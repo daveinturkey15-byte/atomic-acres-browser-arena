@@ -10,36 +10,42 @@
   "blenderVersion": "5.1.2",
   "generator": {
     "path": "scripts/blender/create-pass65-first-person-arms.py",
-    "sha256": "8e4b1b3ec431900ba1dd142ee209f4aa39e74b7f76fdd5f337bd2a3beb91cbb0"
+    "sha256": "e51642d7f3458a39c9c74f42017df40a6901264f448486e844e3fc0a122c999a"
   },
   "sourceBlend": {
     "path": "source-assets/blender/pass65-first-person-operator-arms.blend",
-    "sha256": "5bd58ef28e556c89aa63a649c8df02a794fc6271a014fafc4f0c1ba107cd1b08"
+    "sha256": "a0fbe08492052ae1b027ae455a08337eeb85d5c6416d745b48d0336ace7e1543"
   },
   "firstPersonGlbs": [
     {
       "path": "public/assets/original/models/operators/pass65-first-person-arms-lod0.glb",
-      "sha256": "dd79624ebfb0868970d841491e58033174cba8e5b7e29f76d0b18fbcbcc4c45a",
+      "sha256": "86b48d917c8facd904f6287734e5a241de9b55f25bb6711399e202f03bc281bf",
       "lod": 0,
       "triangles": 5268,
-      "bytes": 309200,
+      "bytes": 357380,
       "skinnedMeshNodes": 4,
       "renderPrimitives": 4,
       "skins": 4,
       "sourceWeightedParts": 45,
-      "bones": 37
+      "bones": 37,
+      "blendedVertexCount": 1160,
+      "multiBoneWeightedParts": 40,
+      "knifeSocketParent": "WristR"
     },
     {
       "path": "public/assets/original/models/operators/pass65-first-person-arms-lod1.glb",
-      "sha256": "d089a68d51fdb44fe17a1f214745973320d59675e28b7e62818c07f16124d964",
+      "sha256": "27317230d91736de281401a3e9933c6eec4eb19b0000bb964b1992a1df03fc69",
       "lod": 1,
       "triangles": 4132,
-      "bytes": 298248,
+      "bytes": 345624,
       "skinnedMeshNodes": 4,
       "renderPrimitives": 4,
       "skins": 4,
       "sourceWeightedParts": 45,
-      "bones": 37
+      "bones": 37,
+      "blendedVertexCount": 920,
+      "multiBoneWeightedParts": 40,
+      "knifeSocketParent": "WristR"
     }
   ],
   "pbrMaps": {
@@ -129,12 +135,14 @@
     "inspect"
   ],
   "materialContract": "All visible materials OPAQUE with depth writes; no alpha fading or see-through anatomy.",
-  "visualRevision": "human-anatomy-m4-contact-v4",
-  "limbProfileContract": "human-deltoid-brachioradialis-ulna-wrist-taper-v4",
-  "handPoseContract": "separate-palm-thumb-index-resting-digit-grip-v4",
+  "visualRevision": "anatomical-blended-viewmodel-v5",
+  "limbProfileContract": "anatomical-deltoid-brachioradialis-ulna-wrist-taper-v5",
+  "handPoseContract": "proportional-palm-opposed-thumb-articulated-digit-grip-v5",
   "shoulderEntryContract": "tapered-offscreen-sleeve",
-  "gloveConstructionContract": "opaque-articulated-knuckle-pads-seams-cloth-v4",
-  "weaponGripReviewContract": "m4a1-neutral-ads-reload-contact-v4",
+  "gloveConstructionContract": "opaque-anatomical-knuckle-pads-seams-cloth-v5",
+  "weaponGripReviewContract": "all-family-runtime-plus-m4-contact-v5",
+  "weightingContract": "adjacent-bone-normalized-blend-v5",
+  "runtimeAnimationContract": "authored-fingers-under-runtime-chain-ik-v1",
   "fingerSegmentCount": 30,
   "weaponGripReviewFrames": 3,
   "performanceContract": {
@@ -151,42 +159,42 @@
     "renders": [
       {
         "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-neutral-front.png",
-        "sha256": "a57e351365e54c10922c786332b6ffccc237b6269ad827f0262f22fe4e7357f9",
+        "sha256": "ebe71cecd881e1ca1f5e42e3d8e819fd02dc535396015160038572e9c5ab5ef2",
         "width": 640,
         "height": 640,
         "cameraId": "neutral-front"
       },
       {
         "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-forearm-wrist-quarter.png",
-        "sha256": "dde7d2365ec535043ae133e1bcd2756e5dac6530b8e8dec64679ff5ca23070ea",
+        "sha256": "793e3945d3335e53b0d95957d7a0675aa7787977a07982e9a3fa0e2beaa4a27e",
         "width": 640,
         "height": 640,
         "cameraId": "forearm-wrist-quarter"
       },
       {
         "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-hand-anatomy-closeup.png",
-        "sha256": "3fc6f2d2149ccd8cdf4f9269e2562dd72c42cb3e415f1b17ecee70bdcff5e6b6",
+        "sha256": "dd3e8e6c85fb6187da21a3c1a025b61725520659f000675649774e606982f813",
         "width": 640,
         "height": 640,
         "cameraId": "hand-anatomy-closeup"
       },
       {
         "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-m4a1-neutral-contact.png",
-        "sha256": "fe5eda8d5ca7b4750e42b4dbea899832e50ca533639ac1dc5424a9b81a2fe924",
+        "sha256": "15881e83bbe575e184a1843df030bbecf36c9c07e0928dbdce10dd703c98ed1e",
         "width": 640,
         "height": 640,
         "cameraId": "m4a1-neutral-contact"
       },
       {
         "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-m4a1-ads-contact.png",
-        "sha256": "96194e222882af529fb0a54b982de1e05a2d2599902adea190d645cce3f58034",
+        "sha256": "2f8a5a34c815062223fe78631c159c68835680d7a45a7c930a0c79e74d3a7339",
         "width": 640,
         "height": 640,
         "cameraId": "m4a1-ads-contact"
       },
       {
         "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-m4a1-reload-contact.png",
-        "sha256": "d97ad4d9155c50abf99abcef21c2c2dac9b913c7e4bbaf2b70349309cddbefb1",
+        "sha256": "5f7d7bb03535afe631201ffbf5a00c81ed0355225f6e34194aef7001497a1792",
         "width": 640,
         "height": 640,
         "cameraId": "m4a1-reload-contact"
@@ -194,7 +202,7 @@
     ],
     "contactSheet": {
       "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-contact-sheet.png",
-      "sha256": "068b9a6955599786b68ac990fbf69b5de63f9f57d14eaaa7d0682c5ab79eaade",
+      "sha256": "6114767eb2125bb3565e8bfa5925e139d5fe64f5e17387984d01fc24c19e89b1",
       "width": 1920,
       "height": 1280
     }
@@ -204,7 +212,7 @@
       {
         "lod": 0,
         "triangles": 5268,
-        "bytes": 309200,
+        "bytes": 357380,
         "meshNodes": 4,
         "skinnedMeshNodes": 4,
         "renderPrimitives": 4,
@@ -231,18 +239,57 @@
         "externalUris": 0,
         "gripContactReceipts": {
           "m4a1": {
-            "rightError": 1e-7,
-            "leftError": 0,
-            "scale": 0.520386,
-            "rightContacts": 3,
+            "rightError": 0,
+            "leftError": 1e-7,
+            "scale": 0.488095,
+            "rightContacts": 4,
             "leftContacts": 5
           }
-        }
+        },
+        "blendedVertexCount": 1160,
+        "multiBoneWeightedParts": 40,
+        "blendedJointPairs": [
+          "Index1L:Index2L",
+          "Index1L:WristL",
+          "Index1R:Index2R",
+          "Index1R:WristR",
+          "Index2L:Index3L",
+          "Index2R:Index3R",
+          "LowerArmL:UpperArmL",
+          "LowerArmL:WristL",
+          "LowerArmR:UpperArmR",
+          "LowerArmR:WristR",
+          "Middle1L:Middle2L",
+          "Middle1L:WristL",
+          "Middle1R:Middle2R",
+          "Middle1R:WristR",
+          "Middle2L:Middle3L",
+          "Middle2R:Middle3R",
+          "Pinky1L:Pinky2L",
+          "Pinky1L:WristL",
+          "Pinky1R:Pinky2R",
+          "Pinky1R:WristR",
+          "Pinky2L:Pinky3L",
+          "Pinky2R:Pinky3R",
+          "Ring1L:Ring2L",
+          "Ring1L:WristL",
+          "Ring1R:Ring2R",
+          "Ring1R:WristR",
+          "Ring2L:Ring3L",
+          "Ring2R:Ring3R",
+          "Thumb1L:Thumb2L",
+          "Thumb1L:WristL",
+          "Thumb1R:Thumb2R",
+          "Thumb1R:WristR",
+          "Thumb2L:Thumb3L",
+          "Thumb2R:Thumb3R"
+        ],
+        "knifeSocketParent": "WristR"
       },
       {
         "lod": 1,
         "triangles": 4132,
-        "bytes": 298248,
+        "bytes": 345624,
         "meshNodes": 4,
         "skinnedMeshNodes": 4,
         "renderPrimitives": 4,
@@ -269,13 +316,52 @@
         "externalUris": 0,
         "gripContactReceipts": {
           "m4a1": {
-            "rightError": 1e-7,
-            "leftError": 0,
-            "scale": 0.520386,
-            "rightContacts": 3,
+            "rightError": 0,
+            "leftError": 1e-7,
+            "scale": 0.488095,
+            "rightContacts": 4,
             "leftContacts": 5
           }
-        }
+        },
+        "blendedVertexCount": 920,
+        "multiBoneWeightedParts": 40,
+        "blendedJointPairs": [
+          "Index1L:Index2L",
+          "Index1L:WristL",
+          "Index1R:Index2R",
+          "Index1R:WristR",
+          "Index2L:Index3L",
+          "Index2R:Index3R",
+          "LowerArmL:UpperArmL",
+          "LowerArmL:WristL",
+          "LowerArmR:UpperArmR",
+          "LowerArmR:WristR",
+          "Middle1L:Middle2L",
+          "Middle1L:WristL",
+          "Middle1R:Middle2R",
+          "Middle1R:WristR",
+          "Middle2L:Middle3L",
+          "Middle2R:Middle3R",
+          "Pinky1L:Pinky2L",
+          "Pinky1L:WristL",
+          "Pinky1R:Pinky2R",
+          "Pinky1R:WristR",
+          "Pinky2L:Pinky3L",
+          "Pinky2R:Pinky3R",
+          "Ring1L:Ring2L",
+          "Ring1L:WristL",
+          "Ring1R:Ring2R",
+          "Ring1R:WristR",
+          "Ring2L:Ring3L",
+          "Ring2R:Ring3R",
+          "Thumb1L:Thumb2L",
+          "Thumb1L:WristL",
+          "Thumb1R:Thumb2R",
+          "Thumb1R:WristR",
+          "Thumb2L:Thumb3L",
+          "Thumb2R:Thumb3R"
+        ],
+        "knifeSocketParent": "WristR"
       }
     ],
     "externalUris": 0

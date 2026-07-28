@@ -302,14 +302,14 @@
       "license": "Original project work",
       "files": "public/assets/original/**/pass65-first-person-arms-*",
       "sourceBlend": "source-assets/blender/pass65-first-person-operator-arms.blend",
-      "sourceBlendSha256": "5bd58ef28e556c89aa63a649c8df02a794fc6271a014fafc4f0c1ba107cd1b08",
+      "sourceBlendSha256": "a0fbe08492052ae1b027ae455a08337eeb85d5c6416d745b48d0336ace7e1543",
       "sourceScript": "scripts/blender/create-pass65-first-person-arms.py",
-      "sourceScriptSha256": "8e4b1b3ec431900ba1dd142ee209f4aa39e74b7f76fdd5f337bd2a3beb91cbb0",
+      "sourceScriptSha256": "e51642d7f3458a39c9c74f42017df40a6901264f448486e844e3fc0a122c999a",
       "sourceProvenance": "source-assets/blender/pass65-first-person-operator-arms.provenance.json",
-      "sourceProvenanceSha256": "cbbf0347bd3606cf86c7a879be521a799d6b87c8515cdd92e1b8249a4860c41b",
+      "sourceProvenanceSha256": "4cfe506106acb2c5da9c928d6b7311a6fb6d48980f99d90c3db43c994f1f8471",
       "preview": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-contact-sheet.png",
       "format": "Two decreasing optimized self-contained glTF 2.0 skinned LODs with 37-bone dedicated skeleton, four material-compatible skinned renderables per LOD, embedded WebP PBR textures, opaque materials and thirteen action clips",
-      "modifications": "Project-original first-person operator arms authored in Blender from 45 weighted sleeve, glove, guard, full-finger/thumb and wrist-display parts. The v4 silhouette uses human deltoid, brachioradialis, ulna and articulated-wrist taper; separate wedge palms, opposed thumbs, trigger indexes and resting digit groups; opaque articulated knuckle pads, low-profile cuff straps, cloth normal detail and an intentional wrist device. Neutral, ADS and reload frames socket-fit the consolidated authored M4A1 and require exact digit-to-mesh contact receipts. Four material batches remain under the six-renderable/six-primitive budget. Runtime camera-space IK remains TypeScript-owned.",
+      "modifications": "Project-original first-person operator arms authored in Blender from 45 sleeve, glove, guard, full-finger/thumb and wrist-display parts. The v5 silhouette refines proportional palms, opposed thumbs, tapered forearms and articulated digits; elbow, wrist and knuckle seams use normalized adjacent-bone skin weights instead of rigid one-bone hinges. Opaque anatomical knuckle pads, low-profile cuff straps, cloth normal detail and the wrist device remain. Neutral, ADS and reload frames socket-fit the consolidated authored M4A1, while a deterministic browser gate covers every weapon family and knife action. Four material batches remain under the six-renderable/six-primitive budget. Runtime camera-space IK remains TypeScript-owned and consumes only authored finger animation beneath that IK layer.",
       "attributionRequired": false
     },
     {

@@ -257,7 +257,7 @@ type DebugState = {
   };
   weaponReady: boolean;
   weaponPresentation: {
-    weapon: 'carbine' | 'smg' | 'scattergun' | 'sniper' | 'pistol' | 'machine-pistol';
+    weapon: string;
     heat: number;
     shotsPresented: number;
     activeCasings: number;
@@ -273,8 +273,19 @@ type DebugState = {
     sightOffset: [number, number] | null;
     armsVisible: boolean;
     armMeshCount: number;
+    armMaterials: { contract: string; total: number; transparent: number; nonOpaque: number; depthWriteDisabled: number };
     attachedWeaponBatchStats: { sourceMeshes: number; batches: number };
     knifeVisible: boolean;
+    armsSource: string;
+    authoredFingerBoneCount: number;
+    authoredArmAnimation: {
+      clips: number;
+      activeAction: string | null;
+      blendPolicy: string;
+      trackPolicy: string;
+      runtimeTracks: number;
+      upperChainTracksExcluded: number;
+    } | null;
     riggedArms: Array<{ finite: boolean; bindOffsetsPreserved: boolean; contactError: number }>;
     importedModel: { source: string; weapon: string; clips: number; meshes: number; renderPrimitives: number; triangles: number; detailMeshes: number; socketContractReady: boolean; muzzleForwardDot: number | null; sightForwardDot: number | null } | null;
   };
@@ -403,6 +414,7 @@ async function debug(page: Page): Promise<DebugState> {
 
 async function pageReadyAt(page: Page, path: string, timeoutMs = 30_000): Promise<void> {
   const url = new URL(path, 'http://atomic-acres.qa');
+  if (!url.searchParams.has('release')) url.searchParams.set('release', 'latest');
   if (!url.searchParams.has('renderer')) url.searchParams.set('renderer', 'webgl2');
   await page.goto(`${url.pathname}${url.search}`, { waitUntil: 'domcontentloaded' });
   try {
@@ -447,12 +459,12 @@ async function pageReady(page: Page): Promise<void> {
 
 async function startSolo(page: Page): Promise<void> {
   await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { startSolo: () => void } }).__ATOMIC_ACRES_DEBUG__.startSolo());
-  await expect(page.locator('#hud')).toBeVisible();
   await page.waitForFunction(
     () => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active',
     undefined,
     { timeout: 15_000 },
   );
+  await expect(page.locator('#hud')).toBeVisible();
 }
 
 // Browser gameplay tests must never read from or write to the production
@@ -1089,7 +1101,7 @@ test.describe('solo mechanics', () => {
     expect(presentation.importedModel?.sightForwardDot ?? -1).toBeGreaterThan(0.995);
   });
 
-  test('captures accepted arms v4 on the integrated M4 neutral, ADS and reload paths', async ({ page }) => {
+  test('captures accepted arms v5 on the integrated M4 neutral, ADS and reload paths', async ({ page }) => {
     test.setTimeout(90_000);
     await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
@@ -1098,14 +1110,14 @@ test.describe('solo mechanics', () => {
       api.equipWeapon('m4a1');
     });
     await expect.poll(async () => (await debug(page)).weaponPresentation.importedModel?.weapon ?? null).toBe('m4a1');
-    await page.screenshot({ path: 'test-results/pass65-arms-v4-m4-neutral.png', animations: 'disabled' });
+    await page.screenshot({ path: 'test-results/pass65-arms-v5-m4-neutral.png', animations: 'disabled' });
 
     await page.evaluate(() => {
       (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setAds: (held: boolean) => void } })
         .__ATOMIC_ACRES_DEBUG__.setAds(true);
     });
     await expect.poll(async () => (await debug(page)).weaponPresentation.adsProgress).toBeGreaterThan(0.98);
-    await page.screenshot({ path: 'test-results/pass65-arms-v4-m4-ads.png', animations: 'disabled' });
+    await page.screenshot({ path: 'test-results/pass65-arms-v5-m4-ads.png', animations: 'disabled' });
 
     await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
@@ -1126,7 +1138,7 @@ test.describe('solo mechanics', () => {
     expect(reloadState.weaponPresentation.importedModel).toMatchObject({
       weapon: 'm4a1', clips: 13, socketContractReady: true,
     });
-    await page.screenshot({ path: 'test-results/pass65-arms-v4-m4-reload.png', animations: 'disabled' });
+    await page.screenshot({ path: 'test-results/pass65-arms-v5-m4-reload.png', animations: 'disabled' });
   });
 
   test('sprints smoothly from the foot to the landing of both house ramps', async ({ page }) => {
@@ -1319,6 +1331,19 @@ test.describe('solo mechanics', () => {
       expect(weaponState.armsVisible, `${weapon}:armsVisible`).toBe(true);
       expect(weaponState.armMeshCount, `${weapon}:armMeshCount`).toBeGreaterThanOrEqual(4);
       expect(weaponState.armMeshCount, `${weapon}:armMeshCount`).toBeLessThanOrEqual(6);
+      expect(weaponState.armMaterials, `${weapon}:opaqueArmMaterials`).toMatchObject({
+        contract: 'opaque-depth-writing', transparent: 0, nonOpaque: 0, depthWriteDisabled: 0,
+      });
+      expect(weaponState.armMaterials.total, `${weapon}:armMaterialCount`).toBeGreaterThan(0);
+      expect(weaponState.armsSource, `${weapon}:armsSource`).toBe('authored-two-chain');
+      expect(weaponState.authoredFingerBoneCount, `${weapon}:fingerBoneCount`).toBe(30);
+      expect(weaponState.authoredArmAnimation, `${weapon}:armAnimation`).toMatchObject({
+        clips: 13,
+        blendPolicy: 'finger-tracks-first-runtime-ik-last',
+        trackPolicy: 'finger-bones-only',
+      });
+      expect(weaponState.authoredArmAnimation?.runtimeTracks ?? 0, `${weapon}:runtimeFingerTracks`).toBeGreaterThan(0);
+      expect(weaponState.authoredArmAnimation?.upperChainTracksExcluded ?? 0, `${weapon}:excludedChainTracks`).toBeGreaterThan(0);
       expect(weaponState.modelKind, `${weapon}:modelKind`).toBe('project-original-blender');
       expect(weaponState.firstPersonSource, `${weapon}:firstPersonSource`).toBe('project-original-blender-pass65-firearm');
       expect(weaponState.weaponModelId, `${weapon}:modelId`).toBe(designs[weapon]);
@@ -1369,6 +1394,37 @@ test.describe('solo mechanics', () => {
       ).__ATOMIC_ACRES_DEBUG__.setReloadCaptureProgress(null));
     }
     expect(finishIds.size).toBe(weapons.length);
+
+    // The crossbow uses its own authored delivery pipeline, but must satisfy
+    // the same two-chain hand-contact and digit-animation contract.
+    await page.evaluate(() => (
+      window as unknown as { __ATOMIC_ACRES_DEBUG__: { equipWeapon: (weapon: string) => void } }
+    ).__ATOMIC_ACRES_DEBUG__.equipWeapon('explosive-crossbow'));
+    await expect.poll(async () => (await debug(page)).weaponPresentation.weapon).toBe('explosive-crossbow');
+    await expect.poll(async () => (await debug(page)).weaponPresentation.importedModel?.weapon ?? null).toBe('explosive-crossbow');
+    const crossbowState = (await debug(page)).weaponPresentation;
+    expect(crossbowState).toMatchObject({
+      armsVisible: true,
+      armsSource: 'authored-two-chain',
+      authoredFingerBoneCount: 30,
+      modelKind: 'project-original-blender',
+      firstPersonSource: 'project-original-blender-pass65-crossbow',
+      authoredArmAnimation: {
+        clips: 13,
+        blendPolicy: 'finger-tracks-first-runtime-ik-last',
+        trackPolicy: 'finger-bones-only',
+      },
+    });
+    expect(crossbowState.importedModel).toMatchObject({
+      source: './assets/original/models/weapons/pass65-crossbow/pass65-crossbow-fp-lod0.glb',
+      weapon: 'explosive-crossbow',
+      clips: 13,
+      socketContractReady: true,
+    });
+    expect(crossbowState.riggedArms).toHaveLength(2);
+    expect(crossbowState.riggedArms.every((arm) => arm.finite && arm.bindOffsetsPreserved && arm.contactError <= 0.02)).toBe(true);
+    await captureViewmodel('test-results/pass65-explosive-crossbow-first-person-neutral.png');
+
     const state = await debug(page);
     expect(state.bots[0].rootVisible).toBe(true);
     expect(state.bots[0].visibleMeshCount).toBeGreaterThanOrEqual(9);

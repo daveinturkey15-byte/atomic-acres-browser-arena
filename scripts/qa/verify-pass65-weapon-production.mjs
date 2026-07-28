@@ -249,12 +249,14 @@ if (manifest.operatorArms?.releaseState !== 'release-ready') {
     if (arms.renderBudget?.[field] !== expected) failures.push(`operator arms: render budget ${field} must equal ${expected}`);
   }
   for (const [field, expected] of Object.entries({
-    visualRevision: 'human-anatomy-m4-contact-v4',
-    limbProfileContract: 'human-deltoid-brachioradialis-ulna-wrist-taper-v4',
-    handPoseContract: 'separate-palm-thumb-index-resting-digit-grip-v4',
+    visualRevision: 'anatomical-blended-viewmodel-v5',
+    limbProfileContract: 'anatomical-deltoid-brachioradialis-ulna-wrist-taper-v5',
+    handPoseContract: 'proportional-palm-opposed-thumb-articulated-digit-grip-v5',
     shoulderEntryContract: 'tapered-offscreen-sleeve',
-    gloveConstructionContract: 'opaque-articulated-knuckle-pads-seams-cloth-v4',
-    weaponGripReviewContract: 'm4a1-neutral-ads-reload-contact-v4',
+    gloveConstructionContract: 'opaque-anatomical-knuckle-pads-seams-cloth-v5',
+    weaponGripReviewContract: 'all-family-runtime-plus-m4-contact-v5',
+    weightingContract: 'adjacent-bone-normalized-blend-v5',
+    runtimeAnimationContract: 'authored-fingers-under-runtime-chain-ik-v1',
     fingerSegmentCount: 30,
     weaponGripReviewFrames: 3,
   })) {
@@ -277,7 +279,8 @@ if (manifest.operatorArms?.releaseState !== 'release-ready') {
       const audit = auditOperatorArmsGlb(json, deliverable.lod, bytes.length);
       for (const failure of audit.failures) failures.push(failure);
       if (audit.triangles !== deliverable.triangles) failures.push(`operator arms: triangle receipt mismatch: ${deliverable.path}`);
-      for (const field of ['skinnedMeshNodes', 'renderPrimitives', 'skins', 'sourceWeightedParts', 'bones']) {
+      for (const field of ['skinnedMeshNodes', 'renderPrimitives', 'skins', 'sourceWeightedParts', 'bones',
+        'blendedVertexCount', 'multiBoneWeightedParts', 'knifeSocketParent']) {
         if (audit[field] !== deliverable[field]) failures.push(`operator arms: ${field} receipt mismatch: ${deliverable.path}`);
       }
     } catch (error) {

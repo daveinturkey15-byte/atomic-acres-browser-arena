@@ -1,8 +1,9 @@
 """Author dedicated opaque first-person operator arms for Pass 65 in Blender.
 
 The two exported LODs share the same named deform skeleton and action corpus but
-are independently built. Meshes are weighted to explicit bones; runtime grip
-IK remains presentation-only and cannot change camera/shot authority.
+are independently built. Elbow, wrist and knuckle seams use normalized adjacent-
+bone blends; runtime grip IK remains presentation-only and cannot change camera
+or shot authority.
 """
 
 from __future__ import annotations
@@ -36,6 +37,14 @@ EXPECTED_BATCH_MATERIALS = (
     "MAT_Pass65_Arms_Glove_PBR",
     "MAT_Pass65_Arms_Sleeve_PBR",
     "MAT_Pass65_Arms_WristDisplay",
+)
+REQUIRED_BLENDED_JOINT_PAIRS = (
+    "LowerArmL:WristL", "LowerArmR:WristR",
+    "LowerArmL:UpperArmL", "LowerArmR:UpperArmR",
+    "Index1L:Index2L", "Index1R:Index2R",
+    "Index2L:Index3L", "Index2R:Index3R",
+    "Thumb1L:Thumb2L", "Thumb1R:Thumb2R",
+    "Thumb2L:Thumb3L", "Thumb2R:Thumb3R",
 )
 
 for directory in (SOURCE_BLEND.parent, RAW_DIR, TEXTURE_DIR, REVIEW_DIR):
@@ -288,6 +297,16 @@ def empty(name, location, parent, semantic=None):
     return obj
 
 
+def bone_socket(name, world_location, armature, bone_name, semantic=None):
+    """Author a semantic empty under the deform bone while preserving world pose."""
+    obj = empty(name, (0, 0, 0), armature, semantic)
+    obj.parent_type = "BONE"
+    obj.parent_bone = bone_name
+    obj.matrix_world = Matrix.Translation(Vector(world_location))
+    obj["deform_parent_bone"] = bone_name
+    return obj
+
+
 def add_edit_bone(armature, name, head, tail, parent=None):
     bone = armature.data.edit_bones.new(name)
     bone.head = head
@@ -299,19 +318,89 @@ def add_edit_bone(armature, name, head, tail, parent=None):
     return bone
 
 
-def skin_to_bone(obj, armature, bone_name):
+def attach_to_armature(obj, armature):
     # glTF requires skinned mesh nodes to be scene roots. Parenting them under
     # the armature emits NODE_SKINNED_MESH_NON_ROOT and makes parent transforms
     # ambiguous at runtime. Keep ownership metadata for deterministic export
     # and review selection while the Armature modifier owns deformation.
     obj.parent = None
     obj["pass65_asset_root"] = armature.parent.get("asset_root_key", armature.parent.name)
-    group = obj.vertex_groups.new(name=bone_name)
-    group.add(list(range(len(obj.data.vertices))), 1.0, "REPLACE")
     modifier = obj.modifiers.new("Pass65 authored armature", "ARMATURE")
     modifier.object = armature
-    obj["weighted_bone"] = bone_name
     obj["opaque_release_mesh"] = True
+
+
+def skin_to_bone(obj, armature, bone_name):
+    attach_to_armature(obj, armature)
+    group = obj.vertex_groups.new(name=bone_name)
+    group.add(list(range(len(obj.data.vertices))), 1.0, "REPLACE")
+    obj["weighted_bone"] = bone_name
+    obj["blended_vertex_count"] = 0
+    obj["blended_joint_pairs_csv"] = ""
+    return obj
+
+
+def skin_blended_chain(obj, armature, current_bone, start, end, parent_bone=None, child_bone=None, blend=0.28):
+    """Weight matching seam vertices identically across an articulated chain.
+
+    Each segment retains a dominant owning bone, but the first/last blend zones
+    share up to 45 percent with the adjacent bone. This removes the rigid hinge
+    deformation that made elbows, wrists and knuckles read as disconnected
+    mannequin pieces while keeping the existing skeleton/socket API intact.
+    """
+    attach_to_armature(obj, armature)
+    names = [name for name in (parent_bone, current_bone, child_bone) if name]
+    groups = {name: obj.vertex_groups.new(name=name) for name in names}
+    start_v = Vector(start)
+    axis = Vector(end) - start_v
+    axis_length_sq = max(axis.length_squared, 1e-9)
+    blended_vertices = 0
+    pairs = set()
+    for vertex in obj.data.vertices:
+        world = obj.matrix_world @ vertex.co
+        t = max(0.0, min(1.0, (world - start_v).dot(axis) / axis_length_sq))
+        weights = {current_bone: 1.0}
+        if parent_bone and t < blend:
+            adjacent = 0.45 * (1.0 - t / blend)
+            weights = {parent_bone: adjacent, current_bone: 1.0 - adjacent}
+        elif child_bone and t > 1.0 - blend:
+            adjacent = 0.45 * ((t - (1.0 - blend)) / blend)
+            weights = {current_bone: 1.0 - adjacent, child_bone: adjacent}
+        active = [name for name, weight in weights.items() if weight > 0.05]
+        if len(active) > 1:
+            blended_vertices += 1
+            pairs.add(":".join(sorted(active)))
+        for name, weight in weights.items():
+            if weight > 0:
+                groups[name].add([vertex.index], weight, "REPLACE")
+    obj["weighted_bone"] = current_bone
+    obj["weighting_contract"] = "adjacent-bone-normalized-blend-v5"
+    obj["blended_vertex_count"] = blended_vertices
+    obj["blended_joint_pairs_csv"] = ",".join(sorted(pairs))
+    return obj
+
+
+def skin_crossfade(obj, armature, bone_a, bone_b, start, end):
+    """Cross-fade a dedicated joint envelope between its two deform bones."""
+    attach_to_armature(obj, armature)
+    groups = {name: obj.vertex_groups.new(name=name) for name in (bone_a, bone_b)}
+    start_v = Vector(start)
+    axis = Vector(end) - start_v
+    axis_length_sq = max(axis.length_squared, 1e-9)
+    blended_vertices = 0
+    for vertex in obj.data.vertices:
+        world = obj.matrix_world @ vertex.co
+        t = max(0.0, min(1.0, (world - start_v).dot(axis) / axis_length_sq))
+        weight_b = t
+        weight_a = 1.0 - t
+        groups[bone_a].add([vertex.index], weight_a, "REPLACE")
+        groups[bone_b].add([vertex.index], weight_b, "REPLACE")
+        if weight_a > 0.05 and weight_b > 0.05:
+            blended_vertices += 1
+    obj["weighted_bone"] = bone_b
+    obj["weighting_contract"] = "two-bone-joint-envelope-v5"
+    obj["blended_vertex_count"] = blended_vertices
+    obj["blended_joint_pairs_csv"] = ":".join(sorted((bone_a, bone_b)))
     return obj
 
 
@@ -359,8 +448,21 @@ def batch_skinned_renderables(root, armature):
         )
 
     batches = []
+    all_blended_pairs = set()
+    total_blended_vertices = 0
+    multi_bone_parts = 0
     for material_name, pieces in sorted(by_material.items()):
         weighted_bones = sorted({group.name for piece in pieces for group in piece.vertex_groups})
+        blended_vertices = sum(int(piece.get("blended_vertex_count", 0)) for piece in pieces)
+        blended_pairs = {
+            pair
+            for piece in pieces
+            for pair in str(piece.get("blended_joint_pairs_csv", "")).split(",")
+            if pair
+        }
+        total_blended_vertices += blended_vertices
+        all_blended_pairs.update(blended_pairs)
+        multi_bone_parts += sum(len(piece.vertex_groups) > 1 for piece in pieces)
         bpy.ops.object.select_all(action="DESELECT")
         for piece in pieces:
             piece.select_set(True)
@@ -379,6 +481,8 @@ def batch_skinned_renderables(root, armature):
         batch["batched_material"] = material_name
         batch["weighted_part_count"] = len(pieces)
         batch["weighted_bones_csv"] = ",".join(weighted_bones)
+        batch["blended_vertex_count"] = blended_vertices
+        batch["blended_joint_pairs_csv"] = ",".join(sorted(blended_pairs))
         if "weighted_bone" in batch:
             del batch["weighted_bone"]
 
@@ -396,6 +500,13 @@ def batch_skinned_renderables(root, armature):
     root["max_skinned_renderable_meshes"] = MAX_SKINNED_RENDERABLES
     root["max_skinned_primitives"] = MAX_SKINNED_RENDERABLES
     root["batching_policy"] = "one-shared-armature-batch-per-material"
+    root["weighting_contract"] = "adjacent-bone-normalized-blend-v5"
+    root["blended_vertex_count"] = total_blended_vertices
+    root["multi_bone_weighted_part_count"] = multi_bone_parts
+    root["blended_joint_pairs_csv"] = ",".join(sorted(all_blended_pairs))
+    missing_pairs = sorted(set(REQUIRED_BLENDED_JOINT_PAIRS) - all_blended_pairs)
+    if missing_pairs:
+        raise RuntimeError(f"{root.name}: missing required blended joint pairs {missing_pairs}")
     return batches
 
 
@@ -454,6 +565,45 @@ def action_corpus(armature):
         "melee": (18, 8, {"UpperArmR": (-0.48, -0.38, 0.72), "LowerArmR": (-0.72, 0.05, -0.25), "WristR": (-0.4, -0.12, 0.38), "UpperArmL": (0.18, 0.16, -0.2)}),
         "inspect": (54, 27, {"UpperArmR": (0.18, -0.32, 0.42), "LowerArmR": (-0.42, 0.08, -0.12), "WristR": (-0.1, 0.38, 0.12), "UpperArmL": (0.12, 0.28, -0.38), "LowerArmL": (-0.36, -0.08, 0.14)}),
     }
+    # Shoulder/elbow/wrist tracks remain useful for offline authoring review,
+    # while runtime IK intentionally overwrites those three chains. Finger
+    # tracks are therefore the safe authored layer consumed at runtime: they
+    # add grip closure and action readability without moving an authoritative
+    # weapon socket or changing a gameplay ray.
+    def add_finger_pose(pose, side, digit_curl, thumb_curl):
+        for finger_name in FINGER_NAMES:
+            values = digit_curl[finger_name]
+            for joint, value in enumerate(values, start=1):
+                pose[f"{finger_name}{joint}{side}"] = (value, 0.0, 0.0)
+        for joint, value in enumerate(thumb_curl, start=1):
+            pose[f"Thumb{joint}{side}"] = (value, 0.0, 0.0)
+
+    relaxed = {name: (0.05, 0.09, 0.06) for name in FINGER_NAMES}
+    firing = {
+        "Index": (0.03, 0.08, 0.05),
+        "Middle": (0.18, 0.28, 0.19),
+        "Ring": (0.22, 0.34, 0.24),
+        "Pinky": (0.27, 0.4, 0.29),
+    }
+    support = {name: (0.14, 0.24, 0.16) for name in FINGER_NAMES}
+    magazine = {
+        "Index": (0.18, 0.32, 0.22), "Middle": (0.24, 0.42, 0.3),
+        "Ring": (0.28, 0.48, 0.34), "Pinky": (0.32, 0.54, 0.38),
+    }
+    knife = {
+        "Index": (0.28, 0.48, 0.34), "Middle": (0.34, 0.58, 0.42),
+        "Ring": (0.38, 0.64, 0.46), "Pinky": (0.42, 0.68, 0.5),
+    }
+    for clip_name in ("fire", "dry-fire"):
+        add_finger_pose(poses[clip_name][2], "R", firing, (0.12, 0.18, 0.12))
+        add_finger_pose(poses[clip_name][2], "L", support, (0.1, 0.16, 0.1))
+    for clip_name in ("reload", "empty-reload"):
+        add_finger_pose(poses[clip_name][2], "R", firing, (0.1, 0.16, 0.1))
+        add_finger_pose(poses[clip_name][2], "L", magazine, (0.18, 0.3, 0.2))
+    add_finger_pose(poses["melee"][2], "R", knife, (0.24, 0.38, 0.26))
+    add_finger_pose(poses["melee"][2], "L", relaxed, (0.04, 0.08, 0.05))
+    add_finger_pose(poses["inspect"][2], "R", support, (0.1, 0.16, 0.1))
+    add_finger_pose(poses["inspect"][2], "L", magazine, (0.16, 0.26, 0.18))
     for clip_name in CORE_ACTIONS:
         end_frame, middle_frame, pose_map = poses[clip_name]
         add_armature_action(armature, clip_name, end_frame, middle_frame, pose_map)
@@ -470,12 +620,13 @@ def build_armature(label: str, detail: float):
     root["blender_authoring_forward_axis"] = "+Y"
     root["opaque_material_contract"] = True
     root["presentation_only"] = True
-    root["visual_revision"] = "human-anatomy-m4-contact-v4"
-    root["limb_profile_contract"] = "human-deltoid-brachioradialis-ulna-wrist-taper-v4"
-    root["hand_pose_contract"] = "separate-palm-thumb-index-resting-digit-grip-v4"
+    root["visual_revision"] = "anatomical-blended-viewmodel-v5"
+    root["limb_profile_contract"] = "anatomical-deltoid-brachioradialis-ulna-wrist-taper-v5"
+    root["hand_pose_contract"] = "proportional-palm-opposed-thumb-articulated-digit-grip-v5"
     root["shoulder_entry_contract"] = "tapered-offscreen-sleeve"
-    root["glove_construction_contract"] = "opaque-articulated-knuckle-pads-seams-cloth-v4"
-    root["weapon_grip_review_contract"] = "m4a1-neutral-ads-reload-contact-v4"
+    root["glove_construction_contract"] = "opaque-anatomical-knuckle-pads-seams-cloth-v5"
+    root["weapon_grip_review_contract"] = "all-family-runtime-plus-m4-contact-v5"
+    root["runtime_animation_contract"] = "authored-fingers-under-runtime-chain-ik-v1"
     root["finger_segment_count"] = 30
     root["weapon_grip_review_frames"] = 3
 
@@ -516,9 +667,9 @@ def build_armature(label: str, detail: float):
         add_edit_bone(armature, f"LowerArm{side}", upper_tail, lower_tail, f"UpperArm{side}")
         add_edit_bone(armature, f"Wrist{side}", lower_tail, wrist_tail, f"LowerArm{side}")
         chains[side] = (upper_head, upper_tail, lower_tail, wrist_tail)
-        finger_x_offsets = (-0.055, -0.018, 0.02, 0.054)
-        finger_lengths = ((0.084, 0.061, 0.044), (0.091, 0.066, 0.047), (0.087, 0.062, 0.044), (0.073, 0.052, 0.038))
-        palm_end_y = wrist_tail[1] + 0.19
+        finger_x_offsets = (-0.049, -0.016, 0.017, 0.048)
+        finger_lengths = ((0.078, 0.057, 0.041), (0.086, 0.062, 0.044), (0.081, 0.058, 0.041), (0.067, 0.048, 0.035))
+        palm_end_y = wrist_tail[1] + 0.17
         for finger_index, (finger_name, offset) in enumerate(zip(FINGER_NAMES, finger_x_offsets)):
             proximal, middle, distal = finger_lengths[finger_index]
             length_bias = (1.5 - finger_index) * 0.003
@@ -529,10 +680,10 @@ def build_armature(label: str, detail: float):
             add_edit_bone(armature, f"{finger_name}1{side}", start, one, f"Wrist{side}")
             add_edit_bone(armature, f"{finger_name}2{side}", one, two, f"{finger_name}1{side}")
             add_edit_bone(armature, f"{finger_name}3{side}", two, three, f"{finger_name}2{side}")
-        thumb_start = (wrist_tail[0] - 0.066 * sign, wrist_tail[1] + 0.055, wrist_tail[2] + 0.008)
-        thumb_one = (thumb_start[0] - 0.052 * sign, wrist_tail[1] + 0.105, wrist_tail[2] - 0.008)
-        thumb_two = (thumb_one[0] - 0.028 * sign, wrist_tail[1] + 0.168, wrist_tail[2] - 0.043)
-        thumb_three = (thumb_two[0] + 0.018 * sign, wrist_tail[1] + 0.195, wrist_tail[2] - 0.084)
+        thumb_start = (wrist_tail[0] - 0.057 * sign, wrist_tail[1] + 0.05, wrist_tail[2] + 0.006)
+        thumb_one = (thumb_start[0] - 0.044 * sign, wrist_tail[1] + 0.096, wrist_tail[2] - 0.008)
+        thumb_two = (thumb_one[0] - 0.025 * sign, wrist_tail[1] + 0.151, wrist_tail[2] - 0.038)
+        thumb_three = (thumb_two[0] + 0.016 * sign, wrist_tail[1] + 0.177, wrist_tail[2] - 0.073)
         add_edit_bone(armature, f"Thumb1{side}", thumb_start, thumb_one, f"Wrist{side}")
         add_edit_bone(armature, f"Thumb2{side}", thumb_one, thumb_two, f"Thumb1{side}")
         add_edit_bone(armature, f"Thumb3{side}", thumb_two, thumb_three, f"Thumb2{side}")
@@ -579,19 +730,19 @@ def build_armature(label: str, detail: float):
              (0.68, 0.054, 0.043, 0.0, 0.0), (1.0, 0.049, 0.038, 0.0, 0.0)),
             materials["glove"], segments,
         )
-        palm_end = Vector(wrist_tail) + Vector((0, 0.19, -0.002))
+        palm_end = Vector(wrist_tail) + Vector((0, 0.17, -0.002))
         palm = profiled_segment(
             f"{side}-authored-palm-{label}", wrist_tail, palm_end,
-            ((0.0, 0.047, 0.033, 0.0, 0.0), (0.18, 0.061, 0.036, 0.0, 0.001),
-             (0.48, 0.079, 0.041, 0.002 * sign, 0.003), (0.76, 0.093, 0.043, 0.003 * sign, 0.004),
-             (0.92, 0.098, 0.04, 0.002 * sign, 0.002), (1.0, 0.088, 0.035, 0.0, 0.0)),
+            ((0.0, 0.043, 0.03, 0.0, 0.0), (0.18, 0.052, 0.033, 0.0, 0.001),
+             (0.46, 0.066, 0.036, 0.002 * sign, 0.004), (0.72, 0.077, 0.037, 0.004 * sign, 0.005),
+             (0.9, 0.079, 0.034, 0.003 * sign, 0.003), (1.0, 0.071, 0.029, 0.0, 0.0)),
             materials["glove"], segments,
         )
         knuckle_pads = [
             rounded_cube(
                 f"{side}-authored-knuckle-pad-{index + 1}-{label}",
                 palm_end + Vector((offset * sign, -0.044 + abs(offset) * 0.08, 0.043)),
-                (0.024 if index in {0, 3} else 0.029, 0.041, 0.01), materials["pad"], 0.004,
+                (0.02 if index in {0, 3} else 0.024, 0.035, 0.008), materials["pad"], 0.003,
             )
             for index, offset in enumerate((-0.054, -0.018, 0.018, 0.054))
         ]
@@ -605,9 +756,16 @@ def build_armature(label: str, detail: float):
             ((0.0, 0.058, 0.048, 0.0, 0.0), (0.5, 0.061, 0.05, 0.0, 0.0),
              (1.0, 0.058, 0.047, 0.0, 0.0)), materials["pad"], max(10, segments // 2),
         )
-        for obj, bone_name in ((upper, f"UpperArm{side}"), (lower, f"LowerArm{side}"), (elbow, f"LowerArm{side}"),
-                               (cuff, f"Wrist{side}"), (palm, f"Wrist{side}"), (knuckle, f"Wrist{side}"), (wrist_guard, f"Wrist{side}")):
-            skin_to_bone(obj, armature, bone_name)
+        skin_blended_chain(upper, armature, f"UpperArm{side}", upper_start, upper_tail, child_bone=f"LowerArm{side}")
+        skin_blended_chain(
+            lower, armature, f"LowerArm{side}", upper_tail, lower_tail,
+            parent_bone=f"UpperArm{side}", child_bone=f"Wrist{side}",
+        )
+        skin_crossfade(elbow, armature, f"UpperArm{side}", f"LowerArm{side}", elbow_start, elbow_end)
+        skin_blended_chain(cuff, armature, f"Wrist{side}", lower_tail, wrist_tail, parent_bone=f"LowerArm{side}")
+        skin_to_bone(palm, armature, f"Wrist{side}")
+        skin_to_bone(knuckle, armature, f"Wrist{side}")
+        skin_blended_chain(wrist_guard, armature, f"Wrist{side}", guard_start, guard_end, parent_bone=f"LowerArm{side}")
         if side == "L":
             display = rounded_cube(
                 "left-wrist-authored-display", cuff_mid + Vector((0, -0.004, 0.056)),
@@ -615,7 +773,7 @@ def build_armature(label: str, detail: float):
             )
             skin_to_bone(display, armature, "WristL")
 
-        finger_base_radii = {"Index": 0.02, "Middle": 0.021, "Ring": 0.0195, "Pinky": 0.0175}
+        finger_base_radii = {"Index": 0.016, "Middle": 0.017, "Ring": 0.0158, "Pinky": 0.014}
         for finger_name in FINGER_NAMES:
             for joint in (1, 2, 3):
                 bone = armature.data.bones[f"{finger_name}{joint}{side}"]
@@ -628,10 +786,15 @@ def build_armature(label: str, detail: float):
                      (1.0, radius * 0.66, radius * 0.58, 0.0, 0.0)),
                     materials["glove"], max(8, segments // 2),
                 )
-                skin_to_bone(mesh, armature, bone.name)
+                parent_bone = f"{finger_name}{joint - 1}{side}" if joint > 1 else f"Wrist{side}"
+                child_bone = f"{finger_name}{joint + 1}{side}" if joint < 3 else None
+                skin_blended_chain(
+                    mesh, armature, bone.name, bone.head_local, bone.tail_local,
+                    parent_bone=parent_bone, child_bone=child_bone, blend=0.3,
+                )
         for joint in (1, 2, 3):
             bone = armature.data.bones[f"Thumb{joint}{side}"]
-            radius = 0.023 if joint == 1 else 0.02 if joint == 2 else 0.0165
+            radius = 0.019 if joint == 1 else 0.0165 if joint == 2 else 0.014
             mesh = profiled_segment(
                 f"{side}-thumb-{joint}-{label}", bone.head_local, bone.tail_local,
                 ((0.0, radius * 0.82, radius * 0.7, 0.0, 0.0),
@@ -640,17 +803,22 @@ def build_armature(label: str, detail: float):
                  (1.0, radius * 0.64, radius * 0.56, 0.0, 0.0)),
                 materials["glove"], max(8, segments // 2),
             )
-            skin_to_bone(mesh, armature, bone.name)
+            parent_bone = f"Thumb{joint - 1}{side}" if joint > 1 else f"Wrist{side}"
+            child_bone = f"Thumb{joint + 1}{side}" if joint < 3 else None
+            skin_blended_chain(
+                mesh, armature, bone.name, bone.head_local, bone.tail_local,
+                parent_bone=parent_bone, child_bone=child_bone, blend=0.3,
+            )
 
     batch_skinned_renderables(root, armature)
 
-    for name, location, semantic in (
-        ("right-hand-grip-socket", (0.06, 1.04, -0.13), "rightGrip"),
-        ("left-hand-grip-socket", (-0.08, 1.31, -0.055), "leftGrip"),
-        ("right-wrist-knife-socket", (0.13, 0.735, -0.07), "knife"),
-        ("left-hand-grenade-socket", (-0.08, 1.28, -0.055), "grenade"),
+    for name, location, bone_name, semantic in (
+        ("right-hand-grip-socket", (0.06, 1.02, -0.115), "WristR", "rightGrip"),
+        ("left-hand-grip-socket", (-0.08, 1.27, -0.05), "WristL", "leftGrip"),
+        ("right-wrist-knife-socket", (0.13, 0.735, -0.07), "WristR", "knife"),
+        ("left-hand-grenade-socket", (-0.08, 1.24, -0.05), "WristL", "grenade"),
     ):
-        empty(name, location, armature, semantic)
+        bone_socket(name, location, armature, bone_name, semantic)
     action_corpus(armature)
     return root, armature
 

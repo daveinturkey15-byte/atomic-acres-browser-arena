@@ -48,6 +48,15 @@ export const REQUIRED_ARM_SOCKETS = Object.freeze([
   'right-wrist-knife-socket', 'left-hand-grenade-socket',
 ]);
 
+export const REQUIRED_ARM_BLEND_PAIRS = Object.freeze([
+  'LowerArmL:WristL', 'LowerArmR:WristR',
+  'LowerArmL:UpperArmL', 'LowerArmR:UpperArmR',
+  'Index1L:Index2L', 'Index1R:Index2R',
+  'Index2L:Index3L', 'Index2R:Index3R',
+  'Thumb1L:Thumb2L', 'Thumb1R:Thumb2R',
+  'Thumb2L:Thumb3L', 'Thumb2R:Thumb3R',
+]);
+
 function primitiveTriangles(json) {
   const instances = new Map();
   for (const node of json.nodes ?? []) {
@@ -199,20 +208,37 @@ export function auditOperatorArmsGlb(json, lod, bytes) {
     const matching = nodes.filter((node) => node.name === socket);
     if (matching.length !== 1 || typeof matching[0]?.mesh === 'number') failures.push(`${label}: ${socket} must be exactly one authored empty`);
   }
+  const parents = new Map();
+  for (const [parentIndex, node] of nodes.entries()) {
+    for (const child of node.children ?? []) parents.set(child, parentIndex);
+  }
+  const knifeSocketIndex = nodes.findIndex((node) => node.name === 'right-wrist-knife-socket');
+  const knifeSocketParent = knifeSocketIndex < 0 ? null : nodes[parents.get(knifeSocketIndex)]?.name ?? null;
+  if (knifeSocketParent !== 'WristR') failures.push(`${label}: right-wrist-knife-socket must be authored under WristR`);
   const skeleton = nodes.find((node) => node.extras?.asset_id === 'pass65-first-person-operator-arms'
     && node.extras?.dedicated_first_person_skeleton === true);
   if (!skeleton) failures.push(`${label}: dedicated first-person skeleton metadata missing`);
   const deliveryRoot = nodes.find((node) => node.extras?.runtime_forward_axis === '-Z');
   if (!deliveryRoot || deliveryRoot.extras?.blender_authoring_forward_axis !== '+Y') failures.push(`${label}: physical runtime -Z delivery-axis contract missing`);
-  if (deliveryRoot?.extras?.visual_revision !== 'human-anatomy-m4-contact-v4'
-    || deliveryRoot?.extras?.limb_profile_contract !== 'human-deltoid-brachioradialis-ulna-wrist-taper-v4'
-    || deliveryRoot?.extras?.hand_pose_contract !== 'separate-palm-thumb-index-resting-digit-grip-v4'
+  if (deliveryRoot?.extras?.visual_revision !== 'anatomical-blended-viewmodel-v5'
+    || deliveryRoot?.extras?.limb_profile_contract !== 'anatomical-deltoid-brachioradialis-ulna-wrist-taper-v5'
+    || deliveryRoot?.extras?.hand_pose_contract !== 'proportional-palm-opposed-thumb-articulated-digit-grip-v5'
     || deliveryRoot?.extras?.shoulder_entry_contract !== 'tapered-offscreen-sleeve'
-    || deliveryRoot?.extras?.glove_construction_contract !== 'opaque-articulated-knuckle-pads-seams-cloth-v4'
-    || deliveryRoot?.extras?.weapon_grip_review_contract !== 'm4a1-neutral-ads-reload-contact-v4'
+    || deliveryRoot?.extras?.glove_construction_contract !== 'opaque-anatomical-knuckle-pads-seams-cloth-v5'
+    || deliveryRoot?.extras?.weapon_grip_review_contract !== 'all-family-runtime-plus-m4-contact-v5'
+    || deliveryRoot?.extras?.runtime_animation_contract !== 'authored-fingers-under-runtime-chain-ik-v1'
     || deliveryRoot?.extras?.finger_segment_count !== 30
     || deliveryRoot?.extras?.weapon_grip_review_frames !== 3) {
-    failures.push(`${label}: human-anatomy M4 contact v4 silhouette, hand, glove and grip-review contract missing`);
+    failures.push(`${label}: anatomical blended v5 silhouette, hand, glove, animation and grip-review contract missing`);
+  }
+  const blendedVertexCount = Number(deliveryRoot?.extras?.blended_vertex_count);
+  const multiBoneWeightedParts = Number(deliveryRoot?.extras?.multi_bone_weighted_part_count);
+  const blendedJointPairs = String(deliveryRoot?.extras?.blended_joint_pairs_csv ?? '').split(',').filter(Boolean);
+  if (!Number.isInteger(blendedVertexCount) || blendedVertexCount < 240
+    || !Number.isInteger(multiBoneWeightedParts) || multiBoneWeightedParts < 24
+    || deliveryRoot?.extras?.weighting_contract !== 'adjacent-bone-normalized-blend-v5'
+    || REQUIRED_ARM_BLEND_PAIRS.some((pair) => !blendedJointPairs.includes(pair))) {
+    failures.push(`${label}: genuine adjacent-bone elbow/wrist/knuckle weighting receipt missing`);
   }
   const gripContactReceipts = {};
   for (const weapon of ['m4a1']) {
@@ -299,6 +325,14 @@ export function auditOperatorArmsGlb(json, lod, bytes) {
   }
   const animationNames = (json.animations ?? []).map((animation) => animation.name);
   for (const action of REQUIRED_CORE_ACTIONS) if (!animationNames.includes(action)) failures.push(`${label}: missing action ${action}`);
+  for (const actionName of ['fire', 'reload', 'empty-reload', 'melee']) {
+    const animation = (json.animations ?? []).find((candidate) => candidate.name === actionName);
+    const fingerChannels = (animation?.channels ?? []).filter((channel) => {
+      const targetName = nodes[channel.target?.node]?.name ?? '';
+      return /^(Index|Middle|Ring|Pinky|Thumb)[123][LR]$/.test(targetName);
+    }).length;
+    if (fingerChannels < 10) failures.push(`${label}: ${actionName} lacks authored finger animation channels`);
+  }
   const pbr = (json.materials ?? []).filter((material) => material.name?.includes('_PBR'));
   if (pbr.length < 2) failures.push(`${label}: sleeve and glove PBR materials are required`);
   for (const material of pbr) {
@@ -316,5 +350,7 @@ export function auditOperatorArmsGlb(json, lod, bytes) {
     materials: (json.materials ?? []).length, images: (json.images ?? []).length,
     animations: Object.freeze(animationNames), externalUris: common.externalUris,
     gripContactReceipts: Object.freeze(gripContactReceipts),
+    blendedVertexCount, multiBoneWeightedParts,
+    blendedJointPairs: Object.freeze(blendedJointPairs), knifeSocketParent,
   });
 }

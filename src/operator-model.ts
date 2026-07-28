@@ -46,6 +46,34 @@ type RiggedOperatorAsset = {
   pbrMaterials: number;
 };
 
+type FirstPersonArmsAsset = {
+  scene: THREE.Group;
+  clips: THREE.AnimationClip[];
+};
+
+type FirstPersonArmsRuntime = {
+  mixer: THREE.AnimationMixer;
+  actions: Map<string, THREE.AnimationAction>;
+  activeAction: string | null;
+};
+
+const FIRST_PERSON_RUNTIME_FINGER_TRACK = /(?:Index|Middle|Ring|Pinky|Thumb)[123][LR](?:\.|$)/;
+
+/**
+ * The authored Blender clips retain complete arm-chain motion for offline
+ * contact review. In the live viewmodel only digit tracks are admitted: the
+ * shoulder, elbow and wrist are solved after animation by weapon socket IK (or
+ * the dedicated melee solve), so a clip can never pull a hand off its socket.
+ */
+export function firstPersonArmRuntimeClip(clip: THREE.AnimationClip): THREE.AnimationClip {
+  return new THREE.AnimationClip(
+    clip.name,
+    clip.duration,
+    clip.tracks.filter((track) => FIRST_PERSON_RUNTIME_FINGER_TRACK.test(track.name)).map((track) => track.clone()),
+    clip.blendMode,
+  );
+}
+
 type RiggedOperatorRuntime = {
   mixer: THREE.AnimationMixer;
   actions: Map<string, THREE.AnimationAction>;
@@ -86,7 +114,7 @@ export type RiggedOperatorInstance = {
 export type OperatorAppearance = 'team' | 'neon-purple';
 
 const operatorAssets: Partial<Record<'quality' | 'performance', RiggedOperatorAsset>> = {};
-let firstPersonArmsAsset: THREE.Group | null = null;
+let firstPersonArmsAsset: FirstPersonArmsAsset | null = null;
 let operatorAssetPromise: Promise<void> | null = null;
 let firstPersonArmsAssetPromise: Promise<void> | null = null;
 
@@ -284,7 +312,8 @@ function materialForTeam(
 
 function materialForFirstPerson(material: THREE.Material, flattenMaterials: boolean): THREE.Material {
   const result = materialForTeam(material, 0, flattenMaterials);
-  if (result instanceof THREE.MeshStandardMaterial && material.name.toLowerCase() === 'skin') {
+  const materialName = material.name.toLowerCase();
+  if (result instanceof THREE.MeshStandardMaterial && materialName === 'skin') {
     // Dark tactical gloves read more cleanly than bare low-poly fingertips
     // when the articulated hand wraps around compact weapon geometry.
     result.color.setHex(0x243238);
@@ -292,6 +321,15 @@ function materialForFirstPerson(material: THREE.Material, flattenMaterials: bool
     result.metalness = 0;
     result.emissive.setHex(0x05090a);
     result.emissiveIntensity = flattenMaterials ? 0.24 : 0.08;
+  } else if (result instanceof THREE.MeshStandardMaterial && materialName.includes('arms_glove')) {
+    // Preserve the dark tactical finish while exposing the authored knuckle,
+    // wrist and digit silhouette in indoor arenas. This is a restrained
+    // presentation lift, not alpha or an unlit replacement.
+    result.emissive.setHex(0x0a1d22);
+    result.emissiveIntensity = flattenMaterials ? 0.3 : 0.2;
+  } else if (result instanceof THREE.MeshStandardMaterial && materialName.includes('arms_sleeve')) {
+    result.emissive.setHex(0x071316);
+    result.emissiveIntensity = flattenMaterials ? 0.24 : 0.14;
   }
   return result;
 }
@@ -329,7 +367,7 @@ function describeOperatorAsset(
 export function loadFirstPersonArmsAsset(): Promise<void> {
   if (firstPersonArmsAsset) return Promise.resolve();
   firstPersonArmsAssetPromise ??= loadRiggedGltf(FIRST_PERSON_ARMS_URL).then((arms) => {
-    firstPersonArmsAsset = arms.scene;
+    firstPersonArmsAsset = { scene: arms.scene, clips: arms.animations };
   });
   return firstPersonArmsAssetPromise;
 }
@@ -363,16 +401,26 @@ export type FirstPersonArmChain = {
   side: 'left' | 'right';
 };
 
+export type FirstPersonFingerBone = {
+  bone: THREE.Bone;
+  bindQuaternion: THREE.Quaternion;
+  side: 'left' | 'right';
+  digit: 'index' | 'middle' | 'ring' | 'pinky' | 'thumb';
+  joint: 1 | 2 | 3;
+};
+
 export type FirstPersonRiggedArms = {
   root: THREE.Group;
   chains: FirstPersonArmChain[];
+  fingers: FirstPersonFingerBone[];
+  knifeSocket: THREE.Object3D;
 };
 
 export function createFirstPersonRiggedArms(flattenMaterials: boolean): FirstPersonRiggedArms | null {
   if (!firstPersonArmsAsset) return null;
   const root = new THREE.Group();
   root.name = 'first-person-arms';
-  const visual = cloneSkeleton(firstPersonArmsAsset) as THREE.Group;
+  const visual = cloneSkeleton(firstPersonArmsAsset.scene) as THREE.Group;
   visual.name = 'authored-first-person-arms-visual';
   visual.scale.setScalar(1);
   visual.position.set(0, 0, 0);
@@ -402,22 +450,95 @@ export function createFirstPersonRiggedArms(flattenMaterials: boolean): FirstPer
       : null;
   };
   const chains = [chain('right'), chain('left')].filter((value): value is FirstPersonArmChain => value !== null);
-  for (const suffix of ['L', 'R']) {
-    for (const fingerName of ['Index', 'Middle', 'Ring', 'Pinky']) {
-      for (let joint = 1; joint <= 3; joint += 1) {
-        const bone = visual.getObjectByName(`${fingerName}${joint}${suffix}`);
-        if (bone instanceof THREE.Bone) bone.rotation.x += joint === 1 ? 0.72 : joint === 2 ? 0.95 : 0.78;
+  const fingers: FirstPersonFingerBone[] = [];
+  const digitNames = ['Index', 'Middle', 'Ring', 'Pinky', 'Thumb'] as const;
+  for (const [suffix, side] of [['L', 'left'], ['R', 'right']] as const) {
+    for (const digitName of digitNames) {
+      for (const joint of [1, 2, 3] as const) {
+        const bone = visual.getObjectByName(`${digitName}${joint}${suffix}`);
+        if (bone instanceof THREE.Bone) {
+          fingers.push({
+            bone,
+            bindQuaternion: bone.quaternion.clone(),
+            side,
+            digit: digitName.toLowerCase() as FirstPersonFingerBone['digit'],
+            joint,
+          });
+        }
       }
     }
-    const thumb = visual.getObjectByName(`Thumb2${suffix}`);
-    if (thumb instanceof THREE.Bone) thumb.rotation.x += 0.58;
   }
+  const knifeSocket = visual.getObjectByName('right-wrist-knife-socket');
+  const rightWrist = visual.getObjectByName('WristR');
+  let knifeAncestor: THREE.Object3D | null = knifeSocket?.parent ?? null;
+  while (knifeAncestor && knifeAncestor !== rightWrist) knifeAncestor = knifeAncestor.parent;
+  if (!knifeSocket || !(rightWrist instanceof THREE.Bone) || knifeAncestor !== rightWrist || fingers.length !== 30) return null;
+  const mixer = new THREE.AnimationMixer(visual);
+  const runtimeClips = firstPersonArmsAsset.clips.map(firstPersonArmRuntimeClip);
+  const authoredTrackCount = firstPersonArmsAsset.clips.reduce((count, clip) => count + clip.tracks.length, 0);
+  const runtimeTrackCount = runtimeClips.reduce((count, clip) => count + clip.tracks.length, 0);
+  const actions = new Map(runtimeClips.map((clip) => [clip.name, mixer.clipAction(clip)]));
+  root.userData.firstPersonArmsRuntime = { mixer, actions, activeAction: null } satisfies FirstPersonArmsRuntime;
   root.userData.importedFirstPersonArms = false;
   root.userData.authoredFirstPersonArms = true;
   root.userData.firstPersonArmsSource = FIRST_PERSON_ARMS_URL;
   root.userData.materialContract = 'opaque-depth-writing';
   root.userData.importedFirstPersonArmChains = chains.length;
-  return { root, chains };
+  root.userData.authoredAnimationClipCount = actions.size;
+  root.userData.authoredAnimationBlendPolicy = 'finger-tracks-first-runtime-ik-last';
+  root.userData.authoredAnimationTrackPolicy = 'finger-bones-only';
+  root.userData.authoredAnimationTrackCount = runtimeTrackCount;
+  root.userData.authoredUpperChainTracksExcluded = authoredTrackCount - runtimeTrackCount;
+  root.userData.authoredKnifeSocket = knifeSocket.name;
+  return { root, chains, fingers, knifeSocket };
+}
+
+function firstPersonArmsRuntime(root: THREE.Object3D): FirstPersonArmsRuntime | null {
+  return (root.userData.firstPersonArmsRuntime as FirstPersonArmsRuntime | undefined) ?? null;
+}
+
+export function resetFirstPersonArmFingers(fingers: readonly FirstPersonFingerBone[]): void {
+  for (const finger of fingers) finger.bone.quaternion.copy(finger.bindQuaternion);
+}
+
+export function playFirstPersonArmAction(root: THREE.Object3D, actionName: string): boolean {
+  const runtime = firstPersonArmsRuntime(root);
+  const action = runtime?.actions.get(actionName);
+  if (!runtime || !action) return false;
+  runtime.mixer.stopAllAction();
+  action.reset().setLoop(THREE.LoopOnce, 1);
+  action.clampWhenFinished = false;
+  action.play();
+  runtime.activeAction = actionName;
+  return true;
+}
+
+export function updateFirstPersonArmAnimations(root: THREE.Object3D, dt: number): void {
+  const runtime = firstPersonArmsRuntime(root);
+  if (!runtime) return;
+  runtime.mixer.update(Math.min(0.05, Math.max(0, dt)));
+  if (runtime.activeAction && runtime.actions.get(runtime.activeAction)?.isRunning() !== true) runtime.activeAction = null;
+}
+
+export function firstPersonArmAnimationState(root: THREE.Object3D | undefined): Readonly<{
+  clips: number;
+  activeAction: string | null;
+  blendPolicy: string;
+  trackPolicy: string;
+  runtimeTracks: number;
+  upperChainTracksExcluded: number;
+}> | null {
+  if (!root) return null;
+  const runtime = firstPersonArmsRuntime(root);
+  if (!runtime) return null;
+  return Object.freeze({
+    clips: runtime.actions.size,
+    activeAction: runtime.activeAction,
+    blendPolicy: String(root.userData.authoredAnimationBlendPolicy ?? 'unknown'),
+    trackPolicy: String(root.userData.authoredAnimationTrackPolicy ?? 'unknown'),
+    runtimeTracks: Number(root.userData.authoredAnimationTrackCount ?? 0),
+    upperChainTracksExcluded: Number(root.userData.authoredUpperChainTracksExcluded ?? 0),
+  });
 }
 
 function runtime(root: THREE.Object3D): RiggedOperatorRuntime | undefined {

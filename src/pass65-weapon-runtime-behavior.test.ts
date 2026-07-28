@@ -57,13 +57,33 @@ function fakeArmsGltf(): FakeGltf {
     const shoulder = new THREE.Bone(); shoulder.name = `UpperArm${suffix}`;
     const elbow = new THREE.Bone(); elbow.name = `LowerArm${suffix}`;
     const wrist = new THREE.Bone(); wrist.name = `Wrist${suffix}`;
-    const index = new THREE.Bone(); index.name = `Index1${suffix}`;
     elbow.position.set(0, -0.36, 0);
     wrist.position.set(0, -0.34, 0);
-    index.position.set(0, -0.12, 0);
-    shoulder.add(elbow); elbow.add(wrist); wrist.add(index); scene.add(shoulder);
+    shoulder.add(elbow); elbow.add(wrist); scene.add(shoulder);
+    for (const digit of ['Index', 'Middle', 'Ring', 'Pinky', 'Thumb']) {
+      let parent: THREE.Object3D = wrist;
+      for (const joint of [1, 2, 3]) {
+        const finger = new THREE.Bone(); finger.name = `${digit}${joint}${suffix}`;
+        finger.position.set(0, -0.04, 0);
+        parent.add(finger);
+        parent = finger;
+      }
+    }
+    if (suffix === 'R') {
+      const knifeSocket = new THREE.Group();
+      knifeSocket.name = 'right-wrist-knife-socket';
+      knifeSocket.position.set(0, -0.08, 0);
+      wrist.add(knifeSocket);
+    }
   }
-  return { scene, animations: [] };
+  const animations = [
+    'equip', 'unequip', 'idle', 'walk', 'sprint', 'ads-in', 'ads-out',
+    'fire', 'dry-fire', 'reload', 'empty-reload', 'melee', 'inspect',
+  ].map((name) => new THREE.AnimationClip(name, 0.52, [
+    new THREE.QuaternionKeyframeTrack('Index2R.quaternion', [0, 0.52], [0, 0, 0, 1, 0.1, 0, 0, 0.995]),
+    new THREE.QuaternionKeyframeTrack('UpperArmR.quaternion', [0, 0.52], [0, 0, 0, 1, 0.1, 0, 0, 0.995]),
+  ]));
+  return { scene, animations };
 }
 
 function fakeKnifeGltf(): FakeGltf {
@@ -346,7 +366,7 @@ describe('Pass 65 managed weapon runtime behavior', () => {
       browserProceduralMeleeArmViolation: false,
       proceduralMeleeArmFrames: 0,
       authoredMeleeChainCount: 2,
-      authoredMeleeKnifeParent: 'authored-field-knife-wrist-socket',
+      authoredMeleeKnifeParent: 'right-wrist-knife-socket',
       knifeVisible: true,
     });
     expect(active.authoredMeleeGripError).toBeLessThan(1e-6);
