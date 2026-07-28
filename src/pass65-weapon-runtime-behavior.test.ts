@@ -236,7 +236,7 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(), false, undefined, prewarmer);
     await presentation.load();
     presentation.root.traverse((node) => node.layers.set(2));
-    const catalogIds = ['carbine', 'sniper', 'machine-pistol', 'explosive-crossbow', 'm14-ebr'] as const;
+    const catalogIds = ['carbine', 'pistol', 'explosive-crossbow', 'm14-ebr'] as const;
     await Promise.all([
       presentation.prewarmBrowserWeaponCatalog(catalogIds),
       presentation.prewarmBrowserWeaponCatalog(catalogIds),
@@ -250,7 +250,7 @@ describe('Pass 65 managed weapon runtime behavior', () => {
       available: PASS65_AUTHORED_FIREARM_IDS.length + 1,
       prewarming: false,
       unpreparedSwitches: 0,
-      maximumRetained: 5,
+      maximumRetained: 4,
     });
     expect(prewarmer).toHaveBeenCalledTimes(catalogIds.length);
     const loadsAfterDeployment = loadSpy.mock.calls.length;
@@ -265,7 +265,7 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     await expect(presentation.prewarmBrowserWeaponCatalog([
       ...PASS65_AUTHORED_FIREARM_IDS,
       'explosive-crossbow',
-    ])).rejects.toThrow(/requires 1-5 unique models/);
+    ])).rejects.toThrow(/requires 1-4 unique models/);
   });
 
   it('never commits stale or failed GPU prewarm generations', async () => {

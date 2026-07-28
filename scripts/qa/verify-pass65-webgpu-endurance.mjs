@@ -197,7 +197,8 @@ try {
     const startedAt = Date.now();
     const samples = [];
     const screenshotHashes = new Set();
-    let previous = null;
+    let previousProgress = null;
+    let previousScreenshotHash = null;
     let sampleIndex = 0;
     let lastScreenshot = null;
     while (Date.now() - startedAt < durationMs) {
@@ -251,6 +252,7 @@ try {
             })),
           },
           smokePresentation: state.dmrThermal.smokePresentation,
+          weaponCatalog: state.weaponPresentation.browserWeaponCatalog,
           residency: api.sampleRendererResidency(),
         };
       });
@@ -265,27 +267,45 @@ try {
         || sample.runtime.presentation.status !== 'healthy'
         || sample.watchdog.status !== 'healthy' || sample.watchdog.fatal
         || sample.gpuRetirement.failures !== 0
-        || sample.smokePresentation.liveDisposals !== 0) {
+        || sample.smokePresentation.liveDisposals !== 0
+        || sample.weaponCatalog.prewarming
+        || sample.weaponCatalog.unpreparedSwitches !== 0
+        || sample.weaponCatalog.retainedCount > sample.weaponCatalog.maximumRetained
+        || sample.weaponCatalog.loaded > sample.weaponCatalog.maximumRetained) {
         throw new Error(`${arenaId} entered an invalid presentation state: ${JSON.stringify(sample)}`);
       }
-      if (previous) {
-        const elapsedMs = Math.max(1, sample.atMs - previous.atMs);
-        const frameDelta = sample.frameCount - previous.frameCount;
-        const submissionDelta = sample.runtime.presentation.submissionSequence - previous.runtime.presentation.submissionSequence;
-        const completionDelta = sample.runtime.presentation.completedSequence - previous.runtime.presentation.completedSequence;
+      if (previousProgress) {
+        // A Playwright compositor screenshot can suspend the page for seconds.
+        // Compare from the post-capture frontier so capture overhead cannot be
+        // misreported as a gameplay presentation freeze.
+        const elapsedMs = Math.max(1, sample.atMs - previousProgress.atMs);
+        const frameDelta = sample.frameCount - previousProgress.frameCount;
+        const submissionDelta = sample.runtime.presentation.submissionSequence - previousProgress.presentation.submissionSequence;
+        const completionDelta = sample.runtime.presentation.completedSequence - previousProgress.presentation.completedSequence;
         const minimumFrameProgress = Math.max(4, Math.floor(elapsedMs / 100));
         // A WebGPU completion probe retires the entire queue frontier, so its
         // sequence advances in batches rather than once per rendered frame.
         // Measure display throughput from admitted submissions; queue stalls
         // remain hard failures through the presentation status above.
         if (frameDelta < minimumFrameProgress || submissionDelta < minimumFrameProgress
-          || screenshotHash === previous.screenshotHash) {
-          throw new Error(`${arenaId} presentation freeze detected: ${JSON.stringify({ elapsedMs, frameDelta, submissionDelta, completionDelta, screenshotHash, previous })}`);
+          || screenshotHash === previousScreenshotHash) {
+          throw new Error(`${arenaId} presentation freeze detected: ${JSON.stringify({
+            elapsedMs, frameDelta, submissionDelta, completionDelta, screenshotHash,
+            previousProgress, previousReceipt: samples.at(-1) ?? null,
+          })}`);
         }
       }
       const receipt = { ...sample, screenshotHash };
       samples.push(receipt);
-      previous = receipt;
+      previousScreenshotHash = screenshotHash;
+      previousProgress = await page.evaluate(() => {
+        const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+        return {
+          atMs: performance.now(),
+          frameCount: state.frameCount,
+          presentation: state.render.runtime.presentation,
+        };
+      });
       sampleIndex += 1;
     }
     if (samples.length < 5 || screenshotHashes.size < Math.ceil(samples.length * 0.8)) {

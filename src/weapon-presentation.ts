@@ -160,7 +160,7 @@ export type WeaponViewmodelGpuPrewarmer = (
 
 /** Original first-person weapon presentation with ADS, sprint, recoil, melee and staged reload motion. */
 export class WeaponPresentation {
-  static readonly MAX_RETAINED_WEBGPU_WEAPONS = 5;
+  static readonly MAX_RETAINED_WEBGPU_WEAPONS = 4;
   readonly root = new THREE.Group();
   private readonly browserRuntime: boolean;
   private readonly models = new Map<WeaponId, THREE.Object3D>();
@@ -808,7 +808,7 @@ export class WeaponPresentation {
    * Loads, creates and GPU-prewarms one bounded gameplay weapon set behind the
    * deployment surface. WebGPU compilation can synchronously occupy the browser
    * main thread even though compileAsync returns a Promise, so a live lazy
-   * switch is not a safe presentation boundary. The hard five-model ceiling
+   * switch is not a safe presentation boundary. The hard four-model ceiling
    * keeps RustRig below its texture budget; WebGL/no-hook callers retain the
    * existing bounded two-model lazy cache.
    */

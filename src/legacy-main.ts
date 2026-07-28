@@ -7845,7 +7845,6 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
     player.secondaryWeapon,
     'explosive-crossbow',
     'm14-ebr',
-    'railgun',
   ]);
   killstreakLoadoutController.releaseAfterMatch();
   const frozenKillstreakLoadout = killstreakLoadoutController.freezeAtMatchStart();
