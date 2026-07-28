@@ -10,7 +10,7 @@ import {
   createOperatorTargetTracker,
   findCoralTargets,
   findMinimapThreats,
-  findOperatorCandidates,
+  findPurpleOperatorCandidates,
   frameSignature,
   signatureDifference,
 } from './vision.mjs';
@@ -208,7 +208,7 @@ async function createVisionCapture(context, page, options = {}) {
       .raw()
       .toBuffer({ resolveWithObject: true });
     const targets = findCoralTargets(data, info.width, info.height, info.channels);
-    const operatorTargets = findOperatorCandidates(data, info.width, info.height, info.channels);
+    const operatorTargets = findPurpleOperatorCandidates(data, info.width, info.height, info.channels);
     const minimapThreats = findMinimapThreats(data, info.width, info.height, info.channels);
     const decodeMs = performance.now() - decodeStartedAt;
     const captureMs = Math.max(0, packet.receivedAt - captureStartedAt);
@@ -922,7 +922,7 @@ async function run() {
         cdpAttached: Boolean(cdpUrl),
       },
       fairness: {
-        perception: args['lifecycle-only'] ? 'none-lifecycle-only' : 'rendered-pixels-operator-palette-geometry-v1-scan-stop-motion-confirmation-visible-player-up-minimap-and-hud',
+        perception: args['lifecycle-only'] ? 'none-lifecycle-only' : 'rendered-pixels-purple-operator-geometry-v1-scan-stop-motion-confirmation-visible-player-up-minimap-and-hud',
         policyVersion: 'atomic-player-policy-v3',
         automaticCombatFireEnabled: allowCombatFire,
         decisionInputs: args['lifecycle-only']

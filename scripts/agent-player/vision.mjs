@@ -132,6 +132,109 @@ export function findMinimapThreats(raw, width, height, channels = 3, options = {
   }).sort((left, right) => left.distance - right.distance);
 }
 
+export function findPurpleOperatorCandidates(raw, width, height, channels = 3, options = {}) {
+  if (!raw || raw.length < width * height * channels) throw new Error('Vision frame is smaller than its declared dimensions');
+  const globalRedFlashMaximum = Number(options.globalRedFlashMaximum ?? 0.08);
+  let redTintPixels = 0;
+  for (let index = 0; index < width * height; index += 1) {
+    const pixel = index * channels;
+    if (isOperatorPalettePixel(raw[pixel], raw[pixel + 1], raw[pixel + 2])) redTintPixels += 1;
+  }
+  const redTintRatio = redTintPixels / (width * height);
+  if (redTintRatio > globalRedFlashMaximum) {
+    const empty = [];
+    Object.defineProperties(empty, {
+      rejectedReason: { value: 'global-red-flash', enumerable: true },
+      paletteRatio: { value: 0, enumerable: true },
+      redTintRatio: { value: redTintRatio, enumerable: true },
+    });
+    return empty;
+  }
+
+  const minimumX = Math.floor(width * (options.minimumXRatio ?? 0.12));
+  const maximumX = Math.ceil(width * (options.maximumXRatio ?? 0.82));
+  const minimumY = Math.floor(height * (options.minimumYRatio ?? 0.25));
+  const maximumY = Math.ceil(height * (options.maximumYRatio ?? 0.75));
+  const mask = new Uint8Array(width * height);
+  let palettePixels = 0;
+  for (let y = minimumY; y <= maximumY; y += 1) {
+    for (let x = minimumX; x <= maximumX; x += 1) {
+      const pixel = (y * width + x) * channels;
+      const red = raw[pixel];
+      const green = raw[pixel + 1];
+      const blue = raw[pixel + 2];
+      // Pass 63 draws hostile bot bodies/outlines in a visible lavender-purple:
+      // both red and blue lead green. Aqua scenery has green/blue dominance,
+      // while the map's red posts lack the blue lead.
+      if (red >= 55 && blue >= 55 && red - green >= 12 && blue - green >= 12) {
+        mask[y * width + x] = 1;
+        palettePixels += 1;
+      }
+    }
+  }
+
+  const candidates = [];
+  const stack = [];
+  for (let start = 0; start < mask.length; start += 1) {
+    if (mask[start] === 0) continue;
+    mask[start] = 0;
+    stack.push(start);
+    let pixels = 0;
+    let sumX = 0;
+    let sumY = 0;
+    let minX = width;
+    let maxX = 0;
+    let minY = height;
+    let maxY = 0;
+    while (stack.length > 0) {
+      const index = stack.pop();
+      const x = index % width;
+      const y = Math.floor(index / width);
+      pixels += 1;
+      sumX += x;
+      sumY += y;
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+      for (const neighbour of [index - 1, index + 1, index - width, index + width]) {
+        if (neighbour < 0 || neighbour >= mask.length || mask[neighbour] === 0) continue;
+        const neighbourX = neighbour % width;
+        if (Math.abs(neighbourX - x) > 1) continue;
+        mask[neighbour] = 0;
+        stack.push(neighbour);
+      }
+    }
+    const boxWidth = maxX - minX + 1;
+    const boxHeight = maxY - minY + 1;
+    const aspect = boxWidth / boxHeight;
+    const density = pixels / (boxWidth * boxHeight);
+    if (pixels < 3 || pixels > 500) continue;
+    if (boxWidth < 2 || boxWidth > 50 || boxHeight < 3 || boxHeight > 70) continue;
+    if (aspect < 0.15 || aspect > 1.5) continue;
+    const x = sumX / pixels;
+    const y = sumY / pixels;
+    const centreDistance = Math.hypot((x - width / 2) / width, (y - height / 2) / height);
+    candidates.push({
+      x,
+      y,
+      pixels,
+      density,
+      aspect,
+      score: centreDistance + Math.abs(aspect - 0.8) * 0.025 - Math.min(0.04, pixels / 5000),
+      bounds: { minX, minY, maxX, maxY, width: boxWidth, height: boxHeight },
+      detector: 'pass63-visible-purple-operator-v1',
+    });
+  }
+  candidates.sort((left, right) => left.score - right.score);
+  Object.defineProperties(candidates, {
+    rejectedReason: { value: null, enumerable: true },
+    paletteRatio: { value: palettePixels / (width * height), enumerable: true },
+    redTintRatio: { value: redTintRatio, enumerable: true },
+  });
+  return candidates;
+}
+
 export function findOperatorCandidates(raw, width, height, channels = 3, options = {}) {
   if (!Number.isInteger(width) || width <= 0 || !Number.isInteger(height) || height <= 0) {
     throw new Error('Vision frame dimensions must be positive integers');

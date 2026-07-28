@@ -4,44 +4,48 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
-import { findOperatorCandidates } from './vision.mjs';
+import { findPurpleOperatorCandidates } from './vision.mjs';
 
-const fixtureDirectory = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures');
+const fixtureRoot = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
 async function detect(name) {
-  const jpeg = await readFile(resolve(fixtureDirectory, name));
+  const jpeg = await readFile(resolve(fixtureRoot, name));
   const { data, info } = await sharp(jpeg)
     .resize({ width: 320, height: 180, fit: 'fill' })
     .removeAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
-  return findOperatorCandidates(data, info.width, info.height, info.channels);
+  return findPurpleOperatorCandidates(data, info.width, info.height, info.channels);
 }
 
-test('Pass 63 archived operator fixtures produce aimable dark-Coral components', async () => {
-  const centre = await detect('pass63-true-operator-centre.jpg');
-  assert.equal(centre.length, 1);
-  assert.ok(Math.abs(centre[0].x - 170.1) < 0.5);
-  assert.ok(Math.abs(centre[0].y - 104.2) < 0.5);
-  assert.deepEqual(centre[0].bounds, { minX: 169, minY: 101, maxX: 171, maxY: 107, width: 3, height: 7 });
+test('Pass 63 live purple operators produce precise visible-pixel aim candidates', async () => {
+  const rightA = await detect('pass63-purple-operator-right-a.jpg');
+  assert.equal(rightA.length, 1);
+  assert.ok(Math.abs(rightA[0].x - 240.2) < 0.5);
+  assert.ok(Math.abs(rightA[0].y - 90.0) < 0.5);
 
-  const right = await detect('pass63-true-operator-right.jpg');
-  assert.equal(right.length, 2);
-  assert.ok(Math.abs(right[0].x - 213.9) < 0.5);
-  assert.ok(Math.abs(right[0].y - 107.4) < 0.5);
-  assert.equal(right[0].bounds.width, 5);
-  assert.equal(right[1].bounds.width, 2);
+  const rightB = await detect('pass63-purple-operator-right-b.jpg');
+  assert.equal(rightB.length, 1);
+  assert.ok(Math.abs(rightB[0].x - 235.4) < 0.5);
+  assert.ok(Math.abs(rightB[0].y - 91.0) < 0.5);
+
+  const left = await detect('pass63-purple-operator-left.jpg');
+  assert.equal(left.length, 1);
+  assert.ok(Math.abs(left[0].x - 140.7) < 0.5);
+  assert.ok(Math.abs(left[0].y - 91.5) < 0.5);
+  assert.equal(left[0].detector, 'pass63-visible-purple-operator-v1');
 });
 
-test('Pass 63 archived tree/scenery fixture does not become an operator', async () => {
-  const targets = await detect('pass63-tree-and-props-negative.jpg');
-  assert.equal(targets.length, 0);
-  assert.equal(targets.rejectedReason, null);
+test('Pass 63 open scenery and prior red-post false positives do not become purple operators', async () => {
+  const openScenery = await detect('pass63-no-purple-operator.jpg');
+  assert.equal(openScenery.length, 0);
+  const redPosts = await detect('pass63-tree-and-props-negative.jpg');
+  assert.equal(redPosts.length, 0);
 });
 
-test('Pass 63 archived red damage flash forces detector abstention', async () => {
-  const targets = await detect('pass63-red-damage-flash-negative.jpg');
-  assert.equal(targets.length, 0);
-  assert.equal(targets.rejectedReason, 'global-red-flash');
-  assert.ok(targets.paletteRatio > 0.25);
+test('Pass 63 red damage flash forces purple-detector abstention', async () => {
+  const damage = await detect('pass63-red-damage-flash-negative.jpg');
+  assert.equal(damage.length, 0);
+  assert.equal(damage.rejectedReason, 'global-red-flash');
+  assert.ok(damage.redTintRatio > 0.3);
 });

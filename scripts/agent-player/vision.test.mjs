@@ -6,6 +6,7 @@ import {
   findCoralTargets,
   findMinimapThreats,
   findOperatorCandidates,
+  findPurpleOperatorCandidates,
   frameSignature,
   isCoralPixel,
   isOperatorPalettePixel,
@@ -38,7 +39,7 @@ test('operator palette isolates shaded Coral tactical material from orange props
   assert.equal(isOperatorPalettePixel(45, 120, 125), false);
 });
 
-test('operator detector accepts a narrow humanoid swatch and rejects a pole and orange crate', () => {
+test('dark-Coral geometry proposal accepts a narrow swatch and rejects a pole and orange crate', () => {
   const width = 100;
   const height = 60;
   const raw = frame(width, height);
@@ -62,6 +63,19 @@ test('operator detector abstains during a global red damage flash', () => {
   assert.equal(targets.length, 0);
   assert.equal(targets.rejectedReason, 'global-red-flash');
   assert.ok(targets.paletteRatio > 0.9);
+});
+
+test('purple operator detector isolates magenta body geometry from Aqua and red props', () => {
+  const width = 100;
+  const height = 60;
+  const raw = frame(width, height);
+  paint(raw, width, 47, 27, 53, 35, [150, 95, 175]);
+  paint(raw, width, 70, 25, 80, 38, [30, 160, 180]);
+  paint(raw, width, 25, 27, 28, 38, [145, 55, 20]);
+  const targets = findPurpleOperatorCandidates(raw, width, height, 3);
+  assert.equal(targets.length, 1);
+  assert.ok(Math.abs(targets[0].x - 50) < 0.1);
+  assert.equal(targets[0].detector, 'pass63-visible-purple-operator-v1');
 });
 
 test('visible player-up minimap markers yield a closed-loop relative bearing', () => {
