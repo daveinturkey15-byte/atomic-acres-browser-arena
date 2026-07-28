@@ -1131,6 +1131,7 @@ const scene = new THREE.Scene();
 const killstreakPresentation = new KillstreakPresentation(
   scene,
   (root) => scheduleDeferredGpuRetirement(root, root.userData.authoredSharedAsset !== true),
+  renderRuntime.backend === 'webgpu',
 );
 scene.fog = new THREE.Fog(activeLighting.fogColor, activeLighting.fogNear, activeLighting.fogFar);
 const graphicsRefinement = new GraphicsRefinementSystem(

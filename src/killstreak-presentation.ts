@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { StorageInstancedBufferAttribute } from 'three/webgpu';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -1392,6 +1393,7 @@ export class KillstreakPresentation {
   constructor(
     scene: THREE.Scene,
     private readonly retireRoot: KillstreakPresentationRetireRoot = disposeRoot,
+    private readonly useStorageSwarmMatrices = false,
   ) {
     this.root.name = 'pass65-killstreak-presentations';
     this.root.userData.presentationOnly = true;
@@ -1477,6 +1479,15 @@ export class KillstreakPresentation {
       representative: THREE.Mesh,
     ): void => {
       const instanced = new THREE.InstancedMesh(geometry, material, pool.length);
+      if (this.useStorageSwarmMatrices) {
+        // Small InstancedMesh sets default to a per-draw uniform array in
+        // Three r185. A live 24-drone swarm updates thirteen such arrays every
+        // frame and can force Dawn's uniform-ring retirement to stop issuing
+        // browser frames. WebGPU storage attributes keep the same bounded CPU
+        // update contract without that per-draw uniform churn; WebGL retains
+        // Three's ordinary InstancedBufferAttribute path.
+        instanced.instanceMatrix = new StorageInstancedBufferAttribute(pool.length, 16);
+      }
       instanced.name = `pass65-swarm-instanced-batch-${this.swarmInstanceBatches.length + 1}`;
       instanced.userData.presentationOnly = true;
       instanced.userData.swarmInstancedPresentation = true;

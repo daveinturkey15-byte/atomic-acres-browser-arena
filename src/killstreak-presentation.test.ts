@@ -66,6 +66,19 @@ const carpetImpacts = (count: number, phase: KillstreakImpactEvent['phase'] = 'i
 );
 
 describe('killstreak presentation', () => {
+  it('uses storage-backed swarm matrices only for the WebGPU presentation path', () => {
+    const webGpuPresentation = new KillstreakPresentation(new THREE.Scene(), undefined, true);
+    const webGlPresentation = new KillstreakPresentation(new THREE.Scene());
+    const webGpuBatch = webGpuPresentation.root.getObjectByName('pass65-swarm-instanced-batch-1') as THREE.InstancedMesh;
+    const webGlBatch = webGlPresentation.root.getObjectByName('pass65-swarm-instanced-batch-1') as THREE.InstancedMesh;
+    expect((webGpuBatch.instanceMatrix as THREE.InstancedBufferAttribute & { isStorageInstancedBufferAttribute?: boolean })
+      .isStorageInstancedBufferAttribute).toBe(true);
+    expect((webGlBatch.instanceMatrix as THREE.InstancedBufferAttribute & { isStorageInstancedBufferAttribute?: boolean })
+      .isStorageInstancedBufferAttribute).not.toBe(true);
+    webGpuPresentation.dispose();
+    webGlPresentation.dispose();
+  });
+
   it('binds the runtime presentation loader to the gated authored Hunter Drone LOD0', () => {
     expect(HUNTER_DRONE_ASSET).toBe('./assets/original/models/support/hunter-drone-lod0.glb');
     expect(hunterDronePresentationTelemetry()).toMatchObject({ state: 'idle', asset: HUNTER_DRONE_ASSET });
