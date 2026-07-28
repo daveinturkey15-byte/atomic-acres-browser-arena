@@ -8180,10 +8180,11 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
     if (renderRuntime.backend === 'webgpu') {
       await settleWebGpuPresentation('Initial match');
       // Initial-match admission may lower the internal render scale and resize
-      // Three's HDR context. Any support pipeline compiled before that final
-      // context would be invalidated and rebuilt during the first activation.
-      // Rehearse the exact chopper-plus-swarm overlap only after the final
-      // match context is settled, while the deployment surface is still opaque.
+      // Three's HDR context. Smoke and support pipelines compiled before that
+      // final context can otherwise rebuild when first combined in combat.
+      // Rehearse both after the final match context settles, while the opaque
+      // deployment surface still owns presentation.
+      await smokeVolumePresentationPool.prewarm(renderRuntime, camera, -killstreakMatchEpoch);
       await killstreakPresentation.prewarm(renderRuntime, camera, -killstreakMatchEpoch);
       restoreCorpsePoolPrewarm();
       // Match-only operators, support pools and their prewarm bookkeeping are
