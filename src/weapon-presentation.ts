@@ -170,6 +170,13 @@ export class WeaponPresentation {
   private browserCatalogPrewarmPromise: Promise<void> | null = null;
   private readonly browserResidentWeaponIds = new Set<WeaponId>();
   private unpreparedBrowserSwitches = 0;
+  private lastUnpreparedBrowserSwitch: Readonly<{
+    requested: WeaponId;
+    previousActive: WeaponId;
+    resident: readonly WeaponId[];
+    loaded: readonly WeaponId[];
+    gpuReady: readonly WeaponId[];
+  }> | null = null;
   private modelUseCounter = 0;
   private browserWeaponRequest = 0;
   private active: WeaponId = 'carbine';
@@ -1010,6 +1017,7 @@ export class WeaponPresentation {
   }
 
   setWeapon(id: WeaponId, immediate = false): void {
+    const previousActive = this.active;
     if (id !== this.active) resetMinigunSpool(this.minigunSpool);
     this.active = id;
     this.switchBlend = immediate ? 1 : 0;
@@ -1026,6 +1034,15 @@ export class WeaponPresentation {
       // atomically and is generation guarded by browserWeaponRequest.
       if (this.browserResidentWeaponIds.size > 0 && !this.browserResidentWeaponIds.has(id)) {
         this.unpreparedBrowserSwitches += 1;
+        this.lastUnpreparedBrowserSwitch = Object.freeze({
+          requested: id,
+          previousActive,
+          resident: Object.freeze([...this.browserResidentWeaponIds]),
+          loaded: Object.freeze([...this.models.keys()]),
+          gpuReady: Object.freeze([...this.models.entries()]
+            .filter(([, model]) => this.modelIsGpuReady(model))
+            .map(([weaponId]) => weaponId)),
+        });
       }
       this.ensureBrowserWeapon(id);
     }
@@ -1310,6 +1327,7 @@ export class WeaponPresentation {
         available: Object.keys(WEAPONS).length,
         prewarming: this.browserCatalogPrewarmPromise !== null,
         unpreparedSwitches: this.unpreparedBrowserSwitches,
+        lastUnpreparedSwitch: this.lastUnpreparedBrowserSwitch,
         maximumRetained: WeaponPresentation.MAX_RETAINED_WEBGPU_WEAPONS,
       },
       importedModel,

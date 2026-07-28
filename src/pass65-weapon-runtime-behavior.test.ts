@@ -250,6 +250,7 @@ describe('Pass 65 managed weapon runtime behavior', () => {
       available: PASS65_AUTHORED_FIREARM_IDS.length + 1,
       prewarming: false,
       unpreparedSwitches: 0,
+      lastUnpreparedSwitch: null,
       maximumRetained: 4,
     });
     expect(prewarmer).toHaveBeenCalledTimes(catalogIds.length);
