@@ -963,7 +963,7 @@
       "sourceProbes": [
         {
           "path": "src/impact-presentation.ts",
-          "symbol": "MAX_PARTICLES = 72"
+          "symbol": "MAX_IMPACT_PARTICLES = 72"
         },
         {
           "path": "src/impact-presentation.ts",
@@ -1406,5 +1406,5 @@
     "adjustable": 15,
     "fixedWithRationale": 7
   },
-  "inventorySha256": "7dccf452efe3992b0760a9d148a36279d3ee2ba67df51b36c57eebcc08b96068"
+  "inventorySha256": "3335085cdedb5e1e61046c55186c14e47c6e62483e7d7e80ebb3d02847bd7eb0"
 }

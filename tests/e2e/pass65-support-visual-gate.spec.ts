@@ -349,7 +349,10 @@ test.describe('Pass 65 support visual fail-closed gate', () => {
         window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(5, 9, -40, 0.83, -0.22);
       });
 
-      await host.evaluate(() => (window.__ATOMIC_ACRES_DEBUG__ as any).fireOnce());
+      await expect.poll(async () => {
+        await host.evaluate(() => (window.__ATOMIC_ACRES_DEBUG__ as any).fireOnce());
+        return (await state(host)).railgun.roundsRemaining;
+      }, { timeout: 3_000 }).toBe(7);
       await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.presentation.activeBeams === 1, undefined, {
         timeout: 3_000,
       });

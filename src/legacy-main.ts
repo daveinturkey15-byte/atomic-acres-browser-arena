@@ -2616,6 +2616,7 @@ let crosshairPreviewMarker: THREE.Group | null = null;
 let crosshairPreviewLastPoint: THREE.Vector3 | null = null;
 const crosshairSupportRaycaster = new THREE.Raycaster();
 const crosshairSupportScreenCenter = new THREE.Vector2(0, 0);
+const crosshairSupportFloorPoint = new THREE.Vector3();
 let triPassHostileMarkers: TriPassHostileMarker[] = [];
 let yardhawkExplosions = 0;
 let triPassLaunches = 0;
@@ -12897,14 +12898,24 @@ function updateCrosshairSupportPreview(): void {
   const floorY = arena.bounds.minY ?? 0;
   const ceilingY = PASS65_FLIGHT_NAVIGATION[selectedArena.id].ceilingY;
   const groundHit = hits.find((candidate) => candidate.point.y >= floorY - 0.05 && candidate.point.y <= ceilingY + 2);
-  if (!groundHit) {
+  let point = groundHit?.point ?? null;
+  if (!point && crosshairSupportRaycaster.ray.direction.y < -0.0001) {
+    const floorDistance = (floorY - crosshairSupportRaycaster.ray.origin.y) / crosshairSupportRaycaster.ray.direction.y;
+    if (floorDistance >= 0) {
+      crosshairSupportRaycaster.ray.at(floorDistance, crosshairSupportFloorPoint);
+      if (crosshairSupportFloorPoint.x >= arena.bounds.minX && crosshairSupportFloorPoint.x <= arena.bounds.maxX
+        && crosshairSupportFloorPoint.z >= arena.bounds.minZ && crosshairSupportFloorPoint.z <= arena.bounds.maxZ) {
+        point = crosshairSupportFloorPoint;
+      }
+    }
+  }
+  if (!point) {
     if (crosshairPreviewMarker) {
       crosshairPreviewMarker.visible = false;
     }
     crosshairPreviewLastPoint = null;
     return;
   }
-  const point = groundHit.point;
   const clampedY = THREE.MathUtils.clamp(point.y, floorY, ceilingY - 0.5);
   const anchor = new THREE.Vector3(point.x, clampedY, point.z);
   crosshairPreviewLastPoint = anchor;
@@ -15757,6 +15768,15 @@ function frame(now: number, scheduleNext = true): void {
     updateDmrThermal();
     updateDeathDrops(now);
     updateFInteractionPrompt(now);
+    if (debugCaptureCameraActive) {
+      camera.position.copy(debugCaptureCameraPosition);
+      camera.rotation.set(debugCaptureCameraPitch, debugCaptureCameraYaw, 0, 'YXZ');
+      if (debugCaptureCameraFov !== null) {
+        camera.fov = debugCaptureCameraFov;
+        camera.updateProjectionMatrix();
+      }
+      camera.updateMatrixWorld(true);
+    }
     updateCrosshairSupportPreview();
     updateCorpsePresentations(now);
     impactPresentation.update(frameDt);
@@ -15779,15 +15799,6 @@ function frame(now: number, scheduleNext = true): void {
     arenaContrastLighting.update(visualNow);
     pass64TslSystems?.update(visualNow);
     if (activeArenaReviewHud) hudRoot.hidden = activeArenaReviewHud === 'hidden';
-    if (debugCaptureCameraActive) {
-      camera.position.copy(debugCaptureCameraPosition);
-      camera.rotation.set(debugCaptureCameraPitch, debugCaptureCameraYaw, 0, 'YXZ');
-      if (debugCaptureCameraFov !== null) {
-        camera.fov = debugCaptureCameraFov;
-        camera.updateProjectionMatrix();
-      }
-      camera.updateMatrixWorld(true);
-    }
     const rendererFrameEligible = gameStarted && menuLifecycle.surface === 'hidden' || debugCaptureCameraActive;
     if (rendererFrameEligible && !debugRenderPaused && !renderSubmissionPaused && !webglContextLost && document.visibilityState === 'visible') {
       let frameSubmitted = false;

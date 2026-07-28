@@ -32,7 +32,7 @@
   },
   "captureReceipt": {
     "path": "source-assets/menu/pass65-preview-masters/runtime-capture-receipt.json",
-    "sha256": "8543de83224647ef7f68d61294f563c6b0a7a82884ea6a718d4b4f0240e7fd0e",
+    "sha256": "955b6cf31d0556418355f8edd01a6b29dd2cb6a6c233b93a5b4c01e37c1318f4",
     "captureId": "pass65-authoritative-runtime-menu-preview-capture-v1",
     "backend": "webgpu"
   },
@@ -43,7 +43,7 @@
     },
     {
       "path": "src/legacy-main.ts",
-      "sha256": "3f437a9cd76036f3a55527b3f401197d9f9b7fa6da41ce34350e6209ea2276e8"
+      "sha256": "6ba16839a13648874ae6a92ce8eed25e15be80bd52938cd9f31a30bbabdf748b"
     }
   ],
   "authoredCockpit": {
@@ -160,73 +160,73 @@
   "runtimeFiles": [
     {
       "path": "public/assets/original/menu-previews/atomic-acres.mp4",
-      "sha256": "5820f7e606b662391f0debba46d5aea76afa6ed9777743c8aa1d16ade758b4a9",
+      "sha256": "fb8e3a177c588ea17c046e84f42cd92d0fbf43b2b0c2d7b637bc113bb861abf4",
       "arenaId": "atomic-acres",
       "extension": "mp4"
     },
     {
       "path": "public/assets/original/menu-previews/atomic-acres.webm",
-      "sha256": "93cad44deb8d3778b686c6b4d4d167bc6010a08bf42ce827ade12114fdfa33e1",
+      "sha256": "6815251b0416bf97ecd1f3eb3eb549beb95c3fa494b6b6599ab5f710dc539e42",
       "arenaId": "atomic-acres",
       "extension": "webm"
     },
     {
       "path": "public/assets/original/menu-previews/atomic-acres.webp",
-      "sha256": "ffec34f2d5631d5c8adf45f1d849048e20c19bf45690ab6473756cb7dc9dae31",
+      "sha256": "747a779bb9f4e5806a53e4060f93a7daf90efd1de7f1152c3fbb977a09df4b1e",
       "arenaId": "atomic-acres",
       "extension": "webp"
     },
     {
       "path": "public/assets/original/menu-previews/skyline-terminal.mp4",
-      "sha256": "76966cdc147b176b85d5cd2e2b60238c4819cbc9bac2335bdb72e5f16d3f53d7",
+      "sha256": "63309261c2ad52288d21d20c9f88c200fa94803825287550a94150eb9c435530",
       "arenaId": "skyline-terminal",
       "extension": "mp4"
     },
     {
       "path": "public/assets/original/menu-previews/skyline-terminal.webm",
-      "sha256": "3f3c77ed04d3e803c2d5b5127a4c5b5381658309197e8ada7a3a0e9069b88d98",
+      "sha256": "da6b426e65266d39f5b8bc04742d77606a6f65620eddd4078afce2c584de1303",
       "arenaId": "skyline-terminal",
       "extension": "webm"
     },
     {
       "path": "public/assets/original/menu-previews/skyline-terminal.webp",
-      "sha256": "4e86dbcd43687f46d1d35148ce3841476532e7909c18b0457ed0cb7623ee92f1",
+      "sha256": "99613699f849301e2fe3df4d449a7a2f6ce8ade9c513047bf17a637f7705875c",
       "arenaId": "skyline-terminal",
       "extension": "webp"
     },
     {
       "path": "public/assets/original/menu-previews/rustworks-1v1.mp4",
-      "sha256": "e87e009e32044a3fce7ed7735d0511d5c94705ef8f882fce79878a2ad7d3d160",
+      "sha256": "1acab3dc28eddc330926d082c470c9aca42e50f4d103124da9a199eed99032da",
       "arenaId": "rustworks-1v1",
       "extension": "mp4"
     },
     {
       "path": "public/assets/original/menu-previews/rustworks-1v1.webm",
-      "sha256": "5217a2c888eeece2814e891eb23d2a6bc57c4c839ca39d9f7b78c889a9bd324e",
+      "sha256": "3983ed17a6587bdacd5d58799f8790aa3d72099b7f3dd3a48b2a494a03dc3950",
       "arenaId": "rustworks-1v1",
       "extension": "webm"
     },
     {
       "path": "public/assets/original/menu-previews/rustworks-1v1.webp",
-      "sha256": "c34a63f8fea5a3a5f02c32be8ab1ffc75f92cea50cdd7c51f15e67e3c20a24fa",
+      "sha256": "87c8f43ee89f9335d4d31aa3e6958ccde66a2ede51958040bc75aeb4211b9c7c",
       "arenaId": "rustworks-1v1",
       "extension": "webp"
     },
     {
       "path": "public/assets/original/menu-previews/gun-range.mp4",
-      "sha256": "ca87f1b96ca4b36a711fe5e7913895dab50a5df5453a7766fbdb4c16d5013e37",
+      "sha256": "4aeff1b31fa5aae4aeb60d645c0f67892479c8528d7eeddc73ee5c1ead108b80",
       "arenaId": "gun-range",
       "extension": "mp4"
     },
     {
       "path": "public/assets/original/menu-previews/gun-range.webm",
-      "sha256": "26e1a4c4ef1ba653043c2407f60e6e823ff25e543056c908a827da62bd893d11",
+      "sha256": "ff5896d77ef504688f1f5440b63a48a5b3cdc1e80ff0753815b1124f5eae9453",
       "arenaId": "gun-range",
       "extension": "webm"
     },
     {
       "path": "public/assets/original/menu-previews/gun-range.webp",
-      "sha256": "ebfefb7c176fbb21b3a4f001d0c23b8b6aa7d1a0421f284bad41c524ed8b0680",
+      "sha256": "2620a2400d8fdf9296118d7d18a7d10e102a753c91cdb620c6e5ec24ac9347dd",
       "arenaId": "gun-range",
       "extension": "webp"
     }
@@ -234,7 +234,7 @@
   "reviewEvidence": [
     {
       "path": "docs/assets/pass65-menu-previews/atomic-acres-review-frames.webp",
-      "sha256": "9e91e64ef1d503f096a27a417bc4729e518e5891f31d513f1b6ea6ac77830711",
+      "sha256": "d37cb129ef37bf5d07c3dcd0c3a007626d6e40ca7bddd6303606ab4b4f2faf62",
       "arenaId": "atomic-acres",
       "frames": [
         1,
@@ -246,7 +246,7 @@
     },
     {
       "path": "docs/assets/pass65-menu-previews/skyline-terminal-review-frames.webp",
-      "sha256": "8e489b4f2b711096a6d24a8b603d6643891e0f509a842f4d67e90158edb808ed",
+      "sha256": "92ca7adb207f2bc6694ee87720bedc328fa41a328e5938fde2973ac722986d34",
       "arenaId": "skyline-terminal",
       "frames": [
         1,
@@ -258,7 +258,7 @@
     },
     {
       "path": "docs/assets/pass65-menu-previews/rustworks-1v1-review-frames.webp",
-      "sha256": "9df1e2e5dc30ac622e9cf16afcab95de5ae479b9fd1fffd178613baee2f32d36",
+      "sha256": "cc0416d399fd347fa29b2ca98bd98833e48b2cc6929b2693c17a4794815c0ca0",
       "arenaId": "rustworks-1v1",
       "frames": [
         1,
@@ -270,7 +270,7 @@
     },
     {
       "path": "docs/assets/pass65-menu-previews/gun-range-review-frames.webp",
-      "sha256": "fb1bbcfb9c199962cea12669501b0941b8a0db966796b4467b5fe032ac68e171",
+      "sha256": "6420824f4bddd9a7846fb93696befc6c5ae0b8c421ea2d6cff295c1edba40b17",
       "arenaId": "gun-range",
       "frames": [
         1,

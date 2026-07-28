@@ -158,7 +158,7 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
   feature({
     id: 'impact-particles-and-decals', title: 'Material impacts, particles and persistent decals', availability: 'active', owner: 'src/impact-presentation.ts',
     sourceProbes: [
-      { path: 'src/impact-presentation.ts', symbol: 'MAX_PARTICLES = 72' },
+      { path: 'src/impact-presentation.ts', symbol: 'MAX_IMPACT_PARTICLES = 72' },
       { path: 'src/impact-presentation.ts', symbol: 'MAX_IMPACT_MARKS = 48' },
     ], pipelineIds: [],
     control: control('setting', ['graphics.particleQuality', 'graphics.decalQuality', 'graphics.preset', 'graphics.adaptiveResolution'], 'Independent Low/High/Ultra particle-density and round-persistent decal-capacity scaling composes with the adaptive effects budget', 'The canonical controls modify the bounded presentation budget without changing admitted impacts, hit outcomes, collision, or authoritative destruction.'),
