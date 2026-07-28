@@ -536,7 +536,17 @@ type PresentedEntity = Readonly<{
 type SwarmInstanceBatch = Readonly<{
   root: THREE.InstancedMesh;
   sources: readonly THREE.Mesh[];
+  staticLocalMatrices: readonly THREE.Matrix4[] | null;
 }>;
+
+function isAnimatedSwarmSource(source: THREE.Object3D, root: THREE.Object3D): boolean {
+  let cursor: THREE.Object3D | null = source;
+  while (cursor && cursor !== root) {
+    if (/rotor|propeller/i.test(cursor.name)) return true;
+    cursor = cursor.parent;
+  }
+  return false;
+}
 
 type PresentedEntityPoolKey = 'chopper' | 'care-aircraft' | 'carpet-aircraft' | 'care-crate' | 'piloted-drone' | 'swarm-drone';
 
@@ -1305,6 +1315,7 @@ export class KillstreakPresentation {
     });
     const primitiveCount = sourceMeshes[0]?.length ?? 0;
     if (primitiveCount === 0 || sourceMeshes.some((meshes) => meshes.length !== primitiveCount)) return;
+    for (const entry of pool) entry.root.updateWorldMatrix(true, true);
 
     const initialMatrix = new THREE.Matrix4();
     for (let primitiveIndex = 0; primitiveIndex < primitiveCount; primitiveIndex += 1) {
@@ -1328,7 +1339,16 @@ export class KillstreakPresentation {
       instanced.count = pool.length;
       instanced.visible = false;
       this.root.add(instanced);
-      this.swarmInstanceBatches.push(Object.freeze({ root: instanced, sources: Object.freeze(sources) }));
+      const staticLocalMatrices = sources.some((source, index) => isAnimatedSwarmSource(source, pool[index]!.root))
+        ? null
+        : sources.map((source, index) => (
+          new THREE.Matrix4().copy(pool[index]!.root.matrixWorld).invert().multiply(source.matrixWorld)
+        ));
+      this.swarmInstanceBatches.push(Object.freeze({
+        root: instanced,
+        sources: Object.freeze(sources),
+        staticLocalMatrices: staticLocalMatrices ? Object.freeze(staticLocalMatrices) : null,
+      }));
     }
     for (const meshes of sourceMeshes) {
       for (const source of meshes) {
@@ -1355,13 +1375,21 @@ export class KillstreakPresentation {
     this.root.updateWorldMatrix(true, false);
     const inverseRoot = new THREE.Matrix4().copy(this.root.matrixWorld).invert();
     const instanceMatrix = new THREE.Matrix4();
-    for (const entry of active) entry.root.updateWorldMatrix(true, true);
+    const sourceWorldMatrix = new THREE.Matrix4();
+    for (const entry of active) entry.root.updateWorldMatrix(true, false);
     for (const batch of this.swarmInstanceBatches) {
       for (const [instanceIndex, entry] of active.entries()) {
         const poolIndex = Number(entry.root.userData.presentationPoolIndex);
         const source = Number.isInteger(poolIndex) ? batch.sources[poolIndex] : undefined;
         if (!source) continue;
-        instanceMatrix.multiplyMatrices(inverseRoot, source.matrixWorld);
+        const staticLocalMatrix = batch.staticLocalMatrices?.[poolIndex];
+        if (staticLocalMatrix) {
+          sourceWorldMatrix.multiplyMatrices(entry.root.matrixWorld, staticLocalMatrix);
+        } else {
+          source.updateWorldMatrix(true, false);
+          sourceWorldMatrix.copy(source.matrixWorld);
+        }
+        instanceMatrix.multiplyMatrices(inverseRoot, sourceWorldMatrix);
         batch.root.setMatrixAt(instanceIndex, instanceMatrix);
       }
       batch.root.count = active.length;
