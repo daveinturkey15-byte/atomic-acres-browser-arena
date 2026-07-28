@@ -15,9 +15,9 @@ async function clickVisibleExact(page, text) { const nodes = page.getByText(text
 async function moveAim(page, x, y) { await page.evaluate(({ mx, my }) => window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, movementX: mx, movementY: my })), { mx: x, my: y }); }
 async function firePulse(page, pulseMs) { await page.evaluate(() => { const c = document.querySelector('#game'); window.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 2, buttons: 2 })); c?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 2, buttons: 2 })); window.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, buttons: 3 })); c?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, buttons: 3 })); }); await sleep(pulseMs); await page.evaluate(() => { const c = document.querySelector('#game'); window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0, buttons: 2 })); c?.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0, buttons: 2 })); window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 2, buttons: 0 })); c?.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 2, buttons: 0 })); }); }
 async function capture(page) { const jpeg = await page.screenshot({ type: 'jpeg', quality: 78 }); const { data, info } = await sharp(jpeg).resize({ width: 320, height: 180, fit: 'fill' }).removeAlpha().raw().toBuffer({ resolveWithObject: true }); return { jpeg, width: info.width, height: info.height, targets: findCyanRangeTargets(data, info.width, info.height, info.channels) }; }
-function targetNearestCentre(frame) { const cx = frame.width / 2; const cy = frame.height / 2; return frame.targets.map((target) => ({ target, distance: Math.hypot(target.x - cx, target.y - cy) })).sort((a, b) => a.distance - b.distance)[0]?.target ?? null; }
+function targetNearestCentre(frame, avoidCentreRadius = 0) { const cx = frame.width / 2; const cy = frame.height / 2; return frame.targets.map((target) => ({ target, distance: Math.hypot(target.x - cx, target.y - cy) })).filter(({ distance }) => distance >= avoidCentreRadius).sort((a, b) => a.distance - b.distance)[0]?.target ?? null; }
 async function hud(page) { return page.evaluate(() => ({ mode: document.querySelector('#match-mode-label')?.textContent?.trim() ?? null, objective: document.querySelector('#objective')?.textContent?.trim() ?? null, weapon: document.querySelector('#weapon-name')?.textContent?.trim() ?? null, ammo: Number(document.querySelector('#ammo')?.textContent?.match(/\d+/)?.[0] ?? NaN), pointer: Boolean(document.pointerLockElement), focused: document.hasFocus(), summary: Boolean(document.querySelector('#download-match-summary')) })); }
-async function aimAtVisibleTarget(page, evidenceDirectory, firstEvidence) { const cx = 160; const cy = 90; let selected = null; for (let step = 0; step < 12; step += 1) { const frame = await capture(page); selected = selected ? associateRangeTarget(selected, frame.targets, 18)?.target ?? targetNearestCentre(frame) : targetNearestCentre(frame); if (!selected) { await sleep(80); continue; } if (firstEvidence && step === 0) await writeFile(resolve(evidenceDirectory, 'first-range-target.jpg'), frame.jpeg); const dx = selected.x - cx; const dy = selected.y - cy; if (Math.hypot(dx, dy) <= 2.5) return { target: selected, error: Math.hypot(dx, dy) }; await moveAim(page, clamp(dx * 4, -90, 90), clamp(dy * 4, -90, 90)); await sleep(70); selected = null; } return null; }
+async function aimAtVisibleTarget(page, evidenceDirectory, firstEvidence, avoidCentreOnFirstFrame = false) { const cx = 160; const cy = 90; let selected = null; for (let step = 0; step < 12; step += 1) { const frame = await capture(page); const avoidRadius = avoidCentreOnFirstFrame && step === 0 ? 10 : 0; selected = selected ? associateRangeTarget(selected, frame.targets, 18)?.target ?? targetNearestCentre(frame, avoidRadius) : targetNearestCentre(frame, avoidRadius); if (!selected) { await sleep(80); continue; } if (firstEvidence && step === 0) await writeFile(resolve(evidenceDirectory, 'first-range-target.jpg'), frame.jpeg); const dx = selected.x - cx; const dy = selected.y - cy; if (Math.hypot(dx, dy) <= 2.5) return { target: selected, error: Math.hypot(dx, dy) }; await moveAim(page, clamp(dx * 4, -90, 90), clamp(dy * 4, -90, 90)); await sleep(70); selected = null; } return null; }
 async function download(page, selector, path) { const event = page.waitForEvent('download', { timeout: 20_000 }); await page.locator(selector).click({ timeout: 20_000 }); const file = await event; await file.saveAs(path); return JSON.parse(await readFile(path, 'utf8')); }
 
 export async function runRange(args) {
@@ -32,7 +32,7 @@ export async function runRange(args) {
   const browser = await chromium.connectOverCDP(String(args.cdp ?? 'http://127.0.0.1:9333'));
   const context = browser.contexts()[0]; const page = context.pages()[0]; const errors = []; const actions = []; let releasedAtEnd = false;
   page.on('pageerror', (error) => errors.push(String(error)));
-  const startedAt = new Date(); let startedFireAt = null; let pulseCount = 0; let reloadCount = 0; let firstEvidence = true; let invalidReason = null; let finalHud = null; let lastScore = 0; let lastHits = 0; let scoreChangeCount = 0; let missStreak = 0; let recoveryCount = 0;
+  const startedAt = new Date(); let startedFireAt = null; let pulseCount = 0; let reloadCount = 0; let firstEvidence = true; let invalidReason = null; let finalHud = null; let lastScore = 0; let lastHits = 0; let scoreChangeCount = 0; let missStreak = 0; let recoveryCount = 0; let forceOffCentreAcquisition = false;
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 120_000 });
     await page.locator('#menu').waitFor({ state: 'visible', timeout: 120_000 });
@@ -106,6 +106,7 @@ export async function runRange(args) {
         lastScore = observedRange.score;
         lastHits = observedRange.hits;
         missStreak = 0;
+        forceOffCentreAcquisition = true;
         await page.screenshot({ path: resolve(output, `score-change-${String(scoreChangeCount).padStart(2, '0')}.png`) });
         if (targetResetMs > 0) { await sleep(targetResetMs); continue; }
       }
@@ -121,9 +122,10 @@ export async function runRange(args) {
       if (Number.isFinite(current.ammo) && current.ammo <= 4) { await page.keyboard.press('KeyR'); reloadCount += 1; actions.push({ atMs: Date.now() - startedAt.getTime(), kind: 'reload', ammo: current.ammo }); await sleep(1450); continue; }
       const elapsedSincePulse = Date.now() - previousPulseAt;
       if (elapsedSincePulse < cadenceMs) { await sleep(Math.min(40, cadenceMs - elapsedSincePulse)); continue; }
-      const aimed = await aimAtVisibleTarget(page, output, firstEvidence);
+      const aimed = await aimAtVisibleTarget(page, output, firstEvidence, forceOffCentreAcquisition);
       firstEvidence = false;
       if (!aimed) { await sleep(80); continue; }
+      forceOffCentreAcquisition = false;
       const before = await capture(page); await sleep(45); const after = await capture(page);
       const beforeTarget = targetNearestCentre(before); const associated = associateRangeTarget(beforeTarget, after.targets, 8)?.target;
       const centreError = associated ? Math.hypot(associated.x - 160, associated.y - 90) : Infinity;
