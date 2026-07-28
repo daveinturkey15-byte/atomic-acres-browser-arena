@@ -19,16 +19,12 @@ const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, '../..');
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function waitForPostInputVision(visionStream, inputIssuedAt, timeoutMs = 260) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const latest = visionStream.state.latest;
-    // One full 30 Hz render interval avoids consuming a screencast packet that
-    // was already in flight when the mouse delta was dispatched.
-    if (latest && latest.receivedAt >= inputIssuedAt + 35) return latest;
-    await sleep(15);
-  }
-  return null;
+async function waitForPostInputVision(visionStream, sourceSequence, inputCompletedAt, timeoutMs = 300) {
+  return visionStream.captureAfter({
+    sourceSequence,
+    notBefore: inputCompletedAt + 40,
+    timeoutMs,
+  });
 }
 
 async function withTimeout(promise, milliseconds, label) {
@@ -229,6 +225,7 @@ async function createVisionCapture(context, page, options = {}) {
     state.decodedFrames += 1;
     state.latest = {
       sequence: state.decodedFrames,
+      sourceSequence: packet.sequence,
       receivedAt: packet.receivedAt,
       jpeg,
       targets,
@@ -247,6 +244,37 @@ async function createVisionCapture(context, page, options = {}) {
 
   return {
     state,
+    async captureAfter({ sourceSequence = 0, notBefore = 0, timeoutMs = 300 } = {}) {
+      if (state.stopped) throw new Error('Vision capture is stopped');
+      if (mode !== 'screencast') {
+        const captured = await this.capture();
+        return captured.receivedAt >= notBefore ? captured : null;
+      }
+      const captureStartedAt = performance.now();
+      const deadline = performance.now() + timeoutMs;
+      while (performance.now() < deadline) {
+        if (latestPacket && latestPacket.sequence > sourceSequence && latestPacket.receivedAt >= notBefore) {
+          consumedPacketSequence = latestPacket.sequence;
+          return decodePacket(latestPacket, captureStartedAt);
+        }
+        const remaining = Math.max(1, deadline - performance.now());
+        const woke = await new Promise((resolveFrame) => {
+          let timer;
+          const wake = () => {
+            clearTimeout(timer);
+            frameWaiters.delete(wake);
+            resolveFrame(true);
+          };
+          timer = setTimeout(() => {
+            frameWaiters.delete(wake);
+            resolveFrame(false);
+          }, remaining);
+          frameWaiters.add(wake);
+        });
+        if (!woke) break;
+      }
+      return null;
+    },
     async capture() {
       if (state.stopped) throw new Error('Vision capture is stopped');
       const captureStartedAt = performance.now();
@@ -719,18 +747,24 @@ async function run() {
           let horizontal = aimedTarget.x - aimedVision.width / 2;
           let vertical = aimedTarget.y - aimedVision.height / 2;
           let alignment = Math.hypot(horizontal / aimedVision.width, vertical / aimedVision.height);
-          const aimTrace = [{ step: 0, x: aimedTarget.x, y: aimedTarget.y, horizontal, vertical, alignment }];
+          let postInputReacquired = true;
+          const aimTrace = [{ step: 0, sourceSequence: aimedVision.sourceSequence, x: aimedTarget.x, y: aimedTarget.y, horizontal, vertical, alignment }];
           for (let aimStep = 0; aimStep < 4 && alignment >= 0.025; aimStep += 1) {
             const movementX = Math.max(-90, Math.min(90, Math.round(horizontal * 1.05)));
             const movementY = Math.max(-55, Math.min(55, Math.round(vertical * 1.50)));
             if (movementX === 0 && movementY === 0) break;
-            const inputIssuedAt = performance.now();
+            const previousSourceSequence = aimedVision.sourceSequence;
             await moveAim(page, movementX, movementY);
+            const inputCompletedAt = performance.now();
             aimMoves += 1;
             aimServoMoves += 1;
             cameraMovedThisFrame = true;
-            const reacquiredVision = await waitForPostInputVision(visionStream, inputIssuedAt);
-            if (!reacquiredVision || reacquiredVision.operatorTargets.length === 0) break;
+            const reacquiredVision = await waitForPostInputVision(visionStream, previousSourceSequence, inputCompletedAt);
+            if (!reacquiredVision || reacquiredVision.operatorTargets.length === 0) {
+              postInputReacquired = false;
+              alignment = Number.POSITIVE_INFINITY;
+              break;
+            }
             const reacquiredTarget = [...reacquiredVision.operatorTargets].sort((left, right) => {
               const leftCentre = Math.hypot(left.x - reacquiredVision.width / 2, left.y - reacquiredVision.height / 2);
               const rightCentre = Math.hypot(right.x - reacquiredVision.width / 2, right.y - reacquiredVision.height / 2);
@@ -741,7 +775,7 @@ async function run() {
             horizontal = aimedTarget.x - aimedVision.width / 2;
             vertical = aimedTarget.y - aimedVision.height / 2;
             alignment = Math.hypot(horizontal / aimedVision.width, vertical / aimedVision.height);
-            aimTrace.push({ step: aimStep + 1, commandX: movementX, commandY: movementY, x: aimedTarget.x, y: aimedTarget.y, horizontal, vertical, alignment });
+            aimTrace.push({ step: aimStep + 1, commandX: movementX, commandY: movementY, sourceSequence: aimedVision.sourceSequence, x: aimedTarget.x, y: aimedTarget.y, horizontal, vertical, alignment });
           }
           if (!firstTargetCaptured) {
             await writeFile(resolve(artifactDirectory, 'first-target.jpg'), vision.jpeg);
@@ -750,7 +784,7 @@ async function run() {
             firstTargetAnnotatedCaptured = true;
           }
           const currentlyReloading = Boolean(hud?.reloadActive) || now < reloadSuppressedUntil;
-          if (allowCombatFire && tracking.fireAuthorized && activeMatch && alignment < 0.03
+          if (allowCombatFire && tracking.fireAuthorized && postInputReacquired && activeMatch && alignment < 0.03
             && !currentlyReloading && now - lastBurstAt >= fireCooldownMs) {
             const shots = Math.max(1, Math.min(burstShots, Number(hud?.ammo ?? burstShots)));
             if (!firstFireCaptured) {
@@ -771,6 +805,7 @@ async function run() {
               trackAge: tracking.age,
               stableFrames: tracking.stableFrames,
               evidenceFrames: tracking.evidenceFrames,
+              postInputReacquired,
               aimTrace,
               target: { x: aimedTarget.x, y: aimedTarget.y, pixels: aimedTarget.pixels, bounds: aimedTarget.bounds },
             });
@@ -782,6 +817,7 @@ async function run() {
             trackAge: tracking.age,
             stableFrames: tracking.stableFrames,
             evidenceFrames: tracking.evidenceFrames,
+            postInputReacquired,
             aimTrace,
             target: { x: aimedTarget.x, y: aimedTarget.y, pixels: aimedTarget.pixels, bounds: aimedTarget.bounds },
             candidates: aimedVision.operatorTargets.length,
