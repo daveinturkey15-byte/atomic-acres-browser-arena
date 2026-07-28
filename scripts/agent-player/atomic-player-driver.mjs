@@ -292,6 +292,7 @@ async function visibleHudSnapshot(page) {
       bannerVisible,
       respawnVisible,
       reloadState: document.querySelector('#reload-state')?.textContent?.trim() ?? '',
+      reloadActive: document.querySelector('#reload-state')?.classList?.contains('active') ?? false,
       matchSummaryVisible,
       activeMatch: !countdownVisible && !bannerVisible && !respawnVisible && !matchSummaryVisible && Boolean(timer && timer !== '00:00'),
     };
@@ -652,7 +653,7 @@ async function run() {
         }
         if (hud?.damageTaken !== null && hud?.damageTaken !== undefined) previousDamageTaken = Number(hud.damageTaken);
 
-        const reloadingVisible = Boolean(hud?.reloadState) || now < reloadSuppressedUntil;
+        const reloadingVisible = Boolean(hud?.reloadActive) || now < reloadSuppressedUntil;
         if (activeMatch && hud?.ammo !== null && hud.ammo <= 3 && Number(hud.reserve ?? 0) > 0
           && !reloadingVisible && now - lastReloadRequestAt >= 2_200) {
           await page.keyboard.press('KeyR');
@@ -734,7 +735,7 @@ async function run() {
             firstTargetCaptured = true;
             firstTargetAnnotatedCaptured = true;
           }
-          const currentlyReloading = Boolean(hud?.reloadState) || now < reloadSuppressedUntil;
+          const currentlyReloading = Boolean(hud?.reloadActive) || now < reloadSuppressedUntil;
           if (allowCombatFire && tracking.fireAuthorized && activeMatch && alignment < 0.065
             && !currentlyReloading && now - lastBurstAt >= fireCooldownMs) {
             const shots = Math.max(1, Math.min(burstShots, Number(hud?.ammo ?? burstShots)));
