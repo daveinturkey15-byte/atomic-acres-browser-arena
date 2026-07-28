@@ -40,8 +40,8 @@ export async function runRange(args) {
     await page.waitForFunction(() => document.querySelector('#match-mode-label')?.textContent?.includes('TARGET DRILL'), null, { timeout: 30_000 });
     await sleep(400); await page.screenshot({ path: resolve(output, 'range-spawn.png') });
     await trustedClick(page, '#game'); await sleep(120);
-    await page.keyboard.down('KeyA'); await sleep(700); await page.keyboard.up('KeyA');
-    await page.keyboard.down('KeyW'); await sleep(900); await page.keyboard.up('KeyW');
+    await page.keyboard.down('KeyA'); await sleep(1700); await page.keyboard.up('KeyA');
+    await page.keyboard.down('KeyW'); await sleep(1600); await page.keyboard.up('KeyW');
     await page.keyboard.press('KeyF'); await sleep(350);
     let current = await hud(page);
     if (current.weapon !== 'VECTORLINE SMG') throw new Error(`Visible weapon pickup failed: ${current.weapon}`);
