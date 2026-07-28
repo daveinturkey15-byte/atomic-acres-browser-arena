@@ -19,6 +19,7 @@ const MAX_SENSOR_CONTACTS = 16;
 const MAX_PLACEMENT_MARKERS = 8;
 export const HUNTER_DRONE_ASSET = './assets/original/models/support/hunter-drone-lod0.glb';
 const HUNTER_DRONE_TARGET_MAX_DIMENSION = 1.45;
+const HUNTER_DRONE_LOOP_ACTIONS = Object.freeze(['Drone_Propellers_Loop']);
 export const SUPPORT_VEHICLE_ASSETS = Object.freeze({
   chopper: Object.freeze([
     './assets/original/models/support/pass65-chopper-gunner-lod0.glb',
@@ -541,10 +542,26 @@ type SwarmInstanceBatch = Readonly<{
   ownsGeometry: boolean;
 }>;
 
-function isAnimatedSwarmSource(source: THREE.Object3D, root: THREE.Object3D): boolean {
+function activeSwarmAnimationTargetNames(): ReadonlySet<string> {
+  const names = new Set<string>();
+  for (const clip of hunterDroneAnimations) {
+    if (!HUNTER_DRONE_LOOP_ACTIONS.includes(clip.name)) continue;
+    for (const track of clip.tracks) {
+      const target = THREE.PropertyBinding.parseTrackName(track.name).nodeName;
+      if (target) names.add(target);
+    }
+  }
+  return names;
+}
+
+function isAnimatedSwarmSource(
+  source: THREE.Object3D,
+  root: THREE.Object3D,
+  animatedTargetNames: ReadonlySet<string>,
+): boolean {
   let cursor: THREE.Object3D | null = source;
   while (cursor && cursor !== root) {
-    if (/rotor|propeller|gun/i.test(cursor.name)) return true;
+    if (animatedTargetNames.has(cursor.name)) return true;
     cursor = cursor.parent;
   }
   return false;
@@ -946,8 +963,10 @@ function buildDrone(mode: 'piloted' | 'swarm' | null): PresentedEntity {
     root.userData.weaponFeedback = [...SUPPORT_WEAPON_FEEDBACK_CONTRACT];
     markSharedPresentationAsset(root);
     const mixer = new THREE.AnimationMixer(root);
-    const propellers = hunterDroneAnimations.find((clip) => clip.name === 'Drone_Propellers_Loop');
-    if (propellers) mixer.clipAction(propellers).play();
+    for (const clipName of HUNTER_DRONE_LOOP_ACTIONS) {
+      const clip = hunterDroneAnimations.find((candidate) => candidate.name === clipName);
+      if (clip) mixer.clipAction(clip).play();
+    }
     return Object.freeze({ root, rotor: null, target: new THREE.Vector3(), mixers: Object.freeze([mixer]), authored: true });
   }
   const root = new THREE.Group();
@@ -1325,6 +1344,12 @@ export class KillstreakPresentation {
 
   private installSwarmInstancing(): void {
     const pool = this.entityPools.get('swarm-drone') ?? [];
+    const animatedTargetNames = new Set(activeSwarmAnimationTargetNames());
+    // Procedural non-release fallback drones rotate this authored group
+    // directly rather than through an AnimationClip.
+    for (const entry of pool) {
+      if (!entry.authored && entry.rotor?.name) animatedTargetNames.add(entry.rotor.name);
+    }
     const sourceMeshes = pool.map((entry) => {
       const meshes: THREE.Mesh[] = [];
       entry.root.traverse((node) => {
@@ -1375,7 +1400,9 @@ export class KillstreakPresentation {
     const individualIndices: number[] = [];
     for (let primitiveIndex = 0; primitiveIndex < primitiveCount; primitiveIndex += 1) {
       const sources = sourceMeshes.map((meshes) => meshes[primitiveIndex]!);
-      const dynamic = sources.some((source, index) => isAnimatedSwarmSource(source, pool[index]!.root));
+      const dynamic = sources.some((source, index) => (
+        isAnimatedSwarmSource(source, pool[index]!.root, animatedTargetNames)
+      ));
       const key = dynamic ? null : swarmStaticMergeKey(sources[0]!);
       if (!key) individualIndices.push(primitiveIndex);
       else {
@@ -1416,7 +1443,9 @@ export class KillstreakPresentation {
     for (const primitiveIndex of individualIndices) {
       const sources = sourceMeshes.map((meshes) => meshes[primitiveIndex]!);
       const representative = sources[0]!;
-      const staticLocalMatrices = sources.some((source, index) => isAnimatedSwarmSource(source, pool[index]!.root))
+      const staticLocalMatrices = sources.some((source, index) => (
+        isAnimatedSwarmSource(source, pool[index]!.root, animatedTargetNames)
+      ))
         ? null
         : sources.map((source, index) => (
           new THREE.Matrix4().copy(pool[index]!.root.matrixWorld).invert().multiply(source.matrixWorld)
