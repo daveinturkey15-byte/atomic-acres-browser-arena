@@ -17801,7 +17801,17 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     };
   },
   earnSupport: (eliminations: number) => {
-    for (let index = 0; index < Math.max(0, Math.min(15, Math.floor(eliminations))); index += 1) awardSupportElimination(false);
+    if (network.role === 'client') return;
+    const admitted = Math.max(0, Math.min(15, Math.floor(eliminations)));
+    for (let index = 0; index < admitted; index += 1) {
+      killstreakRuntime.recordEligibleElimination(player.id, 'weapon');
+    }
+    // QA grants model elapsed eliminations, not fifteen kills occurring in one
+    // browser task. Project and paint the resulting authority once so activation
+    // endurance does not benchmark synthetic snapshot/HUD churn.
+    refreshLocalKillstreakSnapshot();
+    broadcastKillstreakState();
+    updateFieldSupportHud();
   },
   activateKillstreak: (id: Pass65KillstreakId, anchor) => Boolean(requestKillstreakActivation(id, performance.now(), anchor)),
   forceBotGrenade: (fuseMs = 1_100, grenade: GrenadeId = 'frag') => {
