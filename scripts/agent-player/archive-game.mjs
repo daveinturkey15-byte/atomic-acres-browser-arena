@@ -85,6 +85,30 @@ function equalValue(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+function canonicalValue(value) {
+  if (Array.isArray(value)) return value.map(canonicalValue);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalValue(value[key])]));
+  }
+  return value;
+}
+
+export function policyConfigurationFingerprint(configuration) {
+  return createHash('sha256').update(JSON.stringify(canonicalValue(configuration))).digest('hex');
+}
+
+export function hardGateFailures(benchmark, registry = METRIC_REGISTRY) {
+  return registry
+    .filter((metric) => metric.direction === 'invariant')
+    .map((metric) => ({
+      key: metric.key,
+      expected: metric.expected,
+      value: comparableValue(valueAt(benchmark, metric.path)),
+    }))
+    .filter((gate) => gate.value === null || !equalValue(gate.value, gate.expected))
+    .map((gate) => ({ ...gate, reason: gate.value === null ? 'missing' : 'mismatch' }));
+}
+
 export function compareBenchmarks(current, reference, referenceId, registry = METRIC_REGISTRY) {
   const rows = registry.map((metric) => {
     const value = comparableValue(valueAt(current, metric.path));
@@ -124,8 +148,8 @@ export function compareBenchmarks(current, reference, referenceId, registry = ME
   });
   const counts = Object.fromEntries(['improved', 'regressed', 'unchanged', 'informational', 'missing', 'incomparable']
     .map((label) => [label, rows.filter((row) => row.label === label).length]));
-  const hardRegressions = rows.filter((row) => row.label === 'regressed'
-    && registry.find((metric) => metric.key === row.key)?.direction === 'invariant').map((row) => row.key);
+  const absoluteHardFailures = hardGateFailures(current, registry);
+  const hardRegressions = absoluteHardFailures.map((failure) => failure.key);
   return {
     schemaVersion: 1,
     kind: 'atomic-player-game-comparison',
@@ -133,6 +157,7 @@ export function compareBenchmarks(current, reference, referenceId, registry = ME
     counts,
     hardRegression: hardRegressions.length > 0,
     hardRegressions,
+    absoluteHardFailures,
     rows,
   };
 }
@@ -210,26 +235,52 @@ export function partialBenchmarkFromReport(report) {
   };
 }
 
-export function validateExperimentPolicy(policy) {
+export function validateExperimentPolicy(policy, { report = null, modelPolicy = null } = {}) {
   if (!policy || typeof policy !== 'object' || Array.isArray(policy)) {
     throw new Error('experiment-policy.json must contain an object');
   }
+  if (policy.schemaVersion !== 1) throw new Error('experiment-policy.json requires schemaVersion 1');
+  const placeholder = /(replace|placeholder|yyyy|wrong-profile|claimed-|\banything\b)/i;
   for (const key of ['policyId', 'hypothesis', 'rollbackCondition']) {
-    if (typeof policy[key] !== 'string' || policy[key].trim().length < 4) {
-      throw new Error(`experiment-policy.json requires a substantive ${key}`);
+    if (typeof policy[key] !== 'string' || policy[key].trim().length < 8 || placeholder.test(policy[key])) {
+      throw new Error(`experiment-policy.json requires a substantive non-placeholder ${key}`);
     }
   }
   for (const key of ['expectedMetricMovements', 'unchangedControls']) {
-    if (!Array.isArray(policy[key]) || policy[key].length === 0 || policy[key].some((item) => typeof item !== 'string' || !item.trim())) {
-      throw new Error(`experiment-policy.json requires a non-empty string array ${key}`);
+    if (!Array.isArray(policy[key]) || policy[key].length === 0 || policy[key].some((item) => typeof item !== 'string' || item.trim().length < 8 || placeholder.test(item))) {
+      throw new Error(`experiment-policy.json requires a non-placeholder string array ${key}`);
     }
   }
   if (!policy.configuration || typeof policy.configuration !== 'object' || Array.isArray(policy.configuration)) {
     throw new Error('experiment-policy.json requires a configuration object');
   }
   for (const key of ['playerHarnessCommit', 'profile', 'provider', 'model', 'reasoningEffort', 'serviceTier']) {
-    if (typeof policy.configuration[key] !== 'string' || !policy.configuration[key].trim()) {
-      throw new Error(`experiment-policy.json configuration requires ${key}`);
+    if (typeof policy.configuration[key] !== 'string' || !policy.configuration[key].trim() || placeholder.test(policy.configuration[key])) {
+      throw new Error(`experiment-policy.json configuration requires a non-placeholder ${key}`);
+    }
+  }
+  if (!/^[0-9a-f]{7,40}$/i.test(policy.configuration.playerHarnessCommit)) {
+    throw new Error('experiment-policy.json playerHarnessCommit must be a real git SHA');
+  }
+  if (policy.configuration.profile !== 'atomicplayer') {
+    throw new Error('counted Atomic Player policy must use the atomicplayer profile');
+  }
+  if (report?.source?.harnessGitSha && policy.configuration.playerHarnessCommit !== report.source.harnessGitSha) {
+    throw new Error('experiment-policy.json playerHarnessCommit does not match the driver receipt');
+  }
+  if (modelPolicy) {
+    const expected = modelPolicy?.profiles?.[policy.configuration.profile];
+    if (!expected) throw new Error(`model policy does not index profile ${policy.configuration.profile}`);
+    const pairs = [
+      ['provider', expected.provider],
+      ['model', expected.model],
+      ['reasoningEffort', expected.reasoning_effort],
+      ['serviceTier', expected.service_tier],
+    ];
+    for (const [key, expectedValue] of pairs) {
+      if (policy.configuration[key] !== expectedValue) {
+        throw new Error(`experiment-policy.json ${key}=${policy.configuration[key]} does not match model policy ${expectedValue}`);
+      }
     }
   }
   return policy;
@@ -303,7 +354,13 @@ async function atomicWriteJson(path, value) {
   await rename(temporary, path);
 }
 
-export async function archiveGame({ sourceDirectory, archiveRoot, runType = 'benchmark', setBaseline = false }) {
+export async function archiveGame({
+  sourceDirectory,
+  archiveRoot,
+  runType = 'benchmark',
+  setBaseline = false,
+  modelPolicyPath = process.env.HERMES_MODEL_POLICY_PATH ?? '/root/.hermes/policies/model-policy.json',
+}) {
   sourceDirectory = resolve(sourceDirectory);
   archiveRoot = resolve(archiveRoot);
   await mkdir(join(archiveRoot, 'games'), { recursive: true });
@@ -311,13 +368,29 @@ export async function archiveGame({ sourceDirectory, archiveRoot, runType = 'ben
   const index = await readJson(indexPath, { schemaVersion: 1, kind: 'atomic-player-game-index', baselineGameId: null, games: [] });
   const reportPath = join(sourceDirectory, 'report.json');
   if (!await exists(reportPath)) throw new Error(`Source game has no report.json: ${sourceDirectory}`);
+  const sourceReport = await readJson(reportPath, {});
   const experimentPolicyPath = join(sourceDirectory, 'experiment-policy.json');
   const experimentPolicy = await readJson(experimentPolicyPath);
   const requiresExperimentPolicy = runType === 'benchmark' && index.games.length >= 2;
   if (requiresExperimentPolicy && !experimentPolicy) {
     throw new Error('Counted Atomic Player games G0003+ require a frozen experiment-policy.json before play');
   }
-  if (experimentPolicy) validateExperimentPolicy(experimentPolicy);
+  const modelPolicy = await readJson(resolve(modelPolicyPath));
+  if (requiresExperimentPolicy && !modelPolicy) {
+    throw new Error(`Counted Atomic Player games require a readable model policy: ${modelPolicyPath}`);
+  }
+  if (experimentPolicy) validateExperimentPolicy(experimentPolicy, { report: sourceReport, modelPolicy });
+  const policyFingerprint = experimentPolicy
+    ? policyConfigurationFingerprint(experimentPolicy.configuration)
+    : null;
+  const modelPolicyReceipt = experimentPolicy ? {
+    policyAsOf: modelPolicy?.as_of ?? null,
+    profile: experimentPolicy.configuration.profile,
+    provider: modelPolicy?.profiles?.[experimentPolicy.configuration.profile]?.provider ?? null,
+    model: modelPolicy?.profiles?.[experimentPolicy.configuration.profile]?.model ?? null,
+    reasoningEffort: modelPolicy?.profiles?.[experimentPolicy.configuration.profile]?.reasoning_effort ?? null,
+    serviceTier: modelPolicy?.profiles?.[experimentPolicy.configuration.profile]?.service_tier ?? null,
+  } : null;
   const fingerprintHash = createHash('sha256');
   fingerprintHash.update(await readFile(reportPath));
   const sourceSummaryPath = join(sourceDirectory, 'match-summary.json');
@@ -342,9 +415,11 @@ export async function archiveGame({ sourceDirectory, archiveRoot, runType = 'ben
   await buildContactSheet(gameDirectory);
 
   const completed = Boolean(summary && report?.outcome?.matchEndedObserved);
-  const comparableGames = index.games.filter((game) => game.benchmarkFile);
+  const absoluteHardFailures = hardGateFailures(benchmark);
+  const counted = completed && absoluteHardFailures.length === 0;
+  const comparableGames = index.games.filter((game) => game.benchmarkFile && (game.counted ?? game.completed));
   const previousGame = comparableGames.at(-1) ?? null;
-  const baselineId = index.baselineGameId ?? (setBaseline || completed ? gameId : null);
+  const baselineId = index.baselineGameId ?? (setBaseline || counted ? gameId : null);
   const baselineGame = baselineId === gameId ? null : index.games.find((game) => game.id === baselineId) ?? null;
   const previousBenchmark = previousGame ? await readJson(join(archiveRoot, previousGame.benchmarkFile)) : null;
   const baselineBenchmark = baselineGame ? await readJson(join(archiveRoot, baselineGame.benchmarkFile)) : benchmark;
@@ -361,6 +436,8 @@ export async function archiveGame({ sourceDirectory, archiveRoot, runType = 'ben
     `# Atomic Player ${gameId}`,
     '',
     `- Status: **${completed ? 'complete' : 'partial/failed'}**`,
+    `- Counted benchmark: **${counted ? 'yes' : 'no'}**`,
+    `- Absolute hard-gate failures: ${absoluteHardFailures.length ? absoluteHardFailures.map((gate) => gate.key).join(', ') : 'none'}`,
     `- Run type: **${runType}**`,
     `- Started: ${report?.startedAt ?? 'unknown'}`,
     `- Build: ${benchmark?.source?.build ?? report?.source?.pass ?? 'unknown'}`,
@@ -387,6 +464,8 @@ export async function archiveGame({ sourceDirectory, archiveRoot, runType = 'ben
     gameId,
     runType,
     completed,
+    counted,
+    absoluteHardFailures,
     archivedAt: new Date().toISOString(),
     sourceFingerprint,
     sourceDirectory,
@@ -399,6 +478,8 @@ export async function archiveGame({ sourceDirectory, archiveRoot, runType = 'ben
       unchangedControls: experimentPolicy.unchangedControls,
       rollbackCondition: experimentPolicy.rollbackCondition,
       configuration: experimentPolicy.configuration,
+      configurationFingerprint: policyFingerprint,
+      modelPolicyReceipt,
     } : null,
     harnessGitSha: benchmark?.source?.harnessGitSha ?? report?.source?.gitSha ?? null,
     provenance: {
@@ -416,6 +497,8 @@ export async function archiveGame({ sourceDirectory, archiveRoot, runType = 'ben
     directory: gameRelativeDirectory,
     runType,
     completed,
+    counted,
+    absoluteHardFailures,
     startedAt: report?.startedAt ?? null,
     archivedAt: manifest.archivedAt,
     sourceFingerprint,
@@ -427,9 +510,11 @@ export async function archiveGame({ sourceDirectory, archiveRoot, runType = 'ben
     previousComparableGameId: previousGame?.id ?? null,
     policyId: experimentPolicy?.policyId ?? null,
     hypothesis: experimentPolicy?.hypothesis ?? null,
+    policyConfigurationFingerprint: policyFingerprint,
+    modelPolicyReceipt,
     comparisonVsBaseline: baselineComparison?.counts ?? null,
     comparisonVsPrevious: previousComparison?.counts ?? null,
-    hardRegression: Boolean(baselineComparison?.hardRegression || previousComparison?.hardRegression),
+    hardRegression: absoluteHardFailures.length > 0,
   };
   index.baselineGameId = baselineId;
   index.games.push(game);
@@ -446,6 +531,7 @@ async function main() {
     archiveRoot: args['archive-root'] ?? 'artifacts/agent-player/archive',
     runType: String(args['run-type'] ?? 'benchmark'),
     setBaseline: Boolean(args['set-baseline']),
+    modelPolicyPath: String(args['model-policy'] ?? process.env.HERMES_MODEL_POLICY_PATH ?? '/root/.hermes/policies/model-policy.json'),
   });
   console.log(JSON.stringify(result, null, 2));
 }

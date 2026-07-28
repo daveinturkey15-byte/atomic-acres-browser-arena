@@ -36,6 +36,7 @@ Fixed full-round baseline `G0001`:
 - **R16 — replication before promotion:** A one-game high score creates a candidate only. Reserve at least two comparable full games for unchanged replication before adopting a policy as the new default; any safety/fairness hard-gate failure vetoes promotion.
 - **R17 — diagnostic replay is non-scoring:** Saved-frame or recorded-match replay may explain a miss and train the next policy, but it never rewrites a live archive result or counts as a live validation game.
 - **R18 — claim-state discipline:** Label observations, inferences and assumptions separately. Random maps/opponents make single-match deltas exploratory; report uncertainty and sample limits rather than claiming universal causality.
+- **R19 — stratified error budget:** Classify every death, miss, abstention, perception rejection and input failure by encounter/map/perception/decision route. Improve the largest official-outcome error contributor before adding agents or broad policy complexity; aggregate score alone is not a diagnosis.
 
 ## Metric registry
 
@@ -78,6 +79,9 @@ The reusable cross-game method is captured in Hermes skill `evidence-driven-play
 - **C8:** No-target movement includes visible-frame stuck detection and a bounded reverse/turn escape action.
 - **C9:** The dedicated Windows GPU run ends with no held inputs, no dedicated Chrome process and no port-9333 listener.
 - **C10:** The next full Pass 63 game is archived and reports explicit improvement/regression/unchanged rows against `G0001`.
+- **C11:** Absolute hard-gate failure marks a run uncounted even when the baseline has the same invalid value; relative `unchanged` never means safe.
+- **C12:** G0003+ rejects placeholder policy declarations, cross-checks profile/provider/model/reasoning/service tier against the central model policy and the harness commit against the driver receipt, then stores a configuration fingerprint.
+- **C13:** Partial or hard-gate-failed attempts remain archived but cannot become the baseline or previous comparable counted game.
 
 ## G0002 result and new gate
 

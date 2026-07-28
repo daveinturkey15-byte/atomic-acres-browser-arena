@@ -3,7 +3,7 @@ import test from 'node:test';
 import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { archiveGame, compareBenchmarks, METRIC_REGISTRY, partialBenchmarkFromReport, validateExperimentPolicy } from './archive-game.mjs';
+import { archiveGame, compareBenchmarks, hardGateFailures, METRIC_REGISTRY, partialBenchmarkFromReport, policyConfigurationFingerprint, validateExperimentPolicy } from './archive-game.mjs';
 import { verifyArchive } from './verify-archive.mjs';
 
 function benchmarkFixture(overrides = {}) {
@@ -41,6 +41,17 @@ test('missing metrics are not coerced to zero', () => {
   assert.equal(comparison.rows[0].value, null);
 });
 
+test('absolute hard gates fail even when the reference has the same invalid value', () => {
+  const baseline = benchmarkFixture();
+  const invalid = benchmarkFixture({
+    control: { ...baseline.control, releasedAtEnd: false },
+  });
+  const comparison = compareBenchmarks(invalid, invalid, 'G0001');
+  assert.equal(comparison.rows.find((row) => row.key === 'safety.releasedAtEnd').label, 'unchanged');
+  assert.equal(comparison.hardRegression, true);
+  assert.deepEqual(hardGateFailures(invalid).map((gate) => gate.key), ['safety.releasedAtEnd']);
+});
+
 test('partial games preserve available control evidence without inventing combat results', () => {
   const partial = partialBenchmarkFromReport({
     source: { pass: 'PASS 63' }, session: { mode: 'solo', pointerLock: true },
@@ -57,7 +68,7 @@ test('partial games preserve available control evidence without inventing combat
 async function writeGameSource(directory, { startedAt, kills, deaths, damageDealt, damageTaken }) {
   await mkdir(directory, { recursive: true });
   const report = {
-    startedAt, endedAt: startedAt, source: { url: 'https://example.test/?release=latest', pass: 'PASS 63', harnessGitSha: 'abc' },
+    startedAt, endedAt: startedAt, source: { url: 'https://example.test/?release=latest', pass: 'PASS 63', harnessGitSha: 'abc1234' },
     session: { mode: 'solo', callsign: 'Jigglyclaw', pointerLock: true }, fairness: { forbiddenInputsUsed: [] },
     performance: { observedRenderProfile: 'performance', visionFrames: 10, rawTargetFrames: 2, confirmedTargetFrames: 1, fpsCounter: { value: '30' }, framePacing: { cadenceHz: 30 }, visionLoopMs: {}, visionStream: { sourceFps: 5, failedFrames: 0, captureMs: {}, mode: 'test' } },
     input: { releasedAtEnd: true, holdWatchdogExceeded: false }, browser: { pageErrors: [], warningOrErrorCount: 0 },
@@ -99,9 +110,40 @@ test('archive assigns immutable sequential IDs, deduplicates imports and compare
   assert.equal(verification.gameCount, 2);
 });
 
+test('placeholder experiment-policy values are rejected before a counted game can be archived', () => {
+  assert.throws(() => validateExperimentPolicy({
+    schemaVersion: 1,
+    policyId: 'placeholder-policy',
+    hypothesis: 'placeholder hypothesis',
+    expectedMetricMovements: ['anything changes'],
+    unchangedControls: ['anything remains'],
+    rollbackCondition: 'anything fails',
+    configuration: {
+      playerHarnessCommit: 'REPLACE_WITH_GIT_SHA',
+      profile: 'wrong-profile',
+      provider: 'claimed-provider',
+      model: 'claimed-model',
+      reasoningEffort: 'low',
+      serviceTier: 'normal',
+    },
+  }), /non-placeholder/);
+});
+
 test('G0003 and later counted benchmarks require a validated frozen player-policy hypothesis', async () => {
   const root = await mkdtemp(join(tmpdir(), 'atomic-policy-test-'));
   const archiveRoot = join(root, 'archive');
+  const modelPolicyPath = join(root, 'model-policy.json');
+  await writeFile(modelPolicyPath, `${JSON.stringify({
+    as_of: '2026-07-25',
+    profiles: {
+      atomicplayer: {
+        provider: 'openai-codex',
+        model: 'gpt-5.6-sol',
+        reasoning_effort: 'low',
+        service_tier: 'normal',
+      },
+    },
+  })}\n`);
   for (let game = 1; game <= 3; game += 1) {
     const directory = join(root, `source-${game}`);
     await writeGameSource(directory, {
@@ -111,22 +153,29 @@ test('G0003 and later counted benchmarks require a validated frozen player-polic
       damageDealt: (game - 1) * 100,
       damageTaken: 1000 - game * 100,
     });
+    if (game === 2) {
+      const report = JSON.parse(await readFile(join(directory, 'report.json'), 'utf8'));
+      report.outcome.matchEndedObserved = false;
+      await writeFile(join(directory, 'report.json'), `${JSON.stringify(report)}\n`);
+    }
     if (game < 3) {
-      await archiveGame({ sourceDirectory: directory, archiveRoot, setBaseline: game === 1 });
+      const archived = await archiveGame({ sourceDirectory: directory, archiveRoot, setBaseline: game === 1, modelPolicyPath });
+      if (game === 2) assert.equal(archived.game.counted, false);
       continue;
     }
     await assert.rejects(
-      archiveGame({ sourceDirectory: directory, archiveRoot }),
+      archiveGame({ sourceDirectory: directory, archiveRoot, modelPolicyPath }),
       /require a frozen experiment-policy\.json/,
     );
     const policy = validateExperimentPolicy({
+      schemaVersion: 1,
       policyId: 'atomic-player-candidate-01',
       hypothesis: 'Temporal operator confirmation will improve credited hits without extra blind fire.',
       expectedMetricMovements: ['combat.creditedHits increases'],
       unchangedControls: ['Performance render profile', 'visible-state inputs only'],
       rollbackCondition: 'Any safety-gate failure or repeated official outcome regression.',
       configuration: {
-        playerHarnessCommit: 'abc123',
+        playerHarnessCommit: 'abc1234',
         profile: 'atomicplayer',
         provider: 'openai-codex',
         model: 'gpt-5.6-sol',
@@ -135,9 +184,11 @@ test('G0003 and later counted benchmarks require a validated frozen player-polic
       },
     });
     await writeFile(join(directory, 'experiment-policy.json'), `${JSON.stringify(policy, null, 2)}\n`);
-    const archived = await archiveGame({ sourceDirectory: directory, archiveRoot });
+    const archived = await archiveGame({ sourceDirectory: directory, archiveRoot, modelPolicyPath });
     assert.equal(archived.game.id, 'G0003');
+    assert.equal(archived.game.previousComparableGameId, 'G0001');
     assert.equal(archived.game.policyId, 'atomic-player-candidate-01');
     assert.equal(archived.manifest.playerPolicy.hypothesis, policy.hypothesis);
+    assert.equal(archived.game.policyConfigurationFingerprint, policyConfigurationFingerprint(policy.configuration));
   }
 });
