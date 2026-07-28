@@ -714,7 +714,7 @@ async function run() {
           let horizontal = aimedTarget.x - aimedVision.width / 2;
           let vertical = aimedTarget.y - aimedVision.height / 2;
           let alignment = Math.hypot(horizontal / aimedVision.width, vertical / aimedVision.height);
-          for (let aimStep = 0; aimStep < 2 && alignment >= 0.045; aimStep += 1) {
+          for (let aimStep = 0; aimStep < 4 && alignment >= 0.025; aimStep += 1) {
             const movementX = Math.max(-90, Math.min(90, Math.round(horizontal * 1.05)));
             const movementY = Math.max(-55, Math.min(55, Math.round(vertical * 1.50)));
             if (movementX === 0 && movementY === 0) break;
@@ -742,7 +742,7 @@ async function run() {
             firstTargetAnnotatedCaptured = true;
           }
           const currentlyReloading = Boolean(hud?.reloadActive) || now < reloadSuppressedUntil;
-          if (allowCombatFire && tracking.fireAuthorized && activeMatch && alignment < 0.065
+          if (allowCombatFire && tracking.fireAuthorized && activeMatch && alignment < 0.03
             && !currentlyReloading && now - lastBurstAt >= fireCooldownMs) {
             const shots = Math.max(1, Math.min(burstShots, Number(hud?.ammo ?? burstShots)));
             if (!firstFireCaptured) {
@@ -751,7 +751,7 @@ async function run() {
               await writeFile(resolve(artifactDirectory, 'first-fire-aligned-annotated.jpg'), await annotatedVisionJpeg(aimedVision, fireTracking));
               firstFireCaptured = true;
             }
-            await fireBurst(page, shots, alignment < 0.038);
+            await fireBurst(page, shots, alignment < 0.02);
             shotPulses += shots;
             bursts += 1;
             lastBurstAt = now;
