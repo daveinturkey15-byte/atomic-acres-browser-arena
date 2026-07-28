@@ -8128,14 +8128,14 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   try {
     setStatus(`Preparing ${selectedArena.displayName} operators and viewmodel…`);
     if (renderRuntime.backend === 'webgpu') {
-      // Arena prewarm runs against the menu camera before match-only operators
-      // join the scene. Rehearse the exact support overlap once more against
-      // the match-only scene topology after operators join; otherwise Three r185
-      // defers WebGPU render-object and node/bind-group construction for one
-      // chopper plus 24 drones into the first live activation frame.
-      await killstreakPresentation.prewarm(renderRuntime, camera, -killstreakMatchEpoch);
       await renderRuntime.compile(scene, camera);
       await settleWebGpuPresentation('Initial match');
+      // Initial-match admission may lower the internal render scale and resize
+      // Three's HDR context. Any support pipeline compiled before that final
+      // context would be invalidated and rebuilt during the first activation.
+      // Rehearse the exact chopper-plus-swarm overlap only after the final
+      // match context is settled, while the deployment surface is still opaque.
+      await killstreakPresentation.prewarm(renderRuntime, camera, -killstreakMatchEpoch);
       restoreCorpsePoolPrewarm();
       // Match-only operators, support pools and their prewarm bookkeeping are
       // created immediately before this boundary. Keep the opaque deployment
