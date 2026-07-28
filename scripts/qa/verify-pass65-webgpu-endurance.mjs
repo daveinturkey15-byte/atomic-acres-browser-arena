@@ -12,7 +12,8 @@ const otherArenaDurationMs = Math.max(5_000, Number(process.env.PASS65_MAP_SOAK_
 const maximumLiveSubmissionGapMs = 250;
 const maximumLiveCompletionGapMs = 500;
 const maximumLivePendingMs = 750;
-const requiredCaptureRecoveryCompletions = 3;
+const requiredCaptureRecoveryCompletions = 12;
+const minimumCaptureRecoveryWindowMs = 250;
 const maximumCaptureRecoveryCompletionMs = 50;
 const maximumLiveLongTaskEntries = 8;
 const artifactRoot = 'artifacts/pass65/webgpu-endurance';
@@ -42,6 +43,7 @@ const canonicalArenaSequence = [
   'rustworks-1v1',
 ];
 const diagnosticStress = process.env.PASS65_DIAGNOSTIC_STRESS?.trim().toLowerCase() ?? '';
+const skipDiagnosticCapture = process.env.PASS65_DIAGNOSTIC_SKIP_CAPTURE === '1';
 const profileFirstActivation = process.env.PASS65_PROFILE_FIRST_ACTIVATION === '1';
 const traceNodeBuilds = process.env.PASS65_TRACE_NODE_BUILDS === '1';
 const probeBaselineWindow = process.env.PASS65_PROBE_BASELINE === '1';
@@ -59,6 +61,9 @@ const canonicalArenaIds = new Set(canonicalArenaSequence);
 const invalidDiagnosticArena = diagnosticSequence.find((arenaId) => !canonicalArenaIds.has(arenaId));
 if (invalidDiagnosticArena) throw new Error(`Unknown PASS65_DIAGNOSTIC_SEQUENCE arena: ${invalidDiagnosticArena}`);
 const diagnosticMode = diagnosticStress.length > 0 || diagnosticArena.length > 0 || diagnosticSequence.length > 0;
+// Capture stays mandatory for the canonical gate. Diagnostics can explicitly
+// remove compositor screenshots to separate verifier cost from gameplay cost.
+const captureEnabled = !diagnosticMode || !skipDiagnosticCapture;
 const enabledStress = new Set(diagnosticStress && diagnosticStress !== 'all'
   ? diagnosticStress.split(',').map((entry) => entry.trim()).filter(Boolean)
   : ['killstreak', 'grenade', 'smoke', 'weapons']);
@@ -107,7 +112,7 @@ async function pauseAndDrainPresentation(page) {
 }
 
 async function requireCaptureRecoveryCompletions(page, captureCompletionSequence) {
-  return page.evaluate(({ baselineSequence, requiredCompletions, maximumCompletionMs }) => (
+  return page.evaluate(({ baselineSequence, requiredCompletions, minimumWindowMs, maximumCompletionMs }) => (
     new Promise((resolve, reject) => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
       if (!api) {
@@ -149,7 +154,9 @@ async function requireCaptureRecoveryCompletions(page, captureCompletionSequence
         if (presentation.completedSequence > observedCompletionSequence) {
           const advancedBy = presentation.completedSequence - observedCompletionSequence;
           const completionLatencyMs = presentation.lastCompletionLatencyMs;
+          const observedAtMs = performance.now();
           const observation = {
+            observedAtMs,
             completedSequence: presentation.completedSequence,
             submissionSequence: presentation.submissionSequence,
             advancedBy,
@@ -163,8 +170,11 @@ async function requireCaptureRecoveryCompletions(page, captureCompletionSequence
           observedCompletionSequence = presentation.completedSequence;
 
           // MAX_IN_FLIGHT_SUBMISSIONS is one. Count only an individually
-          // observed game completion, never a batched frontier jump, and make
-          // three ordinary low-latency completions prove compositor recovery.
+          // observed game completion, never a batched frontier jump. The July
+          // 29 capture-tail failure crossed the hard 250 ms submission limit
+          // after a three-frame recovery, so recovery must now span that whole
+          // limit and contain at least 12 ordinary <= 50 ms completions. This
+          // proves sustained progress rather than one short compositor burst.
           if (advancedBy === 1
             && presentation.status === 'healthy'
             && Number.isFinite(completionLatencyMs)
@@ -174,24 +184,33 @@ async function requireCaptureRecoveryCompletions(page, captureCompletionSequence
             discardedCompletionCount += advancedBy;
             consecutiveCompletions.length = 0;
           }
-          if (consecutiveCompletions.length >= requiredCompletions) {
-            // Hold in the same browser task that observes the third completion;
+          const recoveryWindowMs = consecutiveCompletions.length > 1
+            ? observedAtMs - consecutiveCompletions[0].observedAtMs
+            : 0;
+          if (consecutiveCompletions.length >= requiredCompletions
+            && recoveryWindowMs >= minimumWindowMs) {
+            // Hold in the same browser task that proves the sustained window;
             // the caller then drains any already-admitted frontier.
             api.setRenderPaused(true);
             resolve({
               baselineSequence,
               requiredCompletions,
+              minimumWindowMs,
               maximumCompletionMs,
+              recoveryWindowMs,
               elapsedMs: performance.now() - startedAt,
               discardedCompletionCount,
-              consecutiveCompletions: consecutiveCompletions.slice(-requiredCompletions),
+              qualifyingCompletionCount: consecutiveCompletions.length,
+              firstQualifyingCompletion: consecutiveCompletions[0],
+              lastQualifyingCompletion: consecutiveCompletions.at(-1),
+              consecutiveCompletions: consecutiveCompletions.slice(),
               observations,
             });
             return;
           }
         }
         if (performance.now() >= timeoutAt) {
-          holdAndReject('Capture recovery did not establish three ordinary completions within 12 seconds');
+          holdAndReject(`Capture recovery did not establish ${requiredCompletions} ordinary completions across ${minimumWindowMs} ms within 12 seconds`);
           return;
         }
         requestAnimationFrame(inspect);
@@ -201,6 +220,7 @@ async function requireCaptureRecoveryCompletions(page, captureCompletionSequence
   ), {
     baselineSequence: captureCompletionSequence,
     requiredCompletions: requiredCaptureRecoveryCompletions,
+    minimumWindowMs: minimumCaptureRecoveryWindowMs,
     maximumCompletionMs: maximumCaptureRecoveryCompletionMs,
   });
 }
@@ -223,9 +243,9 @@ async function captureCanvasOnly(page, clip) {
       window.__ATOMIC_ACRES_DEBUG__?.setRenderPaused(false);
     });
     // page.screenshot() can return while Chrome compositor work remains queued
-    // on the same adapter. Require three individually observed, ordinary game
-    // completions at <= 50 ms before the next measured interval. This is a
-    // quarantine boundary, not a relaxation of the 250/500/750 ms live limits.
+    // on the same adapter. Require a sustained 250 ms window containing at
+    // least 12 individually observed game completions at <= 50 ms before the
+    // next measured interval. This quarantine does not relax the live limits.
     const recovery = await requireCaptureRecoveryCompletions(page, captureCompletionSequence);
     const progress = await pauseAndDrainPresentation(page);
     return { screenshot, progress, recovery, captureIsolationMs: Date.now() - captureIsolationStartedAt };
@@ -559,8 +579,8 @@ try {
     if (activeStressBudget && activeStressBudget.budgetAudit.pass !== true) {
       throw new Error(`${arenaId} exceeded its live chopper plus drone-swarm budget: ${JSON.stringify(activeStressBudget)}`);
     }
-    const canvasClip = await page.locator('#game').boundingBox();
-    if (!canvasClip || canvasClip.width <= 0 || canvasClip.height <= 0) {
+    const canvasClip = captureEnabled ? await page.locator('#game').boundingBox() : null;
+    if (captureEnabled && (!canvasClip || canvasClip.width <= 0 || canvasClip.height <= 0)) {
       throw new Error(`${arenaId} gameplay canvas has no capture bounds`);
     }
 
@@ -735,16 +755,23 @@ try {
       const submissionDelta = sample.runtime.presentation.submissionSequence - liveWindowStart.presentation.submissionSequence;
       const completionDelta = sample.runtime.presentation.completedSequence - liveWindowStart.presentation.completedSequence;
       const minimumFrameProgress = Math.max(4, Math.floor(elapsedMs / 100));
-      const capture = await captureCanvasOnly(page, canvasClip);
+      const capture = captureEnabled
+        ? await captureCanvasOnly(page, canvasClip)
+        : {
+            screenshot: null,
+            progress: await pauseAndDrainPresentation(page),
+            recovery: null,
+            captureIsolationMs: 0,
+          };
       lastScreenshot = capture.screenshot;
-      const screenshotHash = digest(lastScreenshot);
-      screenshotHashes.add(screenshotHash);
+      const screenshotHash = lastScreenshot ? digest(lastScreenshot) : null;
+      if (screenshotHash) screenshotHashes.add(screenshotHash);
       // A WebGPU completion probe retires the entire queue frontier, so its
       // sequence advances in batches rather than once per rendered frame.
       // Measure display throughput from admitted submissions; queue stalls
       // remain hard failures through the presentation status above.
       if (frameDelta < minimumFrameProgress || submissionDelta < minimumFrameProgress
-        || screenshotHash === previousScreenshotHash) {
+        || (captureEnabled && screenshotHash === previousScreenshotHash)) {
         throw new Error(`${arenaId} presentation freeze detected: ${JSON.stringify({
           elapsedMs, frameDelta, submissionDelta, completionDelta, screenshotHash,
           liveWindowStart, previousReceipt: samples.at(-1) ?? null,
@@ -759,13 +786,16 @@ try {
         verifierHeldFrontier: capture.progress,
       };
       samples.push(receipt);
-      previousScreenshotHash = screenshotHash;
+      if (captureEnabled) previousScreenshotHash = screenshotHash;
       sampleIndex += 1;
     }
-    if (samples.length < 5 || screenshotHashes.size < Math.ceil(samples.length * 0.8)) {
+    if (samples.length < 5
+      || (captureEnabled && screenshotHashes.size < Math.ceil(samples.length * 0.8))) {
       throw new Error(`${arenaId} did not produce enough distinct live presentation samples`);
     }
-    if (lastScreenshot) await writeFile(`${artifactRoot}/${visit}-${arenaId}-final.png`, lastScreenshot);
+    if (captureEnabled && lastScreenshot) {
+      await writeFile(`${artifactRoot}/${visit}-${arenaId}-final.png`, lastScreenshot);
+    }
     const beforeReturn = samples.at(-1);
     await page.evaluate(() => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
@@ -838,6 +868,7 @@ try {
       activeStressBudget,
       doorResetProbe,
       samples: samples.length,
+      captureEnabled,
       distinctScreenshots: screenshotHashes.size,
       first: samples[0],
       last: beforeReturn,
@@ -866,11 +897,14 @@ try {
     maximumLiveCompletionGapMs,
     maximumLivePendingMs,
     requiredCaptureRecoveryCompletions,
+    minimumCaptureRecoveryWindowMs,
     maximumCaptureRecoveryCompletionMs,
     maximumLiveLongTaskEntries,
     rustworksDurationMs,
     otherArenaDurationMs,
     arenaSequence,
+    captureEnabled,
+    skipDiagnosticCapture,
     enabledStress: [...enabledStress],
     killstreakProbeMode,
     secondActivationDelayMs,
@@ -904,10 +938,12 @@ try {
     state,
   };
   await writeFile(`${artifactRoot}/failure-receipt.json`, `${JSON.stringify(failure, null, 2)}\n`, 'utf8');
-  try {
-    await page?.screenshot({ path: `${artifactRoot}/failure.png` });
-  } catch {
-    // The JSON receipt remains authoritative if the page itself is unavailable.
+  if (captureEnabled) {
+    try {
+      await page?.screenshot({ path: `${artifactRoot}/failure.png` });
+    } catch {
+      // The JSON receipt remains authoritative if the page itself is unavailable.
+    }
   }
   throw error;
 } finally {

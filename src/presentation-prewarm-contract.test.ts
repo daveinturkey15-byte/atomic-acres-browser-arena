@@ -204,7 +204,8 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('const maximumLiveSubmissionGapMs = 250;');
     expect(source).toContain('const maximumLiveCompletionGapMs = 500;');
     expect(source).toContain('const maximumLivePendingMs = 750;');
-    expect(source).toContain('const requiredCaptureRecoveryCompletions = 3;');
+    expect(source).toContain('const requiredCaptureRecoveryCompletions = 12;');
+    expect(source).toContain('const minimumCaptureRecoveryWindowMs = 250;');
     expect(source).toContain('const maximumCaptureRecoveryCompletionMs = 50;');
     expect(source).toContain('const maximumLiveLongTaskEntries = 8;');
     expect(source).toContain('api.resetPresentationProgressWindow();');
@@ -221,10 +222,22 @@ describe('presentation prewarm startup contract', () => {
       .toBeLessThan(captureIsolation.lastIndexOf('await pauseAndDrainPresentation'));
     expect(source).toContain('advancedBy === 1');
     expect(source).toContain('completionLatencyMs <= maximumCompletionMs');
+    expect(source).toContain('recoveryWindowMs >= minimumWindowMs');
+    expect(source).toContain('minimumWindowMs: minimumCaptureRecoveryWindowMs');
+    expect(source).toContain('qualifyingCompletionCount: consecutiveCompletions.length');
+    expect(source).toContain('firstQualifyingCompletion: consecutiveCompletions[0]');
+    expect(source).toContain('lastQualifyingCompletion: consecutiveCompletions.at(-1)');
     expect(source).toContain('liveLongTaskEvidence.entries.length < maximumLongTaskEntries');
     expect(source).toContain('maximumLongTaskEntries: maximumLiveLongTaskEntries');
     expect(source).toContain('recordEntries(longTaskSample.observer.takeRecords())');
     expect(source).toContain('verifierCaptureRecovery: capture.recovery');
+    expect(source).toContain("const skipDiagnosticCapture = process.env.PASS65_DIAGNOSTIC_SKIP_CAPTURE === '1';");
+    expect(source).toContain('const captureEnabled = !diagnosticMode || !skipDiagnosticCapture;');
+    expect(source).toContain('const canvasClip = captureEnabled ?');
+    expect(source).toContain('captureEnabled && screenshotHash === previousScreenshotHash');
+    expect(source).toContain('captureEnabled && screenshotHashes.size < Math.ceil(samples.length * 0.8)');
+    expect(source).toContain('if (captureEnabled && lastScreenshot)');
+    expect(source).toContain('if (captureEnabled) {\n    try {\n      await page?.screenshot');
   });
 
   it('rejects degraded foreground cadence in the cold physical-menu gate', () => {
