@@ -250,3 +250,11 @@ test('purple operator detector rejects observed range-panel edge geometries', ()
   paint(raw, width, 40, 16, 47, 37, [140, 80, 145]);
   assert.equal(findPurpleOperatorCandidates(raw, width, height).length, 0);
 });
+
+test('purple operator detector rejects red-balanced JPEG panel highlights', () => {
+  const width = 80;
+  const height = 60;
+  const raw = frame(width, height);
+  paint(raw, width, 36, 27, 42, 31, [120, 86, 121]);
+  assert.equal(findPurpleOperatorCandidates(raw, width, height).length, 0);
+});

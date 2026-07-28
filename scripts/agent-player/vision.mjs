@@ -189,6 +189,9 @@ export function findPurpleOperatorCandidates(raw, width, height, channels = 3, o
     let pixels = 0;
     let sumX = 0;
     let sumY = 0;
+    let sumRed = 0;
+    let sumBlue = 0;
+    let blueLeadPixels = 0;
     let minX = width;
     let maxX = 0;
     let minY = height;
@@ -200,6 +203,10 @@ export function findPurpleOperatorCandidates(raw, width, height, channels = 3, o
       pixels += 1;
       sumX += x;
       sumY += y;
+      const sample = index * channels;
+      sumRed += raw[sample];
+      sumBlue += raw[sample + 2];
+      if (raw[sample + 2] > raw[sample]) blueLeadPixels += 1;
       minX = Math.min(minX, x);
       maxX = Math.max(maxX, x);
       minY = Math.min(minY, y);
@@ -216,12 +223,18 @@ export function findPurpleOperatorCandidates(raw, width, height, channels = 3, o
     const boxHeight = maxY - minY + 1;
     const aspect = boxWidth / boxHeight;
     const density = pixels / (boxWidth * boxHeight);
+    const meanBlueRedLead = (sumBlue - sumRed) / pixels;
+    const blueLeadRatio = blueLeadPixels / pixels;
     // Stable evidence classified 2-3 px vertical slivers and >18 px tall
     // components as range-panel/prop edges. Every credited v1 operator
     // component stayed inside 4-14 px wide and 4-13 px tall at 240x135.
     if (pixels < minimumPixels || pixels > Number(options.maximumPixels ?? 160)) continue;
     if (boxWidth < Number(options.minimumWidth ?? 4) || boxWidth > Number(options.maximumWidth ?? 18)
       || boxHeight < Number(options.minimumHeight ?? 4) || boxHeight > Number(options.maximumHeight ?? 18)) continue;
+    // Orange panel highlights can pass the per-pixel green-lead rules after
+    // JPEG blending, but remain red-balanced as a full component.
+    if (meanBlueRedLead < Number(options.minimumMeanBlueRedLead ?? 5)
+      || blueLeadRatio < Number(options.minimumBlueLeadRatio ?? 0.65)) continue;
     if (aspect < 0.15 || aspect > 1.5) continue;
     const x = sumX / pixels;
     const y = sumY / pixels;
@@ -232,6 +245,8 @@ export function findPurpleOperatorCandidates(raw, width, height, channels = 3, o
       pixels,
       density,
       aspect,
+      meanBlueRedLead,
+      blueLeadRatio,
       score: centreDistance + Math.abs(aspect - 0.8) * 0.025 - Math.min(0.04, pixels / 5000),
       bounds: { minX, minY, maxX, maxY, width: boxWidth, height: boxHeight },
       detector: 'pass63-visible-purple-operator-v1',
