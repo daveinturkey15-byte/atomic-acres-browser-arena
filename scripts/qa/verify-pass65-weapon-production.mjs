@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
@@ -34,6 +35,16 @@ const familyHeroSilhouettes = new Set();
 const familyAnimationSignatures = new Set();
 const familyPlatformAnatomies = new Set();
 const familyBinaryHashes = [];
+const rejectedLegacyAnchorPaths = [
+  'scripts/blender/finalize-pass65-m4a1-anchor.mjs',
+  'source-assets/blender/pass65-weapons/m4a1-anchor.provenance.json',
+];
+
+for (const legacyPath of rejectedLegacyAnchorPaths) {
+  if (existsSync(path.join(root, legacyPath))) {
+    failures.push(`obsolete M4A1 anchor path must not coexist with canonical corpus provenance: ${legacyPath}`);
+  }
+}
 
 if (manifest.schemaVersion !== 1) failures.push('schemaVersion must be 1');
 if (manifest.releaseGate !== 'fail-closed-until-every-entry-is-release-ready') failures.push('releaseGate must remain fail closed');
