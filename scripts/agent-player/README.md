@@ -114,7 +114,7 @@ Import an existing run with:
 node scripts/agent-player/archive-game.mjs \
   --source <artifact-directory> \
   --archive-root artifacts/agent-player/archive \
-  --run-type full-benchmark
+  --run-type benchmark
 ```
 
 Each game stores a manifest with SHA-256 hashes, raw reports, full telemetry, screenshots/contact sheet, `combat-benchmark.json`, Markdown summary, comparison versus the fixed first baseline and comparison versus the previous archived game. The metric registry emits `improved`, `regressed`, `unchanged`, `informational`, `missing` or `incomparable` for every tracked row. Missing measurements never become zero, and safety/fairness failures are hard regressions.

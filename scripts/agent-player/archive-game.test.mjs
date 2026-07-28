@@ -10,9 +10,9 @@ function benchmarkFixture(overrides = {}) {
   return {
     result: { kills: 0, deaths: 10, killDeathRatio: 0, shotsFired: 100, shotsHit: 0, accuracyPercent: 0, damageDealt: 0, damageTaken: 1000, headshots: 0, bestKillstreak: 0, shotsPerKill: null, damagePerShot: 0 },
     survival: { firstIncomingDamageAtSeconds: 10, firstDeathAtSeconds: 20, medianCompletedLifeSeconds: 20, longestCompletedLifeSeconds: 30 },
-    contacts: { creditedBotDamageEvents: 0, nonBotDamageEvents: 1, firstCreditedBotHitAtSeconds: null, creditedBotDamageFromTimeline: 0 },
+    contacts: { creditedBotDamageEvents: 0, nonBotDamageEvents: 0, firstCreditedBotHitAtSeconds: null, creditedBotDamageFromTimeline: 0 },
     perception: { sourceFps: 2, captureFailures: 0, captureMedianMs: 300, captureP95Ms: 500, decodeMedianMs: 10, rawTargetFrames: 90, rawTargetFrameRatio: 0.9, confirmedTargetFrames: 0, confirmedToRawRatio: 0, rejectedScreenLockedFrames: 0 },
-    control: { gameFps: 29, gameCadenceHz: 29, warmupShotPulses: 2, unconfirmedShotPulses: 100, reloadRequests: 20, stuckRecoveries: 0, damageReactions: 0, maximumObservedHoldMs: 1000, browserWarnings: 0, performanceProfile: 'performance', pointerLock: true, releasedAtEnd: true, holdWatchdogExceeded: false, pageErrors: [] },
+    control: { gameFps: 29, gameCadenceHz: 29, warmupShotPulses: 0, unconfirmedShotPulses: 0, reloadRequests: 20, stuckRecoveries: 0, damageReactions: 0, activeInputVeto: false, pointerLockLosses: 0, focusLosses: 0, hudFreshnessFailures: 0, maximumObservedHoldMs: 1000, browserWarnings: 0, performanceProfile: 'performance', pointerLock: true, releasedAtEnd: true, holdWatchdogExceeded: false, pageErrors: [] },
     integrity: { droppedDamageEvents: 0, forbiddenInputsUsed: [], matchEndedObserved: true, summaryDownloaded: true, technicalDownloaded: true },
     ...overrides,
   };
@@ -71,7 +71,7 @@ async function writeGameSource(directory, { startedAt, kills, deaths, damageDeal
     startedAt, endedAt: startedAt, source: { url: 'https://example.test/?release=latest', pass: 'PASS 63', harnessGitSha: 'abc1234' },
     session: { mode: 'solo', callsign: 'Jigglyclaw', pointerLock: true }, fairness: { forbiddenInputsUsed: [] },
     performance: { observedRenderProfile: 'performance', visionFrames: 10, rawTargetFrames: 2, confirmedTargetFrames: 1, fpsCounter: { value: '30' }, framePacing: { cadenceHz: 30 }, visionLoopMs: {}, visionStream: { sourceFps: 5, failedFrames: 0, captureMs: {}, mode: 'test' } },
-    input: { releasedAtEnd: true, holdWatchdogExceeded: false }, browser: { pageErrors: [], warningOrErrorCount: 0 },
+    input: { releasedAtEnd: true, holdWatchdogExceeded: false, warmupShotPulses: 0, unconfirmedShotPulses: 0, activeInputVeto: false, pointerLockLosses: 0, focusLosses: 0, hudFreshnessFailures: 0 }, browser: { pageErrors: [], warningOrErrorCount: 0 },
     outcome: { matchEndedObserved: true, downloadedSummary: {}, downloadedTechnical: {} },
   };
   const summary = {

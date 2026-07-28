@@ -53,6 +53,7 @@ export const METRIC_REGISTRY = Object.freeze([
   { key: 'safety.pointerLock', path: 'control.pointerLock', direction: 'invariant', expected: true },
   { key: 'safety.releasedAtEnd', path: 'control.releasedAtEnd', direction: 'invariant', expected: true },
   { key: 'safety.holdWatchdogExceeded', path: 'control.holdWatchdogExceeded', direction: 'invariant', expected: false },
+
   { key: 'safety.pageErrors', path: 'control.pageErrors', direction: 'invariant', expected: [] },
   { key: 'fairness.forbiddenInputsUsed', path: 'integrity.forbiddenInputsUsed', direction: 'invariant', expected: [] },
   { key: 'integrity.matchEndedObserved', path: 'integrity.matchEndedObserved', direction: 'invariant', expected: true },
@@ -98,8 +99,17 @@ export function policyConfigurationFingerprint(configuration) {
 }
 
 export function hardGateFailures(benchmark, registry = METRIC_REGISTRY) {
-  return registry
-    .filter((metric) => metric.direction === 'invariant')
+  const extraHardGates = [
+    { key: 'contacts.nonBotDamageEvents', path: 'contacts.nonBotDamageEvents', expected: 0 },
+    { key: 'perception.captureFailures', path: 'perception.captureFailures', expected: 0 },
+    { key: 'control.warmupShotPulses', path: 'control.warmupShotPulses', expected: 0 },
+    { key: 'control.unconfirmedShotPulses', path: 'control.unconfirmedShotPulses', expected: 0 },
+    { key: 'safety.activeInputVeto', path: 'control.activeInputVeto', expected: false },
+    { key: 'safety.pointerLockLosses', path: 'control.pointerLockLosses', expected: 0 },
+    { key: 'safety.focusLosses', path: 'control.focusLosses', expected: 0 },
+    { key: 'safety.hudFreshnessFailures', path: 'control.hudFreshnessFailures', expected: 0 },
+  ];
+  return [...registry.filter((metric) => metric.direction === 'invariant'), ...extraHardGates]
     .map((metric) => ({
       key: metric.key,
       expected: metric.expected,

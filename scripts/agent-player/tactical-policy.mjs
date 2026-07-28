@@ -40,9 +40,16 @@ export function createTacticalPolicy(options = {}) {
     state,
     update(observation) {
       const now = Number(observation.now);
-      const health = Number(observation.health ?? 100);
+      const health = Number(observation.health);
+      const healthValid = observation.healthFresh !== false && Number.isFinite(health) && health >= 0 && health <= 100;
       const damageDelta = Math.max(0, Number(observation.damageDelta ?? 0));
-      if (damageDelta > 0) {
+      if (!observation.active) {
+        state.retreatUntil = 0;
+        state.recoveryUntil = 0;
+        state.damageWindowStartedAt = Number.NEGATIVE_INFINITY;
+        state.damageWindowAmount = 0;
+      }
+      if (observation.active && damageDelta > 0) {
         if (now - state.damageWindowStartedAt > config.damageWindowMs) {
           state.damageWindowStartedAt = now;
           state.damageWindowAmount = 0;
@@ -59,6 +66,9 @@ export function createTacticalPolicy(options = {}) {
       let nextMode = 'roam';
       if (!observation.active) {
         reason = 'inactive-match';
+      } else if (!healthValid) {
+        nextMode = 'recover';
+        reason = 'invalid-health-hold';
       } else if (health <= 0) {
         state.recoveryUntil = Math.max(state.recoveryUntil, now + 900);
         nextMode = 'recover';
@@ -66,6 +76,9 @@ export function createTacticalPolicy(options = {}) {
       } else if (now < state.retreatUntil) {
         nextMode = 'retreat';
         reason = health < config.retreatHealth ? 'low-health' : 'damage-burst';
+      } else if (health < config.retreatHealth) {
+        nextMode = 'recover';
+        reason = 'low-health-hold';
       } else if (observation.stuck && now >= state.recoveryCooldownUntil) {
         state.direction *= -1;
         state.recoveryUntil = now + config.recoveryDurationMs;
@@ -75,6 +88,9 @@ export function createTacticalPolicy(options = {}) {
       } else if (now < state.recoveryUntil) {
         nextMode = 'recover';
         reason = 'bounded-recovery';
+      } else if (observation.stuck) {
+        nextMode = 'recover';
+        reason = 'stuck-cooldown-hold';
       } else if (observation.currentTarget || observation.rawTarget) {
         nextMode = 'engage';
         reason = observation.currentTarget ? 'confirmed-operator' : 'candidate-observation';
@@ -89,8 +105,10 @@ export function createTacticalPolicy(options = {}) {
           keys.push('KeyS', state.direction > 0 ? 'KeyD' : 'KeyA', 'ShiftLeft');
           if (observation.navigationTick) turn = state.direction * 16;
         } else if (nextMode === 'recover') {
-          keys.push('KeyS', state.direction > 0 ? 'KeyD' : 'KeyA');
-          if (changed?.reason === 'low-world-motion') turn = state.direction * 92;
+          if (reason !== 'invalid-health-hold' && reason !== 'low-health-hold') {
+            keys.push('KeyS', state.direction > 0 ? 'KeyD' : 'KeyA');
+            if (changed?.reason === 'low-world-motion') turn = state.direction * 92;
+          }
         } else if (nextMode === 'engage') {
           if (observation.currentTarget && now - Number(observation.lastShotAt ?? Number.NEGATIVE_INFINITY) < config.postShotStrafeMs) {
             keys.push(state.direction > 0 ? 'KeyA' : 'KeyD');

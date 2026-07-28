@@ -25,7 +25,8 @@ test('recovery is bounded and cooldown prevents repeated stuck oscillation', () 
   assert.equal(held.mode, 'recover');
   assert.equal(held.turn, 0);
   const clear = policy.update({ now: 2200, active: true, health: 100, stuck: true, movementCycle: 2 });
-  assert.equal(clear.mode, 'roam');
+  assert.equal(clear.mode, 'recover');
+  assert.equal(clear.reason, 'stuck-cooldown-hold');
 });
 
 test('engagement stops translation except for a bounded post-shot strafe', () => {
@@ -56,4 +57,30 @@ test('low health vetoes engagement until retreat expires', () => {
   const result = policy.update({ now: 1000, active: true, health: 40, damageDelta: 5, currentTarget: true, movementCycle: 0 });
   assert.equal(result.mode, 'retreat');
   assert.equal(result.allowEngagement, false);
+});
+
+test('missing health fails closed and cannot authorize engagement', () => {
+  const policy = createTacticalPolicy();
+  const result = policy.update({ now: 1000, active: true, currentTarget: true, movementCycle: 0 });
+  assert.equal(result.mode, 'recover');
+  assert.equal(result.reason, 'invalid-health-hold');
+  assert.equal(result.allowEngagement, false);
+  assert.deepEqual(result.keys, []);
+});
+
+test('low health cannot silently expire from retreat into engagement', () => {
+  const policy = createTacticalPolicy({ retreatHealth: 45, retreatDurationMs: 500 });
+  policy.update({ now: 1000, active: true, health: 40, damageDelta: 5, currentTarget: true, movementCycle: 0 });
+  const result = policy.update({ now: 1700, active: true, health: 40, damageDelta: 0, currentTarget: true, movementCycle: 1 });
+  assert.equal(result.mode, 'recover');
+  assert.equal(result.reason, 'low-health-hold');
+  assert.equal(result.allowEngagement, false);
+});
+
+test('inactive respawn state clears old retreat timers', () => {
+  const policy = createTacticalPolicy({ retreatDamage: 5, retreatDurationMs: 2000 });
+  assert.equal(policy.update({ now: 1000, active: true, health: 80, damageDelta: 6, movementCycle: 0 }).mode, 'retreat');
+  assert.equal(policy.update({ now: 1200, active: false, health: 0, movementCycle: 1 }).mode, 'roam');
+  const respawn = policy.update({ now: 1300, active: true, health: 100, damageDelta: 0, movementCycle: 2 });
+  assert.equal(respawn.mode, 'roam');
 });

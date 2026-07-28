@@ -336,6 +336,8 @@ async function visibleHudSnapshot(page) {
       respawnVisible,
       reloadState: document.querySelector('#reload-state')?.textContent?.trim() ?? '',
       reloadActive: document.querySelector('#reload-state')?.classList?.contains('active') ?? false,
+      pointerLock: document.pointerLockElement?.id === 'game',
+      documentFocused: document.hasFocus(),
       matchSummaryVisible,
       activeMatch: !countdownVisible && !bannerVisible && !respawnVisible && !matchSummaryVisible && Boolean(timer && timer !== '00:00'),
     };
@@ -517,6 +519,10 @@ async function run() {
   let controlStartedAtMs = null;
   let controlEndedAtMs = null;
   let tacticalPolicyReceipt = null;
+  let activeInputVeto = false;
+  let pointerLockLosses = 0;
+  let focusLosses = 0;
+  let hudFreshnessFailures = 0;
   const visionDurationsMs = [];
 
   try {
@@ -696,7 +702,24 @@ async function run() {
           actions.push({ atMs, kind: 'match-end-visible' });
           break;
         }
-        const activeMatch = Boolean(hud?.activeMatch);
+        const hudActiveMatch = Boolean(hud?.activeMatch);
+        const healthFresh = hud?.health !== null && hud?.health !== undefined
+          && Number.isFinite(Number(hud.health)) && Number(hud.health) >= 0 && Number(hud.health) <= 100;
+        if (hudActiveMatch && !healthFresh) hudFreshnessFailures += 1;
+        if (hudActiveMatch && !activeInputVeto && hud?.pointerLock === false) {
+          pointerLockLosses += 1;
+          pointerLock = false;
+          activeInputVeto = true;
+          await releaseAll(page, pressedKeys);
+          actions.push({ atMs, kind: 'active-input-veto', reason: 'pointer-lock-lost' });
+        }
+        if (hudActiveMatch && !activeInputVeto && hud?.documentFocused === false) {
+          focusLosses += 1;
+          activeInputVeto = true;
+          await releaseAll(page, pressedKeys);
+          actions.push({ atMs, kind: 'active-input-veto', reason: 'document-focus-lost' });
+        }
+        const activeMatch = hudActiveMatch && !activeInputVeto && healthFresh;
         if (activeMatch) activeVisionFrames += 1;
         const visualDifference = signatureDifference(previousSignature, vision.signature);
         if (previousMovementForward && !cameraMovedLastFrame && visualDifference !== null && visualDifference < 2.2) lowMotionFrames += 1;
@@ -748,7 +771,8 @@ async function run() {
         const tactical = tacticalPolicy?.update({
           now,
           active: activeMatch,
-          health: Number(hud?.health ?? 100),
+          health: hud?.health,
+          healthFresh,
           damageDelta,
           stuck: !rawTarget && lowMotionFrames >= 3,
           currentTarget: Boolean(currentTarget),
@@ -1169,6 +1193,7 @@ async function run() {
         policyVersion: tacticalPolicyReceipt ? 'atomic-player-policy-v6-causal-tactical-state-machine' : 'atomic-player-policy-v5-causal-associated-tri-lane',
         tacticalPolicy: tacticalPolicyName,
         automaticCombatFireEnabled: allowCombatFire,
+        burstShots,
         maximumShotPulses,
         decisionInputs: args['lifecycle-only']
           ? ['ordinary lobby controls and post-action lifecycle receipt']
@@ -1207,7 +1232,7 @@ async function run() {
         agentLanes: {
           scoutPerception: { source: 'latest rendered screencast frame', cadence: 'every control tick' },
           tacticalNavigation: { source: 'visible player-up minimap plus collision recovery', cadenceTicks: navigationLaneStride },
-          aimReflex: { source: 'fresh post-input purple-operator frames', maximumCorrectionsPerLock: 4 },
+          aimReflex: { source: 'fresh post-input purple-operator frames', maximumCorrectionsPerLock: 8 },
         },
         viewport: { width: viewportWidth, height: viewportHeight },
         visionLoopMs: {
@@ -1243,6 +1268,10 @@ async function run() {
         reloadRequests,
         stuckRecoveries,
         damageReactions,
+        activeInputVeto,
+        pointerLockLosses,
+        focusLosses,
+        hudFreshnessFailures,
         requestedHoldMs: 350,
         maximumObservedHoldMs,
         configuredMaxHoldMs: maxHoldMs,
@@ -1318,6 +1347,10 @@ async function run() {
       && report.performance.observedRenderProfile === 'performance'
       && report.input.releasedAtEnd
       && !report.input.holdWatchdogExceeded
+      && !report.input.activeInputVeto
+      && report.input.pointerLockLosses === 0
+      && report.input.focusLosses === 0
+      && report.input.hudFreshnessFailures === 0
       && report.browser.pageErrors.length === 0
       && (!waitForMatchEnd || Boolean(matchEndedObserved && matchSummaryDownload && matchTechnicalDownload));
     console.log(JSON.stringify({
