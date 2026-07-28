@@ -500,7 +500,7 @@ async function run() {
   const burstShots = integerArg(args['burst-shots'], 3, 1, 5);
   const maximumShotPulses = integerArg(args['max-shot-pulses'], 1_000_000, 1, 1_000_000);
   const fireCooldownMs = integerArg(args['fire-cooldown'], 420, 180, 2000);
-  const firePulseMs = integerArg(args['fire-pulse'], 72, 20, 100);
+  const firePulseMs = integerArg(args['fire-pulse'], 72, 20, 250);
   const fireAlignmentMaximum = numberArg(args['fire-alignment'], 0.02, 0.003, 0.02);
   const grenadeAlignmentMaximum = numberArg(args['grenade-alignment'], 0.02, 0.003, 0.02);
   const fieldKitRequest = String(args['field-kit'] ?? 'default');
