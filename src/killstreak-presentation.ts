@@ -1401,6 +1401,7 @@ export class KillstreakPresentation {
   private swarmOverlapAdmission: {
     key: string;
     admittedInstances: number;
+    admittedBatches: number;
     requiredCompletionSequence: number;
   } | null = null;
   private disposalFinalized = false;
@@ -1631,7 +1632,10 @@ export class KillstreakPresentation {
     this.swarmInstanceBatches.length = 0;
   }
 
-  private syncSwarmInstancing(maximumVisibleInstances = Number.POSITIVE_INFINITY): void {
+  private syncSwarmInstancing(
+    maximumVisibleInstances = Number.POSITIVE_INFINITY,
+    maximumVisibleBatches = Number.POSITIVE_INFINITY,
+  ): void {
     if (this.swarmInstanceBatches.length === 0) return;
     const active = [...this.entities.values()].filter((entry) => (
       entry.root.userData.presentationPoolKey === 'swarm-drone'
@@ -1641,7 +1645,7 @@ export class KillstreakPresentation {
     const instanceMatrix = new THREE.Matrix4();
     const sourceWorldMatrix = new THREE.Matrix4();
     for (const entry of active) entry.root.updateWorldMatrix(true, false);
-    for (const batch of this.swarmInstanceBatches) {
+    for (const [batchIndex, batch] of this.swarmInstanceBatches.entries()) {
       for (const [instanceIndex, entry] of active.entries()) {
         const poolIndex = Number(entry.root.userData.presentationPoolIndex);
         const source = Number.isInteger(poolIndex) ? batch.sources[poolIndex] : undefined;
@@ -1656,8 +1660,9 @@ export class KillstreakPresentation {
         instanceMatrix.multiplyMatrices(inverseRoot, sourceWorldMatrix);
         batch.root.setMatrixAt(instanceIndex, instanceMatrix);
       }
-      batch.root.count = active.length;
-      batch.root.visible = active.length > 0;
+      const batchAdmitted = batchIndex < maximumVisibleBatches;
+      batch.root.count = batchAdmitted ? active.length : 0;
+      batch.root.visible = batchAdmitted && active.length > 0;
       batch.root.instanceMatrix.needsUpdate = true;
     }
   }
@@ -2018,6 +2023,7 @@ export class KillstreakPresentation {
     const liveChoppers = admitted.filter((entity) => entity.kind === 'chopper' && entity.expiresInMs > 0);
     const liveSwarm = admitted.filter((entity) => entity.kind === 'drone' && entity.mode === 'swarm' && entity.expiresInMs > 0);
     let maximumVisibleSwarm = liveSwarm.length;
+    let maximumVisibleSwarmBatches = Number.POSITIVE_INFINITY;
     const progressIsUsable = presentationProgress !== null
       && Number.isSafeInteger(presentationProgress.submissionSequence)
       && Number.isSafeInteger(presentationProgress.completedSequence)
@@ -2037,24 +2043,31 @@ export class KillstreakPresentation {
         // The complete formation is visible well before its 500ms fire gate.
         this.swarmOverlapAdmission = {
           key,
-          admittedInstances: Math.min(4, liveSwarm.length),
+          admittedInstances: 0,
+          admittedBatches: 0,
           requiredCompletionSequence: presentationProgress.submissionSequence + 1,
         };
       } else if (
-        this.swarmOverlapAdmission.admittedInstances < liveSwarm.length
+        (this.swarmOverlapAdmission.admittedInstances < liveSwarm.length
+          || this.swarmOverlapAdmission.admittedBatches < this.swarmInstanceBatches.length)
         && presentationProgress.completedSequence >= this.swarmOverlapAdmission.requiredCompletionSequence
       ) {
         this.swarmOverlapAdmission.admittedInstances = Math.min(
           liveSwarm.length,
           this.swarmOverlapAdmission.admittedInstances + 4,
         );
+        this.swarmOverlapAdmission.admittedBatches = Math.min(
+          this.swarmInstanceBatches.length,
+          this.swarmOverlapAdmission.admittedBatches + 2,
+        );
         this.swarmOverlapAdmission.requiredCompletionSequence = presentationProgress.submissionSequence + 1;
       }
       maximumVisibleSwarm = Math.min(liveSwarm.length, this.swarmOverlapAdmission.admittedInstances);
+      maximumVisibleSwarmBatches = this.swarmOverlapAdmission.admittedBatches;
     } else {
       this.swarmOverlapAdmission = null;
     }
-    this.syncSwarmInstancing(maximumVisibleSwarm);
+    this.syncSwarmInstancing(maximumVisibleSwarm, maximumVisibleSwarmBatches);
     this.applyFirstPersonVisibility();
     this.syncSensorContacts(snapshot.sensorContacts);
     this.syncPlacementMarkers(snapshot.placementMarkers, snapshot.revision, nowMs);
