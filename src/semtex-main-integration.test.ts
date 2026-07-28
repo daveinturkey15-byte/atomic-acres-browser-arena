@@ -11,11 +11,11 @@ describe('Semtex live-stick runtime integration', () => {
     const block = source.slice(start, end);
     expect(start).toBeGreaterThan(-1);
     expect(end).toBeGreaterThan(start);
-    expect(block).toContain("const liveAttachedTarget = entity.grenade === 'semtex'");
-    expect(block).toContain('target.id === entity.attachedTargetId && target.lifeId === entity.attachedTargetLifeId');
+    expect(block).toContain("if (entity.grenade === 'semtex' && attachedTargetId !== null && attachedTargetLifeId !== null)");
+    expect(block).toContain('liveAttachedTargetFound = explosiveBoltTargetBuffer.findIndex(attachedTargetId, attachedTargetLifeId) >= 0;');
     expect(block).toContain("sealReceiverStickyDetonation({");
     expect(block).toContain("source: 'semtex'");
-    expect(block).toContain('currentAttachmentTarget: { id: liveAttachedTarget.id, lifeId: liveAttachedTarget.lifeId }');
+    expect(block).toContain('currentAttachmentTarget: { id: attachedTargetId!, lifeId: attachedTargetLifeId! }');
     expect(block).toContain("const semtexStuckToLiveActor = network.role === 'client'");
     expect(block).toContain(': sealedAttachment !== null;');
     expect(block).toContain('semtexBlastRadiusM(semtexStuckToLiveActor)');

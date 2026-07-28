@@ -46,7 +46,8 @@ describe('host-canonical sticky authority integration', () => {
     expect(verification).not.toContain('player.alive');
     expect(verification).not.toContain('remote.snapshot.hp');
     const explosion = block('function explodeGrenade(', '\nfunction grenadeDetonatesOnFirstImpact(');
-    expect(explosion).toContain('currentAttachmentTarget: { id: liveAttachedTarget.id, lifeId: liveAttachedTarget.lifeId }');
+    expect(explosion).toContain('liveAttachedTargetFound = explosiveBoltTargetBuffer.findIndex(attachedTargetId, attachedTargetLifeId) >= 0;');
+    expect(explosion).toContain('currentAttachmentTarget: { id: attachedTargetId!, lifeId: attachedTargetLifeId! }');
     const death = block('function processDeath(', '\nfunction removeRemote(');
     expect(death).toContain('recordRemoteGrenadeDeath(victimGrenadeAuthority)');
     expect(main).toContain('recordRemoteGrenadeRespawn(');

@@ -47,6 +47,7 @@ import type { ShuffleBag } from './bot-arsenal';
 import { classifyFootstepSurface, classifyImpactSurface, nearMissStrength, type ImpactSurface } from './combat-feedback';
 import { nextShotDeadline } from './combat-timing';
 import { SEMTEX_HITL_CONTRACT, flashbangPresentation, semtexBlastDamage, semtexBlastRadiusM } from './combat/pass65-ordnance-contract';
+import { ExplosiveBoltTargetBuffer, type ExplosiveBoltTargetKind } from './combat/explosive-bolt-target-buffer';
 import { latestChangelogEntry } from './changelog';
 import { bindReleaseHistoryDialog } from './ui/release-history-dialog';
 import { bindProjectMapDialog } from './ui/project-map-dialog';
@@ -2506,6 +2507,7 @@ let flashVictimConsumer = new FlashVictimResultConsumer(interactiveWorldMatchEpo
 const explosiveBolts: ExplosiveBoltEntity[] = [];
 const explosiveBoltStartScratch = new THREE.Vector3();
 const explosiveBoltDeltaScratch = new THREE.Vector3();
+const explosiveBoltTargetPositionScratch = new THREE.Vector3();
 const EXPLOSIVE_BOLT_PRESENTATION_POOL_CAPACITY = 32;
 const explosiveBoltShaftGeometry = new THREE.CylinderGeometry(0.018, 0.018, 0.72, 8);
 const explosiveBoltTipGeometry = new THREE.ConeGeometry(0.048, 0.16, 8);
@@ -10294,35 +10296,35 @@ function melee(): void {
   });
 }
 
-type ExplosiveBoltTarget = Readonly<{
-  id: string;
-  team: Team;
-  lifeId: number;
-  kind: 'player' | 'remote' | 'bot';
-  position: THREE.Vector3;
-}>;
+const explosiveBoltTargetBuffer = new ExplosiveBoltTargetBuffer<Team>();
 
-function explosiveBoltTargets(ownerId: string, ownerTeam: Team): ExplosiveBoltTarget[] {
-  const targets: ExplosiveBoltTarget[] = [];
+function fillExplosiveBoltTargets(ownerId: string, ownerTeam: Team): number {
+  explosiveBoltTargetBuffer.reset();
   if (player.id !== ownerId && player.alive && areCombatantsHostile(ownerId, ownerTeam, player.id, player.team)) {
-    targets.push({ id: player.id, team: player.team, lifeId: localContinuity, kind: 'player', position: player.position.clone().add(new THREE.Vector3(0, -0.62, 0)) });
+    explosiveBoltTargetBuffer.append(player.id, player.team, localContinuity, 'player', player.position, -0.62);
   }
   for (const remote of remotes.values()) {
     if (remote.snapshot.id === ownerId || remote.snapshot.hp <= 0
       || !areCombatantsHostile(ownerId, ownerTeam, remote.snapshot.id, remote.snapshot.team)) continue;
-    targets.push({
-      id: remote.snapshot.id,
-      team: remote.snapshot.team,
-      lifeId: remote.continuity,
-      kind: 'remote',
-      position: remote.target.clone().add(new THREE.Vector3(0, 1, 0)),
-    });
+    explosiveBoltTargetBuffer.append(remote.snapshot.id, remote.snapshot.team, remote.continuity, 'remote', remote.target, 1);
   }
   for (const bot of bots.values()) {
     if (bot.id === ownerId || !bot.alive || !areCombatantsHostile(ownerId, ownerTeam, bot.id, bot.team)) continue;
-    targets.push({ id: bot.id, team: bot.team, lifeId: bot.continuity, kind: 'bot', position: bot.position.clone().add(new THREE.Vector3(0, 1, 0)) });
+    explosiveBoltTargetBuffer.append(bot.id, bot.team, bot.continuity, 'bot', bot.position, 1);
   }
-  return targets;
+  return explosiveBoltTargetBuffer.length;
+}
+
+function explosiveBoltTargetDistance(
+  origin: Readonly<{ x: number; y: number; z: number }>,
+  targetX: number,
+  targetY: number,
+  targetZ: number,
+): number {
+  const dx = origin.x - targetX;
+  const dy = origin.y - targetY;
+  const dz = origin.z - targetZ;
+  return Math.sqrt(dx * dx + dy * dy + dz * dz);
 }
 
 function segmentSphereFraction(start: THREE.Vector3, delta: THREE.Vector3, centre: THREE.Vector3, radius: number): number | null {
@@ -10488,7 +10490,11 @@ function disposeExplosiveBolt(entity: ExplosiveBoltEntity): void {
 
 function applyExplosiveBoltTargetDamage(
   bolt: ExplosiveBoltEntity,
-  target: ExplosiveBoltTarget,
+  targetId: string,
+  targetKind: ExplosiveBoltTargetKind,
+  targetX: number,
+  targetY: number,
+  targetZ: number,
   damage: number,
   kind: 'direct' | 'blast',
   origin: THREE.Vector3,
@@ -10497,7 +10503,7 @@ function applyExplosiveBoltTargetDamage(
   const boundedDamage = Math.min(100, damage);
   const stuck = kind === 'blast' && bolt.targetId !== null && bolt.targetLifeId !== null;
   const cause: KillCause = { kind: 'gun', weapon: 'explosive-crossbow' };
-  if (target.kind === 'player') {
+  if (targetKind === 'player') {
     const authoredDamage = handicapOutgoingDamage(bolt.ownerId, resolveRemotePoweredDamage(
       boundedDamage,
       overdriveDamageMultiplier(overdriveState, bolt.ownerId, performance.now()),
@@ -10505,37 +10511,44 @@ function applyExplosiveBoltTargetDamage(
     applyDamage(authoredDamage, bolt.ownerId, 1, false, cause, true);
     return;
   }
-  if (target.kind === 'bot') {
-    const bot = bots.get(target.id);
+  if (targetKind === 'bot') {
+    const bot = bots.get(targetId);
     const authoredDamage = handicapOutgoingDamage(bolt.ownerId, resolveRemotePoweredDamage(
       boundedDamage,
       overdriveDamageMultiplier(overdriveState, bolt.ownerId, performance.now()),
     ), 'explosive-crossbow');
-    if (bot) applyBotDamage(bot, authoredDamage, 'body', cause, bolt.ownerId, { distanceMeters: origin.distanceTo(target.position) });
+    if (bot) applyBotDamage(bot, authoredDamage, 'body', cause, bolt.ownerId, {
+      distanceMeters: explosiveBoltTargetDistance(origin, targetX, targetY, targetZ),
+    });
     return;
   }
   const hit: HitMessage = kind === 'direct'
     ? {
-        type: 'hit', by: bolt.ownerId, target: target.id, damage: boundedDamage, kind: 'shot',
+        type: 'hit', by: bolt.ownerId, target: targetId, damage: boundedDamage, kind: 'shot',
         origin: origin.toArray() as [number, number, number], actionNonce: bolt.actionNonce, nonce: randomNonce(),
       }
     : {
-        type: 'hit', by: bolt.ownerId, target: target.id, damage: boundedDamage, kind: 'explosive',
+        type: 'hit', by: bolt.ownerId, target: targetId, damage: boundedDamage, kind: 'explosive',
         explosiveSource: 'explosive-crossbow', origin: origin.toArray() as [number, number, number],
         actionNonce: bolt.actionNonce, nonce: randomNonce(),
         ...(stuck ? { stuck: true as const } : {}),
       };
-  sendAuthoritativeHit(hit, { hitZone: 'body', distanceMeters: origin.distanceTo(target.position) });
+  sendAuthoritativeHit(hit, {
+    hitZone: 'body',
+    distanceMeters: explosiveBoltTargetDistance(origin, targetX, targetY, targetZ),
+  });
 }
 
 function detonateExplosiveBoltEntity(bolt: ExplosiveBoltEntity, now: number): void {
   const point = bolt.mesh.position.clone();
-  const liveAttachedTarget = bolt.targetId !== null && bolt.targetLifeId !== null
-    ? explosiveBoltTargets(bolt.ownerId, bolt.ownerTeam).find((target) => (
-        target.id === bolt.targetId && target.lifeId === bolt.targetLifeId
-      ))
-    : undefined;
-  const sealedAttachment = bolt.authority && liveAttachedTarget
+  const attachedTargetId = bolt.targetId;
+  const attachedTargetLifeId = bolt.targetLifeId;
+  let liveAttachedTargetFound = false;
+  if (attachedTargetId !== null && attachedTargetLifeId !== null) {
+    fillExplosiveBoltTargets(bolt.ownerId, bolt.ownerTeam);
+    liveAttachedTargetFound = explosiveBoltTargetBuffer.findIndex(attachedTargetId, attachedTargetLifeId) >= 0;
+  }
+  const sealedAttachment = bolt.authority && liveAttachedTargetFound
     ? sealReceiverStickyDetonation({
         ownerId: bolt.ownerId,
         ownerLifeId: bolt.ownerLifeId,
@@ -10543,7 +10556,7 @@ function detonateExplosiveBoltEntity(bolt: ExplosiveBoltEntity, now: number): vo
         actionNonce: bolt.actionNonce,
         origin: point.toArray() as [number, number, number],
         detonatedAtMs: now,
-        currentAttachmentTarget: { id: liveAttachedTarget.id, lifeId: liveAttachedTarget.lifeId },
+        currentAttachmentTarget: { id: attachedTargetId!, lifeId: attachedTargetLifeId! },
       })
     : null;
   disposeExplosiveBolt(bolt);
@@ -10553,15 +10566,30 @@ function detonateExplosiveBoltEntity(bolt: ExplosiveBoltEntity, now: number): vo
   const stuck = sealedAttachment !== null;
   const blastRadiusM = explosiveBoltBlastRadiusM(stuck);
   applyInteractiveWorldExplosion(point, blastRadiusM, EXPLOSIVE_BOLT_BLAST_MAX_DAMAGE * (stuck ? 2 : 1));
-  for (const target of explosiveBoltTargets(bolt.ownerId, bolt.ownerTeam)) {
-    if (target.id === bolt.targetId && target.lifeId !== bolt.targetLifeId) continue;
-    const direct = target.id === bolt.targetId && target.lifeId === bolt.targetLifeId;
-    if (direct) applyExplosiveBoltTargetDamage(bolt, target, EXPLOSIVE_BOLT_DIRECT_DAMAGE, 'direct', point);
-    const distance = target.position.distanceTo(point);
+  const targetCount = fillExplosiveBoltTargets(bolt.ownerId, bolt.ownerTeam);
+  for (let targetIndex = 0; targetIndex < targetCount; targetIndex += 1) {
+    const target = explosiveBoltTargetBuffer.at(targetIndex);
+    const targetId = target.id;
+    const targetLifeId = target.lifeId;
+    const targetKind = target.kind;
+    const targetX = target.position.x;
+    const targetY = target.position.y;
+    const targetZ = target.position.z;
+    if (targetId === bolt.targetId && targetLifeId !== bolt.targetLifeId) continue;
+    const direct = targetId === bolt.targetId && targetLifeId === bolt.targetLifeId;
+    if (direct) applyExplosiveBoltTargetDamage(
+      bolt, targetId, targetKind, targetX, targetY, targetZ, EXPLOSIVE_BOLT_DIRECT_DAMAGE, 'direct', point,
+    );
+    const distance = explosiveBoltTargetDistance(point, targetX, targetY, targetZ);
     if (distance > blastRadiusM) continue;
-    const blocked = !direct && activeWorldColliders().some((box) => segmentIntersectsBox(point, target.position, box));
+    explosiveBoltTargetPositionScratch.set(targetX, targetY, targetZ);
+    const blocked = !direct && activeWorldColliders().some((box) => (
+      segmentIntersectsBox(point, explosiveBoltTargetPositionScratch, box)
+    ));
     if (blocked) continue;
-    applyExplosiveBoltTargetDamage(bolt, target, explosiveBoltBlastDamage(distance, stuck), 'blast', point);
+    applyExplosiveBoltTargetDamage(
+      bolt, targetId, targetKind, targetX, targetY, targetZ, explosiveBoltBlastDamage(distance, stuck), 'blast', point,
+    );
   }
 }
 
@@ -10572,20 +10600,26 @@ function updateExplosiveBolts(dt: number, now: number): void {
       const start = explosiveBoltStartScratch.copy(bolt.mesh.position);
       const delta = explosiveBoltDeltaScratch.copy(bolt.velocity).multiplyScalar(dt);
       const worldCollision = sweepSphereAgainstBoxes(start, delta, activeWorldColliders());
-      let targetHit: ExplosiveBoltTarget | null = null;
+      let targetHitIndex = -1;
       let targetFraction = 2;
-      for (const target of explosiveBoltTargets(bolt.ownerId, bolt.ownerTeam)) {
+      const targetCount = fillExplosiveBoltTargets(bolt.ownerId, bolt.ownerTeam);
+      for (let targetIndex = 0; targetIndex < targetCount; targetIndex += 1) {
+        const target = explosiveBoltTargetBuffer.at(targetIndex);
         const fraction = segmentSphereFraction(start, delta, target.position, 0.58);
         if (fraction !== null && fraction < targetFraction) {
-          targetHit = target;
+          targetHitIndex = targetIndex;
           targetFraction = fraction;
         }
       }
       const worldFraction = worldCollision?.time ?? 2;
-      if (targetHit && targetFraction <= worldFraction) {
+      if (targetHitIndex >= 0 && targetFraction <= worldFraction) {
+        const targetHit = explosiveBoltTargetBuffer.at(targetHitIndex);
         bolt.mesh.position.copy(targetHit.position);
-        bolt.targetId = targetHit.id;
-        bolt.targetLifeId = targetHit.lifeId;
+        const targetHitId = targetHit.id;
+        const targetHitLifeId = targetHit.lifeId;
+        const targetHitKind = targetHit.kind;
+        bolt.targetId = targetHitId;
+        bolt.targetLifeId = targetHitLifeId;
         bolt.impactedAt = now;
         bolt.detonatesAt = Math.min(bolt.expiresAt, now + EXPLOSIVE_BOLT_ARM_DELAY_MS);
         bolt.nextFuseBeepAt = now;
@@ -10595,12 +10629,12 @@ function updateExplosiveBolts(dt: number, now: number): void {
           ownerLifeId: bolt.ownerLifeId,
           source: 'explosive-crossbow',
           actionNonce: bolt.actionNonce,
-          targetId: targetHit.id,
-          targetLifeId: targetHit.lifeId,
+          targetId: targetHitId,
+          targetLifeId: targetHitLifeId,
           attachedAtMs: now,
           expiresAtMs: bolt.detonatesAt + STICKY_AUTHORITY_POST_DETONATION_LIFETIME_MS,
         });
-        if (targetHit.kind === 'player') addFeed('STUCK', 'coral');
+        if (targetHitKind === 'player') addFeed('STUCK', 'coral');
         else if (bolt.ownerId === player.id) addFeed('STUCK', 'gold');
       } else if (worldCollision) {
         bolt.mesh.position.copy(start).addScaledVector(delta, worldCollision.time);
@@ -10612,9 +10646,9 @@ function updateExplosiveBolts(dt: number, now: number): void {
         bolt.mesh.position.add(delta);
       }
     } else if (bolt.targetId !== null && bolt.targetLifeId !== null) {
-      const target = explosiveBoltTargets(bolt.ownerId, bolt.ownerTeam)
-        .find((candidate) => candidate.id === bolt.targetId && candidate.lifeId === bolt.targetLifeId);
-      if (target) bolt.mesh.position.copy(target.position);
+      fillExplosiveBoltTargets(bolt.ownerId, bolt.ownerTeam);
+      const attachedTargetIndex = explosiveBoltTargetBuffer.findIndex(bolt.targetId, bolt.targetLifeId);
+      if (attachedTargetIndex >= 0) bolt.mesh.position.copy(explosiveBoltTargetBuffer.at(attachedTargetIndex).position);
     }
     if (bolt.impactedAt !== null && bolt.nextFuseBeepAt !== null && now >= bolt.nextFuseBeepAt && now < bolt.detonatesAt) {
       const remainingMs = bolt.detonatesAt - now;
@@ -11072,14 +11106,14 @@ function explodeGrenade(entity: GrenadeEntity): void {
   audio.explosion(afterPresentationDetach);
   const afterAudio = performance.now();
   spawnGrenadeExplosionVisual(point, afterAudio);
-  const liveAttachedTarget = entity.grenade === 'semtex'
-    && entity.attachedTargetId !== null
-    && entity.attachedTargetLifeId !== null
-    ? explosiveBoltTargets(entity.ownerId, entity.ownerTeam).find((target) => (
-        target.id === entity.attachedTargetId && target.lifeId === entity.attachedTargetLifeId
-      ))
-    : undefined;
-  const sealedAttachment = entity.grenade === 'semtex' && liveAttachedTarget
+  const attachedTargetId = entity.attachedTargetId;
+  const attachedTargetLifeId = entity.attachedTargetLifeId;
+  let liveAttachedTargetFound = false;
+  if (entity.grenade === 'semtex' && attachedTargetId !== null && attachedTargetLifeId !== null) {
+    fillExplosiveBoltTargets(entity.ownerId, entity.ownerTeam);
+    liveAttachedTargetFound = explosiveBoltTargetBuffer.findIndex(attachedTargetId, attachedTargetLifeId) >= 0;
+  }
+  const sealedAttachment = entity.grenade === 'semtex' && liveAttachedTargetFound
     ? sealReceiverStickyDetonation({
         ownerId: entity.ownerId,
         ownerLifeId: entity.ownerLifeId,
@@ -11087,11 +11121,11 @@ function explodeGrenade(entity: GrenadeEntity): void {
         actionNonce: entity.actionNonce,
         origin: point.toArray() as [number, number, number],
         detonatedAtMs: started,
-        currentAttachmentTarget: { id: liveAttachedTarget.id, lifeId: liveAttachedTarget.lifeId },
+        currentAttachmentTarget: { id: attachedTargetId!, lifeId: attachedTargetLifeId! },
       })
     : null;
   const semtexStuckToLiveActor = network.role === 'client'
-    ? liveAttachedTarget !== undefined
+    ? liveAttachedTargetFound
     : sealedAttachment !== null;
   const blastRadius = entity.grenade === 'semtex'
     ? semtexBlastRadiusM(semtexStuckToLiveActor)
@@ -11172,22 +11206,24 @@ function armImpactGrenade(
   grenade: GrenadeEntity,
   now: number,
   position: THREE.Vector3,
-  target: ExplosiveBoltTarget | null = null,
+  targetId: string | null = null,
+  targetLifeId: number | null = null,
+  targetKind: ExplosiveBoltTargetKind | null = null,
 ): void {
   if (grenade.impactedAt !== null) return;
   grenade.impactedAt = now;
   grenade.mesh.position.copy(position);
   grenade.velocity.set(0, 0, 0);
   grenade.angularVelocity.set(0, 0, 0);
-  grenade.attachedTargetId = target?.id ?? null;
-  grenade.attachedTargetLifeId = target?.lifeId ?? null;
+  grenade.attachedTargetId = targetId;
+  grenade.attachedTargetLifeId = targetLifeId;
   if (grenadeDetonatesOnFirstImpact(grenade.grenade)) {
     grenade.explodeAt = now;
     grenade.nextFuseBeepAt = Number.POSITIVE_INFINITY;
   } else if (grenade.grenade === 'semtex') {
     grenade.explodeAt = now + SEMTEX_HITL_CONTRACT.fuseMs;
     grenade.nextFuseBeepAt = now;
-    if (target !== null) {
+    if (targetId !== null && targetLifeId !== null && targetKind !== null) {
       const remoteGrenadeAuthority = grenade.ownerKind === 'remote'
         ? remoteGrenadeAuthorities.get(grenade.ownerId)
         : undefined;
@@ -11200,12 +11236,12 @@ function armImpactGrenade(
         ownerLifeId: grenade.ownerLifeId,
         source: 'semtex',
         actionNonce: grenade.actionNonce,
-        targetId: target.id,
-        targetLifeId: target.lifeId,
+        targetId,
+        targetLifeId,
         attachedAtMs: now,
         expiresAtMs: grenade.explodeAt + STICKY_AUTHORITY_POST_DETONATION_LIFETIME_MS,
       });
-      if (target.kind === 'player') addFeed('STUCK', 'coral');
+      if (targetKind === 'player') addFeed('STUCK', 'coral');
       else if (grenade.ownerKind === 'player') addFeed('STUCK', 'gold');
     }
   }
@@ -11223,9 +11259,9 @@ function updateGrenades(dt: number, now: number): void {
     }
     if (grenade.impactedAt !== null) {
       if (grenade.attachedTargetId !== null && grenade.attachedTargetLifeId !== null) {
-        const target = explosiveBoltTargets(grenade.ownerId, grenade.ownerTeam)
-          .find((candidate) => candidate.id === grenade.attachedTargetId && candidate.lifeId === grenade.attachedTargetLifeId);
-        if (target) grenade.mesh.position.copy(target.position);
+        fillExplosiveBoltTargets(grenade.ownerId, grenade.ownerTeam);
+        const attachedTargetIndex = explosiveBoltTargetBuffer.findIndex(grenade.attachedTargetId, grenade.attachedTargetLifeId);
+        if (attachedTargetIndex >= 0) grenade.mesh.position.copy(explosiveBoltTargetBuffer.at(attachedTargetIndex).position);
       }
       if (now >= grenade.explodeAt) {
         grenades.splice(index, 1);
@@ -11240,20 +11276,30 @@ function updateGrenades(dt: number, now: number): void {
     const start = grenade.mesh.position.clone();
     const delta = grenade.velocity.clone().multiplyScalar(dt);
     const collision = sweepSphereAgainstBoxes(start, delta, activeWorldColliders());
-    let targetHit: ExplosiveBoltTarget | null = null;
+    let targetHitIndex = -1;
     let targetFraction = 2;
     if (grenadeDetonatesOnFirstImpact(grenade.grenade) || grenade.grenade === 'semtex') {
-      for (const target of explosiveBoltTargets(grenade.ownerId, grenade.ownerTeam)) {
+      const targetCount = fillExplosiveBoltTargets(grenade.ownerId, grenade.ownerTeam);
+      for (let targetIndex = 0; targetIndex < targetCount; targetIndex += 1) {
+        const target = explosiveBoltTargetBuffer.at(targetIndex);
         const fraction = segmentSphereFraction(start, delta, target.position, 0.58);
         if (fraction !== null && fraction < targetFraction) {
-          targetHit = target;
+          targetHitIndex = targetIndex;
           targetFraction = fraction;
         }
       }
     }
     const worldFraction = collision?.time ?? 2;
-    if (targetHit && targetFraction <= worldFraction) {
-      armImpactGrenade(grenade, now, start.clone().addScaledVector(delta, targetFraction), targetHit);
+    if (targetHitIndex >= 0 && targetFraction <= worldFraction) {
+      const targetHit = explosiveBoltTargetBuffer.at(targetHitIndex);
+      armImpactGrenade(
+        grenade,
+        now,
+        start.clone().addScaledVector(delta, targetFraction),
+        targetHit.id,
+        targetHit.lifeId,
+        targetHit.kind,
+      );
     } else if (collision && (grenadeDetonatesOnFirstImpact(grenade.grenade) || grenade.grenade === 'semtex')) {
       const collisionNormal = new THREE.Vector3(collision.normal.x, collision.normal.y, collision.normal.z);
       armImpactGrenade(grenade, now, start.clone().addScaledVector(delta, collision.time).addScaledVector(collisionNormal, 0.025));
