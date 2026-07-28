@@ -2,7 +2,7 @@ export function findCyanRangeTargets(data, width, height, channels = 3) {
   const x0 = Math.floor(width * 0.29);
   const x1 = Math.ceil(width * 0.76);
   const y0 = Math.floor(height * 0.28);
-  const y1 = Math.ceil(height * 0.70);
+  const y1 = Math.ceil(height * 0.48);
   const mask = new Uint8Array(width * height);
   for (let y = y0; y < y1; y += 1) {
     for (let x = x0; x < x1; x += 1) {
