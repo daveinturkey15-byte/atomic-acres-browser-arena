@@ -569,11 +569,25 @@ function animatedSwarmAncestor(
 
 function swarmStaticMergeKey(mesh: THREE.Mesh): string | null {
   if (Array.isArray(mesh.material) || mesh instanceof THREE.SkinnedMesh) return null;
-  const attributes = Object.keys(mesh.geometry.attributes).sort().join(',');
-  const morphAttributes = Object.keys(mesh.geometry.morphAttributes).sort().join(',');
+  const attributeSignature = (attribute: THREE.BufferAttribute | THREE.InterleavedBufferAttribute): string => {
+    const array = attribute instanceof THREE.InterleavedBufferAttribute ? attribute.data.array : attribute.array;
+    const gpuType = 'gpuType' in attribute ? attribute.gpuType : null;
+    return [array.constructor.name, attribute.itemSize, Number(attribute.normalized), gpuType].join(':');
+  };
+  const attributes = Object.entries(mesh.geometry.attributes)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, attribute]) => `${name}:${attributeSignature(attribute)}`)
+    .join(',');
+  const morphAttributes = Object.entries(mesh.geometry.morphAttributes)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, entries]) => `${name}:${entries.map(attributeSignature).join('+')}`)
+    .join(',');
+  const index = mesh.geometry.index
+    ? attributeSignature(mesh.geometry.index)
+    : 'non-indexed';
   return [
     mesh.material.uuid,
-    mesh.geometry.index === null ? 'non-indexed' : 'indexed',
+    index,
     attributes,
     morphAttributes,
     String(mesh.geometry.morphTargetsRelative),
