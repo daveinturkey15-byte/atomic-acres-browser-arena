@@ -92,7 +92,8 @@ export async function runRange(args) {
       previousPulseAt = Date.now(); await firePulse(page, pulseMs); pulseCount += 1;
       actions.push({ atMs: previousPulseAt - startedAt.getTime(), kind: 'smg-pulse', pulseMs, centreError, scoreBefore: beforeHud?.score ?? null, hitsBefore: beforeHud?.hits ?? null });
     }
-    await sleep(1200);
+    await page.evaluate(() => { const c = document.querySelector('#game'); for (const button of [0, 2]) { window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button, buttons: 0 })); c?.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button, buttons: 0 })); } });
+    await page.locator('#download-match-summary').waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
     finalHud = await hud(page);
     await page.screenshot({ path: resolve(output, 'range-final.png') });
     const summaryVisible = await page.locator('#download-match-summary').isVisible().catch(() => false);
