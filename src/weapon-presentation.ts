@@ -64,6 +64,8 @@ type RiggedViewArm = FirstPersonArmChain & {
   bindShoulder: THREE.Quaternion;
   bindElbow: THREE.Quaternion;
   bindWrist: THREE.Quaternion;
+  bindShoulderPosition: THREE.Vector3;
+  bindShoulderScale: THREE.Vector3;
 };
 
 type ViewArmRig = {
@@ -76,6 +78,10 @@ type ViewArmRig = {
 };
 
 type HandRotationSet = { left: [number, number, number]; right: [number, number, number] };
+type MeleeBonePose = Readonly<{
+  windup: readonly [number, number, number];
+  thrust: readonly [number, number, number];
+}>;
 
 const WEAPON_HAND_ROTATIONS: Record<WeaponId, HandRotationSet> = {
   carbine: { left: [-0.32, 0.12, -0.22], right: [-0.22, -0.06, 0.26] },
@@ -150,7 +156,7 @@ function viewmodelGripFamily(weapon: WeaponId): ViewmodelGripFamily {
   return 'long-gun';
 }
 
-const FINGER_CURL_JOINTS = Object.freeze([0.12, 0.2, 0.14] as const);
+const FINGER_CURL_JOINTS = Object.freeze([0.27, 0.54, 0.46] as const);
 const FINGER_RELOAD_CURL_JOINTS = Object.freeze([0.2, 0.34, 0.24] as const);
 const FINGER_MELEE_CURL_JOINTS = Object.freeze([0.16, 0.25, 0.18] as const);
 const FINGER_CURL_DIGIT_SCALE: Readonly<Record<FirstPersonFingerBone['digit'], number>> = Object.freeze({
@@ -166,6 +172,11 @@ const FINGER_SPREAD: Readonly<Record<FirstPersonFingerBone['digit'], number>> = 
   ring: 0.012,
   pinky: 0.03,
   thumb: -0.05,
+});
+const MELEE_ARM_POSES: Readonly<Record<'rightShoulder' | 'rightElbow' | 'rightWrist', MeleeBonePose>> = Object.freeze({
+  rightShoulder: { windup: [0.04, -0.05, 0.08], thrust: [-0.08, -0.1, 0.14] },
+  rightElbow: { windup: [-0.06, 0.02, -0.03], thrust: [-0.12, 0.01, -0.06] },
+  rightWrist: { windup: [-0.04, -0.02, 0.06], thrust: [-0.08, -0.03, 0.1] },
 });
 
 function weaponFingerCurlScale(weapon: WeaponId, finger: FirstPersonFingerBone): number {
@@ -247,6 +258,10 @@ export class WeaponPresentation {
   private readonly riggedFingerBones: FirstPersonFingerBone[] = [];
   private readonly fingerPoseEuler = new THREE.Euler(0, 0, 0, 'XYZ');
   private readonly fingerPoseQuaternion = new THREE.Quaternion();
+  private readonly meleePoseEuler = new THREE.Euler(0, 0, 0, 'XYZ');
+  private readonly meleePoseQuaternion = new THREE.Quaternion();
+  private readonly meleeGripWorld = new THREE.Vector3();
+  private readonly meleeSocketWorld = new THREE.Vector3();
   private authoredArmsRoot: THREE.Group | null = null;
   private riggedArmDiagnostics: Array<Record<string, unknown>> = [];
   private readonly meleeKnife = new THREE.Group();
@@ -699,7 +714,7 @@ export class WeaponPresentation {
     this.meleeKnife.rotation.set(0, 0, 0);
     // The complete viewmodel root is deliberately reduced, so retain physical
     // authority while scaling the presentation around its aligned grip socket.
-    this.meleeKnife.scale.setScalar(1.55);
+    this.meleeKnife.scale.setScalar(2.25);
 
     exportedWristSocket.userData.authoredRigAttachment = true;
     exportedWristSocket.add(this.meleeKnife);
@@ -756,6 +771,8 @@ export class WeaponPresentation {
           bindShoulder: chain.shoulder.quaternion.clone(),
           bindElbow: chain.elbow.quaternion.clone(),
           bindWrist: chain.wrist.quaternion.clone(),
+          bindShoulderPosition: chain.shoulder.position.clone(),
+          bindShoulderScale: chain.shoulder.scale.clone(),
         });
       }
       this.riggedFingerBones.push(...authoredArms.fingers);
@@ -1508,14 +1525,36 @@ export class WeaponPresentation {
       rig.shoulder.quaternion.copy(rig.bindShoulder);
       rig.elbow.quaternion.copy(rig.bindElbow);
       rig.wrist.quaternion.copy(rig.bindWrist);
+      rig.shoulder.position.copy(rig.bindShoulderPosition);
+      rig.shoulder.scale.copy(rig.bindShoulderScale);
     }
     const restored = this.riggedArmRigs.every((rig) => (
       rig.shoulder.quaternion.equals(rig.bindShoulder)
       && rig.elbow.quaternion.equals(rig.bindElbow)
       && rig.wrist.quaternion.equals(rig.bindWrist)
+      && rig.shoulder.position.equals(rig.bindShoulderPosition)
+      && rig.shoulder.scale.equals(rig.bindShoulderScale)
     ));
     this.riggedMeleeBindPoseRestoredExactly = restored;
     return restored;
+  }
+
+  private applyRiggedMeleeBone(
+    bone: THREE.Bone,
+    bind: THREE.Quaternion,
+    pose: MeleeBonePose,
+    windup: number,
+    thrust: number,
+    retained: number,
+  ): void {
+    this.meleePoseEuler.set(
+      (pose.windup[0] * windup + (pose.thrust[0] - pose.windup[0]) * thrust) * retained,
+      (pose.windup[1] * windup + (pose.thrust[1] - pose.windup[1]) * thrust) * retained,
+      (pose.windup[2] * windup + (pose.thrust[2] - pose.windup[2]) * thrust) * retained,
+      'XYZ',
+    );
+    this.meleePoseQuaternion.setFromEuler(this.meleePoseEuler);
+    bone.quaternion.copy(bind).multiply(this.meleePoseQuaternion);
   }
 
   private poseRiggedMeleeArms(progress: number): void {
@@ -1524,40 +1563,37 @@ export class WeaponPresentation {
     const thrust = THREE.MathUtils.smoothstep(progress, 0.18, 0.46);
     const recover = THREE.MathUtils.smoothstep(progress, 0.58, 1);
     const retained = 1 - recover;
-    const blendedOffset = (
-      windupPose: readonly [number, number, number],
-      thrustPose: readonly [number, number, number],
-    ): THREE.Quaternion => new THREE.Quaternion().setFromEuler(new THREE.Euler(
-      (windupPose[0] * windup + (thrustPose[0] - windupPose[0]) * thrust) * retained,
-      (windupPose[1] * windup + (thrustPose[1] - windupPose[1]) * thrust) * retained,
-      (windupPose[2] * windup + (thrustPose[2] - windupPose[2]) * thrust) * retained,
-      'XYZ',
-    ));
-    const apply = (
-      bone: THREE.Bone,
-      bind: THREE.Quaternion,
-      windupPose: readonly [number, number, number],
-      thrustPose: readonly [number, number, number],
-    ) => bone.quaternion.copy(bind).multiply(blendedOffset(windupPose, thrustPose));
-
-    const right = this.riggedArmRigs.find((rig) => rig.side === 'right');
-    const left = this.riggedArmRigs.find((rig) => rig.side === 'left');
+    let right: RiggedViewArm | undefined;
+    let left: RiggedViewArm | undefined;
+    for (const rig of this.riggedArmRigs) {
+      if (rig.side === 'right') right = rig;
+      else left = rig;
+    }
     if (right) {
-      apply(right.shoulder, right.bindShoulder, [0.08, -0.1, 0.14], [-0.24, -0.2, 0.34]);
-      apply(right.elbow, right.bindElbow, [-0.12, 0.04, -0.06], [-0.34, 0.02, -0.13]);
-      apply(right.wrist, right.bindWrist, [-0.08, -0.04, 0.12], [-0.2, -0.07, 0.2]);
+      this.applyRiggedMeleeBone(right.shoulder, right.bindShoulder, MELEE_ARM_POSES.rightShoulder, windup, thrust, retained);
+      this.applyRiggedMeleeBone(right.elbow, right.bindElbow, MELEE_ARM_POSES.rightElbow, windup, thrust, retained);
+      this.applyRiggedMeleeBone(right.wrist, right.bindWrist, MELEE_ARM_POSES.rightWrist, windup, thrust, retained);
     }
     if (left) {
-      apply(left.shoulder, left.bindShoulder, [0.02, 0.02, -0.03], [0.08, 0.07, -0.1]);
-      apply(left.elbow, left.bindElbow, [-0.02, -0.01, 0.02], [-0.06, -0.02, 0.04]);
-      apply(left.wrist, left.bindWrist, [0, 0, 0], [-0.02, 0.01, -0.02]);
+      // A knife action is a one-hand stab. Keeping the firearm support arm at
+      // its prior grip pose made two complete chains cross at the wrist and
+      // read as detached sausage segments. Collapse that non-participating
+      // chain outside the frustum for the action, then restore its exact bind
+      // position/scale on exit; the visible right shoulder-to-knife chain
+      // remains fully skinned and anatomically continuous.
+      left.shoulder.position.set(
+        left.bindShoulderPosition.x + 4,
+        left.bindShoulderPosition.y,
+        left.bindShoulderPosition.z,
+      );
+      left.shoulder.scale.setScalar(0.001);
     }
     this.root.updateWorldMatrix(true, true);
     if (this.authoredMeleeKnife && this.authoredMeleeSocket) {
       const grip = this.authoredMeleeKnife.getObjectByName('grip-socket-r');
       if (grip) {
-        this.authoredMeleeGripError = grip.getWorldPosition(new THREE.Vector3())
-          .distanceTo(this.authoredMeleeSocket.getWorldPosition(new THREE.Vector3()));
+        this.authoredMeleeGripError = grip.getWorldPosition(this.meleeGripWorld)
+          .distanceTo(this.authoredMeleeSocket.getWorldPosition(this.meleeSocketWorld));
       }
     }
     this.riggedArmDiagnostics = this.riggedArmRigs.map((rig) => ({
@@ -1681,8 +1717,11 @@ export class WeaponPresentation {
     this.muzzleFlash.visible = this.muzzleLight.intensity > 0.45;
     const arms = this.root.getObjectByName('first-person-arms');
     if (arms) {
-      arms.position.y = THREE.MathUtils.lerp(-0.075, -0.19, this.adsBlend);
-      arms.scale.setScalar(THREE.MathUtils.lerp(1, 0.82, this.adsBlend));
+      // Keep the ADS reduction modest and lower the shoulders. The authored
+      // sleeves now extend behind the camera, so no capped shoulder endpoint
+      // can enter frame while palms retain enough scale to read at the grips.
+      arms.position.y = THREE.MathUtils.lerp(-0.075, -0.17, this.adsBlend);
+      arms.scale.setScalar(THREE.MathUtils.lerp(1, 0.84, this.adsBlend));
       arms.traverse((node) => {
         if (!(node instanceof THREE.Mesh)) return;
         const material = node.material as THREE.MeshBasicMaterial | THREE.MeshStandardMaterial;
@@ -1896,19 +1935,19 @@ export class WeaponPresentation {
     const viewmodelBaseY = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.y, ADS_VIEWMODEL_BASE_POSITION.y, this.adsBlend);
     const viewmodelBaseZ = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.z, ADS_VIEWMODEL_BASE_POSITION.z, this.adsBlend);
     const targetPosition = new THREE.Vector3(
-      viewmodelBaseX + adsX + bobX + this.swayX - pose.lateralSpeed * 0.012 - meleeArc * 0.24 + grenadeArc * 0.18 + reloadStage.lateral,
+      viewmodelBaseX + adsX + bobX + this.swayX - pose.lateralSpeed * 0.012 - meleeArc * 0.12 + grenadeArc * 0.18 + reloadStage.lateral,
       viewmodelBaseY + adsY + bobY + breath + sprintDrop + crouchLift + proneLift + switchDrop + reloadStage.lift - presentationKick * 0.095 - pose.landingImpulse * 0.075,
-      viewmodelBaseZ + adsZ + (pose.surfaceRetreat ?? 0) + presentationKick * profile.recoilTranslation * 1.12 - meleeArc * 0.32 + grenadeArc * 0.24,
+      viewmodelBaseZ + adsZ + (pose.surfaceRetreat ?? 0) + presentationKick * profile.recoilTranslation * 1.12 - meleeArc * 0.18 + grenadeArc * 0.24,
     );
     this.surfaceRetreat = pose.surfaceRetreat ?? 0;
     this.root.position.lerp(targetPosition, smoothing(18));
     this.root.rotation.x = THREE.MathUtils.lerp(this.root.rotation.x, presentationKick * profile.recoilRotation * 1.15 - this.swayY - grenadeArc * 0.42 + reloadStage.pitch, smoothing(22));
     this.root.rotation.y = THREE.MathUtils.lerp(
       this.root.rotation.y,
-      hipYaw * (1 - this.adsBlend) - this.swayX * 2 - this.sprintBlend * 0.38 - meleeArc * 0.65,
+      hipYaw * (1 - this.adsBlend) - this.swayX * 2 - this.sprintBlend * 0.38 - meleeArc * 0.18,
       smoothing(13),
     );
-    this.root.rotation.z = THREE.MathUtils.lerp(this.root.rotation.z, reloadStage.roll - this.sprintBlend * 0.22 - pose.lateralSpeed * (pose.prone ? 0.01 : 0.025) + meleeArc * 0.42 + shotRoll, smoothing(13));
+    this.root.rotation.z = THREE.MathUtils.lerp(this.root.rotation.z, reloadStage.roll - this.sprintBlend * 0.22 - pose.lateralSpeed * (pose.prone ? 0.01 : 0.025) + meleeArc * 0.12 + shotRoll, smoothing(13));
     this.centerSightReference(activeModel);
     if (arms && !meleeActive) this.solveArms(arms, activeModel, reloadPose);
     if (!authoredMeleeActive) this.solveRiggedArms(activeModel, reloadPose);

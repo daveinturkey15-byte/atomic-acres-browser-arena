@@ -322,14 +322,17 @@ function materialForFirstPerson(material: THREE.Material, flattenMaterials: bool
     result.emissive.setHex(0x05090a);
     result.emissiveIntensity = flattenMaterials ? 0.24 : 0.08;
   } else if (result instanceof THREE.MeshStandardMaterial && materialName.includes('arms_glove')) {
-    // Preserve the dark tactical finish while exposing the authored knuckle,
-    // wrist and digit silhouette in indoor arenas. This is a restrained
-    // presentation lift, not alpha or an unlit replacement.
-    result.emissive.setHex(0x0a1d22);
-    result.emissiveIntensity = flattenMaterials ? 0.3 : 0.2;
+    // The texture remains tactical navy, while this cool fill preserves every
+    // wrapped digit against black receivers in the indoor Gun Range.
+    result.emissive.setHex(0x123a45);
+    result.emissiveIntensity = flattenMaterials ? 0.42 : 0.32;
   } else if (result instanceof THREE.MeshStandardMaterial && materialName.includes('arms_sleeve')) {
-    result.emissive.setHex(0x071316);
-    result.emissiveIntensity = flattenMaterials ? 0.24 : 0.14;
+    result.emissive.setHex(0x0b252c);
+    result.emissiveIntensity = flattenMaterials ? 0.32 : 0.22;
+  } else if (result instanceof THREE.MeshStandardMaterial && materialName.includes('arms_armorpad')) {
+    result.color.setHex(0x31505a);
+    result.emissive.setHex(0x102a31);
+    result.emissiveIntensity = flattenMaterials ? 0.34 : 0.24;
   }
   return result;
 }

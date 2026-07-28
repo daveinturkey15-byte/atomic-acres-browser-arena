@@ -249,11 +249,11 @@ if (manifest.operatorArms?.releaseState !== 'release-ready') {
     if (arms.renderBudget?.[field] !== expected) failures.push(`operator arms: render budget ${field} must equal ${expected}`);
   }
   for (const [field, expected] of Object.entries({
-    visualRevision: 'anatomical-blended-viewmodel-v5',
-    limbProfileContract: 'anatomical-deltoid-brachioradialis-ulna-wrist-taper-v5',
-    handPoseContract: 'proportional-palm-opposed-thumb-articulated-digit-grip-v5',
-    shoulderEntryContract: 'tapered-offscreen-sleeve',
-    gloveConstructionContract: 'opaque-anatomical-knuckle-pads-seams-cloth-v5',
+    visualRevision: 'continuous-manifold-viewmodel-v6',
+    limbProfileContract: 'continuous-shoulder-elbow-wrist-manifold-shell-v6',
+    handPoseContract: 'continuous-cuff-palm-wrapped-articulated-digit-grip-v6',
+    shoulderEntryContract: 'full-profile-frame-edge-sleeve-v6',
+    gloveConstructionContract: 'opaque-continuous-palm-wrapped-fingers-cloth-v6',
     weaponGripReviewContract: 'all-family-runtime-plus-m4-contact-v5',
     weightingContract: 'adjacent-bone-normalized-blend-v5',
     runtimeAnimationContract: 'authored-fingers-under-runtime-chain-ik-v1',

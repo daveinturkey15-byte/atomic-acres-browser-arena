@@ -220,16 +220,16 @@ export function auditOperatorArmsGlb(json, lod, bytes) {
   if (!skeleton) failures.push(`${label}: dedicated first-person skeleton metadata missing`);
   const deliveryRoot = nodes.find((node) => node.extras?.runtime_forward_axis === '-Z');
   if (!deliveryRoot || deliveryRoot.extras?.blender_authoring_forward_axis !== '+Y') failures.push(`${label}: physical runtime -Z delivery-axis contract missing`);
-  if (deliveryRoot?.extras?.visual_revision !== 'anatomical-blended-viewmodel-v5'
-    || deliveryRoot?.extras?.limb_profile_contract !== 'anatomical-deltoid-brachioradialis-ulna-wrist-taper-v5'
-    || deliveryRoot?.extras?.hand_pose_contract !== 'proportional-palm-opposed-thumb-articulated-digit-grip-v5'
-    || deliveryRoot?.extras?.shoulder_entry_contract !== 'tapered-offscreen-sleeve'
-    || deliveryRoot?.extras?.glove_construction_contract !== 'opaque-anatomical-knuckle-pads-seams-cloth-v5'
+  if (deliveryRoot?.extras?.visual_revision !== 'continuous-manifold-viewmodel-v6'
+    || deliveryRoot?.extras?.limb_profile_contract !== 'continuous-shoulder-elbow-wrist-manifold-shell-v6'
+    || deliveryRoot?.extras?.hand_pose_contract !== 'continuous-cuff-palm-wrapped-articulated-digit-grip-v6'
+    || deliveryRoot?.extras?.shoulder_entry_contract !== 'full-profile-frame-edge-sleeve-v6'
+    || deliveryRoot?.extras?.glove_construction_contract !== 'opaque-continuous-palm-wrapped-fingers-cloth-v6'
     || deliveryRoot?.extras?.weapon_grip_review_contract !== 'all-family-runtime-plus-m4-contact-v5'
     || deliveryRoot?.extras?.runtime_animation_contract !== 'authored-fingers-under-runtime-chain-ik-v1'
     || deliveryRoot?.extras?.finger_segment_count !== 30
     || deliveryRoot?.extras?.weapon_grip_review_frames !== 3) {
-    failures.push(`${label}: anatomical blended v5 silhouette, hand, glove, animation and grip-review contract missing`);
+    failures.push(`${label}: continuous manifold v6 silhouette, hand, glove, animation and grip-review contract missing`);
   }
   const blendedVertexCount = Number(deliveryRoot?.extras?.blended_vertex_count);
   const multiBoneWeightedParts = Number(deliveryRoot?.extras?.multi_bone_weighted_part_count);

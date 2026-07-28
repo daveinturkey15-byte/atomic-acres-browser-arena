@@ -79,7 +79,7 @@ function presentationViolations(label, state) {
   return violations;
 }
 
-function evidenceFor(label, state, screenshot) {
+function evidenceFor(label, state, screenshot, cadence = null) {
   const presentation = state.weaponPresentation;
   return Object.freeze({
     label,
@@ -92,6 +92,7 @@ function evidenceFor(label, state, screenshot) {
     authoredArmAnimation: presentation.authoredArmAnimation,
     armFraming: presentation.armFraming,
     riggedArms: presentation.riggedArms,
+    cadence,
     melee: {
       source: presentation.meleeArmSource,
       knifeVisible: presentation.knifeVisible,
@@ -100,6 +101,29 @@ function evidenceFor(label, state, screenshot) {
       bindPoseRestored: presentation.riggedMeleeBindPoseRestoredExactly,
     },
   });
+}
+
+async function measureWarmCadence(page, frameCount = 30) {
+  return page.evaluate((requestedFrames) => new Promise((resolve) => {
+    const samples = [];
+    let previous = performance.now();
+    const tick = (now) => {
+      samples.push(now - previous);
+      previous = now;
+      if (samples.length < requestedFrames) requestAnimationFrame(tick);
+      else {
+        const sorted = [...samples].sort((a, b) => a - b);
+        const totalMs = samples.reduce((sum, value) => sum + value, 0);
+        resolve({
+          frames: samples.length,
+          meanFps: 1000 / (totalMs / samples.length),
+          p95FrameMs: sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))],
+          maxFrameMs: sorted.at(-1),
+        });
+      }
+    };
+    requestAnimationFrame(tick);
+  }), frameCount);
 }
 
 async function stubExternalServices(page) {
@@ -174,11 +198,20 @@ try {
       const presentation = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation;
       return presentation?.weapon === selected && presentation?.importedModel?.weapon === selected;
     }, weapon, { timeout: 30_000 });
-    await page.waitForTimeout(300);
+    // Asset decode/upload/first-pipeline compilation is a cold-switch event,
+    // not representative sustained presentation. Settle it, then measure real
+    // RAF cadence before accepting the frame; a persistently slow crossbow (or
+    // any family) remains a hard failure rather than being explained away.
+    await page.waitForTimeout(900);
+    const cadence = await measureWarmCadence(page);
+    if (!Number.isFinite(cadence.meanFps) || cadence.meanFps < 24
+      || !Number.isFinite(cadence.p95FrameMs) || cadence.p95FrameMs > 50) {
+      violations.push(`${family}/${weapon}/hip: warmed cadence is ${JSON.stringify(cadence)}`);
+    }
     const state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
     violations.push(...presentationViolations(`${family}/${weapon}/hip`, state));
     const screenshot = await capture(page, `${family}-${weapon}-hip`);
-    evidence.push(evidenceFor(`${family}/${weapon}/hip`, state, screenshot));
+    evidence.push(evidenceFor(`${family}/${weapon}/hip`, state, screenshot, cadence));
   }
 
   await page.evaluate(() => { const api = window.__ATOMIC_ACRES_DEBUG__; api.equipWeapon('m4a1'); api.setAds(true); });
@@ -200,7 +233,29 @@ try {
   evidence.push(evidenceFor('long-gun/m4a1/reload', state, screenshot));
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setReloadCaptureProgress(null));
 
-  await page.evaluate(() => { const api = window.__ATOMIC_ACRES_DEBUG__; api.melee(); api.setMeleeCaptureProgress(0.12); });
+  // The deterministic pose override does not cancel authoritative reload
+  // timing. Await the real reload exit before starting independent melee proof
+  // so no screenshot can combine a knife pose with "Reloading M4A1" state.
+  await page.waitForFunction(() => {
+    const presentation = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation;
+    return presentation?.actionContract?.state !== 'reload';
+  }, undefined, { timeout: 6_000 });
+  await page.waitForFunction(() => ![...document.querySelectorAll('#killfeed > *')]
+    .some((row) => row.textContent?.includes('Reloading M4A1')), undefined, { timeout: 7_000 });
+
+  await page.evaluate(() => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    api.setAds(false);
+    api.setAmmo('m4a1', 30, 60);
+    api.melee();
+    api.setMeleeCaptureProgress(0.12);
+  });
+  await page.waitForFunction(() => {
+    const presentation = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation;
+    return presentation?.actionContract?.state === 'melee'
+      && presentation?.meleeArmSource === 'authored-rigged-arms'
+      && presentation?.knifeVisible === true;
+  }, undefined, { timeout: 5_000 });
   for (const progress of [0.12, 0.42, 0.82]) {
     await page.evaluate((value) => window.__ATOMIC_ACRES_DEBUG__.setMeleeCaptureProgress(value), progress);
     await page.waitForTimeout(120);
@@ -208,6 +263,7 @@ try {
     const label = `melee/knife/${progress.toFixed(2)}`;
     violations.push(...presentationViolations(label, state));
     const presentation = state.weaponPresentation;
+    if (presentation.actionContract?.state !== 'melee') violations.push(`${label}: action contract is ${presentation.actionContract?.state}`);
     if (presentation.meleeArmSource !== 'authored-rigged-arms') violations.push(`${label}: authored melee rig is not active`);
     if (presentation.knifeVisible !== true) violations.push(`${label}: authored knife is not visible`);
     if (presentation.authoredMeleeKnifeParent !== 'right-wrist-knife-socket') violations.push(`${label}: knife is not attached to the exported wrist socket`);

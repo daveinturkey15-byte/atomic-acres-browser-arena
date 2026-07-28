@@ -85,11 +85,15 @@ def make_texture(name: str, kind: str) -> bpy.types.Image:
             glove_zone = u > 0.5
             if kind == "baseColor":
                 if glove_zone:
-                    base = 0.045 + weave * 0.032 + max(0.0, twill) * 0.008
-                    value = [base * 0.72, base * 0.86, base * 0.92]
+                    # Gun Range is a dark indoor arena and most weapons are
+                    # black. Keep the glove tactical, but give its authored
+                    # fingers enough cool-value separation to read around the
+                    # grip instead of collapsing into one black paddle.
+                    base = 0.22 + weave * 0.075 + max(0.0, twill) * 0.018
+                    value = [base * 0.56, base * 0.78, base * 0.9]
                 else:
-                    base = 0.09 + weave * 0.045 + twill * 0.009
-                    value = [base * 0.48, base * 0.72, base * 0.78]
+                    base = 0.15 + weave * 0.06 + twill * 0.014
+                    value = [base * 0.46, base * 0.69, base * 0.78]
                 if seam:
                     value = [component * 0.52 for component in value]
                 elif stitch:
@@ -277,6 +281,101 @@ def profiled_segment(name, start, end, rings, material, vertices):
     return finish_mesh(obj, material, smooth=True)
 
 
+def profiled_weighted_path(name, rings, material, vertices, armature):
+    """Create one genuinely continuous skinned shell along a bent limb path.
+
+    Each ring declares its deform weights. Faces share the same joint ring, so
+    elbow and wrist deformation cannot open a contour gap even at aggressive
+    runtime IK poses. This is deliberately different from overlapping capsule
+    segments: the visible shoulder-to-palm silhouette is one manifold shell.
+    """
+    if len(rings) < 2:
+        raise RuntimeError(f"{name}: a weighted path requires at least two rings")
+    centers = [Vector(ring[0]) for ring in rings]
+    points = []
+    ring_weights = []
+    for ring_index, (center_value, radius_side, radius_up, side_offset, up_offset, weights) in enumerate(rings):
+        center = Vector(center_value)
+        if ring_index == 0:
+            tangent = centers[1] - center
+        elif ring_index == len(rings) - 1:
+            tangent = center - centers[ring_index - 1]
+        else:
+            tangent = centers[ring_index + 1] - centers[ring_index - 1]
+        tangent.normalize()
+        side = tangent.cross(Vector((0, 0, 1)))
+        if side.length < 0.001:
+            side = tangent.cross(Vector((1, 0, 0)))
+        side.normalize()
+        up = side.cross(tangent).normalized()
+        center += side * side_offset + up * up_offset
+        normalized_total = sum(weights.values())
+        if normalized_total <= 0:
+            raise RuntimeError(f"{name}: ring {ring_index} has no deform weight")
+        normalized = {bone: weight / normalized_total for bone, weight in weights.items() if weight > 0}
+        for index in range(vertices):
+            angle = math.tau * index / vertices
+            points.append(center + side * (math.cos(angle) * radius_side) + up * (math.sin(angle) * radius_up))
+            ring_weights.append(normalized)
+    faces = []
+    for ring_index in range(len(rings) - 1):
+        for index in range(vertices):
+            next_index = (index + 1) % vertices
+            a = ring_index * vertices + index
+            b = ring_index * vertices + next_index
+            c = (ring_index + 1) * vertices + next_index
+            d = (ring_index + 1) * vertices + index
+            faces.append((a, b, c, d))
+    start_center = len(points)
+    end_center = start_center + 1
+    points.extend((centers[0], centers[-1]))
+    ring_weights.extend((ring_weights[0], ring_weights[-1]))
+    for index in range(vertices):
+        next_index = (index + 1) % vertices
+        faces.append((start_center, next_index, index))
+        final_ring = (len(rings) - 1) * vertices
+        faces.append((end_center, final_ring + index, final_ring + next_index))
+    mesh = bpy.data.meshes.new(f"{name}_Mesh")
+    mesh.from_pydata(points, [], faces)
+    mesh.update()
+    uv_layer = mesh.uv_layers.new(name="UVMap")
+    for polygon in mesh.polygons:
+        for loop_index in polygon.loop_indices:
+            vertex_index = mesh.loops[loop_index].vertex_index
+            if vertex_index < len(rings) * vertices:
+                ring_index = vertex_index // vertices
+                around = vertex_index % vertices
+                uv_layer.data[loop_index].uv = (around / vertices, ring_index / max(1, len(rings) - 1))
+            else:
+                uv_layer.data[loop_index].uv = (0.5, 0.5)
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    finish_mesh(obj, material, smooth=True)
+    attach_to_armature(obj, armature)
+    groups = {
+        bone: obj.vertex_groups.new(name=bone)
+        for bone in sorted({bone for weights in ring_weights for bone in weights})
+    }
+    blended_vertices = 0
+    pairs = set()
+    for vertex, weights in zip(obj.data.vertices, ring_weights):
+        active = sorted(bone for bone, weight in weights.items() if weight > 0.05)
+        if len(active) > 1:
+            blended_vertices += 1
+            pairs.add(":".join(active))
+        for bone, weight in weights.items():
+            groups[bone].add([vertex.index], weight, "REPLACE")
+    obj["weighted_bone"] = max(
+        ((bone, sum(weights.get(bone, 0) for weights in ring_weights)) for bone in groups),
+        key=lambda item: item[1],
+    )[0]
+    obj["weighting_contract"] = "continuous-manifold-ring-blend-v6"
+    obj["blended_vertex_count"] = blended_vertices
+    obj["blended_joint_pairs_csv"] = ",".join(sorted(pairs))
+    obj["manifold_continuity_contract"] = "shared-elbow-wrist-ring-no-open-seams"
+    return obj
+
+
 def sphere(name, location, radius, material, segments, rings):
     bpy.ops.mesh.primitive_uv_sphere_add(segments=segments, ring_count=rings, radius=radius, location=location)
     obj = bpy.context.object
@@ -344,7 +443,9 @@ def skin_blended_chain(obj, armature, current_bone, start, end, parent_bone=None
     """Weight matching seam vertices identically across an articulated chain.
 
     Each segment retains a dominant owning bone, but the first/last blend zones
-    share up to 45 percent with the adjacent bone. This removes the rigid hinge
+    share up to 50 percent with the adjacent bone. Matching 50/50 endpoint
+    weights keep neighbouring digit rings coincident under rotation and remove
+    the last small gaps between articulated finger segments. This removes the rigid hinge
     deformation that made elbows, wrists and knuckles read as disconnected
     mannequin pieces while keeping the existing skeleton/socket API intact.
     """
@@ -361,10 +462,10 @@ def skin_blended_chain(obj, armature, current_bone, start, end, parent_bone=None
         t = max(0.0, min(1.0, (world - start_v).dot(axis) / axis_length_sq))
         weights = {current_bone: 1.0}
         if parent_bone and t < blend:
-            adjacent = 0.45 * (1.0 - t / blend)
+            adjacent = 0.5 * (1.0 - t / blend)
             weights = {parent_bone: adjacent, current_bone: 1.0 - adjacent}
         elif child_bone and t > 1.0 - blend:
-            adjacent = 0.45 * ((t - (1.0 - blend)) / blend)
+            adjacent = 0.5 * ((t - (1.0 - blend)) / blend)
             weights = {current_bone: 1.0 - adjacent, child_bone: adjacent}
         active = [name for name, weight in weights.items() if weight > 0.05]
         if len(active) > 1:
@@ -620,11 +721,11 @@ def build_armature(label: str, detail: float):
     root["blender_authoring_forward_axis"] = "+Y"
     root["opaque_material_contract"] = True
     root["presentation_only"] = True
-    root["visual_revision"] = "anatomical-blended-viewmodel-v5"
-    root["limb_profile_contract"] = "anatomical-deltoid-brachioradialis-ulna-wrist-taper-v5"
-    root["hand_pose_contract"] = "proportional-palm-opposed-thumb-articulated-digit-grip-v5"
-    root["shoulder_entry_contract"] = "tapered-offscreen-sleeve"
-    root["glove_construction_contract"] = "opaque-anatomical-knuckle-pads-seams-cloth-v5"
+    root["visual_revision"] = "continuous-manifold-viewmodel-v6"
+    root["limb_profile_contract"] = "continuous-shoulder-elbow-wrist-manifold-shell-v6"
+    root["hand_pose_contract"] = "continuous-cuff-palm-wrapped-articulated-digit-grip-v6"
+    root["shoulder_entry_contract"] = "full-profile-frame-edge-sleeve-v6"
+    root["glove_construction_contract"] = "opaque-continuous-palm-wrapped-fingers-cloth-v6"
     root["weapon_grip_review_contract"] = "all-family-runtime-plus-m4-contact-v5"
     root["runtime_animation_contract"] = "authored-fingers-under-runtime-chain-ik-v1"
     root["finger_segment_count"] = 30
@@ -697,46 +798,68 @@ def build_armature(label: str, detail: float):
     for side, sign in (("R", 1), ("L", -1)):
         upper_head, upper_tail, lower_tail, wrist_tail = chains[side]
         upper_axis = (Vector(upper_tail) - Vector(upper_head)).normalized()
-        lower_axis = (Vector(lower_tail) - Vector(upper_tail)).normalized()
-        upper_start = Vector(upper_head) - upper_axis * 0.13
-        upper = profiled_segment(
-            f"{side}-authored-upper-sleeve-{label}", upper_start, upper_tail,
-            ((0.0, 0.064, 0.052, 0.0, 0.0), (0.1, 0.083, 0.065, 0.0, 0.0),
-             (0.28, 0.094, 0.071, 0.002 * sign, 0.003), (0.5, 0.088, 0.069, 0.004 * sign, 0.006),
-             (0.7, 0.078, 0.063, 0.002 * sign, 0.004), (0.86, 0.066, 0.056, 0.0, 0.002),
-             (1.0, 0.057, 0.049, 0.0, 0.0)),
-            materials["sleeve"], segments,
+        # Start immediately behind the authored shoulder with a full cloth
+        # profile. A long near-zero taper projected into the camera as a spear
+        # in ADS/melee; the short full-radius entry instead leaves the frame as
+        # a conventional sleeve without exposing a detached rounded cap.
+        upper_start = Vector(upper_head) - upper_axis * 0.075
+        palm_end = Vector(wrist_tail) + Vector((0, 0.17, -0.002))
+        sleeve = profiled_weighted_path(
+            f"{side}-authored-continuous-shoulder-wrist-sleeve-{label}",
+            (
+                (upper_start, 0.079, 0.06, 0.0, 0.001, {f"UpperArm{side}": 1.0}),
+                (Vector(upper_head).lerp(Vector(upper_tail), 0.04), 0.083, 0.063, 0.0, 0.002, {f"UpperArm{side}": 1.0}),
+                (Vector(upper_head).lerp(Vector(upper_tail), 0.16), 0.072, 0.055, 0.0, 0.002, {f"UpperArm{side}": 1.0}),
+                (Vector(upper_head).lerp(Vector(upper_tail), 0.48), 0.078, 0.059, 0.003 * sign, 0.005, {f"UpperArm{side}": 1.0}),
+                (Vector(upper_head).lerp(Vector(upper_tail), 0.82), 0.064, 0.052, 0.0, 0.003, {f"UpperArm{side}": 0.78, f"LowerArm{side}": 0.22}),
+                (Vector(upper_tail), 0.057, 0.048, 0.0, 0.002, {f"UpperArm{side}": 0.5, f"LowerArm{side}": 0.5}),
+                (Vector(upper_tail).lerp(Vector(lower_tail), 0.16), 0.062, 0.049, -0.002 * sign, 0.004, {f"UpperArm{side}": 0.22, f"LowerArm{side}": 0.78}),
+                (Vector(upper_tail).lerp(Vector(lower_tail), 0.42), 0.071, 0.054, -0.005 * sign, 0.006, {f"LowerArm{side}": 1.0}),
+                (Vector(upper_tail).lerp(Vector(lower_tail), 0.7), 0.063, 0.048, -0.003 * sign, 0.004, {f"LowerArm{side}": 1.0}),
+                (Vector(upper_tail).lerp(Vector(lower_tail), 0.9), 0.053, 0.041, 0.0, 0.001, {f"LowerArm{side}": 0.78, f"Wrist{side}": 0.22}),
+                (Vector(lower_tail), 0.048, 0.037, 0.0, 0.0, {f"LowerArm{side}": 0.5, f"Wrist{side}": 0.5}),
+                (Vector(lower_tail).lerp(Vector(wrist_tail), 0.18), 0.046, 0.036, 0.0, 0.0, {f"LowerArm{side}": 0.22, f"Wrist{side}": 0.78}),
+            ),
+            materials["sleeve"], segments, armature,
         )
-        lower = profiled_segment(
-            f"{side}-authored-forearm-sleeve-{label}", upper_tail, lower_tail,
-            ((0.0, 0.061, 0.052, 0.0, 0.0), (0.1, 0.071, 0.055, 0.0, 0.003),
-             (0.3, 0.082, 0.061, -0.004 * sign, 0.006), (0.49, 0.078, 0.058, -0.006 * sign, 0.007),
-             (0.68, 0.068, 0.052, -0.003 * sign, 0.003), (0.84, 0.057, 0.045, 0.0, 0.001),
-             (1.0, 0.047, 0.038, 0.0, 0.0)),
-            materials["sleeve"], segments,
-        )
-        elbow_start = Vector(upper_tail) - upper_axis * 0.036
-        elbow_end = Vector(upper_tail) + lower_axis * 0.074
-        elbow = profiled_segment(
-            f"{side}-authored-elbow-ulna-transition-{label}", elbow_start, elbow_end,
-            ((0.0, 0.055, 0.047, 0.0, 0.0), (0.3, 0.064, 0.052, 0.0, 0.005),
-             (0.68, 0.061, 0.048, -0.003 * sign, -0.004), (1.0, 0.057, 0.045, 0.0, 0.0)),
-            materials["sleeve"], segments,
+        glove = profiled_weighted_path(
+            f"{side}-authored-continuous-cuff-palm-glove-{label}",
+            (
+                (Vector(upper_tail).lerp(Vector(lower_tail), 0.88), 0.054, 0.042, 0.0, 0.0, {f"LowerArm{side}": 0.82, f"Wrist{side}": 0.18}),
+                (Vector(lower_tail), 0.056, 0.043, 0.0, 0.0, {f"LowerArm{side}": 0.5, f"Wrist{side}": 0.5}),
+                (Vector(lower_tail).lerp(Vector(wrist_tail), 0.28), 0.058, 0.044, 0.0, 0.001, {f"LowerArm{side}": 0.2, f"Wrist{side}": 0.8}),
+                (Vector(lower_tail).lerp(Vector(wrist_tail), 0.68), 0.052, 0.039, 0.0, 0.001, {f"Wrist{side}": 1.0}),
+                (Vector(wrist_tail), 0.047, 0.033, 0.0, 0.001, {f"Wrist{side}": 1.0}),
+                (Vector(wrist_tail).lerp(palm_end, 0.24), 0.058, 0.036, 0.001 * sign, 0.003, {f"Wrist{side}": 1.0}),
+                (Vector(wrist_tail).lerp(palm_end, 0.52), 0.071, 0.039, 0.003 * sign, 0.006, {f"Wrist{side}": 1.0}),
+                (Vector(wrist_tail).lerp(palm_end, 0.78), 0.082, 0.04, 0.004 * sign, 0.006, {f"Wrist{side}": 1.0}),
+                (palm_end, 0.075, 0.032, 0.0, 0.002, {f"Wrist{side}": 1.0}),
+            ),
+            materials["glove"], segments, armature,
         )
         cuff_mid = Vector(lower_tail).lerp(Vector(wrist_tail), 0.35)
-        cuff = profiled_segment(
-            f"{side}-authored-glove-cuff-{label}", lower_tail, wrist_tail,
-            ((0.0, 0.052, 0.042, 0.0, 0.0), (0.18, 0.057, 0.046, 0.0, 0.0),
-             (0.68, 0.054, 0.043, 0.0, 0.0), (1.0, 0.049, 0.038, 0.0, 0.0)),
-            materials["glove"], segments,
+
+        # Three meaningful tactical overlays retain the established 45-part
+        # authoring budget after five capsule pieces become two continuous
+        # anatomy shells. They create value breaks without reintroducing seams.
+        shoulder_band_start = Vector(upper_head).lerp(Vector(upper_tail), 0.2)
+        shoulder_band_end = Vector(upper_head).lerp(Vector(upper_tail), 0.34)
+        shoulder_band = profiled_segment(
+            f"{side}-authored-shoulder-armor-band-{label}", shoulder_band_start, shoulder_band_end,
+            ((0.0, 0.076, 0.059, 0.0, 0.0), (0.5, 0.081, 0.062, 0.0, 0.0),
+             (1.0, 0.078, 0.06, 0.0, 0.0)), materials["pad"], max(10, segments // 2),
         )
-        palm_end = Vector(wrist_tail) + Vector((0, 0.17, -0.002))
-        palm = profiled_segment(
-            f"{side}-authored-palm-{label}", wrist_tail, palm_end,
-            ((0.0, 0.043, 0.03, 0.0, 0.0), (0.18, 0.052, 0.033, 0.0, 0.001),
-             (0.46, 0.066, 0.036, 0.002 * sign, 0.004), (0.72, 0.077, 0.037, 0.004 * sign, 0.005),
-             (0.9, 0.079, 0.034, 0.003 * sign, 0.003), (1.0, 0.071, 0.029, 0.0, 0.0)),
-            materials["glove"], segments,
+        forearm_band_start = Vector(upper_tail).lerp(Vector(lower_tail), 0.34)
+        forearm_band_end = Vector(upper_tail).lerp(Vector(lower_tail), 0.5)
+        forearm_band = profiled_segment(
+            f"{side}-authored-forearm-armor-band-{label}", forearm_band_start, forearm_band_end,
+            ((0.0, 0.071, 0.055, 0.0, 0.0), (0.5, 0.075, 0.058, 0.0, 0.0),
+             (1.0, 0.071, 0.055, 0.0, 0.0)), materials["pad"], max(10, segments // 2),
+        )
+        palm_reinforcement = rounded_cube(
+            f"{side}-authored-palm-reinforcement-{label}",
+            Vector(wrist_tail).lerp(palm_end, 0.64) + Vector((0, 0, 0.041)),
+            (0.112, 0.072, 0.012), materials["pad"], 0.004,
         )
         knuckle_pads = [
             rounded_cube(
@@ -756,14 +879,9 @@ def build_armature(label: str, detail: float):
             ((0.0, 0.058, 0.048, 0.0, 0.0), (0.5, 0.061, 0.05, 0.0, 0.0),
              (1.0, 0.058, 0.047, 0.0, 0.0)), materials["pad"], max(10, segments // 2),
         )
-        skin_blended_chain(upper, armature, f"UpperArm{side}", upper_start, upper_tail, child_bone=f"LowerArm{side}")
-        skin_blended_chain(
-            lower, armature, f"LowerArm{side}", upper_tail, lower_tail,
-            parent_bone=f"UpperArm{side}", child_bone=f"Wrist{side}",
-        )
-        skin_crossfade(elbow, armature, f"UpperArm{side}", f"LowerArm{side}", elbow_start, elbow_end)
-        skin_blended_chain(cuff, armature, f"Wrist{side}", lower_tail, wrist_tail, parent_bone=f"LowerArm{side}")
-        skin_to_bone(palm, armature, f"Wrist{side}")
+        skin_to_bone(shoulder_band, armature, f"UpperArm{side}")
+        skin_to_bone(forearm_band, armature, f"LowerArm{side}")
+        skin_to_bone(palm_reinforcement, armature, f"Wrist{side}")
         skin_to_bone(knuckle, armature, f"Wrist{side}")
         skin_blended_chain(wrist_guard, armature, f"Wrist{side}", guard_start, guard_end, parent_bone=f"LowerArm{side}")
         if side == "L":
@@ -773,7 +891,7 @@ def build_armature(label: str, detail: float):
             )
             skin_to_bone(display, armature, "WristL")
 
-        finger_base_radii = {"Index": 0.016, "Middle": 0.017, "Ring": 0.0158, "Pinky": 0.014}
+        finger_base_radii = {"Index": 0.0192, "Middle": 0.0202, "Ring": 0.0188, "Pinky": 0.0168}
         for finger_name in FINGER_NAMES:
             for joint in (1, 2, 3):
                 bone = armature.data.bones[f"{finger_name}{joint}{side}"]
@@ -794,7 +912,7 @@ def build_armature(label: str, detail: float):
                 )
         for joint in (1, 2, 3):
             bone = armature.data.bones[f"Thumb{joint}{side}"]
-            radius = 0.019 if joint == 1 else 0.0165 if joint == 2 else 0.014
+            radius = 0.0225 if joint == 1 else 0.0195 if joint == 2 else 0.0165
             mesh = profiled_segment(
                 f"{side}-thumb-{joint}-{label}", bone.head_local, bone.tail_local,
                 ((0.0, radius * 0.82, radius * 0.7, 0.0, 0.0),
@@ -815,7 +933,7 @@ def build_armature(label: str, detail: float):
     for name, location, bone_name, semantic in (
         ("right-hand-grip-socket", (0.06, 1.02, -0.115), "WristR", "rightGrip"),
         ("left-hand-grip-socket", (-0.08, 1.27, -0.05), "WristL", "leftGrip"),
-        ("right-wrist-knife-socket", (0.13, 0.735, -0.07), "WristR", "knife"),
+        ("right-wrist-knife-socket", (0.105, 0.905, -0.074), "WristR", "knife"),
         ("left-hand-grenade-socket", (-0.08, 1.24, -0.05), "WristL", "grenade"),
     ):
         bone_socket(name, location, armature, bone_name, semantic)
