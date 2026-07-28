@@ -129,23 +129,23 @@ async function moveAim(page, movementX, movementY) {
   }, { x: movementX, y: movementY });
 }
 
-async function firePulse(page, ads) {
+async function firePulse(page, ads, pulseMs = 72) {
   await page.evaluate(({ useAds }) => {
     const canvas = document.querySelector('#game');
     if (!(canvas instanceof HTMLCanvasElement)) return;
     if (useAds) canvas.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 2, buttons: 2 }));
     canvas.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, buttons: useAds ? 3 : 1 }));
   }, { useAds: ads });
-  await sleep(72);
+  await sleep(pulseMs);
   await page.evaluate(({ useAds }) => {
     window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0, buttons: useAds ? 2 : 0 }));
     if (useAds) window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 2, buttons: 0 }));
   }, { useAds: ads });
 }
 
-async function fireBurst(page, shots, ads) {
+async function fireBurst(page, shots, ads, pulseMs = 72) {
   for (let shot = 0; shot < shots; shot += 1) {
-    await firePulse(page, ads);
+    await firePulse(page, ads, pulseMs);
     if (shot + 1 < shots) await sleep(42);
   }
 }
@@ -500,6 +500,7 @@ async function run() {
   const burstShots = integerArg(args['burst-shots'], 3, 1, 5);
   const maximumShotPulses = integerArg(args['max-shot-pulses'], 1_000_000, 1, 1_000_000);
   const fireCooldownMs = integerArg(args['fire-cooldown'], 420, 180, 2000);
+  const firePulseMs = integerArg(args['fire-pulse'], 72, 20, 100);
   const fireAlignmentMaximum = numberArg(args['fire-alignment'], 0.02, 0.003, 0.02);
   const fieldKitRequest = String(args['field-kit'] ?? 'default');
   if (!['default', 'smg'].includes(fieldKitRequest)) throw new Error('--field-kit must be default or smg');
@@ -1109,7 +1110,7 @@ async function run() {
               await writeFile(resolve(artifactDirectory, 'first-fire-aligned-annotated.jpg'), await annotatedVisionJpeg(aimedVision, fireTracking));
               firstFireCaptured = true;
             }
-            await fireBurst(page, shots, alignment < 0.012);
+            await fireBurst(page, shots, alignment < 0.012, firePulseMs);
             shotPulses += shots;
             bursts += 1;
             lastBurstAt = now;
@@ -1340,6 +1341,7 @@ async function run() {
         maximumShotPulses,
         fireAlignmentMaximum,
         fireCooldownMs,
+        firePulseMs,
         maximumGrenadeThrows,
         decisionInputs: args['lifecycle-only']
           ? ['ordinary lobby controls and post-action lifecycle receipt']
