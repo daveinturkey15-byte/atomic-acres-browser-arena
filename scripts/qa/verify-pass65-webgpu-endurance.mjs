@@ -63,7 +63,16 @@ async function captureCanvasOnly(page, clip) {
       const presentation = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.render?.runtime?.presentation;
       return presentation && presentation.completedSequence >= presentation.submissionSequence;
     }, undefined, { timeout: 12_000 });
-    return await page.screenshot({ clip });
+    const screenshot = await page.screenshot({ clip });
+    const progress = await page.evaluate(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+      return {
+        atMs: performance.now(),
+        frameCount: state.frameCount,
+        presentation: state.render.runtime.presentation,
+      };
+    });
+    return { screenshot, progress };
   } finally {
     await page.evaluate(() => {
       delete document.documentElement.dataset.pass65CanvasOnly;
@@ -270,7 +279,8 @@ try {
           residency: api.sampleRendererResidency(),
         };
       });
-      lastScreenshot = await captureCanvasOnly(page, canvasClip);
+      const capture = await captureCanvasOnly(page, canvasClip);
+      lastScreenshot = capture.screenshot;
       const screenshotHash = digest(lastScreenshot);
       screenshotHashes.add(screenshotHash);
 
@@ -312,14 +322,7 @@ try {
       const receipt = { ...sample, screenshotHash };
       samples.push(receipt);
       previousScreenshotHash = screenshotHash;
-      previousProgress = await page.evaluate(() => {
-        const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-        return {
-          atMs: performance.now(),
-          frameCount: state.frameCount,
-          presentation: state.render.runtime.presentation,
-        };
-      });
+      previousProgress = capture.progress;
       sampleIndex += 1;
     }
     if (samples.length < 5 || screenshotHashes.size < Math.ceil(samples.length * 0.8)) {
