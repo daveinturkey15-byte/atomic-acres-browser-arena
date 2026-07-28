@@ -37,6 +37,7 @@ const canonicalArenaSequence = [
 ];
 const diagnosticStress = process.env.PASS65_DIAGNOSTIC_STRESS?.trim().toLowerCase() ?? '';
 const profileFirstActivation = process.env.PASS65_PROFILE_FIRST_ACTIVATION === '1';
+const traceNodeBuilds = process.env.PASS65_TRACE_NODE_BUILDS === '1';
 const probeBaselineWindow = process.env.PASS65_PROBE_BASELINE === '1';
 const killstreakProbeMode = process.env.PASS65_KILLSTREAK_PROBE_MODE?.trim().toLowerCase() ?? 'both';
 const secondActivationDelayMs = Math.max(0, Number(process.env.PASS65_SECOND_ACTIVATION_DELAY_MS ?? '0'));
@@ -168,7 +169,7 @@ try {
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text());
   });
-  await page.goto(`http://127.0.0.1:${port}/?release=latest&renderer=webgpu&map=rustworks-1v1&render=blender&grass=on&mist=on&seed=6501`);
+  await page.goto(`http://127.0.0.1:${port}/?release=latest&renderer=webgpu&map=rustworks-1v1&render=blender&grass=on&mist=on&seed=6501${traceNodeBuilds ? '&traceNodeBuilds=1' : ''}`);
   await page.addStyleTag({
     content: 'html[data-pass65-canvas-only="true"] body > :not(#app), html[data-pass65-canvas-only="true"] #app > :not(#game) { visibility: hidden !important; }',
   });

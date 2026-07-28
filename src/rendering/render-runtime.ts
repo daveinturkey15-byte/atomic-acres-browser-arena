@@ -28,6 +28,13 @@ export type RenderRuntimeTelemetry = Readonly<{
   deviceLost: boolean;
   uncapturedErrors: number;
   lastUncapturedError: string | null;
+  slowNodeBuilds?: readonly Readonly<{
+    atMs: number;
+    durationMs: number;
+    objectName: string;
+    materialName: string;
+    geometryType: string;
+  }>[];
   presentation: PresentationFreshnessTelemetry;
 }>;
 
@@ -440,6 +447,13 @@ export class WebGpuRenderRuntime {
   private lastSubmittedRenderInfo: RenderInfoSnapshot = Object.freeze({ calls: 0, triangles: 0, points: 0, lines: 0 });
   private lightShadowAutoUpdate = true;
   private lightShadowNeedsUpdate = false;
+  private readonly slowNodeBuilds: Array<Readonly<{
+    atMs: number;
+    durationMs: number;
+    objectName: string;
+    materialName: string;
+    geometryType: string;
+  }>> = [];
   private nextCompletionProbeAt = 0;
   private static readonly COMPLETION_PROBE_INTERVAL_MS = 250;
   private static readonly SUBMISSION_BACKPRESSURE_MS = 250;
@@ -480,6 +494,7 @@ export class WebGpuRenderRuntime {
     this.deviceClass = identity.deviceClass;
     this.softwareAdapter = identity.softwareAdapter;
     this.device = identity.device;
+    this.installNodeBuildTrace();
     identity.device.addEventListener?.('uncapturederror', this.uncapturedErrorListener);
     void identity.device.lost?.then((info) => {
       this.deviceLost = true;
@@ -488,6 +503,36 @@ export class WebGpuRenderRuntime {
       const message = record?.message === undefined ? '' : `: ${String(record.message)}`;
       this.lastFailure = `WebGPU device lost (${reason})${message}`;
     });
+  }
+
+  private installNodeBuildTrace(): void {
+    if (typeof location === 'undefined' || new URLSearchParams(location.search).get('traceNodeBuilds') !== '1') return;
+    type RenderObjectShape = Readonly<{
+      object?: THREE.Object3D & { geometry?: { type?: string } };
+      material?: THREE.Material;
+    }>;
+    type NodeManagerShape = {
+      getForRender(renderObject: RenderObjectShape, useAsync?: boolean): unknown;
+    };
+    const nodes = (this.renderer as unknown as { _nodes?: NodeManagerShape })._nodes;
+    if (!nodes) return;
+    const getForRender = nodes.getForRender.bind(nodes);
+    nodes.getForRender = (renderObject, useAsync = false) => {
+      const startedAt = performance.now();
+      const result = getForRender(renderObject, useAsync);
+      const durationMs = performance.now() - startedAt;
+      if (!useAsync && durationMs >= 4) {
+        this.slowNodeBuilds.push(Object.freeze({
+          atMs: startedAt,
+          durationMs,
+          objectName: renderObject.object?.name || '(unnamed)',
+          materialName: renderObject.material?.name || renderObject.material?.type || '(unnamed)',
+          geometryType: renderObject.object?.geometry?.type || '(unknown)',
+        }));
+        if (this.slowNodeBuilds.length > 32) this.slowNodeBuilds.splice(0, this.slowNodeBuilds.length - 32);
+      }
+      return result;
+    };
   }
 
   static async create(parameters: Readonly<{
@@ -554,6 +599,7 @@ export class WebGpuRenderRuntime {
       deviceLost: this.deviceLost,
       uncapturedErrors: this.uncapturedErrors,
       lastUncapturedError: this.lastUncapturedError,
+      slowNodeBuilds: Object.freeze(this.slowNodeBuilds.map((entry) => Object.freeze({ ...entry }))),
       presentation: this.presentationTelemetry(),
     };
   }
