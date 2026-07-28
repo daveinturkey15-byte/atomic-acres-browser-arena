@@ -10753,6 +10753,12 @@ function synchronizeSmokePresentation(snapshot: SmokeAuthoritySnapshot, nowHostT
   smokeVolumes.splice(0, smokeVolumes.length, ...synchronized);
 }
 
+function updateSmokePresentationLeases(nowHostTimeMs: number): void {
+  for (const volume of smokeVolumes) {
+    smokeVolumePresentationPool.update(volume.presentationLease, nowHostTimeMs);
+  }
+}
+
 function smokeStateMessage(nowHostTimeMs = currentHostTimeMs()): SmokeStateMessage {
   return {
     type: 'smoke-state',
@@ -10763,8 +10769,17 @@ function smokeStateMessage(nowHostTimeMs = currentHostTimeMs()): SmokeStateMessa
   };
 }
 
-function broadcastSmokeState(forceReliable = false, nowHostTimeMs = currentHostTimeMs()): void {
+function broadcastSmokeState(
+  forceReliable = false,
+  nowHostTimeMs = currentHostTimeMs(),
+  authorityChanged = false,
+): void {
   if (network.role !== 'host' || !gameStarted) return;
+  const repairWindowDue = smokeVolumes.length > 0 && nowHostTimeMs - lastSmokeStateBroadcastAt >= 250;
+  // Avoid constructing a deeply frozen authority snapshot on every render frame.
+  // Changed revisions still leave immediately; unchanged active smoke retains
+  // the existing four-Hz repair cadence for packet-loss and late-join recovery.
+  if (!forceReliable && !authorityChanged && !repairWindowDue) return;
   const message = smokeStateMessage(nowHostTimeMs);
   const repairDue = message.snapshot.volumes.length > 0 && nowHostTimeMs - lastSmokeStateBroadcastAt >= 250;
   if (!forceReliable && message.snapshot.revision === lastSmokeStateBroadcastRevision && !repairDue) return;
@@ -10823,7 +10838,7 @@ function admitAuthoritativeSmokeSegments(
   });
   if (!result.accepted || result.createdCorridorIds.length === 0) return 0;
   synchronizeSmokePresentation(smokeAuthority.snapshot(nowHostTimeMs), nowHostTimeMs);
-  broadcastSmokeState(false, nowHostTimeMs);
+  broadcastSmokeState(false, nowHostTimeMs, true);
   return result.createdCorridorIds.length;
 }
 
@@ -11000,8 +11015,9 @@ function applyFlashGrenade(point: THREE.Vector3, entity: GrenadeEntity, nowHostT
 function updateOrdnanceVolumes(_now: number): void {
   const nowHostTimeMs = currentHostTimeMs();
   const authorityChanged = smokeAuthority.advance(nowHostTimeMs);
-  synchronizeSmokePresentation(smokeAuthority.snapshot(nowHostTimeMs), nowHostTimeMs);
-  broadcastSmokeState(authorityChanged, nowHostTimeMs);
+  if (authorityChanged) synchronizeSmokePresentation(smokeAuthority.snapshot(nowHostTimeMs), nowHostTimeMs);
+  else updateSmokePresentationLeases(nowHostTimeMs);
+  broadcastSmokeState(authorityChanged, nowHostTimeMs, authorityChanged);
   const overlay = element<HTMLElement>('#ordnance-flash');
   const remainingFlash = flashExposureUntilHostTimeMs - nowHostTimeMs;
   if (remainingFlash <= 0) {

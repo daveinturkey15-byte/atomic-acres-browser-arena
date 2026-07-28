@@ -33,6 +33,21 @@ describe('host-authoritative smoke integration', () => {
     expect(source).toContain('smokeVolumePresentationPool.release(existing.presentationLease)');
   });
 
+  it('does not deep-snapshot unchanged smoke authority on every render frame', () => {
+    const updateStart = source.indexOf('function updateOrdnanceVolumes(');
+    const updateEnd = source.indexOf('\nfunction explodeGrenade(', updateStart);
+    const updateBlock = source.slice(updateStart, updateEnd);
+    expect(updateBlock).toContain('if (authorityChanged) synchronizeSmokePresentation(smokeAuthority.snapshot(nowHostTimeMs), nowHostTimeMs);');
+    expect(updateBlock).toContain('else updateSmokePresentationLeases(nowHostTimeMs);');
+
+    const broadcastStart = source.indexOf('function broadcastSmokeState(');
+    const broadcastEnd = source.indexOf('\nfunction spawnSmokeVolume(', broadcastStart);
+    const broadcastBlock = source.slice(broadcastStart, broadcastEnd);
+    expect(broadcastBlock.indexOf('if (!forceReliable && !authorityChanged && !repairWindowDue) return;'))
+      .toBeLessThan(broadcastBlock.indexOf('const message = smokeStateMessage(nowHostTimeMs);'));
+    expect(source).toContain('broadcastSmokeState(false, nowHostTimeMs, true);');
+  });
+
   it('detonates smoke on the first actor, world, floor, or out-of-bounds impact without a fuse beep', () => {
     expect(source).toContain("function grenadeDetonatesOnFirstImpact(grenade: GrenadeId): boolean {\n  return grenade === 'flash' || grenade === 'smoke';\n}");
     const start = source.indexOf('function updateGrenades(');
