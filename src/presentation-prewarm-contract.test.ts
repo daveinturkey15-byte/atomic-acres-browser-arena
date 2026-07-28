@@ -238,6 +238,21 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('captureEnabled && screenshotHashes.size < Math.ceil(samples.length * 0.8)');
     expect(source).toContain('if (captureEnabled && lastScreenshot)');
     expect(source).toContain('if (captureEnabled) {\n    try {\n      await page?.screenshot');
+    expect(source).toContain('let lastCompletedLiveSample = null;');
+    const failureBreadcrumb = source.slice(
+      source.indexOf('lastCompletedLiveSample = {'),
+      source.indexOf('if (captureEnabled) previousScreenshotHash'),
+    );
+    expect(failureBreadcrumb).toContain('visit,');
+    expect(failureBreadcrumb).toContain('arenaId,');
+    expect(failureBreadcrumb).toContain('sampleIndex,');
+    expect(failureBreadcrumb).toContain('liveMetrics: {');
+    expect(failureBreadcrumb).toContain('verifierCaptureRecovery: capture.recovery ? {');
+    expect(failureBreadcrumb).toContain('verifierHeldFrontier: {');
+    expect(failureBreadcrumb).toContain('liveLongTasks: sample.liveLongTasks');
+    expect(failureBreadcrumb).toContain('observations: capture.recovery.observations.slice(-12)');
+    expect(failureBreadcrumb).not.toContain('...sample');
+    expect(source).toContain('activeContext,\n    lastCompletedLiveSample,\n    error:');
   });
 
   it('rejects degraded foreground cadence in the cold physical-menu gate', () => {

@@ -267,6 +267,7 @@ const server = await createServer({
 let browser;
 let page;
 let activeContext = null;
+let lastCompletedLiveSample = null;
 const errors = [];
 try {
   await server.listen();
@@ -786,6 +787,67 @@ try {
         verifierHeldFrontier: capture.progress,
       };
       samples.push(receipt);
+      // Preserve a deliberately bounded cross-scope breadcrumb. If the next
+      // live interval fails, arena-local `samples` is no longer reachable from
+      // the outer catch; retaining the whole receipt would duplicate runtime,
+      // residency, weapon and killstreak graphs into the failure artifact.
+      lastCompletedLiveSample = {
+        visit,
+        arenaId,
+        sampleIndex,
+        liveMetrics: {
+          atMs: sample.atMs,
+          frameCount: sample.frameCount,
+          elapsedMs,
+          frameDelta,
+          submissionDelta,
+          completionDelta,
+          minimumFrameProgress,
+          screenshotHash,
+          presentation: {
+            status: sample.runtime.presentation.status,
+            submissionSequence: sample.runtime.presentation.submissionSequence,
+            completedSequence: sample.runtime.presentation.completedSequence,
+            pendingForMs: sample.runtime.presentation.pendingForMs,
+            lastCompletionLatencyMs: sample.runtime.presentation.lastCompletionLatencyMs,
+            progress: {
+              elapsedMs: sample.runtime.presentation.progress.elapsedMs,
+              submissionAdvances: sample.runtime.presentation.progress.submissionAdvances,
+              completionAdvances: sample.runtime.presentation.progress.completionAdvances,
+              submittedHz: sample.runtime.presentation.progress.submittedHz,
+              completedHz: sample.runtime.presentation.progress.completedHz,
+              maximumSubmissionGapMs: sample.runtime.presentation.progress.maximumSubmissionGapMs,
+              maximumCompletionGapMs: sample.runtime.presentation.progress.maximumCompletionGapMs,
+              maximumPendingForMs: sample.runtime.presentation.progress.maximumPendingForMs,
+            },
+          },
+        },
+        verifierCaptureRecovery: capture.recovery ? {
+          baselineSequence: capture.recovery.baselineSequence,
+          requiredCompletions: capture.recovery.requiredCompletions,
+          minimumWindowMs: capture.recovery.minimumWindowMs,
+          maximumCompletionMs: capture.recovery.maximumCompletionMs,
+          recoveryWindowMs: capture.recovery.recoveryWindowMs,
+          elapsedMs: capture.recovery.elapsedMs,
+          discardedCompletionCount: capture.recovery.discardedCompletionCount,
+          qualifyingCompletionCount: capture.recovery.qualifyingCompletionCount,
+          firstQualifyingCompletion: capture.recovery.firstQualifyingCompletion,
+          lastQualifyingCompletion: capture.recovery.lastQualifyingCompletion,
+          observations: capture.recovery.observations.slice(-12),
+        } : null,
+        verifierHeldFrontier: {
+          atMs: capture.progress.atMs,
+          frameCount: capture.progress.frameCount,
+          presentation: {
+            status: capture.progress.presentation.status,
+            submissionSequence: capture.progress.presentation.submissionSequence,
+            completedSequence: capture.progress.presentation.completedSequence,
+            pendingForMs: capture.progress.presentation.pendingForMs,
+            lastCompletionLatencyMs: capture.progress.presentation.lastCompletionLatencyMs,
+          },
+        },
+        liveLongTasks: sample.liveLongTasks,
+      };
       if (captureEnabled) previousScreenshotHash = screenshotHash;
       sampleIndex += 1;
     }
@@ -933,6 +995,7 @@ try {
     verdict: 'fail',
     sourceRevision,
     activeContext,
+    lastCompletedLiveSample,
     error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : String(error),
     browserErrors: [...new Set(errors)],
     state,
