@@ -12,7 +12,7 @@ type Particle = {
   color: THREE.Color;
 };
 
-const MAX_PARTICLES = 72;
+export const MAX_IMPACT_PARTICLES = 72;
 export const MAX_IMPACT_MARKS = 48;
 const HIDDEN_Y = -10_000;
 
@@ -56,22 +56,27 @@ function proceduralImpactTexture(size: number, kind: 'particle' | 'mark'): THREE
 
 /** One-draw-call pooled impact debris for every combat surface. */
 export class ImpactPresentation {
+  readonly root = new THREE.Group();
   readonly points: THREE.Points;
   readonly marks: THREE.InstancedMesh;
-  private readonly positions = new Float32Array(MAX_PARTICLES * 3);
-  private readonly colors = new Float32Array(MAX_PARTICLES * 3);
+  private readonly positions = new Float32Array(MAX_IMPACT_PARTICLES * 3);
+  private readonly colors = new Float32Array(MAX_IMPACT_PARTICLES * 3);
   private readonly particles: Particle[] = [];
   private readonly markLife = new Float32Array(MAX_IMPACT_MARKS);
   private cursor = 0;
   private markCursor = 0;
   private particleDensityScale = 1;
   private decalCapacityScale = 1;
-  private wasPrewarmed = false;
+  private gpuPrewarmGeneration = -1;
+  private gpuPrewarmPromise: Promise<void> | null = null;
 
-  constructor(scene: THREE.Scene, reducedDetail = false) {
+  constructor(private readonly scene: THREE.Scene, reducedDetail = false) {
+    this.root.name = 'surface-impact-presentation-pool';
+    this.root.userData.presentationOnly = true;
+    scene.add(this.root);
     const geometry = new THREE.BufferGeometry();
     this.positions.fill(0);
-    for (let index = 0; index < MAX_PARTICLES; index += 1) this.positions[index * 3 + 1] = HIDDEN_Y;
+    for (let index = 0; index < MAX_IMPACT_PARTICLES; index += 1) this.positions[index * 3 + 1] = HIDDEN_Y;
     geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
     geometry.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
     const material = new THREE.PointsMaterial({
@@ -89,7 +94,7 @@ export class ImpactPresentation {
     this.points.name = 'pooled-surface-impact-debris';
     this.points.frustumCulled = false;
     this.points.visible = false;
-    scene.add(this.points);
+    this.root.add(this.points);
     this.marks = new THREE.InstancedMesh(
       new THREE.PlaneGeometry(1, 1),
       new THREE.MeshBasicMaterial({
@@ -108,28 +113,182 @@ export class ImpactPresentation {
     this.marks.frustumCulled = false;
     this.marks.visible = false;
     const hiddenMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
-    for (let index = 0; index < MAX_IMPACT_MARKS; index += 1) this.marks.setMatrixAt(index, hiddenMatrix);
+    const hiddenColor = new THREE.Color(0, 0, 0);
+    for (let index = 0; index < MAX_IMPACT_MARKS; index += 1) {
+      this.marks.setMatrixAt(index, hiddenMatrix);
+      // InstancedMesh lazily creates instanceColor on the first setColorAt().
+      // Allocate it with the permanent pool, not on the first live bullet hit.
+      this.marks.setColorAt(index, hiddenColor);
+    }
     this.marks.instanceMatrix.needsUpdate = true;
-    scene.add(this.marks);
-    for (let index = 0; index < MAX_PARTICLES; index += 1) {
+    if (this.marks.instanceColor) this.marks.instanceColor.needsUpdate = true;
+    this.root.add(this.marks);
+    for (let index = 0; index < MAX_IMPACT_PARTICLES; index += 1) {
       this.particles.push({ velocity: new THREE.Vector3(), life: 0, maxLife: 0, color: new THREE.Color() });
     }
   }
 
-  async prewarm(runtime: PresentationPrewarmRuntime, camera: THREE.Camera): Promise<void> {
-    if (this.wasPrewarmed) return;
-    const parentScene = this.points.parent;
-    if (!(parentScene instanceof THREE.Scene) || this.marks.parent !== parentScene) {
-      throw new Error('Impact presentation must be attached to one scene before prewarm');
+  /**
+   * Re-submits the permanent impact vocabulary once for each committed arena
+   * scene. A menu-only compile is not sufficient: the selected HDR graph and
+   * arena bindings do not exist until the arena transition has committed.
+   */
+  async prewarm(
+    runtime: PresentationPrewarmRuntime,
+    camera: THREE.Camera,
+    sceneGeneration = 0,
+  ): Promise<void> {
+    if (this.gpuPrewarmGeneration === sceneGeneration) return;
+    while (this.gpuPrewarmPromise) {
+      try {
+        await this.gpuPrewarmPromise;
+      } catch {
+        // The initiating caller owns that failure. A queued generation gets an
+        // independent attempt instead of inheriting a poisoned promise.
+      }
+      if (this.gpuPrewarmGeneration === sceneGeneration) return;
     }
-    this.points.visible = true;
-    this.marks.visible = true;
+    const operation = this.performGpuPrewarm(runtime, camera, sceneGeneration);
+    this.gpuPrewarmPromise = operation;
     try {
-      await runtime.compileAndRender(parentScene, camera, parentScene);
-      this.wasPrewarmed = true;
+      await operation;
     } finally {
-      this.points.visible = this.activeParticles() > 0;
-      this.marks.visible = this.activeMarks() > 0;
+      if (this.gpuPrewarmPromise === operation) this.gpuPrewarmPromise = null;
+    }
+  }
+
+  private async performGpuPrewarm(
+    runtime: PresentationPrewarmRuntime,
+    camera: THREE.Camera,
+    sceneGeneration: number,
+  ): Promise<void> {
+    if (this.root.parent !== this.scene || this.points.parent !== this.root || this.marks.parent !== this.root) {
+      throw new Error('Impact presentation pool must be attached to its scene before prewarm');
+    }
+    const instanceColor = this.marks.instanceColor;
+    if (!instanceColor) throw new Error('Impact presentation instanceColor must exist before prewarm');
+
+    const positionState = this.positions.slice();
+    const colorState = this.colors.slice();
+    const markMatrixState = new Float32Array(this.marks.instanceMatrix.array);
+    const markColorState = new Float32Array(instanceColor.array);
+    const markLifeState = this.markLife.slice();
+    const particleStates = this.particles.map((particle) => Object.freeze({
+      velocity: particle.velocity.clone(),
+      life: particle.life,
+      maxLife: particle.maxLife,
+      color: particle.color.clone(),
+    }));
+    const cursorState = this.cursor;
+    const markCursorState = this.markCursor;
+    const rootVisible = this.root.visible;
+    const rootFrustumCulled = this.root.frustumCulled;
+    const pointsVisible = this.points.visible;
+    const pointsFrustumCulled = this.points.frustumCulled;
+    const marksVisible = this.marks.visible;
+    const marksFrustumCulled = this.marks.frustumCulled;
+
+    this.root.visible = true;
+    this.root.frustumCulled = false;
+    this.points.visible = true;
+    this.points.frustumCulled = false;
+    this.marks.visible = true;
+    this.marks.frustumCulled = false;
+    camera.updateWorldMatrix(true, false);
+    this.root.updateWorldMatrix(true, true);
+    const cameraPosition = camera.getWorldPosition(new THREE.Vector3());
+    const forward = camera.getWorldDirection(new THREE.Vector3()).normalize();
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0).normalize();
+    const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1).normalize();
+    const profiles = Object.values(SURFACE_IMPACT_PROFILES);
+
+    // Exercise every permanent particle vertex with representative, non-zero
+    // positions and colors. Hidden-Y sentinels compile the shader but do not
+    // prove the first useful vertex/color upload or fragment path.
+    const particleColumns = 12;
+    for (let slot = 0; slot < MAX_IMPACT_PARTICLES; slot += 1) {
+      const profile = profiles[slot % profiles.length]!;
+      const column = slot % particleColumns;
+      const row = Math.floor(slot / particleColumns);
+      const worldPosition = cameraPosition.clone()
+        .addScaledVector(forward, 6)
+        .addScaledVector(right, (column - (particleColumns - 1) / 2) * 0.16)
+        .addScaledVector(up, (2.5 - row) * 0.16);
+      const localPosition = this.points.worldToLocal(worldPosition);
+      const color = new THREE.Color(profile.particleColors[slot % 2]!);
+      const offset = slot * 3;
+      this.positions[offset] = localPosition.x;
+      this.positions[offset + 1] = localPosition.y;
+      this.positions[offset + 2] = localPosition.z;
+      this.colors[offset] = color.r;
+      this.colors[offset + 1] = color.g;
+      this.colors[offset + 2] = color.b;
+      const particle = this.particles[slot]!;
+      particle.velocity.copy(forward).multiplyScalar(0.8).addScaledVector(up, 0.55);
+      particle.life = 0.38;
+      particle.maxLife = 0.38;
+      particle.color.copy(color);
+    }
+
+    // Submit every instance matrix and color. This is deliberately the real
+    // authored decal scale in the camera frustum; zero matrices or a missing
+    // instanceColor leave the first live impact's WebGPU buffers cold.
+    this.marks.updateWorldMatrix(true, false);
+    const marksWorldInverse = this.marks.matrixWorld.clone().invert();
+    const markFacing = new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 0, 1),
+      forward.clone().negate(),
+    );
+    const markColumns = 8;
+    for (let slot = 0; slot < MAX_IMPACT_MARKS; slot += 1) {
+      const profile = profiles[slot % profiles.length]!;
+      const column = slot % markColumns;
+      const row = Math.floor(slot / markColumns);
+      const worldPosition = cameraPosition.clone()
+        .addScaledVector(forward, 8)
+        .addScaledVector(right, (column - (markColumns - 1) / 2) * 0.24)
+        .addScaledVector(up, (2.5 - row) * 0.24);
+      const worldMatrix = new THREE.Matrix4().compose(
+        worldPosition,
+        markFacing,
+        new THREE.Vector3(profile.markScale, profile.markScale, 1),
+      );
+      this.marks.setMatrixAt(slot, new THREE.Matrix4().multiplyMatrices(marksWorldInverse, worldMatrix));
+      this.marks.setColorAt(slot, new THREE.Color(profile.markColor));
+      this.markLife[slot] = Number.POSITIVE_INFINITY;
+    }
+    this.markDirty();
+    this.marks.instanceMatrix.needsUpdate = true;
+    instanceColor.needsUpdate = true;
+
+    try {
+      await runtime.compileAndRender(this.root, camera, this.scene);
+      this.gpuPrewarmGeneration = sceneGeneration;
+    } finally {
+      this.positions.set(positionState);
+      this.colors.set(colorState);
+      this.marks.instanceMatrix.array.set(markMatrixState);
+      instanceColor.array.set(markColorState);
+      this.markLife.set(markLifeState);
+      for (let slot = 0; slot < this.particles.length; slot += 1) {
+        const particle = this.particles[slot]!;
+        const state = particleStates[slot]!;
+        particle.velocity.copy(state.velocity);
+        particle.life = state.life;
+        particle.maxLife = state.maxLife;
+        particle.color.copy(state.color);
+      }
+      this.cursor = cursorState;
+      this.markCursor = markCursorState;
+      this.root.visible = rootVisible;
+      this.root.frustumCulled = rootFrustumCulled;
+      this.points.visible = pointsVisible;
+      this.points.frustumCulled = pointsFrustumCulled;
+      this.marks.visible = marksVisible;
+      this.marks.frustumCulled = marksFrustumCulled;
+      this.markDirty();
+      this.marks.instanceMatrix.needsUpdate = true;
+      instanceColor.needsUpdate = true;
     }
   }
 
@@ -141,7 +300,7 @@ export class ImpactPresentation {
     const tangent = new THREE.Vector3(normal.z, 0.35, -normal.x).normalize();
     const bitangent = new THREE.Vector3().crossVectors(normal, tangent).normalize();
     for (let index = 0; index < count; index += 1) {
-      const slot = this.cursor++ % MAX_PARTICLES;
+      const slot = this.cursor++ % MAX_IMPACT_PARTICLES;
       const particle = this.particles[slot];
       const positionIndex = slot * 3;
       const spreadA = (presentationRandom() - 0.5) * (profile.impactSurface === 'metal' ? 4.2 : 2.6);
