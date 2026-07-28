@@ -1278,7 +1278,8 @@ export function applyAdditionalMapPresentationProfile(
   const allowQuality = profile === 'blender';
   root.traverse((node) => {
     // Source meshes collapsed into static presentation batches must stay hidden.
-    if (node.userData.staticBatchRendered === true && !String(node.name).startsWith('rustworks-presentation-batch-')) {
+    if (node.userData.staticBatchRendered === true
+      && (root.userData.pass65StaticBatchReady === true || !String(node.name).startsWith('rustworks-presentation-batch-'))) {
       if (node.visible) {
         node.visible = false;
         hidden += 1;

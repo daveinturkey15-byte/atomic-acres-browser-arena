@@ -10,7 +10,8 @@ import {
   rustworksQualityLightOcclusion,
   setRustworksQualityPresentationActive,
 } from './rustworks-quality';
-import { buildRustworks1v1 } from './additional-maps';
+import { applyRustworksPresentationProfile, buildRustworks1v1 } from './additional-maps';
+import { batchStaticMeshes } from './art-kit';
 
 describe('Rustworks Quality Graphics parity', () => {
   it('applies night oil-rig lighting only for Rustworks', () => {
@@ -68,5 +69,32 @@ describe('Rustworks Quality Graphics parity', () => {
     setRustworksQualityPresentationActive(false, 'blender');
     expect(rustworksQualityTelemetry('blender', 'rustworks-1v1').active).toBe(false);
     expect(enhanceRustworksQualityMaterials(map.root, 'performance')).toBe(0);
+  });
+
+  it('batches the enhanced static rig without retiring gameplay mesh references', () => {
+    const map = buildRustworks1v1(new THREE.Scene());
+    applyRustworksPresentationProfile(map.root, 'blender');
+    const visibleDraws = () => {
+      let count = 0;
+      map.root.traverseVisible((node) => {
+        if (node instanceof THREE.Mesh) count += Array.isArray(node.material) ? node.material.length : 1;
+      });
+      return count;
+    };
+    const before = visibleDraws();
+    expect(before).toBeGreaterThan(80);
+    enhanceRustworksQualityMaterials(map.root, 'blender');
+    const stats = batchStaticMeshes(map.root, map.root, () => '', 'preserve');
+    map.root.userData.pass65StaticBatchReady = true;
+    applyRustworksPresentationProfile(map.root, 'blender');
+
+    expect(stats.sourceMeshes).toBeGreaterThan(80);
+    expect(stats.batches).toBeLessThan(32);
+    expect(visibleDraws()).toBeLessThan(before / 2);
+    const gameplayRamp = map.root.getObjectByName('rustworks-lower-ramp') as THREE.Mesh;
+    expect(gameplayRamp.visible).toBe(false);
+    expect(gameplayRamp.userData.staticBatchRendered).toBe(true);
+    expect(map.raycastMeshes).toContain(gameplayRamp);
+    expect(map.root.getObjectByName('Rustworks arena-render-batches')?.visible).toBe(true);
   });
 });

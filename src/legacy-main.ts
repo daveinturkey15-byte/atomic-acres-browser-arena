@@ -17859,6 +17859,12 @@ function batchSelectedArenaPresentation(): void {
   if (selectedArena.id === 'rustworks-1v1' && renderProfile === 'blender') {
     if (arenaRoot.userData.pass65StaticBatchReady !== true) {
       enhanceRustworksQualityMaterials(arenaRoot, renderProfile);
+      // RustRig keeps its named collision/raycast sources for gameplay, but
+      // rendering hundreds of immutable authored pieces individually caused
+      // the severe frame-pacing regression reported on this arena. Preserve
+      // the enhanced PBR materials while collapsing only visible static meshes;
+      // batchStaticMeshes leaves the source objects resident and merely hidden.
+      batchStaticMeshes(arenaRoot, arenaRoot, () => '', 'preserve');
       arenaRoot.userData.pass65StaticBatchReady = true;
     }
   } else if (!(selectedArena.id === 'atomic-acres' && blenderArenaActive)
