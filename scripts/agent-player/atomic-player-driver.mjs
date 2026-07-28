@@ -399,15 +399,19 @@ async function run() {
   const args = parseArgs(process.argv.slice(2));
   const mode = String(args.mode ?? 'solo');
   if (!['solo', 'host', 'join'].includes(mode)) throw new Error('--mode must be solo, host, or join');
+  const realtimeProfile = String(args['realtime-profile'] ?? 'single-rate');
+  if (!['single-rate', 'tri-lane'].includes(realtimeProfile)) throw new Error('--realtime-profile must be single-rate or tri-lane');
+  const triLane = realtimeProfile === 'tri-lane';
   const durationSeconds = integerArg(args.duration, 20, 3, 600);
-  const tickMs = integerArg(args.tick, 140, 80, 500);
+  const tickMs = integerArg(args.tick, triLane ? 80 : 140, 60, 500);
   const maxHoldMs = integerArg(args['max-hold'], 2000, tickMs, 5000);
   const viewportWidth = integerArg(args.width, 640, 480, 1280);
   const viewportHeight = integerArg(args.height, 360, 270, 720);
   const cdpUrl = args['cdp-url'] ? String(args['cdp-url']) : null;
   const headed = Boolean(args.headed) || Boolean(cdpUrl);
   const waitForMatchEnd = Boolean(args['wait-for-match-end']);
-  const controlSleepMs = integerArg(args['control-sleep'], cdpUrl ? 80 : 700, 50, 1000);
+  const controlSleepMs = integerArg(args['control-sleep'], triLane ? 35 : (cdpUrl ? 80 : 700), 20, 1000);
+  const navigationLaneStride = triLane ? 3 : 1;
   const requestedCaptureMode = String(args['capture-mode'] ?? (cdpUrl ? 'screencast' : 'on-demand'));
   if (!['screencast', 'on-demand'].includes(requestedCaptureMode)) throw new Error('--capture-mode must be screencast or on-demand');
   const candidateImageLimit = integerArg(args['candidate-images'], 12, 0, 40);
@@ -465,6 +469,7 @@ async function run() {
   let firstTargetAnnotatedCaptured = false;
   const annotatedCandidateArtifacts = [];
   let aimMoves = 0;
+  let aimServoMoves = 0;
   let maximumObservedHoldMs = 0;
   let bootstrapKind = null;
   let startScreenshotCaptured = false;
@@ -714,6 +719,7 @@ async function run() {
           let horizontal = aimedTarget.x - aimedVision.width / 2;
           let vertical = aimedTarget.y - aimedVision.height / 2;
           let alignment = Math.hypot(horizontal / aimedVision.width, vertical / aimedVision.height);
+          const aimTrace = [{ step: 0, x: aimedTarget.x, y: aimedTarget.y, horizontal, vertical, alignment }];
           for (let aimStep = 0; aimStep < 4 && alignment >= 0.025; aimStep += 1) {
             const movementX = Math.max(-90, Math.min(90, Math.round(horizontal * 1.05)));
             const movementY = Math.max(-55, Math.min(55, Math.round(vertical * 1.50)));
@@ -721,6 +727,7 @@ async function run() {
             const inputIssuedAt = performance.now();
             await moveAim(page, movementX, movementY);
             aimMoves += 1;
+            aimServoMoves += 1;
             cameraMovedThisFrame = true;
             const reacquiredVision = await waitForPostInputVision(visionStream, inputIssuedAt);
             if (!reacquiredVision || reacquiredVision.operatorTargets.length === 0) break;
@@ -734,6 +741,7 @@ async function run() {
             horizontal = aimedTarget.x - aimedVision.width / 2;
             vertical = aimedTarget.y - aimedVision.height / 2;
             alignment = Math.hypot(horizontal / aimedVision.width, vertical / aimedVision.height);
+            aimTrace.push({ step: aimStep + 1, commandX: movementX, commandY: movementY, x: aimedTarget.x, y: aimedTarget.y, horizontal, vertical, alignment });
           }
           if (!firstTargetCaptured) {
             await writeFile(resolve(artifactDirectory, 'first-target.jpg'), vision.jpeg);
@@ -763,6 +771,7 @@ async function run() {
               trackAge: tracking.age,
               stableFrames: tracking.stableFrames,
               evidenceFrames: tracking.evidenceFrames,
+              aimTrace,
               target: { x: aimedTarget.x, y: aimedTarget.y, pixels: aimedTarget.pixels, bounds: aimedTarget.bounds },
             });
           }
@@ -773,12 +782,13 @@ async function run() {
             trackAge: tracking.age,
             stableFrames: tracking.stableFrames,
             evidenceFrames: tracking.evidenceFrames,
+            aimTrace,
             target: { x: aimedTarget.x, y: aimedTarget.y, pixels: aimedTarget.pixels, bounds: aimedTarget.bounds },
             candidates: aimedVision.operatorTargets.length,
           });
         } else {
           const shouldScan = !rawTarget || tracking.reason === 'static-geometry-rejected';
-          if (activeMatch && shouldScan) {
+          if (activeMatch && shouldScan && movementCycle % navigationLaneStride === 0) {
             let scanMovement = 0;
             if (minimapThreat && Math.abs(minimapThreat.bearingRadians) >= 0.035) {
               scanMovement = Math.max(-18, Math.min(18, Math.round(minimapThreat.bearingRadians * 42)));
@@ -958,8 +968,8 @@ async function run() {
         cdpAttached: Boolean(cdpUrl),
       },
       fairness: {
-        perception: args['lifecycle-only'] ? 'none-lifecycle-only' : 'rendered-pixels-purple-operator-geometry-v1-scan-stop-motion-confirmation-visible-player-up-minimap-and-hud',
-        policyVersion: 'atomic-player-policy-v3',
+        perception: args['lifecycle-only'] ? 'none-lifecycle-only' : 'rendered-pixels-purple-operator-geometry-v1-scan-stop-two-frame-confirmation-visible-player-up-minimap-and-hud',
+        policyVersion: 'atomic-player-policy-v4-tri-lane',
         automaticCombatFireEnabled: allowCombatFire,
         decisionInputs: args['lifecycle-only']
           ? ['ordinary lobby controls and post-action lifecycle receipt']
@@ -993,6 +1003,12 @@ async function run() {
           : null,
         tickMs,
         controlSleepMs,
+        realtimeProfile,
+        agentLanes: {
+          scoutPerception: { source: 'latest rendered screencast frame', cadence: 'every control tick' },
+          tacticalNavigation: { source: 'visible player-up minimap plus collision recovery', cadenceTicks: navigationLaneStride },
+          aimReflex: { source: 'fresh post-input purple-operator frames', maximumCorrectionsPerLock: 4 },
+        },
         viewport: { width: viewportWidth, height: viewportHeight },
         visionLoopMs: {
           minimum: sortedVisionDurations[0] ?? null,
@@ -1019,6 +1035,7 @@ async function run() {
       },
       input: {
         aimMoves,
+        aimServoMoves,
         shotPulses,
         bursts,
         warmupShotPulses,
