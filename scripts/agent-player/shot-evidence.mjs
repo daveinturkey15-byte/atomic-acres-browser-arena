@@ -1,6 +1,6 @@
 function officialSummaryReport(download) {
   if (!download) return null;
-  return download.report ?? download;
+  return download.report ?? download.parsed ?? download;
 }
 
 function targetMotion(trace = []) {

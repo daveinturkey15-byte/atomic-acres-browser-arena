@@ -62,3 +62,13 @@ test('pulse versus official shot mismatch remains explicitly unreconciled', () =
   assert.equal(evidence.reconciliation.shotCountReconciled, false);
   assert.equal(evidence.shotRequests[0].official.hitMatch, 'unavailable');
 });
+
+test('driver download receipt parsed payload is accepted', () => {
+  const trigger = Date.parse('2026-07-28T20:00:00.000Z');
+  const evidence = buildShotEvidence({
+    actions: [burst(trigger)],
+    matchSummaryDownload: { parsed: { stats: { shotsFired: 1, shotsHit: 0 }, damageTimeline: [] } },
+  });
+  assert.equal(evidence.reconciliation.shotCountReconciled, true);
+  assert.equal(evidence.shotRequests[0].official.hitMatch, 'miss-by-reconciled-elimination');
+});
