@@ -428,6 +428,7 @@ async function run() {
   let finalSnapshot = null;
   let firstRawTargetCaptured = false;
   let firstTargetCaptured = false;
+  let firstFireCaptured = false;
   let rawTargetFrames = 0;
   let warmupRawTargetFrames = 0;
   let operatorCandidateFrames = 0;
@@ -701,15 +702,31 @@ async function run() {
 
         if (currentTarget) {
           confirmedTargetFrames += 1;
-          const horizontal = currentTarget.x - vision.width / 2;
-          const vertical = currentTarget.y - vision.height / 2;
-          const movementX = Math.max(-30, Math.min(30, Math.round(horizontal * 0.45)));
-          const movementY = Math.max(-20, Math.min(20, Math.round(vertical * 0.40)));
-          const alignment = Math.hypot(horizontal / vision.width, vertical / vision.height);
-          if (movementX !== 0 || movementY !== 0) {
+          let aimedVision = vision;
+          let aimedTarget = currentTarget;
+          let horizontal = aimedTarget.x - aimedVision.width / 2;
+          let vertical = aimedTarget.y - aimedVision.height / 2;
+          let alignment = Math.hypot(horizontal / aimedVision.width, vertical / aimedVision.height);
+          for (let aimStep = 0; aimStep < 2 && alignment >= 0.045; aimStep += 1) {
+            const movementX = Math.max(-55, Math.min(55, Math.round(horizontal * 0.78)));
+            const movementY = Math.max(-32, Math.min(32, Math.round(vertical * 0.62)));
+            if (movementX === 0 && movementY === 0) break;
             await moveAim(page, movementX, movementY);
             aimMoves += 1;
             cameraMovedThisFrame = true;
+            await sleep(70);
+            const reacquiredVision = visionStream.state.latest;
+            if (!reacquiredVision || reacquiredVision.sequence === aimedVision.sequence || reacquiredVision.operatorTargets.length === 0) break;
+            const reacquiredTarget = [...reacquiredVision.operatorTargets].sort((left, right) => {
+              const leftCentre = Math.hypot(left.x - reacquiredVision.width / 2, left.y - reacquiredVision.height / 2);
+              const rightCentre = Math.hypot(right.x - reacquiredVision.width / 2, right.y - reacquiredVision.height / 2);
+              return leftCentre - rightCentre || left.score - right.score;
+            })[0];
+            aimedVision = reacquiredVision;
+            aimedTarget = reacquiredTarget;
+            horizontal = aimedTarget.x - aimedVision.width / 2;
+            vertical = aimedTarget.y - aimedVision.height / 2;
+            alignment = Math.hypot(horizontal / aimedVision.width, vertical / aimedVision.height);
           }
           if (!firstTargetCaptured) {
             await writeFile(resolve(artifactDirectory, 'first-target.jpg'), vision.jpeg);
@@ -718,10 +735,16 @@ async function run() {
             firstTargetAnnotatedCaptured = true;
           }
           const currentlyReloading = Boolean(hud?.reloadState) || now < reloadSuppressedUntil;
-          if (allowCombatFire && tracking.fireAuthorized && activeMatch && alignment < 0.045
+          if (allowCombatFire && tracking.fireAuthorized && activeMatch && alignment < 0.065
             && !currentlyReloading && now - lastBurstAt >= fireCooldownMs) {
             const shots = Math.max(1, Math.min(burstShots, Number(hud?.ammo ?? burstShots)));
-            await fireBurst(page, shots, alignment < 0.032);
+            if (!firstFireCaptured) {
+              const fireTracking = { rawTarget: aimedTarget, confirmedTarget: aimedTarget };
+              await writeFile(resolve(artifactDirectory, 'first-fire-aligned.jpg'), aimedVision.jpeg);
+              await writeFile(resolve(artifactDirectory, 'first-fire-aligned-annotated.jpg'), await annotatedVisionJpeg(aimedVision, fireTracking));
+              firstFireCaptured = true;
+            }
+            await fireBurst(page, shots, alignment < 0.038);
             shotPulses += shots;
             bursts += 1;
             lastBurstAt = now;
@@ -733,7 +756,7 @@ async function run() {
               trackAge: tracking.age,
               stableFrames: tracking.stableFrames,
               evidenceFrames: tracking.evidenceFrames,
-              target: { x: currentTarget.x, y: currentTarget.y, pixels: currentTarget.pixels, bounds: currentTarget.bounds },
+              target: { x: aimedTarget.x, y: aimedTarget.y, pixels: aimedTarget.pixels, bounds: aimedTarget.bounds },
             });
           }
           actions.push({
@@ -743,8 +766,8 @@ async function run() {
             trackAge: tracking.age,
             stableFrames: tracking.stableFrames,
             evidenceFrames: tracking.evidenceFrames,
-            target: { x: currentTarget.x, y: currentTarget.y, pixels: currentTarget.pixels, bounds: currentTarget.bounds },
-            candidates: vision.operatorTargets.length,
+            target: { x: aimedTarget.x, y: aimedTarget.y, pixels: aimedTarget.pixels, bounds: aimedTarget.bounds },
+            candidates: aimedVision.operatorTargets.length,
           });
         } else {
           const shouldScan = !rawTarget || tracking.reason === 'static-geometry-rejected';
@@ -1045,6 +1068,8 @@ async function run() {
         firstRawTargetAnnotatedCaptured ? 'first-raw-target-annotated.jpg' : null,
         firstTargetCaptured ? 'first-target.jpg' : null,
         firstTargetAnnotatedCaptured ? 'first-target-annotated.jpg' : null,
+        firstFireCaptured ? 'first-fire-aligned.jpg' : null,
+        firstFireCaptured ? 'first-fire-aligned-annotated.jpg' : null,
         ...candidateArtifacts,
         ...annotatedCandidateArtifacts,
         ...damageArtifacts,
