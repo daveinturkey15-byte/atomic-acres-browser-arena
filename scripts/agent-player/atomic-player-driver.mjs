@@ -502,6 +502,7 @@ async function run() {
   const fireCooldownMs = integerArg(args['fire-cooldown'], 420, 180, 2000);
   const firePulseMs = integerArg(args['fire-pulse'], 72, 20, 250);
   const fireAlignmentMaximum = numberArg(args['fire-alignment'], 0.02, 0.003, 0.02);
+  const alwaysAds = Boolean(args['always-ads']);
   const grenadeAlignmentMaximum = numberArg(args['grenade-alignment'], 0.02, 0.003, 0.02);
   const fieldKitRequest = String(args['field-kit'] ?? 'default');
   if (!['default', 'smg'].includes(fieldKitRequest)) throw new Error('--field-kit must be default or smg');
@@ -1144,7 +1145,8 @@ async function run() {
               await writeFile(resolve(artifactDirectory, 'first-fire-aligned-annotated.jpg'), await annotatedVisionJpeg(aimedVision, fireTracking));
               firstFireCaptured = true;
             }
-            await fireBurst(page, shots, alignment < 0.012, firePulseMs);
+            const useAds = alwaysAds || alignment < 0.012;
+            await fireBurst(page, shots, useAds, firePulseMs);
             shotPulses += shots;
             bursts += 1;
             lastBurstAt = now;
@@ -1153,6 +1155,7 @@ async function run() {
               kind: 'operator-authorized-burst',
               shots,
               alignment,
+              useAds,
               crosshairAligned: aimAlignment.aligned,
               twoFrameAligned,
               associationReason,
@@ -1376,6 +1379,7 @@ async function run() {
         fireAlignmentMaximum,
         fireCooldownMs,
         firePulseMs,
+        alwaysAds,
         maximumGrenadeThrows,
         grenadeAlignmentMaximum,
         finishWindowMs,
