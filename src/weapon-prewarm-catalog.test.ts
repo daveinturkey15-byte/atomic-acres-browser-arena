@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { GUN_RANGE_WEAPON_STATIONS } from './gun-range-armory';
 import { WEAPON_IDS } from './protocol';
 import {
+  GUN_RANGE_FIELD_TEST_WEAPONS,
   RUNTIME_WEAPON_RETENTION_LIMIT,
   menuWeaponPrewarmCatalog,
   weaponPrewarmCatalogForArena,
@@ -20,9 +21,17 @@ describe('Pass 65 first-person weapon prewarm authority', () => {
     expect(new Set(WEAPON_IDS).size).toBe(WEAPON_IDS.length);
   });
 
-  it('retains every Gun Range rack weapon plus the authoritative sidearm', () => {
+  it('retains every Gun Range rack weapon, authoritative sidearm, and field-test weapon', () => {
     const rackWeapons = GUN_RANGE_WEAPON_STATIONS.map((station) => station.weapon);
-    expect(weaponPrewarmCatalogForArena('gun-range', 'pistol')).toEqual([...rackWeapons, 'pistol']);
-    expect(weaponPrewarmCatalogForArena('gun-range', 'magnum')).toEqual([...rackWeapons, 'magnum']);
+    expect(weaponPrewarmCatalogForArena('gun-range', 'pistol')).toEqual([
+      ...rackWeapons,
+      'pistol',
+      ...GUN_RANGE_FIELD_TEST_WEAPONS,
+    ]);
+    expect(weaponPrewarmCatalogForArena('gun-range', 'magnum')).toEqual([
+      ...rackWeapons,
+      'magnum',
+      ...GUN_RANGE_FIELD_TEST_WEAPONS,
+    ]);
   });
 });

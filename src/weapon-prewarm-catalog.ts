@@ -13,6 +13,10 @@ import {
  * admitted by deployment prewarm automatically instead of regressing later.
  */
 export const RUNTIME_WEAPON_RETENTION_LIMIT = WEAPON_IDS.length;
+export const GUN_RANGE_FIELD_TEST_WEAPONS = Object.freeze([
+  'explosive-crossbow',
+  'm14-ebr',
+] as const satisfies readonly WeaponId[]);
 
 function uniqueWeaponIds(ids: readonly WeaponId[]): readonly WeaponId[] {
   return Object.freeze([...new Set(ids)]);
@@ -39,5 +43,6 @@ export function weaponPrewarmCatalogForArena(
   return uniqueWeaponIds([
     ...GUN_RANGE_WEAPON_STATIONS.map((station) => station.weapon),
     gunRangeSidearm,
+    ...GUN_RANGE_FIELD_TEST_WEAPONS,
   ]);
 }
