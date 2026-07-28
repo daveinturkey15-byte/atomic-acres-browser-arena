@@ -219,7 +219,7 @@ async function createVisionCapture(context, page, options = {}) {
       .raw()
       .toBuffer({ resolveWithObject: true });
     const targets = findCoralTargets(data, info.width, info.height, info.channels);
-    const operatorTargets = findPurpleOperatorCandidates(data, info.width, info.height, info.channels);
+    const operatorTargets = findPurpleOperatorCandidates(data, info.width, info.height, info.channels, options.operatorDetectionOptions ?? {});
     const minimapThreats = findMinimapThreats(data, info.width, info.height, info.channels);
     const decodeMs = performance.now() - decodeStartedAt;
     const captureMs = Math.max(0, packet.receivedAt - captureStartedAt);
@@ -636,14 +636,23 @@ async function run() {
       await sleep(120);
       pointerLock = await page.evaluate(() => document.pointerLockElement?.id === 'game');
       if (headed && !pointerLock) throw new Error('Trusted canvas click did not acquire pointer lock');
-      visionStream = await createVisionCapture(context, page, { mode: requestedCaptureMode });
+      const operatorDetectionOptions = args['operator-profile'] === 'g0031-balanced-v1'
+        ? {
+            minimumWidth: 2, maximumWidth: 50,
+            minimumHeight: 3, maximumHeight: 70,
+            maximumPixels: 500,
+            minimumMeanBlueRedLead: -1_000,
+            minimumBlueLeadRatio: 0,
+          }
+        : {};
+      visionStream = await createVisionCapture(context, page, { mode: requestedCaptureMode, operatorDetectionOptions });
       try {
         await visionStream.capture();
       } catch (error) {
         if (requestedCaptureMode !== 'screencast') throw error;
         browserMessages.push({ type: 'warning', text: `screencast fallback: ${error.message}` });
         await visionStream.stop().catch(() => undefined);
-        visionStream = await createVisionCapture(context, page, { mode: 'on-demand' });
+        visionStream = await createVisionCapture(context, page, { mode: 'on-demand', operatorDetectionOptions });
         await visionStream.capture();
       }
       await writeFile(resolve(artifactDirectory, 'start.jpg'), visionStream.state.latest.jpeg);
@@ -661,8 +670,9 @@ async function run() {
           closeThreatDistance: integerArg(args['close-threat-distance'], 18, 6, 40),
           sprintThreatDistance: integerArg(args['sprint-threat-distance'], 30, 15, 60),
           postShotStrafeMs: integerArg(args['post-shot-strafe'], 650, 0, 1600),
-          routeSweepInterval: integerArg(args['route-sweep-interval'], 36, 12, 120),
+          routeSweepInterval: integerArg(args['route-sweep-interval'], 36, 6, 120),
           routeSweepTurn: integerArg(args['route-sweep-turn'], 18, 0, 60),
+          threatAwareRetreatDirection: args['threat-aware-retreat'] !== 'false',
         })
         : null;
       let movementCycle = 0;

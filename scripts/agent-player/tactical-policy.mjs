@@ -13,6 +13,7 @@ export function createTacticalPolicy(options = {}) {
     postShotStrafeMs: Number(options.postShotStrafeMs ?? 650),
     routeSweepInterval: Number(options.routeSweepInterval ?? 36),
     routeSweepTurn: Number(options.routeSweepTurn ?? 18),
+    threatAwareRetreatDirection: options.threatAwareRetreatDirection !== false,
   };
   const state = {
     mode: 'roam',
@@ -61,7 +62,7 @@ export function createTacticalPolicy(options = {}) {
         if (health < config.retreatHealth || state.damageWindowAmount >= config.retreatDamage) {
           if (state.mode !== 'retreat') {
             const bearing = Number(observation.minimapThreat?.bearingRadians);
-            state.direction = Number.isFinite(bearing) && Math.abs(bearing) > 0.08
+            state.direction = config.threatAwareRetreatDirection && Number.isFinite(bearing) && Math.abs(bearing) > 0.08
               ? (bearing > 0 ? -1 : 1)
               : -state.direction;
           }
