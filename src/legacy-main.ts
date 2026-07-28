@@ -266,7 +266,7 @@ import {
   type FieldSupportId,
   type TriPassTargeting,
 } from './field-support';
-import { createGrenadePresentation, grenadePresentationTelemetry, loadGrenadePresentation } from './grenade-presentation';
+import { createGrenadePresentation, disposeGrenadePresentation, grenadePresentationTelemetry, loadGrenadePresentation } from './grenade-presentation';
 import {
   EXPLOSIVE_BOLT_ARM_DELAY_MS,
   EXPLOSIVE_BOLT_BLAST_MAX_DAMAGE,
@@ -1187,6 +1187,7 @@ type BootstrapStage =
   | 'menu-video-ready'
   | 'loading-gameplay-assets'
   | 'prewarming-weapon-catalog'
+  | 'prewarming-grenade-world-presentations'
   | 'prewarming-killstreak-presentations'
   | 'prewarming-smoke-presentations'
   | 'prewarming-combat-tracers'
@@ -2428,6 +2429,7 @@ const explosiveBoltPresentationPool = Array.from(
   },
 );
 let explosiveBoltPresentationPrewarmGeneration = -1;
+let grenadeWorldPresentationPrewarmGeneration = -1;
 let flashExposureUntilHostTimeMs = 0;
 let flashExposureStrength = 0;
 let lastFlashResultAdmission: Readonly<{
@@ -10185,6 +10187,35 @@ async function prewarmExplosiveBoltPresentation(sceneGeneration = 0): Promise<vo
   }
 }
 
+async function prewarmGrenadeWorldPresentations(sceneGeneration: number): Promise<void> {
+  if (grenadeWorldPresentationPrewarmGeneration === sceneGeneration) return;
+  const stagingRoot = new THREE.Group();
+  stagingRoot.name = `grenade-world-prewarm-${sceneGeneration}`;
+  stagingRoot.userData.presentationOnly = true;
+  scene.add(stagingRoot);
+  camera.updateWorldMatrix(true, false);
+  const cameraPosition = camera.getWorldPosition(new THREE.Vector3());
+  const forward = camera.getWorldDirection(new THREE.Vector3());
+  const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0).normalize();
+  const staged = (['frag', 'semtex'] as const).map((grenade, index) => {
+    const root = createGrenadePresentation(grenade);
+    root.position.copy(cameraPosition)
+      .addScaledVector(forward, 7)
+      .addScaledVector(right, index === 0 ? -0.45 : 0.45);
+    root.visible = true;
+    root.traverse((node) => { node.visible = true; node.frustumCulled = false; });
+    stagingRoot.add(root);
+    return root;
+  });
+  try {
+    await renderRuntime.compileAndRender(stagingRoot, camera, scene);
+    grenadeWorldPresentationPrewarmGeneration = sceneGeneration;
+  } finally {
+    for (const root of staged) disposeGrenadePresentation(root);
+    stagingRoot.removeFromParent();
+  }
+}
+
 function acquireExplosiveBoltMesh(): THREE.Group {
   const root = explosiveBoltPresentationPool.find((candidate) => candidate.userData.presentationPoolInUse !== true);
   if (!root) throw new Error('Explosive-bolt presentation pool exhausted');
@@ -17892,6 +17923,8 @@ async function prepareSharedGameplayAssets(): Promise<void> {
 }
 
 async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): Promise<void> {
+  bootstrapStage = 'prewarming-grenade-world-presentations';
+  await prewarmGrenadeWorldPresentations(sceneGeneration);
   bootstrapStage = 'prewarming-killstreak-presentations';
   await killstreakPresentation.prewarm(renderRuntime, camera, sceneGeneration);
   bootstrapStage = 'prewarming-smoke-presentations';
