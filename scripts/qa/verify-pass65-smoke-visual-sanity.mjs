@@ -202,7 +202,9 @@ try {
   await page.evaluate(() => {
     const api = window.__ATOMIC_ACRES_DEBUG__;
     const [x, y, z] = api.snapshot().player.position;
-    api.setCaptureCameraPose(x, y, z, 0, 0);
+    // Hold unrelated arena animation at one deterministic visual instant so
+    // image deltas measure smoke rather than moving lights/atmosphere.
+    api.setCaptureCameraPose(x, y, z, 0, 0, undefined, 65_000, 6_501);
   });
   await page.waitForTimeout(1_000);
 

@@ -503,7 +503,7 @@ export class SmokeVolumePresentationPool {
       const crowded = component.length >= 3;
       for (const [index, member] of component.entries()) {
         member.presentation.setCrowdingBudget(
-          crowded ? 1 : SMOKE_PRESENTATION_CARD_COUNT,
+          crowded ? 2 : SMOKE_PRESENTATION_CARD_COUNT,
           !crowded || index === 0,
         );
       }
