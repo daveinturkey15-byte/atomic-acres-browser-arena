@@ -1274,7 +1274,9 @@ applyAdaptiveRenderBudget(adaptiveQuality.telemetry().pixelRatioCap);
 async function settleWebGpuPresentation(label: string, maximumLatencyMs = 500): Promise<void> {
   if (renderRuntime.backend !== 'webgpu') return;
   const requiredConsecutiveHealthySamples = 3;
+  const requiredConsecutiveMinimumTierSlowSamples = 3;
   let consecutiveHealthySamples = 0;
+  let consecutiveMinimumTierSlowSamples = 0;
   for (;;) {
     submitWebGpuFrame(performance.now(), true);
     await flushWebGpuFrames(12_000);
@@ -1285,6 +1287,7 @@ async function settleWebGpuPresentation(label: string, maximumLatencyMs = 500): 
     const completionLatencyMs = presentation.lastCompletionLatencyMs;
     if (completionLatencyMs === null) throw new Error(`${label} presentation completed without a queue-latency sample`);
     if (completionLatencyMs <= maximumLatencyMs) {
+      consecutiveMinimumTierSlowSamples = 0;
       consecutiveHealthySamples += 1;
       if (consecutiveHealthySamples >= requiredConsecutiveHealthySamples) return;
       continue;
@@ -1294,10 +1297,13 @@ async function settleWebGpuPresentation(label: string, maximumLatencyMs = 500): 
       `${label} WebGPU queue latency ${Math.round(completionLatencyMs)}ms exceeded ${maximumLatencyMs}ms`,
     );
     if (nextPixelRatio === null) {
+      consecutiveMinimumTierSlowSamples += 1;
+      if (consecutiveMinimumTierSlowSamples < requiredConsecutiveMinimumTierSlowSamples) continue;
       throw new Error(
-        `${label} WebGPU queue latency remained ${Math.round(completionLatencyMs)}ms at the minimum quality tier`,
+        `${label} WebGPU queue latency remained ${Math.round(completionLatencyMs)}ms for ${consecutiveMinimumTierSlowSamples} consecutive samples at the minimum quality tier`,
       );
     }
+    consecutiveMinimumTierSlowSamples = 0;
     deferredWebGpuAdaptivePixelRatio.request(nextPixelRatio);
     if (!applyDeferredAdaptiveWebGpuRenderBudget(performance.now())) {
       throw new Error(`${label} adaptive resize was not admitted after its WebGPU completion fence`);

@@ -142,7 +142,9 @@ describe('presentation prewarm startup contract', () => {
       .toBeLessThan(arenaDeployment.indexOf('auditArenaRenderLiveness('));
     expect(source).toContain('await flushWebGpuFrames(12_000)');
     expect(source).toContain('const requiredConsecutiveHealthySamples = 3;');
-    expect(source).toContain('WebGPU queue latency remained ${Math.round(completionLatencyMs)}ms at the minimum quality tier');
+    expect(source).toContain('const requiredConsecutiveMinimumTierSlowSamples = 3;');
+    expect(source).toContain('if (consecutiveMinimumTierSlowSamples < requiredConsecutiveMinimumTierSlowSamples) continue;');
+    expect(source).toContain('WebGPU queue latency remained ${Math.round(completionLatencyMs)}ms for ${consecutiveMinimumTierSlowSamples} consecutive samples at the minimum quality tier');
     expect(source).toContain('adaptiveQuality.forceDownshift(');
     expect(matchDeployment).toContain("resetWebGpuPresentationEpoch('match admitted', performance.now());");
     expect(source).toContain("resetWebGpuPresentationEpoch('tab visibility regained', refocusAt);");
