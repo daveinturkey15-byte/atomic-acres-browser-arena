@@ -306,25 +306,31 @@ function markSharedPresentationAsset(root: THREE.Object3D): void {
   });
 }
 
-const AUTHORED_SUPPORT_SHADOW_MATERIAL_SUFFIXES = Object.freeze([
-  '_Armor_PBR',
-  '_Carpet_PBR',
-  '_Crate_PBR',
-  '_DarkArmor',
-  '_Dark',
-  '_Gunmetal',
-  '_Metal',
-  '_RotorBlade',
-  '_Blade',
-  '_Bomb',
-  '_Parachute',
-]);
+const AUTHORED_SUPPORT_SHADOW_MATERIALS = Object.freeze({
+  chopper: new Set([
+    'MAT_Pass65Chopper_Armor_PBR',
+    'MAT_Pass65Chopper_DarkArmor',
+    'MAT_Pass65Chopper_Gunmetal',
+    'MAT_Pass65Chopper_RotorBlade',
+  ]),
+  drone: new Set([
+    'MAT_HunterDrone_Armor_PBR',
+    'MAT_HunterDrone_DarkArmor',
+    'MAT_HunterDrone_Gunmetal',
+  ]),
+});
 
-export function authoredSupportMaterialCastsShadow(materialName: string): boolean {
-  return AUTHORED_SUPPORT_SHADOW_MATERIAL_SUFFIXES.some((suffix) => materialName.endsWith(suffix));
+export function authoredSupportMaterialCastsShadow(
+  family: keyof typeof AUTHORED_SUPPORT_SHADOW_MATERIALS,
+  materialName: string,
+): boolean {
+  return AUTHORED_SUPPORT_SHADOW_MATERIALS[family].has(materialName);
 }
 
-function applyAuthoredSupportShadowBudget(root: THREE.Object3D): void {
+function applyAuthoredSupportShadowBudget(
+  root: THREE.Object3D,
+  family: keyof typeof AUTHORED_SUPPORT_SHADOW_MATERIALS,
+): void {
   root.traverse((node) => {
     if (!(node instanceof THREE.Mesh)) return;
     const materials = Array.isArray(node.material) ? node.material : [node.material];
@@ -332,7 +338,7 @@ function applyAuthoredSupportShadowBudget(root: THREE.Object3D): void {
     // colour pass. Shadow maps only need the major opaque silhouette; making
     // every instrument, emissive chip, line and transparent rotor disc a
     // caster multiplied support-streak submissions without a visible benefit.
-    node.castShadow = materials.some((entry) => authoredSupportMaterialCastsShadow(entry.name));
+    node.castShadow = materials.some((entry) => authoredSupportMaterialCastsShadow(family, entry.name));
   });
 }
 
@@ -353,7 +359,7 @@ export function loadHunterDronePresentation(): Promise<void> {
         hunterDroneTemplate = root;
         hunterDroneAnimations = Object.freeze([...gltf.animations]);
         markSharedPresentationAsset(root);
-        applyAuthoredSupportShadowBudget(root);
+        applyAuthoredSupportShadowBudget(root, 'drone');
       }
       resolve();
     }, undefined, (error) => {
@@ -941,7 +947,7 @@ function buildAuthoredSupportVehicle(family: SupportVehicleAssetFamily): Present
     const firstPersonRotor = level.getObjectByName('chopper-first-person-rotor');
     if (firstPersonRotor) firstPersonRotor.userData.firstPersonOnly = true;
     markSharedPresentationAsset(level);
-    applyAuthoredSupportShadowBudget(level);
+    if (family === 'chopper') applyAuthoredSupportShadowBudget(level, 'chopper');
     lod.addLevel(level, [0, 34, 68][index] ?? index * 34);
     const mixer = new THREE.AnimationMixer(level);
     for (const clipName of SUPPORT_VEHICLE_LOOP_ACTIONS[family]) {
@@ -1122,7 +1128,7 @@ function buildDrone(mode: 'piloted' | 'swarm' | null): PresentedEntity {
     root.userData.forwardAxis = [0, 0, -1];
     root.userData.weaponFeedback = [...SUPPORT_WEAPON_FEEDBACK_CONTRACT];
     markSharedPresentationAsset(root);
-    applyAuthoredSupportShadowBudget(root);
+    applyAuthoredSupportShadowBudget(root, 'drone');
     const mixer = new THREE.AnimationMixer(root);
     for (const clipName of HUNTER_DRONE_LOOP_ACTIONS) {
       const clip = hunterDroneAnimations.find((candidate) => candidate.name === clipName);

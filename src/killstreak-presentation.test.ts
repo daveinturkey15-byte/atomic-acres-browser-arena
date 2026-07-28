@@ -17,14 +17,14 @@ import { SUPPORT_VEHICLE_PRESENTATION_CONTRACT, missingSupportNodes, supportForw
 
 describe('authored support shadow budget', () => {
   it('keeps major opaque silhouettes while excluding tiny, emissive and transparent details', () => {
-    expect(authoredSupportMaterialCastsShadow('MAT_HunterDrone_Armor_PBR')).toBe(true);
-    expect(authoredSupportMaterialCastsShadow('MAT_HunterDrone_Gunmetal')).toBe(true);
-    expect(authoredSupportMaterialCastsShadow('MAT_Pass65Chopper_RotorBlade')).toBe(true);
-    expect(authoredSupportMaterialCastsShadow('MAT_Pass65SupportAircraft_Parachute')).toBe(true);
-    expect(authoredSupportMaterialCastsShadow('MAT_Pass65Chopper_CyanInstrument')).toBe(false);
-    expect(authoredSupportMaterialCastsShadow('MAT_Pass65Chopper_RotorBlur')).toBe(false);
-    expect(authoredSupportMaterialCastsShadow('MAT_Pass65Chopper_CanopyGlass')).toBe(false);
-    expect(authoredSupportMaterialCastsShadow('MAT_Pass65SupportAircraft_ParachuteLine')).toBe(false);
+    expect(authoredSupportMaterialCastsShadow('drone', 'MAT_HunterDrone_Armor_PBR')).toBe(true);
+    expect(authoredSupportMaterialCastsShadow('drone', 'MAT_HunterDrone_Gunmetal')).toBe(true);
+    expect(authoredSupportMaterialCastsShadow('chopper', 'MAT_Pass65Chopper_RotorBlade')).toBe(true);
+    expect(authoredSupportMaterialCastsShadow('chopper', 'MAT_Pass65Chopper_CyanInstrument')).toBe(false);
+    expect(authoredSupportMaterialCastsShadow('chopper', 'MAT_Pass65Chopper_RotorBlur')).toBe(false);
+    expect(authoredSupportMaterialCastsShadow('chopper', 'MAT_Pass65Chopper_CanopyGlass')).toBe(false);
+    expect(authoredSupportMaterialCastsShadow('drone', 'MAT_HunterDrone_IdentityLight')).toBe(false);
+    expect(authoredSupportMaterialCastsShadow('drone', 'MAT_FutureDrone_Gunmetal')).toBe(false);
   });
 });
 
