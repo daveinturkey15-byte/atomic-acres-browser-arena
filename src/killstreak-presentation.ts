@@ -1599,7 +1599,10 @@ export class KillstreakPresentation {
     if (!presented) return createPresentedEntity(entity);
     presented.root.userData.presentationPoolInUse = true;
     presented.root.name = String(presented.root.userData.poolActiveName ?? presented.root.name);
-    presented.root.visible = true;
+    // Swarm source trees drive the animated instance matrices but must never
+    // enter renderer traversal themselves. Their 24 authored hierarchies are
+    // represented by the bounded InstancedMesh batches above.
+    presented.root.visible = key !== 'swarm-drone';
     return presented;
   }
 
@@ -1618,6 +1621,7 @@ export class KillstreakPresentation {
 
   private applyFirstPersonVisibility(): void {
     for (const [entityId, presented] of this.entities) {
+      if (presented.root.userData.presentationPoolKey === 'swarm-drone') continue;
       if (entityId !== this.firstPersonEntityId) setSupportFirstPersonVisibility(presented.root, false);
     }
     if (!this.firstPersonEntityId) return;
@@ -1675,12 +1679,14 @@ export class KillstreakPresentation {
         const firstPersonRotor = presented.root.getObjectByName('chopper-first-person-rotor');
         if (firstPersonRotor) firstPersonRotor.rotation.y += 0.92;
       }
-      const parachuteVisible = entity.phase === 'inbound' || entity.phase === 'descending';
-      presented.root.traverse((node) => {
-        if (node.name === 'care-package-parachute' || node.name === 'care-parachute-lines') {
-          node.visible = parachuteVisible;
-        }
-      });
+      if (entity.kind === 'care-crate') {
+        const parachuteVisible = entity.phase === 'inbound' || entity.phase === 'descending';
+        presented.root.traverse((node) => {
+          if (node.name === 'care-package-parachute' || node.name === 'care-parachute-lines') {
+            node.visible = parachuteVisible;
+          }
+        });
+      }
       presented.root.userData.health = entity.health;
       presented.root.userData.phase = entity.phase;
       presented.root.userData.gunController = entity.gunController;

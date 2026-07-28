@@ -409,6 +409,8 @@ describe('killstreak presentation', () => {
     const chopper = presentation.root.getObjectByName('pass65-chopper-gunner') as THREE.Group;
     const drone = presentation.root.getObjectByName('pass65-swarm-drone') as THREE.Group;
     const aircraft = presentation.root.getObjectByName('pass65-care-package-aircraft') as THREE.Group;
+    expect(drone.visible).toBe(false);
+    expect(presentation.root.getObjectByName('pass65-swarm-instanced-primitive-1')?.visible).toBe(true);
     expect(chopper.rotation.x).toBeCloseTo(0.02);
     expect(chopper.rotation.z).toBeCloseTo(-0.04);
     expect(missingSupportNodes(chopper, SUPPORT_VEHICLE_PRESENTATION_CONTRACT.chopper.requiredNodes)).toEqual([]);
