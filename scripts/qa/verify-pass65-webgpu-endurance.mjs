@@ -39,6 +39,7 @@ const diagnosticStress = process.env.PASS65_DIAGNOSTIC_STRESS?.trim().toLowerCas
 const profileFirstActivation = process.env.PASS65_PROFILE_FIRST_ACTIVATION === '1';
 const probeBaselineWindow = process.env.PASS65_PROBE_BASELINE === '1';
 const killstreakProbeMode = process.env.PASS65_KILLSTREAK_PROBE_MODE?.trim().toLowerCase() ?? 'both';
+const secondActivationDelayMs = Math.max(0, Number(process.env.PASS65_SECOND_ACTIVATION_DELAY_MS ?? '0'));
 if (!['both', 'chopper', 'swarm'].includes(killstreakProbeMode)) {
   throw new Error(`Unknown PASS65_KILLSTREAK_PROBE_MODE: ${killstreakProbeMode}`);
 }
@@ -255,7 +256,7 @@ try {
       await activationProfiler.send('Profiler.setSamplingInterval', { interval: 100 });
       await activationProfiler.send('Profiler.start');
     }
-    const killstreakActivationProbe = await page.evaluate(async ({ activate, probe, mode }) => {
+    const killstreakActivationProbe = await page.evaluate(async ({ activate, probe, mode, secondDelayMs }) => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
       if (!probe) return {
         skipped: true,
@@ -324,8 +325,13 @@ try {
           if (activate) {
             activations = {
               chopper: mode === 'swarm' ? null : api.activateKillstreak('chopper'),
-              droneSwarm: mode === 'chopper' ? null : api.activateKillstreak('drone-swarm'),
+              droneSwarm: mode === 'chopper' || (mode === 'both' && secondDelayMs > 0)
+                ? null
+                : api.activateKillstreak('drone-swarm'),
             };
+            if (mode === 'both' && secondDelayMs > 0) window.setTimeout(() => {
+              activations = { ...activations, droneSwarm: api.activateKillstreak('drone-swarm') };
+            }, secondDelayMs);
           }
           activationCallMs = performance.now() - callStartedAt;
           requestAnimationFrame(sampleFrame);
@@ -336,6 +342,7 @@ try {
       activate: enabledStress.has('killstreak'),
       probe: enabledStress.has('killstreak') || probeBaselineWindow,
       mode: killstreakProbeMode,
+      secondDelayMs: secondActivationDelayMs,
     });
     if (activationProfiler) {
       const { profile } = await activationProfiler.send('Profiler.stop');
@@ -613,6 +620,7 @@ try {
     arenaSequence,
     enabledStress: [...enabledStress],
     killstreakProbeMode,
+    secondActivationDelayMs,
     browserErrors: [...new Set(errors)],
     arenaReceipts,
   };
