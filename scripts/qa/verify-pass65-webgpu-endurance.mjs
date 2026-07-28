@@ -266,6 +266,7 @@ try {
       return new Promise((resolve) => {
         const frameGapsMs = [];
         const frameGapDetails = [];
+        const callbackDelayDetails = [];
         const longTasks = [];
         const longTaskObserver = typeof PerformanceObserver === 'function'
           ? new PerformanceObserver((list) => {
@@ -299,6 +300,12 @@ try {
             largestFrameGaps: [...frameGapDetails]
               .sort((left, right) => right.gapMs - left.gapMs)
               .slice(0, 8),
+            maximumCallbackDelayMs: callbackDelayDetails.length > 0
+              ? Math.max(...callbackDelayDetails.map((entry) => entry.delayMs))
+              : null,
+            largestCallbackDelays: [...callbackDelayDetails]
+              .sort((left, right) => right.delayMs - left.delayMs)
+              .slice(0, 8),
             longTasks,
             frameDelta: after.frameCount - before.frameCount,
             submissionDelta: after.render.runtime.presentation.submissionSequence
@@ -310,9 +317,11 @@ try {
           });
         };
         const sampleFrame = (now) => {
+          const callbackDelayMs = Math.max(0, performance.now() - now);
           const gapMs = now - previousRafAt;
           frameGapsMs.push(gapMs);
           frameGapDetails.push({ gapMs, atMs: now, offsetMs: now - activationStartedAt });
+          callbackDelayDetails.push({ delayMs: callbackDelayMs, atMs: now, offsetMs: now - activationStartedAt });
           previousRafAt = now;
           if (now - activationStartedAt >= 2_000) finish('raf-window');
           else requestAnimationFrame(sampleFrame);
