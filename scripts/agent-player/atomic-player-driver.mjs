@@ -359,7 +359,13 @@ async function visibleHudSnapshot(page) {
 }
 
 async function selectVisibleFieldKit(page, requested, artifactDirectory) {
-  if (requested !== 'smg') return null;
+  if (requested === 'default') return null;
+  const fieldKits = {
+    carbine: { selected: 'Linekeeper', weapon: 'M86 Carbine', artifact: 'field-kit-carbine-selected.png' },
+    smg: { selected: 'Circuit Runner', weapon: 'Vectorline SMG', artifact: 'field-kit-smg-selected.png' },
+  };
+  const fieldKit = fieldKits[requested];
+  if (!fieldKit) throw new Error(`Unsupported visible Field Kit request: ${requested}`);
   const clickVisibleText = async (text) => {
     const candidates = page.getByText(text, { exact: true });
     for (let index = 0; index < await candidates.count(); index += 1) {
@@ -372,24 +378,26 @@ async function selectVisibleFieldKit(page, requested, artifactDirectory) {
     throw new Error(`Visible menu text is unavailable: ${text}`);
   };
   await clickVisibleText('FIELD KIT');
-  await clickVisibleText('Circuit Runner');
+  await clickVisibleText(fieldKit.selected);
   const selected = page.getByText('SELECTED', { exact: true });
   let selectedVisible = false;
   for (let index = 0; index < await selected.count(); index += 1) {
     if (await selected.nth(index).isVisible()) selectedVisible = true;
   }
-  if (!selectedVisible) throw new Error('Visible Circuit Runner selection receipt missing');
-  await page.screenshot({ path: resolve(artifactDirectory, 'field-kit-smg-selected.png') });
+  if (!selectedVisible) throw new Error(`Visible ${fieldKit.selected} selection receipt missing`);
+  await page.screenshot({ path: resolve(artifactDirectory, fieldKit.artifact) });
   await clickVisibleText('DEPLOY');
   const visibleMenuText = await page.locator('#menu').innerText();
-  if (!/ACTIVE FIELD KIT\s+Circuit Runner/i.test(visibleMenuText) || !/Vectorline SMG/i.test(visibleMenuText)) {
-    throw new Error('Visible deploy menu did not confirm Circuit Runner / Vectorline SMG');
+  const normalizedMenuText = visibleMenuText.toUpperCase().replace(/\s+/g, ' ');
+  if (!normalizedMenuText.includes(`ACTIVE FIELD KIT ${fieldKit.selected.toUpperCase()}`)
+    || !normalizedMenuText.includes(fieldKit.weapon.toUpperCase())) {
+    throw new Error(`Visible deploy menu did not confirm ${fieldKit.selected} / ${fieldKit.weapon}`);
   }
   return {
-    requested: 'smg',
-    selected: 'Circuit Runner',
-    weapon: 'Vectorline SMG',
-    visibleText: 'ACTIVE FIELD KIT Circuit Runner · Vectorline SMG',
+    requested,
+    selected: fieldKit.selected,
+    weapon: fieldKit.weapon,
+    visibleText: `ACTIVE FIELD KIT ${fieldKit.selected} · ${fieldKit.weapon}`,
   };
 }
 
@@ -505,8 +513,10 @@ async function run() {
   const alwaysAds = Boolean(args['always-ads']);
   const grenadeAlignmentMaximum = numberArg(args['grenade-alignment'], 0.02, 0.003, 0.02);
   const fieldKitRequest = String(args['field-kit'] ?? 'default');
-  if (!['default', 'smg'].includes(fieldKitRequest)) throw new Error('--field-kit must be default or smg');
-  const requiredWeaponName = fieldKitRequest === 'smg' ? 'VECTORLINE SMG' : null;
+  if (!['default', 'carbine', 'smg'].includes(fieldKitRequest)) throw new Error('--field-kit must be default, carbine or smg');
+  const requiredWeaponName = fieldKitRequest === 'smg'
+    ? 'VECTORLINE SMG'
+    : fieldKitRequest === 'carbine' ? 'M86 CARBINE' : null;
   const allowTacticalItems = Boolean(args['allow-tactical-items']);
   const maximumGrenadeThrows = integerArg(args['max-grenades'], 2, 0, 6);
   const finishWindowMs = integerArg(args['finish-window'], 0, 0, 2500);
