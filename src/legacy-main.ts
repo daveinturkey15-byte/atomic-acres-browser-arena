@@ -17891,10 +17891,6 @@ async function prepareSharedGameplayAssets(): Promise<void> {
     // First-person geometry is composited after world depth is cleared. Contact
     // retreat still keeps it tucked near walls without world geometry cutting
     // holes through hands and weapons.
-    bootstrapStage = 'prewarming-combat-tracers';
-    await tracerPool.prewarm(renderRuntime, camera);
-    bootstrapStage = 'prewarming-combat-impacts';
-    await impactPresentation.prewarm(renderRuntime, camera);
     bootstrapStage = 'prewarming-grenade-explosion';
     await grenadeExplosionPresentation.prewarm(renderRuntime, camera);
     bootstrapStage = 'prewarming-support-explosion';
@@ -17916,6 +17912,10 @@ async function prepareSharedGameplayAssets(): Promise<void> {
 }
 
 async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): Promise<void> {
+  bootstrapStage = 'prewarming-combat-tracers';
+  await tracerPool.prewarm(renderRuntime, camera, sceneGeneration);
+  bootstrapStage = 'prewarming-combat-impacts';
+  await impactPresentation.prewarm(renderRuntime, camera, sceneGeneration);
   bootstrapStage = 'prewarming-grenade-world-presentations';
   await prewarmGrenadeWorldPresentations(sceneGeneration);
   bootstrapStage = 'prewarming-killstreak-presentations';

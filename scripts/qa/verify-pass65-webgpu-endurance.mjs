@@ -37,11 +37,20 @@ const canonicalArenaSequence = [
 ];
 const diagnosticStress = process.env.PASS65_DIAGNOSTIC_STRESS?.trim().toLowerCase() ?? '';
 const diagnosticArena = process.env.PASS65_DIAGNOSTIC_ARENA?.trim() ?? '';
-const diagnosticMode = diagnosticStress.length > 0 || diagnosticArena.length > 0;
+const diagnosticSequence = (process.env.PASS65_DIAGNOSTIC_SEQUENCE ?? '')
+  .split(',')
+  .map((entry) => entry.trim())
+  .filter(Boolean);
+const canonicalArenaIds = new Set(canonicalArenaSequence);
+const invalidDiagnosticArena = diagnosticSequence.find((arenaId) => !canonicalArenaIds.has(arenaId));
+if (invalidDiagnosticArena) throw new Error(`Unknown PASS65_DIAGNOSTIC_SEQUENCE arena: ${invalidDiagnosticArena}`);
+const diagnosticMode = diagnosticStress.length > 0 || diagnosticArena.length > 0 || diagnosticSequence.length > 0;
 const enabledStress = new Set(diagnosticStress && diagnosticStress !== 'all'
   ? diagnosticStress.split(',').map((entry) => entry.trim()).filter(Boolean)
   : ['killstreak', 'grenade', 'smoke', 'weapons']);
-const arenaSequence = diagnosticArena ? [diagnosticArena] : canonicalArenaSequence;
+const arenaSequence = diagnosticSequence.length > 0
+  ? diagnosticSequence
+  : diagnosticArena ? [diagnosticArena] : canonicalArenaSequence;
 const doorResetProbeDetachVisit = arenaSequence.length - 2;
 const doorResetProbeRestoreVisit = arenaSequence.length - 1;
 
@@ -57,10 +66,13 @@ function fatalBrowserErrors(errors) {
 }
 
 async function captureCanvasOnly(page, clip) {
+  const captureIsolationStartedAt = Date.now();
   await page.evaluate(() => {
     document.documentElement.dataset.pass65CanvasOnly = 'true';
     window.__ATOMIC_ACRES_DEBUG__?.setRenderPaused(true);
   });
+  let screenshot;
+  let captureCompletionSequence = -1;
   try {
     // Chrome's compositor capture may occupy the same adapter queue for more
     // than a second at 2560x1440. Drain the last game submission and prevent a
@@ -70,7 +82,31 @@ async function captureCanvasOnly(page, clip) {
       const presentation = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.render?.runtime?.presentation;
       return presentation && presentation.completedSequence >= presentation.submissionSequence;
     }, undefined, { timeout: 12_000 });
-    const screenshot = await page.screenshot({ clip });
+    screenshot = await page.screenshot({ clip });
+    captureCompletionSequence = await page.evaluate(() => (
+      window.__ATOMIC_ACRES_DEBUG__.snapshot().render.runtime.presentation.completedSequence
+    ));
+  } finally {
+    await page.evaluate(() => {
+      delete document.documentElement.dataset.pass65CanvasOnly;
+      window.__ATOMIC_ACRES_DEBUG__?.setRenderPaused(false);
+    });
+  }
+  // page.screenshot() can return while Chrome compositor work remains queued on
+  // the same adapter. Require one subsequently completed gameplay submission,
+  // then pause and drain again before recording the comparison frontier. This
+  // excludes verifier work without relaxing the live interval's frame budget.
+  await page.waitForFunction((priorCompletionSequence) => {
+    const presentation = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.render?.runtime?.presentation;
+    return presentation?.status === 'healthy'
+      && presentation.completedSequence > priorCompletionSequence;
+  }, captureCompletionSequence, { timeout: 12_000 });
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__?.setRenderPaused(true));
+  try {
+    await page.waitForFunction(() => {
+      const presentation = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.render?.runtime?.presentation;
+      return presentation && presentation.completedSequence >= presentation.submissionSequence;
+    }, undefined, { timeout: 12_000 });
     const progress = await page.evaluate(() => {
       const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
       return {
@@ -79,12 +115,9 @@ async function captureCanvasOnly(page, clip) {
         presentation: state.render.runtime.presentation,
       };
     });
-    return { screenshot, progress };
+    return { screenshot, progress, captureIsolationMs: Date.now() - captureIsolationStartedAt };
   } finally {
-    await page.evaluate(() => {
-      delete document.documentElement.dataset.pass65CanvasOnly;
-      window.__ATOMIC_ACRES_DEBUG__?.setRenderPaused(false);
-    });
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__?.setRenderPaused(false));
   }
 }
 
@@ -341,7 +374,7 @@ try {
           })}`);
         }
       }
-      const receipt = { ...sample, screenshotHash };
+      const receipt = { ...sample, screenshotHash, verifierCaptureIsolationMs: capture.captureIsolationMs };
       samples.push(receipt);
       previousScreenshotHash = screenshotHash;
       previousProgress = capture.progress;
@@ -457,7 +490,7 @@ try {
     throw new Error(`Pass 65 endurance source changed during the run: ${JSON.stringify({ sourceRevision, endingRevision, endingStatus })}`);
   }
   const receiptName = diagnosticMode
-    ? `diagnostic-${[diagnosticArena || 'canonical', ...enabledStress].join('-')}.json`
+    ? `diagnostic-${[diagnosticArena || diagnosticSequence.join('_') || 'canonical', ...enabledStress].join('-')}.json`
     : 'exact-sha-receipt.json';
   await writeFile(`${artifactRoot}/${receiptName}`, `${JSON.stringify(output, null, 2)}\n`, 'utf8');
   console.log(JSON.stringify(output, null, 2));
