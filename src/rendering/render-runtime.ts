@@ -31,9 +31,17 @@ export type RenderRuntimeTelemetry = Readonly<{
   slowNodeBuilds?: readonly Readonly<{
     atMs: number;
     durationMs: number;
+    mode: 'async' | 'sync';
     objectName: string;
+    objectUuid: string;
     materialName: string;
+    materialUuid: string;
     geometryType: string;
+    initialCacheKey: number | null;
+    initialNodesCacheKey: number | null;
+    dynamicCacheKey: number | null;
+    contextId: number | null;
+    lightsNodeId: number | null;
   }>[];
   presentation: PresentationFreshnessTelemetry;
 }>;
@@ -450,9 +458,17 @@ export class WebGpuRenderRuntime {
   private readonly slowNodeBuilds: Array<Readonly<{
     atMs: number;
     durationMs: number;
+    mode: 'async' | 'sync';
     objectName: string;
+    objectUuid: string;
     materialName: string;
+    materialUuid: string;
     geometryType: string;
+    initialCacheKey: number | null;
+    initialNodesCacheKey: number | null;
+    dynamicCacheKey: number | null;
+    contextId: number | null;
+    lightsNodeId: number | null;
   }>> = [];
   private nextCompletionProbeAt = 0;
   private static readonly COMPLETION_PROBE_INTERVAL_MS = 250;
@@ -510,6 +526,11 @@ export class WebGpuRenderRuntime {
     type RenderObjectShape = Readonly<{
       object?: THREE.Object3D & { geometry?: { type?: string } };
       material?: THREE.Material;
+      initialCacheKey?: number;
+      initialNodesCacheKey?: number;
+      context?: { id?: number };
+      lightsNode?: { id?: number };
+      getDynamicCacheKey?: () => number;
     }>;
     type NodeManagerShape = {
       getForRender(renderObject: RenderObjectShape, useAsync?: boolean): unknown;
@@ -517,20 +538,36 @@ export class WebGpuRenderRuntime {
     const nodes = (this.renderer as unknown as { _nodes?: NodeManagerShape })._nodes;
     if (!nodes) return;
     const getForRender = nodes.getForRender.bind(nodes);
+    const record = (renderObject: RenderObjectShape, startedAt: number, mode: 'async' | 'sync'): void => {
+      const durationMs = performance.now() - startedAt;
+      if (durationMs < 4) return;
+      this.slowNodeBuilds.push(Object.freeze({
+        atMs: startedAt,
+        durationMs,
+        mode,
+        objectName: renderObject.object?.name || '(unnamed)',
+        objectUuid: renderObject.object?.uuid || '(unknown)',
+        materialName: renderObject.material?.name || renderObject.material?.type || '(unnamed)',
+        materialUuid: renderObject.material?.uuid || '(unknown)',
+        geometryType: renderObject.object?.geometry?.type || '(unknown)',
+        initialCacheKey: Number.isFinite(renderObject.initialCacheKey) ? renderObject.initialCacheKey! : null,
+        initialNodesCacheKey: Number.isFinite(renderObject.initialNodesCacheKey) ? renderObject.initialNodesCacheKey! : null,
+        dynamicCacheKey: renderObject.getDynamicCacheKey ? renderObject.getDynamicCacheKey() : null,
+        contextId: Number.isFinite(renderObject.context?.id) ? renderObject.context!.id! : null,
+        lightsNodeId: Number.isFinite(renderObject.lightsNode?.id) ? renderObject.lightsNode!.id! : null,
+      }));
+      if (this.slowNodeBuilds.length > 256) this.slowNodeBuilds.splice(0, this.slowNodeBuilds.length - 256);
+    };
     nodes.getForRender = (renderObject, useAsync = false) => {
       const startedAt = performance.now();
       const result = getForRender(renderObject, useAsync);
-      const durationMs = performance.now() - startedAt;
-      if (!useAsync && durationMs >= 4) {
-        this.slowNodeBuilds.push(Object.freeze({
-          atMs: startedAt,
-          durationMs,
-          objectName: renderObject.object?.name || '(unnamed)',
-          materialName: renderObject.material?.name || renderObject.material?.type || '(unnamed)',
-          geometryType: renderObject.object?.geometry?.type || '(unknown)',
-        }));
-        if (this.slowNodeBuilds.length > 32) this.slowNodeBuilds.splice(0, this.slowNodeBuilds.length - 32);
+      if (useAsync && result && typeof (result as PromiseLike<unknown>).then === 'function') {
+        return Promise.resolve(result).then((value) => {
+          record(renderObject, startedAt, 'async');
+          return value;
+        });
       }
+      record(renderObject, startedAt, useAsync ? 'async' : 'sync');
       return result;
     };
   }
