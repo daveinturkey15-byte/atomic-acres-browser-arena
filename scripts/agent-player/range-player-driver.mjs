@@ -9,7 +9,7 @@ const sleep = (ms) => new Promise((resolveSleep) => setTimeout(resolveSleep, ms)
 function argsFrom(argv) { const out = {}; for (let i = 0; i < argv.length; i += 1) { const t = argv[i]; if (!t.startsWith('--')) throw new Error(`Unexpected argument ${t}`); out[t.slice(2)] = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : true; } return out; }
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 function parseRangeHud(text = '') { const m = String(text).match(/GUN RANGE\s*·\s*SCORE\s*(\d+)\s*·\s*(\d+)\s*HITS/i); return m ? { score: Number(m[1]), hits: Number(m[2]) } : null; }
-async function trustedLocatorClick(page, locator) { const box = await locator.boundingBox(); if (!box) throw new Error('Visible trusted click target unavailable'); await page.bringToFront(); const cdp = await page.context().newCDPSession(page); const x = box.x + box.width / 2; const y = box.y + box.height / 2; await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 }); await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 }); }
+async function trustedLocatorClick(page, locator) { await locator.scrollIntoViewIfNeeded(); const box = await locator.boundingBox(); if (!box) throw new Error('Visible trusted click target unavailable'); await page.bringToFront(); const cdp = await page.context().newCDPSession(page); const x = box.x + box.width / 2; const y = box.y + box.height / 2; await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 }); await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 }); }
 async function trustedClick(page, selector) { await trustedLocatorClick(page, page.locator(selector)); }
 async function clickVisibleExact(page, text) { const nodes = page.getByText(text, { exact: true }); for (let i = 0; i < await nodes.count(); i += 1) { const node = nodes.nth(i); if (await node.isVisible()) { await node.click(); return; } } throw new Error(`No visible exact text: ${text}`); }
 async function moveAim(page, x, y) { await page.evaluate(({ mx, my }) => window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, movementX: mx, movementY: my })), { mx: x, my: y }); }
@@ -38,7 +38,12 @@ export async function runRange(args) {
     if (!/Gun Range selected\s*·\s*2 MIN\s*·\s*6P FFA\s*·\s*NO BOTS/i.test(selectedText)) throw new Error(`Visible Gun Range receipt missing: ${selectedText}`);
     await page.screenshot({ path: resolve(output, 'range-selected.png') });
     await trustedClick(page, '#solo');
-    await page.waitForFunction(() => document.querySelector('#match-mode-label')?.textContent?.includes('TARGET DRILL'), null, { timeout: 30_000 });
+    await page.waitForFunction(() => {
+      const mode = document.querySelector('#match-mode-label');
+      const menu = document.querySelector('#menu');
+      const visible = (element) => Boolean(element && (element.offsetWidth || element.offsetHeight) && getComputedStyle(element).visibility !== 'hidden');
+      return visible(mode) && mode.textContent?.includes('TARGET DRILL') && !visible(menu);
+    }, null, { timeout: 30_000 });
     await sleep(3500); await page.screenshot({ path: resolve(output, 'range-spawn.png') });
     let current = await hud(page);
     if (!current.pointer && await page.locator('#menu').isVisible().catch(() => false)) {
