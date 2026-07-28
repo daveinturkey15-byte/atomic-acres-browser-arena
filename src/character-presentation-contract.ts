@@ -69,7 +69,7 @@ export function objectLocalGeometryBounds(root: THREE.Object3D): THREE.Box3 | nu
   const bounds = new THREE.Box3().makeEmpty();
   root.traverse((child) => {
     if (!(child instanceof THREE.Mesh) || !child.geometry || !child.visible) return;
-    child.geometry.computeBoundingBox();
+    if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
     if (!child.geometry.boundingBox) return;
     const meshToRoot = inverseRoot.clone().multiply(child.matrixWorld);
     bounds.union(child.geometry.boundingBox.clone().applyMatrix4(meshToRoot));
