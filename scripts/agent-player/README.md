@@ -7,10 +7,10 @@ This directory contains Jigglyclaw's low-latency Atomic Acres player-side tools.
 - Drives the ordinary deploy/lobby controls with Playwright.
 - Forces `performance` rendering and records the observed live pass.
 - Supports `solo`, `host`, and `join` flows, private-room chat, Ready, and host-start.
-- Uses a downsampled rendered-canvas Coral **candidate** detector with active-match/banner gating, HUD exclusion, temporal confirmation and screen-lock rejection; colour alone never proves an operator.
-- Automatic combat fire is opt-in with `--allow-combat-fire` and remains disabled until calibration produces a visibly confirmed operator and an official credited bot hit.
+- Uses a downsampled rendered-canvas purple-operator proposal detector with active-match/banner gating, exact HUD exclusions, temporal confirmation, source-sequenced post-input capture, identity association and two-frame body-bounded alignment. Colour alone still never proves an operator.
+- Automatic combat fire is opt-in with `--allow-combat-fire`; the calibrated Stable policy emits one shot per fresh authorization, then reacquires from rendered frames before another shot.
 - Uses latest-frame CDP screencast on GPU Chrome, with on-demand capture as a measured fallback.
-- Debounces reloads, bounds confirmed bursts, reacts to visible damage and uses visible-frame stuck recovery.
+- Debounces reloads and supports an opt-in deterministic `state-machine-v1` tactical layer for latched roam, engage, retreat and visible-frame stuck-recovery episodes.
 - Sends bounded keyboard/mouse-equivalent events and releases every held input on exit/failure.
 - Uses `__ATOMIC_ACRES_DEBUG__.snapshot()` only after actions for aggregate verification and benchmark evidence. Hidden bot positions and direct QA aim/damage/teleport hooks are forbidden as gameplay inputs.
 - Refuses non-local solo/host runs unless `--allow-live` is explicit, preventing accidental global-leaderboard pollution.
@@ -84,6 +84,19 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File \
 ```
 
 Do not push or open a game-source PR for player-harness work unless Dave explicitly asks.
+
+## Tactical state machine
+
+Pass `--tactical-policy state-machine-v1` to wrap the retained causal engagement controller in four deterministic modes with one input owner:
+
+- `roam`: use the visible player-up minimap for relative approach, sprint only at declared distance, and strafe rather than rush a very close unseen threat;
+- `engage`: stop translation while confirming and aiming, with only a bounded post-shot lateral step;
+- `retreat`: latch one escape direction for the whole damage episode instead of flipping on every hit;
+- `recover`: perform one bounded back/strafe/turn manoeuvre after repeated low world motion, then enforce a cooldown.
+
+The policy accepts explicit thresholds such as `--retreat-health`, `--retreat-damage`, `--retreat-duration`, `--recovery-duration`, `--recovery-cooldown`, `--close-threat-distance`, `--sprint-threat-distance`, and `--post-shot-strafe`. Freeze them in `experiment-policy.json` before every counted run. Telemetry records mode transitions, reasons, damage-window amount, mode-frame totals and the exact configuration.
+
+The first three-round Stable campaign showed that retreat time is not cover: increasing retreat sensitivity/duration can suppress engagements while the player backpedals through open sightlines. A tactical refinement must therefore prove official kills/K/D, not merely more retreat frames or fewer stuck recoveries. Large contact variance across an unchanged policy also means a one-round candidate is not a promoted default.
 
 ## Permanent game archive
 
