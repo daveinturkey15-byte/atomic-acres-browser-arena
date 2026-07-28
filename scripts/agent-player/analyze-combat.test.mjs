@@ -24,6 +24,7 @@ test('combat benchmark separates bots, practice targets, survival and control me
       { at: '00:05.0', from: 'Jigglyclaw', to: '1-point range target', damage: 1, distanceMeters: 5, hitZone: 'body' },
       { at: '00:12.0', from: 'Jigglyclaw', to: 'Bot', damage: 30, distanceMeters: 8, hitZone: 'torso' },
       { at: '00:13.0', from: 'Bot', to: 'Jigglyclaw', damage: 20, targetHealthAfter: 80, distanceMeters: 9 },
+      { at: '00:14.0', from: 'Jigglyclaw', to: 'Jigglyclaw', source: 'environment', damage: 4, targetHealthAfter: 76 },
       { at: '00:20.0', from: 'Jigglyclaw', to: 'Bot', damage: 70, distanceMeters: 12, hitZone: 'head' },
       { at: '00:25.0', from: 'Bot', to: 'Jigglyclaw', damage: 80, targetHealthAfter: 0, distanceMeters: 8 },
       { at: '00:50.0', from: 'Bot', to: 'Jigglyclaw', damage: 100, health: '100 -> 0 HP', distanceMeters: 10 },
@@ -50,7 +51,7 @@ test('combat benchmark separates bots, practice targets, survival and control me
   assert.equal(result.result.shotsPerKill, 10);
   assert.equal(result.contacts.creditedBotDamageEvents, 2);
   assert.equal(result.contacts.nonBotDamageEvents, 1);
-  assert.equal(result.contacts.incomingDamageEvents, 3);
+  assert.equal(result.contacts.incomingDamageEvents, 4);
   assert.equal(result.contacts.outgoingContactWindows, 2);
   assert.equal(result.contacts.medianOutgoingDistanceMeters, 10);
   assert.deepEqual(result.contacts.hitZones, { torso: 1, head: 1 });

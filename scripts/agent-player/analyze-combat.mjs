@@ -87,7 +87,9 @@ function completedLives(incoming, durationSeconds) {
 export function analyseCombat(summary, driverReport, callsign = 'Jigglyclaw') {
   const stats = summary?.stats ?? {};
   const events = Array.isArray(summary?.damageTimeline) ? summary.damageTimeline : [];
-  const outgoing = events.filter((event) => event.from === callsign);
+  // Self-attributed environmental/fall damage is incoming survival evidence,
+  // not a shot at a non-bot target.
+  const outgoing = events.filter((event) => event.from === callsign && event.to !== callsign);
   const incoming = events.filter((event) => event.to === callsign);
   const participants = Array.isArray(summary?.participants) ? summary.participants : [];
   const player = participants.find((participant) => participant.name === callsign) ?? null;

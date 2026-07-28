@@ -234,7 +234,7 @@ export function findPurpleOperatorCandidates(raw, width, height, channels = 3, o
     // Orange panel highlights can pass the per-pixel green-lead rules after
     // JPEG blending, but remain red-balanced as a full component.
     if (meanBlueRedLead < Number(options.minimumMeanBlueRedLead ?? 5)
-      || blueLeadRatio < Number(options.minimumBlueLeadRatio ?? 0.65)) continue;
+      || blueLeadRatio < Number(options.minimumBlueLeadRatio ?? 0.60)) continue;
     if (aspect < 0.15 || aspect > 1.5) continue;
     const x = sumX / pixels;
     const y = sumY / pixels;
