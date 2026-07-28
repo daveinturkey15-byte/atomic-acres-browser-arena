@@ -123,7 +123,13 @@ export function loadGunRangeRackPresentation(
   options: GunRangeRackLoadOptions,
 ): Promise<GunRangeRackPresentationReceipt> {
   const ready = readyByRoot.get(arenaRoot);
-  if (ready) return Promise.resolve(ready);
+  if (ready) {
+    // Arena stream telemetry starts a new request epoch on every adoption.
+    // Re-emit the immutable dependency receipt when the resident rack is
+    // reused so cached re-entry remains as attributable as its first load.
+    for (const url of ready.requestedResources) options.recordRequest(url);
+    return Promise.resolve(ready);
+  }
   const pending = pendingByRoot.get(arenaRoot);
   if (pending) return pending;
 

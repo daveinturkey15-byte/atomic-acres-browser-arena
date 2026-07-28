@@ -135,6 +135,14 @@ describe('Gun Range authored rack presentation', () => {
     expect(map.root.userData.gunRangeRackPresentation).toMatchObject({
       status: 'ready', required: 5, ready: 5, source: 'project-original-blender-world-lod0',
     });
+    const cachedRequests: string[] = [];
+    const cachedReceipt = await loadGunRangeRackPresentation(map.root, {
+      recordRequest: (url) => cachedRequests.push(url), runtime,
+    });
+    expect(cachedReceipt).toBe(receipt);
+    expect(cachedRequests).toEqual(GUN_RANGE_RACK_ASSETS.map((asset) => asset.url));
+    expect(load).toHaveBeenCalledTimes(5);
+    expect(create).toHaveBeenCalledTimes(5);
     expect(rackModels(map.root)).toHaveLength(5);
     for (const asset of GUN_RANGE_RACK_ASSETS) {
       const station = map.root.getObjectByName(`gun-range-weapon-station-${asset.weapon}`)!;

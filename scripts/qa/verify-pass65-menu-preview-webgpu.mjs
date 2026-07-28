@@ -7,9 +7,9 @@ import { createServer } from 'vite';
 const port = Number(process.env.QA_PREVIEW_PORT ?? '44165');
 const allowDirty = process.env.PASS65_MENU_PREVIEW_ALLOW_DIRTY === '1';
 const sourceRevision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-const startingStatus = execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { encoding: 'utf8' }).trim();
+const startingStatus = execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { encoding: 'utf8' }).trim();
 if (!allowDirty && startingStatus.length > 0) {
-  throw new Error('Pass 65 menu-preview WebGPU QA requires a clean tracked worktree for exact-SHA evidence');
+  throw new Error('Pass 65 menu-preview WebGPU QA requires a completely clean worktree for exact-SHA evidence');
 }
 const chromeCandidates = [
   process.env.PASS64_CHROME_PATH,
@@ -263,7 +263,7 @@ try {
   if (errors.length > 0) throw new Error(`browser/GPU errors: ${[...new Set(errors)].join(' | ')}`);
 
   const endingRevision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-  const endingStatus = execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { encoding: 'utf8' }).trim();
+  const endingStatus = execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { encoding: 'utf8' }).trim();
   if (!allowDirty && (endingRevision !== sourceRevision || endingStatus !== startingStatus)) {
     throw new Error('source changed during exact Gun Range authored-rack WebGPU capture');
   }
