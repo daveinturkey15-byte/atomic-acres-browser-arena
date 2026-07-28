@@ -569,9 +569,28 @@ type PresentedEntity = Readonly<{
   root: THREE.Group;
   rotor: THREE.Object3D | null;
   target: THREE.Vector3;
+  attitudeTarget: THREE.Quaternion;
+  attitudeEuler: THREE.Euler;
   mixers: readonly THREE.AnimationMixer[];
   authored: boolean;
 }>;
+
+function presentedEntity(
+  root: THREE.Group,
+  rotor: THREE.Object3D | null,
+  mixers: readonly THREE.AnimationMixer[],
+  authored: boolean,
+): PresentedEntity {
+  return Object.freeze({
+    root,
+    rotor,
+    target: new THREE.Vector3(),
+    attitudeTarget: new THREE.Quaternion(),
+    attitudeEuler: new THREE.Euler(0, 0, 0, 'YXZ'),
+    mixers: Object.freeze([...mixers]),
+    authored,
+  });
+}
 
 type SwarmInstanceBatch = Readonly<{
   root: THREE.InstancedMesh;
@@ -972,7 +991,7 @@ function buildAuthoredSupportVehicle(family: SupportVehicleAssetFamily): Present
     }
   }
   markSharedPresentationAsset(root);
-  return Object.freeze({ root, rotor: null, target: new THREE.Vector3(), mixers: Object.freeze(mixers), authored: true });
+  return presentedEntity(root, null, mixers, true);
 }
 
 function buildProceduralChopperFallback(): PresentedEntity {
@@ -1086,7 +1105,7 @@ function buildProceduralChopperFallback(): PresentedEntity {
   root.userData.weaponFeedback = [...SUPPORT_WEAPON_FEEDBACK_CONTRACT];
   root.userData.presentationSource = 'procedural-non-release-fallback';
   root.scale.setScalar(0.82);
-  return Object.freeze({ root, rotor, target: new THREE.Vector3(), mixers: Object.freeze([]), authored: false });
+  return presentedEntity(root, rotor, [], false);
 }
 
 function buildProceduralAircraftFallback(variant: SupportAircraftVariant = 'care'): PresentedEntity {
@@ -1113,7 +1132,7 @@ function buildProceduralAircraftFallback(variant: SupportAircraftVariant = 'care
   root.add(fuselage, nose, wing, tailWing, tailFin, cargoLight, cargoSocket, forwardSocket);
   root.userData.forwardAxis = [0, 0, -1];
   root.scale.setScalar(0.9);
-  return Object.freeze({ root, rotor: null, target: new THREE.Vector3(), mixers: Object.freeze([]), authored: false });
+  return presentedEntity(root, null, [], false);
 }
 
 function buildDrone(mode: 'piloted' | 'swarm' | null): PresentedEntity {
@@ -1134,7 +1153,7 @@ function buildDrone(mode: 'piloted' | 'swarm' | null): PresentedEntity {
       const clip = hunterDroneAnimations.find((candidate) => candidate.name === clipName);
       if (clip) mixer.clipAction(clip).play();
     }
-    return Object.freeze({ root, rotor: null, target: new THREE.Vector3(), mixers: Object.freeze([mixer]), authored: true });
+    return presentedEntity(root, null, [mixer], true);
   }
   const root = new THREE.Group();
   root.name = mode === 'piloted' ? 'pass65-piloted-drone' : 'pass65-swarm-drone';
@@ -1173,7 +1192,7 @@ function buildDrone(mode: 'piloted' | 'swarm' | null): PresentedEntity {
   }
   root.add(body, eye, gun, muzzleSocket, cameraSocket, rotor);
   root.userData.presentationSource = 'procedural-non-release-fallback';
-  return Object.freeze({ root, rotor, target: new THREE.Vector3(), mixers: Object.freeze([]), authored: false });
+  return presentedEntity(root, rotor, [], false);
 }
 
 function buildProceduralCareCrateFallback(): PresentedEntity {
@@ -1192,7 +1211,7 @@ function buildProceduralCareCrateFallback(): PresentedEntity {
   canopy.position.y = 2.4;
   canopy.scale.y = 0.45;
   root.add(crate, straps, canopy);
-  return Object.freeze({ root, rotor: canopy, target: new THREE.Vector3(), mixers: Object.freeze([]), authored: false });
+  return presentedEntity(root, canopy, [], false);
 }
 
 function createPresentedEntity(entity: KillstreakEntitySnapshot): PresentedEntity {
@@ -1996,6 +2015,9 @@ export class KillstreakPresentation {
     presented.root.name = `prewarmed-${key}`;
     presented.root.visible = false;
     presented.target.set(0, 0, 0);
+    presented.attitudeTarget.identity();
+    presented.attitudeEuler.set(0, 0, 0, 'YXZ');
+    delete presented.root.userData.supportSnapshotPhase;
   }
 
   private applyFirstPersonVisibility(): void {
@@ -2047,15 +2069,28 @@ export class KillstreakPresentation {
     for (let index = 0; index < admittedCount; index += 1) {
       const entity = snapshot.entities[index]!;
       let presented = this.entities.get(entity.id);
+      const firstProjection = presented === undefined;
       if (!presented) {
         presented = this.acquirePresentedEntity(entity);
         this.entities.set(entity.id, presented);
         if (presented.root.parent !== this.root) this.root.add(presented.root);
-        presented.root.position.fromArray(entity.position);
       }
       presented.target.fromArray(entity.position);
-      presented.root.position.lerp(presented.target, 0.38);
-      presented.root.rotation.set(entity.attitude[0], entity.attitude[1], entity.attitude[2], 'YXZ');
+      presented.attitudeEuler.set(entity.attitude[0], entity.attitude[1], entity.attitude[2], 'YXZ');
+      presented.attitudeTarget.setFromEuler(presented.attitudeEuler);
+      const phaseReset = !firstProjection && presented.root.userData.supportSnapshotPhase !== entity.phase;
+      const teleported = !firstProjection && presented.root.position.distanceToSquared(presented.target) > 64;
+      if (firstProjection || phaseReset || teleported) {
+        presented.root.position.copy(presented.target);
+        // Preserve the canonical authored YXZ components on deterministic
+        // snaps; assigning the equivalent quaternion can re-express the Euler
+        // triplet near a gimbal boundary even though orientation is unchanged.
+        presented.root.rotation.copy(presented.attitudeEuler);
+      } else {
+        presented.root.position.lerp(presented.target, 0.38);
+        presented.root.quaternion.slerp(presented.attitudeTarget, 0.38);
+      }
+      presented.root.userData.supportSnapshotPhase = entity.phase;
       for (const mixer of presented.mixers) mixer.setTime(nowMs / 1_000);
       if (!presented.authored) {
         if (presented.rotor) presented.rotor.rotation.y += entity.kind === 'chopper' ? 0.72 : 1.1;

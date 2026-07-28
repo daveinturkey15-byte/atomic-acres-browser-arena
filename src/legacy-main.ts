@@ -2582,6 +2582,8 @@ let killstreakControlSequence = 0;
 let localCareCaptureState = createCareCaptureClientState();
 let killstreakSnapshot: KillstreakRecipientSnapshot = killstreakRuntime.snapshotFor(null, 0);
 let lastKillstreakStateBroadcastAt = Number.NEGATIVE_INFINITY;
+const LOCAL_KILLSTREAK_SNAPSHOT_REFRESH_INTERVAL_MS = 50;
+let lastLocalKillstreakSnapshotRefreshAt = Number.NEGATIVE_INFINITY;
 const SUPPORT_ROTOR_AUDIO_REFRESH_INTERVAL_MS = 50;
 const SUPPORT_STATUS_HUD_REFRESH_INTERVAL_MS = 100;
 let lastSupportRotorAudioRefreshAt = Number.NEGATIVE_INFINITY;
@@ -8095,6 +8097,7 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   appliedKillstreakDamageResults.clear();
   killstreakRegisteredActors.clear();
   killstreakPresentation.clear();
+  lastLocalKillstreakSnapshotRefreshAt = Number.NEGATIVE_INFINITY;
   lastSupportRotorAudioRefreshAt = Number.NEGATIVE_INFINITY;
   lastSupportStatusHudRefreshAt = Number.NEGATIVE_INFINITY;
   supportDamageFeedbackTelemetry.reset();
@@ -11792,8 +11795,14 @@ function killstreakWorldState(): KillstreakWorld {
   };
 }
 
-function refreshLocalKillstreakSnapshot(now = performance.now()): void {
-  if (network.role !== 'client') killstreakSnapshot = killstreakRuntime.snapshotFor(player.id, now);
+function refreshLocalKillstreakSnapshot(now = performance.now(), force = true): boolean {
+  if (network.role !== 'client') {
+    const clockRegressed = now < lastLocalKillstreakSnapshotRefreshAt;
+    if (!force && !clockRegressed
+      && now - lastLocalKillstreakSnapshotRefreshAt < LOCAL_KILLSTREAK_SNAPSHOT_REFRESH_INTERVAL_MS) return false;
+    killstreakSnapshot = killstreakRuntime.snapshotFor(player.id, now);
+    lastLocalKillstreakSnapshotRefreshAt = now;
+  }
   const activeCareCrateId = careCaptureCrateId(localCareCaptureState);
   if (activeCareCrateId) {
     const heldCrate = killstreakSnapshot.entities.find((entity) => (
@@ -11825,6 +11834,7 @@ function refreshLocalKillstreakSnapshot(now = performance.now()): void {
     hudChanged = true;
   }
   if (hudChanged) updateFieldSupportHud();
+  return true;
 }
 
 function broadcastKillstreakState(now = performance.now()): void {
@@ -11936,6 +11946,7 @@ function requestKillstreakActivation(
   // Avoiding that redundant allocation removes an idle major-GC/compositor
   // risk on the owner hardware. The next frame refreshes before presentation
   // and before the earliest support fire gate.
+  lastLocalKillstreakSnapshotRefreshAt = Number.NEGATIVE_INFINITY;
   broadcastKillstreakState(now);
   return activationRequestId;
 }
@@ -12213,7 +12224,8 @@ function updatePass65KillstreakRuntime(now: number): void {
       }
     }
     killstreakPresentation.presentImpacts(result.impactEvents, now);
-    refreshLocalKillstreakSnapshot(now);
+    refreshLocalKillstreakSnapshot(now,
+      result.damageEvents.length > 0 || result.impactEvents.length > 0 || result.expiredEntityIds.length > 0);
     if (network.role === 'host' && (applied.length > 0 || result.impactEvents.length > 0)) {
       const message: KillstreakDamageResultMessage = {
         type: 'killstreak-damage-result', by: player.id, matchEpoch: killstreakMatchEpoch,
@@ -13493,6 +13505,7 @@ function clearGrenades(): void {
 function clearFieldSupport(): void {
   localCareCaptureState = createCareCaptureClientState();
   lastKillstreakControlSentAt = Number.NEGATIVE_INFINITY;
+  lastLocalKillstreakSnapshotRefreshAt = Number.NEGATIVE_INFINITY;
   lastSupportRotorAudioRefreshAt = Number.NEGATIVE_INFINITY;
   lastSupportStatusHudRefreshAt = Number.NEGATIVE_INFINITY;
   killstreakPresentation.setFirstPersonEntity(null);

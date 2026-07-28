@@ -524,6 +524,52 @@ describe('killstreak presentation', () => {
     expect(scene.getObjectByName('pass65-killstreak-presentations')).toBeUndefined();
   });
 
+  it('smoothly interpolates attitude between sparse snapshots and snaps deterministic resets', () => {
+    const presentation = new KillstreakPresentation(new THREE.Scene());
+    const initial = snapshot(1);
+    presentation.sync(initial, 1_000);
+    const chopper = presentation.entityRoot('ks-1-chopper-1')!;
+    const initialQuaternion = chopper.quaternion.clone();
+    const changedAttitude = [0.18, -0.7, 0.12] as const;
+    const changed = {
+      ...initial,
+      revision: 2,
+      entities: initial.entities.map((entity) => ({ ...entity, attitude: changedAttitude, revision: 2 })),
+    };
+    const targetQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(...changedAttitude, 'YXZ'));
+
+    presentation.sync(changed, 1_016);
+    const firstAngle = chopper.quaternion.angleTo(targetQuaternion);
+    expect(chopper.quaternion.angleTo(initialQuaternion)).toBeGreaterThan(0);
+    expect(firstAngle).toBeGreaterThan(0);
+    presentation.sync(changed, 1_032);
+    expect(chopper.quaternion.angleTo(targetQuaternion)).toBeLessThan(firstAngle);
+
+    const phaseReset = {
+      ...changed,
+      revision: 3,
+      entities: changed.entities.map((entity) => ({ ...entity, phase: 'outbound' as const, revision: 3 })),
+    };
+    presentation.sync(phaseReset, 1_048);
+    expect(chopper.quaternion.angleTo(targetQuaternion)).toBeLessThan(1e-8);
+
+    const teleportedAttitude = [-0.1, 0.35, -0.08] as const;
+    const teleportedQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(...teleportedAttitude, 'YXZ'));
+    presentation.sync({
+      ...phaseReset,
+      revision: 4,
+      entities: phaseReset.entities.map((entity) => ({
+        ...entity,
+        position: [24, 8, -20] as const,
+        attitude: teleportedAttitude,
+        revision: 4,
+      })),
+    }, 1_064);
+    expect(chopper.position.toArray()).toEqual([24, 8, -20]);
+    expect(chopper.quaternion.angleTo(teleportedQuaternion)).toBeLessThan(1e-8);
+    presentation.dispose();
+  });
+
   it('applies a retained first-person entity ID when that entity arrives later', () => {
     const presentation = new KillstreakPresentation(new THREE.Scene());
     presentation.setFirstPersonEntity('ks-1-chopper-1');

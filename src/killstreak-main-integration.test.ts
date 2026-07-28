@@ -27,6 +27,29 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain('killstreakPresentation.presentImpacts(message.impacts, presentedAt)');
   });
 
+  it('keeps host authority per-frame while bounding only the immutable local presentation snapshot', () => {
+    expect(source).toContain('const LOCAL_KILLSTREAK_SNAPSHOT_REFRESH_INTERVAL_MS = 50;');
+    const updateStart = source.indexOf('function updatePass65KillstreakRuntime(');
+    const updateEnd = source.indexOf('\nfunction overdriveStateMessage(', updateStart);
+    const updateBlock = source.slice(updateStart, updateEnd);
+    expect(updateBlock).toContain('killstreakRuntime.advance(now, killstreakWorldState())');
+    expect(updateBlock).toContain('refreshLocalKillstreakSnapshot(now,');
+    expect(updateBlock).toContain('result.damageEvents.length > 0 || result.impactEvents.length > 0 || result.expiredEntityIds.length > 0');
+    expect(updateBlock.indexOf('killstreakRuntime.advance(now, killstreakWorldState())'))
+      .toBeLessThan(updateBlock.indexOf('refreshLocalKillstreakSnapshot(now,'));
+
+    const refreshStart = source.indexOf('function refreshLocalKillstreakSnapshot(');
+    const refreshEnd = source.indexOf('\nfunction broadcastKillstreakState(', refreshStart);
+    const refreshBlock = source.slice(refreshStart, refreshEnd);
+    expect(refreshBlock).toContain('if (!force && !clockRegressed');
+    expect(refreshBlock).toContain('killstreakRuntime.snapshotFor(player.id, now)');
+    expect(source).toContain('lastLocalKillstreakSnapshotRefreshAt = Number.NEGATIVE_INFINITY;\n  broadcastKillstreakState(now);');
+
+    const controlStart = source.indexOf('function requestKillstreakControl(');
+    const controlEnd = source.indexOf('\nfunction interactWithSelectedKillstreakSupport(', controlStart);
+    expect(source.slice(controlStart, controlEnd)).toContain('refreshLocalKillstreakSnapshot(now);');
+  });
+
   it('restores support possession immediately, then retains or removes the actor with the bounded rejoin reservation', () => {
     expect(source).toContain('killstreakRegisteredActors.has(message.by)');
     expect(source).toContain('shouldRetainRemoteCombatAuthority(');
