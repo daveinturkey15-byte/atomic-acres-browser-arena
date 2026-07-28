@@ -338,7 +338,7 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('supportInbound', "'yardhawk'", 1, ['support.inbound']),
   runtimeCallsite('supportInbound', 'message.source', 1, ['support.inbound']),
   runtimeCallsite('syncChopperRotors', '[]', 2, ['support.chopper-rotor']),
-  runtimeCallsite('syncChopperRotors', "killstreakSnapshot.entities .filter((entity) => entity.kind === 'chopper' && entity.expiresInMs > 0) .map((entity) => ({ id: entity.id, position: { x: entity.position[0], y: entity.position[1], z: entity.position[2] }, phase: entity.phase === 'inbound' || entity.phase === 'outbound' ? entity.phase : 'orbiting', }))", 1, ['support.chopper-rotor']),
+  runtimeCallsite('syncChopperRotors', 'activeSupportRotorAudioSources', 1, ['support.chopper-rotor']),
   runtimeCallsite('weaponAction', 'player.weapon,event', 1, ['weapon.reload-mechanic']),
   runtimeCallsite('weaponSwitch', '', 4, ['weapon.switch', 'interaction.weapon-pickup']),
   runtimeCallsite('worldFootstep', 'footstep.position,footstep.surface,footstep.movement,isFootstepOccluded(footstep.position)', 3, ['movement.footstep.world']),

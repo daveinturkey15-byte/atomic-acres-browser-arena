@@ -2582,10 +2582,15 @@ let killstreakControlSequence = 0;
 let localCareCaptureState = createCareCaptureClientState();
 let killstreakSnapshot: KillstreakRecipientSnapshot = killstreakRuntime.snapshotFor(null, 0);
 let lastKillstreakStateBroadcastAt = Number.NEGATIVE_INFINITY;
+const SUPPORT_ROTOR_AUDIO_REFRESH_INTERVAL_MS = 50;
+const SUPPORT_STATUS_HUD_REFRESH_INTERVAL_MS = 100;
+let lastSupportRotorAudioRefreshAt = Number.NEGATIVE_INFINITY;
+let lastSupportStatusHudRefreshAt = Number.NEGATIVE_INFINITY;
 const appliedKillstreakDamageResults = new Set<string>();
 const killstreakRegisteredActors = new Set<string>();
 let displayedCareReward: Pass65KillstreakId | null = null;
 const supportDamageDealtByActivation = new Map<string, number>();
+const liveSupportActivationIds = new Set<string>();
 const supportDamageFeedbackTelemetry = new SupportDamageFeedbackTelemetry();
 let adrenalineHudWasActive = false;
 let lastMatchCountdownCue: MatchCountdownCue | null = null;
@@ -8090,6 +8095,8 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   appliedKillstreakDamageResults.clear();
   killstreakRegisteredActors.clear();
   killstreakPresentation.clear();
+  lastSupportRotorAudioRefreshAt = Number.NEGATIVE_INFINITY;
+  lastSupportStatusHudRefreshAt = Number.NEGATIVE_INFINITY;
   supportDamageFeedbackTelemetry.reset();
   player.name = requiredName;
   player.team = Number(element<HTMLSelectElement>('#team').value) === 1 ? 1 : 0;
@@ -11482,7 +11489,7 @@ function updateFieldSupportHud(): void {
     const state = item.querySelector<HTMLElement>('.support-state');
     if (state) state.textContent = ready ? 'READY' : 'LOCKED';
   });
-  updateSupportStatusHud();
+  refreshSupportStatusHud(performance.now(), true);
 }
 
 function localKillstreakActorSnapshot(): KillstreakRecipientSnapshot['actors'][number] | null {
@@ -11498,23 +11505,28 @@ function localFieldSupportProjection() {
 
 function preferredOwnedSupportEntity(): KillstreakRecipientSnapshot['entities'][number] | undefined {
   const possession = localKillstreakActorSnapshot()?.possession;
-  const owned = killstreakSnapshot.entities.filter((entity) => (
-    (entity.kind === 'chopper' || entity.kind === 'drone')
-    && entity.ownerId === player.id
-    && entity.expiresInMs > 0
-  ));
-  if (possession) return owned.find((entity) => entity.id === possession.entityId);
-  return owned
-    .filter((entity) => entity.kind === 'chopper' || entity.mode === 'piloted')
-    .sort((left, right) => Math.hypot(
-      left.position[0] - player.position.x,
-      left.position[1] - player.position.y,
-      left.position[2] - player.position.z,
-    ) - Math.hypot(
-      right.position[0] - player.position.x,
-      right.position[1] - player.position.y,
-      right.position[2] - player.position.z,
-    ))[0] ?? owned[0];
+  let firstOwned: KillstreakRecipientSnapshot['entities'][number] | undefined;
+  let nearestControllable: KillstreakRecipientSnapshot['entities'][number] | undefined;
+  let nearestDistanceSquared = Number.POSITIVE_INFINITY;
+  for (const entity of killstreakSnapshot.entities) {
+    if ((entity.kind !== 'chopper' && entity.kind !== 'drone')
+      || entity.ownerId !== player.id || entity.expiresInMs <= 0) continue;
+    firstOwned ??= entity;
+    if (possession) {
+      if (entity.id === possession.entityId) return entity;
+      continue;
+    }
+    if (entity.kind !== 'chopper' && entity.mode !== 'piloted') continue;
+    const dx = entity.position[0] - player.position.x;
+    const dy = entity.position[1] - player.position.y;
+    const dz = entity.position[2] - player.position.z;
+    const distanceSquared = dx * dx + dy * dy + dz * dz;
+    if (distanceSquared >= nearestDistanceSquared) continue;
+    nearestDistanceSquared = distanceSquared;
+    nearestControllable = entity;
+  }
+  if (possession) return undefined;
+  return nearestControllable ?? firstOwned;
 }
 
 function updateSupportStatusHud(): void {
@@ -11535,11 +11547,14 @@ function updateSupportStatusHud(): void {
   feedback.hidden = !ownedSupport;
   feedback.dataset.supportKind = ownedSupport?.kind ?? 'none';
   feedback.dataset.possessed = String(Boolean(possession && ownedSupport?.id === possession.entityId));
-  const liveSupportActivations = new Set(killstreakSnapshot.entities
-    .filter((entity) => (entity.kind === 'chopper' || entity.kind === 'drone') && entity.ownerId === player.id && entity.expiresInMs > 0)
-    .map((entity) => entity.activationId));
+  liveSupportActivationIds.clear();
+  for (const entity of killstreakSnapshot.entities) {
+    if ((entity.kind === 'chopper' || entity.kind === 'drone') && entity.ownerId === player.id && entity.expiresInMs > 0) {
+      liveSupportActivationIds.add(entity.activationId);
+    }
+  }
   for (const activationId of supportDamageDealtByActivation.keys()) {
-    if (!liveSupportActivations.has(activationId)) supportDamageDealtByActivation.delete(activationId);
+    if (!liveSupportActivationIds.has(activationId)) supportDamageDealtByActivation.delete(activationId);
   }
   if (ownedSupport) {
     const platformName = ownedSupport.kind === 'chopper'
@@ -11559,6 +11574,12 @@ function updateSupportStatusHud(): void {
   element<HTMLElement>('#chopper-damage-dealt').textContent = String(Math.round(
     ownedSupport ? supportDamageDealtByActivation.get(ownedSupport.activationId) ?? 0 : 0,
   ));
+}
+
+function refreshSupportStatusHud(now: number, force = false): void {
+  if (!force && now - lastSupportStatusHudRefreshAt < SUPPORT_STATUS_HUD_REFRESH_INTERVAL_MS) return;
+  lastSupportStatusHudRefreshAt = now;
+  updateSupportStatusHud();
 }
 
 function selectedFInteraction(now = performance.now()): InteractionCandidate | null {
@@ -12095,6 +12116,35 @@ function applyKillstreakDamageEvent(event: KillstreakDamageEvent): KillstreakDam
 }
 
 let lastKillstreakControlSentAt = Number.NEGATIVE_INFINITY;
+type SupportRotorAudioSource = {
+  id: string;
+  position: { x: number; y: number; z: number };
+  phase: 'inbound' | 'orbiting' | 'outbound';
+};
+const supportRotorAudioSourcePool: SupportRotorAudioSource[] = Array.from({ length: 4 }, () => ({
+  id: '',
+  position: { x: 0, y: 0, z: 0 },
+  phase: 'orbiting',
+}));
+const activeSupportRotorAudioSources: SupportRotorAudioSource[] = [];
+
+function syncActiveSupportRotorAudio(now: number): void {
+  if (now - lastSupportRotorAudioRefreshAt < SUPPORT_ROTOR_AUDIO_REFRESH_INTERVAL_MS) return;
+  lastSupportRotorAudioRefreshAt = now;
+  activeSupportRotorAudioSources.length = 0;
+  for (const entity of killstreakSnapshot.entities) {
+    if (entity.kind !== 'chopper' || entity.expiresInMs <= 0) continue;
+    const source = supportRotorAudioSourcePool[activeSupportRotorAudioSources.length];
+    source.id = entity.id;
+    source.position.x = entity.position[0];
+    source.position.y = entity.position[1];
+    source.position.z = entity.position[2];
+    source.phase = entity.phase === 'inbound' || entity.phase === 'outbound' ? entity.phase : 'orbiting';
+    activeSupportRotorAudioSources.push(source);
+    if (activeSupportRotorAudioSources.length >= supportRotorAudioSourcePool.length) break;
+  }
+  audio.syncChopperRotors(activeSupportRotorAudioSources);
+}
 
 function updateKillstreakPossession(now: number): void {
   const possession = localKillstreakActorSnapshot()?.possession;
@@ -12174,14 +12224,8 @@ function updatePass65KillstreakRuntime(now: number): void {
     if (network.role === 'host' && now - lastKillstreakStateBroadcastAt >= 100) broadcastKillstreakState(now);
   }
   killstreakPresentation.sync(killstreakSnapshot, now);
-  audio.syncChopperRotors(killstreakSnapshot.entities
-    .filter((entity) => entity.kind === 'chopper' && entity.expiresInMs > 0)
-    .map((entity) => ({
-      id: entity.id,
-      position: { x: entity.position[0], y: entity.position[1], z: entity.position[2] },
-      phase: entity.phase === 'inbound' || entity.phase === 'outbound' ? entity.phase : 'orbiting',
-    })));
-  updateSupportStatusHud();
+  syncActiveSupportRotorAudio(now);
+  refreshSupportStatusHud(now);
   const possession = localKillstreakActorSnapshot()?.possession;
   document.documentElement.dataset.killstreakPossession = possession?.kind ?? 'none';
   weaponView.root.visible = shouldShowWeaponViewmodel();
@@ -13449,6 +13493,8 @@ function clearGrenades(): void {
 function clearFieldSupport(): void {
   localCareCaptureState = createCareCaptureClientState();
   lastKillstreakControlSentAt = Number.NEGATIVE_INFINITY;
+  lastSupportRotorAudioRefreshAt = Number.NEGATIVE_INFINITY;
+  lastSupportStatusHudRefreshAt = Number.NEGATIVE_INFINITY;
   killstreakPresentation.setFirstPersonEntity(null);
   killstreakPresentation.clear();
   document.documentElement.dataset.killstreakPossession = 'none';

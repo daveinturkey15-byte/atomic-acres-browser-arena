@@ -159,6 +159,7 @@ export class ArenaAudio {
   private minigunDrivePhase: MinigunSpoolPhase = 'idle';
   private minigunDriveLastUpdateAt = Number.NEGATIVE_INFINITY;
   private readonly chopperRotorLoops = new Map<string, ChopperRotorLoop>();
+  private readonly liveChopperRotorIds = new Set<string>();
   private chopperRotorStarts = 0;
   private chopperRotorStops = 0;
   private supportCuePlays = 0;
@@ -728,16 +729,23 @@ export class ArenaAudio {
     position: SpatialPoint;
     phase: 'inbound' | 'orbiting' | 'outbound';
   }>[]): void {
-    const admitted = sources
-      .filter((entry) => entry.id.length > 0 && Number.isFinite(entry.position.x)
-        && Number.isFinite(entry.position.y) && Number.isFinite(entry.position.z))
-      .slice(0, 4);
-    const liveIds = new Set(admitted.map((entry) => entry.id));
+    this.liveChopperRotorIds.clear();
+    let admittedCount = 0;
+    for (const entry of sources) {
+      if (entry.id.length === 0 || !Number.isFinite(entry.position.x)
+        || !Number.isFinite(entry.position.y) || !Number.isFinite(entry.position.z)) continue;
+      this.liveChopperRotorIds.add(entry.id);
+      admittedCount += 1;
+      if (admittedCount >= 4) break;
+    }
     for (const id of this.chopperRotorLoops.keys()) {
-      if (!liveIds.has(id)) this.stopChopperRotor(id);
+      if (!this.liveChopperRotorIds.has(id)) this.stopChopperRotor(id);
     }
     if (!this.context || !this.ambience) return;
-    for (const entry of admitted) {
+    admittedCount = 0;
+    for (const entry of sources) {
+      if (entry.id.length === 0 || !Number.isFinite(entry.position.x)
+        || !Number.isFinite(entry.position.y) || !Number.isFinite(entry.position.z)) continue;
       let loop = this.chopperRotorLoops.get(entry.id);
       const listenerDistance = Math.hypot(
         entry.position.x - this.listenerPosition.x,
@@ -789,6 +797,8 @@ export class ArenaAudio {
       loop.gain.gain.value = entry.phase === 'inbound' ? 0.009 : entry.phase === 'outbound' ? 0.007 : 0.011;
       const voice = this.activeVoices.get(loop.source);
       if (voice) voice.distance = listenerDistance;
+      admittedCount += 1;
+      if (admittedCount >= 4) break;
     }
   }
 
