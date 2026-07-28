@@ -213,6 +213,8 @@ export function analyseCombat(summary, driverReport, callsign = 'Jigglyclaw') {
       grenadeThrows: optionalNumeric(driverReport?.input?.grenadeThrows),
       supportActivations: optionalNumeric(driverReport?.input?.supportActivations),
       weaponMismatches: optionalNumeric(driverReport?.input?.weaponMismatches),
+      finishWindows: optionalNumeric(driverReport?.input?.finishWindows),
+      finishHoldFrames: optionalNumeric(driverReport?.input?.finishHoldFrames),
       observedWeaponName: driverReport?.input?.observedWeaponName ?? null,
       stuckRecoveries: optionalNumeric(driverReport?.input?.stuckRecoveries),
       damageReactions: optionalNumeric(driverReport?.input?.damageReactions),

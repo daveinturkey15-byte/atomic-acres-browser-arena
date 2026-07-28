@@ -508,6 +508,7 @@ async function run() {
   const requiredWeaponName = fieldKitRequest === 'smg' ? 'VECTORLINE SMG' : null;
   const allowTacticalItems = Boolean(args['allow-tactical-items']);
   const maximumGrenadeThrows = integerArg(args['max-grenades'], 2, 0, 6);
+  const finishWindowMs = integerArg(args['finish-window'], 0, 0, 2500);
   const allowCombatFire = Boolean(args['allow-combat-fire']);
   const allowLive = Boolean(args['allow-live']);
   const tacticalPolicyName = String(args['tactical-policy'] ?? 'legacy');
@@ -559,6 +560,8 @@ async function run() {
   let grenadeThrows = 0;
   let supportActivations = 0;
   let weaponMismatches = 0;
+  let finishWindows = 0;
+  let finishHoldFrames = 0;
   let stuckRecoveries = 0;
   let damageReactions = 0;
   let candidateImagesSaved = 0;
@@ -742,6 +745,8 @@ async function run() {
       let currentTarget = null;
       let previousSignature = visionStream.state.latest.signature;
       let previousDamageTaken = null;
+      let previousDamageDealt = null;
+      let finishWindowUntil = Number.NEGATIVE_INFINITY;
       let lowMotionFrames = 0;
       let previousMovementForward = false;
       let previousMovementMoved = false;
@@ -816,6 +821,14 @@ async function run() {
 
         const observedDamageTaken = Number(hud?.damageTaken ?? previousDamageTaken ?? 0);
         const damageDelta = previousDamageTaken === null ? 0 : Math.max(0, observedDamageTaken - previousDamageTaken);
+        const damageDealtFresh = hud?.damageDealt !== null && hud?.damageDealt !== undefined
+          && Number.isFinite(Number(hud.damageDealt));
+        const observedDamageDealt = damageDealtFresh ? Number(hud.damageDealt) : null;
+        const visibleDamageDealtDelta = activeMatch && previousDamageDealt !== null && observedDamageDealt !== null
+          ? Math.max(0, observedDamageDealt - previousDamageDealt)
+          : 0;
+        if (activeMatch && observedDamageDealt !== null) previousDamageDealt = observedDamageDealt;
+        else if (!activeMatch) previousDamageDealt = null;
         if (damageDelta > 0) {
           damageReactionUntil = now + 1_100;
           reactionDirection *= -1;
@@ -851,6 +864,23 @@ async function run() {
         const minimapThreat = vision.minimapThreats[0] ?? null;
         if (activeMatch && minimapThreat) minimapThreatFrames += 1;
         currentTarget = tracking.confirmedTarget;
+        if (!activeMatch || !currentTarget) finishWindowUntil = Number.NEGATIVE_INFINITY;
+        if (finishWindowMs > 0 && activeMatch && currentTarget && visibleDamageDealtDelta > 0
+          && now - lastBurstAt <= 1_200) {
+          finishWindowUntil = now + finishWindowMs;
+          finishWindows += 1;
+          actions.push({
+            atMs,
+            kind: 'visible-damage-finish-window',
+            damageDelta: visibleDamageDealtDelta,
+            durationMs: finishWindowMs,
+            trackAge: tracking.trackAge,
+            stableFrames: tracking.stableFrames,
+            target: currentTarget,
+          });
+        }
+        const holdEngagement = activeMatch && Boolean(currentTarget) && now < finishWindowUntil;
+        if (holdEngagement) finishHoldFrames += 1;
         let cameraMovedThisFrame = false;
         if (activeMatch && rawTarget) operatorCandidateFrames += 1;
         if (tracking.reason === 'static-geometry-rejected') staticGeometryRejects += 1;
@@ -865,6 +895,7 @@ async function run() {
           stuck: !rawTarget && lowMotionFrames >= 3,
           currentTarget: Boolean(currentTarget),
           rawTarget: Boolean(rawTarget),
+          holdEngagement,
           minimapThreat,
           lastShotAt: lastBurstAt,
           movementCycle,
@@ -1347,6 +1378,7 @@ async function run() {
         firePulseMs,
         maximumGrenadeThrows,
         grenadeAlignmentMaximum,
+        finishWindowMs,
         decisionInputs: args['lifecycle-only']
           ? ['ordinary lobby controls and post-action lifecycle receipt']
           : ['rendered canvas pixels', 'visible HUD state through ordinary controls'],
@@ -1421,6 +1453,8 @@ async function run() {
         grenadeThrows,
         supportActivations,
         weaponMismatches,
+        finishWindows,
+        finishHoldFrames,
         observedWeaponName,
         stuckRecoveries,
         damageReactions,

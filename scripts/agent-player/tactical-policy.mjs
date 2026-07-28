@@ -118,7 +118,9 @@ export function createTacticalPolicy(options = {}) {
             if (changed?.reason === 'low-world-motion') turn = state.direction * 92;
           }
         } else if (nextMode === 'engage') {
-          if (observation.currentTarget && now - Number(observation.lastShotAt ?? Number.NEGATIVE_INFINITY) < config.postShotStrafeMs) {
+          if (observation.currentTarget
+            && !observation.holdEngagement
+            && now - Number(observation.lastShotAt ?? Number.NEGATIVE_INFINITY) < config.postShotStrafeMs) {
             keys.push(state.direction > 0 ? 'KeyA' : 'KeyD');
           }
         } else {

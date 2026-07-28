@@ -39,6 +39,22 @@ test('engagement stops translation except for a bounded post-shot strafe', () =>
   assert.equal(postShot.keys.length, 1);
 });
 
+test('visible damage finish window suppresses post-shot displacement without weakening engagement authority', () => {
+  const policy = createTacticalPolicy({ postShotStrafeMs: 650 });
+  const result = policy.update({
+    now: 1200,
+    active: true,
+    health: 100,
+    currentTarget: true,
+    holdEngagement: true,
+    lastShotAt: 1100,
+    movementCycle: 1,
+  });
+  assert.equal(result.mode, 'engage');
+  assert.equal(result.allowEngagement, true);
+  assert.deepEqual(result.keys, []);
+});
+
 test('close minimap threats produce lateral exposure control instead of rushing', () => {
   const policy = createTacticalPolicy({ closeThreatDistance: 18 });
   const result = policy.update({
