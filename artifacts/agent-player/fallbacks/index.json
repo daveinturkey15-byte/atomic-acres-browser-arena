@@ -1,0 +1,283 @@
+{
+  "schemaVersion": 1,
+  "kind": "atomic-player-fallback-registry",
+  "createdAt": "2026-07-28",
+  "claimState": {
+    "requestedApproximateKd": 0.6,
+    "exactArchivedKdFound": false,
+    "closestAndBestArchivedKd": 0.5,
+    "closestGameId": "G0031",
+    "note": "No immutable archive records 0.60 K/D. G0031 is the K/D champion; G0041 is the six-kill anchor and may be the remembered run."
+  },
+  "selected": {
+    "overallKdFallback": "overall-kd-champion",
+    "maximumKillsReference": "maximum-kills-anchor",
+    "vectorlineFallback": "vectorline-smg-champion"
+  },
+  "modelInterpretation": {
+    "affectsLiveAim": false,
+    "explanation": "The model receipt describes orchestration. Live perception, aiming and input are deterministic rendered-pixel code. Reasoning or service-tier changes affect offline analysis, not per-frame trajectory.",
+    "historicalCommonReceipt": {
+      "profile": "atomicplayer",
+      "provider": "openai-codex",
+      "model": "gpt-5.6-sol",
+      "reasoningEffort": "low",
+      "serviceTier": "normal",
+      "fastMode": false
+    }
+  },
+  "fallbacks": [
+    {
+      "fallbackId": "overall-kd-champion",
+      "gameId": "G0031",
+      "role": "Historical all-time K/D and accuracy anchor",
+      "observedWeapon": "carbine",
+      "result": {
+        "kills": 4,
+        "deaths": 8,
+        "killDeathRatio": 0.5,
+        "shotsFired": 26,
+        "shotsHit": 16,
+        "accuracyPercent": 61.5,
+        "damageDealt": 494,
+        "damageTaken": 1017,
+        "headshots": 7,
+        "bestKillstreak": 3
+      },
+      "source": {
+        "build": "PASS 63",
+        "driverCommit": "d642c40f9011745147f073542735008fb8b738ee",
+        "archiveDirectory": "artifacts/agent-player/archive/games/G0031",
+        "sourceFingerprint": "7f39f46410376a3bf1e0e12c71520613fb08802fcebda2b524bb76df8f33b650",
+        "policyId": "atomic-player-pass63-tactical-campaign-round1-balanced-v1",
+        "policyConfigurationFingerprint": "3154058048c87ef9be2008c8644e68028d1fbdad7875fec53d695a2ebc3e6c30"
+      },
+      "frozenConfiguration": {
+        "playerHarnessCommit": "d642c40f9011745147f073542735008fb8b738ee",
+        "profile": "atomicplayer",
+        "provider": "openai-codex",
+        "model": "gpt-5.6-sol",
+        "reasoningEffort": "low",
+        "serviceTier": "normal",
+        "localTools": [
+          "visible-pixel CDP screencast",
+          "purple-operator detector",
+          "causal identity-associated aim",
+          "visible player-up minimap",
+          "tactical state machine",
+          "bounded input driver"
+        ],
+        "realtimeProfile": "tri-lane",
+        "tacticalPolicy": "state-machine-v1",
+        "automaticCombatFire": true,
+        "burstShots": 1,
+        "retreatHealth": 45,
+        "retreatDamage": 18,
+        "retreatDurationMs": 1600,
+        "recoveryDurationMs": 1100,
+        "recoveryCooldownMs": 3600,
+        "closeThreatDistance": 18,
+        "sprintThreatDistance": 30,
+        "postShotStrafeMs": 650,
+        "deployedChannel": "stable",
+        "deployedPass": "PASS 63",
+        "viewport": "960x540",
+        "captureMode": "screencast"
+      },
+      "derivedPinnedCommitDefaults": {
+        "firePulseMs": 72,
+        "fireCooldownMs": 420,
+        "fireAlignmentMaximum": 0.02,
+        "adsAlignmentThreshold": 0.012,
+        "operatorProfile": "pre-profile semantic purple detector at pinned commit",
+        "liveDecisionEngine": "deterministic rendered-pixel controller; no per-frame LLM"
+      },
+      "immutableEvidence": {
+        "combat-benchmark.json": {
+          "sha256": "e656240c62c075214299c9beeaed861454f0959afe4c8f7a364d940cf9d29e70",
+          "bytes": 4706
+        },
+        "experiment-policy.json": {
+          "sha256": "992a389df4bb8bac88802f8d4e72462b836eafb0b8c1f6a8aada6f58cd4b1369",
+          "bytes": 2800
+        },
+        "match-summary.json": {
+          "sha256": "f0acac2459c5491bbdf7a1cb839ca74759d49ea09111e58ad5c517739e88c5a2",
+          "bytes": 62375
+        },
+        "report.json": {
+          "sha256": "fd2d493b9a15351395f20a14f926e445dd1aa9a39ccf3b3f98f2f02c82b722b1",
+          "bytes": 157900
+        }
+      },
+      "restoreRule": "Treat this entry as immutable evidence. Start any experiment from a copied policy, change exactly one declared variable, and never rewrite the archived game or this frozen configuration in place."
+    },
+    {
+      "fallbackId": "maximum-kills-anchor",
+      "gameId": "G0041",
+      "role": "Post-hardening G0031-fingerprint run with the most kills",
+      "observedWeapon": "carbine",
+      "result": {
+        "kills": 6,
+        "deaths": 13,
+        "killDeathRatio": 0.46,
+        "shotsFired": 46,
+        "shotsHit": 19,
+        "accuracyPercent": 41.3,
+        "damageDealt": 647,
+        "damageTaken": 1497,
+        "headshots": 13,
+        "bestKillstreak": 3
+      },
+      "source": {
+        "build": "PASS 63",
+        "driverCommit": "20308c27c82b42e158150bf785f591d8240d39d0",
+        "archiveDirectory": "artifacts/agent-player/archive/games/G0041",
+        "sourceFingerprint": "6fe1298f7d80aeee437d09d645f49c727eb5c152eae3a6928d2769f2721a8aff",
+        "policyId": "atomic-player-pass63-g0031-base-campaign-run1",
+        "policyConfigurationFingerprint": "c6450dcd3233884bda92948e1861b965d0bac55dec7121e74b1b6ccde7a22ab7"
+      },
+      "frozenConfiguration": {
+        "playerHarnessCommit": "20308c27c82b42e158150bf785f591d8240d39d0",
+        "profile": "atomicplayer",
+        "provider": "openai-codex",
+        "model": "gpt-5.6-sol",
+        "reasoningEffort": "low",
+        "serviceTier": "normal",
+        "localTools": [
+          "visible-pixel CDP screencast",
+          "purple-operator detector",
+          "causal identity-associated aim",
+          "visible player-up minimap",
+          "tactical state machine",
+          "bounded input driver"
+        ],
+        "tacticalFingerprint": "G0031 balanced-v1",
+        "operatorProfile": "g0031-balanced-v1",
+        "automaticCombatFire": true,
+        "burstShots": 1,
+        "retreatHealth": 45,
+        "retreatDamage": 18,
+        "retreatDurationMs": 1600,
+        "recoveryDurationMs": 1100,
+        "recoveryCooldownMs": 3600,
+        "closeThreatDistance": 18,
+        "sprintThreatDistance": 30,
+        "postShotStrafeMs": 650,
+        "routeSweepTurn": 0,
+        "threatAwareRetreat": false,
+        "deployedChannel": "stable",
+        "deployedPass": "PASS 63",
+        "viewport": "960x540",
+        "captureMode": "screencast"
+      },
+      "derivedPinnedCommitDefaults": {
+        "firePulseMs": 72,
+        "fireCooldownMs": 420,
+        "fireAlignmentMaximum": 0.02,
+        "operatorProfile": "g0031-balanced-v1",
+        "liveDecisionEngine": "deterministic rendered-pixel controller; no per-frame LLM"
+      },
+      "immutableEvidence": {
+        "combat-benchmark.json": {
+          "sha256": "7b1e93f22fd1c73abb5ac41cb481c8f1db95fa39b79d755c08327b263258f33c",
+          "bytes": 4822
+        },
+        "experiment-policy.json": {
+          "sha256": "396c4fe80b8ecd04297c7e91ed720b314ead5e25adf96f6189f3a57de4145c18",
+          "bytes": 2204
+        },
+        "match-summary.json": {
+          "sha256": "ad951a3054c7896e0a86d0ebbf3f2190c5f9f8166dbffd15a6cc54f67e8fb5c1",
+          "bytes": 59798
+        },
+        "report.json": {
+          "sha256": "d4a6f78399a5abd65090c69ada94e973282014d92679e285c8b82a51d254bd7a",
+          "bytes": 171682
+        }
+      },
+      "restoreRule": "Treat this entry as immutable evidence. Start any experiment from a copied policy, change exactly one declared variable, and never rewrite the archived game or this frozen configuration in place."
+    },
+    {
+      "fallbackId": "vectorline-smg-champion",
+      "gameId": "G0059",
+      "role": "Best verified Vectorline SMG K/D and survival anchor",
+      "observedWeapon": "VECTORLINE SMG",
+      "result": {
+        "kills": 2,
+        "deaths": 5,
+        "killDeathRatio": 0.4,
+        "shotsFired": 18,
+        "shotsHit": 10,
+        "accuracyPercent": 55.6,
+        "damageDealt": 200,
+        "damageTaken": 947,
+        "headshots": 3,
+        "bestKillstreak": 2
+      },
+      "source": {
+        "build": "PASS 63",
+        "driverCommit": "5894c099ff798688c9bf24893e90c6601126a6fd",
+        "archiveDirectory": "artifacts/agent-player/archive/games/G0059",
+        "sourceFingerprint": "155b32947b3d080483c13c467fc1d32227e3c5b34b9625c49e8c580e6c42e2a0",
+        "policyId": "atomic-player-pass63-smg-short-automatic-spray-retry",
+        "policyConfigurationFingerprint": "29f7afb4c88956fe5c575c148676a04da2a084596bfdd2d1890ba53d9804c560"
+      },
+      "frozenConfiguration": {
+        "profile": "atomicplayer",
+        "provider": "openai-codex",
+        "model": "gpt-5.6-sol",
+        "reasoningEffort": "low",
+        "serviceTier": "normal",
+        "playerHarnessCommit": "5894c099ff798688c9bf24893e90c6601126a6fd",
+        "deployedChannel": "stable",
+        "deployedPass": "PASS 63",
+        "fieldKit": "Circuit Runner",
+        "requiredWeapon": "VECTORLINE SMG",
+        "operatorProfile": "g0031-balanced-v1",
+        "automaticCombatFire": true,
+        "tacticalItems": false,
+        "maximumGrenades": 0,
+        "finishWindowMs": 0,
+        "burstShots": 1,
+        "firePulseMs": 72,
+        "fireCooldownMs": 300,
+        "fireAlignmentMaximum": 0.008,
+        "postShotStrafeMs": 650,
+        "retreatHealth": 45,
+        "retreatDamage": 18,
+        "retreatDurationMs": 1600,
+        "recoveryDurationMs": 1100,
+        "recoveryCooldownMs": 3600,
+        "closeThreatDistance": 18,
+        "sprintThreatDistance": 30,
+        "routeSweepTurn": 0,
+        "threatAwareRetreat": true,
+        "viewport": "960x540",
+        "captureMode": "screencast"
+      },
+      "derivedPinnedCommitDefaults": {
+        "liveDecisionEngine": "deterministic rendered-pixel controller; no per-frame LLM"
+      },
+      "immutableEvidence": {
+        "combat-benchmark.json": {
+          "sha256": "02908b6e4db634b121ab99e98ecabd8b145509de4128ab3b76c576cff9b3fe1d",
+          "bytes": 4975
+        },
+        "experiment-policy.json": {
+          "sha256": "29e6624f6c8560723d40daeb888a679d3967e30c139146aecc160932028a9c54",
+          "bytes": 3163
+        },
+        "match-summary.json": {
+          "sha256": "4f0246bb338d1dc7ac6c21cbb97cfd46d2dac1a3242bfd40598d493dbef51941",
+          "bytes": 36277
+        },
+        "report.json": {
+          "sha256": "9692ce40a6943c8367b78c2a951c4d8eae11e5bb7d956cee848b668507a0f177",
+          "bytes": 126174
+        }
+      },
+      "restoreRule": "Treat this entry as immutable evidence. Start any experiment from a copied policy, change exactly one declared variable, and never rewrite the archived game or this frozen configuration in place."
+    }
+  ]
+}
