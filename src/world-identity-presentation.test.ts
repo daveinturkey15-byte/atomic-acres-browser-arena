@@ -28,7 +28,7 @@ describe('Pass 29 practical and interior presentation', () => {
     expect(scene.getObjectByName('pass27-world-identity-presentation')).toBe(presentation.root);
     const lights = presentation.root.children.filter((node): node is THREE.PointLight => node instanceof THREE.PointLight);
     expect(lights).toHaveLength(11);
-    expect(lights.every((light) => light.castShadow === false && light.intensity === 0 && light.decay === 2 && light.distance > 0)).toBe(true);
+    expect(lights.every((light) => light.visible === false && light.castShadow === false && light.intensity === 0 && light.decay === 2 && light.distance > 0)).toBe(true);
     expect(auditLocalLightOcclusion(presentation.root)).toMatchObject({
       activeLocalLights: 0,
       emissiveOnlySources: 13,
