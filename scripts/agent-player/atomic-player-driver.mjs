@@ -446,6 +446,7 @@ async function run() {
   if (!['screencast', 'on-demand'].includes(requestedCaptureMode)) throw new Error('--capture-mode must be screencast or on-demand');
   const candidateImageLimit = integerArg(args['candidate-images'], 12, 0, 40);
   const burstShots = integerArg(args['burst-shots'], 3, 1, 5);
+  const maximumShotPulses = integerArg(args['max-shot-pulses'], 1_000_000, 1, 1_000_000);
   const fireCooldownMs = integerArg(args['fire-cooldown'], 420, 180, 2000);
   const allowCombatFire = Boolean(args['allow-combat-fire']);
   const allowLive = Boolean(args['allow-live']);
@@ -882,9 +883,9 @@ async function run() {
             await writeFile(resolve(artifactDirectory, 'first-two-frame-aligned-annotated.jpg'), await annotatedVisionJpeg(aimedVision, alignedTracking));
             firstTwoFrameAlignedCaptured = true;
           }
-          if (allowCombatFire && tracking.fireAuthorized && postInputReacquired && twoFrameAligned && activeMatch && alignment < 0.02
+          if (allowCombatFire && shotPulses < maximumShotPulses && tracking.fireAuthorized && postInputReacquired && twoFrameAligned && activeMatch && alignment < 0.02
             && !currentlyReloading && now - lastBurstAt >= fireCooldownMs) {
-            const shots = Math.max(1, Math.min(burstShots, Number(hud?.ammo ?? burstShots)));
+            const shots = Math.max(1, Math.min(burstShots, maximumShotPulses - shotPulses, Number(hud?.ammo ?? burstShots)));
             if (!firstFireCaptured) {
               const fireTracking = { rawTarget: aimedTarget, confirmedTarget: aimedTarget };
               await writeFile(resolve(artifactDirectory, 'first-fire-aligned.jpg'), aimedVision.jpeg);
@@ -1109,8 +1110,9 @@ async function run() {
       },
       fairness: {
         perception: args['lifecycle-only'] ? 'none-lifecycle-only' : 'rendered-pixels-purple-operator-geometry-v1-scan-stop-two-frame-confirmation-visible-player-up-minimap-and-hud',
-        policyVersion: 'atomic-player-policy-v4-tri-lane',
+        policyVersion: 'atomic-player-policy-v5-causal-associated-tri-lane',
         automaticCombatFireEnabled: allowCombatFire,
+        maximumShotPulses,
         decisionInputs: args['lifecycle-only']
           ? ['ordinary lobby controls and post-action lifecycle receipt']
           : ['rendered canvas pixels', 'visible HUD state through ordinary controls'],
