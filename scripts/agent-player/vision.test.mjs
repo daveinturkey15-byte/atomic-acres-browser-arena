@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createOperatorTargetTracker,
+  createPurpleTargetTracker,
   createTemporalTargetTracker,
   findCoralTargets,
   findMinimapThreats,
@@ -159,6 +160,18 @@ test('temporal confirmation accepts a plausible world track after camera motion'
   const confirmed = tracker.update(target(54), { width: 100, height: 60, active: true, cameraMoved: true });
   assert.equal(confirmed.reason, 'temporally-confirmed');
   assert.equal(confirmed.confirmedTarget.x, 54);
+});
+
+test('purple semantic tracker confirms only after a second plausible rendered frame', () => {
+  const tracker = createPurpleTargetTracker({ confirmationFrames: 2 });
+  const target = (x, pixels = 30) => [{ x, y: 40, pixels, score: 0.1 }];
+  const first = tracker.update(target(60), { width: 100, height: 60, active: true });
+  assert.equal(first.fireAuthorized, false);
+  const second = tracker.update(target(57, 42), { width: 100, height: 60, active: true });
+  assert.equal(second.fireAuthorized, true);
+  assert.equal(second.reason, 'purple-operator-confirmed');
+  const reset = tracker.update([], { width: 100, height: 60, active: true });
+  assert.equal(reset.fireAuthorized, false);
 });
 
 test('operator tracker rejects static geometry after a scan-stop observation', () => {

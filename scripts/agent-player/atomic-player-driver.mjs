@@ -7,7 +7,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  createOperatorTargetTracker,
+  createPurpleTargetTracker,
   findCoralTargets,
   findMinimapThreats,
   findPurpleOperatorCandidates,
@@ -603,13 +603,7 @@ async function run() {
       startScreenshotCaptured = true;
       controlStartedAtMs = Date.now();
       const deadline = controlStartedAtMs + durationSeconds * 1000;
-      const targetTracker = createOperatorTargetTracker({
-        confirmationFrames: 3,
-        settlingFrames: 1,
-        requiredEvidenceFrames: 1,
-        maximumObservationFrames: 3,
-        maxSizeRatio: 8,
-      });
+      const targetTracker = createPurpleTargetTracker({ confirmationFrames: 2, maxSizeRatio: 8 });
       let movementCycle = 0;
       let currentTarget = null;
       let previousSignature = visionStream.state.latest.signature;

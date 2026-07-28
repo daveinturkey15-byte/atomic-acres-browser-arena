@@ -512,6 +512,62 @@ export function createTemporalTargetTracker(options = {}) {
   };
 }
 
+export function createPurpleTargetTracker(options = {}) {
+  const confirmationFrames = Math.max(2, Math.floor(options.confirmationFrames ?? 2));
+  const maximumTrackDistanceRatio = Number(options.maximumTrackDistanceRatio ?? 0.12);
+  const maximumSizeRatio = Math.max(1.5, Number(options.maxSizeRatio ?? 8));
+  let previous = null;
+  let age = 0;
+
+  const reset = () => {
+    previous = null;
+    age = 0;
+  };
+
+  return {
+    reset,
+    update(candidates, { width, height, active } = {}) {
+      if (!active || !Array.isArray(candidates) || candidates.length === 0) {
+        reset();
+        return {
+          rawTarget: candidates?.[0] ?? null,
+          confirmedTarget: null,
+          reason: active ? 'no-purple-operator' : 'inactive-match',
+          age: 0,
+          stableFrames: 0,
+          evidenceFrames: 0,
+          fireAuthorized: false,
+        };
+      }
+      const diagonal = Math.hypot(width, height);
+      let candidate = candidates[0];
+      if (previous) {
+        candidate = [...candidates].sort((left, right) => {
+          const leftDistance = Math.hypot(left.x - previous.x, left.y - previous.y) / diagonal;
+          const rightDistance = Math.hypot(right.x - previous.x, right.y - previous.y) / diagonal;
+          return leftDistance - rightDistance || left.score - right.score;
+        })[0];
+        const distanceRatio = Math.hypot(candidate.x - previous.x, candidate.y - previous.y) / diagonal;
+        const sizeRatio = candidate.pixels / Math.max(1, previous.pixels);
+        if (distanceRatio > maximumTrackDistanceRatio || sizeRatio < 1 / maximumSizeRatio || sizeRatio > maximumSizeRatio) reset();
+      }
+      age = previous ? age + 1 : 1;
+      previous = candidate;
+      const confirmed = age >= confirmationFrames;
+      return {
+        rawTarget: candidate,
+        confirmedTarget: confirmed ? candidate : null,
+        reason: confirmed ? 'purple-operator-confirmed' : 'observing-purple-operator',
+        age,
+        stableFrames: Math.max(0, age - 1),
+        evidenceFrames: Math.max(0, age - 1),
+        fireAuthorized: confirmed,
+      };
+    },
+    snapshot: () => ({ previous, age }),
+  };
+}
+
 export function createOperatorTargetTracker(options = {}) {
   const confirmationFrames = Math.max(3, Math.floor(options.confirmationFrames ?? 3));
   const minimumStableFrames = Math.max(2, Math.floor(options.minimumStableFrames ?? 2));
