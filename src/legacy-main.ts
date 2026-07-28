@@ -10,7 +10,7 @@ import { ArenaVisualStreamController, loadArenaVisualModule, type ArenaVisualSwi
 import { ArenaRenderWatchdog, auditArenaRenderLiveness } from './rendering/arena-render-watchdog';
 import { auditRuntimeTslTraversal, assertRuntimeTslTraversal, createPass64TslSceneSystems, type Pass64TslSceneSystems } from './rendering/pass64-tsl-scene';
 import type { ArenaVisualBudgets, ArenaVisualDefinition } from './rendering/arena-visual-definition';
-import { auditLocalLightOcclusion, makeEmissiveOnly } from './rendering/light-occlusion';
+import { auditLocalLightOcclusion } from './rendering/light-occlusion';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem } from './water-system';
 import { PASS65_HITL_IDENTITY } from './release-identity';
@@ -2157,11 +2157,11 @@ const quadBeacon = new THREE.Mesh(
 );
 quadBeacon.name = 'quad-damage-beacon';
 quadBeacon.position.y = 0.55;
-const quadGlow = new THREE.PointLight(0x8e78ff, 2.4, 8, 2);
-quadGlow.name = 'quad-damage-local-glow';
-quadGlow.position.y = 0.55;
-makeEmissiveOnly(quadGlow);
-overdriveRoot.add(overdriveCore, ...overdriveRings, overdrivePedestal, quadWorldIcon, quadBeacon, quadGlow);
+// The core, rings and beacon own the visible emissive glow. Do not attach a
+// zero-intensity Light as metadata: WebGPU still includes that object in the
+// structural lighting key and would compile a second pipeline for every arena
+// material when the pickup root becomes visible during match admission.
+overdriveRoot.add(overdriveCore, ...overdriveRings, overdrivePedestal, quadWorldIcon, quadBeacon);
 overdriveRoot.traverse((node) => { node.userData.presentationOnly = true; node.userData.blocksShots = false; node.raycast = () => undefined; });
 scene.add(overdriveRoot);
 let overdrivePresentationPrewarmed = false;

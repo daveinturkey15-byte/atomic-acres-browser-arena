@@ -49,6 +49,8 @@ describe('presentation prewarm startup contract', () => {
     expect(matchDeployment).toContain('overdriveRoot.visible = true;');
     expect(matchDeployment).toContain('overdriveRoot.visible = selectedArena.overdrive;');
     expect(source).toContain('overdriveRoot.visible = gameStarted || matchStartPreparing;');
+    expect(source).not.toContain("quadGlow = new THREE.PointLight");
+    expect(source).toContain('overdriveRoot.add(overdriveCore, ...overdriveRings, overdrivePedestal, quadWorldIcon, quadBeacon);');
     expect(source).not.toContain("overdriveRoot.visible = gameStarted && matchState.phase === 'active';");
     expect(source).not.toContain('const renderer = renderRuntime.renderer as unknown as THREE.WebGLRenderer');
     expect(source).toContain("bootstrapStage = 'prewarming-grenade-explosion'");
