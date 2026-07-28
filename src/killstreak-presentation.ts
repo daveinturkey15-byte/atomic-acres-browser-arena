@@ -568,7 +568,7 @@ function animatedSwarmAncestor(
 }
 
 function swarmStaticMergeKey(mesh: THREE.Mesh): string | null {
-  if (Array.isArray(mesh.material)) return null;
+  if (Array.isArray(mesh.material) || mesh instanceof THREE.SkinnedMesh) return null;
   const attributes = Object.keys(mesh.geometry.attributes).sort().join(',');
   const morphAttributes = Object.keys(mesh.geometry.morphAttributes).sort().join(',');
   return [
@@ -582,6 +582,95 @@ function swarmStaticMergeKey(mesh: THREE.Mesh): string | null {
     String(mesh.renderOrder),
     String(mesh.layers.mask),
   ].join('|');
+}
+
+function supportAnimationTargetNames(animations: readonly THREE.AnimationClip[]): ReadonlySet<string> {
+  const names = new Set<string>();
+  for (const clip of animations) {
+    for (const track of clip.tracks) {
+      const target = THREE.PropertyBinding.parseTrackName(track.name).nodeName;
+      if (target) names.add(target);
+    }
+  }
+  return names;
+}
+
+function batchAuthoredSupportStaticMeshes(
+  anchor: THREE.Object3D,
+  family: SupportVehicleAssetFamily,
+  scope: string,
+): Readonly<{ sourceMeshes: number; batches: number }> {
+  anchor.updateWorldMatrix(true, true);
+  const anchorInverse = new THREE.Matrix4().copy(anchor.matrixWorld).invert();
+  const groups = new Map<string, THREE.Mesh[]>();
+  anchor.traverse((node) => {
+    if (!(node instanceof THREE.Mesh) || !node.visible || node.userData.staticBatchRendered === true) return;
+    let cursor: THREE.Object3D | null = node;
+    while (cursor && cursor !== anchor.parent) {
+      if (cursor.userData.supportAnimationTarget === true
+        || cursor.userData.supportStaticBatchBoundary === true) return;
+      cursor = cursor.parent;
+    }
+    const key = swarmStaticMergeKey(node);
+    if (!key) return;
+    const group = groups.get(key) ?? [];
+    group.push(node);
+    groups.set(key, group);
+  });
+
+  let sourceMeshes = 0;
+  let batches = 0;
+  for (const sources of groups.values()) {
+    if (sources.length < 2) continue;
+    const transformed = sources.map((source) => {
+      const localMatrix = new THREE.Matrix4().multiplyMatrices(anchorInverse, source.matrixWorld);
+      return source.geometry.clone().applyMatrix4(localMatrix);
+    });
+    const geometry = mergeGeometries(transformed, false);
+    for (const entry of transformed) entry.dispose();
+    if (!geometry) continue;
+    const representative = sources[0]!;
+    const batch = new THREE.Mesh(geometry, representative.material);
+    batch.name = `pass65-${family}-${scope}-static-batch-${batches + 1}`;
+    batch.userData.presentationOnly = true;
+    batch.userData.supportStaticBatchOutput = true;
+    batch.userData.sourceMeshes = sources.length;
+    batch.castShadow = representative.castShadow;
+    batch.receiveShadow = representative.receiveShadow;
+    batch.renderOrder = representative.renderOrder;
+    batch.layers.mask = representative.layers.mask;
+    batch.raycast = () => undefined;
+    anchor.add(batch);
+    for (const source of sources) {
+      source.visible = false;
+      source.castShadow = false;
+      source.userData.staticBatchRendered = true;
+    }
+    sourceMeshes += sources.length;
+    batches += 1;
+  }
+  return Object.freeze({ sourceMeshes, batches });
+}
+
+function optimizeAuthoredSupportLevel(
+  level: THREE.Group,
+  family: SupportVehicleAssetFamily,
+  animations: readonly THREE.AnimationClip[],
+): void {
+  for (const targetName of supportAnimationTargetNames(animations)) {
+    const target = level.getObjectByName(targetName);
+    if (target) target.userData.supportAnimationTarget = true;
+  }
+  const cockpit = family === 'chopper' ? level.getObjectByName('chopper-first-person-cockpit') : null;
+  const cockpitStats = cockpit
+    ? batchAuthoredSupportStaticMeshes(cockpit, family, 'cockpit')
+    : Object.freeze({ sourceMeshes: 0, batches: 0 });
+  if (cockpit) cockpit.userData.supportStaticBatchBoundary = true;
+  const exteriorStats = batchAuthoredSupportStaticMeshes(level, family, 'exterior');
+  level.userData.supportStaticBatchStats = Object.freeze({
+    sourceMeshes: cockpitStats.sourceMeshes + exteriorStats.sourceMeshes,
+    batches: cockpitStats.batches + exteriorStats.batches,
+  });
 }
 
 type PresentedEntityPoolKey = 'chopper' | 'care-aircraft' | 'carpet-aircraft' | 'care-crate' | 'piloted-drone' | 'swarm-drone';
@@ -735,11 +824,13 @@ function setSupportFirstPersonVisibility(root: THREE.Group, possessed: boolean):
     if (!(node instanceof THREE.Mesh)) return;
     const cockpitNode = isFirstPersonCockpitNode(root, node);
     const firstPersonOnlyNode = isFirstPersonOnlyNode(root, node);
+    const retiredStaticSource = node.userData.staticBatchRendered === true
+      && node.userData.supportStaticBatchOutput !== true;
     const overrideActive = node.userData.supportFirstPersonOverrideActive === true;
     if (possessed) {
       if (!overrideActive) node.userData.supportBaseVisible = node.visible;
       node.userData.supportFirstPersonOverrideActive = true;
-      node.visible = cockpitNode;
+      node.visible = cockpitNode && !retiredStaticSource;
     } else if (overrideActive) {
       node.visible = node.userData.supportBaseVisible === true && !firstPersonOnlyNode;
       node.userData.supportFirstPersonOverrideActive = false;
@@ -776,6 +867,7 @@ function buildAuthoredSupportVehicle(family: SupportVehicleAssetFamily): Present
   for (const [index, source] of template.lods.entries()) {
     const level = source.scene.clone(true);
     level.name = `${runtimeName}-authored-lod${index}`;
+    optimizeAuthoredSupportLevel(level, family, source.animations);
     level.scale.setScalar(SUPPORT_VEHICLE_TARGET_DIMENSIONS[family] / Math.max(0.001, source.sourceMaxDimension));
     level.userData.presentationAsset = source.asset;
     const cockpit = level.getObjectByName('chopper-first-person-cockpit');
