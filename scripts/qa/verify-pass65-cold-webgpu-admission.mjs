@@ -101,6 +101,7 @@ try {
         if (!state) return false;
         const transition = state.arenaSelection.streaming.transition;
         return state.gameStarted === true
+          || state.bootstrap.stage === 'failed'
           || transition.failure !== null
           || transition.phase === 'failed'
           || state.render.runtime.deviceLost
@@ -130,6 +131,11 @@ try {
       if (before.runtime.actualBackend !== 'webgpu' || before.runtime.softwareAdapter) failures.push('hardware WebGPU was not active');
       if (before.localLightOcclusion.violations.length > 0) failures.push(`pre-start local-light violations: ${before.localLightOcclusion.violations.join(', ')}`);
       if (!after.gameStarted || after.arenaId !== 'atomic-acres' || !after.originalArtLoaded) failures.push('Atomic Acres did not become the playable arena');
+      if (!after.bootstrap.matchAdmissionCadence
+        || after.bootstrap.matchAdmissionCadence.admittedDegraded !== false
+        || after.bootstrap.matchAdmissionCadence.visibilityState !== 'visible') {
+        failures.push(`foreground match admission was degraded: ${JSON.stringify(after.bootstrap.matchAdmissionCadence)}`);
+      }
       if (after.renderProfile !== 'blender'
         || after.atomicQualityStreaming !== 'ready'
         || !after.blenderEnvironment.qualityArtRootVisible

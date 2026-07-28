@@ -8,6 +8,7 @@ import {
   formatWebGpuUncapturedError,
   pendingCompletionStartAfterProgress,
   resolveRenderRuntimeRequest,
+  sequenceProgressRate,
   shouldBackpressureWebGpuSubmissions,
   toneMappingForMode,
   webGpuRenderInfoSnapshot,
@@ -66,6 +67,21 @@ describe('Pass 64 render runtime boundary', () => {
     expect(classify({ submissionSequence: 1, completedSequence: 0, pendingForMs: 2_000 })).toBe('stalled');
     expect(classify({ completionFailures: 1 })).toBe('failed');
     expect(classify({ deviceLost: true, completionFailures: 1 })).toBe('device-lost');
+  });
+
+  it('derives truthful presentation cadence from queue sequence progress rather than animation callbacks', () => {
+    expect(sequenceProgressRate({
+      baselineSequence: 100,
+      currentSequence: 232,
+      windowStartedAt: 1_000,
+      now: 3_000,
+    })).toEqual({ advances: 132, elapsedMs: 2_000, cadenceHz: 66 });
+    expect(sequenceProgressRate({
+      baselineSequence: 10,
+      currentSequence: 9,
+      windowStartedAt: 2_000,
+      now: 1_000,
+    })).toEqual({ advances: 0, elapsedMs: 0, cadenceHz: 0 });
   });
 
   it('uses current-frame WebGPU draw calls instead of cumulative lifetime render calls', () => {

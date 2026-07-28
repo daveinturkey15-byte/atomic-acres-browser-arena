@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { RenderPipeline, WebGPURenderer } from 'three/webgpu';
 import { assertTslCutoverReady } from './tsl-migration-inventory';
 import type { ToneMappingMode } from '../graphics-settings-registry';
+import { FramePacingSampler, type FramePacingSummary } from '../frame-pacing';
 
 export type RenderBackendId = 'webgl2' | 'webgpu';
 
@@ -59,7 +60,58 @@ export type PresentationFreshnessTelemetry = Readonly<{
   lastFailure: string | null;
   backpressureActive: boolean;
   skippedSubmissions: number;
+  progress: PresentationProgressTelemetry;
 }>;
+
+export type PresentationProgressTelemetry = Readonly<{
+  windowStartedAt: number;
+  elapsedMs: number;
+  submissionAdvances: number;
+  completionAdvances: number;
+  submittedHz: number;
+  completedHz: number;
+  currentSubmissionGapMs: number;
+  currentCompletionGapMs: number;
+  maximumSubmissionGapMs: number;
+  maximumCompletionGapMs: number;
+  maximumPendingForMs: number;
+  submissionPacing: FramePacingSummary;
+  completionPacing: FramePacingSummary;
+}>;
+
+export function sequenceProgressRate(input: Readonly<{
+  baselineSequence: number;
+  currentSequence: number;
+  windowStartedAt: number;
+  now: number;
+}>): Readonly<{ advances: number; elapsedMs: number; cadenceHz: number }> {
+  const elapsedMs = Number.isFinite(input.now) && Number.isFinite(input.windowStartedAt)
+    ? Math.max(0, input.now - input.windowStartedAt)
+    : 0;
+  const advances = Number.isSafeInteger(input.currentSequence) && Number.isSafeInteger(input.baselineSequence)
+    ? Math.max(0, input.currentSequence - input.baselineSequence)
+    : 0;
+  return Object.freeze({
+    advances,
+    elapsedMs,
+    cadenceHz: elapsedMs > 0 ? advances * 1_000 / elapsedMs : 0,
+  });
+}
+
+function emptyFramePacingSummary(reason: string): FramePacingSummary {
+  return {
+    ready: false,
+    sampleCount: 0,
+    cadenceHz: 0,
+    medianMs: 0,
+    p95Ms: 0,
+    p99Ms: 0,
+    maxMs: 0,
+    longFrames: { over20Ms: 0, over33Ms: 0, over50Ms: 0, over100Ms: 0 },
+    displayLimited: false,
+    lastResetReason: reason,
+  };
+}
 
 export function classifyPresentationFreshness(input: Readonly<{
   deviceLost: boolean;
@@ -267,8 +319,9 @@ export class LegacyWebGlRenderRuntime {
     };
   }
 
-  presentationTelemetry(): PresentationFreshnessTelemetry {
+  presentationTelemetry(now = performance.now()): PresentationFreshnessTelemetry {
     const lost = this.renderer.getContext().isContextLost();
+    const pacing = emptyFramePacingSummary('synchronous WebGL presentation');
     return {
       status: lost ? 'device-lost' : 'synchronous',
       submissionSequence: 0,
@@ -282,8 +335,27 @@ export class LegacyWebGlRenderRuntime {
       lastFailure: lost ? 'WebGL context lost' : null,
       backpressureActive: false,
       skippedSubmissions: 0,
+      progress: {
+        windowStartedAt: now,
+        elapsedMs: 0,
+        submissionAdvances: 0,
+        completionAdvances: 0,
+        submittedHz: 0,
+        completedHz: 0,
+        currentSubmissionGapMs: 0,
+        currentCompletionGapMs: 0,
+        maximumSubmissionGapMs: 0,
+        maximumCompletionGapMs: 0,
+        maximumPendingForMs: 0,
+        submissionPacing: pacing,
+        completionPacing: pacing,
+      },
     };
   }
+
+  resetPresentationProgressTelemetry(_reason?: string, _now?: number): void { /* Synchronous WebGL has no queue frontier. */ }
+
+  resetPresentationProgressWindow(_now?: number): void { /* Synchronous WebGL has no queue frontier. */ }
 
   configureOutput(exposure: number, toneMapping: ToneMappingMode = 'aces'): void {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -452,6 +524,16 @@ export class WebGpuRenderRuntime {
     this.lastFailure = `WebGPU uncaptured error: ${message}`;
   };
   private skippedSubmissions = 0;
+  private readonly submissionPacing = new FramePacingSampler();
+  private readonly completionPacing = new FramePacingSampler();
+  private progressWindowStartedAt = 0;
+  private progressBaselineSubmissionSequence = 0;
+  private progressBaselineCompletionSequence = 0;
+  private progressLastSubmissionAt = 0;
+  private progressLastCompletionAt = 0;
+  private progressMaximumSubmissionGapMs = 0;
+  private progressMaximumCompletionGapMs = 0;
+  private progressMaximumPendingForMs = 0;
   private lastSubmittedRenderInfo: RenderInfoSnapshot = Object.freeze({ calls: 0, triangles: 0, points: 0, lines: 0 });
   private lightShadowAutoUpdate = true;
   private lightShadowNeedsUpdate = false;
@@ -510,6 +592,7 @@ export class WebGpuRenderRuntime {
     this.deviceClass = identity.deviceClass;
     this.softwareAdapter = identity.softwareAdapter;
     this.device = identity.device;
+    this.resetPresentationProgressTelemetry('renderer initialized');
     this.installNodeBuildTrace();
     identity.device.addEventListener?.('uncapturederror', this.uncapturedErrorListener);
     void identity.device.lost?.then((info) => {
@@ -645,6 +728,20 @@ export class WebGpuRenderRuntime {
     const pendingForMs = this.pendingCompletionStartedAt === null
       ? 0
       : Math.max(0, now - this.pendingCompletionStartedAt);
+    const submissionRate = sequenceProgressRate({
+      baselineSequence: this.progressBaselineSubmissionSequence,
+      currentSequence: this.submissionSequence,
+      windowStartedAt: this.progressWindowStartedAt,
+      now,
+    });
+    const completionRate = sequenceProgressRate({
+      baselineSequence: this.progressBaselineCompletionSequence,
+      currentSequence: this.completedSequence,
+      windowStartedAt: this.progressWindowStartedAt,
+      now,
+    });
+    const currentSubmissionGapMs = Math.max(0, now - this.progressLastSubmissionAt);
+    const currentCompletionGapMs = Math.max(0, now - this.progressLastCompletionAt);
     const status = classifyPresentationFreshness({
       deviceLost: this.deviceLost,
       completionFailures: this.completionFailures,
@@ -672,7 +769,41 @@ export class WebGpuRenderRuntime {
         WebGpuRenderRuntime.MAX_IN_FLIGHT_SUBMISSIONS,
       ),
       skippedSubmissions: this.skippedSubmissions,
+      progress: {
+        windowStartedAt: this.progressWindowStartedAt,
+        elapsedMs: submissionRate.elapsedMs,
+        submissionAdvances: submissionRate.advances,
+        completionAdvances: completionRate.advances,
+        submittedHz: submissionRate.cadenceHz,
+        completedHz: completionRate.cadenceHz,
+        currentSubmissionGapMs,
+        currentCompletionGapMs,
+        maximumSubmissionGapMs: Math.max(this.progressMaximumSubmissionGapMs, currentSubmissionGapMs),
+        maximumCompletionGapMs: Math.max(this.progressMaximumCompletionGapMs, currentCompletionGapMs),
+        maximumPendingForMs: Math.max(this.progressMaximumPendingForMs, pendingForMs),
+        submissionPacing: this.submissionPacing.summary(),
+        completionPacing: this.completionPacing.summary(),
+      },
     };
+  }
+
+  resetPresentationProgressTelemetry(reason = 'presentation progress reset', now = performance.now()): void {
+    this.submissionPacing.reset(reason);
+    this.completionPacing.reset(reason);
+    this.resetPresentationProgressWindow(now);
+  }
+
+  resetPresentationProgressWindow(now = performance.now()): void {
+    this.progressWindowStartedAt = now;
+    this.progressBaselineSubmissionSequence = this.submissionSequence;
+    this.progressBaselineCompletionSequence = this.completedSequence;
+    this.progressLastSubmissionAt = now;
+    this.progressLastCompletionAt = now;
+    this.progressMaximumSubmissionGapMs = 0;
+    this.progressMaximumCompletionGapMs = 0;
+    this.progressMaximumPendingForMs = this.pendingCompletionStartedAt === null
+      ? 0
+      : Math.max(0, now - this.pendingCompletionStartedAt);
   }
 
   private scheduleCompletionProbe(now: number, force = false): Promise<void> | null {
@@ -688,7 +819,20 @@ export class WebGpuRenderRuntime {
     const probe = queue.onSubmittedWorkDone()
       .then(() => {
         const completedAt = performance.now();
+        const priorCompletedSequence = this.completedSequence;
         this.completedSequence = Math.max(this.completedSequence, sequence);
+        if (this.completedSequence > priorCompletedSequence) {
+          const completionGapMs = Math.max(0, completedAt - this.progressLastCompletionAt);
+          this.progressMaximumCompletionGapMs = Math.max(this.progressMaximumCompletionGapMs, completionGapMs);
+          this.completionPacing.record(completionGapMs / Math.max(1, this.completedSequence - priorCompletedSequence));
+          this.progressLastCompletionAt = completedAt;
+        }
+        if (this.pendingCompletionStartedAt !== null) {
+          this.progressMaximumPendingForMs = Math.max(
+            this.progressMaximumPendingForMs,
+            completedAt - this.pendingCompletionStartedAt,
+          );
+        }
         this.lastCompletedAt = completedAt;
         this.lastCompletionLatencyMs = Math.max(0, completedAt - startedAt);
         // A continuously busy queue is healthy when its completion frontier is
@@ -839,6 +983,12 @@ export class WebGpuRenderRuntime {
       this.submissionSequence - this.completedSequence,
       WebGpuRenderRuntime.MAX_IN_FLIGHT_SUBMISSIONS,
     )) {
+      if (this.pendingCompletionStartedAt !== null) {
+        this.progressMaximumPendingForMs = Math.max(
+          this.progressMaximumPendingForMs,
+          now - this.pendingCompletionStartedAt,
+        );
+      }
       this.scheduleCompletionProbe(now, true);
       this.skippedSubmissions += 1;
       return false;
@@ -850,6 +1000,10 @@ export class WebGpuRenderRuntime {
     // queue fence cannot turn a real frame into a false zero-draw receipt.
     this.lastSubmittedRenderInfo = Object.freeze(webGpuRenderInfoSnapshot(this.renderer.info.render));
     this.submissionSequence += 1;
+    const submissionGapMs = Math.max(0, now - this.progressLastSubmissionAt);
+    this.progressMaximumSubmissionGapMs = Math.max(this.progressMaximumSubmissionGapMs, submissionGapMs);
+    this.submissionPacing.record(submissionGapMs);
+    this.progressLastSubmissionAt = now;
     this.lastSubmittedAt = now;
     // With a one-submission frontier, every admitted frame needs its own probe.
     // Honouring the 250 ms sampling throttle here leaves the queue at depth one

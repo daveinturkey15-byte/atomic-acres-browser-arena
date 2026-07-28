@@ -1267,6 +1267,8 @@ applyAdaptiveRenderBudget(adaptiveQuality.telemetry().pixelRatioCap);
 
 async function settleWebGpuPresentation(label: string, maximumLatencyMs = 500): Promise<void> {
   if (renderRuntime.backend !== 'webgpu') return;
+  const requiredConsecutiveHealthySamples = 3;
+  let consecutiveHealthySamples = 0;
   for (;;) {
     submitWebGpuFrame(performance.now(), true);
     await flushWebGpuFrames(12_000);
@@ -1276,11 +1278,20 @@ async function settleWebGpuPresentation(label: string, maximumLatencyMs = 500): 
     }
     const completionLatencyMs = presentation.lastCompletionLatencyMs;
     if (completionLatencyMs === null) throw new Error(`${label} presentation completed without a queue-latency sample`);
-    if (completionLatencyMs <= maximumLatencyMs) return;
+    if (completionLatencyMs <= maximumLatencyMs) {
+      consecutiveHealthySamples += 1;
+      if (consecutiveHealthySamples >= requiredConsecutiveHealthySamples) return;
+      continue;
+    }
+    consecutiveHealthySamples = 0;
     const nextPixelRatio = adaptiveQuality.forceDownshift(
       `${label} WebGPU queue latency ${Math.round(completionLatencyMs)}ms exceeded ${maximumLatencyMs}ms`,
     );
-    if (nextPixelRatio === null) return;
+    if (nextPixelRatio === null) {
+      throw new Error(
+        `${label} WebGPU queue latency remained ${Math.round(completionLatencyMs)}ms at the minimum quality tier`,
+      );
+    }
     applyAdaptiveRenderBudget(nextPixelRatio);
     resize();
     // The next forced RenderPipeline submission compiles the resized TSL/HDR
@@ -1344,6 +1355,12 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
     };
     requestAnimationFrame(sample);
   });
+  if (lastMatchAdmissionCadence.admittedDegraded && lastMatchAdmissionCadence.visibilityState === 'visible') {
+    throw new Error(
+      `Foreground match cadence remained degraded after ${Math.round(lastMatchAdmissionCadence.waitedMs)}ms`
+      + ` (maximum animation gap ${Math.round(lastMatchAdmissionCadence.maximumGapMs)}ms)`,
+    );
+  }
   bootstrapStage = 'ready';
 }
 
@@ -2870,6 +2887,9 @@ let lastFrame = performance.now();
 let lastPresentedFrameAt = lastFrame;
 let lastWindowBlurAt = -Infinity;
 const framePacing = new FramePacingSampler();
+const LIVE_WEBGPU_QUEUE_DOWNSHIFT_MS = 250;
+const LIVE_WEBGPU_PRESENTATION_STALL_MS = 1_000;
+let lastAdaptedWebGpuCompletionSequence = 0;
 let lastHudAt = 0;
 let lastFpsHudAt = -Infinity;
 let minimapRenderCount = 0;
@@ -3433,6 +3453,7 @@ function showFatalError(error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
   bootstrapStage = 'failed';
   bootstrapError = message;
+  gameStarted = false;
   clearGameplayInput();
   setLocalTriggerHeld(false);
   setStatus(`Game paused: ${message}`, 'error');
@@ -8174,6 +8195,7 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
     restoreCorpsePoolPrewarm();
     renderSubmissionPaused = priorRenderSubmissionPaused;
   }
+  renderRuntime.resetPresentationProgressTelemetry('match admitted', performance.now());
   gameStarted = true;
   const matchStartedAt = performance.now();
   beginMatchDiagnostics(mode, matchStartedAt);
@@ -9340,7 +9362,7 @@ function spawnBot(index: number, hosted = false, dormantPresentation = false): v
   const spawnedAt = performance.now();
   // Every reinforcement uses the same source-rigged humanoid and approved
   // neon-purple treatment. Only the lead owns the dynamic shadow proxy.
-  const root = buildOperator(botTeam, 'bot-operator', true, weapon, 'neon-purple');
+  const root = buildOperator(botTeam, 'bot-operator', renderProfile !== 'blender', weapon, 'neon-purple');
   applyBotEmissiveBrightness(root);
   addNeonBotHaze(root, index);
   root.traverse((node) => {
@@ -14710,6 +14732,7 @@ function recoverFromVisibilityRegain(): void {
   lastFrame = refocusAt;
   lastPresentedFrameAt = refocusAt;
   framePacing.reset('tab visibility regained');
+  renderRuntime.resetPresentationProgressTelemetry('tab visibility regained', refocusAt);
   adaptiveQuality.resetSampling('tab visibility regained');
 }
 document.addEventListener('visibilitychange', () => {
@@ -15612,6 +15635,55 @@ window.addEventListener('beforeunload', () => {
   renderRuntime.dispose();
 });
 
+function effectiveFramePacing(now = performance.now()) {
+  const callback = framePacing.summary();
+  if (renderRuntime.backend !== 'webgpu') {
+    return Object.freeze({
+      ...callback,
+      source: 'animation-frame' as const,
+      callbackCadenceHz: callback.cadenceHz,
+      completedCadenceHz: callback.cadenceHz,
+    });
+  }
+  const progress = renderRuntime.presentationTelemetry(now).progress;
+  return Object.freeze({
+    ...progress.submissionPacing,
+    source: 'webgpu-submission' as const,
+    callbackCadenceHz: callback.cadenceHz,
+    completedCadenceHz: progress.completionPacing.cadenceHz,
+    progressWindow: Object.freeze({
+      elapsedMs: progress.elapsedMs,
+      submissionAdvances: progress.submissionAdvances,
+      completionAdvances: progress.completionAdvances,
+      currentSubmissionGapMs: progress.currentSubmissionGapMs,
+      currentCompletionGapMs: progress.currentCompletionGapMs,
+      maximumSubmissionGapMs: progress.maximumSubmissionGapMs,
+      maximumCompletionGapMs: progress.maximumCompletionGapMs,
+      maximumPendingForMs: progress.maximumPendingForMs,
+    }),
+  });
+}
+
+function adaptToCompletedWebGpuQueueLatency(now: number): void {
+  if (renderRuntime.backend !== 'webgpu') return;
+  const presentation = renderRuntime.presentationTelemetry(now);
+  if (presentation.completedSequence <= lastAdaptedWebGpuCompletionSequence) return;
+  lastAdaptedWebGpuCompletionSequence = presentation.completedSequence;
+  if (!gameStarted || matchState.phase !== 'active' || document.visibilityState !== 'visible'
+    || !menu.classList.contains('hidden') || renderSubmissionPaused || debugRenderPaused) return;
+  const completionLatencyMs = presentation.lastCompletionLatencyMs;
+  if (completionLatencyMs === null || completionLatencyMs <= LIVE_WEBGPU_QUEUE_DOWNSHIFT_MS) return;
+  const nextPixelRatio = adaptiveQuality.forceDownshift(
+    `Live WebGPU queue latency ${Math.round(completionLatencyMs)}ms exceeded ${LIVE_WEBGPU_QUEUE_DOWNSHIFT_MS}ms`,
+  );
+  if (nextPixelRatio === null) return;
+  // Queue completion is the safe boundary for resizing HDR targets. Never
+  // mutate renderer-owned targets while the slow submission is unresolved.
+  applyAdaptiveRenderBudget(nextPixelRatio);
+  grassSystem?.setAdaptivePixelRatio(nextPixelRatio);
+  resize();
+}
+
 function selectedArenaPresentationRoot(): THREE.Group {
   if (selectedArena.id === 'atomic-acres' && arenaArtRoot?.visible) return arenaArtRoot;
   return arena.root;
@@ -15694,6 +15766,14 @@ function monitorSelectedArenaRender(now: number): void {
     }
   }
   const presentation = renderRuntime.presentationTelemetry(now);
+  const liveForegroundMatch = gameStarted && matchState.phase === 'active'
+    && menuLifecycle.surface === 'hidden' && document.visibilityState === 'visible';
+  if (eligible && liveForegroundMatch && presentation.pendingForMs >= LIVE_WEBGPU_PRESENTATION_STALL_MS) {
+    throw new Error(
+      `Renderer presentation made no GPU progress for ${Math.round(presentation.pendingForMs)}ms`
+      + ` (${presentation.submissionSequence - presentation.completedSequence} submission pending)`,
+    );
+  }
   if (eligible && (presentation.status === 'stalled' || presentation.status === 'device-lost' || presentation.status === 'failed')) {
     throw new Error(`Renderer presentation ${presentation.status}: ${presentation.lastFailure ?? `${Math.round(presentation.pendingForMs)} ms pending`}`);
   }
@@ -15715,6 +15795,7 @@ function frame(now: number, scheduleNext = true): void {
   frameCount += 1;
   try {
     const rawFrameMs = Math.max(0, now - lastFrame);
+    adaptToCompletedWebGpuQueueLatency(now);
     // The HUD must report even pathologically slow software-rendered frames.
     // Adaptive quality still receives the unclamped sample and independently
     // rejects values above its 250 ms control window.
@@ -15729,7 +15810,7 @@ function frame(now: number, scheduleNext = true): void {
       grassSystem?.setAdaptivePixelRatio(adaptivePixelRatio);
       resize();
     }
-    const pacing = framePacing.summary();
+    const pacing = effectiveFramePacing(now);
     if (now - lastFpsHudAt >= 250) {
       const fps = pacing.sampleCount >= 1 ? Math.max(1, Math.round(pacing.cadenceHz)) : null;
       fpsCounterValue.textContent = fps === null ? '--' : String(fps);
@@ -16229,6 +16310,7 @@ const debugWindow = window as Window & {
     readbackWebGpuFrame: () => Promise<{ bytes: number; hash: string; x: number; y: number; width: number; height: number }>;
     sampleRendererResidency: () => ReturnType<typeof estimateRendererResidency>;
     sampleArenaPerformanceBudget: () => Promise<ArenaPerformanceBudgetSample>;
+    resetPresentationProgressWindow: () => void;
     setRenderPaused: (paused: boolean) => void;
     recoverFromVisibilityRegain: () => void;
     openMenu: () => void;
@@ -17035,7 +17117,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       },
       authoredShadows: activeRenderConfig.shadows,
       shadowMode: activeRenderConfig.shadowMode,
-      framePacing: framePacing.summary(),
+      framePacing: effectiveFramePacing(),
       minimapRenders: minimapRenderCount,
       adaptive: adaptiveQuality.telemetry(),
       graphicsRefinement: graphicsRefinement.telemetry(),
@@ -17711,6 +17793,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   },
   sampleRendererResidency: estimateRendererResidency,
   sampleArenaPerformanceBudget,
+  resetPresentationProgressWindow: () => renderRuntime.resetPresentationProgressWindow(performance.now()),
   setRenderPaused: (paused: boolean) => { debugRenderPaused = paused; },
   recoverFromVisibilityRegain,
   openMenu: () => openActiveMatchPause('debug-pause'),

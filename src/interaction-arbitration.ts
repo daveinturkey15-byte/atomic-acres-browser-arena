@@ -15,12 +15,15 @@ export type InteractionCandidate = Readonly<{
 }>;
 
 const INTERACTION_PRIORITY: Readonly<Record<InteractionKind, number>> = Object.freeze({
+  // Possession controls are global 30-second support actions, not local-world
+  // pickups. Once available, F must always enter/exit the selected platform;
+  // a crate, door or corpse near the player's body cannot steal that intent.
+  'support-exit': 2_000,
+  'support-enter-drone': 1_500,
+  'support-enter-chopper': 1_500,
   'care-package': 1_000,
   'shed-door': 900,
   'weapon-pickup': 800,
-  'support-enter-drone': 700,
-  'support-enter-chopper': 700,
-  'support-exit': 700,
 });
 
 /**

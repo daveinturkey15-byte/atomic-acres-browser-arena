@@ -9,6 +9,9 @@ const port = Number(process.env.PASS65_ENDURANCE_PORT ?? '44075');
 const sampleIntervalMs = Math.max(500, Number(process.env.PASS65_SAMPLE_INTERVAL_MS ?? '1000'));
 const rustworksDurationMs = Math.max(10_000, Number(process.env.PASS65_RUSTWORKS_SOAK_MS ?? '45000'));
 const otherArenaDurationMs = Math.max(5_000, Number(process.env.PASS65_MAP_SOAK_MS ?? '12000'));
+const maximumLiveSubmissionGapMs = 250;
+const maximumLiveCompletionGapMs = 500;
+const maximumLivePendingMs = 750;
 const artifactRoot = 'artifacts/pass65/webgpu-endurance';
 const chromeCandidates = [
   process.env.PASS65_CHROME_PATH,
@@ -284,6 +287,7 @@ try {
         skipped: true,
         activations: { chopper: null, droneSwarm: null },
       };
+      api.resetPresentationProgressWindow();
       const before = api.snapshot();
       return new Promise((resolve) => {
         const frameGapsMs = [];
@@ -421,6 +425,9 @@ try {
         || killstreakActivationProbe.maximumCallbackDelayMs > 100
         || killstreakActivationProbe.longTasks.length > 0
         || killstreakActivationProbe.presentation.status !== 'healthy'
+        || killstreakActivationProbe.presentation.progress.maximumSubmissionGapMs > maximumLiveSubmissionGapMs
+        || killstreakActivationProbe.presentation.progress.maximumCompletionGapMs > maximumLiveCompletionGapMs
+        || killstreakActivationProbe.presentation.progress.maximumPendingForMs > maximumLivePendingMs
         || killstreakActivationProbe.uncapturedErrors !== 0) {
         throw new Error(`${arenaId} killstreak first activation stalled presentation: ${JSON.stringify({ minimumActivationProgress, killstreakActivationProbe })}`);
       }
@@ -470,6 +477,7 @@ try {
       activeContext = { visit, arenaId, phase: 'sample', sampleIndex };
       await page.evaluate(({ index, stress }) => {
         const api = window.__ATOMIC_ACRES_DEBUG__;
+        api.resetPresentationProgressWindow();
         const state = api.snapshot();
         const [x, y, z] = state.player.position;
         api.setCaptureCameraPose(x, y, z, (index * 0.31) % (Math.PI * 2), Math.sin(index * 0.37) * 0.08);
@@ -543,6 +551,9 @@ try {
         || sample.runtime.actualBackend !== 'webgpu' || sample.runtime.deviceLost
         || sample.runtime.uncapturedErrors !== 0
         || sample.runtime.presentation.status !== 'healthy'
+        || sample.runtime.presentation.progress.maximumSubmissionGapMs > maximumLiveSubmissionGapMs
+        || sample.runtime.presentation.progress.maximumCompletionGapMs > maximumLiveCompletionGapMs
+        || sample.runtime.presentation.progress.maximumPendingForMs > maximumLivePendingMs
         || sample.watchdog.status !== 'healthy' || sample.watchdog.fatal
         || sample.gpuRetirement.failures !== 0
         || sample.grenadeWorldPool.exhaustions !== 0
@@ -680,6 +691,9 @@ try {
     } : null,
     viewport: [2560, 1440],
     sampleIntervalMs,
+    maximumLiveSubmissionGapMs,
+    maximumLiveCompletionGapMs,
+    maximumLivePendingMs,
     rustworksDurationMs,
     otherArenaDurationMs,
     arenaSequence,

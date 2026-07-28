@@ -10,6 +10,14 @@ const presentationSources = [
 ] as const;
 
 describe('presentation prewarm startup contract', () => {
+  it('keeps one in-flight WebGPU submission while exposing truthful queue progress', () => {
+    const source = readFileSync(new URL('./rendering/render-runtime.ts', import.meta.url), 'utf8');
+    expect(source).toContain('MAX_IN_FLIGHT_SUBMISSIONS = 1');
+    expect(source).toContain('submissionPacing: this.submissionPacing.summary()');
+    expect(source).toContain('completionPacing: this.completionPacing.summary()');
+    expect(source).toContain('maximumPendingForMs: Math.max(this.progressMaximumPendingForMs, pendingForMs)');
+  });
+
   it.each(presentationSources)('%s scopes shader compilation to its presentation root', (path) => {
     const source = readFileSync(new URL(path, import.meta.url), 'utf8');
     expect(source).toContain("import type { PresentationPrewarmRuntime } from './rendering/render-runtime'");
@@ -118,10 +126,20 @@ describe('presentation prewarm startup contract', () => {
     expect(cadenceAdmission).toContain('admittedDegraded: true');
     expect(cadenceAdmission).toContain('visibilityState: document.visibilityState');
     expect(cadenceAdmission).not.toContain('reject(');
+    expect(cadenceAdmission).toContain("lastMatchAdmissionCadence.visibilityState === 'visible'");
+    expect(cadenceAdmission).toContain('Foreground match cadence remained degraded');
     expect(source).toContain('matchAdmissionCadence: lastMatchAdmissionCadence');
     expect(source).toContain('submitWebGpuFrame(performance.now(), true)');
     expect(source).toContain('await flushWebGpuFrames(12_000)');
+    expect(source).toContain('const requiredConsecutiveHealthySamples = 3;');
+    expect(source).toContain('WebGPU queue latency remained ${Math.round(completionLatencyMs)}ms at the minimum quality tier');
     expect(source).toContain('adaptiveQuality.forceDownshift(');
+    expect(matchDeployment).toContain("renderRuntime.resetPresentationProgressTelemetry('match admitted', performance.now());");
+    expect(source).toContain("source: 'webgpu-submission' as const");
+    expect(source).toContain('LIVE_WEBGPU_PRESENTATION_STALL_MS = 1_000');
+    expect(source).toContain('presentation.pendingForMs >= LIVE_WEBGPU_PRESENTATION_STALL_MS');
+    expect(source).toContain('adaptToCompletedWebGpuQueueLatency(now);');
+    expect(source).toContain("buildOperator(botTeam, 'bot-operator', renderProfile !== 'blender', weapon, 'neon-purple')");
     expect(source).toContain('const streamedWeaponGpuPrewarmer: WeaponViewmodelGpuPrewarmer | undefined');
     expect(source).toContain('streamedWeaponGpuPrewarmQueue.run(() => runStreamedWeaponGpuPrewarm(model, context))');
     expect(source).toContain('revealAncestors();');
@@ -140,7 +158,7 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain("bootstrapStage = 'ready'");
   });
 
-  it('runs the shed reset probe only across the final two RustRig visits', () => {
+  it('runs the shed reset probe only across the final two RustRig visits and gates continuous GPU progress', () => {
     const source = readFileSync(new URL('../scripts/qa/verify-pass65-webgpu-endurance.mjs', import.meta.url), 'utf8');
     expect(source).toContain("arenaId === 'rustworks-1v1' ? visit : -1");
     expect(source).toContain('rustworksVisitIndices.length >= 2');
@@ -148,6 +166,20 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('rustworksVisitIndices[rustworksVisitIndices.length - 1]');
     expect(source).not.toContain('const doorResetProbeDetachVisit = arenaSequence.length - 2;');
     expect(source).not.toContain('const doorResetProbeRestoreVisit = arenaSequence.length - 1;');
+    expect(source).toContain('const maximumLiveSubmissionGapMs = 250;');
+    expect(source).toContain('const maximumLiveCompletionGapMs = 500;');
+    expect(source).toContain('const maximumLivePendingMs = 750;');
+    expect(source).toContain('api.resetPresentationProgressWindow();');
+    expect(source).toContain('presentation.progress.maximumSubmissionGapMs > maximumLiveSubmissionGapMs');
+    expect(source).toContain('presentation.progress.maximumCompletionGapMs > maximumLiveCompletionGapMs');
+    expect(source).toContain('presentation.progress.maximumPendingForMs > maximumLivePendingMs');
+  });
+
+  it('rejects degraded foreground cadence in the cold physical-menu gate', () => {
+    const source = readFileSync(new URL('../scripts/qa/verify-pass65-cold-webgpu-admission.mjs', import.meta.url), 'utf8');
+    expect(source).toContain("state.bootstrap.stage === 'failed'");
+    expect(source).toContain('after.bootstrap.matchAdmissionCadence.admittedDegraded !== false');
+    expect(source).toContain("after.bootstrap.matchAdmissionCadence.visibilityState !== 'visible'");
   });
 
   it('adds the four readiness terms and bootstrap stage to timeout evidence', () => {
