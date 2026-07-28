@@ -475,6 +475,7 @@ async function run() {
   let finalSnapshot = null;
   let firstRawTargetCaptured = false;
   let firstTargetCaptured = false;
+  let firstTwoFrameAlignedCaptured = false;
   let firstFireCaptured = false;
   let rawTargetFrames = 0;
   let warmupRawTargetFrames = 0;
@@ -875,6 +876,12 @@ async function run() {
             firstTargetAnnotatedCaptured = true;
           }
           const currentlyReloading = Boolean(hud?.reloadActive) || now < reloadSuppressedUntil;
+          if (twoFrameAligned && !firstTwoFrameAlignedCaptured) {
+            const alignedTracking = { rawTarget: aimedTarget, confirmedTarget: aimedTarget };
+            await writeFile(resolve(artifactDirectory, 'first-two-frame-aligned.jpg'), aimedVision.jpeg);
+            await writeFile(resolve(artifactDirectory, 'first-two-frame-aligned-annotated.jpg'), await annotatedVisionJpeg(aimedVision, alignedTracking));
+            firstTwoFrameAlignedCaptured = true;
+          }
           if (allowCombatFire && tracking.fireAuthorized && postInputReacquired && twoFrameAligned && activeMatch && alignment < 0.02
             && !currentlyReloading && now - lastBurstAt >= fireCooldownMs) {
             const shots = Math.max(1, Math.min(burstShots, Number(hud?.ammo ?? burstShots)));
@@ -1225,6 +1232,8 @@ async function run() {
         firstRawTargetAnnotatedCaptured ? 'first-raw-target-annotated.jpg' : null,
         firstTargetCaptured ? 'first-target.jpg' : null,
         firstTargetAnnotatedCaptured ? 'first-target-annotated.jpg' : null,
+        firstTwoFrameAlignedCaptured ? 'first-two-frame-aligned.jpg' : null,
+        firstTwoFrameAlignedCaptured ? 'first-two-frame-aligned-annotated.jpg' : null,
         firstFireCaptured ? 'first-fire-aligned.jpg' : null,
         firstFireCaptured ? 'first-fire-aligned-annotated.jpg' : null,
         ...candidateArtifacts,
