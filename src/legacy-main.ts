@@ -15829,16 +15829,27 @@ function arenaVisualBudgetAudit(): Record<string, unknown> {
   let shadowMapPixels = 0;
   let drawCalls = 0;
   let triangles = 0;
+  const renderableBreakdown = new Map<string, { drawCalls: number; triangles: number }>();
   scene.traverseVisible((node) => {
     if (camera.layers.test(node.layers) && (node instanceof THREE.Mesh || node instanceof THREE.Points || node instanceof THREE.Line || node instanceof THREE.Sprite)) {
       const material = node.material as THREE.Material | THREE.Material[];
-      drawCalls += Array.isArray(material) ? material.length : 1;
+      const nodeDrawCalls = Array.isArray(material) ? material.length : 1;
+      let nodeTriangles = 0;
+      drawCalls += nodeDrawCalls;
       if (node instanceof THREE.Mesh) {
         const geometry = node.geometry;
         const baseTriangles = geometry.index ? geometry.index.count / 3 : (geometry.getAttribute('position')?.count ?? 0) / 3;
         const instances = node instanceof THREE.InstancedMesh ? node.count : 1;
-        triangles += baseTriangles * instances;
+        nodeTriangles = baseTriangles * instances;
+        triangles += nodeTriangles;
       }
+      let owner: THREE.Object3D = node;
+      while (owner.parent && owner.parent !== scene) owner = owner.parent;
+      const ownerName = owner.name || owner.type;
+      const aggregate = renderableBreakdown.get(ownerName) ?? { drawCalls: 0, triangles: 0 };
+      aggregate.drawCalls += nodeDrawCalls;
+      aggregate.triangles += nodeTriangles;
+      renderableBreakdown.set(ownerName, aggregate);
     }
     if (!(node instanceof THREE.PointLight || node instanceof THREE.SpotLight || node instanceof THREE.DirectionalLight)) return;
     if (!node.castShadow) return;
@@ -15850,6 +15861,9 @@ function arenaVisualBudgetAudit(): Record<string, unknown> {
     triangles: Math.ceil(triangles),
     rendererReportedCalls: renderRuntime.renderInfo().calls,
     drawCallMethod: 'visible-camera-layer-renderable-upper-bound',
+    drawCallsByRoot: [...renderableBreakdown.entries()]
+      .map(([root, value]) => ({ root, drawCalls: value.drawCalls, triangles: Math.ceil(value.triangles) }))
+      .sort((left, right) => right.drawCalls - left.drawCalls || left.root.localeCompare(right.root)),
     shadowLights,
     shadowMapPixels,
     postTextureSamples: renderRuntime.backend === 'webgpu' ? 18 : 0,
