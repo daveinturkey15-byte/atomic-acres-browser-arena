@@ -216,8 +216,12 @@ export function findPurpleOperatorCandidates(raw, width, height, channels = 3, o
     const boxHeight = maxY - minY + 1;
     const aspect = boxWidth / boxHeight;
     const density = pixels / (boxWidth * boxHeight);
-    if (pixels < minimumPixels || pixels > 500) continue;
-    if (boxWidth < 2 || boxWidth > 50 || boxHeight < 3 || boxHeight > 70) continue;
+    // Stable evidence classified 2-3 px vertical slivers and >18 px tall
+    // components as range-panel/prop edges. Every credited v1 operator
+    // component stayed inside 4-14 px wide and 4-13 px tall at 240x135.
+    if (pixels < minimumPixels || pixels > Number(options.maximumPixels ?? 160)) continue;
+    if (boxWidth < Number(options.minimumWidth ?? 4) || boxWidth > Number(options.maximumWidth ?? 18)
+      || boxHeight < Number(options.minimumHeight ?? 4) || boxHeight > Number(options.maximumHeight ?? 18)) continue;
     if (aspect < 0.15 || aspect > 1.5) continue;
     const x = sumX / pixels;
     const y = sumY / pixels;

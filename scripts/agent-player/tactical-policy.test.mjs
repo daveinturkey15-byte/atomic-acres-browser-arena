@@ -84,3 +84,22 @@ test('inactive respawn state clears old retreat timers', () => {
   const respawn = policy.update({ now: 1300, active: true, health: 100, damageDelta: 0, movementCycle: 2 });
   assert.equal(respawn.mode, 'roam');
 });
+
+test('retreat latches a strafe direction away from a visible minimap threat', () => {
+  const policy = createTacticalPolicy();
+  const retreat = policy.update({ now: 100, active: true, health: 75, damageDelta: 20, minimapThreat: { bearingRadians: 0.6 } });
+  assert.equal(retreat.mode, 'retreat');
+  assert.ok(retreat.keys.includes('KeyA'));
+  assert.ok(!retreat.keys.includes('KeyD'));
+  const held = policy.update({ now: 300, active: true, health: 70, damageDelta: 5, minimapThreat: { bearingRadians: -0.6 } });
+  assert.ok(held.keys.includes('KeyA'));
+});
+
+test('no-threat roaming performs bounded alternating route sweeps', () => {
+  const policy = createTacticalPolicy({ routeSweepInterval: 12, routeSweepTurn: 18 });
+  const left = policy.update({ now: 100, active: true, health: 100, movementCycle: 0, navigationTick: true });
+  const right = policy.update({ now: 1200, active: true, health: 100, movementCycle: 12, navigationTick: true });
+  assert.equal(left.mode, 'roam');
+  assert.equal(left.turn, -18);
+  assert.equal(right.turn, 18);
+});

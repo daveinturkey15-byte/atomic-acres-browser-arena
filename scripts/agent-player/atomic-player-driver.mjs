@@ -661,6 +661,8 @@ async function run() {
           closeThreatDistance: integerArg(args['close-threat-distance'], 18, 6, 40),
           sprintThreatDistance: integerArg(args['sprint-threat-distance'], 30, 15, 60),
           postShotStrafeMs: integerArg(args['post-shot-strafe'], 650, 0, 1600),
+          routeSweepInterval: integerArg(args['route-sweep-interval'], 36, 12, 120),
+          routeSweepTurn: integerArg(args['route-sweep-turn'], 18, 0, 60),
         })
         : null;
       let movementCycle = 0;

@@ -11,6 +11,8 @@ export function createTacticalPolicy(options = {}) {
     closeThreatDistance: Number(options.closeThreatDistance ?? 18),
     sprintThreatDistance: Number(options.sprintThreatDistance ?? 30),
     postShotStrafeMs: Number(options.postShotStrafeMs ?? 650),
+    routeSweepInterval: Number(options.routeSweepInterval ?? 36),
+    routeSweepTurn: Number(options.routeSweepTurn ?? 18),
   };
   const state = {
     mode: 'roam',
@@ -57,7 +59,12 @@ export function createTacticalPolicy(options = {}) {
         state.damageWindowAmount += damageDelta;
         state.lastDamageAt = now;
         if (health < config.retreatHealth || state.damageWindowAmount >= config.retreatDamage) {
-          if (state.mode !== 'retreat') state.direction *= -1;
+          if (state.mode !== 'retreat') {
+            const bearing = Number(observation.minimapThreat?.bearingRadians);
+            state.direction = Number.isFinite(bearing) && Math.abs(bearing) > 0.08
+              ? (bearing > 0 ? -1 : 1)
+              : -state.direction;
+          }
           state.retreatUntil = Math.max(state.retreatUntil, now + config.retreatDurationMs);
         }
       }
@@ -131,6 +138,10 @@ export function createTacticalPolicy(options = {}) {
             if (observation.movementCycle % 10 < 6) keys.push('ShiftLeft');
             if (observation.movementCycle % 24 === 7) keys.push('KeyA');
             if (observation.movementCycle % 24 === 19) keys.push('KeyD');
+            if (observation.navigationTick && observation.movementCycle % config.routeSweepInterval === 0) {
+              const sweep = Math.floor(observation.movementCycle / config.routeSweepInterval) % 2 === 0 ? -1 : 1;
+              turn = sweep * config.routeSweepTurn;
+            }
           }
         }
       }

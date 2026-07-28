@@ -241,3 +241,12 @@ test('frame signatures detect visual motion without exposing world state', () =>
   assert.equal(signatureDifference(firstSignature, firstSignature), 0);
   assert.ok(signatureDifference(firstSignature, frameSignature(second, width, height)) > 20);
 });
+
+test('purple operator detector rejects observed range-panel edge geometries', () => {
+  const width = 80;
+  const height = 60;
+  const raw = frame(width, height);
+  paint(raw, width, 20, 20, 22, 29, [140, 80, 145]);
+  paint(raw, width, 40, 16, 47, 37, [140, 80, 145]);
+  assert.equal(findPurpleOperatorCandidates(raw, width, height).length, 0);
+});
