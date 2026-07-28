@@ -119,3 +119,41 @@ test('no-threat roaming performs bounded alternating route sweeps', () => {
   assert.equal(left.turn, -18);
   assert.equal(right.turn, 18);
 });
+
+test('visible four-kill lead activates a defensive bank without disabling rendered engagement', () => {
+  const policy = createTacticalPolicy({ bankLeadMinimumKills: 4, bankLeadMinimumMargin: 1 });
+  const bank = policy.update({
+    now: 1000,
+    active: true,
+    health: 100,
+    kills: 4,
+    deaths: 2,
+    movementCycle: 1,
+    navigationTick: false,
+  });
+  assert.equal(bank.mode, 'bank');
+  assert.equal(bank.leadBankActive, true);
+  assert.equal(bank.allowEngagement, false);
+  assert.equal(bank.allowScan, true);
+  assert.ok(!bank.keys.includes('KeyW'));
+
+  const visibleOperator = policy.update({
+    now: 1100,
+    active: true,
+    health: 100,
+    kills: 4,
+    deaths: 2,
+    currentTarget: true,
+    movementCycle: 2,
+  });
+  assert.equal(visibleOperator.mode, 'engage');
+  assert.equal(visibleOperator.allowEngagement, true);
+});
+
+test('lead banking is opt-in and missing score cannot activate it', () => {
+  const disabled = createTacticalPolicy();
+  assert.equal(disabled.update({ now: 100, active: true, health: 100, kills: 6, deaths: 1, movementCycle: 0 }).mode, 'roam');
+  const enabled = createTacticalPolicy({ bankLeadMinimumKills: 4 });
+  assert.equal(enabled.update({ now: 100, active: true, health: 100, movementCycle: 0 }).mode, 'roam');
+  assert.equal(enabled.snapshot().leadBankActive, false);
+});

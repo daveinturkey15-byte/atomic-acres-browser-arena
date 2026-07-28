@@ -14,6 +14,8 @@ export function createTacticalPolicy(options = {}) {
     routeSweepInterval: Number(options.routeSweepInterval ?? 36),
     routeSweepTurn: Number(options.routeSweepTurn ?? 18),
     threatAwareRetreatDirection: options.threatAwareRetreatDirection !== false,
+    bankLeadMinimumKills: Number(options.bankLeadMinimumKills ?? 0),
+    bankLeadMinimumMargin: Number(options.bankLeadMinimumMargin ?? 1),
   };
   const state = {
     mode: 'roam',
@@ -26,7 +28,8 @@ export function createTacticalPolicy(options = {}) {
     damageWindowStartedAt: Number.NEGATIVE_INFINITY,
     damageWindowAmount: 0,
     transitions: 0,
-    modeFrames: { roam: 0, engage: 0, retreat: 0, recover: 0 },
+    leadBankActive: false,
+    modeFrames: { roam: 0, engage: 0, retreat: 0, recover: 0, bank: 0 },
   };
 
   const transition = (mode, now, reason) => {
@@ -46,6 +49,13 @@ export function createTacticalPolicy(options = {}) {
       const health = Number(observation.health);
       const healthValid = observation.healthFresh !== false && Number.isFinite(health) && health >= 0 && health <= 100;
       const damageDelta = Math.max(0, Number(observation.damageDelta ?? 0));
+      const kills = Number(observation.kills);
+      const deaths = Number(observation.deaths);
+      const scoreFresh = Number.isFinite(kills) && Number.isFinite(deaths) && kills >= 0 && deaths >= 0;
+      if (observation.active && config.bankLeadMinimumKills > 0 && scoreFresh
+        && kills >= config.bankLeadMinimumKills && kills - deaths >= config.bankLeadMinimumMargin) {
+        state.leadBankActive = true;
+      }
       if (!observation.active) {
         state.retreatUntil = 0;
         state.recoveryUntil = 0;
@@ -102,6 +112,9 @@ export function createTacticalPolicy(options = {}) {
       } else if (observation.currentTarget || observation.rawTarget) {
         nextMode = 'engage';
         reason = observation.currentTarget ? 'confirmed-operator' : 'candidate-observation';
+      } else if (state.leadBankActive) {
+        nextMode = 'bank';
+        reason = 'visible-kill-lead-bank';
       }
       const changed = transition(nextMode, now, reason);
       state.modeFrames[nextMode] += 1;
@@ -122,6 +135,20 @@ export function createTacticalPolicy(options = {}) {
             && !observation.holdEngagement
             && now - Number(observation.lastShotAt ?? Number.NEGATIVE_INFINITY) < config.postShotStrafeMs) {
             keys.push(state.direction > 0 ? 'KeyA' : 'KeyD');
+          }
+        } else if (nextMode === 'bank') {
+          const threat = observation.minimapThreat;
+          if (threat) {
+            const bearing = Number(threat.bearingRadians ?? 0);
+            const distance = Number(threat.distance ?? Number.POSITIVE_INFINITY);
+            keys.push(bearing >= 0 ? 'KeyA' : 'KeyD');
+            if (distance <= config.closeThreatDistance) keys.push('KeyS');
+          } else {
+            keys.push(state.direction > 0 ? 'KeyA' : 'KeyD');
+          }
+          if (observation.navigationTick && observation.movementCycle % 18 === 0) {
+            state.direction *= -1;
+            turn = state.direction * 12;
           }
         } else {
           const threat = observation.minimapThreat;
@@ -155,9 +182,10 @@ export function createTacticalPolicy(options = {}) {
         keys: [...new Set(keys)],
         turn: clamp(turn, -100, 100),
         allowEngagement: nextMode === 'engage',
-        allowScan: nextMode === 'roam' || nextMode === 'engage',
+        allowScan: nextMode === 'roam' || nextMode === 'engage' || nextMode === 'bank',
         damageWindowAmount: state.damageWindowAmount,
         direction: state.direction,
+        leadBankActive: state.leadBankActive,
       };
     },
     snapshot() {
@@ -165,6 +193,7 @@ export function createTacticalPolicy(options = {}) {
         mode: state.mode,
         transitions: state.transitions,
         modeFrames: { ...state.modeFrames },
+        leadBankActive: state.leadBankActive,
         config: { ...config },
       };
     },

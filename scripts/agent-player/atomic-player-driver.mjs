@@ -331,6 +331,8 @@ async function visibleHudSnapshot(page) {
       return style.display !== 'none' && style.visibility !== 'hidden';
     };
     const timer = document.querySelector('#timer')?.textContent?.trim() ?? null;
+    const reloadState = document.querySelector('#reload-state')?.textContent?.trim() ?? '';
+    const score = reloadState.match(/(\d+)\s*K\s*\/\s*(\d+)\s*D/i);
     const countdownVisible = visible('#countdown');
     const bannerVisible = visible('#banner');
     const respawnVisible = visible('#respawn');
@@ -344,11 +346,13 @@ async function visibleHudSnapshot(page) {
       supportStreak: visibleCount('#support-streak'),
       damageDealt: numericText('#damage-dealt'),
       damageTaken: numericText('#damage-taken'),
+      kills: score ? Number(score[1]) : null,
+      deaths: score ? Number(score[2]) : null,
       timer,
       countdownVisible,
       bannerVisible,
       respawnVisible,
-      reloadState: document.querySelector('#reload-state')?.textContent?.trim() ?? '',
+      reloadState,
       reloadActive: document.querySelector('#reload-state')?.classList?.contains('active') ?? false,
       pointerLock: document.pointerLockElement?.id === 'game',
       documentFocused: document.hasFocus(),
@@ -505,6 +509,7 @@ async function run() {
   const requestedCaptureMode = String(args['capture-mode'] ?? (cdpUrl ? 'screencast' : 'on-demand'));
   if (!['screencast', 'on-demand'].includes(requestedCaptureMode)) throw new Error('--capture-mode must be screencast or on-demand');
   const candidateImageLimit = integerArg(args['candidate-images'], 12, 0, 40);
+  const fireEvidenceLimit = integerArg(args['fire-evidence-limit'], 64, 0, 100);
   const burstShots = integerArg(args['burst-shots'], 3, 1, 5);
   const maximumShotPulses = integerArg(args['max-shot-pulses'], 1_000_000, 1, 1_000_000);
   const fireCooldownMs = integerArg(args['fire-cooldown'], 420, 180, 2000);
@@ -520,6 +525,8 @@ async function run() {
   const allowTacticalItems = Boolean(args['allow-tactical-items']);
   const maximumGrenadeThrows = integerArg(args['max-grenades'], 2, 0, 6);
   const finishWindowMs = integerArg(args['finish-window'], 0, 0, 2500);
+  const bankLeadMinimumKills = integerArg(args['bank-lead-minimum-kills'], 0, 0, 20);
+  const bankLeadMinimumMargin = integerArg(args['bank-lead-minimum-margin'], 1, 1, 20);
   const allowCombatFire = Boolean(args['allow-combat-fire']);
   const allowLive = Boolean(args['allow-live']);
   const tacticalPolicyName = String(args['tactical-policy'] ?? 'legacy');
@@ -579,6 +586,7 @@ async function run() {
   let firstRawTargetAnnotatedCaptured = false;
   let firstTargetAnnotatedCaptured = false;
   const annotatedCandidateArtifacts = [];
+  const fireEvidenceFrames = [];
   let aimMoves = 0;
   let aimServoMoves = 0;
   let maximumObservedHoldMs = 0;
@@ -750,6 +758,8 @@ async function run() {
           routeSweepInterval: integerArg(args['route-sweep-interval'], 36, 6, 120),
           routeSweepTurn: integerArg(args['route-sweep-turn'], 18, 0, 60),
           threatAwareRetreatDirection: args['threat-aware-retreat'] !== 'false',
+          bankLeadMinimumKills,
+          bankLeadMinimumMargin,
         })
         : null;
       let movementCycle = 0;
@@ -911,6 +921,8 @@ async function run() {
           lastShotAt: lastBurstAt,
           movementCycle,
           navigationTick: movementCycle % navigationLaneStride === 0,
+          kills: hud?.kills,
+          deaths: hud?.deaths,
         }) ?? null;
         if (tactical?.changed) {
           actions.push({
@@ -1160,6 +1172,11 @@ async function run() {
             shotPulses += shots;
             bursts += 1;
             lastBurstAt = now;
+            let fireEvidenceFile = null;
+            if (fireEvidenceFrames.length < fireEvidenceLimit) {
+              fireEvidenceFile = `fire-evidence/burst-${String(fireEvidenceFrames.length + 1).padStart(3, '0')}.jpg`;
+              fireEvidenceFrames.push({ file: fireEvidenceFile, jpeg: aimedVision.jpeg });
+            }
             actions.push({
               atMs,
               kind: 'operator-authorized-burst',
@@ -1173,6 +1190,7 @@ async function run() {
               stableFrames: tracking.stableFrames,
               evidenceFrames: tracking.evidenceFrames,
               postInputReacquired,
+              fireEvidenceFile,
               aimTrace,
               target: { x: aimedTarget.x, y: aimedTarget.y, pixels: aimedTarget.pixels, bounds: aimedTarget.bounds },
             });
@@ -1351,6 +1369,10 @@ async function run() {
     const percentileFrom = (values, ratio) => values.length === 0
       ? null
       : values[Math.min(values.length - 1, Math.floor((values.length - 1) * ratio))];
+    if (fireEvidenceFrames.length > 0) {
+      await mkdir(resolve(artifactDirectory, 'fire-evidence'), { recursive: true });
+      await Promise.all(fireEvidenceFrames.map((entry) => writeFile(resolve(artifactDirectory, entry.file), entry.jpeg)));
+    }
     await writeFile(resolve(artifactDirectory, 'telemetry.json'), `${JSON.stringify({ schemaVersion: 1, actions }, null, 2)}\n`);
     const candidateArtifacts = Array.from({ length: candidateImagesSaved }, (_, index) => `candidate-${String(index + 1).padStart(2, '0')}.jpg`);
     const damageArtifacts = Array.from({ length: Math.min(3, damageReactions) }, (_, index) => `damage-contact-${String(index + 1).padStart(2, '0')}.jpg`);
@@ -1461,6 +1483,7 @@ async function run() {
         aimServoMoves,
         shotPulses,
         bursts,
+        fireEvidenceFrames: fireEvidenceFrames.length,
         warmupShotPulses,
         unconfirmedShotPulses,
         reloadRequests,
@@ -1532,6 +1555,7 @@ async function run() {
         ...candidateArtifacts,
         ...annotatedCandidateArtifacts,
         ...damageArtifacts,
+        ...fireEvidenceFrames.map((entry) => entry.file),
         finalScreenshotCaptured ? 'final.jpg' : null,
         matchEndedObserved ? 'post-game.jpg' : null,
         matchSummaryDownload ? 'match-summary.json' : null,
