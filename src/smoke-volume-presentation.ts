@@ -134,6 +134,7 @@ export class SmokeVolumePresentation {
   private qualityScale = 1;
   private crowdingCardLimit = SMOKE_PRESENTATION_CARD_COUNT;
   private crowdingEdgeVisible = true;
+  private crowdedCluster = false;
   private readonly disturbanceDirection = new THREE.Vector3();
   private readonly envelope: MutableSmokePresentationEnvelope = {
     active: false, growth: 0, coreOpacity: 0, edgeOpacity: 0, lifetimeProgress: 0,
@@ -235,13 +236,14 @@ export class SmokeVolumePresentation {
     this.applyCardBudget();
   }
 
-  setCrowdingBudget(cardLimit: number, edgeVisible: boolean): void {
+  setCrowdingBudget(cardLimit: number, edgeVisible: boolean, crowdedCluster = false): void {
     this.crowdingCardLimit = THREE.MathUtils.clamp(
       Math.floor(Number.isFinite(cardLimit) ? cardLimit : SMOKE_PRESENTATION_CARD_COUNT),
       1,
       SMOKE_PRESENTATION_CARD_COUNT,
     );
     this.crowdingEdgeVisible = edgeVisible;
+    this.crowdedCluster = crowdedCluster;
     this.cards.visible = this.root.visible && edgeVisible;
     this.applyCardBudget();
   }
@@ -253,7 +255,12 @@ export class SmokeVolumePresentation {
   }
 
   private applyCardBudget(): void {
-    const qualityCards = this.qualityScale >= 0.95 ? 3 : this.qualityScale >= 0.7 ? 2 : 1;
+    // The normal adaptive high-quality scale settles around 0.8. Two crossed
+    // cards can expose a camera-aligned seam at that scale, while the third
+    // card adds no draw call and only four transparent triangles per volume.
+    // Keep the one-card fallback for genuinely constrained profiles; tightly
+    // overlapping clusters retain the full basis but share their edge batch.
+    const qualityCards = this.qualityScale >= 0.7 ? 3 : 1;
     const cardCount = Math.min(qualityCards, this.crowdingCardLimit);
     this.innerCards.count = cardCount;
     this.cards.count = cardCount;
@@ -288,7 +295,7 @@ export class SmokeVolumePresentation {
       drawCalls: this.isActive() ? 1 + Number(this.cards.visible) : 0,
       cards: this.cards.count,
       qualityScale: this.qualityScale,
-      crowded: this.crowdingCardLimit < SMOKE_PRESENTATION_CARD_COUNT,
+      crowded: this.crowdedCluster,
       coreOpacity: this.coreMaterial.opacity,
       edgeOpacity: this.edgeMaterial.opacity,
       triangles: (this.innerCards.count + this.cards.count) * 2,
@@ -503,13 +510,14 @@ export class SmokeVolumePresentationPool {
       const crowded = component.length >= 3;
       for (const [index, member] of component.entries()) {
         member.presentation.setCrowdingBudget(
-          crowded ? 2 : SMOKE_PRESENTATION_CARD_COUNT,
+          SMOKE_PRESENTATION_CARD_COUNT,
           !crowded || index === 0,
+          crowded,
         );
       }
     }
     for (const { presentation } of this.slots) {
-      if (!presentation.isActive()) presentation.setCrowdingBudget(SMOKE_PRESENTATION_CARD_COUNT, true);
+      if (!presentation.isActive()) presentation.setCrowdingBudget(SMOKE_PRESENTATION_CARD_COUNT, true, false);
     }
   }
 

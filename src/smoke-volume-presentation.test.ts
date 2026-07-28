@@ -168,7 +168,7 @@ describe('smoke grenade volume presentation', () => {
     expect(pool.telemetry()).toMatchObject({ active: 1, cardsPerVolume: 1, qualityScale: 0.5 });
     expect(scene.getObjectByName('smoke-grenade-inner-density-cards')?.visible).not.toBe(false);
     pool.setQualityScale(0.8);
-    expect(pool.telemetry().cardsPerVolume).toBe(2);
+    expect(pool.telemetry().cardsPerVolume).toBe(3);
   });
 
   it('collapses redundant cards and edges only for tightly overlapping smoke clusters', () => {
@@ -183,7 +183,7 @@ describe('smoke grenade volume presentation', () => {
     pool.update(third, 2_000);
     expect(pool.telemetry()).toMatchObject({
       active: 3,
-      cardsPerVolume: 2,
+      cardsPerVolume: 3,
       crowdedVolumes: 3,
       visibleDrawCalls: 4,
     });
@@ -191,7 +191,7 @@ describe('smoke grenade volume presentation', () => {
     pool.release(first);
     expect(pool.telemetry()).toMatchObject({
       active: 2,
-      cardsPerVolume: 2,
+      cardsPerVolume: 3,
       crowdedVolumes: 0,
       visibleDrawCalls: 4,
     });
@@ -199,7 +199,7 @@ describe('smoke grenade volume presentation', () => {
     pool.update(distant, 2_000);
     expect(pool.telemetry()).toMatchObject({
       active: 3,
-      cardsPerVolume: 2,
+      cardsPerVolume: 3,
       crowdedVolumes: 0,
       visibleDrawCalls: 6,
     });
