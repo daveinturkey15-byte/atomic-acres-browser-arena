@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "kind": "atomic-profile-live-loop-invariance",
+  "profileLabel": "atomicnormal",
+  "profileEnvironment": "atomicnormal",
+  "profileEnvironmentReadByControlPath": false,
+  "graphAudit": {
+    "entry": "/root/jigglyclaw/worktrees/atomic-player/scripts/agent-player/atomic-player-driver.mjs",
+    "transitiveLocalFiles": [
+      "/root/jigglyclaw/worktrees/atomic-player/scripts/agent-player/atomic-player-driver.mjs",
+      "/root/jigglyclaw/worktrees/atomic-player/scripts/agent-player/combat-actions.mjs",
+      "/root/jigglyclaw/worktrees/atomic-player/scripts/agent-player/finish-latch.mjs",
+      "/root/jigglyclaw/worktrees/atomic-player/scripts/agent-player/shot-evidence.mjs",
+      "/root/jigglyclaw/worktrees/atomic-player/scripts/agent-player/tactical-policy.mjs",
+      "/root/jigglyclaw/worktrees/atomic-player/scripts/agent-player/vision.mjs"
+    ],
+    "transitiveLocalFileCount": 6,
+    "findings": [],
+    "modelOrNetworkFree": true,
+    "profileEnvironmentRead": false
+  },
+  "evidence": {
+    "source": "G0076 saved rendered fire-evidence JPEGs",
+    "frameCount": 30,
+    "iterations": 10,
+    "detectorEvaluations": 300,
+    "finalCandidateCount": 22,
+    "semanticSha256": "97039fdfd0fc90903477e5a566521f883307e46f166704d6ed78aa80808eb0ed",
+    "detectorElapsedMs": 5571.78454,
+    "detectorMeanMsPerFrame": 18.572615133333333
+  }
+}

@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "kind": "atomic-profile-orchestration-latency-benchmark",
+  "generatedAt": "2026-07-28T21:40:13.386662+00:00",
+  "protocol": {
+    "suite": "audit",
+    "profiles": [
+      "atomicnormal",
+      "atomicplayer",
+      "atomicsolmedium",
+      "atomicluna",
+      "atomicterra"
+    ],
+    "warmupsPerProfile": 1,
+    "countedRepetitionsPerProfile": 3,
+    "randomSeed": 20260729,
+    "freshProcessPerInvocation": true,
+    "prompt": "You are the independent offline verifier for an Atomic Acres policy review. Do not use tools. Apply zero-regression and causal-mechanism rules.\n\nEvidence:\n- G0031 retained fallback: 4-8, K/D 0.50, 61.5% accuracy, 494 damage, streak 3, correct carbine, hard gates clean.\n- G0068: spawned with the wrong weapon and struck a cyan practice target.\n- R0016: static cyan Gun Range calibration, 197/198 (99.5%); no moving-target combat model or weights were updated.\n- G0071: 2-4, K/D 0.50, 24.2% accuracy, 278 damage, streak 2.\n- G0075 changed only the visible-hit finish latch: 2-4, K/D 0.50, 38.9% accuracy, 200 damage, streak 2; finishWindows=0 and finishFollowupPulses=0.\n- G0076 repeated the same candidate: 2-11, K/D 0.18, 30.0% accuracy, 272 damage; finishWindows=0 and finishFollowupPulses=0.\n- A candidate cannot be credited for an improvement when its changed mechanism never activated. Matching headline K/D does not permit regression in kills, accuracy, damage, or streak. A valid promotion must replicate.\n\nReturn ONLY JSON with exactly these keys and no markdown:\n- retain: one game ID;\n- invalidate: array selected from G0068;\n- reject: array selected from G0071, G0075, G0076, R0016-combat-promotion, sorted in that order;\n- causal_claim: one of none or finish-latch-supported;\n- next_experiment: one of promote-G0075, lower-alignment, pending-hit-reacquisition;\n- reason_codes: applicable items in this canonical order: wrong-weapon-invalid, range-is-not-combat-learning, headline-kd-regresses-core-offense, changed-mechanism-never-activated, replication-failed.\n",
+    "expected": {
+      "retain": "G0031",
+      "invalidate": [
+        "G0068"
+      ],
+      "reject": [
+        "G0071",
+        "G0075",
+        "G0076",
+        "R0016-combat-promotion"
+      ],
+      "causal_claim": "none",
+      "next_experiment": "pending-hit-reacquisition",
+      "reason_codes": [
+        "wrong-weapon-invalid",
+        "range-is-not-combat-learning",
+        "headline-kd-regresses-core-offense",
+        "changed-mechanism-never-activated",
+        "replication-failed"
+      ]
+    }
+  },
+  "summary": {
+    "profiles": {
+      "atomicnormal": {
+        "count": 3,
+        "successful": 3,
+        "qualityPasses": 3,
+        "qualityPassRate": 1.0,
+        "latencySeconds": {
+          "minimum": 13.212,
+          "median": 14.137,
+          "mean": 14.399,
+          "p90": 15.847,
+          "maximum": 15.847
+        }
+      },
+      "atomicplayer": {
+        "count": 3,
+        "successful": 3,
+        "qualityPasses": 3,
+        "qualityPassRate": 1.0,
+        "latencySeconds": {
+          "minimum": 13.444,
+          "median": 14.125,
+          "mean": 14.007,
+          "p90": 14.453,
+          "maximum": 14.453
+        }
+      },
+      "atomicsolmedium": {
+        "count": 3,
+        "successful": 3,
+        "qualityPasses": 2,
+        "qualityPassRate": 0.6667,
+        "latencySeconds": {
+          "minimum": 9.606,
+          "median": 10.951,
+          "mean": 11.413,
+          "p90": 13.681,
+          "maximum": 13.681
+        }
+      },
+      "atomicluna": {
+        "count": 3,
+        "successful": 3,
+        "qualityPasses": 3,
+        "qualityPassRate": 1.0,
+        "latencySeconds": {
+          "minimum": 8.484,
+          "median": 8.543,
+          "mean": 8.569,
+          "p90": 8.681,
+          "maximum": 8.681
+        }
+      },
+      "atomicterra": {
+        "count": 3,
+        "successful": 3,
+        "qualityPasses": 3,
+        "qualityPassRate": 1.0,
+        "latencySeconds": {
+          "minimum": 7.77,
+          "median": 7.951,
+          "mean": 8.909,
+          "p90": 11.007,
+          "maximum": 11.007
+        }
+      }
+    },
+    "comparisons": {
+      "solHighPriorityVsNormalMedianSeconds": -0.012,
+      "solHighPrioritySpeedupPercent": 0.08,
+      "solMediumVsHighPriorityMedianSeconds": -3.174,
+      "solMediumSpeedupPercent": 22.47
+    },
+    "fastestQualityCleanProfile": "atomicterra"
+  },
+  "rawResultsFile": "atomic-profile-causal-audit-20260728.jsonl"
+}

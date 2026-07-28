@@ -1,0 +1,18 @@
+You are the independent offline verifier for an Atomic Acres policy review. Do not use tools. Apply zero-regression and causal-mechanism rules.
+
+Evidence:
+- G0031 retained fallback: 4-8, K/D 0.50, 61.5% accuracy, 494 damage, streak 3, correct carbine, hard gates clean.
+- G0068: spawned with the wrong weapon and struck a cyan practice target.
+- R0016: static cyan Gun Range calibration, 197/198 (99.5%); no moving-target combat model or weights were updated.
+- G0071: 2-4, K/D 0.50, 24.2% accuracy, 278 damage, streak 2.
+- G0075 changed only the visible-hit finish latch: 2-4, K/D 0.50, 38.9% accuracy, 200 damage, streak 2; finishWindows=0 and finishFollowupPulses=0.
+- G0076 repeated the same candidate: 2-11, K/D 0.18, 30.0% accuracy, 272 damage; finishWindows=0 and finishFollowupPulses=0.
+- A candidate cannot be credited for an improvement when its changed mechanism never activated. Matching headline K/D does not permit regression in kills, accuracy, damage, or streak. A valid promotion must replicate.
+
+Return ONLY JSON with exactly these keys and no markdown:
+- retain: one game ID;
+- invalidate: array selected from G0068;
+- reject: array selected from G0071, G0075, G0076, R0016-combat-promotion, sorted in that order;
+- causal_claim: one of none or finish-latch-supported;
+- next_experiment: one of promote-G0075, lower-alignment, pending-hit-reacquisition;
+- reason_codes: applicable items in this canonical order: wrong-weapon-invalid, range-is-not-combat-learning, headline-kd-regresses-core-offense, changed-mechanism-never-activated, replication-failed.

@@ -1,0 +1,40 @@
+{
+  "atomicnormal": {
+    "configured": "normal",
+    "parsed": null,
+    "model": "gpt-5.6-sol",
+    "chatRequestOverrides": null
+  },
+  "atomicplayer": {
+    "configured": "priority",
+    "parsed": "priority",
+    "model": "gpt-5.6-sol",
+    "chatRequestOverrides": {
+      "service_tier": "priority"
+    }
+  },
+  "atomicsolmedium": {
+    "configured": "priority",
+    "parsed": "priority",
+    "model": "gpt-5.6-sol",
+    "chatRequestOverrides": {
+      "service_tier": "priority"
+    }
+  },
+  "atomicluna": {
+    "configured": "priority",
+    "parsed": "priority",
+    "model": "gpt-5.6-luna",
+    "chatRequestOverrides": {
+      "service_tier": "priority"
+    }
+  },
+  "atomicterra": {
+    "configured": "priority",
+    "parsed": "priority",
+    "model": "gpt-5.6-terra",
+    "chatRequestOverrides": {
+      "service_tier": "priority"
+    }
+  }
+}

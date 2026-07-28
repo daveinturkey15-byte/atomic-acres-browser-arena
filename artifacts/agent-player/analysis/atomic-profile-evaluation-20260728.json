@@ -1,0 +1,218 @@
+{
+  "schemaVersion": 1,
+  "kind": "atomic-profile-latency-and-live-path-evaluation",
+  "date": "2026-07-28",
+  "resolvedProfiles": {
+    "default": {
+      "provider": "openai-codex",
+      "model": "gpt-5.6-sol",
+      "reasoningEffort": "high",
+      "serviceTier": "normal",
+      "terminalCwd": "/root/.hermes"
+    },
+    "atomicnormal": {
+      "provider": "openai-codex",
+      "model": "gpt-5.6-sol",
+      "reasoningEffort": "high",
+      "serviceTier": "normal",
+      "terminalCwd": "/root/jigglyclaw/worktrees/atomic-player"
+    },
+    "atomicplayer": {
+      "provider": "openai-codex",
+      "model": "gpt-5.6-sol",
+      "reasoningEffort": "high",
+      "serviceTier": "priority",
+      "terminalCwd": "/root/jigglyclaw/worktrees/atomic-player"
+    },
+    "atomicsolmedium": {
+      "provider": "openai-codex",
+      "model": "gpt-5.6-sol",
+      "reasoningEffort": "medium",
+      "serviceTier": "priority",
+      "terminalCwd": "/root/jigglyclaw/worktrees/atomic-player"
+    },
+    "atomicluna": {
+      "provider": "openai-codex",
+      "model": "gpt-5.6-luna",
+      "reasoningEffort": "medium",
+      "serviceTier": "priority",
+      "terminalCwd": "/root/jigglyclaw/worktrees/atomic-player"
+    },
+    "atomicterra": {
+      "provider": "openai-codex",
+      "model": "gpt-5.6-terra",
+      "reasoningEffort": "medium",
+      "serviceTier": "priority",
+      "terminalCwd": "/root/jigglyclaw/worktrees/atomic-player"
+    }
+  },
+  "countedModelInvocations": 40,
+  "modelPlane": {
+    "combined": {
+      "atomicnormal": {
+        "qualityPasses": 8,
+        "qualityCount": 8,
+        "quickMedianSeconds": 8.633,
+        "auditMedianSeconds": 14.137
+      },
+      "atomicplayer": {
+        "qualityPasses": 8,
+        "qualityCount": 8,
+        "quickMedianSeconds": 8.678,
+        "auditMedianSeconds": 14.125
+      },
+      "atomicsolmedium": {
+        "qualityPasses": 7,
+        "qualityCount": 8,
+        "quickMedianSeconds": 8.304,
+        "auditMedianSeconds": 10.951
+      },
+      "atomicluna": {
+        "qualityPasses": 8,
+        "qualityCount": 8,
+        "quickMedianSeconds": 7.145,
+        "auditMedianSeconds": 8.543
+      },
+      "atomicterra": {
+        "qualityPasses": 8,
+        "qualityCount": 8,
+        "quickMedianSeconds": 7.143,
+        "auditMedianSeconds": 7.951
+      }
+    },
+    "serviceTierIsolation": {
+      "normalProfile": "atomicnormal",
+      "priorityProfile": "atomicplayer",
+      "sameModel": "gpt-5.6-sol",
+      "sameReasoning": "high",
+      "quickMedianDeltaSeconds": 0.045,
+      "auditMedianDeltaSeconds": -0.012,
+      "conclusion": "no material priority-vs-normal latency difference in this sample"
+    },
+    "reasoningIsolation": {
+      "highProfile": "atomicplayer",
+      "mediumProfile": "atomicsolmedium",
+      "sameModel": "gpt-5.6-sol",
+      "sameTier": "priority",
+      "quickMediumSpeedupPercent": 4.31,
+      "auditMediumSpeedupPercent": 22.47,
+      "mediumQualityPasses": 7,
+      "mediumQualityCount": 8,
+      "failure": "one audit chose lower-alignment instead of pending-hit-reacquisition",
+      "conclusion": "medium Sol is faster on the longer audit but not zero-regression quality-clean"
+    },
+    "helpers": {
+      "lunaQuickSpeedupVsHighSolPercent": 17.67,
+      "lunaAuditSpeedupVsHighSolPercent": 39.52,
+      "terraQuickSpeedupVsHighSolPercent": 17.69,
+      "terraAuditSpeedupVsHighSolPercent": 43.71,
+      "lunaQuality": 8,
+      "terraQuality": 8,
+      "qualityCountEach": 8
+    },
+    "threeLaneParallelSmoke": {
+      "elapsedSeconds": 14.629,
+      "exactStructuredConsensus": true,
+      "laneSeconds": {
+        "atomicplayer": 14.625,
+        "atomicluna": 11.106,
+        "atomicterra": 9.987
+      }
+    },
+    "chatRouteResolution": {
+      "atomicnormal": {
+        "configured": "normal",
+        "parsed": null,
+        "model": "gpt-5.6-sol",
+        "chatRequestOverrides": null
+      },
+      "atomicplayer": {
+        "configured": "priority",
+        "parsed": "priority",
+        "model": "gpt-5.6-sol",
+        "chatRequestOverrides": {
+          "service_tier": "priority"
+        }
+      },
+      "atomicsolmedium": {
+        "configured": "priority",
+        "parsed": "priority",
+        "model": "gpt-5.6-sol",
+        "chatRequestOverrides": {
+          "service_tier": "priority"
+        }
+      },
+      "atomicluna": {
+        "configured": "priority",
+        "parsed": "priority",
+        "model": "gpt-5.6-luna",
+        "chatRequestOverrides": {
+          "service_tier": "priority"
+        }
+      },
+      "atomicterra": {
+        "configured": "priority",
+        "parsed": "priority",
+        "model": "gpt-5.6-terra",
+        "chatRequestOverrides": {
+          "service_tier": "priority"
+        }
+      }
+    },
+    "oneshotProbeCaveat": {
+      "observed": "both priority and normal `hermes -z --usage-file` probes reported service_tier null",
+      "cause": "Hermes oneshot _run_agent bypasses service-tier/request-overrides wiring; this probe is not valid evidence about chat -Q routing",
+      "correction": "Atomic review team and latency benchmark use `hermes ... chat -Q`; do not use `hermes -z` for a priority-sensitive lane until oneshot wiring is fixed",
+      "verify": "profile configs parse to priority and resolve chat request overrides to {service_tier: priority}"
+    }
+  },
+  "livePlane": {
+    "sourceGraphClean": true,
+    "profileEnvironmentRead": false,
+    "semanticOutputsIdentical": true,
+    "semanticSha256": "97039fdfd0fc90903477e5a566521f883307e46f166704d6ed78aa80808eb0ed",
+    "detectorEvaluations": 1500,
+    "meanMsPerFrameRange": [
+      18.41057,
+      19.81057
+    ],
+    "g0076TriggerTiming": {
+      "schemaVersion": 1,
+      "kind": "atomic-live-trigger-timing-summary",
+      "source": "G0076 rendered-state-shot-evidence",
+      "shotRequests": 30,
+      "modelInvocationsInControlPath": 0,
+      "nodeToBrowserDispatchMs": {
+        "minimum": 2,
+        "median": 5.0,
+        "p95": 18,
+        "maximum": 23
+      },
+      "authorityFrameAgeAtTriggerMs": {
+        "minimum": 13.895699999993667,
+        "median": 14.73044999999911,
+        "p95": 16.276200000000244,
+        "maximum": 44.85089999999764
+      },
+      "observedHoldMs": {
+        "minimum": 88.27290000001085,
+        "median": 95.28469999998924,
+        "p95": 100.3914999999979,
+        "maximum": 131.2548999999999
+      },
+      "allNewerThanLastAimInput": true,
+      "allTwoFrameAligned": true
+    }
+  },
+  "recommendation": {
+    "chat": "keep default Sol high normal unchanged",
+    "primary": "atomicplayer Sol high priority",
+    "helpers": [
+      "atomicluna Luna medium priority",
+      "atomicterra Terra medium priority"
+    ],
+    "inputOwner": "deterministic rendered-pixel driver only",
+    "rejectAsPrimary": "atomicsolmedium due 1/8 causal-quality failure",
+    "claimBoundary": "profile/model settings affect offline orchestration turnaround, not per-frame aim or trigger latency in the current architecture"
+  }
+}

@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "kind": "atomic-offline-three-lane-review",
+  "generatedAt": "2026-07-28T21:44:18.419162+00:00",
+  "authority": {
+    "scope": "offline evidence review only",
+    "liveInputAuthority": false,
+    "automaticPromotionAuthority": false,
+    "requiredHumanOrMechanicalGate": true
+  },
+  "promptFile": "/root/jigglyclaw/worktrees/atomic-player/scripts/agent-player/fixtures/atomic-causal-audit.txt",
+  "teamElapsedSeconds": 14.629,
+  "allLanesExitedZero": true,
+  "allLanesParseable": true,
+  "exactStructuredConsensus": true,
+  "lanes": [
+    {
+      "lane": "primary",
+      "profile": "atomicplayer",
+      "elapsedSeconds": 14.625,
+      "exitCode": 0,
+      "sessionId": null,
+      "parsed": {
+        "retain": "G0031",
+        "invalidate": [
+          "G0068"
+        ],
+        "reject": [
+          "G0071",
+          "G0075",
+          "G0076",
+          "R0016-combat-promotion"
+        ],
+        "causal_claim": "none",
+        "next_experiment": "pending-hit-reacquisition",
+        "reason_codes": [
+          "wrong-weapon-invalid",
+          "range-is-not-combat-learning",
+          "headline-kd-regresses-core-offense",
+          "changed-mechanism-never-activated",
+          "replication-failed"
+        ]
+      },
+      "stdout": "{\"retain\":\"G0031\",\"invalidate\":[\"G0068\"],\"reject\":[\"G0071\",\"G0075\",\"G0076\",\"R0016-combat-promotion\"],\"causal_claim\":\"none\",\"next_experiment\":\"pending-hit-reacquisition\",\"reason_codes\":[\"wrong-weapon-invalid\",\"range-is-not-combat-learning\",\"headline-kd-regresses-core-offense\",\"changed-mechanism-never-activated\",\"replication-failed\"]}\n",
+      "stderr": "\u001b[33m\u26a0 Config issues detected in config.yaml:\u001b[0m\n  \u001b[33m\u26a0\u001b[0m Unknown top-level config key 'group_sessions_per_user' \u2014 it will be ignored\n  \u001b[33m\u26a0\u001b[0m Unknown top-level config key 'known_plugin_toolsets' \u2014 it will be ignored\n  \u001b[33m\u26a0\u001b[0m Unknown top-level config key 'platform_reasoning_efforts' \u2014 it will be ignored\n  \u001b[33m\u26a0\u001b[0m Unknown top-level config key 'chat_toolset_overrides' \u2014 it will be ignored\n  \u001b[2mRun 'hermes doctor' for fix suggestions.\u001b[0m\n\n\nsession_id: 20260728_224406_63982d\n"
+    },
+    {
+      "lane": "helper-luna",
+      "profile": "atomicluna",
+      "elapsedSeconds": 11.106,
+      "exitCode": 0,
+      "sessionId": null,
+      "parsed": {
+        "retain": "G0031",
+        "invalidate": [
+          "G0068"
+        ],
+        "reject": [
+          "G0071",
+          "G0075",
+          "G0076",
+          "R0016-combat-promotion"
+        ],
+        "causal_claim": "none",
+        "next_experiment": "pending-hit-reacquisition",
+        "reason_codes": [
+          "wrong-weapon-invalid",
+          "range-is-not-combat-learning",
+          "headline-kd-regresses-core-offense",
+          "changed-mechanism-never-activated",
+          "replication-failed"
+        ]
+      },
+      "stdout": "{\"retain\":\"G0031\",\"invalidate\":[\"G0068\"],\"reject\":[\"G0071\",\"G0075\",\"G0076\",\"R0016-combat-promotion\"],\"causal_claim\":\"none\",\"next_experiment\":\"pending-hit-reacquisition\",\"reason_codes\":[\"wrong-weapon-invalid\",\"range-is-not-combat-learning\",\"headline-kd-regresses-core-offense\",\"changed-mechanism-never-activated\",\"replication-failed\"]}\n",
+      "stderr": "\u001b[33m\u26a0 Config issues detected in config.yaml:\u001b[0m\n  \u001b[33m\u26a0\u001b[0m Unknown top-level config key 'group_sessions_per_user' \u2014 it will be ignored\n  \u001b[33m\u26a0\u001b[0m Unknown top-level config key 'known_plugin_toolsets' \u2014 it will be ignored\n  \u001b[33m\u26a0\u001b[0m Unknown top-level config key 'platform_reasoning_efforts' \u2014 it will be ignored\n  \u001b[2mRun 'hermes doctor' for fix suggestions.\u001b[0m\n\n\nsession_id: 20260728_224405_8a5ea2\n"
+    },
+    {
+      "lane": "helper-terra",
+      "profile": "atomicterra",
+      "elapsedSeconds": 9.987,
+      "exitCode": 0,
+      "sessionId": null,
+      "parsed": {
+        "retain": "G0031",
+        "invalidate": [
+          "G0068"
+        ],
+        "reject": [
+          "G0071",
+          "G0075",
+          "G0076",
+          "R0016-combat-promotion"
+        ],
+        "causal_claim": "none",
+        "next_experiment": "pending-hit-reacquisition",
+        "reason_codes": [
+          "wrong-weapon-invalid",
+          "range-is-not-combat-learning",
+          "headline-kd-regresses-core-offense",
+          "changed-mechanism-never-activated",
+          "replication-failed"
+        ]
+      },
+      "stdout": "{\"retain\":\"G0031\",\"invalidate\":[\"G0068\"],\"reject\":[\"G0071\",\"G0075\",\"G0076\",\"R0016-combat-promotion\"],\"causal_claim\":\"none\",\"next_experiment\":\"pending-hit-reacquisition\",\"reason_codes\":[\"wrong-weapon-invalid\",\"range-is-not-combat-learning\",\"headline-kd-regresses-core-offense\",\"changed-mechanism-never-activated\",\"replication-failed\"]}\n",
+      "stderr": "\u001b[33m\u26a0 Config issues detected in config.yaml:\u001b[0m\n  \u001b[33m\u26a0\u001b[0m Unknown top-level config key 'group_sessions_per_user' \u2014 it will be ignored\n  \u001b[33m\u26a0\u001b[0m Unknown top-level config key 'known_plugin_toolsets' \u2014 it will be ignored\n  \u001b[33m\u26a0\u001b[0m Unknown top-level config key 'platform_reasoning_efforts' \u2014 it will be ignored\n  \u001b[2mRun 'hermes doctor' for fix suggestions.\u001b[0m\n\n\nsession_id: 20260728_224406_6200ae\n"
+    }
+  ]
+}

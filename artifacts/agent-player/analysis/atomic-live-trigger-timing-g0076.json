@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "kind": "atomic-live-trigger-timing-summary",
+  "source": "G0076 rendered-state-shot-evidence",
+  "shotRequests": 30,
+  "modelInvocationsInControlPath": 0,
+  "nodeToBrowserDispatchMs": {
+    "minimum": 2,
+    "median": 5.0,
+    "p95": 18,
+    "maximum": 23
+  },
+  "authorityFrameAgeAtTriggerMs": {
+    "minimum": 13.895699999993667,
+    "median": 14.73044999999911,
+    "p95": 16.276200000000244,
+    "maximum": 44.85089999999764
+  },
+  "observedHoldMs": {
+    "minimum": 88.27290000001085,
+    "median": 95.28469999998924,
+    "p95": 100.3914999999979,
+    "maximum": 131.2548999999999
+  },
+  "allNewerThanLastAimInput": true,
+  "allTwoFrameAligned": true
+}

@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "kind": "atomic-profile-live-loop-invariance-summary",
+  "profiles": [
+    "atomicluna",
+    "atomicnormal",
+    "atomicplayer",
+    "atomicsolmedium",
+    "atomicterra"
+  ],
+  "allGraphAuditsClean": true,
+  "anyProfileEnvironmentRead": false,
+  "semanticHashes": [
+    "97039fdfd0fc90903477e5a566521f883307e46f166704d6ed78aa80808eb0ed"
+  ],
+  "semanticOutputsIdentical": true,
+  "runs": [
+    {
+      "profile": "atomicluna",
+      "frameCount": 30,
+      "iterations": 10,
+      "detectorEvaluations": 300,
+      "candidateCount": 22,
+      "semanticSha256": "97039fdfd0fc90903477e5a566521f883307e46f166704d6ed78aa80808eb0ed",
+      "detectorElapsedMs": 5523.171,
+      "detectorMeanMsPerFrame": 18.41057
+    },
+    {
+      "profile": "atomicnormal",
+      "frameCount": 30,
+      "iterations": 10,
+      "detectorEvaluations": 300,
+      "candidateCount": 22,
+      "semanticSha256": "97039fdfd0fc90903477e5a566521f883307e46f166704d6ed78aa80808eb0ed",
+      "detectorElapsedMs": 5571.785,
+      "detectorMeanMsPerFrame": 18.57262
+    },
+    {
+      "profile": "atomicplayer",
+      "frameCount": 30,
+      "iterations": 10,
+      "detectorEvaluations": 300,
+      "candidateCount": 22,
+      "semanticSha256": "97039fdfd0fc90903477e5a566521f883307e46f166704d6ed78aa80808eb0ed",
+      "detectorElapsedMs": 5943.172,
+      "detectorMeanMsPerFrame": 19.81057
+    },
+    {
+      "profile": "atomicsolmedium",
+      "frameCount": 30,
+      "iterations": 10,
+      "detectorEvaluations": 300,
+      "candidateCount": 22,
+      "semanticSha256": "97039fdfd0fc90903477e5a566521f883307e46f166704d6ed78aa80808eb0ed",
+      "detectorElapsedMs": 5632.654,
+      "detectorMeanMsPerFrame": 18.77551
+    },
+    {
+      "profile": "atomicterra",
+      "frameCount": 30,
+      "iterations": 10,
+      "detectorEvaluations": 300,
+      "candidateCount": 22,
+      "semanticSha256": "97039fdfd0fc90903477e5a566521f883307e46f166704d6ed78aa80808eb0ed",
+      "detectorElapsedMs": 5878.7,
+      "detectorMeanMsPerFrame": 19.59567
+    }
+  ]
+}

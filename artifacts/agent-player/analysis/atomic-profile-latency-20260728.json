@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "kind": "atomic-profile-orchestration-latency-benchmark",
+  "generatedAt": "2026-07-28T21:35:13.478161+00:00",
+  "protocol": {
+    "profiles": [
+      "atomicnormal",
+      "atomicplayer",
+      "atomicsolmedium",
+      "atomicluna",
+      "atomicterra"
+    ],
+    "warmupsPerProfile": 1,
+    "countedRepetitionsPerProfile": 5,
+    "randomSeed": 20260728,
+    "freshProcessPerInvocation": true,
+    "prompt": "You are an offline Atomic Acres experiment reviewer. Do not use tools.\nObserved evidence:\n- retained fallback G0031: 4 kills, 8 deaths, K/D 0.50, 61.5% accuracy, 494 damage, streak 3;\n- paired control G0074: 0 kills, 5 deaths, K/D 0.00, 10.0% accuracy, 25 damage;\n- candidate G0075: 2 kills, 4 deaths, K/D 0.50, 38.9% accuracy, 200 damage, streak 2;\n- candidate policy change: visible-hit finish latch;\n- G0075 finishWindows=0 and finishFollowupPulses=0;\n- all hard safety gates passed.\nReturn ONLY one JSON object, no markdown and no extra keys:\n{\"causal_attribution\":false,\"promote\":false,\"next_experiment\":\"pending-hit-reacquisition\",\"reason_codes\":[\"mechanism-never-activated\",\"g0031-core-metrics-regressed\"]}\n",
+    "expected": {
+      "causal_attribution": false,
+      "promote": false,
+      "next_experiment": "pending-hit-reacquisition",
+      "reason_codes": [
+        "mechanism-never-activated",
+        "g0031-core-metrics-regressed"
+      ]
+    }
+  },
+  "summary": {
+    "profiles": {
+      "atomicnormal": {
+        "count": 5,
+        "successful": 5,
+        "qualityPasses": 5,
+        "qualityPassRate": 1.0,
+        "latencySeconds": {
+          "minimum": 6.997,
+          "median": 8.633,
+          "mean": 9.402,
+          "p90": 11.654,
+          "maximum": 11.654
+        }
+      },
+      "atomicplayer": {
+        "count": 5,
+        "successful": 5,
+        "qualityPasses": 5,
+        "qualityPassRate": 1.0,
+        "latencySeconds": {
+          "minimum": 7.328,
+          "median": 8.678,
+          "mean": 8.923,
+          "p90": 11.282,
+          "maximum": 11.282
+        }
+      },
+      "atomicsolmedium": {
+        "count": 5,
+        "successful": 5,
+        "qualityPasses": 5,
+        "qualityPassRate": 1.0,
+        "latencySeconds": {
+          "minimum": 7.332,
+          "median": 8.304,
+          "mean": 9.259,
+          "p90": 14.594,
+          "maximum": 14.594
+        }
+      },
+      "atomicluna": {
+        "count": 5,
+        "successful": 5,
+        "qualityPasses": 5,
+        "qualityPassRate": 1.0,
+        "latencySeconds": {
+          "minimum": 6.746,
+          "median": 7.145,
+          "mean": 7.111,
+          "p90": 7.529,
+          "maximum": 7.529
+        }
+      },
+      "atomicterra": {
+        "count": 5,
+        "successful": 5,
+        "qualityPasses": 5,
+        "qualityPassRate": 1.0,
+        "latencySeconds": {
+          "minimum": 5.738,
+          "median": 7.143,
+          "mean": 7.016,
+          "p90": 8.489,
+          "maximum": 8.489
+        }
+      }
+    },
+    "comparisons": {
+      "solHighPriorityVsNormalMedianSeconds": 0.045,
+      "solHighPrioritySpeedupPercent": -0.52,
+      "solMediumVsHighPriorityMedianSeconds": -0.374,
+      "solMediumSpeedupPercent": 4.31
+    },
+    "fastestQualityCleanProfile": "atomicterra"
+  },
+  "rawResultsFile": "atomic-profile-latency-20260728.jsonl"
+}
