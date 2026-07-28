@@ -477,6 +477,7 @@ describe('killstreak presentation', () => {
     expect(supportForwardAlignment(drone, 'drone-gun-receiver', 'drone-gun-muzzle-socket')).toBeCloseTo(1, 6);
     expect(supportForwardAlignment(aircraft, 'care-aircraft-fuselage', 'care-aircraft-forward-socket')).toBeCloseTo(1, 6);
     expect(presentation.firstPersonCameraAnchor('ks-1-chopper-1')).not.toBeNull();
+    expect((chopper.getObjectByName('chopper-cockpit-dashboard-3d') as THREE.Mesh).visible).toBe(false);
     const dashboardMaterial = (chopper.getObjectByName('chopper-cockpit-dashboard-3d') as THREE.Mesh)
       .material as THREE.Material;
     const dashboardBaseDepthWrite = dashboardMaterial.depthWrite;
@@ -495,6 +496,7 @@ describe('killstreak presentation', () => {
     presentation.setFirstPersonEntity(null);
     expect(chopper.visible).toBe(true);
     expect((chopper.getObjectByName('chopper-fuselage') as THREE.Mesh).visible).toBe(true);
+    expect((chopper.getObjectByName('chopper-cockpit-dashboard-3d') as THREE.Mesh).visible).toBe(false);
     expect((chopper.getObjectByName('chopper-first-person-rotor-blade-a') as THREE.Mesh).visible).toBe(false);
     expect(dashboardMaterial.depthWrite).toBe(dashboardBaseDepthWrite);
     const carePackage = presentation.root.getObjectByName('pass65-care-package') as THREE.Group;
