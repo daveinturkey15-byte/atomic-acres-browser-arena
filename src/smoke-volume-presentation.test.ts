@@ -41,9 +41,7 @@ describe('smoke grenade volume presentation', () => {
       const alphaTextures = new Set<THREE.Texture>();
       for (const presentationRoot of pool.root.children) {
         expect(presentationRoot.visible).toBe(true);
-        expect(presentationRoot.scale.toArray()).toEqual(
-          presentationRoot === firstRoot ? [2, 3, 4] : [1, 1, 1],
-        );
+        expect(presentationRoot.scale.toArray()).toEqual([4.2, 4.2, 4.2]);
         presentationRoot.traverse((node) => {
           expect(node.visible).toBe(true);
           expect(node.frustumCulled).toBe(false);
@@ -52,6 +50,7 @@ describe('smoke grenade volume presentation', () => {
           const nodeMaterials = Array.isArray(node.material) ? node.material : [node.material];
           for (const material of nodeMaterials) {
             materials.add(material);
+            if (material instanceof THREE.MeshBasicMaterial) expect(material.opacity).toBeGreaterThan(0);
             if (material instanceof THREE.MeshBasicMaterial && material.alphaMap) alphaTextures.add(material.alphaMap);
           }
         });
@@ -90,6 +89,19 @@ describe('smoke grenade volume presentation', () => {
     await expect(pool.prewarm(retryRuntime, camera)).rejects.toThrow('disposed');
   });
 
+  it('rewarms its active gameplay envelope once per arena generation', async () => {
+    const scene = new THREE.Scene();
+    const pool = new SmokeVolumePresentationPool(scene, 1);
+    const camera = new THREE.PerspectiveCamera();
+    const compileAndRender = vi.fn(async () => undefined);
+    await pool.prewarm({ compileAndRender }, camera, 2);
+    await pool.prewarm({ compileAndRender }, camera, 2);
+    expect(compileAndRender).toHaveBeenCalledTimes(1);
+    await pool.prewarm({ compileAndRender }, camera, 3);
+    expect(compileAndRender).toHaveBeenCalledTimes(2);
+    pool.terminalDispose();
+  });
+
   it('defers terminal disposal until an active smoke GPU prewarm settles', async () => {
     const scene = new THREE.Scene();
     const pool = new SmokeVolumePresentationPool(scene, 1);
@@ -100,7 +112,7 @@ describe('smoke grenade volume presentation', () => {
       compileAndRender: vi.fn(() => new Promise<void>((resolve) => { releasePrewarm = resolve; })),
     };
     const inFlight = pool.prewarm(runtime, camera);
-    expect(presentationRoot.scale.toArray()).toEqual([1, 1, 1]);
+    expect(presentationRoot.scale.toArray()).toEqual([4.2, 4.2, 4.2]);
     pool.terminalDispose();
     expect(pool.root.parent).toBe(scene);
     releasePrewarm();

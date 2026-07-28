@@ -948,7 +948,7 @@ export class KillstreakPresentation {
   private disposed = false;
   private readonly placementMarkers = new Map<string, PresentedPlacementMarker>();
   private readonly locallyExpiredMarkerRevisions = new Map<string, number>();
-  private gpuPrewarmed = false;
+  private gpuPrewarmGeneration = -1;
   private gpuPrewarmPromise: Promise<void> | null = null;
   private disposalFinalized = false;
 
@@ -1013,7 +1013,7 @@ export class KillstreakPresentation {
     if (this.disposed) throw new Error('Cannot rebuild a disposed killstreak presentation pool');
     if (this.gpuPrewarmPromise) throw new Error('Cannot rebuild killstreak presentation assets during GPU prewarm');
     if (this.entities.size > 0) return;
-    this.gpuPrewarmed = false;
+    this.gpuPrewarmGeneration = -1;
     for (const entry of this.prewarmed) this.retireRoot(entry.root);
     this.prewarmed.length = 0;
     this.entityPools.clear();
@@ -1026,11 +1026,11 @@ export class KillstreakPresentation {
    * WebGPU prewarm: invisible Object3D trees are skipped by Three's compiler
    * and otherwise initialize on the first live support activation.
    */
-  async prewarm(runtime: PresentationPrewarmRuntime, camera: THREE.Camera): Promise<void> {
+  async prewarm(runtime: PresentationPrewarmRuntime, camera: THREE.Camera, sceneGeneration = 0): Promise<void> {
     if (this.disposed) throw new Error('Cannot prewarm a disposed killstreak presentation');
-    if (this.gpuPrewarmed) return;
+    if (this.gpuPrewarmGeneration === sceneGeneration) return;
     if (this.gpuPrewarmPromise) return this.gpuPrewarmPromise;
-    const operation = this.performGpuPrewarm(runtime, camera);
+    const operation = this.performGpuPrewarm(runtime, camera, sceneGeneration);
     this.gpuPrewarmPromise = operation;
     try {
       await operation;
@@ -1039,7 +1039,11 @@ export class KillstreakPresentation {
     }
   }
 
-  private async performGpuPrewarm(runtime: PresentationPrewarmRuntime, camera: THREE.Camera): Promise<void> {
+  private async performGpuPrewarm(
+    runtime: PresentationPrewarmRuntime,
+    camera: THREE.Camera,
+    sceneGeneration: number,
+  ): Promise<void> {
     const parentScene = this.root.parent;
     if (!(parentScene instanceof THREE.Scene)) {
       throw new Error('Killstreak presentation must be attached to one scene before prewarm');
@@ -1064,20 +1068,24 @@ export class KillstreakPresentation {
       return markerRoot;
     });
 
-    // Authored clones share their resources, while procedural fallbacks own
-    // independent geometry/material instances and must all be submitted.
-    const stagedRoots: THREE.Object3D[] = [
-      ...[...this.entityPools.values()].flatMap((pool) => (
-        pool.every((entry) => entry.authored) ? (pool[0] ? [pool[0].root] : []) : pool.map((entry) => entry.root)
-      )),
+    // Three r185 owns per-Object3D render bindings even when authored clones
+    // share geometry and materials. Submit every bounded instance, including
+    // all 24 swarm drones, before any of them can enter a live frame. Families
+    // are split across fenced batches so one hidden warm-up frame cannot become
+    // a giant GPU spike of its own.
+    const entityRoots = [...this.entityPools.values()].flatMap((pool) => pool.map((entry) => entry.root));
+    const effectRoots: THREE.Object3D[] = [
       ...this.impactFlashPool.map((entry) => entry.root),
       ...this.bombShellPool.map((entry) => entry.root),
       ...this.emberPool.map((entry) => entry.root),
-      ...this.sensorSilhouettes,
-      ...stagedMarkerRoots,
     ];
+    const overlayRoots: THREE.Object3D[] = [...this.sensorSilhouettes, ...stagedMarkerRoots];
+    const stagedBatches = [entityRoots, effectRoots, overlayRoots].filter((batch) => batch.length > 0);
+    const stagedRoots = stagedBatches.flat();
     const objectStates = new Map<THREE.Object3D, Readonly<{
       visible: boolean;
+      position: THREE.Vector3;
+      quaternion: THREE.Quaternion;
       scale: THREE.Vector3;
       frustumCulled: boolean;
     }>>();
@@ -1094,6 +1102,8 @@ export class KillstreakPresentation {
         if (!objectStates.has(node)) {
           objectStates.set(node, Object.freeze({
             visible: node.visible,
+            position: node.position.clone(),
+            quaternion: node.quaternion.clone(),
             scale: node.scale.clone(),
             frustumCulled: node.frustumCulled,
           }));
@@ -1111,11 +1121,39 @@ export class KillstreakPresentation {
       // WebGPU. The deployment surface is still opaque while this fenced
       // submission runs, so an exact-scale draw is both invisible to the
       // player and representative of live activation.
+      stagedRoot.visible = false;
     }
 
+    camera.updateWorldMatrix(true, false);
+    this.root.updateWorldMatrix(true, false);
+    const cameraPosition = camera.getWorldPosition(new THREE.Vector3());
+    const forward = camera.getWorldDirection(new THREE.Vector3());
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0).normalize();
+    const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1).normalize();
+    const stageBatchInView = (batch: readonly THREE.Object3D[], distance: number, spacing: number): void => {
+      const columns = Math.max(1, Math.ceil(Math.sqrt(batch.length)));
+      const rows = Math.max(1, Math.ceil(batch.length / columns));
+      for (let index = 0; index < batch.length; index += 1) {
+        const column = index % columns;
+        const row = Math.floor(index / columns);
+        const target = cameraPosition.clone()
+          .addScaledVector(forward, distance)
+          .addScaledVector(right, (column - (columns - 1) / 2) * spacing)
+          .addScaledVector(up, ((rows - 1) / 2 - row) * spacing);
+        batch[index]!.position.copy(this.root.worldToLocal(target));
+      }
+    };
+
     try {
-      await runtime.compileAndRender(this.root, camera, parentScene);
+      for (let batchIndex = 0; batchIndex < stagedBatches.length; batchIndex += 1) {
+        const batch = stagedBatches[batchIndex]!;
+        stageBatchInView(batch, 30 + batchIndex * 4, batchIndex === 0 ? 2.5 : 0.9);
+        for (const stagedRoot of batch) stagedRoot.visible = true;
+        await runtime.compileAndRender(this.root, camera, parentScene);
+        for (const stagedRoot of batch) stagedRoot.visible = false;
+      }
       if (chopperRoot) {
+        chopperRoot.visible = true;
         chopperRoot.traverse((node) => {
           if (!(node instanceof THREE.Mesh)) return;
           const cockpitNode = isFirstPersonCockpitNode(chopperRoot, node);
@@ -1128,20 +1166,21 @@ export class KillstreakPresentation {
           }
         });
         await runtime.compileAndRender(this.root, camera, parentScene);
+        chopperRoot.visible = false;
       }
-      if (!this.disposed) this.gpuPrewarmed = true;
+      if (!this.disposed) this.gpuPrewarmGeneration = sceneGeneration;
     } finally {
-      if (!this.disposed) {
-        for (const [material, depthWrite] of possessedMaterialDepthWrite) material.depthWrite = depthWrite;
-        for (const [lod, autoUpdate] of lodStates) lod.autoUpdate = autoUpdate;
-        for (const [node, state] of objectStates) {
-          node.visible = state.visible;
-          node.scale.copy(state.scale);
-          node.frustumCulled = state.frustumCulled;
-        }
-        this.root.visible = rootVisible;
-        this.root.frustumCulled = rootFrustumCulled;
+      for (const [material, depthWrite] of possessedMaterialDepthWrite) material.depthWrite = depthWrite;
+      for (const [lod, autoUpdate] of lodStates) lod.autoUpdate = autoUpdate;
+      for (const [node, state] of objectStates) {
+        node.visible = state.visible;
+        node.position.copy(state.position);
+        node.quaternion.copy(state.quaternion);
+        node.scale.copy(state.scale);
+        node.frustumCulled = state.frustumCulled;
       }
+      this.root.visible = rootVisible;
+      this.root.frustumCulled = rootFrustumCulled;
       for (const markerRoot of stagedMarkerRoots) this.retireRoot(markerRoot);
     }
   }

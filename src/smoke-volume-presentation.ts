@@ -253,7 +253,7 @@ export class SmokeVolumePresentationPool {
   private cursor = 0;
   private emissions = 0;
   private recycled = 0;
-  private gpuPrewarmed = false;
+  private gpuPrewarmGeneration = -1;
   private gpuPrewarmPromise: Promise<void> | null = null;
   private disposed = false;
   private disposalFinalized = false;
@@ -276,11 +276,11 @@ export class SmokeVolumePresentationPool {
    * its own radial alpha texture, materials and geometry, so staging only one
    * representative would leave later pool emissions with first-use GPU work.
    */
-  async prewarm(runtime: PresentationPrewarmRuntime, camera: THREE.Camera): Promise<void> {
+  async prewarm(runtime: PresentationPrewarmRuntime, camera: THREE.Camera, sceneGeneration = 0): Promise<void> {
     if (this.disposed) throw new Error('Cannot prewarm a disposed smoke presentation pool');
-    if (this.gpuPrewarmed) return;
+    if (this.gpuPrewarmGeneration === sceneGeneration) return;
     if (this.gpuPrewarmPromise) return this.gpuPrewarmPromise;
-    const operation = this.performGpuPrewarm(runtime, camera);
+    const operation = this.performGpuPrewarm(runtime, camera, sceneGeneration);
     this.gpuPrewarmPromise = operation;
     try {
       await operation;
@@ -289,13 +289,19 @@ export class SmokeVolumePresentationPool {
     }
   }
 
-  private async performGpuPrewarm(runtime: PresentationPrewarmRuntime, camera: THREE.Camera): Promise<void> {
+  private async performGpuPrewarm(
+    runtime: PresentationPrewarmRuntime,
+    camera: THREE.Camera,
+    sceneGeneration: number,
+  ): Promise<void> {
     const parentScene = this.root.parent;
     if (!(parentScene instanceof THREE.Scene) || parentScene !== this.scene) {
       throw new Error('Smoke presentation pool must be attached to its scene before prewarm');
     }
     const objectStates = new Map<THREE.Object3D, Readonly<{
       visible: boolean;
+      position: THREE.Vector3;
+      quaternion: THREE.Quaternion;
       scale: THREE.Vector3;
       frustumCulled: boolean;
     }>>();
@@ -307,29 +313,52 @@ export class SmokeVolumePresentationPool {
       presentation.root.traverse((node) => {
         objectStates.set(node, Object.freeze({
           visible: node.visible,
+          position: node.position.clone(),
+          quaternion: node.quaternion.clone(),
           scale: node.scale.clone(),
           frustumCulled: node.frustumCulled,
         }));
         node.visible = true;
         node.frustumCulled = false;
       });
-      // Keep the exact inactive-slot scale for the fenced upload frame. Tiny
-      // smoke cards can leave their first fragment/texture workload deferred
-      // until combat even though compileAsync has completed.
+    }
+    camera.updateWorldMatrix(true, false);
+    this.root.updateWorldMatrix(true, false);
+    const cameraPosition = camera.getWorldPosition(new THREE.Vector3());
+    const forward = camera.getWorldDirection(new THREE.Vector3());
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0).normalize();
+    const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1).normalize();
+    const columns = 4;
+    for (let index = 0; index < this.slots.length; index += 1) {
+      const presentation = this.slots[index]!.presentation;
+      const column = index % columns;
+      const row = Math.floor(index / columns);
+      const target = cameraPosition.clone()
+        .addScaledVector(forward, 24)
+        .addScaledVector(right, (column - 1.5) * 3)
+        .addScaledVector(up, (row - 1) * 3);
+      const localTarget = this.root.worldToLocal(target);
+      // Exercise the live 4.2 m envelope, including non-zero alpha and the
+      // current instanced-card count. An inactive transparent slot can compile
+      // successfully while leaving its first useful fragment work deferred.
+      presentation.activate(localTarget, 0, SMOKE_PRESENTATION_LIFETIME_MS, 4.2);
+      presentation.update(SMOKE_PRESENTATION_GROW_MS);
+      presentation.root.traverse((node) => { node.frustumCulled = false; });
     }
     try {
       await runtime.compileAndRender(this.root, camera, parentScene);
-      if (!this.disposed) this.gpuPrewarmed = true;
+      if (!this.disposed) this.gpuPrewarmGeneration = sceneGeneration;
     } finally {
-      if (!this.disposed) {
-        for (const [node, state] of objectStates) {
-          node.visible = state.visible;
-          node.scale.copy(state.scale);
-          node.frustumCulled = state.frustumCulled;
-        }
-        this.root.visible = rootVisible;
-        this.root.frustumCulled = rootFrustumCulled;
+      for (const { presentation } of this.slots) presentation.deactivate();
+      for (const [node, state] of objectStates) {
+        node.visible = state.visible;
+        node.position.copy(state.position);
+        node.quaternion.copy(state.quaternion);
+        node.scale.copy(state.scale);
+        node.frustumCulled = state.frustumCulled;
       }
+      this.root.visible = rootVisible;
+      this.root.frustumCulled = rootFrustumCulled;
     }
   }
 

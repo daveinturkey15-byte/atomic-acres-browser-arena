@@ -129,27 +129,36 @@ describe('killstreak presentation', () => {
       expect(root).toBe(presentation.root);
       expect(stagedCamera).toBe(camera);
       expect(parentScene).toBe(scene);
-      expect(chopper.visible).toBe(true);
       expect(chopper.scale.toArray()).toEqual([2, 3, 4]);
       expect(chopper.frustumCulled).toBe(false);
-      expect(chopperChild.visible).toBe(true);
       expect(chopperChild.frustumCulled).toBe(false);
-      expect(presentation.root.getObjectByName('prewarmed-swarm-drone-1')?.visible).toBe(true);
-      expect(presentation.root.getObjectByName('prewarmed-swarm-drone-2')?.visible).toBe(true);
-      expect(presentation.root.getObjectByName('prewarmed-swarm-drone-24')?.visible).toBe(true);
-      expect(presentation.root.getObjectByName('pass65-impact-flash-pool-20')?.visible).toBe(true);
-      expect(presentation.root.getObjectByName('pass65-bomb-shell-pool-20')?.visible).toBe(true);
-      expect(presentation.root.getObjectByName('pass65-ember-pool-120')?.visible).toBe(true);
-      expect(presentation.root.getObjectByName('piloted-drone-hostile-sensor-16')?.visible).toBe(true);
-      expect(presentation.root.getObjectByName('prewarmed-support-placement-ground-x')?.visible).toBe(true);
-      expect(presentation.root.getObjectByName('prewarmed-support-placement-corridor')?.visible).toBe(true);
       if (compilePass === 1) {
+        expect(chopper.visible).toBe(true);
+        expect(chopperChild.visible).toBe(true);
+        expect(presentation.root.getObjectByName('prewarmed-swarm-drone-1')?.visible).toBe(true);
+        expect(presentation.root.getObjectByName('prewarmed-swarm-drone-2')?.visible).toBe(true);
+        expect(presentation.root.getObjectByName('prewarmed-swarm-drone-24')?.visible).toBe(true);
+        expect(presentation.root.getObjectByName('pass65-impact-flash-pool-20')?.visible).toBe(false);
         expect(lod.autoUpdate).toBe(false);
         expect(lod0.visible).toBe(true);
         expect(lod1.visible).toBe(true);
         expect(chopperFuselage.visible).toBe(true);
         expect(dashboardMaterial.depthWrite).toBe(true);
+      } else if (compilePass === 2) {
+        expect(chopper.visible).toBe(false);
+        expect(presentation.root.getObjectByName('pass65-impact-flash-pool-20')?.visible).toBe(true);
+        expect(presentation.root.getObjectByName('pass65-bomb-shell-pool-20')?.visible).toBe(true);
+        expect(presentation.root.getObjectByName('pass65-ember-pool-120')?.visible).toBe(true);
+        expect(presentation.root.getObjectByName('piloted-drone-hostile-sensor-16')?.visible).toBe(false);
+      } else if (compilePass === 3) {
+        expect(chopper.visible).toBe(false);
+        expect(presentation.root.getObjectByName('pass65-impact-flash-pool-20')?.visible).toBe(false);
+        expect(presentation.root.getObjectByName('piloted-drone-hostile-sensor-16')?.visible).toBe(true);
+        expect(presentation.root.getObjectByName('prewarmed-support-placement-ground-x')?.visible).toBe(true);
+        expect(presentation.root.getObjectByName('prewarmed-support-placement-corridor')?.visible).toBe(true);
       } else {
+        expect(chopper.visible).toBe(true);
+        expect(presentation.root.getObjectByName('prewarmed-swarm-drone-24')?.visible).toBe(false);
         expect(chopperFuselage.visible).toBe(false);
         expect(dashboard.visible).toBe(true);
         expect(dashboardMaterial.depthWrite).toBe(false);
@@ -160,7 +169,7 @@ describe('killstreak presentation', () => {
       presentation.prewarm({ compileAndRender }, camera),
     ]);
     await presentation.prewarm({ compileAndRender }, camera);
-    expect(compileAndRender).toHaveBeenCalledTimes(2);
+    expect(compileAndRender).toHaveBeenCalledTimes(4);
     expect(chopper.visible).toBe(false);
     expect(chopper.scale.toArray()).toEqual([2, 3, 4]);
     expect(chopper.frustumCulled).toBe(true);
@@ -204,9 +213,22 @@ describe('killstreak presentation', () => {
     presentation.prewarmAuthoredAssets();
     const rebuiltRuntime = { compileAndRender: vi.fn(async () => undefined) };
     await presentation.prewarm(rebuiltRuntime, camera);
-    expect(rebuiltRuntime.compileAndRender).toHaveBeenCalledTimes(2);
+    expect(rebuiltRuntime.compileAndRender).toHaveBeenCalledTimes(4);
     presentation.dispose();
     await expect(presentation.prewarm(rebuiltRuntime, camera)).rejects.toThrow('disposed');
+  });
+
+  it('rewarms the scene-dependent variants exactly once for each arena generation', async () => {
+    const scene = new THREE.Scene();
+    const presentation = new KillstreakPresentation(scene);
+    const camera = new THREE.PerspectiveCamera();
+    const compileAndRender = vi.fn(async () => undefined);
+    await presentation.prewarm({ compileAndRender }, camera, 4);
+    await presentation.prewarm({ compileAndRender }, camera, 4);
+    expect(compileAndRender).toHaveBeenCalledTimes(4);
+    await presentation.prewarm({ compileAndRender }, camera, 5);
+    expect(compileAndRender).toHaveBeenCalledTimes(8);
+    presentation.dispose();
   });
 
   it('defers terminal disposal until an active GPU prewarm settles', async () => {

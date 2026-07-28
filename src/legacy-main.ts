@@ -2427,7 +2427,7 @@ const explosiveBoltPresentationPool = Array.from(
     return root;
   },
 );
-let explosiveBoltPresentationPrewarmed = false;
+let explosiveBoltPresentationPrewarmGeneration = -1;
 let flashExposureUntilHostTimeMs = 0;
 let flashExposureStrength = 0;
 let lastFlashResultAdmission: Readonly<{
@@ -10111,10 +10111,12 @@ function createExplosiveBoltMesh(): THREE.Group {
   return root;
 }
 
-async function prewarmExplosiveBoltPresentation(): Promise<void> {
-  if (explosiveBoltPresentationPrewarmed) return;
+async function prewarmExplosiveBoltPresentation(sceneGeneration = 0): Promise<void> {
+  if (explosiveBoltPresentationPrewarmGeneration === sceneGeneration) return;
   const states = new Map<THREE.Object3D, Readonly<{
     visible: boolean;
+    position: THREE.Vector3;
+    quaternion: THREE.Quaternion;
     scale: THREE.Vector3;
     frustumCulled: boolean;
   }>>();
@@ -10122,6 +10124,8 @@ async function prewarmExplosiveBoltPresentation(): Promise<void> {
     root.traverse((node) => {
       states.set(node, Object.freeze({
         visible: node.visible,
+        position: node.position.clone(),
+        quaternion: node.quaternion.clone(),
         scale: node.scale.clone(),
         frustumCulled: node.frustumCulled,
       }));
@@ -10131,12 +10135,31 @@ async function prewarmExplosiveBoltPresentation(): Promise<void> {
     // Preserve exact projectile scale so the loading-boundary fence covers
     // the same presentation submitted by the first live crossbow bolt.
   }
+  camera.updateWorldMatrix(true, false);
+  explosiveBoltPresentationRoot.updateWorldMatrix(true, false);
+  const cameraPosition = camera.getWorldPosition(new THREE.Vector3());
+  const forward = camera.getWorldDirection(new THREE.Vector3());
+  const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0).normalize();
+  const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1).normalize();
+  const columns = 8;
+  for (let index = 0; index < explosiveBoltPresentationPool.length; index += 1) {
+    const root = explosiveBoltPresentationPool[index]!;
+    const column = index % columns;
+    const row = Math.floor(index / columns);
+    const target = cameraPosition.clone()
+      .addScaledVector(forward, 8)
+      .addScaledVector(right, (column - 3.5) * 0.34)
+      .addScaledVector(up, (1.5 - row) * 0.34);
+    root.position.copy(explosiveBoltPresentationRoot.worldToLocal(target));
+  }
   try {
     await renderRuntime.compileAndRender(explosiveBoltPresentationRoot, camera, scene);
-    explosiveBoltPresentationPrewarmed = true;
+    explosiveBoltPresentationPrewarmGeneration = sceneGeneration;
   } finally {
     for (const [node, state] of states) {
       node.visible = state.visible;
+      node.position.copy(state.position);
+      node.quaternion.copy(state.quaternion);
       node.scale.copy(state.scale);
       node.frustumCulled = state.frustumCulled;
     }
@@ -14970,6 +14993,11 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
     lastBotSpawnAudit.clear();
     respawn(false);
     setArenaMenuCamera();
+    // Scene-dependent WebGPU render objects can only be proven after the
+    // selected arena has installed its HDR/light graph and the review camera
+    // has a valid transform. Keep these exact gameplay draws behind the opaque
+    // deployment surface and fence them before live submission resumes.
+    await prewarmArenaBoundGameplayPresentations(arenaTransitionGeneration);
     arenaTransitionPhase = 'committing';
     // Lazy arena roots and their selected TSL definition must be compiled while
     // submissions remain paused. Terminal and Gun Range do not have a separate
@@ -17815,10 +17843,6 @@ async function prepareSharedGameplayAssets(): Promise<void> {
     // layer before any match-boundary GPU prewarm can stage it.
     weaponView.root.traverse((node) => node.layers.set(VIEWMODEL_RENDER_LAYER));
     killstreakPresentation.prewarmAuthoredAssets();
-    bootstrapStage = 'prewarming-killstreak-presentations';
-    await killstreakPresentation.prewarm(renderRuntime, camera);
-    bootstrapStage = 'prewarming-smoke-presentations';
-    await smokeVolumePresentationPool.prewarm(renderRuntime, camera);
     // First-person geometry is composited after world depth is cleared. Contact
     // retreat still keeps it tucked near walls without world geometry cutting
     // holes through hands and weapons.
@@ -17826,8 +17850,6 @@ async function prepareSharedGameplayAssets(): Promise<void> {
     await tracerPool.prewarm(renderRuntime, camera);
     bootstrapStage = 'prewarming-combat-impacts';
     await impactPresentation.prewarm(renderRuntime, camera);
-    bootstrapStage = 'prewarming-explosive-bolts';
-    await prewarmExplosiveBoltPresentation();
     bootstrapStage = 'prewarming-grenade-explosion';
     await grenadeExplosionPresentation.prewarm(renderRuntime, camera);
     bootstrapStage = 'prewarming-support-explosion';
@@ -17846,6 +17868,15 @@ async function prepareSharedGameplayAssets(): Promise<void> {
     throw error;
   });
   return sharedGameplayAssetsPromise;
+}
+
+async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): Promise<void> {
+  bootstrapStage = 'prewarming-killstreak-presentations';
+  await killstreakPresentation.prewarm(renderRuntime, camera, sceneGeneration);
+  bootstrapStage = 'prewarming-smoke-presentations';
+  await smokeVolumePresentationPool.prewarm(renderRuntime, camera, sceneGeneration);
+  bootstrapStage = 'prewarming-explosive-bolts';
+  await prewarmExplosiveBoltPresentation(sceneGeneration);
 }
 
 function bootstrapMenuPreview(): void {

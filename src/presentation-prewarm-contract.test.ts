@@ -23,6 +23,10 @@ describe('presentation prewarm startup contract', () => {
     const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
     const sharedAssets = source.slice(
       source.indexOf('async function prepareSharedGameplayAssets()'),
+      source.indexOf('async function prewarmArenaBoundGameplayPresentations('),
+    );
+    const arenaPresentationPrewarm = source.slice(
+      source.indexOf('async function prewarmArenaBoundGameplayPresentations('),
       source.indexOf('function bootstrapMenuPreview()'),
     );
     const menuBootstrap = source.slice(source.indexOf('function bootstrapMenuPreview()'), source.indexOf('bootstrapMenuPreview();'));
@@ -45,15 +49,20 @@ describe('presentation prewarm startup contract', () => {
     expect(source).not.toContain('const renderer = renderRuntime.renderer as unknown as THREE.WebGLRenderer');
     expect(source).toContain("bootstrapStage = 'prewarming-grenade-explosion'");
     expect(source).toContain("bootstrapStage = 'prewarming-explosive-bolts'");
-    expect(source).toContain('await prewarmExplosiveBoltPresentation();');
+    expect(arenaPresentationPrewarm).toContain('await prewarmExplosiveBoltPresentation(sceneGeneration);');
     expect(source).toContain("bootstrapStage = 'prewarming-weapon-catalog'");
     expect(matchDeployment).toContain('await weaponView.prewarmBrowserWeaponCatalog([');
     expect(source).toContain("bootstrapStage = 'prewarming-killstreak-presentations'");
-    expect(source).toContain('await killstreakPresentation.prewarm(renderRuntime, camera);');
+    expect(arenaPresentationPrewarm).toContain('await killstreakPresentation.prewarm(renderRuntime, camera, sceneGeneration);');
     expect(source).toContain("bootstrapStage = 'prewarming-smoke-presentations'");
-    expect(source).toContain('await smokeVolumePresentationPool.prewarm(renderRuntime, camera);');
-    expect(sharedAssets.indexOf('await killstreakPresentation.prewarm(renderRuntime, camera);'))
-      .toBeLessThan(sharedAssets.indexOf('await smokeVolumePresentationPool.prewarm(renderRuntime, camera);'));
+    expect(arenaPresentationPrewarm).toContain('await smokeVolumePresentationPool.prewarm(renderRuntime, camera, sceneGeneration);');
+    expect(sharedAssets).not.toContain('killstreakPresentation.prewarm(renderRuntime');
+    expect(sharedAssets).not.toContain('smokeVolumePresentationPool.prewarm(renderRuntime');
+    expect(sharedAssets).not.toContain('prewarmExplosiveBoltPresentation(');
+    expect(arenaDeployment.indexOf('await configurePlayableArenaVisuals('))
+      .toBeLessThan(arenaDeployment.indexOf('await prewarmArenaBoundGameplayPresentations(arenaTransitionGeneration);'));
+    expect(arenaDeployment.indexOf('respawn(false);'))
+      .toBeLessThan(arenaDeployment.indexOf('await prewarmArenaBoundGameplayPresentations(arenaTransitionGeneration);'));
     expect(source).toContain("bootstrapStage = 'prewarming-overdrive'");
     expect(menuBootstrap).toContain("document.documentElement.dataset.gameplayArena = 'deferred-until-deployment'");
     expect(arenaDeployment).toContain("await prepareSharedGameplayAssets()");
