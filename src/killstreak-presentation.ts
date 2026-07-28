@@ -1451,6 +1451,8 @@ export class KillstreakPresentation {
   private disposed = false;
   private readonly placementMarkers = new Map<string, PresentedPlacementMarker>();
   private readonly locallyExpiredMarkerRevisions = new Map<string, number>();
+  private readonly placementMarkerSnapshotIds = new Set<string>();
+  private readonly livePlacementMarkerIds = new Set<string>();
   private gpuPrewarmGeneration = -1;
   private gpuPrewarmPromise: Promise<void> | null = null;
   private gpuPrewarmActive = false;
@@ -2110,10 +2112,11 @@ export class KillstreakPresentation {
   }
 
   private syncSensorContacts(contacts: readonly DroneSensorContact[]): void {
-    const admitted = contacts.slice(0, MAX_SENSOR_CONTACTS);
-    this.visibleSensorContacts = admitted.length;
-    for (const [index, silhouette] of this.sensorSilhouettes.entries()) {
-      const contact = admitted[index];
+    const admittedCount = Math.min(contacts.length, MAX_SENSOR_CONTACTS);
+    this.visibleSensorContacts = admittedCount;
+    for (let index = 0; index < this.sensorSilhouettes.length; index += 1) {
+      const silhouette = this.sensorSilhouettes[index]!;
+      const contact = index < admittedCount ? contacts[index] : undefined;
       silhouette.visible = contact !== undefined;
       if (!contact) continue;
       silhouette.position.fromArray(contact.position);
@@ -2135,20 +2138,35 @@ export class KillstreakPresentation {
       this.placementMarkers.delete(id);
       this.locallyExpiredMarkerRevisions.set(id, presented.snapshotRevision);
     }
-    const markerIds = new Set(markers.map((marker) => marker.id));
+    if (markers.length === 0) {
+      for (const presented of this.placementMarkers.values()) this.retireRoot(presented.root);
+      this.placementMarkers.clear();
+      this.locallyExpiredMarkerRevisions.clear();
+      return;
+    }
+    const markerIds = this.placementMarkerSnapshotIds;
+    markerIds.clear();
+    for (const marker of markers) markerIds.add(marker.id);
     for (const [id, expiredRevision] of this.locallyExpiredMarkerRevisions) {
       if (!markerIds.has(id) || snapshotRevision > expiredRevision) this.locallyExpiredMarkerRevisions.delete(id);
     }
-    const admitted = markers
-      .filter((marker) => marker.expiresInMs > 0 && this.locallyExpiredMarkerRevisions.get(marker.id) !== snapshotRevision)
-      .slice(0, MAX_PLACEMENT_MARKERS);
-    const liveIds = new Set(admitted.map((marker) => marker.id));
+    const liveIds = this.livePlacementMarkerIds;
+    liveIds.clear();
+    let admittedCount = 0;
+    for (const marker of markers) {
+      if (marker.expiresInMs <= 0 || this.locallyExpiredMarkerRevisions.get(marker.id) === snapshotRevision) continue;
+      liveIds.add(marker.id);
+      admittedCount += 1;
+      if (admittedCount >= MAX_PLACEMENT_MARKERS) break;
+    }
     for (const [id, presented] of this.placementMarkers) {
       if (liveIds.has(id)) continue;
       this.retireRoot(presented.root);
       this.placementMarkers.delete(id);
     }
-    for (const marker of admitted) {
+    admittedCount = 0;
+    for (const marker of markers) {
+      if (marker.expiresInMs <= 0 || this.locallyExpiredMarkerRevisions.get(marker.id) === snapshotRevision) continue;
       const existing = this.placementMarkers.get(marker.id);
       if (existing) {
         existing.snapshot = marker;
@@ -2156,6 +2174,8 @@ export class KillstreakPresentation {
           existing.snapshotRevision = snapshotRevision;
           existing.expiresAtMs = nowMs + marker.expiresInMs;
         }
+        admittedCount += 1;
+        if (admittedCount >= MAX_PLACEMENT_MARKERS) break;
         continue;
       }
       const root = buildPlacementMarker(marker);
@@ -2166,6 +2186,8 @@ export class KillstreakPresentation {
         expiresAtMs: nowMs + marker.expiresInMs,
       });
       this.root.add(root);
+      admittedCount += 1;
+      if (admittedCount >= MAX_PLACEMENT_MARKERS) break;
     }
   }
 
