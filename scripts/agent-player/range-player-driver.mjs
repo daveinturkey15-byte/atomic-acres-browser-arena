@@ -16,7 +16,7 @@ async function moveAim(page, x, y) { await page.evaluate(({ mx, my }) => window.
 async function firePulse(page, pulseMs) { await page.evaluate(() => { const c = document.querySelector('#game'); window.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 2, buttons: 2 })); c?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 2, buttons: 2 })); window.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, buttons: 3 })); c?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, buttons: 3 })); }); await sleep(pulseMs); await page.evaluate(() => { const c = document.querySelector('#game'); window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0, buttons: 2 })); c?.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0, buttons: 2 })); window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 2, buttons: 0 })); c?.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 2, buttons: 0 })); }); }
 async function capture(page) { const jpeg = await page.screenshot({ type: 'jpeg', quality: 78 }); const { data, info } = await sharp(jpeg).resize({ width: 320, height: 180, fit: 'fill' }).removeAlpha().raw().toBuffer({ resolveWithObject: true }); return { jpeg, width: info.width, height: info.height, targets: findCyanRangeTargets(data, info.width, info.height, info.channels) }; }
 function targetNearestCentre(frame, avoidCentreRadius = 0) { const cx = frame.width / 2; const cy = frame.height / 2; return frame.targets.map((target) => ({ target, distance: Math.hypot(target.x - cx, target.y - cy) })).filter(({ distance }) => distance >= avoidCentreRadius).sort((a, b) => a.distance - b.distance)[0]?.target ?? null; }
-async function hud(page) { return page.evaluate(() => ({ mode: document.querySelector('#match-mode-label')?.textContent?.trim() ?? null, objective: document.querySelector('#objective')?.textContent?.trim() ?? null, weapon: document.querySelector('#weapon-name')?.textContent?.trim() ?? null, ammo: Number(document.querySelector('#ammo')?.textContent?.match(/\d+/)?.[0] ?? NaN), pointer: Boolean(document.pointerLockElement), focused: document.hasFocus(), summary: Boolean(document.querySelector('#download-match-summary')) })); }
+async function hud(page) { return page.evaluate(() => ({ mode: document.querySelector('#match-mode-label')?.textContent?.trim() ?? null, objective: document.querySelector('#objective')?.textContent?.trim() ?? null, weapon: document.querySelector('#weapon-name')?.textContent?.trim() ?? null, ammo: Number(document.querySelector('#ammo')?.textContent?.match(/\d+/)?.[0] ?? NaN), pointer: Boolean(document.pointerLockElement), focused: document.hasFocus(), summary: Boolean(document.querySelector('#download-match-summary')), targetResetting: /TARGET RESETTING/i.test(document.body.innerText) })); }
 async function aimAtVisibleTarget(page, evidenceDirectory, firstEvidence, avoidCentreOnFirstFrame = false) { const cx = 160; const cy = 90; let selected = null; for (let step = 0; step < 12; step += 1) { const frame = await capture(page); const avoidRadius = avoidCentreOnFirstFrame && step === 0 ? 10 : 0; selected = selected ? associateRangeTarget(selected, frame.targets, 18)?.target ?? targetNearestCentre(frame, avoidRadius) : targetNearestCentre(frame, avoidRadius); if (!selected) { await sleep(80); continue; } if (firstEvidence && step === 0) await writeFile(resolve(evidenceDirectory, 'first-range-target.jpg'), frame.jpeg); const dx = selected.x - cx; const dy = selected.y - cy; if (Math.hypot(dx, dy) <= 2.5) return { target: selected, error: Math.hypot(dx, dy), frame }; await moveAim(page, clamp(dx * 4, -90, 90), clamp(dy * 4, -90, 90)); await sleep(70); selected = null; } return null; }
 async function download(page, selector, path) { const event = page.waitForEvent('download', { timeout: 20_000 }); await page.locator(selector).click({ timeout: 20_000 }); const file = await event; await file.saveAs(path); return JSON.parse(await readFile(path, 'utf8')); }
 
@@ -27,12 +27,13 @@ export async function runRange(args) {
   const targetResetMs = clamp(Number(args['target-reset-ms'] ?? 0), 0, 3000);
   const missRecoveryThreshold = clamp(Number(args['miss-recovery-threshold'] ?? 0), 0, 20);
   const missRecoveryMs = clamp(Number(args['miss-recovery-ms'] ?? 0), 0, 3000);
+  const targetHealthResetGate = String(args['target-health-reset-gate'] ?? 'false') === 'true';
   const url = String(args.url);
   await mkdir(output, { recursive: true });
   const browser = await chromium.connectOverCDP(String(args.cdp ?? 'http://127.0.0.1:9333'));
   const context = browser.contexts()[0]; const page = context.pages()[0]; const errors = []; const actions = []; let releasedAtEnd = false;
   page.on('pageerror', (error) => errors.push(String(error)));
-  const startedAt = new Date(); let startedFireAt = null; let pulseCount = 0; let reloadCount = 0; let firstEvidence = true; let invalidReason = null; let finalHud = null; let lastScore = 0; let lastHits = 0; let scoreChangeCount = 0; let missStreak = 0; let recoveryCount = 0; let forceOffCentreAcquisition = false;
+  const startedAt = new Date(); let startedFireAt = null; let pulseCount = 0; let reloadCount = 0; let firstEvidence = true; let invalidReason = null; let finalHud = null; let lastScore = 0; let lastHits = 0; let scoreChangeCount = 0; let missStreak = 0; let recoveryCount = 0; let forceOffCentreAcquisition = false; let targetHealthResetCount = 0; let targetHealthResetActive = false;
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 120_000 });
     await page.locator('#menu').waitFor({ state: 'visible', timeout: 120_000 });
@@ -99,6 +100,13 @@ export async function runRange(args) {
       if (current.summary) break;
       if (current.mode !== 'TARGET DRILL' || current.weapon !== 'VECTORLINE SMG') { invalidReason = `visible-state-mismatch:${current.mode}:${current.weapon}`; break; }
       if (!current.focused || !current.pointer) { invalidReason = 'focus-or-pointer-loss'; break; }
+      if (targetHealthResetGate && current.targetResetting) {
+        if (!targetHealthResetActive) { targetHealthResetCount += 1; actions.push({ atMs: Date.now() - startedAt.getTime(), kind: 'visible-target-health-reset', targetHealthResetCount }); }
+        targetHealthResetActive = true;
+        await sleep(80);
+        continue;
+      }
+      targetHealthResetActive = false;
       const observedRange = parseRangeHud(current.objective);
       if (observedRange && observedRange.score > lastScore) {
         scoreChangeCount += 1;
@@ -149,7 +157,7 @@ export async function runRange(args) {
     const summary = summaryVisible ? await download(page, '#download-match-summary', resolve(output, 'match-summary.json')) : null;
     const technical = technicalVisible ? await download(page, '#download-match-technical', resolve(output, 'match-technical.json')) : null;
     await writeFile(resolve(output, 'actions.json'), `${JSON.stringify(actions, null, 2)}\n`);
-    const report = { schemaVersion: 1, kind: 'atomic-player-range-run', startedAt: startedAt.toISOString(), endedAt: new Date().toISOString(), source: { url, pass: 'PASS 63' }, protocol: { activity: 'gun-range', durationSeconds: 120, targetValue: 100, weapon: 'VECTORLINE SMG', pulseMs, cadenceMs, targetResetMs, missRecoveryThreshold, missRecoveryMs, alignedFrameReuse: true }, receipts: { selectedGunRange: true, selectedText, observedWeapon: 'VECTORLINE SMG', mode: 'TARGET DRILL' }, input: { pulseCount, reloadCount, scoreChangeCount, recoveryCount, releasedAtEnd: true }, outcome: { invalidReason, finalHud: parseRangeHud(finalHud?.objective), summaryDownloaded: Boolean(summary), technicalDownloaded: Boolean(technical), officialSummary: summary }, browser: { pageErrors: errors } };
+    const report = { schemaVersion: 1, kind: 'atomic-player-range-run', startedAt: startedAt.toISOString(), endedAt: new Date().toISOString(), source: { url, pass: 'PASS 63' }, protocol: { activity: 'gun-range', durationSeconds: 120, targetValue: 100, weapon: 'VECTORLINE SMG', pulseMs, cadenceMs, targetResetMs, missRecoveryThreshold, missRecoveryMs, targetHealthResetGate, alignedFrameReuse: true }, receipts: { selectedGunRange: true, selectedText, observedWeapon: 'VECTORLINE SMG', mode: 'TARGET DRILL' }, input: { pulseCount, reloadCount, scoreChangeCount, recoveryCount, targetHealthResetCount, releasedAtEnd: true }, outcome: { invalidReason, finalHud: parseRangeHud(finalHud?.objective), summaryDownloaded: Boolean(summary), technicalDownloaded: Boolean(technical), officialSummary: summary }, browser: { pageErrors: errors } };
     await writeFile(resolve(output, 'report.json'), `${JSON.stringify(report, null, 2)}\n`); releasedAtEnd = true; return report;
   } finally {
     try { await page.keyboard.up('KeyA'); await page.keyboard.up('KeyW'); await page.keyboard.up('KeyR'); await page.evaluate(() => { const c = document.querySelector('#game'); for (const button of [0, 2]) { window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button, buttons: 0 })); c?.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button, buttons: 0 })); } }); releasedAtEnd = true; } catch {}
