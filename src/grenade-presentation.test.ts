@@ -117,12 +117,19 @@ describe('grenade world presentation residency', () => {
       total: 4,
       active: 4,
       exhaustions: 2,
+      highWater: 4,
+      activeByFamily: { frag: 2, semtex: 2 },
+      exhaustionsByFamily: { frag: 1, semtex: 1 },
     });
 
     expect(pool.release(firstFrag!)).toBe(true);
     expect(pool.acquire('frag')).toBe(firstFrag);
     expect(firstFrag!.parent).toBe(pool.root);
-    expect(GRENADE_WORLD_PRESENTATION_POOL_CAPACITY_PER_FAMILY).toBeGreaterThanOrEqual(6);
+    expect(firstFrag!.name).toBe('frag-grenade-fallback');
+    expect(firstFrag!.userData.presentationPoolSlot).toBe(0);
+    // Six humans can each retain three 5.2 s sticky grenades across the 1.8 s
+    // respawn interval; one extra slot covers the globally bounded solo bot.
+    expect(GRENADE_WORLD_PRESENTATION_POOL_CAPACITY_PER_FAMILY).toBeGreaterThanOrEqual(19);
     pool.terminalDispose();
     expect(pool.root.parent).toBeNull();
   });

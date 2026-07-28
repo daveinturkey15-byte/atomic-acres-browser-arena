@@ -293,6 +293,7 @@ try {
               phase: entity.phase,
             })),
           },
+          grenadeWorldPool: state.grenadeVisual.pool,
           smokePresentation: state.dmrThermal.smokePresentation,
           weaponCatalog: state.weaponPresentation.browserWeaponCatalog,
           residency: api.sampleRendererResidency(),
@@ -310,6 +311,8 @@ try {
         || sample.runtime.presentation.status !== 'healthy'
         || sample.watchdog.status !== 'healthy' || sample.watchdog.fatal
         || sample.gpuRetirement.failures !== 0
+        || sample.grenadeWorldPool.exhaustions !== 0
+        || sample.grenadeWorldPool.prewarmBlockedAcquisitions !== 0
         || sample.smokePresentation.liveDisposals !== 0
         || sample.weaponCatalog.prewarming
         || sample.weaponCatalog.unpreparedSwitches !== 0
@@ -377,6 +380,7 @@ try {
         runtime: state.render.runtime,
         gpuRetirement: state.interactiveWorld.gpuRetirement,
         pendingSupportRoots: state.fieldSupport.pendingRetiredPresentationRoots,
+        grenadeWorldPool: state.grenadeVisual.pool,
         smokePresentation: state.dmrThermal.smokePresentation,
         residency: api.sampleRendererResidency(),
       };
@@ -389,6 +393,9 @@ try {
       || afterReturn.gpuRetirement.scheduledRoots !== afterReturn.gpuRetirement.disposedRoots
       || afterReturn.gpuRetirement.scheduledGeometries !== afterReturn.gpuRetirement.disposedGeometries
       || afterReturn.pendingSupportRoots !== 0
+      || afterReturn.grenadeWorldPool.active !== 0
+      || afterReturn.grenadeWorldPool.exhaustions !== 0
+      || afterReturn.grenadeWorldPool.prewarmBlockedAcquisitions !== 0
       || afterReturn.smokePresentation.liveDisposals !== 0
       || afterReturn.smokePresentation.active !== 0) {
       throw new Error(`${arenaId} menu return did not retire presentation safely: ${JSON.stringify(afterReturn)}`);

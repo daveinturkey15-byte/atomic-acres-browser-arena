@@ -8,7 +8,7 @@ export const FRAG_GRENADE_ASSET = './assets/original/models/frag-grenade.glb';
 export const FRAG_GRENADE_MAX_DIMENSION = 0.46;
 export const SEMTEX_BUNDLE_ASSET = './assets/original/models/ordnance/semtex-bundle-lod0.glb';
 export const SEMTEX_BUNDLE_MAX_DIMENSION = 0.58;
-export const GRENADE_WORLD_PRESENTATION_POOL_CAPACITY_PER_FAMILY = 12;
+export const GRENADE_WORLD_PRESENTATION_POOL_CAPACITY_PER_FAMILY = 24;
 
 export type GrenadePresentationFamily = 'frag' | 'semtex';
 
@@ -235,6 +235,9 @@ export class GrenadeWorldPresentationPool {
   private acquisitions = 0;
   private releases = 0;
   private exhaustions = 0;
+  private highWater = 0;
+  private prewarmBlockedAcquisitions = 0;
+  private readonly exhaustionsByFamily: Record<GrenadePresentationFamily, number> = { frag: 0, semtex: 0 };
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -255,8 +258,8 @@ export class GrenadeWorldPresentationPool {
     for (const family of ['frag', 'semtex'] as const) {
       for (let index = 0; index < this.capacityPerFamily; index += 1) {
         const root = createGrenadePresentation(family === 'semtex' ? 'semtex' : 'frag');
-        root.name = `${family}-grenade-world-pool-${index + 1}`;
         root.userData.presentationPoolFamily = family;
+        root.userData.presentationPoolSlot = index;
         root.userData.presentationPoolInUse = false;
         root.visible = false;
         this.root.add(root);
@@ -268,11 +271,16 @@ export class GrenadeWorldPresentationPool {
 
   acquire(grenade: GrenadeId): THREE.Object3D | null {
     if (this.disposed) return null;
+    if (this.gpuPrewarmPromise) {
+      this.prewarmBlockedAcquisitions += 1;
+      return null;
+    }
     this.ensureInitialized();
     const family = grenadePresentationFamily(grenade);
     const slot = this.slots.find((candidate) => candidate.family === family && !candidate.inUse);
     if (!slot) {
       this.exhaustions += 1;
+      this.exhaustionsByFamily[family] += 1;
       return null;
     }
     slot.inUse = true;
@@ -282,6 +290,7 @@ export class GrenadeWorldPresentationPool {
     slot.root.position.set(0, 0, 0);
     slot.root.quaternion.identity();
     this.acquisitions += 1;
+    this.highWater = Math.max(this.highWater, this.slots.filter((candidate) => candidate.inUse).length);
     return slot.root;
   }
 
@@ -310,7 +319,10 @@ export class GrenadeWorldPresentationPool {
   ): Promise<void> {
     if (this.disposed) throw new Error('Cannot prewarm a disposed grenade presentation pool');
     if (this.gpuPrewarmGeneration === sceneGeneration) return;
-    if (this.gpuPrewarmPromise) return this.gpuPrewarmPromise;
+    if (this.gpuPrewarmPromise) {
+      await this.gpuPrewarmPromise;
+      if (this.gpuPrewarmGeneration === sceneGeneration) return;
+    }
     const operation = this.performGpuPrewarm(runtime, camera, sceneGeneration);
     this.gpuPrewarmPromise = operation;
     try {
@@ -327,6 +339,9 @@ export class GrenadeWorldPresentationPool {
   ): Promise<void> {
     await loadGrenadePresentation();
     this.ensureInitialized();
+    if (this.slots.some((slot) => slot.inUse)) {
+      throw new Error('Grenade presentation prewarm cannot overlap active projectile leases');
+    }
     if (this.root.parent !== this.scene) {
       throw new Error('Grenade presentation pool must be attached to its scene before prewarm');
     }
@@ -397,6 +412,10 @@ export class GrenadeWorldPresentationPool {
     acquisitions: number;
     releases: number;
     exhaustions: number;
+    highWater: number;
+    activeByFamily: Readonly<Record<GrenadePresentationFamily, number>>;
+    exhaustionsByFamily: Readonly<Record<GrenadePresentationFamily, number>>;
+    prewarmBlockedAcquisitions: number;
     gpuPrewarmGeneration: number;
   }> {
     return Object.freeze({
@@ -406,6 +425,13 @@ export class GrenadeWorldPresentationPool {
       acquisitions: this.acquisitions,
       releases: this.releases,
       exhaustions: this.exhaustions,
+      highWater: this.highWater,
+      activeByFamily: Object.freeze({
+        frag: this.slots.filter((slot) => slot.family === 'frag' && slot.inUse).length,
+        semtex: this.slots.filter((slot) => slot.family === 'semtex' && slot.inUse).length,
+      }),
+      exhaustionsByFamily: Object.freeze({ ...this.exhaustionsByFamily }),
+      prewarmBlockedAcquisitions: this.prewarmBlockedAcquisitions,
       gpuPrewarmGeneration: this.gpuPrewarmGeneration,
     });
   }
