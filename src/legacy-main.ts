@@ -4513,15 +4513,28 @@ function persistLoadoutState(candidate: LoadoutStorageV2): boolean {
   return true;
 }
 
+let menuLoadoutPresentationGeneration = 0;
 function applyMenuLoadoutImmediately(): void {
-  if (gameStarted) return;
+  if (gameStarted || selectedArena.id === 'gun-range') return;
   const selection = activeLoadoutSelection();
   player.primaryWeapon = selection.primary;
   player.secondaryWeapon = selection.secondary;
   player.selectedGrenade = selection.grenade;
   player.grenades = 1;
   player.weapon = selection.primary;
-  weaponView.setWeapon(player.weapon, true);
+  if (renderRuntime.backend !== 'webgpu') {
+    weaponView.setWeapon(player.weapon, true);
+    return;
+  }
+  const generation = ++menuLoadoutPresentationGeneration;
+  const selectedWeapon = player.weapon;
+  void weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(selectedArena.id)).then(() => {
+    if (generation !== menuLoadoutPresentationGeneration || gameStarted || player.weapon !== selectedWeapon) return;
+    weaponView.setWeapon(selectedWeapon, true);
+  }).catch((error: unknown) => {
+    if (generation !== menuLoadoutPresentationGeneration) return;
+    setStatus(`Selected loadout presentation could not be prepared: ${error instanceof Error ? error.message : String(error)}`, 'warn');
+  });
 }
 
 let activeMenuTabId: 'deploy' | 'kit' | 'streaks' | 'options' = 'deploy';

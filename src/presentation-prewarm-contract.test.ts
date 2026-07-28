@@ -35,6 +35,10 @@ describe('presentation prewarm startup contract', () => {
       source.indexOf('function activateArenaSelection('),
     );
     const matchDeployment = source.slice(source.indexOf('async function startGame('), source.indexOf('function randomNonce()'));
+    const menuLoadoutApply = source.slice(
+      source.indexOf('function applyMenuLoadoutImmediately()'),
+      source.indexOf('let activeMenuTabId'),
+    );
     expect(source).toContain('renderRuntime.compileAndRender(nukeShockwave, camera, scene)');
     expect(source).toContain('renderRuntime.compileAndRender(overdriveRoot, camera, scene)');
     expect(sharedAssets).not.toContain('renderRuntime.compile(scene, camera)');
@@ -84,6 +88,9 @@ describe('presentation prewarm startup contract', () => {
     expect(weaponPrewarm).not.toContain('multiplyScalar(0.0001)');
     expect(source).toContain('await renderRuntime.compileAndRender(model, camera, scene);');
     expect(source).toContain('streamedWeaponGpuPrewarmer,');
+    expect(menuLoadoutApply).toContain('weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(selectedArena.id))');
+    expect(menuLoadoutApply.indexOf('prewarmBrowserWeaponCatalog'))
+      .toBeLessThan(menuLoadoutApply.indexOf('weaponView.setWeapon(selectedWeapon, true)'));
     expect(source).toContain("bootstrapStage = 'ready'");
   });
 
