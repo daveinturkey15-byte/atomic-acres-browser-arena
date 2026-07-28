@@ -1716,12 +1716,13 @@ export class KillstreakPresentation {
       ...liveActivationEntries.filter((entry) => entry.root.userData.presentationPoolKey === 'chopper').map((entry) => entry.root),
       ...this.swarmInstanceBatches.map((batch) => batch.root),
     ];
-    const objectStates = new Map<THREE.Object3D, Readonly<{
-      visible: boolean;
+    const originallyHiddenNodes = new Set<THREE.Object3D>();
+    const originallyUnculledNodes = new Set<THREE.Object3D>();
+    const stagedRootPositions = new Map<THREE.Object3D, THREE.Vector3>();
+    const animatedNodeTransforms = new Map<THREE.Object3D, Readonly<{
       position: THREE.Vector3;
       quaternion: THREE.Quaternion;
       scale: THREE.Vector3;
-      frustumCulled: boolean;
     }>>();
     const lodStates = new Map<THREE.LOD, boolean>();
     const possessedMaterialDepthWrite = new Map<THREE.Material, boolean>();
@@ -1732,14 +1733,16 @@ export class KillstreakPresentation {
     this.root.frustumCulled = false;
 
     for (const stagedRoot of stagedRoots) {
+      stagedRootPositions.set(stagedRoot, stagedRoot.position.clone());
       stagedRoot.traverse((node) => {
-        if (!objectStates.has(node)) {
-          objectStates.set(node, Object.freeze({
-            visible: node.visible,
+        const nextVisible = node.userData.staticBatchRendered !== true;
+        if (!node.visible) originallyHiddenNodes.add(node);
+        if (!node.frustumCulled) originallyUnculledNodes.add(node);
+        if (node.userData.supportAnimationTarget === true && !animatedNodeTransforms.has(node)) {
+          animatedNodeTransforms.set(node, Object.freeze({
             position: node.position.clone(),
             quaternion: node.quaternion.clone(),
             scale: node.scale.clone(),
-            frustumCulled: node.frustumCulled,
           }));
         }
         if (node instanceof THREE.LOD && !lodStates.has(node)) {
@@ -1750,7 +1753,7 @@ export class KillstreakPresentation {
         // merged batch is the render authority. Uploading both representations
         // wastes GPU memory and can provoke a post-prewarm driver/GC pause on
         // the first real chopper plus swarm activation.
-        node.visible = node.userData.staticBatchRendered !== true;
+        node.visible = nextVisible;
         node.frustumCulled = false;
       });
       // Preserve the pool entry's exact authored/gameplay scale. A near-zero
@@ -1798,14 +1801,8 @@ export class KillstreakPresentation {
       // and animation state while the deployment surface still hides it.
       for (const liveRoot of liveActivationRoots) {
         liveRoot.traverse((node) => {
-          const state = objectStates.get(node);
-          if (state) {
-            node.visible = state.visible;
-            node.position.copy(state.position);
-            node.quaternion.copy(state.quaternion);
-            node.scale.copy(state.scale);
-            node.frustumCulled = state.frustumCulled;
-          }
+          node.visible = !originallyHiddenNodes.has(node);
+          node.frustumCulled = !originallyUnculledNodes.has(node);
           if (node instanceof THREE.LOD) node.autoUpdate = lodStates.get(node) ?? node.autoUpdate;
         });
         liveRoot.visible = true;
@@ -1843,13 +1840,16 @@ export class KillstreakPresentation {
     } finally {
       for (const [material, depthWrite] of possessedMaterialDepthWrite) material.depthWrite = depthWrite;
       for (const [lod, autoUpdate] of lodStates) lod.autoUpdate = autoUpdate;
-      for (const [node, state] of objectStates) {
-        node.visible = state.visible;
-        node.position.copy(state.position);
-        node.quaternion.copy(state.quaternion);
-        node.scale.copy(state.scale);
-        node.frustumCulled = state.frustumCulled;
+      for (const stagedRoot of stagedRoots) stagedRoot.traverse((node) => {
+        node.visible = !originallyHiddenNodes.has(node);
+        node.frustumCulled = !originallyUnculledNodes.has(node);
+      });
+      for (const [node, transform] of animatedNodeTransforms) {
+        node.position.copy(transform.position);
+        node.quaternion.copy(transform.quaternion);
+        node.scale.copy(transform.scale);
       }
+      for (const [stagedRoot, position] of stagedRootPositions) stagedRoot.position.copy(position);
       this.root.visible = rootVisible;
       this.root.frustumCulled = rootFrustumCulled;
       for (const markerRoot of stagedMarkerRoots) this.retireRoot(markerRoot);
