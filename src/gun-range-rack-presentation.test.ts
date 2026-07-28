@@ -74,6 +74,7 @@ describe('Gun Range authored rack presentation', () => {
 
   it('awaits authored rack preparation before the existing selected-scene GPU prewarm and exposes source telemetry', () => {
     const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+    const browserGate = readFileSync(new URL('../scripts/qa/verify-pass65-menu-preview-webgpu.mjs', import.meta.url), 'utf8');
     const qualityGate = source.slice(
       source.indexOf('async function ensureSelectedQualityPresentation('),
       source.indexOf('function retireAtomicPresentation()'),
@@ -94,6 +95,11 @@ describe('Gun Range authored rack presentation', () => {
     expect(source).toContain('rackPresentation: arena.root.userData.gunRangeRackPresentation ?? null');
     expect(source).toContain('authored: rackModel?.userData.projectOriginalWeapon === true');
     expect(source).toContain('deliveryVariant: rackModel?.userData.deliveryVariant ?? null');
+    expect(browserGate).toContain("requireWebGPU=1&render=blender");
+    expect(browserGate).toContain("setArenaReviewCamera('gun-range-armory-support')");
+    expect(browserGate).toContain("afterDeployment.rangePractice.rackPresentation?.status !== 'ready'");
+    expect(browserGate).toContain("station.deliveryVariant !== 'world'");
+    expect(browserGate).toContain('source changed during exact Gun Range authored-rack WebGPU capture');
   });
 
   it('loads and validates all five models before one atomic attach without mutating authority', async () => {

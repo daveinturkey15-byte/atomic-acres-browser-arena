@@ -1,9 +1,16 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
 
 const port = Number(process.env.QA_PREVIEW_PORT ?? '44165');
+const allowDirty = process.env.PASS65_MENU_PREVIEW_ALLOW_DIRTY === '1';
+const sourceRevision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+const startingStatus = execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { encoding: 'utf8' }).trim();
+if (!allowDirty && startingStatus.length > 0) {
+  throw new Error('Pass 65 menu-preview WebGPU QA requires a clean tracked worktree for exact-SHA evidence');
+}
 const chromeCandidates = [
   process.env.PASS64_CHROME_PATH,
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
@@ -48,7 +55,7 @@ try {
     body: JSON.stringify({ accepted: true }),
   }));
 
-  await page.goto(`http://127.0.0.1:${port}/?release=latest&renderer=webgpu&render=blender&seed=6505`);
+  await page.goto(`http://127.0.0.1:${port}/?release=latest&renderer=webgpu&requireWebGPU=1&render=blender&seed=6505`);
   await page.waitForFunction(() => {
     const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
     return ['menu-video-ready', 'ready'].includes(state?.bootstrap.stage)
@@ -167,14 +174,44 @@ try {
   await page.locator('#player-name').fill('WebGPU Preview QA');
   await page.locator('#solo').click();
   await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().gameStarted === true, undefined, { timeout: 75_000 });
+  const reviewCamera = await page.evaluate(() => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    const before = api.snapshot();
+    api.setBotsFrozen(true);
+    api.setCaptureViewmodelHidden(true);
+    return {
+      applied: api.setArenaReviewCamera('gun-range-armory-support'),
+      beforeFrame: before.frameCount,
+      beforeSubmission: before.render.runtime.presentation.submissionSequence,
+    };
+  });
+  if (!reviewCamera.applied) throw new Error('Gun Range authored-rack review camera was unavailable');
+  await page.waitForFunction(({ beforeFrame, beforeSubmission }) => {
+    const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+    const presentation = state.render.runtime.presentation;
+    return state.render.playableScene.deterministicReview.cameraId === 'gun-range-armory-support'
+      && state.frameCount > beforeFrame
+      && presentation.submissionSequence > beforeSubmission;
+  }, reviewCamera, { timeout: 20_000 });
+  const reviewSubmission = await page.evaluate(() => (
+    window.__ATOMIC_ACRES_DEBUG__.snapshot().render.runtime.presentation.submissionSequence
+  ));
+  await page.waitForFunction((targetSequence) => {
+    const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+    return state.render.playableScene.deterministicReview.cameraId === 'gun-range-armory-support'
+      && state.render.runtime.presentation.completedSequence >= targetSequence;
+  }, reviewSubmission, { timeout: 20_000 });
   const afterDeployment = await page.evaluate(() => {
     const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
     return {
       runtime: state.render.runtime,
+      profile: state.render.profile,
+      playableScene: state.render.playableScene,
       menuPreview: state.menuPreview,
       arenaStreaming: state.arenaSelection.streaming,
       arenaId: state.arenaSelection.id,
       gameStarted: state.gameStarted,
+      rangePractice: state.rangePractice,
     };
   });
   if (afterDeployment.arenaId !== 'gun-range'
@@ -185,15 +222,62 @@ try {
     || afterDeployment.runtime.presentation.status !== 'healthy') {
     throw new Error(`explicit deployment did not produce one healthy selected WebGPU arena: ${JSON.stringify(afterDeployment)}`);
   }
+  const expectedRackWeapons = ['carbine', 'smg', 'lmg', 'scattergun', 'sniper'];
+  const expectedRackRequests = expectedRackWeapons.map((weapon) => (
+    `./assets/original/models/weapons/pass65-firearms/${weapon}/${weapon}-world-lod0.glb`
+  ));
+  const rackFailures = [];
+  if (afterDeployment.runtime.actualBackend !== 'webgpu' || afterDeployment.runtime.softwareAdapter === true) {
+    rackFailures.push('authored rack gate did not use hardware WebGPU');
+  }
+  if (afterDeployment.profile !== 'blender') rackFailures.push(`authored rack gate used ${afterDeployment.profile} instead of Quality`);
+  if (afterDeployment.playableScene.deterministicReview.cameraId !== 'gun-range-armory-support') {
+    rackFailures.push('deterministic armory review camera was not active');
+  }
+  if (afterDeployment.rangePractice.rackPresentation?.status !== 'ready'
+    || afterDeployment.rangePractice.rackPresentation?.ready !== expectedRackWeapons.length
+    || afterDeployment.rangePractice.rackPresentation?.source !== 'project-original-blender-world-lod0') {
+    rackFailures.push(`rack aggregate did not attest five authored models: ${JSON.stringify(afterDeployment.rangePractice.rackPresentation)}`);
+  }
+  if (JSON.stringify(afterDeployment.playableScene.arena?.requestedResources) !== JSON.stringify(expectedRackRequests)) {
+    rackFailures.push(`selected request receipt mismatch: ${JSON.stringify(afterDeployment.playableScene.arena?.requestedResources)}`);
+  }
+  if (afterDeployment.rangePractice.stations.length !== expectedRackWeapons.length) {
+    rackFailures.push(`expected ${expectedRackWeapons.length} rack stations, received ${afterDeployment.rangePractice.stations.length}`);
+  }
+  afterDeployment.rangePractice.stations.forEach((station, index) => {
+    const expectedWeapon = expectedRackWeapons[index];
+    const expectedSource = expectedRackRequests[index];
+    if (station.weapon !== expectedWeapon
+      || station.authored !== true
+      || station.deliveryVariant !== 'world'
+      || station.presentationSource !== 'project-original-blender-world-lod0'
+      || station.importedWeaponSource !== expectedSource
+      || typeof station.modelId !== 'string'
+      || station.modelId.length === 0
+      || /procedural|fallback|test-only/i.test(`${station.modelId} ${station.importedWeaponSource} ${station.presentationSource}`)) {
+      rackFailures.push(`station ${index} failed authored identity: ${JSON.stringify(station)}`);
+    }
+  });
+  if (rackFailures.length > 0) throw new Error(`Gun Range authored-rack gate failed: ${rackFailures.join('; ')}`);
   if (errors.length > 0) throw new Error(`browser/GPU errors: ${[...new Set(errors)].join(' | ')}`);
+
+  const endingRevision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  const endingStatus = execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { encoding: 'utf8' }).trim();
+  if (!allowDirty && (endingRevision !== sourceRevision || endingStatus !== startingStatus)) {
+    throw new Error('source changed during exact Gun Range authored-rack WebGPU capture');
+  }
 
   const receipt = {
     checkedAt: new Date().toISOString(),
+    sourceRevision,
+    exactSource: !allowDirty && startingStatus.length === 0 && endingRevision === sourceRevision && endingStatus === startingStatus,
     executablePath,
     before,
     settledSample,
     browseSamples,
     afterBrowse,
+    reviewSubmission,
     afterDeployment,
     errors,
     pass: true,
