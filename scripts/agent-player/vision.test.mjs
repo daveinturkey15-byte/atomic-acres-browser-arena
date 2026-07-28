@@ -4,6 +4,7 @@ import {
   createOperatorTargetTracker,
   createTemporalTargetTracker,
   findCoralTargets,
+  findMinimapThreats,
   findOperatorCandidates,
   frameSignature,
   isCoralPixel,
@@ -61,6 +62,19 @@ test('operator detector abstains during a global red damage flash', () => {
   assert.equal(targets.length, 0);
   assert.equal(targets.rejectedReason, 'global-red-flash');
   assert.ok(targets.paletteRatio > 0.9);
+});
+
+test('visible player-up minimap markers yield a closed-loop relative bearing', () => {
+  const width = 320;
+  const height = 180;
+  const raw = frame(width, height);
+  // Player anchor is approximately (49.6, 97.2); this marker is ahead-right.
+  paint(raw, width, 57, 56, 58, 57, [222, 62, 72]);
+  const threats = findMinimapThreats(raw, width, height, 3);
+  assert.equal(threats.length, 1);
+  assert.ok(threats[0].deltaX > 7);
+  assert.ok(threats[0].deltaY < -39);
+  assert.ok(threats[0].bearingRadians > 0 && threats[0].bearingRadians < 0.4);
 });
 
 test('nearest plausible central coral component wins without exposing game state', () => {

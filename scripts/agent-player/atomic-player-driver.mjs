@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import {
   createOperatorTargetTracker,
   findCoralTargets,
+  findMinimapThreats,
   findOperatorCandidates,
   frameSignature,
   signatureDifference,
@@ -208,6 +209,7 @@ async function createVisionCapture(context, page, options = {}) {
       .toBuffer({ resolveWithObject: true });
     const targets = findCoralTargets(data, info.width, info.height, info.channels);
     const operatorTargets = findOperatorCandidates(data, info.width, info.height, info.channels);
+    const minimapThreats = findMinimapThreats(data, info.width, info.height, info.channels);
     const decodeMs = performance.now() - decodeStartedAt;
     const captureMs = Math.max(0, packet.receivedAt - captureStartedAt);
     state.captureDurationsMs.push(captureMs);
@@ -219,6 +221,7 @@ async function createVisionCapture(context, page, options = {}) {
       jpeg,
       targets,
       operatorTargets,
+      minimapThreats,
       operatorPaletteRatio: Number(operatorTargets.paletteRatio ?? 0),
       operatorRejectedReason: operatorTargets.rejectedReason ?? null,
       signature: frameSignature(data, info.width, info.height, info.channels),
@@ -429,6 +432,7 @@ async function run() {
   let warmupRawTargetFrames = 0;
   let operatorCandidateFrames = 0;
   let operatorRedFlashFrames = 0;
+  let minimapThreatFrames = 0;
   let confirmedTargetFrames = 0;
   let staticGeometryRejects = 0;
   let fireAuthorizedFrames = 0;
@@ -664,6 +668,8 @@ async function run() {
           movementMoved: previousMovementMoved,
         });
         const rawTarget = tracking.rawTarget;
+        const minimapThreat = vision.minimapThreats[0] ?? null;
+        if (activeMatch && minimapThreat) minimapThreatFrames += 1;
         currentTarget = tracking.confirmedTarget;
         let cameraMovedThisFrame = false;
         if (activeMatch && rawTarget) operatorCandidateFrames += 1;
@@ -736,11 +742,19 @@ async function run() {
           });
         } else {
           const shouldScan = !rawTarget || tracking.reason === 'static-geometry-rejected';
-          if (activeMatch && shouldScan && movementCycle % 2 === 0) {
-            const scanDirection = Math.floor(movementCycle / 42) % 2 === 0 ? 1 : -1;
-            await moveAim(page, scanDirection * 10, 0);
-            aimMoves += 1;
-            cameraMovedThisFrame = true;
+          if (activeMatch && shouldScan) {
+            let scanMovement = 0;
+            if (minimapThreat && Math.abs(minimapThreat.bearingRadians) >= 0.035) {
+              scanMovement = Math.max(-18, Math.min(18, Math.round(minimapThreat.bearingRadians * 42)));
+            } else if (!minimapThreat && movementCycle % 2 === 0) {
+              const scanDirection = Math.floor(movementCycle / 42) % 2 === 0 ? 1 : -1;
+              scanMovement = scanDirection * 10;
+            }
+            if (scanMovement !== 0) {
+              await moveAim(page, scanMovement, 0);
+              aimMoves += 1;
+              cameraMovedThisFrame = true;
+            }
           }
           actions.push({
             atMs,
@@ -751,6 +765,12 @@ async function run() {
             trackAge: tracking.age,
             stableFrames: tracking.stableFrames,
             evidenceFrames: tracking.evidenceFrames,
+            minimapThreat: minimapThreat ? {
+              x: minimapThreat.x,
+              y: minimapThreat.y,
+              bearingRadians: minimapThreat.bearingRadians,
+              distance: minimapThreat.distance,
+            } : null,
             target: rawTarget ? { x: rawTarget.x, y: rawTarget.y, pixels: rawTarget.pixels, bounds: rawTarget.bounds } : null,
           });
         }
@@ -784,6 +804,10 @@ async function run() {
           } else if (rawTarget) {
             // Scan-stop-confirm: remove both camera and translation motion so a
             // static pole/prop cannot masquerade as an independently moving bot.
+          } else if (minimapThreat) {
+            if (Math.abs(minimapThreat.bearingRadians) < 0.55) desiredKeys.add('KeyW');
+            else desiredKeys.add(minimapThreat.bearingRadians > 0 ? 'KeyD' : 'KeyA');
+            if (Math.abs(minimapThreat.bearingRadians) < 0.22 && movementCycle % 5 < 2) desiredKeys.add('ShiftLeft');
           } else {
             desiredKeys.add('KeyW');
             if (movementCycle % 12 === 4) desiredKeys.add('KeyA');
@@ -898,7 +922,7 @@ async function run() {
         cdpAttached: Boolean(cdpUrl),
       },
       fairness: {
-        perception: args['lifecycle-only'] ? 'none-lifecycle-only' : 'rendered-pixels-operator-palette-geometry-v1-scan-stop-motion-confirmation-visible-hud',
+        perception: args['lifecycle-only'] ? 'none-lifecycle-only' : 'rendered-pixels-operator-palette-geometry-v1-scan-stop-motion-confirmation-visible-player-up-minimap-and-hud',
         policyVersion: 'atomic-player-policy-v3',
         automaticCombatFireEnabled: allowCombatFire,
         decisionInputs: args['lifecycle-only']
@@ -921,6 +945,7 @@ async function run() {
         warmupRawTargetFrames,
         operatorCandidateFrames,
         operatorRedFlashFrames,
+        minimapThreatFrames,
         confirmedTargetFrames,
         staticGeometryRejects,
         fireAuthorizedFrames,

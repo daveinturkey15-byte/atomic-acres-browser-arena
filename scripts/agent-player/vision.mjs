@@ -46,6 +46,92 @@ export function isOperatorPalettePixel(red, green, blue, config = DEFAULT_OPERAT
     && red - blue >= config.redBlueLead;
 }
 
+export function findMinimapThreats(raw, width, height, channels = 3, options = {}) {
+  if (!raw || raw.length < width * height * channels) throw new Error('Vision frame is smaller than its declared dimensions');
+  const minimumX = Math.floor(width * (options.minimumXRatio ?? 0.10));
+  const maximumX = Math.ceil(width * (options.maximumXRatio ?? 0.28));
+  const minimumY = Math.floor(height * (options.minimumYRatio ?? 0.24));
+  const maximumY = Math.ceil(height * (options.maximumYRatio ?? 0.61));
+  const mask = new Uint8Array(width * height);
+  for (let y = minimumY; y <= maximumY; y += 1) {
+    for (let x = minimumX; x <= maximumX; x += 1) {
+      const pixel = (y * width + x) * channels;
+      const red = raw[pixel];
+      const green = raw[pixel + 1];
+      const blue = raw[pixel + 2];
+      if (red >= 120 && green <= 125 && blue <= 150 && red - green >= 30 && red >= blue) mask[y * width + x] = 1;
+    }
+  }
+
+  const components = [];
+  const stack = [];
+  for (let start = 0; start < mask.length; start += 1) {
+    if (mask[start] === 0) continue;
+    mask[start] = 0;
+    stack.push(start);
+    const points = [];
+    while (stack.length > 0) {
+      const index = stack.pop();
+      const x = index % width;
+      const y = Math.floor(index / width);
+      points.push({ x, y });
+      for (const deltaY of [-1, 0, 1]) {
+        for (const deltaX of [-1, 0, 1]) {
+          if (deltaX === 0 && deltaY === 0) continue;
+          const neighbourX = x + deltaX;
+          const neighbourY = y + deltaY;
+          if (neighbourX < 0 || neighbourX >= width || neighbourY < 0 || neighbourY >= height) continue;
+          const neighbour = neighbourY * width + neighbourX;
+          if (mask[neighbour] === 0) continue;
+          mask[neighbour] = 0;
+          stack.push(neighbour);
+        }
+      }
+    }
+    const xs = points.map((point) => point.x);
+    const ys = points.map((point) => point.y);
+    const boxWidth = Math.max(...xs) - Math.min(...xs) + 1;
+    const boxHeight = Math.max(...ys) - Math.min(...ys) + 1;
+    if (points.length < 2 || points.length > 12 || boxWidth > 4 || boxHeight > 4) continue;
+    components.push({
+      x: xs.reduce((sum, value) => sum + value, 0) / points.length,
+      y: ys.reduce((sum, value) => sum + value, 0) / points.length,
+      pixels: points.length,
+      bounds: { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys), width: boxWidth, height: boxHeight },
+    });
+  }
+
+  // JPEG antialiasing can split one tiny marker into adjacent islands. Merge
+  // islands that a human would see as one dot before deriving player-up bearing.
+  const merged = [];
+  for (const component of components) {
+    const neighbour = merged.find((candidate) => Math.hypot(candidate.x - component.x, candidate.y - component.y) <= 4);
+    if (!neighbour) {
+      merged.push({ ...component });
+      continue;
+    }
+    const totalPixels = neighbour.pixels + component.pixels;
+    neighbour.x = (neighbour.x * neighbour.pixels + component.x * component.pixels) / totalPixels;
+    neighbour.y = (neighbour.y * neighbour.pixels + component.y * component.pixels) / totalPixels;
+    neighbour.pixels = totalPixels;
+  }
+
+  const playerAnchorX = width * (options.playerAnchorXRatio ?? 0.155);
+  const playerAnchorY = height * (options.playerAnchorYRatio ?? 0.54);
+  return merged.map((component) => {
+    const deltaX = component.x - playerAnchorX;
+    const deltaY = component.y - playerAnchorY;
+    return {
+      ...component,
+      deltaX,
+      deltaY,
+      distance: Math.hypot(deltaX, deltaY),
+      bearingRadians: Math.atan2(deltaX, -deltaY),
+      detector: 'visible-player-up-minimap-v1',
+    };
+  }).sort((left, right) => left.distance - right.distance);
+}
+
 export function findOperatorCandidates(raw, width, height, channels = 3, options = {}) {
   if (!Number.isInteger(width) || width <= 0 || !Number.isInteger(height) || height <= 0) {
     throw new Error('Vision frame dimensions must be positive integers');
