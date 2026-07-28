@@ -177,10 +177,16 @@ async function state(page: Page): Promise<any> {
   return page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
 }
 
-async function clickStrikeMap(page: Page, xRatio: number, yRatio: number): Promise<void> {
-  const box = await page.locator('#strike-map').boundingBox();
-  if (!box) throw new Error('Targeting map has no bounds');
-  await page.mouse.click(box.x + box.width * xRatio, box.y + box.height * yRatio);
+async function aimCrosshairAtGround(page: Page, xRatio: number, zRatio: number): Promise<number[]> {
+  await page.evaluate(({ xRatio: xAlpha, zRatio: zAlpha }) => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    const bounds = api.snapshot().arenaSelection.bounds;
+    const x = bounds.minX + (bounds.maxX - bounds.minX) * xAlpha;
+    const z = bounds.minZ + (bounds.maxZ - bounds.minZ) * zAlpha;
+    api.setCaptureCameraPose(x, 18, z, 0, -1.45);
+  }, { xRatio, zRatio });
+  await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().fieldSupport.crosshairTarget !== null);
+  return (await state(page)).fieldSupport.crosshairTarget;
 }
 
 async function freezeTopDownMarkerFrame(pages: readonly Page[], anchor: number[]): Promise<void> {
@@ -217,7 +223,7 @@ function writeReceipt(name: string, payload: Record<string, unknown>): void {
 test.describe('Pass 65 support visual fail-closed gate', () => {
   test.skip(({ browserName }) => browserName !== 'chromium', 'Representative GPU support-visual gate is Chromium-only.');
 
-  test('places replicated red support X markers and keeps the carpet corridor caller-private', async ({ browser }) => {
+  test('places replicated crosshair-selected support X markers and keeps the carpet corridor caller-private', async ({ browser }) => {
     test.setTimeout(150_000);
     const pair = await startPair(browser, 'SUPPORT MARKERS');
     const { context, host, guest, errors } = pair;
@@ -228,21 +234,26 @@ test.describe('Pass 65 support visual fail-closed gate', () => {
       await expect.poll(async () => (await state(host)).fieldSupport.available['care-package']).toBe(true);
       expect((await state(host)).killstreak.actors[0].loadout.slots).toEqual(pass65Loadout.slots);
 
-      // Real player input opens the generalized targeting UI. Escape must
-      // refund without creating a runtime or presentation marker.
+      // Care and Carpet use the world-space crosshair, not the Tri-Pass map.
+      // Escape must refund without creating a runtime or presentation marker.
       await host.keyboard.press('3');
-      await expect(host.locator('#strike-map-overlay')).toBeVisible();
-      await expect(host.locator('#strike-target-mode')).toHaveText('CARE PACKAGE');
-      await expect(host.locator('#strike-target-count')).toHaveText('0 / 1');
+      await expect(host.locator('#strike-map-overlay')).toBeHidden();
+      await expect.poll(async () => (await state(host)).fieldSupport).toMatchObject({
+        tacticalMapOpen: false,
+        targetingMode: 'care-package',
+      });
       await host.keyboard.press('Escape');
       await expect(host.locator('#strike-map-overlay')).toBeHidden();
+      await expect.poll(async () => (await state(host)).fieldSupport.targetingMode).toBeNull();
       expect((await state(host)).fieldSupport.available['care-package']).toBe(true);
       expect((await state(host)).killstreakPresentation.placementMarkers).toBe(0);
 
       await host.keyboard.press('3');
-      await expect(host.locator('#strike-map-overlay')).toBeVisible();
-      await clickStrikeMap(host, 0.56, 0.43);
-      await expect(host.locator('#strike-map-overlay')).toBeHidden();
+      await expect.poll(async () => (await state(host)).fieldSupport.targetingMode).toBe('care-package');
+      const careCrosshairTarget = await aimCrosshairAtGround(host, 0.56, 0.43);
+      await host.locator('#game').click({ force: true });
+      await expect.poll(async () => (await state(host)).fieldSupport.targetingMode).toBeNull();
+      await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(null));
       await expect.poll(async () => (await state(host)).killstreakPresentation.markerDetails
         .filter((marker: any) => marker.source === 'care-package').length).toBe(1);
       await expect.poll(async () => (await state(guest)).killstreakPresentation.markerDetails
@@ -270,9 +281,12 @@ test.describe('Pass 65 support visual fail-closed gate', () => {
         .some((marker: any) => marker.id === hostCare.id), { timeout: 9_000 }).toBe(false);
 
       await host.keyboard.press('5');
-      await expect(host.locator('#strike-map-overlay')).toBeVisible();
-      await expect(host.locator('#strike-target-mode')).toHaveText('CARPET BOMBER');
-      await clickStrikeMap(host, 0.42, 0.61);
+      await expect(host.locator('#strike-map-overlay')).toBeHidden();
+      await expect.poll(async () => (await state(host)).fieldSupport.targetingMode).toBe('carpet-bomber');
+      const carpetCrosshairTarget = await aimCrosshairAtGround(host, 0.42, 0.61);
+      await host.locator('#game').click({ force: true });
+      await expect.poll(async () => (await state(host)).fieldSupport.targetingMode).toBeNull();
+      await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(null));
       await expect.poll(async () => (await state(host)).killstreakPresentation.markerDetails.length).toBe(2);
       await expect.poll(async () => (await state(guest)).killstreakPresentation.markerDetails.length).toBe(1);
       const hostCarpetMarkers = (await state(host)).killstreakPresentation.markerDetails;
@@ -302,8 +316,8 @@ test.describe('Pass 65 support visual fail-closed gate', () => {
       await expect.poll(async () => (await state(guest)).killstreakPresentation.placementMarkers, { timeout: 3_000 }).toBe(0);
       expect(errors).toEqual([]);
       writeReceipt('replicated-placement-markers', {
-        care: { host: hostCare, guest: guestCare },
-        carpet: { host: hostCarpetMarkers, guest: guestCarpetMarkers },
+        care: { crosshairTarget: careCrosshairTarget, host: hostCare, guest: guestCare },
+        carpet: { crosshairTarget: carpetCrosshairTarget, host: hostCarpetMarkers, guest: guestCarpetMarkers },
         browserErrors: errors,
       });
     } finally {
@@ -424,7 +438,7 @@ test.describe('Pass 65 support visual fail-closed gate', () => {
           piloted: entities.some((entity: any) => entity.kind === 'drone' && entity.mode === 'piloted'),
           swarm: entities.filter((entity: any) => entity.kind === 'drone' && entity.mode === 'swarm').length,
         };
-      }).toEqual({ chopper: true, piloted: true, swarm: 12 });
+      }).toEqual({ chopper: true, piloted: true, swarm: 24 });
       await expect.poll(async () => (await state(host)).supportDamageFeedback.visible, { timeout: 20_000 }).toBeGreaterThan(0);
       await expect.poll(async () => [...new Set((await state(host)).supportDamageFeedback.recent
         .map((sample: any) => sample.source))].sort(), { timeout: 35_000 }).toEqual(['chopper', 'drone-swarm', 'piloted-drone']);

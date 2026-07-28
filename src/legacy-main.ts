@@ -12874,7 +12874,7 @@ function confirmCrosshairSupportTarget(confirmedAt = performance.now()): boolean
     return true;
   }
   addFeed(targeting.id === 'care-package'
-    ? 'CARE PACKAGE · TARGET CONFIRMED · PRESS F TO SECURE'
+    ? 'CARE PACKAGE · TARGET CONFIRMED · DELIVERY INBOUND'
     : 'CARPET BOMBER · TARGET CONFIRMED · 20-IMPACT RUN INBOUND', 'gold');
   cancelSupportTargeting(false);
   return true;
@@ -12951,7 +12951,7 @@ function registerPointSupportClick(clientX: number, clientY: number, confirmedAt
     return true;
   }
   addFeed(targeting.id === 'care-package'
-    ? 'CARE PACKAGE · TARGET CONFIRMED · PRESS F TO SECURE'
+    ? 'CARE PACKAGE · TARGET CONFIRMED · DELIVERY INBOUND'
     : 'CARPET BOMBER · TARGET CONFIRMED · 20-IMPACT RUN INBOUND', 'gold');
   cancelSupportTargeting(false);
   return true;
@@ -16598,6 +16598,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       yardhawkExplosions,
       tacticalMapOpen,
       targetingMode: pointSupportTargeting?.id ?? (triPassTargeting ? 'tri-pass' : null),
+      crosshairTarget: crosshairPreviewLastPoint?.toArray() ?? null,
       tacticalTargets: triPassTargeting?.points.map((point) => ({ ...point })) ?? [],
       tacticalHostiles: triPassHostileMarkers.map((marker) => ({
         id: marker.id,

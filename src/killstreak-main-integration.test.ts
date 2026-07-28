@@ -88,14 +88,22 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(block).not.toContain('showHitmarker(');
   });
 
-  it('uses the real tactical map for one-click Care/Carpet placement and host-owned surface height', () => {
+  it('uses a world-space crosshair for Care/Carpet placement and host-owned surface height', () => {
     expect(source).toContain("beginPointSupportTargeting('care-package')");
     expect(source).toContain("beginPointSupportTargeting('carpet-bomber')");
-    expect(source).toContain('function registerPointSupportClick(');
-    expect(source).toContain('tacticalMapToWorld(x, y, arena.bounds');
-    expect(source).toContain('requestKillstreakActivation(targeting.id, confirmedAt, [point.x, 0, point.z])');
+    const targetingStart = source.indexOf('function beginPointSupportTargeting(');
+    const targetingEnd = source.indexOf('\nfunction cancelSupportTargeting(', targetingStart);
+    const targetingBlock = source.slice(targetingStart, targetingEnd);
+    expect(targetingBlock).toContain('tacticalMapOpen = false;');
+    expect(targetingBlock).toContain("if (id === 'care-package' || id === 'carpet-bomber') {");
+    expect(source).toContain('function updateCrosshairSupportPreview()');
+    expect(source).toContain('function confirmCrosshairSupportTarget(');
+    expect(source).toContain('requestKillstreakActivation(targeting.id, confirmedAt, [point.x, point.y, point.z])');
     expect(source).toContain('cancelSupportTargeting(true)');
     expect(source).toContain('groundHeightAt: supportPlacementGroundHeightAt');
+    expect(source).toContain('crosshairTarget: crosshairPreviewLastPoint?.toArray() ?? null');
+    expect(source).toContain('CARE PACKAGE · TARGET CONFIRMED · DELIVERY INBOUND');
+    expect(source).not.toContain('CARE PACKAGE · TARGET CONFIRMED · PRESS F TO SECURE');
     expect(source).not.toContain('nearestSupportTarget()?.point ?? player.position.clone().addScaledVector');
   });
 
