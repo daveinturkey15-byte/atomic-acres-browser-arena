@@ -130,6 +130,9 @@ describe('presentation prewarm startup contract', () => {
     expect(cadenceAdmission).toContain('Foreground match cadence remained degraded');
     expect(source).toContain('matchAdmissionCadence: lastMatchAdmissionCadence');
     expect(source).toContain('submitWebGpuFrame(performance.now(), true)');
+    expect(arenaDeployment).toContain('await withArenaFrustumCullingDisabled(presentationRoot, async () => {');
+    expect(arenaDeployment.indexOf('withArenaFrustumCullingDisabled(presentationRoot'))
+      .toBeLessThan(arenaDeployment.indexOf('auditArenaRenderLiveness('));
     expect(source).toContain('await flushWebGpuFrames(12_000)');
     expect(source).toContain('const requiredConsecutiveHealthySamples = 3;');
     expect(source).toContain('WebGPU queue latency remained ${Math.round(completionLatencyMs)}ms at the minimum quality tier');

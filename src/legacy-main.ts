@@ -8,6 +8,7 @@ import { centeredReadbackRegion, detectLivePresentationStall, LegacyWebGlRenderR
 import { estimateResidentObjectMemory } from './rendering/resident-memory';
 import { ArenaVisualStreamController, loadArenaVisualModule, type ArenaVisualSwitchReceipt } from './rendering/arena-visual-stream';
 import { ArenaRenderWatchdog, auditArenaRenderLiveness } from './rendering/arena-render-watchdog';
+import { withArenaFrustumCullingDisabled } from './rendering/arena-coverage-prewarm';
 import { auditRuntimeTslTraversal, assertRuntimeTslTraversal, createPass64TslSceneSystems, type Pass64TslSceneSystems } from './rendering/pass64-tsl-scene';
 import type { ArenaVisualBudgets, ArenaVisualDefinition } from './rendering/arena-visual-definition';
 import { auditLocalLightOcclusion } from './rendering/light-occlusion';
@@ -15276,15 +15277,20 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
     // Lazy arena roots and their selected TSL definition must be compiled while
     // submissions remain paused. This also compiles the awaited Gun Range rack
     // assets before their first live frame can trip the presentation watchdog.
-    renderRuntime.resetRenderInfo();
-    if (renderRuntime.backend === 'webgpu') submitWebGpuFrame(performance.now(), true);
-    else atomicSignal?.render(scene, camera, VIEWMODEL_RENDER_LAYER);
-    // This is an admitted cold-generation fence, not the live-frame stall
-    // budget. Keep the longer allowance behind the menu/loading surface.
-    await flushWebGpuFrames(12_000);
     const presentationRoot = selectedArena.id === 'atomic-acres' && arenaArtRoot?.visible
       ? arenaArtRoot
       : arena.root;
+    renderRuntime.resetRenderInfo();
+    if (renderRuntime.backend === 'webgpu') {
+      await withArenaFrustumCullingDisabled(presentationRoot, async () => {
+        submitWebGpuFrame(performance.now(), true);
+        // This is an admitted cold-generation fence, not the live-frame stall
+        // budget. Keep the longer allowance behind the menu/loading surface.
+        await flushWebGpuFrames(12_000);
+      });
+    } else {
+      atomicSignal?.render(scene, camera, VIEWMODEL_RENDER_LAYER);
+    }
     const readiness = auditArenaRenderLiveness(
       scene,
       arena.root,
