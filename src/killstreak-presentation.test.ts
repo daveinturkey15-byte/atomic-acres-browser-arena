@@ -228,6 +228,10 @@ describe('killstreak presentation', () => {
     lod.name = 'prewarm-test-authored-lod';
     const lod0 = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
     const lod1 = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+    expect(lod0.geometry.boundingBox).toBeNull();
+    expect(lod0.geometry.boundingSphere).toBeNull();
+    expect(lod1.geometry.boundingBox).toBeNull();
+    expect(lod1.geometry.boundingSphere).toBeNull();
     lod0.visible = false;
     lod1.visible = true;
     lod.addLevel(lod0, 0);
@@ -244,6 +248,10 @@ describe('killstreak presentation', () => {
       expect(chopper.scale.toArray()).toEqual([2, 3, 4]);
       expect(chopper.frustumCulled).toBe(false);
       expect(chopperChild.frustumCulled).toBe(false);
+      expect(lod0.geometry.boundingBox).not.toBeNull();
+      expect(lod0.geometry.boundingSphere).not.toBeNull();
+      expect(lod1.geometry.boundingBox).not.toBeNull();
+      expect(lod1.geometry.boundingSphere).not.toBeNull();
       if (compilePass === 1) {
         expect(chopper.visible).toBe(true);
         expect(chopperChild.visible).toBe(true);

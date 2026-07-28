@@ -1357,6 +1357,24 @@ export class KillstreakPresentation {
     const overlayRoots: THREE.Object3D[] = [...this.sensorSilhouettes, ...stagedMarkerRoots];
     const stagedBatches = [entityRoots, effectRoots, overlayRoots].filter((batch) => batch.length > 0);
     const stagedRoots = stagedBatches.flat();
+    // Three computes missing BufferGeometry bounds synchronously the first
+    // time a frustum-culled object becomes visible. The hidden compile pass
+    // disables frustum culling so it cannot trigger that path by itself; with
+    // a full drone swarm this deferred thousands of position reads into the
+    // first live support frame. Pay that deterministic cost behind the
+    // deployment surface along with the pipeline and texture prewarm.
+    const stagedGeometries = new Set<THREE.BufferGeometry>();
+    for (const stagedRoot of stagedRoots) {
+      stagedRoot.traverse((node) => {
+        if (node instanceof THREE.Mesh || node instanceof THREE.Line || node instanceof THREE.Points) {
+          stagedGeometries.add(node.geometry);
+        }
+      });
+    }
+    for (const geometry of stagedGeometries) {
+      if (geometry.boundingBox === null) geometry.computeBoundingBox();
+      if (geometry.boundingSphere === null) geometry.computeBoundingSphere();
+    }
     const objectStates = new Map<THREE.Object3D, Readonly<{
       visible: boolean;
       position: THREE.Vector3;
