@@ -9,7 +9,8 @@ const sleep = (ms) => new Promise((resolveSleep) => setTimeout(resolveSleep, ms)
 function argsFrom(argv) { const out = {}; for (let i = 0; i < argv.length; i += 1) { const t = argv[i]; if (!t.startsWith('--')) throw new Error(`Unexpected argument ${t}`); out[t.slice(2)] = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : true; } return out; }
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 function parseRangeHud(text = '') { const m = String(text).match(/GUN RANGE\s*·\s*SCORE\s*(\d+)\s*·\s*(\d+)\s*HITS/i); return m ? { score: Number(m[1]), hits: Number(m[2]) } : null; }
-async function trustedClick(page, selector) { const box = await page.locator(selector).boundingBox(); if (!box) throw new Error(`Visible control unavailable: ${selector}`); await page.bringToFront(); const cdp = await page.context().newCDPSession(page); const x = box.x + box.width / 2; const y = box.y + box.height / 2; await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 }); await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 }); }
+async function trustedLocatorClick(page, locator) { const box = await locator.boundingBox(); if (!box) throw new Error('Visible trusted click target unavailable'); await page.bringToFront(); const cdp = await page.context().newCDPSession(page); const x = box.x + box.width / 2; const y = box.y + box.height / 2; await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 }); await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 }); }
+async function trustedClick(page, selector) { await trustedLocatorClick(page, page.locator(selector)); }
 async function clickVisibleExact(page, text) { const nodes = page.getByText(text, { exact: true }); for (let i = 0; i < await nodes.count(); i += 1) { const node = nodes.nth(i); if (await node.isVisible()) { await node.click(); return; } } throw new Error(`No visible exact text: ${text}`); }
 async function moveAim(page, x, y) { await page.evaluate(({ mx, my }) => window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, movementX: mx, movementY: my })), { mx: x, my: y }); }
 async function firePulse(page, pulseMs) { await page.evaluate(() => { const c = document.querySelector('#game'); window.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 2, buttons: 2 })); c?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 2, buttons: 2 })); window.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, buttons: 3 })); c?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, buttons: 3 })); }); await sleep(pulseMs); await page.evaluate(() => { const c = document.querySelector('#game'); window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0, buttons: 2 })); c?.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0, buttons: 2 })); window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 2, buttons: 0 })); c?.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 2, buttons: 0 })); }); }
@@ -42,13 +43,30 @@ export async function runRange(args) {
     await trustedClick(page, '#game'); await sleep(120);
     await page.keyboard.down('KeyA'); await sleep(1000); await page.keyboard.up('KeyA');
     await page.keyboard.down('KeyW'); await sleep(700); await page.keyboard.up('KeyW');
-    await page.keyboard.press('KeyF'); await sleep(350);
+    const pickupAdjustments = [['KeyF', 0], ['KeyA', 300], ['KeyW', 220], ['KeyD', 180], ['KeyA', 360], ['KeyW', 260]];
     let current = await hud(page);
+    for (const [code, duration] of pickupAdjustments) {
+      if (current.weapon === 'VECTORLINE SMG') break;
+      if (duration > 0) { await page.keyboard.down(code); await sleep(duration); await page.keyboard.up(code); }
+      await page.keyboard.press('KeyF'); await sleep(220);
+      current = await hud(page);
+    }
     if (current.weapon !== 'VECTORLINE SMG') throw new Error(`Visible weapon pickup failed: ${current.weapon}`);
     if (current.mode !== 'TARGET DRILL') throw new Error(`Visible range mode lost: ${current.mode}`);
     if (!current.pointer) {
-      await trustedClick(page, '#game');
-      await sleep(180);
+      if (await page.locator('#menu').isVisible().catch(() => false)) {
+        await clickVisibleExact(page, 'DEPLOY');
+        const resumeNodes = page.getByText('RETURN TO MATCH', { exact: true });
+        let resumed = false;
+        for (let i = 0; i < await resumeNodes.count(); i += 1) {
+          const node = resumeNodes.nth(i);
+          if (await node.isVisible()) { await trustedLocatorClick(page, node); resumed = true; break; }
+        }
+        if (!resumed) throw new Error('Visible RETURN TO MATCH control missing after SMG pickup');
+      } else {
+        await trustedClick(page, '#game');
+      }
+      await sleep(220);
       current = await hud(page);
     }
     if (!current.pointer || !current.focused) throw new Error('Visible post-pickup pointer/focus receipt missing');
