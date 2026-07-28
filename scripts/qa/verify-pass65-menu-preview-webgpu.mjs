@@ -56,14 +56,28 @@ try {
       && state?.menuPreview.sourceCount === 2;
   }, undefined, { timeout: 60_000 });
 
+  // WebGPU performs one bounded empty-scene bootstrap probe after device setup.
+  // Establish a stable baseline before attributing any later submission to menu browsing.
+  await page.waitForTimeout(1_000);
   const before = await page.evaluate(() => {
     const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
     return {
+      gameStarted: state.gameStarted,
+      menuLifecycle: state.menuLifecycle,
       runtime: state.render.runtime,
       menuPreview: state.menuPreview,
       arenaStreaming: state.arenaSelection.streaming,
     };
   });
+  await page.waitForTimeout(250);
+  const settledSample = await page.evaluate(() => {
+    const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+    return {
+      submissionSequence: state.render.runtime.presentation.submissionSequence,
+      renderCalls: state.menuPreview.rendererEvidence.renderCalls,
+    };
+  });
+  const browseSamples = [];
   for (const arenaId of ['skyline-terminal', 'rustworks-1v1', 'gun-range', 'atomic-acres']) {
     await page.locator(`.map-card[data-arena-id="${arenaId}"]`).click();
     await page.waitForFunction((expectedArena) => {
@@ -72,10 +86,20 @@ try {
         && state.menuPreview.sourceCount === 2
         && state.menuPreview.videoCurrentSrc.includes(`/menu-previews/${expectedArena}.`);
     }, arenaId, { timeout: 15_000 });
+    browseSamples.push(await page.evaluate((selectedArenaId) => {
+      const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+      return {
+        arenaId: selectedArenaId,
+        submissionSequence: state.render.runtime.presentation.submissionSequence,
+        renderCalls: state.menuPreview.rendererEvidence.renderCalls,
+      };
+    }, arenaId));
   }
   const afterBrowse = await page.evaluate(() => {
     const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
     return {
+      gameStarted: state.gameStarted,
+      menuLifecycle: state.menuLifecycle,
       runtime: state.render.runtime,
       menuPreview: state.menuPreview,
       arenaStreaming: state.arenaSelection.streaming,
@@ -84,18 +108,51 @@ try {
 
   const browseFailures = [];
   if (before.runtime.actualBackend !== 'webgpu' || before.runtime.softwareAdapter) browseFailures.push('hardware WebGPU was not active');
-  if (before.runtime.presentation.submissionSequence !== 0 || afterBrowse.runtime.presentation.submissionSequence !== 0) {
+  if (before.runtime.presentation.submissionSequence > 1 || before.menuPreview.rendererEvidence.renderCalls > 1) {
+    browseFailures.push('pre-deployment bootstrap exceeded one bounded empty-scene renderer probe');
+  }
+  if (settledSample.submissionSequence !== before.runtime.presentation.submissionSequence
+    || settledSample.renderCalls !== before.menuPreview.rendererEvidence.renderCalls) {
+    browseFailures.push('pre-deployment renderer baseline did not settle');
+  }
+  if (afterBrowse.runtime.presentation.submissionSequence !== before.runtime.presentation.submissionSequence) {
     browseFailures.push('map browsing submitted a WebGPU gameplay frame');
   }
   if (before.menuPreview.rendererEvidence.renderCalls !== afterBrowse.menuPreview.rendererEvidence.renderCalls) {
     browseFailures.push('map browsing changed gameplay render calls');
+  }
+  if (before.menuPreview.rendererSubmissions !== 0 || afterBrowse.menuPreview.rendererSubmissions !== 0) {
+    browseFailures.push('prerecorded menu-preview controller reported a renderer submission');
   }
   if (afterBrowse.menuPreview.rendererEvidence.gameplayArenaPrepared
     || afterBrowse.arenaStreaming.constructionCount !== 0
     || afterBrowse.arenaStreaming.residentArenaRoots !== 0) {
     browseFailures.push('map browsing constructed or retained a gameplay arena');
   }
-  if (browseFailures.length > 0) throw new Error(browseFailures.join('; '));
+  if (browseFailures.length > 0) {
+    throw new Error(`${browseFailures.join('; ')}: ${JSON.stringify({
+      before: {
+        submissionSequence: before.runtime.presentation.submissionSequence,
+        renderCalls: before.menuPreview.rendererEvidence.renderCalls,
+        gameplayArenaPrepared: before.menuPreview.rendererEvidence.gameplayArenaPrepared,
+        constructionCount: before.arenaStreaming.constructionCount,
+        residentArenaRoots: before.arenaStreaming.residentArenaRoots,
+        gameStarted: before.gameStarted,
+        menuSurface: before.menuLifecycle.surface,
+      },
+      afterBrowse: {
+        submissionSequence: afterBrowse.runtime.presentation.submissionSequence,
+        renderCalls: afterBrowse.menuPreview.rendererEvidence.renderCalls,
+        gameplayArenaPrepared: afterBrowse.menuPreview.rendererEvidence.gameplayArenaPrepared,
+        constructionCount: afterBrowse.arenaStreaming.constructionCount,
+        residentArenaRoots: afterBrowse.arenaStreaming.residentArenaRoots,
+        gameStarted: afterBrowse.gameStarted,
+        menuSurface: afterBrowse.menuLifecycle.surface,
+      },
+      browseSamples,
+      settledSample,
+    })}`);
+  }
 
   await page.locator('.map-card[data-arena-id="gun-range"]').click();
   await page.waitForFunction(() => {
@@ -134,6 +191,8 @@ try {
     checkedAt: new Date().toISOString(),
     executablePath,
     before,
+    settledSample,
+    browseSamples,
     afterBrowse,
     afterDeployment,
     errors,
@@ -144,7 +203,8 @@ try {
   console.log(JSON.stringify({
     pass: true,
     backend: afterDeployment.runtime.actualBackend,
-    menuSubmissionSequence: afterBrowse.runtime.presentation.submissionSequence,
+    bootstrapSubmissionSequence: before.runtime.presentation.submissionSequence,
+    menuSubmissionDelta: afterBrowse.runtime.presentation.submissionSequence - before.runtime.presentation.submissionSequence,
     menuArenaConstructions: afterBrowse.arenaStreaming.constructionCount,
     deploymentArenaConstructions: afterDeployment.arenaStreaming.constructionCount,
     receipt: `${artifactRoot}/receipt.json`,

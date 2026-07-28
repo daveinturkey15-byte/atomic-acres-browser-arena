@@ -160,7 +160,7 @@
   "runtimeFiles": [
     {
       "path": "public/assets/original/menu-previews/atomic-acres.mp4",
-      "sha256": "fb8e3a177c588ea17c046e84f42cd92d0fbf43b2b0c2d7b637bc113bb861abf4",
+      "sha256": "c83f09650b0583087b0559985d81f962dab16d7f4819f2fa76042ea7d73d2f3a",
       "arenaId": "atomic-acres",
       "extension": "mp4"
     },
@@ -178,7 +178,7 @@
     },
     {
       "path": "public/assets/original/menu-previews/skyline-terminal.mp4",
-      "sha256": "63309261c2ad52288d21d20c9f88c200fa94803825287550a94150eb9c435530",
+      "sha256": "f52b16574b190e3e811b5752e90d69032c44894826fe600f0dfd0696749ae471",
       "arenaId": "skyline-terminal",
       "extension": "mp4"
     },
@@ -196,7 +196,7 @@
     },
     {
       "path": "public/assets/original/menu-previews/rustworks-1v1.mp4",
-      "sha256": "1acab3dc28eddc330926d082c470c9aca42e50f4d103124da9a199eed99032da",
+      "sha256": "f733c2f19bb34873ee7a82dd8ff75d961a76a82684a253b91c88472f104c10e4",
       "arenaId": "rustworks-1v1",
       "extension": "mp4"
     },
@@ -214,7 +214,7 @@
     },
     {
       "path": "public/assets/original/menu-previews/gun-range.mp4",
-      "sha256": "4aeff1b31fa5aae4aeb60d645c0f67892479c8528d7eeddc73ee5c1ead108b80",
+      "sha256": "3b730fdfd7693422ff393a49aa15a5de263dcb9779ae650f9a9aeb5ad271023e",
       "arenaId": "gun-range",
       "extension": "mp4"
     },
