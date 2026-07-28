@@ -502,6 +502,7 @@ async function run() {
   const fireCooldownMs = integerArg(args['fire-cooldown'], 420, 180, 2000);
   const firePulseMs = integerArg(args['fire-pulse'], 72, 20, 100);
   const fireAlignmentMaximum = numberArg(args['fire-alignment'], 0.02, 0.003, 0.02);
+  const grenadeAlignmentMaximum = numberArg(args['grenade-alignment'], 0.02, 0.003, 0.02);
   const fieldKitRequest = String(args['field-kit'] ?? 'default');
   if (!['default', 'smg'].includes(fieldKitRequest)) throw new Error('--field-kit must be default or smg');
   const requiredWeaponName = fieldKitRequest === 'smg' ? 'VECTORLINE SMG' : null;
@@ -1080,6 +1081,7 @@ async function run() {
             twoFrameAligned,
             stableFrames: tracking.stableFrames,
             alignment,
+            maximumAlignment: grenadeAlignmentMaximum,
             health: hud?.health,
             threatDistance: minimapThreat?.distance,
             now,
@@ -1343,6 +1345,7 @@ async function run() {
         fireCooldownMs,
         firePulseMs,
         maximumGrenadeThrows,
+        grenadeAlignmentMaximum,
         decisionInputs: args['lifecycle-only']
           ? ['ordinary lobby controls and post-action lifecycle receipt']
           : ['rendered canvas pixels', 'visible HUD state through ordinary controls'],
