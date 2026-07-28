@@ -226,8 +226,12 @@ export class SmokeVolumePresentation {
     this.innerCards.rotation.z = disturbancePulse * 0.18;
     this.cards.rotation.z = -disturbancePulse * 0.14;
     const densityScale = 0.72 + this.qualityScale * 0.28;
-    this.coreMaterial.opacity = envelope.coreOpacity * densityScale * (1 - disturbancePulse * 0.78);
-    this.edgeMaterial.opacity = envelope.edgeOpacity * densityScale * (1 - disturbancePulse * 0.48);
+    // Compensate for the crowded-cluster two-card fill budget with density,
+    // which is cheap and keeps overlapping smoke at least as obscuring as one
+    // isolated three-card volume without restoring the discarded overdraw.
+    const crowdedDensityScale = this.crowdedCluster ? 1.35 : 1;
+    this.coreMaterial.opacity = envelope.coreOpacity * densityScale * crowdedDensityScale * (1 - disturbancePulse * 0.78);
+    this.edgeMaterial.opacity = envelope.edgeOpacity * densityScale * crowdedDensityScale * (1 - disturbancePulse * 0.48);
     return true;
   }
 
