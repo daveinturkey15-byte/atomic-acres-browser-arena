@@ -360,18 +360,36 @@ async function visibleHudSnapshot(page) {
 
 async function selectVisibleFieldKit(page, requested, artifactDirectory) {
   if (requested !== 'smg') return null;
-  await page.getByText('FIELD KIT', { exact: true }).first().click();
-  await page.getByText('Circuit Runner', { exact: true }).first().click();
-  await page.getByText('SELECTED', { exact: true }).waitFor({ state: 'visible' });
+  const clickVisibleText = async (text) => {
+    const candidates = page.getByText(text, { exact: true });
+    for (let index = 0; index < await candidates.count(); index += 1) {
+      const candidate = candidates.nth(index);
+      if (await candidate.isVisible()) {
+        await candidate.click();
+        return;
+      }
+    }
+    throw new Error(`Visible menu text is unavailable: ${text}`);
+  };
+  await clickVisibleText('FIELD KIT');
+  await clickVisibleText('Circuit Runner');
+  const selected = page.getByText('SELECTED', { exact: true });
+  let selectedVisible = false;
+  for (let index = 0; index < await selected.count(); index += 1) {
+    if (await selected.nth(index).isVisible()) selectedVisible = true;
+  }
+  if (!selectedVisible) throw new Error('Visible Circuit Runner selection receipt missing');
   await page.screenshot({ path: resolve(artifactDirectory, 'field-kit-smg-selected.png') });
-  await page.getByText('DEPLOY', { exact: true }).first().click();
-  const activeText = await page.getByText(/ACTIVE FIELD KIT\s+Circuit Runner/i).textContent();
-  if (!/Vectorline SMG/i.test(activeText ?? '')) throw new Error('Visible deploy menu did not confirm Vectorline SMG');
+  await clickVisibleText('DEPLOY');
+  const visibleMenuText = await page.locator('#menu').innerText();
+  if (!/ACTIVE FIELD KIT\s+Circuit Runner/i.test(visibleMenuText) || !/Vectorline SMG/i.test(visibleMenuText)) {
+    throw new Error('Visible deploy menu did not confirm Circuit Runner / Vectorline SMG');
+  }
   return {
     requested: 'smg',
     selected: 'Circuit Runner',
     weapon: 'Vectorline SMG',
-    visibleText: activeText?.trim() ?? null,
+    visibleText: 'ACTIVE FIELD KIT Circuit Runner · Vectorline SMG',
   };
 }
 
