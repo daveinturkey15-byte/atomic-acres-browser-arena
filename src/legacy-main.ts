@@ -7172,7 +7172,9 @@ function resetBreakableWindows(): void {
 
 const CORPSE_LIFETIME_MS = 7_500;
 const MAX_CORPSE_PRESENTATIONS = 12;
+const CORPSE_POOL_CAPACITY_PER_TEAM = 4;
 const corpsePresentations: Array<{ root: THREE.Group; expiresAt: number }> = [];
+const corpsePresentationPool: Array<{ root: THREE.Group; team: Team; inUse: boolean }> = [];
 const deferredDeathPresentations: Array<{
   victimId: string;
   source: CorpseSource | null;
@@ -7202,8 +7204,76 @@ function deferDeathPresentation(victimId: string, source: CorpseSource | null, d
   }
 }
 
+function hideCorpseHeldWeapon(root: THREE.Group): void {
+  const rig = root.userData.operatorRig as { weapon?: THREE.Object3D; meleeKnife?: THREE.Object3D } | undefined;
+  if (rig?.weapon) rig.weapon.visible = false;
+  if (rig?.meleeKnife) rig.meleeKnife.visible = false;
+}
+
+function prepareCorpsePresentationRoot(root: THREE.Group): void {
+  root.userData.presentationOnly = true;
+  root.userData.blocksShots = false;
+  root.traverse((node) => {
+    node.userData.presentationOnly = true;
+    node.userData.blocksShots = false;
+    if (node instanceof THREE.Mesh) {
+      node.castShadow = false;
+      node.raycast = () => undefined;
+    }
+  });
+  hideCorpseHeldWeapon(root);
+}
+
+function ensureCorpsePresentationPool(): void {
+  if (corpsePresentationPool.length > 0) return;
+  for (const team of [0, 1] as const) {
+    for (let index = 0; index < CORPSE_POOL_CAPACITY_PER_TEAM; index += 1) {
+      const root = buildOperator(team, 'prewarmed-fallen-operator', flattenOperatorMaterials, 'carbine');
+      prepareCorpsePresentationRoot(root);
+      root.visible = false;
+      scene.add(root);
+      corpsePresentationPool.push({ root, team, inUse: false });
+    }
+  }
+}
+
+function stageCorpsePresentationPoolForPrewarm(): () => void {
+  const cameraPosition = camera.getWorldPosition(new THREE.Vector3());
+  const forward = camera.getWorldDirection(new THREE.Vector3());
+  const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0).normalize();
+  for (const [index, entry] of corpsePresentationPool.entries()) {
+    resetOperator(entry.root);
+    hideCorpseHeldWeapon(entry.root);
+    entry.root.position.copy(cameraPosition)
+      .addScaledVector(forward, 5 + Math.floor(index / 4) * 1.4)
+      .addScaledVector(right, (index % 4 - 1.5) * 0.9);
+    entry.root.rotation.set(0, Math.PI, 0);
+    entry.root.visible = true;
+  }
+  let restored = false;
+  return () => {
+    if (restored) return;
+    restored = true;
+    for (const entry of corpsePresentationPool) {
+      entry.root.visible = false;
+      entry.root.position.set(0, 0, 0);
+      entry.root.rotation.set(0, 0, 0);
+    }
+  };
+}
+
 function disposeCorpsePresentation(root: THREE.Group): void {
-  scheduleDeferredGpuRetirement(root);
+  const pooled = corpsePresentationPool.find((entry) => entry.root === root);
+  if (!pooled) {
+    scheduleDeferredGpuRetirement(root);
+    return;
+  }
+  root.visible = false;
+  root.position.set(0, 0, 0);
+  root.rotation.set(0, 0, 0);
+  resetOperator(root);
+  hideCorpseHeldWeapon(root);
+  pooled.inUse = false;
 }
 
 function clearCorpsePresentations(): void {
@@ -7239,22 +7309,28 @@ function corpseSource(victimId: string): CorpseSource | null {
 
 function spawnCorpsePresentation(victimId: string, source = corpseSource(victimId), now = performance.now()): void {
   if (!source) return;
-  const root = buildOperator(source.team, 'fallen-operator', flattenOperatorMaterials, source.weapon);
+  let pooled = corpsePresentationPool.find((entry) => entry.team === source.team && !entry.inUse);
+  if (!pooled) {
+    const recycledIndex = corpsePresentations.findIndex((entry) => (
+      corpsePresentationPool.some((candidate) => candidate.root === entry.root && candidate.team === source.team)
+    ));
+    if (recycledIndex >= 0) {
+      const [recycled] = corpsePresentations.splice(recycledIndex, 1);
+      disposeCorpsePresentation(recycled!.root);
+      pooled = corpsePresentationPool.find((entry) => entry.team === source.team && !entry.inUse);
+    }
+  }
+  if (!pooled) return;
+  pooled.inUse = true;
+  const root = pooled.root;
+  resetOperator(root);
+  hideCorpseHeldWeapon(root);
+  root.name = 'fallen-operator';
   root.position.copy(source.position);
   root.position.y += 0.08;
   root.rotation.y = source.yaw;
   root.rotation.z = [...victimId].reduce((sum, character) => sum + character.charCodeAt(0), 0) % 2 === 0 ? 1.38 : -1.38;
-  root.userData.presentationOnly = true;
-  root.userData.blocksShots = false;
-  root.traverse((node) => {
-    node.userData.presentationOnly = true;
-    node.userData.blocksShots = false;
-    if (node instanceof THREE.Mesh) {
-      node.castShadow = false;
-      node.raycast = () => undefined;
-    }
-  });
-  scene.add(root);
+  root.visible = true;
   deathOperator(root);
   corpsePresentations.push({ root, expiresAt: now + CORPSE_LIFETIME_MS });
   if (corpsePresentations.length > MAX_CORPSE_PRESENTATIONS) disposeCorpsePresentation(corpsePresentations.shift()!.root);
@@ -8031,6 +8107,8 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   };
   if (mode === 'solo') await spawnBots();
   else if (mode === 'host') await spawnBots(privateMatchConfig.hostedBotCount);
+  ensureCorpsePresentationPool();
+  const restoreCorpsePoolPrewarm = stageCorpsePresentationPoolForPrewarm();
   // Compile and retire the first complete gameplay presentation while the
   // transition surface still owns the screen. Bot operators, the selected
   // viewmodel and their textures do not exist in the menu-only bootstrap
@@ -8058,6 +8136,7 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
       await killstreakPresentation.prewarm(renderRuntime, camera, -killstreakMatchEpoch);
       await renderRuntime.compile(scene, camera);
       await settleWebGpuPresentation('Initial match');
+      restoreCorpsePoolPrewarm();
       // Match-only operators, support pools and their prewarm bookkeeping are
       // created immediately before this boundary. Keep the opaque deployment
       // surface in control until the browser has delivered a full hitch-free
@@ -8066,9 +8145,11 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
       await waitForStableMatchAdmissionCadence();
     } else {
       await renderRuntime.compileAndRender(scene, camera, scene);
+      restoreCorpsePoolPrewarm();
       await waitForStableMatchAdmissionCadence();
     }
   } finally {
+    restoreCorpsePoolPrewarm();
     renderSubmissionPaused = priorRenderSubmissionPaused;
   }
   gameStarted = true;
@@ -9630,6 +9711,10 @@ function applyBotDamage(
   bot.respawnAt = now + 2_200;
   bot.deathVisibleUntil = now + 1_050;
   deathOperator(bot.root);
+  // The pooled corpse owns the persistent death pose. Keeping the live bot
+  // visible as well rendered the same operator twice during support-streak
+  // kills and was a repeatable frame-time spike on the owner hardware.
+  bot.root.visible = false;
   const afterDeathPose = performance.now();
   if (gameMode === 'solo' && attackerId === player.id) {
     player.kills += 1;
@@ -9863,8 +9948,7 @@ function updateBots(dt: number, now: number): void {
       haze.scale.set(2.35 + pulse * 0.08, 3.15 + pulse * 0.12, 1);
     }
     if (!bot.alive) {
-      bot.root.visible = now < bot.deathVisibleUntil;
-      if (bot.root.visible) poseOperator(bot.root, 'stand', 0, now * 0.001, 1, 0, dt);
+      bot.root.visible = false;
       if (now >= bot.respawnAt && !matchFinished) respawnBot(bot, now);
       continue;
     }
