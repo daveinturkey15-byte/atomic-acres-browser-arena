@@ -159,6 +159,11 @@ export function loadGunRangeRackPresentation(
         model.userData.weaponId = asset.weapon;
         model.userData.gunRangeStationId = asset.stationId;
         model.userData.presentationSource = 'project-original-blender-world-lod0';
+        // Imported GLBs retain their authored vertex/UV buffer encodings. The
+        // arena batcher only merges homogeneous procedural geometry, so keep
+        // each rack model as one explicit batch-excluded presentation subtree.
+        // This also preserves authored material and LOD identity for HITL.
+        model.userData.dynamic = true;
         model.traverse((node) => {
           node.userData.presentationOnly = true;
           if (node instanceof THREE.Mesh) node.raycast = () => undefined;

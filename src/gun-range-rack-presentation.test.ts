@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { describe, expect, it, vi } from 'vitest';
 import { buildGunRange } from './additional-maps';
+import { batchStaticMeshes } from './art-kit';
 import { GUN_RANGE_WEAPON_STATIONS } from './gun-range-armory';
 import {
   GUN_RANGE_RACK_ASSETS,
@@ -150,6 +151,7 @@ describe('Gun Range authored rack presentation', () => {
         weaponId: asset.weapon,
         gunRangeStationId: asset.stationId,
         presentationSource: 'project-original-blender-world-lod0',
+        dynamic: true,
       });
       expect(model.rotation.toArray().slice(0, 3)).toEqual([0.08, Math.PI / 2, -0.08]);
       expect(model.scale.x).toBe(asset.weapon === 'lmg' ? 0.52 : 0.58);
@@ -157,6 +159,11 @@ describe('Gun Range authored rack presentation', () => {
         expect(node.userData.presentationOnly).toBe(true);
         if (node instanceof THREE.Mesh) expect(node.raycast(new THREE.Raycaster(), [])).toBeUndefined();
       });
+      const rackMeshes: THREE.Mesh[] = [];
+      model.traverse((node) => { if (node instanceof THREE.Mesh) rackMeshes.push(node); });
+      const batchStats = batchStaticMeshes(station, station, () => '', 'texture-lit');
+      expect(batchStats).toEqual({ sourceMeshes: 0, batches: 0 });
+      expect(rackMeshes.every((mesh) => mesh.visible && mesh.userData.staticBatchRendered !== true)).toBe(true);
     }
     expect(map.colliders).toBe(authorityBefore.colliders);
     expect(map.physicsColliders).toBe(authorityBefore.physicsColliders);
