@@ -95,6 +95,11 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain("bootstrapStage = 'prewarming-overdrive'");
     expect(menuBootstrap).toContain("document.documentElement.dataset.gameplayArena = 'deferred-until-deployment'");
     expect(arenaDeployment).toContain("await prepareSharedGameplayAssets()");
+    expect(matchDeployment).toContain('await killstreakPresentation.prewarm(renderRuntime, camera, -killstreakMatchEpoch);');
+    expect(matchDeployment.indexOf('await spawnBots()'))
+      .toBeLessThan(matchDeployment.indexOf('await killstreakPresentation.prewarm(renderRuntime, camera, -killstreakMatchEpoch);'));
+    expect(matchDeployment.indexOf('await killstreakPresentation.prewarm(renderRuntime, camera, -killstreakMatchEpoch);'))
+      .toBeLessThan(matchDeployment.indexOf('await renderRuntime.compile(scene, camera);'));
     expect(matchDeployment).toContain("await settleWebGpuPresentation('Initial match')");
     expect(source).toContain('submitWebGpuFrame(performance.now(), true)');
     expect(source).toContain('await flushWebGpuFrames(12_000)');
