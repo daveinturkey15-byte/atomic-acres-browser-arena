@@ -81,6 +81,23 @@
       "attributionRequired": false
     },
     {
+      "id": "atomic-acres-azure-coil-leviathan-2026-07-28",
+      "kind": "original-project-rigged-animated-creature",
+      "creator": "Atomic Acres project / Hermes",
+      "source": "scripts/blender/create-azure-coil-leviathan.py",
+      "generatedAsOf": "2026-07-28",
+      "license": "Original project work",
+      "files": "public/assets/original/models/azure-coil-leviathan.glb",
+      "sha256": "62f3bb8f12ff087629eba3fb84430d083337b7005f4929dc056db6d8b3fe7387",
+      "sourceBlend": "source-assets/blender/azure-coil/azure-coil-leviathan.blend",
+      "sourceBlendSha256": "01f26e39c2d2893618d96cf9d0fd63debb35c118d0699bcf70e90ddbd881c5b5",
+      "sourceProvenance": "source-assets/blender/azure-coil/azure-coil-leviathan.provenance.json",
+      "sourceProvenanceSha256": "5e997096dc66a2700401d251b4eaf0eda06572335f65166d09fdcbb9aa0d827b",
+      "preview": "docs/assets/azure-coil-leviathan-preview.png",
+      "modifications": "Original 60,424-triangle aquatic serpent-dragon with a 30-bone rig, looping swim clip, and five embedded project-authored PBR maps. Presentation-only: no collider, ballistics, or network authority. No downloaded model, image, or protected-franchise asset is included.",
+      "attributionRequired": false
+    },
+    {
       "id": "quaternius-ultimate-modular-males-swat-2026-07-13",
       "kind": "third-party-rigged-operator-and-derived-first-person-arms",
       "creator": "Quaternius (@Quaternius)",

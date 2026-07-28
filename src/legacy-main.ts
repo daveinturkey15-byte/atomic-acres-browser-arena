@@ -106,6 +106,7 @@ import { matchPresentationAt, respawnPresentation } from './match-presentation';
 import { tuneMaterialsForAtomicSignal, type AtomicSignalMaterialAudit } from './material-compatibility';
 import { addNeighbourhoodLife, loadArenaArt, updateArenaArt, type ArenaArtResult } from './environment-assets';
 import { BLENDER_ARENA_ASSET, blenderArenaTelemetry, loadBlenderArena, markBlenderArenaFallback, proceduralArenaRootVisible } from './blender-environment';
+import { loadAzureCoilPresentation, type AzureCoilPresentation } from './azure-coil-presentation';
 import { RUSTWORKS_BLENDER_ASSET, loadRustworksBlenderTower, markRustworksBlenderFallback, rustworksBlenderTelemetry, setRustworksProceduralPresentationVisible } from './rustworks-blender';
 import {
   createRustworksQualityLights,
@@ -1043,6 +1044,36 @@ async function retireAllArenasExcept(arenaId: ArenaId): Promise<void> {
 let arena: ArenaMap = ensureArenaConstructed(selectedArena.id);
 let worldIdentityPresentation: WorldIdentityPresentation | null = null;
 let neighbourhoodLifeRoot: THREE.Group | null = null;
+let azureCoilPresentation: AzureCoilPresentation | null = null;
+let azureCoilLoadPromise: Promise<AzureCoilPresentation | null> | null = null;
+let azureCoilLoadState: 'idle' | 'loading' | 'ready' | 'failed' = 'idle';
+let azureCoilLoadError: string | null = null;
+
+async function ensureAzureCoilPresentation(): Promise<void> {
+  if (azureCoilPresentation || azureCoilLoadPromise) {
+    await azureCoilLoadPromise;
+    return;
+  }
+  azureCoilLoadState = 'loading';
+  azureCoilLoadError = null;
+  azureCoilLoadPromise = loadAzureCoilPresentation(scene, (loaded, total) => {
+    if (selectedArena.id !== 'atomic-acres') return;
+    const progress = total > 0 ? `${Math.round((loaded / total) * 100)}%` : `${Math.round(loaded / 1_024)} KiB`;
+    setStatus(`Loading Azure Coil island creature ${progress}…`);
+  }).then((presentation) => {
+    azureCoilPresentation = presentation;
+    azureCoilPresentation.setArena(selectedArena.id);
+    azureCoilLoadState = 'ready';
+    return presentation;
+  }).catch((error: unknown) => {
+    azureCoilLoadState = 'failed';
+    azureCoilLoadError = error instanceof Error ? error.message : String(error);
+    azureCoilLoadPromise = null;
+    console.error('[Azure Coil authored creature failed to load; presentation omitted]', error);
+    return null;
+  });
+  await azureCoilLoadPromise;
+}
 
 function ensureAtomicWorldPresentation(): void {
   if (!worldIdentityPresentation) {
@@ -1443,8 +1474,11 @@ async function ensureRustworksQualityPresentation(): Promise<THREE.Group | null>
 }
 
 async function ensureSelectedQualityPresentation(id: ArenaId): Promise<void> {
-  if (id === 'atomic-acres') await ensureAtomicQualityPresentation();
-  else if (id === 'rustworks-1v1' && renderProfile === 'blender') await ensureRustworksQualityPresentation();
+  if (id === 'atomic-acres') {
+    await Promise.all([ensureAzureCoilPresentation(), ensureAtomicQualityPresentation()]);
+  } else if (id === 'rustworks-1v1' && renderProfile === 'blender') {
+    await ensureRustworksQualityPresentation();
+  }
   graphicsRefinement.refreshSelectiveBloom(scene);
 }
 
@@ -9815,6 +9849,7 @@ function setArenaPresentationVisibility(): void {
     setWorldIdentityHouseShellPresentation(worldIdentityPresentation.root, atomicVisible && !blenderArenaActive);
   }
   if (neighbourhoodLifeRoot) neighbourhoodLifeRoot.visible = atomicVisible;
+  azureCoilPresentation?.setArena(selectedArena.id);
   // Rustworks' ocean needs a long view frustum so water, not void, meets the horizon.
   const desiredFarPlane = rustworksVisible ? 1_400 : 180;
   if (camera.far !== desiredFarPlane) {
@@ -10306,6 +10341,7 @@ window.addEventListener('beforeunload', () => {
   persistRoomIdentityForCloseTabRejoin();
   matchDiagnosticUploader.flushForPageLifecycle();
   network.close();
+  azureCoilPresentation?.dispose();
   pass64TslSystems?.dispose();
   arenaVisualStream.dispose();
   renderRuntime.dispose();
@@ -10426,6 +10462,7 @@ function frame(now: number, scheduleNext = true): void {
     if (selectedArena.id === 'atomic-acres') {
       if (arenaArtRoot && !blenderArenaActive) updateArenaArt(arenaArtRoot, now);
       if (neighbourhoodLifeRoot) updateArenaArt(neighbourhoodLifeRoot, now);
+      azureCoilPresentation?.update(now);
       atmosphereSystem?.update(now / 1_000);
       grassSystem?.update(now / 1_000, camera.position, player.position, gameStarted);
     } else if (selectedArena.id === 'rustworks-1v1') {
@@ -11537,6 +11574,19 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         qualityArtRootVisible: blenderArenaActive && arenaArtRoot?.visible === true,
         overlappingPrimaryArenaRoots: selectedArena.id === 'atomic-acres' && arena.root.visible && blenderArenaActive && arenaArtRoot?.visible === true,
       },
+      azureCoil: azureCoilPresentation?.telemetry() ?? {
+        asset: '/assets/original/models/azure-coil-leviathan.glb',
+        state: azureCoilLoadState,
+        error: azureCoilLoadError,
+        visible: false,
+        authority: {
+          presentationOnly: true,
+          blocksShots: false,
+          hasRapierCollider: false,
+          hasBallisticSurface: false,
+          networkReplicated: false,
+        },
+      },
       rustworksBlender: rustworksBlenderTelemetry(),
       rustworksQuality: rustworksQualityTelemetry(renderProfile, selectedArena.id),
       staticBatchPalette: scene.getObjectByName('Atomic Acres arena-render-batches')?.children.flatMap((node) => {
@@ -12374,8 +12424,11 @@ async function bootstrap(): Promise<void> {
         return value;
       });
   const grenadePromise = loadGrenadePresentation();
+  const azureCoilPromise = selectedArena.id === 'atomic-acres'
+    ? ensureAzureCoilPresentation()
+    : Promise.resolve();
   const [physics, , art] = await Promise.all([
-    physicsPromise, weaponPromise, artPromise, rustworksArtPromise, grenadePromise,
+    physicsPromise, weaponPromise, artPromise, rustworksArtPromise, grenadePromise, azureCoilPromise,
   ]);
   characterPhysics = physics;
   arenaArtRoot = art?.root ?? null;

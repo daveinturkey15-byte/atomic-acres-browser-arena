@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "assetId": "atomic-acres-azure-coil-leviathan-2026-07-28",
+  "assetVersion": "azure-coil-leviathan-v1",
+  "kind": "original-project-rigged-animated-creature",
+  "creator": "Atomic Acres project / Hermes",
+  "license": "Original project work",
+  "generatedAsOf": "2026-07-28",
+  "source": "scripts/blender/create-azure-coil-leviathan.py",
+  "sourceSha256": "6631accaea710708552fe67bf3d0cc968e799c086b9db9454c0039e6d9339b73",
+  "sourceBlend": "source-assets/blender/azure-coil/azure-coil-leviathan.blend",
+  "sourceBlendSha256": "01f26e39c2d2893618d96cf9d0fd63debb35c118d0699bcf70e90ddbd881c5b5",
+  "runtimeGlb": "public/assets/original/models/azure-coil-leviathan.glb",
+  "runtimeGlbSha256": "62f3bb8f12ff087629eba3fb84430d083337b7005f4929dc056db6d8b3fe7387",
+  "preview": "artifacts/azure-coil/azure-coil-leviathan-preview.png",
+  "previewSha256": "6ad913e47bb529f4a7490216fbc667da174e42d768ac0006a81f06d2b57c0966",
+  "sourceTextures": [
+    {
+      "path": "source-assets/blender/azure-coil/textures/azure-coil-body-basecolor.png",
+      "sha256": "a6372bc7c1710a723d808623d75a5cb00f64332ab52ab1c761f814e6c335b0a3",
+      "bytes": 1408378
+    },
+    {
+      "path": "source-assets/blender/azure-coil/textures/azure-coil-body-normal.png",
+      "sha256": "11cd94777fe7b8d2e152fa389a71e53827a7d0d3e67d00a078192696f28735ea",
+      "bytes": 704511
+    },
+    {
+      "path": "source-assets/blender/azure-coil/textures/azure-coil-body-roughness.png",
+      "sha256": "cf2ff1d57537e211bbed25c6533856c0d6f6919d4c9dd318792f4daf9aeb18b8",
+      "bytes": 371285
+    },
+    {
+      "path": "source-assets/blender/azure-coil/textures/azure-coil-body-emissive.png",
+      "sha256": "6c5917419b9cd7a76e8f9ec6c46e7ab43247b49265e0efe011c48277391d9bbe",
+      "bytes": 454931
+    },
+    {
+      "path": "source-assets/blender/azure-coil/textures/azure-coil-fin-basecolor.png",
+      "sha256": "68c0a72896fbf186f73bc8223b4df1ad99549f9174ec65914369320f4f1fb82d",
+      "bytes": 248822
+    }
+  ],
+  "blenderVersion": "5.1.2",
+  "pythonHashSeed": "0",
+  "randomSeed": 10666001,
+  "animation": {
+    "name": "AzureCoil_Swim",
+    "fps": 24,
+    "startFrame": 1,
+    "endFrame": 121,
+    "durationSeconds": 5.0,
+    "bodyBones": 24,
+    "controlBones": 6
+  },
+  "glb": {
+    "nodes": 41,
+    "meshes": 10,
+    "materials": 8,
+    "textures": 5,
+    "images": 5,
+    "skins": 1,
+    "animations": [
+      "AzureCoil_Swim"
+    ],
+    "triangles": 60424,
+    "externalUris": [],
+    "bytes": 6137084
+  },
+  "originality": {
+    "externalModelBytes": false,
+    "externalImageBytes": false,
+    "downloadedAssets": [],
+    "referenceUse": "Broad large-blue-aquatic-serpentine-dragon concept only; protected franchise silhouette, identifiers, meshes, images, textures and markings are excluded."
+  },
+  "authority": {
+    "presentationOnly": true,
+    "blocksShots": false,
+    "rapierCollider": false,
+    "ballisticSurface": false,
+    "networkReplicated": false
+  }
+}
