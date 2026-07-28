@@ -17,7 +17,19 @@ import {
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, '../..');
-const sleep = (milliseconds) => new Promise((resolveSleep) => setTimeout(resolveSleep, milliseconds));
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function waitForPostInputVision(visionStream, inputIssuedAt, timeoutMs = 260) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const latest = visionStream.state.latest;
+    // One full 30 Hz render interval avoids consuming a screencast packet that
+    // was already in flight when the mouse delta was dispatched.
+    if (latest && latest.receivedAt >= inputIssuedAt + 35) return latest;
+    await sleep(15);
+  }
+  return null;
+}
 
 async function withTimeout(promise, milliseconds, label) {
   let timer;
@@ -709,15 +721,15 @@ async function run() {
           let vertical = aimedTarget.y - aimedVision.height / 2;
           let alignment = Math.hypot(horizontal / aimedVision.width, vertical / aimedVision.height);
           for (let aimStep = 0; aimStep < 2 && alignment >= 0.045; aimStep += 1) {
-            const movementX = Math.max(-55, Math.min(55, Math.round(horizontal * 0.78)));
-            const movementY = Math.max(-32, Math.min(32, Math.round(vertical * 0.62)));
+            const movementX = Math.max(-90, Math.min(90, Math.round(horizontal * 1.05)));
+            const movementY = Math.max(-55, Math.min(55, Math.round(vertical * 1.50)));
             if (movementX === 0 && movementY === 0) break;
+            const inputIssuedAt = performance.now();
             await moveAim(page, movementX, movementY);
             aimMoves += 1;
             cameraMovedThisFrame = true;
-            await sleep(70);
-            const reacquiredVision = visionStream.state.latest;
-            if (!reacquiredVision || reacquiredVision.sequence === aimedVision.sequence || reacquiredVision.operatorTargets.length === 0) break;
+            const reacquiredVision = await waitForPostInputVision(visionStream, inputIssuedAt);
+            if (!reacquiredVision || reacquiredVision.operatorTargets.length === 0) break;
             const reacquiredTarget = [...reacquiredVision.operatorTargets].sort((left, right) => {
               const leftCentre = Math.hypot(left.x - reacquiredVision.width / 2, left.y - reacquiredVision.height / 2);
               const rightCentre = Math.hypot(right.x - reacquiredVision.width / 2, right.y - reacquiredVision.height / 2);
