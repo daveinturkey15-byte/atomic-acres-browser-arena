@@ -55,6 +55,10 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain("bootstrapStage = 'prewarming-explosive-bolts'");
     expect(arenaPresentationPrewarm).toContain('await prewarmExplosiveBoltPresentation(sceneGeneration);');
     expect(arenaPresentationPrewarm).toContain('await prewarmGrenadeWorldPresentations(sceneGeneration);');
+    expect(source).toContain('const grenadeWorldPresentationPool = new GrenadeWorldPresentationPool(scene);');
+    expect(source).toContain('await grenadeWorldPresentationPool.prewarm(renderRuntime, camera, sceneGeneration);');
+    expect(source).not.toContain('createGrenadePresentation(');
+    expect(source).not.toContain('disposeGrenadePresentation(');
     expect(source).toContain("bootstrapStage = 'prewarming-weapon-catalog'");
     expect(matchDeployment).toContain('await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(selectedArena.id));');
     expect(source).toContain("const rangeSidearm: WeaponId = localDhv === 'X' ? 'magnum' : 'pistol';");

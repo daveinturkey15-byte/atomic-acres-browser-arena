@@ -266,7 +266,7 @@ import {
   type FieldSupportId,
   type TriPassTargeting,
 } from './field-support';
-import { createGrenadePresentation, disposeGrenadePresentation, grenadePresentationTelemetry, loadGrenadePresentation } from './grenade-presentation';
+import { GrenadeWorldPresentationPool, grenadePresentationTelemetry, loadGrenadePresentation } from './grenade-presentation';
 import {
   EXPLOSIVE_BOLT_ARM_DELAY_MS,
   EXPLOSIVE_BOLT_BLAST_MAX_DAMAGE,
@@ -2403,6 +2403,7 @@ const dormantBots = new Map<string, BotPlayer>();
 let dormantBotsPrewarmed = false;
 let soloBotDeaths = 0;
 const grenades: GrenadeEntity[] = [];
+const grenadeWorldPresentationPool = new GrenadeWorldPresentationPool(scene);
 const smokeVolumes: RuntimeSmokeVolume[] = [];
 let smokeAuthority = new SmokeAuthority(interactiveWorldMatchEpoch, 'host');
 let lastSmokeStateBroadcastRevision = -1;
@@ -2429,7 +2430,6 @@ const explosiveBoltPresentationPool = Array.from(
   },
 );
 let explosiveBoltPresentationPrewarmGeneration = -1;
-let grenadeWorldPresentationPrewarmGeneration = -1;
 let flashExposureUntilHostTimeMs = 0;
 let flashExposureStrength = 0;
 let lastFlashResultAdmission: Readonly<{
@@ -9452,10 +9452,9 @@ function throwBotGrenade(
   const flightTime = THREE.MathUtils.clamp(horizontalDistance / 12, 0.72, 1.35);
   const velocity = targetGround.clone().sub(origin).divideScalar(flightTime);
   velocity.y += 9 * flightTime;
-  const mesh = createGrenadePresentation(grenade);
+  const mesh = acquireGrenadeWorldPresentation(grenade);
   mesh.position.copy(origin);
   mesh.castShadow = true;
-  scene.add(mesh);
   const grenadeSpec = grenadeDefinition(grenade);
   const impactDetonated = grenadeSpec.runtimeKind === 'impact-flash' || grenadeSpec.runtimeKind === 'smoke-volume';
   const sticky = grenadeSpec.runtimeKind === 'sticky-explosive';
@@ -10188,32 +10187,27 @@ async function prewarmExplosiveBoltPresentation(sceneGeneration = 0): Promise<vo
 }
 
 async function prewarmGrenadeWorldPresentations(sceneGeneration: number): Promise<void> {
-  if (grenadeWorldPresentationPrewarmGeneration === sceneGeneration) return;
-  const stagingRoot = new THREE.Group();
-  stagingRoot.name = `grenade-world-prewarm-${sceneGeneration}`;
-  stagingRoot.userData.presentationOnly = true;
-  scene.add(stagingRoot);
-  camera.updateWorldMatrix(true, false);
-  const cameraPosition = camera.getWorldPosition(new THREE.Vector3());
-  const forward = camera.getWorldDirection(new THREE.Vector3());
-  const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0).normalize();
-  const staged = (['frag', 'semtex'] as const).map((grenade, index) => {
-    const root = createGrenadePresentation(grenade);
-    root.position.copy(cameraPosition)
-      .addScaledVector(forward, 7)
-      .addScaledVector(right, index === 0 ? -0.45 : 0.45);
-    root.visible = true;
-    root.traverse((node) => { node.visible = true; node.frustumCulled = false; });
-    stagingRoot.add(root);
-    return root;
-  });
-  try {
-    await renderRuntime.compileAndRender(stagingRoot, camera, scene);
-    grenadeWorldPresentationPrewarmGeneration = sceneGeneration;
-  } finally {
-    for (const root of staged) disposeGrenadePresentation(root);
-    stagingRoot.removeFromParent();
-  }
+  await grenadeWorldPresentationPool.prewarm(renderRuntime, camera, sceneGeneration);
+}
+
+function acquireGrenadeWorldPresentation(grenade: GrenadeId): THREE.Object3D {
+  const presentation = grenadeWorldPresentationPool.acquire(grenade);
+  if (presentation) return presentation;
+  // The six-player lobby and one-grenade inventory fit well inside the fixed
+  // family capacity. A malformed remote burst must not allocate an uncompiled
+  // visible clone or crash the match, so it receives a simulation-only anchor.
+  const anchor = new THREE.Object3D();
+  anchor.name = 'grenade-world-pool-overflow-anchor';
+  anchor.visible = false;
+  anchor.userData.presentationOnly = true;
+  anchor.userData.grenadePresentationOverflow = true;
+  return anchor;
+}
+
+function releaseGrenadeWorldPresentation(root: THREE.Object3D): void {
+  if (grenadeWorldPresentationPool.release(root)) return;
+  root.removeFromParent();
+  root.visible = false;
 }
 
 function acquireExplosiveBoltMesh(): THREE.Group {
@@ -10432,10 +10426,9 @@ function throwGrenade(): void {
     nonce: randomNonce(),
   });
   localGrenadeActionSequence += 1;
-  const mesh = createGrenadePresentation(player.selectedGrenade);
+  const mesh = acquireGrenadeWorldPresentation(player.selectedGrenade);
   mesh.position.copy(origin);
   mesh.castShadow = true;
-  scene.add(mesh);
   const thrownAt = performance.now();
   const impactDetonated = player.selectedGrenade === 'flash' || player.selectedGrenade === 'smoke';
   const sticky = player.selectedGrenade === 'semtex';
@@ -10459,10 +10452,9 @@ function throwGrenade(): void {
 }
 
 function presentRemoteGrenade(message: Extract<GameMessage, { type: 'grenade-throw' }>, ownerTeam: Team): void {
-  const mesh = createGrenadePresentation(message.grenade);
+  const mesh = acquireGrenadeWorldPresentation(message.grenade);
   mesh.position.fromArray(message.origin);
   mesh.castShadow = true;
-  scene.add(mesh);
   const receivedAt = performance.now();
   const impactDetonated = message.grenade === 'flash' || message.grenade === 'smoke';
   const sticky = message.grenade === 'semtex';
@@ -10821,7 +10813,7 @@ function updateOrdnanceVolumes(_now: number): void {
 function explodeGrenade(entity: GrenadeEntity): void {
   const started = performance.now();
   const point = entity.mesh.position.clone();
-  scheduleDeferredGpuRetirement(entity.mesh, entity.mesh.userData.authoredGrenade !== true);
+  releaseGrenadeWorldPresentation(entity.mesh);
   releaseBotGrenadeOwner(entity);
   const afterPresentationDetach = performance.now();
   if (entity.grenade === 'smoke') {
@@ -11053,7 +11045,7 @@ function updateGrenades(dt: number, now: number): void {
       }
       spawnImpactFlash(grenade.mesh.position.clone());
       audio.coverImpact(grenade.mesh.position.distanceTo(player.position));
-      scheduleDeferredGpuRetirement(grenade.mesh, grenade.mesh.userData.authoredGrenade !== true);
+      releaseGrenadeWorldPresentation(grenade.mesh);
       releaseBotGrenadeOwner(grenade);
       grenades.splice(index, 1);
       continue;
@@ -13202,7 +13194,7 @@ function updateFieldSupport(dt: number, now: number): void {
 function clearGrenades(): void {
   for (const grenade of grenades) {
     releaseBotGrenadeOwner(grenade);
-    scheduleDeferredGpuRetirement(grenade.mesh, grenade.mesh.userData.authoredGrenade !== true);
+    releaseGrenadeWorldPresentation(grenade.mesh);
   }
   grenades.length = 0;
   for (const bolt of explosiveBolts) disposeExplosiveBolt(bolt);
@@ -16458,6 +16450,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     },
     grenadeVisual: {
       ...grenadePresentationTelemetry(),
+      pool: grenadeWorldPresentationPool.telemetry(),
       active: grenades.map((grenade) => ({
         name: grenade.mesh.name,
         authored: grenade.mesh.userData.authoredGrenade === true,

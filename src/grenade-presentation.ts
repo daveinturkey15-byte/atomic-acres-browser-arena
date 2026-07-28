@@ -2,11 +2,13 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import type { GrenadeId } from './combat/grenade-catalog';
+import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 
 export const FRAG_GRENADE_ASSET = './assets/original/models/frag-grenade.glb';
 export const FRAG_GRENADE_MAX_DIMENSION = 0.46;
 export const SEMTEX_BUNDLE_ASSET = './assets/original/models/ordnance/semtex-bundle-lod0.glb';
 export const SEMTEX_BUNDLE_MAX_DIMENSION = 0.58;
+export const GRENADE_WORLD_PRESENTATION_POOL_CAPACITY_PER_FAMILY = 12;
 
 export type GrenadePresentationFamily = 'frag' | 'semtex';
 
@@ -207,4 +209,214 @@ export function grenadePresentationTelemetry(): {
       targetMaxDimension: SEMTEX_BUNDLE_MAX_DIMENSION,
     }),
   };
+}
+
+type GrenadeWorldPresentationSlot = {
+  family: GrenadePresentationFamily;
+  root: THREE.Object3D;
+  inUse: boolean;
+};
+
+/**
+ * Fixed projectile-object residency for WebGPU. Three's render objects and
+ * bindings are keyed by Object3D, so warming a disposable clone does not warm
+ * the clone created by the first live throw. Every projectile that can become
+ * visible in a supported lobby is created once, rendered behind the deployment
+ * surface, and returned to this pool after detonation.
+ */
+export class GrenadeWorldPresentationPool {
+  readonly root = new THREE.Group();
+  private readonly slots: GrenadeWorldPresentationSlot[] = [];
+  private readonly capacityPerFamily: number;
+  private initialized = false;
+  private disposed = false;
+  private gpuPrewarmGeneration = -1;
+  private gpuPrewarmPromise: Promise<void> | null = null;
+  private acquisitions = 0;
+  private releases = 0;
+  private exhaustions = 0;
+
+  constructor(
+    private readonly scene: THREE.Scene,
+    capacityPerFamily = GRENADE_WORLD_PRESENTATION_POOL_CAPACITY_PER_FAMILY,
+  ) {
+    this.capacityPerFamily = Math.max(
+      1,
+      Math.min(GRENADE_WORLD_PRESENTATION_POOL_CAPACITY_PER_FAMILY, Math.floor(capacityPerFamily)),
+    );
+    this.root.name = 'grenade-world-presentation-pool';
+    this.root.userData.presentationOnly = true;
+    scene.add(this.root);
+  }
+
+  private ensureInitialized(): void {
+    if (this.initialized) return;
+    if (this.disposed) throw new Error('Cannot initialize a disposed grenade presentation pool');
+    for (const family of ['frag', 'semtex'] as const) {
+      for (let index = 0; index < this.capacityPerFamily; index += 1) {
+        const root = createGrenadePresentation(family === 'semtex' ? 'semtex' : 'frag');
+        root.name = `${family}-grenade-world-pool-${index + 1}`;
+        root.userData.presentationPoolFamily = family;
+        root.userData.presentationPoolInUse = false;
+        root.visible = false;
+        this.root.add(root);
+        this.slots.push({ family, root, inUse: false });
+      }
+    }
+    this.initialized = true;
+  }
+
+  acquire(grenade: GrenadeId): THREE.Object3D | null {
+    if (this.disposed) return null;
+    this.ensureInitialized();
+    const family = grenadePresentationFamily(grenade);
+    const slot = this.slots.find((candidate) => candidate.family === family && !candidate.inUse);
+    if (!slot) {
+      this.exhaustions += 1;
+      return null;
+    }
+    slot.inUse = true;
+    slot.root.userData.presentationPoolInUse = true;
+    slot.root.userData.grenadeSelection = grenade;
+    slot.root.visible = true;
+    slot.root.position.set(0, 0, 0);
+    slot.root.quaternion.identity();
+    this.acquisitions += 1;
+    return slot.root;
+  }
+
+  release(root: THREE.Object3D): boolean {
+    const slot = this.slots.find((candidate) => candidate.root === root);
+    if (!slot || !slot.inUse) return false;
+    slot.inUse = false;
+    slot.root.userData.presentationPoolInUse = false;
+    slot.root.visible = false;
+    slot.root.position.set(0, -10_000, 0);
+    slot.root.quaternion.identity();
+    this.releases += 1;
+    return true;
+  }
+
+  clearActive(): void {
+    for (const slot of this.slots) {
+      if (slot.inUse) this.release(slot.root);
+    }
+  }
+
+  async prewarm(
+    runtime: PresentationPrewarmRuntime,
+    camera: THREE.Camera,
+    sceneGeneration = 0,
+  ): Promise<void> {
+    if (this.disposed) throw new Error('Cannot prewarm a disposed grenade presentation pool');
+    if (this.gpuPrewarmGeneration === sceneGeneration) return;
+    if (this.gpuPrewarmPromise) return this.gpuPrewarmPromise;
+    const operation = this.performGpuPrewarm(runtime, camera, sceneGeneration);
+    this.gpuPrewarmPromise = operation;
+    try {
+      await operation;
+    } finally {
+      if (this.gpuPrewarmPromise === operation) this.gpuPrewarmPromise = null;
+    }
+  }
+
+  private async performGpuPrewarm(
+    runtime: PresentationPrewarmRuntime,
+    camera: THREE.Camera,
+    sceneGeneration: number,
+  ): Promise<void> {
+    await loadGrenadePresentation();
+    this.ensureInitialized();
+    if (this.root.parent !== this.scene) {
+      throw new Error('Grenade presentation pool must be attached to its scene before prewarm');
+    }
+    const states = new Map<THREE.Object3D, Readonly<{
+      visible: boolean;
+      position: THREE.Vector3;
+      quaternion: THREE.Quaternion;
+      scale: THREE.Vector3;
+      frustumCulled: boolean;
+    }>>();
+    const rootVisible = this.root.visible;
+    const rootFrustumCulled = this.root.frustumCulled;
+    this.root.visible = true;
+    this.root.frustumCulled = false;
+    camera.updateWorldMatrix(true, false);
+    this.root.updateWorldMatrix(true, false);
+    const cameraPosition = camera.getWorldPosition(new THREE.Vector3());
+    const forward = camera.getWorldDirection(new THREE.Vector3());
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0).normalize();
+    const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1).normalize();
+    const columns = 6;
+    for (let index = 0; index < this.slots.length; index += 1) {
+      const slot = this.slots[index]!;
+      slot.root.traverse((node) => {
+        states.set(node, Object.freeze({
+          visible: node.visible,
+          position: node.position.clone(),
+          quaternion: node.quaternion.clone(),
+          scale: node.scale.clone(),
+          frustumCulled: node.frustumCulled,
+        }));
+        node.visible = true;
+        node.frustumCulled = false;
+      });
+      const column = index % columns;
+      const row = Math.floor(index / columns);
+      const target = cameraPosition.clone()
+        .addScaledVector(forward, 7)
+        .addScaledVector(right, (column - 2.5) * 0.42)
+        .addScaledVector(up, (1.5 - row) * 0.42);
+      slot.root.position.copy(this.root.worldToLocal(target));
+    }
+    try {
+      await runtime.compileAndRender(this.root, camera, this.scene);
+      if (!this.disposed) this.gpuPrewarmGeneration = sceneGeneration;
+    } finally {
+      for (const [node, state] of states) {
+        node.visible = state.visible;
+        node.position.copy(state.position);
+        node.quaternion.copy(state.quaternion);
+        node.scale.copy(state.scale);
+        node.frustumCulled = state.frustumCulled;
+      }
+      for (const slot of this.slots) {
+        slot.inUse = false;
+        slot.root.userData.presentationPoolInUse = false;
+        slot.root.visible = false;
+      }
+      this.root.visible = rootVisible;
+      this.root.frustumCulled = rootFrustumCulled;
+    }
+  }
+
+  telemetry(): Readonly<{
+    capacityPerFamily: number;
+    total: number;
+    active: number;
+    acquisitions: number;
+    releases: number;
+    exhaustions: number;
+    gpuPrewarmGeneration: number;
+  }> {
+    return Object.freeze({
+      capacityPerFamily: this.capacityPerFamily,
+      total: this.slots.length,
+      active: this.slots.filter((slot) => slot.inUse).length,
+      acquisitions: this.acquisitions,
+      releases: this.releases,
+      exhaustions: this.exhaustions,
+      gpuPrewarmGeneration: this.gpuPrewarmGeneration,
+    });
+  }
+
+  /** Terminal renderer teardown only; live expiry must release slots instead. */
+  terminalDispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    for (const slot of this.slots) disposeGrenadePresentation(slot.root);
+    this.slots.length = 0;
+    this.root.removeFromParent();
+    this.root.visible = false;
+  }
 }

@@ -1,8 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import * as THREE from 'three';
 import {
   FRAG_GRENADE_ASSET,
   FRAG_GRENADE_MAX_DIMENSION,
+  GRENADE_WORLD_PRESENTATION_POOL_CAPACITY_PER_FAMILY,
+  GrenadeWorldPresentationPool,
   SEMTEX_BUNDLE_ASSET,
   SEMTEX_BUNDLE_MAX_DIMENSION,
   createGrenadePresentation,
@@ -91,5 +94,36 @@ describe('Semtex bundle presentation', () => {
     disposeGrenadePresentation(smoke);
     disposeGrenadePresentation(flash);
     disposeGrenadePresentation(semtex);
+  });
+});
+
+describe('grenade world presentation residency', () => {
+  it('bounds both families and reuses the exact warmed Object3D after release', () => {
+    const scene = new THREE.Scene();
+    const pool = new GrenadeWorldPresentationPool(scene, 2);
+    const firstFrag = pool.acquire('smoke');
+    const secondFrag = pool.acquire('flash');
+    const firstSemtex = pool.acquire('semtex');
+    const secondSemtex = pool.acquire('semtex');
+
+    expect(firstFrag).toBeTruthy();
+    expect(secondFrag).toBeTruthy();
+    expect(firstSemtex).toBeTruthy();
+    expect(secondSemtex).toBeTruthy();
+    expect(pool.acquire('frag')).toBeNull();
+    expect(pool.acquire('semtex')).toBeNull();
+    expect(pool.telemetry()).toMatchObject({
+      capacityPerFamily: 2,
+      total: 4,
+      active: 4,
+      exhaustions: 2,
+    });
+
+    expect(pool.release(firstFrag!)).toBe(true);
+    expect(pool.acquire('frag')).toBe(firstFrag);
+    expect(firstFrag!.parent).toBe(pool.root);
+    expect(GRENADE_WORLD_PRESENTATION_POOL_CAPACITY_PER_FAMILY).toBeGreaterThanOrEqual(6);
+    pool.terminalDispose();
+    expect(pool.root.parent).toBeNull();
   });
 });
