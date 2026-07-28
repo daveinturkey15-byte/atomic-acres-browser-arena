@@ -1,4 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import http from 'node:http';
+import { resolve } from 'node:path';
 import { chromium } from '@playwright/test';
 
 const baseUrl = process.env.QA_BASE_URL ?? 'http://127.0.0.1:4182/';
@@ -18,6 +21,39 @@ const context = await browser.newContext({ viewport: { width: 1_280, height: 720
 const host = await context.newPage();
 const guest = await context.newPage();
 const errors = [];
+let peerProcess = null;
+
+function peerServerReady() {
+  return new Promise((resolveReady) => {
+    const request = http.get(`http://127.0.0.1:${peerPort}/peerjs`, (response) => {
+      response.resume();
+      resolveReady(response.statusCode !== undefined && response.statusCode < 500);
+    });
+    request.once('error', () => resolveReady(false));
+    request.setTimeout(500, () => {
+      request.destroy();
+      resolveReady(false);
+    });
+  });
+}
+
+async function ensurePeerServer() {
+  if (peerPort <= 0 || await peerServerReady()) return null;
+  const child = spawn(process.execPath, [
+    resolve('node_modules/peer/dist/bin/peerjs.js'),
+    '--host', '127.0.0.1',
+    '--port', String(peerPort),
+    '--path', '/peerjs',
+    '--no-allow_discovery',
+  ], { cwd: process.cwd(), stdio: 'ignore', windowsHide: true });
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    if (await peerServerReady()) return child;
+    if (child.exitCode !== null) throw new Error(`Local PeerJS server exited with ${child.exitCode}`);
+    await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+  }
+  child.kill();
+  throw new Error('Local PeerJS server did not become ready');
+}
 
 function observe(label, page) {
   page.on('pageerror', (error) => errors.push(`${label}: ${error.message}`));
@@ -34,7 +70,9 @@ function observe(label, page) {
 async function open(page, label) {
   console.error(`[focus-recovery] opening ${label}`);
   const url = new URL(baseUrl);
-  url.searchParams.set('render', 'compatibility');
+  url.searchParams.set('release', 'latest');
+  url.searchParams.set('renderer', 'webgl2');
+  url.searchParams.set('render', 'compat');
   url.searchParams.set('seed', `focus-recovery-${label}`);
   url.searchParams.set('multiplayerQa', '1');
   if (peerPort > 0) url.searchParams.set('peerQaPort', String(peerPort));
@@ -169,6 +207,7 @@ async function assertActiveMatchRecovers(page, other, label) {
 }
 
 try {
+  peerProcess = await ensurePeerServer();
   observe('host', host);
   observe('guest', guest);
   await open(host, 'host');
@@ -234,5 +273,6 @@ try {
   console.error('[focus-recovery] closing browser context');
   await context.close();
   await browser.close();
+  if (peerProcess?.exitCode === null) peerProcess.kill();
   console.error('[focus-recovery] browser closed');
 }
