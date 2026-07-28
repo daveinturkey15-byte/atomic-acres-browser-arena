@@ -5,6 +5,7 @@ import {
   centeredReadbackRegion,
   classifyPresentationFreshness,
   configureSceneLightShadowSchedule,
+  detectLivePresentationStall,
   formatWebGpuUncapturedError,
   pendingCompletionStartAfterProgress,
   resolveRenderRuntimeRequest,
@@ -82,6 +83,32 @@ describe('Pass 64 render runtime boundary', () => {
       windowStartedAt: 2_000,
       now: 1_000,
     })).toEqual({ advances: 0, elapsedMs: 0, cadenceHz: 0 });
+  });
+
+  it('fails a foreground idle submission gap while exempting every intentional pause surface', () => {
+    const detect = (overrides: Partial<Parameters<typeof detectLivePresentationStall>[0]> = {}) => detectLivePresentationStall({
+      activeMatch: true,
+      menuHidden: true,
+      documentVisible: true,
+      arenaSelectionReady: true,
+      debugRenderPaused: false,
+      renderSubmissionPaused: false,
+      backpressureActive: false,
+      currentSubmissionGapMs: 1_000,
+      pendingForMs: 0,
+      stallThresholdMs: 1_000,
+      ...overrides,
+    });
+    expect(detect()).toEqual({ kind: 'missing-submission', elapsedMs: 1_000 });
+    expect(detect({ activeMatch: false })).toBeNull();
+    expect(detect({ menuHidden: false })).toBeNull();
+    expect(detect({ documentVisible: false })).toBeNull();
+    expect(detect({ arenaSelectionReady: false })).toBeNull();
+    expect(detect({ debugRenderPaused: true })).toBeNull();
+    expect(detect({ renderSubmissionPaused: true })).toBeNull();
+    expect(detect({ backpressureActive: true })).toBeNull();
+    expect(detect({ backpressureActive: true, pendingForMs: 1_000 }))
+      .toEqual({ kind: 'pending-completion', elapsedMs: 1_000 });
   });
 
   it('uses current-frame WebGPU draw calls instead of cumulative lifetime render calls', () => {
@@ -178,6 +205,86 @@ describe('Pass 64 render runtime boundary', () => {
     await settleProbe();
     expect(runtime.submitFrame(120)).toBe(true);
     expect(pending).toHaveLength(1);
+  });
+
+  it('rejects a second unresolved submission, times latency post-submit, and rebases hidden time', async () => {
+    let now = 100;
+    const pending: Array<() => void> = [];
+    const render = vi.fn(() => { now = 300; });
+    const renderer = {
+      info: { reset: vi.fn(), render: { calls: 1, triangles: 2, points: 0, lines: 0 } },
+    };
+    const device = {
+      queue: { onSubmittedWorkDone: () => new Promise<void>((resolve) => pending.push(resolve)) },
+      addEventListener: () => undefined,
+      lost: new Promise<never>(() => undefined),
+    };
+    const runtime = new (WebGpuRenderRuntime as unknown as new (
+      renderer: unknown,
+      pipeline: unknown,
+      identity: unknown,
+    ) => WebGpuRenderRuntime)(renderer, { render }, {
+      canvasAntialias: true,
+      canvasSamples: 4,
+      adapterLabel: 'test adapter',
+      adapterClass: 'GPUAdapter',
+      deviceClass: 'GPUDevice',
+      softwareAdapter: false,
+      device,
+      now: () => now,
+    });
+
+    expect(runtime.submitFrame(10)).toBe(true);
+    expect(runtime.presentationTelemetry(now)).toMatchObject({
+      submissionSequence: 1,
+      completedSequence: 0,
+      lastSubmittedAt: 300,
+      pendingSince: 300,
+    });
+    now = 301;
+    expect(runtime.submitFrame(11)).toBe(false);
+    expect(render).toHaveBeenCalledTimes(1);
+    expect(pending).toHaveLength(1);
+    expect(runtime.presentationTelemetry(now)).toMatchObject({ submissionSequence: 1, skippedSubmissions: 1 });
+
+    now = 5_000;
+    runtime.resetPresentationProgressTelemetry('tab visibility regained', now);
+    expect(runtime.presentationTelemetry(now)).toMatchObject({ pendingSince: 5_000, pendingForMs: 0 });
+    const beforeFence = runtime.presentationTelemetry(5_999);
+    expect(detectLivePresentationStall({
+      activeMatch: true,
+      menuHidden: true,
+      documentVisible: true,
+      arenaSelectionReady: true,
+      debugRenderPaused: false,
+      renderSubmissionPaused: false,
+      backpressureActive: beforeFence.backpressureActive,
+      currentSubmissionGapMs: beforeFence.progress.currentSubmissionGapMs,
+      pendingForMs: beforeFence.pendingForMs,
+      stallThresholdMs: 1_000,
+    })).toBeNull();
+    const atFence = runtime.presentationTelemetry(6_000);
+    expect(detectLivePresentationStall({
+      activeMatch: true,
+      menuHidden: true,
+      documentVisible: true,
+      arenaSelectionReady: true,
+      debugRenderPaused: false,
+      renderSubmissionPaused: false,
+      backpressureActive: atFence.backpressureActive,
+      currentSubmissionGapMs: atFence.progress.currentSubmissionGapMs,
+      pendingForMs: atFence.pendingForMs,
+      stallThresholdMs: 1_000,
+    })).toEqual({ kind: 'pending-completion', elapsedMs: 1_000 });
+
+    now = 5_025;
+    pending.shift()?.();
+    for (let turn = 0; turn < 6; turn += 1) await Promise.resolve();
+    expect(runtime.presentationTelemetry(now)).toMatchObject({
+      completedSequence: 1,
+      pendingSince: null,
+      lastCompletionLatencyMs: 25,
+    });
   });
 
   it('prewarms only the submitted TSL render-pipeline context', async () => {

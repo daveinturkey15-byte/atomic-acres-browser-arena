@@ -137,8 +137,15 @@ describe('presentation prewarm startup contract', () => {
     expect(matchDeployment).toContain("renderRuntime.resetPresentationProgressTelemetry('match admitted', performance.now());");
     expect(source).toContain("source: 'webgpu-submission' as const");
     expect(source).toContain('LIVE_WEBGPU_PRESENTATION_STALL_MS = 1_000');
-    expect(source).toContain('presentation.pendingForMs >= LIVE_WEBGPU_PRESENTATION_STALL_MS');
+    expect(source).toContain('detectLivePresentationStall({');
+    expect(source).toContain('currentSubmissionGapMs: presentation.progress.currentSubmissionGapMs');
+    expect(source).toContain('backpressureActive: presentation.backpressureActive');
+    expect(source).toContain('debugRenderPaused,');
+    expect(source).toContain('renderSubmissionPaused,');
     expect(source).toContain('adaptToCompletedWebGpuQueueLatency(now);');
+    expect(source).toContain('deferredWebGpuAdaptivePixelRatio.takeWhenPresentationIdle(');
+    expect(source).toContain("if (renderRuntime.backend === 'webgpu') applyDeferredAdaptiveWebGpuRenderBudget(now);");
+    expect(source).toContain('cadenceWithNoProgressAge(');
     expect(source).toContain("buildOperator(botTeam, 'bot-operator', renderProfile !== 'blender', weapon, 'neon-purple')");
     expect(source).toContain('const streamedWeaponGpuPrewarmer: WeaponViewmodelGpuPrewarmer | undefined');
     expect(source).toContain('streamedWeaponGpuPrewarmQueue.run(() => runStreamedWeaponGpuPrewarm(model, context))');

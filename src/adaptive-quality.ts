@@ -16,6 +16,35 @@ export type AdaptiveQualityTelemetry = {
   cooldownFrames: number;
 };
 
+export type WebGpuPresentationIdleState = Readonly<{
+  submissionSequence: number;
+  completedSequence: number;
+  pendingSince: number | null;
+}>;
+
+/** Keeps renderer target mutations queued until the one-deep GPU frontier is idle. */
+export class DeferredAdaptivePixelRatio {
+  private pendingPixelRatio: number | null = null;
+
+  request(pixelRatio: number): void {
+    if (!Number.isFinite(pixelRatio) || pixelRatio <= 0) return;
+    this.pendingPixelRatio = pixelRatio;
+  }
+
+  takeWhenPresentationIdle(presentation: WebGpuPresentationIdleState): number | null {
+    if (this.pendingPixelRatio === null
+      || presentation.submissionSequence !== presentation.completedSequence
+      || presentation.pendingSince !== null) return null;
+    const pixelRatio = this.pendingPixelRatio;
+    this.pendingPixelRatio = null;
+    return pixelRatio;
+  }
+
+  pending(): number | null {
+    return this.pendingPixelRatio;
+  }
+}
+
 export function adaptiveShadowsEnabled(profile: RenderProfile, authoredShadows: boolean, pixelRatioCap: number): boolean {
   // Shadows are an explicit player choice, not a disposable post effect. The
   // controller sheds bloom, contact shading, fog, particles, decals, IBL and

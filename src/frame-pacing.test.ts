@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FramePacingSampler } from './frame-pacing';
+import { FramePacingSampler, cadenceWithNoProgressAge } from './frame-pacing';
 
 describe('FramePacingSampler', () => {
   it('identifies a sustained 30 Hz presentation cap', () => {
@@ -58,5 +58,12 @@ describe('FramePacingSampler', () => {
     for (let index = 0; index < 90; index += 1) sampler.record(6.94);
     expect(sampler.summary()).toMatchObject({ ready: true, sampleCount: 90, displayLimited: false });
     expect(sampler.summary().cadenceHz).toBeGreaterThan(140);
+  });
+
+  it('decays effective cadence when no new presentation progress arrives', () => {
+    expect(cadenceWithNoProgressAge(144, 5)).toBe(144);
+    expect(cadenceWithNoProgressAge(144, 500)).toBe(2);
+    expect(cadenceWithNoProgressAge(60, 1_000)).toBe(1);
+    expect(cadenceWithNoProgressAge(0, 500)).toBe(0);
   });
 });

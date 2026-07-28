@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import './style.css';
 import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } from './atomic-signal';
-import { AdaptiveQualityController, adaptiveShadowsEnabled, classifyDisplayFrameMs, configuredAdaptiveQualityLevels } from './adaptive-quality';
+import { AdaptiveQualityController, DeferredAdaptivePixelRatio, adaptiveShadowsEnabled, classifyDisplayFrameMs, configuredAdaptiveQualityLevels } from './adaptive-quality';
 import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBudget } from './graphics-refinement';
 import { ArenaContrastLighting } from './arena-contrast-lighting';
-import { centeredReadbackRegion, LegacyWebGlRenderRuntime, WebGpuRenderRuntime, resolveRenderRuntimeRequest } from './rendering/render-runtime';
+import { centeredReadbackRegion, detectLivePresentationStall, LegacyWebGlRenderRuntime, WebGpuRenderRuntime, resolveRenderRuntimeRequest } from './rendering/render-runtime';
 import { estimateResidentObjectMemory } from './rendering/resident-memory';
 import { ArenaVisualStreamController, loadArenaVisualModule, type ArenaVisualSwitchReceipt } from './rendering/arena-visual-stream';
 import { ArenaRenderWatchdog, auditArenaRenderLiveness } from './rendering/arena-render-watchdog';
@@ -209,7 +209,7 @@ import {
   type DirectionalDamageState,
   type LowHealthFeedbackState,
 } from './sensory-feedback';
-import { FramePacingSampler } from './frame-pacing';
+import { FramePacingSampler, cadenceWithNoProgressAge } from './frame-pacing';
 import { GrenadeExplosionPresentation } from './grenade-explosion-presentation';
 import { SupportExplosionPresentation } from './support-explosion-presentation';
 import { GrassSystem } from './grass-system';
@@ -1246,6 +1246,7 @@ const adaptiveQuality = new AdaptiveQualityController({
   enabled: graphicsRuntime.adaptive,
   levels: configuredAdaptiveLevels,
 });
+const deferredWebGpuAdaptivePixelRatio = new DeferredAdaptivePixelRatio();
 renderRuntime.setPixelRatio(Math.min(window.devicePixelRatio, adaptiveQuality.telemetry().pixelRatioCap));
 let activeArenaVisualDefinition: ArenaVisualDefinition | null = null;
 
@@ -1292,8 +1293,10 @@ async function settleWebGpuPresentation(label: string, maximumLatencyMs = 500): 
         `${label} WebGPU queue latency remained ${Math.round(completionLatencyMs)}ms at the minimum quality tier`,
       );
     }
-    applyAdaptiveRenderBudget(nextPixelRatio);
-    resize();
+    deferredWebGpuAdaptivePixelRatio.request(nextPixelRatio);
+    if (!applyDeferredAdaptiveWebGpuRenderBudget(performance.now())) {
+      throw new Error(`${label} adaptive resize was not admitted after its WebGPU completion fence`);
+    }
     // The next forced RenderPipeline submission compiles the resized TSL/HDR
     // context directly; a default-context compile would only duplicate it.
   }
@@ -15646,11 +15649,20 @@ function effectiveFramePacing(now = performance.now()) {
     });
   }
   const progress = renderRuntime.presentationTelemetry(now).progress;
+  const submittedCadenceHz = cadenceWithNoProgressAge(
+    progress.submissionPacing.cadenceHz,
+    progress.currentSubmissionGapMs,
+  );
+  const completedCadenceHz = cadenceWithNoProgressAge(
+    progress.completionPacing.cadenceHz,
+    progress.currentCompletionGapMs,
+  );
   return Object.freeze({
     ...progress.submissionPacing,
+    cadenceHz: submittedCadenceHz,
     source: 'webgpu-submission' as const,
     callbackCadenceHz: callback.cadenceHz,
-    completedCadenceHz: progress.completionPacing.cadenceHz,
+    completedCadenceHz,
     progressWindow: Object.freeze({
       elapsedMs: progress.elapsedMs,
       submissionAdvances: progress.submissionAdvances,
@@ -15664,24 +15676,39 @@ function effectiveFramePacing(now = performance.now()) {
   });
 }
 
+function applyDeferredAdaptiveWebGpuRenderBudget(now: number): boolean {
+  if (renderRuntime.backend !== 'webgpu') return false;
+  const pixelRatioCap = deferredWebGpuAdaptivePixelRatio.takeWhenPresentationIdle(
+    renderRuntime.presentationTelemetry(now),
+  );
+  if (pixelRatioCap === null) return false;
+  applyAdaptiveRenderBudget(pixelRatioCap);
+  grassSystem?.setAdaptivePixelRatio(pixelRatioCap);
+  resize();
+  return true;
+}
+
 function adaptToCompletedWebGpuQueueLatency(now: number): void {
   if (renderRuntime.backend !== 'webgpu') return;
   const presentation = renderRuntime.presentationTelemetry(now);
   if (presentation.completedSequence <= lastAdaptedWebGpuCompletionSequence) return;
   lastAdaptedWebGpuCompletionSequence = presentation.completedSequence;
-  if (!gameStarted || matchState.phase !== 'active' || document.visibilityState !== 'visible'
-    || !menu.classList.contains('hidden') || renderSubmissionPaused || debugRenderPaused) return;
   const completionLatencyMs = presentation.lastCompletionLatencyMs;
-  if (completionLatencyMs === null || completionLatencyMs <= LIVE_WEBGPU_QUEUE_DOWNSHIFT_MS) return;
-  const nextPixelRatio = adaptiveQuality.forceDownshift(
-    `Live WebGPU queue latency ${Math.round(completionLatencyMs)}ms exceeded ${LIVE_WEBGPU_QUEUE_DOWNSHIFT_MS}ms`,
-  );
+  const adaptiveEligible = gameStarted && matchState.phase === 'active' && document.visibilityState === 'visible'
+    && menu.classList.contains('hidden') && !renderSubmissionPaused && !debugRenderPaused;
+  if (completionLatencyMs === null || !adaptiveEligible) {
+    adaptiveQuality.record(completionLatencyMs ?? 0, false);
+    return;
+  }
+  // Sample once per completed queue frontier. This catches sustained 5-20 FPS
+  // GPU throughput even while requestAnimationFrame itself remains fast.
+  const nextPixelRatio = completionLatencyMs > LIVE_WEBGPU_QUEUE_DOWNSHIFT_MS
+    ? adaptiveQuality.forceDownshift(
+        `Live WebGPU queue latency ${Math.round(completionLatencyMs)}ms exceeded ${LIVE_WEBGPU_QUEUE_DOWNSHIFT_MS}ms`,
+      )
+    : adaptiveQuality.record(completionLatencyMs, true);
   if (nextPixelRatio === null) return;
-  // Queue completion is the safe boundary for resizing HDR targets. Never
-  // mutate renderer-owned targets while the slow submission is unresolved.
-  applyAdaptiveRenderBudget(nextPixelRatio);
-  grassSystem?.setAdaptivePixelRatio(nextPixelRatio);
-  resize();
+  deferredWebGpuAdaptivePixelRatio.request(nextPixelRatio);
 }
 
 function selectedArenaPresentationRoot(): THREE.Group {
@@ -15766,13 +15793,26 @@ function monitorSelectedArenaRender(now: number): void {
     }
   }
   const presentation = renderRuntime.presentationTelemetry(now);
-  const liveForegroundMatch = gameStarted && matchState.phase === 'active'
-    && menuLifecycle.surface === 'hidden' && document.visibilityState === 'visible';
-  if (eligible && liveForegroundMatch && presentation.pendingForMs >= LIVE_WEBGPU_PRESENTATION_STALL_MS) {
+  const liveStall = detectLivePresentationStall({
+    activeMatch: gameStarted && matchState.phase === 'active',
+    menuHidden: menuLifecycle.surface === 'hidden',
+    documentVisible: document.visibilityState === 'visible',
+    arenaSelectionReady,
+    debugRenderPaused,
+    renderSubmissionPaused,
+    backpressureActive: presentation.backpressureActive,
+    currentSubmissionGapMs: presentation.progress.currentSubmissionGapMs,
+    pendingForMs: presentation.pendingForMs,
+    stallThresholdMs: LIVE_WEBGPU_PRESENTATION_STALL_MS,
+  });
+  if (liveStall?.kind === 'pending-completion') {
     throw new Error(
-      `Renderer presentation made no GPU progress for ${Math.round(presentation.pendingForMs)}ms`
+      `Renderer presentation made no GPU progress for ${Math.round(liveStall.elapsedMs)}ms`
       + ` (${presentation.submissionSequence - presentation.completedSequence} submission pending)`,
     );
+  }
+  if (liveStall?.kind === 'missing-submission') {
+    throw new Error(`Renderer admitted no foreground WebGPU submission for ${Math.round(liveStall.elapsedMs)}ms`);
   }
   if (eligible && (presentation.status === 'stalled' || presentation.status === 'device-lost' || presentation.status === 'failed')) {
     throw new Error(`Renderer presentation ${presentation.status}: ${presentation.lastFailure ?? `${Math.round(presentation.pendingForMs)} ms pending`}`);
@@ -15801,7 +15841,7 @@ function frame(now: number, scheduleNext = true): void {
     // rejects values above its 250 ms control window.
     if (scheduleNext) framePacing.record(Math.min(rawFrameMs, 1_000));
     if (scheduleNext && gameStarted && matchState.phase === 'active') matchDiagnostics?.recordFrame(rawFrameMs);
-    const adaptivePixelRatio = scheduleNext ? adaptiveQuality.record(
+    const adaptivePixelRatio = scheduleNext && renderRuntime.backend !== 'webgpu' ? adaptiveQuality.record(
       rawFrameMs,
       gameStarted && menu.classList.contains('hidden') && document.visibilityState === 'visible' && !debugRenderPaused,
     ) : null;
@@ -15810,6 +15850,7 @@ function frame(now: number, scheduleNext = true): void {
       grassSystem?.setAdaptivePixelRatio(adaptivePixelRatio);
       resize();
     }
+    if (renderRuntime.backend === 'webgpu') applyDeferredAdaptiveWebGpuRenderBudget(now);
     const pacing = effectiveFramePacing(now);
     if (now - lastFpsHudAt >= 250) {
       const fps = pacing.sampleCount >= 1 ? Math.max(1, Math.round(pacing.cadenceHz)) : null;

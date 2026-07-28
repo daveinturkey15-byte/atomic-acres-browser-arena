@@ -16,6 +16,19 @@ export type FramePacingSummary = {
   lastResetReason: string | null;
 };
 
+/**
+ * A historical median cannot remain the effective cadence after presentation
+ * progress stops. Once the current gap exceeds the historical frame interval,
+ * decay toward the observable one-frame-per-gap rate.
+ */
+export function cadenceWithNoProgressAge(historicalCadenceHz: number, currentGapMs: number): number {
+  if (!Number.isFinite(historicalCadenceHz) || historicalCadenceHz <= 0) return 0;
+  if (!Number.isFinite(currentGapMs) || currentGapMs <= 0) return historicalCadenceHz;
+  const historicalFrameMs = 1_000 / historicalCadenceHz;
+  if (currentGapMs <= historicalFrameMs) return historicalCadenceHz;
+  return Math.min(historicalCadenceHz, 1_000 / currentGapMs);
+}
+
 export class FramePacingSampler {
   private readonly samples: number[] = [];
   private lastResetReason: string | null = null;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   AdaptiveQualityController,
+  DeferredAdaptivePixelRatio,
   adaptiveShadowsEnabled,
   classifyDisplayFrameMs,
   configuredAdaptiveQualityLevels,
@@ -128,5 +129,23 @@ describe('adaptive quality controller', () => {
     });
     for (let index = 0; index < 200; index += 1) fixed.record(40, true);
     expect(fixed.telemetry()).toMatchObject({ enabled: false, levels: [1], pixelRatioCap: 1, downshifts: 0 });
+  });
+
+  it('defers one adaptive renderer mutation until the WebGPU frontier is fully idle', () => {
+    const deferred = new DeferredAdaptivePixelRatio();
+    deferred.request(0.75);
+    expect(deferred.takeWhenPresentationIdle({
+      submissionSequence: 4, completedSequence: 3, pendingSince: 100,
+    })).toBeNull();
+    expect(deferred.pending()).toBe(0.75);
+    expect(deferred.takeWhenPresentationIdle({
+      submissionSequence: 4, completedSequence: 4, pendingSince: 100,
+    })).toBeNull();
+    expect(deferred.takeWhenPresentationIdle({
+      submissionSequence: 4, completedSequence: 4, pendingSince: null,
+    })).toBe(0.75);
+    expect(deferred.takeWhenPresentationIdle({
+      submissionSequence: 4, completedSequence: 4, pendingSince: null,
+    })).toBeNull();
   });
 });

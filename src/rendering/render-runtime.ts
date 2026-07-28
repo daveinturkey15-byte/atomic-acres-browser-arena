@@ -128,6 +128,41 @@ export function classifyPresentationFreshness(input: Readonly<{
   return 'healthy';
 }
 
+export type LivePresentationStall = Readonly<{
+  kind: 'pending-completion' | 'missing-submission';
+  elapsedMs: number;
+}>;
+
+/**
+ * Detects a foreground presentation stall without treating menus, hidden tabs,
+ * explicit render pauses, or normal one-deep queue backpressure as missing
+ * submissions. Pending queue work retains its own independent fatal fence.
+ */
+export function detectLivePresentationStall(input: Readonly<{
+  activeMatch: boolean;
+  menuHidden: boolean;
+  documentVisible: boolean;
+  arenaSelectionReady: boolean;
+  debugRenderPaused: boolean;
+  renderSubmissionPaused: boolean;
+  backpressureActive: boolean;
+  currentSubmissionGapMs: number;
+  pendingForMs: number;
+  stallThresholdMs: number;
+}>): LivePresentationStall | null {
+  if (!input.activeMatch || !input.menuHidden || !input.documentVisible || !input.arenaSelectionReady
+    || input.debugRenderPaused || input.renderSubmissionPaused) return null;
+  if (!Number.isFinite(input.stallThresholdMs) || input.stallThresholdMs < 0) return null;
+  if (Number.isFinite(input.pendingForMs) && input.pendingForMs >= input.stallThresholdMs) {
+    return Object.freeze({ kind: 'pending-completion', elapsedMs: Math.max(0, input.pendingForMs) });
+  }
+  if (!input.backpressureActive && Number.isFinite(input.currentSubmissionGapMs)
+    && input.currentSubmissionGapMs >= input.stallThresholdMs) {
+    return Object.freeze({ kind: 'missing-submission', elapsedMs: Math.max(0, input.currentSubmissionGapMs) });
+  }
+  return null;
+}
+
 export function shouldBackpressureWebGpuSubmissions(
   pendingSince: number | null,
   now: number,
@@ -503,6 +538,7 @@ export class WebGpuRenderRuntime {
   private readonly deviceClass: string;
   private readonly softwareAdapter: boolean;
   private readonly device: GpuDeviceShape;
+  private readonly clock: () => number;
   private principalHdrSamples: number | null = null;
   private bloomSamples: number | null = null;
   private submissionSequence = 0;
@@ -581,6 +617,7 @@ export class WebGpuRenderRuntime {
       deviceClass: string;
       softwareAdapter: boolean;
       device: GpuDeviceShape;
+      now?: () => number;
     }>,
   ) {
     this.renderer = renderer;
@@ -592,7 +629,8 @@ export class WebGpuRenderRuntime {
     this.deviceClass = identity.deviceClass;
     this.softwareAdapter = identity.softwareAdapter;
     this.device = identity.device;
-    this.resetPresentationProgressTelemetry('renderer initialized');
+    this.clock = identity.now ?? (() => performance.now());
+    this.resetPresentationProgressTelemetry('renderer initialized', this.clock());
     this.installNodeBuildTrace();
     identity.device.addEventListener?.('uncapturederror', this.uncapturedErrorListener);
     void identity.device.lost?.then((info) => {
@@ -724,7 +762,7 @@ export class WebGpuRenderRuntime {
     };
   }
 
-  presentationTelemetry(now = performance.now()): PresentationFreshnessTelemetry {
+  presentationTelemetry(now = this.clock()): PresentationFreshnessTelemetry {
     const pendingForMs = this.pendingCompletionStartedAt === null
       ? 0
       : Math.max(0, now - this.pendingCompletionStartedAt);
@@ -787,13 +825,17 @@ export class WebGpuRenderRuntime {
     };
   }
 
-  resetPresentationProgressTelemetry(reason = 'presentation progress reset', now = performance.now()): void {
+  resetPresentationProgressTelemetry(reason = 'presentation progress reset', now = this.clock()): void {
     this.submissionPacing.reset(reason);
     this.completionPacing.reset(reason);
+    // Full lifecycle resets (not endurance-window samples) establish a new
+    // foreground observation epoch. An unresolved queue item may remain, but
+    // hidden-tab time must not count against its one-second foreground fence.
+    if (this.pendingCompletionStartedAt !== null) this.pendingCompletionStartedAt = now;
     this.resetPresentationProgressWindow(now);
   }
 
-  resetPresentationProgressWindow(now = performance.now()): void {
+  resetPresentationProgressWindow(now = this.clock()): void {
     this.progressWindowStartedAt = now;
     this.progressBaselineSubmissionSequence = this.submissionSequence;
     this.progressBaselineCompletionSequence = this.completedSequence;
@@ -818,7 +860,8 @@ export class WebGpuRenderRuntime {
     this.nextCompletionProbeAt = now + WebGpuRenderRuntime.COMPLETION_PROBE_INTERVAL_MS;
     const probe = queue.onSubmittedWorkDone()
       .then(() => {
-        const completedAt = performance.now();
+        const completedAt = this.clock();
+        const latencyStartedAt = Math.max(startedAt, this.pendingCompletionStartedAt ?? startedAt);
         const priorCompletedSequence = this.completedSequence;
         this.completedSequence = Math.max(this.completedSequence, sequence);
         if (this.completedSequence > priorCompletedSequence) {
@@ -834,7 +877,7 @@ export class WebGpuRenderRuntime {
           );
         }
         this.lastCompletedAt = completedAt;
-        this.lastCompletionLatencyMs = Math.max(0, completedAt - startedAt);
+        this.lastCompletionLatencyMs = Math.max(0, completedAt - latencyStartedAt);
         // A continuously busy queue is healthy when its completion frontier is
         // advancing. Measure pending age from the latest progress, not from the
         // moment any backlog first appeared, or long play is misclassified as
@@ -966,19 +1009,20 @@ export class WebGpuRenderRuntime {
     // doubles cold node/pipeline residency without warming the live path. One
     // forced pipeline submission compiles the exact context and the queue fence
     // below makes that work an admission boundary rather than a gameplay hitch.
-    this.submitFrame(performance.now(), true);
+    this.submitFrame(this.clock(), true);
     // Presentation-only effects prewarm behind the loading surface. Cold
     // Chrome/driver shader creation can exceed the live four-second fence,
     // especially when each QA page owns a fresh WebGPU device.
     await this.waitForSubmittedWork(12_000);
   }
 
-  submitFrame(now = performance.now(), force = false): boolean {
+  submitFrame(_frameTimestamp = this.clock(), force = false): boolean {
     if (this.deviceLost) throw new Error(this.lastFailure ?? 'WebGPU device lost');
     if (this.uncapturedErrors > 0) throw new Error(this.lastFailure ?? 'WebGPU uncaptured error');
+    const admissionCheckedAt = this.clock();
     if (!force && shouldBackpressureWebGpuSubmissions(
       this.pendingCompletionStartedAt,
-      now,
+      admissionCheckedAt,
       WebGpuRenderRuntime.SUBMISSION_BACKPRESSURE_MS,
       this.submissionSequence - this.completedSequence,
       WebGpuRenderRuntime.MAX_IN_FLIGHT_SUBMISSIONS,
@@ -986,30 +1030,34 @@ export class WebGpuRenderRuntime {
       if (this.pendingCompletionStartedAt !== null) {
         this.progressMaximumPendingForMs = Math.max(
           this.progressMaximumPendingForMs,
-          now - this.pendingCompletionStartedAt,
+          admissionCheckedAt - this.pendingCompletionStartedAt,
         );
       }
-      this.scheduleCompletionProbe(now, true);
+      this.scheduleCompletionProbe(admissionCheckedAt, true);
       this.skippedSubmissions += 1;
       return false;
     }
     this.renderer.info.reset();
     this.renderPipeline.render();
+    // Queue latency begins only after Three has encoded/submitted the frame.
+    // The rAF timestamp is intentionally not used: it predates simulation and
+    // render encoding and previously misreported CPU hitches as GPU latency.
+    const submittedAt = this.clock();
     // Three clears its public per-frame counters while asynchronous WebGPU
     // work retires. Capture the admitted submission synchronously so a later
     // queue fence cannot turn a real frame into a false zero-draw receipt.
     this.lastSubmittedRenderInfo = Object.freeze(webGpuRenderInfoSnapshot(this.renderer.info.render));
     this.submissionSequence += 1;
-    const submissionGapMs = Math.max(0, now - this.progressLastSubmissionAt);
+    const submissionGapMs = Math.max(0, submittedAt - this.progressLastSubmissionAt);
     this.progressMaximumSubmissionGapMs = Math.max(this.progressMaximumSubmissionGapMs, submissionGapMs);
     this.submissionPacing.record(submissionGapMs);
-    this.progressLastSubmissionAt = now;
-    this.lastSubmittedAt = now;
+    this.progressLastSubmissionAt = submittedAt;
+    this.lastSubmittedAt = submittedAt;
     // With a one-submission frontier, every admitted frame needs its own probe.
     // Honouring the 250 ms sampling throttle here leaves the queue at depth one
     // without a completion observer and forces the following display frame to
     // be skipped merely to attach that probe.
-    this.scheduleCompletionProbe(now, true);
+    this.scheduleCompletionProbe(submittedAt, true);
     return true;
   }
 
@@ -1043,7 +1091,7 @@ export class WebGpuRenderRuntime {
     await awaitSubmissionCompletionTarget({
       targetSequence,
       completedSequence: () => this.completedSequence,
-      createProbe: () => this.scheduleCompletionProbe(performance.now(), true),
+      createProbe: () => this.scheduleCompletionProbe(this.clock(), true),
       failure: () => this.lastFailure,
       timeoutMs,
     });
