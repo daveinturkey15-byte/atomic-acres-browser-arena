@@ -12014,11 +12014,7 @@ function updatePass65KillstreakRuntime(now: number): void {
     }
     if (network.role === 'host' && now - lastKillstreakStateBroadcastAt >= 100) broadcastKillstreakState(now);
   }
-  const presentationProgress = renderRuntime.presentationTelemetry(now);
-  killstreakPresentation.sync(killstreakSnapshot, now, {
-    submissionSequence: presentationProgress.submissionSequence,
-    completedSequence: presentationProgress.completedSequence,
-  });
+  killstreakPresentation.sync(killstreakSnapshot, now);
   audio.syncChopperRotors(killstreakSnapshot.entities
     .filter((entity) => entity.kind === 'chopper' && entity.expiresInMs > 0)
     .map((entity) => ({

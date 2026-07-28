@@ -79,30 +79,30 @@ describe('killstreak presentation', () => {
     webGlPresentation.dispose();
   });
 
-  it('admits a legal chopper plus 24-drone overlap only across completed presentation frames', () => {
-    const presentation = new KillstreakPresentation(new THREE.Scene(), undefined, true);
-    const overlap = snapshot(27);
-    const overlapBatchCount = presentation.telemetry().swarmRenderBatches;
-    presentation.sync(overlap, 1_000, { submissionSequence: 10, completedSequence: 10 });
-    expect(presentation.telemetry().swarmRenderedInstances).toBe(0);
-    presentation.sync(overlap, 1_016, { submissionSequence: 10, completedSequence: 10 });
-    expect(presentation.telemetry().swarmRenderedInstances).toBe(0);
-    presentation.sync(overlap, 1_032, { submissionSequence: 11, completedSequence: 11 });
-    expect(presentation.telemetry().swarmRenderedInstances).toBe(0);
-    presentation.sync(overlap, 1_048, { submissionSequence: 12, completedSequence: 12 });
-    expect(presentation.telemetry().swarmRenderedInstances).toBe(4);
-    expect(presentation.root.children.filter((node) => node.userData.swarmInstancedPresentation === true && node.visible)).toHaveLength(2);
-    presentation.sync(overlap, 1_064, { submissionSequence: 13, completedSequence: 13 });
-    presentation.sync(overlap, 1_080, { submissionSequence: 14, completedSequence: 14 });
-    presentation.sync(overlap, 1_096, { submissionSequence: 15, completedSequence: 15 });
-    presentation.sync(overlap, 1_112, { submissionSequence: 16, completedSequence: 16 });
-    presentation.sync(overlap, 1_128, { submissionSequence: 17, completedSequence: 17 });
-    presentation.sync(overlap, 1_144, { submissionSequence: 18, completedSequence: 18 });
-    expect(presentation.telemetry().swarmRenderedInstances).toBe(24);
-    expect(presentation.root.children.filter((node) => node.userData.swarmInstancedPresentation === true && node.visible)).toHaveLength(overlapBatchCount);
-    presentation.sync(snapshot(1), 1_160, { submissionSequence: 19, completedSequence: 19 });
-    expect(presentation.telemetry().swarmRenderedInstances).toBe(0);
-    presentation.dispose();
+  it('renders every legal chopper plus 24-drone batch atomically on WebGPU and WebGL', () => {
+    for (const useStorageSwarmMatrices of [true, false]) {
+      const presentation = new KillstreakPresentation(new THREE.Scene(), undefined, useStorageSwarmMatrices);
+      const overlapBatchCount = presentation.telemetry().swarmRenderBatches;
+      presentation.sync(snapshot(27), 1_000);
+      expect(presentation.telemetry()).toMatchObject({
+        entities: 27,
+        swarmRenderedInstances: 24,
+        swarmVisibleRenderBatches: overlapBatchCount,
+        swarmMinimumRenderedInstances: 24,
+        swarmMaximumRenderedInstances: 24,
+      });
+      expect(presentation.root.children.filter((node) => (
+        node.userData.swarmInstancedPresentation === true && node.visible && (node as THREE.InstancedMesh).count === 24
+      ))).toHaveLength(overlapBatchCount);
+      presentation.sync(snapshot(1), 1_016);
+      expect(presentation.telemetry()).toMatchObject({
+        swarmRenderedInstances: 0,
+        swarmVisibleRenderBatches: 0,
+        swarmMinimumRenderedInstances: 0,
+        swarmMaximumRenderedInstances: 0,
+      });
+      presentation.dispose();
+    }
   });
 
   it('binds the runtime presentation loader to the gated authored Hunter Drone LOD0', () => {
@@ -452,6 +452,9 @@ describe('killstreak presentation', () => {
       pooledSwarmDrones: 24,
       swarmRenderBatches: 12,
       swarmRenderedInstances: 1,
+      swarmVisibleRenderBatches: 12,
+      swarmMinimumRenderedInstances: 1,
+      swarmMaximumRenderedInstances: 1,
       prewarmedAuthoredSupportFamilies: [],
       markerDetails: [],
       bounded: true,
