@@ -24,6 +24,7 @@ describe('Pass 65 native-WebGPU frame-pacing gate', () => {
 
   it('accepts a complete 60 Hz-class ten-second window without long tasks', () => {
     const summary = summarizeFramePacingWindow(repeat(16.667, 600), 10_001);
+    expect(summary.cadenceHz).toBeCloseTo(59.994, 3);
     expect(validateFramePacingWindow(summary, 0, true)).toEqual([]);
   });
 
@@ -43,11 +44,27 @@ describe('Pass 65 native-WebGPU frame-pacing gate', () => {
 
   it('fails when Atomic Acres hides a severe tail behind a good median', () => {
     const terminal = summarizeFramePacingWindow([...repeat(8.3, 599), 8.5], 10_000);
-    const atomic = summarizeFramePacingWindow([...repeat(8.4, 590), ...repeat(31.4, 9), 58.5], 10_000);
+    const atomic = summarizeFramePacingWindow([...repeat(8.4, 560), ...repeat(31.4, 39), 58.5], 10_000);
     expect(compareAtomicAgainstTerminal(atomic, terminal)).toEqual(expect.arrayContaining([
-      'atomic-p99-materially-worse:31.4/8.3',
       'atomic-max-materially-worse:58.5/8.5',
+      'atomic-over-20ms-rate-materially-worse:66.667/0',
     ]));
+  });
+
+  it('does not turn a display-interval percentile cliff into a false relative regression', () => {
+    const terminal = summarizeFramePacingWindow([...repeat(5.6, 3_254), ...repeat(11.1, 171)], 20_000);
+    const atomic = summarizeFramePacingWindow([...repeat(5.6, 3_205), ...repeat(11.1, 198)], 20_000);
+    expect({ atomicP95: atomic.p95Ms, terminalP95: terminal.p95Ms }).toEqual({
+      atomicP95: 11.1,
+      terminalP95: 5.6,
+    });
+    expect(compareAtomicAgainstTerminal(atomic, terminal)).toEqual([]);
+  });
+
+  it('rejects a material Atomic Acres throughput deficit', () => {
+    const terminal = summarizeFramePacingWindow(repeat(16.667, 600), 10_000);
+    const atomic = summarizeFramePacingWindow(repeat(16.667, 500), 10_000);
+    expect(compareAtomicAgainstTerminal(atomic, terminal)).toContain('atomic-cadence-materially-worse:50/60');
   });
 
   it('permits only bounded measurement noise between Atomic Acres and Terminal', () => {

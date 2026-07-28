@@ -37,12 +37,8 @@ export type FramePacingThresholds = Readonly<{
   maximumOver50MsPer10Seconds: number;
   maximumSteadyLongTasks: number;
   atomicDelta: Readonly<{
-    p50FixedMs: number;
-    p50Fraction: number;
-    p95FixedMs: number;
-    p95Fraction: number;
-    p99FixedMs: number;
-    p99Fraction: number;
+    cadenceFixedHz: number;
+    cadenceFraction: number;
     maxFixedMs: number;
     maxFraction: number;
     over20MsPer1000: number;
@@ -70,12 +66,8 @@ export const PASS65_FRAME_PACING_THRESHOLDS: FramePacingThresholds = Object.free
   maximumOver50MsPer10Seconds: 1,
   maximumSteadyLongTasks: 0,
   atomicDelta: Object.freeze({
-    p50FixedMs: 1.5,
-    p50Fraction: 0.10,
-    p95FixedMs: 2,
-    p95Fraction: 0.15,
-    p99FixedMs: 4,
-    p99Fraction: 0.20,
+    cadenceFixedHz: 5,
+    cadenceFraction: 0.05,
     maxFixedMs: 12,
     maxFraction: 0.30,
     over20MsPer1000: 15,
@@ -110,13 +102,12 @@ export function summarizeFramePacingWindow(
     over50Ms: count(50),
     over100Ms: count(100),
   });
-  const p50Ms = percentile(ordered, 0.50);
   return Object.freeze({
     windowMs: rounded(windowMs),
     sampleCount: ordered.length,
     rejectedSampleCount: samples.length - ordered.length,
-    cadenceHz: Number.isFinite(p50Ms) && p50Ms > 0 ? rounded(1_000 / p50Ms) : 0,
-    p50Ms: rounded(p50Ms),
+    cadenceHz: Number.isFinite(windowMs) && windowMs > 0 ? rounded(ordered.length * 1_000 / windowMs) : 0,
+    p50Ms: rounded(percentile(ordered, 0.50)),
     p95Ms: rounded(percentile(ordered, 0.95)),
     p99Ms: rounded(percentile(ordered, 0.99)),
     maxMs: rounded(ordered.at(-1) ?? Number.POSITIVE_INFINITY),
@@ -168,6 +159,10 @@ function materiallyAbove(candidate: number, baseline: number, fixedMs: number, f
   return candidate > baseline + Math.max(fixedMs, baseline * fraction);
 }
 
+function materiallyBelow(candidate: number, baseline: number, fixed: number, fraction: number): boolean {
+  return candidate < baseline - Math.max(fixed, baseline * fraction);
+}
+
 export function compareAtomicAgainstTerminal(
   atomic: FramePacingWindowSummary,
   terminal: FramePacingWindowSummary,
@@ -175,14 +170,12 @@ export function compareAtomicAgainstTerminal(
 ): readonly string[] {
   const delta = thresholds.atomicDelta;
   const issues: string[] = [];
-  if (materiallyAbove(atomic.p50Ms, terminal.p50Ms, delta.p50FixedMs, delta.p50Fraction)) {
-    issues.push(`atomic-p50-materially-worse:${atomic.p50Ms}/${terminal.p50Ms}`);
-  }
-  if (materiallyAbove(atomic.p95Ms, terminal.p95Ms, delta.p95FixedMs, delta.p95Fraction)) {
-    issues.push(`atomic-p95-materially-worse:${atomic.p95Ms}/${terminal.p95Ms}`);
-  }
-  if (materiallyAbove(atomic.p99Ms, terminal.p99Ms, delta.p99FixedMs, delta.p99Fraction)) {
-    issues.push(`atomic-p99-materially-worse:${atomic.p99Ms}/${terminal.p99Ms}`);
+  // Browser callbacks are quantized at display intervals, so p95/p99 can jump
+  // an entire refresh slot when otherwise-near-identical distributions straddle
+  // a percentile boundary. Compare actual delivered throughput and hitch tails;
+  // validateFramePacingWindow still enforces every absolute percentile limit.
+  if (materiallyBelow(atomic.cadenceHz, terminal.cadenceHz, delta.cadenceFixedHz, delta.cadenceFraction)) {
+    issues.push(`atomic-cadence-materially-worse:${atomic.cadenceHz}/${terminal.cadenceHz}`);
   }
   if (materiallyAbove(atomic.maxMs, terminal.maxMs, delta.maxFixedMs, delta.maxFraction)) {
     issues.push(`atomic-max-materially-worse:${atomic.maxMs}/${terminal.maxMs}`);
