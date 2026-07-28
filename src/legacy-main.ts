@@ -11750,7 +11750,13 @@ function requestKillstreakActivation(
     addFeed(`${GAMEPAD_SUPPORT_LABELS[id]} REJECTED · ${admission.reason.toUpperCase()}`, 'coral');
     return null;
   }
-  refreshLocalKillstreakSnapshot(now);
+  // Host authority is already committed and remote projections are broadcast
+  // below. Coalesce the local immutable projection into the next active frame:
+  // consecutive support keys otherwise allocate an intermediate chopper-only
+  // snapshot immediately before the final chopper-plus-24-drone snapshot.
+  // Avoiding that redundant allocation removes an idle major-GC/compositor
+  // risk on the owner hardware. The next frame refreshes before presentation
+  // and before the earliest support fire gate.
   broadcastKillstreakState(now);
   return activationRequestId;
 }
