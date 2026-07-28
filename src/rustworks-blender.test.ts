@@ -157,4 +157,15 @@ describe('Rustworks Blender Quality plant asset', () => {
       expect(map.root.getObjectByName('rustworks-upper-deck')?.visible, `${profile}:procedural upper deck`).toBe(true);
     }
   });
+
+  it('does not retain any runtime request or load path for the retired overlay', () => {
+    const runtime = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+    const ensureStart = runtime.indexOf('async function ensureRustworksQualityPresentation()');
+    const ensureEnd = runtime.indexOf('\nasync function ensureSelectedQualityPresentation', ensureStart);
+    const ensureSource = runtime.slice(ensureStart, ensureEnd);
+
+    expect(ensureSource).toContain('setRustworksProceduralPresentationVisible(authority.root, true)');
+    expect(ensureSource).not.toContain('recordSelectedAssetRequest');
+    expect(ensureSource).not.toContain('loadRustworksBlenderTower');
+  });
 });

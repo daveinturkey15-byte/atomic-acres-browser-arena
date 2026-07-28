@@ -64,7 +64,9 @@ export const definition = createProceduralArenaVisualDefinition({
   id: 'rustworks-1v1',
   displayLabel: 'RustRig',
   moduleId: 'arena.visual.rustworks-1v1.v1',
-  assetDependencies: ['./assets/original/models/rustworks-central-tower.glb?v=pass62-20260724-1'],
+  // The duplicate Blender tower is retained as source evidence only. Runtime
+  // presentation uses the procedural authority and requests no retired GLB.
+  assetDependencies: [],
   sharedAssetDependencies: SHARED_GAMEPLAY_ASSETS,
   lighting: {
     sunColor: 0xe2ebff, sunIntensity: 3.6, ambientColor: 0x718aa5, ambientIntensity: 0.72,

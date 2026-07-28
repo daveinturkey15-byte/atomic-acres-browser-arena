@@ -72,7 +72,9 @@ test.describe('Pass 62 isolated graphics refinement', () => {
       window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }
     ).__ATOMIC_ACRES_DEBUG__.selectArena('rustworks-1v1'));
     await expect.poll(async () => (await snapshot(page)).arenaSelection.id, { timeout: 40_000 }).toBe('rustworks-1v1');
-    expect(qualityGlbRequests.filter((url) => url.includes('rustworks-central-tower.glb'))).toHaveLength(1);
+    // The retired duplicate RustRig GLB is source evidence only; loading its
+    // permanently hidden textures cost more than 200 MiB of GPU residency.
+    expect(qualityGlbRequests.filter((url) => url.includes('rustworks-central-tower.glb'))).toHaveLength(0);
     expect(qualityGlbRequests.some((url) => url.includes('atomic-acres-blender-arena.glb'))).toBe(false);
 
     await page.evaluate(() => (

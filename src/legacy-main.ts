@@ -179,7 +179,7 @@ import {
   auditAtomicHouseAuthorityParity,
   type AtomicHouseAuthorityParityReport,
 } from './atomic-profile-authority-parity';
-import { RUSTWORKS_BLENDER_ASSET, loadRustworksBlenderTower, markRustworksBlenderFallback, rustworksBlenderTelemetry, setRustworksProceduralPresentationVisible } from './rustworks-blender';
+import { rustworksBlenderTelemetry, setRustworksProceduralPresentationVisible } from './rustworks-blender';
 import {
   createRustworksQualityLights,
   enhanceRustworksQualityMaterials,
@@ -2305,7 +2305,6 @@ let blenderArenaActive = false;
 let atomicHouseAuthorityParity: AtomicHouseAuthorityParityReport | null = null;
 let atomicAuthoredLoadPromise: Promise<THREE.Group | null> | null = null;
 let atomicQualityLoadPromise: Promise<THREE.Group | null> | null = null;
-let rustworksQualityLoadPromise: Promise<THREE.Group | null> | null = null;
 const qualityAssetStreaming = {
   atomicAcres: 'idle' as 'idle' | 'loading' | 'ready' | 'fallback',
   rustworks: 'idle' as 'idle' | 'loading' | 'ready' | 'fallback',
@@ -2411,26 +2410,13 @@ async function ensureAtomicQualityPresentation(): Promise<THREE.Group | null> {
 async function ensureRustworksQualityPresentation(): Promise<THREE.Group | null> {
   if (renderProfile !== 'blender') return null;
   const authority = selectedArenaAuthority('rustworks-1v1');
-  const existingRoot = authority.root.getObjectByName('Rustworks Blender central tower');
-  if (existingRoot instanceof THREE.Group) return existingRoot;
-  if (rustworksQualityLoadPromise) return rustworksQualityLoadPromise;
-  qualityAssetStreaming.rustworks = 'loading';
-  arenaVisualStream.recordSelectedAssetRequest('rustworks-1v1', RUSTWORKS_BLENDER_ASSET);
-  rustworksQualityLoadPromise = loadRustworksBlenderTower(authority.root).then(async (root) => {
-    setRustworksProceduralPresentationVisible(authority.root, true);
-    setRustworksQualityPresentationActive(selectedArena.id === 'rustworks-1v1', renderProfile);
-    qualityAssetStreaming.rustworks = 'ready';
-    graphicsRefinement.refine(root, maximumAnisotropy);
-    return root;
-  }).catch((error) => {
-    markRustworksBlenderFallback(error);
-    console.error('[RustRig Blender tower asset load failed; keeping procedural tower]', error);
-    applyRustworksPresentationProfile(authority.root, renderProfile);
-    setRustworksProceduralPresentationVisible(authority.root, true);
-    qualityAssetStreaming.rustworks = 'fallback';
-    return null;
-  });
-  return rustworksQualityLoadPromise;
+  // The duplicate authored tower is retired in favour of this procedural
+  // gameplay authority. Never fetch/decode/upload its permanently hidden
+  // 206 MiB presentation merely to hide it again.
+  setRustworksProceduralPresentationVisible(authority.root, true);
+  setRustworksQualityPresentationActive(selectedArena.id === 'rustworks-1v1', renderProfile);
+  qualityAssetStreaming.rustworks = 'ready';
+  return null;
 }
 
 async function ensureSelectedQualityPresentation(id: ArenaId): Promise<void> {
