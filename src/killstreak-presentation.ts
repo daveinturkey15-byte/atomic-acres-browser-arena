@@ -415,8 +415,6 @@ function loadSupportVehicleLod(asset: string): Promise<LoadedSupportVehicleLod> 
     }, SUPPORT_VEHICLE_LOAD_TIMEOUT_MS);
     new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(asset, (gltf) => {
       if (settled) return;
-      settled = true;
-      globalThis.clearTimeout(timer);
       void (async () => {
         const scene = gltf.scene;
         scene.updateMatrixWorld(true);
@@ -426,8 +424,16 @@ function loadSupportVehicleLod(asset: string): Promise<LoadedSupportVehicleLod> 
         const contentDigests = await supportTextureContentDigests(gltf);
         supportVehicleTextureCanonicalizer.canonicalize(scene, contentDigests);
         markSharedPresentationAsset(scene);
+        if (settled) return;
+        settled = true;
+        globalThis.clearTimeout(timer);
         resolve(Object.freeze({ scene, animations: Object.freeze([...gltf.animations]), sourceMaxDimension, asset }));
-      })().catch((error: unknown) => reject(error instanceof Error ? error : new Error(String(error))));
+      })().catch((error: unknown) => {
+        if (settled) return;
+        settled = true;
+        globalThis.clearTimeout(timer);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      });
     }, undefined, (error) => {
       if (settled) return;
       settled = true;
