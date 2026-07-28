@@ -258,8 +258,11 @@ export class SmokeVolumePresentation {
     // The normal adaptive high-quality scale settles around 0.8. Two crossed
     // cards can expose a camera-aligned seam at that scale, while the third
     // card adds no draw call and only four transparent triangles per volume.
-    // Keep the one-card fallback for genuinely constrained profiles; tightly
-    // overlapping clusters retain the full basis but share their edge batch.
+    // Keep the one-card fallback for genuinely constrained profiles. Three or
+    // more tightly overlapping volumes already mask one another's camera seam,
+    // so cap those redundant inner/edge bases at two cards as well as sharing
+    // the edge batch. This bounds near-camera transparent fill without taking
+    // the third card away from the isolated smoke silhouette that needs it.
     const qualityCards = this.qualityScale >= 0.7 ? 3 : 1;
     const cardCount = Math.min(qualityCards, this.crowdingCardLimit);
     this.innerCards.count = cardCount;
@@ -510,7 +513,7 @@ export class SmokeVolumePresentationPool {
       const crowded = component.length >= 3;
       for (const [index, member] of component.entries()) {
         member.presentation.setCrowdingBudget(
-          SMOKE_PRESENTATION_CARD_COUNT,
+          crowded ? 2 : SMOKE_PRESENTATION_CARD_COUNT,
           !crowded || index === 0,
           crowded,
         );

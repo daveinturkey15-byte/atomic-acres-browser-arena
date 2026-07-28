@@ -183,7 +183,7 @@ describe('smoke grenade volume presentation', () => {
     pool.update(third, 2_000);
     expect(pool.telemetry()).toMatchObject({
       active: 3,
-      cardsPerVolume: 3,
+      cardsPerVolume: 2,
       crowdedVolumes: 3,
       visibleDrawCalls: 4,
     });
