@@ -132,6 +132,8 @@ export class SmokeVolumePresentation {
   private disturbedAtMs = Number.NEGATIVE_INFINITY;
   private disturbance = 0;
   private qualityScale = 1;
+  private crowdingCardLimit = SMOKE_PRESENTATION_CARD_COUNT;
+  private crowdingEdgeVisible = true;
   private readonly disturbanceDirection = new THREE.Vector3();
   private readonly envelope: MutableSmokePresentationEnvelope = {
     active: false, growth: 0, coreOpacity: 0, edgeOpacity: 0, lifetimeProgress: 0,
@@ -211,6 +213,8 @@ export class SmokeVolumePresentation {
     const envelope = writeSmokePresentationEnvelope(this.envelope, nowMs, this.startsAtMs, this.expiresAtMs);
     this.root.visible = envelope.active;
     if (!this.root.visible) return false;
+    this.innerCards.visible = true;
+    this.cards.visible = this.crowdingEdgeVisible;
     this.root.scale.setScalar(this.radiusM * envelope.growth);
     this.root.rotation.y = envelope.lifetimeProgress * Math.PI * 0.42;
     this.root.rotation.z = Math.sin(envelope.lifetimeProgress * Math.PI * 2) * 0.035;
@@ -228,7 +232,29 @@ export class SmokeVolumePresentation {
 
   setQualityScale(scale: number): void {
     this.qualityScale = THREE.MathUtils.clamp(Number.isFinite(scale) ? scale : 1, 0.35, 1);
-    const cardCount = this.qualityScale >= 0.95 ? 3 : this.qualityScale >= 0.7 ? 2 : 1;
+    this.applyCardBudget();
+  }
+
+  setCrowdingBudget(cardLimit: number, edgeVisible: boolean): void {
+    this.crowdingCardLimit = THREE.MathUtils.clamp(
+      Math.floor(Number.isFinite(cardLimit) ? cardLimit : SMOKE_PRESENTATION_CARD_COUNT),
+      1,
+      SMOKE_PRESENTATION_CARD_COUNT,
+    );
+    this.crowdingEdgeVisible = edgeVisible;
+    this.cards.visible = this.root.visible && edgeVisible;
+    this.applyCardBudget();
+  }
+
+  overlaps(other: SmokeVolumePresentation): boolean {
+    if (!this.active || !other.active || this.disposed || other.disposed) return false;
+    const overlapDistance = Math.min(this.radiusM, other.radiusM) * 0.75;
+    return this.root.position.distanceToSquared(other.root.position) <= overlapDistance * overlapDistance;
+  }
+
+  private applyCardBudget(): void {
+    const qualityCards = this.qualityScale >= 0.95 ? 3 : this.qualityScale >= 0.7 ? 2 : 1;
+    const cardCount = Math.min(qualityCards, this.crowdingCardLimit);
     this.innerCards.count = cardCount;
     this.cards.count = cardCount;
   }
@@ -256,12 +282,13 @@ export class SmokeVolumePresentation {
     return this.active && this.root.visible && !this.disposed;
   }
 
-  telemetry(): Readonly<{ active: boolean; drawCalls: 2; cards: number; qualityScale: number; coreOpacity: number; edgeOpacity: number; triangles: number }> {
+  telemetry(): Readonly<{ active: boolean; drawCalls: number; cards: number; qualityScale: number; crowded: boolean; coreOpacity: number; edgeOpacity: number; triangles: number }> {
     return Object.freeze({
       active: this.isActive(),
-      drawCalls: 2,
+      drawCalls: this.isActive() ? 1 + Number(this.cards.visible) : 0,
       cards: this.cards.count,
       qualityScale: this.qualityScale,
+      crowded: this.crowdingCardLimit < SMOKE_PRESENTATION_CARD_COUNT,
       coreOpacity: this.coreMaterial.opacity,
       edgeOpacity: this.edgeMaterial.opacity,
       triangles: (this.innerCards.count + this.cards.count) * 2,
@@ -418,6 +445,7 @@ export class SmokeVolumePresentationPool {
     const slot = this.slots[slotIndex]!;
     slot.generation += 1;
     slot.presentation.activate(position, startsAtMs, expiresAtMs, radiusM);
+    this.rebalanceOverlappingVolumes();
     this.emissions += 1;
     return Object.freeze({ slot: slotIndex, generation: slot.generation });
   }
@@ -429,7 +457,10 @@ export class SmokeVolumePresentationPool {
 
   release(lease: SmokeVolumePresentationLease): void {
     const slot = this.slots[lease.slot];
-    if (slot?.generation === lease.generation) slot.presentation.deactivate();
+    if (slot?.generation === lease.generation) {
+      slot.presentation.deactivate();
+      this.rebalanceOverlappingVolumes();
+    }
   }
 
   disturb(
@@ -444,14 +475,48 @@ export class SmokeVolumePresentationPool {
 
   clear(): void {
     for (const slot of this.slots) slot.presentation.deactivate();
+    this.rebalanceOverlappingVolumes();
   }
 
   setQualityScale(scale: number): void {
     for (const slot of this.slots) slot.presentation.setQualityScale(scale);
   }
 
-  telemetry(): Readonly<{ capacity: number; active: number; emissions: number; recycled: number; liveDisposals: 0; cardsPerVolume: number; qualityScale: number }> {
-    const sample = this.slots[0]?.presentation.telemetry();
+  private rebalanceOverlappingVolumes(): void {
+    const active = this.slots
+      .map(({ presentation }, slot) => ({ presentation, slot }))
+      .filter(({ presentation }) => presentation.isActive());
+    const remaining = new Set(active.map(({ slot }) => slot));
+    for (const entry of active) {
+      if (!remaining.has(entry.slot)) continue;
+      const component = [entry];
+      remaining.delete(entry.slot);
+      for (let cursor = 0; cursor < component.length; cursor += 1) {
+        const member = component[cursor]!;
+        for (const candidate of active) {
+          if (!remaining.has(candidate.slot) || !member.presentation.overlaps(candidate.presentation)) continue;
+          remaining.delete(candidate.slot);
+          component.push(candidate);
+        }
+      }
+      component.sort((left, right) => left.slot - right.slot);
+      const crowded = component.length >= 3;
+      for (const [index, member] of component.entries()) {
+        member.presentation.setCrowdingBudget(
+          crowded ? 1 : SMOKE_PRESENTATION_CARD_COUNT,
+          !crowded || index === 0,
+        );
+      }
+    }
+    for (const { presentation } of this.slots) {
+      if (!presentation.isActive()) presentation.setCrowdingBudget(SMOKE_PRESENTATION_CARD_COUNT, true);
+    }
+  }
+
+  telemetry(): Readonly<{ capacity: number; active: number; emissions: number; recycled: number; liveDisposals: 0; cardsPerVolume: number; qualityScale: number; crowdedVolumes: number; visibleDrawCalls: number }> {
+    const presentations = this.slots.map(({ presentation }) => presentation.telemetry());
+    const activePresentations = presentations.filter((presentation) => presentation.active);
+    const sample = activePresentations[0] ?? presentations[0];
     return Object.freeze({
       capacity: this.slots.length,
       active: this.slots.reduce((count, { presentation }) => count + Number(presentation.isActive()), 0),
@@ -460,6 +525,8 @@ export class SmokeVolumePresentationPool {
       liveDisposals: 0,
       cardsPerVolume: sample?.cards ?? 0,
       qualityScale: sample?.qualityScale ?? 0,
+      crowdedVolumes: activePresentations.filter((presentation) => presentation.crowded).length,
+      visibleDrawCalls: activePresentations.reduce((sum, presentation) => sum + presentation.drawCalls, 0),
     });
   }
 

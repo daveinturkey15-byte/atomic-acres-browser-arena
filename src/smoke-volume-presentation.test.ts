@@ -171,6 +171,40 @@ describe('smoke grenade volume presentation', () => {
     expect(pool.telemetry().cardsPerVolume).toBe(2);
   });
 
+  it('collapses redundant cards and edges only for tightly overlapping smoke clusters', () => {
+    const scene = new THREE.Scene();
+    const pool = new SmokeVolumePresentationPool(scene, 4);
+    pool.setQualityScale(0.8);
+    const first = pool.emit({ x: 0, y: 1, z: 0 }, 1_000, 13_000, 4.2);
+    const second = pool.emit({ x: 1, y: 1, z: 0 }, 1_000, 13_000, 4.2);
+    const third = pool.emit({ x: 2, y: 1, z: 0 }, 1_000, 13_000, 4.2);
+    pool.update(first, 2_000);
+    pool.update(second, 2_000);
+    pool.update(third, 2_000);
+    expect(pool.telemetry()).toMatchObject({
+      active: 3,
+      cardsPerVolume: 1,
+      crowdedVolumes: 3,
+      visibleDrawCalls: 4,
+    });
+
+    pool.release(first);
+    expect(pool.telemetry()).toMatchObject({
+      active: 2,
+      cardsPerVolume: 2,
+      crowdedVolumes: 0,
+      visibleDrawCalls: 4,
+    });
+    const distant = pool.emit({ x: 20, y: 1, z: 0 }, 1_000, 13_000, 4.2);
+    pool.update(distant, 2_000);
+    expect(pool.telemetry()).toMatchObject({
+      active: 3,
+      cardsPerVolume: 2,
+      crowdedVolumes: 0,
+      visibleDrawCalls: 6,
+    });
+  });
+
   it('stores every soft alpha mask in the grayscale channel sampled by Three', () => {
     const scene = new THREE.Scene();
     const pool = new SmokeVolumePresentationPool(scene, 1);
