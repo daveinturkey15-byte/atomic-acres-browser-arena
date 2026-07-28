@@ -1439,6 +1439,11 @@ export class KillstreakPresentation {
   private readonly prewarmed: PresentedEntity[] = [];
   private readonly entityPools = new Map<PresentedEntityPoolKey, PresentedEntity[]>();
   private readonly swarmInstanceBatches: SwarmInstanceBatch[] = [];
+  private readonly liveEntityIds = new Set<string>();
+  private readonly activeSwarmEntries: PresentedEntity[] = [];
+  private readonly swarmInverseRootMatrix = new THREE.Matrix4();
+  private readonly swarmInstanceMatrix = new THREE.Matrix4();
+  private readonly swarmSourceWorldMatrix = new THREE.Matrix4();
   private readonly sensorRoot = new THREE.Group();
   private readonly sensorSilhouettes: THREE.Group[];
   private visibleSensorContacts = 0;
@@ -1675,16 +1680,19 @@ export class KillstreakPresentation {
 
   private syncSwarmInstancing(): void {
     if (this.swarmInstanceBatches.length === 0) return;
-    const active = [...this.entities.values()].filter((entry) => (
-      entry.root.userData.presentationPoolKey === 'swarm-drone'
-    ));
+    const active = this.activeSwarmEntries;
+    active.length = 0;
+    for (const entry of this.entities.values()) {
+      if (entry.root.userData.presentationPoolKey === 'swarm-drone') active.push(entry);
+    }
     this.root.updateWorldMatrix(true, false);
-    const inverseRoot = new THREE.Matrix4().copy(this.root.matrixWorld).invert();
-    const instanceMatrix = new THREE.Matrix4();
-    const sourceWorldMatrix = new THREE.Matrix4();
+    const inverseRoot = this.swarmInverseRootMatrix.copy(this.root.matrixWorld).invert();
+    const instanceMatrix = this.swarmInstanceMatrix;
+    const sourceWorldMatrix = this.swarmSourceWorldMatrix;
     for (const entry of active) entry.root.updateWorldMatrix(true, false);
     for (const batch of this.swarmInstanceBatches) {
-      for (const [instanceIndex, entry] of active.entries()) {
+      for (let instanceIndex = 0; instanceIndex < active.length; instanceIndex += 1) {
+        const entry = active[instanceIndex]!;
         const poolIndex = Number(entry.root.userData.presentationPoolIndex);
         const source = Number.isInteger(poolIndex) ? batch.sources[poolIndex] : undefined;
         if (!source) continue;
@@ -2024,16 +2032,18 @@ export class KillstreakPresentation {
     snapshot: KillstreakRecipientSnapshot,
     nowMs: number,
   ): void {
-    const bounded = snapshot.entities.slice(0, MAX_PRESENTED_ENTITIES);
-    const admitted = bounded;
-    const liveIds = new Set(admitted.map((entity) => entity.id));
+    const admittedCount = Math.min(snapshot.entities.length, MAX_PRESENTED_ENTITIES);
+    const liveIds = this.liveEntityIds;
+    liveIds.clear();
+    for (let index = 0; index < admittedCount; index += 1) liveIds.add(snapshot.entities[index]!.id);
     for (const [id, presented] of this.entities) {
       if (liveIds.has(id)) continue;
       if (id === this.firstPersonEntityId) setSupportFirstPersonVisibility(presented.root, false);
       this.releasePresentedEntity(presented);
       this.entities.delete(id);
     }
-    for (const entity of admitted) {
+    for (let index = 0; index < admittedCount; index += 1) {
+      const entity = snapshot.entities[index]!;
       let presented = this.entities.get(entity.id);
       if (!presented) {
         presented = this.acquirePresentedEntity(entity);
