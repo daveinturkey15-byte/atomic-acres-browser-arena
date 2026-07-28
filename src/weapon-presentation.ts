@@ -160,12 +160,16 @@ export type WeaponViewmodelGpuPrewarmer = (
 
 /** Original first-person weapon presentation with ADS, sprint, recoil, melee and staged reload motion. */
 export class WeaponPresentation {
+  static readonly MAX_RETAINED_WEBGPU_WEAPONS = 5;
   readonly root = new THREE.Group();
   private readonly browserRuntime: boolean;
   private readonly models = new Map<WeaponId, THREE.Object3D>();
   private readonly modelLastUsed = new Map<WeaponId, number>();
   private readonly gpuReadyModels = new WeakSet<THREE.Object3D>();
   private readonly gpuPrewarmPromises = new WeakMap<THREE.Object3D, Promise<void>>();
+  private browserCatalogPrewarmPromise: Promise<void> | null = null;
+  private readonly browserResidentWeaponIds = new Set<WeaponId>();
+  private unpreparedBrowserSwitches = 0;
   private modelUseCounter = 0;
   private browserWeaponRequest = 0;
   private active: WeaponId = 'carbine';
@@ -800,6 +804,92 @@ export class WeaponPresentation {
     if (browserRuntime) this.trimBrowserWeaponModels();
   }
 
+  /**
+   * Loads, creates and GPU-prewarms one bounded gameplay weapon set behind the
+   * deployment surface. WebGPU compilation can synchronously occupy the browser
+   * main thread even though compileAsync returns a Promise, so a live lazy
+   * switch is not a safe presentation boundary. The hard five-model ceiling
+   * keeps RustRig below its texture budget; WebGL/no-hook callers retain the
+   * existing bounded two-model lazy cache.
+   */
+  async prewarmBrowserWeaponCatalog(
+    requestedIds: readonly WeaponId[],
+    onProgress?: (loaded: number, total: number) => void,
+  ): Promise<void> {
+    if (!this.browserRuntime || !this.gpuPrewarmer) return;
+    const ids = [...new Set(requestedIds)];
+    if (ids.length === 0 || ids.length > WeaponPresentation.MAX_RETAINED_WEBGPU_WEAPONS) {
+      throw new Error(`Pass 65 WebGPU weapon prewarm requires 1-${WeaponPresentation.MAX_RETAINED_WEBGPU_WEAPONS} unique models`);
+    }
+    if (!ids.includes(this.active)) {
+      throw new Error(`Pass 65 WebGPU weapon prewarm omitted active model: ${this.active}`);
+    }
+    if (this.browserCatalogPrewarmPromise) {
+      await this.browserCatalogPrewarmPromise;
+      return this.prewarmBrowserWeaponCatalog(ids, onProgress);
+    }
+    const exactSetReady = ids.length === this.browserResidentWeaponIds.size
+      && ids.every((id) => {
+        const model = this.models.get(id);
+        return this.browserResidentWeaponIds.has(id) && model !== undefined && this.modelIsGpuReady(model);
+      });
+    if (exactSetReady) return;
+    const operation = this.performBrowserWeaponCatalogPrewarm(ids, onProgress);
+    this.browserCatalogPrewarmPromise = operation;
+    try {
+      await operation;
+    } finally {
+      if (this.browserCatalogPrewarmPromise === operation) this.browserCatalogPrewarmPromise = null;
+    }
+  }
+
+  private async performBrowserWeaponCatalogPrewarm(
+    ids: readonly WeaponId[],
+    onProgress?: (loaded: number, total: number) => void,
+  ): Promise<void> {
+    for (const [index, id] of ids.entries()) {
+      await loadPass65WeaponPresentation(id, 'first-person');
+      let model = this.models.get(id);
+      if (!model) {
+        const loadedModel = this.createLoadedBrowserWeapon(id);
+        if (!loadedModel) throw new Error(`Pass 65 first-person catalog asset unavailable after load: ${id}`);
+        model = loadedModel;
+        model.visible = false;
+        model.traverse((node) => { node.layers.mask = this.root.layers.mask; });
+        this.models.set(id, model);
+        this.modelLastUsed.set(id, ++this.modelUseCounter);
+        this.root.add(model);
+      }
+      try {
+        await this.prewarmBrowserModel(id, model, this.browserWeaponRequest);
+      } catch (error) {
+        this.retireRejectedBrowserModel(id, model);
+        throw error;
+      }
+      this.browserResidentWeaponIds.add(id);
+      onProgress?.(index + 1, ids.length);
+    }
+    const desired = new Set(ids);
+    for (const id of [...this.browserResidentWeaponIds]) {
+      if (!desired.has(id)) this.browserResidentWeaponIds.delete(id);
+    }
+    for (const [id, model] of [...this.models]) {
+      if (desired.has(id) || id === this.active || this.gpuPrewarmPromises.has(model)) continue;
+      this.models.delete(id);
+      this.modelLastUsed.delete(id);
+      this.root.remove(model);
+      if (this.retireModel) this.retireModel(model, () => releasePass65WeaponModel(model));
+      else disposePass65WeaponModel(model);
+    }
+    const activeModel = this.models.get(this.active);
+    if (!activeModel || !this.modelIsGpuReady(activeModel)) {
+      throw new Error(`Pass 65 active first-person catalog model was not GPU-ready: ${this.active}`);
+    }
+    for (const [weaponId, model] of this.models) model.visible = weaponId === this.active;
+    this.modelLastUsed.set(this.active, ++this.modelUseCounter);
+    this.updateActiveSockets(this.active);
+  }
+
   isReady(): boolean {
     return typeof document !== 'undefined' ? this.models.has(this.active) : this.models.size === Object.keys(WEAPONS).length;
   }
@@ -811,11 +901,13 @@ export class WeaponPresentation {
   }
 
   private trimBrowserWeaponModels(): void {
-    while (this.models.size > 2) {
+    if (this.browserCatalogPrewarmPromise) return;
+    const retainedLimit = Math.max(2, this.browserResidentWeaponIds.size);
+    while (this.models.size > retainedLimit) {
       const victim = [...this.models.keys()]
         .filter((id) => {
           const model = this.models.get(id);
-          if (!model || id === this.active || model.visible) return false;
+          if (!model || id === this.active || model.visible || this.browserResidentWeaponIds.has(id)) return false;
           return !this.gpuPrewarmPromises.has(model);
         })
         .sort((a, b) => (this.modelLastUsed.get(a) ?? 0) - (this.modelLastUsed.get(b) ?? 0))[0];
@@ -932,6 +1024,9 @@ export class WeaponPresentation {
       // Keep the last complete viewmodel mounted while the requested authored
       // model is loading. The completion callback performs the visibility swap
       // atomically and is generation guarded by browserWeaponRequest.
+      if (this.browserResidentWeaponIds.size > 0 && !this.browserResidentWeaponIds.has(id)) {
+        this.unpreparedBrowserSwitches += 1;
+      }
       this.ensureBrowserWeapon(id);
     }
     const flashlight = WEAPONS[id].flashlight;
@@ -1207,6 +1302,16 @@ export class WeaponPresentation {
       passiveKnifeVisible: this.passiveKnife.visible,
       passiveKnifeModel: this.passiveKnife.getObjectByName('passive-field-knife-model') !== undefined,
       minigunSpool: { ...this.minigunSpool },
+      browserWeaponCatalog: {
+        retained: [...this.browserResidentWeaponIds],
+        retainedCount: this.browserResidentWeaponIds.size,
+        loaded: this.models.size,
+        gpuReady: [...this.models.values()].filter((entry) => this.modelIsGpuReady(entry)).length,
+        available: Object.keys(WEAPONS).length,
+        prewarming: this.browserCatalogPrewarmPromise !== null,
+        unpreparedSwitches: this.unpreparedBrowserSwitches,
+        maximumRetained: WeaponPresentation.MAX_RETAINED_WEBGPU_WEAPONS,
+      },
       importedModel,
     };
   }

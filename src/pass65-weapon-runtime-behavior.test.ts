@@ -227,6 +227,47 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(releasePass65WeaponModelsIn(presentation.root)).toBe(2);
   });
 
+  it('prewarms and pins a hard-bounded WebGPU gameplay set before live weapon switches', async () => {
+    stubBrowserTextureLoading();
+    const loadSpy = vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (
+      Promise.resolve(fakeGltfForUrl(String(url)))
+    )) as GLTFLoader['loadAsync']);
+    const prewarmer = vi.fn(async () => undefined);
+    const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(), false, undefined, prewarmer);
+    await presentation.load();
+    presentation.root.traverse((node) => node.layers.set(2));
+    const catalogIds = ['carbine', 'sniper', 'machine-pistol', 'explosive-crossbow', 'm14-ebr'] as const;
+    await Promise.all([
+      presentation.prewarmBrowserWeaponCatalog(catalogIds),
+      presentation.prewarmBrowserWeaponCatalog(catalogIds),
+    ]);
+
+    expect(presentation.presentationState().browserWeaponCatalog).toEqual({
+      retained: catalogIds,
+      retainedCount: catalogIds.length,
+      loaded: catalogIds.length,
+      gpuReady: catalogIds.length,
+      available: PASS65_AUTHORED_FIREARM_IDS.length + 1,
+      prewarming: false,
+      unpreparedSwitches: 0,
+      maximumRetained: 5,
+    });
+    expect(prewarmer).toHaveBeenCalledTimes(catalogIds.length);
+    const loadsAfterDeployment = loadSpy.mock.calls.length;
+    for (const id of catalogIds) {
+      presentation.setWeapon(id);
+      const model = presentation.root.getObjectByName(`${id}-pass65-first-person-model`);
+      expect(model?.visible, id).toBe(true);
+    }
+    expect(loadSpy).toHaveBeenCalledTimes(loadsAfterDeployment);
+    expect(prewarmer).toHaveBeenCalledTimes(catalogIds.length);
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(catalogIds.length - 1);
+    await expect(presentation.prewarmBrowserWeaponCatalog([
+      ...PASS65_AUTHORED_FIREARM_IDS,
+      'explosive-crossbow',
+    ])).rejects.toThrow(/requires 1-5 unique models/);
+  });
+
   it('never commits stale or failed GPU prewarm generations', async () => {
     stubBrowserTextureLoading();
     vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (

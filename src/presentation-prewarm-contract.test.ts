@@ -44,6 +44,10 @@ describe('presentation prewarm startup contract', () => {
     expect(source).not.toContain("overdriveRoot.visible = gameStarted && matchState.phase === 'active';");
     expect(source).not.toContain('const renderer = renderRuntime.renderer as unknown as THREE.WebGLRenderer');
     expect(source).toContain("bootstrapStage = 'prewarming-grenade-explosion'");
+    expect(source).toContain("bootstrapStage = 'prewarming-explosive-bolts'");
+    expect(source).toContain('await prewarmExplosiveBoltPresentation();');
+    expect(source).toContain("bootstrapStage = 'prewarming-weapon-catalog'");
+    expect(matchDeployment).toContain('await weaponView.prewarmBrowserWeaponCatalog([');
     expect(source).toContain("bootstrapStage = 'prewarming-killstreak-presentations'");
     expect(source).toContain('await killstreakPresentation.prewarm(renderRuntime, camera);');
     expect(source).toContain("bootstrapStage = 'prewarming-smoke-presentations'");
@@ -59,6 +63,8 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('adaptiveQuality.forceDownshift(');
     expect(source).toContain('const streamedWeaponGpuPrewarmer: WeaponViewmodelGpuPrewarmer | undefined');
     expect(source).toContain('streamedWeaponGpuPrewarmQueue.run(() => runStreamedWeaponGpuPrewarm(model, context))');
+    expect(source).toContain('revealAncestors();');
+    expect(source).toContain('for (const [ancestor, visible] of ancestorVisibility) ancestor.visible = visible;');
     expect(source).toContain('await renderRuntime.compileAndRender(model, camera, scene);');
     expect(source).toContain('streamedWeaponGpuPrewarmer,');
     expect(source).toContain("bootstrapStage = 'ready'");

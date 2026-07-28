@@ -451,8 +451,8 @@ export class WebGpuRenderRuntime {
   // deliberately serialized at the renderer boundary.
   private static readonly MAX_IN_FLIGHT_SUBMISSIONS = 1;
   // Cold shader/shadow compilation on the frozen owner hardware can retire in
-  // ~2.4 s. Backpressure still stops new work at 250 ms; four seconds matches
-  // the explicit queue-fence timeout and distinguishes cold work from a hang.
+  // ~2.4 s. Backpressure still stops new work at 250 ms; twelve seconds matches
+  // the explicit cold-generation fence and distinguishes cold work from a hang.
   // Queue-latency adaptation handles bounded overload before gameplay. Keep
   // the fatal fence for a genuinely non-progressing device, not a slow frame
   // that can still retire and trigger a safe quality downshift.
@@ -759,7 +759,11 @@ export class WebGpuRenderRuntime {
     this.lastSubmittedRenderInfo = Object.freeze(webGpuRenderInfoSnapshot(this.renderer.info.render));
     this.submissionSequence += 1;
     this.lastSubmittedAt = now;
-    this.scheduleCompletionProbe(now);
+    // With a one-submission frontier, every admitted frame needs its own probe.
+    // Honouring the 250 ms sampling throttle here leaves the queue at depth one
+    // without a completion observer and forces the following display frame to
+    // be skipped merely to attach that probe.
+    this.scheduleCompletionProbe(now, true);
     return true;
   }
 

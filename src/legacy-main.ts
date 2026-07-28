@@ -1186,10 +1186,12 @@ type BootstrapStage =
   | 'module-ready'
   | 'menu-video-ready'
   | 'loading-gameplay-assets'
+  | 'prewarming-weapon-catalog'
   | 'prewarming-killstreak-presentations'
   | 'prewarming-smoke-presentations'
   | 'prewarming-combat-tracers'
   | 'prewarming-combat-impacts'
+  | 'prewarming-explosive-bolts'
   | 'prewarming-grenade-explosion'
   | 'prewarming-support-explosion'
   | 'prewarming-death-drops'
@@ -2407,6 +2409,25 @@ let lastSmokeStateBroadcastAt = Number.NEGATIVE_INFINITY;
 let flashHostAuthority = new FlashHostAuthority(interactiveWorldMatchEpoch, 'host');
 let flashVictimConsumer = new FlashVictimResultConsumer(interactiveWorldMatchEpoch, 'pending-player', 0);
 const explosiveBolts: ExplosiveBoltEntity[] = [];
+const EXPLOSIVE_BOLT_PRESENTATION_POOL_CAPACITY = 32;
+const explosiveBoltShaftGeometry = new THREE.CylinderGeometry(0.018, 0.018, 0.72, 8);
+const explosiveBoltTipGeometry = new THREE.ConeGeometry(0.048, 0.16, 8);
+const explosiveBoltShaftMaterial = new THREE.MeshStandardMaterial({ color: 0x29363b, roughness: 0.42, metalness: 0.72 });
+const explosiveBoltArmedMaterial = new THREE.MeshBasicMaterial({ color: 0xff8b48, toneMapped: false });
+const explosiveBoltPresentationRoot = new THREE.Group();
+explosiveBoltPresentationRoot.name = 'explosive-bolt-presentation-pool';
+explosiveBoltPresentationRoot.userData.presentationOnly = true;
+scene.add(explosiveBoltPresentationRoot);
+const explosiveBoltPresentationPool = Array.from(
+  { length: EXPLOSIVE_BOLT_PRESENTATION_POOL_CAPACITY },
+  (_, index) => {
+    const root = createExplosiveBoltMesh();
+    root.name = `tac15-explosive-bolt-${index + 1}`;
+    explosiveBoltPresentationRoot.add(root);
+    return root;
+  },
+);
+let explosiveBoltPresentationPrewarmed = false;
 let flashExposureUntilHostTimeMs = 0;
 let flashExposureStrength = 0;
 let lastFlashResultAdmission: Readonly<{
@@ -4381,8 +4402,17 @@ const runStreamedWeaponGpuPrewarm: WeaponViewmodelGpuPrewarmer = async (model, {
       const priorParent = model.parent;
       const priorVisible = model.visible;
       const priorScale = model.scale.clone();
+      const ancestorVisibility = new Map<THREE.Object3D, boolean>();
       const restoreParent = (): void => {
         if (priorParent && model.parent !== priorParent) priorParent.add(model);
+      };
+      const revealAncestors = (): void => {
+        let ancestor = model.parent;
+        while (ancestor && ancestor !== scene) {
+          if (!ancestorVisibility.has(ancestor)) ancestorVisibility.set(ancestor, ancestor.visible);
+          ancestor.visible = true;
+          ancestor = ancestor.parent;
+        }
       };
 
       // Compile the detached candidate while the last complete viewmodel keeps
@@ -4398,6 +4428,10 @@ const runStreamedWeaponGpuPrewarm: WeaponViewmodelGpuPrewarmer = async (model, {
         try {
           await flushWebGpuFrames(12_000);
           restoreParent();
+          // The menu/deployment lifecycle normally hides the entire viewmodel
+          // ancestry. Reveal that chain only for this fenced upload frame or a
+          // compile-only receipt could still leave first draw work in combat.
+          revealAncestors();
           await renderRuntime.compileAndRender(model, camera, scene);
           const presentation = renderRuntime.presentationTelemetry();
           if (presentation.status !== 'healthy') {
@@ -4408,6 +4442,7 @@ const runStreamedWeaponGpuPrewarm: WeaponViewmodelGpuPrewarmer = async (model, {
         }
       } finally {
         restoreParent();
+        for (const [ancestor, visible] of ancestorVisibility) ancestor.visible = visible;
         model.visible = priorVisible;
         model.scale.copy(priorScale);
       }
@@ -7804,6 +7839,14 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
       throw new Error(`Selected arena ${requestedArenaId} did not commit before match start`);
     }
   }
+  bootstrapStage = 'prewarming-weapon-catalog';
+  await weaponView.prewarmBrowserWeaponCatalog([
+    player.primaryWeapon,
+    player.secondaryWeapon,
+    'explosive-crossbow',
+    'm14-ebr',
+    'railgun',
+  ]);
   killstreakLoadoutController.releaseAfterMatch();
   const frozenKillstreakLoadout = killstreakLoadoutController.freezeAtMatchStart();
   gamepadSupportSelection = frozenKillstreakLoadout.slots[0];
@@ -10056,16 +10099,56 @@ function segmentSphereFraction(start: THREE.Vector3, delta: THREE.Vector3, centr
 function createExplosiveBoltMesh(): THREE.Group {
   const root = new THREE.Group();
   root.name = 'tac15-explosive-bolt';
-  const shaftMaterial = new THREE.MeshStandardMaterial({ color: 0x29363b, roughness: 0.42, metalness: 0.72 });
-  const armedMaterial = new THREE.MeshBasicMaterial({ color: 0xff8b48, toneMapped: false });
-  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.72, 8), shaftMaterial);
+  const shaft = new THREE.Mesh(explosiveBoltShaftGeometry, explosiveBoltShaftMaterial);
   shaft.rotation.x = Math.PI / 2;
   root.add(shaft);
-  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.048, 0.16, 8), armedMaterial);
+  const tip = new THREE.Mesh(explosiveBoltTipGeometry, explosiveBoltArmedMaterial);
   tip.rotation.x = -Math.PI / 2;
   tip.position.z = -0.42;
   root.add(tip);
   root.userData.presentationOnly = true;
+  root.userData.presentationPoolInUse = false;
+  root.visible = false;
+  return root;
+}
+
+async function prewarmExplosiveBoltPresentation(): Promise<void> {
+  if (explosiveBoltPresentationPrewarmed) return;
+  const states = new Map<THREE.Object3D, Readonly<{
+    visible: boolean;
+    scale: THREE.Vector3;
+    frustumCulled: boolean;
+  }>>();
+  for (const root of explosiveBoltPresentationPool) {
+    root.traverse((node) => {
+      states.set(node, Object.freeze({
+        visible: node.visible,
+        scale: node.scale.clone(),
+        frustumCulled: node.frustumCulled,
+      }));
+      node.visible = true;
+      node.frustumCulled = false;
+    });
+    root.scale.setScalar(0.0001);
+  }
+  try {
+    await renderRuntime.compileAndRender(explosiveBoltPresentationRoot, camera, scene);
+    explosiveBoltPresentationPrewarmed = true;
+  } finally {
+    for (const [node, state] of states) {
+      node.visible = state.visible;
+      node.scale.copy(state.scale);
+      node.frustumCulled = state.frustumCulled;
+    }
+  }
+}
+
+function acquireExplosiveBoltMesh(): THREE.Group {
+  const root = explosiveBoltPresentationPool.find((candidate) => candidate.userData.presentationPoolInUse !== true);
+  if (!root) throw new Error('Explosive-bolt presentation pool exhausted');
+  root.userData.presentationPoolInUse = true;
+  root.visible = true;
+  root.scale.setScalar(1);
   return root;
 }
 
@@ -10079,10 +10162,9 @@ function spawnExplosiveBolt(
   now = performance.now(),
 ): void {
   const normalized = direction.clone().normalize();
-  const mesh = createExplosiveBoltMesh();
+  const mesh = acquireExplosiveBoltMesh();
   mesh.position.copy(origin);
   mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), normalized);
-  scene.add(mesh);
   explosiveBolts.push({
     mesh,
     velocity: normalized.multiplyScalar(EXPLOSIVE_BOLT_SPEED_MPS),
@@ -10104,7 +10186,10 @@ function spawnExplosiveBolt(
 }
 
 function disposeExplosiveBolt(entity: ExplosiveBoltEntity): void {
-  scheduleDeferredGpuRetirement(entity.mesh);
+  entity.mesh.visible = false;
+  entity.mesh.userData.presentationPoolInUse = false;
+  entity.mesh.position.set(0, 0, 0);
+  entity.mesh.quaternion.identity();
 }
 
 function applyExplosiveBoltTargetDamage(
@@ -17726,6 +17811,9 @@ async function prepareSharedGameplayAssets(): Promise<void> {
       loadHunterDronePresentation(),
       loadSupportVehiclePresentations(),
     ]);
+    // Every streamed viewmodel must inherit the camera's isolated compositing
+    // layer before any match-boundary GPU prewarm can stage it.
+    weaponView.root.traverse((node) => node.layers.set(VIEWMODEL_RENDER_LAYER));
     killstreakPresentation.prewarmAuthoredAssets();
     bootstrapStage = 'prewarming-killstreak-presentations';
     await killstreakPresentation.prewarm(renderRuntime, camera);
@@ -17734,11 +17822,12 @@ async function prepareSharedGameplayAssets(): Promise<void> {
     // First-person geometry is composited after world depth is cleared. Contact
     // retreat still keeps it tucked near walls without world geometry cutting
     // holes through hands and weapons.
-    weaponView.root.traverse((node) => node.layers.set(VIEWMODEL_RENDER_LAYER));
     bootstrapStage = 'prewarming-combat-tracers';
     await tracerPool.prewarm(renderRuntime, camera);
     bootstrapStage = 'prewarming-combat-impacts';
     await impactPresentation.prewarm(renderRuntime, camera);
+    bootstrapStage = 'prewarming-explosive-bolts';
+    await prewarmExplosiveBoltPresentation();
     bootstrapStage = 'prewarming-grenade-explosion';
     await grenadeExplosionPresentation.prewarm(renderRuntime, camera);
     bootstrapStage = 'prewarming-support-explosion';

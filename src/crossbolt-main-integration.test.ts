@@ -38,4 +38,20 @@ describe('Pass 65 explosive crossbolt runtime integration', () => {
     expect(detonate.match(/explosiveBoltBlastDamage\(/g)).toHaveLength(1);
     expect(detonate).toContain('EXPLOSIVE_BOLT_BLAST_MAX_DAMAGE * (stuck ? 2 : 1)');
   });
+
+  it('prewarms a bounded shared-resource bolt pool instead of allocating GPU resources during fire', () => {
+    expect(source).toContain('const EXPLOSIVE_BOLT_PRESENTATION_POOL_CAPACITY = 32;');
+    expect(source).toContain('await renderRuntime.compileAndRender(explosiveBoltPresentationRoot, camera, scene);');
+    expect(source).toContain('const mesh = acquireExplosiveBoltMesh();');
+    expect(source).toContain("entity.mesh.userData.presentationPoolInUse = false;");
+    const createStart = source.indexOf('function createExplosiveBoltMesh(');
+    const createEnd = source.indexOf('\nasync function prewarmExplosiveBoltPresentation(', createStart);
+    const create = source.slice(createStart, createEnd);
+    expect(create).toContain('explosiveBoltShaftGeometry');
+    expect(create).toContain('explosiveBoltTipGeometry');
+    expect(create).not.toContain('new THREE.CylinderGeometry');
+    expect(create).not.toContain('new THREE.ConeGeometry');
+    expect(create).not.toContain('new THREE.MeshStandardMaterial');
+    expect(create).not.toContain('new THREE.MeshBasicMaterial');
+  });
 });

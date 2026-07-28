@@ -11,6 +11,7 @@ import {
   shouldBackpressureWebGpuSubmissions,
   toneMappingForMode,
   webGpuRenderInfoSnapshot,
+  WebGpuRenderRuntime,
 } from './render-runtime';
 import { assertTslCutoverReady, assertTslReviewAuthored, pendingTslMigrationIds, TSL_MIGRATION_INVENTORY } from './tsl-migration-inventory';
 
@@ -118,6 +119,49 @@ describe('Pass 64 render runtime boundary', () => {
     expect(shouldBackpressureWebGpuSubmissions(null, 1_000, 250, 12, 8)).toBe(true);
     expect(shouldBackpressureWebGpuSubmissions(null, 1_000, 250, 3, 4)).toBe(false);
     expect(shouldBackpressureWebGpuSubmissions(null, 1_000, 250, 4, 4)).toBe(true);
+  });
+
+  it('attaches a completion probe to every admitted one-deep submission frontier', async () => {
+    const pending: Array<() => void> = [];
+    const queue = {
+      onSubmittedWorkDone: () => new Promise<void>((resolve) => pending.push(resolve)),
+    };
+    const renderer = {
+      info: { reset: () => undefined, render: { calls: 1, triangles: 2, points: 0, lines: 0 } },
+    };
+    const pipeline = { render: () => undefined };
+    const device = {
+      queue,
+      addEventListener: () => undefined,
+      lost: new Promise<never>(() => undefined),
+    };
+    const runtime = new (WebGpuRenderRuntime as unknown as new (
+      renderer: unknown,
+      pipeline: unknown,
+      identity: unknown,
+    ) => WebGpuRenderRuntime)(renderer, pipeline, {
+      canvasAntialias: true,
+      canvasSamples: 4,
+      adapterLabel: 'test adapter',
+      adapterClass: 'GPUAdapter',
+      deviceClass: 'GPUDevice',
+      softwareAdapter: false,
+      device,
+    });
+    const settleProbe = async () => {
+      for (let turn = 0; turn < 6; turn += 1) await Promise.resolve();
+    };
+
+    expect(runtime.submitFrame(100)).toBe(true);
+    expect(pending).toHaveLength(1);
+    pending.shift()?.();
+    await settleProbe();
+    expect(runtime.submitFrame(110)).toBe(true);
+    expect(pending).toHaveLength(1);
+    pending.shift()?.();
+    await settleProbe();
+    expect(runtime.submitFrame(120)).toBe(true);
+    expect(pending).toHaveLength(1);
   });
 
   it('restarts pending age when the completion frontier advances and clears it when caught up', () => {
