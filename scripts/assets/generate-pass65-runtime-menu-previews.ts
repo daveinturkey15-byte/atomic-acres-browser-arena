@@ -129,19 +129,26 @@ async function installCaptureSurface(page: Page, kind: 'helicopter' | 'cat'): Pr
       .aa-rotor:before,.aa-rotor:after{content:"";position:absolute;left:0;top:45%;width:100%;height:10%;border-radius:100%;background:linear-gradient(90deg,transparent,${palette[2]} 16%,${palette[3]} 50%,${palette[2]} 84%,transparent);box-shadow:0 0 7px #000}
       .aa-rotor:after{transform:rotate(90deg)}
       .aa-rotor-hub{position:absolute;left:47%;top:25%;width:6%;height:50%;border-radius:50%;background:${palette[0]};border:1px solid ${palette[3]}}
-      .aa-cockpit{position:absolute;left:33%;bottom:3%;width:34%;height:12.5%;display:grid;grid-template-columns:1fr 1.35fr 1fr;gap:8px;padding:8px 10px;border:1px solid ${palette[2]};border-radius:7px 7px 16px 16px;background:linear-gradient(180deg,rgba(17,23,25,.84),rgba(5,7,8,.94));box-shadow:0 7px 22px rgba(0,0,0,.7),inset 0 1px rgba(255,255,255,.08)}
-      .aa-panel{position:relative;min-width:0;border:1px solid rgba(155,165,170,.38);background:${palette[0]};padding:7px 6px;overflow:hidden}
-      .aa-panel:after{content:"";position:absolute;left:12%;right:12%;bottom:6px;height:2px;background:#708b8d;box-shadow:0 0 4px #5e7477}
-      .aa-panel strong{display:block;color:#b3bdc1;font-size:10px;margin-top:4px;letter-spacing:.08em}
-      .aa-panel span{display:block;color:#708184;font-size:7px;white-space:nowrap}
-      .aa-brace{position:absolute;bottom:0;width:2px;height:26%;background:linear-gradient(transparent,${palette[2]});opacity:.65}.aa-brace.left{left:22%;transform:rotate(16deg)}.aa-brace.right{right:22%;transform:rotate(-16deg)}
-      .aa-canopy{position:absolute;top:15%;bottom:13%;width:7%;border-style:solid;border-color:${palette[2]};filter:drop-shadow(0 4px 7px #000);opacity:.72}.aa-canopy.left{left:18%;border-width:0 3px 3px 0;transform:skewX(-7deg)}.aa-canopy.right{right:18%;border-width:0 0 3px 3px;transform:skewX(7deg)}
-      .aa-glass{position:absolute;top:17%;bottom:16%;width:12%;opacity:.1;mix-blend-mode:screen}.aa-glass.left{left:23%;background:linear-gradient(118deg,rgba(185,205,210,.52),transparent 24%)}.aa-glass.right{right:23%;background:linear-gradient(242deg,rgba(185,205,210,.52),transparent 24%)}
-      .aa-ear{position:absolute;top:2.4%;width:9%;height:12%;background:linear-gradient(145deg,#9ba5aa 0%,${palette[2]} 28%,${palette[0]} 78%);clip-path:polygon(50% 0,91% 78%,76% 70%,100% 100%,0 100%,24% 70%,9% 78%);filter:drop-shadow(0 0 2px #c3cacc) drop-shadow(0 4px 5px #000)}
-      .aa-ear:before{content:"";position:absolute;inset:15% 19% 12%;background:linear-gradient(160deg,#7f878a,#3d4447);clip-path:polygon(50% 0,92% 100%,8% 100%);opacity:.94}
-      .aa-ear:after{content:"";position:absolute;left:42%;right:42%;bottom:0;height:25%;background:#c1c8ca;clip-path:polygon(50% 0,100% 100%,0 100%)}.aa-ear.left{left:29%;transform:rotate(-6deg)}.aa-ear.right{right:29%;transform:scaleX(-1) rotate(-6deg)}
-      .aa-paw{position:absolute;bottom:-1.2%;width:8%;height:7.4%;border:2px solid ${palette[3]};border-radius:48% 48% 30% 30%;background:linear-gradient(${palette[2]},${palette[0]});box-shadow:0 -2px 8px #000}.aa-paw.left{left:33%;transform:rotate(7deg)}.aa-paw.right{right:33%;transform:rotate(-7deg)}
-      .aa-paw:before{content:"";position:absolute;left:32%;top:31%;width:36%;height:39%;border-radius:50%;background:#777d7f;box-shadow:-14px -9px 0 -4px #777d7f,0 -13px 0 -4px #777d7f,14px -9px 0 -4px #777d7f}
+      .aa-cockpit{position:absolute;left:25%;bottom:1.6%;width:50%;height:17%;display:grid;grid-template-columns:1fr 1.38fr 1fr;gap:7px;padding:12px 15px 10px;border:1px solid rgba(75,229,255,.72);border-radius:15px 15px 28px 28px;clip-path:polygon(4% 0,96% 0,100% 28%,97% 100%,3% 100%,0 28%);background:linear-gradient(180deg,rgba(29,45,49,.94),rgba(4,10,13,.97) 42%,rgba(1,5,8,.99)),repeating-linear-gradient(90deg,transparent 0 10px,rgba(72,224,255,.03) 10px 11px);box-shadow:0 10px 28px rgba(0,0,0,.8),0 0 15px rgba(48,211,255,.2),inset 0 2px rgba(199,248,255,.18),inset 0 -8px 18px rgba(0,0,0,.72)}
+      .aa-cockpit:before{content:"";position:absolute;left:5%;right:5%;top:5px;height:2px;background:linear-gradient(90deg,transparent,#38dfff 18%,#9bffd0 50%,#38dfff 82%,transparent);box-shadow:0 0 8px #28ccec;opacity:.88}
+      .aa-cockpit:after{content:"";position:absolute;left:43%;right:43%;bottom:5px;height:3px;border-radius:2px;background:#a0ffd1;box-shadow:-18px 0 #35dfff,18px 0 #35dfff,0 0 8px #62ffc4}
+      .aa-panel{position:relative;min-width:0;border:1px solid rgba(66,221,255,.58);border-radius:4px;background:radial-gradient(circle at 50% 115%,rgba(41,255,174,.22),transparent 55%),linear-gradient(180deg,rgba(8,26,32,.96),rgba(2,9,13,.98));padding:8px 7px;overflow:hidden;box-shadow:inset 0 0 9px rgba(44,213,255,.17),0 0 5px rgba(38,212,255,.13)}
+      .aa-panel:after{content:"";position:absolute;left:10%;right:10%;bottom:6px;height:2px;background:linear-gradient(90deg,#27d9ff,#8affc5);box-shadow:0 0 6px #35dcff}
+      .aa-panel strong{display:block;color:#a8ffd3;font-size:11px;margin-top:5px;letter-spacing:.08em;text-shadow:0 0 5px rgba(92,255,190,.72)}
+      .aa-panel span{display:block;color:#70eaff;font-size:7px;white-space:nowrap;text-shadow:0 0 4px rgba(42,216,255,.66)}
+      .aa-brace{position:absolute;bottom:0;width:3px;height:29%;background:linear-gradient(transparent,#27363b 48%,#57dff5);box-shadow:0 0 4px rgba(55,213,242,.36);opacity:.82}.aa-brace.left{left:20%;transform:rotate(17deg)}.aa-brace.right{right:20%;transform:rotate(-17deg)}
+      .aa-canopy{position:absolute;top:13%;bottom:15%;width:9%;border-style:solid;border-color:#314247;filter:drop-shadow(0 4px 7px #000);opacity:.88}.aa-canopy.left{left:15%;border-width:0 4px 4px 0;transform:skewX(-7deg)}.aa-canopy.right{right:15%;border-width:0 0 4px 4px;transform:skewX(7deg)}
+      .aa-glass{position:absolute;top:15%;bottom:18%;width:16%;opacity:.16;mix-blend-mode:screen}.aa-glass.left{left:20%;background:linear-gradient(118deg,rgba(97,229,255,.58),transparent 27%)}.aa-glass.right{right:20%;background:linear-gradient(242deg,rgba(97,229,255,.58),transparent 27%)}
+      .aa-reticle{position:absolute;left:calc(50% - 12px);top:34%;width:24px;height:24px;border:1px solid rgba(87,239,255,.55);border-radius:50%;box-shadow:0 0 7px rgba(53,219,255,.45)}
+      .aa-reticle:before,.aa-reticle:after{content:"";position:absolute;background:#8affc5;box-shadow:0 0 4px #46f9ba}.aa-reticle:before{left:11px;top:-7px;width:1px;height:36px}.aa-reticle:after{left:-7px;top:11px;width:36px;height:1px}
+      .aa-cat-crown{position:absolute;left:18%;right:18%;top:-7%;height:18%;border-radius:48% 48% 42% 42%;background:radial-gradient(ellipse at 50% 100%,#6f7b81 0%,#252d31 47%,#080c0f 76%);filter:drop-shadow(0 5px 8px #000);opacity:.97}
+      .aa-ear{position:absolute;top:.5%;width:14%;height:17%;border:1px solid rgba(210,226,230,.58);background:linear-gradient(145deg,#c0cbd0 0%,#69767c 23%,#22292d 60%,#090c0f 100%);clip-path:polygon(50% 0,94% 83%,76% 73%,100% 100%,0 100%,24% 73%,6% 83%);filter:drop-shadow(0 0 3px #d3e2e7) drop-shadow(0 5px 7px #000);z-index:2}
+      .aa-ear:before{content:"";position:absolute;inset:17% 21% 13%;background:linear-gradient(165deg,#efb7b7 4%,#916d78 48%,#30383d 100%);clip-path:polygon(50% 0,94% 100%,6% 100%);opacity:.96}
+      .aa-ear:after{content:"";position:absolute;left:34%;right:34%;bottom:0;height:34%;background:linear-gradient(#d7e0e3,#737f84);clip-path:polygon(50% 0,100% 100%,0 100%)}.aa-ear.left{left:22%;transform:rotate(-8deg)}.aa-ear.right{right:22%;transform:scaleX(-1) rotate(-8deg)}
+      .aa-foreleg{position:absolute;bottom:-5%;width:11%;height:22%;border:1px solid rgba(207,220,224,.48);border-radius:46% 46% 28% 28%;background:linear-gradient(100deg,#0b1013,#69757a 45%,#252d31 78%,#090d10);box-shadow:0 -3px 10px #000}.aa-foreleg.left{left:25%;transform:rotate(8deg)}.aa-foreleg.right{right:25%;transform:scaleX(-1) rotate(8deg)}
+      .aa-paw{position:absolute;bottom:1%;width:12%;height:10%;border:2px solid #bdcbd0;border-radius:50% 50% 35% 35%;background:radial-gradient(circle at 50% 34%,#8f9ba0,#354046 56%,#0a0f12 100%);box-shadow:0 -3px 10px #000,0 0 4px rgba(195,223,229,.35);z-index:3}.aa-paw.left{left:24.5%;transform:rotate(8deg)}.aa-paw.right{right:24.5%;transform:rotate(-8deg)}
+      .aa-paw:before{content:"";position:absolute;left:32%;top:41%;width:36%;height:38%;border-radius:52% 52% 46% 46%;background:#d99ca0;box-shadow:-18px -12px 0 -5px #d99ca0,-6px -17px 0 -5px #d99ca0,6px -17px 0 -5px #d99ca0,18px -12px 0 -5px #d99ca0}
+      .aa-paw:after{content:"";position:absolute;left:18%;right:18%;top:8%;height:12%;border-top:2px solid rgba(228,240,243,.75);border-radius:50%}
     `;
     document.head.append(style);
     const overlay = document.createElement('div');
@@ -150,8 +157,8 @@ async function installCaptureSurface(page: Page, kind: 'helicopter' | 'cat'): Pr
     overlay.dataset.scale = String(scale);
     overlay.dataset.palette = palette.join(',');
     overlay.innerHTML = kind === 'helicopter'
-      ? '<div class="aa-rotor"><i class="aa-rotor-hub"></i></div><i class="aa-canopy left"></i><i class="aa-canopy right"></i><i class="aa-glass left"></i><i class="aa-glass right"></i><i class="aa-brace left"></i><i class="aa-brace right"></i><div class="aa-cockpit"><div class="aa-panel"><span>ALT / RADAR</span><strong id="aa-alt">024 M</strong></div><div class="aa-panel"><span>FLIGHT PATH</span><strong id="aa-heading">HOLD 000</strong></div><div class="aa-panel"><span>ROTOR / LINK</span><strong>ARMED</strong></div></div>'
-      : '<div class="aa-ear left"></div><div class="aa-ear right"></div><div class="aa-paw left"></div><div class="aa-paw right"></div>';
+      ? '<div class="aa-rotor"><i class="aa-rotor-hub"></i></div><i class="aa-canopy left"></i><i class="aa-canopy right"></i><i class="aa-glass left"></i><i class="aa-glass right"></i><i class="aa-brace left"></i><i class="aa-brace right"></i><i class="aa-reticle"></i><div class="aa-cockpit"><div class="aa-panel"><span>ALT / RADAR</span><strong id="aa-alt">024 M</strong></div><div class="aa-panel"><span>FLIGHT PATH</span><strong id="aa-heading">HOLD 000</strong></div><div class="aa-panel"><span>ROTOR / LINK</span><strong>ARMED</strong></div></div>'
+      : '<div class="aa-cat-crown"></div><div class="aa-ear left"></div><div class="aa-ear right"></div><div class="aa-foreleg left"></div><div class="aa-foreleg right"></div><div class="aa-paw left"></div><div class="aa-paw right"></div>';
     document.querySelector('#app')?.append(overlay);
   }, { kind, palette: choreography.capture.overlayPalette, scale: choreography.capture.overlayScale });
 }
@@ -220,8 +227,15 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
         overlay.querySelector<HTMLElement>('#aa-alt')?.replaceChildren(`${Math.round(altitude).toString().padStart(3, '0')} M`);
         overlay.querySelector<HTMLElement>('#aa-heading')?.replaceChildren(`HDG ${Math.round(((yaw * 180 / Math.PI) % 360 + 360) % 360).toString().padStart(3, '0')}`);
         if (pose.frame === 'cat') {
-          const paw = overlay.querySelector<HTMLElement>(frame % 2 === 0 ? '.aa-paw.left' : '.aa-paw.right');
-          paw?.style.setProperty('translate', `0 ${-Math.max(0, Math.sin(pose.pathProgress * Math.PI * 8)) * 5}px`);
+          const gait = Math.sin(pose.pathProgress * Math.PI * 8);
+          const bob = Math.sin(pose.pathProgress * Math.PI * 4) * 2;
+          overlay.querySelector<HTMLElement>('.aa-paw.left')?.style.setProperty('translate', `0 ${-Math.max(0, gait) * 8}px`);
+          overlay.querySelector<HTMLElement>('.aa-paw.right')?.style.setProperty('translate', `0 ${-Math.max(0, -gait) * 8}px`);
+          overlay.querySelector<HTMLElement>('.aa-foreleg.left')?.style.setProperty('translate', `0 ${-Math.max(0, gait) * 4}px`);
+          overlay.querySelector<HTMLElement>('.aa-foreleg.right')?.style.setProperty('translate', `0 ${-Math.max(0, -gait) * 4}px`);
+          overlay.querySelector<HTMLElement>('.aa-cat-crown')?.style.setProperty('translate', `0 ${bob}px`);
+          overlay.querySelector<HTMLElement>('.aa-ear.left')?.style.setProperty('rotate', `${Math.max(0, Math.sin(pose.pathProgress * Math.PI * 6)) * -3}deg`);
+          overlay.querySelector<HTMLElement>('.aa-ear.right')?.style.setProperty('rotate', `${Math.max(0, Math.sin(pose.pathProgress * Math.PI * 6 + 1.4)) * 3}deg`);
         }
       }
     }, {

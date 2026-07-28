@@ -17,9 +17,9 @@ describe('prerecorded map-selection previews', () => {
       expect(definition.arenaId).toBe(id);
       expect(definition.durationSeconds).toBe(8);
       expect(definition.width / definition.height).toBeCloseTo(16 / 9, 5);
-      expect(definition.webm).toMatch(new RegExp(`${id}\\.webm\\?v=pass65-runtime-preview-v4$`));
-      expect(definition.mp4).toMatch(new RegExp(`${id}\\.mp4\\?v=pass65-runtime-preview-v4$`));
-      expect(definition.poster).toMatch(new RegExp(`${id}\\.webp\\?v=pass65-runtime-preview-v4$`));
+      expect(definition.webm).toMatch(new RegExp(`${id}\\.webm\\?v=pass65-runtime-preview-v5$`));
+      expect(definition.mp4).toMatch(new RegExp(`${id}\\.mp4\\?v=pass65-runtime-preview-v5$`));
+      expect(definition.poster).toMatch(new RegExp(`${id}\\.webp\\?v=pass65-runtime-preview-v5$`));
       return [definition.webm, definition.mp4, definition.poster];
     });
     expect(new Set(assets).size).toBe(assets.length);

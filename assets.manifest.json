@@ -377,11 +377,11 @@
       "license": "Original project work",
       "files": "public/assets/original/menu-previews/*",
       "sourceScript": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
-      "sourceScriptSha256": "66d6071904340dc46e2690309bba5cb917f26e1123ef08cc31f4fce9f6ac5592",
+      "sourceScriptSha256": "834451ea16073bfde0e4c0ca13eab358f8eedd75988c631dc0e6c6c2a8bc65f4",
       "sourceProvenance": "source-assets/menu/pass65-preview-masters/provenance.json",
-      "sourceProvenanceSha256": "20cb8380606a9c437dd15b5673cbc7fa39ee497de529e4699f3820830ee9eab5",
+      "sourceProvenanceSha256": "d7bc864c444be9634a298d53618c8819824c6812fb4fb265bbb5041c7d9e54a0",
       "format": "Four distinct 960x540 eight-second 24 FPS selected-map runtime captures, shipped as VP9/Opus WebM, H.264/AAC MP4 and static WebP posters, plus deterministic five-frame review evidence",
-      "modifications": "Captured offline from each actual authoritative production WebGPU arena with deterministic camera and visual time. Three map flyovers bake a compact half-scale black/grey rotor and spaced cockpit HUD; Gun Range bakes compact half-scale black/grey ears and paws. Runtime loading/menu playback remains prerecorded-only, reduced motion is poster-only, and no downloaded or sampled assets are used. The former byte-identical Gun Range media gate is explicitly superseded.",
+      "modifications": "Captured offline from each actual authoritative production WebGPU arena with deterministic camera and visual time. Three map flyovers bake a graphite rotor, dimensional canopy and cyan/green cockpit avionics; Gun Range bakes an expressive charcoal/silver crown, articulated ears, forelegs and coral-padded paws. Runtime loading/menu playback remains prerecorded-only, reduced motion is poster-only, and no downloaded or sampled assets are used. The former byte-identical Gun Range media gate is explicitly superseded.",
       "attributionRequired": false
     },
     {

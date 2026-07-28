@@ -26,7 +26,7 @@ type ArenaRecipeBase = Readonly<{
 
 type HelicopterRecipe = ArenaRecipeBase & Readonly<{
   kind: 'helicopter';
-  cockpitAssetId: 'pass65-compact-cockpit-overlay-v3';
+  cockpitAssetId: 'pass65-compact-cockpit-overlay-v4';
   centre: Vector3Tuple;
   radius: readonly [number, number];
   altitudeM: number;

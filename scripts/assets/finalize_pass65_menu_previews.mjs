@@ -73,7 +73,7 @@ function validateRecipe() {
     || choreography.reviewFrames.at(-1) !== choreography.frameCount) {
     throw new Error('reviewFrames must be unique and include the exact loop endpoints');
   }
-  if (choreography.media.cacheKey !== 'pass65-runtime-preview-v4') throw new Error('runtime preview cache key is stale');
+  if (choreography.media.cacheKey !== 'pass65-runtime-preview-v5') throw new Error('runtime preview cache key is stale');
   for (const arena of arenas) {
     const recipe = choreography.arenas[arena];
     if (!['helicopter', 'cat'].includes(recipe.kind)) throw new Error(`${arena} has an invalid preview kind`);
@@ -288,8 +288,8 @@ const provenance = {
     durationSeconds: choreography.durationSeconds,
     mapSource: 'Selected authoritative production runtime arena under hardware WebGPU',
     motion: 'Canonical deterministic cyclic camera paths over fixed runtime visual time',
-    helicopter: 'Compact half-scale black/grey first-person rotor and three-panel cockpit/HUD baked offline with spaced map-safe composition',
-    cat: 'Compact half-scale black/grey ear and paw anatomy baked offline over the authoritative Gun Range moving-target scene',
+    helicopter: 'Graphite first-person rotor and sculpted three-panel cockpit with cyan/green avionics, canopy depth, glass, braces and a map-safe reticle baked offline',
+    cat: 'Expressive charcoal/silver feline crown, articulated ears, forelegs and coral-padded paws baked offline over the authoritative Gun Range moving-target scene',
     overlayScale: choreography.capture.overlayScale,
     audio: choreography.media.audioProfiles,
   },
@@ -312,7 +312,7 @@ record.sourceScriptSha256 = provenance.generator.sha256;
 record.sourceProvenanceSha256 = await sha256(provenancePath);
 record.generatedAsOf = provenance.generatedAt;
 record.format = 'Four distinct 960x540 eight-second 24 FPS selected-map runtime captures, shipped as VP9/Opus WebM, H.264/AAC MP4 and static WebP posters, plus deterministic five-frame review evidence';
-record.modifications = 'Captured offline from each actual authoritative production WebGPU arena with deterministic camera and visual time. Three map flyovers bake a compact half-scale black/grey rotor and spaced cockpit HUD; Gun Range bakes compact half-scale black/grey ears and paws. Runtime loading/menu playback remains prerecorded-only, reduced motion is poster-only, and no downloaded or sampled assets are used. The former byte-identical Gun Range media gate is explicitly superseded.';
+record.modifications = 'Captured offline from each actual authoritative production WebGPU arena with deterministic camera and visual time. Three map flyovers bake a graphite rotor, dimensional canopy and cyan/green cockpit avionics; Gun Range bakes an expressive charcoal/silver crown, articulated ears, forelegs and coral-padded paws. Runtime loading/menu playback remains prerecorded-only, reduced motion is poster-only, and no downloaded or sampled assets are used. The former byte-identical Gun Range media gate is explicitly superseded.';
 await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
 
 console.log(JSON.stringify({ releaseState: provenance.releaseState, recipeId: choreography.recipeId, source: choreography.capture.source, arenas, runtimeFiles: runtimeFiles.length, reviewSheets: reviewEvidence.length }, null, 2));

@@ -218,7 +218,9 @@ for (const [file, oldDigest] of Object.entries(supersededGunRangeDigests)) {
 if (manifestRecord) {
   if (manifestRecord.sourceScript !== 'scripts/assets/generate-pass65-runtime-menu-previews.ts' || manifestRecord.sourceScriptSha256 !== provenance.generator.sha256) failures.push('manifest runtime generator record is stale');
   if (manifestRecord.sourceProvenanceSha256 !== await sha256(provenancePath)) failures.push('manifest provenance digest is stale');
-  if (!manifestRecord.modifications.includes('actual authoritative production WebGPU arena') || !manifestRecord.modifications.includes('half-scale black/grey')) failures.push('manifest does not disclose authoritative runtime source and compact overlay treatment');
+  if (!manifestRecord.modifications.includes('actual authoritative production WebGPU arena')
+    || !manifestRecord.modifications.includes('cyan/green cockpit avionics')
+    || !manifestRecord.modifications.includes('articulated ears, forelegs and coral-padded paws')) failures.push('manifest does not disclose authoritative runtime source and reviewed cockpit/cat overlay treatment');
 }
 
 const runtimeHashesByExtension = { mp4: new Set(), webm: new Set(), webp: new Set() };
@@ -233,7 +235,7 @@ for (const [extension, hashes] of Object.entries(runtimeHashesByExtension)) if (
 
 const generatorSource = await readFile(generatorPath, 'utf8');
 const documentationSource = await readFile(documentationPath, 'utf8');
-for (const marker of ['chromium.launch', 'createServer', 'menuPreviewPose', 'setCaptureCameraPose', 'authoritative-runtime-arena', 'offline-menu-preview-overlay', 'offline-baked-compact-black-grey', 'overlayScale', 'aa-canopy', 'aa-glass']) if (!generatorSource.includes(marker)) failures.push(`runtime capture generator is missing ${marker}`);
+for (const marker of ['chromium.launch', 'createServer', 'menuPreviewPose', 'setCaptureCameraPose', 'authoritative-runtime-arena', 'offline-menu-preview-overlay', 'offline-baked-compact-black-grey', 'overlayScale', 'aa-canopy', 'aa-glass', 'aa-reticle', 'aa-foreleg']) if (!generatorSource.includes(marker)) failures.push(`runtime capture generator is missing ${marker}`);
 for (const forbidden of ['import bpy', 'primitive_cube_add', 'generate_pass65_menu_previews.py']) if (generatorSource.includes(forbidden)) failures.push(`runtime capture generator still contains synthetic Blender authoring marker ${forbidden}`);
 if (!documentationSource.includes('npm run author:pass65:menu-previews') || !documentationSource.includes('actual authoritative map')) failures.push('authoring documentation does not describe the fail-closed runtime capture workflow');
 

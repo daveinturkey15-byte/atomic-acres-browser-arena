@@ -45,7 +45,7 @@ describe('canonical prerecorded menu preview choreography', () => {
       const definition = menuPreviewDefinition(arenaId);
       expect(definition.kind).toBe('helicopter');
       if (definition.kind !== 'helicopter') throw new Error('unreachable definition');
-      expect(definition.cockpitAssetId).toBe('pass65-compact-cockpit-overlay-v3');
+      expect(definition.cockpitAssetId).toBe('pass65-compact-cockpit-overlay-v4');
     }
     expect(menuPreviewDefinition('gun-range').kind).toBe('cat');
   });
