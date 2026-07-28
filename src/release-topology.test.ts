@@ -8,6 +8,7 @@ const pass62Benchmark = JSON.parse(readFileSync('baselines/pass62/best-netcode-b
 const shell = readFileSync('release-shell/release-shell.js', 'utf8');
 const shellHtml = readFileSync('release-shell/index.html', 'utf8');
 const staging = readFileSync('scripts/release/stage-release-topology.mjs', 'utf8');
+const playwrightServer = readFileSync('scripts/qa/playwright-web-server.mjs', 'utf8');
 
 describe('Pass 65 two-channel release topology', () => {
   it('retains the immutable best-ever Pass 62 benchmark record independently', () => {
@@ -80,6 +81,12 @@ describe('Pass 65 two-channel release topology', () => {
     expect(staging).not.toContain("stagePinned('new-netcode'");
     expect(staging).toContain("channels: { experimental, stable }");
     expect(staging).toContain("schemaVersion: 4");
+  });
+
+  it('stages the production channel topology before browser regression tests', () => {
+    expect(playwrightServer).toContain("['scripts/release/stage-release-topology.mjs']");
+    expect(playwrightServer).toContain("stdio: 'inherit'");
+    expect(playwrightServer.indexOf('stage-release-topology.mjs')).toBeLessThan(playwrightServer.indexOf('const server = await preview'));
   });
 
   it('keeps publication denied until the exact-SHA Pass 65 acceptance descendant exists', () => {
