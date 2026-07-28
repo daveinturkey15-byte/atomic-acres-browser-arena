@@ -11937,6 +11937,7 @@ function applyKillstreakDamageEvent(event: KillstreakDamageEvent): KillstreakDam
 }
 
 let lastKillstreakControlSentAt = Number.NEGATIVE_INFINITY;
+const FULL_SUPPORT_OVERLAP_PIXEL_RATIO_CAP = 0.65;
 let fullSupportOverlapAdaptiveActive = false;
 
 function updateFullSupportOverlapAdaptiveBudget(): void {
@@ -11952,7 +11953,7 @@ function updateFullSupportOverlapAdaptiveBudget(): void {
   if (fullSupportOverlapAdaptiveActive) return;
   fullSupportOverlapAdaptiveActive = true;
   let nextPixelRatio: number | null = null;
-  while (adaptiveQuality.telemetry().pixelRatioCap > 0.75) {
+  while (adaptiveQuality.telemetry().pixelRatioCap > FULL_SUPPORT_OVERLAP_PIXEL_RATIO_CAP) {
     const downshifted = adaptiveQuality.forceDownshift('full chopper plus 24-drone support overlap');
     if (downshifted === null) break;
     nextPixelRatio = downshifted;
