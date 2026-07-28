@@ -1746,7 +1746,11 @@ export class KillstreakPresentation {
           lodStates.set(node, node.autoUpdate);
           node.autoUpdate = false;
         }
-        node.visible = true;
+        // A retired static source can never re-enter a live presentation; its
+        // merged batch is the render authority. Uploading both representations
+        // wastes GPU memory and can provoke a post-prewarm driver/GC pause on
+        // the first real chopper plus swarm activation.
+        node.visible = node.userData.staticBatchRendered !== true;
         node.frustumCulled = false;
       });
       // Preserve the pool entry's exact authored/gameplay scale. A near-zero
