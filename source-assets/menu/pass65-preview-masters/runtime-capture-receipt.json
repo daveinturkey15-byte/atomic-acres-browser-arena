@@ -223,7 +223,7 @@
     "captureRuntime": [
       {
         "path": "src/legacy-main.ts",
-        "sha256": "d47bd79c7520eb7d05606609913a9d56f2e32cd0c8233b799eab3737080b1cc2"
+        "sha256": "1ebb787db31cbf3e9760fd3958a7ebe43ffee7875f0f029eea6303853c258427"
       },
       {
         "path": "src/ui/menu-preview-camera.ts",
@@ -345,7 +345,7 @@
           "fixedVisualTimeMs": 65000,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "e5a85b97048457c95e6e5bbb7c1bb1c33fa52909745c90cda59b6341c4102cb2"
+          "pngSha256": "fcf3e98035350b99836a5efadfcdb84b4e9932d8d570398ca48e4319bb003918"
         },
         {
           "frame": 48,
@@ -421,7 +421,7 @@
           "fixedVisualTimeMs": 65000,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "e5a85b97048457c95e6e5bbb7c1bb1c33fa52909745c90cda59b6341c4102cb2",
+          "pngSha256": "fcf3e98035350b99836a5efadfcdb84b4e9932d8d570398ca48e4319bb003918",
           "seamSourceFrame": 1
         }
       ]
@@ -577,7 +577,7 @@
           "fixedVisualTimeMs": 65000,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "ae1890b758d66528dee7c541c3efdae968e8adc8557ea5e56cd0b236c18531e8"
+          "pngSha256": "1ef9751334d9a4c6fa2380f44be734c2387eceb654d36fda6e62b26e3d63755b"
         },
         {
           "frame": 48,
@@ -596,7 +596,7 @@
           "fixedVisualTimeMs": 66968.58638743455,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "320666cf08ac729bcc93be6c7cc09e19956a23d4f4f9fe5c4428dd6ebca502c3"
+          "pngSha256": "127fdc262fe849f3a9a0178322c05772c2dcd7485bc81002a9d282a44b0110f6"
         },
         {
           "frame": 96,
@@ -615,7 +615,7 @@
           "fixedVisualTimeMs": 68979.05759162303,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "33e0181694f4bfbdff268fab00c8380120fab258632c7fc89fd803e015e67088"
+          "pngSha256": "44d763fae824ad9c824d4aff0354353580a0d79fc373e77e99add994ae84da8b"
         },
         {
           "frame": 144,
@@ -634,7 +634,7 @@
           "fixedVisualTimeMs": 70989.52879581152,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "61a1b14d16e61477709f7b649821b23b4164c68e28c13c21326c59d389cd2b60"
+          "pngSha256": "800a65e20d6b9db48138e6bfa8bb69e1132fa66fbca7ff07c42cad97cd329408"
         },
         {
           "frame": 192,
@@ -653,7 +653,7 @@
           "fixedVisualTimeMs": 65000,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "ae1890b758d66528dee7c541c3efdae968e8adc8557ea5e56cd0b236c18531e8",
+          "pngSha256": "1ef9751334d9a4c6fa2380f44be734c2387eceb654d36fda6e62b26e3d63755b",
           "seamSourceFrame": 1
         }
       ]
@@ -693,7 +693,7 @@
           "fixedVisualTimeMs": 65000,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "a157965c8d388f8dda36558858c7240e0ed97835598db0fdd6d284e875fa899b"
+          "pngSha256": "679cea2f65b927d2919df519f476142b475091e030acabb1e64ea58cb08b8e52"
         },
         {
           "frame": 48,
@@ -712,7 +712,7 @@
           "fixedVisualTimeMs": 66968.58638743455,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "6f3d9f021458a9ceb9691de1a4845af1286359a46170f0055ff8944f87991bdc"
+          "pngSha256": "5c3b006293866a3715a4c689a63e788258167a401c42327c09a3b02fa0ec71d3"
         },
         {
           "frame": 96,
@@ -731,7 +731,7 @@
           "fixedVisualTimeMs": 68979.05759162303,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "6b4a67d862d47f6fdd2cbc1ce3e6cf48bef57115207ba3edf2fc359783e5dfad"
+          "pngSha256": "8867753fa994c9b6fe4bcb80209263f5d214a5d96170bf22cd6993eb1400eba1"
         },
         {
           "frame": 144,
@@ -750,7 +750,7 @@
           "fixedVisualTimeMs": 70989.52879581152,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "c65b5fa510bb864dd801e5a5b92f6d7d9c2ddf8454ba9d3b4b0eaf2ddad75c37"
+          "pngSha256": "230933cf70389546c434e9e7793e6b47a0ab38c227f81752011e5541d721e9e0"
         },
         {
           "frame": 192,
@@ -769,7 +769,7 @@
           "fixedVisualTimeMs": 65000,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "a157965c8d388f8dda36558858c7240e0ed97835598db0fdd6d284e875fa899b",
+          "pngSha256": "679cea2f65b927d2919df519f476142b475091e030acabb1e64ea58cb08b8e52",
           "seamSourceFrame": 1
         }
       ]
