@@ -37,6 +37,7 @@ const canonicalArenaSequence = [
 ];
 const diagnosticStress = process.env.PASS65_DIAGNOSTIC_STRESS?.trim().toLowerCase() ?? '';
 const profileFirstActivation = process.env.PASS65_PROFILE_FIRST_ACTIVATION === '1';
+const probeBaselineWindow = process.env.PASS65_PROBE_BASELINE === '1';
 const diagnosticArena = process.env.PASS65_DIAGNOSTIC_ARENA?.trim() ?? '';
 const diagnosticSequence = (process.env.PASS65_DIAGNOSTIC_SEQUENCE ?? '')
   .split(',')
@@ -244,15 +245,15 @@ try {
       }
     }
     let activationProfiler = null;
-    if (profileFirstActivation && visit === 0 && enabledStress.has('killstreak')) {
+    if (profileFirstActivation && visit === 0 && (enabledStress.has('killstreak') || probeBaselineWindow)) {
       activationProfiler = await page.context().newCDPSession(page);
       await activationProfiler.send('Profiler.enable');
       await activationProfiler.send('Profiler.setSamplingInterval', { interval: 100 });
       await activationProfiler.send('Profiler.start');
     }
-    const killstreakActivationProbe = await page.evaluate(async (enabled) => {
+    const killstreakActivationProbe = await page.evaluate(async ({ activate, probe }) => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
-      if (!enabled) return {
+      if (!probe) return {
         skipped: true,
         activations: { chopper: null, droneSwarm: null },
       };
@@ -314,18 +315,23 @@ try {
         requestAnimationFrame((now) => {
           previousRafAt = now;
           activationStartedAt = performance.now();
-          api.earnSupport(15);
+          if (activate) api.earnSupport(15);
           const callStartedAt = performance.now();
-          activations = {
-            chopper: api.activateKillstreak('chopper'),
-            droneSwarm: api.activateKillstreak('drone-swarm'),
-          };
+          if (activate) {
+            activations = {
+              chopper: api.activateKillstreak('chopper'),
+              droneSwarm: api.activateKillstreak('drone-swarm'),
+            };
+          }
           activationCallMs = performance.now() - callStartedAt;
           requestAnimationFrame(sampleFrame);
         });
         fallbackTimer = window.setTimeout(() => finish('timeout'), 3_500);
       });
-    }, enabledStress.has('killstreak'));
+    }, {
+      activate: enabledStress.has('killstreak'),
+      probe: enabledStress.has('killstreak') || probeBaselineWindow,
+    });
     if (activationProfiler) {
       const { profile } = await activationProfiler.send('Profiler.stop');
       await activationProfiler.detach();
