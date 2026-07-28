@@ -266,6 +266,17 @@ try {
       await activationProfiler.send('Profiler.setSamplingInterval', { interval: 100 });
       await activationProfiler.send('Profiler.start');
     }
+    if (enabledStress.has('killstreak')) {
+      // Entitlement is earned before a real player presses the support key.
+      // Stage the synthetic QA eliminations outside the measured activation
+      // window and drain their snapshot/HUD projection first.
+      await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.earnSupport(15));
+      await page.waitForFunction(() => {
+        const available = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.fieldSupport?.available;
+        return available?.chopper === true && available?.['drone-swarm'] === true;
+      }, undefined, { timeout: 5_000 });
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    }
     const killstreakActivationProbe = await page.evaluate(async ({ activate, probe, mode, secondDelayMs }) => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
       if (!probe) return {
@@ -305,6 +316,16 @@ try {
             activations,
             matchPhaseBefore: before.matchPhase,
             matchPhaseAfter: after.matchPhase,
+            supportProjection: {
+              choppers: after.killstreak.entities.filter((entity) => entity.kind === 'chopper').length,
+              swarmAuthorityEntities: after.killstreak.entities
+                .filter((entity) => entity.kind === 'drone' && entity.mode === 'swarm').length,
+              swarmRenderedInstances: after.killstreakPresentation.swarmRenderedInstances,
+              swarmVisibleRenderBatches: after.killstreakPresentation.swarmVisibleRenderBatches,
+              swarmRenderBatches: after.killstreakPresentation.swarmRenderBatches,
+              swarmMinimumRenderedInstances: after.killstreakPresentation.swarmMinimumRenderedInstances,
+              swarmMaximumRenderedInstances: after.killstreakPresentation.swarmMaximumRenderedInstances,
+            },
             activationCallMs,
             elapsedMs,
             sampledFrames: frameGapsMs.length,
@@ -341,7 +362,6 @@ try {
         requestAnimationFrame((now) => {
           previousRafAt = now;
           activationStartedAt = performance.now();
-          if (activate) api.earnSupport(15);
           const callStartedAt = performance.now();
           if (activate) {
             activations = {
@@ -378,9 +398,20 @@ try {
     }
     if (enabledStress.has('killstreak')) {
       const minimumActivationProgress = Math.max(4, Math.floor(killstreakActivationProbe.elapsedMs / 100));
+      const projection = killstreakActivationProbe.supportProjection;
+      const completeRequestedChopper = killstreakProbeMode === 'swarm' || projection.choppers >= 1;
+      const completeRequestedSwarm = killstreakProbeMode === 'chopper' || (
+        projection.swarmAuthorityEntities === 24
+        && projection.swarmRenderedInstances === 24
+        && projection.swarmVisibleRenderBatches === projection.swarmRenderBatches
+        && projection.swarmMinimumRenderedInstances === 24
+        && projection.swarmMaximumRenderedInstances === 24
+      );
       if (killstreakActivationProbe.finishReason !== 'raf-window'
         || killstreakActivationProbe.matchPhaseBefore !== 'active'
         || killstreakActivationProbe.matchPhaseAfter !== 'active'
+        || !completeRequestedChopper
+        || !completeRequestedSwarm
         || killstreakActivationProbe.sampledFrames < minimumActivationProgress
         || killstreakActivationProbe.frameDelta < minimumActivationProgress
         || killstreakActivationProbe.submissionDelta < minimumActivationProgress
@@ -392,9 +423,17 @@ try {
       }
     }
     if (enabledStress.has('killstreak')) await page.waitForFunction((mode) => {
-      const entities = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.killstreak?.entities ?? [];
+      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+      const entities = state?.killstreak?.entities ?? [];
+      const presentation = state?.killstreakPresentation;
       return (mode === 'swarm' || entities.some((entity) => entity.kind === 'chopper'))
-        && (mode === 'chopper' || entities.filter((entity) => entity.kind === 'drone' && entity.mode === 'swarm').length >= 5);
+        && (mode === 'chopper' || (
+          entities.filter((entity) => entity.kind === 'drone' && entity.mode === 'swarm').length === 24
+          && presentation?.swarmRenderedInstances === 24
+          && presentation?.swarmVisibleRenderBatches === presentation?.swarmRenderBatches
+          && presentation?.swarmMinimumRenderedInstances === 24
+          && presentation?.swarmMaximumRenderedInstances === 24
+        ));
     }, killstreakProbeMode, { timeout: 5_000 });
     const activeStressBudget = enabledStress.has('killstreak')
       ? await page.evaluate(async () => {
