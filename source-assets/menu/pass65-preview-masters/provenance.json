@@ -32,7 +32,7 @@
   },
   "captureReceipt": {
     "path": "source-assets/menu/pass65-preview-masters/runtime-capture-receipt.json",
-    "sha256": "1153af9327863eb9f2507b325bd630ce665e5014ddf63b88e8ff61484ccb03c9",
+    "sha256": "3db1532ac6a75bab808bcf3318879b452c3ded70cdd8401f396ddca67427e5f0",
     "captureId": "pass65-authoritative-runtime-menu-preview-capture-v1",
     "backend": "webgpu"
   },
@@ -43,7 +43,7 @@
     },
     {
       "path": "src/legacy-main.ts",
-      "sha256": "0334938e8f73280ff39d64cb0bb9a7a70e33d3a19d9b75bdad6f3b04557347a3"
+      "sha256": "d47bd79c7520eb7d05606609913a9d56f2e32cd0c8233b799eab3737080b1cc2"
     }
   ],
   "authoredCockpit": {
@@ -192,13 +192,13 @@
   "runtimeFiles": [
     {
       "path": "public/assets/original/menu-previews/atomic-acres.mp4",
-      "sha256": "c5e5341d70acd2c12c38559bc2ca97c9d91f914959be1386e3190440858c41a7",
+      "sha256": "bb63e3a64d1b5c0243b4ff15121ddb5d79d7478c7e2048c92d267ce473dbfb14",
       "arenaId": "atomic-acres",
       "extension": "mp4"
     },
     {
       "path": "public/assets/original/menu-previews/atomic-acres.webm",
-      "sha256": "307f9b67d435dddf6068810b9f072543c103555abe7db0eeb836c4c211fce720",
+      "sha256": "5954250c90c2ea152931d7495d4f4a1b6e604287354a7ddd4dfbf6b5ccb09585",
       "arenaId": "atomic-acres",
       "extension": "webm"
     },
@@ -210,13 +210,13 @@
     },
     {
       "path": "public/assets/original/menu-previews/skyline-terminal.mp4",
-      "sha256": "1870a1a8aceb4f308e429e2c60ce775d876e996d704b64d1bef002178d9b105e",
+      "sha256": "efb99548d9912fbd9033a88d37da21891700b4ebe1098f69b491f9e394c511de",
       "arenaId": "skyline-terminal",
       "extension": "mp4"
     },
     {
       "path": "public/assets/original/menu-previews/skyline-terminal.webm",
-      "sha256": "8e3d39f3a80821564d9c30011d625c20b52e4d4624db847a1374183733960290",
+      "sha256": "1faa72abd11b5a76ab9aeafa7b29373bcb9c6ff8114411e39a3c5b893b7d93b2",
       "arenaId": "skyline-terminal",
       "extension": "webm"
     },
@@ -228,37 +228,37 @@
     },
     {
       "path": "public/assets/original/menu-previews/rustworks-1v1.mp4",
-      "sha256": "07444e22e4877d1d44a92f49b59601b67afd3ce7dc41f4610df5d46f99fbbc09",
+      "sha256": "12fb499fba02428e8f14bcd35c1f125dec467dfcdc0674b18dfec38d2f86566b",
       "arenaId": "rustworks-1v1",
       "extension": "mp4"
     },
     {
       "path": "public/assets/original/menu-previews/rustworks-1v1.webm",
-      "sha256": "3bb999668841844f2127bb3ed540e90f7b5200df25a82e950cf19535fed59063",
+      "sha256": "cd2e65449ed89d98f4e440fb9d9fa07f6ba0bead31dabf8639458d786e617701",
       "arenaId": "rustworks-1v1",
       "extension": "webm"
     },
     {
       "path": "public/assets/original/menu-previews/rustworks-1v1.webp",
-      "sha256": "68850bd9edfe45539c5354e90a2f7121a706710aba1b8c914fd755c0e9154ea4",
+      "sha256": "a09d49126235fa21f27a02c15bce3ca1f960c0ce1a3bf45ac969c95a692e824f",
       "arenaId": "rustworks-1v1",
       "extension": "webp"
     },
     {
       "path": "public/assets/original/menu-previews/gun-range.mp4",
-      "sha256": "356ea6f7c61cdf79092f82aa26b8c8b3bf916b3cfc516605de70442853832081",
+      "sha256": "190c20e33f749b304ce825e662bdc036ed10ec1798f36bcf03beb236707ef53c",
       "arenaId": "gun-range",
       "extension": "mp4"
     },
     {
       "path": "public/assets/original/menu-previews/gun-range.webm",
-      "sha256": "71f8e9ff5d5186f6933855ead8f5282b18177bcdbfd4c76c14190ce333d73a0a",
+      "sha256": "dcb59d6631d0dbc4340a11cc497737810a556d08c8381e45ee713b9b5c95c4ee",
       "arenaId": "gun-range",
       "extension": "webm"
     },
     {
       "path": "public/assets/original/menu-previews/gun-range.webp",
-      "sha256": "8fbe6dfe93873a88dabc90c14902c5351cfafe5d2d9f26ef03f150662695429c",
+      "sha256": "e93e1f7d9f9d875dedb749b77ad32fb91eb0d4889fb5c3adc67a85ffb4785362",
       "arenaId": "gun-range",
       "extension": "webp"
     }
@@ -290,7 +290,7 @@
     },
     {
       "path": "docs/assets/pass65-menu-previews/rustworks-1v1-review-frames.webp",
-      "sha256": "c804fafed950302e382af5f8fca1059c47439fa975619e0b2b281a718dfc7fb8",
+      "sha256": "cfd07ec725cb0898ea8fe95140ad82d7abff643e18f9268386bc89e996d103ea",
       "arenaId": "rustworks-1v1",
       "frames": [
         1,
@@ -302,7 +302,7 @@
     },
     {
       "path": "docs/assets/pass65-menu-previews/gun-range-review-frames.webp",
-      "sha256": "8756b723cae104587a5a803b0adee679dfbeca5836c17236ffe6a8da2b577317",
+      "sha256": "5d84e7e879cbee51dc6782e487bae70c7f2832a769474cb55b61d578684a0ea4",
       "arenaId": "gun-range",
       "frames": [
         1,
