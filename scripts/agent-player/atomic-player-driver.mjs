@@ -7,11 +7,13 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  associatePurpleOperator,
   createPurpleTargetTracker,
   findCoralTargets,
   findMinimapThreats,
   findPurpleOperatorCandidates,
   frameSignature,
+  operatorCrosshairAlignment,
   signatureDifference,
 } from './vision.mjs';
 
@@ -744,16 +746,30 @@ async function run() {
           confirmedTargetFrames += 1;
           let aimedVision = vision;
           let aimedTarget = currentTarget;
-          let horizontal = aimedTarget.x - aimedVision.width / 2;
-          let vertical = aimedTarget.y - aimedVision.height / 2;
-          let alignment = Math.hypot(horizontal / aimedVision.width, vertical / aimedVision.height);
+          let aimAlignment = operatorCrosshairAlignment(aimedTarget, aimedVision.width, aimedVision.height);
+          let { horizontal, vertical, normalized: alignment } = aimAlignment;
           let postInputReacquired = true;
-          const aimTrace = [{ step: 0, sourceSequence: aimedVision.sourceSequence, x: aimedTarget.x, y: aimedTarget.y, horizontal, vertical, alignment }];
-          for (let aimStep = 0; aimStep < 4 && alignment >= 0.025; aimStep += 1) {
-            const movementX = Math.max(-90, Math.min(90, Math.round(horizontal * 1.05)));
-            const movementY = Math.max(-55, Math.min(55, Math.round(vertical * 1.50)));
+          let twoFrameAligned = false;
+          let associationReason = 'initial-confirmed-track';
+          const aimTrace = [{
+            step: 0,
+            phase: 'initial',
+            sourceSequence: aimedVision.sourceSequence,
+            x: aimedTarget.x,
+            y: aimedTarget.y,
+            horizontal,
+            vertical,
+            alignment,
+            aligned: aimAlignment.aligned,
+            bounds: aimedTarget.bounds,
+            pixels: aimedTarget.pixels,
+          }];
+          for (let aimStep = 0; aimStep < 4 && !aimAlignment.aligned; aimStep += 1) {
+            const movementX = Math.max(-90, Math.min(90, Math.round(horizontal * 4.0)));
+            const movementY = Math.max(-55, Math.min(55, Math.round(vertical * 4.0)));
             if (movementX === 0 && movementY === 0) break;
             const previousSourceSequence = aimedVision.sourceSequence;
+            const previousTarget = aimedTarget;
             await moveAim(page, movementX, movementY);
             const inputCompletedAt = performance.now();
             aimMoves += 1;
@@ -763,19 +779,83 @@ async function run() {
             if (!reacquiredVision || reacquiredVision.operatorTargets.length === 0) {
               postInputReacquired = false;
               alignment = Number.POSITIVE_INFINITY;
+              associationReason = 'post-input-frame-missing';
               break;
             }
-            const reacquiredTarget = [...reacquiredVision.operatorTargets].sort((left, right) => {
-              const leftCentre = Math.hypot(left.x - reacquiredVision.width / 2, left.y - reacquiredVision.height / 2);
-              const rightCentre = Math.hypot(right.x - reacquiredVision.width / 2, right.y - reacquiredVision.height / 2);
-              return leftCentre - rightCentre || left.score - right.score;
-            })[0];
+            const association = associatePurpleOperator(previousTarget, reacquiredVision.operatorTargets, {
+              commandX: movementX,
+              commandY: movementY,
+            });
+            associationReason = association.reason;
+            if (!association.target) {
+              postInputReacquired = false;
+              alignment = Number.POSITIVE_INFINITY;
+              break;
+            }
             aimedVision = reacquiredVision;
-            aimedTarget = reacquiredTarget;
-            horizontal = aimedTarget.x - aimedVision.width / 2;
-            vertical = aimedTarget.y - aimedVision.height / 2;
-            alignment = Math.hypot(horizontal / aimedVision.width, vertical / aimedVision.height);
-            aimTrace.push({ step: aimStep + 1, commandX: movementX, commandY: movementY, sourceSequence: aimedVision.sourceSequence, x: aimedTarget.x, y: aimedTarget.y, horizontal, vertical, alignment });
+            aimedTarget = association.target;
+            aimAlignment = operatorCrosshairAlignment(aimedTarget, aimedVision.width, aimedVision.height);
+            ({ horizontal, vertical, normalized: alignment } = aimAlignment);
+            aimTrace.push({
+              step: aimStep + 1,
+              phase: 'post-input',
+              commandX: movementX,
+              commandY: movementY,
+              sourceSequence: aimedVision.sourceSequence,
+              x: aimedTarget.x,
+              y: aimedTarget.y,
+              horizontal,
+              vertical,
+              alignment,
+              aligned: aimAlignment.aligned,
+              associationReason,
+              associationScore: association.score,
+              associationMargin: association.margin,
+              predicted: association.predicted,
+              bounds: aimedTarget.bounds,
+              pixels: aimedTarget.pixels,
+            });
+          }
+          if (postInputReacquired && aimAlignment.aligned) {
+            const verificationStartedAt = performance.now();
+            const verificationVision = await waitForPostInputVision(
+              visionStream,
+              aimedVision.sourceSequence,
+              verificationStartedAt,
+            );
+            const verificationAssociation = verificationVision
+              ? associatePurpleOperator(aimedTarget, verificationVision.operatorTargets)
+              : { target: null, reason: 'verification-frame-missing', predicted: null, score: null, margin: null };
+            if (verificationVision && verificationAssociation.target) {
+              aimedVision = verificationVision;
+              aimedTarget = verificationAssociation.target;
+              aimAlignment = operatorCrosshairAlignment(aimedTarget, aimedVision.width, aimedVision.height);
+              ({ horizontal, vertical, normalized: alignment } = aimAlignment);
+              associationReason = verificationAssociation.reason;
+              twoFrameAligned = aimAlignment.aligned;
+              aimTrace.push({
+                step: aimTrace.length,
+                phase: 'causal-alignment-verification',
+                commandX: 0,
+                commandY: 0,
+                sourceSequence: aimedVision.sourceSequence,
+                x: aimedTarget.x,
+                y: aimedTarget.y,
+                horizontal,
+                vertical,
+                alignment,
+                aligned: aimAlignment.aligned,
+                associationReason,
+                associationScore: verificationAssociation.score,
+                associationMargin: verificationAssociation.margin,
+                predicted: verificationAssociation.predicted,
+                bounds: aimedTarget.bounds,
+                pixels: aimedTarget.pixels,
+              });
+            } else {
+              associationReason = verificationAssociation.reason;
+              twoFrameAligned = false;
+            }
           }
           if (!firstTargetCaptured) {
             await writeFile(resolve(artifactDirectory, 'first-target.jpg'), vision.jpeg);
@@ -784,7 +864,7 @@ async function run() {
             firstTargetAnnotatedCaptured = true;
           }
           const currentlyReloading = Boolean(hud?.reloadActive) || now < reloadSuppressedUntil;
-          if (allowCombatFire && tracking.fireAuthorized && postInputReacquired && activeMatch && alignment < 0.03
+          if (allowCombatFire && tracking.fireAuthorized && postInputReacquired && twoFrameAligned && activeMatch && alignment < 0.02
             && !currentlyReloading && now - lastBurstAt >= fireCooldownMs) {
             const shots = Math.max(1, Math.min(burstShots, Number(hud?.ammo ?? burstShots)));
             if (!firstFireCaptured) {
@@ -793,7 +873,7 @@ async function run() {
               await writeFile(resolve(artifactDirectory, 'first-fire-aligned-annotated.jpg'), await annotatedVisionJpeg(aimedVision, fireTracking));
               firstFireCaptured = true;
             }
-            await fireBurst(page, shots, alignment < 0.02);
+            await fireBurst(page, shots, alignment < 0.012);
             shotPulses += shots;
             bursts += 1;
             lastBurstAt = now;
@@ -802,6 +882,9 @@ async function run() {
               kind: 'operator-authorized-burst',
               shots,
               alignment,
+              crosshairAligned: aimAlignment.aligned,
+              twoFrameAligned,
+              associationReason,
               trackAge: tracking.age,
               stableFrames: tracking.stableFrames,
               evidenceFrames: tracking.evidenceFrames,
@@ -814,6 +897,9 @@ async function run() {
             atMs,
             kind: 'operator-confirmed-track',
             alignment,
+            crosshairAligned: aimAlignment.aligned,
+            twoFrameAligned,
+            associationReason,
             trackAge: tracking.age,
             stableFrames: tracking.stableFrames,
             evidenceFrames: tracking.evidenceFrames,

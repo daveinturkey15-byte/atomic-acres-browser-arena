@@ -242,6 +242,61 @@ export function findPurpleOperatorCandidates(raw, width, height, channels = 3, o
   return candidates;
 }
 
+export function associatePurpleOperator(previousTarget, candidates, options = {}) {
+  if (!previousTarget || !Array.isArray(candidates) || candidates.length === 0) {
+    return { target: null, reason: 'missing-candidate', predicted: null, score: null, margin: null };
+  }
+  const commandX = Number(options.commandX ?? 0);
+  const commandY = Number(options.commandY ?? 0);
+  const pixelsPerMouseX = Number(options.pixelsPerMouseX ?? 0.24);
+  const pixelsPerMouseY = Number(options.pixelsPerMouseY ?? 0.20);
+  const predicted = {
+    x: previousTarget.x - commandX * pixelsPerMouseX,
+    y: previousTarget.y - commandY * pixelsPerMouseY,
+  };
+  const oldWidth = Math.max(1, Number(previousTarget.bounds?.width ?? 1));
+  const oldHeight = Math.max(1, Number(previousTarget.bounds?.height ?? 1));
+  const oldPixels = Math.max(1, Number(previousTarget.pixels ?? 1));
+  const maximumDistance = Math.max(12, Math.hypot(oldWidth, oldHeight) * 1.8 + Math.hypot(commandX, commandY) * 0.04);
+  const ranked = candidates.map((candidate) => {
+    const distance = Math.hypot(candidate.x - predicted.x, candidate.y - predicted.y);
+    const pixelRatio = Math.max(1, Number(candidate.pixels ?? 1)) / oldPixels;
+    const widthRatio = Math.max(1, Number(candidate.bounds?.width ?? 1)) / oldWidth;
+    const heightRatio = Math.max(1, Number(candidate.bounds?.height ?? 1)) / oldHeight;
+    const shapePenalty = Math.abs(Math.log(pixelRatio)) * 0.18
+      + Math.abs(Math.log(widthRatio)) * 0.08
+      + Math.abs(Math.log(heightRatio)) * 0.08;
+    return { candidate, distance, score: distance / maximumDistance + shapePenalty };
+  }).filter((entry) => entry.distance <= maximumDistance)
+    .sort((left, right) => left.score - right.score);
+  if (ranked.length === 0) return { target: null, reason: 'association-out-of-range', predicted, score: null, margin: null };
+  const best = ranked[0];
+  const margin = ranked.length > 1 ? ranked[1].score - best.score : Number.POSITIVE_INFINITY;
+  if (best.score > 1.15) return { target: null, reason: 'association-shape-mismatch', predicted, score: best.score, margin };
+  if (margin < 0.10) return { target: null, reason: 'association-ambiguous', predicted, score: best.score, margin };
+  return { target: best.candidate, reason: 'associated', predicted, score: best.score, margin };
+}
+
+export function operatorCrosshairAlignment(target, frameWidth, frameHeight, options = {}) {
+  if (!target || !Number.isFinite(frameWidth) || !Number.isFinite(frameHeight) || frameWidth <= 0 || frameHeight <= 0) {
+    return { aligned: false, horizontal: null, vertical: null, normalized: null, horizontalLimit: null, verticalLimit: null };
+  }
+  const horizontal = target.x - frameWidth / 2;
+  const vertical = target.y - frameHeight / 2;
+  const normalized = Math.hypot(horizontal / frameWidth, vertical / frameHeight);
+  const horizontalLimit = Math.max(3, Math.min(8, Number(target.bounds?.width ?? 1) * 0.55));
+  const verticalLimit = Math.max(4, Math.min(10, Number(target.bounds?.height ?? 1) * 0.45));
+  const normalizedMaximum = Number(options.normalizedMaximum ?? 0.02);
+  return {
+    aligned: normalized < normalizedMaximum && Math.abs(horizontal) <= horizontalLimit && Math.abs(vertical) <= verticalLimit,
+    horizontal,
+    vertical,
+    normalized,
+    horizontalLimit,
+    verticalLimit,
+  };
+}
+
 export function findOperatorCandidates(raw, width, height, channels = 3, options = {}) {
   if (!Number.isInteger(width) || width <= 0 || !Number.isInteger(height) || height <= 0) {
     throw new Error('Vision frame dimensions must be positive integers');

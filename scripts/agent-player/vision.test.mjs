@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  associatePurpleOperator,
   createOperatorTargetTracker,
   createPurpleTargetTracker,
   createTemporalTargetTracker,
@@ -11,6 +12,7 @@ import {
   frameSignature,
   isCoralPixel,
   isOperatorPalettePixel,
+  operatorCrosshairAlignment,
   signatureDifference,
 } from './vision.mjs';
 
@@ -77,6 +79,33 @@ test('purple operator detector isolates magenta body geometry from Aqua and red 
   assert.equal(targets.length, 1);
   assert.ok(Math.abs(targets[0].x - 50) < 0.1);
   assert.equal(targets[0].detector, 'pass63-visible-purple-operator-v1');
+});
+
+test('purple operator association follows predicted mouse displacement instead of nearest centre', () => {
+  const previous = { x: 130, y: 90, pixels: 42, bounds: { width: 7, height: 14 } };
+  const intended = { x: 120, y: 88, pixels: 40, bounds: { width: 7, height: 13 } };
+  const centreDistractor = { x: 158, y: 90, pixels: 15, bounds: { width: 3, height: 6 } };
+  const result = associatePurpleOperator(previous, [centreDistractor, intended], { commandX: 40, commandY: 10 });
+  assert.equal(result.reason, 'associated');
+  assert.equal(result.target, intended);
+  assert.ok(Math.abs(result.predicted.x - 120.4) < 0.001);
+});
+
+test('purple operator association abstains when two candidates are equally plausible', () => {
+  const previous = { x: 130, y: 90, pixels: 40, bounds: { width: 7, height: 14 } };
+  const left = { x: 128, y: 90, pixels: 40, bounds: { width: 7, height: 14 } };
+  const right = { x: 132, y: 90, pixels: 40, bounds: { width: 7, height: 14 } };
+  const result = associatePurpleOperator(previous, [left, right]);
+  assert.equal(result.reason, 'association-ambiguous');
+  assert.equal(result.target, null);
+});
+
+test('operator crosshair alignment requires tight normalized error and body-scaled bounds', () => {
+  const centred = operatorCrosshairAlignment({ x: 161, y: 91, bounds: { width: 8, height: 18 } }, 320, 180);
+  assert.equal(centred.aligned, true);
+  const horizontallyLoose = operatorCrosshairAlignment({ x: 166, y: 90, bounds: { width: 5, height: 18 } }, 320, 180);
+  assert.equal(horizontallyLoose.normalized < 0.02, true);
+  assert.equal(horizontallyLoose.aligned, false);
 });
 
 test('visible player-up minimap markers yield a closed-loop relative bearing', () => {
