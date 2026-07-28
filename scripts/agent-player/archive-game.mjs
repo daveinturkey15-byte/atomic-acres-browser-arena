@@ -416,7 +416,7 @@ export async function archiveGame({
 
   const completed = Boolean(summary && report?.outcome?.matchEndedObserved);
   const absoluteHardFailures = hardGateFailures(benchmark);
-  const counted = completed && absoluteHardFailures.length === 0;
+  const counted = runType === 'benchmark' && completed && absoluteHardFailures.length === 0;
   const comparableGames = index.games.filter((game) => game.benchmarkFile && (game.counted ?? game.completed));
   const previousGame = comparableGames.at(-1) ?? null;
   const baselineId = index.baselineGameId ?? (setBaseline || counted ? gameId : null);

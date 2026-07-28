@@ -90,24 +90,30 @@ test('archive assigns immutable sequential IDs, deduplicates imports and compare
   const archiveRoot = join(root, 'archive');
   const first = join(root, 'first');
   const second = join(root, 'second');
+  const calibration = join(root, 'calibration');
   await writeGameSource(first, { startedAt: '2026-07-25T00:00:00Z', kills: 0, deaths: 10, damageDealt: 0, damageTaken: 1000 });
   await writeGameSource(second, { startedAt: '2026-07-25T01:00:00Z', kills: 1, deaths: 8, damageDealt: 100, damageTaken: 800 });
+  await writeGameSource(calibration, { startedAt: '2026-07-25T02:00:00Z', kills: 2, deaths: 7, damageDealt: 200, damageTaken: 700 });
   const archivedFirst = await archiveGame({ sourceDirectory: first, archiveRoot, setBaseline: true });
   const duplicate = await archiveGame({ sourceDirectory: first, archiveRoot });
   const archivedSecond = await archiveGame({ sourceDirectory: second, archiveRoot });
+  const archivedCalibration = await archiveGame({ sourceDirectory: calibration, archiveRoot, runType: 'calibration' });
   assert.equal(archivedFirst.game.id, 'G0001');
   assert.equal(duplicate.duplicate, true);
   assert.equal(archivedSecond.game.id, 'G0002');
   assert.equal(archivedSecond.game.previousComparableGameId, 'G0001');
   assert.equal(archivedSecond.baselineComparison.rows.length, METRIC_REGISTRY.length);
+  assert.equal(archivedCalibration.game.completed, true);
+  assert.equal(archivedCalibration.game.counted, false);
+  assert.equal(archivedCalibration.game.previousComparableGameId, 'G0002');
   const index = JSON.parse(await readFile(join(archiveRoot, 'index.json'), 'utf8'));
   assert.equal(index.baselineGameId, 'G0001');
-  assert.deepEqual(index.games.map((game) => game.id), ['G0001', 'G0002']);
+  assert.deepEqual(index.games.map((game) => game.id), ['G0001', 'G0002', 'G0003']);
   const manifest = JSON.parse(await readFile(join(archiveRoot, 'games/G0002/manifest.json'), 'utf8'));
   assert.ok(manifest.evidence.some((entry) => entry.file === 'combat-benchmark.json' && /^[a-f0-9]{64}$/.test(entry.sha256)));
   const verification = await verifyArchive(archiveRoot);
   assert.equal(verification.ok, true, verification.errors.join('\n'));
-  assert.equal(verification.gameCount, 2);
+  assert.equal(verification.gameCount, 3);
 });
 
 test('placeholder experiment-policy values are rejected before a counted game can be archived', () => {
