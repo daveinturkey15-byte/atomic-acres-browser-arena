@@ -554,17 +554,17 @@ function activeSwarmAnimationTargetNames(): ReadonlySet<string> {
   return names;
 }
 
-function isAnimatedSwarmSource(
+function animatedSwarmAncestor(
   source: THREE.Object3D,
   root: THREE.Object3D,
   animatedTargetNames: ReadonlySet<string>,
-): boolean {
+): THREE.Object3D | null {
   let cursor: THREE.Object3D | null = source;
   while (cursor && cursor !== root) {
-    if (animatedTargetNames.has(cursor.name)) return true;
+    if (animatedTargetNames.has(cursor.name)) return cursor;
     cursor = cursor.parent;
   }
-  return false;
+  return null;
 }
 
 function swarmStaticMergeKey(mesh: THREE.Mesh): string | null {
@@ -1397,54 +1397,69 @@ export class KillstreakPresentation {
     };
 
     const staticGroups = new Map<string, number[]>();
+    const dynamicGroups = new Map<string, Readonly<{ targetName: string; primitiveIndices: number[] }>>();
     const individualIndices: number[] = [];
     for (let primitiveIndex = 0; primitiveIndex < primitiveCount; primitiveIndex += 1) {
       const sources = sourceMeshes.map((meshes) => meshes[primitiveIndex]!);
-      const dynamic = sources.some((source, index) => (
-        isAnimatedSwarmSource(source, pool[index]!.root, animatedTargetNames)
+      const animatedAncestors = sources.map((source, index) => (
+        animatedSwarmAncestor(source, pool[index]!.root, animatedTargetNames)
       ));
-      const key = dynamic ? null : swarmStaticMergeKey(sources[0]!);
-      if (!key) individualIndices.push(primitiveIndex);
-      else {
-        const indices = staticGroups.get(key) ?? [];
+      const targetName = animatedAncestors[0]?.name ?? null;
+      const mergeKey = swarmStaticMergeKey(sources[0]!);
+      if (targetName && mergeKey && animatedAncestors.every((ancestor) => ancestor?.name === targetName)) {
+        const key = `${targetName}|${mergeKey}`;
+        const group = dynamicGroups.get(key) ?? { targetName, primitiveIndices: [] };
+        group.primitiveIndices.push(primitiveIndex);
+        dynamicGroups.set(key, group);
+      } else if (animatedAncestors.some(Boolean) || !mergeKey) {
+        individualIndices.push(primitiveIndex);
+      } else {
+        const indices = staticGroups.get(mergeKey) ?? [];
         indices.push(primitiveIndex);
-        staticGroups.set(key, indices);
+        staticGroups.set(mergeKey, indices);
       }
     }
 
-    const firstRootInverse = new THREE.Matrix4().copy(pool[0]!.root.matrixWorld).invert();
-    for (const primitiveIndices of staticGroups.values()) {
-      if (primitiveIndices.length === 1) {
-        individualIndices.push(primitiveIndices[0]!);
-        continue;
-      }
+    const mergeBatch = (
+      primitiveIndices: readonly number[],
+      anchors: readonly THREE.Object3D[],
+    ): boolean => {
+      if (primitiveIndices.length < 2 || anchors.length !== pool.length) return false;
       const representative = sourceMeshes[0]![primitiveIndices[0]!]!;
+      const anchorInverse = new THREE.Matrix4().copy(anchors[0]!.matrixWorld).invert();
       const transformed = primitiveIndices.map((primitiveIndex) => {
         const source = sourceMeshes[0]![primitiveIndex]!;
-        const localMatrix = new THREE.Matrix4().multiplyMatrices(firstRootInverse, source.matrixWorld);
+        const localMatrix = new THREE.Matrix4().multiplyMatrices(anchorInverse, source.matrixWorld);
         return source.geometry.clone().applyMatrix4(localMatrix);
       });
       const merged = mergeGeometries(transformed, false);
       for (const geometry of transformed) geometry.dispose();
-      if (!merged) {
-        individualIndices.push(...primitiveIndices);
-        continue;
-      }
+      if (!merged) return false;
       addBatch(
         merged,
         representative.material,
-        pool.map((entry) => entry.root),
-        pool.map(() => new THREE.Matrix4()),
+        anchors,
+        anchors[0] === pool[0]!.root ? pool.map(() => new THREE.Matrix4()) : null,
         true,
         representative,
       );
+      return true;
+    };
+
+    const rootAnchors = pool.map((entry) => entry.root);
+    for (const primitiveIndices of staticGroups.values()) {
+      if (!mergeBatch(primitiveIndices, rootAnchors)) individualIndices.push(...primitiveIndices);
+    }
+    for (const group of dynamicGroups.values()) {
+      const anchors = pool.map((entry) => entry.root.getObjectByName(group.targetName)).filter((entry): entry is THREE.Object3D => Boolean(entry));
+      if (!mergeBatch(group.primitiveIndices, anchors)) individualIndices.push(...group.primitiveIndices);
     }
 
     for (const primitiveIndex of individualIndices) {
       const sources = sourceMeshes.map((meshes) => meshes[primitiveIndex]!);
       const representative = sources[0]!;
       const staticLocalMatrices = sources.some((source, index) => (
-        isAnimatedSwarmSource(source, pool[index]!.root, animatedTargetNames)
+        animatedSwarmAncestor(source, pool[index]!.root, animatedTargetNames)
       ))
         ? null
         : sources.map((source, index) => (
