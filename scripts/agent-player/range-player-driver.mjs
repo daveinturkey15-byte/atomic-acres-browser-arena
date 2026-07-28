@@ -46,6 +46,12 @@ export async function runRange(args) {
     let current = await hud(page);
     if (current.weapon !== 'VECTORLINE SMG') throw new Error(`Visible weapon pickup failed: ${current.weapon}`);
     if (current.mode !== 'TARGET DRILL') throw new Error(`Visible range mode lost: ${current.mode}`);
+    if (!current.pointer) {
+      await trustedClick(page, '#game');
+      await sleep(180);
+      current = await hud(page);
+    }
+    if (!current.pointer || !current.focused) throw new Error('Visible post-pickup pointer/focus receipt missing');
     await page.screenshot({ path: resolve(output, 'vectorline-smg-picked.png') });
     startedFireAt = new Date();
     let previousPulseAt = 0;
