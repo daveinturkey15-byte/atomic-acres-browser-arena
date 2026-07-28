@@ -14099,11 +14099,7 @@ function updateMatchState(now: number): void {
     const rematch = element<HTMLButtonElement>('#rematch');
     if (!rematch.disabled) rematch.addEventListener('click', () => {
       if (privateMatch && network.role === 'host') returnPrivateMatchToLobby(true);
-      else {
-        network.close();
-        resetForMode();
-        void startGame('solo', false);
-      }
+      else restartSoloMatch();
     }, { once: true });
     element<HTMLButtonElement>('#match-main-menu').addEventListener('click', returnToMainMenu, { once: true });
     document.exitPointerLock();
@@ -15473,6 +15469,17 @@ function resetForMode(): void {
   renderFieldKitSelection();
   player.ammo = createWeaponCapacityRegistry('mag');
   player.reserve = createWeaponCapacityRegistry('reserve');
+}
+
+function restartSoloMatch(): void {
+  network.close();
+  // startGame deliberately refuses to overlap an active match. Clear the old
+  // lifecycle identity before resetting per-round state, otherwise a rematch
+  // click leaves the expired 00:00 match running and startGame returns early.
+  gameStarted = false;
+  matchFinished = false;
+  resetForMode();
+  void startGame('solo', false);
 }
 
 function returnToMainMenu(): void {
@@ -18172,9 +18179,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     updateMatchState(now);
   },
   rematch: () => {
-    network.close();
-    resetForMode();
-    void startGame('solo', false);
+    restartSoloMatch();
   },
   returnToMainMenu,
   selectArena: async (id: ArenaId) => activateArenaSelection(id),

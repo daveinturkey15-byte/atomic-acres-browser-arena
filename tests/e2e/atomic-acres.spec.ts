@@ -1976,11 +1976,16 @@ test.describe('solo mechanics', () => {
     await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
         equipKit: (id: 'marksman') => void;
+        respawn: () => void;
         placeBotAhead: (distance: number) => void;
         aimAtBot: (zone: 'body' | 'head') => void;
         fireOnce: () => void;
       } }).__ATOMIC_ACRES_DEBUG__;
       api.equipKit('marksman');
+      // In-match class choices are deliberately queued until deployment.
+      // Apply that selected loadout through the normal respawn boundary before
+      // measuring weapon authority, instead of accidentally firing the prior kit.
+      api.respawn();
       api.placeBotAhead(5);
       api.aimAtBot('body');
       api.fireOnce();
