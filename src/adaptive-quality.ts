@@ -37,7 +37,7 @@ type AdaptiveQualityOptions = {
 
 const LEVELS: Record<RenderProfile, readonly number[]> = {
   performance: [0.55, 0.65, 0.75],
-  blender: [0.65, 0.75, 0.85, 1],
+  blender: [0.55, 0.65, 0.75, 0.85, 1],
   compat: [0.2],
 };
 
@@ -54,7 +54,7 @@ export function configuredAdaptiveQualityLevels(
 ): readonly number[] {
   const cap = Number.isFinite(pixelRatioCap) && pixelRatioCap > 0 ? pixelRatioCap : LEVELS[profile].at(-1) ?? 1;
   if (!enabled || profile === 'compat') return Object.freeze([cap]);
-  const ratios = profile === 'performance' ? [0.73, 0.87, 1] : [0.65, 0.75, 0.85, 1];
+  const ratios = profile === 'performance' ? [0.73, 0.87, 1] : [0.55, 0.65, 0.75, 0.85, 1];
   const minimum = Math.min(0.5, cap);
   return Object.freeze([...new Set(ratios.map((ratio) => (
     Number(Math.min(cap, Math.max(minimum, cap * ratio)).toFixed(2))

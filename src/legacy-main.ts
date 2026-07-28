@@ -11937,7 +11937,7 @@ function applyKillstreakDamageEvent(event: KillstreakDamageEvent): KillstreakDam
 }
 
 let lastKillstreakControlSentAt = Number.NEGATIVE_INFINITY;
-const FULL_SUPPORT_OVERLAP_PIXEL_RATIO_CAP = 0.65;
+const FULL_SUPPORT_OVERLAP_PIXEL_RATIO_CAP = 0.55;
 let fullSupportOverlapAdaptiveActive = false;
 
 function updateFullSupportOverlapAdaptiveBudget(): void {

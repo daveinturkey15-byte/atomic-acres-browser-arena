@@ -29,7 +29,7 @@ describe('adaptive quality controller', () => {
 
   it('never constructs an adaptive tier above the selected Custom render scale', () => {
     expect(configuredAdaptiveQualityLevels('performance', 0.75, true)).toEqual([0.55, 0.65, 0.75]);
-    expect(configuredAdaptiveQualityLevels('blender', 1, true)).toEqual([0.65, 0.75, 0.85, 1]);
+    expect(configuredAdaptiveQualityLevels('blender', 1, true)).toEqual([0.55, 0.65, 0.75, 0.85, 1]);
     expect(configuredAdaptiveQualityLevels('performance', 0.5, true)).toEqual([0.5]);
     expect(configuredAdaptiveQualityLevels('performance', 1.25, true)).toEqual([0.91, 1.09, 1.25]);
     expect(configuredAdaptiveQualityLevels('blender', 0.9, false)).toEqual([0.9]);
@@ -40,7 +40,7 @@ describe('adaptive quality controller', () => {
       profile: 'blender', targetFrameMs: 1_000 / 60, initialPixelRatioCap: 1,
     });
     expect(controller.telemetry()).toMatchObject({
-      profile: 'blender', levels: [0.65, 0.75, 0.85, 1], pixelRatioCap: 1,
+      profile: 'blender', levels: [0.55, 0.65, 0.75, 0.85, 1], pixelRatioCap: 1,
     });
   });
 
@@ -80,8 +80,8 @@ describe('adaptive quality controller', () => {
       downshiftSamples: 10, upshiftSamples: 20, cooldownSamples: 5,
     });
     const changes = Array.from({ length: 100 }, () => controller.record(24, true)).filter((value) => value !== null);
-    expect(changes).toEqual([0.85, 0.75, 0.65]);
-    expect(controller.telemetry()).toMatchObject({ pixelRatioCap: 0.65, downshifts: 3, upshifts: 0 });
+    expect(changes).toEqual([0.85, 0.75, 0.65, 0.55]);
+    expect(controller.telemetry()).toMatchObject({ pixelRatioCap: 0.55, downshifts: 4, upshifts: 0 });
   });
 
   it('uses longer stable headroom and cooldown before recovering', () => {
