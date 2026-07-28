@@ -16,6 +16,7 @@ import {
   operatorCrosshairAlignment,
   signatureDifference,
 } from './vision.mjs';
+import { createTacticalPolicy } from './tactical-policy.mjs';
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, '../..');
@@ -450,6 +451,8 @@ async function run() {
   const fireCooldownMs = integerArg(args['fire-cooldown'], 420, 180, 2000);
   const allowCombatFire = Boolean(args['allow-combat-fire']);
   const allowLive = Boolean(args['allow-live']);
+  const tacticalPolicyName = String(args['tactical-policy'] ?? 'legacy');
+  if (!['legacy', 'state-machine-v1'].includes(tacticalPolicyName)) throw new Error('--tactical-policy must be legacy or state-machine-v1');
   const baseUrl = String(args.url ?? 'http://127.0.0.1:4173/');
   const targetUrl = new URL(baseUrl);
   targetUrl.searchParams.set('render', 'performance');
@@ -513,6 +516,7 @@ async function run() {
   let rendererInfo = null;
   let controlStartedAtMs = null;
   let controlEndedAtMs = null;
+  let tacticalPolicyReceipt = null;
   const visionDurationsMs = [];
 
   try {
@@ -641,6 +645,18 @@ async function run() {
       controlStartedAtMs = Date.now();
       const deadline = controlStartedAtMs + durationSeconds * 1000;
       const targetTracker = createPurpleTargetTracker({ confirmationFrames: 2, maxSizeRatio: 8 });
+      const tacticalPolicy = tacticalPolicyName === 'state-machine-v1'
+        ? createTacticalPolicy({
+          retreatHealth: integerArg(args['retreat-health'], 45, 20, 80),
+          retreatDamage: integerArg(args['retreat-damage'], 18, 5, 60),
+          retreatDurationMs: integerArg(args['retreat-duration'], 1600, 500, 4000),
+          recoveryDurationMs: integerArg(args['recovery-duration'], 1100, 400, 3000),
+          recoveryCooldownMs: integerArg(args['recovery-cooldown'], 3600, 1200, 9000),
+          closeThreatDistance: integerArg(args['close-threat-distance'], 18, 6, 40),
+          sprintThreatDistance: integerArg(args['sprint-threat-distance'], 30, 15, 60),
+          postShotStrafeMs: integerArg(args['post-shot-strafe'], 650, 0, 1600),
+        })
+        : null;
       let movementCycle = 0;
       let currentTarget = null;
       let previousSignature = visionStream.state.latest.signature;
@@ -687,7 +703,9 @@ async function run() {
         else if (!previousMovementForward || cameraMovedLastFrame || (visualDifference !== null && visualDifference >= 2.2)) lowMotionFrames = 0;
         previousSignature = vision.signature;
 
-        if (previousDamageTaken !== null && Number(hud?.damageTaken ?? previousDamageTaken) > previousDamageTaken) {
+        const observedDamageTaken = Number(hud?.damageTaken ?? previousDamageTaken ?? 0);
+        const damageDelta = previousDamageTaken === null ? 0 : Math.max(0, observedDamageTaken - previousDamageTaken);
+        if (damageDelta > 0) {
           damageReactionUntil = now + 1_100;
           reactionDirection *= -1;
           damageReactions += 1;
@@ -727,6 +745,41 @@ async function run() {
         if (tracking.reason === 'static-geometry-rejected') staticGeometryRejects += 1;
         if (tracking.fireAuthorized) fireAuthorizedFrames += 1;
 
+        const tactical = tacticalPolicy?.update({
+          now,
+          active: activeMatch,
+          health: Number(hud?.health ?? 100),
+          damageDelta,
+          stuck: !rawTarget && lowMotionFrames >= 3,
+          currentTarget: Boolean(currentTarget),
+          rawTarget: Boolean(rawTarget),
+          minimapThreat,
+          lastShotAt: lastBurstAt,
+          movementCycle,
+          navigationTick: movementCycle % navigationLaneStride === 0,
+        }) ?? null;
+        if (tactical?.changed) {
+          actions.push({
+            atMs,
+            kind: 'tactical-transition',
+            previous: tactical.changed.previous,
+            mode: tactical.mode,
+            reason: tactical.reason,
+            health: hud?.health ?? null,
+            damageWindowAmount: tactical.damageWindowAmount,
+          });
+          if (tactical.changed.reason === 'low-world-motion') {
+            stuckRecoveries += 1;
+            lowMotionFrames = 0;
+            actions.push({ atMs, kind: 'stuck-recovery', visualDifference, policy: tacticalPolicyName });
+          }
+        }
+        if (tactical?.turn) {
+          await moveAim(page, tactical.turn, 0);
+          aimMoves += 1;
+          cameraMovedThisFrame = true;
+        }
+
         if (rawTarget) {
           if (activeMatch && !firstRawTargetCaptured) {
             await writeFile(resolve(artifactDirectory, 'first-raw-target.jpg'), vision.jpeg);
@@ -744,7 +797,7 @@ async function run() {
           }
         }
 
-        if (currentTarget) {
+        if (currentTarget && (!tactical || tactical.allowEngagement)) {
           confirmedTargetFrames += 1;
           let aimedVision = vision;
           let aimedTarget = currentTarget;
@@ -929,7 +982,7 @@ async function run() {
           });
         } else {
           const shouldScan = !rawTarget || tracking.reason === 'static-geometry-rejected';
-          if (activeMatch && shouldScan && movementCycle % navigationLaneStride === 0) {
+          if (activeMatch && shouldScan && (!tactical || tactical.allowScan) && movementCycle % navigationLaneStride === 0) {
             let scanMovement = 0;
             if (minimapThreat && Math.abs(minimapThreat.bearingRadians) >= 0.035) {
               scanMovement = Math.max(-18, Math.min(18, Math.round(minimapThreat.bearingRadians * 42)));
@@ -970,7 +1023,9 @@ async function run() {
           actions.push({ atMs, kind: 'mechanical-fire-check' });
         }
 
-        if (activeMatch) {
+        if (tactical) {
+          for (const code of tactical.keys) desiredKeys.add(code);
+        } else if (activeMatch) {
           if (!rawTarget && lowMotionFrames >= 3) {
             desiredKeys.add('KeyS');
             desiredKeys.add(reactionDirection > 0 ? 'KeyD' : 'KeyA');
@@ -1014,6 +1069,7 @@ async function run() {
         await sleep(Math.max(controlSleepMs, tickMs - elapsed));
       }
       controlEndedAtMs = Date.now();
+      tacticalPolicyReceipt = tacticalPolicy?.snapshot() ?? null;
       console.error('[atomic-player] phase=finalize');
       if (visionStream.state.latest?.jpeg) {
         await writeFile(resolve(artifactDirectory, 'final.jpg'), visionStream.state.latest.jpeg);
@@ -1110,7 +1166,8 @@ async function run() {
       },
       fairness: {
         perception: args['lifecycle-only'] ? 'none-lifecycle-only' : 'rendered-pixels-purple-operator-geometry-v1-scan-stop-two-frame-confirmation-visible-player-up-minimap-and-hud',
-        policyVersion: 'atomic-player-policy-v5-causal-associated-tri-lane',
+        policyVersion: tacticalPolicyReceipt ? 'atomic-player-policy-v6-causal-tactical-state-machine' : 'atomic-player-policy-v5-causal-associated-tri-lane',
+        tacticalPolicy: tacticalPolicyName,
         automaticCombatFireEnabled: allowCombatFire,
         maximumShotPulses,
         decisionInputs: args['lifecycle-only']
@@ -1146,6 +1203,7 @@ async function run() {
         tickMs,
         controlSleepMs,
         realtimeProfile,
+        tacticalPolicy: tacticalPolicyReceipt,
         agentLanes: {
           scoutPerception: { source: 'latest rendered screencast frame', cadence: 'every control tick' },
           tacticalNavigation: { source: 'visible player-up minimap plus collision recovery', cadenceTicks: navigationLaneStride },
