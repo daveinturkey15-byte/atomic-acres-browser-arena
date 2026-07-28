@@ -4485,7 +4485,8 @@ function activeLoadoutSelection(state = loadoutState): CombatLoadoutSelection {
 function weaponPrewarmCatalogForArena(arenaId: ArenaId): readonly WeaponId[] {
   if (arenaId === 'gun-range') {
     const rangePrimary: PrimaryWeaponId = 'carbine';
-    return [rangePrimary, handicapSidearm(rangePrimary), 'explosive-crossbow', 'm14-ebr'];
+    const rangeSidearm: WeaponId = localDhv === 'X' ? 'magnum' : 'pistol';
+    return [rangePrimary, rangeSidearm, 'explosive-crossbow', 'm14-ebr'];
   }
   const deployment = activeLoadoutSelection();
   return [deployment.primary, deployment.secondary, 'explosive-crossbow', 'm14-ebr'];
