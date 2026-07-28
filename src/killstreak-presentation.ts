@@ -1518,9 +1518,10 @@ export class KillstreakPresentation {
       instanced.renderOrder = representative.renderOrder;
       instanced.frustumCulled = false;
       instanced.raycast = () => undefined;
-      // Storage attributes are version-gated. DynamicDrawUsage would make
-      // Three upload the matrix storage again for every render/shadow pass.
-      if (!this.useStorageSwarmMatrices) instanced.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      // The authored matrices move every frame. On the owner's r185 WebGPU path,
+      // DynamicDrawUsage avoids a repeatable first-live-update stall; the exact
+      // isolated A/B is retained by the endurance gate.
+      instanced.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       for (let index = 0; index < pool.length; index += 1) {
         initialMatrix.makeTranslation((index % 6 - 2.5) * 2.4, Math.floor(index / 6) * 1.8, 0);
         instanced.setMatrixAt(index, initialMatrix);
