@@ -15,12 +15,12 @@ export type InteractionCandidate = Readonly<{
 }>;
 
 const INTERACTION_PRIORITY: Readonly<Record<InteractionKind, number>> = Object.freeze({
-  'support-exit': 1_000,
-  'support-enter-drone': 900,
-  'support-enter-chopper': 900,
-  'care-package': 700,
-  'shed-door': 500,
-  'weapon-pickup': 400,
+  'care-package': 1_000,
+  'shed-door': 900,
+  'weapon-pickup': 800,
+  'support-enter-drone': 700,
+  'support-enter-chopper': 700,
+  'support-exit': 700,
 });
 
 /**

@@ -51,6 +51,29 @@ describe('adaptive quality controller', () => {
     expect(classifyDisplayFrameMs(Array(60).fill(90))).toBeCloseTo(1_000 / 60);
   });
 
+  it('keeps genuine high-refresh cadences instead of bucketing them down', () => {
+    expect(classifyDisplayFrameMs(Array(60).fill(1_000 / 144))).toBeCloseTo(1_000 / 144);
+    expect(classifyDisplayFrameMs(Array(60).fill(1_000 / 165))).toBeCloseTo(1_000 / 165);
+    expect(classifyDisplayFrameMs(Array(60).fill(1_000 / 180))).toBeCloseTo(1_000 / 180);
+    expect(classifyDisplayFrameMs(Array(60).fill(1_000 / 240))).toBeCloseTo(1_000 / 240);
+    // Unusual/VRR cadence: trust the measured median instead of snapping.
+    expect(classifyDisplayFrameMs(Array(60).fill(9.5))).toBeCloseTo(9.5);
+  });
+
+  it('drops throttled background evidence on refocus without changing tier', () => {
+    const controller = new AdaptiveQualityController({
+      profile: 'blender', targetFrameMs: 1_000 / 180, initialPixelRatioCap: 1,
+      downshiftSamples: 100, upshiftSamples: 200, cooldownSamples: 500,
+    });
+    for (let index = 0; index < 60; index += 1) controller.record(22, true);
+    controller.resetSampling('tab visibility regained');
+    expect(controller.telemetry()).toMatchObject({
+      samples: 0, p50Ms: 0, p95Ms: 0, cooldownFrames: 0,
+      pixelRatioCap: 1, downshifts: 0,
+      lastReason: 'tab visibility regained',
+    });
+  });
+
   it('downshifts after sustained overload without leaving the public profile floor', () => {
     const controller = new AdaptiveQualityController({
       profile: 'blender', targetFrameMs: 1_000 / 60, initialPixelRatioCap: 1,

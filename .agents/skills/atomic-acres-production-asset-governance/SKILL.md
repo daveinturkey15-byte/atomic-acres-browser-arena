@@ -1,6 +1,6 @@
 ---
 name: atomic-acres-production-asset-governance
-description: Forge, ingest, integrate, and release-gate authored Atomic Acres weapons, first- and third-person characters, vehicles, support platforms, ordnance props, and hero world assets. Use for Blender or licensed-source assets, PBR textures, rigs, animation, LODs, sockets, review renders, runtime streaming, provenance, performance budgets, or any pass that adds or changes a player-visible production asset.
+description: Forge, ingest, integrate, and release-gate authored Atomic Acres production assets. Use for weapons, first- or third-person characters, vehicles, support platforms, ordnance, hero world assets, Blender or licensed sources, PBR textures, rigs, animation, LODs, sockets, streaming, provenance, performance budgets, or visual QA.
 ---
 
 # Atomic Acres Production Asset Governance
@@ -27,7 +27,7 @@ Treat a model being loadable as the start of verification, not the quality resul
 - Require unique gameplay-facing silhouettes and complete action/socket coverage; reject renamed shared meshes.
 - Require skin weights and believable anatomy for characters, canonical forward/up axes for vehicles, and sight/muzzle/grip alignment for weapons.
 - Require visual evidence in addition to schema checks. The implementer cannot be the only visual approver.
-- Keep hero assets visible and semantically identical across Quality, Performance and Custom. LODs may simplify presentation without removing gameplay geometry or retaining invisible collision.
+- Keep hero assets visible and semantically identical across Performance, Quality, Max and Custom. LODs may simplify presentation without removing gameplay geometry or retaining invisible collision.
 - Prewarm expensive support and possession assets before activation. No ability may synchronously decode, compile or allocate enough work to hitch gameplay.
 - Preserve the immutable Stable benchmark and compare candidate visuals, budgets and runtime behavior before promotion.
 

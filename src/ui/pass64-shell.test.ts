@@ -46,13 +46,14 @@ describe('Pass 65 command shell', () => {
     expect(markup).toContain('<option value="semtex">Semtex</option>');
   });
 
-  it('exposes three simple graphics modes and keeps WebGPU tuning under Advanced Graphics', () => {
+  it('exposes four simple graphics modes and keeps WebGPU tuning under Advanced Graphics', () => {
     const markup = renderPass64Shell(createPass64ShellViewModel('Operator'));
     const presetMarkup = markup.match(/<select id="graphics-profile">([\s\S]*?)<\/select>/)?.[1] ?? '';
     expect([...presetMarkup.matchAll(/<option value="([^"]+)">([^<]+)<\/option>/g)]
       .map((match) => [match[1], match[2]])).toEqual([
       ['high', 'QUALITY'],
       ['performance', 'PERFORMANCE'],
+      ['max', 'MAX'],
       ['custom', 'CUSTOM'],
     ]);
     expect(markup).toContain('id="advanced-graphics"');

@@ -13,6 +13,7 @@
     "author:blender-support-vehicles": "node scripts/blender/run-authoring.mjs support-vehicles",
     "author:blender-weapon-families": "node scripts/blender/run-authoring.mjs weapon-families",
     "author:blender-field-knife": "node scripts/blender/run-authoring.mjs field-knife",
+    "author:pass65:menu-previews": "tsx scripts/assets/generate-pass65-runtime-menu-previews.ts",
     "finalize:pass65:menu-previews": "node scripts/assets/finalize_pass65_menu_previews.mjs",
     "author:rustworks-tower": "node scripts/blender/run-authoring.mjs tower",
     "assets:compress:quality": "node scripts/assets/compress-quality-glbs.mjs",

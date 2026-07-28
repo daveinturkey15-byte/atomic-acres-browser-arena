@@ -75,19 +75,72 @@ function settingValue(definition: GraphicsControlDefinition, element: HTMLInputE
 export type AdvancedGraphicsBinding = Readonly<{
   refresh(settings: GraphicsSettings): void;
   registeredKeys: readonly GraphicsAdvancedKey[];
+  hasPendingEdits(): boolean;
+  peekPendingEdits(): Partial<GraphicsSettings>;
+  customSettings(): GraphicsSettings;
+  clearPendingEdits(): void;
+  /** @deprecated Non-destructive compatibility alias for peekPendingEdits. */
+  takePendingEdits(): Partial<GraphicsSettings>;
 }>;
+
+/**
+ * Keeps one preset snapshot and its unsaved edits separate from persistence.
+ * Callers may inspect/materialize repeatedly, persist the result, and clear
+ * only after verified storage succeeds. Refreshing with another named preset
+ * atomically replaces the seed and discards the superseded draft.
+ */
+export class AdvancedGraphicsEditTransaction {
+  private baseline: GraphicsSettings;
+  private pending: Partial<Record<GraphicsAdvancedKey, unknown>> = {};
+
+  constructor(initial: GraphicsSettings) {
+    this.baseline = Object.freeze({ ...initial });
+  }
+
+  refresh(settings: GraphicsSettings): void {
+    this.baseline = Object.freeze({ ...settings });
+    this.clearPendingEdits();
+  }
+
+  stage(key: GraphicsAdvancedKey, value: GraphicsSettings[GraphicsAdvancedKey]): void {
+    this.pending[key] = value;
+  }
+
+  hasPendingEdits(): boolean {
+    return Object.keys(this.pending).length > 0;
+  }
+
+  peekPendingEdits(): Partial<GraphicsSettings> {
+    return Object.freeze({ ...this.pending }) as Partial<GraphicsSettings>;
+  }
+
+  customSettings(): GraphicsSettings {
+    return Object.freeze({
+      ...this.baseline,
+      ...this.pending,
+      schemaVersion: 1,
+      preset: 'custom',
+    }) as GraphicsSettings;
+  }
+
+  clearPendingEdits(): void {
+    this.pending = {};
+  }
+}
 
 export function bindAdvancedGraphicsControls(
   root: ParentNode,
   initial: GraphicsSettings,
-  commit: (patch: Partial<GraphicsSettings>) => void,
+  onEdit: () => void,
 ): AdvancedGraphicsBinding {
   const registryIssues = validateAdvancedGraphicsRegistry();
   if (registryIssues.length > 0) {
     throw new Error(`Advanced Graphics registry is invalid: ${registryIssues.join(', ')}`);
   }
   const elements = new Map<GraphicsAdvancedKey, HTMLInputElement | HTMLSelectElement>();
+  const transaction = new AdvancedGraphicsEditTransaction(initial);
   const refresh = (settings: GraphicsSettings): void => {
+    transaction.refresh(settings);
     for (const definition of ADVANCED_GRAPHICS_CONTROLS) {
       const element = elements.get(definition.key);
       if (!element) continue;
@@ -110,12 +163,21 @@ export function bindAdvancedGraphicsControls(
       });
     }
     element.addEventListener('change', () => {
-      commit({ preset: 'custom', [definition.key]: settingValue(definition, element) } as Partial<GraphicsSettings>);
+      transaction.stage(
+        definition.key,
+        settingValue(definition, element) as GraphicsSettings[GraphicsAdvancedKey],
+      );
+      onEdit();
     });
   }
   refresh(initial);
   return Object.freeze({
     refresh,
     registeredKeys: Object.freeze(ADVANCED_GRAPHICS_CONTROLS.map(({ key }) => key)),
+    hasPendingEdits: () => transaction.hasPendingEdits(),
+    peekPendingEdits: () => transaction.peekPendingEdits(),
+    customSettings: () => transaction.customSettings(),
+    clearPendingEdits: () => transaction.clearPendingEdits(),
+    takePendingEdits: () => transaction.peekPendingEdits(),
   });
 }

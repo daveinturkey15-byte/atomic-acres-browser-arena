@@ -9,18 +9,40 @@ const candidate = (kind: InteractionCandidate['kind'], targetId: string, proximi
 });
 
 describe('shared F interaction arbitration', () => {
-  it('always lets an active support exit/entry outrank nearby doors, crates and pickups', () => {
+  it('lets eligible doors and crates outrank both vehicle entry and exit', () => {
     expect(primaryInteraction([
       candidate('weapon-pickup', 'weapon', 0.2),
       candidate('shed-door', 'door', 0.1),
       candidate('care-package', 'crate', 0.05),
       candidate('support-enter-drone', 'drone', 48),
-    ])).toMatchObject({ kind: 'support-enter-drone', targetId: 'drone' });
+    ])).toMatchObject({ kind: 'care-package', targetId: 'crate' });
     expect(primaryInteraction([
-      candidate('support-enter-chopper', 'chopper', 1),
-      candidate('support-exit', 'possessed-drone', 99),
-    ])).toMatchObject({ kind: 'support-exit', targetId: 'possessed-drone' });
-    expect(interactionPriority('support-exit')).toBeGreaterThan(interactionPriority('support-enter-drone'));
+      candidate('support-enter-chopper', 'chopper', 0),
+      candidate('shed-door', 'door', 1),
+    ])).toMatchObject({ kind: 'shed-door', targetId: 'door' });
+    expect(primaryInteraction([
+      candidate('support-exit', 'possessed-drone', 0),
+      candidate('shed-door', 'door', 1),
+    ])).toMatchObject({ kind: 'shed-door', targetId: 'door' });
+    expect(primaryInteraction([
+      candidate('support-exit', 'possessed-drone', 0),
+      candidate('care-package', 'crate', 0.5),
+    ])).toMatchObject({ kind: 'care-package', targetId: 'crate' });
+    expect(interactionPriority('support-enter-drone')).toBeLessThan(interactionPriority('shed-door'));
+    expect(interactionPriority('support-exit')).toBeLessThan(interactionPriority('shed-door'));
+  });
+
+  it('keeps weapon pickup above support controls as a world interaction', () => {
+    expect(primaryInteraction([
+      candidate('weapon-pickup', 'weapon', 0.1),
+      candidate('support-enter-drone', 'drone', 48),
+    ])).toMatchObject({ kind: 'weapon-pickup', targetId: 'weapon' });
+    expect(primaryInteraction([
+      candidate('weapon-pickup', 'weapon', 0.1),
+      candidate('support-exit', 'possessed-drone', 0),
+    ])).toMatchObject({ kind: 'weapon-pickup', targetId: 'weapon' });
+    expect(interactionPriority('weapon-pickup')).toBeGreaterThan(interactionPriority('support-enter-drone'));
+    expect(interactionPriority('weapon-pickup')).toBeGreaterThan(interactionPriority('support-exit'));
   });
 
   it('selects exactly one equal-priority platform by proximity and stable identity', () => {

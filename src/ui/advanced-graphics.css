@@ -10,7 +10,7 @@
   min-width: 0;
   padding: 10px;
   border: 1px solid color-mix(in srgb, var(--ui-cyan, #54d9ec) 28%, transparent);
-  background: color-mix(in srgb, var(--ui-ink, #0c181c) 86%, transparent);
+  background: var(--ui-deep, #f5f7f2);
 }
 
 #advanced-graphics .advanced-graphics-category > header {
@@ -50,7 +50,7 @@
   min-height: 58px;
   padding: 8px 9px;
   border: 1px solid color-mix(in srgb, var(--ui-line, #b8c8cb) 42%, transparent);
-  background: color-mix(in srgb, var(--ui-panel, #f1f4ef) 8%, transparent);
+  background: var(--ui-panel, #ffffff);
 }
 
 #advanced-graphics .advanced-graphics-control > span:first-child,

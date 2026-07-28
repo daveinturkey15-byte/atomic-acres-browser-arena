@@ -17,7 +17,7 @@ describe('Pass 65 settings contract', () => {
   it('defaults capable machines to a real High configuration', () => {
     const settings = createDefaultPass65Settings({ hardwareConcurrency: 16, deviceMemoryGb: 16 });
     expect(settings.graphics).toMatchObject({
-      schemaVersion: 1, preset: 'high', renderScale: 1, adaptiveResolution: true, targetFps: 60,
+      schemaVersion: 1, preset: 'high', renderScale: 1, adaptiveResolution: true, targetFps: 240,
       frameRateLimit: 0, antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high',
       shadowResolution: 'high', indirectLighting: 'high', ambientOcclusion: 'off', volumetricQuality: 'high',
       anisotropy: 8, bloomQuality: 'cinematic', toneMapping: 'aces',
@@ -44,17 +44,60 @@ describe('Pass 65 settings contract', () => {
     });
   });
 
-  it('migrates legacy persisted High and Max presets into the simplified public Quality choice', () => {
+  it('migrates legacy persisted High preset but preserves Max as a distinct public choice', () => {
     const legacyHigh = parsePass65Settings(JSON.stringify({
       version: 1,
-      graphics: { schemaVersion: 1, preset: 'high', renderScale: 0.9, adaptiveResolution: true, targetFps: 165, shadows: 'high' },
+      graphics: {
+        schemaVersion: 1, preset: 'high', renderScale: 0.9, adaptiveResolution: true,
+        targetFps: 165, frameRateLimit: 60, shadows: 'high',
+      },
     }));
     const legacyMax = parsePass65Settings(JSON.stringify({
       version: 1,
-      graphics: { schemaVersion: 1, preset: 'max', renderScale: 1, adaptiveResolution: false, targetFps: 240, shadows: 'high' },
+      graphics: {
+        schemaVersion: 1, preset: 'max', renderScale: 1, adaptiveResolution: false,
+        targetFps: 240, frameRateLimit: 144, shadows: 'high',
+      },
     }));
-    expect(legacyHigh.graphics).toMatchObject({ preset: 'high', targetFps: 165 });
-    expect(legacyMax.graphics).toMatchObject({ preset: 'high', targetFps: 240 });
+    // Named presets discard every stale advanced override and resolve to one
+    // canonical profile. Custom is the only profile that preserves overrides.
+    expect(legacyHigh.graphics).toMatchObject({
+      preset: 'high', renderScale: 1, adaptiveResolution: true,
+      targetFps: 240, frameRateLimit: 0, shadows: 'high',
+    });
+    expect(legacyMax.graphics).toMatchObject({
+      preset: 'max', renderScale: 1.25, adaptiveResolution: false,
+      targetFps: 240, frameRateLimit: 0, shadows: 'high',
+    });
+  });
+
+  it('keeps every named profile uncapped while preserving an explicit Custom cap', () => {
+    for (const preset of ['performance', 'high', 'max'] as const) {
+      const named = normalizePass65Settings({
+        graphics: { preset, targetFps: 60, frameRateLimit: 60 },
+      });
+      expect(named.graphics).toMatchObject({ preset, targetFps: 240, frameRateLimit: 0 });
+    }
+
+    const custom = normalizePass65Settings({
+      graphics: { preset: 'custom', targetFps: 165, frameRateLimit: 60 },
+    });
+    expect(custom.graphics).toMatchObject({ preset: 'custom', targetFps: 165, frameRateLimit: 60 });
+  });
+
+  it('does not let stale advanced overrides masquerade as a named profile', () => {
+    const quality = normalizePass65Settings({
+      graphics: {
+        preset: 'high', renderScale: 0.5, adaptiveResolution: false,
+        shadows: 'off', shadowUpdateMode: 'dynamic', particleQuality: 'low',
+        ambientOcclusion: 'ultra', frameRateLimit: 60,
+      },
+    });
+    expect(quality.graphics).toMatchObject({
+      preset: 'high', renderScale: 1, adaptiveResolution: true,
+      shadows: 'high', shadowUpdateMode: 'static', particleQuality: 'high',
+      ambientOcclusion: 'off', targetFps: 240, frameRateLimit: 0,
+    });
   });
 
   it('accepts display-aware adaptive targets beyond 144 and clamps hostile storage', () => {

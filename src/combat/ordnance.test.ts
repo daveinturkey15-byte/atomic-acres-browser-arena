@@ -5,9 +5,14 @@ import {
   EXPLOSIVE_BOLT_BLAST_RADIUS_M,
   EXPLOSIVE_BOLT_DIRECT_DAMAGE,
   EXPLOSIVE_BOLT_MAX_LIFE_MS,
+  EXPLOSIVE_BOLT_PREVIOUS_SPEED_MPS,
+  EXPLOSIVE_BOLT_SPEED_MPS,
+  EXPLOSIVE_BOLT_SPEED_MULTIPLIER,
+  EXPLOSIVE_BOLT_STUCK_MULTIPLIER,
   calculateFlashExposure,
   detonateExplosiveBolt,
   explosiveBoltBlastDamage,
+  explosiveBoltBlastRadiusM,
   explosiveBoltReadyToDetonate,
   impactExplosiveBolt,
   launchExplosiveBolt,
@@ -101,5 +106,18 @@ describe('Pass 65 ordnance rules', () => {
     expect(explosiveBoltBlastDamage(0)).toBe(60);
     expect(explosiveBoltBlastDamage(EXPLOSIVE_BOLT_BLAST_RADIUS_M)).toBe(EXPLOSIVE_BOLT_BLAST_MIN_DAMAGE);
     expect(explosiveBoltBlastDamage(EXPLOSIVE_BOLT_BLAST_RADIUS_M + 0.01)).toBe(0);
+  });
+
+  it('flies 3x the legacy speed and doubles stuck damage and blast area', () => {
+    expect(EXPLOSIVE_BOLT_SPEED_MULTIPLIER).toBe(3);
+    expect(EXPLOSIVE_BOLT_SPEED_MPS).toBe(EXPLOSIVE_BOLT_PREVIOUS_SPEED_MPS * EXPLOSIVE_BOLT_SPEED_MULTIPLIER);
+    expect(EXPLOSIVE_BOLT_STUCK_MULTIPLIER).toBe(2);
+    expect(explosiveBoltBlastRadiusM(false)).toBe(EXPLOSIVE_BOLT_BLAST_RADIUS_M);
+    expect(explosiveBoltBlastRadiusM(true)).toBe(EXPLOSIVE_BOLT_BLAST_RADIUS_M * 2);
+    expect(explosiveBoltBlastDamage(0, true)).toBe(120);
+    // Stuck falloff spans the doubled radius, so mid-radius still deals the doubled midpoint.
+    expect(explosiveBoltBlastDamage(EXPLOSIVE_BOLT_BLAST_RADIUS_M, true)).toBe(75);
+    expect(explosiveBoltBlastDamage(EXPLOSIVE_BOLT_BLAST_RADIUS_M * 2, true)).toBe(EXPLOSIVE_BOLT_BLAST_MIN_DAMAGE * 2);
+    expect(explosiveBoltBlastDamage(EXPLOSIVE_BOLT_BLAST_RADIUS_M * 2 + 0.01, true)).toBe(0);
   });
 });

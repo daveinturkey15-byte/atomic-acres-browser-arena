@@ -265,15 +265,20 @@ describe('shared interactive-world runtime adapter', () => {
 
   it('applies bounded radial explosion damage only under host authority', () => {
     const host = new InteractiveWorldRuntime('atomic-acres', 10, [placement], true);
+    const shedCalibratedHost = new InteractiveWorldRuntime('atomic-acres', 10, [placement], true);
     const guest = new InteractiveWorldRuntime('atomic-acres', 10, [placement], false);
     const origin = { x: placement.position.x, y: placement.position.y + 1.2, z: placement.position.z + 2.1 };
     expect(guest.applyExplosionAt({ origin, radius: 4, maximumDamageQ: 300 })).toBe(0);
     expect(host.applyExplosionAt({ origin, radius: 4, maximumDamageQ: 300 })).toBeGreaterThan(0);
     expect(host.telemetry().revision).toBeGreaterThan(0);
     expect(host.telemetry().dents).toBeGreaterThan(0);
+    expect(shedCalibratedHost.applyExplosionAt({ origin, radius: 4, maximumDamageQ: 1, shedMaximumDamageQ: 300 })).toBeGreaterThan(0);
+    expect(shedCalibratedHost.telemetry().dents).toBe(host.telemetry().dents);
+    expect(shedCalibratedHost.applyExplosionAt({ origin, radius: 4, maximumDamageQ: 1, shedMaximumDamageQ: Number.NaN })).toBe(0);
     expect(guest.applyAuthoritativeEnvelope(JSON.parse(JSON.stringify(host.stateEnvelope())))).toBe(true);
     expect(guest.telemetry()).toMatchObject({ dents: host.telemetry().dents, detachedChunks: host.telemetry().detachedChunks });
     guest.dispose();
+    shedCalibratedHost.dispose();
     host.dispose();
   });
 

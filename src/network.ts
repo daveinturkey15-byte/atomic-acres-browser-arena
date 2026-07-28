@@ -555,7 +555,7 @@ export class ArenaNetwork {
         try { connection.close(); } catch { /* no-op */ }
         return;
       }
-      if (payload.type === 'overdrive-claim' || payload.type === 'hit'
+      if (payload.type === 'overdrive-claim' || payload.type === 'hit' || payload.type === 'window-break'
         || payload.type === 'join' || payload.type === 'shot' || payload.type === 'shot-request' || payload.type === 'trigger-state' || payload.type === 'state-feedback' || payload.type === 'melee'
         || payload.type === 'support-activate' || payload.type === 'grenade-throw'
         || payload.type === 'lobby-ready' || payload.type === 'lobby-team' || payload.type === 'lobby-handicap'

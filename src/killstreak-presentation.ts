@@ -7,6 +7,12 @@ import { SUPPORT_WEAPON_FEEDBACK_CONTRACT } from './support-vehicle-presentation
 
 const MAX_PRESENTED_ENTITIES = 32;
 const MAX_IMPACT_FLASHES = 20;
+const MAX_BOMB_SHELLS = 20;
+const EMBERS_PER_CARPET_IMPACT = 6;
+const MAX_EMBER_PARTICLES = MAX_BOMB_SHELLS * EMBERS_PER_CARPET_IMPACT;
+const BOMB_SHELL_DROP_DURATION_MS = 420;
+const BOMB_SHELL_ALTITUDE = 20;
+const EMBER_GRAVITY_MPS2 = 11.25;
 const MAX_SENSOR_CONTACTS = 16;
 const MAX_PLACEMENT_MARKERS = 8;
 export const HUNTER_DRONE_ASSET = './assets/original/models/support/hunter-drone-lod0.glb';
@@ -251,10 +257,58 @@ type PresentedEntity = Readonly<{
   authored: boolean;
 }>;
 
+type PresentedEntityPoolKey = 'chopper' | 'care-aircraft' | 'carpet-aircraft' | 'care-crate' | 'piloted-drone' | 'swarm-drone';
+
+function presentedEntityPoolKey(entity: KillstreakEntitySnapshot): PresentedEntityPoolKey {
+  if (entity.kind === 'chopper') return 'chopper';
+  if (entity.kind === 'care-crate') return 'care-crate';
+  if (entity.kind === 'drone') return entity.mode === 'piloted' ? 'piloted-drone' : 'swarm-drone';
+  return supportAircraftPresentationVariant(entity.id) === 'carpet' ? 'carpet-aircraft' : 'care-aircraft';
+}
+
+function buildPresentedEntityForPool(key: PresentedEntityPoolKey): PresentedEntity {
+  if (key === 'chopper') return buildAuthoredSupportVehicle('chopper') ?? buildProceduralChopperFallback();
+  if (key === 'care-aircraft') return buildAuthoredSupportVehicle('care') ?? buildProceduralAircraftFallback('care');
+  if (key === 'carpet-aircraft') return buildAuthoredSupportVehicle('carpet') ?? buildProceduralAircraftFallback('carpet');
+  if (key === 'care-crate') return buildAuthoredSupportVehicle('crate') ?? buildProceduralCareCrateFallback();
+  return buildDrone(key === 'piloted-drone' ? 'piloted' : 'swarm');
+}
+
 type PresentedPlacementMarker = {
   root: THREE.Group;
   snapshot: KillstreakPlacementMarkerSnapshot;
   snapshotRevision: number;
+  expiresAtMs: number;
+};
+
+type PooledImpactFlash = {
+  root: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
+  inactiveName: string;
+  active: boolean;
+  createdAtMs: number;
+  expiresAtMs: number;
+  baseRadius: number;
+  maximumOpacity: number;
+};
+
+type PooledBombShell = {
+  root: THREE.Mesh<THREE.CylinderGeometry, THREE.MeshStandardMaterial>;
+  inactiveName: string;
+  impactPosition: THREE.Vector3;
+  active: boolean;
+  startY: number;
+  createdAtMs: number;
+  impactAtMs: number;
+};
+
+type PooledEmber = {
+  root: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
+  inactiveName: string;
+  origin: THREE.Vector3;
+  velocity: THREE.Vector3;
+  active: boolean;
+  radius: number;
+  createdAtMs: number;
   expiresAtMs: number;
 };
 
@@ -284,9 +338,13 @@ export type KillstreakPlacementMarkerTelemetry = Readonly<{
 export type KillstreakPresentationTelemetry = Readonly<{
   entities: number;
   impactFlashes: number;
+  bombShells: number;
+  emberParticles: number;
   sensorContacts: number;
   placementMarkers: number;
   prewarmed: number;
+  pooledEntityInstances: number;
+  pooledSwarmDrones: number;
   prewarmedAuthoredSupportFamilies: readonly string[];
   markerDetails: readonly KillstreakPlacementMarkerTelemetry[];
   bounded: boolean;
@@ -340,14 +398,31 @@ function isFirstPersonOnlyNode(root: THREE.Object3D, node: THREE.Object3D): bool
   return false;
 }
 
+const supportMaterialBaseDepthWrite = new WeakMap<THREE.Material, boolean>();
+
 function setSupportFirstPersonVisibility(root: THREE.Group, possessed: boolean): void {
   root.visible = true;
   root.traverse((node) => {
     if (!(node instanceof THREE.Mesh)) return;
-    if (node.userData.supportBaseVisible === undefined) node.userData.supportBaseVisible = node.visible;
-    node.visible = possessed
-      ? isFirstPersonCockpitNode(root, node)
-      : node.userData.supportBaseVisible === true && !isFirstPersonOnlyNode(root, node);
+    const cockpitNode = isFirstPersonCockpitNode(root, node);
+    const firstPersonOnlyNode = isFirstPersonOnlyNode(root, node);
+    const overrideActive = node.userData.supportFirstPersonOverrideActive === true;
+    if (possessed) {
+      if (!overrideActive) node.userData.supportBaseVisible = node.visible;
+      node.userData.supportFirstPersonOverrideActive = true;
+      node.visible = cockpitNode;
+    } else if (overrideActive) {
+      node.visible = node.userData.supportBaseVisible === true && !firstPersonOnlyNode;
+      node.userData.supportFirstPersonOverrideActive = false;
+    } else if (firstPersonOnlyNode) {
+      node.visible = false;
+    }
+    if (!node.material || !cockpitNode) return;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    for (const entry of materials) {
+      if (!supportMaterialBaseDepthWrite.has(entry)) supportMaterialBaseDepthWrite.set(entry, entry.depthWrite);
+      entry.depthWrite = possessed ? false : supportMaterialBaseDepthWrite.get(entry)!;
+    }
   });
 }
 
@@ -748,15 +823,128 @@ function disposeRoot(root: THREE.Object3D): void {
   });
 }
 
+function hashString(seed: number, value: string): number {
+  let hash = seed >>> 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
+function impactSeed(impact: KillstreakImpactEvent): number {
+  let seed = hashString(0x811c9dc5, impact.activationId);
+  seed = hashString(seed, impact.source);
+  seed ^= impact.ordinal >>> 0;
+  seed = Math.imul(seed ^ (seed >>> 16), 0x7feb352d);
+  seed = Math.imul(seed ^ (seed >>> 15), 0x846ca68b);
+  return (seed ^ (seed >>> 16)) >>> 0;
+}
+
+function deterministicUnit(seed: number, lane: number): number {
+  let value = (seed + Math.imul(lane + 1, 0x9e3779b1)) >>> 0;
+  value = Math.imul(value ^ (value >>> 16), 0x7feb352d);
+  value = Math.imul(value ^ (value >>> 15), 0x846ca68b);
+  return ((value ^ (value >>> 16)) >>> 0) / 0xffffffff;
+}
+
+function createPooledImpactFlash(index: number): PooledImpactFlash {
+  const inactiveName = `pass65-impact-flash-pool-${index + 1}`;
+  const root = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 14, 10),
+    new THREE.MeshBasicMaterial({
+      color: 0xffb14c,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      toneMapped: false,
+    }),
+  );
+  root.name = inactiveName;
+  root.visible = false;
+  root.userData.presentationOnly = true;
+  root.userData.poolSlot = index;
+  return { root, inactiveName, active: false, createdAtMs: 0, expiresAtMs: 0, baseRadius: 0, maximumOpacity: 0 };
+}
+
+function createPooledBombShell(index: number): PooledBombShell {
+  const inactiveName = `pass65-bomb-shell-pool-${index + 1}`;
+  const root = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.08, 0.12, 0.45, 8),
+    new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.7, metalness: 0.4, depthWrite: true }),
+  );
+  root.name = inactiveName;
+  root.visible = false;
+  root.castShadow = true;
+  root.rotation.x = Math.PI / 2;
+  root.userData.presentationOnly = true;
+  root.userData.poolSlot = index;
+  return {
+    root,
+    inactiveName,
+    impactPosition: new THREE.Vector3(),
+    active: false,
+    startY: 0,
+    createdAtMs: 0,
+    impactAtMs: 0,
+  };
+}
+
+function createPooledEmber(index: number): PooledEmber {
+  const inactiveName = `pass65-ember-pool-${index + 1}`;
+  const root = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 5, 4),
+    new THREE.MeshBasicMaterial({
+      color: 0xff5c1a,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      toneMapped: false,
+    }),
+  );
+  root.name = inactiveName;
+  root.visible = false;
+  root.userData.presentationOnly = true;
+  root.userData.poolSlot = index;
+  return {
+    root,
+    inactiveName,
+    origin: new THREE.Vector3(),
+    velocity: new THREE.Vector3(),
+    active: false,
+    radius: 0,
+    createdAtMs: 0,
+    expiresAtMs: 0,
+  };
+}
+
+function countActive(pool: readonly { active: boolean }[]): number {
+  let count = 0;
+  for (const entry of pool) if (entry.active) count += 1;
+  return count;
+}
+
+function firstInactive<T extends { active: boolean }>(pool: readonly T[]): T | null {
+  for (const entry of pool) if (!entry.active) return entry;
+  return null;
+}
+
 export class KillstreakPresentation {
   readonly root = new THREE.Group();
   private readonly entities = new Map<string, PresentedEntity>();
-  private readonly impactFlashes: Array<{ root: THREE.Mesh; expiresAt: number }> = [];
+  private readonly impactFlashPoolRoot = new THREE.Group();
+  private readonly bombShellPoolRoot = new THREE.Group();
+  private readonly emberPoolRoot = new THREE.Group();
+  private readonly impactFlashPool = Array.from({ length: MAX_IMPACT_FLASHES }, (_, index) => createPooledImpactFlash(index));
+  private readonly bombShellPool = Array.from({ length: MAX_BOMB_SHELLS }, (_, index) => createPooledBombShell(index));
+  private readonly emberPool = Array.from({ length: MAX_EMBER_PARTICLES }, (_, index) => createPooledEmber(index));
   private readonly prewarmed: PresentedEntity[] = [];
+  private readonly entityPools = new Map<PresentedEntityPoolKey, PresentedEntity[]>();
   private readonly sensorRoot = new THREE.Group();
   private readonly sensorSilhouettes: THREE.Group[];
   private visibleSensorContacts = 0;
   private firstPersonEntityId: string | null = null;
+  private disposed = false;
   private readonly placementMarkers = new Map<string, PresentedPlacementMarker>();
   private readonly locallyExpiredMarkerRevisions = new Map<string, number>();
 
@@ -767,8 +955,19 @@ export class KillstreakPresentation {
     this.root.name = 'pass65-killstreak-presentations';
     this.root.userData.presentationOnly = true;
     scene.add(this.root);
-    // Keep one instance of every material/geometry vocabulary resident so the
-    // first earned streak does not discover shaders on a live combat frame.
+    this.impactFlashPoolRoot.name = 'pass65-impact-flash-pool';
+    this.bombShellPoolRoot.name = 'pass65-bomb-shell-pool';
+    this.emberPoolRoot.name = 'pass65-ember-pool';
+    for (const poolRoot of [this.impactFlashPoolRoot, this.bombShellPoolRoot, this.emberPoolRoot]) {
+      poolRoot.userData.presentationOnly = true;
+      this.root.add(poolRoot);
+    }
+    this.impactFlashPoolRoot.add(...this.impactFlashPool.map((entry) => entry.root));
+    this.bombShellPoolRoot.add(...this.bombShellPool.map((entry) => entry.root));
+    this.emberPoolRoot.add(...this.emberPool.map((entry) => entry.root));
+    // Prewarm the complete 24-drone swarm outside combat. The reported freeze
+    // occurred when one snapshot synchronously cloned every drone on the
+    // activation frame; pooled roots make that path allocation-free.
     this.installPrewarmedVocabulary();
     this.sensorRoot.name = 'piloted-drone-through-wall-sensor';
     this.sensorRoot.userData.presentationOnly = true;
@@ -778,26 +977,94 @@ export class KillstreakPresentation {
   }
 
   private installPrewarmedVocabulary(): void {
-    const vocabulary = [
-      buildAuthoredSupportVehicle('chopper') ?? buildProceduralChopperFallback(),
-      buildAuthoredSupportVehicle('care') ?? buildProceduralAircraftFallback('care'),
-      buildAuthoredSupportVehicle('carpet') ?? buildProceduralAircraftFallback('carpet'),
-      buildDrone('piloted'), buildDrone('swarm'),
-      buildAuthoredSupportVehicle('crate') ?? buildProceduralCareCrateFallback(),
+    const capacities: readonly [PresentedEntityPoolKey, number][] = [
+      ['chopper', 1],
+      ['care-aircraft', 1],
+      ['carpet-aircraft', 1],
+      ['piloted-drone', 1],
+      ['swarm-drone', 24],
+      ['care-crate', 1],
     ];
-    this.prewarmed.push(...vocabulary);
+    for (const [key, capacity] of capacities) {
+      const pool: PresentedEntity[] = [];
+      for (let index = 0; index < capacity; index += 1) {
+        const entry = buildPresentedEntityForPool(key);
+        entry.root.userData.poolActiveName = entry.root.name;
+        entry.root.userData.presentationPoolKey = key;
+        entry.root.userData.presentationPoolInUse = false;
+        entry.root.name = `prewarmed-${key}-${index + 1}`;
+        entry.root.visible = false;
+        pool.push(entry);
+        this.prewarmed.push(entry);
+        this.root.add(entry.root);
+      }
+      this.entityPools.set(key, pool);
+    }
     for (const entry of this.prewarmed) {
-      entry.root.name = `prewarmed-${entry.root.name}`;
       entry.root.userData.prewarmed = true;
-      entry.root.scale.setScalar(0.0001);
-      this.root.add(entry.root);
     }
   }
 
   prewarmAuthoredAssets(): void {
+    if (this.entities.size > 0) return;
     for (const entry of this.prewarmed) this.retireRoot(entry.root);
     this.prewarmed.length = 0;
+    this.entityPools.clear();
     this.installPrewarmedVocabulary();
+  }
+
+  private acquirePresentedEntity(entity: KillstreakEntitySnapshot): PresentedEntity {
+    const key = presentedEntityPoolKey(entity);
+    const presented = this.entityPools.get(key)?.find((entry) => entry.root.userData.presentationPoolInUse !== true);
+    if (!presented) return createPresentedEntity(entity);
+    presented.root.userData.presentationPoolInUse = true;
+    presented.root.name = String(presented.root.userData.poolActiveName ?? presented.root.name);
+    presented.root.visible = true;
+    return presented;
+  }
+
+  private releasePresentedEntity(presented: PresentedEntity): void {
+    const key = presented.root.userData.presentationPoolKey;
+    if (typeof key !== 'string') {
+      this.retireRoot(presented.root);
+      return;
+    }
+    setSupportFirstPersonVisibility(presented.root, false);
+    presented.root.userData.presentationPoolInUse = false;
+    presented.root.name = `prewarmed-${key}`;
+    presented.root.visible = false;
+    presented.target.set(0, 0, 0);
+  }
+
+  private applyFirstPersonVisibility(): void {
+    for (const [entityId, presented] of this.entities) {
+      if (entityId !== this.firstPersonEntityId) setSupportFirstPersonVisibility(presented.root, false);
+    }
+    if (!this.firstPersonEntityId) return;
+    const possessed = this.entities.get(this.firstPersonEntityId);
+    if (possessed) setSupportFirstPersonVisibility(possessed.root, true);
+  }
+
+  private deactivateImpactFlash(flash: PooledImpactFlash): void {
+    flash.active = false;
+    flash.root.visible = false;
+    flash.root.name = flash.inactiveName;
+    flash.root.material.opacity = 0;
+    flash.root.scale.setScalar(1);
+  }
+
+  private deactivateBombShell(shell: PooledBombShell): void {
+    shell.active = false;
+    shell.root.visible = false;
+    shell.root.name = shell.inactiveName;
+  }
+
+  private deactivateEmber(ember: PooledEmber): void {
+    ember.active = false;
+    ember.root.visible = false;
+    ember.root.name = ember.inactiveName;
+    ember.root.material.opacity = 0;
+    ember.root.scale.setScalar(1);
   }
 
   sync(snapshot: KillstreakRecipientSnapshot, nowMs: number): void {
@@ -805,18 +1072,18 @@ export class KillstreakPresentation {
     const liveIds = new Set(admitted.map((entity) => entity.id));
     for (const [id, presented] of this.entities) {
       if (liveIds.has(id)) continue;
-      this.retireRoot(presented.root);
+      if (id === this.firstPersonEntityId) setSupportFirstPersonVisibility(presented.root, false);
+      this.releasePresentedEntity(presented);
       this.entities.delete(id);
     }
     for (const entity of admitted) {
       let presented = this.entities.get(entity.id);
       if (!presented) {
-        presented = createPresentedEntity(entity);
+        presented = this.acquirePresentedEntity(entity);
         this.entities.set(entity.id, presented);
-        this.root.add(presented.root);
+        if (presented.root.parent !== this.root) this.root.add(presented.root);
         presented.root.position.fromArray(entity.position);
       }
-      setSupportFirstPersonVisibility(presented.root, entity.id === this.firstPersonEntityId);
       presented.target.fromArray(entity.position);
       presented.root.position.lerp(presented.target, 0.38);
       presented.root.rotation.set(entity.attitude[0], entity.attitude[1], entity.attitude[2], 'YXZ');
@@ -838,16 +1105,37 @@ export class KillstreakPresentation {
       presented.root.userData.phase = entity.phase;
       presented.root.userData.gunController = entity.gunController;
     }
+    this.applyFirstPersonVisibility();
     this.syncSensorContacts(snapshot.sensorContacts);
     this.syncPlacementMarkers(snapshot.placementMarkers, snapshot.revision, nowMs);
-    for (let index = this.impactFlashes.length - 1; index >= 0; index -= 1) {
-      const flash = this.impactFlashes[index];
-      const remaining = THREE.MathUtils.clamp((flash.expiresAt - nowMs) / 420, 0, 1);
-      flash.root.scale.setScalar(1 + (1 - remaining) * 2.8);
-      (flash.root.material as THREE.MeshBasicMaterial).opacity = remaining * 0.8;
+    for (const flash of this.impactFlashPool) {
+      if (!flash.active) continue;
+      const lifetimeMs = flash.expiresAtMs - flash.createdAtMs;
+      const remaining = THREE.MathUtils.clamp((flash.expiresAtMs - nowMs) / lifetimeMs, 0, 1);
+      flash.root.scale.setScalar(flash.baseRadius * (1 + (1 - remaining) * 2.8));
+      flash.root.material.opacity = remaining * flash.maximumOpacity;
       if (remaining > 0) continue;
-      this.retireRoot(flash.root);
-      this.impactFlashes.splice(index, 1);
+      this.deactivateImpactFlash(flash);
+    }
+    for (const ember of this.emberPool) {
+      if (!ember.active) continue;
+      const elapsed = Math.max(0, nowMs - ember.createdAtMs);
+      const lifetime = ember.expiresAtMs - ember.createdAtMs;
+      const remaining = THREE.MathUtils.clamp(1 - elapsed / lifetime, 0, 1);
+      const elapsedSeconds = elapsed / 1_000;
+      ember.root.scale.setScalar(ember.radius * (0.2 + remaining * 0.85));
+      ember.root.material.opacity = remaining * 0.85;
+      ember.root.position.copy(ember.origin).addScaledVector(ember.velocity, elapsedSeconds);
+      ember.root.position.y -= 0.5 * EMBER_GRAVITY_MPS2 * elapsedSeconds * elapsedSeconds;
+      if (remaining > 0) continue;
+      this.deactivateEmber(ember);
+    }
+    for (const shell of this.bombShellPool) {
+      if (!shell.active) continue;
+      const dropDurationMs = Math.max(1, shell.impactAtMs - shell.createdAtMs);
+      const progress = THREE.MathUtils.clamp((nowMs - shell.createdAtMs) / dropDurationMs, 0, 1);
+      shell.root.position.y = THREE.MathUtils.lerp(shell.startY, shell.impactPosition.y, progress);
+      if (progress >= 1) this.deactivateBombShell(shell);
     }
   }
 
@@ -912,16 +1200,68 @@ export class KillstreakPresentation {
   }
 
   presentImpacts(impacts: readonly KillstreakImpactEvent[], nowMs: number): void {
-    for (const impact of impacts.slice(0, Math.max(0, MAX_IMPACT_FLASHES - this.impactFlashes.length))) {
-      const flash = new THREE.Mesh(
-        new THREE.SphereGeometry(0.55, 10, 7),
-        new THREE.MeshBasicMaterial({ color: 0xffb14c, transparent: true, opacity: 0.8, depthWrite: false }),
-      );
-      flash.name = 'pass65-carpet-impact-flash';
-      flash.position.fromArray(impact.position);
-      flash.position.y += 0.35;
-      this.root.add(flash);
-      this.impactFlashes.push({ root: flash, expiresAt: nowMs + 420 });
+    for (const impact of impacts) {
+      const isCarpet = impact.source === 'carpet-bomber';
+      if (isCarpet && impact.phase === 'drop') {
+        const shell = firstInactive(this.bombShellPool);
+        if (!shell) continue;
+        shell.active = true;
+        shell.createdAtMs = nowMs;
+        const authoredDropDurationMs = THREE.MathUtils.clamp(
+          impact.impactAtMs - impact.atMs,
+          1,
+          BOMB_SHELL_DROP_DURATION_MS,
+        );
+        shell.impactAtMs = nowMs + authoredDropDurationMs;
+        shell.startY = impact.position[1] + BOMB_SHELL_ALTITUDE;
+        shell.impactPosition.set(impact.position[0], impact.position[1] + 0.35, impact.position[2]);
+        shell.root.name = 'pass65-carpet-bomb-shell';
+        shell.root.position.set(impact.position[0], shell.startY, impact.position[2]);
+        shell.root.visible = true;
+        continue;
+      }
+      if (impact.phase !== 'impact') continue;
+      const flash = firstInactive(this.impactFlashPool);
+      if (!flash) break;
+      flash.active = true;
+      flash.createdAtMs = nowMs;
+      flash.expiresAtMs = nowMs + (isCarpet ? 600 : 420);
+      flash.baseRadius = isCarpet ? 1.2 : 0.55;
+      flash.maximumOpacity = isCarpet ? 0.9 : 0.8;
+      flash.root.name = isCarpet ? 'pass65-carpet-impact-flash-large' : 'pass65-carpet-impact-flash';
+      flash.root.position.set(impact.position[0], impact.position[1] + 0.35, impact.position[2]);
+      flash.root.scale.setScalar(flash.baseRadius);
+      flash.root.material.color.setHex(isCarpet ? 0xff6a1a : 0xffb14c);
+      flash.root.material.opacity = flash.maximumOpacity;
+      flash.root.visible = true;
+
+      if (isCarpet) {
+        const seed = impactSeed(impact);
+        for (let particle = 0; particle < EMBERS_PER_CARPET_IMPACT; particle += 1) {
+          const ember = firstInactive(this.emberPool);
+          if (!ember) break;
+          const lane = particle * 5;
+          const spreadX = (deterministicUnit(seed, lane) - 0.5) * 2.5;
+          const spreadZ = (deterministicUnit(seed, lane + 1) - 0.5) * 2.5;
+          const spreadY = deterministicUnit(seed, lane + 2) * 1.2;
+          ember.active = true;
+          ember.radius = 0.08 + deterministicUnit(seed, lane + 3) * 0.14;
+          ember.createdAtMs = nowMs;
+          ember.expiresAtMs = nowMs + 700;
+          ember.origin.set(
+            impact.position[0] + spreadX,
+            impact.position[1] + 0.35 + spreadY,
+            impact.position[2] + spreadZ,
+          );
+          ember.velocity.set(spreadX * 3, 3 + deterministicUnit(seed, lane + 4) * 4, spreadZ * 3);
+          ember.root.name = 'pass65-carpet-ember';
+          ember.root.position.copy(ember.origin);
+          ember.root.scale.setScalar(ember.radius * 1.05);
+          ember.root.material.color.setHex(particle < 3 ? 0xff5c1a : 0x4a4a4a);
+          ember.root.material.opacity = 0.85;
+          ember.root.visible = true;
+        }
+      }
     }
   }
 
@@ -931,7 +1271,7 @@ export class KillstreakPresentation {
 
   setFirstPersonEntity(id: string | null): void {
     this.firstPersonEntityId = id;
-    for (const [entityId, presented] of this.entities) setSupportFirstPersonVisibility(presented.root, entityId === id);
+    this.applyFirstPersonVisibility();
   }
 
   firstPersonCameraAnchor(id: string): THREE.Vector3 | null {
@@ -1009,30 +1349,39 @@ export class KillstreakPresentation {
           visible: root.visible && root.parent !== null,
         });
       });
+    const impactFlashes = countActive(this.impactFlashPool);
+    const bombShells = countActive(this.bombShellPool);
+    const emberParticles = countActive(this.emberPool);
     return Object.freeze({
       entities: this.entities.size,
-      impactFlashes: this.impactFlashes.length,
+      impactFlashes,
+      bombShells,
+      emberParticles,
       sensorContacts: this.visibleSensorContacts,
       placementMarkers: this.placementMarkers.size,
-      prewarmed: this.prewarmed.length,
-      prewarmedAuthoredSupportFamilies: Object.freeze(this.prewarmed
+      prewarmed: this.entityPools.size,
+      pooledEntityInstances: this.prewarmed.length,
+      pooledSwarmDrones: this.entityPools.get('swarm-drone')?.length ?? 0,
+      prewarmedAuthoredSupportFamilies: Object.freeze([...new Set(this.prewarmed
         .filter((entry) => entry.root.userData.presentationSource === 'project-original-blender-glb')
-        .map((entry) => String(entry.root.userData.presentationFamily))
-        .sort()),
+        .map((entry) => String(entry.root.userData.presentationFamily)))].sort()),
       markerDetails: Object.freeze(markerDetails),
       bounded: this.entities.size <= MAX_PRESENTED_ENTITIES
-        && this.impactFlashes.length <= MAX_IMPACT_FLASHES
+        && impactFlashes <= MAX_IMPACT_FLASHES
+        && bombShells <= MAX_BOMB_SHELLS
+        && emberParticles <= MAX_EMBER_PARTICLES
         && this.visibleSensorContacts <= MAX_SENSOR_CONTACTS
         && this.placementMarkers.size <= MAX_PLACEMENT_MARKERS,
     });
   }
 
   clear(): void {
-    this.firstPersonEntityId = null;
-    for (const presented of this.entities.values()) this.retireRoot(presented.root);
+    this.setFirstPersonEntity(null);
+    for (const presented of this.entities.values()) this.releasePresentedEntity(presented);
     this.entities.clear();
-    for (const flash of this.impactFlashes) this.retireRoot(flash.root);
-    this.impactFlashes.length = 0;
+    for (const flash of this.impactFlashPool) if (flash.active) this.deactivateImpactFlash(flash);
+    for (const shell of this.bombShellPool) if (shell.active) this.deactivateBombShell(shell);
+    for (const ember of this.emberPool) if (ember.active) this.deactivateEmber(ember);
     this.visibleSensorContacts = 0;
     for (const silhouette of this.sensorSilhouettes) silhouette.visible = false;
     for (const presented of this.placementMarkers.values()) this.retireRoot(presented.root);
@@ -1041,9 +1390,15 @@ export class KillstreakPresentation {
   }
 
   dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
     this.clear();
     for (const entry of this.prewarmed) this.retireRoot(entry.root);
+    this.prewarmed.length = 0;
     this.retireRoot(this.sensorRoot);
+    this.retireRoot(this.impactFlashPoolRoot);
+    this.retireRoot(this.bombShellPoolRoot);
+    this.retireRoot(this.emberPoolRoot);
     this.root.removeFromParent();
   }
 }

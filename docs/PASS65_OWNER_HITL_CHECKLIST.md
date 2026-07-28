@@ -75,7 +75,7 @@ Sections 3–12 are owned by the integrator and independent QA lanes. They must 
 ### Graphics
 
 - Quality is the effective default on the capable target machine.
-- Only Quality, Performance and Custom appear at the top level; Advanced Graphics starts collapsed and an advanced edit selects Custom.
+- Exactly Performance, Quality, Max and Custom appear at the top level; Advanced Graphics starts collapsed and legible, named profiles are uncapped, and committed advanced edits select Custom from the last named-profile snapshot.
 - Target FPS accepts values above 144 and clearly distinguishes adaptive target from an optional hard/uncapped scheduler.
 - Every visible advanced setting comes from the canonical WebGPU renderer-feature inventory, has a real runtime consumer and reports supported/effective/apply-mode state. Unsupported settings are disabled or clamped with a reason; they do not silently fail or masquerade as Cyberpunk technology the browser does not implement.
 - Live-change and arena-reload settings behave as labelled.
@@ -201,7 +201,7 @@ Reject a visual-only hole, invisible shoot-through, render-only door, client-aut
 - Inspect deterministic weighted reward evidence: the pool is derived from the unique catalog, contains retained Scout Sweep at the highest base-weight band and every present/future eligible nonretired streak except Care Package exactly once, recomputes under synthetic add/retire/rename/weight mutations, contains no retired/recursive entry, and gives selectable Nuke exactly 1%.
 - Chopper flies under AI for 30 seconds, acquires valid targets, respects cover/LOS and meets the measurable four-to-five-second escape/survival envelope. Its gun defaults to AI; `F` enters/exits owner gun-only control at any active time, AI resumes firing on exit, the operator body stays vulnerable and no gun input changes flight.
 - Carpet Bomber activation supplies only the frozen strip anchor semantics; host-seeded RNG chooses and communicates a random valid ingress, then resolves exactly 20 bounded zigzag impacts along the intended strip.
-- Drone Swarm creates exactly 12 targetable 50-HP drones, seeks eligible opposing living human players and bots indoors/outdoors, rejects allies/dead lives, performs unlimited host-authored 20-round reload loops until its 60-second hard expiry, and meets the frozen approximately-five-second exposure/escape survival-pressure band.
+- Drone Swarm creates exactly 24 targetable 50-HP drones, enters from behind the caller, distributes into divergent individual/small-group routes, seeks eligible opposing living human players and bots indoors/outdoors, rejects allies/dead lives, performs unlimited host-authored 20-round reload loops until its 60-second hard expiry, and meets the frozen approximately-five-second exposure/escape survival-pressure band.
 - Destroy drones within the frozen hitbox/core and per-weapon shot-count bands; no client can forge drone damage/death.
 - Standalone Drone explicitly offers autonomous-AI or first-person owner-control deployment, reuses the Swarm drone asset/gun family, and restores player control on exit, destruction, death, disconnect and 30-second fuel expiry.
 - Piloted Drone altitude controls use Space/Crouch, wall vision matches the approved railgun-like rule, HP is 50 and ammunition is exactly two 20-round magazines.

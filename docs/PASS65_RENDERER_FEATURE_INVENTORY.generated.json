@@ -363,7 +363,7 @@
         "preset": "performance",
         "renderScale": 0.75,
         "adaptiveResolution": true,
-        "targetFps": 120,
+        "targetFps": 240,
         "frameRateLimit": 0,
         "antiAliasing": "off",
         "geometryDetail": "reduced",
@@ -390,7 +390,7 @@
         "renderProfile": "performance",
         "renderScale": 0.75,
         "adaptive": true,
-        "targetFps": 120,
+        "targetFps": 240,
         "frameRateLimit": 0,
         "antialiasSamples": 0,
         "shadows": false,
@@ -450,7 +450,7 @@
         "preset": "high",
         "renderScale": 1,
         "adaptiveResolution": true,
-        "targetFps": 60,
+        "targetFps": 240,
         "frameRateLimit": 0,
         "antiAliasing": "msaa-4x",
         "geometryDetail": "full",
@@ -477,7 +477,7 @@
         "renderProfile": "blender",
         "renderScale": 1,
         "adaptive": true,
-        "targetFps": 60,
+        "targetFps": 240,
         "frameRateLimit": 0,
         "antialiasSamples": 4,
         "shadows": true,
@@ -537,7 +537,7 @@
         "preset": "max",
         "renderScale": 1.25,
         "adaptiveResolution": false,
-        "targetFps": 60,
+        "targetFps": 240,
         "frameRateLimit": 0,
         "antiAliasing": "msaa-4x",
         "geometryDetail": "full",
@@ -564,7 +564,7 @@
         "renderProfile": "blender",
         "renderScale": 1.25,
         "adaptive": false,
-        "targetFps": 60,
+        "targetFps": 240,
         "frameRateLimit": 0,
         "antialiasSamples": 4,
         "shadows": true,
@@ -711,7 +711,7 @@
     },
     {
       "id": "presentation-profile",
-      "title": "Quality, Performance and Custom presentation profiles",
+      "title": "Performance, Quality, Max and Custom presentation profiles",
       "availability": "active",
       "owner": "src/pass65-settings.ts + src/render-profile.ts",
       "sourceProbes": [
@@ -731,10 +731,10 @@
           "graphics.preset",
           "graphics.geometryDetail"
         ],
-        "effectiveValue": "Quality defaults to full authored geometry; Performance defaults to reduced presentation; Custom exposes the same presentation-only selector",
+        "effectiveValue": "Performance uses the lowest gameplay-safe presentation values; Quality is the balanced full-geometry profile; Max enables the highest supported values; Custom seeds from the last named profile before an explicit save",
         "rationale": "Profiles and geometry detail change presentation roots only. They never change movement, collision, ballistics, visibility authority, invisible blockers, or major debris physics."
       },
-      "budget": "Performance pixel ratio cap 0.75; Quality cap 1.0; internal Max supersampling cap 1.25; compatibility cap 0.2.",
+      "budget": "Performance effective pixel ratio cap 0.75; Quality base scale 1.0; Max and explicit Custom supersampling cap 1.25; compatibility cap 0.2.",
       "verifier": "src/pass65-settings.test.ts + src/render-profile.test.ts",
       "authorityAffecting": false
     },
@@ -1406,5 +1406,5 @@
     "adjustable": 15,
     "fixedWithRationale": 7
   },
-  "inventorySha256": "6cb1662f82086ff24c9ff70b66a844ec9584c2ce211644c1f54a2e19737aaeb9"
+  "inventorySha256": "7dccf452efe3992b0760a9d148a36279d3ee2ba67df51b36c57eebcc08b96068"
 }

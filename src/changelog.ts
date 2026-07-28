@@ -38,10 +38,31 @@ export function resolveProductionReleasedAt(
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
   Object.freeze({
+    id: 'pass65',
+    pass: 'PASS 65',
+    title: 'The Big One',
+    releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
+    areas: Object.freeze(['KILLSTREAKS', 'VEHICLES', 'ORDNANCE', 'DESTRUCTION', 'HUD', 'GRAPHICS']),
+    summary: 'Pass 65 makes vehicle killstreaks fly properly, calls the Carpet Bomber in at your crosshair, adds sticky ordnance and real shed destruction, halves the vehicle HUD footprint and lets you batch graphics changes without being kicked out.',
+    highlights: Object.freeze([
+      'The piloted Hunter Drone steers on every axis with a stable low-latency camera, and the Chopper Gunner gains a dedicated gun crosshair',
+      'The Carpet Bomber is called in along your crosshair and its falling shells deal real explosion damage down the strike corridor',
+      'Killstreak rewards collect with F, cycle predictably, and never swallow door, crate or pickup interactions',
+      'Semtex sticks to enemies with an animated STUCK alert for double damage, and smoke grenades pop instantly without fuse beeps',
+      'The explosive crossbolt flies three times faster, and a bolt that sticks doubles its blast damage and radius',
+      'Close explosions now rip panels straight off destructible sheds and launch the debris visibly instead of leaving dents',
+      'Helicopter and flying-cat HUD overlays are rescaled to half size so combat information stays readable',
+      'First-person arms, gloves and the knife stab now match the authored third-person melee timing',
+      'Graphics offers Performance, Quality and Max presets that all chase maximum frame rate, and Custom starts from whichever preset you picked',
+      'Graphics edits batch in the options screen and save when you leave it, so changing settings never kicks you out of the menu or a live match',
+      'Alt-tab recovery re-anchors frame pacing and adaptive quality so refocusing returns straight to full display cadence',
+    ]),
+  }),
+  Object.freeze({
     id: 'pass64',
     pass: 'PASS 64',
     title: 'WebGPU Combat, Tactical HUD & Arena Forge',
-    releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
+    releasedAt: '2026-07-25T21:15:25Z',
     areas: Object.freeze(['WEBGPU', 'MULTIPLAYER', 'HUD', 'RAILGUN', 'TERMINAL', 'RUSTRIG', 'GUN RANGE']),
     summary: 'Pass 64 moves the complete playable game to hardware WebGPU/TSL, rebuilds the tactical interface, hardens multiplayer recovery and gives every arena a focused visual-quality pass.',
     highlights: Object.freeze([

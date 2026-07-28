@@ -1,0 +1,746 @@
+{
+  "schemaVersion": 1,
+  "captureId": "pass65-authoritative-runtime-menu-preview-capture-v1",
+  "generatedAt": "2026-07-28",
+  "recipeId": "pass65-authoritative-runtime-menu-preview-v3",
+  "recipeDigest": "37189acd7a477d348b516ec05428ee258ce9137355e603827c305bf092b46f4f",
+  "source": "authoritative-runtime-arena",
+  "backendRequired": "webgpu",
+  "viewport": [
+    960,
+    540
+  ],
+  "overlay": {
+    "scale": 0.5,
+    "palette": [
+      "#050708",
+      "#111719",
+      "#4b5458",
+      "#9ba5aa"
+    ],
+    "mode": "offline-baked-compact-black-grey",
+    "liveLoadingRenderer": false
+  },
+  "frameRoster": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83,
+    84,
+    85,
+    86,
+    87,
+    88,
+    89,
+    90,
+    91,
+    92,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109,
+    110,
+    111,
+    112,
+    113,
+    114,
+    115,
+    116,
+    117,
+    118,
+    119,
+    120,
+    121,
+    122,
+    123,
+    124,
+    125,
+    126,
+    127,
+    128,
+    129,
+    130,
+    131,
+    132,
+    133,
+    134,
+    135,
+    136,
+    137,
+    138,
+    139,
+    140,
+    141,
+    142,
+    143,
+    144,
+    145,
+    146,
+    147,
+    148,
+    149,
+    150,
+    151,
+    152,
+    153,
+    154,
+    155,
+    156,
+    157,
+    158,
+    159,
+    160,
+    161,
+    162,
+    163,
+    164,
+    165,
+    166,
+    167,
+    168,
+    169,
+    170,
+    171,
+    172,
+    173,
+    174,
+    175,
+    176,
+    177,
+    178,
+    179,
+    180,
+    181,
+    182,
+    183,
+    184,
+    185,
+    186,
+    187,
+    188,
+    189,
+    190,
+    191,
+    192
+  ],
+  "runtimeInputs": {
+    "captureTool": {
+      "path": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
+      "sha256": "66d6071904340dc46e2690309bba5cb917f26e1123ef08cc31f4fce9f6ac5592"
+    },
+    "captureRuntime": [
+      {
+        "path": "src/legacy-main.ts",
+        "sha256": "af246dc35d08e57b44cb6f39fbdc7c10f7f7949f886f7d57701b176958e7582c"
+      },
+      {
+        "path": "src/ui/menu-preview-camera.ts",
+        "sha256": "d3744ed9057f64dded01cac5f5131fde69f44b64a09bc7f17270d22035ca54ed"
+      }
+    ],
+    "arenas": {
+      "atomic-acres": [
+        {
+          "path": "src/map.ts",
+          "sha256": "a070003ad3fa5cf46362a3182618c43d02ba16f822deaf13004e2a980913558c"
+        },
+        {
+          "path": "src/arena-layout.ts",
+          "sha256": "2908e2b9001b27315fa9198472319b2af4dd67bd289e5e57ddb4fc946852d891"
+        },
+        {
+          "path": "src/rendering/arenas/atomic-acres.ts",
+          "sha256": "b76e30143b5e9dca1e87f43ed00fee7f919eae2e453278aabb5fdc520e33690d"
+        }
+      ],
+      "skyline-terminal": [
+        {
+          "path": "src/additional-maps.ts",
+          "sha256": "b2b185a8f98e0b78128c5b406c9beabcca74d77dc15823574f0886e47cb2422d"
+        },
+        {
+          "path": "src/rendering/arenas/skyline-terminal.ts",
+          "sha256": "d2c4efeb9293e38ee345eadc1753185d09ceef866cc368cd72b28f069ad29c4a"
+        }
+      ],
+      "rustworks-1v1": [
+        {
+          "path": "src/additional-maps.ts",
+          "sha256": "b2b185a8f98e0b78128c5b406c9beabcca74d77dc15823574f0886e47cb2422d"
+        },
+        {
+          "path": "src/rendering/arenas/rustworks-1v1.ts",
+          "sha256": "fbf91ea31efc1ca115e6f3d1fb454eee6f9ecc3085156d416f2ff94fcef85c26"
+        }
+      ],
+      "gun-range": [
+        {
+          "path": "src/additional-maps.ts",
+          "sha256": "b2b185a8f98e0b78128c5b406c9beabcca74d77dc15823574f0886e47cb2422d"
+        },
+        {
+          "path": "src/rendering/arenas/gun-range.ts",
+          "sha256": "92c9bd71e4a120898969c5006f1d80ec158a362d1f74d599e99488ef64cd5a38"
+        }
+      ]
+    }
+  },
+  "arenas": [
+    {
+      "arenaId": "atomic-acres",
+      "kind": "helicopter",
+      "presentationId": "menu-video-runtime-helo-nuke-town-v3",
+      "backend": "webgpu",
+      "softwareAdapter": false,
+      "constructionHistory": [
+        "atomic-acres"
+      ],
+      "residentArenaRoots": 1,
+      "colliders": 183,
+      "raycastMeshes": 160,
+      "targets": 6,
+      "viewmodelHidden": true,
+      "firstFrame": 1,
+      "lastFrame": 192,
+      "capturedFrames": 192,
+      "reviewFrames": [
+        {
+          "frame": 1,
+          "requestedPosition": [
+            39.383642770008365,
+            23.9976587069163,
+            7.467073419597865
+          ],
+          "renderedPosition": [
+            39.383642770008365,
+            23.9976587069163,
+            7.467073419597865
+          ],
+          "requestedFov": 68,
+          "renderedFov": 68,
+          "fixedVisualTimeMs": 65000,
+          "aboveArenaFloor": true,
+          "insideHorizontalCollider": false,
+          "pngSha256": "a8807b67b2022e8795c25b75cf7e51716a65bef2bdb232e36feb039f16920d40"
+        },
+        {
+          "frame": 48,
+          "requestedPosition": [
+            -5.993794662443604,
+            23.6116239222881,
+            43.67587612750801
+          ],
+          "renderedPosition": [
+            -5.993794662443604,
+            23.6116239222881,
+            43.67587612750801
+          ],
+          "requestedFov": 68,
+          "renderedFov": 68,
+          "fixedVisualTimeMs": 66968.58638743455,
+          "aboveArenaFloor": true,
+          "insideHorizontalCollider": false,
+          "pngSha256": "ab9db5f504d9dc0eff785051c655425110e8143c312936fde8f4e8e79b0f3fba"
+        },
+        {
+          "frame": 96,
+          "requestedPosition": [
+            -39.61316019473926,
+            23.89154050071495,
+            -6.686861320345696
+          ],
+          "renderedPosition": [
+            -39.61316019473926,
+            23.89154050071495,
+            -6.686861320345696
+          ],
+          "requestedFov": 68,
+          "renderedFov": 68,
+          "fixedVisualTimeMs": 68979.05759162303,
+          "aboveArenaFloor": true,
+          "insideHorizontalCollider": false,
+          "pngSha256": "4171bbd53c3f013e0af75c610e6455b9da70a47a43b147516cd5fb59f7a1dfe6"
+        },
+        {
+          "frame": 144,
+          "requestedPosition": [
+            6.394414874502656,
+            24.60165383767242,
+            -43.06669530571619
+          ],
+          "renderedPosition": [
+            6.394414874502656,
+            24.60165383767242,
+            -43.06669530571619
+          ],
+          "requestedFov": 68,
+          "renderedFov": 68,
+          "fixedVisualTimeMs": 70989.52879581152,
+          "aboveArenaFloor": true,
+          "insideHorizontalCollider": false,
+          "pngSha256": "46ca3eb08e007479e3864b3bc1b777f6cb0822aa7942c70066350aeb255f40bf"
+        },
+        {
+          "frame": 192,
+          "requestedPosition": [
+            39.383642770008365,
+            23.9976587069163,
+            7.467073419597865
+          ],
+          "renderedPosition": [
+            39.383642770008365,
+            23.9976587069163,
+            7.467073419597865
+          ],
+          "requestedFov": 68,
+          "renderedFov": 68,
+          "fixedVisualTimeMs": 65000,
+          "aboveArenaFloor": true,
+          "insideHorizontalCollider": false,
+          "pngSha256": "a8807b67b2022e8795c25b75cf7e51716a65bef2bdb232e36feb039f16920d40",
+          "seamSourceFrame": 1
+        }
+      ]
+    },
+    {
+      "arenaId": "skyline-terminal",
+      "kind": "helicopter",
+      "presentationId": "menu-video-runtime-helo-terminal-v3",
+      "backend": "webgpu",
+      "softwareAdapter": false,
+      "constructionHistory": [
+        "skyline-terminal"
+      ],
+      "residentArenaRoots": 1,
+      "colliders": 167,
+      "raycastMeshes": 156,
+      "targets": 0,
+      "viewmodelHidden": true,
+      "firstFrame": 1,
+      "lastFrame": 192,
+      "capturedFrames": 192,
+      "reviewFrames": [
+        {
+          "frame": 1,
+          "requestedPosition": [
+            41.49702549058807,
+            14.92731350832411,
+            2.0087485038184436
+          ],
+          "renderedPosition": [
+            41.49702549058807,
+            14.92731350832411,
+            2.0087485038184436
+          ],
+          "requestedFov": 68,
+          "renderedFov": 68,
+          "fixedVisualTimeMs": 65000,
+          "aboveArenaFloor": true,
+          "insideHorizontalCollider": false,
+          "pngSha256": "08bc1c2ed3539dbad9efee23713e71193e634867af7a7a721fbe8edc3b0ced09"
+        },
+        {
+          "frame": 48,
+          "requestedPosition": [
+            15.667328980862388,
+            15.2082893868617,
+            40.35216909594287
+          ],
+          "renderedPosition": [
+            15.667328980862388,
+            15.2082893868617,
+            40.35216909594287
+          ],
+          "requestedFov": 68,
+          "renderedFov": 68,
+          "fixedVisualTimeMs": 66968.58638743455,
+          "aboveArenaFloor": true,
+          "insideHorizontalCollider": false,
+          "pngSha256": "32fc87d915b2c9d017f0c0c2fdd94de4a798ca700bb60e5e98c36c0a23df15c1"
+        },
+        {
+          "frame": 96,
+          "requestedPosition": [
+            -41.237415883844164,
+            14.968176627933786,
+            22.499775040538786
+          ],
+          "renderedPosition": [
+            -41.237415883844164,
+            14.968176627933786,
+            22.499775040538786
+          ],
+          "requestedFov": 68,
+          "renderedFov": 68,
+          "fixedVisualTimeMs": 68979.05759162303,
+          "aboveArenaFloor": true,
+          "insideHorizontalCollider": false,
+          "pngSha256": "bbee36af28ca01faee1feb4a2447bd5f61573630773f232d441e9e931a25c82f"
+        },
+        {
+          "frame": 144,
+          "requestedPosition": [
+            -14.987613836800707,
+            14.990315736069991,
+            -16.24582603872975
+          ],
+          "renderedPosition": [
+            -14.987613836800707,
+            14.990315736069991,
+            -16.24582603872975
+          ],
+          "requestedFov": 68,
+          "renderedFov": 68,
+          "fixedVisualTimeMs": 70989.52879581152,
+          "aboveArenaFloor": true,
+          "insideHorizontalCollider": false,
+          "pngSha256": "38196f84b13581ba7c17b4e3622467c8f028e92a0422056028364fdcb4b7b999"
+        },
+        {
+          "frame": 192,
+          "requestedPosition": [
+            41.49702549058807,
+            14.92731350832411,
+            2.0087485038184436
+          ],
+          "renderedPosition": [
+            41.49702549058807,
+            14.92731350832411,
+            2.0087485038184436
+          ],
+          "requestedFov": 68,
+          "renderedFov": 68,
+          "fixedVisualTimeMs": 65000,
+          "aboveArenaFloor": true,
+          "insideHorizontalCollider": false,
+          "pngSha256": "08bc1c2ed3539dbad9efee23713e71193e634867af7a7a721fbe8edc3b0ced09",
+          "seamSourceFrame": 1
+        }
+      ]
+    },
+    {
+      "arenaId": "rustworks-1v1",
+      "kind": "helicopter",
+      "presentationId": "menu-video-runtime-helo-rustrig-v3",
+      "backend": "webgpu",
+      "softwareAdapter": false,
+      "constructionHistory": [
+        "rustworks-1v1"
+      ],
+      "residentArenaRoots": 1,
+      "colliders": 81,
+      "raycastMeshes": 64,
+      "targets": 0,
+      "viewmodelHidden": true,
+      "firstFrame": 1,
+      "lastFrame": 192,
+      "capturedFrames": 192,
+      "reviewFrames": [
+        {
+          "frame": 1,
+          "requestedPosition": [
+            34.626648970144515,
+            24.939811878289017,
+            17.074284326859296
+          ],
+          "renderedPosition": [
+            34.626648970144515,
+            24.939811878289017,
+            17.074284326859296
+          ],
+          "requestedFov": 68,
+          "renderedFov": 68,
+          "fixedVisualTimeMs": 65000,
+          "aboveArenaFloor": true,
+          "insideHorizontalCollider": false,
+          "pngSha256": "f96493e9ef750752f25bc2ed857737a2f1fbce00b535c1a3afbd9028b40f12ee"
+        },
+        {
+          "frame": 48,
+          "requestedPosition": [
+            -17.182440711172042,
+            24.93492533676228,
+            33.07462109686541
+          ],
+          "renderedPosition": [
+            -17.182440711172042,
+            24.93492533676228,
+            33.07462109686541
+          ],
+          "requestedFov": 68,
+          "renderedFov": 68,
+          "fixedVisualTimeMs": 66968.58638743455,
+          "aboveArenaFloor": true,
+          "insideHorizontalCollider": false,
+          "pngSha256": "cea56fccfa7d11750816d6cb980495370b4c1aaf2cb6092d87481d34a61dfacc"
+        },
+        {
+          "frame": 96,
+          "requestedPosition": [
+            -34.91432914768317,
+            25.0097662388921,
+            -16.53613793167584
+          ],
+          "renderedPosition": [
+            -34.91432914768317,
+            25.0097662388921,
+            -16.53613793167584
+          ],
+          "requestedFov": 68,
+          "renderedFov": 68,
+          "fixedVisualTimeMs": 68979.05759162303,
+          "aboveArenaFloor": true,
+          "insideHorizontalCollider": false,
+          "pngSha256": "98a4260e8d2bd31d733e87f431eeec478825c40f12c4fccb5226c8d5bf77afaf"
+        },
+        {
+          "frame": 144,
+          "requestedPosition": [
+            17.705457509372778,
+            25.0320528253354,
+            -32.96319825032995
+          ],
+          "renderedPosition": [
+            17.705457509372778,
+            25.0320528253354,
+            -32.96319825032995
+          ],
+          "requestedFov": 68,
+          "renderedFov": 68,
+          "fixedVisualTimeMs": 70989.52879581152,
+          "aboveArenaFloor": true,
+          "insideHorizontalCollider": false,
+          "pngSha256": "5e3abc29206b692d3f2da9cc16a0685b606b10fde07ef4378186974fc18375e5"
+        },
+        {
+          "frame": 192,
+          "requestedPosition": [
+            34.626648970144515,
+            24.939811878289017,
+            17.074284326859296
+          ],
+          "renderedPosition": [
+            34.626648970144515,
+            24.939811878289017,
+            17.074284326859296
+          ],
+          "requestedFov": 68,
+          "renderedFov": 68,
+          "fixedVisualTimeMs": 65000,
+          "aboveArenaFloor": true,
+          "insideHorizontalCollider": false,
+          "pngSha256": "f96493e9ef750752f25bc2ed857737a2f1fbce00b535c1a3afbd9028b40f12ee",
+          "seamSourceFrame": 1
+        }
+      ]
+    },
+    {
+      "arenaId": "gun-range",
+      "kind": "cat",
+      "presentationId": "menu-video-runtime-cat-gun-range-v3",
+      "backend": "webgpu",
+      "softwareAdapter": false,
+      "constructionHistory": [
+        "gun-range"
+      ],
+      "residentArenaRoots": 1,
+      "colliders": 20,
+      "raycastMeshes": 26,
+      "targets": 16,
+      "viewmodelHidden": true,
+      "firstFrame": 1,
+      "lastFrame": 192,
+      "capturedFrames": 192,
+      "reviewFrames": [
+        {
+          "frame": 1,
+          "requestedPosition": [
+            0,
+            0.82,
+            0.5
+          ],
+          "renderedPosition": [
+            0,
+            0.82,
+            0.5
+          ],
+          "requestedFov": 62,
+          "renderedFov": 62,
+          "fixedVisualTimeMs": 65000,
+          "aboveArenaFloor": true,
+          "insideHorizontalCollider": false,
+          "pngSha256": "9a34a0d3d98dff76927fd395fe6059f7242440eaf4601b6e88585db0928489d8"
+        },
+        {
+          "frame": 48,
+          "requestedPosition": [
+            1.1026032628904872,
+            0.7978014131709561,
+            -1.9452728817740754
+          ],
+          "renderedPosition": [
+            1.1026032628904872,
+            0.7978014131709561,
+            -1.9452728817740754
+          ],
+          "requestedFov": 62,
+          "renderedFov": 62,
+          "fixedVisualTimeMs": 66968.58638743455,
+          "aboveArenaFloor": true,
+          "insideHorizontalCollider": false,
+          "pngSha256": "21066ba9fd1ead4693967ae63c485b8dfde57486b87e6d66ad50f28c0a657ba6"
+        },
+        {
+          "frame": 96,
+          "requestedPosition": [
+            0.013590636221595183,
+            0.8391037641371234,
+            -5.199130179074785
+          ],
+          "renderedPosition": [
+            0.013590636221595183,
+            0.8391037641371234,
+            -5.199130179074785
+          ],
+          "requestedFov": 62,
+          "renderedFov": 62,
+          "fixedVisualTimeMs": 68979.05759162303,
+          "aboveArenaFloor": true,
+          "insideHorizontalCollider": false,
+          "pngSha256": "a1a3993f2418e16f517bc928f2fe365369fc12ab1302b28dc7f3d855c9273b24"
+        },
+        {
+          "frame": 144,
+          "requestedPosition": [
+            -1.099672690553542,
+            0.7994319355529017,
+            -2.018935195556865
+          ],
+          "renderedPosition": [
+            -1.099672690553542,
+            0.7994319355529017,
+            -2.018935195556865
+          ],
+          "requestedFov": 62,
+          "renderedFov": 62,
+          "fixedVisualTimeMs": 70989.52879581152,
+          "aboveArenaFloor": true,
+          "insideHorizontalCollider": false,
+          "pngSha256": "8b21e1cc20e0c0d67fb5a1b5ecf6d7a7a60faaa2aa61655d3c498352e19b8d5e"
+        },
+        {
+          "frame": 192,
+          "requestedPosition": [
+            0,
+            0.82,
+            0.5
+          ],
+          "renderedPosition": [
+            0,
+            0.82,
+            0.5
+          ],
+          "requestedFov": 62,
+          "renderedFov": 62,
+          "fixedVisualTimeMs": 65000,
+          "aboveArenaFloor": true,
+          "insideHorizontalCollider": false,
+          "pngSha256": "9a34a0d3d98dff76927fd395fe6059f7242440eaf4601b6e88585db0928489d8",
+          "seamSourceFrame": 1
+        }
+      ]
+    }
+  ]
+}

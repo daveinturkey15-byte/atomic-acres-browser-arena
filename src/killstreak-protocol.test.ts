@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseKillstreakLoadout } from './killstreak-catalog';
 import { HostKillstreakRuntime } from './killstreak-runtime';
 import {
+  admitKillstreakCareCaptureResultMessage,
   admitKillstreakStateMessage,
   isKillstreakHostAuthorityMessage,
   isKillstreakProtocolMessage,
@@ -17,8 +18,12 @@ describe('killstreak protocol', () => {
     })).toBe(true);
     expect(isKillstreakProtocolMessage({
       type: 'killstreak-activate-intent', by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 1,
-      slot: 3, activationId: 'activation-tri-pass-1', expectedId: 'tri-pass', anchor: [0, 0, 0], nonce: 2,
+      slot: 3, activationId: 'activation-tri-pass-1', expectedId: 'tri-pass', anchor: [0, 0, 0], facing: [0, 0, -1], nonce: 2,
     })).toBe(true);
+    expect(isKillstreakProtocolMessage({
+      type: 'killstreak-activate-intent', by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 1,
+      slot: 3, activationId: 'activation-tri-pass-1', expectedId: 'tri-pass', anchor: [0, 0, 0], facing: [Number.NaN, 0, -1], nonce: 2,
+    })).toBe(false);
     expect(isKillstreakProtocolMessage({
       type: 'killstreak-activate-intent', by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 1,
       slot: 3, activationId: 'activation-tri-pass-1', expectedId: 'tri-pass', anchor: [0, 0, 0], seed: 42, path: [[0, 0, 0]], nonce: 2,
@@ -40,6 +45,53 @@ describe('killstreak protocol', () => {
       entityId: 'ks-7-chopper-1', action: 'pilot-control', yawQ: 0, pitchQ: 0, thrustQ: 0, verticalQ: 0,
       position: [99, 99, 99], flightAuthority: 'player', nonce: 3,
     })).toBe(false);
+  });
+
+  it('admits only correlated host-authored care capture results', () => {
+    const message = {
+      type: 'killstreak-care-capture-result' as const,
+      by: 'host', forPlayerId: 'owner', matchEpoch: 7, lifeId: 3, sequence: 9,
+      crateId: 'ks-7-care-1', holding: true, accepted: true, reason: 'accepted' as const,
+      revision: 14, nonce: 55,
+    };
+    expect(isKillstreakProtocolMessage(message)).toBe(true);
+    expect(isKillstreakHostAuthorityMessage(message)).toBe(true);
+    expect(killstreakMessageBelongsToPlayer(message, 'owner')).toBe(true);
+    expect(admitKillstreakCareCaptureResultMessage(message, {
+      expectedHostId: 'host', expectedRecipientId: 'owner', expectedMatchEpoch: 7,
+      expectedLifeId: 3, seenNonces: new Set(),
+    })).toEqual({ accepted: true, reason: 'accepted' });
+    expect(admitKillstreakCareCaptureResultMessage(message, {
+      expectedHostId: 'forged', expectedRecipientId: 'owner', expectedMatchEpoch: 7,
+      expectedLifeId: 3, seenNonces: new Set(),
+    }).accepted).toBe(false);
+    expect(admitKillstreakCareCaptureResultMessage(message, {
+      expectedHostId: 'host', expectedRecipientId: 'owner', expectedMatchEpoch: 7,
+      expectedLifeId: 3, seenNonces: new Set([55]),
+    }).reason).toBe('duplicate-nonce');
+    expect(isKillstreakProtocolMessage({ ...message, accepted: false, reason: 'accepted' })).toBe(false);
+    expect(isKillstreakProtocolMessage({ ...message, accepted: true, reason: 'crate-unavailable' })).toBe(false);
+    expect(isKillstreakProtocolMessage({ ...message, accepted: true, holding: false, reason: 'released' })).toBe(true);
+    expect(isKillstreakProtocolMessage({ ...message, accepted: false, holding: false, reason: 'not-capturing' })).toBe(true);
+  });
+
+  it('admits bounded host carpet drop/impact choreography even when no damage target was hit', () => {
+    const message = {
+      type: 'killstreak-damage-result' as const,
+      by: 'host', matchEpoch: 7, revision: 3, events: [],
+      impacts: [
+        { activationId: 'ks-activation-7-1', source: 'carpet-bomber' as const, ordinal: 0, phase: 'drop' as const, position: [1, 0, 2] as const, impactAtMs: 2_000, atMs: 1_580 },
+        { activationId: 'ks-activation-7-1', source: 'carpet-bomber' as const, ordinal: 0, phase: 'impact' as const, position: [1, 0, 2] as const, impactAtMs: 2_000, atMs: 2_000 },
+      ],
+      nonce: 9,
+    };
+    expect(isKillstreakProtocolMessage(message)).toBe(true);
+    expect(killstreakMessageBelongsToPlayer(message, 'observer')).toBe(true);
+    expect(isKillstreakHostAuthorityMessage(message)).toBe(true);
+    expect(isKillstreakProtocolMessage({ ...message, impacts: [...message.impacts, message.impacts[0]] })).toBe(false);
+    expect(isKillstreakProtocolMessage({ ...message, impacts: [{ ...message.impacts[0], phase: 'drop', atMs: 2_001 }] })).toBe(false);
+    expect(isKillstreakProtocolMessage({ ...message, impacts: [{ ...message.impacts[1], phase: 'impact', atMs: 1_999 }] })).toBe(false);
+    expect(isKillstreakProtocolMessage({ ...message, impacts: [{ ...message.impacts[0], ordinal: 20 }] })).toBe(false);
   });
 
   it('admits bounded recipient snapshots, rejects entity storms, and classifies host authority', () => {

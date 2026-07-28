@@ -82,6 +82,9 @@ describe('remote hit admission', () => {
     expect(maximumRemoteExplosiveBaseDamage('grenade', 0, 'stand', 'semtex')).toBe(95);
     expect(maximumRemoteExplosiveBaseDamage('grenade', 0, 'prone', 'semtex')).toBeCloseTo(39.9, 5);
     expect(maximumRemoteExplosiveBaseDamage('grenade', 4.26, 'stand', 'semtex')).toBe(0);
+    expect(maximumRemoteExplosiveBaseDamage('grenade', 0, 'stand', 'semtex', true)).toBe(100);
+    expect(maximumRemoteExplosiveBaseDamage('grenade', 4.26, 'stand', 'semtex', true)).toBeGreaterThan(0);
+    expect(maximumRemoteExplosiveBaseDamage('grenade', 8.51, 'stand', 'semtex', true)).toBe(0);
     expect(maximumRemoteExplosiveBaseDamage('tri-pass', 12, 'stand')).toBeGreaterThan(0);
   });
 

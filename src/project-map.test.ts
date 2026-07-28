@@ -26,7 +26,12 @@ describe('project map', () => {
     expect(bundle.current.release).toEqual(PROJECT_MAP_CANDIDATE);
     expect(bundle.current.previousRelease).toBe('PASS 64');
     expect(bundle.archive).toEqual(CHANGELOG);
-    expect(bundle.changes).toEqual([PROJECT_MAP_CANDIDATE, ...CHANGELOG]);
+    // The candidate snapshot replaces the pending PASS 65 ledger entry at the
+    // front of the combined changes list instead of duplicating the pass.
+    expect(bundle.changes).toEqual([
+      PROJECT_MAP_CANDIDATE,
+      ...CHANGELOG.filter((entry) => entry.pass !== PROJECT_MAP_CANDIDATE.pass),
+    ]);
     expect(bundle.current.candidateState).toBe('hitl-candidate');
     expect(bundle.publishedChannels.stagedCandidate).toMatchObject({
       pass: 'PASS 65', label: 'THE BIG ONE', path: 'channels/the-big-one', state: 'unpublished-hitl-candidate',

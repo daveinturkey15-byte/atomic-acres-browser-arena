@@ -218,6 +218,12 @@ export function calculateFlashExposure(input: Readonly<{
 
 export const EXPLOSIVE_BOLT_ARM_DELAY_MS = 1_250;
 export const EXPLOSIVE_BOLT_MAX_LIFE_MS = 5_000;
+/** Pass 65: bolts fly 3x the legacy 36 m/s so mid-range shots land without heavy lead. */
+export const EXPLOSIVE_BOLT_PREVIOUS_SPEED_MPS = 36;
+export const EXPLOSIVE_BOLT_SPEED_MULTIPLIER = 3;
+export const EXPLOSIVE_BOLT_SPEED_MPS = EXPLOSIVE_BOLT_PREVIOUS_SPEED_MPS * EXPLOSIVE_BOLT_SPEED_MULTIPLIER;
+/** Bolts stuck to a combatant detonate with double damage and double blast area. */
+export const EXPLOSIVE_BOLT_STUCK_MULTIPLIER = 2;
 export const EXPLOSIVE_BOLT_DIRECT_DAMAGE = 45;
 export const EXPLOSIVE_BOLT_BLAST_MAX_DAMAGE = 60;
 export const EXPLOSIVE_BOLT_BLAST_MIN_DAMAGE = 15;
@@ -285,9 +291,16 @@ export function detonateExplosiveBolt(state: ExplosiveBoltState, nowMs: number):
   return Object.freeze({ ...state, detonatedAtMs: nowMs });
 }
 
-export function explosiveBoltBlastDamage(distanceM: number): number {
-  if (!Number.isFinite(distanceM) || distanceM < 0 || distanceM > EXPLOSIVE_BOLT_BLAST_RADIUS_M) return 0;
-  const alpha = distanceM / EXPLOSIVE_BOLT_BLAST_RADIUS_M;
-  return EXPLOSIVE_BOLT_BLAST_MAX_DAMAGE
-    + (EXPLOSIVE_BOLT_BLAST_MIN_DAMAGE - EXPLOSIVE_BOLT_BLAST_MAX_DAMAGE) * alpha;
+export function explosiveBoltBlastRadiusM(stuck = false): number {
+  return EXPLOSIVE_BOLT_BLAST_RADIUS_M * (stuck ? EXPLOSIVE_BOLT_STUCK_MULTIPLIER : 1);
+}
+
+/** Pure balance oracle shared by local and host-admitted remote crossbolt damage. */
+export function explosiveBoltBlastDamage(distanceM: number, stuck = false): number {
+  const radiusM = explosiveBoltBlastRadiusM(stuck);
+  if (!Number.isFinite(distanceM) || distanceM < 0 || distanceM > radiusM) return 0;
+  const alpha = distanceM / radiusM;
+  return (EXPLOSIVE_BOLT_BLAST_MAX_DAMAGE
+    + (EXPLOSIVE_BOLT_BLAST_MIN_DAMAGE - EXPLOSIVE_BOLT_BLAST_MAX_DAMAGE) * alpha)
+    * (stuck ? EXPLOSIVE_BOLT_STUCK_MULTIPLIER : 1);
 }

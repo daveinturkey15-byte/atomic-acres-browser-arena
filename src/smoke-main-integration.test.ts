@@ -32,4 +32,17 @@ describe('host-authoritative smoke integration', () => {
     expect(source).toMatch(/smokeVolumePresentationPool\.clear\(\);\s+smokeVolumes\.length = 0;\s+smokeAuthority\.reset/);
     expect(source).toContain('smokeVolumePresentationPool.release(existing.presentationLease)');
   });
+
+  it('detonates smoke on the first actor, world, floor, or out-of-bounds impact without a fuse beep', () => {
+    expect(source).toContain("function grenadeDetonatesOnFirstImpact(grenade: GrenadeId): boolean {\n  return grenade === 'flash' || grenade === 'smoke';\n}");
+    const start = source.indexOf('function updateGrenades(');
+    const end = source.indexOf('\nfunction hitPracticeTarget(', start);
+    const block = source.slice(start, end);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    expect(block).toContain('!grenadeDetonatesOnFirstImpact(grenade.grenade) && fuseRemainingMs <= GRENADE_FUSE_BEEP_START_MS');
+    expect(block).toContain('if (grenadeDetonatesOnFirstImpact(grenade.grenade) || grenade.grenade === \'semtex\')');
+    expect(block).toMatch(/if \(!pointInsideBounds\([\s\S]+?armImpactGrenade\(grenade, now, grenade\.mesh\.position\);[\s\S]+?if \(grenadeDetonatesOnFirstImpact\(grenade\.grenade\)\) \{[\s\S]+?explodeGrenade\(grenade\);/);
+    expect(block).toMatch(/if \(grenade\.mesh\.position\.y < 0\.18\)[\s\S]+?armImpactGrenade\(grenade, now, grenade\.mesh\.position\);[\s\S]+?if \(grenadeDetonatesOnFirstImpact\(grenade\.grenade\)\) \{[\s\S]+?explodeGrenade\(grenade\);/);
+  });
 });

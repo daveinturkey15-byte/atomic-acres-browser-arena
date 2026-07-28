@@ -13,10 +13,17 @@ export type FramePacingSummary = {
     over100Ms: number;
   }>;
   displayLimited: boolean;
+  lastResetReason: string | null;
 };
 
 export class FramePacingSampler {
   private readonly samples: number[] = [];
+  private lastResetReason: string | null = null;
+
+  reset(reason: string): void {
+    this.samples.length = 0;
+    this.lastResetReason = reason.trim() || 'unspecified';
+  }
 
   record(frameMs: number): void {
     if (!Number.isFinite(frameMs) || frameMs < 1 || frameMs > 1_000) return;
@@ -36,6 +43,7 @@ export class FramePacingSampler {
         maxMs: 0,
         longFrames: { over20Ms: 0, over33Ms: 0, over50Ms: 0, over100Ms: 0 },
         displayLimited: false,
+        lastResetReason: this.lastResetReason,
       };
     }
     const ordered = [...this.samples].sort((a, b) => a - b);
@@ -59,6 +67,7 @@ export class FramePacingSampler {
         over100Ms: ordered.filter((frameMs) => frameMs > 100).length,
       },
       displayLimited: ordered.length >= 90 && cadenceHz < 55,
+      lastResetReason: this.lastResetReason,
     };
   }
 }

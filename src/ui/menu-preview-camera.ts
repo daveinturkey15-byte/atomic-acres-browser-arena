@@ -26,7 +26,7 @@ type ArenaRecipeBase = Readonly<{
 
 type HelicopterRecipe = ArenaRecipeBase & Readonly<{
   kind: 'helicopter';
-  cockpitAssetId: 'pass65-sleek-cockpit-v1';
+  cockpitAssetId: 'pass65-compact-cockpit-overlay-v3';
   centre: Vector3Tuple;
   radius: readonly [number, number];
   altitudeM: number;
@@ -49,7 +49,7 @@ type CatRecipe = ArenaRecipeBase & Readonly<{
 
 type ArenaRecipe = HelicopterRecipe | CatRecipe;
 type ChoreographyRecipe = Readonly<{
-  schemaVersion: 2;
+  schemaVersion: 3;
   recipeId: string;
   fps: number;
   durationSeconds: number;
@@ -239,11 +239,11 @@ function adjustedLookAt(position: Vector3Tuple, target: Vector3Tuple, pitchDegre
   const dx = target[0] - position[0];
   const dy = target[1] - position[1];
   const dz = target[2] - position[2];
-  const horizontal = Math.max(0.001, Math.hypot(dx, dy));
+  const horizontal = Math.max(0.001, Math.hypot(dx, dz));
   return [
-    position[0] + dx * Math.cos(yaw) - dy * Math.sin(yaw),
-    position[1] + dx * Math.sin(yaw) + dy * Math.cos(yaw),
-    position[2] + dz + Math.tan(pitchDegrees * Math.PI / 180) * horizontal,
+    position[0] + dx * Math.cos(yaw) - dz * Math.sin(yaw),
+    position[1] + dy + Math.tan(pitchDegrees * Math.PI / 180) * horizontal,
+    position[2] + dx * Math.sin(yaw) + dz * Math.cos(yaw),
   ];
 }
 
@@ -265,7 +265,7 @@ export function menuPreviewPose(arenaId: ArenaId, elapsedMs: number, reducedMoti
   if (definition.kind === 'cat') {
     const basePosition = closedSpline(definition.path, progress);
     const bob = reducedMotion ? 0 : Math.sin(progress * Math.PI * 8) * 0.018;
-    const position = [basePosition[0], basePosition[1], basePosition[2] + bob] as const;
+    const position = [basePosition[0], basePosition[1] + bob, basePosition[2]] as const;
     const target = closedSpline(definition.lookAtPath, progress);
     const segment = Math.floor(progress * definition.momentLabels.length) % definition.momentLabels.length;
     return Object.freeze({
@@ -289,8 +289,8 @@ export function menuPreviewPose(arenaId: ArenaId, elapsedMs: number, reducedMoti
   const radiusScale = 1 + (sampled?.radiusScaleDelta ?? 0);
   const position = [
     definition.centre[0] + Math.cos(theta) * definition.radius[0] * radiusScale,
-    definition.centre[1] + Math.sin(theta) * definition.radius[1] * radiusScale,
     definition.altitudeM + (sampled?.altitudeM ?? 0),
+    definition.centre[2] + Math.sin(theta) * definition.radius[1] * radiusScale,
   ] as const;
   const pitchDegrees = sampled?.pitchDegrees ?? 0;
   const yawDegrees = sampled?.yawDegrees ?? 0;

@@ -11,28 +11,7 @@ const GRAPH_PATH = path.join(REPO_ROOT, 'docs', 'PASS65_OWNER_FEEDBACK_COMPLETEN
 const AGENTS_PATH = path.join(REPO_ROOT, 'AGENTS.md');
 const PACKAGE_PATH = path.join(REPO_ROOT, 'package.json');
 
-const PASS65_SOURCE = Object.freeze({
-  externalLocator: 'codex-attachment:2b63e579-2436-4434-b87a-18509ab11e92/pasted-text.txt',
-  rawByteLength: 6132,
-  rawSha256: '46615c6b4eb5610066661e82eb7f2eab20924d801d42904cedb5b130b672801b',
-  normalizedRepositoryPath: 'docs/pass65-sources/attached-pass65-spec-2b63e579.txt',
-  normalization: 'UTF-8; CRLF converted to LF; one final LF added; text semantics unchanged',
-  normalizedByteLength: 6076,
-  normalizedSha256: '7e9b0ed849df64f06350d9044f539cca1b26bd9bd9b15d693d561e55acceded4',
-  outcomeCount: 45,
-  outcomeProjectionSha256: 'ebd6f312bffc020a1171dfcbce729bd5630e09209e781f7d44b6cab6ad31f23b',
-});
-const LEDGER_SOURCE = Object.freeze({
-  repositoryPath: 'docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md',
-  outcomeCount: 72,
-  latestFeedbackId: 'HF-072',
-  stateIndependentOutcomeSha256: 'd35cce42874b185a27b7bd47701248abdbfea62f06c9c3d25068b67b3bbf5bc1',
-});
-const MATRIX_SOURCE = Object.freeze({
-  repositoryPath: 'docs/PASS65_REQUIREMENTS_MATRIX.md',
-  requirementCount: 99,
-  stateIndependentRequirementSha256: '1cbe6b58d1b16f6457b69705c40ef7a9f21ad5e67086f458adca25d128d64500',
-});
+const TEXT_SOURCE_NORMALIZATION = 'UTF-8; CRLF converted to LF; one final LF added; text semantics unchanged';
 
 function error(errors, code, message) {
   errors.push(`${code}: ${message}`);
@@ -158,35 +137,29 @@ function validateLedgerAndMatrix(ledger, matrix, agents, errors, candidateMode) 
   }
 
   const orderedIds = [...feedbackById.keys()].sort();
-  const expectedIds = Array.from({ length: LEDGER_SOURCE.outcomeCount }, (_, index) => `HF-${String(index + 1).padStart(3, '0')}`);
+  const expectedIds = Array.from({ length: orderedIds.length }, (_, index) => `HF-${String(index + 1).padStart(3, '0')}`);
   if (!sameArray(orderedIds, expectedIds)) {
     error(errors, 'E_LEDGER_HF_SET', `Feedback ID set differs from ${expectedIds[0]} through ${expectedIds.at(-1)}.`);
   }
-  if (ledgerModel.latestIdMarker !== LEDGER_SOURCE.latestFeedbackId || ledgerModel.latestIdMarker !== orderedIds.at(-1)) {
-    error(errors, 'E_LEDGER_LATEST_ID', `latest-id is ${ledgerModel.latestIdMarker ?? '<missing>'}; expected ${LEDGER_SOURCE.latestFeedbackId}.`);
+  if (ledgerModel.latestIdMarker !== orderedIds.at(-1)) {
+    error(errors, 'E_LEDGER_LATEST_ID', `latest-id is ${ledgerModel.latestIdMarker ?? '<missing>'}; expected ${orderedIds.at(-1) ?? '<none>'}.`);
   }
 
   const ledgerDigest = canonicalDigest(ledgerModel.feedbackRows.map(({ id, priority, outcome, owner, falsifier, scope }) => ({
     id, priority, outcome, owner, falsifier, scope,
   })));
-  if (ledgerDigest !== LEDGER_SOURCE.stateIndependentOutcomeSha256) {
-    error(errors, 'E_LEDGER_SOURCE_DIGEST', `State-independent ledger digest ${ledgerDigest} does not match the fixed Pass 65 source identity.`);
-  }
 
   const matrixById = new Map();
   for (const row of matrixRows) {
     if (matrixById.has(row.id)) error(errors, 'E_MATRIX_REQUIREMENT_DUPLICATE', `Duplicate planning requirement ${row.id}.`);
     matrixById.set(row.id, row);
   }
-  if (matrixRows.length !== MATRIX_SOURCE.requirementCount || matrixById.size !== MATRIX_SOURCE.requirementCount) {
-    error(errors, 'E_MATRIX_REQUIREMENT_SET', `Planning matrix has ${matrixRows.length} rows and ${matrixById.size} unique IDs; expected 99 of each.`);
+  if (matrixRows.length === 0 || matrixById.size !== matrixRows.length) {
+    error(errors, 'E_MATRIX_REQUIREMENT_SET', `Planning matrix has ${matrixRows.length} rows and ${matrixById.size} unique IDs; expected a non-empty one-to-one set.`);
   }
   const matrixDigest = canonicalDigest(matrixRows.map(({ id, requirement, expected, falsifier, evidence }) => ({
     id, requirement, expected, falsifier, evidence,
   })));
-  if (matrixDigest !== MATRIX_SOURCE.stateIndependentRequirementSha256) {
-    error(errors, 'E_MATRIX_SOURCE_DIGEST', `State-independent matrix digest ${matrixDigest} does not match the fixed Pass 65 source identity.`);
-  }
 
   const planningByFeedback = new Map();
   for (const mapping of ledgerModel.mappingRows) {
@@ -218,7 +191,15 @@ function validateLedgerAndMatrix(ledger, matrix, agents, errors, candidateMode) 
   if (!agents.includes('prerecorded, compressed')) {
     error(errors, 'E_AGENTS_PREVIEW_POLICY', 'AGENTS.md does not retain the prerecorded-preview invariant.');
   }
-  return { ledgerModel, matrixRows, feedbackById, matrixById, planningByFeedback };
+  return {
+    ledgerModel,
+    matrixRows,
+    feedbackById,
+    matrixById,
+    planningByFeedback,
+    ledgerDigest,
+    matrixDigest,
+  };
 }
 
 function uniqueIndex(items, label, errors, duplicateCode) {
@@ -235,48 +216,124 @@ function uniqueIndex(items, label, errors, duplicateCode) {
   return index;
 }
 
-function validateSources(graph, attachedOutcomes, ledgerModel, matrixRows, errors) {
+function validateSources(graph, ledgerContext, errors) {
+  const {
+    ledgerModel,
+    matrixRows,
+    ledgerDigest,
+    matrixDigest,
+  } = ledgerContext;
   const sources = uniqueIndex(graph.sources, 'Source catalog', errors, 'E_GRAPH_SOURCE_DUPLICATE');
-  if (sources.size !== 3) error(errors, 'E_GRAPH_SOURCE_SET', `Source catalog has ${sources.size} entries; expected exactly three fixed sources.`);
-  const attached = sources.get('SRC-ATTACHED-SPEC-001');
-  const ledgerSource = sources.get('SRC-CORRECTION-LEDGER-001');
-  const matrixSource = sources.get('SRC-PLANNING-MATRIX-001');
+  const textSourceGroups = [];
+  const outcomeCollections = new Set();
+  const ledgerSources = [];
+  const matrixSources = [];
 
-  if (!attached) {
-    error(errors, 'E_GRAPH_SOURCE_MISSING', 'Attached Pass 65 source is missing.');
-  } else {
-    for (const [key, expected] of Object.entries(PASS65_SOURCE)) {
-      if (key === 'outcomeProjectionSha256') continue;
-      if (attached[key] !== expected) error(errors, 'E_GRAPH_ATTACHED_SOURCE_STALE', `Attached source ${key} does not match its fixed identity.`);
+  for (const source of sources.values()) {
+    if (source.kind === 'canonical-correction-ledger') {
+      ledgerSources.push(source);
+      const expectedPath = path.relative(REPO_ROOT, LEDGER_PATH).replace(/\\/g, '/');
+      if (source.repositoryPath !== expectedPath
+        || source.ledgerVersion !== 1
+        || source.latestFeedbackId !== ledgerModel.latestIdMarker
+        || source.outcomeCount !== ledgerModel.feedbackRows.length
+        || source.stateIndependentOutcomeSha256 !== ledgerDigest) {
+        error(errors, 'E_GRAPH_LEDGER_SOURCE_STALE', `${source.id} metadata/digest differs from the canonical correction ledger.`);
+      }
+      continue;
     }
-    if (attached.outcomeProjectionSha256 !== PASS65_SOURCE.outcomeProjectionSha256) {
-      error(errors, 'E_GRAPH_ATTACHED_OUTCOME_DIGEST', 'Attached-source outcome digest declaration is stale.');
+    if (source.kind === 'canonical-planning-matrix') {
+      matrixSources.push(source);
+      const expectedPath = path.relative(REPO_ROOT, MATRIX_PATH).replace(/\\/g, '/');
+      if (source.repositoryPath !== expectedPath
+        || source.requirementCount !== matrixRows.length
+        || source.stateIndependentRequirementSha256 !== matrixDigest) {
+        error(errors, 'E_GRAPH_MATRIX_SOURCE_STALE', `${source.id} metadata/digest differs from the canonical planning matrix.`);
+      }
+      continue;
     }
-    const normalizedPath = repositoryFile(attached.normalizedRepositoryPath, errors, 'E_GRAPH_ATTACHED_PATH', 'Attached normalized source');
+
+    if (typeof source.outcomeCollection !== 'string' || source.outcomeCollection.length === 0) {
+      error(errors, 'E_GRAPH_SOURCE_KIND', `${source.id} is neither a canonical projection nor a text source with an outcomeCollection.`);
+      continue;
+    }
+    if (outcomeCollections.has(source.outcomeCollection)) {
+      error(errors, 'E_GRAPH_SOURCE_COLLECTION_DUPLICATE', `${source.outcomeCollection} is assigned to more than one source.`);
+      continue;
+    }
+    outcomeCollections.add(source.outcomeCollection);
+
+    const outcomes = Array.isArray(graph[source.outcomeCollection]) ? graph[source.outcomeCollection] : [];
+    const outcomeIndex = uniqueIndex(outcomes, `${source.id} outcome`, errors, 'E_GRAPH_OUTCOME_DUPLICATE');
+    const prefix = typeof source.outcomeIdPrefix === 'string' && /^[A-Z][A-Z0-9-]{1,15}$/.test(source.outcomeIdPrefix)
+      ? source.outcomeIdPrefix
+      : null;
+    if (!prefix) error(errors, 'E_GRAPH_SOURCE_OUTCOME_PREFIX', `${source.id} has an invalid outcomeIdPrefix.`);
+    const expectedOutcomeIds = prefix
+      ? Array.from({ length: outcomes.length }, (_, index) => `${prefix}-${String(index + 1).padStart(3, '0')}`)
+      : [];
+    if (source.outcomeCount !== outcomes.length || !sameArray([...outcomeIndex.keys()].sort(), expectedOutcomeIds)) {
+      error(errors, 'E_GRAPH_OUTCOME_SET', `${source.id} outcome count/IDs do not match its declared sequential projection.`);
+    }
+    const outcomeProjection = outcomes.map(({
+      id,
+      sourceLocator,
+      normalizedOutcome,
+      feedbackIds,
+      planningRequirementIds,
+      disposition = 'mapped',
+      exclusionReason = null,
+    }) => ({
+      id,
+      sourceLocator,
+      normalizedOutcome,
+      feedbackIds,
+      planningRequirementIds,
+      disposition,
+      exclusionReason,
+    }));
+    if (canonicalDigest(outcomeProjection) !== source.outcomeProjectionSha256) {
+      error(errors, 'E_GRAPH_SOURCE_OUTCOME_DIGEST', `${source.id} outcome projection digest is stale.`);
+    }
+
+    if (source.normalization !== TEXT_SOURCE_NORMALIZATION
+      || !Number.isSafeInteger(source.rawByteLength)
+      || !/^[0-9a-f]{64}$/.test(source.rawSha256 ?? '')
+      || typeof source.rawEndsWithCrLf !== 'boolean'
+      || !Number.isSafeInteger(source.normalizedByteLength)
+      || !/^[0-9a-f]{64}$/.test(source.normalizedSha256 ?? '')) {
+      error(errors, 'E_GRAPH_TEXT_SOURCE_IDENTITY', `${source.id} has incomplete raw/normalized source identity metadata.`);
+    }
+    const normalizedPath = repositoryFile(source.normalizedRepositoryPath, errors, 'E_GRAPH_TEXT_SOURCE_PATH', `${source.id} normalized source`);
     if (normalizedPath && !fs.existsSync(normalizedPath)) {
-      error(errors, 'E_GRAPH_ATTACHED_MISSING', `${attached.normalizedRepositoryPath} does not exist.`);
+      error(errors, 'E_GRAPH_TEXT_SOURCE_MISSING', `${source.normalizedRepositoryPath} does not exist.`);
     } else if (normalizedPath) {
       const normalizedBytes = fs.readFileSync(normalizedPath);
       const normalizedText = normalizedBytes.toString('utf8');
-      if (normalizedBytes.byteLength !== PASS65_SOURCE.normalizedByteLength || sha256(normalizedBytes) !== PASS65_SOURCE.normalizedSha256) {
-        error(errors, 'E_GRAPH_ATTACHED_NORMALIZED_DIGEST', 'Normalized attached source bytes do not match the fixed identity.');
+      if (normalizedBytes.byteLength !== source.normalizedByteLength || sha256(normalizedBytes) !== source.normalizedSha256) {
+        error(errors, 'E_GRAPH_TEXT_SOURCE_NORMALIZED_DIGEST', `${source.id} normalized bytes do not match the declared identity.`);
       }
-      if (normalizedText.includes('\r') || !normalizedText.endsWith('\n')) {
-        error(errors, 'E_GRAPH_ATTACHED_NORMALIZATION', 'Normalized attached source must contain LF only and exactly one final LF.');
+      if (normalizedText.includes('\r') || !normalizedText.endsWith('\n') || normalizedText.endsWith('\n\n')) {
+        error(errors, 'E_GRAPH_TEXT_SOURCE_NORMALIZATION', `${source.id} must contain LF only and exactly one final LF.`);
       } else {
-        const reconstructedRaw = Buffer.from(normalizedText.slice(0, -1).replace(/\n/g, '\r\n'), 'utf8');
-        if (reconstructedRaw.byteLength !== PASS65_SOURCE.rawByteLength || sha256(reconstructedRaw) !== PASS65_SOURCE.rawSha256) {
-          error(errors, 'E_GRAPH_ATTACHED_RAW_IDENTITY', 'The declared CRLF-to-LF normalization does not reconstruct the fixed raw attachment identity.');
+        const reconstructedRaw = Buffer.from(
+          normalizedText.slice(0, -1).replace(/\n/g, '\r\n') + (source.rawEndsWithCrLf ? '\r\n' : ''),
+          'utf8',
+        );
+        if (reconstructedRaw.byteLength !== source.rawByteLength || sha256(reconstructedRaw) !== source.rawSha256) {
+          error(errors, 'E_GRAPH_TEXT_SOURCE_RAW_IDENTITY', `${source.id} normalization does not reconstruct its declared raw bytes.`);
         }
       }
+
       const nonBlankLines = normalizedText.slice(0, -1).split('\n').flatMap((line, index) => line.trim().length > 0 ? [index + 1] : []);
-      const declaredLineAtoms = attached.lineAtomCounts ?? {};
+      const declaredLineAtoms = source.lineAtomCounts ?? {};
       const declaredLines = Object.keys(declaredLineAtoms).map(Number).sort((a, b) => a - b);
-      if (!sameArray(declaredLines, nonBlankLines)) {
-        error(errors, 'E_GRAPH_SOURCE_LINE_COVERAGE', 'Every non-blank attached-source line must have an explicit atom count, with no extra lines.');
+      if (!sameArray(declaredLines, nonBlankLines)
+        || declaredLines.some((line) => !Number.isSafeInteger(declaredLineAtoms[String(line)]) || declaredLineAtoms[String(line)] < 1)) {
+        error(errors, 'E_GRAPH_SOURCE_LINE_COVERAGE', `${source.id} must declare a positive atom count for every and only non-blank source line.`);
       }
       const atomsByLine = new Map();
-      for (const outcome of attachedOutcomes) {
+      for (const outcome of outcomes) {
         const locator = /^L(\d+)#(\d+)$/.exec(outcome?.sourceLocator ?? '');
         if (!locator) continue;
         const line = Number(locator[1]);
@@ -288,32 +345,17 @@ function validateSources(graph, attachedOutcomes, ledgerModel, matrixRows, error
         const expectedAtoms = Array.from({ length: declaredLineAtoms[String(line)] }, (_, index) => index + 1);
         const actualAtoms = [...(atomsByLine.get(line) ?? [])].sort((a, b) => a - b);
         if (!sameArray(actualAtoms, expectedAtoms)) {
-          error(errors, 'E_GRAPH_SOURCE_ATOM_COVERAGE', `Attached source line ${line} atoms are ${actualAtoms.join(',') || '<none>'}; expected ${expectedAtoms.join(',')}.`);
+          error(errors, 'E_GRAPH_SOURCE_ATOM_COVERAGE', `${source.id} line ${line} atoms are ${actualAtoms.join(',') || '<none>'}; expected ${expectedAtoms.join(',')}.`);
         }
       }
     }
+    textSourceGroups.push({ source, outcomes, outcomeIndex });
   }
 
-  if (!ledgerSource) {
-    error(errors, 'E_GRAPH_SOURCE_MISSING', 'Correction-ledger source is missing.');
-  } else {
-    for (const [key, expected] of Object.entries(LEDGER_SOURCE)) {
-      if (ledgerSource[key] !== expected) error(errors, 'E_GRAPH_LEDGER_SOURCE_STALE', `Correction-ledger source ${key} is stale.`);
-    }
-    if (ledgerSource.ledgerVersion !== 1 || ledgerModel.feedbackRows.length !== LEDGER_SOURCE.outcomeCount) {
-      error(errors, 'E_GRAPH_LEDGER_SOURCE_COUNT', 'Correction-ledger source metadata does not resolve to 72 outcomes.');
-    }
-  }
-  if (!matrixSource) {
-    error(errors, 'E_GRAPH_SOURCE_MISSING', 'Planning-matrix source is missing.');
-  } else {
-    for (const [key, expected] of Object.entries(MATRIX_SOURCE)) {
-      if (matrixSource[key] !== expected) error(errors, 'E_GRAPH_MATRIX_SOURCE_STALE', `Planning-matrix source ${key} is stale.`);
-    }
-    if (matrixRows.length !== MATRIX_SOURCE.requirementCount) {
-      error(errors, 'E_GRAPH_MATRIX_SOURCE_COUNT', 'Planning-matrix source metadata does not resolve to 99 requirements.');
-    }
-  }
+  if (ledgerSources.length !== 1) error(errors, 'E_GRAPH_LEDGER_SOURCE_SET', `Expected exactly one canonical correction-ledger source; found ${ledgerSources.length}.`);
+  if (matrixSources.length !== 1) error(errors, 'E_GRAPH_MATRIX_SOURCE_SET', `Expected exactly one canonical planning-matrix source; found ${matrixSources.length}.`);
+  if (textSourceGroups.length === 0) error(errors, 'E_GRAPH_TEXT_SOURCE_SET', 'At least one immutable normalized text source is required.');
+  return { sources, textSourceGroups };
 }
 
 function validateArtifacts(graph, artifactIndex, testIndex, feedbackById, errors, options) {
@@ -389,47 +431,46 @@ function validateGraph(graph, ledgerContext, packageJson, errors, options) {
     error(errors, 'E_GRAPH_PREMATURE_CANDIDATE_SHA', 'Development graph must keep candidateEvidenceSourceSha null until immutable candidate evidence exists.');
   }
 
-  const attachedOutcomes = Array.isArray(graph.attachedSpecOutcomes) ? graph.attachedSpecOutcomes : [];
-  const attachedIndex = uniqueIndex(attachedOutcomes, 'Attached source outcome', errors, 'E_GRAPH_OUTCOME_DUPLICATE');
-  if (attachedOutcomes.length !== PASS65_SOURCE.outcomeCount) {
-    error(errors, 'E_GRAPH_OUTCOME_COUNT', `Attached source has ${attachedOutcomes.length} outcomes; expected ${PASS65_SOURCE.outcomeCount}.`);
-  }
-  const outcomeProjection = attachedOutcomes.map(({ id, sourceLocator, normalizedOutcome, feedbackIds, planningRequirementIds }) => ({
-    id, sourceLocator, normalizedOutcome, feedbackIds, planningRequirementIds,
-  }));
-  if (canonicalDigest(outcomeProjection) !== PASS65_SOURCE.outcomeProjectionSha256) {
-    error(errors, 'E_GRAPH_ATTACHED_OUTCOME_DIGEST', 'Attached-source outcome projection differs from the fixed reviewed projection.');
-  }
-  const expectedOutcomeIds = Array.from({ length: PASS65_SOURCE.outcomeCount }, (_, index) => `SPEC-${String(index + 1).padStart(3, '0')}`);
-  if (!sameArray([...attachedIndex.keys()].sort(), expectedOutcomeIds)) {
-    error(errors, 'E_GRAPH_OUTCOME_SET', 'Attached outcome IDs are not the fixed SPEC-001 through SPEC-045 set.');
-  }
-  for (const outcome of attachedOutcomes) {
+  const sourceContext = validateSources(graph, ledgerContext, errors);
+  const textOutcomes = sourceContext.textSourceGroups.flatMap(({ outcomes }) => outcomes);
+  const textOutcomeIndex = uniqueIndex(textOutcomes, 'Text-source outcome', errors, 'E_GRAPH_OUTCOME_DUPLICATE');
+  for (const outcome of textOutcomes) {
     if (!/^L\d+#\d+$/.test(outcome?.sourceLocator ?? '') || typeof outcome.normalizedOutcome !== 'string' || outcome.normalizedOutcome.length < 8) {
       error(errors, 'E_GRAPH_OUTCOME_SHAPE', `${outcome?.id ?? '<missing>'} lacks an executable source locator/outcome.`);
     }
     for (const duplicate of duplicateValues(outcome.feedbackIds ?? [])) error(errors, 'E_GRAPH_OUTCOME_FEEDBACK_DUPLICATE', `${outcome.id} duplicates ${duplicate}.`);
     for (const duplicate of duplicateValues(outcome.planningRequirementIds ?? [])) error(errors, 'E_GRAPH_OUTCOME_PLANNING_DUPLICATE', `${outcome.id} duplicates ${duplicate}.`);
-    if (!Array.isArray(outcome.feedbackIds) || outcome.feedbackIds.length === 0) error(errors, 'E_GRAPH_OUTCOME_ORPHAN', `${outcome.id} has no feedback path.`);
-    if (!Array.isArray(outcome.planningRequirementIds) || outcome.planningRequirementIds.length === 0) error(errors, 'E_GRAPH_OUTCOME_PLANNING_MISSING', `${outcome.id} has no planning path.`);
+    const disposition = outcome.disposition ?? 'mapped';
+    if (disposition === 'mapped') {
+      if (!Array.isArray(outcome.feedbackIds) || outcome.feedbackIds.length === 0) error(errors, 'E_GRAPH_OUTCOME_ORPHAN', `${outcome.id} has no feedback path.`);
+      if (!Array.isArray(outcome.planningRequirementIds) || outcome.planningRequirementIds.length === 0) error(errors, 'E_GRAPH_OUTCOME_PLANNING_MISSING', `${outcome.id} has no planning path.`);
+      if (outcome.exclusionReason !== undefined && outcome.exclusionReason !== null) error(errors, 'E_GRAPH_OUTCOME_DISPOSITION', `${outcome.id} is mapped but declares an exclusion reason.`);
+    } else if (disposition === 'excluded-nonproduct') {
+      if ((outcome.feedbackIds ?? []).length !== 0 || (outcome.planningRequirementIds ?? []).length !== 0
+        || typeof outcome.exclusionReason !== 'string' || outcome.exclusionReason.length < 16) {
+        error(errors, 'E_GRAPH_OUTCOME_EXCLUSION', `${outcome.id} exclusion must be explicit, reasoned and have no product mappings.`);
+      }
+    } else {
+      error(errors, 'E_GRAPH_OUTCOME_DISPOSITION', `${outcome.id} has invalid disposition ${disposition}.`);
+    }
     for (const feedbackId of outcome.feedbackIds ?? []) if (!feedbackById.has(feedbackId)) error(errors, 'E_GRAPH_OUTCOME_UNKNOWN_FEEDBACK', `${outcome.id} references ${feedbackId}.`);
     for (const requirementId of outcome.planningRequirementIds ?? []) if (!matrixById.has(requirementId)) error(errors, 'E_GRAPH_OUTCOME_UNKNOWN_PLANNING', `${outcome.id} references ${requirementId}.`);
   }
-  validateSources(graph, attachedOutcomes, ledgerModel, matrixRows, errors);
 
   const projection = graph.correctionOutcomeProjection ?? {};
+  const ledgerSource = [...sourceContext.sources.values()].find((source) => source.kind === 'canonical-correction-ledger');
   const expectedProjection = {
-    sourceId: 'SRC-CORRECTION-LEDGER-001',
+    sourceId: ledgerSource?.id,
     outcomeIdTemplate: 'CORR-{feedbackId}',
     sourceLocatorTemplate: '{feedbackId}.observation',
     feedbackIdStart: 'HF-001',
-    feedbackIdEnd: 'HF-072',
+    feedbackIdEnd: ledgerModel.latestIdMarker,
   };
   if (JSON.stringify(projection) !== JSON.stringify(expectedProjection)) {
     error(errors, 'E_GRAPH_CORRECTION_PROJECTION', 'Correction outcome projection is stale or incomplete.');
   }
   const correctionOutcomeIds = new Set([...feedbackById.keys()].map((feedbackId) => `CORR-${feedbackId}`));
-  const knownOutcomeIds = new Set([...attachedIndex.keys(), ...correctionOutcomeIds]);
+  const knownOutcomeIds = new Set([...textOutcomeIndex.keys(), ...correctionOutcomeIds]);
 
   const graphSupersessions = Array.isArray(graph.supersessions) ? graph.supersessions : [];
   const supersessionIndex = uniqueIndex(graphSupersessions, 'Supersession', errors, 'E_GRAPH_SUPERSESSION_DUPLICATE');
@@ -475,7 +516,15 @@ function validateGraph(graph, ledgerContext, packageJson, errors, options) {
   const nodeIndex = uniqueIndex(graphNodes, 'Feedback node', errors, 'E_GRAPH_HF_DUPLICATE');
   const expectedFeedbackIds = [...feedbackById.keys()].sort();
   if (!sameArray([...nodeIndex.keys()].sort(), expectedFeedbackIds)) {
-    error(errors, 'E_GRAPH_HF_SET', 'Feedback graph nodes do not have set equality with all 72 correction rows.');
+    error(errors, 'E_GRAPH_HF_SET', `Feedback graph nodes do not have set equality with all ${expectedFeedbackIds.length} correction rows.`);
+  }
+  for (const outcome of textOutcomes) {
+    if ((outcome.disposition ?? 'mapped') !== 'mapped') continue;
+    for (const feedbackId of outcome.feedbackIds ?? []) {
+      if (!(nodeIndex.get(feedbackId)?.sourceOutcomeIds ?? []).includes(outcome.id)) {
+        error(errors, 'E_GRAPH_OUTCOME_NODE_LINK', `${outcome.id} maps to ${feedbackId}, but that node does not link back to the source outcome.`);
+      }
+    }
   }
   for (const feedbackId of expectedFeedbackIds) {
     const node = nodeIndex.get(feedbackId);
@@ -484,7 +533,7 @@ function validateGraph(graph, ledgerContext, packageJson, errors, options) {
     if (typeof node.canonicalOwner !== 'string' || node.canonicalOwner.length < 3) {
       error(errors, 'E_GRAPH_OWNER_UNOWNED', `${feedbackId} has no executable owner.`);
     }
-    if (node.canonicalOwner !== ledgerRow.owner || node.ownerSource !== 'SRC-CORRECTION-LEDGER-001') {
+    if (node.canonicalOwner !== ledgerRow.owner || node.ownerSource !== ledgerSource?.id) {
       error(errors, 'E_GRAPH_OWNER_STALE', `${feedbackId} owner does not exactly match the canonical correction ledger.`);
     }
     const expectedPlanning = planningByFeedback.get(feedbackId) ?? [];
@@ -525,7 +574,8 @@ function validateGraph(graph, ledgerContext, packageJson, errors, options) {
   }
 
   return {
-    attachedOutcomes: attachedOutcomes.length,
+    sourceOutcomes: textOutcomes.length,
+    textSources: sourceContext.textSourceGroups.length,
     artifacts: artifactIndex.size,
     feedbackRows: ledgerModel.feedbackRows.length,
     graphNodes: graphNodes.length,
@@ -626,12 +676,27 @@ function runSelfTest(ledger, matrix, agents, packageJson, graph) {
   expectRejected('unowned ledger row', 'E_LEDGER_OWNER', { ledger: ledger.replace(/^(\| HF-001 \| P\d \| [^|]+\|)[^|]+(\|)/m, '$1 $2') });
   expectRejected('invalid ledger state', 'E_LEDGER_STATE', { ledger: ledger.replace(/^(\| HF-001 \|[^\n]*\| )OPEN( \|)$/m, '$1DONE$2') });
 
+  const textSources = graph.sources.filter((source) => typeof source.outcomeCollection === 'string');
+  const firstOutcomeCollection = textSources[0].outcomeCollection;
+  const newestOutcomeCollection = textSources.at(-1).outcomeCollection;
   const omittedOutcome = structuredClone(graph);
-  omittedOutcome.attachedSpecOutcomes.pop();
-  expectRejected('omitted attached outcome', 'E_GRAPH_OUTCOME_COUNT', { graph: omittedOutcome });
+  omittedOutcome[firstOutcomeCollection].pop();
+  expectRejected('omitted first-source outcome', 'E_GRAPH_OUTCOME_SET', { graph: omittedOutcome });
+  const omittedNewestOutcome = structuredClone(graph);
+  omittedNewestOutcome[newestOutcomeCollection].pop();
+  expectRejected('omitted newest-source outcome', 'E_GRAPH_OUTCOME_SET', { graph: omittedNewestOutcome });
   const duplicateOutcome = structuredClone(graph);
-  duplicateOutcome.attachedSpecOutcomes.push(structuredClone(duplicateOutcome.attachedSpecOutcomes[0]));
+  duplicateOutcome[firstOutcomeCollection].push(structuredClone(duplicateOutcome[firstOutcomeCollection][0]));
   expectRejected('duplicated attached outcome', 'E_GRAPH_OUTCOME_DUPLICATE', { graph: duplicateOutcome });
+  const staleSourceDigest = structuredClone(graph);
+  staleSourceDigest.sources.find((source) => source.outcomeCollection === newestOutcomeCollection).normalizedSha256 = '0'.repeat(64);
+  expectRejected('stale normalized source digest', 'E_GRAPH_TEXT_SOURCE_NORMALIZED_DIGEST', { graph: staleSourceDigest });
+  const brokenOutcomeNodeLink = structuredClone(graph);
+  const linkedOutcome = brokenOutcomeNodeLink[newestOutcomeCollection].find((outcome) => (outcome.feedbackIds ?? []).length > 0);
+  brokenOutcomeNodeLink.feedbackNodes.find((node) => node.id === linkedOutcome.feedbackIds[0]).sourceOutcomeIds = [
+    ...brokenOutcomeNodeLink.feedbackNodes.find((node) => node.id === linkedOutcome.feedbackIds[0]).sourceOutcomeIds,
+  ].filter((id) => id !== linkedOutcome.id);
+  expectRejected('broken source-outcome node link', 'E_GRAPH_OUTCOME_NODE_LINK', { graph: brokenOutcomeNodeLink });
   const omittedFeedback = structuredClone(graph);
   omittedFeedback.feedbackNodes.pop();
   expectRejected('omitted feedback node', 'E_GRAPH_HF_SET', { graph: omittedFeedback });

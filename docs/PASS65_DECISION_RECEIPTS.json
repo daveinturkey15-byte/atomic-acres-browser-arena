@@ -2,7 +2,7 @@
   "$schema": "PASS65_DECISION_RECEIPTS.schema.json",
   "schemaVersion": 1,
   "releasePass": "PASS 65",
-  "updatedAt": "2026-07-26T14:18:00.000Z",
+  "updatedAt": "2026-07-28T04:32:32.888Z",
   "receipts": [
     {
       "receiptVersion": 1,
@@ -68,7 +68,7 @@
       "receiptVersion": 1,
       "id": "DEC-04",
       "status": "FROZEN",
-      "proposedDefault": "Chopper flight is always host-AI; its gun can be AI-operated or entered and exited by the owning player with F during the 30-second activation",
+      "proposedDefault": "Chopper flight is always host-AI; its gun can be AI-operated or entered and exited by the owner with F during the 30-second activation when no eligible higher-priority world interaction is nearby",
       "value": {
         "durationMs": 30000,
         "flightAuthority": "host-ai-always",
@@ -80,14 +80,16 @@
         "controlTransferScope": "gun-only",
         "aiResumesGunOnPlayerExit": true,
         "operatorBodyWhileGunning": "in-world-immobile-vulnerable",
-        "terminalExitPolicy": "restore-player-control-exactly-once"
+        "terminalExitPolicy": "restore-player-control-exactly-once",
+        "interactionPriorityPolicy": "eligible-world-interaction-before-support-toggle; support-toggle-otherwise",
+        "higherPriorityWorldKinds": ["care-package-collect", "door-open-close", "weapon-pickup", "future-catalogued-world-interaction"]
       },
-      "rationale": "Dave requires AI flight at all times and optional gunner possession. Pressing F may enter or exit the gun at any point in the 30-second active window; possession never transfers route, pose, navigation or flight authority. The in-world vulnerable body is the conservative authority-preserving interpretation and is recorded explicitly rather than hidden.",
-      "owner": "Dave — 2026-07-26 decision reply; body-policy implementation inference recorded",
+      "rationale": "Dave requires AI flight at all times and optional gunner possession. The newest correction requires an eligible nearby door, care crate, weapon or sibling world interaction to win the shared F edge before support toggle; the toggle remains available at any active time otherwise. Possession never transfers route, pose, navigation or flight authority. The in-world vulnerable body is the conservative authority-preserving interpretation and is recorded explicitly rather than hidden.",
+      "owner": "Dave — 2026-07-27 Desktop Untitled correction; body-policy implementation inference retained",
       "recordedAt": "2026-07-25T22:30:00Z",
-      "resolvedAt": "2026-07-26T06:33:46.635Z",
+      "resolvedAt": "2026-07-28T04:32:32.888Z",
       "freezeNoLaterThan": "Killstreak-catalog wave",
-      "supersedesReceiptSha256": null
+      "supersedesReceiptSha256": "57f0012e1c5338129620535887ba0e35b8addd983d4e287c1ac6896f2a02a876"
     },
     {
       "receiptVersion": 1,
@@ -145,6 +147,9 @@
         "semtexPolicy": {
           "collisionPolicy": "stick-world-and-current-actor-life",
           "damageRole": "high-localized-blast",
+          "actorStuckBlastDamageMultiplier": 2,
+          "actorStuckBlastRadiusMultiplier": 2,
+          "actorStuckVictimAlert": "STUCK-current-life-until-detonation-or-valid-teardown",
           "proneMitigationRequired": true,
           "authority": "host-exactly-once"
         },
@@ -152,42 +157,49 @@
         "corpseAmmoPickupReplenishesGrenade": true,
         "corpsePickupResult": "set-selected-grenade-count-to-one-without-exceeding-cap",
         "smokeAffects": "all-players-and-ai-equally",
+        "smokeDetonationPolicy": "first-admitted-impact-immediate-no-countdown-beep",
         "friendlyFlashMultiplier": 0.5,
         "selfFlashPolicy": "full-host-angle-distance-line-of-sight-calculation",
         "authority": "host"
       },
-      "rationale": "Dave replaced the provisional per-family counts with one selected grenade, one on spawn and an absolute carry cap of one. Grenades replenish only through the same valid corpse ammo pickup that replenishes ammunition, never from a kill event. The accepted friendly-effect defaults remain smoke for everyone and half-strength friendly flash. The first HITL correction adds Semtex as a selectable sticky high-damage family with prone mitigation, without changing the one-count lifecycle.",
-      "owner": "Dave — 2026-07-26 HITL correction",
+      "rationale": "Dave replaced the provisional per-family counts with one selected grenade, one on spawn and an absolute carry cap of one. Grenades replenish only through the same valid corpse ammo pickup that replenishes ammunition, never from a kill event. Smoke now detonates immediately on admitted impact with no countdown beep. Semtex remains a selectable sticky high-damage family; a current human/bot-life stick uses exactly double blast damage and radius and emits a bounded STUCK victim alert, while prone mitigation and the one-count lifecycle remain.",
+      "owner": "Dave — 2026-07-27 Desktop Untitled correction",
       "recordedAt": "2026-07-25T22:30:00Z",
-      "resolvedAt": "2026-07-26T14:08:29.561Z",
+      "resolvedAt": "2026-07-28T04:32:32.888Z",
       "freezeNoLaterThan": "Ordnance-schema wave",
-      "supersedesReceiptSha256": "4e226659d248974bf563fd4db834da4bd3b50bc5777f719f8a1dcd2a0fdd4c7a"
+      "supersedesReceiptSha256": "0d119840b4c3a9aafa584c1d5c201f7909c294887149ce024b03fbc84f915e87"
     },
     {
       "receiptVersion": 1,
       "id": "DEC-08",
       "status": "FROZEN",
-      "proposedDefault": "The host arms a 1.25-second fuse on first authoritative impact; the bolt sticks to world or the admitted actor life and deals 45 direct plus up to 60 blast damage over 3.5 metres",
+      "proposedDefault": "The host fires the bolt at 108 m/s, arms a 1.25-second fuse on first impact, and applies double blast damage and radius plus STUCK feedback only for an admitted current actor-life attachment",
       "value": {
         "authority": "host",
         "fuseOrigin": "first-authoritative-world-or-actor-impact",
         "fuseMs": 1250,
         "maximumNoImpactLifetimeMs": 5000,
+        "legacyProjectileSpeedMps": 36,
+        "projectileSpeedMultiplier": 3,
+        "projectileSpeedMps": 108,
         "stickTargets": ["eligible-world-surface", "admitted-actor-life-id"],
         "followsRespawnedLife": false,
         "directImpactDamage": 45,
         "blastMaximumDamage": 60,
         "blastMinimumDamage": 15,
         "blastRadiusM": 3.5,
+        "actorStuckBlastDamageMultiplier": 2,
+        "actorStuckBlastRadiusMultiplier": 2,
+        "actorStuckVictimAlert": "STUCK-current-life-until-detonation-or-valid-teardown",
         "beepPolicy": "accelerate-against-fixed-host-detonation-tick",
         "damageResolution": "exactly-once"
       },
-      "rationale": "Dave approved the decision-packet recommendation. Impact arming preserves the stick-beep-explode moment while a single host detonation tick, stable actor life ID and exactly-once result remain replay safe.",
-      "owner": "Dave — 2026-07-26 decision reply",
+      "rationale": "Dave superseded the slow-bolt tuning with an exact three-times speed correction, yielding 108 m/s from the preceding 36 m/s baseline. Impact arming preserves the stick-beep-explode moment; actor sticks now emit STUCK and double blast damage and radius while a single host detonation tick, stable actor life ID and exactly-once result remain replay safe.",
+      "owner": "Dave — 2026-07-27 Desktop Untitled correction",
       "recordedAt": "2026-07-25T22:30:00Z",
-      "resolvedAt": "2026-07-26T06:33:46.635Z",
+      "resolvedAt": "2026-07-28T04:32:32.888Z",
       "freezeNoLaterThan": "Projectile slice",
-      "supersedesReceiptSha256": null
+      "supersedesReceiptSha256": "a724a33b6987e60c72e929918af29f099b0e585a708203429778d320c74aa7be"
     },
     {
       "receiptVersion": 1,
@@ -314,21 +326,21 @@
           "retiredEntriesExcluded": true,
           "validatorPolicy": "catalog-set-equality-plus-forced-every-reward-plus-formula-recomputation"
         },
-        "earningPolicy": {"progressScope": "per-life", "advancingKillSources": ["weapon", "ordnance"], "excludedKillSources": ["killstreak"], "eachRewardEarnsOncePerLife": true, "deathClearsProgress": true, "deathClearsUnconsumedRewards": false, "unconsumedRewardLifetime": "until-consumed-or-match-epoch-ends", "respawnStartsFreshLife": true, "rematchStartsFreshEpoch": true},
+        "earningPolicy": {"progressScope": "per-life", "advancingKillSources": ["weapon", "ordnance"], "excludedKillSources": ["killstreak"], "eachRewardEarnsOncePerCycle": true, "cycleRepeatsAfterFinalThresholdWhileLifeActive": true, "nextCycleProgressStartsAtZero": true, "deathClearsProgress": true, "deathClearsUnconsumedRewards": false, "unconsumedRewardLifetime": "until-consumed-or-match-epoch-ends", "respawnStartsFreshLife": true, "rematchStartsFreshEpoch": true},
         "activationPolicy": {"hostOwnsActivation": true, "consumesExactlyOnce": true, "duplicateOwnerTypePolicy": "forbid-unless-definition-allows"},
         "privacyPolicy": {"rewardSeedRollHostOnly": true, "acquisitionStateHostOnly": true, "rewardRevealPolicy": "claimant-after-exclusive-claim", "recipientSnapshotOmitsSeedAndRoll": true},
         "chopperCalibration": {"targetable": true, "health": 800, "durationMs": 30000, "severePressureByMs": 4000, "survivalIntent": "breaking-line-of-sight-within-four-to-five-seconds-normally-survives", "flightAuthority": "host-ai"},
-        "droneSwarmCalibration": {"count": 12, "healthEach": 50, "magazineSize": 20, "reservePolicy": "unlimited-reloads-until-expiry", "maximumLifetimeMs": 60000, "targets": ["opposing-living-human-player", "opposing-living-bot"], "rejects": ["ally", "dead-life", "stale-life"], "survivalIntent": "breaking-exposure-after-approximately-five-seconds-usually-permits-survival"},
+        "droneSwarmCalibration": {"count": 24, "healthEach": 50, "magazineSize": 20, "reservePolicy": "unlimited-reloads-until-expiry", "maximumLifetimeMs": 60000, "ingress": "safe-volume-behind-caller-fast-then-smooth-normal-speed", "formation": "distributed-individual-or-small-groups", "routePolicy": "host-seeded-divergent-valid-map-directions", "targets": ["opposing-living-human-player", "opposing-living-bot"], "rejects": ["ally", "dead-life", "stale-life"], "survivalIntent": "breaking-exposure-after-approximately-five-seconds-usually-permits-survival"},
         "pilotedDroneSensor": {"targets": "opposing-living-hostiles-only", "maximumRangeM": 50, "forwardConeDegrees": 90, "refreshMs": 250, "revealsThroughWalls": true, "changesBallisticAuthority": false},
         "pilotedDroneDeployment": {"modeChoiceRequired": true, "allowedModes": ["autonomous", "first-person-owner-control"], "sharedAssetFamilyWithDroneSwarm": true, "sharedGunProfileId": "drone-gun-standard-v1", "variantDifferencesLimitedTo": ["control-mode", "reserve", "lifetime", "sensor-policy"]},
-        "carpetBomber": {"playerInput": "strip-midpoint-only", "ingressAndOrientation": "host-seeded-valid-random", "impactCount": 20, "pattern": "bounded-zigzag"}
+        "carpetBomber": {"playerInput": "crosshair-ground-anchor-no-overview-map", "ingressAndOrientation": "host-seeded-valid-random", "impactCount": 20, "pattern": "bounded-zigzag", "damageMultiplierFromPreviousFrozenProfile": 3, "payloadPresentation": ["visible-falling-shell", "large-bounded-explosion", "smoke", "fire", "spatial-audio"]}
       },
-      "rationale": "Dave replaced free pick-any-five with five exact slot families, retained both Scout Sweep and Nuke, and made Nuke and Drone Swarm mutually exclusive slot-5 alternatives. Repository evidence confirms Yardhawk is the existing canonical ID. The request's 'carpet bomb' and 'carpet bomber' wording maps to the one planned canonical Carpet Bomber ID because no second distinct catalog ID exists. Recommended costs, lifecycle, privacy and support calibration remain approved. Care rewards are derived from the catalog itself: Scout Sweep shares the highest base weight, every present or future eligible nonrecursive nonretired streak appears exactly once, weights recompute on every catalog change, and Nuke remains exactly one percent. The first HITL correction makes earned unconsumed rewards survive deaths while per-life progress resets. The second correction requires the standalone drone to reuse the Swarm asset/gun family and offer an explicit autonomous or first-person owner-control deployment choice, with only the frozen variant specifications differing.",
-      "owner": "Dave — 2026-07-26 HITL correction; canonical-ID observations verified in repository",
+      "rationale": "Dave retained the five exact slot families, Scout Sweep, Nuke and the future-complete catalog-derived care pool. The newest correction makes the reward ladder repeat after its final threshold while the same life remains active, with one earn per cycle and earned rewards still surviving death. Drone Swarm increases from 12 to exactly 24, enters from behind the caller and spreads into divergent individual/small-group routes. Carpet Bomber activates from the crosshair without an overview map, deals exactly three times the preceding frozen damage and visibly drops shells with explosion/smoke/fire audiovisual presentation. The standalone drone still reuses the Swarm asset/gun family and offers autonomous or first-person owner control.",
+      "owner": "Dave — 2026-07-27 Desktop Untitled correction; canonical-ID observations retained",
       "recordedAt": "2026-07-25T22:30:00Z",
-      "resolvedAt": "2026-07-26T14:18:00.000Z",
+      "resolvedAt": "2026-07-28T04:32:32.888Z",
       "freezeNoLaterThan": "Before support schema",
-      "supersedesReceiptSha256": "8ab6ebaf21a6b0e58561f67362396f52ff32ca21ff1943bda82653a8d2cde848"
+      "supersedesReceiptSha256": "bf15107867186691ede2d3164572508fb5093f2dcc4923c01ae906e63b9cfd59"
     },
     {
       "receiptVersion": 1,
@@ -376,6 +388,35 @@
       "recordedAt": "2026-07-25T22:30:00Z",
       "resolvedAt": "2026-07-26T06:33:46.635Z",
       "freezeNoLaterThan": "Before F00 rollback/release topology and RL01 release shell",
+      "supersedesReceiptSha256": null
+    },
+    {
+      "receiptVersion": 1,
+      "id": "DEC-16",
+      "status": "FROZEN",
+      "proposedDefault": "Expose Performance, Quality, Max and Custom; migrate former Quality to Max; keep named profiles uncapped and seed Custom transactionally from the last named profile",
+      "value": {
+        "topLevelLabels": ["Performance", "Quality", "Max", "Custom"],
+        "defaultProfile": "Quality",
+        "legacyQualityMigrationTarget": "Max",
+        "profileRoles": {
+          "Performance": "lowest-gameplay-safe-presentation-for-weak-pcs",
+          "Quality": "balanced-high-fidelity-with-decent-frame-pacing-and-no-needless-max-cost",
+          "Max": "highest-supported-values-subject-to-honest-capability-and-safety-clamps",
+          "Custom": "complete-committed-derivative-of-last-selected-named-profile"
+        },
+        "namedProfileFrameRateLimit": 0,
+        "adaptiveQualityMayImposeHiddenFrameCap": false,
+        "customSeedPolicy": "complete-effective-settings-of-last-selected-named-profile",
+        "editPolicy": "batch-in-current-panel-without-leaving-menu-or-match",
+        "commitPolicy": "atomic-save-exit-or-successful-panel-exit-apply-persist-readback-then-clear",
+        "persistenceScope": "reload-rejoin-later-visit-and-build-migration"
+      },
+      "rationale": "Dave explicitly restored Max as a distinct named profile and clarified all four labels and roles. The prior Quality values represent Max; the new Quality balances visual quality and frame pacing, Performance targets weak PCs, and named profiles never default to a 60/90 cap. Custom begins from the selected named profile, batches edits without ejecting the panel or match, and persists only after successful atomic commit and read-back.",
+      "owner": "Dave — 2026-07-27 Desktop Untitled correction",
+      "recordedAt": "2026-07-27T19:56:41.000Z",
+      "resolvedAt": "2026-07-28T04:32:32.888Z",
+      "freezeNoLaterThan": "Before Pass 65 owner-feedback candidate construction",
       "supersedesReceiptSha256": null
     }
   ]

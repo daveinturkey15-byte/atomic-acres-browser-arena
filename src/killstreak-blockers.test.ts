@@ -86,11 +86,14 @@ describe('Pass 65 killstreak blockers', () => {
     expect(pilot.advance(1_200, baseWorld()).damageEvents).toHaveLength(0);
     expect(pilot.advance(1_001 + DRONE_GUN_PROFILE.cadenceMs, baseWorld()).damageEvents).toHaveLength(1);
 
-    const firstSwarm = swarm.advance(2_000, baseWorld()).damageEvents;
+    // The formation spends its first two seconds on the authored behind-player
+    // ingress path; weapons become eligible only after that choreography ends.
+    const firstSwarmAt = 3_001;
+    const firstSwarm = swarm.advance(firstSwarmAt, baseWorld()).damageEvents;
     expect(firstSwarm).toHaveLength(1);
     expect(firstSwarm[0].damage).toBeGreaterThan(1);
-    expect(swarm.advance(2_000 + DRONE_SWARM_FIRE_LANE_INTERVAL_MS - 1, baseWorld()).damageEvents).toHaveLength(0);
-    expect(swarm.advance(2_000 + DRONE_SWARM_FIRE_LANE_INTERVAL_MS, baseWorld()).damageEvents).toHaveLength(1);
+    expect(swarm.advance(firstSwarmAt + DRONE_SWARM_FIRE_LANE_INTERVAL_MS - 1, baseWorld()).damageEvents).toHaveLength(0);
+    expect(swarm.advance(firstSwarmAt + DRONE_SWARM_FIRE_LANE_INTERVAL_MS, baseWorld()).damageEvents).toHaveLength(1);
   });
 
   it('enforces piloted 2x20 ammo and swarm unlimited 20-round reload loops inside their hard lifetimes', () => {

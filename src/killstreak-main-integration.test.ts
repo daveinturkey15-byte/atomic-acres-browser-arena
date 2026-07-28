@@ -24,6 +24,7 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain('admitKillstreakStateMessage(message, {');
     expect(source).toContain('seenNonces: processedNonces');
     expect(source).toContain('event.targetLifeId !== localContinuity');
+    expect(source).toContain('killstreakPresentation.presentImpacts(message.impacts, presentedAt)');
   });
 
   it('restores support possession immediately, then retains or removes the actor with the bounded rejoin reservation', () => {
@@ -109,15 +110,48 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain("import { primaryInteraction, type InteractionCandidate } from './interaction-arbitration'");
     expect(source).toContain('function selectedFInteraction(');
     expect(source).toContain('function executePrimaryFInteraction(');
-    expect(source).toContain("if (event.code === 'KeyF' && !event.repeat) executePrimaryFInteraction()");
+    expect(source).toContain("if (event.code === 'KeyF' && !event.repeat) {");
     expect(source).toContain("interaction.kind === 'support-enter-chopper'");
     expect(source).toContain("interaction.kind === 'support-enter-drone'");
     expect(source).toContain("type: 'killstreak-care-capture-intent'");
-    expect(source).toContain("if (event.code === 'KeyF') releaseCareCapture();");
+    expect(source).not.toContain("if (event.code === 'KeyF') releaseCareCapture();");
     expect(source).toMatch(/function clearGameplayInput\(\): void \{\s+releaseCareCapture\(\);/);
     expect(source).toContain('if (appliedDamage > 0) releaseCareCapture(now);');
     expect(source).toContain('killstreakRuntime.recordActorDamage(victimId)');
     expect(source).not.toMatch(/!interactWithKillstreakSupport\(\)[\s\S]{0,100}!interactWithShedDoor\(\)/);
+  });
+
+  it('offers only claimable landed crates and correlates pending, acknowledged, released and rejected capture state', () => {
+    const selectionStart = source.indexOf('function selectedFInteraction(');
+    const selectionEnd = source.indexOf('\nfunction updateFInteractionPrompt(', selectionStart);
+    const selectionBlock = source.slice(selectionStart, selectionEnd);
+    expect(selectionBlock).toContain('const activeCareCrateId = careCaptureCrateId(localCareCaptureState);');
+    expect(selectionBlock).toContain("crate.kind !== 'care-crate' || crate.phase !== 'landed' || crate.id === activeCareCrateId");
+    expect(selectionBlock).not.toContain("crate.phase !== 'capturing'");
+
+    const interactionStart = source.indexOf('function interactWithSelectedKillstreakSupport(');
+    const interactionEnd = source.indexOf('\nfunction executePrimaryFInteraction(', interactionStart);
+    const interactionBlock = source.slice(interactionStart, interactionEnd);
+    expect(interactionBlock).toContain("if (!crate || crate.phase !== 'landed' || localCareCaptureState.status !== 'idle') return false;");
+    expect(interactionBlock).toContain('const requested = requestCareCapture(localCareCaptureState, {');
+    expect(interactionBlock).toContain("addFeed('CARE PACKAGE - REQUESTING AUTHORITY', 'gold')");
+    expect(interactionBlock).toContain('const admission = killstreakRuntime.beginCareCapture(');
+    expect(interactionBlock).toContain('const result = applyCareCaptureResult(localCareCaptureState, {');
+    expect(interactionBlock).toContain('if (!admission.accepted) {');
+    expect(interactionBlock).toContain('CARE PACKAGE - CLAIM REJECTED');
+    expect(interactionBlock.indexOf("addFeed('CARE PACKAGE - SECURING', 'gold')"))
+      .toBeGreaterThan(interactionBlock.indexOf('if (!admission.accepted) {'));
+
+    const refreshStart = source.indexOf('function refreshLocalKillstreakSnapshot(');
+    const refreshEnd = source.indexOf('\nfunction broadcastKillstreakState(', refreshStart);
+    const refreshBlock = source.slice(refreshStart, refreshEnd);
+    expect(refreshBlock).toContain('const reconciliation = applyCareCaptureProjection(localCareCaptureState, {');
+    expect(refreshBlock).toContain('captureActorId: heldCrate?.captureActorId ?? null');
+    expect(refreshBlock).toContain('CARE PACKAGE - CLAIM INTERRUPTED / UNAVAILABLE');
+
+    expect(source).toContain("if (message.type === 'killstreak-care-capture-result') {");
+    expect(source).toContain('admitKillstreakCareCaptureResultMessage(message, {');
+    expect(source).toContain('const release = requestCareCaptureRelease(localCareCaptureState, sequence, killstreakSnapshot.revision);');
   });
 
   it('applies the exact Adrenaline stage to damage, movement and reload duration', () => {

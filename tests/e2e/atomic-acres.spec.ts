@@ -931,8 +931,8 @@ test.describe('boot and authored presentation', () => {
     await expect(page.locator('#field-of-view')).toBeVisible();
     await expect(page.locator('#graphics-profile')).toBeVisible();
     await expect(page.locator('#graphics-profile')).toHaveValue('performance');
-    await expect(page.locator('#graphics-profile option')).toHaveCount(3);
-    await expect(page.locator('#graphics-profile option')).toHaveText(['QUALITY', 'PERFORMANCE', 'CUSTOM']);
+    await expect(page.locator('#graphics-profile option')).toHaveCount(4);
+    await expect(page.locator('#graphics-profile option')).toHaveText(['QUALITY', 'PERFORMANCE', 'MAX', 'CUSTOM']);
     await expect(page.locator('#audio-settings')).toBeVisible();
     await expect(page.locator('#accessibility-settings')).toBeVisible();
     expect((await debug(page)).audio.ambience.continuousSources).toBe(2);
@@ -959,7 +959,7 @@ test.describe('boot and authored presentation', () => {
     await expect(page.locator('.controls')).toContainText('crouch');
     await expect(page.locator('.controls')).toContainText('prone');
     await expect(page.locator('.controls')).toContainText('knife');
-    await expect(page.locator('.controls')).toContainText('frag');
+    await expect(page.locator('.controls')).toContainText('selected grenade');
   });
 
   test('times out an invalid room and leaves a clean retryable state', async ({ page }) => {
@@ -2832,8 +2832,8 @@ test.describe('performance and stability', () => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await pageReadyAt(page, '/?render=quality');
-    await expect(page.locator('#graphics-profile option')).toHaveCount(3);
-    await expect(page.locator('#graphics-profile option')).toHaveText(['QUALITY', 'PERFORMANCE', 'CUSTOM']);
+    await expect(page.locator('#graphics-profile option')).toHaveCount(4);
+    await expect(page.locator('#graphics-profile option')).toHaveText(['QUALITY', 'PERFORMANCE', 'MAX', 'CUSTOM']);
     await startSolo(page);
     await page.waitForTimeout(1_000);
     const state = await debug(page);

@@ -34,6 +34,35 @@ export function resetRemoteGrenadeAuthorityState(): RemoteGrenadeAuthorityState 
   return createRemoteGrenadeAuthorityState();
 }
 
+/** Stops new throws for a dead life while retaining already-thrown ordnance. */
+export function recordRemoteGrenadeDeath(state: RemoteGrenadeAuthorityState): RemoteGrenadeAuthorityState {
+  return { ...state, remaining: 0 };
+}
+
+function unexpiredRemoteGrenadeActions(
+  state: RemoteGrenadeAuthorityState,
+  now: number,
+): Readonly<Record<number, RemoteGrenadeAction>> {
+  if (!Number.isFinite(now)) return {};
+  return Object.fromEntries(Object.entries(state.actions)
+    .filter(([, action]) => now - action.thrownAt <= REMOTE_SEMTEX_MAX_FUSE_MS));
+}
+
+/** Starts a new life without erasing still-live ordnance thrown by the prior life. */
+export function recordRemoteGrenadeRespawn(
+  state: RemoteGrenadeAuthorityState,
+  selectedGrenade: GrenadeId,
+  now: number,
+): RemoteGrenadeAuthorityState {
+  return {
+    remaining: 1,
+    selectedGrenade,
+    lifeId: null,
+    highestActionSequence: -1,
+    actions: unexpiredRemoteGrenadeActions(state, now),
+  };
+}
+
 export function replenishRemoteGrenadeAuthorityState(
   state: RemoteGrenadeAuthorityState,
   amount = 1,
@@ -67,8 +96,7 @@ export function admitRemoteGrenadeThrow(
   if (originDistance > REMOTE_GRENADE_ORIGIN_TOLERANCE || velocity <= 0 || velocity > REMOTE_GRENADE_MAX_VELOCITY) {
     return { accepted: false, state };
   }
-  const activeActions = Object.fromEntries(Object.entries(state.actions)
-    .filter(([, action]) => now - action.thrownAt <= REMOTE_SEMTEX_MAX_FUSE_MS));
+  const activeActions = unexpiredRemoteGrenadeActions(state, now);
   return {
     accepted: true,
     state: {
@@ -154,4 +182,8 @@ export function admitRemoteGrenadeHit(
 
 export function remoteGrenadeForAction(state: RemoteGrenadeAuthorityState, actionNonce: number): GrenadeId | null {
   return state.actions[actionNonce]?.grenade ?? null;
+}
+
+export function remoteGrenadeLifeForAction(state: RemoteGrenadeAuthorityState, actionNonce: number): number | null {
+  return state.actions[actionNonce]?.lifeId ?? null;
 }

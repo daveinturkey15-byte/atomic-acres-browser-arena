@@ -148,6 +148,22 @@ export class AdaptiveQualityController {
     return null;
   }
 
+  /**
+   * Drops accumulated frame-time evidence without touching the current tier.
+   * Used when the tab regains visibility: browser-throttled background frames
+   * are scheduling artifacts, not workload evidence, and must never trigger a
+   * downshift or block an upshift after refocus.
+   */
+  resetSampling(reason: string): void {
+    this.samples.length = 0;
+    this.overloadSamples = 0;
+    this.headroomSamples = 0;
+    this.cooldownFrames = 0;
+    this.p50Ms = 0;
+    this.p95Ms = 0;
+    this.lastReason = reason;
+  }
+
   forceDownshift(reason: string): number | null {
     if (this.options.enabled === false || this.options.profile === 'compat' || this.tier <= 0) return null;
     this.tier -= 1;
@@ -179,14 +195,23 @@ export class AdaptiveQualityController {
   }
 }
 
+const COMMON_DISPLAY_REFRESH_HZ = [30, 60, 75, 90, 120, 144, 165, 180, 240, 360] as const;
+
 export function classifyDisplayFrameMs(samples: readonly number[]): number {
-  const valid = samples.filter((sample) => Number.isFinite(sample) && sample > 4 && sample < 100).sort((a, b) => a - b);
+  const valid = samples.filter((sample) => Number.isFinite(sample) && sample > 2 && sample < 100).sort((a, b) => a - b);
   const measured = percentile(valid, 0.5);
-  if (measured <= 12.5) return 1_000 / 120;
-  if (measured <= 23) return 1_000 / 60;
-  if (measured <= 42) return 1_000 / 30;
   // Very slow startup/browser-throttling samples are workload evidence, not a
   // credible display refresh rate. Treating 80-120ms as an 8-12Hz display
   // would hide genuine overload and prevent adaptation from ever engaging.
-  return 1_000 / 60;
+  if (measured <= 0 || measured > 42) return 1_000 / 60;
+  // High-refresh displays (144/165/180 Hz...) must keep their real cadence as
+  // the adaptive budget. Bucketing 180 Hz down to a 120 or 60 Hz target let
+  // frame times sag to 60-90 FPS on capable hardware without any response.
+  const measuredHz = 1_000 / measured;
+  const nearestHz = COMMON_DISPLAY_REFRESH_HZ.reduce((best, hz) => (
+    Math.abs(hz - measuredHz) < Math.abs(best - measuredHz) ? hz : best
+  ), COMMON_DISPLAY_REFRESH_HZ[0]);
+  // Snap to a standard cadence only when the measurement credibly matches it;
+  // otherwise trust the measured median (unusual or VRR displays).
+  return Math.abs(nearestHz - measuredHz) <= measuredHz * 0.06 ? 1_000 / nearestHz : measured;
 }

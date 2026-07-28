@@ -5,7 +5,7 @@ Plan owner: Codex release integrator
 Target project: `daveinturkey15-byte/atomic-acres-browser-arena`
 Publication rule: **Pass 65 must stop at an immutable preview for Dave’s explicit HITL approval. It must not publish before that approval.**
 
-Correction authority: Dave's 2026-07-26 local review rejected failed-HITL baseline `ec8a55fa83f194f34abe6708cab727e45057285e`. The complete correction scope, owners, falsifiers and execution waves are frozen in [`PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md`](PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md). Where this original plan still mentions High/Max top-level presets, rewards clearing on death, three grenade families, possession-only standalone drone behavior, or visual-only support placeholders, the correction ledger and superseded decision receipts govern.
+Correction authority: Dave's 2026-07-26 local review rejected failed-HITL baseline `ec8a55fa83f194f34abe6708cab727e45057285e`; the normalized 2026-07-27 Desktop `Untitled.txt` feedback adds HF-073+ and supersedes further graphics, killstreak, interaction, preview and ordnance contracts. The complete correction scope, owners, falsifiers and execution waves are frozen in [`PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md`](PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md). Where this original plan conflicts, the newest ledger row, source outcome, supersession and digest-lined decision receipt govern.
 
 ## 0. Executive decision
 
@@ -348,7 +348,7 @@ Replace the fixed internal list with:
 - `SupportActivation`: stable ID, owner/team/life, seed, earned time, activation time, state, consumed revision.
 - `SupportEntity`: entity ID, activation ID, owner/team, health, pose, velocity, ammo, reload, fuel/lifetime, target, navigation state.
 
-Every product choice is represented in canonical `docs/PASS65_DECISION_RECEIPTS.json`, validated against `docs/PASS65_DECISION_RECEIPTS.schema.json`. P0 historically instantiated 15 complete `OPEN` receipts; Dave's 2026-07-26 reply now freezes all 15 with structured values, rationale, owner, timestamps and supersession lineage where an earlier frozen value changed. A dependency such as `P04[DEC-13=FROZEN]` is satisfied only by the current schema-valid receipt and by code/evidence that binds its canonical digest; copying a prose summary never unlocks implementation.
+Every product choice is represented in canonical `docs/PASS65_DECISION_RECEIPTS.json`, validated against `docs/PASS65_DECISION_RECEIPTS.schema.json`. P0 historically instantiated 15 complete `OPEN` receipts; Dave froze them on 2026-07-26, and the normalized 2026-07-27 Desktop feedback adds frozen DEC-16 while superseding DEC-04/07/08/13 with structured values, rationale, owner, timestamps and digest lineage. A dependency such as `P04[DEC-13=FROZEN]` is satisfied only by the current schema-valid receipt and by code/evidence that binds its canonical digest; copying a prose summary never unlocks implementation.
 
 Host fixed-step simulation authors navigation, targeting, damage, health, reward, crate roll, loot, and lifecycle. Reliable spawn/despawn/state transitions combine with bounded pose snapshots. Targetable support entities use hit proxies with pose history so ordinary host-authored shots can destroy them under latency.
 
@@ -977,7 +977,7 @@ Before F07, asset authoring or shed coding, capture final live Pass 64 on the sa
 ### 11.6 Drone Swarm
 
 - Selectable slot-5 alternative to retained selectable Nuke.
-- Exactly 12 host-simulated drones.
+- Exactly 24 host-simulated drones, entering from behind the caller and distributing into divergent individual/small-group routes.
 - 50 HP each; freeze hitbox/core multipliers and per-weapon shot-count bands so “accurate fire” is testable.
 - Up to 60 seconds lifetime.
 - 20-round magazines with reload loops; unlimited reloads within lifetime.

@@ -5,7 +5,12 @@ import {
   ADRENALINE_DURATION_MS,
   ADRENALINE_MOVEMENT_MULTIPLIER,
   ADRENALINE_RELOAD_DURATION_MULTIPLIER,
+  CARPET_BOMBER_DAMAGE_MULTIPLIER,
   CARPET_BOMBER_IMPACT_COUNT,
+  CARPET_BOMBER_MAX_DAMAGE,
+  CARPET_BOMBER_PREVIOUS_MAX_DAMAGE,
+  CARPET_BOMB_SHELL_DROP_LEAD_MS,
+  CARPET_TARGET_MARKER_MAX_LIFETIME_MS,
   CHOPPER_DURATION_MS,
   CHOPPER_HEALTH,
   DRONE_HEALTH,
@@ -74,6 +79,24 @@ describe('host killstreak runtime', () => {
       streak: 0,
       available: ['adrenaline', 'yardhawk', 'carpet-bomber', 'chopper', 'drone-swarm'],
     });
+  });
+
+  it('recycles the streak ladder after all five rewards are earned and spent without dying', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
+    earn(runtime, 15);
+    expect(runtime.snapshotFor('owner', 0).actors[0].available).toEqual(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke']);
+    expect(runtime.activate(intent('scout-sweep', 1, 1), 1_000, DEFAULT_WORLD).accepted).toBe(true);
+    expect(runtime.activate(intent('yardhawk', 2, 2), 1_001, DEFAULT_WORLD).accepted).toBe(true);
+    expect(runtime.activate(intent('tri-pass', 3, 3), 1_002, DEFAULT_WORLD).accepted).toBe(true);
+    expect(runtime.activate(intent('chopper', 4, 4), 1_003, DEFAULT_WORLD).accepted).toBe(true);
+    expect(runtime.activate(intent('nuke', 5, 5), 1_004, DEFAULT_WORLD).accepted).toBe(true);
+    const recycled = runtime.snapshotFor('owner', 1_005).actors[0];
+    expect(recycled.streak).toBe(0);
+    expect(recycled.available).toEqual([]);
+    earn(runtime, 2);
+    expect(runtime.recordEligibleElimination('owner', 'weapon')).toEqual(['scout-sweep']);
+    expect(runtime.snapshotFor('owner', 1_006).actors[0].available).toEqual(['scout-sweep']);
   });
 
   it('preserves earned rewards across repeated deaths and a transport rejoin while rejecting stale, duplicate, and forged activation claims', () => {
@@ -260,15 +283,91 @@ describe('host killstreak runtime', () => {
       runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'carpet-bomber', 'chopper', 'nuke']));
       earn(runtime, 7);
       runtime.activate(intent('carpet-bomber', 3, 1, clientRequestId), 1_000, DEFAULT_WORLD);
-      return runtime.advance(6_000, DEFAULT_WORLD);
+      const damageEvents = [];
+      const impactEvents = [];
+      for (let now = 1_000; now <= 6_000; now += 20) {
+        const step = runtime.advance(now, DEFAULT_WORLD);
+        damageEvents.push(...step.damageEvents);
+        impactEvents.push(...step.impactEvents);
+      }
+      return {
+        damageEvents,
+        impactEvents,
+      };
     };
     const first = setup('activation-client-request-a');
     const second = setup('activation-client-request-b');
-    expect(first.impactEvents).toHaveLength(CARPET_BOMBER_IMPACT_COUNT);
+    expect(first.impactEvents).toHaveLength(CARPET_BOMBER_IMPACT_COUNT * 2);
     expect(first.impactEvents).toEqual(second.impactEvents);
     expect(first.impactEvents.every((impact) => impact.position[0] >= -40 && impact.position[0] <= 40
       && impact.position[2] >= -45 && impact.position[2] <= 45)).toBe(true);
-    expect(new Set(first.impactEvents.map((impact) => impact.ordinal)).size).toBe(CARPET_BOMBER_IMPACT_COUNT);
+    expect(new Set(first.impactEvents.map((impact) => `${impact.ordinal}:${impact.phase}`)).size)
+      .toBe(CARPET_BOMBER_IMPACT_COUNT * 2);
+    for (let ordinal = 0; ordinal < CARPET_BOMBER_IMPACT_COUNT; ordinal += 1) {
+      const drop = first.impactEvents.find((event) => event.ordinal === ordinal && event.phase === 'drop');
+      const impact = first.impactEvents.find((event) => event.ordinal === ordinal && event.phase === 'impact');
+      expect(drop).toBeDefined();
+      expect(impact).toBeDefined();
+      expect(drop?.impactAtMs).toBe(impact?.impactAtMs);
+      expect(drop?.atMs).toBe((impact?.impactAtMs ?? 0) - CARPET_BOMB_SHELL_DROP_LEAD_MS);
+      expect(impact?.atMs).toBe(impact?.impactAtMs);
+      expect((drop?.impactAtMs ?? 0) - (1_000 + CARPET_TARGET_MARKER_MAX_LIFETIME_MS + ordinal * 180))
+        .toBe(0);
+    }
+    const staged = new HostKillstreakRuntime(7);
+    staged.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'carpet-bomber', 'chopper', 'nuke']));
+    earn(staged, 7);
+    staged.activate(intent('carpet-bomber', 3), 1_000, DEFAULT_WORLD);
+    expect(staged.advance(2_000 - CARPET_BOMB_SHELL_DROP_LEAD_MS, DEFAULT_WORLD).impactEvents)
+      .toEqual([expect.objectContaining({ ordinal: 0, phase: 'drop', impactAtMs: 2_000 })]);
+    expect(staged.advance(1_999, DEFAULT_WORLD).impactEvents.every((event) => event.phase === 'drop')).toBe(true);
+    expect(staged.advance(2_000, DEFAULT_WORLD).impactEvents)
+      .toContainEqual(expect.objectContaining({ ordinal: 0, phase: 'impact', impactAtMs: 2_000 }));
+  });
+
+  it('preserves a real 420ms shell lead after a coarse/stalled host advance', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'carpet-bomber', 'chopper', 'nuke']));
+    earn(runtime, 7);
+    runtime.activate(intent('carpet-bomber', 3), 1_000, DEFAULT_WORLD);
+
+    const stalled = runtime.advance(6_000, DEFAULT_WORLD);
+    expect(stalled.damageEvents).toEqual([]);
+    expect(stalled.impactEvents).toEqual([
+      expect.objectContaining({ ordinal: 0, phase: 'drop', atMs: 6_000, impactAtMs: 6_420 }),
+    ]);
+    expect(runtime.advance(6_001, DEFAULT_WORLD).impactEvents).toEqual([]);
+    expect(runtime.advance(6_180, DEFAULT_WORLD).impactEvents).toEqual([
+      expect.objectContaining({ ordinal: 1, phase: 'drop', atMs: 6_180, impactAtMs: 6_600 }),
+    ]);
+    expect(runtime.advance(6_419, DEFAULT_WORLD).impactEvents.every((event) => event.phase === 'drop')).toBe(true);
+    const landed = runtime.advance(6_420, DEFAULT_WORLD);
+    expect(landed.impactEvents).toContainEqual(
+      expect.objectContaining({ ordinal: 0, phase: 'impact', atMs: 6_420, impactAtMs: 6_420 }),
+    );
+    const firstLanded = landed.impactEvents.find((event) => event.phase === 'impact' && event.ordinal === 0);
+    expect(firstLanded).toBeDefined();
+    expect(firstLanded!.atMs - stalled.impactEvents[0]!.atMs).toBe(CARPET_BOMB_SHELL_DROP_LEAD_MS);
+  });
+
+  it('binds Carpet Bomber to exactly three times the previous maximum damage', () => {
+    expect(CARPET_BOMBER_MAX_DAMAGE).toBe(CARPET_BOMBER_PREVIOUS_MAX_DAMAGE * CARPET_BOMBER_DAMAGE_MULTIPLIER);
+    expect(CARPET_BOMBER_DAMAGE_MULTIPLIER).toBe(3);
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'carpet-bomber', 'chopper', 'nuke']));
+    earn(runtime, 7);
+    runtime.activate(intent('carpet-bomber', 3), 1_000, DEFAULT_WORLD);
+    const drops = runtime.advance(2_000 - CARPET_BOMB_SHELL_DROP_LEAD_MS, DEFAULT_WORLD).impactEvents.filter((event) => event.phase === 'drop');
+    const exactImpact = drops[0]!.position;
+    const result = runtime.advance(2_000, {
+      ...DEFAULT_WORLD,
+      targets: [
+        DEFAULT_WORLD.targets[0]!,
+        { id: 'exact-impact-enemy', kind: 'player', team: 1, lifeId: 1, alive: true, position: exactImpact },
+      ],
+    });
+    expect(result.damageEvents.find((event) => event.targetId === 'exact-impact-enemy'
+      && event.origin.every((value, axis) => value === exactImpact[axis]))?.damage).toBe(CARPET_BOMBER_MAX_DAMAGE);
   });
 
   it('contains every admitted payload inside its seeded mildly-wide corridor across seeds, bounds and surfaces', () => {
@@ -303,9 +402,12 @@ describe('host killstreak runtime', () => {
       const dx = end[0] - start[0];
       const dz = end[2] - start[2];
       const lengthSquared = dx * dx + dz * dz;
-      const result = runtime.advance(6_000, world);
-      expect(result.impactEvents).toHaveLength(CARPET_BOMBER_IMPACT_COUNT);
-      for (const impact of result.impactEvents) {
+      const impactEvents = [];
+      for (let now = 1_000; now <= 6_000; now += 20) {
+        impactEvents.push(...runtime.advance(now, world).impactEvents.filter((event) => event.phase === 'impact'));
+      }
+      expect(impactEvents).toHaveLength(CARPET_BOMBER_IMPACT_COUNT);
+      for (const impact of impactEvents) {
         const relativeX = impact.position[0] - start[0];
         const relativeZ = impact.position[2] - start[2];
         const projection = (relativeX * dx + relativeZ * dz) / lengthSquared;
@@ -367,16 +469,19 @@ describe('host killstreak runtime', () => {
     expect(runtime.snapshotFor('owner', 1_001).actors[0].available).toContain('care-package');
   });
 
-  it('creates exactly 12 targetable 50-HP swarm drones with bounded host damage and 60-second expiry', () => {
+  it('flies exactly 24 targetable 50-HP swarm drones in from behind before spreading to bounded host targets', () => {
     const runtime = new HostKillstreakRuntime(7);
     runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'drone-swarm']));
     earn(runtime, 15);
-    const activation = runtime.activate(intent('drone-swarm', 5), 1_000, DEFAULT_WORLD);
+    const activation = runtime.activate({ ...intent('drone-swarm', 5), facing: [0, 0, 1] }, 1_000, DEFAULT_WORLD);
     expect(activation.entityIds).toHaveLength(DRONE_SWARM_COUNT);
     const spawned = runtime.snapshotFor('owner', 1_000).entities;
     expect(spawned).toHaveLength(DRONE_SWARM_COUNT);
     expect(spawned.every((entity) => entity.kind === 'drone' && entity.mode === 'swarm' && entity.health === DRONE_HEALTH && entity.magazine === 20 && entity.reserveClips === null)).toBe(true);
-    const attacks = runtime.advance(2_000, DEFAULT_WORLD).damageEvents;
+    expect(spawned.every((entity) => entity.position[2] < -8)).toBe(true);
+    expect(new Set(spawned.map((entity) => `${entity.position[0].toFixed(1)}:${entity.position[1].toFixed(1)}`)).size).toBeGreaterThan(12);
+    const attacks = [...runtime.advance(2_000, DEFAULT_WORLD).damageEvents];
+    for (let atMs = 2_100; atMs <= 5_000; atMs += 100) attacks.push(...runtime.advance(atMs, DEFAULT_WORLD).damageEvents);
     expect(attacks.length).toBeGreaterThan(0);
     expect(attacks.length).toBeLessThanOrEqual(DRONE_SWARM_COUNT);
     expect(attacks.every((event) => event.targetId === 'enemy' || event.targetId === 'enemy-bot')).toBe(true);
@@ -438,6 +543,33 @@ describe('host killstreak runtime', () => {
     expect(runtime.snapshotFor('owner', 1_618).actors.find((actor) => actor.actorId === 'owner')?.possession).toBeNull();
   });
 
+  it('strafes the possessed drone level-right and level-left independent of look direction', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'piloted-drone', 'tri-pass', 'chopper', 'nuke']));
+    earn(runtime, 5);
+    const entityId = runtime.activate(intent('piloted-drone', 2), 1_000, DEFAULT_WORLD).entityIds[0];
+    expect(runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 1, entityId, action: 'toggle-piloted-drone',
+    }, 1_001).accepted).toBe(true);
+    // Look along negative Z (yaw 0): D must travel positive X with no forward drift.
+    expect(runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2, entityId, action: 'pilot-control', yawQ: 0, pitchQ: 0, thrustQ: 0, strafeQ: 1, verticalQ: 0,
+    }, 1_002).accepted).toBe(true);
+    runtime.advance(1_100, DEFAULT_WORLD);
+    const start = runtime.snapshotFor('owner', 1_100).entities[0].position;
+    for (let atMs = 1_150; atMs <= 1_600; atMs += 50) runtime.advance(atMs, DEFAULT_WORLD);
+    const right = runtime.snapshotFor('owner', 1_600).entities[0].position;
+    expect(right[0]).toBeGreaterThan(start[0] + 1);
+    expect(Math.abs(right[2] - start[2])).toBeLessThan(0.01);
+    // Reverse the axis: A must return along negative X.
+    expect(runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 3, entityId, action: 'pilot-control', strafeQ: -1,
+    }, 1_601).accepted).toBe(true);
+    for (let atMs = 1_650; atMs <= 2_100; atMs += 50) runtime.advance(atMs, DEFAULT_WORLD);
+    const left = runtime.snapshotFor('owner', 2_100).entities[0].position;
+    expect(left[0]).toBeLessThan(right[0] - 1);
+  });
+
   it('keeps care seed, roll and reward host-private until one admitted capture completes', () => {
     const runtime = new HostKillstreakRuntime(7);
     runtime.registerActor('owner', 0, 1, loadout(['care-package', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
@@ -451,7 +583,9 @@ describe('host killstreak runtime', () => {
     runtime.advance(7_100, DEFAULT_WORLD);
     expect(runtime.beginCareCapture('owner', 99, entityId, 7_100, DEFAULT_WORLD)).toMatchObject({ accepted: false, reason: 'identity-mismatch' });
     expect(runtime.beginCareCapture('owner', 1, entityId, 7_100, DEFAULT_WORLD).accepted).toBe(true);
-    expect(runtime.snapshotFor('owner', 7_100).entities[0].revealedReward).toBeNull();
+    expect(runtime.snapshotFor('owner', 7_100).entities[0]).toMatchObject({
+      captureActorId: 'owner', phase: 'capturing', revealedReward: null,
+    });
     runtime.advance(8_349, DEFAULT_WORLD);
     expect(runtime.snapshotFor('owner', 8_349).actors[0].revealedCareRewards).toEqual([]);
     runtime.advance(8_350, DEFAULT_WORLD);

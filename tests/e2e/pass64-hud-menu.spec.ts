@@ -124,7 +124,7 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await ready(page);
     await page.locator('#menu-tab-options').click();
-    await expect(page.locator('#graphics-profile option')).toHaveText(['QUALITY', 'PERFORMANCE', 'CUSTOM']);
+    await expect(page.locator('#graphics-profile option')).toHaveText(['QUALITY', 'PERFORMANCE', 'MAX', 'CUSTOM']);
     await expect(page.locator('#advanced-graphics')).not.toHaveAttribute('open', '');
     await expect(page.locator('#graphics-target-fps')).toBeHidden();
     await page.locator('#advanced-graphics summary').click();
@@ -156,7 +156,7 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     await testInfo.attach('advanced-webgpu-controls-1280x720', { path: screenshot, contentType: 'image/png' });
   });
 
-  test('persists an Advanced Graphics edit as Custom across the renderer rebuild', async ({ page }) => {
+  test('batches Advanced Graphics edits and commits Custom once when Options closes', async ({ page }) => {
     await ready(page);
     await page.locator('#menu-tab-options').click();
     await page.locator('#advanced-graphics summary').click();
@@ -165,14 +165,30 @@ test.describe('Pass 64 command HUD and menu contract', () => {
       input.value = '240';
       input.dispatchEvent(new Event('change', { bubbles: true }));
     });
-    await page.waitForURL((url) => !url.searchParams.has('render'), { timeout: 30_000 });
+    await page.locator('#graphics-film-grain').evaluate((node) => {
+      const input = node as HTMLInputElement;
+      input.value = '0.19';
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await expect(page.locator('#advanced-graphics')).toHaveAttribute('open', '');
+    await expect(page.locator('#graphics-profile')).toHaveValue('custom');
+    await expect(page.locator('#graphics-effective')).toContainText('PENDING');
+    expect(new URL(page.url()).searchParams.get('render')).toBe('compat');
+    expect(await page.evaluate((key) => (
+      JSON.parse(localStorage.getItem(key) ?? 'null')?.settings?.graphics?.frameRateLimit
+    ), PLAYER_PROFILE_STORAGE_KEY)).not.toBe(240);
+
+    await Promise.all([
+      page.waitForURL((url) => !url.searchParams.has('render'), { timeout: 30_000 }),
+      page.locator('#menu-tab-deploy').click(),
+    ]);
     await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 30_000 });
     await page.locator('#menu-tab-options').click();
     await page.locator('#advanced-graphics summary').click();
     await expect(page.locator('#graphics-profile')).toHaveValue('custom');
     await expect(page.locator('#graphics-frame-rate-limit')).toHaveValue('240');
     const persisted = await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? 'null'), PLAYER_PROFILE_STORAGE_KEY);
-    expect(persisted.settings.graphics).toMatchObject({ preset: 'custom', frameRateLimit: 240 });
+    expect(persisted.settings.graphics).toMatchObject({ preset: 'custom', frameRateLimit: 240, filmGrain: 0.19 });
     await expect(page.locator('html')).toHaveAttribute('data-graphics-frame-rate-limit', '240');
   });
 

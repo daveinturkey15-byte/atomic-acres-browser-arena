@@ -77,13 +77,13 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
     verifier: 'src/pass65-settings.test.ts + src/adaptive-quality.test.ts',
   }),
   feature({
-    id: 'presentation-profile', title: 'Quality, Performance and Custom presentation profiles', availability: 'active', owner: 'src/pass65-settings.ts + src/render-profile.ts',
+    id: 'presentation-profile', title: 'Performance, Quality, Max and Custom presentation profiles', availability: 'active', owner: 'src/pass65-settings.ts + src/render-profile.ts',
     sourceProbes: [
       { path: 'src/pass65-settings.ts', symbol: "export type GraphicsPreset = 'performance' | 'high' | 'max' | 'custom'" },
       { path: 'src/render-profile.ts', symbol: 'renderProfileConfig' },
     ], pipelineIds: [],
-    control: control('setting', ['graphics.preset', 'graphics.geometryDetail'], 'Quality defaults to full authored geometry; Performance defaults to reduced presentation; Custom exposes the same presentation-only selector', 'Profiles and geometry detail change presentation roots only. They never change movement, collision, ballistics, visibility authority, invisible blockers, or major debris physics.'),
-    budget: 'Performance pixel ratio cap 0.75; Quality cap 1.0; internal Max supersampling cap 1.25; compatibility cap 0.2.',
+    control: control('setting', ['graphics.preset', 'graphics.geometryDetail'], 'Performance uses the lowest gameplay-safe presentation values; Quality is the balanced full-geometry profile; Max enables the highest supported values; Custom seeds from the last named profile before an explicit save', 'Profiles and geometry detail change presentation roots only. They never change movement, collision, ballistics, visibility authority, invisible blockers, or major debris physics.'),
+    budget: 'Performance effective pixel ratio cap 0.75; Quality base scale 1.0; Max and explicit Custom supersampling cap 1.25; compatibility cap 0.2.',
     verifier: 'src/pass65-settings.test.ts + src/render-profile.test.ts',
   }),
   feature({

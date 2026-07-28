@@ -1,5 +1,6 @@
 import { GRENADE_RADIUS, type Stance } from './gameplay';
 import type { ExplosiveSource } from './protocol';
+import { explosiveBoltBlastRadiusM } from './combat/ordnance';
 import { PASS65_KILLSTREAK_CATALOG, type KillstreakLoadoutV1, type Pass65KillstreakId } from './killstreak-catalog';
 import { DEFAULT_KILLSTREAK_LOADOUT } from './killstreak-loadout';
 
@@ -43,9 +44,9 @@ export const SCOUT_SWEEP_PULSE_INTERVAL_MS = 3_000;
 export const SCOUT_SWEEP_PULSE_VISIBLE_MS = 1_500;
 export const REMOTE_EXPLOSIVE_HIT_MARGIN = 1.3;
 
-export function remoteExplosiveHitMaximumDistance(source?: ExplosiveSource): number {
+export function remoteExplosiveHitMaximumDistance(source?: ExplosiveSource, stuck = false): number {
   if (source === 'grenade') return GRENADE_RADIUS + REMOTE_EXPLOSIVE_HIT_MARGIN;
-  if (source === 'explosive-crossbow') return 3.5 + REMOTE_EXPLOSIVE_HIT_MARGIN;
+  if (source === 'explosive-crossbow') return explosiveBoltBlastRadiusM(stuck) + REMOTE_EXPLOSIVE_HIT_MARGIN;
   if (source === 'tri-pass') return TRI_PASS_BLAST_RADIUS + REMOTE_EXPLOSIVE_HIT_MARGIN;
   if (source === 'hunter-swarm') return HUNTER_SWARM_BLAST_RADIUS + REMOTE_EXPLOSIVE_HIT_MARGIN;
   if (source === 'nuke') return Number.POSITIVE_INFINITY;

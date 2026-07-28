@@ -185,8 +185,8 @@ function optionsPanelMarkup(): string {
     <section id="graphics-settings" class="settings-section" aria-labelledby="graphics-settings-title">
       <header><b id="graphics-settings-title">GRAPHICS</b><span id="graphics-effective">EFFECTIVE: QUALITY</span></header>
       <div class="graphics-preset-row">
-        <label>GRAPHICS MODE<select id="graphics-profile"><option value="high">QUALITY</option><option value="performance">PERFORMANCE</option><option value="custom">CUSTOM</option></select></label>
-        <p>Quality is the balanced default. Performance reduces presentation cost. Editing any advanced control saves the mode as Custom.</p>
+        <label>GRAPHICS MODE<select id="graphics-profile"><option value="high">QUALITY</option><option value="performance">PERFORMANCE</option><option value="max">MAX</option><option value="custom">CUSTOM</option></select></label>
+        <p>Quality is the balanced default. Performance reduces presentation cost. Max cranks every setting. Editing any advanced control saves the mode as Custom.</p>
       </div>
       <details id="advanced-graphics" class="advanced-settings">
         <summary><span>ADVANCED GRAPHICS</span><small>REAL WEBGPU / PRESENTATION CONTROLS + CAPABILITY LIMITS</small></summary>
@@ -255,15 +255,16 @@ function menuMarkup(model: Pass64ShellViewModel): string {
 
 function deploymentTransitionMarkup(): string {
   const preview = menuPreviewVideoDefinition('atomic-acres');
-  return `<section id="deployment-transition" hidden aria-hidden="true" aria-live="polite" aria-busy="true" data-arena="atomic-acres" data-media="cached-static-poster" data-live-render="false">
+  return `<section id="deployment-transition" hidden aria-hidden="true" aria-live="polite" aria-busy="true" data-arena="atomic-acres" data-media="prerecorded-video" data-live-render="false">
     <img id="deployment-transition-poster" src="${preview.poster}" width="${preview.width}" height="${preview.height}" alt="" decoding="async" fetchpriority="high">
+    <video id="deployment-transition-video" width="${preview.width}" height="${preview.height}" muted playsinline preload="none" hidden aria-hidden="true"></video>
     <div class="deployment-transition-scrim" aria-hidden="true"></div>
     <div class="deployment-transition-console">
       <small id="deployment-transition-kicker">THE BIG ONE // DEPLOYMENT STREAM</small>
       <strong id="deployment-transition-title">NUKE TOWN</strong>
       <span id="deployment-transition-status">Preparing authoritative arena state…</span>
       <i aria-hidden="true"><b></b></i>
-      <em>PRERECORDED POSTER HELD · ZERO LIVE PREVIEW RENDERING · GAMEPLAY CLOCK PAUSED</em>
+      <em>PRERECORDED VIDEO ACTIVE · ZERO LIVE PREVIEW RENDERING · GAMEPLAY CLOCK PAUSED</em>
     </div>
   </section>`;
 }
@@ -318,6 +319,7 @@ function hudMarkup(): string {
       <div class="support-platform-readout">
         <span>LINK <b>SECURE</b></span><span>HP <b id="support-platform-health">100</b></span>
         <span>AMMO <b id="support-platform-ammo">--</b></span><span>TIME <b id="support-platform-time">30.0</b></span>
+        <span>ALT <b id="support-platform-altitude">0</b>M</span><span>SPD <b id="support-platform-speed">0</b></span>
       </div>
       <strong class="support-damage-total"><span id="chopper-damage-dealt">0</span><small> DAMAGE</small></strong>
       <footer id="support-control-action">F EXIT · AI FLIGHT CONTINUES</footer>

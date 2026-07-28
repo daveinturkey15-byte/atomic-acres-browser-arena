@@ -7,9 +7,12 @@ import {
   admitRemoteGrenadeHit,
   admitRemoteGrenadeThrow,
   createRemoteGrenadeAuthorityState,
+  recordRemoteGrenadeDeath,
+  recordRemoteGrenadeRespawn,
   replenishRemoteGrenadeAuthorityState,
   resetRemoteGrenadeAuthorityState,
   remoteGrenadeForAction,
+  remoteGrenadeLifeForAction,
 } from './remote-grenade-admission';
 
 const sender: PlayerSnapshot = {
@@ -108,5 +111,36 @@ describe('remote grenade authority', () => {
     expect(admitRemoteGrenadeHit(hit.state, {
       actionNonce: 22, explosionOrigin: [1, 0.2, -3], target: 'host', now: 2_100,
     }).accepted).toBe(false);
+  });
+
+  it('blocks new throws after death while retaining an already-thrown posthumous Semtex action', () => {
+    const semtexSender = { ...sender, grenade: 'semtex' as const };
+    const semtexThrow = { ...thrown(31), grenade: 'semtex' as const };
+    const admitted = admitRemoteGrenadeThrow(createRemoteGrenadeAuthorityState('semtex'), semtexThrow, semtexSender, 1_000);
+    const deadLife = recordRemoteGrenadeDeath(admitted.state);
+    expect(deadLife.remaining).toBe(0);
+    expect(remoteGrenadeForAction(deadLife, 31)).toBe('semtex');
+    expect(remoteGrenadeLifeForAction(deadLife, 31)).toBe(4);
+    expect(admitRemoteGrenadeHit(deadLife, {
+      actionNonce: 31, explosionOrigin: [1, 0.2, -3], target: 'host', now: 1_000 + REMOTE_SEMTEX_MIN_FUSE_MS,
+    }).accepted).toBe(true);
+    expect(admitRemoteGrenadeThrow(deadLife, { ...semtexThrow, actionNonce: 32, actionSequence: 32 }, semtexSender, 2_000).accepted).toBe(false);
+  });
+
+  it('keeps live prior-life ordnance through respawn while resetting new-life inventory and sequence', () => {
+    const firstLifeThrow = admitRemoteGrenadeThrow(createRemoteGrenadeAuthorityState('frag'), thrown(41), sender, 1_000);
+    const deadLife = recordRemoteGrenadeDeath(firstLifeThrow.state);
+    const respawned = recordRemoteGrenadeRespawn(deadLife, 'semtex', 2_900);
+
+    expect(respawned).toMatchObject({ remaining: 1, selectedGrenade: 'semtex', lifeId: null, highestActionSequence: -1 });
+    expect(remoteGrenadeLifeForAction(respawned, 41)).toBe(4);
+    expect(admitRemoteGrenadeHit(respawned, {
+      actionNonce: 41, explosionOrigin: [1, 0.2, -8], target: 'host', now: 3_300,
+    }).accepted).toBe(true);
+
+    const nextLifeSender = { ...sender, grenade: 'semtex' as const };
+    const nextLifeThrow = { ...thrown(42), grenade: 'semtex' as const, lifeId: 5, actionSequence: 0 };
+    expect(admitRemoteGrenadeThrow(respawned, nextLifeThrow, nextLifeSender, 3_000).accepted).toBe(true);
+    expect(recordRemoteGrenadeRespawn(deadLife, 'semtex', 1_000 + 5_201).actions).toEqual({});
   });
 });

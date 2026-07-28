@@ -5,6 +5,7 @@ import {
   SEMTEX_HITL_CONTRACT,
   flashbangPresentation,
   semtexBlastDamage,
+  semtexBlastRadiusM,
 } from './pass65-ordnance-contract';
 
 describe('Pass 65 HITL ordnance corrections', () => {
@@ -68,5 +69,17 @@ describe('Pass 65 HITL ordnance corrections', () => {
     expect(semtexBlastDamage(0, true)).toBeCloseTo(39.9, 5);
     expect(semtexBlastDamage(SEMTEX_HITL_CONTRACT.blastRadiusM, false)).toBe(18);
     expect(semtexBlastDamage(SEMTEX_HITL_CONTRACT.blastRadiusM + 0.01, false)).toBe(0);
+  });
+
+  it('doubles both Semtex damage and falloff radius when stuck to a combatant', () => {
+    const baseRadius = SEMTEX_HITL_CONTRACT.blastRadiusM;
+    expect(semtexBlastRadiusM(false)).toBe(baseRadius);
+    expect(semtexBlastRadiusM(true)).toBe(baseRadius * 2);
+    expect(semtexBlastDamage(0, false)).toBe(95);
+    expect(semtexBlastDamage(0, false, true)).toBe(190);
+    expect(semtexBlastDamage(baseRadius, false, true)).toBe(113);
+    expect(semtexBlastDamage(baseRadius * 2, false, true)).toBe(36);
+    expect(semtexBlastDamage(baseRadius * 2 + 0.01, false, true)).toBe(0);
+    expect(semtexBlastDamage(baseRadius, true, true)).toBeCloseTo(47.46, 5);
   });
 });

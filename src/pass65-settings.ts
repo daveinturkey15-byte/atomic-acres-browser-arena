@@ -154,13 +154,16 @@ export function normalizePass65Settings(value: unknown, capabilities: Capability
   const raw = value as Partial<Pass65Settings>;
   const rawGraphics = raw.graphics && typeof raw.graphics === 'object' ? raw.graphics as Partial<GraphicsSettings> : {};
   const preset = PRESETS.has(rawGraphics.preset as GraphicsPreset) ? rawGraphics.preset as GraphicsPreset : defaults.graphics.preset;
-  const base = preset === 'custom' ? defaults.graphics : presetGraphics(preset);
-  const advanced = normalizeAdvancedGraphicsValues(rawGraphics, base);
-  const graphics: GraphicsSettings = Object.freeze({
-    schemaVersion: 1,
-    preset,
-    ...advanced,
-  });
+  // A named profile is an atomic, canonical choice. Persisted advanced values
+  // can only belong to Custom; allowing them to leak into a named profile
+  // makes the label lie about the runtime configuration after migrations.
+  const graphics: GraphicsSettings = preset === 'custom'
+    ? Object.freeze({
+        schemaVersion: 1,
+        preset,
+        ...normalizeAdvancedGraphicsValues(rawGraphics, defaults.graphics),
+      })
+    : presetGraphics(preset);
   const rawAudio = raw.audio && typeof raw.audio === 'object' ? raw.audio as Partial<AudioSettings> : {};
   const rawGains = rawAudio.gains && typeof rawAudio.gains === 'object' ? rawAudio.gains as Partial<Record<AudioBusId, number>> : {};
   const rawMutes = rawAudio.mutes && typeof rawAudio.mutes === 'object' ? rawAudio.mutes as Partial<Record<AudioBusId, boolean>> : {};
@@ -200,14 +203,8 @@ export function parsePass65Settings(serialized: string | null, capabilities: Cap
       const record = decoded as { graphics?: unknown };
       if (record.graphics && typeof record.graphics === 'object') {
         const graphics = record.graphics as { preset?: unknown };
-        // Max was a Pass 65 pre-HITL public preset. The simplified player
-        // surface folds it deterministically into Quality while the internal
-        // benchmark can still construct a Max snapshot directly.
         if (graphics.preset === 'max') {
-          return normalizePass65Settings({
-            ...record,
-            graphics: { ...graphics, preset: 'high' },
-          }, capabilities);
+          return normalizePass65Settings(decoded, capabilities);
         }
       }
     }
@@ -348,7 +345,7 @@ export function resolveDisplayedGraphicsPreset(
   queryRenderProfile: RenderProfile | null = null,
 ): GraphicsPreset {
   if (queryRenderProfile === 'performance' || queryRenderProfile === 'compat') return 'performance';
-  if (queryRenderProfile === 'blender' || requestedPreset === 'max') return 'high';
+  if (queryRenderProfile === 'blender') return 'high';
   return requestedPreset;
 }
 

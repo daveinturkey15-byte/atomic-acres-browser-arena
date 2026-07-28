@@ -135,6 +135,33 @@ describe('network protocol guards', () => {
     expect(messageBelongsToPlayer(grenadeThrow, 'a')).toBe(true);
   });
 
+  it('treats canonical sticky hit and window envelopes as host-only authority', () => {
+    const stickyAttachment = { targetId: 'guest-b', targetLifeId: 9 } as const;
+    const hit = {
+      type: 'hit' as const, by: 'guest-a', target: 'guest-b', damage: 100, kind: 'explosive' as const,
+      explosiveSource: 'grenade' as const, origin: [1, 2, 3] as [number, number, number], actionNonce: 41,
+      stuck: true as const,
+      hostAuthority: { hostId: 'host', targetLifeId: 9, appliedDamage: 64, resultingHealth: 36, stickyAttachment }, nonce: 78,
+    };
+    const windowBreak = {
+      type: 'window-break' as const, by: 'guest-a', windowId: 'aqua-house:ground-window-glass',
+      origin: [1, 2, 3] as [number, number, number], kind: 'explosive' as const, actionNonce: 41,
+      hostAuthority: { hostId: 'host', stickyAttachment }, nonce: 79,
+    };
+    expect(isGameMessage(hit)).toBe(true);
+    expect(isGameMessage(windowBreak)).toBe(true);
+    expect(isHostAuthorityMessage(hit)).toBe(true);
+    expect(isHostAuthorityMessage(windowBreak)).toBe(true);
+    expect(messageBelongsToPlayer(hit, 'guest-a')).toBe(true);
+    expect(isGameMessage({ ...hit, hostAuthority: { ...hit.hostAuthority, targetLifeId: 1.5 } })).toBe(false);
+    expect(isGameMessage({ ...hit, hostAuthority: { ...hit.hostAuthority, appliedDamage: 101 } })).toBe(false);
+    expect(isGameMessage({ ...hit, hostAuthority: { ...hit.hostAuthority, resultingHealth: -1 } })).toBe(false);
+    expect(isGameMessage({ ...hit, hostAuthority: { ...hit.hostAuthority, stickyAttachment: { ...stickyAttachment, targetId: 'other' } } })).toBe(false);
+    expect(isGameMessage({ ...hit, stuck: undefined })).toBe(false);
+    expect(isGameMessage({ ...hit, hostAuthority: { ...hit.hostAuthority, stickyAttachment: null } })).toBe(false);
+    expect(isGameMessage({ ...windowBreak, hostAuthority: { hostId: '', stickyAttachment } })).toBe(false);
+  });
+
   it('validates combat timing and bounded host-bot authority messages', () => {
     const timing = { eventSeq: 7, sentAtHostTimeMs: 1_700 };
     expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'carbine', origin: [0, 1, 2], direction: [0, 0, -1], pelletDirections: [[0, 0, -1]], timing, nonce: 3 })).toBe(true);

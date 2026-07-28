@@ -16,7 +16,8 @@ type CatalogId = string; // must resolve through the exact allowlisted catalog
 type DecisionId =
   | 'DEC-01' | 'DEC-02' | 'DEC-03' | 'DEC-04' | 'DEC-05'
   | 'DEC-06' | 'DEC-07' | 'DEC-08' | 'DEC-09' | 'DEC-10'
-  | 'DEC-11' | 'DEC-12' | 'DEC-13' | 'DEC-14' | 'DEC-15';
+  | 'DEC-11' | 'DEC-12' | 'DEC-13' | 'DEC-14' | 'DEC-15'
+  | 'DEC-16';
 
 type DecisionReceipt<TValue> = Readonly<{
   receiptVersion: 1;
@@ -46,7 +47,7 @@ Invariants:
 - Revisions increase monotonically inside their epoch/entity.
 - Action sequences are per actor/life/action domain and reject duplicates/replay.
 - Catalog/definition IDs are allowlisted and length-capped. Dynamic host-created entity/activation IDs instead use strict type-specific prefixes, character patterns, maximum lengths, epoch ownership and uniqueness checks. Never accept arbitrary free text as either identity class.
-- `docs/PASS65_DECISION_RECEIPTS.json` is the canonical registry and `docs/PASS65_DECISION_RECEIPTS.schema.json` is its schema. P0 historically created one complete `OPEN` receipt for each DEC-01…DEC-15; Dave's 2026-07-26 decision reply freezes all 15 with structured authoritative values, resolution metadata and supersession lineage where a prior frozen value changed.
+- `docs/PASS65_DECISION_RECEIPTS.json` is the canonical registry and `docs/PASS65_DECISION_RECEIPTS.schema.json` is its schema. P0 historically created one complete `OPEN` receipt for each DEC-01…DEC-15; Dave froze those 15 on 2026-07-26. The normalized 2026-07-27 Desktop feedback adds frozen DEC-16 and supersedes DEC-04, DEC-07, DEC-08 and DEC-13 with structured authoritative values and digest lineage.
 - A downstream `P04[DEC-x=FROZEN]` dependency is satisfied only by a schema-valid `FROZEN` decision receipt with non-null value, rationale, owner and resolution timestamp; a proposed default or `OPEN` receipt is not authority.
 
 ## 1A. Preview and chopper motion choreography
@@ -90,6 +91,8 @@ type OfflineCatPreviewRenderDefinition = Readonly<{
 
 type MenuPreviewMediaDefinition = Readonly<{
   arenaId: CatalogId;
+  productionArenaDefinitionDigest: string;
+  requiredLandmarkIds: readonly CatalogId[];
   offlineRenderRecipeId: CatalogId;
   webmAssetId: CatalogId;
   mp4AssetId: CatalogId;
@@ -101,6 +104,7 @@ type MenuPreviewMediaDefinition = Readonly<{
   reducedMotionPresentation: 'poster';
   sourceSha256: string;
   mediaSha256: Readonly<{ webm: string; mp4: string; poster: string }>;
+  overlayLayoutId: CatalogId;
 }>;
 
 type MenuPreviewRuntimeTelemetry = Readonly<{
@@ -127,9 +131,9 @@ const pass65ChannelIdentity = Object.freeze({
 });
 ```
 
-Menu choreography is authored and rendered offline: a seeded PRNG selects occasional targets and a band-limited/critically damped interpolator reaches them without per-frame `Math.random()`, discontinuities or flight-volume escape. Pitch, yaw, bank, speed and altitude remain coupled like aircraft motion rather than independent noise. The checked-in recipe, seed, source digest, compressed WebM/MP4 outputs and poster are provenance evidence. Runtime map selection swaps only bounded local media by generation token; it does not instantiate the renderer, construct an arena, compile a gameplay pipeline, submit a WebGPU frame or run preview physics. Reduced motion uses the equally informative poster. Arena streaming and compilation begin only after an explicit deploy action owns the loading transition.
+Menu choreography is authored and rendered offline against the actual production arena definition: a seeded PRNG selects occasional targets and a band-limited/critically damped interpolator reaches them without per-frame `Math.random()`, discontinuities or flight-volume escape. Pitch, yaw, bank, speed and altitude remain coupled like aircraft motion rather than independent noise. The checked-in recipe, production-arena digest, required landmark IDs, seed, compressed WebM/MP4 outputs and poster are provenance evidence. Runtime map selection swaps only the matching bounded local media by generation token; a proxy/placeholder/wrong-map frame fails. It does not instantiate the renderer, construct an arena, compile a gameplay pipeline, submit a WebGPU frame or run preview physics. Reduced motion uses the equally informative poster. Arena streaming and compilation begin only after an explicit deploy action owns the loading transition.
 
-The cockpit is an authored asset contract with canopy/frame/instrument silhouette, coherent glass and interior/exterior material response, LODs, source/licence digest and review cameras; it cannot be a hollow primitive shell hidden at most angles. Cat choreography owns separate body and look-at tracks, deliberate points of interest, comfortable acceleration/angular bounds, clean loop closure and an expressive reduced-motion pose.
+The cockpit is an authored asset contract with canopy/frame/instrument silhouette, coherent glass and interior/exterior material response, LODs, source/licence digest and review cameras; it cannot be a hollow primitive shell hidden at most angles. The helicopter overlay contract freezes the approximately-half-scale HUD, rotor-at-top/rest-lower anchors and centre reticle exclusion zone. Cat choreography owns separate body and look-at tracks, deliberate points of interest, comfortable acceleration/angular bounds, clean loop closure, black/grey paws/hands, approximately-half-scale top/bottom framing and an expressive reduced-motion pose.
 
 Killstreak variation is shared authority. The host derives the variance seed from activation identity, advances it at fixed step, constrains the resulting pose through arena flight/no-fly/collision data, and replicates bounded state for client interpolation. Client-local randomness cannot affect chopper pose, targeting, LOS, fire admission or expiry. Seed variation must change visual cadence without changing the frozen survival/pressure calibration outside tolerance.
 
@@ -449,7 +453,7 @@ type ProjectileState = Readonly<{
 
 Rules:
 
-- Host creates the ID. The frozen explosive-crossbow definition uses `fuseOrigin: 'attachment'`, `fuseMs: 1250`, maximum lifetime 5000ms, 45 direct damage and a 60-to-15 blast over 3.5m. It remains explicitly unarmed with null ticks until the one canonical host world/current-actor-life attachment transition assigns both ticks exactly once; misses expire at maximum lifetime and attachments never follow a respawned life.
+- Host creates the ID. The frozen explosive-crossbow definition uses 108 m/s projectile speed (exactly 3× the preceding 36 m/s baseline), `fuseOrigin: 'attachment'`, `fuseMs: 1250`, maximum lifetime 5000ms, 45 direct damage and a base 60-to-15 blast over 3.5m. It remains explicitly unarmed with null ticks until the one canonical host world/current-actor-life attachment transition assigns both ticks exactly once; misses expire at maximum lifetime and attachments never follow a respawned life. A current-actor-life attachment emits `STUCK` and applies exactly 2× blast damage and 2× blast radius at detonation; world attachment retains the base profile.
 - Strict cross-field parsing rejects attachment-origin armed state before attachment, attached state without target/local-pose identity, any detonation tick earlier than its arm tick, or later rewrites.
 - Detonation result is idempotent on projectile ID + revision.
 - Attachment to a player includes target life ID; a new life cannot inherit a stale bolt.
@@ -602,6 +606,7 @@ Validation:
 - Nuke and Drone Swarm both have `availability: 'selectable'`; both remain care-eligible, while Nuke's derived units / total units equals exactly `1 / 100` and its existing host-owned effect remains verifier-green under R512.
 - Every non-null support definition reference resolves to a strict per-kind definition. The registry freezes targetability/health/hitbox, gun identity, magazine/reserve/reload, lifetime/fuel, navigation/targeting/sensor policy, presentation/audio and entity cap before implementation.
 - Selection freezes at match start and never accepts remote free text.
+- Earning is once per selected reward per ladder cycle, not once per life. Crossing the final selected threshold advances to a fresh zero-progress cycle while the life remains active; death resets current progress, already earned unconsumed rewards survive until consumption or epoch reset, and rematch starts a new epoch.
 
 ## 9. Support entities
 
@@ -707,15 +712,15 @@ Lossy bounded snapshots:
 
 No reliable per-frame pose stream.
 
-The Drone Swarm targeting policy admits only opposing living `player` and `bot` actors under current match/life/team identity; allies, dead/stale lives, support entities and scenery are ineligible. Its fixed-start/cover-route/armour-health/seed/sample profile freezes an approximately-five-second exposure/escape survival percentile, so target selection and damage pressure cannot drift behind a generic targeting-policy ID.
+The Drone Swarm contains exactly 24 targetable units. A host-seeded spawn policy places them in a safe volume behind the caller at bounded fast ingress speed, blends continuously to ordinary speed, preserves distributed separation and assigns divergent valid routes to individuals or small groups. The targeting policy admits only opposing living `player` and `bot` actors under current match/life/team identity; allies, dead/stale lives, support entities and scenery are ineligible. Its fixed-start/cover-route/armour-health/seed/sample profile freezes an approximately-five-second exposure/escape survival percentile, so target selection and damage pressure cannot drift behind a generic targeting-policy ID.
 
 Chopper navigation, route pose, no-fly recovery and motion variance remain host-AI under every gun mode. The gun defaults to AI. During the 30-second active phase, an admitted owner `F` intent may switch only `gunController`; a second `F`, body death, chopper death, expiry, disconnect, round end or invalid life restores ordinary player control exactly once, and AI resumes the gun when the chopper remains active. The operator body remains in-world, immobile and vulnerable while gunning. No client yaw/pitch/fire input can affect flight pose or navigation.
 
-Unconsumed earned rewards belong to the match epoch, not the life that crossed the cost threshold. Death clears per-life progress and earned-this-life markers but retains every available reward and claimed care reward through any number of respawns until exactly-once consumption or epoch reset.
+Unconsumed earned rewards belong to the match epoch, not the life/cycle that crossed the cost threshold. Each selected reward earns at most once per ladder cycle; finishing the ladder starts another cycle during the same life. Death clears per-life progress and cycle markers but retains every available reward and claimed care reward through any number of respawns until exactly-once consumption or epoch reset.
 
 Every support vehicle uses one asset-authored axis conversion. At each moving route sample its canonical forward vector must face admitted velocity within the frozen angular tolerance; individual abilities cannot add ad-hoc sign flips. Care Package presentation includes a visible aircraft, visible descent parachute and range/LOS-derived `F to collect killstreak` prompt bound to the same host capture state.
 
-Care Package and Carpet Bomber selection display a large world-ground red `X` after host admission to all relevant peers. Carpet Bomber additionally displays the caller-only red payload corridor across the admitted map-bounded route before commit. Shape, outline/pulse and HUD label keep both telegraphs readable without colour alone. Cancel, rejection, commit, expiry, rematch and arena disposal remove them exactly once; clients never infer their own authoritative target from a cursor decal.
+Care Package and Carpet Bomber activation starts from the caller's crosshair ground ray and never opens an overview map. After host admission, both display a large world-ground red `X` to all relevant peers; Carpet Bomber additionally displays the caller-only red payload corridor before commit. Its 20 bomb entities are visible while falling and each admitted impact uses exactly 3× the preceding frozen damage profile plus bounded explosion/smoke/fire audiovisual presentation. Shape, outline/pulse and HUD label keep telegraphs readable without colour alone. Cancel, rejection, commit, expiry, rematch and arena disposal remove them exactly once; clients never author their own target from a decal.
 
 Chopper and drone weapon damage uses the canonical support gun profile and combat-result reducer; no placeholder one-damage fallback exists. The caller HUD projects feedback from the matching living target's authoritative `targetPositionQ`, deliberately independent of current aim. Behind-camera or off-screen victims are suppressed or receive an explicit edge treatment and never become a misleading centre-reticle number. Duplicate/reordered results coalesce by result ID without losing distinct targets.
 
@@ -819,7 +824,7 @@ type InteractionResolution = Readonly<{
 }>;
 ```
 
-All features submit candidates to one resolver once per frame; only its winner may render a prompt or consume the debounced `F` edge. Active owner support enter/exit has the highest priority and is evaluated before nearby crate, door and weapon candidates. Remaining ties resolve by explicit priority, range/LOS, distance and stable ID. Menu/focus loss, death, life change, possession teardown and rematch clear the held-key latch so one press can never trigger two actions.
+All features submit candidates to one resolver once per frame; only its winner may render a prompt or consume the debounced `F` edge. An eligible nearby world action—care-crate collection, door, weapon pickup or future catalogued sibling—is evaluated before active support enter/exit. Support toggle wins only when no higher-priority world candidate is eligible. Remaining ties resolve by explicit priority, range/LOS, distance and stable ID. Menu/focus loss, death, life change, possession teardown and rematch clear the held-key latch so one press can never trigger two actions.
 
 ## 12. Dynamic world collision
 
@@ -910,7 +915,7 @@ Hard caps are part of the parser and definition, not presentation advice: global
 ## 14. Settings contracts
 
 ```ts
-type GraphicsPreset = 'performance' | 'quality' | 'custom';
+type GraphicsPreset = 'performance' | 'quality' | 'max' | 'custom';
 type Percent0To100 = number; // parser requires finite integer 0..100
 type UnitScale0To1 = number; // parser requires finite 0..1
 type SettingApplyMode = 'live' | 'pipeline-rebuild' | 'arena-reload';
@@ -959,7 +964,7 @@ type SettingDefinition = Readonly<{
 }>;
 ```
 
-Normalization rejects NaN/infinity/out-of-range values, returns requested/effective values plus downgrade/apply-mode reasons, and enforces effective adaptive target ≤ nonzero frame cap. The top-level UI exposes only Quality (default), Performance and Custom; Advanced Graphics is collapsed initially and any admitted advanced edit selects Custom. Legacy `high`/`max` values migrate transactionally into Quality or an equivalent Custom snapshot. Save only after successful application and read-back. MSAA is a pipeline rebuild. Sensory controls live only in accessibility settings. Minor-debris quality never changes authoritative major bodies, colliders or replication.
+Normalization rejects NaN/infinity/out-of-range values, returns requested/effective values plus downgrade/apply-mode reasons, and enforces effective adaptive target ≤ an explicitly user-selected nonzero Custom frame cap. The top-level UI exposes exactly Performance, Quality (default), Max and Custom under DEC-16. Performance is lowest gameplay-safe, Quality is balanced high fidelity, Max selects the highest supported values and Custom is a complete derivative of the last named profile. Legacy Quality migrates transactionally to Max. Named profiles use `frameCap=0`; adaptive quality cannot invent a hidden 60/90 cap. Advanced Graphics is bright/legible and collapsed initially. Edits remain staged in the current panel/match, non-destructive pending reads support preview, and Custom becomes durable only after successful apply, atomic persistence, read-back and pending-clear on Save/Exit or successful panel exit. MSAA is a pipeline rebuild. Sensory controls live only in accessibility settings. Minor-debris quality never changes authoritative major bodies, colliders or replication.
 
 ### 14.1 Route-neutral local player profile
 

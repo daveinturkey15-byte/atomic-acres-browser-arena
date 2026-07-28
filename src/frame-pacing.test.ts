@@ -45,4 +45,18 @@ describe('FramePacingSampler', () => {
       longFrames: { over20Ms: 7, over33Ms: 5, over50Ms: 3, over100Ms: 1 },
     });
   });
+
+  it('drops stale hidden-tab cadence immediately on visibility recovery', () => {
+    const sampler = new FramePacingSampler();
+    for (let index = 0; index < 180; index += 1) sampler.record(22.2);
+    expect(sampler.summary()).toMatchObject({ ready: true, sampleCount: 180, displayLimited: true });
+    sampler.reset('tab visibility regained');
+    expect(sampler.summary()).toMatchObject({
+      ready: false, sampleCount: 0, cadenceHz: 0, displayLimited: false,
+      lastResetReason: 'tab visibility regained',
+    });
+    for (let index = 0; index < 90; index += 1) sampler.record(6.94);
+    expect(sampler.summary()).toMatchObject({ ready: true, sampleCount: 90, displayLimited: false });
+    expect(sampler.summary().cadenceHz).toBeGreaterThan(140);
+  });
 });

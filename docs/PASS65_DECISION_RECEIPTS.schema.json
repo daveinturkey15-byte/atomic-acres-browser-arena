@@ -12,8 +12,8 @@
     "updatedAt": { "type": "string", "format": "date-time" },
     "receipts": {
       "type": "array",
-      "minItems": 15,
-      "maxItems": 15,
+      "minItems": 16,
+      "maxItems": 16,
       "uniqueItems": true,
       "items": {
         "type": "object",
@@ -37,7 +37,7 @@
             "enum": [
               "DEC-01", "DEC-02", "DEC-03", "DEC-04", "DEC-05",
               "DEC-06", "DEC-07", "DEC-08", "DEC-09", "DEC-10",
-              "DEC-11", "DEC-12", "DEC-13", "DEC-14", "DEC-15"
+              "DEC-11", "DEC-12", "DEC-13", "DEC-14", "DEC-15", "DEC-16"
             ]
           },
           "status": { "enum": ["OPEN", "FROZEN", "SUPERSEDED"] },
@@ -90,7 +90,8 @@
         { "contains": { "type": "object", "required": ["id"], "properties": { "id": { "const": "DEC-12" } } }, "minContains": 1, "maxContains": 1 },
         { "contains": { "type": "object", "required": ["id"], "properties": { "id": { "const": "DEC-13" } } }, "minContains": 1, "maxContains": 1 },
         { "contains": { "type": "object", "required": ["id"], "properties": { "id": { "const": "DEC-14" } } }, "minContains": 1, "maxContains": 1 },
-        { "contains": { "type": "object", "required": ["id"], "properties": { "id": { "const": "DEC-15" } } }, "minContains": 1, "maxContains": 1 }
+        { "contains": { "type": "object", "required": ["id"], "properties": { "id": { "const": "DEC-15" } } }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["id"], "properties": { "id": { "const": "DEC-16" } } }, "minContains": 1, "maxContains": 1 }
       ]
     }
   }

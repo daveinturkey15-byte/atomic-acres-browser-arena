@@ -8,7 +8,7 @@ import {
   supportAircraftPresentationVariant,
   supportVehiclePresentationTelemetry,
 } from './killstreak-presentation';
-import type { KillstreakRecipientSnapshot } from './killstreak-runtime';
+import type { KillstreakImpactEvent, KillstreakRecipientSnapshot } from './killstreak-runtime';
 import { DRONE_GUN_PROFILE_ID } from './killstreak-support-catalog';
 import { SUPPORT_VEHICLE_PRESENTATION_CONTRACT, missingSupportNodes, supportForwardAlignment } from './support-vehicle-presentation-contract';
 
@@ -41,6 +41,7 @@ const snapshot = (
     reserveClips: null,
     gunProfileId: index <= 2 ? null : DRONE_GUN_PROFILE_ID,
     gunController: index === 0 ? 'ai' : null,
+    captureActorId: null,
     captureProgress: null,
     revealedReward: null,
     revision: 1,
@@ -48,6 +49,19 @@ const snapshot = (
   sensorContacts,
   placementMarkers,
 });
+
+const carpetImpacts = (count: number, phase: KillstreakImpactEvent['phase'] = 'impact'): readonly KillstreakImpactEvent[] => Array.from(
+  { length: count },
+  (_, ordinal): KillstreakImpactEvent => ({
+    activationId: 'ks-carpet-pool-test',
+    source: 'carpet-bomber',
+    ordinal,
+    phase,
+    position: [ordinal * 0.5, 0, ordinal * -0.25],
+    impactAtMs: 1_000,
+    atMs: phase === 'drop' ? 580 : 1_000,
+  }),
+);
 
 describe('killstreak presentation', () => {
   it('binds the runtime presentation loader to the gated authored Hunter Drone LOD0', () => {
@@ -92,9 +106,13 @@ describe('killstreak presentation', () => {
     expect(presentation.telemetry()).toEqual({
       entities: 4,
       impactFlashes: 0,
+      bombShells: 0,
+      emberParticles: 0,
       sensorContacts: 0,
       placementMarkers: 0,
       prewarmed: 6,
+      pooledEntityInstances: 29,
+      pooledSwarmDrones: 24,
       prewarmedAuthoredSupportFamilies: [],
       markerDetails: [],
       bounded: true,
@@ -115,12 +133,16 @@ describe('killstreak presentation', () => {
     expect(supportForwardAlignment(drone, 'drone-gun-receiver', 'drone-gun-muzzle-socket')).toBeCloseTo(1, 6);
     expect(supportForwardAlignment(aircraft, 'care-aircraft-fuselage', 'care-aircraft-forward-socket')).toBeCloseTo(1, 6);
     expect(presentation.firstPersonCameraAnchor('ks-1-chopper-1')).not.toBeNull();
+    const dashboardMaterial = (chopper.getObjectByName('chopper-cockpit-dashboard-3d') as THREE.Mesh)
+      .material as THREE.Material;
+    const dashboardBaseDepthWrite = dashboardMaterial.depthWrite;
     presentation.setFirstPersonEntity('ks-1-chopper-1');
     expect(chopper.visible).toBe(true);
     expect((chopper.getObjectByName('chopper-fuselage') as THREE.Mesh).visible).toBe(false);
     expect((chopper.getObjectByName('chopper-cockpit-dashboard-3d') as THREE.Mesh).visible).toBe(true);
     expect((chopper.getObjectByName('chopper-cockpit-display-cyan') as THREE.Mesh).visible).toBe(true);
     expect((chopper.getObjectByName('chopper-first-person-rotor-blade-a') as THREE.Mesh).visible).toBe(true);
+    expect(dashboardMaterial.depthWrite).toBe(false);
     const cameraQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.12, 0.8, 0, 'YXZ'));
     presentation.alignFirstPersonCockpit('ks-1-chopper-1', cameraQuaternion);
     const cockpitWorldQuaternion = chopper.getObjectByName('chopper-first-person-cockpit')!
@@ -130,6 +152,7 @@ describe('killstreak presentation', () => {
     expect(chopper.visible).toBe(true);
     expect((chopper.getObjectByName('chopper-fuselage') as THREE.Mesh).visible).toBe(true);
     expect((chopper.getObjectByName('chopper-first-person-rotor-blade-a') as THREE.Mesh).visible).toBe(false);
+    expect(dashboardMaterial.depthWrite).toBe(dashboardBaseDepthWrite);
     const carePackage = presentation.root.getObjectByName('pass65-care-package') as THREE.Group;
     expect(carePackage.userData).toMatchObject({ interactable: true, interactionPrompt: 'F TO COLLECT KILLSTREAK' });
     expect(carePackage.getObjectByName('care-package-crate')!.userData)
@@ -138,6 +161,39 @@ describe('killstreak presentation', () => {
     expect(presentation.telemetry().entities).toBe(0);
     presentation.dispose();
     expect(scene.getObjectByName('pass65-killstreak-presentations')).toBeUndefined();
+  });
+
+  it('applies a retained first-person entity ID when that entity arrives later', () => {
+    const presentation = new KillstreakPresentation(new THREE.Scene());
+    presentation.setFirstPersonEntity('ks-1-chopper-1');
+    presentation.sync(snapshot(1), 1_000);
+    const chopper = presentation.entityRoot('ks-1-chopper-1')!;
+    const fuselage = chopper.getObjectByName('chopper-fuselage') as THREE.Mesh;
+    const dashboard = chopper.getObjectByName('chopper-cockpit-dashboard-3d') as THREE.Mesh;
+    const dashboardMaterial = dashboard.material as THREE.Material;
+    expect(fuselage.visible).toBe(false);
+    expect(dashboard.visible).toBe(true);
+    expect(dashboardMaterial.depthWrite).toBe(false);
+    presentation.setFirstPersonEntity(null);
+    expect(fuselage.visible).toBe(true);
+    expect(dashboardMaterial.depthWrite).toBe(true);
+    presentation.dispose();
+  });
+
+  it('does not overwrite dynamic support visibility while applying third-person state', () => {
+    const presentation = new KillstreakPresentation(new THREE.Scene());
+    const descending = snapshot(3);
+    presentation.sync({
+      ...descending,
+      entities: descending.entities.map((entity) => (
+        entity.kind === 'care-crate' ? { ...entity, phase: 'descending' as const } : entity
+      )),
+    }, 1_000);
+    const parachute = presentation.entityRoot('ks-1-care-3')!.getObjectByName('care-package-parachute')!;
+    expect(parachute.visible).toBe(true);
+    presentation.sync(snapshot(3), 1_100);
+    expect(parachute.visible).toBe(false);
+    presentation.dispose();
   });
 
   it('uses the exact same visual and gun family for standalone and swarm drones', () => {
@@ -179,6 +235,115 @@ describe('killstreak presentation', () => {
     presentation.sync(snapshot(40), 1_000);
     expect(presentation.telemetry()).toMatchObject({ entities: 32, bounded: true });
     presentation.dispose();
+  });
+
+  it('reuses deterministic bounded impact pools without per-impact GPU resource creation', () => {
+    const presentation = new KillstreakPresentation(new THREE.Scene());
+    const flashPool = presentation.root.getObjectByName('pass65-impact-flash-pool') as THREE.Group;
+    const shellPool = presentation.root.getObjectByName('pass65-bomb-shell-pool') as THREE.Group;
+    const emberPool = presentation.root.getObjectByName('pass65-ember-pool') as THREE.Group;
+    expect(flashPool.children).toHaveLength(20);
+    expect(shellPool.children).toHaveLength(20);
+    expect(emberPool.children).toHaveLength(120);
+    const pooledResources = [...flashPool.children, ...shellPool.children, ...emberPool.children]
+      .map((node) => {
+        const mesh = node as THREE.Mesh;
+        return { mesh, geometry: mesh.geometry, material: mesh.material };
+      });
+
+    const impacts = carpetImpacts(40);
+    presentation.presentImpacts(carpetImpacts(20, 'drop'), 1_000);
+    presentation.presentImpacts(impacts, 1_000);
+    expect(presentation.telemetry()).toMatchObject({
+      impactFlashes: 20,
+      bombShells: 20,
+      emberParticles: 120,
+      bounded: true,
+    });
+    presentation.sync(snapshot(0), 1_100);
+    const firstTrajectory = emberPool.children.slice(0, 6).map((node) => node.position.toArray());
+    presentation.sync(snapshot(0), 1_801);
+    expect(presentation.telemetry()).toMatchObject({ impactFlashes: 0, bombShells: 0, emberParticles: 0 });
+
+    presentation.presentImpacts(carpetImpacts(20, 'drop'), 2_000);
+    presentation.presentImpacts(impacts, 2_000);
+    presentation.sync(snapshot(0), 2_100);
+    const repeatedTrajectory = emberPool.children.slice(0, 6).map((node) => node.position.toArray());
+    expect(repeatedTrajectory).toEqual(firstTrajectory);
+    for (const [index, resource] of pooledResources.entries()) {
+      const mesh = [...flashPool.children, ...shellPool.children, ...emberPool.children][index] as THREE.Mesh;
+      expect(mesh).toBe(resource.mesh);
+      expect(mesh.geometry).toBe(resource.geometry);
+      expect(mesh.material).toBe(resource.material);
+    }
+    presentation.dispose();
+  });
+
+  it('preserves the authored 420ms fall after delayed drop delivery', () => {
+    const presentation = new KillstreakPresentation(new THREE.Scene());
+    const shellPool = presentation.root.getObjectByName('pass65-bomb-shell-pool') as THREE.Group;
+    const delayedDrop = [{
+      activationId: 'ks-carpet-delayed', source: 'carpet-bomber' as const, ordinal: 0, phase: 'drop' as const,
+      position: [2, 0, -3] as const, atMs: 1_080, impactAtMs: 1_500,
+    }];
+    presentation.presentImpacts(delayedDrop, 1_200);
+    const shell = shellPool.children[0]!;
+    const startY = shell.position.y;
+    presentation.sync(snapshot(0), 1_350);
+    expect(shell.visible).toBe(true);
+    expect(shell.position.y).toBeLessThan(startY);
+    expect(shell.position.y).toBeGreaterThan(0.35);
+    presentation.sync(snapshot(0), 1_619);
+    expect(shell.visible).toBe(true);
+    presentation.sync(snapshot(0), 1_620);
+    expect(shell.visible).toBe(false);
+    presentation.dispose();
+  });
+
+  it('uses the clock-invariant 420ms event delta for both positive and negative unmapped clock offsets', () => {
+    const presentation = new KillstreakPresentation(new THREE.Scene());
+    const shellPool = presentation.root.getObjectByName('pass65-bomb-shell-pool') as THREE.Group;
+    presentation.presentImpacts([{
+      activationId: 'ks-carpet-offset-domain', source: 'carpet-bomber', ordinal: 0, phase: 'drop',
+      position: [0, 0, 0], atMs: 5_000, impactAtMs: 5_420,
+    }], 2_000);
+    const shell = shellPool.children[0]!;
+    presentation.sync(snapshot(0), 2_419);
+    expect(shell.visible).toBe(true);
+    presentation.sync(snapshot(0), 2_420);
+    expect(shell.visible).toBe(false);
+    presentation.presentImpacts([{
+      activationId: 'ks-carpet-negative-offset', source: 'carpet-bomber', ordinal: 1, phase: 'drop',
+      position: [0, 0, 0], atMs: -1_000, impactAtMs: -580,
+    }], 3_000);
+    presentation.sync(snapshot(0), 3_419);
+    expect(shell.visible).toBe(true);
+    presentation.sync(snapshot(0), 3_420);
+    expect(shell.visible).toBe(false);
+    presentation.dispose();
+  });
+
+  it('keeps impact pools through clear and retires each pool exactly once on dispose', () => {
+    const retired: THREE.Object3D[] = [];
+    const presentation = new KillstreakPresentation(new THREE.Scene(), (root) => {
+      retired.push(root);
+      root.removeFromParent();
+    });
+    const flashPool = presentation.root.getObjectByName('pass65-impact-flash-pool') as THREE.Group;
+    const shellPool = presentation.root.getObjectByName('pass65-bomb-shell-pool') as THREE.Group;
+    const emberPool = presentation.root.getObjectByName('pass65-ember-pool') as THREE.Group;
+    presentation.presentImpacts(carpetImpacts(20, 'drop'), 1_000);
+    presentation.presentImpacts(carpetImpacts(20), 1_000);
+    presentation.clear();
+    expect(retired).not.toContain(flashPool);
+    expect(retired).not.toContain(shellPool);
+    expect(retired).not.toContain(emberPool);
+    expect([...flashPool.children, ...shellPool.children, ...emberPool.children].every((node) => !node.visible)).toBe(true);
+    presentation.dispose();
+    presentation.dispose();
+    expect(retired.filter((root) => root === flashPool)).toHaveLength(1);
+    expect(retired.filter((root) => root === shellPool)).toHaveLength(1);
+    expect(retired.filter((root) => root === emberPool)).toHaveLength(1);
   });
 
   it('presents host-admitted ground X markers to peers and the carpet corridor only when supplied to its owner', () => {

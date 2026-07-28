@@ -154,10 +154,10 @@ export function maximumRemoteShotBaseDamage(weapon: WeaponId): number {
   return Math.min(100, computeDamage(spec, 0, 'head') * spec.pellets);
 }
 
-export function maximumRemoteExplosiveBaseDamage(source: ExplosiveSource, distance: number, stance: Stance, grenade: GrenadeId | null = null): number {
+export function maximumRemoteExplosiveBaseDamage(source: ExplosiveSource, distance: number, stance: Stance, grenade: GrenadeId | null = null, stuck = false): number {
   if (!Number.isFinite(distance) || distance < 0) return 0;
-  if (source === 'grenade') return Math.min(100, grenade === 'semtex' ? semtexBlastDamage(distance, stance === 'prone') : grenadeDamage(distance));
-  if (source === 'explosive-crossbow') return Math.min(100, explosiveBoltBlastDamage(distance));
+  if (source === 'grenade') return Math.min(100, grenade === 'semtex' ? semtexBlastDamage(distance, stance === 'prone', stuck) : grenadeDamage(distance));
+  if (source === 'explosive-crossbow') return Math.min(100, explosiveBoltBlastDamage(distance, stuck));
   if (source === 'yardhawk') {
     if (distance > 3.2) return 0;
     return Math.min(100, Math.max(1, Math.round(200 * (1 - distance / 3.2))));

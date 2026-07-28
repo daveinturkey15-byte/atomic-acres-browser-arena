@@ -58,11 +58,16 @@ export const SEMTEX_HITL_CONTRACT = Object.freeze({
   damageResolution: 'exactly-once',
 } as const);
 
+export function semtexBlastRadiusM(stuck = false): number {
+  return SEMTEX_HITL_CONTRACT.blastRadiusM * (stuck ? 2 : 1);
+}
+
 /** Pure balance oracle shared by local and host-admitted remote Semtex damage. */
-export function semtexBlastDamage(distanceM: number, prone: boolean): number {
-  if (!Number.isFinite(distanceM) || distanceM < 0 || distanceM > SEMTEX_HITL_CONTRACT.blastRadiusM) return 0;
-  const alpha = distanceM / SEMTEX_HITL_CONTRACT.blastRadiusM;
+export function semtexBlastDamage(distanceM: number, prone: boolean, stuck = false): number {
+  const radiusM = semtexBlastRadiusM(stuck);
+  if (!Number.isFinite(distanceM) || distanceM < 0 || distanceM > radiusM) return 0;
+  const alpha = distanceM / radiusM;
   const standingDamage = SEMTEX_HITL_CONTRACT.blastMaximumDamage
     + (SEMTEX_HITL_CONTRACT.blastMinimumDamage - SEMTEX_HITL_CONTRACT.blastMaximumDamage) * alpha;
-  return standingDamage * (prone ? SEMTEX_HITL_CONTRACT.proneDamageMultiplier : 1);
+  return standingDamage * (prone ? SEMTEX_HITL_CONTRACT.proneDamageMultiplier : 1) * (stuck ? 2 : 1);
 }

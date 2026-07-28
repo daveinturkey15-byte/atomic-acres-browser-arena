@@ -311,21 +311,21 @@ export const GRAPHICS_CAPABILITY_NOTICES: readonly GraphicsCapabilityNotice[] = 
 
 export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'max', AdvancedGraphicsValues>> = Object.freeze({
   performance: Object.freeze({
-    renderScale: 0.75, adaptiveResolution: true, targetFps: 120, frameRateLimit: 0,
+    renderScale: 0.75, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'off', geometryDetail: 'reduced', shadows: 'off', shadowResolution: 'medium', shadowUpdateMode: 'static',
     indirectLighting: 'low', ambientOcclusion: 'off', reflectionQuality: 'low', volumetricQuality: 'low', smokeQuality: 'low',
     particleQuality: 'low', anisotropy: 4, decalQuality: 'low', bloomQuality: 'subtle',
     exposure: 1, toneMapping: 'aces', filmGrain: 0.1, vignette: 0.08,
   }),
   high: Object.freeze({
-    renderScale: 1, adaptiveResolution: true, targetFps: 60, frameRateLimit: 0,
+    renderScale: 1, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'static',
     indirectLighting: 'high', ambientOcclusion: 'off', reflectionQuality: 'high', volumetricQuality: 'high', smokeQuality: 'high',
     particleQuality: 'high', anisotropy: 8, decalQuality: 'high', bloomQuality: 'cinematic',
     exposure: 1, toneMapping: 'aces', filmGrain: 0.32, vignette: 0.16,
   }),
   max: Object.freeze({
-    renderScale: 1.25, adaptiveResolution: false, targetFps: 60, frameRateLimit: 0,
+    renderScale: 1.25, adaptiveResolution: false, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'dynamic',
     indirectLighting: 'high', ambientOcclusion: 'ultra', reflectionQuality: 'high', volumetricQuality: 'ultra', smokeQuality: 'ultra',
     particleQuality: 'ultra', anisotropy: 16, decalQuality: 'ultra', bloomQuality: 'cinematic',

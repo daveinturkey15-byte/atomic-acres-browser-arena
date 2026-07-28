@@ -220,6 +220,11 @@ export class ArenaAudio {
     if (this.context?.state === 'running') void this.context.suspend();
   }
 
+  /** Resumes an already-unlocked context (tab refocus). Never creates one. */
+  resume(): void {
+    if (this.context?.state === 'suspended') void this.context.resume();
+  }
+
   dispose(): void {
     this.stopMinigunDrive();
     this.stopAllChopperRotors();

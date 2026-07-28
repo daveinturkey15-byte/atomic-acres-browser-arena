@@ -53,7 +53,7 @@ import { GRENADE_IDS, type GrenadeId } from './combat/grenade-catalog';
 export { GRENADE_IDS, type GrenadeId } from './combat/grenade-catalog';
 
 export type Team = 0 | 1;
-export const MULTIPLAYER_PROTOCOL_VERSION = 8;
+export const MULTIPLAYER_PROTOCOL_VERSION = 9;
 export type PrimaryWeaponId =
   | 'carbine' | 'smg' | 'lmg' | 'scattergun' | 'sniper'
   | 'mini-uzi' | 'mp5' | 'm4a1' | 'ak-47' | 'minigun' | 'm14-ebr' | 'slug-shotgun';
@@ -207,6 +207,21 @@ export type GrenadeThrowMessage = {
 };
 export type ExplosiveSource = 'grenade' | 'explosive-crossbow' | 'yardhawk' | 'tri-pass' | 'hunter-swarm' | 'nuke';
 export type OffensiveSupportSource = Exclude<ExplosiveSource, 'grenade' | 'explosive-crossbow'>;
+export type HostVerifiedStickyAttachment = Readonly<{
+  targetId: string;
+  targetLifeId: number;
+}>;
+export type HostHitAuthority = Readonly<{
+  hostId: string;
+  targetLifeId: number;
+  appliedDamage: number;
+  resultingHealth: number;
+  stickyAttachment: HostVerifiedStickyAttachment | null;
+}>;
+export type HostWindowBreakAuthority = Readonly<{
+  hostId: string;
+  stickyAttachment: HostVerifiedStickyAttachment | null;
+}>;
 export type HitMessage = {
   type: 'hit';
   by: string;
@@ -219,6 +234,10 @@ export type HitMessage = {
   actionNonce: number;
   /** Host-verified earned-support activation; required for non-grenade explosives. */
   supportNonce?: number;
+  /** Present when a sticky Semtex or explosive crossbolt is attached to a combatant. */
+  stuck?: true;
+  /** Added only by the host after receiver simulation canonicalizes the hit. */
+  hostAuthority?: HostHitAuthority;
   timing?: CombatTiming;
   nonce: number;
 };
@@ -260,6 +279,8 @@ export type WindowBreakMessage = {
   origin: [number, number, number];
   kind?: 'shot' | 'explosive';
   actionNonce?: number;
+  /** Added only by the host after receiver simulation canonicalizes the break. */
+  hostAuthority?: HostWindowBreakAuthority;
   nonce: number;
 };
 export type LeaveMessage = { type: 'leave'; playerId: string; voluntary?: boolean };
@@ -382,6 +403,30 @@ function isOptionalCombatTiming(value: unknown): boolean {
   const timing = value as Record<string, unknown>;
   return Number.isSafeInteger(timing.eventSeq) && Number(timing.eventSeq) >= 0
     && Number.isFinite(timing.sentAtHostTimeMs) && Number(timing.sentAtHostTimeMs) >= 0;
+}
+
+function isHostVerifiedStickyAttachment(value: unknown): value is HostVerifiedStickyAttachment {
+  if (!value || typeof value !== 'object') return false;
+  const attachment = value as Record<string, unknown>;
+  return typeof attachment.targetId === 'string' && attachment.targetId.length > 0 && attachment.targetId.length <= 80
+    && Number.isSafeInteger(attachment.targetLifeId) && Number(attachment.targetLifeId) >= 0;
+}
+
+function isHostHitAuthority(value: unknown): value is HostHitAuthority {
+  if (!value || typeof value !== 'object') return false;
+  const authority = value as Record<string, unknown>;
+  return typeof authority.hostId === 'string' && authority.hostId.length > 0 && authority.hostId.length <= 80
+    && Number.isSafeInteger(authority.targetLifeId) && Number(authority.targetLifeId) >= 0
+    && Number.isFinite(authority.appliedDamage) && Number(authority.appliedDamage) >= 0 && Number(authority.appliedDamage) <= 100
+    && Number.isFinite(authority.resultingHealth) && Number(authority.resultingHealth) >= 0 && Number(authority.resultingHealth) <= 100
+    && (authority.stickyAttachment === null || isHostVerifiedStickyAttachment(authority.stickyAttachment));
+}
+
+function isHostWindowBreakAuthority(value: unknown): value is HostWindowBreakAuthority {
+  if (!value || typeof value !== 'object') return false;
+  const authority = value as Record<string, unknown>;
+  return typeof authority.hostId === 'string' && authority.hostId.length > 0 && authority.hostId.length <= 80
+    && (authority.stickyAttachment === null || isHostVerifiedStickyAttachment(authority.stickyAttachment));
 }
 
 function isNormalizedDirection(value: unknown): value is [number, number, number] {
@@ -524,6 +569,12 @@ export function isGameMessage(value: unknown): value is GameMessage {
           && msg.explosiveSource !== 'explosive-crossbow'
           ? Number.isFinite(msg.supportNonce)
           : msg.supportNonce === undefined)
+        && (msg.stuck === undefined || msg.stuck === true)
+        && (msg.hostAuthority === undefined || isHostHitAuthority(msg.hostAuthority)
+          && Boolean(msg.hostAuthority.stickyAttachment) === (msg.stuck === true)
+          && (msg.hostAuthority.stickyAttachment === null
+            || msg.hostAuthority.stickyAttachment.targetId === msg.target
+              && msg.hostAuthority.stickyAttachment.targetLifeId === msg.hostAuthority.targetLifeId))
         && isOptionalCombatTiming(msg.timing)
         && Number.isFinite(msg.nonce);
     case 'support-activate':
@@ -585,6 +636,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && typeof msg.windowId === 'string' && msg.windowId.length > 0 && msg.windowId.length <= 160
         && (msg.kind === undefined || msg.kind === 'shot' || msg.kind === 'explosive')
         && (msg.kind === 'explosive' ? Number.isFinite(msg.actionNonce) : msg.actionNonce === undefined)
+        && (msg.hostAuthority === undefined || isHostWindowBreakAuthority(msg.hostAuthority))
         && Array.isArray(msg.origin) && msg.origin.length === 3 && msg.origin.every(Number.isFinite)
         && Number.isFinite(msg.nonce);
     case 'leave':
@@ -807,7 +859,9 @@ export function isHostAuthorityMessage(message: GameMessage): boolean {
     || message.type === 'railgun-state'
     || message.type === 'railgun-shot-result'
     || message.type === 'bot-state'
-    || message.type === 'bot-damage';
+    || message.type === 'bot-damage'
+    || message.type === 'hit' && message.hostAuthority !== undefined
+    || message.type === 'window-break' && message.hostAuthority !== undefined;
 }
 
 export function isStateTrafficMessage(message: GameMessage): message is StateMessage | BotStateMessage | RailgunStateMessage | KillstreakStateMessage | InteractiveWorldSnapshotMessage | SmokeStateMessage {

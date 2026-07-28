@@ -55,14 +55,28 @@ function fakeArmsGltf(): FakeGltf {
     const elbow = new THREE.Bone(); elbow.name = `LowerArm${suffix}`;
     const wrist = new THREE.Bone(); wrist.name = `Wrist${suffix}`;
     const index = new THREE.Bone(); index.name = `Index1${suffix}`;
+    elbow.position.set(0, -0.36, 0);
+    wrist.position.set(0, -0.34, 0);
+    index.position.set(0, -0.12, 0);
     shoulder.add(elbow); elbow.add(wrist); wrist.add(index); scene.add(shoulder);
   }
   return { scene, animations: [] };
 }
 
+function fakeKnifeGltf(): FakeGltf {
+  const scene = new THREE.Group();
+  const grip = new THREE.Group(); grip.name = 'grip-socket-r'; grip.position.set(0, 0.61, 0);
+  const tip = new THREE.Group(); tip.name = 'blade-tip-socket'; tip.position.set(0, -1.2, 0);
+  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.1, 0.04), new THREE.MeshStandardMaterial());
+  blade.name = 'field-knife-blade';
+  blade.position.y = -0.3;
+  scene.add(grip, tip, blade);
+  return { scene, animations: [new THREE.AnimationClip('melee', 0.52, [])] };
+}
+
 function fakeGltfForUrl(url: string): FakeGltf {
   if (url.includes('pass65-first-person-arms')) return fakeArmsGltf();
-  if (url.includes('pass65-field-knife')) return { scene: new THREE.Group(), animations: [] };
+  if (url.includes('pass65-field-knife')) return fakeKnifeGltf();
   return fakeWeaponGltf(weaponIdFromUrl(url));
 }
 
@@ -121,6 +135,59 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(loaded).toHaveLength(2);
     expect(loaded.every((entry) => entry.refs === 1)).toBe(true);
     expect(releasePass65WeaponModelsIn(presentation.root)).toBe(2);
+  });
+
+  it('uses only the authored two-chain arm rig for browser melee and restores bind state on exit', async () => {
+    stubBrowserTextureLoading();
+    vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (
+      Promise.resolve(fakeGltfForUrl(String(url)))
+    )) as GLTFLoader['loadAsync']);
+    const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(), false);
+
+    expect(presentation.root.getObjectByName('first-person-arms')).toBeUndefined();
+    expect(presentation.root.getObjectByName('field-knife-arm-rig')).toBeUndefined();
+    await presentation.load();
+    const arms = presentation.root.getObjectByName('first-person-arms');
+    expect(arms?.userData.authoredFirstPersonArms).toBe(true);
+
+    presentation.melee();
+    presentation.setMeleeCaptureProgress(0.42);
+    presentation.update({
+      dt: 1 / 60, moving: false, sprinting: false, crouched: false, prone: false,
+      ads: false, phase: 0, landingImpulse: 0, lateralSpeed: 0, reloadProgress: null,
+    });
+    const active = presentation.presentationState();
+    expect(arms?.visible).toBe(true);
+    expect(active).toMatchObject({
+      armsSource: 'authored-two-chain',
+      meleeArmSource: 'authored-rigged-arms',
+      proceduralMeleeArmVisible: false,
+      browserProceduralMeleeArmViolation: false,
+      proceduralMeleeArmFrames: 0,
+      authoredMeleeChainCount: 2,
+      authoredMeleeKnifeParent: 'authored-field-knife-wrist-socket',
+      knifeVisible: true,
+    });
+    expect(active.authoredMeleeGripError).toBeLessThan(1e-6);
+    expect(active.riggedArms).toEqual(expect.arrayContaining([
+      expect.objectContaining({ side: 'right', action: 'melee', knifeAttachedToRightWrist: true }),
+    ]));
+    expect((active.riggedArms.find((rig) => rig.side === 'right')?.shoulderBindDelta as number)).toBeGreaterThan(0);
+
+    presentation.setMeleeCaptureProgress(null);
+    presentation.fire(0.02);
+    presentation.update({
+      dt: 1 / 60, moving: false, sprinting: false, crouched: false, prone: false,
+      ads: false, phase: 0, landingImpulse: 0, lateralSpeed: 0, reloadProgress: null,
+    });
+    expect(presentation.presentationState()).toMatchObject({
+      meleeArmSource: 'inactive',
+      proceduralMeleeArmVisible: false,
+      browserProceduralMeleeArmViolation: false,
+      riggedMeleeBindPoseRestoredExactly: true,
+      knifeVisible: false,
+    });
+    expect(arms?.visible).toBe(true);
   });
 
   it('does not resurrect a retired operator after a delayed world-weapon load', async () => {

@@ -135,7 +135,9 @@ const RELOAD_HAND_ROTATIONS: Record<WeaponId, [number, number, number]> = {
   'explosive-crossbow': [-0.72, 0.28, -0.48],
 };
 
-const MELEE_PRESENTATION_MS = 620;
+// Pass 65: matches the 520 ms third-person melee window so first-person and
+// remote observers see the same stab duration.
+const MELEE_PRESENTATION_MS = 520;
 export const HIP_VIEWMODEL_POSITION = Object.freeze({ x: 0.4, y: -0.42, z: -0.94 });
 export const HIP_VIEWMODEL_SCALE = 0.54;
 const ADS_VIEWMODEL_BASE_POSITION = Object.freeze({ x: 0.28, y: -0.34, z: -0.88 });
@@ -144,6 +146,7 @@ const ADS_VIEWMODEL_SCALE = 0.64;
 /** Original first-person weapon presentation with ADS, sprint, recoil, melee and staged reload motion. */
 export class WeaponPresentation {
   readonly root = new THREE.Group();
+  private readonly browserRuntime: boolean;
   private readonly models = new Map<WeaponId, THREE.Object3D>();
   private readonly modelLastUsed = new Map<WeaponId, number>();
   private modelUseCounter = 0;
@@ -173,6 +176,13 @@ export class WeaponPresentation {
   private readonly meleeKnife = new THREE.Group();
   private readonly meleeRig = new THREE.Group();
   private readonly passiveKnife = new THREE.Group();
+  private authoredMeleeKnife: THREE.Group | null = null;
+  private authoredMeleeSocket: THREE.Group | null = null;
+  private meleePresentationActive = false;
+  private meleePresentationMode: 'inactive' | 'authored-rigged-arms' | 'headless-procedural-fallback' = 'inactive';
+  private proceduralMeleeArmFrames = 0;
+  private riggedMeleeBindPoseRestoredExactly = true;
+  private authoredMeleeGripError = Number.POSITIVE_INFINITY;
   private readonly brassGeometry = new THREE.CylinderGeometry(0.018, 0.018, 0.085, 7);
   private readonly shellGeometry = new THREE.CylinderGeometry(0.025, 0.025, 0.105, 8);
   private readonly brassMaterial = new THREE.MeshStandardMaterial({ color: 0xc8a65c, roughness: 0.3, metalness: 0.78 });
@@ -198,6 +208,7 @@ export class WeaponPresentation {
     private readonly flattenMaterials = false,
     private readonly retireModel?: (root: THREE.Object3D, afterFence?: () => void) => void,
   ) {
+    this.browserRuntime = typeof document !== 'undefined';
     this.root.name = 'original-weapon-view';
     this.root.position.set(HIP_VIEWMODEL_POSITION.x, HIP_VIEWMODEL_POSITION.y, HIP_VIEWMODEL_POSITION.z);
     this.root.scale.setScalar(HIP_VIEWMODEL_SCALE);
@@ -423,17 +434,21 @@ export class WeaponPresentation {
       this.armRigs.push({ side, shoulder, elbow, hand: wrist, upperLength, lowerLength });
       return shoulder;
     };
-    arms.add(makeArm('right'), makeArm('left'));
-    arms.scale.setScalar(this.flattenMaterials ? 0.76 : 0.74);
-    arms.position.set(0, -0.08, 0.02);
-    arms.visible = true;
-    this.root.add(arms);
+    if (!this.browserRuntime) {
+      arms.userData.testOnlyProceduralFallback = true;
+      arms.add(makeArm('right'), makeArm('left'));
+      arms.scale.setScalar(this.flattenMaterials ? 0.76 : 0.74);
+      arms.position.set(0, -0.08, 0.02);
+      arms.visible = true;
+      this.root.add(arms);
+    }
 
     // Headless tests retain a deterministic construction-only fallback. Browser
     // release runtime leaves this container empty until the authored GLB is
     // available, so a procedural knife can never flash on screen during load.
     this.meleeKnife.name = 'field-knife-presentation';
-    if (typeof document === 'undefined') {
+    this.meleeKnife.visible = false;
+    if (!this.browserRuntime) {
       const knifeHandle = roundedBox('field-knife-handle', [0.15, 0.42, 0.14], glove, 0.035, 2);
       knifeHandle.position.set(0, -0.24, 0);
       const knifeGuard = roundedBox('field-knife-guard', [0.36, 0.075, 0.11], sleeveTrim, 0.018, 2);
@@ -469,29 +484,31 @@ export class WeaponPresentation {
       }
     }
     this.meleeRig.name = 'field-knife-arm-rig';
-    const meleeForearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.115, 0.82, 8, 16), sleeve);
-    meleeForearm.name = 'field-knife-forearm';
-    meleeForearm.position.set(0.56, -0.58, 0.12);
-    meleeForearm.rotation.z = 0.55;
-    const meleeUpperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.105, 0.17, 1.4, 14, 1, false), sleeve);
-    meleeUpperArm.name = 'field-knife-upper-arm';
-    meleeUpperArm.position.set(0.82, -1.55, 0.14);
-    meleeUpperArm.rotation.z = 0.08;
-    const meleeElbow = roundedBox('field-knife-elbow-guard', [0.25, 0.2, 0.18], glove, 0.055, 3);
-    meleeElbow.position.set(0.73, -0.92, 0.13);
-    meleeElbow.rotation.z = 0.52;
-    const meleeCuff = roundedBox('knife-glove-cuff', [0.21, 0.18, 0.15], sleeveTrim, 0.04, 2);
-    meleeCuff.position.set(0.24, -0.13, -0.04);
-    meleeCuff.rotation.z = 0.3;
-    const meleeHand = roundedBox('knife-glove', [0.19, 0.21, 0.24], glove, 0.055, 3);
-    meleeHand.position.set(0.19, -0.02, -0.14);
-    meleeHand.rotation.set(-0.18, 0.08, -0.42);
-    this.meleeKnife.position.set(0.19, 0.1, -0.2);
-    this.meleeKnife.rotation.set(0.04, -0.06, -0.48);
-    this.meleeKnife.visible = true;
-    this.meleeRig.add(meleeUpperArm, meleeElbow, meleeForearm, meleeCuff, meleeHand, this.meleeKnife);
-    this.meleeRig.visible = false;
-    this.root.add(this.meleeRig);
+    this.meleeRig.userData.testOnlyProceduralFallback = true;
+    if (!this.browserRuntime) {
+      const meleeForearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.115, 0.82, 8, 16), sleeve);
+      meleeForearm.name = 'field-knife-forearm';
+      meleeForearm.position.set(0.56, -0.58, 0.12);
+      meleeForearm.rotation.z = 0.55;
+      const meleeUpperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.105, 0.17, 1.4, 14, 1, false), sleeve);
+      meleeUpperArm.name = 'field-knife-upper-arm';
+      meleeUpperArm.position.set(0.82, -1.55, 0.14);
+      meleeUpperArm.rotation.z = 0.08;
+      const meleeElbow = roundedBox('field-knife-elbow-guard', [0.25, 0.2, 0.18], glove, 0.055, 3);
+      meleeElbow.position.set(0.73, -0.92, 0.13);
+      meleeElbow.rotation.z = 0.52;
+      const meleeCuff = roundedBox('knife-glove-cuff', [0.21, 0.18, 0.15], sleeveTrim, 0.04, 2);
+      meleeCuff.position.set(0.24, -0.13, -0.04);
+      meleeCuff.rotation.z = 0.3;
+      const meleeHand = roundedBox('knife-glove', [0.19, 0.21, 0.24], glove, 0.055, 3);
+      meleeHand.position.set(0.19, -0.02, -0.14);
+      meleeHand.rotation.set(-0.18, 0.08, -0.42);
+      this.meleeKnife.position.set(0.19, 0.1, -0.2);
+      this.meleeKnife.rotation.set(0.04, -0.06, -0.48);
+      this.meleeRig.add(meleeUpperArm, meleeElbow, meleeForearm, meleeCuff, meleeHand, this.meleeKnife);
+      this.meleeRig.visible = false;
+      this.root.add(this.meleeRig);
+    }
     const passiveKnifeModel = this.meleeKnife.clone(true);
     passiveKnifeModel.name = 'passive-field-knife-model';
     passiveKnifeModel.position.set(0, 0, 0);
@@ -591,6 +608,51 @@ export class WeaponPresentation {
     }
   }
 
+  private attachAuthoredMeleeKnife(rightRig: RiggedViewArm, authoredKnife: THREE.Group): void {
+    const authoredGrip = authoredKnife.getObjectByName('grip-socket-r');
+    if (!authoredGrip) throw new Error('Pass 65 authored field knife is missing grip-socket-r');
+
+    this.meleeKnife.removeFromParent();
+    this.meleeKnife.clear();
+    this.meleeKnife.position.set(0, 0, 0);
+    this.meleeKnife.rotation.set(0, 0, 0);
+    this.meleeKnife.scale.set(1, 1, 1);
+
+    const wristSocket = new THREE.Group();
+    wristSocket.name = 'authored-field-knife-wrist-socket';
+    wristSocket.userData.authoredRigAttachment = true;
+    wristSocket.position.set(0.012, -0.014, -0.026);
+    rightRig.wrist.add(wristSocket);
+    wristSocket.add(this.meleeKnife);
+    this.meleeKnife.add(authoredKnife);
+
+    // The authored knife's grip empty is the alignment authority. Translating
+    // its managed model by the grip position keeps the handle centred on the
+    // wrist socket even when the source asset scale changes.
+    this.root.updateWorldMatrix(true, true);
+    const gripInContainer = this.meleeKnife.worldToLocal(authoredGrip.getWorldPosition(new THREE.Vector3()));
+    authoredKnife.position.sub(gripInContainer);
+
+    // Point the authored -Z blade axis along the hand chain, then add a small
+    // palm roll so the edge reads clearly during the thrust instead of showing
+    // a flat, edge-on silhouette.
+    this.root.updateWorldMatrix(true, true);
+    const fingerDirection = rightRig.wrist.worldToLocal(rightRig.finger.getWorldPosition(new THREE.Vector3()));
+    if (fingerDirection.lengthSq() < 1e-6) fingerDirection.set(0, -1, 0);
+    else fingerDirection.normalize();
+    wristSocket.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), fingerDirection);
+    wristSocket.rotateZ(-0.2);
+
+    this.root.updateWorldMatrix(true, true);
+    this.authoredMeleeGripError = authoredGrip.getWorldPosition(new THREE.Vector3())
+      .distanceTo(wristSocket.getWorldPosition(new THREE.Vector3()));
+    this.authoredMeleeKnife = authoredKnife;
+    this.authoredMeleeSocket = wristSocket;
+    this.meleeKnife.userData.projectOriginalMeleeWeapon = true;
+    this.meleeKnife.userData.authoredGripSocket = authoredGrip.name;
+    this.meleeKnife.visible = false;
+  }
+
   async load(onProgress?: (loaded: number, total: number) => void): Promise<void> {
     const browserRuntime = typeof document !== 'undefined';
     const initialWeapon = this.active;
@@ -619,9 +681,9 @@ export class WeaponPresentation {
       this.root.add(authoredArms.root);
       const authoredKnife = createPass65FieldKnifeModel(this.flattenMaterials, 'first-person');
       if (!authoredKnife) throw new Error('Pass 65 authored first-person field knife failed the release contract');
-      this.meleeKnife.clear();
-      this.meleeKnife.add(authoredKnife);
-      this.meleeKnife.userData.projectOriginalMeleeWeapon = true;
+      const rightRig = this.riggedArmRigs.find((rig) => rig.side === 'right');
+      if (!rightRig) throw new Error('Pass 65 authored first-person arms are missing the right-hand chain');
+      this.attachAuthoredMeleeKnife(rightRig, authoredKnife);
       this.passiveKnife.clear();
       const prewarmDropKnife = () => {
         void loadPass65FieldKnifeAsset('drop').then(() => {
@@ -827,6 +889,10 @@ export class WeaponPresentation {
       this.meleeStart = 0;
       this.meleePresentationFrames = 0;
       this.meleeRig.visible = false;
+      this.meleeKnife.visible = false;
+      this.meleePresentationActive = false;
+      this.meleePresentationMode = 'inactive';
+      this.restoreRiggedArmBindPose();
       const arms = this.root.getObjectByName('first-person-arms');
       if (arms) arms.visible = true;
       const model = this.mountedModel();
@@ -891,10 +957,22 @@ export class WeaponPresentation {
   melee(): void {
     this.meleeStart = performance.now();
     this.meleePresentationFrames = 0;
-    this.meleeRig.visible = true;
-    meleeImportedWeapon(this.meleeKnife);
+    const authoredReady = this.browserRuntime
+      && this.riggedArmRigs.length === 2
+      && this.authoredMeleeKnife !== null
+      && this.authoredMeleeSocket !== null;
+    this.meleeRig.visible = !this.browserRuntime;
+    this.meleeKnife.visible = !this.browserRuntime || authoredReady;
+    this.meleePresentationActive = true;
+    this.meleePresentationMode = authoredReady
+      ? 'authored-rigged-arms'
+      : this.browserRuntime ? 'inactive' : 'headless-procedural-fallback';
+    if (this.browserRuntime && !authoredReady) {
+      this.root.userData.pass65MeleePresentationError = 'authored arms or wrist-mounted knife unavailable';
+    }
+    meleeImportedWeapon(this.authoredMeleeKnife ?? this.meleeKnife);
     const arms = this.root.getObjectByName('first-person-arms');
-    if (arms) arms.visible = false;
+    if (arms) arms.visible = this.browserRuntime;
     const activeModel = this.mountedModel();
     if (activeModel) activeModel.visible = false;
     this.actionContract = characterActionContract({
@@ -1034,7 +1112,18 @@ export class WeaponPresentation {
       actionContract: this.actionContract,
       surfaceRetreat: this.surfaceRetreat,
       riggedArms: this.riggedArmDiagnostics,
-      knifeVisible: this.meleeRig.visible,
+      armsSource: arms?.userData.authoredFirstPersonArms === true
+        ? 'authored-two-chain'
+        : arms?.userData.testOnlyProceduralFallback === true ? 'headless-procedural-fallback' : 'unavailable',
+      meleeArmSource: this.meleePresentationMode,
+      proceduralMeleeArmVisible: this.meleeRig.visible,
+      browserProceduralMeleeArmViolation: this.browserRuntime && this.meleeRig.visible,
+      proceduralMeleeArmFrames: this.proceduralMeleeArmFrames,
+      riggedMeleeBindPoseRestoredExactly: this.riggedMeleeBindPoseRestoredExactly,
+      authoredMeleeChainCount: this.riggedArmRigs.length,
+      authoredMeleeKnifeParent: this.meleeKnife.parent?.name ?? null,
+      authoredMeleeGripError: Number.isFinite(this.authoredMeleeGripError) ? this.authoredMeleeGripError : null,
+      knifeVisible: this.meleePresentationActive && this.meleeKnife.visible,
       passiveKnifeVisible: this.passiveKnife.visible,
       passiveKnifeModel: this.passiveKnife.getObjectByName('passive-field-knife-model') !== undefined,
       minigunSpool: { ...this.minigunSpool },
@@ -1113,13 +1202,78 @@ export class WeaponPresentation {
     bone.updateWorldMatrix(false, true);
   }
 
-  private solveRiggedArms(activeModel: THREE.Object3D | undefined, reloadPose: ReloadPose): void {
-    if (!activeModel || this.riggedArmRigs.length === 0) return;
+  private restoreRiggedArmBindPose(): boolean {
     for (const rig of this.riggedArmRigs) {
       rig.shoulder.quaternion.copy(rig.bindShoulder);
       rig.elbow.quaternion.copy(rig.bindElbow);
       rig.wrist.quaternion.copy(rig.bindWrist);
     }
+    const restored = this.riggedArmRigs.every((rig) => (
+      rig.shoulder.quaternion.equals(rig.bindShoulder)
+      && rig.elbow.quaternion.equals(rig.bindElbow)
+      && rig.wrist.quaternion.equals(rig.bindWrist)
+    ));
+    this.riggedMeleeBindPoseRestoredExactly = restored;
+    return restored;
+  }
+
+  private poseRiggedMeleeArms(progress: number): void {
+    this.restoreRiggedArmBindPose();
+    const windup = THREE.MathUtils.smoothstep(progress, 0, 0.18);
+    const thrust = THREE.MathUtils.smoothstep(progress, 0.18, 0.46);
+    const recover = THREE.MathUtils.smoothstep(progress, 0.58, 1);
+    const retained = 1 - recover;
+    const blendedOffset = (
+      windupPose: readonly [number, number, number],
+      thrustPose: readonly [number, number, number],
+    ): THREE.Quaternion => new THREE.Quaternion().setFromEuler(new THREE.Euler(
+      (windupPose[0] * windup + (thrustPose[0] - windupPose[0]) * thrust) * retained,
+      (windupPose[1] * windup + (thrustPose[1] - windupPose[1]) * thrust) * retained,
+      (windupPose[2] * windup + (thrustPose[2] - windupPose[2]) * thrust) * retained,
+      'XYZ',
+    ));
+    const apply = (
+      bone: THREE.Bone,
+      bind: THREE.Quaternion,
+      windupPose: readonly [number, number, number],
+      thrustPose: readonly [number, number, number],
+    ) => bone.quaternion.copy(bind).multiply(blendedOffset(windupPose, thrustPose));
+
+    const right = this.riggedArmRigs.find((rig) => rig.side === 'right');
+    const left = this.riggedArmRigs.find((rig) => rig.side === 'left');
+    if (right) {
+      apply(right.shoulder, right.bindShoulder, [0.2, -0.24, 0.36], [-0.5, -0.4, 0.76]);
+      apply(right.elbow, right.bindElbow, [-0.26, 0.08, -0.14], [-0.74, 0.05, -0.27]);
+      apply(right.wrist, right.bindWrist, [-0.16, -0.1, 0.24], [-0.42, -0.14, 0.4]);
+    }
+    if (left) {
+      apply(left.shoulder, left.bindShoulder, [0.05, 0.04, -0.07], [0.19, 0.17, -0.22]);
+      apply(left.elbow, left.bindElbow, [-0.04, -0.02, 0.03], [-0.12, -0.04, 0.08]);
+      apply(left.wrist, left.bindWrist, [0, 0, 0], [-0.05, 0.03, -0.04]);
+    }
+    this.root.updateWorldMatrix(true, true);
+    if (this.authoredMeleeKnife && this.authoredMeleeSocket) {
+      const grip = this.authoredMeleeKnife.getObjectByName('grip-socket-r');
+      if (grip) {
+        this.authoredMeleeGripError = grip.getWorldPosition(new THREE.Vector3())
+          .distanceTo(this.authoredMeleeSocket.getWorldPosition(new THREE.Vector3()));
+      }
+    }
+    this.riggedArmDiagnostics = this.riggedArmRigs.map((rig) => ({
+      side: rig.side,
+      action: 'melee',
+      progress,
+      shoulderBindDelta: rig.shoulder.quaternion.angleTo(rig.bindShoulder),
+      elbowBindDelta: rig.elbow.quaternion.angleTo(rig.bindElbow),
+      wristBindDelta: rig.wrist.quaternion.angleTo(rig.bindWrist),
+      knifeAttachedToRightWrist: rig.side === 'right' && this.authoredMeleeSocket?.parent === rig.wrist,
+    }));
+  }
+
+  private solveRiggedArms(activeModel: THREE.Object3D | undefined, reloadPose: ReloadPose): void {
+    if (this.riggedArmRigs.length === 0) return;
+    this.restoreRiggedArmBindPose();
+    if (!activeModel) return;
     this.root.updateMatrixWorld(true);
     const cameraRotation = this.camera.getWorldQuaternion(new THREE.Quaternion());
     const diagnostics: Array<Record<string, unknown>> = [];
@@ -1237,7 +1391,7 @@ export class WeaponPresentation {
 
     const activeModel = this.mountedModel();
     if (activeModel) updateImportedWeapon(activeModel, pose.dt);
-    updateImportedWeapon(this.meleeKnife, pose.dt);
+    updateImportedWeapon(this.authoredMeleeKnife ?? this.meleeKnife, pose.dt);
     const minigunBarrels = this.models.get('minigun')?.getObjectByName('minigun-barrel-cluster');
     if (minigunBarrels) minigunBarrels.rotation.z = this.minigunSpool.angleRadians;
     const profile = weaponFamilyPresentation(this.active);
@@ -1335,15 +1489,15 @@ export class WeaponPresentation {
 
     if (this.meleeStart > 0) this.meleePresentationFrames += 1;
     const timedMeleeProgress = THREE.MathUtils.clamp((performance.now() - this.meleeStart) / MELEE_PRESENTATION_MS, 0, 1);
-    // A software-rendered frame may take longer than the authored 620 ms arc.
+    // A software-rendered frame may take longer than the authored 520 ms arc.
     // Preserve at least three presented frames so a valid knife action cannot
     // disappear entirely while keeping authoritative melee timing unchanged.
     const presentedMeleeProgress = this.meleeStart > 0 && this.meleePresentationFrames <= 3
       ? Math.min(timedMeleeProgress, 0.98)
       : timedMeleeProgress;
     const meleeProgress = this.debugMeleeProgress ?? presentedMeleeProgress;
-    const meleeArc = this.meleeStart > 0 && meleeProgress < 1 ? Math.sin(meleeProgress * Math.PI) : 0;
     const meleeActive = this.debugMeleeProgress !== null || (this.meleeStart > 0 && meleeProgress < 1);
+    const meleeArc = meleeActive ? Math.sin(meleeProgress * Math.PI) : 0;
     this.actionContract = characterActionContract({
       weapon: this.active,
       aimBlend: this.adsBlend,
@@ -1351,17 +1505,43 @@ export class WeaponPresentation {
       reloadProgress: pose.reloadProgress,
       meleeProgress: meleeActive ? meleeProgress : null,
     });
-    this.meleeRig.visible = meleeActive;
+    const wasMeleeActive = this.meleePresentationActive;
+    const authoredMeleeActive = meleeActive && this.browserRuntime
+      && this.riggedArmRigs.length === 2
+      && this.authoredMeleeKnife !== null
+      && this.authoredMeleeSocket !== null;
+    const proceduralMeleeActive = meleeActive && !this.browserRuntime;
+    this.meleePresentationActive = meleeActive;
+    this.meleePresentationMode = authoredMeleeActive
+      ? 'authored-rigged-arms'
+      : proceduralMeleeActive ? 'headless-procedural-fallback' : 'inactive';
+    this.meleeRig.visible = proceduralMeleeActive;
+    this.meleeKnife.visible = authoredMeleeActive || proceduralMeleeActive;
     // A knife is an action presentation, never a permanent off-hand prop. The
     // old passive clone read as a floating knife beside every firearm.
     this.passiveKnife.visible = false;
-    if (arms) arms.visible = !meleeActive;
+    if (arms) arms.visible = this.browserRuntime || !meleeActive;
     if (activeModel) activeModel.visible = !meleeActive;
     if (meleeActive) {
-      const contact = THREE.MathUtils.smoothstep(meleeProgress, 0.12, 0.48);
-      const recover = 1 - THREE.MathUtils.smoothstep(meleeProgress, 0.55, 1);
-      this.meleeRig.position.set(0.28 - contact * 0.34, -0.12 + contact * 0.22, -0.2 - contact * 0.46);
-      this.meleeRig.rotation.set(-contact * 0.25, -contact * 0.42, contact * 0.52 * recover);
+      // Pass 65: three-phase stab — short wind-up, hard thrust, eased recover —
+      // so the knife returns to rest instead of popping out mid-lunge.
+      const windup = THREE.MathUtils.smoothstep(meleeProgress, 0, 0.14);
+      const thrust = THREE.MathUtils.smoothstep(meleeProgress, 0.14, 0.44);
+      const recover = THREE.MathUtils.smoothstep(meleeProgress, 0.58, 1);
+      const drive = thrust * (1 - recover);
+      if (authoredMeleeActive) {
+        this.poseRiggedMeleeArms(meleeProgress);
+      } else if (proceduralMeleeActive) {
+        this.proceduralMeleeArmFrames += 1;
+        this.meleeRig.position.set(
+          0.28 + windup * 0.08 - drive * 0.42,
+          -0.12 - windup * 0.07 + drive * 0.24,
+          -0.2 + windup * 0.1 - drive * 0.54,
+        );
+        this.meleeRig.rotation.set(-drive * 0.3, -drive * 0.48, drive * 0.55);
+      }
+    } else if (wasMeleeActive) {
+      this.restoreRiggedArmBindPose();
     }
     const grenadeProgress = THREE.MathUtils.clamp((performance.now() - this.grenadeStart) / 620, 0, 1);
     const grenadeArc = this.grenadeStart > 0 && grenadeProgress < 1 ? Math.sin(grenadeProgress * Math.PI) : 0;
@@ -1384,8 +1564,8 @@ export class WeaponPresentation {
     );
     this.root.rotation.z = THREE.MathUtils.lerp(this.root.rotation.z, reloadStage.roll - this.sprintBlend * 0.22 - pose.lateralSpeed * (pose.prone ? 0.01 : 0.025) + meleeArc * 0.42 + shotRoll, smoothing(13));
     this.centerSightReference(activeModel);
-    if (arms) this.solveArms(arms, activeModel, reloadPose);
-    this.solveRiggedArms(activeModel, reloadPose);
+    if (arms && !meleeActive) this.solveArms(arms, activeModel, reloadPose);
+    if (!authoredMeleeActive) this.solveRiggedArms(activeModel, reloadPose);
     return actionEvents;
   }
 }

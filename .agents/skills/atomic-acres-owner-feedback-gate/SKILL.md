@@ -37,7 +37,7 @@ Preserve observations, inferences, assumptions, unknowns and falsifiers as disti
 - No owner statement is discarded because it overlaps an older request; either merge it into the same outcome with new evidence or assign a new correction ID.
 - A current correction supersedes an older assumption explicitly; it does not silently rewrite history.
 - Every row has one accountable lane even when several specialists contribute.
-- Every non-blank line in the fixed attached Pass 65 source has an explicit atom count, and every atom has a stable outcome ID. The fixed outcome projection and all canonical supersessions are digest-checked.
+- Every non-blank line in each immutable normalized Pass 65 text source has an explicit atom count, and every atom has a stable source-scoped outcome ID. Every source outcome projection and all canonical supersessions are digest-checked.
 - Every feedback row has an executable test reference. Candidate P0/P1 rows additionally require complete coverage and a digest-checked receipt bound to the exact candidate SHA, build, verifier and environment.
 - Every `all maps`, `all weapons`, `all grenades`, `all peers`, `future additions`, persistence or cross-profile claim requires set-equality or mutation evidence, not representative spot checks.
 - Runtime evidence names the exact source/build, renderer/backend, map/profile, peer count and relevant seed. Headless topology proof is not native-GPU performance proof.

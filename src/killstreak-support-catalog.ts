@@ -38,8 +38,8 @@ export const DRONE_GUN_PROFILE: DroneGunProfile = Object.freeze({
 /**
  * Swarm coordination is an activation-level pressure budget, not a second gun
  * profile. Each drone still references the byte-identical weapon above, while
- * the host admits one member of a 12-drone formation into a fire lane at a
- * time. This preserves visible, meaningful per-hit damage without turning 12
+ * the host admits one member of a 24-drone formation into a fire lane at a
+ * time. This preserves visible, meaningful per-hit damage without turning 24
  * simultaneous barrels into an unavoidable one-frame kill.
  */
 export const DRONE_SWARM_FIRE_LANE_INTERVAL_MS = 460;

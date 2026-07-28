@@ -1,10 +1,12 @@
 import { PASS65_KILLSTREAK_CATALOG, validateKillstreakLoadout, type KillstreakLoadoutV1, type Pass65KillstreakId } from './killstreak-catalog';
 import type { CombatTiming } from './network-fairness';
 import type {
+  CareCaptureAdmissionReason,
   DroneSensorContact,
   KillstreakActivationIntent,
   KillstreakControlIntent,
   KillstreakDamageEvent,
+  KillstreakImpactEvent,
   KillstreakPlacementMarkerSnapshot,
   KillstreakRecipientSnapshot,
 } from './killstreak-runtime';
@@ -51,6 +53,25 @@ export type KillstreakCareCaptureIntentMessage = Readonly<{
   nonce: number;
 }>;
 
+export type KillstreakCareCaptureResultReason = CareCaptureAdmissionReason
+  | 'released'
+  | 'not-capturing';
+
+export type KillstreakCareCaptureResultMessage = Readonly<{
+  type: 'killstreak-care-capture-result';
+  by: string;
+  forPlayerId: string;
+  matchEpoch: number;
+  lifeId: number;
+  sequence: number;
+  crateId: string;
+  holding: boolean;
+  accepted: boolean;
+  reason: KillstreakCareCaptureResultReason;
+  revision: number;
+  nonce: number;
+}>;
+
 export type KillstreakStateMessage = Readonly<{
   type: 'killstreak-state';
   by: string;
@@ -65,6 +86,8 @@ export type KillstreakDamageResultMessage = Readonly<{
   matchEpoch: number;
   revision: number;
   events: readonly KillstreakDamageEvent[];
+  /** Public host-authored payload choreography, including no-damage impacts. */
+  impacts: readonly KillstreakImpactEvent[];
   nonce: number;
 }>;
 
@@ -72,6 +95,7 @@ export type KillstreakProtocolMessage = KillstreakLoadoutIntentMessage
   | KillstreakActivateIntentMessage
   | KillstreakControlIntentMessage
   | KillstreakCareCaptureIntentMessage
+  | KillstreakCareCaptureResultMessage
   | KillstreakStateMessage
   | KillstreakDamageResultMessage;
 
@@ -79,6 +103,39 @@ export type KillstreakStateAdmission = Readonly<{
   accepted: boolean;
   reason: 'accepted' | 'forged-host' | 'forged-recipient' | 'match-epoch-mismatch' | 'stale-revision' | 'duplicate-nonce';
 }>;
+
+export type KillstreakCareCaptureResultAdmission = Readonly<{
+  accepted: boolean;
+  reason: 'accepted' | 'forged-host' | 'forged-recipient' | 'match-epoch-mismatch' | 'life-mismatch' | 'duplicate-nonce';
+}>;
+
+export function admitKillstreakCareCaptureResultMessage(
+  message: KillstreakCareCaptureResultMessage,
+  context: Readonly<{
+    expectedHostId: string | null;
+    expectedRecipientId: string;
+    expectedMatchEpoch: number;
+    expectedLifeId: number;
+    seenNonces: ReadonlySet<number>;
+  }>,
+): KillstreakCareCaptureResultAdmission {
+  if (!context.expectedHostId || message.by !== context.expectedHostId) {
+    return Object.freeze({ accepted: false, reason: 'forged-host' });
+  }
+  if (message.forPlayerId !== context.expectedRecipientId) {
+    return Object.freeze({ accepted: false, reason: 'forged-recipient' });
+  }
+  if (message.matchEpoch !== context.expectedMatchEpoch) {
+    return Object.freeze({ accepted: false, reason: 'match-epoch-mismatch' });
+  }
+  if (message.lifeId !== context.expectedLifeId) {
+    return Object.freeze({ accepted: false, reason: 'life-mismatch' });
+  }
+  if (context.seenNonces.has(message.nonce)) {
+    return Object.freeze({ accepted: false, reason: 'duplicate-nonce' });
+  }
+  return Object.freeze({ accepted: true, reason: 'accepted' });
+}
 
 /**
  * Transport admission for the recipient-specific authority snapshot. The
@@ -114,6 +171,10 @@ export function admitKillstreakStateMessage(
 }
 
 const ids = new Set<string>(PASS65_KILLSTREAK_CATALOG.definitions.map((definition) => definition.id));
+const careCaptureResultReasons = new Set<KillstreakCareCaptureResultReason>([
+  'accepted', 'identity-mismatch', 'invalid-time', 'reward-capacity', 'crate-unavailable',
+  'actor-already-capturing', 'capture-admission-failed', 'released', 'not-capturing',
+]);
 
 function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -189,7 +250,7 @@ function isActorSnapshot(value: unknown): boolean {
 function isEntitySnapshot(value: unknown): boolean {
   if (!object(value) || !exactKeys(value, [
     'id', 'activationId', 'ownerId', 'team', 'kind', 'mode', 'phase', 'position', 'velocity', 'attitude', 'health', 'expiresInMs',
-    'magazine', 'reserveClips', 'gunProfileId', 'gunController', 'captureProgress', 'revealedReward', 'revision',
+    'magazine', 'reserveClips', 'gunProfileId', 'gunController', 'captureActorId', 'captureProgress', 'revealedReward', 'revision',
   ]) || !hostEntityId(value.id) || !activationId(value.activationId) || !actorId(value.ownerId)
     || (value.team !== 0 && value.team !== 1)
     || (value.kind !== 'aircraft' && value.kind !== 'chopper' && value.kind !== 'drone' && value.kind !== 'care-crate')
@@ -212,8 +273,11 @@ function isEntitySnapshot(value: unknown): boolean {
     if (value.gunController !== 'ai' && value.gunController !== 'owner-player') return false;
   } else if (value.gunController !== null) return false;
   if (value.kind === 'care-crate') {
-    if (!(value.captureProgress === null || finite(value.captureProgress, 0, 1))) return false;
-  } else if (value.captureProgress !== null) return false;
+    const capturing = value.phase === 'capturing';
+    if (capturing
+      ? !actorId(value.captureActorId) || !finite(value.captureProgress, 0, 1)
+      : value.captureActorId !== null || value.captureProgress !== null) return false;
+  } else if (value.captureActorId !== null || value.captureProgress !== null) return false;
   return value.revealedReward === null || ids.has(String(value.revealedReward));
 }
 
@@ -313,6 +377,19 @@ function isDamageEvent(value: unknown): value is KillstreakDamageEvent {
     && finite(value.atMs, 0, Number.MAX_SAFE_INTEGER);
 }
 
+function isImpactEvent(value: unknown): value is KillstreakImpactEvent {
+  return object(value)
+    && exactKeys(value, ['activationId', 'source', 'ordinal', 'phase', 'position', 'impactAtMs', 'atMs'])
+    && activationId(value.activationId)
+    && value.source === 'carpet-bomber'
+    && typeof value.ordinal === 'number' && Number.isSafeInteger(value.ordinal) && value.ordinal >= 0 && value.ordinal < 20
+    && (value.phase === 'drop' || value.phase === 'impact')
+    && vec3(value.position)
+    && finite(value.impactAtMs, 0, Number.MAX_SAFE_INTEGER)
+    && finite(value.atMs, 0, Number.MAX_SAFE_INTEGER)
+    && (value.phase === 'drop' ? value.atMs <= value.impactAtMs : value.atMs >= value.impactAtMs);
+}
+
 export function isKillstreakProtocolMessage(value: unknown): value is KillstreakProtocolMessage {
   if (!object(value) || typeof value.type !== 'string') return false;
   if (value.type === 'killstreak-loadout-intent') {
@@ -320,22 +397,24 @@ export function isKillstreakProtocolMessage(value: unknown): value is Killstreak
       && baseIntent(value) && validateKillstreakLoadout(value.loadout).valid;
   }
   if (value.type === 'killstreak-activate-intent') {
-    return exactKeys(value, ['type', 'by', 'matchEpoch', 'lifeId', 'sequence', 'slot', 'activationId', 'expectedId', 'nonce'], ['anchor', 'timing'])
+    return exactKeys(value, ['type', 'by', 'matchEpoch', 'lifeId', 'sequence', 'slot', 'activationId', 'expectedId', 'nonce'], ['anchor', 'facing', 'timing'])
       && baseIntent(value)
       && (value.slot === 1 || value.slot === 2 || value.slot === 3 || value.slot === 4 || value.slot === 5)
       && activationId(value.activationId)
       && ids.has(String(value.expectedId))
       && (value.anchor === undefined || vec3(value.anchor))
+      && (value.facing === undefined || vec3(value.facing))
       && timing(value.timing);
   }
   if (value.type === 'killstreak-control-intent') {
     return exactKeys(value, ['type', 'by', 'matchEpoch', 'lifeId', 'sequence', 'entityId', 'action', 'nonce'], [
-      'yawQ', 'pitchQ', 'thrustQ', 'verticalQ', 'fire', 'timing',
+      'yawQ', 'pitchQ', 'thrustQ', 'strafeQ', 'verticalQ', 'fire', 'timing',
     ]) && baseIntent(value) && hostEntityId(value.entityId)
       && (value.action === 'toggle-chopper-gunner' || value.action === 'toggle-piloted-drone' || value.action === 'pilot-control' || value.action === 'exit-piloted-drone')
       && (value.yawQ === undefined || finite(value.yawQ, -Math.PI, Math.PI))
       && (value.pitchQ === undefined || finite(value.pitchQ, -1.2, 1.2))
       && (value.thrustQ === undefined || finite(value.thrustQ, -1, 1))
+      && (value.strafeQ === undefined || finite(value.strafeQ, -1, 1))
       && (value.verticalQ === undefined || finite(value.verticalQ, -1, 1))
       && (value.fire === undefined || typeof value.fire === 'boolean')
       && timing(value.timing);
@@ -343,6 +422,18 @@ export function isKillstreakProtocolMessage(value: unknown): value is Killstreak
   if (value.type === 'killstreak-care-capture-intent') {
     return exactKeys(value, ['type', 'by', 'matchEpoch', 'lifeId', 'sequence', 'crateId', 'holding', 'nonce'], ['timing'])
       && baseIntent(value) && hostEntityId(value.crateId) && typeof value.holding === 'boolean' && timing(value.timing);
+  }
+  if (value.type === 'killstreak-care-capture-result') {
+    if (!exactKeys(value, [
+      'type', 'by', 'forPlayerId', 'matchEpoch', 'lifeId', 'sequence', 'crateId', 'holding',
+      'accepted', 'reason', 'revision', 'nonce',
+    ]) || !actorId(value.by) || !actorId(value.forPlayerId)
+      || !safeCounter(value.matchEpoch) || !safeCounter(value.lifeId) || !safeCounter(value.sequence)
+      || !hostEntityId(value.crateId) || typeof value.holding !== 'boolean' || typeof value.accepted !== 'boolean'
+      || !careCaptureResultReasons.has(value.reason as KillstreakCareCaptureResultReason)
+      || !safeCounter(value.revision) || !finite(value.nonce, 0, Number.MAX_SAFE_INTEGER)) return false;
+    if (value.accepted) return value.holding ? value.reason === 'accepted' : value.reason === 'released';
+    return value.reason !== 'accepted' && value.reason !== 'released';
   }
   if (value.type === 'killstreak-state') {
     return exactKeys(value, ['type', 'by', 'forPlayerId', 'snapshot', 'nonce'])
@@ -353,10 +444,15 @@ export function isKillstreakProtocolMessage(value: unknown): value is Killstreak
       && finite(value.nonce, 0, Number.MAX_SAFE_INTEGER);
   }
   if (value.type === 'killstreak-damage-result') {
-    return exactKeys(value, ['type', 'by', 'matchEpoch', 'revision', 'events', 'nonce'])
+    return exactKeys(value, ['type', 'by', 'matchEpoch', 'revision', 'events', 'impacts', 'nonce'])
       && actorId(value.by) && safeCounter(value.matchEpoch) && safeCounter(value.revision)
       && Array.isArray(value.events) && value.events.length <= 64 && value.events.every(isDamageEvent)
       && new Set(value.events.map((event) => (event as KillstreakDamageEvent).resultId)).size === value.events.length
+      && Array.isArray(value.impacts) && value.impacts.length <= 40 && value.impacts.every(isImpactEvent)
+      && new Set(value.impacts.map((impact) => {
+        const event = impact as KillstreakImpactEvent;
+        return `${event.activationId}:${event.ordinal}:${event.phase}`;
+      })).size === value.impacts.length
       && finite(value.nonce, 0, Number.MAX_SAFE_INTEGER);
   }
   return false;
@@ -364,13 +460,18 @@ export function isKillstreakProtocolMessage(value: unknown): value is Killstreak
 
 export function killstreakMessageBelongsToPlayer(message: KillstreakProtocolMessage, playerId: string): boolean {
   if (!playerId) return false;
+  if (message.type === 'killstreak-care-capture-result') return message.by === playerId || message.forPlayerId === playerId;
   if (message.type === 'killstreak-state') return message.by === playerId || message.forPlayerId === playerId;
-  if (message.type === 'killstreak-damage-result') return message.by === playerId || message.events.some((event) => event.ownerId === playerId || event.targetId === playerId);
+  if (message.type === 'killstreak-damage-result') return message.impacts.length > 0
+    || message.by === playerId
+    || message.events.some((event) => event.ownerId === playerId || event.targetId === playerId);
   return message.by === playerId;
 }
 
 export function isKillstreakHostAuthorityMessage(message: KillstreakProtocolMessage): boolean {
-  return message.type === 'killstreak-state' || message.type === 'killstreak-damage-result';
+  return message.type === 'killstreak-care-capture-result'
+    || message.type === 'killstreak-state'
+    || message.type === 'killstreak-damage-result';
 }
 
 export function isPass65KillstreakId(value: unknown): value is Pass65KillstreakId {

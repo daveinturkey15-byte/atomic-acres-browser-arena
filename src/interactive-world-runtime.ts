@@ -850,11 +850,16 @@ export class InteractiveWorldRuntime {
     origin: Point3;
     radius: number;
     maximumDamageQ: number;
+    /** Optional shed-only calibration; houses retain maximumDamageQ. */
+    shedMaximumDamageQ?: number;
   }>): number {
     if (!this.hostAuthority
-      || ![request.origin.x, request.origin.y, request.origin.z, request.radius, request.maximumDamageQ].every(Number.isFinite)
+      || ![request.origin.x, request.origin.y, request.origin.z, request.radius, request.maximumDamageQ,
+        request.shedMaximumDamageQ ?? request.maximumDamageQ].every(Number.isFinite)
       || request.radius <= 0
-      || request.maximumDamageQ < 1) return 0;
+      || request.maximumDamageQ < 1
+      || (request.shedMaximumDamageQ ?? request.maximumDamageQ) < 1) return 0;
+    const shedMaximumDamageQ = request.shedMaximumDamageQ ?? request.maximumDamageQ;
     let mutations = 0;
     for (const shed of this.sheds) {
       for (const surface of shed.definition.surfaces) {
@@ -867,7 +872,7 @@ export class InteractiveWorldRuntime {
           centre.z - request.origin.z,
         );
         if (distance > request.radius) continue;
-        const damageQ = Math.max(1, Math.round(request.maximumDamageQ * (1 - distance / request.radius)));
+        const damageQ = Math.max(1, Math.round(shedMaximumDamageQ * (1 - distance / request.radius)));
         const impactCoordinates = panelCoordinates(surfaceFrame(surface, shed.placement, shed.state), request.origin);
         const result = this.applyExplosion({
           placementId: shed.placement.id,

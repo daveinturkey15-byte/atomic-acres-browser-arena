@@ -1,46 +1,57 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "assetId": "atomic-acres-pass65-prerecorded-menu-previews-2026-07-26",
-  "generatedAt": "2026-07-27",
+  "generatedAt": "2026-07-28",
   "creator": "Atomic Acres project",
   "license": "Original project work",
   "releaseState": "HITL candidate only",
   "choreography": {
     "path": "source-assets/menu/pass65-preview-masters/choreography.json",
-    "sha256": "9eab9cdc18336bb10b539cb4435cfe593267009a75ba6edcd192864e270e2d68",
-    "recipeId": "pass65-menu-preview-choreography-v2"
+    "sha256": "9cb7131598e607ce52b71f7c1d013e669b185f0bd3e6ec2d2bfd6d2fef29a21a",
+    "recipeId": "pass65-authoritative-runtime-menu-preview-v3"
   },
   "documentation": {
     "path": "source-assets/menu/pass65-preview-masters/README.md",
-    "sha256": "87f18b0912c041b7cd9f3ab7bfa21ad724c4322deef40158f71ac36005f4cd43"
+    "sha256": "561ff2f284346918a64592111b8d26865a4e942587ae8600d9e49920558521f1"
   },
   "generator": {
-    "path": "scripts/assets/generate_pass65_menu_previews.py",
-    "sha256": "37c5eff0aa84b47bb9fc3d5af395cf58c842dad3d1536052e4fa133d9904a616",
-    "blender": "5.1.2",
-    "pythonExitCode": 1
+    "path": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
+    "sha256": "66d6071904340dc46e2690309bba5cb917f26e1123ef08cc31f4fce9f6ac5592",
+    "engine": "Playwright installed Chrome hardware WebGPU",
+    "deterministicCapture": true
   },
   "finalizer": {
     "path": "scripts/assets/finalize_pass65_menu_previews.mjs",
-    "sha256": "dfa7b0c651acf8b3cb333424f0a8a9bd4e039d78f9ef6bdf653426f2c5dc41ba",
+    "sha256": "9ad25ee6cd8b2fdd76858b56855feb97a4789baab1705fde8aa01257b3a0b540",
     "ffmpeg": "required"
-  },
-  "blendAudit": {
-    "path": "scripts/qa/audit_pass65_menu_preview_blend.py",
-    "sha256": "7dbb441441d8917b0750f6c05486f6eae7df6699789793c4583f543bc342850e",
-    "failClosed": true,
-    "pythonExitCode": 1
   },
   "verification": {
     "path": "scripts/qa/verify-pass65-menu-preview-production.mjs",
-    "sha256": "990a9e5acbbc5dafff320f4d310b57148a8f2615f0d7b9a2a1835301275ea93b",
+    "sha256": "03399514c0a90d52babb6bdf59fffb0b67b0fa193edc6ee683cd340e55b08b56",
     "failClosed": true
   },
+  "captureReceipt": {
+    "path": "source-assets/menu/pass65-preview-masters/runtime-capture-receipt.json",
+    "sha256": "2501e51009181fe2a72baf032756f25929640f106062d6dd5e30c0d97cc347c9",
+    "captureId": "pass65-authoritative-runtime-menu-preview-capture-v1",
+    "backend": "webgpu"
+  },
+  "captureRuntime": [
+    {
+      "path": "src/ui/menu-preview-camera.ts",
+      "sha256": "d3744ed9057f64dded01cac5f5131fde69f44b64a09bc7f17270d22035ca54ed"
+    },
+    {
+      "path": "src/legacy-main.ts",
+      "sha256": "af246dc35d08e57b44cb6f39fbdc7c10f7f7949f886f7d57701b176958e7582c"
+    }
+  ],
   "authoredCockpit": {
     "assetId": "chopper-gunner-vehicle-v1",
     "path": "source-assets/blender/pass65-chopper-gunner.blend",
     "sha256": "194b2a1879f11c175a306fbc04f65c284e1f2eddf920a82ebe1aa2fe10268443",
     "qualityTier": "LOD0",
+    "role": "visual design reference; compact black-grey treatment is baked offline over runtime footage",
     "evidence": "docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png",
     "evidenceSha256": "a09ec4d7344a369546fde3179b17012badf434681a37f9e8bab663a142ca3b8f"
   },
@@ -48,38 +59,78 @@
     {
       "arenaId": "atomic-acres",
       "kind": "helicopter",
-      "path": "source-assets/menu/pass65-preview-masters/atomic-acres.blend",
-      "sha256": "c65c9a28f3258ffcc629be99279214afb0f49a1ff3e0e3f117f7c733d662f5fa",
       "seed": 65011201,
       "fovDegrees": 68,
-      "reviewLabel": "Nuke Town cockpit flyover"
+      "reviewLabel": "Nuke Town cockpit flyover",
+      "source": "authoritative-runtime-arena",
+      "runtimeSources": [
+        {
+          "path": "src/map.ts",
+          "sha256": "a070003ad3fa5cf46362a3182618c43d02ba16f822deaf13004e2a980913558c"
+        },
+        {
+          "path": "src/arena-layout.ts",
+          "sha256": "2908e2b9001b27315fa9198472319b2af4dd67bd289e5e57ddb4fc946852d891"
+        },
+        {
+          "path": "src/rendering/arenas/atomic-acres.ts",
+          "sha256": "b76e30143b5e9dca1e87f43ed00fee7f919eae2e453278aabb5fdc520e33690d"
+        }
+      ]
     },
     {
       "arenaId": "skyline-terminal",
       "kind": "helicopter",
-      "path": "source-assets/menu/pass65-preview-masters/skyline-terminal.blend",
-      "sha256": "e35d65ddeb1b9dbdf161716d3bcb73d0836ac8550d42fdd3379694600198d369",
       "seed": 65011202,
       "fovDegrees": 68,
-      "reviewLabel": "Terminal cockpit flyover"
+      "reviewLabel": "Terminal cockpit flyover",
+      "source": "authoritative-runtime-arena",
+      "runtimeSources": [
+        {
+          "path": "src/additional-maps.ts",
+          "sha256": "b2b185a8f98e0b78128c5b406c9beabcca74d77dc15823574f0886e47cb2422d"
+        },
+        {
+          "path": "src/rendering/arenas/skyline-terminal.ts",
+          "sha256": "d2c4efeb9293e38ee345eadc1753185d09ceef866cc368cd72b28f069ad29c4a"
+        }
+      ]
     },
     {
       "arenaId": "rustworks-1v1",
       "kind": "helicopter",
-      "path": "source-assets/menu/pass65-preview-masters/rustworks-1v1.blend",
-      "sha256": "0be11ecca82dbb1c79a7c4e54aa58a8ee37239d001d73929e23714d2dae55a61",
       "seed": 65011203,
       "fovDegrees": 68,
-      "reviewLabel": "RustRig cockpit flyover"
+      "reviewLabel": "RustRig cockpit flyover",
+      "source": "authoritative-runtime-arena",
+      "runtimeSources": [
+        {
+          "path": "src/additional-maps.ts",
+          "sha256": "b2b185a8f98e0b78128c5b406c9beabcca74d77dc15823574f0886e47cb2422d"
+        },
+        {
+          "path": "src/rendering/arenas/rustworks-1v1.ts",
+          "sha256": "fbf91ea31efc1ca115e6f3d1fb454eee6f9ecc3085156d416f2ff94fcef85c26"
+        }
+      ]
     },
     {
       "arenaId": "gun-range",
       "kind": "cat",
-      "path": "source-assets/menu/pass65-preview-masters/gun-range.blend",
-      "sha256": "04586f94264d8c33727c46403baee2f6a8eabd83b596bfa11a9e2f242104d6d4",
       "seed": 65011401,
       "fovDegrees": 62,
-      "reviewLabel": "Gun Range joyful feline first-person prowl"
+      "reviewLabel": "Gun Range joyful feline first-person prowl",
+      "source": "authoritative-runtime-arena",
+      "runtimeSources": [
+        {
+          "path": "src/additional-maps.ts",
+          "sha256": "b2b185a8f98e0b78128c5b406c9beabcca74d77dc15823574f0886e47cb2422d"
+        },
+        {
+          "path": "src/rendering/arenas/gun-range.ts",
+          "sha256": "92c9bd71e4a120898969c5006f1d80ec158a362d1f74d599e99488ef64cd5a38"
+        }
+      ]
     }
   ],
   "render": {
@@ -87,9 +138,11 @@
     "dimensions": "960x540",
     "frameRate": 24,
     "durationSeconds": 8,
-    "motion": "Canonical deterministic cyclic paths; xorshift32 targets; long holds and quintic blends; exact first/final camera and rotor seam",
-    "helicopter": "Authored LOD0 three-dimensional cockpit, cyan/green emissive instruments, canopy glass, first-person rotor and bounded occasional corrections",
-    "cat": "Authored non-primitive ear shells, pinnae, tufts, forelegs, palms, four toes and pads per paw; compact clip-safe prowl with alternating paw and ear beats",
+    "mapSource": "Selected authoritative production runtime arena under hardware WebGPU",
+    "motion": "Canonical deterministic cyclic camera paths over fixed runtime visual time",
+    "helicopter": "Compact half-scale black/grey first-person rotor and three-panel cockpit/HUD baked offline with spaced map-safe composition",
+    "cat": "Compact half-scale black/grey ear and paw anatomy baked offline over the authoritative Gun Range moving-target scene",
+    "overlayScale": 0.5,
     "audio": {
       "helicopter": {
         "id": "quiet-rotor-bed-v1",
@@ -107,73 +160,73 @@
   "runtimeFiles": [
     {
       "path": "public/assets/original/menu-previews/atomic-acres.mp4",
-      "sha256": "e1e9c2ec00eb415ade8940054c0a23c4bb0986e13b7d123a2740fe9b0032deaf",
+      "sha256": "2f1a66f988f859db08e483740f984fa41ea6aeb739bdd4ccf7de1ae973b1881a",
       "arenaId": "atomic-acres",
       "extension": "mp4"
     },
     {
       "path": "public/assets/original/menu-previews/atomic-acres.webm",
-      "sha256": "f25cbe4621e4c07e251f0c092c96da7adfdf7bac953bc86bdfb37b5ffd1eeac3",
+      "sha256": "743408f33a7edc5fe4b5768325820a4c16d136527184df809d466aec84440350",
       "arenaId": "atomic-acres",
       "extension": "webm"
     },
     {
       "path": "public/assets/original/menu-previews/atomic-acres.webp",
-      "sha256": "f2b3017469c1920e83b3e834cc40ef98abb864e0268137d6ec4e1bd75e7fa3c5",
+      "sha256": "00511c95e57234be3e6e85005892b7c0bf20199cd82efbdff5e537f2c848fbca",
       "arenaId": "atomic-acres",
       "extension": "webp"
     },
     {
       "path": "public/assets/original/menu-previews/skyline-terminal.mp4",
-      "sha256": "6a43ec94d344b90e7348d285781f7498e7dd5bbc027333f581f5743ba2f051c6",
+      "sha256": "1aeb68418d028bbc6b220966e25269924bcc23f47f2103ca737ca428f46034b1",
       "arenaId": "skyline-terminal",
       "extension": "mp4"
     },
     {
       "path": "public/assets/original/menu-previews/skyline-terminal.webm",
-      "sha256": "c8fca9a38efab413b8733bb9c2295a9d0270fb0c6188b053efc51e32e8e0a054",
+      "sha256": "f2560e400a709a775e521446299547b27dc38cd96d01e890e9ec75744465df84",
       "arenaId": "skyline-terminal",
       "extension": "webm"
     },
     {
       "path": "public/assets/original/menu-previews/skyline-terminal.webp",
-      "sha256": "5e0b14f8f74d117845e365c7f72c06fd14bc3b240b199e34389d222c6d3347e3",
+      "sha256": "d90420b25d6f89f4660e7bf1eb101b3411867b7e446567c14096b67c9e566dc2",
       "arenaId": "skyline-terminal",
       "extension": "webp"
     },
     {
       "path": "public/assets/original/menu-previews/rustworks-1v1.mp4",
-      "sha256": "7060fd5ec978194b8c8f63210b885e5b03dd61a647743017503936c51ab46cb8",
+      "sha256": "84895e9c95fcb8d7ed5f2f104f90bf6695300dfa13e630fe7cf5aec1c106ab99",
       "arenaId": "rustworks-1v1",
       "extension": "mp4"
     },
     {
       "path": "public/assets/original/menu-previews/rustworks-1v1.webm",
-      "sha256": "f480dcf97db62076bfb1aaea787a4a5fb170609269f88316585074c0ad403cfc",
+      "sha256": "e1a315ed1abb5cdb1c3904958772eca9a027745f6a5d4360500a5c965a6602f2",
       "arenaId": "rustworks-1v1",
       "extension": "webm"
     },
     {
       "path": "public/assets/original/menu-previews/rustworks-1v1.webp",
-      "sha256": "dc868ac5335408038a7fb871302116025a0ffec63ac1b689ebae31a18dad3d47",
+      "sha256": "e87c39fec46a835a64174504d0958664939d63f89dad9283600343d870fc5b6f",
       "arenaId": "rustworks-1v1",
       "extension": "webp"
     },
     {
       "path": "public/assets/original/menu-previews/gun-range.mp4",
-      "sha256": "b6bd6eb469e388acb186bae1f22c6e7ecd981975961316dcea7e409d25b7a731",
+      "sha256": "c8bd6610a060316a7b8bb7f8f0c974b318812af93fd4d4318404fb16809c3730",
       "arenaId": "gun-range",
       "extension": "mp4"
     },
     {
       "path": "public/assets/original/menu-previews/gun-range.webm",
-      "sha256": "85eb943bcc33146b85dae42bf563527787f96c236f316821acfa81e5328fc18a",
+      "sha256": "e378c322f02268bf89cc63408ba136add639a2116a8df908ca995005049f8bea",
       "arenaId": "gun-range",
       "extension": "webm"
     },
     {
       "path": "public/assets/original/menu-previews/gun-range.webp",
-      "sha256": "48e76b97280f24d5727aba19037a8a01a4793aa3e4012892b825f64995526bc4",
+      "sha256": "62ca87ba23fe5590e8406b489e37e1d033c83fe9418c9ac8012453ddfdbaa327",
       "arenaId": "gun-range",
       "extension": "webp"
     }
@@ -181,7 +234,7 @@
   "reviewEvidence": [
     {
       "path": "docs/assets/pass65-menu-previews/atomic-acres-review-frames.webp",
-      "sha256": "5d9cb0b431f8575223f4fbc0babc5e7f71915a24efeec91de2e901d724bb091a",
+      "sha256": "b3e11e018e7ce3e2c2b0f85a8c5bafa63c83b0458b807697626c255b5edc7c0c",
       "arenaId": "atomic-acres",
       "frames": [
         1,
@@ -193,7 +246,7 @@
     },
     {
       "path": "docs/assets/pass65-menu-previews/skyline-terminal-review-frames.webp",
-      "sha256": "7e692866fe4e37f8cd7cc23f643baa70e84995c1b2de17e24b002ec84fd0ee31",
+      "sha256": "e76a0467c58e3fdd8676eb1d1b65735648f16e5a42e1516be0cb6949d8dffe55",
       "arenaId": "skyline-terminal",
       "frames": [
         1,
@@ -205,7 +258,7 @@
     },
     {
       "path": "docs/assets/pass65-menu-previews/rustworks-1v1-review-frames.webp",
-      "sha256": "0ffe28aa995cffd8b8fbb8455965a033747894e060bc86c5ccaabf77df771d7b",
+      "sha256": "37a9586a8d6562dd4b2fe9a2655a767244a8957b15bb32aac0082248312c7450",
       "arenaId": "rustworks-1v1",
       "frames": [
         1,
@@ -217,7 +270,7 @@
     },
     {
       "path": "docs/assets/pass65-menu-previews/gun-range-review-frames.webp",
-      "sha256": "7d9133fd8c513a876eb2d6e1e184f44859b22341cb301ac60122822427ad86a7",
+      "sha256": "884b0bf9e04c7425fb735cb69f211bca9b8da13ea4418bc4b7c50e41dd91b55e",
       "arenaId": "gun-range",
       "frames": [
         1,
@@ -230,15 +283,14 @@
   ],
   "supersedes": {
     "gunRangeByteIdenticalGate": {
-      "reason": "HF-011 and R114 explicitly supersede the byte-identical gate so clearer authored anatomy and the compact joyful path can ship.",
+      "reason": "HF-011 and R114 explicitly supersede the former byte-identical media gate.",
       "files": {
         "public/assets/original/menu-previews/gun-range.mp4": "3de2c28899d32ee48b8a023613305690d59227b1e64189ffafaf1aa0b447fc13",
         "public/assets/original/menu-previews/gun-range.webm": "708bdf00af28906a8ce7b1605dc1c534c854c537fb82fecab62173dbce1e9885",
-        "public/assets/original/menu-previews/gun-range.webp": "23479fe37b290d909e21d0c3015e49f3b09a244d51d986b67c665136fce210fe",
-        "source-assets/menu/pass65-preview-masters/gun-range.blend": "14d9f6bc7b3a3b1b0948559d9d172c2666156c1730110540a88650b2a5c1994b"
+        "public/assets/original/menu-previews/gun-range.webp": "23479fe37b290d909e21d0c3015e49f3b09a244d51d986b67c665136fce210fe"
       }
     }
   },
   "externalAssets": [],
-  "notes": "All four runtime previews are compressed prerecorded media. Reduced motion uses the authored poster and menu browsing constructs no arena and submits no gameplay frames."
+  "notes": "All four previews are compressed prerecorded captures of their actual selected runtime arenas. Reduced motion uses the poster; browsing and loading construct no arena and submit no gameplay frames."
 }

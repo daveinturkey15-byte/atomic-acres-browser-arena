@@ -102,6 +102,9 @@ describe('first-person anatomical presentation', () => {
     expect(state.knifeVisible).toBe(true);
     expect(state.actionContract.meleeProgress).toBe(0);
     expect(state.armsVisible).toBe(true);
+    expect(state.meleeArmSource).toBe('headless-procedural-fallback');
+    expect(state.proceduralMeleeArmVisible).toBe(true);
+    expect(state.browserProceduralMeleeArmViolation).toBe(false);
   });
 
   it('never floats a passive knife beside a firearm', () => {
