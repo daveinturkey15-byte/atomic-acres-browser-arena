@@ -17,6 +17,7 @@ import {
   signatureDifference,
 } from './vision.mjs';
 import { createTacticalPolicy } from './tactical-policy.mjs';
+import { chooseVisibleSupport, shouldThrowVisibleGrenade } from './combat-actions.mjs';
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, '../..');
@@ -61,6 +62,12 @@ function integerArg(value, fallback, minimum, maximum) {
   const parsed = Number(value ?? fallback);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.min(maximum, Math.max(minimum, Math.round(parsed)));
+}
+
+function numberArg(value, fallback, minimum, maximum) {
+  const parsed = Number(value ?? fallback);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(maximum, Math.max(minimum, parsed));
 }
 
 function scrubUrl(value) {
@@ -313,6 +320,10 @@ async function visibleHudSnapshot(page) {
       const value = Number.parseInt(document.querySelector(selector)?.textContent?.trim() ?? '', 10);
       return Number.isFinite(value) ? value : null;
     };
+    const visibleCount = (selector) => {
+      const match = (document.querySelector(selector)?.textContent ?? '').match(/(?:×|x|streak\s+)(\d+)/i);
+      return match ? Number(match[1]) : null;
+    };
     const visible = (selector) => {
       const element = document.querySelector(selector);
       if (!(element instanceof HTMLElement) || element.hidden) return false;
@@ -328,6 +339,9 @@ async function visibleHudSnapshot(page) {
       health: numericText('#health'),
       ammo: numericText('#ammo'),
       reserve: numericText('#reserve'),
+      weaponName: document.querySelector('#weapon-name')?.textContent?.trim() ?? null,
+      grenades: visibleCount('#grenades'),
+      supportStreak: visibleCount('#support-streak'),
       damageDealt: numericText('#damage-dealt'),
       damageTaken: numericText('#damage-taken'),
       timer,
@@ -342,6 +356,23 @@ async function visibleHudSnapshot(page) {
       activeMatch: !countdownVisible && !bannerVisible && !respawnVisible && !matchSummaryVisible && Boolean(timer && timer !== '00:00'),
     };
   });
+}
+
+async function selectVisibleFieldKit(page, requested, artifactDirectory) {
+  if (requested !== 'smg') return null;
+  await page.getByText('FIELD KIT', { exact: true }).first().click();
+  await page.getByText('Circuit Runner', { exact: true }).first().click();
+  await page.getByText('SELECTED', { exact: true }).waitFor({ state: 'visible' });
+  await page.screenshot({ path: resolve(artifactDirectory, 'field-kit-smg-selected.png') });
+  await page.getByText('DEPLOY', { exact: true }).first().click();
+  const activeText = await page.getByText(/ACTIVE FIELD KIT\s+Circuit Runner/i).textContent();
+  if (!/Vectorline SMG/i.test(activeText ?? '')) throw new Error('Visible deploy menu did not confirm Vectorline SMG');
+  return {
+    requested: 'smg',
+    selected: 'Circuit Runner',
+    weapon: 'Vectorline SMG',
+    visibleText: activeText?.trim() ?? null,
+  };
 }
 
 async function downloadVisibleMatchReport(page, selector, outputPath) {
@@ -451,6 +482,12 @@ async function run() {
   const burstShots = integerArg(args['burst-shots'], 3, 1, 5);
   const maximumShotPulses = integerArg(args['max-shot-pulses'], 1_000_000, 1, 1_000_000);
   const fireCooldownMs = integerArg(args['fire-cooldown'], 420, 180, 2000);
+  const fireAlignmentMaximum = numberArg(args['fire-alignment'], 0.02, 0.003, 0.02);
+  const fieldKitRequest = String(args['field-kit'] ?? 'default');
+  if (!['default', 'smg'].includes(fieldKitRequest)) throw new Error('--field-kit must be default or smg');
+  const requiredWeaponName = fieldKitRequest === 'smg' ? 'VECTORLINE SMG' : null;
+  const allowTacticalItems = Boolean(args['allow-tactical-items']);
+  const maximumGrenadeThrows = integerArg(args['max-grenades'], 2, 0, 6);
   const allowCombatFire = Boolean(args['allow-combat-fire']);
   const allowLive = Boolean(args['allow-live']);
   const tacticalPolicyName = String(args['tactical-policy'] ?? 'legacy');
@@ -499,6 +536,9 @@ async function run() {
   let warmupShotPulses = 0;
   let unconfirmedShotPulses = 0;
   let reloadRequests = 0;
+  let grenadeThrows = 0;
+  let supportActivations = 0;
+  let weaponMismatches = 0;
   let stuckRecoveries = 0;
   let damageReactions = 0;
   let candidateImagesSaved = 0;
@@ -519,6 +559,7 @@ async function run() {
   let controlStartedAtMs = null;
   let controlEndedAtMs = null;
   let tacticalPolicyReceipt = null;
+  let fieldKitReceipt = null;
   let activeInputVeto = false;
   let pointerLockLosses = 0;
   let focusLosses = 0;
@@ -587,6 +628,7 @@ async function run() {
     await page.locator('#player-name').waitFor({ state: 'visible', timeout: 45_000 });
     await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot, null, { timeout: 45_000 });
     console.error('[atomic-player] phase=deploy');
+    fieldKitReceipt = await selectVisibleFieldKit(page, fieldKitRequest, artifactDirectory);
     bootstrapKind = await prepareLobby(page, args, mode, headed);
 
     const gameplayExpectedNow = mode === 'solo' || Boolean(args.start);
@@ -686,6 +728,10 @@ async function run() {
       let lastReloadRequestAt = Number.NEGATIVE_INFINITY;
       let reloadSuppressedUntil = 0;
       let lastBurstAt = Number.NEGATIVE_INFINITY;
+      let lastGrenadeAt = Number.NEGATIVE_INFINITY;
+      let lastSupportActivationAt = Number.NEGATIVE_INFINITY;
+      const usedSupportThresholds = new Set();
+      let observedWeaponName = null;
       let lastCandidateImageAt = Number.NEGATIVE_INFINITY;
       let damageReactionUntil = 0;
       let reactionDirection = 1;
@@ -730,6 +776,15 @@ async function run() {
           activeInputVeto = true;
           await releaseAll(page, pressedKeys);
           actions.push({ atMs, kind: 'active-input-veto', reason: 'document-focus-lost' });
+        }
+        if (hudActiveMatch && requiredWeaponName) {
+          observedWeaponName = hud?.weaponName ?? null;
+          if (!activeInputVeto && observedWeaponName !== requiredWeaponName) {
+            weaponMismatches += 1;
+            activeInputVeto = true;
+            await releaseAll(page, pressedKeys);
+            actions.push({ atMs, kind: 'active-input-veto', reason: 'required-weapon-mismatch', requiredWeaponName, observedWeaponName });
+          }
         }
         const activeMatch = hudActiveMatch && !activeInputVeto && healthFresh;
         if (activeMatch) activeVisionFrames += 1;
@@ -816,6 +871,28 @@ async function run() {
           cameraMovedThisFrame = true;
         }
 
+        if (allowTacticalItems && activeMatch && !rawTarget && Number(hud?.health) >= 50
+          && now - lastSupportActivationAt >= 5_000) {
+          const support = chooseVisibleSupport(hud?.supportStreak, usedSupportThresholds);
+          if (support) {
+            await page.keyboard.press(support.code);
+            usedSupportThresholds.add(support.threshold);
+            lastSupportActivationAt = now;
+            supportActivations += 1;
+            await sleep(160);
+            const supportAfter = await visibleHudSnapshot(page).catch(() => null);
+            actions.push({
+              atMs,
+              kind: 'visible-support-activation',
+              support: support.name,
+              threshold: support.threshold,
+              key: support.code,
+              visibleStreakBefore: hud?.supportStreak ?? null,
+              visibleStreakAfter: supportAfter?.supportStreak ?? null,
+            });
+          }
+        }
+
         if (rawTarget) {
           if (activeMatch && !firstRawTargetCaptured) {
             await writeFile(resolve(artifactDirectory, 'first-raw-target.jpg'), vision.jpeg);
@@ -841,6 +918,7 @@ async function run() {
           let { horizontal, vertical, normalized: alignment } = aimAlignment;
           let postInputReacquired = true;
           let twoFrameAligned = false;
+          let grenadeThrownThisTick = false;
           let associationReason = 'initial-confirmed-track';
           const aimTrace = [{
             step: 0,
@@ -972,7 +1050,38 @@ async function run() {
             await writeFile(resolve(artifactDirectory, 'first-two-frame-aligned-annotated.jpg'), await annotatedVisionJpeg(aimedVision, alignedTracking));
             firstTwoFrameAlignedCaptured = true;
           }
-          if (allowCombatFire && shotPulses < maximumShotPulses && tracking.fireAuthorized && postInputReacquired && twoFrameAligned && activeMatch && alignment < 0.02
+          if (shouldThrowVisibleGrenade({
+            enabled: allowTacticalItems,
+            grenades: hud?.grenades,
+            throwsSoFar: grenadeThrows,
+            maximumThrows: maximumGrenadeThrows,
+            active: activeMatch,
+            targetConfirmed: Boolean(currentTarget),
+            twoFrameAligned,
+            stableFrames: tracking.stableFrames,
+            alignment,
+            health: hud?.health,
+            threatDistance: minimapThreat?.distance,
+            now,
+            lastThrowAt: lastGrenadeAt,
+          })) {
+            await page.keyboard.press('KeyG');
+            grenadeThrows += 1;
+            lastGrenadeAt = now;
+            grenadeThrownThisTick = true;
+            actions.push({
+              atMs,
+              kind: 'visible-operator-authorized-grenade',
+              grenadesBefore: hud?.grenades ?? null,
+              alignment,
+              twoFrameAligned,
+              stableFrames: tracking.stableFrames,
+              threatDistance: minimapThreat?.distance ?? null,
+              target: { x: aimedTarget.x, y: aimedTarget.y, pixels: aimedTarget.pixels, bounds: aimedTarget.bounds },
+            });
+            await sleep(250);
+          }
+          if (!grenadeThrownThisTick && allowCombatFire && shotPulses < maximumShotPulses && tracking.fireAuthorized && postInputReacquired && twoFrameAligned && activeMatch && alignment < fireAlignmentMaximum
             && !currentlyReloading && now - lastBurstAt >= fireCooldownMs) {
             const shots = Math.max(1, Math.min(burstShots, maximumShotPulses - shotPulses, Number(hud?.ammo ?? burstShots)));
             if (!firstFireCaptured) {
@@ -1198,6 +1307,8 @@ async function run() {
         pointerLock,
         bootstrap: bootstrapKind,
         lobbyReceipt,
+        fieldKitReceipt,
+        requiredWeaponName,
         cdpAttached: Boolean(cdpUrl),
       },
       fairness: {
@@ -1205,8 +1316,12 @@ async function run() {
         policyVersion: tacticalPolicyReceipt ? 'atomic-player-policy-v6-causal-tactical-state-machine' : 'atomic-player-policy-v5-causal-associated-tri-lane',
         tacticalPolicy: tacticalPolicyName,
         automaticCombatFireEnabled: allowCombatFire,
+        tacticalItemsEnabled: allowTacticalItems,
         burstShots,
         maximumShotPulses,
+        fireAlignmentMaximum,
+        fireCooldownMs,
+        maximumGrenadeThrows,
         decisionInputs: args['lifecycle-only']
           ? ['ordinary lobby controls and post-action lifecycle receipt']
           : ['rendered canvas pixels', 'visible HUD state through ordinary controls'],
@@ -1278,6 +1393,10 @@ async function run() {
         warmupShotPulses,
         unconfirmedShotPulses,
         reloadRequests,
+        grenadeThrows,
+        supportActivations,
+        weaponMismatches,
+        observedWeaponName,
         stuckRecoveries,
         damageReactions,
         activeInputVeto,
