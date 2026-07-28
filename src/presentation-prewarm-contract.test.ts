@@ -108,6 +108,13 @@ describe('presentation prewarm startup contract', () => {
       .toBeLessThan(matchDeployment.indexOf('gameStarted = true;'));
     expect(source).toContain('const minimumStableWindowMs = 1_000;');
     expect(source).toContain('const hitchThresholdMs = 50;');
+    const cadenceAdmission = source.slice(
+      source.indexOf('async function waitForStableMatchAdmissionCadence()'),
+      source.indexOf('function buildSky()'),
+    );
+    expect(cadenceAdmission).toContain('admittedDegraded: true');
+    expect(cadenceAdmission).toContain('visibilityState: document.visibilityState');
+    expect(cadenceAdmission).not.toContain('reject(');
     expect(source).toContain('matchAdmissionCadence: lastMatchAdmissionCadence');
     expect(source).toContain('submitWebGpuFrame(performance.now(), true)');
     expect(source).toContain('await flushWebGpuFrames(12_000)');

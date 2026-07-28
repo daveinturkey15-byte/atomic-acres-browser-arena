@@ -245,14 +245,23 @@ test.describe('Pass 64 command HUD and menu contract', () => {
 
     await page.goto('/?release=stable&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&seed=pass65-profile-stable&previewTime=0');
     await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 30_000 });
+    await page.locator('#menu-tab-options, [data-menu-tab="options"]').click();
+    await expect(page.locator('#sensitivity')).toHaveValue('1.45');
+    await expect(page.locator('#field-of-view')).toHaveValue('97');
+    expect(await page.evaluate((key) => localStorage.getItem(key), PLAYER_PROFILE_STORAGE_KEY)).toBe(latestProfile);
+    expect(await page.evaluate(() => ({
+      mouse: localStorage.getItem('atomic-acres-sensitivity'),
+      controller: localStorage.getItem('atomic-acres-controller-sensitivity'),
+      fov: localStorage.getItem('atomic-acres-fov'),
+    }))).toEqual({ mouse: '1.45', controller: '1', fov: '97' });
+
+    await page.goto('/?release=latest&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&seed=pass65-profile-return&previewTime=0');
+    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 30_000 });
     await page.locator('#menu-tab-options').click();
     await expect(page.locator('#sensitivity')).toHaveValue('1.45');
     await expect(page.locator('#field-of-view')).toHaveValue('97');
     expect(await page.evaluate((key) => localStorage.getItem(key), PLAYER_PROFILE_STORAGE_KEY)).toBe(latestProfile);
     expect(await page.evaluate(() => Object.keys(localStorage).filter((key) => [
-      'atomic-acres-pass65-settings-v1',
-      'atomic-acres.loadout.v2',
-      'atomic-acres:killstreak-loadout:v1',
       'atomic-acres-sensitivity',
       'atomic-acres-controller-sensitivity',
       'atomic-acres-fov',

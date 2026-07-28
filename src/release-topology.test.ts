@@ -72,6 +72,13 @@ describe('Pass 65 two-channel release topology', () => {
     expect(shell).toContain("target.searchParams.set('release', 'latest')");
   });
 
+  it('bridges overlapping controls into immutable Pass 63 and back without changing channel bytes', () => {
+    expect(shell).toContain("const profileKey = 'atomic-acres.player-profile.v1'");
+    expect(shell).toContain("bridgeControls(key === 'stable' ? 'stable' : 'latest')");
+    expect(shell).toContain("mouseSensitivity: 'atomic-acres-sensitivity'");
+    expect(shell).toContain('localStorage.removeItem(key)');
+  });
+
   it('moves the candidate under experimental and reconstructs only stable Pass 63 from Git blobs', () => {
     expect(staging).toContain("renameSync(join(distRoot, 'index.html'), join(experimentalRoot, 'index.html'))");
     expect(staging).toContain("const stable = stagePinned('recent-stable', config.stable)");

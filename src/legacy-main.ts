@@ -1216,6 +1216,8 @@ type MatchAdmissionCadence = Readonly<{
   samples: number;
   resets: number;
   maximumGapMs: number;
+  admittedDegraded: boolean;
+  visibilityState: DocumentVisibilityState;
 }>;
 let lastMatchAdmissionCadence: MatchAdmissionCadence | null = null;
 const displayCadencePromise = new Promise<number>((resolve) => {
@@ -1291,7 +1293,7 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
   const maximumWaitMs = 5_000;
   const hitchThresholdMs = 50;
   bootstrapStage = 'verifying-first-presentation';
-  lastMatchAdmissionCadence = await new Promise<MatchAdmissionCadence>((resolve, reject) => {
+  lastMatchAdmissionCadence = await new Promise<MatchAdmissionCadence>((resolve) => {
     const startedAt = performance.now();
     let stableSince = startedAt;
     let previousAt = 0;
@@ -1311,11 +1313,31 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
       previousAt = now;
       const waitedMs = Math.max(0, now - startedAt);
       if (now - stableSince >= minimumStableWindowMs) {
-        resolve(Object.freeze({ waitedMs, stableWindowMs: now - stableSince, samples, resets, maximumGapMs }));
+        resolve(Object.freeze({
+          waitedMs,
+          stableWindowMs: now - stableSince,
+          samples,
+          resets,
+          maximumGapMs,
+          admittedDegraded: false,
+          visibilityState: document.visibilityState,
+        }));
         return;
       }
       if (waitedMs >= maximumWaitMs) {
-        reject(new Error(`Match admission cadence did not stabilize within ${maximumWaitMs}ms (${Math.round(maximumGapMs)}ms maximum gap)`));
+        // A backgrounded tab can be throttled to roughly one animation frame
+        // per second even when its GPU work is fully retired. Admission
+        // telemetry must record that degraded cadence, not turn it into a
+        // fatal error that bounces one multiplayer peer back to the menu.
+        resolve(Object.freeze({
+          waitedMs,
+          stableWindowMs: now - stableSince,
+          samples,
+          resets,
+          maximumGapMs,
+          admittedDegraded: true,
+          visibilityState: document.visibilityState,
+        }));
         return;
       }
       requestAnimationFrame(sample);
