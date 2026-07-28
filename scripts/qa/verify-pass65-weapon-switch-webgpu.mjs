@@ -202,7 +202,7 @@ try {
 
   const admittedState = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
   authority = {
-    kind: 'menu-primary-options-plus-admitted-sidearm-plus-map-special',
+    kind: 'menu-primary-and-secondary-options-plus-map-special',
     primaryOptions: menuAuthority.primaryOptions,
     secondaryOptions: menuAuthority.secondaryOptions,
     admittedSecondary: admittedState.player.secondaryWeapon,
@@ -210,7 +210,7 @@ try {
   };
   const expectedWeapons = unique([
     ...authority.primaryOptions,
-    authority.admittedSecondary,
+    ...authority.secondaryOptions,
     authority.mapSpecial,
   ]);
   const knownProfiles = Object.keys(admittedState.ballistics.weaponProfiles);
