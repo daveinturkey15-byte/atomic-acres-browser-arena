@@ -188,7 +188,7 @@ describe('smoke grenade volume presentation', () => {
       visibleDrawCalls: 4,
     });
     const crowdedCore = scene.getObjectByName('smoke-grenade-inner-density-cards') as THREE.InstancedMesh;
-    expect((crowdedCore.material as THREE.MeshBasicMaterial).opacity).toBeGreaterThan(0.45);
+    expect((crowdedCore.material as THREE.MeshBasicMaterial).opacity).toBeGreaterThan(0.6);
 
     pool.release(first);
     expect(pool.telemetry()).toMatchObject({
