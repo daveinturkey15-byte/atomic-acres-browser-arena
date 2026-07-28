@@ -7,8 +7,9 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  createTemporalTargetTracker,
+  createOperatorTargetTracker,
   findCoralTargets,
+  findOperatorCandidates,
   frameSignature,
   signatureDifference,
 } from './vision.mjs';
@@ -130,6 +131,28 @@ async function fireBurst(page, shots, ads) {
   }
 }
 
+async function annotatedVisionJpeg(vision, tracking) {
+  const metadata = await sharp(vision.jpeg).metadata();
+  const outputWidth = Number(metadata.width ?? vision.width);
+  const outputHeight = Number(metadata.height ?? vision.height);
+  const scaleX = outputWidth / vision.width;
+  const scaleY = outputHeight / vision.height;
+  const boxes = vision.operatorTargets.map((candidate, index) => {
+    const bounds = candidate.bounds;
+    const x = bounds.minX * scaleX;
+    const y = bounds.minY * scaleY;
+    const width = Math.max(2, bounds.width * scaleX);
+    const height = Math.max(2, bounds.height * scaleY);
+    const selected = candidate === tracking.rawTarget;
+    const color = tracking.fireAuthorized && selected ? '#22c55e' : selected ? '#facc15' : '#f97316';
+    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${width.toFixed(1)}" height="${height.toFixed(1)}" fill="none" stroke="${color}" stroke-width="3"/><text x="${x.toFixed(1)}" y="${Math.max(12, y - 4).toFixed(1)}" fill="${color}" font-size="12">op${index} px${candidate.pixels}</text>`;
+  }).join('');
+  const crosshairX = outputWidth / 2;
+  const crosshairY = outputHeight / 2;
+  const overlay = Buffer.from(`<svg width="${outputWidth}" height="${outputHeight}" xmlns="http://www.w3.org/2000/svg">${boxes}<path d="M ${crosshairX - 8} ${crosshairY} H ${crosshairX + 8} M ${crosshairX} ${crosshairY - 8} V ${crosshairY + 8}" stroke="#22d3ee" stroke-width="2"/></svg>`);
+  return sharp(vision.jpeg).composite([{ input: overlay }]).jpeg({ quality: 86 }).toBuffer();
+}
+
 async function createVisionCapture(context, page, options = {}) {
   const cdp = await context.newCDPSession(page);
   const mode = options.mode ?? 'on-demand';
@@ -184,6 +207,7 @@ async function createVisionCapture(context, page, options = {}) {
       .raw()
       .toBuffer({ resolveWithObject: true });
     const targets = findCoralTargets(data, info.width, info.height, info.channels);
+    const operatorTargets = findOperatorCandidates(data, info.width, info.height, info.channels);
     const decodeMs = performance.now() - decodeStartedAt;
     const captureMs = Math.max(0, packet.receivedAt - captureStartedAt);
     state.captureDurationsMs.push(captureMs);
@@ -194,6 +218,9 @@ async function createVisionCapture(context, page, options = {}) {
       receivedAt: packet.receivedAt,
       jpeg,
       targets,
+      operatorTargets,
+      operatorPaletteRatio: Number(operatorTargets.paletteRatio ?? 0),
+      operatorRejectedReason: operatorTargets.rejectedReason ?? null,
       signature: frameSignature(data, info.width, info.height, info.channels),
       width: info.width,
       height: info.height,
@@ -400,7 +427,11 @@ async function run() {
   let firstTargetCaptured = false;
   let rawTargetFrames = 0;
   let warmupRawTargetFrames = 0;
+  let operatorCandidateFrames = 0;
+  let operatorRedFlashFrames = 0;
   let confirmedTargetFrames = 0;
+  let staticGeometryRejects = 0;
+  let fireAuthorizedFrames = 0;
   let rejectedScreenLockedFrames = 0;
   let visionFrames = 0;
   let activeVisionFrames = 0;
@@ -412,6 +443,9 @@ async function run() {
   let stuckRecoveries = 0;
   let damageReactions = 0;
   let candidateImagesSaved = 0;
+  let firstRawTargetAnnotatedCaptured = false;
+  let firstTargetAnnotatedCaptured = false;
+  const annotatedCandidateArtifacts = [];
   let aimMoves = 0;
   let maximumObservedHoldMs = 0;
   let bootstrapKind = null;
@@ -551,13 +585,14 @@ async function run() {
       startScreenshotCaptured = true;
       controlStartedAtMs = Date.now();
       const deadline = controlStartedAtMs + durationSeconds * 1000;
-      const targetTracker = createTemporalTargetTracker({ confirmationFrames: 3 });
+      const targetTracker = createOperatorTargetTracker({ confirmationFrames: 3, minimumStableFrames: 2, maximumObservationFrames: 7 });
       let movementCycle = 0;
       let currentTarget = null;
       let previousSignature = visionStream.state.latest.signature;
       let previousDamageTaken = null;
       let lowMotionFrames = 0;
       let previousMovementForward = false;
+      let previousMovementMoved = false;
       let cameraMovedLastFrame = false;
       let lastReloadRequestAt = Number.NEGATIVE_INFINITY;
       let reloadSuppressedUntil = 0;
@@ -616,68 +651,108 @@ async function run() {
           actions.push({ atMs, kind: 'reload-visible-hud', ammo: hud.ammo, reserve: hud.reserve });
         }
 
-        const tracking = targetTracker.update(vision.targets, {
+        if (vision.targets.length > 0) {
+          if (activeMatch) rawTargetFrames += 1;
+          else warmupRawTargetFrames += 1;
+        }
+        if (activeMatch && vision.operatorRejectedReason === 'global-red-flash') operatorRedFlashFrames += 1;
+        const tracking = targetTracker.update(vision.operatorTargets, {
           width: vision.width,
           height: vision.height,
           active: activeMatch,
           cameraMoved: cameraMovedLastFrame,
+          movementMoved: previousMovementMoved,
         });
         const rawTarget = tracking.rawTarget;
         currentTarget = tracking.confirmedTarget;
         let cameraMovedThisFrame = false;
+        if (activeMatch && rawTarget) operatorCandidateFrames += 1;
+        if (tracking.reason === 'static-geometry-rejected') staticGeometryRejects += 1;
+        if (tracking.fireAuthorized) fireAuthorizedFrames += 1;
+
         if (rawTarget) {
-          if (activeMatch) rawTargetFrames += 1;
-          else warmupRawTargetFrames += 1;
           if (activeMatch && !firstRawTargetCaptured) {
             await writeFile(resolve(artifactDirectory, 'first-raw-target.jpg'), vision.jpeg);
+            await writeFile(resolve(artifactDirectory, 'first-raw-target-annotated.jpg'), await annotatedVisionJpeg(vision, tracking));
             firstRawTargetCaptured = true;
+            firstRawTargetAnnotatedCaptured = true;
           }
           if (activeMatch && candidateImagesSaved < candidateImageLimit && atMs - lastCandidateImageAt >= 2_000) {
             candidateImagesSaved += 1;
             lastCandidateImageAt = atMs;
-            await writeFile(resolve(artifactDirectory, `candidate-${String(candidateImagesSaved).padStart(2, '0')}.jpg`), vision.jpeg);
-          }
-          if (tracking.reason === 'screen-locked-overlay') {
-            rejectedScreenLockedFrames += 1;
-            targetTracker.reset();
-          } else if (activeMatch) {
-            const horizontal = rawTarget.x - vision.width / 2;
-            const vertical = rawTarget.y - vision.height / 2;
-            const movementX = Math.max(-42, Math.min(42, Math.round(horizontal * 0.55)));
-            const movementY = Math.max(-28, Math.min(28, Math.round(vertical * 0.48)));
-            if (movementX !== 0 || movementY !== 0) {
-              await moveAim(page, movementX, movementY);
-              aimMoves += 1;
-              cameraMovedThisFrame = true;
-            }
+            const candidateName = `candidate-${String(candidateImagesSaved).padStart(2, '0')}`;
+            await writeFile(resolve(artifactDirectory, `${candidateName}.jpg`), vision.jpeg);
+            await writeFile(resolve(artifactDirectory, `${candidateName}-annotated.jpg`), await annotatedVisionJpeg(vision, tracking));
+            annotatedCandidateArtifacts.push(`${candidateName}-annotated.jpg`);
           }
         }
+
         if (currentTarget) {
           confirmedTargetFrames += 1;
           const horizontal = currentTarget.x - vision.width / 2;
           const vertical = currentTarget.y - vision.height / 2;
+          const movementX = Math.max(-30, Math.min(30, Math.round(horizontal * 0.45)));
+          const movementY = Math.max(-20, Math.min(20, Math.round(vertical * 0.40)));
           const alignment = Math.hypot(horizontal / vision.width, vertical / vision.height);
-          if (!firstTargetCaptured) {
-            await writeFile(resolve(artifactDirectory, 'first-target.jpg'), vision.jpeg);
-            firstTargetCaptured = true;
-          }
-          const currentlyReloading = Boolean(hud?.reloadState) || now < reloadSuppressedUntil;
-          if (allowCombatFire && activeMatch && alignment < 0.12 && !currentlyReloading && now - lastBurstAt >= fireCooldownMs) {
-            const shots = Math.max(1, Math.min(burstShots, Number(hud?.ammo ?? burstShots)));
-            await fireBurst(page, shots, alignment < 0.075);
-            shotPulses += shots;
-            bursts += 1;
-            lastBurstAt = now;
-            actions.push({ atMs, kind: 'confirmed-burst', shots, alignment, trackAge: tracking.age, pixels: currentTarget.pixels });
-          }
-          actions.push({ atMs, kind: 'confirmed-track', alignment, pixels: currentTarget.pixels, candidates: vision.targets.length, trackAge: tracking.age });
-        } else {
-          if (activeMatch && movementCycle % 6 === 0) {
-            await moveAim(page, movementCycle % 24 < 12 ? 20 : -26, 0);
+          if (movementX !== 0 || movementY !== 0) {
+            await moveAim(page, movementX, movementY);
             aimMoves += 1;
             cameraMovedThisFrame = true;
           }
-          actions.push({ atMs, kind: rawTarget ? 'unconfirmed-track' : 'scan', candidates: vision.targets.length, reason: tracking.reason });
+          if (!firstTargetCaptured) {
+            await writeFile(resolve(artifactDirectory, 'first-target.jpg'), vision.jpeg);
+            await writeFile(resolve(artifactDirectory, 'first-target-annotated.jpg'), await annotatedVisionJpeg(vision, tracking));
+            firstTargetCaptured = true;
+            firstTargetAnnotatedCaptured = true;
+          }
+          const currentlyReloading = Boolean(hud?.reloadState) || now < reloadSuppressedUntil;
+          if (allowCombatFire && tracking.fireAuthorized && activeMatch && alignment < 0.045
+            && !currentlyReloading && now - lastBurstAt >= fireCooldownMs) {
+            const shots = Math.max(1, Math.min(burstShots, Number(hud?.ammo ?? burstShots)));
+            await fireBurst(page, shots, alignment < 0.032);
+            shotPulses += shots;
+            bursts += 1;
+            lastBurstAt = now;
+            actions.push({
+              atMs,
+              kind: 'operator-authorized-burst',
+              shots,
+              alignment,
+              trackAge: tracking.age,
+              stableFrames: tracking.stableFrames,
+              evidenceFrames: tracking.evidenceFrames,
+              target: { x: currentTarget.x, y: currentTarget.y, pixels: currentTarget.pixels, bounds: currentTarget.bounds },
+            });
+          }
+          actions.push({
+            atMs,
+            kind: 'operator-confirmed-track',
+            alignment,
+            trackAge: tracking.age,
+            stableFrames: tracking.stableFrames,
+            evidenceFrames: tracking.evidenceFrames,
+            target: { x: currentTarget.x, y: currentTarget.y, pixels: currentTarget.pixels, bounds: currentTarget.bounds },
+            candidates: vision.operatorTargets.length,
+          });
+        } else {
+          const shouldScan = !rawTarget || tracking.reason === 'static-geometry-rejected';
+          if (activeMatch && shouldScan && movementCycle % 2 === 0) {
+            const scanDirection = Math.floor(movementCycle / 42) % 2 === 0 ? 1 : -1;
+            await moveAim(page, scanDirection * 10, 0);
+            aimMoves += 1;
+            cameraMovedThisFrame = true;
+          }
+          actions.push({
+            atMs,
+            kind: rawTarget ? tracking.reason : 'scan',
+            legacyCoralCandidates: vision.targets.length,
+            operatorCandidates: vision.operatorTargets.length,
+            paletteRatio: vision.operatorPaletteRatio,
+            trackAge: tracking.age,
+            stableFrames: tracking.stableFrames,
+            evidenceFrames: tracking.evidenceFrames,
+            target: rawTarget ? { x: rawTarget.x, y: rawTarget.y, pixels: rawTarget.pixels, bounds: rawTarget.bounds } : null,
+          });
         }
 
         if (mode === 'solo' && activeMatch && !fireCheckDone && shotPulses === 0 && args['fire-check']) {
@@ -689,7 +764,7 @@ async function run() {
         }
 
         if (activeMatch) {
-          if (lowMotionFrames >= 3) {
+          if (!rawTarget && lowMotionFrames >= 3) {
             desiredKeys.add('KeyS');
             desiredKeys.add(reactionDirection > 0 ? 'KeyD' : 'KeyA');
             await moveAim(page, reactionDirection > 0 ? 92 : -92, 0);
@@ -703,22 +778,27 @@ async function run() {
             desiredKeys.add(reactionDirection > 0 ? 'KeyD' : 'KeyA');
             desiredKeys.add('ShiftLeft');
           } else if (currentTarget) {
-            desiredKeys.add(movementCycle % 2 === 0 ? 'KeyA' : 'KeyD');
-            if (Number(hud?.health ?? 100) >= 55) desiredKeys.add('KeyW');
+            // Hold aim steady before a burst, then make one bounded lateral step
+            // while the detector reacquires through ordinary rendered frames.
+            if (now - lastBurstAt < 650) desiredKeys.add(movementCycle % 2 === 0 ? 'KeyA' : 'KeyD');
+          } else if (rawTarget) {
+            // Scan-stop-confirm: remove both camera and translation motion so a
+            // static pole/prop cannot masquerade as an independently moving bot.
           } else {
             desiredKeys.add('KeyW');
-            if (movementCycle % 10 === 3) desiredKeys.add('KeyA');
-            if (movementCycle % 10 === 8) desiredKeys.add('KeyD');
-            if (movementCycle % 17 === 11) desiredKeys.add('Space');
+            if (movementCycle % 12 === 4) desiredKeys.add('KeyA');
+            if (movementCycle % 12 === 10) desiredKeys.add('KeyD');
+            if (movementCycle % 23 === 17) desiredKeys.add('Space');
           }
-          if (movementCycle % 11 < 2) desiredKeys.add('ShiftLeft');
+          if (!rawTarget && movementCycle % 11 < 2) desiredKeys.add('ShiftLeft');
         }
         const boundedHoldMs = Math.min(maxHoldMs, 350);
         await boundedMovement(page, desiredKeys, boundedHoldMs);
         previousMovementForward = desiredKeys.has('KeyW');
+        previousMovementMoved = desiredKeys.size > 0;
         cameraMovedLastFrame = cameraMovedThisFrame;
         movementCycle += 1;
-        console.error(`[atomic-player] frame=${vision.sequence} raw=${vision.targets.length} confirmed=${currentTarget ? 1 : 0} shots=${shotPulses}`);
+        console.error(`[atomic-player] frame=${vision.sequence} legacyRaw=${vision.targets.length} operator=${vision.operatorTargets.length} confirmed=${currentTarget ? 1 : 0} shots=${shotPulses}`);
         const elapsed = performance.now() - tickStarted;
         await sleep(Math.max(controlSleepMs, tickMs - elapsed));
       }
@@ -818,8 +898,8 @@ async function run() {
         cdpAttached: Boolean(cdpUrl),
       },
       fairness: {
-        perception: args['lifecycle-only'] ? 'none-lifecycle-only' : 'rendered-pixels-coral-mask-v2-temporal-visible-hud',
-        policyVersion: 'atomic-player-policy-v2',
+        perception: args['lifecycle-only'] ? 'none-lifecycle-only' : 'rendered-pixels-operator-palette-geometry-v1-scan-stop-motion-confirmation-visible-hud',
+        policyVersion: 'atomic-player-policy-v3',
         automaticCombatFireEnabled: allowCombatFire,
         decisionInputs: args['lifecycle-only']
           ? ['ordinary lobby controls and post-action lifecycle receipt']
@@ -839,7 +919,11 @@ async function run() {
         targetFrames: rawTargetFrames,
         rawTargetFrames,
         warmupRawTargetFrames,
+        operatorCandidateFrames,
+        operatorRedFlashFrames,
         confirmedTargetFrames,
+        staticGeometryRejects,
+        fireAuthorizedFrames,
         rejectedScreenLockedFrames,
         targetFrameRatio: activeVisionFrames > 0 ? rawTargetFrames / activeVisionFrames : 0,
         confirmedTargetFrameRatio: activeVisionFrames > 0 ? confirmedTargetFrames / activeVisionFrames : 0,
@@ -927,8 +1011,11 @@ async function run() {
       artifacts: [
         startScreenshotCaptured ? 'start.jpg' : null,
         firstRawTargetCaptured ? 'first-raw-target.jpg' : null,
+        firstRawTargetAnnotatedCaptured ? 'first-raw-target-annotated.jpg' : null,
         firstTargetCaptured ? 'first-target.jpg' : null,
+        firstTargetAnnotatedCaptured ? 'first-target-annotated.jpg' : null,
         ...candidateArtifacts,
+        ...annotatedCandidateArtifacts,
         ...damageArtifacts,
         finalScreenshotCaptured ? 'final.jpg' : null,
         matchEndedObserved ? 'post-game.jpg' : null,
@@ -959,7 +1046,9 @@ async function run() {
       pointerLock,
       visionFrames,
       rawTargetFrames,
+      operatorCandidateFrames,
       confirmedTargetFrames,
+      fireAuthorizedFrames,
       shotPulses,
       outcome: report.outcome,
       pageErrors: errors.length,

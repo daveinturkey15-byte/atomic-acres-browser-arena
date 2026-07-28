@@ -1,10 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  createOperatorTargetTracker,
   createTemporalTargetTracker,
   findCoralTargets,
+  findOperatorCandidates,
   frameSignature,
   isCoralPixel,
+  isOperatorPalettePixel,
   signatureDifference,
 } from './vision.mjs';
 
@@ -26,6 +29,38 @@ test('coral mask accepts the Performance enemy palette and rejects aqua', () => 
   assert.equal(isCoralPixel(255, 176, 157), true);
   assert.equal(isCoralPixel(85, 216, 210), false);
   assert.equal(isCoralPixel(143, 255, 247), false);
+});
+
+test('operator palette isolates shaded Coral tactical material from orange props', () => {
+  assert.equal(isOperatorPalettePixel(179, 77, 63), true);
+  assert.equal(isOperatorPalettePixel(154, 110, 5), false);
+  assert.equal(isOperatorPalettePixel(45, 120, 125), false);
+});
+
+test('operator detector accepts a narrow humanoid swatch and rejects a pole and orange crate', () => {
+  const width = 100;
+  const height = 60;
+  const raw = frame(width, height);
+  paint(raw, width, 48, 22, 50, 28, [179, 77, 63]);
+  // Break three pixels so the component is not a perfectly solid UI-like bar.
+  for (const [x, y] of [[48, 22], [50, 22], [48, 28]]) paint(raw, width, x, y, x, y, [18, 18, 18]);
+  paint(raw, width, 65, 21, 65, 30, [179, 77, 63]);
+  paint(raw, width, 35, 24, 44, 31, [154, 110, 5]);
+  const targets = findOperatorCandidates(raw, width, height, 3, { minimumPixels: 8 });
+  assert.equal(targets.length, 1);
+  assert.ok(Math.abs(targets[0].x - 49) < 0.2);
+  assert.equal(targets[0].detector, 'operator-palette-geometry-v1');
+});
+
+test('operator detector abstains during a global red damage flash', () => {
+  const width = 100;
+  const height = 60;
+  const raw = frame(width, height);
+  paint(raw, width, 0, 0, width - 1, height - 1, [140, 60, 50]);
+  const targets = findOperatorCandidates(raw, width, height, 3);
+  assert.equal(targets.length, 0);
+  assert.equal(targets.rejectedReason, 'global-red-flash');
+  assert.ok(targets.paletteRatio > 0.9);
 });
 
 test('nearest plausible central coral component wins without exposing game state', () => {
@@ -92,6 +127,29 @@ test('temporal confirmation accepts a plausible world track after camera motion'
   const confirmed = tracker.update(target(54), { width: 100, height: 60, active: true, cameraMoved: true });
   assert.equal(confirmed.reason, 'temporally-confirmed');
   assert.equal(confirmed.confirmedTarget.x, 54);
+});
+
+test('operator tracker rejects static geometry after a scan-stop observation', () => {
+  const tracker = createOperatorTargetTracker({ maximumObservationFrames: 4 });
+  const target = [{ x: 50, y: 40, pixels: 18, score: 0, bounds: { width: 3, height: 7 } }];
+  tracker.update(target, { width: 100, height: 60, active: true, cameraMoved: true, movementMoved: true });
+  let result;
+  for (let index = 0; index < 4; index += 1) {
+    result = tracker.update(target, { width: 100, height: 60, active: true, cameraMoved: false, movementMoved: false });
+  }
+  assert.equal(result.reason, 'static-geometry-rejected');
+  assert.equal(result.fireAuthorized, false);
+});
+
+test('operator tracker authorises a changing candidate only after stable observation', () => {
+  const tracker = createOperatorTargetTracker();
+  const target = (x, pixels) => [{ x, y: 40, pixels, score: 0, bounds: { width: 3, height: 7 } }];
+  tracker.update(target(50, 18), { width: 100, height: 60, active: true, cameraMoved: true, movementMoved: true });
+  tracker.update(target(51, 19), { width: 100, height: 60, active: true, cameraMoved: false, movementMoved: false });
+  const result = tracker.update(target(52, 20), { width: 100, height: 60, active: true, cameraMoved: false, movementMoved: false });
+  assert.equal(result.reason, 'operator-motion-confirmed');
+  assert.equal(result.fireAuthorized, true);
+  assert.equal(result.confirmedTarget.x, 52);
 });
 
 test('frame signatures detect visual motion without exposing world state', () => {

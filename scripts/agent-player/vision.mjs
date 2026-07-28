@@ -7,6 +7,19 @@ export const DEFAULT_CORAL_MASK = Object.freeze({
   redBlueLead: 32,
 });
 
+// Pass 63 Performance operators use a deliberately dark Coral tactical palette
+// (the main swatch is #b34d3f). The bright-coral proposal mask misses that
+// material in shade while orange props dominate the brighter mask. Keep this
+// second mask narrow and require humanoid geometry plus temporal motion before
+// it can authorise fire.
+export const DEFAULT_OPERATOR_MASK = Object.freeze({
+  redMinimum: 85,
+  greenMaximum: 105,
+  blueMaximum: 105,
+  redGreenLead: 35,
+  redBlueLead: 30,
+});
+
 export const DEFAULT_EXCLUDED_REGIONS = Object.freeze([
   // The visible minimap may contain Coral markers; exclude its rectangle rather than the whole left field.
   Object.freeze({ minimumXRatio: 0, maximumXRatio: 0.39, minimumYRatio: 0, maximumYRatio: 0.52 }),
@@ -23,6 +36,130 @@ export function isCoralPixel(red, green, blue, config = DEFAULT_CORAL_MASK) {
     && blue <= config.blueMaximum
     && red - green >= config.redGreenLead
     && red - blue >= config.redBlueLead;
+}
+
+export function isOperatorPalettePixel(red, green, blue, config = DEFAULT_OPERATOR_MASK) {
+  return red >= config.redMinimum
+    && green <= config.greenMaximum
+    && blue <= config.blueMaximum
+    && red - green >= config.redGreenLead
+    && red - blue >= config.redBlueLead;
+}
+
+export function findOperatorCandidates(raw, width, height, channels = 3, options = {}) {
+  if (!Number.isInteger(width) || width <= 0 || !Number.isInteger(height) || height <= 0) {
+    throw new Error('Vision frame dimensions must be positive integers');
+  }
+  if (!Number.isInteger(channels) || channels < 3) throw new Error('Vision frame must have at least three channels');
+  if (!raw || raw.length < width * height * channels) throw new Error('Vision frame is smaller than its declared dimensions');
+
+  const minimumY = Math.max(0, Math.floor(height * (options.minimumYRatio ?? 0.18)));
+  const maximumY = Math.min(height - 1, Math.ceil(height * (options.maximumYRatio ?? 0.72)));
+  const minimumX = Math.max(0, Math.floor(width * (options.minimumXRatio ?? 0.10)));
+  const maximumX = Math.min(width - 1, Math.ceil(width * (options.maximumXRatio ?? 0.95)));
+  const excludedRegions = options.excludedRegions ?? DEFAULT_EXCLUDED_REGIONS;
+  const mask = new Uint8Array(width * height);
+  let palettePixels = 0;
+
+  // A damage flash tints most of the frame red and can make unrelated props
+  // satisfy any colour-only rule. Abstain while that transient overlay exists.
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const pixel = (y * width + x) * channels;
+      if (isOperatorPalettePixel(raw[pixel], raw[pixel + 1], raw[pixel + 2], options.mask ?? DEFAULT_OPERATOR_MASK)) {
+        palettePixels += 1;
+      }
+    }
+  }
+  const paletteRatio = palettePixels / Math.max(1, width * height);
+  const maximumPaletteRatio = Number(options.maximumPaletteRatio ?? 0.08);
+  if (paletteRatio > maximumPaletteRatio) {
+    return Object.assign([], { paletteRatio, rejectedReason: 'global-red-flash' });
+  }
+
+  for (let y = minimumY; y <= maximumY; y += 1) {
+    for (let x = minimumX; x <= maximumX; x += 1) {
+      const excluded = excludedRegions.some((region) => x / width >= region.minimumXRatio
+        && x / width <= region.maximumXRatio
+        && y / height >= region.minimumYRatio
+        && y / height <= region.maximumYRatio);
+      if (excluded) continue;
+      const pixel = (y * width + x) * channels;
+      if (isOperatorPalettePixel(raw[pixel], raw[pixel + 1], raw[pixel + 2], options.mask ?? DEFAULT_OPERATOR_MASK)) {
+        mask[y * width + x] = 1;
+      }
+    }
+  }
+
+  const minimumPixels = Math.max(2, Math.floor(options.minimumPixels ?? 8));
+  const maximumPixels = Math.max(minimumPixels, Math.floor(options.maximumPixels ?? 120));
+  const candidates = [];
+  const stack = [];
+  const centreX = width / 2;
+  const centreY = height / 2;
+  for (let start = 0; start < mask.length; start += 1) {
+    if (mask[start] === 0) continue;
+    mask[start] = 0;
+    stack.push(start);
+    let pixels = 0;
+    let sumX = 0;
+    let sumY = 0;
+    let minX = width;
+    let maxX = 0;
+    let minY = height;
+    let maxY = 0;
+    while (stack.length > 0) {
+      const index = stack.pop();
+      const x = index % width;
+      const y = Math.floor(index / width);
+      pixels += 1;
+      sumX += x;
+      sumY += y;
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+      for (const neighbour of [index - 1, index + 1, index - width, index + width]) {
+        if (neighbour < 0 || neighbour >= mask.length || mask[neighbour] === 0) continue;
+        const neighbourX = neighbour % width;
+        if (Math.abs(neighbourX - x) > 1) continue;
+        mask[neighbour] = 0;
+        stack.push(neighbour);
+      }
+    }
+
+    const boxWidth = maxX - minX + 1;
+    const boxHeight = maxY - minY + 1;
+    const aspect = boxWidth / Math.max(1, boxHeight);
+    const density = pixels / Math.max(1, boxWidth * boxHeight);
+    if (pixels < minimumPixels || pixels > maximumPixels) continue;
+    if (boxWidth < 2 || boxWidth > (options.maximumWidth ?? 12)) continue;
+    if (boxHeight < 5 || boxHeight > (options.maximumHeight ?? 30)) continue;
+    if (aspect < (options.minimumAspect ?? 0.18) || aspect > (options.maximumAspect ?? 1.05)) continue;
+    if (density < (options.minimumDensity ?? 0.18) || density > (options.maximumDensity ?? 0.95)) continue;
+
+    const x = sumX / pixels;
+    const y = sumY / pixels;
+    const centreDistance = Math.hypot((x - centreX) / width, (y - centreY) / height);
+    const shapePenalty = Math.abs(aspect - 0.45) * 0.12;
+    const narrowPenalty = boxWidth === 2 ? 0.12 : 0;
+    const sizePenalty = Math.abs(Math.log(pixels / 18)) * 0.02;
+    candidates.push({
+      x,
+      y,
+      pixels,
+      bounds: { minX, minY, maxX, maxY, width: boxWidth, height: boxHeight },
+      density,
+      aspect,
+      paletteRatio,
+      centreDistance,
+      score: centreDistance + shapePenalty + narrowPenalty + sizePenalty,
+      detector: 'operator-palette-geometry-v1',
+    });
+  }
+
+  const sorted = candidates.sort((left, right) => left.score - right.score || right.pixels - left.pixels);
+  return Object.assign(sorted, { paletteRatio, rejectedReason: null });
 }
 
 export function findCoralTargets(raw, width, height, channels = 3, options = {}) {
@@ -176,6 +313,108 @@ export function createTemporalTargetTracker(options = {}) {
       };
     },
     snapshot: () => ({ age, screenLockedFrames, observedWorldMotionFrames, previous }),
+  };
+}
+
+export function createOperatorTargetTracker(options = {}) {
+  const confirmationFrames = Math.max(3, Math.floor(options.confirmationFrames ?? 3));
+  const minimumStableFrames = Math.max(2, Math.floor(options.minimumStableFrames ?? 2));
+  const maximumObservationFrames = Math.max(minimumStableFrames + 1, Math.floor(options.maximumObservationFrames ?? 7));
+  const maximumTrackDistanceRatio = Number(options.maximumTrackDistanceRatio ?? 0.08);
+  const minimumMotionRatio = Number(options.minimumMotionRatio ?? 0.002);
+  const minimumShapeChange = Number(options.minimumShapeChange ?? 0.08);
+  let previous = null;
+  let age = 0;
+  let stableFrames = 0;
+  let evidenceFrames = 0;
+  let confirmed = false;
+
+  const reset = () => {
+    previous = null;
+    age = 0;
+    stableFrames = 0;
+    evidenceFrames = 0;
+    confirmed = false;
+  };
+
+  return {
+    reset,
+    update(candidates, { width, height, active, cameraMoved = false, movementMoved = false } = {}) {
+      if (!active || !Array.isArray(candidates) || candidates.length === 0) {
+        reset();
+        return {
+          rawTarget: candidates?.[0] ?? null,
+          confirmedTarget: null,
+          reason: active ? 'no-operator-candidate' : 'inactive-match',
+          age: 0,
+          stableFrames: 0,
+          evidenceFrames: 0,
+          fireAuthorized: false,
+        };
+      }
+
+      const frameDiagonal = Math.hypot(width, height);
+      let candidate = candidates[0];
+      let distanceRatio = null;
+      let shapeChange = null;
+      if (previous) {
+        candidate = [...candidates].sort((left, right) => {
+          const leftDistance = Math.hypot(left.x - previous.x, left.y - previous.y) / frameDiagonal;
+          const rightDistance = Math.hypot(right.x - previous.x, right.y - previous.y) / frameDiagonal;
+          return leftDistance - rightDistance || left.score - right.score;
+        })[0];
+        distanceRatio = Math.hypot(candidate.x - previous.x, candidate.y - previous.y) / frameDiagonal;
+        const sizeRatio = candidate.pixels / Math.max(1, previous.pixels);
+        shapeChange = Math.abs(Math.log(sizeRatio));
+        if (distanceRatio > maximumTrackDistanceRatio || sizeRatio < 0.28 || sizeRatio > 3.6) {
+          reset();
+        }
+      }
+
+      if (!previous) {
+        age = 1;
+      } else {
+        age += 1;
+        if (!cameraMoved && !movementMoved) {
+          stableFrames += 1;
+          if ((distanceRatio ?? 0) >= minimumMotionRatio || (shapeChange ?? 0) >= minimumShapeChange) {
+            evidenceFrames += 1;
+          }
+        }
+      }
+      previous = candidate;
+
+      if (!confirmed && age >= confirmationFrames && stableFrames >= minimumStableFrames && evidenceFrames >= 1) {
+        confirmed = true;
+      }
+      if (!confirmed && stableFrames >= maximumObservationFrames && evidenceFrames === 0) {
+        const rejected = candidate;
+        const rejectedAge = age;
+        reset();
+        return {
+          rawTarget: rejected,
+          confirmedTarget: null,
+          reason: 'static-geometry-rejected',
+          age: rejectedAge,
+          stableFrames: maximumObservationFrames,
+          evidenceFrames: 0,
+          fireAuthorized: false,
+        };
+      }
+
+      return {
+        rawTarget: candidate,
+        confirmedTarget: confirmed ? candidate : null,
+        reason: confirmed ? 'operator-motion-confirmed' : 'observing-operator-candidate',
+        age,
+        stableFrames,
+        evidenceFrames,
+        distanceRatio,
+        shapeChange,
+        fireAuthorized: confirmed,
+      };
+    },
+    snapshot: () => ({ previous, age, stableFrames, evidenceFrames, confirmed }),
   };
 }
 
