@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const presentationSources = [
+  './killstreak-presentation.ts',
+  './smoke-volume-presentation.ts',
   './grenade-explosion-presentation.ts',
   './support-explosion-presentation.ts',
   './death-drop-presentation.ts',
@@ -42,6 +44,12 @@ describe('presentation prewarm startup contract', () => {
     expect(source).not.toContain("overdriveRoot.visible = gameStarted && matchState.phase === 'active';");
     expect(source).not.toContain('const renderer = renderRuntime.renderer as unknown as THREE.WebGLRenderer');
     expect(source).toContain("bootstrapStage = 'prewarming-grenade-explosion'");
+    expect(source).toContain("bootstrapStage = 'prewarming-killstreak-presentations'");
+    expect(source).toContain('await killstreakPresentation.prewarm(renderRuntime, camera);');
+    expect(source).toContain("bootstrapStage = 'prewarming-smoke-presentations'");
+    expect(source).toContain('await smokeVolumePresentationPool.prewarm(renderRuntime, camera);');
+    expect(sharedAssets.indexOf('await killstreakPresentation.prewarm(renderRuntime, camera);'))
+      .toBeLessThan(sharedAssets.indexOf('await smokeVolumePresentationPool.prewarm(renderRuntime, camera);'));
     expect(source).toContain("bootstrapStage = 'prewarming-overdrive'");
     expect(menuBootstrap).toContain("document.documentElement.dataset.gameplayArena = 'deferred-until-deployment'");
     expect(arenaDeployment).toContain("await prepareSharedGameplayAssets()");
@@ -49,6 +57,10 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('submitWebGpuFrame(performance.now(), true)');
     expect(source).toContain('await flushWebGpuFrames(12_000)');
     expect(source).toContain('adaptiveQuality.forceDownshift(');
+    expect(source).toContain('const streamedWeaponGpuPrewarmer: WeaponViewmodelGpuPrewarmer | undefined');
+    expect(source).toContain('streamedWeaponGpuPrewarmQueue.run(() => runStreamedWeaponGpuPrewarm(model, context))');
+    expect(source).toContain('await renderRuntime.compileAndRender(model, camera, scene);');
+    expect(source).toContain('streamedWeaponGpuPrewarmer,');
     expect(source).toContain("bootstrapStage = 'ready'");
   });
 

@@ -143,12 +143,29 @@ export const HIP_VIEWMODEL_SCALE = 0.54;
 const ADS_VIEWMODEL_BASE_POSITION = Object.freeze({ x: 0.28, y: -0.34, z: -0.88 });
 const ADS_VIEWMODEL_SCALE = 0.64;
 
+export type WeaponViewmodelGpuPrewarmContext = Readonly<{
+  weaponId: WeaponId;
+  requestGeneration: number;
+}>;
+
+/**
+ * Resolves only after a newly loaded live viewmodel is safe to reveal. The
+ * caller owns renderer compilation/submission fencing; this presentation owns
+ * request-generation admission and keeps the previous model visible meanwhile.
+ */
+export type WeaponViewmodelGpuPrewarmer = (
+  model: THREE.Object3D,
+  context: WeaponViewmodelGpuPrewarmContext,
+) => Promise<void>;
+
 /** Original first-person weapon presentation with ADS, sprint, recoil, melee and staged reload motion. */
 export class WeaponPresentation {
   readonly root = new THREE.Group();
   private readonly browserRuntime: boolean;
   private readonly models = new Map<WeaponId, THREE.Object3D>();
   private readonly modelLastUsed = new Map<WeaponId, number>();
+  private readonly gpuReadyModels = new WeakSet<THREE.Object3D>();
+  private readonly gpuPrewarmPromises = new WeakMap<THREE.Object3D, Promise<void>>();
   private modelUseCounter = 0;
   private browserWeaponRequest = 0;
   private active: WeaponId = 'carbine';
@@ -207,6 +224,7 @@ export class WeaponPresentation {
     private readonly camera: THREE.Camera,
     private readonly flattenMaterials = false,
     private readonly retireModel?: (root: THREE.Object3D, afterFence?: () => void) => void,
+    private readonly gpuPrewarmer?: WeaponViewmodelGpuPrewarmer,
   ) {
     this.browserRuntime = typeof document !== 'undefined';
     this.root.name = 'original-weapon-view';
@@ -760,9 +778,24 @@ export class WeaponPresentation {
       model.visible = false;
       this.models.set(id, model);
       this.modelLastUsed.set(id, ++this.modelUseCounter);
+      // Without an injected renderer hook (the WebGL/no-hook path), the
+      // existing match-start compile remains the readiness boundary. WebGPU
+      // callers inject a prewarmer and must explicitly settle even this first
+      // browser model before load() can admit it.
+      if (!this.gpuPrewarmer) this.gpuReadyModels.add(model);
       this.root.add(model);
       onProgress?.(index + 1, ids.length);
     });
+    if (browserRuntime && this.gpuPrewarmer) {
+      const initialModel = this.models.get(initialWeapon);
+      if (!initialModel) throw new Error(`Pass 65 initial first-person asset unavailable after load: ${initialWeapon}`);
+      try {
+        await this.prewarmBrowserModel(initialWeapon, initialModel, this.browserWeaponRequest);
+      } catch (error) {
+        this.retireRejectedBrowserModel(initialWeapon, initialModel);
+        throw error;
+      }
+    }
     this.setWeapon(this.active, true);
     if (browserRuntime) this.trimBrowserWeaponModels();
   }
@@ -780,7 +813,11 @@ export class WeaponPresentation {
   private trimBrowserWeaponModels(): void {
     while (this.models.size > 2) {
       const victim = [...this.models.keys()]
-        .filter((id) => id !== this.active && this.models.get(id)?.visible !== true)
+        .filter((id) => {
+          const model = this.models.get(id);
+          if (!model || id === this.active || model.visible) return false;
+          return !this.gpuPrewarmPromises.has(model);
+        })
         .sort((a, b) => (this.modelLastUsed.get(a) ?? 0) - (this.modelLastUsed.get(b) ?? 0))[0];
       if (!victim) return;
       const model = this.models.get(victim);
@@ -804,19 +841,62 @@ export class WeaponPresentation {
   }
 
   private mountedModel(): THREE.Object3D | undefined {
-    return this.models.get(this.active) ?? [...this.models.values()].find((model) => model.visible);
+    const requested = this.models.get(this.active);
+    if (requested && this.modelIsGpuReady(requested)) return requested;
+    return [...this.models.values()].find((model) => model.visible);
+  }
+
+  private modelIsGpuReady(model: THREE.Object3D): boolean {
+    return !this.gpuPrewarmer || this.gpuReadyModels.has(model);
+  }
+
+  private prewarmBrowserModel(id: WeaponId, model: THREE.Object3D, requestGeneration: number): Promise<void> {
+    if (this.modelIsGpuReady(model)) return Promise.resolve();
+    const pending = this.gpuPrewarmPromises.get(model);
+    if (pending) return pending;
+    const promise = Promise.resolve().then(() => this.gpuPrewarmer!(model, {
+      weaponId: id,
+      requestGeneration,
+    })).then(() => {
+      this.gpuReadyModels.add(model);
+    }).finally(() => {
+      this.gpuPrewarmPromises.delete(model);
+    });
+    this.gpuPrewarmPromises.set(model, promise);
+    return promise;
+  }
+
+  private retireRejectedBrowserModel(id: WeaponId, model: THREE.Object3D): void {
+    if (this.models.get(id) !== model || this.gpuReadyModels.has(model)) return;
+    this.models.delete(id);
+    this.modelLastUsed.delete(id);
+    this.root.remove(model);
+    if (this.retireModel) this.retireModel(model, () => releasePass65WeaponModel(model));
+    else disposePass65WeaponModel(model);
   }
 
   private ensureBrowserWeapon(id: WeaponId): void {
     const request = ++this.browserWeaponRequest;
-    void loadPass65WeaponPresentation(id, 'first-person').then(() => {
+    void loadPass65WeaponPresentation(id, 'first-person').then(async () => {
       if (!this.models.has(id)) {
         const model = this.createLoadedBrowserWeapon(id);
         if (!model) throw new Error(`Pass 65 first-person asset unavailable after load: ${id}`);
         model.visible = false;
+        // The initial asset is attached before legacy assigns the dedicated
+        // viewmodel layer. Streamed replacements arrive later, so inherit the
+        // current root mask explicitly or their descendants fall back to world
+        // layer 0 and bypass the depth-cleared viewmodel composite.
+        model.traverse((node) => { node.layers.mask = this.root.layers.mask; });
         this.models.set(id, model);
         this.modelLastUsed.set(id, ++this.modelUseCounter);
         this.root.add(model);
+      }
+      const model = this.models.get(id)!;
+      try {
+        await this.prewarmBrowserModel(id, model, request);
+      } catch (error) {
+        this.retireRejectedBrowserModel(id, model);
+        throw error;
       }
       if (request === this.browserWeaponRequest && this.active === id) {
         for (const [weaponId, model] of this.models) model.visible = weaponId === id;
@@ -844,7 +924,7 @@ export class WeaponPresentation {
     this.reloadLastProgress = 0;
     this.pendingScattergunShell = false;
     const activeModel = this.models.get(id);
-    if (activeModel) {
+    if (activeModel && this.modelIsGpuReady(activeModel)) {
       for (const [weaponId, model] of this.models) model.visible = weaponId === id;
       this.modelLastUsed.set(id, ++this.modelUseCounter);
       this.updateActiveSockets(id);

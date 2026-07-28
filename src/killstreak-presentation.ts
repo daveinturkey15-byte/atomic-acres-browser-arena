@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import type { DroneSensorContact, KillstreakEntitySnapshot, KillstreakImpactEvent, KillstreakPlacementMarkerSnapshot, KillstreakRecipientSnapshot } from './killstreak-runtime';
 import { DRONE_GUN_PROFILE_ID, DRONE_PRESENTATION_FAMILY_ID } from './killstreak-support-catalog';
+import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 import { SUPPORT_WEAPON_FEEDBACK_CONTRACT } from './support-vehicle-presentation-contract';
 
 const MAX_PRESENTED_ENTITIES = 32;
@@ -947,6 +948,9 @@ export class KillstreakPresentation {
   private disposed = false;
   private readonly placementMarkers = new Map<string, PresentedPlacementMarker>();
   private readonly locallyExpiredMarkerRevisions = new Map<string, number>();
+  private gpuPrewarmed = false;
+  private gpuPrewarmPromise: Promise<void> | null = null;
+  private disposalFinalized = false;
 
   constructor(
     scene: THREE.Scene,
@@ -1006,11 +1010,135 @@ export class KillstreakPresentation {
   }
 
   prewarmAuthoredAssets(): void {
+    if (this.disposed) throw new Error('Cannot rebuild a disposed killstreak presentation pool');
+    if (this.gpuPrewarmPromise) throw new Error('Cannot rebuild killstreak presentation assets during GPU prewarm');
     if (this.entities.size > 0) return;
+    this.gpuPrewarmed = false;
     for (const entry of this.prewarmed) this.retireRoot(entry.root);
     this.prewarmed.length = 0;
     this.entityPools.clear();
     this.installPrewarmedVocabulary();
+  }
+
+  /**
+   * Uploads and compiles every bounded pooled presentation family while the
+   * deployment surface still owns the screen. CPU allocation alone is not a
+   * WebGPU prewarm: invisible Object3D trees are skipped by Three's compiler
+   * and otherwise initialize on the first live support activation.
+   */
+  async prewarm(runtime: PresentationPrewarmRuntime, camera: THREE.Camera): Promise<void> {
+    if (this.disposed) throw new Error('Cannot prewarm a disposed killstreak presentation');
+    if (this.gpuPrewarmed) return;
+    if (this.gpuPrewarmPromise) return this.gpuPrewarmPromise;
+    const operation = this.performGpuPrewarm(runtime, camera);
+    this.gpuPrewarmPromise = operation;
+    try {
+      await operation;
+    } finally {
+      if (this.gpuPrewarmPromise === operation) this.gpuPrewarmPromise = null;
+    }
+  }
+
+  private async performGpuPrewarm(runtime: PresentationPrewarmRuntime, camera: THREE.Camera): Promise<void> {
+    const parentScene = this.root.parent;
+    if (!(parentScene instanceof THREE.Scene)) {
+      throw new Error('Killstreak presentation must be attached to one scene before prewarm');
+    }
+
+    const markerVocabulary: readonly KillstreakPlacementMarkerSnapshot[] = [
+      {
+        id: 'prewarm-care-package-ground-x', activationId: 'prewarm-care-package', source: 'care-package',
+        shape: 'ground-x', ownerId: 'prewarm', team: 0, audience: 'all-combatants', anchor: [0, 0, 0],
+        pathStart: null, pathEnd: null, halfWidthM: null, expiresInMs: 1,
+      },
+      {
+        id: 'prewarm-carpet-bomber-corridor', activationId: 'prewarm-carpet-bomber', source: 'carpet-bomber',
+        shape: 'corridor', ownerId: 'prewarm', team: 0, audience: 'owner-only', anchor: [0, 0, 0],
+        pathStart: [-8, 0, 0], pathEnd: [8, 0, 0], halfWidthM: 2.5, expiresInMs: 1,
+      },
+    ];
+    const stagedMarkerRoots = markerVocabulary.map((marker) => {
+      const markerRoot = buildPlacementMarker(marker);
+      markerRoot.name = `prewarmed-${markerRoot.name}`;
+      this.root.add(markerRoot);
+      return markerRoot;
+    });
+
+    // Authored clones share their resources, while procedural fallbacks own
+    // independent geometry/material instances and must all be submitted.
+    const stagedRoots: THREE.Object3D[] = [
+      ...[...this.entityPools.values()].flatMap((pool) => (
+        pool.every((entry) => entry.authored) ? (pool[0] ? [pool[0].root] : []) : pool.map((entry) => entry.root)
+      )),
+      ...this.impactFlashPool.map((entry) => entry.root),
+      ...this.bombShellPool.map((entry) => entry.root),
+      ...this.emberPool.map((entry) => entry.root),
+      ...this.sensorSilhouettes,
+      ...stagedMarkerRoots,
+    ];
+    const objectStates = new Map<THREE.Object3D, Readonly<{
+      visible: boolean;
+      scale: THREE.Vector3;
+      frustumCulled: boolean;
+    }>>();
+    const lodStates = new Map<THREE.LOD, boolean>();
+    const possessedMaterialDepthWrite = new Map<THREE.Material, boolean>();
+    const chopperRoot = this.entityPools.get('chopper')?.[0]?.root ?? null;
+    const rootVisible = this.root.visible;
+    const rootFrustumCulled = this.root.frustumCulled;
+    this.root.visible = true;
+    this.root.frustumCulled = false;
+
+    for (const stagedRoot of stagedRoots) {
+      stagedRoot.traverse((node) => {
+        if (!objectStates.has(node)) {
+          objectStates.set(node, Object.freeze({
+            visible: node.visible,
+            scale: node.scale.clone(),
+            frustumCulled: node.frustumCulled,
+          }));
+        }
+        if (node instanceof THREE.LOD && !lodStates.has(node)) {
+          lodStates.set(node, node.autoUpdate);
+          node.autoUpdate = false;
+        }
+        node.visible = true;
+        node.frustumCulled = false;
+      });
+      stagedRoot.scale.setScalar(0.0001);
+    }
+
+    try {
+      await runtime.compileAndRender(this.root, camera, parentScene);
+      if (chopperRoot) {
+        chopperRoot.traverse((node) => {
+          if (!(node instanceof THREE.Mesh)) return;
+          const cockpitNode = isFirstPersonCockpitNode(chopperRoot, node);
+          node.visible = cockpitNode;
+          if (!cockpitNode) return;
+          const materials = Array.isArray(node.material) ? node.material : [node.material];
+          for (const entry of materials) {
+            if (!possessedMaterialDepthWrite.has(entry)) possessedMaterialDepthWrite.set(entry, entry.depthWrite);
+            entry.depthWrite = false;
+          }
+        });
+        await runtime.compileAndRender(this.root, camera, parentScene);
+      }
+      if (!this.disposed) this.gpuPrewarmed = true;
+    } finally {
+      if (!this.disposed) {
+        for (const [material, depthWrite] of possessedMaterialDepthWrite) material.depthWrite = depthWrite;
+        for (const [lod, autoUpdate] of lodStates) lod.autoUpdate = autoUpdate;
+        for (const [node, state] of objectStates) {
+          node.visible = state.visible;
+          node.scale.copy(state.scale);
+          node.frustumCulled = state.frustumCulled;
+        }
+        this.root.visible = rootVisible;
+        this.root.frustumCulled = rootFrustumCulled;
+      }
+      for (const markerRoot of stagedMarkerRoots) this.retireRoot(markerRoot);
+    }
   }
 
   private acquirePresentedEntity(entity: KillstreakEntitySnapshot): PresentedEntity {
@@ -1392,6 +1520,17 @@ export class KillstreakPresentation {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    const pendingPrewarm = this.gpuPrewarmPromise;
+    if (pendingPrewarm) {
+      void pendingPrewarm.catch(() => undefined).finally(() => this.finalizeDispose());
+      return;
+    }
+    this.finalizeDispose();
+  }
+
+  private finalizeDispose(): void {
+    if (this.disposalFinalized) return;
+    this.disposalFinalized = true;
     this.clear();
     for (const entry of this.prewarmed) this.retireRoot(entry.root);
     this.prewarmed.length = 0;

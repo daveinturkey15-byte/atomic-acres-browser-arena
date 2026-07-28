@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   HUNTER_DRONE_ASSET,
   SUPPORT_VEHICLE_ASSETS,
@@ -97,6 +97,143 @@ describe('killstreak presentation', () => {
     expect(supportAircraftPresentationVariant('ks-9-care-aircraft-12')).toBe('care');
     expect(supportAircraftPresentationVariant('ks-9-carpet-aircraft-13')).toBe('carpet');
     expect(supportAircraftPresentationVariant('malformed-aircraft')).toBeNull();
+  });
+
+  it('GPU-prewarms every bounded resource family once and restores exact pooled state', async () => {
+    const scene = new THREE.Scene();
+    const presentation = new KillstreakPresentation(scene);
+    const camera = new THREE.PerspectiveCamera();
+    const chopper = presentation.root.getObjectByName('prewarmed-chopper-1') as THREE.Group;
+    const chopperChild = chopper.getObjectByName('chopper-first-person-rotor')!;
+    const chopperFuselage = chopper.getObjectByName('chopper-fuselage')!;
+    const dashboard = chopper.getObjectByName('chopper-cockpit-dashboard-3d') as THREE.Mesh;
+    const dashboardMaterial = dashboard.material as THREE.Material;
+    chopper.scale.set(2, 3, 4);
+    chopper.frustumCulled = true;
+    chopperChild.visible = false;
+    chopperChild.frustumCulled = true;
+    const lod = new THREE.LOD();
+    lod.name = 'prewarm-test-authored-lod';
+    const lod0 = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+    const lod1 = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+    lod0.visible = false;
+    lod1.visible = true;
+    lod.addLevel(lod0, 0);
+    lod.addLevel(lod1, 20);
+    lod.autoUpdate = true;
+    chopper.add(lod);
+    const telemetryBefore = presentation.telemetry();
+    let compilePass = 0;
+    const compileAndRender = vi.fn(async (root: THREE.Object3D, stagedCamera: THREE.Camera, parentScene: THREE.Scene) => {
+      compilePass += 1;
+      expect(root).toBe(presentation.root);
+      expect(stagedCamera).toBe(camera);
+      expect(parentScene).toBe(scene);
+      expect(chopper.visible).toBe(true);
+      expect(chopper.scale.toArray()).toEqual([0.0001, 0.0001, 0.0001]);
+      expect(chopper.frustumCulled).toBe(false);
+      expect(chopperChild.visible).toBe(true);
+      expect(chopperChild.frustumCulled).toBe(false);
+      expect(presentation.root.getObjectByName('prewarmed-swarm-drone-1')?.visible).toBe(true);
+      expect(presentation.root.getObjectByName('prewarmed-swarm-drone-2')?.visible).toBe(true);
+      expect(presentation.root.getObjectByName('prewarmed-swarm-drone-24')?.visible).toBe(true);
+      expect(presentation.root.getObjectByName('pass65-impact-flash-pool-20')?.visible).toBe(true);
+      expect(presentation.root.getObjectByName('pass65-bomb-shell-pool-20')?.visible).toBe(true);
+      expect(presentation.root.getObjectByName('pass65-ember-pool-120')?.visible).toBe(true);
+      expect(presentation.root.getObjectByName('piloted-drone-hostile-sensor-16')?.visible).toBe(true);
+      expect(presentation.root.getObjectByName('prewarmed-support-placement-ground-x')?.visible).toBe(true);
+      expect(presentation.root.getObjectByName('prewarmed-support-placement-corridor')?.visible).toBe(true);
+      if (compilePass === 1) {
+        expect(lod.autoUpdate).toBe(false);
+        expect(lod0.visible).toBe(true);
+        expect(lod1.visible).toBe(true);
+        expect(chopperFuselage.visible).toBe(true);
+        expect(dashboardMaterial.depthWrite).toBe(true);
+      } else {
+        expect(chopperFuselage.visible).toBe(false);
+        expect(dashboard.visible).toBe(true);
+        expect(dashboardMaterial.depthWrite).toBe(false);
+      }
+    });
+    await Promise.all([
+      presentation.prewarm({ compileAndRender }, camera),
+      presentation.prewarm({ compileAndRender }, camera),
+    ]);
+    await presentation.prewarm({ compileAndRender }, camera);
+    expect(compileAndRender).toHaveBeenCalledTimes(2);
+    expect(chopper.visible).toBe(false);
+    expect(chopper.scale.toArray()).toEqual([2, 3, 4]);
+    expect(chopper.frustumCulled).toBe(true);
+    expect(chopperChild.visible).toBe(false);
+    expect(chopperChild.frustumCulled).toBe(true);
+    expect(lod.autoUpdate).toBe(true);
+    expect(lod0.visible).toBe(false);
+    expect(lod1.visible).toBe(true);
+    expect(dashboardMaterial.depthWrite).toBe(true);
+    expect(presentation.root.getObjectByName('prewarmed-support-placement-ground-x')).toBeUndefined();
+    expect(presentation.root.getObjectByName('prewarmed-support-placement-corridor')).toBeUndefined();
+    expect(presentation.telemetry()).toEqual(telemetryBefore);
+    presentation.dispose();
+  });
+
+  it('restores failed prewarm state and invalidates the GPU receipt when the authored pool is rebuilt', async () => {
+    const scene = new THREE.Scene();
+    const presentation = new KillstreakPresentation(scene);
+    const camera = new THREE.PerspectiveCamera();
+    const chopper = presentation.root.getObjectByName('prewarmed-chopper-1')!;
+    const originalScale = chopper.scale.toArray();
+    const failedRuntime = { compileAndRender: vi.fn(async () => { throw new Error('compile failed'); }) };
+    await expect(presentation.prewarm(failedRuntime, camera)).rejects.toThrow('compile failed');
+    expect(chopper.visible).toBe(false);
+    expect(chopper.scale.toArray()).toEqual(originalScale);
+
+    let releasePrewarm!: () => void;
+    let compilePass = 0;
+    const blockedRuntime = {
+      compileAndRender: vi.fn(() => {
+        compilePass += 1;
+        if (compilePass > 1) return Promise.resolve();
+        return new Promise<void>((resolve) => { releasePrewarm = resolve; });
+      }),
+    };
+    const inFlight = presentation.prewarm(blockedRuntime, camera);
+    expect(() => presentation.prewarmAuthoredAssets()).toThrow('during GPU prewarm');
+    releasePrewarm();
+    await inFlight;
+
+    presentation.prewarmAuthoredAssets();
+    const rebuiltRuntime = { compileAndRender: vi.fn(async () => undefined) };
+    await presentation.prewarm(rebuiltRuntime, camera);
+    expect(rebuiltRuntime.compileAndRender).toHaveBeenCalledTimes(2);
+    presentation.dispose();
+    await expect(presentation.prewarm(rebuiltRuntime, camera)).rejects.toThrow('disposed');
+  });
+
+  it('defers terminal disposal until an active GPU prewarm settles', async () => {
+    const scene = new THREE.Scene();
+    const presentation = new KillstreakPresentation(scene);
+    const camera = new THREE.PerspectiveCamera();
+    const chopper = presentation.root.getObjectByName('prewarmed-chopper-1')!;
+    let releasePrewarm!: () => void;
+    let compilePass = 0;
+    const runtime = {
+      compileAndRender: vi.fn(() => {
+        compilePass += 1;
+        if (compilePass > 1) return Promise.resolve();
+        return new Promise<void>((resolve) => { releasePrewarm = resolve; });
+      }),
+    };
+    const inFlight = presentation.prewarm(runtime, camera);
+    expect(chopper.scale.toArray()).toEqual([0.0001, 0.0001, 0.0001]);
+    presentation.dispose();
+    expect(presentation.root.parent).toBe(scene);
+    releasePrewarm();
+    await inFlight;
+    await Promise.resolve();
+    expect(presentation.root.parent).toBeNull();
+    expect(chopper.parent).toBeNull();
+    expect(chopper.scale.toArray()).toEqual([0.0001, 0.0001, 0.0001]);
+    await expect(presentation.prewarm(runtime, camera)).rejects.toThrow('disposed');
   });
 
   it('renders a sleek chopper/care/drone vocabulary and retires stale entities', () => {

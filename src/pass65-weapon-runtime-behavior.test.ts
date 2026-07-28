@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { poseOperator, setOperatorWeapon } from './art-kit';
 import { WeaponPresentation } from './weapon-presentation';
+import type { WeaponId } from './protocol';
 import {
   PASS65_AUTHORED_FIREARM_IDS,
   createPass65WeaponModel,
@@ -18,12 +19,14 @@ type FakeGltf = { scene: THREE.Group; animations: THREE.AnimationClip[] };
 type Deferred<T> = {
   promise: Promise<T>;
   resolve: (value: T) => void;
+  reject: (reason?: unknown) => void;
 };
 
 function deferred<T>(): Deferred<T> {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((done) => { resolve = done; });
-  return { promise, resolve };
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((done, fail) => { resolve = done; reject = fail; });
+  return { promise, resolve, reject };
 }
 
 function weaponIdFromUrl(url: string): Pass65AuthoredFirearmId {
@@ -92,8 +95,7 @@ function stubBrowserTextureLoading(): void {
 }
 
 async function flushPromises(): Promise<void> {
-  await Promise.resolve();
-  await Promise.resolve();
+  for (let turn = 0; turn < 8; turn += 1) await Promise.resolve();
 }
 
 afterEach(() => {
@@ -135,6 +137,129 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(loaded).toHaveLength(2);
     expect(loaded.every((entry) => entry.refs === 1)).toBe(true);
     expect(releasePass65WeaponModelsIn(presentation.root)).toBe(2);
+  });
+
+  it('keeps the previous complete viewmodel visible until injected GPU prewarm settles', async () => {
+    stubBrowserTextureLoading();
+    vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (
+      Promise.resolve(fakeGltfForUrl(String(url)))
+    )) as GLTFLoader['loadAsync']);
+    const gate = deferred<void>();
+    const prewarmer = vi.fn((_model: THREE.Object3D, context: { weaponId: WeaponId }) => (
+      context.weaponId === 'carbine' ? Promise.resolve() : gate.promise
+    ));
+    const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(), false, undefined, prewarmer);
+    await presentation.load();
+
+    const carbine = presentation.root.getObjectByName('carbine-pass65-first-person-model');
+    expect(carbine?.visible).toBe(true);
+    presentation.setWeapon('mp5');
+    await flushPromises();
+
+    const mp5 = presentation.root.getObjectByName('mp5-pass65-first-person-model');
+    expect(prewarmer).toHaveBeenCalledWith(mp5, { weaponId: 'mp5', requestGeneration: 1 });
+    expect(mp5?.visible).toBe(false);
+    expect(carbine?.visible).toBe(true);
+
+    gate.resolve();
+    await flushPromises();
+    expect(mp5?.visible).toBe(true);
+    expect(carbine?.visible).toBe(false);
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(2);
+  });
+
+  it('inherits the dedicated viewmodel layer on every asynchronously streamed descendant', async () => {
+    stubBrowserTextureLoading();
+    vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (
+      Promise.resolve(fakeGltfForUrl(String(url)))
+    )) as GLTFLoader['loadAsync']);
+    const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(), false);
+    await presentation.load();
+    presentation.root.traverse((node) => node.layers.set(2));
+
+    presentation.setWeapon('mp5');
+    await flushPromises();
+    const mp5 = presentation.root.getObjectByName('mp5-pass65-first-person-model');
+    const layerMasks: number[] = [];
+    mp5?.traverse((node) => layerMasks.push(node.layers.mask));
+
+    expect(layerMasks.length).toBeGreaterThan(1);
+    expect(new Set(layerMasks)).toEqual(new Set([presentation.root.layers.mask]));
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(2);
+  });
+
+  it('awaits initial GPU prewarm and safely admits a switch-away/switch-back race', async () => {
+    stubBrowserTextureLoading();
+    vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (
+      Promise.resolve(fakeGltfForUrl(String(url)))
+    )) as GLTFLoader['loadAsync']);
+    const gates = new Map<WeaponId, Deferred<void>>();
+    const prewarmer = vi.fn((_model: THREE.Object3D, context: { weaponId: WeaponId }) => {
+      const gate = deferred<void>();
+      gates.set(context.weaponId, gate);
+      return gate.promise;
+    });
+    const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(), false, undefined, prewarmer);
+    let loadSettled = false;
+    const initialLoad = presentation.load().then(() => { loadSettled = true; });
+    await flushPromises();
+
+    const carbine = presentation.root.getObjectByName('carbine-pass65-first-person-model');
+    expect(prewarmer).toHaveBeenCalledWith(carbine, { weaponId: 'carbine', requestGeneration: 0 });
+    expect(carbine?.visible).toBe(false);
+    expect(loadSettled).toBe(false);
+
+    presentation.setWeapon('mp5');
+    await flushPromises();
+    presentation.setWeapon('carbine');
+    await flushPromises();
+    gates.get('mp5')?.resolve();
+    await flushPromises();
+    expect(carbine?.visible).toBe(false);
+    expect(presentation.root.getObjectByName('mp5-pass65-first-person-model')?.visible).toBe(false);
+    expect(loadSettled).toBe(false);
+
+    gates.get('carbine')?.resolve();
+    await initialLoad;
+    await flushPromises();
+    expect(carbine?.visible).toBe(true);
+    expect(presentation.root.getObjectByName('mp5-pass65-first-person-model')?.visible).toBe(false);
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(2);
+  });
+
+  it('never commits stale or failed GPU prewarm generations', async () => {
+    stubBrowserTextureLoading();
+    vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (
+      Promise.resolve(fakeGltfForUrl(String(url)))
+    )) as GLTFLoader['loadAsync']);
+    const gates = new Map<WeaponId, Deferred<void>>();
+    const prewarmer = vi.fn((_model: THREE.Object3D, context: { weaponId: WeaponId }) => {
+      if (context.weaponId === 'carbine') return Promise.resolve();
+      const gate = deferred<void>();
+      gates.set(context.weaponId, gate);
+      return gate.promise;
+    });
+    const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(), false, undefined, prewarmer);
+    await presentation.load();
+    const carbine = presentation.root.getObjectByName('carbine-pass65-first-person-model');
+
+    presentation.setWeapon('mp5');
+    await flushPromises();
+    presentation.setWeapon('m4a1');
+    await flushPromises();
+    gates.get('mp5')?.resolve();
+    await flushPromises();
+
+    expect(presentation.root.getObjectByName('mp5-pass65-first-person-model')?.visible ?? false).toBe(false);
+    expect(presentation.root.getObjectByName('m4a1-pass65-first-person-model')?.visible).toBe(false);
+    expect(carbine?.visible).toBe(true);
+
+    gates.get('m4a1')?.reject(new Error('synthetic GPU prewarm failure'));
+    await flushPromises();
+    expect(presentation.root.getObjectByName('m4a1-pass65-first-person-model')).toBeUndefined();
+    expect(carbine?.visible).toBe(true);
+    expect(presentation.root.userData.pass65WeaponLoadError).toBe('synthetic GPU prewarm failure');
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(1);
   });
 
   it('uses only the authored two-chain arm rig for browser melee and restores bind state on exit', async () => {

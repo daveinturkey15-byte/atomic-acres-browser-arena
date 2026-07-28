@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 import { SMOKE_VOLUME_LIFETIME_MS } from './smoke-authority';
 
 export const SMOKE_PRESENTATION_CARD_COUNT = 3;
@@ -247,18 +248,86 @@ export type SmokeVolumePresentationLease = Readonly<{ slot: number; generation: 
  * destroyed submitted-buffer failure mode observed in Pass 64 WebGPU.
  */
 export class SmokeVolumePresentationPool {
+  readonly root = new THREE.Group();
   private readonly slots: Array<{ presentation: SmokeVolumePresentation; generation: number }> = [];
   private cursor = 0;
   private emissions = 0;
   private recycled = 0;
+  private gpuPrewarmed = false;
+  private gpuPrewarmPromise: Promise<void> | null = null;
+  private disposed = false;
+  private disposalFinalized = false;
 
   constructor(private readonly scene: THREE.Scene, capacity = SMOKE_VOLUME_PRESENTATION_POOL_CAPACITY) {
+    this.root.name = 'smoke-grenade-volume-presentation-pool';
+    this.root.userData.presentationOnly = true;
+    scene.add(this.root);
     const boundedCapacity = Math.max(1, Math.min(SMOKE_VOLUME_PRESENTATION_POOL_CAPACITY, Math.floor(capacity)));
     for (let index = 0; index < boundedCapacity; index += 1) {
       const presentation = new SmokeVolumePresentation();
       presentation.root.name = `smoke-grenade-volume-presentation-${index + 1}`;
-      scene.add(presentation.root);
+      this.root.add(presentation.root);
       this.slots.push({ presentation, generation: 0 });
+    }
+  }
+
+  /**
+   * Compiles and uploads every fixed smoke slot before combat. Each slot owns
+   * its own radial alpha texture, materials and geometry, so staging only one
+   * representative would leave later pool emissions with first-use GPU work.
+   */
+  async prewarm(runtime: PresentationPrewarmRuntime, camera: THREE.Camera): Promise<void> {
+    if (this.disposed) throw new Error('Cannot prewarm a disposed smoke presentation pool');
+    if (this.gpuPrewarmed) return;
+    if (this.gpuPrewarmPromise) return this.gpuPrewarmPromise;
+    const operation = this.performGpuPrewarm(runtime, camera);
+    this.gpuPrewarmPromise = operation;
+    try {
+      await operation;
+    } finally {
+      if (this.gpuPrewarmPromise === operation) this.gpuPrewarmPromise = null;
+    }
+  }
+
+  private async performGpuPrewarm(runtime: PresentationPrewarmRuntime, camera: THREE.Camera): Promise<void> {
+    const parentScene = this.root.parent;
+    if (!(parentScene instanceof THREE.Scene) || parentScene !== this.scene) {
+      throw new Error('Smoke presentation pool must be attached to its scene before prewarm');
+    }
+    const objectStates = new Map<THREE.Object3D, Readonly<{
+      visible: boolean;
+      scale: THREE.Vector3;
+      frustumCulled: boolean;
+    }>>();
+    const rootVisible = this.root.visible;
+    const rootFrustumCulled = this.root.frustumCulled;
+    this.root.visible = true;
+    this.root.frustumCulled = false;
+    for (const { presentation } of this.slots) {
+      presentation.root.traverse((node) => {
+        objectStates.set(node, Object.freeze({
+          visible: node.visible,
+          scale: node.scale.clone(),
+          frustumCulled: node.frustumCulled,
+        }));
+        node.visible = true;
+        node.frustumCulled = false;
+      });
+      presentation.root.scale.setScalar(0.0001);
+    }
+    try {
+      await runtime.compileAndRender(this.root, camera, parentScene);
+      if (!this.disposed) this.gpuPrewarmed = true;
+    } finally {
+      if (!this.disposed) {
+        for (const [node, state] of objectStates) {
+          node.visible = state.visible;
+          node.scale.copy(state.scale);
+          node.frustumCulled = state.frustumCulled;
+        }
+        this.root.visible = rootVisible;
+        this.root.frustumCulled = rootFrustumCulled;
+      }
     }
   }
 
@@ -323,8 +392,21 @@ export class SmokeVolumePresentationPool {
 
   /** Must be routed through the renderer's fenced terminal-retirement path. */
   terminalDispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    const pendingPrewarm = this.gpuPrewarmPromise;
+    if (pendingPrewarm) {
+      void pendingPrewarm.catch(() => undefined).finally(() => this.finalizeTerminalDispose());
+      return;
+    }
+    this.finalizeTerminalDispose();
+  }
+
+  private finalizeTerminalDispose(): void {
+    if (this.disposalFinalized) return;
+    this.disposalFinalized = true;
     for (const slot of this.slots) slot.presentation.terminalDispose();
     this.slots.length = 0;
-    this.scene.remove(...this.scene.children.filter((child) => child.name.startsWith('smoke-grenade-volume-presentation-')));
+    this.root.removeFromParent();
   }
 }

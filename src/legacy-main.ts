@@ -456,8 +456,9 @@ import {
   type ShedInteractionIntentMessage,
 } from './interactive-world-protocol';
 import { TracerPool } from './tracer-pool';
+import { AsyncSerialQueue } from './async-serial-queue';
 import { loadRiggedOperatorAsset, riggedOperatorAssetReady, riggedOperatorTelemetry } from './operator-model';
-import { WeaponPresentation } from './weapon-presentation';
+import { WeaponPresentation, type WeaponViewmodelGpuPrewarmer } from './weapon-presentation';
 import { magnifiedFovDegrees, viewmodelSurfaceRetreat } from './weapon-presentation-state';
 import { RailgunPresentation, type RailgunThermalContact } from './railgun-presentation';
 import { DMR_THERMAL_MAGNIFICATION, DmrThermalPresentation, type DmrThermalContact } from './dmr-thermal-presentation';
@@ -1185,6 +1186,8 @@ type BootstrapStage =
   | 'module-ready'
   | 'menu-video-ready'
   | 'loading-gameplay-assets'
+  | 'prewarming-killstreak-presentations'
+  | 'prewarming-smoke-presentations'
   | 'prewarming-combat-tracers'
   | 'prewarming-combat-impacts'
   | 'prewarming-grenade-explosion'
@@ -4373,9 +4376,51 @@ element<HTMLInputElement>('#player-name').addEventListener('input', () => {
   renderHighScores();
 });
 
-const weaponView = new WeaponPresentation(camera, reducedRenderMode, (root, afterFence) => (
-  scheduleDeferredGpuRetirement(root, true, afterFence)
-));
+const streamedWeaponGpuPrewarmQueue = new AsyncSerialQueue();
+const runStreamedWeaponGpuPrewarm: WeaponViewmodelGpuPrewarmer = async (model, { weaponId }) => {
+      const priorParent = model.parent;
+      const priorVisible = model.visible;
+      const priorScale = model.scale.clone();
+      const restoreParent = (): void => {
+        if (priorParent && model.parent !== priorParent) priorParent.add(model);
+      };
+
+      // Compile the detached candidate while the last complete viewmodel keeps
+      // presenting. Only the short first-upload fence pauses submissions; a
+      // slow asynchronous shader compile must never turn into a live freeze.
+      model.removeFromParent();
+      model.visible = true;
+      model.scale.multiplyScalar(0.0001);
+      try {
+        await renderRuntime.compile(model, camera, scene);
+        const submissionWasPaused = renderSubmissionPaused;
+        renderSubmissionPaused = true;
+        try {
+          await flushWebGpuFrames(12_000);
+          restoreParent();
+          await renderRuntime.compileAndRender(model, camera, scene);
+          const presentation = renderRuntime.presentationTelemetry();
+          if (presentation.status !== 'healthy') {
+            throw new Error(`Streamed ${weaponId} viewmodel prewarm was ${presentation.status}`);
+          }
+        } finally {
+          renderSubmissionPaused = submissionWasPaused;
+        }
+      } finally {
+        restoreParent();
+        model.visible = priorVisible;
+        model.scale.copy(priorScale);
+      }
+    };
+const streamedWeaponGpuPrewarmer: WeaponViewmodelGpuPrewarmer | undefined = renderRuntime.backend === 'webgpu'
+  ? (model, context) => streamedWeaponGpuPrewarmQueue.run(() => runStreamedWeaponGpuPrewarm(model, context))
+  : undefined;
+const weaponView = new WeaponPresentation(
+  camera,
+  reducedRenderMode,
+  (root, afterFence) => scheduleDeferredGpuRetirement(root, true, afterFence),
+  streamedWeaponGpuPrewarmer,
+);
 let loadoutState: LoadoutStorageV2 = playerProfileStore.current.loadout;
 let managedPresetId: LoadoutPresetId = loadoutState.selected.kind === 'custom'
   ? loadoutState.selected.presetId
@@ -17682,6 +17727,10 @@ async function prepareSharedGameplayAssets(): Promise<void> {
       loadSupportVehiclePresentations(),
     ]);
     killstreakPresentation.prewarmAuthoredAssets();
+    bootstrapStage = 'prewarming-killstreak-presentations';
+    await killstreakPresentation.prewarm(renderRuntime, camera);
+    bootstrapStage = 'prewarming-smoke-presentations';
+    await smokeVolumePresentationPool.prewarm(renderRuntime, camera);
     // First-person geometry is composited after world depth is cleared. Contact
     // retreat still keeps it tucked near walls without world geometry cutting
     // holes through hands and weapons.
