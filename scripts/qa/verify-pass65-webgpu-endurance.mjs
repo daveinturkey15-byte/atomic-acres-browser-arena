@@ -12,6 +12,9 @@ const otherArenaDurationMs = Math.max(5_000, Number(process.env.PASS65_MAP_SOAK_
 const maximumLiveSubmissionGapMs = 250;
 const maximumLiveCompletionGapMs = 500;
 const maximumLivePendingMs = 750;
+const requiredCaptureRecoveryCompletions = 3;
+const maximumCaptureRecoveryCompletionMs = 50;
+const maximumLiveLongTaskEntries = 8;
 const artifactRoot = 'artifacts/pass65/webgpu-endurance';
 const chromeCandidates = [
   process.env.PASS65_CHROME_PATH,
@@ -103,6 +106,105 @@ async function pauseAndDrainPresentation(page) {
   return progress;
 }
 
+async function requireCaptureRecoveryCompletions(page, captureCompletionSequence) {
+  return page.evaluate(({ baselineSequence, requiredCompletions, maximumCompletionMs }) => (
+    new Promise((resolve, reject) => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      if (!api) {
+        reject(new Error('Capture recovery requires the Atomic Acres debug API'));
+        return;
+      }
+      const startedAt = performance.now();
+      const timeoutAt = startedAt + 12_000;
+      const consecutiveCompletions = [];
+      const observations = [];
+      let observedCompletionSequence = baselineSequence;
+      let discardedCompletionCount = 0;
+
+      const holdAndReject = (message) => {
+        api.setRenderPaused(true);
+        reject(new Error(`${message}: ${JSON.stringify({
+          baselineSequence,
+          observedCompletionSequence,
+          consecutiveCompletions,
+          discardedCompletionCount,
+          observations,
+        })}`));
+      };
+      const inspect = () => {
+        const presentation = api.snapshot()?.render?.runtime?.presentation;
+        if (!presentation) {
+          holdAndReject('Capture recovery lost presentation telemetry');
+          return;
+        }
+        if (presentation.status === 'device-lost' || presentation.status === 'failed'
+          || presentation.status === 'stalled') {
+          holdAndReject(`Capture recovery entered ${presentation.status}`);
+          return;
+        }
+        if (presentation.completedSequence < observedCompletionSequence) {
+          holdAndReject('Capture recovery completion sequence regressed');
+          return;
+        }
+        if (presentation.completedSequence > observedCompletionSequence) {
+          const advancedBy = presentation.completedSequence - observedCompletionSequence;
+          const completionLatencyMs = presentation.lastCompletionLatencyMs;
+          const observation = {
+            completedSequence: presentation.completedSequence,
+            submissionSequence: presentation.submissionSequence,
+            advancedBy,
+            completionLatencyMs,
+            lastSubmittedAt: presentation.lastSubmittedAt,
+            lastCompletedAt: presentation.lastCompletedAt,
+            status: presentation.status,
+          };
+          observations.push(observation);
+          if (observations.length > 12) observations.shift();
+          observedCompletionSequence = presentation.completedSequence;
+
+          // MAX_IN_FLIGHT_SUBMISSIONS is one. Count only an individually
+          // observed game completion, never a batched frontier jump, and make
+          // three ordinary low-latency completions prove compositor recovery.
+          if (advancedBy === 1
+            && presentation.status === 'healthy'
+            && Number.isFinite(completionLatencyMs)
+            && completionLatencyMs <= maximumCompletionMs) {
+            consecutiveCompletions.push(observation);
+          } else {
+            discardedCompletionCount += advancedBy;
+            consecutiveCompletions.length = 0;
+          }
+          if (consecutiveCompletions.length >= requiredCompletions) {
+            // Hold in the same browser task that observes the third completion;
+            // the caller then drains any already-admitted frontier.
+            api.setRenderPaused(true);
+            resolve({
+              baselineSequence,
+              requiredCompletions,
+              maximumCompletionMs,
+              elapsedMs: performance.now() - startedAt,
+              discardedCompletionCount,
+              consecutiveCompletions: consecutiveCompletions.slice(-requiredCompletions),
+              observations,
+            });
+            return;
+          }
+        }
+        if (performance.now() >= timeoutAt) {
+          holdAndReject('Capture recovery did not establish three ordinary completions within 12 seconds');
+          return;
+        }
+        requestAnimationFrame(inspect);
+      };
+      requestAnimationFrame(inspect);
+    })
+  ), {
+    baselineSequence: captureCompletionSequence,
+    requiredCompletions: requiredCaptureRecoveryCompletions,
+    maximumCompletionMs: maximumCaptureRecoveryCompletionMs,
+  });
+}
+
 async function captureCanvasOnly(page, clip) {
   const captureIsolationStartedAt = Date.now();
   try {
@@ -121,17 +223,12 @@ async function captureCanvasOnly(page, clip) {
       window.__ATOMIC_ACRES_DEBUG__?.setRenderPaused(false);
     });
     // page.screenshot() can return while Chrome compositor work remains queued
-    // on the same adapter. Require a subsequently completed game submission,
-    // then pause and drain again. Deliberately return while held: the next
-    // sample resets telemetry, applies stress and unpauses atomically, leaving
-    // no rAF race in which capture residue can enter the live interval.
-    await page.waitForFunction((priorCompletionSequence) => {
-      const presentation = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.render?.runtime?.presentation;
-      return presentation?.status === 'healthy'
-        && presentation.completedSequence > priorCompletionSequence;
-    }, captureCompletionSequence, { timeout: 12_000 });
+    // on the same adapter. Require three individually observed, ordinary game
+    // completions at <= 50 ms before the next measured interval. This is a
+    // quarantine boundary, not a relaxation of the 250/500/750 ms live limits.
+    const recovery = await requireCaptureRecoveryCompletions(page, captureCompletionSequence);
     const progress = await pauseAndDrainPresentation(page);
-    return { screenshot, progress, captureIsolationMs: Date.now() - captureIsolationStartedAt };
+    return { screenshot, progress, recovery, captureIsolationMs: Date.now() - captureIsolationStartedAt };
   } catch (error) {
     await page.evaluate(() => {
       delete document.documentElement.dataset.pass65CanvasOnly;
@@ -477,13 +574,55 @@ try {
     await pauseAndDrainPresentation(page);
     while (Date.now() - startedAt < durationMs) {
       activeContext = { visit, arenaId, phase: 'sample', sampleIndex };
-      const liveWindowStart = await page.evaluate(({ index, stress }) => {
+      const liveWindowStart = await page.evaluate(({ index, stress, maximumLongTaskEntries }) => {
         const api = window.__ATOMIC_ACRES_DEBUG__;
         const held = api.snapshot().render.runtime.presentation;
         if (held.submissionSequence !== held.completedSequence) {
           throw new Error(`Live sample did not begin from a drained frontier: ${JSON.stringify(held)}`);
         }
         api.resetPresentationProgressWindow();
+        const liveLongTaskEvidence = {
+          supported: false,
+          count: 0,
+          totalDurationMs: 0,
+          maximumDurationMs: 0,
+          entries: [],
+          truncated: false,
+        };
+        let liveLongTaskObserver = null;
+        const recordLiveLongTasks = (entries) => {
+          liveLongTaskEvidence.supported = true;
+          for (const entry of entries) {
+            const evidence = {
+              startTime: entry.startTime,
+              duration: entry.duration,
+              name: entry.name,
+            };
+            liveLongTaskEvidence.count += 1;
+            liveLongTaskEvidence.totalDurationMs += entry.duration;
+            liveLongTaskEvidence.maximumDurationMs = Math.max(
+              liveLongTaskEvidence.maximumDurationMs,
+              entry.duration,
+            );
+            if (liveLongTaskEvidence.entries.length < maximumLongTaskEntries) {
+              liveLongTaskEvidence.entries.push(evidence);
+            } else liveLongTaskEvidence.truncated = true;
+          }
+        };
+        if (typeof PerformanceObserver === 'function') {
+          try {
+            liveLongTaskObserver = new PerformanceObserver((list) => recordLiveLongTasks(list.getEntries()));
+            liveLongTaskObserver.observe({ type: 'longtask', buffered: false });
+            liveLongTaskEvidence.supported = true;
+          } catch {
+            liveLongTaskObserver = null;
+          }
+        }
+        window.__PASS65_ENDURANCE_LIVE_LONG_TASK_SAMPLE__ = {
+          evidence: liveLongTaskEvidence,
+          observer: liveLongTaskObserver,
+          recordEntries: recordLiveLongTasks,
+        };
         const state = api.snapshot();
         const [x, y, z] = state.player.position;
         api.setCaptureCameraPose(x, y, z, (index * 0.31) % (Math.PI * 2), Math.sin(index * 0.37) * 0.08);
@@ -525,11 +664,18 @@ try {
           smoke: enabledStress.has('smoke'),
           weapons: enabledStress.has('weapons'),
         },
+        maximumLongTaskEntries: maximumLiveLongTaskEntries,
       });
       await page.waitForTimeout(sampleIntervalMs);
 
       const sample = await page.evaluate(() => {
         const api = window.__ATOMIC_ACRES_DEBUG__;
+        const longTaskSample = window.__PASS65_ENDURANCE_LIVE_LONG_TASK_SAMPLE__;
+        if (longTaskSample?.observer) {
+          longTaskSample.recordEntries(longTaskSample.observer.takeRecords());
+        }
+        longTaskSample?.observer?.disconnect();
+        delete window.__PASS65_ENDURANCE_LIVE_LONG_TASK_SAMPLE__;
         const state = api.snapshot();
         return {
           atMs: performance.now(),
@@ -551,6 +697,14 @@ try {
           grenadeWorldPool: state.grenadeVisual.pool,
           smokePresentation: state.dmrThermal.smokePresentation,
           weaponCatalog: state.weaponPresentation.browserWeaponCatalog,
+          liveLongTasks: longTaskSample?.evidence ?? {
+            supported: false,
+            count: 0,
+            totalDurationMs: 0,
+            maximumDurationMs: 0,
+            entries: [],
+            truncated: false,
+          },
           residency: api.sampleRendererResidency(),
         };
       });
@@ -601,6 +755,7 @@ try {
         liveWindowStart,
         screenshotHash,
         verifierCaptureIsolationMs: capture.captureIsolationMs,
+        verifierCaptureRecovery: capture.recovery,
         verifierHeldFrontier: capture.progress,
       };
       samples.push(receipt);
@@ -710,6 +865,9 @@ try {
     maximumLiveSubmissionGapMs,
     maximumLiveCompletionGapMs,
     maximumLivePendingMs,
+    requiredCaptureRecoveryCompletions,
+    maximumCaptureRecoveryCompletionMs,
+    maximumLiveLongTaskEntries,
     rustworksDurationMs,
     otherArenaDurationMs,
     arenaSequence,

@@ -204,10 +204,27 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('const maximumLiveSubmissionGapMs = 250;');
     expect(source).toContain('const maximumLiveCompletionGapMs = 500;');
     expect(source).toContain('const maximumLivePendingMs = 750;');
+    expect(source).toContain('const requiredCaptureRecoveryCompletions = 3;');
+    expect(source).toContain('const maximumCaptureRecoveryCompletionMs = 50;');
+    expect(source).toContain('const maximumLiveLongTaskEntries = 8;');
     expect(source).toContain('api.resetPresentationProgressWindow();');
     expect(source).toContain('presentation.progress.maximumSubmissionGapMs > maximumLiveSubmissionGapMs');
     expect(source).toContain('presentation.progress.maximumCompletionGapMs > maximumLiveCompletionGapMs');
     expect(source).toContain('presentation.progress.maximumPendingForMs > maximumLivePendingMs');
+    const captureIsolation = source.slice(
+      source.indexOf('async function captureCanvasOnly'),
+      source.indexOf('await mkdir(artifactRoot'),
+    );
+    expect(captureIsolation.indexOf('await page.screenshot({ clip })'))
+      .toBeLessThan(captureIsolation.indexOf('await requireCaptureRecoveryCompletions'));
+    expect(captureIsolation.indexOf('await requireCaptureRecoveryCompletions'))
+      .toBeLessThan(captureIsolation.lastIndexOf('await pauseAndDrainPresentation'));
+    expect(source).toContain('advancedBy === 1');
+    expect(source).toContain('completionLatencyMs <= maximumCompletionMs');
+    expect(source).toContain('liveLongTaskEvidence.entries.length < maximumLongTaskEntries');
+    expect(source).toContain('maximumLongTaskEntries: maximumLiveLongTaskEntries');
+    expect(source).toContain('recordEntries(longTaskSample.observer.takeRecords())');
+    expect(source).toContain('verifierCaptureRecovery: capture.recovery');
   });
 
   it('rejects degraded foreground cadence in the cold physical-menu gate', () => {
