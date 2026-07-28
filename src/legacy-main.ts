@@ -1209,6 +1209,14 @@ type BootstrapStage =
   | 'failed';
 let bootstrapStage: BootstrapStage = 'loading-module-assets';
 let bootstrapError: string | null = null;
+type MatchAdmissionCadence = Readonly<{
+  waitedMs: number;
+  stableWindowMs: number;
+  samples: number;
+  resets: number;
+  maximumGapMs: number;
+}>;
+let lastMatchAdmissionCadence: MatchAdmissionCadence | null = null;
 const displayCadencePromise = new Promise<number>((resolve) => {
   const samples: number[] = [];
   let previous = performance.now();
@@ -1274,6 +1282,45 @@ async function settleWebGpuPresentation(label: string, maximumLatencyMs = 500): 
     resize();
     await renderRuntime.compile(scene, camera);
   }
+}
+
+async function waitForStableMatchAdmissionCadence(): Promise<void> {
+  const minimumStableWindowMs = 1_000;
+  const maximumWaitMs = 5_000;
+  const hitchThresholdMs = 50;
+  bootstrapStage = 'verifying-first-presentation';
+  lastMatchAdmissionCadence = await new Promise<MatchAdmissionCadence>((resolve, reject) => {
+    const startedAt = performance.now();
+    let stableSince = startedAt;
+    let previousAt = 0;
+    let samples = 0;
+    let resets = 0;
+    let maximumGapMs = 0;
+    const sample = (now: number): void => {
+      samples += 1;
+      if (previousAt > 0) {
+        const gapMs = Math.max(0, now - previousAt);
+        maximumGapMs = Math.max(maximumGapMs, gapMs);
+        if (gapMs > hitchThresholdMs) {
+          stableSince = now;
+          resets += 1;
+        }
+      }
+      previousAt = now;
+      const waitedMs = Math.max(0, now - startedAt);
+      if (now - stableSince >= minimumStableWindowMs) {
+        resolve(Object.freeze({ waitedMs, stableWindowMs: now - stableSince, samples, resets, maximumGapMs }));
+        return;
+      }
+      if (waitedMs >= maximumWaitMs) {
+        reject(new Error(`Match admission cadence did not stabilize within ${maximumWaitMs}ms (${Math.round(maximumGapMs)}ms maximum gap)`));
+        return;
+      }
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
+  bootstrapStage = 'ready';
 }
 
 function buildSky(): void {
@@ -7852,6 +7899,7 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   const requiredName = requirePlayerName();
   if (!requiredName) return;
   matchStartPreparing = true;
+  lastMatchAdmissionCadence = null;
   prepareDeploymentTransition();
   applyMenuLifecycle({ type: 'match-start' });
   syncMenuPreviewCanvasPlacement();
@@ -8009,8 +8057,15 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
       await killstreakPresentation.prewarm(renderRuntime, camera, -killstreakMatchEpoch);
       await renderRuntime.compile(scene, camera);
       await settleWebGpuPresentation('Initial match');
+      // Match-only operators, support pools and their prewarm bookkeeping are
+      // created immediately before this boundary. Keep the opaque deployment
+      // surface in control until the browser has delivered a full hitch-free
+      // second; deferred driver work or a major collection must never spill
+      // into the first controllable frame.
+      await waitForStableMatchAdmissionCadence();
     } else {
       await renderRuntime.compileAndRender(scene, camera, scene);
+      await waitForStableMatchAdmissionCadence();
     }
   } finally {
     renderSubmissionPaused = priorRenderSubmissionPaused;
@@ -16104,7 +16159,7 @@ const debugWindow = window as Window & {
 };
 debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   snapshot: () => ({
-    bootstrap: { stage: bootstrapStage, error: bootstrapError },
+    bootstrap: { stage: bootstrapStage, error: bootstrapError, matchAdmissionCadence: lastMatchAdmissionCadence },
     gameStarted,
     frameCount,
     gameMode,

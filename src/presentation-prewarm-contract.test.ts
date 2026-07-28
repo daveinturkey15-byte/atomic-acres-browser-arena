@@ -101,6 +101,12 @@ describe('presentation prewarm startup contract', () => {
     expect(matchDeployment.indexOf('await killstreakPresentation.prewarm(renderRuntime, camera, -killstreakMatchEpoch);'))
       .toBeLessThan(matchDeployment.indexOf('await renderRuntime.compile(scene, camera);'));
     expect(matchDeployment).toContain("await settleWebGpuPresentation('Initial match')");
+    expect(matchDeployment).toContain('await waitForStableMatchAdmissionCadence();');
+    expect(matchDeployment.indexOf('await waitForStableMatchAdmissionCadence();'))
+      .toBeLessThan(matchDeployment.indexOf('gameStarted = true;'));
+    expect(source).toContain('const minimumStableWindowMs = 1_000;');
+    expect(source).toContain('const hitchThresholdMs = 50;');
+    expect(source).toContain('matchAdmissionCadence: lastMatchAdmissionCadence');
     expect(source).toContain('submitWebGpuFrame(performance.now(), true)');
     expect(source).toContain('await flushWebGpuFrames(12_000)');
     expect(source).toContain('adaptiveQuality.forceDownshift(');
@@ -119,6 +125,16 @@ describe('presentation prewarm startup contract', () => {
     expect(menuLoadoutApply.indexOf('prewarmBrowserWeaponCatalog'))
       .toBeLessThan(menuLoadoutApply.indexOf('weaponView.setWeapon(selectedWeapon, true)'));
     expect(source).toContain("bootstrapStage = 'ready'");
+  });
+
+  it('runs the shed reset probe only across the final two RustRig visits', () => {
+    const source = readFileSync(new URL('../scripts/qa/verify-pass65-webgpu-endurance.mjs', import.meta.url), 'utf8');
+    expect(source).toContain("arenaId === 'rustworks-1v1' ? visit : -1");
+    expect(source).toContain('rustworksVisitIndices.length >= 2');
+    expect(source).toContain('rustworksVisitIndices[rustworksVisitIndices.length - 2]');
+    expect(source).toContain('rustworksVisitIndices[rustworksVisitIndices.length - 1]');
+    expect(source).not.toContain('const doorResetProbeDetachVisit = arenaSequence.length - 2;');
+    expect(source).not.toContain('const doorResetProbeRestoreVisit = arenaSequence.length - 1;');
   });
 
   it('adds the four readiness terms and bootstrap stage to timeout evidence', () => {

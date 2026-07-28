@@ -51,8 +51,15 @@ const enabledStress = new Set(diagnosticStress && diagnosticStress !== 'all'
 const arenaSequence = diagnosticSequence.length > 0
   ? diagnosticSequence
   : diagnosticArena ? [diagnosticArena] : canonicalArenaSequence;
-const doorResetProbeDetachVisit = arenaSequence.length - 2;
-const doorResetProbeRestoreVisit = arenaSequence.length - 1;
+const rustworksVisitIndices = arenaSequence
+  .map((arenaId, visit) => arenaId === 'rustworks-1v1' ? visit : -1)
+  .filter((visit) => visit >= 0);
+const doorResetProbeDetachVisit = rustworksVisitIndices.length >= 2
+  ? rustworksVisitIndices[rustworksVisitIndices.length - 2]
+  : -1;
+const doorResetProbeRestoreVisit = rustworksVisitIndices.length >= 2
+  ? rustworksVisitIndices[rustworksVisitIndices.length - 1]
+  : -1;
 
 function digest(buffer) {
   return createHash('sha256').update(buffer).digest('hex');
