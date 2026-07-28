@@ -1096,7 +1096,7 @@ export class WeaponPresentation {
       for (const [weaponId, model] of this.models) model.visible = weaponId === id;
       this.modelLastUsed.set(id, ++this.modelUseCounter);
       this.updateActiveSockets(id);
-      this.trimBrowserWeaponModels();
+      if (this.browserRuntime) this.trimBrowserWeaponModels();
     } else if (typeof document !== 'undefined') {
       // Keep the last complete viewmodel mounted while the requested authored
       // model is loading. The completion callback performs the visibility swap
@@ -1116,7 +1116,12 @@ export class WeaponPresentation {
       this.ensureBrowserWeapon(id);
     }
     const flashlight = WEAPONS[id].flashlight;
-    this.weaponFlashlight.visible = flashlight !== null && !this.flattenMaterials;
+    // Keep one quality spotlight in the renderer topology from bootstrap onward.
+    // Toggling the light's visibility when the flashlight pistol was equipped
+    // forced a new WebGPU lighting/shadow pipeline during live play and could
+    // freeze the presented frame for several seconds. Zero intensity preserves
+    // the dark state without changing shader topology.
+    this.weaponFlashlight.visible = !this.flattenMaterials;
     this.weaponFlashlight.intensity = flashlight?.intensity ?? 0;
     this.weaponFlashlight.distance = flashlight?.rangeM ?? 0;
     this.weaponFlashlight.angle = flashlight?.coneAngleRadians ?? 0.42;

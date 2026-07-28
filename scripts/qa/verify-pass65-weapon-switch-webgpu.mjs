@@ -202,15 +202,17 @@ try {
 
   const admittedState = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
   authority = {
-    kind: 'menu-primary-and-secondary-options-plus-map-special',
+    kind: 'menu-primary-and-secondary-options-plus-handicap-sidearm-and-map-special',
     primaryOptions: menuAuthority.primaryOptions,
     secondaryOptions: menuAuthority.secondaryOptions,
     admittedSecondary: admittedState.player.secondaryWeapon,
+    handicapSidearm: 'magnum',
     mapSpecial: 'railgun',
   };
   const expectedWeapons = unique([
     ...authority.primaryOptions,
     ...authority.secondaryOptions,
+    authority.handicapSidearm,
     authority.mapSpecial,
   ]);
   const knownProfiles = Object.keys(admittedState.ballistics.weaponProfiles);
@@ -253,10 +255,12 @@ try {
     const frame = (now) => {
       monitor.maximumFrameGapMs = Math.max(monitor.maximumFrameGapMs, now - monitor.lastFrameAt);
       monitor.lastFrameAt = now;
-      sample('animation-frame');
       if (!monitor.stopped) monitor.animationFrameId = requestAnimationFrame(frame);
     };
-    monitor.intervalId = window.setInterval(() => sample('interval'), 0);
+    // Full debug snapshots are deliberately sampled at display cadence. A 0ms
+    // interval plus an additional snapshot in every animation frame distorted
+    // the very frame-gap measurement this gate is responsible for checking.
+    monitor.intervalId = window.setInterval(() => sample('interval'), 16);
     monitor.animationFrameId = requestAnimationFrame(frame);
     window.__PASS65_WEAPON_SWITCH_MONITOR__ = monitor;
   });

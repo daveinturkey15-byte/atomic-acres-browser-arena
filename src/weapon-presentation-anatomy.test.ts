@@ -82,6 +82,26 @@ describe('first-person anatomical presentation', () => {
     presentation.setFireCaptureAgeMs(null);
   });
 
+  it('keeps the flashlight lighting topology resident across live weapon switches', () => {
+    const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
+    const presentation = new WeaponPresentation(camera, false);
+    const flashlight = camera.getObjectByName('always-on-solid-occluded-weapon-flashlight') as THREE.SpotLight;
+    expect(flashlight).toBeInstanceOf(THREE.SpotLight);
+
+    presentation.setWeapon('carbine', true);
+    expect(flashlight.visible).toBe(true);
+    expect(flashlight.intensity).toBe(0);
+
+    presentation.setWeapon('flashlight-pistol', true);
+    expect(flashlight.visible).toBe(true);
+    expect(flashlight.intensity).toBeGreaterThan(0);
+    expect(flashlight.castShadow).toBe(true);
+
+    presentation.setWeapon('pistol', true);
+    expect(flashlight.visible).toBe(true);
+    expect(flashlight.intensity).toBe(0);
+  });
+
   it('makes a non-scattergun casing visible at the accepted shot boundary', () => {
     const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
     const presentation = new WeaponPresentation(camera, false);
