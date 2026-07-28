@@ -40,11 +40,12 @@ export async function runRange(args) {
     await trustedClick(page, '#solo');
     await page.waitForFunction(() => document.querySelector('#match-mode-label')?.textContent?.includes('TARGET DRILL'), null, { timeout: 30_000 });
     await sleep(3500); await page.screenshot({ path: resolve(output, 'range-spawn.png') });
-    await trustedClick(page, '#game'); await sleep(120);
+    let current = await hud(page);
+    if (!current.pointer || !current.focused) throw new Error('Visible live-range pointer/focus receipt missing before bench movement');
     await page.keyboard.down('KeyA'); await sleep(1000); await page.keyboard.up('KeyA');
     await page.keyboard.down('KeyW'); await sleep(700); await page.keyboard.up('KeyW');
     const pickupAdjustments = [['KeyF', 0], ['KeyA', 300], ['KeyW', 220], ['KeyD', 180], ['KeyA', 360], ['KeyW', 260]];
-    let current = await hud(page);
+    current = await hud(page);
     for (const [code, duration] of pickupAdjustments) {
       if (current.weapon === 'VECTORLINE SMG') break;
       if (duration > 0) { await page.keyboard.down(code); await sleep(duration); await page.keyboard.up(code); }
