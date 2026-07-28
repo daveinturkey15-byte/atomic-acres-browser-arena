@@ -59,6 +59,16 @@ describe('presentation prewarm startup contract', () => {
     expect(arenaPresentationPrewarm).toContain('await impactPresentation.prewarm(renderRuntime, camera, sceneGeneration);');
     expect(sharedAssets).not.toContain('tracerPool.prewarm(');
     expect(sharedAssets).not.toContain('impactPresentation.prewarm(');
+    expect(arenaPresentationPrewarm).toContain('await grenadeExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration);');
+    expect(arenaPresentationPrewarm).toContain('await supportExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration);');
+    expect(arenaPresentationPrewarm).toContain('await deathDropPresentationPool.prewarm(renderRuntime, camera, player.weapon);');
+    expect(arenaPresentationPrewarm).toContain('await prewarmNukePresentation();');
+    expect(arenaPresentationPrewarm).toContain('await prewarmOverdrivePresentation();');
+    expect(sharedAssets).not.toContain('grenadeExplosionPresentation.prewarm(');
+    expect(sharedAssets).not.toContain('supportExplosionPresentation.prewarm(');
+    expect(sharedAssets).not.toContain('deathDropPresentationPool.prewarm(');
+    expect(sharedAssets).not.toContain('prewarmNukePresentation(');
+    expect(sharedAssets).not.toContain('prewarmOverdrivePresentation(');
     expect(source).toContain('const grenadeWorldPresentationPool = new GrenadeWorldPresentationPool(scene);');
     expect(source).toContain('await grenadeWorldPresentationPool.prewarm(renderRuntime, camera, sceneGeneration);');
     expect(source).not.toContain('createGrenadePresentation(');

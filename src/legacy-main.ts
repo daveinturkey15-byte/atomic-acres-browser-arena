@@ -17891,16 +17891,6 @@ async function prepareSharedGameplayAssets(): Promise<void> {
     // First-person geometry is composited after world depth is cleared. Contact
     // retreat still keeps it tucked near walls without world geometry cutting
     // holes through hands and weapons.
-    bootstrapStage = 'prewarming-grenade-explosion';
-    await grenadeExplosionPresentation.prewarm(renderRuntime, camera);
-    bootstrapStage = 'prewarming-support-explosion';
-    await supportExplosionPresentation.prewarm(renderRuntime, camera);
-    bootstrapStage = 'prewarming-death-drops';
-    await deathDropPresentationPool.prewarm(renderRuntime, camera, player.weapon);
-    bootstrapStage = 'prewarming-nuke';
-    await prewarmNukePresentation();
-    bootstrapStage = 'prewarming-overdrive';
-    await prewarmOverdrivePresentation();
     weaponView.setWeapon(player.weapon, true);
     weaponView.root.visible = false;
     bootstrapStage = 'gameplay-assets-ready';
@@ -17916,6 +17906,16 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
   await tracerPool.prewarm(renderRuntime, camera, sceneGeneration);
   bootstrapStage = 'prewarming-combat-impacts';
   await impactPresentation.prewarm(renderRuntime, camera, sceneGeneration);
+  bootstrapStage = 'prewarming-grenade-explosion';
+  await grenadeExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration);
+  bootstrapStage = 'prewarming-support-explosion';
+  await supportExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration);
+  bootstrapStage = 'prewarming-death-drops';
+  await deathDropPresentationPool.prewarm(renderRuntime, camera, player.weapon);
+  bootstrapStage = 'prewarming-nuke';
+  await prewarmNukePresentation();
+  bootstrapStage = 'prewarming-overdrive';
+  await prewarmOverdrivePresentation();
   bootstrapStage = 'prewarming-grenade-world-presentations';
   await prewarmGrenadeWorldPresentations(sceneGeneration);
   bootstrapStage = 'prewarming-killstreak-presentations';
