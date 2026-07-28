@@ -1397,7 +1397,6 @@ export class KillstreakPresentation {
   private readonly locallyExpiredMarkerRevisions = new Map<string, number>();
   private gpuPrewarmGeneration = -1;
   private gpuPrewarmPromise: Promise<void> | null = null;
-  private gpuPrewarmActive = false;
   private swarmOverlapAdmission: {
     key: string;
     chopperAdmitted: boolean;
@@ -1691,14 +1690,12 @@ export class KillstreakPresentation {
     if (this.disposed) throw new Error('Cannot prewarm a disposed killstreak presentation');
     if (this.gpuPrewarmGeneration === sceneGeneration) return;
     if (this.gpuPrewarmPromise) return this.gpuPrewarmPromise;
-    this.gpuPrewarmActive = true;
     const operation = this.performGpuPrewarm(runtime, camera, sceneGeneration);
     this.gpuPrewarmPromise = operation;
     try {
       await operation;
     } finally {
       if (this.gpuPrewarmPromise === operation) this.gpuPrewarmPromise = null;
-      this.gpuPrewarmActive = false;
     }
   }
 
@@ -1758,10 +1755,6 @@ export class KillstreakPresentation {
       ...liveActivationEntries.filter((entry) => entry.root.userData.presentationPoolKey === 'chopper').map((entry) => entry.root),
       ...this.swarmInstanceBatches.map((batch) => batch.root),
     ];
-    const swarmBatchStates = new Map(this.swarmInstanceBatches.map((batch) => [batch.root, Object.freeze({
-      count: batch.root.count,
-      matrices: new Float32Array(batch.root.instanceMatrix.array),
-    })] as const));
     const originallyHiddenNodes = new Set<THREE.Object3D>();
     const originallyUnculledNodes = new Set<THREE.Object3D>();
     const stagedRootPositions = new Map<THREE.Object3D, THREE.Vector3>();
@@ -1832,19 +1825,6 @@ export class KillstreakPresentation {
     };
 
     try {
-      // clear() normally makes every inactive swarm batch count=0. A zero-count
-      // compile creates shader objects but Three skips the actual instanced draw,
-      // leaving the first live 24-drone activation to allocate its backend state.
-      // Submit the exact bounded count while the deployment surface is opaque.
-      const prewarmInstanceMatrix = new THREE.Matrix4();
-      for (const batch of this.swarmInstanceBatches) {
-        for (let index = 0; index < 24; index += 1) {
-          prewarmInstanceMatrix.makeTranslation((index % 6 - 2.5) * 2.4, Math.floor(index / 6) * 1.8, 0);
-          batch.root.setMatrixAt(index, prewarmInstanceMatrix);
-        }
-        batch.root.count = 24;
-        batch.root.instanceMatrix.needsUpdate = true;
-      }
       for (let batchIndex = 0; batchIndex < stagedBatches.length; batchIndex += 1) {
         const batch = stagedBatches[batchIndex]!;
         stageBatchInView(batch, 30 + batchIndex * 4, batchIndex === 0 ? 2.5 : 0.9);
@@ -1897,11 +1877,6 @@ export class KillstreakPresentation {
       }
       if (!this.disposed) this.gpuPrewarmGeneration = sceneGeneration;
     } finally {
-      for (const [batch, state] of swarmBatchStates) {
-        batch.instanceMatrix.array.set(state.matrices);
-        batch.count = state.count;
-        batch.instanceMatrix.needsUpdate = true;
-      }
       for (const [material, depthWrite] of possessedMaterialDepthWrite) material.depthWrite = depthWrite;
       for (const [lod, autoUpdate] of lodStates) lod.autoUpdate = autoUpdate;
       for (const stagedRoot of stagedRoots) stagedRoot.traverse((node) => {
@@ -2355,10 +2330,6 @@ export class KillstreakPresentation {
   }
 
   clear(): void {
-    // The match bootstrap loop can call clear() while the async GPU fence is in
-    // flight. Preserve the staged exact-count submission until prewarm settles;
-    // no live presentation state exists behind the opaque deployment surface.
-    if (this.gpuPrewarmActive) return;
     this.swarmOverlapAdmission = null;
     this.setFirstPersonEntity(null);
     for (const presented of this.entities.values()) this.releasePresentedEntity(presented);
