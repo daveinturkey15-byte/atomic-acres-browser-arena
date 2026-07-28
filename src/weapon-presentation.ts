@@ -39,6 +39,7 @@ import {
   resetMinigunSpool,
   type MinigunSpoolPhase,
 } from './minigun-spool';
+import { RUNTIME_WEAPON_RETENTION_LIMIT } from './weapon-prewarm-catalog';
 
 export type WeaponPose = {
   dt: number;
@@ -215,7 +216,7 @@ export type WeaponViewmodelGpuPrewarmer = (
 
 /** Original first-person weapon presentation with ADS, sprint, recoil, melee and staged reload motion. */
 export class WeaponPresentation {
-  static readonly MAX_RETAINED_WEBGPU_WEAPONS = 4;
+  static readonly MAX_RETAINED_WEBGPU_WEAPONS = RUNTIME_WEAPON_RETENTION_LIMIT;
   readonly root = new THREE.Group();
   private readonly browserRuntime: boolean;
   private readonly models = new Map<WeaponId, THREE.Object3D>();
@@ -885,9 +886,9 @@ export class WeaponPresentation {
    * Loads, creates and GPU-prewarms one bounded gameplay weapon set behind the
    * deployment surface. WebGPU compilation can synchronously occupy the browser
    * main thread even though compileAsync returns a Promise, so a live lazy
-   * switch is not a safe presentation boundary. The hard four-model ceiling
-   * keeps RustRig below its texture budget; WebGL/no-hook callers retain the
-   * existing bounded two-model lazy cache.
+   * switch is not a safe presentation boundary. Deployment therefore pins the
+   * complete arena-reachable set; WebGL/no-hook callers retain the existing
+   * bounded two-model lazy cache.
    */
   async prewarmBrowserWeaponCatalog(
     requestedIds: readonly WeaponId[],
@@ -897,19 +898,6 @@ export class WeaponPresentation {
     const ids = [...new Set(requestedIds)];
     if (ids.length === 0 || ids.length > WeaponPresentation.MAX_RETAINED_WEBGPU_WEAPONS) {
       throw new Error(`Pass 65 WebGPU weapon prewarm requires 1-${WeaponPresentation.MAX_RETAINED_WEBGPU_WEAPONS} unique models`);
-    }
-    if (!ids.includes(this.active)) {
-      // Loadout changes may replace both primary and secondary while the menu
-      // still owns the screen. Move presentation ownership to an already-warm
-      // member of the destination set (the bounded policy pins crossbow/DMR),
-      // then the old model can retire without a fifth live catalog entry or a
-      // cold visibility swap.
-      const bridge = ids.find((id) => {
-        const model = this.models.get(id);
-        return this.browserResidentWeaponIds.has(id) && model !== undefined && this.modelIsGpuReady(model);
-      });
-      if (!bridge) throw new Error(`Pass 65 WebGPU weapon prewarm has no ready bridge from active model: ${this.active}`);
-      this.setWeapon(bridge, true);
     }
     if (this.browserCatalogPrewarmPromise) {
       await this.browserCatalogPrewarmPromise;
@@ -1108,6 +1096,7 @@ export class WeaponPresentation {
       for (const [weaponId, model] of this.models) model.visible = weaponId === id;
       this.modelLastUsed.set(id, ++this.modelUseCounter);
       this.updateActiveSockets(id);
+      this.trimBrowserWeaponModels();
     } else if (typeof document !== 'undefined') {
       // Keep the last complete viewmodel mounted while the requested authored
       // model is loading. The completion callback performs the visibility swap

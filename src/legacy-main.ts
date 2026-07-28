@@ -105,6 +105,7 @@ import {
 import { DHV_VALUES, applyDhvIncomingDamage, applyDhvWeaponOutgoingDamage, dhvLabel, isDhv, reportedDhvRawDamage, type Dhv } from './handicap';
 import { GUN_RANGE_WEAPON_STATIONS, nearestGunRangeWeaponStation, type GunRangeWeaponStation } from './gun-range-armory';
 import { loadGunRangeRackPresentation } from './gun-range-rack-presentation';
+import { menuWeaponPrewarmCatalog, weaponPrewarmCatalogForArena } from './weapon-prewarm-catalog';
 import { ArenaAudio, GRENADE_FUSE_BEEP_START_MS, crossbowFuseBeepIntervalMs, grenadeFuseBeepIntervalMs } from './audio';
 import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sweepSphereAgainstBoxes } from './collision';
 import {
@@ -4594,14 +4595,8 @@ function activeLoadoutSelection(state = loadoutState): CombatLoadoutSelection {
   });
 }
 
-function weaponPrewarmCatalogForArena(arenaId: ArenaId): readonly WeaponId[] {
-  if (arenaId === 'gun-range') {
-    const rangePrimary: PrimaryWeaponId = 'carbine';
-    const rangeSidearm: WeaponId = localDhv === 'X' ? 'magnum' : 'pistol';
-    return [rangePrimary, rangeSidearm, 'explosive-crossbow', 'm14-ebr'];
-  }
-  const deployment = activeLoadoutSelection();
-  return [deployment.primary, deployment.secondary, 'explosive-crossbow', 'm14-ebr'];
+function gunRangeSidearmForWeaponPrewarm(): SidearmWeaponId {
+  return localDhv === 'X' ? 'magnum' : 'pistol';
 }
 
 function selectedLoadoutLabel(state = loadoutState): string {
@@ -4641,7 +4636,7 @@ function applyMenuLoadoutImmediately(): void {
   }
   const generation = ++menuLoadoutPresentationGeneration;
   const selectedWeapon = player.weapon;
-  void weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(selectedArena.id)).then(() => {
+  void weaponView.prewarmBrowserWeaponCatalog(menuWeaponPrewarmCatalog(selection.primary, selection.secondary)).then(() => {
     if (generation !== menuLoadoutPresentationGeneration || gameStarted || player.weapon !== selectedWeapon) return;
     weaponView.setWeapon(selectedWeapon, true);
   }).catch((error: unknown) => {
@@ -8053,7 +8048,10 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
     }
   }
   bootstrapStage = 'prewarming-weapon-catalog';
-  await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(selectedArena.id));
+  await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(
+    selectedArena.id,
+    gunRangeSidearmForWeaponPrewarm(),
+  ));
   weaponView.setWeapon(player.weapon, true);
   killstreakLoadoutController.releaseAfterMatch();
   const frozenKillstreakLoadout = killstreakLoadoutController.freezeAtMatchStart();
@@ -15256,7 +15254,10 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
     graphicsRefinement.refine(scene, maximumAnisotropy);
     await waitForPendingArtTextures();
     bootstrapStage = 'prewarming-weapon-catalog';
-    await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(nextSelection.id));
+    await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(
+      nextSelection.id,
+      gunRangeSidearmForWeaponPrewarm(),
+    ));
     batchSelectedArenaPresentation();
     setArenaPresentationVisibility();
     matchState = createMatch(performance.now(), selectedArena.matchRules);

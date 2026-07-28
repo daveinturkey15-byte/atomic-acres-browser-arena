@@ -84,15 +84,15 @@ describe('presentation prewarm startup contract', () => {
     expect(source).not.toContain('createGrenadePresentation(');
     expect(source).not.toContain('disposeGrenadePresentation(');
     expect(source).toContain("bootstrapStage = 'prewarming-weapon-catalog'");
-    expect(matchDeployment).toContain('await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(selectedArena.id));');
+    expect(matchDeployment).toContain('await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(');
     expect(matchDeployment).toContain("const arenaTransitionDetail = arenaTransitionFailure ? `: ${arenaTransitionFailure}` : '';");
     expect(matchDeployment).toContain('did not commit before match start${arenaTransitionDetail}');
     expect(matchDeployment).not.toContain('throw new Error(`Selected arena ${requestedArenaId} did not commit before match start`);');
-    expect(source).toContain("const rangeSidearm: WeaponId = localDhv === 'X' ? 'magnum' : 'pistol';");
-    expect(matchDeployment.indexOf('prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(selectedArena.id))'))
+    expect(source).toContain("return localDhv === 'X' ? 'magnum' : 'pistol';");
+    expect(matchDeployment.indexOf('prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena('))
       .toBeLessThan(matchDeployment.indexOf('weaponView.setWeapon(player.weapon, true);'));
-    expect(arenaDeployment).toContain('await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(nextSelection.id));');
-    expect(arenaDeployment.indexOf('weaponPrewarmCatalogForArena(nextSelection.id)'))
+    expect(arenaDeployment).toContain('await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(');
+    expect(arenaDeployment.indexOf('weaponPrewarmCatalogForArena('))
       .toBeLessThan(arenaDeployment.indexOf('respawn(false);'));
     expect(source).toContain("bootstrapStage = 'prewarming-killstreak-presentations'");
     expect(arenaPresentationPrewarm).toContain('await killstreakPresentation.prewarm(renderRuntime, camera, sceneGeneration);');
@@ -166,7 +166,7 @@ describe('presentation prewarm startup contract', () => {
     expect(weaponPrewarm).not.toContain('multiplyScalar(0.0001)');
     expect(source).toContain('await renderRuntime.compileAndRender(model, camera, scene);');
     expect(source).toContain('streamedWeaponGpuPrewarmer,');
-    expect(menuLoadoutApply).toContain('weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(selectedArena.id))');
+    expect(menuLoadoutApply).toContain('weaponView.prewarmBrowserWeaponCatalog(menuWeaponPrewarmCatalog(selection.primary, selection.secondary))');
     expect(menuLoadoutApply.indexOf('prewarmBrowserWeaponCatalog'))
       .toBeLessThan(menuLoadoutApply.indexOf('weaponView.setWeapon(selectedWeapon, true)'));
     expect(source).toContain("bootstrapStage = 'ready'");
