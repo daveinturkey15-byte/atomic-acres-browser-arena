@@ -79,7 +79,7 @@ describe('killstreak presentation', () => {
     webGlPresentation.dispose();
   });
 
-  it('admits standalone and overlapping 24-drone storage batches only across completed presentation frames', () => {
+  it('admits a legal chopper plus 24-drone overlap only across completed presentation frames', () => {
     const presentation = new KillstreakPresentation(new THREE.Scene(), undefined, true);
     const overlap = snapshot(27);
     const overlapBatchCount = presentation.telemetry().swarmRenderBatches;
@@ -91,30 +91,17 @@ describe('killstreak presentation', () => {
     expect(presentation.telemetry().swarmRenderedInstances).toBe(0);
     presentation.sync(overlap, 1_048, { submissionSequence: 12, completedSequence: 12 });
     expect(presentation.telemetry().swarmRenderedInstances).toBe(4);
-    expect(presentation.root.children.filter((node) => node.userData.swarmInstancedPresentation === true && node.visible)).toHaveLength(1);
-    for (let sequence = 13; sequence <= 24; sequence += 1) {
-      presentation.sync(overlap, 1_048 + (sequence - 12) * 16, { submissionSequence: sequence, completedSequence: sequence });
-    }
+    expect(presentation.root.children.filter((node) => node.userData.swarmInstancedPresentation === true && node.visible)).toHaveLength(2);
+    presentation.sync(overlap, 1_064, { submissionSequence: 13, completedSequence: 13 });
+    presentation.sync(overlap, 1_080, { submissionSequence: 14, completedSequence: 14 });
+    presentation.sync(overlap, 1_096, { submissionSequence: 15, completedSequence: 15 });
+    presentation.sync(overlap, 1_112, { submissionSequence: 16, completedSequence: 16 });
+    presentation.sync(overlap, 1_128, { submissionSequence: 17, completedSequence: 17 });
+    presentation.sync(overlap, 1_144, { submissionSequence: 18, completedSequence: 18 });
     expect(presentation.telemetry().swarmRenderedInstances).toBe(24);
     expect(presentation.root.children.filter((node) => node.userData.swarmInstancedPresentation === true && node.visible)).toHaveLength(overlapBatchCount);
-    presentation.sync(snapshot(1), 1_256, { submissionSequence: 25, completedSequence: 25 });
+    presentation.sync(snapshot(1), 1_160, { submissionSequence: 19, completedSequence: 19 });
     expect(presentation.telemetry().swarmRenderedInstances).toBe(0);
-
-    const swarmOnly = { ...snapshot(27), entities: snapshot(27).entities.slice(3) };
-    const versionsBefore = presentation.root.children
-      .filter((node): node is THREE.InstancedMesh => node.userData.swarmInstancedPresentation === true)
-      .map((batch) => batch.instanceMatrix.version);
-    presentation.sync(swarmOnly, 2_000, { submissionSequence: 30, completedSequence: 30 });
-    const versionsWhileHidden = presentation.root.children
-      .filter((node): node is THREE.InstancedMesh => node.userData.swarmInstancedPresentation === true)
-      .map((batch) => batch.instanceMatrix.version);
-    expect(versionsWhileHidden).toEqual(versionsBefore);
-    presentation.sync(swarmOnly, 2_016, { submissionSequence: 31, completedSequence: 31 });
-    expect(presentation.telemetry().swarmRenderedInstances).toBe(4);
-    const versionsAfterFirstBatch = presentation.root.children
-      .filter((node): node is THREE.InstancedMesh => node.userData.swarmInstancedPresentation === true)
-      .map((batch) => batch.instanceMatrix.version);
-    expect(versionsAfterFirstBatch.filter((version, index) => version > versionsWhileHidden[index]!)).toHaveLength(1);
     presentation.dispose();
   });
 

@@ -1394,7 +1394,7 @@ export class KillstreakPresentation {
   private gpuPrewarmGeneration = -1;
   private gpuPrewarmPromise: Promise<void> | null = null;
   private gpuPrewarmActive = false;
-  private swarmActivationAdmission: {
+  private swarmOverlapAdmission: {
     key: string;
     chopperAdmitted: boolean;
     admittedInstances: number;
@@ -1639,12 +1639,6 @@ export class KillstreakPresentation {
     const sourceWorldMatrix = new THREE.Matrix4();
     for (const entry of active) entry.root.updateWorldMatrix(true, false);
     for (const [batchIndex, batch] of this.swarmInstanceBatches.entries()) {
-      const batchAdmitted = batchIndex < maximumVisibleBatches;
-      if (!batchAdmitted) {
-        batch.root.count = 0;
-        batch.root.visible = false;
-        continue;
-      }
       for (const [instanceIndex, entry] of active.entries()) {
         const poolIndex = Number(entry.root.userData.presentationPoolIndex);
         const source = Number.isInteger(poolIndex) ? batch.sources[poolIndex] : undefined;
@@ -1659,8 +1653,9 @@ export class KillstreakPresentation {
         instanceMatrix.multiplyMatrices(inverseRoot, sourceWorldMatrix);
         batch.root.setMatrixAt(instanceIndex, instanceMatrix);
       }
-      batch.root.count = active.length;
-      batch.root.visible = active.length > 0;
+      const batchAdmitted = batchIndex < maximumVisibleBatches;
+      batch.root.count = batchAdmitted ? active.length : 0;
+      batch.root.visible = batchAdmitted && active.length > 0;
       batch.root.instanceMatrix.needsUpdate = true;
     }
   }
@@ -1988,53 +1983,54 @@ export class KillstreakPresentation {
       && Number.isSafeInteger(presentationProgress.completedSequence)
       && presentationProgress.submissionSequence >= 0
       && presentationProgress.completedSequence >= 0;
-    if (liveSwarm.length > 0 && progressIsUsable) {
+    if (liveChoppers.length > 0 && liveSwarm.length > 0 && progressIsUsable) {
       const key = [...liveChoppers, ...liveSwarm]
         .map((entity) => entity.activationId)
         .filter((activationId, index, values) => values.indexOf(activationId) === index)
         .sort()
         .join('|');
-      if (!this.swarmActivationAdmission || this.swarmActivationAdmission.key !== key) {
-        // Authority remains immediate, but a cold WebGPU driver can still defer
-        // storage-buffer and pipeline work until the exact live matrices arrive.
-        // Admit one render batch per completed presentation frontier so no live
-        // frame pays for all 13 authored batches. The formation is complete
-        // during ingress, before any swarm gun may fire.
-        this.swarmActivationAdmission = {
+      if (!this.swarmOverlapAdmission || this.swarmOverlapAdmission.key !== key) {
+        // The exact full chopper+24-drone visibility edge intermittently stalls
+        // Chrome's WebGPU compositor even though each family is smooth alone and
+        // the combined pipeline is prewarmed. Keep authority immediate, but
+        // admit pooled drone sources and their render batches only after each
+        // preceding presentation frontier completes. The complete formation is
+        // visible well before its 500ms fire gate.
+        this.swarmOverlapAdmission = {
           key,
-          chopperAdmitted: liveChoppers.length === 0,
+          chopperAdmitted: false,
           admittedInstances: 0,
           admittedBatches: 0,
           requiredCompletionSequence: presentationProgress.submissionSequence + 1,
         };
       } else if (
-        (!this.swarmActivationAdmission.chopperAdmitted
-          || this.swarmActivationAdmission.admittedInstances < liveSwarm.length
-          || this.swarmActivationAdmission.admittedBatches < this.swarmInstanceBatches.length)
-        && presentationProgress.completedSequence >= this.swarmActivationAdmission.requiredCompletionSequence
+        (!this.swarmOverlapAdmission.chopperAdmitted
+          || this.swarmOverlapAdmission.admittedInstances < liveSwarm.length
+          || this.swarmOverlapAdmission.admittedBatches < this.swarmInstanceBatches.length)
+        && presentationProgress.completedSequence >= this.swarmOverlapAdmission.requiredCompletionSequence
       ) {
-        if (!this.swarmActivationAdmission.chopperAdmitted) {
-          this.swarmActivationAdmission.chopperAdmitted = true;
+        if (!this.swarmOverlapAdmission.chopperAdmitted) {
+          this.swarmOverlapAdmission.chopperAdmitted = true;
         } else {
-          this.swarmActivationAdmission.admittedInstances = Math.min(
+          this.swarmOverlapAdmission.admittedInstances = Math.min(
             liveSwarm.length,
-            this.swarmActivationAdmission.admittedInstances + 4,
+            this.swarmOverlapAdmission.admittedInstances + 4,
           );
-          this.swarmActivationAdmission.admittedBatches = Math.min(
+          this.swarmOverlapAdmission.admittedBatches = Math.min(
             this.swarmInstanceBatches.length,
-            this.swarmActivationAdmission.admittedBatches + 1,
+            this.swarmOverlapAdmission.admittedBatches + 2,
           );
         }
-        this.swarmActivationAdmission.requiredCompletionSequence = presentationProgress.submissionSequence + 1;
+        this.swarmOverlapAdmission.requiredCompletionSequence = presentationProgress.submissionSequence + 1;
       }
-      maximumVisibleSwarm = Math.min(liveSwarm.length, this.swarmActivationAdmission.admittedInstances);
-      maximumVisibleSwarmBatches = this.swarmActivationAdmission.admittedBatches;
+      maximumVisibleSwarm = Math.min(liveSwarm.length, this.swarmOverlapAdmission.admittedInstances);
+      maximumVisibleSwarmBatches = this.swarmOverlapAdmission.admittedBatches;
     } else {
-      this.swarmActivationAdmission = null;
+      this.swarmOverlapAdmission = null;
     }
     const admittedSwarmIds = new Set(liveSwarm.slice(0, maximumVisibleSwarm).map((entity) => entity.id));
     const admitted = bounded.filter((entity) => (
-      (entity.kind !== 'chopper' || this.swarmActivationAdmission?.chopperAdmitted !== false)
+      (entity.kind !== 'chopper' || this.swarmOverlapAdmission?.chopperAdmitted !== false)
       && (entity.kind !== 'drone' || entity.mode !== 'swarm' || admittedSwarmIds.has(entity.id))
     ));
     const liveIds = new Set(admitted.map((entity) => entity.id));
@@ -2352,7 +2348,7 @@ export class KillstreakPresentation {
     // The match bootstrap loop can call clear() while the async GPU fence is in
     // flight. Preserve the staged exact-count submission until prewarm settles.
     if (this.gpuPrewarmActive) return;
-    this.swarmActivationAdmission = null;
+    this.swarmOverlapAdmission = null;
     this.setFirstPersonEntity(null);
     for (const presented of this.entities.values()) this.releasePresentedEntity(presented);
     this.entities.clear();
