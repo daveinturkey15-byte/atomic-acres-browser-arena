@@ -6,6 +6,7 @@ export const SMOKE_PRESENTATION_CARD_COUNT = 3;
 export const SMOKE_PRESENTATION_LIFETIME_MS = SMOKE_VOLUME_LIFETIME_MS;
 export const SMOKE_PRESENTATION_GROW_MS = 900;
 export const SMOKE_VOLUME_PRESENTATION_POOL_CAPACITY = 12;
+const SMOKE_ALPHA_TEXTURE_SIZE = 64;
 
 export type SmokePresentationEnvelope = Readonly<{
   active: boolean;
@@ -50,8 +51,11 @@ function writeSmokePresentationEnvelope(
   const density = release * decay;
   target.active = true;
   target.growth = growth;
-  target.coreOpacity = 0.78 * density;
-  target.edgeOpacity = 0.3 * density;
+  // Authority decides whether smoke blocks sight. Presentation density stays
+  // below a solid shell so entering one volume cannot become a flat whiteout;
+  // overlapping volumes still converge to deliberately dense obscuration.
+  target.coreOpacity = 0.42 * density;
+  target.edgeOpacity = 0.22 * density;
   target.lifetimeProgress = clamp01(ageMs / lifetimeMs);
   return target;
 }
@@ -69,7 +73,19 @@ export function smokePresentationEnvelopeAt(
   ) });
 }
 
-function radialAlphaTexture(size = 32): THREE.DataTexture {
+function smokeNoise(x: number, y: number, seed: number): number {
+  const first = Math.sin(x * 0.173 + y * 0.117 + seed * 1.91);
+  const second = Math.sin(x * 0.071 - y * 0.193 + seed * 3.17);
+  const third = Math.sin((x + y) * 0.049 + seed * 5.23);
+  return clamp01(0.5 + first * 0.22 + second * 0.18 + third * 0.1);
+}
+
+function radialAlphaTexture(
+  name: string,
+  size = SMOKE_ALPHA_TEXTURE_SIZE,
+  seed = 1,
+  feather = 0.52,
+): THREE.DataTexture {
   const data = new Uint8Array(size * size * 4);
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
@@ -77,28 +93,36 @@ function radialAlphaTexture(size = 32): THREE.DataTexture {
       const dx = (x + 0.5) / size * 2 - 1;
       const dy = (y + 0.5) / size * 2 - 1;
       const radius = Math.hypot(dx, dy);
-      const alpha = clamp01((1 - radius) / 0.34);
-      data[offset] = 198;
-      data[offset + 1] = 207;
-      data[offset + 2] = 202;
-      data[offset + 3] = Math.round(alpha * alpha * 255);
+      const radial = clamp01((1 - radius) / feather);
+      const billow = 0.56 + smokeNoise(x, y, seed) * 0.44;
+      const alpha = Math.round(radial * radial * billow * 255);
+      // Three samples the green channel of RGB/RGBA alpha maps and ignores the
+      // alpha channel. Keep the mask grayscale so WebGL and WebGPU agree.
+      data[offset] = alpha;
+      data[offset + 1] = alpha;
+      data[offset + 2] = alpha;
+      data[offset + 3] = 255;
     }
   }
   const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
-  texture.name = 'smoke-grenade-soft-radial-alpha';
+  texture.name = name;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = true;
   texture.needsUpdate = true;
   return texture;
 }
 
-/** Two draw calls per volume: a dense low-poly core and three instanced soft cards. */
+/** Two draw calls per volume: two bounded batches of deterministic soft density cards. */
 export class SmokeVolumePresentation {
   readonly root = new THREE.Group();
-  private readonly coreGeometry = new THREE.IcosahedronGeometry(1, 2);
-  private readonly cardGeometry = new THREE.PlaneGeometry(2, 2);
-  private readonly alphaTexture = radialAlphaTexture();
+  private readonly innerGeometry = new THREE.PlaneGeometry(2, 2);
+  private readonly edgeGeometry = new THREE.PlaneGeometry(2, 2);
+  private readonly innerAlphaTexture = radialAlphaTexture('smoke-grenade-inner-noise-alpha', SMOKE_ALPHA_TEXTURE_SIZE, 11, 0.58);
+  private readonly edgeAlphaTexture = radialAlphaTexture('smoke-grenade-soft-radial-alpha', SMOKE_ALPHA_TEXTURE_SIZE, 29, 0.42);
   private readonly coreMaterial: THREE.MeshBasicMaterial;
   private readonly edgeMaterial: THREE.MeshBasicMaterial;
-  private readonly core: THREE.Mesh;
+  private readonly innerCards: THREE.InstancedMesh;
   private readonly cards: THREE.InstancedMesh;
   private disposed = false;
   private active = false;
@@ -114,7 +138,8 @@ export class SmokeVolumePresentation {
   };
   private readonly cardMatrix = new THREE.Matrix4();
   private readonly cardQuaternion = new THREE.Quaternion();
-  private readonly cardScale = new THREE.Vector3(1, 0.78, 1);
+  private readonly cardScale = new THREE.Vector3(1, 0.82, 1);
+  private readonly innerCardScale = new THREE.Vector3(0.82, 0.68, 1);
   private readonly cardPosition = new THREE.Vector3();
 
   constructor() {
@@ -122,29 +147,41 @@ export class SmokeVolumePresentation {
     this.root.userData.presentationOnly = true;
     this.root.userData.blocksShots = false;
     this.coreMaterial = new THREE.MeshBasicMaterial({
-      name: 'smoke-grenade-opaque-core', color: 0x7f8985, transparent: true,
-      opacity: 0, depthWrite: false, side: THREE.DoubleSide,
+      name: 'smoke-grenade-inner-density', color: 0x707a76, alphaMap: this.innerAlphaTexture,
+      transparent: true, opacity: 0, depthWrite: false, alphaTest: 0.012,
+      side: THREE.DoubleSide, toneMapped: false,
     });
     this.edgeMaterial = new THREE.MeshBasicMaterial({
-      name: 'smoke-grenade-soft-edge', color: 0xc6cfca, alphaMap: this.alphaTexture,
+      name: 'smoke-grenade-soft-edge', color: 0xaeb9b4, alphaMap: this.edgeAlphaTexture,
       transparent: true, opacity: 0, depthWrite: false, alphaTest: 0.015,
-      side: THREE.DoubleSide,
+      side: THREE.DoubleSide, toneMapped: false,
     });
-    this.core = new THREE.Mesh(this.coreGeometry, this.coreMaterial);
-    this.core.name = 'smoke-grenade-dense-core';
-    this.core.scale.set(0.72, 0.6, 0.72);
-    this.core.renderOrder = 18;
-    this.cards = new THREE.InstancedMesh(this.cardGeometry, this.edgeMaterial, SMOKE_PRESENTATION_CARD_COUNT);
+    // Transparent DoubleSide materials otherwise render back and front passes,
+    // doubling density and draw calls for every card batch.
+    this.coreMaterial.forceSinglePass = true;
+    this.edgeMaterial.forceSinglePass = true;
+    this.innerCards = new THREE.InstancedMesh(this.innerGeometry, this.coreMaterial, SMOKE_PRESENTATION_CARD_COUNT);
+    this.innerCards.name = 'smoke-grenade-inner-density-cards';
+    this.innerCards.renderOrder = 18;
+    this.cards = new THREE.InstancedMesh(this.edgeGeometry, this.edgeMaterial, SMOKE_PRESENTATION_CARD_COUNT);
     this.cards.name = 'smoke-grenade-soft-edge-cards';
     this.cards.renderOrder = 19;
     for (let index = 0; index < SMOKE_PRESENTATION_CARD_COUNT; index += 1) {
-      this.cardQuaternion.setFromEuler(new THREE.Euler(0, index * Math.PI / SMOKE_PRESENTATION_CARD_COUNT, index === 2 ? 0.18 : 0));
+      const yaw = index * Math.PI / SMOKE_PRESENTATION_CARD_COUNT;
+      this.cardPosition.set((index - 1) * 0.045, index === 1 ? 0.055 : -0.025, 0);
+      this.cardQuaternion.setFromEuler(new THREE.Euler(0, yaw + 0.24, index === 2 ? -0.14 : 0.08));
+      this.cardMatrix.compose(this.cardPosition, this.cardQuaternion, this.innerCardScale);
+      this.innerCards.setMatrixAt(index, this.cardMatrix);
+      this.cardPosition.set((1 - index) * 0.035, index === 0 ? 0.04 : -0.015, 0);
+      this.cardQuaternion.setFromEuler(new THREE.Euler(0, yaw, index === 2 ? 0.18 : -0.05));
       this.cardMatrix.compose(this.cardPosition, this.cardQuaternion, this.cardScale);
       this.cards.setMatrixAt(index, this.cardMatrix);
     }
+    this.innerCards.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+    this.innerCards.instanceMatrix.needsUpdate = true;
     this.cards.instanceMatrix.setUsage(THREE.StaticDrawUsage);
     this.cards.instanceMatrix.needsUpdate = true;
-    this.root.add(this.core, this.cards);
+    this.root.add(this.innerCards, this.cards);
     this.root.visible = false;
   }
 
@@ -161,7 +198,8 @@ export class SmokeVolumePresentation {
     this.radiusM = Math.max(0, radiusM);
     this.disturbedAtMs = Number.NEGATIVE_INFINITY;
     this.disturbance = 0;
-    this.core.position.set(0, 0, 0);
+    this.innerCards.position.set(0, 0, 0);
+    this.innerCards.rotation.z = 0;
     this.cards.position.set(0, 0, 0);
     this.cards.rotation.z = 0;
     this.root.position.set(position.x, position.y, position.z);
@@ -178,18 +216,21 @@ export class SmokeVolumePresentation {
     this.root.rotation.z = Math.sin(envelope.lifetimeProgress * Math.PI * 2) * 0.035;
     const disturbanceAge = Math.max(0, nowMs - this.disturbedAtMs);
     const disturbancePulse = disturbanceAge < 900 ? this.disturbance * (1 - disturbanceAge / 900) : 0;
-    this.core.position.copy(this.disturbanceDirection).multiplyScalar(disturbancePulse * 0.28);
-    this.cards.position.copy(this.disturbanceDirection).multiplyScalar(-disturbancePulse * 0.18);
-    this.cards.rotation.z = disturbancePulse * 0.14;
+    this.innerCards.position.copy(this.disturbanceDirection).multiplyScalar(disturbancePulse * 0.42);
+    this.cards.position.copy(this.disturbanceDirection).multiplyScalar(-disturbancePulse * 0.26);
+    this.innerCards.rotation.z = disturbancePulse * 0.18;
+    this.cards.rotation.z = -disturbancePulse * 0.14;
     const densityScale = 0.72 + this.qualityScale * 0.28;
-    this.coreMaterial.opacity = envelope.coreOpacity * densityScale * (1 - disturbancePulse * 0.34);
-    this.edgeMaterial.opacity = envelope.edgeOpacity * densityScale * (1 - disturbancePulse * 0.16);
+    this.coreMaterial.opacity = envelope.coreOpacity * densityScale * (1 - disturbancePulse * 0.78);
+    this.edgeMaterial.opacity = envelope.edgeOpacity * densityScale * (1 - disturbancePulse * 0.48);
     return true;
   }
 
   setQualityScale(scale: number): void {
     this.qualityScale = THREE.MathUtils.clamp(Number.isFinite(scale) ? scale : 1, 0.35, 1);
-    this.cards.count = this.qualityScale >= 0.95 ? 3 : this.qualityScale >= 0.7 ? 2 : 1;
+    const cardCount = this.qualityScale >= 0.95 ? 3 : this.qualityScale >= 0.7 ? 2 : 1;
+    this.innerCards.count = cardCount;
+    this.cards.count = cardCount;
   }
 
   disturb(direction: Readonly<{ x: number; y: number; z: number }>, strength: number, nowMs: number): void {
@@ -205,7 +246,8 @@ export class SmokeVolumePresentation {
     this.root.visible = false;
     this.coreMaterial.opacity = 0;
     this.edgeMaterial.opacity = 0;
-    this.core.position.set(0, 0, 0);
+    this.innerCards.position.set(0, 0, 0);
+    this.innerCards.rotation.z = 0;
     this.cards.position.set(0, 0, 0);
     this.cards.rotation.z = 0;
   }
@@ -222,8 +264,7 @@ export class SmokeVolumePresentation {
       qualityScale: this.qualityScale,
       coreOpacity: this.coreMaterial.opacity,
       edgeOpacity: this.edgeMaterial.opacity,
-      triangles: (this.coreGeometry.index ? this.coreGeometry.index.count / 3 : this.coreGeometry.getAttribute('position').count / 3)
-        + this.cards.count * 2,
+      triangles: (this.innerCards.count + this.cards.count) * 2,
     });
   }
 
@@ -232,11 +273,12 @@ export class SmokeVolumePresentation {
     if (this.disposed) return;
     this.disposed = true;
     this.root.removeFromParent();
-    this.coreGeometry.dispose();
-    this.cardGeometry.dispose();
+    this.innerGeometry.dispose();
+    this.edgeGeometry.dispose();
     this.coreMaterial.dispose();
     this.edgeMaterial.dispose();
-    this.alphaTexture.dispose();
+    this.innerAlphaTexture.dispose();
+    this.edgeAlphaTexture.dispose();
     this.root.visible = false;
   }
 }

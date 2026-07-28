@@ -15,7 +15,8 @@ describe('smoke grenade volume presentation', () => {
     expect(smokePresentationEnvelopeAt(start - 1, start, end).active).toBe(false);
     const dense = smokePresentationEnvelopeAt(start + 1_000, start, end);
     expect(dense).toMatchObject({ active: true, growth: 1 });
-    expect(dense.coreOpacity).toBeGreaterThan(0.7);
+    expect(dense.coreOpacity).toBeGreaterThan(0.35);
+    expect(dense.coreOpacity).toBeLessThan(0.5);
     expect(dense.edgeOpacity).toBeLessThan(dense.coreOpacity);
     expect(smokePresentationEnvelopeAt(end, start, end).active).toBe(false);
   });
@@ -25,11 +26,11 @@ describe('smoke grenade volume presentation', () => {
     const pool = new SmokeVolumePresentationPool(scene, 2);
     const camera = new THREE.PerspectiveCamera();
     const firstRoot = pool.root.children[0]!;
-    const firstCore = firstRoot.getObjectByName('smoke-grenade-dense-core')!;
+    const firstInnerCards = firstRoot.getObjectByName('smoke-grenade-inner-density-cards')!;
     firstRoot.scale.set(2, 3, 4);
     firstRoot.frustumCulled = true;
-    firstCore.visible = false;
-    firstCore.frustumCulled = true;
+    firstInnerCards.visible = false;
+    firstInnerCards.frustumCulled = true;
     const telemetryBefore = pool.telemetry();
     const compileAndRender = vi.fn(async (root: THREE.Object3D, stagedCamera: THREE.Camera, parentScene: THREE.Scene) => {
       expect(root).toBe(pool.root);
@@ -57,7 +58,7 @@ describe('smoke grenade volume presentation', () => {
       }
       expect(geometries.size).toBe(4);
       expect(materials.size).toBe(4);
-      expect(alphaTextures.size).toBe(2);
+      expect(alphaTextures.size).toBe(4);
     });
     await Promise.all([
       pool.prewarm({ compileAndRender }, camera),
@@ -68,8 +69,8 @@ describe('smoke grenade volume presentation', () => {
     expect(firstRoot.visible).toBe(false);
     expect(firstRoot.scale.toArray()).toEqual([2, 3, 4]);
     expect(firstRoot.frustumCulled).toBe(true);
-    expect(firstCore.visible).toBe(false);
-    expect(firstCore.frustumCulled).toBe(true);
+    expect(firstInnerCards.visible).toBe(false);
+    expect(firstInnerCards.frustumCulled).toBe(true);
     expect(pool.telemetry()).toEqual(telemetryBefore);
   });
 
@@ -144,8 +145,10 @@ describe('smoke grenade volume presentation', () => {
     pool.update(lease, 3_000);
     pool.update(lease, 7_000);
     expect(scene.children).toEqual(roots);
-    expect(scene.getObjectByName('smoke-grenade-dense-core')).toBeInstanceOf(THREE.Mesh);
+    expect(scene.getObjectByName('smoke-grenade-dense-core')).toBeUndefined();
+    expect(scene.getObjectByName('smoke-grenade-inner-density-cards')).toBeInstanceOf(THREE.InstancedMesh);
     expect(scene.getObjectByName('smoke-grenade-soft-edge-cards')).toBeInstanceOf(THREE.InstancedMesh);
+    expect((scene.getObjectByName('smoke-grenade-inner-density-cards') as THREE.InstancedMesh).count).toBe(SMOKE_PRESENTATION_CARD_COUNT);
     expect((scene.getObjectByName('smoke-grenade-soft-edge-cards') as THREE.InstancedMesh).count).toBe(SMOKE_PRESENTATION_CARD_COUNT);
     expect(pool.telemetry()).toMatchObject({ capacity: 2, active: 1, liveDisposals: 0 });
     pool.release(lease);
@@ -163,8 +166,60 @@ describe('smoke grenade volume presentation', () => {
     const lease = pool.emit({ x: 0, y: 1, z: 0 }, 1_000, 13_000, 4.2);
     pool.update(lease, 2_000);
     expect(pool.telemetry()).toMatchObject({ active: 1, cardsPerVolume: 1, qualityScale: 0.5 });
-    expect(scene.getObjectByName('smoke-grenade-dense-core')?.visible).not.toBe(false);
+    expect(scene.getObjectByName('smoke-grenade-inner-density-cards')?.visible).not.toBe(false);
     pool.setQualityScale(0.8);
     expect(pool.telemetry().cardsPerVolume).toBe(2);
+  });
+
+  it('stores every soft alpha mask in the grayscale channel sampled by Three', () => {
+    const scene = new THREE.Scene();
+    const pool = new SmokeVolumePresentationPool(scene, 1);
+    const maps: THREE.DataTexture[] = [];
+    pool.root.traverse((node) => {
+      if (!(node instanceof THREE.Mesh)) return;
+      const material = Array.isArray(node.material) ? node.material[0] : node.material;
+      if (material instanceof THREE.MeshBasicMaterial && material.alphaMap instanceof THREE.DataTexture) {
+        maps.push(material.alphaMap);
+      }
+    });
+    expect(maps).toHaveLength(2);
+    for (const map of maps) {
+      const data = map.image.data as Uint8Array;
+      const greenValues: number[] = [];
+      for (let offset = 0; offset < data.length; offset += 4) {
+        expect(data[offset]).toBe(data[offset + 1]);
+        expect(data[offset + 1]).toBe(data[offset + 2]);
+        expect(data[offset + 3]).toBe(255);
+        greenValues.push(data[offset + 1]!);
+      }
+      expect(Math.min(...greenValues)).toBe(0);
+      expect(Math.max(...greenValues)).toBeGreaterThan(150);
+      expect(new Set(greenValues).size).toBeGreaterThan(32);
+    }
+    pool.terminalDispose();
+  });
+
+  it('opens and shifts pooled density when a shot disturbs smoke without allocating scene resources', () => {
+    const scene = new THREE.Scene();
+    const pool = new SmokeVolumePresentationPool(scene, 1);
+    const inner = scene.getObjectByName('smoke-grenade-inner-density-cards') as THREE.InstancedMesh;
+    const edge = scene.getObjectByName('smoke-grenade-soft-edge-cards') as THREE.InstancedMesh;
+    const innerMaterial = inner.material as THREE.MeshBasicMaterial;
+    const edgeMaterial = edge.material as THREE.MeshBasicMaterial;
+    const rootsBefore = [...scene.children];
+    const lease = pool.emit({ x: 0, y: 1, z: 0 }, 1_000, 13_000, 4.2);
+    pool.update(lease, 2_000);
+    const denseInnerOpacity = innerMaterial.opacity;
+    const denseEdgeOpacity = edgeMaterial.opacity;
+    pool.disturb(lease, { x: 1, y: 0.2, z: -0.4 }, 1, 2_000);
+    pool.update(lease, 2_001);
+    expect(inner.position.length()).toBeGreaterThan(0.3);
+    expect(edge.position.length()).toBeGreaterThan(0.2);
+    expect(inner.position.dot(edge.position)).toBeLessThan(0);
+    expect(innerMaterial.opacity).toBeLessThan(denseInnerOpacity * 0.3);
+    expect(edgeMaterial.opacity).toBeLessThan(denseEdgeOpacity * 0.6);
+    expect(scene.children).toEqual(rootsBefore);
+    expect(pool.telemetry()).toMatchObject({ active: 1, liveDisposals: 0, cardsPerVolume: 3 });
+    pool.terminalDispose();
   });
 });
