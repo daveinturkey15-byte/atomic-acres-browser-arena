@@ -6,6 +6,7 @@ import {
   SUPPORT_VEHICLE_TEXTURE_MEMORY_EXPECTATION,
   KillstreakPresentation,
   SupportVehicleTextureCanonicalizer,
+  authoredSupportMaterialCastsShadow,
   hunterDronePresentationTelemetry,
   supportAircraftPresentationVariant,
   supportVehiclePresentationTelemetry,
@@ -13,6 +14,19 @@ import {
 import type { KillstreakImpactEvent, KillstreakRecipientSnapshot } from './killstreak-runtime';
 import { DRONE_GUN_PROFILE_ID } from './killstreak-support-catalog';
 import { SUPPORT_VEHICLE_PRESENTATION_CONTRACT, missingSupportNodes, supportForwardAlignment } from './support-vehicle-presentation-contract';
+
+describe('authored support shadow budget', () => {
+  it('keeps major opaque silhouettes while excluding tiny, emissive and transparent details', () => {
+    expect(authoredSupportMaterialCastsShadow('MAT_HunterDrone_Armor_PBR')).toBe(true);
+    expect(authoredSupportMaterialCastsShadow('MAT_HunterDrone_Gunmetal')).toBe(true);
+    expect(authoredSupportMaterialCastsShadow('MAT_Pass65Chopper_RotorBlade')).toBe(true);
+    expect(authoredSupportMaterialCastsShadow('MAT_Pass65SupportAircraft_Parachute')).toBe(true);
+    expect(authoredSupportMaterialCastsShadow('MAT_Pass65Chopper_CyanInstrument')).toBe(false);
+    expect(authoredSupportMaterialCastsShadow('MAT_Pass65Chopper_RotorBlur')).toBe(false);
+    expect(authoredSupportMaterialCastsShadow('MAT_Pass65Chopper_CanopyGlass')).toBe(false);
+    expect(authoredSupportMaterialCastsShadow('MAT_Pass65SupportAircraft_ParachuteLine')).toBe(false);
+  });
+});
 
 const snapshot = (
   count: number,

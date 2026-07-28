@@ -306,6 +306,36 @@ function markSharedPresentationAsset(root: THREE.Object3D): void {
   });
 }
 
+const AUTHORED_SUPPORT_SHADOW_MATERIAL_SUFFIXES = Object.freeze([
+  '_Armor_PBR',
+  '_Carpet_PBR',
+  '_Crate_PBR',
+  '_DarkArmor',
+  '_Dark',
+  '_Gunmetal',
+  '_Metal',
+  '_RotorBlade',
+  '_Blade',
+  '_Bomb',
+  '_Parachute',
+]);
+
+export function authoredSupportMaterialCastsShadow(materialName: string): boolean {
+  return AUTHORED_SUPPORT_SHADOW_MATERIAL_SUFFIXES.some((suffix) => materialName.endsWith(suffix));
+}
+
+function applyAuthoredSupportShadowBudget(root: THREE.Object3D): void {
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    // Keep the complete authored model, PBR vocabulary and animation in the
+    // colour pass. Shadow maps only need the major opaque silhouette; making
+    // every instrument, emissive chip, line and transparent rotor disc a
+    // caster multiplied support-streak submissions without a visible benefit.
+    node.castShadow = materials.some((entry) => authoredSupportMaterialCastsShadow(entry.name));
+  });
+}
+
 export function loadHunterDronePresentation(): Promise<void> {
   if (hunterDroneLoadPromise) return hunterDroneLoadPromise;
   hunterDroneLoadState = 'loading';
@@ -323,6 +353,7 @@ export function loadHunterDronePresentation(): Promise<void> {
         hunterDroneTemplate = root;
         hunterDroneAnimations = Object.freeze([...gltf.animations]);
         markSharedPresentationAsset(root);
+        applyAuthoredSupportShadowBudget(root);
       }
       resolve();
     }, undefined, (error) => {
@@ -896,6 +927,7 @@ function buildAuthoredSupportVehicle(family: SupportVehicleAssetFamily): Present
     const firstPersonRotor = level.getObjectByName('chopper-first-person-rotor');
     if (firstPersonRotor) firstPersonRotor.userData.firstPersonOnly = true;
     markSharedPresentationAsset(level);
+    applyAuthoredSupportShadowBudget(level);
     lod.addLevel(level, [0, 34, 68][index] ?? index * 34);
     const mixer = new THREE.AnimationMixer(level);
     for (const clipName of SUPPORT_VEHICLE_LOOP_ACTIONS[family]) {
