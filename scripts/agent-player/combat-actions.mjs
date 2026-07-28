@@ -17,7 +17,12 @@ export function chooseVisibleSupport(streak, usedThresholds = new Set()) {
 }
 
 export function shouldThrowVisibleGrenade(observation) {
-  const distance = Number(observation?.threatDistance);
+  const hasDistance = observation?.threatDistance !== null && observation?.threatDistance !== undefined
+    && Number.isFinite(Number(observation.threatDistance));
+  const distance = hasDistance ? Number(observation.threatDistance) : null;
+  const distanceOrScaleValid = hasDistance
+    ? distance >= Number(observation?.minimumDistance ?? 8) && distance <= Number(observation?.maximumDistance ?? 22)
+    : Number(observation?.targetHeight ?? 0) >= Number(observation?.minimumTargetHeight ?? 8);
   return Boolean(observation?.enabled)
     && Number(observation?.grenades) > 0
     && Number(observation?.throwsSoFar) < Number(observation?.maximumThrows ?? 2)
@@ -27,9 +32,7 @@ export function shouldThrowVisibleGrenade(observation) {
     && Number(observation?.stableFrames) >= 2
     && Number(observation?.alignment) <= Number(observation?.maximumAlignment ?? 0.008)
     && Number(observation?.health) >= Number(observation?.minimumHealth ?? 55)
-    && Number.isFinite(distance)
-    && distance >= Number(observation?.minimumDistance ?? 8)
-    && distance <= Number(observation?.maximumDistance ?? 22)
+    && distanceOrScaleValid
     && Number(observation?.now) - Number(observation?.lastThrowAt ?? Number.NEGATIVE_INFINITY)
       >= Number(observation?.cooldownMs ?? 20_000);
 }

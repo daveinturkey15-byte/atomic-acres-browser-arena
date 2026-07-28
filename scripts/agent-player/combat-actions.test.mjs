@@ -22,6 +22,8 @@ test('grenade authority requires a healthy aligned confirmed operator at bounded
     now: 30_000, lastThrowAt: 0,
   };
   assert.equal(shouldThrowVisibleGrenade(valid), true);
+  assert.equal(shouldThrowVisibleGrenade({ ...valid, threatDistance: null, targetHeight: 9 }), true);
+  assert.equal(shouldThrowVisibleGrenade({ ...valid, threatDistance: null, targetHeight: 5 }), false);
   for (const mutation of [
     { targetConfirmed: false }, { twoFrameAligned: false }, { alignment: 0.009 },
     { health: 40 }, { threatDistance: 30 }, { grenades: 0 }, { throwsSoFar: 2 },

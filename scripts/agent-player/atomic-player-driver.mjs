@@ -1084,6 +1084,7 @@ async function run() {
             maximumAlignment: grenadeAlignmentMaximum,
             health: hud?.health,
             threatDistance: minimapThreat?.distance,
+            targetHeight: aimedTarget.bounds?.height,
             now,
             lastThrowAt: lastGrenadeAt,
           })) {
