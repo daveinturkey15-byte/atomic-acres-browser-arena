@@ -110,6 +110,17 @@ describe('adaptive quality controller', () => {
     expect(controller.telemetry()).toMatchObject({ samples: 44, downshifts: 0, pixelRatioCap: 0.65 });
   });
 
+  it('discards a deferred renderer resize when presentation ownership changes', () => {
+    const deferred = new DeferredAdaptivePixelRatio();
+    deferred.request(0.65);
+    expect(deferred.pending()).toBe(0.65);
+    deferred.clear();
+    expect(deferred.pending()).toBeNull();
+    expect(deferred.takeWhenPresentationIdle({
+      submissionSequence: 4, completedSequence: 4, pendingSince: null,
+    })).toBeNull();
+  });
+
   it('ignores loading, hidden, paused and pathological samples supplied as ineligible', () => {
     const controller = new AdaptiveQualityController({
       profile: 'blender', targetFrameMs: 1_000 / 60, initialPixelRatioCap: 1,

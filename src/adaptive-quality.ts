@@ -43,6 +43,10 @@ export class DeferredAdaptivePixelRatio {
   pending(): number | null {
     return this.pendingPixelRatio;
   }
+
+  clear(): void {
+    this.pendingPixelRatio = null;
+  }
 }
 
 export function adaptiveShadowsEnabled(profile: RenderProfile, authoredShadows: boolean, pixelRatioCap: number): boolean {

@@ -2899,6 +2899,16 @@ const framePacing = new FramePacingSampler();
 const LIVE_WEBGPU_QUEUE_DOWNSHIFT_MS = 250;
 const LIVE_WEBGPU_PRESENTATION_STALL_MS = 1_000;
 let lastAdaptedWebGpuCompletionSequence = 0;
+
+function resetWebGpuPresentationEpoch(reason: string, now: number): void {
+  renderRuntime.resetPresentationProgressTelemetry(reason, now);
+  if (renderRuntime.backend !== 'webgpu') return;
+  // A completion which retired during a hidden/pre-admission epoch is not live
+  // foreground performance evidence. Consume its sequence and discard any
+  // queued resize so refocus cannot apply a stale downshift to HDR targets.
+  lastAdaptedWebGpuCompletionSequence = renderRuntime.presentationTelemetry(now).completedSequence;
+  deferredWebGpuAdaptivePixelRatio.clear();
+}
 let lastHudAt = 0;
 let lastFpsHudAt = -Infinity;
 let minimapRenderCount = 0;
@@ -8204,7 +8214,7 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
     restoreCorpsePoolPrewarm();
     renderSubmissionPaused = priorRenderSubmissionPaused;
   }
-  renderRuntime.resetPresentationProgressTelemetry('match admitted', performance.now());
+  resetWebGpuPresentationEpoch('match admitted', performance.now());
   gameStarted = true;
   const matchStartedAt = performance.now();
   beginMatchDiagnostics(mode, matchStartedAt);
@@ -14741,7 +14751,7 @@ function recoverFromVisibilityRegain(): void {
   lastFrame = refocusAt;
   lastPresentedFrameAt = refocusAt;
   framePacing.reset('tab visibility regained');
-  renderRuntime.resetPresentationProgressTelemetry('tab visibility regained', refocusAt);
+  resetWebGpuPresentationEpoch('tab visibility regained', refocusAt);
   adaptiveQuality.resetSampling('tab visibility regained');
 }
 document.addEventListener('visibilitychange', () => {

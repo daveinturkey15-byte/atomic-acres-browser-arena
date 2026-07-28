@@ -134,7 +134,14 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('const requiredConsecutiveHealthySamples = 3;');
     expect(source).toContain('WebGPU queue latency remained ${Math.round(completionLatencyMs)}ms at the minimum quality tier');
     expect(source).toContain('adaptiveQuality.forceDownshift(');
-    expect(matchDeployment).toContain("renderRuntime.resetPresentationProgressTelemetry('match admitted', performance.now());");
+    expect(matchDeployment).toContain("resetWebGpuPresentationEpoch('match admitted', performance.now());");
+    expect(source).toContain("resetWebGpuPresentationEpoch('tab visibility regained', refocusAt);");
+    const presentationEpochReset = source.slice(
+      source.indexOf('function resetWebGpuPresentationEpoch('),
+      source.indexOf('let lastHudAt'),
+    );
+    expect(presentationEpochReset).toContain('lastAdaptedWebGpuCompletionSequence = renderRuntime.presentationTelemetry(now).completedSequence;');
+    expect(presentationEpochReset).toContain('deferredWebGpuAdaptivePixelRatio.clear();');
     expect(source).toContain("source: 'webgpu-submission' as const");
     expect(source).toContain('LIVE_WEBGPU_PRESENTATION_STALL_MS = 1_000');
     expect(source).toContain('detectLivePresentationStall({');
