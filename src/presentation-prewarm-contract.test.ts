@@ -65,6 +65,11 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('streamedWeaponGpuPrewarmQueue.run(() => runStreamedWeaponGpuPrewarm(model, context))');
     expect(source).toContain('revealAncestors();');
     expect(source).toContain('for (const [ancestor, visible] of ancestorVisibility) ancestor.visible = visible;');
+    const weaponPrewarm = source.slice(
+      source.indexOf('const runStreamedWeaponGpuPrewarm:'),
+      source.indexOf('const streamedWeaponGpuPrewarmer:'),
+    );
+    expect(weaponPrewarm).not.toContain('multiplyScalar(0.0001)');
     expect(source).toContain('await renderRuntime.compileAndRender(model, camera, scene);');
     expect(source).toContain('streamedWeaponGpuPrewarmer,');
     expect(source).toContain("bootstrapStage = 'ready'");

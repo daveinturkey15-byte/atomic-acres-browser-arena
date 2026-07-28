@@ -4416,11 +4416,11 @@ const runStreamedWeaponGpuPrewarm: WeaponViewmodelGpuPrewarmer = async (model, {
       };
 
       // Compile the detached candidate while the last complete viewmodel keeps
-      // presenting. Only the short first-upload fence pauses submissions; a
-      // slow asynchronous shader compile must never turn into a live freeze.
+      // presenting. Preserve its exact gameplay scale for the fenced upload
+      // frame: sub-pixel staging can compile the pipeline without exercising
+      // texture sampling and leaves first full-size draw work in combat.
       model.removeFromParent();
       model.visible = true;
-      model.scale.multiplyScalar(0.0001);
       try {
         await renderRuntime.compile(model, camera, scene);
         const submissionWasPaused = renderSubmissionPaused;
