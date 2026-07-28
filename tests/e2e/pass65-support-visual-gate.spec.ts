@@ -70,7 +70,8 @@ async function installPointerLockHarness(page: Page): Promise<void> {
       configurable: true,
       get: () => harness.locked ? canvas : null,
     });
-    Object.defineProperty(document, 'hasFocus', { configurable: true, value: () => true });
+    // Preserve the browser's real focus signal so admission telemetry records
+    // the page state instead of a synthetic always-focused test value.
     Object.defineProperty(canvas, 'requestPointerLock', {
       configurable: true,
       value: () => {
@@ -143,8 +144,17 @@ async function startPair(browser: Browser, label: string, arenaId = 'rustworks-1
   }
   await host.locator('#team').selectOption('0');
   await guest.locator('#team').selectOption('1');
+  expect(await peerServerReady(), 'Local PeerJS signalling must remain live before host creation').toBe(true);
   await host.locator('#host').click();
-  await host.waitForFunction(() => Boolean(document.querySelector('#room-code')?.textContent?.trim()), undefined, { timeout: 30_000 });
+  try {
+    await host.waitForFunction(() => Boolean(document.querySelector('#room-code')?.textContent?.trim()), undefined, { timeout: 30_000 });
+  } catch (error) {
+    const diagnostics = await host.evaluate(() => ({
+      status: document.querySelector('#network-status')?.textContent?.trim() ?? null,
+      snapshot: window.__ATOMIC_ACRES_DEBUG__?.snapshot() ?? null,
+    }));
+    throw new Error(`Host signalling did not produce a room code: ${JSON.stringify(diagnostics)}`, { cause: error });
+  }
   const roomCode = (await host.locator('#room-code').textContent())?.trim() ?? '';
   expect(roomCode.length).toBeGreaterThan(0);
   await guest.locator('#room-input').fill(roomCode);
@@ -160,8 +170,22 @@ async function startPair(browser: Browser, label: string, arenaId = 'rustworks-1
   await host.locator('#lobby-start').click();
   await Promise.all([host, guest].map((page) => page.waitForFunction(() => {
     const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-    return state.gameStarted === true && state.matchPhase === 'active';
+    return (state.gameStarted === true && state.matchPhase === 'active') || state.bootstrap.stage === 'failed';
   }, undefined, { timeout: 45_000 })));
+  const admissionStates = await Promise.all([host, guest].map((page) => page.evaluate(() => {
+    const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+    return {
+      bootstrap: snapshot.bootstrap,
+      gameStarted: snapshot.gameStarted,
+      matchPhase: snapshot.matchPhase,
+      networkLifecycle: snapshot.networkLifecycle,
+      status: document.querySelector('#network-status')?.textContent?.trim() ?? null,
+    };
+  })));
+  expect(admissionStates, 'Both peers must admit the match without a bootstrap failure').toMatchObject([
+    { bootstrap: { stage: 'ready', error: null }, gameStarted: true, matchPhase: 'active' },
+    { bootstrap: { stage: 'ready', error: null }, gameStarted: true, matchPhase: 'active' },
+  ]);
   await Promise.all([host, guest].map((page) => page.waitForFunction(() => {
     const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
     return state.remotePlayers.length === 1;

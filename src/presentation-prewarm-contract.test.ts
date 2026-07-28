@@ -125,9 +125,10 @@ describe('presentation prewarm startup contract', () => {
     );
     expect(cadenceAdmission).toContain('admittedDegraded: true');
     expect(cadenceAdmission).toContain('visibilityState: document.visibilityState');
+    expect(cadenceAdmission).toContain('documentHasFocus: document.hasFocus()');
     expect(cadenceAdmission).not.toContain('reject(');
-    expect(cadenceAdmission).toContain("lastMatchAdmissionCadence.visibilityState === 'visible'");
-    expect(cadenceAdmission).toContain('Foreground match cadence remained degraded');
+    expect(cadenceAdmission).not.toContain('throw new Error(');
+    expect(cadenceAdmission).toContain('exact-SHA cold WebGPU release gate rejects');
     expect(source).toContain('matchAdmissionCadence: lastMatchAdmissionCadence');
     expect(source).toContain('submitWebGpuFrame(performance.now(), true)');
     expect(arenaDeployment).toContain('await withArenaFrustumCullingDisabled(presentationRoot, async () => {');

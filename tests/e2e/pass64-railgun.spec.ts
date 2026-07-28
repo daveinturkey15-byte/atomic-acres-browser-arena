@@ -2,7 +2,8 @@ import { expect, test } from '@playwright/test';
 
 test('railgun exits ADS, enforces the 1.5 second rechamber, and permits a released second ADS shot', async ({ page }) => {
   test.setTimeout(90_000);
-  await page.goto('/?renderer=webgl2&render=performance&signal=off&grass=off&mist=off&clouds=off&rays=off&seed=6402&map=atomic-acres');
+  await page.goto('/?release=latest&renderer=webgl2&render=performance&signal=off&grass=off&mist=off&clouds=off&rays=off&seed=6402&map=atomic-acres');
+  expect(new URL(page.url()).pathname).toBe('/channels/the-big-one/');
   await page.waitForFunction(() => {
     const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => any } }).__ATOMIC_ACRES_DEBUG__;
     return api?.snapshot().weaponReady === true;

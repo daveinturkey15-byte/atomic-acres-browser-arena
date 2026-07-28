@@ -1221,6 +1221,7 @@ type MatchAdmissionCadence = Readonly<{
   maximumGapMs: number;
   admittedDegraded: boolean;
   visibilityState: DocumentVisibilityState;
+  documentHasFocus: boolean;
 }>;
 let lastMatchAdmissionCadence: MatchAdmissionCadence | null = null;
 const displayCadencePromise = new Promise<number>((resolve) => {
@@ -1338,6 +1339,7 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
           maximumGapMs,
           admittedDegraded: false,
           visibilityState: document.visibilityState,
+          documentHasFocus: document.hasFocus(),
         }));
         return;
       }
@@ -1354,6 +1356,7 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
           maximumGapMs,
           admittedDegraded: true,
           visibilityState: document.visibilityState,
+          documentHasFocus: document.hasFocus(),
         }));
         return;
       }
@@ -1361,12 +1364,10 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
     };
     requestAnimationFrame(sample);
   });
-  if (lastMatchAdmissionCadence.admittedDegraded && lastMatchAdmissionCadence.visibilityState === 'visible') {
-    throw new Error(
-      `Foreground match cadence remained degraded after ${Math.round(lastMatchAdmissionCadence.waitedMs)}ms`
-      + ` (maximum animation gap ${Math.round(lastMatchAdmissionCadence.maximumGapMs)}ms)`,
-    );
-  }
+  // Never bounce a player back to the menu merely because a browser cadence
+  // sample was degraded. The exact-SHA cold WebGPU release gate rejects a
+  // candidate with admittedDegraded=true; the runtime records it and proceeds
+  // so a background peer or transiently occluded window can still recover.
   bootstrapStage = 'ready';
 }
 
