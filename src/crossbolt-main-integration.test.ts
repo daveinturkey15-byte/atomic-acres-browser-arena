@@ -19,11 +19,22 @@ describe('Pass 65 explosive crossbolt runtime integration', () => {
     const updateStart = source.indexOf('function updateExplosiveBolts(');
     const updateEnd = source.indexOf('\nfunction throwGrenade(', updateStart);
     const update = source.slice(updateStart, updateEnd);
+    expect(update).toContain('explosiveBoltStartScratch.copy(bolt.mesh.position)');
+    expect(update).toContain('explosiveBoltDeltaScratch.copy(bolt.velocity).multiplyScalar(dt)');
+    expect(update).not.toContain('bolt.mesh.position.clone()');
+    expect(update).not.toContain('bolt.velocity.clone()');
     expect(update).toContain('bolt.targetId = targetHit.id;');
     expect(update).toContain('bolt.targetLifeId = targetHit.lifeId;');
     expect(update).toContain("if (targetHit.kind === 'player') addFeed('STUCK', 'coral');");
     expect(update).toContain("else if (bolt.ownerId === player.id) addFeed('STUCK', 'gold');");
     expect(update).toContain('candidate.id === bolt.targetId && candidate.lifeId === bolt.targetLifeId');
+
+    const segmentStart = source.indexOf('function segmentSphereFraction(');
+    const segmentEnd = source.indexOf('\nfunction createExplosiveBoltMesh(', segmentStart);
+    const segment = source.slice(segmentStart, segmentEnd);
+    expect(segment).not.toContain('.clone()');
+    expect(segment).not.toContain('new THREE.Vector3');
+    expect(segment).toContain('nearestX * nearestX + nearestY * nearestY + nearestZ * nearestZ');
   });
 
   it('derives stuck radius and damage once from the shared exact 2x oracle', () => {

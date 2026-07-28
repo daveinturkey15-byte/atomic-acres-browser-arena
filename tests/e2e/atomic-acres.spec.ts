@@ -384,6 +384,7 @@ type DebugState = {
     };
     framePacing: { ready: boolean; cadenceHz: number; medianMs: number; p95Ms: number; displayLimited: boolean };
     minimapRenders: number;
+    minimapTargetHz: number;
     staticBatchPalette: Array<string | null>;
     blenderEnvironment: {
       status: 'idle' | 'loading' | 'ready' | 'fallback';
@@ -2924,15 +2925,17 @@ test.describe('performance and stability', () => {
     expect(signalState.render.atomicSignal).toMatchObject({ enabled: true, fallbackReason: null, textureSamples: 1 });
     expect(signalState.render.atomicSignal.samples).toBeGreaterThan(0);
     const cadenceStart = signalState;
+    expect(cadenceStart.render.minimapTargetHz).toBe(60);
     await page.waitForFunction((targetFrame) => (
       (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } })
         .__ATOMIC_ACRES_DEBUG__.snapshot().frameCount >= targetFrame
-    ), cadenceStart.frameCount + 3, { timeout: 15_000 });
+    ), cadenceStart.frameCount + 12, { timeout: 15_000 });
     const cadenceEnd = await debug(page);
     const renderedFrames = cadenceEnd.frameCount - cadenceStart.frameCount;
     const minimapFrames = cadenceEnd.render.minimapRenders - cadenceStart.render.minimapRenders;
-    expect(minimapFrames).toBeGreaterThanOrEqual(renderedFrames - 1);
-    expect(minimapFrames).toBeLessThanOrEqual(renderedFrames + 1);
+    expect(minimapFrames).toBeGreaterThanOrEqual(1);
+    expect(minimapFrames).toBeLessThanOrEqual(renderedFrames);
+    if (cadenceEnd.render.framePacing.cadenceHz > 75) expect(minimapFrames).toBeLessThan(renderedFrames);
     expect(errors).toEqual([]);
   });
 

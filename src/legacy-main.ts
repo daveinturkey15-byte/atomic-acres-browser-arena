@@ -2504,6 +2504,8 @@ let lastSmokeStateBroadcastAt = Number.NEGATIVE_INFINITY;
 let flashHostAuthority = new FlashHostAuthority(interactiveWorldMatchEpoch, 'host');
 let flashVictimConsumer = new FlashVictimResultConsumer(interactiveWorldMatchEpoch, 'pending-player', 0);
 const explosiveBolts: ExplosiveBoltEntity[] = [];
+const explosiveBoltStartScratch = new THREE.Vector3();
+const explosiveBoltDeltaScratch = new THREE.Vector3();
 const EXPLOSIVE_BOLT_PRESENTATION_POOL_CAPACITY = 32;
 const explosiveBoltShaftGeometry = new THREE.CylinderGeometry(0.018, 0.018, 0.72, 8);
 const explosiveBoltTipGeometry = new THREE.ConeGeometry(0.048, 0.16, 8);
@@ -2915,6 +2917,8 @@ function resetWebGpuPresentationEpoch(reason: string, now: number): void {
 let lastHudAt = 0;
 let lastFpsHudAt = -Infinity;
 let minimapRenderCount = 0;
+const MINIMAP_RENDER_HZ = 60;
+let lastMinimapRenderAt = Number.NEGATIVE_INFINITY;
 let minimapLandmarksRendered: Array<{ id: string; kind: MinimapLandmarkKind; label: string }> = [];
 let lastPlayerSpawnIndex = -1;
 const lastBotSpawnIndices = new Map<Team, number>();
@@ -10324,9 +10328,18 @@ function explosiveBoltTargets(ownerId: string, ownerTeam: Team): ExplosiveBoltTa
 function segmentSphereFraction(start: THREE.Vector3, delta: THREE.Vector3, centre: THREE.Vector3, radius: number): number | null {
   const denominator = delta.lengthSq();
   if (denominator < 1e-9) return null;
-  const alpha = THREE.MathUtils.clamp(centre.clone().sub(start).dot(delta) / denominator, 0, 1);
-  const nearest = start.clone().addScaledVector(delta, alpha);
-  return nearest.distanceToSquared(centre) <= radius * radius ? alpha : null;
+  const offsetX = centre.x - start.x;
+  const offsetY = centre.y - start.y;
+  const offsetZ = centre.z - start.z;
+  const alpha = THREE.MathUtils.clamp(
+    (offsetX * delta.x + offsetY * delta.y + offsetZ * delta.z) / denominator,
+    0,
+    1,
+  );
+  const nearestX = start.x + delta.x * alpha - centre.x;
+  const nearestY = start.y + delta.y * alpha - centre.y;
+  const nearestZ = start.z + delta.z * alpha - centre.z;
+  return nearestX * nearestX + nearestY * nearestY + nearestZ * nearestZ <= radius * radius ? alpha : null;
 }
 
 function createExplosiveBoltMesh(): THREE.Group {
@@ -10556,8 +10569,8 @@ function updateExplosiveBolts(dt: number, now: number): void {
   for (let index = explosiveBolts.length - 1; index >= 0; index -= 1) {
     const bolt = explosiveBolts[index];
     if (bolt.impactedAt === null) {
-      const start = bolt.mesh.position.clone();
-      const delta = bolt.velocity.clone().multiplyScalar(dt);
+      const start = explosiveBoltStartScratch.copy(bolt.mesh.position);
+      const delta = explosiveBoltDeltaScratch.copy(bolt.velocity).multiplyScalar(dt);
       const worldCollision = sweepSphereAgainstBoxes(start, delta, activeWorldColliders());
       let targetHit: ExplosiveBoltTarget | null = null;
       let targetFraction = 2;
@@ -14277,6 +14290,10 @@ function drawMinimapLandmark(
 }
 
 function updateMinimap(now: number): void {
+  if (!presentationFrameDue(now, lastMinimapRenderAt, MINIMAP_RENDER_HZ)) return;
+  lastMinimapRenderAt = Number.isFinite(lastMinimapRenderAt)
+    ? advancePresentationFrameAnchor(now, lastMinimapRenderAt, MINIMAP_RENDER_HZ)
+    : now;
   minimapRenderCount += 1;
   const context = minimapContext;
   const width = minimapCanvas.width;
@@ -14438,12 +14455,14 @@ function updateMinimap(now: number): void {
   context.textAlign = 'center';
   const [northX, northY] = northMarkerPosition(player.yaw, width, height);
   context.fillText('N', northX, northY + 7);
-  element<HTMLElement>('#map-heading').textContent = `PLAYER UP · ${String(headingDegrees(player.yaw)).padStart(3, '0')}°`;
+  const headingText = `PLAYER UP · ${String(headingDegrees(player.yaw)).padStart(3, '0')}°`;
+  const headingElement = element<HTMLElement>('#map-heading');
+  if (headingElement.textContent !== headingText) headingElement.textContent = headingText;
 }
 
 function updateHud(now: number): void {
-  // DOM reconstruction can stay at 10 Hz. The rotating minimap is intentionally
-  // drawn from frame() so camera-relative direction remains smooth and accurate.
+  // DOM reconstruction can stay at 10 Hz. The rotating minimap has its own
+  // bounded 60 Hz cadence so uncapped rendering cannot flood Canvas2D work.
   if (now - lastHudAt < 100) return;
   lastHudAt = now;
   if (gameStarted) updateMatchState(now);
@@ -17335,6 +17354,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       shadowMode: activeRenderConfig.shadowMode,
       framePacing: effectiveFramePacing(),
       minimapRenders: minimapRenderCount,
+      minimapTargetHz: MINIMAP_RENDER_HZ,
       adaptive: adaptiveQuality.telemetry(),
       graphicsRefinement: graphicsRefinement.telemetry(),
       arenaContrastLighting: arenaContrastLighting.telemetry(),

@@ -124,54 +124,73 @@ function worldPointToLocal(frame: BoxFrame, point: Point3): Point3 {
   };
 }
 
-function worldVectorToLocal(frame: BoxFrame, vector: Point3): Point3 {
+function worldPointToLocalInto(frame: BoxFrame, point: Point3, result: Point3): void {
+  const x = point.x - frame.centre.x;
+  const y = point.y - frame.centre.y;
+  const z = point.z - frame.centre.z;
   const rotation = frame.rotation;
+  result.x = rotation.xx * x + rotation.yx * y + rotation.zx * z;
+  result.y = rotation.xy * x + rotation.yy * y + rotation.zy * z;
+  result.z = rotation.xz * x + rotation.yz * y + rotation.zz * z;
+}
+
+function worldVectorToLocalInto(frame: BoxFrame, vector: Point3, result: Point3): void {
+  const rotation = frame.rotation;
+  const x = vector.x;
+  const y = vector.y;
+  const z = vector.z;
+  result.x = rotation.xx * x + rotation.yx * y + rotation.zx * z;
+  result.y = rotation.xy * x + rotation.yy * y + rotation.zy * z;
+  result.z = rotation.xz * x + rotation.yz * y + rotation.zz * z;
+}
+
+function cleanNormalComponent(value: number, magnitude: number): number {
+  const normalized = value / magnitude;
+  if (Math.abs(normalized) < 1e-12) return 0;
+  if (Math.abs(normalized - 1) < 1e-12) return 1;
+  if (Math.abs(normalized + 1) < 1e-12) return -1;
+  return normalized;
+}
+
+function localAxisNormalToWorld(frame: BoxFrame, axis: number, sign: number): Point3 {
+  const rotation = frame.rotation;
+  const x = sign * (axis === 0 ? rotation.xx : axis === 1 ? rotation.xy : rotation.xz);
+  const y = sign * (axis === 0 ? rotation.yx : axis === 1 ? rotation.yy : rotation.yz);
+  const z = sign * (axis === 0 ? rotation.zx : axis === 1 ? rotation.zy : rotation.zz);
+  const magnitude = Math.hypot(x, y, z) || 1;
   return {
-    x: rotation.xx * vector.x + rotation.yx * vector.y + rotation.zx * vector.z,
-    y: rotation.xy * vector.x + rotation.yy * vector.y + rotation.zy * vector.z,
-    z: rotation.xz * vector.x + rotation.yz * vector.y + rotation.zz * vector.z,
+    x: cleanNormalComponent(x, magnitude),
+    y: cleanNormalComponent(y, magnitude),
+    z: cleanNormalComponent(z, magnitude),
   };
 }
 
-function localVectorToWorld(frame: BoxFrame, vector: Point3): Point3 {
-  const rotation = frame.rotation;
-  const result = {
-    x: rotation.xx * vector.x + rotation.xy * vector.y + rotation.xz * vector.z,
-    y: rotation.yx * vector.x + rotation.yy * vector.y + rotation.yz * vector.z,
-    z: rotation.zx * vector.x + rotation.zy * vector.y + rotation.zz * vector.z,
-  };
-  const magnitude = Math.hypot(result.x, result.y, result.z) || 1;
-  const clean = (value: number) => {
-    const normalized = value / magnitude;
-    if (Math.abs(normalized) < 1e-12) return 0;
-    if (Math.abs(normalized - 1) < 1e-12) return 1;
-    if (Math.abs(normalized + 1) < 1e-12) return -1;
-    return normalized;
-  };
-  return { x: clean(result.x), y: clean(result.y), z: clean(result.z) };
-}
-
-function segmentSlabHit(start: Point3, delta: Point3, halfExtents: Point3, padding: number): SlabHit | null {
-  const starts = [start.x, start.y, start.z];
-  const deltas = [delta.x, delta.y, delta.z];
-  const halfSizes = [halfExtents.x + padding, halfExtents.y + padding, halfExtents.z + padding];
+function segmentSlabHit(
+  start: Point3,
+  delta: Point3,
+  halfExtents: Point3,
+  padding: number,
+  result: SlabHit,
+): boolean {
   let near = 0;
   let far = 1;
   let nearAxis = -1;
   let nearSign = 0;
   for (let axis = 0; axis < 3; axis += 1) {
-    const origin = starts[axis];
-    const direction = deltas[axis];
-    const halfSize = halfSizes[axis];
+    const origin = axis === 0 ? start.x : axis === 1 ? start.y : start.z;
+    const direction = axis === 0 ? delta.x : axis === 1 ? delta.y : delta.z;
+    const halfSize = (axis === 0 ? halfExtents.x : axis === 1 ? halfExtents.y : halfExtents.z) + padding;
     if (Math.abs(direction) < 1e-8) {
-      if (origin < -halfSize || origin > halfSize) return null;
+      if (origin < -halfSize || origin > halfSize) return false;
       continue;
     }
     let first = (-halfSize - origin) / direction;
     let second = (halfSize - origin) / direction;
     let sign = -Math.sign(direction);
     if (first > second) {
-      [first, second] = [second, first];
+      const swap = first;
+      first = second;
+      second = swap;
       sign *= -1;
     }
     if (first > near) {
@@ -180,10 +199,22 @@ function segmentSlabHit(start: Point3, delta: Point3, halfExtents: Point3, paddi
       nearSign = sign;
     }
     far = Math.min(far, second);
-    if (near > far) return null;
+    if (near > far) return false;
   }
-  return { near, far, nearAxis, nearSign };
+  result.near = near;
+  result.far = far;
+  result.nearAxis = nearAxis;
+  result.nearSign = nearSign;
+  return true;
 }
+
+// Collision queries are synchronous and contain no callbacks. Reusing these
+// scalar outputs prevents one fast projectile from manufacturing five short-
+// lived objects per collider and frame while returned public hits stay owned by
+// their callers.
+const collisionLocalStartScratch: Point3 = { x: 0, y: 0, z: 0 };
+const collisionLocalDeltaScratch: Point3 = { x: 0, y: 0, z: 0 };
+const collisionSlabHitScratch: SlabHit = { near: 0, far: 0, nearAxis: -1, nearSign: 0 };
 
 function cross2d(origin: ProjectedPoint, a: ProjectedPoint, b: ProjectedPoint): number {
   return (a.x - origin.x) * (b.z - origin.z) - (a.z - origin.z) * (b.x - origin.x);
@@ -317,20 +348,32 @@ export function sweepSphereAgainstBoxes(
   boxes: readonly Box2[],
   radius = 0.17,
 ): SweptSphereHit | null {
-  let best: SweptSphereHit | null = null;
+  let bestTime = Number.POSITIVE_INFINITY;
+  let bestFrame: BoxFrame | null = null;
+  let bestAxis = -1;
+  let bestSign = 0;
   for (const box of boxes) {
     const frame = boxFrame(box);
-    const localStart = worldPointToLocal(frame, start);
-    const localDelta = worldVectorToLocal(frame, delta);
-    const hit = segmentSlabHit(localStart, localDelta, frame.halfExtents, radius);
-    if (!hit || hit.nearAxis < 0 || hit.near < 0 || hit.near > 1 || (best && hit.near >= best.time)) continue;
-    const localNormal = { x: 0, y: 0, z: 0 };
-    if (hit.nearAxis === 0) localNormal.x = hit.nearSign;
-    else if (hit.nearAxis === 1) localNormal.y = hit.nearSign;
-    else localNormal.z = hit.nearSign;
-    best = { time: hit.near, normal: localVectorToWorld(frame, localNormal) };
+    worldPointToLocalInto(frame, start, collisionLocalStartScratch);
+    worldVectorToLocalInto(frame, delta, collisionLocalDeltaScratch);
+    if (!segmentSlabHit(
+      collisionLocalStartScratch,
+      collisionLocalDeltaScratch,
+      frame.halfExtents,
+      radius,
+      collisionSlabHitScratch,
+    )) continue;
+    if (collisionSlabHitScratch.nearAxis < 0
+      || collisionSlabHitScratch.near < 0
+      || collisionSlabHitScratch.near > 1
+      || collisionSlabHitScratch.near >= bestTime) continue;
+    bestTime = collisionSlabHitScratch.near;
+    bestFrame = frame;
+    bestAxis = collisionSlabHitScratch.nearAxis;
+    bestSign = collisionSlabHitScratch.nearSign;
   }
-  return best;
+  if (!bestFrame) return null;
+  return { time: bestTime, normal: localAxisNormalToWorld(bestFrame, bestAxis, bestSign) };
 }
 
 /** Exact sphere overlap against an authored axis-aligned or oriented box. */
@@ -356,14 +399,21 @@ export function circleIntersectsBox(x: number, z: number, radius: number, box: B
 /** Exact three-dimensional segment/box entry time. Null means the segment is not blocked. */
 export function segmentBoxHitTime(start: Point3, end: Point3, box: Box2, padding = 0.02): number | null {
   const frame = boxFrame(box);
-  const localStart = worldPointToLocal(frame, start);
-  const localDelta = worldVectorToLocal(frame, {
-    x: end.x - start.x,
-    y: end.y - start.y,
-    z: end.z - start.z,
-  });
-  const hit = segmentSlabHit(localStart, localDelta, frame.halfExtents, padding);
-  return hit && hit.far > 0.01 && hit.near < 0.99 ? Math.max(0, hit.near) : null;
+  worldPointToLocalInto(frame, start, collisionLocalStartScratch);
+  collisionLocalDeltaScratch.x = end.x - start.x;
+  collisionLocalDeltaScratch.y = end.y - start.y;
+  collisionLocalDeltaScratch.z = end.z - start.z;
+  worldVectorToLocalInto(frame, collisionLocalDeltaScratch, collisionLocalDeltaScratch);
+  const hit = segmentSlabHit(
+    collisionLocalStartScratch,
+    collisionLocalDeltaScratch,
+    frame.halfExtents,
+    padding,
+    collisionSlabHitScratch,
+  );
+  return hit && collisionSlabHitScratch.far > 0.01 && collisionSlabHitScratch.near < 0.99
+    ? Math.max(0, collisionSlabHitScratch.near)
+    : null;
 }
 
 /** Exact line-of-sight check against a solid 3D box. */
