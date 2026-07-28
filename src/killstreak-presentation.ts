@@ -1900,18 +1900,26 @@ export class KillstreakPresentation {
         });
         liveRoot.visible = true;
       }
-      stageBatchInView(liveActivationRoots, 30, 2.5);
-      for (const entry of liveActivationEntries) {
-        for (const mixer of entry.mixers) mixer.setTime(0.5);
+      // LOD render objects are cached per concrete Object3D. A single near
+      // formation only rehearses LOD0 even after the all-visible vocabulary
+      // compile above; Atomic's live flight paths enter LOD1/LOD2 and used to
+      // build those WebGPU node/material pipelines during the first support
+      // activation. Exercise one exact-scale formation inside every authored
+      // distance band while the deployment surface is still opaque.
+      for (const [passIndex, distance] of [24, 50, 88].entries()) {
+        stageBatchInView(liveActivationRoots, distance, 2.5);
+        for (const entry of liveActivationEntries) {
+          for (const mixer of entry.mixers) mixer.setTime(0.35 + passIndex * 0.4);
+        }
+        camera.updateWorldMatrix(true, false);
+        this.root.updateWorldMatrix(true, false);
+        for (const liveRoot of liveActivationRoots) {
+          liveRoot.traverse((node) => {
+            if (node instanceof THREE.LOD) node.update(camera);
+          });
+        }
+        await runtime.compileAndRender(this.root, camera, parentScene);
       }
-      camera.updateWorldMatrix(true, false);
-      this.root.updateWorldMatrix(true, false);
-      for (const liveRoot of liveActivationRoots) {
-        liveRoot.traverse((node) => {
-          if (node instanceof THREE.LOD) node.update(camera);
-        });
-      }
-      await runtime.compileAndRender(this.root, camera, parentScene);
       for (const liveRoot of liveActivationRoots) liveRoot.visible = false;
       if (chopperRoot) {
         chopperRoot.visible = true;

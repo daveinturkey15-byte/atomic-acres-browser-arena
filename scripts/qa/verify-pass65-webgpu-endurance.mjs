@@ -416,7 +416,9 @@ try {
         || killstreakActivationProbe.frameDelta < minimumActivationProgress
         || killstreakActivationProbe.submissionDelta < minimumActivationProgress
         || killstreakActivationProbe.completionDelta < 1
-        || killstreakActivationProbe.maxFrameGapMs > 250
+        || killstreakActivationProbe.maxFrameGapMs > 100
+        || killstreakActivationProbe.maximumCallbackDelayMs > 100
+        || killstreakActivationProbe.longTasks.length > 0
         || killstreakActivationProbe.presentation.status !== 'healthy'
         || killstreakActivationProbe.uncapturedErrors !== 0) {
         throw new Error(`${arenaId} killstreak first activation stalled presentation: ${JSON.stringify({ minimumActivationProgress, killstreakActivationProbe })}`);

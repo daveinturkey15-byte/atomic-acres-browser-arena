@@ -333,7 +333,7 @@ describe('killstreak presentation', () => {
         expect(presentation.root.getObjectByName('piloted-drone-hostile-sensor-16')?.visible).toBe(true);
         expect(presentation.root.getObjectByName('prewarmed-support-placement-ground-x')?.visible).toBe(true);
         expect(presentation.root.getObjectByName('prewarmed-support-placement-corridor')?.visible).toBe(true);
-      } else if (compilePass === 4) {
+      } else if (compilePass >= 4 && compilePass <= 6) {
         expect(chopper.visible).toBe(true);
         expect(presentation.root.getObjectByName('prewarmed-swarm-drone-1')?.visible).toBe(false);
         expect(presentation.root.getObjectByName('prewarmed-swarm-drone-24')?.visible).toBe(false);
@@ -344,6 +344,7 @@ describe('killstreak presentation', () => {
         expect([lod0.visible, lod1.visible].filter(Boolean)).toHaveLength(1);
         expect(dashboardMaterial.depthWrite).toBe(true);
       } else {
+        expect(compilePass).toBe(7);
         expect(chopper.visible).toBe(true);
         expect(presentation.root.getObjectByName('prewarmed-swarm-drone-24')?.visible).toBe(false);
         expect(chopperFuselage.visible).toBe(false);
@@ -356,7 +357,7 @@ describe('killstreak presentation', () => {
       presentation.prewarm({ compileAndRender }, camera),
     ]);
     await presentation.prewarm({ compileAndRender }, camera);
-    expect(compileAndRender).toHaveBeenCalledTimes(5);
+    expect(compileAndRender).toHaveBeenCalledTimes(7);
     expect(chopper.visible).toBe(false);
     expect(chopper.scale.toArray()).toEqual([2, 3, 4]);
     expect(chopper.frustumCulled).toBe(true);
@@ -404,7 +405,7 @@ describe('killstreak presentation', () => {
     presentation.prewarmAuthoredAssets();
     const rebuiltRuntime = { compileAndRender: vi.fn(async () => undefined) };
     await presentation.prewarm(rebuiltRuntime, camera);
-    expect(rebuiltRuntime.compileAndRender).toHaveBeenCalledTimes(5);
+    expect(rebuiltRuntime.compileAndRender).toHaveBeenCalledTimes(7);
     presentation.dispose();
     await expect(presentation.prewarm(rebuiltRuntime, camera)).rejects.toThrow('disposed');
   });
@@ -416,9 +417,9 @@ describe('killstreak presentation', () => {
     const compileAndRender = vi.fn(async () => undefined);
     await presentation.prewarm({ compileAndRender }, camera, 4);
     await presentation.prewarm({ compileAndRender }, camera, 4);
-    expect(compileAndRender).toHaveBeenCalledTimes(5);
+    expect(compileAndRender).toHaveBeenCalledTimes(7);
     await presentation.prewarm({ compileAndRender }, camera, 5);
-    expect(compileAndRender).toHaveBeenCalledTimes(10);
+    expect(compileAndRender).toHaveBeenCalledTimes(14);
     presentation.dispose();
   });
 
