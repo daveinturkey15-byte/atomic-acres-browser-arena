@@ -51,6 +51,7 @@
     "qa:pass63": "playwright test tests/e2e/pass63-project-map.spec.ts tests/e2e/pass63-atomic-visuals.spec.ts tests/e2e/pass63-skyline-terminal-openings.spec.ts tests/e2e/pass63-text-chat.spec.ts tests/e2e/rustworks-refinement.spec.ts --project=chromium --workers=1 --retries=0",
     "qa:pass63:text-chat": "playwright test tests/e2e/pass63-text-chat.spec.ts --project=chromium --workers=1 --retries=0",
     "qa:pass64:webgpu": "node scripts/qa/verify-pass64-webgpu.mjs",
+    "qa:pass65:cold-webgpu-admission": "node scripts/qa/verify-pass65-cold-webgpu-admission.mjs",
     "qa:pass65:webgpu-endurance": "node scripts/qa/verify-pass65-webgpu-endurance.mjs",
     "qa:pass65:frame-pacing-policy": "node .agents/skills/atomic-acres-webgpu-frame-pacing/scripts/verify-webgpu-frame-pacing-policy.mjs --self-test",
     "qa:pass65:frame-pacing": "npm run qa:pass65:frame-pacing-policy && npm run build && node scripts/qa/verify-pass65-frame-pacing.ts",

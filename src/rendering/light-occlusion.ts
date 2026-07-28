@@ -48,6 +48,7 @@ export function auditLocalLightOcclusion(root: THREE.Object3D, layerMask?: numbe
     const tagged = node as OcclusionTaggedLight;
     if (tagged.userData.occlusionPolicy === 'emissive-only') {
       emissiveOnlySources += 1;
+      if (node.visible) violations.push(`${node.name || '(unnamed)'}:emissive-only-render-visible`);
       if (node.intensity !== 0 || node.castShadow) violations.push(`${node.name}:emissive-only-runtime-light`);
       return;
     }
