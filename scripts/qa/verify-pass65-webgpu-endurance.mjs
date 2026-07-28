@@ -50,11 +50,25 @@ function fatalBrowserErrors(errors) {
 }
 
 async function captureCanvasOnly(page, clip) {
-  await page.evaluate(() => { document.documentElement.dataset.pass65CanvasOnly = 'true'; });
+  await page.evaluate(() => {
+    document.documentElement.dataset.pass65CanvasOnly = 'true';
+    window.__ATOMIC_ACRES_DEBUG__?.setRenderPaused(true);
+  });
   try {
+    // Chrome's compositor capture may occupy the same adapter queue for more
+    // than a second at 2560x1440. Drain the last game submission and prevent a
+    // new one from being admitted during capture so verifier work is excluded
+    // from the next gameplay progress interval.
+    await page.waitForFunction(() => {
+      const presentation = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.render?.runtime?.presentation;
+      return presentation && presentation.completedSequence >= presentation.submissionSequence;
+    }, undefined, { timeout: 12_000 });
     return await page.screenshot({ clip });
   } finally {
-    await page.evaluate(() => { delete document.documentElement.dataset.pass65CanvasOnly; });
+    await page.evaluate(() => {
+      delete document.documentElement.dataset.pass65CanvasOnly;
+      window.__ATOMIC_ACRES_DEBUG__?.setRenderPaused(false);
+    });
   }
 }
 
