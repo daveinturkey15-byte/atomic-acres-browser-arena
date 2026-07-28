@@ -12258,11 +12258,13 @@ function updateOverdrive(now: number): void {
     overdriveClaimLastSentAt = Number.NEGATIVE_INFINITY;
   }
 
-  // Keep the already-submitted presentation resident at sub-pixel scale for
-  // the whole deployed match, including the countdown. Toggling this Atomic-
-  // only tree at ENGAGE forced a cold WebGPU scene rebuild on the first live
-  // combat frame; scaling it is allocation-free and preserves the warm cache.
-  overdriveRoot.visible = gameStarted;
+  // Keep the already-submitted presentation resident at sub-pixel scale while
+  // the opaque deployment surface is compiling and throughout the match. The
+  // frame loop remains active during async match admission; hiding this tree
+  // merely because gameStarted is still false changes Three's lighting cache
+  // key between support prewarm and first live activation, rebuilding every
+  // chopper/swarm node pipeline in combat.
+  overdriveRoot.visible = gameStarted || matchStartPreparing;
   overdriveRoot.scale.setScalar(overdriveState.available ? 1 : 0.0001);
   if (overdriveRoot.visible && overdriveState.available) {
     overdriveRoot.position.set(

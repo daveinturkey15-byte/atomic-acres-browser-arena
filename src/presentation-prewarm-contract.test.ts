@@ -48,7 +48,7 @@ describe('presentation prewarm startup contract', () => {
     expect(matchDeployment).toContain('const matchActiveOverdrivePrewarm = selectedArena.overdrive;');
     expect(matchDeployment).toContain('overdriveRoot.visible = true;');
     expect(matchDeployment).toContain('overdriveRoot.visible = selectedArena.overdrive;');
-    expect(source).toContain('overdriveRoot.visible = gameStarted;');
+    expect(source).toContain('overdriveRoot.visible = gameStarted || matchStartPreparing;');
     expect(source).not.toContain("overdriveRoot.visible = gameStarted && matchState.phase === 'active';");
     expect(source).not.toContain('const renderer = renderRuntime.renderer as unknown as THREE.WebGLRenderer');
     expect(source).toContain("bootstrapStage = 'prewarming-grenade-explosion'");
