@@ -18,6 +18,8 @@ import {
 } from './vision.mjs';
 import { createTacticalPolicy } from './tactical-policy.mjs';
 import { chooseVisibleSupport, shouldThrowVisibleGrenade } from './combat-actions.mjs';
+import { advanceFinishLatch, consumeFinishFollowup } from './finish-latch.mjs';
+import { buildShotEvidence } from './shot-evidence.mjs';
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, '../..');
@@ -130,24 +132,40 @@ async function moveAim(page, movementX, movementY) {
 }
 
 async function firePulse(page, ads, pulseMs = 72) {
-  await page.evaluate(({ useAds }) => {
-    const canvas = document.querySelector('#game');
-    if (!(canvas instanceof HTMLCanvasElement)) return;
-    if (useAds) canvas.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 2, buttons: 2 }));
-    canvas.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, buttons: useAds ? 3 : 1 }));
-  }, { useAds: ads });
-  await sleep(pulseMs);
-  await page.evaluate(({ useAds }) => {
-    window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0, buttons: useAds ? 2 : 0 }));
-    if (useAds) window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 2, buttons: 0 }));
-  }, { useAds: ads });
+  let downReceipt = null;
+  try {
+    const downMonotonicMs = performance.now();
+    const downEpochMs = Date.now();
+    const browserDownEpochMs = await page.evaluate(({ useAds }) => {
+      const canvas = document.querySelector('#game');
+      if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Visible game canvas missing at trigger-down');
+      if (useAds) canvas.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 2, buttons: 2 }));
+      canvas.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, buttons: useAds ? 3 : 1 }));
+      return Date.now();
+    }, { useAds: ads });
+    downReceipt = { downMonotonicMs, downEpochMs, browserDownEpochMs, adsRequested: ads, pulseMs };
+    await sleep(pulseMs);
+    return downReceipt;
+  } finally {
+    await page.evaluate(({ useAds }) => {
+      window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0, buttons: useAds ? 2 : 0 }));
+      if (useAds) window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 2, buttons: 0 }));
+    }, { useAds: ads }).catch(() => undefined);
+    if (downReceipt) {
+      downReceipt.upMonotonicMs = performance.now();
+      downReceipt.upEpochMs = Date.now();
+      downReceipt.observedHoldMs = downReceipt.upMonotonicMs - downReceipt.downMonotonicMs;
+    }
+  }
 }
 
 async function fireBurst(page, shots, ads, pulseMs = 72) {
+  const receipts = [];
   for (let shot = 0; shot < shots; shot += 1) {
-    await firePulse(page, ads, pulseMs);
+    receipts.push(await firePulse(page, ads, pulseMs));
     if (shot + 1 < shots) await sleep(42);
   }
+  return receipts;
 }
 
 async function annotatedVisionJpeg(vision, tracking) {
@@ -192,12 +210,12 @@ async function createVisionCapture(context, page, options = {}) {
   let consumedPacketSequence = 0;
   const frameWaiters = new Set();
 
-  const recordPacket = (encodedData, receivedAt) => {
+  const recordPacket = (encodedData, receivedAt, sourceTimestamp = null) => {
     state.receivedFrames += 1;
     state.firstReceivedAt ??= receivedAt;
     state.latestReceivedAt = receivedAt;
     packetSequence += 1;
-    latestPacket = { encodedData, receivedAt, sequence: packetSequence };
+    latestPacket = { encodedData, receivedAt, sourceTimestamp, sequence: packetSequence };
     for (const resolveWaiter of frameWaiters) resolveWaiter();
     frameWaiters.clear();
   };
@@ -206,7 +224,7 @@ async function createVisionCapture(context, page, options = {}) {
     cdp.on('Page.screencastFrame', (event) => {
       const receivedAt = performance.now();
       void cdp.send('Page.screencastFrameAck', { sessionId: event.sessionId }).catch(() => undefined);
-      recordPacket(event.data, receivedAt);
+      recordPacket(event.data, receivedAt, event.metadata?.timestamp ?? null);
     });
     await cdp.send('Page.startScreencast', {
       format: 'jpeg',
@@ -229,6 +247,7 @@ async function createVisionCapture(context, page, options = {}) {
     const operatorTargets = findPurpleOperatorCandidates(data, info.width, info.height, info.channels, options.operatorDetectionOptions ?? {});
     const minimapThreats = findMinimapThreats(data, info.width, info.height, info.channels);
     const decodeMs = performance.now() - decodeStartedAt;
+    const decodedAt = performance.now();
     const captureMs = Math.max(0, packet.receivedAt - captureStartedAt);
     state.captureDurationsMs.push(captureMs);
     state.decodeDurationsMs.push(decodeMs);
@@ -236,7 +255,9 @@ async function createVisionCapture(context, page, options = {}) {
     state.latest = {
       sequence: state.decodedFrames,
       sourceSequence: packet.sequence,
+      sourceTimestamp: packet.sourceTimestamp,
       receivedAt: packet.receivedAt,
+      decodedAt,
       jpeg,
       targets,
       operatorTargets,
@@ -525,6 +546,7 @@ async function run() {
   const allowTacticalItems = Boolean(args['allow-tactical-items']);
   const maximumGrenadeThrows = integerArg(args['max-grenades'], 2, 0, 6);
   const finishWindowMs = integerArg(args['finish-window'], 0, 0, 2500);
+  const finishFollowupLimit = integerArg(args['finish-followup-limit'], 2, 1, 4);
   const bankLeadMinimumKills = integerArg(args['bank-lead-minimum-kills'], 0, 0, 20);
   const bankLeadMinimumMargin = integerArg(args['bank-lead-minimum-margin'], 1, 1, 20);
   const allowCombatFire = Boolean(args['allow-combat-fire']);
@@ -559,6 +581,8 @@ async function run() {
   let firstTargetCaptured = false;
   let firstTwoFrameAlignedCaptured = false;
   let firstFireCaptured = false;
+  let firstFireVision = null;
+  let firstFireTracking = null;
   let rawTargetFrames = 0;
   let warmupRawTargetFrames = 0;
   let operatorCandidateFrames = 0;
@@ -580,6 +604,8 @@ async function run() {
   let weaponMismatches = 0;
   let finishWindows = 0;
   let finishHoldFrames = 0;
+  let finishFollowupPulses = 0;
+  let finishCancellations = 0;
   let stuckRecoveries = 0;
   let damageReactions = 0;
   let candidateImagesSaved = 0;
@@ -597,6 +623,7 @@ async function run() {
   let matchEndedObserved = false;
   let matchSummaryDownload = null;
   let matchTechnicalDownload = null;
+  let shotEvidenceReceipt = null;
   let rendererInfo = null;
   let controlStartedAtMs = null;
   let controlEndedAtMs = null;
@@ -767,7 +794,8 @@ async function run() {
       let previousSignature = visionStream.state.latest.signature;
       let previousDamageTaken = null;
       let previousDamageDealt = null;
-      let finishWindowUntil = Number.NEGATIVE_INFINITY;
+      let previousKills = null;
+      let finishLatch = null;
       let lowMotionFrames = 0;
       let previousMovementForward = false;
       let previousMovementMoved = false;
@@ -775,6 +803,7 @@ async function run() {
       let lastReloadRequestAt = Number.NEGATIVE_INFINITY;
       let reloadSuppressedUntil = 0;
       let lastBurstAt = Number.NEGATIVE_INFINITY;
+      let lastBurstTarget = null;
       let lastGrenadeAt = Number.NEGATIVE_INFINITY;
       let lastSupportActivationAt = Number.NEGATIVE_INFINITY;
       const usedSupportThresholds = new Set();
@@ -848,8 +877,14 @@ async function run() {
         const visibleDamageDealtDelta = activeMatch && previousDamageDealt !== null && observedDamageDealt !== null
           ? Math.max(0, observedDamageDealt - previousDamageDealt)
           : 0;
+        const observedKills = Number.isFinite(Number(hud?.kills)) ? Number(hud.kills) : null;
+        const visibleKillDelta = activeMatch && previousKills !== null && observedKills !== null
+          ? Math.max(0, observedKills - previousKills)
+          : 0;
         if (activeMatch && observedDamageDealt !== null) previousDamageDealt = observedDamageDealt;
         else if (!activeMatch) previousDamageDealt = null;
+        if (activeMatch && observedKills !== null) previousKills = observedKills;
+        else if (!activeMatch) previousKills = null;
         if (damageDelta > 0) {
           damageReactionUntil = now + 1_100;
           reactionDirection *= -1;
@@ -885,22 +920,41 @@ async function run() {
         const minimapThreat = vision.minimapThreats[0] ?? null;
         if (activeMatch && minimapThreat) minimapThreatFrames += 1;
         currentTarget = tracking.confirmedTarget;
-        if (!activeMatch || !currentTarget) finishWindowUntil = Number.NEGATIVE_INFINITY;
-        if (finishWindowMs > 0 && activeMatch && currentTarget && visibleDamageDealtDelta > 0
-          && now - lastBurstAt <= 1_200) {
-          finishWindowUntil = now + finishWindowMs;
+        const finishAdvance = advanceFinishLatch({
+          latch: finishLatch,
+          active: activeMatch,
+          now,
+          atMs,
+          visibleKillDelta,
+          currentTarget,
+          lastBurstTarget,
+          visibleDamageDealtDelta,
+          lastBurstAt,
+          durationMs: finishWindowMs,
+          followupLimit: finishFollowupLimit,
+          associate: (previous, current) => associatePurpleOperator(previous, [current]).target,
+        });
+        finishLatch = finishAdvance.latch;
+        if (finishAdvance.event?.kind === 'cancel') {
+          const cancelDetails = { ...finishAdvance.event };
+          delete cancelDetails.kind;
+          finishCancellations += 1;
+          actions.push({ atMs, kind: 'visible-damage-finish-cancel', ...cancelDetails });
+        } else if (finishAdvance.event?.kind === 'activate') {
+          const activationDetails = { ...finishAdvance.event };
+          delete activationDetails.kind;
           finishWindows += 1;
           actions.push({
             atMs,
             kind: 'visible-damage-finish-window',
-            damageDelta: visibleDamageDealtDelta,
-            durationMs: finishWindowMs,
+            ...activationDetails,
             trackAge: tracking.trackAge,
             stableFrames: tracking.stableFrames,
             target: currentTarget,
           });
         }
-        const holdEngagement = activeMatch && Boolean(currentTarget) && now < finishWindowUntil;
+        const holdEngagement = activeMatch && Boolean(currentTarget) && Boolean(finishLatch)
+          && now < finishLatch.expiresAt && finishLatch.followupsRemaining > 0;
         if (holdEngagement) finishHoldFrames += 1;
         let cameraMovedThisFrame = false;
         if (activeMatch && rawTarget) operatorCandidateFrames += 1;
@@ -999,6 +1053,9 @@ async function run() {
             step: 0,
             phase: 'initial',
             sourceSequence: aimedVision.sourceSequence,
+            sourceTimestamp: aimedVision.sourceTimestamp,
+            receivedAt: aimedVision.receivedAt,
+            decodedAt: aimedVision.decodedAt,
             x: aimedTarget.x,
             y: aimedTarget.y,
             horizontal,
@@ -1040,6 +1097,9 @@ async function run() {
                 commandX: 0,
                 commandY: 0,
                 sourceSequence: aimedVision.sourceSequence,
+                sourceTimestamp: aimedVision.sourceTimestamp,
+                receivedAt: aimedVision.receivedAt,
+                decodedAt: aimedVision.decodedAt,
                 x: aimedTarget.x,
                 y: aimedTarget.y,
                 horizontal,
@@ -1098,6 +1158,9 @@ async function run() {
               commandX: movementX,
               commandY: movementY,
               sourceSequence: aimedVision.sourceSequence,
+              sourceTimestamp: aimedVision.sourceTimestamp,
+              receivedAt: aimedVision.receivedAt,
+              decodedAt: aimedVision.decodedAt,
               x: aimedTarget.x,
               y: aimedTarget.y,
               horizontal,
@@ -1159,30 +1222,44 @@ async function run() {
             await sleep(250);
           }
           if (!grenadeThrownThisTick && allowCombatFire && shotPulses < maximumShotPulses && tracking.fireAuthorized && postInputReacquired && twoFrameAligned && activeMatch && alignment < fireAlignmentMaximum
-            && !currentlyReloading && now - lastBurstAt >= fireCooldownMs) {
+            && !currentlyReloading && now - lastBurstAt >= fireCooldownMs
+            && (!finishLatch || finishLatch.followupsRemaining > 0)) {
             const shots = Math.max(1, Math.min(burstShots, maximumShotPulses - shotPulses, Number(hud?.ammo ?? burstShots)));
             if (!firstFireCaptured) {
-              const fireTracking = { rawTarget: aimedTarget, confirmedTarget: aimedTarget };
-              await writeFile(resolve(artifactDirectory, 'first-fire-aligned.jpg'), aimedVision.jpeg);
-              await writeFile(resolve(artifactDirectory, 'first-fire-aligned-annotated.jpg'), await annotatedVisionJpeg(aimedVision, fireTracking));
+              firstFireVision = aimedVision;
+              firstFireTracking = { rawTarget: aimedTarget, confirmedTarget: aimedTarget, fireAuthorized: true };
               firstFireCaptured = true;
             }
             const useAds = alwaysAds || alignment < 0.012;
-            await fireBurst(page, shots, useAds, firePulseMs);
+            const triggerReceipts = await fireBurst(page, shots, useAds, firePulseMs);
+            const firstTrigger = triggerReceipts[0];
             shotPulses += shots;
             bursts += 1;
-            lastBurstAt = now;
+            lastBurstAt = firstTrigger.downMonotonicMs;
+            lastBurstTarget = aimedTarget;
+            const finishConsumption = consumeFinishFollowup(finishLatch, firstTrigger.downMonotonicMs);
+            finishLatch = finishConsumption.latch;
+            const finishFollowup = finishConsumption.finishFollowup;
+            if (finishFollowup) {
+              finishFollowupPulses += 1;
+            }
             let fireEvidenceFile = null;
             if (fireEvidenceFrames.length < fireEvidenceLimit) {
               fireEvidenceFile = `fire-evidence/burst-${String(fireEvidenceFrames.length + 1).padStart(3, '0')}.jpg`;
               fireEvidenceFrames.push({ file: fireEvidenceFile, jpeg: aimedVision.jpeg });
             }
             actions.push({
-              atMs,
+              atMs: firstTrigger.downEpochMs - startedAt.getTime(),
               kind: 'operator-authorized-burst',
               shots,
               alignment,
               useAds,
+              adsRenderedState: 'unknown',
+              finishFollowup,
+              finishActivationAtMs: finishFollowup ? finishLatch.activatedAtMs : null,
+              finishFollowupsRemaining: finishFollowup ? finishLatch.followupsRemaining : null,
+              triggerReceipts,
+              authorityFrameAgeAtTriggerMs: firstTrigger.downMonotonicMs - aimedVision.receivedAt,
               crosshairAligned: aimAlignment.aligned,
               twoFrameAligned,
               associationReason,
@@ -1369,9 +1446,19 @@ async function run() {
     const percentileFrom = (values, ratio) => values.length === 0
       ? null
       : values[Math.min(values.length - 1, Math.floor((values.length - 1) * ratio))];
+    if (firstFireCaptured && firstFireVision && firstFireTracking) {
+      await writeFile(resolve(artifactDirectory, 'first-fire-aligned.jpg'), firstFireVision.jpeg);
+      await writeFile(
+        resolve(artifactDirectory, 'first-fire-aligned-annotated.jpg'),
+        await annotatedVisionJpeg(firstFireVision, firstFireTracking),
+      );
+    }
     if (fireEvidenceFrames.length > 0) {
       await mkdir(resolve(artifactDirectory, 'fire-evidence'), { recursive: true });
       await Promise.all(fireEvidenceFrames.map((entry) => writeFile(resolve(artifactDirectory, entry.file), entry.jpeg)));
+      const shotEvidence = buildShotEvidence({ actions, matchSummaryDownload, startedAt: startedAt.toISOString() });
+      await writeFile(resolve(artifactDirectory, 'shot-evidence.json'), `${JSON.stringify(shotEvidence, null, 2)}\n`);
+      shotEvidenceReceipt = { file: 'shot-evidence.json', reconciliation: shotEvidence.reconciliation };
     }
     await writeFile(resolve(artifactDirectory, 'telemetry.json'), `${JSON.stringify({ schemaVersion: 1, actions }, null, 2)}\n`);
     const candidateArtifacts = Array.from({ length: candidateImagesSaved }, (_, index) => `candidate-${String(index + 1).padStart(2, '0')}.jpg`);
@@ -1492,6 +1579,8 @@ async function run() {
         weaponMismatches,
         finishWindows,
         finishHoldFrames,
+        finishFollowupPulses,
+        finishCancellations,
         observedWeaponName,
         stuckRecoveries,
         damageReactions,
@@ -1541,6 +1630,7 @@ async function run() {
         messages: browserMessages.slice(0, 50),
       },
       actionsFile: 'telemetry.json',
+      shotEvidence: shotEvidenceReceipt,
       actions: actions.slice(-250),
       artifacts: [
         startScreenshotCaptured ? 'start.jpg' : null,
@@ -1556,6 +1646,7 @@ async function run() {
         ...annotatedCandidateArtifacts,
         ...damageArtifacts,
         ...fireEvidenceFrames.map((entry) => entry.file),
+        shotEvidenceReceipt?.file ?? null,
         finalScreenshotCaptured ? 'final.jpg' : null,
         matchEndedObserved ? 'post-game.jpg' : null,
         matchSummaryDownload ? 'match-summary.json' : null,
