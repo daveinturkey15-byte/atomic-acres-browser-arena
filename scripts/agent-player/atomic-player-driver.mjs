@@ -578,6 +578,7 @@ async function run() {
   let controlEndedAtMs = null;
   let tacticalPolicyReceipt = null;
   let fieldKitReceipt = null;
+  let observedWeaponName = null;
   let activeInputVeto = false;
   let pointerLockLosses = 0;
   let focusLosses = 0;
@@ -749,7 +750,7 @@ async function run() {
       let lastGrenadeAt = Number.NEGATIVE_INFINITY;
       let lastSupportActivationAt = Number.NEGATIVE_INFINITY;
       const usedSupportThresholds = new Set();
-      let observedWeaponName = null;
+
       let lastCandidateImageAt = Number.NEGATIVE_INFINITY;
       let damageReactionUntil = 0;
       let reactionDirection = 1;
