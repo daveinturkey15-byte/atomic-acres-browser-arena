@@ -1108,6 +1108,7 @@ function buildDrone(mode: 'piloted' | 'swarm' | null): PresentedEntity {
     root.userData.forwardAxis = [0, 0, -1];
     root.userData.weaponFeedback = [...SUPPORT_WEAPON_FEEDBACK_CONTRACT];
     markSharedPresentationAsset(root);
+    applyAuthoredSupportShadowBudget(root);
     const mixer = new THREE.AnimationMixer(root);
     for (const clipName of HUNTER_DRONE_LOOP_ACTIONS) {
       const clip = hunterDroneAnimations.find((candidate) => candidate.name === clipName);
