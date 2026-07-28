@@ -38,6 +38,10 @@ const canonicalArenaSequence = [
 const diagnosticStress = process.env.PASS65_DIAGNOSTIC_STRESS?.trim().toLowerCase() ?? '';
 const profileFirstActivation = process.env.PASS65_PROFILE_FIRST_ACTIVATION === '1';
 const probeBaselineWindow = process.env.PASS65_PROBE_BASELINE === '1';
+const killstreakProbeMode = process.env.PASS65_KILLSTREAK_PROBE_MODE?.trim().toLowerCase() ?? 'both';
+if (!['both', 'chopper', 'swarm'].includes(killstreakProbeMode)) {
+  throw new Error(`Unknown PASS65_KILLSTREAK_PROBE_MODE: ${killstreakProbeMode}`);
+}
 const diagnosticArena = process.env.PASS65_DIAGNOSTIC_ARENA?.trim() ?? '';
 const diagnosticSequence = (process.env.PASS65_DIAGNOSTIC_SEQUENCE ?? '')
   .split(',')
@@ -251,7 +255,7 @@ try {
       await activationProfiler.send('Profiler.setSamplingInterval', { interval: 100 });
       await activationProfiler.send('Profiler.start');
     }
-    const killstreakActivationProbe = await page.evaluate(async ({ activate, probe }) => {
+    const killstreakActivationProbe = await page.evaluate(async ({ activate, probe, mode }) => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
       if (!probe) return {
         skipped: true,
@@ -319,8 +323,8 @@ try {
           const callStartedAt = performance.now();
           if (activate) {
             activations = {
-              chopper: api.activateKillstreak('chopper'),
-              droneSwarm: api.activateKillstreak('drone-swarm'),
+              chopper: mode === 'swarm' ? null : api.activateKillstreak('chopper'),
+              droneSwarm: mode === 'chopper' ? null : api.activateKillstreak('drone-swarm'),
             };
           }
           activationCallMs = performance.now() - callStartedAt;
@@ -331,6 +335,7 @@ try {
     }, {
       activate: enabledStress.has('killstreak'),
       probe: enabledStress.has('killstreak') || probeBaselineWindow,
+      mode: killstreakProbeMode,
     });
     if (activationProfiler) {
       const { profile } = await activationProfiler.send('Profiler.stop');
@@ -338,8 +343,10 @@ try {
       await writeFile(`${artifactRoot}/activation-cpu-profile.json`, `${JSON.stringify(profile)}\n`, 'utf8');
     }
     const killstreakStress = killstreakActivationProbe.activations;
-    if (enabledStress.has('killstreak') && (!killstreakStress.chopper || !killstreakStress.droneSwarm)) {
-      throw new Error(`${arenaId} could not stage the chopper plus drone-swarm stress overlap: ${JSON.stringify(killstreakStress)}`);
+    if (enabledStress.has('killstreak')
+      && ((killstreakProbeMode !== 'swarm' && !killstreakStress.chopper)
+        || (killstreakProbeMode !== 'chopper' && !killstreakStress.droneSwarm))) {
+      throw new Error(`${arenaId} could not stage the requested ${killstreakProbeMode} support stress: ${JSON.stringify(killstreakStress)}`);
     }
     if (enabledStress.has('killstreak')) {
       const minimumActivationProgress = Math.max(4, Math.floor(killstreakActivationProbe.elapsedMs / 100));
@@ -354,11 +361,11 @@ try {
         throw new Error(`${arenaId} killstreak first activation stalled presentation: ${JSON.stringify({ minimumActivationProgress, killstreakActivationProbe })}`);
       }
     }
-    if (enabledStress.has('killstreak')) await page.waitForFunction(() => {
+    if (enabledStress.has('killstreak')) await page.waitForFunction((mode) => {
       const entities = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.killstreak?.entities ?? [];
-      return entities.some((entity) => entity.kind === 'chopper')
-        && entities.filter((entity) => entity.kind === 'drone' && entity.mode === 'swarm').length >= 5;
-    }, undefined, { timeout: 5_000 });
+      return (mode === 'swarm' || entities.some((entity) => entity.kind === 'chopper'))
+        && (mode === 'chopper' || entities.filter((entity) => entity.kind === 'drone' && entity.mode === 'swarm').length >= 5);
+    }, killstreakProbeMode, { timeout: 5_000 });
     const activeStressBudget = enabledStress.has('killstreak')
       ? await page.evaluate(async () => {
         const api = window.__ATOMIC_ACRES_DEBUG__;
@@ -605,6 +612,7 @@ try {
     otherArenaDurationMs,
     arenaSequence,
     enabledStress: [...enabledStress],
+    killstreakProbeMode,
     browserErrors: [...new Set(errors)],
     arenaReceipts,
   };
