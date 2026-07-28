@@ -886,7 +886,10 @@ function buildAuthoredSupportVehicle(family: SupportVehicleAssetFamily): Present
     level.scale.setScalar(SUPPORT_VEHICLE_TARGET_DIMENSIONS[family] / Math.max(0.001, source.sourceMaxDimension));
     level.userData.presentationAsset = source.asset;
     const cockpit = level.getObjectByName('chopper-first-person-cockpit');
-    if (cockpit) cockpit.userData.firstPersonCockpit = true;
+    if (cockpit) {
+      cockpit.userData.firstPersonCockpit = true;
+      cockpit.userData.firstPersonOnly = true;
+    }
     const firstPersonRotor = level.getObjectByName('chopper-first-person-rotor');
     if (firstPersonRotor) firstPersonRotor.userData.firstPersonOnly = true;
     markSharedPresentationAsset(level);
@@ -944,6 +947,7 @@ function buildProceduralChopperFallback(): PresentedEntity {
   const cockpit = new THREE.Group();
   cockpit.name = 'chopper-first-person-cockpit';
   cockpit.userData.firstPersonCockpit = true;
+  cockpit.userData.firstPersonOnly = true;
   cockpit.position.copy(cameraSocket.position);
   const dashboard = mesh(new THREE.BoxGeometry(0.82, 0.13, 0.16), 0x071215, 'chopper-cockpit-dashboard-3d');
   dashboard.position.set(0, -0.165, -0.35);
@@ -1492,8 +1496,13 @@ export class KillstreakPresentation {
       instanced.name = `pass65-swarm-instanced-batch-${this.swarmInstanceBatches.length + 1}`;
       instanced.userData.presentationOnly = true;
       instanced.userData.swarmInstancedPresentation = true;
-      instanced.castShadow = representative.castShadow;
-      instanced.receiveShadow = representative.receiveShadow;
+      // These small airborne drones never touch a readable receiver shadow and
+      // should not sample the arena's seven-light shadow rig 24 times per batch.
+      // Keeping their authored PBR material while removing irrelevant shadow
+      // work preserves silhouette/lighting and stabilizes legal support overlap.
+      instanced.castShadow = false;
+      instanced.receiveShadow = false;
+      instanced.userData.airborneShadowPolicy = 'unshadowed-small-support-lod';
       instanced.renderOrder = representative.renderOrder;
       instanced.frustumCulled = false;
       instanced.raycast = () => undefined;
