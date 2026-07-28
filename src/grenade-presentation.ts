@@ -319,7 +319,7 @@ export class GrenadeWorldPresentationPool {
   ): Promise<void> {
     if (this.disposed) throw new Error('Cannot prewarm a disposed grenade presentation pool');
     if (this.gpuPrewarmGeneration === sceneGeneration) return;
-    if (this.gpuPrewarmPromise) {
+    while (this.gpuPrewarmPromise) {
       await this.gpuPrewarmPromise;
       if (this.gpuPrewarmGeneration === sceneGeneration) return;
     }
