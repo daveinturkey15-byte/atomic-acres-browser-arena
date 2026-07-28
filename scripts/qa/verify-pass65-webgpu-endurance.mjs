@@ -83,59 +83,61 @@ function fatalBrowserErrors(errors) {
   ));
 }
 
+async function pauseAndDrainPresentation(page) {
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__?.setRenderPaused(true));
+  await page.waitForFunction(() => {
+    const presentation = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.render?.runtime?.presentation;
+    return presentation && presentation.completedSequence >= presentation.submissionSequence;
+  }, undefined, { timeout: 12_000 });
+  const progress = await page.evaluate(() => {
+    const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+    return {
+      atMs: performance.now(),
+      frameCount: state.frameCount,
+      presentation: state.render.runtime.presentation,
+    };
+  });
+  if (progress.presentation.submissionSequence !== progress.presentation.completedSequence) {
+    throw new Error(`Verifier failed to hold a drained WebGPU frontier: ${JSON.stringify(progress.presentation)}`);
+  }
+  return progress;
+}
+
 async function captureCanvasOnly(page, clip) {
   const captureIsolationStartedAt = Date.now();
-  await page.evaluate(() => {
-    document.documentElement.dataset.pass65CanvasOnly = 'true';
-    window.__ATOMIC_ACRES_DEBUG__?.setRenderPaused(true);
-  });
-  let screenshot;
-  let captureCompletionSequence = -1;
   try {
+    await page.evaluate(() => { document.documentElement.dataset.pass65CanvasOnly = 'true'; });
     // Chrome's compositor capture may occupy the same adapter queue for more
     // than a second at 2560x1440. Drain the last game submission and prevent a
     // new one from being admitted during capture so verifier work is excluded
     // from the next gameplay progress interval.
-    await page.waitForFunction(() => {
-      const presentation = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.render?.runtime?.presentation;
-      return presentation && presentation.completedSequence >= presentation.submissionSequence;
-    }, undefined, { timeout: 12_000 });
-    screenshot = await page.screenshot({ clip });
-    captureCompletionSequence = await page.evaluate(() => (
+    await pauseAndDrainPresentation(page);
+    const screenshot = await page.screenshot({ clip });
+    const captureCompletionSequence = await page.evaluate(() => (
       window.__ATOMIC_ACRES_DEBUG__.snapshot().render.runtime.presentation.completedSequence
     ));
-  } finally {
     await page.evaluate(() => {
       delete document.documentElement.dataset.pass65CanvasOnly;
       window.__ATOMIC_ACRES_DEBUG__?.setRenderPaused(false);
     });
-  }
-  // page.screenshot() can return while Chrome compositor work remains queued on
-  // the same adapter. Require one subsequently completed gameplay submission,
-  // then pause and drain again before recording the comparison frontier. This
-  // excludes verifier work without relaxing the live interval's frame budget.
-  await page.waitForFunction((priorCompletionSequence) => {
-    const presentation = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.render?.runtime?.presentation;
-    return presentation?.status === 'healthy'
-      && presentation.completedSequence > priorCompletionSequence;
-  }, captureCompletionSequence, { timeout: 12_000 });
-  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__?.setRenderPaused(true));
-  try {
-    await page.waitForFunction(() => {
+    // page.screenshot() can return while Chrome compositor work remains queued
+    // on the same adapter. Require a subsequently completed game submission,
+    // then pause and drain again. Deliberately return while held: the next
+    // sample resets telemetry, applies stress and unpauses atomically, leaving
+    // no rAF race in which capture residue can enter the live interval.
+    await page.waitForFunction((priorCompletionSequence) => {
       const presentation = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.render?.runtime?.presentation;
-      return presentation && presentation.completedSequence >= presentation.submissionSequence;
-    }, undefined, { timeout: 12_000 });
-    const progress = await page.evaluate(() => {
-      const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-      return {
-        atMs: performance.now(),
-        frameCount: state.frameCount,
-        presentation: state.render.runtime.presentation,
-      };
-    });
+      return presentation?.status === 'healthy'
+        && presentation.completedSequence > priorCompletionSequence;
+    }, captureCompletionSequence, { timeout: 12_000 });
+    const progress = await pauseAndDrainPresentation(page);
     return { screenshot, progress, captureIsolationMs: Date.now() - captureIsolationStartedAt };
-  } finally {
-    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__?.setRenderPaused(false));
+  } catch (error) {
+    await page.evaluate(() => {
+      delete document.documentElement.dataset.pass65CanvasOnly;
+      window.__ATOMIC_ACRES_DEBUG__?.setRenderPaused(false);
+    }).catch(() => undefined);
+    throw error;
   }
 }
 
@@ -469,14 +471,18 @@ try {
     const startedAt = Date.now();
     const samples = [];
     const screenshotHashes = new Set();
-    let previousProgress = null;
     let previousScreenshotHash = null;
     let sampleIndex = 0;
     let lastScreenshot = null;
+    await pauseAndDrainPresentation(page);
     while (Date.now() - startedAt < durationMs) {
       activeContext = { visit, arenaId, phase: 'sample', sampleIndex };
-      await page.evaluate(({ index, stress }) => {
+      const liveWindowStart = await page.evaluate(({ index, stress }) => {
         const api = window.__ATOMIC_ACRES_DEBUG__;
+        const held = api.snapshot().render.runtime.presentation;
+        if (held.submissionSequence !== held.completedSequence) {
+          throw new Error(`Live sample did not begin from a drained frontier: ${JSON.stringify(held)}`);
+        }
         api.resetPresentationProgressWindow();
         const state = api.snapshot();
         const [x, y, z] = state.player.position;
@@ -505,6 +511,13 @@ try {
             api.damageShed(shed.placementId, shedIndex === 0 ? 'wall-west' : 'wall-east', 220);
           }
         }
+        api.setRenderPaused(false);
+        const started = api.snapshot();
+        return {
+          atMs: performance.now(),
+          frameCount: started.frameCount,
+          presentation: started.render.runtime.presentation,
+        };
       }, {
         index: sampleIndex,
         stress: {
@@ -541,11 +554,6 @@ try {
           residency: api.sampleRendererResidency(),
         };
       });
-      const capture = await captureCanvasOnly(page, canvasClip);
-      lastScreenshot = capture.screenshot;
-      const screenshotHash = digest(lastScreenshot);
-      screenshotHashes.add(screenshotHash);
-
       if (!sample.gameStarted || sample.arenaId !== arenaId
         || sample.transition.phase !== 'idle' || sample.transition.failure !== null || sample.transition.renderSubmissionPaused
         || sample.runtime.actualBackend !== 'webgpu' || sample.runtime.deviceLost
@@ -565,31 +573,38 @@ try {
         || sample.weaponCatalog.loaded > sample.weaponCatalog.maximumRetained) {
         throw new Error(`${arenaId} entered an invalid presentation state: ${JSON.stringify(sample)}`);
       }
-      if (previousProgress) {
-        // A Playwright compositor screenshot can suspend the page for seconds.
-        // Compare from the post-capture frontier so capture overhead cannot be
-        // misreported as a gameplay presentation freeze.
-        const elapsedMs = Math.max(1, sample.atMs - previousProgress.atMs);
-        const frameDelta = sample.frameCount - previousProgress.frameCount;
-        const submissionDelta = sample.runtime.presentation.submissionSequence - previousProgress.presentation.submissionSequence;
-        const completionDelta = sample.runtime.presentation.completedSequence - previousProgress.presentation.completedSequence;
-        const minimumFrameProgress = Math.max(4, Math.floor(elapsedMs / 100));
-        // A WebGPU completion probe retires the entire queue frontier, so its
-        // sequence advances in batches rather than once per rendered frame.
-        // Measure display throughput from admitted submissions; queue stalls
-        // remain hard failures through the presentation status above.
-        if (frameDelta < minimumFrameProgress || submissionDelta < minimumFrameProgress
-          || screenshotHash === previousScreenshotHash) {
-          throw new Error(`${arenaId} presentation freeze detected: ${JSON.stringify({
-            elapsedMs, frameDelta, submissionDelta, completionDelta, screenshotHash,
-            previousProgress, previousReceipt: samples.at(-1) ?? null,
-          })}`);
-        }
+      // Measure each interval from its own paused+drained frontier. Reset occurs
+      // before gameplay actions, so any real smoke/crossbow/support hitch still
+      // counts; only Node and compositor capture work is excluded.
+      const elapsedMs = Math.max(1, sample.atMs - liveWindowStart.atMs);
+      const frameDelta = sample.frameCount - liveWindowStart.frameCount;
+      const submissionDelta = sample.runtime.presentation.submissionSequence - liveWindowStart.presentation.submissionSequence;
+      const completionDelta = sample.runtime.presentation.completedSequence - liveWindowStart.presentation.completedSequence;
+      const minimumFrameProgress = Math.max(4, Math.floor(elapsedMs / 100));
+      const capture = await captureCanvasOnly(page, canvasClip);
+      lastScreenshot = capture.screenshot;
+      const screenshotHash = digest(lastScreenshot);
+      screenshotHashes.add(screenshotHash);
+      // A WebGPU completion probe retires the entire queue frontier, so its
+      // sequence advances in batches rather than once per rendered frame.
+      // Measure display throughput from admitted submissions; queue stalls
+      // remain hard failures through the presentation status above.
+      if (frameDelta < minimumFrameProgress || submissionDelta < minimumFrameProgress
+        || screenshotHash === previousScreenshotHash) {
+        throw new Error(`${arenaId} presentation freeze detected: ${JSON.stringify({
+          elapsedMs, frameDelta, submissionDelta, completionDelta, screenshotHash,
+          liveWindowStart, previousReceipt: samples.at(-1) ?? null,
+        })}`);
       }
-      const receipt = { ...sample, screenshotHash, verifierCaptureIsolationMs: capture.captureIsolationMs };
+      const receipt = {
+        ...sample,
+        liveWindowStart,
+        screenshotHash,
+        verifierCaptureIsolationMs: capture.captureIsolationMs,
+        verifierHeldFrontier: capture.progress,
+      };
       samples.push(receipt);
       previousScreenshotHash = screenshotHash;
-      previousProgress = capture.progress;
       sampleIndex += 1;
     }
     if (samples.length < 5 || screenshotHashes.size < Math.ceil(samples.length * 0.8)) {
@@ -599,6 +614,7 @@ try {
     const beforeReturn = samples.at(-1);
     await page.evaluate(() => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
+      api.setRenderPaused(false);
       api.setAds(false);
       api.setMovement(false);
       api.setCaptureCameraPose(null);
