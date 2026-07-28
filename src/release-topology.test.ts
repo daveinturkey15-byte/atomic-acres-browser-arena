@@ -96,9 +96,26 @@ describe('Pass 65 two-channel release topology', () => {
     expect(playwrightServer.indexOf('stage-release-topology.mjs')).toBeLessThan(playwrightServer.indexOf('const server = await preview'));
   });
 
-  it('keeps publication denied until the exact-SHA Pass 65 acceptance descendant exists', () => {
-    expect(existsSync('acceptance/pass-65.json')).toBe(false);
-    expect(() => evaluateAcceptance({ phase: 'release', pass: PASS65_HITL_IDENTITY.pass, head: 'a'.repeat(40) }))
-      .toThrow('acceptance manifest does not exist: acceptance/pass-65.json');
+  it('tracks the Pass 65 acceptance lifecycle without allowing premature publication', () => {
+    const manifestPath = 'acceptance/pass-65.json';
+    if (!existsSync(manifestPath)) {
+      expect(() => evaluateAcceptance({ phase: 'release', pass: PASS65_HITL_IDENTITY.pass }))
+        .toThrow(`acceptance manifest does not exist: ${manifestPath}`);
+      return;
+    }
+
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    const result = evaluateAcceptance({ phase: 'release', pass: PASS65_HITL_IDENTITY.pass }) as {
+      ok: boolean;
+      errors: string[];
+      approvalParity: { ok: boolean };
+    };
+    expect(result.approvalParity.ok).toBe(true);
+    if (!manifest.humanAcceptance) {
+      expect(result.ok).toBe(false);
+      expect(result.errors).toEqual(['humanAcceptance must be approved by Dave with timestamped evidence']);
+      return;
+    }
+    expect(result.ok).toBe(true);
   });
 });

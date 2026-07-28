@@ -90,4 +90,12 @@ describe('release acceptance manifest', () => {
     expect(result.ok).toBe(false);
     expect(result.errors.join('\n')).toMatch(/match preview.sourceSha/);
   });
+
+  it('leaves exactly the owner-approval error on a complete pre-HITL manifest', () => {
+    const manifest = acceptedManifest();
+    delete (manifest as { humanAcceptance?: unknown }).humanAcceptance;
+    const result = validateAcceptanceManifest(manifest, { policy });
+    expect(result.ok).toBe(false);
+    expect(result.errors).toEqual(['humanAcceptance must be approved by Dave with timestamped evidence']);
+  });
 });
