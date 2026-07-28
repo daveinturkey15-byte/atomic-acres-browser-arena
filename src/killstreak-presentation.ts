@@ -1357,24 +1357,11 @@ export class KillstreakPresentation {
     const overlayRoots: THREE.Object3D[] = [...this.sensorSilhouettes, ...stagedMarkerRoots];
     const stagedBatches = [entityRoots, effectRoots, overlayRoots].filter((batch) => batch.length > 0);
     const stagedRoots = stagedBatches.flat();
-    // Three computes missing BufferGeometry bounds synchronously the first
-    // time a frustum-culled object becomes visible. The hidden compile pass
-    // disables frustum culling so it cannot trigger that path by itself; with
-    // a full drone swarm this deferred thousands of position reads into the
-    // first live support frame. Pay that deterministic cost behind the
-    // deployment surface along with the pipeline and texture prewarm.
-    const stagedGeometries = new Set<THREE.BufferGeometry>();
-    for (const stagedRoot of stagedRoots) {
-      stagedRoot.traverse((node) => {
-        if (node instanceof THREE.Mesh || node instanceof THREE.Line || node instanceof THREE.Points) {
-          stagedGeometries.add(node.geometry);
-        }
-      });
-    }
-    for (const geometry of stagedGeometries) {
-      if (geometry.boundingBox === null) geometry.computeBoundingBox();
-      if (geometry.boundingSphere === null) geometry.computeBoundingSphere();
-    }
+    const liveActivationEntries = [
+      ...(this.entityPools.get('chopper') ?? []).slice(0, 1),
+      ...(this.entityPools.get('swarm-drone') ?? []),
+    ];
+    const liveActivationRoots = liveActivationEntries.map((entry) => entry.root);
     const objectStates = new Map<THREE.Object3D, Readonly<{
       visible: boolean;
       position: THREE.Vector3;
@@ -1445,6 +1432,39 @@ export class KillstreakPresentation {
         await runtime.compileAndRender(this.root, camera, parentScene);
         for (const stagedRoot of batch) stagedRoot.visible = false;
       }
+      // The all-visible vocabulary pass above compiles every LOD and material,
+      // but it intentionally disables frustum culling and LOD selection. Three
+      // r185 also creates WebGPU render objects and node/bind-group state for
+      // the exact live visibility graph. Rehearse the heaviest legal overlap
+      // (one chopper plus all 24 swarm drones) with normal culling, LOD updates
+      // and animation state while the deployment surface still hides it.
+      for (const liveRoot of liveActivationRoots) {
+        liveRoot.traverse((node) => {
+          const state = objectStates.get(node);
+          if (state) {
+            node.visible = state.visible;
+            node.position.copy(state.position);
+            node.quaternion.copy(state.quaternion);
+            node.scale.copy(state.scale);
+            node.frustumCulled = state.frustumCulled;
+          }
+          if (node instanceof THREE.LOD) node.autoUpdate = lodStates.get(node) ?? node.autoUpdate;
+        });
+        liveRoot.visible = true;
+      }
+      stageBatchInView(liveActivationRoots, 30, 2.5);
+      for (const entry of liveActivationEntries) {
+        for (const mixer of entry.mixers) mixer.setTime(0.5);
+      }
+      camera.updateWorldMatrix(true, false);
+      this.root.updateWorldMatrix(true, false);
+      for (const liveRoot of liveActivationRoots) {
+        liveRoot.traverse((node) => {
+          if (node instanceof THREE.LOD) node.update(camera);
+        });
+      }
+      await runtime.compileAndRender(this.root, camera, parentScene);
+      for (const liveRoot of liveActivationRoots) liveRoot.visible = false;
       if (chopperRoot) {
         chopperRoot.visible = true;
         chopperRoot.traverse((node) => {
