@@ -21,7 +21,18 @@ const arenaRuntimeSourcePaths: Readonly<Record<ArenaId, readonly string[]>> = Ob
   'atomic-acres': ['src/map.ts', 'src/arena-layout.ts', 'src/rendering/arenas/atomic-acres.ts'],
   'skyline-terminal': ['src/additional-maps.ts', 'src/rendering/arenas/skyline-terminal.ts'],
   'rustworks-1v1': ['src/additional-maps.ts', 'src/rendering/arenas/rustworks-1v1.ts'],
-  'gun-range': ['src/additional-maps.ts', 'src/rendering/arenas/gun-range.ts'],
+  'gun-range': [
+    'src/additional-maps.ts',
+    'src/gun-range-armory.ts',
+    'src/gun-range-rack-presentation.ts',
+    'src/weapon-model.ts',
+    'src/rendering/arenas/gun-range.ts',
+    'public/assets/original/models/weapons/pass65-firearms/carbine/carbine-world-lod0.glb',
+    'public/assets/original/models/weapons/pass65-firearms/smg/smg-world-lod0.glb',
+    'public/assets/original/models/weapons/pass65-firearms/lmg/lmg-world-lod0.glb',
+    'public/assets/original/models/weapons/pass65-firearms/scattergun/scattergun-world-lod0.glb',
+    'public/assets/original/models/weapons/pass65-firearms/sniper/sniper-world-lod0.glb',
+  ],
 });
 const selectedArenas = process.env.AA_PREVIEW_ARENAS
   ? process.env.AA_PREVIEW_ARENAS.split(',').map((value) => value.trim()).filter(Boolean) as ArenaId[]
