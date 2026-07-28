@@ -89,6 +89,10 @@ test('visible player-up minimap markers yield a closed-loop relative bearing', (
   assert.ok(threats[0].deltaX > 7);
   assert.ok(threats[0].deltaY < -39);
   assert.ok(threats[0].bearingRadians > 0 && threats[0].bearingRadians < 0.4);
+
+  const purpleHud = frame(width, height);
+  paint(purpleHud, width, 55, 55, 59, 59, [150, 95, 175]);
+  assert.equal(findPurpleOperatorCandidates(purpleHud, width, height, 3).length, 0);
 });
 
 test('nearest plausible central coral component wins without exposing game state', () => {

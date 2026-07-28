@@ -589,7 +589,13 @@ async function run() {
       startScreenshotCaptured = true;
       controlStartedAtMs = Date.now();
       const deadline = controlStartedAtMs + durationSeconds * 1000;
-      const targetTracker = createOperatorTargetTracker({ confirmationFrames: 3, minimumStableFrames: 2, maximumObservationFrames: 7 });
+      const targetTracker = createOperatorTargetTracker({
+        confirmationFrames: 3,
+        settlingFrames: 1,
+        requiredEvidenceFrames: 1,
+        maximumObservationFrames: 3,
+        maxSizeRatio: 8,
+      });
       let movementCycle = 0;
       let currentTarget = null;
       let previousSignature = visionStream.state.latest.signature;

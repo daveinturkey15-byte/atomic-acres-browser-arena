@@ -155,10 +155,17 @@ export function findPurpleOperatorCandidates(raw, width, height, channels = 3, o
   const maximumX = Math.ceil(width * (options.maximumXRatio ?? 0.82));
   const minimumY = Math.floor(height * (options.minimumYRatio ?? 0.25));
   const maximumY = Math.ceil(height * (options.maximumYRatio ?? 0.75));
+  const exclusions = options.exclusions ?? DEFAULT_EXCLUDED_REGIONS;
+  const minimumPixels = Math.max(3, Math.floor(options.minimumPixels ?? 12));
   const mask = new Uint8Array(width * height);
   let palettePixels = 0;
   for (let y = minimumY; y <= maximumY; y += 1) {
     for (let x = minimumX; x <= maximumX; x += 1) {
+      const excluded = exclusions.some((region) => x / width >= region.minimumXRatio
+        && x / width <= region.maximumXRatio
+        && y / height >= region.minimumYRatio
+        && y / height <= region.maximumYRatio);
+      if (excluded) continue;
       const pixel = (y * width + x) * channels;
       const red = raw[pixel];
       const green = raw[pixel + 1];
@@ -209,7 +216,7 @@ export function findPurpleOperatorCandidates(raw, width, height, channels = 3, o
     const boxHeight = maxY - minY + 1;
     const aspect = boxWidth / boxHeight;
     const density = pixels / (boxWidth * boxHeight);
-    if (pixels < 3 || pixels > 500) continue;
+    if (pixels < minimumPixels || pixels > 500) continue;
     if (boxWidth < 2 || boxWidth > 50 || boxHeight < 3 || boxHeight > 70) continue;
     if (aspect < 0.15 || aspect > 1.5) continue;
     const x = sumX / pixels;
@@ -512,6 +519,7 @@ export function createOperatorTargetTracker(options = {}) {
   const requiredEvidenceFrames = Math.max(1, Math.floor(options.requiredEvidenceFrames ?? 2));
   const maximumObservationFrames = Math.max(settlingFrames + requiredEvidenceFrames + 1, Math.floor(options.maximumObservationFrames ?? 10));
   const maximumTrackDistanceRatio = Number(options.maximumTrackDistanceRatio ?? 0.08);
+  const maximumSizeRatio = Math.max(1.1, Number(options.maxSizeRatio ?? 3.6));
   const minimumMotionRatio = Number(options.minimumMotionRatio ?? 0.003);
   const minimumShapeChange = Number(options.minimumShapeChange ?? 0.14);
   let previous = null;
@@ -559,7 +567,7 @@ export function createOperatorTargetTracker(options = {}) {
         distanceRatio = Math.hypot(candidate.x - previous.x, candidate.y - previous.y) / frameDiagonal;
         const sizeRatio = candidate.pixels / Math.max(1, previous.pixels);
         shapeChange = Math.abs(Math.log(sizeRatio));
-        if (distanceRatio > maximumTrackDistanceRatio || sizeRatio < 0.28 || sizeRatio > 3.6) {
+        if (distanceRatio > maximumTrackDistanceRatio || sizeRatio < 1 / maximumSizeRatio || sizeRatio > maximumSizeRatio) {
           reset();
         }
       }
