@@ -280,7 +280,7 @@ type WeaponPresentationDefinition = Readonly<{
 type RailgunBoltPresentationDefinition = Readonly<{
   id: 'railgun-map-bolt-v1';
   minimumLengthM: 180;
-  minimumVisibleMs: 420;
+  minimumVisibleMs: 1000;
   coreDiameterM: number;
   haloDiameterM: number;
   coreDepthPolicy: 'authoritative-path';
@@ -298,7 +298,7 @@ Authority boundary:
 - Authoritative fire, ammo consumption, reload completion and switch completion use canonical action state.
 - Camera-centred ray and host-resolved shot geometry never derive from animated muzzle pose.
 - The verifier checks only capability-applicable required actions and rejects both missing actions and forbidden transitions such as sprint-while-ADS.
-- A Railgun shot creates one bounded pooled core/halo bolt aligned to the authoritative penetration path. Its halo remains unmistakable through buildings/map geometry for shooter and peers; local and replicated presentations share length, duration, endpoints and audio timing. Ordinary weapon tracers do not inherit this through-solid policy.
+- A Railgun shot creates one bounded pooled core/halo bolt aligned to the authoritative penetration path. Its core and halo remain visible for exactly 1000 ms and the halo remains unmistakable through buildings/map geometry for shooter and peers; local and replicated presentations share length, duration, endpoints and audio timing. Ordinary weapon tracers do not inherit this through-solid policy.
 
 ## 4. Loadout v2
 

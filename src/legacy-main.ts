@@ -5820,7 +5820,9 @@ function onNetworkMessage(message: GameMessage): void {
   if (message.type === 'shot') {
     if (message.by === player.id) return;
     if (message.weapon === 'railgun') {
-      if (network.role === 'host') return;
+      if (network.role === 'host' || processedNonces.has(message.nonce)) return;
+      processedNonces.add(message.nonce);
+      trimNonceSet();
       renderRemoteShot(message);
       return;
     }

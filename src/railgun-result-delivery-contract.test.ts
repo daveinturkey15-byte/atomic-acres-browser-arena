@@ -18,6 +18,20 @@ describe('railgun result delivery contract', () => {
     expect(acceptance).toContain('while (processedRailgunShotResults.size > 512)');
   });
 
+  it('deduplicates relayed Railgun shot presentation before auxiliary world effects', () => {
+    const shotDispatch = main.slice(main.indexOf("if (message.type === 'shot') {"), main.indexOf("if (message.type === 'melee') {"));
+    const railgunBranch = shotDispatch.slice(0, shotDispatch.indexOf('const sender = remotes.get(message.by)'));
+    const duplicateGuard = railgunBranch.indexOf('processedNonces.has(message.nonce)');
+    const recordNonce = railgunBranch.indexOf('processedNonces.add(message.nonce)');
+    const trimHistory = railgunBranch.indexOf('trimNonceSet()');
+    const presentation = railgunBranch.indexOf('renderRemoteShot(message)');
+    expect(railgunBranch).toContain("message.weapon === 'railgun'");
+    expect(duplicateGuard).toBeGreaterThan(-1);
+    expect(recordNonce).toBeGreaterThan(duplicateGuard);
+    expect(trimHistory).toBeGreaterThan(recordNonce);
+    expect(presentation).toBeGreaterThan(trimHistory);
+  });
+
   it('never creates a speculative client beam and routes every accepted host path through the result hook', () => {
     const presentationHook = main.slice(main.indexOf('function presentAuthoritativeRailgunResult('), main.indexOf('function railgunResult('));
     expect(presentationHook).toContain("local ? 'shooter' : 'peer'");
