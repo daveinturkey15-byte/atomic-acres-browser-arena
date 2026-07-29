@@ -259,6 +259,7 @@ export class WeaponPresentation {
   private grenadeStart = 0;
   private readonly muzzleLight: THREE.PointLight;
   private readonly muzzleFlash: THREE.Group;
+  private readonly viewmodelFill: THREE.PointLight;
   private readonly weaponFlashlight: THREE.SpotLight;
   private readonly weaponFlashlightTarget: THREE.Object3D;
   private flashlightGpuPrewarmCount = 0;
@@ -360,13 +361,13 @@ export class WeaponPresentation {
     this.root.position.set(HIP_VIEWMODEL_POSITION.x, HIP_VIEWMODEL_POSITION.y, HIP_VIEWMODEL_POSITION.z);
     this.root.scale.setScalar(HIP_VIEWMODEL_SCALE);
     camera.add(this.root);
-    const viewmodelFill = new THREE.PointLight(0xe6f2ef, flattenMaterials ? 0 : 1.05, 2.6, 2);
-    viewmodelFill.name = 'first-person-viewmodel-fill';
-    viewmodelFill.position.set(-0.48, 0.72, 0.4);
-    viewmodelFill.castShadow = false;
-    viewmodelFill.userData.presentationOnly = true;
-    this.root.add(viewmodelFill);
-
+    this.viewmodelFill = new THREE.PointLight(0xe6f2ef, 0, 2.6, 2);
+    this.viewmodelFill.name = 'first-person-viewmodel-fill';
+    this.viewmodelFill.position.set(-0.48, 0.72, 0.4);
+    this.viewmodelFill.castShadow = false;
+    this.viewmodelFill.userData.presentationOnly = true;
+    this.viewmodelFill.userData.authoredIntensity = flattenMaterials ? 0 : 1.05;
+    this.root.add(this.viewmodelFill);
     const fabricMaterial = (color: number, roughness: number, repeatX: number, repeatY: number, normalScale: number): THREE.MeshStandardMaterial => {
       if (typeof document === 'undefined') return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0 });
       return texturedMaterial('./assets/original/textures/fabric-weave.png', {
@@ -1318,6 +1319,13 @@ export class WeaponPresentation {
       this.ensureBrowserWeapon(id);
     }
     this.configureWeaponFlashlight(id);
+  }
+
+  setPresentationVisible(visible: boolean): void {
+    this.root.visible = visible;
+    this.viewmodelFill.intensity = visible
+      ? Number(this.viewmodelFill.userData.authoredIntensity ?? 0)
+      : 0;
   }
 
   private configureWeaponFlashlight(id: WeaponId): void {

@@ -18,6 +18,17 @@ const BOMB_SHELL_ALTITUDE = 20;
 const EMBER_GRAVITY_MPS2 = 11.25;
 const MAX_SENSOR_CONTACTS = 16;
 const MAX_PLACEMENT_MARKERS = 8;
+
+async function yieldPresentationPreparation(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    if (typeof globalThis.requestAnimationFrame === 'function') {
+      globalThis.requestAnimationFrame(() => resolve());
+    } else {
+      globalThis.setTimeout(resolve, 0);
+    }
+  });
+}
+
 export const HUNTER_DRONE_ASSET = './assets/original/models/support/hunter-drone-lod0.glb';
 const HUNTER_DRONE_TARGET_MAX_DIMENSION = 1.45;
 const HUNTER_DRONE_LOOP_ACTIONS = Object.freeze(['Drone_Propellers_Loop']);
@@ -1535,38 +1546,61 @@ export class KillstreakPresentation {
     this.root.add(this.sensorRoot);
   }
 
-  private installPrewarmedVocabulary(): void {
-    const capacities: readonly [PresentedEntityPoolKey, number][] = [
-      ['chopper', 1],
-      ['care-aircraft', 1],
-      ['carpet-aircraft', 1],
-      ['piloted-drone', 1],
-      ['swarm-drone', 24],
-      ['care-crate', 1],
-    ];
-    for (const [key, capacity] of capacities) {
-      const pool: PresentedEntity[] = [];
-      for (let index = 0; index < capacity; index += 1) {
-        const entry = buildPresentedEntityForPool(key);
-        entry.root.userData.poolActiveName = entry.root.name;
-        entry.root.userData.presentationPoolKey = key;
-        entry.root.userData.presentationPoolIndex = index;
-        entry.root.userData.presentationPoolInUse = false;
-        entry.root.name = `prewarmed-${key}-${index + 1}`;
-        entry.root.visible = false;
-        pool.push(entry);
-        this.prewarmed.push(entry);
-        this.root.add(entry.root);
-      }
-      this.entityPools.set(key, pool);
-    }
-    for (const entry of this.prewarmed) {
-      entry.root.userData.prewarmed = true;
-    }
+  private static readonly PREWARMED_CAPACITIES: readonly [PresentedEntityPoolKey, number][] = Object.freeze([
+    ['chopper', 1],
+    ['care-aircraft', 1],
+    ['carpet-aircraft', 1],
+    ['piloted-drone', 1],
+    ['swarm-drone', 24],
+    ['care-crate', 1],
+  ]);
+
+  private installPrewarmedPoolEntry(key: PresentedEntityPoolKey, index: number): PresentedEntity {
+    const entry = buildPresentedEntityForPool(key);
+    entry.root.userData.poolActiveName = entry.root.name;
+    entry.root.userData.presentationPoolKey = key;
+    entry.root.userData.presentationPoolIndex = index;
+    entry.root.userData.presentationPoolInUse = false;
+    entry.root.name = `prewarmed-${key}-${index + 1}`;
+    entry.root.visible = false;
+    this.prewarmed.push(entry);
+    this.root.add(entry.root);
+    return entry;
+  }
+
+  private finalizePrewarmedVocabulary(): void {
+    for (const entry of this.prewarmed) entry.root.userData.prewarmed = true;
     this.installSwarmInstancing();
   }
 
-  private installSwarmInstancing(): void {
+  private installPrewarmedVocabulary(): void {
+    for (const [key, capacity] of KillstreakPresentation.PREWARMED_CAPACITIES) {
+      const pool: PresentedEntity[] = [];
+      for (let index = 0; index < capacity; index += 1) {
+        pool.push(this.installPrewarmedPoolEntry(key, index));
+      }
+      this.entityPools.set(key, pool);
+    }
+    this.finalizePrewarmedVocabulary();
+  }
+
+  private async installPrewarmedVocabularyBatched(): Promise<void> {
+    let installed = 0;
+    for (const [key, capacity] of KillstreakPresentation.PREWARMED_CAPACITIES) {
+      const pool: PresentedEntity[] = [];
+      for (let index = 0; index < capacity; index += 1) {
+        pool.push(this.installPrewarmedPoolEntry(key, index));
+        installed += 1;
+        if (installed % 2 === 0) await yieldPresentationPreparation();
+      }
+      this.entityPools.set(key, pool);
+    }
+    await yieldPresentationPreparation();
+    for (const entry of this.prewarmed) entry.root.userData.prewarmed = true;
+    await this.installSwarmInstancingBatched();
+  }
+
+  private *installSwarmInstancingSteps(): Generator<void, void, void> {
     const pool = this.entityPools.get('swarm-drone') ?? [];
     const animatedTargetNames = new Set(activeSwarmAnimationTargetNames());
     // Procedural non-release fallback drones rotate this authored group
@@ -1574,16 +1608,21 @@ export class KillstreakPresentation {
     for (const entry of pool) {
       if (!entry.authored && entry.rotor?.name) animatedTargetNames.add(entry.rotor.name);
     }
-    const sourceMeshes = pool.map((entry) => {
+    const sourceMeshes: THREE.Mesh[][] = [];
+    for (const [entryIndex, entry] of pool.entries()) {
       const meshes: THREE.Mesh[] = [];
       entry.root.traverse((node) => {
         if (node instanceof THREE.Mesh && !(node instanceof THREE.InstancedMesh)) meshes.push(node);
       });
-      return meshes;
-    });
+      sourceMeshes.push(meshes);
+      if ((entryIndex + 1) % 2 === 0) yield;
+    }
     const primitiveCount = sourceMeshes[0]?.length ?? 0;
     if (primitiveCount === 0 || sourceMeshes.some((meshes) => meshes.length !== primitiveCount)) return;
-    for (const entry of pool) entry.root.updateWorldMatrix(true, true);
+    for (const [entryIndex, entry] of pool.entries()) {
+      entry.root.updateWorldMatrix(true, true);
+      if ((entryIndex + 1) % 2 === 0) yield;
+    }
 
     const initialMatrix = new THREE.Matrix4();
     const addBatch = (
@@ -1654,6 +1693,7 @@ export class KillstreakPresentation {
         indices.push(primitiveIndex);
         staticGroups.set(mergeKey, indices);
       }
+      if ((primitiveIndex + 1) % 2 === 0) yield;
     }
 
     const mergeBatch = (
@@ -1685,10 +1725,12 @@ export class KillstreakPresentation {
     const rootAnchors = pool.map((entry) => entry.root);
     for (const primitiveIndices of staticGroups.values()) {
       if (!mergeBatch(primitiveIndices, rootAnchors)) individualIndices.push(...primitiveIndices);
+      yield;
     }
     for (const group of dynamicGroups.values()) {
       const anchors = pool.map((entry) => entry.root.getObjectByName(group.targetName)).filter((entry): entry is THREE.Object3D => Boolean(entry));
       if (!mergeBatch(group.primitiveIndices, anchors)) individualIndices.push(...group.primitiveIndices);
+      yield;
     }
 
     for (const primitiveIndex of individualIndices) {
@@ -1709,6 +1751,7 @@ export class KillstreakPresentation {
         false,
         representative,
       );
+      yield;
     }
     for (const meshes of sourceMeshes) {
       for (const source of meshes) {
@@ -1716,14 +1759,37 @@ export class KillstreakPresentation {
         source.castShadow = false;
         source.userData.swarmInstanceSource = true;
       }
+      yield;
     }
+  }
+
+  private installSwarmInstancing(): void {
+    for (const _ of this.installSwarmInstancingSteps()) {
+      // The constructor's procedural/headless fallback remains synchronous.
+    }
+  }
+
+  private async installSwarmInstancingBatched(): Promise<void> {
+    for (const _ of this.installSwarmInstancingSteps()) await yieldPresentationPreparation();
   }
 
   private disposeSwarmInstancing(): void {
     for (const batch of this.swarmInstanceBatches) {
-      batch.root.removeFromParent();
-      batch.root.dispose();
-      if (batch.ownsGeometry) batch.root.geometry.dispose();
+      this.disposeSwarmInstanceBatch(batch);
+    }
+    this.swarmInstanceBatches.length = 0;
+  }
+
+  private disposeSwarmInstanceBatch(batch: SwarmInstanceBatch): void {
+    batch.root.removeFromParent();
+    batch.root.dispose();
+    if (batch.ownsGeometry) batch.root.geometry.dispose();
+  }
+
+  private async disposeSwarmInstancingBatched(): Promise<void> {
+    for (const [index, batch] of this.swarmInstanceBatches.entries()) {
+      this.disposeSwarmInstanceBatch(batch);
+      if ((index + 1) % 2 === 0) await yieldPresentationPreparation();
     }
     this.swarmInstanceBatches.length = 0;
   }
@@ -1762,16 +1828,19 @@ export class KillstreakPresentation {
     }
   }
 
-  prewarmAuthoredAssets(): void {
+  async prewarmAuthoredAssets(): Promise<void> {
     if (this.disposed) throw new Error('Cannot rebuild a disposed killstreak presentation pool');
     if (this.gpuPrewarmPromise) throw new Error('Cannot rebuild killstreak presentation assets during GPU prewarm');
     if (this.entities.size > 0) return;
     this.gpuPrewarmGeneration = -1;
-    this.disposeSwarmInstancing();
-    for (const entry of this.prewarmed) this.retireRoot(entry.root);
+    await this.disposeSwarmInstancingBatched();
+    for (const [index, entry] of this.prewarmed.entries()) {
+      this.retireRoot(entry.root);
+      if ((index + 1) % 2 === 0) await yieldPresentationPreparation();
+    }
     this.prewarmed.length = 0;
     this.entityPools.clear();
-    this.installPrewarmedVocabulary();
+    await this.installPrewarmedVocabularyBatched();
   }
 
   /**
@@ -1841,7 +1910,15 @@ export class KillstreakPresentation {
       ...this.emberPool.map((entry) => entry.root),
     ];
     const overlayRoots: THREE.Object3D[] = [...this.sensorSilhouettes, ...stagedMarkerRoots];
-    const stagedBatches = [entityRoots, effectRoots, overlayRoots].filter((batch) => batch.length > 0);
+    const entityBatches: THREE.Object3D[][] = [];
+    if (typeof document === 'undefined') {
+      entityBatches.push(entityRoots);
+    } else {
+      for (let offset = 0; offset < entityRoots.length; offset += 2) {
+        entityBatches.push(entityRoots.slice(offset, offset + 2));
+      }
+    }
+    const stagedBatches = [...entityBatches, effectRoots, overlayRoots].filter((batch) => batch.length > 0);
     const stagedRoots = stagedBatches.flat();
     const liveActivationEntries = [
       ...(this.entityPools.get('chopper') ?? []).slice(0, 1),
@@ -1943,6 +2020,9 @@ export class KillstreakPresentation {
         for (const stagedRoot of batch) stagedRoot.visible = true;
         await runtime.compileAndRender(this.root, camera, parentScene);
         for (const stagedRoot of batch) stagedRoot.visible = false;
+        if (typeof document !== 'undefined' && batchIndex + 1 < stagedBatches.length) {
+          await yieldPresentationPreparation();
+        }
       }
       // The all-visible vocabulary pass above compiles every LOD and material,
       // but it intentionally disables frustum culling and LOD selection. Three

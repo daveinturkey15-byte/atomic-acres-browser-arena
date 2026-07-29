@@ -4226,7 +4226,7 @@ function returnPrivateMatchToLobby(asHost: boolean): void {
   resetForMode();
   gameStarted = false;
   matchFinished = false;
-  weaponView.root.visible = false;
+  weaponView.setPresentationVisible(false);
   hudRoot.hidden = true;
   element<HTMLElement>('#banner').hidden = true;
   element<HTMLElement>('#countdown').hidden = true;
@@ -7345,7 +7345,7 @@ function prepareCorpsePresentationRoot(root: THREE.Group): void {
   hideCorpseHeldWeapon(root);
 }
 
-function ensureCorpsePresentationPool(): void {
+async function ensureCorpsePresentationPool(): Promise<void> {
   if (corpsePresentationPool.length > 0) return;
   for (const team of [0, 1] as const) {
     for (let index = 0; index < CORPSE_POOL_CAPACITY_PER_TEAM; index += 1) {
@@ -7354,6 +7354,7 @@ function ensureCorpsePresentationPool(): void {
       root.visible = false;
       scene.add(root);
       corpsePresentationPool.push({ root, team, inUse: false });
+      await yieldDeploymentPrewarmFrame();
     }
   }
 }
@@ -8226,7 +8227,7 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
     target.root.visible = true;
   }
   refreshWarningUntil = performance.now() + 6_000;
-  weaponView.root.visible = true;
+  weaponView.setPresentationVisible(true);
   gameMode = mode;
   lastPlayerSpawnIndex = -1;
   lastPlayerSpawnAudit = null;
@@ -8247,7 +8248,7 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   };
   if (mode === 'solo') await spawnBots();
   else if (mode === 'host') await spawnBots(privateMatchConfig.hostedBotCount);
-  ensureCorpsePresentationPool();
+  await ensureCorpsePresentationPool();
   const restoreCorpsePoolPrewarm = stageCorpsePresentationPoolForPrewarm();
   // Compile and retire the first complete gameplay presentation while the
   // transition surface still owns the screen. Bot operators, the selected
@@ -9666,7 +9667,10 @@ async function spawnBots(hostedCount?: HostedBotCount): Promise<void> {
   lastBotGrenadeDamage = 0;
   soloBotDeaths = 0;
   dormantBotsPrewarmed = false;
-  for (let index = 0; index < activeCount; index += 1) spawnBot(index, hostedCount !== undefined);
+  for (let index = 0; index < activeCount; index += 1) {
+    spawnBot(index, hostedCount !== undefined);
+    await yieldDeploymentPrewarmFrame();
+  }
   if (hostedCount !== undefined) {
     for (const bot of bots.values()) authoritativeScores.set(bot.id, emptyPlayerScore(bot.id));
     if (activeCount > 0) addFeed(String(activeCount) + ' HOST-AUTHORITATIVE BOTS DEPLOYED', 'coral');
@@ -9684,6 +9688,7 @@ async function spawnBots(hostedCount?: HostedBotCount): Promise<void> {
     bot.alive = false;
     bot.root.visible = false;
     dormantBots.set(bot.id, bot);
+    await yieldDeploymentPrewarmFrame();
   }
   lastBotSpawnIndices.clear();
   for (const [team, index] of activeSpawnHistory) lastBotSpawnIndices.set(team, index);
@@ -12425,7 +12430,7 @@ function updateKillstreakPossession(now: number): void {
   camera.rotation.y = player.yaw;
   camera.rotation.x = player.pitch;
   killstreakPresentation.alignFirstPersonCockpit(entity.id, camera.quaternion);
-  weaponView.root.visible = false;
+  weaponView.setPresentationVisible(false);
   if (now - lastKillstreakControlSentAt < 50) return;
   const droneAxes = pilotedDroneControlAxes({
     keyboardForward: keys.has('KeyW'),
@@ -12490,7 +12495,7 @@ function updatePass65KillstreakRuntime(now: number): void {
   refreshSupportStatusHud(now);
   const possession = localKillstreakActorSnapshot()?.possession;
   document.documentElement.dataset.killstreakPossession = possession?.kind ?? 'none';
-  weaponView.root.visible = shouldShowWeaponViewmodel();
+  weaponView.setPresentationVisible(shouldShowWeaponViewmodel());
   updateKillstreakPossession(now);
 }
 
@@ -13765,7 +13770,7 @@ function clearFieldSupport(): void {
     camera.near = 0.08;
     camera.updateProjectionMatrix();
   }
-  weaponView.root.visible = player.alive;
+  weaponView.setPresentationVisible(player.alive);
   if (yardhawk) disposeSupportRoot(yardhawk.root);
   yardhawk = null;
   for (const strike of strikeMissiles) {
@@ -13996,7 +14001,7 @@ function updatePhysics(dt: number): void {
     && weaponView.adsProgress() >= 0.9
     && Math.abs(camera.fov - aimingFov) < 0.35;
   hudRoot.classList.toggle('dmr-thermal-active', dmrThermalActive);
-  weaponView.root.visible = shouldShowWeaponViewmodel();
+  weaponView.setPresentationVisible(shouldShowWeaponViewmodel());
   camera.position.copy(player.position);
   camera.position.y += cameraHeightOffset - landingImpulse * 0.035 * accessibilityRuntime.weaponMotionScale;
   camera.rotation.y = player.yaw + recoilCamera.yaw;
@@ -15892,7 +15897,7 @@ function returnToMainMenu(): void {
   matchFinished = false;
   killstreakLoadoutController.releaseAfterMatch();
   killstreakMenuBinding.setMatchActive(false);
-  weaponView.root.visible = false;
+  weaponView.setPresentationVisible(false);
   hudRoot.hidden = true;
   roomCard.hidden = true;
   roomCodeEl.textContent = '';
@@ -18291,7 +18296,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   },
   setCaptureViewmodelHidden: (hidden) => {
     debugCaptureViewmodelHidden = hidden;
-    weaponView.root.visible = shouldShowWeaponViewmodel();
+    weaponView.setPresentationVisible(shouldShowWeaponViewmodel());
   },
   stageLoadingCaptureSquad: () => {
     if (selectedArena.id !== 'atomic-acres' || gameMode !== 'solo' || !gameStarted) {
@@ -18902,12 +18907,12 @@ async function prepareSharedGameplayAssets(): Promise<void> {
     // Every streamed viewmodel must inherit the camera's isolated compositing
     // layer before any match-boundary GPU prewarm can stage it.
     weaponView.root.traverse((node) => node.layers.set(VIEWMODEL_RENDER_LAYER));
-    killstreakPresentation.prewarmAuthoredAssets();
+    await killstreakPresentation.prewarmAuthoredAssets();
     // First-person geometry is composited after world depth is cleared. Contact
     // retreat still keeps it tucked near walls without world geometry cutting
     // holes through hands and weapons.
     weaponView.setWeapon(player.weapon, true);
-    weaponView.root.visible = false;
+    weaponView.setPresentationVisible(false);
   })().catch((error) => {
     sharedGameplayAssetsPromise = null;
     throw error;
@@ -19009,10 +19014,11 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
       supportExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration),
     ]));
     await yieldDeploymentPrewarmFrame();
-    await runGroup('world-drops-ordnance', () => Promise.all([
-      deathDropPresentationPool.prewarm(renderRuntime, camera, player.weapon),
-      prewarmGrenadeWorldPresentations(sceneGeneration),
-    ]));
+    await runGroup('death-drops', () => deathDropPresentationPool.prewarm(
+      renderRuntime, camera, player.weapon,
+    ));
+    await yieldDeploymentPrewarmFrame();
+    await runGroup('world-ordnance', () => prewarmGrenadeWorldPresentations(sceneGeneration));
     await yieldDeploymentPrewarmFrame();
     await runGroup('nuke-overdrive-bolts', () => Promise.all([
       prewarmNukePresentation(),

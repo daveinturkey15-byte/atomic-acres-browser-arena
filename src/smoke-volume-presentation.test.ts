@@ -74,6 +74,30 @@ describe('smoke grenade volume presentation', () => {
     expect(pool.telemetry()).toEqual(telemetryBefore);
   });
 
+  it('splits the native browser smoke vocabulary into bounded six-slot submissions', async () => {
+    const scene = new THREE.Scene();
+    const pool = new SmokeVolumePresentationPool(scene, 12);
+    const camera = new THREE.PerspectiveCamera();
+    vi.stubGlobal('document', {});
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      callback(performance.now());
+      return 1;
+    });
+    try {
+      const visiblePerSubmission: number[] = [];
+      const compileAndRender = vi.fn(async () => {
+        visiblePerSubmission.push(pool.root.children.filter((root) => root.visible).length);
+      });
+      await pool.prewarm({ compileAndRender }, camera, 9);
+      expect(compileAndRender).toHaveBeenCalledTimes(2);
+      expect(visiblePerSubmission).toEqual([6, 6]);
+      expect(pool.root.children.every((root) => !root.visible)).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+      pool.terminalDispose();
+    }
+  });
+
   it('restores state after a failed smoke prewarm and permits one clean retry', async () => {
     const scene = new THREE.Scene();
     const pool = new SmokeVolumePresentationPool(scene, 1);

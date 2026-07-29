@@ -382,6 +382,30 @@ describe('killstreak presentation', () => {
     presentation.dispose();
   });
 
+  it('splits native browser support render-object construction into two-root submissions', async () => {
+    const scene = new THREE.Scene();
+    const presentation = new KillstreakPresentation(scene);
+    const camera = new THREE.PerspectiveCamera();
+    const entityRootCount = presentation.root.children.filter((node) => (
+      node.userData.swarmInstancedPresentation === true
+      || typeof node.userData.presentationPoolKey === 'string'
+        && node.userData.presentationPoolKey !== 'swarm-drone'
+    )).length;
+    vi.stubGlobal('document', {});
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      callback(performance.now());
+      return 1;
+    });
+    try {
+      const compileAndRender = vi.fn(async () => undefined);
+      await presentation.prewarm({ compileAndRender }, camera, 12);
+      expect(compileAndRender).toHaveBeenCalledTimes(Math.ceil(entityRootCount / 2) + 6);
+    } finally {
+      vi.unstubAllGlobals();
+      presentation.dispose();
+    }
+  });
+
   it('restores failed prewarm state and invalidates the GPU receipt when the authored pool is rebuilt', async () => {
     const scene = new THREE.Scene();
     const presentation = new KillstreakPresentation(scene);
@@ -403,11 +427,11 @@ describe('killstreak presentation', () => {
       }),
     };
     const inFlight = presentation.prewarm(blockedRuntime, camera);
-    expect(() => presentation.prewarmAuthoredAssets()).toThrow('during GPU prewarm');
+    await expect(presentation.prewarmAuthoredAssets()).rejects.toThrow('during GPU prewarm');
     releasePrewarm();
     await inFlight;
 
-    presentation.prewarmAuthoredAssets();
+    await presentation.prewarmAuthoredAssets();
     const rebuiltRuntime = { compileAndRender: vi.fn(async () => undefined) };
     await presentation.prewarm(rebuiltRuntime, camera);
     expect(rebuiltRuntime.compileAndRender).toHaveBeenCalledTimes(7);

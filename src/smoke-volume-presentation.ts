@@ -429,7 +429,24 @@ export class SmokeVolumePresentationPool {
       presentation.root.traverse((node) => { node.frustumCulled = false; });
     }
     try {
-      await runtime.compileAndRender(this.root, camera, parentScene);
+      if (typeof document === 'undefined') {
+        await runtime.compileAndRender(this.root, camera, parentScene);
+      } else {
+        const batchSize = 6;
+        for (const { presentation } of this.slots) presentation.root.visible = false;
+        for (let offset = 0; offset < this.slots.length; offset += batchSize) {
+          const batch = this.slots.slice(offset, offset + batchSize);
+          for (const { presentation } of batch) presentation.root.visible = true;
+          await runtime.compileAndRender(this.root, camera, parentScene);
+          for (const { presentation } of batch) presentation.root.visible = false;
+          if (offset + batchSize < this.slots.length) {
+            await new Promise<void>((resolve) => {
+              if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => resolve());
+              else globalThis.setTimeout(resolve, 0);
+            });
+          }
+        }
+      }
       if (!this.disposed) this.gpuPrewarmGeneration = sceneGeneration;
     } finally {
       for (const { presentation } of this.slots) presentation.deactivate();

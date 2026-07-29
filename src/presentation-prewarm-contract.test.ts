@@ -121,6 +121,9 @@ describe('presentation prewarm startup contract', () => {
     expect(sharedAssets).toContain("await runPhase('world-drop-corpus'");
     expect(source).toContain('menuDeploymentAssetsProfile: lastMenuDeploymentAssetsProfile');
     expect(arenaPresentationPrewarm).toContain("await runGroup('tracers-impacts'");
+    expect(arenaPresentationPrewarm).toContain("await runGroup('death-drops'");
+    expect(arenaPresentationPrewarm).toContain("await runGroup('world-ordnance'");
+    expect(arenaPresentationPrewarm).not.toContain("runGroup('world-drops-ordnance'");
     expect(arenaPresentationPrewarm).toContain("await runGroup('killstreak-vocabulary'");
     expect(arenaPresentationPrewarm).toContain('await yieldDeploymentPrewarmFrame();');
     expect(matchDeployment).toContain('await killstreakPresentation.prewarm(renderRuntime, camera, -killstreakMatchEpoch);');

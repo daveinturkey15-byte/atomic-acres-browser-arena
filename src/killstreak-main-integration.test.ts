@@ -73,7 +73,7 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(clearBlock).toContain('killstreakPresentation.setFirstPersonEntity(null);');
     expect(clearBlock).toContain("document.documentElement.dataset.killstreakPossession = 'none';");
     expect(clearBlock).toContain('camera.near = 0.08;');
-    expect(clearBlock).toContain('weaponView.root.visible = player.alive;');
+    expect(clearBlock).toContain('weaponView.setPresentationVisible(player.alive);');
   });
 
   it('keeps legacy offensive effects as admitted presentation adapters, never a second reward queue', () => {

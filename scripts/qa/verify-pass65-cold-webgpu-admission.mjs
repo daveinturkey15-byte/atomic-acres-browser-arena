@@ -301,8 +301,8 @@ try {
       if (before.runtime.actualBackend !== 'webgpu' || before.runtime.softwareAdapter) failures.push('hardware WebGPU was not active');
       if (before.localLightOcclusion.violations.length > 0) failures.push(`pre-start local-light violations: ${before.localLightOcclusion.violations.join(', ')}`);
       const corpusPolicy = after.weaponAssetCache.runtimeCorpus.policy;
-      const decodedRuntimeCorpusBytes = after.weaponAssetCache.resident.world.estimatedDecodedBytes
-        + after.weaponAssetCache.resident.drop.estimatedDecodedBytes;
+      const decodedRuntimeCorpusBytes = after.weaponAssetCache.runtimeCorpus.residency.estimatedDecodedBytes;
+      const decodedAllVariantBytes = after.weaponAssetCache.runtimeCorpus.allVariantsResidency.estimatedDecodedBytes;
       const menuPrewarmProfile = after.bootstrap.menuDeploymentAssetsProfile;
       if (!menuPrewarmProfile?.completed || menuPrewarmProfile.error !== null
         || menuPrewarmProfile.phases.length !== 3) {
@@ -329,6 +329,9 @@ try {
       }
       if (decodedRuntimeCorpusBytes > corpusPolicy.maximumEstimatedDecodedBytes) {
         failures.push(`runtime weapon corpus decoded estimate ${decodedRuntimeCorpusBytes} exceeded ${corpusPolicy.maximumEstimatedDecodedBytes}`);
+      }
+      if (decodedAllVariantBytes > corpusPolicy.maximumAllVariantEstimatedDecodedBytes) {
+        failures.push(`all-variant weapon corpus decoded estimate ${decodedAllVariantBytes} exceeded ${corpusPolicy.maximumAllVariantEstimatedDecodedBytes}`);
       }
       const expectedResidentAssetsPerVariant = corpusPolicy.assets / corpusPolicy.variants.length;
       if (after.weaponAssetCache.resident.world.assets !== expectedResidentAssetsPerVariant
@@ -389,7 +392,12 @@ try {
         failures.push(`effect prewarm ${phaseDuration('prewarm-batched-effects')}ms exceeded ${maximumEffectPrewarmMs}ms`);
       }
       const effectPrewarmProfile = after.bootstrap.effectPrewarmProfile;
-      if (effectPrewarmProfile?.groups.length !== 6) {
+      const expectedEffectPrewarmGroups = [
+        'tracers-impacts', 'explosions', 'death-drops', 'world-ordnance',
+        'nuke-overdrive-bolts', 'smoke-volumes', 'killstreak-vocabulary',
+      ];
+      if (JSON.stringify(effectPrewarmProfile?.groups.map(({ name }) => name) ?? [])
+        !== JSON.stringify(expectedEffectPrewarmGroups)) {
         failures.push(`bounded effect prewarm groups were incomplete: ${JSON.stringify(effectPrewarmProfile)}`);
       }
       if (!taskAudit.supported) failures.push('browser Long Tasks API unavailable for cold admission audit');
@@ -442,6 +450,7 @@ try {
           files: runtimeWeaponCorpusPaths.length,
           compressedBytes: runtimeWeaponCorpusCompressedBytes,
           decodedBytesEstimate: decodedRuntimeCorpusBytes,
+          allVariantDecodedBytesEstimate: decodedAllVariantBytes,
           postPrewarmLoads: postCorpusPrewarmLoads,
         },
         before,
