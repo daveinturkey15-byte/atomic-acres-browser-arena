@@ -10,7 +10,7 @@ describe('debug capture viewmodel integration', () => {
     const setter = source.slice(setterStart, setterEnd);
     expect(setterStart).toBeGreaterThan(0);
     expect(setter).toContain('debugCaptureViewmodelHidden = hidden;');
-    expect(setter).toContain('weaponView.root.visible = shouldShowWeaponViewmodel();');
+    expect(setter).toContain('weaponView.setPresentationVisible(shouldShowWeaponViewmodel());');
     expect(source).toMatch(/function shouldShowWeaponViewmodel\(\): boolean \{[\s\S]*!debugCaptureViewmodelHidden;/);
   });
 

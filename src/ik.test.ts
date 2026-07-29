@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { solveTwoBoneElbow } from './ik';
+import { solveTwoBoneElbow, solveTwoBoneElbowInto } from './ik';
 
 describe('two-bone arm solver', () => {
   it('keeps both authored segment lengths for a reachable target', () => {
@@ -27,5 +27,25 @@ describe('two-bone arm solver', () => {
     const right = solveTwoBoneElbow(shoulder, target, 0.56, 0.58, new THREE.Vector3(1, -1, 0));
     expect(left.x).toBeLessThan(0);
     expect(right.x).toBeGreaterThan(0);
+  });
+
+  it('can reuse caller-owned storage without changing the solved pose', () => {
+    const shoulder = new THREE.Vector3(0.1, -0.2, 0.3);
+    const target = new THREE.Vector3(-0.45, 0.3, -0.75);
+    const hint = new THREE.Vector3(-0.7, -1, 0.25);
+    const expected = solveTwoBoneElbow(shoulder, target, 0.56, 0.58, hint);
+    const result = new THREE.Vector3();
+    const scratch = {
+      toTarget: new THREE.Vector3(),
+      perpendicular: new THREE.Vector3(),
+      projection: new THREE.Vector3(),
+    };
+
+    expect(solveTwoBoneElbowInto(shoulder, target, 0.56, 0.58, hint, result, scratch)).toBe(result);
+    expect(result.distanceTo(expected)).toBeLessThan(1e-10);
+    const identity = result;
+    solveTwoBoneElbowInto(shoulder, new THREE.Vector3(0.2, 0.4, -1), 0.56, 0.58, hint, result, scratch);
+    expect(result).toBe(identity);
+    expect(result.toArray().every(Number.isFinite)).toBe(true);
   });
 });

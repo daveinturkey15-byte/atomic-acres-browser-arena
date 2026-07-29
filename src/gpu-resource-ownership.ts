@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
 export const GPU_GEOMETRY_OWNER_KEY = 'atomicAcresGpuGeometryOwner' as const;
+export const GPU_SHARED_GEOMETRY_KEY = 'atomicAcresGpuSharedGeometry' as const;
 
 /**
  * SkeletonUtils clones scene graphs but deliberately shares mesh geometries.
@@ -31,4 +32,25 @@ export function ownedMeshGeometryCount(root: THREE.Object3D, owner: string): num
     if (node instanceof THREE.Mesh && node.geometry.userData[GPU_GEOMETRY_OWNER_KEY] === owner) owned.add(node.geometry);
   });
   return owned.size;
+}
+
+/**
+ * Marks immutable source geometry that may be reused by independently retired
+ * scene graphs. Retirement disposes each instance's materials but must retain
+ * these buffers until their long-lived source asset is released.
+ */
+export function markMeshGeometriesShared(root: THREE.Object3D, owner: string): number {
+  const shared = new Set<THREE.BufferGeometry>();
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    node.geometry.userData = { ...node.geometry.userData, [GPU_SHARED_GEOMETRY_KEY]: owner };
+    shared.add(node.geometry);
+  });
+  root.userData.gpuSharedGeometryOwner = owner;
+  root.userData.gpuSharedGeometryCount = shared.size;
+  return shared.size;
+}
+
+export function isSharedMeshGeometry(geometry: THREE.BufferGeometry): boolean {
+  return typeof geometry.userData[GPU_SHARED_GEOMETRY_KEY] === 'string';
 }

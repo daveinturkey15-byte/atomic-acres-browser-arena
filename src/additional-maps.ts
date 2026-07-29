@@ -1987,9 +1987,22 @@ function terminalSurfaceMaterial(
 function prismGeometryXZ(points: Array<[number, number]>, thickness: number): THREE.BufferGeometry {
   const half = thickness / 2;
   const positions: number[] = [];
+  const uvs: number[] = [];
+  const minimumX = Math.min(...points.map(([x]) => x));
+  const maximumX = Math.max(...points.map(([x]) => x));
+  const minimumZ = Math.min(...points.map(([, z]) => z));
+  const maximumZ = Math.max(...points.map(([, z]) => z));
+  const extentX = Math.max(Number.EPSILON, maximumX - minimumX);
+  const extentZ = Math.max(Number.EPSILON, maximumZ - minimumZ);
   const indices: number[] = [];
   for (const y of [-half, half]) {
-    for (const [x, z] of points) positions.push(x, y, z);
+    for (const [x, z] of points) {
+      positions.push(x, y, z);
+      // The shared top/side vertices use a stable planar wing projection. The
+      // thin edge may stretch slightly, but every textured vertex now has a
+      // finite UV and WebGPU never has to synthesize a missing attribute.
+      uvs.push((x - minimumX) / extentX, (z - minimumZ) / extentZ);
+    }
   }
   const count = points.length;
   for (let index = 1; index < count - 1; index += 1) {
@@ -2002,6 +2015,7 @@ function prismGeometryXZ(points: Array<[number, number]>, thickness: number): TH
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;

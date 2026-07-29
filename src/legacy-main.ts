@@ -9,6 +9,7 @@ import { estimateResidentObjectMemory } from './rendering/resident-memory';
 import { ArenaVisualStreamController, loadArenaVisualModule, type ArenaVisualSwitchReceipt } from './rendering/arena-visual-stream';
 import { ArenaRenderWatchdog, auditArenaRenderLiveness } from './rendering/arena-render-watchdog';
 import { withArenaFrustumCullingDisabled } from './rendering/arena-coverage-prewarm';
+import { ArenaTransitionProfiler, type ArenaTransitionProfilePhase } from './arena-transition-profile';
 import { isViewmodelShadowLight, VIEWMODEL_SHADOW_BUDGET } from './rendering/runtime-shadow-budget';
 import { auditRuntimeTslTraversal, assertRuntimeTslTraversal, createPass64TslSceneSystems, type Pass64TslSceneSystems } from './rendering/pass64-tsl-scene';
 import type { ArenaVisualBudgets, ArenaVisualDefinition } from './rendering/arena-visual-definition';
@@ -17,8 +18,14 @@ import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem } from './water-system';
 import { PASS65_HITL_IDENTITY } from './release-identity';
 import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon, waitForPendingArtTextures } from './art-kit';
-import { invalidatePass65PresentationTree, releasePass65WeaponModelsIn } from './weapon-model';
+import {
+  invalidatePass65PresentationTree,
+  pass65WeaponCacheTelemetry,
+  prewarmPass65RuntimeWeaponCorpus,
+  releasePass65WeaponModelsIn,
+} from './weapon-model';
 import { applyBotEmissiveBrightness } from './operator-model';
+import { isSharedMeshGeometry } from './gpu-resource-ownership';
 import { GUN_RANGE_FIRING_LINE_Z, applyAdditionalMapPresentationProfile, applyRustworksPresentationProfile, buildGunRange, buildRustworks1v1, buildSkylineTerminal, updateGunRangePresentation } from './additional-maps';
 import {
   BOT_DEATHS_PER_REINFORCEMENT,
@@ -469,8 +476,12 @@ import {
 } from './interactive-world-protocol';
 import { TracerPool } from './tracer-pool';
 import { AsyncSerialQueue } from './async-serial-queue';
-import { loadRiggedOperatorAsset, riggedOperatorAssetReady, riggedOperatorTelemetry } from './operator-model';
-import { WeaponPresentation, type WeaponViewmodelGpuPrewarmer } from './weapon-presentation';
+import { RIGGED_OPERATOR_CORPSE_ACTION_NAMES, loadRiggedOperatorAsset, prewarmRiggedOperatorActions, riggedOperatorAssetReady, riggedOperatorTelemetry } from './operator-model';
+import {
+  WeaponPresentation,
+  type WeaponViewmodelCatalogGpuPrewarmer,
+  type WeaponViewmodelGpuPrewarmer,
+} from './weapon-presentation';
 import { magnifiedFovDegrees, viewmodelSurfaceRetreat } from './weapon-presentation-state';
 import { RailgunPresentation, type RailgunThermalContact } from './railgun-presentation';
 import { DMR_THERMAL_MAGNIFICATION, DmrThermalPresentation, type DmrThermalContact } from './dmr-thermal-presentation';
@@ -998,6 +1009,16 @@ let gpuRetirementDisposedRoots = 0;
 let gpuRetirementDisposedGeometries = 0;
 let gpuRetirementFailures = 0;
 
+async function yieldDeferredGpuRetirementTask(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    if (typeof requestAnimationFrame === 'function' && document.visibilityState === 'visible') {
+      requestAnimationFrame(() => resolve());
+    } else {
+      globalThis.setTimeout(resolve, 0);
+    }
+  });
+}
+
 function disposeDetachedRootResources(root: THREE.Object3D): void {
   const geometries = new Set<THREE.BufferGeometry>();
   const materials = new Set<THREE.Material>();
@@ -1011,7 +1032,7 @@ function disposeDetachedRootResources(root: THREE.Object3D): void {
       node.shadow.map?.dispose();
     }
   });
-  geometries.forEach((geometry) => geometry.dispose());
+  geometries.forEach((geometry) => { if (!isSharedMeshGeometry(geometry)) geometry.dispose(); });
   materials.forEach((material) => material.dispose());
   root.clear();
 }
@@ -1031,7 +1052,7 @@ async function drainDeferredGpuRetirements(): Promise<void> {
       console.warn('[Pass 65 GPU retirement fence failed; resources retained]', error);
       return;
     }
-    for (const retirement of batch) {
+    for (const [retirementIndex, retirement] of batch.entries()) {
       if (retirement.kind === 'geometry') {
         retirement.geometry.dispose();
         gpuRetirementDisposedGeometries += 1;
@@ -1042,6 +1063,13 @@ async function drainDeferredGpuRetirements(): Promise<void> {
         if (retirement.disposeResources) disposeDetachedRootResources(retirement.root);
         retirement.afterFence?.();
         gpuRetirementDisposedRoots += 1;
+      }
+      // Fence completion only establishes that disposal is safe; it does not
+      // require every detached hierarchy to be torn down in one browser task.
+      // One retirement per frame prevents cleanup of prewarm clones and old
+      // operators from colliding with match admission or a weapon switch.
+      if (retirementIndex + 1 < batch.length || deferredGpuRetirements.length > 0) {
+        await yieldDeferredGpuRetirementTask();
       }
     }
   }
@@ -1201,6 +1229,7 @@ type BootstrapStage =
   | 'menu-video-ready'
   | 'loading-gameplay-assets'
   | 'prewarming-weapon-catalog'
+  | 'prewarming-batched-presentations'
   | 'prewarming-grenade-world-presentations'
   | 'prewarming-killstreak-presentations'
   | 'prewarming-smoke-presentations'
@@ -2968,6 +2997,11 @@ let arenaTransitionPhase: 'idle' | 'fencing' | 'preparing' | 'committing' | 'rol
 let arenaTransitionStartedAt: number | null = null;
 let arenaTransitionCompletedAt: number | null = null;
 let arenaTransitionFailure: string | null = null;
+const arenaTransitionProfiler = new ArenaTransitionProfiler();
+
+function profileArenaTransition(phase: ArenaTransitionProfilePhase): void {
+  arenaTransitionProfiler.enter(phase, performance.now());
+}
 let lastArenaRenderAuditAt = -Infinity;
 const ARENA_RENDER_AUDIT_INTERVAL_MS = 250;
 let debugShadowProbe: THREE.Mesh | null = null;
@@ -4210,7 +4244,7 @@ function returnPrivateMatchToLobby(asHost: boolean): void {
   resetForMode();
   gameStarted = false;
   matchFinished = false;
-  weaponView.root.visible = false;
+  weaponView.setPresentationVisible(false);
   hudRoot.hidden = true;
   element<HTMLElement>('#banner').hidden = true;
   element<HTMLElement>('#countdown').hidden = true;
@@ -4541,15 +4575,21 @@ element<HTMLInputElement>('#player-name').addEventListener('input', () => {
 });
 
 const streamedWeaponGpuPrewarmQueue = new AsyncSerialQueue();
-const runStreamedWeaponGpuPrewarm: WeaponViewmodelGpuPrewarmer = async (model, { weaponId }) => {
-      const priorParent = model.parent;
-      const priorVisible = model.visible;
-      const priorScale = model.scale.clone();
+const runStreamedWeaponCatalogGpuPrewarm: WeaponViewmodelCatalogGpuPrewarmer = async (entries) => {
+      if (entries.length === 0) return;
+      const priorStates = entries.map(({ weaponId, model }) => Object.freeze({
+        weaponId,
+        model,
+        parent: model.parent,
+        visible: model.visible,
+        scale: model.scale.clone(),
+      }));
       const ancestorVisibility = new Map<THREE.Object3D, boolean>();
-      const restoreParent = (): void => {
-        if (priorParent && model.parent !== priorParent) priorParent.add(model);
+      const restoreParent = (state: typeof priorStates[number]): void => {
+        if (state.parent && state.model.parent !== state.parent) state.parent.add(state.model);
+        else if (!state.parent && state.model.parent) state.model.removeFromParent();
       };
-      const revealAncestors = (): void => {
+      const revealAncestors = (model: THREE.Object3D): void => {
         let ancestor = model.parent;
         while (ancestor && ancestor !== scene) {
           if (!ancestorVisibility.has(ancestor)) ancestorVisibility.set(ancestor, ancestor.visible);
@@ -4561,41 +4601,52 @@ const runStreamedWeaponGpuPrewarm: WeaponViewmodelGpuPrewarmer = async (model, {
       // Detach the candidate while the last complete viewmodel keeps
       // presenting, then stage its exact gameplay scale in the fenced TSL/HDR
       // submission below. A default-context compile does not warm that path.
-      model.removeFromParent();
-      model.visible = true;
+      for (const { model } of priorStates) {
+        model.removeFromParent();
+        model.visible = true;
+      }
       try {
         const submissionWasPaused = renderSubmissionPaused;
         renderSubmissionPaused = true;
         try {
           await flushWebGpuFrames(12_000);
-          restoreParent();
+          for (const state of priorStates) restoreParent(state);
           // The menu/deployment lifecycle normally hides the entire viewmodel
           // ancestry. Reveal that chain only for this fenced upload frame or a
           // compile-only receipt could still leave first draw work in combat.
-          revealAncestors();
-          await renderRuntime.compileAndRender(model, camera, scene);
+          for (const { model } of priorStates) revealAncestors(model);
+          await renderRuntime.compileAndRender(priorStates[0].model, camera, scene);
           const presentation = renderRuntime.presentationTelemetry();
           if (presentation.status !== 'healthy') {
-            throw new Error(`Streamed ${weaponId} viewmodel prewarm was ${presentation.status}`);
+            throw new Error(`Streamed ${priorStates.map(({ weaponId }) => weaponId).join(', ')} viewmodel prewarm was ${presentation.status}`);
           }
         } finally {
           renderSubmissionPaused = submissionWasPaused;
         }
       } finally {
-        restoreParent();
+        for (const state of priorStates) restoreParent(state);
         for (const [ancestor, visible] of ancestorVisibility) ancestor.visible = visible;
-        model.visible = priorVisible;
-        model.scale.copy(priorScale);
+        for (const state of priorStates) {
+          state.model.visible = state.visible;
+          state.model.scale.copy(state.scale);
+        }
       }
     };
+const runStreamedWeaponGpuPrewarm: WeaponViewmodelGpuPrewarmer = async (model, { weaponId, requestGeneration }) => (
+  runStreamedWeaponCatalogGpuPrewarm([{ weaponId, model }], { requestGeneration })
+);
 const streamedWeaponGpuPrewarmer: WeaponViewmodelGpuPrewarmer | undefined = renderRuntime.backend === 'webgpu'
   ? (model, context) => streamedWeaponGpuPrewarmQueue.run(() => runStreamedWeaponGpuPrewarm(model, context))
+  : undefined;
+const streamedWeaponCatalogGpuPrewarmer: WeaponViewmodelCatalogGpuPrewarmer | undefined = renderRuntime.backend === 'webgpu'
+  ? (entries, context) => streamedWeaponGpuPrewarmQueue.run(() => runStreamedWeaponCatalogGpuPrewarm(entries, context))
   : undefined;
 const weaponView = new WeaponPresentation(
   camera,
   reducedRenderMode,
   (root, afterFence) => scheduleDeferredGpuRetirement(root, true, afterFence),
   streamedWeaponGpuPrewarmer,
+  streamedWeaponCatalogGpuPrewarmer,
 );
 let loadoutState: LoadoutStorageV2 = playerProfileStore.current.loadout;
 let managedPresetId: LoadoutPresetId = loadoutState.selected.kind === 'custom'
@@ -4664,7 +4715,10 @@ function applyMenuLoadoutImmediately(): void {
   }
   const generation = ++menuLoadoutPresentationGeneration;
   const selectedWeapon = player.weapon;
-  void weaponView.prewarmBrowserWeaponCatalog(menuWeaponPrewarmCatalog(selection.primary, selection.secondary)).then(() => {
+  const retainedCatalog = menuDeploymentAssetsPromise
+    ? WEAPON_IDS
+    : menuWeaponPrewarmCatalog(selection.primary, selection.secondary);
+  void weaponView.prewarmBrowserWeaponCatalog(retainedCatalog).then(() => {
     if (generation !== menuLoadoutPresentationGeneration || gameStarted || player.weapon !== selectedWeapon) return;
     weaponView.setWeapon(selectedWeapon, true);
   }).catch((error: unknown) => {
@@ -7313,15 +7367,17 @@ function prepareCorpsePresentationRoot(root: THREE.Group): void {
   hideCorpseHeldWeapon(root);
 }
 
-function ensureCorpsePresentationPool(): void {
+async function ensureCorpsePresentationPool(): Promise<void> {
   if (corpsePresentationPool.length > 0) return;
   for (const team of [0, 1] as const) {
     for (let index = 0; index < CORPSE_POOL_CAPACITY_PER_TEAM; index += 1) {
       const root = buildOperator(team, 'prewarmed-fallen-operator', flattenOperatorMaterials, 'carbine');
+      await prewarmRiggedOperatorActions(root, RIGGED_OPERATOR_CORPSE_ACTION_NAMES);
       prepareCorpsePresentationRoot(root);
       root.visible = false;
       scene.add(root);
       corpsePresentationPool.push({ root, team, inUse: false });
+      await yieldDeploymentPrewarmFrame();
     }
   }
 }
@@ -8194,7 +8250,7 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
     target.root.visible = true;
   }
   refreshWarningUntil = performance.now() + 6_000;
-  weaponView.root.visible = true;
+  weaponView.setPresentationVisible(true);
   gameMode = mode;
   lastPlayerSpawnIndex = -1;
   lastPlayerSpawnAudit = null;
@@ -8215,7 +8271,7 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   };
   if (mode === 'solo') await spawnBots();
   else if (mode === 'host') await spawnBots(privateMatchConfig.hostedBotCount);
-  ensureCorpsePresentationPool();
+  await ensureCorpsePresentationPool();
   const restoreCorpsePoolPrewarm = stageCorpsePresentationPoolForPrewarm();
   // Compile and retire the first complete gameplay presentation while the
   // transition surface still owns the screen. Bot operators, the selected
@@ -9634,7 +9690,13 @@ async function spawnBots(hostedCount?: HostedBotCount): Promise<void> {
   lastBotGrenadeDamage = 0;
   soloBotDeaths = 0;
   dormantBotsPrewarmed = false;
-  for (let index = 0; index < activeCount; index += 1) spawnBot(index, hostedCount !== undefined);
+  for (let index = 0; index < activeCount; index += 1) {
+    spawnBot(index, hostedCount !== undefined);
+    const id = hostedCount !== undefined ? `host-bot-${index}` : `bot-${index}`;
+    const bot = bots.get(id);
+    if (bot) await prewarmRiggedOperatorActions(bot.root);
+    await yieldDeploymentPrewarmFrame();
+  }
   if (hostedCount !== undefined) {
     for (const bot of bots.values()) authoritativeScores.set(bot.id, emptyPlayerScore(bot.id));
     if (activeCount > 0) addFeed(String(activeCount) + ' HOST-AUTHORITATIVE BOTS DEPLOYED', 'coral');
@@ -9648,10 +9710,12 @@ async function spawnBots(hostedCount?: HostedBotCount): Promise<void> {
   for (let index = selectedArena.soloBotCount; index < selectedArena.maximumSoloBots; index += 1) {
     spawnBot(index, false, true);
     const bot = bots.get(`bot-${index}`)!;
+    await prewarmRiggedOperatorActions(bot.root);
     bots.delete(bot.id);
     bot.alive = false;
     bot.root.visible = false;
     dormantBots.set(bot.id, bot);
+    await yieldDeploymentPrewarmFrame();
   }
   lastBotSpawnIndices.clear();
   for (const [team, index] of activeSpawnHistory) lastBotSpawnIndices.set(team, index);
@@ -12394,7 +12458,7 @@ function updateKillstreakPossession(now: number): void {
   camera.rotation.y = player.yaw;
   camera.rotation.x = player.pitch;
   killstreakPresentation.alignFirstPersonCockpit(entity.id, camera.quaternion);
-  weaponView.root.visible = false;
+  weaponView.setPresentationVisible(false);
   if (now - lastKillstreakControlSentAt < 50) return;
   const droneAxes = pilotedDroneControlAxes({
     keyboardForward: keys.has('KeyW'),
@@ -12459,7 +12523,7 @@ function updatePass65KillstreakRuntime(now: number): void {
   refreshSupportStatusHud(now);
   const possession = localKillstreakActorSnapshot()?.possession;
   document.documentElement.dataset.killstreakPossession = possession?.kind ?? 'none';
-  weaponView.root.visible = shouldShowWeaponViewmodel();
+  weaponView.setPresentationVisible(shouldShowWeaponViewmodel());
   updateKillstreakPossession(now);
 }
 
@@ -13734,7 +13798,7 @@ function clearFieldSupport(): void {
     camera.near = 0.08;
     camera.updateProjectionMatrix();
   }
-  weaponView.root.visible = player.alive;
+  weaponView.setPresentationVisible(player.alive);
   if (yardhawk) disposeSupportRoot(yardhawk.root);
   yardhawk = null;
   for (const strike of strikeMissiles) {
@@ -13965,7 +14029,7 @@ function updatePhysics(dt: number): void {
     && weaponView.adsProgress() >= 0.9
     && Math.abs(camera.fov - aimingFov) < 0.35;
   hudRoot.classList.toggle('dmr-thermal-active', dmrThermalActive);
-  weaponView.root.visible = shouldShowWeaponViewmodel();
+  weaponView.setPresentationVisible(shouldShowWeaponViewmodel());
   camera.position.copy(player.position);
   camera.position.y += cameraHeightOffset - landingImpulse * 0.035 * accessibilityRuntime.weaponMotionScale;
   camera.rotation.y = player.yaw + recoilCamera.yaw;
@@ -15540,18 +15604,27 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
   renderSubmissionPaused = true;
   arenaTransitionPhase = 'fencing';
   arenaTransitionStartedAt = performance.now();
+  arenaTransitionProfiler.begin(
+    arenaTransitionGeneration,
+    nextSelection.id,
+    arenaTransitionStartedAt,
+    'shared-gameplay-assets',
+  );
   arenaTransitionCompletedAt = null;
   arenaTransitionFailure = null;
   syncArenaSelectionUi();
   setStatus(`Preparing ${nextSelection.displayName} deployment assets…`);
   try {
-    await prepareSharedGameplayAssets();
+    await prepareMenuDeploymentAssets();
     // A map generation may only replace renderer-visible authority once every
     // earlier WebGPU submission has completed. This prevents the old root's
     // buffers from being detached or destroyed while the queue still uses it.
+    profileArenaTransition('previous-webgpu-fence');
     await flushWebGpuFrames();
     arenaTransitionPhase = 'preparing';
+    profileArenaTransition('arena-construction');
     nextArena = ensureArenaConstructed(nextSelection.id);
+    profileArenaTransition('interactive-world-construction');
     nextInteractiveWorldRuntime = createInteractiveWorldRuntime(
       nextArena,
       interactiveWorldMatchEpoch,
@@ -15562,7 +15635,9 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
     if (localArenaSwitchQaDelayMs > 0) {
       await new Promise<void>((resolve) => setTimeout(resolve, localArenaSwitchQaDelayMs));
     }
+    profileArenaTransition('physics-construction');
     nextPhysics = await CharacterPhysics.create(nextArena.physicsColliders, nextArena.bounds);
+    profileArenaTransition('authority-commit');
     characterPhysics = nextPhysics;
     selectedArena = nextSelection;
     arena = nextArena;
@@ -15573,8 +15648,11 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
     audio.setArena(selectedArena.id);
     footstepEmitters.reset();
     document.documentElement.dataset.arenaId = selectedArena.id;
+    profileArenaTransition('visual-definition');
     await configurePlayableArenaVisuals(selectedArena.id, arena.root, false);
+    profileArenaTransition('quality-presentation');
     await ensureSelectedQualityPresentation(selectedArena.id);
+    profileArenaTransition('material-tuning');
     materialCompatibility = tuneMaterialsForAtomicSignal(
       scene,
       weaponView.root,
@@ -15582,14 +15660,18 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
       maximumAnisotropy,
     );
     graphicsRefinement.refine(scene, maximumAnisotropy);
+    profileArenaTransition('art-texture-settle');
     await waitForPendingArtTextures();
     bootstrapStage = 'prewarming-weapon-catalog';
+    profileArenaTransition('weapon-catalog-prewarm');
     await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(
       nextSelection.id,
       gunRangeSidearmForWeaponPrewarm(),
     ));
+    profileArenaTransition('presentation-batching');
     batchSelectedArenaPresentation();
     setArenaPresentationVisibility();
+    profileArenaTransition('match-authority-reset');
     matchState = createMatch(performance.now(), selectedArena.matchRules);
     lastPlayerSpawnIndex = -1;
     lastPlayerSpawnAudit = null;
@@ -15609,6 +15691,7 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
     const presentationRoot = selectedArena.id === 'atomic-acres' && arenaArtRoot?.visible
       ? arenaArtRoot
       : arena.root;
+    profileArenaTransition('coverage-submit-fence');
     renderRuntime.resetRenderInfo();
     if (renderRuntime.backend === 'webgpu') {
       await withArenaFrustumCullingDisabled(presentationRoot, async () => {
@@ -15632,7 +15715,9 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
     if (readiness.reasons.length > 0) {
       throw new Error(`Map presentation failed readiness: ${readiness.reasons.join(', ')}`);
     }
+    profileArenaTransition('retire-previous-arenas');
     await retireAllArenasExcept(selectedArena.id);
+    profileArenaTransition('commit-bookkeeping');
     renderHighScores();
     committed = true;
     gameplayArenaPrepared = true;
@@ -15649,6 +15734,7 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
     console.error('[Nuke Town map selection failed]', error);
     arenaTransitionPhase = 'rolling-back';
     arenaTransitionFailure = error instanceof Error ? error.message : String(error);
+    profileArenaTransition('rollback');
     characterPhysics = previousPhysics;
     selectedArena = previousSelection;
     arena = previousArena;
@@ -15691,6 +15777,7 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
       showFatalError(new Error(`Map switch rollback failed: ${arenaTransitionFailure}`));
     }
   } finally {
+    profileArenaTransition('finalize');
     if (!committed && nextPhysics && nextPhysics !== characterPhysics) nextPhysics.dispose();
     if (!committed && nextInteractiveWorldRuntime && nextInteractiveWorldRuntime !== interactiveWorldRuntime) {
       try {
@@ -15705,6 +15792,10 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
     renderSubmissionPaused = false;
     if (arenaTransitionPhase !== 'failed') arenaTransitionPhase = 'idle';
     arenaTransitionCompletedAt = performance.now();
+    arenaTransitionProfiler.finish(
+      arenaTransitionCompletedAt,
+      committed ? 'committed' : arenaTransitionPhase === 'failed' ? 'failed' : 'rolled-back',
+    );
     arenaSelectionReady = true;
     syncArenaSelectionUi();
     if (network.role !== 'offline' || privateLobbySnapshot) renderPrivateLobby();
@@ -15834,7 +15925,7 @@ function returnToMainMenu(): void {
   matchFinished = false;
   killstreakLoadoutController.releaseAfterMatch();
   killstreakMenuBinding.setMatchActive(false);
-  weaponView.root.visible = false;
+  weaponView.setPresentationVisible(false);
   hudRoot.hidden = true;
   roomCard.hidden = true;
   roomCodeEl.textContent = '';
@@ -15845,6 +15936,7 @@ function returnToMainMenu(): void {
   syncArenaSelectionUi();
   setArenaMenuCamera();
   setStatus(`${selectedArena.displayName} ready · choose a map or deploy again.`);
+  void prepareMenuDeploymentAssets().catch(showFatalError);
   if (document.pointerLockElement) void document.exitPointerLock();
   // Pass 65: apply graphics saved mid-match now that we are back at the menu.
   flushPendingGraphics();
@@ -16713,9 +16805,53 @@ function playableSceneProof(): Record<string, unknown> {
     },
   };
 }
+
+function sampleEnduranceHealth() {
+  let choppers = 0;
+  let swarmDrones = 0;
+  for (const entity of killstreakSnapshot.entities) {
+    if (entity.kind === 'chopper') choppers += 1;
+    else if (entity.kind === 'drone' && entity.mode === 'swarm') swarmDrones += 1;
+  }
+  const grenadeWorldPool = grenadeWorldPresentationPool.telemetry();
+  const smokePresentation = smokeVolumePresentationPool.telemetry();
+  return {
+    frameCount,
+    gameStarted,
+    playerPosition: [player.position.x, player.position.y, player.position.z] as [number, number, number],
+    arenaId: selectedArena.id,
+    transition: {
+      phase: arenaTransitionPhase,
+      failure: arenaTransitionFailure,
+      renderSubmissionPaused,
+    },
+    runtime: renderRuntime.healthTelemetry(),
+    watchdog: arenaRenderWatchdog.telemetry(),
+    gpuRetirement: { failures: gpuRetirementFailures },
+    killstreak: {
+      revision: killstreakSnapshot.revision,
+      entities: killstreakSnapshot.entities.length,
+      choppers,
+      swarmDrones,
+    },
+    grenadeWorldPool: {
+      exhaustions: grenadeWorldPool.exhaustions,
+      prewarmBlockedAcquisitions: grenadeWorldPool.prewarmBlockedAcquisitions,
+    },
+    smokePresentation: {
+      active: smokePresentation.active,
+      liveDisposals: smokePresentation.liveDisposals,
+    },
+    weaponCatalog: weaponView.browserCatalogHealth(),
+  };
+}
+
 const debugWindow = window as Window & {
   __ATOMIC_ACRES_DEBUG__?: {
     snapshot: () => Record<string, unknown>;
+    sampleEnduranceHealth: () => ReturnType<typeof sampleEnduranceHealth>;
+    sampleWeaponCatalogReadiness: () => ReturnType<typeof weaponView.browserCatalogReadiness>;
+    sampleWeaponAssetCache: () => ReturnType<typeof pass65WeaponCacheTelemetry>;
     traceBallistics: (
       weapon: WeaponId,
       origin: [number, number, number],
@@ -16817,6 +16953,7 @@ const debugWindow = window as Window & {
     damageRemoteAuthoritatively: (amount: number, playerId?: string) => { targetId: string; storedBefore: number; canonicalBefore: number; storedAfter: number } | null;
     earnSupport: (eliminations: number) => void;
     activateKillstreak: (id: Pass65KillstreakId, anchor?: [number, number, number]) => boolean;
+    togglePilotedDroneControl: (entityId?: string) => boolean;
     forceBotGrenade: (fuseMs?: number, grenade?: GrenadeId) => boolean;
     activateSupport: (id: FieldSupportId) => void;
     setOverdrive: (mode: 'charging' | 'available' | 'active' | 'expired') => void;
@@ -16844,12 +16981,33 @@ const debugWindow = window as Window & {
     interactShed: () => boolean;
     damageShed: (placementId?: string, surfaceId?: string, damageQ?: number) => boolean;
     bulletHitShed: (placementId?: string, surfaceId?: string, damageQ?: number, penetrationEnergyQ?: number) => boolean;
+    detonateGrenadeAtShed: (placementId?: string, surfaceId?: string) => {
+      accepted: boolean;
+      placementId: string | null;
+      surfaceId: string;
+      point: number[] | null;
+      revisionBefore: number | null;
+      revisionAfter: number | null;
+      detachedChunksBefore: number | null;
+      detachedChunksAfter: number | null;
+      grenadeExplosionsBefore: number;
+      grenadeExplosionsAfter: number;
+    };
 
   };
 };
 debugWindow.__ATOMIC_ACRES_DEBUG__ = {
+  sampleEnduranceHealth,
+  sampleWeaponCatalogReadiness: () => weaponView.browserCatalogReadiness(),
+  sampleWeaponAssetCache: () => pass65WeaponCacheTelemetry(),
   snapshot: () => ({
-    bootstrap: { stage: bootstrapStage, error: bootstrapError, matchAdmissionCadence: lastMatchAdmissionCadence },
+    bootstrap: {
+      stage: bootstrapStage,
+      error: bootstrapError,
+      matchAdmissionCadence: lastMatchAdmissionCadence,
+      menuDeploymentAssetsProfile: lastMenuDeploymentAssetsProfile,
+      effectPrewarmProfile: lastArenaEffectPrewarmProfile,
+    },
     gameStarted,
     frameCount,
     gameMode,
@@ -16952,6 +17110,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
           completedAt: arenaTransitionCompletedAt,
           failure: arenaTransitionFailure,
           renderSubmissionPaused,
+          profile: arenaTransitionProfiler.snapshot(performance.now()),
         },
         retirement: { ...arenaRetirementInventory },
         atomicAuxiliaryRoots: [arenaArtRoot, worldIdentityPresentation?.root, neighbourhoodLifeRoot]
@@ -18179,7 +18338,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   },
   setCaptureViewmodelHidden: (hidden) => {
     debugCaptureViewmodelHidden = hidden;
-    weaponView.root.visible = shouldShowWeaponViewmodel();
+    weaponView.setPresentationVisible(shouldShowWeaponViewmodel());
   },
   stageLoadingCaptureSquad: () => {
     if (selectedArena.id !== 'atomic-acres' || gameMode !== 'solo' || !gameStarted) {
@@ -18529,6 +18688,16 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     updateFieldSupportHud();
   },
   activateKillstreak: (id: Pass65KillstreakId, anchor) => Boolean(requestKillstreakActivation(id, performance.now(), anchor)),
+  togglePilotedDroneControl: (entityId) => {
+    const entity = killstreakSnapshot.entities.find((candidate) => (
+      candidate.kind === 'drone'
+      && candidate.mode === 'piloted'
+      && candidate.ownerId === player.id
+      && candidate.expiresInMs > 0
+      && (!entityId || candidate.id === entityId)
+    ));
+    return entity ? requestKillstreakControl(entity.id, 'toggle-piloted-drone') : false;
+  },
   forceBotGrenade: (fuseMs = 1_100, grenade: GrenadeId = 'frag') => {
     const bot = bots.values().next().value as BotPlayer | undefined;
     return bot ? throwBotGrenade(bot, performance.now(), fuseMs, player.position, player.stance, grenade) : false;
@@ -18720,11 +18889,60 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     broadcastInteractiveWorldState(true);
     return true;
   },
+  detonateGrenadeAtShed: (placementId, surfaceId = 'door-south') => {
+    const rejected = {
+      accepted: false,
+      placementId: placementId ?? null,
+      surfaceId,
+      point: null,
+      revisionBefore: null,
+      revisionAfter: null,
+      detachedChunksBefore: null,
+      detachedChunksAfter: null,
+      grenadeExplosionsBefore: grenadeExplosions,
+      grenadeExplosionsAfter: grenadeExplosions,
+    };
+    if (!interactiveWorldRuntime?.hasHostAuthority()) return rejected;
+    const envelopeBefore = interactiveWorldRuntime.stateEnvelope();
+    const targetPlacementId = placementId ?? envelopeBefore.sheds[0]?.placementId;
+    if (!targetPlacementId) return rejected;
+    const surface = interactiveWorldRuntime.collisions().ballisticSurfaces.find((candidate) => (
+      candidate.destructibleSurface?.placementId === targetPlacementId
+      && candidate.destructibleSurface.surfaceId === surfaceId
+    ));
+    if (!surface) return { ...rejected, placementId: targetPlacementId };
+    const point = new THREE.Vector3(
+      (surface.bounds.minX + surface.bounds.maxX) / 2,
+      ((surface.bounds.minY ?? 0) + (surface.bounds.maxY ?? 0)) / 2,
+      (surface.bounds.minZ + surface.bounds.maxZ) / 2,
+    );
+    const detachedChunksBefore = interactiveWorldRuntime.telemetry().detachedChunks;
+    const grenadeExplosionsBefore = grenadeExplosions;
+    const detonatedAt = performance.now();
+    audio.explosion(detonatedAt);
+    spawnGrenadeExplosionVisual(point, detonatedAt);
+    breakWindowsInGrenadeBlast(point, randomNonce(), true, GRENADE_RADIUS);
+    const accepted = applyInteractiveWorldExplosion(point, GRENADE_RADIUS, 100);
+    const envelopeAfter = interactiveWorldRuntime.stateEnvelope();
+    return {
+      accepted,
+      placementId: targetPlacementId,
+      surfaceId,
+      point: point.toArray(),
+      revisionBefore: envelopeBefore.revision,
+      revisionAfter: envelopeAfter.revision,
+      detachedChunksBefore,
+      detachedChunksAfter: interactiveWorldRuntime.telemetry().detachedChunks,
+      grenadeExplosionsBefore,
+      grenadeExplosionsAfter: grenadeExplosions,
+    };
+  },
 
 };
 
 let menuWeaponAssetPromise: Promise<void> | null = null;
 let sharedGameplayAssetsPromise: Promise<void> | null = null;
+let menuDeploymentAssetsPromise: Promise<void> | null = null;
 
 async function prepareMenuWeaponAsset(): Promise<void> {
   if (menuWeaponAssetPromise) return menuWeaponAssetPromise;
@@ -18776,7 +18994,6 @@ function batchSelectedArenaPresentation(): void {
 async function prepareSharedGameplayAssets(): Promise<void> {
   if (sharedGameplayAssetsPromise) return sharedGameplayAssetsPromise;
   sharedGameplayAssetsPromise = (async () => {
-    bootstrapStage = 'loading-gameplay-assets';
     const operatorPromise = loadRiggedOperatorAsset().catch((error: unknown) => {
       riggedOperatorLoadError = error instanceof Error ? error.message : String(error);
       console.error('[Nuke Town operator asset load failed]', riggedOperatorLoadError);
@@ -18791,13 +19008,12 @@ async function prepareSharedGameplayAssets(): Promise<void> {
     // Every streamed viewmodel must inherit the camera's isolated compositing
     // layer before any match-boundary GPU prewarm can stage it.
     weaponView.root.traverse((node) => node.layers.set(VIEWMODEL_RENDER_LAYER));
-    killstreakPresentation.prewarmAuthoredAssets();
+    await killstreakPresentation.prewarmAuthoredAssets();
     // First-person geometry is composited after world depth is cleared. Contact
     // retreat still keeps it tucked near walls without world geometry cutting
     // holes through hands and weapons.
     weaponView.setWeapon(player.weapon, true);
-    weaponView.root.visible = false;
-    bootstrapStage = 'gameplay-assets-ready';
+    weaponView.setPresentationVisible(false);
   })().catch((error) => {
     sharedGameplayAssetsPromise = null;
     throw error;
@@ -18805,28 +19021,166 @@ async function prepareSharedGameplayAssets(): Promise<void> {
   return sharedGameplayAssetsPromise;
 }
 
+let lastMenuDeploymentAssetsProfile: Readonly<{
+  startedAt: number;
+  completedAt: number | null;
+  durationMs: number | null;
+  completed: boolean;
+  error: string | null;
+  phases: readonly Readonly<{ name: string; durationMs: number }>[];
+}> | null = null;
+
+async function prepareMenuDeploymentAssets(): Promise<void> {
+  if (menuDeploymentAssetsPromise) return menuDeploymentAssetsPromise;
+  const startedAt = performance.now();
+  const phases: Array<{ name: string; durationMs: number }> = [];
+  const runPhase = async (name: string, task: () => Promise<unknown>): Promise<void> => {
+    const phaseStartedAt = performance.now();
+    await task();
+    phases.push({ name, durationMs: Number((performance.now() - phaseStartedAt).toFixed(3)) });
+  };
+  lastMenuDeploymentAssetsProfile = Object.freeze({
+    startedAt,
+    completedAt: null,
+    durationMs: null,
+    completed: false,
+    error: null,
+    phases: Object.freeze([]),
+  });
+  const operation = (async () => {
+    await runPhase('shared-assets', () => prepareSharedGameplayAssets());
+    if (renderRuntime.backend === 'webgpu') {
+      await runPhase('first-person-catalog', () => weaponView.prewarmBrowserWeaponCatalog(WEAPON_IDS));
+    }
+    await runPhase('world-drop-corpus', () => prewarmPass65RuntimeWeaponCorpus());
+  })();
+  menuDeploymentAssetsPromise = operation;
+  try {
+    await operation;
+    const completedAt = performance.now();
+    lastMenuDeploymentAssetsProfile = Object.freeze({
+      startedAt,
+      completedAt,
+      durationMs: Number((completedAt - startedAt).toFixed(3)),
+      completed: true,
+      error: null,
+      phases: Object.freeze(phases.map((phase) => Object.freeze(phase))),
+    });
+  } catch (error) {
+    const completedAt = performance.now();
+    lastMenuDeploymentAssetsProfile = Object.freeze({
+      startedAt,
+      completedAt,
+      durationMs: Number((completedAt - startedAt).toFixed(3)),
+      completed: false,
+      error: error instanceof Error ? error.message : String(error),
+      phases: Object.freeze(phases.map((phase) => Object.freeze(phase))),
+    });
+    if (menuDeploymentAssetsPromise === operation) menuDeploymentAssetsPromise = null;
+    throw error;
+  }
+}
+
+let lastArenaEffectPrewarmProfile: Readonly<{
+  sceneGeneration: number;
+  durationMs: number;
+  groups: readonly Readonly<{ name: string; startedAt: number; completedAt: number; durationMs: number }>[];
+}> | null = null;
+
+async function yieldDeploymentPrewarmFrame(): Promise<void> {
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+}
+
 async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): Promise<void> {
+  if (renderRuntime.backend === 'webgpu') {
+    bootstrapStage = 'prewarming-batched-presentations';
+    profileArenaTransition('prewarm-batched-effects');
+    const startedAt = performance.now();
+    const groups: Array<{ name: string; startedAt: number; completedAt: number; durationMs: number }> = [];
+    const runGroup = async (name: string, operation: () => Promise<unknown>): Promise<void> => {
+      const groupStartedAt = performance.now();
+      await operation();
+      const completedAt = performance.now();
+      groups.push({
+        name,
+        startedAt: groupStartedAt,
+        completedAt,
+        durationMs: Number((completedAt - groupStartedAt).toFixed(3)),
+      });
+    };
+    // Keep exact-scene coalescing within small compatible families, then end
+    // the browser task before staging the next family. Coalescing all eleven
+    // roots produced a measured 1.17s node/pipeline build on native WebGPU.
+    await runGroup('tracers-impacts', () => Promise.all([
+      tracerPool.prewarm(renderRuntime, camera, sceneGeneration),
+      impactPresentation.prewarm(renderRuntime, camera, sceneGeneration),
+    ]));
+    await yieldDeploymentPrewarmFrame();
+    await runGroup('explosions', () => Promise.all([
+      grenadeExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration),
+      supportExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration),
+    ]));
+    await yieldDeploymentPrewarmFrame();
+    await runGroup('death-drops', () => deathDropPresentationPool.prewarm(
+      renderRuntime, camera, player.weapon,
+    ));
+    await yieldDeploymentPrewarmFrame();
+    await runGroup('world-ordnance', () => prewarmGrenadeWorldPresentations(sceneGeneration));
+    await yieldDeploymentPrewarmFrame();
+    await runGroup('nuke-overdrive-bolts', () => Promise.all([
+      prewarmNukePresentation(),
+      prewarmOverdrivePresentation(),
+      prewarmExplosiveBoltPresentation(sceneGeneration),
+    ]));
+    await yieldDeploymentPrewarmFrame();
+    await runGroup('smoke-volumes', () => smokeVolumePresentationPool.prewarm(
+      renderRuntime, camera, sceneGeneration,
+    ));
+    await yieldDeploymentPrewarmFrame();
+    // Killstreak prewarm retains its own exact vocabulary, three LOD bands,
+    // 24-drone formation and possessed-cockpit submissions.
+    await runGroup('killstreak-vocabulary', () => killstreakPresentation.prewarm(
+      renderRuntime, camera, sceneGeneration,
+    ));
+    lastArenaEffectPrewarmProfile = Object.freeze({
+      sceneGeneration,
+      durationMs: Number((performance.now() - startedAt).toFixed(3)),
+      groups: Object.freeze(groups.map((group) => Object.freeze(group))),
+    });
+    return;
+  }
   bootstrapStage = 'prewarming-combat-tracers';
+  profileArenaTransition('prewarm-tracers');
   await tracerPool.prewarm(renderRuntime, camera, sceneGeneration);
   bootstrapStage = 'prewarming-combat-impacts';
+  profileArenaTransition('prewarm-impacts');
   await impactPresentation.prewarm(renderRuntime, camera, sceneGeneration);
   bootstrapStage = 'prewarming-grenade-explosion';
+  profileArenaTransition('prewarm-grenade-explosion');
   await grenadeExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration);
   bootstrapStage = 'prewarming-support-explosion';
+  profileArenaTransition('prewarm-support-explosion');
   await supportExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration);
   bootstrapStage = 'prewarming-death-drops';
+  profileArenaTransition('prewarm-death-drops');
   await deathDropPresentationPool.prewarm(renderRuntime, camera, player.weapon);
   bootstrapStage = 'prewarming-nuke';
+  profileArenaTransition('prewarm-nuke');
   await prewarmNukePresentation();
   bootstrapStage = 'prewarming-overdrive';
+  profileArenaTransition('prewarm-overdrive');
   await prewarmOverdrivePresentation();
   bootstrapStage = 'prewarming-grenade-world-presentations';
+  profileArenaTransition('prewarm-grenade-world');
   await prewarmGrenadeWorldPresentations(sceneGeneration);
   bootstrapStage = 'prewarming-killstreak-presentations';
+  profileArenaTransition('prewarm-killstreaks');
   await killstreakPresentation.prewarm(renderRuntime, camera, sceneGeneration);
   bootstrapStage = 'prewarming-smoke-presentations';
+  profileArenaTransition('prewarm-smoke');
   await smokeVolumePresentationPool.prewarm(renderRuntime, camera, sceneGeneration);
   bootstrapStage = 'prewarming-explosive-bolts';
+  profileArenaTransition('prewarm-explosive-bolts');
   await prewarmExplosiveBoltPresentation(sceneGeneration);
 }
 
@@ -18835,12 +19189,13 @@ function bootstrapMenuPreview(): void {
   arenaSelectionReady = true;
   syncArenaSelectionUi();
   setArenaMenuCamera();
-  setStatus(`${selectedArena.displayName} preview ready · gameplay streams only when you deploy.`);
-  bootstrapStage = 'menu-video-ready';
+  setStatus(`${selectedArena.displayName} preview ready · deployment assets prepare in the background.`);
+  bootstrapStage = 'ready';
   requestAnimationFrame(frame);
   window.setTimeout(() => {
-    void prepareMenuWeaponAsset().then(() => {
-      if (bootstrapStage === 'menu-video-ready') bootstrapStage = 'ready';
+    void prepareMenuDeploymentAssets().then(() => {
+      if (gameStarted || matchStartPreparing) return;
+      setStatus(`${selectedArena.displayName} ready · deployment assets retained.`);
     }).catch(showFatalError);
   }, 0);
 }

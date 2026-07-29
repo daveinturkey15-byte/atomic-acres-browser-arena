@@ -21,17 +21,10 @@ describe('Pass 65 first-person weapon prewarm authority', () => {
     expect(new Set(WEAPON_IDS).size).toBe(WEAPON_IDS.length);
   });
 
-  it('retains every Gun Range rack weapon, authoritative sidearm, and field-test weapon', () => {
-    const rackWeapons = GUN_RANGE_WEAPON_STATIONS.map((station) => station.weapon);
-    expect(weaponPrewarmCatalogForArena('gun-range', 'pistol')).toEqual([
-      ...rackWeapons,
-      'pistol',
-      ...GUN_RANGE_FIELD_TEST_WEAPONS,
-    ]);
-    expect(weaponPrewarmCatalogForArena('gun-range', 'magnum')).toEqual([
-      ...rackWeapons,
-      'magnum',
-      ...GUN_RANGE_FIELD_TEST_WEAPONS,
-    ]);
+  it('keeps the full retained corpus across Gun Range and normal-map transitions', () => {
+    expect(weaponPrewarmCatalogForArena('gun-range', 'pistol')).toBe(WEAPON_IDS);
+    expect(weaponPrewarmCatalogForArena('gun-range', 'magnum')).toBe(WEAPON_IDS);
+    expect(GUN_RANGE_WEAPON_STATIONS.every((station) => WEAPON_IDS.includes(station.weapon))).toBe(true);
+    expect(GUN_RANGE_FIELD_TEST_WEAPONS.every((weapon) => WEAPON_IDS.includes(weapon))).toBe(true);
   });
 });

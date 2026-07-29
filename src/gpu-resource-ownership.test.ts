@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { cloneMeshGeometriesForOwner, ownedMeshGeometryCount } from './gpu-resource-ownership';
+import {
+  cloneMeshGeometriesForOwner,
+  isSharedMeshGeometry,
+  markMeshGeometriesShared,
+  ownedMeshGeometryCount,
+} from './gpu-resource-ownership';
 
 describe('independently retired GPU resource ownership', () => {
   it('clones shared source geometry before an instance can dispose it', () => {
@@ -26,5 +31,17 @@ describe('independently retired GPU resource ownership', () => {
     first.geometry.dispose();
     otherInstance.geometry.dispose();
     expect(sourceDisposals).toBe(0);
+  });
+
+  it('marks immutable source geometry for selective retirement without cloning it', () => {
+    const source = new THREE.BoxGeometry(1, 1, 1);
+    const root = new THREE.Group();
+    const first = new THREE.Mesh(source, new THREE.MeshBasicMaterial());
+    const second = new THREE.Mesh(source, new THREE.MeshBasicMaterial());
+    root.add(first, second);
+    expect(markMeshGeometriesShared(root, 'operator-source')).toBe(1);
+    expect(first.geometry).toBe(source);
+    expect(second.geometry).toBe(source);
+    expect(isSharedMeshGeometry(source)).toBe(true);
   });
 });

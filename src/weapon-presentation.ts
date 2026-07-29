@@ -13,7 +13,7 @@ import {
   type FirstPersonArmChain,
   type FirstPersonFingerBone,
 } from './operator-model';
-import { solveTwoBoneElbow } from './ik';
+import { solveTwoBoneElbow, solveTwoBoneElbowInto, type TwoBoneElbowScratch } from './ik';
 import { reloadActionEvents, reloadPoseAt, viewmodelReloadStageAt, type ReloadPose, type WeaponActionEvent } from './weapon-actions';
 import { advanceAdsBlend, advanceWeaponHeat, fireCycleAt } from './weapon-presentation-state';
 import { weaponFamilyPresentation } from './weapon-family-presentation';
@@ -215,9 +215,20 @@ export type WeaponViewmodelGpuPrewarmer = (
   context: WeaponViewmodelGpuPrewarmContext,
 ) => Promise<void>;
 
+export type WeaponViewmodelCatalogGpuPrewarmEntry = Readonly<{
+  weaponId: WeaponId;
+  model: THREE.Object3D;
+}>;
+
+export type WeaponViewmodelCatalogGpuPrewarmer = (
+  entries: readonly WeaponViewmodelCatalogGpuPrewarmEntry[],
+  context: Readonly<{ requestGeneration: number }>,
+) => Promise<void>;
+
 /** Original first-person weapon presentation with ADS, sprint, recoil, melee and staged reload motion. */
 export class WeaponPresentation {
   static readonly MAX_RETAINED_WEBGPU_WEAPONS = RUNTIME_WEAPON_RETENTION_LIMIT;
+  static readonly CATALOG_GPU_MODELS_PER_SUBMISSION = 2;
   readonly root = new THREE.Group();
   private readonly browserRuntime: boolean;
   private readonly models = new Map<WeaponId, THREE.Object3D>();
@@ -248,9 +259,22 @@ export class WeaponPresentation {
   private grenadeStart = 0;
   private readonly muzzleLight: THREE.PointLight;
   private readonly muzzleFlash: THREE.Group;
+  private readonly viewmodelFill: THREE.PointLight;
   private readonly weaponFlashlight: THREE.SpotLight;
   private readonly weaponFlashlightTarget: THREE.Object3D;
   private flashlightGpuPrewarmCount = 0;
+  private lastBrowserCatalogPrewarmProfile: Readonly<{
+    requested: number;
+    newlyCreated: number;
+    assetLoadMs: number;
+    modelCreateMs: number;
+    assetPrepareWallMs: number;
+    gpuPrewarmMs: number;
+    gpuSubmissionBatches: number;
+    cleanupMs: number;
+    totalMs: number;
+    mode: 'catalog-batch' | 'individual-fallback';
+  }> | null = null;
   private readonly casings: ViewCasing[] = [];
   private readonly smokes: ViewSmoke[] = [];
   private readonly smokePositions = new Float32Array(24);
@@ -267,6 +291,34 @@ export class WeaponPresentation {
   private readonly meleeSocketWorld = new THREE.Vector3();
   private authoredArmsRoot: THREE.Group | null = null;
   private riggedArmDiagnostics: Array<Record<string, unknown>> = [];
+  private nextRiggedArmDiagnosticsAt = 0;
+  private readonly riggedArmSolveScratch = {
+    cameraRotation: new THREE.Quaternion(),
+    target: new THREE.Vector3(),
+    shoulderPosition: new THREE.Vector3(),
+    elbowPosition: new THREE.Vector3(),
+    wristPosition: new THREE.Vector3(),
+    bendHint: new THREE.Vector3(),
+    elbowTarget: new THREE.Vector3(),
+    handDirection: new THREE.Vector3(),
+    handTarget: new THREE.Vector3(),
+    solvedWrist: new THREE.Vector3(),
+    diagnosticShoulder: new THREE.Vector3(),
+    diagnosticElbow: new THREE.Vector3(),
+    diagnosticWrist: new THREE.Vector3(),
+    gripEuler: new THREE.Euler(),
+    elbowSolver: {
+      toTarget: new THREE.Vector3(),
+      perpendicular: new THREE.Vector3(),
+      projection: new THREE.Vector3(),
+    } satisfies TwoBoneElbowScratch,
+    orientOrigin: new THREE.Vector3(),
+    orientCurrentDirection: new THREE.Vector3(),
+    orientDesiredDirection: new THREE.Vector3(),
+    orientCurrentWorld: new THREE.Quaternion(),
+    orientDesiredWorld: new THREE.Quaternion(),
+    orientParentWorld: new THREE.Quaternion(),
+  };
   private readonly meleeKnife = new THREE.Group();
   private readonly meleeRig = new THREE.Group();
   private readonly passiveKnife = new THREE.Group();
@@ -302,19 +354,20 @@ export class WeaponPresentation {
     private readonly flattenMaterials = false,
     private readonly retireModel?: (root: THREE.Object3D, afterFence?: () => void) => void,
     private readonly gpuPrewarmer?: WeaponViewmodelGpuPrewarmer,
+    private readonly catalogGpuPrewarmer?: WeaponViewmodelCatalogGpuPrewarmer,
   ) {
     this.browserRuntime = typeof document !== 'undefined';
     this.root.name = 'original-weapon-view';
     this.root.position.set(HIP_VIEWMODEL_POSITION.x, HIP_VIEWMODEL_POSITION.y, HIP_VIEWMODEL_POSITION.z);
     this.root.scale.setScalar(HIP_VIEWMODEL_SCALE);
     camera.add(this.root);
-    const viewmodelFill = new THREE.PointLight(0xe6f2ef, flattenMaterials ? 0 : 1.05, 2.6, 2);
-    viewmodelFill.name = 'first-person-viewmodel-fill';
-    viewmodelFill.position.set(-0.48, 0.72, 0.4);
-    viewmodelFill.castShadow = false;
-    viewmodelFill.userData.presentationOnly = true;
-    this.root.add(viewmodelFill);
-
+    this.viewmodelFill = new THREE.PointLight(0xe6f2ef, 0, 2.6, 2);
+    this.viewmodelFill.name = 'first-person-viewmodel-fill';
+    this.viewmodelFill.position.set(-0.48, 0.72, 0.4);
+    this.viewmodelFill.castShadow = false;
+    this.viewmodelFill.userData.presentationOnly = true;
+    this.viewmodelFill.userData.authoredIntensity = flattenMaterials ? 0 : 1.05;
+    this.root.add(this.viewmodelFill);
     const fabricMaterial = (color: number, roughness: number, repeatX: number, repeatY: number, normalScale: number): THREE.MeshStandardMaterial => {
       if (typeof document === 'undefined') return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0 });
       return texturedMaterial('./assets/original/textures/fabric-weave.png', {
@@ -925,8 +978,22 @@ export class WeaponPresentation {
     ids: readonly WeaponId[],
     onProgress?: (loaded: number, total: number) => void,
   ): Promise<void> {
-    for (const [index, id] of ids.entries()) {
+    const prewarmStartedAt = performance.now();
+    let assetLoadMs = 0;
+    let modelCreateMs = 0;
+    let newlyCreated = 0;
+    const assetPrepareStartedAt = performance.now();
+    const entries: WeaponViewmodelCatalogGpuPrewarmEntry[] = [];
+    // Load then immediately acquire each cache-backed clone. A wider decode
+    // burst can exceed the two-source soft cache before awaiting owners acquire
+    // refs, evicting a just-decoded source. Keep this atomic ownership boundary
+    // serial; native profiling shows GPU preparation, not this subsecond phase,
+    // dominates cold admission.
+    for (const id of ids) {
+      const assetLoadStartedAt = performance.now();
       await loadPass65WeaponPresentation(id, 'first-person');
+      assetLoadMs += performance.now() - assetLoadStartedAt;
+      const modelCreateStartedAt = performance.now();
       let model = this.models.get(id);
       if (!model) {
         const loadedModel = this.createLoadedBrowserWeapon(id);
@@ -937,25 +1004,70 @@ export class WeaponPresentation {
         this.models.set(id, model);
         this.modelLastUsed.set(id, ++this.modelUseCounter);
         this.root.add(model);
+        newlyCreated += 1;
       }
-      const exercisesFlashlightPipeline = WEAPONS[id].flashlight !== null;
-      let flashlightPipelineReady = false;
-      if (exercisesFlashlightPipeline) this.configureWeaponFlashlight(id);
+      entries.push(Object.freeze({ weaponId: id, model }));
+      modelCreateMs += performance.now() - modelCreateStartedAt;
+    }
+    const assetPrepareWallMs = performance.now() - assetPrepareStartedAt;
+
+    const gpuPrewarmStartedAt = performance.now();
+    let gpuSubmissionBatches = 0;
+    if (this.catalogGpuPrewarmer) {
+      // A live switch can already own one candidate's individual prewarm. Let
+      // that exact operation settle before forming the remaining deployment
+      // batch so one model is never staged by two owners concurrently.
+      await Promise.all(entries.flatMap(({ model }) => {
+        const pending = this.gpuPrewarmPromises.get(model);
+        return pending ? [pending] : [];
+      }));
+      const batchEntries = entries.filter(({ model }) => !this.modelIsGpuReady(model));
+      gpuSubmissionBatches = Math.ceil(batchEntries.length / WeaponPresentation.CATALOG_GPU_MODELS_PER_SUBMISSION);
+      const flashlightEntries = batchEntries.filter(({ weaponId }) => WEAPONS[weaponId].flashlight !== null);
+      if (flashlightEntries[0]) this.configureWeaponFlashlight(flashlightEntries[0].weaponId);
       try {
-        await this.prewarmBrowserModel(id, model, this.browserWeaponRequest);
-        flashlightPipelineReady = true;
+        await this.prewarmBrowserCatalogModels(batchEntries, this.browserWeaponRequest);
+        // One shared spotlight topology serves every flashlight-capable
+        // weapon. The batch exercises that renderer pipeline once, so telemetry
+        // counts the real submission exercise rather than the model count.
+        this.flashlightGpuPrewarmCount += Number(flashlightEntries.length > 0);
       } catch (error) {
-        this.retireRejectedBrowserModel(id, model);
+        for (const { weaponId, model } of batchEntries) this.retireRejectedBrowserModel(weaponId, model);
         throw error;
       } finally {
-        if (exercisesFlashlightPipeline) {
-          if (flashlightPipelineReady) this.flashlightGpuPrewarmCount += 1;
-          this.configureWeaponFlashlight(this.active);
-        }
+        if (flashlightEntries.length > 0) this.configureWeaponFlashlight(this.active);
       }
-      this.browserResidentWeaponIds.add(id);
-      onProgress?.(index + 1, ids.length);
+      entries.forEach(({ weaponId }, index) => {
+        this.browserResidentWeaponIds.add(weaponId);
+        onProgress?.(index + 1, ids.length);
+      });
+    } else {
+      gpuSubmissionBatches = entries.reduce(
+        (count, { model }) => count + Number(!this.modelIsGpuReady(model)),
+        0,
+      );
+      for (const [index, { weaponId: id, model }] of entries.entries()) {
+        const exercisesFlashlightPipeline = WEAPONS[id].flashlight !== null;
+        let flashlightPipelineReady = false;
+        if (exercisesFlashlightPipeline) this.configureWeaponFlashlight(id);
+        try {
+          await this.prewarmBrowserModel(id, model, this.browserWeaponRequest);
+          flashlightPipelineReady = true;
+        } catch (error) {
+          this.retireRejectedBrowserModel(id, model);
+          throw error;
+        } finally {
+          if (exercisesFlashlightPipeline) {
+            if (flashlightPipelineReady) this.flashlightGpuPrewarmCount += 1;
+            this.configureWeaponFlashlight(this.active);
+          }
+        }
+        this.browserResidentWeaponIds.add(id);
+        onProgress?.(index + 1, ids.length);
+      }
     }
+    const gpuPrewarmMs = performance.now() - gpuPrewarmStartedAt;
+    const cleanupStartedAt = performance.now();
     const desired = new Set(ids);
     for (const id of [...this.browserResidentWeaponIds]) {
       if (!desired.has(id)) this.browserResidentWeaponIds.delete(id);
@@ -975,10 +1087,59 @@ export class WeaponPresentation {
     for (const [weaponId, model] of this.models) model.visible = weaponId === this.active;
     this.modelLastUsed.set(this.active, ++this.modelUseCounter);
     this.updateActiveSockets(this.active);
+    this.lastBrowserCatalogPrewarmProfile = Object.freeze({
+      requested: ids.length,
+      newlyCreated,
+      assetLoadMs: Number(assetLoadMs.toFixed(3)),
+      modelCreateMs: Number(modelCreateMs.toFixed(3)),
+      assetPrepareWallMs: Number(assetPrepareWallMs.toFixed(3)),
+      gpuPrewarmMs: Number(gpuPrewarmMs.toFixed(3)),
+      gpuSubmissionBatches,
+      cleanupMs: Number((performance.now() - cleanupStartedAt).toFixed(3)),
+      totalMs: Number((performance.now() - prewarmStartedAt).toFixed(3)),
+      mode: this.catalogGpuPrewarmer ? 'catalog-batch' : 'individual-fallback',
+    });
   }
 
   isReady(): boolean {
     return typeof document !== 'undefined' ? this.models.has(this.active) : this.models.size === Object.keys(WEAPONS).length;
+  }
+
+  /** Narrow live-gate health; unlike presentationState(), this never traverses models or measures framing. */
+  browserCatalogHealth(): Readonly<{
+    retainedCount: number;
+    loaded: number;
+    prewarming: boolean;
+    unpreparedSwitches: number;
+    maximumRetained: number;
+  }> {
+    return Object.freeze({
+      retainedCount: this.browserResidentWeaponIds.size,
+      loaded: this.models.size,
+      prewarming: this.browserCatalogPrewarmPromise !== null,
+      unpreparedSwitches: this.unpreparedBrowserSwitches,
+      maximumRetained: WeaponPresentation.MAX_RETAINED_WEBGPU_WEAPONS,
+    });
+  }
+
+  /** Exact catalog readiness for cold admission without full viewmodel framing/traversal telemetry. */
+  browserCatalogReadiness() {
+    return Object.freeze({
+      retained: Object.freeze([...this.browserResidentWeaponIds]),
+      retainedCount: this.browserResidentWeaponIds.size,
+      loaded: this.models.size,
+      gpuReady: [...this.models.values()].reduce(
+        (count, model) => count + Number(this.modelIsGpuReady(model)),
+        0,
+      ),
+      available: Object.keys(WEAPONS).length,
+      prewarming: this.browserCatalogPrewarmPromise !== null,
+      unpreparedSwitches: this.unpreparedBrowserSwitches,
+      lastUnpreparedSwitch: this.lastUnpreparedBrowserSwitch,
+      maximumRetained: WeaponPresentation.MAX_RETAINED_WEBGPU_WEAPONS,
+      flashlightGpuPrewarmCount: this.flashlightGpuPrewarmCount,
+      lastPrewarmProfile: this.lastBrowserCatalogPrewarmProfile,
+    });
   }
 
   private createLoadedBrowserWeapon(id: WeaponId): THREE.Group | null {
@@ -1045,6 +1206,36 @@ export class WeaponPresentation {
     return promise;
   }
 
+  private prewarmBrowserCatalogModels(
+    entries: readonly WeaponViewmodelCatalogGpuPrewarmEntry[],
+    requestGeneration: number,
+  ): Promise<void> {
+    if (entries.length === 0) return Promise.resolve();
+    const promise = Promise.resolve().then(async () => {
+      for (let offset = 0; offset < entries.length; offset += WeaponPresentation.CATALOG_GPU_MODELS_PER_SUBMISSION) {
+        const batch = entries.slice(offset, offset + WeaponPresentation.CATALOG_GPU_MODELS_PER_SUBMISSION);
+        await this.catalogGpuPrewarmer!(batch, { requestGeneration });
+        if (offset + WeaponPresentation.CATALOG_GPU_MODELS_PER_SUBMISSION < entries.length) {
+          // End the current browser task between renderer submissions so the
+          // prerecorded loading/menu video and accessibility UI can present.
+          // One giant 17-model node build created a measured 1.24s long task.
+          await new Promise<void>((resolve) => {
+            if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => resolve());
+            else globalThis.setTimeout(resolve, 0);
+          });
+        }
+      }
+    }).then(() => {
+      for (const { model } of entries) this.gpuReadyModels.add(model);
+    }).finally(() => {
+      for (const { model } of entries) {
+        if (this.gpuPrewarmPromises.get(model) === promise) this.gpuPrewarmPromises.delete(model);
+      }
+    });
+    for (const { model } of entries) this.gpuPrewarmPromises.set(model, promise);
+    return promise;
+  }
+
   private retireRejectedBrowserModel(id: WeaponId, model: THREE.Object3D): void {
     if (this.models.get(id) !== model || this.gpuReadyModels.has(model)) return;
     this.models.delete(id);
@@ -1092,8 +1283,13 @@ export class WeaponPresentation {
   private socketLocalPosition(model: THREE.Object3D, name: string): THREE.Vector3 | null {
     const socket = model.getObjectByName(name);
     if (!socket) return null;
-    this.root.updateMatrixWorld(true);
-    return this.root.worldToLocal(socket.getWorldPosition(new THREE.Vector3()));
+    // getWorldPosition updates only the socket's ancestor chain. Calling
+    // updateMatrixWorld(true) on the shared viewmodel root recursively touched
+    // every descendant of the complete retained weapon catalog on each switch,
+    // even though every sibling model was hidden and unchanged.
+    const worldPosition = socket.getWorldPosition(new THREE.Vector3());
+    this.root.updateWorldMatrix(true, false);
+    return this.root.worldToLocal(worldPosition);
   }
 
   setWeapon(id: WeaponId, immediate = false): void {
@@ -1128,6 +1324,13 @@ export class WeaponPresentation {
       this.ensureBrowserWeapon(id);
     }
     this.configureWeaponFlashlight(id);
+  }
+
+  setPresentationVisible(visible: boolean): void {
+    this.root.visible = visible;
+    this.viewmodelFill.intensity = visible
+      ? Number(this.viewmodelFill.userData.authoredIntensity ?? 0)
+      : 0;
   }
 
   private configureWeaponFlashlight(id: WeaponId): void {
@@ -1459,24 +1662,13 @@ export class WeaponPresentation {
         budgetScope: this.weaponFlashlight.userData.shadowBudgetScope ?? null,
       },
       minigunSpool: { ...this.minigunSpool },
-      browserWeaponCatalog: {
-        retained: [...this.browserResidentWeaponIds],
-        retainedCount: this.browserResidentWeaponIds.size,
-        loaded: this.models.size,
-        gpuReady: [...this.models.values()].filter((entry) => this.modelIsGpuReady(entry)).length,
-        available: Object.keys(WEAPONS).length,
-        prewarming: this.browserCatalogPrewarmPromise !== null,
-        unpreparedSwitches: this.unpreparedBrowserSwitches,
-        lastUnpreparedSwitch: this.lastUnpreparedBrowserSwitch,
-        maximumRetained: WeaponPresentation.MAX_RETAINED_WEBGPU_WEAPONS,
-        flashlightGpuPrewarmCount: this.flashlightGpuPrewarmCount,
-      },
+      browserWeaponCatalog: this.browserCatalogReadiness(),
       importedModel,
     };
   }
 
   private solveArms(arms: THREE.Object3D, activeModel: THREE.Object3D | undefined, reloadPose: ReloadPose): void {
-    if (!activeModel) return;
+    if (!activeModel || this.armRigs.length === 0) return;
     this.root.updateMatrixWorld(true);
     const diagnostics: Array<Record<string, unknown>> = [];
     for (const rig of this.armRigs) {
@@ -1534,14 +1726,17 @@ export class WeaponPresentation {
   }
 
   private orientRiggedBone(bone: THREE.Bone, child: THREE.Bone, targetWorld: THREE.Vector3): void {
+    const scratch = this.riggedArmSolveScratch;
     bone.updateWorldMatrix(true, true);
-    const origin = bone.getWorldPosition(new THREE.Vector3());
-    const currentDirection = child.getWorldPosition(new THREE.Vector3()).sub(origin).normalize();
-    const desiredDirection = targetWorld.clone().sub(origin).normalize();
+    const origin = bone.getWorldPosition(scratch.orientOrigin);
+    const currentDirection = child.getWorldPosition(scratch.orientCurrentDirection).sub(origin).normalize();
+    const desiredDirection = scratch.orientDesiredDirection.copy(targetWorld).sub(origin).normalize();
     if (currentDirection.lengthSq() < 1e-6 || desiredDirection.lengthSq() < 1e-6) return;
-    const currentWorld = bone.getWorldQuaternion(new THREE.Quaternion());
-    const desiredWorld = new THREE.Quaternion().setFromUnitVectors(currentDirection, desiredDirection).multiply(currentWorld);
-    const parentWorld = bone.parent?.getWorldQuaternion(new THREE.Quaternion()) ?? new THREE.Quaternion();
+    const currentWorld = bone.getWorldQuaternion(scratch.orientCurrentWorld);
+    const desiredWorld = scratch.orientDesiredWorld.setFromUnitVectors(currentDirection, desiredDirection).multiply(currentWorld);
+    const parentWorld = bone.parent
+      ? bone.parent.getWorldQuaternion(scratch.orientParentWorld)
+      : scratch.orientParentWorld.identity();
     bone.quaternion.copy(parentWorld.invert().multiply(desiredWorld));
     bone.updateWorldMatrix(false, true);
   }
@@ -1661,41 +1856,56 @@ export class WeaponPresentation {
     this.restoreRiggedArmBindPose();
     if (!activeModel) return;
     this.root.updateMatrixWorld(true);
-    const cameraRotation = this.camera.getWorldQuaternion(new THREE.Quaternion());
-    const diagnostics: Array<Record<string, unknown>> = [];
+    const scratch = this.riggedArmSolveScratch;
+    const cameraRotation = this.camera.getWorldQuaternion(scratch.cameraRotation);
+    const now = performance.now();
+    const captureDiagnostics = now >= this.nextRiggedArmDiagnosticsAt;
+    const diagnostics: Array<Record<string, unknown>> | null = captureDiagnostics ? [] : null;
+    if (captureDiagnostics) this.nextRiggedArmDiagnosticsAt = now + 250;
     for (const rig of this.riggedArmRigs) {
       const socketName = rig.side === 'right' ? 'grip-socket-r' : 'support-socket-l';
       const socket = activeModel.getObjectByName(socketName);
       if (!socket) continue;
-      const target = socket.getWorldPosition(new THREE.Vector3());
+      const target = socket.getWorldPosition(scratch.target);
       if (rig.side === 'left' && reloadPose.handToReload > 0) {
         const reloadSocket = activeModel.getObjectByName('reload-socket-l');
-        if (reloadSocket) target.lerp(reloadSocket.getWorldPosition(new THREE.Vector3()), reloadPose.handToReload);
+        if (reloadSocket) target.lerp(reloadSocket.getWorldPosition(scratch.handTarget), reloadPose.handToReload);
       }
-      const shoulderPosition = rig.shoulder.getWorldPosition(new THREE.Vector3());
-      const elbowPosition = rig.elbow.getWorldPosition(new THREE.Vector3());
-      const wristPosition = rig.wrist.getWorldPosition(new THREE.Vector3());
+      const shoulderPosition = rig.shoulder.getWorldPosition(scratch.shoulderPosition);
+      const elbowPosition = rig.elbow.getWorldPosition(scratch.elbowPosition);
+      const wristPosition = rig.wrist.getWorldPosition(scratch.wristPosition);
       const upperLength = shoulderPosition.distanceTo(elbowPosition);
       const lowerLength = elbowPosition.distanceTo(wristPosition);
-      const bendHint = new THREE.Vector3(rig.side === 'left' ? -0.7 : 0.7, -1, 0.25).applyQuaternion(cameraRotation);
-      const elbowTarget = solveTwoBoneElbow(shoulderPosition, target, upperLength, lowerLength, bendHint);
+      const bendHint = scratch.bendHint.set(rig.side === 'left' ? -0.7 : 0.7, -1, 0.25).applyQuaternion(cameraRotation);
+      const elbowTarget = solveTwoBoneElbowInto(
+        shoulderPosition,
+        target,
+        upperLength,
+        lowerLength,
+        bendHint,
+        scratch.elbowTarget,
+        scratch.elbowSolver,
+      );
       this.orientRiggedBone(rig.shoulder, rig.elbow, elbowTarget);
       this.orientRiggedBone(rig.elbow, rig.wrist, target);
-      const handDirection = new THREE.Vector3(
+      const handDirection = scratch.handDirection.set(
         rig.side === 'left' ? 0.55 : 0.12,
         -1,
         rig.side === 'left' ? -0.15 : 0.08,
       ).normalize();
       const gripRotation = WEAPON_HAND_ROTATIONS[this.active][rig.side];
-      handDirection.applyEuler(new THREE.Euler(
+      scratch.gripEuler.set(
         gripRotation[0] * 0.24,
         gripRotation[1] * 0.24,
         gripRotation[2] * 0.24,
         'XYZ',
-      )).applyQuaternion(cameraRotation);
-      this.orientRiggedBone(rig.wrist, rig.finger, rig.wrist.getWorldPosition(new THREE.Vector3()).add(handDirection));
-      const solvedWrist = rig.wrist.getWorldPosition(new THREE.Vector3());
+      );
+      handDirection.applyEuler(scratch.gripEuler).applyQuaternion(cameraRotation);
+      const handTarget = rig.wrist.getWorldPosition(scratch.handTarget).add(handDirection);
+      this.orientRiggedBone(rig.wrist, rig.finger, handTarget);
+      const solvedWrist = rig.wrist.getWorldPosition(scratch.solvedWrist);
       const reachRatio = shoulderPosition.distanceTo(target) / Math.max(upperLength + lowerLength, 1e-6);
+      if (!diagnostics) continue;
       diagnostics.push({
         side: rig.side,
         weapon: this.active,
@@ -1703,9 +1913,9 @@ export class WeaponPresentation {
         socket: socketName,
         upperLength,
         lowerLength,
-        shoulder: rig.shoulder.getWorldPosition(new THREE.Vector3()).toArray(),
-        elbow: rig.elbow.getWorldPosition(new THREE.Vector3()).toArray(),
-        wrist: rig.wrist.getWorldPosition(new THREE.Vector3()).toArray(),
+        shoulder: rig.shoulder.getWorldPosition(scratch.diagnosticShoulder).toArray(),
+        elbow: rig.elbow.getWorldPosition(scratch.diagnosticElbow).toArray(),
+        wrist: rig.wrist.getWorldPosition(scratch.diagnosticWrist).toArray(),
         target: target.toArray(),
         contactError: solvedWrist.distanceTo(target),
         reachRatio,
@@ -1716,7 +1926,7 @@ export class WeaponPresentation {
         elbowQuaternion: rig.elbow.quaternion.toArray(),
       });
     }
-    this.riggedArmDiagnostics = diagnostics;
+    if (diagnostics) this.riggedArmDiagnostics = diagnostics;
   }
 
   update(pose: WeaponPose): WeaponActionEvent[] {

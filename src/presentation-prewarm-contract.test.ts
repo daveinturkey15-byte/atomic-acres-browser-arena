@@ -38,6 +38,7 @@ describe('presentation prewarm startup contract', () => {
       source.indexOf('function bootstrapMenuPreview()'),
     );
     const menuBootstrap = source.slice(source.indexOf('function bootstrapMenuPreview()'), source.indexOf('bootstrapMenuPreview();'));
+    const menuReturn = source.slice(source.indexOf('function returnToMainMenu()'), source.indexOf('resumeButton.addEventListener'));
     const arenaDeployment = source.slice(
       source.indexOf('async function performArenaSelection('),
       source.indexOf('function activateArenaSelection('),
@@ -107,7 +108,24 @@ describe('presentation prewarm startup contract', () => {
       .toBeLessThan(arenaDeployment.indexOf('await prewarmArenaBoundGameplayPresentations(arenaTransitionGeneration);'));
     expect(source).toContain("bootstrapStage = 'prewarming-overdrive'");
     expect(menuBootstrap).toContain("document.documentElement.dataset.gameplayArena = 'deferred-until-deployment'");
-    expect(arenaDeployment).toContain("await prepareSharedGameplayAssets()");
+    expect(arenaDeployment).toContain('await prepareMenuDeploymentAssets()');
+    expect(sharedAssets).toContain('weaponView.prewarmBrowserWeaponCatalog(WEAPON_IDS)');
+    expect(sharedAssets).toContain('prewarmPass65RuntimeWeaponCorpus()');
+    expect(menuBootstrap).toContain('void prepareMenuDeploymentAssets().then(() => {');
+    expect(menuBootstrap).toContain('arenaSelectionReady = true;');
+    expect(menuReturn).toContain('arenaSelectionReady = true;');
+    expect(menuReturn).toContain('void prepareMenuDeploymentAssets().catch(showFatalError);');
+    expect(menuBootstrap).toContain("bootstrapStage = 'ready';");
+    expect(sharedAssets).toContain("await runPhase('shared-assets'");
+    expect(sharedAssets).toContain("await runPhase('first-person-catalog'");
+    expect(sharedAssets).toContain("await runPhase('world-drop-corpus'");
+    expect(source).toContain('menuDeploymentAssetsProfile: lastMenuDeploymentAssetsProfile');
+    expect(arenaPresentationPrewarm).toContain("await runGroup('tracers-impacts'");
+    expect(arenaPresentationPrewarm).toContain("await runGroup('death-drops'");
+    expect(arenaPresentationPrewarm).toContain("await runGroup('world-ordnance'");
+    expect(arenaPresentationPrewarm).not.toContain("runGroup('world-drops-ordnance'");
+    expect(arenaPresentationPrewarm).toContain("await runGroup('killstreak-vocabulary'");
+    expect(arenaPresentationPrewarm).toContain('await yieldDeploymentPrewarmFrame();');
     expect(matchDeployment).toContain('await killstreakPresentation.prewarm(renderRuntime, camera, -killstreakMatchEpoch);');
     expect(matchDeployment).toContain('await smokeVolumePresentationPool.prewarm(renderRuntime, camera, -killstreakMatchEpoch);');
     expect(matchDeployment).toContain('await prewarmExplosiveBoltPresentation(-killstreakMatchEpoch);');
@@ -143,6 +161,7 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('await flushWebGpuFrames(12_000)');
     expect(source).toContain('const requiredConsecutiveHealthySamples = 3;');
     expect(source).toContain('const requiredConsecutiveMinimumTierSlowSamples = 3;');
+    expect(source).toContain('if (!isSharedMeshGeometry(geometry)) geometry.dispose();');
     expect(source).toContain('if (consecutiveMinimumTierSlowSamples < requiredConsecutiveMinimumTierSlowSamples) continue;');
     expect(source).toContain('WebGPU queue latency remained ${Math.round(completionLatencyMs)}ms for ${consecutiveMinimumTierSlowSamples} consecutive samples at the minimum quality tier');
     expect(source).toContain('adaptiveQuality.forceDownshift(');
@@ -177,7 +196,9 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain("buildOperator(botTeam, 'bot-operator', renderProfile !== 'blender', weapon, 'neon-purple')");
     expect(source).toContain('const streamedWeaponGpuPrewarmer: WeaponViewmodelGpuPrewarmer | undefined');
     expect(source).toContain('streamedWeaponGpuPrewarmQueue.run(() => runStreamedWeaponGpuPrewarm(model, context))');
-    expect(source).toContain('revealAncestors();');
+    expect(source).toContain('const streamedWeaponCatalogGpuPrewarmer: WeaponViewmodelCatalogGpuPrewarmer | undefined');
+    expect(source).toContain('streamedWeaponGpuPrewarmQueue.run(() => runStreamedWeaponCatalogGpuPrewarm(entries, context))');
+    expect(source).toContain('revealAncestors(model);');
     expect(source).toContain('for (const [ancestor, visible] of ancestorVisibility) ancestor.visible = visible;');
     const weaponPrewarm = source.slice(
       source.indexOf('const runStreamedWeaponGpuPrewarm:'),
@@ -185,12 +206,38 @@ describe('presentation prewarm startup contract', () => {
     );
     expect(weaponPrewarm).not.toContain('renderRuntime.compile(');
     expect(weaponPrewarm).not.toContain('multiplyScalar(0.0001)');
-    expect(source).toContain('await renderRuntime.compileAndRender(model, camera, scene);');
+    expect(source).toContain('await renderRuntime.compileAndRender(priorStates[0].model, camera, scene);');
     expect(source).toContain('streamedWeaponGpuPrewarmer,');
-    expect(menuLoadoutApply).toContain('weaponView.prewarmBrowserWeaponCatalog(menuWeaponPrewarmCatalog(selection.primary, selection.secondary))');
+    expect(source).toContain('streamedWeaponCatalogGpuPrewarmer,');
+    expect(menuLoadoutApply).toContain('const retainedCatalog = menuDeploymentAssetsPromise');
+    expect(menuLoadoutApply).toContain('weaponView.prewarmBrowserWeaponCatalog(retainedCatalog)');
     expect(menuLoadoutApply.indexOf('prewarmBrowserWeaponCatalog'))
       .toBeLessThan(menuLoadoutApply.indexOf('weaponView.setWeapon(selectedWeapon, true)'));
     expect(source).toContain("bootstrapStage = 'ready'");
+  });
+
+  it('yields cold pool construction, vocabulary state walks and fenced retirement cleanup', () => {
+    const grenadeSource = readFileSync(new URL('./grenade-presentation.ts', import.meta.url), 'utf8');
+    const killstreakSource = readFileSync(new URL('./killstreak-presentation.ts', import.meta.url), 'utf8');
+    const operatorSource = readFileSync(new URL('./operator-model.ts', import.meta.url), 'utf8');
+    const runtimeSource = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+    const retirementDrain = runtimeSource.slice(
+      runtimeSource.indexOf('async function drainDeferredGpuRetirements()'),
+      runtimeSource.indexOf('function scheduleDeferredGpuRetirement('),
+    );
+
+    expect(grenadeSource).toContain('GRENADE_WORLD_PRESENTATION_BUILD_BATCH_SIZE = 2');
+    expect(grenadeSource).toContain('await this.ensureInitializedBatched();');
+    expect(grenadeSource).toContain('built % GRENADE_WORLD_PRESENTATION_BUILD_BATCH_SIZE === 0');
+    expect(killstreakSource).toContain('PREWARM_STATE_ROOTS_PER_TASK = 4');
+    expect(killstreakSource).toContain('await yieldPresentationCpuTask();');
+    expect(killstreakSource.match(/await yieldPresentationPreparation\(\);/g)?.length ?? 0).toBeGreaterThan(4);
+    expect(operatorSource).toContain('RIGGED_OPERATOR_ACTIONS_PER_TASK = 2');
+    expect(operatorSource).toContain('performRiggedOperatorActionPrewarm(runtimeState, actionNames)');
+    expect(operatorSource).not.toContain('for (const clip of operatorAsset.clips) actions.set');
+    expect(runtimeSource.match(/await prewarmRiggedOperatorActions\(/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
+    expect(retirementDrain).toContain('for (const [retirementIndex, retirement] of batch.entries())');
+    expect(retirementDrain).toContain('await yieldDeferredGpuRetirementTask();');
   });
 
   it('runs the shed reset probe only across the final two RustRig visits and gates continuous GPU progress', () => {
@@ -230,6 +277,10 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('liveLongTaskEvidence.entries.length < maximumLongTaskEntries');
     expect(source).toContain('maximumLongTaskEntries: maximumLiveLongTaskEntries');
     expect(source).toContain('recordEntries(longTaskSample.observer.takeRecords())');
+    expect(source).toContain('sample.liveLongTasks.count !== 0');
+    expect(source).toContain('sample.verifierBoundaryOwnWorkMs >= maximumVerifierOwnedTaskMs');
+    expect(source).toContain('const verifierBoundaryAudit = auditVerifierBoundaryOwnWork(samples);');
+    expect(source).toContain('if (!verifierBoundaryAudit.pass)');
     expect(source).toContain('verifierCaptureRecovery: summarizeCaptureRecovery(capture.recovery)');
     expect(source).toContain("const skipDiagnosticCapture = process.env.PASS65_DIAGNOSTIC_SKIP_CAPTURE === '1';");
     expect(source).toContain('const captureEnabled = !diagnosticMode || !skipDiagnosticCapture;');
@@ -252,6 +303,73 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('lastCompletedVisualEvidence,\n    error:');
   });
 
+  it('exercises every HF-138 support and lifecycle workflow through production paths', () => {
+    const verifierSource = readFileSync(new URL('../scripts/qa/verify-pass65-webgpu-endurance.mjs', import.meta.url), 'utf8');
+    const runtimeSource = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+    const pilotWorkflow = verifierSource.slice(
+      verifierSource.indexOf('async function runPilotedDroneWorkflow('),
+      verifierSource.indexOf('async function runCarpetBomberWorkflow('),
+    );
+    const carpetWorkflow = verifierSource.slice(
+      verifierSource.indexOf('async function runCarpetBomberWorkflow('),
+      verifierSource.indexOf('async function runLifecycleRecoveryProbe('),
+    );
+    const lifecycleWorkflow = verifierSource.slice(
+      verifierSource.indexOf('async function runLifecycleRecoveryProbe('),
+      verifierSource.indexOf('await mkdir(artifactRoot'),
+    );
+    const doorProbe = verifierSource.slice(
+      verifierSource.indexOf('if (visit === doorResetProbeDetachVisit)'),
+      verifierSource.indexOf('} else if (visit === doorResetProbeRestoreVisit)'),
+    );
+    const grenadeShedHook = runtimeSource.slice(
+      runtimeSource.indexOf('detonateGrenadeAtShed: (placementId, surfaceId'),
+      runtimeSource.indexOf('\n\n};', runtimeSource.indexOf('detonateGrenadeAtShed: (placementId, surfaceId')),
+    );
+
+    expect(verifierSource).toContain("slots: ['scout-sweep', 'piloted-drone', 'carpet-bomber', 'chopper', 'drone-swarm']");
+    expect(pilotWorkflow).toContain("api.activateSupport('piloted-drone')");
+    expect(pilotWorkflow).toContain("api.togglePilotedDroneControl(activated.id)");
+    for (const [code, axis] of [
+      ['KeyW', 'forward'], ['KeyS', 'backward'], ['KeyD', 'right'],
+      ['KeyA', 'left'], ['Space', 'up'], ['ControlLeft', 'down'],
+    ]) {
+      expect(pilotWorkflow).toContain(`controls.push(await phase('${code}', '${axis}'`);
+    }
+    expect(pilotWorkflow).toContain('api.setTriggerHeld(true)');
+    expect(pilotWorkflow).toContain('result.firedRounds < 1');
+    expect(pilotWorkflow).toContain('result.autonomousDisplacementM <= 0.02');
+
+    expect(carpetWorkflow).toContain("api.activateSupport('carpet-bomber')");
+    expect(carpetWorkflow).toContain("new KeyboardEvent('keydown', { code: 'KeyF'");
+    expect(carpetWorkflow).toContain("marker.shape === 'ground-x'");
+    expect(carpetWorkflow).toContain("marker.shape === 'corridor'");
+    expect(carpetWorkflow).toContain("entity.kind === 'aircraft'");
+    expect(carpetWorkflow).toContain("entity.id.includes('carpet-aircraft')");
+    expect(carpetWorkflow).toContain('result.aircraft.displacementM <= 0.1');
+    expect(carpetWorkflow).toContain("}, 'authored shell drop');");
+    expect(carpetWorkflow).toContain("}, 'flight and first impact');");
+    expect(carpetWorkflow).toContain('result.impactPresentation.droppedBombShells <= result.impactPresentation.baselineBombShells');
+    expect(carpetWorkflow).toContain('result.impactPresentation.impactFlashes <= result.impactPresentation.baselineImpactFlashes');
+
+    expect(verifierSource).toContain('const requiredLifecycleRecoveryCyclesPerVisit = 2;');
+    expect(lifecycleWorkflow).toContain('await coverPage.bringToFront();');
+    expect(lifecycleWorkflow).toContain("entry.type === 'visibilitychange' && entry.visibilityState === 'hidden'");
+    expect(lifecycleWorkflow).toContain("entry.type === 'visibilitychange' && entry.visibilityState === 'visible'");
+    expect(lifecycleWorkflow).toContain("['tab visibility regained', 'window focus regained']");
+
+    expect(doorProbe).toContain("api.detonateGrenadeAtShed(shed.placementId, 'door-south')");
+    expect(doorProbe).not.toContain('api.damageShed(');
+    expect(grenadeShedHook).toContain('spawnGrenadeExplosionVisual(point, detonatedAt);');
+    expect(grenadeShedHook).toContain('breakWindowsInGrenadeBlast(point, randomNonce(), true, GRENADE_RADIUS);');
+    expect(grenadeShedHook).toContain('applyInteractiveWorldExplosion(point, GRENADE_RADIUS, 100);');
+
+    expect(verifierSource).toContain('pilotedDroneProbe,\n      carpetBomberProbe,\n      lifecycleRecoveryProbe,');
+    expect(verifierSource).toContain('frameTail: samples.slice(-5)');
+    expect(verifierSource).toContain('deviceErrorTelemetry: {');
+    expect(verifierSource).toContain("deviceErrorTelemetry.actualBackend !== 'webgpu'");
+  });
+
   it('keeps the complete live tour separate and immutable before the global visual tour', () => {
     const source = readFileSync(new URL('../scripts/qa/verify-pass65-webgpu-endurance.mjs', import.meta.url), 'utf8');
     const liveTour = source.slice(
@@ -269,6 +387,9 @@ describe('presentation prewarm startup contract', () => {
     expect(liveLoop).not.toContain('page.screenshot');
     expect(liveLoop).not.toContain('captureCanvasOnly');
     expect(liveLoop).not.toContain('pauseAndDrainPresentation');
+    expect(liveLoop).not.toContain('api.snapshot()');
+    expect(liveLoop).not.toContain('api.sampleRendererResidency()');
+    expect(liveLoop).toContain('api.sampleEnduranceHealth()');
     expect(liveLoop).toContain('api.resetPresentationProgressWindow();');
     expect(liveLoop).toContain('presentation.progress.maximumSubmissionGapMs > maximumLiveSubmissionGapMs');
     expect(liveLoop).toContain('presentation.progress.maximumCompletionGapMs > maximumLiveCompletionGapMs');
@@ -276,6 +397,8 @@ describe('presentation prewarm startup contract', () => {
     expect(liveLoop).toContain('requireDrained: false');
     expect(liveLoop).toContain('measuredLiveDurationMs += elapsedMs;');
     expect(liveLoop).toContain('samples.push(receipt);');
+    expect(liveLoop).toContain('verifierBoundaryOwnWorkSubstages');
+    expect(liveLoop).toContain('sample.liveLongTasks.count !== 0');
 
     const liveGateIndex = source.indexOf('if (samples.length < 5 || measuredLiveDurationMs < durationMs)');
     const finalDrainIndex = source.indexOf('const finalLiveHeldFrontier = summarizeHeldFrontier');
@@ -330,11 +453,55 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('if (captureEnabled && visualPhaseStarted) {');
   });
 
+  it('keeps continuous endurance telemetry allocation-light and isolates full audits behind pauses', () => {
+    const runtimeSource = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+    const enduranceHealth = runtimeSource.slice(
+      runtimeSource.indexOf('function sampleEnduranceHealth()'),
+      runtimeSource.indexOf('const debugWindow = window'),
+    );
+    expect(enduranceHealth).toContain('renderRuntime.healthTelemetry()');
+    expect(enduranceHealth).toContain('weaponView.browserCatalogHealth()');
+    expect(enduranceHealth).not.toContain('snapshot()');
+    expect(enduranceHealth).not.toContain('estimateRendererResidency');
+    expect(enduranceHealth).not.toContain('presentationState()');
+    expect(enduranceHealth).not.toContain('.traverse(');
+    expect(runtimeSource).toContain('sampleEnduranceHealth: () => ReturnType<typeof sampleEnduranceHealth>;');
+    expect(runtimeSource).toContain('sampleWeaponCatalogReadiness: () => weaponView.browserCatalogReadiness()');
+
+    const verifierSource = readFileSync(new URL('../scripts/qa/verify-pass65-webgpu-endurance.mjs', import.meta.url), 'utf8');
+    const admissionAudit = verifierSource.indexOf('const arenaAdmissionAudit = await page.evaluate');
+    const admissionPause = verifierSource.lastIndexOf('await pauseAndDrainPresentation(page);', admissionAudit);
+    expect(admissionPause).toBeGreaterThan(0);
+    expect(admissionPause).toBeLessThan(admissionAudit);
+    const liveLoop = verifierSource.slice(
+      verifierSource.indexOf('while (measuredLiveDurationMs < durationMs) {'),
+      verifierSource.indexOf('if (samples.length < 5 || measuredLiveDurationMs < durationMs)'),
+    );
+    expect(liveLoop).not.toContain('.snapshot()');
+    expect(liveLoop).not.toContain('sampleRendererResidency');
+    expect(verifierSource).toContain('api.setRenderPaused(true);\n      return {\n        state: api.snapshot(),\n        residency: api.sampleRendererResidency(),');
+  });
+
   it('rejects degraded foreground cadence in the cold physical-menu gate', () => {
     const source = readFileSync(new URL('../scripts/qa/verify-pass65-cold-webgpu-admission.mjs', import.meta.url), 'utf8');
     expect(source).toContain("state.bootstrap.stage === 'failed'");
     expect(source).toContain('after.bootstrap.matchAdmissionCadence.admittedDegraded !== false');
     expect(source).toContain("after.bootstrap.matchAdmissionCadence.visibilityState !== 'visible'");
+    expect(source).toContain('const maximumColdTransitionMs = 10_000;');
+    expect(source).toContain('const maximumMenuDeploymentPrewarmMs = 10_000;');
+    expect(source).toContain('const maximumPreparedSwitchFrameMs = 50;');
+    expect(source).toContain("phaseDuration('weapon-catalog-prewarm')");
+    expect(source).toContain("phaseDuration('prewarm-batched-effects')");
+    expect(source).toContain("new PerformanceObserver((list) => {");
+    expect(source).toContain(".observe({ type: 'longtask', buffered: true });");
+    expect(source).toContain('menuPrewarmLongTasks.length > 0');
+    expect(source).toContain('admissionLongTasks.length > 0');
+    expect(source).toContain('postCorpusPrewarmLoads.length > 0');
+    expect(source).toContain("menuPhaseDuration('first-person-catalog') > maximumWeaponCatalogPrewarmMs");
+    expect(source).toContain('coldPreparationWorkMs > maximumColdTransitionMs');
+    expect(source).toContain('menuInteractionAudit.mapButtonsEnabled');
+    expect(source).toContain("earlyDeploymentAudit.lifecycle !== 'deploying'");
+    expect(source).toContain('firstSwitchAudit.before.gpuReady !== firstSwitchAudit.before.available');
   });
 
   it('adds the four readiness terms and bootstrap stage to timeout evidence', () => {

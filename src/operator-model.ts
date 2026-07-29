@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
-import { cloneMeshGeometriesForOwner } from './gpu-resource-ownership';
+import { markMeshGeometriesShared } from './gpu-resource-ownership';
 import type { Team } from './protocol';
 import { objectLocalGeometryBounds } from './character-presentation-contract';
 import { solveTwoBoneElbow } from './ik';
@@ -76,6 +76,7 @@ export function firstPersonArmRuntimeClip(clip: THREE.AnimationClip): THREE.Anim
 
 type RiggedOperatorRuntime = {
   mixer: THREE.AnimationMixer;
+  clips: Map<string, THREE.AnimationClip>;
   actions: Map<string, THREE.AnimationAction>;
   currentBase: string;
   lastUpdatedAt: number;
@@ -105,6 +106,37 @@ type RiggedOperatorRuntime = {
     quaternion: THREE.Quaternion;
   }>;
 };
+
+/**
+ * Only clips reachable from the live operator controller belong in the runtime
+ * mixer. The source GLB deliberately retains the complete authored animation
+ * library for offline review, but binding every track of every unused clip at
+ * spawn time creates a multi-hundred-millisecond main-thread task.
+ */
+export const RIGGED_OPERATOR_RUNTIME_ACTION_NAMES = Object.freeze([
+  'Idle_Gun_Pointing',
+  'Idle_Gun',
+  'Idle_Gun_Shoot',
+  'Walk',
+  'Run_Shoot',
+  'Run',
+  'Gun_Shoot',
+  'HitRecieve_2',
+  'HitRecieve',
+  'Death',
+  'Punch_Right',
+  'Kick_Right',
+] as const);
+
+export const RIGGED_OPERATOR_CORPSE_ACTION_NAMES = Object.freeze(['Death'] as const);
+
+export function riggedOperatorRuntimeClips(clips: readonly THREE.AnimationClip[]): THREE.AnimationClip[] {
+  const clipsByName = new Map(clips.map((clip) => [clip.name, clip]));
+  return RIGGED_OPERATOR_RUNTIME_ACTION_NAMES.flatMap((name) => {
+    const clip = clipsByName.get(name);
+    return clip ? [clip] : [];
+  });
+}
 
 export type RiggedOperatorInstance = {
   root: THREE.Group;
@@ -308,6 +340,33 @@ function materialForTeam(
     result.metalness = 0;
   }
   return result;
+}
+
+/**
+ * One operator owns one mutable material set, but meshes inside that operator
+ * which referenced the same authored source material should continue sharing a
+ * single clone. Cloning per mesh multiplied material objects during every bot
+ * and corpse build, while sharing across operators would make independent
+ * fenced retirement unsafe.
+ */
+export function createOperatorInstanceMaterialResolver(
+  team: Team,
+  flattenMaterials: boolean,
+  appearance: OperatorAppearance = 'team',
+): (material: THREE.Material) => THREE.Material {
+  const instanceMaterials = new Map<THREE.Material, THREE.Material>();
+  return (material: THREE.Material): THREE.Material => {
+    const existing = instanceMaterials.get(material);
+    if (existing) return existing;
+    const result = materialForTeam(material, team, flattenMaterials, appearance);
+    result.transparent = false;
+    result.opacity = 1;
+    result.depthWrite = true;
+    result.depthTest = true;
+    result.alphaTest = 0;
+    instanceMaterials.set(material, result);
+    return result;
+  };
 }
 
 function materialForFirstPerson(material: THREE.Material, flattenMaterials: boolean): THREE.Material {
@@ -549,7 +608,43 @@ function runtime(root: THREE.Object3D): RiggedOperatorRuntime | undefined {
 }
 
 function actionFor(runtimeState: RiggedOperatorRuntime, name: string): THREE.AnimationAction | undefined {
-  return runtimeState.actions.get(name);
+  const existing = runtimeState.actions.get(name);
+  if (existing) return existing;
+  const clip = runtimeState.clips.get(name);
+  if (!clip) return undefined;
+  const action = runtimeState.mixer.clipAction(clip);
+  runtimeState.actions.set(name, action);
+  return action;
+}
+
+const RIGGED_OPERATOR_ACTIONS_PER_TASK = 2;
+
+async function performRiggedOperatorActionPrewarm(
+  runtimeState: RiggedOperatorRuntime,
+  actionNames: readonly string[],
+): Promise<number> {
+  let bound = 0;
+  for (let index = 0; index < actionNames.length; index += 1) {
+    const name = actionNames[index]!;
+    const existed = runtimeState.actions.has(name);
+    if (actionFor(runtimeState, name) && !existed) bound += 1;
+    if (typeof document !== 'undefined'
+      && (index + 1) % RIGGED_OPERATOR_ACTIONS_PER_TASK === 0
+      && index + 1 < actionNames.length) {
+      await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 0));
+    }
+  }
+  return bound;
+}
+
+/** Binds requested live animation actions in short CPU tasks before admission. */
+export function prewarmRiggedOperatorActions(
+  root: THREE.Object3D,
+  actionNames: readonly string[] = RIGGED_OPERATOR_RUNTIME_ACTION_NAMES,
+): Promise<number> {
+  const runtimeState = runtime(root);
+  if (!runtimeState) return Promise.resolve(0);
+  return performRiggedOperatorActionPrewarm(runtimeState, actionNames);
 }
 
 function switchBaseAction(runtimeState: RiggedOperatorRuntime, name: string): void {
@@ -593,25 +688,21 @@ export function createRiggedOperator(
   // network yaw and authoritative hit proxies keep their established axes.
   visual.rotation.y = Math.PI;
   const embeddedWeaponsSuppressed = suppressEmbeddedWeaponObjects(visual);
+  const prepareMaterial = createOperatorInstanceMaterialResolver(team, flattenMaterials, appearance);
   visual.traverse((node) => {
     if (!(node instanceof THREE.Mesh)) return;
     node.castShadow = !flattenMaterials;
     node.receiveShadow = !flattenMaterials;
     node.userData.presentationOnly = true;
     node.raycast = () => undefined;
-    const prepare = (material: THREE.Material) => {
-      const result = materialForTeam(material, team, flattenMaterials, appearance);
-      result.transparent = false;
-      result.opacity = 1;
-      result.depthWrite = true;
-      result.depthTest = true;
-      result.alphaTest = 0;
-      return result;
-    };
-    if (Array.isArray(node.material)) node.material = node.material.map(prepare);
-    else node.material = prepare(node.material);
+    if (Array.isArray(node.material)) node.material = node.material.map(prepareMaterial);
+    else node.material = prepareMaterial(node.material);
   });
-  cloneMeshGeometriesForOwner(visual, 'operator-instance');
+  // SkeletonUtils already creates independent bones and SkinnedMesh objects.
+  // Their immutable vertex/index buffers can remain shared with the retained
+  // operator source; selective fenced retirement disposes per-instance team
+  // materials without copying or invalidating these multi-megabyte buffers.
+  markMeshGeometriesShared(visual, 'rigged-operator-source');
   const stancePivot = new THREE.Group();
   stancePivot.name = 'operator-stance-pivot';
   stancePivot.position.y = STANCE_PIVOT_HEIGHT;
@@ -625,10 +716,15 @@ export function createRiggedOperator(
   root.add(weaponSocket);
 
   const mixer = new THREE.AnimationMixer(visual);
+  const clips = new Map(riggedOperatorRuntimeClips(operatorAsset.clips).map((clip) => [clip.name, clip]));
   const actions = new Map<string, THREE.AnimationAction>();
-  for (const clip of operatorAsset.clips) actions.set(clip.name, mixer.clipAction(clip));
-  const base = actions.has('Idle_Gun_Pointing') ? 'Idle_Gun_Pointing' : actions.has('Idle_Gun') ? 'Idle_Gun' : 'Idle_Gun_Shoot';
-  actions.get(base)?.setLoop(THREE.LoopRepeat, Infinity).play();
+  const base = clips.has('Idle_Gun_Pointing') ? 'Idle_Gun_Pointing' : clips.has('Idle_Gun') ? 'Idle_Gun' : 'Idle_Gun_Shoot';
+  const baseClip = clips.get(base);
+  if (baseClip) {
+    const baseAction = mixer.clipAction(baseClip);
+    actions.set(base, baseAction);
+    baseAction.setLoop(THREE.LoopRepeat, Infinity).play();
+  }
   const poseBone = (...names: string[]): THREE.Bone | undefined => {
     for (const candidate of names) {
       const node = visual.getObjectByName(candidate);
@@ -638,6 +734,7 @@ export function createRiggedOperator(
   };
   root.userData.riggedOperatorRuntime = {
     mixer,
+    clips,
     actions,
     currentBase: base,
     lastUpdatedAt: performance.now(),
@@ -696,7 +793,7 @@ export function updateRiggedOperator(root: THREE.Object3D, speed: number, stance
   const next = stance !== 'stand'
     ? 'Idle_Gun_Pointing'
     : speed > 3.2 ? 'Run_Shoot' : speed > 0.18 ? 'Walk' : 'Idle_Gun_Pointing';
-  switchBaseAction(runtimeState, runtimeState.actions.has(next) ? next : speed > 0.18 ? 'Run' : 'Idle_Gun');
+  switchBaseAction(runtimeState, runtimeState.clips.has(next) ? next : speed > 0.18 ? 'Run' : 'Idle_Gun');
   runtimeState.mixer.update(dt);
   runtimeState.poseBeforeStance = Object.values(runtimeState.poseBones)
     .filter((bone): bone is THREE.Bone => bone instanceof THREE.Bone)
@@ -712,20 +809,20 @@ export function updateRiggedOperator(root: THREE.Object3D, speed: number, stance
 export function fireRiggedOperator(root: THREE.Object3D): boolean {
   const runtimeState = runtime(root);
   if (!runtimeState) return false;
-  playOneShot(runtimeState, runtimeState.actions.has('Gun_Shoot') ? 'Gun_Shoot' : 'Idle_Gun_Shoot', 1.35);
+  playOneShot(runtimeState, runtimeState.clips.has('Gun_Shoot') ? 'Gun_Shoot' : 'Idle_Gun_Shoot', 1.35);
   return true;
 }
 
 export function reactRiggedOperator(root: THREE.Object3D, alternate = false): boolean {
   const runtimeState = runtime(root);
   if (!runtimeState) return false;
-  playOneShot(runtimeState, alternate && runtimeState.actions.has('HitRecieve_2') ? 'HitRecieve_2' : 'HitRecieve', 1.15);
+  playOneShot(runtimeState, alternate && runtimeState.clips.has('HitRecieve_2') ? 'HitRecieve_2' : 'HitRecieve', 1.15);
   return true;
 }
 
 export function deathRiggedOperator(root: THREE.Object3D): boolean {
   const runtimeState = runtime(root);
-  if (!runtimeState || !runtimeState.actions.has('Death')) return false;
+  if (!runtimeState || !runtimeState.clips.has('Death')) return false;
   for (const action of runtimeState.actions.values()) action.fadeOut(0.04);
   playOneShot(runtimeState, 'Death', 1.08);
   runtimeState.currentBase = 'Death';
@@ -736,10 +833,10 @@ export function resetRiggedOperator(root: THREE.Object3D): boolean {
   const runtimeState = runtime(root);
   if (!runtimeState) return false;
   for (const action of runtimeState.actions.values()) action.stop();
-  const base = runtimeState.actions.has('Idle_Gun_Pointing')
+  const base = runtimeState.clips.has('Idle_Gun_Pointing')
     ? 'Idle_Gun_Pointing'
-    : runtimeState.actions.has('Idle_Gun') ? 'Idle_Gun' : 'Idle_Gun_Shoot';
-  runtimeState.actions.get(base)?.reset().setLoop(THREE.LoopRepeat, Infinity).play();
+    : runtimeState.clips.has('Idle_Gun') ? 'Idle_Gun' : 'Idle_Gun_Shoot';
+  actionFor(runtimeState, base)?.reset().setLoop(THREE.LoopRepeat, Infinity).play();
   runtimeState.currentBase = base;
   runtimeState.stance = 'stand';
   runtimeState.crouchBlend = 0;
@@ -756,7 +853,7 @@ export function resetRiggedOperator(root: THREE.Object3D): boolean {
 export function meleeRiggedOperator(root: THREE.Object3D): boolean {
   const runtimeState = runtime(root);
   if (!runtimeState) return false;
-  playOneShot(runtimeState, runtimeState.actions.has('Punch_Right') ? 'Punch_Right' : 'Kick_Right', 1.4);
+  playOneShot(runtimeState, runtimeState.clips.has('Punch_Right') ? 'Punch_Right' : 'Kick_Right', 1.4);
   return true;
 }
 
@@ -817,6 +914,8 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
     pbrMaterials: root.userData.operatorAsset?.pbrMaterials,
     materialContract: root.userData.operatorAsset?.materialContract,
     clips: root.userData.operatorAsset?.clips,
+    runtimeClips: runtimeState.clips.size,
+    runtimeActionsBound: runtimeState.actions.size,
     embeddedWeaponsSuppressed: root.userData.operatorAsset?.embeddedWeaponsSuppressed,
     visibleEmbeddedWeapons,
     activeClip: runtimeState.currentBase,

@@ -1,4 +1,3 @@
-import { GUN_RANGE_WEAPON_STATIONS } from './gun-range-armory';
 import type { ArenaId } from './map-selection';
 import {
   WEAPON_IDS,
@@ -36,13 +35,11 @@ export function menuWeaponPrewarmCatalog(
  * pickup, and the railgun, so the canonical set is intentionally exhaustive.
  */
 export function weaponPrewarmCatalogForArena(
-  arenaId: ArenaId,
-  gunRangeSidearm: SidearmWeaponId,
+  _arenaId: ArenaId,
+  _gunRangeSidearm: SidearmWeaponId,
 ): readonly WeaponId[] {
-  if (arenaId !== 'gun-range') return WEAPON_IDS;
-  return uniqueWeaponIds([
-    ...GUN_RANGE_WEAPON_STATIONS.map((station) => station.weapon),
-    gunRangeSidearm,
-    ...GUN_RANGE_FIELD_TEST_WEAPONS,
-  ]);
+  // A retained menu-video corpus is also the smooth map-switch boundary.
+  // Shrinking it for Gun Range would force all normal-match models through a
+  // second decode/compile cycle when the player changes maps.
+  return WEAPON_IDS;
 }

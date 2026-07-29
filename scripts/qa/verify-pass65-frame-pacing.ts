@@ -12,6 +12,7 @@ import {
   validateFramePacingWindow,
   type FramePacingWindowSummary,
 } from '../../src/pass65-frame-pacing-gate.ts';
+import { isFatalWebGpuConsoleWarning } from './pass65-browser-console-contract.mjs';
 
 const ARTIFACT_ROOT = 'artifacts/pass65/frame-pacing';
 const VIEWPORT = Object.freeze({ width: 2_560, height: 1_440 });
@@ -348,7 +349,13 @@ async function runTrial(browser: Browser, repeat: number, arenaId: ArenaId): Pro
   page.on('crash', () => browserErrors.push({ kind: 'page-crash', message: 'renderer page crashed' }));
   page.on('console', (message) => {
     if (message.type() === 'error') browserErrors.push({ kind: 'console-error', message: message.text() });
-    else if (message.type() === 'warning') browserWarnings.push(message.text());
+    else if (message.type() === 'warning') {
+      const warning = message.text();
+      browserWarnings.push(warning);
+      if (isFatalWebGpuConsoleWarning(warning)) {
+        browserErrors.push({ kind: 'console-warning-contract', message: warning });
+      }
+    }
   });
   page.on('requestfailed', (request) => requestFailures.push({
     url: request.url(),

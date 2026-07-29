@@ -390,13 +390,6 @@ function distance(left: SupportVec3, right: SupportVec3): number {
   return Math.hypot(left[0] - right[0], left[1] - right[1], left[2] - right[2]);
 }
 
-function hostileTargets(world: KillstreakWorld, ownerId: string, team: 0 | 1): KillstreakTarget[] {
-  return world.targets.filter((target) => target.alive
-    && target.id !== ownerId
-    && (world.areHostile?.(ownerId, team, target) ?? target.team !== team)
-    && (target.kind === 'player' || target.kind === 'bot'));
-}
-
 function lineOfSight(world: KillstreakWorld, from: SupportVec3, to: SupportVec3): boolean {
   return world.hasLineOfSight?.(from, to) ?? true;
 }
@@ -632,6 +625,8 @@ export class HostKillstreakRuntime {
   private resultCounter = 0;
   private readonly seenActivationRequestIds = new Set<string>();
   private lastAdvancedAtMs = 0;
+  private readonly hostileTargetCache = new Map<string, readonly KillstreakTarget[]>();
+  private readonly sortedHostileTargetCache = new Map<string, readonly KillstreakTarget[]>();
 
   constructor(matchEpoch: number, catalog: KillstreakCatalog<string> = PASS65_KILLSTREAK_CATALOG) {
     if (!Number.isSafeInteger(matchEpoch) || matchEpoch < 0) throw new Error('match epoch must be a non-negative safe integer');
@@ -1271,6 +1266,11 @@ export class HostKillstreakRuntime {
     const damageEvents: KillstreakDamageEvent[] = [];
     const impactEvents: KillstreakImpactEvent[] = [];
     const expiredEntityIds: string[] = [];
+    // One host step may advance all 24 swarm drones for the same owner. Build
+    // and sort that owner's hostile set once instead of allocating it again
+    // for every target lookup, sensor scan and area-damage query.
+    this.hostileTargetCache.clear();
+    this.sortedHostileTargetCache.clear();
 
     for (const [activationId, activation] of this.timedActivations) {
       if (canonicalNowMs >= activation.expiresAtMs) this.timedActivations.delete(activationId);
@@ -1332,7 +1332,7 @@ export class HostKillstreakRuntime {
       if (canonicalNowMs >= bomber.expiresAtMs || bomber.nextImpactOrdinal >= bomber.impacts.length) this.carpetBombers.delete(activationId);
     }
 
-    for (const entity of [...this.entities.values()]) {
+    for (const entity of this.entities.values()) {
       if (canonicalNowMs >= entity.expiresAtMs || entity.health <= 0) {
         expiredEntityIds.push(entity.id);
         this.expireEntity(entity.id);
@@ -1565,21 +1565,36 @@ export class HostKillstreakRuntime {
         this.moveDroneToward(entity, entity.swarmIngressTarget, DRONE_DEPLOYMENT_POLICY.swarmIngressSpeedMps, 0.25, dt, world);
       } else {
         entity.swarmIngressTarget = null;
-        let target = hostileTargets(world, owner.actorId, owner.team).find((candidate) => candidate.id === entity.targetId) ?? null;
+        const hostiles = this.hostileTargets(world, owner.actorId, owner.team);
+        let target = hostiles.find((candidate) => candidate.id === entity.targetId) ?? null;
         if (!target) {
-          const candidates = hostileTargets(world, owner.actorId, owner.team).sort((left, right) => left.id.localeCompare(right.id));
+          const candidates = this.sortedHostileTargets(world, owner.actorId, owner.team);
           let pick = candidates.length > 0 ? candidates[entity.seed % candidates.length] : null;
           if (entity.mode === 'swarm' && entity.swarmOrdinal !== null && candidates.length > 0) {
             const groupOrdinal = entity.swarmOrdinal % 4;
             const cx = (world.bounds.minX + world.bounds.maxX) / 2;
             const cz = (world.bounds.minZ + world.bounds.maxZ) / 2;
-            const quadrantCandidates = candidates.filter((candidate) => {
+            let matchingQuadrantCount = 0;
+            for (const candidate of candidates) {
               const dx = candidate.position[0] - cx;
               const dz = candidate.position[2] - cz;
               const candidateQuadrant = (dx >= 0 ? 1 : 0) | (dz >= 0 ? 2 : 0);
-              return candidateQuadrant === groupOrdinal;
-            });
-            if (quadrantCandidates.length > 0) pick = quadrantCandidates[entity.seed % quadrantCandidates.length];
+              if (candidateQuadrant === groupOrdinal) matchingQuadrantCount += 1;
+            }
+            if (matchingQuadrantCount > 0) {
+              let matchingOrdinal = entity.seed % matchingQuadrantCount;
+              for (const candidate of candidates) {
+                const dx = candidate.position[0] - cx;
+                const dz = candidate.position[2] - cz;
+                const candidateQuadrant = (dx >= 0 ? 1 : 0) | (dz >= 0 ? 2 : 0);
+                if (candidateQuadrant !== groupOrdinal) continue;
+                if (matchingOrdinal === 0) {
+                  pick = candidate;
+                  break;
+                }
+                matchingOrdinal -= 1;
+              }
+            }
           }
           target = pick;
           entity.targetId = target?.id ?? null;
@@ -1729,19 +1744,18 @@ export class HostKillstreakRuntime {
     }
     const direction = supportForwardFromYawPitch(entity.yaw, entity.pitch);
     const minimumDot = Math.cos(PILOTED_DRONE_SENSOR_PROFILE.forwardConeDegrees / 2 * Math.PI / 180);
-    entity.sensorContacts = hostileTargets(world, owner.actorId, owner.team)
-      .filter((target) => {
-        const dx = target.position[0] - entity.position[0];
-        const dy = target.position[1] - entity.position[1];
-        const dz = target.position[2] - entity.position[2];
-        const range = Math.hypot(dx, dy, dz);
-        if (range <= 0.001 || range > PILOTED_DRONE_SENSOR_PROFILE.maximumRangeM) return false;
-        return (dx * direction[0] + dy * direction[1] + dz * direction[2]) / range >= minimumDot;
-      })
-      .sort((left, right) => left.id.localeCompare(right.id))
-      .filter((target, index, targets) => index === 0 || target.id !== targets[index - 1].id)
-      .slice(0, 16)
-      .map((target) => Object.freeze({
+    const contacts: DroneSensorContact[] = [];
+    let previousTargetId: string | null = null;
+    for (const target of this.sortedHostileTargets(world, owner.actorId, owner.team)) {
+      if (target.id === previousTargetId) continue;
+      const dx = target.position[0] - entity.position[0];
+      const dy = target.position[1] - entity.position[1];
+      const dz = target.position[2] - entity.position[2];
+      const range = Math.hypot(dx, dy, dz);
+      if (range <= 0.001 || range > PILOTED_DRONE_SENSOR_PROFILE.maximumRangeM) continue;
+      if ((dx * direction[0] + dy * direction[1] + dz * direction[2]) / range < minimumDot) continue;
+      previousTargetId = target.id;
+      contacts.push(Object.freeze({
         id: target.id,
         kind: target.kind,
         team: target.team,
@@ -1750,13 +1764,25 @@ export class HostKillstreakRuntime {
         relation: 'hostile' as const,
         throughWall: true as const,
       }));
+      if (contacts.length === 16) break;
+    }
+    entity.sensorContacts = contacts;
     entity.nextSensorRefreshAtMs = nowMs + PILOTED_DRONE_SENSOR_PROFILE.refreshMs;
   }
 
   private nearestVisibleTarget(origin: SupportVec3, ownerId: string, team: 0 | 1, world: KillstreakWorld): KillstreakTarget | null {
-    return hostileTargets(world, ownerId, team)
-      .filter((target) => lineOfSight(world, origin, target.position))
-      .sort((left, right) => distance(origin, left.position) - distance(origin, right.position) || left.id.localeCompare(right.id))[0] ?? null;
+    let nearest: KillstreakTarget | null = null;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (const target of this.hostileTargets(world, ownerId, team)) {
+      if (!lineOfSight(world, origin, target.position)) continue;
+      const candidateDistance = distance(origin, target.position);
+      if (candidateDistance < nearestDistance
+        || candidateDistance === nearestDistance && (nearest === null || target.id.localeCompare(nearest.id) < 0)) {
+        nearest = target;
+        nearestDistance = candidateDistance;
+      }
+    }
+    return nearest;
   }
 
   private aimedVisibleTarget(
@@ -1769,14 +1795,22 @@ export class HostKillstreakRuntime {
     maximumRange = Number.POSITIVE_INFINITY,
   ): KillstreakTarget | null {
     const direction = supportForwardFromYawPitch(yaw, pitch);
-    return hostileTargets(world, ownerId, team).filter((target) => {
-      if (!lineOfSight(world, origin, target.position)) return false;
-      const delta = [target.position[0] - origin[0], target.position[1] - origin[1], target.position[2] - origin[2]] as const;
-      const length = Math.max(0.001, Math.hypot(...delta));
-      if (length > maximumRange) return false;
-      const dot = (delta[0] * direction[0] + delta[1] * direction[1] + delta[2] * direction[2]) / length;
-      return dot >= Math.cos(8 * Math.PI / 180);
-    }).sort((left, right) => distance(origin, left.position) - distance(origin, right.position))[0] ?? null;
+    const minimumDot = Math.cos(8 * Math.PI / 180);
+    let nearest: KillstreakTarget | null = null;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (const target of this.hostileTargets(world, ownerId, team)) {
+      if (!lineOfSight(world, origin, target.position)) continue;
+      const dx = target.position[0] - origin[0];
+      const dy = target.position[1] - origin[1];
+      const dz = target.position[2] - origin[2];
+      const length = Math.max(0.001, Math.hypot(dx, dy, dz));
+      if (length > maximumRange) continue;
+      const dot = (dx * direction[0] + dy * direction[1] + dz * direction[2]) / length;
+      if (dot < minimumDot || length >= nearestDistance) continue;
+      nearest = target;
+      nearestDistance = length;
+    }
+    return nearest;
   }
 
   private damageAround(
@@ -1790,12 +1824,36 @@ export class HostKillstreakRuntime {
     world: KillstreakWorld,
     output: KillstreakDamageEvent[],
   ): void {
-    for (const target of hostileTargets(world, owner.actorId, owner.team)) {
+    for (const target of this.hostileTargets(world, owner.actorId, owner.team)) {
       const range = distance(origin, target.position);
       if (range > radius || !lineOfSight(world, origin, target.position) || output.length >= MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP) continue;
       const damage = Math.max(1, Math.round(maximum * (1 - range / radius * 0.75)));
       output.push(this.damageEvent(activationId, source, owner.actorId, target, damage, origin, nowMs));
     }
+  }
+
+  private hostileTargets(world: KillstreakWorld, ownerId: string, team: 0 | 1): readonly KillstreakTarget[] {
+    const key = `${ownerId}\u0000${team}`;
+    const cached = this.hostileTargetCache.get(key);
+    if (cached) return cached;
+    const targets: KillstreakTarget[] = [];
+    for (const target of world.targets) {
+      if (!target.alive || target.id === ownerId || (target.kind !== 'player' && target.kind !== 'bot')) continue;
+      if (!(world.areHostile?.(ownerId, team, target) ?? target.team !== team)) continue;
+      targets.push(target);
+    }
+    this.hostileTargetCache.set(key, targets);
+    return targets;
+  }
+
+  private sortedHostileTargets(world: KillstreakWorld, ownerId: string, team: 0 | 1): readonly KillstreakTarget[] {
+    const key = `${ownerId}\u0000${team}`;
+    const cached = this.sortedHostileTargetCache.get(key);
+    if (cached) return cached;
+    const targets = [...this.hostileTargets(world, ownerId, team)]
+      .sort((left, right) => left.id.localeCompare(right.id));
+    this.sortedHostileTargetCache.set(key, targets);
+    return targets;
   }
 
   private damageEvent(
