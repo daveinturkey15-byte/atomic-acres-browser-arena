@@ -27,6 +27,13 @@ export const RAILGUN_BOLT_PRESENTATION = Object.freeze({
   shooterCoreRadiusM: 0.32,
   shooterHaloRadiusM: 1,
   shooterStartOffsetM: 2.4,
+  shooterLaunchOffsetM: 0.72,
+  launchDurationMs: 280,
+  launchCoreRadiusM: 0.2,
+  launchCoronaRadiusM: 0.52,
+  launchRingRadiusM: 0.78,
+  launchBridgeRadiusM: 0.14,
+  launchSparkCount: 6,
   poolCapacity: 6,
 });
 
@@ -47,6 +54,12 @@ export class RailgunPresentation {
     shock: THREE.Mesh;
     filamentRoot: THREE.Group;
     filaments: THREE.Mesh[];
+    launchRoot: THREE.Group;
+    launchCore: THREE.Mesh;
+    launchCorona: THREE.Mesh;
+    launchRing: THREE.Mesh;
+    launchBridge: THREE.Mesh;
+    launchSparks: THREE.Mesh[];
     startsAt: number;
     expiresAt: number;
     authorityKey: string | null;
@@ -108,13 +121,17 @@ export class RailgunPresentation {
     this.thermalWorldRoot.visible = false;
     this.beamRoot.name = 'railgun-replicated-beams';
     this.beamRoot.userData.presentationOnly = true;
+    const beamGeometry = new THREE.CylinderGeometry(1, 1, 1, 12, 1, true);
+    const launchSphereGeometry = new THREE.IcosahedronGeometry(1, 2);
+    const launchRingGeometry = new THREE.TorusGeometry(1, 0.055, 8, 36);
+    const launchBridgeGeometry = new THREE.ConeGeometry(1, 1, 16, 1, true);
+    const launchSparkGeometry = new THREE.ConeGeometry(1, 1, 7, 1, true);
     for (let index = 0; index < RAILGUN_BOLT_PRESENTATION.poolCapacity; index += 1) {
       const beam = new THREE.Group();
       beam.name = `railgun-massive-beam-${index + 1}`;
       beam.visible = false;
       beam.userData.presentationOnly = true;
-      const geometry = new THREE.CylinderGeometry(1, 1, 1, 12, 1, true);
-      const core = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+      const core = new THREE.Mesh(beamGeometry, new THREE.MeshBasicMaterial({
         color: 0xc9fbff,
         transparent: true,
         opacity: 0.94,
@@ -123,7 +140,7 @@ export class RailgunPresentation {
         blending: THREE.AdditiveBlending,
         toneMapped: false,
       }));
-      const bloom = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+      const bloom = new THREE.Mesh(beamGeometry, new THREE.MeshBasicMaterial({
         color: 0x25cfff,
         transparent: true,
         opacity: 0.38,
@@ -132,7 +149,7 @@ export class RailgunPresentation {
         blending: THREE.AdditiveBlending,
         toneMapped: false,
       }));
-      const shock = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+      const shock = new THREE.Mesh(beamGeometry, new THREE.MeshBasicMaterial({
         color: 0x7f5cff,
         transparent: true,
         opacity: 0.14,
@@ -143,7 +160,7 @@ export class RailgunPresentation {
       }));
       const filamentRoot = new THREE.Group();
       const filaments = Array.from({ length: RAILGUN_BOLT_PRESENTATION.filamentCount }, (_, filamentIndex) => {
-        const filament = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+        const filament = new THREE.Mesh(beamGeometry, new THREE.MeshBasicMaterial({
           color: filamentIndex === 1 ? 0xffffff : 0x49e8ff,
           transparent: true,
           opacity: 0.72,
@@ -164,6 +181,50 @@ export class RailgunPresentation {
         filamentRoot.add(filament);
         return filament;
       });
+      const launchRoot = new THREE.Group();
+      launchRoot.name = 'railgun-launch-origin';
+      const additiveMaterial = (color: number, opacity: number) => new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity,
+        depthTest: false,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+      });
+      const launchCore = new THREE.Mesh(launchSphereGeometry, additiveMaterial(0xf2feff, 0.98));
+      const launchCorona = new THREE.Mesh(launchSphereGeometry, additiveMaterial(0x39dcff, 0.5));
+      const launchRing = new THREE.Mesh(launchRingGeometry, additiveMaterial(0x94f8ff, 0.76));
+      const launchBridge = new THREE.Mesh(launchBridgeGeometry, additiveMaterial(0xbafaff, 0.68));
+      const launchSparks = Array.from({ length: RAILGUN_BOLT_PRESENTATION.launchSparkCount }, (_, sparkIndex) => {
+        const spark = new THREE.Mesh(
+          launchSparkGeometry,
+          additiveMaterial(sparkIndex % 2 === 0 ? 0xffffff : 0x48e7ff, 0.72),
+        );
+        const phase = sparkIndex / RAILGUN_BOLT_PRESENTATION.launchSparkCount * Math.PI * 2;
+        spark.position.set(Math.cos(phase) * 0.24, 0.18, Math.sin(phase) * 0.24);
+        spark.rotation.x = Math.sin(phase) * 0.34;
+        spark.rotation.z = -Math.cos(phase) * 0.34;
+        spark.name = `railgun-launch-spark-${sparkIndex + 1}`;
+        spark.renderOrder = 24;
+        spark.frustumCulled = false;
+        launchRoot.add(spark);
+        return spark;
+      });
+      launchCore.name = 'railgun-launch-core';
+      launchCorona.name = 'railgun-launch-corona';
+      launchRing.name = 'railgun-launch-shock-ring';
+      launchBridge.name = 'railgun-launch-bridge';
+      launchRing.rotation.x = Math.PI / 2;
+      launchCore.renderOrder = 25;
+      launchCorona.renderOrder = 23;
+      launchRing.renderOrder = 22;
+      launchBridge.renderOrder = 21;
+      launchCore.frustumCulled = false;
+      launchCorona.frustumCulled = false;
+      launchRing.frustumCulled = false;
+      launchBridge.frustumCulled = false;
+      launchRoot.add(launchCorona, launchCore, launchRing, launchBridge);
       core.name = 'railgun-beam-core';
       bloom.name = 'railgun-beam-bloom';
       shock.name = 'railgun-beam-shock-sheath';
@@ -174,7 +235,7 @@ export class RailgunPresentation {
       core.frustumCulled = false;
       bloom.frustumCulled = false;
       shock.frustumCulled = false;
-      beam.add(shock, bloom, core, filamentRoot);
+      beam.add(shock, bloom, core, filamentRoot, launchRoot);
       this.beamRoot.add(beam);
       this.beams.push({
         root: beam,
@@ -183,6 +244,12 @@ export class RailgunPresentation {
         shock,
         filamentRoot,
         filaments,
+        launchRoot,
+        launchCore,
+        launchCorona,
+        launchRing,
+        launchBridge,
+        launchSparks,
         startsAt: 0,
         expiresAt: 0,
         authorityKey: null,
@@ -263,13 +330,33 @@ export class RailgunPresentation {
         RAILGUN_BOLT_PRESENTATION.filamentRadiusM,
       );
     }
+    const launchOffsetM = viewer === 'shooter' ? RAILGUN_BOLT_PRESENTATION.shooterLaunchOffsetM : 0;
+    const launchBridgeLengthM = Math.max(0, startOffsetM - launchOffsetM);
+    beam.launchRoot.position.set(
+      0,
+      -presentationLength * 0.5 - startOffsetM + launchOffsetM,
+      0,
+    );
+    beam.launchCore.scale.setScalar(RAILGUN_BOLT_PRESENTATION.launchCoreRadiusM);
+    beam.launchCorona.scale.setScalar(RAILGUN_BOLT_PRESENTATION.launchCoronaRadiusM);
+    beam.launchRing.scale.setScalar(RAILGUN_BOLT_PRESENTATION.launchRingRadiusM);
+    beam.launchBridge.visible = launchBridgeLengthM > 0.05;
+    beam.launchBridge.position.set(0, launchBridgeLengthM * 0.5, 0);
+    beam.launchBridge.scale.set(
+      RAILGUN_BOLT_PRESENTATION.launchBridgeRadiusM,
+      Math.max(0.001, launchBridgeLengthM),
+      RAILGUN_BOLT_PRESENTATION.launchBridgeRadiusM,
+    );
+    for (const spark of beam.launchSparks) spark.scale.set(0.045, 0.62, 0.045);
     // The camera starts outside the open tube. Rendering its back faces turns
     // the near circular wall into a cyan tunnel that fills the shooter view.
     (beam.core.material as THREE.MeshBasicMaterial).side = THREE.FrontSide;
     (beam.bloom.material as THREE.MeshBasicMaterial).side = THREE.FrontSide;
     (beam.shock.material as THREE.MeshBasicMaterial).side = THREE.FrontSide;
     for (const filament of beam.filaments) (filament.material as THREE.MeshBasicMaterial).side = THREE.FrontSide;
+    (beam.launchBridge.material as THREE.MeshBasicMaterial).side = THREE.FrontSide;
     beam.root.visible = true;
+    beam.launchRoot.visible = true;
     beam.startsAt = now;
     beam.expiresAt = now + RAILGUN_BOLT_PRESENTATION.visibleDurationMs;
     beam.authorityKey = authorityKey;
@@ -280,6 +367,8 @@ export class RailgunPresentation {
     beam.root.userData.presentationStartOffsetM = startOffsetM;
     beam.root.userData.presentationCoreRadiusM = coreRadius;
     beam.root.userData.presentationHaloRadiusM = haloRadius;
+    beam.root.userData.presentationLaunchOffsetM = launchOffsetM;
+    beam.root.userData.presentationLaunchBridgeLengthM = launchBridgeLengthM;
     beam.root.userData.viewer = viewer;
     this.beamPresentations += 1;
     this.lastBeamLengthM = length;
@@ -314,6 +403,31 @@ export class RailgunPresentation {
       (beam.shock.material as THREE.MeshBasicMaterial).opacity = 0.16 * Math.sqrt(fade) * attack * (1.1 - pulse * 0.35);
       for (const [index, filament] of beam.filaments.entries()) {
         (filament.material as THREE.MeshBasicMaterial).opacity = (0.58 + index * 0.08) * fade * attack * pulse;
+      }
+      const launchProgress = THREE.MathUtils.clamp(age / RAILGUN_BOLT_PRESENTATION.launchDurationMs, 0, 1);
+      const launchFade = 1 - THREE.MathUtils.smoothstep(launchProgress, 0.18, 1);
+      beam.launchRoot.visible = launchFade > 0;
+      if (beam.launchRoot.visible) {
+        const ignitionPulse = 0.88 + Math.sin(age * 0.11) * 0.12;
+        beam.launchCore.scale.setScalar(
+          RAILGUN_BOLT_PRESENTATION.launchCoreRadiusM * (0.85 + launchProgress * 0.55),
+        );
+        beam.launchCorona.scale.setScalar(
+          RAILGUN_BOLT_PRESENTATION.launchCoronaRadiusM * (0.75 + launchProgress * 1.45),
+        );
+        beam.launchRing.scale.setScalar(
+          RAILGUN_BOLT_PRESENTATION.launchRingRadiusM * (0.68 + launchProgress * 1.8),
+        );
+        beam.launchRing.rotation.z = age * 0.018;
+        (beam.launchCore.material as THREE.MeshBasicMaterial).opacity = 0.98 * launchFade * ignitionPulse;
+        (beam.launchCorona.material as THREE.MeshBasicMaterial).opacity = 0.52 * launchFade * ignitionPulse;
+        (beam.launchRing.material as THREE.MeshBasicMaterial).opacity = 0.76 * launchFade;
+        (beam.launchBridge.material as THREE.MeshBasicMaterial).opacity = 0.68 * launchFade * ignitionPulse;
+        for (const [index, spark] of beam.launchSparks.entries()) {
+          const stagger = 0.78 + index * 0.035;
+          spark.scale.set(0.045 * launchFade, (0.62 + launchProgress * 0.82) * stagger, 0.045 * launchFade);
+          (spark.material as THREE.MeshBasicMaterial).opacity = 0.72 * launchFade * ignitionPulse;
+        }
       }
     }
   }
@@ -407,6 +521,10 @@ export class RailgunPresentation {
     filamentCount: number;
     shooterCoreRadiusM: number;
     shooterHaloRadiusM: number;
+    shooterLaunchOffsetM: number;
+    launchDurationMs: number;
+    launchSparkCount: number;
+    launchLayerCount: number;
     poolCapacity: number;
     throughGeometry: boolean;
     openEnded: boolean;
@@ -423,13 +541,19 @@ export class RailgunPresentation {
     modelId: string;
     authoredWorldModel: boolean;
   }> {
-    const throughGeometry = this.beams.every(({ core, bloom, shock, filaments }) => {
+    const throughGeometry = this.beams.every(({
+      core, bloom, shock, filaments, launchCore, launchCorona, launchRing, launchBridge, launchSparks,
+    }) => {
       const coreMaterial = core.material as THREE.MeshBasicMaterial;
       const bloomMaterial = bloom.material as THREE.MeshBasicMaterial;
       const shockMaterial = shock.material as THREE.MeshBasicMaterial;
       return coreMaterial.depthTest === false && coreMaterial.depthWrite === false
         && bloomMaterial.depthTest === false && bloomMaterial.depthWrite === false
         && shockMaterial.depthTest === false && shockMaterial.depthWrite === false
+        && [launchCore, launchCorona, launchRing, launchBridge, ...launchSparks].every((mesh) => {
+          const material = mesh.material as THREE.MeshBasicMaterial;
+          return material.depthTest === false && material.depthWrite === false;
+        })
         && filaments.every((filament) => {
           const material = filament.material as THREE.MeshBasicMaterial;
           return material.depthTest === false && material.depthWrite === false;
@@ -456,6 +580,10 @@ export class RailgunPresentation {
       filamentCount: RAILGUN_BOLT_PRESENTATION.filamentCount,
       shooterCoreRadiusM: RAILGUN_BOLT_PRESENTATION.shooterCoreRadiusM,
       shooterHaloRadiusM: RAILGUN_BOLT_PRESENTATION.shooterHaloRadiusM,
+      shooterLaunchOffsetM: RAILGUN_BOLT_PRESENTATION.shooterLaunchOffsetM,
+      launchDurationMs: RAILGUN_BOLT_PRESENTATION.launchDurationMs,
+      launchSparkCount: RAILGUN_BOLT_PRESENTATION.launchSparkCount,
+      launchLayerCount: 4 + RAILGUN_BOLT_PRESENTATION.launchSparkCount,
       poolCapacity: this.beams.length,
       throughGeometry,
       openEnded,
@@ -480,6 +608,7 @@ export class RailgunPresentation {
       beam.startsAt = 0;
       beam.expiresAt = 0;
       beam.authorityKey = null;
+      beam.launchRoot.visible = false;
     }
     this.acceptedBeamKeys.clear();
     this.beamCursor = 0;

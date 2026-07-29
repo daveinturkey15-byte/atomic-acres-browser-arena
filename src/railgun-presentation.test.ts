@@ -51,10 +51,20 @@ describe('railgun presentation', () => {
     const bloom = beam.getObjectByName('railgun-beam-bloom') as THREE.Mesh;
     const shock = beam.getObjectByName('railgun-beam-shock-sheath') as THREE.Mesh;
     const filaments = beam.getObjectByName('railgun-beam-energy-filaments') as THREE.Group;
+    const launch = beam.getObjectByName('railgun-launch-origin') as THREE.Group;
+    const launchCore = launch.getObjectByName('railgun-launch-core') as THREE.Mesh;
+    const launchBridge = launch.getObjectByName('railgun-launch-bridge') as THREE.Mesh;
     expect(core.scale).toMatchObject({ x: RAILGUN_BOLT_PRESENTATION.coreRadiusM, y: 180 });
     expect(bloom.scale).toMatchObject({ x: RAILGUN_BOLT_PRESENTATION.haloRadiusM, y: 180 });
     expect(shock.scale).toMatchObject({ x: RAILGUN_BOLT_PRESENTATION.shockRadiusM, y: 180 });
     expect(filaments.children).toHaveLength(RAILGUN_BOLT_PRESENTATION.filamentCount);
+    expect(launch.visible).toBe(true);
+    expect(launch.position.y).toBeCloseTo(-RAILGUN_BOLT_PRESENTATION.minimumLengthM * 0.5, 6);
+    expect(launch.children.filter((child) => child.name.startsWith('railgun-launch-spark-'))).toHaveLength(
+      RAILGUN_BOLT_PRESENTATION.launchSparkCount,
+    );
+    expect(launchBridge.visible).toBe(false);
+    expect((launchCore.material as THREE.MeshBasicMaterial).depthTest).toBe(false);
     expect((core.material as THREE.MeshBasicMaterial).depthTest).toBe(false);
     expect((bloom.material as THREE.MeshBasicMaterial).depthTest).toBe(false);
     expect((core.material as THREE.MeshBasicMaterial).side).toBe(THREE.FrontSide);
@@ -68,6 +78,9 @@ describe('railgun presentation', () => {
       visibleDurationMs: 1_000,
       shockRadiusM: 1.6,
       filamentCount: 3,
+      launchDurationMs: 280,
+      launchSparkCount: 6,
+      launchLayerCount: 10,
       poolCapacity: 6,
       throughGeometry: true,
       openEnded: true,
@@ -107,6 +120,8 @@ describe('railgun presentation', () => {
     const beam = scene.getObjectByName('railgun-massive-beam-1') as THREE.Group;
     const core = beam.getObjectByName('railgun-beam-core') as THREE.Mesh;
     const bloom = beam.getObjectByName('railgun-beam-bloom') as THREE.Mesh;
+    const launch = beam.getObjectByName('railgun-launch-origin') as THREE.Group;
+    const launchBridge = launch.getObjectByName('railgun-launch-bridge') as THREE.Mesh;
     expect(core.scale).toMatchObject({
       x: RAILGUN_BOLT_PRESENTATION.shooterCoreRadiusM,
       y: 180 - RAILGUN_BOLT_PRESENTATION.shooterStartOffsetM,
@@ -119,18 +134,33 @@ describe('railgun presentation', () => {
     });
     expect((core.material as THREE.MeshBasicMaterial).side).toBe(THREE.FrontSide);
     expect((bloom.material as THREE.MeshBasicMaterial).side).toBe(THREE.FrontSide);
+    expect(launch.position.y).toBeCloseTo(
+      -(180 - RAILGUN_BOLT_PRESENTATION.shooterStartOffsetM) * 0.5
+        - RAILGUN_BOLT_PRESENTATION.shooterStartOffsetM
+        + RAILGUN_BOLT_PRESENTATION.shooterLaunchOffsetM,
+      6,
+    );
+    expect(launchBridge.visible).toBe(true);
+    expect(launchBridge.scale.y).toBeCloseTo(
+      RAILGUN_BOLT_PRESENTATION.shooterStartOffsetM - RAILGUN_BOLT_PRESENTATION.shooterLaunchOffsetM,
+      6,
+    );
     expect(beam.userData).toMatchObject({
       authoritativeStart: authority.start,
       authoritativeEnd: authority.end,
       presentationStartOffsetM: RAILGUN_BOLT_PRESENTATION.shooterStartOffsetM,
       presentationCoreRadiusM: RAILGUN_BOLT_PRESENTATION.shooterCoreRadiusM,
       presentationHaloRadiusM: RAILGUN_BOLT_PRESENTATION.shooterHaloRadiusM,
+      presentationLaunchOffsetM: RAILGUN_BOLT_PRESENTATION.shooterLaunchOffsetM,
+      presentationLaunchBridgeLengthM:
+        RAILGUN_BOLT_PRESENTATION.shooterStartOffsetM - RAILGUN_BOLT_PRESENTATION.shooterLaunchOffsetM,
       viewer: 'shooter',
     });
     expect(presentation.telemetry()).toMatchObject({
       lastBeamLengthM: 180,
       lastPresentationStartOffsetM: RAILGUN_BOLT_PRESENTATION.shooterStartOffsetM,
       lastViewer: 'shooter',
+      shooterLaunchOffsetM: RAILGUN_BOLT_PRESENTATION.shooterLaunchOffsetM,
       lastAcceptedBeam: { start: authority.start, end: authority.end, lengthM: 180 },
       throughGeometry: true,
       openEnded: true,
