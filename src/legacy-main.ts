@@ -18858,10 +18858,10 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
   if (renderRuntime.backend === 'webgpu') {
     bootstrapStage = 'prewarming-batched-presentations';
     profileArenaTransition('prewarm-batched-effects');
-    // Each presentation stages its exact live geometry/material variant before
-    // its first await. The WebGPU runtime coalesces those concurrently visible
-    // roots into one TSL/HDR submission and one queue fence, rather than
-    // resubmitting the complete scene once for every independent effect.
+    // Each independent presentation stages its first exact live variant before
+    // its first await, allowing that shared staging wave to use one TSL/HDR
+    // submission and queue fence. Killstreak vocabulary, three LOD bands and
+    // possessed-cockpit variants deliberately retain their later exact passes.
     await Promise.all([
       tracerPool.prewarm(renderRuntime, camera, sceneGeneration),
       impactPresentation.prewarm(renderRuntime, camera, sceneGeneration),

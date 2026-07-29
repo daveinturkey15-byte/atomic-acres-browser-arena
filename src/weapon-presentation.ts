@@ -966,7 +966,10 @@ export class WeaponPresentation {
       if (flashlightEntries[0]) this.configureWeaponFlashlight(flashlightEntries[0].weaponId);
       try {
         await this.prewarmBrowserCatalogModels(batchEntries, this.browserWeaponRequest);
-        this.flashlightGpuPrewarmCount += flashlightEntries.length;
+        // One shared spotlight topology serves every flashlight-capable
+        // weapon. The batch exercises that renderer pipeline once, so telemetry
+        // counts the real submission exercise rather than the model count.
+        this.flashlightGpuPrewarmCount += Number(flashlightEntries.length > 0);
       } catch (error) {
         for (const { weaponId, model } of batchEntries) this.retireRejectedBrowserModel(weaponId, model);
         throw error;

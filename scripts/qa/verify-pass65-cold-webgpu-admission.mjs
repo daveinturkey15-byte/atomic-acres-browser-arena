@@ -8,6 +8,7 @@ import { isFatalWebGpuConsoleWarning } from './pass65-browser-console-contract.m
 const port = Number(process.env.PASS65_COLD_ADMISSION_PORT ?? '44175');
 const requestedTrials = Number(process.env.PASS65_COLD_ADMISSION_TRIALS ?? '3');
 const trials = Math.min(5, Math.max(3, Math.floor(requestedTrials)));
+const maximumFirstSwitchFrameMs = 50;
 const artifactRoot = 'artifacts/pass65/cold-webgpu-admission';
 const chromeCandidates = [
   process.env.PASS65_CHROME_PATH,
@@ -115,6 +116,32 @@ try {
       }, undefined, { timeout: 90_000 });
       await page.waitForTimeout(1_000);
 
+      const firstSwitchAudit = await page.evaluate(async () => {
+        const api = window.__ATOMIC_ACRES_DEBUG__;
+        const beforeSwitches = api.snapshot().weaponPresentation.browserWeaponCatalog;
+        const weaponIds = [...beforeSwitches.retained];
+        const samples = [];
+        for (const weaponId of weaponIds) {
+          const startedAt = performance.now();
+          api.equipWeapon(weaponId);
+          const firstPresentedAt = await new Promise((resolve) => requestAnimationFrame(resolve));
+          const settledAt = await new Promise((resolve) => requestAnimationFrame(resolve));
+          samples.push({
+            weaponId,
+            firstFrameMs: firstPresentedAt - startedAt,
+            settledFrameMs: settledAt - firstPresentedAt,
+          });
+        }
+        const afterSwitches = api.snapshot().weaponPresentation.browserWeaponCatalog;
+        return {
+          before: beforeSwitches,
+          after: afterSwitches,
+          samples,
+          maximumFirstFrameMs: Math.max(0, ...samples.map((sample) => sample.firstFrameMs)),
+          maximumSettledFrameMs: Math.max(0, ...samples.map((sample) => sample.settledFrameMs)),
+        };
+      });
+
       const after = await page.evaluate(() => {
         const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
         return {
@@ -154,13 +181,25 @@ try {
         })}`);
       }
       if (after.streaming.constructionCount !== 1 || after.streaming.constructionHistory[0] !== 'atomic-acres') failures.push('cold deployment did not construct exactly one Atomic arena');
+      if (firstSwitchAudit.before.retainedCount !== firstSwitchAudit.before.available
+        || firstSwitchAudit.before.loaded !== firstSwitchAudit.before.available
+        || firstSwitchAudit.before.gpuReady !== firstSwitchAudit.before.available
+        || new Set(firstSwitchAudit.before.retained).size !== firstSwitchAudit.before.available) {
+        failures.push(`deployment weapon catalog was incomplete: ${JSON.stringify(firstSwitchAudit.before)}`);
+      }
+      if (firstSwitchAudit.before.unpreparedSwitches !== 0 || firstSwitchAudit.after.unpreparedSwitches !== 0) {
+        failures.push(`a first weapon switch reached an unprepared model: ${JSON.stringify(firstSwitchAudit.after.lastUnpreparedSwitch)}`);
+      }
+      if (firstSwitchAudit.maximumFirstFrameMs > maximumFirstSwitchFrameMs) {
+        failures.push(`first prepared weapon switch frame ${firstSwitchAudit.maximumFirstFrameMs.toFixed(1)}ms exceeded ${maximumFirstSwitchFrameMs}ms`);
+      }
       if (transition.phase !== 'idle' || transition.failure !== null || transition.renderSubmissionPaused) failures.push(`arena transition did not commit cleanly: ${JSON.stringify(transition)}`);
       if (after.runtime.actualBackend !== 'webgpu' || after.runtime.softwareAdapter || after.runtime.deviceLost) failures.push('hardware WebGPU did not remain healthy');
       if (after.runtime.uncapturedErrors !== 0 || after.runtime.presentation.completionFailures !== 0 || after.runtime.presentation.status !== 'healthy') failures.push(`presentation failed: ${JSON.stringify(after.runtime.presentation)}`);
       if (after.localLightOcclusion.violations.length > 0) failures.push(`active local-light violations: ${after.localLightOcclusion.violations.join(', ')}`);
       if (fatalErrors.length > 0) failures.push(`browser/GPU errors: ${fatalErrors.join(' | ')}`);
 
-      const receipt = { trial, browserVersion, before, after, errors: fatalErrors, pass: failures.length === 0 };
+      const receipt = { trial, browserVersion, before, after, firstSwitchAudit, errors: fatalErrors, pass: failures.length === 0 };
       receipts.push(receipt);
       if (trial === 1) await page.screenshot({ path: `${artifactRoot}/atomic-quality-active.png`, animations: 'disabled' });
       await context.close();

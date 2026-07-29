@@ -346,6 +346,82 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(releasePass65WeaponModelsIn(presentation.root)).toBe(PASS65_AUTHORED_FIREARM_IDS.length);
   });
 
+  it('keeps the newest switch generation authoritative while a catalog batch settles', async () => {
+    stubBrowserTextureLoading();
+    vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (
+      Promise.resolve(fakeGltfForUrl(String(url)))
+    )) as GLTFLoader['loadAsync']);
+    const gate = deferred<void>();
+    const individualPrewarmer = vi.fn(async () => undefined);
+    const catalogPrewarmer = vi.fn(async (
+      _entries: readonly WeaponViewmodelCatalogGpuPrewarmEntry[],
+    ) => gate.promise);
+    const presentation = new WeaponPresentation(
+      new THREE.PerspectiveCamera(), false, undefined, individualPrewarmer, catalogPrewarmer,
+    );
+    await presentation.load();
+    const prewarm = presentation.prewarmBrowserWeaponCatalog(WEAPON_IDS);
+    for (let turn = 0; turn < 40 && catalogPrewarmer.mock.calls.length === 0; turn += 1) await Promise.resolve();
+    expect(catalogPrewarmer).toHaveBeenCalledTimes(1);
+
+    presentation.setWeapon('mp5');
+    presentation.setWeapon('m4a1');
+    gate.resolve();
+    await prewarm;
+    await flushPromises();
+
+    expect(presentation.presentationState().weapon).toBe('m4a1');
+    expect(presentation.root.getObjectByName('m4a1-pass65-first-person-model')?.visible).toBe(true);
+    expect(presentation.root.getObjectByName('mp5-pass65-first-person-model')?.visible).toBe(false);
+    expect(presentation.presentationState().browserWeaponCatalog).toMatchObject({
+      gpuReady: WEAPON_IDS.length,
+      unpreparedSwitches: 0,
+      prewarming: false,
+    });
+    expect(individualPrewarmer).toHaveBeenCalledTimes(1);
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(PASS65_AUTHORED_FIREARM_IDS.length);
+  });
+
+  it('retires every rejected batch candidate and admits a clean retry', async () => {
+    stubBrowserTextureLoading();
+    vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (
+      Promise.resolve(fakeGltfForUrl(String(url)))
+    )) as GLTFLoader['loadAsync']);
+    let attempts = 0;
+    const catalogPrewarmer = vi.fn(async (
+      _entries: readonly WeaponViewmodelCatalogGpuPrewarmEntry[],
+    ) => {
+      attempts += 1;
+      if (attempts === 1) throw new Error('synthetic catalog pipeline failure');
+    });
+    const presentation = new WeaponPresentation(
+      new THREE.PerspectiveCamera(), false, undefined, vi.fn(async () => undefined), catalogPrewarmer,
+    );
+    await presentation.load();
+
+    await expect(presentation.prewarmBrowserWeaponCatalog(WEAPON_IDS))
+      .rejects.toThrow('synthetic catalog pipeline failure');
+    expect(presentation.presentationState().browserWeaponCatalog).toMatchObject({
+      loaded: 1,
+      gpuReady: 1,
+      retainedCount: 0,
+      prewarming: false,
+    });
+    expect(presentation.root.getObjectByName('carbine-pass65-first-person-model')?.visible).toBe(true);
+
+    await presentation.prewarmBrowserWeaponCatalog(['carbine', 'mp5']);
+    presentation.setWeapon('mp5', true);
+    expect(catalogPrewarmer).toHaveBeenCalledTimes(2);
+    expect(presentation.root.getObjectByName('mp5-pass65-first-person-model')?.visible).toBe(true);
+    expect(presentation.presentationState().browserWeaponCatalog).toMatchObject({
+      loaded: 2,
+      gpuReady: 2,
+      retainedCount: 2,
+      prewarming: false,
+    });
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(2);
+  });
+
   it('never commits stale or failed GPU prewarm generations', async () => {
     stubBrowserTextureLoading();
     vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (

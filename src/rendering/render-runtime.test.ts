@@ -376,6 +376,83 @@ describe('Pass 64 render runtime boundary', () => {
     expect(render).toHaveBeenCalledTimes(2);
   });
 
+  it('rejects a concurrent prewarm from a different scene', async () => {
+    let releaseFence!: () => void;
+    const fence = new Promise<void>((resolve) => { releaseFence = resolve; });
+    const render = vi.fn();
+    const renderer = {
+      compileAsync: vi.fn(async () => undefined),
+      info: { reset: () => undefined, render: { calls: 1, triangles: 2, points: 0, lines: 0 } },
+    };
+    const device = {
+      queue: { onSubmittedWorkDone: () => fence },
+      addEventListener: () => undefined,
+      lost: new Promise<never>(() => undefined),
+    };
+    const runtime = new (WebGpuRenderRuntime as unknown as new (
+      renderer: unknown,
+      pipeline: unknown,
+      identity: unknown,
+    ) => WebGpuRenderRuntime)(renderer, { render }, {
+      canvasAntialias: true,
+      canvasSamples: 4,
+      adapterLabel: 'test adapter',
+      adapterClass: 'GPUAdapter',
+      deviceClass: 'GPUDevice',
+      softwareAdapter: false,
+      device,
+    });
+    const firstScene = new THREE.Scene();
+    const firstRoot = new THREE.Group();
+    firstScene.add(firstRoot);
+    const secondScene = new THREE.Scene();
+    const secondRoot = new THREE.Group();
+    secondScene.add(secondRoot);
+
+    const first = runtime.compileAndRender(firstRoot, new THREE.PerspectiveCamera(), firstScene);
+    await expect(runtime.compileAndRender(secondRoot, new THREE.PerspectiveCamera(), secondScene))
+      .rejects.toThrow('cannot span multiple submitted scenes');
+    releaseFence();
+    await first;
+    expect(render).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears a failed prewarm batch so a later submission can retry', async () => {
+    const render = vi.fn()
+      .mockImplementationOnce(() => { throw new Error('synthetic pipeline build failure'); })
+      .mockImplementation(() => undefined);
+    const renderer = {
+      compileAsync: vi.fn(async () => undefined),
+      info: { reset: () => undefined, render: { calls: 1, triangles: 2, points: 0, lines: 0 } },
+    };
+    const device = {
+      queue: { onSubmittedWorkDone: async () => undefined },
+      addEventListener: () => undefined,
+      lost: new Promise<never>(() => undefined),
+    };
+    const runtime = new (WebGpuRenderRuntime as unknown as new (
+      renderer: unknown,
+      pipeline: unknown,
+      identity: unknown,
+    ) => WebGpuRenderRuntime)(renderer, { render }, {
+      canvasAntialias: true,
+      canvasSamples: 4,
+      adapterLabel: 'test adapter',
+      adapterClass: 'GPUAdapter',
+      deviceClass: 'GPUDevice',
+      softwareAdapter: false,
+      device,
+    });
+    const scene = new THREE.Scene();
+    const root = new THREE.Group();
+    scene.add(root);
+
+    await expect(runtime.compileAndRender(root, new THREE.PerspectiveCamera(), scene))
+      .rejects.toThrow('synthetic pipeline build failure');
+    await runtime.compileAndRender(root, new THREE.PerspectiveCamera(), scene);
+    expect(render).toHaveBeenCalledTimes(2);
+  });
+
   it('restarts pending age when the completion frontier advances and clears it when caught up', () => {
     expect(pendingCompletionStartAfterProgress({
       completedAt: 4_250,
