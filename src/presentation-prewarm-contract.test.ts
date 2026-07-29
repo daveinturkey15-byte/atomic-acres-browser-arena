@@ -177,7 +177,9 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain("buildOperator(botTeam, 'bot-operator', renderProfile !== 'blender', weapon, 'neon-purple')");
     expect(source).toContain('const streamedWeaponGpuPrewarmer: WeaponViewmodelGpuPrewarmer | undefined');
     expect(source).toContain('streamedWeaponGpuPrewarmQueue.run(() => runStreamedWeaponGpuPrewarm(model, context))');
-    expect(source).toContain('revealAncestors();');
+    expect(source).toContain('const streamedWeaponCatalogGpuPrewarmer: WeaponViewmodelCatalogGpuPrewarmer | undefined');
+    expect(source).toContain('streamedWeaponGpuPrewarmQueue.run(() => runStreamedWeaponCatalogGpuPrewarm(entries, context))');
+    expect(source).toContain('revealAncestors(model);');
     expect(source).toContain('for (const [ancestor, visible] of ancestorVisibility) ancestor.visible = visible;');
     const weaponPrewarm = source.slice(
       source.indexOf('const runStreamedWeaponGpuPrewarm:'),
@@ -185,8 +187,9 @@ describe('presentation prewarm startup contract', () => {
     );
     expect(weaponPrewarm).not.toContain('renderRuntime.compile(');
     expect(weaponPrewarm).not.toContain('multiplyScalar(0.0001)');
-    expect(source).toContain('await renderRuntime.compileAndRender(model, camera, scene);');
+    expect(source).toContain('await renderRuntime.compileAndRender(priorStates[0].model, camera, scene);');
     expect(source).toContain('streamedWeaponGpuPrewarmer,');
+    expect(source).toContain('streamedWeaponCatalogGpuPrewarmer,');
     expect(menuLoadoutApply).toContain('weaponView.prewarmBrowserWeaponCatalog(menuWeaponPrewarmCatalog(selection.primary, selection.secondary))');
     expect(menuLoadoutApply.indexOf('prewarmBrowserWeaponCatalog'))
       .toBeLessThan(menuLoadoutApply.indexOf('weaponView.setWeapon(selectedWeapon, true)'));

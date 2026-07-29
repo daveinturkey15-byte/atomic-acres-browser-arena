@@ -561,6 +561,8 @@ export class WebGpuRenderRuntime {
   private lastCompletedAt: number | null = null;
   private pendingCompletionStartedAt: number | null = null;
   private completionProbe: Promise<void> | null = null;
+  private presentationPrewarmBatch: Promise<void> | null = null;
+  private presentationPrewarmScene: THREE.Scene | null = null;
   private lastCompletionLatencyMs: number | null = null;
   private completionFailures = 0;
   private lastFailure: string | null = null;
@@ -1018,16 +1020,37 @@ export class WebGpuRenderRuntime {
     if (attachmentRoot !== scene) {
       throw new Error('WebGPU presentation prewarm root must be attached to the submitted scene');
     }
+    if (this.presentationPrewarmBatch) {
+      if (this.presentationPrewarmScene !== scene) {
+        throw new Error('WebGPU presentation prewarm batch cannot span multiple submitted scenes');
+      }
+      return this.presentationPrewarmBatch;
+    }
     // compileAsync() uses Three's default renderer context, while gameplay is
     // submitted through the TSL/HDR RenderPipeline. Building both contexts
     // doubles cold node/pipeline residency without warming the live path. One
     // forced pipeline submission compiles the exact context and the queue fence
     // below makes that work an admission boundary rather than a gameplay hitch.
-    this.submitFrame(this.clock(), true);
-    // Presentation-only effects prewarm behind the loading surface. Cold
-    // Chrome/driver shader creation can exceed the live four-second fence,
-    // especially when each QA page owns a fresh WebGPU device.
-    await this.waitForSubmittedWork(12_000);
+    // Defer one microtask so independently staged presentation roots can join
+    // the same exact scene submission. Rendering the whole TSL/HDR scene once
+    // already compiles every visible staged root; submitting and fencing that
+    // identical scene once per effect only multiplies cold admission time.
+    this.presentationPrewarmScene = scene;
+    let batch!: Promise<void>;
+    batch = Promise.resolve().then(async () => {
+      this.submitFrame(this.clock(), true);
+      // Presentation-only effects prewarm behind the loading surface. Cold
+      // Chrome/driver shader creation can exceed the live four-second fence,
+      // especially when each QA page owns a fresh WebGPU device.
+      await this.waitForSubmittedWork(12_000);
+    }).finally(() => {
+      if (this.presentationPrewarmBatch === batch) {
+        this.presentationPrewarmBatch = null;
+        this.presentationPrewarmScene = null;
+      }
+    });
+    this.presentationPrewarmBatch = batch;
+    return batch;
   }
 
   submitFrame(_frameTimestamp = this.clock(), force = false): boolean {

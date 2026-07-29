@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isFatalWebGpuConsoleWarning } from '../scripts/qa/pass65-browser-console-contract';
+import { isFatalWebGpuConsoleWarning } from '../scripts/qa/pass65-browser-console-contract.mjs';
 
 describe('Pass 65 native WebGPU console contract', () => {
   it('fails closed on missing geometry attributes reported as Three warnings', () => {

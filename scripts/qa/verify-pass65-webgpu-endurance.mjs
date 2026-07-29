@@ -4,7 +4,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
-import { isFatalWebGpuConsoleWarning } from './pass65-browser-console-contract.ts';
+import { isFatalWebGpuConsoleWarning } from './pass65-browser-console-contract.mjs';
 
 const port = Number(process.env.PASS65_ENDURANCE_PORT ?? '44075');
 const sampleIntervalMs = Math.max(500, Number(process.env.PASS65_SAMPLE_INTERVAL_MS ?? '1000'));

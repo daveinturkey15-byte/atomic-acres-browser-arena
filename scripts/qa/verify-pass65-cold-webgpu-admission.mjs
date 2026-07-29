@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
-import { isFatalWebGpuConsoleWarning } from './pass65-browser-console-contract.ts';
+import { isFatalWebGpuConsoleWarning } from './pass65-browser-console-contract.mjs';
 
 const port = Number(process.env.PASS65_COLD_ADMISSION_PORT ?? '44175');
 const requestedTrials = Number(process.env.PASS65_COLD_ADMISSION_TRIALS ?? '3');

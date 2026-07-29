@@ -14,6 +14,7 @@ export type ArenaTransitionProfilePhase =
   | 'weapon-catalog-prewarm'
   | 'presentation-batching'
   | 'match-authority-reset'
+  | 'prewarm-batched-effects'
   | 'prewarm-tracers'
   | 'prewarm-impacts'
   | 'prewarm-grenade-explosion'

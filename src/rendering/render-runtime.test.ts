@@ -336,6 +336,46 @@ describe('Pass 64 render runtime boundary', () => {
     expect(render).toHaveBeenCalledTimes(1);
   });
 
+  it('coalesces concurrently staged presentation roots into one fenced scene submission', async () => {
+    const render = vi.fn();
+    const renderer = {
+      compileAsync: vi.fn(async () => undefined),
+      info: { reset: () => undefined, render: { calls: 1, triangles: 2, points: 0, lines: 0 } },
+    };
+    const device = {
+      queue: { onSubmittedWorkDone: async () => undefined },
+      addEventListener: () => undefined,
+      lost: new Promise<never>(() => undefined),
+    };
+    const runtime = new (WebGpuRenderRuntime as unknown as new (
+      renderer: unknown,
+      pipeline: unknown,
+      identity: unknown,
+    ) => WebGpuRenderRuntime)(renderer, { render }, {
+      canvasAntialias: true,
+      canvasSamples: 4,
+      adapterLabel: 'test adapter',
+      adapterClass: 'GPUAdapter',
+      deviceClass: 'GPUDevice',
+      softwareAdapter: false,
+      device,
+    });
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const tracerRoot = new THREE.Group();
+    const smokeRoot = new THREE.Group();
+    scene.add(camera, tracerRoot, smokeRoot);
+
+    await Promise.all([
+      runtime.compileAndRender(tracerRoot, camera, scene),
+      runtime.compileAndRender(smokeRoot, camera, scene),
+    ]);
+    expect(render).toHaveBeenCalledTimes(1);
+
+    await runtime.compileAndRender(tracerRoot, camera, scene);
+    expect(render).toHaveBeenCalledTimes(2);
+  });
+
   it('restarts pending age when the completion frontier advances and clears it when caught up', () => {
     expect(pendingCompletionStartAfterProgress({
       completedAt: 4_250,

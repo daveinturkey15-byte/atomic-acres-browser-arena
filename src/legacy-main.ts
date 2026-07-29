@@ -471,7 +471,11 @@ import {
 import { TracerPool } from './tracer-pool';
 import { AsyncSerialQueue } from './async-serial-queue';
 import { loadRiggedOperatorAsset, riggedOperatorAssetReady, riggedOperatorTelemetry } from './operator-model';
-import { WeaponPresentation, type WeaponViewmodelGpuPrewarmer } from './weapon-presentation';
+import {
+  WeaponPresentation,
+  type WeaponViewmodelCatalogGpuPrewarmer,
+  type WeaponViewmodelGpuPrewarmer,
+} from './weapon-presentation';
 import { magnifiedFovDegrees, viewmodelSurfaceRetreat } from './weapon-presentation-state';
 import { RailgunPresentation, type RailgunThermalContact } from './railgun-presentation';
 import { DMR_THERMAL_MAGNIFICATION, DmrThermalPresentation, type DmrThermalContact } from './dmr-thermal-presentation';
@@ -1202,6 +1206,7 @@ type BootstrapStage =
   | 'menu-video-ready'
   | 'loading-gameplay-assets'
   | 'prewarming-weapon-catalog'
+  | 'prewarming-batched-presentations'
   | 'prewarming-grenade-world-presentations'
   | 'prewarming-killstreak-presentations'
   | 'prewarming-smoke-presentations'
@@ -4547,15 +4552,21 @@ element<HTMLInputElement>('#player-name').addEventListener('input', () => {
 });
 
 const streamedWeaponGpuPrewarmQueue = new AsyncSerialQueue();
-const runStreamedWeaponGpuPrewarm: WeaponViewmodelGpuPrewarmer = async (model, { weaponId }) => {
-      const priorParent = model.parent;
-      const priorVisible = model.visible;
-      const priorScale = model.scale.clone();
+const runStreamedWeaponCatalogGpuPrewarm: WeaponViewmodelCatalogGpuPrewarmer = async (entries) => {
+      if (entries.length === 0) return;
+      const priorStates = entries.map(({ weaponId, model }) => Object.freeze({
+        weaponId,
+        model,
+        parent: model.parent,
+        visible: model.visible,
+        scale: model.scale.clone(),
+      }));
       const ancestorVisibility = new Map<THREE.Object3D, boolean>();
-      const restoreParent = (): void => {
-        if (priorParent && model.parent !== priorParent) priorParent.add(model);
+      const restoreParent = (state: typeof priorStates[number]): void => {
+        if (state.parent && state.model.parent !== state.parent) state.parent.add(state.model);
+        else if (!state.parent && state.model.parent) state.model.removeFromParent();
       };
-      const revealAncestors = (): void => {
+      const revealAncestors = (model: THREE.Object3D): void => {
         let ancestor = model.parent;
         while (ancestor && ancestor !== scene) {
           if (!ancestorVisibility.has(ancestor)) ancestorVisibility.set(ancestor, ancestor.visible);
@@ -4567,41 +4578,52 @@ const runStreamedWeaponGpuPrewarm: WeaponViewmodelGpuPrewarmer = async (model, {
       // Detach the candidate while the last complete viewmodel keeps
       // presenting, then stage its exact gameplay scale in the fenced TSL/HDR
       // submission below. A default-context compile does not warm that path.
-      model.removeFromParent();
-      model.visible = true;
+      for (const { model } of priorStates) {
+        model.removeFromParent();
+        model.visible = true;
+      }
       try {
         const submissionWasPaused = renderSubmissionPaused;
         renderSubmissionPaused = true;
         try {
           await flushWebGpuFrames(12_000);
-          restoreParent();
+          for (const state of priorStates) restoreParent(state);
           // The menu/deployment lifecycle normally hides the entire viewmodel
           // ancestry. Reveal that chain only for this fenced upload frame or a
           // compile-only receipt could still leave first draw work in combat.
-          revealAncestors();
-          await renderRuntime.compileAndRender(model, camera, scene);
+          for (const { model } of priorStates) revealAncestors(model);
+          await renderRuntime.compileAndRender(priorStates[0].model, camera, scene);
           const presentation = renderRuntime.presentationTelemetry();
           if (presentation.status !== 'healthy') {
-            throw new Error(`Streamed ${weaponId} viewmodel prewarm was ${presentation.status}`);
+            throw new Error(`Streamed ${priorStates.map(({ weaponId }) => weaponId).join(', ')} viewmodel prewarm was ${presentation.status}`);
           }
         } finally {
           renderSubmissionPaused = submissionWasPaused;
         }
       } finally {
-        restoreParent();
+        for (const state of priorStates) restoreParent(state);
         for (const [ancestor, visible] of ancestorVisibility) ancestor.visible = visible;
-        model.visible = priorVisible;
-        model.scale.copy(priorScale);
+        for (const state of priorStates) {
+          state.model.visible = state.visible;
+          state.model.scale.copy(state.scale);
+        }
       }
     };
+const runStreamedWeaponGpuPrewarm: WeaponViewmodelGpuPrewarmer = async (model, { weaponId, requestGeneration }) => (
+  runStreamedWeaponCatalogGpuPrewarm([{ weaponId, model }], { requestGeneration })
+);
 const streamedWeaponGpuPrewarmer: WeaponViewmodelGpuPrewarmer | undefined = renderRuntime.backend === 'webgpu'
   ? (model, context) => streamedWeaponGpuPrewarmQueue.run(() => runStreamedWeaponGpuPrewarm(model, context))
+  : undefined;
+const streamedWeaponCatalogGpuPrewarmer: WeaponViewmodelCatalogGpuPrewarmer | undefined = renderRuntime.backend === 'webgpu'
+  ? (entries, context) => streamedWeaponGpuPrewarmQueue.run(() => runStreamedWeaponCatalogGpuPrewarm(entries, context))
   : undefined;
 const weaponView = new WeaponPresentation(
   camera,
   reducedRenderMode,
   (root, afterFence) => scheduleDeferredGpuRetirement(root, true, afterFence),
   streamedWeaponGpuPrewarmer,
+  streamedWeaponCatalogGpuPrewarmer,
 );
 let loadoutState: LoadoutStorageV2 = playerProfileStore.current.loadout;
 let managedPresetId: LoadoutPresetId = loadoutState.selected.kind === 'custom'
@@ -18833,6 +18855,28 @@ async function prepareSharedGameplayAssets(): Promise<void> {
 }
 
 async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): Promise<void> {
+  if (renderRuntime.backend === 'webgpu') {
+    bootstrapStage = 'prewarming-batched-presentations';
+    profileArenaTransition('prewarm-batched-effects');
+    // Each presentation stages its exact live geometry/material variant before
+    // its first await. The WebGPU runtime coalesces those concurrently visible
+    // roots into one TSL/HDR submission and one queue fence, rather than
+    // resubmitting the complete scene once for every independent effect.
+    await Promise.all([
+      tracerPool.prewarm(renderRuntime, camera, sceneGeneration),
+      impactPresentation.prewarm(renderRuntime, camera, sceneGeneration),
+      grenadeExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration),
+      supportExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration),
+      deathDropPresentationPool.prewarm(renderRuntime, camera, player.weapon),
+      prewarmNukePresentation(),
+      prewarmOverdrivePresentation(),
+      prewarmGrenadeWorldPresentations(sceneGeneration),
+      killstreakPresentation.prewarm(renderRuntime, camera, sceneGeneration),
+      smokeVolumePresentationPool.prewarm(renderRuntime, camera, sceneGeneration),
+      prewarmExplosiveBoltPresentation(sceneGeneration),
+    ]);
+    return;
+  }
   bootstrapStage = 'prewarming-combat-tracers';
   profileArenaTransition('prewarm-tracers');
   await tracerPool.prewarm(renderRuntime, camera, sceneGeneration);

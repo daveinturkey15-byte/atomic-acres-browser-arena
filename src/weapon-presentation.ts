@@ -215,6 +215,16 @@ export type WeaponViewmodelGpuPrewarmer = (
   context: WeaponViewmodelGpuPrewarmContext,
 ) => Promise<void>;
 
+export type WeaponViewmodelCatalogGpuPrewarmEntry = Readonly<{
+  weaponId: WeaponId;
+  model: THREE.Object3D;
+}>;
+
+export type WeaponViewmodelCatalogGpuPrewarmer = (
+  entries: readonly WeaponViewmodelCatalogGpuPrewarmEntry[],
+  context: Readonly<{ requestGeneration: number }>,
+) => Promise<void>;
+
 /** Original first-person weapon presentation with ADS, sprint, recoil, melee and staged reload motion. */
 export class WeaponPresentation {
   static readonly MAX_RETAINED_WEBGPU_WEAPONS = RUNTIME_WEAPON_RETENTION_LIMIT;
@@ -302,6 +312,7 @@ export class WeaponPresentation {
     private readonly flattenMaterials = false,
     private readonly retireModel?: (root: THREE.Object3D, afterFence?: () => void) => void,
     private readonly gpuPrewarmer?: WeaponViewmodelGpuPrewarmer,
+    private readonly catalogGpuPrewarmer?: WeaponViewmodelCatalogGpuPrewarmer,
   ) {
     this.browserRuntime = typeof document !== 'undefined';
     this.root.name = 'original-weapon-view';
@@ -925,7 +936,8 @@ export class WeaponPresentation {
     ids: readonly WeaponId[],
     onProgress?: (loaded: number, total: number) => void,
   ): Promise<void> {
-    for (const [index, id] of ids.entries()) {
+    const entries: WeaponViewmodelCatalogGpuPrewarmEntry[] = [];
+    for (const id of ids) {
       await loadPass65WeaponPresentation(id, 'first-person');
       let model = this.models.get(id);
       if (!model) {
@@ -938,23 +950,53 @@ export class WeaponPresentation {
         this.modelLastUsed.set(id, ++this.modelUseCounter);
         this.root.add(model);
       }
-      const exercisesFlashlightPipeline = WEAPONS[id].flashlight !== null;
-      let flashlightPipelineReady = false;
-      if (exercisesFlashlightPipeline) this.configureWeaponFlashlight(id);
+      entries.push(Object.freeze({ weaponId: id, model }));
+    }
+
+    if (this.catalogGpuPrewarmer) {
+      // A live switch can already own one candidate's individual prewarm. Let
+      // that exact operation settle before forming the remaining deployment
+      // batch so one model is never staged by two owners concurrently.
+      await Promise.all(entries.flatMap(({ model }) => {
+        const pending = this.gpuPrewarmPromises.get(model);
+        return pending ? [pending] : [];
+      }));
+      const batchEntries = entries.filter(({ model }) => !this.modelIsGpuReady(model));
+      const flashlightEntries = batchEntries.filter(({ weaponId }) => WEAPONS[weaponId].flashlight !== null);
+      if (flashlightEntries[0]) this.configureWeaponFlashlight(flashlightEntries[0].weaponId);
       try {
-        await this.prewarmBrowserModel(id, model, this.browserWeaponRequest);
-        flashlightPipelineReady = true;
+        await this.prewarmBrowserCatalogModels(batchEntries, this.browserWeaponRequest);
+        this.flashlightGpuPrewarmCount += flashlightEntries.length;
       } catch (error) {
-        this.retireRejectedBrowserModel(id, model);
+        for (const { weaponId, model } of batchEntries) this.retireRejectedBrowserModel(weaponId, model);
         throw error;
       } finally {
-        if (exercisesFlashlightPipeline) {
-          if (flashlightPipelineReady) this.flashlightGpuPrewarmCount += 1;
-          this.configureWeaponFlashlight(this.active);
-        }
+        if (flashlightEntries.length > 0) this.configureWeaponFlashlight(this.active);
       }
-      this.browserResidentWeaponIds.add(id);
-      onProgress?.(index + 1, ids.length);
+      entries.forEach(({ weaponId }, index) => {
+        this.browserResidentWeaponIds.add(weaponId);
+        onProgress?.(index + 1, ids.length);
+      });
+    } else {
+      for (const [index, { weaponId: id, model }] of entries.entries()) {
+        const exercisesFlashlightPipeline = WEAPONS[id].flashlight !== null;
+        let flashlightPipelineReady = false;
+        if (exercisesFlashlightPipeline) this.configureWeaponFlashlight(id);
+        try {
+          await this.prewarmBrowserModel(id, model, this.browserWeaponRequest);
+          flashlightPipelineReady = true;
+        } catch (error) {
+          this.retireRejectedBrowserModel(id, model);
+          throw error;
+        } finally {
+          if (exercisesFlashlightPipeline) {
+            if (flashlightPipelineReady) this.flashlightGpuPrewarmCount += 1;
+            this.configureWeaponFlashlight(this.active);
+          }
+        }
+        this.browserResidentWeaponIds.add(id);
+        onProgress?.(index + 1, ids.length);
+      }
     }
     const desired = new Set(ids);
     for (const id of [...this.browserResidentWeaponIds]) {
@@ -1042,6 +1084,24 @@ export class WeaponPresentation {
       this.gpuPrewarmPromises.delete(model);
     });
     this.gpuPrewarmPromises.set(model, promise);
+    return promise;
+  }
+
+  private prewarmBrowserCatalogModels(
+    entries: readonly WeaponViewmodelCatalogGpuPrewarmEntry[],
+    requestGeneration: number,
+  ): Promise<void> {
+    if (entries.length === 0) return Promise.resolve();
+    const promise = Promise.resolve().then(() => this.catalogGpuPrewarmer!(entries, {
+      requestGeneration,
+    })).then(() => {
+      for (const { model } of entries) this.gpuReadyModels.add(model);
+    }).finally(() => {
+      for (const { model } of entries) {
+        if (this.gpuPrewarmPromises.get(model) === promise) this.gpuPrewarmPromises.delete(model);
+      }
+    });
+    for (const { model } of entries) this.gpuPrewarmPromises.set(model, promise);
     return promise;
   }
 

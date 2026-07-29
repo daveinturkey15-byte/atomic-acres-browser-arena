@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { poseOperator, setOperatorWeapon } from './art-kit';
-import { WeaponPresentation } from './weapon-presentation';
+import { WeaponPresentation, type WeaponViewmodelCatalogGpuPrewarmEntry } from './weapon-presentation';
 import { WEAPON_IDS, type WeaponId } from './protocol';
 import { RUNTIME_WEAPON_RETENTION_LIMIT } from './weapon-prewarm-catalog';
 import {
@@ -307,6 +307,43 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     });
     expect(prewarmer).toHaveBeenCalledTimes(catalogIds.length);
     expect(releasePass65WeaponModelsIn(presentation.root)).toBe(replacementIds.length);
+  });
+
+  it('batches the not-yet-ready deployment catalog behind one renderer fence', async () => {
+    stubBrowserTextureLoading();
+    vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (
+      Promise.resolve(fakeGltfForUrl(String(url)))
+    )) as GLTFLoader['loadAsync']);
+    const individualPrewarmer = vi.fn(async () => undefined);
+    const catalogPrewarmer = vi.fn(async (
+      _entries: readonly WeaponViewmodelCatalogGpuPrewarmEntry[],
+    ) => undefined);
+    const presentation = new WeaponPresentation(
+      new THREE.PerspectiveCamera(),
+      false,
+      undefined,
+      individualPrewarmer,
+      catalogPrewarmer,
+    );
+    await presentation.load();
+    await Promise.all([
+      presentation.prewarmBrowserWeaponCatalog(WEAPON_IDS),
+      presentation.prewarmBrowserWeaponCatalog(WEAPON_IDS),
+    ]);
+
+    expect(individualPrewarmer).toHaveBeenCalledTimes(1);
+    expect(catalogPrewarmer).toHaveBeenCalledTimes(1);
+    const [entries] = catalogPrewarmer.mock.calls[0]!;
+    expect(entries.map((entry) => entry.weaponId)).toEqual(WEAPON_IDS.filter((id) => id !== 'carbine'));
+    expect(entries.every((entry) => entry.model.visible === false)).toBe(true);
+    expect(presentation.presentationState().browserWeaponCatalog).toMatchObject({
+      retainedCount: WEAPON_IDS.length,
+      loaded: WEAPON_IDS.length,
+      gpuReady: WEAPON_IDS.length,
+      prewarming: false,
+      unpreparedSwitches: 0,
+    });
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(PASS65_AUTHORED_FIREARM_IDS.length);
   });
 
   it('never commits stale or failed GPU prewarm generations', async () => {

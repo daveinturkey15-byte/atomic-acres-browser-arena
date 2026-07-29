@@ -12,7 +12,7 @@ import {
   validateFramePacingWindow,
   type FramePacingWindowSummary,
 } from '../../src/pass65-frame-pacing-gate.ts';
-import { isFatalWebGpuConsoleWarning } from './pass65-browser-console-contract.ts';
+import { isFatalWebGpuConsoleWarning } from './pass65-browser-console-contract.mjs';
 
 const ARTIFACT_ROOT = 'artifacts/pass65/frame-pacing';
 const VIEWPORT = Object.freeze({ width: 2_560, height: 1_440 });
