@@ -432,7 +432,7 @@ export class SmokeVolumePresentationPool {
       if (typeof document === 'undefined') {
         await runtime.compileAndRender(this.root, camera, parentScene);
       } else {
-        const batchSize = 6;
+        const batchSize = 2;
         for (const { presentation } of this.slots) presentation.root.visible = false;
         for (let offset = 0; offset < this.slots.length; offset += batchSize) {
           const batch = this.slots.slice(offset, offset + batchSize);

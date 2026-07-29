@@ -161,6 +161,7 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('await flushWebGpuFrames(12_000)');
     expect(source).toContain('const requiredConsecutiveHealthySamples = 3;');
     expect(source).toContain('const requiredConsecutiveMinimumTierSlowSamples = 3;');
+    expect(source).toContain('if (!isSharedMeshGeometry(geometry)) geometry.dispose();');
     expect(source).toContain('if (consecutiveMinimumTierSlowSamples < requiredConsecutiveMinimumTierSlowSamples) continue;');
     expect(source).toContain('WebGPU queue latency remained ${Math.round(completionLatencyMs)}ms for ${consecutiveMinimumTierSlowSamples} consecutive samples at the minimum quality tier');
     expect(source).toContain('adaptiveQuality.forceDownshift(');

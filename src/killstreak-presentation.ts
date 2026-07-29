@@ -1585,13 +1585,11 @@ export class KillstreakPresentation {
   }
 
   private async installPrewarmedVocabularyBatched(): Promise<void> {
-    let installed = 0;
     for (const [key, capacity] of KillstreakPresentation.PREWARMED_CAPACITIES) {
       const pool: PresentedEntity[] = [];
       for (let index = 0; index < capacity; index += 1) {
         pool.push(this.installPrewarmedPoolEntry(key, index));
-        installed += 1;
-        if (installed % 2 === 0) await yieldPresentationPreparation();
+        await yieldPresentationPreparation();
       }
       this.entityPools.set(key, pool);
     }
@@ -1609,19 +1607,19 @@ export class KillstreakPresentation {
       if (!entry.authored && entry.rotor?.name) animatedTargetNames.add(entry.rotor.name);
     }
     const sourceMeshes: THREE.Mesh[][] = [];
-    for (const [entryIndex, entry] of pool.entries()) {
+    for (const entry of pool) {
       const meshes: THREE.Mesh[] = [];
       entry.root.traverse((node) => {
         if (node instanceof THREE.Mesh && !(node instanceof THREE.InstancedMesh)) meshes.push(node);
       });
       sourceMeshes.push(meshes);
-      if ((entryIndex + 1) % 2 === 0) yield;
+      yield;
     }
     const primitiveCount = sourceMeshes[0]?.length ?? 0;
     if (primitiveCount === 0 || sourceMeshes.some((meshes) => meshes.length !== primitiveCount)) return;
-    for (const [entryIndex, entry] of pool.entries()) {
+    for (const entry of pool) {
       entry.root.updateWorldMatrix(true, true);
-      if ((entryIndex + 1) % 2 === 0) yield;
+      yield;
     }
 
     const initialMatrix = new THREE.Matrix4();
@@ -1693,7 +1691,7 @@ export class KillstreakPresentation {
         indices.push(primitiveIndex);
         staticGroups.set(mergeKey, indices);
       }
-      if ((primitiveIndex + 1) % 2 === 0) yield;
+      yield;
     }
 
     const mergeBatch = (
@@ -1787,9 +1785,9 @@ export class KillstreakPresentation {
   }
 
   private async disposeSwarmInstancingBatched(): Promise<void> {
-    for (const [index, batch] of this.swarmInstanceBatches.entries()) {
+    for (const batch of this.swarmInstanceBatches) {
       this.disposeSwarmInstanceBatch(batch);
-      if ((index + 1) % 2 === 0) await yieldPresentationPreparation();
+      await yieldPresentationPreparation();
     }
     this.swarmInstanceBatches.length = 0;
   }
@@ -1834,9 +1832,9 @@ export class KillstreakPresentation {
     if (this.entities.size > 0) return;
     this.gpuPrewarmGeneration = -1;
     await this.disposeSwarmInstancingBatched();
-    for (const [index, entry] of this.prewarmed.entries()) {
+    for (const entry of this.prewarmed) {
       this.retireRoot(entry.root);
-      if ((index + 1) % 2 === 0) await yieldPresentationPreparation();
+      await yieldPresentationPreparation();
     }
     this.prewarmed.length = 0;
     this.entityPools.clear();

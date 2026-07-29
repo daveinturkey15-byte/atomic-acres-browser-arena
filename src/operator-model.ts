@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
-import { cloneMeshGeometriesForOwner } from './gpu-resource-ownership';
+import { markMeshGeometriesShared } from './gpu-resource-ownership';
 import type { Team } from './protocol';
 import { objectLocalGeometryBounds } from './character-presentation-contract';
 import { solveTwoBoneElbow } from './ik';
@@ -611,7 +611,11 @@ export function createRiggedOperator(
     if (Array.isArray(node.material)) node.material = node.material.map(prepare);
     else node.material = prepare(node.material);
   });
-  cloneMeshGeometriesForOwner(visual, 'operator-instance');
+  // SkeletonUtils already creates independent bones and SkinnedMesh objects.
+  // Their immutable vertex/index buffers can remain shared with the retained
+  // operator source; selective fenced retirement disposes per-instance team
+  // materials without copying or invalidating these multi-megabyte buffers.
+  markMeshGeometriesShared(visual, 'rigged-operator-source');
   const stancePivot = new THREE.Group();
   stancePivot.name = 'operator-stance-pivot';
   stancePivot.position.y = STANCE_PIVOT_HEIGHT;

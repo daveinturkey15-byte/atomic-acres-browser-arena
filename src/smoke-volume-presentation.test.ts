@@ -74,7 +74,7 @@ describe('smoke grenade volume presentation', () => {
     expect(pool.telemetry()).toEqual(telemetryBefore);
   });
 
-  it('splits the native browser smoke vocabulary into bounded six-slot submissions', async () => {
+  it('splits the native browser smoke vocabulary into bounded two-slot submissions', async () => {
     const scene = new THREE.Scene();
     const pool = new SmokeVolumePresentationPool(scene, 12);
     const camera = new THREE.PerspectiveCamera();
@@ -89,8 +89,8 @@ describe('smoke grenade volume presentation', () => {
         visiblePerSubmission.push(pool.root.children.filter((root) => root.visible).length);
       });
       await pool.prewarm({ compileAndRender }, camera, 9);
-      expect(compileAndRender).toHaveBeenCalledTimes(2);
-      expect(visiblePerSubmission).toEqual([6, 6]);
+      expect(compileAndRender).toHaveBeenCalledTimes(6);
+      expect(visiblePerSubmission).toEqual([2, 2, 2, 2, 2, 2]);
       expect(pool.root.children.every((root) => !root.visible)).toBe(true);
     } finally {
       vi.unstubAllGlobals();

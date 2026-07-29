@@ -25,6 +25,7 @@ import {
   releasePass65WeaponModelsIn,
 } from './weapon-model';
 import { applyBotEmissiveBrightness } from './operator-model';
+import { isSharedMeshGeometry } from './gpu-resource-ownership';
 import { GUN_RANGE_FIRING_LINE_Z, applyAdditionalMapPresentationProfile, applyRustworksPresentationProfile, buildGunRange, buildRustworks1v1, buildSkylineTerminal, updateGunRangePresentation } from './additional-maps';
 import {
   BOT_DEATHS_PER_REINFORCEMENT,
@@ -1021,7 +1022,7 @@ function disposeDetachedRootResources(root: THREE.Object3D): void {
       node.shadow.map?.dispose();
     }
   });
-  geometries.forEach((geometry) => geometry.dispose());
+  geometries.forEach((geometry) => { if (!isSharedMeshGeometry(geometry)) geometry.dispose(); });
   materials.forEach((material) => material.dispose());
   root.clear();
 }
@@ -18983,7 +18984,7 @@ async function prepareMenuDeploymentAssets(): Promise<void> {
 let lastArenaEffectPrewarmProfile: Readonly<{
   sceneGeneration: number;
   durationMs: number;
-  groups: readonly Readonly<{ name: string; durationMs: number }>[];
+  groups: readonly Readonly<{ name: string; startedAt: number; completedAt: number; durationMs: number }>[];
 }> | null = null;
 
 async function yieldDeploymentPrewarmFrame(): Promise<void> {
@@ -18995,11 +18996,17 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
     bootstrapStage = 'prewarming-batched-presentations';
     profileArenaTransition('prewarm-batched-effects');
     const startedAt = performance.now();
-    const groups: Array<{ name: string; durationMs: number }> = [];
+    const groups: Array<{ name: string; startedAt: number; completedAt: number; durationMs: number }> = [];
     const runGroup = async (name: string, operation: () => Promise<unknown>): Promise<void> => {
       const groupStartedAt = performance.now();
       await operation();
-      groups.push({ name, durationMs: Number((performance.now() - groupStartedAt).toFixed(3)) });
+      const completedAt = performance.now();
+      groups.push({
+        name,
+        startedAt: groupStartedAt,
+        completedAt,
+        durationMs: Number((completedAt - groupStartedAt).toFixed(3)),
+      });
     };
     // Keep exact-scene coalescing within small compatible families, then end
     // the browser task before staging the next family. Coalescing all eleven
