@@ -113,6 +113,35 @@ test('inactive respawn state clears old retreat timers', () => {
   assert.equal(respawn.mode, 'roam');
 });
 
+test('opt-in respawn escape leaves the initial life unchanged and reverse-sprints after a rendered respawn', () => {
+  const policy = createTacticalPolicy({ respawnEscapeDurationMs: 2500 });
+  const initialLife = policy.update({ now: 1000, active: true, health: 100, movementCycle: 0 });
+  assert.equal(initialLife.mode, 'roam');
+  assert.equal(policy.snapshot().respawnEscapeActivations, 0);
+
+  policy.update({ now: 2000, active: false, health: 0, movementCycle: 1 });
+  const respawn = policy.update({ now: 3000, active: true, health: 100, movementCycle: 2 });
+  assert.equal(respawn.mode, 'retreat');
+  assert.equal(respawn.reason, 'respawn-escape');
+  assert.equal(respawn.allowEngagement, false);
+  assert.ok(respawn.keys.includes('KeyS'));
+  assert.ok(respawn.keys.includes('ShiftLeft'));
+  assert.equal(policy.snapshot().respawnEscapeActivations, 1);
+  assert.equal(policy.snapshot().respawnEscapeFrames, 1);
+
+  const expired = policy.update({ now: 5600, active: true, health: 100, movementCycle: 3 });
+  assert.equal(expired.mode, 'roam');
+});
+
+test('respawn escape remains default-off after an active-inactive-active cycle', () => {
+  const policy = createTacticalPolicy();
+  policy.update({ now: 1000, active: true, health: 100, movementCycle: 0 });
+  policy.update({ now: 2000, active: false, health: 0, movementCycle: 1 });
+  const respawn = policy.update({ now: 3000, active: true, health: 100, movementCycle: 2 });
+  assert.equal(respawn.mode, 'roam');
+  assert.equal(policy.snapshot().respawnEscapeActivations, 0);
+});
+
 test('retreat latches a strafe direction away from a visible minimap threat', () => {
   const policy = createTacticalPolicy();
   const retreat = policy.update({ now: 100, active: true, health: 75, damageDelta: 20, minimapThreat: { bearingRadians: 0.6 } });
