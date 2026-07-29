@@ -102,18 +102,18 @@ function textureBindings(asset: WeaponAsset): readonly TextureBinding[] {
       materials.push(material);
     }
   });
-  for (const [materialIndex, material] of materials.entries()) {
+  for (const material of materials) {
     const writable = material as unknown as Record<string, unknown>;
     for (const [property, value] of Object.entries(material).sort(([left], [right]) => left.localeCompare(right))) {
       if (!(value instanceof THREE.Texture)) continue;
       bindings.push(Object.freeze({
-        key: `${materialIndex}:${material.name}:${property}`,
+        key: `${material.name}:${property}`,
         texture: value,
         assign: (texture: THREE.Texture) => { writable[property] = texture; },
       }));
     }
   }
-  return Object.freeze(bindings);
+  return Object.freeze(bindings.sort((left, right) => left.key.localeCompare(right.key)));
 }
 
 function textureCompatibility(texture: THREE.Texture): string {

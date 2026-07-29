@@ -8,17 +8,23 @@ import { WEAPON_IDS } from './protocol';
 
 function fakeGltf(url: string) {
   const scene = new THREE.Group();
-  const texture = new THREE.Texture();
-  texture.image = { width: 4, height: 4 };
-  texture.name = 'shared-pass65-test-texture';
-  const material = new THREE.MeshStandardMaterial({ color: 0x667788, map: texture });
-  material.name = 'shared-pass65-test-material';
-  const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(1, 0.25, 0.2),
-    material,
-  );
-  mesh.name = `source-${url}`;
-  scene.add(mesh);
+  const material = (name: string): THREE.MeshStandardMaterial => {
+    const texture = new THREE.Texture();
+    texture.image = { width: 4, height: 4 };
+    texture.name = `${name}-texture`;
+    const result = new THREE.MeshStandardMaterial({ color: 0x667788, map: texture });
+    result.name = name;
+    return result;
+  };
+  const materialNames = url.includes('/lmg/')
+    ? ['MAT_Pass65_lmg_Polymer_PBR', 'MAT_Pass65_lmg_Primary_PBR']
+    : ['shared-pass65-test-material'];
+  if (url.includes('/lmg/') && url.includes('-drop-lod0')) materialNames.reverse();
+  for (const [index, name] of materialNames.entries()) {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 0.25, 0.2), material(name));
+    mesh.name = `source-${index}-${url}`;
+    scene.add(mesh);
+  }
   return { scene, animations: [] };
 }
 
