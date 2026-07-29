@@ -462,7 +462,9 @@ async function pageReady(page: Page): Promise<void> {
 async function startSolo(page: Page): Promise<void> {
   await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { startSolo: () => void } }).__ATOMIC_ACRES_DEBUG__.startSolo());
   await page.waitForFunction(
-    () => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active',
+    () => (window as unknown as {
+      __ATOMIC_ACRES_DEBUG__: { admissionState: () => { matchPhase: DebugState['matchPhase'] } };
+    }).__ATOMIC_ACRES_DEBUG__.admissionState().matchPhase === 'active',
     undefined,
     { timeout: 15_000 },
   );

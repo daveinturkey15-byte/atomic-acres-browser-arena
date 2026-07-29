@@ -771,9 +771,8 @@ try {
       api.setMovement(true, true);
     });
     await page.waitForFunction(() => {
-      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+      const state = window.__ATOMIC_ACRES_DEBUG__?.admissionState();
       return state?.gameStarted === true
-        && state?.render?.runtime?.presentation?.status === 'healthy'
         && document.querySelector('#menu')?.classList.contains('hidden');
     }, undefined, { timeout: 30_000 });
     // The former probe started as soon as the menu closed, during the three-
@@ -782,10 +781,14 @@ try {
     // measured rAF window contained no support vehicle at all. Enter the exact
     // gameplay phase whose first-live submission this gate is meant to measure.
     await page.waitForFunction(() => {
-      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
-      return state?.matchPhase === 'active'
-        && state?.render?.runtime?.presentation?.status === 'healthy';
+      const state = window.__ATOMIC_ACRES_DEBUG__?.admissionState();
+      return state?.matchPhase === 'active';
     }, undefined, { timeout: 15_000 });
+    const admissionHealth = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.sampleEnduranceHealth());
+    if (admissionHealth.runtime.actualBackend !== 'webgpu'
+      || admissionHealth.runtime.presentation.status !== 'healthy') {
+      throw new Error(`${arenaId} match admission was not healthy: ${JSON.stringify(admissionHealth.runtime)}`);
+    }
     let doorResetProbe = null;
     if (visit === doorResetProbeDetachVisit) {
       doorResetProbe = await page.evaluate(() => {
@@ -1588,14 +1591,17 @@ try {
         api.setMovement(false);
       });
       await page.waitForFunction((id) => {
-        const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+        const state = window.__ATOMIC_ACRES_DEBUG__?.admissionState();
         return state?.gameStarted === true
           && state.matchPhase === 'active'
-          && state.arenaSelection.id === id
-          && state.render.runtime.actualBackend === 'webgpu'
-          && state.render.runtime.presentation.status === 'healthy'
+          && state.arenaId === id
           && document.querySelector('#menu')?.classList.contains('hidden');
       }, arenaId, { timeout: 30_000 });
+      const visualAdmissionHealth = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.sampleEnduranceHealth());
+      if (visualAdmissionHealth.runtime.actualBackend !== 'webgpu'
+        || visualAdmissionHealth.runtime.presentation.status !== 'healthy') {
+        throw new Error(`${arenaId} visual admission was not healthy: ${JSON.stringify(visualAdmissionHealth.runtime)}`);
+      }
       await pauseAndDrainPresentation(page);
 
       const canvasClip = await page.locator('#game').boundingBox();

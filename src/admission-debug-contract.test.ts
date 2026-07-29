@@ -1,0 +1,66 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+
+function sourceSlice(source: string, start: string, end: string, fromIndex = 0): string {
+  const startIndex = source.indexOf(start, fromIndex);
+  expect(startIndex).toBeGreaterThanOrEqual(0);
+  const endIndex = source.indexOf(end, startIndex + start.length);
+  expect(endIndex).toBeGreaterThan(startIndex);
+  return source.slice(startIndex, endIndex);
+}
+
+describe('allocation-light match admission observation contract', () => {
+  it('exposes only authoritative scalar admission state without scene or render telemetry', () => {
+    const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+    const sampler = sourceSlice(source, 'function sampleAdmissionState()', 'const debugWindow');
+
+    expect(sampler).toContain('bootstrapStage,');
+    expect(sampler).toContain('gameStarted,');
+    expect(sampler).toContain('matchPhase: matchState.phase,');
+    expect(sampler).toContain('arenaId: selectedArena.id,');
+    expect(sampler).not.toContain('snapshot(');
+    expect(sampler).not.toContain('renderRuntime');
+    expect(sampler).not.toContain('telemetry(');
+    expect(sampler).not.toContain('scene.');
+    expect(source).toContain('admissionState: sampleAdmissionState,');
+  });
+
+  it('keeps the exact ladder active-phase poll scalar and the frozen timeout intact', () => {
+    const source = readFileSync(new URL('../tests/e2e/atomic-acres.spec.ts', import.meta.url), 'utf8');
+    const startSolo = sourceSlice(
+      source,
+      'async function startSolo(page: Page): Promise<void>',
+      '// Browser gameplay tests must never read from or write to the production',
+    );
+
+    expect(startSolo).toContain('__ATOMIC_ACRES_DEBUG__.admissionState().matchPhase');
+    expect(startSolo).toContain('{ timeout: 15_000 }');
+    expect(startSolo).not.toContain('.snapshot(');
+    expect(startSolo).not.toContain('.render');
+    expect(startSolo).not.toContain('telemetry');
+  });
+
+  it('keeps endurance startSolo waits scalar while retaining one-shot health evidence', () => {
+    const source = readFileSync(new URL('../scripts/qa/verify-pass65-webgpu-endurance.mjs', import.meta.url), 'utf8');
+    const mainStart = source.indexOf('api.startSolo();');
+    expect(mainStart).toBeGreaterThanOrEqual(0);
+    const mainPolls = sourceSlice(source, 'api.startSolo();', 'const admissionHealth', mainStart);
+    const visualStart = source.indexOf('api.startSolo();', mainStart + 1);
+    expect(visualStart).toBeGreaterThan(mainStart);
+    const visualPoll = sourceSlice(source, 'api.startSolo();', 'const visualAdmissionHealth', visualStart);
+
+    expect(mainPolls.match(/page\.waitForFunction/g)).toHaveLength(2);
+    expect(mainPolls.match(/\.admissionState\(\)/g)).toHaveLength(2);
+    expect(mainPolls).toContain('{ timeout: 15_000 }');
+    expect(visualPoll.match(/page\.waitForFunction/g)).toHaveLength(1);
+    expect(visualPoll.match(/\.admissionState\(\)/g)).toHaveLength(1);
+    expect(visualPoll).toContain('{ timeout: 30_000 }');
+    for (const highFrequencyPolls of [mainPolls, visualPoll]) {
+      expect(highFrequencyPolls).not.toContain('.snapshot(');
+      expect(highFrequencyPolls).not.toContain('.render');
+      expect(highFrequencyPolls).not.toContain('.sampleEnduranceHealth(');
+    }
+    expect(source).toContain('const admissionHealth = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.sampleEnduranceHealth());');
+    expect(source).toContain('const visualAdmissionHealth = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.sampleEnduranceHealth());');
+  });
+});

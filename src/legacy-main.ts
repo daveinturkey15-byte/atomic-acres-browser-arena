@@ -16849,9 +16849,19 @@ function sampleEnduranceHealth() {
   };
 }
 
+function sampleAdmissionState() {
+  return {
+    bootstrapStage,
+    gameStarted,
+    matchPhase: matchState.phase,
+    arenaId: selectedArena.id,
+  };
+}
+
 const debugWindow = window as Window & {
   __ATOMIC_ACRES_DEBUG__?: {
     snapshot: () => Record<string, unknown>;
+    admissionState: () => ReturnType<typeof sampleAdmissionState>;
     sampleEnduranceHealth: () => ReturnType<typeof sampleEnduranceHealth>;
     sampleWeaponCatalogReadiness: () => ReturnType<typeof weaponView.browserCatalogReadiness>;
     sampleWeaponAssetCache: () => ReturnType<typeof pass65WeaponCacheTelemetry>;
@@ -17000,6 +17010,7 @@ const debugWindow = window as Window & {
   };
 };
 debugWindow.__ATOMIC_ACRES_DEBUG__ = {
+  admissionState: sampleAdmissionState,
   sampleEnduranceHealth,
   sampleWeaponCatalogReadiness: () => weaponView.browserCatalogReadiness(),
   sampleWeaponAssetCache: () => pass65WeaponCacheTelemetry(),
