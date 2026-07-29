@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { evaluateAcceptance } from '../scripts/release/acceptance-gate.mjs';
-import { PASS65_HITL_IDENTITY } from './release-identity';
+import { PASS66_RELEASE_IDENTITY } from './release-identity';
 
 const config = JSON.parse(readFileSync('release-channels.json', 'utf8'));
 const pass62Benchmark = JSON.parse(readFileSync('baselines/pass62/best-netcode-benchmark.json', 'utf8'));
@@ -10,7 +10,7 @@ const shellHtml = readFileSync('release-shell/index.html', 'utf8');
 const staging = readFileSync('scripts/release/stage-release-topology.mjs', 'utf8');
 const playwrightServer = readFileSync('scripts/qa/playwright-web-server.mjs', 'utf8');
 
-describe('Pass 65 two-channel release topology', () => {
+describe('Pass 66 two-channel release topology', () => {
   it('retains the immutable best-ever Pass 62 benchmark record independently', () => {
     expect(pass62Benchmark).toMatchObject({
       designation: 'user-approved-best-ever-netcode',
@@ -40,12 +40,12 @@ describe('Pass 65 two-channel release topology', () => {
     });
   });
 
-  it('stages Pass 65 The Big One at its own candidate path and removes old live channels', () => {
+  it('stages Pass 66 The Big One at its own live path and removes old live channels', () => {
     expect(config.experimental).toEqual({
-      pass: PASS65_HITL_IDENTITY.pass,
-      label: PASS65_HITL_IDENTITY.label,
+      pass: PASS66_RELEASE_IDENTITY.pass,
+      label: PASS66_RELEASE_IDENTITY.label,
       description: expect.any(String),
-      path: PASS65_HITL_IDENTITY.route,
+      path: PASS66_RELEASE_IDENTITY.route,
     });
     expect(config.normal).toBeUndefined();
     expect(JSON.stringify(config)).not.toContain('PASS 59');
@@ -53,11 +53,11 @@ describe('Pass 65 two-channel release topology', () => {
     expect(JSON.stringify(config)).not.toContain('channels/new-netcode');
   });
 
-  it('renders exactly live Pass 65 The Big One and stable Pass 63 choices', () => {
+  it('renders exactly live Pass 66 The Big One and stable Pass 63 choices', () => {
     expect(shell).toContain("['experimental', 'stable']");
     expect(shell).not.toContain("['normal', 'stable', 'experimental']");
     expect(shell).toContain("key === 'stable' ? 'STABLE' : 'LIVE'");
-    expect(shellHtml).toContain('Pass 65');
+    expect(shellHtml).toContain('Pass 66');
     expect(shellHtml).toContain('The Big One');
     expect(shellHtml).toContain('byte-exact Pass 63 production release');
     expect(shellHtml).toContain('Nuke Town');
@@ -65,7 +65,7 @@ describe('Pass 65 two-channel release topology', () => {
     expect(shellHtml).not.toContain('Pass 59');
   });
 
-  it('routes root rooms and legacy latest or normal aliases to Pass 65', () => {
+  it('routes root rooms and legacy latest or normal aliases to Pass 66', () => {
     expect(shell).toContain("requested === 'latest' || requested === 'normal') return route('experimental')");
     expect(shell).toContain("requested === 'experimental'");
     expect(shell).toContain("requested === 'stable'");
@@ -96,16 +96,16 @@ describe('Pass 65 two-channel release topology', () => {
     expect(playwrightServer.indexOf('stage-release-topology.mjs')).toBeLessThan(playwrightServer.indexOf('const server = await preview'));
   });
 
-  it('tracks the Pass 65 acceptance lifecycle without allowing premature publication', () => {
-    const manifestPath = 'acceptance/pass-65.json';
+  it('tracks the Pass 66 acceptance lifecycle without allowing premature publication', () => {
+    const manifestPath = 'acceptance/pass-66.json';
     if (!existsSync(manifestPath)) {
-      expect(() => evaluateAcceptance({ phase: 'release', pass: PASS65_HITL_IDENTITY.pass }))
+      expect(() => evaluateAcceptance({ phase: 'release', pass: PASS66_RELEASE_IDENTITY.pass }))
         .toThrow(`acceptance manifest does not exist: ${manifestPath}`);
       return;
     }
 
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-    const result = evaluateAcceptance({ phase: 'release', pass: PASS65_HITL_IDENTITY.pass }) as {
+    const result = evaluateAcceptance({ phase: 'release', pass: PASS66_RELEASE_IDENTITY.pass }) as {
       ok: boolean;
       errors: string[];
       approvalParity: { ok: boolean };

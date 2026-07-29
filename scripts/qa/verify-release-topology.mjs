@@ -15,9 +15,9 @@ const publicConfig = JSON.parse(publicConfigSource.slice(publicConfigSource.inde
 if (JSON.stringify(Object.keys(publicConfig)) !== JSON.stringify(['experimental', 'stable'])) {
   throw new Error(`Root chooser must expose only experimental and stable: ${Object.keys(publicConfig).join(', ')}`);
 }
-if (publicConfig.experimental.pass !== 'PASS 65' || publicConfig.experimental.label !== 'THE BIG ONE'
+if (publicConfig.experimental.pass !== 'PASS 66' || publicConfig.experimental.label !== 'THE BIG ONE'
   || publicConfig.experimental.path !== 'channels/the-big-one') {
-  throw new Error('Root chooser is missing live Pass 65 THE BIG ONE');
+  throw new Error('Root chooser is missing live Pass 66 THE BIG ONE');
 }
 if (publicConfig.stable.pass !== 'PASS 63' || publicConfig.stable.label !== 'NEW NETCODE') {
   throw new Error('Root chooser is missing stable Pass 63 new netcode');

@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { CHANGELOG } from './changelog';
 import {
-  PROJECT_MAP_CANDIDATE,
+  PROJECT_MAP_RELEASE,
   PROJECT_MAP_TREE,
   createProjectMapBundle,
   flattenProjectMap,
@@ -23,20 +23,20 @@ describe('project map', () => {
 
   it('keeps the current snapshot first and the complete older history in the archive', () => {
     const bundle = createProjectMapBundle('2026-07-24T17:00:00Z');
-    expect(bundle.current.release).toEqual(PROJECT_MAP_CANDIDATE);
+    expect(bundle.current.release).toEqual(PROJECT_MAP_RELEASE);
     expect(bundle.current.previousRelease).toBe('PASS 64');
     expect(bundle.archive).toEqual(CHANGELOG);
-    // The candidate snapshot replaces the pending PASS 65 ledger entry at the
+    // The current snapshot replaces the pending PASS 66 ledger entry at the
     // front of the combined changes list instead of duplicating the pass.
     expect(bundle.changes).toEqual([
-      PROJECT_MAP_CANDIDATE,
-      ...CHANGELOG.filter((entry) => entry.pass !== PROJECT_MAP_CANDIDATE.pass),
+      PROJECT_MAP_RELEASE,
+      ...CHANGELOG.filter((entry) => entry.pass !== PROJECT_MAP_RELEASE.pass),
     ]);
-    expect(bundle.current.candidateState).toBe('hitl-candidate');
-    expect(bundle.publishedChannels.stagedCandidate).toMatchObject({
-      pass: 'PASS 65', label: 'THE BIG ONE', path: 'channels/the-big-one', state: 'unpublished-hitl-candidate',
+    expect(bundle.current.releaseState).toBe('release-candidate');
+    expect(bundle.publishedChannels.liveTarget).toMatchObject({
+      pass: 'PASS 66', label: 'THE BIG ONE', path: 'channels/the-big-one', state: 'release-candidate',
     });
-    expect(bundle.publishedChannels.live).toMatchObject({
+    expect(bundle.publishedChannels.failedRegressionEvidence).toMatchObject({
       pass: 'PASS 64', role: 'published-failed-regression-evidence',
     });
     expect(bundle.publishedChannels.stable.pass).toBe('PASS 63');
@@ -48,13 +48,13 @@ describe('project map', () => {
     const markdown = projectMapMarkdown(bundle);
     expect(JSON.parse(json)).toMatchObject({
       schemaVersion: 1,
-      current: { release: { pass: PROJECT_MAP_CANDIDATE.pass } },
+      current: { release: { pass: PROJECT_MAP_RELEASE.pass } },
     });
     expect(markdown.indexOf('## Current release snapshot')).toBeLessThan(markdown.indexOf('## Release archive'));
     expect(markdown).toContain(`### ${CHANGELOG[0]?.pass}: ${CHANGELOG[0]?.title}`);
     expect(markdown).toContain('TypeScript and Rapier own physics');
-    expect(markdown).toContain('Staged HITL candidate: PASS 65 (THE BIG ONE); unpublished');
-    expect(markdown).toContain('Published live channel: PASS 64');
+    expect(markdown).toContain('Live target: PASS 66 (THE BIG ONE); release-candidate');
+    expect(markdown).toContain('Failed-regression evidence: PASS 64');
   });
 
   it('rejects an invalid generated timestamp', () => {

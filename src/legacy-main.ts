@@ -16,7 +16,7 @@ import type { ArenaVisualBudgets, ArenaVisualDefinition } from './rendering/aren
 import { auditLocalLightOcclusion } from './rendering/light-occlusion';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem } from './water-system';
-import { PASS65_HITL_IDENTITY } from './release-identity';
+import { PASS66_RELEASE_IDENTITY } from './release-identity';
 import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon, waitForPendingArtTextures } from './art-kit';
 import {
   invalidatePass65PresentationTree,
@@ -14694,7 +14694,7 @@ function updateMatchState(now: number): void {
     if (matchDiagnostics) {
       const remoteEnvelope = matchDiagnostics.remoteEnvelope({
         completedAtEpochMs: Date.now(),
-        pass: PASS65_HITL_IDENTITY.pass,
+        pass: PASS66_RELEASE_IDENTITY.pass,
         backend: renderRuntime.telemetry().actualBackend === 'webgpu' ? 'webgpu' : 'webgl-compatibility',
         durationMs: Math.max(0, performance.now() - matchDiagnosticsStartedAt),
         network: {

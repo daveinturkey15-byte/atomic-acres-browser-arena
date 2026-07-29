@@ -1,9 +1,9 @@
-export const PASS65_HITL_IDENTITY = Object.freeze({
-  pass: 'PASS 65',
+export const PASS66_RELEASE_IDENTITY = Object.freeze({
+  pass: 'PASS 66',
   label: 'THE BIG ONE',
-  state: 'HITL CANDIDATE',
+  state: 'RELEASE CANDIDATE',
   route: 'channels/the-big-one',
-  runtimeLabel: 'PASS 65 · THE BIG ONE · HITL CANDIDATE',
+  runtimeLabel: 'PASS 66 · THE BIG ONE',
 });
 
 export const PASS64_FAILED_REGRESSION_IDENTITY = Object.freeze({

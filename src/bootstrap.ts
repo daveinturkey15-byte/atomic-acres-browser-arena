@@ -33,7 +33,7 @@ function showReleaseChooser(): void {
         <p>Load the newest approved build, or keep playing the preserved version people already know.</p>
         <div class="release-channel-options">
           <button type="button" class="release-channel-option primary" data-release-choice="latest">
-            <small>${releaseChannels.experimental.pass} · HITL CANDIDATE</small>
+            <small>${releaseChannels.experimental.pass} · LIVE TARGET</small>
             <strong>${releaseChannels.latest.label}</strong>
             <span>${releaseChannels.latest.description}</span>
           </button>

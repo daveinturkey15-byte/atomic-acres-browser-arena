@@ -10,7 +10,7 @@ import { DEFAULT_KILLSTREAK_LOADOUT } from '../killstreak-loadout';
 import { killstreakLoadoutPanelMarkup } from './killstreak-loadout-menu';
 import { projectMapButtonMarkup, projectMapDialogMarkup } from './project-map-dialog';
 import { releaseHistoryButtonMarkup, releaseHistoryDialogMarkup } from './release-history-dialog';
-import { PASS65_HITL_IDENTITY } from '../release-identity';
+import { PASS66_RELEASE_IDENTITY } from '../release-identity';
 import { advancedGraphicsMarkup } from './advanced-graphics-controls';
 import './advanced-graphics.css';
 import { menuPreviewVideoDefinition, menuPreviewVideoMarkup } from './menu-preview-video';
@@ -31,7 +31,7 @@ function escapeAttribute(value: string): string {
 export function createPass64ShellViewModel(playerName: string): Pass64ShellViewModel {
   return Object.freeze({
     playerName: escapeAttribute(playerName),
-    releaseLabel: PASS65_HITL_IDENTITY.runtimeLabel,
+    releaseLabel: PASS66_RELEASE_IDENTITY.runtimeLabel,
   });
 }
 

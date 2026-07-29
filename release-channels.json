@@ -3,12 +3,12 @@
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
     "label": "THE BIG ONE",
-    "description": "The Pass 65 local HITL candidate. It is not approved or published yet."
+    "description": "Pass 66: the current live target, promoted only after exact-SHA verification."
   },
   "experimental": {
     "label": "THE BIG ONE",
-    "description": "Pass 65 candidate staged for exact-SHA HITL while byte-exact Pass 63 remains the stable rollback.",
-    "pass": "PASS 65",
+    "description": "Pass 66 live release while byte-exact Pass 63 remains the stable rollback.",
+    "pass": "PASS 66",
     "path": "channels/the-big-one"
   },
   "stable": {
