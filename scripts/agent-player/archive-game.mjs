@@ -226,6 +226,10 @@ export function partialBenchmarkFromReport(report) {
       reloadRequests: input.reloadRequests ?? null,
       stuckRecoveries: input.stuckRecoveries ?? null,
       damageReactions: input.damageReactions ?? null,
+      activeInputVeto: input.activeInputVeto ?? null,
+      pointerLockLosses: input.pointerLockLosses ?? null,
+      focusLosses: input.focusLosses ?? null,
+      hudFreshnessFailures: input.hudFreshnessFailures ?? null,
       maximumObservedHoldMs: input.maximumObservedHoldMs ?? null,
       configuredMaxHoldMs: input.configuredMaxHoldMs ?? null,
       releasedAtEnd: input.releasedAtEnd ?? null,
@@ -416,6 +420,26 @@ export async function archiveGame({
   const duplicate = index.games.find((game) => game.sourceFingerprint === sourceFingerprint);
   if (duplicate) return { duplicate: true, game: duplicate, directory: join(archiveRoot, duplicate.directory) };
 
+  // Validate comparison references before copying into the immutable games
+  // directory. A bad policy must not strand an unindexed G#### destination.
+  const observedWeaponName = String(
+    experimentPolicy?.configuration?.expectedWeaponName
+      ?? sourceReport?.session?.observedWeaponName
+      ?? sourceReport?.input?.observedWeaponName
+      ?? '',
+  ).trim().toUpperCase();
+  const comparisonGroup = experimentPolicy?.comparisonGroup
+    ?? (observedWeaponName ? `weapon:${observedWeaponName}` : null);
+  const requestedBaselineId = experimentPolicy?.comparisonBaselineGameId
+    ?? (comparisonGroup ? index.comparisonBaselines?.[comparisonGroup] : null)
+    ?? null;
+  const requestedBaselineGame = requestedBaselineId
+    ? index.games.find((game) => game.id === requestedBaselineId && game.benchmarkFile && (game.counted ?? game.completed))
+    : null;
+  if (requestedBaselineId && !requestedBaselineGame) {
+    throw new Error(`Requested comparison baseline is not a completed comparable archive game: ${requestedBaselineId}`);
+  }
+
   const gameId = `G${String(index.games.length + 1).padStart(4, '0')}`;
   const gameRelativeDirectory = `games/${gameId}`;
   const gameDirectory = join(archiveRoot, gameRelativeDirectory);
@@ -433,23 +457,7 @@ export async function archiveGame({
   const completed = Boolean(summary && report?.outcome?.matchEndedObserved);
   const absoluteHardFailures = hardGateFailures(benchmark);
   const counted = runType === 'benchmark' && completed && absoluteHardFailures.length === 0;
-  const observedWeaponName = String(
-    experimentPolicy?.configuration?.expectedWeaponName
-      ?? report?.session?.observedWeaponName
-      ?? report?.input?.observedWeaponName
-      ?? '',
-  ).trim().toUpperCase();
-  const comparisonGroup = experimentPolicy?.comparisonGroup
-    ?? (observedWeaponName ? `weapon:${observedWeaponName}` : null);
-  const requestedBaselineId = experimentPolicy?.comparisonBaselineGameId
-    ?? (comparisonGroup ? index.comparisonBaselines?.[comparisonGroup] : null)
-    ?? null;
-  const requestedBaselineGame = requestedBaselineId
-    ? index.games.find((game) => game.id === requestedBaselineId && game.benchmarkFile && (game.counted ?? game.completed))
-    : null;
-  if (requestedBaselineId && !requestedBaselineGame) {
-    throw new Error(`Requested comparison baseline is not a completed comparable archive game: ${requestedBaselineId}`);
-  }
+
   const comparableGames = index.games.filter((game) => game.benchmarkFile
     && (game.counted ?? game.completed)
     && (!comparisonGroup || game.comparisonGroup === comparisonGroup || game.id === requestedBaselineId));

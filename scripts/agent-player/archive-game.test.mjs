@@ -56,12 +56,16 @@ test('partial games preserve available control evidence without inventing combat
   const partial = partialBenchmarkFromReport({
     source: { pass: 'PASS 63' }, session: { mode: 'solo', pointerLock: true },
     performance: { observedRenderProfile: 'performance', visionFrames: 12, visionStream: { sourceFps: 6, failedFrames: 1 } },
-    input: { releasedAtEnd: true, holdWatchdogExceeded: false }, browser: { pageErrors: [] },
+    input: { releasedAtEnd: true, holdWatchdogExceeded: false, activeInputVeto: false, pointerLockLosses: 0, focusLosses: 0, hudFreshnessFailures: 0 }, browser: { pageErrors: [] },
     fairness: { forbiddenInputsUsed: [] }, outcome: { matchEndedObserved: false },
   });
   assert.deepEqual(partial.result, {});
   assert.equal(partial.perception.sourceFps, 6);
   assert.equal(partial.control.releasedAtEnd, true);
+  assert.equal(partial.control.activeInputVeto, false);
+  assert.equal(partial.control.pointerLockLosses, 0);
+  assert.equal(partial.control.focusLosses, 0);
+  assert.equal(partial.control.hudFreshnessFailures, 0);
   assert.equal(partial.integrity.matchEndedObserved, false);
 });
 
@@ -114,6 +118,42 @@ test('archive assigns immutable sequential IDs, deduplicates imports and compare
   const verification = await verifyArchive(archiveRoot);
   assert.equal(verification.ok, true, verification.errors.join('\n'));
   assert.equal(verification.gameCount, 3);
+});
+
+test('archive rejects an invalid comparison baseline before creating an immutable destination', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'atomic-archive-preflight-test-'));
+  const archiveRoot = join(root, 'archive');
+  const first = join(root, 'first');
+  const candidate = join(root, 'candidate');
+  await writeGameSource(first, { startedAt: '2026-07-25T00:00:00Z', kills: 1, deaths: 8, damageDealt: 100, damageTaken: 800 });
+  await writeGameSource(candidate, { startedAt: '2026-07-25T01:00:00Z', kills: 0, deaths: 1, damageDealt: 0, damageTaken: 100 });
+  await archiveGame({ sourceDirectory: first, archiveRoot, setBaseline: true });
+  const policy = {
+    schemaVersion: 1,
+    policyId: 'atomic-player-invalid-baseline-preflight',
+    hypothesis: 'Archive baseline validation should happen before immutable evidence is copied.',
+    expectedMetricMovements: ['Archive integrity remains unchanged after a rejected policy.'],
+    unchangedControls: ['The source report and existing G0001 evidence remain untouched.'],
+    rollbackCondition: 'Any unindexed G0002 directory is created.',
+    comparisonBaselineGameId: 'G9999',
+    comparisonGroup: 'weapon:CARBINE',
+    configuration: {
+      playerHarnessCommit: 'abc1234',
+      profile: 'atomicplayer',
+      provider: 'openai-codex',
+      model: 'gpt-5.6-sol',
+      reasoningEffort: 'high',
+      serviceTier: 'priority',
+    },
+  };
+  await writeFile(join(candidate, 'experiment-policy.json'), `${JSON.stringify(policy, null, 2)}\n`);
+  await assert.rejects(
+    archiveGame({ sourceDirectory: candidate, archiveRoot, runType: 'calibration' }),
+    /not a completed comparable archive game/,
+  );
+  await assert.rejects(readFile(join(archiveRoot, 'games/G0002/report.json')), /ENOENT/);
+  const index = JSON.parse(await readFile(join(archiveRoot, 'index.json'), 'utf8'));
+  assert.deepEqual(index.games.map((game) => game.id), ['G0001']);
 });
 
 test('placeholder experiment-policy values are rejected before a counted game can be archived', () => {
