@@ -94,6 +94,25 @@ describe('killstreak protocol', () => {
     expect(isKillstreakProtocolMessage({ ...message, impacts: [{ ...message.impacts[0], ordinal: 20 }] })).toBe(false);
   });
 
+  it('requires finite authoritative ray endpoints and tracer origins on damage results', () => {
+    const event = {
+      resultId: 'ks-result-7-1', activationId: 'ks-activation-7-1', source: 'chopper' as const,
+      ownerId: 'owner', targetId: 'enemy', targetLifeId: 3, targetPosition: [0, 1.7, -20] as const,
+      damage: 10, origin: [0, 8, 0] as const, endpoint: [0, 1.7, -19.38] as const,
+      tracerOrigin: [0, 6.4, -3] as const, atMs: 2_000,
+    };
+    const message = {
+      type: 'killstreak-damage-result' as const,
+      by: 'host', matchEpoch: 7, revision: 4, events: [event], impacts: [], nonce: 10,
+    };
+    expect(isKillstreakProtocolMessage(message)).toBe(true);
+    expect(isKillstreakProtocolMessage({ ...message, events: [{ ...event, endpoint: [0, Number.NaN, -19.38] }] })).toBe(false);
+    expect(isKillstreakProtocolMessage({ ...message, events: [{ ...event, tracerOrigin: [0, 6.4] }] })).toBe(false);
+    const missingEndpoint = Object.fromEntries(Object.entries(event).filter(([key]) => key !== 'endpoint'));
+    expect(isKillstreakProtocolMessage({ ...message, events: [missingEndpoint] })).toBe(false);
+    expect(isKillstreakProtocolMessage({ ...message, events: [{ ...event, clientRay: [0, 0, -1] }] })).toBe(false);
+  });
+
   it('admits bounded recipient snapshots, rejects entity storms, and classifies host authority', () => {
     const runtime = new HostKillstreakRuntime(7);
     runtime.registerActor('owner', 0, 1, loadout);

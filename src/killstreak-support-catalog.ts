@@ -56,6 +56,18 @@ export const CHOPPER_GUN_PROFILE = Object.freeze({
   criticalHits: false,
 } as const);
 
+/**
+ * Host-owned geometry for the possessed Chopper Gunner fire contract. These
+ * offsets are the authored LOD0 socket transforms after Blender-to-glTF axis
+ * conversion; gameplay never reads a rendered/interpolated Object3D pose.
+ */
+export const CHOPPER_GUNNER_RAY_POLICY = Object.freeze({
+  cameraSocketLocalM: Object.freeze([0, 0.74, -0.38] as const),
+  cameraForwardNudgeM: 0.08,
+  muzzleSocketLocalM: Object.freeze([0, -0.82, -3.32] as const),
+  targetRadiusM: 0.62,
+} as const);
+
 export type SupportGunDamageProfile = Pick<
   DroneGunProfile,
   'damage' | 'minimumDamage' | 'falloffStartM' | 'maximumRangeM' | 'criticalHits'

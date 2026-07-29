@@ -614,6 +614,31 @@ describe('killstreak presentation', () => {
     presentation.dispose();
   });
 
+  it('never interpolates the possessed chopper pose that anchors its camera and HUD', () => {
+    const presentation = new KillstreakPresentation(new THREE.Scene());
+    const initial = snapshot(1);
+    presentation.sync(initial, 1_000);
+    presentation.setFirstPersonEntity('ks-1-chopper-1');
+    const movedAttitude = [0.11, -0.62, 0.08] as const;
+    const movedPosition = [3, 5.5, -2] as const;
+    presentation.sync({
+      ...initial,
+      revision: 2,
+      entities: initial.entities.map((entity) => ({
+        ...entity,
+        position: movedPosition,
+        attitude: movedAttitude,
+        revision: 2,
+      })),
+    }, 1_016);
+    const chopper = presentation.entityRoot('ks-1-chopper-1')!;
+    expect(chopper.position.toArray()).toEqual(movedPosition);
+    expect(chopper.quaternion.angleTo(new THREE.Quaternion().setFromEuler(new THREE.Euler(...movedAttitude, 'YXZ'))))
+      .toBeLessThan(1e-8);
+    presentation.setFirstPersonEntity(null);
+    presentation.dispose();
+  });
+
   it('applies a retained first-person entity ID when that entity arrives later', () => {
     const presentation = new KillstreakPresentation(new THREE.Scene());
     presentation.setFirstPersonEntity('ks-1-chopper-1');

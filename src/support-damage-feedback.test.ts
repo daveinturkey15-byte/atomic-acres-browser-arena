@@ -35,7 +35,8 @@ describe('support damage feedback projection', () => {
     const telemetry = new SupportDamageFeedbackTelemetry();
     const event = {
       resultId: 'result-1', activationId: 'activation-1', source: 'chopper', ownerId: 'owner',
-      targetId: 'victim', targetLifeId: 4, targetPosition: [4, 0, -10], damage: 10, origin: [0, 8, 0], atMs: 1_000,
+      targetId: 'victim', targetLifeId: 4, targetPosition: [4, 0, -10], damage: 10,
+      origin: [0, 8, 0], endpoint: [4, 0, -10], tracerOrigin: [0, 7, -1], atMs: 1_000,
     } as const;
     const visible = projectSupportDamageAnchor(new THREE.Vector3(...event.targetPosition), camera, { width: 1_920, height: 1_080 });
     expect(telemetry.record(event, visible, { width: 1_920, height: 1_080 })).toMatchObject({

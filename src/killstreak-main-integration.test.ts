@@ -109,10 +109,20 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(end).toBeGreaterThan(start);
     const block = source.slice(start, end);
     expect(block).toContain('new THREE.Vector3(...event.targetPosition)');
+    expect(block).toContain('new THREE.Vector3(...event.tracerOrigin)');
+    expect(block).toContain('new THREE.Vector3(...event.endpoint)');
     expect(block).toContain('projectSupportDamageAnchor(targetPosition, camera, viewport)');
     expect(block).toContain('supportDamageFeedbackTelemetry.record(event, anchor, viewport)');
     expect(block).toContain("showDamageNumber(event.damage, 'body', undefined, { ...anchor, targetId: event.targetId })");
     expect(block).not.toContain('showHitmarker(');
+  });
+
+  it('derives the possessed chopper camera from authority snapshots instead of presentation interpolation', () => {
+    const start = source.indexOf('function updateKillstreakPossession(');
+    const end = source.indexOf('\nfunction updatePass65KillstreakRuntime(', start);
+    const block = source.slice(start, end);
+    expect(block).toContain("possession.kind === 'chopper-gunner'");
+    expect(block).toContain('chopperGunnerCameraOrigin(entity.position, entity.attitude)');
   });
 
   it('uses a world-space crosshair for Care/Carpet placement and host-owned surface height', () => {

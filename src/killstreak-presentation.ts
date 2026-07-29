@@ -2202,9 +2202,10 @@ export class KillstreakPresentation {
       presented.target.fromArray(entity.position);
       presented.attitudeEuler.set(entity.attitude[0], entity.attitude[1], entity.attitude[2], 'YXZ');
       presented.attitudeTarget.setFromEuler(presented.attitudeEuler);
+      const possessed = entity.id === this.firstPersonEntityId;
       const phaseReset = !firstProjection && presented.root.userData.supportSnapshotPhase !== entity.phase;
       const teleported = !firstProjection && presented.root.position.distanceToSquared(presented.target) > 64;
-      if (firstProjection || phaseReset || teleported) {
+      if (firstProjection || phaseReset || teleported || possessed) {
         presented.root.position.copy(presented.target);
         // Preserve the canonical authored YXZ components on deterministic
         // snaps; assigning the equivalent quaternion can re-express the Euler
@@ -2420,6 +2421,13 @@ export class KillstreakPresentation {
 
   setFirstPersonEntity(id: string | null): void {
     this.firstPersonEntityId = id;
+    const presented = id ? this.entities.get(id) : null;
+    if (presented) {
+      // A possessed support view must use the current immutable snapshot pose;
+      // sparse-snapshot presentation smoothing cannot move the camera/HUD ray.
+      presented.root.position.copy(presented.target);
+      presented.root.quaternion.copy(presented.attitudeTarget);
+    }
     this.applyFirstPersonVisibility();
   }
 

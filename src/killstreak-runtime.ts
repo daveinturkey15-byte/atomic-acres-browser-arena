@@ -7,6 +7,7 @@ import {
 import { parseKillstreakLoadout, type KillstreakLoadoutV1 } from './killstreak-catalog';
 import {
   CHOPPER_GUN_PROFILE,
+  CHOPPER_GUNNER_RAY_POLICY,
   DRONE_GUN_PROFILE,
   DRONE_GUN_PROFILE_ID,
   DRONE_DEPLOYMENT_POLICY,
@@ -50,6 +51,11 @@ export const MAX_REPLICATED_KILLSTREAK_STREAK = 100_000;
 export const MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD = 255;
 /** Matches the strict recipient snapshot bound; a full queue leaves the crate claimable. */
 export const MAX_RETAINED_CARE_REWARDS = 8;
+const CHOPPER_GUNNER_CAMERA_ORIGIN_LOCAL = Object.freeze([
+  CHOPPER_GUNNER_RAY_POLICY.cameraSocketLocalM[0],
+  CHOPPER_GUNNER_RAY_POLICY.cameraSocketLocalM[1],
+  CHOPPER_GUNNER_RAY_POLICY.cameraSocketLocalM[2] - CHOPPER_GUNNER_RAY_POLICY.cameraForwardNudgeM,
+] as const);
 
 export type SupportVec3 = readonly [number, number, number];
 
@@ -96,7 +102,12 @@ export type KillstreakDamageEvent = Readonly<{
   /** Host-admitted impact-time anchor used only for world-space feedback. */
   targetPosition: SupportVec3;
   damage: number;
+  /** Authoritative camera/damage ray origin, never a rendered socket pose. */
   origin: SupportVec3;
+  /** Exact point on the admitted weapon ray used by every recipient tracer. */
+  endpoint: SupportVec3;
+  /** Host-derived authored muzzle socket used only as the tracer's visual start. */
+  tracerOrigin: SupportVec3;
   atMs: number;
 }>;
 
@@ -390,6 +401,80 @@ function distance(left: SupportVec3, right: SupportVec3): number {
   return Math.hypot(left[0] - right[0], left[1] - right[1], left[2] - right[2]);
 }
 
+export type ChopperGunnerAuthoritativeRay = Readonly<{
+  origin: SupportVec3;
+  direction: SupportVec3;
+  tracerOrigin: SupportVec3;
+}>;
+
+type SupportRayTargetHit = Readonly<{
+  target: KillstreakTarget;
+  endpoint: SupportVec3;
+  distance: number;
+}>;
+
+function rotateSupportOffsetYXZ(offset: SupportVec3, attitude: SupportVec3): SupportVec3 {
+  const [pitch, yaw, bank] = attitude;
+  const c1 = Math.cos(pitch / 2);
+  const c2 = Math.cos(yaw / 2);
+  const c3 = Math.cos(bank / 2);
+  const s1 = Math.sin(pitch / 2);
+  const s2 = Math.sin(yaw / 2);
+  const s3 = Math.sin(bank / 2);
+  const qx = s1 * c2 * c3 + c1 * s2 * s3;
+  const qy = c1 * s2 * c3 - s1 * c2 * s3;
+  const qz = c1 * c2 * s3 - s1 * s2 * c3;
+  const qw = c1 * c2 * c3 + s1 * s2 * s3;
+  const uvx = qy * offset[2] - qz * offset[1];
+  const uvy = qz * offset[0] - qx * offset[2];
+  const uvz = qx * offset[1] - qy * offset[0];
+  const uuvx = qy * uvz - qz * uvy;
+  const uuvy = qz * uvx - qx * uvz;
+  const uuvz = qx * uvy - qy * uvx;
+  return Object.freeze([
+    offset[0] + 2 * (qw * uvx + uuvx),
+    offset[1] + 2 * (qw * uvy + uuvy),
+    offset[2] + 2 * (qw * uvz + uuvz),
+  ] as const);
+}
+
+function translatedSupportOffset(position: SupportVec3, attitude: SupportVec3, offset: SupportVec3): SupportVec3 {
+  const rotated = rotateSupportOffsetYXZ(offset, attitude);
+  return Object.freeze([
+    position[0] + rotated[0],
+    position[1] + rotated[1],
+    position[2] + rotated[2],
+  ] as const);
+}
+
+/**
+ * One pure host/client geometry contract for the possessed gunner camera and
+ * visual muzzle. Both derive from the immutable support snapshot; neither may
+ * read the interpolated presentation hierarchy.
+ */
+export function chopperGunnerCameraOrigin(position: SupportVec3, attitude: SupportVec3): SupportVec3 {
+  return translatedSupportOffset(position, attitude, CHOPPER_GUNNER_CAMERA_ORIGIN_LOCAL);
+}
+
+export function chopperGunnerAuthoritativeRay(
+  position: SupportVec3,
+  attitude: SupportVec3,
+  aimYaw: number,
+  aimPitch: number,
+): ChopperGunnerAuthoritativeRay {
+  return Object.freeze({
+    origin: chopperGunnerCameraOrigin(position, attitude),
+    direction: supportForwardFromYawPitch(aimYaw, aimPitch),
+    tracerOrigin: translatedSupportOffset(position, attitude, CHOPPER_GUNNER_RAY_POLICY.muzzleSocketLocalM),
+  });
+}
+
+function hostileTargets(world: KillstreakWorld, ownerId: string, team: 0 | 1): KillstreakTarget[] {
+  return world.targets.filter((target) => target.alive
+    && target.id !== ownerId
+    && (world.areHostile?.(ownerId, team, target) ?? target.team !== team)
+    && (target.kind === 'player' || target.kind === 'bot'));
+}
 function lineOfSight(world: KillstreakWorld, from: SupportVec3, to: SupportVec3): boolean {
   return world.hasLineOfSight?.(from, to) ?? true;
 }
@@ -1456,28 +1541,44 @@ export class HostKillstreakRuntime {
     if (!shouldFire || damageEvents.length >= MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP) return;
     const owner = this.actors.get(entity.ownerId);
     if (!owner) return;
-    const target = entity.gunController === 'ai'
-      ? this.nearestVisibleTarget(entity.position, owner.actorId, owner.team, world)
-      : this.aimedVisibleTarget(
-        entity.position,
-        entity.aimYaw,
-        entity.aimPitch,
+    if (entity.gunController === 'ai') {
+      const target = this.nearestVisibleTarget(entity.position, owner.actorId, owner.team, world);
+      if (target) {
+        const admittedDamage = supportGunDamageAtDistance(CHOPPER_GUN_PROFILE, distance(entity.position, target.position));
+        if (admittedDamage > 0) damageEvents.push(this.damageEvent(
+          entity.activationId,
+          'chopper',
+          owner.actorId,
+          target,
+          admittedDamage,
+          entity.position,
+          nowMs,
+        ));
+      }
+    } else {
+      const ray = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, entity.aimYaw, entity.aimPitch);
+      const hit = this.visibleTargetAlongRay(
+        ray.origin,
+        ray.direction,
         owner.actorId,
         owner.team,
         world,
         CHOPPER_GUN_PROFILE.maximumRangeM,
       );
-    if (target) {
-      const admittedDamage = supportGunDamageAtDistance(CHOPPER_GUN_PROFILE, distance(entity.position, target.position));
-      if (admittedDamage > 0) damageEvents.push(this.damageEvent(
-        entity.activationId,
-        'chopper',
-        owner.actorId,
-        target,
-        admittedDamage,
-        entity.position,
-        nowMs,
-      ));
+      if (hit) {
+        const admittedDamage = supportGunDamageAtDistance(CHOPPER_GUN_PROFILE, hit.distance);
+        if (admittedDamage > 0) damageEvents.push(this.damageEvent(
+          entity.activationId,
+          'chopper',
+          owner.actorId,
+          hit.target,
+          admittedDamage,
+          ray.origin,
+          nowMs,
+          hit.endpoint,
+          ray.tracerOrigin,
+        ));
+      }
     }
     entity.nextShotAtMs = nowMs + CHOPPER_GUN_PROFILE.cadenceMs;
     entity.pendingPlayerFire = false;
@@ -1813,6 +1914,37 @@ export class HostKillstreakRuntime {
     return nearest;
   }
 
+  private visibleTargetAlongRay(
+    origin: SupportVec3,
+    direction: SupportVec3,
+    ownerId: string,
+    team: 0 | 1,
+    world: KillstreakWorld,
+    maximumRange: number,
+  ): SupportRayTargetHit | null {
+    const radiusSquared = CHOPPER_GUNNER_RAY_POLICY.targetRadiusM ** 2;
+    const hits: SupportRayTargetHit[] = [];
+    for (const target of hostileTargets(world, ownerId, team)) {
+      const dx = target.position[0] - origin[0];
+      const dy = target.position[1] - origin[1];
+      const dz = target.position[2] - origin[2];
+      const centreDistance = dx * direction[0] + dy * direction[1] + dz * direction[2];
+      if (centreDistance <= 0 || centreDistance - CHOPPER_GUNNER_RAY_POLICY.targetRadiusM > maximumRange) continue;
+      const perpendicularSquared = Math.max(0, dx * dx + dy * dy + dz * dz - centreDistance * centreDistance);
+      if (perpendicularSquared > radiusSquared) continue;
+      const entryDistance = Math.max(0, centreDistance - Math.sqrt(radiusSquared - perpendicularSquared));
+      if (entryDistance > maximumRange) continue;
+      const endpoint: SupportVec3 = Object.freeze([
+        origin[0] + direction[0] * entryDistance,
+        origin[1] + direction[1] * entryDistance,
+        origin[2] + direction[2] * entryDistance,
+      ] as const);
+      if (!lineOfSight(world, origin, endpoint)) continue;
+      hits.push(Object.freeze({ target, endpoint, distance: entryDistance }));
+    }
+    return hits.sort((left, right) => left.distance - right.distance || left.target.id.localeCompare(right.target.id))[0] ?? null;
+  }
+
   private damageAround(
     owner: ActorAuthorityState,
     activationId: string,
@@ -1864,6 +1996,8 @@ export class HostKillstreakRuntime {
     damage: number,
     origin: SupportVec3,
     nowMs: number,
+    endpoint: SupportVec3 = target.position,
+    tracerOrigin: SupportVec3 = origin,
   ): KillstreakDamageEvent {
     this.resultCounter += 1;
     return Object.freeze({
@@ -1876,6 +2010,8 @@ export class HostKillstreakRuntime {
       targetPosition: Object.freeze([...target.position]) as unknown as SupportVec3,
       damage,
       origin: Object.freeze([...origin]) as unknown as SupportVec3,
+      endpoint: Object.freeze([...endpoint]) as unknown as SupportVec3,
+      tracerOrigin: Object.freeze([...tracerOrigin]) as unknown as SupportVec3,
       atMs: nowMs,
     });
   }

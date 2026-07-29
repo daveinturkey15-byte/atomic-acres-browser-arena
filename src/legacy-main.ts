@@ -75,6 +75,7 @@ import { KillstreakLoadoutController } from './killstreak-loadout';
 import type { KillstreakLoadoutV1, Pass65KillstreakId } from './killstreak-catalog';
 import {
   HostKillstreakRuntime,
+  chopperGunnerCameraOrigin,
   type KillstreakDamageEvent,
   type KillstreakRecipientSnapshot,
   type KillstreakWorld,
@@ -11943,7 +11944,7 @@ function recordOwnerSupportDamage(event: KillstreakDamageEvent): void {
   const targetPosition = new THREE.Vector3(...event.targetPosition);
   if (targetPosition && (event.source === 'chopper' || event.source === 'piloted-drone' || event.source === 'drone-swarm')) {
     const drone = event.source === 'piloted-drone' || event.source === 'drone-swarm';
-    spawnTracer(new THREE.Vector3(...event.origin), targetPosition, drone ? 0x52e8ff : 0xffc65c);
+    spawnTracer(new THREE.Vector3(...event.tracerOrigin), new THREE.Vector3(...event.endpoint), drone ? 0x52e8ff : 0xffc65c);
     audio.supportGun(drone ? 'drone' : 'chopper');
   }
   const viewport = {
@@ -12448,7 +12449,9 @@ function updateKillstreakPossession(now: number): void {
     return;
   }
   killstreakPresentation.setFirstPersonEntity(entity.id);
-  const position = killstreakPresentation.firstPersonCameraAnchor(entity.id) ?? new THREE.Vector3(...entity.position);
+  const position = possession.kind === 'chopper-gunner'
+    ? new THREE.Vector3(...chopperGunnerCameraOrigin(entity.position, entity.attitude))
+    : killstreakPresentation.firstPersonCameraAnchor(entity.id) ?? new THREE.Vector3(...entity.position);
   camera.position.copy(position);
   if (camera.near !== 0.35) {
     camera.near = 0.35;

@@ -387,7 +387,10 @@ function sensorCapabilityMatchesRecipient(snapshot: KillstreakRecipientSnapshot,
 
 function isDamageEvent(value: unknown): value is KillstreakDamageEvent {
   return object(value)
-    && exactKeys(value, ['resultId', 'activationId', 'source', 'ownerId', 'targetId', 'targetLifeId', 'targetPosition', 'damage', 'origin', 'atMs'])
+    && exactKeys(value, [
+      'resultId', 'activationId', 'source', 'ownerId', 'targetId', 'targetLifeId',
+      'targetPosition', 'damage', 'origin', 'endpoint', 'tracerOrigin', 'atMs',
+    ])
     && typeof value.resultId === 'string' && /^ks-result-[0-9]+-[0-9]+$/.test(value.resultId)
     && activationId(value.activationId)
     && ids.has(String(value.source))
@@ -396,6 +399,8 @@ function isDamageEvent(value: unknown): value is KillstreakDamageEvent {
     && vec3(value.targetPosition)
     && finite(value.damage, 0.01, 1_000)
     && vec3(value.origin)
+    && vec3(value.endpoint)
+    && vec3(value.tracerOrigin)
     && finite(value.atMs, 0, Number.MAX_SAFE_INTEGER);
 }
 
