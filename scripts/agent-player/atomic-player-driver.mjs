@@ -20,6 +20,7 @@ import { createTacticalPolicy } from './tactical-policy.mjs';
 import { chooseVisibleSupport, shouldThrowVisibleGrenade } from './combat-actions.mjs';
 import { advanceFinishLatch, consumeFinishFollowup } from './finish-latch.mjs';
 import { buildShotEvidence } from './shot-evidence.mjs';
+import { evaluateTargetExposure } from './target-exposure.mjs';
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, '../..');
@@ -550,6 +551,9 @@ async function run() {
   const bankLeadMinimumKills = integerArg(args['bank-lead-minimum-kills'], 0, 0, 20);
   const bankLeadMinimumMargin = integerArg(args['bank-lead-minimum-margin'], 1, 1, 20);
   const killAnchorDurationMs = integerArg(args['kill-anchor-duration'], 0, 0, 60_000);
+  const fireMinimumTargetPixels = integerArg(args['fire-min-target-pixels'], 0, 0, 500);
+  const fireMinimumTargetArea = integerArg(args['fire-min-target-area'], 0, 0, 5_000);
+  const fireMinimumTargetHeight = integerArg(args['fire-min-target-height'], 0, 0, 100);
   const allowCombatFire = Boolean(args['allow-combat-fire']);
   const allowLive = Boolean(args['allow-live']);
   const tacticalPolicyName = String(args['tactical-policy'] ?? 'legacy');
@@ -609,6 +613,10 @@ async function run() {
   let finishCancellations = 0;
   let stuckRecoveries = 0;
   let damageReactions = 0;
+  let exposureGateSuppressions = 0;
+  let exposurePixelSuppressions = 0;
+  let exposureAreaSuppressions = 0;
+  let exposureHeightSuppressions = 0;
   let candidateImagesSaved = 0;
   let firstRawTargetAnnotatedCaptured = false;
   let firstTargetAnnotatedCaptured = false;
@@ -808,6 +816,7 @@ async function run() {
       let lastBurstTarget = null;
       let lastGrenadeAt = Number.NEGATIVE_INFINITY;
       let lastSupportActivationAt = Number.NEGATIVE_INFINITY;
+      let lastExposureSuppressionAt = Number.NEGATIVE_INFINITY;
       const usedSupportThresholds = new Set();
 
       let lastCandidateImageAt = Number.NEGATIVE_INFINITY;
@@ -1232,9 +1241,24 @@ async function run() {
             });
             await sleep(250);
           }
-          if (!grenadeThrownThisTick && allowCombatFire && shotPulses < maximumShotPulses && tracking.fireAuthorized && postInputReacquired && twoFrameAligned && activeMatch && alignment < fireAlignmentMaximum
+          const targetExposure = evaluateTargetExposure(aimedTarget, {
+            minimumPixels: fireMinimumTargetPixels,
+            minimumArea: fireMinimumTargetArea,
+            minimumHeight: fireMinimumTargetHeight,
+          });
+          const fireReadyWithoutExposure = !grenadeThrownThisTick && allowCombatFire && shotPulses < maximumShotPulses
+            && tracking.fireAuthorized && postInputReacquired && twoFrameAligned && activeMatch && alignment < fireAlignmentMaximum
             && !currentlyReloading && now - lastBurstAt >= fireCooldownMs
-            && (!finishLatch || finishLatch.followupsRemaining > 0)) {
+            && (!finishLatch || finishLatch.followupsRemaining > 0);
+          if (fireReadyWithoutExposure && !targetExposure.passes && now - lastExposureSuppressionAt >= fireCooldownMs) {
+            lastExposureSuppressionAt = now;
+            exposureGateSuppressions += 1;
+            if (targetExposure.reasons.includes('insufficient-visible-pixels')) exposurePixelSuppressions += 1;
+            if (targetExposure.reasons.includes('insufficient-visible-area')) exposureAreaSuppressions += 1;
+            if (targetExposure.reasons.includes('insufficient-visible-height')) exposureHeightSuppressions += 1;
+            actions.push({ atMs, kind: 'exposed-target-fire-suppressed', exposure: targetExposure });
+          }
+          if (fireReadyWithoutExposure && targetExposure.passes) {
             const shots = Math.max(1, Math.min(burstShots, maximumShotPulses - shotPulses, Number(hud?.ammo ?? burstShots)));
             if (!firstFireCaptured) {
               firstFireVision = aimedVision;
@@ -1281,6 +1305,7 @@ async function run() {
               fireEvidenceFile,
               aimTrace,
               target: { x: aimedTarget.x, y: aimedTarget.y, pixels: aimedTarget.pixels, bounds: aimedTarget.bounds },
+              targetExposure,
             });
           }
           actions.push({
@@ -1514,6 +1539,9 @@ async function run() {
         grenadeAlignmentMaximum,
         finishWindowMs,
         killAnchorDurationMs,
+        fireMinimumTargetPixels,
+        fireMinimumTargetArea,
+        fireMinimumTargetHeight,
         decisionInputs: args['lifecycle-only']
           ? ['ordinary lobby controls and post-action lifecycle receipt']
           : ['rendered canvas pixels', 'visible HUD state through ordinary controls'],
@@ -1597,6 +1625,10 @@ async function run() {
         killAnchorRenewals: tacticalPolicyReceipt?.killAnchorRenewals ?? 0,
         killAnchorActiveFrames: tacticalPolicyReceipt?.killAnchorActiveFrames ?? 0,
         killAnchorEngagementFrames: tacticalPolicyReceipt?.killAnchorEngagementFrames ?? 0,
+        exposureGateSuppressions,
+        exposurePixelSuppressions,
+        exposureAreaSuppressions,
+        exposureHeightSuppressions,
         observedWeaponName,
         stuckRecoveries,
         damageReactions,
