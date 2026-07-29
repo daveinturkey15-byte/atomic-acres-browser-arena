@@ -303,6 +303,73 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('lastCompletedVisualEvidence,\n    error:');
   });
 
+  it('exercises every HF-138 support and lifecycle workflow through production paths', () => {
+    const verifierSource = readFileSync(new URL('../scripts/qa/verify-pass65-webgpu-endurance.mjs', import.meta.url), 'utf8');
+    const runtimeSource = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+    const pilotWorkflow = verifierSource.slice(
+      verifierSource.indexOf('async function runPilotedDroneWorkflow('),
+      verifierSource.indexOf('async function runCarpetBomberWorkflow('),
+    );
+    const carpetWorkflow = verifierSource.slice(
+      verifierSource.indexOf('async function runCarpetBomberWorkflow('),
+      verifierSource.indexOf('async function runLifecycleRecoveryProbe('),
+    );
+    const lifecycleWorkflow = verifierSource.slice(
+      verifierSource.indexOf('async function runLifecycleRecoveryProbe('),
+      verifierSource.indexOf('await mkdir(artifactRoot'),
+    );
+    const doorProbe = verifierSource.slice(
+      verifierSource.indexOf('if (visit === doorResetProbeDetachVisit)'),
+      verifierSource.indexOf('} else if (visit === doorResetProbeRestoreVisit)'),
+    );
+    const grenadeShedHook = runtimeSource.slice(
+      runtimeSource.indexOf('detonateGrenadeAtShed: (placementId, surfaceId'),
+      runtimeSource.indexOf('\n\n};', runtimeSource.indexOf('detonateGrenadeAtShed: (placementId, surfaceId')),
+    );
+
+    expect(verifierSource).toContain("slots: ['scout-sweep', 'piloted-drone', 'carpet-bomber', 'chopper', 'drone-swarm']");
+    expect(pilotWorkflow).toContain("api.activateSupport('piloted-drone')");
+    expect(pilotWorkflow).toContain("api.togglePilotedDroneControl(activated.id)");
+    for (const [code, axis] of [
+      ['KeyW', 'forward'], ['KeyS', 'backward'], ['KeyD', 'right'],
+      ['KeyA', 'left'], ['Space', 'up'], ['ControlLeft', 'down'],
+    ]) {
+      expect(pilotWorkflow).toContain(`controls.push(await phase('${code}', '${axis}'`);
+    }
+    expect(pilotWorkflow).toContain('api.setTriggerHeld(true)');
+    expect(pilotWorkflow).toContain('result.firedRounds < 1');
+    expect(pilotWorkflow).toContain('result.autonomousDisplacementM <= 0.02');
+
+    expect(carpetWorkflow).toContain("api.activateSupport('carpet-bomber')");
+    expect(carpetWorkflow).toContain("new KeyboardEvent('keydown', { code: 'KeyF'");
+    expect(carpetWorkflow).toContain("marker.shape === 'ground-x'");
+    expect(carpetWorkflow).toContain("marker.shape === 'corridor'");
+    expect(carpetWorkflow).toContain("entity.kind === 'aircraft'");
+    expect(carpetWorkflow).toContain("entity.id.includes('carpet-aircraft')");
+    expect(carpetWorkflow).toContain('result.aircraft.displacementM <= 0.1');
+    expect(carpetWorkflow).toContain("}, 'authored shell drop');");
+    expect(carpetWorkflow).toContain("}, 'flight and first impact');");
+    expect(carpetWorkflow).toContain('result.impactPresentation.droppedBombShells <= result.impactPresentation.baselineBombShells');
+    expect(carpetWorkflow).toContain('result.impactPresentation.impactFlashes <= result.impactPresentation.baselineImpactFlashes');
+
+    expect(verifierSource).toContain('const requiredLifecycleRecoveryCyclesPerVisit = 2;');
+    expect(lifecycleWorkflow).toContain('await coverPage.bringToFront();');
+    expect(lifecycleWorkflow).toContain("entry.type === 'visibilitychange' && entry.visibilityState === 'hidden'");
+    expect(lifecycleWorkflow).toContain("entry.type === 'visibilitychange' && entry.visibilityState === 'visible'");
+    expect(lifecycleWorkflow).toContain("['tab visibility regained', 'window focus regained']");
+
+    expect(doorProbe).toContain("api.detonateGrenadeAtShed(shed.placementId, 'door-south')");
+    expect(doorProbe).not.toContain('api.damageShed(');
+    expect(grenadeShedHook).toContain('spawnGrenadeExplosionVisual(point, detonatedAt);');
+    expect(grenadeShedHook).toContain('breakWindowsInGrenadeBlast(point, randomNonce(), true, GRENADE_RADIUS);');
+    expect(grenadeShedHook).toContain('applyInteractiveWorldExplosion(point, GRENADE_RADIUS, 100);');
+
+    expect(verifierSource).toContain('pilotedDroneProbe,\n      carpetBomberProbe,\n      lifecycleRecoveryProbe,');
+    expect(verifierSource).toContain('frameTail: samples.slice(-5)');
+    expect(verifierSource).toContain('deviceErrorTelemetry: {');
+    expect(verifierSource).toContain("deviceErrorTelemetry.actualBackend !== 'webgpu'");
+  });
+
   it('keeps the complete live tour separate and immutable before the global visual tour', () => {
     const source = readFileSync(new URL('../scripts/qa/verify-pass65-webgpu-endurance.mjs', import.meta.url), 'utf8');
     const liveTour = source.slice(

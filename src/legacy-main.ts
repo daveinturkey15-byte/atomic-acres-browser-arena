@@ -16948,6 +16948,7 @@ const debugWindow = window as Window & {
     damageRemoteAuthoritatively: (amount: number, playerId?: string) => { targetId: string; storedBefore: number; canonicalBefore: number; storedAfter: number } | null;
     earnSupport: (eliminations: number) => void;
     activateKillstreak: (id: Pass65KillstreakId, anchor?: [number, number, number]) => boolean;
+    togglePilotedDroneControl: (entityId?: string) => boolean;
     forceBotGrenade: (fuseMs?: number, grenade?: GrenadeId) => boolean;
     activateSupport: (id: FieldSupportId) => void;
     setOverdrive: (mode: 'charging' | 'available' | 'active' | 'expired') => void;
@@ -16975,6 +16976,18 @@ const debugWindow = window as Window & {
     interactShed: () => boolean;
     damageShed: (placementId?: string, surfaceId?: string, damageQ?: number) => boolean;
     bulletHitShed: (placementId?: string, surfaceId?: string, damageQ?: number, penetrationEnergyQ?: number) => boolean;
+    detonateGrenadeAtShed: (placementId?: string, surfaceId?: string) => {
+      accepted: boolean;
+      placementId: string | null;
+      surfaceId: string;
+      point: number[] | null;
+      revisionBefore: number | null;
+      revisionAfter: number | null;
+      detachedChunksBefore: number | null;
+      detachedChunksAfter: number | null;
+      grenadeExplosionsBefore: number;
+      grenadeExplosionsAfter: number;
+    };
 
   };
 };
@@ -18668,6 +18681,16 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     updateFieldSupportHud();
   },
   activateKillstreak: (id: Pass65KillstreakId, anchor) => Boolean(requestKillstreakActivation(id, performance.now(), anchor)),
+  togglePilotedDroneControl: (entityId) => {
+    const entity = killstreakSnapshot.entities.find((candidate) => (
+      candidate.kind === 'drone'
+      && candidate.mode === 'piloted'
+      && candidate.ownerId === player.id
+      && candidate.expiresInMs > 0
+      && (!entityId || candidate.id === entityId)
+    ));
+    return entity ? requestKillstreakControl(entity.id, 'toggle-piloted-drone') : false;
+  },
   forceBotGrenade: (fuseMs = 1_100, grenade: GrenadeId = 'frag') => {
     const bot = bots.values().next().value as BotPlayer | undefined;
     return bot ? throwBotGrenade(bot, performance.now(), fuseMs, player.position, player.stance, grenade) : false;
@@ -18858,6 +18881,54 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     syncInteractiveWorldPhysics();
     broadcastInteractiveWorldState(true);
     return true;
+  },
+  detonateGrenadeAtShed: (placementId, surfaceId = 'door-south') => {
+    const rejected = {
+      accepted: false,
+      placementId: placementId ?? null,
+      surfaceId,
+      point: null,
+      revisionBefore: null,
+      revisionAfter: null,
+      detachedChunksBefore: null,
+      detachedChunksAfter: null,
+      grenadeExplosionsBefore: grenadeExplosions,
+      grenadeExplosionsAfter: grenadeExplosions,
+    };
+    if (!interactiveWorldRuntime?.hasHostAuthority()) return rejected;
+    const envelopeBefore = interactiveWorldRuntime.stateEnvelope();
+    const targetPlacementId = placementId ?? envelopeBefore.sheds[0]?.placementId;
+    if (!targetPlacementId) return rejected;
+    const surface = interactiveWorldRuntime.collisions().ballisticSurfaces.find((candidate) => (
+      candidate.destructibleSurface?.placementId === targetPlacementId
+      && candidate.destructibleSurface.surfaceId === surfaceId
+    ));
+    if (!surface) return { ...rejected, placementId: targetPlacementId };
+    const point = new THREE.Vector3(
+      (surface.bounds.minX + surface.bounds.maxX) / 2,
+      ((surface.bounds.minY ?? 0) + (surface.bounds.maxY ?? 0)) / 2,
+      (surface.bounds.minZ + surface.bounds.maxZ) / 2,
+    );
+    const detachedChunksBefore = interactiveWorldRuntime.telemetry().detachedChunks;
+    const grenadeExplosionsBefore = grenadeExplosions;
+    const detonatedAt = performance.now();
+    audio.explosion(detonatedAt);
+    spawnGrenadeExplosionVisual(point, detonatedAt);
+    breakWindowsInGrenadeBlast(point, randomNonce(), true, GRENADE_RADIUS);
+    const accepted = applyInteractiveWorldExplosion(point, GRENADE_RADIUS, 100);
+    const envelopeAfter = interactiveWorldRuntime.stateEnvelope();
+    return {
+      accepted,
+      placementId: targetPlacementId,
+      surfaceId,
+      point: point.toArray(),
+      revisionBefore: envelopeBefore.revision,
+      revisionAfter: envelopeAfter.revision,
+      detachedChunksBefore,
+      detachedChunksAfter: interactiveWorldRuntime.telemetry().detachedChunks,
+      grenadeExplosionsBefore,
+      grenadeExplosionsAfter: grenadeExplosions,
+    };
   },
 
 };

@@ -22,6 +22,7 @@ const requiredCaptureRecoveryCompletions = 12;
 const minimumCaptureRecoveryWindowMs = 250;
 const maximumCaptureRecoveryCompletionMs = 50;
 const maximumLiveLongTaskEntries = 8;
+const requiredLifecycleRecoveryCyclesPerVisit = 2;
 const minimumVisualEvidenceFrames = 5;
 const minimumVisualEvidenceDistinctRatio = 0.8;
 const visualEvidencePoses = [
@@ -322,6 +323,366 @@ async function captureCanvasOnly(page, clip) {
   }
 }
 
+async function runPilotedDroneWorkflow(page, arenaId) {
+  if (arenaId === 'gun-range') return { skipped: true, reason: 'field-support-disabled-in-gun-range' };
+  const result = await page.evaluate(async ({ submissionLimitMs, completionLimitMs, pendingLimitMs }) => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    const waitFor = (read, label, timeoutMs = 7_500) => new Promise((resolve, reject) => {
+      const timeoutAt = performance.now() + timeoutMs;
+      const inspect = () => {
+        const value = read();
+        if (value) resolve(value);
+        else if (performance.now() >= timeoutAt) reject(new Error(`Piloted drone ${label} timed out`));
+        else requestAnimationFrame(inspect);
+      };
+      inspect();
+    });
+    const waitDuration = (durationMs) => new Promise((resolve) => {
+      const endsAt = performance.now() + durationMs;
+      const inspect = () => performance.now() >= endsAt ? resolve() : requestAnimationFrame(inspect);
+      requestAnimationFrame(inspect);
+    });
+    const localActor = (state) => state.killstreak.actors[0] ?? null;
+    const ownedDrone = (state) => state.killstreak.entities.find((entity) => (
+      entity.kind === 'drone' && entity.mode === 'piloted' && entity.ownerId === localActor(state)?.actorId
+    ));
+    const longTasks = [];
+    const observer = typeof PerformanceObserver === 'function'
+      ? new PerformanceObserver((list) => {
+          for (const entry of list.getEntries()) longTasks.push({ startTime: entry.startTime, duration: entry.duration, name: entry.name });
+        })
+      : null;
+    observer?.observe({ type: 'longtask', buffered: false });
+    api.setMovement(false);
+    api.resetPresentationProgressWindow();
+    const before = api.snapshot();
+    const keyName = {
+      KeyW: 'w', KeyS: 's', KeyD: 'd', KeyA: 'a', Space: ' ', ControlLeft: 'Control',
+    };
+    const dispatchKey = (type, code) => window.dispatchEvent(new KeyboardEvent(type, {
+      code, key: keyName[code], bubbles: true, cancelable: true,
+    }));
+    const releaseAll = () => {
+      for (const code of Object.keys(keyName)) dispatchKey('keyup', code);
+      api.setTriggerHeld(false);
+    };
+    try {
+      api.activateSupport('piloted-drone');
+      const activatedState = await waitFor(() => {
+        const state = api.snapshot();
+        return ownedDrone(state) ? state : null;
+      }, 'activation');
+      const activated = ownedDrone(activatedState);
+      const possessionAccepted = api.togglePilotedDroneControl(activated.id);
+      const possessedState = await waitFor(() => {
+        const state = api.snapshot();
+        const actor = localActor(state);
+        return actor?.possession?.kind === 'piloted-drone' && actor.possession.entityId === activated.id
+          && document.documentElement.dataset.killstreakPossession === 'piloted-drone'
+          ? state : null;
+      }, 'possession');
+      const possessionProof = {
+        kind: localActor(possessedState)?.possession?.kind ?? null,
+        documentDataset: document.documentElement.dataset.killstreakPossession,
+        hudVisible: document.querySelector('#support-combat-feedback')?.hidden === false,
+      };
+      const phase = async (code, expectedAxis, fire = false) => {
+        const phaseBeforeState = api.snapshot();
+        const phaseBefore = ownedDrone(phaseBeforeState);
+        if (fire) api.setTriggerHeld(true);
+        dispatchKey('keydown', code);
+        await waitDuration(260);
+        dispatchKey('keyup', code);
+        if (fire) api.setTriggerHeld(false);
+        await waitDuration(80);
+        const phaseAfterState = api.snapshot();
+        const phaseAfter = ownedDrone(phaseAfterState);
+        const displacement = phaseAfter.position.map((value, index) => value - phaseBefore.position[index]);
+        const yaw = phaseBefore.attitude[1];
+        const forward = [-Math.sin(yaw), 0, -Math.cos(yaw)];
+        const right = [Math.cos(yaw), 0, -Math.sin(yaw)];
+        const projection = expectedAxis === 'forward' ? displacement[0] * forward[0] + displacement[2] * forward[2]
+          : expectedAxis === 'backward' ? -(displacement[0] * forward[0] + displacement[2] * forward[2])
+            : expectedAxis === 'right' ? displacement[0] * right[0] + displacement[2] * right[2]
+              : expectedAxis === 'left' ? -(displacement[0] * right[0] + displacement[2] * right[2])
+                : expectedAxis === 'up' ? displacement[1] : -displacement[1];
+        return {
+          code,
+          expectedAxis,
+          before: phaseBefore.position,
+          after: phaseAfter.position,
+          displacement,
+          projection,
+          revisionDelta: phaseAfter.revision - phaseBefore.revision,
+          magazineBefore: phaseBefore.magazine,
+          magazineAfter: phaseAfter.magazine,
+        };
+      };
+      const controls = [];
+      controls.push(await phase('KeyW', 'forward', true));
+      controls.push(await phase('KeyS', 'backward'));
+      controls.push(await phase('KeyD', 'right'));
+      controls.push(await phase('KeyA', 'left'));
+      controls.push(await phase('Space', 'up'));
+      controls.push(await phase('ControlLeft', 'down'));
+      releaseAll();
+      const beforeExitState = api.snapshot();
+      const beforeExit = ownedDrone(beforeExitState);
+      const exitAccepted = api.togglePilotedDroneControl(activated.id);
+      const exitedState = await waitFor(() => {
+        const state = api.snapshot();
+        const actor = localActor(state);
+        return actor?.possession === null && document.documentElement.dataset.killstreakPossession === 'none'
+          ? state : null;
+      }, 'exit');
+      await waitDuration(450);
+      const after = api.snapshot();
+      const afterExit = ownedDrone(after);
+      const autonomousDisplacementM = Math.hypot(...afterExit.position.map((value, index) => value - beforeExit.position[index]));
+      for (const entry of observer?.takeRecords() ?? []) {
+        longTasks.push({ startTime: entry.startTime, duration: entry.duration, name: entry.name });
+      }
+      observer?.disconnect();
+      api.setMovement(true, true);
+      return {
+        skipped: false,
+        possessionAccepted,
+        exitAccepted,
+        entityId: activated.id,
+        spawn: activated.position,
+        possessed: possessionProof,
+        controls,
+        firedRounds: Math.max(0, controls[0].magazineBefore - controls[0].magazineAfter),
+        autonomousDisplacementM,
+        afterExitPosition: afterExit.position,
+        frameDelta: after.frameCount - before.frameCount,
+        submissionDelta: after.render.runtime.presentation.submissionSequence - before.render.runtime.presentation.submissionSequence,
+        completionDelta: after.render.runtime.presentation.completedSequence - before.render.runtime.presentation.completedSequence,
+        longTasks,
+        presentation: after.render.runtime.presentation,
+        deviceLost: after.render.runtime.deviceLost,
+        uncapturedErrors: after.render.runtime.uncapturedErrors,
+        exited: localActor(exitedState)?.possession === null,
+        thresholds: { submissionLimitMs, completionLimitMs, pendingLimitMs },
+      };
+    } catch (error) {
+      releaseAll();
+      api.setMovement(true, true);
+      observer?.disconnect();
+      throw error;
+    }
+  }, {
+    submissionLimitMs: maximumLiveSubmissionGapMs,
+    completionLimitMs: maximumLiveCompletionGapMs,
+    pendingLimitMs: maximumLivePendingMs,
+  });
+  if (result.skipped) return result;
+  if (!result.possessionAccepted || !result.exitAccepted || !result.exited
+    || result.possessed.kind !== 'piloted-drone' || result.possessed.documentDataset !== 'piloted-drone' || !result.possessed.hudVisible
+    || result.controls.length !== 6 || result.controls.some((control) => control.projection <= 0.02 || control.revisionDelta <= 0)
+    || result.firedRounds < 1 || result.autonomousDisplacementM <= 0.02
+    || result.frameDelta < 20 || result.submissionDelta < 20 || result.completionDelta < 1
+    || result.longTasks.length !== 0 || result.deviceLost || result.uncapturedErrors !== 0
+    || result.presentation.status !== 'healthy'
+    || result.presentation.progress.maximumSubmissionGapMs > maximumLiveSubmissionGapMs
+    || result.presentation.progress.maximumCompletionGapMs > maximumLiveCompletionGapMs
+    || result.presentation.progress.maximumPendingForMs > maximumLivePendingMs) {
+    throw new Error(`${arenaId} piloted-drone activation/possession/control failed: ${JSON.stringify(result)}`);
+  }
+  return result;
+}
+
+async function runCarpetBomberWorkflow(page, arenaId) {
+  if (arenaId === 'gun-range') return { skipped: true, reason: 'field-support-disabled-in-gun-range' };
+  const result = await page.evaluate(async () => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    const waitFor = (read, label, timeoutMs = 7_500) => new Promise((resolve, reject) => {
+      const timeoutAt = performance.now() + timeoutMs;
+      const inspect = () => {
+        const value = read();
+        if (value) resolve(value);
+        else if (performance.now() >= timeoutAt) reject(new Error(`Carpet bomber ${label} timed out`));
+        else requestAnimationFrame(inspect);
+      };
+      inspect();
+    });
+    const longTasks = [];
+    const observer = typeof PerformanceObserver === 'function'
+      ? new PerformanceObserver((list) => {
+          for (const entry of list.getEntries()) longTasks.push({ startTime: entry.startTime, duration: entry.duration, name: entry.name });
+        })
+      : null;
+    observer?.observe({ type: 'longtask', buffered: false });
+    api.setMovement(false);
+    api.resetPresentationProgressWindow();
+    const before = api.snapshot();
+    const [x, y, z] = before.player.position;
+    api.setCaptureCameraPose(x, y + 8, z, 0, -1.18);
+    try {
+      api.activateSupport('carpet-bomber');
+      const targeting = await waitFor(() => {
+        const state = api.snapshot();
+        return state.fieldSupport.targetingMode === 'carpet-bomber' && state.fieldSupport.crosshairTarget
+          ? state : null;
+      }, 'target preview');
+      const previewTarget = targeting.fieldSupport.crosshairTarget;
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyF', key: 'f', bubbles: true, cancelable: true }));
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyF', key: 'f', bubbles: true, cancelable: true }));
+      const staged = await waitFor(() => {
+        const state = api.snapshot();
+        const markers = state.killstreakPresentation.markerDetails.filter((marker) => marker.source === 'carpet-bomber');
+        const aircraft = state.killstreak.entities.find((entity) => entity.kind === 'aircraft' && entity.id.includes('carpet-aircraft'));
+        return state.fieldSupport.targetingMode === null && markers.length === 2 && aircraft
+          ? { state, markers, aircraft } : null;
+      }, 'marker and aircraft projection');
+      const dropped = await waitFor(() => {
+        const state = api.snapshot();
+        return state.killstreakPresentation.bombShells > before.killstreakPresentation.bombShells
+          ? state : null;
+      }, 'authored shell drop');
+      const impact = await waitFor(() => {
+        const state = api.snapshot();
+        const aircraft = state.killstreak.entities.find((entity) => entity.id === staged.aircraft.id);
+        const presented = state.killstreakPresentation.impactFlashes > before.killstreakPresentation.impactFlashes
+          || state.killstreakPresentation.emberParticles > before.killstreakPresentation.emberParticles;
+        return presented && aircraft ? { state, aircraft } : null;
+      }, 'flight and first impact');
+      for (const entry of observer?.takeRecords() ?? []) {
+        longTasks.push({ startTime: entry.startTime, duration: entry.duration, name: entry.name });
+      }
+      observer?.disconnect();
+      const after = impact.state;
+      const aircraftDisplacementM = Math.hypot(...impact.aircraft.position.map((value, index) => value - staged.aircraft.position[index]));
+      return {
+        skipped: false,
+        preview: {
+          targetingMode: targeting.fieldSupport.targetingMode,
+          crosshairTarget: previewTarget,
+        },
+        markers: staged.markers,
+        aircraft: {
+          id: staged.aircraft.id,
+          start: staged.aircraft.position,
+          afterFirstImpact: impact.aircraft.position,
+          displacementM: aircraftDisplacementM,
+        },
+        impactPresentation: {
+          baselineImpactFlashes: before.killstreakPresentation.impactFlashes,
+          baselineBombShells: before.killstreakPresentation.bombShells,
+          baselineEmberParticles: before.killstreakPresentation.emberParticles,
+          droppedBombShells: dropped.killstreakPresentation.bombShells,
+          impactFlashes: after.killstreakPresentation.impactFlashes,
+          bombShells: after.killstreakPresentation.bombShells,
+          emberParticles: after.killstreakPresentation.emberParticles,
+        },
+        frameDelta: after.frameCount - before.frameCount,
+        submissionDelta: after.render.runtime.presentation.submissionSequence - before.render.runtime.presentation.submissionSequence,
+        completionDelta: after.render.runtime.presentation.completedSequence - before.render.runtime.presentation.completedSequence,
+        longTasks,
+        presentation: after.render.runtime.presentation,
+        deviceLost: after.render.runtime.deviceLost,
+        uncapturedErrors: after.render.runtime.uncapturedErrors,
+      };
+    } finally {
+      api.setCaptureCameraPose(null);
+      api.setMovement(true, true);
+      observer?.disconnect();
+    }
+  });
+  if (result.skipped) return result;
+  const groundMarker = result.markers.find((marker) => marker.shape === 'ground-x');
+  const corridor = result.markers.find((marker) => marker.shape === 'corridor');
+  if (result.preview.targetingMode !== 'carpet-bomber' || result.preview.crosshairTarget?.length !== 3
+    || !groundMarker || groundMarker.audience !== 'all-combatants' || !groundMarker.visible
+    || !groundMarker.colourHexes.includes('#ff253f') || groundMarker.writesDepth || !groundMarker.depthTest || !groundMarker.raycastDisabled
+    || !corridor || corridor.audience !== 'owner-only' || !corridor.visible || corridor.corridorLengthM < 30
+    || !corridor.colourHexes.includes('#ff253f') || corridor.writesDepth || !corridor.depthTest || !corridor.raycastDisabled
+    || result.aircraft.displacementM <= 0.1
+    || result.impactPresentation.droppedBombShells <= result.impactPresentation.baselineBombShells
+    || result.impactPresentation.impactFlashes <= result.impactPresentation.baselineImpactFlashes
+      && result.impactPresentation.emberParticles <= result.impactPresentation.baselineEmberParticles
+    || result.frameDelta < 8 || result.submissionDelta < 8 || result.completionDelta < 1
+    || result.longTasks.length !== 0 || result.deviceLost || result.uncapturedErrors !== 0
+    || result.presentation.status !== 'healthy'
+    || result.presentation.progress.maximumSubmissionGapMs > maximumLiveSubmissionGapMs
+    || result.presentation.progress.maximumCompletionGapMs > maximumLiveCompletionGapMs
+    || result.presentation.progress.maximumPendingForMs > maximumLivePendingMs) {
+    throw new Error(`${arenaId} carpet-bomber targeting/flight failed: ${JSON.stringify(result)}`);
+  }
+  return result;
+}
+
+async function runLifecycleRecoveryProbe(page, coverPage, arenaId) {
+  const cycles = [];
+  for (let cycle = 0; cycle < requiredLifecycleRecoveryCyclesPerVisit; cycle += 1) {
+    await page.bringToFront();
+    const before = await page.evaluate(() => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      window.__PASS65_LIFECYCLE_EVENTS__.length = 0;
+      api.resetPresentationProgressWindow();
+      const state = api.snapshot();
+      return {
+        frameCount: state.frameCount,
+        completedSequence: state.render.runtime.presentation.completedSequence,
+      };
+    });
+    await coverPage.bringToFront();
+    await coverPage.waitForTimeout(150);
+    await page.bringToFront();
+    await page.waitForFunction(({ minimumFrameCount, minimumCompletionSequence }) => {
+      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+      const events = window.__PASS65_LIFECYCLE_EVENTS__ ?? [];
+      return state?.gameStarted === true
+        && state.matchPhase === 'active'
+        && state.render.runtime.presentation.status === 'healthy'
+        && state.render.runtime.deviceLost === false
+        && state.render.runtime.uncapturedErrors === 0
+        && document.visibilityState === 'visible'
+        && document.hasFocus()
+        && events.some((entry) => entry.type === 'blur')
+        && events.some((entry) => entry.type === 'focus')
+        && events.some((entry) => entry.type === 'visibilitychange' && entry.visibilityState === 'hidden')
+        && events.some((entry) => entry.type === 'visibilitychange' && entry.visibilityState === 'visible')
+        && state.frameCount >= minimumFrameCount
+        && state.render.runtime.presentation.completedSequence >= minimumCompletionSequence;
+    }, {
+      minimumFrameCount: before.frameCount + 8,
+      minimumCompletionSequence: before.completedSequence + 1,
+    }, { timeout: 12_000 });
+    const after = await page.evaluate(() => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      api.setMovement(true, true);
+      const state = api.snapshot();
+      return {
+        frameCount: state.frameCount,
+        presentation: state.render.runtime.presentation,
+        deviceLost: state.render.runtime.deviceLost,
+        uncapturedErrors: state.render.runtime.uncapturedErrors,
+        framePacing: state.render.framePacing,
+        visibilityState: document.visibilityState,
+        focused: document.hasFocus(),
+        events: [...window.__PASS65_LIFECYCLE_EVENTS__],
+      };
+    });
+    const receipt = {
+      cycle,
+      frameDelta: after.frameCount - before.frameCount,
+      completionDelta: after.presentation.completedSequence - before.completedSequence,
+      ...after,
+    };
+    if (receipt.presentation.status !== 'healthy' || receipt.deviceLost || receipt.uncapturedErrors !== 0
+      || receipt.frameDelta < 8 || receipt.completionDelta < 1 || !receipt.focused || receipt.visibilityState !== 'visible'
+      || !['tab visibility regained', 'window focus regained'].includes(receipt.framePacing.lastResetReason)
+      || receipt.presentation.progress.maximumSubmissionGapMs > maximumLiveSubmissionGapMs
+      || receipt.presentation.progress.maximumCompletionGapMs > maximumLiveCompletionGapMs
+      || receipt.presentation.progress.maximumPendingForMs > maximumLivePendingMs) {
+      throw new Error(`${arenaId} focus/visibility recovery cycle ${cycle} failed: ${JSON.stringify(receipt)}`);
+    }
+    cycles.push(receipt);
+  }
+  return { requiredCycles: requiredLifecycleRecoveryCyclesPerVisit, completedCycles: cycles.length, cycles };
+}
+
 await mkdir(artifactRoot, { recursive: true });
 const server = await createServer({
   server: { host: '127.0.0.1', port, strictPort: true },
@@ -354,8 +715,18 @@ try {
   await page.addInitScript(() => {
     localStorage.setItem('atomic-acres:killstreak-loadout:v1', JSON.stringify({
       schemaVersion: 1,
-      slots: ['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'drone-swarm'],
+      slots: ['scout-sweep', 'piloted-drone', 'carpet-bomber', 'chopper', 'drone-swarm'],
     }));
+    window.__PASS65_LIFECYCLE_EVENTS__ = [];
+    const recordLifecycle = (type) => window.__PASS65_LIFECYCLE_EVENTS__.push({
+      type,
+      atMs: performance.now(),
+      visibilityState: document.visibilityState,
+      focused: document.hasFocus(),
+    });
+    window.addEventListener('blur', () => recordLifecycle('blur'));
+    window.addEventListener('focus', () => recordLifecycle('focus'));
+    document.addEventListener('visibilitychange', () => recordLifecycle('visibilitychange'));
   });
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
@@ -374,6 +745,10 @@ try {
       && state?.bootstrap?.stage === 'ready'
       && state?.render?.runtime?.actualBackend === 'webgpu';
   }, undefined, { timeout: 60_000 });
+  const lifecycleCoverPage = await page.context().newPage();
+  await lifecycleCoverPage.goto('about:blank');
+  await page.bringToFront();
+  await page.evaluate(() => { window.__PASS65_LIFECYCLE_EVENTS__.length = 0; });
 
   const arenaReceipts = [];
   const visualEvidenceByArena = [];
@@ -418,18 +793,22 @@ try {
         const before = api.snapshot();
         const shed = before.interactiveWorld?.envelope?.sheds?.[0];
         if (!shed) return { phase: 'detach', accepted: false, reason: 'no-shed' };
-        const accepted = api.damageShed(shed.placementId, 'door-south', 220);
+        const explosion = api.detonateGrenadeAtShed(shed.placementId, 'door-south');
         const after = api.snapshot();
         const next = after.interactiveWorld.envelope.sheds.find((entry) => entry.placementId === shed.placementId);
         return {
           phase: 'detach',
-          accepted,
+          accepted: explosion.accepted,
+          explosion,
           placementId: shed.placementId,
           matchEpoch: next?.matchEpoch ?? null,
           doorStage: next?.surfaces.find((surface) => surface.surfaceId === 'door-south')?.stage ?? null,
         };
       });
-      if (!doorResetProbe.accepted || doorResetProbe.doorStage !== 'detached') {
+      if (!doorResetProbe.accepted || doorResetProbe.doorStage !== 'detached'
+        || doorResetProbe.explosion.revisionAfter <= doorResetProbe.explosion.revisionBefore
+        || doorResetProbe.explosion.detachedChunksAfter <= doorResetProbe.explosion.detachedChunksBefore
+        || doorResetProbe.explosion.grenadeExplosionsAfter !== doorResetProbe.explosion.grenadeExplosionsBefore + 1) {
         throw new Error(`RustRig door-reset probe could not stage a detached door: ${JSON.stringify(doorResetProbe)}`);
       }
     } else if (visit === doorResetProbeRestoreVisit) {
@@ -470,7 +849,10 @@ try {
       await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.earnSupport(15));
       await page.waitForFunction(() => {
         const available = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.fieldSupport?.available;
-        return available?.chopper === true && available?.['drone-swarm'] === true;
+        return available?.['piloted-drone'] === true
+          && available?.['carpet-bomber'] === true
+          && available?.chopper === true
+          && available?.['drone-swarm'] === true;
       }, undefined, { timeout: 5_000 });
       await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     }
@@ -638,6 +1020,16 @@ try {
           && presentation?.swarmMaximumRenderedInstances === 24
         ));
     }, killstreakProbeMode, { timeout: 5_000 });
+    let pilotedDroneProbe = { skipped: true, reason: 'killstreak-stress-disabled' };
+    let carpetBomberProbe = { skipped: true, reason: 'killstreak-stress-disabled' };
+    if (enabledStress.has('killstreak')) {
+      activeContext = { visit, arenaId, phase: 'piloted-drone-workflow', sampleIndex: null };
+      pilotedDroneProbe = await runPilotedDroneWorkflow(page, arenaId);
+      activeContext = { visit, arenaId, phase: 'carpet-bomber-workflow', sampleIndex: null };
+      carpetBomberProbe = await runCarpetBomberWorkflow(page, arenaId);
+    }
+    activeContext = { visit, arenaId, phase: 'focus-visibility-recovery', sampleIndex: null };
+    const lifecycleRecoveryProbe = await runLifecycleRecoveryProbe(page, lifecycleCoverPage, arenaId);
     // Full graph/residency audits are deliberately isolated behind a drained,
     // paused arena-admission frontier. They must never run inside a measured
     // live interval: both walk thousands of resident objects and can trigger GC.
@@ -663,7 +1055,7 @@ try {
     }, enabledStress.has('killstreak'));
     const activeStressBudget = arenaAdmissionAudit.activeStressBudget;
     if (activeStressBudget && activeStressBudget.budgetAudit.pass !== true) {
-      throw new Error(`${arenaId} exceeded its live chopper plus drone-swarm budget: ${JSON.stringify(activeStressBudget)}`);
+      throw new Error(`${arenaId} exceeded its live chopper, drone and carpet-bomber support budget: ${JSON.stringify(activeStressBudget)}`);
     }
     const durationMs = arenaId === 'rustworks-1v1' ? rustworksDurationMs : otherArenaDurationMs;
     const samples = [];
@@ -1088,6 +1480,9 @@ try {
       arenaId,
       killstreakStress,
       killstreakActivationProbe,
+      pilotedDroneProbe,
+      carpetBomberProbe,
+      lifecycleRecoveryProbe,
       activeStressBudget,
       admissionRuntimeIdentity: arenaAdmissionAudit.runtimeIdentity,
       doorResetProbe,
@@ -1099,6 +1494,24 @@ try {
         verifierBoundaryAudit,
         first: samples[0],
         last: beforeReturn,
+        frameTail: samples.slice(-5).map((sample) => ({
+          atMs: sample.atMs,
+          frameCount: sample.frameCount,
+          elapsedMs: sample.elapsedMs,
+          frameDelta: sample.frameDelta,
+          submissionDelta: sample.submissionDelta,
+          completionDelta: sample.completionDelta,
+          presentationStatus: sample.runtime.presentation.status,
+          deviceLost: sample.runtime.deviceLost,
+          uncapturedErrors: sample.runtime.uncapturedErrors,
+        })),
+      },
+      deviceErrorTelemetry: {
+        actualBackend: afterReturn.runtime.actualBackend,
+        deviceLost: afterReturn.runtime.deviceLost,
+        uncapturedErrors: afterReturn.runtime.uncapturedErrors,
+        presentationStatus: afterReturn.runtime.presentation.status,
+        completionFailures: afterReturn.runtime.presentation.completionFailures,
       },
       afterReturn,
     });
@@ -1112,6 +1525,14 @@ try {
       || receipt.afterReturn.runtime.presentation.status !== 'healthy'
       || receipt.afterReturn.runtime.uncapturedErrors !== 0
       || receipt.afterReturn.gpuRetirement.draining
+      || receipt.lifecycleRecoveryProbe.completedCycles !== requiredLifecycleRecoveryCyclesPerVisit
+      || receipt.live.frameTail.length !== Math.min(5, receipt.live.sampleCount)
+      || receipt.deviceErrorTelemetry.actualBackend !== 'webgpu'
+      || receipt.deviceErrorTelemetry.deviceLost
+      || receipt.deviceErrorTelemetry.uncapturedErrors !== 0
+      || receipt.deviceErrorTelemetry.presentationStatus !== 'healthy'
+      || enabledStress.has('killstreak') && receipt.arenaId !== 'gun-range'
+        && (receipt.pilotedDroneProbe.skipped || receipt.carpetBomberProbe.skipped)
     ))) {
     throw new Error(`Live tour did not finish every requested visit cleanly: ${JSON.stringify({ expected: arenaSequence.length, arenaReceipts })}`);
   }
@@ -1130,6 +1551,12 @@ try {
       requestedDurationMs: receipt.live.requestedDurationMs,
       measuredLiveDurationMs: receipt.live.measuredLiveDurationMs,
       sampleCount: receipt.live.sampleCount,
+      frameTailSamples: receipt.live.frameTail.length,
+      lifecycleRecoveryCycles: receipt.lifecycleRecoveryProbe.completedCycles,
+      pilotedDroneWorkflow: receipt.pilotedDroneProbe.skipped ? receipt.pilotedDroneProbe.reason : 'passed',
+      carpetBomberWorkflow: receipt.carpetBomberProbe.skipped ? receipt.carpetBomberProbe.reason : 'passed',
+      deviceLost: receipt.deviceErrorTelemetry.deviceLost,
+      uncapturedErrors: receipt.deviceErrorTelemetry.uncapturedErrors,
       menuReturnFrameCount: receipt.afterReturn.frameCount,
     })),
   };
@@ -1336,6 +1763,7 @@ try {
     minimumCaptureRecoveryWindowMs,
     maximumCaptureRecoveryCompletionMs,
     maximumLiveLongTaskEntries,
+    requiredLifecycleRecoveryCyclesPerVisit,
     minimumVisualEvidenceFrames,
     minimumVisualEvidenceDistinctRatio,
     rustworksDurationMs,
