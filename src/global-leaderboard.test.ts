@@ -3,6 +3,7 @@ import {
   LEADERBOARD_INSTALL_STORAGE_KEY,
   fetchGlobalLeaderboard,
   forgetLeaderboardInstallId,
+  leaderboardNetworkEnabled,
   leaderboardInstallId,
   submitGlobalStreak,
 } from './global-leaderboard';
@@ -17,6 +18,12 @@ class MemoryStorage implements ScoreStorage {
 }
 
 describe('global leaderboard client', () => {
+  it('supports an explicit deterministic offline-services route for browser and hardware QA', () => {
+    expect(leaderboardNetworkEnabled('?externalServices=off')).toBe(false);
+    expect(leaderboardNetworkEnabled('?multiplayerQa=1')).toBe(false);
+    expect(leaderboardNetworkEnabled('?release=latest')).toBe(true);
+  });
+
   it('creates and reuses a stable non-secret installation identifier', () => {
     const storage = new MemoryStorage();
     const created = leaderboardInstallId(storage, true, () => 'install_123456789');

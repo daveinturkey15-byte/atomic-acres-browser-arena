@@ -358,6 +358,7 @@ import {
   GLOBAL_LEADERBOARD_ENDPOINT,
   fetchGlobalLeaderboard,
   forgetLeaderboardInstallId,
+  leaderboardNetworkEnabled,
   leaderboardInstallId,
   submitGlobalStreak,
 } from './global-leaderboard';
@@ -2832,7 +2833,8 @@ const matchDiagnosticUploader = new MatchDiagnosticUploader(
 );
 void matchDiagnosticUploader.flushPending();
 window.addEventListener('online', () => { void matchDiagnosticUploader.flushPending(); });
-let globalLeaderboardState: 'pending' | 'live' | 'cached' | 'saved' = GLOBAL_LEADERBOARD_ENDPOINT && !localMultiplayerQa ? 'pending' : 'cached';
+const externalLeaderboardNetworkEnabled = leaderboardNetworkEnabled(window.location.search);
+let globalLeaderboardState: 'pending' | 'live' | 'cached' | 'saved' = GLOBAL_LEADERBOARD_ENDPOINT && externalLeaderboardNetworkEnabled ? 'pending' : 'cached';
 const highScoreChannel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('atomic-acres:high-scores:v2') : null;
 let scoutSweepUntil = 0;
 let yardhawk: YardhawkEntity | null = null;
@@ -3607,7 +3609,7 @@ function sendLeaderboardSync(): void {
 }
 
 async function refreshGlobalLeaderboard(): Promise<void> {
-  if (!GLOBAL_LEADERBOARD_ENDPOINT || localMultiplayerQa) {
+  if (!GLOBAL_LEADERBOARD_ENDPOINT || !externalLeaderboardNetworkEnabled) {
     globalLeaderboardState = 'cached';
     renderHighScores();
     return;
@@ -3637,7 +3639,7 @@ function recordImmediateStreak(syncGlobal = true): void {
   if (!entry) return;
   persistMergedHighScores([entry]);
   if (network.role !== 'offline') network.send({ type: 'high-score', by: player.id, season: LEADERBOARD_SEASON, entry });
-  if (!syncGlobal || localMultiplayerQa || !pass65Settings.privacy.shareGlobalLeaderboard) return;
+  if (!syncGlobal || !externalLeaderboardNetworkEnabled || !pass65Settings.privacy.shareGlobalLeaderboard) return;
   const leaderboardInstallation = leaderboardInstallId(localStorage, true);
   if (!leaderboardInstallation) return;
   const nameKey = entry.id.replace(/^global:/, '');

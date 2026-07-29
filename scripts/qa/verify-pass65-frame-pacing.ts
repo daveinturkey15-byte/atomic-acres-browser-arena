@@ -395,7 +395,7 @@ async function runTrial(browser: Browser, repeat: number, arenaId: ArenaId): Pro
     if (headed) await page.bringToFront();
     const seed = 6_505 + repeat;
     await page.goto(
-      `http://127.0.0.1:${port}/?release=latest&renderer=webgpu&map=${arenaId}&render=blender&grass=on&mist=on&seed=${seed}`,
+      `http://127.0.0.1:${port}/?release=latest&renderer=webgpu&externalServices=off&map=${arenaId}&render=blender&grass=on&mist=on&seed=${seed}`,
       { waitUntil: 'domcontentloaded', timeout: 60_000 },
     );
     await page.waitForFunction(() => {

@@ -2,6 +2,11 @@ import type { HighScoreEntry, ScoreStorage } from './high-scores';
 import { LEADERBOARD_SEASON } from '../shared/leaderboard-season';
 
 export const LEADERBOARD_INSTALL_STORAGE_KEY = 'atomic-acres:leaderboard-install:v2';
+
+export function leaderboardNetworkEnabled(search: string): boolean {
+  const params = new URLSearchParams(search);
+  return params.get('externalServices') !== 'off' && params.get('multiplayerQa') !== '1';
+}
 export const GLOBAL_LEADERBOARD_ENDPOINT = (import.meta.env.VITE_GLOBAL_LEADERBOARD_URL ?? '').trim().replace(/\/$/, '');
 export const GLOBAL_LEADERBOARD_TIMEOUT_MS = 4_000;
 
