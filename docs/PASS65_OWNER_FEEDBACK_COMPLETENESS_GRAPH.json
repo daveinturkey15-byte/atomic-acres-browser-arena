@@ -1284,8 +1284,11 @@
       "command": "npm run qa:pass64:railgun",
       "paths": [
         "tests/e2e/pass64-railgun.spec.ts",
+        "tests/e2e/pass65-railgun-multihit.spec.ts",
         "src/railgun-authority.test.ts",
-        "src/railgun-presentation.test.ts"
+        "src/railgun-presentation.test.ts",
+        "src/railgun-result-delivery-contract.test.ts",
+        "src/audio-railgun.test.ts"
       ]
     },
     {
