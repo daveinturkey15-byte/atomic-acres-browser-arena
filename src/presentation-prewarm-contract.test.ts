@@ -233,8 +233,8 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('verifierCaptureRecovery: summarizeCaptureRecovery(capture.recovery)');
     expect(source).toContain("const skipDiagnosticCapture = process.env.PASS65_DIAGNOSTIC_SKIP_CAPTURE === '1';");
     expect(source).toContain('const captureEnabled = !diagnosticMode || !skipDiagnosticCapture;');
-    expect(source).toContain('if (captureEnabled) {\n      const canvasClip =');
-    expect(source).toContain('if (captureEnabled) {\n    try {\n      await page?.screenshot');
+    expect(source).toContain('if (captureEnabled) {\n    visualPhaseStarted = true;');
+    expect(source).toContain('if (captureEnabled && visualPhaseStarted) {\n    try {\n      await page?.screenshot');
     expect(source).toContain('let lastCompletedLiveSample = null;');
     const failureBreadcrumb = source.slice(
       source.indexOf('lastCompletedLiveSample = {'),
@@ -248,11 +248,20 @@ describe('presentation prewarm startup contract', () => {
     expect(failureBreadcrumb).toContain('finalHeldFrontier: null');
     expect(failureBreadcrumb).toContain('liveLongTasks: sample.liveLongTasks');
     expect(failureBreadcrumb).not.toContain('...sample');
-    expect(source).toContain('activeContext,\n    lastCompletedLiveSample,\n    lastCompletedVisualEvidence,\n    error:');
+    expect(source).toContain('completedLivePhaseSummary,\n    livePhaseEvidenceDigest,\n    lastCompletedLiveSample,');
+    expect(source).toContain('lastCompletedVisualEvidence,\n    error:');
   });
 
-  it('keeps continuous timed live evidence separate from quarantined visual captures', () => {
+  it('keeps the complete live tour separate and immutable before the global visual tour', () => {
     const source = readFileSync(new URL('../scripts/qa/verify-pass65-webgpu-endurance.mjs', import.meta.url), 'utf8');
+    const liveTour = source.slice(
+      source.indexOf('for (const [visit, arenaId] of arenaSequence.entries()) {'),
+      source.indexOf('if (arenaReceipts.length !== arenaSequence.length'),
+    );
+    expect(liveTour).not.toContain('page.screenshot');
+    expect(liveTour).not.toContain('captureCanvasOnly');
+    expect(liveTour).not.toContain("locator('#game').boundingBox()");
+    expect(liveTour).not.toContain('visualEvidence');
     const liveLoop = source.slice(
       source.indexOf('while (measuredLiveDurationMs < durationMs) {'),
       source.indexOf('if (samples.length < 5 || measuredLiveDurationMs < durationMs)'),
@@ -270,11 +279,7 @@ describe('presentation prewarm startup contract', () => {
 
     const liveGateIndex = source.indexOf('if (samples.length < 5 || measuredLiveDurationMs < durationMs)');
     const finalDrainIndex = source.indexOf('const finalLiveHeldFrontier = summarizeHeldFrontier');
-    const visualPhaseIndex = source.indexOf('const visualEvidence = {');
-    const menuReturnIndex = source.indexOf('const beforeReturn = samples.at(-1);');
     expect(finalDrainIndex).toBeGreaterThan(liveGateIndex);
-    expect(visualPhaseIndex).toBeGreaterThan(finalDrainIndex);
-    expect(menuReturnIndex).toBeGreaterThan(visualPhaseIndex);
     expect(source).toContain('measuredLiveDurationMs,\n        actualDurationMs: measuredLiveDurationMs');
     expect(source).toContain('finalLiveFrontier.presentation.submissionSequence !== finalLiveFrontier.presentation.completedSequence');
     expect(source).toContain('finalLiveFrontier.presentation.lastCompletionLatencyMs > maximumLiveCompletionGapMs');
@@ -287,8 +292,22 @@ describe('presentation prewarm startup contract', () => {
     expect(drainIsolation).toContain('Resolve with the same snapshot that first proves equality');
     expect(drainIsolation).not.toContain('page.waitForFunction');
 
-    const visualPhase = source.slice(visualPhaseIndex, menuReturnIndex);
-    expect(visualPhase).toContain('if (captureEnabled) {');
+    const liveTourGateIndex = source.indexOf('if (arenaReceipts.length !== arenaSequence.length');
+    const liveDigestIndex = source.indexOf('livePhaseEvidenceDigest = digest(Buffer.from(JSON.stringify(arenaReceipts)))');
+    const liveFreezeIndex = source.indexOf('Object.freeze(arenaReceipts);');
+    const visualPhaseIndex = source.indexOf('visualPhaseStarted = true;');
+    const visualPhaseEnd = source.indexOf('const endingLivePhaseEvidenceDigest');
+    expect(liveDigestIndex).toBeGreaterThan(liveTourGateIndex);
+    expect(liveFreezeIndex).toBeGreaterThan(liveDigestIndex);
+    expect(visualPhaseIndex).toBeGreaterThan(liveFreezeIndex);
+    expect(visualPhaseEnd).toBeGreaterThan(visualPhaseIndex);
+    expect(source).toContain('arenaReceipts.length !== arenaSequence.length');
+    expect(source).toContain('receipt.live.measuredLiveDurationMs < receipt.live.requestedDurationMs');
+    expect(source).toContain('Live tour emitted browser/GPU errors before visual capture began');
+    expect(source).toContain('endingLivePhaseEvidenceDigest !== livePhaseEvidenceDigest');
+
+    const visualPhase = source.slice(visualPhaseIndex, visualPhaseEnd);
+    expect(visualPhase).toContain('for (const [tourIndex, arenaId] of visualArenaSequence.entries())');
     expect(visualPhase).toContain('for (const [visualIndex, pose] of visualEvidencePoses.entries())');
     expect(visualPhase).toContain("state.render.runtime.actualBackend === 'webgpu'");
     expect(visualPhase).toContain("state.render.runtime.presentation.status === 'healthy'");
@@ -301,10 +320,14 @@ describe('presentation prewarm startup contract', () => {
     expect(visualPhase).toContain('!visualEvidence.adjacentHashesDistinct');
     expect(visualPhase).toContain('visualEvidence.distinctScreenshots < minimumDistinctScreenshots');
     expect(visualPhase).toContain('minimumVisualEvidenceDistinctRatio');
-    expect(visualPhase).toContain('await writeFile(`${artifactRoot}/${visit}-${arenaId}-final.png`, lastScreenshot);');
+    expect(visualPhase).toContain('await writeFile(`${artifactRoot}/visual-${tourIndex}-${arenaId}-final.png`, lastScreenshot);');
+    expect(visualPhase).toContain('visual-tour menu return did not retire presentation safely');
+    expect(visualPhase).toContain('visualEvidenceByArena.push(visualEvidence);');
     expect(source).toContain('const minimumVisualEvidenceFrames = 5;');
     expect(source).toContain('const minimumVisualEvidenceDistinctRatio = 0.8;');
-    expect(source).toContain('lastCompletedVisualEvidence = { visit, arenaId, ...frame };');
+    expect(source).toContain('lastCompletedVisualEvidence = { tourIndex, arenaId, ...frame };');
+    expect(source).toContain('visualEvidenceByArena,');
+    expect(source).toContain('if (captureEnabled && visualPhaseStarted) {');
   });
 
   it('rejects degraded foreground cadence in the cold physical-menu gate', () => {

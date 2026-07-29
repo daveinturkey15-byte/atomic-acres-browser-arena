@@ -327,6 +327,10 @@ let page;
 let activeContext = null;
 let lastCompletedLiveSample = null;
 let lastCompletedVisualEvidence = null;
+let liveTourComplete = false;
+let visualPhaseStarted = false;
+let completedLivePhaseSummary = null;
+let livePhaseEvidenceDigest = null;
 const errors = [];
 try {
   await server.listen();
@@ -363,6 +367,7 @@ try {
   }, undefined, { timeout: 60_000 });
 
   const arenaReceipts = [];
+  const visualEvidenceByArena = [];
   const settledResidencyByArena = new Map();
   for (const [visit, arenaId] of arenaSequence.entries()) {
     activeContext = { visit, arenaId, phase: 'select-arena', sampleIndex: null };
@@ -938,95 +943,6 @@ try {
     samples.at(-1).finalHeldFrontier = finalLiveHeldFrontier;
     lastCompletedLiveSample.finalHeldFrontier = finalLiveHeldFrontier;
 
-    const visualEvidence = {
-      enabled: captureEnabled,
-      requiredFrames: minimumVisualEvidenceFrames,
-      minimumDistinctRatio: minimumVisualEvidenceDistinctRatio,
-      capturedFrames: 0,
-      distinctScreenshots: 0,
-      adjacentHashesDistinct: true,
-      skippedReason: captureEnabled ? null : 'diagnostic-capture-disabled',
-      frames: [],
-    };
-    let lastScreenshot = null;
-    if (captureEnabled) {
-      const canvasClip = await page.locator('#game').boundingBox();
-      if (!canvasClip || canvasClip.width <= 0 || canvasClip.height <= 0) {
-        throw new Error(`${arenaId} gameplay canvas has no capture bounds`);
-      }
-      await page.evaluate(() => {
-        const api = window.__ATOMIC_ACRES_DEBUG__;
-        api.setMovement(false);
-        api.setAds(false);
-        api.setBotsFrozen?.(true);
-      });
-      const screenshotHashes = new Set();
-      let previousScreenshotHash = null;
-      for (const [visualIndex, pose] of visualEvidencePoses.entries()) {
-        activeContext = { visit, arenaId, phase: 'visual-evidence', sampleIndex: visualIndex };
-        const poseStart = await page.evaluate((nextPose) => {
-          const api = window.__ATOMIC_ACRES_DEBUG__;
-          const state = api.snapshot();
-          const [x, y, z] = state.player.position;
-          api.setCaptureCameraPose(x, y, z, nextPose.yaw, nextPose.pitch);
-          const before = api.snapshot();
-          api.setRenderPaused(false);
-          return {
-            frameCount: before.frameCount,
-            completedSequence: before.render.runtime.presentation.completedSequence,
-          };
-        }, pose);
-        await page.waitForFunction(({ expectedArenaId, minimumFrameCount, minimumCompletionSequence }) => {
-          const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
-          return state?.gameStarted === true
-            && state.arenaSelection.id === expectedArenaId
-            && state.arenaSelection.streaming.transition.phase === 'idle'
-            && state.arenaSelection.streaming.transition.failure === null
-            && state.arenaSelection.streaming.transition.renderSubmissionPaused === false
-            && state.render.runtime.actualBackend === 'webgpu'
-            && state.render.runtime.deviceLost === false
-            && state.render.runtime.uncapturedErrors === 0
-            && state.render.runtime.presentation.status === 'healthy'
-            && state.render.playableScene.renderWatchdog.status === 'healthy'
-            && state.render.playableScene.renderWatchdog.fatal === false
-            && state.frameCount >= minimumFrameCount
-            && state.render.runtime.presentation.completedSequence >= minimumCompletionSequence;
-        }, {
-          expectedArenaId: arenaId,
-          minimumFrameCount: poseStart.frameCount + 4,
-          minimumCompletionSequence: poseStart.completedSequence + 2,
-        }, { timeout: 12_000 });
-        const capture = await captureCanvasOnly(page, canvasClip);
-        lastScreenshot = capture.screenshot;
-        const screenshotHash = digest(lastScreenshot);
-        const adjacentHashDistinct = previousScreenshotHash === null || screenshotHash !== previousScreenshotHash;
-        screenshotHashes.add(screenshotHash);
-        const frame = {
-          visualIndex,
-          pose,
-          screenshotHash,
-          adjacentHashDistinct,
-          captureIsolationMs: capture.captureIsolationMs,
-          verifierCaptureRecovery: summarizeCaptureRecovery(capture.recovery),
-          verifierHeldFrontier: summarizeHeldFrontier(capture.progress),
-        };
-        visualEvidence.frames.push(frame);
-        lastCompletedVisualEvidence = { visit, arenaId, ...frame };
-        previousScreenshotHash = screenshotHash;
-      }
-      visualEvidence.capturedFrames = visualEvidence.frames.length;
-      visualEvidence.distinctScreenshots = screenshotHashes.size;
-      visualEvidence.adjacentHashesDistinct = visualEvidence.frames.every((frame) => frame.adjacentHashDistinct);
-      const minimumDistinctScreenshots = Math.ceil(
-        visualEvidence.capturedFrames * minimumVisualEvidenceDistinctRatio,
-      );
-      if (visualEvidence.capturedFrames < minimumVisualEvidenceFrames
-        || !visualEvidence.adjacentHashesDistinct
-        || visualEvidence.distinctScreenshots < minimumDistinctScreenshots) {
-        throw new Error(`${arenaId} visual evidence was not sufficiently live and distinct: ${JSON.stringify(visualEvidence)}`);
-      }
-      await writeFile(`${artifactRoot}/${visit}-${arenaId}-final.png`, lastScreenshot);
-    }
     const beforeReturn = samples.at(-1);
     await page.evaluate(() => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
@@ -1105,10 +1021,219 @@ try {
         first: samples[0],
         last: beforeReturn,
       },
-      visualEvidence,
       afterReturn,
     });
-    console.log(`[pass65-endurance] visit=${visit} arena=${arenaId} liveMs=${measuredLiveDurationMs.toFixed(1)} samples=${samples.length} visuals=${visualEvidence.capturedFrames} result=pass`);
+    console.log(`[pass65-endurance] visit=${visit} arena=${arenaId} liveMs=${measuredLiveDurationMs.toFixed(1)} samples=${samples.length} result=pass`);
+  }
+
+  if (arenaReceipts.length !== arenaSequence.length
+    || arenaReceipts.some((receipt) => (
+      receipt.live.sampleCount < 5
+      || receipt.live.measuredLiveDurationMs < receipt.live.requestedDurationMs
+      || receipt.afterReturn.runtime.presentation.status !== 'healthy'
+      || receipt.afterReturn.runtime.uncapturedErrors !== 0
+      || receipt.afterReturn.gpuRetirement.draining
+    ))) {
+    throw new Error(`Live tour did not finish every requested visit cleanly: ${JSON.stringify({ expected: arenaSequence.length, arenaReceipts })}`);
+  }
+  const livePhaseBrowserErrors = fatalBrowserErrors(errors);
+  if (livePhaseBrowserErrors.length > 0) {
+    throw new Error(`Live tour emitted browser/GPU errors before visual capture began: ${livePhaseBrowserErrors[0]}`);
+  }
+  livePhaseEvidenceDigest = digest(Buffer.from(JSON.stringify(arenaReceipts)));
+  completedLivePhaseSummary = {
+    visits: arenaReceipts.length,
+    requestedVisits: arenaSequence.length,
+    evidenceDigest: livePhaseEvidenceDigest,
+    arenas: arenaReceipts.map((receipt) => ({
+      visit: receipt.visit,
+      arenaId: receipt.arenaId,
+      requestedDurationMs: receipt.live.requestedDurationMs,
+      measuredLiveDurationMs: receipt.live.measuredLiveDurationMs,
+      sampleCount: receipt.live.sampleCount,
+      menuReturnFrameCount: receipt.afterReturn.frameCount,
+    })),
+  };
+  Object.freeze(arenaReceipts);
+  liveTourComplete = true;
+
+  const visualArenaSequence = [...new Set(arenaSequence)];
+  if (!diagnosticMode && (visualArenaSequence.length !== 4
+    || [...canonicalArenaIds].some((arenaId) => !visualArenaSequence.includes(arenaId)))) {
+    throw new Error(`Canonical visual tour must contain each of the four arenas exactly once: ${JSON.stringify(visualArenaSequence)}`);
+  }
+  if (captureEnabled) {
+    visualPhaseStarted = true;
+    for (const [tourIndex, arenaId] of visualArenaSequence.entries()) {
+      activeContext = { visit: tourIndex, arenaId, phase: 'visual-select-arena', sampleIndex: null };
+      console.log(`[pass65-endurance] visual=${tourIndex} arena=${arenaId} phase=select`);
+      await page.evaluate((id) => window.__ATOMIC_ACRES_DEBUG__.selectArena(id), arenaId);
+      await page.waitForFunction((id) => {
+        const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+        return state?.arenaSelection?.id === id
+          && state?.arenaSelection?.streaming?.transition?.phase === 'idle'
+          && state?.arenaSelection?.streaming?.transition?.failure === null;
+      }, arenaId, { timeout: 30_000 });
+      await page.evaluate(() => {
+        const api = window.__ATOMIC_ACRES_DEBUG__;
+        api.equipKit('marksman');
+        api.startSolo();
+        api.setBotsFrozen(true);
+        api.setMovement(false);
+      });
+      await page.waitForFunction((id) => {
+        const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+        return state?.gameStarted === true
+          && state.matchPhase === 'active'
+          && state.arenaSelection.id === id
+          && state.render.runtime.actualBackend === 'webgpu'
+          && state.render.runtime.presentation.status === 'healthy'
+          && document.querySelector('#menu')?.classList.contains('hidden');
+      }, arenaId, { timeout: 30_000 });
+      await pauseAndDrainPresentation(page);
+
+      const canvasClip = await page.locator('#game').boundingBox();
+      if (!canvasClip || canvasClip.width <= 0 || canvasClip.height <= 0) {
+        throw new Error(`${arenaId} gameplay canvas has no capture bounds`);
+      }
+      const visualEvidence = {
+        tourIndex,
+        arenaId,
+        requiredFrames: minimumVisualEvidenceFrames,
+        minimumDistinctRatio: minimumVisualEvidenceDistinctRatio,
+        capturedFrames: 0,
+        distinctScreenshots: 0,
+        adjacentHashesDistinct: true,
+        frames: [],
+        afterReturn: null,
+      };
+      const screenshotHashes = new Set();
+      let previousScreenshotHash = null;
+      let lastScreenshot = null;
+      for (const [visualIndex, pose] of visualEvidencePoses.entries()) {
+        activeContext = { visit: tourIndex, arenaId, phase: 'visual-evidence', sampleIndex: visualIndex };
+        const poseStart = await page.evaluate((nextPose) => {
+          const api = window.__ATOMIC_ACRES_DEBUG__;
+          const state = api.snapshot();
+          const [x, y, z] = state.player.position;
+          api.setCaptureCameraPose(x, y, z, nextPose.yaw, nextPose.pitch);
+          const before = api.snapshot();
+          api.setRenderPaused(false);
+          return {
+            frameCount: before.frameCount,
+            completedSequence: before.render.runtime.presentation.completedSequence,
+          };
+        }, pose);
+        await page.waitForFunction(({ expectedArenaId, minimumFrameCount, minimumCompletionSequence }) => {
+          const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+          return state?.gameStarted === true
+            && state.arenaSelection.id === expectedArenaId
+            && state.arenaSelection.streaming.transition.phase === 'idle'
+            && state.arenaSelection.streaming.transition.failure === null
+            && state.arenaSelection.streaming.transition.renderSubmissionPaused === false
+            && state.render.runtime.actualBackend === 'webgpu'
+            && state.render.runtime.deviceLost === false
+            && state.render.runtime.uncapturedErrors === 0
+            && state.render.runtime.presentation.status === 'healthy'
+            && state.render.playableScene.renderWatchdog.status === 'healthy'
+            && state.render.playableScene.renderWatchdog.fatal === false
+            && state.frameCount >= minimumFrameCount
+            && state.render.runtime.presentation.completedSequence >= minimumCompletionSequence;
+        }, {
+          expectedArenaId: arenaId,
+          minimumFrameCount: poseStart.frameCount + 4,
+          minimumCompletionSequence: poseStart.completedSequence + 2,
+        }, { timeout: 12_000 });
+        const capture = await captureCanvasOnly(page, canvasClip);
+        lastScreenshot = capture.screenshot;
+        const screenshotHash = digest(lastScreenshot);
+        const adjacentHashDistinct = previousScreenshotHash === null || screenshotHash !== previousScreenshotHash;
+        screenshotHashes.add(screenshotHash);
+        const frame = {
+          visualIndex,
+          pose,
+          screenshotHash,
+          adjacentHashDistinct,
+          captureIsolationMs: capture.captureIsolationMs,
+          verifierCaptureRecovery: summarizeCaptureRecovery(capture.recovery),
+          verifierHeldFrontier: summarizeHeldFrontier(capture.progress),
+        };
+        visualEvidence.frames.push(frame);
+        lastCompletedVisualEvidence = { tourIndex, arenaId, ...frame };
+        previousScreenshotHash = screenshotHash;
+      }
+      visualEvidence.capturedFrames = visualEvidence.frames.length;
+      visualEvidence.distinctScreenshots = screenshotHashes.size;
+      visualEvidence.adjacentHashesDistinct = visualEvidence.frames.every((frame) => frame.adjacentHashDistinct);
+      const minimumDistinctScreenshots = Math.ceil(
+        visualEvidence.capturedFrames * minimumVisualEvidenceDistinctRatio,
+      );
+      if (visualEvidence.capturedFrames < minimumVisualEvidenceFrames
+        || !visualEvidence.adjacentHashesDistinct
+        || visualEvidence.distinctScreenshots < minimumDistinctScreenshots) {
+        throw new Error(`${arenaId} visual evidence was not sufficiently live and distinct: ${JSON.stringify(visualEvidence)}`);
+      }
+      await writeFile(`${artifactRoot}/visual-${tourIndex}-${arenaId}-final.png`, lastScreenshot);
+
+      activeContext = { visit: tourIndex, arenaId, phase: 'visual-menu-return', sampleIndex: null };
+      await page.evaluate(() => {
+        const api = window.__ATOMIC_ACRES_DEBUG__;
+        api.setRenderPaused(false);
+        api.setAds(false);
+        api.setMovement(false);
+        api.setBotsFrozen?.(false);
+        api.setCaptureCameraPose(null);
+        api.returnToMainMenu();
+      });
+      await page.waitForFunction(() => {
+        const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+        return state?.gameStarted === false && !document.querySelector('#menu')?.classList.contains('hidden');
+      }, undefined, { timeout: 20_000 });
+      await page.waitForFunction(() => {
+        const gpu = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.interactiveWorld?.gpuRetirement;
+        return gpu?.queuedResources === 0
+          && gpu?.queuedRoots === 0
+          && gpu?.queuedGeometries === 0
+          && gpu?.draining === false
+          && gpu?.scheduledRoots === gpu?.disposedRoots
+          && gpu?.scheduledGeometries === gpu?.disposedGeometries;
+      }, undefined, { timeout: 20_000 });
+      const afterReturn = await page.evaluate(() => {
+        const api = window.__ATOMIC_ACRES_DEBUG__;
+        const state = api.snapshot();
+        return {
+          frameCount: state.frameCount,
+          runtime: state.render.runtime,
+          gpuRetirement: state.interactiveWorld.gpuRetirement,
+          pendingSupportRoots: state.fieldSupport.pendingRetiredPresentationRoots,
+          grenadeWorldPool: state.grenadeVisual.pool,
+          smokePresentation: state.dmrThermal.smokePresentation,
+          residency: api.sampleRendererResidency(),
+        };
+      });
+      if (afterReturn.runtime.presentation.status !== 'healthy'
+        || afterReturn.runtime.uncapturedErrors !== 0
+        || afterReturn.gpuRetirement.failures !== 0
+        || afterReturn.gpuRetirement.queuedResources !== 0
+        || afterReturn.gpuRetirement.draining
+        || afterReturn.gpuRetirement.scheduledRoots !== afterReturn.gpuRetirement.disposedRoots
+        || afterReturn.gpuRetirement.scheduledGeometries !== afterReturn.gpuRetirement.disposedGeometries
+        || afterReturn.pendingSupportRoots !== 0
+        || afterReturn.grenadeWorldPool.active !== 0
+        || afterReturn.grenadeWorldPool.exhaustions !== 0
+        || afterReturn.grenadeWorldPool.prewarmBlockedAcquisitions !== 0
+        || afterReturn.smokePresentation.liveDisposals !== 0
+        || afterReturn.smokePresentation.active !== 0) {
+        throw new Error(`${arenaId} visual-tour menu return did not retire presentation safely: ${JSON.stringify(afterReturn)}`);
+      }
+      visualEvidence.afterReturn = afterReturn;
+      visualEvidenceByArena.push(visualEvidence);
+      console.log(`[pass65-endurance] visual=${tourIndex} arena=${arenaId} frames=${visualEvidence.capturedFrames} result=pass`);
+    }
+  }
+  const endingLivePhaseEvidenceDigest = digest(Buffer.from(JSON.stringify(arenaReceipts)));
+  if (endingLivePhaseEvidenceDigest !== livePhaseEvidenceDigest) {
+    throw new Error(`Visual tour mutated retained live evidence: ${JSON.stringify({ livePhaseEvidenceDigest, endingLivePhaseEvidenceDigest })}`);
   }
 
   const uniqueErrors = fatalBrowserErrors(errors);
@@ -1145,7 +1270,15 @@ try {
     killstreakProbeMode,
     secondActivationDelayMs,
     browserErrors: [...new Set(errors)],
+    completedLivePhaseSummary,
+    livePhaseEvidenceDigest,
     arenaReceipts,
+    visualTour: {
+      enabled: captureEnabled,
+      skippedReason: captureEnabled ? null : 'diagnostic-capture-disabled',
+      arenaSequence: visualArenaSequence,
+    },
+    visualEvidenceByArena,
   };
   const endingRevision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   const endingStatus = execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim();
@@ -1169,6 +1302,10 @@ try {
     verdict: 'fail',
     sourceRevision,
     activeContext,
+    liveTourComplete,
+    visualPhaseStarted,
+    completedLivePhaseSummary,
+    livePhaseEvidenceDigest,
     lastCompletedLiveSample,
     lastCompletedVisualEvidence,
     error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : String(error),
@@ -1176,7 +1313,7 @@ try {
     state,
   };
   await writeFile(`${artifactRoot}/failure-receipt.json`, `${JSON.stringify(failure, null, 2)}\n`, 'utf8');
-  if (captureEnabled) {
+  if (captureEnabled && visualPhaseStarted) {
     try {
       await page?.screenshot({ path: `${artifactRoot}/failure.png` });
     } catch {
