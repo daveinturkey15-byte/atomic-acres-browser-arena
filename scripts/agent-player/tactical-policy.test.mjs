@@ -190,6 +190,21 @@ test('respawn escape never enables retreat return fire', () => {
   assert.equal(escape.allowEngagement, false);
 });
 
+test('contact search stays dormant initially, sweeps after a confirmed-target drought, and stops on confirmation', () => {
+  const policy = createTacticalPolicy({ contactSearchAfterMs: 15_000, contactSearchTurn: 24 });
+  const initial = policy.update({ now: 1000, active: true, health: 100, movementCycle: 0, navigationTick: true });
+  assert.equal(initial.reason, 'roam-clear');
+  const search = policy.update({ now: 16_100, active: true, health: 100, movementCycle: 1, navigationTick: true });
+  assert.equal(search.reason, 'contact-search-sweep');
+  assert.equal(search.turn, 24);
+  assert.ok(search.keys.includes('KeyW'));
+  assert.ok(search.keys.includes('ShiftLeft'));
+  assert.equal(policy.snapshot().contactSearchFrames, 1);
+  const found = policy.update({ now: 16_200, active: true, health: 100, currentTarget: true, movementCycle: 2 });
+  assert.equal(found.mode, 'engage');
+  assert.equal(found.allowEngagement, true);
+});
+
 test('no-threat roaming performs bounded alternating route sweeps', () => {
   const policy = createTacticalPolicy({ routeSweepInterval: 12, routeSweepTurn: 18 });
   const left = policy.update({ now: 100, active: true, health: 100, movementCycle: 0, navigationTick: true });

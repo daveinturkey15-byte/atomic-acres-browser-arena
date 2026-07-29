@@ -19,6 +19,8 @@ export function createTacticalPolicy(options = {}) {
     respawnReentryDurationMs: Math.max(0, Number(options.respawnReentryDurationMs ?? 0)),
     retreatReturnFire: options.retreatReturnFire === true,
     retreatReturnFireMinimumHealth: Number(options.retreatReturnFireMinimumHealth ?? 30),
+    contactSearchAfterMs: Math.max(0, Number(options.contactSearchAfterMs ?? 0)),
+    contactSearchTurn: Number(options.contactSearchTurn ?? 24),
     bankLeadMinimumKills: Number(options.bankLeadMinimumKills ?? 0),
     bankLeadMinimumMargin: Number(options.bankLeadMinimumMargin ?? 1),
     killAnchorDurationMs: Number(options.killAnchorDurationMs ?? 0),
@@ -57,6 +59,8 @@ export function createTacticalPolicy(options = {}) {
     respawnEscapeFrames: 0,
     respawnReentryFrames: 0,
     retreatReturnFireFrames: 0,
+    lastConfirmedTargetAt: Number.NEGATIVE_INFINITY,
+    contactSearchFrames: 0,
     modeFrames: { roam: 0, engage: 0, retreat: 0, recover: 0, bank: 0, anchor: 0 },
   };
 
@@ -88,6 +92,7 @@ export function createTacticalPolicy(options = {}) {
       } else {
         if (!state.everActive) {
           state.everActive = true;
+          state.lastConfirmedTargetAt = now;
         } else if (state.pendingRespawn) {
           if (config.respawnEscapeDurationMs > 0) {
             state.direction *= -1;
@@ -95,6 +100,7 @@ export function createTacticalPolicy(options = {}) {
             state.respawnReentryUntil = state.respawnEscapeUntil + config.respawnReentryDurationMs;
             state.respawnEscapeActivations += 1;
           }
+          state.lastConfirmedTargetAt = now;
           state.pendingRespawn = false;
         }
         state.wasActive = true;
@@ -122,6 +128,7 @@ export function createTacticalPolicy(options = {}) {
         state.rawTargetObservationExpired = true;
         state.rawTargetObservationExpirations += 1;
       }
+      if (observation.active && observation.currentTarget) state.lastConfirmedTargetAt = now;
       if (observation.active && config.bankLeadMinimumKills > 0 && scoreFresh
         && kills >= config.bankLeadMinimumKills && kills - deaths >= config.bankLeadMinimumMargin) {
         state.leadBankActive = true;
@@ -215,12 +222,15 @@ export function createTacticalPolicy(options = {}) {
         reason = 'candidate-observation-expired';
       } else if (now < state.respawnReentryUntil) {
         reason = 'respawn-reentry';
+      } else if (config.contactSearchAfterMs > 0 && now - state.lastConfirmedTargetAt >= config.contactSearchAfterMs) {
+        reason = 'contact-search-sweep';
       }
       const changed = transition(nextMode, now, reason);
       state.modeFrames[nextMode] += 1;
       if (reason === 'low-health-evasion') state.lowHealthEvasionFrames += 1;
       if (reason === 'respawn-escape') state.respawnEscapeFrames += 1;
       if (reason === 'respawn-reentry') state.respawnReentryFrames += 1;
+      if (reason === 'contact-search-sweep') state.contactSearchFrames += 1;
       const killAnchorActive = observation.active && now < state.killAnchorUntil;
       if (killAnchorActive) {
         state.killAnchorActiveFrames += 1;
@@ -273,6 +283,9 @@ export function createTacticalPolicy(options = {}) {
           if (reason === 'respawn-reentry') {
             keys.push('KeyW', 'ShiftLeft');
             if (observation.navigationTick) turn = state.direction * 18;
+          } else if (reason === 'contact-search-sweep') {
+            keys.push('KeyW', 'ShiftLeft');
+            if (observation.navigationTick) turn = state.direction * config.contactSearchTurn;
           } else if (threat) {
             const bearing = Number(threat.bearingRadians ?? 0);
             const distance = Number(threat.distance ?? Number.POSITIVE_INFINITY);
@@ -329,6 +342,7 @@ export function createTacticalPolicy(options = {}) {
         respawnEscapeFrames: state.respawnEscapeFrames,
         respawnReentryFrames: state.respawnReentryFrames,
         retreatReturnFireFrames: state.retreatReturnFireFrames,
+        contactSearchFrames: state.contactSearchFrames,
         config: { ...config },
       };
     },

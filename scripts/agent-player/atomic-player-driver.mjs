@@ -557,6 +557,8 @@ async function run() {
   const respawnReentryDurationMs = integerArg(args['respawn-reentry-duration'], 0, 0, 10_000);
   const retreatReturnFire = args['retreat-return-fire'] === 'true';
   const retreatReturnFireMinimumHealth = integerArg(args['retreat-return-fire-min-health'], 30, 1, 100);
+  const contactSearchAfterMs = integerArg(args['contact-search-after'], 0, 0, 120_000);
+  const contactSearchTurn = integerArg(args['contact-search-turn'], 24, 0, 60);
   const fireMinimumTargetPixels = integerArg(args['fire-min-target-pixels'], 0, 0, 500);
   const fireMinimumTargetArea = integerArg(args['fire-min-target-area'], 0, 0, 5_000);
   const fireMinimumTargetHeight = integerArg(args['fire-min-target-height'], 0, 0, 100);
@@ -805,6 +807,8 @@ async function run() {
           respawnReentryDurationMs,
           retreatReturnFire,
           retreatReturnFireMinimumHealth,
+          contactSearchAfterMs,
+          contactSearchTurn,
           bankLeadMinimumKills,
           bankLeadMinimumMargin,
           killAnchorDurationMs,
@@ -1557,6 +1561,8 @@ async function run() {
         respawnReentryDurationMs,
         retreatReturnFire,
         retreatReturnFireMinimumHealth,
+        contactSearchAfterMs,
+        contactSearchTurn,
         fireMinimumTargetPixels,
         fireMinimumTargetArea,
         fireMinimumTargetHeight,
@@ -1650,6 +1656,7 @@ async function run() {
         respawnEscapeFrames: tacticalPolicyReceipt?.respawnEscapeFrames ?? 0,
         respawnReentryFrames: tacticalPolicyReceipt?.respawnReentryFrames ?? 0,
         retreatReturnFireFrames: tacticalPolicyReceipt?.retreatReturnFireFrames ?? 0,
+        contactSearchFrames: tacticalPolicyReceipt?.contactSearchFrames ?? 0,
         exposureGateSuppressions,
         exposurePixelSuppressions,
         exposureAreaSuppressions,
