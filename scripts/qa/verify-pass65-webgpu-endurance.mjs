@@ -16,6 +16,15 @@ const requiredCaptureRecoveryCompletions = 12;
 const minimumCaptureRecoveryWindowMs = 250;
 const maximumCaptureRecoveryCompletionMs = 50;
 const maximumLiveLongTaskEntries = 8;
+const minimumVisualEvidenceFrames = 5;
+const minimumVisualEvidenceDistinctRatio = 0.8;
+const visualEvidencePoses = [
+  { id: 'forward-low', yaw: 0, pitch: -0.08 },
+  { id: 'quarter-right-high', yaw: Math.PI * 0.4, pitch: 0.06 },
+  { id: 'rear-right-low', yaw: Math.PI * 0.8, pitch: -0.04 },
+  { id: 'rear-left-high', yaw: Math.PI * 1.2, pitch: 0.08 },
+  { id: 'quarter-left-level', yaw: Math.PI * 1.6, pitch: 0 },
+];
 const artifactRoot = 'artifacts/pass65/webgpu-endurance';
 const chromeCandidates = [
   process.env.PASS65_CHROME_PATH,
@@ -91,20 +100,69 @@ function fatalBrowserErrors(errors) {
   ));
 }
 
+function summarizeHeldFrontier(frontier) {
+  return {
+    atMs: frontier.atMs,
+    frameCount: frontier.frameCount,
+    presentation: {
+      status: frontier.presentation.status,
+      submissionSequence: frontier.presentation.submissionSequence,
+      completedSequence: frontier.presentation.completedSequence,
+      pendingForMs: frontier.presentation.pendingForMs,
+      lastCompletionLatencyMs: frontier.presentation.lastCompletionLatencyMs,
+    },
+  };
+}
+
+function summarizeCaptureRecovery(recovery) {
+  if (!recovery) return null;
+  return {
+    baselineSequence: recovery.baselineSequence,
+    requiredCompletions: recovery.requiredCompletions,
+    minimumWindowMs: recovery.minimumWindowMs,
+    maximumCompletionMs: recovery.maximumCompletionMs,
+    recoveryWindowMs: recovery.recoveryWindowMs,
+    elapsedMs: recovery.elapsedMs,
+    discardedCompletionCount: recovery.discardedCompletionCount,
+    qualifyingCompletionCount: recovery.qualifyingCompletionCount,
+    firstQualifyingCompletion: recovery.firstQualifyingCompletion,
+    lastQualifyingCompletion: recovery.lastQualifyingCompletion,
+    observations: recovery.observations.slice(-12),
+  };
+}
+
 async function pauseAndDrainPresentation(page) {
-  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__?.setRenderPaused(true));
-  await page.waitForFunction(() => {
-    const presentation = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.render?.runtime?.presentation;
-    return presentation && presentation.completedSequence >= presentation.submissionSequence;
-  }, undefined, { timeout: 12_000 });
-  const progress = await page.evaluate(() => {
-    const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-    return {
-      atMs: performance.now(),
-      frameCount: state.frameCount,
-      presentation: state.render.runtime.presentation,
+  const progress = await page.evaluate(() => new Promise((resolve, reject) => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    if (!api) {
+      reject(new Error('Presentation drain requires the Atomic Acres debug API'));
+      return;
+    }
+    const timeoutAt = performance.now() + 12_000;
+    let lastPresentation = null;
+    api.setRenderPaused(true);
+    const inspect = () => {
+      const state = api.snapshot();
+      lastPresentation = state.render.runtime.presentation;
+      if (lastPresentation.completedSequence >= lastPresentation.submissionSequence) {
+        // Resolve with the same snapshot that first proves equality. A second
+        // Node/browser round trip while intentionally paused would inflate the
+        // time-decaying gap telemetry with verifier time.
+        resolve({
+          atMs: performance.now(),
+          frameCount: state.frameCount,
+          presentation: lastPresentation,
+        });
+        return;
+      }
+      if (performance.now() >= timeoutAt) {
+        reject(new Error(`Presentation drain timed out: ${JSON.stringify(lastPresentation)}`));
+        return;
+      }
+      requestAnimationFrame(inspect);
     };
-  });
+    inspect();
+  }));
   if (progress.presentation.submissionSequence !== progress.presentation.completedSequence) {
     throw new Error(`Verifier failed to hold a drained WebGPU frontier: ${JSON.stringify(progress.presentation)}`);
   }
@@ -268,6 +326,7 @@ let browser;
 let page;
 let activeContext = null;
 let lastCompletedLiveSample = null;
+let lastCompletedVisualEvidence = null;
 const errors = [];
 try {
   await server.listen();
@@ -580,25 +639,19 @@ try {
     if (activeStressBudget && activeStressBudget.budgetAudit.pass !== true) {
       throw new Error(`${arenaId} exceeded its live chopper plus drone-swarm budget: ${JSON.stringify(activeStressBudget)}`);
     }
-    const canvasClip = captureEnabled ? await page.locator('#game').boundingBox() : null;
-    if (captureEnabled && (!canvasClip || canvasClip.width <= 0 || canvasClip.height <= 0)) {
-      throw new Error(`${arenaId} gameplay canvas has no capture bounds`);
-    }
-
     const durationMs = arenaId === 'rustworks-1v1' ? rustworksDurationMs : otherArenaDurationMs;
-    const startedAt = Date.now();
     const samples = [];
-    const screenshotHashes = new Set();
-    let previousScreenshotHash = null;
     let sampleIndex = 0;
-    let lastScreenshot = null;
+    let measuredLiveDurationMs = 0;
+    let liveWindowStart = null;
     await pauseAndDrainPresentation(page);
-    while (Date.now() - startedAt < durationMs) {
+    while (measuredLiveDurationMs < durationMs) {
       activeContext = { visit, arenaId, phase: 'sample', sampleIndex };
-      const liveWindowStart = await page.evaluate(({ index, stress, maximumLongTaskEntries }) => {
+      if (!liveWindowStart) liveWindowStart = await page.evaluate((initial) => {
+        const beginLiveWindow = ({ index, stress, maximumLongTaskEntries, requireDrained }) => {
         const api = window.__ATOMIC_ACRES_DEBUG__;
         const held = api.snapshot().render.runtime.presentation;
-        if (held.submissionSequence !== held.completedSequence) {
+        if (requireDrained && held.submissionSequence !== held.completedSequence) {
           throw new Error(`Live sample did not begin from a drained frontier: ${JSON.stringify(held)}`);
         }
         api.resetPresentationProgressWindow();
@@ -678,6 +731,9 @@ try {
           frameCount: started.frameCount,
           presentation: started.render.runtime.presentation,
         };
+        };
+        window.__PASS65_ENDURANCE_BEGIN_LIVE_WINDOW__ = beginLiveWindow;
+        return beginLiveWindow({ ...initial, requireDrained: true });
       }, {
         index: sampleIndex,
         stress: {
@@ -687,9 +743,17 @@ try {
         },
         maximumLongTaskEntries: maximumLiveLongTaskEntries,
       });
-      await page.waitForTimeout(sampleIntervalMs);
+      await page.waitForFunction((minimumEndAt) => performance.now() >= minimumEndAt,
+        liveWindowStart.atMs + sampleIntervalMs);
 
-      const sample = await page.evaluate(() => {
+      const boundary = await page.evaluate(({
+        measuredBefore,
+        requestedDurationMs,
+        windowStartAtMs,
+        nextIndex,
+        stress,
+        maximumLongTaskEntries,
+      }) => {
         const api = window.__ATOMIC_ACRES_DEBUG__;
         const longTaskSample = window.__PASS65_ENDURANCE_LIVE_LONG_TASK_SAMPLE__;
         if (longTaskSample?.observer) {
@@ -698,7 +762,7 @@ try {
         longTaskSample?.observer?.disconnect();
         delete window.__PASS65_ENDURANCE_LIVE_LONG_TASK_SAMPLE__;
         const state = api.snapshot();
-        return {
+        const sample = {
           atMs: performance.now(),
           frameCount: state.frameCount,
           gameStarted: state.gameStarted,
@@ -728,7 +792,30 @@ try {
           },
           residency: api.sampleRendererResidency(),
         };
+        const measuredAfter = measuredBefore + Math.max(1, sample.atMs - windowStartAtMs);
+        const reachedRequestedDuration = measuredAfter >= requestedDurationMs;
+        let nextLiveWindowStart = null;
+        if (reachedRequestedDuration) api.setRenderPaused(true);
+        else nextLiveWindowStart = window.__PASS65_ENDURANCE_BEGIN_LIVE_WINDOW__({
+          index: nextIndex,
+          stress,
+          maximumLongTaskEntries,
+          requireDrained: false,
+        });
+        return { sample, nextLiveWindowStart, reachedRequestedDuration };
+      }, {
+        measuredBefore: measuredLiveDurationMs,
+        requestedDurationMs: durationMs,
+        windowStartAtMs: liveWindowStart.atMs,
+        nextIndex: sampleIndex + 1,
+        stress: {
+          grenade: enabledStress.has('grenade'),
+          smoke: enabledStress.has('smoke'),
+          weapons: enabledStress.has('weapons'),
+        },
+        maximumLongTaskEntries: maximumLiveLongTaskEntries,
       });
+      const sample = boundary.sample;
       if (!sample.gameStarted || sample.arenaId !== arenaId
         || sample.transition.phase !== 'idle' || sample.transition.failure !== null || sample.transition.renderSubmissionPaused
         || sample.runtime.actualBackend !== 'webgpu' || sample.runtime.deviceLost
@@ -748,43 +835,35 @@ try {
         || sample.weaponCatalog.loaded > sample.weaponCatalog.maximumRetained) {
         throw new Error(`${arenaId} entered an invalid presentation state: ${JSON.stringify(sample)}`);
       }
-      // Measure each interval from its own paused+drained frontier. Reset occurs
-      // before gameplay actions, so any real smoke/crossbow/support hitch still
-      // counts; only Node and compositor capture work is excluded.
+      // Every boundary snapshots the completed interval before the browser-side
+      // controller atomically resets telemetry and starts the next one. No
+      // screenshot, pause or Node-side gap is admitted into measured live time.
       const elapsedMs = Math.max(1, sample.atMs - liveWindowStart.atMs);
       const frameDelta = sample.frameCount - liveWindowStart.frameCount;
       const submissionDelta = sample.runtime.presentation.submissionSequence - liveWindowStart.presentation.submissionSequence;
       const completionDelta = sample.runtime.presentation.completedSequence - liveWindowStart.presentation.completedSequence;
       const minimumFrameProgress = Math.max(4, Math.floor(elapsedMs / 100));
-      const capture = captureEnabled
-        ? await captureCanvasOnly(page, canvasClip)
-        : {
-            screenshot: null,
-            progress: await pauseAndDrainPresentation(page),
-            recovery: null,
-            captureIsolationMs: 0,
-          };
-      lastScreenshot = capture.screenshot;
-      const screenshotHash = lastScreenshot ? digest(lastScreenshot) : null;
-      if (screenshotHash) screenshotHashes.add(screenshotHash);
       // A WebGPU completion probe retires the entire queue frontier, so its
       // sequence advances in batches rather than once per rendered frame.
       // Measure display throughput from admitted submissions; queue stalls
       // remain hard failures through the presentation status above.
-      if (frameDelta < minimumFrameProgress || submissionDelta < minimumFrameProgress
-        || (captureEnabled && screenshotHash === previousScreenshotHash)) {
+      if (frameDelta < minimumFrameProgress || submissionDelta < minimumFrameProgress) {
         throw new Error(`${arenaId} presentation freeze detected: ${JSON.stringify({
-          elapsedMs, frameDelta, submissionDelta, completionDelta, screenshotHash,
+          elapsedMs, frameDelta, submissionDelta, completionDelta,
           liveWindowStart, previousReceipt: samples.at(-1) ?? null,
         })}`);
+      }
+      measuredLiveDurationMs += elapsedMs;
+      if (boundary.reachedRequestedDuration !== (measuredLiveDurationMs >= durationMs)) {
+        throw new Error(`${arenaId} live-duration boundary disagreed with Node: ${JSON.stringify({ measuredLiveDurationMs, durationMs, boundary })}`);
       }
       const receipt = {
         ...sample,
         liveWindowStart,
-        screenshotHash,
-        verifierCaptureIsolationMs: capture.captureIsolationMs,
-        verifierCaptureRecovery: capture.recovery,
-        verifierHeldFrontier: capture.progress,
+        elapsedMs,
+        frameDelta,
+        submissionDelta,
+        completionDelta,
       };
       samples.push(receipt);
       // Preserve a deliberately bounded cross-scope breadcrumb. If the next
@@ -803,7 +882,7 @@ try {
           submissionDelta,
           completionDelta,
           minimumFrameProgress,
-          screenshotHash,
+          measuredLiveDurationMs,
           presentation: {
             status: sample.runtime.presentation.status,
             submissionSequence: sample.runtime.presentation.submissionSequence,
@@ -822,40 +901,130 @@ try {
             },
           },
         },
-        verifierCaptureRecovery: capture.recovery ? {
-          baselineSequence: capture.recovery.baselineSequence,
-          requiredCompletions: capture.recovery.requiredCompletions,
-          minimumWindowMs: capture.recovery.minimumWindowMs,
-          maximumCompletionMs: capture.recovery.maximumCompletionMs,
-          recoveryWindowMs: capture.recovery.recoveryWindowMs,
-          elapsedMs: capture.recovery.elapsedMs,
-          discardedCompletionCount: capture.recovery.discardedCompletionCount,
-          qualifyingCompletionCount: capture.recovery.qualifyingCompletionCount,
-          firstQualifyingCompletion: capture.recovery.firstQualifyingCompletion,
-          lastQualifyingCompletion: capture.recovery.lastQualifyingCompletion,
-          observations: capture.recovery.observations.slice(-12),
-        } : null,
-        verifierHeldFrontier: {
-          atMs: capture.progress.atMs,
-          frameCount: capture.progress.frameCount,
-          presentation: {
-            status: capture.progress.presentation.status,
-            submissionSequence: capture.progress.presentation.submissionSequence,
-            completedSequence: capture.progress.presentation.completedSequence,
-            pendingForMs: capture.progress.presentation.pendingForMs,
-            lastCompletionLatencyMs: capture.progress.presentation.lastCompletionLatencyMs,
-          },
-        },
+        nextLiveWindowStart: boundary.nextLiveWindowStart,
+        finalHeldFrontier: null,
         liveLongTasks: sample.liveLongTasks,
       };
-      if (captureEnabled) previousScreenshotHash = screenshotHash;
       sampleIndex += 1;
+      liveWindowStart = boundary.nextLiveWindowStart;
     }
-    if (samples.length < 5
-      || (captureEnabled && screenshotHashes.size < Math.ceil(samples.length * 0.8))) {
-      throw new Error(`${arenaId} did not produce enough distinct live presentation samples`);
+    if (samples.length < 5 || measuredLiveDurationMs < durationMs) {
+      throw new Error(`${arenaId} did not complete its requested measured live soak: ${JSON.stringify({ samples: samples.length, measuredLiveDurationMs, durationMs })}`);
     }
-    if (captureEnabled && lastScreenshot) {
+    const finalLiveFrontier = await pauseAndDrainPresentation(page);
+    const finalLiveHealth = await page.evaluate(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+      return {
+        actualBackend: state.render.runtime.actualBackend,
+        deviceLost: state.render.runtime.deviceLost,
+        uncapturedErrors: state.render.runtime.uncapturedErrors,
+        watchdog: state.render.playableScene.renderWatchdog,
+      };
+    });
+    if (finalLiveFrontier.presentation.status !== 'healthy'
+      || finalLiveFrontier.presentation.submissionSequence !== finalLiveFrontier.presentation.completedSequence
+      || Number(finalLiveFrontier.presentation.pendingForMs ?? 0) > 0
+      || finalLiveFrontier.presentation.lastCompletionLatencyMs > maximumLiveCompletionGapMs
+      || finalLiveFrontier.presentation.completionFailures !== 0
+      || finalLiveFrontier.presentation.progress.maximumPendingForMs > maximumLivePendingMs
+      || finalLiveHealth.actualBackend !== 'webgpu'
+      || finalLiveHealth.deviceLost
+      || finalLiveHealth.uncapturedErrors !== 0
+      || finalLiveHealth.watchdog.status !== 'healthy'
+      || finalLiveHealth.watchdog.fatal) {
+      throw new Error(`${arenaId} final live drain exceeded its hard presentation limits: ${JSON.stringify({ finalLiveFrontier, finalLiveHealth })}`);
+    }
+    const finalLiveHeldFrontier = summarizeHeldFrontier(finalLiveFrontier);
+    samples.at(-1).finalHeldFrontier = finalLiveHeldFrontier;
+    lastCompletedLiveSample.finalHeldFrontier = finalLiveHeldFrontier;
+
+    const visualEvidence = {
+      enabled: captureEnabled,
+      requiredFrames: minimumVisualEvidenceFrames,
+      minimumDistinctRatio: minimumVisualEvidenceDistinctRatio,
+      capturedFrames: 0,
+      distinctScreenshots: 0,
+      adjacentHashesDistinct: true,
+      skippedReason: captureEnabled ? null : 'diagnostic-capture-disabled',
+      frames: [],
+    };
+    let lastScreenshot = null;
+    if (captureEnabled) {
+      const canvasClip = await page.locator('#game').boundingBox();
+      if (!canvasClip || canvasClip.width <= 0 || canvasClip.height <= 0) {
+        throw new Error(`${arenaId} gameplay canvas has no capture bounds`);
+      }
+      await page.evaluate(() => {
+        const api = window.__ATOMIC_ACRES_DEBUG__;
+        api.setMovement(false);
+        api.setAds(false);
+        api.setBotsFrozen?.(true);
+      });
+      const screenshotHashes = new Set();
+      let previousScreenshotHash = null;
+      for (const [visualIndex, pose] of visualEvidencePoses.entries()) {
+        activeContext = { visit, arenaId, phase: 'visual-evidence', sampleIndex: visualIndex };
+        const poseStart = await page.evaluate((nextPose) => {
+          const api = window.__ATOMIC_ACRES_DEBUG__;
+          const state = api.snapshot();
+          const [x, y, z] = state.player.position;
+          api.setCaptureCameraPose(x, y, z, nextPose.yaw, nextPose.pitch);
+          const before = api.snapshot();
+          api.setRenderPaused(false);
+          return {
+            frameCount: before.frameCount,
+            completedSequence: before.render.runtime.presentation.completedSequence,
+          };
+        }, pose);
+        await page.waitForFunction(({ expectedArenaId, minimumFrameCount, minimumCompletionSequence }) => {
+          const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+          return state?.gameStarted === true
+            && state.arenaSelection.id === expectedArenaId
+            && state.arenaSelection.streaming.transition.phase === 'idle'
+            && state.arenaSelection.streaming.transition.failure === null
+            && state.arenaSelection.streaming.transition.renderSubmissionPaused === false
+            && state.render.runtime.actualBackend === 'webgpu'
+            && state.render.runtime.deviceLost === false
+            && state.render.runtime.uncapturedErrors === 0
+            && state.render.runtime.presentation.status === 'healthy'
+            && state.render.playableScene.renderWatchdog.status === 'healthy'
+            && state.render.playableScene.renderWatchdog.fatal === false
+            && state.frameCount >= minimumFrameCount
+            && state.render.runtime.presentation.completedSequence >= minimumCompletionSequence;
+        }, {
+          expectedArenaId: arenaId,
+          minimumFrameCount: poseStart.frameCount + 4,
+          minimumCompletionSequence: poseStart.completedSequence + 2,
+        }, { timeout: 12_000 });
+        const capture = await captureCanvasOnly(page, canvasClip);
+        lastScreenshot = capture.screenshot;
+        const screenshotHash = digest(lastScreenshot);
+        const adjacentHashDistinct = previousScreenshotHash === null || screenshotHash !== previousScreenshotHash;
+        screenshotHashes.add(screenshotHash);
+        const frame = {
+          visualIndex,
+          pose,
+          screenshotHash,
+          adjacentHashDistinct,
+          captureIsolationMs: capture.captureIsolationMs,
+          verifierCaptureRecovery: summarizeCaptureRecovery(capture.recovery),
+          verifierHeldFrontier: summarizeHeldFrontier(capture.progress),
+        };
+        visualEvidence.frames.push(frame);
+        lastCompletedVisualEvidence = { visit, arenaId, ...frame };
+        previousScreenshotHash = screenshotHash;
+      }
+      visualEvidence.capturedFrames = visualEvidence.frames.length;
+      visualEvidence.distinctScreenshots = screenshotHashes.size;
+      visualEvidence.adjacentHashesDistinct = visualEvidence.frames.every((frame) => frame.adjacentHashDistinct);
+      const minimumDistinctScreenshots = Math.ceil(
+        visualEvidence.capturedFrames * minimumVisualEvidenceDistinctRatio,
+      );
+      if (visualEvidence.capturedFrames < minimumVisualEvidenceFrames
+        || !visualEvidence.adjacentHashesDistinct
+        || visualEvidence.distinctScreenshots < minimumDistinctScreenshots) {
+        throw new Error(`${arenaId} visual evidence was not sufficiently live and distinct: ${JSON.stringify(visualEvidence)}`);
+      }
       await writeFile(`${artifactRoot}/${visit}-${arenaId}-final.png`, lastScreenshot);
     }
     const beforeReturn = samples.at(-1);
@@ -864,6 +1033,7 @@ try {
       api.setRenderPaused(false);
       api.setAds(false);
       api.setMovement(false);
+      api.setBotsFrozen?.(false);
       api.setCaptureCameraPose(null);
       api.returnToMainMenu();
     });
@@ -923,20 +1093,22 @@ try {
     arenaReceipts.push({
       visit,
       arenaId,
-      requestedDurationMs: durationMs,
-      actualDurationMs: samples.at(-1).atMs - samples[0].atMs,
       killstreakStress,
       killstreakActivationProbe,
       activeStressBudget,
       doorResetProbe,
-      samples: samples.length,
-      captureEnabled,
-      distinctScreenshots: screenshotHashes.size,
-      first: samples[0],
-      last: beforeReturn,
+      live: {
+        requestedDurationMs: durationMs,
+        measuredLiveDurationMs,
+        actualDurationMs: measuredLiveDurationMs,
+        sampleCount: samples.length,
+        first: samples[0],
+        last: beforeReturn,
+      },
+      visualEvidence,
       afterReturn,
     });
-    console.log(`[pass65-endurance] visit=${visit} arena=${arenaId} samples=${samples.length} result=pass`);
+    console.log(`[pass65-endurance] visit=${visit} arena=${arenaId} liveMs=${measuredLiveDurationMs.toFixed(1)} samples=${samples.length} visuals=${visualEvidence.capturedFrames} result=pass`);
   }
 
   const uniqueErrors = fatalBrowserErrors(errors);
@@ -947,11 +1119,11 @@ try {
     sourceRevision,
     browserExecutable: executablePath,
     browserVersion: browser.version(),
-    adapter: arenaReceipts[0]?.first?.runtime ? {
-      label: arenaReceipts[0].first.runtime.adapterLabel,
-      adapterClass: arenaReceipts[0].first.runtime.adapterClass,
-      deviceClass: arenaReceipts[0].first.runtime.deviceClass,
-      softwareAdapter: arenaReceipts[0].first.runtime.softwareAdapter,
+    adapter: arenaReceipts[0]?.live?.first?.runtime ? {
+      label: arenaReceipts[0].live.first.runtime.adapterLabel,
+      adapterClass: arenaReceipts[0].live.first.runtime.adapterClass,
+      deviceClass: arenaReceipts[0].live.first.runtime.deviceClass,
+      softwareAdapter: arenaReceipts[0].live.first.runtime.softwareAdapter,
     } : null,
     viewport: [2560, 1440],
     sampleIntervalMs,
@@ -962,6 +1134,8 @@ try {
     minimumCaptureRecoveryWindowMs,
     maximumCaptureRecoveryCompletionMs,
     maximumLiveLongTaskEntries,
+    minimumVisualEvidenceFrames,
+    minimumVisualEvidenceDistinctRatio,
     rustworksDurationMs,
     otherArenaDurationMs,
     arenaSequence,
@@ -996,6 +1170,7 @@ try {
     sourceRevision,
     activeContext,
     lastCompletedLiveSample,
+    lastCompletedVisualEvidence,
     error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : String(error),
     browserErrors: [...new Set(errors)],
     state,

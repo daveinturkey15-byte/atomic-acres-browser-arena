@@ -230,29 +230,81 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('liveLongTaskEvidence.entries.length < maximumLongTaskEntries');
     expect(source).toContain('maximumLongTaskEntries: maximumLiveLongTaskEntries');
     expect(source).toContain('recordEntries(longTaskSample.observer.takeRecords())');
-    expect(source).toContain('verifierCaptureRecovery: capture.recovery');
+    expect(source).toContain('verifierCaptureRecovery: summarizeCaptureRecovery(capture.recovery)');
     expect(source).toContain("const skipDiagnosticCapture = process.env.PASS65_DIAGNOSTIC_SKIP_CAPTURE === '1';");
     expect(source).toContain('const captureEnabled = !diagnosticMode || !skipDiagnosticCapture;');
-    expect(source).toContain('const canvasClip = captureEnabled ?');
-    expect(source).toContain('captureEnabled && screenshotHash === previousScreenshotHash');
-    expect(source).toContain('captureEnabled && screenshotHashes.size < Math.ceil(samples.length * 0.8)');
-    expect(source).toContain('if (captureEnabled && lastScreenshot)');
+    expect(source).toContain('if (captureEnabled) {\n      const canvasClip =');
     expect(source).toContain('if (captureEnabled) {\n    try {\n      await page?.screenshot');
     expect(source).toContain('let lastCompletedLiveSample = null;');
     const failureBreadcrumb = source.slice(
       source.indexOf('lastCompletedLiveSample = {'),
-      source.indexOf('if (captureEnabled) previousScreenshotHash'),
+      source.indexOf('sampleIndex += 1;'),
     );
     expect(failureBreadcrumb).toContain('visit,');
     expect(failureBreadcrumb).toContain('arenaId,');
     expect(failureBreadcrumb).toContain('sampleIndex,');
     expect(failureBreadcrumb).toContain('liveMetrics: {');
-    expect(failureBreadcrumb).toContain('verifierCaptureRecovery: capture.recovery ? {');
-    expect(failureBreadcrumb).toContain('verifierHeldFrontier: {');
+    expect(failureBreadcrumb).toContain('nextLiveWindowStart: boundary.nextLiveWindowStart');
+    expect(failureBreadcrumb).toContain('finalHeldFrontier: null');
     expect(failureBreadcrumb).toContain('liveLongTasks: sample.liveLongTasks');
-    expect(failureBreadcrumb).toContain('observations: capture.recovery.observations.slice(-12)');
     expect(failureBreadcrumb).not.toContain('...sample');
-    expect(source).toContain('activeContext,\n    lastCompletedLiveSample,\n    error:');
+    expect(source).toContain('activeContext,\n    lastCompletedLiveSample,\n    lastCompletedVisualEvidence,\n    error:');
+  });
+
+  it('keeps continuous timed live evidence separate from quarantined visual captures', () => {
+    const source = readFileSync(new URL('../scripts/qa/verify-pass65-webgpu-endurance.mjs', import.meta.url), 'utf8');
+    const liveLoop = source.slice(
+      source.indexOf('while (measuredLiveDurationMs < durationMs) {'),
+      source.indexOf('if (samples.length < 5 || measuredLiveDurationMs < durationMs)'),
+    );
+    expect(liveLoop).not.toContain('page.screenshot');
+    expect(liveLoop).not.toContain('captureCanvasOnly');
+    expect(liveLoop).not.toContain('pauseAndDrainPresentation');
+    expect(liveLoop).toContain('api.resetPresentationProgressWindow();');
+    expect(liveLoop).toContain('presentation.progress.maximumSubmissionGapMs > maximumLiveSubmissionGapMs');
+    expect(liveLoop).toContain('presentation.progress.maximumCompletionGapMs > maximumLiveCompletionGapMs');
+    expect(liveLoop).toContain('presentation.progress.maximumPendingForMs > maximumLivePendingMs');
+    expect(liveLoop).toContain('requireDrained: false');
+    expect(liveLoop).toContain('measuredLiveDurationMs += elapsedMs;');
+    expect(liveLoop).toContain('samples.push(receipt);');
+
+    const liveGateIndex = source.indexOf('if (samples.length < 5 || measuredLiveDurationMs < durationMs)');
+    const finalDrainIndex = source.indexOf('const finalLiveHeldFrontier = summarizeHeldFrontier');
+    const visualPhaseIndex = source.indexOf('const visualEvidence = {');
+    const menuReturnIndex = source.indexOf('const beforeReturn = samples.at(-1);');
+    expect(finalDrainIndex).toBeGreaterThan(liveGateIndex);
+    expect(visualPhaseIndex).toBeGreaterThan(finalDrainIndex);
+    expect(menuReturnIndex).toBeGreaterThan(visualPhaseIndex);
+    expect(source).toContain('measuredLiveDurationMs,\n        actualDurationMs: measuredLiveDurationMs');
+    expect(source).toContain('finalLiveFrontier.presentation.submissionSequence !== finalLiveFrontier.presentation.completedSequence');
+    expect(source).toContain('finalLiveFrontier.presentation.lastCompletionLatencyMs > maximumLiveCompletionGapMs');
+    expect(source).toContain('finalLiveFrontier.presentation.completionFailures !== 0');
+    expect(source).toContain('finalLiveFrontier.presentation.progress.maximumPendingForMs > maximumLivePendingMs');
+    const drainIsolation = source.slice(
+      source.indexOf('async function pauseAndDrainPresentation'),
+      source.indexOf('async function requireCaptureRecoveryCompletions'),
+    );
+    expect(drainIsolation).toContain('Resolve with the same snapshot that first proves equality');
+    expect(drainIsolation).not.toContain('page.waitForFunction');
+
+    const visualPhase = source.slice(visualPhaseIndex, menuReturnIndex);
+    expect(visualPhase).toContain('if (captureEnabled) {');
+    expect(visualPhase).toContain('for (const [visualIndex, pose] of visualEvidencePoses.entries())');
+    expect(visualPhase).toContain("state.render.runtime.actualBackend === 'webgpu'");
+    expect(visualPhase).toContain("state.render.runtime.presentation.status === 'healthy'");
+    expect(visualPhase).toContain("state.arenaSelection.streaming.transition.phase === 'idle'");
+    expect(visualPhase).toContain('state.arenaSelection.streaming.transition.failure === null');
+    expect(visualPhase).toContain('state.arenaSelection.streaming.transition.renderSubmissionPaused === false');
+    expect(visualPhase).toContain("state.render.playableScene.renderWatchdog.status === 'healthy'");
+    expect(visualPhase).toContain('const capture = await captureCanvasOnly(page, canvasClip);');
+    expect(visualPhase).toContain('visualEvidence.capturedFrames < minimumVisualEvidenceFrames');
+    expect(visualPhase).toContain('!visualEvidence.adjacentHashesDistinct');
+    expect(visualPhase).toContain('visualEvidence.distinctScreenshots < minimumDistinctScreenshots');
+    expect(visualPhase).toContain('minimumVisualEvidenceDistinctRatio');
+    expect(visualPhase).toContain('await writeFile(`${artifactRoot}/${visit}-${arenaId}-final.png`, lastScreenshot);');
+    expect(source).toContain('const minimumVisualEvidenceFrames = 5;');
+    expect(source).toContain('const minimumVisualEvidenceDistinctRatio = 0.8;');
+    expect(source).toContain('lastCompletedVisualEvidence = { visit, arenaId, ...frame };');
   });
 
   it('rejects degraded foreground cadence in the cold physical-menu gate', () => {
