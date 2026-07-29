@@ -164,6 +164,32 @@ test('retreat latches a strafe direction away from a visible minimap threat', ()
   assert.ok(held.keys.includes('KeyA'));
 });
 
+test('opt-in retreat return fire requires a confirmed operator and sufficient visible health', () => {
+  const disabled = createTacticalPolicy({ retreatDamage: 5 });
+  const defaultRetreat = disabled.update({ now: 100, active: true, health: 80, damageDelta: 6, currentTarget: true });
+  assert.equal(defaultRetreat.mode, 'retreat');
+  assert.equal(defaultRetreat.allowEngagement, false);
+
+  const enabled = createTacticalPolicy({ retreatDamage: 5, retreatReturnFire: true, retreatReturnFireMinimumHealth: 30 });
+  const armedRetreat = enabled.update({ now: 100, active: true, health: 80, damageDelta: 6, currentTarget: true });
+  assert.equal(armedRetreat.mode, 'retreat');
+  assert.equal(armedRetreat.allowEngagement, true);
+  assert.equal(armedRetreat.allowScan, true);
+  assert.equal(enabled.snapshot().retreatReturnFireFrames, 1);
+
+  const lowHealth = enabled.update({ now: 200, active: true, health: 20, damageDelta: 0, currentTarget: true });
+  assert.equal(lowHealth.allowEngagement, false);
+});
+
+test('respawn escape never enables retreat return fire', () => {
+  const policy = createTacticalPolicy({ respawnEscapeDurationMs: 2500, retreatReturnFire: true });
+  policy.update({ now: 100, active: true, health: 100 });
+  policy.update({ now: 200, active: false, health: 0 });
+  const escape = policy.update({ now: 300, active: true, health: 100, currentTarget: true });
+  assert.equal(escape.reason, 'respawn-escape');
+  assert.equal(escape.allowEngagement, false);
+});
+
 test('no-threat roaming performs bounded alternating route sweeps', () => {
   const policy = createTacticalPolicy({ routeSweepInterval: 12, routeSweepTurn: 18 });
   const left = policy.update({ now: 100, active: true, health: 100, movementCycle: 0, navigationTick: true });

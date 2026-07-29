@@ -17,6 +17,8 @@ export function createTacticalPolicy(options = {}) {
     lowHealthEvade: options.lowHealthEvade === true,
     respawnEscapeDurationMs: Math.max(0, Number(options.respawnEscapeDurationMs ?? 0)),
     respawnReentryDurationMs: Math.max(0, Number(options.respawnReentryDurationMs ?? 0)),
+    retreatReturnFire: options.retreatReturnFire === true,
+    retreatReturnFireMinimumHealth: Number(options.retreatReturnFireMinimumHealth ?? 30),
     bankLeadMinimumKills: Number(options.bankLeadMinimumKills ?? 0),
     bankLeadMinimumMargin: Number(options.bankLeadMinimumMargin ?? 1),
     killAnchorDurationMs: Number(options.killAnchorDurationMs ?? 0),
@@ -54,6 +56,7 @@ export function createTacticalPolicy(options = {}) {
     respawnEscapeActivations: 0,
     respawnEscapeFrames: 0,
     respawnReentryFrames: 0,
+    retreatReturnFireFrames: 0,
     modeFrames: { roam: 0, engage: 0, retreat: 0, recover: 0, bank: 0, anchor: 0 },
   };
 
@@ -224,6 +227,13 @@ export function createTacticalPolicy(options = {}) {
         if (observation.currentTarget || observation.rawTarget) state.killAnchorEngagementFrames += 1;
       }
 
+      const retreatReturnFire = nextMode === 'retreat'
+        && reason !== 'respawn-escape'
+        && config.retreatReturnFire
+        && Boolean(observation.currentTarget)
+        && healthValid
+        && health >= config.retreatReturnFireMinimumHealth;
+      if (retreatReturnFire) state.retreatReturnFireFrames += 1;
       const keys = [];
       let turn = 0;
       if (observation.active) {
@@ -292,8 +302,8 @@ export function createTacticalPolicy(options = {}) {
         changed,
         keys: [...new Set(keys)],
         turn: clamp(turn, -100, 100),
-        allowEngagement: nextMode === 'engage',
-        allowScan: nextMode === 'roam' || nextMode === 'engage' || nextMode === 'bank' || nextMode === 'anchor',
+        allowEngagement: nextMode === 'engage' || retreatReturnFire,
+        allowScan: nextMode === 'roam' || nextMode === 'engage' || nextMode === 'bank' || nextMode === 'anchor' || retreatReturnFire,
         damageWindowAmount: state.damageWindowAmount,
         direction: state.direction,
         leadBankActive: state.leadBankActive,
@@ -318,6 +328,7 @@ export function createTacticalPolicy(options = {}) {
         respawnEscapeActivations: state.respawnEscapeActivations,
         respawnEscapeFrames: state.respawnEscapeFrames,
         respawnReentryFrames: state.respawnReentryFrames,
+        retreatReturnFireFrames: state.retreatReturnFireFrames,
         config: { ...config },
       };
     },
