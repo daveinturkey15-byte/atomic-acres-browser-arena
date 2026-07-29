@@ -1502,7 +1502,7 @@ export class HostKillstreakRuntime {
       const strafeSpeed = DRONE_DEPLOYMENT_POLICY.manualHorizontalSpeedMps * entity.strafe;
       const desired: [number, number, number] = [
         clamp(entity.position[0] + (forward[0] * speed + rightX * strafeSpeed) * dt, world.bounds.minX + 0.35, world.bounds.maxX - 0.35),
-        clamp(entity.position[1] + (forward[1] * Math.abs(speed) + entity.vertical * DRONE_DEPLOYMENT_POLICY.manualVerticalSpeedMps) * dt, world.bounds.floorY + 0.5, world.bounds.ceilingY - 0.5),
+        clamp(entity.position[1] + (forward[1] * speed + entity.vertical * DRONE_DEPLOYMENT_POLICY.manualVerticalSpeedMps) * dt, world.bounds.floorY + 0.5, world.bounds.ceilingY - 0.5),
         clamp(entity.position[2] + (forward[2] * speed + rightZ * strafeSpeed) * dt, world.bounds.minZ + 0.35, world.bounds.maxZ - 0.35),
       ];
       const previous: SupportVec3 = [...entity.position];

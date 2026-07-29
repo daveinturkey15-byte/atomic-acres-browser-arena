@@ -268,6 +268,38 @@ describe('drone centre-map deployment and movement', () => {
     expect(manual.snapshotFor('owner', 1_103).actors[0]!.possession).toBeNull();
   });
 
+  it('moves toward or away from the full pitched aim vector under forward and reverse thrust', () => {
+    const bounds = supportMapBounds[2];
+    const supportWorld = world(bounds);
+    const move = (thrustQ: -1 | 1) => {
+      const runtime = new HostKillstreakRuntime(7);
+      runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'piloted-drone', 'tri-pass', 'chopper', 'nuke']));
+      earn(runtime, 5);
+      const droneId = runtime.activate(intent('piloted-drone', 2), 1_000, supportWorld).entityIds[0]!;
+      expect(runtime.control({
+        by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 1, entityId: droneId, action: 'toggle-piloted-drone',
+      }, 1_001).accepted).toBe(true);
+      expect(runtime.control({
+        by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2, entityId: droneId, action: 'pilot-control',
+        yawQ: 0, pitchQ: Math.PI / 6, thrustQ, strafeQ: 0, verticalQ: 0,
+      }, 1_002).accepted).toBe(true);
+      const start = runtime.snapshotFor('owner', 1_002).entities[0]!.position;
+      runtime.advance(1_002, supportWorld);
+      runtime.advance(1_102, supportWorld);
+      const end = runtime.snapshotFor('owner', 1_102).entities[0]!.position;
+      return [end[0] - start[0], end[1] - start[1], end[2] - start[2]] as const;
+    };
+
+    const forward = move(1);
+    const reverse = move(-1);
+    expect(forward[0]).toBeCloseTo(0, 8);
+    expect(forward[1]).toBeCloseTo(0.5, 8);
+    expect(forward[2]).toBeCloseTo(-Math.sqrt(3) / 2, 8);
+    expect(reverse[0]).toBeCloseTo(-forward[0], 8);
+    expect(reverse[1]).toBeCloseTo(-forward[1], 8);
+    expect(reverse[2]).toBeCloseTo(-forward[2], 8);
+  });
+
   it('keeps autonomous standalone no-target patrol at the same canonical 20m/s', () => {
     const bounds = supportMapBounds[2];
     const noTargetWorld = world(bounds, [
