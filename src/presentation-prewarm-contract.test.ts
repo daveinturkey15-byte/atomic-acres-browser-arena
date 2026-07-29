@@ -38,6 +38,7 @@ describe('presentation prewarm startup contract', () => {
       source.indexOf('function bootstrapMenuPreview()'),
     );
     const menuBootstrap = source.slice(source.indexOf('function bootstrapMenuPreview()'), source.indexOf('bootstrapMenuPreview();'));
+    const menuReturn = source.slice(source.indexOf('function returnToMainMenu()'), source.indexOf('resumeButton.addEventListener'));
     const arenaDeployment = source.slice(
       source.indexOf('async function performArenaSelection('),
       source.indexOf('function activateArenaSelection('),
@@ -107,7 +108,21 @@ describe('presentation prewarm startup contract', () => {
       .toBeLessThan(arenaDeployment.indexOf('await prewarmArenaBoundGameplayPresentations(arenaTransitionGeneration);'));
     expect(source).toContain("bootstrapStage = 'prewarming-overdrive'");
     expect(menuBootstrap).toContain("document.documentElement.dataset.gameplayArena = 'deferred-until-deployment'");
-    expect(arenaDeployment).toContain("await prepareSharedGameplayAssets()");
+    expect(arenaDeployment).toContain('await prepareMenuDeploymentAssets()');
+    expect(sharedAssets).toContain('weaponView.prewarmBrowserWeaponCatalog(WEAPON_IDS)');
+    expect(sharedAssets).toContain('prewarmPass65RuntimeWeaponCorpus()');
+    expect(menuBootstrap).toContain('void prepareMenuDeploymentAssets().then(() => {');
+    expect(menuBootstrap).toContain('arenaSelectionReady = true;');
+    expect(menuReturn).toContain('arenaSelectionReady = true;');
+    expect(menuReturn).toContain('void prepareMenuDeploymentAssets().catch(showFatalError);');
+    expect(menuBootstrap).toContain("bootstrapStage = 'ready';");
+    expect(sharedAssets).toContain("await runPhase('shared-assets'");
+    expect(sharedAssets).toContain("await runPhase('first-person-catalog'");
+    expect(sharedAssets).toContain("await runPhase('world-drop-corpus'");
+    expect(source).toContain('menuDeploymentAssetsProfile: lastMenuDeploymentAssetsProfile');
+    expect(arenaPresentationPrewarm).toContain("await runGroup('tracers-impacts'");
+    expect(arenaPresentationPrewarm).toContain("await runGroup('killstreak-vocabulary'");
+    expect(arenaPresentationPrewarm).toContain('await yieldDeploymentPrewarmFrame();');
     expect(matchDeployment).toContain('await killstreakPresentation.prewarm(renderRuntime, camera, -killstreakMatchEpoch);');
     expect(matchDeployment).toContain('await smokeVolumePresentationPool.prewarm(renderRuntime, camera, -killstreakMatchEpoch);');
     expect(matchDeployment).toContain('await prewarmExplosiveBoltPresentation(-killstreakMatchEpoch);');
@@ -190,7 +205,8 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('await renderRuntime.compileAndRender(priorStates[0].model, camera, scene);');
     expect(source).toContain('streamedWeaponGpuPrewarmer,');
     expect(source).toContain('streamedWeaponCatalogGpuPrewarmer,');
-    expect(menuLoadoutApply).toContain('weaponView.prewarmBrowserWeaponCatalog(menuWeaponPrewarmCatalog(selection.primary, selection.secondary))');
+    expect(menuLoadoutApply).toContain('const retainedCatalog = menuDeploymentAssetsPromise');
+    expect(menuLoadoutApply).toContain('weaponView.prewarmBrowserWeaponCatalog(retainedCatalog)');
     expect(menuLoadoutApply.indexOf('prewarmBrowserWeaponCatalog'))
       .toBeLessThan(menuLoadoutApply.indexOf('weaponView.setWeapon(selectedWeapon, true)'));
     expect(source).toContain("bootstrapStage = 'ready'");
@@ -377,12 +393,15 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('after.bootstrap.matchAdmissionCadence.admittedDegraded !== false');
     expect(source).toContain("after.bootstrap.matchAdmissionCadence.visibilityState !== 'visible'");
     expect(source).toContain('const maximumColdTransitionMs = 10_000;');
+    expect(source).toContain('const maximumMenuDeploymentPrewarmMs = 10_000;');
     expect(source).toContain('const maximumPreparedSwitchFrameMs = 50;');
     expect(source).toContain("phaseDuration('weapon-catalog-prewarm')");
     expect(source).toContain("phaseDuration('prewarm-batched-effects')");
     expect(source).toContain("new PerformanceObserver((list) => {");
     expect(source).toContain(".observe({ type: 'longtask', buffered: true });");
-    expect(source).toContain('taskAudit.longTasks.length > 0');
+    expect(source).toContain('menuPrewarmLongTasks.length > 0');
+    expect(source).toContain('admissionLongTasks.length > 0');
+    expect(source).toContain('postCorpusPrewarmLoads.length > 0');
     expect(source).toContain('firstSwitchAudit.before.gpuReady !== firstSwitchAudit.before.available');
   });
 

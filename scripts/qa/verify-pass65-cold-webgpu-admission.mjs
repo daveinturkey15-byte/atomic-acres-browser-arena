@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, stat, writeFile } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
 import { isFatalWebGpuConsoleWarning } from './pass65-browser-console-contract.mjs';
@@ -10,6 +10,7 @@ const requestedTrials = Number(process.env.PASS65_COLD_ADMISSION_TRIALS ?? '3');
 const trials = Math.min(5, Math.max(3, Math.floor(requestedTrials)));
 const maximumPreparedSwitchFrameMs = 50;
 const maximumColdTransitionMs = 10_000;
+const maximumMenuDeploymentPrewarmMs = 10_000;
 const maximumWeaponCatalogPrewarmMs = 5_000;
 const maximumEffectPrewarmMs = 4_500;
 const artifactRoot = 'artifacts/pass65/cold-webgpu-admission';
@@ -21,6 +22,21 @@ const chromeCandidates = [
 ].filter(Boolean);
 const executablePath = chromeCandidates.find((candidate) => existsSync(candidate));
 if (!executablePath) throw new Error('Pass 65 cold admission requires installed Google Chrome');
+
+async function runtimeWeaponCorpusFiles(directory) {
+  const files = [];
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const path = `${directory}/${entry.name}`;
+    if (entry.isDirectory()) files.push(...await runtimeWeaponCorpusFiles(path));
+    else if (/(?:-world-lod0|-drop-lod0)\.glb$/.test(entry.name)) files.push(path);
+  }
+  return files;
+}
+
+const runtimeWeaponCorpusPaths = await runtimeWeaponCorpusFiles('public/assets/original/models/weapons');
+const runtimeWeaponCorpusCompressedBytes = (await Promise.all(
+  runtimeWeaponCorpusPaths.map(async (path) => (await stat(path)).size),
+)).reduce((sum, size) => sum + size, 0);
 
 const sourceRevision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
 if (execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim()) {
@@ -36,6 +52,13 @@ const receipts = [];
 
 function uniqueFatalErrors(errors) {
   return [...new Set(errors)].filter((message) => !/favicon|leaderboard|Failed to fetch/i.test(message));
+}
+
+function variantCacheKeys(telemetry, variant) {
+  return telemetry.entries
+    .filter((entry) => entry.variant === variant)
+    .map((entry) => entry.key)
+    .sort();
 }
 
 async function stubExternalServices(page) {
@@ -75,7 +98,9 @@ try {
       await page.addInitScript(() => {
         window.__PASS65_COLD_TASK_AUDIT__ = {
           supported: typeof PerformanceObserver === 'function',
-          startedAt: 0,
+          startedAt: performance.now(),
+          menuInteractiveAt: null,
+          deploymentStartedAt: null,
           longTasks: [],
         };
         if (window.__PASS65_COLD_TASK_AUDIT__.supported) {
@@ -112,7 +137,9 @@ try {
       }, undefined, { timeout: 60_000 });
 
       const before = await page.evaluate(() => {
-        const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+        const api = window.__ATOMIC_ACRES_DEBUG__;
+        const state = api.snapshot();
+        window.__PASS65_COLD_TASK_AUDIT__.menuInteractiveAt = performance.now();
         return {
           gameStarted: state.gameStarted,
           bootstrap: state.bootstrap,
@@ -120,14 +147,13 @@ try {
           localLightOcclusion: state.render.worldLocalLightOcclusion,
           arenaId: state.arenaSelection.id,
           streaming: state.arenaSelection.streaming,
+          weaponAssetCache: api.sampleWeaponAssetCache(),
         };
       });
       await page.locator('.map-card[data-arena-id="atomic-acres"]').click();
       await page.locator('#player-name').fill(`Cold Atomic QA ${trial}`);
       await page.evaluate(() => {
-        window.__PASS65_COLD_TASK_AUDIT__.startedAt = performance.now();
-        window.__PASS65_COLD_TASK_AUDIT__.longTasks.length = 0;
-        performance.clearResourceTimings();
+        window.__PASS65_COLD_TASK_AUDIT__.deploymentStartedAt = performance.now();
       });
       await page.locator('#solo').click();
       await page.waitForFunction(() => {
@@ -142,6 +168,15 @@ try {
           || state.render.runtime.uncapturedErrors > 0;
       }, undefined, { timeout: 90_000 });
       await page.waitForTimeout(1_000);
+
+      const admitted = await page.evaluate(() => {
+        const api = window.__ATOMIC_ACRES_DEBUG__;
+        const state = api.snapshot();
+        return {
+          bootstrap: state.bootstrap,
+          weaponAssetCache: api.sampleWeaponAssetCache(),
+        };
+      });
 
       const firstSwitchAudit = await page.evaluate(async () => {
         const api = window.__ATOMIC_ACRES_DEBUG__;
@@ -158,6 +193,8 @@ try {
           const frameGapsMs = frameTimes.map((at, index) => at - (index === 0 ? startedAt : frameTimes[index - 1]));
           samples.push({
             weaponId,
+            startedAt,
+            completedAt: frameTimes.at(-1),
             frameGapsMs,
             maximumFrameMs: Math.max(...frameGapsMs),
           });
@@ -174,6 +211,8 @@ try {
       const taskAudit = await page.evaluate(() => ({
         supported: window.__PASS65_COLD_TASK_AUDIT__.supported,
         startedAt: window.__PASS65_COLD_TASK_AUDIT__.startedAt,
+        menuInteractiveAt: window.__PASS65_COLD_TASK_AUDIT__.menuInteractiveAt,
+        deploymentStartedAt: window.__PASS65_COLD_TASK_AUDIT__.deploymentStartedAt,
         longTasks: [...window.__PASS65_COLD_TASK_AUDIT__.longTasks],
         resources: performance.getEntriesByType('resource').map((entry) => ({
           name: new URL(entry.name, location.href).pathname,
@@ -190,7 +229,8 @@ try {
       }));
 
       const after = await page.evaluate(() => {
-        const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+        const api = window.__ATOMIC_ACRES_DEBUG__;
+        const state = api.snapshot();
         return {
           gameStarted: state.gameStarted,
           bootstrap: state.bootstrap,
@@ -202,6 +242,7 @@ try {
           originalArtLoaded: state.originalArtLoaded,
           arenaId: state.arenaSelection.id,
           streaming: state.arenaSelection.streaming,
+          weaponAssetCache: api.sampleWeaponAssetCache(),
         };
       });
       const fatalErrors = uniqueFatalErrors(errors);
@@ -210,6 +251,33 @@ try {
       if (before.gameStarted || before.streaming.constructionCount !== 0) failures.push('gameplay was not cold before the physical menu start');
       if (before.runtime.actualBackend !== 'webgpu' || before.runtime.softwareAdapter) failures.push('hardware WebGPU was not active');
       if (before.localLightOcclusion.violations.length > 0) failures.push(`pre-start local-light violations: ${before.localLightOcclusion.violations.join(', ')}`);
+      const corpusPolicy = after.weaponAssetCache.runtimeCorpus.policy;
+      const decodedRuntimeCorpusBytes = after.weaponAssetCache.resident.world.estimatedDecodedBytes
+        + after.weaponAssetCache.resident.drop.estimatedDecodedBytes;
+      const menuPrewarmProfile = after.bootstrap.menuDeploymentAssetsProfile;
+      if (!menuPrewarmProfile?.completed || menuPrewarmProfile.error !== null
+        || menuPrewarmProfile.phases.length !== 3) {
+        failures.push(`menu deployment prewarm did not complete: ${JSON.stringify(menuPrewarmProfile)}`);
+      } else if (menuPrewarmProfile.durationMs > maximumMenuDeploymentPrewarmMs) {
+        failures.push(`menu deployment prewarm ${menuPrewarmProfile.durationMs}ms exceeded ${maximumMenuDeploymentPrewarmMs}ms`);
+      }
+      if (!after.weaponAssetCache.runtimeCorpus.ready || after.weaponAssetCache.runtimeCorpus.prewarming
+        || after.weaponAssetCache.runtimeCorpus.profile?.completed !== true
+        || after.weaponAssetCache.runtimeCorpus.profile.loadedAssets !== corpusPolicy.assets) {
+        failures.push(`runtime weapon corpus was not retained: ${JSON.stringify(after.weaponAssetCache.runtimeCorpus)}`);
+      }
+      if (runtimeWeaponCorpusPaths.length !== corpusPolicy.assets
+        || runtimeWeaponCorpusCompressedBytes > corpusPolicy.maximumCompressedBytes) {
+        failures.push(`runtime weapon corpus compressed budget failed: ${runtimeWeaponCorpusPaths.length} assets / ${runtimeWeaponCorpusCompressedBytes} bytes`);
+      }
+      if (decodedRuntimeCorpusBytes > corpusPolicy.maximumEstimatedDecodedBytes) {
+        failures.push(`runtime weapon corpus decoded estimate ${decodedRuntimeCorpusBytes} exceeded ${corpusPolicy.maximumEstimatedDecodedBytes}`);
+      }
+      const expectedResidentAssetsPerVariant = corpusPolicy.assets / corpusPolicy.variants.length;
+      if (after.weaponAssetCache.resident.world.assets !== expectedResidentAssetsPerVariant
+        || after.weaponAssetCache.resident.drop.assets !== expectedResidentAssetsPerVariant) {
+        failures.push(`runtime weapon corpus residency was incomplete: ${JSON.stringify(after.weaponAssetCache.resident)}`);
+      }
       if (!after.gameStarted || after.arenaId !== 'atomic-acres' || !after.originalArtLoaded) failures.push('Atomic Acres did not become the playable arena');
       if (!after.bootstrap.matchAdmissionCadence
         || after.bootstrap.matchAdmissionCadence.admittedDegraded !== false
@@ -251,9 +319,46 @@ try {
       if (phaseDuration('prewarm-batched-effects') > maximumEffectPrewarmMs) {
         failures.push(`effect prewarm ${phaseDuration('prewarm-batched-effects')}ms exceeded ${maximumEffectPrewarmMs}ms`);
       }
+      const effectPrewarmProfile = after.bootstrap.effectPrewarmProfile;
+      if (effectPrewarmProfile?.groups.length !== 6) {
+        failures.push(`bounded effect prewarm groups were incomplete: ${JSON.stringify(effectPrewarmProfile)}`);
+      }
       if (!taskAudit.supported) failures.push('browser Long Tasks API unavailable for cold admission audit');
-      if (taskAudit.longTasks.length > 0) {
-        failures.push(`cold admission produced ${taskAudit.longTasks.length} >=50ms main-thread tasks (max ${Math.max(...taskAudit.longTasks.map((entry) => entry.duration)).toFixed(1)}ms)`);
+      const overlapsWindow = (entry, startedAt, completedAt = Number.POSITIVE_INFINITY) => (
+        entry.startTime + entry.duration > startedAt && entry.startTime < completedAt
+      );
+      const menuPrewarmLongTasks = menuPrewarmProfile?.completedAt === null || !menuPrewarmProfile
+        ? []
+        : taskAudit.longTasks.filter((entry) => overlapsWindow(
+          entry, menuPrewarmProfile.startedAt, menuPrewarmProfile.completedAt,
+        ));
+      const admissionLongTasks = taskAudit.deploymentStartedAt === null
+        ? []
+        : taskAudit.longTasks.filter((entry) => overlapsWindow(entry, taskAudit.deploymentStartedAt));
+      if (menuPrewarmLongTasks.length > 0) {
+        failures.push(`menu deployment prewarm produced ${menuPrewarmLongTasks.length} >=50ms main-thread tasks (max ${Math.max(...menuPrewarmLongTasks.map((entry) => entry.duration)).toFixed(1)}ms)`);
+      }
+      if (admissionLongTasks.length > 0) {
+        failures.push(`cold admission produced ${admissionLongTasks.length} >=50ms main-thread tasks (max ${Math.max(...admissionLongTasks.map((entry) => entry.duration)).toFixed(1)}ms)`);
+      }
+      const postCorpusPrewarmLoads = taskAudit.resources.filter((entry) => (
+        /\/models\/weapons\//.test(entry.name) && /(?:-world-lod0|-drop-lod0)\.glb$/.test(entry.name)
+        && menuPrewarmProfile?.completedAt != null
+        && entry.startTime > menuPrewarmProfile.completedAt
+      ));
+      if (postCorpusPrewarmLoads.length > 0) {
+        failures.push(`gameplay re-decoded ${postCorpusPrewarmLoads.length} retained world/drop weapon assets`);
+      }
+      if (!after.weaponAssetCache.runtimeCorpus.ready || after.weaponAssetCache.loading !== 0) {
+        failures.push(`runtime weapon corpus changed after admission: ${JSON.stringify(after.weaponAssetCache.runtimeCorpus)}`);
+      }
+      for (const variant of corpusPolicy.variants) {
+        const admittedKeys = variantCacheKeys(admitted.weaponAssetCache, variant);
+        const finalKeys = variantCacheKeys(after.weaponAssetCache, variant);
+        if (admittedKeys.length !== after.weaponAssetCache.budgets[variant]
+          || JSON.stringify(admittedKeys) !== JSON.stringify(finalKeys)) {
+          failures.push(`${variant} weapon source cache churned during live exercise: ${JSON.stringify({ admittedKeys, finalKeys })}`);
+        }
       }
       if (transition.phase !== 'idle' || transition.failure !== null || transition.renderSubmissionPaused) failures.push(`arena transition did not commit cleanly: ${JSON.stringify(transition)}`);
       if (after.runtime.actualBackend !== 'webgpu' || after.runtime.softwareAdapter || after.runtime.deviceLost) failures.push('hardware WebGPU did not remain healthy');
@@ -261,7 +366,23 @@ try {
       if (after.localLightOcclusion.violations.length > 0) failures.push(`active local-light violations: ${after.localLightOcclusion.violations.join(', ')}`);
       if (fatalErrors.length > 0) failures.push(`browser/GPU errors: ${fatalErrors.join(' | ')}`);
 
-      const receipt = { trial, browserVersion, before, after, firstSwitchAudit, taskAudit, errors: fatalErrors, pass: failures.length === 0 };
+      const receipt = {
+        trial,
+        browserVersion,
+        runtimeWeaponCorpus: {
+          files: runtimeWeaponCorpusPaths.length,
+          compressedBytes: runtimeWeaponCorpusCompressedBytes,
+          decodedBytesEstimate: decodedRuntimeCorpusBytes,
+          postPrewarmLoads: postCorpusPrewarmLoads,
+        },
+        before,
+        admitted,
+        after,
+        firstSwitchAudit,
+        taskAudit: { ...taskAudit, menuPrewarmLongTasks, admissionLongTasks },
+        errors: fatalErrors,
+        pass: failures.length === 0,
+      };
       receipts.push(receipt);
       if (trial === 1) await page.screenshot({ path: `${artifactRoot}/atomic-quality-active.png`, animations: 'disabled' });
       await context.close();

@@ -18,7 +18,12 @@ import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem } from './water-system';
 import { PASS65_HITL_IDENTITY } from './release-identity';
 import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon, waitForPendingArtTextures } from './art-kit';
-import { invalidatePass65PresentationTree, releasePass65WeaponModelsIn } from './weapon-model';
+import {
+  invalidatePass65PresentationTree,
+  pass65WeaponCacheTelemetry,
+  prewarmPass65RuntimeWeaponCorpus,
+  releasePass65WeaponModelsIn,
+} from './weapon-model';
 import { applyBotEmissiveBrightness } from './operator-model';
 import { GUN_RANGE_FIRING_LINE_Z, applyAdditionalMapPresentationProfile, applyRustworksPresentationProfile, buildGunRange, buildRustworks1v1, buildSkylineTerminal, updateGunRangePresentation } from './additional-maps';
 import {
@@ -4692,7 +4697,10 @@ function applyMenuLoadoutImmediately(): void {
   }
   const generation = ++menuLoadoutPresentationGeneration;
   const selectedWeapon = player.weapon;
-  void weaponView.prewarmBrowserWeaponCatalog(menuWeaponPrewarmCatalog(selection.primary, selection.secondary)).then(() => {
+  const retainedCatalog = menuDeploymentAssetsPromise
+    ? WEAPON_IDS
+    : menuWeaponPrewarmCatalog(selection.primary, selection.secondary);
+  void weaponView.prewarmBrowserWeaponCatalog(retainedCatalog).then(() => {
     if (generation !== menuLoadoutPresentationGeneration || gameStarted || player.weapon !== selectedWeapon) return;
     weaponView.setWeapon(selectedWeapon, true);
   }).catch((error: unknown) => {
@@ -15574,7 +15582,7 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
   syncArenaSelectionUi();
   setStatus(`Preparing ${nextSelection.displayName} deployment assets…`);
   try {
-    await prepareSharedGameplayAssets();
+    await prepareMenuDeploymentAssets();
     // A map generation may only replace renderer-visible authority once every
     // earlier WebGPU submission has completed. This prevents the old root's
     // buffers from being detached or destroyed while the queue still uses it.
@@ -15895,6 +15903,7 @@ function returnToMainMenu(): void {
   syncArenaSelectionUi();
   setArenaMenuCamera();
   setStatus(`${selectedArena.displayName} ready · choose a map or deploy again.`);
+  void prepareMenuDeploymentAssets().catch(showFatalError);
   if (document.pointerLockElement) void document.exitPointerLock();
   // Pass 65: apply graphics saved mid-match now that we are back at the menu.
   flushPendingGraphics();
@@ -16809,6 +16818,7 @@ const debugWindow = window as Window & {
     snapshot: () => Record<string, unknown>;
     sampleEnduranceHealth: () => ReturnType<typeof sampleEnduranceHealth>;
     sampleWeaponCatalogReadiness: () => ReturnType<typeof weaponView.browserCatalogReadiness>;
+    sampleWeaponAssetCache: () => ReturnType<typeof pass65WeaponCacheTelemetry>;
     traceBallistics: (
       weapon: WeaponId,
       origin: [number, number, number],
@@ -16943,8 +16953,15 @@ const debugWindow = window as Window & {
 debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   sampleEnduranceHealth,
   sampleWeaponCatalogReadiness: () => weaponView.browserCatalogReadiness(),
+  sampleWeaponAssetCache: () => pass65WeaponCacheTelemetry(),
   snapshot: () => ({
-    bootstrap: { stage: bootstrapStage, error: bootstrapError, matchAdmissionCadence: lastMatchAdmissionCadence },
+    bootstrap: {
+      stage: bootstrapStage,
+      error: bootstrapError,
+      matchAdmissionCadence: lastMatchAdmissionCadence,
+      menuDeploymentAssetsProfile: lastMenuDeploymentAssetsProfile,
+      effectPrewarmProfile: lastArenaEffectPrewarmProfile,
+    },
     gameStarted,
     frameCount,
     gameMode,
@@ -18819,6 +18836,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
 
 let menuWeaponAssetPromise: Promise<void> | null = null;
 let sharedGameplayAssetsPromise: Promise<void> | null = null;
+let menuDeploymentAssetsPromise: Promise<void> | null = null;
 
 async function prepareMenuWeaponAsset(): Promise<void> {
   if (menuWeaponAssetPromise) return menuWeaponAssetPromise;
@@ -18870,7 +18888,6 @@ function batchSelectedArenaPresentation(): void {
 async function prepareSharedGameplayAssets(): Promise<void> {
   if (sharedGameplayAssetsPromise) return sharedGameplayAssetsPromise;
   sharedGameplayAssetsPromise = (async () => {
-    bootstrapStage = 'loading-gameplay-assets';
     const operatorPromise = loadRiggedOperatorAsset().catch((error: unknown) => {
       riggedOperatorLoadError = error instanceof Error ? error.message : String(error);
       console.error('[Nuke Town operator asset load failed]', riggedOperatorLoadError);
@@ -18891,7 +18908,6 @@ async function prepareSharedGameplayAssets(): Promise<void> {
     // holes through hands and weapons.
     weaponView.setWeapon(player.weapon, true);
     weaponView.root.visible = false;
-    bootstrapStage = 'gameplay-assets-ready';
   })().catch((error) => {
     sharedGameplayAssetsPromise = null;
     throw error;
@@ -18899,27 +18915,125 @@ async function prepareSharedGameplayAssets(): Promise<void> {
   return sharedGameplayAssetsPromise;
 }
 
+let lastMenuDeploymentAssetsProfile: Readonly<{
+  startedAt: number;
+  completedAt: number | null;
+  durationMs: number | null;
+  completed: boolean;
+  error: string | null;
+  phases: readonly Readonly<{ name: string; durationMs: number }>[];
+}> | null = null;
+
+async function prepareMenuDeploymentAssets(): Promise<void> {
+  if (menuDeploymentAssetsPromise) return menuDeploymentAssetsPromise;
+  const startedAt = performance.now();
+  const phases: Array<{ name: string; durationMs: number }> = [];
+  const runPhase = async (name: string, task: () => Promise<unknown>): Promise<void> => {
+    const phaseStartedAt = performance.now();
+    await task();
+    phases.push({ name, durationMs: Number((performance.now() - phaseStartedAt).toFixed(3)) });
+  };
+  lastMenuDeploymentAssetsProfile = Object.freeze({
+    startedAt,
+    completedAt: null,
+    durationMs: null,
+    completed: false,
+    error: null,
+    phases: Object.freeze([]),
+  });
+  const operation = (async () => {
+    await runPhase('shared-assets', () => prepareSharedGameplayAssets());
+    if (renderRuntime.backend === 'webgpu') {
+      await runPhase('first-person-catalog', () => weaponView.prewarmBrowserWeaponCatalog(WEAPON_IDS));
+    }
+    await runPhase('world-drop-corpus', () => prewarmPass65RuntimeWeaponCorpus());
+  })();
+  menuDeploymentAssetsPromise = operation;
+  try {
+    await operation;
+    const completedAt = performance.now();
+    lastMenuDeploymentAssetsProfile = Object.freeze({
+      startedAt,
+      completedAt,
+      durationMs: Number((completedAt - startedAt).toFixed(3)),
+      completed: true,
+      error: null,
+      phases: Object.freeze(phases.map((phase) => Object.freeze(phase))),
+    });
+  } catch (error) {
+    const completedAt = performance.now();
+    lastMenuDeploymentAssetsProfile = Object.freeze({
+      startedAt,
+      completedAt,
+      durationMs: Number((completedAt - startedAt).toFixed(3)),
+      completed: false,
+      error: error instanceof Error ? error.message : String(error),
+      phases: Object.freeze(phases.map((phase) => Object.freeze(phase))),
+    });
+    if (menuDeploymentAssetsPromise === operation) menuDeploymentAssetsPromise = null;
+    throw error;
+  }
+}
+
+let lastArenaEffectPrewarmProfile: Readonly<{
+  sceneGeneration: number;
+  durationMs: number;
+  groups: readonly Readonly<{ name: string; durationMs: number }>[];
+}> | null = null;
+
+async function yieldDeploymentPrewarmFrame(): Promise<void> {
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+}
+
 async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): Promise<void> {
   if (renderRuntime.backend === 'webgpu') {
     bootstrapStage = 'prewarming-batched-presentations';
     profileArenaTransition('prewarm-batched-effects');
-    // Each independent presentation stages its first exact live variant before
-    // its first await, allowing that shared staging wave to use one TSL/HDR
-    // submission and queue fence. Killstreak vocabulary, three LOD bands and
-    // possessed-cockpit variants deliberately retain their later exact passes.
-    await Promise.all([
+    const startedAt = performance.now();
+    const groups: Array<{ name: string; durationMs: number }> = [];
+    const runGroup = async (name: string, operation: () => Promise<unknown>): Promise<void> => {
+      const groupStartedAt = performance.now();
+      await operation();
+      groups.push({ name, durationMs: Number((performance.now() - groupStartedAt).toFixed(3)) });
+    };
+    // Keep exact-scene coalescing within small compatible families, then end
+    // the browser task before staging the next family. Coalescing all eleven
+    // roots produced a measured 1.17s node/pipeline build on native WebGPU.
+    await runGroup('tracers-impacts', () => Promise.all([
       tracerPool.prewarm(renderRuntime, camera, sceneGeneration),
       impactPresentation.prewarm(renderRuntime, camera, sceneGeneration),
+    ]));
+    await yieldDeploymentPrewarmFrame();
+    await runGroup('explosions', () => Promise.all([
       grenadeExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration),
       supportExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration),
+    ]));
+    await yieldDeploymentPrewarmFrame();
+    await runGroup('world-drops-ordnance', () => Promise.all([
       deathDropPresentationPool.prewarm(renderRuntime, camera, player.weapon),
+      prewarmGrenadeWorldPresentations(sceneGeneration),
+    ]));
+    await yieldDeploymentPrewarmFrame();
+    await runGroup('nuke-overdrive-bolts', () => Promise.all([
       prewarmNukePresentation(),
       prewarmOverdrivePresentation(),
-      prewarmGrenadeWorldPresentations(sceneGeneration),
-      killstreakPresentation.prewarm(renderRuntime, camera, sceneGeneration),
-      smokeVolumePresentationPool.prewarm(renderRuntime, camera, sceneGeneration),
       prewarmExplosiveBoltPresentation(sceneGeneration),
-    ]);
+    ]));
+    await yieldDeploymentPrewarmFrame();
+    await runGroup('smoke-volumes', () => smokeVolumePresentationPool.prewarm(
+      renderRuntime, camera, sceneGeneration,
+    ));
+    await yieldDeploymentPrewarmFrame();
+    // Killstreak prewarm retains its own exact vocabulary, three LOD bands,
+    // 24-drone formation and possessed-cockpit submissions.
+    await runGroup('killstreak-vocabulary', () => killstreakPresentation.prewarm(
+      renderRuntime, camera, sceneGeneration,
+    ));
+    lastArenaEffectPrewarmProfile = Object.freeze({
+      sceneGeneration,
+      durationMs: Number((performance.now() - startedAt).toFixed(3)),
+      groups: Object.freeze(groups.map((group) => Object.freeze(group))),
+    });
     return;
   }
   bootstrapStage = 'prewarming-combat-tracers';
@@ -18962,12 +19076,13 @@ function bootstrapMenuPreview(): void {
   arenaSelectionReady = true;
   syncArenaSelectionUi();
   setArenaMenuCamera();
-  setStatus(`${selectedArena.displayName} preview ready · gameplay streams only when you deploy.`);
-  bootstrapStage = 'menu-video-ready';
+  setStatus(`${selectedArena.displayName} preview ready · deployment assets prepare in the background.`);
+  bootstrapStage = 'ready';
   requestAnimationFrame(frame);
   window.setTimeout(() => {
-    void prepareMenuWeaponAsset().then(() => {
-      if (bootstrapStage === 'menu-video-ready') bootstrapStage = 'ready';
+    void prepareMenuDeploymentAssets().then(() => {
+      if (gameStarted || matchStartPreparing) return;
+      setStatus(`${selectedArena.displayName} ready · deployment assets retained.`);
     }).catch(showFatalError);
   }, 0);
 }
