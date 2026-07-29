@@ -503,6 +503,26 @@ describe('host killstreak runtime', () => {
     expect(runtime.advance(1_000 + DRONE_SWARM_DURATION_MS, DEFAULT_WORLD).expiredEntityIds).toHaveLength(DRONE_SWARM_COUNT);
   });
 
+  it('evaluates each owner hostile set once per host step for the full 24-drone swarm', () => {
+    let hostilityChecks = 0;
+    const world: KillstreakWorld = {
+      ...DEFAULT_WORLD,
+      areHostile: (_ownerId, ownerTeam, target) => {
+        hostilityChecks += 1;
+        return target.team !== ownerTeam;
+      },
+    };
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'drone-swarm']));
+    earn(runtime, 15);
+    expect(runtime.activate(intent('drone-swarm', 5), 1_000, world).accepted).toBe(true);
+
+    runtime.advance(3_001, world);
+    expect(hostilityChecks).toBe(world.targets.length - 1);
+    runtime.advance(3_101, world);
+    expect(hostilityChecks).toBe((world.targets.length - 1) * 2);
+  });
+
   it('uses the match hostility predicate so free-for-all opponents may share a team value', () => {
     const world: KillstreakWorld = {
       ...DEFAULT_WORLD,
