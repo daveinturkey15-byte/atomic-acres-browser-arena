@@ -30,16 +30,21 @@ export function createOneVOneController(profile, options = {}) {
     }
     const inputIssued = false;
     const detectionConfidence = semantic.accepted[0]?.confidence ?? semantic.rejected[0]?.confidence ?? null;
-    const detectionDisposition = semantic.accepted.length ? 'accepted' : semantic.rejected[0]?.reason ?? 'none';
+    const detectionDisposition = semantic.accepted[0]?.disposition ?? semantic.rejected[0]?.reason ?? 'none';
     const telemetry = {
       frameSequence: frame.sequence,
       frameCapturedAtMs: frame.capturedAtMs,
       detectorProvider: semantic.provider,
       detectionConfidence,
       detectionDisposition,
+      semanticAuthority: track.semanticAuthority,
+      semanticAcceptedCount: semantic.accepted.length,
+      semanticRejectedCount: semantic.rejected.length,
       trackId: track.trackId,
       trackState: track.state,
       associationCost: track.association.cost,
+      associationReason: track.association.reason,
+      reacquired: track.reacquired,
       measurementAgeMs: track.measurementAgeMs,
       predictionAgeMs: track.predictionAgeMs,
       uncertainty: track.uncertainty,

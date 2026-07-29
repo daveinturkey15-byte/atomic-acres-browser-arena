@@ -69,3 +69,26 @@ export function validatePlayerProfile(profile) {
   }
   return { ok: errors.length === 0, errors, fingerprint: errors.length ? null : fingerprintProfile(profile) };
 }
+
+export function validatePlayerRuntimeRequest(profile, request = {}) {
+  const shadowMode = request.shadowMode === true;
+  if (shadowMode) {
+    if (!request.allowLive) throw new Error('live shadow mode requires allowLive');
+    if (request.allowCombatFire) throw new Error('live shadow mode forbids combat fire');
+    if (request.allowTacticalItems) throw new Error('live shadow mode forbids tactical items');
+    if (profile.activation.liveEnabled || profile.activation.aimInputEnabled || profile.activation.automaticFireEnabled) {
+      throw new Error('live shadow mode requires a completely default-off profile');
+    }
+    return { mode: 'live-shadow-observer', semanticAuthority: false, inputAuthority: false };
+  }
+  if (request.allowLive && !profile.activation.liveEnabled) {
+    throw new Error(`Player profile ${profile.profileId} is default-off and cannot enter a live session`);
+  }
+  if (request.allowCombatFire && !profile.activation.automaticFireEnabled) {
+    throw new Error(`Player profile ${profile.profileId} does not authorize automatic fire`);
+  }
+  if (profile.activation.liveEnabled) {
+    throw new Error(`Player profile ${profile.profileId} has no live detector binding yet; run the offline replay evaluator until the new-build detector receipt exists`);
+  }
+  return { mode: 'offline', semanticAuthority: false, inputAuthority: false };
+}

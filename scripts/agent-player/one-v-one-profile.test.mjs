@@ -8,8 +8,9 @@ import {
   fingerprintProfile,
   loadPlayerProfile,
   validatePlayerProfile,
+  validatePlayerRuntimeRequest,
 } from './one-v-one/profile-contract.mjs';
-import { gateSemanticDetections } from './one-v-one/semantic-detector.mjs';
+import { gateSemanticDetections, legacyProposalsToShadowDetections } from './one-v-one/semantic-detector.mjs';
 import { createSingleTargetTracker } from './one-v-one/single-target-tracker.mjs';
 import { createVisualServoController } from './one-v-one/visual-servo.mjs';
 import { createFreshFrameFireGate } from './one-v-one/fresh-frame-fire-gate.mjs';
@@ -29,6 +30,7 @@ function opponent(sequence, x = 160, y = 90, confidence = 0.96) {
     provider: 'deterministic-fixture',
     semanticClass: 'mobile-opponent-operator',
     confidence,
+    semanticAuthority: true,
     proposalOnly: false,
     bounds: { x: x - 8, y: y - 18, width: 16, height: 36 },
     centre: { x, y },
@@ -77,6 +79,54 @@ test('unavailable production semantic model rejects every live detection', async
   const result = gateSemanticDetections([opponent(1)], frame(1), profile, { offlineFixture: false });
   assert.equal(result.accepted.length, 0);
   assert.equal(result.rejected[0].reason, 'semantic-model-unavailable');
+});
+
+test('live shadow accepts legacy rendered proposals without granting semantic or fire authority', async () => {
+  const profile = await loadPlayerProfile(profilePath);
+  const target = (x) => ({
+    x,
+    y: 90,
+    pixels: 40,
+    detector: 'pass63-visible-purple-operator-v1',
+    bounds: { minX: x - 6, minY: 76, width: 12, height: 28 },
+  });
+  const semantic = gateSemanticDetections(
+    legacyProposalsToShadowDetections([target(160)], 1),
+    frame(1),
+    profile,
+    { liveShadowProposal: true },
+  );
+  assert.equal(semantic.accepted.length, 1);
+  assert.equal(semantic.accepted[0].semanticAuthority, false);
+  assert.equal(semantic.accepted[0].disposition, 'accepted-shadow-proposal');
+  const tracker = createSingleTargetTracker(profile.tracker, profile.detector.thresholds);
+  tracker.update(semantic.accepted, frame(1));
+  const second = gateSemanticDetections(
+    legacyProposalsToShadowDetections([target(162)], 2),
+    frame(2),
+    profile,
+    { liveShadowProposal: true },
+  );
+  const confirmed = tracker.update(second.accepted, frame(2));
+  assert.equal(confirmed.state, 'CONFIRMED');
+  assert.equal(confirmed.semanticAuthority, false);
+  assert.equal(confirmed.canAuthorizeFire, false);
+});
+
+test('runtime contract permits only no-fire, no-item observation for the default-off shadow profile', async () => {
+  const profile = await loadPlayerProfile(profilePath);
+  assert.deepEqual(validatePlayerRuntimeRequest(profile, {
+    shadowMode: true,
+    allowLive: true,
+    allowCombatFire: false,
+    allowTacticalItems: false,
+  }), { mode: 'live-shadow-observer', semanticAuthority: false, inputAuthority: false });
+  assert.throws(() => validatePlayerRuntimeRequest(profile, {
+    shadowMode: true, allowLive: true, allowCombatFire: true, allowTacticalItems: false,
+  }), /forbids combat fire/);
+  assert.throws(() => validatePlayerRuntimeRequest(profile, {
+    shadowMode: true, allowLive: true, allowCombatFire: false, allowTacticalItems: true,
+  }), /forbids tactical items/);
 });
 
 test('offline fixture gate accepts only fresh rendered opponent semantics', async () => {
@@ -230,8 +280,10 @@ test('launcher surfaces forward both profile path and fingerprint only when expl
   const powershell = await readFile('/root/.hermes/scripts/run_atomic_player_game.ps1', 'utf8');
   assert.match(campaign, /PLAYER_PROFILE_PATH/);
   assert.match(campaign, /PlayerProfileFingerprint/);
+  assert.match(campaign, /PLAYER_PROFILE_SHADOW/);
   assert.match(powershell, /--player-profile/);
   assert.match(powershell, /--player-profile-fingerprint/);
+  assert.match(powershell, /--player-profile-shadow/);
   assert.match(powershell, /PlayerProfileFingerprint is required/);
 });
 

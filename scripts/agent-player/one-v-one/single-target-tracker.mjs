@@ -30,12 +30,14 @@ export function createSingleTargetTracker(config, thresholds) {
       vx: track?.vx ?? 0,
       vy: track?.vy ?? 0,
       semanticConfidence: track?.semanticConfidence ?? 0,
+      semanticAuthority: track?.semanticAuthority ?? false,
       uncertainty: track?.uncertainty ?? 1,
       lastMeasurementSequence: track?.lastMeasurementSequence ?? null,
       measurementFresh: extra.measurementFresh ?? false,
       measurementAgeMs: track ? extra.nowMs - track.lastMeasurementAtMs : null,
       predictionAgeMs: track ? extra.nowMs - track.lastMeasurementAtMs : null,
       canAuthorizeFire: confirmed && Boolean(extra.measurementFresh)
+        && track.semanticAuthority === true
         && track.semanticConfidence >= thresholds.authorizationConfidence,
       association: extra.association ?? { reason: 'none', cost: null, margin: null },
       reacquired: Boolean(extra.reacquired),
@@ -81,7 +83,7 @@ export function createSingleTargetTracker(config, thresholds) {
         state = 'SEARCH'; return publicReceipt({ nowMs: frame.capturedAtMs, association: { reason: 'ambiguous-initiation', cost: null, margin: eligible[0].confidence - eligible[1].confidence } });
       }
       const candidate = eligible[0];
-      track = { id: `OV1-${nextId++}`, x: candidate.centre.x, y: candidate.centre.y, vx: 0, vy: 0, bounds: candidate.bounds, semanticConfidence: candidate.confidence, uncertainty: config.initialUncertainty, lastMeasurementSequence: frame.sequence, lastMeasurementAtMs: frame.capturedAtMs, updatedAtMs: frame.capturedAtMs };
+      track = { id: `OV1-${nextId++}`, x: candidate.centre.x, y: candidate.centre.y, vx: 0, vy: 0, bounds: candidate.bounds, semanticConfidence: candidate.confidence, semanticAuthority: candidate.semanticAuthority === true, uncertainty: config.initialUncertainty, lastMeasurementSequence: frame.sequence, lastMeasurementAtMs: frame.capturedAtMs, updatedAtMs: frame.capturedAtMs };
       hitSequences = [frame.sequence]; misses = 0; state = 'TENTATIVE';
       return publicReceipt({ nowMs: frame.capturedAtMs, measurementFresh: true, association: { reason: 'track-initiated', cost: 0, margin: null } });
     }
@@ -108,7 +110,7 @@ export function createSingleTargetTracker(config, thresholds) {
     const x = predicted.x + config.alpha * residualX; const y = predicted.y + config.alpha * residualY;
     const vx = track.vx + config.beta * residualX / predicted.dt; const vy = track.vy + config.beta * residualY / predicted.dt;
     const reacquired = state === 'COASTING';
-    track = { ...track, x, y, vx, vy, bounds: candidate.bounds, semanticConfidence: candidate.confidence, uncertainty: clamp(track.uncertainty * config.measurementUncertaintyDecay, 0, 1), lastMeasurementSequence: frame.sequence, lastMeasurementAtMs: frame.capturedAtMs, updatedAtMs: frame.capturedAtMs };
+    track = { ...track, x, y, vx, vy, bounds: candidate.bounds, semanticConfidence: candidate.confidence, semanticAuthority: candidate.semanticAuthority === true, uncertainty: clamp(track.uncertainty * config.measurementUncertaintyDecay, 0, 1), lastMeasurementSequence: frame.sequence, lastMeasurementAtMs: frame.capturedAtMs, updatedAtMs: frame.capturedAtMs };
     misses = 0; hitSequences.push(frame.sequence); hitSequences = hitSequences.filter((sequence) => sequence >= frame.sequence - config.confirmationWindowFrames + 1);
     if (reacquired || state === 'CONFIRMED' || hitSequences.length >= config.confirmationHits) state = 'CONFIRMED'; else state = 'TENTATIVE';
     return publicReceipt({ nowMs: frame.capturedAtMs, measurementFresh: true, reacquired, association: { reason: reacquired ? 'reassociated' : 'associated', cost: winner.cost, margin } });

@@ -17,7 +17,9 @@ import {
   operatorCrosshairAlignment,
   signatureDifference,
 } from './vision.mjs';
-import { fingerprintProfile, loadPlayerProfile } from './one-v-one/profile-contract.mjs';
+import { fingerprintProfile, loadPlayerProfile, validatePlayerRuntimeRequest } from './one-v-one/profile-contract.mjs';
+import { createOneVOneController } from './one-v-one/one-v-one-controller.mjs';
+import { legacyProposalsToShadowDetections } from './one-v-one/semantic-detector.mjs';
 import { createTacticalPolicy } from './tactical-policy.mjs';
 import { chooseVisibleSupport, shouldThrowVisibleGrenade } from './combat-actions.mjs';
 import { advanceFinishLatch, consumeFinishFollowup } from './finish-latch.mjs';
@@ -91,6 +93,43 @@ function currentSourceSha() {
   } catch {
     return null;
   }
+}
+
+function summarizeOneVOneShadow(receipts) {
+  const summary = {
+    frames: receipts.length,
+    states: {},
+    acceptedShadowProposalFrames: 0,
+    semanticAuthorityFrames: 0,
+    confirmedFrames: 0,
+    coastingFrames: 0,
+    reacquisitions: 0,
+    trackIds: [],
+    trackFragmentCount: 0,
+    ambiguousAssociations: 0,
+    fireCandidateFrames: 0,
+    fireAuthorizedFrames: 0,
+    inputCommandsIssued: 0,
+    aimPhases: {},
+  };
+  const trackIds = new Set();
+  for (const receipt of receipts) {
+    summary.states[receipt.trackState] = (summary.states[receipt.trackState] ?? 0) + 1;
+    summary.aimPhases[receipt.aimPhase] = (summary.aimPhases[receipt.aimPhase] ?? 0) + 1;
+    if (receipt.semanticAcceptedCount > 0) summary.acceptedShadowProposalFrames += 1;
+    if (receipt.semanticAuthority) summary.semanticAuthorityFrames += 1;
+    if (receipt.trackState === 'CONFIRMED') summary.confirmedFrames += 1;
+    if (receipt.trackState === 'COASTING') summary.coastingFrames += 1;
+    if (receipt.reacquired) summary.reacquisitions += 1;
+    if (receipt.trackId) trackIds.add(receipt.trackId);
+    if (receipt.associationReason === 'ambiguous-association' || receipt.associationReason === 'ambiguous-initiation') summary.ambiguousAssociations += 1;
+    if (receipt.fireCandidate) summary.fireCandidateFrames += 1;
+    if (receipt.fireAuthorized) summary.fireAuthorizedFrames += 1;
+    if (receipt.inputIssued) summary.inputCommandsIssued += 1;
+  }
+  summary.trackIds = [...trackIds];
+  summary.trackFragmentCount = Math.max(0, trackIds.size - 1);
+  return summary;
 }
 
 async function debugSnapshot(page) {
@@ -594,25 +633,27 @@ async function run() {
   const fireMinimumTargetHeight = integerArg(args['fire-min-target-height'], 0, 0, 100);
   const allowCombatFire = Boolean(args['allow-combat-fire']);
   const allowLive = Boolean(args['allow-live']);
+  const playerProfileShadow = Boolean(args['player-profile-shadow']);
   let requestedPlayerProfile = null;
+  let requestedPlayerProfileFingerprint = null;
+  let playerProfileRuntimeReceipt = null;
   if (args['player-profile']) {
     const playerProfilePath = resolve(repositoryRoot, String(args['player-profile']));
     requestedPlayerProfile = await loadPlayerProfile(playerProfilePath);
     const observedFingerprint = fingerprintProfile(requestedPlayerProfile);
+    requestedPlayerProfileFingerprint = observedFingerprint;
     const expectedFingerprint = String(args['player-profile-fingerprint'] ?? '');
     if (!expectedFingerprint || expectedFingerprint !== observedFingerprint) {
       throw new Error(`Player profile fingerprint mismatch: expected ${expectedFingerprint || 'missing'}, observed ${observedFingerprint}`);
     }
-    if (allowLive && !requestedPlayerProfile.activation.liveEnabled) {
-      throw new Error(`Player profile ${requestedPlayerProfile.profileId} is default-off and cannot enter a live session`);
-    }
-    if (allowCombatFire && !requestedPlayerProfile.activation.automaticFireEnabled) {
-      throw new Error(`Player profile ${requestedPlayerProfile.profileId} does not authorize automatic fire`);
-    }
-    if (requestedPlayerProfile.activation.liveEnabled) {
-      throw new Error(`Player profile ${requestedPlayerProfile.profileId} has no live detector binding yet; run the offline replay evaluator until the new-build detector receipt exists`);
-    }
+    playerProfileRuntimeReceipt = validatePlayerRuntimeRequest(requestedPlayerProfile, {
+      allowLive,
+      allowCombatFire,
+      allowTacticalItems,
+      shadowMode: playerProfileShadow,
+    });
   }
+  if (playerProfileShadow && !requestedPlayerProfile) throw new Error('--player-profile-shadow requires --player-profile');
   const tacticalPolicyName = String(args['tactical-policy'] ?? 'legacy');
   if (!['legacy', 'state-machine-v1'].includes(tacticalPolicyName)) throw new Error('--tactical-policy must be legacy or state-machine-v1');
   const baseUrl = String(args.url ?? 'http://127.0.0.1:4173/');
@@ -654,6 +695,9 @@ async function run() {
   let confirmedTargetFrames = 0;
   let staticGeometryRejects = 0;
   let fireAuthorizedFrames = 0;
+  const oneVOneShadowReceipts = [];
+  let oneVOneShadowSummary = null;
+  let oneVOneShadowFirstConfirmedCaptured = false;
   let rejectedScreenLockedFrames = 0;
   let visionFrames = 0;
   let activeVisionFrames = 0;
@@ -839,6 +883,9 @@ async function run() {
       controlStartedAtMs = Date.now();
       const deadline = controlStartedAtMs + durationSeconds * 1000;
       const targetTracker = createPurpleTargetTracker({ confirmationFrames: 2, maxSizeRatio: 8 });
+      const oneVOneShadowController = requestedPlayerProfile && playerProfileShadow
+        ? createOneVOneController(requestedPlayerProfile, { liveShadowProposal: true })
+        : null;
       const tacticalPolicy = tacticalPolicyName === 'state-machine-v1'
         ? createTacticalPolicy({
           retreatHealth: integerArg(args['retreat-health'], 45, 20, 80),
@@ -1019,6 +1066,28 @@ async function run() {
           cameraMoved: cameraMovedLastFrame,
           movementMoved: previousMovementMoved,
         });
+        if (oneVOneShadowController && activeMatch) {
+          const shadowFrameSequence = Number(vision.sourceSequence ?? vision.sequence);
+          const shadowResult = oneVOneShadowController.step({
+            frame: {
+              sequence: shadowFrameSequence,
+              capturedAtMs: Number(vision.receivedAt ?? performance.now()),
+              width: vision.width,
+              height: vision.height,
+              source: 'rendered-world-view',
+            },
+            detections: legacyProposalsToShadowDetections(vision.operatorTargets, shadowFrameSequence),
+          });
+          oneVOneShadowReceipts.push({
+            ...shadowResult.telemetry,
+            inputIssued: shadowResult.inputIssued,
+            legacyOperatorCandidates: vision.operatorTargets.length,
+          });
+          if (!oneVOneShadowFirstConfirmedCaptured && shadowResult.track.state === 'CONFIRMED') {
+            await writeFile(resolve(artifactDirectory, 'one-v-one-shadow-first-confirmed.jpg'), vision.jpeg);
+            oneVOneShadowFirstConfirmedCaptured = true;
+          }
+        }
         const rawTarget = tracking.rawTarget;
         const minimapThreat = vision.minimapThreats[0] ?? null;
         if (activeMatch && minimapThreat) minimapThreatFrames += 1;
@@ -1615,6 +1684,19 @@ async function run() {
       await writeFile(resolve(artifactDirectory, 'shot-evidence.json'), `${JSON.stringify(shotEvidence, null, 2)}\n`);
       shotEvidenceReceipt = { file: 'shot-evidence.json', reconciliation: shotEvidence.reconciliation };
     }
+    if (oneVOneShadowReceipts.length > 0) {
+      oneVOneShadowSummary = summarizeOneVOneShadow(oneVOneShadowReceipts);
+      await writeFile(resolve(artifactDirectory, 'one-v-one-shadow-telemetry.json'), `${JSON.stringify({
+        schemaVersion: 1,
+        kind: 'atomic-player-one-v-one-live-shadow',
+        profileId: requestedPlayerProfile.profileId,
+        profileFingerprint: requestedPlayerProfileFingerprint,
+        runtime: playerProfileRuntimeReceipt,
+        semanticSource: 'legacy rendered purple-operator proposals; observer-only; not semantic authority',
+        summary: oneVOneShadowSummary,
+        frames: oneVOneShadowReceipts,
+      }, null, 2)}\n`);
+    }
     await writeFile(resolve(artifactDirectory, 'telemetry.json'), `${JSON.stringify({ schemaVersion: 1, actions }, null, 2)}\n`);
     const candidateArtifacts = Array.from({ length: candidateImagesSaved }, (_, index) => `candidate-${String(index + 1).padStart(2, '0')}.jpg`);
     const damageArtifacts = Array.from({ length: Math.min(3, damageReactions) }, (_, index) => `damage-contact-${String(index + 1).padStart(2, '0')}.jpg`);
@@ -1641,6 +1723,12 @@ async function run() {
         fieldKitReceipt,
         requiredWeaponName,
         cdpAttached: Boolean(cdpUrl),
+        playerProfile: requestedPlayerProfile ? {
+          profileId: requestedPlayerProfile.profileId,
+          fingerprint: requestedPlayerProfileFingerprint,
+          runtime: playerProfileRuntimeReceipt,
+          shadowMode: playerProfileShadow,
+        } : null,
       },
       fairness: {
         perception: args['lifecycle-only'] ? 'none-lifecycle-only' : 'rendered-pixels-purple-operator-geometry-v1-scan-stop-two-frame-confirmation-visible-player-up-minimap-and-hud',
@@ -1729,6 +1817,7 @@ async function run() {
         controlSleepMs,
         realtimeProfile,
         tacticalPolicy: tacticalPolicyReceipt,
+        oneVOneShadow: oneVOneShadowSummary,
         agentLanes: {
           scoutPerception: { source: 'latest rendered screencast frame', cadence: 'every control tick' },
           tacticalNavigation: { source: 'visible player-up minimap plus collision recovery', cadenceTicks: navigationLaneStride },
@@ -1762,6 +1851,7 @@ async function run() {
         aimMoves,
         aimServoMoves,
         shotPulses,
+        oneVOneProfileInputCommands: oneVOneShadowSummary?.inputCommandsIssued ?? 0,
         bursts,
         fireEvidenceFrames: fireEvidenceFrames.length,
         warmupShotPulses,
@@ -1886,6 +1976,8 @@ async function run() {
         ...damageArtifacts,
         ...fireEvidenceFrames.map((entry) => entry.file),
         shotEvidenceReceipt?.file ?? null,
+        oneVOneShadowReceipts.length > 0 ? 'one-v-one-shadow-telemetry.json' : null,
+        oneVOneShadowFirstConfirmedCaptured ? 'one-v-one-shadow-first-confirmed.jpg' : null,
         finalScreenshotCaptured ? 'final.jpg' : null,
         matchEndedObserved ? 'post-game.jpg' : null,
         matchSummaryDownload ? 'match-summary.json' : null,
