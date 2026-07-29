@@ -15,6 +15,7 @@ const TEXT_EXTENSIONS = new Set([
 
 function validateTextBytes(bytes) {
   const failures = [];
+  if (bytes.length === 0) failures.push('is unexpectedly empty');
   if (bytes.includes(0)) failures.push('contains NUL bytes');
   try {
     new TextDecoder('utf-8', { fatal: true }).decode(bytes);
@@ -37,6 +38,7 @@ function trackedTextPaths() {
 
 function runSelfTest() {
   assert.deepEqual(validateTextBytes(Buffer.from('export const intact = true;\n', 'utf8')), []);
+  assert.deepEqual(validateTextBytes(Buffer.alloc(0)), ['is unexpectedly empty']);
   assert.deepEqual(validateTextBytes(Buffer.from([0x61, 0x00, 0x62])), ['contains NUL bytes']);
   assert.deepEqual(validateTextBytes(Buffer.from([0xc3, 0x28])), ['is not valid UTF-8']);
   assert.deepEqual(
