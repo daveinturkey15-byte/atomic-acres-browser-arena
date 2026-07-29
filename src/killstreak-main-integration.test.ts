@@ -123,7 +123,11 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain('function confirmCrosshairSupportTarget(');
     expect(source).toContain('requestKillstreakActivation(targeting.id, confirmedAt, [point.x, point.y, point.z])');
     expect(source).toContain('cancelSupportTargeting(true)');
-    expect(source).toContain('groundHeightAt: supportPlacementGroundHeightAt');
+    expect(source).toContain('let groundSampler: SupportPlacementGroundSampler | null = null;');
+    expect(source).toContain('groundSampler ??= new SupportPlacementGroundSampler({');
+    expect(source).toContain('colliders: flightSolids');
+    expect(source).toContain('arena.root.updateWorldMatrix(true, true);');
+    expect(source).toContain('groundHeightAt,');
     expect(source).toContain('crosshairTarget: crosshairPreviewLastPoint?.toArray() ?? null');
     expect(source).toContain('CARE PACKAGE · TARGET CONFIRMED · DELIVERY INBOUND');
     expect(source).not.toContain('CARE PACKAGE · TARGET CONFIRMED · PRESS F TO SECURE');

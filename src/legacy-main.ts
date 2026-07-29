@@ -74,6 +74,7 @@ import {
 } from './killstreak-runtime';
 import { KillstreakPresentation, loadHunterDronePresentation, loadSupportVehiclePresentations, supportVehiclePresentationTelemetry } from './killstreak-presentation';
 import { PASS65_FLIGHT_NAVIGATION, resolveSupportFlightStep } from './killstreak-flight-navigation';
+import { SupportPlacementGroundSampler } from './support-placement-ground';
 import {
   applyPilotedDronePointerDelta,
   applyPilotedDroneScreenLookDelta,
@@ -11771,31 +11772,6 @@ function recordOwnerSupportDamage(event: KillstreakDamageEvent): void {
   }
 }
 
-const supportPlacementRaycaster = new THREE.Raycaster();
-const supportPlacementRayOrigin = new THREE.Vector3();
-const supportPlacementRayDirection = new THREE.Vector3(0, -1, 0);
-
-function supportPlacementGroundHeightAt(x: number, z: number): number {
-  const floorY = arena.bounds.minY ?? 0;
-  const ceilingY = PASS65_FLIGHT_NAVIGATION[selectedArena.id].ceilingY;
-  let admittedHeight = floorY;
-  for (const box of activeWorldColliders()) {
-    if (x < box.minX || x > box.maxX || z < box.minZ || z > box.maxZ) continue;
-    const top = box.maxY ?? 4;
-    if (Number.isFinite(top)) admittedHeight = Math.max(admittedHeight, top);
-  }
-  const originY = Math.max(ceilingY + 8, (arena.bounds.maxY ?? ceilingY) + 8);
-  supportPlacementRayOrigin.set(x, originY, z);
-  supportPlacementRaycaster.set(supportPlacementRayOrigin, supportPlacementRayDirection);
-  supportPlacementRaycaster.near = 0;
-  supportPlacementRaycaster.far = originY - floorY + 2;
-  arena.root.updateWorldMatrix(true, true);
-  const hit = supportPlacementRaycaster.intersectObjects(activeRaycastMeshes(), true)
-    .find((candidate) => candidate.point.y >= floorY - 0.05 && candidate.point.y <= ceilingY);
-  if (hit) admittedHeight = Math.max(admittedHeight, hit.point.y);
-  return THREE.MathUtils.clamp(admittedHeight, floorY, ceilingY - 0.5);
-}
-
 function killstreakActorModifiers(actorId: string, now: number): Readonly<{ damage: number; movement: number; reloadDuration: number }> {
   if (network.role !== 'client') return killstreakRuntime.modifiersForActor(actorId, now);
   const actor = killstreakSnapshot.actors.find((entry) => entry.actorId === actorId);
@@ -11843,6 +11819,19 @@ function killstreakWorldState(): KillstreakWorld {
   // current collision authority once so each probe does not rebuild/enumerate
   // the full collider set and introduce an activation hitch.
   const flightSolids = activeWorldColliders();
+  let groundSampler: SupportPlacementGroundSampler | null = null;
+  const groundHeightAt = (x: number, z: number): number => {
+    groundSampler ??= new SupportPlacementGroundSampler({
+      bounds: arena.bounds,
+      ceilingY: flightNavigation.ceilingY,
+      colliders: flightSolids,
+      prepareRaycastMeshes: () => {
+        arena.root.updateWorldMatrix(true, true);
+        return activeRaycastMeshes();
+      },
+    });
+    return groundSampler.heightAt(x, z);
+  };
   return {
     bounds: {
       minX: arena.bounds.minX,
@@ -11859,7 +11848,7 @@ function killstreakWorldState(): KillstreakWorld {
       { x: to[0], y: to[1], z: to[2] },
       box,
     )),
-    groundHeightAt: supportPlacementGroundHeightAt,
+    groundHeightAt,
     resolveFlightPosition: (from, desired, radius) => {
       const result = resolveSupportFlightStep({
         definition: flightNavigation,

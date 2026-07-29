@@ -13,7 +13,8 @@ describe('live Atomic-house destruction composition contract', () => {
     expect(source).toContain('const surfaces = activeBallisticSurfaces(traceArena);');
     expect(source).toContain("collision.dynamicColliders.filter((entry) => !entry.id.includes('debris:'))");
     expect(source).toContain('object.userData.dynamicAuthorityReplacement === true');
-    expect(source).toContain('supportPlacementRaycaster.intersectObjects(activeRaycastMeshes(), true)');
+    expect(source).toContain('prepareRaycastMeshes: () => {');
+    expect(source).toContain('return activeRaycastMeshes();');
   });
 
   it('routes house shots, physics and windows through the shared deterministic budget', () => {

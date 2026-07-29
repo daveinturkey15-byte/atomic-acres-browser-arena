@@ -508,13 +508,17 @@ export class InteractiveWorldRuntime {
     });
   }
 
-  private commit(shed: RuntimeShed, result: ShedMutationResult): ShedMutationResult {
-    if (!result.accepted) return result;
+  private shedStateFitsSharedBudget(shed: RuntimeShed, state: ShedState): boolean {
     const otherShedBodies = this.sheds.reduce(
       (sum, candidate) => sum + (candidate === shed ? 0 : candidate.state.majorDebris.length),
       0,
     );
-    if (otherShedBodies + result.state.majorDebris.length > SHARED_MAJOR_DEBRIS_BUDGET.shed) {
+    return otherShedBodies + state.majorDebris.length <= SHARED_MAJOR_DEBRIS_BUDGET.shed;
+  }
+
+  private commit(shed: RuntimeShed, result: ShedMutationResult): ShedMutationResult {
+    if (!result.accepted) return result;
+    if (!this.shedStateFitsSharedBudget(shed, result.state)) {
       return Object.freeze({ accepted: false, reason: 'shared-major-body-cap', state: shed.state });
     }
     shed.state = result.state;
@@ -887,20 +891,30 @@ export class InteractiveWorldRuntime {
     const shedMaximumDamageQ = request.shedMaximumDamageQ ?? request.maximumDamageQ;
     let mutations = 0;
     for (const shed of this.sheds) {
+      let nextState = shed.state;
+      let shedMutations = 0;
       for (const surface of shed.definition.surfaces) {
-        const state = shed.state.surfaces.find((candidate) => candidate.surfaceId === surface.id);
+        const state = nextState.surfaces.find((candidate) => candidate.surfaceId === surface.id);
         if (!state || state.stage === 'detached') continue;
-        const impact = closestPanelPoint(surfaceFrame(surface, shed.placement, shed.state), request.origin);
+        const impact = closestPanelPoint(surfaceFrame(surface, shed.placement, nextState), request.origin);
         if (impact.distance > request.radius) continue;
         const damageQ = Math.max(1, Math.round(shedMaximumDamageQ * (1 - impact.distance / request.radius)));
-        const result = this.applyExplosion({
-          placementId: shed.placement.id,
+        const result = applyShedExplosion(shed.definition, nextState, {
+          isHost: this.hostAuthority,
+          matchEpoch: this.matchEpoch,
+          expectedRevision: nextState.revision,
           surfaceId: surface.id,
           damageQ,
           uQ: impact.uQ,
           vQ: impact.vQ,
         });
-        if (result?.accepted) mutations += 1;
+        if (!result.accepted || !this.shedStateFitsSharedBudget(shed, result.state)) continue;
+        nextState = result.state;
+        shedMutations += 1;
+      }
+      if (shedMutations > 0) {
+        const result = this.commit(shed, Object.freeze({ accepted: true, reason: 'accepted', state: nextState }));
+        if (result.accepted) mutations += shedMutations;
       }
     }
     if (this.house) {
