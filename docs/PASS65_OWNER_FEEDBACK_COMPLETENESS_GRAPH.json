@@ -1047,9 +1047,11 @@
       "ledgerOrdinal": 15,
       "sourceOutcomeIds": [
         "UNT-018",
+        "CORR-HF-060",
         "CORR-HF-090"
       ],
       "feedbackIds": [
+        "HF-060",
         "HF-090"
       ],
       "canonicalText": "Shared `F` arbitration now gives an eligible nearby world interaction—care-crate collection, door, weapon pickup or future catalogued sibling—priority over support enter/exit. Support toggle wins only when no higher-priority world candidate is eligible; competing raw listeners remain forbidden."
