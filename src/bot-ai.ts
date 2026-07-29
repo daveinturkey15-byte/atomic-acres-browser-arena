@@ -28,6 +28,7 @@ export type BotSense = {
   reactionDelay?: number;
   burstShotsRemaining?: number;
   fireIntervalMs?: number;
+  fireSuppressed?: boolean;
 };
 
 export type BotIntent = {
@@ -218,6 +219,7 @@ export function chooseBotIntent(sense: BotSense): BotIntent {
     ? Math.max(40, sense.fireIntervalMs!)
     : (sense.burstShotsRemaining ?? 0) > 0 ? 135 : 620;
   const fire = reacted
+    && !sense.fireSuppressed
     && sense.distanceToPlayer <= BOT_FIRE_RANGE
     && sense.distanceToPlayer >= 2.5
     && sense.now - sense.lastShotAt >= shotInterval;

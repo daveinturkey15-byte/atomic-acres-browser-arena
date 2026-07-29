@@ -41,6 +41,10 @@ const base: BotSense = {
 };
 
 describe('chooseBotIntent', () => {
+  it('never fires while host perception suppresses fire', () => {
+    expect(chooseBotIntent({ ...base, fireSuppressed: true }).fire).toBe(false);
+  });
+
   it('assigns a seeded random mixed weapon cycle with no avoidable duplicates', () => {
     const samples = [0.1, 0.8, 0.35, 0.65, 0.2, 0.9, 0.45, 0.75];
     const run = () => {

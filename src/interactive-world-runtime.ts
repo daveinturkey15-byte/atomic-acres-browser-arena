@@ -8,6 +8,7 @@ import {
   admitShedDoorInteraction,
   advanceShedDoor,
   applyShedExplosion,
+  applyShedStructuralBlast,
   applyShedSheetImpact,
   blockShedDoor,
   createInitialShedState,
@@ -25,6 +26,7 @@ import {
   type ShedArenaId,
   type ShedPlacement,
   type ShedState,
+  type ShedStructuralBlastClass,
   type WorldCollisionSnapshot,
   type QuantizedVector,
 } from './destructible-world';
@@ -881,6 +883,7 @@ export class InteractiveWorldRuntime {
     maximumDamageQ: number;
     /** Optional shed-only calibration; houses retain maximumDamageQ. */
     shedMaximumDamageQ?: number;
+    shedBlastClass?: ShedStructuralBlastClass;
   }>): number {
     if (!this.hostAuthority
       || ![request.origin.x, request.origin.y, request.origin.z, request.radius, request.maximumDamageQ,
@@ -891,6 +894,25 @@ export class InteractiveWorldRuntime {
     const shedMaximumDamageQ = request.shedMaximumDamageQ ?? request.maximumDamageQ;
     let mutations = 0;
     for (const shed of this.sheds) {
+      if (request.shedBlastClass) {
+        const localOrigin = inverseTransformPoint(request.origin, shed.placement);
+        const shedDistance = Math.hypot(localOrigin.x, Math.max(0, localOrigin.y - 1.5), localOrigin.z);
+        if (shedDistance <= request.radius + 2.6) {
+          const structural = applyShedStructuralBlast(shed.definition, shed.state, {
+            isHost: this.hostAuthority,
+            matchEpoch: this.matchEpoch,
+            expectedRevision: shed.state.revision,
+            blastId: `${request.shedBlastClass}-${this.matchEpoch}-${shed.state.revision + 1}`,
+            blastClass: request.shedBlastClass,
+            originLocal: localOrigin,
+          });
+          if (structural.accepted && this.shedStateFitsSharedBudget(shed, structural.state)) {
+            this.commit(shed, structural);
+            mutations += 1;
+            continue;
+          }
+        }
+      }
       let nextState = shed.state;
       let shedMutations = 0;
       for (const surface of shed.definition.surfaces) {

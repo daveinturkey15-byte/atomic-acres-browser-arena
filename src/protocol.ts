@@ -277,7 +277,7 @@ export type WindowBreakMessage = {
   by: string;
   windowId: string;
   origin: [number, number, number];
-  kind?: 'shot' | 'explosive';
+  kind?: 'shot' | 'knife' | 'explosive';
   actionNonce?: number;
   /** Added only by the host after receiver simulation canonicalizes the break. */
   hostAuthority?: HostWindowBreakAuthority;
@@ -634,7 +634,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
     case 'window-break':
       return typeof msg.by === 'string'
         && typeof msg.windowId === 'string' && msg.windowId.length > 0 && msg.windowId.length <= 160
-        && (msg.kind === undefined || msg.kind === 'shot' || msg.kind === 'explosive')
+        && (msg.kind === undefined || msg.kind === 'shot' || msg.kind === 'knife' || msg.kind === 'explosive')
         && (msg.kind === 'explosive' ? Number.isFinite(msg.actionNonce) : msg.actionNonce === undefined)
         && (msg.hostAuthority === undefined || isHostWindowBreakAuthority(msg.hostAuthority))
         && Array.isArray(msg.origin) && msg.origin.length === 3 && msg.origin.every(Number.isFinite)

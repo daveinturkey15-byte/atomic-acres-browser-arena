@@ -139,6 +139,35 @@ function smokeCorridorOpensRay(observer: Vec3, target: Vec3, volume: SmokeVolume
   ));
 }
 
+function smokeChordDensity(observer: Vec3, target: Vec3, volume: SmokeVolume): number {
+  const nearest = nearestPointOnSegment(observer, target, volume.centre);
+  const offsetSq = lengthSquared(subtract(nearest, volume.centre));
+  const radiusSq = volume.radiusM * volume.radiusM;
+  if (offsetSq >= radiusSq) return 0;
+  const chordLength = Math.sqrt(Math.max(0, radiusSq - offsetSq)) * 2;
+  return clamp01(chordLength / Math.max(0.001, volume.radiusM * 2));
+}
+
+/**
+ * Semantic visibility density used by host AI. It is derived from the same
+ * authoritative volumes/corridors as presentation and never from particles.
+ */
+export function smokeDensityAlongRay(
+  observer: Vec3,
+  target: Vec3,
+  volumes: readonly SmokeVolume[],
+  nowMs: number,
+): number {
+  let transmittance = 1;
+  for (const volume of volumes) {
+    if (nowMs < volume.startsAtMs || nowMs >= volume.expiresAtMs || volume.radiusM <= 0
+      || smokeCorridorOpensRay(observer, target, volume, nowMs)) continue;
+    const density = smokeChordDensity(observer, target, volume);
+    transmittance *= 1 - density;
+  }
+  return clamp01(1 - transmittance);
+}
+
 export function smokeBlocksTargetAcquisition(
   observer: Vec3,
   target: Vec3,

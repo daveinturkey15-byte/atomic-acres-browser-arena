@@ -20,7 +20,7 @@ describe('Semtex live-stick runtime integration', () => {
     expect(block).toContain(': sealedAttachment !== null;');
     expect(block).toContain('semtexBlastRadiusM(semtexStuckToLiveActor)');
     expect(block).toContain('semtexBlastDamage(distance, prone, semtexStuckToLiveActor)');
-    expect(block).toContain("applyInteractiveWorldExplosion(point, blastRadius, entity.grenade === 'semtex' ? blastDamage(0) : 100)");
+    expect(block).toMatch(/applyInteractiveWorldExplosion\([\s\S]*point,[\s\S]*blastRadius,[\s\S]*entity\.grenade === 'semtex' \? blastDamage\(0\) : 100,[\s\S]*'grenade-major-collapse',[\s\S]*\);/);
     expect(block).toContain('breakWindowsInGrenadeBlast(point, entity.actionNonce, entity.ownerKind === \'player\', blastRadius)');
     expect(block).toContain("...(semtexStuckToLiveActor ? { stuck: true as const } : {})");
   });

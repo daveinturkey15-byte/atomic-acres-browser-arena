@@ -433,7 +433,7 @@ describe('presentation prewarm startup contract', () => {
     expect(doorProbe).not.toContain('api.damageShed(');
     expect(grenadeShedHook).toContain('spawnGrenadeExplosionVisual(point, detonatedAt);');
     expect(grenadeShedHook).toContain('breakWindowsInGrenadeBlast(point, randomNonce(), true, GRENADE_RADIUS);');
-    expect(grenadeShedHook).toContain('applyInteractiveWorldExplosion(point, GRENADE_RADIUS, 100);');
+    expect(grenadeShedHook).toContain("applyInteractiveWorldExplosion(point, GRENADE_RADIUS, 100, 'grenade-major-collapse');");
 
     expect(verifierSource).toContain('pilotedDroneProbe,\n      carpetBomberProbe,\n      lifecycleRecoveryProbe,');
     expect(verifierSource).toContain('frameTail: samples.slice(-5)');

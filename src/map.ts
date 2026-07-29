@@ -22,6 +22,7 @@ import {
   type HouseFragmentDefinition,
 } from './house-destruction';
 import { Team } from './protocol';
+import type { GlassState } from './glass-authority';
 
 export type PracticeTarget = {
   id: string;
@@ -36,7 +37,7 @@ export type PracticeTarget = {
   alwaysCritical?: boolean;
   kind?: 'plate' | 'flying-cat';
 };
-export type BreakableWindow = { id: string; mesh: THREE.Mesh; broken: boolean };
+export type BreakableWindow = { id: string; mesh: THREE.Mesh; broken: boolean; glassState?: GlassState };
 export type ArenaMap = {
   id: 'atomic-acres' | 'rustworks-1v1' | 'gun-range' | 'skyline-terminal';
   label: string;

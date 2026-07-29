@@ -868,6 +868,113 @@ export function applyShedExplosion(
   };
 }
 
+export type ShedStructuralBlastClass = 'grenade-major-collapse' | 'carpet-bomber-obliteration';
+
+function openedDetachedDoor(door: ShedDoorState): ShedDoorState {
+  return Object.freeze({
+    ...door,
+    angleQ: SHED_ANGLE_Q,
+    motionOriginAngleQ: SHED_ANGLE_Q,
+    desiredAngleQ: SHED_ANGLE_Q,
+    direction: 'stationary',
+    phase: 'open',
+    blockedAtTick: null,
+    blockedBy: null,
+  });
+}
+
+/**
+ * One host mutation owns door, supports, panels and debris. A grenade admits a
+ * major three-chunk collapse; Carpet Bomber removes the entire shell while the
+ * preauthored six-body cap keeps persistent debris bounded.
+ */
+export function applyShedStructuralBlast(
+  definition: DestructibleShedDefinition,
+  state: ShedState,
+  request: Readonly<{
+    isHost: boolean;
+    matchEpoch: number;
+    expectedRevision: number;
+    blastId: string;
+    blastClass: ShedStructuralBlastClass;
+    originLocal: Point3;
+  }>,
+): ShedMutationResult {
+  if (!request.isHost) return { accepted: false, reason: 'not-host', state };
+  if (request.matchEpoch !== state.matchEpoch) return { accepted: false, reason: 'stale-epoch', state };
+  if (request.expectedRevision !== state.revision) return { accepted: false, reason: 'stale-revision', state };
+  if (!validId(request.blastId) || !['grenade-major-collapse', 'carpet-bomber-obliteration'].includes(request.blastClass)
+    || ![request.originLocal.x, request.originLocal.y, request.originLocal.z].every(Number.isFinite)) {
+    return { accepted: false, reason: 'invalid-impact', state };
+  }
+  const detachable = definition.surfaces
+    .filter((surface) => surface.detachableChunkId !== null)
+    .filter((surface) => !state.detachedChunkIds.includes(surface.detachableChunkId!))
+    .sort((left, right) => {
+      const leftDistance = magnitude({
+        x: left.frame.centre.x - request.originLocal.x,
+        y: left.frame.centre.y - request.originLocal.y,
+        z: left.frame.centre.z - request.originLocal.z,
+      });
+      const rightDistance = magnitude({
+        x: right.frame.centre.x - request.originLocal.x,
+        y: right.frame.centre.y - request.originLocal.y,
+        z: right.frame.centre.z - request.originLocal.z,
+      });
+      return leftDistance - rightDistance || left.id.localeCompare(right.id);
+    });
+  const targetCount = request.blastClass === 'carpet-bomber-obliteration'
+    ? definition.caps.majorChunks
+    : Math.min(3, definition.caps.majorChunks);
+  const targets = detachable.slice(0, Math.max(0, targetCount - state.detachedChunkIds.length));
+  if (request.blastClass === 'carpet-bomber-obliteration'
+    && state.surfaces.every((surface) => surface.stage === 'detached')) {
+    return { accepted: false, reason: 'already-detached', state };
+  }
+  if (targets.length === 0 && request.blastClass !== 'carpet-bomber-obliteration') {
+    return { accepted: false, reason: 'already-detached', state };
+  }
+
+  let surfaces = state.surfaces;
+  let detachedChunkIds = state.detachedChunkIds;
+  let majorDebris = state.majorDebris;
+  for (const target of targets) {
+    const interim = Object.freeze({ ...state, surfaces, detachedChunkIds, majorDebris });
+    const detached = detachSurfaceUpdate(definition, interim, surfaces, target.id, 1_000_000);
+    if (!detached) continue;
+    surfaces = detached.surfaces;
+    detachedChunkIds = detached.detachedChunkIds;
+    majorDebris = detached.majorDebris;
+  }
+
+  if (request.blastClass === 'carpet-bomber-obliteration') {
+    surfaces = Object.freeze(surfaces.map((surface) => surface.stage === 'detached' ? surface : Object.freeze({
+      ...surface,
+      healthQ: 1_000_000,
+      stage: 'detached' as const,
+      attachedChunkId: null,
+    })));
+  } else {
+    // Fixed frame/support pieces share the same lifecycle revision and retain
+    // visible damage without creating unbounded arbitrary rigid bodies.
+    surfaces = Object.freeze(surfaces.map((surface) => surface.stage === 'intact' ? Object.freeze({
+      ...surface,
+      healthQ: Math.max(surface.healthQ, definition.thresholds.detachDamageQ),
+    }) : surface));
+  }
+  const doorDetached = surfaces.find((surface) => surface.surfaceId === state.door.surfaceId)?.stage === 'detached';
+  return {
+    accepted: true,
+    reason: 'accepted',
+    state: withRevision(state, {
+      surfaces,
+      detachedChunkIds,
+      majorDebris,
+      ...(doorDetached ? { door: openedDetachedDoor(state.door) } : {}),
+    }),
+  };
+}
+
 export function impulseMajorShedDebris(
   state: ShedState,
   request: Readonly<{
