@@ -16808,6 +16808,7 @@ const debugWindow = window as Window & {
   __ATOMIC_ACRES_DEBUG__?: {
     snapshot: () => Record<string, unknown>;
     sampleEnduranceHealth: () => ReturnType<typeof sampleEnduranceHealth>;
+    sampleWeaponCatalogReadiness: () => ReturnType<typeof weaponView.browserCatalogReadiness>;
     traceBallistics: (
       weapon: WeaponId,
       origin: [number, number, number],
@@ -16941,6 +16942,7 @@ const debugWindow = window as Window & {
 };
 debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   sampleEnduranceHealth,
+  sampleWeaponCatalogReadiness: () => weaponView.browserCatalogReadiness(),
   snapshot: () => ({
     bootstrap: { stage: bootstrapStage, error: bootstrapError, matchAdmissionCadence: lastMatchAdmissionCadence },
     gameStarted,

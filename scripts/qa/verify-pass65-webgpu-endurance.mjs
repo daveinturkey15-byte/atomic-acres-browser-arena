@@ -5,6 +5,11 @@ import { execFileSync } from 'node:child_process';
 import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
 import { isFatalWebGpuConsoleWarning } from './pass65-browser-console-contract.mjs';
+import {
+  auditVerifierBoundaryOwnWork,
+  maximumVerifierBoundaryP99Ms,
+  maximumVerifierOwnedTaskMs,
+} from './pass65-endurance-verifier-contract.mjs';
 
 const port = Number(process.env.PASS65_ENDURANCE_PORT ?? '44075');
 const sampleIntervalMs = Math.max(500, Number(process.env.PASS65_SAMPLE_INTERVAL_MS ?? '1000'));
@@ -633,18 +638,30 @@ try {
           && presentation?.swarmMaximumRenderedInstances === 24
         ));
     }, killstreakProbeMode, { timeout: 5_000 });
-    const activeStressBudget = enabledStress.has('killstreak')
-      ? await page.evaluate(async () => {
-        const api = window.__ATOMIC_ACRES_DEBUG__;
-        const performanceSample = await api.sampleArenaPerformanceBudget();
-        const state = api.snapshot();
-        return {
+    // Full graph/residency audits are deliberately isolated behind a drained,
+    // paused arena-admission frontier. They must never run inside a measured
+    // live interval: both walk thousands of resident objects and can trigger GC.
+    await pauseAndDrainPresentation(page);
+    const arenaAdmissionAudit = await page.evaluate(async (samplePerformanceBudget) => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      const performanceSample = samplePerformanceBudget ? await api.sampleArenaPerformanceBudget() : null;
+      const state = api.snapshot();
+      return {
+        shedTargets: (state.interactiveWorld?.envelope?.sheds ?? []).slice(0, 2).map((shed) => shed.placementId),
+        runtimeIdentity: {
+          label: state.render.runtime.adapterLabel,
+          adapterClass: state.render.runtime.adapterClass,
+          deviceClass: state.render.runtime.deviceClass,
+          softwareAdapter: state.render.runtime.softwareAdapter,
+        },
+        activeStressBudget: samplePerformanceBudget ? {
           performanceSample,
           budgetAudit: state.render.playableScene.budgetAudit,
           residency: api.sampleRendererResidency(),
-        };
-      })
-      : null;
+        } : null,
+      };
+    }, enabledStress.has('killstreak'));
+    const activeStressBudget = arenaAdmissionAudit.activeStressBudget;
     if (activeStressBudget && activeStressBudget.budgetAudit.pass !== true) {
       throw new Error(`${arenaId} exceeded its live chopper plus drone-swarm budget: ${JSON.stringify(activeStressBudget)}`);
     }
@@ -653,93 +670,122 @@ try {
     let sampleIndex = 0;
     let measuredLiveDurationMs = 0;
     let liveWindowStart = null;
-    await pauseAndDrainPresentation(page);
     while (measuredLiveDurationMs < durationMs) {
       activeContext = { visit, arenaId, phase: 'sample', sampleIndex };
       if (!liveWindowStart) liveWindowStart = await page.evaluate((initial) => {
-        const beginLiveWindow = ({ index, stress, maximumLongTaskEntries, requireDrained }) => {
-        const api = window.__ATOMIC_ACRES_DEBUG__;
-        const held = api.snapshot().render.runtime.presentation;
-        if (requireDrained && held.submissionSequence !== held.completedSequence) {
-          throw new Error(`Live sample did not begin from a drained frontier: ${JSON.stringify(held)}`);
-        }
-        api.resetPresentationProgressWindow();
-        const liveLongTaskEvidence = {
-          supported: false,
-          count: 0,
-          totalDurationMs: 0,
-          maximumDurationMs: 0,
-          entries: [],
-          truncated: false,
-        };
-        let liveLongTaskObserver = null;
-        const recordLiveLongTasks = (entries) => {
-          liveLongTaskEvidence.supported = true;
-          for (const entry of entries) {
-            const evidence = {
-              startTime: entry.startTime,
-              duration: entry.duration,
-              name: entry.name,
-            };
-            liveLongTaskEvidence.count += 1;
-            liveLongTaskEvidence.totalDurationMs += entry.duration;
-            liveLongTaskEvidence.maximumDurationMs = Math.max(
-              liveLongTaskEvidence.maximumDurationMs,
-              entry.duration,
-            );
-            if (liveLongTaskEvidence.entries.length < maximumLongTaskEntries) {
-              liveLongTaskEvidence.entries.push(evidence);
-            } else liveLongTaskEvidence.truncated = true;
+        const beginLiveWindow = ({ index, stress, shedTargets, maximumLongTaskEntries, requireDrained }) => {
+          const verifierTaskStartedAt = performance.now();
+          const verifierBeginOwnWorkSubstages = {};
+          const api = window.__ATOMIC_ACRES_DEBUG__;
+
+          let substageStartedAt = performance.now();
+          const held = api.sampleEnduranceHealth();
+          verifierBeginOwnWorkSubstages.healthReadMs = performance.now() - substageStartedAt;
+          if (requireDrained
+            && held.runtime.presentation.submissionSequence !== held.runtime.presentation.completedSequence) {
+            throw new Error(`Live sample did not begin from a drained frontier: ${JSON.stringify(held.runtime.presentation)}`);
           }
-        };
-        if (typeof PerformanceObserver === 'function') {
-          try {
-            liveLongTaskObserver = new PerformanceObserver((list) => recordLiveLongTasks(list.getEntries()));
-            liveLongTaskObserver.observe({ type: 'longtask', buffered: false });
+
+          substageStartedAt = performance.now();
+          const [x, y, z] = held.playerPosition;
+          api.setCaptureCameraPose(x, y, z, (index * 0.31) % (Math.PI * 2), Math.sin(index * 0.37) * 0.08);
+          if (index % 4 === 0) {
+            if (stress.grenade) {
+              api.setGrenades(1);
+              api.throwGrenade();
+            }
+            if (stress.smoke) {
+              api.stageSmokeVolume(2.5);
+              api.stageSmokeVolume(3.5);
+              api.stageSmokeVolume(4.5);
+            }
+          }
+          if (stress.weapons && index % 5 === 1) {
+            api.equipWeapon('explosive-crossbow');
+            api.fireOnce();
+          } else if (stress.weapons && index % 5 === 3) {
+            api.equipWeapon('m14-ebr');
+            api.setAds(true);
+            api.fireOnce();
+          } else api.setAds(false);
+          if (index % 7 === 2) {
+            for (const [shedIndex, placementId] of shedTargets.entries()) {
+              api.damageShed(placementId, shedIndex === 0 ? 'wall-west' : 'wall-east', 220);
+            }
+          }
+          verifierBeginOwnWorkSubstages.stressSetupMs = performance.now() - substageStartedAt;
+
+          substageStartedAt = performance.now();
+          api.resetPresentationProgressWindow();
+          api.setRenderPaused(false);
+          verifierBeginOwnWorkSubstages.progressResetMs = performance.now() - substageStartedAt;
+
+          substageStartedAt = performance.now();
+          const started = api.sampleEnduranceHealth();
+          verifierBeginOwnWorkSubstages.baselineReadMs = performance.now() - substageStartedAt;
+
+          const liveLongTaskEvidence = {
+            supported: false,
+            count: 0,
+            totalDurationMs: 0,
+            maximumDurationMs: 0,
+            entries: [],
+            truncated: false,
+            ignoredBeforeWindow: 0,
+          };
+          let liveLongTaskObserver = null;
+          let observationStartsAtMs = Number.POSITIVE_INFINITY;
+          const recordLiveLongTasks = (entries) => {
             liveLongTaskEvidence.supported = true;
-          } catch {
-            liveLongTaskObserver = null;
+            for (const entry of entries) {
+              // An observer registered at the tail of this task may receive the
+              // task that registered it. That work is separately receipted as
+              // verifier-owned and must not masquerade as a gameplay long task.
+              if (entry.startTime < observationStartsAtMs) {
+                liveLongTaskEvidence.ignoredBeforeWindow += 1;
+                continue;
+              }
+              const evidence = {
+                startTime: entry.startTime,
+                duration: entry.duration,
+                name: entry.name,
+              };
+              liveLongTaskEvidence.count += 1;
+              liveLongTaskEvidence.totalDurationMs += entry.duration;
+              liveLongTaskEvidence.maximumDurationMs = Math.max(
+                liveLongTaskEvidence.maximumDurationMs,
+                entry.duration,
+              );
+              if (liveLongTaskEvidence.entries.length < maximumLongTaskEntries) {
+                liveLongTaskEvidence.entries.push(evidence);
+              } else liveLongTaskEvidence.truncated = true;
+            }
+          };
+          substageStartedAt = performance.now();
+          if (typeof PerformanceObserver === 'function') {
+            try {
+              liveLongTaskObserver = new PerformanceObserver((list) => recordLiveLongTasks(list.getEntries()));
+              liveLongTaskObserver.observe({ type: 'longtask', buffered: false });
+              liveLongTaskEvidence.supported = true;
+            } catch {
+              liveLongTaskObserver = null;
+            }
           }
-        }
-        window.__PASS65_ENDURANCE_LIVE_LONG_TASK_SAMPLE__ = {
-          evidence: liveLongTaskEvidence,
-          observer: liveLongTaskObserver,
-          recordEntries: recordLiveLongTasks,
-        };
-        const state = api.snapshot();
-        const [x, y, z] = state.player.position;
-        api.setCaptureCameraPose(x, y, z, (index * 0.31) % (Math.PI * 2), Math.sin(index * 0.37) * 0.08);
-        if (index % 4 === 0) {
-          if (stress.grenade) {
-            api.setGrenades(1);
-            api.throwGrenade();
-          }
-          if (stress.smoke) {
-            api.stageSmokeVolume(2.5);
-            api.stageSmokeVolume(3.5);
-            api.stageSmokeVolume(4.5);
-          }
-        }
-        if (stress.weapons && index % 5 === 1) {
-          api.equipWeapon('explosive-crossbow');
-          api.fireOnce();
-        } else if (stress.weapons && index % 5 === 3) {
-          api.equipWeapon('m14-ebr');
-          api.setAds(true);
-          api.fireOnce();
-        } else api.setAds(false);
-        if (index % 7 === 2) {
-          for (const [shedIndex, shed] of (state.interactiveWorld?.envelope?.sheds ?? []).slice(0, 2).entries()) {
-            api.damageShed(shed.placementId, shedIndex === 0 ? 'wall-west' : 'wall-east', 220);
-          }
-        }
-        api.setRenderPaused(false);
-        const started = api.snapshot();
-        return {
-          atMs: performance.now(),
-          frameCount: started.frameCount,
-          presentation: started.render.runtime.presentation,
-        };
+          observationStartsAtMs = performance.now();
+          verifierBeginOwnWorkSubstages.longTaskObserverSetupMs = observationStartsAtMs - substageStartedAt;
+          const verifierBeginOwnWorkMs = observationStartsAtMs - verifierTaskStartedAt;
+          window.__PASS65_ENDURANCE_LIVE_LONG_TASK_SAMPLE__ = {
+            evidence: liveLongTaskEvidence,
+            observer: liveLongTaskObserver,
+            recordEntries: recordLiveLongTasks,
+          };
+          return {
+            atMs: observationStartsAtMs,
+            frameCount: started.frameCount,
+            presentation: started.runtime.presentation,
+            verifierBeginOwnWorkMs,
+            verifierBeginOwnWorkSubstages,
+          };
         };
         window.__PASS65_ENDURANCE_BEGIN_LIVE_WINDOW__ = beginLiveWindow;
         return beginLiveWindow({ ...initial, requireDrained: true });
@@ -750,8 +796,13 @@ try {
           smoke: enabledStress.has('smoke'),
           weapons: enabledStress.has('weapons'),
         },
+        shedTargets: arenaAdmissionAudit.shedTargets,
         maximumLongTaskEntries: maximumLiveLongTaskEntries,
       });
+      if (liveWindowStart.verifierBeginOwnWorkMs >= maximumVerifierOwnedTaskMs
+        || Math.max(0, ...Object.values(liveWindowStart.verifierBeginOwnWorkSubstages)) >= maximumVerifierOwnedTaskMs) {
+        throw new Error(`${arenaId} verifier live-window setup exceeded its own-task limit: ${JSON.stringify(liveWindowStart)}`);
+      }
       await page.waitForFunction((minimumEndAt) => performance.now() >= minimumEndAt,
         liveWindowStart.atMs + sampleIntervalMs);
 
@@ -761,36 +812,40 @@ try {
         windowStartAtMs,
         nextIndex,
         stress,
+        shedTargets,
         maximumLongTaskEntries,
       }) => {
+        const verifierBoundaryStartedAt = performance.now();
+        const boundaryEnteredAtMs = verifierBoundaryStartedAt;
+        const verifierBoundaryOwnWorkSubstages = {};
         const api = window.__ATOMIC_ACRES_DEBUG__;
+        let substageStartedAt = performance.now();
         const longTaskSample = window.__PASS65_ENDURANCE_LIVE_LONG_TASK_SAMPLE__;
         if (longTaskSample?.observer) {
           longTaskSample.recordEntries(longTaskSample.observer.takeRecords());
         }
         longTaskSample?.observer?.disconnect();
         delete window.__PASS65_ENDURANCE_LIVE_LONG_TASK_SAMPLE__;
-        const state = api.snapshot();
+        verifierBoundaryOwnWorkSubstages.longTaskCollectionMs = performance.now() - substageStartedAt;
+
+        substageStartedAt = performance.now();
+        const health = api.sampleEnduranceHealth();
+        verifierBoundaryOwnWorkSubstages.healthReadMs = performance.now() - substageStartedAt;
+
+        substageStartedAt = performance.now();
         const sample = {
-          atMs: performance.now(),
-          frameCount: state.frameCount,
-          gameStarted: state.gameStarted,
-          arenaId: state.arenaSelection.id,
-          transition: state.arenaSelection.streaming.transition,
-          runtime: state.render.runtime,
-          watchdog: state.render.playableScene.renderWatchdog,
-          gpuRetirement: state.interactiveWorld.gpuRetirement,
-          killstreak: {
-            revision: state.killstreak.revision,
-            entities: state.killstreak.entities.map((entity) => ({
-              kind: entity.kind,
-              mode: entity.mode,
-              phase: entity.phase,
-            })),
-          },
-          grenadeWorldPool: state.grenadeVisual.pool,
-          smokePresentation: state.dmrThermal.smokePresentation,
-          weaponCatalog: state.weaponPresentation.browserWeaponCatalog,
+          atMs: boundaryEnteredAtMs,
+          frameCount: health.frameCount,
+          gameStarted: health.gameStarted,
+          arenaId: health.arenaId,
+          transition: health.transition,
+          runtime: health.runtime,
+          watchdog: health.watchdog,
+          gpuRetirement: health.gpuRetirement,
+          killstreak: health.killstreak,
+          grenadeWorldPool: health.grenadeWorldPool,
+          smokePresentation: health.smokePresentation,
+          weaponCatalog: health.weaponCatalog,
           liveLongTasks: longTaskSample?.evidence ?? {
             supported: false,
             count: 0,
@@ -798,19 +853,25 @@ try {
             maximumDurationMs: 0,
             entries: [],
             truncated: false,
+            ignoredBeforeWindow: 0,
           },
-          residency: api.sampleRendererResidency(),
         };
-        const measuredAfter = measuredBefore + Math.max(1, sample.atMs - windowStartAtMs);
+        verifierBoundaryOwnWorkSubstages.sampleAssemblyMs = performance.now() - substageStartedAt;
+        const measuredAfter = measuredBefore + Math.max(1, boundaryEnteredAtMs - windowStartAtMs);
         const reachedRequestedDuration = measuredAfter >= requestedDurationMs;
         let nextLiveWindowStart = null;
+        substageStartedAt = performance.now();
         if (reachedRequestedDuration) api.setRenderPaused(true);
         else nextLiveWindowStart = window.__PASS65_ENDURANCE_BEGIN_LIVE_WINDOW__({
           index: nextIndex,
           stress,
+          shedTargets,
           maximumLongTaskEntries,
           requireDrained: false,
         });
+        verifierBoundaryOwnWorkSubstages.nextWindowSetupMs = performance.now() - substageStartedAt;
+        sample.verifierBoundaryOwnWorkMs = performance.now() - verifierBoundaryStartedAt;
+        sample.verifierBoundaryOwnWorkSubstages = verifierBoundaryOwnWorkSubstages;
         return { sample, nextLiveWindowStart, reachedRequestedDuration };
       }, {
         measuredBefore: measuredLiveDurationMs,
@@ -822,6 +883,7 @@ try {
           smoke: enabledStress.has('smoke'),
           weapons: enabledStress.has('weapons'),
         },
+        shedTargets: arenaAdmissionAudit.shedTargets,
         maximumLongTaskEntries: maximumLiveLongTaskEntries,
       });
       const sample = boundary.sample;
@@ -841,10 +903,14 @@ try {
         || sample.weaponCatalog.prewarming
         || sample.weaponCatalog.unpreparedSwitches !== 0
         || sample.weaponCatalog.retainedCount > sample.weaponCatalog.maximumRetained
-        || sample.weaponCatalog.loaded > sample.weaponCatalog.maximumRetained) {
+        || sample.weaponCatalog.loaded > sample.weaponCatalog.maximumRetained
+        || !sample.liveLongTasks.supported
+        || sample.liveLongTasks.count !== 0
+        || sample.verifierBoundaryOwnWorkMs >= maximumVerifierOwnedTaskMs
+        || Math.max(0, ...Object.values(sample.verifierBoundaryOwnWorkSubstages)) >= maximumVerifierOwnedTaskMs) {
         throw new Error(`${arenaId} entered an invalid presentation state: ${JSON.stringify(sample)}`);
       }
-      // Every boundary snapshots the completed interval before the browser-side
+      // Every boundary samples the completed interval before the browser-side
       // controller atomically resets telemetry and starts the next one. No
       // screenshot, pause or Node-side gap is admitted into measured live time.
       const elapsedMs = Math.max(1, sample.atMs - liveWindowStart.atMs);
@@ -913,12 +979,18 @@ try {
         nextLiveWindowStart: boundary.nextLiveWindowStart,
         finalHeldFrontier: null,
         liveLongTasks: sample.liveLongTasks,
+        verifierBoundaryOwnWorkMs: sample.verifierBoundaryOwnWorkMs,
+        verifierBoundaryOwnWorkSubstages: sample.verifierBoundaryOwnWorkSubstages,
       };
       sampleIndex += 1;
       liveWindowStart = boundary.nextLiveWindowStart;
     }
     if (samples.length < 5 || measuredLiveDurationMs < durationMs) {
       throw new Error(`${arenaId} did not complete its requested measured live soak: ${JSON.stringify({ samples: samples.length, measuredLiveDurationMs, durationMs })}`);
+    }
+    const verifierBoundaryAudit = auditVerifierBoundaryOwnWork(samples);
+    if (!verifierBoundaryAudit.pass) {
+      throw new Error(`${arenaId} verifier boundary perturbed the measured live window: ${JSON.stringify(verifierBoundaryAudit)}`);
     }
     const finalLiveFrontier = await pauseAndDrainPresentation(page);
     const finalLiveHealth = await page.evaluate(() => {
@@ -956,6 +1028,7 @@ try {
       api.setBotsFrozen?.(false);
       api.setCaptureCameraPose(null);
       api.returnToMainMenu();
+      api.setRenderPaused(true);
     });
     await page.waitForFunction(() => {
       const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
@@ -1016,12 +1089,14 @@ try {
       killstreakStress,
       killstreakActivationProbe,
       activeStressBudget,
+      admissionRuntimeIdentity: arenaAdmissionAudit.runtimeIdentity,
       doorResetProbe,
       live: {
         requestedDurationMs: durationMs,
         measuredLiveDurationMs,
         actualDurationMs: measuredLiveDurationMs,
         sampleCount: samples.length,
+        verifierBoundaryAudit,
         first: samples[0],
         last: beforeReturn,
       },
@@ -1188,6 +1263,7 @@ try {
         api.setBotsFrozen?.(false);
         api.setCaptureCameraPose(null);
         api.returnToMainMenu();
+        api.setRenderPaused(true);
       });
       await page.waitForFunction(() => {
         const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
@@ -1248,17 +1324,14 @@ try {
     sourceRevision,
     browserExecutable: executablePath,
     browserVersion: browser.version(),
-    adapter: arenaReceipts[0]?.live?.first?.runtime ? {
-      label: arenaReceipts[0].live.first.runtime.adapterLabel,
-      adapterClass: arenaReceipts[0].live.first.runtime.adapterClass,
-      deviceClass: arenaReceipts[0].live.first.runtime.deviceClass,
-      softwareAdapter: arenaReceipts[0].live.first.runtime.softwareAdapter,
-    } : null,
+    adapter: arenaReceipts[0]?.admissionRuntimeIdentity ?? null,
     viewport: [2560, 1440],
     sampleIntervalMs,
     maximumLiveSubmissionGapMs,
     maximumLiveCompletionGapMs,
     maximumLivePendingMs,
+    maximumVerifierBoundaryP99Ms,
+    maximumVerifierOwnedTaskMs,
     requiredCaptureRecoveryCompletions,
     minimumCaptureRecoveryWindowMs,
     maximumCaptureRecoveryCompletionMs,
@@ -1296,8 +1369,19 @@ try {
   console.log(JSON.stringify(output, null, 2));
 } catch (error) {
   let state = null;
+  let failureResidency = null;
   try {
-    state = await page?.evaluate(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot() ?? null);
+    const failureAudit = await page?.evaluate(() => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      if (!api) return null;
+      api.setRenderPaused(true);
+      return {
+        state: api.snapshot(),
+        residency: api.sampleRendererResidency(),
+      };
+    });
+    state = failureAudit?.state ?? null;
+    failureResidency = failureAudit?.residency ?? null;
   } catch {
     // The renderer may have already failed closed; the browser errors remain evidence.
   }
@@ -1315,6 +1399,7 @@ try {
     error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : String(error),
     browserErrors: [...new Set(errors)],
     state,
+    failureResidency,
   };
   await writeFile(`${artifactRoot}/failure-receipt.json`, `${JSON.stringify(failure, null, 2)}\n`, 'utf8');
   if (captureEnabled && visualPhaseStarted) {

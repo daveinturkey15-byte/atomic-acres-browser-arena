@@ -233,6 +233,10 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('liveLongTaskEvidence.entries.length < maximumLongTaskEntries');
     expect(source).toContain('maximumLongTaskEntries: maximumLiveLongTaskEntries');
     expect(source).toContain('recordEntries(longTaskSample.observer.takeRecords())');
+    expect(source).toContain('sample.liveLongTasks.count !== 0');
+    expect(source).toContain('sample.verifierBoundaryOwnWorkMs >= maximumVerifierOwnedTaskMs');
+    expect(source).toContain('const verifierBoundaryAudit = auditVerifierBoundaryOwnWork(samples);');
+    expect(source).toContain('if (!verifierBoundaryAudit.pass)');
     expect(source).toContain('verifierCaptureRecovery: summarizeCaptureRecovery(capture.recovery)');
     expect(source).toContain("const skipDiagnosticCapture = process.env.PASS65_DIAGNOSTIC_SKIP_CAPTURE === '1';");
     expect(source).toContain('const captureEnabled = !diagnosticMode || !skipDiagnosticCapture;');
@@ -272,6 +276,9 @@ describe('presentation prewarm startup contract', () => {
     expect(liveLoop).not.toContain('page.screenshot');
     expect(liveLoop).not.toContain('captureCanvasOnly');
     expect(liveLoop).not.toContain('pauseAndDrainPresentation');
+    expect(liveLoop).not.toContain('api.snapshot()');
+    expect(liveLoop).not.toContain('api.sampleRendererResidency()');
+    expect(liveLoop).toContain('api.sampleEnduranceHealth()');
     expect(liveLoop).toContain('api.resetPresentationProgressWindow();');
     expect(liveLoop).toContain('presentation.progress.maximumSubmissionGapMs > maximumLiveSubmissionGapMs');
     expect(liveLoop).toContain('presentation.progress.maximumCompletionGapMs > maximumLiveCompletionGapMs');
@@ -279,6 +286,8 @@ describe('presentation prewarm startup contract', () => {
     expect(liveLoop).toContain('requireDrained: false');
     expect(liveLoop).toContain('measuredLiveDurationMs += elapsedMs;');
     expect(liveLoop).toContain('samples.push(receipt);');
+    expect(liveLoop).toContain('verifierBoundaryOwnWorkSubstages');
+    expect(liveLoop).toContain('sample.liveLongTasks.count !== 0');
 
     const liveGateIndex = source.indexOf('if (samples.length < 5 || measuredLiveDurationMs < durationMs)');
     const finalDrainIndex = source.indexOf('const finalLiveHeldFrontier = summarizeHeldFrontier');
@@ -331,6 +340,35 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('lastCompletedVisualEvidence = { tourIndex, arenaId, ...frame };');
     expect(source).toContain('visualEvidenceByArena,');
     expect(source).toContain('if (captureEnabled && visualPhaseStarted) {');
+  });
+
+  it('keeps continuous endurance telemetry allocation-light and isolates full audits behind pauses', () => {
+    const runtimeSource = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+    const enduranceHealth = runtimeSource.slice(
+      runtimeSource.indexOf('function sampleEnduranceHealth()'),
+      runtimeSource.indexOf('const debugWindow = window'),
+    );
+    expect(enduranceHealth).toContain('renderRuntime.healthTelemetry()');
+    expect(enduranceHealth).toContain('weaponView.browserCatalogHealth()');
+    expect(enduranceHealth).not.toContain('snapshot()');
+    expect(enduranceHealth).not.toContain('estimateRendererResidency');
+    expect(enduranceHealth).not.toContain('presentationState()');
+    expect(enduranceHealth).not.toContain('.traverse(');
+    expect(runtimeSource).toContain('sampleEnduranceHealth: () => ReturnType<typeof sampleEnduranceHealth>;');
+    expect(runtimeSource).toContain('sampleWeaponCatalogReadiness: () => weaponView.browserCatalogReadiness()');
+
+    const verifierSource = readFileSync(new URL('../scripts/qa/verify-pass65-webgpu-endurance.mjs', import.meta.url), 'utf8');
+    const admissionAudit = verifierSource.indexOf('const arenaAdmissionAudit = await page.evaluate');
+    const admissionPause = verifierSource.lastIndexOf('await pauseAndDrainPresentation(page);', admissionAudit);
+    expect(admissionPause).toBeGreaterThan(0);
+    expect(admissionPause).toBeLessThan(admissionAudit);
+    const liveLoop = verifierSource.slice(
+      verifierSource.indexOf('while (measuredLiveDurationMs < durationMs) {'),
+      verifierSource.indexOf('if (samples.length < 5 || measuredLiveDurationMs < durationMs)'),
+    );
+    expect(liveLoop).not.toContain('.snapshot()');
+    expect(liveLoop).not.toContain('sampleRendererResidency');
+    expect(verifierSource).toContain('api.setRenderPaused(true);\n      return {\n        state: api.snapshot(),\n        residency: api.sampleRendererResidency(),');
   });
 
   it('rejects degraded foreground cadence in the cold physical-menu gate', () => {
