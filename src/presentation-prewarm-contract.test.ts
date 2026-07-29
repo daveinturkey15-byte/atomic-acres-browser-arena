@@ -30,6 +30,15 @@ describe('presentation prewarm startup contract', () => {
     );
     expect(coldSettlement.indexOf('await flushWebGpuFrames(12_000);'))
       .toBeLessThan(coldSettlement.indexOf('submitWebGpuFrame(performance.now(), true);'));
+    const readbackStart = legacy.indexOf('readbackWebGpuFrame: async () => {');
+    const readback = legacy.slice(readbackStart, legacy.indexOf('sampleRendererResidency:', readbackStart));
+    expect(readback).toContain('const previousRenderPaused = debugRenderPaused;');
+    expect(readback.indexOf('debugRenderPaused = true;'))
+      .toBeLessThan(readback.indexOf('await flushWebGpuFrames();'));
+    expect(readback.indexOf('await flushWebGpuFrames();'))
+      .toBeLessThan(readback.indexOf('submitWebGpuFrame(performance.now(), true);'));
+    expect(readback).toContain('finally {');
+    expect(readback).toContain('debugRenderPaused = previousRenderPaused;');
   });
 
   it.each(presentationSources)('%s scopes shader compilation to its presentation root', (path) => {

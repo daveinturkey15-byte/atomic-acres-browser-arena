@@ -18966,19 +18966,28 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     if (renderRuntime.backend !== 'webgpu' || !pass64TslSystems) {
       throw new Error('WebGPU HDR readback is unavailable on the explicit WebGL compatibility route');
     }
-    await flushWebGpuFrames();
-    submitWebGpuFrame(performance.now(), true);
-    await flushWebGpuFrames();
-    const target = pass64TslSystems.principalHdrTarget;
-    const { x, y, width, height } = centeredReadbackRegion(target.width, target.height);
-    const pixels = await renderRuntime.readRenderTargetPixels(target, x, y, width, height);
-    const bytes = new Uint8Array(pixels.buffer, pixels.byteOffset, pixels.byteLength);
-    let hash = 0x811c9dc5;
-    for (const byte of bytes) {
-      hash ^= byte;
-      hash = Math.imul(hash, 0x01000193);
+    const previousRenderPaused = debugRenderPaused;
+    debugRenderPaused = true;
+    try {
+      // Keep live rAF admission paused across the complete drain-submit-drain
+      // boundary. A warmed frame admitted between the first drain and this
+      // forced readback submission would violate its required idle frontier.
+      await flushWebGpuFrames();
+      submitWebGpuFrame(performance.now(), true);
+      await flushWebGpuFrames();
+      const target = pass64TslSystems.principalHdrTarget;
+      const { x, y, width, height } = centeredReadbackRegion(target.width, target.height);
+      const pixels = await renderRuntime.readRenderTargetPixels(target, x, y, width, height);
+      const bytes = new Uint8Array(pixels.buffer, pixels.byteOffset, pixels.byteLength);
+      let hash = 0x811c9dc5;
+      for (const byte of bytes) {
+        hash ^= byte;
+        hash = Math.imul(hash, 0x01000193);
+      }
+      return { bytes: bytes.byteLength, hash: (hash >>> 0).toString(16).padStart(8, '0'), x, y, width, height };
+    } finally {
+      debugRenderPaused = previousRenderPaused;
     }
-    return { bytes: bytes.byteLength, hash: (hash >>> 0).toString(16).padStart(8, '0'), x, y, width, height };
   },
   sampleRendererResidency: estimateRendererResidency,
   sampleArenaPerformanceBudget,
