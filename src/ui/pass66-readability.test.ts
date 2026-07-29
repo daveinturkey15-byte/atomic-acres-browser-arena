@@ -23,6 +23,8 @@ describe('Pass 66 dense-surface readability contract', () => {
       '.kit-card',
       '.killstreak-slot-card',
       '#roster-list',
+      '#menu-panel-options .settings-section',
+      '#advanced-graphics .advanced-graphics-control',
     ]) expect(css).toContain(selector);
     expect(css).not.toContain('#hud *');
     expect(css).not.toContain('#support-block *');
@@ -33,5 +35,11 @@ describe('Pass 66 dense-surface readability contract', () => {
     expect(css).toContain('--pass66-copy: clamp(12px');
     expect(css).not.toMatch(/font-size:\s*[0-9](?:\.[0-9]+)?px/);
     expect(css).toMatch(/min-height:\s*42px/);
+  });
+
+  it('replaces the inherited grey Options wash with an explicit high-contrast instrument surface', () => {
+    expect(css).toContain('linear-gradient(140deg, rgba(8, 24, 29, 0.98), rgba(4, 12, 16, 0.99))');
+    expect(css).toContain('#menu-panel-options .audio-setting-row');
+    expect(css).toContain('color: #c4d8d7');
   });
 });

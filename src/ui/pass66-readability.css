@@ -156,6 +156,102 @@
 #roster-list strong,
 #roster-list small { font-size: var(--pass66-micro); }
 
+/* Options is intentionally a dark instrument surface inside the otherwise
+ * light command deck. The prior inherited translucent grey made its muted
+ * labels effectively disappear on the bright shell. */
+#menu-panel-options .options-heading span {
+  max-width: 62ch;
+  color: #526b70;
+  font-size: var(--pass66-copy);
+  line-height: 1.5;
+  letter-spacing: 0.025em;
+}
+
+#menu-panel-options > .settings-grid label {
+  color: #314b51;
+  font-size: var(--pass66-copy);
+  line-height: 1.25;
+}
+
+#menu-panel-options .settings-section {
+  margin-top: 16px;
+  padding: clamp(16px, 1.35vw, 22px);
+  border: 1px solid rgba(67, 207, 214, 0.25);
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 94% 2%, rgba(47, 216, 220, 0.09), transparent 32%),
+    linear-gradient(140deg, rgba(8, 24, 29, 0.98), rgba(4, 12, 16, 0.99));
+  box-shadow: 0 16px 34px rgba(7, 20, 24, 0.16), inset 0 1px rgba(222, 252, 249, 0.07);
+  color: #e7f5f3;
+}
+
+#menu-panel-options .settings-section > header {
+  align-items: center;
+  min-height: 28px;
+  color: #f4fbfa;
+  font-size: var(--pass66-label);
+  line-height: 1.2;
+}
+
+#menu-panel-options .settings-section > header span {
+  color: #72e4e0;
+  font-size: var(--pass66-micro);
+  line-height: 1.35;
+}
+
+#menu-panel-options .graphics-preset-row > label,
+#menu-panel-options .graphics-preset-row p,
+#menu-panel-options .privacy-setting-row p,
+#menu-panel-options .audio-setting-row {
+  color: #c4d8d7;
+  font-size: var(--pass66-copy);
+  line-height: 1.5;
+}
+
+#menu-panel-options .audio-settings-grid {
+  gap: 12px 20px;
+  margin-top: 16px;
+}
+
+#menu-panel-options .audio-setting-row {
+  grid-template-columns: minmax(104px, auto) minmax(120px, 1fr) auto auto;
+  min-height: 36px;
+  letter-spacing: 0.055em;
+}
+
+#menu-panel-options .audio-setting-row small { color: #91aaa9; font-size: var(--pass66-micro); }
+#menu-panel-options .advanced-settings {
+  border-color: rgba(99, 229, 226, 0.24);
+  background: rgba(232, 250, 247, 0.055);
+}
+#menu-panel-options .advanced-settings summary { color: #eefaf8; font-size: var(--pass66-label); }
+#menu-panel-options .advanced-settings summary small { color: #72e4e0; font-size: var(--pass66-micro); }
+#menu-panel-options .privacy-setting-row {
+  border-color: rgba(99, 229, 226, 0.18);
+  background: rgba(237, 251, 248, 0.055);
+}
+#menu-panel-options .privacy-setting-row .setting-check { color: #eefaf8; font-size: var(--pass66-copy); }
+#menu-panel-options .controls { font-size: var(--pass66-copy); line-height: 1.7; }
+#menu-panel-options .legal { color: #60797c; font-size: var(--pass66-micro); line-height: 1.5; }
+
+#advanced-graphics .advanced-graphics-category {
+  border-color: rgba(99, 229, 226, 0.22);
+  background: rgba(235, 250, 247, 0.055);
+}
+#advanced-graphics .advanced-graphics-category > header b { font-size: var(--pass66-label); }
+#advanced-graphics .advanced-graphics-category > header small { font-size: var(--pass66-micro); }
+#advanced-graphics .advanced-graphics-control,
+#advanced-graphics .advanced-graphics-unavailable {
+  min-height: 74px;
+  border-color: rgba(99, 229, 226, 0.2);
+  background: rgba(244, 253, 251, 0.08);
+}
+#advanced-graphics .advanced-graphics-control > span:first-child,
+#advanced-graphics .advanced-graphics-unavailable > span { font-size: var(--pass66-copy); }
+#advanced-graphics .advanced-graphics-control > small,
+#advanced-graphics .advanced-graphics-unavailable > small,
+#advanced-graphics .advanced-graphics-range output { font-size: var(--pass66-micro); }
+
 @media (max-width: 700px) {
   :root {
     --pass66-micro: 10px;
@@ -171,4 +267,6 @@
   .project-map-header strong,
   #changelog-panel .changelog-header strong { font-size: 30px; }
   .lobby-player { min-height: 58px; }
+  #menu-panel-options .audio-settings-grid { grid-template-columns: 1fr; }
+  #menu-panel-options .audio-setting-row { grid-template-columns: minmax(88px, auto) minmax(100px, 1fr) auto auto; }
 }
