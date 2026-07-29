@@ -7,6 +7,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  analyzeRenderedCoverCues,
   associatePurpleOperator,
   createPurpleTargetTracker,
   findCoralTargets,
@@ -247,6 +248,7 @@ async function createVisionCapture(context, page, options = {}) {
     const targets = findCoralTargets(data, info.width, info.height, info.channels);
     const operatorTargets = findPurpleOperatorCandidates(data, info.width, info.height, info.channels, options.operatorDetectionOptions ?? {});
     const minimapThreats = findMinimapThreats(data, info.width, info.height, info.channels);
+    const renderedCoverCues = analyzeRenderedCoverCues(data, info.width, info.height, info.channels);
     const decodeMs = performance.now() - decodeStartedAt;
     const decodedAt = performance.now();
     const captureMs = Math.max(0, packet.receivedAt - captureStartedAt);
@@ -263,6 +265,7 @@ async function createVisionCapture(context, page, options = {}) {
       targets,
       operatorTargets,
       minimapThreats,
+      renderedCoverCues,
       operatorPaletteRatio: Number(operatorTargets.paletteRatio ?? 0),
       operatorRejectedReason: operatorTargets.rejectedReason ?? null,
       signature: frameSignature(data, info.width, info.height, info.channels),
@@ -562,6 +565,18 @@ async function run() {
   const retreatReturnFireMinimumHealth = integerArg(args['retreat-return-fire-min-health'], 30, 1, 100);
   const contactSearchAfterMs = integerArg(args['contact-search-after'], 0, 0, 120_000);
   const contactSearchTurn = integerArg(args['contact-search-turn'], 24, 0, 60);
+  const renderedCover = args['rendered-cover'] === 'true';
+  const coverProbeDurationMs = integerArg(args['cover-probe-duration'], 900, 200, 5_000);
+  const coverOcclusionConfirmMs = integerArg(args['cover-occlusion-confirm'], 350, 100, 3_000);
+  const coverDamageQuietMs = integerArg(args['cover-damage-quiet'], 500, 150, 5_000);
+  const coverHoldDurationMs = integerArg(args['cover-hold-duration'], 1_200, 250, 10_000);
+  const coverPeekDurationMs = integerArg(args['cover-peek-duration'], 500, 150, 3_000);
+  const coverReturnDurationMs = integerArg(args['cover-return-duration'], 450, 150, 3_000);
+  const coverMaximumProbeReversals = integerArg(args['cover-max-probe-reversals'], 1, 0, 3);
+  const coverMaximumPeekCycles = integerArg(args['cover-max-peek-cycles'], 3, 1, 10);
+  const coverMaximumActiveMs = integerArg(args['cover-max-active'], 15_000, 2_000, 60_000);
+  const coverMinimumHealth = integerArg(args['cover-min-health'], 24, 1, 100);
+  const coverCueMargin = numberArg(args['cover-cue-margin'], 0.015, 0, 1);
   const fireMinimumTargetPixels = integerArg(args['fire-min-target-pixels'], 0, 0, 500);
   const fireMinimumTargetArea = integerArg(args['fire-min-target-area'], 0, 0, 5_000);
   const fireMinimumTargetHeight = integerArg(args['fire-min-target-height'], 0, 0, 100);
@@ -595,6 +610,7 @@ async function run() {
   let finalSnapshot = null;
   let firstRawTargetCaptured = false;
   let firstTargetCaptured = false;
+  let firstCoverAcquisitionCaptured = false;
   let firstTwoFrameAlignedCaptured = false;
   let firstFireCaptured = false;
   let firstFireVision = null;
@@ -815,6 +831,18 @@ async function run() {
           retreatReturnFireMinimumHealth,
           contactSearchAfterMs,
           contactSearchTurn,
+          renderedCover,
+          coverProbeDurationMs,
+          coverOcclusionConfirmMs,
+          coverDamageQuietMs,
+          coverHoldDurationMs,
+          coverPeekDurationMs,
+          coverReturnDurationMs,
+          coverMaximumProbeReversals,
+          coverMaximumPeekCycles,
+          coverMaximumActiveMs,
+          coverMinimumHealth,
+          coverCueMargin,
           bankLeadMinimumKills,
           bankLeadMinimumMargin,
           killAnchorDurationMs,
@@ -1002,7 +1030,11 @@ async function run() {
           damageDelta,
           stuck: !rawTarget && lowMotionFrames >= 3,
           currentTarget: Boolean(currentTarget),
+          currentTargetDetails: currentTarget,
           rawTarget: Boolean(rawTarget),
+          rawTargetDetails: rawTarget,
+          renderedCoverCues: vision.renderedCoverCues,
+          frameWidth: vision.width,
           holdEngagement,
           minimapThreat,
           lastShotAt: lastBurstAt,
@@ -1019,6 +1051,20 @@ async function run() {
             visibleKillDelta: tactical.anchorEvent.visibleKillDelta,
             expiresAt: tactical.anchorEvent.expiresAt,
           });
+        }
+        if (tactical?.coverEvent) {
+          actions.push({
+            atMs,
+            kind: `rendered-cover-${tactical.coverEvent.kind}`,
+            ...tactical.coverEvent,
+            health: hud?.health ?? null,
+            target: currentTarget ?? rawTarget ?? null,
+            coverCues: vision.renderedCoverCues,
+          });
+          if (tactical.coverEvent.kind === 'acquire' && !firstCoverAcquisitionCaptured) {
+            await writeFile(resolve(artifactDirectory, 'first-cover-acquisition.jpg'), vision.jpeg);
+            firstCoverAcquisitionCaptured = true;
+          }
         }
         if (tactical?.changed) {
           actions.push({
@@ -1572,6 +1618,18 @@ async function run() {
         retreatReturnFireMinimumHealth,
         contactSearchAfterMs,
         contactSearchTurn,
+        renderedCover,
+        coverProbeDurationMs,
+        coverOcclusionConfirmMs,
+        coverDamageQuietMs,
+        coverHoldDurationMs,
+        coverPeekDurationMs,
+        coverReturnDurationMs,
+        coverMaximumProbeReversals,
+        coverMaximumPeekCycles,
+        coverMaximumActiveMs,
+        coverMinimumHealth,
+        coverCueMargin,
         fireMinimumTargetPixels,
         fireMinimumTargetArea,
         fireMinimumTargetHeight,
@@ -1670,6 +1728,21 @@ async function run() {
         quickDeathCooldownFrames: tacticalPolicyReceipt?.quickDeathCooldownFrames ?? 0,
         retreatReturnFireFrames: tacticalPolicyReceipt?.retreatReturnFireFrames ?? 0,
         contactSearchFrames: tacticalPolicyReceipt?.contactSearchFrames ?? 0,
+        renderedCoverActivations: tacticalPolicyReceipt?.renderedCover?.activations ?? 0,
+        renderedCoverAcquisitions: tacticalPolicyReceipt?.renderedCover?.acquisitions ?? 0,
+        renderedCoverProbeReversals: tacticalPolicyReceipt?.renderedCover?.probeReversals ?? 0,
+        renderedCoverAborts: tacticalPolicyReceipt?.renderedCover?.aborts ?? 0,
+        renderedCoverProbeFrames: tacticalPolicyReceipt?.renderedCover?.probeFrames ?? 0,
+        renderedCoverOcclusionFrames: tacticalPolicyReceipt?.renderedCover?.occlusionFrames ?? 0,
+        renderedCoverHoldFrames: tacticalPolicyReceipt?.renderedCover?.holdFrames ?? 0,
+        renderedCoverPeekFrames: tacticalPolicyReceipt?.renderedCover?.peekFrames ?? 0,
+        renderedCoverReturnFrames: tacticalPolicyReceipt?.renderedCover?.returnFrames ?? 0,
+        renderedCoverConfirmedPeekFrames: tacticalPolicyReceipt?.renderedCover?.confirmedPeekFrames ?? 0,
+        renderedCoverCueChosenDirections: tacticalPolicyReceipt?.renderedCover?.cueChosenDirections ?? 0,
+        renderedCoverTargetAwayDirections: tacticalPolicyReceipt?.renderedCover?.targetAwayDirections ?? 0,
+        renderedCoverMeanLeftCue: tacticalPolicyReceipt?.renderedCover?.meanLeftCue ?? 0,
+        renderedCoverMeanRightCue: tacticalPolicyReceipt?.renderedCover?.meanRightCue ?? 0,
+        firstCoverAcquisitionCaptured,
         exposureGateSuppressions,
         exposurePixelSuppressions,
         exposureAreaSuppressions,

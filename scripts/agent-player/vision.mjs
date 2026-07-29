@@ -753,6 +753,66 @@ export function createOperatorTargetTracker(options = {}) {
   };
 }
 
+export function analyzeRenderedCoverCues(raw, width, height, channels = 3, options = {}) {
+  if (!raw || raw.length < width * height * channels) throw new Error('Vision frame is smaller than its declared dimensions');
+  const minimumY = Math.max(1, Math.floor(height * (options.minimumYRatio ?? 0.30)));
+  const maximumY = Math.min(height - 2, Math.ceil(height * (options.maximumYRatio ?? 0.68)));
+  const threshold = Math.max(1, Number(options.edgeThreshold ?? 32));
+  const stride = Math.max(1, Math.round(Number(options.stride ?? 2)));
+  const exclusions = options.exclusions ?? [
+    { minimumXRatio: 0, maximumXRatio: 0.39, minimumYRatio: 0, maximumYRatio: 1 },
+    { minimumXRatio: 0.78, maximumXRatio: 1, minimumYRatio: 0, maximumYRatio: 1 },
+  ];
+  const luminance = (x, y) => {
+    const offset = (y * width + x) * channels;
+    return raw[offset] * 0.299 + raw[offset + 1] * 0.587 + raw[offset + 2] * 0.114;
+  };
+  const scoreZone = (minimumXRatio, maximumXRatio) => {
+    const minimumX = Math.max(1, Math.floor(width * minimumXRatio));
+    const maximumX = Math.min(width - 2, Math.ceil(width * maximumXRatio));
+    let samples = 0;
+    let strongEdges = 0;
+    let edgeEnergy = 0;
+    const columnHits = new Map();
+    for (let y = minimumY; y <= maximumY; y += stride) {
+      const lowerWeight = 0.65 + 0.35 * (y - minimumY) / Math.max(1, maximumY - minimumY);
+      for (let x = minimumX; x <= maximumX; x += stride) {
+        const excluded = exclusions.some((region) => x / width >= region.minimumXRatio
+          && x / width <= region.maximumXRatio
+          && y / height >= region.minimumYRatio
+          && y / height <= region.maximumYRatio);
+        if (excluded) continue;
+        const gradient = Math.abs(luminance(x + 1, y) - luminance(x - 1, y));
+        samples += 1;
+        if (gradient < threshold) continue;
+        strongEdges += 1;
+        edgeEnergy += Math.min(1, (gradient - threshold) / Math.max(1, 255 - threshold)) * lowerWeight;
+        columnHits.set(x, (columnHits.get(x) ?? 0) + 1);
+      }
+    }
+    const rows = Math.max(1, Math.floor((maximumY - minimumY) / stride) + 1);
+    const strongestColumn = Math.max(0, ...columnHits.values()) / rows;
+    const edgeDensity = strongEdges / Math.max(1, samples);
+    const normalizedEnergy = edgeEnergy / Math.max(1, samples);
+    return {
+      score: Math.min(1, edgeDensity * 2.4 + normalizedEnergy * 1.8 + strongestColumn * 0.55),
+      edgeDensity,
+      edgeEnergy: normalizedEnergy,
+      verticalContinuity: strongestColumn,
+      samples,
+    };
+  };
+  const left = scoreZone(options.leftMinimumXRatio ?? 0.28, options.leftMaximumXRatio ?? 0.49);
+  const right = scoreZone(options.rightMinimumXRatio ?? 0.51, options.rightMaximumXRatio ?? 0.82);
+  return {
+    detector: 'rendered-cover-edge-cues-v1',
+    left,
+    right,
+    preferredDirection: right.score === left.score ? 0 : right.score > left.score ? 1 : -1,
+    scoreMargin: Math.abs(right.score - left.score),
+  };
+}
+
 export function frameSignature(raw, width, height, channels = 3, options = {}) {
   const columns = Math.max(4, Math.floor(options.columns ?? 16));
   const rows = Math.max(3, Math.floor(options.rows ?? 9));

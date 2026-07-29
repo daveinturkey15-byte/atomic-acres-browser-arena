@@ -145,6 +145,44 @@ test('opt-in respawn escape leaves the initial life unchanged and reverse-sprint
   assert.equal(expired.reason, 'roam-clear');
 });
 
+test('rendered cover overrides scalar retreat only after damage and preserves visible receipts', () => {
+  const policy = createTacticalPolicy({
+    renderedCover: true,
+    coverProbeDurationMs: 1000,
+    coverOcclusionConfirmMs: 300,
+    coverDamageQuietMs: 400,
+    coverHoldDurationMs: 700,
+  });
+  const targetDetails = { x: 80, pixels: 40, bounds: { width: 8, height: 12 } };
+  const coverCues = { left: { score: 0.03 }, right: { score: 0.20 } };
+  const probe = policy.update({
+    now: 100,
+    active: true,
+    health: 88,
+    healthFresh: true,
+    movementCycle: 0,
+    damageDelta: 12,
+    currentTarget: true,
+    currentTargetDetails: targetDetails,
+    rawTarget: true,
+    rawTargetDetails: targetDetails,
+    renderedCoverCues: coverCues,
+    frameWidth: 320,
+  });
+  assert.equal(probe.mode, 'cover-probe');
+  assert.deepEqual(probe.keys, ['KeyD', 'ShiftLeft']);
+  assert.equal(probe.coverEvent.kind, 'activate');
+
+  policy.update({ now: 300, active: true, health: 88, healthFresh: true, movementCycle: 1, renderedCoverCues: coverCues, frameWidth: 320 });
+  const hold = policy.update({ now: 700, active: true, health: 88, healthFresh: true, movementCycle: 2, renderedCoverCues: coverCues, frameWidth: 320 });
+  assert.equal(hold.mode, 'cover-hold');
+  assert.equal(hold.allowScan, false);
+  assert.equal(hold.coverEvent.kind, 'acquire');
+  const receipt = policy.snapshot().renderedCover;
+  assert.equal(receipt.activations, 1);
+  assert.equal(receipt.acquisitions, 1);
+});
+
 test('quick-death receipts lengthen escape and hold a safe cooldown before re-entry', () => {
   const policy = createTacticalPolicy({
     respawnEscapeDurationMs: 1000,

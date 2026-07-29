@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  analyzeRenderedCoverCues,
   associatePurpleOperator,
   createOperatorTargetTracker,
   createPurpleTargetTracker,
@@ -229,6 +230,38 @@ test('operator tracker authorises a changing candidate only after settling and r
   assert.equal(result.reason, 'operator-motion-confirmed');
   assert.equal(result.fireAuthorized, true);
   assert.equal(result.confirmedTarget.x, 52);
+});
+
+test('rendered cover cues prefer the lane with a continuous nearby vertical edge', () => {
+  const width = 120;
+  const height = 80;
+  const raw = frame(width, height);
+  // A bright, tall right-side wall edge produces both strong energy and continuity.
+  paint(raw, width, 88, 22, 91, 68, [225, 225, 225]);
+  const cues = analyzeRenderedCoverCues(raw, width, height, 3, { stride: 1 });
+  assert.equal(cues.detector, 'rendered-cover-edge-cues-v1');
+  assert.ok(cues.right.score > cues.left.score);
+  assert.equal(cues.preferredDirection, 1);
+  assert.ok(cues.right.verticalContinuity > 0.5);
+});
+
+test('cover cues ignore persistent left and right HUD columns', () => {
+  const width = 120;
+  const height = 80;
+  const raw = frame(width, height);
+  paint(raw, width, 4, 20, 40, 68, [230, 230, 230]);
+  paint(raw, width, 96, 20, 118, 68, [230, 230, 230]);
+  const cues = analyzeRenderedCoverCues(raw, width, height, 3, { stride: 1 });
+  assert.equal(cues.left.score, 0);
+  assert.equal(cues.right.score, 0);
+});
+
+test('uniform rendered lanes produce no cover preference', () => {
+  const raw = frame(120, 80);
+  const cues = analyzeRenderedCoverCues(raw, 120, 80, 3);
+  assert.equal(cues.left.score, 0);
+  assert.equal(cues.right.score, 0);
+  assert.equal(cues.preferredDirection, 0);
 });
 
 test('frame signatures detect visual motion without exposing world state', () => {

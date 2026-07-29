@@ -47,6 +47,11 @@ test('combat benchmark separates bots, practice targets, survival and control me
       respawnEscapeActivations: 3, respawnEscapeFrames: 27, respawnReentryFrames: 19,
       lastLifeDurationMs: 12_500, quickDeathStreak: 2, quickDeathReceipts: 4, quickDeathCooldownFrames: 29,
       retreatReturnFireFrames: 11, contactSearchFrames: 17,
+      renderedCoverActivations: 5, renderedCoverAcquisitions: 3, renderedCoverProbeReversals: 2, renderedCoverAborts: 1,
+      renderedCoverProbeFrames: 31, renderedCoverOcclusionFrames: 13, renderedCoverHoldFrames: 23,
+      renderedCoverPeekFrames: 7, renderedCoverReturnFrames: 9, renderedCoverConfirmedPeekFrames: 2,
+      renderedCoverCueChosenDirections: 4, renderedCoverTargetAwayDirections: 1,
+      renderedCoverMeanLeftCue: 0.12, renderedCoverMeanRightCue: 0.27, firstCoverAcquisitionCaptured: true,
       exposureGateSuppressions: 6, exposurePixelSuppressions: 5, exposureAreaSuppressions: 4, exposureHeightSuppressions: 3,
       configuredMaxHoldMs: 2_000, releasedAtEnd: true, holdWatchdogExceeded: false,
     },
@@ -82,6 +87,13 @@ test('combat benchmark separates bots, practice targets, survival and control me
   assert.equal(result.control.quickDeathCooldownFrames, 29);
   assert.equal(result.control.retreatReturnFireFrames, 11);
   assert.equal(result.control.contactSearchFrames, 17);
+  assert.equal(result.control.renderedCoverActivations, 5);
+  assert.equal(result.control.renderedCoverAcquisitions, 3);
+  assert.equal(result.control.renderedCoverProbeReversals, 2);
+  assert.equal(result.control.renderedCoverAborts, 1);
+  assert.equal(result.control.renderedCoverConfirmedPeekFrames, 2);
+  assert.equal(result.control.renderedCoverMeanRightCue, 0.27);
+  assert.equal(result.control.firstCoverAcquisitionCaptured, true);
   assert.equal(result.control.exposureGateSuppressions, 6);
   assert.equal(result.control.exposurePixelSuppressions, 5);
   assert.equal(result.control.exposureAreaSuppressions, 4);

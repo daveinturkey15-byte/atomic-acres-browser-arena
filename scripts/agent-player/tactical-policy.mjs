@@ -1,3 +1,5 @@
+import { createRenderedCoverController } from './rendered-cover-controller.mjs';
+
 const clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, value));
 
 export function createTacticalPolicy(options = {}) {
@@ -29,7 +31,33 @@ export function createTacticalPolicy(options = {}) {
     killAnchorDurationMs: Number(options.killAnchorDurationMs ?? 0),
     rawTargetObserveDurationMs: Number(options.rawTargetObserveDurationMs ?? 0),
     rawTargetObserveResetMs: Number(options.rawTargetObserveResetMs ?? 1_500),
+    renderedCover: options.renderedCover === true,
+    coverProbeDurationMs: Math.max(200, Number(options.coverProbeDurationMs ?? 900)),
+    coverOcclusionConfirmMs: Math.max(100, Number(options.coverOcclusionConfirmMs ?? 350)),
+    coverDamageQuietMs: Math.max(150, Number(options.coverDamageQuietMs ?? 500)),
+    coverHoldDurationMs: Math.max(250, Number(options.coverHoldDurationMs ?? 1_200)),
+    coverPeekDurationMs: Math.max(150, Number(options.coverPeekDurationMs ?? 500)),
+    coverReturnDurationMs: Math.max(150, Number(options.coverReturnDurationMs ?? 450)),
+    coverMaximumProbeReversals: Math.max(0, Number(options.coverMaximumProbeReversals ?? 1)),
+    coverMaximumPeekCycles: Math.max(1, Number(options.coverMaximumPeekCycles ?? 3)),
+    coverMaximumActiveMs: Math.max(2_000, Number(options.coverMaximumActiveMs ?? 15_000)),
+    coverMinimumHealth: Math.max(1, Number(options.coverMinimumHealth ?? 24)),
+    coverCueMargin: Math.max(0, Number(options.coverCueMargin ?? 0.015)),
   };
+  const coverController = createRenderedCoverController({
+    enabled: config.renderedCover,
+    probeDurationMs: config.coverProbeDurationMs,
+    occlusionConfirmMs: config.coverOcclusionConfirmMs,
+    damageQuietMs: config.coverDamageQuietMs,
+    holdDurationMs: config.coverHoldDurationMs,
+    peekDurationMs: config.coverPeekDurationMs,
+    returnDurationMs: config.coverReturnDurationMs,
+    maximumProbeReversals: config.coverMaximumProbeReversals,
+    maximumPeekCycles: config.coverMaximumPeekCycles,
+    maximumActiveMs: config.coverMaximumActiveMs,
+    minimumHealth: config.coverMinimumHealth,
+    cueMargin: config.coverCueMargin,
+  });
   const state = {
     mode: 'roam',
     enteredAt: 0,
@@ -184,6 +212,16 @@ export function createTacticalPolicy(options = {}) {
         state.quickDeathCooldownUntil = 0;
         state.respawnReentryUntil = 0;
       }
+      const coverDecision = coverController.update({
+        now,
+        active: observation.active && healthValid && health > 0,
+        health,
+        damageDelta,
+        target: observation.currentTargetDetails ?? observation.rawTargetDetails ?? null,
+        confirmedTarget: Boolean(observation.currentTarget),
+        coverCues: observation.renderedCoverCues,
+        width: observation.frameWidth,
+      });
       if (observation.active && damageDelta > 0) {
         if (now - state.damageWindowStartedAt > config.damageWindowMs) {
           state.damageWindowStartedAt = now;
@@ -191,7 +229,7 @@ export function createTacticalPolicy(options = {}) {
         }
         state.damageWindowAmount += damageDelta;
         state.lastDamageAt = now;
-        if (health < config.retreatHealth || state.damageWindowAmount >= config.retreatDamage) {
+        if (!coverDecision.active && (health < config.retreatHealth || state.damageWindowAmount >= config.retreatDamage)) {
           if (state.mode !== 'retreat') {
             const bearing = Number(observation.minimapThreat?.bearingRadians);
             state.direction = config.threatAwareRetreatDirection && Number.isFinite(bearing) && Math.abs(bearing) > 0.08
@@ -216,6 +254,9 @@ export function createTacticalPolicy(options = {}) {
       } else if (now < state.respawnEscapeUntil) {
         nextMode = 'retreat';
         reason = 'respawn-escape';
+      } else if (coverDecision.active) {
+        nextMode = coverDecision.mode;
+        reason = coverDecision.reason;
       } else if (now < state.retreatUntil) {
         nextMode = 'retreat';
         reason = health < config.retreatHealth ? 'low-health' : 'damage-burst';
@@ -259,7 +300,7 @@ export function createTacticalPolicy(options = {}) {
         reason = 'contact-search-sweep';
       }
       const changed = transition(nextMode, now, reason);
-      state.modeFrames[nextMode] += 1;
+      state.modeFrames[nextMode] = (state.modeFrames[nextMode] ?? 0) + 1;
       if (reason === 'low-health-evasion') state.lowHealthEvasionFrames += 1;
       if (reason === 'respawn-escape') state.respawnEscapeFrames += 1;
       if (reason === 'respawn-reentry') state.respawnReentryFrames += 1;
@@ -281,7 +322,9 @@ export function createTacticalPolicy(options = {}) {
       const keys = [];
       let turn = 0;
       if (observation.active) {
-        if (nextMode === 'retreat') {
+        if (coverDecision.active && nextMode.startsWith('cover-')) {
+          keys.push(...coverDecision.keys);
+        } else if (nextMode === 'retreat') {
           keys.push('KeyS', state.direction > 0 ? 'KeyD' : 'KeyA', 'ShiftLeft');
           if (observation.navigationTick) turn = state.direction * 16;
         } else if (nextMode === 'recover') {
@@ -349,13 +392,16 @@ export function createTacticalPolicy(options = {}) {
         changed,
         keys: [...new Set(keys)],
         turn: clamp(turn, -100, 100),
-        allowEngagement: nextMode === 'engage' || retreatReturnFire,
-        allowScan: nextMode === 'roam' || nextMode === 'engage' || nextMode === 'bank' || nextMode === 'anchor' || retreatReturnFire,
+        allowEngagement: nextMode === 'engage' || retreatReturnFire || (coverDecision.active && Boolean(observation.currentTarget)),
+        allowScan: coverDecision.active
+          ? coverDecision.allowScan
+          : nextMode === 'roam' || nextMode === 'engage' || nextMode === 'bank' || nextMode === 'anchor' || retreatReturnFire,
         damageWindowAmount: state.damageWindowAmount,
-        direction: state.direction,
+        direction: coverDecision.active ? coverDecision.direction : state.direction,
         leadBankActive: state.leadBankActive,
         killAnchorActive,
         anchorEvent,
+        coverEvent: coverDecision.event,
       };
     },
     snapshot() {
@@ -381,6 +427,7 @@ export function createTacticalPolicy(options = {}) {
         quickDeathCooldownFrames: state.quickDeathCooldownFrames,
         retreatReturnFireFrames: state.retreatReturnFireFrames,
         contactSearchFrames: state.contactSearchFrames,
+        renderedCover: coverController.snapshot(),
         config: { ...config },
       };
     },

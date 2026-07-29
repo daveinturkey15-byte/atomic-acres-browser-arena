@@ -10,6 +10,11 @@ function optionalNumeric(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function optionalBoolean(value) {
+  if (value === null || value === undefined || value === '') return null;
+  return Boolean(value);
+}
+
 function numeric(value) {
   return optionalNumeric(value) ?? 0;
 }
@@ -231,6 +236,21 @@ export function analyseCombat(summary, driverReport, callsign = 'Jigglyclaw') {
       quickDeathCooldownFrames: optionalNumeric(driverReport?.input?.quickDeathCooldownFrames),
       retreatReturnFireFrames: optionalNumeric(driverReport?.input?.retreatReturnFireFrames),
       contactSearchFrames: optionalNumeric(driverReport?.input?.contactSearchFrames),
+      renderedCoverActivations: optionalNumeric(driverReport?.input?.renderedCoverActivations),
+      renderedCoverAcquisitions: optionalNumeric(driverReport?.input?.renderedCoverAcquisitions),
+      renderedCoverProbeReversals: optionalNumeric(driverReport?.input?.renderedCoverProbeReversals),
+      renderedCoverAborts: optionalNumeric(driverReport?.input?.renderedCoverAborts),
+      renderedCoverProbeFrames: optionalNumeric(driverReport?.input?.renderedCoverProbeFrames),
+      renderedCoverOcclusionFrames: optionalNumeric(driverReport?.input?.renderedCoverOcclusionFrames),
+      renderedCoverHoldFrames: optionalNumeric(driverReport?.input?.renderedCoverHoldFrames),
+      renderedCoverPeekFrames: optionalNumeric(driverReport?.input?.renderedCoverPeekFrames),
+      renderedCoverReturnFrames: optionalNumeric(driverReport?.input?.renderedCoverReturnFrames),
+      renderedCoverConfirmedPeekFrames: optionalNumeric(driverReport?.input?.renderedCoverConfirmedPeekFrames),
+      renderedCoverCueChosenDirections: optionalNumeric(driverReport?.input?.renderedCoverCueChosenDirections),
+      renderedCoverTargetAwayDirections: optionalNumeric(driverReport?.input?.renderedCoverTargetAwayDirections),
+      renderedCoverMeanLeftCue: optionalNumeric(driverReport?.input?.renderedCoverMeanLeftCue),
+      renderedCoverMeanRightCue: optionalNumeric(driverReport?.input?.renderedCoverMeanRightCue),
+      firstCoverAcquisitionCaptured: optionalBoolean(driverReport?.input?.firstCoverAcquisitionCaptured),
       exposureGateSuppressions: optionalNumeric(driverReport?.input?.exposureGateSuppressions),
       exposurePixelSuppressions: optionalNumeric(driverReport?.input?.exposurePixelSuppressions),
       exposureAreaSuppressions: optionalNumeric(driverReport?.input?.exposureAreaSuppressions),
