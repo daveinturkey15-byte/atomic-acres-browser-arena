@@ -844,6 +844,34 @@ describe('additional authored maps', () => {
     expect((magenta.material as THREE.MeshStandardMaterial).emissiveIntensity).toBeGreaterThan(1);
   });
 
+  it('provides UVs for every textured Terminal mesh, including both authored wing prisms', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const missingUv: string[] = [];
+    const texturedProperties = [
+      'map', 'alphaMap', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'lightMap', 'emissiveMap',
+    ] as const;
+    map.root.traverse((node) => {
+      if (!(node instanceof THREE.Mesh)) return;
+      const materials = Array.isArray(node.material) ? node.material : [node.material];
+      const textured = materials.some((material) => texturedProperties.some(
+        (property) => (material as THREE.Material & Record<string, unknown>)[property] instanceof THREE.Texture,
+      ));
+      if (textured && !node.geometry.getAttribute('uv')) missingUv.push(node.name || node.uuid);
+    });
+    expect(missingUv).toEqual([]);
+
+    for (const name of ['skyline-quality-wing-port', 'skyline-quality-wing-starboard']) {
+      const wing = map.root.getObjectByName(name) as THREE.Mesh;
+      const position = wing.geometry.getAttribute('position');
+      const uv = wing.geometry.getAttribute('uv');
+      expect(uv.itemSize, name).toBe(2);
+      expect(uv.count, name).toBe(position.count);
+      expect(Array.from(uv.array), name).toSatisfy((values: number[]) => (
+        values.every((value) => Number.isFinite(value) && value >= 0 && value <= 1)
+      ));
+    }
+  });
+
   it('keeps six breakable facade panes independent from the added mullion frames', () => {
     const map = buildSkylineTerminal(new THREE.Scene());
     expect(map.breakableWindows.map((window) => window.id)).toEqual([

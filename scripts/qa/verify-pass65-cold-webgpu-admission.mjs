@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
+import { isFatalWebGpuConsoleWarning } from './pass65-browser-console-contract.ts';
 
 const port = Number(process.env.PASS65_COLD_ADMISSION_PORT ?? '44175');
 const requestedTrials = Number(process.env.PASS65_COLD_ADMISSION_TRIALS ?? '3');
@@ -69,7 +70,12 @@ try {
       const page = await context.newPage();
       const errors = [];
       page.on('pageerror', (error) => errors.push(error.message));
-      page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
+      page.on('console', (message) => {
+        if (message.type() === 'error'
+          || message.type() === 'warning' && isFatalWebGpuConsoleWarning(message.text())) {
+          errors.push(message.text());
+        }
+      });
       await stubExternalServices(page);
 
       await page.goto(`http://127.0.0.1:${port}/?release=latest&renderer=webgpu&render=blender&map=atomic-acres&seed=${65_100 + trial}`);

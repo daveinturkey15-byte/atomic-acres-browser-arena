@@ -4,6 +4,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
+import { isFatalWebGpuConsoleWarning } from './pass65-browser-console-contract.ts';
 
 const port = Number(process.env.PASS65_ENDURANCE_PORT ?? '44075');
 const sampleIntervalMs = Math.max(500, Number(process.env.PASS65_SAMPLE_INTERVAL_MS ?? '1000'));
@@ -353,7 +354,10 @@ try {
   });
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
-    if (message.type() === 'error') errors.push(message.text());
+    if (message.type() === 'error'
+      || message.type() === 'warning' && isFatalWebGpuConsoleWarning(message.text())) {
+      errors.push(message.text());
+    }
   });
   await page.goto(`http://127.0.0.1:${port}/?release=latest&renderer=webgpu&map=rustworks-1v1&render=blender&grass=on&mist=on&seed=6501${traceNodeBuilds ? '&traceNodeBuilds=1' : ''}`);
   await page.addStyleTag({

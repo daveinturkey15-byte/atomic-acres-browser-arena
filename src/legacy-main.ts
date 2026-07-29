@@ -9,6 +9,7 @@ import { estimateResidentObjectMemory } from './rendering/resident-memory';
 import { ArenaVisualStreamController, loadArenaVisualModule, type ArenaVisualSwitchReceipt } from './rendering/arena-visual-stream';
 import { ArenaRenderWatchdog, auditArenaRenderLiveness } from './rendering/arena-render-watchdog';
 import { withArenaFrustumCullingDisabled } from './rendering/arena-coverage-prewarm';
+import { ArenaTransitionProfiler, type ArenaTransitionProfilePhase } from './arena-transition-profile';
 import { isViewmodelShadowLight, VIEWMODEL_SHADOW_BUDGET } from './rendering/runtime-shadow-budget';
 import { auditRuntimeTslTraversal, assertRuntimeTslTraversal, createPass64TslSceneSystems, type Pass64TslSceneSystems } from './rendering/pass64-tsl-scene';
 import type { ArenaVisualBudgets, ArenaVisualDefinition } from './rendering/arena-visual-definition';
@@ -2968,6 +2969,11 @@ let arenaTransitionPhase: 'idle' | 'fencing' | 'preparing' | 'committing' | 'rol
 let arenaTransitionStartedAt: number | null = null;
 let arenaTransitionCompletedAt: number | null = null;
 let arenaTransitionFailure: string | null = null;
+const arenaTransitionProfiler = new ArenaTransitionProfiler();
+
+function profileArenaTransition(phase: ArenaTransitionProfilePhase): void {
+  arenaTransitionProfiler.enter(phase, performance.now());
+}
 let lastArenaRenderAuditAt = -Infinity;
 const ARENA_RENDER_AUDIT_INTERVAL_MS = 250;
 let debugShadowProbe: THREE.Mesh | null = null;
@@ -15535,6 +15541,12 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
   renderSubmissionPaused = true;
   arenaTransitionPhase = 'fencing';
   arenaTransitionStartedAt = performance.now();
+  arenaTransitionProfiler.begin(
+    arenaTransitionGeneration,
+    nextSelection.id,
+    arenaTransitionStartedAt,
+    'shared-gameplay-assets',
+  );
   arenaTransitionCompletedAt = null;
   arenaTransitionFailure = null;
   syncArenaSelectionUi();
@@ -15544,9 +15556,12 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
     // A map generation may only replace renderer-visible authority once every
     // earlier WebGPU submission has completed. This prevents the old root's
     // buffers from being detached or destroyed while the queue still uses it.
+    profileArenaTransition('previous-webgpu-fence');
     await flushWebGpuFrames();
     arenaTransitionPhase = 'preparing';
+    profileArenaTransition('arena-construction');
     nextArena = ensureArenaConstructed(nextSelection.id);
+    profileArenaTransition('interactive-world-construction');
     nextInteractiveWorldRuntime = createInteractiveWorldRuntime(
       nextArena,
       interactiveWorldMatchEpoch,
@@ -15557,7 +15572,9 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
     if (localArenaSwitchQaDelayMs > 0) {
       await new Promise<void>((resolve) => setTimeout(resolve, localArenaSwitchQaDelayMs));
     }
+    profileArenaTransition('physics-construction');
     nextPhysics = await CharacterPhysics.create(nextArena.physicsColliders, nextArena.bounds);
+    profileArenaTransition('authority-commit');
     characterPhysics = nextPhysics;
     selectedArena = nextSelection;
     arena = nextArena;
@@ -15568,8 +15585,11 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
     audio.setArena(selectedArena.id);
     footstepEmitters.reset();
     document.documentElement.dataset.arenaId = selectedArena.id;
+    profileArenaTransition('visual-definition');
     await configurePlayableArenaVisuals(selectedArena.id, arena.root, false);
+    profileArenaTransition('quality-presentation');
     await ensureSelectedQualityPresentation(selectedArena.id);
+    profileArenaTransition('material-tuning');
     materialCompatibility = tuneMaterialsForAtomicSignal(
       scene,
       weaponView.root,
@@ -15577,14 +15597,18 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
       maximumAnisotropy,
     );
     graphicsRefinement.refine(scene, maximumAnisotropy);
+    profileArenaTransition('art-texture-settle');
     await waitForPendingArtTextures();
     bootstrapStage = 'prewarming-weapon-catalog';
+    profileArenaTransition('weapon-catalog-prewarm');
     await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(
       nextSelection.id,
       gunRangeSidearmForWeaponPrewarm(),
     ));
+    profileArenaTransition('presentation-batching');
     batchSelectedArenaPresentation();
     setArenaPresentationVisibility();
+    profileArenaTransition('match-authority-reset');
     matchState = createMatch(performance.now(), selectedArena.matchRules);
     lastPlayerSpawnIndex = -1;
     lastPlayerSpawnAudit = null;
@@ -15604,6 +15628,7 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
     const presentationRoot = selectedArena.id === 'atomic-acres' && arenaArtRoot?.visible
       ? arenaArtRoot
       : arena.root;
+    profileArenaTransition('coverage-submit-fence');
     renderRuntime.resetRenderInfo();
     if (renderRuntime.backend === 'webgpu') {
       await withArenaFrustumCullingDisabled(presentationRoot, async () => {
@@ -15627,7 +15652,9 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
     if (readiness.reasons.length > 0) {
       throw new Error(`Map presentation failed readiness: ${readiness.reasons.join(', ')}`);
     }
+    profileArenaTransition('retire-previous-arenas');
     await retireAllArenasExcept(selectedArena.id);
+    profileArenaTransition('commit-bookkeeping');
     renderHighScores();
     committed = true;
     gameplayArenaPrepared = true;
@@ -15644,6 +15671,7 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
     console.error('[Nuke Town map selection failed]', error);
     arenaTransitionPhase = 'rolling-back';
     arenaTransitionFailure = error instanceof Error ? error.message : String(error);
+    profileArenaTransition('rollback');
     characterPhysics = previousPhysics;
     selectedArena = previousSelection;
     arena = previousArena;
@@ -15686,6 +15714,7 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
       showFatalError(new Error(`Map switch rollback failed: ${arenaTransitionFailure}`));
     }
   } finally {
+    profileArenaTransition('finalize');
     if (!committed && nextPhysics && nextPhysics !== characterPhysics) nextPhysics.dispose();
     if (!committed && nextInteractiveWorldRuntime && nextInteractiveWorldRuntime !== interactiveWorldRuntime) {
       try {
@@ -15700,6 +15729,10 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
     renderSubmissionPaused = false;
     if (arenaTransitionPhase !== 'failed') arenaTransitionPhase = 'idle';
     arenaTransitionCompletedAt = performance.now();
+    arenaTransitionProfiler.finish(
+      arenaTransitionCompletedAt,
+      committed ? 'committed' : arenaTransitionPhase === 'failed' ? 'failed' : 'rolled-back',
+    );
     arenaSelectionReady = true;
     syncArenaSelectionUi();
     if (network.role !== 'offline' || privateLobbySnapshot) renderPrivateLobby();
@@ -16947,6 +16980,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
           completedAt: arenaTransitionCompletedAt,
           failure: arenaTransitionFailure,
           renderSubmissionPaused,
+          profile: arenaTransitionProfiler.snapshot(performance.now()),
         },
         retirement: { ...arenaRetirementInventory },
         atomicAuxiliaryRoots: [arenaArtRoot, worldIdentityPresentation?.root, neighbourhoodLifeRoot]
@@ -18800,26 +18834,37 @@ async function prepareSharedGameplayAssets(): Promise<void> {
 
 async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): Promise<void> {
   bootstrapStage = 'prewarming-combat-tracers';
+  profileArenaTransition('prewarm-tracers');
   await tracerPool.prewarm(renderRuntime, camera, sceneGeneration);
   bootstrapStage = 'prewarming-combat-impacts';
+  profileArenaTransition('prewarm-impacts');
   await impactPresentation.prewarm(renderRuntime, camera, sceneGeneration);
   bootstrapStage = 'prewarming-grenade-explosion';
+  profileArenaTransition('prewarm-grenade-explosion');
   await grenadeExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration);
   bootstrapStage = 'prewarming-support-explosion';
+  profileArenaTransition('prewarm-support-explosion');
   await supportExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration);
   bootstrapStage = 'prewarming-death-drops';
+  profileArenaTransition('prewarm-death-drops');
   await deathDropPresentationPool.prewarm(renderRuntime, camera, player.weapon);
   bootstrapStage = 'prewarming-nuke';
+  profileArenaTransition('prewarm-nuke');
   await prewarmNukePresentation();
   bootstrapStage = 'prewarming-overdrive';
+  profileArenaTransition('prewarm-overdrive');
   await prewarmOverdrivePresentation();
   bootstrapStage = 'prewarming-grenade-world-presentations';
+  profileArenaTransition('prewarm-grenade-world');
   await prewarmGrenadeWorldPresentations(sceneGeneration);
   bootstrapStage = 'prewarming-killstreak-presentations';
+  profileArenaTransition('prewarm-killstreaks');
   await killstreakPresentation.prewarm(renderRuntime, camera, sceneGeneration);
   bootstrapStage = 'prewarming-smoke-presentations';
+  profileArenaTransition('prewarm-smoke');
   await smokeVolumePresentationPool.prewarm(renderRuntime, camera, sceneGeneration);
   bootstrapStage = 'prewarming-explosive-bolts';
+  profileArenaTransition('prewarm-explosive-bolts');
   await prewarmExplosiveBoltPresentation(sceneGeneration);
 }
 
