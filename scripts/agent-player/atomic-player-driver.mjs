@@ -1054,9 +1054,9 @@ async function run() {
         }
         if (tactical?.coverEvent) {
           actions.push({
-            atMs,
-            kind: `rendered-cover-${tactical.coverEvent.kind}`,
             ...tactical.coverEvent,
+            kind: `rendered-cover-${tactical.coverEvent.kind}`,
+            atMs,
             health: hud?.health ?? null,
             target: currentTarget ?? rawTarget ?? null,
             coverCues: vision.renderedCoverCues,
