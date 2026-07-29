@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "kind": "atomic-player-profile-registry",
-  "createdAt": "2026-07-29T19:06:06Z",
+  "createdAt": "2026-07-29T19:18:18Z",
   "preservedCurrentProfileId": "legacy-offensive-accuracy-v2-frozen-20260729",
   "candidateProfileId": "one-v-one-semantic-v1-scaffold",
   "selectionRule": "The preserved current profile remains the rollback reference. The candidate is default-off, non-promoted and replay-only until explicit authorization plus hash-bound build, detector and calibration receipts.",
@@ -85,8 +85,8 @@
     },
     {
       "path": "scripts/agent-player/freeze-player-profile-registry.mjs",
-      "sha256": "fc10740f47cff9782ec4888afe422d90c6941bd56c588e231104f51f6f6a4b37",
-      "bytes": 5581
+      "sha256": "56384adac4d19bfa43175e3dacd04302bd08e13d139842617b2095d20a980cea",
+      "bytes": 5674
     },
     {
       "path": "scripts/agent-player/verify-player-profiles.mjs",
@@ -95,8 +95,8 @@
     },
     {
       "path": "scripts/agent-player/one-v-one-profile.test.mjs",
-      "sha256": "d8bed00aab448a44f1659a2bf58b990dc508447552ad7b3d3fbfd2e805a8d0e2",
-      "bytes": 19896
+      "sha256": "d8402ba34654a2f5e99a75368cfaa13253dd68bc6da606426cf0e63ff7edaed2",
+      "bytes": 20712
     },
     {
       "path": "scripts/agent-player/one-v-one/fixtures/scaffold-replay-v1.json",
@@ -124,14 +124,19 @@
       "bytes": 21411
     },
     {
+      "path": "scripts/agent-player/profiles/datasets/rendered-motion-semantic-v1.live-evaluation.json",
+      "sha256": "ee82f77f0dbac400726fe228e781060dda16c66676caa6f17efa7134d9cdbb56",
+      "bytes": 3838
+    },
+    {
       "path": "scripts/agent-player/profiles/one-v-one-semantic-refinement-v2.spec.json",
       "sha256": "b501d5a24246e60c27dad1ee3ead11d76e39ed8ae07875aa63c2991524923163",
       "bytes": 4961
     },
     {
       "path": "scripts/agent-player/profiles/README.md",
-      "sha256": "898f834737767f3cfea1f320e488fc2c1971650641c5a0f693c7744edea7e4f3",
-      "bytes": 4651
+      "sha256": "7e0c1092b557916af3bc7285ee145a6cce17a03917d3b79937a3524362defbd7",
+      "bytes": 5094
     }
   ],
   "launcherSurfaces": [

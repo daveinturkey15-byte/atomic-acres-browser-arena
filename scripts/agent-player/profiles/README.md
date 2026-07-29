@@ -48,7 +48,7 @@ Frozen evidence is split across:
 - `datasets/rendered-motion-semantic-v1.evaluation.json` — G0134 held-sequence and synthetic regression receipt;
 - `one-v-one-semantic-refinement-v2.spec.json` — claim states, retained behaviour and promotion gates.
 
-Known static G0133/G0125-style contacts, horizontal prop handoffs and observer-camera motion remain non-authoritative in the offline gate. Live use remains no-input shadow observation until a second rendered calibration is reviewed.
+Known static G0133/G0125-style contacts, horizontal prop handoffs and observer-camera motion remain non-authoritative in the offline gate. The live receipt `datasets/rendered-motion-semantic-v1.live-evaluation.json` is intentionally `failed-closed-no-fire`: G0137 produced a ten-measurement persistent track with zero profile input and zero shots, but one of two first-confirmed rendered crops was too peripheral/occluded to prove a visible body and safe centre ray. Do not reinterpret motion continuity as opponent identity, do not run a firing benchmark from this receipt, and keep the candidate default-off until a separate fresh-frame rendered body/occlusion gate passes.
 
 ## Offline verification
 

@@ -29,6 +29,7 @@ const implementationPaths = [
   'scripts/agent-player/profiles/datasets/one-v-one-operator-v1.manifest.json',
   'scripts/agent-player/profiles/datasets/one-v-one-rendered-semantic-v2.manifest.json',
   'scripts/agent-player/profiles/datasets/rendered-motion-semantic-v1.evaluation.json',
+  'scripts/agent-player/profiles/datasets/rendered-motion-semantic-v1.live-evaluation.json',
   'scripts/agent-player/profiles/one-v-one-semantic-refinement-v2.spec.json',
   'scripts/agent-player/profiles/README.md',
 ];

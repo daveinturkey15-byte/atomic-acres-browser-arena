@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "kind": "atomic-player-live-semantic-evaluation",
+  "evaluationId": "rendered-motion-semantic-v1-live-20260729",
+  "detectorProvider": "rendered-motion-semantic-v1",
+  "status": "failed-closed-no-fire",
+  "build": "PASS 63",
+  "renderProfile": "performance",
+  "profileId": "one-v-one-semantic-v1-scaffold",
+  "profileFingerprint": "7b4c351e7378b6fb0217ac1062dbcb321e0cbde5b619b00aafa6da53506fe1d9",
+  "runs": [
+    {
+      "gameId": "G0135",
+      "durationSeconds": 180,
+      "validRuntime": false,
+      "invalidReason": "pointer-lock-lost-at-135278ms",
+      "motionSemanticAcceptedFrames": 126,
+      "confirmedFrames": 72,
+      "profileInputCommands": 0,
+      "shotPulses": 0,
+      "informationalOnly": true,
+      "reportSha256": "f36275093567da1944a1faa091e2f7b4ce13c61129ee887f3b4c2d06bd363d58",
+      "shadowTelemetrySha256": "289247f9fcdd86f6a8db60d9a229856bc6e9376de78615d2047ca5f36bd6943a"
+    },
+    {
+      "gameId": "G0136",
+      "durationSeconds": 120,
+      "validRuntime": true,
+      "motionSemanticAcceptedFrames": 5,
+      "confirmedFrames": 0,
+      "longestSemanticTrackMeasurements": 2,
+      "profileInputCommands": 0,
+      "shotPulses": 0,
+      "acceptancePassed": false,
+      "failureReason": "insufficient-confirmed-track-evidence",
+      "reportSha256": "6023bcf1446116c29f06a8baa34d88f2b2b17cb2e3763af28f96846156a6ffe1",
+      "shadowTelemetrySha256": "5d5b495158f8b9d59c58092eda326ad090eb3fc836e8323f72b894ce0973d390"
+    },
+    {
+      "gameId": "G0137",
+      "durationSeconds": 120,
+      "validRuntime": true,
+      "motionSemanticAcceptedFrames": 17,
+      "semanticAuthorityFrames": 21,
+      "confirmedFrames": 9,
+      "longestSemanticTrackMeasurements": 10,
+      "profileInputCommands": 0,
+      "shotPulses": 0,
+      "confirmedTrackReviews": [
+        {
+          "trackId": "OV1-6",
+          "sourceSequence": 2421,
+          "classification": "ambiguous-partial-occlusion",
+          "fireSafe": false,
+          "reason": "The small selected component is peripheral and substantially occluded by the teal building/minimap boundary; a visible humanoid body and centre-ray overlap are not provable from the fresh rendered frame.",
+          "annotatedImage": "artifacts/agent-player/archive/games/G0137/one-v-one-shadow-confirmed-track-01-annotated.jpg",
+          "annotatedImageSha256": "8059fbeb2af1eb191f3cf2482d73a0f0e4f4aa8f3d298d2ab0a9faa8e7fa38ed"
+        },
+        {
+          "trackId": "OV1-7",
+          "sourceSequence": 2826,
+          "classification": "visible-mobile-bot-body-overlap",
+          "fireSafe": true,
+          "reason": "A purple humanoid opponent is visibly present and the selected component overlaps the body.",
+          "annotatedImage": "artifacts/agent-player/archive/games/G0137/one-v-one-shadow-confirmed-track-02-annotated.jpg",
+          "annotatedImageSha256": "f67052bbaacd008d2eab9525cba747ab79ad27b510c70c22ae7e6214c0ef8012"
+        }
+      ],
+      "acceptancePassed": false,
+      "failureReason": "one-of-two-confirmed-track-crops-was-ambiguous",
+      "reportSha256": "fcc905be227cd63ad6f9d9ff14bd31a19664cd11b0fd69da02f71bc22339a9da",
+      "shadowTelemetrySha256": "3e05672f6f7c0ee70afea21eee57840bf9ea56f53c70c9c0db177a4f1996b12e"
+    }
+  ],
+  "acceptance": {
+    "offlineKnownHardNegativesRejected": true,
+    "validRunWithPersistentTrack": true,
+    "allConfirmedTrackCropsVisibleAndBodyAligned": false,
+    "profileInputCommandsZero": true,
+    "liveShotsZero": true,
+    "liveShadowPassed": false,
+    "firingBenchmarkAllowed": false
+  },
+  "decision": "Do not run a firing benchmark. Keep the candidate default-off and fail closed. The next refinement must add fresh-frame rendered body/occlusion identity evidence separate from motion continuity before semantic authority or fire authorization."
+}

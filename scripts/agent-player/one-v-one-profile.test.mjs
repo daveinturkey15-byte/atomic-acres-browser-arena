@@ -24,6 +24,7 @@ const profilePath = resolve(here, 'profiles/one-v-one-semantic-v1.profile.json')
 const fixturePath = resolve(here, 'one-v-one/fixtures/scaffold-replay-v1.json');
 const semanticDatasetPath = resolve(here, 'profiles/datasets/one-v-one-rendered-semantic-v2.manifest.json');
 const motionSemanticEvaluationPath = resolve(here, 'profiles/datasets/rendered-motion-semantic-v1.evaluation.json');
+const motionSemanticLiveEvaluationPath = resolve(here, 'profiles/datasets/rendered-motion-semantic-v1.live-evaluation.json');
 const clone = (value) => structuredClone(value);
 
 function opponent(sequence, x = 160, y = 90, confidence = 0.96) {
@@ -97,6 +98,17 @@ test('offline motion semantic evaluation rejects every known hard negative and r
   assert.equal(evaluation.summary.acceptedAmbiguousFrames, 0);
   assert.ok(evaluation.summary.visibleBotSequenceAcceptanceRate >= 0.8);
   assert.ok(evaluation.summary.eligibleVisibleBotSequences >= 3);
+});
+
+test('live motion semantic receipt fails closed when any confirmed rendered crop is ambiguous', async () => {
+  const evaluation = JSON.parse(await readFile(motionSemanticLiveEvaluationPath, 'utf8'));
+  assert.equal(evaluation.status, 'failed-closed-no-fire');
+  assert.equal(evaluation.acceptance.validRunWithPersistentTrack, true);
+  assert.equal(evaluation.acceptance.allConfirmedTrackCropsVisibleAndBodyAligned, false);
+  assert.equal(evaluation.acceptance.profileInputCommandsZero, true);
+  assert.equal(evaluation.acceptance.liveShotsZero, true);
+  assert.equal(evaluation.acceptance.liveShadowPassed, false);
+  assert.equal(evaluation.acceptance.firingBenchmarkAllowed, false);
 });
 
 test('unavailable production semantic model rejects every live detection', async () => {
