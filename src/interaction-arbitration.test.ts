@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  SUPPORT_ENTRY_INTERACTION_RANGE_M,
   interactionPriority,
   primaryInteraction,
   type InteractionCandidate,
@@ -37,14 +36,11 @@ describe('shared F interaction arbitration', () => {
     ])).toMatchObject({ kind: 'support-exit', targetId: 'possessed-drone' });
   });
 
-  it('distance-gates drone and chopper entry without removing an eligible nearby entry', () => {
+  it('keeps drone and chopper entry globally available when no world action is eligible', () => {
     for (const kind of ['support-enter-drone', 'support-enter-chopper'] as const) {
       expect(primaryInteraction([
-        candidate(kind, 'near-support', SUPPORT_ENTRY_INTERACTION_RANGE_M),
-      ])).toMatchObject({ kind, targetId: 'near-support' });
-      expect(primaryInteraction([
-        candidate(kind, 'far-support', SUPPORT_ENTRY_INTERACTION_RANGE_M + 0.001),
-      ])).toBeNull();
+        candidate(kind, 'global-support', 999),
+      ])).toMatchObject({ kind, targetId: 'global-support' });
     }
   });
 

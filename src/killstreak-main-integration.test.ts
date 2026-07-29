@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
-  SUPPORT_ENTRY_INTERACTION_RANGE_M,
   primaryInteraction,
   type InteractionCandidate,
 } from './interaction-arbitration';
@@ -176,10 +175,10 @@ describe('Pass 65 playable killstreak integration', () => {
       }
     }
     expect(primaryInteraction([
-      candidate('support-enter-drone', 'far-drone', SUPPORT_ENTRY_INTERACTION_RANGE_M + 1),
-    ])).toBeNull();
+      candidate('support-enter-drone', 'global-drone', 999),
+    ])).toMatchObject({ kind: 'support-enter-drone' });
     expect(primaryInteraction([
-      candidate('support-enter-chopper', 'near-chopper', SUPPORT_ENTRY_INTERACTION_RANGE_M),
+      candidate('support-enter-chopper', 'global-chopper', 999),
     ])).toMatchObject({ kind: 'support-enter-chopper' });
     expect(primaryInteraction([
       candidate('support-exit', 'possessed-chopper', 0),
