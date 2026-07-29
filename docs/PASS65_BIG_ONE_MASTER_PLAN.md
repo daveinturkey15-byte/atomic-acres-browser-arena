@@ -977,7 +977,7 @@ Before F07, asset authoring or shed coding, capture final live Pass 64 on the sa
 ### 11.6 Drone Swarm
 
 - Selectable slot-5 alternative to retained selectable Nuke.
-- Exactly 24 host-simulated drones, admitted in a deterministic valid centre-map volume with bounded spread and distributing into divergent individual/small-group routes.
+- Exactly 24 host-simulated drones, admitted as a separated deterministic centre-map formation and distributing into divergent individual/small-group routes.
 - 50 HP each; freeze hitbox/core multipliers and per-weapon shot-count bands so “accurate fire” is testable.
 - Up to 60 seconds lifetime.
 - 20-round magazines with reload loops; unlimited reloads within lifetime.

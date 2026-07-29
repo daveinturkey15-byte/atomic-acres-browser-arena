@@ -75,6 +75,11 @@ import {
 import { KillstreakPresentation, loadHunterDronePresentation, loadSupportVehiclePresentations, supportVehiclePresentationTelemetry } from './killstreak-presentation';
 import { PASS65_FLIGHT_NAVIGATION, resolveSupportFlightStep } from './killstreak-flight-navigation';
 import {
+  applyPilotedDronePointerDelta,
+  applyPilotedDroneScreenLookDelta,
+  pilotedDroneControlAxes,
+} from './killstreak-drone-input';
+import {
   admitKillstreakCareCaptureResultMessage,
   admitKillstreakStateMessage,
   type KillstreakActivateIntentMessage,
@@ -110,7 +115,7 @@ import { GUN_RANGE_WEAPON_STATIONS, nearestGunRangeWeaponStation, type GunRangeW
 import { loadGunRangeRackPresentation } from './gun-range-rack-presentation';
 import { menuWeaponPrewarmCatalog, weaponPrewarmCatalogForArena } from './weapon-prewarm-catalog';
 import { ArenaAudio, GRENADE_FUSE_BEEP_START_MS, crossbowFuseBeepIntervalMs, grenadeFuseBeepIntervalMs } from './audio';
-import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sweepSphereAgainstBoxes } from './collision';
+import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes } from './collision';
 import {
   applyPenetrationDamage,
   ballisticImpactSurface,
@@ -3146,6 +3151,7 @@ let mouseTriggerHeld = false;
 let mouseAdsHeld = false;
 let gamepadMove = { x: 0, y: 0 };
 let gamepadLookRate = { yaw: 0, pitch: 0 };
+let gamepadDroneVertical = 0;
 let gamepadSprint = false;
 let gamepadTriggerArmed = true;
 let gamepadAdsArmed = true;
@@ -3254,6 +3260,7 @@ function clearGameplayInput(): void {
   keys.clear();
   gamepadMove = { x: 0, y: 0 };
   gamepadLookRate = { yaw: 0, pitch: 0 };
+  gamepadDroneVertical = 0;
   gamepadSprint = false;
   mouseTriggerHeld = false;
   mouseAdsHeld = false;
@@ -11823,6 +11830,19 @@ function killstreakWorldState(): KillstreakWorld {
     position: [remote.target.x, remote.target.y + 1.15, remote.target.z],
   });
   const flightNavigation = PASS65_FLIGHT_NAVIGATION[selectedArena.id];
+  const centrePortal = [...flightNavigation.portals]
+    .sort((left, right) => right.altitudeM - left.altitudeM || left.id.localeCompare(right.id))[0];
+  const centreSpawn: [number, number, number] = [
+    (arena.bounds.minX + arena.bounds.maxX) / 2
+      + (centrePortal?.xQ ?? 0) * (arena.bounds.maxX - arena.bounds.minX) / 2,
+    centrePortal?.altitudeM ?? flightNavigation.ceilingY * 0.45,
+    (arena.bounds.minZ + arena.bounds.maxZ) / 2
+      + (centrePortal?.zQ ?? 0) * (arena.bounds.maxZ - arena.bounds.minZ) / 2,
+  ];
+  // Centre-spawn admission can run hundreds of bounded probes. Snapshot the
+  // current collision authority once so each probe does not rebuild/enumerate
+  // the full collider set and introduce an activation hitch.
+  const flightSolids = activeWorldColliders();
   return {
     bounds: {
       minX: arena.bounds.minX,
@@ -11834,7 +11854,7 @@ function killstreakWorldState(): KillstreakWorld {
     },
     targets,
     areHostile: (ownerId, ownerTeam, target) => areCombatantsHostile(ownerId, ownerTeam, target.id, target.team),
-    hasLineOfSight: (from, to) => !activeWorldColliders().some((box) => segmentIntersectsBox(
+    hasLineOfSight: (from, to) => !flightSolids.some((box) => segmentIntersectsBox(
       { x: from[0], y: from[1], z: from[2] },
       { x: to[0], y: to[1], z: to[2] },
       box,
@@ -11844,14 +11864,26 @@ function killstreakWorldState(): KillstreakWorld {
       const result = resolveSupportFlightStep({
         definition: flightNavigation,
         arenaBounds: arena.bounds,
-        solids: activeWorldColliders(),
+        solids: flightSolids,
         from: { x: from[0], y: from[1], z: from[2] },
         desired: { x: desired[0], y: desired[1], z: desired[2] },
         radius,
       });
       return [result.position.x, result.position.y, result.position.z];
     },
-    isFlightPositionValid: (position) => pointInsideBounds({ x: position[0], y: position[1], z: position[2] }, arena.bounds, 0.35),
+    isFlightPositionValid: (position) => {
+      const point = { x: position[0], y: position[1], z: position[2] };
+      return pointInsideBounds(point, arena.bounds, 0.35)
+        && !flightSolids.some((solid) => sphereIntersectsBox(point, 0.35, solid));
+    },
+    droneCentreSpawnVolume: {
+      centre: centreSpawn,
+      halfExtents: [
+        Math.min(7.5, (arena.bounds.maxX - arena.bounds.minX) * 0.12),
+        Math.min(2, flightNavigation.ceilingY * 0.05),
+        Math.min(7.5, (arena.bounds.maxZ - arena.bounds.minZ) * 0.12),
+      ],
+    },
   };
 }
 
@@ -12245,15 +12277,23 @@ function updateKillstreakPossession(now: number): void {
   killstreakPresentation.alignFirstPersonCockpit(entity.id, camera.quaternion);
   weaponView.root.visible = false;
   if (now - lastKillstreakControlSentAt < 50) return;
-  const forwardInput = THREE.MathUtils.clamp(Number(keys.has('KeyW')) - Number(keys.has('KeyS')) - gamepadMove.y, -1, 1);
-  const strafeInput = THREE.MathUtils.clamp(Number(keys.has('KeyD')) - Number(keys.has('KeyA')) + gamepadMove.x, -1, 1);
-  const vertical = THREE.MathUtils.clamp(Number(keys.has('Space')) - Number(keys.has('ControlLeft') || keys.has('KeyC')), -1, 1);
+  const droneAxes = pilotedDroneControlAxes({
+    keyboardForward: keys.has('KeyW'),
+    keyboardBackward: keys.has('KeyS'),
+    keyboardRight: keys.has('KeyD'),
+    keyboardLeft: keys.has('KeyA'),
+    keyboardAscend: keys.has('Space'),
+    keyboardDescend: keys.has('ControlLeft') || keys.has('KeyC'),
+    gamepadMoveX: gamepadMove.x,
+    gamepadMoveY: gamepadMove.y,
+    gamepadVertical: gamepadDroneVertical,
+  });
   requestKillstreakControl(entity.id, 'pilot-control', {
     yawQ: player.yaw,
     pitchQ: player.pitch,
-    thrustQ: possession.kind === 'piloted-drone' ? forwardInput : 0,
-    strafeQ: possession.kind === 'piloted-drone' ? strafeInput : 0,
-    verticalQ: possession.kind === 'piloted-drone' ? vertical : 0,
+    thrustQ: possession.kind === 'piloted-drone' ? droneAxes.thrust : 0,
+    strafeQ: possession.kind === 'piloted-drone' ? droneAxes.strafe : 0,
+    verticalQ: possession.kind === 'piloted-drone' ? droneAxes.vertical : 0,
     fire: triggerHeld,
   }, now);
   lastKillstreakControlSentAt = now;
@@ -14921,6 +14961,7 @@ function pollGamepad(dt: number): void {
   if (!pad) {
     gamepadMove = { x: 0, y: 0 };
     gamepadLookRate = { yaw: 0, pitch: 0 };
+    gamepadDroneVertical = 0;
     gamepadSprint = false;
     previousGamepadButtons = [];
     setLocalTriggerHeld(mouseTriggerHeld);
@@ -14934,6 +14975,8 @@ function pollGamepad(dt: number): void {
   const padAds = Boolean(buttons[6]) || (pad.buttons[6]?.value ?? 0) > 0.22;
   const padTrigger = Boolean(buttons[7]) || (pad.buttons[7]?.value ?? 0) > 0.22;
   const canControlPlayer = gameplayInputEnabled();
+  const possession = localKillstreakActorSnapshot()?.possession ?? null;
+  const pilotedDronePossessed = possession?.kind === 'piloted-drone';
   if (!padTrigger) gamepadTriggerArmed = true;
   else if (!canControlPlayer) gamepadTriggerArmed = false;
   if (!padAds) gamepadAdsArmed = true;
@@ -14944,6 +14987,9 @@ function pollGamepad(dt: number): void {
   adsHeld = admittedAdsHeld(debugAdsOverride ?? (mouseAdsHeld || padAdsActive));
   setLocalTriggerHeld(mouseTriggerHeld || padTriggerActive);
   gamepadMove = canControlPlayer ? shapedMove : { x: 0, y: 0 };
+  gamepadDroneVertical = canControlPlayer && pilotedDronePossessed
+    ? THREE.MathUtils.clamp(Number(buttons[0]) - Number(buttons[1]), -1, 1)
+    : 0;
   gamepadLookRate = integrateGamepadLookRate(
     gamepadLookRate,
     canControlPlayer ? look : { x: 0, y: 0 },
@@ -14952,21 +14998,34 @@ function pollGamepad(dt: number): void {
     controllerSensitivity,
   );
   if (canControlPlayer) {
-    player.yaw -= gamepadLookRate.yaw * dt;
-    player.pitch = THREE.MathUtils.clamp(player.pitch - gamepadLookRate.pitch * dt, -1.42, 1.42);
-    if (pressed(0)) {
-      if (player.stance !== 'stand') requestStance('stand');
-      jumpQueuedAt = performance.now();
+    if (pilotedDronePossessed) {
+      const pose = applyPilotedDroneScreenLookDelta({
+        yaw: player.yaw,
+        pitch: player.pitch,
+        horizontalLookDelta: gamepadLookRate.yaw * dt,
+        verticalLookDelta: gamepadLookRate.pitch * dt,
+      });
+      player.yaw = pose.yaw;
+      player.pitch = pose.pitch;
+    } else {
+      player.yaw -= gamepadLookRate.yaw * dt;
+      player.pitch = THREE.MathUtils.clamp(player.pitch - gamepadLookRate.pitch * dt, -1.42, 1.42);
     }
-    if (pressed(1)) requestStance('toggle-crouch');
-    if (pressed(13)) requestStance('toggle-prone');
-    if (pressed(2)) reload();
-    if (pressed(3)) switchWeapon(player.weapon === (localHoldsRailgun() ? 'railgun' : player.primaryWeapon) ? 1 : 0);
-    if (pressed(4)) throwGrenade();
-    if (pressed(5)) melee();
-    if (pressed(14)) selectGamepadSupport(-1);
-    if (pressed(15)) selectGamepadSupport(1);
-    if (pressed(12)) activateFieldSupport(gamepadSupportSelection);
+    if (!possession) {
+      if (pressed(0)) {
+        if (player.stance !== 'stand') requestStance('stand');
+        jumpQueuedAt = performance.now();
+      }
+      if (pressed(1)) requestStance('toggle-crouch');
+      if (pressed(13)) requestStance('toggle-prone');
+      if (pressed(2)) reload();
+      if (pressed(3)) switchWeapon(player.weapon === (localHoldsRailgun() ? 'railgun' : player.primaryWeapon) ? 1 : 0);
+      if (pressed(4)) throwGrenade();
+      if (pressed(5)) melee();
+      if (pressed(14)) selectGamepadSupport(-1);
+      if (pressed(15)) selectGamepadSupport(1);
+      if (pressed(12)) activateFieldSupport(gamepadSupportSelection);
+    }
   }
   previousGamepadButtons = buttons;
 }
@@ -15029,19 +15088,22 @@ window.addEventListener('keydown', (event) => {
   }
   if (gameplayInputEnabled()) keys.add(event.code);
   else if (event.code !== 'Tab') return;
-  if (event.code === 'Space' && !event.repeat) {
-    if (player.stance !== 'stand') requestStance('stand');
-    jumpQueuedAt = performance.now();
+  const supportPossession = localKillstreakActorSnapshot()?.possession ?? null;
+  if (!supportPossession) {
+    if (event.code === 'Space' && !event.repeat) {
+      if (player.stance !== 'stand') requestStance('stand');
+      jumpQueuedAt = performance.now();
+    }
+    if (event.code === 'KeyC' && !event.repeat) requestStance('toggle-crouch');
+    if ((event.code === 'KeyZ' || event.code === 'ControlLeft') && !event.repeat) requestStance('toggle-prone');
+    if (event.code === 'Digit1') switchWeapon(0);
+    if (event.code === 'Digit2') switchWeapon(1);
+    const supportSlot = ['Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7'].indexOf(event.code);
+    if (supportSlot >= 0 && !event.repeat) activateFieldSupport(localFieldSupportProjection().loadout.slots[supportSlot]);
+    if (event.code === 'KeyR') reload();
+    if (event.code === 'KeyV' && !event.repeat) melee();
+    if (event.code === 'KeyG' && !event.repeat) throwGrenade();
   }
-  if (event.code === 'KeyC' && !event.repeat) requestStance('toggle-crouch');
-  if ((event.code === 'KeyZ' || event.code === 'ControlLeft') && !event.repeat) requestStance('toggle-prone');
-  if (event.code === 'Digit1') switchWeapon(0);
-  if (event.code === 'Digit2') switchWeapon(1);
-  const supportSlot = ['Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7'].indexOf(event.code);
-  if (supportSlot >= 0 && !event.repeat) activateFieldSupport(localFieldSupportProjection().loadout.slots[supportSlot]);
-  if (event.code === 'KeyR') reload();
-  if (event.code === 'KeyV' && !event.repeat) melee();
-  if (event.code === 'KeyG' && !event.repeat) throwGrenade();
   if (event.code === 'KeyF' && !event.repeat) {
     if (pointSupportTargeting && !tacticalMapOpen) {
       confirmCrosshairSupportTarget(performance.now());
@@ -15071,9 +15133,22 @@ window.addEventListener('focus', () => {
 window.addEventListener('mousemove', (event) => {
   if (document.pointerLockElement !== canvas || !player.alive || isTextChatTyping()) return;
   const aimScale = mouseSensitivityMultiplier(adsHeld, currentSprinting);
-  player.yaw -= event.movementX * 0.00215 * sensitivity * aimScale;
-  player.pitch = Math.max(-1.42, Math.min(1.42, player.pitch - event.movementY * 0.0019 * sensitivity * aimScale));
-  weaponView.addMouseDelta(event.movementX, event.movementY);
+  if (localKillstreakActorSnapshot()?.possession?.kind === 'piloted-drone') {
+    const pose = applyPilotedDronePointerDelta({
+      yaw: player.yaw,
+      pitch: player.pitch,
+      deltaX: event.movementX,
+      deltaY: event.movementY,
+      radiansPerPixel: 0.00215 * sensitivity * aimScale,
+      verticalRadiansPerPixel: 0.0019 * sensitivity * aimScale,
+    });
+    player.yaw = pose.yaw;
+    player.pitch = pose.pitch;
+  } else {
+    player.yaw -= event.movementX * 0.00215 * sensitivity * aimScale;
+    player.pitch = Math.max(-1.42, Math.min(1.42, player.pitch - event.movementY * 0.0019 * sensitivity * aimScale));
+  }
+  if (!localKillstreakActorSnapshot()?.possession) weaponView.addMouseDelta(event.movementX, event.movementY);
 });
 canvas.addEventListener('contextmenu', (event) => event.preventDefault());
 canvas.addEventListener('mousedown', (event) => {

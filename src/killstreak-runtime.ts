@@ -9,6 +9,7 @@ import {
   CHOPPER_GUN_PROFILE,
   DRONE_GUN_PROFILE,
   DRONE_GUN_PROFILE_ID,
+  DRONE_DEPLOYMENT_POLICY,
   DRONE_SWARM_FIRE_LANE_INTERVAL_MS,
   DRONE_SUPPORT_DEFINITIONS,
   PILOTED_DRONE_SENSOR_PROFILE,
@@ -68,6 +69,8 @@ export type KillstreakWorld = Readonly<{
   /** Resolves against arena static/dynamic solids, ceilings, portals and no-fly data. */
   resolveFlightPosition?: (from: SupportVec3, desired: SupportVec3, radius: number) => SupportVec3;
   isFlightPositionValid?: (position: SupportVec3) => boolean;
+  /** Optional arena-authored centre volume; the host derives a bounded fallback when absent. */
+  droneCentreSpawnVolume?: Readonly<{ centre: SupportVec3; halfExtents: SupportVec3 }>;
 }>;
 
 export type DroneSensorContact = Readonly<{
@@ -490,6 +493,90 @@ function resolveFlightPosition(
   return bounded;
 }
 
+export type DroneCentreSpawnPlan = Readonly<{
+  centre: SupportVec3;
+  positions: readonly SupportVec3[];
+}>;
+
+function droneCentreVolume(world: KillstreakWorld): Readonly<{ centre: SupportVec3; halfExtents: SupportVec3 }> {
+  const width = Math.max(1, world.bounds.maxX - world.bounds.minX);
+  const depth = Math.max(1, world.bounds.maxZ - world.bounds.minZ);
+  const height = Math.max(1, world.bounds.ceilingY - world.bounds.floorY);
+  const fallbackCentre: SupportVec3 = Object.freeze([
+    (world.bounds.minX + world.bounds.maxX) / 2,
+    clamp(world.bounds.floorY + height * 0.45, world.bounds.floorY + 1, world.bounds.ceilingY - 0.5),
+    (world.bounds.minZ + world.bounds.maxZ) / 2,
+  ] as const);
+  const requested = world.droneCentreSpawnVolume;
+  const centre = finiteTuple(requested?.centre)
+    ? clampFlightPosition(requested!.centre, world, 0.35)
+    : fallbackCentre;
+  const requestedExtents = requested?.halfExtents;
+  const halfExtents: SupportVec3 = Object.freeze([
+    clamp(finiteTuple(requestedExtents) ? Math.abs(requestedExtents[0]) : width * 0.12, 1.5, Math.min(8, width * 0.32)),
+    clamp(finiteTuple(requestedExtents) ? Math.abs(requestedExtents[1]) : height * 0.05, 0.6, Math.min(2.5, height * 0.2)),
+    clamp(finiteTuple(requestedExtents) ? Math.abs(requestedExtents[2]) : depth * 0.12, 1.5, Math.min(8, depth * 0.32)),
+  ] as const);
+  return Object.freeze({ centre: Object.freeze([...centre]) as unknown as SupportVec3, halfExtents });
+}
+
+/**
+ * Host-only deterministic centre-map deployment. The first candidate is a
+ * separated 6x4 formation; bounded seeded probes recover individual slots from
+ * colliders without accepting a caller-provided anchor or collapsing units.
+ */
+export function planDroneCentreSpawns(world: KillstreakWorld, count: number, seed: number): DroneCentreSpawnPlan {
+  if (!Number.isSafeInteger(count) || count < 1 || count > DRONE_SWARM_COUNT) {
+    throw new Error('drone centre spawn count must be between 1 and 24');
+  }
+  const volume = droneCentreVolume(world);
+  const columns = count === 1 ? 1 : 6;
+  const rows = Math.ceil(count / columns);
+  const positions: SupportVec3[] = [];
+  const rotation = count === 1 ? 0 : (seed % 4) * Math.PI / 2;
+  const cosine = Math.cos(rotation);
+  const sine = Math.sin(rotation);
+  const rotate = (x: number, z: number): readonly [number, number] => Object.freeze([
+    x * cosine - z * sine,
+    x * sine + z * cosine,
+  ] as const);
+  for (let index = 0; index < count; index += 1) {
+    const column = index % columns;
+    const row = Math.floor(index / columns);
+    const baseX = columns === 1 ? 0 : (column / (columns - 1) - 0.5) * volume.halfExtents[0] * 2;
+    const baseZ = rows === 1 ? 0 : (row / (rows - 1) - 0.5) * volume.halfExtents[2] * 2;
+    const [rotatedX, rotatedZ] = rotate(baseX, baseZ);
+    let admitted: SupportVec3 | null = null;
+    for (let attempt = 0; attempt < DRONE_DEPLOYMENT_POLICY.maximumAdmissionProbesPerUnit; attempt += 1) {
+      const probeAngle = unit(seed ^ index, 300 + attempt) * Math.PI * 2;
+      const probeRadius = attempt === 0 ? 0 : Math.min(
+        Math.min(volume.halfExtents[0], volume.halfExtents[2]) * 0.72,
+        0.48 * Math.ceil(attempt / 4),
+      );
+      const raw: SupportVec3 = Object.freeze([
+        clamp(volume.centre[0] + rotatedX + Math.cos(probeAngle) * probeRadius, world.bounds.minX + 0.35, world.bounds.maxX - 0.35),
+        clamp(
+          volume.centre[1] + ((index % 3) - 1) * Math.min(0.8, volume.halfExtents[1])
+            + Math.sin(probeAngle * 0.5) * Math.min(0.35, volume.halfExtents[1] * 0.25),
+          world.bounds.floorY + 0.5,
+          world.bounds.ceilingY - 0.5,
+        ),
+        clamp(volume.centre[2] + rotatedZ + Math.sin(probeAngle) * probeRadius, world.bounds.minZ + 0.35, world.bounds.maxZ - 0.35),
+      ] as const);
+      const candidate = world.resolveFlightPosition?.(raw, raw, 0.35) ?? raw;
+      if (!finiteTuple(candidate)) continue;
+      const resolved = clampFlightPosition(candidate, world, 0.35);
+      if (world.isFlightPositionValid?.(resolved) === false) continue;
+      if (positions.some((position) => distance(position, resolved) < DRONE_DEPLOYMENT_POLICY.minimumSpawnSeparationM)) continue;
+      admitted = Object.freeze([...resolved]) as unknown as SupportVec3;
+      break;
+    }
+    if (!admitted) return Object.freeze({ centre: volume.centre, positions: Object.freeze([]) });
+    positions.push(admitted);
+  }
+  return Object.freeze({ centre: volume.centre, positions: Object.freeze(positions) });
+}
+
 function attitudeFromMotion(
   from: SupportVec3,
   to: SupportVec3,
@@ -717,6 +804,16 @@ export class HostKillstreakRuntime {
         || actualId === 'piloted-drone' && entity.kind === 'drone' && entity.mode === 'piloted'
         || actualId === 'drone-swarm' && entity.kind === 'drone' && entity.mode === 'swarm'))) return reject('duplicate-owner-support-kind');
 
+    const activationId = this.nextActivationId();
+    const seed = hashText(`${this.matchEpoch}:${activationId}:${actualId}`);
+    const droneSpawnPlan = actualId === 'piloted-drone'
+      ? planDroneCentreSpawns(world, 1, seed)
+      : actualId === 'drone-swarm'
+        ? planDroneCentreSpawns(world, DRONE_SWARM_COUNT, seed)
+        : null;
+    if (droneSpawnPlan && droneSpawnPlan.positions.length !== (actualId === 'drone-swarm' ? DRONE_SWARM_COUNT : 1)) {
+      return reject('no-valid-centre-drone-spawn-volume');
+    }
     actor.lastActivationSequence = intent.sequence;
     this.seenActivationRequestIds.add(intent.activationId);
     if (fromCare) actor.careRewards.shift();
@@ -724,15 +821,8 @@ export class HostKillstreakRuntime {
       actor.available.delete(actualId);
       this.recycleStreakWhenExhausted(actor);
     }
-    const activationId = this.nextActivationId();
-    const seed = hashText(`${this.matchEpoch}:${activationId}:${actualId}`);
     const entityIds: string[] = [];
     const requestedAnchor = finiteTuple(intent.anchor) ? this.clampAnchor(intent.anchor, world) : this.defaultAnchor(actor.actorId, world);
-    const requestedFacing = finiteTuple(intent.facing) ? intent.facing : [0, 0, -1] as const;
-    const facingLength = Math.hypot(requestedFacing[0], requestedFacing[2]);
-    const facing: readonly [number, number] = facingLength > 0.001
-      ? [requestedFacing[0] / facingLength, requestedFacing[2] / facingLength]
-      : [0, -1];
     const anchor: [number, number, number] = actualId === 'care-package' || actualId === 'carpet-bomber'
       ? [requestedAnchor[0], supportGroundHeight(world, requestedAnchor[0], requestedAnchor[2]), requestedAnchor[2]]
       : requestedAnchor;
@@ -827,8 +917,7 @@ export class HostKillstreakRuntime {
     } else if (actualId === 'piloted-drone') {
       this.restoreActorControl(actor, true);
       const id = this.nextEntityId('pilot-drone');
-      const spawn: [number, number, number] = [anchor[0], Math.min(world.bounds.ceilingY - 1, anchor[1] + 2.5), anchor[2]];
-      const admittedSpawn = resolveFlightPosition(anchor, spawn, 0.35, world);
+      const admittedSpawn = [...droneSpawnPlan!.positions[0]!] as [number, number, number];
       this.entities.set(id, {
         id, activationId, ownerId: actor.actorId, team: actor.team,
         createdAtMs: nowMs, expiresAtMs: nowMs + PILOTED_DRONE_DURATION_MS,
@@ -851,27 +940,25 @@ export class HostKillstreakRuntime {
         const id = this.nextEntityId('swarm-drone');
         const group = index % 6;
         const row = Math.floor(index / 6);
-        const lateralX = -facing[1];
-        const lateralZ = facing[0];
-        const lateralOffset = (group - 2.5) * 1.9 + (row % 2 === 0 ? -0.45 : 0.45);
-        const behindDistance = 14 + row * 1.35;
-        const spawn: [number, number, number] = [
-          clamp(anchor[0] - facing[0] * behindDistance + lateralX * lateralOffset, world.bounds.minX + 0.5, world.bounds.maxX - 0.5),
-          Math.min(world.bounds.ceilingY - 1, Math.max(world.bounds.floorY + 2, anchor[1] + 3 + row * 1.25)),
-          clamp(anchor[2] - facing[1] * behindDistance + lateralZ * lateralOffset, world.bounds.minZ + 0.5, world.bounds.maxZ - 0.5),
-        ];
-        const admittedSpawn = resolveFlightPosition(anchor, spawn, 0.35, world);
+        const admittedSpawn = [...droneSpawnPlan!.positions[index]!] as [number, number, number];
+        const routeAngle = group / 6 * Math.PI * 2
+          + (row - 1.5) * 0.11
+          + (unit(seed ^ index, 71) - 0.5) * 0.16;
+        const routeDistance = Math.min(
+          (world.bounds.maxX - world.bounds.minX) * 0.31,
+          (world.bounds.maxZ - world.bounds.minZ) * 0.31,
+        ) * (0.72 + row * 0.06);
         const rawIngressTarget: [number, number, number] = [
-          clamp(anchor[0] + facing[0] * (7 + row) + lateralX * lateralOffset * 1.35, world.bounds.minX + 0.5, world.bounds.maxX - 0.5),
-          Math.min(world.bounds.ceilingY - 1, Math.max(world.bounds.floorY + 2, anchor[1] + 4 + row * 1.25)),
-          clamp(anchor[2] + facing[1] * (7 + row) + lateralZ * lateralOffset * 1.35, world.bounds.minZ + 0.5, world.bounds.maxZ - 0.5),
+          clamp(droneSpawnPlan!.centre[0] + Math.cos(routeAngle) * routeDistance, world.bounds.minX + 0.5, world.bounds.maxX - 0.5),
+          clamp(admittedSpawn[1] + ((index % 3) - 1) * 0.7, world.bounds.floorY + 1, world.bounds.ceilingY - 0.5),
+          clamp(droneSpawnPlan!.centre[2] + Math.sin(routeAngle) * routeDistance, world.bounds.minZ + 0.5, world.bounds.maxZ - 0.5),
         ];
         const ingressTarget = resolveFlightPosition(admittedSpawn, rawIngressTarget, 0.35, world);
         const ingressDx = ingressTarget[0] - admittedSpawn[0];
         const ingressDy = ingressTarget[1] - admittedSpawn[1];
         const ingressDz = ingressTarget[2] - admittedSpawn[2];
         const ingressRange = Math.max(0.001, Math.hypot(ingressDx, ingressDy, ingressDz));
-        const inboundSpeed = 22;
+        const inboundSpeed = DRONE_DEPLOYMENT_POLICY.swarmIngressSpeedMps;
         this.entities.set(id, {
           id, activationId, ownerId: actor.actorId, team: actor.team,
           createdAtMs: nowMs, expiresAtMs: nowMs + DRONE_SWARM_DURATION_MS,
@@ -1015,10 +1102,18 @@ export class HostKillstreakRuntime {
         entity.thrust = 0;
         entity.strafe = 0;
         entity.vertical = 0;
+        entity.velocity = [0, 0, 0];
+        entity.targetId = null;
+        entity.sensorContacts.length = 0;
         this.restoreActorControl(actor, false);
       } else {
         this.restoreActorControl(actor, true);
         actor.possession = Object.freeze({ kind: 'piloted-drone', entityId: entity.id });
+        entity.thrust = 0;
+        entity.strafe = 0;
+        entity.vertical = 0;
+        entity.velocity = [0, 0, 0];
+        entity.targetId = null;
         entity.nextSensorRefreshAtMs = Math.min(entity.nextSensorRefreshAtMs, nowMs);
       }
       entity.revision += 1;
@@ -1028,6 +1123,9 @@ export class HostKillstreakRuntime {
       entity.thrust = 0;
       entity.strafe = 0;
       entity.vertical = 0;
+      entity.velocity = [0, 0, 0];
+      entity.targetId = null;
+      entity.sensorContacts.length = 0;
       this.restoreActorControl(actor, false);
     } else {
       if (![intent.yawQ, intent.pitchQ, intent.thrustQ, intent.strafeQ, intent.verticalQ].every((value) => value === undefined || Number.isFinite(value))) {
@@ -1068,7 +1166,11 @@ export class HostKillstreakRuntime {
       if (drone?.kind === 'drone') {
         drone.pendingPlayerFire = false;
         drone.thrust = 0;
+        drone.strafe = 0;
         drone.vertical = 0;
+        drone.velocity = [0, 0, 0];
+        drone.targetId = null;
+        drone.sensorContacts.length = 0;
       }
     }
     actor.possession = null;
@@ -1391,16 +1493,16 @@ export class HostKillstreakRuntime {
     }
     if (playerControlled) {
       const forward = supportForwardFromYawPitch(entity.yaw, entity.pitch);
-      const speed = 10 * entity.thrust;
+      const speed = DRONE_DEPLOYMENT_POLICY.manualHorizontalSpeedMps * entity.thrust;
       // Level right vector for full quadcopter strafing: at yaw 0 forward is
       // negative Z, so right is positive X. Without this axis the drone could
       // only travel forward/back along its look direction.
       const rightX = Math.cos(entity.yaw);
       const rightZ = -Math.sin(entity.yaw);
-      const strafeSpeed = 10 * entity.strafe;
+      const strafeSpeed = DRONE_DEPLOYMENT_POLICY.manualHorizontalSpeedMps * entity.strafe;
       const desired: [number, number, number] = [
         clamp(entity.position[0] + (forward[0] * speed + rightX * strafeSpeed) * dt, world.bounds.minX + 0.35, world.bounds.maxX - 0.35),
-        clamp(entity.position[1] + (forward[1] * Math.abs(speed) + entity.vertical * 7) * dt, world.bounds.floorY + 0.5, world.bounds.ceilingY - 0.5),
+        clamp(entity.position[1] + (forward[1] * Math.abs(speed) + entity.vertical * DRONE_DEPLOYMENT_POLICY.manualVerticalSpeedMps) * dt, world.bounds.floorY + 0.5, world.bounds.ceilingY - 0.5),
         clamp(entity.position[2] + (forward[2] * speed + rightZ * strafeSpeed) * dt, world.bounds.minZ + 0.35, world.bounds.maxZ - 0.35),
       ];
       const previous: SupportVec3 = [...entity.position];
@@ -1441,7 +1543,7 @@ export class HostKillstreakRuntime {
         && entity.swarmIngressTarget !== null
         && nowMs - entity.createdAtMs < 2_000;
       if (ingressActive && entity.swarmIngressTarget) {
-        this.moveDroneToward(entity, entity.swarmIngressTarget, 22, 0.25, dt, world);
+        this.moveDroneToward(entity, entity.swarmIngressTarget, DRONE_DEPLOYMENT_POLICY.swarmIngressSpeedMps, 0.25, dt, world);
       } else {
         entity.swarmIngressTarget = null;
         let target = hostileTargets(world, owner.actorId, owner.team).find((candidate) => candidate.id === entity.targetId) ?? null;
@@ -1468,7 +1570,16 @@ export class HostKillstreakRuntime {
           const dy = target.position[1] + 1.5 - entity.position[1];
           const dz = target.position[2] - entity.position[2];
           const range = Math.max(0.001, Math.hypot(dx, dy, dz));
-          if (range > 7) this.moveDroneToward(entity, [target.position[0], target.position[1] + 1.5, target.position[2]], 8, 7, dt, world);
+          if (range > 7) this.moveDroneToward(
+            entity,
+            [target.position[0], target.position[1] + 1.5, target.position[2]],
+            entity.mode === 'piloted'
+              ? DRONE_DEPLOYMENT_POLICY.autonomousStandaloneSpeedMps
+              : 8,
+            7,
+            dt,
+            world,
+          );
           const canHit = range <= gunProfile.maximumRangeM && lineOfSight(world, entity.position, target.position);
           const canFireOwnGun = canHit && nowMs >= entity.nextShotAtMs && entity.magazine > 0;
           const fireLaneAdmitted = entity.mode !== 'swarm' || this.claimSwarmFireLane(entity, nowMs, canFireOwnGun);
@@ -1486,11 +1597,11 @@ export class HostKillstreakRuntime {
             entity.magazine -= 1;
             entity.nextShotAtMs = nowMs + gunProfile.cadenceMs;
           }
-        } else if (entity.mode === 'swarm' && entity.swarmOrdinal !== null) {
+        } else {
           const reachedWaypoint = entity.swarmPatrolTarget
             ? distance(entity.position, entity.swarmPatrolTarget) <= 2
             : true;
-          if (reachedWaypoint || nowMs >= entity.swarmPatrolRefreshAtMs) {
+          if (entity.mode === 'swarm' && entity.swarmOrdinal !== null && (reachedWaypoint || nowMs >= entity.swarmPatrolRefreshAtMs)) {
             const epoch = Math.max(0, Math.floor((nowMs - entity.createdAtMs - 2_000) / 6_000));
             const group = entity.swarmOrdinal % 6;
             const column = group % 3;
@@ -1503,8 +1614,30 @@ export class HostKillstreakRuntime {
               clamp(world.bounds.minZ + (world.bounds.maxZ - world.bounds.minZ) * zAlpha, world.bounds.minZ + 0.5, world.bounds.maxZ - 0.5),
             ];
             entity.swarmPatrolRefreshAtMs = nowMs + 6_000;
+          } else if (entity.mode === 'piloted' && (reachedWaypoint || nowMs >= entity.swarmPatrolRefreshAtMs)) {
+            const epoch = Math.max(0, Math.floor((nowMs - entity.createdAtMs) / 6_000));
+            const angle = unit(entity.seed, 200 + epoch) * Math.PI * 2;
+            const radius = Math.min(
+              world.bounds.maxX - world.bounds.minX,
+              world.bounds.maxZ - world.bounds.minZ,
+            ) * 0.28;
+            entity.swarmPatrolTarget = [
+              clamp((world.bounds.minX + world.bounds.maxX) / 2 + Math.cos(angle) * radius, world.bounds.minX + 0.5, world.bounds.maxX - 0.5),
+              clamp(world.bounds.floorY + (world.bounds.ceilingY - world.bounds.floorY) * 0.45, world.bounds.floorY + 1, world.bounds.ceilingY - 0.5),
+              clamp((world.bounds.minZ + world.bounds.maxZ) / 2 + Math.sin(angle) * radius, world.bounds.minZ + 0.5, world.bounds.maxZ - 0.5),
+            ];
+            entity.swarmPatrolRefreshAtMs = nowMs + 6_000;
           }
-          if (entity.swarmPatrolTarget) this.moveDroneToward(entity, entity.swarmPatrolTarget, 7, 1.5, dt, world);
+          if (entity.swarmPatrolTarget) this.moveDroneToward(
+            entity,
+            entity.swarmPatrolTarget,
+            entity.mode === 'piloted'
+              ? DRONE_DEPLOYMENT_POLICY.autonomousStandaloneSpeedMps
+              : DRONE_DEPLOYMENT_POLICY.swarmPatrolSpeedMps,
+            1.5,
+            dt,
+            world,
+          );
         }
       }
     }

@@ -3,6 +3,7 @@ import {
   CHOPPER_GUN_PROFILE,
   DRONE_GUN_PROFILE,
   DRONE_GUN_PROFILE_ID,
+  DRONE_DEPLOYMENT_POLICY,
   DRONE_SWARM_FIRE_LANE_INTERVAL_MS,
   DRONE_SUPPORT_DEFINITIONS,
   PILOTED_DRONE_SENSOR_PROFILE,
@@ -71,5 +72,16 @@ describe('Pass 65 support catalog', () => {
     expect(DRONE_SUPPORT_DEFINITIONS.swarm.controllerOptions).toEqual(['ai']);
     expect(standaloneDroneController('ai')).toBe('ai');
     expect(standaloneDroneController('owner-player')).toBe('owner-player');
+  });
+
+  it('freezes centre-map deployment and an exactly two-times autonomous standalone speed', () => {
+    expect(DRONE_DEPLOYMENT_POLICY.spawnOrigin).toBe('deterministic-valid-centre-map-volume');
+    expect(DRONE_DEPLOYMENT_POLICY.minimumSpawnSeparationM).toBeGreaterThan(1);
+    expect(DRONE_DEPLOYMENT_POLICY.maximumAdmissionProbesPerUnit).toBe(36);
+    expect(DRONE_DEPLOYMENT_POLICY.autonomousStandaloneSpeedMultiplier).toBe(2);
+    expect(DRONE_DEPLOYMENT_POLICY.autonomousStandaloneSpeedMps).toBe(
+      DRONE_DEPLOYMENT_POLICY.manualHorizontalSpeedMps
+        * DRONE_DEPLOYMENT_POLICY.autonomousStandaloneSpeedMultiplier,
+    );
   });
 });

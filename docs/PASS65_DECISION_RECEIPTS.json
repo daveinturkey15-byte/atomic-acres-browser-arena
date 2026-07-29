@@ -2,7 +2,7 @@
   "$schema": "PASS65_DECISION_RECEIPTS.schema.json",
   "schemaVersion": 1,
   "releasePass": "PASS 65",
-  "updatedAt": "2026-07-28T04:32:32.888Z",
+  "updatedAt": "2026-07-29T05:55:01.801Z",
   "receipts": [
     {
       "receiptVersion": 1,
@@ -330,17 +330,17 @@
         "activationPolicy": {"hostOwnsActivation": true, "consumesExactlyOnce": true, "duplicateOwnerTypePolicy": "forbid-unless-definition-allows"},
         "privacyPolicy": {"rewardSeedRollHostOnly": true, "acquisitionStateHostOnly": true, "rewardRevealPolicy": "claimant-after-exclusive-claim", "recipientSnapshotOmitsSeedAndRoll": true},
         "chopperCalibration": {"targetable": true, "health": 800, "durationMs": 30000, "severePressureByMs": 4000, "survivalIntent": "breaking-line-of-sight-within-four-to-five-seconds-normally-survives", "flightAuthority": "host-ai"},
-        "droneSwarmCalibration": {"count": 24, "healthEach": 50, "magazineSize": 20, "reservePolicy": "unlimited-reloads-until-expiry", "maximumLifetimeMs": 60000, "ingress": "safe-volume-behind-caller-fast-then-smooth-normal-speed", "formation": "distributed-individual-or-small-groups", "routePolicy": "host-seeded-divergent-valid-map-directions", "targets": ["opposing-living-human-player", "opposing-living-bot"], "rejects": ["ally", "dead-life", "stale-life"], "survivalIntent": "breaking-exposure-after-approximately-five-seconds-usually-permits-survival"},
+        "droneSwarmCalibration": {"count": 24, "healthEach": 50, "magazineSize": 20, "reservePolicy": "unlimited-reloads-until-expiry", "maximumLifetimeMs": 60000, "spawnOrigin": "deterministic-valid-centre-map-volume", "minimumSpawnSeparationM": 1.15, "ingress": "fast-then-smooth-normal-speed", "formation": "distributed-individual-or-small-groups", "routePolicy": "host-seeded-divergent-valid-map-directions", "targets": ["opposing-living-human-player", "opposing-living-bot"], "rejects": ["ally", "dead-life", "stale-life"], "survivalIntent": "breaking-exposure-after-approximately-five-seconds-usually-permits-survival"},
         "pilotedDroneSensor": {"targets": "opposing-living-hostiles-only", "maximumRangeM": 50, "forwardConeDegrees": 90, "refreshMs": 250, "revealsThroughWalls": true, "changesBallisticAuthority": false},
-        "pilotedDroneDeployment": {"modeChoiceRequired": true, "allowedModes": ["autonomous", "first-person-owner-control"], "sharedAssetFamilyWithDroneSwarm": true, "sharedGunProfileId": "drone-gun-standard-v1", "variantDifferencesLimitedTo": ["control-mode", "reserve", "lifetime", "sensor-policy"]},
-        "carpetBomber": {"playerInput": "crosshair-ground-anchor-no-overview-map", "ingressAndOrientation": "host-seeded-valid-random", "impactCount": 20, "pattern": "bounded-zigzag", "damageMultiplierFromPreviousFrozenProfile": 3, "payloadPresentation": ["visible-falling-shell", "large-bounded-explosion", "smoke", "fire", "spatial-audio"]}
+        "pilotedDroneDeployment": {"modeChoiceRequired": true, "allowedModes": ["autonomous", "first-person-owner-control"], "spawnOrigin": "deterministic-valid-centre-map-volume", "minimumSpawnSeparationM": 1.15, "inputConvention": "non-inverted-screen-space-keyboard-mouse-gamepad", "manualHorizontalSpeedMps": 10, "autonomousStandaloneSpeedMultiplier": 2, "autonomousStandaloneSpeedMps": 20, "sharedAssetFamilyWithDroneSwarm": true, "sharedGunProfileId": "drone-gun-standard-v1", "variantDifferencesLimitedTo": ["control-mode", "reserve", "lifetime", "sensor-policy"]},
+        "carpetBomber": {"playerInput": "crosshair-ground-anchor-no-overview-map", "targetingLifecycle": "care-package-style-crosshair-preview-commit-aircraft-resolve", "sharedGroundMarker": "large-red-x-at-admitted-anchor", "callerFlightPathPreview": "red-map-bounded-payload-corridor", "ingressAndOrientation": "host-seeded-valid-random", "impactCount": 20, "pattern": "bounded-zigzag", "damageMultiplierFromPreviousFrozenProfile": 3, "payloadPresentation": ["visible-falling-shell", "large-bounded-explosion", "smoke", "fire", "spatial-audio"]}
       },
-      "rationale": "Dave retained the five exact slot families, Scout Sweep, Nuke and the future-complete catalog-derived care pool. The newest correction makes the reward ladder repeat after its final threshold while the same life remains active, with one earn per cycle and earned rewards still surviving death. Drone Swarm increases from 12 to exactly 24, enters from behind the caller and spreads into divergent individual/small-group routes. Carpet Bomber activates from the crosshair without an overview map, deals exactly three times the preceding frozen damage and visibly drops shells with explosion/smoke/fire audiovisual presentation. The standalone drone still reuses the Swarm asset/gun family and offers autonomous or first-person owner control.",
-      "owner": "Dave — 2026-07-27 Desktop Untitled correction; canonical-ID observations retained",
+      "rationale": "Dave retained the five exact slot families, Scout Sweep, Nuke and the future-complete catalog-derived care pool. The reward ladder repeats after its final threshold while the same life remains active, with one earn per cycle and earned rewards surviving death. The latest correction supersedes behind-caller drone deployment: both variants now originate in deterministic valid centre-map volumes, with all 24 Swarm drones separated before divergent routing. Standalone autonomous movement is exactly twice the manual horizontal speed and direct keyboard, mouse and gamepad controls use a non-inverted screen-space convention. Carpet Bomber now follows the Care Package-style crosshair preview, commit and inbound-aircraft lifecycle, while retaining exactly 20 bounded impacts at three times the preceding frozen damage and visible shell/explosion/smoke/fire audiovisual presentation.",
+      "owner": "Dave - 2026-07-29 Pass 65 HITL correction",
       "recordedAt": "2026-07-25T22:30:00Z",
-      "resolvedAt": "2026-07-28T04:32:32.888Z",
+      "resolvedAt": "2026-07-29T05:55:01.801Z",
       "freezeNoLaterThan": "Before support schema",
-      "supersedesReceiptSha256": "bf15107867186691ede2d3164572508fb5093f2dcc4923c01ae906e63b9cfd59"
+      "supersedesReceiptSha256": "2f73d74da698485cfd32348263d5fe79d3ebc9e5fb98405e8d4b0c560f9fdba3"
     },
     {
       "receiptVersion": 1,

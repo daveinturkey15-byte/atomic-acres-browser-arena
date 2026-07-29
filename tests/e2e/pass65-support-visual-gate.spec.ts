@@ -315,6 +315,10 @@ test.describe('Pass 65 support visual fail-closed gate', () => {
       await expect.poll(async () => (await state(guest)).killstreakPresentation.markerDetails.length).toBe(1);
       const hostCarpetMarkers = (await state(host)).killstreakPresentation.markerDetails;
       const guestCarpetMarkers = (await state(guest)).killstreakPresentation.markerDetails;
+      const carpetAircraft = (await state(host)).killstreak.entities.find((entity: any) => (
+        entity.kind === 'aircraft' && String(entity.id).includes('carpet-aircraft')
+      ));
+      expect(carpetAircraft).toMatchObject({ kind: 'aircraft', phase: 'inbound' });
       const hostTarget = hostCarpetMarkers.find((marker: any) => marker.shape === 'ground-x');
       const corridor = hostCarpetMarkers.find((marker: any) => marker.shape === 'corridor');
       expect(hostTarget).toMatchObject({ source: 'carpet-bomber', audience: 'all-combatants', halfWidthM: null });
@@ -341,7 +345,12 @@ test.describe('Pass 65 support visual fail-closed gate', () => {
       expect(errors).toEqual([]);
       writeReceipt('replicated-placement-markers', {
         care: { crosshairTarget: careCrosshairTarget, host: hostCare, guest: guestCare },
-        carpet: { crosshairTarget: carpetCrosshairTarget, host: hostCarpetMarkers, guest: guestCarpetMarkers },
+        carpet: {
+          crosshairTarget: carpetCrosshairTarget,
+          aircraft: carpetAircraft,
+          host: hostCarpetMarkers,
+          guest: guestCarpetMarkers,
+        },
         browserErrors: errors,
       });
     } finally {

@@ -202,8 +202,9 @@ exactKeys(decision.carePackagePolicy, ['eligibilityPredicate', 'inclusionCardina
 exactKeys(decision.earningPolicy, ['progressScope', 'advancingKillSources', 'excludedKillSources', 'eachRewardEarnsOncePerCycle', 'cycleRepeatsAfterFinalThresholdWhileLifeActive', 'nextCycleProgressStartsAtZero', 'deathClearsProgress', 'deathClearsUnconsumedRewards', 'unconsumedRewardLifetime', 'respawnStartsFreshLife', 'rematchStartsFreshEpoch'], 'DEC-13 earningPolicy');
 exactKeys(decision.activationPolicy, ['hostOwnsActivation', 'consumesExactlyOnce', 'duplicateOwnerTypePolicy'], 'DEC-13 activationPolicy');
 exactKeys(decision.privacyPolicy, ['rewardSeedRollHostOnly', 'acquisitionStateHostOnly', 'rewardRevealPolicy', 'recipientSnapshotOmitsSeedAndRoll'], 'DEC-13 privacyPolicy');
-exactKeys(decision.droneSwarmCalibration, ['count', 'healthEach', 'magazineSize', 'reservePolicy', 'maximumLifetimeMs', 'ingress', 'formation', 'routePolicy', 'targets', 'rejects', 'survivalIntent'], 'DEC-13 droneSwarmCalibration');
-exactKeys(decision.carpetBomber, ['playerInput', 'ingressAndOrientation', 'impactCount', 'pattern', 'damageMultiplierFromPreviousFrozenProfile', 'payloadPresentation'], 'DEC-13 carpetBomber');
+exactKeys(decision.droneSwarmCalibration, ['count', 'healthEach', 'magazineSize', 'reservePolicy', 'maximumLifetimeMs', 'spawnOrigin', 'minimumSpawnSeparationM', 'ingress', 'formation', 'routePolicy', 'targets', 'rejects', 'survivalIntent'], 'DEC-13 droneSwarmCalibration');
+exactKeys(decision.pilotedDroneDeployment, ['modeChoiceRequired', 'allowedModes', 'spawnOrigin', 'minimumSpawnSeparationM', 'inputConvention', 'manualHorizontalSpeedMps', 'autonomousStandaloneSpeedMultiplier', 'autonomousStandaloneSpeedMps', 'sharedAssetFamilyWithDroneSwarm', 'sharedGunProfileId', 'variantDifferencesLimitedTo'], 'DEC-13 pilotedDroneDeployment');
+exactKeys(decision.carpetBomber, ['playerInput', 'targetingLifecycle', 'sharedGroundMarker', 'callerFlightPathPreview', 'ingressAndOrientation', 'impactCount', 'pattern', 'damageMultiplierFromPreviousFrozenProfile', 'payloadPresentation'], 'DEC-13 carpetBomber');
 check(decision.selectionPolicy?.slotCount === 5 && decision.selectionPolicy?.duplicatesAllowed === false, 'DEC-13 must explicitly require five distinct slots');
 check(decision.selectionPolicy?.freezeAt === 'match-start', 'DEC-13 selection freeze policy invalid');
 check(canonical(decision.selectionPolicy?.keyBindings) === canonical([3, 4, 5, 6, 7]), 'DEC-13 slot keys must equal 3-7');
@@ -231,12 +232,18 @@ check(decision.earningPolicy?.eachRewardEarnsOncePerCycle === true && decision.e
 check(decision.earningPolicy?.deathClearsUnconsumedRewards === false, 'death must retain unconsumed rewards');
 check(decision.earningPolicy?.unconsumedRewardLifetime === 'until-consumed-or-match-epoch-ends', 'unconsumed reward lifetime invalid');
 check(decision.droneSwarmCalibration?.count === 24 && decision.droneSwarmCalibration?.healthEach === 50 && decision.droneSwarmCalibration?.magazineSize === 20 && decision.droneSwarmCalibration?.maximumLifetimeMs === 60000, 'DEC-13 Drone Swarm numeric calibration invalid');
-check(decision.droneSwarmCalibration?.ingress === 'safe-volume-behind-caller-fast-then-smooth-normal-speed' && decision.droneSwarmCalibration?.formation === 'distributed-individual-or-small-groups' && decision.droneSwarmCalibration?.routePolicy === 'host-seeded-divergent-valid-map-directions', 'DEC-13 Drone Swarm ingress/formation/route policy invalid');
-check(decision.carpetBomber?.playerInput === 'crosshair-ground-anchor-no-overview-map' && decision.carpetBomber?.ingressAndOrientation === 'host-seeded-valid-random' && decision.carpetBomber?.impactCount === 20 && decision.carpetBomber?.pattern === 'bounded-zigzag' && decision.carpetBomber?.damageMultiplierFromPreviousFrozenProfile === 3, 'DEC-13 Carpet Bomber targeting/damage policy invalid');
+check(decision.droneSwarmCalibration?.spawnOrigin === 'deterministic-valid-centre-map-volume' && decision.droneSwarmCalibration?.minimumSpawnSeparationM === 1.15 && decision.droneSwarmCalibration?.ingress === 'fast-then-smooth-normal-speed' && decision.droneSwarmCalibration?.formation === 'distributed-individual-or-small-groups' && decision.droneSwarmCalibration?.routePolicy === 'host-seeded-divergent-valid-map-directions', 'DEC-13 Drone Swarm spawn/ingress/formation/route policy invalid');
+check(decision.carpetBomber?.playerInput === 'crosshair-ground-anchor-no-overview-map' && decision.carpetBomber?.targetingLifecycle === 'care-package-style-crosshair-preview-commit-aircraft-resolve' && decision.carpetBomber?.sharedGroundMarker === 'large-red-x-at-admitted-anchor' && decision.carpetBomber?.callerFlightPathPreview === 'red-map-bounded-payload-corridor' && decision.carpetBomber?.ingressAndOrientation === 'host-seeded-valid-random' && decision.carpetBomber?.impactCount === 20 && decision.carpetBomber?.pattern === 'bounded-zigzag' && decision.carpetBomber?.damageMultiplierFromPreviousFrozenProfile === 3, 'DEC-13 Carpet Bomber targeting/lifecycle/damage policy invalid');
 check(sameSet(decision.carpetBomber?.payloadPresentation, ['visible-falling-shell', 'large-bounded-explosion', 'smoke', 'fire', 'spatial-audio']), 'DEC-13 Carpet Bomber payload presentation incomplete');
 check(canonical(decision.pilotedDroneDeployment) === canonical({
   modeChoiceRequired: true,
   allowedModes: ['autonomous', 'first-person-owner-control'],
+  spawnOrigin: 'deterministic-valid-centre-map-volume',
+  minimumSpawnSeparationM: 1.15,
+  inputConvention: 'non-inverted-screen-space-keyboard-mouse-gamepad',
+  manualHorizontalSpeedMps: 10,
+  autonomousStandaloneSpeedMultiplier: 2,
+  autonomousStandaloneSpeedMps: 20,
   sharedAssetFamilyWithDroneSwarm: true,
   sharedGunProfileId: 'drone-gun-standard-v1',
   variantDifferencesLimitedTo: ['control-mode', 'reserve', 'lifetime', 'sensor-policy'],
@@ -400,7 +407,7 @@ for (const def of definitions) {
   check(def.navigation?.required ? idOk(def.navigation.policyId) && def.navigation.recoveryPolicy === 'bounded-host-recovery' : def.navigation?.policyId === null && def.navigation?.recoveryPolicy === 'not-applicable', `${label}: navigation policy inconsistent`);
 
   if (def.targeting === null) {
-    check(['parachute-crate', 'drone'].includes(def.kind), `${label}: only non-AI crate/piloted drone may omit targeting`);
+    check(def.kind === 'parachute-crate', `${label}: only a non-AI crate may omit targeting`);
   } else {
     exactKeys(def.targeting, ['policyId', 'hostOwned', 'livingOnly', 'opposingOnly', 'allowedTargetKinds', 'lineOfSightRequired', 'semanticSmokeBlocks', 'hardCoverBlocks', 'hiddenUntilReveal'], `${label}.targeting`);
     check(idOk(def.targeting?.policyId) && def.targeting?.hostOwned === true, `${label}: targeting must be host-owned and identified`);
@@ -437,13 +444,16 @@ for (const def of definitions) {
   }
 
   if (def.kind === 'aircraft') {
-    exactKeys(def.detail, ['role', 'bombCount', 'ingressPolicy', 'pathPolicy', 'activationAnchorPolicy', 'lifetimeMs'], `${label}.detail`);
+    const aircraftDetailKeys = ['role', 'bombCount', 'ingressPolicy', 'pathPolicy', 'activationAnchorPolicy', 'lifetimeMs'];
+    if (def.detail?.role === 'carpet-bomber') aircraftDetailKeys.push('targetingLifecycle', 'sharedGroundMarker', 'callerFlightPathPreview');
+    exactKeys(def.detail, aircraftDetailKeys, `${label}.detail`);
     check(['care-drop', 'yardhawk', 'tri-pass', 'carpet-bomber', 'hunter-swarm'].includes(def.detail?.role), `${label}: aircraft role invalid`);
     check(Number.isInteger(def.detail?.bombCount) && def.detail.bombCount >= 0 && def.detail.bombCount <= 20, `${label}: aircraft bomb count invalid`);
     check(Number.isInteger(def.detail?.lifetimeMs) && def.detail.lifetimeMs >= 1 && def.detail.lifetimeMs <= 600000, `${label}: aircraft lifetime invalid`);
     if (def.detail?.role === 'carpet-bomber') {
       check(def.detail?.bombCount === 20 && def.maximumProjectiles === 20, `${label}: Carpet Bomber must schedule exactly 20 bounded impacts`);
       check(def.detail?.ingressPolicy === 'host-seeded-random-valid' && def.detail?.pathPolicy === 'bounded-zigzag-strip' && def.detail?.activationAnchorPolicy === 'crosshair-ground-anchor-no-overview-map', `${label}: Carpet Bomber anchor/ingress/path policy invalid`);
+      check(def.detail?.targetingLifecycle === 'care-package-style-crosshair-preview-commit-aircraft-resolve' && def.detail?.sharedGroundMarker === 'large-red-x-at-admitted-anchor' && def.detail?.callerFlightPathPreview === 'red-map-bounded-payload-corridor', `${label}: Carpet Bomber targeting/aircraft lifecycle incomplete`);
     } else {
       check(def.detail?.bombCount === 0 && def.detail?.ingressPolicy === 'not-applicable' && def.detail?.pathPolicy === 'not-applicable' && def.detail?.activationAnchorPolicy === 'not-applicable', `${label}: non-bomber aircraft carries bomber-only fields`);
     }
@@ -459,7 +469,7 @@ for (const def of definitions) {
     check(def.detail?.losRequired === true && def.detail?.semanticSmokeBlocks === true, `${label}: chopper LOS/smoke policy invalid`);
     check(def.detail?.pressureSevereByMs === 4000 && def.detail?.escapeWindowMinMs === 4000 && def.detail?.escapeWindowMaxMs === 5000, `${label}: chopper pressure calibration invalid`);
   } else if (def.kind === 'drone') {
-    exactKeys(def.detail, ['count', 'durationMs', 'fuelMs', 'ownerBodyVulnerable', 'controlRestoreConditions', 'targetKinds', 'relationshipPolicy', 'pressureSevereByMs', 'escapeWindowMinMs', 'escapeWindowMaxMs', 'ingressPolicy', 'formationPolicy', 'routePolicy'], `${label}.detail`);
+    exactKeys(def.detail, ['count', 'durationMs', 'fuelMs', 'ownerBodyVulnerable', 'controlRestoreConditions', 'targetKinds', 'relationshipPolicy', 'pressureSevereByMs', 'escapeWindowMinMs', 'escapeWindowMaxMs', 'spawnOrigin', 'minimumSpawnSeparationM', 'inputConvention', 'manualHorizontalSpeedMps', 'autonomousStandaloneSpeedMultiplier', 'autonomousStandaloneSpeedMps', 'ingressPolicy', 'formationPolicy', 'routePolicy'], `${label}.detail`);
     check(Number.isInteger(def.detail?.count) && def.detail.count >= 1 && def.detail.count <= 24, `${label}: drone count invalid`);
     check(def.maximumEntities === def.detail.count, `${label}: maximumEntities must equal drone count`);
     check(Number.isInteger(def.detail?.durationMs) && def.detail.durationMs >= 1 && def.detail.durationMs <= 60000, `${label}: drone duration invalid`);
@@ -467,7 +477,8 @@ for (const def of definitions) {
     check(typeof def.detail?.ownerBodyVulnerable === 'boolean', `${label}: owner-body vulnerability missing`);
     check(Array.isArray(def.detail?.controlRestoreConditions) && def.detail.controlRestoreConditions.every(idOk) && unique(def.detail.controlRestoreConditions), `${label}: control restoration conditions invalid`);
     check(Array.isArray(def.detail?.targetKinds) && def.detail.targetKinds.every(idOk) && unique(def.detail.targetKinds), `${label}: drone target kinds invalid`);
-    check(['opposing-living-only', 'pilot-controlled'].includes(def.detail?.relationshipPolicy), `${label}: drone relationship policy invalid`);
+    check(['opposing-living-only', 'owner-controlled-or-opposing-living-ai'].includes(def.detail?.relationshipPolicy), `${label}: drone relationship policy invalid`);
+    check(def.detail?.spawnOrigin === 'deterministic-valid-centre-map-volume' && def.detail?.minimumSpawnSeparationM === 1.15, `${label}: deterministic separated centre-map spawn policy invalid`);
     check(def.weapon?.gunProfileId === DRONE_GUN_ID && def.weapon?.magazineSize === 20, `${label}: drones must use the immutable shared 20-round gun profile`);
     const minimumProjectileCapacity = (Number.isInteger(def.detail?.count) ? def.detail.count : Infinity) * (Number.isInteger(def.weapon?.magazineSize) ? def.weapon.magazineSize : Infinity);
     check(def.maximumProjectiles >= minimumProjectileCapacity, `${label}: projectile cap below one loaded magazine per drone`);
@@ -480,16 +491,19 @@ const chopper = definitions.find(item => item.id === 'chopper-entity');
 check(Boolean(swarm) && swarm.detail?.count === 24 && swarm.health === 50 && swarm.detail?.durationMs === 60000, 'Drone Swarm must be 24 targetable 50-HP drones for 60 seconds');
 check(swarm?.weapon?.reservePolicy === 'unlimited-reloads-until-expiry', 'Drone Swarm must have unlimited host reloads until expiry');
 check(swarm?.maximumProjectiles === 480, 'Drone Swarm projectile cap must equal one loaded 20-round magazine for each of 24 drones');
-check(swarm?.detail?.ingressPolicy === 'behind-caller-fast-then-smooth-normal-speed' && swarm?.detail?.formationPolicy === 'distributed-individual-or-small-groups' && swarm?.detail?.routePolicy === 'host-seeded-divergent-valid-map-directions', 'Drone Swarm ingress/formation/route contract incomplete');
+check(swarm?.detail?.spawnOrigin === 'deterministic-valid-centre-map-volume' && swarm?.detail?.minimumSpawnSeparationM === 1.15 && swarm?.detail?.inputConvention === 'not-applicable' && swarm?.detail?.manualHorizontalSpeedMps === null && swarm?.detail?.autonomousStandaloneSpeedMultiplier === null && swarm?.detail?.autonomousStandaloneSpeedMps === null, 'Drone Swarm centre-spawn/standalone-speed isolation contract incomplete');
+check(swarm?.detail?.ingressPolicy === 'fast-then-smooth-normal-speed' && swarm?.detail?.formationPolicy === 'distributed-individual-or-small-groups' && swarm?.detail?.routePolicy === 'host-seeded-divergent-valid-map-directions', 'Drone Swarm ingress/formation/route contract incomplete');
 check(sameSet(swarm?.detail?.targetKinds, ['player', 'bot']) && swarm?.detail?.relationshipPolicy === 'opposing-living-only', 'Drone Swarm target eligibility must be opposing living players and bots');
 check(swarm?.detail?.fuelMs === null && swarm?.detail?.ownerBodyVulnerable === false && sameSet(swarm?.detail?.controlRestoreConditions, []), 'Drone Swarm cannot carry piloted-drone fuel/body/control semantics');
 check(swarm?.detail?.pressureSevereByMs === 4000 && swarm?.detail?.escapeWindowMinMs === 4000 && swarm?.detail?.escapeWindowMaxMs === 5000, 'Drone Swarm pressure calibration must bind the four-to-five-second exposure/escape target');
 check(swarm?.targeting?.livingOnly === true && swarm?.targeting?.opposingOnly === true && swarm?.targeting?.lineOfSightRequired === true && swarm?.targeting?.semanticSmokeBlocks === true && swarm?.targeting?.hardCoverBlocks === true, 'Drone Swarm LOS/smoke/cover target policy incomplete');
 check(Boolean(pilot) && pilot.detail?.count === 1 && pilot.health === 50 && pilot.detail?.durationMs === 30000 && pilot.detail?.fuelMs === 30000, 'Piloted Drone must be one targetable 50-HP drone with 30-second duration and fuel');
-check(pilot?.detail?.ingressPolicy === 'not-applicable' && pilot?.detail?.formationPolicy === 'not-applicable' && pilot?.detail?.routePolicy === 'pilot-controlled', 'Piloted Drone must not inherit Drone Swarm formation policy');
+check(pilot?.detail?.spawnOrigin === 'deterministic-valid-centre-map-volume' && pilot?.detail?.minimumSpawnSeparationM === 1.15 && pilot?.detail?.inputConvention === 'non-inverted-screen-space-keyboard-mouse-gamepad', 'Piloted Drone centre-spawn/input convention incomplete');
+check(pilot?.detail?.manualHorizontalSpeedMps === 10 && pilot?.detail?.autonomousStandaloneSpeedMultiplier === 2 && pilot?.detail?.autonomousStandaloneSpeedMps === 20 && pilot.detail.autonomousStandaloneSpeedMps === pilot.detail.manualHorizontalSpeedMps * pilot.detail.autonomousStandaloneSpeedMultiplier, 'Piloted Drone autonomous speed must be exactly twice manual horizontal speed');
+check(pilot?.detail?.ingressPolicy === 'not-applicable' && pilot?.detail?.formationPolicy === 'not-applicable' && pilot?.detail?.routePolicy === 'owner-controlled-or-host-ai-twice-manual-speed', 'Piloted Drone must not inherit Drone Swarm formation policy');
 check(pilot?.weapon?.reservePolicy === 'two-magazines-total' && pilot?.maximumProjectiles === 40, 'Piloted Drone must have exactly two 20-round magazines');
 check(pilot?.detail?.ownerBodyVulnerable === true && sameSet(pilot?.detail?.controlRestoreConditions, ['body-death', 'disconnect', 'drone-death', 'exit', 'fuel-expiry']), 'Piloted Drone body/control restoration policy incomplete');
-check(pilot?.targeting === null && sameSet(pilot?.detail?.targetKinds, []) && pilot?.detail?.relationshipPolicy === 'pilot-controlled', 'Piloted Drone cannot carry autonomous target-acquisition semantics');
+check(pilot?.targeting?.livingOnly === true && pilot?.targeting?.opposingOnly === true && pilot?.targeting?.lineOfSightRequired === true && pilot?.targeting?.semanticSmokeBlocks === true && pilot?.targeting?.hardCoverBlocks === true && sameSet(pilot?.detail?.targetKinds, ['player', 'bot']) && pilot?.detail?.relationshipPolicy === 'owner-controlled-or-opposing-living-ai', 'Piloted Drone autonomous mode must target opposing living players/bots under LOS/smoke/cover policy');
 check(pilot?.detail?.pressureSevereByMs === null && pilot?.detail?.escapeWindowMinMs === null && pilot?.detail?.escapeWindowMaxMs === null, 'Piloted Drone cannot carry autonomous pressure-calibration semantics');
 check(Boolean(chopper) && chopper.health === 800 && chopper.targetable === true, 'Chopper must be targetable with 800 HP');
 check(chopper?.maximumProjectiles === 64, 'Chopper projectile cap must equal its 64-round loaded magazine');

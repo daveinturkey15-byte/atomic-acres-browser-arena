@@ -132,9 +132,11 @@ describe('Pass 65 playable killstreak integration', () => {
 
   it('feeds arena-owned portal/no-fly data and current static plus dynamic solids into support flight', () => {
     expect(source).toContain('PASS65_FLIGHT_NAVIGATION[selectedArena.id]');
+    expect(source).toContain('const flightSolids = activeWorldColliders();');
     expect(source).toContain('resolveFlightPosition: (from, desired, radius)');
     expect(source).toContain('resolveSupportFlightStep({');
-    expect(source).toContain('solids: activeWorldColliders()');
+    expect(source).toContain('solids: flightSolids');
+    expect(source).toContain('!flightSolids.some((solid) => sphereIntersectsBox(point, 0.35, solid))');
   });
 
   it('routes F to gun-only chopper handoff, autonomous/manual drone toggle, care capture, or shed interaction before weapon pickup', () => {

@@ -469,7 +469,7 @@ describe('host killstreak runtime', () => {
     expect(runtime.snapshotFor('owner', 1_001).actors[0].available).toContain('care-package');
   });
 
-  it('flies exactly 24 targetable 50-HP swarm drones in from behind before spreading to bounded host targets', () => {
+  it('deploys exactly 24 targetable 50-HP swarm drones in a separated deterministic centre-map formation', () => {
     const runtime = new HostKillstreakRuntime(7);
     runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'drone-swarm']));
     earn(runtime, 15);
@@ -478,8 +478,21 @@ describe('host killstreak runtime', () => {
     const spawned = runtime.snapshotFor('owner', 1_000).entities;
     expect(spawned).toHaveLength(DRONE_SWARM_COUNT);
     expect(spawned.every((entity) => entity.kind === 'drone' && entity.mode === 'swarm' && entity.health === DRONE_HEALTH && entity.magazine === 20 && entity.reserveClips === null)).toBe(true);
-    expect(spawned.every((entity) => entity.position[2] < -8)).toBe(true);
-    expect(new Set(spawned.map((entity) => `${entity.position[0].toFixed(1)}:${entity.position[1].toFixed(1)}`)).size).toBeGreaterThan(12);
+    const centroid = spawned.reduce<[number, number, number]>(
+      (sum, entity) => [sum[0] + entity.position[0], sum[1] + entity.position[1], sum[2] + entity.position[2]],
+      [0, 0, 0],
+    ).map((axis) => axis / spawned.length);
+    expect(Math.abs(centroid[0])).toBeLessThan(0.1);
+    expect(Math.abs(centroid[2])).toBeLessThan(0.1);
+    for (let left = 0; left < spawned.length; left += 1) {
+      for (let right = left + 1; right < spawned.length; right += 1) {
+        expect(Math.hypot(
+          spawned[left].position[0] - spawned[right].position[0],
+          spawned[left].position[1] - spawned[right].position[1],
+          spawned[left].position[2] - spawned[right].position[2],
+        )).toBeGreaterThanOrEqual(1.15);
+      }
+    }
     const attacks = [...runtime.advance(2_000, DEFAULT_WORLD).damageEvents];
     for (let atMs = 2_100; atMs <= 5_000; atMs += 100) attacks.push(...runtime.advance(atMs, DEFAULT_WORLD).damageEvents);
     expect(attacks.length).toBeGreaterThan(0);
@@ -512,7 +525,7 @@ describe('host killstreak runtime', () => {
     const firstPersonForwardWorld: KillstreakWorld = {
       ...DEFAULT_WORLD,
       targets: DEFAULT_WORLD.targets.map((target) => target.id === 'enemy'
-        ? { ...target, position: [0, 1.7, -12] as const }
+        ? { ...target, position: [0, 18, -12] as const }
         : target),
     };
     const runtime = new HostKillstreakRuntime(7);

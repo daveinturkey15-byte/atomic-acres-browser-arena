@@ -84,6 +84,25 @@ export type StandaloneDroneController = 'ai' | 'owner-player';
 
 export const DRONE_PRESENTATION_FAMILY_ID = 'hunter-drone-visual-family-v1' as const;
 
+/**
+ * Shared deployment and movement policy for both drone variants. Spawn origin
+ * is authority, not presentation: callers cannot relocate either variant by
+ * supplying an activation anchor. The standalone AI is deliberately twice as
+ * quick as direct owner control while the 24-unit Swarm retains its separately
+ * pressure-calibrated ingress and patrol speeds.
+ */
+export const DRONE_DEPLOYMENT_POLICY = Object.freeze({
+  spawnOrigin: 'deterministic-valid-centre-map-volume',
+  minimumSpawnSeparationM: 1.15,
+  maximumAdmissionProbesPerUnit: 36,
+  manualHorizontalSpeedMps: 10,
+  manualVerticalSpeedMps: 7,
+  autonomousStandaloneSpeedMultiplier: 2,
+  autonomousStandaloneSpeedMps: 20,
+  swarmIngressSpeedMps: 22,
+  swarmPatrolSpeedMps: 7,
+} as const);
+
 export type DroneSupportDefinition = Readonly<{
   mode: DroneSupportMode;
   gunProfileId: typeof DRONE_GUN_PROFILE_ID;

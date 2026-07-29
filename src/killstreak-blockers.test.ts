@@ -143,10 +143,10 @@ describe('Pass 65 killstreak blockers', () => {
     const world = baseWorld({
       targets: [
         { id: 'owner', kind: 'player', team: 0, lifeId: 1, alive: true, position: [0, 1.7, 0] },
-        { id: 'enemy', kind: 'player', team: 1, lifeId: 2, alive: true, position: [0, 1.7, -12] },
-        { id: 'enemy-dead', kind: 'player', team: 1, lifeId: 8, alive: false, position: [0, 1.7, -10] },
-        { id: 'friendly', kind: 'player', team: 0, lifeId: 3, alive: true, position: [0, 1.7, -8] },
-        { id: 'behind', kind: 'bot', team: 1, lifeId: 4, alive: true, position: [0, 1.7, 8] },
+        { id: 'enemy', kind: 'player', team: 1, lifeId: 2, alive: true, position: [0, 18, -12] },
+        { id: 'enemy-dead', kind: 'player', team: 1, lifeId: 8, alive: false, position: [0, 18, -10] },
+        { id: 'friendly', kind: 'player', team: 0, lifeId: 3, alive: true, position: [0, 18, -8] },
+        { id: 'behind', kind: 'bot', team: 1, lifeId: 4, alive: true, position: [0, 18, 8] },
       ],
       hasLineOfSight: () => false,
     });
@@ -166,7 +166,7 @@ describe('Pass 65 killstreak blockers', () => {
     expect(result.damageEvents).toHaveLength(0);
     expect(runtime.snapshotFor('owner', 1_001).entities[0].magazine).toBe(19);
     expect(runtime.snapshotFor('owner', 1_001).sensorContacts).toEqual([{
-      id: 'enemy', kind: 'player', team: 1, lifeId: 2, position: [0, 1.7, -12], relation: 'hostile', throughWall: true,
+      id: 'enemy', kind: 'player', team: 1, lifeId: 2, position: [0, 18, -12], relation: 'hostile', throughWall: true,
     }]);
     expect(runtime.snapshotFor('observer', 1_001).sensorContacts).toEqual([]);
   });
