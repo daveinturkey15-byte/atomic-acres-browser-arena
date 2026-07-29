@@ -228,6 +228,7 @@ export type WeaponViewmodelCatalogGpuPrewarmer = (
 /** Original first-person weapon presentation with ADS, sprint, recoil, melee and staged reload motion. */
 export class WeaponPresentation {
   static readonly MAX_RETAINED_WEBGPU_WEAPONS = RUNTIME_WEAPON_RETENTION_LIMIT;
+  static readonly CATALOG_GPU_MODELS_PER_SUBMISSION = 2;
   readonly root = new THREE.Group();
   private readonly browserRuntime: boolean;
   private readonly models = new Map<WeaponId, THREE.Object3D>();
@@ -268,6 +269,7 @@ export class WeaponPresentation {
     modelCreateMs: number;
     assetPrepareWallMs: number;
     gpuPrewarmMs: number;
+    gpuSubmissionBatches: number;
     cleanupMs: number;
     totalMs: number;
     mode: 'catalog-batch' | 'individual-fallback';
@@ -1009,6 +1011,7 @@ export class WeaponPresentation {
     const assetPrepareWallMs = performance.now() - assetPrepareStartedAt;
 
     const gpuPrewarmStartedAt = performance.now();
+    let gpuSubmissionBatches = 0;
     if (this.catalogGpuPrewarmer) {
       // A live switch can already own one candidate's individual prewarm. Let
       // that exact operation settle before forming the remaining deployment
@@ -1018,6 +1021,7 @@ export class WeaponPresentation {
         return pending ? [pending] : [];
       }));
       const batchEntries = entries.filter(({ model }) => !this.modelIsGpuReady(model));
+      gpuSubmissionBatches = Math.ceil(batchEntries.length / WeaponPresentation.CATALOG_GPU_MODELS_PER_SUBMISSION);
       const flashlightEntries = batchEntries.filter(({ weaponId }) => WEAPONS[weaponId].flashlight !== null);
       if (flashlightEntries[0]) this.configureWeaponFlashlight(flashlightEntries[0].weaponId);
       try {
@@ -1037,6 +1041,10 @@ export class WeaponPresentation {
         onProgress?.(index + 1, ids.length);
       });
     } else {
+      gpuSubmissionBatches = entries.reduce(
+        (count, { model }) => count + Number(!this.modelIsGpuReady(model)),
+        0,
+      );
       for (const [index, { weaponId: id, model }] of entries.entries()) {
         const exercisesFlashlightPipeline = WEAPONS[id].flashlight !== null;
         let flashlightPipelineReady = false;
@@ -1085,6 +1093,7 @@ export class WeaponPresentation {
       modelCreateMs: Number(modelCreateMs.toFixed(3)),
       assetPrepareWallMs: Number(assetPrepareWallMs.toFixed(3)),
       gpuPrewarmMs: Number(gpuPrewarmMs.toFixed(3)),
+      gpuSubmissionBatches,
       cleanupMs: Number((performance.now() - cleanupStartedAt).toFixed(3)),
       totalMs: Number((performance.now() - prewarmStartedAt).toFixed(3)),
       mode: this.catalogGpuPrewarmer ? 'catalog-batch' : 'individual-fallback',
@@ -1109,6 +1118,26 @@ export class WeaponPresentation {
       prewarming: this.browserCatalogPrewarmPromise !== null,
       unpreparedSwitches: this.unpreparedBrowserSwitches,
       maximumRetained: WeaponPresentation.MAX_RETAINED_WEBGPU_WEAPONS,
+    });
+  }
+
+  /** Exact catalog readiness for cold admission without full viewmodel framing/traversal telemetry. */
+  browserCatalogReadiness() {
+    return Object.freeze({
+      retained: Object.freeze([...this.browserResidentWeaponIds]),
+      retainedCount: this.browserResidentWeaponIds.size,
+      loaded: this.models.size,
+      gpuReady: [...this.models.values()].reduce(
+        (count, model) => count + Number(this.modelIsGpuReady(model)),
+        0,
+      ),
+      available: Object.keys(WEAPONS).length,
+      prewarming: this.browserCatalogPrewarmPromise !== null,
+      unpreparedSwitches: this.unpreparedBrowserSwitches,
+      lastUnpreparedSwitch: this.lastUnpreparedBrowserSwitch,
+      maximumRetained: WeaponPresentation.MAX_RETAINED_WEBGPU_WEAPONS,
+      flashlightGpuPrewarmCount: this.flashlightGpuPrewarmCount,
+      lastPrewarmProfile: this.lastBrowserCatalogPrewarmProfile,
     });
   }
 
@@ -1181,9 +1210,21 @@ export class WeaponPresentation {
     requestGeneration: number,
   ): Promise<void> {
     if (entries.length === 0) return Promise.resolve();
-    const promise = Promise.resolve().then(() => this.catalogGpuPrewarmer!(entries, {
-      requestGeneration,
-    })).then(() => {
+    const promise = Promise.resolve().then(async () => {
+      for (let offset = 0; offset < entries.length; offset += WeaponPresentation.CATALOG_GPU_MODELS_PER_SUBMISSION) {
+        const batch = entries.slice(offset, offset + WeaponPresentation.CATALOG_GPU_MODELS_PER_SUBMISSION);
+        await this.catalogGpuPrewarmer!(batch, { requestGeneration });
+        if (offset + WeaponPresentation.CATALOG_GPU_MODELS_PER_SUBMISSION < entries.length) {
+          // End the current browser task between renderer submissions so the
+          // prerecorded loading/menu video and accessibility UI can present.
+          // One giant 17-model node build created a measured 1.24s long task.
+          await new Promise<void>((resolve) => {
+            if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => resolve());
+            else globalThis.setTimeout(resolve, 0);
+          });
+        }
+      }
+    }).then(() => {
       for (const { model } of entries) this.gpuReadyModels.add(model);
     }).finally(() => {
       for (const { model } of entries) {
@@ -1608,19 +1649,7 @@ export class WeaponPresentation {
         budgetScope: this.weaponFlashlight.userData.shadowBudgetScope ?? null,
       },
       minigunSpool: { ...this.minigunSpool },
-      browserWeaponCatalog: {
-        retained: [...this.browserResidentWeaponIds],
-        retainedCount: this.browserResidentWeaponIds.size,
-        loaded: this.models.size,
-        gpuReady: [...this.models.values()].filter((entry) => this.modelIsGpuReady(entry)).length,
-        available: Object.keys(WEAPONS).length,
-        prewarming: this.browserCatalogPrewarmPromise !== null,
-        unpreparedSwitches: this.unpreparedBrowserSwitches,
-        lastUnpreparedSwitch: this.lastUnpreparedBrowserSwitch,
-        maximumRetained: WeaponPresentation.MAX_RETAINED_WEBGPU_WEAPONS,
-        flashlightGpuPrewarmCount: this.flashlightGpuPrewarmCount,
-        lastPrewarmProfile: this.lastBrowserCatalogPrewarmProfile,
-      },
+      browserWeaponCatalog: this.browserCatalogReadiness(),
       importedModel,
     };
   }

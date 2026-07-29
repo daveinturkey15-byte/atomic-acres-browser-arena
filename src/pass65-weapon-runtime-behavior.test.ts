@@ -314,7 +314,7 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(releasePass65WeaponModelsIn(presentation.root)).toBe(replacementIds.length);
   });
 
-  it('batches the not-yet-ready deployment catalog behind one renderer fence', async () => {
+  it('prewarms the not-yet-ready deployment catalog in bounded yielded renderer batches', async () => {
     stubBrowserTextureLoading();
     vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (
       Promise.resolve(fakeGltfForUrl(String(url)))
@@ -337,10 +337,15 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     ]);
 
     expect(individualPrewarmer).toHaveBeenCalledTimes(1);
-    expect(catalogPrewarmer).toHaveBeenCalledTimes(1);
-    const [entries] = catalogPrewarmer.mock.calls[0]!;
+    expect(catalogPrewarmer).toHaveBeenCalledTimes(Math.ceil(
+      (WEAPON_IDS.length - 1) / WeaponPresentation.CATALOG_GPU_MODELS_PER_SUBMISSION,
+    ));
+    const entries = catalogPrewarmer.mock.calls.flatMap(([batch]) => batch);
     expect(entries.map((entry) => entry.weaponId)).toEqual(WEAPON_IDS.filter((id) => id !== 'carbine'));
     expect(entries.every((entry) => entry.model.visible === false)).toBe(true);
+    expect(catalogPrewarmer.mock.calls.every(([batch]) => (
+      batch.length <= WeaponPresentation.CATALOG_GPU_MODELS_PER_SUBMISSION
+    ))).toBe(true);
     expect(presentation.presentationState().browserWeaponCatalog).toMatchObject({
       retainedCount: WEAPON_IDS.length,
       loaded: WEAPON_IDS.length,
@@ -356,6 +361,8 @@ describe('Pass 65 managed weapon runtime behavior', () => {
       maximumRetained: RUNTIME_WEAPON_RETENTION_LIMIT,
     });
     expect(Object.isFrozen(presentation.browserCatalogHealth())).toBe(true);
+    expect(presentation.browserCatalogReadiness()).toEqual(presentation.presentationState().browserWeaponCatalog);
+    expect(Object.isFrozen(presentation.browserCatalogReadiness())).toBe(true);
     expect(releasePass65WeaponModelsIn(presentation.root)).toBe(PASS65_AUTHORED_FIREARM_IDS.length);
   });
 
