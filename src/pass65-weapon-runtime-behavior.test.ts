@@ -274,6 +274,11 @@ describe('Pass 65 managed weapon runtime behavior', () => {
       lastUnpreparedSwitch: null,
       maximumRetained: RUNTIME_WEAPON_RETENTION_LIMIT,
       flashlightGpuPrewarmCount: 1,
+      lastPrewarmProfile: expect.objectContaining({
+        requested: catalogIds.length,
+        newlyCreated: catalogIds.length - 1,
+        mode: 'individual-fallback',
+      }),
     });
     expect(prewarmer).toHaveBeenCalledTimes(catalogIds.length);
     const loadsAfterDeployment = loadSpy.mock.calls.length;

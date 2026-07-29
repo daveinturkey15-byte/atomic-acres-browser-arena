@@ -8,7 +8,7 @@ import { isFatalWebGpuConsoleWarning } from './pass65-browser-console-contract.m
 const port = Number(process.env.PASS65_COLD_ADMISSION_PORT ?? '44175');
 const requestedTrials = Number(process.env.PASS65_COLD_ADMISSION_TRIALS ?? '3');
 const trials = Math.min(5, Math.max(3, Math.floor(requestedTrials)));
-const maximumFirstSwitchFrameMs = 50;
+const maximumPreparedSwitchFrameMs = 50;
 const artifactRoot = 'artifacts/pass65/cold-webgpu-admission';
 const chromeCandidates = [
   process.env.PASS65_CHROME_PATH,
@@ -124,12 +124,15 @@ try {
         for (const weaponId of weaponIds) {
           const startedAt = performance.now();
           api.equipWeapon(weaponId);
-          const firstPresentedAt = await new Promise((resolve) => requestAnimationFrame(resolve));
-          const settledAt = await new Promise((resolve) => requestAnimationFrame(resolve));
+          const frameTimes = [];
+          for (let frame = 0; frame < 3; frame += 1) {
+            frameTimes.push(await new Promise((resolve) => requestAnimationFrame(() => resolve(performance.now()))));
+          }
+          const frameGapsMs = frameTimes.map((at, index) => at - (index === 0 ? startedAt : frameTimes[index - 1]));
           samples.push({
             weaponId,
-            firstFrameMs: firstPresentedAt - startedAt,
-            settledFrameMs: settledAt - firstPresentedAt,
+            frameGapsMs,
+            maximumFrameMs: Math.max(...frameGapsMs),
           });
         }
         const afterSwitches = api.snapshot().weaponPresentation.browserWeaponCatalog;
@@ -137,8 +140,7 @@ try {
           before: beforeSwitches,
           after: afterSwitches,
           samples,
-          maximumFirstFrameMs: Math.max(0, ...samples.map((sample) => sample.firstFrameMs)),
-          maximumSettledFrameMs: Math.max(0, ...samples.map((sample) => sample.settledFrameMs)),
+          maximumFrameMs: Math.max(0, ...samples.map((sample) => sample.maximumFrameMs)),
         };
       });
 
@@ -190,8 +192,8 @@ try {
       if (firstSwitchAudit.before.unpreparedSwitches !== 0 || firstSwitchAudit.after.unpreparedSwitches !== 0) {
         failures.push(`a first weapon switch reached an unprepared model: ${JSON.stringify(firstSwitchAudit.after.lastUnpreparedSwitch)}`);
       }
-      if (firstSwitchAudit.maximumFirstFrameMs > maximumFirstSwitchFrameMs) {
-        failures.push(`first prepared weapon switch frame ${firstSwitchAudit.maximumFirstFrameMs.toFixed(1)}ms exceeded ${maximumFirstSwitchFrameMs}ms`);
+      if (firstSwitchAudit.maximumFrameMs > maximumPreparedSwitchFrameMs) {
+        failures.push(`prepared weapon switch frame ${firstSwitchAudit.maximumFrameMs.toFixed(1)}ms exceeded ${maximumPreparedSwitchFrameMs}ms`);
       }
       if (transition.phase !== 'idle' || transition.failure !== null || transition.renderSubmissionPaused) failures.push(`arena transition did not commit cleanly: ${JSON.stringify(transition)}`);
       if (after.runtime.actualBackend !== 'webgpu' || after.runtime.softwareAdapter || after.runtime.deviceLost) failures.push('hardware WebGPU did not remain healthy');

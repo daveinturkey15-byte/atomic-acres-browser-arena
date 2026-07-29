@@ -261,6 +261,16 @@ export class WeaponPresentation {
   private readonly weaponFlashlight: THREE.SpotLight;
   private readonly weaponFlashlightTarget: THREE.Object3D;
   private flashlightGpuPrewarmCount = 0;
+  private lastBrowserCatalogPrewarmProfile: Readonly<{
+    requested: number;
+    newlyCreated: number;
+    assetLoadMs: number;
+    modelCreateMs: number;
+    gpuPrewarmMs: number;
+    cleanupMs: number;
+    totalMs: number;
+    mode: 'catalog-batch' | 'individual-fallback';
+  }> | null = null;
   private readonly casings: ViewCasing[] = [];
   private readonly smokes: ViewSmoke[] = [];
   private readonly smokePositions = new Float32Array(24);
@@ -936,9 +946,16 @@ export class WeaponPresentation {
     ids: readonly WeaponId[],
     onProgress?: (loaded: number, total: number) => void,
   ): Promise<void> {
+    const prewarmStartedAt = performance.now();
+    let assetLoadMs = 0;
+    let modelCreateMs = 0;
+    let newlyCreated = 0;
     const entries: WeaponViewmodelCatalogGpuPrewarmEntry[] = [];
     for (const id of ids) {
+      const assetLoadStartedAt = performance.now();
       await loadPass65WeaponPresentation(id, 'first-person');
+      assetLoadMs += performance.now() - assetLoadStartedAt;
+      const modelCreateStartedAt = performance.now();
       let model = this.models.get(id);
       if (!model) {
         const loadedModel = this.createLoadedBrowserWeapon(id);
@@ -949,10 +966,13 @@ export class WeaponPresentation {
         this.models.set(id, model);
         this.modelLastUsed.set(id, ++this.modelUseCounter);
         this.root.add(model);
+        newlyCreated += 1;
       }
       entries.push(Object.freeze({ weaponId: id, model }));
+      modelCreateMs += performance.now() - modelCreateStartedAt;
     }
 
+    const gpuPrewarmStartedAt = performance.now();
     if (this.catalogGpuPrewarmer) {
       // A live switch can already own one candidate's individual prewarm. Let
       // that exact operation settle before forming the remaining deployment
@@ -1001,6 +1021,8 @@ export class WeaponPresentation {
         onProgress?.(index + 1, ids.length);
       }
     }
+    const gpuPrewarmMs = performance.now() - gpuPrewarmStartedAt;
+    const cleanupStartedAt = performance.now();
     const desired = new Set(ids);
     for (const id of [...this.browserResidentWeaponIds]) {
       if (!desired.has(id)) this.browserResidentWeaponIds.delete(id);
@@ -1020,6 +1042,16 @@ export class WeaponPresentation {
     for (const [weaponId, model] of this.models) model.visible = weaponId === this.active;
     this.modelLastUsed.set(this.active, ++this.modelUseCounter);
     this.updateActiveSockets(this.active);
+    this.lastBrowserCatalogPrewarmProfile = Object.freeze({
+      requested: ids.length,
+      newlyCreated,
+      assetLoadMs: Number(assetLoadMs.toFixed(3)),
+      modelCreateMs: Number(modelCreateMs.toFixed(3)),
+      gpuPrewarmMs: Number(gpuPrewarmMs.toFixed(3)),
+      cleanupMs: Number((performance.now() - cleanupStartedAt).toFixed(3)),
+      totalMs: Number((performance.now() - prewarmStartedAt).toFixed(3)),
+      mode: this.catalogGpuPrewarmer ? 'catalog-batch' : 'individual-fallback',
+    });
   }
 
   isReady(): boolean {
@@ -1533,6 +1565,7 @@ export class WeaponPresentation {
         lastUnpreparedSwitch: this.lastUnpreparedBrowserSwitch,
         maximumRetained: WeaponPresentation.MAX_RETAINED_WEBGPU_WEAPONS,
         flashlightGpuPrewarmCount: this.flashlightGpuPrewarmCount,
+        lastPrewarmProfile: this.lastBrowserCatalogPrewarmProfile,
       },
       importedModel,
     };
