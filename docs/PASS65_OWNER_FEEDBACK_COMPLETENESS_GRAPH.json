@@ -139,13 +139,63 @@
       "outcomeProjectionSha256": "4104b9defd55330ab8070e5a46075c09998c1899412df6939794c9e19ad08ac5"
     },
     {
+      "id": "SRC-CODEX-V66-JUL29-001",
+      "kind": "codex-owner-feedback",
+      "externalLocator": "codex-task:pass66-hitl-correction-2026-07-29",
+      "rawByteLength": 4338,
+      "rawSha256": "653194af148e5846cc72b300dfd787e4366b8053482b5f37972f2331b9f768b5",
+      "rawEndsWithCrLf": false,
+      "normalizedRepositoryPath": "docs/pass65-sources/codex-owner-feedback-v66-2026-07-29.txt",
+      "normalization": "UTF-8; CRLF converted to LF; one final LF added; text semantics unchanged",
+      "normalizedByteLength": 4308,
+      "normalizedSha256": "1d292cdf0836f37743771cec5b56e3c7240af6f7d35f18dc763978f18e278c11",
+      "outcomeCollection": "codexV66July29Outcomes",
+      "outcomeIdPrefix": "V66JUL29",
+      "outcomeCount": 32,
+      "lineAtomCounts": {
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1,
+        "14": 1,
+        "15": 1,
+        "16": 1,
+        "17": 1,
+        "18": 1,
+        "19": 1,
+        "20": 1,
+        "21": 1,
+        "22": 1,
+        "23": 1,
+        "24": 1,
+        "25": 1,
+        "26": 1,
+        "27": 1,
+        "28": 1,
+        "29": 1,
+        "30": 1,
+        "31": 1,
+        "32": 1
+      },
+      "outcomeProjectionSha256": "d7c1620bb45219bb043907fbbc6c2406e8f38943940e97d9f616f96b7743a87d"
+    },
+    {
       "id": "SRC-CORRECTION-LEDGER-001",
       "kind": "canonical-correction-ledger",
       "repositoryPath": "docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md",
       "ledgerVersion": 1,
-      "latestFeedbackId": "HF-140",
-      "outcomeCount": 140,
-      "stateIndependentOutcomeSha256": "d0c24ad416192e335bb9563a446d892af374a2dd2d201064ba26c276f47fa592"
+      "latestFeedbackId": "HF-160",
+      "outcomeCount": 160,
+      "stateIndependentOutcomeSha256": "7cba230b4d0e4f199a1ad313537e133bf452fed3131ad0e8b5b4fe83286b1c37"
     },
     {
       "id": "SRC-PLANNING-MATRIX-001",
@@ -829,7 +879,7 @@
     "outcomeIdTemplate": "CORR-{feedbackId}",
     "sourceLocatorTemplate": "{feedbackId}.observation",
     "feedbackIdStart": "HF-001",
-    "feedbackIdEnd": "HF-140"
+    "feedbackIdEnd": "HF-160"
   },
   "supersessions": [
     {
@@ -1148,6 +1198,94 @@
         "HF-131"
       ],
       "canonicalText": "`DEC-13` Piloted Drone and Drone Swarm deployment now originates from deterministic valid centre-map spawn volumes with distributed separation. This supersedes the behind-caller ingress rule while retaining the 24-unit Swarm count, targetability, bounded navigation and divergent individual/small-group routes."
+    },
+    {
+      "id": "SUP-021",
+      "ledgerOrdinal": 21,
+      "sourceOutcomeIds": [
+        "V66JUL29-006",
+        "CORR-HF-142"
+      ],
+      "feedbackIds": [
+        "HF-142"
+      ],
+      "canonicalText": "`DEC-13` standalone Piloted Drone manual movement is exactly 30% of the inspected 10 m/s baseline, therefore 3 m/s; autonomous movement remains exactly twice manual at 6 m/s. Drone Swarm ingress and patrol are independent catalog values and are not multiplied or reduced by this change."
+    },
+    {
+      "id": "SUP-022",
+      "ledgerOrdinal": 22,
+      "sourceOutcomeIds": [
+        "V66JUL29-010",
+        "CORR-HF-144"
+      ],
+      "feedbackIds": [
+        "HF-144"
+      ],
+      "canonicalText": "Shared `F` arbitration is now a pinned press lifecycle rather than an immediate keydown priority. Releasing before 1,000 ms performs the winning eligible tap world action; reaching 1,000 ms performs eligible Piloted Drone or Chopper Gunner enter/exit with visible progress. Exactly one action commits, and keyup, blur, death, epoch, range or LOS invalidation cancels stale work. This supersedes supersession 15 and the earlier continuous care-capture interpretation."
+    },
+    {
+      "id": "SUP-023",
+      "ledgerOrdinal": 23,
+      "sourceOutcomeIds": [
+        "V66JUL29-012",
+        "CORR-HF-145"
+      ],
+      "feedbackIds": [
+        "HF-145"
+      ],
+      "canonicalText": "Solo skirmish initial enemy count is exactly one on every bot-enabled arena. Arena-specific reinforcement cadence, hard caps and hosted-lobby bot choices remain separately catalogued; graphics profiles may never alter any count."
+    },
+    {
+      "id": "SUP-024",
+      "ledgerOrdinal": 24,
+      "sourceOutcomeIds": [
+        "V66JUL29-013",
+        "CORR-HF-146"
+      ],
+      "feedbackIds": [
+        "HF-146"
+      ],
+      "canonicalText": "Smoke authority and presentation share one frozen volume contract: semantic radius is 150% of the inspected baseline, lifetime is deterministically sampled within five to ten seconds, one replicated readable colour is selected per activation, and admitted bullet corridors affect the same semantic density queried by humans and bots."
+    },
+    {
+      "id": "SUP-025",
+      "ledgerOrdinal": 25,
+      "sourceOutcomeIds": [
+        "V66JUL29-024",
+        "CORR-HF-152"
+      ],
+      "feedbackIds": [
+        "HF-152"
+      ],
+      "canonicalText": "Background browser lifecycle never promises hidden rendering cadence that Chromium does not provide. Generation-owned fetch/decode/preparation may continue where permitted, hosted authority uses only its minimum fixed-step/network path, offline simulation pauses, presentation submits no hidden frames, and one coalesced foreground recovery resumes the existing admission."
+    },
+    {
+      "id": "SUP-026",
+      "ledgerOrdinal": 26,
+      "sourceOutcomeIds": [
+        "V66JUL29-007",
+        "V66JUL29-026",
+        "CORR-HF-154"
+      ],
+      "feedbackIds": [
+        "HF-154"
+      ],
+      "canonicalText": "Shed damage calibration is explicit: one admitted grenade causes major collapse and a Carpet Bomber strike obliterates the shed within bounded persistent-debris budgets. The door remains interactive only while its authoritative support structure exists, then detaches into the same physical lifecycle."
+    },
+    {
+      "id": "SUP-027",
+      "ledgerOrdinal": 27,
+      "sourceOutcomeIds": [
+        "V66JUL29-027",
+        "V66JUL29-030",
+        "CORR-HF-155",
+        "CORR-HF-158"
+      ],
+      "feedbackIds": [
+        "HF-155",
+        "HF-158"
+      ],
+      "canonicalText": "Glass lifecycle is authoritative across presentation, collision and ballistics. Intact and cracked panes block projectiles; only an admitted simultaneous break or pre-existing breached aperture permits pass-through, and detached panes cannot retain intact collision or damage state."
     }
   ],
   "testCatalog": [
@@ -1652,7 +1790,8 @@
     {
       "id": "HF-004",
       "sourceOutcomeIds": [
-        "CORR-HF-004"
+        "CORR-HF-004",
+        "V66JUL29-002"
       ],
       "planningRequirementIds": [
         "R307",
@@ -1696,7 +1835,8 @@
     {
       "id": "HF-006",
       "sourceOutcomeIds": [
-        "CORR-HF-006"
+        "CORR-HF-006",
+        "V66JUL29-014"
       ],
       "planningRequirementIds": [
         "R109",
@@ -1768,7 +1908,9 @@
     {
       "id": "HF-009",
       "sourceOutcomeIds": [
-        "CORR-HF-009"
+        "CORR-HF-009",
+        "V66JUL29-001",
+        "V66JUL29-003"
       ],
       "planningRequirementIds": [
         "R108",
@@ -1921,7 +2063,8 @@
     {
       "id": "HF-015",
       "sourceOutcomeIds": [
-        "CORR-HF-015"
+        "CORR-HF-015",
+        "V66JUL29-011"
       ],
       "planningRequirementIds": [
         "R233",
@@ -2639,7 +2782,8 @@
       "sourceOutcomeIds": [
         "CORR-HF-036",
         "SPEC-028",
-        "SPEC-031"
+        "SPEC-031",
+        "V66JUL29-025"
       ],
       "planningRequirementIds": [
         "R110",
@@ -3245,7 +3389,8 @@
     {
       "id": "HF-056",
       "sourceOutcomeIds": [
-        "CORR-HF-056"
+        "CORR-HF-056",
+        "V66JUL29-002"
       ],
       "planningRequirementIds": [
         "R112",
@@ -3739,7 +3884,8 @@
         "SPEC-023",
         "SPEC-027",
         "SPEC-029",
-        "SPEC-036"
+        "SPEC-036",
+        "V66JUL29-011"
       ],
       "planningRequirementIds": [
         "R008",
@@ -4461,7 +4607,8 @@
       "id": "HF-103",
       "sourceOutcomeIds": [
         "CORR-HF-103",
-        "UNT-031"
+        "UNT-031",
+        "V66JUL29-018"
       ],
       "planningRequirementIds": [
         "R300",
@@ -4645,7 +4792,8 @@
       "id": "HF-111",
       "sourceOutcomeIds": [
         "CORR-HF-111",
-        "UNT-045"
+        "UNT-045",
+        "V66JUL29-019"
       ],
       "planningRequirementIds": [
         "R010",
@@ -4874,7 +5022,8 @@
       "id": "HF-121",
       "sourceOutcomeIds": [
         "CORR-HF-121",
-        "UNT-055"
+        "UNT-055",
+        "V66JUL29-021"
       ],
       "planningRequirementIds": [
         "R300",
@@ -4989,7 +5138,8 @@
       "id": "HF-126",
       "sourceOutcomeIds": [
         "CORR-HF-126",
-        "UNT-061"
+        "UNT-061",
+        "V66JUL29-019"
       ],
       "planningRequirementIds": [
         "R005",
@@ -5150,7 +5300,8 @@
       "id": "HF-133",
       "sourceOutcomeIds": [
         "CORR-HF-133",
-        "JUL29-006"
+        "JUL29-006",
+        "V66JUL29-004"
       ],
       "planningRequirementIds": [
         "R105",
@@ -5195,7 +5346,8 @@
       "id": "HF-135",
       "sourceOutcomeIds": [
         "CORR-HF-135",
-        "JUL29-008"
+        "JUL29-008",
+        "V66JUL29-003"
       ],
       "planningRequirementIds": [
         "R109",
@@ -5218,7 +5370,9 @@
       "id": "HF-136",
       "sourceOutcomeIds": [
         "CORR-HF-136",
-        "JUL29-009"
+        "JUL29-009",
+        "V66JUL29-007",
+        "V66JUL29-026"
       ],
       "planningRequirementIds": [
         "R400",
@@ -5277,7 +5431,8 @@
       "id": "HF-138",
       "sourceOutcomeIds": [
         "CORR-HF-138",
-        "JUL29-011"
+        "JUL29-011",
+        "V66JUL29-009"
       ],
       "planningRequirementIds": [
         "R006",
@@ -5352,6 +5507,545 @@
         "testRefs": [
           "T-RAILGUN",
           "T-AUDIO",
+          "T-NETWORK"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-141",
+      "sourceOutcomeIds": [
+        "CORR-HF-141",
+        "V66JUL29-005"
+      ],
+      "planningRequirementIds": [
+        "R307",
+        "R308",
+        "R609"
+      ],
+      "canonicalOwner": "Spatial-audio/mixer",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-AUDIO",
+          "T-MENU-LIFECYCLE-E2E"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-142",
+      "sourceOutcomeIds": [
+        "CORR-HF-142",
+        "V66JUL29-006"
+      ],
+      "planningRequirementIds": [
+        "R507",
+        "R509",
+        "R511",
+        "R610"
+      ],
+      "canonicalOwner": "Drone navigation/authority",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-DRONE-GATE",
+          "T-SUPPORT-RUNTIME",
+          "T-NETWORK"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-143",
+      "sourceOutcomeIds": [
+        "CORR-HF-143",
+        "V66JUL29-008"
+      ],
+      "planningRequirementIds": [
+        "R506",
+        "R509",
+        "R510",
+        "R511"
+      ],
+      "canonicalOwner": "Drone Swarm navigation/formation",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-DRONE-GATE",
+          "T-SUPPORT-RUNTIME",
+          "T-NETWORK"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-144",
+      "sourceOutcomeIds": [
+        "CORR-HF-144",
+        "V66JUL29-010"
+      ],
+      "planningRequirementIds": [
+        "R505",
+        "R510",
+        "R609"
+      ],
+      "canonicalOwner": "Input/interaction coordinator",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-INTERACTION",
+          "T-MENU-LIFECYCLE-E2E",
+          "T-NETWORK"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-145",
+      "sourceOutcomeIds": [
+        "CORR-HF-145",
+        "V66JUL29-012"
+      ],
+      "planningRequirementIds": [
+        "R234",
+        "R509",
+        "R510"
+      ],
+      "canonicalOwner": "Bot/match catalog",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-BOTS",
+          "T-ADDITIONAL-MAPS"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-146",
+      "sourceOutcomeIds": [
+        "CORR-HF-146",
+        "V66JUL29-013"
+      ],
+      "planningRequirementIds": [
+        "R234",
+        "R307",
+        "R400",
+        "R509",
+        "R510",
+        "R608"
+      ],
+      "canonicalOwner": "Smoke authority/presentation",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-SMOKE",
+          "T-NETWORK",
+          "T-NATIVE-FRAME-PACING"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-147",
+      "sourceOutcomeIds": [
+        "CORR-HF-147",
+        "V66JUL29-015"
+      ],
+      "planningRequirementIds": [
+        "R220",
+        "R221",
+        "R222",
+        "R223",
+        "R224",
+        "R225",
+        "R226",
+        "R227",
+        "R228",
+        "R229",
+        "R230",
+        "R231",
+        "R232",
+        "R233",
+        "R234",
+        "R235",
+        "R236",
+        "R304",
+        "R608",
+        "R613"
+      ],
+      "canonicalOwner": "Field-kit UI/combat registry",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-WEAPON-CATALOG",
+          "T-ORDNANCE",
+          "T-HUD-E2E",
+          "T-PERSISTENCE"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-148",
+      "sourceOutcomeIds": [
+        "CORR-HF-148",
+        "V66JUL29-016"
+      ],
+      "planningRequirementIds": [
+        "R304",
+        "R500",
+        "R501",
+        "R502",
+        "R503",
+        "R504",
+        "R505",
+        "R506",
+        "R507",
+        "R508",
+        "R509",
+        "R510",
+        "R511",
+        "R512",
+        "R608",
+        "R609"
+      ],
+      "canonicalOwner": "Killstreak UI/preview media",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-KILLSTREAK-CATALOG",
+          "T-HUD-E2E",
+          "T-PREVIEW-GATE"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-149",
+      "sourceOutcomeIds": [
+        "CORR-HF-149",
+        "V66JUL29-017"
+      ],
+      "planningRequirementIds": [
+        "R505",
+        "R510",
+        "R609"
+      ],
+      "canonicalOwner": "Carpet Bomber targeting/HUD",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-SUPPORT-RUNTIME",
+          "T-SUPPORT-VISUAL-E2E",
+          "T-SUPPORT-FORWARD"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-150",
+      "sourceOutcomeIds": [
+        "CORR-HF-150",
+        "V66JUL29-020"
+      ],
+      "planningRequirementIds": [
+        "R004",
+        "R109",
+        "R304",
+        "R305",
+        "R608",
+        "R609",
+        "R613"
+      ],
+      "canonicalOwner": "HUD/menu/lobby coordinator",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-HUD-UNIT",
+          "T-HUD-E2E",
+          "T-MENU-LIFECYCLE-E2E"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-151",
+      "sourceOutcomeIds": [
+        "CORR-HF-151",
+        "V66JUL29-022"
+      ],
+      "planningRequirementIds": [
+        "R300",
+        "R306",
+        "R610"
+      ],
+      "canonicalOwner": "Menu/match lifecycle",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-MENU-LIFECYCLE-E2E",
+          "T-SETTINGS",
+          "T-LIFECYCLE-UNIT"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-152",
+      "sourceOutcomeIds": [
+        "CORR-HF-152",
+        "V66JUL29-024"
+      ],
+      "planningRequirementIds": [
+        "R307",
+        "R608",
+        "R610"
+      ],
+      "canonicalOwner": "Runtime scheduling/loading lifecycle",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-FRAME-POLICY",
+          "T-COLD-WEBGPU-ADMISSION",
+          "T-WEBGPU-ENDURANCE",
+          "T-NATIVE-FRAME-PACING"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-153",
+      "sourceOutcomeIds": [
+        "CORR-HF-153",
+        "V66JUL29-023"
+      ],
+      "planningRequirementIds": [
+        "R109",
+        "R307",
+        "R601",
+        "R608",
+        "R609"
+      ],
+      "canonicalOwner": "Railgun/weapon presentation",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-RAILGUN",
+          "T-WEAPON-PRESENTATION",
+          "T-AUDIO"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-154",
+      "sourceOutcomeIds": [
+        "CORR-HF-154",
+        "V66JUL29-007",
+        "V66JUL29-025",
+        "V66JUL29-026"
+      ],
+      "planningRequirementIds": [
+        "R400",
+        "R401",
+        "R402",
+        "R403",
+        "R404",
+        "R405",
+        "R406",
+        "R407",
+        "R408",
+        "R409",
+        "R410",
+        "R411",
+        "R412",
+        "R413",
+        "R505",
+        "R608"
+      ],
+      "canonicalOwner": "Destructible-world/interaction authority",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-DESTRUCTIBLE",
+          "T-INTERACTION",
+          "T-ADDITIONAL-MAPS"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-155",
+      "sourceOutcomeIds": [
+        "CORR-HF-155",
+        "V66JUL29-027"
+      ],
+      "planningRequirementIds": [
+        "R400",
+        "R401",
+        "R402",
+        "R403",
+        "R404",
+        "R405",
+        "R406",
+        "R407",
+        "R408",
+        "R409",
+        "R410",
+        "R411",
+        "R412",
+        "R413",
+        "R510",
+        "R608"
+      ],
+      "canonicalOwner": "Material/destructible-world authority",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-DESTRUCTIBLE",
+          "T-IMPACTS",
+          "T-NETWORK"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-156",
+      "sourceOutcomeIds": [
+        "CORR-HF-156",
+        "V66JUL29-028"
+      ],
+      "planningRequirementIds": [
+        "R300",
+        "R301",
+        "R307",
+        "R606",
+        "R610"
+      ],
+      "canonicalOwner": "Frame-pacing/settings integration",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-FRAME-POLICY",
+          "T-PROFILE-AUTHORITY-UNIT",
+          "T-NATIVE-FRAME-PACING",
+          "T-FOCUS-RECOVERY-E2E"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-157",
+      "sourceOutcomeIds": [
+        "CORR-HF-157",
+        "V66JUL29-029"
+      ],
+      "planningRequirementIds": [
+        "R100",
+        "R105",
+        "R109",
+        "R400",
+        "R608"
+      ],
+      "canonicalOwner": "Player movement/viewmodel/rig",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-LIFECYCLE-UNIT",
+          "T-WEAPON-PRESENTATION",
+          "T-NETWORK"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-158",
+      "sourceOutcomeIds": [
+        "CORR-HF-158",
+        "V66JUL29-030"
+      ],
+      "planningRequirementIds": [
+        "R223",
+        "R236",
+        "R400",
+        "R410",
+        "R510"
+      ],
+      "canonicalOwner": "Projectile/glass authority",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-ORDNANCE",
+          "T-DESTRUCTIBLE",
+          "T-REMOTE-STICKY-AUTHORITY",
+          "T-NETWORK"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-159",
+      "sourceOutcomeIds": [
+        "CORR-HF-159",
+        "V66JUL29-031"
+      ],
+      "planningRequirementIds": [
+        "R234",
+        "R509",
+        "R510"
+      ],
+      "canonicalOwner": "Bot perception/smoke authority",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-SMOKE",
+          "T-BOTS",
+          "T-NETWORK"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-160",
+      "sourceOutcomeIds": [
+        "CORR-HF-160",
+        "V66JUL29-032"
+      ],
+      "planningRequirementIds": [
+        "R234",
+        "R509",
+        "R510",
+        "R609"
+      ],
+      "canonicalOwner": "Bot perception/flash authority",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-FLASH-AUTHORITY",
+          "T-FLASH-E2E",
+          "T-BOTS",
           "T-NETWORK"
         ],
         "artifactRefs": []
@@ -6373,6 +7067,560 @@
         "R601",
         "R607",
         "R608",
+        "R609"
+      ]
+    }
+  ],
+  "codexV66July29Outcomes": [
+    {
+      "id": "V66JUL29-001",
+      "sourceLocator": "L1#1",
+      "normalizedOutcome": "Tweak the helicopter interior on the loading screen toward the supplied clean minimal cockpit references.",
+      "feedbackIds": [
+        "HF-009"
+      ],
+      "planningRequirementIds": [
+        "R108",
+        "R109",
+        "R112",
+        "R113",
+        "R114",
+        "R115",
+        "R504",
+        "R608"
+      ]
+    },
+    {
+      "id": "V66JUL29-002",
+      "sourceLocator": "L2#1",
+      "normalizedOutcome": "Increase the prerecorded menu and loading video resolution and fidelity while keeping playback smooth and non-blocking.",
+      "feedbackIds": [
+        "HF-004",
+        "HF-056"
+      ],
+      "planningRequirementIds": [
+        "R112",
+        "R113",
+        "R114",
+        "R307",
+        "R608",
+        "R609",
+        "R610"
+      ]
+    },
+    {
+      "id": "V66JUL29-003",
+      "sourceLocator": "L3#1",
+      "normalizedOutcome": "Use the same restrained minimal cockpit HUD direction for the menu helicopter and Chopper Gunner.",
+      "feedbackIds": [
+        "HF-009",
+        "HF-135"
+      ],
+      "planningRequirementIds": [
+        "R108",
+        "R109",
+        "R112",
+        "R113",
+        "R114",
+        "R115",
+        "R504",
+        "R608",
+        "R609"
+      ]
+    },
+    {
+      "id": "V66JUL29-004",
+      "sourceLocator": "L4#1",
+      "normalizedOutcome": "The first-person arms remain unacceptable and require a substantial authored rigging and contact rework.",
+      "feedbackIds": [
+        "HF-133"
+      ],
+      "planningRequirementIds": [
+        "R105",
+        "R108",
+        "R608",
+        "R613"
+      ]
+    },
+    {
+      "id": "V66JUL29-005",
+      "sourceLocator": "L5#1",
+      "normalizedOutcome": "Investigate and remove the intermittent background white-noise sound.",
+      "feedbackIds": [
+        "HF-141"
+      ],
+      "planningRequirementIds": [
+        "R307",
+        "R308",
+        "R609"
+      ]
+    },
+    {
+      "id": "V66JUL29-006",
+      "sourceLocator": "L6#1",
+      "normalizedOutcome": "Set the standalone Piloted Drone manual movement speed to 30 percent of its current value while retaining autonomous travel at twice manual speed.",
+      "feedbackIds": [
+        "HF-142"
+      ],
+      "planningRequirementIds": [
+        "R507",
+        "R509",
+        "R511",
+        "R610"
+      ]
+    },
+    {
+      "id": "V66JUL29-007",
+      "sourceLocator": "L7#1",
+      "normalizedOutcome": "Make the green shed collapse from one admitted grenade or mild explosive damage, or a moderate amount of shots, while its door continues to work until structurally detached.",
+      "feedbackIds": [
+        "HF-136",
+        "HF-154"
+      ],
+      "planningRequirementIds": [
+        "R400",
+        "R401",
+        "R402",
+        "R403",
+        "R404",
+        "R405",
+        "R406",
+        "R407",
+        "R408",
+        "R409",
+        "R410",
+        "R411",
+        "R412",
+        "R413",
+        "R505",
+        "R608"
+      ]
+    },
+    {
+      "id": "V66JUL29-008",
+      "sourceLocator": "L8#1",
+      "normalizedOutcome": "Keep Drone Swarm units spread into separated clusters and prevent stacking even when several units engage one target.",
+      "feedbackIds": [
+        "HF-143"
+      ],
+      "planningRequirementIds": [
+        "R506",
+        "R509",
+        "R510",
+        "R511"
+      ]
+    },
+    {
+      "id": "V66JUL29-009",
+      "sourceLocator": "L9#1",
+      "normalizedOutcome": "Eliminate the remaining game freezing and stuttering before the next HITL candidate.",
+      "feedbackIds": [
+        "HF-138"
+      ],
+      "planningRequirementIds": [
+        "R006",
+        "R606",
+        "R610",
+        "R613"
+      ]
+    },
+    {
+      "id": "V66JUL29-010",
+      "sourceLocator": "L10#1",
+      "normalizedOutcome": "Use tap F for doors, pickups and crate collection, and a visible one-second Hold F lifecycle for entering or exiting Piloted Drone and Chopper Gunner.",
+      "feedbackIds": [
+        "HF-144"
+      ],
+      "planningRequirementIds": [
+        "R505",
+        "R510",
+        "R609"
+      ]
+    },
+    {
+      "id": "V66JUL29-011",
+      "sourceLocator": "L11#1",
+      "normalizedOutcome": "Replace or substantially improve the low-quality Carpet Bomber aircraft model.",
+      "feedbackIds": [
+        "HF-015",
+        "HF-072"
+      ],
+      "planningRequirementIds": [
+        "R108",
+        "R109",
+        "R304",
+        "R501",
+        "R502",
+        "R503",
+        "R504",
+        "R505",
+        "R506",
+        "R507",
+        "R510",
+        "R608",
+        "R609"
+      ]
+    },
+    {
+      "id": "V66JUL29-012",
+      "sourceLocator": "L12#1",
+      "normalizedOutcome": "Start a solo skirmish with one enemy bot rather than two, without silently changing hosted-lobby choices.",
+      "feedbackIds": [
+        "HF-145"
+      ],
+      "planningRequirementIds": [
+        "R234",
+        "R509",
+        "R510"
+      ]
+    },
+    {
+      "id": "V66JUL29-013",
+      "sourceLocator": "L13#1",
+      "normalizedOutcome": "Each smoke grenade selects one random readable smoke colour, uses a thick semantic radius 50 percent wider than the current radius, and dissipates over five to ten seconds with shot corridors through the smoke.",
+      "feedbackIds": [
+        "HF-146"
+      ],
+      "planningRequirementIds": [
+        "R234",
+        "R307",
+        "R400",
+        "R509",
+        "R510",
+        "R608"
+      ]
+    },
+    {
+      "id": "V66JUL29-014",
+      "sourceLocator": "L14#1",
+      "normalizedOutcome": "Modernise the main menu without losing its current information or functionality and remove tiny player-facing text.",
+      "feedbackIds": [
+        "HF-006"
+      ],
+      "planningRequirementIds": [
+        "R109",
+        "R304",
+        "R305",
+        "R609"
+      ]
+    },
+    {
+      "id": "V66JUL29-015",
+      "sourceLocator": "L15#1",
+      "normalizedOutcome": "Clicking Custom 1, Custom 2 or Custom 3 should open a large usable field-kit editor with canonical weapon and grenade stats plus honest model imagery or preview.",
+      "feedbackIds": [
+        "HF-147"
+      ],
+      "planningRequirementIds": [
+        "R220",
+        "R221",
+        "R222",
+        "R223",
+        "R224",
+        "R225",
+        "R226",
+        "R227",
+        "R228",
+        "R229",
+        "R230",
+        "R231",
+        "R232",
+        "R233",
+        "R234",
+        "R235",
+        "R236",
+        "R304",
+        "R608",
+        "R613"
+      ]
+    },
+    {
+      "id": "V66JUL29-016",
+      "sourceLocator": "L16#1",
+      "normalizedOutcome": "The killstreak menu should use a clearer gallery layout with a large honest prerecorded example video or poster for each streak.",
+      "feedbackIds": [
+        "HF-148"
+      ],
+      "planningRequirementIds": [
+        "R304",
+        "R500",
+        "R501",
+        "R502",
+        "R503",
+        "R504",
+        "R505",
+        "R506",
+        "R507",
+        "R508",
+        "R509",
+        "R510",
+        "R511",
+        "R512",
+        "R608",
+        "R609"
+      ]
+    },
+    {
+      "id": "V66JUL29-017",
+      "sourceLocator": "L17#1",
+      "normalizedOutcome": "Before committing Carpet Bomber, show its away-from-player flight direction and align the visible red strike corridor with that path.",
+      "feedbackIds": [
+        "HF-149"
+      ],
+      "planningRequirementIds": [
+        "R505",
+        "R510",
+        "R609"
+      ]
+    },
+    {
+      "id": "V66JUL29-018",
+      "sourceLocator": "L18#1",
+      "normalizedOutcome": "Reskin the Options surface consistently with the rest of the menu while preserving every setting and advanced control.",
+      "feedbackIds": [
+        "HF-103"
+      ],
+      "planningRequirementIds": [
+        "R300",
+        "R306",
+        "R610"
+      ]
+    },
+    {
+      "id": "V66JUL29-019",
+      "sourceLocator": "L19#1",
+      "normalizedOutcome": "Pass 65 may become The Big One Live only through the protected exact-SHA release path while the existing byte-exact Pass 63 Stable remains unchanged; Version 66 stops at owner HITL until later approval.",
+      "feedbackIds": [
+        "HF-111",
+        "HF-126"
+      ],
+      "planningRequirementIds": [
+        "R005",
+        "R608",
+        "R610",
+        "R613"
+      ]
+    },
+    {
+      "id": "V66JUL29-020",
+      "sourceLocator": "L20#1",
+      "normalizedOutcome": "Make Latest Release information, Project Map, hosted lobbies, and pre-match and post-match surfaces modern, legible and free of tiny text.",
+      "feedbackIds": [
+        "HF-150"
+      ],
+      "planningRequirementIds": [
+        "R004",
+        "R109",
+        "R304",
+        "R305",
+        "R608",
+        "R609",
+        "R613"
+      ]
+    },
+    {
+      "id": "V66JUL29-021",
+      "sourceLocator": "L21#1",
+      "normalizedOutcome": "Foreground FPS must recover consistently after leaving and returning to the browser without duplicate lifecycle resets or a persistent throttled cadence.",
+      "feedbackIds": [
+        "HF-121"
+      ],
+      "planningRequirementIds": [
+        "R300",
+        "R307",
+        "R610"
+      ]
+    },
+    {
+      "id": "V66JUL29-022",
+      "sourceLocator": "L22#1",
+      "normalizedOutcome": "Pressing Escape from Options during an active match returns directly to the game without ending deployment.",
+      "feedbackIds": [
+        "HF-151"
+      ],
+      "planningRequirementIds": [
+        "R300",
+        "R306",
+        "R610"
+      ]
+    },
+    {
+      "id": "V66JUL29-023",
+      "sourceLocator": "L23#1",
+      "normalizedOutcome": "Improve the Railgun launch presentation at the real player muzzle so its otherwise accepted world bolt has a high-quality visible creation point.",
+      "feedbackIds": [
+        "HF-153"
+      ],
+      "planningRequirementIds": [
+        "R109",
+        "R307",
+        "R601",
+        "R608",
+        "R609"
+      ]
+    },
+    {
+      "id": "V66JUL29-024",
+      "sourceLocator": "L24#1",
+      "normalizedOutcome": "Continue map asset fetch, decode and preparation while the browser is backgrounded where the platform permits, but never burn hidden presentation frames; resume foreground play cleanly.",
+      "feedbackIds": [
+        "HF-152"
+      ],
+      "planningRequirementIds": [
+        "R307",
+        "R608",
+        "R610"
+      ]
+    },
+    {
+      "id": "V66JUL29-025",
+      "sourceLocator": "L25#1",
+      "normalizedOutcome": "Redesign the regressed shed-door and support-frame behavior as one authoritative structural lifecycle.",
+      "feedbackIds": [
+        "HF-036",
+        "HF-154"
+      ],
+      "planningRequirementIds": [
+        "R400",
+        "R401",
+        "R402",
+        "R403",
+        "R404",
+        "R405",
+        "R406",
+        "R407",
+        "R408",
+        "R409",
+        "R410",
+        "R411",
+        "R412",
+        "R413",
+        "R505",
+        "R608"
+      ]
+    },
+    {
+      "id": "V66JUL29-026",
+      "sourceLocator": "L26#1",
+      "normalizedOutcome": "A Carpet Bomber strike must smash the green shed rather than leave it intact.",
+      "feedbackIds": [
+        "HF-136",
+        "HF-154"
+      ],
+      "planningRequirementIds": [
+        "R400",
+        "R401",
+        "R402",
+        "R403",
+        "R404",
+        "R405",
+        "R406",
+        "R407",
+        "R408",
+        "R409",
+        "R410",
+        "R411",
+        "R412",
+        "R413",
+        "R505",
+        "R608"
+      ]
+    },
+    {
+      "id": "V66JUL29-027",
+      "sourceLocator": "L27#1",
+      "normalizedOutcome": "Glass must react coherently to knife, bullet and explosion damage, and an intact pane must never appear to fall out while retaining intact collision or damage state.",
+      "feedbackIds": [
+        "HF-155"
+      ],
+      "planningRequirementIds": [
+        "R400",
+        "R401",
+        "R402",
+        "R403",
+        "R404",
+        "R405",
+        "R406",
+        "R407",
+        "R408",
+        "R409",
+        "R410",
+        "R411",
+        "R412",
+        "R413",
+        "R510",
+        "R608"
+      ]
+    },
+    {
+      "id": "V66JUL29-028",
+      "sourceLocator": "L28#1",
+      "normalizedOutcome": "Investigate the observed roughly 38 FPS plateau across Performance, Quality and Max; each profile must apply distinct real settings and Performance must recover its expected high-throughput behavior on capable hardware.",
+      "feedbackIds": [
+        "HF-156"
+      ],
+      "planningRequirementIds": [
+        "R300",
+        "R301",
+        "R307",
+        "R606",
+        "R610"
+      ]
+    },
+    {
+      "id": "V66JUL29-029",
+      "sourceLocator": "L29#1",
+      "normalizedOutcome": "Prone movement and camera/viewmodel presentation must not clip through the floor on any map or graphics profile.",
+      "feedbackIds": [
+        "HF-157"
+      ],
+      "planningRequirementIds": [
+        "R100",
+        "R105",
+        "R109",
+        "R400",
+        "R608"
+      ]
+    },
+    {
+      "id": "V66JUL29-030",
+      "sourceLocator": "L30#1",
+      "normalizedOutcome": "An intact glass window must stop, stick or break an admitted crossbow bolt; the bolt may pass only through an authoritative breached aperture.",
+      "feedbackIds": [
+        "HF-158"
+      ],
+      "planningRequirementIds": [
+        "R223",
+        "R236",
+        "R400",
+        "R410",
+        "R510"
+      ]
+    },
+    {
+      "id": "V66JUL29-031",
+      "sourceLocator": "L31#1",
+      "normalizedOutcome": "Bots must not see or shoot accurately through semantic smoke and must lose or heavily degrade target confidence while LOS crosses smoke density.",
+      "feedbackIds": [
+        "HF-159"
+      ],
+      "planningRequirementIds": [
+        "R234",
+        "R509",
+        "R510"
+      ]
+    },
+    {
+      "id": "V66JUL29-032",
+      "sourceLocator": "L32#1",
+      "normalizedOutcome": "When a bot is facing a valid Flashbang detonation, it must become authoritatively blinded, break target lock, stop firing and recover over the same bounded effect lifecycle.",
+      "feedbackIds": [
+        "HF-160"
+      ],
+      "planningRequirementIds": [
+        "R234",
+        "R509",
+        "R510",
         "R609"
       ]
     }
