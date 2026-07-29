@@ -338,6 +338,14 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain("state.bootstrap.stage === 'failed'");
     expect(source).toContain('after.bootstrap.matchAdmissionCadence.admittedDegraded !== false');
     expect(source).toContain("after.bootstrap.matchAdmissionCadence.visibilityState !== 'visible'");
+    expect(source).toContain('const maximumColdTransitionMs = 10_000;');
+    expect(source).toContain('const maximumPreparedSwitchFrameMs = 50;');
+    expect(source).toContain("phaseDuration('weapon-catalog-prewarm')");
+    expect(source).toContain("phaseDuration('prewarm-batched-effects')");
+    expect(source).toContain("new PerformanceObserver((list) => {");
+    expect(source).toContain(".observe({ type: 'longtask', buffered: true });");
+    expect(source).toContain('taskAudit.longTasks.length > 0');
+    expect(source).toContain('firstSwitchAudit.before.gpuReady !== firstSwitchAudit.before.available');
   });
 
   it('adds the four readiness terms and bootstrap stage to timeout evidence', () => {

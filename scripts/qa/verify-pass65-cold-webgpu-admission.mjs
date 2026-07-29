@@ -9,6 +9,9 @@ const port = Number(process.env.PASS65_COLD_ADMISSION_PORT ?? '44175');
 const requestedTrials = Number(process.env.PASS65_COLD_ADMISSION_TRIALS ?? '3');
 const trials = Math.min(5, Math.max(3, Math.floor(requestedTrials)));
 const maximumPreparedSwitchFrameMs = 50;
+const maximumColdTransitionMs = 10_000;
+const maximumWeaponCatalogPrewarmMs = 5_000;
+const maximumEffectPrewarmMs = 4_500;
 const artifactRoot = 'artifacts/pass65/cold-webgpu-admission';
 const chromeCandidates = [
   process.env.PASS65_CHROME_PATH,
@@ -69,6 +72,25 @@ try {
       const browserVersion = browser.version();
       const context = await browser.newContext({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: 1 });
       const page = await context.newPage();
+      await page.addInitScript(() => {
+        window.__PASS65_COLD_TASK_AUDIT__ = {
+          supported: typeof PerformanceObserver === 'function',
+          startedAt: 0,
+          longTasks: [],
+        };
+        if (window.__PASS65_COLD_TASK_AUDIT__.supported) {
+          new PerformanceObserver((list) => {
+            for (const entry of list.getEntries()) {
+              if (entry.startTime < window.__PASS65_COLD_TASK_AUDIT__.startedAt) continue;
+              window.__PASS65_COLD_TASK_AUDIT__.longTasks.push({
+                startTime: entry.startTime,
+                duration: entry.duration,
+                name: entry.name,
+              });
+            }
+          }).observe({ type: 'longtask', buffered: true });
+        }
+      });
       const errors = [];
       page.on('pageerror', (error) => errors.push(error.message));
       page.on('console', (message) => {
@@ -102,6 +124,11 @@ try {
       });
       await page.locator('.map-card[data-arena-id="atomic-acres"]').click();
       await page.locator('#player-name').fill(`Cold Atomic QA ${trial}`);
+      await page.evaluate(() => {
+        window.__PASS65_COLD_TASK_AUDIT__.startedAt = performance.now();
+        window.__PASS65_COLD_TASK_AUDIT__.longTasks.length = 0;
+        performance.clearResourceTimings();
+      });
       await page.locator('#solo').click();
       await page.waitForFunction(() => {
         const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
@@ -143,6 +170,24 @@ try {
           maximumFrameMs: Math.max(0, ...samples.map((sample) => sample.maximumFrameMs)),
         };
       });
+      await page.waitForTimeout(100);
+      const taskAudit = await page.evaluate(() => ({
+        supported: window.__PASS65_COLD_TASK_AUDIT__.supported,
+        startedAt: window.__PASS65_COLD_TASK_AUDIT__.startedAt,
+        longTasks: [...window.__PASS65_COLD_TASK_AUDIT__.longTasks],
+        resources: performance.getEntriesByType('resource').map((entry) => ({
+          name: new URL(entry.name, location.href).pathname,
+          startTime: entry.startTime,
+          duration: entry.duration,
+          transferSize: 'transferSize' in entry ? entry.transferSize : null,
+          decodedBodySize: 'decodedBodySize' in entry ? entry.decodedBodySize : null,
+        })),
+        heap: 'memory' in performance ? {
+          usedJsHeapSize: performance.memory.usedJSHeapSize,
+          totalJsHeapSize: performance.memory.totalJSHeapSize,
+          jsHeapSizeLimit: performance.memory.jsHeapSizeLimit,
+        } : null,
+      }));
 
       const after = await page.evaluate(() => {
         const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
@@ -195,13 +240,28 @@ try {
       if (firstSwitchAudit.maximumFrameMs > maximumPreparedSwitchFrameMs) {
         failures.push(`prepared weapon switch frame ${firstSwitchAudit.maximumFrameMs.toFixed(1)}ms exceeded ${maximumPreparedSwitchFrameMs}ms`);
       }
+      const profile = transition.profile;
+      const phaseDuration = (phase) => profile?.phases.find((entry) => entry.phase === phase)?.durationMs ?? Number.POSITIVE_INFINITY;
+      if (!profile || profile.durationMs > maximumColdTransitionMs) {
+        failures.push(`cold transition ${profile?.durationMs ?? 'missing'}ms exceeded ${maximumColdTransitionMs}ms`);
+      }
+      if (phaseDuration('weapon-catalog-prewarm') > maximumWeaponCatalogPrewarmMs) {
+        failures.push(`weapon catalog prewarm ${phaseDuration('weapon-catalog-prewarm')}ms exceeded ${maximumWeaponCatalogPrewarmMs}ms`);
+      }
+      if (phaseDuration('prewarm-batched-effects') > maximumEffectPrewarmMs) {
+        failures.push(`effect prewarm ${phaseDuration('prewarm-batched-effects')}ms exceeded ${maximumEffectPrewarmMs}ms`);
+      }
+      if (!taskAudit.supported) failures.push('browser Long Tasks API unavailable for cold admission audit');
+      if (taskAudit.longTasks.length > 0) {
+        failures.push(`cold admission produced ${taskAudit.longTasks.length} >=50ms main-thread tasks (max ${Math.max(...taskAudit.longTasks.map((entry) => entry.duration)).toFixed(1)}ms)`);
+      }
       if (transition.phase !== 'idle' || transition.failure !== null || transition.renderSubmissionPaused) failures.push(`arena transition did not commit cleanly: ${JSON.stringify(transition)}`);
       if (after.runtime.actualBackend !== 'webgpu' || after.runtime.softwareAdapter || after.runtime.deviceLost) failures.push('hardware WebGPU did not remain healthy');
       if (after.runtime.uncapturedErrors !== 0 || after.runtime.presentation.completionFailures !== 0 || after.runtime.presentation.status !== 'healthy') failures.push(`presentation failed: ${JSON.stringify(after.runtime.presentation)}`);
       if (after.localLightOcclusion.violations.length > 0) failures.push(`active local-light violations: ${after.localLightOcclusion.violations.join(', ')}`);
       if (fatalErrors.length > 0) failures.push(`browser/GPU errors: ${fatalErrors.join(' | ')}`);
 
-      const receipt = { trial, browserVersion, before, after, firstSwitchAudit, errors: fatalErrors, pass: failures.length === 0 };
+      const receipt = { trial, browserVersion, before, after, firstSwitchAudit, taskAudit, errors: fatalErrors, pass: failures.length === 0 };
       receipts.push(receipt);
       if (trial === 1) await page.screenshot({ path: `${artifactRoot}/atomic-quality-active.png`, animations: 'disabled' });
       await context.close();
