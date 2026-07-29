@@ -115,16 +115,16 @@
       "id": "SRC-CODEX-JUL29-001",
       "kind": "codex-owner-feedback",
       "externalLocator": "codex-task:pass65-hitl-correction-2026-07-29",
-      "rawByteLength": 1218,
-      "rawSha256": "b259af5c36cb25a59a603c900b0ffa639299c605947d25326749e5cea0b45cca",
+      "rawByteLength": 1594,
+      "rawSha256": "f1fb53337b143a8f44bd48c18be3cd1013ac9518042d83180ae468694396dff5",
       "rawEndsWithCrLf": false,
       "normalizedRepositoryPath": "docs/pass65-sources/codex-owner-feedback-2026-07-29.txt",
       "normalization": "UTF-8; CRLF converted to LF; one final LF added; text semantics unchanged",
-      "normalizedByteLength": 1205,
-      "normalizedSha256": "2e1de56c1bf2cbe82dbfca939dfc83e259ed65e1a6d824be13d28171aa164c2b",
+      "normalizedByteLength": 1579,
+      "normalizedSha256": "3d12c78d01ce30792dce985472a543ff411866d83415080b97b3be3cc0ef1cb1",
       "outcomeCollection": "codexJuly29Outcomes",
       "outcomeIdPrefix": "JUL29",
-      "outcomeCount": 11,
+      "outcomeCount": 13,
       "lineAtomCounts": {
         "1": 1,
         "3": 2,
@@ -133,18 +133,19 @@
         "9": 1,
         "11": 2,
         "13": 1,
-        "15": 2
+        "15": 2,
+        "17": 2
       },
-      "outcomeProjectionSha256": "869108588a81a7048d797e9268e813c2868a4b1e552ecb9b6a29ad175ba213bd"
+      "outcomeProjectionSha256": "4104b9defd55330ab8070e5a46075c09998c1899412df6939794c9e19ad08ac5"
     },
     {
       "id": "SRC-CORRECTION-LEDGER-001",
       "kind": "canonical-correction-ledger",
       "repositoryPath": "docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md",
       "ledgerVersion": 1,
-      "latestFeedbackId": "HF-138",
-      "outcomeCount": 138,
-      "stateIndependentOutcomeSha256": "a768e4d310540812b906a7eda8ad40937f2f3b9edfa37bd57cddeb39d526e57e"
+      "latestFeedbackId": "HF-140",
+      "outcomeCount": 140,
+      "stateIndependentOutcomeSha256": "d0c24ad416192e335bb9563a446d892af374a2dd2d201064ba26c276f47fa592"
     },
     {
       "id": "SRC-PLANNING-MATRIX-001",
@@ -828,7 +829,7 @@
     "outcomeIdTemplate": "CORR-{feedbackId}",
     "sourceLocatorTemplate": "{feedbackId}.observation",
     "feedbackIdStart": "HF-001",
-    "feedbackIdEnd": "HF-138"
+    "feedbackIdEnd": "HF-140"
   },
   "supersessions": [
     {
@@ -5195,6 +5196,61 @@
         ],
         "artifactRefs": []
       }
+    },
+    {
+      "id": "HF-139",
+      "sourceOutcomeIds": [
+        "CORR-HF-139",
+        "JUL29-012"
+      ],
+      "planningRequirementIds": [
+        "R109",
+        "R510",
+        "R600",
+        "R601",
+        "R602",
+        "R603",
+        "R607",
+        "R608"
+      ],
+      "canonicalOwner": "Combat registry/multiplayer authority",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-RAILGUN",
+          "T-HOST-CANONICAL-HIT",
+          "T-NETWORK"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-140",
+      "sourceOutcomeIds": [
+        "CORR-HF-140",
+        "JUL29-013"
+      ],
+      "planningRequirementIds": [
+        "R109",
+        "R307",
+        "R308",
+        "R601",
+        "R607",
+        "R608",
+        "R609"
+      ],
+      "canonicalOwner": "Railgun presentation/spatial audio/multiplayer",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-RAILGUN",
+          "T-AUDIO",
+          "T-NETWORK"
+        ],
+        "artifactRefs": []
+      }
     }
   ],
   "desktopUntitledOutcomes": [
@@ -6178,6 +6234,41 @@
         "R606",
         "R610",
         "R613"
+      ]
+    },
+    {
+      "id": "JUL29-012",
+      "sourceLocator": "L17#1",
+      "normalizedOutcome": "Make one Railgun shot hit multiple aligned targets, deal exactly 50 damage to each without criticals or modifiers, and attribute every resulting death to the shooter.",
+      "feedbackIds": [
+        "HF-139"
+      ],
+      "planningRequirementIds": [
+        "R109",
+        "R510",
+        "R600",
+        "R601",
+        "R602",
+        "R603",
+        "R607",
+        "R608"
+      ]
+    },
+    {
+      "id": "JUL29-013",
+      "sourceLocator": "L17#2",
+      "normalizedOutcome": "Present every Railgun shot to the shooter and relevant observers as a large, loud map-spanning laser that remains visible for exactly one second, following the shared audiovisual replication rule.",
+      "feedbackIds": [
+        "HF-140"
+      ],
+      "planningRequirementIds": [
+        "R109",
+        "R307",
+        "R308",
+        "R601",
+        "R607",
+        "R608",
+        "R609"
       ]
     }
   ]

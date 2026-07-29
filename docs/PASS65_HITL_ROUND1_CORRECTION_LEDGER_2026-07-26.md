@@ -1,6 +1,6 @@
 # Pass 65 HITL Round 1 Correction Ledger
 
-<!-- owner-feedback-ledger-version: 1; latest-id: HF-138 -->
+<!-- owner-feedback-ledger-version: 1; latest-id: HF-140 -->
 
 Status: **BLOCKING CORRECTION WAVE — NOT APPROVED, NOT PUBLISHABLE**
 
@@ -167,6 +167,8 @@ This ledger is the authoritative translation of Dave's first local Pass 65 revie
 | HF-136 | P1 | Explosive damage against the physical green shed must more readily produce visible authoritative panel detachment, corner failure and persistent blow-apart debris while preserving bullet-hole and ballistic-aperture behavior. | Destructible-world authority/physics | Frozen comparator explosions at panels/corners and calibrated damage-boundary tests prove earlier threshold crossing, exactly-once detach/collapse, impulse, persistent sleeping debris, late join/reset and body caps; dent-only response, disappearing major chunks or lost shoot-through parity fail. | Green sheds on RustRig and Terminal | OPEN |
 | HF-137 | P1 | After the corrections, perform a bounded profile-guided code-quality pass that removes demonstrated duplication, stale ownership and avoidable hot-path allocation without broad speculative rewrites or behavior loss. | Architecture/performance integration | Static analysis, ownership/diff audit, measured before/after allocation and frame traces, focused positive comparators and mutation tests reject unrelated refactors, weakened gates, duplicate authorities or unmeasured cleanup claims. | Changed Pass 65 runtime, presentation and test lanes | OPEN |
 | HF-138 | P0 | The replacement HITL candidate must remain crash-free and free of user-visible freezing or severe hitching across all maps, transitions, drone/chopper/carpet activation, destruction stress and repeated foreground/focus cycles. | Stability/performance integration | Exact-SHA native-WebGPU multi-run endurance, all-map transition circuits, mixed-support/destruction stress, focus cycles, first-fault logs, GPU error/device-loss scopes and p95/p99/max long-frame ledger must pass frozen thresholds with zero crash; one recurrence fails. | Whole replacement Pass 65 candidate | OPEN |
+| HF-139 | P0 | One authoritative Railgun shot damages every eligible hostile intersected by its admitted beam in deterministic near-to-far order. Every admitted target receives exactly 50 requested damage with no critical-hit, headshot, falloff, penetration, Adrenaline or other modifier path; canonical deaths, score and kill-feed ownership are attributed to the shooter exactly once. | Combat registry/multiplayer authority | Pure beam-order tests, three-aligned-target host/guest/bot E2E, friendly/off-axis exclusion, low-health overkill accounting, duplicate/reorder/replay rejection and canonical health/death/score traces prove unique ordered outcomes, exactly 50 requested damage and exactly-once shooter attribution. | Railgun on every supported map, mode and peer role | OPEN |
+| HF-140 | P1 | Each authoritative Railgun discharge presents a large, frightening map-spanning laser and loud spatial report to the shooter and every relevant observer, including through intervening presentation geometry, for exactly 1,000 ms. Shared gameplay animations and sounds follow the same replicated semantic-event rule wherever observer relevance permits. | Railgun presentation/spatial audio/multiplayer | Unit lifecycle assertions plus local, guest and uninvolved-observer captures prove exact 1,000 ms expiry, beam scale/depth behavior, authoritative path equality, synchronized spatial report, bus/voice-cap compliance and no shooter-only duplicate or missing observer presentation. | Railgun presentation for every relevant observer; shared audiovisual-event policy game-wide | OPEN |
 
 ### 3A. Implemented boundaries awaiting independent candidate evidence
 
@@ -272,6 +274,8 @@ The feedback IDs remain the correction source; these ranges bind each row back t
 | HF-136 | R400-R413, R608 |
 | HF-137 | R005, R610, R613 |
 | HF-138 | R006, R606, R610, R613 |
+| HF-139 | R109, R510, R600-R603, R607, R608 |
+| HF-140 | R109, R307, R308, R601, R607, R608, R609 |
 
 ## 4. Canonical contract supersessions
 
