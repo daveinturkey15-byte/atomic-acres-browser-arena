@@ -112,13 +112,39 @@
       "outcomeProjectionSha256": "3477c33ae7b8938c08e72278f80a62bafd18cd01d032115921758e305605fc26"
     },
     {
+      "id": "SRC-CODEX-JUL29-001",
+      "kind": "codex-owner-feedback",
+      "externalLocator": "codex-task:pass65-hitl-correction-2026-07-29",
+      "rawByteLength": 1218,
+      "rawSha256": "b259af5c36cb25a59a603c900b0ffa639299c605947d25326749e5cea0b45cca",
+      "rawEndsWithCrLf": false,
+      "normalizedRepositoryPath": "docs/pass65-sources/codex-owner-feedback-2026-07-29.txt",
+      "normalization": "UTF-8; CRLF converted to LF; one final LF added; text semantics unchanged",
+      "normalizedByteLength": 1205,
+      "normalizedSha256": "2e1de56c1bf2cbe82dbfca939dfc83e259ed65e1a6d824be13d28171aa164c2b",
+      "outcomeCollection": "codexJuly29Outcomes",
+      "outcomeIdPrefix": "JUL29",
+      "outcomeCount": 11,
+      "lineAtomCounts": {
+        "1": 1,
+        "3": 2,
+        "5": 1,
+        "7": 1,
+        "9": 1,
+        "11": 2,
+        "13": 1,
+        "15": 2
+      },
+      "outcomeProjectionSha256": "869108588a81a7048d797e9268e813c2868a4b1e552ecb9b6a29ad175ba213bd"
+    },
+    {
       "id": "SRC-CORRECTION-LEDGER-001",
       "kind": "canonical-correction-ledger",
       "repositoryPath": "docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md",
       "ledgerVersion": 1,
-      "latestFeedbackId": "HF-127",
-      "outcomeCount": 127,
-      "stateIndependentOutcomeSha256": "2067af464db6eed71e3decb0c759b6f31931f9b1bfe89a68e6cd9e68ac43fb81"
+      "latestFeedbackId": "HF-138",
+      "outcomeCount": 138,
+      "stateIndependentOutcomeSha256": "a768e4d310540812b906a7eda8ad40937f2f3b9edfa37bd57cddeb39d526e57e"
     },
     {
       "id": "SRC-PLANNING-MATRIX-001",
@@ -802,7 +828,7 @@
     "outcomeIdTemplate": "CORR-{feedbackId}",
     "sourceLocatorTemplate": "{feedbackId}.observation",
     "feedbackIdStart": "HF-001",
-    "feedbackIdEnd": "HF-127"
+    "feedbackIdEnd": "HF-138"
   },
   "supersessions": [
     {
@@ -1107,6 +1133,18 @@
         "HF-120"
       ],
       "canonicalText": "`DEC-08` explosive crossbow speed is 108 m/s, exactly three times the prior 36 m/s baseline. An actor-stuck bolt emits `STUCK` and uses exactly two-times blast damage and two-times blast radius; the prior slow-bolt profile is retired."
+    },
+    {
+      "id": "SUP-020",
+      "ledgerOrdinal": 20,
+      "sourceOutcomeIds": [
+        "JUL29-004",
+        "CORR-HF-131"
+      ],
+      "feedbackIds": [
+        "HF-131"
+      ],
+      "canonicalText": "`DEC-13` Piloted Drone and Drone Swarm deployment now originates from deterministic valid centre-map spawn volumes with distributed separation. This supersedes the behind-caller ingress rule while retaining the 24-unit Swarm count, targetability, bounded navigation and divergent individual/small-group routes."
     }
   ],
   "testCatalog": [
@@ -4894,6 +4932,269 @@
         ],
         "artifactRefs": []
       }
+    },
+    {
+      "id": "HF-128",
+      "sourceOutcomeIds": [
+        "CORR-HF-128",
+        "JUL29-001"
+      ],
+      "planningRequirementIds": [
+        "R112",
+        "R113",
+        "R608",
+        "R610"
+      ],
+      "canonicalOwner": "Preview-media/vehicle presentation",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-PREVIEW-GATE",
+          "T-SUPPORT-VEHICLE-GATE",
+          "T-SUPPORT-VISUAL-E2E"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-129",
+      "sourceOutcomeIds": [
+        "CORR-HF-129",
+        "JUL29-002"
+      ],
+      "planningRequirementIds": [
+        "R507",
+        "R509",
+        "R510"
+      ],
+      "canonicalOwner": "Drone input/authority",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-SUPPORT-RUNTIME",
+          "T-DRONE-GATE"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-130",
+      "sourceOutcomeIds": [
+        "CORR-HF-130",
+        "JUL29-003"
+      ],
+      "planningRequirementIds": [
+        "R507",
+        "R509",
+        "R511",
+        "R610"
+      ],
+      "canonicalOwner": "Drone navigation/authority",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-SUPPORT-RUNTIME",
+          "T-DRONE-GATE"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-131",
+      "sourceOutcomeIds": [
+        "CORR-HF-131",
+        "JUL29-004"
+      ],
+      "planningRequirementIds": [
+        "R506",
+        "R507",
+        "R509",
+        "R510",
+        "R511"
+      ],
+      "canonicalOwner": "Drone spawn/navigation authority",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-SUPPORT-RUNTIME",
+          "T-DRONE-GATE"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-132",
+      "sourceOutcomeIds": [
+        "CORR-HF-132",
+        "JUL29-005"
+      ],
+      "planningRequirementIds": [
+        "R505",
+        "R510",
+        "R609"
+      ],
+      "canonicalOwner": "Carpet Bomber lifecycle/UI/interaction",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-SUPPORT-RUNTIME",
+          "T-SUPPORT-VISUAL-E2E",
+          "T-INTERACTION"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-133",
+      "sourceOutcomeIds": [
+        "CORR-HF-133",
+        "JUL29-006"
+      ],
+      "planningRequirementIds": [
+        "R105",
+        "R108",
+        "R608",
+        "R613"
+      ],
+      "canonicalOwner": "Operator rig/asset forge",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-OPERATOR-GATE",
+          "T-WEAPON-PRESENTATION"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-134",
+      "sourceOutcomeIds": [
+        "CORR-HF-134",
+        "JUL29-007"
+      ],
+      "planningRequirementIds": [
+        "R108",
+        "R504",
+        "R608"
+      ],
+      "canonicalOwner": "Chopper vehicle asset forge",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-SUPPORT-VEHICLE-GATE",
+          "T-SUPPORT-VISUAL-E2E"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-135",
+      "sourceOutcomeIds": [
+        "CORR-HF-135",
+        "JUL29-008"
+      ],
+      "planningRequirementIds": [
+        "R109",
+        "R504",
+        "R608",
+        "R609"
+      ],
+      "canonicalOwner": "Chopper possession camera/HUD",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-SUPPORT-VEHICLE-GATE",
+          "T-SUPPORT-VISUAL-E2E"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-136",
+      "sourceOutcomeIds": [
+        "CORR-HF-136",
+        "JUL29-009"
+      ],
+      "planningRequirementIds": [
+        "R400",
+        "R401",
+        "R402",
+        "R403",
+        "R404",
+        "R405",
+        "R406",
+        "R407",
+        "R408",
+        "R409",
+        "R410",
+        "R411",
+        "R412",
+        "R413",
+        "R608"
+      ],
+      "canonicalOwner": "Destructible-world authority/physics",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-DESTRUCTIBLE"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-137",
+      "sourceOutcomeIds": [
+        "CORR-HF-137",
+        "JUL29-010"
+      ],
+      "planningRequirementIds": [
+        "R005",
+        "R610",
+        "R613"
+      ],
+      "canonicalOwner": "Architecture/performance integration",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-OWNER-GATE",
+          "T-LIFECYCLE-UNIT"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-138",
+      "sourceOutcomeIds": [
+        "CORR-HF-138",
+        "JUL29-011"
+      ],
+      "planningRequirementIds": [
+        "R006",
+        "R606",
+        "R610",
+        "R613"
+      ],
+      "canonicalOwner": "Stability/performance integration",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-FRAME-POLICY",
+          "T-MENU-LIFECYCLE-E2E",
+          "T-SUPPORT-RUNTIME"
+        ],
+        "artifactRefs": []
+      }
     }
   ],
   "desktopUntitledOutcomes": [
@@ -5713,6 +6014,170 @@
         "R505",
         "R510",
         "R609"
+      ]
+    }
+  ],
+  "codexJuly29Outcomes": [
+    {
+      "id": "JUL29-001",
+      "sourceLocator": "L1#1",
+      "normalizedOutcome": "Improve the prerecorded menu and loading helicopter rotors with a perspective-aware implementation for the authored camera.",
+      "feedbackIds": [
+        "HF-128"
+      ],
+      "planningRequirementIds": [
+        "R112",
+        "R113",
+        "R608",
+        "R610"
+      ]
+    },
+    {
+      "id": "JUL29-002",
+      "sourceLocator": "L3#1",
+      "normalizedOutcome": "Correct every inverted direction control on the Piloted Drone.",
+      "feedbackIds": [
+        "HF-129"
+      ],
+      "planningRequirementIds": [
+        "R507",
+        "R509",
+        "R510"
+      ]
+    },
+    {
+      "id": "JUL29-003",
+      "sourceLocator": "L3#2",
+      "normalizedOutcome": "Double the standalone drone movement speed while it is not player-controlled.",
+      "feedbackIds": [
+        "HF-130"
+      ],
+      "planningRequirementIds": [
+        "R507",
+        "R509",
+        "R511",
+        "R610"
+      ]
+    },
+    {
+      "id": "JUL29-004",
+      "sourceLocator": "L5#1",
+      "normalizedOutcome": "Always spawn Piloted Drone and Drone Swarm from the map centre in a spread-out pattern.",
+      "feedbackIds": [
+        "HF-131"
+      ],
+      "planningRequirementIds": [
+        "R506",
+        "R507",
+        "R509",
+        "R510",
+        "R511"
+      ]
+    },
+    {
+      "id": "JUL29-005",
+      "sourceLocator": "L7#1",
+      "normalizedOutcome": "Make Carpet Bomber use the Care Package-style crosshair call-in, red X target and visible aircraft fly-in.",
+      "feedbackIds": [
+        "HF-132"
+      ],
+      "planningRequirementIds": [
+        "R505",
+        "R510",
+        "R609"
+      ]
+    },
+    {
+      "id": "JUL29-006",
+      "sourceLocator": "L9#1",
+      "normalizedOutcome": "Substantially rework the visibly poor first-person arms.",
+      "feedbackIds": [
+        "HF-133"
+      ],
+      "planningRequirementIds": [
+        "R105",
+        "R108",
+        "R608",
+        "R613"
+      ]
+    },
+    {
+      "id": "JUL29-007",
+      "sourceLocator": "L11#1",
+      "normalizedOutcome": "Complete the Chopper Gunner exterior with the missing rear vehicle body.",
+      "feedbackIds": [
+        "HF-134"
+      ],
+      "planningRequirementIds": [
+        "R108",
+        "R504",
+        "R608"
+      ]
+    },
+    {
+      "id": "JUL29-008",
+      "sourceLocator": "L11#2",
+      "normalizedOutcome": "Exclude rotor blades and vehicle shell from the Chopper Gunner owner sightline while retaining its UI, crosshair and gun.",
+      "feedbackIds": [
+        "HF-135"
+      ],
+      "planningRequirementIds": [
+        "R109",
+        "R504",
+        "R608",
+        "R609"
+      ]
+    },
+    {
+      "id": "JUL29-009",
+      "sourceLocator": "L13#1",
+      "normalizedOutcome": "Make explosive damage more capable of blowing apart the physical green shed.",
+      "feedbackIds": [
+        "HF-136"
+      ],
+      "planningRequirementIds": [
+        "R400",
+        "R401",
+        "R402",
+        "R403",
+        "R404",
+        "R405",
+        "R406",
+        "R407",
+        "R408",
+        "R409",
+        "R410",
+        "R411",
+        "R412",
+        "R413",
+        "R608"
+      ]
+    },
+    {
+      "id": "JUL29-010",
+      "sourceLocator": "L15#1",
+      "normalizedOutcome": "Perform a bounded code-quality cleanup after implementing the requested corrections.",
+      "feedbackIds": [
+        "HF-137"
+      ],
+      "planningRequirementIds": [
+        "R005",
+        "R610",
+        "R613"
+      ]
+    },
+    {
+      "id": "JUL29-011",
+      "sourceLocator": "L15#2",
+      "normalizedOutcome": "Prove the replacement remains free of freezing, crashing and severe hitching.",
+      "feedbackIds": [
+        "HF-138"
+      ],
+      "planningRequirementIds": [
+        "R006",
+        "R606",
+        "R610",
+        "R613"
       ]
     }
   ]

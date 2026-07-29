@@ -1,6 +1,6 @@
 # Pass 65 HITL Round 1 Correction Ledger
 
-<!-- owner-feedback-ledger-version: 1; latest-id: HF-127 -->
+<!-- owner-feedback-ledger-version: 1; latest-id: HF-138 -->
 
 Status: **BLOCKING CORRECTION WAVE — NOT APPROVED, NOT PUBLISHABLE**
 
@@ -156,6 +156,17 @@ This ledger is the authoritative translation of Dave's first local Pass 65 revie
 | HF-125 | P0 | Piloted Drone accepts full yaw, pitch, forward/backward and vertical control; a forward/back-only control path is invalid. | Drone input/authority | Signed input-axis unit tests, simultaneous-axis property tests and two-peer pose traces on every map reject inversion, ignored axes or client-forged movement. | Piloted Drone first-person owner control | IMPLEMENTED |
 | HF-126 | P0 | Regressions reported in this imported feedback must become durable positive contracts and mutations rather than relying on another owner HITL report. | Regression governance/integration | Every HF-073+ node maps to canonical requirements/tests, candidate evidence and deliberate regression fixtures; omissions, stale supersessions or self-attestation fail the owner-feedback gate. | Whole Pass 65 candidate | OPEN |
 | HF-127 | P0 | Carpet Bomber activation must enter the same working crosshair call-in contract as Care Package and may not leave the earned reward stuck behind a no-op prompt. | Carpet Bomber lifecycle/UI/interaction | Earn/select/activate/target/commit/cancel/consume tests and served all-map traces reject overview UI, collection messaging, no target marker or unconsumed no-op state. | Carpet Bomber on all support-enabled maps | IMPLEMENTED |
+| HF-128 | P1 | Menu and loading helicopter prerecorded videos need perspective-aware main/tail rotor presentation that reads as a plausible spinning rotor from the authored camera rather than a flat, detached or visually absurd blade treatment. | Preview-media/vehicle presentation | Offline source and decoded-video captures at every authored review camera prove rotor hub attachment, projected ellipse/occlusion, motion-blur cadence, clean loop and safe framing; flat crossed cards, detached hubs, reverse spin, aliasing or implausible camera intersection fail. | Helicopter menu and loading videos for Nuke Town, Terminal and RustRig | OPEN |
+| HF-129 | P0 | Every piloted-drone direction control uses the expected non-inverted sign: yaw, pitch, forward/backward and vertical motion must all agree with the displayed input and camera convention. | Drone input/authority | Signed keyboard/mouse/gamepad axis matrix, simultaneous-axis property tests and native served pose traces on every support-enabled map reject any reversed, ignored or double-negated axis. | Piloted Drone first-person owner control | OPEN |
+| HF-130 | P1 | The standalone drone moves at exactly twice its player-controlled movement speed whenever it is autonomous and returns to the player-controlled speed without a discontinuity when possession changes. | Drone navigation/authority | Canonical manual-versus-autonomous speed constants, fixed-step distance tests, mode-transition continuity, obstacle/no-fly bounds and two-peer pose traces reject a copied speed, client-only multiplier or teleporting blend. | Standalone Drone autonomous and player-controlled modes | OPEN |
+| HF-131 | P0 | Piloted Drone and Drone Swarm always spawn from deterministic valid volumes centred on the active map, distributed in a spread-out pattern rather than behind/on the caller or at one shared point. | Drone spawn/navigation authority | Per-map centre-volume declarations, seeded multi-unit separation, bounds/clearance/no-fly/collision tests, host/guest pose equality and 100-activation traces reject caller-relative ingress, clustering, invalid geometry or profile-dependent spawn locations. | Piloted Drone and Drone Swarm on every support-enabled map | OPEN |
+| HF-132 | P0 | Carpet Bomber must follow the working Care Package crosshair call-in experience: select the earned reward, place the large red ground X at the admitted aim point, commit it, then visibly fly the bomber through the strike; the current non-working path is invalid. | Carpet Bomber lifecycle/UI/interaction | Earn/select/activate/aim/marker/commit/aircraft/payload/consume/cancel state-machine tests and served all-map traces reject no-op activation, missing red X, overview-map substitution, aircraft omission, early consumption or stranded reward state. | Carpet Bomber on every support-enabled map | OPEN |
+| HF-133 | P1 | First-person arms and hands require a substantial authored rework: retain the accepted opaque black/grey direction while replacing the visibly poor proportions, joints, skinning, grips, materials and action deformation across the complete arsenal. | Operator rig/asset forge | Editable source/provenance, skeleton/weight/tangent/PBR/socket validators, every-weapon/grenade/action contact sheets and native close-camera review reject transparent surfaces, primitive geometry, twisted joints, detached grips, clipping, inconsistent scale or fallback arms. | All first-person weapons, grenades, interactions and melee actions | OPEN |
+| HF-134 | P1 | The Chopper Gunner exterior is a complete aircraft with an authored rear fuselage/tail volume; the current front-only cut-off model is invalid. | Chopper vehicle asset forge | Editable source/provenance, closed-manifold/LOD/material/axis/socket validator and deterministic front/side/rear/flight captures reject an open shell, missing rear body, detached tail or presentation-only cap. | Chopper Gunner exterior on every support-enabled map | OPEN |
+| HF-135 | P0 | Entering Chopper Gunner presents an unobstructed gunner station with only the dedicated HUD, crosshair and admitted weapon presentation in the sightline; exterior rotor blades or vehicle shell may not enter the owner camera view. | Chopper possession camera/HUD | Camera exclusion-volume assertions over full yaw/pitch limits, near/far target captures, fire-ray parity and possession/exit lifecycle tests reject any rotor/fuselage occlusion, hidden crosshair, mismatched aim or stranded overlay. | Chopper Gunner owner POV | OPEN |
+| HF-136 | P1 | Explosive damage against the physical green shed must more readily produce visible authoritative panel detachment, corner failure and persistent blow-apart debris while preserving bullet-hole and ballistic-aperture behavior. | Destructible-world authority/physics | Frozen comparator explosions at panels/corners and calibrated damage-boundary tests prove earlier threshold crossing, exactly-once detach/collapse, impulse, persistent sleeping debris, late join/reset and body caps; dent-only response, disappearing major chunks or lost shoot-through parity fail. | Green sheds on RustRig and Terminal | OPEN |
+| HF-137 | P1 | After the corrections, perform a bounded profile-guided code-quality pass that removes demonstrated duplication, stale ownership and avoidable hot-path allocation without broad speculative rewrites or behavior loss. | Architecture/performance integration | Static analysis, ownership/diff audit, measured before/after allocation and frame traces, focused positive comparators and mutation tests reject unrelated refactors, weakened gates, duplicate authorities or unmeasured cleanup claims. | Changed Pass 65 runtime, presentation and test lanes | OPEN |
+| HF-138 | P0 | The replacement HITL candidate must remain crash-free and free of user-visible freezing or severe hitching across all maps, transitions, drone/chopper/carpet activation, destruction stress and repeated foreground/focus cycles. | Stability/performance integration | Exact-SHA native-WebGPU multi-run endurance, all-map transition circuits, mixed-support/destruction stress, focus cycles, first-fault logs, GPU error/device-loss scopes and p95/p99/max long-frame ledger must pass frozen thresholds with zero crash; one recurrence fails. | Whole replacement Pass 65 candidate | OPEN |
 
 ### 3A. Implemented boundaries awaiting independent candidate evidence
 
@@ -250,6 +261,17 @@ The feedback IDs remain the correction source; these ranges bind each row back t
 | HF-125 | R507, R509, R510 |
 | HF-126 | R005, R608, R610, R613 |
 | HF-127 | R505, R510, R609 |
+| HF-128 | R112, R113, R608, R610 |
+| HF-129 | R507, R509, R510 |
+| HF-130 | R507, R509, R511, R610 |
+| HF-131 | R506, R507, R509, R510, R511 |
+| HF-132 | R505, R510, R609 |
+| HF-133 | R105, R108, R608, R613 |
+| HF-134 | R108, R504, R608 |
+| HF-135 | R109, R504, R608, R609 |
+| HF-136 | R400-R413, R608 |
+| HF-137 | R005, R610, R613 |
+| HF-138 | R006, R606, R610, R613 |
 
 ## 4. Canonical contract supersessions
 
@@ -274,6 +296,7 @@ These corrections are authoritative and must be reflected without creating a sec
 17. Care Package and Carpet Bomber activate from the admitted crosshair ground hit with no overview map. Carpet Bomber retains its corridor telegraph, uses exactly three times the preceding authoritative impact-damage profile and visibly drops bomb shells with bounded explosion/smoke/fire audiovisual presentation.
 18. `DEC-07` now also freezes impact-instant, no-beep Smoke and actor-sticky Semtex. Actor-stuck Semtex uses exactly two-times blast damage and two-times blast radius and emits a current-life `STUCK` victim alert.
 19. `DEC-08` explosive crossbow speed is 108 m/s, exactly three times the prior 36 m/s baseline. An actor-stuck bolt emits `STUCK` and uses exactly two-times blast damage and two-times blast radius; the prior slow-bolt profile is retired.
+20. `DEC-13` Piloted Drone and Drone Swarm deployment now originates from deterministic valid centre-map spawn volumes with distributed separation. This supersedes the behind-caller ingress rule while retaining the 24-unit Swarm count, targetability, bounded navigation and divergent individual/small-group routes.
 
 ## 5. Execution waves and merge order
 
