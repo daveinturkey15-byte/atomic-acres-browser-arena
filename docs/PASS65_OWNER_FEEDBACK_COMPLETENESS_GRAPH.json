@@ -1487,9 +1487,10 @@
     },
     {
       "id": "T-INTERACTION",
-      "command": "npx vitest run src/interaction-arbitration.test.ts",
+      "command": "npx vitest run src/interaction-arbitration.test.ts src/killstreak-main-integration.test.ts",
       "paths": [
-        "src/interaction-arbitration.test.ts"
+        "src/interaction-arbitration.test.ts",
+        "src/killstreak-main-integration.test.ts"
       ]
     },
     {
