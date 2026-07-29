@@ -405,7 +405,7 @@ test.describe('Pass 65 host-authoritative Railgun multi-hit gate', () => {
     }
   });
 
-  test('pierces two aligned human peers for two exact 50-damage passes and credits both deaths to the host shooter', async ({ browser }) => {
+  test('pierces two aligned 50-health human peers for exact railgun kills credited to the host shooter', async ({ browser }) => {
     test.setTimeout(180_000);
     const trio = await startRailgunTrio(browser, '1');
     const { context, host, shooter, observer, errors } = trio;
@@ -448,48 +448,49 @@ test.describe('Pass 65 host-authoritative Railgun multi-hit gate', () => {
         return at(shooter, 18) && at(observer, 8);
       }, { shooterId, observerId }, { timeout: 10_000 });
 
-      const fireAndAwait = async (expectedPresentations: number): Promise<any> => {
-        await host.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.fireOnce());
-        await host.waitForFunction((presentations) => {
-          const railgun = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().railgun;
-          return railgun.presentation.beamPresentations === presentations
-            && railgun.lastAuthoritativeResult?.outcomes.length === 2;
-        }, expectedPresentations, { timeout: 5_000 });
-        const result = (await state(host)).railgun.lastAuthoritativeResult;
-        expect(result).toMatchObject({
-          forPlayerId: hostId,
-          status: 'accepted-hit',
-          reason: 'accepted',
-        });
-        expect(result.outcomes.map((outcome: any) => outcome.target)).toEqual([shooterId, observerId]);
-        expect(result.outcomes.map((outcome: any) => outcome.damageRequested)).toEqual([50, 50]);
-        expect(result.outcomes.map((outcome: any) => outcome.damageApplied)).toEqual([50, 50]);
-        // Remote interpolation can move a staged peer by millimetres between
-        // the two rechambered shots; retain the ordering/range oracle without
-        // pretending transport snapshots are bit-exact world positions.
-        expect(result.outcomes[0].distanceMeters).toBeCloseTo(12, 0);
-        expect(result.outcomes[1].distanceMeters).toBeCloseTo(22, 0);
-        return result;
-      };
-
-      const first = await fireAndAwait(1);
-      expect(first.outcomes.map((outcome: any) => ({ resultingHealth: outcome.resultingHealth, died: outcome.died }))).toEqual([
-        { resultingHealth: 50, died: false },
-        { resultingHealth: 50, died: false },
+      // Stage both real peers at exactly 50 HP and fire in the same browser task.
+      // This isolates the railgun contract from normal delayed health regeneration
+      // while preserving the production host-authoritative health/death path.
+      const stagedHealth = await host.evaluate(({ shooterId, observerId }) => {
+        const api = (window as any).__ATOMIC_ACRES_DEBUG__;
+        const staged = [
+          api.damageRemoteAuthoritatively(50, shooterId),
+          api.damageRemoteAuthoritatively(50, observerId),
+        ];
+        api.fireOnce();
+        return staged;
+      }, { shooterId, observerId });
+      expect(stagedHealth).toEqual([
+        expect.objectContaining({ targetId: shooterId, canonicalBefore: 100, storedAfter: 50 }),
+        expect.objectContaining({ targetId: observerId, canonicalBefore: 100, storedAfter: 50 }),
       ]);
-      await host.waitForFunction(() => (
-        (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().railgun.chamberReadyAtHostTimeMs <= performance.now()
-      ), undefined, { timeout: 4_000 });
-      const second = await fireAndAwait(2);
-      expect(second.outcomes.map((outcome: any) => ({ resultingHealth: outcome.resultingHealth, died: outcome.died }))).toEqual([
+      await host.waitForFunction(() => {
+        const railgun = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().railgun;
+        return railgun.presentation.beamPresentations === 1
+          && railgun.lastAuthoritativeResult?.outcomes.length === 2;
+      }, undefined, { timeout: 5_000 });
+      const result = (await state(host)).railgun.lastAuthoritativeResult;
+      expect(result).toMatchObject({
+        forPlayerId: hostId,
+        status: 'accepted-hit',
+        reason: 'accepted',
+      });
+      expect(result.outcomes.map((outcome: any) => outcome.target)).toEqual([shooterId, observerId]);
+      expect(result.outcomes.map((outcome: any) => outcome.damageRequested)).toEqual([50, 50]);
+      expect(result.outcomes.map((outcome: any) => outcome.damageApplied)).toEqual([50, 50]);
+      expect(result.outcomes.map((outcome: any) => ({ resultingHealth: outcome.resultingHealth, died: outcome.died }))).toEqual([
         { resultingHealth: 0, died: true },
         { resultingHealth: 0, died: true },
       ]);
+      // Remote interpolation can move a staged peer by millimetres; retain the
+      // ordering/range oracle without pretending transport positions are exact.
+      expect(result.outcomes[0].distanceMeters).toBeCloseTo(12, 0);
+      expect(result.outcomes[1].distanceMeters).toBeCloseTo(22, 0);
 
       await Promise.all([host, shooter, observer].map((page) => page.waitForFunction(({ hostId, shooterId, observerId }) => {
         const snapshot = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
         const deaths = snapshot.railgun.deathPresentations;
-        return snapshot.railgun.presentation.beamPresentations === 2
+        return snapshot.railgun.presentation.beamPresentations === 1
           && deaths.length === 2
           && deaths.map((entry: any) => entry.victimId).join(',') === `${shooterId},${observerId}`
           && deaths.every((entry: any) => entry.killerId === hostId);
@@ -504,11 +505,11 @@ test.describe('Pass 65 host-authoritative Railgun multi-hit gate', () => {
       expect(roleShots[0].privateMatch.scores.find((score: any) => score.id === hostId)).toMatchObject({
         kills: 2,
         deaths: 0,
-        damageDealt: 200,
+        damageDealt: 100,
       });
-      expect(roleShots[0].audio.railgun).toMatchObject({ local: 2, replicated: 0 });
-      expect(roleShots[1].audio.railgun).toMatchObject({ local: 0, replicated: 2, lastSpatial: true });
-      expect(roleShots[2].audio.railgun).toMatchObject({ local: 0, replicated: 2, lastSpatial: true });
+      expect(roleShots[0].audio.railgun).toMatchObject({ local: 1, replicated: 0 });
+      expect(roleShots[1].audio.railgun).toMatchObject({ local: 0, replicated: 1, lastSpatial: true });
+      expect(roleShots[2].audio.railgun).toMatchObject({ local: 0, replicated: 1, lastSpatial: true });
       expect(errors).toEqual([]);
     } finally {
       await context.close();
