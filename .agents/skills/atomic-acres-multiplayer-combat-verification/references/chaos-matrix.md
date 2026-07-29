@@ -17,6 +17,7 @@ Require an exact 40-hex Git source SHA, immutable build ID, environment hash, ac
 - reconnect, late join, match end and rematch repair;
 - pose-history shots against moving support/dynamic geometry;
 - exactly-once health, death, score, reward and consumption.
+- Railgun multi-outcome replication with a guest shooter, host observer, uninvolved guest, at least three aligned hostiles, aligned friendly and off-axis exclusions, ordered unique `damageRequested=50` outcomes, honest low-health `damageApplied`, exactly-once shooter death/score attribution, duplicate/reorder/replay rejection, and one beam/report presentation per relevant observer.
 
 ## Impairment profiles
 

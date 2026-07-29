@@ -16,6 +16,8 @@ Every weapon, ordnance, impact, door, shed/debris, support entity, movement/foot
 - concurrency, priority, cooldown and optional occlusion profile;
 - lifecycle/disposal owner and evidence ID.
 
+The Railgun report is one authoritative semantic weapon event: the shooter receives one bounded local report and every relevant remote observer receives one replicated world-spatial report from the authoritative beam origin. Replay, duplicate delivery or the accompanying generic shot message cannot create a second report; distance/pan remain observer-relative, and all pressure/crack/tail layers stay on the declared SFX/ambience buses inside global, per-bus and spatial-chain caps.
+
 ## Spatial and footstep rules
 
 Require finite positive reference distances, greater finite maximum distances, sampled monotonic rolloff, bounded cone values, per-profile voice caps and deterministic stealing. Every spatial staging event has exactly one numeric pan/occlusion evidence row with an immutable artifact digest. Footsteps require admitted grounded planar movement, actor/life/continuity identity, surface policy and numeric grounded, airborne, discontinuity and remote-position evidence. Airborne lateral motion emits no footstep.
