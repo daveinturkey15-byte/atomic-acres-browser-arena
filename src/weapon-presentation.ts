@@ -961,6 +961,7 @@ export class WeaponPresentation {
   async prewarmBrowserWeaponCatalog(
     requestedIds: readonly WeaponId[],
     onProgress?: (loaded: number, total: number) => void,
+    yieldToBrowser?: () => Promise<void>,
   ): Promise<void> {
     if (!this.browserRuntime || !this.gpuPrewarmer) return;
     const ids = [...new Set(requestedIds)];
@@ -969,7 +970,7 @@ export class WeaponPresentation {
     }
     if (this.browserCatalogPrewarmPromise) {
       await this.browserCatalogPrewarmPromise;
-      return this.prewarmBrowserWeaponCatalog(ids, onProgress);
+      return this.prewarmBrowserWeaponCatalog(ids, onProgress, yieldToBrowser);
     }
     const exactSetReady = ids.length === this.browserResidentWeaponIds.size
       && ids.every((id) => {
@@ -977,7 +978,7 @@ export class WeaponPresentation {
         return this.browserResidentWeaponIds.has(id) && model !== undefined && this.modelIsGpuReady(model);
       });
     if (exactSetReady) return;
-    const operation = this.performBrowserWeaponCatalogPrewarm(ids, onProgress);
+    const operation = this.performBrowserWeaponCatalogPrewarm(ids, onProgress, yieldToBrowser);
     this.browserCatalogPrewarmPromise = operation;
     try {
       await operation;
@@ -1016,6 +1017,7 @@ export class WeaponPresentation {
   private async performBrowserWeaponCatalogPrewarm(
     ids: readonly WeaponId[],
     onProgress?: (loaded: number, total: number) => void,
+    yieldToBrowser?: () => Promise<void>,
   ): Promise<void> {
     const prewarmStartedAt = performance.now();
     let assetLoadMs = 0;
@@ -1047,6 +1049,7 @@ export class WeaponPresentation {
       }
       entries.push(Object.freeze({ weaponId: id, model }));
       modelCreateMs += performance.now() - modelCreateStartedAt;
+      await yieldToBrowser?.();
     }
     const assetPrepareWallMs = performance.now() - assetPrepareStartedAt;
 
@@ -1065,7 +1068,7 @@ export class WeaponPresentation {
       const flashlightEntries = batchEntries.filter(({ weaponId }) => WEAPONS[weaponId].flashlight !== null);
       if (flashlightEntries[0]) this.configureWeaponFlashlight(flashlightEntries[0].weaponId);
       try {
-        await this.prewarmBrowserCatalogModels(batchEntries, this.browserWeaponRequest);
+        await this.prewarmBrowserCatalogModels(batchEntries, this.browserWeaponRequest, yieldToBrowser);
         // One shared spotlight topology serves every flashlight-capable
         // weapon. The batch exercises that renderer pipeline once, so telemetry
         // counts the real submission exercise rather than the model count.
@@ -1103,6 +1106,7 @@ export class WeaponPresentation {
         }
         this.browserResidentWeaponIds.add(id);
         onProgress?.(index + 1, ids.length);
+        await yieldToBrowser?.();
       }
     }
     const gpuPrewarmMs = performance.now() - gpuPrewarmStartedAt;
@@ -1248,6 +1252,7 @@ export class WeaponPresentation {
   private prewarmBrowserCatalogModels(
     entries: readonly WeaponViewmodelCatalogGpuPrewarmEntry[],
     requestGeneration: number,
+    yieldToBrowser?: () => Promise<void>,
   ): Promise<void> {
     if (entries.length === 0) return Promise.resolve();
     const promise = Promise.resolve().then(async () => {
@@ -1258,10 +1263,13 @@ export class WeaponPresentation {
           // End the current browser task between renderer submissions so the
           // prerecorded loading/menu video and accessibility UI can present.
           // One giant 17-model node build created a measured 1.24s long task.
-          await new Promise<void>((resolve) => {
-            if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => resolve());
-            else globalThis.setTimeout(resolve, 0);
-          });
+          if (yieldToBrowser) await yieldToBrowser();
+          else {
+            await new Promise<void>((resolve) => {
+              if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => resolve());
+              else globalThis.setTimeout(resolve, 0);
+            });
+          }
         }
       }
     }).then(() => {

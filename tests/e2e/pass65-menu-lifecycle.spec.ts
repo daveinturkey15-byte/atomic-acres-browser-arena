@@ -454,6 +454,38 @@ test.describe('Pass 65 active-match menu lifecycle', () => {
     });
   });
 
+  test('Escape from active-match Options commits once and returns directly to play', async ({ page }) => {
+    await ready(page);
+    await installPointerLockHarness(page, 'transient');
+    await startFromMenu(page);
+    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active', undefined, { timeout: 15_000 });
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.openMenu());
+    await expect(page.locator('#menu')).toBeVisible();
+    await page.locator('#menu-tab-options').click();
+    await expect(page.locator('#menu-panel-options')).toBeVisible();
+    await page.evaluate(() => {
+      const original = Storage.prototype.setItem;
+      let writes = 0;
+      Storage.prototype.setItem = function setItem(key: string, value: string): void {
+        if (key === 'atomic-acres.player-profile.v1') writes += 1;
+        original.call(this, key, value);
+      };
+      Object.defineProperty(window, '__PASS66_SETTINGS_WRITES__', {
+        configurable: true,
+        get: () => writes,
+      });
+    });
+    const currentProfile = await page.locator('#graphics-profile').inputValue();
+    await page.locator('#graphics-profile').selectOption(currentProfile === 'performance' ? 'high' : 'performance');
+    await expect(page.locator('#graphics-effective')).toContainText('PENDING');
+
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#menu')).toBeHidden();
+    await expect.poll(async () => (await lifecycle(page)).pointerLock).toBe('locked');
+    await expect(page.locator('#menu-tab-deploy')).toHaveAttribute('aria-selected', 'true');
+    expect(await page.evaluate(() => (window as unknown as { __PASS66_SETTINGS_WRITES__: number }).__PASS66_SETTINGS_WRITES__)).toBe(1);
+  });
+
   test('restarts all four countdown cues and latches one F press for care capture', async ({ page }) => {
     test.setTimeout(60_000);
     await page.addInitScript((loadout) => {

@@ -10,9 +10,6 @@ const headed = process.env.QA_HEADED === '1';
 const browser = await chromium.launch({
   headless: !headed,
   args: [
-    '--disable-background-timer-throttling',
-    '--disable-renderer-backgrounding',
-    '--disable-backgrounding-occluded-windows',
     '--allow-loopback-in-peer-connection',
     '--disable-features=WebRtcHideLocalIpsWithMdns',
   ],
@@ -104,6 +101,7 @@ async function state(page) {
       gameMode: snapshot.gameMode,
       remotes: snapshot.remotes,
       frameCount: snapshot.frameCount,
+      presentationScheduling: snapshot.presentationScheduling,
       menuVisible: !menu.classList.contains('hidden'),
       privateLobbyActive: menu.classList.contains('private-lobby-active'),
       privateLobbyVisible: visible(lobby),
@@ -140,23 +138,44 @@ async function assertActiveMatchRecovers(page, other, label) {
     page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false)),
     other.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true)),
   ]);
+  await page.evaluate(() => {
+    const focusHarness = { focused: true };
+    Object.defineProperty(window, '__PASS66_FOCUS_HARNESS__', { configurable: true, value: focusHarness });
+    Object.defineProperty(document, 'hasFocus', {
+      configurable: true,
+      value: () => focusHarness.focused,
+    });
+  });
   const beforeBlur = await state(page);
   if (beforeBlur.menuVisible || beforeBlur.canvasVisibility !== 'visible') {
     throw new Error(`${label} was not in playable rendering before focus-loss probe: ${JSON.stringify(beforeBlur)}`);
   }
   await other.bringToFront();
   await page.evaluate(() => {
+    window.__PASS66_FOCUS_HARNESS__.focused = false;
     window.dispatchEvent(new Event('blur'));
     document.dispatchEvent(new Event('pointerlockchange'));
   });
   await page.waitForTimeout(350);
   const background = await state(page);
-  if (!background.gameStarted || background.remotes !== 1 || background.menuVisible || background.frameCount <= beforeBlur.frameCount) {
-    throw new Error(`${label} did not continue its multiplayer heartbeat while unfocused: ${JSON.stringify({ beforeBlur, background })}`);
+  const expectedBackgroundMode = label === 'host' ? 'hosted-authority-network' : 'network-only';
+  if (!background.gameStarted || background.remotes !== 1 || background.menuVisible
+    || background.frameCount > beforeBlur.frameCount + 1
+    || background.presentationScheduling.mode !== expectedBackgroundMode
+    || (label === 'host' && background.presentationScheduling.hostedBackgroundNetworkHeartbeatCount
+      <= beforeBlur.presentationScheduling.hostedBackgroundNetworkHeartbeatCount)) {
+    throw new Error(`${label} ran presentation work or lost its bounded network lifecycle while unfocused: ${JSON.stringify({ beforeBlur, background })}`);
   }
   await page.bringToFront();
+  await page.evaluate(() => {
+    window.__PASS66_FOCUS_HARNESS__.focused = true;
+    window.dispatchEvent(new Event('focus'));
+  });
   await page.waitForTimeout(100);
   const returned = await state(page);
+  if (returned.presentationScheduling.recoveryCount !== beforeBlur.presentationScheduling.recoveryCount + 1) {
+    throw new Error(`${label} did not coalesce focus recovery into one generation: ${JSON.stringify({ beforeBlur, returned })}`);
+  }
   await mkdir('artifacts/focus-recovery', { recursive: true });
   try {
     await page.screenshot({ path: `artifacts/focus-recovery/${label}-focus-return.png`, fullPage: true, timeout: 15_000 });
@@ -203,7 +222,41 @@ async function assertActiveMatchRecovers(page, other, label) {
     throw new Error(`${label} canvas click did not reacquire pointer lock: ${JSON.stringify(await state(page))}`);
   }
   console.error(`[focus-recovery] ${label} active-match focus recovery passed`);
-  return { returned, resumed };
+  return { beforeBlur, background, returned, resumed };
+}
+
+async function assertOptionsEscapeReturnsToPlay(page) {
+  await page.bringToFront();
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.openMenu());
+  await page.waitForSelector('#menu-tab-options', { state: 'visible' });
+  await page.click('#menu-tab-options');
+  await page.evaluate(() => {
+    const original = Storage.prototype.setItem;
+    let writes = 0;
+    Storage.prototype.setItem = function setItem(key, value) {
+      if (key === 'atomic-acres.player-profile.v1') writes += 1;
+      original.call(this, key, value);
+    };
+    Object.defineProperty(window, '__PASS66_SETTINGS_WRITES__', { configurable: true, get: () => writes });
+  });
+  const current = await page.inputValue('#graphics-profile');
+  await page.selectOption('#graphics-profile', current === 'performance' ? 'high' : 'performance');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => {
+    const menu = document.querySelector('#menu');
+    const deployTab = document.querySelector('#menu-tab-deploy');
+    return menu?.classList.contains('hidden')
+      && document.pointerLockElement?.id === 'game'
+      && deployTab?.getAttribute('aria-selected') === 'true';
+  }, undefined, { timeout: 15_000 });
+  const result = await page.evaluate(() => ({
+    settingsWrites: window.__PASS66_SETTINGS_WRITES__,
+    lifecycle: window.__ATOMIC_ACRES_DEBUG__.snapshot().menuLifecycle,
+  }));
+  if (result.settingsWrites !== 1 || result.lifecycle.surface !== 'hidden') {
+    throw new Error(`Options Escape did not commit once and return directly to play: ${JSON.stringify(result)}`);
+  }
+  return result;
 }
 
 try {
@@ -257,13 +310,15 @@ try {
     host: await assertActiveMatchRecovers(host, guest, 'host'),
     guest: await assertActiveMatchRecovers(guest, host, 'guest'),
   };
+  const optionsEscape = await assertOptionsEscapeReturnsToPlay(host);
   const report = {
-    schema: 'atomic-acres/focus-recovery@1',
-    resumeTransition: 'match heartbeat continues while unfocused; a direct canvas click reacquires pointer lock without opening the pause menu',
+    schema: 'atomic-acres/focus-recovery@2',
+    resumeTransition: 'presentation pauses while unfocused; transport remains live and one foreground recovery resumes the existing match',
     roomCodeLength: roomCode.length,
     errors,
     waiting,
     active,
+    optionsEscape,
   };
   await mkdir('artifacts/focus-recovery', { recursive: true });
   await writeFile('artifacts/focus-recovery/report.json', `${JSON.stringify(report, null, 2)}\n`);

@@ -109,12 +109,15 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain("bootstrapStage = 'prewarming-overdrive'");
     expect(menuBootstrap).toContain("document.documentElement.dataset.gameplayArena = 'deferred-until-deployment'");
     expect(arenaDeployment).toContain('await prepareMenuDeploymentAssets()');
-    expect(sharedAssets).toContain('weaponView.prewarmBrowserWeaponCatalog(WEAPON_IDS)');
-    expect(sharedAssets).toContain('prewarmPass65RuntimeWeaponCorpus()');
-    expect(menuBootstrap).toContain('void prepareMenuDeploymentAssets().then(() => {');
+    expect(sharedAssets).toContain('menuDeploymentAssetsCoordinator.prepare(priority');
+    expect(sharedAssets).toContain('weaponView.prewarmBrowserWeaponCatalog(');
+    expect(sharedAssets).toContain('prewarmPass65RuntimeWeaponCorpus(checkpoint)');
+    expect(menuBootstrap).toContain('menuPreviewVideoController.whenFirstFramePresented().then(() => {');
+    expect(menuBootstrap).toContain("prepareMenuDeploymentAssets('idle')");
     expect(menuBootstrap).toContain('arenaSelectionReady = true;');
     expect(menuReturn).toContain('arenaSelectionReady = true;');
-    expect(menuReturn).toContain('void prepareMenuDeploymentAssets().catch(showFatalError);');
+    expect(menuReturn).toContain('menuPreviewVideoController.whenFirstFramePresented()');
+    expect(menuReturn).toContain("prepareMenuDeploymentAssets('idle')");
     expect(menuBootstrap).toContain("bootstrapStage = 'ready';");
     expect(sharedAssets).toContain("await runPhase('shared-assets'");
     expect(sharedAssets).toContain("await runPhase('first-person-catalog'");
@@ -194,7 +197,11 @@ describe('presentation prewarm startup contract', () => {
     expect(finalWebGlPrime.match(/atomicSignal\.render\(scene, camera, VIEWMODEL_RENDER_LAYER\);/g)).toHaveLength(2);
     expect(finalWebGlPrime).not.toContain('lastGameplayPresentedFrame =');
     expect(source).toContain('webGlReadyPrime: lastWebGlReadyPrime');
-    const frameLoop = source.slice(source.indexOf('function frame('), source.indexOf('// requestAnimationFrame is suspended'));
+    const frameLoop = source.slice(source.indexOf('function frame('), source.indexOf('// Multiplayer transport'));
+    expect(frameLoop).toContain("schedulingDecision.mode !== 'foreground-presentation'");
+    expect(frameLoop.indexOf("schedulingDecision.mode !== 'foreground-presentation'"))
+      .toBeLessThan(frameLoop.indexOf('frameCount += 1;'));
+    expect(source).not.toContain('frame(performance.now(), false)');
     expect(frameLoop).toContain('if (matchAdmissionPresentationPaused) {');
     expect(frameLoop.indexOf('if (matchAdmissionPresentationPaused) {')).toBeLessThan(frameLoop.indexOf('frameCount += 1;'));
     expect(frameLoop.indexOf('if (matchAdmissionPresentationPaused) {')).toBeLessThan(frameLoop.indexOf('presentationFrameDue('));
@@ -237,8 +244,8 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('WebGPU queue latency remained ${Math.round(completionLatencyMs)}ms for ${consecutiveMinimumTierSlowSamples} consecutive samples at the minimum quality tier');
     expect(source).toContain('adaptiveQuality.forceDownshift(');
     expect(matchDeployment).toContain("resetWebGpuPresentationEpoch('match admitted', performance.now());");
-    expect(source).toContain("recoverFromSchedulingInterruption('tab visibility regained');");
-    expect(source).toContain("recoverFromSchedulingInterruption('window focus regained');");
+    expect(source).toContain("reconcilePresentationScheduling(document.hidden ? 'tab visibility hidden' : 'tab visibility regained');");
+    expect(source).toContain("reconcilePresentationScheduling('window focus regained');");
     const presentationEpochReset = source.slice(
       source.indexOf('function resetWebGpuPresentationEpoch('),
       source.indexOf('let lastHudAt'),
@@ -581,5 +588,23 @@ describe('presentation prewarm startup contract', () => {
       expect(source).toContain(term);
     }
     expect(source).toContain('Readiness diagnostic:');
+  });
+
+  it('returns active-match Options Escape directly to play through one settings flush', () => {
+    const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+    const resume = source.slice(
+      source.indexOf('function resumeActiveMatchFromMenu()'),
+      source.indexOf("resumeButton.addEventListener('click'"),
+    );
+    expect(resume.match(/flushPendingGraphics\(\)/g)).toHaveLength(1);
+    expect(resume).toContain("setMenuTab('deploy', false)");
+    expect(resume).toContain("applyMenuLifecycle({ type: 'resume' })");
+    expect(resume).toContain("requestGamePointerLock('resume')");
+    const keydown = source.slice(
+      source.indexOf("window.addEventListener('keydown', (event) => {", source.indexOf('submitTextChat();')),
+      source.indexOf("window.addEventListener('keyup'"),
+    );
+    expect(keydown).toContain("activeMenuTabId === 'options'");
+    expect(keydown).toContain('resumeActiveMatchFromMenu();');
   });
 });

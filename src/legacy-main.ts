@@ -76,6 +76,8 @@ import {
   type PointerLockRequestSource,
 } from './ui/menu-lifecycle';
 import { MenuPreviewVideoController, menuPreviewVideoDefinition } from './ui/menu-preview-video';
+import { PresentationSchedulingLifecycle, type PresentationSchedulingDecision } from './presentation-scheduling-lifecycle';
+import { PriorityPreparationCoordinator, type PreparationPriority } from './priority-preparation-coordinator';
 import { flyingCatPose } from './gun-range-cat-choreography';
 import { KillstreakLoadoutController } from './killstreak-loadout';
 import type { KillstreakLoadoutV1, Pass65KillstreakId } from './killstreak-catalog';
@@ -4874,11 +4876,11 @@ function applyMenuLoadoutImmediately(): void {
 }
 
 let activeMenuTabId: 'deploy' | 'kit' | 'streaks' | 'options' = 'deploy';
-function setMenuTab(tab: 'deploy' | 'kit' | 'streaks' | 'options'): void {
+function setMenuTab(tab: 'deploy' | 'kit' | 'streaks' | 'options', flushOptions = true): void {
   if (tab === 'kit' && selectedArena.id === 'gun-range') tab = 'deploy';
   // Pass 65: leaving the options tab is a graphics save point — batched edits
   // flush here instead of reloading the page per control change.
-  if (activeMenuTabId === 'options' && tab !== 'options') flushPendingGraphics();
+  if (flushOptions && activeMenuTabId === 'options' && tab !== 'options') flushPendingGraphics();
   activeMenuTabId = tab;
   document.querySelectorAll<HTMLButtonElement>('[data-menu-tab]').forEach((button) => {
     const active = button.dataset.menuTab === tab;
@@ -15413,12 +15415,44 @@ function recoverFromSchedulingInterruption(reason: string): void {
   resetWebGpuPresentationEpoch(reason, refocusAt);
   adaptiveQuality.resetSampling(reason);
 }
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
+
+function currentPresentationSchedulingInput() {
+  const presentationRequested = debugCaptureCameraActive
+    || (gameStarted && !matchFinished && menuLifecycle.surface === 'hidden');
+  return {
+    pageVisible: document.visibilityState === 'visible',
+    windowFocused: document.hasFocus(),
+    presentationRequested,
+    hostedAuthority: network.role === 'host' && gameStarted && !matchFinished,
+    networkConnected: network.role !== 'offline' && gameStarted && !matchFinished,
+  } as const;
+}
+
+const presentationSchedulingLifecycle = new PresentationSchedulingLifecycle(currentPresentationSchedulingInput());
+let lastPresentationSchedulingDecision: PresentationSchedulingDecision = presentationSchedulingLifecycle.observe(
+  currentPresentationSchedulingInput(),
+  'initial',
+);
+let hostedBackgroundNetworkHeartbeatCount = 0;
+
+function reconcilePresentationScheduling(reason: string): PresentationSchedulingDecision {
+  const decision = presentationSchedulingLifecycle.observe(currentPresentationSchedulingInput(), reason);
+  lastPresentationSchedulingDecision = decision;
+  if (decision.leftForeground) {
+    clearGameplayInput();
     audio.suspend();
-    return;
+    accumulator = 0;
+    lastFrame = performance.now();
   }
-  recoverFromSchedulingInterruption('tab visibility regained');
+  if (decision.resumedForeground) {
+    recoverFromSchedulingInterruption(`${reason} · recovery ${decision.recoveryGeneration}`);
+    accumulator = 0;
+  }
+  return decision;
+}
+
+document.addEventListener('visibilitychange', () => {
+  reconcilePresentationScheduling(document.hidden ? 'tab visibility hidden' : 'tab visibility regained');
 });
 window.addEventListener('beforeunload', () => audio.dispose(), { once: true });
 
@@ -15549,6 +15583,19 @@ window.addEventListener('keydown', (event) => {
 
 window.addEventListener('keydown', (event) => {
   if (isTextChatTyping()) return;
+  if (
+    event.code === 'Escape'
+    && !event.repeat
+    && activeMenuTabId === 'options'
+    && gameStarted
+    && player.alive
+    && !matchFinished
+    && menuLifecycle.surface === 'paused-match'
+  ) {
+    event.preventDefault();
+    resumeActiveMatchFromMenu();
+    return;
+  }
   if (pointSupportTargeting && !tacticalMapOpen && event.code === 'Escape' && !event.repeat) {
     event.preventDefault();
     cancelSupportTargeting(true);
@@ -15609,12 +15656,12 @@ window.addEventListener('keyup', (event) => {
 });
 window.addEventListener('blur', () => {
   lastWindowBlurAt = performance.now();
-  clearGameplayInput();
   applyMenuLifecycle({ type: 'focus-lost' });
+  reconcilePresentationScheduling('window focus lost');
 });
 window.addEventListener('focus', () => {
-  recoverFromSchedulingInterruption('window focus regained');
   applyMenuLifecycle({ type: 'focus-gained' });
+  reconcilePresentationScheduling('window focus regained');
 });
 window.addEventListener('mousemove', (event) => {
   if (document.pointerLockElement !== canvas || !player.alive || isTextChatTyping()) return;
@@ -16239,7 +16286,9 @@ function returnToMainMenu(): void {
   syncArenaSelectionUi();
   setArenaMenuCamera();
   setStatus(`${selectedArena.displayName} ready · choose a map or deploy again.`);
-  void prepareMenuDeploymentAssets().catch(showFatalError);
+  void menuPreviewVideoController.whenFirstFramePresented()
+    .then(() => prepareMenuDeploymentAssets('idle'))
+    .catch(showFatalError);
   if (document.pointerLockElement) void document.exitPointerLock();
   // Pass 65: apply graphics saved mid-match now that we are back at the menu.
   flushPendingGraphics();
@@ -16249,12 +16298,18 @@ function returnToMainMenu(): void {
   }
 }
 
-resumeButton.addEventListener('click', () => {
+function resumeActiveMatchFromMenu(): void {
   if (!gameStarted || !player.alive || matchFinished) return;
-  // Pass 65: resuming the match is a graphics save point (reload stays deferred).
+  // One explicit transaction owns every pending Options edit. Switching the
+  // visible panel after it must not perform a second persistence operation.
   flushPendingGraphics();
+  if (activeMenuTabId === 'options') setMenuTab('deploy', false);
   applyMenuLifecycle({ type: 'resume' });
   requestGamePointerLock('resume');
+}
+
+resumeButton.addEventListener('click', () => {
+  resumeActiveMatchFromMenu();
 });
 mainMenuButton.addEventListener('click', returnToMainMenu);
 element<HTMLButtonElement>('#menu-download-match-summary').addEventListener('click', downloadMatchSummary);
@@ -16365,6 +16420,8 @@ function scheduleStateBroadcast(): void {
   if (stateBroadcastTimer) clearTimeout(stateBroadcastTimer);
   const delay = stateBroadcastWakeIntervalMs(network.role, gameStarted, player.alive, localSnapshotRateState.rateHz);
   stateBroadcastTimer = setTimeout(() => {
+    const schedulingDecision = reconcilePresentationScheduling('network heartbeat eligibility');
+    if (schedulingDecision.mode === 'hosted-authority-network') hostedBackgroundNetworkHeartbeatCount += 1;
     if (gameStarted && !matchAdmissionPresentationPaused && network.role !== 'offline' && player.alive) {
       const now = performance.now();
       localSnapshotRateState = updateSnapshotRate(localSnapshotRateState, {
@@ -16594,6 +16651,16 @@ function monitorSelectedArenaRender(now: number): void {
 }
 
 function frame(now: number, scheduleNext = true): void {
+  const schedulingDecision = reconcilePresentationScheduling('animation frame eligibility');
+  if (schedulingDecision.mode !== 'foreground-presentation') {
+    // The prerecorded menu/loading media owns its own browser compositor path.
+    // An ineligible game frame must not poll input, step physics/AI/effects,
+    // touch HUD/audio presentation or submit either renderer backend.
+    lastFrame = now;
+    accumulator = 0;
+    if (scheduleNext) requestAnimationFrame(frame);
+    return;
+  }
   if (matchAdmissionPresentationPaused) {
     // Hidden WebGL2 prime frames are GPU settle boundaries, not simulation
     // ticks. Keep the next live delta bounded without consuming countdown,
@@ -16711,8 +16778,9 @@ function frame(now: number, scheduleNext = true): void {
     arenaContrastLighting.update(visualNow);
     pass64TslSystems?.update(visualNow);
     if (activeArenaReviewHud) hudRoot.hidden = activeArenaReviewHud === 'hidden';
-    const rendererFrameEligible = gameStarted && menuLifecycle.surface === 'hidden' || debugCaptureCameraActive;
-    if (rendererFrameEligible && !debugRenderPaused && !renderSubmissionPaused && !webglContextLost && document.visibilityState === 'visible') {
+    const rendererFrameEligible = (gameStarted && menuLifecycle.surface === 'hidden') || debugCaptureCameraActive;
+    if (rendererFrameEligible && !debugRenderPaused && !renderSubmissionPaused && !webglContextLost
+      && document.visibilityState === 'visible' && document.hasFocus()) {
       let frameSubmitted = false;
       if (renderRuntime.backend === 'webgpu') {
         frameSubmitted = submitWebGpuFrame(now);
@@ -16738,12 +16806,8 @@ function frame(now: number, scheduleNext = true): void {
   }
 }
 
-// requestAnimationFrame is suspended by background tabs. Keep a bounded,
-// no-render heartbeat so host/guest simulation, clocks, AI and network state do
-// not turn a tab switch into an implicit multiplayer pause.
-window.setInterval(() => {
-  if (document.visibilityState === 'hidden' && gameStarted && !matchFinished) frame(performance.now(), false);
-}, 50);
+// Multiplayer transport and snapshot timers remain independent below. Hidden
+// or unfocused pages never re-enter the complete visual/simulation frame.
 
 function activePostTelemetry(): Record<string, unknown> {
   if (atomicSignal) return atomicSignal.telemetry();
@@ -17333,10 +17397,16 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       matchAdmissionCadence: lastMatchAdmissionCadence,
       webGlReadyPrime: lastWebGlReadyPrime,
       menuDeploymentAssetsProfile: lastMenuDeploymentAssetsProfile,
+      menuDeploymentAssets: menuDeploymentAssetsCoordinator.snapshot(),
       effectPrewarmProfile: lastArenaEffectPrewarmProfile,
     },
     gameStarted,
     frameCount,
+    presentationScheduling: {
+      ...presentationSchedulingLifecycle.snapshot(),
+      lastDecision: lastPresentationSchedulingDecision,
+      hostedBackgroundNetworkHeartbeatCount,
+    },
     gameMode,
     matchPhase: matchState.phase,
     matchEndReason: matchState.endReason ?? null,
@@ -19271,6 +19341,18 @@ let menuWeaponAssetPromise: Promise<void> | null = null;
 let sharedGameplayAssetsPromise: Promise<void> | null = null;
 let menuDeploymentAssetsPromise: Promise<void> | null = null;
 
+function yieldMenuPreparationIdleSlice(): Promise<void> {
+  return new Promise<void>((resolve) => {
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(() => resolve(), { timeout: 180 });
+      return;
+    }
+    window.setTimeout(resolve, document.visibilityState === 'visible' ? 16 : 50);
+  });
+}
+
+const menuDeploymentAssetsCoordinator = new PriorityPreparationCoordinator(yieldMenuPreparationIdleSlice);
+
 async function prepareMenuWeaponAsset(): Promise<void> {
   if (menuWeaponAssetPromise) return menuWeaponAssetPromise;
   menuWeaponAssetPromise = weaponView.load().then(() => {
@@ -19357,55 +19439,62 @@ let lastMenuDeploymentAssetsProfile: Readonly<{
   phases: readonly Readonly<{ name: string; durationMs: number }>[];
 }> | null = null;
 
-async function prepareMenuDeploymentAssets(): Promise<void> {
-  if (menuDeploymentAssetsPromise) return menuDeploymentAssetsPromise;
-  const startedAt = performance.now();
-  const phases: Array<{ name: string; durationMs: number }> = [];
-  const runPhase = async (name: string, task: () => Promise<unknown>): Promise<void> => {
-    const phaseStartedAt = performance.now();
-    await task();
-    phases.push({ name, durationMs: Number((performance.now() - phaseStartedAt).toFixed(3)) });
-  };
-  lastMenuDeploymentAssetsProfile = Object.freeze({
-    startedAt,
-    completedAt: null,
-    durationMs: null,
-    completed: false,
-    error: null,
-    phases: Object.freeze([]),
-  });
-  const operation = (async () => {
-    await runPhase('shared-assets', () => prepareSharedGameplayAssets());
-    if (renderRuntime.backend === 'webgpu') {
-      await runPhase('first-person-catalog', () => weaponView.prewarmBrowserWeaponCatalog(WEAPON_IDS));
-    }
-    await runPhase('world-drop-corpus', () => prewarmPass65RuntimeWeaponCorpus());
-  })();
-  menuDeploymentAssetsPromise = operation;
-  try {
-    await operation;
-    const completedAt = performance.now();
+function prepareMenuDeploymentAssets(priority: PreparationPriority = 'deployment'): Promise<void> {
+  const operation = menuDeploymentAssetsCoordinator.prepare(priority, async ({ checkpoint }) => {
+    const startedAt = performance.now();
+    const phases: Array<{ name: string; durationMs: number }> = [];
+    const runPhase = async (name: string, task: () => Promise<unknown>): Promise<void> => {
+      await checkpoint();
+      const phaseStartedAt = performance.now();
+      await task();
+      phases.push({ name, durationMs: Number((performance.now() - phaseStartedAt).toFixed(3)) });
+      await checkpoint();
+    };
     lastMenuDeploymentAssetsProfile = Object.freeze({
       startedAt,
-      completedAt,
-      durationMs: Number((completedAt - startedAt).toFixed(3)),
-      completed: true,
-      error: null,
-      phases: Object.freeze(phases.map((phase) => Object.freeze(phase))),
-    });
-  } catch (error) {
-    const completedAt = performance.now();
-    lastMenuDeploymentAssetsProfile = Object.freeze({
-      startedAt,
-      completedAt,
-      durationMs: Number((completedAt - startedAt).toFixed(3)),
+      completedAt: null,
+      durationMs: null,
       completed: false,
-      error: error instanceof Error ? error.message : String(error),
-      phases: Object.freeze(phases.map((phase) => Object.freeze(phase))),
+      error: null,
+      phases: Object.freeze([]),
     });
+    try {
+      await runPhase('shared-assets', () => prepareSharedGameplayAssets());
+      if (renderRuntime.backend === 'webgpu') {
+        await runPhase('first-person-catalog', () => weaponView.prewarmBrowserWeaponCatalog(
+          WEAPON_IDS,
+          undefined,
+          checkpoint,
+        ));
+      }
+      await runPhase('world-drop-corpus', () => prewarmPass65RuntimeWeaponCorpus(checkpoint));
+      const completedAt = performance.now();
+      lastMenuDeploymentAssetsProfile = Object.freeze({
+        startedAt,
+        completedAt,
+        durationMs: Number((completedAt - startedAt).toFixed(3)),
+        completed: true,
+        error: null,
+        phases: Object.freeze(phases.map((phase) => Object.freeze(phase))),
+      });
+    } catch (error) {
+      const completedAt = performance.now();
+      lastMenuDeploymentAssetsProfile = Object.freeze({
+        startedAt,
+        completedAt,
+        durationMs: Number((completedAt - startedAt).toFixed(3)),
+        completed: false,
+        error: error instanceof Error ? error.message : String(error),
+        phases: Object.freeze(phases.map((phase) => Object.freeze(phase))),
+      });
+      throw error;
+    }
+  });
+  menuDeploymentAssetsPromise = operation;
+  void operation.catch(() => {
     if (menuDeploymentAssetsPromise === operation) menuDeploymentAssetsPromise = null;
-    throw error;
-  }
+  });
+  return operation;
 }
 
 let lastArenaEffectPrewarmProfile: Readonly<{
@@ -19519,12 +19608,13 @@ function bootstrapMenuPreview(): void {
   setStatus(`${selectedArena.displayName} preview ready · deployment assets prepare in the background.`);
   bootstrapStage = 'ready';
   requestAnimationFrame(frame);
-  window.setTimeout(() => {
-    void prepareMenuDeploymentAssets().then(() => {
+  void menuPreviewVideoController.whenFirstFramePresented().then(() => {
+    if (gameStarted || matchStartPreparing) return;
+    return prepareMenuDeploymentAssets('idle').then(() => {
       if (gameStarted || matchStartPreparing) return;
       setStatus(`${selectedArena.displayName} ready · deployment assets retained.`);
-    }).catch(showFatalError);
-  }, 0);
+    });
+  }).catch(showFatalError);
 }
 
 bootstrapMenuPreview();

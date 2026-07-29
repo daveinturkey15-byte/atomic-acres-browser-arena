@@ -13,6 +13,11 @@ const pacing = () => (
 
 test('resets stale frame-pacing evidence through the visibility-regain recovery path', async ({ page }) => {
   await page.goto('/?renderer=webgl2&signal=off&seed=pass65-focus-pacing', { waitUntil: 'domcontentloaded' });
+  await page.fill('#player-name', 'Focus pacing QA');
+  await page.click('#solo');
+  await page.waitForFunction(() => (
+    window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => { gameStarted: boolean } } }
+  ).__ATOMIC_ACRES_DEBUG__?.snapshot().gameStarted === true, undefined, { timeout: 60_000 });
   await page.waitForFunction(() => (
     window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => { render: { framePacing: Pacing } } } }
   ).__ATOMIC_ACRES_DEBUG__?.snapshot().render.framePacing.ready === true, undefined, { timeout: 60_000 });

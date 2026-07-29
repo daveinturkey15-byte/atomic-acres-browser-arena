@@ -107,6 +107,7 @@ export type MenuPreviewVideoSnapshot = Readonly<{
   audioUnlocked: boolean;
   videoMuted: boolean;
   videoVolume: number;
+  firstFramePresentedGeneration: number;
 }>;
 
 type MenuPreviewVideoElements = Readonly<{
@@ -131,6 +132,8 @@ export class MenuPreviewVideoController {
   private audioMutedBySettings = false;
   private audioVolume = 0.12;
   private switchAbort = new AbortController();
+  private firstFramePresentedGeneration = -1;
+  private readonly firstFrameWaiters = new Set<(generation: number) => void>();
 
   constructor(private readonly elements: MenuPreviewVideoElements, initialArena: ArenaId = 'atomic-acres') {
     this.selected = menuPreviewVideoDefinition(initialArena);
@@ -172,6 +175,15 @@ export class MenuPreviewVideoController {
     this.applyDefinition(this.selected, reducedMotion);
   }
 
+  /** Resolves only after the selected generation has presented video or its poster fallback. */
+  whenFirstFramePresented(): Promise<number> {
+    const generation = this.generation;
+    if (this.firstFramePresentedGeneration === generation) return Promise.resolve(generation);
+    return new Promise<number>((resolve) => {
+      this.firstFrameWaiters.add(resolve);
+    });
+  }
+
   snapshot(): MenuPreviewVideoSnapshot {
     return Object.freeze({
       active: this.active,
@@ -189,6 +201,7 @@ export class MenuPreviewVideoController {
       audioUnlocked: this.audioUnlocked,
       videoMuted: this.elements.video.muted,
       videoVolume: this.elements.video.volume,
+      firstFramePresentedGeneration: this.firstFramePresentedGeneration,
     });
   }
 
@@ -227,6 +240,7 @@ export class MenuPreviewVideoController {
     if (reducedMotion) {
       video.removeAttribute('src');
       video.load();
+      void poster.decode().catch(() => {}).then(() => this.resolveFirstFrame(generation));
       return;
     }
 
@@ -242,6 +256,7 @@ export class MenuPreviewVideoController {
     video.addEventListener('loadeddata', () => {
       if (generation !== this.generation || definition.arenaId !== this.selected.arenaId) return;
       frame.dataset.mediaState = 'ready';
+      this.resolveFirstFrame(generation);
       if (this.active) this.requestPlay(generation);
     }, { once: true, signal: this.switchAbort.signal });
     video.addEventListener('playing', () => {
@@ -250,6 +265,7 @@ export class MenuPreviewVideoController {
         if (!this.active || generation !== this.generation || definition.arenaId !== this.selected.arenaId) return;
         frame.dataset.mediaState = 'playing';
         poster.hidden = true;
+        this.resolveFirstFrame(generation);
       };
       if (typeof video.requestVideoFrameCallback === 'function') {
         video.requestVideoFrameCallback(() => revealPresentedFrame());
@@ -262,6 +278,7 @@ export class MenuPreviewVideoController {
       frame.dataset.mediaState = 'poster-fallback';
       poster.hidden = false;
       video.hidden = true;
+      this.resolveFirstFrame(generation);
     }, { once: true, signal: this.switchAbort.signal });
     video.load();
     if (this.active) this.requestPlay(generation);
@@ -277,6 +294,14 @@ export class MenuPreviewVideoController {
     this.elements.video.muted = !this.audioUnlocked || this.audioMutedBySettings || this.audioVolume <= 0;
   }
 
+  private resolveFirstFrame(generation: number): void {
+    if (generation !== this.generation) return;
+    this.firstFramePresentedGeneration = generation;
+    const waiters = [...this.firstFrameWaiters];
+    this.firstFrameWaiters.clear();
+    for (const resolve of waiters) resolve(generation);
+  }
+
   private requestPlay(generation: number): void {
     if (!this.active || this.reducedMotion || generation !== this.generation) return;
     const attempted = this.elements.video.play();
@@ -285,6 +310,7 @@ export class MenuPreviewVideoController {
       if (generation !== this.generation) return;
       this.elements.frame.dataset.mediaState = 'poster-fallback';
       this.elements.poster.hidden = false;
+      this.resolveFirstFrame(generation);
     });
   }
 }
