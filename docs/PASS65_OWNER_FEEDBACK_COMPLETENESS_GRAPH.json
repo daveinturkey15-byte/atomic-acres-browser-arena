@@ -1159,6 +1159,13 @@
       ]
     },
     {
+      "id": "T-TEXT-INTEGRITY",
+      "command": "npm run qa:text-integrity",
+      "paths": [
+        "scripts/qa/verify-text-source-integrity.mjs"
+      ]
+    },
+    {
       "id": "T-MENU-LIFECYCLE-E2E",
       "command": "npx playwright test tests/e2e/pass65-menu-lifecycle.spec.ts --project=chromium --workers=1 --retries=0",
       "paths": [
@@ -4357,7 +4364,8 @@
         "coverage": "partial",
         "testRefs": [
           "T-OWNER-GATE",
-          "T-FRAME-POLICY"
+          "T-FRAME-POLICY",
+          "T-TEXT-INTEGRITY"
         ],
         "artifactRefs": []
       }
@@ -4974,7 +4982,8 @@
       "verification": {
         "coverage": "partial",
         "testRefs": [
-          "T-OWNER-GATE"
+          "T-OWNER-GATE",
+          "T-TEXT-INTEGRITY"
         ],
         "artifactRefs": []
       }
@@ -5238,7 +5247,8 @@
           "T-LIFECYCLE-UNIT",
           "T-COLD-WEBGPU-ADMISSION",
           "T-WEBGPU-ENDURANCE",
-          "T-NATIVE-FRAME-PACING"
+          "T-NATIVE-FRAME-PACING",
+          "T-TEXT-INTEGRITY"
         ],
         "artifactRefs": []
       }
@@ -5265,7 +5275,8 @@
           "T-SUPPORT-RUNTIME",
           "T-COLD-WEBGPU-ADMISSION",
           "T-WEBGPU-ENDURANCE",
-          "T-NATIVE-FRAME-PACING"
+          "T-NATIVE-FRAME-PACING",
+          "T-TEXT-INTEGRITY"
         ],
         "artifactRefs": []
       }
