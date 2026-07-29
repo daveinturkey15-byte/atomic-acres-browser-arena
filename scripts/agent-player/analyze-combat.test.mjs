@@ -43,6 +43,7 @@ test('combat benchmark separates bots, practice targets, survival and control me
       aimMoves: 50, shotPulses: 10, bursts: 3, warmupShotPulses: 0, unconfirmedShotPulses: 0,
       reloadRequests: 1, stuckRecoveries: 2, damageReactions: 3, maximumObservedHoldMs: 360,
       killAnchorActivations: 2, killAnchorRenewals: 1, killAnchorActiveFrames: 40, killAnchorEngagementFrames: 8,
+      rawTargetObservationExpirations: 4, rawTargetObservationFrames: 33,
       exposureGateSuppressions: 6, exposurePixelSuppressions: 5, exposureAreaSuppressions: 4, exposureHeightSuppressions: 3,
       configuredMaxHoldMs: 2_000, releasedAtEnd: true, holdWatchdogExceeded: false,
     },
@@ -66,6 +67,8 @@ test('combat benchmark separates bots, practice targets, survival and control me
   assert.equal(result.control.killAnchorRenewals, 1);
   assert.equal(result.control.killAnchorActiveFrames, 40);
   assert.equal(result.control.killAnchorEngagementFrames, 8);
+  assert.equal(result.control.rawTargetObservationExpirations, 4);
+  assert.equal(result.control.rawTargetObservationFrames, 33);
   assert.equal(result.control.exposureGateSuppressions, 6);
   assert.equal(result.control.exposurePixelSuppressions, 5);
   assert.equal(result.control.exposureAreaSuppressions, 4);

@@ -551,6 +551,7 @@ async function run() {
   const bankLeadMinimumKills = integerArg(args['bank-lead-minimum-kills'], 0, 0, 20);
   const bankLeadMinimumMargin = integerArg(args['bank-lead-minimum-margin'], 1, 1, 20);
   const killAnchorDurationMs = integerArg(args['kill-anchor-duration'], 0, 0, 60_000);
+  const rawTargetObserveDurationMs = integerArg(args['raw-target-observe-duration'], 0, 0, 5_000);
   const fireMinimumTargetPixels = integerArg(args['fire-min-target-pixels'], 0, 0, 500);
   const fireMinimumTargetArea = integerArg(args['fire-min-target-area'], 0, 0, 5_000);
   const fireMinimumTargetHeight = integerArg(args['fire-min-target-height'], 0, 0, 100);
@@ -797,6 +798,7 @@ async function run() {
           bankLeadMinimumKills,
           bankLeadMinimumMargin,
           killAnchorDurationMs,
+          rawTargetObserveDurationMs,
         })
         : null;
       let movementCycle = 0;
@@ -1539,6 +1541,7 @@ async function run() {
         grenadeAlignmentMaximum,
         finishWindowMs,
         killAnchorDurationMs,
+        rawTargetObserveDurationMs,
         fireMinimumTargetPixels,
         fireMinimumTargetArea,
         fireMinimumTargetHeight,
@@ -1625,6 +1628,8 @@ async function run() {
         killAnchorRenewals: tacticalPolicyReceipt?.killAnchorRenewals ?? 0,
         killAnchorActiveFrames: tacticalPolicyReceipt?.killAnchorActiveFrames ?? 0,
         killAnchorEngagementFrames: tacticalPolicyReceipt?.killAnchorEngagementFrames ?? 0,
+        rawTargetObservationExpirations: tacticalPolicyReceipt?.rawTargetObservationExpirations ?? 0,
+        rawTargetObservationFrames: tacticalPolicyReceipt?.rawTargetObservationFrames ?? 0,
         exposureGateSuppressions,
         exposurePixelSuppressions,
         exposureAreaSuppressions,

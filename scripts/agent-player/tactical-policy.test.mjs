@@ -220,3 +220,34 @@ test('clustered visible kill renews the anchor and expiry returns to roam', () =
   assert.equal(expired.mode, 'roam');
   assert.equal(expired.killAnchorActive, false);
 });
+
+test('bounded raw-target observation resumes roaming when a candidate never confirms', () => {
+  const policy = createTacticalPolicy({ rawTargetObserveDurationMs: 700, rawTargetObserveResetMs: 1_500 });
+  const first = policy.update({ now: 100, active: true, health: 100, rawTarget: true, navigationTick: false });
+  assert.equal(first.mode, 'engage');
+  assert.equal(first.reason, 'candidate-observation');
+  const expired = policy.update({ now: 801, active: true, health: 100, rawTarget: true, navigationTick: false });
+  assert.equal(expired.mode, 'roam');
+  assert.equal(expired.reason, 'candidate-observation-expired');
+  assert.deepEqual(expired.keys, ['KeyW']);
+  assert.equal(policy.snapshot().rawTargetObservationExpirations, 1);
+});
+
+test('confirmed target still engages after raw observation expiry', () => {
+  const policy = createTacticalPolicy({ rawTargetObserveDurationMs: 700 });
+  policy.update({ now: 0, active: true, health: 100, rawTarget: true, navigationTick: false });
+  const confirmed = policy.update({ now: 900, active: true, health: 100, rawTarget: true, currentTarget: true, navigationTick: false });
+  assert.equal(confirmed.mode, 'engage');
+  assert.equal(confirmed.reason, 'confirmed-operator');
+});
+
+test('a candidate absent past reset receives one fresh bounded observation window', () => {
+  const policy = createTacticalPolicy({ rawTargetObserveDurationMs: 700, rawTargetObserveResetMs: 1_500 });
+  policy.update({ now: 0, active: true, health: 100, rawTarget: true, navigationTick: false });
+  policy.update({ now: 800, active: true, health: 100, rawTarget: true, navigationTick: false });
+  policy.update({ now: 2_400, active: true, health: 100, rawTarget: false, navigationTick: false });
+  const reacquired = policy.update({ now: 2_500, active: true, health: 100, rawTarget: true, navigationTick: false });
+  assert.equal(reacquired.mode, 'engage');
+  assert.equal(reacquired.reason, 'candidate-observation');
+  assert.equal(policy.snapshot().rawTargetObservationExpirations, 1);
+});

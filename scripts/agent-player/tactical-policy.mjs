@@ -17,6 +17,8 @@ export function createTacticalPolicy(options = {}) {
     bankLeadMinimumKills: Number(options.bankLeadMinimumKills ?? 0),
     bankLeadMinimumMargin: Number(options.bankLeadMinimumMargin ?? 1),
     killAnchorDurationMs: Number(options.killAnchorDurationMs ?? 0),
+    rawTargetObserveDurationMs: Number(options.rawTargetObserveDurationMs ?? 0),
+    rawTargetObserveResetMs: Number(options.rawTargetObserveResetMs ?? 1_500),
   };
   const state = {
     mode: 'roam',
@@ -35,6 +37,11 @@ export function createTacticalPolicy(options = {}) {
     killAnchorRenewals: 0,
     killAnchorActiveFrames: 0,
     killAnchorEngagementFrames: 0,
+    rawTargetObservationStartedAt: null,
+    rawTargetLastSeenAt: Number.NEGATIVE_INFINITY,
+    rawTargetObservationExpired: false,
+    rawTargetObservationExpirations: 0,
+    rawTargetObservationFrames: 0,
     modeFrames: { roam: 0, engage: 0, retreat: 0, recover: 0, bank: 0, anchor: 0 },
   };
 
@@ -59,6 +66,30 @@ export function createTacticalPolicy(options = {}) {
       const kills = Number(observation.kills);
       const deaths = Number(observation.deaths);
       const scoreFresh = Number.isFinite(kills) && Number.isFinite(deaths) && kills >= 0 && deaths >= 0;
+      const rawTarget = Boolean(observation.rawTarget);
+      if (!observation.active) {
+        state.rawTargetObservationStartedAt = null;
+        state.rawTargetLastSeenAt = Number.NEGATIVE_INFINITY;
+        state.rawTargetObservationExpired = false;
+      } else if (rawTarget) {
+        if (state.rawTargetObservationStartedAt === null
+          || now - state.rawTargetLastSeenAt > config.rawTargetObserveResetMs) {
+          state.rawTargetObservationStartedAt = now;
+          state.rawTargetObservationExpired = false;
+        }
+        state.rawTargetLastSeenAt = now;
+      } else if (now - state.rawTargetLastSeenAt > config.rawTargetObserveResetMs) {
+        state.rawTargetObservationStartedAt = null;
+        state.rawTargetObservationExpired = false;
+      }
+      const boundedRawObservation = config.rawTargetObserveDurationMs > 0;
+      const rawTargetObservationActive = rawTarget && (!boundedRawObservation
+        || now - state.rawTargetObservationStartedAt < config.rawTargetObserveDurationMs);
+      if (rawTargetObservationActive && boundedRawObservation) state.rawTargetObservationFrames += 1;
+      if (rawTarget && boundedRawObservation && !rawTargetObservationActive && !state.rawTargetObservationExpired) {
+        state.rawTargetObservationExpired = true;
+        state.rawTargetObservationExpirations += 1;
+      }
       if (observation.active && config.bankLeadMinimumKills > 0 && scoreFresh
         && kills >= config.bankLeadMinimumKills && kills - deaths >= config.bankLeadMinimumMargin) {
         state.leadBankActive = true;
@@ -129,7 +160,7 @@ export function createTacticalPolicy(options = {}) {
       } else if (observation.stuck) {
         nextMode = 'recover';
         reason = 'stuck-cooldown-hold';
-      } else if (observation.currentTarget || observation.rawTarget) {
+      } else if (observation.currentTarget || rawTargetObservationActive) {
         nextMode = 'engage';
         reason = observation.currentTarget ? 'confirmed-operator' : 'candidate-observation';
       } else if (now < state.killAnchorUntil) {
@@ -138,6 +169,8 @@ export function createTacticalPolicy(options = {}) {
       } else if (state.leadBankActive) {
         nextMode = 'bank';
         reason = 'visible-kill-lead-bank';
+      } else if (rawTarget && boundedRawObservation) {
+        reason = 'candidate-observation-expired';
       }
       const changed = transition(nextMode, now, reason);
       state.modeFrames[nextMode] += 1;
@@ -232,6 +265,8 @@ export function createTacticalPolicy(options = {}) {
         killAnchorRenewals: state.killAnchorRenewals,
         killAnchorActiveFrames: state.killAnchorActiveFrames,
         killAnchorEngagementFrames: state.killAnchorEngagementFrames,
+        rawTargetObservationExpirations: state.rawTargetObservationExpirations,
+        rawTargetObservationFrames: state.rawTargetObservationFrames,
         config: { ...config },
       };
     },
