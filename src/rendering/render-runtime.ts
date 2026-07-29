@@ -47,6 +47,13 @@ export type RenderRuntimeTelemetry = Readonly<{
   presentation: PresentationFreshnessTelemetry;
 }>;
 
+export type RenderRuntimeHealthTelemetry = Readonly<{
+  actualBackend: RenderBackendId;
+  deviceLost: boolean;
+  uncapturedErrors: number;
+  presentation: PresentationFreshnessTelemetry;
+}>;
+
 export type PresentationFreshnessTelemetry = Readonly<{
   status: 'synchronous' | 'warming' | 'healthy' | 'stalled' | 'device-lost' | 'failed';
   submissionSequence: number;
@@ -365,6 +372,16 @@ export class LegacyWebGlRenderRuntime {
       uncapturedErrors: 0,
       lastUncapturedError: null,
       presentation: this.presentationTelemetry(),
+    };
+  }
+
+  healthTelemetry(now = performance.now()): RenderRuntimeHealthTelemetry {
+    const deviceLost = this.renderer.getContext().isContextLost();
+    return {
+      actualBackend: 'webgl2',
+      deviceLost,
+      uncapturedErrors: 0,
+      presentation: this.presentationTelemetry(now),
     };
   }
 
@@ -775,6 +792,16 @@ export class WebGpuRenderRuntime {
       lastUncapturedError: this.lastUncapturedError,
       slowNodeBuilds: Object.freeze(this.slowNodeBuilds.map((entry) => Object.freeze({ ...entry }))),
       presentation: this.presentationTelemetry(),
+    };
+  }
+
+  healthTelemetry(now = this.clock()): RenderRuntimeHealthTelemetry {
+    const backend = this.renderer.backend as WebGpuBackendShape;
+    return {
+      actualBackend: backend.isWebGPUBackend === true ? 'webgpu' : 'webgl2',
+      deviceLost: this.deviceLost,
+      uncapturedErrors: this.uncapturedErrors,
+      presentation: this.presentationTelemetry(now),
     };
   }
 

@@ -181,6 +181,7 @@ describe('Pass 64 render runtime boundary', () => {
       onSubmittedWorkDone: () => new Promise<void>((resolve) => pending.push(resolve)),
     };
     const renderer = {
+      backend: { isWebGPUBackend: true },
       info: { reset: () => undefined, render: { calls: 1, triangles: 2, points: 0, lines: 0 } },
     };
     const pipeline = { render: () => undefined };
@@ -202,6 +203,13 @@ describe('Pass 64 render runtime boundary', () => {
       softwareAdapter: false,
       device,
     });
+    expect(runtime.healthTelemetry()).toMatchObject({
+      actualBackend: 'webgpu',
+      deviceLost: false,
+      uncapturedErrors: 0,
+      presentation: { status: 'warming' },
+    });
+    expect(runtime.healthTelemetry()).not.toHaveProperty('slowNodeBuilds');
     const settleProbe = async () => {
       for (let turn = 0; turn < 6; turn += 1) await Promise.resolve();
     };

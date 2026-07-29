@@ -16763,9 +16763,51 @@ function playableSceneProof(): Record<string, unknown> {
     },
   };
 }
+
+function sampleEnduranceHealth() {
+  let choppers = 0;
+  let swarmDrones = 0;
+  for (const entity of killstreakSnapshot.entities) {
+    if (entity.kind === 'chopper') choppers += 1;
+    else if (entity.kind === 'drone' && entity.mode === 'swarm') swarmDrones += 1;
+  }
+  const grenadeWorldPool = grenadeWorldPresentationPool.telemetry();
+  const smokePresentation = smokeVolumePresentationPool.telemetry();
+  return {
+    frameCount,
+    gameStarted,
+    playerPosition: [player.position.x, player.position.y, player.position.z] as [number, number, number],
+    arenaId: selectedArena.id,
+    transition: {
+      phase: arenaTransitionPhase,
+      failure: arenaTransitionFailure,
+      renderSubmissionPaused,
+    },
+    runtime: renderRuntime.healthTelemetry(),
+    watchdog: arenaRenderWatchdog.telemetry(),
+    gpuRetirement: { failures: gpuRetirementFailures },
+    killstreak: {
+      revision: killstreakSnapshot.revision,
+      entities: killstreakSnapshot.entities.length,
+      choppers,
+      swarmDrones,
+    },
+    grenadeWorldPool: {
+      exhaustions: grenadeWorldPool.exhaustions,
+      prewarmBlockedAcquisitions: grenadeWorldPool.prewarmBlockedAcquisitions,
+    },
+    smokePresentation: {
+      active: smokePresentation.active,
+      liveDisposals: smokePresentation.liveDisposals,
+    },
+    weaponCatalog: weaponView.browserCatalogHealth(),
+  };
+}
+
 const debugWindow = window as Window & {
   __ATOMIC_ACRES_DEBUG__?: {
     snapshot: () => Record<string, unknown>;
+    sampleEnduranceHealth: () => ReturnType<typeof sampleEnduranceHealth>;
     traceBallistics: (
       weapon: WeaponId,
       origin: [number, number, number],
@@ -16898,6 +16940,7 @@ const debugWindow = window as Window & {
   };
 };
 debugWindow.__ATOMIC_ACRES_DEBUG__ = {
+  sampleEnduranceHealth,
   snapshot: () => ({
     bootstrap: { stage: bootstrapStage, error: bootstrapError, matchAdmissionCadence: lastMatchAdmissionCadence },
     gameStarted,
