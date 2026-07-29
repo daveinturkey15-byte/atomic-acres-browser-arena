@@ -145,7 +145,7 @@ try {
 
       const firstSwitchAudit = await page.evaluate(async () => {
         const api = window.__ATOMIC_ACRES_DEBUG__;
-        const beforeSwitches = api.snapshot().weaponPresentation.browserWeaponCatalog;
+        const beforeSwitches = api.sampleWeaponCatalogReadiness();
         const weaponIds = [...beforeSwitches.retained];
         const samples = [];
         for (const weaponId of weaponIds) {
@@ -162,7 +162,7 @@ try {
             maximumFrameMs: Math.max(...frameGapsMs),
           });
         }
-        const afterSwitches = api.snapshot().weaponPresentation.browserWeaponCatalog;
+        const afterSwitches = api.sampleWeaponCatalogReadiness();
         return {
           before: beforeSwitches,
           after: afterSwitches,
