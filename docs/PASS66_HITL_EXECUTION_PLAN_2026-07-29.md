@@ -1,18 +1,19 @@
-# Pass 66 Owner-HITL Execution Plan
+# Pass 66 Release Execution Plan
 
-Status: **IN DEVELOPMENT — NEVER PUBLISH WITHOUT A NEW EXPLICIT OWNER DECISION**
+Status: **IN DEVELOPMENT — OWNER AUTHORIZED PROTECTED PUBLICATION WHEN THE EXACT CANDIDATE IS GREEN**
 
 Baseline: `7c57f0bcdedd66236767a4e7e92afabf2769506e`  
 Integration branch: `contrib/dave-gaming-pc/codex/pass66-integration`  
 Feedback contract: `HF-001` through `HF-160`  
-Target outcome: one clean local immutable Version 66 candidate for Dave's morning HITL.
+Target outcome: one clean immutable Version 66 candidate promoted as `The Big One`, with byte-exact Pass 63 retained as Stable.
 
 ## 1. Release boundary
 
 - Pass 63 remains the byte-exact Stable rollback.
-- Pass 65 remains the inspected `The Big One` candidate. Its draft PR is contribution evidence, not publication authority.
-- Pass 65 is not mechanically publishable while acceptance, owner-feedback candidate evidence, asset governance and representative-hardware cadence gates remain red.
-- Pass 66 contains every new correction after the inspected Pass 65 SHA. It must stop at local owner HITL even if every mechanical gate is green.
+- Pass 65 is superseded and its draft PR is closed. Its exact branch/SHA remains audit evidence only and may not be promoted.
+- Pass 66 contains every correction after the inspected Pass 65 SHA and is the sole live candidate.
+- Dave explicitly removed the discretionary HITL feedback round and authorized protected publication when Pass 66 is complete and green. This does not authorize a fabricated/backdated acceptance receipt, a weakened exact-SHA gate or a manual Pages push.
+- The integrator freezes the final immutable Pass 66 SHA, records only truthful acceptance evidence permitted by the repository contract, and uses the protected workflow. If the exact-SHA gate still requires a post-preview owner acknowledgement, that acknowledgement is the only remaining owner interaction; no new subjective review round is implied.
 - No specialist may edit `main`, `gh-pages`, Pass 63 artifacts, production workflow receipts or release metadata.
 
 ## 2. Priority law

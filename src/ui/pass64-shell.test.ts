@@ -12,6 +12,8 @@ describe('Pass 66 command shell', () => {
     const markup = renderPass64Shell(createPass64ShellViewModel('Operator'));
     expect(markup).toContain('class="panel pass64-command-deck"');
     expect(markup).toContain('PASS 66 · THE BIG ONE');
+    expect(markup).toContain('THE BIG ONE · PASS 66');
+    expect(markup).not.toContain('HITL REVIEW DECK');
     expect(markup).not.toContain('LIVE SYSTEMS READY');
     expect(markup).toContain('class="command-rail"');
     expect(markup).toContain('class="arena-command"');

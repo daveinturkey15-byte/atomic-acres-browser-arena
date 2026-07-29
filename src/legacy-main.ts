@@ -7977,12 +7977,16 @@ function spawnPoint(): THREE.Vector3 {
 }
 
 function syncMenuLifecyclePresentation(): void {
-  const menuVisible = menuLifecycle.surface !== 'hidden';
   const pausedMatch = menuLifecycle.surface === 'paused-match';
   const deploying = menuLifecycle.surface === 'deploying';
+  // Deployment owns a dedicated full-screen prerecorded-video surface which
+  // sits outside #menu. Keeping the menu in layout while merely inert/aria-
+  // hidden lets it flash behind the transition and makes browser visibility
+  // semantics disagree with the lifecycle contract.
+  const menuVisible = menuLifecycle.surface !== 'hidden' && !deploying;
   menu.classList.toggle('hidden', !menuVisible);
-  menu.inert = !menuVisible || deploying;
-  menu.setAttribute('aria-hidden', String(!menuVisible || deploying));
+  menu.inert = !menuVisible;
+  menu.setAttribute('aria-hidden', String(!menuVisible));
   menu.dataset.lifecycleSurface = menuLifecycle.surface;
   menu.dataset.lifecycleReason = menuLifecycle.reason;
   menu.dataset.pointerLock = menuLifecycle.pointerLock;
