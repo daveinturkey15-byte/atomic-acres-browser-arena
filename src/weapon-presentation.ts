@@ -197,6 +197,12 @@ function weaponFingerCurlScale(weapon: WeaponId, finger: FirstPersonFingerBone):
 // Pass 65: matches the 520 ms third-person melee window so first-person and
 // remote observers see the same stab duration.
 const MELEE_PRESENTATION_MS = 520;
+// A two-bone solver cannot place a wrist beyond the physical arm span. Clamp
+// only that impossible final fraction while publishing both the raw socket
+// reach and calibration distance; the visual gate separately rejects a socket
+// that needs more than a small authored tolerance, so malformed assets cannot
+// be hidden by the runtime solver.
+const RIGGED_ARM_MAX_REACH_RATIO = 0.992;
 export const HIP_VIEWMODEL_POSITION = Object.freeze({ x: 0.4, y: -0.42, z: -1.02 });
 export const HIP_VIEWMODEL_SCALE = 0.54;
 const ADS_VIEWMODEL_BASE_POSITION = Object.freeze({ x: 0.28, y: -0.34, z: -0.97 });
@@ -307,6 +313,7 @@ export class WeaponPresentation {
   private readonly riggedArmSolveScratch = {
     cameraRotation: new THREE.Quaternion(),
     target: new THREE.Vector3(),
+    socketTarget: new THREE.Vector3(),
     shoulderPosition: new THREE.Vector3(),
     elbowPosition: new THREE.Vector3(),
     wristPosition: new THREE.Vector3(),
@@ -783,7 +790,7 @@ export class WeaponPresentation {
     this.meleeKnife.rotation.set(0, 0, 0);
     // The complete viewmodel root is deliberately reduced, so retain physical
     // authority while scaling the presentation around its aligned grip socket.
-    this.meleeKnife.scale.setScalar(2.25);
+    this.meleeKnife.scale.setScalar(1.45);
 
     exportedWristSocket.userData.authoredRigAttachment = true;
     exportedWristSocket.add(this.meleeKnife);
@@ -1477,7 +1484,7 @@ export class WeaponPresentation {
     const arms = this.root.getObjectByName('first-person-arms');
     if (arms) {
       arms.visible = true;
-      arms.position.y = -0.075;
+      arms.position.set(0, -0.075, 0);
       arms.scale.setScalar(1);
       arms.traverse((node) => {
         if (!(node instanceof THREE.Mesh)) return;
@@ -1972,7 +1979,7 @@ export class WeaponPresentation {
       // position/scale on exit; the visible right shoulder-to-knife chain
       // remains fully skinned and anatomically continuous.
       left.shoulder.position.set(
-        left.bindShoulderPosition.x + 4,
+        left.bindShoulderPosition.x + 40,
         left.bindShoulderPosition.y,
         left.bindShoulderPosition.z,
       );
@@ -2045,6 +2052,16 @@ export class WeaponPresentation {
       const wristPosition = rig.wrist.getWorldPosition(scratch.wristPosition);
       const upperLength = shoulderPosition.distanceTo(elbowPosition);
       const lowerLength = elbowPosition.distanceTo(wristPosition);
+      const socketTarget = scratch.socketTarget.copy(target);
+      const physicalReach = upperLength + lowerLength;
+      const socketReach = shoulderPosition.distanceTo(target);
+      const socketReachRatio = socketReach / Math.max(physicalReach, 1e-6);
+      const calibratedReach = physicalReach * RIGGED_ARM_MAX_REACH_RATIO;
+      let gripSocketCalibration = 0;
+      if (socketReach > calibratedReach) {
+        target.lerp(shoulderPosition, 1 - calibratedReach / socketReach);
+        gripSocketCalibration = socketTarget.distanceTo(target);
+      }
       const bendHint = scratch.bendHint.set(rig.side === 'left' ? -0.7 : 0.7, -1, 0.25).applyQuaternion(cameraRotation);
       const elbowTarget = solveTwoBoneElbowInto(
         shoulderPosition,
@@ -2058,9 +2075,9 @@ export class WeaponPresentation {
       this.orientRiggedBone(rig.shoulder, rig.elbow, elbowTarget);
       this.orientRiggedBone(rig.elbow, rig.wrist, target);
       const handDirection = scratch.handDirection.set(
-        rig.side === 'left' ? 0.55 : 0.12,
+        rig.side === 'left' ? 0.2 : 0.08,
+        rig.side === 'left' ? -0.08 : -0.28,
         -1,
-        rig.side === 'left' ? -0.15 : 0.08,
       ).normalize();
       const gripRotation = WEAPON_HAND_ROTATIONS[this.active][rig.side];
       scratch.gripEuler.set(
@@ -2080,6 +2097,9 @@ export class WeaponPresentation {
         weapon: this.active,
         gripFamily: viewmodelGripFamily(this.active),
         socket: socketName,
+        socketTarget: socketTarget.toArray(),
+        socketReachRatio,
+        gripSocketCalibration,
         upperLength,
         lowerLength,
         shoulder: rig.shoulder.getWorldPosition(scratch.diagnosticShoulder).toArray(),
@@ -2122,11 +2142,13 @@ export class WeaponPresentation {
     this.muzzleFlash.visible = this.muzzleLight.intensity > 0.45;
     const arms = this.root.getObjectByName('first-person-arms');
     if (arms) {
-      // Keep the ADS reduction modest and lower the shoulders. The authored
-      // sleeves now extend behind the camera, so no capped shoulder endpoint
-      // can enter frame while palms retain enough scale to read at the grips.
-      arms.position.y = THREE.MathUtils.lerp(-0.075, -0.17, this.adsBlend);
-      arms.scale.setScalar(THREE.MathUtils.lerp(1, 0.84, this.adsBlend));
+      // Keep the licensed chains close to physical scale in ADS. The previous
+      // 16% shrink and deep shoulder drop made the long-gun support socket
+      // unreachable and could hyperextend the elbow. The capped sleeves stay
+      // behind the camera with this shallow, bounded clearance adjustment.
+      arms.position.y = THREE.MathUtils.lerp(-0.075, -0.11, this.adsBlend);
+      arms.position.z = THREE.MathUtils.lerp(0, -0.18, this.adsBlend);
+      arms.scale.setScalar(THREE.MathUtils.lerp(1, 0.96, this.adsBlend));
       arms.traverse((node) => {
         if (!(node instanceof THREE.Mesh)) return;
         const material = node.material as THREE.MeshBasicMaterial | THREE.MeshStandardMaterial;

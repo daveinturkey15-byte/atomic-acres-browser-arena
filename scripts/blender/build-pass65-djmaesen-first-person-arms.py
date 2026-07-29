@@ -10,6 +10,7 @@ and partitions the real (non-duplicated) source faces into four render batches.
 from __future__ import annotations
 
 from array import array
+import hashlib
 import json
 import math
 import os
@@ -23,13 +24,19 @@ from mathutils import Matrix, Quaternion, Vector
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE_DIR = Path(os.environ["PASS65_DJMAESEN_SOURCE"]).resolve()
+SOURCE_DIR = Path(
+    os.environ.get(
+        "PASS65_DJMAESEN_SOURCE",
+        ROOT / "source-assets/third-party/djmaesen-fps-arms",
+    )
+).resolve()
 OUTPUT_DIR = ROOT / "artifacts/blender-operator-arms/djmaesen-prototype"
 TEXTURE_DIR = OUTPUT_DIR / "textures"
 REVIEW_DIR = OUTPUT_DIR / "reviews"
 REVIEW_WEAPON_DIR = OUTPUT_DIR / "review-weapons"
 SOURCE_GLTF = SOURCE_DIR / "scene.gltf"
 OUTPUT_GLB = OUTPUT_DIR / "pass65-first-person-arms-lod0.glb"
+OUTPUT_LOD1_GLB = OUTPUT_DIR / "pass65-first-person-arms-lod1.glb"
 OUTPUT_BLEND = OUTPUT_DIR / "pass65-first-person-arms-djmaesen-prototype.blend"
 TEXTURE_SIZE = 1024
 REVIEW_WIDTH = 960
@@ -37,6 +44,15 @@ REVIEW_HEIGHT = 540
 ASSET_ID = "pass65-first-person-operator-arms"
 SOURCE_UID = "08ec4403a47645d8ad80633abf13d39d"
 SOURCE_MIRROR_COMMIT = "96fdc4c94ba6c37786b0af6e8caf44b6cf2913f0"
+SOURCE_SHA256 = {
+    "license.txt": "0a3a79ee4fcd16538ee0760c29217c6306035f1609414bfe386a4847876de50b",
+    "scene.bin": "e247e239feab51f84a14da4b018e61093d0bf29dfaace43e409089d7b5c7bc79",
+    "scene.gltf": "f2b5527846da489d6d33614ecf4725c28b89c680c884f4ea6d2790e6491465fd",
+    "textures/material_diffuse.png": "c388b8708509cd606c6257d01a48a3fd04022659cf6bc129c9868a165cb45ae4",
+    "textures/material_normal.png": "9f78779b21248cbef81ccb9988d53e0b349c011ef7c00b0f94c000094bb1ba38",
+    "textures/material_occlusion.png": "9f7f37d86a9d818c9063a40a427bbaa92589d42773c285508d70a4f639059075",
+    "textures/material_specularGlossiness.png": "484489addcbae2c46ea1972bca754fd03d0624dd7bbbcbba2397f1356a183c3f",
+}
 CORE_ACTIONS = (
     "equip", "unequip", "idle", "walk", "sprint", "ads-in", "ads-out",
     "fire", "dry-fire", "reload", "empty-reload", "melee", "inspect",
@@ -62,6 +78,22 @@ def env_vector(name: str, default) -> Vector:
     if len(values) != 3:
         raise RuntimeError(f"{name} requires three comma-separated values, got {raw!r}")
     return Vector(values)
+
+
+def env_float(name: str, default: float, minimum: float, maximum: float) -> float:
+    value = float(os.environ.get(name, str(default)))
+    if not minimum <= value <= maximum:
+        raise RuntimeError(
+            f"{name}={value} outside reviewed range [{minimum}, {maximum}]"
+        )
+    return value
+
+
+def smoothstep(edge0: float, edge1: float, value: float) -> float:
+    if edge1 <= edge0:
+        raise RuntimeError(f"invalid smoothstep range {edge0}..{edge1}")
+    factor = max(0.0, min(1.0, (value - edge0) / (edge1 - edge0)))
+    return factor * factor * (3.0 - 2.0 * factor)
 
 # Source L/R already match the canonical anatomical side.  A 180-degree
 # authoring-root turn moves the source's -Y view direction to Blender +Y (and
@@ -93,6 +125,20 @@ TIP_TO_DISTAL = {
 for directory in (OUTPUT_DIR, TEXTURE_DIR, REVIEW_DIR, REVIEW_WEAPON_DIR):
     directory.mkdir(parents=True, exist_ok=True)
 bpy.context.preferences.filepaths.save_version = 0
+
+
+def verify_frozen_source() -> None:
+    failures = []
+    for relative, expected in SOURCE_SHA256.items():
+        source = SOURCE_DIR / relative
+        if not source.is_file():
+            failures.append(f"missing {source}")
+            continue
+        actual = hashlib.sha256(source.read_bytes()).hexdigest()
+        if actual != expected:
+            failures.append(f"{source}: expected sha256 {expected}, got {actual}")
+    if failures:
+        raise RuntimeError("DJMaesen source package integrity failed:\n- " + "\n- ".join(failures))
 
 
 def reset() -> None:
@@ -152,7 +198,7 @@ def build_textures():
     normal = load_scaled_image(
         SOURCE_DIR / "textures/material_normal.png",
         "Pass65_DJMaesen_Normal_1024",
-        TEXTURE_DIR / "pass65-arms-normal.png",
+        TEXTURE_DIR / "pass65-first-person-arms-normal.png",
         "Non-Color",
     )
     occlusion = load_scaled_image(
@@ -185,7 +231,7 @@ def build_textures():
         tactical[offset + 3] = alpha
     tactical_base = image_from_pixels(
         "Pass65_Arms_TacticalBase_1024",
-        TEXTURE_DIR / "pass65-arms-tactical-baseColor.png",
+        TEXTURE_DIR / "pass65-first-person-arms-baseColor.png",
         tactical,
         "sRGB",
     )
@@ -193,15 +239,33 @@ def build_textures():
     occ_pixels = read_pixels(occlusion)
     spec_pixels = read_pixels(spec_gloss)
     orm = array("f", [0.0]) * len(occ_pixels)
+    roughness_map = array("f", [0.0]) * len(occ_pixels)
+    metallic_map = array("f", [0.0]) * len(occ_pixels)
     for offset in range(0, len(orm), 4):
         ao = max(0.2, min(1.0, occ_pixels[offset]))
         gloss = max(0.0, min(1.0, spec_pixels[offset + 3]))
         roughness = max(0.36, min(0.96, 1.0 - gloss))
         orm[offset:offset + 4] = array("f", (ao, roughness, 0.0, 1.0))
+        roughness_map[offset:offset + 4] = array(
+            "f", (roughness, roughness, roughness, 1.0),
+        )
+        metallic_map[offset:offset + 4] = array("f", (0.0, 0.0, 0.0, 1.0))
     orm_image = image_from_pixels(
         "Pass65_Arms_ORM_1024",
         TEXTURE_DIR / "pass65-arms-orm.png",
         orm,
+        "Non-Color",
+    )
+    image_from_pixels(
+        "Pass65_Arms_Roughness_1024",
+        TEXTURE_DIR / "pass65-first-person-arms-roughness.png",
+        roughness_map,
+        "Non-Color",
+    )
+    image_from_pixels(
+        "Pass65_Arms_Metallic_1024",
+        TEXTURE_DIR / "pass65-first-person-arms-metallic.png",
+        metallic_map,
         "Non-Color",
     )
 
@@ -259,11 +323,14 @@ def pbr_material(name: str, base_image: bpy.types.Image, images, tint, roughness
     normal.name = f"{name}_Normal"
     normal.image = images["normal"]
     normal_map = nodes.new("ShaderNodeNormalMap")
-    normal_map.inputs["Strength"].default_value = 0.72
+    # Keep each anatomical render batch semantically distinct through glTF
+    # optimization while retaining one shared source normal map.
+    normal_map.inputs["Strength"].default_value = 0.58 + roughness_bias * 0.18
     links.new(normal.outputs["Color"], normal_map.inputs["Color"])
     links.new(normal_map.outputs["Normal"], input_socket(bsdf, "Normal"))
     material["opaque_depth_write_contract"] = True
     material["source_texture_uvs_preserved"] = True
+    material["render_batch_semantic"] = name
     return material
 
 
@@ -282,8 +349,8 @@ def build_materials(images):
             (0.30, 0.92, 0.96), 0.58,
         ),
         "skin": pbr_material(
-            "MAT_Pass65_Arms_Skin_PBR", images["skin"], images,
-            (1.0, 0.96, 0.92), 0.64,
+            "MAT_Pass65_Arms_FingerGlove_PBR", images["tactical"], images,
+            (1.00, 1.00, 1.00), 0.66,
         ),
     }
 
@@ -312,6 +379,71 @@ def import_source():
         if obj.type == "MESH" and obj != mesh:
             bpy.data.objects.remove(obj, do_unlink=True)
     return armature, mesh, source_triangles
+
+
+def canonical_digit_segment_metrics(armature):
+    """Fail closed on malformed or disconnected three-phalanx chains."""
+    digits = {}
+    maximum_segment = 0.0
+    maximum_joint_gap = 0.0
+    minimum_distal_alignment = 1.0
+    for side in ("L", "R"):
+        for digit in ("Index", "Middle", "Ring", "Pinky", "Thumb"):
+            first, second, distal = (
+                armature.data.bones[f"{digit}{joint}{side}"]
+                for joint in (1, 2, 3)
+            )
+            lengths = (first.length, second.length, distal.length)
+            proximal_ratio = lengths[0] / max(lengths[1], 1e-8)
+            distal_ratio = lengths[2] / max(lengths[1], 1e-8)
+            first_gap = (first.tail_local - second.head_local).length
+            second_gap = (second.tail_local - distal.head_local).length
+            middle_direction = distal.head_local - second.head_local
+            distal_direction = distal.tail_local - distal.head_local
+            if middle_direction.length_squared < 1e-10 or distal_direction.length_squared < 1e-10:
+                raise RuntimeError(f"{digit}{side}: degenerate canonical digit direction")
+            distal_alignment = middle_direction.normalized().dot(
+                distal_direction.normalized()
+            )
+            maximum_segment = max(maximum_segment, *lengths)
+            maximum_joint_gap = max(maximum_joint_gap, first_gap, second_gap)
+            minimum_distal_alignment = min(minimum_distal_alignment, distal_alignment)
+            if not 0.70 <= proximal_ratio <= 1.85:
+                raise RuntimeError(
+                    f"{digit}{side}: proximal phalanx ratio drift {proximal_ratio:.4f}"
+                )
+            if not 0.68 <= distal_ratio <= 0.76:
+                raise RuntimeError(
+                    f"{digit}{side}: distal phalanx ratio drift {distal_ratio:.4f}"
+                )
+            if max(lengths) > 6.5:
+                raise RuntimeError(
+                    f"{digit}{side}: unbounded canonical phalanx length {max(lengths):.4f}"
+                )
+            if max(first_gap, second_gap) > 1e-5:
+                raise RuntimeError(
+                    f"{digit}{side}: disconnected phalanx chain gap "
+                    f"{max(first_gap, second_gap):.8f}"
+                )
+            if distal_alignment < 0.999:
+                raise RuntimeError(
+                    f"{digit}{side}: terminal tail direction drift {distal_alignment:.6f}"
+                )
+            digits[f"{digit}{side}"] = {
+                "segmentLengthsSourceUnits": lengths,
+                "proximalToMiddleRatio": proximal_ratio,
+                "distalToMiddleRatio": distal_ratio,
+                "maximumJointGapSourceUnits": max(first_gap, second_gap),
+                "distalDirectionAlignment": distal_alignment,
+            }
+    return {
+        "contract": "connected-bounded-three-phalanx-chain-v2",
+        "digits": digits,
+        "maximumSegmentSourceUnits": maximum_segment,
+        "maximumJointGapSourceUnits": maximum_joint_gap,
+        "minimumDistalDirectionAlignment": minimum_distal_alignment,
+        "passed": True,
+    }
 
 
 def transfer_tip_weights_and_rename(armature, mesh) -> None:
@@ -397,11 +529,12 @@ def transfer_tip_weights_and_rename(armature, mesh) -> None:
         armature.data.edit_bones.remove(tip)
     bpy.ops.object.mode_set(mode="OBJECT")
     armature.select_set(False)
-    armature["rig_integrity"] = json.dumps(rig_integrity, sort_keys=True)
 
     actual = {bone.name for bone in armature.data.bones}
     if actual != set(CANONICAL_BONES):
         raise RuntimeError(f"canonical bone mismatch missing={set(CANONICAL_BONES)-actual} extra={actual-set(CANONICAL_BONES)}")
+    rig_integrity["canonicalValidation"] = canonical_digit_segment_metrics(armature)
+    armature["rig_integrity"] = json.dumps(rig_integrity, sort_keys=True)
 
     bpy.context.view_layer.objects.active = mesh
     mesh.select_set(True)
@@ -558,6 +691,43 @@ def split_loose_parts(mesh):
     return [obj for obj in bpy.data.objects if obj == mesh or obj not in before]
 
 
+def boundary_loop_records(obj):
+    edge_use = {}
+    for polygon in obj.data.polygons:
+        vertices = tuple(polygon.vertices)
+        for index, left in enumerate(vertices):
+            edge = tuple(sorted((left, vertices[(index + 1) % len(vertices)])))
+            edge_use[edge] = edge_use.get(edge, 0) + 1
+    adjacency = {}
+    for (left, right), use_count in edge_use.items():
+        if use_count != 1:
+            continue
+        adjacency.setdefault(left, set()).add(right)
+        adjacency.setdefault(right, set()).add(left)
+    unseen = set(adjacency)
+    records = []
+    while unseen:
+        seed = unseen.pop()
+        component = {seed}
+        stack = [seed]
+        while stack:
+            current = stack.pop()
+            for neighbor in adjacency[current]:
+                if neighbor in unseen:
+                    unseen.remove(neighbor)
+                    component.add(neighbor)
+                    stack.append(neighbor)
+        points = [obj.data.vertices[index].co for index in component]
+        centroid = sum(points, Vector()) / len(points)
+        records.append({
+            "vertices": len(component),
+            "centroid": tuple(centroid),
+            "minimum": tuple(min(point[axis] for point in points) for axis in range(3)),
+            "maximum": tuple(max(point[axis] for point in points) for axis in range(3)),
+        })
+    return sorted(records, key=lambda record: record["vertices"], reverse=True)
+
+
 def closest_point_on_segment(point: Vector, start: Vector, end: Vector) -> Vector:
     delta = end - start
     if delta.length_squared < 1e-10:
@@ -566,22 +736,39 @@ def closest_point_on_segment(point: Vector, start: Vector, end: Vector) -> Vecto
     return start + delta * factor
 
 
-def refine_sleeve_profile(part, armature) -> None:
+def refine_sleeve_profile(
+    part, armature, support_radial_scale: float, firing_radial_scale: float,
+) -> None:
     average_x = sum(vertex.co.x for vertex in part.data.vertices) / len(part.data.vertices)
     side = "L" if average_x > 0 else "R"
+    radial_scale = support_radial_scale if side == "L" else firing_radial_scale
     shoulder = armature.data.bones[f"UpperArm{side}"].head_local.copy()
     elbow = armature.data.bones[f"LowerArm{side}"].head_local.copy()
     wrist = armature.data.bones[f"Wrist{side}"].head_local.copy()
     for vertex in part.data.vertices:
         first = closest_point_on_segment(vertex.co, shoulder, elbow)
         second = closest_point_on_segment(vertex.co, elbow, wrist)
-        center = first if (vertex.co - first).length_squared <= (vertex.co - second).length_squared else second
+        use_lower_arm = (vertex.co - second).length_squared < (vertex.co - first).length_squared
+        center = second if use_lower_arm else first
         # Preserve the licensed silhouette while adapting its presentation-
         # pose sleeve volume to a near-camera viewmodel.  The source's broad
-        # hero-render sleeves dominate a 16:9 FPS frame; a uniform radial
-        # reduction keeps the complete weighted chain readable and prevents
-        # the forearm from obscuring the receiver.
-        vertex.co = center + (vertex.co - center) * 0.48
+        # hero-render sleeves dominate a 16:9 FPS frame.  Preserve enough
+        # radius to read as a clothed human forearm rather than the rejected
+        # thin tube, while keeping the complete weighted chain clear of the
+        # receiver.
+        profile = 1.0
+        if side == "L" and use_lower_arm:
+            lower_axis = wrist - elbow
+            lower_progress = max(0.0, min(
+                1.0,
+                (center - elbow).dot(lower_axis) / max(lower_axis.length_squared, 1e-8),
+            ))
+            # Preserve believable cloth volume through the elbow and close the
+            # pinched wrist transition without turning the whole limb into a
+            # uniform hose.  Mid-forearm remains the narrowest point.
+            profile += 0.06 * (1.0 - smoothstep(0.0, 0.35, lower_progress))
+            profile += 0.14 * smoothstep(0.55, 1.0, lower_progress)
+        vertex.co = center + (vertex.co - center) * radial_scale * profile
 
 
 def separate_cuff_band(part):
@@ -609,6 +796,28 @@ def separate_cuff_band(part):
     if len(created) != 1:
         raise RuntimeError(f"cuff partition produced {len(created)} objects")
     return created[0]
+
+
+def extend_cuff_band(part, armature) -> None:
+    """Stretch the real distal sleeve band into the glove without a seam."""
+    average_x = sum(vertex.co.x for vertex in part.data.vertices) / len(part.data.vertices)
+    side = "L" if average_x > 0 else "R"
+    elbow = armature.data.bones[f"LowerArm{side}"].head_local.copy()
+    wrist = armature.data.bones[f"Wrist{side}"].head_local.copy()
+    axis = wrist - elbow
+    if axis.length_squared < 1e-10:
+        raise RuntimeError(f"{side} cuff bridge has a degenerate lower-arm axis")
+    axis.normalize()
+    projections = [(vertex.co - elbow).dot(axis) for vertex in part.data.vertices]
+    minimum, maximum = min(projections), max(projections)
+    if maximum - minimum <= 1e-5:
+        raise RuntimeError(f"{side} cuff bridge has no authored axial span")
+    for vertex, projection in zip(part.data.vertices, projections):
+        distal = smoothstep(0.0, 1.0, (projection - minimum) / (maximum - minimum))
+        center = closest_point_on_segment(vertex.co, elbow, wrist)
+        radial = vertex.co - center
+        vertex.co = center + radial * (1.0 + distal * 0.035) + axis * distal * 0.90
+    part.data.update()
 
 
 def assign_single_material(obj, material) -> None:
@@ -658,9 +867,26 @@ def partition_render_batches(mesh, armature, materials, root_key, source_triangl
     gloves = [obj for obj in ranked if len(obj.data.vertices) == 671]
     sleeves = [obj for obj in ranked if len(obj.data.vertices) == 561]
     skin = [obj for obj in ranked if len(obj.data.vertices) < 500]
+    if os.environ.get("PASS65_DEBUG_GLOVE_BOUNDARIES") == "1":
+        for glove in gloves:
+            print(
+                "PASS65_GLOVE_BOUNDARIES",
+                glove.name,
+                json.dumps(boundary_loop_records(glove)),
+            )
+    sleeve_radial_scale = env_float(
+        "PASS65_SLEEVE_RADIAL_SCALE", 0.86, 0.48, 0.86,
+    )
+    firing_sleeve_radial_scale = env_float(
+        "PASS65_FIRING_SLEEVE_RADIAL_SCALE", 0.56, 0.48, 0.66,
+    )
     for sleeve in sleeves:
-        refine_sleeve_profile(sleeve, armature)
+        refine_sleeve_profile(
+            sleeve, armature, sleeve_radial_scale, firing_sleeve_radial_scale,
+        )
     accents = [separate_cuff_band(part) for part in sleeves]
+    for accent in accents:
+        extend_cuff_band(accent, armature)
     batches = [
         join_parts("Pass65_Arms_Batch_Sleeve", sleeves, materials["sleeve"], armature, root_key, 2),
         join_parts("Pass65_Arms_Batch_Glove", gloves, materials["glove"], armature, root_key, 2),
@@ -681,8 +907,9 @@ def refine_hand_proportions(batches, armature, hand_scale: float) -> None:
     the lens.  At the actual 16:9 gameplay FOV that silhouette is larger than
     the M4/MP5 controls and hides the articulated digits.  Scaling the real
     glove/skin vertices together with all thirty digit bones preserves source
-    topology, UVs, weights, and finger animation; the unchanged cuff overlaps
-    the wrist seam as it does in the source garment.
+    topology, UVs, weights, and finger animation.  The glove now uses a smooth
+    wrist-to-palm taper so the authored cuff ring remains full-size and closed;
+    uniformly shrinking that ring caused the rejected open-cuff silhouette.
     """
     if not 0.75 <= hand_scale <= 1.0:
         raise RuntimeError(f"hand scale outside reviewed range: {hand_scale}")
@@ -690,6 +917,26 @@ def refine_hand_proportions(batches, armature, hand_scale: float) -> None:
         side: armature.data.bones[f"Wrist{side}"].head_local.copy()
         for side in ("L", "R")
     }
+    digit_base_centers = {
+        side: sum(
+            (
+                armature.data.bones[f"{digit}1{side}"].head_local.copy()
+                for digit in ("Index", "Middle", "Ring", "Pinky", "Thumb")
+            ),
+            Vector(),
+        ) / 5.0
+        for side in ("L", "R")
+    }
+    palm_axes = {
+        side: (digit_base_centers[side] - wrists[side]).normalized()
+        for side in ("L", "R")
+    }
+    palm_lengths = {
+        side: (digit_base_centers[side] - wrists[side]).length
+        for side in ("L", "R")
+    }
+    if min(palm_lengths.values()) <= 1e-6:
+        raise RuntimeError(f"degenerate hand axes {palm_lengths}")
     hand_batches = [
         batch for batch in batches
         if "Glove" in batch.name or "Skin" in batch.name
@@ -699,6 +946,7 @@ def refine_hand_proportions(batches, armature, hand_scale: float) -> None:
             f"expected disjoint glove and skin batches, found {[item.name for item in hand_batches]}"
         )
     for batch in hand_batches:
+        is_glove = "Glove" in batch.name
         group_names = {group.index: group.name for group in batch.vertex_groups}
         for vertex in batch.data.vertices:
             side_scores = {"L": 0.0, "R": 0.0}
@@ -714,7 +962,23 @@ def refine_hand_proportions(batches, armature, hand_scale: float) -> None:
                     f"unweighted hand vertex cannot be proportioned: {batch.name}:{vertex.index}"
                 )
             wrist = wrists[side]
-            vertex.co = wrist + (vertex.co - wrist) * hand_scale
+            relative = vertex.co - wrist
+            scale = hand_scale
+            if is_glove:
+                normalized_along = (
+                    relative.dot(palm_axes[side]) / palm_lengths[side]
+                )
+                taper = smoothstep(0.08, 0.82, normalized_along)
+                scale = 1.0 - (1.0 - hand_scale) * taper
+                # Sink the proximal glove ring a few millimetres into the
+                # sleeve.  The meshes stay disjoint and source weighted, but
+                # the overlap remains closed when the wrist rotates away from
+                # the lower-arm bone in an FPS support grip.
+                cuff_overlap = palm_lengths[side] * 0.10 * (
+                    1.0 - smoothstep(-0.05, 0.25, normalized_along)
+                )
+                relative -= palm_axes[side] * cuff_overlap
+            vertex.co = wrist + relative * scale
         batch.data.update()
 
     bpy.context.view_layer.objects.active = armature
@@ -730,6 +994,15 @@ def refine_hand_proportions(batches, armature, hand_scale: float) -> None:
     bpy.ops.object.mode_set(mode="OBJECT")
     armature.select_set(False)
     bpy.context.view_layer.update()
+    rig_integrity = json.loads(armature["rig_integrity"])
+    rig_integrity["postHandScale"] = canonical_digit_segment_metrics(armature)
+    rig_integrity["handProportioning"] = {
+        "contract": "full-cuff-smooth-palm-taper-v1",
+        "handScale": hand_scale,
+        "gloveTaperNormalizedRange": [0.08, 0.82],
+        "proximalGloveOverlapPalmFraction": 0.10,
+    }
+    armature["rig_integrity"] = json.dumps(rig_integrity, sort_keys=True)
 
 
 def empty(name, world_location, parent=None, semantic=None):
@@ -829,15 +1102,65 @@ def action_corpus(armature):
         add_armature_action(armature, clip_name, end_frame, middle_frame, pose)
 
 
+def weighting_receipt(batches):
+    blended_vertices = 0
+    multi_bone_batches = 0
+    pairs = set()
+    for batch in batches:
+        group_names = {group.index: group.name for group in batch.vertex_groups}
+        batch_blended = False
+        for vertex in batch.data.vertices:
+            active = sorted(
+                group_names[membership.group]
+                for membership in vertex.groups
+                if membership.weight > 0.05 and membership.group in group_names
+            )
+            if len(active) < 2:
+                continue
+            blended_vertices += 1
+            batch_blended = True
+            for left in range(len(active)):
+                for right in range(left + 1, len(active)):
+                    pairs.add(":".join(sorted((active[left], active[right]))))
+        if batch_blended:
+            multi_bone_batches += 1
+    required = {
+        "LowerArmL:WristL", "LowerArmR:WristR",
+        "LowerArmL:UpperArmL", "LowerArmR:UpperArmR",
+        "Index1L:Index2L", "Index1R:Index2R",
+        "Index2L:Index3L", "Index2R:Index3R",
+        "Thumb1L:Thumb2L", "Thumb1R:Thumb2R",
+        "Thumb2L:Thumb3L", "Thumb2R:Thumb3R",
+    }
+    missing = sorted(required - pairs)
+    if blended_vertices < 240 or missing:
+        raise RuntimeError(
+            "licensed arms weighting contract failed "
+            f"blended={blended_vertices} missingPairs={missing}"
+        )
+    return blended_vertices, multi_bone_batches, sorted(pairs)
+
+
 def configure_asset_root(
     armature, batches, source_triangles, authored_cap_triangles,
     delivery_triangles, decoded_texture_bytes,
 ):
+    blended_vertices, multi_bone_batches, blended_pairs = weighting_receipt(batches)
     root = empty("Pass65_FirstPersonArms_LOD0", (0, 0, 0))
     root["asset_id"] = ASSET_ID
     root["asset_root_key"] = root.name
     root["creator"] = "DJMaesen; Atomic Acres integration"
     root["license"] = "CC-BY-4.0"
+    root["license_url"] = "https://creativecommons.org/licenses/by/4.0/"
+    root["source_title"] = "fps arms"
+    root["source_creator"] = "DJMaesen (bumstrum)"
+    root["source_url"] = "https://sketchfab.com/3d-models/fps-arms-08ec4403a47645d8ad80633abf13d39d"
+    root["source_creator_url"] = "https://sketchfab.com/bumstrum"
+    root["modified_by"] = "Atomic Acres project"
+    root["modification_notice"] = (
+        "Retargeted 47 to 37 bones; removed Icosphere; adapted bind pose, sleeves, "
+        "hands, PBR materials, sockets, action clips, LODs, and weapon contacts."
+    )
     root["source_asset_uid"] = SOURCE_UID
     root["source_mirror_commit"] = SOURCE_MIRROR_COMMIT
     root["quality_tier"] = "LOD0"
@@ -845,10 +1168,12 @@ def configure_asset_root(
     root["blender_authoring_forward_axis"] = "+Y"
     root["opaque_material_contract"] = True
     root["presentation_only"] = True
-    root["visual_revision"] = "licensed-anatomical-viewmodel-v7-prototype"
+    root["visual_revision"] = "licensed-anatomical-viewmodel-v7"
     root["limb_profile_contract"] = "licensed-human-skin-and-glove-deformation-v1"
     root["hand_pose_contract"] = "licensed-articulated-fingerless-glove-grip-v1"
     root["glove_construction_contract"] = "opaque-uv-preserved-licensed-human-hand-v1"
+    root["shoulder_entry_contract"] = "weighted-capped-frame-edge-sleeve-v1"
+    root["weapon_grip_review_contract"] = "seven-view-actual-weapon-contact-v1"
     root["runtime_animation_contract"] = "authored-fingers-under-runtime-chain-ik-v1"
     root["finger_segment_count"] = 30
     root["source_vertex_count"] = 4026
@@ -856,15 +1181,23 @@ def configure_asset_root(
     root["authored_weighted_shoulder_cap_triangles"] = authored_cap_triangles
     root["delivery_triangle_count"] = delivery_triangles
     root["source_disconnected_component_count"] = 14
+    root["source_weighted_part_count"] = 16
     root["source_terminal_joints_collapsed"] = 10
     root["expected_bone_count"] = len(CANONICAL_BONES)
     root["batched_skinned_mesh_count"] = len(batches)
     root["render_region_count"] = 4
     root["geometry_duplication_count"] = 0
+    root["max_skinned_renderable_meshes"] = 6
+    root["max_skinned_primitives"] = 6
     root["batching_policy"] = "four-disjoint-source-face-regions"
+    root["blended_vertex_count"] = blended_vertices
+    root["multi_bone_weighted_part_count"] = multi_bone_batches
+    root["blended_joint_pairs_csv"] = ",".join(blended_pairs)
+    root["weighting_contract"] = "adjacent-bone-normalized-blend-v5"
     root["texture_resolution"] = TEXTURE_SIZE
     root["decoded_texture_budget_bytes"] = decoded_texture_bytes
     root["texture_grade_contract"] = "source-uv-preserved-charcoal-navy-teal-pbr-v1"
+    root["weapon_grip_review_frames"] = 7
     root["reviewed_hand_scale_from_source"] = float(
         os.environ.get("PASS65_HAND_SCALE", "1.0")
     )
@@ -900,7 +1233,7 @@ def hierarchy(root):
     return [root, *root.children_recursive, *owned]
 
 
-def export_glb(root):
+def export_glb(root, output_path):
     selected = list(dict.fromkeys(hierarchy(root)))
     bpy.ops.object.select_all(action="DESELECT")
     for obj in selected:
@@ -909,7 +1242,7 @@ def export_glb(root):
         obj.select_set(True)
     bpy.context.view_layer.objects.active = root
     bpy.ops.export_scene.gltf(
-        filepath=str(OUTPUT_GLB),
+        filepath=str(output_path),
         export_format="GLB",
         use_selection=True,
         export_yup=True,
@@ -924,6 +1257,53 @@ def export_glb(root):
         export_optimize_animation_size=True,
         export_tangents=True,
     )
+
+
+def mesh_triangle_count(objects):
+    return sum(
+        len(polygon.vertices) - 2
+        for obj in objects
+        for polygon in obj.data.polygons
+    )
+
+
+def author_lod1(root, armature, batches, lod0_triangles):
+    """Create a true reduced delivery after the editable LOD0 blend is saved."""
+    for batch in batches:
+        armature_modifiers = [
+            modifier for modifier in batch.modifiers if modifier.type == "ARMATURE"
+        ]
+        if len(armature_modifiers) != 1:
+            raise RuntimeError(
+                f"{batch.name}: expected one armature modifier before LOD1, "
+                f"found {len(armature_modifiers)}"
+            )
+        batch.modifiers.remove(armature_modifiers[0])
+        decimate = batch.modifiers.new("Pass66 deterministic LOD1", "DECIMATE")
+        decimate.decimate_type = "COLLAPSE"
+        decimate.ratio = 0.70
+        decimate.use_collapse_triangulate = True
+        bpy.ops.object.select_all(action="DESELECT")
+        batch.select_set(True)
+        bpy.context.view_layer.objects.active = batch
+        bpy.ops.object.modifier_apply(modifier=decimate.name)
+        skin = batch.modifiers.new("Pass65 licensed arms skin", "ARMATURE")
+        skin.object = armature
+        batch["quality_tier"] = "LOD1"
+    lod1_triangles = mesh_triangle_count(batches)
+    if not 0 < lod1_triangles < lod0_triangles:
+        raise RuntimeError(
+            f"LOD1 must reduce triangles strictly: lod0={lod0_triangles} lod1={lod1_triangles}"
+        )
+    blended_vertices, multi_bone_batches, blended_pairs = weighting_receipt(batches)
+    root["quality_tier"] = "LOD1"
+    root["delivery_triangle_count"] = lod1_triangles
+    root["lod_reduction_ratio"] = lod1_triangles / lod0_triangles
+    root["blended_vertex_count"] = blended_vertices
+    root["multi_bone_weighted_part_count"] = multi_bone_batches
+    root["blended_joint_pairs_csv"] = ",".join(blended_pairs)
+    export_glb(root, OUTPUT_LOD1_GLB)
+    return lod1_triangles
 
 
 def look_at(obj, target):
@@ -993,6 +1373,34 @@ def bone_tail_world(armature, bone_name: str) -> Vector:
     return armature.matrix_world @ armature.pose.bones[bone_name].tail
 
 
+def bounded_digit_target(
+    armature, digit: str, side: str, requested_world: Vector,
+    maximum_reach_ratio: float = 0.94,
+):
+    """Keep procedural digit goals inside the real three-bone reach envelope."""
+    chain = [f"{digit}{joint}{side}" for joint in (1, 2, 3)]
+    base = bone_head_world(armature, chain[0])
+    reach = sum(
+        (bone_tail_world(armature, name) - bone_head_world(armature, name)).length
+        for name in chain
+    )
+    requested_delta = requested_world - base
+    if reach <= 1e-8 or requested_delta.length <= 1e-8:
+        raise RuntimeError(f"{digit}{side}: degenerate procedural digit target")
+    limit = reach * maximum_reach_ratio
+    resolved = (
+        requested_world.copy()
+        if requested_delta.length <= limit
+        else base + requested_delta.normalized() * limit
+    )
+    return resolved, {
+        "chainReachM": reach,
+        "requestedReachRatio": requested_delta.length / reach,
+        "resolvedReachRatio": (resolved - base).length / reach,
+        "clamped": requested_delta.length > limit,
+    }
+
+
 def rotate_pose_bone_world_delta(armature, bone_name: str, delta: Quaternion) -> None:
     bone = armature.pose.bones[bone_name]
     current_world = armature.matrix_world @ bone.matrix
@@ -1041,7 +1449,11 @@ def solve_elbow(shoulder: Vector, elbow: Vector, wrist: Vector, target: Vector, 
         upper_length * upper_length - lower_length * lower_length + target_distance * target_distance
     ) / (2.0 * target_distance)
     height = math.sqrt(max(0.0, upper_length * upper_length - along * along))
-    pole = shoulder + Vector((-0.32 if side == "L" else 0.32, -0.08, -0.35))
+    pole_offset = (
+        env_vector("PASS65_LEFT_ELBOW_POLE", (-0.32, -0.08, -0.35))
+        if side == "L" else Vector((0.32, -0.08, -0.35))
+    )
+    pole = shoulder + pole_offset
     pole_projection = shoulder + direction * (pole - shoulder).dot(direction)
     perpendicular = pole - pole_projection
     if perpendicular.length_squared < 1e-8:
@@ -1211,48 +1623,149 @@ def pose_support_digits_around_handguard(
         "Ring": -0.04,
         "Pinky": -0.12,
     }
+    vertical_fan = {
+        "Index": 0.18,
+        "Middle": 0.06,
+        "Ring": -0.06,
+        "Pinky": -0.18,
+    }
     for digit, along in longitudinal.items():
+        fan = vertical_fan[digit]
         directions = (
-            right * 0.24 - up * 0.96 + forward * along,
-            right * 0.72 - up * 0.68 + forward * along * 0.65,
-            right * 0.92 + up * 0.36 + forward * along * 0.35,
+            right * 0.36 + up * (-0.91 + fan) + forward * along,
+            right * 0.62 + up * (-0.70 + fan * 0.70) + forward * along * 0.65,
+            right * 0.78 + up * (0.24 + fan * 0.40) + forward * along * 0.35,
         )
         for joint, direction in enumerate(directions, start=1):
             orient_pose_bone_world_direction(
                 armature, f"{digit}{joint}L", direction,
             )
     thumb_directions = (
-        right * 0.28 + up * 0.94 + forward * 0.12,
-        right * 0.90 + up * 0.38 + forward * 0.08,
-        right * 0.95 - up * 0.26 + forward * 0.04,
+        right * 0.45 + up * 0.85 + forward * 0.12,
+        right * 0.90 + up * 0.25 + forward * 0.08,
+        right * 0.97 - up * 0.10 + forward * 0.04,
     )
     for joint, direction in enumerate(thumb_directions, start=1):
         orient_pose_bone_world_direction(
             armature, f"Thumb{joint}L", direction,
         )
+    requested_targets = {}
     targets = {}
+    reach = {}
     errors = {}
     finger_target_offsets = {
-        "Index": (0.030, -0.018, 0.032),
-        "Middle": (0.034, -0.027, 0.011),
-        "Ring": (0.038, -0.036, -0.011),
-        "Pinky": (0.042, -0.043, -0.032),
+        "Index": (0.045, -0.004, 0.026),
+        "Middle": (0.050, -0.010, 0.010),
+        "Ring": (0.052, -0.016, -0.008),
+        "Pinky": (0.050, -0.022, -0.024),
     }
     for digit, (across, vertical, along) in finger_target_offsets.items():
-        target = palm_socket + right * across + up * vertical + forward * along
+        requested = palm_socket + right * across + up * vertical + forward * along
+        target, reach[digit] = bounded_digit_target(
+            armature, digit, "L", requested,
+        )
+        requested_targets[digit] = tuple(requested)
         targets[digit] = tuple(target)
-        errors[digit] = solve_digit_tip_ccd(armature, digit, "L", target)
-    thumb_target = palm_socket + right * 0.032 + up * 0.030 + forward * 0.026
+        errors[digit] = (
+            solve_digit_tip_ccd(armature, digit, "L", target)
+            if os.environ.get("PASS65_SUPPORT_DIGIT_CCD", "1") == "1"
+            else (bone_tail_world(armature, f"{digit}3L") - target).length
+        )
+    requested_thumb = palm_socket + right * 0.025 + up * 0.042 + forward * 0.012
+    thumb_target, reach["Thumb"] = bounded_digit_target(
+        armature, "Thumb", "L", requested_thumb,
+    )
+    requested_targets["Thumb"] = tuple(requested_thumb)
     targets["Thumb"] = tuple(thumb_target)
-    errors["Thumb"] = solve_digit_tip_ccd(
-        armature, "Thumb", "L", thumb_target,
+    errors["Thumb"] = (
+        solve_digit_tip_ccd(armature, "Thumb", "L", thumb_target)
+        if os.environ.get("PASS65_SUPPORT_DIGIT_CCD", "1") == "1"
+        else (bone_tail_world(armature, "Thumb3L") - thumb_target).length
     )
     return {
-        "contract": "evaluated-phalanx-ccd-handguard-wrap-v1",
+        "contract": "bounded-evaluated-phalanx-ccd-handguard-wrap-v2",
+        "requestedTargets": requested_targets,
         "targets": targets,
+        "reach": reach,
         "tipErrorsM": errors,
         "maximumTipErrorM": max(errors.values()),
-        "passed": max(errors.values()) <= 0.012,
+        "passed": (
+            max(errors.values()) <= 0.012
+            and max(item["resolvedReachRatio"] for item in reach.values()) <= 0.94 + 1e-6
+        ),
+    }
+
+
+def pose_reload_digits_around_magazine(armature, reload_state):
+    """Wrap the real left-hand digits around the detached STANAG body."""
+    minimum = Vector(reload_state["detachedBounds"]["minimum"])
+    maximum = Vector(reload_state["detachedBounds"]["maximum"])
+    center = Vector(reload_state["detachedBounds"]["center"])
+    front_y = minimum.y - 0.004
+    requested = {
+        "Index": Vector((center.x - 0.012, front_y, maximum.z - 0.026)),
+        "Middle": Vector((center.x - 0.012, front_y, center.z + 0.016)),
+        "Ring": Vector((center.x - 0.012, front_y, center.z - 0.016)),
+        "Pinky": Vector((center.x - 0.012, front_y, minimum.z + 0.026)),
+        # Seat the thumb over the magazine's upper shoulder.  The earlier
+        # target stopped 2 mm short of the opposed-contact threshold and left
+        # the thumb reading as another finger beneath the box.
+        "Thumb": Vector((minimum.x + 0.006, minimum.y - 0.002, maximum.z - 0.012)),
+    }
+    targets = {}
+    reach = {}
+    errors = {}
+    for digit, requested_target in requested.items():
+        target, reach[digit] = bounded_digit_target(
+            armature, digit, "L", requested_target,
+        )
+        targets[digit] = tuple(target)
+        errors[digit] = solve_digit_tip_ccd(
+            armature, digit, "L", target, iterations=16,
+        )
+    evaluated_tips = {
+        digit: tuple(bone_tail_world(armature, f"{digit}3L"))
+        for digit in requested
+    }
+    finger_z = [evaluated_tips[digit][2] for digit in ("Index", "Middle", "Ring", "Pinky")]
+    ordered_finger_cues = all(
+        finger_z[index] > finger_z[index + 1] + 0.006
+        for index in range(len(finger_z) - 1)
+    )
+    thumb_opposed = evaluated_tips["Thumb"][2] >= max(finger_z) + 0.010
+    return {
+        "contract": "detached-stanag-four-finger-front-wrap-v1",
+        "requestedTargets": {key: tuple(value) for key, value in requested.items()},
+        "targets": targets,
+        "reach": reach,
+        "tipErrorsM": errors,
+        "evaluatedTips": evaluated_tips,
+        "orderedFingerCues": ordered_finger_cues,
+        "thumbOpposed": thumb_opposed,
+        "maximumTipErrorM": max(errors.values()),
+        "passed": (
+            max(errors.values()) <= 0.012
+            and ordered_finger_cues
+            and thumb_opposed
+        ),
+    }
+
+
+def mesh_world_bounds(objects):
+    points = [
+        obj.matrix_world @ vertex.co
+        for obj in objects if obj.type == "MESH"
+        for vertex in obj.data.vertices
+    ]
+    if not points:
+        raise RuntimeError("cannot derive bounds from an empty mesh set")
+    minimum = Vector(tuple(min(point[axis] for point in points) for axis in range(3)))
+    maximum = Vector(tuple(max(point[axis] for point in points) for axis in range(3)))
+    return {
+        "minimum": minimum,
+        "maximum": maximum,
+        "center": (minimum + maximum) * 0.5,
+        "extent": maximum - minimum,
     }
 
 
@@ -1300,7 +1813,7 @@ def import_review_weapon(weapon_id: str, scale: float, right_target: Vector):
     support_offsets = {
         "pistol": Vector((-0.160, 0.110, 0.090)),
         "mp5": Vector((-0.050, 0.180, 0.100)),
-        "m4a1": env_vector("PASS65_M4_SUPPORT_OFFSET", (-0.050, 0.190, 0.110)),
+        "m4a1": env_vector("PASS65_M4_SUPPORT_OFFSET", (-0.070, 0.170, 0.085)),
     }
     if left is not None and weapon_id in support_offsets:
         original = left.matrix_world.translation.copy()
@@ -1319,18 +1832,52 @@ def import_review_weapon(weapon_id: str, scale: float, right_target: Vector):
         }
     reload_node = node("reload-socket-l")
     reload_calibration = None
+    magazine_bounds = None
+    magazine_meshes = []
+    magazine_root = node("weapon-magazine")
+    magazine_socket = node("magazine-socket")
     if weapon_id == "m4a1" and reload_node is not None:
         original = reload_node.matrix_world.translation.copy()
-        # Magazine-hand presentation: below and left of the magwell, avoiding
-        # both the firing arm and the weapon body while remaining visibly in
-        # the reload path.
-        calibrated = right_target + Vector((-0.135, 0.045, -0.075))
+        magazine_meshes = [
+            obj for obj in imported
+            if obj.type == "MESH" and "Runtime_magazine_" in obj.name
+        ]
+        if len(magazine_meshes) != 2:
+            raise RuntimeError(
+                f"m4a1: expected two evaluated magazine batches, found "
+                f"{[obj.name for obj in magazine_meshes]}"
+            )
+        if os.environ.get("PASS65_DEBUG_MAGAZINE_MATERIAL") == "1":
+            debug_material = bpy.data.materials.new("DEBUG_M4_MAGAZINE_RED")
+            debug_material.diffuse_color = (1.0, 0.0, 0.0, 1.0)
+            debug_material.use_nodes = True
+            debug_bsdf = debug_material.node_tree.nodes.get("Principled BSDF")
+            input_socket(debug_bsdf, "Base Color").default_value = (1.0, 0.0, 0.0, 1.0)
+            for magazine_mesh in magazine_meshes:
+                magazine_mesh.data.materials.clear()
+                magazine_mesh.data.materials.append(debug_material)
+        magazine_bounds = mesh_world_bounds(magazine_meshes)
+        # Grip the camera-left face of the evaluated STANAG body.  The source
+        # socket is authored for its presentation camera and resolves behind
+        # the receiver after this FPS root conversion; the earlier replacement
+        # sat too far outboard and produced a floating fist.
+        default_reload_target = Vector((
+            magazine_bounds["minimum"].x - 0.025,
+            magazine_bounds["center"].y,
+            magazine_bounds["minimum"].z + magazine_bounds["extent"].z * 0.46,
+        ))
+        calibrated = default_reload_target + env_vector(
+            "PASS65_M4_RELOAD_TRIM", (0.0, 0.0, 0.0),
+        )
         reload_node.matrix_world.translation = calibrated
         bpy.context.view_layer.update()
         reload_calibration = {
             "originalWorld": tuple(original),
             "calibratedWorld": tuple(calibrated),
-            "contract": "left-hand-magazine-approach-v1",
+            "evaluatedMagazineBounds": {
+                key: tuple(value) for key, value in magazine_bounds.items()
+            },
+            "contract": "evaluated-stanag-camera-left-grip-v3",
         }
     rear_node = node("rear-sight-socket")
     front_node = node("front-sight-socket")
@@ -1398,6 +1945,10 @@ def import_review_weapon(weapon_id: str, scale: float, right_target: Vector):
         "front": front_node,
         "supportCalibration": support_calibration,
         "reloadCalibration": reload_calibration,
+        "magazineBounds": magazine_bounds,
+        "magazineMeshes": magazine_meshes,
+        "magazineRoot": magazine_root,
+        "magazineSocket": magazine_socket,
         "sightCalibration": sight_calibration,
     }
 
@@ -1453,12 +2004,64 @@ def debug_mesh_components(review) -> None:
         print("PASS65_WEAPON_COMPONENTS", review["id"], obj.name, json.dumps(components))
 
 
+def prepare_detached_reload_magazine(review):
+    root = review.get("magazineRoot")
+    meshes = review.get("magazineMeshes") or []
+    socket = review.get("magazineSocket")
+    reload_node = review.get("reload")
+    if root is None or len(meshes) != 2 or socket is None or reload_node is None:
+        raise RuntimeError("m4a1 reload requires magazine root, two batches, socket, and hand target")
+    inserted_bounds = mesh_world_bounds(meshes)
+    world = root.matrix_world.copy()
+    offset = env_vector("PASS65_RELOAD_MAGAZINE_OFFSET", (-0.125, -0.035, -0.065))
+    world.translation += offset
+    root.matrix_world = world
+    bpy.context.view_layer.update()
+    detached_bounds = mesh_world_bounds(meshes)
+    palm_target = Vector((
+        # Put the metacarpal anchor beside the magazine centreline instead of
+        # outside its minimum X face.  This seats the box between the opposed
+        # thumb and four articulated fingers rather than producing a floating
+        # fingertip pinch.
+        detached_bounds["center"].x - 0.010,
+        detached_bounds["center"].y,
+        detached_bounds["center"].z,
+    )) + env_vector("PASS65_RELOAD_PALM_TRIM", (0.0, 0.0, 0.0))
+    reload_node.matrix_world.translation = palm_target
+    bpy.context.view_layer.update()
+    insertion_axis = socket.matrix_world.translation - detached_bounds["center"]
+    if insertion_axis.length < 0.08:
+        raise RuntimeError(
+            f"reload magazine separation too small: {insertion_axis.length:.4f}m"
+        )
+    state = {
+        "contract": "detached-stanag-visible-approach-v1",
+        "offsetWorld": tuple(offset),
+        "insertedBounds": {
+            key: tuple(value) for key, value in inserted_bounds.items()
+        },
+        "detachedBounds": {
+            key: tuple(value) for key, value in detached_bounds.items()
+        },
+        "palmTarget": tuple(palm_target),
+        "magazineSocket": tuple(socket.matrix_world.translation),
+        "insertionAxis": tuple(insertion_axis),
+        "insertionSeparationM": insertion_axis.length,
+    }
+    review["reloadCalibration"] = state
+    return state
+
+
 def pose_for_weapon(armature, review, left_socket="left"):
     reset_pose(armature)
     for track in armature.animation_data.nla_tracks:
         track.mute = True
     bpy.context.scene.frame_set(1)
     bpy.context.view_layer.update()
+    reload_magazine = (
+        prepare_detached_reload_magazine(review)
+        if left_socket == "reload" else None
+    )
     if left_socket == "reload":
         place_pose_bone_head_world(
             armature, "UpperArmL", Vector((-0.34, 0.34, -0.56)),
@@ -1466,7 +2069,7 @@ def pose_for_weapon(armature, review, left_socket="left"):
     elif left_socket == "left" and review["id"] in {"mp5", "m4a1"}:
         place_pose_bone_head_world(
             armature, "UpperArmL",
-            env_vector("PASS65_SUPPORT_SHOULDER", (-0.34, 0.34, -0.50)),
+            env_vector("PASS65_SUPPORT_SHOULDER", (-0.28, 0.40, -0.48)),
         )
     right_target = review["right"].matrix_world.translation.copy()
     left_node = review[left_socket]
@@ -1491,13 +2094,14 @@ def pose_for_weapon(armature, review, left_socket="left"):
         left_style = "offhand"
     else:
         left_forward = (
-            Vector((0.30, 0.05, -1.0))
+            env_vector("PASS65_RELOAD_FORWARD", (0.90, 0.05, -0.25))
             if left_socket == "reload"
             else env_vector("PASS65_SUPPORT_FORWARD", (0.85, 0.45, -0.20))
         )
         support_roll_degrees = (
-            float(os.environ.get("PASS65_SUPPORT_ROLL_DEGREES", "0"))
-            if left_socket == "left" else 0.0
+            float(os.environ.get("PASS65_SUPPORT_ROLL_DEGREES", "-4"))
+            if left_socket == "left"
+            else float(os.environ.get("PASS65_RELOAD_ROLL_DEGREES", "-20"))
         )
         left_error, left_reach, left_wrist_target = pose_hand_to_socket(
             armature, "L", left_target, left_forward,
@@ -1506,12 +2110,17 @@ def pose_for_weapon(armature, review, left_socket="left"):
         left_style = "reload" if left_socket == "reload" else "support"
     pose_grip_fingers(armature, left_style=left_style)
     support_digit_wrap = None
+    reload_digit_wrap = None
     if (
         left_style == "support"
-        and os.environ.get("PASS65_PROCEDURAL_SUPPORT_WRAP", "0") == "1"
+        and os.environ.get("PASS65_PROCEDURAL_SUPPORT_WRAP", "1") == "1"
     ):
         support_digit_wrap = pose_support_digits_around_handguard(
             armature, forward, left_target,
+        )
+    if left_style == "reload":
+        reload_digit_wrap = pose_reload_digits_around_magazine(
+            armature, reload_magazine,
         )
     chains = {
         side: {
@@ -1532,10 +2141,13 @@ def pose_for_weapon(armature, review, left_socket="left"):
         "socketAnchor": "mean-digit-base-palm",
         "supportMode": support_mode,
         "supportWristRollDegrees": (
-            float(os.environ.get("PASS65_SUPPORT_ROLL_DEGREES", "0"))
+            float(os.environ.get("PASS65_SUPPORT_ROLL_DEGREES", "-4"))
             if support_mode == "two-hand-support" else 0.0
         ),
         "supportDigitWrap": support_digit_wrap,
+        "reloadDigitWrap": reload_digit_wrap,
+        "reloadMagazine": reload_magazine,
+        "weaponReloadCalibration": review["reloadCalibration"],
         "chainWorld": chains,
     }
 
@@ -1902,6 +2514,13 @@ def render_contact_sheet(root, armature, batches):
         ("pistol-hip", "pistol", "left", (-0.08, 0.28, 0.14), (0.00, 0.92, -0.32), 58),
         ("mp5-hip", "mp5", "left", (-0.10, 0.20, 0.16), (0.00, 1.02, -0.42), 54),
         ("m4a1-hip", "m4a1", "left", (-0.12, 0.24, 0.18), (0.00, 1.10, -0.52), 53),
+        (
+            "m4a1-grip-oblique", "m4a1", "left",
+            # This is a contact-inspection angle, not a macro crop.  A 65-degree
+            # vertical FOV keeps the thicker, corrected sleeve and complete
+            # support hand inside the immutable occupancy bounds.
+            (-0.30, 0.80, -0.18), (0.00, 0.77, -0.12), 65,
+        ),
         ("m4a1-ads", "m4a1", "left", None, None, 46),
         ("m4a1-reload", "m4a1", "reload", (-0.10, 0.20, 0.14), (-0.02, 0.78, -0.30), 59),
         ("knife-contact", "knife", "knife", (0.02, 0.22, 0.10), (0.08, 0.62, -0.16), 60),
@@ -1959,8 +2578,16 @@ def render_contact_sheet(root, armature, batches):
             count for key, count in weapon_collisions["pairsByRenderRegion"].items()
             if key in {"glove:L", "skin:L"}
         )
+        right_hand_contacts = sum(
+            count for key, count in weapon_collisions["pairsByRenderRegion"].items()
+            if key in {"glove:R", "skin:R"}
+        )
         metrics["leftHandWeaponContactPairs"] = left_hand_contacts
-        metrics["leftHandContactRequired"] = left_socket == "left" and weapon_id in {"mp5", "m4a1"}
+        metrics["rightHandWeaponContactPairs"] = right_hand_contacts
+        metrics["leftHandContactRequired"] = (
+            (left_socket == "left" and weapon_id in {"mp5", "m4a1"})
+            or (left_socket == "reload" and weapon_id == "m4a1")
+        )
         metrics["passed"] = (
             metrics["rightSocketErrorM"] <= 0.02
             and (metrics["leftSocketErrorM"] is None or metrics["leftSocketErrorM"] <= 0.02)
@@ -1968,6 +2595,14 @@ def render_contact_sheet(root, armature, batches):
             and intersections["passed"]
             and weapon_collisions["passed"]
             and (not metrics["leftHandContactRequired"] or left_hand_contacts >= 12)
+            and (
+                metrics.get("supportDigitWrap") is None
+                or metrics["supportDigitWrap"]["passed"]
+            )
+            and (
+                metrics.get("reloadDigitWrap") is None
+                or metrics["reloadDigitWrap"]["passed"]
+            )
         )
 
         if label == "m4a1-ads":
@@ -2020,6 +2655,13 @@ def render_contact_sheet(root, armature, batches):
         bpy.ops.render.render(write_still=True)
         rendered.append(path)
 
+    m4_hip = next(item for item in evidence if item["view"] == "m4a1-hip")
+    root["m4a1_review_right_socket_error_m"] = m4_hip["rightSocketErrorM"]
+    root["m4a1_review_left_socket_error_m"] = m4_hip["leftSocketErrorM"]
+    root["m4a1_review_scale"] = float(weapons["m4a1"]["group"].scale.x)
+    root["m4a1_review_right_digit_contacts"] = m4_hip["rightHandWeaponContactPairs"]
+    root["m4a1_review_left_digit_contacts"] = m4_hip["leftHandWeaponContactPairs"]
+
     violations = []
     for item in evidence:
         if not item["passed"]:
@@ -2054,6 +2696,7 @@ def render_contact_sheet(root, armature, batches):
         raise RuntimeError("weapon contact review failed:\n- " + "\n- ".join(violations))
 
 
+verify_frozen_source()
 reset()
 images = build_textures()
 materials = build_materials(images)
@@ -2065,7 +2708,7 @@ batches, delivery_triangles = partition_render_batches(
     source_mesh, armature, materials, root_key, source_triangles, authored_cap_triangles,
 )
 refine_hand_proportions(
-    batches, armature, float(os.environ.get("PASS65_HAND_SCALE", "1.0")),
+    batches, armature, float(os.environ.get("PASS65_HAND_SCALE", "0.86")),
 )
 author_first_person_shoulder_anchors(armature, batches)
 root = configure_asset_root(
@@ -2073,15 +2716,23 @@ root = configure_asset_root(
     delivery_triangles, images["decoded_bytes"],
 )
 action_corpus(armature)
-export_glb(root)
 render_contact_sheet(root, armature, batches)
+bpy.ops.object.select_all(action="DESELECT")
+allowed = set(hierarchy(root))
+for obj in list(bpy.data.objects):
+    if obj not in allowed:
+        bpy.data.objects.remove(obj, do_unlink=True)
+export_glb(root, OUTPUT_GLB)
 bpy.ops.wm.save_as_mainfile(filepath=str(OUTPUT_BLEND))
+lod1_triangles = author_lod1(root, armature, batches, delivery_triangles)
 
 print(
     "PASS65_DJMAESEN_ARMS_PROTOTYPE_READY "
     f"meshes={len(batches)} bones={len(armature.data.bones)} triangles={delivery_triangles} "
-    f"clips={len(armature.animation_data.nla_tracks)} decodedTextureBytes={images['decoded_bytes']}"
+    f"lod1Triangles={lod1_triangles} clips={len(armature.animation_data.nla_tracks)} "
+    f"decodedTextureBytes={images['decoded_bytes']}"
 )
 print(f"GLB={OUTPUT_GLB}")
+print(f"LOD1_GLB={OUTPUT_LOD1_GLB}")
 print(f"BLEND={OUTPUT_BLEND}")
-print(f"CONTACT_SHEET={REVIEW_DIR / 'pass65-djmaesen-arms-contact-sheet.png'}")
+print(f"CONTACT_SHEET={REVIEW_DIR / 'pass65-djmaesen-arms-weapon-contact-sheet.png'}")

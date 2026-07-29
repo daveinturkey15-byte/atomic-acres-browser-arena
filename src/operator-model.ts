@@ -380,18 +380,20 @@ function materialForFirstPerson(material: THREE.Material, flattenMaterials: bool
     result.metalness = 0;
     result.emissive.setHex(0x05090a);
     result.emissiveIntensity = flattenMaterials ? 0.24 : 0.08;
-  } else if (result instanceof THREE.MeshStandardMaterial && materialName.includes('arms_glove')) {
-    // The texture remains tactical navy, while this cool fill preserves every
-    // wrapped digit against black receivers in the indoor Gun Range.
-    result.emissive.setHex(0x123a45);
-    result.emissiveIntensity = flattenMaterials ? 0.42 : 0.32;
+  } else if (result instanceof THREE.MeshStandardMaterial
+    && (materialName.includes('arms_glove') || materialName.includes('arms_fingerglove'))) {
+    // The source texture remains tactical navy. A restrained cool fill keeps
+    // articulated digits readable against black receivers in the indoor Gun
+    // Range without flattening the baked normal/roughness response.
+    result.emissive.setHex(0x285866);
+    result.emissiveIntensity = flattenMaterials ? 0.58 : 0.48;
   } else if (result instanceof THREE.MeshStandardMaterial && materialName.includes('arms_sleeve')) {
-    result.emissive.setHex(0x0b252c);
-    result.emissiveIntensity = flattenMaterials ? 0.32 : 0.22;
+    result.emissive.setHex(0x1c424d);
+    result.emissiveIntensity = flattenMaterials ? 0.5 : 0.4;
   } else if (result instanceof THREE.MeshStandardMaterial && materialName.includes('arms_armorpad')) {
     result.color.setHex(0x31505a);
-    result.emissive.setHex(0x102a31);
-    result.emissiveIntensity = flattenMaterials ? 0.34 : 0.24;
+    result.emissive.setHex(0x204954);
+    result.emissiveIntensity = flattenMaterials ? 0.52 : 0.42;
   }
   return result;
 }

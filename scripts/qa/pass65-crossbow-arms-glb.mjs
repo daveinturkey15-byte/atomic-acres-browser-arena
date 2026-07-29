@@ -31,10 +31,11 @@ export const REQUIRED_ARM_BONES = Object.freeze([
 export const OPERATOR_ARMS_RENDER_BUDGET = Object.freeze({
   maxSkinnedRenderableMeshesPerLod: 6,
   maxSkinnedPrimitivesPerLod: 6,
-  sourceWeightedParts: 45,
+  sourceWeightedParts: 16,
   boneCount: 37,
   batchingPolicy: 'one-shared-armature-batch-per-material',
 });
+const LEGACY_OPERATOR_ARMS_SOURCE_WEIGHTED_PARTS = 45;
 
 const REQUIRED_ARM_MATERIALS = Object.freeze([
   'MAT_Pass65_Arms_ArmorPad',
@@ -42,6 +43,15 @@ const REQUIRED_ARM_MATERIALS = Object.freeze([
   'MAT_Pass65_Arms_Sleeve_PBR',
   'MAT_Pass65_Arms_WristDisplay',
 ]);
+
+const REQUIRED_LICENSED_ARM_MATERIALS = Object.freeze([
+  'MAT_Pass65_Arms_Sleeve_PBR',
+  'MAT_Pass65_Arms_Glove_PBR',
+  'MAT_Pass65_Arms_WristAccent_PBR',
+  'MAT_Pass65_Arms_FingerGlove_PBR',
+]);
+
+const DJMAESEN_SOURCE_UID = '08ec4403a47645d8ad80633abf13d39d';
 
 export const REQUIRED_ARM_SOCKETS = Object.freeze([
   'right-hand-grip-socket', 'left-hand-grip-socket',
@@ -220,22 +230,35 @@ export function auditOperatorArmsGlb(json, lod, bytes) {
   if (!skeleton) failures.push(`${label}: dedicated first-person skeleton metadata missing`);
   const deliveryRoot = nodes.find((node) => node.extras?.runtime_forward_axis === '-Z');
   if (!deliveryRoot || deliveryRoot.extras?.blender_authoring_forward_axis !== '+Y') failures.push(`${label}: physical runtime -Z delivery-axis contract missing`);
-  if (deliveryRoot?.extras?.visual_revision !== 'continuous-manifold-viewmodel-v6'
-    || deliveryRoot?.extras?.limb_profile_contract !== 'continuous-shoulder-elbow-wrist-manifold-shell-v6'
-    || deliveryRoot?.extras?.hand_pose_contract !== 'continuous-cuff-palm-wrapped-articulated-digit-grip-v6'
-    || deliveryRoot?.extras?.shoulder_entry_contract !== 'full-profile-frame-edge-sleeve-v6'
-    || deliveryRoot?.extras?.glove_construction_contract !== 'opaque-continuous-palm-wrapped-fingers-cloth-v6'
-    || deliveryRoot?.extras?.weapon_grip_review_contract !== 'all-family-runtime-plus-m4-contact-v5'
+  const licensedDerivative = deliveryRoot?.extras?.source_asset_uid === DJMAESEN_SOURCE_UID;
+  const licensedContract = licensedDerivative
+    && deliveryRoot?.extras?.creator === 'DJMaesen; Atomic Acres integration'
+    && deliveryRoot?.extras?.license === 'CC-BY-4.0'
+    && deliveryRoot?.extras?.source_mirror_commit === '96fdc4c94ba6c37786b0af6e8caf44b6cf2913f0'
+    && deliveryRoot?.extras?.visual_revision === 'licensed-anatomical-viewmodel-v7'
+    && deliveryRoot?.extras?.limb_profile_contract === 'licensed-human-skin-and-glove-deformation-v1'
+    && deliveryRoot?.extras?.hand_pose_contract === 'licensed-articulated-fingerless-glove-grip-v1'
+    && deliveryRoot?.extras?.shoulder_entry_contract === 'weighted-capped-frame-edge-sleeve-v1'
+    && deliveryRoot?.extras?.glove_construction_contract === 'opaque-uv-preserved-licensed-human-hand-v1'
+    && deliveryRoot?.extras?.weapon_grip_review_contract === 'seven-view-actual-weapon-contact-v1';
+  const legacyContract = !licensedDerivative
+    && deliveryRoot?.extras?.visual_revision === 'continuous-manifold-viewmodel-v6'
+    && deliveryRoot?.extras?.limb_profile_contract === 'continuous-shoulder-elbow-wrist-manifold-shell-v6'
+    && deliveryRoot?.extras?.hand_pose_contract === 'continuous-cuff-palm-wrapped-articulated-digit-grip-v6'
+    && deliveryRoot?.extras?.shoulder_entry_contract === 'full-profile-frame-edge-sleeve-v6'
+    && deliveryRoot?.extras?.glove_construction_contract === 'opaque-continuous-palm-wrapped-fingers-cloth-v6'
+    && deliveryRoot?.extras?.weapon_grip_review_contract === 'all-family-runtime-plus-m4-contact-v5';
+  if (!(licensedContract || legacyContract)
     || deliveryRoot?.extras?.runtime_animation_contract !== 'authored-fingers-under-runtime-chain-ik-v1'
     || deliveryRoot?.extras?.finger_segment_count !== 30
-    || deliveryRoot?.extras?.weapon_grip_review_frames !== 3) {
-    failures.push(`${label}: continuous manifold v6 silhouette, hand, glove, animation and grip-review contract missing`);
+    || deliveryRoot?.extras?.weapon_grip_review_frames !== (licensedDerivative ? 7 : 3)) {
+    failures.push(`${label}: accepted licensed-v7 or legacy-v6 silhouette, hand, glove, animation and grip-review contract missing`);
   }
   const blendedVertexCount = Number(deliveryRoot?.extras?.blended_vertex_count);
   const multiBoneWeightedParts = Number(deliveryRoot?.extras?.multi_bone_weighted_part_count);
   const blendedJointPairs = String(deliveryRoot?.extras?.blended_joint_pairs_csv ?? '').split(',').filter(Boolean);
   if (!Number.isInteger(blendedVertexCount) || blendedVertexCount < 240
-    || !Number.isInteger(multiBoneWeightedParts) || multiBoneWeightedParts < 24
+    || !Number.isInteger(multiBoneWeightedParts) || multiBoneWeightedParts < (licensedDerivative ? 4 : 24)
     || deliveryRoot?.extras?.weighting_contract !== 'adjacent-bone-normalized-blend-v5'
     || REQUIRED_ARM_BLEND_PAIRS.some((pair) => !blendedJointPairs.includes(pair))) {
     failures.push(`${label}: genuine adjacent-bone elbow/wrist/knuckle weighting receipt missing`);
@@ -248,15 +271,21 @@ export function auditOperatorArmsGlb(json, lod, bytes) {
     const rightContacts = Number(deliveryRoot?.extras?.[`${weapon}_review_right_digit_contacts`]);
     const leftContacts = Number(deliveryRoot?.extras?.[`${weapon}_review_left_digit_contacts`]);
     gripContactReceipts[weapon] = { rightError, leftError, scale, rightContacts, leftContacts };
-    if (!Number.isFinite(rightError) || !Number.isFinite(leftError) || rightError > 0.0005 || leftError > 0.0005
+    const maximumSocketError = licensedDerivative ? 0.02 : 0.0005;
+    if (!Number.isFinite(rightError) || !Number.isFinite(leftError) || rightError > maximumSocketError || leftError > maximumSocketError
       || !Number.isFinite(scale) || scale < 0.2 || scale > 1.2 || rightContacts < 3 || leftContacts < 3) {
       failures.push(`${label}: ${weapon} actual weapon-contact receipt is invalid`);
     }
   }
-  for (const socketName of ['right-hand-grip-socket', 'left-hand-grip-socket']) {
+  for (const [socketName, expectedParent] of [['right-hand-grip-socket', 'WristR'], ['left-hand-grip-socket', 'WristL']]) {
     const index = nodes.findIndex((node) => node.name === socketName);
-    const position = index < 0 ? null : nodeWorldTranslation(json, index);
-    if (!position || position[2] > -0.55) failures.push(`${label}: ${socketName} is not forward on local -Z`);
+    const parentName = index < 0 ? null : nodes[parents.get(index)]?.name ?? null;
+    if (licensedDerivative) {
+      if (parentName !== expectedParent) failures.push(`${label}: ${socketName} must be authored under ${expectedParent}`);
+    } else {
+      const position = index < 0 ? null : nodeWorldTranslation(json, index);
+      if (!position || position[2] > -0.55) failures.push(`${label}: ${socketName} is not forward on local -Z`);
+    }
   }
   const meshNodeEntries = nodes.map((node, index) => ({ node, index }))
     .filter(({ node }) => typeof node.mesh === 'number');
@@ -280,8 +309,11 @@ export function auditOperatorArmsGlb(json, lod, bytes) {
   const sourceWeightedParts = skinnedNodes.reduce(
     (count, node) => count + (Number.isInteger(node.extras?.weighted_part_count) ? node.extras.weighted_part_count : 0), 0,
   );
-  if (sourceWeightedParts !== OPERATOR_ARMS_RENDER_BUDGET.sourceWeightedParts) {
-    failures.push(`${label}: batched source-part receipt ${sourceWeightedParts} does not equal ${OPERATOR_ARMS_RENDER_BUDGET.sourceWeightedParts}`);
+  const expectedSourceWeightedParts = licensedDerivative
+    ? OPERATOR_ARMS_RENDER_BUDGET.sourceWeightedParts
+    : LEGACY_OPERATOR_ARMS_SOURCE_WEIGHTED_PARTS;
+  if (sourceWeightedParts !== expectedSourceWeightedParts) {
+    failures.push(`${label}: batched source-part receipt ${sourceWeightedParts} does not equal ${expectedSourceWeightedParts}`);
   }
   if (skinnedNodes.some((node) => node.extras?.batched_skinned_renderable !== true
     || !Number.isInteger(node.extras?.weighted_part_count) || node.extras.weighted_part_count < 1)) {
@@ -289,16 +321,16 @@ export function auditOperatorArmsGlb(json, lod, bytes) {
   }
   const batchedMaterials = skinnedNodes.map((node) => node.extras?.batched_material).filter((value) => typeof value === 'string');
   if (batchedMaterials.length !== skinnedNodes.length || new Set(batchedMaterials).size !== skinnedNodes.length
-    || REQUIRED_ARM_MATERIALS.some((material) => !batchedMaterials.includes(material))
-    || batchedMaterials.some((material) => !REQUIRED_ARM_MATERIALS.includes(material))) {
+    || (licensedDerivative ? REQUIRED_LICENSED_ARM_MATERIALS : REQUIRED_ARM_MATERIALS).some((material) => !batchedMaterials.includes(material))
+    || batchedMaterials.some((material) => !(licensedDerivative ? REQUIRED_LICENSED_ARM_MATERIALS : REQUIRED_ARM_MATERIALS).includes(material))) {
     failures.push(`${label}: batches must be unique one-per-material renderables`);
   }
-  if (deliveryRoot?.extras?.source_weighted_part_count !== OPERATOR_ARMS_RENDER_BUDGET.sourceWeightedParts
+  if (deliveryRoot?.extras?.source_weighted_part_count !== expectedSourceWeightedParts
     || deliveryRoot?.extras?.expected_bone_count !== OPERATOR_ARMS_RENDER_BUDGET.boneCount
     || deliveryRoot?.extras?.batched_skinned_mesh_count !== skinnedNodes.length
     || deliveryRoot?.extras?.max_skinned_renderable_meshes !== OPERATOR_ARMS_RENDER_BUDGET.maxSkinnedRenderableMeshesPerLod
     || deliveryRoot?.extras?.max_skinned_primitives !== OPERATOR_ARMS_RENDER_BUDGET.maxSkinnedPrimitivesPerLod
-    || deliveryRoot?.extras?.batching_policy !== OPERATOR_ARMS_RENDER_BUDGET.batchingPolicy) {
+    || deliveryRoot?.extras?.batching_policy !== (licensedDerivative ? 'four-disjoint-source-face-regions' : OPERATOR_ARMS_RENDER_BUDGET.batchingPolicy)) {
     failures.push(`${label}: declared batching and render-budget contract missing or inconsistent`);
   }
   for (const node of skinnedNodes) {

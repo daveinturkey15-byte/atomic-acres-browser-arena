@@ -26,7 +26,25 @@ const pngRecord = async (value, extra = {}) => {
 const crossbowSourceBlend = await fileRecord('source-assets/blender/pass65-explosive-crossbow.blend');
 const crossbowSourceScript = await fileRecord('scripts/blender/create-pass65-explosive-crossbow.py');
 const armsSourceBlend = await fileRecord('source-assets/blender/pass65-first-person-operator-arms.blend');
-const armsSourceScript = await fileRecord('scripts/blender/create-pass65-first-person-arms.py');
+const armsSourceScript = await fileRecord('scripts/blender/build-pass65-djmaesen-first-person-arms.py');
+const armsContactReceipt = await fileRecord('source-assets/blender/pass65-first-person-operator-arms-contact-receipt.json');
+const armsContact = JSON.parse(await readFile(absolute(armsContactReceipt.path), 'utf8'));
+if (armsContact.verdict !== 'pass' || armsContact.evidence?.length !== 7 || armsContact.violations?.length !== 0) {
+  throw new Error('DJMaesen arms require seven passing deterministic weapon-contact views');
+}
+const armsSourceFiles = [
+  'license.txt', 'scene.bin', 'scene.gltf',
+  'textures/material_diffuse.png', 'textures/material_normal.png',
+  'textures/material_occlusion.png', 'textures/material_specularGlossiness.png',
+];
+const armsSourceRecords = await Promise.all(armsSourceFiles.map((relative) => fileRecord(
+  `source-assets/third-party/djmaesen-fps-arms/${relative}`, { sourceRelativePath: relative },
+)));
+const armsPublicLicense = await fileRecord('public/assets/third-party/djmaesen/fps-arms/LICENSE.txt');
+const armsPublicReadme = await fileRecord('public/assets/third-party/djmaesen/fps-arms/README.md');
+if (armsPublicLicense.sha256 !== armsSourceRecords[0].sha256) {
+  throw new Error('Shipped DJMaesen licence must be byte-identical to the frozen source licence');
+}
 
 const crossbowSpecs = [
   ['first-person-lod0', 'firstPersonGlbs', 0, 'public/assets/original/models/weapons/pass65-crossbow/pass65-crossbow-fp-lod0.glb'],
@@ -97,8 +115,8 @@ const crossbowRenders = await Promise.all(crossbowRenderLabels.map((label) => pn
 )));
 const crossbowContactSheet = await pngRecord('docs/assets/pass65-weapons/crossbow/pass65-crossbow-contact-sheet.png');
 const armsRenderLabels = [
-  'neutral-front', 'forearm-wrist-quarter', 'hand-anatomy-closeup',
-  'm4a1-neutral-contact', 'm4a1-ads-contact', 'm4a1-reload-contact',
+  'pistol-hip', 'mp5-hip', 'm4a1-hip', 'm4a1-grip-oblique',
+  'm4a1-ads', 'm4a1-reload', 'knife-contact',
 ];
 const armsRenders = await Promise.all(armsRenderLabels.map((label) => pngRecord(
   `docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-${label}.png`, { cameraId: label },
@@ -128,27 +146,50 @@ const armsProvenancePath = 'source-assets/blender/pass65-first-person-operator-a
 const armsProvenance = {
   schemaVersion: 1,
   id: 'pass65-first-person-operator-arms',
-  title: 'Pass 65 project-original opaque first-person operator arms',
-  creator: 'Atomic Acres project', owner: 'Atomic Acres project', created: '2026-07-26',
-  license: 'Project-original; no third-party meshes or textures',
-  inspirationBoundary: 'Original tactical sleeves, gloves, guards and full articulated hands. No copied commercial-game geometry, textures, logos, animation, UI, or audio.',
+  title: 'Pass 66 licensed anatomical first-person operator-arms derivative',
+  derivativeCreator: 'Atomic Acres project', created: '2026-07-29',
+  sourceCreator: 'DJMaesen (bumstrum)', sourceTitle: 'fps arms',
+  sourceAssetUid: '08ec4403a47645d8ad80633abf13d39d',
+  sourceUrl: 'https://sketchfab.com/3d-models/fps-arms-08ec4403a47645d8ad80633abf13d39d',
+  sourceCreatorUrl: 'https://sketchfab.com/bumstrum',
+  sourceMirror: {
+    repository: 'VixidDev/Heatstroke', commit: '96fdc4c94ba6c37786b0af6e8caf44b6cf2913f0',
+    path: 'Game/assets/guns/fists2',
+  },
+  license: 'Creative Commons Attribution 4.0 International (CC BY 4.0)',
+  licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+  attributionRequired: true,
+  attribution: '"fps arms" by DJMaesen (bumstrum), modified by Atomic Acres, licensed under CC BY 4.0.',
+  sourceRecords: armsSourceRecords,
   blenderVersion: '5.1.2', generator: armsSourceScript, sourceBlend: armsSourceBlend,
   firstPersonGlbs: armsGlbs, pbrMaps: armsPbrMaps,
   requiredBones: REQUIRED_ARM_BONES, requiredSockets: REQUIRED_ARM_SOCKETS, animationClips: REQUIRED_CORE_ACTIONS,
   materialContract: 'All visible materials OPAQUE with depth writes; no alpha fading or see-through anatomy.',
-  visualRevision: 'continuous-manifold-viewmodel-v6',
-  limbProfileContract: 'continuous-shoulder-elbow-wrist-manifold-shell-v6',
-  handPoseContract: 'continuous-cuff-palm-wrapped-articulated-digit-grip-v6',
-  shoulderEntryContract: 'full-profile-frame-edge-sleeve-v6',
-  gloveConstructionContract: 'opaque-continuous-palm-wrapped-fingers-cloth-v6',
-  weaponGripReviewContract: 'all-family-runtime-plus-m4-contact-v5',
+  visualRevision: 'licensed-anatomical-viewmodel-v7',
+  limbProfileContract: 'licensed-human-skin-and-glove-deformation-v1',
+  handPoseContract: 'licensed-articulated-fingerless-glove-grip-v1',
+  shoulderEntryContract: 'weighted-capped-frame-edge-sleeve-v1',
+  gloveConstructionContract: 'opaque-uv-preserved-licensed-human-hand-v1',
+  weaponGripReviewContract: 'seven-view-actual-weapon-contact-v1',
   weightingContract: 'adjacent-bone-normalized-blend-v5',
   runtimeAnimationContract: 'authored-fingers-under-runtime-chain-ik-v1',
   fingerSegmentCount: 30,
-  weaponGripReviewFrames: 3,
+  weaponGripReviewFrames: 7,
   performanceContract: OPERATOR_ARMS_RENDER_BUDGET,
-  review: { authoringSeed: 0, frame: 1, renderEngine: 'BLENDER_EEVEE', renders: armsRenders, contactSheet: armsContactSheet },
+  modifications: [
+    'Removed unrelated source Icosphere object.',
+    'Retargeted the 47-joint source to the 37-bone runtime contract and collapsed terminal tip joints.',
+    'Adapted bind shoulders, sleeves, hands and finger poses for the first-person camera and actual weapon sockets.',
+    'Capped proximal sleeves, converted source specular-glossiness maps to metallic-roughness PBR, and authored four skinned batches.',
+    'Added four gameplay sockets, thirteen action clips, a reduced LOD1, and seven deterministic weapon-contact reviews.',
+  ],
+  removedObjects: ['Icosphere'], sourceJointCount: 47, runtimeBoneCount: 37,
+  review: {
+    authoringSeed: 0, frame: 1, renderEngine: 'BLENDER_EEVEE',
+    renders: armsRenders, contactSheet: armsContactSheet, contactReceipt: armsContactReceipt,
+  },
   runtimeAudit: { lods: armsAudits.map(({ failures: _failures, ...audit }) => audit), externalUris: 0 },
+  determinismCommand: 'npm run author:blender-operator-arms',
   gameplayBoundary: 'Presentation asset only. Camera, weapon sockets, IK targets, gameplay authority and networking remain TypeScript-owned.',
 };
 await writeFile(absolute(armsProvenancePath), `${JSON.stringify(armsProvenance, null, 2)}\n`, 'utf8');
@@ -172,25 +213,31 @@ productionManifest.weapons[crossbowIndex] = {
   technicalAudit: { deliveries: crossbowAudits.map(({ failures: _failures, ...audit }) => audit) },
 };
 productionManifest.operatorArms = {
-  id: 'pass65-first-person-operator-arms', releaseState: 'release-ready', sourceKind: 'project-original-blender',
-  owner: 'Atomic Acres project', qualityTier: 'hero-first-person-operator',
+  id: 'pass65-first-person-operator-arms', releaseState: 'release-ready',
+  sourceKind: 'license-vetted-cc-by-4.0-blender-derivative',
+  sourceCreator: 'DJMaesen (bumstrum)', derivativeCreator: 'Atomic Acres project',
+  sourceAssetUid: '08ec4403a47645d8ad80633abf13d39d',
+  license: 'Creative Commons Attribution 4.0 International (CC BY 4.0)',
+  licenseUrl: 'https://creativecommons.org/licenses/by/4.0/', attributionRequired: true,
+  attribution: '"fps arms" by DJMaesen (bumstrum), modified by Atomic Acres, licensed under CC BY 4.0.',
+  sourceRecords: armsSourceRecords, qualityTier: 'hero-first-person-operator',
   currentRuntimeSource: armsGlbs[0].path, placeholderStatus: 'forbidden-and-not-present',
   sourceBlend: armsSourceBlend, sourceScript: armsSourceScript, firstPersonGlbs: armsGlbs,
   pbrMaps: armsPbrMaps, provenance: armsProvenanceRecord,
   bones: REQUIRED_ARM_BONES, sockets: REQUIRED_ARM_SOCKETS, actions: REQUIRED_CORE_ACTIONS,
   materialContract: 'opaque-depth-writing',
-  visualRevision: 'continuous-manifold-viewmodel-v6',
-  limbProfileContract: 'continuous-shoulder-elbow-wrist-manifold-shell-v6',
-  handPoseContract: 'continuous-cuff-palm-wrapped-articulated-digit-grip-v6',
-  shoulderEntryContract: 'full-profile-frame-edge-sleeve-v6',
-  gloveConstructionContract: 'opaque-continuous-palm-wrapped-fingers-cloth-v6',
-  weaponGripReviewContract: 'all-family-runtime-plus-m4-contact-v5',
+  visualRevision: 'licensed-anatomical-viewmodel-v7',
+  limbProfileContract: 'licensed-human-skin-and-glove-deformation-v1',
+  handPoseContract: 'licensed-articulated-fingerless-glove-grip-v1',
+  shoulderEntryContract: 'weighted-capped-frame-edge-sleeve-v1',
+  gloveConstructionContract: 'opaque-uv-preserved-licensed-human-hand-v1',
+  weaponGripReviewContract: 'seven-view-actual-weapon-contact-v1',
   weightingContract: 'adjacent-bone-normalized-blend-v5',
   runtimeAnimationContract: 'authored-fingers-under-runtime-chain-ik-v1',
   fingerSegmentCount: 30,
-  weaponGripReviewFrames: 3,
+  weaponGripReviewFrames: 7,
   renderBudget: OPERATOR_ARMS_RENDER_BUDGET,
-  review: { renders: armsRenders, contactSheet: armsContactSheet },
+  review: { renders: armsRenders, contactSheet: armsContactSheet, contactReceipt: armsContactReceipt },
   technicalAudit: { lods: armsAudits.map(({ failures: _failures, ...audit }) => audit) },
 };
 if (JSON.stringify(productionManifest.supportVehicles ?? []) !== supportVehicleSnapshot) {
@@ -213,15 +260,36 @@ const assetRecords = [
     attributionRequired: false,
   },
   {
-    id: 'atomic-acres-pass65-first-person-operator-arms-2026-07-26', kind: 'original-project-blender-skinned-operator-family',
-    creator: 'Atomic Acres project', source: armsSourceScript.path, generatedAsOf: '2026-07-26', license: 'Original project work',
+    id: 'atomic-acres-pass65-first-person-operator-arms-2026-07-26',
+    kind: 'cc-by-4.0-source-project-blender-pbr-skinned-first-person-operator-derivative',
+    creator: 'DJMaesen source; Atomic Acres controlled Blender derivative',
+    source: 'https://sketchfab.com/3d-models/fps-arms-08ec4403a47645d8ad80633abf13d39d',
+    sourceCreatorUrl: 'https://sketchfab.com/bumstrum', generatedAsOf: '2026-07-29',
+    license: 'Creative Commons Attribution 4.0 International (CC BY 4.0)',
+    licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+    attribution: '"fps arms" by DJMaesen (bumstrum), modified by Atomic Acres, licensed under CC BY 4.0.',
+    licenseFile: armsPublicLicense.path, provenanceFile: armsPublicReadme.path,
+    sourceAssetUid: '08ec4403a47645d8ad80633abf13d39d', sourceRecords: armsSourceRecords,
     files: 'public/assets/original/**/pass65-first-person-arms-*', sourceBlend: armsSourceBlend.path, sourceBlendSha256: armsSourceBlend.sha256,
     sourceScript: armsSourceScript.path, sourceScriptSha256: armsSourceScript.sha256,
     sourceProvenance: armsProvenanceRecord.path, sourceProvenanceSha256: armsProvenanceRecord.sha256,
     preview: armsContactSheet.path,
     format: 'Two decreasing optimized self-contained glTF 2.0 skinned LODs with 37-bone dedicated skeleton, four material-compatible skinned renderables per LOD, embedded WebP PBR textures, opaque materials and thirteen action clips',
-    modifications: 'Project-original first-person operator arms authored in Blender from 45 sleeve, glove, guard, full-finger/thumb and wrist-display parts. The v6 silhouette uses shared-ring manifold shells from shoulder through wrist and cuff through palm, preventing open elbow or wrist contours under runtime IK. Enlarged articulated digits use matching 50/50 seam weights and a readable cool tactical PBR value range. Opaque anatomy pads, low-profile cuff straps, cloth normal detail and the wrist device remain. Neutral, ADS and reload frames socket-fit the consolidated authored M4A1, while a deterministic browser gate covers every weapon family and knife action. Four material batches remain under the six-renderable/six-primitive budget. Runtime camera-space IK remains TypeScript-owned and consumes only authored finger animation beneath that IK layer.',
-    attributionRequired: false,
+    modifications: 'Removed the unrelated Icosphere; retargeted 47 source joints to the 37-bone runtime rig; collapsed terminal tip joints into distal phalanges; adapted bind shoulders, sleeves, hand proportions and real weapon grips for the FPS camera; capped proximal sleeves; converted specular-glossiness maps to metallic-roughness PBR; authored four disjoint skinned batches, four gameplay sockets, thirteen action clips, a true reduced LOD1, and seven strict contact views.',
+    attributionRequired: true,
+  },
+  {
+    id: 'djmaesen-fps-arms-cc-by-4.0-notice', kind: 'third-party-license-and-attribution-notice',
+    creator: 'DJMaesen (bumstrum)',
+    source: 'https://sketchfab.com/3d-models/fps-arms-08ec4403a47645d8ad80633abf13d39d',
+    sourceCreatorUrl: 'https://sketchfab.com/bumstrum', generatedAsOf: '2026-07-29',
+    license: 'Creative Commons Attribution 4.0 International (CC BY 4.0)',
+    licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+    licenseFile: armsPublicLicense.path, provenanceFile: armsPublicReadme.path,
+    files: [armsPublicLicense, armsPublicReadme],
+    attribution: '"fps arms" by DJMaesen (bumstrum), modified by Atomic Acres, licensed under CC BY 4.0.',
+    modifications: 'Public licence and modification notice for the shipped Atomic Acres derivative.',
+    attributionRequired: true,
   },
 ];
 for (const record of assetRecords.reverse()) {

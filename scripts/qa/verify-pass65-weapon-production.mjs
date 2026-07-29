@@ -247,6 +247,14 @@ if (manifest.operatorArms?.releaseState !== 'release-ready') {
   failures.push(`operator arms: ${manifest.operatorArms?.releaseState ?? 'missing-state'} - ${(manifest.operatorArms?.blockers ?? []).join('; ')}`);
 } else {
   const arms = manifest.operatorArms;
+  if (arms.sourceKind !== 'license-vetted-cc-by-4.0-blender-derivative') failures.push('operator arms: licensed derivative sourceKind missing');
+  if (arms.license !== 'Creative Commons Attribution 4.0 International (CC BY 4.0)'
+    || arms.licenseUrl !== 'https://creativecommons.org/licenses/by/4.0/'
+    || arms.attributionRequired !== true
+    || arms.sourceAssetUid !== '08ec4403a47645d8ad80633abf13d39d') {
+    failures.push('operator arms: CC BY 4.0 attribution/source identity contract missing');
+  }
+  if ((arms.sourceRecords ?? []).length !== 7) failures.push('operator arms: seven frozen source records are required');
   for (const field of ['sourceBlend', 'firstPersonGlbs', 'pbrMaps', 'provenance']) {
     if (arms[field] === undefined) failures.push(`operator arms: release-ready entry missing ${field}`);
   }
@@ -260,28 +268,29 @@ if (manifest.operatorArms?.releaseState !== 'release-ready') {
     if (arms.renderBudget?.[field] !== expected) failures.push(`operator arms: render budget ${field} must equal ${expected}`);
   }
   for (const [field, expected] of Object.entries({
-    visualRevision: 'continuous-manifold-viewmodel-v6',
-    limbProfileContract: 'continuous-shoulder-elbow-wrist-manifold-shell-v6',
-    handPoseContract: 'continuous-cuff-palm-wrapped-articulated-digit-grip-v6',
-    shoulderEntryContract: 'full-profile-frame-edge-sleeve-v6',
-    gloveConstructionContract: 'opaque-continuous-palm-wrapped-fingers-cloth-v6',
-    weaponGripReviewContract: 'all-family-runtime-plus-m4-contact-v5',
+    visualRevision: 'licensed-anatomical-viewmodel-v7',
+    limbProfileContract: 'licensed-human-skin-and-glove-deformation-v1',
+    handPoseContract: 'licensed-articulated-fingerless-glove-grip-v1',
+    shoulderEntryContract: 'weighted-capped-frame-edge-sleeve-v1',
+    gloveConstructionContract: 'opaque-uv-preserved-licensed-human-hand-v1',
+    weaponGripReviewContract: 'seven-view-actual-weapon-contact-v1',
     weightingContract: 'adjacent-bone-normalized-blend-v5',
     runtimeAnimationContract: 'authored-fingers-under-runtime-chain-ik-v1',
     fingerSegmentCount: 30,
-    weaponGripReviewFrames: 3,
+    weaponGripReviewFrames: 7,
   })) {
     if (arms[field] !== expected) failures.push(`operator arms: ${field} must equal ${expected}`);
   }
   for (const cameraId of [
-    'neutral-front', 'forearm-wrist-quarter', 'hand-anatomy-closeup',
-    'm4a1-neutral-contact', 'm4a1-ads-contact', 'm4a1-reload-contact',
+    'pistol-hip', 'mp5-hip', 'm4a1-hip', 'm4a1-grip-oblique',
+    'm4a1-ads', 'm4a1-reload', 'knife-contact',
   ]) {
     if (!arms.review?.renders?.some((render) => render.cameraId === cameraId)) {
       failures.push(`operator arms: required ${cameraId} review frame missing`);
     }
   }
   for (const deliverable of [arms.sourceBlend, arms.sourceScript, arms.provenance,
+    arms.review?.contactReceipt, ...(arms.sourceRecords ?? []),
     ...(arms.firstPersonGlbs ?? []), ...Object.values(arms.pbrMaps ?? {})]) queueDeliverable('operator arms', deliverable);
   for (const deliverable of arms.firstPersonGlbs ?? []) {
     try {

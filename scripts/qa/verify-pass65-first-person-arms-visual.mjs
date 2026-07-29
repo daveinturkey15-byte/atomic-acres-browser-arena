@@ -70,6 +70,8 @@ function presentationViolations(label, state) {
     for (const arm of presentation.riggedArms) {
       if (!arm.finite || !arm.bindOffsetsPreserved || !arm.withinStableReach) violations.push(`${label}/${arm.side}: unstable or nonfinite IK`);
       if (!Number.isFinite(arm.contactError) || arm.contactError > 0.02) violations.push(`${label}/${arm.side}: hand contact error ${arm.contactError}`);
+      if (!Number.isFinite(arm.socketReachRatio) || arm.socketReachRatio > 1.04) violations.push(`${label}/${arm.side}: authored socket reach ratio ${arm.socketReachRatio}`);
+      if (!Number.isFinite(arm.gripSocketCalibration) || arm.gripSocketCalibration > 0.015) violations.push(`${label}/${arm.side}: grip calibration ${arm.gripSocketCalibration}m exceeds authored tolerance`);
       for (const key of ['shoulder', 'elbow', 'wrist', 'target', 'shoulderQuaternion', 'elbowQuaternion']) {
         if (!finiteArray(arm[key])) violations.push(`${label}/${arm.side}: nonfinite ${key}`);
       }

@@ -68,6 +68,31 @@
       "attributionRequired": false
     },
     {
+      "id": "djmaesen-fps-arms-cc-by-4.0-notice",
+      "kind": "third-party-license-and-attribution-notice",
+      "creator": "DJMaesen (bumstrum)",
+      "source": "https://sketchfab.com/3d-models/fps-arms-08ec4403a47645d8ad80633abf13d39d",
+      "sourceCreatorUrl": "https://sketchfab.com/bumstrum",
+      "generatedAsOf": "2026-07-29",
+      "license": "Creative Commons Attribution 4.0 International (CC BY 4.0)",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "licenseFile": "public/assets/third-party/djmaesen/fps-arms/LICENSE.txt",
+      "provenanceFile": "public/assets/third-party/djmaesen/fps-arms/README.md",
+      "files": [
+        {
+          "path": "public/assets/third-party/djmaesen/fps-arms/LICENSE.txt",
+          "sha256": "0a3a79ee4fcd16538ee0760c29217c6306035f1609414bfe386a4847876de50b"
+        },
+        {
+          "path": "public/assets/third-party/djmaesen/fps-arms/README.md",
+          "sha256": "d9a7aac54160c46ab60c54279b3903332c4d25a55cd466c3e80bde5e44108b0e"
+        }
+      ],
+      "attribution": "\"fps arms\" by DJMaesen (bumstrum), modified by Atomic Acres, licensed under CC BY 4.0.",
+      "modifications": "Public licence and modification notice for the shipped Atomic Acres derivative.",
+      "attributionRequired": true
+    },
+    {
       "id": "atomic-acres-pass65-field-knife-2026-07-26",
       "kind": "original-project-blender-melee-weapon-family",
       "creator": "Atomic Acres project",
@@ -295,22 +320,65 @@
     },
     {
       "id": "atomic-acres-pass65-first-person-operator-arms-2026-07-26",
-      "kind": "original-project-blender-skinned-operator-family",
-      "creator": "Atomic Acres project",
-      "source": "scripts/blender/create-pass65-first-person-arms.py",
-      "generatedAsOf": "2026-07-26",
-      "license": "Original project work",
+      "kind": "cc-by-4.0-source-project-blender-pbr-skinned-first-person-operator-derivative",
+      "creator": "DJMaesen source; Atomic Acres controlled Blender derivative",
+      "source": "https://sketchfab.com/3d-models/fps-arms-08ec4403a47645d8ad80633abf13d39d",
+      "sourceCreatorUrl": "https://sketchfab.com/bumstrum",
+      "generatedAsOf": "2026-07-29",
+      "license": "Creative Commons Attribution 4.0 International (CC BY 4.0)",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "\"fps arms\" by DJMaesen (bumstrum), modified by Atomic Acres, licensed under CC BY 4.0.",
+      "licenseFile": "public/assets/third-party/djmaesen/fps-arms/LICENSE.txt",
+      "provenanceFile": "public/assets/third-party/djmaesen/fps-arms/README.md",
+      "sourceAssetUid": "08ec4403a47645d8ad80633abf13d39d",
+      "sourceRecords": [
+        {
+          "path": "source-assets/third-party/djmaesen-fps-arms/license.txt",
+          "sha256": "0a3a79ee4fcd16538ee0760c29217c6306035f1609414bfe386a4847876de50b",
+          "sourceRelativePath": "license.txt"
+        },
+        {
+          "path": "source-assets/third-party/djmaesen-fps-arms/scene.bin",
+          "sha256": "e247e239feab51f84a14da4b018e61093d0bf29dfaace43e409089d7b5c7bc79",
+          "sourceRelativePath": "scene.bin"
+        },
+        {
+          "path": "source-assets/third-party/djmaesen-fps-arms/scene.gltf",
+          "sha256": "f2b5527846da489d6d33614ecf4725c28b89c680c884f4ea6d2790e6491465fd",
+          "sourceRelativePath": "scene.gltf"
+        },
+        {
+          "path": "source-assets/third-party/djmaesen-fps-arms/textures/material_diffuse.png",
+          "sha256": "c388b8708509cd606c6257d01a48a3fd04022659cf6bc129c9868a165cb45ae4",
+          "sourceRelativePath": "textures/material_diffuse.png"
+        },
+        {
+          "path": "source-assets/third-party/djmaesen-fps-arms/textures/material_normal.png",
+          "sha256": "9f78779b21248cbef81ccb9988d53e0b349c011ef7c00b0f94c000094bb1ba38",
+          "sourceRelativePath": "textures/material_normal.png"
+        },
+        {
+          "path": "source-assets/third-party/djmaesen-fps-arms/textures/material_occlusion.png",
+          "sha256": "9f7f37d86a9d818c9063a40a427bbaa92589d42773c285508d70a4f639059075",
+          "sourceRelativePath": "textures/material_occlusion.png"
+        },
+        {
+          "path": "source-assets/third-party/djmaesen-fps-arms/textures/material_specularGlossiness.png",
+          "sha256": "484489addcbae2c46ea1972bca754fd03d0624dd7bbbcbba2397f1356a183c3f",
+          "sourceRelativePath": "textures/material_specularGlossiness.png"
+        }
+      ],
       "files": "public/assets/original/**/pass65-first-person-arms-*",
       "sourceBlend": "source-assets/blender/pass65-first-person-operator-arms.blend",
-      "sourceBlendSha256": "6f2841f2251e3a600d5d9c5b86926e520ffc2c794ed0a56403cefc20d65bfe98",
-      "sourceScript": "scripts/blender/create-pass65-first-person-arms.py",
-      "sourceScriptSha256": "e2aae906b91e16b5758784d34f89dce8600dcef857625c15a06b486ca45f9e6d",
+      "sourceBlendSha256": "971e738e71c85326e975d75facddd462450799f0ddca1ddf8ad8861049f91a4e",
+      "sourceScript": "scripts/blender/build-pass65-djmaesen-first-person-arms.py",
+      "sourceScriptSha256": "9105a624cd5f32b264b06b9abc1f4f8febbcce65c1c476b0575dbac58bc4d5d6",
       "sourceProvenance": "source-assets/blender/pass65-first-person-operator-arms.provenance.json",
-      "sourceProvenanceSha256": "9c6cfd770c7d1f4b96cf27925b2164f955997e021d30fba81015d5960e528b1a",
+      "sourceProvenanceSha256": "1d99c8feb8f758131a4ab987b0b05ceff094f2437d9b2daa4c977a679521560d",
       "preview": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-contact-sheet.png",
       "format": "Two decreasing optimized self-contained glTF 2.0 skinned LODs with 37-bone dedicated skeleton, four material-compatible skinned renderables per LOD, embedded WebP PBR textures, opaque materials and thirteen action clips",
-      "modifications": "Project-original first-person operator arms authored in Blender from 45 sleeve, glove, guard, full-finger/thumb and wrist-display parts. The v6 silhouette uses shared-ring manifold shells from shoulder through wrist and cuff through palm, preventing open elbow or wrist contours under runtime IK. Enlarged articulated digits use matching 50/50 seam weights and a readable cool tactical PBR value range. Opaque anatomy pads, low-profile cuff straps, cloth normal detail and the wrist device remain. Neutral, ADS and reload frames socket-fit the consolidated authored M4A1, while a deterministic browser gate covers every weapon family and knife action. Four material batches remain under the six-renderable/six-primitive budget. Runtime camera-space IK remains TypeScript-owned and consumes only authored finger animation beneath that IK layer.",
-      "attributionRequired": false
+      "modifications": "Removed the unrelated Icosphere; retargeted 47 source joints to the 37-bone runtime rig; collapsed terminal tip joints into distal phalanges; adapted bind shoulders, sleeves, hand proportions and real weapon grips for the FPS camera; capped proximal sleeves; converted specular-glossiness maps to metallic-roughness PBR; authored four disjoint skinned batches, four gameplay sockets, thirteen action clips, a true reduced LOD1, and seven strict contact views.",
+      "attributionRequired": true
     },
     {
       "id": "atomic-acres-pass65-third-person-operator-family-2026-07-27",

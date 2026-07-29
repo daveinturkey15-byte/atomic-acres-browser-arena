@@ -88,28 +88,29 @@ describe('Pass 65 Blender weapon and operator production gate', () => {
     expect(Object.keys(crossbow?.pbrMaps ?? {})).toEqual(expect.arrayContaining([...manifest.requiredPbrMaps]));
     expect(manifest.operatorArms).toMatchObject({
       releaseState: 'release-ready',
+      sourceKind: 'license-vetted-cc-by-4.0-blender-derivative',
       materialContract: 'opaque-depth-writing',
       currentRuntimeSource: 'public/assets/original/models/operators/pass65-first-person-arms-lod0.glb',
-      visualRevision: 'continuous-manifold-viewmodel-v6',
-      limbProfileContract: 'continuous-shoulder-elbow-wrist-manifold-shell-v6',
-      handPoseContract: 'continuous-cuff-palm-wrapped-articulated-digit-grip-v6',
-      shoulderEntryContract: 'full-profile-frame-edge-sleeve-v6',
-      gloveConstructionContract: 'opaque-continuous-palm-wrapped-fingers-cloth-v6',
-      weaponGripReviewContract: 'all-family-runtime-plus-m4-contact-v5',
+      visualRevision: 'licensed-anatomical-viewmodel-v7',
+      limbProfileContract: 'licensed-human-skin-and-glove-deformation-v1',
+      handPoseContract: 'licensed-articulated-fingerless-glove-grip-v1',
+      shoulderEntryContract: 'weighted-capped-frame-edge-sleeve-v1',
+      gloveConstructionContract: 'opaque-uv-preserved-licensed-human-hand-v1',
+      weaponGripReviewContract: 'seven-view-actual-weapon-contact-v1',
       weightingContract: 'adjacent-bone-normalized-blend-v5',
       runtimeAnimationContract: 'authored-fingers-under-runtime-chain-ik-v1',
       fingerSegmentCount: 30,
-      weaponGripReviewFrames: 3,
+      weaponGripReviewFrames: 7,
     });
     expect(manifest.operatorArms.review?.renders?.map((render) => render.cameraId)).toEqual(expect.arrayContaining([
-      'neutral-front', 'forearm-wrist-quarter', 'hand-anatomy-closeup',
-      'm4a1-neutral-contact', 'm4a1-ads-contact', 'm4a1-reload-contact',
+      'pistol-hip', 'mp5-hip', 'm4a1-hip', 'm4a1-grip-oblique',
+      'm4a1-ads', 'm4a1-reload', 'knife-contact',
     ]));
     expect(manifest.operatorArms.firstPersonGlbs).toHaveLength(2);
     expect(manifest.operatorArms.renderBudget).toEqual({
       maxSkinnedRenderableMeshesPerLod: 6,
       maxSkinnedPrimitivesPerLod: 6,
-      sourceWeightedParts: 45,
+      sourceWeightedParts: 16,
       boneCount: 37,
       batchingPolicy: 'one-shared-armature-batch-per-material',
     });
@@ -120,7 +121,7 @@ describe('Pass 65 Blender weapon and operator production gate', () => {
       expect(lod.skinnedMeshNodes).toBeLessThanOrEqual(6);
       expect(lod.renderPrimitives).toBeGreaterThanOrEqual(1);
       expect(lod.renderPrimitives).toBeLessThanOrEqual(6);
-      expect(lod.sourceWeightedParts).toBe(45);
+      expect(lod.sourceWeightedParts).toBe(16);
       expect(lod.bones).toBe(37);
     }
     expect(manifest.operatorArms.actions).toEqual(expect.arrayContaining([...manifest.requiredCoreActions]));

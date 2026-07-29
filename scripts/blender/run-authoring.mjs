@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 const target = process.argv[2];
@@ -66,10 +66,48 @@ function authorCrossbow() {
 
 function authorOperatorArms() {
   mkdirSync('public/assets/original/models/operators', { recursive: true });
-  runBlenderPython('scripts/blender/create-pass65-first-person-arms.py');
+  const raw = 'artifacts/blender-operator-arms/djmaesen-prototype';
+  const reviews = `${raw}/reviews`;
+  const reviewWeapons = `${raw}/review-weapons`;
+  mkdirSync(reviewWeapons, { recursive: true });
+  const weaponSources = {
+    pistol: 'public/assets/original/models/weapons/pass65-firearms/pistol/pistol-fp-lod0.glb',
+    mp5: 'public/assets/original/models/weapons/pass65-firearms/mp5/mp5-fp-lod0.glb',
+    m4a1: 'public/assets/original/models/weapons/pass65-firearms/m4a1/m4a1-fp-lod0.glb',
+    knife: 'public/assets/original/models/weapons/pass65-field-knife/pass65-field-knife-fp-lod0.glb',
+  };
+  for (const [id, source] of Object.entries(weaponSources)) {
+    run(process.execPath, [gltfTransformCli, 'copy', source, `${reviewWeapons}/${id}-uncompressed.glb`]);
+  }
+  runBlenderPython('scripts/blender/build-pass65-djmaesen-first-person-arms.py');
   for (const lod of [0, 1]) optimizeGlb(
-    `artifacts/blender-operator-arms/raw/pass65-first-person-arms-lod${lod}.glb`,
+    `${raw}/pass65-first-person-arms-lod${lod}.glb`,
     `public/assets/original/models/operators/pass65-first-person-arms-lod${lod}.glb`,
+  );
+  mkdirSync('public/assets/original/textures/operators/pass65-first-person-arms', { recursive: true });
+  for (const map of ['baseColor', 'normal', 'roughness', 'metallic']) copyFileSync(
+    `${raw}/textures/pass65-first-person-arms-${map}.png`,
+    `public/assets/original/textures/operators/pass65-first-person-arms/pass65-first-person-arms-${map}.png`,
+  );
+  copyFileSync(
+    `${raw}/pass65-first-person-arms-djmaesen-prototype.blend`,
+    'source-assets/blender/pass65-first-person-operator-arms.blend',
+  );
+  copyFileSync(
+    `${reviews}/weapon-contact-receipt.json`,
+    'source-assets/blender/pass65-first-person-operator-arms-contact-receipt.json',
+  );
+  mkdirSync('docs/assets/pass65-operators/first-person-arms', { recursive: true });
+  for (const label of [
+    'pistol-hip', 'mp5-hip', 'm4a1-hip', 'm4a1-grip-oblique',
+    'm4a1-ads', 'm4a1-reload', 'knife-contact',
+  ]) copyFileSync(
+    `${reviews}/pass65-djmaesen-arms-${label}.png`,
+    `docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-${label}.png`,
+  );
+  copyFileSync(
+    `${reviews}/pass65-djmaesen-arms-weapon-contact-sheet.png`,
+    'docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-contact-sheet.png',
   );
 }
 

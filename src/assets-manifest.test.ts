@@ -8,8 +8,13 @@ type ManifestAsset = {
   id?: string;
   files: string | ManifestFile[];
   license?: string;
+  licenseUrl?: string;
   licenseFile?: string;
   provenanceFile?: string;
+  attributionRequired?: boolean;
+  attribution?: string;
+  source?: string;
+  sourceCreatorUrl?: string;
   sha256?: string;
   sourceBlend?: string;
   sourceBlendSha256?: string;
@@ -45,14 +50,41 @@ describe('third-party asset provenance', () => {
     const shipped = filesBelow('public/assets/third-party');
     expect(records.map((record) => record.path).sort()).toEqual(shipped);
     for (const asset of thirdPartyAssets) {
-      expect(asset.license).toMatch(/CC0/);
+      const isCc0 = /CC0/.test(asset.license ?? '');
+      const isCcBy = asset.license === 'Creative Commons Attribution 4.0 International (CC BY 4.0)';
+      expect(isCc0 || isCcBy).toBe(true);
       expect(asset.licenseFile).toMatch(/^public\/assets\/third-party\//);
       expect(asset.provenanceFile).toMatch(/^public\/assets\/third-party\//);
+      if (isCcBy) {
+        expect(asset.attributionRequired).toBe(true);
+        expect(asset.attribution).toMatch(/DJMaesen.*modified by Atomic Acres.*CC BY 4\.0/);
+        expect(asset.source).toMatch(/^https:\/\/sketchfab\.com\/3d-models\/fps-arms-/);
+        expect(asset.sourceCreatorUrl).toBe('https://sketchfab.com/bumstrum');
+        expect(asset.licenseUrl).toBe('https://creativecommons.org/licenses/by/4.0/');
+      }
     }
     for (const record of records) {
       expect(record.sha256).toMatch(/^[a-f0-9]{64}$/);
       expect(sha256(record.path)).toBe(record.sha256);
     }
+  });
+
+  it('keeps the licensed operator-arms manifests and frozen source hashes consistent', () => {
+    const manifest = JSON.parse(readFileSync('assets.manifest.json', 'utf8')) as Manifest;
+    const production = JSON.parse(readFileSync('source-assets/blender/pass65-weapon-production.manifest.json', 'utf8'));
+    const provenance = JSON.parse(readFileSync('source-assets/blender/pass65-first-person-operator-arms.provenance.json', 'utf8'));
+    const asset = manifest.assets.find((entry) => entry.id === 'atomic-acres-pass65-first-person-operator-arms-2026-07-26') as ManifestAsset & { sourceAssetUid?: string; sourceRecords?: ManifestFile[] };
+    expect(asset).toBeTruthy();
+    expect(asset.attributionRequired).toBe(true);
+    expect(production.operatorArms.sourceKind).toBe('license-vetted-cc-by-4.0-blender-derivative');
+    expect(production.operatorArms.license).toBe(asset.license);
+    expect(provenance.license).toBe(asset.license);
+    expect(production.operatorArms.sourceAssetUid).toBe(asset.sourceAssetUid);
+    expect(provenance.sourceAssetUid).toBe(asset.sourceAssetUid);
+    const expected = (asset.sourceRecords ?? []).map((record) => [record.path, record.sha256]);
+    expect(production.operatorArms.sourceRecords.map((record: ManifestFile) => [record.path, record.sha256])).toEqual(expected);
+    expect(provenance.sourceRecords.map((record: ManifestFile) => [record.path, record.sha256])).toEqual(expected);
+    for (const record of asset.sourceRecords ?? []) expect(sha256(record.path)).toBe(record.sha256);
   });
 
   it('records exact checksums for the conventional frag GLB and editable Blender source', () => {
