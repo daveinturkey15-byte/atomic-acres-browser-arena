@@ -314,6 +314,36 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(releasePass65WeaponModelsIn(presentation.root)).toBe(replacementIds.length);
   });
 
+  it('updates only the selected socket ancestor chain when switching a retained catalog', async () => {
+    stubBrowserTextureLoading();
+    vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (
+      Promise.resolve(fakeGltfForUrl(String(url)))
+    )) as GLTFLoader['loadAsync']);
+    const prewarmer = vi.fn(async () => undefined);
+    const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(), false, undefined, prewarmer);
+    await presentation.load();
+    await presentation.prewarmBrowserWeaponCatalog(WEAPON_IDS);
+
+    const selected = presentation.root.getObjectByName('mp5-pass65-first-person-model');
+    const inactive = presentation.root.getObjectByName('railgun-pass65-first-person-model');
+    expect(selected).toBeDefined();
+    expect(inactive).toBeDefined();
+    const muzzleSocket = new THREE.Group();
+    muzzleSocket.name = 'muzzle-socket';
+    muzzleSocket.position.set(0.18, 0.04, -0.72);
+    selected!.add(muzzleSocket);
+    const selectedUpdate = vi.spyOn(selected!, 'updateWorldMatrix');
+    const inactiveWorldUpdate = vi.spyOn(inactive!, 'updateWorldMatrix');
+    const inactiveRecursiveUpdate = vi.spyOn(inactive!, 'updateMatrixWorld');
+
+    presentation.setWeapon('mp5', true);
+
+    expect(selectedUpdate).toHaveBeenCalled();
+    expect(inactiveWorldUpdate).not.toHaveBeenCalled();
+    expect(inactiveRecursiveUpdate).not.toHaveBeenCalled();
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(PASS65_AUTHORED_FIREARM_IDS.length);
+  });
+
   it('prewarms the not-yet-ready deployment catalog in bounded yielded renderer batches', async () => {
     stubBrowserTextureLoading();
     vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (

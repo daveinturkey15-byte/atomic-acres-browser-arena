@@ -216,6 +216,24 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain("bootstrapStage = 'ready'");
   });
 
+  it('yields cold pool construction, vocabulary state walks and fenced retirement cleanup', () => {
+    const grenadeSource = readFileSync(new URL('./grenade-presentation.ts', import.meta.url), 'utf8');
+    const killstreakSource = readFileSync(new URL('./killstreak-presentation.ts', import.meta.url), 'utf8');
+    const runtimeSource = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+    const retirementDrain = runtimeSource.slice(
+      runtimeSource.indexOf('async function drainDeferredGpuRetirements()'),
+      runtimeSource.indexOf('function scheduleDeferredGpuRetirement('),
+    );
+
+    expect(grenadeSource).toContain('GRENADE_WORLD_PRESENTATION_BUILD_BATCH_SIZE = 6');
+    expect(grenadeSource).toContain('await this.ensureInitializedBatched();');
+    expect(grenadeSource).toContain('built % GRENADE_WORLD_PRESENTATION_BUILD_BATCH_SIZE === 0');
+    expect(killstreakSource).toContain('PREWARM_STATE_ROOTS_PER_TASK = 12');
+    expect(killstreakSource.match(/await yieldPresentationPreparation\(\);/g)?.length ?? 0).toBeGreaterThan(4);
+    expect(retirementDrain).toContain('for (const [retirementIndex, retirement] of batch.entries())');
+    expect(retirementDrain).toContain('await yieldDeferredGpuRetirementTask();');
+  });
+
   it('runs the shed reset probe only across the final two RustRig visits and gates continuous GPU progress', () => {
     const source = readFileSync(new URL('../scripts/qa/verify-pass65-webgpu-endurance.mjs', import.meta.url), 'utf8');
     expect(source).toContain("arenaId === 'rustworks-1v1' ? visit : -1");

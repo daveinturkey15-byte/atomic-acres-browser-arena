@@ -1283,8 +1283,13 @@ export class WeaponPresentation {
   private socketLocalPosition(model: THREE.Object3D, name: string): THREE.Vector3 | null {
     const socket = model.getObjectByName(name);
     if (!socket) return null;
-    this.root.updateMatrixWorld(true);
-    return this.root.worldToLocal(socket.getWorldPosition(new THREE.Vector3()));
+    // getWorldPosition updates only the socket's ancestor chain. Calling
+    // updateMatrixWorld(true) on the shared viewmodel root recursively touched
+    // every descendant of the complete retained weapon catalog on each switch,
+    // even though every sibling model was hidden and unchanged.
+    const worldPosition = socket.getWorldPosition(new THREE.Vector3());
+    this.root.updateWorldMatrix(true, false);
+    return this.root.worldToLocal(worldPosition);
   }
 
   setWeapon(id: WeaponId, immediate = false): void {

@@ -310,6 +310,33 @@ function materialForTeam(
   return result;
 }
 
+/**
+ * One operator owns one mutable material set, but meshes inside that operator
+ * which referenced the same authored source material should continue sharing a
+ * single clone. Cloning per mesh multiplied material objects during every bot
+ * and corpse build, while sharing across operators would make independent
+ * fenced retirement unsafe.
+ */
+export function createOperatorInstanceMaterialResolver(
+  team: Team,
+  flattenMaterials: boolean,
+  appearance: OperatorAppearance = 'team',
+): (material: THREE.Material) => THREE.Material {
+  const instanceMaterials = new Map<THREE.Material, THREE.Material>();
+  return (material: THREE.Material): THREE.Material => {
+    const existing = instanceMaterials.get(material);
+    if (existing) return existing;
+    const result = materialForTeam(material, team, flattenMaterials, appearance);
+    result.transparent = false;
+    result.opacity = 1;
+    result.depthWrite = true;
+    result.depthTest = true;
+    result.alphaTest = 0;
+    instanceMaterials.set(material, result);
+    return result;
+  };
+}
+
 function materialForFirstPerson(material: THREE.Material, flattenMaterials: boolean): THREE.Material {
   const result = materialForTeam(material, 0, flattenMaterials);
   const materialName = material.name.toLowerCase();
@@ -593,23 +620,15 @@ export function createRiggedOperator(
   // network yaw and authoritative hit proxies keep their established axes.
   visual.rotation.y = Math.PI;
   const embeddedWeaponsSuppressed = suppressEmbeddedWeaponObjects(visual);
+  const prepareMaterial = createOperatorInstanceMaterialResolver(team, flattenMaterials, appearance);
   visual.traverse((node) => {
     if (!(node instanceof THREE.Mesh)) return;
     node.castShadow = !flattenMaterials;
     node.receiveShadow = !flattenMaterials;
     node.userData.presentationOnly = true;
     node.raycast = () => undefined;
-    const prepare = (material: THREE.Material) => {
-      const result = materialForTeam(material, team, flattenMaterials, appearance);
-      result.transparent = false;
-      result.opacity = 1;
-      result.depthWrite = true;
-      result.depthTest = true;
-      result.alphaTest = 0;
-      return result;
-    };
-    if (Array.isArray(node.material)) node.material = node.material.map(prepare);
-    else node.material = prepare(node.material);
+    if (Array.isArray(node.material)) node.material = node.material.map(prepareMaterial);
+    else node.material = prepareMaterial(node.material);
   });
   // SkeletonUtils already creates independent bones and SkinnedMesh objects.
   // Their immutable vertex/index buffers can remain shared with the retained

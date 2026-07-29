@@ -9,6 +9,7 @@ export const FRAG_GRENADE_MAX_DIMENSION = 0.46;
 export const SEMTEX_BUNDLE_ASSET = './assets/original/models/ordnance/semtex-bundle-lod0.glb';
 export const SEMTEX_BUNDLE_MAX_DIMENSION = 0.58;
 export const GRENADE_WORLD_PRESENTATION_POOL_CAPACITY_PER_FAMILY = 24;
+export const GRENADE_WORLD_PRESENTATION_BUILD_BATCH_SIZE = 6;
 
 export type GrenadePresentationFamily = 'frag' | 'semtex';
 
@@ -252,18 +253,43 @@ export class GrenadeWorldPresentationPool {
     scene.add(this.root);
   }
 
+  private appendSlot(family: GrenadePresentationFamily, index: number): void {
+    const root = createGrenadePresentation(family === 'semtex' ? 'semtex' : 'frag');
+    root.userData.presentationPoolFamily = family;
+    root.userData.presentationPoolSlot = index;
+    root.userData.presentationPoolInUse = false;
+    root.visible = false;
+    this.root.add(root);
+    this.slots.push({ family, root, inUse: false });
+  }
+
   private ensureInitialized(): void {
     if (this.initialized) return;
     if (this.disposed) throw new Error('Cannot initialize a disposed grenade presentation pool');
     for (const family of ['frag', 'semtex'] as const) {
       for (let index = 0; index < this.capacityPerFamily; index += 1) {
-        const root = createGrenadePresentation(family === 'semtex' ? 'semtex' : 'frag');
-        root.userData.presentationPoolFamily = family;
-        root.userData.presentationPoolSlot = index;
-        root.userData.presentationPoolInUse = false;
-        root.visible = false;
-        this.root.add(root);
-        this.slots.push({ family, root, inUse: false });
+        this.appendSlot(family, index);
+      }
+    }
+    this.initialized = true;
+  }
+
+  private async ensureInitializedBatched(): Promise<void> {
+    if (this.initialized) return;
+    if (this.disposed) throw new Error('Cannot initialize a disposed grenade presentation pool');
+    let built = 0;
+    for (const family of ['frag', 'semtex'] as const) {
+      for (let index = 0; index < this.capacityPerFamily; index += 1) {
+        this.appendSlot(family, index);
+        built += 1;
+        if (typeof document !== 'undefined'
+          && built % GRENADE_WORLD_PRESENTATION_BUILD_BATCH_SIZE === 0
+          && built < this.capacityPerFamily * 2) {
+          await new Promise<void>((resolve) => {
+            if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => resolve());
+            else globalThis.setTimeout(resolve, 0);
+          });
+        }
       }
     }
     this.initialized = true;
@@ -338,7 +364,7 @@ export class GrenadeWorldPresentationPool {
     sceneGeneration: number,
   ): Promise<void> {
     await loadGrenadePresentation();
-    this.ensureInitialized();
+    await this.ensureInitializedBatched();
     if (this.slots.some((slot) => slot.inUse)) {
       throw new Error('Grenade presentation prewarm cannot overlap active projectile leases');
     }

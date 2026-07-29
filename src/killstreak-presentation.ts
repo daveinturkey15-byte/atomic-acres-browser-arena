@@ -18,6 +18,7 @@ const BOMB_SHELL_ALTITUDE = 20;
 const EMBER_GRAVITY_MPS2 = 11.25;
 const MAX_SENSOR_CONTACTS = 16;
 const MAX_PLACEMENT_MARKERS = 8;
+const PREWARM_STATE_ROOTS_PER_TASK = 12;
 
 async function yieldPresentationPreparation(): Promise<void> {
   await new Promise<void>((resolve) => {
@@ -1946,7 +1947,7 @@ export class KillstreakPresentation {
     this.root.visible = true;
     this.root.frustumCulled = false;
 
-    for (const stagedRoot of stagedRoots) {
+    for (const [stagedRootIndex, stagedRoot] of stagedRoots.entries()) {
       stagedRootPositions.set(stagedRoot, stagedRoot.position.clone());
       stagedRoot.traverse((node) => {
         const nextVisible = node.userData.staticBatchRendered !== true;
@@ -1977,6 +1978,11 @@ export class KillstreakPresentation {
       // submission runs, so an exact-scale draw is both invisible to the
       // player and representative of live activation.
       stagedRoot.visible = false;
+      if (typeof document !== 'undefined'
+        && (stagedRootIndex + 1) % PREWARM_STATE_ROOTS_PER_TASK === 0
+        && stagedRootIndex + 1 < stagedRoots.length) {
+        await yieldPresentationPreparation();
+      }
     }
 
     camera.updateWorldMatrix(true, false);
@@ -2082,10 +2088,17 @@ export class KillstreakPresentation {
       }
       for (const [material, depthWrite] of possessedMaterialDepthWrite) material.depthWrite = depthWrite;
       for (const [lod, autoUpdate] of lodStates) lod.autoUpdate = autoUpdate;
-      for (const stagedRoot of stagedRoots) stagedRoot.traverse((node) => {
-        node.visible = !originallyHiddenNodes.has(node);
-        node.frustumCulled = !originallyUnculledNodes.has(node);
-      });
+      for (const [stagedRootIndex, stagedRoot] of stagedRoots.entries()) {
+        stagedRoot.traverse((node) => {
+          node.visible = !originallyHiddenNodes.has(node);
+          node.frustumCulled = !originallyUnculledNodes.has(node);
+        });
+        if (typeof document !== 'undefined'
+          && (stagedRootIndex + 1) % PREWARM_STATE_ROOTS_PER_TASK === 0
+          && stagedRootIndex + 1 < stagedRoots.length) {
+          await yieldPresentationPreparation();
+        }
+      }
       for (const [node, transform] of animatedNodeTransforms) {
         node.position.copy(transform.position);
         node.quaternion.copy(transform.quaternion);

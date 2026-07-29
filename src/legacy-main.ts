@@ -1009,6 +1009,16 @@ let gpuRetirementDisposedRoots = 0;
 let gpuRetirementDisposedGeometries = 0;
 let gpuRetirementFailures = 0;
 
+async function yieldDeferredGpuRetirementTask(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    if (typeof requestAnimationFrame === 'function' && document.visibilityState === 'visible') {
+      requestAnimationFrame(() => resolve());
+    } else {
+      globalThis.setTimeout(resolve, 0);
+    }
+  });
+}
+
 function disposeDetachedRootResources(root: THREE.Object3D): void {
   const geometries = new Set<THREE.BufferGeometry>();
   const materials = new Set<THREE.Material>();
@@ -1042,7 +1052,7 @@ async function drainDeferredGpuRetirements(): Promise<void> {
       console.warn('[Pass 65 GPU retirement fence failed; resources retained]', error);
       return;
     }
-    for (const retirement of batch) {
+    for (const [retirementIndex, retirement] of batch.entries()) {
       if (retirement.kind === 'geometry') {
         retirement.geometry.dispose();
         gpuRetirementDisposedGeometries += 1;
@@ -1053,6 +1063,13 @@ async function drainDeferredGpuRetirements(): Promise<void> {
         if (retirement.disposeResources) disposeDetachedRootResources(retirement.root);
         retirement.afterFence?.();
         gpuRetirementDisposedRoots += 1;
+      }
+      // Fence completion only establishes that disposal is safe; it does not
+      // require every detached hierarchy to be torn down in one browser task.
+      // One retirement per frame prevents cleanup of prewarm clones and old
+      // operators from colliding with match admission or a weapon switch.
+      if (retirementIndex + 1 < batch.length || deferredGpuRetirements.length > 0) {
+        await yieldDeferredGpuRetirementTask();
       }
     }
   }
