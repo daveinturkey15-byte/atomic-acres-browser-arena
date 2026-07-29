@@ -49,6 +49,7 @@ test('combat benchmark separates bots, practice targets, survival and control me
       retreatReturnFireFrames: 11, contactSearchFrames: 17,
       renderedCoverActivations: 5, renderedCoverAcquisitions: 3, renderedCoverProbeReversals: 2, renderedCoverAborts: 1,
       renderedCoverProbeFrames: 31, renderedCoverOcclusionFrames: 13, renderedCoverHoldFrames: 23,
+      renderedCoverHealthGatedHoldFrames: 14,
       renderedCoverPeekFrames: 7, renderedCoverReturnFrames: 9, renderedCoverConfirmedPeekFrames: 2,
       renderedCoverCueChosenDirections: 4, renderedCoverTargetAwayDirections: 1,
       renderedCoverMeanLeftCue: 0.12, renderedCoverMeanRightCue: 0.27, firstCoverAcquisitionCaptured: true,
@@ -91,6 +92,7 @@ test('combat benchmark separates bots, practice targets, survival and control me
   assert.equal(result.control.renderedCoverAcquisitions, 3);
   assert.equal(result.control.renderedCoverProbeReversals, 2);
   assert.equal(result.control.renderedCoverAborts, 1);
+  assert.equal(result.control.renderedCoverHealthGatedHoldFrames, 14);
   assert.equal(result.control.renderedCoverConfirmedPeekFrames, 2);
   assert.equal(result.control.renderedCoverMeanRightCue, 0.27);
   assert.equal(result.control.firstCoverAcquisitionCaptured, true);

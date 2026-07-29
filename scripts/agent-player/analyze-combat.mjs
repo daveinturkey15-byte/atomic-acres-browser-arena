@@ -243,6 +243,7 @@ export function analyseCombat(summary, driverReport, callsign = 'Jigglyclaw') {
       renderedCoverProbeFrames: optionalNumeric(driverReport?.input?.renderedCoverProbeFrames),
       renderedCoverOcclusionFrames: optionalNumeric(driverReport?.input?.renderedCoverOcclusionFrames),
       renderedCoverHoldFrames: optionalNumeric(driverReport?.input?.renderedCoverHoldFrames),
+      renderedCoverHealthGatedHoldFrames: optionalNumeric(driverReport?.input?.renderedCoverHealthGatedHoldFrames),
       renderedCoverPeekFrames: optionalNumeric(driverReport?.input?.renderedCoverPeekFrames),
       renderedCoverReturnFrames: optionalNumeric(driverReport?.input?.renderedCoverReturnFrames),
       renderedCoverConfirmedPeekFrames: optionalNumeric(driverReport?.input?.renderedCoverConfirmedPeekFrames),

@@ -20,6 +20,7 @@ export function createRenderedCoverController(options = {}) {
     maximumPeekCycles: Math.max(1, Math.round(finite(options.maximumPeekCycles, 3))),
     maximumActiveMs: Math.max(2000, finite(options.maximumActiveMs, 15000)),
     minimumHealth: Math.max(1, finite(options.minimumHealth, 24)),
+    peekMinimumHealth: Math.max(1, finite(options.peekMinimumHealth, 80)),
     cueMargin: Math.max(0, finite(options.cueMargin, 0.015)),
   };
   const state = {
@@ -40,6 +41,7 @@ export function createRenderedCoverController(options = {}) {
     probeFrames: 0,
     occlusionFrames: 0,
     holdFrames: 0,
+    healthGatedHoldFrames: 0,
     peekFrames: 0,
     returnFrames: 0,
     confirmedPeekFrames: 0,
@@ -149,9 +151,13 @@ export function createRenderedCoverController(options = {}) {
           transition('probe', now);
           event = { kind: 'reverse', direction: state.direction, reason: 'cover-took-damage' };
         } else if (now - state.phaseStartedAt >= config.holdDurationMs) {
-          state.peeksThisActivation += 1;
-          transition('peek', now);
-          event = { kind: 'peek', direction: -state.direction, cycle: state.peeksThisActivation };
+          if (health < config.peekMinimumHealth) {
+            state.healthGatedHoldFrames += 1;
+          } else {
+            state.peeksThisActivation += 1;
+            transition('peek', now);
+            event = { kind: 'peek', direction: -state.direction, cycle: state.peeksThisActivation, health };
+          }
         }
       } else if (state.mode === 'peek') {
         state.peekFrames += 1;
@@ -200,6 +206,7 @@ export function createRenderedCoverController(options = {}) {
         probeFrames: state.probeFrames,
         occlusionFrames: state.occlusionFrames,
         holdFrames: state.holdFrames,
+        healthGatedHoldFrames: state.healthGatedHoldFrames,
         peekFrames: state.peekFrames,
         returnFrames: state.returnFrames,
         confirmedPeekFrames: state.confirmedPeekFrames,

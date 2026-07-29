@@ -42,6 +42,7 @@ export function createTacticalPolicy(options = {}) {
     coverMaximumPeekCycles: Math.max(1, Number(options.coverMaximumPeekCycles ?? 3)),
     coverMaximumActiveMs: Math.max(2_000, Number(options.coverMaximumActiveMs ?? 15_000)),
     coverMinimumHealth: Math.max(1, Number(options.coverMinimumHealth ?? 24)),
+    coverPeekMinimumHealth: Math.max(1, Number(options.coverPeekMinimumHealth ?? 80)),
     coverCueMargin: Math.max(0, Number(options.coverCueMargin ?? 0.015)),
   };
   const coverController = createRenderedCoverController({
@@ -56,6 +57,7 @@ export function createTacticalPolicy(options = {}) {
     maximumPeekCycles: config.coverMaximumPeekCycles,
     maximumActiveMs: config.coverMaximumActiveMs,
     minimumHealth: config.coverMinimumHealth,
+    peekMinimumHealth: config.coverPeekMinimumHealth,
     cueMargin: config.coverCueMargin,
   });
   const state = {

@@ -576,6 +576,7 @@ async function run() {
   const coverMaximumPeekCycles = integerArg(args['cover-max-peek-cycles'], 3, 1, 10);
   const coverMaximumActiveMs = integerArg(args['cover-max-active'], 15_000, 2_000, 60_000);
   const coverMinimumHealth = integerArg(args['cover-min-health'], 24, 1, 100);
+  const coverPeekMinimumHealth = integerArg(args['cover-peek-min-health'], 80, 1, 100);
   const coverCueMargin = numberArg(args['cover-cue-margin'], 0.015, 0, 1);
   const fireMinimumTargetPixels = integerArg(args['fire-min-target-pixels'], 0, 0, 500);
   const fireMinimumTargetArea = integerArg(args['fire-min-target-area'], 0, 0, 5_000);
@@ -842,6 +843,7 @@ async function run() {
           coverMaximumPeekCycles,
           coverMaximumActiveMs,
           coverMinimumHealth,
+          coverPeekMinimumHealth,
           coverCueMargin,
           bankLeadMinimumKills,
           bankLeadMinimumMargin,
@@ -1629,6 +1631,7 @@ async function run() {
         coverMaximumPeekCycles,
         coverMaximumActiveMs,
         coverMinimumHealth,
+        coverPeekMinimumHealth,
         coverCueMargin,
         fireMinimumTargetPixels,
         fireMinimumTargetArea,
@@ -1735,6 +1738,7 @@ async function run() {
         renderedCoverProbeFrames: tacticalPolicyReceipt?.renderedCover?.probeFrames ?? 0,
         renderedCoverOcclusionFrames: tacticalPolicyReceipt?.renderedCover?.occlusionFrames ?? 0,
         renderedCoverHoldFrames: tacticalPolicyReceipt?.renderedCover?.holdFrames ?? 0,
+        renderedCoverHealthGatedHoldFrames: tacticalPolicyReceipt?.renderedCover?.healthGatedHoldFrames ?? 0,
         renderedCoverPeekFrames: tacticalPolicyReceipt?.renderedCover?.peekFrames ?? 0,
         renderedCoverReturnFrames: tacticalPolicyReceipt?.renderedCover?.returnFrames ?? 0,
         renderedCoverConfirmedPeekFrames: tacticalPolicyReceipt?.renderedCover?.confirmedPeekFrames ?? 0,

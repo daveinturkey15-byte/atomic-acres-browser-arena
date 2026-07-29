@@ -68,6 +68,27 @@ test('failed occlusion reverses once and then aborts instead of looping forever'
   assert.equal(controller.snapshot().aborts, 1);
 });
 
+test('cover hold refuses to peek until visible health reaches the frozen threshold', () => {
+  const controller = createRenderedCoverController({
+    enabled: true,
+    probeDurationMs: 1000,
+    occlusionConfirmMs: 200,
+    damageQuietMs: 200,
+    holdDurationMs: 300,
+    peekMinimumHealth: 80,
+  });
+  controller.update(active(0, { health: 55, damageDelta: 8 }));
+  const acquired = controller.update(active(250, { health: 55, target: null }));
+  assert.equal(acquired.mode, 'cover-hold');
+  const gated = controller.update(active(600, { health: 65, target: null }));
+  assert.equal(gated.mode, 'cover-hold');
+  assert.deepEqual(gated.keys, []);
+  assert.equal(controller.snapshot().healthGatedHoldFrames, 1);
+  const peek = controller.update(active(700, { health: 82, target: null }));
+  assert.equal(peek.mode, 'cover-peek');
+  assert.equal(peek.event.health, 82);
+});
+
 test('default-off controller never changes movement', () => {
   const controller = createRenderedCoverController();
   const result = controller.update(active(0, { damageDelta: 20 }));
