@@ -51,6 +51,14 @@ const FAMILY_VALUES = new Set(['assault-rifle', 'smg', 'lmg', 'marksman', 'shotg
 const FIRE_KIND_VALUES = new Set(['hitscan', 'pellet', 'slug', 'projectile']);
 const FIRE_MODE_VALUES = new Set(['semi', 'automatic']);
 const MATERIAL_POLICY_ID = 'pass64-ballistic-materials-v1';
+const RAILGUN_DAMAGE_ORACLE = Object.freeze({
+  base: 50,
+  minimum: 50,
+  falloffStartM: 512,
+  falloffEndM: 512,
+  headMultiplier: 1,
+  limbMultiplier: 1,
+});
 
 const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const idOk = value => typeof value === 'string' && /^[a-z0-9][a-z0-9-]{0,63}$/.test(value);
@@ -177,6 +185,9 @@ function validateWeapon(weapon, failures) {
   if (!finite(damage?.falloffStartM, 0, 2000) || !finite(damage?.falloffEndM, damage?.falloffStartM ?? 2001, 2000)) failures.push(`${label}: falloff invalid`);
   if (!finite(damage?.headMultiplier, 0, 10) || !finite(damage?.limbMultiplier, 0, 10)) failures.push(`${label}: hit multipliers invalid`);
   if (damage?.policy === 'head-only' && !(damage.headMultiplier === 1 && damage.limbMultiplier === 0)) failures.push(`${label}: head-only policy must encode the B1 binary head contract`);
+  if (weapon?.id === 'railgun' && Object.entries(RAILGUN_DAMAGE_ORACLE).some(([key, expected]) => damage?.[key] !== expected)) {
+    failures.push(`${label}: railgun must preserve exact unmodified 50 damage with no falloff or hit-location multiplier`);
+  }
 
   const spread = weapon?.spread;
   exactKeys(spread, ['hipRadians', 'adsMultiplier', 'movementMultiplier', 'standMultiplier', 'crouchMultiplier', 'proneMultiplier', 'sustainedPerShot', 'maximumRadians'], `${label}.spread`, failures);
@@ -328,6 +339,11 @@ function runSelfTest() {
     ['pellet-cap', value => { value.weapons.find(item => item.id === 'scattergun').pellets = 13; }, 'scattergun: pellets must be an integer from 1 through 12'],
     ['railgun-power-above-exact', value => { value.weapons.find(item => item.id === 'railgun').penetration.power = 100001; }, 'railgun: penetration power invalid'],
     ['railgun-surfaces-above-exact', value => { value.weapons.find(item => item.id === 'railgun').penetration.maximumSurfaces = 65; }, 'railgun: maximumSurfaces invalid'],
+    ['railgun-base-damage-drift', value => { value.weapons.find(item => item.id === 'railgun').damage.base = 51; }, 'railgun: railgun must preserve exact unmodified 50 damage with no falloff or hit-location multiplier'],
+    ['railgun-minimum-damage-drift', value => { value.weapons.find(item => item.id === 'railgun').damage.minimum = 49; }, 'railgun: railgun must preserve exact unmodified 50 damage with no falloff or hit-location multiplier'],
+    ['railgun-headshot-drift', value => { value.weapons.find(item => item.id === 'railgun').damage.headMultiplier = 1.5; }, 'railgun: railgun must preserve exact unmodified 50 damage with no falloff or hit-location multiplier'],
+    ['railgun-limb-drift', value => { value.weapons.find(item => item.id === 'railgun').damage.limbMultiplier = 0.8; }, 'railgun: railgun must preserve exact unmodified 50 damage with no falloff or hit-location multiplier'],
+    ['railgun-falloff-drift', value => { value.weapons.find(item => item.id === 'railgun').damage.falloffStartM = 100; }, 'railgun: railgun must preserve exact unmodified 50 damage with no falloff or hit-location multiplier'],
     ['tracer-color-below-range', value => { value.weapons[0].effects.tracerColorHex = -1; }, 'carbine: tracerColorHex must be a 24-bit integer'],
     ['tracer-color-above-range', value => { value.weapons[0].effects.tracerColorHex = 0x1000000; }, 'carbine: tracerColorHex must be a 24-bit integer'],
     ['tracer-color-non-integer', value => { value.weapons[0].effects.tracerColorHex = 1.5; }, 'carbine: tracerColorHex must be a 24-bit integer'],
