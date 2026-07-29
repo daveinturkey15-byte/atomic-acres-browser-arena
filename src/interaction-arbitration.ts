@@ -14,17 +14,28 @@ export type InteractionCandidate = Readonly<{
   enabled?: boolean;
 }>;
 
+/**
+ * Support possession is remotely available, but taking control must still be
+ * a local-world action. A generous range keeps airborne platforms usable
+ * without letting one own F from the opposite side of an arena.
+ */
+export const SUPPORT_ENTRY_INTERACTION_RANGE_M = 48;
+
 const INTERACTION_PRIORITY: Readonly<Record<InteractionKind, number>> = Object.freeze({
-  // Possession controls are global 30-second support actions, not local-world
-  // pickups. Once available, F must always enter/exit the selected platform;
-  // a crate, door or corpse near the player's body cannot steal that intent.
+  // An eligible nearby world action always owns F before a support toggle.
+  // Possession exit remains globally available when no world candidate wins.
+  'care-package': 3_000,
+  'shed-door': 2_900,
+  'weapon-pickup': 2_800,
   'support-exit': 2_000,
   'support-enter-drone': 1_500,
   'support-enter-chopper': 1_500,
-  'care-package': 1_000,
-  'shed-door': 900,
-  'weapon-pickup': 800,
 });
+
+function withinInteractionRange(candidate: InteractionCandidate): boolean {
+  if (candidate.kind !== 'support-enter-drone' && candidate.kind !== 'support-enter-chopper') return true;
+  return candidate.proximityM <= SUPPORT_ENTRY_INTERACTION_RANGE_M;
+}
 
 /**
  * One authority for F. Priority is structural; callers cannot smuggle an
@@ -34,7 +45,8 @@ const INTERACTION_PRIORITY: Readonly<Record<InteractionKind, number>> = Object.f
 export function primaryInteraction(candidates: readonly InteractionCandidate[]): InteractionCandidate | null {
   return candidates
     .filter((candidate) => candidate.enabled !== false && candidate.targetId.length > 0
-      && Number.isFinite(candidate.proximityM) && candidate.proximityM >= 0)
+      && Number.isFinite(candidate.proximityM) && candidate.proximityM >= 0
+      && withinInteractionRange(candidate))
     .sort((left, right) => INTERACTION_PRIORITY[right.kind] - INTERACTION_PRIORITY[left.kind]
       || left.proximityM - right.proximityM
       || left.targetId.localeCompare(right.targetId))[0] ?? null;

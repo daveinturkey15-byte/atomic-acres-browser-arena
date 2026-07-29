@@ -1,5 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import {
+  SUPPORT_ENTRY_INTERACTION_RANGE_M,
+  primaryInteraction,
+  type InteractionCandidate,
+} from './interaction-arbitration';
 
 const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
 
@@ -156,6 +161,29 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain('if (appliedDamage > 0) releaseCareCapture(now);');
     expect(source).toContain('killstreakRuntime.recordActorDamage(victimId)');
     expect(source).not.toMatch(/!interactWithKillstreakSupport\(\)[\s\S]{0,100}!interactWithShedDoor\(\)/);
+  });
+
+  it('integrates one world-over-support F contract for both drone and chopper possession', () => {
+    const candidate = (kind: InteractionCandidate['kind'], targetId: string, proximityM: number): InteractionCandidate => ({
+      kind, targetId, proximityM, prompt: kind,
+    });
+    for (const supportKind of ['support-exit', 'support-enter-drone', 'support-enter-chopper'] as const) {
+      for (const worldKind of ['care-package', 'shed-door', 'weapon-pickup'] as const) {
+        expect(primaryInteraction([
+          candidate(supportKind, `support-${supportKind}`, 0),
+          candidate(worldKind, `world-${worldKind}`, 1),
+        ])).toMatchObject({ kind: worldKind });
+      }
+    }
+    expect(primaryInteraction([
+      candidate('support-enter-drone', 'far-drone', SUPPORT_ENTRY_INTERACTION_RANGE_M + 1),
+    ])).toBeNull();
+    expect(primaryInteraction([
+      candidate('support-enter-chopper', 'near-chopper', SUPPORT_ENTRY_INTERACTION_RANGE_M),
+    ])).toMatchObject({ kind: 'support-enter-chopper' });
+    expect(primaryInteraction([
+      candidate('support-exit', 'possessed-chopper', 0),
+    ])).toMatchObject({ kind: 'support-exit' });
   });
 
   it('offers only claimable landed crates and correlates pending, acknowledged, released and rejected capture state', () => {

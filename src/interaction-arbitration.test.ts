@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { interactionPriority, primaryInteraction, type InteractionCandidate } from './interaction-arbitration';
+import {
+  SUPPORT_ENTRY_INTERACTION_RANGE_M,
+  interactionPriority,
+  primaryInteraction,
+  type InteractionCandidate,
+} from './interaction-arbitration';
 
 const candidate = (kind: InteractionCandidate['kind'], targetId: string, proximityM: number): InteractionCandidate => ({
   kind,
@@ -9,40 +14,38 @@ const candidate = (kind: InteractionCandidate['kind'], targetId: string, proximi
 });
 
 describe('shared F interaction arbitration', () => {
-  it('keeps support entry and exit authoritative over nearby world interactions', () => {
-    expect(primaryInteraction([
-      candidate('weapon-pickup', 'weapon', 0.2),
-      candidate('shed-door', 'door', 0.1),
-      candidate('care-package', 'crate', 0.05),
-      candidate('support-enter-drone', 'drone', 48),
-    ])).toMatchObject({ kind: 'support-enter-drone', targetId: 'drone' });
-    expect(primaryInteraction([
-      candidate('support-enter-chopper', 'chopper', 0),
-      candidate('shed-door', 'door', 1),
-    ])).toMatchObject({ kind: 'support-enter-chopper', targetId: 'chopper' });
-    expect(primaryInteraction([
-      candidate('support-exit', 'possessed-drone', 0),
-      candidate('shed-door', 'door', 1),
-    ])).toMatchObject({ kind: 'support-exit', targetId: 'possessed-drone' });
-    expect(primaryInteraction([
-      candidate('support-exit', 'possessed-drone', 0),
-      candidate('care-package', 'crate', 0.5),
-    ])).toMatchObject({ kind: 'support-exit', targetId: 'possessed-drone' });
-    expect(interactionPriority('support-enter-drone')).toBeGreaterThan(interactionPriority('care-package'));
-    expect(interactionPriority('support-exit')).toBeGreaterThan(interactionPriority('support-enter-drone'));
+  it('keeps every eligible nearby world action ahead of drone/chopper entry and exit', () => {
+    const worldKinds = ['care-package', 'shed-door', 'weapon-pickup'] as const;
+    const supportKinds = ['support-enter-drone', 'support-enter-chopper', 'support-exit'] as const;
+    for (const worldKind of worldKinds) {
+      for (const supportKind of supportKinds) {
+        expect(primaryInteraction([
+          candidate(supportKind, `support-${supportKind}`, 0),
+          candidate(worldKind, `world-${worldKind}`, 1),
+        ])).toMatchObject({ kind: worldKind, targetId: `world-${worldKind}` });
+        expect(interactionPriority(worldKind)).toBeGreaterThan(interactionPriority(supportKind));
+      }
+    }
   });
 
-  it('does not let weapon pickup overwrite support controls', () => {
+  it('falls back to support exit when nearby world candidates are ineligible', () => {
     expect(primaryInteraction([
-      candidate('weapon-pickup', 'weapon', 0.1),
-      candidate('support-enter-drone', 'drone', 48),
-    ])).toMatchObject({ kind: 'support-enter-drone', targetId: 'drone' });
-    expect(primaryInteraction([
-      candidate('weapon-pickup', 'weapon', 0.1),
       candidate('support-exit', 'possessed-drone', 0),
+      { ...candidate('care-package', 'crate', 0.1), enabled: false },
+      { ...candidate('shed-door', 'door', 0.1), enabled: false },
+      { ...candidate('weapon-pickup', 'weapon', 0.1), enabled: false },
     ])).toMatchObject({ kind: 'support-exit', targetId: 'possessed-drone' });
-    expect(interactionPriority('weapon-pickup')).toBeLessThan(interactionPriority('support-enter-drone'));
-    expect(interactionPriority('weapon-pickup')).toBeLessThan(interactionPriority('support-exit'));
+  });
+
+  it('distance-gates drone and chopper entry without removing an eligible nearby entry', () => {
+    for (const kind of ['support-enter-drone', 'support-enter-chopper'] as const) {
+      expect(primaryInteraction([
+        candidate(kind, 'near-support', SUPPORT_ENTRY_INTERACTION_RANGE_M),
+      ])).toMatchObject({ kind, targetId: 'near-support' });
+      expect(primaryInteraction([
+        candidate(kind, 'far-support', SUPPORT_ENTRY_INTERACTION_RANGE_M + 0.001),
+      ])).toBeNull();
+    }
   });
 
   it('selects exactly one equal-priority platform by proximity and stable identity', () => {
