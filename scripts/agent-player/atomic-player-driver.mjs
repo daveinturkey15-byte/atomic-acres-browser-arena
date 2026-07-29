@@ -552,6 +552,7 @@ async function run() {
   const bankLeadMinimumMargin = integerArg(args['bank-lead-minimum-margin'], 1, 1, 20);
   const killAnchorDurationMs = integerArg(args['kill-anchor-duration'], 0, 0, 60_000);
   const rawTargetObserveDurationMs = integerArg(args['raw-target-observe-duration'], 0, 0, 5_000);
+  const lowHealthEvade = args['low-health-evade'] === 'true';
   const fireMinimumTargetPixels = integerArg(args['fire-min-target-pixels'], 0, 0, 500);
   const fireMinimumTargetArea = integerArg(args['fire-min-target-area'], 0, 0, 5_000);
   const fireMinimumTargetHeight = integerArg(args['fire-min-target-height'], 0, 0, 100);
@@ -795,6 +796,7 @@ async function run() {
           routeSweepInterval: integerArg(args['route-sweep-interval'], 36, 6, 120),
           routeSweepTurn: integerArg(args['route-sweep-turn'], 18, 0, 60),
           threatAwareRetreatDirection: args['threat-aware-retreat'] !== 'false',
+          lowHealthEvade,
           bankLeadMinimumKills,
           bankLeadMinimumMargin,
           killAnchorDurationMs,
@@ -1542,6 +1544,7 @@ async function run() {
         finishWindowMs,
         killAnchorDurationMs,
         rawTargetObserveDurationMs,
+        lowHealthEvade,
         fireMinimumTargetPixels,
         fireMinimumTargetArea,
         fireMinimumTargetHeight,
@@ -1630,6 +1633,7 @@ async function run() {
         killAnchorEngagementFrames: tacticalPolicyReceipt?.killAnchorEngagementFrames ?? 0,
         rawTargetObservationExpirations: tacticalPolicyReceipt?.rawTargetObservationExpirations ?? 0,
         rawTargetObservationFrames: tacticalPolicyReceipt?.rawTargetObservationFrames ?? 0,
+        lowHealthEvasionFrames: tacticalPolicyReceipt?.lowHealthEvasionFrames ?? 0,
         exposureGateSuppressions,
         exposurePixelSuppressions,
         exposureAreaSuppressions,

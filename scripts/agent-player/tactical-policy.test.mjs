@@ -93,6 +93,18 @@ test('low health cannot silently expire from retreat into engagement', () => {
   assert.equal(result.allowEngagement, false);
 });
 
+test('opt-in low-health evasion keeps moving after the initial retreat timer expires', () => {
+  const policy = createTacticalPolicy({ retreatHealth: 45, retreatDurationMs: 500, lowHealthEvade: true });
+  policy.update({ now: 1000, active: true, health: 40, damageDelta: 5, currentTarget: true, movementCycle: 0 });
+  const result = policy.update({ now: 1700, active: true, health: 40, damageDelta: 0, currentTarget: true, movementCycle: 1 });
+  assert.equal(result.mode, 'retreat');
+  assert.equal(result.reason, 'low-health-evasion');
+  assert.equal(result.allowEngagement, false);
+  assert.ok(result.keys.includes('KeyS'));
+  assert.ok(result.keys.includes('ShiftLeft'));
+  assert.equal(policy.snapshot().lowHealthEvasionFrames, 1);
+});
+
 test('inactive respawn state clears old retreat timers', () => {
   const policy = createTacticalPolicy({ retreatDamage: 5, retreatDurationMs: 2000 });
   assert.equal(policy.update({ now: 1000, active: true, health: 80, damageDelta: 6, movementCycle: 0 }).mode, 'retreat');

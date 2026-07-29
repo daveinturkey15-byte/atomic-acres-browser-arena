@@ -14,6 +14,7 @@ export function createTacticalPolicy(options = {}) {
     routeSweepInterval: Number(options.routeSweepInterval ?? 36),
     routeSweepTurn: Number(options.routeSweepTurn ?? 18),
     threatAwareRetreatDirection: options.threatAwareRetreatDirection !== false,
+    lowHealthEvade: options.lowHealthEvade === true,
     bankLeadMinimumKills: Number(options.bankLeadMinimumKills ?? 0),
     bankLeadMinimumMargin: Number(options.bankLeadMinimumMargin ?? 1),
     killAnchorDurationMs: Number(options.killAnchorDurationMs ?? 0),
@@ -42,6 +43,7 @@ export function createTacticalPolicy(options = {}) {
     rawTargetObservationExpired: false,
     rawTargetObservationExpirations: 0,
     rawTargetObservationFrames: 0,
+    lowHealthEvasionFrames: 0,
     modeFrames: { roam: 0, engage: 0, retreat: 0, recover: 0, bank: 0, anchor: 0 },
   };
 
@@ -146,8 +148,13 @@ export function createTacticalPolicy(options = {}) {
         nextMode = 'retreat';
         reason = health < config.retreatHealth ? 'low-health' : 'damage-burst';
       } else if (health < config.retreatHealth) {
-        nextMode = 'recover';
-        reason = 'low-health-hold';
+        if (config.lowHealthEvade) {
+          nextMode = 'retreat';
+          reason = 'low-health-evasion';
+        } else {
+          nextMode = 'recover';
+          reason = 'low-health-hold';
+        }
       } else if (observation.stuck && now >= state.recoveryCooldownUntil) {
         state.direction *= -1;
         state.recoveryUntil = now + config.recoveryDurationMs;
@@ -174,6 +181,7 @@ export function createTacticalPolicy(options = {}) {
       }
       const changed = transition(nextMode, now, reason);
       state.modeFrames[nextMode] += 1;
+      if (reason === 'low-health-evasion') state.lowHealthEvasionFrames += 1;
       const killAnchorActive = observation.active && now < state.killAnchorUntil;
       if (killAnchorActive) {
         state.killAnchorActiveFrames += 1;
@@ -267,6 +275,7 @@ export function createTacticalPolicy(options = {}) {
         killAnchorEngagementFrames: state.killAnchorEngagementFrames,
         rawTargetObservationExpirations: state.rawTargetObservationExpirations,
         rawTargetObservationFrames: state.rawTargetObservationFrames,
+        lowHealthEvasionFrames: state.lowHealthEvasionFrames,
         config: { ...config },
       };
     },
