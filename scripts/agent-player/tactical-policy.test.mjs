@@ -114,7 +114,7 @@ test('inactive respawn state clears old retreat timers', () => {
 });
 
 test('opt-in respawn escape leaves the initial life unchanged and reverse-sprints after a rendered respawn', () => {
-  const policy = createTacticalPolicy({ respawnEscapeDurationMs: 2500 });
+  const policy = createTacticalPolicy({ respawnEscapeDurationMs: 2500, respawnReentryDurationMs: 2000 });
   const initialLife = policy.update({ now: 1000, active: true, health: 100, movementCycle: 0 });
   assert.equal(initialLife.mode, 'roam');
   assert.equal(policy.snapshot().respawnEscapeActivations, 0);
@@ -129,8 +129,20 @@ test('opt-in respawn escape leaves the initial life unchanged and reverse-sprint
   assert.equal(policy.snapshot().respawnEscapeActivations, 1);
   assert.equal(policy.snapshot().respawnEscapeFrames, 1);
 
-  const expired = policy.update({ now: 5600, active: true, health: 100, movementCycle: 3 });
+  const reentry = policy.update({ now: 5600, active: true, health: 100, movementCycle: 3, navigationTick: true });
+  assert.equal(reentry.mode, 'roam');
+  assert.equal(reentry.reason, 'respawn-reentry');
+  assert.ok(reentry.keys.includes('KeyW'));
+  assert.ok(reentry.keys.includes('ShiftLeft'));
+  assert.equal(policy.snapshot().respawnReentryFrames, 1);
+
+  const visibleDuringReentry = policy.update({ now: 5700, active: true, health: 100, currentTarget: true, movementCycle: 4 });
+  assert.equal(visibleDuringReentry.mode, 'engage');
+  assert.equal(visibleDuringReentry.allowEngagement, true);
+
+  const expired = policy.update({ now: 7600, active: true, health: 100, movementCycle: 5 });
   assert.equal(expired.mode, 'roam');
+  assert.equal(expired.reason, 'roam-clear');
 });
 
 test('respawn escape remains default-off after an active-inactive-active cycle', () => {

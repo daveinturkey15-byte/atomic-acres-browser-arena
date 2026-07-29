@@ -224,6 +224,7 @@ export function analyseCombat(summary, driverReport, callsign = 'Jigglyclaw') {
       lowHealthEvasionFrames: optionalNumeric(driverReport?.input?.lowHealthEvasionFrames),
       respawnEscapeActivations: optionalNumeric(driverReport?.input?.respawnEscapeActivations),
       respawnEscapeFrames: optionalNumeric(driverReport?.input?.respawnEscapeFrames),
+      respawnReentryFrames: optionalNumeric(driverReport?.input?.respawnReentryFrames),
       exposureGateSuppressions: optionalNumeric(driverReport?.input?.exposureGateSuppressions),
       exposurePixelSuppressions: optionalNumeric(driverReport?.input?.exposurePixelSuppressions),
       exposureAreaSuppressions: optionalNumeric(driverReport?.input?.exposureAreaSuppressions),

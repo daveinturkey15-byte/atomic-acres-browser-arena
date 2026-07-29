@@ -16,6 +16,7 @@ export function createTacticalPolicy(options = {}) {
     threatAwareRetreatDirection: options.threatAwareRetreatDirection !== false,
     lowHealthEvade: options.lowHealthEvade === true,
     respawnEscapeDurationMs: Math.max(0, Number(options.respawnEscapeDurationMs ?? 0)),
+    respawnReentryDurationMs: Math.max(0, Number(options.respawnReentryDurationMs ?? 0)),
     bankLeadMinimumKills: Number(options.bankLeadMinimumKills ?? 0),
     bankLeadMinimumMargin: Number(options.bankLeadMinimumMargin ?? 1),
     killAnchorDurationMs: Number(options.killAnchorDurationMs ?? 0),
@@ -49,8 +50,10 @@ export function createTacticalPolicy(options = {}) {
     wasActive: false,
     pendingRespawn: false,
     respawnEscapeUntil: 0,
+    respawnReentryUntil: 0,
     respawnEscapeActivations: 0,
     respawnEscapeFrames: 0,
+    respawnReentryFrames: 0,
     modeFrames: { roam: 0, engage: 0, retreat: 0, recover: 0, bank: 0, anchor: 0 },
   };
 
@@ -86,6 +89,7 @@ export function createTacticalPolicy(options = {}) {
           if (config.respawnEscapeDurationMs > 0) {
             state.direction *= -1;
             state.respawnEscapeUntil = now + config.respawnEscapeDurationMs;
+            state.respawnReentryUntil = state.respawnEscapeUntil + config.respawnReentryDurationMs;
             state.respawnEscapeActivations += 1;
           }
           state.pendingRespawn = false;
@@ -138,6 +142,7 @@ export function createTacticalPolicy(options = {}) {
         state.damageWindowAmount = 0;
         state.killAnchorUntil = 0;
         state.respawnEscapeUntil = 0;
+        state.respawnReentryUntil = 0;
       }
       if (observation.active && damageDelta > 0) {
         if (now - state.damageWindowStartedAt > config.damageWindowMs) {
@@ -205,11 +210,14 @@ export function createTacticalPolicy(options = {}) {
         reason = 'visible-kill-lead-bank';
       } else if (rawTarget && boundedRawObservation) {
         reason = 'candidate-observation-expired';
+      } else if (now < state.respawnReentryUntil) {
+        reason = 'respawn-reentry';
       }
       const changed = transition(nextMode, now, reason);
       state.modeFrames[nextMode] += 1;
       if (reason === 'low-health-evasion') state.lowHealthEvasionFrames += 1;
       if (reason === 'respawn-escape') state.respawnEscapeFrames += 1;
+      if (reason === 'respawn-reentry') state.respawnReentryFrames += 1;
       const killAnchorActive = observation.active && now < state.killAnchorUntil;
       if (killAnchorActive) {
         state.killAnchorActiveFrames += 1;
@@ -252,7 +260,10 @@ export function createTacticalPolicy(options = {}) {
           }
         } else {
           const threat = observation.minimapThreat;
-          if (threat) {
+          if (reason === 'respawn-reentry') {
+            keys.push('KeyW', 'ShiftLeft');
+            if (observation.navigationTick) turn = state.direction * 18;
+          } else if (threat) {
             const bearing = Number(threat.bearingRadians ?? 0);
             const distance = Number(threat.distance ?? Number.POSITIVE_INFINITY);
             if (distance <= config.closeThreatDistance) {
@@ -306,6 +317,7 @@ export function createTacticalPolicy(options = {}) {
         lowHealthEvasionFrames: state.lowHealthEvasionFrames,
         respawnEscapeActivations: state.respawnEscapeActivations,
         respawnEscapeFrames: state.respawnEscapeFrames,
+        respawnReentryFrames: state.respawnReentryFrames,
         config: { ...config },
       };
     },

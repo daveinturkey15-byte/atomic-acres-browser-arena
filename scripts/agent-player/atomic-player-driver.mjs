@@ -554,6 +554,7 @@ async function run() {
   const rawTargetObserveDurationMs = integerArg(args['raw-target-observe-duration'], 0, 0, 5_000);
   const lowHealthEvade = args['low-health-evade'] === 'true';
   const respawnEscapeDurationMs = integerArg(args['respawn-escape-duration'], 0, 0, 10_000);
+  const respawnReentryDurationMs = integerArg(args['respawn-reentry-duration'], 0, 0, 10_000);
   const fireMinimumTargetPixels = integerArg(args['fire-min-target-pixels'], 0, 0, 500);
   const fireMinimumTargetArea = integerArg(args['fire-min-target-area'], 0, 0, 5_000);
   const fireMinimumTargetHeight = integerArg(args['fire-min-target-height'], 0, 0, 100);
@@ -799,6 +800,7 @@ async function run() {
           threatAwareRetreatDirection: args['threat-aware-retreat'] !== 'false',
           lowHealthEvade,
           respawnEscapeDurationMs,
+          respawnReentryDurationMs,
           bankLeadMinimumKills,
           bankLeadMinimumMargin,
           killAnchorDurationMs,
@@ -1548,6 +1550,7 @@ async function run() {
         rawTargetObserveDurationMs,
         lowHealthEvade,
         respawnEscapeDurationMs,
+        respawnReentryDurationMs,
         fireMinimumTargetPixels,
         fireMinimumTargetArea,
         fireMinimumTargetHeight,
@@ -1639,6 +1642,7 @@ async function run() {
         lowHealthEvasionFrames: tacticalPolicyReceipt?.lowHealthEvasionFrames ?? 0,
         respawnEscapeActivations: tacticalPolicyReceipt?.respawnEscapeActivations ?? 0,
         respawnEscapeFrames: tacticalPolicyReceipt?.respawnEscapeFrames ?? 0,
+        respawnReentryFrames: tacticalPolicyReceipt?.respawnReentryFrames ?? 0,
         exposureGateSuppressions,
         exposurePixelSuppressions,
         exposureAreaSuppressions,
