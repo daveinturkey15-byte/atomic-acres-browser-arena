@@ -348,6 +348,14 @@ describe('Pass 65 managed weapon runtime behavior', () => {
       prewarming: false,
       unpreparedSwitches: 0,
     });
+    expect(presentation.browserCatalogHealth()).toEqual({
+      retainedCount: WEAPON_IDS.length,
+      loaded: WEAPON_IDS.length,
+      prewarming: false,
+      unpreparedSwitches: 0,
+      maximumRetained: RUNTIME_WEAPON_RETENTION_LIMIT,
+    });
+    expect(Object.isFrozen(presentation.browserCatalogHealth())).toBe(true);
     expect(releasePass65WeaponModelsIn(presentation.root)).toBe(PASS65_AUTHORED_FIREARM_IDS.length);
   });
 
@@ -513,6 +521,34 @@ describe('Pass 65 managed weapon runtime behavior', () => {
       knifeVisible: false,
     });
     expect(arms?.visible).toBe(true);
+  });
+
+  it('keeps arm posing live while publishing allocation-heavy diagnostics at a bounded cadence', async () => {
+    stubBrowserTextureLoading();
+    vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (
+      Promise.resolve(fakeGltfForUrl(String(url)))
+    )) as GLTFLoader['loadAsync']);
+    const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(), false);
+    await presentation.load();
+    let now = 1_000;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    const pose = {
+      dt: 1 / 180, moving: false, sprinting: false, crouched: false, prone: false,
+      ads: false, phase: 0, landingImpulse: 0, lateralSpeed: 0, reloadProgress: null,
+    } as const;
+
+    const initialDiagnostics = presentation.presentationState().riggedArms;
+    presentation.update(pose);
+    const firstDiagnostics = presentation.presentationState().riggedArms;
+    expect(firstDiagnostics).not.toBe(initialDiagnostics);
+    now += 5;
+    presentation.update(pose);
+    expect(presentation.presentationState().riggedArms).toBe(firstDiagnostics);
+
+    now += 250;
+    presentation.update(pose);
+    expect(presentation.presentationState().riggedArms).not.toBe(firstDiagnostics);
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(1);
   });
 
   it('does not resurrect a retired operator after a delayed world-weapon load', async () => {

@@ -13,7 +13,7 @@ import {
   type FirstPersonArmChain,
   type FirstPersonFingerBone,
 } from './operator-model';
-import { solveTwoBoneElbow } from './ik';
+import { solveTwoBoneElbow, solveTwoBoneElbowInto, type TwoBoneElbowScratch } from './ik';
 import { reloadActionEvents, reloadPoseAt, viewmodelReloadStageAt, type ReloadPose, type WeaponActionEvent } from './weapon-actions';
 import { advanceAdsBlend, advanceWeaponHeat, fireCycleAt } from './weapon-presentation-state';
 import { weaponFamilyPresentation } from './weapon-family-presentation';
@@ -287,6 +287,34 @@ export class WeaponPresentation {
   private readonly meleeSocketWorld = new THREE.Vector3();
   private authoredArmsRoot: THREE.Group | null = null;
   private riggedArmDiagnostics: Array<Record<string, unknown>> = [];
+  private nextRiggedArmDiagnosticsAt = 0;
+  private readonly riggedArmSolveScratch = {
+    cameraRotation: new THREE.Quaternion(),
+    target: new THREE.Vector3(),
+    shoulderPosition: new THREE.Vector3(),
+    elbowPosition: new THREE.Vector3(),
+    wristPosition: new THREE.Vector3(),
+    bendHint: new THREE.Vector3(),
+    elbowTarget: new THREE.Vector3(),
+    handDirection: new THREE.Vector3(),
+    handTarget: new THREE.Vector3(),
+    solvedWrist: new THREE.Vector3(),
+    diagnosticShoulder: new THREE.Vector3(),
+    diagnosticElbow: new THREE.Vector3(),
+    diagnosticWrist: new THREE.Vector3(),
+    gripEuler: new THREE.Euler(),
+    elbowSolver: {
+      toTarget: new THREE.Vector3(),
+      perpendicular: new THREE.Vector3(),
+      projection: new THREE.Vector3(),
+    } satisfies TwoBoneElbowScratch,
+    orientOrigin: new THREE.Vector3(),
+    orientCurrentDirection: new THREE.Vector3(),
+    orientDesiredDirection: new THREE.Vector3(),
+    orientCurrentWorld: new THREE.Quaternion(),
+    orientDesiredWorld: new THREE.Quaternion(),
+    orientParentWorld: new THREE.Quaternion(),
+  };
   private readonly meleeKnife = new THREE.Group();
   private readonly meleeRig = new THREE.Group();
   private readonly passiveKnife = new THREE.Group();
@@ -1058,6 +1086,23 @@ export class WeaponPresentation {
     return typeof document !== 'undefined' ? this.models.has(this.active) : this.models.size === Object.keys(WEAPONS).length;
   }
 
+  /** Narrow live-gate health; unlike presentationState(), this never traverses models or measures framing. */
+  browserCatalogHealth(): Readonly<{
+    retainedCount: number;
+    loaded: number;
+    prewarming: boolean;
+    unpreparedSwitches: number;
+    maximumRetained: number;
+  }> {
+    return Object.freeze({
+      retainedCount: this.browserResidentWeaponIds.size,
+      loaded: this.models.size,
+      prewarming: this.browserCatalogPrewarmPromise !== null,
+      unpreparedSwitches: this.unpreparedBrowserSwitches,
+      maximumRetained: WeaponPresentation.MAX_RETAINED_WEBGPU_WEAPONS,
+    });
+  }
+
   private createLoadedBrowserWeapon(id: WeaponId): THREE.Group | null {
     return id === 'explosive-crossbow'
       ? createPass65CrossbowModel(this.flattenMaterials, 'first-person')
@@ -1572,7 +1617,7 @@ export class WeaponPresentation {
   }
 
   private solveArms(arms: THREE.Object3D, activeModel: THREE.Object3D | undefined, reloadPose: ReloadPose): void {
-    if (!activeModel) return;
+    if (!activeModel || this.armRigs.length === 0) return;
     this.root.updateMatrixWorld(true);
     const diagnostics: Array<Record<string, unknown>> = [];
     for (const rig of this.armRigs) {
@@ -1630,14 +1675,17 @@ export class WeaponPresentation {
   }
 
   private orientRiggedBone(bone: THREE.Bone, child: THREE.Bone, targetWorld: THREE.Vector3): void {
+    const scratch = this.riggedArmSolveScratch;
     bone.updateWorldMatrix(true, true);
-    const origin = bone.getWorldPosition(new THREE.Vector3());
-    const currentDirection = child.getWorldPosition(new THREE.Vector3()).sub(origin).normalize();
-    const desiredDirection = targetWorld.clone().sub(origin).normalize();
+    const origin = bone.getWorldPosition(scratch.orientOrigin);
+    const currentDirection = child.getWorldPosition(scratch.orientCurrentDirection).sub(origin).normalize();
+    const desiredDirection = scratch.orientDesiredDirection.copy(targetWorld).sub(origin).normalize();
     if (currentDirection.lengthSq() < 1e-6 || desiredDirection.lengthSq() < 1e-6) return;
-    const currentWorld = bone.getWorldQuaternion(new THREE.Quaternion());
-    const desiredWorld = new THREE.Quaternion().setFromUnitVectors(currentDirection, desiredDirection).multiply(currentWorld);
-    const parentWorld = bone.parent?.getWorldQuaternion(new THREE.Quaternion()) ?? new THREE.Quaternion();
+    const currentWorld = bone.getWorldQuaternion(scratch.orientCurrentWorld);
+    const desiredWorld = scratch.orientDesiredWorld.setFromUnitVectors(currentDirection, desiredDirection).multiply(currentWorld);
+    const parentWorld = bone.parent
+      ? bone.parent.getWorldQuaternion(scratch.orientParentWorld)
+      : scratch.orientParentWorld.identity();
     bone.quaternion.copy(parentWorld.invert().multiply(desiredWorld));
     bone.updateWorldMatrix(false, true);
   }
@@ -1757,41 +1805,56 @@ export class WeaponPresentation {
     this.restoreRiggedArmBindPose();
     if (!activeModel) return;
     this.root.updateMatrixWorld(true);
-    const cameraRotation = this.camera.getWorldQuaternion(new THREE.Quaternion());
-    const diagnostics: Array<Record<string, unknown>> = [];
+    const scratch = this.riggedArmSolveScratch;
+    const cameraRotation = this.camera.getWorldQuaternion(scratch.cameraRotation);
+    const now = performance.now();
+    const captureDiagnostics = now >= this.nextRiggedArmDiagnosticsAt;
+    const diagnostics: Array<Record<string, unknown>> | null = captureDiagnostics ? [] : null;
+    if (captureDiagnostics) this.nextRiggedArmDiagnosticsAt = now + 250;
     for (const rig of this.riggedArmRigs) {
       const socketName = rig.side === 'right' ? 'grip-socket-r' : 'support-socket-l';
       const socket = activeModel.getObjectByName(socketName);
       if (!socket) continue;
-      const target = socket.getWorldPosition(new THREE.Vector3());
+      const target = socket.getWorldPosition(scratch.target);
       if (rig.side === 'left' && reloadPose.handToReload > 0) {
         const reloadSocket = activeModel.getObjectByName('reload-socket-l');
-        if (reloadSocket) target.lerp(reloadSocket.getWorldPosition(new THREE.Vector3()), reloadPose.handToReload);
+        if (reloadSocket) target.lerp(reloadSocket.getWorldPosition(scratch.handTarget), reloadPose.handToReload);
       }
-      const shoulderPosition = rig.shoulder.getWorldPosition(new THREE.Vector3());
-      const elbowPosition = rig.elbow.getWorldPosition(new THREE.Vector3());
-      const wristPosition = rig.wrist.getWorldPosition(new THREE.Vector3());
+      const shoulderPosition = rig.shoulder.getWorldPosition(scratch.shoulderPosition);
+      const elbowPosition = rig.elbow.getWorldPosition(scratch.elbowPosition);
+      const wristPosition = rig.wrist.getWorldPosition(scratch.wristPosition);
       const upperLength = shoulderPosition.distanceTo(elbowPosition);
       const lowerLength = elbowPosition.distanceTo(wristPosition);
-      const bendHint = new THREE.Vector3(rig.side === 'left' ? -0.7 : 0.7, -1, 0.25).applyQuaternion(cameraRotation);
-      const elbowTarget = solveTwoBoneElbow(shoulderPosition, target, upperLength, lowerLength, bendHint);
+      const bendHint = scratch.bendHint.set(rig.side === 'left' ? -0.7 : 0.7, -1, 0.25).applyQuaternion(cameraRotation);
+      const elbowTarget = solveTwoBoneElbowInto(
+        shoulderPosition,
+        target,
+        upperLength,
+        lowerLength,
+        bendHint,
+        scratch.elbowTarget,
+        scratch.elbowSolver,
+      );
       this.orientRiggedBone(rig.shoulder, rig.elbow, elbowTarget);
       this.orientRiggedBone(rig.elbow, rig.wrist, target);
-      const handDirection = new THREE.Vector3(
+      const handDirection = scratch.handDirection.set(
         rig.side === 'left' ? 0.55 : 0.12,
         -1,
         rig.side === 'left' ? -0.15 : 0.08,
       ).normalize();
       const gripRotation = WEAPON_HAND_ROTATIONS[this.active][rig.side];
-      handDirection.applyEuler(new THREE.Euler(
+      scratch.gripEuler.set(
         gripRotation[0] * 0.24,
         gripRotation[1] * 0.24,
         gripRotation[2] * 0.24,
         'XYZ',
-      )).applyQuaternion(cameraRotation);
-      this.orientRiggedBone(rig.wrist, rig.finger, rig.wrist.getWorldPosition(new THREE.Vector3()).add(handDirection));
-      const solvedWrist = rig.wrist.getWorldPosition(new THREE.Vector3());
+      );
+      handDirection.applyEuler(scratch.gripEuler).applyQuaternion(cameraRotation);
+      const handTarget = rig.wrist.getWorldPosition(scratch.handTarget).add(handDirection);
+      this.orientRiggedBone(rig.wrist, rig.finger, handTarget);
+      const solvedWrist = rig.wrist.getWorldPosition(scratch.solvedWrist);
       const reachRatio = shoulderPosition.distanceTo(target) / Math.max(upperLength + lowerLength, 1e-6);
+      if (!diagnostics) continue;
       diagnostics.push({
         side: rig.side,
         weapon: this.active,
@@ -1799,9 +1862,9 @@ export class WeaponPresentation {
         socket: socketName,
         upperLength,
         lowerLength,
-        shoulder: rig.shoulder.getWorldPosition(new THREE.Vector3()).toArray(),
-        elbow: rig.elbow.getWorldPosition(new THREE.Vector3()).toArray(),
-        wrist: rig.wrist.getWorldPosition(new THREE.Vector3()).toArray(),
+        shoulder: rig.shoulder.getWorldPosition(scratch.diagnosticShoulder).toArray(),
+        elbow: rig.elbow.getWorldPosition(scratch.diagnosticElbow).toArray(),
+        wrist: rig.wrist.getWorldPosition(scratch.diagnosticWrist).toArray(),
         target: target.toArray(),
         contactError: solvedWrist.distanceTo(target),
         reachRatio,
@@ -1812,7 +1875,7 @@ export class WeaponPresentation {
         elbowQuaternion: rig.elbow.quaternion.toArray(),
       });
     }
-    this.riggedArmDiagnostics = diagnostics;
+    if (diagnostics) this.riggedArmDiagnostics = diagnostics;
   }
 
   update(pose: WeaponPose): WeaponActionEvent[] {
