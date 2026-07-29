@@ -1,0 +1,646 @@
+{
+  "schemaVersion": 1,
+  "kind": "atomic-player-rendered-motion-semantic-evaluation",
+  "evaluatorId": "rendered-motion-semantic-v1-g0134-held-sequence",
+  "sources": {
+    "manifest": {
+      "path": "/root/jigglyclaw/worktrees/atomic-player/scripts/agent-player/profiles/datasets/one-v-one-rendered-semantic-v2.manifest.json",
+      "sha256": "c272202b12af187b245d33781c891c7aac4a05aac5ac3fd43cb44cb21225c39b"
+    },
+    "fixture": {
+      "path": "/root/jigglyclaw/worktrees/atomic-player/scripts/agent-player/one-v-one/fixtures/rendered-motion-semantic-regression-v1.json",
+      "sha256": "506ae871d908f9683689e3c90e3e4625b68cbd879c128d484a03670fa27a9daa"
+    },
+    "telemetry": {
+      "path": "/root/jigglyclaw/worktrees/atomic-player/artifacts/agent-player/archive/games/G0134/telemetry.json",
+      "sha256": "a14aa70fd24d9d0c254829e39acdf51fdff49fa21d17fd9c529cb1ae8cefc755"
+    },
+    "shadowTelemetry": {
+      "path": "/root/jigglyclaw/worktrees/atomic-player/artifacts/agent-player/archive/games/G0134/one-v-one-shadow-telemetry.json",
+      "sha256": "dbc5da9e1522acf4cdd28a8ec06ba588c7de6623d415c512467fbb3aaa4cd1f4"
+    }
+  },
+  "frozenThresholds": {
+    "requiredStationaryFrames": 3,
+    "minimumIndependentMotionPixels": 2,
+    "maximumAssociationDistancePixels": 18,
+    "minimumAssociationMarginPixels": 3,
+    "maximumSizeRatio": 4,
+    "maximumCandidateAspect": 1.2,
+    "minimumCandidateHeight": 5,
+    "maximumAspectRatioChange": 2.5,
+    "maximumObservationSequenceGap": 12,
+    "maximumFreshMotionSequenceGap": 12
+  },
+  "summary": {
+    "labelledCandidateFrames": 100,
+    "visibleBotLabelledFrames": 88,
+    "acceptedFrames": 26,
+    "acceptedVisibleBotFrames": 26,
+    "acceptedHardNegativeFrames": 0,
+    "acceptedAmbiguousFrames": 0,
+    "eligibleVisibleBotSequences": 3,
+    "acceptedVisibleBotSequences": 3,
+    "visibleBotSequenceAcceptanceRate": 1,
+    "fixturePasses": 5,
+    "fixtureCount": 5
+  },
+  "acceptance": {
+    "allKnownHardNegativeFramesRejected": true,
+    "allAmbiguousFramesRejected": true,
+    "visibleBotSequenceAcceptanceAtLeast80Percent": true,
+    "eligibleVisibleBotSequencesAtLeast3": true,
+    "allSyntheticRegressionSequencesPass": true,
+    "datasetAcceptancePassed": true,
+    "noLiveInputAuthority": true
+  },
+  "fixtureResults": [
+    {
+      "sequenceId": "g0133-static-purple-geometry",
+      "acceptedFrames": 0,
+      "expectedAcceptedFrames": 0,
+      "minimumAcceptedFrames": null,
+      "reasons": [
+        "stationary-anchor",
+        "awaiting-independent-motion",
+        "awaiting-independent-motion",
+        "awaiting-independent-motion",
+        "awaiting-independent-motion"
+      ],
+      "passed": true
+    },
+    {
+      "sequenceId": "g0125-practice-contact-static",
+      "acceptedFrames": 0,
+      "expectedAcceptedFrames": 0,
+      "minimumAcceptedFrames": null,
+      "reasons": [
+        "stationary-anchor",
+        "awaiting-independent-motion",
+        "awaiting-independent-motion",
+        "awaiting-independent-motion"
+      ],
+      "passed": true
+    },
+    {
+      "sequenceId": "moving-rendered-bot",
+      "acceptedFrames": 2,
+      "expectedAcceptedFrames": null,
+      "minimumAcceptedFrames": 2,
+      "reasons": [
+        "stationary-anchor",
+        "awaiting-independent-motion",
+        "independent-rendered-motion-confirmed",
+        "independent-rendered-motion-confirmed"
+      ],
+      "passed": true
+    },
+    {
+      "sequenceId": "observer-camera-motion-is-not-target-motion",
+      "acceptedFrames": 0,
+      "expectedAcceptedFrames": 0,
+      "minimumAcceptedFrames": null,
+      "reasons": [
+        "observer-moving",
+        "observer-moving",
+        "observer-moving"
+      ],
+      "passed": true
+    },
+    {
+      "sequenceId": "body-to-horizontal-prop-handoff",
+      "acceptedFrames": 0,
+      "expectedAcceptedFrames": 0,
+      "minimumAcceptedFrames": null,
+      "reasons": [
+        "stationary-anchor",
+        "awaiting-independent-motion",
+        "non-body-geometry"
+      ],
+      "passed": true
+    }
+  ],
+  "acceptedFrameReceipts": [
+    {
+      "frameSequence": 820,
+      "label": "visible-live-bot",
+      "receipt": {
+        "disposition": "accepted-motion-semantic",
+        "reason": "independent-rendered-motion-confirmed",
+        "frameSequence": 820,
+        "trackId": "RMS-4",
+        "confidence": 0.96,
+        "observerStationary": true,
+        "stationaryFrames": 3,
+        "evidenceEvents": 2,
+        "independentMotionPixels": 13.455667670709882,
+        "minimumIndependentMotionPixels": 2,
+        "lastIndependentMotionSequence": 820,
+        "motionFresh": true,
+        "associationDistance": 11.739381717651586,
+        "associationMargin": 4.358845688489584
+      }
+    },
+    {
+      "frameSequence": 823,
+      "label": "visible-live-bot",
+      "receipt": {
+        "disposition": "accepted-motion-semantic",
+        "reason": "independent-rendered-motion-confirmed",
+        "frameSequence": 823,
+        "trackId": "RMS-4",
+        "confidence": 0.97,
+        "observerStationary": true,
+        "stationaryFrames": 4,
+        "evidenceEvents": 3,
+        "independentMotionPixels": 11.694301168790401,
+        "minimumIndependentMotionPixels": 2,
+        "lastIndependentMotionSequence": 823,
+        "motionFresh": true,
+        "associationDistance": 4.3765086944653415,
+        "associationMargin": 3.592956922161953
+      }
+    },
+    {
+      "frameSequence": 842,
+      "label": "visible-live-bot",
+      "receipt": {
+        "disposition": "accepted-motion-semantic",
+        "reason": "independent-rendered-motion-confirmed",
+        "frameSequence": 842,
+        "trackId": "RMS-4",
+        "confidence": 0.96,
+        "observerStationary": true,
+        "stationaryFrames": 3,
+        "evidenceEvents": 2,
+        "independentMotionPixels": 7.117284923922742,
+        "minimumIndependentMotionPixels": 2,
+        "lastIndependentMotionSequence": 842,
+        "motionFresh": true,
+        "associationDistance": 2.6787421295140526,
+        "associationMargin": 8.32394980255721
+      }
+    },
+    {
+      "frameSequence": 1120,
+      "label": "visible-live-bot",
+      "receipt": {
+        "disposition": "accepted-motion-semantic",
+        "reason": "independent-rendered-motion-confirmed",
+        "frameSequence": 1120,
+        "trackId": "RMS-7",
+        "confidence": 0.96,
+        "observerStationary": true,
+        "stationaryFrames": 3,
+        "evidenceEvents": 2,
+        "independentMotionPixels": 19.9567313462459,
+        "minimumIndependentMotionPixels": 2,
+        "lastIndependentMotionSequence": 1120,
+        "motionFresh": true,
+        "associationDistance": 17.822743698695323,
+        "associationMargin": null
+      }
+    },
+    {
+      "frameSequence": 1618,
+      "label": "visible-live-bot",
+      "receipt": {
+        "disposition": "accepted-motion-semantic",
+        "reason": "independent-rendered-motion-confirmed",
+        "frameSequence": 1618,
+        "trackId": "RMS-13",
+        "confidence": 0.95,
+        "observerStationary": true,
+        "stationaryFrames": 3,
+        "evidenceEvents": 1,
+        "independentMotionPixels": 10.88594757361536,
+        "minimumIndependentMotionPixels": 2,
+        "lastIndependentMotionSequence": 1618,
+        "motionFresh": true,
+        "associationDistance": 9.980223703077284,
+        "associationMargin": null
+      }
+    },
+    {
+      "frameSequence": 2257,
+      "label": "visible-live-bot",
+      "receipt": {
+        "disposition": "accepted-motion-semantic",
+        "reason": "independent-rendered-motion-confirmed",
+        "frameSequence": 2257,
+        "trackId": "RMS-20",
+        "confidence": 0.96,
+        "observerStationary": true,
+        "stationaryFrames": 3,
+        "evidenceEvents": 2,
+        "independentMotionPixels": 7.599493208098131,
+        "minimumIndependentMotionPixels": 2,
+        "lastIndependentMotionSequence": 2257,
+        "motionFresh": true,
+        "associationDistance": 12.128734721895258,
+        "associationMargin": 7.459367230057657
+      }
+    },
+    {
+      "frameSequence": 2264,
+      "label": "visible-live-bot",
+      "receipt": {
+        "disposition": "accepted-motion-semantic",
+        "reason": "independent-rendered-motion-confirmed",
+        "frameSequence": 2264,
+        "trackId": "RMS-20",
+        "confidence": 0.9579929645533836,
+        "observerStationary": true,
+        "stationaryFrames": 4,
+        "evidenceEvents": 3,
+        "independentMotionPixels": 6.239788936601506,
+        "minimumIndependentMotionPixels": 2,
+        "lastIndependentMotionSequence": 2264,
+        "motionFresh": true,
+        "associationDistance": 2.009926928465748,
+        "associationMargin": 3.363581151562385
+      }
+    },
+    {
+      "frameSequence": 2436,
+      "label": "visible-live-bot",
+      "receipt": {
+        "disposition": "accepted-motion-semantic",
+        "reason": "independent-rendered-motion-confirmed",
+        "frameSequence": 2436,
+        "trackId": "RMS-22",
+        "confidence": 0.8743757469825204,
+        "observerStationary": true,
+        "stationaryFrames": 3,
+        "evidenceEvents": 2,
+        "independentMotionPixels": 4.031272409475613,
+        "minimumIndependentMotionPixels": 2,
+        "lastIndependentMotionSequence": 2436,
+        "motionFresh": true,
+        "associationDistance": 2.418853539318286,
+        "associationMargin": 24.70786740868064
+      }
+    },
+    {
+      "frameSequence": 2473,
+      "label": "visible-live-bot",
+      "receipt": {
+        "disposition": "accepted-motion-semantic",
+        "reason": "independent-rendered-motion-confirmed",
+        "frameSequence": 2473,
+        "trackId": "RMS-24",
+        "confidence": 0.96,
+        "observerStationary": true,
+        "stationaryFrames": 3,
+        "evidenceEvents": 2,
+        "independentMotionPixels": 9.890826277134007,
+        "minimumIndependentMotionPixels": 2,
+        "lastIndependentMotionSequence": 2473,
+        "motionFresh": true,
+        "associationDistance": 2.253036797126532,
+        "associationMargin": 8.260121696404514
+      }
+    },
+    {
+      "frameSequence": 2480,
+      "label": "visible-live-bot",
+      "receipt": {
+        "disposition": "accepted-motion-semantic",
+        "reason": "independent-rendered-motion-confirmed",
+        "frameSequence": 2480,
+        "trackId": "RMS-24",
+        "confidence": 0.8877518449863183,
+        "observerStationary": true,
+        "stationaryFrames": 4,
+        "evidenceEvents": 3,
+        "independentMotionPixels": 4.132555349589548,
+        "minimumIndependentMotionPixels": 2,
+        "lastIndependentMotionSequence": 2480,
+        "motionFresh": true,
+        "associationDistance": 9.372478170193542,
+        "associationMargin": 9.864334815145423
+      }
+    },
+    {
+      "frameSequence": 2487,
+      "label": "visible-live-bot",
+      "receipt": {
+        "disposition": "accepted-motion-semantic",
+        "reason": "independent-rendered-motion-confirmed",
+        "frameSequence": 2487,
+        "trackId": "RMS-24",
+        "confidence": 0.98,
+        "observerStationary": true,
+        "stationaryFrames": 5,
+        "evidenceEvents": 4,
+        "independentMotionPixels": 10.43785184559347,
+        "minimumIndependentMotionPixels": 2,
+        "lastIndependentMotionSequence": 2487,
+        "motionFresh": true,
+        "associationDistance": 13.602650271275937,
+        "associationMargin": 49.977628637227326
+      }
+    },
+    {
+      "frameSequence": 3536,
+      "label": "visible-live-bot",
+      "receipt": {
+        "disposition": "accepted-motion-semantic",
+        "reason": "independent-rendered-motion-confirmed",
+        "frameSequence": 3536,
+        "trackId": "RMS-26",
+        "confidence": 0.96,
+        "observerStationary": true,
+        "stationaryFrames": 3,
+        "evidenceEvents": 2,
+        "independentMotionPixels": 10.154771903697595,
+        "minimumIndependentMotionPixels": 2,
+        "lastIndependentMotionSequence": 3536,
+        "motionFresh": true,
+        "associationDistance": 8.033998672328183,
+        "associationMargin": null
+      }
+    },
+    {
+      "frameSequence": 3541,
+      "label": "visible-live-bot",
+      "receipt": {
+        "disposition": "accepted-motion-semantic",
+        "reason": "independent-rendered-motion-confirmed",
+        "frameSequence": 3541,
+        "trackId": "RMS-26",
+        "confidence": 0.97,
+        "observerStationary": true,
+        "stationaryFrames": 4,
+        "evidenceEvents": 3,
+        "independentMotionPixels": 10.299718510177309,
+        "minimumIndependentMotionPixels": 2,
+        "lastIndependentMotionSequence": 3541,
+        "motionFresh": true,
+        "associationDistance": 0.3052614061014577,
+        "associationMargin": null
+      }
+    },
+    {
+      "frameSequence": 3547,
+      "label": "visible-live-bot",
+      "receipt": {
+        "disposition": "accepted-motion-semantic",
+        "reason": "independent-rendered-motion-confirmed",
+        "frameSequence": 3547,
+        "trackId": "RMS-26",
+        "confidence": 0.98,
+        "observerStationary": true,
+        "stationaryFrames": 5,
+        "evidenceEvents": 4,
+        "independentMotionPixels": 9.558323909816966,
+        "minimumIndependentMotionPixels": 2,
+        "lastIndependentMotionSequence": 3547,
+        "motionFresh": true,
+        "associationDistance": 0.7414013789177408,
+        "associationMargin": null
+      }
+    },
+    {
+      "frameSequence": 3557,
+      "label": "visible-live-bot",
+      "receipt": {
+        "disposition": "accepted-motion-semantic",
+        "reason": "independent-rendered-motion-confirmed",
+        "frameSequence": 3557,
+        "trackId": "RMS-26",
+        "confidence": 0.99,
+        "observerStationary": true,
+        "stationaryFrames": 6,
+        "evidenceEvents": 5,
+        "independentMotionPixels": 10.464608440291077,
+        "minimumIndependentMotionPixels": 2,
+        "lastIndependentMotionSequence": 3557,
+        "motionFresh": true,
+        "associationDistance": 1.197178409881298,
+        "associationMargin": null
+      }
+    },
+    {
+      "frameSequence": 3560,
+      "label": "visible-live-bot",
+      "receipt": {
+        "disposition": "accepted-motion-semantic",
+        "reason": "independent-rendered-motion-confirmed",
+        "frameSequence": 3560,
+        "trackId": "RMS-26",
+        "confidence": 0.99,
+        "observerStationary": true,
+        "stationaryFrames": 7,
+        "evidenceEvents": 6,
+        "independentMotionPixels": 12.668250759495432,
+        "minimumIndependentMotionPixels": 2,
+        "lastIndependentMotionSequence": 3560,
+        "motionFresh": true,
+        "associationDistance": 6.929803076489005,
+        "associationMargin": null
+      }
+    },
+    {
+      "frameSequence": 3567,
+      "label": "visible-live-bot",
+      "receipt": {
+        "disposition": "accepted-motion-semantic",
+        "reason": "independent-rendered-motion-confirmed",
+        "frameSequence": 3567,
+        "trackId": "RMS-26",
+        "confidence": 0.99,
+        "observerStationary": true,
+        "stationaryFrames": 8,
+        "evidenceEvents": 7,
+        "independentMotionPixels": 11.90369048750102,
+        "minimumIndependentMotionPixels": 2,
+        "lastIndependentMotionSequence": 3567,
+        "motionFresh": true,
+        "associationDistance": 13.165125262855751,
+        "associationMargin": null
+      }
+    },
+    {
+      "frameSequence": 3570,
+      "label": "visible-live-bot",
+      "receipt": {
+        "disposition": "accepted-motion-semantic",
+        "reason": "independent-rendered-motion-confirmed",
+        "frameSequence": 3570,
+        "trackId": "RMS-26",
+        "confidence": 0.99,
+        "observerStationary": true,
+        "stationaryFrames": 9,
+        "evidenceEvents": 8,
+        "independentMotionPixels": 13.359805715317103,
+        "minimumIndependentMotionPixels": 2,
+        "lastIndependentMotionSequence": 3570,
+        "motionFresh": true,
+        "associationDistance": 2.459195262886575,
+        "associationMargin": null
+      }
+    },
+    {
+      "frameSequence": 3581,
+      "label": "visible-live-bot",
+      "receipt": {
+        "disposition": "accepted-motion-semantic",
+        "reason": "independent-rendered-motion-confirmed",
+        "frameSequence": 3581,
+        "trackId": "RMS-26",
+        "confidence": 0.99,
+        "observerStationary": true,
+        "stationaryFrames": 10,
+        "evidenceEvents": 9,
+        "independentMotionPixels": 12.464014244098783,
+        "minimumIndependentMotionPixels": 2,
+        "lastIndependentMotionSequence": 3581,
+        "motionFresh": true,
+        "associationDistance": 3.9127272841550753,
+        "associationMargin": null
+      }
+    },
+    {
+      "frameSequence": 3587,
+      "label": "visible-live-bot",
+      "receipt": {
+        "disposition": "accepted-motion-semantic",
+        "reason": "independent-rendered-motion-confirmed",
+        "frameSequence": 3587,
+        "trackId": "RMS-26",
+        "confidence": 0.99,
+        "observerStationary": true,
+        "stationaryFrames": 11,
+        "evidenceEvents": 10,
+        "independentMotionPixels": 14.619254829339228,
+        "minimumIndependentMotionPixels": 2,
+        "lastIndependentMotionSequence": 3587,
+        "motionFresh": true,
+        "associationDistance": 2.226740703859029,
+        "associationMargin": null
+      }
+    },
+    {
+      "frameSequence": 3598,
+      "label": "visible-live-bot",
+      "receipt": {
+        "disposition": "accepted-motion-semantic",
+        "reason": "independent-rendered-motion-confirmed",
+        "frameSequence": 3598,
+        "trackId": "RMS-26",
+        "confidence": 0.99,
+        "observerStationary": true,
+        "stationaryFrames": 12,
+        "evidenceEvents": 11,
+        "independentMotionPixels": 13.735011843948865,
+        "minimumIndependentMotionPixels": 2,
+        "lastIndependentMotionSequence": 3598,
+        "motionFresh": true,
+        "associationDistance": 14.19456199674696,
+        "associationMargin": null
+      }
+    },
+    {
+      "frameSequence": 3601,
+      "label": "visible-live-bot",
+      "receipt": {
+        "disposition": "accepted-motion-semantic",
+        "reason": "independent-rendered-motion-confirmed",
+        "frameSequence": 3601,
+        "trackId": "RMS-26",
+        "confidence": 0.99,
+        "observerStationary": true,
+        "stationaryFrames": 13,
+        "evidenceEvents": 12,
+        "independentMotionPixels": 13.68252758734266,
+        "minimumIndependentMotionPixels": 2,
+        "lastIndependentMotionSequence": 3601,
+        "motionFresh": true,
+        "associationDistance": 3.225402142452122,
+        "associationMargin": null
+      }
+    },
+    {
+      "frameSequence": 4298,
+      "label": "visible-live-bot",
+      "receipt": {
+        "disposition": "accepted-motion-semantic",
+        "reason": "independent-rendered-motion-confirmed",
+        "frameSequence": 4298,
+        "trackId": "RMS-32",
+        "confidence": 0.9435481464141185,
+        "observerStationary": true,
+        "stationaryFrames": 3,
+        "evidenceEvents": 1,
+        "independentMotionPixels": 6.406444392423556,
+        "minimumIndependentMotionPixels": 2,
+        "lastIndependentMotionSequence": 4298,
+        "motionFresh": true,
+        "associationDistance": 5.678420317192547,
+        "associationMargin": 7.0872978109917995
+      }
+    },
+    {
+      "frameSequence": 4740,
+      "label": "visible-live-bot",
+      "receipt": {
+        "disposition": "accepted-motion-semantic",
+        "reason": "independent-rendered-motion-confirmed",
+        "frameSequence": 4740,
+        "trackId": "RMS-33",
+        "confidence": 0.95,
+        "observerStationary": true,
+        "stationaryFrames": 3,
+        "evidenceEvents": 1,
+        "independentMotionPixels": 17.68335458145047,
+        "minimumIndependentMotionPixels": 2,
+        "lastIndependentMotionSequence": 4740,
+        "motionFresh": true,
+        "associationDistance": 17.04596243819269,
+        "associationMargin": 13.853749615446244
+      }
+    },
+    {
+      "frameSequence": 4742,
+      "label": "visible-live-bot",
+      "receipt": {
+        "disposition": "accepted-motion-semantic",
+        "reason": "independent-rendered-motion-confirmed",
+        "frameSequence": 4742,
+        "trackId": "RMS-33",
+        "confidence": 0.96,
+        "observerStationary": true,
+        "stationaryFrames": 4,
+        "evidenceEvents": 2,
+        "independentMotionPixels": 17.66366152834306,
+        "minimumIndependentMotionPixels": 2,
+        "lastIndependentMotionSequence": 4742,
+        "motionFresh": true,
+        "associationDistance": 0.10254683245665937,
+        "associationMargin": null
+      }
+    },
+    {
+      "frameSequence": 4750,
+      "label": "visible-live-bot",
+      "receipt": {
+        "disposition": "accepted-motion-semantic",
+        "reason": "independent-rendered-motion-confirmed",
+        "frameSequence": 4750,
+        "trackId": "RMS-33",
+        "confidence": 0.97,
+        "observerStationary": true,
+        "stationaryFrames": 5,
+        "evidenceEvents": 3,
+        "independentMotionPixels": 17.03288101488466,
+        "minimumIndependentMotionPixels": 2,
+        "lastIndependentMotionSequence": 4750,
+        "motionFresh": true,
+        "associationDistance": 0.6434532910602033,
+        "associationMargin": 7.442086670894388
+      }
+    }
+  ],
+  "passed": true
+}

@@ -20,6 +20,7 @@ import {
 import { fingerprintProfile, loadPlayerProfile, validatePlayerRuntimeRequest } from './one-v-one/profile-contract.mjs';
 import { createOneVOneController } from './one-v-one/one-v-one-controller.mjs';
 import { legacyProposalsToShadowDetections } from './one-v-one/semantic-detector.mjs';
+import { createRenderedMotionSemanticGate } from './one-v-one/rendered-motion-semantic.mjs';
 import { createTacticalPolicy } from './tactical-policy.mjs';
 import { chooseVisibleSupport, shouldThrowVisibleGrenade } from './combat-actions.mjs';
 import { advanceFinishLatch, consumeFinishFollowup } from './finish-latch.mjs';
@@ -109,6 +110,8 @@ function summarizeOneVOneShadow(receipts) {
     ambiguousAssociations: 0,
     fireCandidateFrames: 0,
     fireAuthorizedFrames: 0,
+    motionSemanticAcceptedFrames: 0,
+    motionSemanticReasons: {},
     inputCommandsIssued: 0,
     aimPhases: {},
   };
@@ -125,6 +128,8 @@ function summarizeOneVOneShadow(receipts) {
     if (receipt.associationReason === 'ambiguous-association' || receipt.associationReason === 'ambiguous-initiation') summary.ambiguousAssociations += 1;
     if (receipt.fireCandidate) summary.fireCandidateFrames += 1;
     if (receipt.fireAuthorized) summary.fireAuthorizedFrames += 1;
+    if (receipt.motionSemantic?.disposition === 'accepted-motion-semantic') summary.motionSemanticAcceptedFrames += 1;
+    if (receipt.motionSemantic?.reason) summary.motionSemanticReasons[receipt.motionSemantic.reason] = (summary.motionSemanticReasons[receipt.motionSemantic.reason] ?? 0) + 1;
     if (receipt.inputIssued) summary.inputCommandsIssued += 1;
   }
   summary.trackIds = [...trackIds];
@@ -635,6 +640,7 @@ async function run() {
   const allowCombatFire = Boolean(args['allow-combat-fire']);
   const allowLive = Boolean(args['allow-live']);
   const playerProfileShadow = Boolean(args['player-profile-shadow']);
+  const playerProfileMotionSemanticShadow = Boolean(args['player-profile-motion-semantic-shadow']);
   let requestedPlayerProfile = null;
   let requestedPlayerProfileFingerprint = null;
   let playerProfileRuntimeReceipt = null;
@@ -655,6 +661,7 @@ async function run() {
     });
   }
   if (playerProfileShadow && !requestedPlayerProfile) throw new Error('--player-profile-shadow requires --player-profile');
+  if (playerProfileMotionSemanticShadow && !playerProfileShadow) throw new Error('--player-profile-motion-semantic-shadow requires --player-profile-shadow');
   const tacticalPolicyName = String(args['tactical-policy'] ?? 'legacy');
   if (!['legacy', 'state-machine-v1'].includes(tacticalPolicyName)) throw new Error('--tactical-policy must be legacy or state-machine-v1');
   const baseUrl = String(args.url ?? 'http://127.0.0.1:4173/');
@@ -885,7 +892,19 @@ async function run() {
       const deadline = controlStartedAtMs + durationSeconds * 1000;
       const targetTracker = createPurpleTargetTracker({ confirmationFrames: 2, maxSizeRatio: 8 });
       const oneVOneShadowController = requestedPlayerProfile && playerProfileShadow
-        ? createOneVOneController(requestedPlayerProfile, { liveShadowProposal: true })
+        ? createOneVOneController(requestedPlayerProfile, {
+          liveShadowProposal: !playerProfileMotionSemanticShadow,
+          liveMotionSemanticObserver: playerProfileMotionSemanticShadow,
+        })
+        : null;
+      const oneVOneMotionSemanticGate = playerProfileMotionSemanticShadow
+        ? createRenderedMotionSemanticGate({
+          requiredStationaryFrames: 3,
+          minimumIndependentMotionPixels: 2,
+          maximumAssociationDistancePixels: 18,
+          minimumAssociationMarginPixels: 3,
+          maximumFreshMotionSequenceGap: 12,
+        })
         : null;
       const tacticalPolicy = tacticalPolicyName === 'state-machine-v1'
         ? createTacticalPolicy({
@@ -1067,9 +1086,18 @@ async function run() {
           cameraMoved: cameraMovedLastFrame,
           movementMoved: previousMovementMoved,
         });
+        let motionSemanticReceipt = null;
         if (oneVOneShadowController && activeMatch) {
           const shadowFrameSequence = Number(vision.sourceSequence ?? vision.sequence);
-          const shadowDetections = legacyProposalsToShadowDetections(vision.operatorTargets, shadowFrameSequence);
+          const motionSemantic = oneVOneMotionSemanticGate?.update(
+            vision.operatorTargets,
+            { sequence: shadowFrameSequence },
+            { cameraMoved: cameraMovedLastFrame, movementMoved: previousMovementMoved },
+          ) ?? null;
+          motionSemanticReceipt = motionSemantic?.receipt ?? null;
+          const shadowDetections = motionSemantic
+            ? motionSemantic.detections
+            : legacyProposalsToShadowDetections(vision.operatorTargets, shadowFrameSequence);
           const shadowResult = oneVOneShadowController.step({
             frame: {
               sequence: shadowFrameSequence,
@@ -1085,6 +1113,7 @@ async function run() {
             inputIssued: shadowResult.inputIssued,
             legacyOperatorCandidates: vision.operatorTargets.length,
             detections: shadowDetections,
+            motionSemantic: motionSemanticReceipt,
           });
           if (!oneVOneShadowFirstConfirmedCaptured && shadowResult.track.state === 'CONFIRMED') {
             await writeFile(resolve(artifactDirectory, 'one-v-one-shadow-first-confirmed.jpg'), vision.jpeg);
@@ -1094,7 +1123,10 @@ async function run() {
         const rawTarget = tracking.rawTarget;
         const minimapThreat = vision.minimapThreats[0] ?? null;
         if (activeMatch && minimapThreat) minimapThreatFrames += 1;
-        currentTarget = tracking.confirmedTarget;
+        currentTarget = playerProfileMotionSemanticShadow ? null : tracking.confirmedTarget;
+        if (playerProfileMotionSemanticShadow && tracking.confirmedTarget) {
+          actions.push({ atMs, kind: 'motion-semantic-observer-input-veto', reason: 'legacy-aim-suppressed', motionSemantic: motionSemanticReceipt });
+        }
         const finishAdvance = advanceFinishLatch({
           latch: finishLatch,
           active: activeMatch,
@@ -1253,6 +1285,7 @@ async function run() {
               file: `${candidateName}.jpg`,
               annotatedFile: `${candidateName}-annotated.jpg`,
               sourceSequence: vision.sourceSequence,
+              observerMotion: { cameraMoved: cameraMovedLastFrame, movementMoved: previousMovementMoved },
               target: rawTarget ? { x: rawTarget.x, y: rawTarget.y, pixels: rawTarget.pixels, bounds: rawTarget.bounds } : null,
               candidates: vision.operatorTargets.map((target) => ({
                 x: target.x,
@@ -1714,7 +1747,10 @@ async function run() {
         profileId: requestedPlayerProfile.profileId,
         profileFingerprint: requestedPlayerProfileFingerprint,
         runtime: playerProfileRuntimeReceipt,
-        semanticSource: 'legacy rendered purple-operator proposals; observer-only; not semantic authority',
+        semanticSource: playerProfileMotionSemanticShadow
+          ? 'rendered colour/geometry proposals plus independent target motion while the observer is stationary; shadow-observer semantic authority only'
+          : 'legacy rendered purple-operator proposals; observer-only; not semantic authority',
+        semanticMode: playerProfileMotionSemanticShadow ? 'rendered-motion-semantic-v1-shadow-observer' : 'legacy-rendered-proposal-shadow',
         summary: oneVOneShadowSummary,
         frames: oneVOneShadowReceipts,
       }, null, 2)}\n`);
@@ -1750,6 +1786,7 @@ async function run() {
           fingerprint: requestedPlayerProfileFingerprint,
           runtime: playerProfileRuntimeReceipt,
           shadowMode: playerProfileShadow,
+          motionSemanticShadow: playerProfileMotionSemanticShadow,
         } : null,
       },
       fairness: {

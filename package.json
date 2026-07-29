@@ -12,6 +12,7 @@
     "test:agent-player": "node --test scripts/agent-player/*.test.mjs",
     "verify:player-profiles": "node scripts/agent-player/verify-player-profiles.mjs scripts/agent-player/profiles/index.json",
     "replay:one-v-one-scaffold": "node scripts/agent-player/one-v-one/replay-evaluator.mjs scripts/agent-player/profiles/one-v-one-semantic-v1.profile.json scripts/agent-player/one-v-one/fixtures/scaffold-replay-v1.json",
+    "evaluate:one-v-one-motion-semantic": "node scripts/agent-player/one-v-one/evaluate-motion-semantic.mjs --archive artifacts/agent-player/archive --manifest scripts/agent-player/profiles/datasets/one-v-one-rendered-semantic-v2.manifest.json --fixture scripts/agent-player/one-v-one/fixtures/rendered-motion-semantic-regression-v1.json --output scripts/agent-player/profiles/datasets/rendered-motion-semantic-v1.evaluation.json",
     "test:property": "vitest run src/gameplay-state-property.test.ts",
     "test:property:nightly": "PASS25_PROPERTY_RUNS=100000 vitest run src/gameplay-state-property.test.ts",
     "test:mutation": "PASS25_PROPERTY_RUNS=50 stryker run",

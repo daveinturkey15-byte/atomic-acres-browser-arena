@@ -13,6 +13,9 @@ const implementationPaths = [
   'scripts/agent-player/atomic-player-driver.mjs',
   'scripts/agent-player/one-v-one/profile-contract.mjs',
   'scripts/agent-player/one-v-one/semantic-detector.mjs',
+  'scripts/agent-player/one-v-one/rendered-motion-semantic.mjs',
+  'scripts/agent-player/one-v-one/build_semantic_dataset.py',
+  'scripts/agent-player/one-v-one/evaluate-motion-semantic.mjs',
   'scripts/agent-player/one-v-one/single-target-tracker.mjs',
   'scripts/agent-player/one-v-one/visual-servo.mjs',
   'scripts/agent-player/one-v-one/fresh-frame-fire-gate.mjs',
@@ -22,7 +25,11 @@ const implementationPaths = [
   'scripts/agent-player/verify-player-profiles.mjs',
   'scripts/agent-player/one-v-one-profile.test.mjs',
   'scripts/agent-player/one-v-one/fixtures/scaffold-replay-v1.json',
+  'scripts/agent-player/one-v-one/fixtures/rendered-motion-semantic-regression-v1.json',
   'scripts/agent-player/profiles/datasets/one-v-one-operator-v1.manifest.json',
+  'scripts/agent-player/profiles/datasets/one-v-one-rendered-semantic-v2.manifest.json',
+  'scripts/agent-player/profiles/datasets/rendered-motion-semantic-v1.evaluation.json',
+  'scripts/agent-player/profiles/one-v-one-semantic-refinement-v2.spec.json',
   'scripts/agent-player/profiles/README.md',
 ];
 const launcherPaths = [

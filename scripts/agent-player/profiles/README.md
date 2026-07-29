@@ -38,11 +38,24 @@ Its deterministic pipeline is:
 
 Proposal colour, minimap bearings, optical flow and predicted/coasting tracks can guide search or aim. None can authorize fire.
 
+### Rendered semantic refinement v2
+
+The default-off refinement adds `rendered-motion-semantic-v1` as a **shadow-observer-only** gate. It combines an existing rendered colour/geometry proposal with body-shaped component constraints and independent target motion measured only after camera and movement commands have stopped. It is not a production model, motion alone never authorizes a live shot, and legacy aim is suppressed during its bounded calibration so observer motion cannot be mistaken for target motion.
+
+Frozen evidence is split across:
+
+- `datasets/one-v-one-rendered-semantic-v2.manifest.json` — rendered positive, hard-negative and ambiguous/reject labels with image hashes and provenance;
+- `datasets/rendered-motion-semantic-v1.evaluation.json` — G0134 held-sequence and synthetic regression receipt;
+- `one-v-one-semantic-refinement-v2.spec.json` — claim states, retained behaviour and promotion gates.
+
+Known static G0133/G0125-style contacts, horizontal prop handoffs and observer-camera motion remain non-authoritative in the offline gate. Live use remains no-input shadow observation until a second rendered calibration is reviewed.
+
 ## Offline verification
 
 ```bash
 npm run test:agent-player
 npm run replay:one-v-one-scaffold
+npm run evaluate:one-v-one-motion-semantic
 npm run verify:player-profiles
 ```
 

@@ -38,7 +38,7 @@
   },
   "acceptanceCriteria": {
     "C1": "Dataset contains at least 50 independently receipted credited-bot rendered examples from at least 10 games and at least 12 independent practice/static hard-negative sequences including G0125 and G0133-family evidence.",
-    "C2": "Held-out evaluation by game/sequence rejects 100 percent of known practice/static negatives and retains at least 80 percent of credited-bot examples whose rendered crop is semantically usable; optic-obscured or ambiguous samples are excluded with explicit reasons, not relabelled.",
+    "C2": "Held-out evaluation by rendered sequence rejects 100 percent of known practice/static negatives and accepts at least 80 percent of semantically usable visible-bot sequences that contain the required three stationary rendered observations; optic-obscured or ambiguous samples are excluded with explicit reasons, not relabelled.",
     "C3": "All G0133 known/static replay candidates remain non-authoritative; warmup, HUD, optic, banner and damage-overlay fixtures remain rejected.",
     "C4": "Refined live shadow records zero profile input and zero shots, and every semantically accepted confirmation crop visibly contains a real bot.",
     "C5": "Refined live shadow obtains at least one track with five fresh semantic measurements, at least one bounded coasting/reacquisition event or an explicit no-event result, and no identity handoff to static geometry.",

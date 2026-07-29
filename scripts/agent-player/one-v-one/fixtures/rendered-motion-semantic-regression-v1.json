@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "rendered-motion-semantic-regression-v1",
+  "sequences": [
+    {
+      "id": "g0133-static-purple-geometry",
+      "expectedAcceptedFrames": 0,
+      "frames": [
+        { "sequence": 1, "cameraMoved": false, "movementMoved": false, "targets": [{ "x": 140.4, "y": 89.1, "pixels": 24, "bounds": { "minX": 139, "minY": 85, "maxX": 142, "maxY": 93, "width": 4, "height": 9 } }] },
+        { "sequence": 2, "cameraMoved": false, "movementMoved": false, "targets": [{ "x": 140.4, "y": 89.1, "pixels": 24, "bounds": { "minX": 139, "minY": 85, "maxX": 142, "maxY": 93, "width": 4, "height": 9 } }] },
+        { "sequence": 3, "cameraMoved": false, "movementMoved": false, "targets": [{ "x": 140.5, "y": 89.0, "pixels": 25, "bounds": { "minX": 139, "minY": 85, "maxX": 142, "maxY": 93, "width": 4, "height": 9 } }] },
+        { "sequence": 4, "cameraMoved": false, "movementMoved": false, "targets": [{ "x": 140.4, "y": 89.1, "pixels": 24, "bounds": { "minX": 139, "minY": 85, "maxX": 142, "maxY": 93, "width": 4, "height": 9 } }] },
+        { "sequence": 5, "cameraMoved": false, "movementMoved": false, "targets": [{ "x": 140.5, "y": 89.1, "pixels": 25, "bounds": { "minX": 139, "minY": 85, "maxX": 142, "maxY": 93, "width": 4, "height": 9 } }] }
+      ]
+    },
+    {
+      "id": "g0125-practice-contact-static",
+      "expectedAcceptedFrames": 0,
+      "frames": [
+        { "sequence": 10, "cameraMoved": false, "movementMoved": false, "targets": [{ "x": 157.8, "y": 89.0, "pixels": 17, "bounds": { "minX": 155, "minY": 87, "maxX": 160, "maxY": 93, "width": 6, "height": 7 } }] },
+        { "sequence": 11, "cameraMoved": false, "movementMoved": false, "targets": [{ "x": 157.9, "y": 89.0, "pixels": 17, "bounds": { "minX": 155, "minY": 87, "maxX": 160, "maxY": 93, "width": 6, "height": 7 } }] },
+        { "sequence": 12, "cameraMoved": false, "movementMoved": false, "targets": [{ "x": 157.8, "y": 89.1, "pixels": 18, "bounds": { "minX": 155, "minY": 87, "maxX": 160, "maxY": 93, "width": 6, "height": 7 } }] },
+        { "sequence": 13, "cameraMoved": false, "movementMoved": false, "targets": [{ "x": 157.9, "y": 89.0, "pixels": 17, "bounds": { "minX": 155, "minY": 87, "maxX": 160, "maxY": 93, "width": 6, "height": 7 } }] }
+      ]
+    },
+    {
+      "id": "moving-rendered-bot",
+      "minimumAcceptedFrames": 2,
+      "frames": [
+        { "sequence": 20, "cameraMoved": false, "movementMoved": false, "targets": [{ "x": 150, "y": 90, "pixels": 60, "bounds": { "minX": 146, "minY": 84, "maxX": 154, "maxY": 96, "width": 9, "height": 13 } }] },
+        { "sequence": 21, "cameraMoved": false, "movementMoved": false, "targets": [{ "x": 150.5, "y": 90, "pixels": 61, "bounds": { "minX": 146.5, "minY": 84, "maxX": 154.5, "maxY": 96, "width": 9, "height": 13 } }] },
+        { "sequence": 22, "cameraMoved": false, "movementMoved": false, "targets": [{ "x": 153, "y": 90, "pixels": 63, "bounds": { "minX": 149, "minY": 84, "maxX": 157, "maxY": 96, "width": 9, "height": 13 } }] },
+        { "sequence": 23, "cameraMoved": false, "movementMoved": false, "targets": [{ "x": 155, "y": 90, "pixels": 64, "bounds": { "minX": 151, "minY": 84, "maxX": 159, "maxY": 96, "width": 9, "height": 13 } }] }
+      ]
+    },
+    {
+      "id": "observer-camera-motion-is-not-target-motion",
+      "expectedAcceptedFrames": 0,
+      "frames": [
+        { "sequence": 30, "cameraMoved": true, "movementMoved": false, "targets": [{ "x": 150, "y": 90, "pixels": 60, "bounds": { "minX": 146, "minY": 84, "maxX": 154, "maxY": 96, "width": 9, "height": 13 } }] },
+        { "sequence": 31, "cameraMoved": true, "movementMoved": false, "targets": [{ "x": 156, "y": 90, "pixels": 60, "bounds": { "minX": 152, "minY": 84, "maxX": 160, "maxY": 96, "width": 9, "height": 13 } }] },
+        { "sequence": 32, "cameraMoved": true, "movementMoved": false, "targets": [{ "x": 162, "y": 90, "pixels": 60, "bounds": { "minX": 158, "minY": 84, "maxX": 166, "maxY": 96, "width": 9, "height": 13 } }] }
+      ]
+    },
+    {
+      "id": "body-to-horizontal-prop-handoff",
+      "expectedAcceptedFrames": 0,
+      "frames": [
+        { "sequence": 40, "cameraMoved": false, "movementMoved": false, "targets": [{ "x": 162.4, "y": 91.2, "pixels": 15, "bounds": { "minX": 161, "minY": 87, "maxX": 162, "maxY": 95, "width": 2, "height": 9 } }] },
+        { "sequence": 41, "cameraMoved": false, "movementMoved": false, "targets": [{ "x": 162.5, "y": 91.2, "pixels": 15, "bounds": { "minX": 161, "minY": 87, "maxX": 162, "maxY": 95, "width": 2, "height": 9 } }] },
+        { "sequence": 42, "cameraMoved": false, "movementMoved": false, "targets": [{ "x": 156.6, "y": 93.1, "pixels": 14, "bounds": { "minX": 154, "minY": 92, "maxX": 159, "maxY": 95, "width": 6, "height": 4 } }] }
+      ]
+    }
+  ]
+}

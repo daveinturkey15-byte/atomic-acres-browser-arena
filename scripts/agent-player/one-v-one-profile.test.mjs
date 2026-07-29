@@ -15,12 +15,15 @@ import { createSingleTargetTracker } from './one-v-one/single-target-tracker.mjs
 import { createVisualServoController } from './one-v-one/visual-servo.mjs';
 import { createFreshFrameFireGate } from './one-v-one/fresh-frame-fire-gate.mjs';
 import { createOneVOneController } from './one-v-one/one-v-one-controller.mjs';
+import { createRenderedMotionSemanticGate } from './one-v-one/rendered-motion-semantic.mjs';
 import { runReplay } from './one-v-one/replay-evaluator.mjs';
 import { verifyPlayerProfiles } from './verify-player-profiles.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const profilePath = resolve(here, 'profiles/one-v-one-semantic-v1.profile.json');
 const fixturePath = resolve(here, 'one-v-one/fixtures/scaffold-replay-v1.json');
+const semanticDatasetPath = resolve(here, 'profiles/datasets/one-v-one-rendered-semantic-v2.manifest.json');
+const motionSemanticEvaluationPath = resolve(here, 'profiles/datasets/rendered-motion-semantic-v1.evaluation.json');
 const clone = (value) => structuredClone(value);
 
 function opponent(sequence, x = 160, y = 90, confidence = 0.96) {
@@ -74,6 +77,28 @@ test('activation fails closed without build, detector and calibration receipts',
   assert.ok(validation.errors.some((error) => error.includes('detector model')));
 });
 
+test('rendered semantic dataset freezes credited positives, hard negatives and ambiguous fail-closed labels', async () => {
+  const manifest = JSON.parse(await readFile(semanticDatasetPath, 'utf8'));
+  assert.equal(manifest.status, 'frozen-offline-evidence-default-off');
+  assert.ok(Object.values(manifest.acceptance).every(Boolean));
+  assert.ok(manifest.counts['visible-live-bot'] >= 50);
+  assert.ok(manifest.counts['credited-bot-contact'] >= 50);
+  assert.ok(manifest.hardNegativeIndependentSequenceCount >= 12);
+  assert.equal(manifest.counts['ambiguous-reject'], 2);
+  assert.equal(manifest.fairnessBoundary.hiddenStateUsedLive, false);
+  assert.equal(manifest.fairnessBoundary.motionAloneMayAuthorizeFire, false);
+});
+
+test('offline motion semantic evaluation rejects every known hard negative and retains eligible bot sequences', async () => {
+  const evaluation = JSON.parse(await readFile(motionSemanticEvaluationPath, 'utf8'));
+  assert.equal(evaluation.passed, true);
+  assert.ok(Object.values(evaluation.acceptance).every(Boolean));
+  assert.equal(evaluation.summary.acceptedHardNegativeFrames, 0);
+  assert.equal(evaluation.summary.acceptedAmbiguousFrames, 0);
+  assert.ok(evaluation.summary.visibleBotSequenceAcceptanceRate >= 0.8);
+  assert.ok(evaluation.summary.eligibleVisibleBotSequences >= 3);
+});
+
 test('unavailable production semantic model rejects every live detection', async () => {
   const profile = await loadPlayerProfile(profilePath);
   const result = gateSemanticDetections([opponent(1)], frame(1), profile, { offlineFixture: false });
@@ -111,6 +136,47 @@ test('live shadow accepts legacy rendered proposals without granting semantic or
   assert.equal(confirmed.state, 'CONFIRMED');
   assert.equal(confirmed.semanticAuthority, false);
   assert.equal(confirmed.canAuthorizeFire, false);
+});
+
+test('rendered motion semantic gate rejects static contacts and confirms independently moving contacts only while the observer is stationary', async () => {
+  const target = (x, pixels = 60) => ({
+    x, y: 90, pixels, detector: 'pass63-visible-purple-operator-v1',
+    bounds: { minX: x - 4, minY: 84, maxX: x + 4, maxY: 96, width: 9, height: 13 },
+  });
+  const staticGate = createRenderedMotionSemanticGate();
+  for (let sequence = 1; sequence <= 5; sequence += 1) {
+    const result = staticGate.update([target(160)], frame(sequence), { cameraMoved: false, movementMoved: false });
+    assert.equal(result.detections.length, 0);
+  }
+  const movingGate = createRenderedMotionSemanticGate();
+  assert.equal(movingGate.update([target(150)], frame(1), { cameraMoved: false, movementMoved: false }).detections.length, 0);
+  assert.equal(movingGate.update([target(150.5)], frame(2), { cameraMoved: false, movementMoved: false }).detections.length, 0);
+  const accepted = movingGate.update([target(153)], frame(3), { cameraMoved: false, movementMoved: false });
+  assert.equal(accepted.detections.length, 1);
+  assert.equal(accepted.receipt.reason, 'independent-rendered-motion-confirmed');
+  assert.equal(accepted.detections[0].provider, 'rendered-motion-semantic-v1');
+  const movingObserverGate = createRenderedMotionSemanticGate();
+  movingObserverGate.update([target(150)], frame(1), { cameraMoved: true, movementMoved: false });
+  movingObserverGate.update([target(156)], frame(2), { cameraMoved: true, movementMoved: false });
+  const observerMotion = movingObserverGate.update([target(160)], frame(3), { cameraMoved: true, movementMoved: false });
+  assert.equal(observerMotion.detections.length, 0);
+  assert.equal(observerMotion.receipt.reason, 'observer-moving');
+});
+
+test('motion semantic authority is accepted only inside explicit no-input shadow observer mode', async () => {
+  const profile = await loadPlayerProfile(profilePath);
+  const gate = createRenderedMotionSemanticGate();
+  const target = (x) => ({ x, y: 90, pixels: 60, bounds: { minX: x - 4, minY: 84, maxX: x + 4, maxY: 96, width: 9, height: 13 } });
+  gate.update([target(150)], frame(1), { cameraMoved: false, movementMoved: false });
+  gate.update([target(151)], frame(2), { cameraMoved: false, movementMoved: false });
+  const detection = gate.update([target(154)], frame(3), { cameraMoved: false, movementMoved: false }).detections[0];
+  const blocked = gateSemanticDetections([detection], frame(3), profile, {});
+  assert.equal(blocked.accepted.length, 0);
+  assert.equal(blocked.rejected[0].reason, 'semantic-model-unavailable');
+  const observer = gateSemanticDetections([detection], frame(3), profile, { liveMotionSemanticObserver: true });
+  assert.equal(observer.accepted.length, 1);
+  assert.equal(observer.accepted[0].semanticAuthority, true);
+  assert.equal(observer.accepted[0].authorityScope, 'shadow-observer-only');
 });
 
 test('runtime contract permits only no-fire, no-item observation for the default-off shadow profile', async () => {
@@ -281,10 +347,12 @@ test('launcher surfaces forward both profile path and fingerprint only when expl
   assert.match(campaign, /PLAYER_PROFILE_PATH/);
   assert.match(campaign, /PlayerProfileFingerprint/);
   assert.match(campaign, /PLAYER_PROFILE_SHADOW/);
+  assert.match(campaign, /PLAYER_PROFILE_MOTION_SEMANTIC_SHADOW/);
   assert.match(campaign, /CANDIDATE_IMAGE_INTERVAL_MS/);
   assert.match(powershell, /--player-profile/);
   assert.match(powershell, /--player-profile-fingerprint/);
   assert.match(powershell, /--player-profile-shadow/);
+  assert.match(powershell, /--player-profile-motion-semantic-shadow/);
   assert.match(powershell, /BoundedCalibration/);
   assert.match(powershell, /CandidateImageInterval/);
   assert.match(powershell, /PlayerProfileFingerprint is required/);
