@@ -454,6 +454,7 @@ import {
 } from './physics';
 import { InteractiveWorldRuntime } from './interactive-world-runtime';
 import { shedPlacementsForArena } from './destructible-shed-registry';
+import { FIELD_SHED_EXPLOSION_DAMAGE_MULTIPLIER } from './destructible-shed-definition';
 import { canAdmitMajorDebris, SHARED_MAJOR_DEBRIS_BUDGET } from './major-debris-budget';
 import {
   INTERACTIVE_WORLD_SCHEMA_VERSION,
@@ -2123,7 +2124,7 @@ function applyInteractiveWorldExplosion(point: THREE.Vector3, radius: number, ma
     origin: point,
     radius,
     maximumDamageQ: Math.max(1, Math.round(maximumDamage)),
-    shedMaximumDamageQ: Math.max(1, Math.round(maximumDamage * 4)),
+    shedMaximumDamageQ: Math.max(1, Math.round(maximumDamage * FIELD_SHED_EXPLOSION_DAMAGE_MULTIPLIER)),
   });
   let debrisImpulses = 0;
   if (mutations > 0) syncInteractiveWorldPhysics();

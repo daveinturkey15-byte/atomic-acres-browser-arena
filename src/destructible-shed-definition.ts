@@ -82,3 +82,10 @@ export const FIELD_SHED_MATERIAL_IDS = Object.freeze({
 });
 
 export const FIELD_SHED_BALLISTIC_MATERIAL_ID = 'thin-metal' as const;
+
+/**
+ * Thin corrugated panels amplify admitted blast damage relative to actors and
+ * structural house fragments. The bounded authored chunk cap still limits how
+ * much physical debris one explosion can create.
+ */
+export const FIELD_SHED_EXPLOSION_DAMAGE_MULTIPLIER = 5;

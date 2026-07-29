@@ -282,6 +282,34 @@ describe('shared interactive-world runtime adapter', () => {
     host.dispose();
   });
 
+  it('uses the nearest physical sheet point so close edge blasts fracture instead of missing the panel centre', () => {
+    const runtime = new InteractiveWorldRuntime('atomic-acres', 10, [placement], true);
+    const west = FIELD_SHED_DEFINITION.surfaces.find((surface) => surface.id === 'wall-west')!;
+    const origin = {
+      x: west.frame.centre.x - 0.02,
+      y: west.frame.centre.y + west.frame.halfV - 0.05,
+      z: west.frame.centre.z + west.frame.halfU - 0.05,
+    };
+    expect(Math.hypot(
+      origin.x - west.frame.centre.x,
+      origin.y - west.frame.centre.y,
+      origin.z - west.frame.centre.z,
+    )).toBeGreaterThan(2);
+    expect(runtime.applyExplosionAt({
+      origin,
+      radius: 0.5,
+      maximumDamageQ: 1,
+      shedMaximumDamageQ: FIELD_SHED_DEFINITION.thresholds.detachDamageQ + 40,
+    })).toBeGreaterThan(0);
+    expect(runtime.telemetry()).toMatchObject({ detachedChunks: 2, awakeMajorBodies: 2 });
+    const state = runtime.stateEnvelope().sheds[0]!;
+    expect(state.surfaces.find((surface) => surface.surfaceId === 'wall-west')).toMatchObject({
+      stage: 'detached',
+      dents: [expect.objectContaining({ uQ: expect.any(Number), vQ: expect.any(Number) })],
+    });
+    runtime.dispose();
+  });
+
   it('strictly reconstructs a late join and resets every shed on a newer epoch', () => {
     const host = new InteractiveWorldRuntime('atomic-acres', 11, [placement], true);
     const guest = new InteractiveWorldRuntime('atomic-acres', 11, [placement], false);

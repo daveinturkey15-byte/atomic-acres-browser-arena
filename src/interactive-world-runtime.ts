@@ -271,6 +271,31 @@ function panelCoordinates(frame: SurfaceFrame, point: Point3): Readonly<{ uQ: nu
   });
 }
 
+function closestPanelPoint(
+  frame: SurfaceFrame,
+  point: Point3,
+): Readonly<{ distance: number; uQ: number; vQ: number }> {
+  const offsetX = point.x - frame.centre.x;
+  const offsetY = point.y - frame.centre.y;
+  const offsetZ = point.z - frame.centre.z;
+  const localU = Math.max(-frame.halfU, Math.min(
+    frame.halfU,
+    offsetX * frame.uAxis.x + offsetY * frame.uAxis.y + offsetZ * frame.uAxis.z,
+  ));
+  const localV = Math.max(-frame.halfV, Math.min(
+    frame.halfV,
+    offsetX * frame.vAxis.x + offsetY * frame.vAxis.y + offsetZ * frame.vAxis.z,
+  ));
+  const closestX = frame.centre.x + frame.uAxis.x * localU + frame.vAxis.x * localV;
+  const closestY = frame.centre.y + frame.uAxis.y * localU + frame.vAxis.y * localV;
+  const closestZ = frame.centre.z + frame.uAxis.z * localU + frame.vAxis.z * localV;
+  return Object.freeze({
+    distance: Math.hypot(point.x - closestX, point.y - closestY, point.z - closestZ),
+    uQ: Math.round(localU / frame.halfU * SHED_PANEL_COORD_Q),
+    vQ: Math.round(localV / frame.halfV * SHED_PANEL_COORD_Q),
+  });
+}
+
 function majorDebrisBounds(shed: RuntimeShed, body: ShedState['majorDebris'][number]): Box2 {
   const localPosition = new THREE.Vector3(
     body.poseQ.position.xQ / 1_000,
@@ -865,21 +890,15 @@ export class InteractiveWorldRuntime {
       for (const surface of shed.definition.surfaces) {
         const state = shed.state.surfaces.find((candidate) => candidate.surfaceId === surface.id);
         if (!state || state.stage === 'detached') continue;
-        const centre = surfaceFrame(surface, shed.placement, shed.state).centre;
-        const distance = Math.hypot(
-          centre.x - request.origin.x,
-          centre.y - request.origin.y,
-          centre.z - request.origin.z,
-        );
-        if (distance > request.radius) continue;
-        const damageQ = Math.max(1, Math.round(shedMaximumDamageQ * (1 - distance / request.radius)));
-        const impactCoordinates = panelCoordinates(surfaceFrame(surface, shed.placement, shed.state), request.origin);
+        const impact = closestPanelPoint(surfaceFrame(surface, shed.placement, shed.state), request.origin);
+        if (impact.distance > request.radius) continue;
+        const damageQ = Math.max(1, Math.round(shedMaximumDamageQ * (1 - impact.distance / request.radius)));
         const result = this.applyExplosion({
           placementId: shed.placement.id,
           surfaceId: surface.id,
           damageQ,
-          uQ: Math.max(-SHED_PANEL_COORD_Q, Math.min(SHED_PANEL_COORD_Q, impactCoordinates.uQ)),
-          vQ: Math.max(-SHED_PANEL_COORD_Q, Math.min(SHED_PANEL_COORD_Q, impactCoordinates.vQ)),
+          uQ: impact.uQ,
+          vQ: impact.vQ,
         });
         if (result?.accepted) mutations += 1;
       }

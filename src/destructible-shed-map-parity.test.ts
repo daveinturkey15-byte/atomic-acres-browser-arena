@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import {
   FIELD_SHED_DEFINITION,
+  FIELD_SHED_EXPLOSION_DAMAGE_MULTIPLIER,
   FIELD_SHED_MATERIAL_IDS,
   FIELD_SHED_MATERIAL_POLICY_ID,
 } from './destructible-shed-definition';
@@ -49,6 +50,11 @@ function firstDentMatrix(presentation: DestructibleShedPresentation): readonly n
 }
 
 describe('Pass 65 RustRig/Terminal shed definition and material parity', () => {
+  it('keeps one stronger bounded explosion calibration for every shed placement', () => {
+    expect(FIELD_SHED_EXPLOSION_DAMAGE_MULTIPLIER).toBe(5);
+    expect(FIELD_SHED_DEFINITION.thresholds.detachDamageQ).toBe(220);
+  });
+
   it('projects every placement from one definition and one named material policy', () => {
     const placements = [
       ...shedPlacementsForArena('rustworks-1v1'),
