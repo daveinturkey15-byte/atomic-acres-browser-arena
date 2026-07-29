@@ -573,7 +573,8 @@ async function run() {
   const navigationLaneStride = triLane ? 3 : 1;
   const requestedCaptureMode = String(args['capture-mode'] ?? (cdpUrl ? 'screencast' : 'on-demand'));
   if (!['screencast', 'on-demand'].includes(requestedCaptureMode)) throw new Error('--capture-mode must be screencast or on-demand');
-  const candidateImageLimit = integerArg(args['candidate-images'], 12, 0, 40);
+  const candidateImageLimit = integerArg(args['candidate-images'], 12, 0, 200);
+  const candidateImageIntervalMs = integerArg(args['candidate-image-interval'], 2_000, 0, 10_000);
   const fireEvidenceLimit = integerArg(args['fire-evidence-limit'], 64, 0, 100);
   const burstShots = integerArg(args['burst-shots'], 3, 1, 5);
   const maximumShotPulses = integerArg(args['max-shot-pulses'], 1_000_000, 1, 1_000_000);
@@ -1068,6 +1069,7 @@ async function run() {
         });
         if (oneVOneShadowController && activeMatch) {
           const shadowFrameSequence = Number(vision.sourceSequence ?? vision.sequence);
+          const shadowDetections = legacyProposalsToShadowDetections(vision.operatorTargets, shadowFrameSequence);
           const shadowResult = oneVOneShadowController.step({
             frame: {
               sequence: shadowFrameSequence,
@@ -1076,12 +1078,13 @@ async function run() {
               height: vision.height,
               source: 'rendered-world-view',
             },
-            detections: legacyProposalsToShadowDetections(vision.operatorTargets, shadowFrameSequence),
+            detections: shadowDetections,
           });
           oneVOneShadowReceipts.push({
             ...shadowResult.telemetry,
             inputIssued: shadowResult.inputIssued,
             legacyOperatorCandidates: vision.operatorTargets.length,
+            detections: shadowDetections,
           });
           if (!oneVOneShadowFirstConfirmedCaptured && shadowResult.track.state === 'CONFIRMED') {
             await writeFile(resolve(artifactDirectory, 'one-v-one-shadow-first-confirmed.jpg'), vision.jpeg);
@@ -1237,13 +1240,32 @@ async function run() {
             firstRawTargetCaptured = true;
             firstRawTargetAnnotatedCaptured = true;
           }
-          if (activeMatch && candidateImagesSaved < candidateImageLimit && atMs - lastCandidateImageAt >= 2_000) {
+          if (activeMatch && candidateImagesSaved < candidateImageLimit && atMs - lastCandidateImageAt >= candidateImageIntervalMs) {
             candidateImagesSaved += 1;
             lastCandidateImageAt = atMs;
             const candidateName = `candidate-${String(candidateImagesSaved).padStart(2, '0')}`;
             await writeFile(resolve(artifactDirectory, `${candidateName}.jpg`), vision.jpeg);
             await writeFile(resolve(artifactDirectory, `${candidateName}-annotated.jpg`), await annotatedVisionJpeg(vision, tracking));
             annotatedCandidateArtifacts.push(`${candidateName}-annotated.jpg`);
+            actions.push({
+              atMs,
+              kind: 'rendered-candidate-capture',
+              file: `${candidateName}.jpg`,
+              annotatedFile: `${candidateName}-annotated.jpg`,
+              sourceSequence: vision.sourceSequence,
+              target: rawTarget ? { x: rawTarget.x, y: rawTarget.y, pixels: rawTarget.pixels, bounds: rawTarget.bounds } : null,
+              candidates: vision.operatorTargets.map((target) => ({
+                x: target.x,
+                y: target.y,
+                pixels: target.pixels,
+                density: target.density,
+                aspect: target.aspect,
+                meanBlueRedLead: target.meanBlueRedLead,
+                blueLeadRatio: target.blueLeadRatio,
+                score: target.score,
+                bounds: target.bounds,
+              })),
+            });
           }
         }
 

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "kind": "atomic-player-profile-registry",
-  "createdAt": "2026-07-29T17:49:54Z",
+  "createdAt": "2026-07-29T18:19:49Z",
   "preservedCurrentProfileId": "legacy-offensive-accuracy-v2-frozen-20260729",
   "candidateProfileId": "one-v-one-semantic-v1-scaffold",
   "selectionRule": "The preserved current profile remains the rollback reference. The candidate is default-off, non-promoted and replay-only until explicit authorization plus hash-bound build, detector and calibration receipts.",
@@ -30,8 +30,8 @@
     },
     {
       "path": "scripts/agent-player/atomic-player-driver.mjs",
-      "sha256": "c3f147462134daf0000a3b402a058c9dfd0eec728d3a9c2989948e03a38479f1",
-      "bytes": 98782
+      "sha256": "545e3ac1949e0a2f86a4287dfc3880b01b007541a9934c274363422c2c9ea291",
+      "bytes": 99848
     },
     {
       "path": "scripts/agent-player/one-v-one/profile-contract.mjs",
@@ -80,8 +80,8 @@
     },
     {
       "path": "scripts/agent-player/one-v-one-profile.test.mjs",
-      "sha256": "82f5c1ec9686b7b19b579c56334c4dc08c8e7b06e1cc58375006aa501c14df1b",
-      "bytes": 15093
+      "sha256": "521d1fd0c384d6f3d18de82eabeb4bd8209500aa380551547859932cf58cdbda",
+      "bytes": 15204
     },
     {
       "path": "scripts/agent-player/one-v-one/fixtures/scaffold-replay-v1.json",
@@ -102,13 +102,13 @@
   "launcherSurfaces": [
     {
       "path": "/root/.hermes/scripts/run_atomic_player_campaign.sh",
-      "sha256": "cd4df58c49be1ab0e10fd906043b27410e5f6b5f9bba6b51c04d04982993e85b",
-      "bytes": 9975
+      "sha256": "0dad8049ba514f0ec03150e94ae7b1a812196c7609498a97412c0e94ec88007d",
+      "bytes": 10142
     },
     {
       "path": "/root/.hermes/scripts/run_atomic_player_game.ps1",
-      "sha256": "4610995d61ab4e66d4279af30b7a9efdfd3ad16bc4bad75c768d7c356c7a1f2f",
-      "bytes": 9071
+      "sha256": "be4389a8b78378754cba4fb0113bcf6a035fb8d72564af706d959ff0d09c6f5c",
+      "bytes": 9271
     }
   ],
   "replay": {

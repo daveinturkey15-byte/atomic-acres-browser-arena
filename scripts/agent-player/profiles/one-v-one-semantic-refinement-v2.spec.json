@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "kind": "atomic-player-semantic-refinement-spec",
+  "specId": "one-v-one-semantic-refinement-v2-20260729",
+  "status": "active-default-off",
+  "goal": "Replace legacy colour/geometry proposal authority with a lightweight rendered-pixel semantic operator gate that rejects known practice/range/static contacts before any scored fire.",
+  "claimStates": {
+    "observed": [
+      "G0133 proved exact live shadow plumbing, zero profile input, and zero semantic authority.",
+      "G0133 accepted only 20 legacy proposal frames, confirmed two frames across ten fragmented track IDs, and visually included static or ambiguous geometry.",
+      "The archive contains rendered authority frames and target bounds for credited bot hits and known practice-target contacts.",
+      "Aligned authority crops are often partially occluded by the weapon sight, so official-hit association alone is not sufficient semantic training evidence."
+    ],
+    "hypotheses": [
+      "A larger contextual rendered crop plus temporal residual motion can reject the known static/range components while retaining close and medium mobile bots.",
+      "More complete candidate-sequence logging can supply independent hard negatives and expose proposal fragmentation without hidden game state."
+    ],
+    "unknowns": [
+      "Whether the existing proposal mask recalls enough real bots before ADS alignment.",
+      "Whether a compact CPU-only contextual classifier can separate bots from practice/static geometry at four-to-twelve-pixel component scale.",
+      "Whether the current two-bot build supplies enough close/medium rendered contacts in one bounded calibration."
+    ],
+    "falsifiers": [
+      "Any known practice/static hard negative accepted with semantic authority.",
+      "Held-out performance that depends on duplicated frames from one encounter rather than independent games/sequences.",
+      "A refined live shadow confirmation whose selected crop does not visibly contain a bot.",
+      "Any profile input or shot during dataset or shadow calibration."
+    ]
+  },
+  "requirements": {
+    "R1": "Preserve the immutable G0031 champion, G0125 behavioural baseline, and default-off one-v-one profile without in-place mutation or promotion.",
+    "R2": "Use only ordinary rendered RGB frames and visible UI in live operation; offline labels may use archived official outcomes and human/VLM crop review but never hidden live state.",
+    "R3": "Preserve candidate source, frame sequence, target bounds, contextual crop, temporal lineage, label provenance, build and render profile for every dataset item.",
+    "R4": "Keep proposal confidence, semantic confidence, motion confidence, tracking confidence and fire authority separate.",
+    "R5": "A candidate model remains observer-only until all offline and live shadow gates pass; no threshold may be weakened to make a run pass.",
+    "R6": "Prediction, coasting, minimap, optical flow, colour masks and compatibility proposals never independently authorize fire.",
+    "R7": "Every live test is bounded, archived, input-clean and followed by exact browser/port cleanup verification."
+  },
+  "acceptanceCriteria": {
+    "C1": "Dataset contains at least 50 independently receipted credited-bot rendered examples from at least 10 games and at least 12 independent practice/static hard-negative sequences including G0125 and G0133-family evidence.",
+    "C2": "Held-out evaluation by game/sequence rejects 100 percent of known practice/static negatives and retains at least 80 percent of credited-bot examples whose rendered crop is semantically usable; optic-obscured or ambiguous samples are excluded with explicit reasons, not relabelled.",
+    "C3": "All G0133 known/static replay candidates remain non-authoritative; warmup, HUD, optic, banner and damage-overlay fixtures remain rejected.",
+    "C4": "Refined live shadow records zero profile input and zero shots, and every semantically accepted confirmation crop visibly contains a real bot.",
+    "C5": "Refined live shadow obtains at least one track with five fresh semantic measurements, at least one bounded coasting/reacquisition event or an explicit no-event result, and no identity handoff to static geometry.",
+    "C6": "A firing calibration is permitted only after C1-C5 and requires fresh same-track body-bounded alignment, one shot per authorization, immediate reassociation and zero non-bot contacts.",
+    "C7": "Focused tests, full agent-player tests, canonical tests, profile/fallback/archive verification, model policy, skill regression, AKP adoption and cleanup all pass."
+  },
+  "outOfScope": [
+    "Promotion from a single refinement run.",
+    "Hidden author labels or world coordinates in live play.",
+    "End-to-end reinforcement learning.",
+    "Reviving rendered-cover or threat-lane movement.",
+    "Using an LLM or VLM as the frame-by-frame live input owner."
+  ]
+}
