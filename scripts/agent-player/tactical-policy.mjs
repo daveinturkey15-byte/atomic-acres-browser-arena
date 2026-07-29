@@ -17,6 +17,9 @@ export function createTacticalPolicy(options = {}) {
     lowHealthEvade: options.lowHealthEvade === true,
     respawnEscapeDurationMs: Math.max(0, Number(options.respawnEscapeDurationMs ?? 0)),
     respawnReentryDurationMs: Math.max(0, Number(options.respawnReentryDurationMs ?? 0)),
+    respawnQuickDeathWindowMs: Math.max(0, Number(options.respawnQuickDeathWindowMs ?? 0)),
+    respawnQuickDeathEscapeBonusMs: Math.max(0, Number(options.respawnQuickDeathEscapeBonusMs ?? 0)),
+    respawnQuickDeathCooldownMs: Math.max(0, Number(options.respawnQuickDeathCooldownMs ?? 0)),
     retreatReturnFire: options.retreatReturnFire === true,
     retreatReturnFireMinimumHealth: Number(options.retreatReturnFireMinimumHealth ?? 30),
     contactSearchAfterMs: Math.max(0, Number(options.contactSearchAfterMs ?? 0)),
@@ -58,6 +61,12 @@ export function createTacticalPolicy(options = {}) {
     respawnEscapeActivations: 0,
     respawnEscapeFrames: 0,
     respawnReentryFrames: 0,
+    currentLifeStartedAt: null,
+    lastLifeDurationMs: null,
+    quickDeathStreak: 0,
+    quickDeathReceipts: 0,
+    quickDeathCooldownUntil: 0,
+    quickDeathCooldownFrames: 0,
     retreatReturnFireFrames: 0,
     lastConfirmedTargetAt: Number.NEGATIVE_INFINITY,
     contactSearchFrames: 0,
@@ -87,19 +96,39 @@ export function createTacticalPolicy(options = {}) {
       const scoreFresh = Number.isFinite(kills) && Number.isFinite(deaths) && kills >= 0 && deaths >= 0;
       const rawTarget = Boolean(observation.rawTarget);
       if (!observation.active) {
-        if (state.wasActive) state.pendingRespawn = true;
+        if (state.wasActive) {
+          state.pendingRespawn = true;
+          if (state.currentLifeStartedAt !== null) {
+            state.lastLifeDurationMs = Math.max(0, now - state.currentLifeStartedAt);
+            if (config.respawnQuickDeathWindowMs > 0
+              && state.lastLifeDurationMs < config.respawnQuickDeathWindowMs) {
+              state.quickDeathStreak += 1;
+              state.quickDeathReceipts += 1;
+            } else {
+              state.quickDeathStreak = 0;
+            }
+          }
+        }
         state.wasActive = false;
       } else {
         if (!state.everActive) {
           state.everActive = true;
+          state.currentLifeStartedAt = now;
           state.lastConfirmedTargetAt = now;
         } else if (state.pendingRespawn) {
-          if (config.respawnEscapeDurationMs > 0) {
+          const quickDeathBonus = state.quickDeathStreak > 0
+            ? config.respawnQuickDeathEscapeBonusMs * Math.min(state.quickDeathStreak, 2)
+            : 0;
+          const escapeDurationMs = config.respawnEscapeDurationMs + quickDeathBonus;
+          if (escapeDurationMs > 0) {
             state.direction *= -1;
-            state.respawnEscapeUntil = now + config.respawnEscapeDurationMs;
-            state.respawnReentryUntil = state.respawnEscapeUntil + config.respawnReentryDurationMs;
+            state.respawnEscapeUntil = now + escapeDurationMs;
+            state.quickDeathCooldownUntil = state.respawnEscapeUntil
+              + (state.quickDeathStreak > 0 ? config.respawnQuickDeathCooldownMs : 0);
+            state.respawnReentryUntil = state.quickDeathCooldownUntil + config.respawnReentryDurationMs;
             state.respawnEscapeActivations += 1;
           }
+          state.currentLifeStartedAt = now;
           state.lastConfirmedTargetAt = now;
           state.pendingRespawn = false;
         }
@@ -152,6 +181,7 @@ export function createTacticalPolicy(options = {}) {
         state.damageWindowAmount = 0;
         state.killAnchorUntil = 0;
         state.respawnEscapeUntil = 0;
+        state.quickDeathCooldownUntil = 0;
         state.respawnReentryUntil = 0;
       }
       if (observation.active && damageDelta > 0) {
@@ -212,6 +242,9 @@ export function createTacticalPolicy(options = {}) {
       } else if (observation.currentTarget || rawTargetObservationActive) {
         nextMode = 'engage';
         reason = observation.currentTarget ? 'confirmed-operator' : 'candidate-observation';
+      } else if (now < state.quickDeathCooldownUntil) {
+        nextMode = 'anchor';
+        reason = 'quick-death-cooldown';
       } else if (now < state.killAnchorUntil) {
         nextMode = 'anchor';
         reason = 'visible-kill-productive-angle';
@@ -230,6 +263,7 @@ export function createTacticalPolicy(options = {}) {
       if (reason === 'low-health-evasion') state.lowHealthEvasionFrames += 1;
       if (reason === 'respawn-escape') state.respawnEscapeFrames += 1;
       if (reason === 'respawn-reentry') state.respawnReentryFrames += 1;
+      if (reason === 'quick-death-cooldown') state.quickDeathCooldownFrames += 1;
       if (reason === 'contact-search-sweep') state.contactSearchFrames += 1;
       const killAnchorActive = observation.active && now < state.killAnchorUntil;
       if (killAnchorActive) {
@@ -341,6 +375,10 @@ export function createTacticalPolicy(options = {}) {
         respawnEscapeActivations: state.respawnEscapeActivations,
         respawnEscapeFrames: state.respawnEscapeFrames,
         respawnReentryFrames: state.respawnReentryFrames,
+        lastLifeDurationMs: state.lastLifeDurationMs,
+        quickDeathStreak: state.quickDeathStreak,
+        quickDeathReceipts: state.quickDeathReceipts,
+        quickDeathCooldownFrames: state.quickDeathCooldownFrames,
         retreatReturnFireFrames: state.retreatReturnFireFrames,
         contactSearchFrames: state.contactSearchFrames,
         config: { ...config },

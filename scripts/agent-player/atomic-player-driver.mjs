@@ -555,6 +555,9 @@ async function run() {
   const lowHealthEvade = args['low-health-evade'] === 'true';
   const respawnEscapeDurationMs = integerArg(args['respawn-escape-duration'], 0, 0, 10_000);
   const respawnReentryDurationMs = integerArg(args['respawn-reentry-duration'], 0, 0, 10_000);
+  const respawnQuickDeathWindowMs = integerArg(args['respawn-quick-death-window'], 0, 0, 120_000);
+  const respawnQuickDeathEscapeBonusMs = integerArg(args['respawn-quick-death-escape-bonus'], 0, 0, 10_000);
+  const respawnQuickDeathCooldownMs = integerArg(args['respawn-quick-death-cooldown'], 0, 0, 30_000);
   const retreatReturnFire = args['retreat-return-fire'] === 'true';
   const retreatReturnFireMinimumHealth = integerArg(args['retreat-return-fire-min-health'], 30, 1, 100);
   const contactSearchAfterMs = integerArg(args['contact-search-after'], 0, 0, 120_000);
@@ -805,6 +808,9 @@ async function run() {
           lowHealthEvade,
           respawnEscapeDurationMs,
           respawnReentryDurationMs,
+          respawnQuickDeathWindowMs,
+          respawnQuickDeathEscapeBonusMs,
+          respawnQuickDeathCooldownMs,
           retreatReturnFire,
           retreatReturnFireMinimumHealth,
           contactSearchAfterMs,
@@ -1559,6 +1565,9 @@ async function run() {
         lowHealthEvade,
         respawnEscapeDurationMs,
         respawnReentryDurationMs,
+        respawnQuickDeathWindowMs,
+        respawnQuickDeathEscapeBonusMs,
+        respawnQuickDeathCooldownMs,
         retreatReturnFire,
         retreatReturnFireMinimumHealth,
         contactSearchAfterMs,
@@ -1655,6 +1664,10 @@ async function run() {
         respawnEscapeActivations: tacticalPolicyReceipt?.respawnEscapeActivations ?? 0,
         respawnEscapeFrames: tacticalPolicyReceipt?.respawnEscapeFrames ?? 0,
         respawnReentryFrames: tacticalPolicyReceipt?.respawnReentryFrames ?? 0,
+        lastLifeDurationMs: tacticalPolicyReceipt?.lastLifeDurationMs ?? null,
+        quickDeathStreak: tacticalPolicyReceipt?.quickDeathStreak ?? 0,
+        quickDeathReceipts: tacticalPolicyReceipt?.quickDeathReceipts ?? 0,
+        quickDeathCooldownFrames: tacticalPolicyReceipt?.quickDeathCooldownFrames ?? 0,
         retreatReturnFireFrames: tacticalPolicyReceipt?.retreatReturnFireFrames ?? 0,
         contactSearchFrames: tacticalPolicyReceipt?.contactSearchFrames ?? 0,
         exposureGateSuppressions,

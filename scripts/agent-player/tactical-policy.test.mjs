@@ -145,6 +145,39 @@ test('opt-in respawn escape leaves the initial life unchanged and reverse-sprint
   assert.equal(expired.reason, 'roam-clear');
 });
 
+test('quick-death receipts lengthen escape and hold a safe cooldown before re-entry', () => {
+  const policy = createTacticalPolicy({
+    respawnEscapeDurationMs: 1000,
+    respawnReentryDurationMs: 2500,
+    respawnQuickDeathWindowMs: 30_000,
+    respawnQuickDeathEscapeBonusMs: 500,
+    respawnQuickDeathCooldownMs: 4000,
+  });
+  policy.update({ now: 0, active: true, health: 100 });
+  policy.update({ now: 10_000, active: false, health: 0 });
+  const escaped = policy.update({ now: 12_000, active: true, health: 100, navigationTick: true });
+  assert.equal(escaped.mode, 'retreat');
+  assert.equal(escaped.reason, 'respawn-escape');
+
+  const cooldown = policy.update({ now: 14_000, active: true, health: 100 });
+  assert.equal(cooldown.mode, 'anchor');
+  assert.equal(cooldown.reason, 'quick-death-cooldown');
+  assert.deepEqual(cooldown.keys, []);
+
+  const defended = policy.update({ now: 14_500, active: true, health: 100, currentTarget: true });
+  assert.equal(defended.mode, 'engage');
+  assert.equal(defended.allowEngagement, true);
+
+  const reentry = policy.update({ now: 18_000, active: true, health: 100, navigationTick: true });
+  assert.equal(reentry.reason, 'respawn-reentry');
+  assert.deepEqual(reentry.keys, ['KeyW', 'ShiftLeft']);
+  const receipt = policy.snapshot();
+  assert.equal(receipt.quickDeathReceipts, 1);
+  assert.equal(receipt.quickDeathStreak, 1);
+  assert.equal(receipt.lastLifeDurationMs, 10_000);
+  assert.ok(receipt.quickDeathCooldownFrames >= 1);
+});
+
 test('respawn escape remains default-off after an active-inactive-active cycle', () => {
   const policy = createTacticalPolicy();
   policy.update({ now: 1000, active: true, health: 100, movementCycle: 0 });

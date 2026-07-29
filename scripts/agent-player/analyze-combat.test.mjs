@@ -44,7 +44,9 @@ test('combat benchmark separates bots, practice targets, survival and control me
       reloadRequests: 1, stuckRecoveries: 2, damageReactions: 3, maximumObservedHoldMs: 360,
       killAnchorActivations: 2, killAnchorRenewals: 1, killAnchorActiveFrames: 40, killAnchorEngagementFrames: 8,
       rawTargetObservationExpirations: 4, rawTargetObservationFrames: 33, lowHealthEvasionFrames: 21,
-      respawnEscapeActivations: 3, respawnEscapeFrames: 27, respawnReentryFrames: 19, retreatReturnFireFrames: 11, contactSearchFrames: 17,
+      respawnEscapeActivations: 3, respawnEscapeFrames: 27, respawnReentryFrames: 19,
+      lastLifeDurationMs: 12_500, quickDeathStreak: 2, quickDeathReceipts: 4, quickDeathCooldownFrames: 29,
+      retreatReturnFireFrames: 11, contactSearchFrames: 17,
       exposureGateSuppressions: 6, exposurePixelSuppressions: 5, exposureAreaSuppressions: 4, exposureHeightSuppressions: 3,
       configuredMaxHoldMs: 2_000, releasedAtEnd: true, holdWatchdogExceeded: false,
     },
@@ -74,6 +76,10 @@ test('combat benchmark separates bots, practice targets, survival and control me
   assert.equal(result.control.respawnEscapeActivations, 3);
   assert.equal(result.control.respawnEscapeFrames, 27);
   assert.equal(result.control.respawnReentryFrames, 19);
+  assert.equal(result.control.lastLifeDurationMs, 12_500);
+  assert.equal(result.control.quickDeathStreak, 2);
+  assert.equal(result.control.quickDeathReceipts, 4);
+  assert.equal(result.control.quickDeathCooldownFrames, 29);
   assert.equal(result.control.retreatReturnFireFrames, 11);
   assert.equal(result.control.contactSearchFrames, 17);
   assert.equal(result.control.exposureGateSuppressions, 6);
