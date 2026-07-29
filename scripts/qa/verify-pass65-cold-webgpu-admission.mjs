@@ -61,6 +61,30 @@ function variantCacheKeys(telemetry, variant) {
     .sort();
 }
 
+function intervalUnionDurationMs(intervals) {
+  const ordered = intervals
+    .filter(({ startedAt, completedAt }) => Number.isFinite(startedAt) && Number.isFinite(completedAt))
+    .map(({ startedAt, completedAt }) => ({
+      startedAt: Math.min(startedAt, completedAt),
+      completedAt: Math.max(startedAt, completedAt),
+    }))
+    .sort((left, right) => left.startedAt - right.startedAt);
+  if (ordered.length !== intervals.length) return Number.POSITIVE_INFINITY;
+  let durationMs = 0;
+  let activeStart = ordered[0]?.startedAt ?? 0;
+  let activeEnd = ordered[0]?.completedAt ?? 0;
+  for (const interval of ordered.slice(1)) {
+    if (interval.startedAt <= activeEnd) {
+      activeEnd = Math.max(activeEnd, interval.completedAt);
+      continue;
+    }
+    durationMs += activeEnd - activeStart;
+    activeStart = interval.startedAt;
+    activeEnd = interval.completedAt;
+  }
+  return Number((durationMs + activeEnd - activeStart).toFixed(3));
+}
+
 async function stubExternalServices(page) {
   await page.route('https://fonts.googleapis.com/**', (route) => route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
   await page.route('**/v1/leaderboard?*', (route) => route.fulfill({
@@ -150,12 +174,37 @@ try {
           weaponAssetCache: api.sampleWeaponAssetCache(),
         };
       });
+      const menuInteractionAudit = await page.evaluate(() => ({
+        sampledAt: performance.now(),
+        selectedArena: window.__ATOMIC_ACRES_DEBUG__.snapshot().arenaSelection.id,
+        mapButtonsEnabled: [...document.querySelectorAll('.map-card[data-arena-id]')]
+          .every((button) => !(button instanceof HTMLButtonElement) || !button.disabled),
+        soloEnabled: !(document.querySelector('#solo')?.disabled ?? true),
+      }));
+      await page.locator('.map-card[data-arena-id="skyline-terminal"]').click();
+      await page.waitForFunction(() => {
+        const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+        return state.arenaSelection.id === 'skyline-terminal'
+          && state.arenaSelection.streaming.constructionCount === 0;
+      });
       await page.locator('.map-card[data-arena-id="atomic-acres"]').click();
+      await page.waitForFunction(() => {
+        const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+        return state.arenaSelection.id === 'atomic-acres'
+          && state.arenaSelection.streaming.constructionCount === 0;
+      });
       await page.locator('#player-name').fill(`Cold Atomic QA ${trial}`);
       await page.evaluate(() => {
         window.__PASS65_COLD_TASK_AUDIT__.deploymentStartedAt = performance.now();
       });
       await page.locator('#solo').click();
+      const earlyDeploymentAudit = await page.evaluate(() => ({
+        sampledAt: performance.now(),
+        lifecycle: document.documentElement.dataset.menuLifecycle ?? null,
+        transitionVisible: !(document.querySelector('#deployment-transition')?.hidden ?? true),
+        media: document.querySelector('#deployment-transition')?.getAttribute('data-media') ?? null,
+        liveRender: document.querySelector('#deployment-transition')?.getAttribute('data-live-render') ?? null,
+      }));
       await page.waitForFunction(() => {
         const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
         if (!state) return false;
@@ -261,6 +310,14 @@ try {
       } else if (menuPrewarmProfile.durationMs > maximumMenuDeploymentPrewarmMs) {
         failures.push(`menu deployment prewarm ${menuPrewarmProfile.durationMs}ms exceeded ${maximumMenuDeploymentPrewarmMs}ms`);
       }
+      if (!menuInteractionAudit.mapButtonsEnabled || !menuInteractionAudit.soloEnabled) {
+        failures.push(`menu interactions were disabled during background deployment preparation: ${JSON.stringify(menuInteractionAudit)}`);
+      }
+      if (earlyDeploymentAudit.lifecycle !== 'deploying' || !earlyDeploymentAudit.transitionVisible
+        || earlyDeploymentAudit.liveRender !== 'false'
+        || !['shared-prerecorded-video', 'reduced-motion-poster'].includes(earlyDeploymentAudit.media)) {
+        failures.push(`early deployment did not remain behind bounded loading media: ${JSON.stringify(earlyDeploymentAudit)}`);
+      }
       if (!after.weaponAssetCache.runtimeCorpus.ready || after.weaponAssetCache.runtimeCorpus.prewarming
         || after.weaponAssetCache.runtimeCorpus.profile?.completed !== true
         || after.weaponAssetCache.runtimeCorpus.profile.loadedAssets !== corpusPolicy.assets) {
@@ -310,8 +367,20 @@ try {
       }
       const profile = transition.profile;
       const phaseDuration = (phase) => profile?.phases.find((entry) => entry.phase === phase)?.durationMs ?? Number.POSITIVE_INFINITY;
+      const menuPhaseDuration = (phase) => menuPrewarmProfile?.phases.find((entry) => entry.name === phase)?.durationMs
+        ?? Number.POSITIVE_INFINITY;
       if (!profile || profile.durationMs > maximumColdTransitionMs) {
         failures.push(`cold transition ${profile?.durationMs ?? 'missing'}ms exceeded ${maximumColdTransitionMs}ms`);
+      }
+      const coldPreparationWorkMs = intervalUnionDurationMs([
+        { startedAt: menuPrewarmProfile?.startedAt, completedAt: menuPrewarmProfile?.completedAt },
+        { startedAt: profile?.startedAt, completedAt: profile?.completedAt },
+      ]);
+      if (coldPreparationWorkMs > maximumColdTransitionMs) {
+        failures.push(`combined cold preparation work ${coldPreparationWorkMs}ms exceeded preserved ${maximumColdTransitionMs}ms budget`);
+      }
+      if (menuPhaseDuration('first-person-catalog') > maximumWeaponCatalogPrewarmMs) {
+        failures.push(`menu weapon catalog prewarm ${menuPhaseDuration('first-person-catalog')}ms exceeded ${maximumWeaponCatalogPrewarmMs}ms`);
       }
       if (phaseDuration('weapon-catalog-prewarm') > maximumWeaponCatalogPrewarmMs) {
         failures.push(`weapon catalog prewarm ${phaseDuration('weapon-catalog-prewarm')}ms exceeded ${maximumWeaponCatalogPrewarmMs}ms`);
@@ -376,6 +445,9 @@ try {
           postPrewarmLoads: postCorpusPrewarmLoads,
         },
         before,
+        menuInteractionAudit,
+        earlyDeploymentAudit,
+        coldPreparationWorkMs,
         admitted,
         after,
         firstSwitchAudit,

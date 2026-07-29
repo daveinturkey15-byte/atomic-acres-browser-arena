@@ -402,6 +402,10 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('menuPrewarmLongTasks.length > 0');
     expect(source).toContain('admissionLongTasks.length > 0');
     expect(source).toContain('postCorpusPrewarmLoads.length > 0');
+    expect(source).toContain("menuPhaseDuration('first-person-catalog') > maximumWeaponCatalogPrewarmMs");
+    expect(source).toContain('coldPreparationWorkMs > maximumColdTransitionMs');
+    expect(source).toContain('menuInteractionAudit.mapButtonsEnabled');
+    expect(source).toContain("earlyDeploymentAudit.lifecycle !== 'deploying'");
     expect(source).toContain('firstSwitchAudit.before.gpuReady !== firstSwitchAudit.before.available');
   });
 
