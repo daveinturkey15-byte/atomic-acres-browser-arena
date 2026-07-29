@@ -157,3 +157,66 @@ test('lead banking is opt-in and missing score cannot activate it', () => {
   assert.equal(enabled.update({ now: 100, active: true, health: 100, movementCycle: 0 }).mode, 'roam');
   assert.equal(enabled.snapshot().leadBankActive, false);
 });
+
+test('visible kill anchors the productive angle while preserving scan authority', () => {
+  const policy = createTacticalPolicy({ killAnchorDurationMs: 30_000 });
+  const result = policy.update({
+    now: 10_000,
+    active: true,
+    health: 100,
+    visibleKillDelta: 1,
+    kills: 1,
+    deaths: 2,
+    movementCycle: 0,
+  });
+  assert.equal(result.mode, 'anchor');
+  assert.equal(result.reason, 'visible-kill-productive-angle');
+  assert.deepEqual(result.keys, []);
+  assert.equal(result.allowScan, true);
+  assert.equal(result.allowEngagement, false);
+  assert.equal(result.killAnchorActive, true);
+  assert.equal(result.anchorEvent.kind, 'activate');
+  assert.equal(policy.snapshot().killAnchorActivations, 1);
+});
+
+test('fresh visible operator still engages during a kill anchor', () => {
+  const policy = createTacticalPolicy({ killAnchorDurationMs: 30_000 });
+  policy.update({ now: 10_000, active: true, health: 100, visibleKillDelta: 1, movementCycle: 0 });
+  const result = policy.update({
+    now: 11_000,
+    active: true,
+    health: 100,
+    currentTarget: true,
+    movementCycle: 1,
+  });
+  assert.equal(result.mode, 'engage');
+  assert.equal(result.allowEngagement, true);
+  assert.equal(result.killAnchorActive, true);
+  assert.equal(policy.snapshot().killAnchorEngagementFrames, 1);
+});
+
+test('damage retreat overrides a live kill anchor', () => {
+  const policy = createTacticalPolicy({ killAnchorDurationMs: 30_000, retreatDamage: 18 });
+  policy.update({ now: 10_000, active: true, health: 100, visibleKillDelta: 1, movementCycle: 0 });
+  const result = policy.update({
+    now: 10_300,
+    active: true,
+    health: 80,
+    damageDelta: 20,
+    movementCycle: 1,
+  });
+  assert.equal(result.mode, 'retreat');
+  assert.equal(result.killAnchorActive, true);
+  assert.ok(result.keys.includes('KeyS'));
+});
+
+test('clustered visible kill renews the anchor and expiry returns to roam', () => {
+  const policy = createTacticalPolicy({ killAnchorDurationMs: 30_000 });
+  policy.update({ now: 10_000, active: true, health: 100, visibleKillDelta: 1, movementCycle: 0 });
+  const renewed = policy.update({ now: 25_000, active: true, health: 100, visibleKillDelta: 1, movementCycle: 1 });
+  assert.equal(renewed.anchorEvent.kind, 'renew');
+  assert.equal(policy.snapshot().killAnchorRenewals, 1);
+  const expired = policy.update({ now: 55_001, active: true, health: 100, movementCycle: 2 });
+  assert.equal(expired.mode, 'roam');
+  assert.equal(expired.killAnchorActive, false);
+});

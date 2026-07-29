@@ -549,6 +549,7 @@ async function run() {
   const finishFollowupLimit = integerArg(args['finish-followup-limit'], 2, 1, 4);
   const bankLeadMinimumKills = integerArg(args['bank-lead-minimum-kills'], 0, 0, 20);
   const bankLeadMinimumMargin = integerArg(args['bank-lead-minimum-margin'], 1, 1, 20);
+  const killAnchorDurationMs = integerArg(args['kill-anchor-duration'], 0, 0, 60_000);
   const allowCombatFire = Boolean(args['allow-combat-fire']);
   const allowLive = Boolean(args['allow-live']);
   const tacticalPolicyName = String(args['tactical-policy'] ?? 'legacy');
@@ -787,6 +788,7 @@ async function run() {
           threatAwareRetreatDirection: args['threat-aware-retreat'] !== 'false',
           bankLeadMinimumKills,
           bankLeadMinimumMargin,
+          killAnchorDurationMs,
         })
         : null;
       let movementCycle = 0;
@@ -977,7 +979,16 @@ async function run() {
           navigationTick: movementCycle % navigationLaneStride === 0,
           kills: hud?.kills,
           deaths: hud?.deaths,
+          visibleKillDelta,
         }) ?? null;
+        if (tactical?.anchorEvent) {
+          actions.push({
+            atMs,
+            kind: tactical.anchorEvent.kind === 'renew' ? 'visible-kill-anchor-renew' : 'visible-kill-anchor-activate',
+            visibleKillDelta: tactical.anchorEvent.visibleKillDelta,
+            expiresAt: tactical.anchorEvent.expiresAt,
+          });
+        }
         if (tactical?.changed) {
           actions.push({
             atMs,
@@ -1502,6 +1513,7 @@ async function run() {
         maximumGrenadeThrows,
         grenadeAlignmentMaximum,
         finishWindowMs,
+        killAnchorDurationMs,
         decisionInputs: args['lifecycle-only']
           ? ['ordinary lobby controls and post-action lifecycle receipt']
           : ['rendered canvas pixels', 'visible HUD state through ordinary controls'],
@@ -1581,6 +1593,10 @@ async function run() {
         finishHoldFrames,
         finishFollowupPulses,
         finishCancellations,
+        killAnchorActivations: tacticalPolicyReceipt?.killAnchorActivations ?? 0,
+        killAnchorRenewals: tacticalPolicyReceipt?.killAnchorRenewals ?? 0,
+        killAnchorActiveFrames: tacticalPolicyReceipt?.killAnchorActiveFrames ?? 0,
+        killAnchorEngagementFrames: tacticalPolicyReceipt?.killAnchorEngagementFrames ?? 0,
         observedWeaponName,
         stuckRecoveries,
         damageReactions,

@@ -16,6 +16,7 @@ export function createTacticalPolicy(options = {}) {
     threatAwareRetreatDirection: options.threatAwareRetreatDirection !== false,
     bankLeadMinimumKills: Number(options.bankLeadMinimumKills ?? 0),
     bankLeadMinimumMargin: Number(options.bankLeadMinimumMargin ?? 1),
+    killAnchorDurationMs: Number(options.killAnchorDurationMs ?? 0),
   };
   const state = {
     mode: 'roam',
@@ -29,7 +30,12 @@ export function createTacticalPolicy(options = {}) {
     damageWindowAmount: 0,
     transitions: 0,
     leadBankActive: false,
-    modeFrames: { roam: 0, engage: 0, retreat: 0, recover: 0, bank: 0 },
+    killAnchorUntil: 0,
+    killAnchorActivations: 0,
+    killAnchorRenewals: 0,
+    killAnchorActiveFrames: 0,
+    killAnchorEngagementFrames: 0,
+    modeFrames: { roam: 0, engage: 0, retreat: 0, recover: 0, bank: 0, anchor: 0 },
   };
 
   const transition = (mode, now, reason) => {
@@ -49,6 +55,7 @@ export function createTacticalPolicy(options = {}) {
       const health = Number(observation.health);
       const healthValid = observation.healthFresh !== false && Number.isFinite(health) && health >= 0 && health <= 100;
       const damageDelta = Math.max(0, Number(observation.damageDelta ?? 0));
+      const visibleKillDelta = Math.max(0, Number(observation.visibleKillDelta ?? 0));
       const kills = Number(observation.kills);
       const deaths = Number(observation.deaths);
       const scoreFresh = Number.isFinite(kills) && Number.isFinite(deaths) && kills >= 0 && deaths >= 0;
@@ -56,11 +63,24 @@ export function createTacticalPolicy(options = {}) {
         && kills >= config.bankLeadMinimumKills && kills - deaths >= config.bankLeadMinimumMargin) {
         state.leadBankActive = true;
       }
+      let anchorEvent = null;
+      if (observation.active && config.killAnchorDurationMs > 0 && visibleKillDelta > 0) {
+        const renewed = now < state.killAnchorUntil;
+        state.killAnchorUntil = now + config.killAnchorDurationMs;
+        state.killAnchorActivations += 1;
+        if (renewed) state.killAnchorRenewals += 1;
+        anchorEvent = {
+          kind: renewed ? 'renew' : 'activate',
+          visibleKillDelta,
+          expiresAt: state.killAnchorUntil,
+        };
+      }
       if (!observation.active) {
         state.retreatUntil = 0;
         state.recoveryUntil = 0;
         state.damageWindowStartedAt = Number.NEGATIVE_INFINITY;
         state.damageWindowAmount = 0;
+        state.killAnchorUntil = 0;
       }
       if (observation.active && damageDelta > 0) {
         if (now - state.damageWindowStartedAt > config.damageWindowMs) {
@@ -112,12 +132,20 @@ export function createTacticalPolicy(options = {}) {
       } else if (observation.currentTarget || observation.rawTarget) {
         nextMode = 'engage';
         reason = observation.currentTarget ? 'confirmed-operator' : 'candidate-observation';
+      } else if (now < state.killAnchorUntil) {
+        nextMode = 'anchor';
+        reason = 'visible-kill-productive-angle';
       } else if (state.leadBankActive) {
         nextMode = 'bank';
         reason = 'visible-kill-lead-bank';
       }
       const changed = transition(nextMode, now, reason);
       state.modeFrames[nextMode] += 1;
+      const killAnchorActive = observation.active && now < state.killAnchorUntil;
+      if (killAnchorActive) {
+        state.killAnchorActiveFrames += 1;
+        if (observation.currentTarget || observation.rawTarget) state.killAnchorEngagementFrames += 1;
+      }
 
       const keys = [];
       let turn = 0;
@@ -136,6 +164,9 @@ export function createTacticalPolicy(options = {}) {
             && now - Number(observation.lastShotAt ?? Number.NEGATIVE_INFINITY) < config.postShotStrafeMs) {
             keys.push(state.direction > 0 ? 'KeyA' : 'KeyD');
           }
+        } else if (nextMode === 'anchor') {
+          // Hold the productive position that just converted a visible kill.
+          // Incoming damage/low health still take precedence above and force retreat.
         } else if (nextMode === 'bank') {
           const threat = observation.minimapThreat;
           if (threat) {
@@ -182,10 +213,12 @@ export function createTacticalPolicy(options = {}) {
         keys: [...new Set(keys)],
         turn: clamp(turn, -100, 100),
         allowEngagement: nextMode === 'engage',
-        allowScan: nextMode === 'roam' || nextMode === 'engage' || nextMode === 'bank',
+        allowScan: nextMode === 'roam' || nextMode === 'engage' || nextMode === 'bank' || nextMode === 'anchor',
         damageWindowAmount: state.damageWindowAmount,
         direction: state.direction,
         leadBankActive: state.leadBankActive,
+        killAnchorActive,
+        anchorEvent,
       };
     },
     snapshot() {
@@ -194,6 +227,11 @@ export function createTacticalPolicy(options = {}) {
         transitions: state.transitions,
         modeFrames: { ...state.modeFrames },
         leadBankActive: state.leadBankActive,
+        killAnchorUntil: state.killAnchorUntil,
+        killAnchorActivations: state.killAnchorActivations,
+        killAnchorRenewals: state.killAnchorRenewals,
+        killAnchorActiveFrames: state.killAnchorActiveFrames,
+        killAnchorEngagementFrames: state.killAnchorEngagementFrames,
         config: { ...config },
       };
     },

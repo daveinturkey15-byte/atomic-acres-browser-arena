@@ -42,6 +42,7 @@ test('combat benchmark separates bots, practice targets, survival and control me
     input: {
       aimMoves: 50, shotPulses: 10, bursts: 3, warmupShotPulses: 0, unconfirmedShotPulses: 0,
       reloadRequests: 1, stuckRecoveries: 2, damageReactions: 3, maximumObservedHoldMs: 360,
+      killAnchorActivations: 2, killAnchorRenewals: 1, killAnchorActiveFrames: 40, killAnchorEngagementFrames: 8,
       configuredMaxHoldMs: 2_000, releasedAtEnd: true, holdWatchdogExceeded: false,
     },
     browser: { pageErrors: [], warningOrErrorCount: 0 },
@@ -60,6 +61,10 @@ test('combat benchmark separates bots, practice targets, survival and control me
   assert.equal(result.survival.finalCensoredLifeSeconds, 10);
   assert.equal(result.perception.confirmedToRawRatio, 0.4);
   assert.equal(result.control.gameFps, 30);
+  assert.equal(result.control.killAnchorActivations, 2);
+  assert.equal(result.control.killAnchorRenewals, 1);
+  assert.equal(result.control.killAnchorActiveFrames, 40);
+  assert.equal(result.control.killAnchorEngagementFrames, 8);
 });
 
 test('legacy reports preserve absent policy metrics as missing rather than zero', () => {
