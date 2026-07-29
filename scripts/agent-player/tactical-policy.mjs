@@ -64,6 +64,7 @@ export function createTacticalPolicy(options = {}) {
     offensiveLaneBurstMs: Math.max(100, Number(options.offensiveLaneBurstMs ?? 450)),
     offensiveLaneCooldownMs: Math.max(200, Number(options.offensiveLaneCooldownMs ?? 1200)),
     offensiveLaneDamageMinimum: Math.max(1, Number(options.offensiveLaneDamageMinimum ?? 15)),
+    offensiveLaneRequireRecentDamage: options.offensiveLaneRequireRecentDamage !== false,
     bankLeadMinimumKills: Number(options.bankLeadMinimumKills ?? 0),
     bankLeadMinimumMargin: Number(options.bankLeadMinimumMargin ?? 1),
     killAnchorDurationMs: Number(options.killAnchorDurationMs ?? 0),
@@ -310,7 +311,8 @@ export function createTacticalPolicy(options = {}) {
       if (config.offensiveLaneIsolation && observation.active && observation.currentTarget
         && healthValid && health >= config.retreatHealth
         && state.damageWindowAmount < config.retreatDamage
-        && recentLaneDamage && laneReceipt && now >= state.offensiveLaneIsolationCooldownUntil) {
+        && (!config.offensiveLaneRequireRecentDamage || recentLaneDamage)
+        && laneReceipt && now >= state.offensiveLaneIsolationCooldownUntil) {
         state.offensiveLaneIsolationUntil = now + config.offensiveLaneBurstMs;
         state.offensiveLaneIsolationCooldownUntil = now + config.offensiveLaneCooldownMs;
         state.offensiveLaneIsolationDirection = laneReceipt.direction;

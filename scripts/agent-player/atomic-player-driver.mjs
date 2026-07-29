@@ -574,6 +574,7 @@ async function run() {
   const offensiveLaneBurstMs = integerArg(args['offensive-lane-burst'], 450, 100, 2_000);
   const offensiveLaneCooldownMs = integerArg(args['offensive-lane-cooldown'], 1200, 200, 10_000);
   const offensiveLaneDamageMinimum = integerArg(args['offensive-lane-min-damage'], 15, 1, 100);
+  const offensiveLaneRequireRecentDamage = args['offensive-lane-require-damage'] !== 'false';
   const renderedCover = args['rendered-cover'] === 'true';
   const coverProbeDurationMs = integerArg(args['cover-probe-duration'], 900, 200, 5_000);
   const coverOcclusionConfirmMs = integerArg(args['cover-occlusion-confirm'], 350, 100, 3_000);
@@ -850,6 +851,7 @@ async function run() {
           offensiveLaneBurstMs,
           offensiveLaneCooldownMs,
           offensiveLaneDamageMinimum,
+          offensiveLaneRequireRecentDamage,
           renderedCover,
           coverProbeDurationMs,
           coverOcclusionConfirmMs,
@@ -1656,6 +1658,7 @@ async function run() {
         offensiveLaneBurstMs,
         offensiveLaneCooldownMs,
         offensiveLaneDamageMinimum,
+        offensiveLaneRequireRecentDamage,
         renderedCover,
         coverProbeDurationMs,
         coverOcclusionConfirmMs,

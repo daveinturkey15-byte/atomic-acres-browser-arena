@@ -360,6 +360,26 @@ test('offensive lane isolation makes a bounded diagonal move under rendered two-
   assert.equal(policy.snapshot().offensiveLaneEngagementSuppressions, 2);
 });
 
+test('proactive offensive lane isolation can activate from rendered crossfire geometry before damage', () => {
+  const policy = createTacticalPolicy({
+    offensiveLaneIsolation: true,
+    offensiveLaneRequireRecentDamage: false,
+    offensiveLaneMinimumSpreadRadians: 0.75,
+    offensiveLaneMaximumDistance: 60,
+  });
+  const threats = [
+    { bearingRadians: -0.2, distance: 36 },
+    { bearingRadians: 1.1, distance: 44 },
+  ];
+  const result = policy.update({
+    now: 100, active: true, health: 100, healthFresh: true, damageDelta: 0,
+    currentTarget: true, rawTarget: true, minimapThreats: threats, minimapThreat: threats[0], movementCycle: 1,
+  });
+  assert.equal(result.reason, 'offensive-crossfire-isolation');
+  assert.equal(result.allowEngagement, false);
+  assert.equal(result.offensiveLaneEvent.damageWindowAmount, 0);
+});
+
 test('opt-in contact search turns toward the rendered player-up minimap bearing', () => {
   const policy = createTacticalPolicy({ contactSearchAfterMs: 1000, contactSearchTurn: 20, contactSearchMinimapGuidance: true });
   policy.update({ now: 100, active: true, health: 100, movementCycle: 0, navigationTick: false });
