@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createPass64ShellViewModel, renderPass64Shell } from './pass64-shell';
 
-describe('Pass 65 command shell', () => {
+describe('Pass 66 command shell', () => {
   it('escapes persisted player names before placing them in markup', () => {
     const markup = renderPass64Shell(createPass64ShellViewModel('"<script>&'));
     expect(markup).toContain('value="&quot;&lt;script&gt;&amp;"');
@@ -11,7 +11,7 @@ describe('Pass 65 command shell', () => {
   it('renders the new command hierarchy and ordered player-facing arenas', () => {
     const markup = renderPass64Shell(createPass64ShellViewModel('Operator'));
     expect(markup).toContain('class="panel pass64-command-deck"');
-    expect(markup).toContain('PASS 65 · THE BIG ONE · HITL CANDIDATE');
+    expect(markup).toContain('PASS 66 · THE BIG ONE');
     expect(markup).not.toContain('LIVE SYSTEMS READY');
     expect(markup).toContain('class="command-rail"');
     expect(markup).toContain('class="arena-command"');
