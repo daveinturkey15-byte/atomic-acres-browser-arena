@@ -276,6 +276,17 @@ test('contact search stays dormant initially, sweeps after a confirmed-target dr
   assert.equal(found.allowEngagement, true);
 });
 
+test('opt-in contact search turns toward the rendered player-up minimap bearing', () => {
+  const policy = createTacticalPolicy({ contactSearchAfterMs: 1000, contactSearchTurn: 20, contactSearchMinimapGuidance: true });
+  policy.update({ now: 100, active: true, health: 100, movementCycle: 0, navigationTick: false });
+  const right = policy.update({ now: 1200, active: true, health: 100, movementCycle: 1, navigationTick: true, minimapThreat: { bearingRadians: 0.8, distance: 30 } });
+  assert.equal(right.reason, 'contact-search-sweep');
+  assert.equal(right.turn, 20);
+  const left = policy.update({ now: 1400, active: true, health: 100, movementCycle: 1, navigationTick: true, minimapThreat: { bearingRadians: -0.5, distance: 24 } });
+  assert.equal(left.turn, -20);
+  assert.equal(policy.snapshot().minimapGuidedContactSearchFrames, 2);
+});
+
 test('no-threat roaming performs bounded alternating route sweeps', () => {
   const policy = createTacticalPolicy({ routeSweepInterval: 12, routeSweepTurn: 18 });
   const left = policy.update({ now: 100, active: true, health: 100, movementCycle: 0, navigationTick: true });

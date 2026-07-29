@@ -236,6 +236,7 @@ export function analyseCombat(summary, driverReport, callsign = 'Jigglyclaw') {
       quickDeathCooldownFrames: optionalNumeric(driverReport?.input?.quickDeathCooldownFrames),
       retreatReturnFireFrames: optionalNumeric(driverReport?.input?.retreatReturnFireFrames),
       contactSearchFrames: optionalNumeric(driverReport?.input?.contactSearchFrames),
+      minimapGuidedContactSearchFrames: optionalNumeric(driverReport?.input?.minimapGuidedContactSearchFrames),
       renderedCoverActivations: optionalNumeric(driverReport?.input?.renderedCoverActivations),
       renderedCoverAcquisitions: optionalNumeric(driverReport?.input?.renderedCoverAcquisitions),
       renderedCoverProbeReversals: optionalNumeric(driverReport?.input?.renderedCoverProbeReversals),

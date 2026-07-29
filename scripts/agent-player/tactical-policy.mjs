@@ -25,7 +25,8 @@ export function createTacticalPolicy(options = {}) {
     retreatReturnFire: options.retreatReturnFire === true,
     retreatReturnFireMinimumHealth: Number(options.retreatReturnFireMinimumHealth ?? 30),
     contactSearchAfterMs: Math.max(0, Number(options.contactSearchAfterMs ?? 0)),
-    contactSearchTurn: Number(options.contactSearchTurn ?? 24),
+    contactSearchTurn: Math.max(0, Number(options.contactSearchTurn ?? 24)),
+    contactSearchMinimapGuidance: options.contactSearchMinimapGuidance === true,
     bankLeadMinimumKills: Number(options.bankLeadMinimumKills ?? 0),
     bankLeadMinimumMargin: Number(options.bankLeadMinimumMargin ?? 1),
     killAnchorDurationMs: Number(options.killAnchorDurationMs ?? 0),
@@ -100,6 +101,7 @@ export function createTacticalPolicy(options = {}) {
     retreatReturnFireFrames: 0,
     lastConfirmedTargetAt: Number.NEGATIVE_INFINITY,
     contactSearchFrames: 0,
+    minimapGuidedContactSearchFrames: 0,
     modeFrames: { roam: 0, engage: 0, retreat: 0, recover: 0, bank: 0, anchor: 0 },
   };
 
@@ -364,7 +366,15 @@ export function createTacticalPolicy(options = {}) {
             if (observation.navigationTick) turn = state.direction * 18;
           } else if (reason === 'contact-search-sweep') {
             keys.push('KeyW', 'ShiftLeft');
-            if (observation.navigationTick) turn = state.direction * config.contactSearchTurn;
+            if (observation.navigationTick) {
+              const guidedBearing = Number(observation.minimapThreat?.bearingRadians);
+              if (config.contactSearchMinimapGuidance && Number.isFinite(guidedBearing)) {
+                turn = Math.abs(guidedBearing) < 0.12 ? 0 : Math.sign(guidedBearing) * config.contactSearchTurn;
+                state.minimapGuidedContactSearchFrames += 1;
+              } else {
+                turn = state.direction * config.contactSearchTurn;
+              }
+            }
           } else if (threat) {
             const bearing = Number(threat.bearingRadians ?? 0);
             const distance = Number(threat.distance ?? Number.POSITIVE_INFINITY);
@@ -429,6 +439,7 @@ export function createTacticalPolicy(options = {}) {
         quickDeathCooldownFrames: state.quickDeathCooldownFrames,
         retreatReturnFireFrames: state.retreatReturnFireFrames,
         contactSearchFrames: state.contactSearchFrames,
+        minimapGuidedContactSearchFrames: state.minimapGuidedContactSearchFrames,
         renderedCover: coverController.snapshot(),
         config: { ...config },
       };

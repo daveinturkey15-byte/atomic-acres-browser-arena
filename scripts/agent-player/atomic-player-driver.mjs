@@ -565,6 +565,7 @@ async function run() {
   const retreatReturnFireMinimumHealth = integerArg(args['retreat-return-fire-min-health'], 30, 1, 100);
   const contactSearchAfterMs = integerArg(args['contact-search-after'], 0, 0, 120_000);
   const contactSearchTurn = integerArg(args['contact-search-turn'], 24, 0, 60);
+  const contactSearchMinimapGuidance = args['contact-search-minimap-guidance'] === 'true';
   const renderedCover = args['rendered-cover'] === 'true';
   const coverProbeDurationMs = integerArg(args['cover-probe-duration'], 900, 200, 5_000);
   const coverOcclusionConfirmMs = integerArg(args['cover-occlusion-confirm'], 350, 100, 3_000);
@@ -832,6 +833,7 @@ async function run() {
           retreatReturnFireMinimumHealth,
           contactSearchAfterMs,
           contactSearchTurn,
+          contactSearchMinimapGuidance,
           renderedCover,
           coverProbeDurationMs,
           coverOcclusionConfirmMs,
@@ -1620,6 +1622,7 @@ async function run() {
         retreatReturnFireMinimumHealth,
         contactSearchAfterMs,
         contactSearchTurn,
+        contactSearchMinimapGuidance,
         renderedCover,
         coverProbeDurationMs,
         coverOcclusionConfirmMs,
@@ -1731,6 +1734,7 @@ async function run() {
         quickDeathCooldownFrames: tacticalPolicyReceipt?.quickDeathCooldownFrames ?? 0,
         retreatReturnFireFrames: tacticalPolicyReceipt?.retreatReturnFireFrames ?? 0,
         contactSearchFrames: tacticalPolicyReceipt?.contactSearchFrames ?? 0,
+        minimapGuidedContactSearchFrames: tacticalPolicyReceipt?.minimapGuidedContactSearchFrames ?? 0,
         renderedCoverActivations: tacticalPolicyReceipt?.renderedCover?.activations ?? 0,
         renderedCoverAcquisitions: tacticalPolicyReceipt?.renderedCover?.acquisitions ?? 0,
         renderedCoverProbeReversals: tacticalPolicyReceipt?.renderedCover?.probeReversals ?? 0,
