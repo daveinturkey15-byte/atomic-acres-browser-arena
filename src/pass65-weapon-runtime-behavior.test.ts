@@ -609,11 +609,11 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(releasePass65WeaponModelsIn(root)).toBe(1);
   });
 
-  it('returns managed refs to zero and enforces the world cache budget across churn', async () => {
+  it('returns managed refs to zero while retaining the complete bot-cycle world corpus', async () => {
     vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (
       Promise.resolve(fakeWeaponGltf(weaponIdFromUrl(String(url))))
     )) as GLTFLoader['loadAsync']);
-    const churnIds = PASS65_AUTHORED_FIREARM_IDS.slice(0, 11);
+    const churnIds = PASS65_AUTHORED_FIREARM_IDS;
     for (const id of churnIds) {
       await loadPass65WeaponAsset(id, 'world');
       const model = createPass65WeaponModel(id, false, 'world');
@@ -625,7 +625,7 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     }
 
     const worldEntries = pass65WeaponCacheTelemetry().entries.filter((entry) => entry.variant === 'world');
-    expect(worldEntries.length).toBeLessThanOrEqual(pass65WeaponCacheTelemetry().budgets.world);
+    expect(worldEntries).toHaveLength(pass65WeaponCacheTelemetry().budgets.world);
     expect(worldEntries.every((entry) => entry.refs === 0)).toBe(true);
   });
 

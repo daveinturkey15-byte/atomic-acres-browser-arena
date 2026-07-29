@@ -56,8 +56,12 @@ describe('Pass 65 authored firearm runtime selection', () => {
     }
   });
 
-  it('bounds decoded assets and excludes eager corpus loading and release procedural fallback', () => {
-    expect(PASS65_WEAPON_CACHE_BUDGET).toEqual({ 'first-person': 2, world: 8, drop: 4 });
+  it('retains the bounded runtime corpus and excludes unbounded eager loading and release procedural fallback', () => {
+    expect(PASS65_WEAPON_CACHE_BUDGET).toEqual({
+      'first-person': 2,
+      world: PASS65_AUTHORED_FIREARM_IDS.length,
+      drop: PASS65_AUTHORED_FIREARM_IDS.length,
+    });
     const modelSource = readFileSync('src/weapon-model.ts', 'utf8');
     const viewSource = readFileSync('src/weapon-presentation.ts', 'utf8');
     const artKitSource = readFileSync('src/art-kit.ts', 'utf8');

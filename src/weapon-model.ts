@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 import { cloneMeshGeometriesForOwner } from './gpu-resource-ownership';
-import type { WeaponId } from './protocol';
+import { WEAPON_IDS, type WeaponId } from './protocol';
 
 type WeaponAsset = { scene: THREE.Group; clips: THREE.AnimationClip[] };
 type PresentationAssetId = WeaponId | 'field-knife';
@@ -21,9 +21,20 @@ export type Pass65AuthoredFirearmId = (typeof PASS65_AUTHORED_FIREARM_IDS)[numbe
 
 export const PASS65_WEAPON_CACHE_BUDGET = Object.freeze({
   'first-person': 2,
-  world: 8,
-  drop: 4,
+  // Bots cycle the complete canonical arsenal and every corpse can retain its
+  // authored drop. Evicting these small source GLBs guarantees a future main-
+  // thread decode hitch; clones still retire independently behind GPU fences.
+  world: PASS65_AUTHORED_FIREARM_IDS.length,
+  drop: PASS65_AUTHORED_FIREARM_IDS.length,
 } satisfies Readonly<Record<Pass65WeaponVariant, number>>);
+
+export const PASS65_RUNTIME_WEAPON_CORPUS_BUDGET = Object.freeze({
+  variants: Object.freeze(['world', 'drop'] as const),
+  assets: (WEAPON_IDS.length + 1) * 2,
+  maximumCompressedBytes: 12 * 1024 * 1024,
+  maximumEstimatedDecodedBytes: 128 * 1024 * 1024,
+  yieldEveryAssets: 1,
+} as const);
 
 const PASS65_CROSSBOW_URLS: Record<Pass65CrossbowVariant, string> = Object.freeze({
   'first-person': './assets/original/models/weapons/pass65-crossbow/pass65-crossbow-fp-lod0.glb',
@@ -55,6 +66,14 @@ const pass65CrossbowLoads = new Map<Pass65CrossbowVariant, Promise<void>>();
 const pass65FieldKnifeAssets = new Map<Pass65WeaponVariant, WeaponAsset>();
 const pass65FieldKnifeLoads = new Map<Pass65WeaponVariant, Promise<void>>();
 let useCounter = 0;
+let runtimeCorpusPrewarmPromise: Promise<void> | null = null;
+let runtimeCorpusPrewarmProfile: Readonly<{
+  requestedAssets: number;
+  loadedAssets: number;
+  durationMs: number;
+  completed: boolean;
+  error: string | null;
+}> | null = null;
 
 function loader(): GLTFLoader {
   return new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
@@ -164,6 +183,84 @@ export function loadPass65WeaponPresentation(id: WeaponId, variant: Pass65Weapon
   return id === 'explosive-crossbow'
     ? loadPass65CrossbowAssets(variant)
     : loadPass65WeaponAsset(id as Pass65AuthoredFirearmId, variant);
+}
+
+function runtimeCorpusReady(): boolean {
+  return PASS65_RUNTIME_WEAPON_CORPUS_BUDGET.variants.every((variant) => (
+    WEAPON_IDS.every((id) => id === 'explosive-crossbow'
+      ? pass65CrossbowAssets.has(variant)
+      : cache.has(cacheKey(id as Pass65AuthoredFirearmId, variant)))
+    && pass65FieldKnifeAssets.has(variant)
+  ));
+}
+
+async function defaultRuntimeCorpusYield(): Promise<void> {
+  if (typeof document === 'undefined') return;
+  await new Promise<void>((resolve) => {
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => resolve());
+    else globalThis.setTimeout(resolve, 0);
+  });
+}
+
+/**
+ * Sequentially decodes the complete third-person/drop corpus while the menu
+ * video owns presentation. Retaining these 38 small sources prevents bot
+ * arsenal cycling and corpse drops from scheduling GLTF parse work in combat.
+ */
+export async function prewarmPass65RuntimeWeaponCorpus(
+  yieldToBrowser: () => Promise<void> = defaultRuntimeCorpusYield,
+): Promise<void> {
+  if (runtimeCorpusReady()) {
+    if (!runtimeCorpusPrewarmProfile) {
+      runtimeCorpusPrewarmProfile = Object.freeze({
+        requestedAssets: PASS65_RUNTIME_WEAPON_CORPUS_BUDGET.assets,
+        loadedAssets: 0,
+        durationMs: 0,
+        completed: true,
+        error: null,
+      });
+    }
+    return;
+  }
+  if (runtimeCorpusPrewarmPromise) return runtimeCorpusPrewarmPromise;
+  const startedAt = performance.now();
+  let loadedAssets = 0;
+  const operation = (async () => {
+    for (const variant of PASS65_RUNTIME_WEAPON_CORPUS_BUDGET.variants) {
+      for (const id of WEAPON_IDS) {
+        await loadPass65WeaponPresentation(id, variant);
+        loadedAssets += 1;
+        if (loadedAssets % PASS65_RUNTIME_WEAPON_CORPUS_BUDGET.yieldEveryAssets === 0) {
+          await yieldToBrowser();
+        }
+      }
+      await loadPass65FieldKnifeAsset(variant);
+      loadedAssets += 1;
+      if (loadedAssets % PASS65_RUNTIME_WEAPON_CORPUS_BUDGET.yieldEveryAssets === 0) {
+        await yieldToBrowser();
+      }
+    }
+    runtimeCorpusPrewarmProfile = Object.freeze({
+      requestedAssets: PASS65_RUNTIME_WEAPON_CORPUS_BUDGET.assets,
+      loadedAssets,
+      durationMs: Number((performance.now() - startedAt).toFixed(3)),
+      completed: true,
+      error: null,
+    });
+  })().catch((error: unknown) => {
+    runtimeCorpusPrewarmProfile = Object.freeze({
+      requestedAssets: PASS65_RUNTIME_WEAPON_CORPUS_BUDGET.assets,
+      loadedAssets,
+      durationMs: Number((performance.now() - startedAt).toFixed(3)),
+      completed: false,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }).finally(() => {
+    if (runtimeCorpusPrewarmPromise === operation) runtimeCorpusPrewarmPromise = null;
+  });
+  runtimeCorpusPrewarmPromise = operation;
+  return operation;
 }
 
 function flattenMaterial(material: THREE.Material): THREE.Material {
@@ -344,15 +441,78 @@ export function disposePass65WeaponModel(root: THREE.Object3D): void {
   materials.forEach((material) => material.dispose());
 }
 
+function sourceAssetsForVariant(variant: Pass65WeaponVariant): readonly WeaponAsset[] {
+  const assets: WeaponAsset[] = [...cache.values()].filter((entry) => entry.variant === variant);
+  const crossbow = pass65CrossbowAssets.get(variant);
+  const knife = pass65FieldKnifeAssets.get(variant);
+  if (crossbow) assets.push(crossbow);
+  if (knife) assets.push(knife);
+  return assets;
+}
+
+function sourceAssetResidency(assets: readonly WeaponAsset[]) {
+  const arrays = new Set<ArrayBufferLike>();
+  const textures = new Set<THREE.Texture>();
+  let geometryBytes = 0;
+  let textureBytesEstimate = 0;
+  for (const asset of assets) asset.scene.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    const attributes = [node.geometry.index, ...Object.values(node.geometry.attributes)];
+    for (const attribute of attributes) {
+      if (!attribute) continue;
+      const array = attribute instanceof THREE.InterleavedBufferAttribute
+        ? attribute.data.array
+        : attribute.array;
+      if (arrays.has(array.buffer)) continue;
+      arrays.add(array.buffer);
+      geometryBytes += array.byteLength;
+    }
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    for (const material of materials) {
+      for (const value of Object.values(material)) if (value instanceof THREE.Texture) textures.add(value);
+    }
+  });
+  for (const texture of textures) {
+    const image = texture.source.data as { width?: unknown; height?: unknown } | null;
+    const width = Number(image?.width ?? 0);
+    const height = Number(image?.height ?? 0);
+    if (width > 0 && height > 0) textureBytesEstimate += Math.ceil(width * height * 4 * (texture.generateMipmaps ? 4 / 3 : 1));
+  }
+  return Object.freeze({
+    assets: assets.length,
+    geometryBytes,
+    textureBytesEstimate,
+    estimatedDecodedBytes: geometryBytes + textureBytesEstimate,
+  });
+}
+
 export function pass65WeaponCacheTelemetry(): Readonly<{
   budgets: typeof PASS65_WEAPON_CACHE_BUDGET;
   loading: number;
   entries: readonly Readonly<{ key: string; variant: Pass65WeaponVariant; refs: number; lastUsed: number }>[];
+  resident: Readonly<Record<Pass65WeaponVariant, ReturnType<typeof sourceAssetResidency>>>;
+  runtimeCorpus: Readonly<{
+    policy: typeof PASS65_RUNTIME_WEAPON_CORPUS_BUDGET;
+    ready: boolean;
+    prewarming: boolean;
+    profile: typeof runtimeCorpusPrewarmProfile;
+  }>;
 }> {
   return Object.freeze({
     budgets: PASS65_WEAPON_CACHE_BUDGET,
     loading: loading.size,
     entries: Object.freeze([...cache.values()].map(({ key, variant, refs, lastUsed }) => Object.freeze({ key, variant, refs, lastUsed }))),
+    resident: Object.freeze({
+      'first-person': sourceAssetResidency(sourceAssetsForVariant('first-person')),
+      world: sourceAssetResidency(sourceAssetsForVariant('world')),
+      drop: sourceAssetResidency(sourceAssetsForVariant('drop')),
+    }),
+    runtimeCorpus: Object.freeze({
+      policy: PASS65_RUNTIME_WEAPON_CORPUS_BUDGET,
+      ready: runtimeCorpusReady(),
+      prewarming: runtimeCorpusPrewarmPromise !== null,
+      profile: runtimeCorpusPrewarmProfile,
+    }),
   });
 }
 
