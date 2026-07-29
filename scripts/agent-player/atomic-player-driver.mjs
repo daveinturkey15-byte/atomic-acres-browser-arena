@@ -17,6 +17,7 @@ import {
   operatorCrosshairAlignment,
   signatureDifference,
 } from './vision.mjs';
+import { fingerprintProfile, loadPlayerProfile } from './one-v-one/profile-contract.mjs';
 import { createTacticalPolicy } from './tactical-policy.mjs';
 import { chooseVisibleSupport, shouldThrowVisibleGrenade } from './combat-actions.mjs';
 import { advanceFinishLatch, consumeFinishFollowup } from './finish-latch.mjs';
@@ -593,6 +594,25 @@ async function run() {
   const fireMinimumTargetHeight = integerArg(args['fire-min-target-height'], 0, 0, 100);
   const allowCombatFire = Boolean(args['allow-combat-fire']);
   const allowLive = Boolean(args['allow-live']);
+  let requestedPlayerProfile = null;
+  if (args['player-profile']) {
+    const playerProfilePath = resolve(repositoryRoot, String(args['player-profile']));
+    requestedPlayerProfile = await loadPlayerProfile(playerProfilePath);
+    const observedFingerprint = fingerprintProfile(requestedPlayerProfile);
+    const expectedFingerprint = String(args['player-profile-fingerprint'] ?? '');
+    if (!expectedFingerprint || expectedFingerprint !== observedFingerprint) {
+      throw new Error(`Player profile fingerprint mismatch: expected ${expectedFingerprint || 'missing'}, observed ${observedFingerprint}`);
+    }
+    if (allowLive && !requestedPlayerProfile.activation.liveEnabled) {
+      throw new Error(`Player profile ${requestedPlayerProfile.profileId} is default-off and cannot enter a live session`);
+    }
+    if (allowCombatFire && !requestedPlayerProfile.activation.automaticFireEnabled) {
+      throw new Error(`Player profile ${requestedPlayerProfile.profileId} does not authorize automatic fire`);
+    }
+    if (requestedPlayerProfile.activation.liveEnabled) {
+      throw new Error(`Player profile ${requestedPlayerProfile.profileId} has no live detector binding yet; run the offline replay evaluator until the new-build detector receipt exists`);
+    }
+  }
   const tacticalPolicyName = String(args['tactical-policy'] ?? 'legacy');
   if (!['legacy', 'state-machine-v1'].includes(tacticalPolicyName)) throw new Error('--tactical-policy must be legacy or state-machine-v1');
   const baseUrl = String(args.url ?? 'http://127.0.0.1:4173/');

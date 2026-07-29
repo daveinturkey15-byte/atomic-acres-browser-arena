@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "kind": "atomic-one-v-one-detector-dataset-manifest",
+  "datasetId": "one-v-one-operator-v1-awaiting-new-build",
+  "status": "empty-awaiting-new-build-rendered-frames",
+  "observationAuthority": "rendered-pixels-only",
+  "positiveClass": "mobile-opponent-operator",
+  "positiveSequences": [],
+  "hardNegativeSequences": [],
+  "requiredHardNegativeSources": [
+    "G0125 verified practice-target contact",
+    "practice targets and static props",
+    "trees, foliage, walls, trim, banners and map decoration",
+    "HUD messages and minimap regions",
+    "first-person arms and weapon",
+    "muzzle flashes, damage tints, particles and transient effects",
+    "every future false authorization"
+  ],
+  "splitPolicy": {
+    "unit": "capture-sequence-or-session",
+    "adjacentFramesMayCrossSplits": false,
+    "train": [],
+    "validation": [],
+    "test": []
+  },
+  "modelReceipt": null,
+  "calibrationReceipt": null,
+  "liveUsePermitted": false
+}

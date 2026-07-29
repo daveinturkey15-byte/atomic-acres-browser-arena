@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 1,
+  "kind": "atomic-player-profile-registry",
+  "createdAt": "2026-07-29T18:24:08+01:00",
+  "preservedCurrentProfileId": "legacy-offensive-accuracy-v2-frozen-20260729",
+  "candidateProfileId": "one-v-one-semantic-v1-scaffold",
+  "selectionRule": "The preserved current profile remains the rollback reference. The candidate is default-off, non-promoted and replay-only until explicit authorization plus hash-bound build, detector and calibration receipts.",
+  "profiles": [
+    {
+      "path": "scripts/agent-player/profiles/legacy-offensive-accuracy-v2.profile.json",
+      "sha256": "8015372f17f62b9e8fa1c023f10075e1a8060615caac95f79372a494a9e3fab6",
+      "bytes": 5369,
+      "profileId": "legacy-offensive-accuracy-v2-frozen-20260729",
+      "status": "frozen-legacy-reference"
+    },
+    {
+      "path": "scripts/agent-player/profiles/one-v-one-semantic-v1.profile.json",
+      "sha256": "a4e0fc9143412480336fb146e3593f24062d140d102776eabc198a97ddb880b9",
+      "bytes": 6112,
+      "profileId": "one-v-one-semantic-v1-scaffold",
+      "status": "scaffold-default-off",
+      "configurationFingerprint": "7b4c351e7378b6fb0217ac1062dbcb321e0cbde5b619b00aafa6da53506fe1d9"
+    }
+  ],
+  "implementation": [
+    {
+      "path": "package.json",
+      "sha256": "07e8ab7d71e88ea384766ade2aed7e95d843551ff104c3159c4666b7a6573c84",
+      "bytes": 6603
+    },
+    {
+      "path": "scripts/agent-player/atomic-player-driver.mjs",
+      "sha256": "1f3976d8e5f10c118fae5a1f886014acf9599fef39c837feaf6ac1956455b05c",
+      "bytes": 94459
+    },
+    {
+      "path": "scripts/agent-player/one-v-one/profile-contract.mjs",
+      "sha256": "d073a73708fcddfb582dbb7b75f57566ecb0b509fa9a4530f41d0a246b51cb4c",
+      "bytes": 5167
+    },
+    {
+      "path": "scripts/agent-player/one-v-one/semantic-detector.mjs",
+      "sha256": "62cf3d9cc73edcd43c545c413697692399ddd7ba43772417d8da05d84d38ad66",
+      "bytes": 1806
+    },
+    {
+      "path": "scripts/agent-player/one-v-one/single-target-tracker.mjs",
+      "sha256": "b5b8cf0694d8d34aea3dbe1c85915f73751a52193aa109405f6f54961e2bf98f",
+      "bytes": 7542
+    },
+    {
+      "path": "scripts/agent-player/one-v-one/visual-servo.mjs",
+      "sha256": "c7765f7c7b94c3660593185fdb7f8287ba0a14efcbf6501b284eb92999d694e9",
+      "bytes": 2364
+    },
+    {
+      "path": "scripts/agent-player/one-v-one/fresh-frame-fire-gate.mjs",
+      "sha256": "19f7d998c4e5ed0314027ab90e7a7f4fbc9ecb1b35f6a89c46dea7b7508cb711",
+      "bytes": 2474
+    },
+    {
+      "path": "scripts/agent-player/one-v-one/one-v-one-controller.mjs",
+      "sha256": "f49c0d50a59a1f973db21e0d3c7c537fc4a88dbaceb26e26adeff8d1011b89b1",
+      "bytes": 3567
+    },
+    {
+      "path": "scripts/agent-player/one-v-one/replay-evaluator.mjs",
+      "sha256": "610fbf39605eccb4550e67f14c4df30135234e904f5d178de55d84f510fa3f1d",
+      "bytes": 3628
+    },
+    {
+      "path": "scripts/agent-player/freeze-player-profile-registry.mjs",
+      "sha256": "c477c002acf09575dff0d5b1b8fbea931c6dbf1df0ba8c2e75994b8e653554e0",
+      "bytes": 5045
+    },
+    {
+      "path": "scripts/agent-player/verify-player-profiles.mjs",
+      "sha256": "e4594c5404c10e714dfbf60b1f2f6f7f86dfa2874c389259fa535c7295edcb5d",
+      "bytes": 4467
+    },
+    {
+      "path": "scripts/agent-player/one-v-one-profile.test.mjs",
+      "sha256": "3ea576d5138a7b10a38b681c8278df907f5cc32eb1668b712a810f1f64275fbb",
+      "bytes": 12829
+    },
+    {
+      "path": "scripts/agent-player/one-v-one/fixtures/scaffold-replay-v1.json",
+      "sha256": "434006bf0ed6626521810281535f614e3523c14bcfda4ce679942b8778499430",
+      "bytes": 3678
+    },
+    {
+      "path": "scripts/agent-player/profiles/datasets/one-v-one-operator-v1.manifest.json",
+      "sha256": "c4046c6dba9da13d7f1a05fd666a8759e50c203e3bdfaebccfb7c64a51e81dd1",
+      "bytes": 972
+    },
+    {
+      "path": "scripts/agent-player/profiles/README.md",
+      "sha256": "8ac55ac3dd45ea0a9a012a6f872d76633b1d3173548fba793a21a014f4f16ee1",
+      "bytes": 3446
+    }
+  ],
+  "launcherSurfaces": [
+    {
+      "path": "/root/.hermes/scripts/run_atomic_player_campaign.sh",
+      "sha256": "50167c18ae4e56b539ef5b573ed0270d644612a71585904a6a1ccdbc6b4ebe6c",
+      "bytes": 9085
+    },
+    {
+      "path": "/root/.hermes/scripts/run_atomic_player_game.ps1",
+      "sha256": "8a5a34f1213f4234b118fa92ada0f62415b252f4e01f7d7269e4bc95cddbb90e",
+      "bytes": 8809
+    }
+  ],
+  "replay": {
+    "fixturePath": "scripts/agent-player/one-v-one/fixtures/scaffold-replay-v1.json",
+    "expectedFingerprint": "dda3dc0251cb062115b2e5ed5e560b83179c8a6a1a170fa0992d1575b307d50c",
+    "expectedSummary": {
+      "frames": 9,
+      "states": {
+        "SEARCH": 1,
+        "TENTATIVE": 1,
+        "CONFIRMED": 5,
+        "COASTING": 2
+      },
+      "aimPhases": {
+        "SEARCH": 1,
+        "COARSE": 2,
+        "ALIGNED": 5,
+        "FINE": 1
+      },
+      "fireGateReasons": {
+        "fresh-confirmed-semantic-track-required": 5,
+        "not-aligned": 1,
+        "awaiting-fresh-alignment": 1,
+        "profile-default-off": 2
+      },
+      "semanticRejectReasons": {
+        "forbidden-semantic-class": 1
+      },
+      "semanticAcceptedCount": 6,
+      "semanticRejectedCount": 1,
+      "uniqueTrackCount": 1,
+      "reacquisitionCount": 1,
+      "meanTrackUncertainty": 0.17291150555555557,
+      "meanAbsoluteAimErrorPixels": 15.817387411764695,
+      "fireCandidateCount": 2,
+      "fireAuthorizedCount": 0,
+      "inputCommandsIssued": 0
+    }
+  }
+}

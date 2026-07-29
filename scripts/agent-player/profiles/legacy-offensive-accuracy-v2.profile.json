@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "kind": "atomic-player-profile",
+  "profileId": "legacy-offensive-accuracy-v2-frozen-20260729",
+  "status": "frozen-legacy-reference",
+  "selected": false,
+  "promoted": false,
+  "liveActivationPermitted": false,
+  "frozenAt": "2026-07-29T18:09:02+01:00",
+  "purpose": "Immutable pre-1v1 rollback reference preserving the G0125 offensive Carbine behavior and current default-off harness state.",
+  "authority": {
+    "liveInputOwner": "deterministic-rendered-pixel-javascript-only",
+    "modelRole": "offline-engineering-and-review-only",
+    "renderedWorldFrameRequiredForFire": true,
+    "minimapMayAuthorizeFire": false,
+    "predictionMayAuthorizeFire": false,
+    "privilegedGameStateAllowed": false
+  },
+  "source": {
+    "repository": "/root/jigglyclaw/worktrees/atomic-player",
+    "savedBranch": "local/jigglyclaw/atomic-player-harness",
+    "savedHarnessCommit": "3ce55df23e356cd25f0c3ec3b3b36947cb655ae4",
+    "behaviorEvidenceGameId": "G0125",
+    "behaviorHarnessCommit": "6bbb06a667d59a872968dce3a1d4ccc576271ed5",
+    "archiveDirectory": "artifacts/agent-player/archive/games/G0125",
+    "policyId": "atomic-player-pass63-offensive-accuracy-finish-v2-20260729",
+    "policyConfigurationFingerprint": "41a0fadae854ecf06f90e250064d3b7829e22f71f2131d20cd5e4eae154c9b2a"
+  },
+  "claimState": {
+    "runtimeAuthority": "G0125 archived report and manifest, not the companion shell environment alone",
+    "automaticCombatFireObserved": true,
+    "companionEnvAutomaticFire": "false",
+    "resolution": "The campaign launcher always forwarded -AllowCombatFire; G0125 runtime receipt proves combat fire was enabled. The conflicting unused AUTOMATIC_FIRE shell variable is retained verbatim as provenance and must not be treated as launcher authority.",
+    "fairnessValidity": "reference-only-invalid",
+    "fairnessReason": [
+      {
+        "key": "contacts.nonBotDamageEvents",
+        "expected": 0,
+        "value": 1,
+        "reason": "mismatch"
+      }
+    ]
+  },
+  "behavior": {
+    "profile": "atomicplayer",
+    "provider": "openai-codex",
+    "model": "gpt-5.6-sol",
+    "reasoningEffort": "high",
+    "serviceTier": "priority",
+    "playerHarnessCommit": "6bbb06a667d59a872968dce3a1d4ccc576271ed5",
+    "deployedChannel": "stable",
+    "deployedPass": "PASS 63",
+    "fieldKit": "carbine",
+    "observedWeapon": "carbine",
+    "requiredWeapon": "M86 CARBINE",
+    "operatorProfile": "g0031-balanced-v1",
+    "automaticCombatFire": true,
+    "alwaysAds": false,
+    "burstShots": 1,
+    "firePulseMs": 72,
+    "fireCooldownMs": 420,
+    "fireAlignmentMaximum": 0.02,
+    "postShotStrafeMs": 650,
+    "retreatHealth": 20,
+    "retreatDamage": 150,
+    "damageWindowMs": 700,
+    "retreatDurationMs": 700,
+    "recoveryDurationMs": 400,
+    "recoveryCooldownMs": 1200,
+    "closeThreatDistance": 18,
+    "sprintThreatDistance": 30,
+    "routeSweepTurn": 0,
+    "threatAwareRetreat": false,
+    "tacticalItems": false,
+    "maximumGrenades": 0,
+    "finishWindowMs": 1800,
+    "finishFollowupLimit": 3,
+    "bankLeadMinimumKills": 0,
+    "fireEvidenceLimit": 64,
+    "viewport": "960x540",
+    "captureMode": "screencast",
+    "killAnchorDurationMs": 0,
+    "rawTargetObserveDurationMs": 0,
+    "fireMinimumTargetPixels": 0,
+    "fireMinimumTargetArea": 0,
+    "fireMinimumTargetHeight": 0,
+    "maximumShotPulses": 96,
+    "lowHealthEvade": false,
+    "respawnEscapeDurationMs": 0,
+    "respawnReentryDurationMs": 0,
+    "respawnQuickDeathWindowMs": 0,
+    "respawnQuickDeathEscapeBonusMs": 0,
+    "respawnQuickDeathCooldownMs": 0,
+    "retreatReturnFire": false,
+    "contactSearchAfterMs": 12000,
+    "contactSearchTurn": 18,
+    "contactSearchMinimapGuidance": true,
+    "offensiveProfile": true,
+    "offensiveContactCommitMs": 900,
+    "renderedCover": false
+  },
+  "positiveOutcomeReference": {
+    "kills": 2,
+    "deaths": 5,
+    "shotPulses": 10,
+    "accuracyPercent": 70.0,
+    "note": "Strong attacking shape only; not promotion evidence because a practice target was contacted."
+  },
+  "immutableSnapshots": {
+    "offensive-accuracy-v2.policy.json": {
+      "path": "snapshots/offensive-accuracy-v2.policy.json",
+      "sha256": "99d4801e146c079c452d7cccdfa624a7cfb411af8c0ec60e5e9c6e8316fd073a",
+      "bytes": 5551
+    },
+    "offensive-accuracy-v2.env": {
+      "path": "snapshots/offensive-accuracy-v2.env",
+      "sha256": "0d0dd18666dfd45abd18773b46f99ce02b129fe4423a4a0172ea8ef86901b2bf",
+      "bytes": 1941
+    },
+    "G0125/experiment-policy.json": {
+      "path": "artifacts/agent-player/archive/games/G0125/experiment-policy.json",
+      "sha256": "99d4801e146c079c452d7cccdfa624a7cfb411af8c0ec60e5e9c6e8316fd073a",
+      "bytes": 5551
+    },
+    "G0125/report.json": {
+      "path": "artifacts/agent-player/archive/games/G0125/report.json",
+      "sha256": "7aecf51b289607c9e46cf5be0de82e88646606ba765e71427aee8f8d8728c739",
+      "bytes": 150292
+    },
+    "G0125/manifest.json": {
+      "path": "artifacts/agent-player/archive/games/G0125/manifest.json",
+      "sha256": "11bd4ee761a27c68ba55f26325fcd44ab24111c65b455b05cd511fa1d83fee29",
+      "bytes": 14569
+    }
+  },
+  "restoreRule": "Never mutate this profile. Copy it into a new experiment, resolve all launcher values through one validated profile adapter, freeze the resulting fingerprint, and require explicit live-test authorization."
+}

@@ -1,0 +1,210 @@
+{
+  "schemaVersion": 1,
+  "kind": "atomic-player-one-v-one-profile",
+  "profileId": "one-v-one-semantic-v1-scaffold",
+  "status": "scaffold-default-off",
+  "selected": false,
+  "promoted": false,
+  "purpose": "One-bot rendered-pixel architecture for offline replay and later explicitly authorized calibration against a new Atomic Acres build.",
+  "parentProfileId": "legacy-offensive-accuracy-v2-frozen-20260729",
+  "activation": {
+    "stage": "offline-replay",
+    "liveEnabled": false,
+    "aimInputEnabled": false,
+    "automaticFireEnabled": false,
+    "requiresExplicitTestAuthorization": true,
+    "requiredBuildReceipt": null,
+    "requiredCalibrationReceipt": null,
+    "requiredDetectorReceipt": null
+  },
+  "authority": {
+    "liveInputOwner": "deterministic-rendered-pixel-javascript-only",
+    "modelRole": "offline-engineering-label-assistance-and-review-only",
+    "allowedObservations": [
+      "rendered world-view pixels",
+      "visible HUD state",
+      "visible player-up minimap for navigation only",
+      "receipts from deterministic bounded keyboard and mouse commands"
+    ],
+    "forbiddenObservations": [
+      "world coordinates",
+      "bot objects or identifiers",
+      "hidden geometry",
+      "engine memory",
+      "privileged APIs",
+      "non-rendered game state"
+    ],
+    "fireRequiresFreshWorldFrame": true,
+    "minimapMayAuthorizeFire": false,
+    "predictionMayAuthorizeFire": false,
+    "opticalFlowMayAuthorizeFire": false,
+    "proposalMayAuthorizeFire": false
+  },
+  "render": {
+    "workingWidth": 320,
+    "workingHeight": 180,
+    "expectedFps": 30,
+    "frameSequenceMustIncrease": true,
+    "maximumFrameAgeMs": 100
+  },
+  "detector": {
+    "provider": "semantic-one-class-operator-v1",
+    "model": {
+      "status": "unavailable-awaiting-new-build-data",
+      "path": null,
+      "sha256": null,
+      "calibrationId": null
+    },
+    "fixtureProviderAllowedOffline": true,
+    "proposalSources": [
+      "rendered-colour-components",
+      "rendered-motion-regions"
+    ],
+    "positiveClass": "mobile-opponent-operator",
+    "hardNegativeClasses": [
+      "practice-target",
+      "static-prop",
+      "foliage",
+      "wall-or-trim",
+      "banner-or-decoration",
+      "hud",
+      "first-person-arm-or-weapon",
+      "muzzle-flash",
+      "damage-tint",
+      "particle-or-effect"
+    ],
+    "thresholds": {
+      "initiationConfidence": 0.82,
+      "continuationConfidence": 0.58,
+      "authorizationConfidence": 0.9,
+      "ambiguityMargin": 0.08
+    },
+    "dataset": {
+      "manifestPath": "profiles/datasets/one-v-one-operator-v1.manifest.json",
+      "splitRule": "sequence-and-session-disjoint",
+      "newBuildFramesRequired": true,
+      "g0125PracticeTargetRequiredAsHardNegative": true
+    }
+  },
+  "tracker": {
+    "type": "single-target-alpha-beta-v1",
+    "states": [
+      "SEARCH",
+      "TENTATIVE",
+      "CONFIRMED",
+      "COASTING",
+      "LOST"
+    ],
+    "confirmationHits": 2,
+    "confirmationWindowFrames": 3,
+    "coastingMaximumFrames": 5,
+    "coastingMaximumMs": 170,
+    "alpha": 0.72,
+    "beta": 0.18,
+    "initialUncertainty": 0.08,
+    "measurementUncertaintyDecay": 0.55,
+    "missUncertaintyGrowth": 0.12,
+    "maximumUncertainty": 0.62,
+    "association": {
+      "maximumCentreDistanceNormalized": 0.16,
+      "maximumScaleRatio": 2.2,
+      "minimumIou": 0,
+      "minimumWinnerMargin": 0.08,
+      "distanceWeight": 0.48,
+      "overlapWeight": 0.18,
+      "scaleWeight": 0.14,
+      "semanticWeight": 0.2
+    },
+    "cameraMotionCompensation": "command-receipt-required",
+    "opticalFlowSupportMaximumFrames": 3
+  },
+  "servo": {
+    "type": "bounded-image-space-pd-v1",
+    "aimPoint": "upper-torso",
+    "aimPointVerticalFraction": 0.43,
+    "coarseThresholdNormalized": 0.055,
+    "deadbandXNormalized": 0.008,
+    "deadbandYNormalized": 0.012,
+    "coarseGain": 0.82,
+    "fineGain": 0.42,
+    "derivativeGain": 0.08,
+    "integralGain": 0,
+    "maximumMouseX": 72,
+    "maximumMouseY": 48,
+    "pixelsPerMouseX": 0.82,
+    "pixelsPerMouseY": 0.82,
+    "maximumLeadPixels": 8,
+    "measuredControlLatencyMs": 70,
+    "postCorrectionFreshFrameRequired": true
+  },
+  "fire": {
+    "weapon": "M86 CARBINE",
+    "mode": "single-shot",
+    "pulseMs": 72,
+    "cooldownMs": 420,
+    "alignedFreshFramesRequired": 2,
+    "sameTrackRequired": true,
+    "reassociationAfterEveryShotRequired": true,
+    "freshSemanticMeasurementRequired": true,
+    "finishWindowMs": 1800,
+    "finishFollowupLimit": 3,
+    "finishEvidence": "visible-rendered-hit-or-damage-cue-only",
+    "fireIsNeverProofOfEffect": true
+  },
+  "movement": {
+    "base": "g0125-offensive-contact-v2",
+    "contactSearchAfterMs": 12000,
+    "contactSearchTurn": 18,
+    "minimapGuidanceNavigationOnly": true,
+    "recentlyLostContactPursuitMs": 900,
+    "postShotStrafeMs": 650,
+    "retreatHealth": 20,
+    "exceptionalDamageThreshold": 150,
+    "renderedCoverEnabled": false,
+    "threatLaneIsolationEnabled": false
+  },
+  "telemetry": {
+    "schema": "atomic-one-v-one-telemetry-v1",
+    "requiredFields": [
+      "frameSequence",
+      "frameCapturedAtMs",
+      "detectorProvider",
+      "detectionConfidence",
+      "detectionDisposition",
+      "trackId",
+      "trackState",
+      "associationCost",
+      "measurementAgeMs",
+      "predictionAgeMs",
+      "uncertainty",
+      "aimPhase",
+      "aimErrorX",
+      "aimErrorY",
+      "mouseCommandX",
+      "mouseCommandY",
+      "alignedFreshFrameCount",
+      "fireCandidate",
+      "fireAuthorized",
+      "fireGateReason",
+      "reassociationRequired",
+      "finishLatchActive"
+    ]
+  },
+  "acceptance": {
+    "offline": {
+      "zeroHardNegativeAuthorizations": true,
+      "zeroStaleFrameAuthorizations": true,
+      "zeroCoastingAuthorizations": true,
+      "deterministicReplay": true
+    },
+    "laterLiveCalibration": {
+      "zeroPracticeTargetContacts": true,
+      "minimumKills": 2,
+      "initialMinimumKd": 0.5,
+      "targetMinimumKd": 1,
+      "minimumCarbineAccuracyPercent": 50,
+      "maximumDeaths": 8,
+      "consecutivePassingGamesForPromotion": 3
+    }
+  }
+}

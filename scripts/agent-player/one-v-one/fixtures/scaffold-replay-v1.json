@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "kind": "atomic-one-v-one-offline-replay",
+  "replayId": "scaffold-replay-v1",
+  "observationAuthority": "synthetic-rendered-frame-fixture-only",
+  "frames": [
+    {
+      "frame": { "sequence": 1, "capturedAtMs": 34, "width": 320, "height": 180, "source": "rendered-world-view" },
+      "detections": []
+    },
+    {
+      "frame": { "sequence": 2, "capturedAtMs": 68, "width": 320, "height": 180, "source": "rendered-world-view" },
+      "detections": [
+        { "frameSequence": 2, "source": "rendered-world-view", "provider": "deterministic-fixture", "semanticClass": "mobile-opponent-operator", "confidence": 0.97, "proposalOnly": false, "bounds": { "x": 212, "y": 72, "width": 16, "height": 36 }, "centre": { "x": 220, "y": 90 } }
+      ]
+    },
+    {
+      "frame": { "sequence": 3, "capturedAtMs": 102, "width": 320, "height": 180, "source": "rendered-world-view" },
+      "detections": [
+        { "frameSequence": 3, "source": "rendered-world-view", "provider": "deterministic-fixture", "semanticClass": "mobile-opponent-operator", "confidence": 0.96, "proposalOnly": false, "bounds": { "x": 210, "y": 72, "width": 16, "height": 36 }, "centre": { "x": 218, "y": 90 } }
+      ]
+    },
+    {
+      "frame": { "sequence": 4, "capturedAtMs": 136, "width": 320, "height": 180, "source": "rendered-world-view" },
+      "detections": [
+        { "frameSequence": 4, "source": "rendered-world-view", "provider": "deterministic-fixture", "semanticClass": "mobile-opponent-operator", "confidence": 0.97, "proposalOnly": false, "bounds": { "x": 155, "y": 72, "width": 16, "height": 36 }, "centre": { "x": 163, "y": 90 } }
+      ],
+      "commandReceipt": { "sourceFrameSequence": 3, "renderedShiftX": -55, "renderedShiftY": 0 }
+    },
+    {
+      "frame": { "sequence": 5, "capturedAtMs": 170, "width": 320, "height": 180, "source": "rendered-world-view" },
+      "detections": [
+        { "frameSequence": 5, "source": "rendered-world-view", "provider": "deterministic-fixture", "semanticClass": "mobile-opponent-operator", "confidence": 0.98, "proposalOnly": false, "bounds": { "x": 152, "y": 72, "width": 16, "height": 36 }, "centre": { "x": 160, "y": 90 } }
+      ]
+    },
+    {
+      "frame": { "sequence": 6, "capturedAtMs": 204, "width": 320, "height": 180, "source": "rendered-world-view" },
+      "detections": [
+        { "frameSequence": 6, "source": "rendered-world-view", "provider": "deterministic-fixture", "semanticClass": "mobile-opponent-operator", "confidence": 0.98, "proposalOnly": false, "bounds": { "x": 152, "y": 72, "width": 16, "height": 36 }, "centre": { "x": 160, "y": 90 } }
+      ]
+    },
+    {
+      "frame": { "sequence": 7, "capturedAtMs": 238, "width": 320, "height": 180, "source": "rendered-world-view" },
+      "detections": []
+    },
+    {
+      "frame": { "sequence": 8, "capturedAtMs": 272, "width": 320, "height": 180, "source": "rendered-world-view" },
+      "detections": [
+        { "frameSequence": 8, "source": "rendered-world-view", "provider": "deterministic-fixture", "semanticClass": "mobile-opponent-operator", "confidence": 0.68, "proposalOnly": false, "bounds": { "x": 154, "y": 72, "width": 16, "height": 36 }, "centre": { "x": 162, "y": 90 } }
+      ]
+    },
+    {
+      "frame": { "sequence": 9, "capturedAtMs": 306, "width": 320, "height": 180, "source": "rendered-world-view" },
+      "detections": [
+        { "frameSequence": 9, "source": "rendered-world-view", "provider": "deterministic-fixture", "semanticClass": "practice-target", "confidence": 0.99, "proposalOnly": false, "bounds": { "x": 152, "y": 72, "width": 16, "height": 36 }, "centre": { "x": 160, "y": 90 } }
+      ]
+    }
+  ]
+}
