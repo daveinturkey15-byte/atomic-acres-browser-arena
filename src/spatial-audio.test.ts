@@ -57,6 +57,19 @@ describe('spatial audio contracts', () => {
     expect(AUDIO_RUNTIME_BUDGET.continuousVoices).toBeGreaterThanOrEqual(8);
   });
 
+  it('keeps continuous air beds narrow, quiet and slowly modulated instead of broadband white hiss', () => {
+    for (const definition of Object.values(ARENA_AUDIO_DEFINITIONS)) {
+      expect(definition.airGain).toBeGreaterThan(0);
+      expect(definition.airGain).toBeLessThanOrEqual(0.01);
+      expect(definition.airQ).toBeGreaterThanOrEqual(1.4);
+      expect(definition.airLowpassHz).toBeGreaterThan(definition.airFrequencyHz);
+      expect(definition.airLowpassHz).toBeLessThanOrEqual(900);
+      expect(definition.modulationHz).toBeGreaterThan(0);
+      expect(definition.modulationDepth).toBeGreaterThan(0);
+      expect(definition.modulationDepth).toBeLessThanOrEqual(0.2);
+    }
+  });
+
   it('maps footsteps to each arena dominant authored walkable material', () => {
     expect(arenaFootstepSurface('atomic-acres', 'asphalt')).toBe('asphalt');
     expect(arenaFootstepSurface('atomic-acres', 'wood')).toBe('wood');

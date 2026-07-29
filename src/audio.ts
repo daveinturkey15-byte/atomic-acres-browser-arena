@@ -1230,14 +1230,18 @@ export class ArenaAudio {
     }
     const air = this.context.createBufferSource();
     const airFilter = this.context.createBiquadFilter();
+    const airLowpass = this.context.createBiquadFilter();
     const airGain = this.context.createGain();
     const airPanner = this.context.createPanner();
     air.buffer = this.noiseBuffer;
     air.loop = true;
     airFilter.type = 'bandpass';
     airFilter.frequency.value = definition.airFrequencyHz;
-    airFilter.Q.value = arenaId === 'gun-range' ? 2.1 : 0.7;
-    airGain.gain.value = 0.017;
+    airFilter.Q.value = definition.airQ;
+    airLowpass.type = 'lowpass';
+    airLowpass.frequency.value = definition.airLowpassHz;
+    airLowpass.Q.value = 0.72;
+    airGain.gain.value = definition.airGain;
     airPanner.panningModel = 'HRTF';
     airPanner.distanceModel = 'inverse';
     airPanner.refDistance = 9;
@@ -1246,13 +1250,28 @@ export class ArenaAudio {
     airPanner.positionX.value = definition.airPosition.x;
     airPanner.positionY.value = definition.airPosition.y;
     airPanner.positionZ.value = definition.airPosition.z;
-    air.connect(airFilter).connect(airGain).connect(airPanner).connect(this.ambience);
+    // The loop is deliberately narrow and gently animated. A broad, static
+    // white-noise bed reads as intermittent hiss after loud combat tails,
+    // especially on headsets; the second filter removes that broadband floor
+    // without spending another continuous voice.
+    airFilter.frequency.setValueAtTime(definition.airFrequencyHz, now);
+    const halfCycleSeconds = 0.5 / definition.modulationHz;
+    const scheduledHalfCycles = Math.ceil(120 / halfCycleSeconds);
+    for (let step = 1; step <= scheduledHalfCycles; step += 1) {
+      const direction = step % 2 === 0 ? -1 : 1;
+      airFilter.frequency.exponentialRampToValueAtTime(
+        definition.airFrequencyHz * (1 + definition.modulationDepth * direction),
+        now + halfCycleSeconds * step,
+      );
+    }
+    air.connect(airFilter).connect(airLowpass).connect(airGain).connect(airPanner).connect(this.ambience);
     if (this.registerVoice(air, this.ambience, 1)) {
       air.start(now, presentationRandom() * this.noiseBuffer.duration);
       this.arenaSources.push(air);
-      this.arenaNodes.push(airFilter, airGain, airPanner);
+      this.arenaNodes.push(airFilter, airLowpass, airGain, airPanner);
     } else {
       airFilter.disconnect();
+      airLowpass.disconnect();
       airGain.disconnect();
       airPanner.disconnect();
     }
