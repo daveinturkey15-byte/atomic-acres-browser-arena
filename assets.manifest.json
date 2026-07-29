@@ -201,9 +201,9 @@
       "sourceBlend": "source-assets/blender/pass65-support-aircraft-family.blend",
       "sourceBlendSha256": "1902a7a38c0a466855939f194873e1be6a8f0c0444074f34138e617963091ffd",
       "sourceScript": "scripts/blender/create-pass65-support-vehicles.py",
-      "sourceScriptSha256": "033b1324530c0ce3dddc408839cd7ceddcaea406fb84d816f8c9e450171b963f",
+      "sourceScriptSha256": "e6b3c602fa6818a8292e0b071df7f023d527564b5657b55291b669b1b7ac0b25",
       "sourceProvenance": "source-assets/blender/pass65-support-aircraft-family.provenance.json",
-      "sourceProvenanceSha256": "31f3869bd7ac5ab0417f76c9f23ea2a6b3872d36b6ba6354a60de6a07f8ac776",
+      "sourceProvenanceSha256": "68f22321a2ba264661333f2ee84854d8d19efb9c5d75ad6e3ce3dc2b88eda7dc",
       "preview": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-contact-sheet.png",
       "format": "Distinct Care transport and Carpet bomber three-LOD GLBs plus two-LOD parachute crate, embedded WebP PBR maps, semantic cargo/bomb sockets and authored actions",
       "modifications": "Project-original fixed-wing support family with correct local -Z forward contract, animated propellers/engines/doors/bay/racks and a visible parachute crate. Runtime gameplay authority remains TypeScript-owned.",
@@ -219,24 +219,24 @@
       "files": [
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod0.glb",
-          "sha256": "0c1819b004f44593d4a6b90393e77837d77e67b52217576797a3ab46b5e16e1e",
+          "sha256": "ecf252f51e683320c0668bf484afb6a41c6c7fe76c9eee501fab234ac256e356",
           "lod": 0,
-          "triangles": 72900,
-          "bytes": 793408
+          "triangles": 73200,
+          "bytes": 802292
         },
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod1.glb",
-          "sha256": "c9be76818848b6dfd22887d6f33ce125d514f74a86858304f6fe174ca00126b8",
+          "sha256": "9d59fe48c608bf355dd4a6a00b5644a3b61dc949c46c82292c6d6a4c4afe0d6e",
           "lod": 1,
-          "triangles": 30564,
-          "bytes": 532228
+          "triangles": 30784,
+          "bytes": 549764
         },
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod2.glb",
-          "sha256": "d161b2b5c3cdb1bfe78750f00f30eac22af0468e20fd2bff7f767ef1b4dac973",
+          "sha256": "a0fff39d989f3b0840ac2169952ad4be1636ad3b64e00e3ac0198640224666f7",
           "lod": 2,
-          "triangles": 18020,
-          "bytes": 398788
+          "triangles": 18008,
+          "bytes": 404016
         },
         {
           "path": "public/assets/original/textures/support/pass65-chopper-albedo.png",
@@ -264,14 +264,14 @@
         }
       ],
       "sourceBlend": "source-assets/blender/pass65-chopper-gunner.blend",
-      "sourceBlendSha256": "194b2a1879f11c175a306fbc04f65c284e1f2eddf920a82ebe1aa2fe10268443",
+      "sourceBlendSha256": "7320007b182ab11cab0f8fc11eaf6d66daf37955d79f4cdf65fa1b0802768bdf",
       "sourceScript": "scripts/blender/create-pass65-support-vehicles.py",
-      "sourceScriptSha256": "033b1324530c0ce3dddc408839cd7ceddcaea406fb84d816f8c9e450171b963f",
+      "sourceScriptSha256": "e6b3c602fa6818a8292e0b071df7f023d527564b5657b55291b669b1b7ac0b25",
       "sourceProvenance": "source-assets/blender/pass65-chopper-gunner.provenance.json",
-      "sourceProvenanceSha256": "8982d2caf9cb3a36d1677804d7b2632439918c479cfe89b7d6bf5810c1c284c9",
+      "sourceProvenanceSha256": "fd65cbb4664aaa09dba8a9b11be649ec38f713ce2fc711ef42f8673003a57055",
       "preview": "docs/assets/pass65-vehicles/chopper/pass65-chopper-contact-sheet.png",
-      "format": "Three strict decreasing optimized self-contained glTF 2.0 binary LODs with embedded WebP PBR maps, authored cockpit/HUD/rotors/gun/sockets and nine animation clips",
-      "modifications": "Project-original support helicopter, cockpit and presentation feedback corpus. Runtime gameplay authority remains TypeScript-owned; procedural geometry is non-release fallback only.",
+      "format": "Three strict decreasing optimized self-contained glTF 2.0 binary LODs with embedded WebP PBR maps, complete rear fuselage/tail, authored unobstructed gunner sightline/HUD/weapon view, exterior rotors/gun/sockets and eight animation clips",
+      "modifications": "Project-original support helicopter with substantial rear cabin and tail volume plus a possessed-view-only gunner sightline that excludes exterior shell and rotors. Runtime gameplay authority remains TypeScript-owned; procedural geometry is non-release fallback only.",
       "attributionRequired": false
     },
     {
@@ -377,9 +377,9 @@
       "license": "Original project work",
       "files": "public/assets/original/menu-previews/*",
       "sourceScript": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
-      "sourceScriptSha256": "b8236a4a0f9a793af38a807b9690cfa53c1de3ab655b79be5e5f784338c6e5e2",
+      "sourceScriptSha256": "065dfe0202b2c0497caa8d2fa144231eee576304983a1884853ca4766c23c623",
       "sourceProvenance": "source-assets/menu/pass65-preview-masters/provenance.json",
-      "sourceProvenanceSha256": "6774642aa21d999447f84a8244d58d769762694f1fb4f32b78fef0706f10c447",
+      "sourceProvenanceSha256": "f3b8b3f89f222b820cd4bc381884f08e39401faffcdc6ce055a08306e3a89a75",
       "format": "Four distinct 960x540 eight-second 24 FPS selected-map runtime captures, shipped as VP9/Opus WebM, H.264/AAC MP4 and static WebP posters, plus deterministic five-frame review evidence",
       "modifications": "Captured offline from each actual authoritative production WebGPU arena with deterministic camera and visual time. Three map flyovers bake a graphite rotor, dimensional canopy and cyan/green cockpit avionics; Gun Range bakes an expressive charcoal/silver crown, articulated ears, forelegs and coral-padded paws. Runtime loading/menu playback remains prerecorded-only, reduced motion is poster-only, and no downloaded or sampled assets are used. The former byte-identical Gun Range media gate is explicitly superseded.",
       "attributionRequired": false

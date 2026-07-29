@@ -431,7 +431,7 @@ def build_chopper(lod: int, materials):
     body = empty("chopper-fuselage", (0, 0, 0), root, "fuselage")
     loft(
         f"Chopper_TaperedFuselage_LOD{lod}",
-        [(-2.05, 0.30, 0.52, 0.50), (-1.35, 0.32, 1.05, 0.72), (-0.25, 0.27, 1.20, 0.80),
+        [(-0.55, 0.29, 1.14, 0.76), (-0.25, 0.27, 1.20, 0.80),
          (0.62, 0.10, 1.12, 0.63), (1.48, -0.12, 0.76, 0.38), (2.72, -0.27, 0.18, 0.11)],
         materials["armor"], body, max(12, segments // 2),
     )
@@ -452,13 +452,34 @@ def build_chopper(lod: int, materials):
         for y in (-0.84, 0.70):
             strut_between(f"Chopper_SkidStrut_{side}_{y}_LOD{lod}", (side * 0.70, y, -0.52), (side * 0.91, y, -1.02), 0.052, materials["metal"], root, max(10, segments // 2))
 
+    rear = empty("chopper-rear-fuselage", (0, 0, 0), root, "rear-fuselage")
+    rear["complete_rear_volume"] = True
+    loft(
+        f"Chopper_RearCabin_LOD{lod}",
+        [(-2.72, 0.48, 0.42, 0.38), (-2.28, 0.43, 0.70, 0.52),
+         (-1.52, 0.34, 1.01, 0.68), (-0.48, 0.29, 1.14, 0.75)],
+        materials["armor"], rear, max(12, segments // 2),
+    )
+    cube(f"Chopper_RearEngineCowling_LOD{lod}", (0, -1.34, 0.93), (1.66, 1.62, 0.34), materials["frame"], rear, bevel=0.14)
+    for side in (-1, 1):
+        cube(
+            f"Chopper_RearArmorDoor_{side}_LOD{lod}", (side * 0.93, -1.40, 0.32),
+            (0.10, 1.18, 0.82), materials["dark"], rear,
+            rotation=(0, math.radians(side * 5), 0), bevel=0.055,
+        )
+        cube(
+            f"Chopper_RearDoorAccent_{side}_LOD{lod}", (side * 0.988, -1.40, 0.36),
+            (0.018, 0.72, 0.055), materials["accent"], rear, bevel=0.008,
+        )
+
     tail = empty("chopper-tail-boom", (0, 0, 0), root, "tail-boom")
     loft(
         f"Chopper_TailBoom_LOD{lod}",
-        [(-1.62, 0.47, 0.50, 0.42), (-2.85, 0.57, 0.35, 0.29), (-4.10, 0.78, 0.22, 0.22), (-5.18, 1.05, 0.13, 0.16)],
+        [(-2.45, 0.47, 0.48, 0.40), (-3.20, 0.58, 0.34, 0.28), (-4.20, 0.80, 0.22, 0.22), (-5.18, 1.05, 0.13, 0.16)],
         materials["armor"], tail, max(10, segments // 2),
     )
-    wedge(f"Chopper_TailFin_LOD{lod}", (0, -4.72, 1.60), (0.22, 1.30, 1.72), materials["accent"], tail, rotation=(math.radians(-8), 0, 0))
+    tail_fin = empty("chopper-tail-fin", (0, 0, 0), tail, "tail-fin")
+    wedge(f"Chopper_TailFin_LOD{lod}", (0, -4.72, 1.60), (0.22, 1.30, 1.72), materials["accent"], tail_fin, rotation=(math.radians(-8), 0, 0))
     for side in (-1, 1):
         wing_panel(f"Chopper_TailPlane_{side}_LOD{lod}", side, -4.28, 0.72, 1.20, 0.14, 0.34, 0.82, 0.10, materials["armor"], tail)
 
@@ -572,21 +593,34 @@ def build_chopper(lod: int, materials):
         strut_between(f"Chopper_InnerWindscreenGlow_{side}_LOD{lod}", (side * 0.64, 1.00, 0.07), (side * 0.44, 2.14, 0.90), 0.012, materials["cyan"], cockpit, 8)
     strut_between(f"Chopper_InnerWindscreenHeader_LOD{lod}", (-0.47, 2.18, 0.94), (0.47, 2.18, 0.94), 0.035, materials["frame"], cockpit, 10)
     strut_between(f"Chopper_InnerWindscreenHeaderGlow_LOD{lod}", (-0.42, 2.15, 0.90), (0.42, 2.15, 0.90), 0.012, materials["green"], cockpit, 8)
-    strut_between(f"Chopper_HUDMount_Left_LOD{lod}", (-0.105, 1.29, 0.62), (-0.105, 1.17, 0.655), 0.010, materials["metal"], cockpit, 8)
-    strut_between(f"Chopper_HUDMount_Right_LOD{lod}", (0.105, 1.29, 0.62), (0.105, 1.17, 0.655), 0.010, materials["metal"], cockpit, 8)
-    hud_glass = cube("chopper-cockpit-hud-glass", (0, 1.14, 0.72), (0.23, 0.016, 0.13), materials["hudglass"], cockpit, rotation=(math.radians(-7), 0, 0), bevel=0.007)
-    cube(f"Chopper_HUDBorderTop_LOD{lod}", (0, 1.127, 0.781), (0.23, 0.007, 0.009), materials["hud_cyan"], cockpit, bevel=0.002)
-    cube(f"Chopper_HUDBorderBottom_LOD{lod}", (0, 1.127, 0.659), (0.23, 0.007, 0.009), materials["hud_cyan"], cockpit, bevel=0.002)
+    gunner_sightline = empty("chopper-gunner-sightline", (0, 0, 0), cockpit, "gunner-sightline")
+    gunner_sightline["first_person_only"] = True
+    gunner_sightline["gunner_sightline"] = True
+    strut_between(f"Chopper_HUDMount_Left_LOD{lod}", (-0.083, 1.26, 0.65), (-0.083, 1.17, 0.675), 0.007, materials["metal"], gunner_sightline, 8)
+    strut_between(f"Chopper_HUDMount_Right_LOD{lod}", (0.083, 1.26, 0.65), (0.083, 1.17, 0.675), 0.007, materials["metal"], gunner_sightline, 8)
+    hud_glass = cube("chopper-cockpit-hud-glass", (0, 1.14, 0.72), (0.17, 0.012, 0.09), materials["hudglass"], gunner_sightline, rotation=(math.radians(-7), 0, 0), bevel=0.005)
+    cube(f"Chopper_HUDBorderTop_LOD{lod}", (0, 1.127, 0.761), (0.17, 0.006, 0.006), materials["hud_cyan"], gunner_sightline, bevel=0.0015)
+    cube(f"Chopper_HUDBorderBottom_LOD{lod}", (0, 1.127, 0.679), (0.17, 0.006, 0.006), materials["hud_cyan"], gunner_sightline, bevel=0.0015)
     for side in (-1, 1):
-        cube(f"Chopper_HUDBorderSide_{side}_LOD{lod}", (side * 0.110, 1.127, 0.72), (0.009, 0.007, 0.13), materials["hud_cyan"], cockpit, bevel=0.002)
-    torus("chopper-cockpit-hud-target-ring", (0, 1.120, 0.72), 0.028, 0.0025, materials["hud_green"], cockpit, max(16, segments // 2), rotation=(math.pi / 2, 0, 0))
-    cube("chopper-cockpit-hud-reticle", (0, 1.116, 0.72), (0.052, 0.004, 0.004), materials["hud_green"], cockpit, bevel=0.001)
-    cube("chopper-cockpit-hud-horizon", (0, 1.114, 0.69), (0.095, 0.004, 0.004), materials["hud_cyan"], cockpit, bevel=0.001)
+        cube(f"Chopper_HUDBorderSide_{side}_LOD{lod}", (side * 0.081, 1.127, 0.72), (0.006, 0.006, 0.09), materials["hud_cyan"], gunner_sightline, bevel=0.0015)
+    torus("chopper-cockpit-hud-target-ring", (0, 1.120, 0.72), 0.023, 0.002, materials["hud_green"], gunner_sightline, max(16, segments // 2), rotation=(math.pi / 2, 0, 0))
+    cube("chopper-cockpit-hud-reticle", (0, 1.116, 0.72), (0.044, 0.003, 0.003), materials["hud_green"], gunner_sightline, bevel=0.001)
+    cube("chopper-cockpit-hud-horizon", (0, 1.114, 0.696), (0.070, 0.003, 0.003), materials["hud_cyan"], gunner_sightline, bevel=0.001)
     if lod < 2:
-        for tick, x in enumerate((-0.09, -0.06, -0.03, 0.0, 0.03, 0.06, 0.09)):
-            cube(f"Chopper_HUDHeadingTick_{tick}_LOD{lod}", (x, 1.110, 0.765), (0.003, 0.003, 0.012 if tick % 3 == 0 else 0.007), materials["hud_cyan"], cockpit, bevel=0.001)
-        for pitch, z in enumerate((0.680, 0.700, 0.740, 0.760)):
-            cube(f"Chopper_HUDPitchLadder_{pitch}_LOD{lod}", (0, 1.109, z), (0.032 if pitch % 2 == 0 else 0.022, 0.003, 0.0025), materials["hud_green"], cockpit, bevel=0.001)
+        for tick, x in enumerate((-0.065, -0.043, -0.022, 0.0, 0.022, 0.043, 0.065)):
+            cube(f"Chopper_HUDHeadingTick_{tick}_LOD{lod}", (x, 1.110, 0.755), (0.0025, 0.0025, 0.009 if tick % 3 == 0 else 0.005), materials["hud_cyan"], gunner_sightline, bevel=0.001)
+        for pitch, z in enumerate((0.692, 0.706, 0.734, 0.748)):
+            cube(f"Chopper_HUDPitchLadder_{pitch}_LOD{lod}", (0, 1.109, z), (0.026 if pitch % 2 == 0 else 0.018, 0.0025, 0.002), materials["hud_green"], gunner_sightline, bevel=0.001)
+    gunner_weapon = empty("chopper-gunner-weapon-view", (0, 0, 0), gunner_sightline, "gunner-weapon-view")
+    gunner_weapon["gunner_weapon_presentation"] = True
+    cube(f"Chopper_GunnerViewReceiver_LOD{lod}", (0.34, 0.91, 0.43), (0.16, 0.34, 0.13), materials["dark"], gunner_weapon, rotation=(math.radians(-5), 0, math.radians(-4)), bevel=0.035)
+    for barrel in range(2 if lod < 2 else 1):
+        offset = (barrel - 0.5) * 0.035 if lod < 2 else 0
+        strut_between(
+            f"Chopper_GunnerViewBarrel_{barrel}_LOD{lod}", (0.34 + offset, 1.02, 0.45),
+            (0.34 + offset, 1.46, 0.39), 0.018, materials["metal"], gunner_weapon, max(8, segments // 3),
+        )
+    cube(f"Chopper_GunnerViewStatus_LOD{lod}", (0.34, 0.892, 0.49), (0.085, 0.012, 0.018), materials["hud_green"], gunner_weapon, bevel=0.004)
     empty("chopper-first-person-camera-socket", (0, 0.38, 0.74), root, "first-person-camera")
 
     main_rotor = empty("chopper-main-rotor", (0, -0.42, 1.72), root, "main-rotor")
@@ -605,23 +639,6 @@ def build_chopper(lod: int, materials):
         angle = index * math.tau / (4 if lod < 2 else 2)
         cube(f"Chopper_TailBlade_{index}_LOD{lod}", (0, 0, 0), (0.055, 1.28, 0.11), materials["accent"], tail_rotor, rotation=(angle, 0, 0), bevel=0.018)
     add_action(tail_rotor, "Chopper_Tail_Rotor_Loop", [(1, 0.0), (13, math.tau * 1.5), (25, math.tau * 3)], "rotation_euler", 0)
-
-    fp_rotor = empty("chopper-first-person-rotor", (0, 1.38, 0.94), cockpit, "first-person-rotor")
-    fp_rotor["first_person_only"] = True
-    sphere(f"Chopper_FP_RotorHub_LOD{lod}", (0, 0, 0), (0.025, 0.025, 0.018), materials["panel_wear"], fp_rotor, 10, 6)
-    for index in range(2):
-        angle = index * math.pi / 2
-        cube(f"Chopper_FP_RotorBlade_{index}_LOD{lod}", (0, 0, 0), (0.034, 6.10, 0.012), materials["rotorblur"], fp_rotor, rotation=(0, 0, angle), bevel=0.006)
-        for tip in (-1, 1):
-            distance = 3.0 * tip
-            tip_position = (-math.sin(angle) * distance, math.cos(angle) * distance, 0)
-            tip_dimensions = (0.050, 0.18, 0.014) if index == 0 else (0.18, 0.050, 0.014)
-            cube(
-                f"Chopper_FP_RotorTip_{index}_{tip}_LOD{lod}", tip_position, tip_dimensions,
-                materials["rotortip"], fp_rotor, rotation=(0, 0, angle), bevel=0.004,
-            )
-    torus(f"Chopper_FP_RotorArc_LOD{lod}", (0, 0, 0), 2.90, 0.012, materials["rotorblur"], fp_rotor, max(32, segments))
-    add_action(fp_rotor, "Chopper_Cockpit_Rotor_Loop", [(1, 0.0), (13, math.tau), (25, math.tau * 2)], "rotation_euler", 2)
 
     gun = empty("chopper-player-gun", (0, 0, 0), root, "gun")
     cylinder(f"Chopper_GunGimbal_LOD{lod}", (0, 1.18, -0.62), 0.30, 0.36, materials["dark"], gun, rotation=(0, math.pi / 2, 0), vertices=segments)
@@ -980,7 +997,7 @@ def render_chopper_reviews(roots) -> None:
     sky_horizon_material = simple_material("MAT_ReviewFPSkyHorizon", (0.18, 0.15, 0.13), 0.0, 0.80, (0.34, 0.16, 0.07), 1.10)
     sky_mid_material = simple_material("MAT_ReviewFPSkyMid", (0.035, 0.095, 0.15), 0.0, 0.86, (0.025, 0.14, 0.27), 0.82)
     sky_upper_material = simple_material("MAT_ReviewFPSkyUpper", (0.008, 0.025, 0.060), 0.0, 0.90, (0.008, 0.035, 0.12), 0.62)
-    haze_material = simple_material("MAT_ReviewFPAtmosphericHaze", (0.06, 0.20, 0.24), 0.0, 0.94, (0.03, 0.14, 0.18), 0.28, 0.10)
+    haze_material = simple_material("MAT_ReviewFPAtmosphericHaze", (0.06, 0.20, 0.24), 0.0, 0.94, (0.03, 0.14, 0.18), 0.18, 0.035)
     beacon_material = simple_material("MAT_ReviewFPBeacon", (0.18, 0.06, 0.02), 0.05, 0.35, (1.0, 0.18, 0.02), 3.2)
     cube("Review_FP_SkyUpper", (0, 21.5, 4.0), (42.0, 0.10, 4.8), sky_upper_material, fp_world, bevel=0.0)
     cube("Review_FP_SkyMid", (0, 21.4, 1.25), (42.0, 0.10, 2.3), sky_mid_material, fp_world, bevel=0.0)
@@ -991,20 +1008,20 @@ def render_chopper_reviews(roots) -> None:
     for stripe, y in enumerate((3.2, 5.8, 8.4, 11.0, 13.6, 16.2, 18.8)):
         cube(f"Review_FP_RunwayStripe_{stripe}", (0, y, -0.765), (0.14, 1.10, 0.025), runway_marking_material, fp_world, bevel=0.006)
     for index, (x, y, width, depth, height) in enumerate((
-        (-6.0, 8.5, 3.2, 2.5, 1.8), (-2.4, 11.5, 2.2, 2.1, 2.7),
-        (2.3, 10.6, 3.0, 2.4, 1.5), (6.0, 12.2, 2.6, 2.2, 2.3),
+        (-7.4, 12.5, 2.8, 2.2, 1.8), (-5.2, 15.2, 2.0, 1.8, 2.4),
+        (5.2, 14.4, 2.4, 2.0, 1.5), (7.4, 12.8, 2.4, 2.0, 2.1),
     )):
         cube(f"Review_FP_Structure_{index}", (x, y, -0.81 + height * 0.5), (width, depth, height), structure_material, fp_world, bevel=0.14)
         for seam in (-0.30, 0.0, 0.30):
             cube(f"Review_FP_StructureSeam_{index}_{seam}", (x + seam * width, y - depth * 0.505, -0.76 + height * 0.5), (0.035, 0.025, height * 0.72), landmark_material, fp_world, bevel=0.004)
         cube(f"Review_FP_Beacon_{index}", (x, y - depth * 0.36, -0.66 + height), (0.20, 0.12, 0.08), beacon_material, fp_world, bevel=0.02)
-    for index, (x, width, height) in enumerate(((-8.0, 5.8, 2.4), (-3.7, 4.5, 1.6), (1.2, 5.8, 2.0), (6.2, 5.2, 2.8))):
+    for index, (x, width, height) in enumerate(((-10.0, 3.8, 1.8), (-7.4, 3.2, 1.3), (7.4, 3.4, 1.5), (10.0, 3.8, 2.0))):
         wedge(f"Review_FP_Mountain_{index}", (x, 18.0 + index * 0.22, -0.72 + height * 0.36), (width, 1.6, height), mountain_material, fp_world, rotation=(0, 0, math.radians((-4 + index * 3))))
     cylinder("Review_FP_ControlTower", (-5.0, 14.4, 0.45), 0.24, 2.4, landmark_material, fp_world, vertices=12, bevel=0.025)
     sphere("Review_FP_ControlCab", (-5.0, 14.4, 1.72), (0.62, 0.42, 0.28), structure_material, fp_world, 16, 8)
     cylinder("Review_FP_RadarMast", (5.2, 15.0, 0.12), 0.10, 1.7, landmark_material, fp_world, vertices=10, bevel=0.015)
     torus("Review_FP_RadarDish", (5.2, 15.0, 1.12), 0.42, 0.055, runway_marking_material, fp_world, 24, rotation=(math.pi / 2, math.radians(18), 0))
-    cube("Review_FP_AtmosphericHaze", (0, 13.2, 0.65), (28.0, 0.035, 3.1), haze_material, fp_world, bevel=0.0)
+    cube("Review_FP_AtmosphericHaze", (0, 19.2, 0.35), (28.0, 0.025, 1.5), haze_material, fp_world, bevel=0.0)
     for obj in hierarchy(fp_world):
         obj.hide_render = True
         obj.hide_viewport = True
@@ -1012,7 +1029,6 @@ def render_chopper_reviews(roots) -> None:
         hidden = []
         for name in (
             "chopper-fuselage", "Chopper_CanopyGlass_LOD0", "Chopper_PilotSeatBack_LOD0",
-            "chopper-first-person-rotor",
         ):
             candidate = next((obj for obj in hierarchy(lod0) if obj.name == name or obj.get("canonical_node_name") == name), None)
             if candidate is None:
@@ -1041,18 +1057,18 @@ def render_chopper_reviews(roots) -> None:
         print(f"CHOPPER_FP_DIAGNOSTIC={diagnostic}")
         return
     def render_accepted_first_person() -> Path:
-        cockpit = next((
+        sightline = next((
             obj for obj in hierarchy(lod0)
-            if obj.name == "chopper-first-person-cockpit"
-            or obj.get("canonical_node_name") == "chopper-first-person-cockpit"
+            if obj.name == "chopper-gunner-sightline"
+            or obj.get("canonical_node_name") == "chopper-gunner-sightline"
         ), None)
-        if cockpit is None:
-            raise RuntimeError("authored chopper cockpit missing from focused review")
-        cockpit_nodes = set(hierarchy(cockpit))
+        if sightline is None:
+            raise RuntimeError("authored unobstructed chopper gunner sightline missing from focused review")
+        sightline_nodes = set(hierarchy(sightline))
         for obj in hierarchy(lod0):
             if obj.type == "MESH":
-                obj.hide_render = obj not in cockpit_nodes
-                obj.hide_viewport = obj not in cockpit_nodes
+                obj.hide_render = obj not in sightline_nodes
+                obj.hide_viewport = obj not in sightline_nodes
         for obj in hierarchy(fp_world):
             obj.hide_render = False
             obj.hide_viewport = False
@@ -1079,7 +1095,7 @@ def render_chopper_reviews(roots) -> None:
         contact_sheet([
             CHOPPER_REVIEW / "pass65-chopper-exterior-front-quarter.png",
             CHOPPER_REVIEW / "pass65-chopper-rotor-gun-profile.png",
-            CHOPPER_REVIEW / "pass65-chopper-cockpit-glass-closeup.png",
+            CHOPPER_REVIEW / "pass65-chopper-rear-fuselage-quarter.png",
             focused_path,
         ], CHOPPER_REVIEW / "pass65-chopper-contact-sheet.png")
         print(f"CHOPPER_FP_REVIEW_16X9={focused_path}")
@@ -1087,7 +1103,7 @@ def render_chopper_reviews(roots) -> None:
     views = (
         ("exterior-front-quarter", (-8.2, 9.6, 4.7), (0, -0.25, 0.22)),
         ("rotor-gun-profile", (11.0, -0.2, 3.1), (0, -0.70, 0.18)),
-        ("cockpit-glass-closeup", (-3.3, 6.4, 2.35), (0, 1.34, 0.36)),
+        ("rear-fuselage-quarter", (7.6, -10.4, 4.6), (0, -1.45, 0.46)),
     )
     paths = []
     for label, location, target in views:

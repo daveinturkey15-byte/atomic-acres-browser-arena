@@ -66,7 +66,7 @@ const aircraftPbrMaps = await pbrSet('pass65-support-aircraft');
 const chopperRenders = await Promise.all([
   reviewRecord('docs/assets/pass65-vehicles/chopper/pass65-chopper-exterior-front-quarter.png', 'exterior-front-quarter', 512, 512),
   reviewRecord('docs/assets/pass65-vehicles/chopper/pass65-chopper-rotor-gun-profile.png', 'rotor-gun-profile', 512, 512),
-  reviewRecord('docs/assets/pass65-vehicles/chopper/pass65-chopper-cockpit-glass-closeup.png', 'cockpit-glass-closeup', 512, 512),
+  reviewRecord('docs/assets/pass65-vehicles/chopper/pass65-chopper-rear-fuselage-quarter.png', 'rear-fuselage-quarter', 512, 512),
   reviewRecord('docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png', 'accepted-first-person-instruments', 960, 540),
 ]);
 const chopperContactSheet = await reviewRecord(
@@ -120,7 +120,7 @@ const chopperProvenance = {
     acceptedFirstPersonFrame: chopperRenders[3],
     renders: chopperRenders,
     contactSheet: chopperContactSheet,
-    acceptance: 'parent visual gate APPROVE after 960x540 original-resolution inspection',
+    acceptance: 'parent visual gate APPROVE after original-resolution rear-quarter and unobstructed 960x540 gunner-sightline inspection',
   },
   runtimeAudit: {
     lods: compactAudit(chopper.audits),
@@ -207,8 +207,8 @@ upsertAsset({
   sourceScript: sourceScript.path, sourceScriptSha256: sourceScript.sha256,
   sourceProvenance: chopperProvenanceRecord.path, sourceProvenanceSha256: chopperProvenanceRecord.sha256,
   preview: chopperContactSheet.path,
-  format: 'Three strict decreasing optimized self-contained glTF 2.0 binary LODs with embedded WebP PBR maps, authored cockpit/HUD/rotors/gun/sockets and nine animation clips',
-  modifications: 'Project-original support helicopter, cockpit and presentation feedback corpus. Runtime gameplay authority remains TypeScript-owned; procedural geometry is non-release fallback only.',
+  format: 'Three strict decreasing optimized self-contained glTF 2.0 binary LODs with embedded WebP PBR maps, complete rear fuselage/tail, authored unobstructed gunner sightline/HUD/weapon view, exterior rotors/gun/sockets and eight animation clips',
+  modifications: 'Project-original support helicopter with substantial rear cabin and tail volume plus a possessed-view-only gunner sightline that excludes exterior shell and rotors. Runtime gameplay authority remains TypeScript-owned; procedural geometry is non-release fallback only.',
   attributionRequired: false,
 });
 upsertAsset({

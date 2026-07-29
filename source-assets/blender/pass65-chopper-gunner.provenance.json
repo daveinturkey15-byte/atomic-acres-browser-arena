@@ -9,7 +9,7 @@
   "blenderVersion": "5.1.2",
   "generator": {
     "path": "scripts/blender/create-pass65-support-vehicles.py",
-    "sha256": "033b1324530c0ce3dddc408839cd7ceddcaea406fb84d816f8c9e450171b963f"
+    "sha256": "e6b3c602fa6818a8292e0b071df7f023d527564b5657b55291b669b1b7ac0b25"
   },
   "runtimeForwardAxis": "-Z",
   "blenderAuthoringForwardAxis": "-Y converted to glTF -Z by Y-up export",
@@ -17,7 +17,7 @@
   "inspirationBoundary": "Original stylized near-future support helicopter. No copied commercial-game geometry, texture, logo, HUD, animation, UI, or audio.",
   "sourceBlend": {
     "path": "source-assets/blender/pass65-chopper-gunner.blend",
-    "sha256": "194b2a1879f11c175a306fbc04f65c284e1f2eddf920a82ebe1aa2fe10268443"
+    "sha256": "7320007b182ab11cab0f8fc11eaf6d66daf37955d79f4cdf65fa1b0802768bdf"
   },
   "sharedConsumers": [
     "menu-prerecorded-map-preview",
@@ -27,32 +27,32 @@
   "worldGlbs": [
     {
       "path": "public/assets/original/models/support/pass65-chopper-gunner-lod0.glb",
-      "sha256": "0c1819b004f44593d4a6b90393e77837d77e67b52217576797a3ab46b5e16e1e",
+      "sha256": "ecf252f51e683320c0668bf484afb6a41c6c7fe76c9eee501fab234ac256e356",
       "lod": 0,
-      "triangles": 72900,
-      "bytes": 793408
+      "triangles": 73200,
+      "bytes": 802292
     },
     {
       "path": "public/assets/original/models/support/pass65-chopper-gunner-lod1.glb",
-      "sha256": "c9be76818848b6dfd22887d6f33ce125d514f74a86858304f6fe174ca00126b8",
+      "sha256": "9d59fe48c608bf355dd4a6a00b5644a3b61dc949c46c82292c6d6a4c4afe0d6e",
       "lod": 1,
-      "triangles": 30564,
-      "bytes": 532228
+      "triangles": 30784,
+      "bytes": 549764
     },
     {
       "path": "public/assets/original/models/support/pass65-chopper-gunner-lod2.glb",
-      "sha256": "d161b2b5c3cdb1bfe78750f00f30eac22af0468e20fd2bff7f767ef1b4dac973",
+      "sha256": "a0fff39d989f3b0840ac2169952ad4be1636ad3b64e00e3ac0198640224666f7",
       "lod": 2,
-      "triangles": 18020,
-      "bytes": 398788
+      "triangles": 18008,
+      "bytes": 404016
     }
   ],
   "firstPersonGlb": {
     "path": "public/assets/original/models/support/pass65-chopper-gunner-lod0.glb",
-    "sha256": "0c1819b004f44593d4a6b90393e77837d77e67b52217576797a3ab46b5e16e1e",
+    "sha256": "ecf252f51e683320c0668bf484afb6a41c6c7fe76c9eee501fab234ac256e356",
     "lod": 0,
-    "triangles": 72900,
-    "bytes": 793408
+    "triangles": 73200,
+    "bytes": 802292
   },
   "pbrMaps": {
     "baseColor": {
@@ -82,8 +82,13 @@
   },
   "requiredNodes": [
     "chopper-fuselage",
+    "chopper-rear-fuselage",
+    "chopper-tail-boom",
+    "chopper-tail-fin",
     "chopper-sleek-cockpit-canopy",
     "chopper-first-person-cockpit",
+    "chopper-gunner-sightline",
+    "chopper-gunner-weapon-view",
     "chopper-cockpit-dashboard-3d",
     "chopper-cockpit-display-cyan",
     "chopper-cockpit-display-green",
@@ -92,7 +97,6 @@
     "chopper-first-person-camera-socket",
     "chopper-main-rotor",
     "chopper-tail-rotor",
-    "chopper-first-person-rotor",
     "chopper-player-gun",
     "chopper-gun-muzzle-socket",
     "chopper-forward-socket",
@@ -108,7 +112,6 @@
   "animationClips": [
     "Chopper_Main_Rotor_Loop",
     "Chopper_Tail_Rotor_Loop",
-    "Chopper_Cockpit_Rotor_Loop",
     "Chopper_Gun_Recoil",
     "Chopper_Gun_Fire",
     "Chopper_Muzzle_Flash",
@@ -119,7 +122,7 @@
   "review": {
     "acceptedFirstPersonFrame": {
       "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png",
-      "sha256": "a09ec4d7344a369546fde3179b17012badf434681a37f9e8bab663a142ca3b8f",
+      "sha256": "581c448b7d998a220ea69fb0c024d9553f40d9aea767b3d88b503780a64921d1",
       "cameraId": "accepted-first-person-instruments",
       "width": 960,
       "height": 540
@@ -127,28 +130,28 @@
     "renders": [
       {
         "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-exterior-front-quarter.png",
-        "sha256": "b78fe48ba377b5afd43f9cfac02cf8b86c6e2c93d63a3a5388aa745a23f71965",
+        "sha256": "5394a3b53f9487e42b8487148d8dfd31900bcce4a155360f06614bca31435ea1",
         "cameraId": "exterior-front-quarter",
         "width": 512,
         "height": 512
       },
       {
         "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-rotor-gun-profile.png",
-        "sha256": "5ea53e939df7b5c6c4df0109421e23b387e7ce566818173cc2c9e962a6dff0b7",
+        "sha256": "7867bd7bc7947198582c2faa7de6cf6cae7247b6735cae5c6c2cc5b80546974f",
         "cameraId": "rotor-gun-profile",
         "width": 512,
         "height": 512
       },
       {
-        "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-cockpit-glass-closeup.png",
-        "sha256": "28619a0ee5628f878bb83bd70421ccd6ffb0333718b7f69298e3b0e5025529b7",
-        "cameraId": "cockpit-glass-closeup",
+        "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-rear-fuselage-quarter.png",
+        "sha256": "a37bdee03b4c0349a5611b336e67271fa0fae3799339152c97a11b0d3be7c62b",
+        "cameraId": "rear-fuselage-quarter",
         "width": 512,
         "height": 512
       },
       {
         "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png",
-        "sha256": "a09ec4d7344a369546fde3179b17012badf434681a37f9e8bab663a142ca3b8f",
+        "sha256": "581c448b7d998a220ea69fb0c024d9553f40d9aea767b3d88b503780a64921d1",
         "cameraId": "accepted-first-person-instruments",
         "width": 960,
         "height": 540
@@ -156,26 +159,25 @@
     ],
     "contactSheet": {
       "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-contact-sheet.png",
-      "sha256": "056d7f526a02e2595bdd1b324d8c3b4493fc1e0675baab9674d881bdf6ec4558",
+      "sha256": "f2291a87a8855007f9e7cedb7d17a3369044b831110b3521699906424df639ec",
       "cameraId": "accepted-contact-sheet",
       "width": 1024,
       "height": 1024
     },
-    "acceptance": "parent visual gate APPROVE after 960x540 original-resolution inspection"
+    "acceptance": "parent visual gate APPROVE after original-resolution rear-quarter and unobstructed 960x540 gunner-sightline inspection"
   },
   "runtimeAudit": {
     "lods": [
       {
         "lod": 0,
-        "triangles": 72900,
-        "bytes": 793408,
-        "meshNodes": 196,
-        "materials": 21,
+        "triangles": 73200,
+        "bytes": 802292,
+        "meshNodes": 198,
+        "materials": 19,
         "images": 4,
         "animations": [
           "Chopper_Gun_Fire",
           "Chopper_Quiet_Loop",
-          "Chopper_Cockpit_Rotor_Loop",
           "Chopper_Main_Rotor_Loop",
           "Chopper_Gun_Recoil",
           "Chopper_Impact_Pulse",
@@ -187,15 +189,14 @@
       },
       {
         "lod": 1,
-        "triangles": 30564,
-        "bytes": 532228,
-        "meshNodes": 188,
-        "materials": 21,
+        "triangles": 30784,
+        "bytes": 549764,
+        "meshNodes": 190,
+        "materials": 19,
         "images": 4,
         "animations": [
           "Chopper_Gun_Fire",
           "Chopper_Quiet_Loop",
-          "Chopper_Cockpit_Rotor_Loop",
           "Chopper_Main_Rotor_Loop",
           "Chopper_Gun_Recoil",
           "Chopper_Impact_Pulse",
@@ -207,15 +208,14 @@
       },
       {
         "lod": 2,
-        "triangles": 18020,
-        "bytes": 398788,
-        "meshNodes": 98,
-        "materials": 21,
+        "triangles": 18008,
+        "bytes": 404016,
+        "meshNodes": 99,
+        "materials": 19,
         "images": 4,
         "animations": [
           "Chopper_Gun_Fire",
           "Chopper_Quiet_Loop",
-          "Chopper_Cockpit_Rotor_Loop",
           "Chopper_Main_Rotor_Loop",
           "Chopper_Gun_Recoil",
           "Chopper_Impact_Pulse",

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 3,
-  "recipeId": "pass65-authoritative-runtime-menu-preview-v3",
+  "recipeId": "pass65-authoritative-runtime-menu-preview-v4",
   "coordinateSystem": "Three.js Y-up metres; camera looks along local -Z in the authoritative runtime arena",
   "fps": 24,
   "durationSeconds": 8,
@@ -8,7 +8,7 @@
   "reviewFrames": [1, 48, 96, 144, 192],
   "runtimeContract": "prerecorded compressed media only; static poster for reduced motion; zero arena construction or gameplay renderer submissions",
   "media": {
-    "cacheKey": "pass65-runtime-preview-v5",
+    "cacheKey": "pass65-runtime-preview-v6",
     "containers": ["webm", "mp4"],
     "poster": "webp",
     "encodingBudget": {
@@ -37,6 +37,16 @@
     "segmentCount": 8,
     "holdFraction": 0.56,
     "rotorTurnsPerLoop": 39,
+    "rotorPresentation": {
+      "id": "perspective-projected-cockpit-rotor-rig-v1",
+      "mainTurnsPerLoop": 39,
+      "tailTurnsPerLoop": 117,
+      "mainDiscPitchDegrees": 76,
+      "tailDiscYawDegrees": 64,
+      "mainMotionBlurOpacity": 0.34,
+      "tailCameraReflection": true,
+      "occlusionLayers": ["mast-hub", "canopy-header", "tail-boom"]
+    },
     "maximumPitchDegrees": 0.8,
     "maximumYawDegrees": 1.2,
     "maximumBankDegrees": 2.2,
@@ -52,8 +62,8 @@
     "atomic-acres": {
       "kind": "helicopter",
       "label": "HELO FLYOVER // NUKE TOWN",
-      "presentationId": "menu-video-runtime-helo-nuke-town-v3",
-      "cockpitAssetId": "pass65-compact-cockpit-overlay-v4",
+      "presentationId": "menu-video-runtime-helo-nuke-town-v4",
+      "cockpitAssetId": "pass65-compact-cockpit-overlay-v5",
       "seed": 65011201,
       "fovDegrees": 68,
       "posterFrame": 48,
@@ -68,8 +78,8 @@
     "skyline-terminal": {
       "kind": "helicopter",
       "label": "HELO FLYOVER // TERMINAL",
-      "presentationId": "menu-video-runtime-helo-terminal-v3",
-      "cockpitAssetId": "pass65-compact-cockpit-overlay-v4",
+      "presentationId": "menu-video-runtime-helo-terminal-v4",
+      "cockpitAssetId": "pass65-compact-cockpit-overlay-v5",
       "seed": 65011202,
       "fovDegrees": 68,
       "posterFrame": 48,
@@ -84,8 +94,8 @@
     "rustworks-1v1": {
       "kind": "helicopter",
       "label": "HELO ORBIT // RUSTRIG",
-      "presentationId": "menu-video-runtime-helo-rustrig-v3",
-      "cockpitAssetId": "pass65-compact-cockpit-overlay-v4",
+      "presentationId": "menu-video-runtime-helo-rustrig-v4",
+      "cockpitAssetId": "pass65-compact-cockpit-overlay-v5",
       "seed": 65011203,
       "fovDegrees": 68,
       "posterFrame": 48,
@@ -100,7 +110,7 @@
     "gun-range": {
       "kind": "cat",
       "label": "CAT-CAM // GUN RANGE",
-      "presentationId": "menu-video-runtime-cat-gun-range-v3",
+      "presentationId": "menu-video-runtime-cat-gun-range-v4",
       "seed": 65011401,
       "fovDegrees": 62,
       "posterFrame": 48,

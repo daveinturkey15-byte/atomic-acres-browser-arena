@@ -19,7 +19,7 @@ const runtimeSourcePath = path.join(root, 'src/ui/menu-preview-video.ts');
 const runtimeEntryPath = path.join(root, 'src/legacy-main.ts');
 const cameraEvaluatorPath = path.join(root, 'src/ui/menu-preview-camera.ts');
 const acceptedCockpitEvidence = 'docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png';
-const acceptedCockpitDigest = 'a09ec4d7344a369546fde3179b17012badf434681a37f9e8bab663a142ca3b8f';
+const acceptedCockpitDigest = '581c448b7d998a220ea69fb0c024d9553f40d9aea767b3d88b503780a64921d1';
 const arenas = ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range'];
 const helicopterArenas = arenas.slice(0, 3);
 const expectedRuntimeInputPaths = Object.freeze({
@@ -157,7 +157,7 @@ const captureReceipt = JSON.parse(await readFile(captureReceiptPath, 'utf8'));
 const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
 const manifestRecord = manifest.assets.find((asset) => asset.id === provenance.assetId);
 
-if (choreography.schemaVersion !== 3 || choreography.recipeId !== 'pass65-authoritative-runtime-menu-preview-v3') failures.push('canonical runtime choreography schema/recipe drifted');
+if (choreography.schemaVersion !== 3 || choreography.recipeId !== 'pass65-authoritative-runtime-menu-preview-v4') failures.push('canonical runtime choreography schema/recipe drifted');
 if (choreography.capture?.source !== 'authoritative-runtime-arena' || choreography.capture?.backend !== 'webgpu' || choreography.capture?.overlayScale !== 0.5) failures.push('canonical capture must pin authoritative WebGPU arenas and half-scale overlays');
 if (choreography.frameCount !== choreography.fps * choreography.durationSeconds) failures.push('choreography frame count does not equal fps * duration');
 if (Object.keys(choreography.arenas).join(',') !== arenas.join(',')) failures.push('choreography arena roster/order drifted');
@@ -166,7 +166,17 @@ if (!manifestRecord) failures.push(`assets.manifest.json is missing ${provenance
 if (provenance.authoredCockpit?.assetId !== 'chopper-gunner-vehicle-v1' || provenance.authoredCockpit?.qualityTier !== 'LOD0') failures.push('provenance must retain the accepted LOD0 cockpit design reference');
 
 const recipeDigest = createHash('sha256').update(JSON.stringify(choreography)).digest('hex');
-if (captureReceipt.captureId !== 'pass65-authoritative-runtime-menu-preview-capture-v1'
+const rotor = choreography.helicopter?.rotorPresentation;
+if (rotor?.id !== 'perspective-projected-cockpit-rotor-rig-v1'
+  || rotor.mainTurnsPerLoop !== choreography.helicopter.rotorTurnsPerLoop
+  || rotor.tailTurnsPerLoop !== rotor.mainTurnsPerLoop * 3
+  || rotor.mainDiscPitchDegrees < 68
+  || rotor.mainDiscPitchDegrees > 82
+  || rotor.tailDiscYawDegrees < 50
+  || rotor.tailDiscYawDegrees > 75
+  || rotor.tailCameraReflection !== true
+  || !['mast-hub', 'canopy-header', 'tail-boom'].every((layer) => rotor.occlusionLayers?.includes(layer))) failures.push('perspective-aware main/tail rotor projection contract drifted');
+if (captureReceipt.captureId !== 'pass65-authoritative-runtime-menu-preview-capture-v2'
   || captureReceipt.recipeId !== choreography.recipeId
   || captureReceipt.recipeDigest !== recipeDigest
   || captureReceipt.source !== 'authoritative-runtime-arena'
@@ -246,7 +256,7 @@ for (const [extension, hashes] of Object.entries(runtimeHashesByExtension)) if (
 
 const generatorSource = await readFile(generatorPath, 'utf8');
 const documentationSource = await readFile(documentationPath, 'utf8');
-for (const marker of ['chromium.launch', 'createServer', 'menuPreviewPose', 'setCaptureCameraPose', 'authoritative-runtime-arena', 'offline-menu-preview-overlay', 'offline-baked-compact-black-grey', 'overlayScale', 'aa-canopy', 'aa-glass', 'aa-reticle', 'aa-foreleg']) if (!generatorSource.includes(marker)) failures.push(`runtime capture generator is missing ${marker}`);
+for (const marker of ['chromium.launch', 'createServer', 'menuPreviewPose', 'setCaptureCameraPose', 'authoritative-runtime-arena', 'offline-menu-preview-overlay', 'offline-baked-compact-black-grey', 'overlayScale', 'aa-canopy', 'aa-glass', 'aa-reticle', 'aa-foreleg', 'aa-main-rotor-plane', 'aa-main-rotor-hub', 'aa-main-rotor-occluder', 'aa-tail-rotor-plane', 'aa-tail-boom-occluder', 'perspective:', 'rotateX(', 'rotateY(', 'repeating-conic-gradient']) if (!generatorSource.includes(marker)) failures.push(`runtime capture generator is missing ${marker}`);
 for (const forbidden of ['import bpy', 'primitive_cube_add', 'generate_pass65_menu_previews.py']) if (generatorSource.includes(forbidden)) failures.push(`runtime capture generator still contains synthetic Blender authoring marker ${forbidden}`);
 if (!documentationSource.includes('npm run author:pass65:menu-previews') || !documentationSource.includes('actual authoritative map')) failures.push('authoring documentation does not describe the fail-closed runtime capture workflow');
 

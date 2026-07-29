@@ -28,6 +28,11 @@ describe('support vehicle authored orientation contract', () => {
     );
     expect(SUPPORT_VEHICLE_PRESENTATION_CONTRACT.drone.visualFamilyId).toBe('hunter-drone-visual-family-v1');
     expect(SUPPORT_VEHICLE_PRESENTATION_CONTRACT.drone.gunProfileId).toBe('drone-gun-standard-v1');
+    expect(SUPPORT_VEHICLE_PRESENTATION_CONTRACT.chopper.possessedView).toEqual({
+      visibleOnlyBelow: 'chopper-gunner-sightline',
+      requiredVisibleNodes: ['chopper-cockpit-hud-glass', 'chopper-cockpit-hud-target-ring', 'chopper-gunner-weapon-view'],
+      forbiddenVisibleNodes: ['chopper-fuselage', 'chopper-rear-fuselage', 'chopper-main-rotor', 'chopper-tail-rotor'],
+    });
     expect(missingSupportNodes(new THREE.Group(), SUPPORT_VEHICLE_PRESENTATION_CONTRACT.drone.requiredNodes))
       .toEqual(SUPPORT_VEHICLE_PRESENTATION_CONTRACT.drone.requiredNodes);
   });

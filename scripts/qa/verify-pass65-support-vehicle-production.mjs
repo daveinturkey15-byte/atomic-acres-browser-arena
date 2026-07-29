@@ -68,7 +68,7 @@ if (!blender) failures.push('Blender 5.1 executable unavailable for editable-sou
 else {
   const blendAudits = [
     [chopperEntry.sourceBlend.path,
-      "import bpy; roots=[o for o in bpy.data.objects if o.get('asset_id')=='chopper-gunner-vehicle-v1']; assert len(roots)==3; assert all(any(c.get('canonical_node_name')=='chopper-first-person-cockpit' for c in r.children_recursive) for r in roots); assert len(bpy.data.actions)>=27; assert len([i for i in bpy.data.images if i.packed_file])>=4"],
+      "import bpy; roots=[o for o in bpy.data.objects if o.get('asset_id')=='chopper-gunner-vehicle-v1']; assert len(roots)==3; required={'chopper-rear-fuselage','chopper-tail-boom','chopper-tail-fin','chopper-first-person-cockpit','chopper-gunner-sightline','chopper-gunner-weapon-view'}; assert all(required.issubset({c.get('canonical_node_name') for c in r.children_recursive}) for r in roots); assert all(not any(c.get('canonical_node_name')=='chopper-first-person-rotor' for c in r.children_recursive) for r in roots); assert len(bpy.data.actions)>=24; assert len([i for i in bpy.data.images if i.packed_file])>=4"],
     [aircraftEntry.sourceBlend.path,
       "import bpy; roots=[o for o in bpy.data.objects if o.get('asset_id')=='support-aircraft-family-v1']; assert len(roots)==8; assert len([o for o in roots if o.get('presentation_variant')=='care'])==3; assert len([o for o in roots if o.get('presentation_variant')=='carpet'])==3; assert len([o for o in roots if o.get('presentation_variant')=='parachute-crate'])==2; assert len(bpy.data.actions)>=32; assert len([i for i in bpy.data.images if i.packed_file])>=4"],
   ];
@@ -230,7 +230,11 @@ for (const token of [
   "presentationSource = 'procedural-non-release-fallback'",
   'prewarmAuthoredAssets()',
   'prewarmedAuthoredSupportFamilies',
+  'isGunnerSightlineNode',
+  "level.getObjectByName('chopper-gunner-sightline')",
+  'node.visible = gunnerSightlineNode && !retiredStaticSource',
 ]) if (!presentationSource.includes(token)) failures.push(`runtime lazy-cache/prewarm boundary missing: ${token}`);
+if (presentationSource.includes("getObjectByName('chopper-first-person-rotor')")) failures.push('possessed chopper still admits a first-person rotor into the runtime sightline');
 if (!mainSource.includes('loadSupportVehiclePresentations(),')
   || !mainSource.includes('killstreakPresentation.prewarmAuthoredAssets();')
   || !mainSource.includes('supportVehiclePresentation: supportVehiclePresentationTelemetry(),')) {

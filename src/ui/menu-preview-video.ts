@@ -18,7 +18,7 @@ export type MenuPreviewVideoDefinition = Readonly<{
 }>;
 
 const ROOT = './assets/original/menu-previews';
-const CACHE_KEY = 'pass65-runtime-preview-v5';
+const CACHE_KEY = 'pass65-runtime-preview-v6';
 
 export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
   'atomic-acres': Object.freeze({
@@ -27,7 +27,7 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     label: 'PRERECORDED HELO // NUKE TOWN',
     motionLabel: 'AUTHORED COCKPIT FLYOVER',
     reducedMotionLabel: 'STABILIZED PREVIEW FRAME',
-    presentationId: 'menu-video-runtime-helo-nuke-town-v3',
+    presentationId: 'menu-video-runtime-helo-nuke-town-v4',
     webm: `${ROOT}/atomic-acres.webm?v=${CACHE_KEY}`,
     mp4: `${ROOT}/atomic-acres.mp4?v=${CACHE_KEY}`,
     poster: `${ROOT}/atomic-acres.webp?v=${CACHE_KEY}`,
@@ -41,7 +41,7 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     label: 'PRERECORDED HELO // TERMINAL',
     motionLabel: 'AUTHORED COCKPIT FLYOVER',
     reducedMotionLabel: 'STABILIZED PREVIEW FRAME',
-    presentationId: 'menu-video-runtime-helo-terminal-v3',
+    presentationId: 'menu-video-runtime-helo-terminal-v4',
     webm: `${ROOT}/skyline-terminal.webm?v=${CACHE_KEY}`,
     mp4: `${ROOT}/skyline-terminal.mp4?v=${CACHE_KEY}`,
     poster: `${ROOT}/skyline-terminal.webp?v=${CACHE_KEY}`,
@@ -55,7 +55,7 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     label: 'PRERECORDED HELO // RUSTRIG',
     motionLabel: 'AUTHORED COCKPIT FLYOVER',
     reducedMotionLabel: 'STABILIZED PREVIEW FRAME',
-    presentationId: 'menu-video-runtime-helo-rustrig-v3',
+    presentationId: 'menu-video-runtime-helo-rustrig-v4',
     webm: `${ROOT}/rustworks-1v1.webm?v=${CACHE_KEY}`,
     mp4: `${ROOT}/rustworks-1v1.mp4?v=${CACHE_KEY}`,
     poster: `${ROOT}/rustworks-1v1.webp?v=${CACHE_KEY}`,
@@ -69,7 +69,7 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     label: 'PRERECORDED CAT-CAM // GUN RANGE',
     motionLabel: 'JOYFUL FIRST-PERSON PROWL',
     reducedMotionLabel: 'CURIOUS CAT-CAM HOLD',
-    presentationId: 'menu-video-runtime-cat-gun-range-v3',
+    presentationId: 'menu-video-runtime-cat-gun-range-v4',
     webm: `${ROOT}/gun-range.webm?v=${CACHE_KEY}`,
     mp4: `${ROOT}/gun-range.mp4?v=${CACHE_KEY}`,
     poster: `${ROOT}/gun-range.webp?v=${CACHE_KEY}`,

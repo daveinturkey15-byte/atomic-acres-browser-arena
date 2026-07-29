@@ -269,10 +269,12 @@ describe('killstreak presentation', () => {
     const presentation = new KillstreakPresentation(scene);
     const camera = new THREE.PerspectiveCamera();
     const chopper = presentation.root.getObjectByName('prewarmed-chopper-1') as THREE.Group;
-    const chopperChild = chopper.getObjectByName('chopper-first-person-rotor')!;
+    const chopperChild = chopper.getObjectByName('chopper-cockpit-hud-glass')!;
     const chopperFuselage = chopper.getObjectByName('chopper-fuselage')!;
+    const chopperRearFuselage = chopper.getObjectByName('chopper-rear-fuselage')!;
+    const chopperMainRotor = chopper.getObjectByName('chopper-main-rotor')!;
     const dashboard = chopper.getObjectByName('chopper-cockpit-dashboard-3d') as THREE.Mesh;
-    const dashboardMaterial = dashboard.material as THREE.Material;
+    const gunnerHudMaterial = (chopperChild as THREE.Mesh).material as THREE.Material;
     chopper.scale.set(2, 3, 4);
     chopper.frustumCulled = true;
     chopperChild.visible = false;
@@ -317,7 +319,7 @@ describe('killstreak presentation', () => {
         expect(lod0.visible).toBe(true);
         expect(lod1.visible).toBe(true);
         expect(chopperFuselage.visible).toBe(true);
-        expect(dashboardMaterial.depthWrite).toBe(true);
+        expect(gunnerHudMaterial.depthWrite).toBe(true);
         presentation.clear();
         expect(swarmBatches.every((batch) => batch.count === 24)).toBe(true);
         expect(chopper.visible).toBe(true);
@@ -342,14 +344,17 @@ describe('killstreak presentation', () => {
         expect(presentation.root.getObjectByName('prewarmed-care-aircraft-1')?.visible).toBe(false);
         expect(lod.autoUpdate).toBe(true);
         expect([lod0.visible, lod1.visible].filter(Boolean)).toHaveLength(1);
-        expect(dashboardMaterial.depthWrite).toBe(true);
+        expect(gunnerHudMaterial.depthWrite).toBe(true);
       } else {
         expect(compilePass).toBe(7);
         expect(chopper.visible).toBe(true);
         expect(presentation.root.getObjectByName('prewarmed-swarm-drone-24')?.visible).toBe(false);
         expect(chopperFuselage.visible).toBe(false);
-        expect(dashboard.visible).toBe(true);
-        expect(dashboardMaterial.depthWrite).toBe(false);
+        expect(chopperRearFuselage.visible).toBe(false);
+        expect(chopperMainRotor.children.every((node) => !node.visible)).toBe(true);
+        expect(dashboard.visible).toBe(false);
+        expect(chopperChild.visible).toBe(true);
+        expect(gunnerHudMaterial.depthWrite).toBe(false);
       }
     });
     await Promise.all([
@@ -366,7 +371,7 @@ describe('killstreak presentation', () => {
     expect(lod.autoUpdate).toBe(true);
     expect(lod0.visible).toBe(false);
     expect(lod1.visible).toBe(true);
-    expect(dashboardMaterial.depthWrite).toBe(true);
+    expect(gunnerHudMaterial.depthWrite).toBe(true);
     expect(swarmBatches.every((batch) => batch.count === 0)).toBe(true);
     for (let index = 0; index < swarmBatches.length; index += 1) {
       expect(Array.from(swarmBatches[index]!.instanceMatrix.array)).toEqual(Array.from(swarmMatricesBefore[index]!));
@@ -471,6 +476,7 @@ describe('killstreak presentation', () => {
       swarmMinimumRenderedInstances: 1,
       swarmMaximumRenderedInstances: 1,
       prewarmedAuthoredSupportFamilies: [],
+      firstPersonSightline: null,
       markerDetails: [],
       bounded: true,
     });
@@ -493,16 +499,28 @@ describe('killstreak presentation', () => {
     expect(supportForwardAlignment(aircraft, 'care-aircraft-fuselage', 'care-aircraft-forward-socket')).toBeCloseTo(1, 6);
     expect(presentation.firstPersonCameraAnchor('ks-1-chopper-1')).not.toBeNull();
     expect((chopper.getObjectByName('chopper-cockpit-dashboard-3d') as THREE.Mesh).visible).toBe(false);
-    const dashboardMaterial = (chopper.getObjectByName('chopper-cockpit-dashboard-3d') as THREE.Mesh)
+    expect(chopper.getObjectByName('chopper-first-person-rotor')).toBeUndefined();
+    const hudMaterial = (chopper.getObjectByName('chopper-cockpit-hud-glass') as THREE.Mesh)
       .material as THREE.Material;
-    const dashboardBaseDepthWrite = dashboardMaterial.depthWrite;
+    const hudBaseDepthWrite = hudMaterial.depthWrite;
     presentation.setFirstPersonEntity('ks-1-chopper-1');
     expect(chopper.visible).toBe(true);
     expect((chopper.getObjectByName('chopper-fuselage') as THREE.Mesh).visible).toBe(false);
-    expect((chopper.getObjectByName('chopper-cockpit-dashboard-3d') as THREE.Mesh).visible).toBe(true);
-    expect((chopper.getObjectByName('chopper-cockpit-display-cyan') as THREE.Mesh).visible).toBe(true);
-    expect((chopper.getObjectByName('chopper-first-person-rotor-blade-a') as THREE.Mesh).visible).toBe(true);
-    expect(dashboardMaterial.depthWrite).toBe(false);
+    expect((chopper.getObjectByName('chopper-rear-fuselage') as THREE.Mesh).visible).toBe(false);
+    expect((chopper.getObjectByName('chopper-main-rotor') as THREE.Group).children.every((node) => !node.visible)).toBe(true);
+    expect((chopper.getObjectByName('chopper-cockpit-dashboard-3d') as THREE.Mesh).visible).toBe(false);
+    expect((chopper.getObjectByName('chopper-cockpit-display-cyan') as THREE.Mesh).visible).toBe(false);
+    expect((chopper.getObjectByName('chopper-cockpit-hud-glass') as THREE.Mesh).visible).toBe(true);
+    expect((chopper.getObjectByName('chopper-cockpit-hud-target-ring') as THREE.Mesh).visible).toBe(true);
+    expect((chopper.getObjectByName('chopper-gunner-view-receiver') as THREE.Mesh).visible).toBe(true);
+    expect(hudMaterial.depthWrite).toBe(false);
+    expect(presentation.telemetry().firstPersonSightline).toMatchObject({
+      entityId: 'ks-1-chopper-1',
+      presentationSource: 'procedural-non-release-fallback',
+      visibleOutsideSightline: [],
+      hudVisible: true,
+      weaponVisible: true,
+    });
     const cameraQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.12, 0.8, 0, 'YXZ'));
     presentation.alignFirstPersonCockpit('ks-1-chopper-1', cameraQuaternion);
     const cockpitWorldQuaternion = chopper.getObjectByName('chopper-first-person-cockpit')!
@@ -511,9 +529,11 @@ describe('killstreak presentation', () => {
     presentation.setFirstPersonEntity(null);
     expect(chopper.visible).toBe(true);
     expect((chopper.getObjectByName('chopper-fuselage') as THREE.Mesh).visible).toBe(true);
+    expect((chopper.getObjectByName('chopper-rear-fuselage') as THREE.Mesh).visible).toBe(true);
     expect((chopper.getObjectByName('chopper-cockpit-dashboard-3d') as THREE.Mesh).visible).toBe(false);
-    expect((chopper.getObjectByName('chopper-first-person-rotor-blade-a') as THREE.Mesh).visible).toBe(false);
-    expect(dashboardMaterial.depthWrite).toBe(dashboardBaseDepthWrite);
+    expect((chopper.getObjectByName('chopper-cockpit-hud-glass') as THREE.Mesh).visible).toBe(false);
+    expect((chopper.getObjectByName('chopper-gunner-view-receiver') as THREE.Mesh).visible).toBe(false);
+    expect(hudMaterial.depthWrite).toBe(hudBaseDepthWrite);
     const carePackage = presentation.root.getObjectByName('pass65-care-package') as THREE.Group;
     expect(carePackage.userData).toMatchObject({ interactable: true, interactionPrompt: 'F TO COLLECT KILLSTREAK' });
     expect(carePackage.getObjectByName('care-package-crate')!.userData)
@@ -577,13 +597,16 @@ describe('killstreak presentation', () => {
     const chopper = presentation.entityRoot('ks-1-chopper-1')!;
     const fuselage = chopper.getObjectByName('chopper-fuselage') as THREE.Mesh;
     const dashboard = chopper.getObjectByName('chopper-cockpit-dashboard-3d') as THREE.Mesh;
-    const dashboardMaterial = dashboard.material as THREE.Material;
+    const gunnerHud = chopper.getObjectByName('chopper-cockpit-hud-glass') as THREE.Mesh;
+    const gunnerHudMaterial = gunnerHud.material as THREE.Material;
     expect(fuselage.visible).toBe(false);
-    expect(dashboard.visible).toBe(true);
-    expect(dashboardMaterial.depthWrite).toBe(false);
+    expect(dashboard.visible).toBe(false);
+    expect(gunnerHud.visible).toBe(true);
+    expect(gunnerHudMaterial.depthWrite).toBe(false);
     presentation.setFirstPersonEntity(null);
     expect(fuselage.visible).toBe(true);
-    expect(dashboardMaterial.depthWrite).toBe(true);
+    expect(gunnerHud.visible).toBe(false);
+    expect(gunnerHudMaterial.depthWrite).toBe(true);
     presentation.dispose();
   });
 

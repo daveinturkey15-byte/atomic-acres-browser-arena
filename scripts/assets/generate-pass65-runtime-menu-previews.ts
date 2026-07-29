@@ -126,7 +126,7 @@ function cameraAngles(position: readonly number[], target: readonly number[]): {
 }
 
 async function installCaptureSurface(page: Page, kind: 'helicopter' | 'cat'): Promise<void> {
-  await page.evaluate(({ kind, palette, scale }) => {
+  await page.evaluate(({ kind, palette, scale, rotorPresentation }) => {
     document.querySelector('#offline-menu-preview-overlay')?.remove();
     const style = document.createElement('style');
     style.id = 'offline-menu-preview-capture-style';
@@ -136,10 +136,23 @@ async function installCaptureSurface(page: Page, kind: 'helicopter' | 'cat'): Pr
       #game{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;display:block!important}
       #offline-menu-preview-overlay{position:fixed;inset:0;z-index:2147483647;pointer-events:none;color:${palette[3]};font:600 9px/1.1 ui-monospace,Consolas,monospace;letter-spacing:.16em;text-shadow:0 1px 2px #000}
       #offline-menu-preview-overlay *{box-sizing:border-box}
-      .aa-rotor{position:absolute;left:31%;top:3.1%;width:38%;height:6%;transform-origin:50% 50%;opacity:.78}
-      .aa-rotor:before,.aa-rotor:after{content:"";position:absolute;left:0;top:45%;width:100%;height:10%;border-radius:100%;background:linear-gradient(90deg,transparent,${palette[2]} 16%,${palette[3]} 50%,${palette[2]} 84%,transparent);box-shadow:0 0 7px #000}
-      .aa-rotor:after{transform:rotate(90deg)}
-      .aa-rotor-hub{position:absolute;left:47%;top:25%;width:6%;height:50%;border-radius:50%;background:${palette[0]};border:1px solid ${palette[3]}}
+      .aa-main-rotor-stage{position:absolute;left:25%;top:-1.4%;width:50%;height:14%;perspective:520px;transform-style:preserve-3d;filter:drop-shadow(0 3px 6px #000);opacity:.88}
+      .aa-main-rotor-plane{position:absolute;inset:1% 2% 18%;transform-origin:50% 50%;transform-style:preserve-3d;transform:rotateX(${rotorPresentation.mainDiscPitchDegrees}deg) rotateZ(var(--aa-main-rotor-angle,0deg))}
+      .aa-main-rotor-plane:before{content:"";position:absolute;inset:8% 0;border-radius:50%;border:1px solid rgba(168,224,232,.28);background:repeating-conic-gradient(from 7deg,rgba(160,218,226,${rotorPresentation.mainMotionBlurOpacity}) 0 4deg,rgba(35,52,57,.04) 6deg 18deg);filter:blur(2.3px);box-shadow:inset 0 0 12px rgba(184,235,241,.18),0 0 8px rgba(0,0,0,.9)}
+      .aa-main-rotor-plane:after{content:"";position:absolute;left:7%;right:7%;top:36%;height:28%;border-radius:50%;border-top:2px solid rgba(209,242,245,.48);border-bottom:1px solid rgba(80,108,114,.22);filter:blur(.8px)}
+      .aa-main-rotor-blade{position:absolute;left:2%;right:2%;top:48%;height:4%;border-radius:90%;transform-origin:50% 50%;background:linear-gradient(90deg,transparent 0%,rgba(110,139,145,.30) 8%,${palette[3]} 48%,rgba(110,139,145,.30) 92%,transparent 100%);filter:blur(.75px)}
+      .aa-main-rotor-blade:nth-child(2){transform:rotate(45deg)}.aa-main-rotor-blade:nth-child(3){transform:rotate(90deg)}.aa-main-rotor-blade:nth-child(4){transform:rotate(135deg)}
+      .aa-main-rotor-mast{position:absolute;left:49.55%;top:41%;width:.9%;height:43%;border-radius:4px;background:linear-gradient(90deg,#12191c,${palette[3]},#101518);box-shadow:0 0 4px #000}
+      .aa-main-rotor-hub{position:absolute;left:48.1%;top:36%;width:3.8%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 38% 32%,#d9f1f2,${palette[2]} 35%,${palette[0]} 72%);border:1px solid rgba(202,239,242,.58);box-shadow:0 1px 5px #000}
+      .aa-main-rotor-occluder{position:absolute;left:42%;right:42%;top:72%;height:25%;clip-path:polygon(16% 0,84% 0,100% 100%,0 100%);background:linear-gradient(180deg,#344347 0%,#11191c 62%,#050809 100%);border-top:1px solid rgba(167,224,230,.38);filter:drop-shadow(0 -2px 3px #000)}
+      .aa-tail-rotor-camera{position:absolute;right:16.2%;top:8.2%;width:10.8%;height:8.8%;overflow:hidden;border:1px solid rgba(83,218,240,.36);border-radius:3px;background:linear-gradient(180deg,rgba(14,32,38,.54),rgba(2,8,11,.76));box-shadow:inset 0 0 8px rgba(35,194,221,.14),0 2px 5px #000;opacity:.68}
+      .aa-tail-rotor-camera:before{content:"TAIL OPTIC";position:absolute;left:5%;top:5%;z-index:4;color:rgba(112,234,255,.7);font-size:5px;letter-spacing:.12em;text-shadow:0 1px #000}
+      .aa-tail-rotor-stage{position:absolute;inset:6% 5%;perspective:180px;transform-style:preserve-3d}
+      .aa-tail-rotor-plane{position:absolute;right:8%;top:10%;width:43%;height:76%;transform-origin:50% 50%;transform-style:preserve-3d;transform:rotateY(${rotorPresentation.tailDiscYawDegrees}deg) rotateZ(var(--aa-tail-rotor-angle,0deg))}
+      .aa-tail-rotor-plane:before{content:"";position:absolute;inset:1%;border:1px solid rgba(168,231,236,.46);border-radius:50%;background:repeating-conic-gradient(rgba(126,208,219,.36) 0 7deg,transparent 9deg 25deg);filter:blur(.8px)}
+      .aa-tail-rotor-blade{position:absolute;left:2%;right:2%;top:47%;height:6%;border-radius:80%;background:linear-gradient(90deg,transparent,rgba(196,239,242,.76),transparent);filter:blur(.35px)}.aa-tail-rotor-blade:nth-child(2){transform:rotate(90deg)}
+      .aa-tail-rotor-hub{position:absolute;left:43%;top:43%;width:14%;aspect-ratio:1;border-radius:50%;background:${palette[2]};border:1px solid rgba(210,245,247,.62);box-shadow:0 0 3px #000}
+      .aa-tail-boom-occluder{position:absolute;left:-8%;top:47%;width:70%;height:14%;z-index:3;transform:rotate(-8deg);transform-origin:0 50%;clip-path:polygon(0 20%,100% 0,100% 100%,0 80%);background:linear-gradient(180deg,#35474b,#0c1315);border-top:1px solid rgba(151,203,209,.32)}
       .aa-cockpit{position:absolute;left:25%;bottom:1.6%;width:50%;height:17%;display:grid;grid-template-columns:1fr 1.38fr 1fr;gap:7px;padding:12px 15px 10px;border:1px solid rgba(75,229,255,.72);border-radius:15px 15px 28px 28px;clip-path:polygon(4% 0,96% 0,100% 28%,97% 100%,3% 100%,0 28%);background:linear-gradient(180deg,rgba(29,45,49,.94),rgba(4,10,13,.97) 42%,rgba(1,5,8,.99)),repeating-linear-gradient(90deg,transparent 0 10px,rgba(72,224,255,.03) 10px 11px);box-shadow:0 10px 28px rgba(0,0,0,.8),0 0 15px rgba(48,211,255,.2),inset 0 2px rgba(199,248,255,.18),inset 0 -8px 18px rgba(0,0,0,.72)}
       .aa-cockpit:before{content:"";position:absolute;left:5%;right:5%;top:5px;height:2px;background:linear-gradient(90deg,transparent,#38dfff 18%,#9bffd0 50%,#38dfff 82%,transparent);box-shadow:0 0 8px #28ccec;opacity:.88}
       .aa-cockpit:after{content:"";position:absolute;left:43%;right:43%;bottom:5px;height:3px;border-radius:2px;background:#a0ffd1;box-shadow:-18px 0 #35dfff,18px 0 #35dfff,0 0 8px #62ffc4}
@@ -168,10 +181,15 @@ async function installCaptureSurface(page: Page, kind: 'helicopter' | 'cat'): Pr
     overlay.dataset.scale = String(scale);
     overlay.dataset.palette = palette.join(',');
     overlay.innerHTML = kind === 'helicopter'
-      ? '<div class="aa-rotor"><i class="aa-rotor-hub"></i></div><i class="aa-canopy left"></i><i class="aa-canopy right"></i><i class="aa-glass left"></i><i class="aa-glass right"></i><i class="aa-brace left"></i><i class="aa-brace right"></i><i class="aa-reticle"></i><div class="aa-cockpit"><div class="aa-panel"><span>ALT / RADAR</span><strong id="aa-alt">024 M</strong></div><div class="aa-panel"><span>FLIGHT PATH</span><strong id="aa-heading">HOLD 000</strong></div><div class="aa-panel"><span>ROTOR / LINK</span><strong>ARMED</strong></div></div>'
+      ? '<div class="aa-main-rotor-stage"><div class="aa-main-rotor-plane"><i class="aa-main-rotor-blade"></i><i class="aa-main-rotor-blade"></i><i class="aa-main-rotor-blade"></i><i class="aa-main-rotor-blade"></i></div><i class="aa-main-rotor-mast"></i><i class="aa-main-rotor-hub"></i><i class="aa-main-rotor-occluder"></i></div><div class="aa-tail-rotor-camera"><div class="aa-tail-rotor-stage"><div class="aa-tail-rotor-plane"><i class="aa-tail-rotor-blade"></i><i class="aa-tail-rotor-blade"></i><i class="aa-tail-rotor-hub"></i></div><i class="aa-tail-boom-occluder"></i></div></div><i class="aa-canopy left"></i><i class="aa-canopy right"></i><i class="aa-glass left"></i><i class="aa-glass right"></i><i class="aa-brace left"></i><i class="aa-brace right"></i><i class="aa-reticle"></i><div class="aa-cockpit"><div class="aa-panel"><span>ALT / RADAR</span><strong id="aa-alt">024 M</strong></div><div class="aa-panel"><span>FLIGHT PATH</span><strong id="aa-heading">HOLD 000</strong></div><div class="aa-panel"><span>ROTOR / LINK</span><strong>ARMED</strong></div></div>'
       : '<div class="aa-cat-crown"></div><div class="aa-ear left"></div><div class="aa-ear right"></div><div class="aa-foreleg left"></div><div class="aa-foreleg right"></div><div class="aa-paw left"></div><div class="aa-paw right"></div>';
     document.querySelector('#app')?.append(overlay);
-  }, { kind, palette: choreography.capture.overlayPalette, scale: choreography.capture.overlayScale });
+  }, {
+    kind,
+    palette: choreography.capture.overlayPalette,
+    scale: choreography.capture.overlayScale,
+    rotorPresentation: choreography.helicopter.rotorPresentation,
+  });
 }
 
 async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEvidence> {
@@ -227,14 +245,15 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
       const snapshot = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot(): any } }).__ATOMIC_ACRES_DEBUG__.snapshot();
       return { frameCount: snapshot.frameCount, submissionSequence: snapshot.render.runtime.presentation.submissionSequence };
     });
-    await page.evaluate(({ pose, yaw, pitch, fixedTimeMs, seed, frame, rotorTurns, altitude }) => {
+    await page.evaluate(({ pose, yaw, pitch, fixedTimeMs, seed, frame, mainRotorTurns, tailRotorTurns, altitude }) => {
       const debug = (window as unknown as { __ATOMIC_ACRES_DEBUG__: any }).__ATOMIC_ACRES_DEBUG__;
       debug.setCaptureCameraPose(pose.position[0], pose.position[1], pose.position[2], yaw, pitch, pose.fov, fixedTimeMs, seed);
       debug.setGrassTime(fixedTimeMs / 1_000);
       const overlay = document.querySelector<HTMLElement>('#offline-menu-preview-overlay');
       if (overlay) {
         overlay.dataset.frame = String(frame);
-        overlay.querySelector<HTMLElement>('.aa-rotor')?.style.setProperty('transform', `rotate(${pose.pathProgress * rotorTurns * 360}deg)`);
+        overlay.style.setProperty('--aa-main-rotor-angle', `${pose.pathProgress * mainRotorTurns * 360}deg`);
+        overlay.style.setProperty('--aa-tail-rotor-angle', `${pose.pathProgress * tailRotorTurns * 360}deg`);
         overlay.querySelector<HTMLElement>('#aa-alt')?.replaceChildren(`${Math.round(altitude).toString().padStart(3, '0')} M`);
         overlay.querySelector<HTMLElement>('#aa-heading')?.replaceChildren(`HDG ${Math.round(((yaw * 180 / Math.PI) % 360 + 360) % 360).toString().padStart(3, '0')}`);
         if (pose.frame === 'cat') {
@@ -256,7 +275,8 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
       fixedTimeMs: fixedVisualTimeMs,
       seed: definition.seed,
       frame,
-      rotorTurns: choreography.helicopter.rotorTurnsPerLoop,
+      mainRotorTurns: choreography.helicopter.rotorPresentation.mainTurnsPerLoop,
+      tailRotorTurns: choreography.helicopter.rotorPresentation.tailTurnsPerLoop,
       altitude: pose.position[1],
     });
     await page.waitForFunction((minimum) => {
@@ -359,7 +379,7 @@ async function main(): Promise<void> {
     }
     const receipt = {
       schemaVersion: 1,
-      captureId: 'pass65-authoritative-runtime-menu-preview-capture-v1',
+      captureId: 'pass65-authoritative-runtime-menu-preview-capture-v2',
       generatedAt: '2026-07-28',
       recipeId: choreography.recipeId,
       recipeDigest: sha256(JSON.stringify(choreography)),

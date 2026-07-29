@@ -26,7 +26,7 @@ type ArenaRecipeBase = Readonly<{
 
 type HelicopterRecipe = ArenaRecipeBase & Readonly<{
   kind: 'helicopter';
-  cockpitAssetId: 'pass65-compact-cockpit-overlay-v4';
+  cockpitAssetId: 'pass65-compact-cockpit-overlay-v5';
   centre: Vector3Tuple;
   radius: readonly [number, number];
   altitudeM: number;
@@ -60,6 +60,16 @@ type ChoreographyRecipe = Readonly<{
     segmentCount: number;
     holdFraction: number;
     rotorTurnsPerLoop: number;
+    rotorPresentation: Readonly<{
+      id: 'perspective-projected-cockpit-rotor-rig-v1';
+      mainTurnsPerLoop: number;
+      tailTurnsPerLoop: number;
+      mainDiscPitchDegrees: number;
+      tailDiscYawDegrees: number;
+      mainMotionBlurOpacity: number;
+      tailCameraReflection: true;
+      occlusionLayers: readonly ['mast-hub', 'canopy-header', 'tail-boom'];
+    }>;
     maximumPitchDegrees: number;
     maximumYawDegrees: number;
     maximumBankDegrees: number;

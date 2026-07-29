@@ -64,7 +64,7 @@ function run(command, args) {
 }
 
 function validateRecipe() {
-  if (choreography.schemaVersion !== 3 || choreography.recipeId !== 'pass65-authoritative-runtime-menu-preview-v3') {
+  if (choreography.schemaVersion !== 3 || choreography.recipeId !== 'pass65-authoritative-runtime-menu-preview-v4') {
     throw new Error('canonical authoritative-runtime choreography schema or recipe id is invalid');
   }
   if (choreography.capture?.source !== 'authoritative-runtime-arena'
@@ -84,7 +84,19 @@ function validateRecipe() {
     || choreography.reviewFrames.at(-1) !== choreography.frameCount) {
     throw new Error('reviewFrames must be unique and include the exact loop endpoints');
   }
-  if (choreography.media.cacheKey !== 'pass65-runtime-preview-v5') throw new Error('runtime preview cache key is stale');
+  if (choreography.media.cacheKey !== 'pass65-runtime-preview-v6') throw new Error('runtime preview cache key is stale');
+  const rotor = choreography.helicopter?.rotorPresentation;
+  if (rotor?.id !== 'perspective-projected-cockpit-rotor-rig-v1'
+    || rotor.mainTurnsPerLoop !== choreography.helicopter.rotorTurnsPerLoop
+    || rotor.tailTurnsPerLoop !== rotor.mainTurnsPerLoop * 3
+    || rotor.mainDiscPitchDegrees < 68
+    || rotor.mainDiscPitchDegrees > 82
+    || rotor.tailDiscYawDegrees < 50
+    || rotor.tailDiscYawDegrees > 75
+    || rotor.tailCameraReflection !== true
+    || !['mast-hub', 'canopy-header', 'tail-boom'].every((layer) => rotor.occlusionLayers?.includes(layer))) {
+    throw new Error('perspective-aware main/tail rotor projection contract is invalid');
+  }
   for (const arena of arenas) {
     const recipe = choreography.arenas[arena];
     if (!['helicopter', 'cat'].includes(recipe.kind)) throw new Error(`${arena} has an invalid preview kind`);
@@ -116,7 +128,7 @@ async function assertCaptureReceipt() {
   const receipt = JSON.parse(await readFile(captureReceiptPath, 'utf8'));
   const recipeDigest = createHash('sha256').update(JSON.stringify(choreography)).digest('hex');
   if (receipt.schemaVersion !== 1
-    || receipt.captureId !== 'pass65-authoritative-runtime-menu-preview-capture-v1'
+    || receipt.captureId !== 'pass65-authoritative-runtime-menu-preview-capture-v2'
     || receipt.recipeId !== choreography.recipeId
     || receipt.recipeDigest !== recipeDigest
     || receipt.source !== choreography.capture.source

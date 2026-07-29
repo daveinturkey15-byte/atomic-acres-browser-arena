@@ -26,11 +26,18 @@ export const SUPPORT_VEHICLE_PRESENTATION_CONTRACT = Object.freeze({
   }),
   chopper: Object.freeze({
     requiredNodes: Object.freeze([
+      'chopper-fuselage', 'chopper-rear-fuselage', 'chopper-tail-boom', 'chopper-tail-fin',
       'chopper-main-rotor', 'chopper-tail-rotor', 'chopper-player-gun', 'chopper-gun-muzzle-socket',
       'chopper-first-person-camera-socket', 'chopper-first-person-cockpit',
+      'chopper-gunner-sightline', 'chopper-gunner-weapon-view',
       'chopper-cockpit-dashboard-3d', 'chopper-cockpit-display-cyan', 'chopper-cockpit-display-green',
-      'chopper-cockpit-hud-glass', 'chopper-cockpit-hud-target-ring', 'chopper-first-person-rotor',
+      'chopper-cockpit-hud-glass', 'chopper-cockpit-hud-target-ring',
     ]),
+    possessedView: Object.freeze({
+      visibleOnlyBelow: 'chopper-gunner-sightline',
+      requiredVisibleNodes: Object.freeze(['chopper-cockpit-hud-glass', 'chopper-cockpit-hud-target-ring', 'chopper-gunner-weapon-view']),
+      forbiddenVisibleNodes: Object.freeze(['chopper-fuselage', 'chopper-rear-fuselage', 'chopper-main-rotor', 'chopper-tail-rotor']),
+    }),
     requiredAudio: Object.freeze(['chopper-low-loop', 'chopper-gun-report']),
     requiredWeaponFeedback: SUPPORT_WEAPON_FEEDBACK_CONTRACT,
   }),
