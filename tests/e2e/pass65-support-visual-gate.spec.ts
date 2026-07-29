@@ -398,9 +398,11 @@ test.describe('Pass 65 support visual fail-closed gate', () => {
           activeBeams: 1,
           beamPresentations: 1,
           lastBeamLengthM: 180,
-          visibleDurationMs: 900,
+          visibleDurationMs: 1_000,
           coreRadiusM: 0.32,
           haloRadiusM: 1,
+          shockRadiusM: 1.6,
+          filamentCount: 3,
           poolCapacity: 6,
           throughGeometry: true,
         });

@@ -36,7 +36,11 @@ describe('railgun presentation', () => {
     const authority = createRailgunBeamAuthority(3, 'shot-authority-0001', [3, 2, 7], [0.6, 0, -0.8]);
     const accepted: RailgunShotResultMessage = {
       type: 'railgun-shot-result', protocolVersion: 6, by: 'host', forPlayerId: 'shooter', generation: 3,
-      shotId: authority.shotId, status: 'accepted-miss', reason: 'accepted', outcomes: [], beam: authority, nonce: 1,
+      shotId: authority.shotId, status: 'accepted-hit', reason: 'accepted', outcomes: [
+        { target: 'near', damageRequested: 50, damageApplied: 50, resultingHealth: 50, died: false, distanceMeters: 12 },
+        { target: 'middle', damageRequested: 50, damageApplied: 40, resultingHealth: 0, died: true, distanceMeters: 24 },
+        { target: 'far', damageRequested: 50, damageApplied: 10, resultingHealth: 0, died: true, distanceMeters: 36 },
+      ], beam: authority, nonce: 1,
     };
     expect(presentation.presentAcceptedResult(accepted, 1_000)).toBe(true);
     expect(presentation.presentAcceptedResult(accepted, 1_001)).toBe(false);
@@ -45,8 +49,12 @@ describe('railgun presentation', () => {
     expect(beam.visible).toBe(true);
     const core = beam.getObjectByName('railgun-beam-core') as THREE.Mesh;
     const bloom = beam.getObjectByName('railgun-beam-bloom') as THREE.Mesh;
+    const shock = beam.getObjectByName('railgun-beam-shock-sheath') as THREE.Mesh;
+    const filaments = beam.getObjectByName('railgun-beam-energy-filaments') as THREE.Group;
     expect(core.scale).toMatchObject({ x: RAILGUN_BOLT_PRESENTATION.coreRadiusM, y: 180 });
     expect(bloom.scale).toMatchObject({ x: RAILGUN_BOLT_PRESENTATION.haloRadiusM, y: 180 });
+    expect(shock.scale).toMatchObject({ x: RAILGUN_BOLT_PRESENTATION.shockRadiusM, y: 180 });
+    expect(filaments.children).toHaveLength(RAILGUN_BOLT_PRESENTATION.filamentCount);
     expect((core.material as THREE.MeshBasicMaterial).depthTest).toBe(false);
     expect((bloom.material as THREE.MeshBasicMaterial).depthTest).toBe(false);
     expect((core.material as THREE.MeshBasicMaterial).side).toBe(THREE.FrontSide);
@@ -57,7 +65,9 @@ describe('railgun presentation', () => {
     expect(beam.position.distanceTo(new THREE.Vector3(...authority.start).add(new THREE.Vector3(...authority.end)).multiplyScalar(0.5))).toBeLessThan(1e-6);
     expect(presentation.telemetry()).toMatchObject({
       lastBeamLengthM: 180,
-      visibleDurationMs: 900,
+      visibleDurationMs: 1_000,
+      shockRadiusM: 1.6,
+      filamentCount: 3,
       poolCapacity: 6,
       throughGeometry: true,
       openEnded: true,
@@ -70,6 +80,7 @@ describe('railgun presentation', () => {
         end: authority.end,
         lengthM: 180,
       },
+      lastAcceptedOutcomes: accepted.outcomes,
     });
     (core.material as THREE.MeshBasicMaterial).depthTest = true;
     expect(presentation.telemetry().throughGeometry).toBe(false);

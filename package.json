@@ -36,7 +36,7 @@
     "qa:pass37:quality-bounds": "playwright test tests/e2e/pass37-quality-bounds.spec.ts --project=chromium --workers=1 --retries=0",
     "qa:multiplayer:lifecycle": "node scripts/qa/verify-multiplayer-lifecycle.mjs",
     "qa:pass64:rematch": "node scripts/qa/run-pass64-rematch.mjs",
-    "qa:pass64:railgun": "playwright test tests/e2e/pass64-railgun.spec.ts --project=chromium --workers=1 --retries=0",
+    "qa:pass64:railgun": "playwright test tests/e2e/pass64-railgun.spec.ts tests/e2e/pass65-railgun-multihit.spec.ts --project=chromium --workers=1 --retries=0",
     "qa:pass64:diagnostics:collector": "tsx scripts/qa/collect-pass64-match-diagnostics.ts",
     "qa:pass64:diagnostics:analyze": "tsx scripts/qa/analyze-pass64-match-diagnostics.ts",
     "qa:pass64:diagnostics": "node scripts/qa/run-pass64-diagnostics-browser.mjs",

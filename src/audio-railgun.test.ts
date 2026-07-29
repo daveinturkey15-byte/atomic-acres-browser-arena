@@ -15,9 +15,17 @@ describe('railgun report presentation', () => {
     const audio = new ArenaAudio();
     const shot = vi.spyOn(audio, 'shot').mockImplementation(() => undefined);
     audio.railgunReport(false, 0);
-    audio.railgunReport(true, 52);
-    expect(shot).toHaveBeenNthCalledWith(1, 'railgun', false, 0);
-    expect(shot).toHaveBeenNthCalledWith(2, 'railgun', true, 52);
-    expect(audio.telemetry().railgun).toMatchObject({ local: 1, replicated: 1, layerCount: 8, pressureDuration: 0.62 });
+    audio.railgunReport(true, { x: 20, y: 0, z: -48 });
+    expect(shot).toHaveBeenNthCalledWith(1, 'railgun', false, 0, undefined);
+    expect(shot).toHaveBeenNthCalledWith(2, 'railgun', true, 52, { x: 20, y: 0, z: -48 });
+    expect(audio.telemetry().railgun).toMatchObject({
+      local: 1,
+      replicated: 1,
+      lastDistanceM: 52,
+      lastSpatial: true,
+      lastEmitter: { x: 20, y: 0, z: -48 },
+      layerCount: 8,
+      pressureDuration: 0.62,
+    });
   });
 });

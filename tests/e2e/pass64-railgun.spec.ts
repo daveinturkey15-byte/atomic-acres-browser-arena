@@ -57,9 +57,11 @@ test('railgun exits ADS, enforces the 1.5 second rechamber, and permits a releas
     beamPresentations: 1,
     activeBeams: 1,
     lastBeamLengthM: 180,
-    visibleDurationMs: 900,
+    visibleDurationMs: 1_000,
     coreRadiusM: 0.32,
     haloRadiusM: 1,
+    shockRadiusM: 1.6,
+    filamentCount: 3,
     poolCapacity: 6,
     throughGeometry: true,
   });

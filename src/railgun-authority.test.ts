@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   RAILGUN_DAMAGE,
+  RAILGUN_MAX_TARGET_OUTCOMES,
+  RAILGUN_TARGET_HALF_HEIGHT_M,
+  RAILGUN_TARGET_RADIUS_M,
   RAILGUN_PENETRATION_MULTIPLIER,
   RAILGUN_RECHAMBER_MS,
   RAILGUN_SPAWN_DELAY_MS,
@@ -9,6 +12,7 @@ import {
   RAILGUN_UPPER_ROOM_SPAWN_SITES,
   advanceRailgunAuthority,
   advanceRailgunChamber,
+  admitRailgunTargets,
   chooseRailgunUpperRoom,
   claimRailgun,
   createRailgunBeamAuthority,
@@ -118,6 +122,52 @@ describe('host-authoritative railgun', () => {
     expect(railgunThermalTargetEligible(observer, { id: 'other', team: 0, alive: true, kind: 'player' }, 'ffa')).toBe(true);
   });
 
+  it('admits every aligned hostile once in deterministic near-to-far order and excludes friendly or off-axis actors', () => {
+    const admitted = admitRailgunTargets([0, 1, 0], [0, 0, -1], [
+      { target: 'hostile-far', position: [0, 1, -29], alive: true, hostile: true },
+      { target: 'friendly-middle', position: [0, 1, -19], alive: true, hostile: false },
+      { target: 'hostile-near', position: [0.2, 1, -9], alive: true, hostile: true },
+      { target: 'hostile-off-axis', position: [0.7, 1, -14], alive: true, hostile: true },
+      { target: 'hostile-middle', position: [-0.1, 1, -19], alive: true, hostile: true },
+      { target: 'dead-aligned', position: [0, 1, -24], alive: false, hostile: true },
+    ]);
+    expect(admitted).toEqual({
+      accepted: true,
+      reason: 'accepted',
+      targets: [
+        { target: 'hostile-near', distanceMeters: 9 },
+        { target: 'hostile-middle', distanceMeters: 19 },
+        { target: 'hostile-far', distanceMeters: 29 },
+      ],
+    });
+    expect(admitRailgunTargets([0, 0, 0], [0, 0, -1], [
+      { target: 'duplicate', position: [0, 0, -5], alive: true, hostile: true },
+      { target: 'duplicate', position: [0, 0, -10], alive: true, hostile: true },
+    ])).toMatchObject({ accepted: false, reason: 'duplicate-candidate', targets: [] });
+    expect(admitRailgunTargets([0, 0, 0], [0, 0, -1], Array.from(
+      { length: RAILGUN_MAX_TARGET_OUTCOMES + 1 },
+      (_, index) => ({ target: `target-${index}`, position: [0, 0, -(index + 1)] as const, alive: true, hostile: true }),
+    ))).toMatchObject({ accepted: false, reason: 'candidate-cap', targets: [] });
+    expect(admitRailgunTargets([0, 0, 0], [0, 0, -1], Array.from(
+      { length: RAILGUN_MAX_TARGET_OUTCOMES },
+      (_, index) => ({ target: `maximum-actor-${index}`, position: [0, 0, -(index + 1)] as const, alive: true, hostile: true }),
+    )).targets).toHaveLength(9);
+  });
+
+  it('uses a vertical operator capsule so body and head-height aim remain admitted at the 0.62 m radial boundary', () => {
+    const atDistance = 20;
+    const aimedHeight = RAILGUN_TARGET_HALF_HEIGHT_M;
+    const magnitude = Math.hypot(0, aimedHeight, atDistance);
+    const headDirection = [0, aimedHeight / magnitude, -atDistance / magnitude] as const;
+    expect(admitRailgunTargets([0, 0, 0], headDirection, [
+      { target: 'head-height', position: [0, 0, -atDistance], alive: true, hostile: true },
+    ]).targets).toHaveLength(1);
+    expect(admitRailgunTargets([0, 0, 0], [0, 0, -1], [
+      { target: 'radial-inside', position: [RAILGUN_TARGET_RADIUS_M - 0.001, 0, -20], alive: true, hostile: true },
+      { target: 'radial-outside', position: [RAILGUN_TARGET_RADIUS_M + 0.001, 0, -30], alive: true, hostile: true },
+    ]).targets.map(({ target }) => target)).toEqual(['radial-inside']);
+  });
+
   it('validates bounded railgun protocol messages', () => {
     const beam = createRailgunBeamAuthority(1, 'shot-0001', [1, 2, 3], [0, 0, -1]);
     expect(beam).toEqual({ generation: 1, shotId: 'shot-0001', start: [1, 2, 3], end: [1, 2, -177] });
@@ -133,12 +183,40 @@ describe('host-authoritative railgun', () => {
     expect(isRailgunProtocolMessage({
       type: 'railgun-shot-result', protocolVersion: 6, by: 'host', forPlayerId: 'player-a', generation: 1,
       shotId: 'shot-0001', status: 'accepted-hit', reason: 'accepted',
-      outcomes: [{ target: 'player-b', damage: 50, resultingHealth: 50, died: false, distanceMeters: 180 }], beam, nonce: 3,
+      outcomes: [
+        { target: 'player-b', damageRequested: 50, damageApplied: 50, resultingHealth: 50, died: false, distanceMeters: 12 },
+        { target: 'player-c', damageRequested: 50, damageApplied: 40, resultingHealth: 0, died: true, distanceMeters: 24 },
+        { target: 'player-d', damageRequested: 50, damageApplied: 10, resultingHealth: 0, died: true, distanceMeters: 36 },
+      ], beam, nonce: 3,
     }, 6)).toBe(true);
     expect(isRailgunProtocolMessage({
       type: 'railgun-shot-result', protocolVersion: 6, by: 'host', forPlayerId: 'player-a', generation: 1,
       shotId: 'shot-0001', status: 'accepted-hit', reason: 'accepted',
-      outcomes: [{ target: 'player-b', damage: 51, resultingHealth: 49, died: false, distanceMeters: 180 }], beam, nonce: 3,
+      outcomes: [{ target: 'player-b', damageRequested: 51, damageApplied: 50, resultingHealth: 50, died: false, distanceMeters: 12 }], beam, nonce: 3,
+    }, 6)).toBe(false);
+    expect(isRailgunProtocolMessage({
+      type: 'railgun-shot-result', protocolVersion: 6, by: 'host', forPlayerId: 'player-a', generation: 1,
+      shotId: 'shot-0001', status: 'accepted-hit', reason: 'accepted',
+      outcomes: [{
+        target: 'player-b', damageRequested: 50, damageApplied: 50, resultingHealth: 50,
+        died: false, distanceMeters: 12, critical: true,
+      }], beam, nonce: 3,
+    }, 6)).toBe(false);
+    expect(isRailgunProtocolMessage({
+      type: 'railgun-shot-result', protocolVersion: 6, by: 'host', forPlayerId: 'player-a', generation: 1,
+      shotId: 'shot-0001', status: 'accepted-hit', reason: 'accepted',
+      outcomes: [
+        { target: 'player-b', damageRequested: 50, damageApplied: 50, resultingHealth: 50, died: false, distanceMeters: 24 },
+        { target: 'player-c', damageRequested: 50, damageApplied: 50, resultingHealth: 50, died: false, distanceMeters: 12 },
+      ], beam, nonce: 3,
+    }, 6)).toBe(false);
+    expect(isRailgunProtocolMessage({
+      type: 'railgun-shot-result', protocolVersion: 6, by: 'host', forPlayerId: 'player-a', generation: 1,
+      shotId: 'shot-0001', status: 'accepted-hit', reason: 'accepted',
+      outcomes: [
+        { target: 'player-b', damageRequested: 50, damageApplied: 50, resultingHealth: 50, died: false, distanceMeters: 12 },
+        { target: 'player-b', damageRequested: 50, damageApplied: 50, resultingHealth: 50, died: false, distanceMeters: 24 },
+      ], beam, nonce: 3,
     }, 6)).toBe(false);
     expect(isRailgunProtocolMessage({
       type: 'railgun-shot-result', protocolVersion: 6, by: 'host', forPlayerId: 'player-a', generation: 1,

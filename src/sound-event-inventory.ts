@@ -301,7 +301,7 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('grenadeBounce', 'impactSpeed', 1, ['ordnance.grenade-bounce']),
   runtimeCallsite('grenadeBounce', 'Math.abs(incoming)', 1, ['ordnance.grenade-bounce']),
   runtimeCallsite('grenadeFuseBeep', 'fuseRemainingMs,now', 1, ['ordnance.frag-fuse-beep']),
-  runtimeCallsite('hit', 'false', 3, ['combat.hit-confirm']),
+  runtimeCallsite('hit', 'false', 2, ['combat.hit-confirm']),
   runtimeCallsite('hit', 'headshot', 2, ['combat.hit-confirm']),
   runtimeCallsite('hit', "hit.zone === 'head'", 1, ['combat.hit-confirm']),
   runtimeCallsite('hit', "zone === 'head'", 1, ['combat.hit-confirm']),
@@ -322,7 +322,7 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('overdriveAvailable', '', 1, ['pickup.overdrive-available']),
   runtimeCallsite('overdriveExpire', '', 1, ['pickup.overdrive-expired']),
   runtimeCallsite('overdrivePickup', '', 1, ['pickup.overdrive-claimed']),
-  runtimeCallsite('railgunReport', '!local,new THREE.Vector3(...message.beam.start).distanceTo(camera.position)', 1, ['weapon.report.local', 'weapon.report.world']),
+  runtimeCallsite('railgunReport', '!local,railgunReportEmitter(message.beam, local)', 1, ['weapon.report.local', 'weapon.report.world']),
   runtimeCallsite('reload', '', 1, ['weapon.reload-handling']),
   runtimeCallsite('scoutSweep', '', 1, ['support.scout-sweep']),
   runtimeCallsite('setArena', 'selectedArena.id', 3, ['ambience.arena-bed']),
@@ -546,7 +546,7 @@ const events: SoundEventInventoryEntry[] = [
     spatialProfileId: 'weapon-report-world-v1', variants: PASS64_WEAPON_AUDIO_VARIANTS,
     emitterSymbols: ['shot', 'railgunReport'], contractRefs: ['R109', 'R307', 'R308'],
     concurrency: WORLD_TRANSIENT, lifecycleOwner: 'audio-session', coverageStatus: 'partial',
-    coverageDetail: 'Replicated reports have scalar distance attenuation; pooled HRTF, pan, occlusion, and deterministic stealing remain S04/O06 work.',
+    coverageDetail: 'The Railgun report uses a bounded HRTF world emitter on the existing SFX/ambience buses; other replicated reports retain scalar attenuation pending their catalog migration.',
   }),
   existingEvent({
     id: 'weapon.reload-mechanic', family: 'weapon-foley', bus: 'sfx', delivery: 'listener-local',
@@ -1004,7 +1004,7 @@ export const SOUND_EVENT_INVENTORY_DOCUMENT = Object.freeze({
   schemaVersion: SOUND_EVENT_INVENTORY_SCHEMA_VERSION,
   events: SOUND_EVENT_INVENTORY,
 });
-export const SOUND_EVENT_INVENTORY_SHA256 = '897e98b905a07483ab9ebdfd04cb04e7e54b5dc7c953a7da5f0856f4018b3ea0';
+export const SOUND_EVENT_INVENTORY_SHA256 = '9f9b3cfbbd4ad0b883dc45acce28096e47c5cc87284bd5deec672b035b668b0a';
 
 export type SoundEventInventoryVerificationOptions = Readonly<{
   observedRuntimeEmitterSymbols?: readonly string[];

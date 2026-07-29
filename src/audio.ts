@@ -166,7 +166,19 @@ export class ArenaAudio {
   private matchCountdownCuePlays = 0;
   private lastMatchCountdownCue: MatchCountdownAudioCueId | null = null;
   private explosionAudioGate = createExplosionAudioGate();
-  private railgunReports = { local: 0, replicated: 0, lastAttenuation: 0 };
+  private railgunReports = {
+    local: 0,
+    replicated: 0,
+    lastAttenuation: 0,
+    lastDistanceM: 0,
+    lastSpatial: false,
+    lastEmitter: null as SpatialPoint | null,
+  };
+  private readonly spatialReportDestinations = new WeakSet<AudioNode>();
+  private readonly spatialReportDistances = new WeakMap<AudioNode, number>();
+  private readonly railgunSpatialNodes: AudioNode[] = [];
+  private readonly railgunSpatialTimers: ReturnType<typeof setTimeout>[] = [];
+  private railgunSpatialChainCount = 0;
   private flashbangs = { plays: 0, lastAudioGain: 0, immediateOnsets: 0, scheduledBeeps: 0 };
   private activeVoices = new Map<AudioScheduledSourceNode, { id: number; bus: AudioBusId; startedAt: number; priority: number; spatial: boolean; distance: number }>();
   private nextVoiceId = 1;
@@ -234,6 +246,13 @@ export class ArenaAudio {
     this.stopSources(this.lowHealthSources);
     this.disconnectNodes(this.lowHealthNodes);
     for (const source of [...this.activeVoices.keys()]) this.stopSource(source);
+    for (const timer of this.railgunSpatialTimers.splice(0)) clearTimeout(timer);
+    for (const node of this.railgunSpatialNodes.splice(0)) {
+      this.busIdentity.delete(node);
+      node.disconnect();
+    }
+    this.spatialChains = Math.max(0, this.spatialChains - this.railgunSpatialChainCount);
+    this.railgunSpatialChainCount = 0;
     const context = this.context;
     this.context = null;
     this.master = null;
@@ -359,30 +378,35 @@ export class ArenaAudio {
     this.tone(frequency * 1.5, 0.08, 0.012, 'triangle', this.ambience, 0.09);
   }
 
-  shot(weapon: WeaponId, remote = false, distance = 0): void {
+  shot(weapon: WeaponId, remote = false, distance = 0, emitter?: SpatialPoint): void {
     if (!this.context || !this.weapons) return;
-    const spatialAttenuation = weapon === 'railgun'
+    const railgunSpatial = weapon === 'railgun' && remote && emitter
+      ? this.createRailgunSpatialDestinations(emitter, distance)
+      : null;
+    const weaponDestination = railgunSpatial?.weapons ?? this.weapons;
+    const ambienceDestination = railgunSpatial?.ambience ?? this.ambience;
+    const spatialAttenuation = railgunSpatial ? 1 : weapon === 'railgun'
       ? railgunReportAttenuation(remote, distance)
       : remote ? Math.max(0.08, 0.55 * (1 - Math.min(1, distance / 80))) : 1;
     const attenuation = spatialAttenuation * WEAPON_REPORT_GAIN[weapon];
     const profile = WEAPON_REPORT_PROFILES[weapon];
 
-    this.sweep(profile.body, profile.bodyEnd, profile.duration, 0.22 * attenuation, 'sawtooth', this.weapons);
-    this.sweep(profile.crack, profile.crack * profile.crackEndRatio, profile.crackDuration, 0.075 * attenuation, 'square', this.weapons);
+    this.sweep(profile.body, profile.bodyEnd, profile.duration, 0.22 * attenuation, 'sawtooth', weaponDestination);
+    this.sweep(profile.crack, profile.crack * profile.crackEndRatio, profile.crackDuration, 0.075 * attenuation, 'square', weaponDestination);
     this.noise({
       duration: profile.duration,
       volume: profile.noise * attenuation,
       filter: 'lowpass',
       frequency: profile.lowpass,
       q: 0.7,
-    }, this.weapons);
+    }, weaponDestination);
     this.noise({
       duration: profile.transientDuration,
       volume: 0.17 * attenuation,
       filter: 'highpass',
       frequency: profile.transientHighpass,
       q: 0.4,
-    }, this.weapons);
+    }, weaponDestination);
     this.noise({
       duration: profile.tailDuration,
       volume: (remote ? 0.055 : 0.082) * attenuation,
@@ -390,7 +414,7 @@ export class ArenaAudio {
       frequency: profile.tail,
       q: 0.48,
       delay: 0.025,
-    }, this.ambience);
+    }, ambienceDestination);
     if (weapon === 'carbine') {
       // Original HK416 pressure and yard-reflection layers; short enough to stay readable at full RPM.
       this.sweep(74, 38, 0.16, 0.052 * attenuation, 'triangle', this.weapons, 0.008);
@@ -402,11 +426,11 @@ export class ArenaAudio {
       // An authored pressure report, supersonic snap and long structural tail.
       // It remains on the existing compressed weapon/ambience buses, so local
       // and replicated shots are large without bypassing the bounded mix.
-      this.sweep(36, 10, RAILGUN_REPORT_PROFILE.pressureDuration, 0.2 * attenuation, 'sawtooth', this.weapons, 0.008);
-      this.sweep(118, 24, 0.38, 0.12 * attenuation, 'triangle', this.weapons, 0.026);
-      this.noise({ duration: 0.7, volume: 0.2 * attenuation, filter: 'bandpass', frequency: 165, q: 0.5, delay: 0.045 }, this.ambience);
-      this.noise({ duration: 0.08, volume: 0.16 * attenuation, filter: 'highpass', frequency: 4_800, q: 0.32, delay: 0.006 }, this.feedback);
-      this.tone(92, 0.42, 0.13 * attenuation, 'triangle', this.ambience, 0.075);
+      this.sweep(36, 10, RAILGUN_REPORT_PROFILE.pressureDuration, 0.2 * attenuation, 'sawtooth', weaponDestination, 0.008);
+      this.sweep(118, 24, 0.38, 0.12 * attenuation, 'triangle', weaponDestination, 0.026);
+      this.noise({ duration: 0.7, volume: 0.2 * attenuation, filter: 'bandpass', frequency: 165, q: 0.5, delay: 0.045 }, ambienceDestination);
+      this.noise({ duration: 0.08, volume: 0.16 * attenuation, filter: 'highpass', frequency: 4_800, q: 0.32, delay: 0.006 }, remote ? weaponDestination : this.feedback);
+      this.tone(92, 0.42, 0.13 * attenuation, 'triangle', ambienceDestination, 0.075);
     }
 
     if (!remote) {
@@ -415,11 +439,20 @@ export class ArenaAudio {
     }
   }
 
-  railgunReport(remote = false, distance = 0): void {
+  railgunReport(remote = false, emitter: number | SpatialPoint = 0): void {
+    const position = typeof emitter === 'number' ? null : emitter;
+    const distance = typeof emitter === 'number' ? emitter : Math.hypot(
+      emitter.x - this.listenerPosition.x,
+      emitter.y - this.listenerPosition.y,
+      emitter.z - this.listenerPosition.z,
+    );
     if (remote) this.railgunReports.replicated += 1;
     else this.railgunReports.local += 1;
     this.railgunReports.lastAttenuation = railgunReportAttenuation(remote, distance);
-    this.shot('railgun', remote, distance);
+    this.railgunReports.lastDistanceM = distance;
+    this.railgunReports.lastSpatial = remote && position !== null;
+    this.railgunReports.lastEmitter = position ? { ...position } : null;
+    this.shot('railgun', remote, distance, position ?? undefined);
   }
 
   hit(headshot = false): void {
@@ -913,7 +946,16 @@ export class ArenaAudio {
     minigunDrive: { active: boolean; starts: number; stops: number; fraction: number; phase: MinigunSpoolPhase };
     support: { cues: number; chopperRotorActive: boolean; chopperRotorStarts: number; chopperRotorStops: number };
     countdown: { cues: number; lastCue: MatchCountdownAudioCueId | null; maximumVoicesPerCue: number; maximumCueWindowSeconds: number; buses: readonly ['announcements', 'ui'] };
-    railgun: { local: number; replicated: number; lastAttenuation: number; layerCount: number; pressureDuration: number };
+    railgun: {
+      local: number;
+      replicated: number;
+      lastAttenuation: number;
+      lastDistanceM: number;
+      lastSpatial: boolean;
+      lastEmitter: SpatialPoint | null;
+      layerCount: number;
+      pressureDuration: number;
+    };
     flashbang: { plays: number; lastAudioGain: number; immediateOnsets: number; scheduledBeeps: number; maximumTailMs: number };
     runtime: { voices: number; spatialChains: number; spatialPoolSize: number; stolen: number; dropped: number; globalCap: number; spatialCap: number };
     buses: Record<AudioBusId, { configuredGain: number; muted: boolean; effectiveGain: number }>;
@@ -978,6 +1020,54 @@ export class ArenaAudio {
     return bus;
   }
 
+  private createRailgunSpatialDestinations(
+    emitter: SpatialPoint,
+    distance: number,
+  ): Readonly<{ weapons: PannerNode; ambience: PannerNode }> | null {
+    if (!this.context || !this.weapons || !this.ambience
+      || ![emitter.x, emitter.y, emitter.z, distance].every(Number.isFinite)
+      || this.spatialChains + 2 > AUDIO_RUNTIME_BUDGET.spatialVoices) {
+      this.voicesDropped += 1;
+      return null;
+    }
+    const create = (bus: 'sfx' | 'ambience', destination: GainNode): PannerNode => {
+      const panner = this.context!.createPanner();
+      panner.panningModel = 'HRTF';
+      panner.distanceModel = 'inverse';
+      panner.refDistance = 14;
+      panner.maxDistance = 220;
+      panner.rolloffFactor = 0.12;
+      panner.positionX.value = emitter.x;
+      panner.positionY.value = emitter.y;
+      panner.positionZ.value = emitter.z;
+      panner.connect(destination);
+      this.busIdentity.set(panner, bus);
+      this.spatialReportDestinations.add(panner);
+      this.spatialReportDistances.set(panner, distance);
+      this.railgunSpatialNodes.push(panner);
+      return panner;
+    };
+    const weapons = create('sfx', this.weapons);
+    const ambience = create('ambience', this.ambience);
+    this.spatialChains += 2;
+    this.railgunSpatialChainCount += 2;
+    const cleanup = () => {
+      for (const node of [weapons, ambience]) {
+        const index = this.railgunSpatialNodes.indexOf(node);
+        if (index >= 0) this.railgunSpatialNodes.splice(index, 1);
+        this.busIdentity.delete(node);
+        node.disconnect();
+      }
+      this.spatialChains = Math.max(0, this.spatialChains - 2);
+      this.railgunSpatialChainCount = Math.max(0, this.railgunSpatialChainCount - 2);
+      const timerIndex = this.railgunSpatialTimers.indexOf(timer);
+      if (timerIndex >= 0) this.railgunSpatialTimers.splice(timerIndex, 1);
+    };
+    const timer = setTimeout(cleanup, Math.ceil((RAILGUN_REPORT_PROFILE.tailDuration + 0.12) * 1_000));
+    this.railgunSpatialTimers.push(timer);
+    return { weapons, ambience };
+  }
+
   private busBaseGain(id: AudioBusId): number {
     if (id === 'master') return 0.34;
     if (id === 'sfx') return 0.78;
@@ -1000,11 +1090,16 @@ export class ArenaAudio {
 
   private registerVoice(source: AudioScheduledSourceNode, destination: AudioNode, priority: number, spatial = false, distance = 0): boolean {
     const bus = this.busIdentity.get(destination) ?? 'sfx';
+    const reservedSpatial = this.spatialReportDestinations.has(destination);
+    const admittedSpatial = spatial || reservedSpatial;
+    const admittedDistance = reservedSpatial ? this.spatialReportDistances.get(destination) ?? distance : distance;
     const busCap = bus === 'master' ? AUDIO_RUNTIME_BUDGET.globalVoices : AUDIO_RUNTIME_BUDGET.perBus[bus];
     const busVoices = [...this.activeVoices.entries()].filter(([, voice]) => voice.bus === bus);
     const overGlobal = this.activeVoices.size >= AUDIO_RUNTIME_BUDGET.globalVoices;
     const overBus = busVoices.length >= busCap;
-    const overSpatial = spatial && this.spatialChains >= AUDIO_RUNTIME_BUDGET.spatialVoices;
+    const overSpatial = admittedSpatial && (reservedSpatial
+      ? this.spatialChains > AUDIO_RUNTIME_BUDGET.spatialVoices
+      : this.spatialChains >= AUDIO_RUNTIME_BUDGET.spatialVoices);
     if (overSpatial) {
       this.voicesDropped += 1;
       source.disconnect();
@@ -1017,7 +1112,7 @@ export class ArenaAudio {
         candidates.map(([, voice]) => ({
           id: String(voice.id), priority: voice.priority, distance: voice.distance, startedAt: voice.startedAt,
         })),
-        { id: candidateId, priority, distance, startedAt: this.context?.currentTime ?? 0 },
+        { id: candidateId, priority, distance: admittedDistance, startedAt: this.context?.currentTime ?? 0 },
         candidates.length,
       );
       const weakest = selected ? candidates.find(([, voice]) => String(voice.id) === selected.id) : undefined;
@@ -1029,7 +1124,14 @@ export class ArenaAudio {
       this.voicesStolen += 1;
       this.stopSource(weakest[0]);
     }
-    const voice = { id: this.nextVoiceId++, bus, startedAt: this.context?.currentTime ?? 0, priority, spatial, distance };
+    const voice = {
+      id: this.nextVoiceId++,
+      bus,
+      startedAt: this.context?.currentTime ?? 0,
+      priority,
+      spatial: admittedSpatial,
+      distance: admittedDistance,
+    };
     this.activeVoices.set(source, voice);
     source.onended = () => {
       this.activeVoices.delete(source);

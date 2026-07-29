@@ -502,6 +502,7 @@ import {
   RAILGUN_SPAWN_DELAY_MS,
   RAILGUN_TOTAL_ROUNDS,
   RAILGUN_UPPER_ROOM_SPAWN_SITES,
+  admitRailgunTargets,
   advanceRailgunAuthority,
   advanceRailgunChamber,
   claimRailgun,
@@ -2739,6 +2740,16 @@ let localConnectionEpoch: string = crypto.randomUUID();
 const resolvedShotRequests = new Map<string, ShotResultMessage>();
 const resolvedRailgunShots = new Map<string, RailgunShotResultMessage>();
 const processedRailgunShotResults = new Set<string>();
+let lastAuthoritativeRailgunResult: RailgunShotResultMessage | null = null;
+const railgunQaHeldDeadBots = new Set<string>();
+let railgunLocalFeedbackPresentations = 0;
+let lastRailgunLocalFeedbackSummary: string | null = null;
+let railgunDeathPresentationCount = 0;
+const railgunDeathPresentations: Array<{
+  killerId: string;
+  victimId: string;
+  text: string;
+}> = [];
 let railgunState: RailgunAuthorityState = createRailgunAuthorityState('disabled', 0, 0, 0);
 let localRailgunPendingUntilHostTimeMs = 0;
 let lastRailgunStateBroadcastAt = -Infinity;
@@ -7500,7 +7511,13 @@ function processDeath(message: DeathMessage): void {
       verifiedRemoteKills.set(message.killer, (verifiedRemoteKills.get(message.killer) ?? 0) + 1);
     }
   }
-  addFeed(`${killer} eliminated ${victim}`, message.killer === player.id ? 'gold' : undefined);
+  const eliminationFeedText = `${killer} eliminated ${victim}`;
+  if (message.cause.kind === 'gun' && message.cause.weapon === 'railgun') {
+    railgunDeathPresentationCount += 1;
+    railgunDeathPresentations.push({ killerId: message.killer, victimId: message.victim, text: eliminationFeedText });
+    if (railgunDeathPresentations.length > 32) railgunDeathPresentations.shift();
+  }
+  addFeed(eliminationFeedText, message.killer === player.id ? 'gold' : undefined);
   const remote = remotes.get(message.victim);
   if (remote) {
     remote.snapshot = { ...remote.snapshot, hp: 0 };
@@ -8150,6 +8167,12 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   presentedShotResults.clear();
   processedShotResults.clear();
   processedRailgunShotResults.clear();
+  lastAuthoritativeRailgunResult = null;
+  railgunQaHeldDeadBots.clear();
+  railgunLocalFeedbackPresentations = 0;
+  lastRailgunLocalFeedbackSummary = null;
+  railgunDeathPresentationCount = 0;
+  railgunDeathPresentations.length = 0;
   railgunPresentation.resetBeams();
   authoritativeShotAdmissions.clear();
   for (const key of Object.keys(shotProtocolTelemetry)) delete shotProtocolTelemetry[key];
@@ -8389,6 +8412,12 @@ function initializeRailgunForMatch(activeAtHostTimeMs: number): void {
   railgunRechamberPresentationActive = false;
   resolvedRailgunShots.clear();
   processedRailgunShotResults.clear();
+  lastAuthoritativeRailgunResult = null;
+  railgunQaHeldDeadBots.clear();
+  railgunLocalFeedbackPresentations = 0;
+  lastRailgunLocalFeedbackSummary = null;
+  railgunDeathPresentationCount = 0;
+  railgunDeathPresentations.length = 0;
   railgunPresentation.resetBeams();
   railgunClaimAudit = createRailgunClaimAudit();
   railgunPresentation.updateWorld(railgunState, performance.now());
@@ -8434,39 +8463,71 @@ function dropHeldRailgun(holderId: string, position: THREE.Vector3): boolean {
   return true;
 }
 
-type RailgunTarget = Readonly<{ id: string; team: Team; kind: 'player' | 'bot'; health: number; position: THREE.Vector3 }>;
+type RailgunTarget = Readonly<{
+  id: string;
+  team: Team;
+  kind: 'player' | 'bot';
+  health: number;
+  alive: boolean;
+  hostile: boolean;
+  position: THREE.Vector3;
+}>;
 
 function railgunTargets(shooterId: string, shooterTeam: Team): RailgunTarget[] {
   const targets: RailgunTarget[] = [];
-  if (player.id !== shooterId && player.alive && areCombatantsHostile(shooterId, shooterTeam, player.id, player.team)) {
-    targets.push({ id: player.id, team: player.team, kind: 'player', health: player.hp, position: player.position.clone().add(new THREE.Vector3(0, -0.63, 0)) });
+  if (player.id !== shooterId) {
+    targets.push({
+      id: player.id, team: player.team, kind: 'player', health: player.hp, alive: player.alive,
+      hostile: areCombatantsHostile(shooterId, shooterTeam, player.id, player.team),
+      position: player.position.clone().add(new THREE.Vector3(0, -0.63, 0)),
+    });
   }
   for (const remote of remotes.values()) {
-    if (remote.snapshot.id === shooterId || remote.snapshot.hp <= 0
-      || !areCombatantsHostile(shooterId, shooterTeam, remote.snapshot.id, remote.snapshot.team)) continue;
+    if (remote.snapshot.id === shooterId) continue;
     targets.push({
       id: remote.snapshot.id, team: remote.snapshot.team, kind: 'player', health: remote.snapshot.hp,
+      alive: remote.snapshot.hp > 0,
+      hostile: areCombatantsHostile(shooterId, shooterTeam, remote.snapshot.id, remote.snapshot.team),
       position: new THREE.Vector3(remote.snapshot.x, remote.snapshot.y - 0.63, remote.snapshot.z),
     });
   }
   for (const bot of bots.values()) {
-    if (!bot.alive || bot.id === shooterId || !areCombatantsHostile(shooterId, shooterTeam, bot.id, bot.team)) continue;
-    targets.push({ id: bot.id, team: bot.team, kind: 'bot', health: bot.hp, position: bot.position.clone().add(new THREE.Vector3(0, 0.95, 0)) });
+    if (bot.id === shooterId) continue;
+    targets.push({
+      id: bot.id, team: bot.team, kind: 'bot', health: bot.hp, alive: bot.alive,
+      hostile: areCombatantsHostile(shooterId, shooterTeam, bot.id, bot.team),
+      position: bot.position.clone().add(new THREE.Vector3(0, 0.95, 0)),
+    });
   }
   return targets;
 }
 
-function selectRailgunTarget(shooterId: string, shooterTeam: Team, origin: THREE.Vector3, direction: THREE.Vector3): { target: RailgunTarget; distance: number } | null {
-  const ray = new THREE.Ray(origin, direction.clone().normalize());
-  let selected: { target: RailgunTarget; distance: number } | null = null;
-  for (const target of railgunTargets(shooterId, shooterTeam)) {
-    const alongRay = target.position.clone().sub(origin).dot(ray.direction);
-    if (alongRay < 0.1 || alongRay > RAILGUN_BEAM_LENGTH_M) continue;
-    const closest = ray.at(alongRay, new THREE.Vector3());
-    if (closest.distanceToSquared(target.position) > 0.62 ** 2) continue;
-    if (!selected || alongRay < selected.distance) selected = { target, distance: alongRay };
-  }
-  return selected;
+function selectRailgunTargets(
+  shooterId: string,
+  shooterTeam: Team,
+  origin: THREE.Vector3,
+  direction: THREE.Vector3,
+): { accepted: boolean; targets: ReadonlyArray<{ target: RailgunTarget; distance: number }> } {
+  const candidates = railgunTargets(shooterId, shooterTeam);
+  const byId = new Map(candidates.map((target) => [target.id, target]));
+  const admission = admitRailgunTargets(
+    origin.toArray() as [number, number, number],
+    direction.toArray() as [number, number, number],
+    candidates.map((target) => ({
+      target: target.id,
+      position: target.position.toArray() as [number, number, number],
+      alive: target.alive,
+      hostile: target.hostile,
+    })),
+  );
+  if (!admission.accepted) return { accepted: false, targets: [] };
+  return {
+    accepted: true,
+    targets: admission.targets.flatMap(({ target: targetId, distanceMeters }) => {
+      const target = byId.get(targetId);
+      return target ? [{ target, distance: distanceMeters }] : [];
+    }),
+  };
 }
 
 function applyAuthoritativeRailgunDamage(shooterId: string, target: RailgunTarget, distance: number): RailgunShotResultMessage['outcomes'][number] | null {
@@ -8475,12 +8536,27 @@ function applyAuthoritativeRailgunDamage(shooterId: string, target: RailgunTarge
     const healthBefore = player.hp;
     applyDamage(RAILGUN_DAMAGE, shooterId, 1, false, cause, true);
     const damage = Math.max(0, healthBefore - player.hp);
-    return damage > 0 ? { target: player.id, damage, resultingHealth: player.hp, died: !player.alive, distanceMeters: distance } : null;
+    return damage > 0 ? {
+      target: player.id, damageRequested: RAILGUN_DAMAGE, damageApplied: damage,
+      resultingHealth: player.hp, died: !player.alive, distanceMeters: distance,
+    } : null;
   }
   const bot = bots.get(target.id);
   if (bot) {
-    const damage = applyBotDamage(bot, RAILGUN_DAMAGE, 'body', cause, shooterId, { wallbang: true, penetrationMultiplier: 1, distanceMeters: distance });
-    return damage > 0 ? { target: bot.id, damage, resultingHealth: bot.hp, died: !bot.alive, distanceMeters: distance } : null;
+    const damage = applyBotDamage(
+      bot,
+      RAILGUN_DAMAGE,
+      'body',
+      cause,
+      shooterId,
+      { wallbang: true, penetrationMultiplier: 1, distanceMeters: distance },
+      false,
+      true,
+    );
+    return damage > 0 ? {
+      target: bot.id, damageRequested: RAILGUN_DAMAGE, damageApplied: damage,
+      resultingHealth: bot.hp, died: !bot.alive, distanceMeters: distance,
+    } : null;
   }
   const remote = remotes.get(target.id);
   const health = remoteHealthAuthorities.get(target.id);
@@ -8506,7 +8582,26 @@ function applyAuthoritativeRailgunDamage(shooterId: string, target: RailgunTarge
     network.send(death);
     processDeath(death);
   }
-  return { target: target.id, damage: applied.damageApplied, resultingHealth: applied.healthAfter, died: applied.died, distanceMeters: distance };
+  return {
+    target: target.id, damageRequested: RAILGUN_DAMAGE, damageApplied: applied.damageApplied,
+    resultingHealth: applied.healthAfter, died: applied.died, distanceMeters: distance,
+  };
+}
+
+function presentLocalRailgunFeedback(outcomes: RailgunShotResultMessage['outcomes']): void {
+  if (outcomes.length === 0) return;
+  railgunLocalFeedbackPresentations += 1;
+  const damageApplied = outcomes.reduce((total, outcome) => total + outcome.damageApplied, 0);
+  const lethalHits = outcomes.filter((outcome) => outcome.died).length;
+  showHitmarker(false);
+  showDamageNumber(damageApplied, 'body');
+  audio.hit(false);
+  roundHitShots += 1;
+  roundDamageDealt += damageApplied;
+  if (outcomes.length > 1) {
+    lastRailgunLocalFeedbackSummary = `RAILGUN MULTI-HIT ×${outcomes.length} · ${Math.round(damageApplied)} DAMAGE${lethalHits > 0 ? ` · ${lethalHits} LETHAL` : ''}`;
+    addFeed(lastRailgunLocalFeedbackSummary, 'gold');
+  }
 }
 
 function presentLocalRailgunTrigger(): void {
@@ -8518,10 +8613,14 @@ function presentLocalRailgunTrigger(): void {
   railgunRechamberPresentationActive = true;
 }
 
+function railgunReportEmitter(beam: RailgunBeamAuthority, local: boolean): number | { x: number; y: number; z: number } {
+  return local ? 0 : { x: beam.start[0], y: beam.start[1], z: beam.start[2] };
+}
+
 function presentAuthoritativeRailgunResult(message: RailgunShotResultMessage, local: boolean): boolean {
   const presented = railgunPresentation.presentAcceptedResult(message, performance.now(), local ? 'shooter' : 'peer');
   if (!presented || !message.beam) return false;
-  audio.railgunReport(!local, new THREE.Vector3(...message.beam.start).distanceTo(camera.position));
+  audio.railgunReport(!local, railgunReportEmitter(message.beam, local));
   return true;
 }
 
@@ -8559,6 +8658,13 @@ function resolveRailgunShot(request: RailgunShotRequestMessage): RailgunShotResu
     network.sendToPlayer(request.by, rejected);
     return rejected;
   }
+  const normalized = direction.normalize();
+  const admission = selectRailgunTargets(request.by, remote.snapshot.team, origin, normalized);
+  if (!admission.accepted) {
+    const rejected = railgunResult(request.by, request.generation, request.shotId, 'rejected', 'invalid', [], null);
+    network.sendToPlayer(request.by, rejected);
+    return rejected;
+  }
   const fired = fireRailgun(railgunState, request.by, request.shotId, performance.now());
   if (!fired.accepted) {
     const rejected = railgunResult(request.by, request.generation, request.shotId, 'rejected', fired.reason, [], null);
@@ -8567,11 +8673,21 @@ function resolveRailgunShot(request: RailgunShotRequestMessage): RailgunShotResu
   }
   applyRailgunState(fired.state);
   broadcastRailgunState();
-  const normalized = direction.normalize();
-  const target = selectRailgunTarget(request.by, remote.snapshot.team, origin, normalized);
-  const outcome = target ? applyAuthoritativeRailgunDamage(request.by, target.target, target.distance) : null;
+  const outcomes = admission.targets.flatMap(({ target, distance }) => {
+    const outcome = applyAuthoritativeRailgunDamage(request.by, target, distance);
+    return outcome ? [outcome] : [];
+  });
   const beam = createRailgunBeamAuthority(request.generation, request.shotId, request.origin, normalized.toArray() as [number, number, number]);
-  const result = railgunResult(request.by, request.generation, request.shotId, outcome ? 'accepted-hit' : 'accepted-miss', 'accepted', outcome ? [outcome] : [], beam);
+  const result = railgunResult(
+    request.by,
+    request.generation,
+    request.shotId,
+    outcomes.length > 0 ? 'accepted-hit' : 'accepted-miss',
+    'accepted',
+    outcomes,
+    beam,
+  );
+  lastAuthoritativeRailgunResult = result;
   resolvedRailgunShots.set(cacheKey, result);
   while (resolvedRailgunShots.size > 64) resolvedRailgunShots.delete(resolvedRailgunShots.keys().next().value!);
   const visual: ShotMessage = {
@@ -8595,15 +8711,16 @@ function acceptRailgunShotResult(message: RailgunShotResultMessage): void {
   presentAuthoritativeRailgunResult(message, message.forPlayerId === player.id);
   for (const outcome of message.outcomes) {
     if (outcome.target !== player.id || !player.alive) continue;
-    reconcileLocalAuthoritativeHealth(outcome.resultingHealth, outcome.damage, message.forPlayerId, 1, { kind: 'gun', weapon: 'railgun' });
+    reconcileLocalAuthoritativeHealth(
+      outcome.resultingHealth,
+      outcome.damageRequested,
+      message.forPlayerId,
+      1,
+      { kind: 'gun', weapon: 'railgun' },
+    );
   }
   if (message.forPlayerId !== player.id || message.status !== 'accepted-hit') return;
-  const damage = message.outcomes.reduce((total, outcome) => total + outcome.damage, 0);
-  showHitmarker(false);
-  showDamageNumber(damage, 'body');
-  audio.hit(false);
-  roundHitShots += 1;
-  roundDamageDealt += damage;
+  presentLocalRailgunFeedback(message.outcomes);
 }
 
 function tryFireRailgun(now: number): void {
@@ -8615,6 +8732,8 @@ function tryFireRailgun(now: number): void {
   if (hostNow < Math.max(railgunState.chamberReadyAtHostTimeMs, localRailgunPendingUntilHostTimeMs)) return;
   const origin = camera.getWorldPosition(new THREE.Vector3());
   const direction = camera.getWorldDirection(new THREE.Vector3()).normalize();
+  const hostAdmission = network.role === 'client' ? null : selectRailgunTargets(player.id, player.team, origin, direction);
+  if (hostAdmission && !hostAdmission.accepted) return;
   const shotId = `${localConnectionEpoch}:rail:${localShotSeq++}`;
   railgunAdsResetRequired = true;
   adsHeld = false;
@@ -8637,17 +8756,22 @@ function tryFireRailgun(now: number): void {
   broadcastRailgunState();
   applyInteractiveWorldBallisticTrace(traceWeaponPath(origin, direction, RAILGUN_BEAM_LENGTH_M, 'railgun'), origin, direction, 'railgun');
   applyKillstreakEntityShot(player.id, player.team, origin, [direction], 'railgun', now);
-  const target = selectRailgunTarget(player.id, player.team, origin, direction);
-  const outcome = target ? applyAuthoritativeRailgunDamage(player.id, target.target, target.distance) : null;
-  if (outcome) {
-    showHitmarker(false);
-    showDamageNumber(outcome.damage, 'body', target!.target.health);
-    audio.hit(false);
-    roundHitShots += 1;
-    roundDamageDealt += outcome.damage;
-  }
+  const outcomes = (hostAdmission?.targets ?? []).flatMap(({ target, distance }) => {
+    const outcome = applyAuthoritativeRailgunDamage(player.id, target, distance);
+    return outcome ? [outcome] : [];
+  });
+  presentLocalRailgunFeedback(outcomes);
   const beam = createRailgunBeamAuthority(railgunState.generation, shotId, origin.toArray() as [number, number, number], direction.toArray() as [number, number, number]);
-  const result = railgunResult(player.id, railgunState.generation, shotId, outcome ? 'accepted-hit' : 'accepted-miss', 'accepted', outcome ? [outcome] : [], beam);
+  const result = railgunResult(
+    player.id,
+    railgunState.generation,
+    shotId,
+    outcomes.length > 0 ? 'accepted-hit' : 'accepted-miss',
+    'accepted',
+    outcomes,
+    beam,
+  );
+  lastAuthoritativeRailgunResult = result;
   presentAuthoritativeRailgunResult(result, true);
   if (network.role === 'host') {
     const visual: ShotMessage = {
@@ -9739,6 +9863,7 @@ function applyBotDamage(
   attackerId = player.id,
   evidence?: Readonly<{ wallbang?: boolean; penetrationMultiplier?: number; distanceMeters?: number }>,
   deferPresentation = false,
+  suppressAttackerFeedback = false,
 ): number {
   const now = performance.now();
   if (!bot.alive || now < bot.invulnerableUntil) return 0;
@@ -9760,11 +9885,11 @@ function applyBotDamage(
     distanceMeters: evidence?.distanceMeters,
     reason: bot.id.startsWith('host-bot-') ? 'hosted-bot-authority' : 'solo-bot-authority',
   });
-  if (attackerId === player.id) roundDamageDealt += dealt;
+  if (attackerId === player.id && !suppressAttackerFeedback) roundDamageDealt += dealt;
   if (network.role === 'host') recordAuthoritativeDamage(attackerId, bot.id, dealt);
   else if (attackerId === player.id) addFeed('DAMAGE DONE +' + Math.round(dealt), 'gold', { damageDealt: dealt });
   bot.hp = Math.max(0, bot.hp - damage);
-  if (attackerId === player.id) {
+  if (attackerId === player.id && !suppressAttackerFeedback) {
     showHitmarker(zone === 'head');
     audio.hit(zone === 'head');
   }
@@ -9791,7 +9916,7 @@ function applyBotDamage(
     }
   }
   const afterDeathDrop = performance.now();
-  bot.respawnAt = now + 2_200;
+  bot.respawnAt = railgunQaHeldDeadBots.has(bot.id) ? Number.POSITIVE_INFINITY : now + 2_200;
   bot.deathVisibleUntil = now + 1_050;
   deathOperator(bot.root);
   // The pooled corpse owns the persistent death pose. Keeping the live bot
@@ -15655,6 +15780,12 @@ function resetForMode(): void {
   railgunClaimAudit = createRailgunClaimAudit();
   resolvedRailgunShots.clear();
   processedRailgunShotResults.clear();
+  lastAuthoritativeRailgunResult = null;
+  railgunQaHeldDeadBots.clear();
+  railgunLocalFeedbackPresentations = 0;
+  lastRailgunLocalFeedbackSummary = null;
+  railgunDeathPresentationCount = 0;
+  railgunDeathPresentations.length = 0;
   railgunPresentation.resetBeams();
   railgunPresentation.updateWorld(railgunState, performance.now());
   railgunPresentation.updateThermal(camera, [], false);
@@ -16685,6 +16816,17 @@ const debugWindow = window as Window & {
     activateSupport: (id: FieldSupportId) => void;
     setOverdrive: (mode: 'charging' | 'available' | 'active' | 'expired') => void;
     stageRailgunSpawn: (siteIndex?: number) => RailgunAuthorityState;
+    stageRailgunMultiHitTargets: (shooterId?: string) => {
+      staged: boolean;
+      shooterId: string | null;
+      hostileIds: string[];
+      friendlyId: string | null;
+      distances: number[];
+      health: number[];
+      positions: number[][];
+    };
+    replayLastRailgunResult: () => boolean;
+    grantRailgunToRemote: (playerId: string) => boolean;
     interactRailgun: () => boolean;
     degradeStateChannel: () => boolean;
     endMatch: () => void;
@@ -16743,6 +16885,19 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       thermalVisible: !element<HTMLElement>('#railgun-thermal').hidden,
       presentation: railgunPresentation.telemetry(),
       claimAudit: { ...railgunClaimAudit },
+      localFeedbackPresentations: railgunLocalFeedbackPresentations,
+      lastLocalFeedbackSummary: lastRailgunLocalFeedbackSummary,
+      deathPresentationCount: railgunDeathPresentationCount,
+      deathPresentations: railgunDeathPresentations.map((entry) => ({ ...entry })),
+      lastAuthoritativeResult: localMultiplayerQa && lastAuthoritativeRailgunResult ? {
+        ...lastAuthoritativeRailgunResult,
+        outcomes: lastAuthoritativeRailgunResult.outcomes.map((outcome) => ({ ...outcome })),
+        beam: lastAuthoritativeRailgunResult.beam ? {
+          ...lastAuthoritativeRailgunResult.beam,
+          start: [...lastAuthoritativeRailgunResult.beam.start],
+          end: [...lastAuthoritativeRailgunResult.beam.end],
+        } : null,
+      } : null,
     },
     dmrThermal: {
       ...dmrThermalPresentation.telemetry(),
@@ -16950,9 +17105,12 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     spawnSelection: lastPlayerSpawnAudit ? { ...lastPlayerSpawnAudit } : null,
     bots: [...bots.values()].map((bot) => ({
       id: bot.id,
+      name: bot.name,
+      team: bot.team,
       hp: bot.hp,
       alive: bot.alive,
       kills: bot.kills,
+      deaths: bot.deaths,
       weapon: bot.weapon,
       grenade: bot.grenade,
       nextGrenadeInMs: Math.max(0, bot.nextGrenadeAt - performance.now()),
@@ -17037,12 +17195,17 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     remoteHitAdmission: { ...remoteHitAdmissionTelemetry },
     remotePlayers: [...remotes.values()].map((remote) => ({
       id: remote.snapshot.id,
+      name: remote.snapshot.name,
+      team: remote.snapshot.team,
       hp: remote.snapshot.hp,
       primary: remote.snapshot.primary,
       weapon: remote.snapshot.weapon,
       stance: remote.snapshot.stance ?? 'stand',
       seq: remote.snapshot.seq,
       position: remote.target.toArray(),
+      authoritativePosition: [remote.snapshot.x, remote.snapshot.y, remote.snapshot.z],
+      yaw: remote.snapshot.yaw,
+      pitch: remote.snapshot.pitch,
       renderedHostTimeMs: remote.renderedHostTimeMs,
       renderedWorldAgeMs: remote.renderedWorldAgeMs,
       snapshotBufferDepth: remote.interpolation.depth,
@@ -18385,6 +18548,95 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     applyRailgunState(advanced.state, advanced.announcement !== null);
     broadcastRailgunState();
     return railgunState;
+  },
+  stageRailgunMultiHitTargets: (shooterId = player.id) => {
+    const failed = {
+      staged: false,
+      shooterId: null,
+      hostileIds: [] as string[],
+      friendlyId: null,
+      distances: [] as number[],
+      health: [] as number[],
+      positions: [] as number[][],
+    };
+    if (!localMultiplayerQa || !gameStarted || network.role !== 'host' || privateMatchMode !== 'tdm') return failed;
+    const remoteShooter = shooterId === player.id ? null : remotes.get(shooterId);
+    if (shooterId !== player.id && !remoteShooter) return failed;
+    const shooterTeam = remoteShooter?.snapshot.team ?? player.team;
+    const origin = remoteShooter
+      ? new THREE.Vector3(remoteShooter.snapshot.x, remoteShooter.snapshot.y, remoteShooter.snapshot.z)
+      : camera.getWorldPosition(new THREE.Vector3());
+    const yaw = remoteShooter?.snapshot.yaw ?? player.yaw;
+    const pitch = remoteShooter?.snapshot.pitch ?? player.pitch;
+    const direction = new THREE.Vector3(
+      -Math.sin(yaw) * Math.cos(pitch),
+      Math.sin(pitch),
+      -Math.cos(yaw) * Math.cos(pitch),
+    ).normalize();
+    const stagedBots = [...bots.values()].filter((bot) => bot.id.startsWith('host-bot-')).slice(0, 4);
+    if (stagedBots.length !== 4 || Math.abs(direction.y) > 0.05) return failed;
+    const distances = [12, 22, 32, 42] as const;
+    const health = [100, 40, 10, 100] as const;
+    const hostileTeam: Team = shooterTeam === 0 ? 1 : 0;
+    const now = performance.now();
+    railgunQaHeldDeadBots.clear();
+    for (const [index, bot] of stagedBots.entries()) {
+      const centre = origin.clone().addScaledVector(direction, distances[index]);
+      bot.team = index < 3 ? hostileTeam : shooterTeam;
+      bot.position.set(centre.x, 0, centre.z);
+      bot.velocity.set(0, 0, 0);
+      bot.hp = health[index];
+      bot.alive = true;
+      bot.invulnerableUntil = 0;
+      bot.respawnAt = 0;
+      bot.deathVisibleUntil = 0;
+      bot.lastSightAt = 0;
+      bot.hasLineOfSight = false;
+      bot.sightStartedAt = 0;
+      bot.burstShots = 0;
+      bot.nextDecisionAt = 0;
+      bot.nextGrenadeAt = now + 60_000;
+      bot.grenadeActive = false;
+      bot.continuity += 1;
+      bot.positionHistory = [{
+        at: currentHostTimeMs(), x: bot.position.x, y: bot.position.y + 1.7, z: bot.position.z,
+        yaw: operatorYawToward(bot.position, origin), stance: 'stand', continuity: bot.continuity,
+      }];
+      bot.root.position.copy(bot.position);
+      bot.root.rotation.set(0, operatorYawToward(bot.position, origin), 0);
+      bot.root.scale.setScalar(1);
+      bot.root.visible = true;
+      resetOperator(bot.root);
+      poseOperator(bot.root, 'stand', 0, now * 0.001);
+      bot.root.updateMatrixWorld(true);
+      if (index < 3) railgunQaHeldDeadBots.add(bot.id);
+    }
+    botsFrozen = true;
+    broadcastHostedBotState();
+    return {
+      staged: true,
+      shooterId,
+      hostileIds: stagedBots.slice(0, 3).map((bot) => bot.id),
+      friendlyId: stagedBots[3].id,
+      distances: [...distances],
+      health: [...health],
+      positions: stagedBots.map((bot) => bot.position.toArray()),
+    };
+  },
+  replayLastRailgunResult: () => {
+    if (!localMultiplayerQa || network.role !== 'host' || !lastAuthoritativeRailgunResult) return false;
+    network.send(lastAuthoritativeRailgunResult);
+    return true;
+  },
+  grantRailgunToRemote: (playerId) => {
+    if (!localMultiplayerQa || network.role !== 'host' || !remotes.has(playerId)) return false;
+    const health = remoteHealthAuthorities.get(playerId);
+    if (!health?.alive) return false;
+    const claimed = claimRailgun(railgunState, playerId, railgunState.generation);
+    if (!claimed.accepted) return false;
+    applyRailgunState(claimed.state);
+    broadcastRailgunState();
+    return true;
   },
   interactRailgun: () => interactWithRailgunPickup(),
   degradeStateChannel: () => localMultiplayerQa && network.degradeStateChannelForQa(),

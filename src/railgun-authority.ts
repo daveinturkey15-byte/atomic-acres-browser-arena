@@ -8,6 +8,10 @@ export const RAILGUN_TOTAL_ROUNDS = 8;
 export const RAILGUN_PROCESSED_SHOT_LIMIT = 64;
 export const RAILGUN_STATE_RESYNC_MS = 1_000;
 export const RAILGUN_BEAM_LENGTH_M = 180;
+/** Six lobby players plus four hosted bots leaves at most nine non-shooter actors. */
+export const RAILGUN_MAX_TARGET_OUTCOMES = 9;
+export const RAILGUN_TARGET_RADIUS_M = 0.62;
+export const RAILGUN_TARGET_HALF_HEIGHT_M = 0.78;
 
 export type RailgunSpawnSite = Readonly<{
   id: 'aqua-front' | 'aqua-rear' | 'coral-front' | 'coral-rear';
@@ -262,11 +266,86 @@ export type RailgunStateMessage = Readonly<{
 
 export type RailgunShotOutcome = Readonly<{
   target: string;
-  damage: number;
+  damageRequested: typeof RAILGUN_DAMAGE;
+  damageApplied: number;
   resultingHealth: number;
   died: boolean;
   distanceMeters: number;
 }>;
+
+export type RailgunTargetCandidate = Readonly<{
+  target: string;
+  position: readonly [number, number, number];
+  alive: boolean;
+  hostile: boolean;
+}>;
+
+export type RailgunTargetAdmission = Readonly<{
+  target: string;
+  distanceMeters: number;
+}>;
+
+export type RailgunTargetAdmissionResult = Readonly<{
+  accepted: boolean;
+  reason: 'accepted' | 'invalid-ray' | 'invalid-candidate' | 'duplicate-candidate' | 'candidate-cap';
+  targets: readonly RailgunTargetAdmission[];
+}>;
+
+/**
+ * Host-only geometric oracle for the map-spanning shot. The caller supplies
+ * current-life hostility; this function owns ray admission and deterministic
+ * near-to-far ordering. Invalid or over-cap actor sets fail closed.
+ */
+export function admitRailgunTargets(
+  origin: readonly [number, number, number],
+  direction: readonly [number, number, number],
+  candidates: readonly RailgunTargetCandidate[],
+): RailgunTargetAdmissionResult {
+  if (!isVector3(origin) || !isVector3(direction)) {
+    return Object.freeze({ accepted: false, reason: 'invalid-ray', targets: Object.freeze([]) });
+  }
+  const magnitude = Math.hypot(direction[0], direction[1], direction[2]);
+  if (magnitude < 0.96 || magnitude > 1.04) {
+    return Object.freeze({ accepted: false, reason: 'invalid-ray', targets: Object.freeze([]) });
+  }
+  if (candidates.length > RAILGUN_MAX_TARGET_OUTCOMES) {
+    return Object.freeze({ accepted: false, reason: 'candidate-cap', targets: Object.freeze([]) });
+  }
+  const ids = new Set<string>();
+  for (const candidate of candidates) {
+    if (!validPlayerId(candidate.target) || !isVector3(candidate.position)
+      || typeof candidate.alive !== 'boolean' || typeof candidate.hostile !== 'boolean') {
+      return Object.freeze({ accepted: false, reason: 'invalid-candidate', targets: Object.freeze([]) });
+    }
+    if (ids.has(candidate.target)) {
+      return Object.freeze({ accepted: false, reason: 'duplicate-candidate', targets: Object.freeze([]) });
+    }
+    ids.add(candidate.target);
+  }
+  const normalized = [direction[0] / magnitude, direction[1] / magnitude, direction[2] / magnitude] as const;
+  const radiusSquared = RAILGUN_TARGET_RADIUS_M * RAILGUN_TARGET_RADIUS_M;
+  const targets = candidates.flatMap((candidate): RailgunTargetAdmission[] => {
+    if (!candidate.alive || !candidate.hostile) return [];
+    const deltaX = candidate.position[0] - origin[0];
+    const deltaY = candidate.position[1] - origin[1];
+    const deltaZ = candidate.position[2] - origin[2];
+    const distanceMeters = deltaX * normalized[0] + deltaY * normalized[1] + deltaZ * normalized[2];
+    if (distanceMeters < 0.1 || distanceMeters > RAILGUN_BEAM_LENGTH_M) return [];
+    const closestX = origin[0] + normalized[0] * distanceMeters;
+    const closestY = origin[1] + normalized[1] * distanceMeters;
+    const closestZ = origin[2] + normalized[2] * distanceMeters;
+    const verticalExcess = Math.max(0, Math.abs(candidate.position[1] - closestY) - RAILGUN_TARGET_HALF_HEIGHT_M);
+    const offRaySquared = (candidate.position[0] - closestX) ** 2
+      + verticalExcess ** 2
+      + (candidate.position[2] - closestZ) ** 2;
+    return offRaySquared <= radiusSquared ? [{ target: candidate.target, distanceMeters }] : [];
+  }).sort((left, right) => left.distanceMeters - right.distanceMeters || left.target.localeCompare(right.target));
+  return Object.freeze({
+    accepted: true,
+    reason: 'accepted',
+    targets: Object.freeze(targets.map((target) => Object.freeze(target))),
+  });
+}
 
 export type RailgunBeamAuthority = Readonly<{
   generation: number;
@@ -380,16 +459,32 @@ export function isRailgunProtocolMessage(value: unknown, protocolVersion: number
         ? message.reason === 'accepted' && isRailgunBeamAuthority(beam)
           && beam.generation === message.generation && beam.shotId === message.shotId
         : message.reason !== 'accepted' && beam === null)
-      && Array.isArray(outcomes) && outcomes.length <= 1
-      && (message.status === 'accepted-hit' ? outcomes.length === 1 : outcomes.length === 0)
+      && Array.isArray(outcomes) && outcomes.length <= RAILGUN_MAX_TARGET_OUTCOMES
+      && (message.status === 'accepted-hit' ? outcomes.length >= 1 : outcomes.length === 0)
+      && new Set(outcomes.map((outcome) => outcome && typeof outcome === 'object'
+        ? (outcome as Partial<RailgunShotOutcome>).target : null)).size === outcomes.length
       && outcomes.every((outcome) => {
         if (!outcome || typeof outcome !== 'object') return false;
         const candidate = outcome as Partial<RailgunShotOutcome>;
-        return typeof candidate.target === 'string' && validPlayerId(candidate.target)
-          && Number.isFinite(candidate.damage) && Number(candidate.damage) >= 0 && Number(candidate.damage) <= RAILGUN_DAMAGE
+        return Object.keys(outcome).length === 6
+          && Object.keys(outcome).every((key) => key === 'target' || key === 'damageRequested' || key === 'damageApplied'
+            || key === 'resultingHealth' || key === 'died' || key === 'distanceMeters')
+          && typeof candidate.target === 'string' && validPlayerId(candidate.target)
+          && candidate.target !== message.forPlayerId
+          && candidate.damageRequested === RAILGUN_DAMAGE
+          && Number.isFinite(candidate.damageApplied) && Number(candidate.damageApplied) > 0
+          && Number(candidate.damageApplied) <= RAILGUN_DAMAGE
           && Number.isFinite(candidate.resultingHealth) && Number(candidate.resultingHealth) >= 0 && Number(candidate.resultingHealth) <= 100
-          && typeof candidate.died === 'boolean'
-          && Number.isFinite(candidate.distanceMeters) && Number(candidate.distanceMeters) >= 0 && Number(candidate.distanceMeters) <= 512;
+          && typeof candidate.died === 'boolean' && candidate.died === (candidate.resultingHealth === 0)
+          && Number.isFinite(candidate.distanceMeters) && Number(candidate.distanceMeters) >= 0.1
+          && Number(candidate.distanceMeters) <= RAILGUN_BEAM_LENGTH_M;
+      })
+      && outcomes.every((outcome, index) => {
+        if (index === 0) return true;
+        const previous = outcomes[index - 1] as RailgunShotOutcome;
+        const current = outcome as RailgunShotOutcome;
+        return current.distanceMeters > previous.distanceMeters
+          || current.distanceMeters === previous.distanceMeters && current.target.localeCompare(previous.target) > 0;
       });
   }
   return message.type === 'railgun-state' && isRailgunAuthorityState(message.state);
