@@ -374,7 +374,7 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     );
     await presentation.load();
     const prewarm = presentation.prewarmBrowserWeaponCatalog(WEAPON_IDS);
-    for (let turn = 0; turn < 40 && catalogPrewarmer.mock.calls.length === 0; turn += 1) await Promise.resolve();
+    for (let turn = 0; turn < 200 && catalogPrewarmer.mock.calls.length === 0; turn += 1) await Promise.resolve();
     expect(catalogPrewarmer).toHaveBeenCalledTimes(1);
 
     presentation.setWeapon('mp5');

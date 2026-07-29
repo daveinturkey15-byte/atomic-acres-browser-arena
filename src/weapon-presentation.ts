@@ -266,6 +266,7 @@ export class WeaponPresentation {
     newlyCreated: number;
     assetLoadMs: number;
     modelCreateMs: number;
+    assetPrepareWallMs: number;
     gpuPrewarmMs: number;
     cleanupMs: number;
     totalMs: number;
@@ -978,7 +979,13 @@ export class WeaponPresentation {
     let assetLoadMs = 0;
     let modelCreateMs = 0;
     let newlyCreated = 0;
+    const assetPrepareStartedAt = performance.now();
     const entries: WeaponViewmodelCatalogGpuPrewarmEntry[] = [];
+    // Load then immediately acquire each cache-backed clone. A wider decode
+    // burst can exceed the two-source soft cache before awaiting owners acquire
+    // refs, evicting a just-decoded source. Keep this atomic ownership boundary
+    // serial; native profiling shows GPU preparation, not this subsecond phase,
+    // dominates cold admission.
     for (const id of ids) {
       const assetLoadStartedAt = performance.now();
       await loadPass65WeaponPresentation(id, 'first-person');
@@ -999,6 +1006,7 @@ export class WeaponPresentation {
       entries.push(Object.freeze({ weaponId: id, model }));
       modelCreateMs += performance.now() - modelCreateStartedAt;
     }
+    const assetPrepareWallMs = performance.now() - assetPrepareStartedAt;
 
     const gpuPrewarmStartedAt = performance.now();
     if (this.catalogGpuPrewarmer) {
@@ -1075,6 +1083,7 @@ export class WeaponPresentation {
       newlyCreated,
       assetLoadMs: Number(assetLoadMs.toFixed(3)),
       modelCreateMs: Number(modelCreateMs.toFixed(3)),
+      assetPrepareWallMs: Number(assetPrepareWallMs.toFixed(3)),
       gpuPrewarmMs: Number(gpuPrewarmMs.toFixed(3)),
       cleanupMs: Number((performance.now() - cleanupStartedAt).toFixed(3)),
       totalMs: Number((performance.now() - prewarmStartedAt).toFixed(3)),
