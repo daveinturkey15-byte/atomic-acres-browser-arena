@@ -102,6 +102,7 @@ export function createTacticalPolicy(options = {}) {
     lastConfirmedTargetAt: Number.NEGATIVE_INFINITY,
     contactSearchFrames: 0,
     minimapGuidedContactSearchFrames: 0,
+    coverEngagementSuppressedFrames: 0,
     modeFrames: { roam: 0, engage: 0, retreat: 0, recover: 0, bank: 0, anchor: 0 },
   };
 
@@ -322,6 +323,11 @@ export function createTacticalPolicy(options = {}) {
         && Boolean(observation.currentTarget)
         && healthValid
         && health >= config.retreatReturnFireMinimumHealth;
+      const coverEngagementAllowed = coverDecision.active && Boolean(observation.currentTarget)
+        && (nextMode === 'cover-peek' || nextMode === 'cover-hold');
+      if (coverDecision.active && observation.currentTarget && !coverEngagementAllowed) {
+        state.coverEngagementSuppressedFrames += 1;
+      }
       if (retreatReturnFire) state.retreatReturnFireFrames += 1;
       const keys = [];
       let turn = 0;
@@ -404,7 +410,7 @@ export function createTacticalPolicy(options = {}) {
         changed,
         keys: [...new Set(keys)],
         turn: clamp(turn, -100, 100),
-        allowEngagement: nextMode === 'engage' || retreatReturnFire || (coverDecision.active && Boolean(observation.currentTarget)),
+        allowEngagement: nextMode === 'engage' || retreatReturnFire || coverEngagementAllowed,
         allowScan: coverDecision.active
           ? coverDecision.allowScan
           : nextMode === 'roam' || nextMode === 'engage' || nextMode === 'bank' || nextMode === 'anchor' || retreatReturnFire,
@@ -440,6 +446,7 @@ export function createTacticalPolicy(options = {}) {
         retreatReturnFireFrames: state.retreatReturnFireFrames,
         contactSearchFrames: state.contactSearchFrames,
         minimapGuidedContactSearchFrames: state.minimapGuidedContactSearchFrames,
+        coverEngagementSuppressedFrames: state.coverEngagementSuppressedFrames,
         renderedCover: coverController.snapshot(),
         config: { ...config },
       };

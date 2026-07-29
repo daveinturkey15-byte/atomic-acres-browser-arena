@@ -171,7 +171,9 @@ test('rendered cover overrides scalar retreat only after damage and preserves vi
   });
   assert.equal(probe.mode, 'cover-probe');
   assert.deepEqual(probe.keys, ['KeyD', 'ShiftLeft']);
+  assert.equal(probe.allowEngagement, false);
   assert.equal(probe.coverEvent.kind, 'activate');
+  assert.equal(policy.snapshot().coverEngagementSuppressedFrames, 1);
 
   policy.update({ now: 300, active: true, health: 88, healthFresh: true, movementCycle: 1, renderedCoverCues: coverCues, frameWidth: 320 });
   const hold = policy.update({ now: 700, active: true, health: 88, healthFresh: true, movementCycle: 2, renderedCoverCues: coverCues, frameWidth: 320 });

@@ -1735,6 +1735,7 @@ async function run() {
         retreatReturnFireFrames: tacticalPolicyReceipt?.retreatReturnFireFrames ?? 0,
         contactSearchFrames: tacticalPolicyReceipt?.contactSearchFrames ?? 0,
         minimapGuidedContactSearchFrames: tacticalPolicyReceipt?.minimapGuidedContactSearchFrames ?? 0,
+        coverEngagementSuppressedFrames: tacticalPolicyReceipt?.coverEngagementSuppressedFrames ?? 0,
         renderedCoverActivations: tacticalPolicyReceipt?.renderedCover?.activations ?? 0,
         renderedCoverAcquisitions: tacticalPolicyReceipt?.renderedCover?.acquisitions ?? 0,
         renderedCoverProbeReversals: tacticalPolicyReceipt?.renderedCover?.probeReversals ?? 0,
