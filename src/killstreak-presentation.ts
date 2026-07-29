@@ -18,7 +18,7 @@ const BOMB_SHELL_ALTITUDE = 20;
 const EMBER_GRAVITY_MPS2 = 11.25;
 const MAX_SENSOR_CONTACTS = 16;
 const MAX_PLACEMENT_MARKERS = 8;
-const PREWARM_STATE_ROOTS_PER_TASK = 12;
+const PREWARM_STATE_ROOTS_PER_TASK = 4;
 
 async function yieldPresentationPreparation(): Promise<void> {
   await new Promise<void>((resolve) => {
@@ -28,6 +28,10 @@ async function yieldPresentationPreparation(): Promise<void> {
       globalThis.setTimeout(resolve, 0);
     }
   });
+}
+
+async function yieldPresentationCpuTask(): Promise<void> {
+  await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 0));
 }
 
 export const HUNTER_DRONE_ASSET = './assets/original/models/support/hunter-drone-lod0.glb';
@@ -1590,7 +1594,7 @@ export class KillstreakPresentation {
       const pool: PresentedEntity[] = [];
       for (let index = 0; index < capacity; index += 1) {
         pool.push(this.installPrewarmedPoolEntry(key, index));
-        await yieldPresentationPreparation();
+        await yieldPresentationCpuTask();
       }
       this.entityPools.set(key, pool);
     }
@@ -1981,7 +1985,7 @@ export class KillstreakPresentation {
       if (typeof document !== 'undefined'
         && (stagedRootIndex + 1) % PREWARM_STATE_ROOTS_PER_TASK === 0
         && stagedRootIndex + 1 < stagedRoots.length) {
-        await yieldPresentationPreparation();
+        await yieldPresentationCpuTask();
       }
     }
 
@@ -2096,7 +2100,7 @@ export class KillstreakPresentation {
         if (typeof document !== 'undefined'
           && (stagedRootIndex + 1) % PREWARM_STATE_ROOTS_PER_TASK === 0
           && stagedRootIndex + 1 < stagedRoots.length) {
-          await yieldPresentationPreparation();
+          await yieldPresentationCpuTask();
         }
       }
       for (const [node, transform] of animatedNodeTransforms) {

@@ -476,7 +476,7 @@ import {
 } from './interactive-world-protocol';
 import { TracerPool } from './tracer-pool';
 import { AsyncSerialQueue } from './async-serial-queue';
-import { loadRiggedOperatorAsset, riggedOperatorAssetReady, riggedOperatorTelemetry } from './operator-model';
+import { RIGGED_OPERATOR_CORPSE_ACTION_NAMES, loadRiggedOperatorAsset, prewarmRiggedOperatorActions, riggedOperatorAssetReady, riggedOperatorTelemetry } from './operator-model';
 import {
   WeaponPresentation,
   type WeaponViewmodelCatalogGpuPrewarmer,
@@ -7368,6 +7368,7 @@ async function ensureCorpsePresentationPool(): Promise<void> {
   for (const team of [0, 1] as const) {
     for (let index = 0; index < CORPSE_POOL_CAPACITY_PER_TEAM; index += 1) {
       const root = buildOperator(team, 'prewarmed-fallen-operator', flattenOperatorMaterials, 'carbine');
+      await prewarmRiggedOperatorActions(root, RIGGED_OPERATOR_CORPSE_ACTION_NAMES);
       prepareCorpsePresentationRoot(root);
       root.visible = false;
       scene.add(root);
@@ -9687,6 +9688,9 @@ async function spawnBots(hostedCount?: HostedBotCount): Promise<void> {
   dormantBotsPrewarmed = false;
   for (let index = 0; index < activeCount; index += 1) {
     spawnBot(index, hostedCount !== undefined);
+    const id = hostedCount !== undefined ? `host-bot-${index}` : `bot-${index}`;
+    const bot = bots.get(id);
+    if (bot) await prewarmRiggedOperatorActions(bot.root);
     await yieldDeploymentPrewarmFrame();
   }
   if (hostedCount !== undefined) {
@@ -9702,6 +9706,7 @@ async function spawnBots(hostedCount?: HostedBotCount): Promise<void> {
   for (let index = selectedArena.soloBotCount; index < selectedArena.maximumSoloBots; index += 1) {
     spawnBot(index, false, true);
     const bot = bots.get(`bot-${index}`)!;
+    await prewarmRiggedOperatorActions(bot.root);
     bots.delete(bot.id);
     bot.alive = false;
     bot.root.visible = false;

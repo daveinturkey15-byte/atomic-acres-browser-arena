@@ -9,7 +9,7 @@ export const FRAG_GRENADE_MAX_DIMENSION = 0.46;
 export const SEMTEX_BUNDLE_ASSET = './assets/original/models/ordnance/semtex-bundle-lod0.glb';
 export const SEMTEX_BUNDLE_MAX_DIMENSION = 0.58;
 export const GRENADE_WORLD_PRESENTATION_POOL_CAPACITY_PER_FAMILY = 24;
-export const GRENADE_WORLD_PRESENTATION_BUILD_BATCH_SIZE = 6;
+export const GRENADE_WORLD_PRESENTATION_BUILD_BATCH_SIZE = 2;
 
 export type GrenadePresentationFamily = 'frag' | 'semtex';
 
@@ -285,10 +285,7 @@ export class GrenadeWorldPresentationPool {
         if (typeof document !== 'undefined'
           && built % GRENADE_WORLD_PRESENTATION_BUILD_BATCH_SIZE === 0
           && built < this.capacityPerFamily * 2) {
-          await new Promise<void>((resolve) => {
-            if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => resolve());
-            else globalThis.setTimeout(resolve, 0);
-          });
+          await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 0));
         }
       }
     }

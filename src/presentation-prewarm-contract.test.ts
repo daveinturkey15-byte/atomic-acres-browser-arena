@@ -219,17 +219,23 @@ describe('presentation prewarm startup contract', () => {
   it('yields cold pool construction, vocabulary state walks and fenced retirement cleanup', () => {
     const grenadeSource = readFileSync(new URL('./grenade-presentation.ts', import.meta.url), 'utf8');
     const killstreakSource = readFileSync(new URL('./killstreak-presentation.ts', import.meta.url), 'utf8');
+    const operatorSource = readFileSync(new URL('./operator-model.ts', import.meta.url), 'utf8');
     const runtimeSource = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
     const retirementDrain = runtimeSource.slice(
       runtimeSource.indexOf('async function drainDeferredGpuRetirements()'),
       runtimeSource.indexOf('function scheduleDeferredGpuRetirement('),
     );
 
-    expect(grenadeSource).toContain('GRENADE_WORLD_PRESENTATION_BUILD_BATCH_SIZE = 6');
+    expect(grenadeSource).toContain('GRENADE_WORLD_PRESENTATION_BUILD_BATCH_SIZE = 2');
     expect(grenadeSource).toContain('await this.ensureInitializedBatched();');
     expect(grenadeSource).toContain('built % GRENADE_WORLD_PRESENTATION_BUILD_BATCH_SIZE === 0');
-    expect(killstreakSource).toContain('PREWARM_STATE_ROOTS_PER_TASK = 12');
+    expect(killstreakSource).toContain('PREWARM_STATE_ROOTS_PER_TASK = 4');
+    expect(killstreakSource).toContain('await yieldPresentationCpuTask();');
     expect(killstreakSource.match(/await yieldPresentationPreparation\(\);/g)?.length ?? 0).toBeGreaterThan(4);
+    expect(operatorSource).toContain('RIGGED_OPERATOR_ACTIONS_PER_TASK = 2');
+    expect(operatorSource).toContain('performRiggedOperatorActionPrewarm(runtimeState, actionNames)');
+    expect(operatorSource).not.toContain('for (const clip of operatorAsset.clips) actions.set');
+    expect(runtimeSource.match(/await prewarmRiggedOperatorActions\(/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
     expect(retirementDrain).toContain('for (const [retirementIndex, retirement] of batch.entries())');
     expect(retirementDrain).toContain('await yieldDeferredGpuRetirementTask();');
   });

@@ -2,10 +2,12 @@ import * as THREE from 'three';
 import { describe, expect, it, vi } from 'vitest';
 import {
   BOT_EMISSIVE_BRIGHTNESS_SCALE,
+  RIGGED_OPERATOR_RUNTIME_ACTION_NAMES,
   applyBotEmissiveBrightness,
   createOperatorInstanceMaterialResolver,
   isEmbeddedWeaponObjectName,
   riggedStanceTarget,
+  riggedOperatorRuntimeClips,
   suppressEmbeddedWeaponObjects,
 } from './operator-model';
 
@@ -71,5 +73,20 @@ describe('rigged operator presentation contract', () => {
     secondOwnerMaterial.addEventListener('dispose', secondOwnerDisposed);
     firstMeshMaterial.dispose();
     expect(secondOwnerDisposed).not.toHaveBeenCalled();
+  });
+
+  it('admits only controller-reachable authored clips in deterministic prewarm order', () => {
+    const authored = [
+      new THREE.AnimationClip('Wave', 1, []),
+      ...[...RIGGED_OPERATOR_RUNTIME_ACTION_NAMES].reverse().map((name) => new THREE.AnimationClip(name, 1, [])),
+      new THREE.AnimationClip('Roll', 1, []),
+    ];
+
+    const runtimeClips = riggedOperatorRuntimeClips(authored);
+    expect(runtimeClips.map((clip) => clip.name)).toEqual(RIGGED_OPERATOR_RUNTIME_ACTION_NAMES);
+    expect(runtimeClips).toHaveLength(12);
+    expect(runtimeClips).not.toContain(authored[0]);
+    expect(runtimeClips).not.toContain(authored.at(-1));
+    expect(runtimeClips.every((clip) => authored.includes(clip))).toBe(true);
   });
 });
