@@ -117,11 +117,11 @@
     "placeholderStatus": "forbidden-and-not-present",
     "sourceBlend": {
       "path": "source-assets/blender/pass65-first-person-operator-arms.blend",
-      "sha256": "971e738e71c85326e975d75facddd462450799f0ddca1ddf8ad8861049f91a4e"
+      "sha256": "3b97e7e256c15d7a9437e0a2e3c86e7d1ddd1c3765b91678884786315aefe08d"
     },
     "sourceScript": {
       "path": "scripts/blender/build-pass65-djmaesen-first-person-arms.py",
-      "sha256": "9105a624cd5f32b264b06b9abc1f4f8febbcce65c1c476b0575dbac58bc4d5d6"
+      "sha256": "8946d81748ba0b2c26dc4c552661001ea1c19e307e0761f0ce460c72d5d41f04"
     },
     "firstPersonGlbs": [
       {
@@ -183,7 +183,7 @@
     },
     "provenance": {
       "path": "source-assets/blender/pass65-first-person-operator-arms.provenance.json",
-      "sha256": "1d99c8feb8f758131a4ab987b0b05ceff094f2437d9b2daa4c977a679521560d"
+      "sha256": "b1d368f674d9c491dc31d3131ac157de66e04711a2ef75368f388d8222808888"
     },
     "bones": [
       "Root",
@@ -267,49 +267,49 @@
       "renders": [
         {
           "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-pistol-hip.png",
-          "sha256": "5eef4156b412eaa5ff83845c53cf7a9843066654ff82785939cbadc6603b66c3",
+          "sha256": "6f85aa305657ae03dc5197e93f15663923a336da2e4073ca886e639d1531a363",
           "width": 960,
           "height": 540,
           "cameraId": "pistol-hip"
         },
         {
           "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-mp5-hip.png",
-          "sha256": "4a0c6de725d12b965a96675af454ef9ff3eb79883dd6b2b32c0ad33ecd2b1a7d",
+          "sha256": "f2bf8fbcdf1a433f2182224f3a147576cbafddeedf99a9779e69ccf753e539b3",
           "width": 960,
           "height": 540,
           "cameraId": "mp5-hip"
         },
         {
           "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-m4a1-hip.png",
-          "sha256": "94ae65bd5f3b8ef5bf0c543e3596ddcc915aaac5afee4fb9a7fccf84ae1d4b10",
+          "sha256": "6216483405ec641ff248aa375b55ff5ad5aef8614c0d3fb0cbcb67af30d277a7",
           "width": 960,
           "height": 540,
           "cameraId": "m4a1-hip"
         },
         {
           "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-m4a1-grip-oblique.png",
-          "sha256": "d6966bfe15b19e39b1d154f8210c2256dd8a93d32278815651e66e69df174be1",
+          "sha256": "58b0a3ab54c1e53812e4de290d5c99da85c33f6f6ec2b80d7fe262709ba0a866",
           "width": 960,
           "height": 540,
           "cameraId": "m4a1-grip-oblique"
         },
         {
           "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-m4a1-ads.png",
-          "sha256": "a2e83e7326625ba456cef9ab9007c2b41936066de0343828f18954298249e1b9",
+          "sha256": "1fa06e305ef445004450a766bf188f1e714a07dfe40463a10ea5036699981dbb",
           "width": 960,
           "height": 540,
           "cameraId": "m4a1-ads"
         },
         {
           "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-m4a1-reload.png",
-          "sha256": "d4cd4d562a3fd89d814f7f2b5e655f3178d72a741fc570e853fd03c8c647cf66",
+          "sha256": "7a020ac9f6a3c5f6dbd493afd9ea7e803fd748e05a40bf3fa45384503f714cd9",
           "width": 960,
           "height": 540,
           "cameraId": "m4a1-reload"
         },
         {
           "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-knife-contact.png",
-          "sha256": "d573a6cafb1266a49fff50dc109137cb1981ed52181a640ef8420fbbeceaa6a0",
+          "sha256": "197ff22fb1af2b36efe2e60828b6962ec5c472cf1cee3efcd57da6d93502af99",
           "width": 960,
           "height": 540,
           "cameraId": "knife-contact"
@@ -323,7 +323,7 @@
       },
       "contactReceipt": {
         "path": "source-assets/blender/pass65-first-person-operator-arms-contact-receipt.json",
-        "sha256": "7e15220d7a2971e7f6a247cac4062c916fee08ee6293412227e7a0e417798c41"
+        "sha256": "2c8fe7c04bfac7a66d6a13ff21f0154984a38fb33520857c62db836cedb7a439"
       }
     },
     "technicalAudit": {

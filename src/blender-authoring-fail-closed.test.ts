@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -40,5 +41,18 @@ describe('Blender authoring process contract', () => {
       expect(args[exitCodeIndex + 1]).toBe('1');
       expect(exitCodeIndex).toBeLessThan(pythonIndex);
     }
+  });
+
+  it('pins the hashed operator-arms contact receipt to LF bytes', () => {
+    const repository = path.resolve(import.meta.dirname, '..');
+    const runner = readFileSync(path.join(repository, 'scripts/blender/run-authoring.mjs'), 'utf8');
+    const builder = readFileSync(
+      path.join(repository, 'scripts/blender/build-pass65-djmaesen-first-person-arms.py'),
+      'utf8',
+    );
+
+    expect(runner).toContain("assertLfOnly(`${reviews}/weapon-contact-receipt.json`");
+    expect(runner).toContain('bytes.includes(13)');
+    expect(builder).toContain('newline="\\n"');
   });
 });

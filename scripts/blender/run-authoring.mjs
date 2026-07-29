@@ -5,6 +5,7 @@ import path from 'node:path';
 const target = process.argv[2];
 const npxCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 const env = { ...process.env, PYTHONHASHSEED: '0' };
+const dryRun = process.env.AUTHORING_DRY_RUN === '1';
 const blenderCandidates = [
   process.env.BLENDER_EXECUTABLE,
   'C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe',
@@ -21,7 +22,7 @@ function run(command, args) {
   const runArgs = pythonFlagIndex >= 0 && !args.includes('--python-exit-code')
     ? [...args.slice(0, pythonFlagIndex), '--python-exit-code', '1', ...args.slice(pythonFlagIndex)]
     : args;
-  if (process.env.AUTHORING_DRY_RUN === '1') {
+  if (dryRun) {
     console.log(JSON.stringify({ command, args: runArgs, pythonHashSeed: env.PYTHONHASHSEED }));
     return;
   }
@@ -54,6 +55,13 @@ function runBlenderPython(script) {
   ]);
 }
 
+function assertLfOnly(pathname, label) {
+  const bytes = readFileSync(pathname);
+  if (bytes.includes(13)) {
+    throw new Error(`${label} must use canonical LF line endings: ${pathname}`);
+  }
+}
+
 function authorCrossbow() {
   mkdirSync('public/assets/original/models/weapons/pass65-crossbow', { recursive: true });
   runBlenderPython('scripts/blender/create-pass65-explosive-crossbow.py');
@@ -80,6 +88,9 @@ function authorOperatorArms() {
     run(process.execPath, [gltfTransformCli, 'copy', source, `${reviewWeapons}/${id}-uncompressed.glb`]);
   }
   runBlenderPython('scripts/blender/build-pass65-djmaesen-first-person-arms.py');
+  if (!dryRun) {
+    assertLfOnly(`${reviews}/weapon-contact-receipt.json`, 'Operator-arms contact receipt');
+  }
   for (const lod of [0, 1]) optimizeGlb(
     `${raw}/pass65-first-person-arms-lod${lod}.glb`,
     `public/assets/original/models/operators/pass65-first-person-arms-lod${lod}.glb`,

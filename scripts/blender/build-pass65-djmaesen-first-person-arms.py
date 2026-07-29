@@ -2683,10 +2683,15 @@ def render_contact_sheet(root, armature, batches):
         "violations": violations,
         "verdict": "pass" if not violations else "fail",
     }
-    (REVIEW_DIR / "weapon-contact-receipt.json").write_text(
-        json.dumps(receipt, indent=2) + "\n",
+    # Pin LF bytes across platforms because this receipt is hashed into the
+    # checked-in asset manifest. Windows text mode would otherwise emit CRLF,
+    # while Git's JSON attributes canonicalize the committed copy to LF.
+    with (REVIEW_DIR / "weapon-contact-receipt.json").open(
+        "w",
         encoding="utf-8",
-    )
+        newline="\n",
+    ) as receipt_file:
+        receipt_file.write(json.dumps(receipt, indent=2) + "\n")
     compose_contact_sheet(rendered, "pass65-djmaesen-arms-weapon-contact-sheet.png")
     for track in armature.animation_data.nla_tracks:
         track.mute = False
