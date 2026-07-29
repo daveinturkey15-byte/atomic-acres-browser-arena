@@ -30,6 +30,14 @@ describe('pooled impact presentation', () => {
     expect(presentation.marks.parent).toBe(presentation.root);
     expect(presentation.marks.instanceColor).not.toBeNull();
     expect((presentation.points.material as THREE.PointsMaterial).map?.name).toBe('pass62-procedural-impact-particle');
+    const particlePositions = presentation.points.geometry.getAttribute('position');
+    const particleUvs = presentation.points.geometry.getAttribute('uv');
+    expect(particleUvs).toBeDefined();
+    expect(particleUvs.itemSize).toBe(2);
+    expect(particleUvs.count).toBe(particlePositions.count);
+    expect(Array.from(particleUvs.array)).toEqual(
+      Array.from({ length: MAX_IMPACT_PARTICLES * 2 }, () => 0.5),
+    );
     expect((presentation.marks.material as THREE.MeshBasicMaterial).map?.name).toBe('pass62-procedural-impact-mark');
     presentation.update(15);
     expect(presentation.activeParticles()).toBe(0);

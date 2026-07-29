@@ -61,6 +61,7 @@ export class ImpactPresentation {
   readonly marks: THREE.InstancedMesh;
   private readonly positions = new Float32Array(MAX_IMPACT_PARTICLES * 3);
   private readonly colors = new Float32Array(MAX_IMPACT_PARTICLES * 3);
+  private readonly uvs = new Float32Array(MAX_IMPACT_PARTICLES * 2);
   private readonly particles: Particle[] = [];
   private readonly markLife = new Float32Array(MAX_IMPACT_MARKS);
   private cursor = 0;
@@ -76,9 +77,15 @@ export class ImpactPresentation {
     scene.add(this.root);
     const geometry = new THREE.BufferGeometry();
     this.positions.fill(0);
+    this.uvs.fill(0.5);
     for (let index = 0; index < MAX_IMPACT_PARTICLES; index += 1) this.positions[index * 3 + 1] = HIDDEN_Y;
     geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
     geometry.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
+    // WebGL samples a PointsMaterial map with gl_PointCoord. Three's WebGPU
+    // node translation instead requests a geometry UV for point primitives;
+    // a stable centre sample preserves the radial particle core and prevents
+    // a missing-attribute shader fallback in both prewarm and live impacts.
+    geometry.setAttribute('uv', new THREE.BufferAttribute(this.uvs, 2));
     const material = new THREE.PointsMaterial({
       size: reducedDetail ? 0.075 : 0.105,
       vertexColors: true,
