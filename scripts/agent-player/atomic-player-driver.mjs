@@ -568,6 +568,12 @@ async function run() {
   const contactSearchMinimapGuidance = args['contact-search-minimap-guidance'] === 'true';
   const offensiveProfile = args['offensive-profile'] === 'true';
   const offensiveContactCommitMs = integerArg(args['offensive-contact-commit'], 900, 0, 10_000);
+  const offensiveLaneIsolation = args['offensive-lane-isolation'] === 'true';
+  const offensiveLaneMinimumSpreadRadians = numberArg(args['offensive-lane-min-spread'], 0.75, 0.1, 3.142);
+  const offensiveLaneMaximumDistance = integerArg(args['offensive-lane-max-distance'], 60, 1, 200);
+  const offensiveLaneBurstMs = integerArg(args['offensive-lane-burst'], 450, 100, 2_000);
+  const offensiveLaneCooldownMs = integerArg(args['offensive-lane-cooldown'], 1200, 200, 10_000);
+  const offensiveLaneDamageMinimum = integerArg(args['offensive-lane-min-damage'], 15, 1, 100);
   const renderedCover = args['rendered-cover'] === 'true';
   const coverProbeDurationMs = integerArg(args['cover-probe-duration'], 900, 200, 5_000);
   const coverOcclusionConfirmMs = integerArg(args['cover-occlusion-confirm'], 350, 100, 3_000);
@@ -838,6 +844,12 @@ async function run() {
           contactSearchMinimapGuidance,
           offensiveProfile,
           offensiveContactCommitMs,
+          offensiveLaneIsolation,
+          offensiveLaneMinimumSpreadRadians,
+          offensiveLaneMaximumDistance,
+          offensiveLaneBurstMs,
+          offensiveLaneCooldownMs,
+          offensiveLaneDamageMinimum,
           renderedCover,
           coverProbeDurationMs,
           coverOcclusionConfirmMs,
@@ -1045,6 +1057,7 @@ async function run() {
           frameWidth: vision.width,
           holdEngagement,
           minimapThreat,
+          minimapThreats: vision.minimapThreats,
           lastShotAt: lastBurstAt,
           movementCycle,
           navigationTick: movementCycle % navigationLaneStride === 0,
@@ -1058,6 +1071,14 @@ async function run() {
             kind: tactical.anchorEvent.kind === 'renew' ? 'visible-kill-anchor-renew' : 'visible-kill-anchor-activate',
             visibleKillDelta: tactical.anchorEvent.visibleKillDelta,
             expiresAt: tactical.anchorEvent.expiresAt,
+          });
+        }
+        if (tactical?.offensiveLaneEvent) {
+          actions.push({
+            ...tactical.offensiveLaneEvent,
+            kind: `offensive-lane-${tactical.offensiveLaneEvent.kind}`,
+            atMs,
+            health: hud?.health ?? null,
           });
         }
         if (tactical?.coverEvent) {
@@ -1629,6 +1650,12 @@ async function run() {
         contactSearchMinimapGuidance,
         offensiveProfile,
         offensiveContactCommitMs,
+        offensiveLaneIsolation,
+        offensiveLaneMinimumSpreadRadians,
+        offensiveLaneMaximumDistance,
+        offensiveLaneBurstMs,
+        offensiveLaneCooldownMs,
+        offensiveLaneDamageMinimum,
         renderedCover,
         coverProbeDurationMs,
         coverOcclusionConfirmMs,
@@ -1745,6 +1772,10 @@ async function run() {
         offensiveEngagementFrames: tacticalPolicyReceipt?.offensiveEngagementFrames ?? 0,
         offensiveStableAimFrames: tacticalPolicyReceipt?.offensiveStableAimFrames ?? 0,
         offensivePostShotStrafeFrames: tacticalPolicyReceipt?.offensivePostShotStrafeFrames ?? 0,
+        offensiveLaneIsolationActivations: tacticalPolicyReceipt?.offensiveLaneIsolationActivations ?? 0,
+        offensiveLaneIsolationFrames: tacticalPolicyReceipt?.offensiveLaneIsolationFrames ?? 0,
+        offensiveLaneEngagementSuppressions: tacticalPolicyReceipt?.offensiveLaneEngagementSuppressions ?? 0,
+        offensiveLaneLastReceipt: tacticalPolicyReceipt?.offensiveLaneLastReceipt ?? null,
         coverEngagementSuppressedFrames: tacticalPolicyReceipt?.coverEngagementSuppressedFrames ?? 0,
         renderedCoverActivations: tacticalPolicyReceipt?.renderedCover?.activations ?? 0,
         renderedCoverAcquisitions: tacticalPolicyReceipt?.renderedCover?.acquisitions ?? 0,

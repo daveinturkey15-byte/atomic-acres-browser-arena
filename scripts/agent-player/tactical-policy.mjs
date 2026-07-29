@@ -2,6 +2,35 @@ import { createRenderedCoverController } from './rendered-cover-controller.mjs';
 
 const clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, value));
 
+function crossfireLane(threats, maximumDistance, minimumSpreadRadians) {
+  const visible = Array.isArray(threats)
+    ? threats.filter((threat) => Number.isFinite(threat?.bearingRadians)
+      && Number.isFinite(threat?.distance) && threat.distance <= maximumDistance)
+    : [];
+  if (visible.length < 2) return null;
+  let widest = null;
+  for (let leftIndex = 0; leftIndex < visible.length - 1; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < visible.length; rightIndex += 1) {
+      const rawDifference = Math.abs(visible[leftIndex].bearingRadians - visible[rightIndex].bearingRadians);
+      const spreadRadians = Math.min(rawDifference, Math.PI * 2 - rawDifference);
+      if (!widest || spreadRadians > widest.spreadRadians) {
+        widest = { left: visible[leftIndex], right: visible[rightIndex], spreadRadians };
+      }
+    }
+  }
+  if (!widest || widest.spreadRadians < minimumSpreadRadians) return null;
+  const selected = visible.reduce((nearest, threat) => threat.distance < nearest.distance ? threat : nearest);
+  const fallbackBearing = widest.left.bearingRadians + widest.right.bearingRadians >= 0 ? -1 : 1;
+  const direction = Math.abs(selected.bearingRadians) >= 0.08 ? Math.sign(selected.bearingRadians) : fallbackBearing;
+  return {
+    threatCount: visible.length,
+    spreadRadians: widest.spreadRadians,
+    selectedBearingRadians: selected.bearingRadians,
+    selectedDistance: selected.distance,
+    direction: direction >= 0 ? 1 : -1,
+  };
+}
+
 export function createTacticalPolicy(options = {}) {
   const config = {
     retreatHealth: Number(options.retreatHealth ?? 45),
@@ -29,6 +58,12 @@ export function createTacticalPolicy(options = {}) {
     contactSearchMinimapGuidance: options.contactSearchMinimapGuidance === true,
     offensiveProfile: options.offensiveProfile === true,
     offensiveContactCommitMs: Math.max(0, Number(options.offensiveContactCommitMs ?? 900)),
+    offensiveLaneIsolation: options.offensiveLaneIsolation === true,
+    offensiveLaneMinimumSpreadRadians: clamp(Number(options.offensiveLaneMinimumSpreadRadians ?? 0.75), 0.1, Math.PI),
+    offensiveLaneMaximumDistance: Math.max(1, Number(options.offensiveLaneMaximumDistance ?? 60)),
+    offensiveLaneBurstMs: Math.max(100, Number(options.offensiveLaneBurstMs ?? 450)),
+    offensiveLaneCooldownMs: Math.max(200, Number(options.offensiveLaneCooldownMs ?? 1200)),
+    offensiveLaneDamageMinimum: Math.max(1, Number(options.offensiveLaneDamageMinimum ?? 15)),
     bankLeadMinimumKills: Number(options.bankLeadMinimumKills ?? 0),
     bankLeadMinimumMargin: Number(options.bankLeadMinimumMargin ?? 1),
     killAnchorDurationMs: Number(options.killAnchorDurationMs ?? 0),
@@ -109,6 +144,13 @@ export function createTacticalPolicy(options = {}) {
     offensiveEngagementFrames: 0,
     offensiveStableAimFrames: 0,
     offensivePostShotStrafeFrames: 0,
+    offensiveLaneIsolationUntil: 0,
+    offensiveLaneIsolationCooldownUntil: 0,
+    offensiveLaneIsolationDirection: 1,
+    offensiveLaneIsolationActivations: 0,
+    offensiveLaneIsolationFrames: 0,
+    offensiveLaneEngagementSuppressions: 0,
+    offensiveLaneLastReceipt: null,
     coverEngagementSuppressedFrames: 0,
     modeFrames: { roam: 0, engage: 0, retreat: 0, recover: 0, bank: 0, anchor: 0 },
   };
@@ -227,6 +269,7 @@ export function createTacticalPolicy(options = {}) {
         state.quickDeathCooldownUntil = 0;
         state.respawnReentryUntil = 0;
         state.confirmedTargetSeen = false;
+        state.offensiveLaneIsolationUntil = 0;
       }
       const coverDecision = coverController.update({
         now,
@@ -254,6 +297,26 @@ export function createTacticalPolicy(options = {}) {
           }
           state.retreatUntil = Math.max(state.retreatUntil, now + config.retreatDurationMs);
         }
+      }
+
+      let offensiveLaneEvent = null;
+      const laneReceipt = crossfireLane(
+        observation.minimapThreats,
+        config.offensiveLaneMaximumDistance,
+        config.offensiveLaneMinimumSpreadRadians,
+      );
+      const recentLaneDamage = now - state.lastDamageAt <= config.damageWindowMs
+        && state.damageWindowAmount >= config.offensiveLaneDamageMinimum;
+      if (config.offensiveLaneIsolation && observation.active && observation.currentTarget
+        && healthValid && health >= config.retreatHealth
+        && state.damageWindowAmount < config.retreatDamage
+        && recentLaneDamage && laneReceipt && now >= state.offensiveLaneIsolationCooldownUntil) {
+        state.offensiveLaneIsolationUntil = now + config.offensiveLaneBurstMs;
+        state.offensiveLaneIsolationCooldownUntil = now + config.offensiveLaneCooldownMs;
+        state.offensiveLaneIsolationDirection = laneReceipt.direction;
+        state.offensiveLaneIsolationActivations += 1;
+        state.offensiveLaneLastReceipt = { ...laneReceipt, activatedAt: now, damageWindowAmount: state.damageWindowAmount };
+        offensiveLaneEvent = { kind: 'activate', ...state.offensiveLaneLastReceipt };
       }
 
       let reason = 'roam-clear';
@@ -296,6 +359,8 @@ export function createTacticalPolicy(options = {}) {
       } else if (observation.stuck) {
         nextMode = 'recover';
         reason = 'stuck-cooldown-hold';
+      } else if (now < state.offensiveLaneIsolationUntil) {
+        reason = 'offensive-crossfire-isolation';
       } else if (observation.currentTarget || rawTargetObservationActive) {
         nextMode = 'engage';
         reason = observation.currentTarget ? 'confirmed-operator' : 'candidate-observation';
@@ -326,6 +391,10 @@ export function createTacticalPolicy(options = {}) {
       if (reason === 'quick-death-cooldown') state.quickDeathCooldownFrames += 1;
       if (reason === 'contact-search-sweep') state.contactSearchFrames += 1;
       if (reason === 'offensive-contact-pursuit') state.offensivePursuitFrames += 1;
+      if (reason === 'offensive-crossfire-isolation') {
+        state.offensiveLaneIsolationFrames += 1;
+        if (observation.currentTarget) state.offensiveLaneEngagementSuppressions += 1;
+      }
       if (config.offensiveProfile && nextMode === 'engage' && observation.currentTarget) {
         state.offensiveEngagementFrames += 1;
         if (now - Number(observation.lastShotAt ?? Number.NEGATIVE_INFINITY) < config.postShotStrafeMs) {
@@ -390,7 +459,9 @@ export function createTacticalPolicy(options = {}) {
           }
         } else {
           const threat = observation.minimapThreat;
-          if (reason === 'offensive-contact-pursuit') {
+          if (reason === 'offensive-crossfire-isolation') {
+            keys.push('KeyW', 'ShiftLeft', state.offensiveLaneIsolationDirection > 0 ? 'KeyD' : 'KeyA');
+          } else if (reason === 'offensive-contact-pursuit') {
             keys.push('KeyW', 'ShiftLeft');
             if (observation.navigationTick) {
               const bearing = Number(threat?.bearingRadians);
@@ -448,6 +519,7 @@ export function createTacticalPolicy(options = {}) {
         leadBankActive: state.leadBankActive,
         killAnchorActive,
         anchorEvent,
+        offensiveLaneEvent,
         coverEvent: coverDecision.event,
       };
     },
@@ -479,6 +551,10 @@ export function createTacticalPolicy(options = {}) {
         offensiveEngagementFrames: state.offensiveEngagementFrames,
         offensiveStableAimFrames: state.offensiveStableAimFrames,
         offensivePostShotStrafeFrames: state.offensivePostShotStrafeFrames,
+        offensiveLaneIsolationActivations: state.offensiveLaneIsolationActivations,
+        offensiveLaneIsolationFrames: state.offensiveLaneIsolationFrames,
+        offensiveLaneEngagementSuppressions: state.offensiveLaneEngagementSuppressions,
+        offensiveLaneLastReceipt: state.offensiveLaneLastReceipt ? { ...state.offensiveLaneLastReceipt } : null,
         coverEngagementSuppressedFrames: state.coverEngagementSuppressedFrames,
         renderedCover: coverController.snapshot(),
         config: { ...config },

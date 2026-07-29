@@ -317,6 +317,49 @@ test('offensive profile remains default-off after target loss', () => {
   assert.equal(policy.snapshot().offensivePursuitFrames, 0);
 });
 
+test('offensive lane isolation makes a bounded diagonal move under rendered two-lane damage without granting fire', () => {
+  const policy = createTacticalPolicy({
+    offensiveProfile: true,
+    offensiveLaneIsolation: true,
+    offensiveLaneMinimumSpreadRadians: 0.75,
+    offensiveLaneMaximumDistance: 60,
+    offensiveLaneBurstMs: 450,
+    offensiveLaneCooldownMs: 1200,
+    offensiveLaneDamageMinimum: 15,
+    retreatHealth: 20,
+    retreatDamage: 150,
+    damageWindowMs: 700,
+  });
+  const threats = [
+    { bearingRadians: -0.62, distance: 20 },
+    { bearingRadians: 0.58, distance: 28 },
+  ];
+  const first = policy.update({
+    now: 100, active: true, health: 100, healthFresh: true, damageDelta: 16,
+    currentTarget: true, rawTarget: true, minimapThreats: threats, minimapThreat: threats[0], movementCycle: 1,
+  });
+  assert.equal(first.reason, 'offensive-crossfire-isolation');
+  assert.equal(first.allowEngagement, false);
+  assert.deepEqual(first.keys, ['KeyW', 'ShiftLeft', 'KeyA']);
+  assert.equal(first.offensiveLaneEvent.kind, 'activate');
+  assert.equal(first.offensiveLaneEvent.threatCount, 2);
+  const continued = policy.update({
+    now: 300, active: true, health: 84, healthFresh: true, damageDelta: 0,
+    currentTarget: true, rawTarget: true, minimapThreats: threats, minimapThreat: threats[0], movementCycle: 2,
+  });
+  assert.equal(continued.reason, 'offensive-crossfire-isolation');
+  assert.equal(continued.offensiveLaneEvent, null);
+  const resumed = policy.update({
+    now: 600, active: true, health: 84, healthFresh: true, damageDelta: 0,
+    currentTarget: true, rawTarget: true, minimapThreats: threats, minimapThreat: threats[0], movementCycle: 3,
+  });
+  assert.equal(resumed.reason, 'confirmed-operator');
+  assert.equal(resumed.allowEngagement, true);
+  assert.equal(policy.snapshot().offensiveLaneIsolationActivations, 1);
+  assert.equal(policy.snapshot().offensiveLaneIsolationFrames, 2);
+  assert.equal(policy.snapshot().offensiveLaneEngagementSuppressions, 2);
+});
+
 test('opt-in contact search turns toward the rendered player-up minimap bearing', () => {
   const policy = createTacticalPolicy({ contactSearchAfterMs: 1000, contactSearchTurn: 20, contactSearchMinimapGuidance: true });
   policy.update({ now: 100, active: true, health: 100, movementCycle: 0, navigationTick: false });

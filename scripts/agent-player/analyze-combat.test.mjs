@@ -48,6 +48,8 @@ test('combat benchmark separates bots, practice targets, survival and control me
       lastLifeDurationMs: 12_500, quickDeathStreak: 2, quickDeathReceipts: 4, quickDeathCooldownFrames: 29,
       retreatReturnFireFrames: 11, contactSearchFrames: 17, minimapGuidedContactSearchFrames: 9, coverEngagementSuppressedFrames: 6,
       offensivePursuitFrames: 13, offensiveEngagementFrames: 21, offensiveStableAimFrames: 14, offensivePostShotStrafeFrames: 7,
+      offensiveLaneIsolationActivations: 3, offensiveLaneIsolationFrames: 12, offensiveLaneEngagementSuppressions: 9,
+      offensiveLaneLastReceipt: { threatCount: 2, spreadRadians: 1.2, selectedBearingRadians: -0.62 },
       renderedCoverActivations: 5, renderedCoverAcquisitions: 3, renderedCoverProbeReversals: 2, renderedCoverAborts: 1,
       renderedCoverProbeFrames: 31, renderedCoverOcclusionFrames: 13, renderedCoverHoldFrames: 23,
       renderedCoverHealthGatedHoldFrames: 14,
@@ -95,6 +97,10 @@ test('combat benchmark separates bots, practice targets, survival and control me
   assert.equal(result.control.offensiveEngagementFrames, 21);
   assert.equal(result.control.offensiveStableAimFrames, 14);
   assert.equal(result.control.offensivePostShotStrafeFrames, 7);
+  assert.equal(result.control.offensiveLaneIsolationActivations, 3);
+  assert.equal(result.control.offensiveLaneIsolationFrames, 12);
+  assert.equal(result.control.offensiveLaneEngagementSuppressions, 9);
+  assert.equal(result.control.offensiveLaneLastReceipt.threatCount, 2);
   assert.equal(result.control.renderedCoverActivations, 5);
   assert.equal(result.control.renderedCoverAcquisitions, 3);
   assert.equal(result.control.renderedCoverProbeReversals, 2);
