@@ -284,6 +284,7 @@ test('launcher surfaces forward both profile path and fingerprint only when expl
   assert.match(powershell, /--player-profile/);
   assert.match(powershell, /--player-profile-fingerprint/);
   assert.match(powershell, /--player-profile-shadow/);
+  assert.match(powershell, /BoundedCalibration/);
   assert.match(powershell, /PlayerProfileFingerprint is required/);
 });
 
