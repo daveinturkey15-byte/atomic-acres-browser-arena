@@ -12,7 +12,9 @@ import type { ArenaId } from '../../src/map-selection';
 const root = path.resolve(process.cwd());
 const frameRoot = path.join(root, 'artifacts/pass65/menu-preview-master-frames');
 const receiptPath = path.join(root, 'source-assets/menu/pass65-preview-masters/runtime-capture-receipt.json');
+const reviewReceiptPath = path.join(root, 'artifacts/pass65/menu-preview-rotor-review/runtime-capture-receipt.json');
 const port = Number(process.env.AA_PREVIEW_PORT ?? '44166');
+const reviewOnly = process.env.AA_PREVIEW_REVIEW_ONLY === '1';
 const choreography = choreographyJson;
 const canonicalArenas = Object.keys(choreography.arenas) as ArenaId[];
 const captureRuntimePaths = ['src/legacy-main.ts', 'src/ui/menu-preview-camera.ts'] as const;
@@ -86,6 +88,24 @@ type CaptureEvidence = {
     insideHorizontalCollider: boolean;
     pngSha256: string;
     seamSourceFrame?: number;
+    rotorProjection?: {
+      mode: string | null;
+      stageWidthFraction: number;
+      stageHeightFraction: number;
+      stageAreaFraction: number;
+      bladeCount: number;
+      legibleBladeSweeps: number;
+      projectedBladeThresholdPixels: number;
+      shortestProjectedBladeLengthPixels: number;
+      authoredBladeThicknessPixels: number;
+      bladeOpacity: number;
+      contrastMode: string | null;
+      filledDiscDetected: boolean;
+      poseTransform: string;
+      poseShiftXPixels: number;
+      poseShiftYPixels: number;
+      poseBankDegrees: number;
+    };
   }>;
 };
 
@@ -136,15 +156,14 @@ async function installCaptureSurface(page: Page, kind: 'helicopter' | 'cat'): Pr
       #game{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;display:block!important}
       #offline-menu-preview-overlay{position:fixed;inset:0;z-index:2147483647;pointer-events:none;color:${palette[3]};font:600 9px/1.1 ui-monospace,Consolas,monospace;letter-spacing:.16em;text-shadow:0 1px 2px #000}
       #offline-menu-preview-overlay *{box-sizing:border-box}
-      .aa-main-rotor-stage{position:absolute;left:25%;top:-1.4%;width:50%;height:14%;perspective:520px;transform-style:preserve-3d;filter:drop-shadow(0 3px 6px #000);opacity:.88}
-      .aa-main-rotor-plane{position:absolute;inset:1% 2% 18%;transform-origin:50% 50%;transform-style:preserve-3d;transform:rotateX(${rotorPresentation.mainDiscPitchDegrees}deg) rotateZ(var(--aa-main-rotor-angle,0deg))}
-      .aa-main-rotor-plane:before{content:"";position:absolute;inset:8% 0;border-radius:50%;border:1px solid rgba(168,224,232,.28);background:repeating-conic-gradient(from 7deg,rgba(160,218,226,${rotorPresentation.mainMotionBlurOpacity}) 0 4deg,rgba(35,52,57,.04) 6deg 18deg);filter:blur(2.3px);box-shadow:inset 0 0 12px rgba(184,235,241,.18),0 0 8px rgba(0,0,0,.9)}
-      .aa-main-rotor-plane:after{content:"";position:absolute;left:7%;right:7%;top:36%;height:28%;border-radius:50%;border-top:2px solid rgba(209,242,245,.48);border-bottom:1px solid rgba(80,108,114,.22);filter:blur(.8px)}
-      .aa-main-rotor-blade{position:absolute;left:2%;right:2%;top:48%;height:4%;border-radius:90%;transform-origin:50% 50%;background:linear-gradient(90deg,transparent 0%,rgba(110,139,145,.30) 8%,${palette[3]} 48%,rgba(110,139,145,.30) 92%,transparent 100%);filter:blur(.75px)}
-      .aa-main-rotor-blade:nth-child(2){transform:rotate(45deg)}.aa-main-rotor-blade:nth-child(3){transform:rotate(90deg)}.aa-main-rotor-blade:nth-child(4){transform:rotate(135deg)}
-      .aa-main-rotor-mast{position:absolute;left:49.55%;top:41%;width:.9%;height:43%;border-radius:4px;background:linear-gradient(90deg,#12191c,${palette[3]},#101518);box-shadow:0 0 4px #000}
-      .aa-main-rotor-hub{position:absolute;left:48.1%;top:36%;width:3.8%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 38% 32%,#d9f1f2,${palette[2]} 35%,${palette[0]} 72%);border:1px solid rgba(202,239,242,.58);box-shadow:0 1px 5px #000}
-      .aa-main-rotor-occluder{position:absolute;left:42%;right:42%;top:72%;height:25%;clip-path:polygon(16% 0,84% 0,100% 100%,0 100%);background:linear-gradient(180deg,#344347 0%,#11191c 62%,#050809 100%);border-top:1px solid rgba(167,224,230,.38);filter:drop-shadow(0 -2px 3px #000)}
+      .aa-main-rotor-stage{position:absolute;left:${(100 - rotorPresentation.mainStageWidthPercent) / 2}%;top:4.3%;width:${rotorPresentation.mainStageWidthPercent}%;height:${rotorPresentation.mainStageHeightPercent}%;perspective:760px;transform-style:preserve-3d;overflow:hidden;transform-origin:50% 82%;transform:translate3d(var(--aa-main-rotor-shift-x,0px),var(--aa-main-rotor-shift-y,0px),0) rotate(var(--aa-main-rotor-bank,0deg));filter:drop-shadow(0 2px 4px rgba(0,0,0,.84));opacity:.9}
+      .aa-main-rotor-plane{position:absolute;left:1%;right:1%;top:5%;height:62%;transform-origin:50% 52%;transform-style:preserve-3d;transform:rotateX(${rotorPresentation.mainDiscPitchDegrees}deg) rotateZ(var(--aa-main-rotor-angle,0deg))}
+      .aa-main-rotor-blade{position:absolute;left:49.7%;top:48%;width:47%;height:3px;transform-origin:.3% 50%;border-radius:0 90% 90% 0;background:linear-gradient(90deg,rgba(15,22,25,.9) 0%,rgba(36,51,56,.76) 38%,rgba(74,96,101,.42) 74%,transparent 100%);filter:blur(.18px);box-shadow:0 1px 1px rgba(0,0,0,.34);opacity:.94}
+      .aa-main-rotor-blade:after{content:"";position:absolute;left:4%;right:8%;top:-2px;height:3px;transform-origin:0 50%;transform:rotate(-5.5deg);border-radius:0 90% 90% 0;background:linear-gradient(90deg,rgba(184,226,230,${rotorPresentation.mainMotionBlurOpacity}) 0%,rgba(111,144,149,.13) 57%,transparent 100%);filter:blur(.72px)}
+      .aa-main-rotor-blade:nth-child(2){transform:rotate(90deg)}.aa-main-rotor-blade:nth-child(3){transform:rotate(180deg)}.aa-main-rotor-blade:nth-child(4){transform:rotate(270deg)}
+      .aa-main-rotor-mast{position:absolute;left:49.75%;top:40%;width:.5%;height:48%;border-radius:3px;background:linear-gradient(90deg,#0b1012,${palette[2]} 50%,#080c0e);box-shadow:0 1px 3px #000;z-index:2}
+      .aa-main-rotor-hub{position:absolute;left:49%;top:33%;width:2%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 38% 30%,#d9edef,${palette[2]} 38%,${palette[0]} 78%);border:1px solid rgba(202,239,242,.5);box-shadow:0 1px 3px #000;z-index:3}
+      .aa-main-rotor-occluder{position:absolute;left:48%;right:48%;top:70%;height:29%;clip-path:polygon(20% 0,80% 0,100% 100%,0 100%);background:linear-gradient(180deg,#2a393d 0%,#11191c 58%,#050809 100%);border-top:1px solid rgba(167,224,230,.3);filter:drop-shadow(0 -1px 2px #000);z-index:4}
       .aa-tail-rotor-camera{position:absolute;right:16.2%;top:8.2%;width:10.8%;height:8.8%;overflow:hidden;border:1px solid rgba(83,218,240,.36);border-radius:3px;background:linear-gradient(180deg,rgba(14,32,38,.54),rgba(2,8,11,.76));box-shadow:inset 0 0 8px rgba(35,194,221,.14),0 2px 5px #000;opacity:.68}
       .aa-tail-rotor-camera:before{content:"TAIL OPTIC";position:absolute;left:5%;top:5%;z-index:4;color:rgba(112,234,255,.7);font-size:5px;letter-spacing:.12em;text-shadow:0 1px #000}
       .aa-tail-rotor-stage{position:absolute;inset:6% 5%;perspective:180px;transform-style:preserve-3d}
@@ -180,8 +199,9 @@ async function installCaptureSurface(page: Page, kind: 'helicopter' | 'cat'): Pr
     overlay.dataset.kind = kind;
     overlay.dataset.scale = String(scale);
     overlay.dataset.palette = palette.join(',');
+    overlay.dataset.minimumProjectedBladeLength = String(rotorPresentation.mainMinimumProjectedBladeLengthPixels);
     overlay.innerHTML = kind === 'helicopter'
-      ? '<div class="aa-main-rotor-stage"><div class="aa-main-rotor-plane"><i class="aa-main-rotor-blade"></i><i class="aa-main-rotor-blade"></i><i class="aa-main-rotor-blade"></i><i class="aa-main-rotor-blade"></i></div><i class="aa-main-rotor-mast"></i><i class="aa-main-rotor-hub"></i><i class="aa-main-rotor-occluder"></i></div><div class="aa-tail-rotor-camera"><div class="aa-tail-rotor-stage"><div class="aa-tail-rotor-plane"><i class="aa-tail-rotor-blade"></i><i class="aa-tail-rotor-blade"></i><i class="aa-tail-rotor-hub"></i></div><i class="aa-tail-boom-occluder"></i></div></div><i class="aa-canopy left"></i><i class="aa-canopy right"></i><i class="aa-glass left"></i><i class="aa-glass right"></i><i class="aa-brace left"></i><i class="aa-brace right"></i><i class="aa-reticle"></i><div class="aa-cockpit"><div class="aa-panel"><span>ALT / RADAR</span><strong id="aa-alt">024 M</strong></div><div class="aa-panel"><span>FLIGHT PATH</span><strong id="aa-heading">HOLD 000</strong></div><div class="aa-panel"><span>ROTOR / LINK</span><strong>ARMED</strong></div></div>'
+      ? '<div class="aa-main-rotor-stage" data-projection="foreshortened-partial-sweep" data-contrast="graphite-root-fade-v1"><div class="aa-main-rotor-plane"><i class="aa-main-rotor-blade"></i><i class="aa-main-rotor-blade"></i><i class="aa-main-rotor-blade"></i><i class="aa-main-rotor-blade"></i></div><i class="aa-main-rotor-mast"></i><i class="aa-main-rotor-hub"></i><i class="aa-main-rotor-occluder"></i></div><div class="aa-tail-rotor-camera"><div class="aa-tail-rotor-stage"><div class="aa-tail-rotor-plane"><i class="aa-tail-rotor-blade"></i><i class="aa-tail-rotor-blade"></i><i class="aa-tail-rotor-hub"></i></div><i class="aa-tail-boom-occluder"></i></div></div><i class="aa-canopy left"></i><i class="aa-canopy right"></i><i class="aa-glass left"></i><i class="aa-glass right"></i><i class="aa-brace left"></i><i class="aa-brace right"></i><i class="aa-reticle"></i><div class="aa-cockpit"><div class="aa-panel"><span>ALT / RADAR</span><strong id="aa-alt">024 M</strong></div><div class="aa-panel"><span>FLIGHT PATH</span><strong id="aa-heading">HOLD 000</strong></div><div class="aa-panel"><span>ROTOR / LINK</span><strong>ARMED</strong></div></div>'
       : '<div class="aa-cat-crown"></div><div class="aa-ear left"></div><div class="aa-ear right"></div><div class="aa-foreleg left"></div><div class="aa-foreleg right"></div><div class="aa-paw left"></div><div class="aa-paw right"></div>';
     document.querySelector('#app')?.append(overlay);
   }, {
@@ -245,7 +265,7 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
       const snapshot = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot(): any } }).__ATOMIC_ACRES_DEBUG__.snapshot();
       return { frameCount: snapshot.frameCount, submissionSequence: snapshot.render.runtime.presentation.submissionSequence };
     });
-    await page.evaluate(({ pose, yaw, pitch, fixedTimeMs, seed, frame, mainRotorTurns, tailRotorTurns, altitude }) => {
+    await page.evaluate(({ pose, yaw, pitch, fixedTimeMs, seed, frame, mainRotorTurns, tailRotorTurns, altitude, rotorPose }) => {
       const debug = (window as unknown as { __ATOMIC_ACRES_DEBUG__: any }).__ATOMIC_ACRES_DEBUG__;
       debug.setCaptureCameraPose(pose.position[0], pose.position[1], pose.position[2], yaw, pitch, pose.fov, fixedTimeMs, seed);
       debug.setGrassTime(fixedTimeMs / 1_000);
@@ -254,6 +274,22 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
         overlay.dataset.frame = String(frame);
         overlay.style.setProperty('--aa-main-rotor-angle', `${pose.pathProgress * mainRotorTurns * 360}deg`);
         overlay.style.setProperty('--aa-tail-rotor-angle', `${pose.pathProgress * tailRotorTurns * 360}deg`);
+        if (pose.frame === 'helicopter') {
+          const bankDegrees = pose.bankRadians * 180 / Math.PI;
+          const normalizedLateral = pose.variance.yawDegrees / rotorPose.maximumYawDegrees * 0.62
+            + bankDegrees / rotorPose.maximumFlightBankDegrees * 0.38;
+          const shiftXPixels = Math.max(-rotorPose.maximumShiftPixels, Math.min(rotorPose.maximumShiftPixels, normalizedLateral * rotorPose.maximumShiftPixels));
+          const maximumVerticalShift = rotorPose.maximumShiftPixels * 0.32;
+          const shiftYPixels = Math.max(-maximumVerticalShift, Math.min(maximumVerticalShift, -pose.variance.pitchDegrees / rotorPose.maximumPitchDegrees * maximumVerticalShift));
+          const presentationBankDegrees = Math.max(-rotorPose.maximumBankDegrees, Math.min(rotorPose.maximumBankDegrees, bankDegrees * 0.56));
+          overlay.style.setProperty('--aa-main-rotor-shift-x', `${shiftXPixels.toFixed(3)}px`);
+          overlay.style.setProperty('--aa-main-rotor-shift-y', `${shiftYPixels.toFixed(3)}px`);
+          overlay.style.setProperty('--aa-main-rotor-bank', `${presentationBankDegrees.toFixed(3)}deg`);
+          overlay.dataset.rotorPoseResponsive = 'true';
+          overlay.dataset.rotorShiftX = shiftXPixels.toFixed(3);
+          overlay.dataset.rotorShiftY = shiftYPixels.toFixed(3);
+          overlay.dataset.rotorBank = presentationBankDegrees.toFixed(3);
+        }
         overlay.querySelector<HTMLElement>('#aa-alt')?.replaceChildren(`${Math.round(altitude).toString().padStart(3, '0')} M`);
         overlay.querySelector<HTMLElement>('#aa-heading')?.replaceChildren(`HDG ${Math.round(((yaw * 180 / Math.PI) % 360 + 360) % 360).toString().padStart(3, '0')}`);
         if (pose.frame === 'cat') {
@@ -278,6 +314,13 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
       mainRotorTurns: choreography.helicopter.rotorPresentation.mainTurnsPerLoop,
       tailRotorTurns: choreography.helicopter.rotorPresentation.tailTurnsPerLoop,
       altitude: pose.position[1],
+      rotorPose: {
+        maximumShiftPixels: choreography.helicopter.rotorPresentation.mainMaximumPoseShiftPixels,
+        maximumBankDegrees: choreography.helicopter.rotorPresentation.mainMaximumPoseBankDegrees,
+        maximumYawDegrees: choreography.helicopter.maximumYawDegrees,
+        maximumPitchDegrees: choreography.helicopter.maximumPitchDegrees,
+        maximumFlightBankDegrees: choreography.helicopter.maximumBankDegrees,
+      },
     });
     await page.waitForFunction((minimum) => {
       const snapshot = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot(): any } }).__ATOMIC_ACRES_DEBUG__.snapshot();
@@ -304,6 +347,59 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
       || (pose.frame === 'helicopter' && rendered.position[1]! < definition.safeVolume.y[0])) {
       throw new Error(`${arenaId} frame ${frame} did not present the requested capture camera: ${JSON.stringify({ pose, rendered, positionError })}`);
     }
+    const rotorProjection = pose.frame === 'helicopter' ? await page.evaluate(() => {
+      const overlay = document.querySelector<HTMLElement>('#offline-menu-preview-overlay')!;
+      const stage = overlay.querySelector<HTMLElement>('.aa-main-rotor-stage')!;
+      const plane = overlay.querySelector<HTMLElement>('.aa-main-rotor-plane')!;
+      const rect = stage.getBoundingClientRect();
+      const planeStyle = getComputedStyle(plane);
+      const before = getComputedStyle(plane, '::before');
+      const after = getComputedStyle(plane, '::after');
+      const blades = [...plane.querySelectorAll<HTMLElement>('.aa-main-rotor-blade')];
+      const bladeLengths = blades.map((blade) => {
+        const bladeRect = blade.getBoundingClientRect();
+        return Math.max(bladeRect.width, bladeRect.height);
+      });
+      const bladeStyle = getComputedStyle(blades[0]!);
+      const projectedBladeThresholdPixels = Number(overlay.dataset.minimumProjectedBladeLength);
+      const hasPseudoSurface = [before, after].some((style) => style.content !== 'none' && style.content !== 'normal');
+      const hasPlaneSurface = planeStyle.backgroundImage !== 'none'
+        || !['rgba(0, 0, 0, 0)', 'transparent'].includes(planeStyle.backgroundColor);
+      return {
+        mode: stage.dataset.projection ?? null,
+        stageWidthFraction: rect.width / window.innerWidth,
+        stageHeightFraction: rect.height / window.innerHeight,
+        stageAreaFraction: rect.width * rect.height / (window.innerWidth * window.innerHeight),
+        bladeCount: blades.length,
+        legibleBladeSweeps: bladeLengths.filter((length) => length >= projectedBladeThresholdPixels).length,
+        projectedBladeThresholdPixels,
+        shortestProjectedBladeLengthPixels: Math.min(...bladeLengths),
+        authoredBladeThicknessPixels: Number.parseFloat(bladeStyle.height),
+        bladeOpacity: Number.parseFloat(bladeStyle.opacity),
+        contrastMode: stage.dataset.contrast ?? null,
+        filledDiscDetected: hasPseudoSurface || hasPlaneSurface,
+        poseTransform: getComputedStyle(stage).transform,
+        poseShiftXPixels: Number(overlay.dataset.rotorShiftX),
+        poseShiftYPixels: Number(overlay.dataset.rotorShiftY),
+        poseBankDegrees: Number(overlay.dataset.rotorBank),
+      };
+    }) : undefined;
+    if (rotorProjection && (rotorProjection.mode !== 'foreshortened-partial-sweep'
+      || rotorProjection.bladeCount !== choreography.helicopter.rotorPresentation.mainBladeCount
+      || rotorProjection.legibleBladeSweeps < choreography.helicopter.rotorPresentation.mainMinimumLegibleBladeSweeps
+      || rotorProjection.projectedBladeThresholdPixels !== choreography.helicopter.rotorPresentation.mainMinimumProjectedBladeLengthPixels
+      || !Number.isFinite(rotorProjection.shortestProjectedBladeLengthPixels)
+      || rotorProjection.authoredBladeThicknessPixels < choreography.helicopter.rotorPresentation.mainMinimumAuthoredBladeThicknessPixels
+      || rotorProjection.bladeOpacity < choreography.helicopter.rotorPresentation.mainMinimumBladeOpacity
+      || rotorProjection.contrastMode !== choreography.helicopter.rotorPresentation.mainContrastMode
+      || rotorProjection.filledDiscDetected
+      || rotorProjection.stageAreaFraction > choreography.helicopter.rotorPresentation.mainMaximumScreenAreaFraction
+      || rotorProjection.stageHeightFraction > choreography.helicopter.rotorPresentation.mainMaximumScreenHeightFraction
+      || !Number.isFinite(rotorProjection.poseShiftXPixels)
+      || !Number.isFinite(rotorProjection.poseShiftYPixels)
+      || !Number.isFinite(rotorProjection.poseBankDegrees))) {
+      throw new Error(`${arenaId} frame ${frame} violates the partial foreshortened rotor projection contract: ${JSON.stringify(rotorProjection)}`);
+    }
     const framePath = path.join(directory, `frame-${String(frame).padStart(4, '0')}.png`);
     const seamSourcePath = path.join(directory, 'frame-0001.png');
     const copiedSeam = frame === choreography.frameCount && existsSync(seamSourcePath);
@@ -324,6 +420,7 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
         insideHorizontalCollider: rendered.insideHorizontalCollider,
         pngSha256: createHash('sha256').update(await readFile(framePath)).digest('hex'),
         ...(copiedSeam ? { seamSourceFrame: 1 } : {}),
+        ...(rotorProjection ? { rotorProjection } : {}),
       });
     }
   }
@@ -396,8 +493,10 @@ async function main(): Promise<void> {
       runtimeInputs,
       arenas: evidence,
     };
-    await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
-    console.log(JSON.stringify({ capture: 'passed', receipt: path.relative(root, receiptPath), arenas: evidence }, null, 2));
+    const outputReceiptPath = reviewOnly ? reviewReceiptPath : receiptPath;
+    await mkdir(path.dirname(outputReceiptPath), { recursive: true });
+    await writeFile(outputReceiptPath, `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
+    console.log(JSON.stringify({ capture: 'passed', reviewOnly, receipt: path.relative(root, outputReceiptPath), arenas: evidence }, null, 2));
   } finally {
     await browser?.close();
     await server?.close();

@@ -61,12 +61,27 @@ type ChoreographyRecipe = Readonly<{
     holdFraction: number;
     rotorTurnsPerLoop: number;
     rotorPresentation: Readonly<{
-      id: 'perspective-projected-cockpit-rotor-rig-v1';
+      id: 'perspective-projected-cockpit-rotor-rig-v2';
       mainTurnsPerLoop: number;
       tailTurnsPerLoop: number;
       mainDiscPitchDegrees: number;
+      mainStageWidthPercent: number;
+      mainStageHeightPercent: number;
+      mainBladeCount: 4;
+      mainBladeMode: 'discrete-radial-sweeps-v1';
+      mainContrastMode: 'graphite-root-fade-v1';
+      mainFilledDisc: false;
+      mainMinimumLegibleBladeSweeps: 2;
+      mainMinimumProjectedBladeLengthPixels: number;
+      mainMinimumAuthoredBladeThicknessPixels: number;
+      mainMinimumBladeOpacity: number;
+      mainMaximumScreenAreaFraction: number;
+      mainMaximumScreenHeightFraction: number;
+      mainMaximumPoseShiftPixels: number;
+      mainMaximumPoseBankDegrees: number;
       tailDiscYawDegrees: number;
       mainMotionBlurOpacity: number;
+      poseResponsive: true;
       tailCameraReflection: true;
       occlusionLayers: readonly ['mast-hub', 'canopy-header', 'tail-boom'];
     }>;

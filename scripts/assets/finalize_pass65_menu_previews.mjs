@@ -84,13 +84,40 @@ function validateRecipe() {
     || choreography.reviewFrames.at(-1) !== choreography.frameCount) {
     throw new Error('reviewFrames must be unique and include the exact loop endpoints');
   }
-  if (choreography.media.cacheKey !== 'pass65-runtime-preview-v6') throw new Error('runtime preview cache key is stale');
+  if (choreography.media.cacheKey !== 'pass65-runtime-preview-v7') throw new Error('runtime preview cache key is stale');
   const rotor = choreography.helicopter?.rotorPresentation;
-  if (rotor?.id !== 'perspective-projected-cockpit-rotor-rig-v1'
+  const configuredRotorArea = rotor?.mainStageWidthPercent / 100 * rotor?.mainStageHeightPercent / 100;
+  if (rotor?.id !== 'perspective-projected-cockpit-rotor-rig-v2'
     || rotor.mainTurnsPerLoop !== choreography.helicopter.rotorTurnsPerLoop
     || rotor.tailTurnsPerLoop !== rotor.mainTurnsPerLoop * 3
-    || rotor.mainDiscPitchDegrees < 68
-    || rotor.mainDiscPitchDegrees > 82
+    || rotor.mainDiscPitchDegrees < 82
+    || rotor.mainDiscPitchDegrees > 84
+    || rotor.mainStageWidthPercent < 24
+    || rotor.mainStageWidthPercent > 34
+    || rotor.mainStageHeightPercent < 6
+    || rotor.mainStageHeightPercent > 9
+    || rotor.mainBladeCount !== 4
+    || rotor.mainBladeMode !== 'discrete-radial-sweeps-v1'
+    || rotor.mainContrastMode !== 'graphite-root-fade-v1'
+    || rotor.mainFilledDisc !== false
+    || rotor.mainMinimumLegibleBladeSweeps !== 2
+    || rotor.mainMinimumProjectedBladeLengthPixels < 48
+    || rotor.mainMinimumProjectedBladeLengthPixels > 70
+    || rotor.mainMinimumAuthoredBladeThicknessPixels < 1.5
+    || rotor.mainMinimumAuthoredBladeThicknessPixels > 3.5
+    || rotor.mainMinimumBladeOpacity < 0.85
+    || rotor.mainMinimumBladeOpacity > 1
+    || configuredRotorArea > rotor.mainMaximumScreenAreaFraction
+    || rotor.mainMaximumScreenAreaFraction > 0.025
+    || rotor.mainMaximumScreenHeightFraction > 0.08
+    || rotor.mainMaximumScreenHeightFraction < rotor.mainStageHeightPercent / 100
+    || rotor.mainMaximumPoseShiftPixels < 2
+    || rotor.mainMaximumPoseShiftPixels > 8
+    || rotor.mainMaximumPoseBankDegrees < 0.5
+    || rotor.mainMaximumPoseBankDegrees > 2.4
+    || rotor.mainMotionBlurOpacity < 0.08
+    || rotor.mainMotionBlurOpacity > 0.22
+    || rotor.poseResponsive !== true
     || rotor.tailDiscYawDegrees < 50
     || rotor.tailDiscYawDegrees > 75
     || rotor.tailCameraReflection !== true
@@ -192,6 +219,28 @@ async function assertCaptureReceipt() {
         || frame.insideHorizontalCollider !== false
         || !/^[0-9a-f]{64}$/.test(frame.pngSha256)) {
         throw new Error(`${evidence.arenaId} review frame ${frame.frame} camera/visual evidence is invalid`);
+      }
+      if (recipe.kind === 'helicopter') {
+        const projection = frame.rotorProjection;
+        if (projection?.mode !== 'foreshortened-partial-sweep'
+          || projection.bladeCount !== choreography.helicopter.rotorPresentation.mainBladeCount
+          || projection.legibleBladeSweeps < choreography.helicopter.rotorPresentation.mainMinimumLegibleBladeSweeps
+          || projection.projectedBladeThresholdPixels !== choreography.helicopter.rotorPresentation.mainMinimumProjectedBladeLengthPixels
+          || !Number.isFinite(projection.shortestProjectedBladeLengthPixels)
+          || projection.authoredBladeThicknessPixels < choreography.helicopter.rotorPresentation.mainMinimumAuthoredBladeThicknessPixels
+          || projection.bladeOpacity < choreography.helicopter.rotorPresentation.mainMinimumBladeOpacity
+          || projection.contrastMode !== choreography.helicopter.rotorPresentation.mainContrastMode
+          || projection.filledDiscDetected !== false
+          || projection.stageAreaFraction > choreography.helicopter.rotorPresentation.mainMaximumScreenAreaFraction
+          || projection.stageHeightFraction > choreography.helicopter.rotorPresentation.mainMaximumScreenHeightFraction
+          || !Number.isFinite(projection.poseShiftXPixels)
+          || !Number.isFinite(projection.poseShiftYPixels)
+          || !Number.isFinite(projection.poseBankDegrees)
+          || projection.poseTransform === 'none') {
+          throw new Error(`${evidence.arenaId} review frame ${frame.frame} does not prove the partial foreshortened rotor projection`);
+        }
+      } else if (frame.rotorProjection !== undefined) {
+        throw new Error(`${evidence.arenaId} cat review frame ${frame.frame} unexpectedly contains helicopter rotor evidence`);
       }
     }
     const firstReview = evidence.reviewFrames.find((entry) => entry.frame === 1);

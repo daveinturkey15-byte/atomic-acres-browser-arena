@@ -63,6 +63,7 @@
     "qa:pass65:drone-asset": "node scripts/qa/verify-pass65-drone-production.mjs",
     "qa:pass65:ordnance-assets": "node scripts/qa/verify-pass65-semtex-production.mjs",
     "qa:pass65:support-vehicles": "node scripts/qa/verify-pass65-support-vehicle-production.mjs",
+    "qa:pass65:menu-rotor": "node scripts/qa/verify-pass65-menu-preview-production.mjs --rotor-contract-only --rotor-contract-self-test",
     "qa:pass65:menu-previews": "node scripts/qa/verify-pass65-menu-preview-production.mjs",
     "qa:pass65:weapon-assets": "node scripts/qa/verify-pass65-weapon-production.mjs && node scripts/qa/verify-pass65-first-person-arms-weighting.mjs && node scripts/qa/validate-pass65-weapon-glbs.mjs && node scripts/qa/finalize-pass65-firearm-corpus-gate.mjs",
     "qa:pass65:first-person-arms-visual": "node scripts/qa/verify-pass65-first-person-arms-visual.mjs",
