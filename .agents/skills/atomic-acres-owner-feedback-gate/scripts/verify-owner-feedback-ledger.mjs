@@ -1,7 +1,15 @@
 import crypto from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  HARDWARE_WEBGL2_TEST_ID,
+  createHardwareWebGl2ReceiptFixture,
+  receiptSha256,
+  validateHardwareWebGl2BuildManifest,
+  validateHardwareWebGl2DetailedReceipt,
+} from '../../../../scripts/qa/pass65-hardware-webgl2-receipt-contract.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '../../../..');
@@ -12,6 +20,10 @@ const AGENTS_PATH = path.join(REPO_ROOT, 'AGENTS.md');
 const PACKAGE_PATH = path.join(REPO_ROOT, 'package.json');
 
 const TEXT_SOURCE_NORMALIZATION = 'UTF-8; CRLF converted to LF; one final LF added; text semantics unchanged';
+const HARDWARE_WEBGL2_FEEDBACK_IDS = Object.freeze([
+  'HF-001', 'HF-002', 'HF-003', 'HF-041', 'HF-064',
+  'HF-065', 'HF-098', 'HF-118', 'HF-138',
+]);
 const REQUIRED_NATIVE_TESTS_BY_FEEDBACK = new Map([
   ['HF-001', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE']],
   ['HF-002', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE']],
@@ -38,6 +50,10 @@ const REQUIRED_NATIVE_TESTS_BY_FEEDBACK = new Map([
   ['HF-137', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE', 'T-NATIVE-FRAME-PACING']],
   ['HF-138', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE', 'T-NATIVE-FRAME-PACING']],
 ]);
+for (const feedbackId of HARDWARE_WEBGL2_FEEDBACK_IDS) {
+  const required = REQUIRED_NATIVE_TESTS_BY_FEEDBACK.get(feedbackId) ?? [];
+  REQUIRED_NATIVE_TESTS_BY_FEEDBACK.set(feedbackId, [...required, HARDWARE_WEBGL2_TEST_ID]);
+}
 
 function error(errors, code, message) {
   errors.push(`${code}: ${message}`);
@@ -49,6 +65,27 @@ function sha256(value) {
 
 function canonicalDigest(value) {
   return sha256(Buffer.from(JSON.stringify(value), 'utf8'));
+}
+
+function git(...args) {
+  return execFileSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8' }).trim();
+}
+
+function currentBuildManifest(sourceSha, directory = path.join(REPO_ROOT, 'dist')) {
+  const files = [];
+  function visit(current, relative = '') {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true }).sort((left, right) => left.name.localeCompare(right.name))) {
+      const childRelative = relative ? `${relative}/${entry.name}` : entry.name;
+      const child = path.join(current, entry.name);
+      if (entry.isDirectory()) visit(child, childRelative);
+      else if (entry.isFile()) {
+        const bytes = fs.readFileSync(child);
+        files.push({ path: childRelative.replaceAll('\\', '/'), bytes: bytes.length, sha256: sha256(bytes) });
+      }
+    }
+  }
+  visit(directory);
+  return { schemaVersion: 1, sourceSha, files };
 }
 
 function cells(line) {
@@ -427,7 +464,23 @@ function validateArtifacts(graph, artifactIndex, testIndex, feedbackById, errors
     for (const testRef of testRefs) if (!testIndex.has(testRef)) error(errors, 'E_GRAPH_ARTIFACT_UNKNOWN_TEST', `${artifact.id} references ${testRef}.`);
     try {
       const receipt = JSON.parse(bytes.toString('utf8'));
-      const expectedReceipt = {
+      const hardwareWebGl2Artifact = testRefs.includes(HARDWARE_WEBGL2_TEST_ID);
+      const expectedReceipt = hardwareWebGl2Artifact ? {
+        schemaVersion: 2,
+        kind: 'pass65-owner-feedback-evidence',
+        sourceSha: artifact.sourceSha,
+        buildId: artifact.buildId,
+        verifierId: artifact.verifierId,
+        verifierVersion: artifact.verifierVersion,
+        environmentHash: artifact.environmentHash,
+        result: artifact.result,
+        feedbackIds,
+        testRefs,
+        detailedReceiptPath: artifact.detailedReceiptPath,
+        detailedReceiptSha256: artifact.detailedReceiptSha256,
+        buildManifestPath: artifact.buildManifestPath,
+        buildManifestSha256: artifact.buildManifestSha256,
+      } : {
         schemaVersion: 1,
         kind: 'pass65-owner-feedback-evidence',
         sourceSha: artifact.sourceSha,
@@ -442,8 +495,59 @@ function validateArtifacts(graph, artifactIndex, testIndex, feedbackById, errors
       if (JSON.stringify(receipt) !== JSON.stringify(expectedReceipt)) {
         error(errors, 'E_GRAPH_ARTIFACT_RECEIPT', `${artifact.id} receipt content does not exactly mirror its catalog entry.`);
       }
-    } catch {
-      error(errors, 'E_GRAPH_ARTIFACT_RECEIPT', `${artifact.id} evidence is not a valid canonical JSON receipt.`);
+      if (hardwareWebGl2Artifact) {
+        const detailPath = repositoryFile(receipt.detailedReceiptPath, errors, 'E_HARDWARE_WEBGL2_DETAIL_PATH', `${artifact.id} detail`);
+        const manifestPath = repositoryFile(receipt.buildManifestPath, errors, 'E_HARDWARE_WEBGL2_MANIFEST_PATH', `${artifact.id} manifest`);
+        if (!String(receipt.detailedReceiptPath ?? '').replace(/\\/g, '/').startsWith('artifacts/pass65/hardware-webgl2-admission/')
+          || !String(receipt.buildManifestPath ?? '').replace(/\\/g, '/').startsWith('artifacts/pass65/hardware-webgl2-admission/')) {
+          error(errors, 'E_HARDWARE_WEBGL2_DETAIL_PATH', `${artifact.id} detailed evidence must live below its exact Pass 65 artifact root.`);
+        }
+        let detailBytes = options.artifactBytesByPath?.get(receipt.detailedReceiptPath);
+        let manifestBytes = options.artifactBytesByPath?.get(receipt.buildManifestPath);
+        if (!detailBytes && detailPath && fs.existsSync(detailPath)) detailBytes = fs.readFileSync(detailPath);
+        if (!manifestBytes && manifestPath && fs.existsSync(manifestPath)) manifestBytes = fs.readFileSync(manifestPath);
+        if (!detailBytes || receiptSha256(detailBytes) !== receipt.detailedReceiptSha256) {
+          error(errors, 'E_HARDWARE_WEBGL2_DETAIL_DIGEST', `${artifact.id} detailed receipt is missing or has a forged digest.`);
+        }
+        if (!manifestBytes || receiptSha256(manifestBytes) !== receipt.buildManifestSha256) {
+          error(errors, 'E_HARDWARE_WEBGL2_BUILD_DIGEST', `${artifact.id} build manifest is missing or has a forged digest.`);
+        }
+        if (detailBytes && manifestBytes) {
+          const detailedReceipt = JSON.parse(Buffer.from(detailBytes).toString('utf8'));
+          const manifest = JSON.parse(Buffer.from(manifestBytes).toString('utf8'));
+          for (const failure of validateHardwareWebGl2DetailedReceipt(detailedReceipt, {
+            sourceSha: artifact.sourceSha,
+            environmentHash: artifact.environmentHash,
+            buildManifestSha256: artifact.buildManifestSha256,
+          })) error(errors, 'E_HARDWARE_WEBGL2_DETAIL_CONTRACT', `${artifact.id} ${failure}.`);
+          for (const failure of validateHardwareWebGl2BuildManifest(manifest, { sourceSha: artifact.sourceSha })) {
+            error(errors, 'E_HARDWARE_WEBGL2_BUILD_CONTRACT', `${artifact.id} ${failure}.`);
+          }
+          const currentSha = options.currentGitSha ?? git('rev-parse', 'HEAD');
+          const currentStatus = options.currentGitStatus ?? git('status', '--porcelain', '--untracked-files=all');
+          if (currentSha !== artifact.sourceSha || currentStatus !== '') {
+            error(errors, 'E_HARDWARE_WEBGL2_CURRENT_SOURCE', `${artifact.id} does not match the current clean candidate HEAD.`);
+          }
+          let liveBuildManifest = options.currentBuildManifest;
+          if (!liveBuildManifest) {
+            try { liveBuildManifest = currentBuildManifest(artifact.sourceSha); }
+            catch (caught) {
+              error(errors, 'E_HARDWARE_WEBGL2_CURRENT_BUILD', `${artifact.id} cannot read current dist/: ${caught.message}.`);
+            }
+          }
+          if (liveBuildManifest && JSON.stringify(liveBuildManifest) !== JSON.stringify(manifest)) {
+            error(errors, 'E_HARDWARE_WEBGL2_CURRENT_BUILD', `${artifact.id} bound manifest differs from the current production dist/ bytes.`);
+          }
+          const chromePath = detailedReceipt.environment?.chromeExecutable;
+          let chromeBytes = options.chromeExecutableBytesByPath?.get(chromePath);
+          if (!chromeBytes && typeof chromePath === 'string' && fs.existsSync(chromePath)) chromeBytes = fs.readFileSync(chromePath);
+          if (!chromeBytes || sha256(chromeBytes) !== detailedReceipt.environment?.chromeExecutableSha256) {
+            error(errors, 'E_HARDWARE_WEBGL2_CHROME_DIGEST', `${artifact.id} installed Chrome executable identity does not match the detailed receipt.`);
+          }
+        }
+      }
+    } catch (caught) {
+      error(errors, 'E_GRAPH_ARTIFACT_RECEIPT', `${artifact.id} evidence is not a valid canonical JSON receipt: ${caught.message}`);
     }
   }
 }
@@ -519,6 +623,10 @@ function validateGraph(graph, ledgerContext, packageJson, errors, options) {
   }
 
   const testIndex = uniqueIndex(graph.testCatalog, 'Test catalog', errors, 'E_GRAPH_TEST_DUPLICATE');
+  const expectedHardwareWebGl2Command = 'npm run qa:pass65:frame-pacing-policy && npm run build && node scripts/qa/verify-pass65-hardware-webgl2-admission.ts';
+  if (packageJson.scripts?.['qa:pass65:hardware-webgl2-admission'] !== expectedHardwareWebGl2Command) {
+    error(errors, 'E_HARDWARE_WEBGL2_PACKAGE_COMMAND', 'hardware-WebGL2 candidate command must retain policy, production build and exact verifier execution.');
+  }
   for (const test of testIndex.values()) {
     if (!/^T-[A-Z0-9-]+$/.test(test.id) || typeof test.command !== 'string' || test.command.length < 5 || /[\r\n]|&&|\|\||;|`|\$\(/.test(test.command)) {
       error(errors, 'E_GRAPH_TEST_COMMAND', `${test.id} has an invalid or compound executable command.`);
@@ -601,6 +709,10 @@ function validateGraph(graph, ledgerContext, packageJson, errors, options) {
           error(errors, 'E_CANDIDATE_ARTIFACT_TEST', `${artifactRef} does not attest one of ${feedbackId}'s tests.`);
         }
       }
+      if (HARDWARE_WEBGL2_FEEDBACK_IDS.includes(feedbackId)
+        && !artifactRefs.some((artifactRef) => artifactIndex.get(artifactRef)?.testRefs?.includes(HARDWARE_WEBGL2_TEST_ID))) {
+        error(errors, 'E_CANDIDATE_HARDWARE_WEBGL2_ARTIFACT_REQUIRED', `${feedbackId} lacks an exact ${HARDWARE_WEBGL2_TEST_ID} schema-v2 evidence artifact.`);
+      }
     }
   }
 
@@ -644,7 +756,7 @@ function buildCandidateFixture(graph, ledger) {
     .map((node) => node.id);
   const testRefs = [...new Set(fixtureGraph.feedbackNodes
     .filter((node) => candidateIds.includes(node.id))
-    .flatMap((node) => node.verification.testRefs))].sort();
+    .flatMap((node) => node.verification.testRefs))].filter((testRef) => testRef !== HARDWARE_WEBGL2_TEST_ID).sort();
   const receipt = {
     schemaVersion: 1,
     kind: 'pass65-owner-feedback-evidence',
@@ -672,14 +784,103 @@ function buildCandidateFixture(graph, ledger) {
     feedbackIds: candidateIds,
     testRefs,
   };
+  const hardwareFixture = createHardwareWebGl2ReceiptFixture(sourceSha);
+  const hardwareFeedbackIds = candidateIds.filter((feedbackId) => HARDWARE_WEBGL2_FEEDBACK_IDS.includes(feedbackId));
+  const hardwareDetailPath = 'artifacts/pass65/hardware-webgl2-admission/self-test-receipt.json';
+  const hardwareManifestPath = 'artifacts/pass65/hardware-webgl2-admission/self-test-dist-manifest.json';
+  const hardwareSidecarPath = 'artifacts/pass65-owner-feedback/self-test-hardware-webgl2.json';
+  const hardwareSidecar = {
+    schemaVersion: 2,
+    kind: 'pass65-owner-feedback-evidence',
+    sourceSha,
+    buildId: 'self-test-hardware-webgl2',
+    verifierId: 'pass65-installed-chrome-hardware-webgl2-admission',
+    verifierVersion: '1',
+    environmentHash: hardwareFixture.environmentHash,
+    result: 'passed',
+    feedbackIds: hardwareFeedbackIds,
+    testRefs: [HARDWARE_WEBGL2_TEST_ID],
+    detailedReceiptPath: hardwareDetailPath,
+    detailedReceiptSha256: hardwareFixture.detailedReceiptSha256,
+    buildManifestPath: hardwareManifestPath,
+    buildManifestSha256: hardwareFixture.buildManifestSha256,
+  };
+  const hardwareSidecarBytes = Buffer.from(JSON.stringify(hardwareSidecar), 'utf8');
+  const hardwareArtifact = {
+    id: 'ART-SELFTEST-HARDWARE-WEBGL2',
+    path: hardwareSidecarPath,
+    sha256: sha256(hardwareSidecarBytes),
+    ...hardwareSidecar,
+  };
+  delete hardwareArtifact.schemaVersion;
+  delete hardwareArtifact.kind;
+
   fixtureGraph.candidateEvidenceSourceSha = sourceSha;
-  fixtureGraph.artifactCatalog = [artifact];
+  fixtureGraph.artifactCatalog = [artifact, hardwareArtifact];
   for (const node of fixtureGraph.feedbackNodes) {
     if (!candidateIds.includes(node.id)) continue;
     node.verification.coverage = 'complete';
-    node.verification.artifactRefs = [artifact.id];
+    node.verification.artifactRefs = HARDWARE_WEBGL2_FEEDBACK_IDS.includes(node.id)
+      ? [artifact.id, hardwareArtifact.id]
+      : [artifact.id];
   }
-  return { graph: fixtureGraph, artifactBytesByPath: new Map([[relativePath, bytes]]) };
+  return {
+    graph: fixtureGraph,
+    artifactBytesByPath: new Map([
+      [relativePath, bytes],
+      [hardwareSidecarPath, hardwareSidecarBytes],
+      [hardwareDetailPath, hardwareFixture.detailedBytes],
+      [hardwareManifestPath, hardwareFixture.manifestBytes],
+    ]),
+    chromeExecutableBytesByPath: new Map([[
+      hardwareFixture.detailedReceipt.environment.chromeExecutable,
+      hardwareFixture.chromeExecutableBytes,
+    ]]),
+    currentGitSha: sourceSha,
+    currentGitStatus: '',
+    currentBuildManifest: hardwareFixture.manifest,
+  };
+}
+
+function hardwareSidecarFromArtifact(artifact) {
+  return {
+    schemaVersion: 2,
+    kind: 'pass65-owner-feedback-evidence',
+    sourceSha: artifact.sourceSha,
+    buildId: artifact.buildId,
+    verifierId: artifact.verifierId,
+    verifierVersion: artifact.verifierVersion,
+    environmentHash: artifact.environmentHash,
+    result: artifact.result,
+    feedbackIds: artifact.feedbackIds,
+    testRefs: artifact.testRefs,
+    detailedReceiptPath: artifact.detailedReceiptPath,
+    detailedReceiptSha256: artifact.detailedReceiptSha256,
+    buildManifestPath: artifact.buildManifestPath,
+    buildManifestSha256: artifact.buildManifestSha256,
+  };
+}
+
+function mutateHardwareDetailedFixture(fixture, mutate) {
+  const graph = structuredClone(fixture.graph);
+  const artifactBytesByPath = new Map(fixture.artifactBytesByPath);
+  const artifact = graph.artifactCatalog.find((candidate) => candidate.testRefs?.includes(HARDWARE_WEBGL2_TEST_ID));
+  const detail = JSON.parse(Buffer.from(artifactBytesByPath.get(artifact.detailedReceiptPath)).toString('utf8'));
+  mutate(detail);
+  const detailBytes = Buffer.from(`${JSON.stringify(detail, null, 2)}\n`, 'utf8');
+  artifact.detailedReceiptSha256 = sha256(detailBytes);
+  artifactBytesByPath.set(artifact.detailedReceiptPath, detailBytes);
+  const sidecarBytes = Buffer.from(JSON.stringify(hardwareSidecarFromArtifact(artifact)), 'utf8');
+  artifact.sha256 = sha256(sidecarBytes);
+  artifactBytesByPath.set(artifact.path, sidecarBytes);
+  return {
+    graph,
+    artifactBytesByPath,
+    chromeExecutableBytesByPath: fixture.chromeExecutableBytesByPath,
+    currentGitSha: fixture.currentGitSha,
+    currentGitStatus: fixture.currentGitStatus,
+    currentBuildManifest: fixture.currentBuildManifest,
+  };
 }
 
 function runSelfTest(ledger, matrix, agents, packageJson, graph) {
@@ -692,7 +893,7 @@ function runSelfTest(ledger, matrix, agents, packageJson, graph) {
       inputs.ledger ?? ledger,
       matrix,
       agents,
-      packageJson,
+      inputs.packageJson ?? packageJson,
       inputs.graph ?? graph,
       inputs.options ?? {},
     );
@@ -749,10 +950,25 @@ function runSelfTest(ledger, matrix, agents, packageJson, graph) {
     'T-WEBGPU-ENDURANCE',
   ];
   expectRejected('missing required native gate', 'E_GRAPH_NATIVE_GATE_REQUIRED', { graph: missingNativeGate });
+  const missingHardwareWebGl2Gate = structuredClone(graph);
+  missingHardwareWebGl2Gate.feedbackNodes.find((node) => node.id === 'HF-001').verification.testRefs =
+    missingHardwareWebGl2Gate.feedbackNodes.find((node) => node.id === 'HF-001').verification.testRefs
+      .filter((testRef) => testRef !== HARDWARE_WEBGL2_TEST_ID);
+  expectRejected('missing required hardware WebGL2 gate', 'E_GRAPH_NATIVE_GATE_REQUIRED', { graph: missingHardwareWebGl2Gate });
+  const noOpHardwarePackage = structuredClone(packageJson);
+  noOpHardwarePackage.scripts['qa:pass65:hardware-webgl2-admission'] = 'node -e "process.exit(0)"';
+  expectRejected('no-op hardware WebGL2 package command', 'E_HARDWARE_WEBGL2_PACKAGE_COMMAND', { packageJson: noOpHardwarePackage });
 
   const readyLedger = candidateReadyLedger(ledger);
   const fixture = buildCandidateFixture(graph, readyLedger);
-  const fixtureOptions = { candidateMode: true, artifactBytesByPath: fixture.artifactBytesByPath };
+  const fixtureOptions = {
+    candidateMode: true,
+    artifactBytesByPath: fixture.artifactBytesByPath,
+    chromeExecutableBytesByPath: fixture.chromeExecutableBytesByPath,
+    currentGitSha: fixture.currentGitSha,
+    currentGitStatus: fixture.currentGitStatus,
+    currentBuildManifest: fixture.currentBuildManifest,
+  };
   const candidateResult = validate(readyLedger, matrix, agents, packageJson, fixture.graph, fixtureOptions);
   if (candidateResult.errors.length > 0) {
     failures.push(`E_SELFTEST_CANDIDATE_FIXTURE: Candidate-ready fixture failed: ${candidateResult.errors[0]}.`);
@@ -764,9 +980,140 @@ function runSelfTest(ledger, matrix, agents, packageJson, graph) {
   const missingArtifact = structuredClone(fixture.graph);
   missingArtifact.feedbackNodes.find((node) => node.id === 'HF-001').verification.artifactRefs = [];
   expectRejected('candidate missing artifact', 'E_CANDIDATE_ARTIFACT_REQUIRED', { ledger: readyLedger, graph: missingArtifact, options: fixtureOptions });
+  const missingHardwareArtifact = structuredClone(fixture.graph);
+  missingHardwareArtifact.feedbackNodes.find((node) => node.id === 'HF-001').verification.artifactRefs =
+    missingHardwareArtifact.feedbackNodes.find((node) => node.id === 'HF-001').verification.artifactRefs
+      .filter((artifactRef) => artifactRef !== 'ART-SELFTEST-HARDWARE-WEBGL2');
+  expectRejected('candidate missing exact hardware WebGL2 artifact', 'E_CANDIDATE_HARDWARE_WEBGL2_ARTIFACT_REQUIRED', {
+    ledger: readyLedger, graph: missingHardwareArtifact, options: fixtureOptions,
+  });
   const wrongDigest = structuredClone(fixture.graph);
   wrongDigest.artifactCatalog[0].sha256 = '0'.repeat(64);
   expectRejected('candidate stale artifact digest', 'E_CANDIDATE_ARTIFACT_DIGEST', { ledger: readyLedger, graph: wrongDigest, options: fixtureOptions });
+
+  function rejectDetailedMutation(name, mutate) {
+    const candidate = mutateHardwareDetailedFixture(fixture, mutate);
+    expectRejected(name, 'E_HARDWARE_WEBGL2_DETAIL_CONTRACT', {
+      ledger: readyLedger,
+      graph: candidate.graph,
+      options: { candidateMode: true, ...candidate },
+    });
+  }
+  rejectDetailedMutation('two fresh browser trials', (detail) => { detail.trials.pop(); });
+  rejectDetailedMutation('duplicate browser/profile identity', (detail) => {
+    detail.trials[1].profile = structuredClone(detail.trials[0].profile);
+    detail.trials[1].browserProcessIds = [...detail.trials[0].browserProcessIds];
+  });
+  rejectDetailedMutation('software adapter forged false', (detail) => {
+    const active = detail.trials[0].arenas[0].activeAudit;
+    active.runtime.adapterLabel = 'Google SwiftShader';
+    active.runtime.softwareAdapter = false;
+    active.rawWebGl.renderer = 'Google SwiftShader';
+  });
+  rejectDetailedMutation('compat route', (detail) => { detail.configuration.routeContract = 'renderer=webgl2&render=compat'; });
+  rejectDetailedMutation('renderPaused route', (detail) => { detail.configuration.routeContract += '&renderPaused=1'; });
+  rejectDetailedMutation('signal-off route', (detail) => { detail.configuration.routeContract += '&signal=off'; });
+  rejectDetailedMutation('untrusted physical start', (detail) => {
+    detail.trials[0].arenas[0].admission.physicalSoloStarts[0].isTrusted = false;
+  });
+  rejectDetailedMutation('trimmed and reordered timing', (detail) => {
+    const timing = detail.trials[0].arenas[0].admission.timing;
+    timing.transitionReadyAt = timing.firstGameplayPresentedAt + 1;
+  });
+  rejectDetailedMutation('missing all-map circuit arena', (detail) => { detail.trials[0].arenas.pop(); });
+  rejectDetailedMutation('accepted restored context', (detail) => {
+    detail.trials[0].arenas[0].activeAudit.runtime.contextLifecycle.restorations = 1;
+  });
+  rejectDetailedMutation('reset readPixels counter after validation', (detail) => {
+    detail.trials[0].arenas[0].admission.readPixels = [];
+  });
+  rejectDetailedMutation('readPixels between transition-ready and first-live', (detail) => {
+    const timing = detail.trials[0].arenas[0].admission.timing;
+    detail.trials[0].arenas[0].admission.readPixels[0].at = (timing.transitionReadyAt + timing.firstGameplayPresentedAt) / 2;
+  });
+  rejectDetailedMutation('full-frame admission readPixels', (detail) => {
+    detail.trials[0].arenas[0].admission.readPixels[0].width = 2_560;
+  });
+  rejectDetailedMutation('empty steady intervals', (detail) => {
+    detail.trials[0].arenas[0].steady.frameWindow.intervalsMs = [];
+  });
+  rejectDetailedMutation('NaN steady interval', (detail) => {
+    detail.trials[0].arenas[0].steady.frameWindow.intervalsMs[0] = Number.NaN;
+  });
+  rejectDetailedMutation('post-ready frame hitch', (detail) => {
+    detail.trials[0].arenas[0].admission.postReadyFrameWindow.intervalsMs[0] = 50;
+  });
+  rejectDetailedMutation('post-ready long task', (detail) => {
+    detail.trials[0].arenas[0].admission.postReadyFrameWindow.longTasks.push({ startTime: 3_000, duration: 60, name: 'self' });
+  });
+  rejectDetailedMutation('post-ready ledger gap', (detail) => {
+    detail.trials[0].arenas[0].admission.postReadyFrameWindow.endedAt -= 100;
+  });
+  rejectDetailedMutation('frozen gameplay counters under smooth browser rAF', (detail) => {
+    const progress = detail.trials[0].arenas[0].steady.progress;
+    progress.after = structuredClone(progress.before);
+    progress.delta = { frameCount: 0, presentedGameplayFrame: 0 };
+  });
+  rejectDetailedMutation('forged gameplay progress delta', (detail) => {
+    detail.trials[0].arenas[0].steady.progress.delta.frameCount += 1;
+  });
+  rejectDetailedMutation('missing active presentation counters', (detail) => {
+    delete detail.trials[0].arenas[0].activeAudit.presentedGameplayFrame;
+    delete detail.trials[0].arenas[0].activeAudit.renderCalls;
+  });
+  rejectDetailedMutation('non-active AtomicSignal dataset', (detail) => {
+    detail.trials[0].arenas[0].activeAudit.atomicSignalDataset = 'warming';
+  });
+  rejectDetailedMutation('unknown device-loss state', (detail) => {
+    delete detail.trials[0].arenas[0].activeAudit.runtime.deviceLost;
+  });
+  rejectDetailedMutation('readPixels after steady handoff', (detail) => {
+    const arena = detail.trials[0].arenas[0];
+    arena.admission.readPixels.push({
+      at: arena.steady.frameWindow.endedAt + 1,
+      width: 1,
+      height: 1,
+      stack: 'AtomicSignalPass.validateOutput',
+    });
+  });
+  rejectDetailedMutation('forged trial environment index', (detail) => { detail.trials[0].trial = 2; });
+  rejectDetailedMutation('forged CDP process proof', (detail) => {
+    detail.trials[0].systemInfo.processInfo[0].id += 1;
+  });
+  rejectDetailedMutation('forged aggregate comparison', (detail) => { detail.aggregate.atomic.sampleCount += 1; });
+  rejectDetailedMutation('raw Atomic regression hidden by stored comparison', (detail) => {
+    detail.trials[0].arenas[0].steady.frameWindow.intervalsMs.fill(49);
+  });
+  rejectDetailedMutation('blank drawing buffer', (detail) => {
+    detail.trials[0].arenas[0].activeAudit.drawingBuffer = [0, 0];
+  });
+  rejectDetailedMutation('non-idle transition accepted', (detail) => {
+    detail.trials[0].arenas[0].activeAudit.transition.phase = 'committing';
+  });
+  rejectDetailedMutation('weakened admission readPixels area', (detail) => {
+    detail.configuration.thresholds.maximumAdmissionReadPixelsArea = 2;
+  });
+  rejectDetailedMutation('forged environment hash content', (detail) => { detail.environment.totalMemoryGiB += 1; });
+  rejectDetailedMutation('dirty detailed source', (detail) => { detail.source.cleanAfter = false; });
+  rejectDetailedMutation('head drift in detailed source', (detail) => { detail.source.endingSha = 'f'.repeat(40); });
+  rejectDetailedMutation('stale build digest in detail', (detail) => { detail.source.buildManifestSha256 = 'f'.repeat(64); });
+
+  expectRejected('current candidate HEAD drift', 'E_HARDWARE_WEBGL2_CURRENT_SOURCE', {
+    ledger: readyLedger, graph: fixture.graph, options: { ...fixtureOptions, currentGitSha: 'f'.repeat(40) },
+  });
+  expectRejected('current candidate dirty tree', 'E_HARDWARE_WEBGL2_CURRENT_SOURCE', {
+    ledger: readyLedger, graph: fixture.graph, options: { ...fixtureOptions, currentGitStatus: ' M src/legacy-main.ts' },
+  });
+  expectRejected('current dist manifest drift', 'E_HARDWARE_WEBGL2_CURRENT_BUILD', {
+    ledger: readyLedger,
+    graph: fixture.graph,
+    options: { ...fixtureOptions, currentBuildManifest: { ...fixture.currentBuildManifest, files: [] } },
+  });
+  const forgedChromeBytes = new Map(fixture.chromeExecutableBytesByPath);
+  forgedChromeBytes.set([...forgedChromeBytes.keys()][0], Buffer.from('forged chrome', 'utf8'));
+  expectRejected('forged installed Chrome bytes', 'E_HARDWARE_WEBGL2_CHROME_DIGEST', {
+    ledger: readyLedger, graph: fixture.graph, options: { ...fixtureOptions, chromeExecutableBytesByPath: forgedChromeBytes },
+  });
   const openCandidate = readyLedger.replace(/^(\| HF-001 \| P0 \|[^\n]*\| )(?:VERIFIED|HITL)( \|)$/m, '$1OPEN$2');
   expectRejected('candidate OPEN P0', 'E_CANDIDATE_STATE', { ledger: openCandidate, graph: fixture.graph, options: fixtureOptions });
   return failures;

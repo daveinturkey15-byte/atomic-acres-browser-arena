@@ -471,6 +471,25 @@ async function startSolo(page: Page): Promise<void> {
   await expect(page.locator('#hud')).toBeVisible();
 }
 
+async function startSoloForStateOnlySupportLadder(page: Page): Promise<void> {
+  await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { startSolo: () => void } }).__ATOMIC_ACRES_DEBUG__.startSolo());
+  await page.waitForFunction(
+    () => (window as unknown as {
+      __ATOMIC_ACRES_DEBUG__: { admissionState: () => { gameStarted: boolean } };
+    }).__ATOMIC_ACRES_DEBUG__.admissionState().gameStarted,
+    undefined,
+    { timeout: 15_000 },
+  );
+  await page.waitForFunction(
+    () => (window as unknown as {
+      __ATOMIC_ACRES_DEBUG__: { admissionState: () => { matchPhase: DebugState['matchPhase'] } };
+    }).__ATOMIC_ACRES_DEBUG__.admissionState().matchPhase === 'active',
+    undefined,
+    { timeout: 4_000 },
+  );
+  await expect(page.locator('#hud')).toBeVisible();
+}
+
 // Browser gameplay tests must never read from or write to the production
 // leaderboard. Unit/Worker suites exercise the real schema independently.
 test.beforeEach(async ({ page }) => {
@@ -1046,9 +1065,11 @@ test.describe('boot and authored presentation', () => {
 
 test.describe('solo mechanics', () => {
   test.beforeEach(async ({ page }, testInfo) => {
-    const simulationOnly = /routes the bot|routes the mirrored|sky missiles/.test(testInfo.title);
+    const stateOnlySupportLadder = testInfo.title === 'loops the selected five-slot ladder at its final threshold without requiring banked rewards to be spent';
+    const simulationOnly = /routes the bot|routes the mirrored|sky missiles/.test(testInfo.title) || stateOnlySupportLadder;
     await pageReadyAt(page, simulationOnly ? '/?render=compat&renderPaused=1' : '/?render=performance');
-    await startSolo(page);
+    if (stateOnlySupportLadder) await startSoloForStateOnlySupportLadder(page);
+    else await startSolo(page);
     await page.evaluate((pauseRenderer) => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setBotsFrozen: (frozen: boolean) => void; respawn: () => void; setRenderPaused: (paused: boolean) => void } }).__ATOMIC_ACRES_DEBUG__;
       api.setBotsFrozen(true);
@@ -1819,6 +1840,10 @@ test.describe('solo mechanics', () => {
       api.earnSupport(15);
       api.activateSupport('scout-sweep');
     });
+    await expect.poll(
+      async () => (await debug(page)).fieldSupport.available['scout-sweep'],
+      { timeout: 2_000 },
+    ).toBe(false);
     const firstCycle = (await debug(page)).fieldSupport;
     expect(firstCycle.streak).toBe(15);
     expect(firstCycle.rewardCycle).toBe(0);

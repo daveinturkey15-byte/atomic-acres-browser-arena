@@ -18,6 +18,8 @@ describe('allocation-light match admission observation contract', () => {
     expect(sampler).toContain('gameStarted,');
     expect(sampler).toContain('matchPhase: matchState.phase,');
     expect(sampler).toContain('arenaId: selectedArena.id,');
+    expect(sampler).toContain('presentedGameplayFrame: lastGameplayPresentedFrame,');
+    expect(sampler).toContain('matchAdmissionGeneration,');
     expect(sampler).not.toContain('snapshot(');
     expect(sampler).not.toContain('renderRuntime');
     expect(sampler).not.toContain('telemetry(');
@@ -62,5 +64,30 @@ describe('allocation-light match admission observation contract', () => {
     }
     expect(source).toContain('const admissionHealth = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.sampleEnduranceHealth());');
     expect(source).toContain('const visualAdmissionHealth = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.sampleEnduranceHealth());');
+  });
+
+  it('starts hardware-WebGL2 admission timing from one trusted physical Solo click and a new match generation', () => {
+    const source = readFileSync(new URL('../scripts/qa/verify-pass65-hardware-webgl2-admission.ts', import.meta.url), 'utf8');
+    const arm = sourceSlice(
+      source,
+      'target.__PASS65_HARDWARE_WEBGL2_START_WATCH__ = () => {',
+      'const beginTrustedAdmissionWatch = () => {',
+    );
+    const trustedStart = sourceSlice(
+      source,
+      'const beginTrustedAdmissionWatch = () => {',
+      "document.addEventListener('click'",
+    );
+    const clickCapture = sourceSlice(source, "document.addEventListener('click'", '}, { capture: true });');
+
+    expect(arm).toContain('gate.armedBaselineGeneration = api?.admissionState().matchAdmissionGeneration ?? null;');
+    expect(arm).toContain('gate.deploymentStartedAt = null;');
+    expect(arm).not.toContain('requestAnimationFrame(');
+    expect(trustedStart).toContain('gate.deploymentStartedAt = performance.now();');
+    expect(trustedStart).toContain('gate.expectedAdmissionGeneration = gate.armedBaselineGeneration + 1;');
+    expect(trustedStart).toContain('state.matchAdmissionGeneration === gate.expectedAdmissionGeneration');
+    expect(trustedStart).toContain('state.gameStarted && state.presentedGameplayFrame > 0');
+    expect(clickCapture).toContain('event.isTrusted');
+    expect(clickCapture).toContain('beginTrustedAdmissionWatch();');
   });
 });

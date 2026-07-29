@@ -853,6 +853,7 @@ canvas.after(canvasHomeAnchor);
 const reducedMotionMedia = window.matchMedia('(prefers-reduced-motion: reduce)');
 let menuLifecycle = INITIAL_MENU_LIFECYCLE_STATE;
 let lastGameplayPresentedFrame = 0;
+let matchAdmissionGeneration = 0;
 let matchPauseBackdropPresentationCount = 0;
 let matchPauseBackdropFallbackCount = 0;
 let matchPauseSourceCaptureAttemptCount = 0;
@@ -7408,6 +7409,22 @@ function stageCorpsePresentationPoolForPrewarm(): () => void {
   };
 }
 
+async function prewarmExactWebGlMatchComposition(): Promise<void> {
+  if (renderRuntime.backend !== 'webgl2' || !atomicSignal) {
+    throw new Error('Exact WebGL2 match composition prewarm requires the WebGL2 AtomicSignal pass');
+  }
+  const priorCameraLayerMask = camera.layers.mask;
+  try {
+    await withArenaFrustumCullingDisabled(scene, async () => {
+      // Keep this identical to the live WebGL2 frame path: world-only first,
+      // then the viewmodel layer after clearDepth through AtomicSignalPass.
+      atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);
+    });
+  } finally {
+    camera.layers.mask = priorCameraLayerMask;
+  }
+}
+
 function disposeCorpsePresentation(root: THREE.Group): void {
   const pooled = corpsePresentationPool.find((entry) => entry.root === root);
   if (!pooled) {
@@ -8128,6 +8145,8 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   const requiredName = requirePlayerName();
   if (!requiredName) return;
   matchStartPreparing = true;
+  matchAdmissionGeneration += 1;
+  lastGameplayPresentedFrame = 0;
   lastMatchAdmissionCadence = null;
   prepareDeploymentTransition();
   applyMenuLifecycle({ type: 'match-start' });
@@ -8196,7 +8215,6 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   supportDamageFeedbackTelemetry.reset();
   player.name = requiredName;
   player.team = Number(element<HTMLSelectElement>('#team').value) === 1 ? 1 : 0;
-  lastGameplayPresentedFrame = 0;
   resetMatchPauseBackdrop();
   hidePrivateLobbyPresentation();
   syncArenaSelectionUi();
@@ -8310,7 +8328,7 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
       // into the first controllable frame.
       await waitForStableMatchAdmissionCadence();
     } else {
-      await renderRuntime.compileAndRender(scene, camera, scene);
+      await prewarmExactWebGlMatchComposition();
       restoreCorpsePoolPrewarm();
       await waitForStableMatchAdmissionCadence();
     }
@@ -16855,6 +16873,8 @@ function sampleAdmissionState() {
     gameStarted,
     matchPhase: matchState.phase,
     arenaId: selectedArena.id,
+    presentedGameplayFrame: lastGameplayPresentedFrame,
+    matchAdmissionGeneration,
   };
 }
 

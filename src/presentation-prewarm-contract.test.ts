@@ -141,6 +141,17 @@ describe('presentation prewarm startup contract', () => {
     expect(matchDeployment).toContain('await waitForStableMatchAdmissionCadence();');
     expect(matchDeployment.indexOf('await waitForStableMatchAdmissionCadence();'))
       .toBeLessThan(matchDeployment.indexOf('gameStarted = true;'));
+    expect(matchDeployment).toContain('await prewarmExactWebGlMatchComposition();');
+    expect(matchDeployment).not.toContain('await renderRuntime.compileAndRender(scene, camera, scene);');
+    const webGlMatchPrewarm = source.slice(
+      source.indexOf('async function prewarmExactWebGlMatchComposition()'),
+      source.indexOf('function disposeCorpsePresentation('),
+    );
+    expect(webGlMatchPrewarm).toContain("renderRuntime.backend !== 'webgl2' || !atomicSignal");
+    expect(webGlMatchPrewarm).toContain('const priorCameraLayerMask = camera.layers.mask;');
+    expect(webGlMatchPrewarm).toContain('await withArenaFrustumCullingDisabled(scene, async () => {');
+    expect(webGlMatchPrewarm).toContain('atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);');
+    expect(webGlMatchPrewarm).toContain('camera.layers.mask = priorCameraLayerMask;');
     expect(source).toContain('const minimumStableWindowMs = 1_000;');
     expect(source).toContain('const hitchThresholdMs = 50;');
     const cadenceAdmission = source.slice(

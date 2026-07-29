@@ -1288,6 +1288,18 @@
       ]
     },
     {
+      "id": "T-COLD-HARDWARE-WEBGL2",
+      "command": "npm run qa:pass65:hardware-webgl2-admission",
+      "paths": [
+        "scripts/qa/verify-pass65-hardware-webgl2-admission.ts",
+        "scripts/qa/pass65-hardware-webgl2-receipt-contract.mjs",
+        "src/pass65-hardware-webgl2-admission-gate.ts",
+        "src/pass65-hardware-webgl2-admission-gate.test.ts",
+        "src/admission-debug-contract.test.ts",
+        "src/presentation-prewarm-contract.test.ts"
+      ]
+    },
+    {
       "id": "T-FOCUS-RECOVERY-E2E",
       "command": "npx playwright test tests/e2e/pass65-frame-pacing-focus.spec.ts --project=chromium --workers=1 --retries=0",
       "paths": [
@@ -1584,7 +1596,8 @@
         "testRefs": [
           "T-MENU-LIFECYCLE-E2E",
           "T-COLD-WEBGPU-ADMISSION",
-          "T-WEBGPU-ENDURANCE"
+          "T-WEBGPU-ENDURANCE",
+          "T-COLD-HARDWARE-WEBGL2"
         ],
         "artifactRefs": []
       }
@@ -1607,7 +1620,8 @@
           "T-LIFECYCLE-UNIT",
           "T-FRAME-POLICY",
           "T-COLD-WEBGPU-ADMISSION",
-          "T-WEBGPU-ENDURANCE"
+          "T-WEBGPU-ENDURANCE",
+          "T-COLD-HARDWARE-WEBGL2"
         ],
         "artifactRefs": []
       }
@@ -1629,7 +1643,8 @@
         "testRefs": [
           "T-LIFECYCLE-UNIT",
           "T-MENU-LIFECYCLE-E2E",
-          "T-WEBGPU-ENDURANCE"
+          "T-WEBGPU-ENDURANCE",
+          "T-COLD-HARDWARE-WEBGL2"
         ],
         "artifactRefs": []
       }
@@ -2812,7 +2827,8 @@
           "T-MENU-LIFECYCLE-E2E",
           "T-COLD-WEBGPU-ADMISSION",
           "T-WEBGPU-ENDURANCE",
-          "T-NATIVE-FRAME-PACING"
+          "T-NATIVE-FRAME-PACING",
+          "T-COLD-HARDWARE-WEBGL2"
         ],
         "artifactRefs": []
       }
@@ -3431,7 +3447,8 @@
         "coverage": "partial",
         "testRefs": [
           "T-MENU-LIFECYCLE-E2E",
-          "T-WEBGPU-ENDURANCE"
+          "T-WEBGPU-ENDURANCE",
+          "T-COLD-HARDWARE-WEBGL2"
         ],
         "artifactRefs": []
       }
@@ -3453,7 +3470,8 @@
           "T-FRAME-POLICY",
           "T-COLD-WEBGPU-ADMISSION",
           "T-WEBGPU-ENDURANCE",
-          "T-NATIVE-FRAME-PACING"
+          "T-NATIVE-FRAME-PACING",
+          "T-COLD-HARDWARE-WEBGL2"
         ],
         "artifactRefs": []
       }
@@ -4342,7 +4360,8 @@
           "T-LIFECYCLE-UNIT",
           "T-COLD-WEBGPU-ADMISSION",
           "T-WEBGPU-ENDURANCE",
-          "T-NATIVE-FRAME-PACING"
+          "T-NATIVE-FRAME-PACING",
+          "T-COLD-HARDWARE-WEBGL2"
         ],
         "artifactRefs": []
       }
@@ -4798,7 +4817,8 @@
           "T-LIFECYCLE-UNIT",
           "T-COLD-WEBGPU-ADMISSION",
           "T-WEBGPU-ENDURANCE",
-          "T-NATIVE-FRAME-PACING"
+          "T-NATIVE-FRAME-PACING",
+          "T-COLD-HARDWARE-WEBGL2"
         ],
         "artifactRefs": []
       }
@@ -5276,7 +5296,8 @@
           "T-COLD-WEBGPU-ADMISSION",
           "T-WEBGPU-ENDURANCE",
           "T-NATIVE-FRAME-PACING",
-          "T-TEXT-INTEGRITY"
+          "T-TEXT-INTEGRITY",
+          "T-COLD-HARDWARE-WEBGL2"
         ],
         "artifactRefs": []
       }

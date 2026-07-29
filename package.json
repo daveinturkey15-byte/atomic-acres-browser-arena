@@ -56,6 +56,7 @@
     "qa:pass65:webgpu-endurance": "node scripts/qa/verify-pass65-webgpu-endurance.mjs",
     "qa:pass65:frame-pacing-policy": "node .agents/skills/atomic-acres-webgpu-frame-pacing/scripts/verify-webgpu-frame-pacing-policy.mjs --self-test",
     "qa:pass65:frame-pacing": "npm run qa:pass65:frame-pacing-policy && npm run build && node scripts/qa/verify-pass65-frame-pacing.ts",
+    "qa:pass65:hardware-webgl2-admission": "npm run qa:pass65:frame-pacing-policy && npm run build && node scripts/qa/verify-pass65-hardware-webgl2-admission.ts",
     "qa:pass65:menu-lifecycle": "playwright test tests/e2e/pass65-menu-lifecycle.spec.ts --project=chromium --workers=1 --retries=0",
     "qa:pass65:rustrig-lighting": "playwright test tests/e2e/pass65-rustrig-container-lighting.spec.ts --project=chromium --workers=1 --retries=0",
     "qa:pass65:owner-feedback": "node .agents/skills/atomic-acres-owner-feedback-gate/scripts/verify-owner-feedback-ledger.mjs --self-test",
