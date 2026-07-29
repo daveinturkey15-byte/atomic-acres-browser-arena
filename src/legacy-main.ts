@@ -939,6 +939,7 @@ const killstreakLoadoutController = new KillstreakLoadoutController(null, {
 });
 if (!pass65Settings.privacy.shareGlobalLeaderboard) forgetLeaderboardInstallId(localStorage);
 const explicitRenderQuery = new URLSearchParams(window.location.search).get('render');
+const offlineMenuPreviewCapture = new URLSearchParams(window.location.search).get('menuPreviewCapture') === '1';
 const queryRenderProfile = explicitRenderQuery ? resolveRenderProfile(window.location.search, null) : null;
 const graphicsRuntime = resolveGraphicsRuntime(pass65Settings.graphics, queryRenderProfile === 'compat');
 const reducedTransparencyMedia = window.matchMedia('(prefers-reduced-transparency: reduce)');
@@ -16708,7 +16709,7 @@ function monitorSelectedArenaRender(now: number): void {
     activeMatch: gameStarted && matchState.phase === 'active',
     menuHidden: menuLifecycle.surface === 'hidden',
     documentVisible: document.visibilityState === 'visible',
-    documentFocused: document.hasFocus(),
+    documentFocused: document.hasFocus() && !offlineMenuPreviewCapture,
     arenaSelectionReady,
     debugRenderPaused,
     renderSubmissionPaused,

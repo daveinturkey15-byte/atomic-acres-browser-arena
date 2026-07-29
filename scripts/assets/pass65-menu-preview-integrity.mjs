@@ -158,7 +158,7 @@ export function cacheFamilyLockFailures(lock, baseline = undefined) {
   }
   const keys = new Set();
   for (const [index, family] of lock.families.entries()) {
-    if (typeof family?.cacheKey !== 'string' || !/^pass65-runtime-preview-v[1-9][0-9]*$/.test(family.cacheKey)) issues.push(`cache-family entry ${index} has an invalid key`);
+    if (typeof family?.cacheKey !== 'string' || !/^pass(?:65|66)-runtime-preview-v[1-9][0-9]*$/.test(family.cacheKey)) issues.push(`cache-family entry ${index} has an invalid key`);
     if (keys.has(family?.cacheKey)) issues.push(`cache-family key is duplicated: ${family?.cacheKey}`);
     keys.add(family?.cacheKey);
     if (!/^[0-9a-f]{64}$/.test(family?.finalMediaSetSha256 ?? '')

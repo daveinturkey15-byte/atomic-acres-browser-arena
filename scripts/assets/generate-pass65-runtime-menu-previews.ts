@@ -41,8 +41,8 @@ const chromeCandidates = [
 const executablePath = chromeCandidates.find((candidate) => existsSync(candidate));
 
 if (!executablePath) throw new Error('Authoritative preview capture requires installed Google Chrome with WebGPU support');
-if (choreography.schemaVersion !== 3 || choreography.capture.source !== 'authoritative-runtime-arena') {
-  throw new Error('Pass 65 runtime capture requires canonical schema 3 authoritative-runtime choreography');
+if (choreography.schemaVersion !== 4 || choreography.capture.source !== 'authoritative-runtime-arena') {
+  throw new Error('Pass 66 runtime capture requires canonical schema 4 authoritative-runtime choreography');
 }
 if (selectedArenas.some((arena) => !canonicalArenas.includes(arena))) {
   throw new Error(`AA_PREVIEW_ARENAS contains an unknown arena: ${selectedArenas.join(', ')}`);
@@ -97,11 +97,13 @@ type CaptureEvidence = {
       stageHeightFraction: number;
       stageAreaFraction: number;
       bladeCount: number;
+      arcCount: number;
       temporalTrailCount: number;
       legibleBladeSweeps: number;
       projectedBladeThresholdPixels: number;
       shortestProjectedBladeLengthPixels: number;
       projectedSweepSpanPixels: number;
+      projectedArcSpanPixels: number;
       authoredBladeThicknessPixels: number;
       bladeOpacity: number;
       contrastMode: string | null;
@@ -184,48 +186,52 @@ async function installCaptureSurface(page: Page, kind: 'helicopter' | 'cat'): Pr
       #game{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;display:block!important}
       #offline-menu-preview-overlay{position:fixed;inset:0;z-index:2147483647;pointer-events:none;color:${palette[3]};font:600 9px/1.1 ui-monospace,Consolas,monospace;letter-spacing:.16em;text-shadow:0 1px 2px #000}
       #offline-menu-preview-overlay *{box-sizing:border-box}
-      .aa-main-rotor-stage{position:absolute;z-index:1;left:${(100 - rotorPresentation.mainStageWidthPercent) / 2}%;top:${rotorPresentation.mainStageTopPercent}%;width:${rotorPresentation.mainStageWidthPercent}%;height:${rotorPresentation.mainStageHeightPercent}%;perspective:900px;transform-style:preserve-3d;overflow:hidden;isolation:isolate;transform-origin:50% 72%;transform:translate3d(var(--aa-main-rotor-shift-x,0px),var(--aa-main-rotor-shift-y,0px),0) rotate(var(--aa-main-rotor-bank,0deg));filter:drop-shadow(0 2px 5px rgba(0,0,0,.78));opacity:.96}
-      .aa-main-rotor-plane{position:absolute;z-index:1;left:-8%;right:-8%;top:-38%;height:185%;transform-origin:50% 52%;transform-style:preserve-3d;transform:rotateX(calc(${rotorPresentation.mainDiscPitchDegrees}deg + var(--aa-main-rotor-pitch-response,0deg))) rotateY(var(--aa-main-rotor-yaw-response,0deg)) rotateZ(var(--aa-main-rotor-angle,0deg))}
-      .aa-main-rotor-blade{position:absolute;left:50%;top:51%;width:48%;height:7px;transform-origin:0 50%;border-radius:2px 82% 82% 2px;background:linear-gradient(90deg,rgba(9,14,16,.97) 0%,rgba(20,29,32,.94) 19%,rgba(43,57,61,.82) 58%,rgba(90,112,116,.52) 82%,rgba(123,151,155,.14) 96%,transparent 100%);filter:blur(.12px);box-shadow:0 1px 1px rgba(0,0,0,.48),inset 0 1px rgba(186,218,220,.16);opacity:0.86}
-      .aa-main-rotor-blade:before,.aa-main-rotor-blade:after{content:"";position:absolute;left:1.5%;top:0;width:97%;height:7px;transform-origin:0 50%;border-radius:2px 85% 85% 2px;pointer-events:none}
-      .aa-main-rotor-blade:before{transform:rotate(-${rotorPresentation.mainNearTrailDegrees}deg) scaleX(.985);background:linear-gradient(90deg,rgba(165,202,205,${rotorPresentation.mainMotionBlurOpacity}) 0%,rgba(98,125,129,.15) 42%,rgba(99,128,132,.07) 74%,transparent 100%);filter:blur(1.05px)}
-      .aa-main-rotor-blade:after{transform:rotate(-${rotorPresentation.mainFarTrailDegrees}deg) scaleX(.95);background:linear-gradient(90deg,rgba(142,178,181,${(rotorPresentation.mainMotionBlurOpacity * 0.55).toFixed(3)}) 0%,rgba(84,109,112,.08) 43%,transparent 88%);filter:blur(1.55px)}
+      .aa-main-rotor-stage{position:absolute;z-index:1;left:${(100 - rotorPresentation.mainStageWidthPercent) / 2}%;top:${rotorPresentation.mainStageTopPercent}%;width:${rotorPresentation.mainStageWidthPercent}%;height:${rotorPresentation.mainStageHeightPercent}%;perspective:1400px;transform-style:preserve-3d;overflow:hidden;isolation:isolate;transform-origin:50% 68%;transform:translate3d(var(--aa-main-rotor-shift-x,0px),var(--aa-main-rotor-shift-y,0px),0) rotate(var(--aa-main-rotor-bank,0deg));filter:drop-shadow(0 2px 4px rgba(0,0,0,.62));opacity:.9}
+      .aa-main-rotor-arc{position:absolute;z-index:1;left:4%;right:4%;height:52%;border-radius:50%;border-top:2px solid rgba(151,190,193,.22);filter:blur(1.1px);transform-origin:50% 100%;pointer-events:none}
+      .aa-main-rotor-arc.near{top:4%;border-top-color:rgba(203,227,225,.27);transform:rotate(-1.2deg) scaleY(.72)}
+      .aa-main-rotor-arc.mid{left:10%;right:10%;top:12%;border-top-color:rgba(111,160,164,.2);filter:blur(1.7px);transform:rotate(.8deg) scaleY(.58)}
+      .aa-main-rotor-arc.far{left:18%;right:18%;top:20%;border-top-color:rgba(81,129,133,.14);filter:blur(2.2px);transform:rotate(-.45deg) scaleY(.44)}
+      .aa-main-rotor-plane{position:absolute;z-index:2;left:-5%;right:-5%;top:-30%;height:165%;transform-origin:50% 52%;transform-style:preserve-3d;transform:rotateX(calc(${rotorPresentation.mainDiscPitchDegrees}deg + var(--aa-main-rotor-pitch-response,0deg))) rotateY(var(--aa-main-rotor-yaw-response,0deg)) rotateZ(var(--aa-main-rotor-angle,0deg))}
+      .aa-main-rotor-blade{position:absolute;left:50%;top:51%;width:48%;height:3px;transform-origin:0 50%;border-radius:2px 88% 88% 2px;background:linear-gradient(90deg,rgba(12,18,20,.72) 0%,rgba(31,43,46,.52) 32%,rgba(94,119,121,.26) 72%,rgba(179,205,203,.08) 94%,transparent 100%);filter:blur(.75px);box-shadow:0 1px 2px rgba(0,0,0,.34);opacity:0.32}
+      .aa-main-rotor-blade:before,.aa-main-rotor-blade:after{content:"";position:absolute;left:2%;top:-1px;width:96%;height:4px;transform-origin:0 50%;border-radius:2px 90% 90% 2px;pointer-events:none}
+      .aa-main-rotor-blade:before{transform:rotate(-${rotorPresentation.mainNearTrailDegrees}deg) scaleX(.985);background:linear-gradient(90deg,rgba(155,190,191,${rotorPresentation.mainMotionBlurOpacity}) 0%,rgba(92,121,123,.1) 46%,transparent 100%);filter:blur(1.8px)}
+      .aa-main-rotor-blade:after{transform:rotate(-${rotorPresentation.mainFarTrailDegrees}deg) scaleX(.95);background:linear-gradient(90deg,rgba(130,165,167,${(rotorPresentation.mainMotionBlurOpacity * 0.55).toFixed(3)}) 0%,rgba(72,101,103,.05) 48%,transparent 91%);filter:blur(2.4px)}
       .aa-main-rotor-blade:nth-child(2){transform:rotate(90deg)}.aa-main-rotor-blade:nth-child(3){transform:rotate(180deg)}.aa-main-rotor-blade:nth-child(4){transform:rotate(270deg)}
-      .aa-main-rotor-mast{position:absolute;left:49.4%;top:28%;width:1.2%;height:52%;border-radius:5px;background:linear-gradient(90deg,#070b0c 0%,#253438 26%,${palette[2]} 50%,#1a2528 72%,#070a0c 100%);box-shadow:0 2px 4px #000,inset 1px 0 rgba(203,236,238,.2);z-index:2}
-      .aa-main-rotor-hub{position:absolute;left:48.3%;top:50%;width:3.4%;height:17%;border-radius:48% 52% 44% 56%;background:radial-gradient(ellipse at 38% 28%,#d9edef 0%,${palette[2]} 30%,#202c30 58%,${palette[0]} 84%);border:1px solid rgba(202,239,242,.5);box-shadow:0 2px 4px #000,inset 0 1px rgba(224,248,249,.26);z-index:3}
-      .aa-main-rotor-structural-tie{position:absolute;top:62%;width:${rotorPresentation.mainStructuralTieWidthPercent}%;height:6px;border-top:1px solid rgba(181,222,226,.36);border-bottom:1px solid rgba(0,0,0,.72);border-radius:3px;background:linear-gradient(180deg,#53676b 0%,#1c292d 42%,#080d0f 100%);box-shadow:0 2px 4px #000,inset 0 1px rgba(218,244,246,.14);z-index:4}
+      .aa-main-rotor-mast{position:absolute;left:49.55%;top:25%;width:.9%;height:49%;border-radius:5px;background:linear-gradient(90deg,#050809 0%,#1b292c 28%,${palette[2]} 50%,#111a1c 72%,#040708 100%);box-shadow:0 2px 4px #000,inset 1px 0 rgba(193,229,222,.14);z-index:3}
+      .aa-main-rotor-hub{position:absolute;left:48.8%;top:52%;width:2.4%;height:14%;border-radius:48% 52% 44% 56%;background:radial-gradient(ellipse at 38% 28%,#a7c4c1 0%,${palette[2]} 27%,#152225 58%,${palette[0]} 84%);border:1px solid rgba(164,214,207,.34);box-shadow:0 2px 5px #000,0 0 6px rgba(134,196,188,.1);z-index:4}
+      .aa-main-rotor-structural-tie{position:absolute;top:69%;width:${rotorPresentation.mainStructuralTieWidthPercent}%;height:5px;border-top:1px solid rgba(150,198,195,.22);border-bottom:1px solid rgba(0,0,0,.78);border-radius:3px;background:linear-gradient(180deg,#33474a 0%,#121d20 44%,#05090b 100%);box-shadow:0 2px 4px #000;z-index:5}
       .aa-main-rotor-structural-tie.left{left:${rotorPresentation.mainStructuralTieInsetPercent}%;transform-origin:100% 50%;transform:rotate(-${rotorPresentation.mainStructuralTieAngleDegrees}deg)}
       .aa-main-rotor-structural-tie.right{right:${rotorPresentation.mainStructuralTieInsetPercent}%;transform-origin:0 50%;transform:rotate(${rotorPresentation.mainStructuralTieAngleDegrees}deg)}
-      .aa-main-rotor-canopy-header{position:absolute;left:${(100 - rotorPresentation.mainCanopyHeaderWidthPercent) / 2}%;right:${(100 - rotorPresentation.mainCanopyHeaderWidthPercent) / 2}%;top:62%;height:38%;clip-path:polygon(8% 0,92% 0,100% 100%,0 100%);background:linear-gradient(180deg,#394b50 0%,#1b282c 22%,#0b1215 58%,#040709 100%);border-top:2px solid rgba(177,226,231,.34);box-shadow:0 -2px 4px rgba(0,0,0,.86),inset 0 1px rgba(203,237,239,.14);filter:drop-shadow(0 -1px 2px #000);z-index:5}
+      .aa-main-rotor-canopy-header{position:absolute;left:${(100 - rotorPresentation.mainCanopyHeaderWidthPercent) / 2}%;right:${(100 - rotorPresentation.mainCanopyHeaderWidthPercent) / 2}%;top:63%;height:37%;clip-path:polygon(9% 0,91% 0,100% 100%,0 100%);background:linear-gradient(180deg,#25383b 0%,#111c1f 25%,#070d0f 61%,#020506 100%);border-top:2px solid rgba(148,207,199,.24);box-shadow:0 -2px 4px rgba(0,0,0,.9),inset 0 1px rgba(184,224,217,.1);filter:drop-shadow(0 -1px 2px #000);z-index:6}
       .aa-main-rotor-canopy-header:before{content:"";position:absolute;left:12%;right:12%;top:5px;height:2px;background:linear-gradient(90deg,rgba(107,142,147,.18),rgba(181,222,226,.42) 50%,rgba(107,142,147,.18));box-shadow:20px 5px 0 -1px rgba(151,195,199,.18),-20px 5px 0 -1px rgba(151,195,199,.18)}
-      .aa-tail-rotor-camera{position:absolute;z-index:8;right:16.2%;top:8.2%;width:10.8%;height:8.8%;overflow:hidden;border:1px solid rgba(83,218,240,.36);border-radius:3px;background:linear-gradient(180deg,rgba(14,32,38,.54),rgba(2,8,11,.76));box-shadow:inset 0 0 8px rgba(35,194,221,.14),0 2px 5px #000;opacity:.68}
-      .aa-tail-rotor-camera:before{content:"TAIL OPTIC";position:absolute;left:5%;top:5%;z-index:4;color:rgba(112,234,255,.7);font-size:5px;letter-spacing:.12em;text-shadow:0 1px #000}
+      .aa-tail-rotor-camera{position:absolute;z-index:8;right:12%;top:15%;width:8.4%;height:7.2%;overflow:hidden;border:1px solid rgba(89,213,194,.24);border-radius:2px;background:linear-gradient(180deg,rgba(9,23,25,.48),rgba(1,6,8,.72));box-shadow:inset 0 0 8px rgba(50,203,177,.08),0 2px 5px #000;opacity:.56}
+      .aa-tail-rotor-camera:before{content:"TAIL CAM";position:absolute;left:6%;top:6%;z-index:4;color:rgba(126,236,206,.62);font-size:5px;letter-spacing:.11em;text-shadow:0 1px #000}
       .aa-tail-rotor-stage{position:absolute;inset:6% 5%;perspective:180px;transform-style:preserve-3d}
       .aa-tail-rotor-plane{position:absolute;right:8%;top:10%;width:43%;height:76%;transform-origin:50% 50%;transform-style:preserve-3d;transform:rotateY(${rotorPresentation.tailDiscYawDegrees}deg) rotateZ(var(--aa-tail-rotor-angle,0deg))}
-      .aa-tail-rotor-plane:before{content:"";position:absolute;inset:1%;border:1px solid rgba(168,231,236,.46);border-radius:50%;background:repeating-conic-gradient(rgba(126,208,219,.36) 0 7deg,transparent 9deg 25deg);filter:blur(.8px)}
-      .aa-tail-rotor-blade{position:absolute;left:2%;right:2%;top:47%;height:6%;border-radius:80%;background:linear-gradient(90deg,transparent,rgba(196,239,242,.76),transparent);filter:blur(.35px)}.aa-tail-rotor-blade:nth-child(2){transform:rotate(90deg)}
+      .aa-tail-rotor-plane:before{content:"";position:absolute;inset:3%;border:1px dashed rgba(140,217,203,.34);border-radius:50%;filter:blur(.65px)}
+      .aa-tail-rotor-blade{position:absolute;left:4%;right:4%;top:48%;height:4%;border-radius:80%;background:linear-gradient(90deg,transparent,rgba(174,226,216,.52),transparent);filter:blur(.7px)}.aa-tail-rotor-blade:nth-child(2){transform:rotate(90deg)}
       .aa-tail-rotor-hub{position:absolute;left:43%;top:43%;width:14%;aspect-ratio:1;border-radius:50%;background:${palette[2]};border:1px solid rgba(210,245,247,.62);box-shadow:0 0 3px #000}
       .aa-tail-boom-occluder{position:absolute;left:-8%;top:47%;width:70%;height:14%;z-index:3;transform:rotate(-8deg);transform-origin:0 50%;clip-path:polygon(0 20%,100% 0,100% 100%,0 80%);background:linear-gradient(180deg,#35474b,#0c1315);border-top:1px solid rgba(151,203,209,.32)}
-      .aa-cockpit{position:absolute;left:25%;bottom:1.6%;width:50%;height:17%;display:grid;grid-template-columns:1fr 1.38fr 1fr;gap:7px;padding:12px 15px 10px;border:1px solid rgba(75,229,255,.72);border-radius:15px 15px 28px 28px;clip-path:polygon(4% 0,96% 0,100% 28%,97% 100%,3% 100%,0 28%);background:linear-gradient(180deg,rgba(29,45,49,.94),rgba(4,10,13,.97) 42%,rgba(1,5,8,.99)),repeating-linear-gradient(90deg,transparent 0 10px,rgba(72,224,255,.03) 10px 11px);box-shadow:0 10px 28px rgba(0,0,0,.8),0 0 15px rgba(48,211,255,.2),inset 0 2px rgba(199,248,255,.18),inset 0 -8px 18px rgba(0,0,0,.72)}
-      .aa-cockpit:before{content:"";position:absolute;left:5%;right:5%;top:5px;height:2px;background:linear-gradient(90deg,transparent,#38dfff 18%,#9bffd0 50%,#38dfff 82%,transparent);box-shadow:0 0 8px #28ccec;opacity:.88}
-      .aa-cockpit:after{content:"";position:absolute;left:43%;right:43%;bottom:5px;height:3px;border-radius:2px;background:#a0ffd1;box-shadow:-18px 0 #35dfff,18px 0 #35dfff,0 0 8px #62ffc4}
-      .aa-panel{position:relative;min-width:0;border:1px solid rgba(66,221,255,.58);border-radius:4px;background:radial-gradient(circle at 50% 115%,rgba(41,255,174,.22),transparent 55%),linear-gradient(180deg,rgba(8,26,32,.96),rgba(2,9,13,.98));padding:8px 7px;overflow:hidden;box-shadow:inset 0 0 9px rgba(44,213,255,.17),0 0 5px rgba(38,212,255,.13)}
-      .aa-panel:after{content:"";position:absolute;left:10%;right:10%;bottom:6px;height:2px;background:linear-gradient(90deg,#27d9ff,#8affc5);box-shadow:0 0 6px #35dcff}
-      .aa-panel strong{display:block;color:#a8ffd3;font-size:11px;margin-top:5px;letter-spacing:.08em;text-shadow:0 0 5px rgba(92,255,190,.72)}
-      .aa-panel span{display:block;color:#70eaff;font-size:7px;white-space:nowrap;text-shadow:0 0 4px rgba(42,216,255,.66)}
-      .aa-brace{position:absolute;bottom:0;width:3px;height:29%;background:linear-gradient(transparent,#27363b 48%,#57dff5);box-shadow:0 0 4px rgba(55,213,242,.36);opacity:.82}.aa-brace.left{left:20%;transform:rotate(17deg)}.aa-brace.right{right:20%;transform:rotate(-17deg)}
-      .aa-canopy{position:absolute;top:13%;bottom:15%;width:9%;border-style:solid;border-color:#314247;filter:drop-shadow(0 4px 7px #000);opacity:.88}.aa-canopy.left{left:15%;border-width:0 4px 4px 0;transform:skewX(-7deg)}.aa-canopy.right{right:15%;border-width:0 0 4px 4px;transform:skewX(7deg)}
-      .aa-glass{position:absolute;top:15%;bottom:18%;width:16%;opacity:.16;mix-blend-mode:screen}.aa-glass.left{left:20%;background:linear-gradient(118deg,rgba(97,229,255,.58),transparent 27%)}.aa-glass.right{right:20%;background:linear-gradient(242deg,rgba(97,229,255,.58),transparent 27%)}
-      .aa-reticle{position:absolute;left:calc(50% - 12px);top:34%;width:24px;height:24px;border:1px solid rgba(87,239,255,.55);border-radius:50%;box-shadow:0 0 7px rgba(53,219,255,.45)}
-      .aa-reticle:before,.aa-reticle:after{content:"";position:absolute;background:#8affc5;box-shadow:0 0 4px #46f9ba}.aa-reticle:before{left:11px;top:-7px;width:1px;height:36px}.aa-reticle:after{left:-7px;top:11px;width:36px;height:1px}
-      .aa-cat-crown{position:absolute;left:18%;right:18%;top:-7%;height:18%;border-radius:48% 48% 42% 42%;background:radial-gradient(ellipse at 50% 100%,#6f7b81 0%,#252d31 47%,#080c0f 76%);filter:drop-shadow(0 5px 8px #000);opacity:.97}
-      .aa-ear{position:absolute;top:.5%;width:14%;height:17%;border:1px solid rgba(210,226,230,.58);background:linear-gradient(145deg,#c0cbd0 0%,#69767c 23%,#22292d 60%,#090c0f 100%);clip-path:polygon(50% 0,94% 83%,76% 73%,100% 100%,0 100%,24% 73%,6% 83%);filter:drop-shadow(0 0 3px #d3e2e7) drop-shadow(0 5px 7px #000);z-index:2}
+      .aa-cockpit{position:absolute;left:31%;bottom:1.4%;width:38%;height:11.8%;display:grid;grid-template-columns:1fr 1.28fr 1fr;gap:5px;padding:8px 10px 7px;border:1px solid rgba(91,222,199,.36);border-radius:9px 9px 22px 22px;clip-path:polygon(5% 0,95% 0,100% 34%,97% 100%,3% 100%,0 34%);background:linear-gradient(180deg,rgba(20,34,36,.94),rgba(3,9,11,.98) 45%,rgba(1,4,6,.99));box-shadow:0 8px 22px rgba(0,0,0,.82),0 0 9px rgba(52,209,181,.09),inset 0 1px rgba(185,232,222,.11)}
+      .aa-cockpit:before{content:"";position:absolute;left:7%;right:7%;top:4px;height:1px;background:linear-gradient(90deg,transparent,#49bfc2 22%,#8ff0b6 50%,#49bfc2 78%,transparent);box-shadow:0 0 5px rgba(77,221,190,.42);opacity:.72}
+      .aa-cockpit:after{content:"";position:absolute;left:44%;right:44%;bottom:4px;height:2px;border-radius:2px;background:#8ee8ac;box-shadow:-13px 0 #43aeb8,13px 0 #43aeb8,0 0 5px rgba(99,232,175,.38)}
+      .aa-panel{position:relative;min-width:0;border:1px solid rgba(72,183,177,.28);border-radius:3px;background:radial-gradient(circle at 50% 120%,rgba(61,218,148,.14),transparent 58%),linear-gradient(180deg,rgba(6,19,22,.94),rgba(1,7,9,.98));padding:5px 5px;overflow:hidden;box-shadow:inset 0 0 6px rgba(55,187,177,.09)}
+      .aa-panel:after{content:"";position:absolute;left:13%;right:13%;bottom:4px;height:1px;background:linear-gradient(90deg,#3aaab7,#78dca1);box-shadow:0 0 4px rgba(74,213,180,.32)}
+      .aa-panel strong{display:block;color:#a3e9b9;font-size:9px;margin-top:3px;letter-spacing:.07em;text-shadow:0 0 4px rgba(82,205,144,.42)}
+      .aa-panel span{display:block;color:#71bfc4;font-size:6px;white-space:nowrap;text-shadow:0 1px #000}
+      .aa-brace{position:absolute;bottom:0;width:5px;height:27%;background:linear-gradient(transparent,#111b1e 40%,#263b3e 72%,#3f8e8a);box-shadow:0 0 3px rgba(56,157,151,.2);opacity:.94}.aa-brace.left{left:18%;transform:rotate(15deg)}.aa-brace.right{right:18%;transform:rotate(-15deg)}
+      .aa-canopy{position:absolute;top:12%;bottom:10%;width:9%;border-style:solid;border-color:#18272a;filter:drop-shadow(0 4px 7px #000);opacity:.96}.aa-canopy.left{left:15%;border-width:0 5px 5px 0;transform:skewX(-7deg)}.aa-canopy.right{right:15%;border-width:0 0 5px 5px;transform:skewX(7deg)}
+      .aa-glass{position:absolute;top:14%;bottom:13%;width:15%;opacity:.1;mix-blend-mode:screen}.aa-glass.left{left:20%;background:linear-gradient(118deg,rgba(79,193,184,.46),transparent 25%)}.aa-glass.right{right:20%;background:linear-gradient(242deg,rgba(79,193,184,.46),transparent 25%)}
+      .aa-reticle{position:absolute;left:calc(50% - 10px);top:36%;width:20px;height:20px;border:1px solid rgba(109,222,166,.46);border-radius:50%;box-shadow:0 0 5px rgba(73,204,150,.24)}
+      .aa-reticle:before,.aa-reticle:after{content:"";position:absolute;background:#93eab1;box-shadow:0 0 3px rgba(72,207,146,.44)}.aa-reticle:before{left:9px;top:-6px;width:1px;height:30px}.aa-reticle:after{left:-6px;top:9px;width:30px;height:1px}
+      .aa-cat-crown{position:absolute;left:29%;right:29%;top:-5%;height:11%;border-radius:46% 46% 38% 38%;background:radial-gradient(ellipse at 50% 100%,#617076 0%,#242d31 48%,#070b0d 78%);filter:drop-shadow(0 4px 6px #000);opacity:.96}
+      .aa-ear{position:absolute;top:.7%;width:9%;height:13%;border:1px solid rgba(190,207,210,.46);background:linear-gradient(145deg,#a7b4b8 0%,#59676d 25%,#1b2327 63%,#070a0c 100%);clip-path:polygon(50% 0,94% 83%,76% 73%,100% 100%,0 100%,24% 73%,6% 83%);filter:drop-shadow(0 0 2px rgba(205,222,224,.52)) drop-shadow(0 4px 6px #000);z-index:2}
       .aa-ear:before{content:"";position:absolute;inset:17% 21% 13%;background:linear-gradient(165deg,#efb7b7 4%,#916d78 48%,#30383d 100%);clip-path:polygon(50% 0,94% 100%,6% 100%);opacity:.96}
-      .aa-ear:after{content:"";position:absolute;left:34%;right:34%;bottom:0;height:34%;background:linear-gradient(#d7e0e3,#737f84);clip-path:polygon(50% 0,100% 100%,0 100%)}.aa-ear.left{left:22%;transform:rotate(-8deg)}.aa-ear.right{right:22%;transform:scaleX(-1) rotate(-8deg)}
-      .aa-foreleg{position:absolute;bottom:-5%;width:11%;height:22%;border:1px solid rgba(207,220,224,.48);border-radius:46% 46% 28% 28%;background:linear-gradient(100deg,#0b1013,#69757a 45%,#252d31 78%,#090d10);box-shadow:0 -3px 10px #000}.aa-foreleg.left{left:25%;transform:rotate(8deg)}.aa-foreleg.right{right:25%;transform:scaleX(-1) rotate(8deg)}
-      .aa-paw{position:absolute;bottom:1%;width:12%;height:10%;border:2px solid #bdcbd0;border-radius:50% 50% 35% 35%;background:radial-gradient(circle at 50% 34%,#8f9ba0,#354046 56%,#0a0f12 100%);box-shadow:0 -3px 10px #000,0 0 4px rgba(195,223,229,.35);z-index:3}.aa-paw.left{left:24.5%;transform:rotate(8deg)}.aa-paw.right{right:24.5%;transform:rotate(-8deg)}
-      .aa-paw:before{content:"";position:absolute;left:32%;top:41%;width:36%;height:38%;border-radius:52% 52% 46% 46%;background:#d99ca0;box-shadow:-18px -12px 0 -5px #d99ca0,-6px -17px 0 -5px #d99ca0,6px -17px 0 -5px #d99ca0,18px -12px 0 -5px #d99ca0}
-      .aa-paw:after{content:"";position:absolute;left:18%;right:18%;top:8%;height:12%;border-top:2px solid rgba(228,240,243,.75);border-radius:50%}
+      .aa-ear:after{content:"";position:absolute;left:34%;right:34%;bottom:0;height:34%;background:linear-gradient(#c9d4d7,#637177);clip-path:polygon(50% 0,100% 100%,0 100%)}.aa-ear.left{left:29%;transform:rotate(-7deg)}.aa-ear.right{right:29%;transform:scaleX(-1) rotate(-7deg)}
+      .aa-foreleg{position:absolute;bottom:-4%;width:7%;height:16%;border:1px solid rgba(185,204,207,.34);border-radius:48% 48% 30% 30%;background:linear-gradient(100deg,#080c0e,#56646a 46%,#20292d 78%,#070b0d);box-shadow:0 -3px 8px #000}.aa-foreleg.left{left:30%;transform:rotate(6deg)}.aa-foreleg.right{right:30%;transform:scaleX(-1) rotate(6deg)}
+      .aa-paw{position:absolute;bottom:.5%;width:8.5%;height:7.5%;border:1px solid rgba(188,205,208,.5);border-radius:50% 50% 38% 38%;background:radial-gradient(circle at 50% 22%,#87959a,#364247 56%,#080c0e 100%);box-shadow:0 -3px 8px #000,0 0 3px rgba(188,216,217,.2);z-index:3}.aa-paw.left{left:29.2%;transform:rotate(6deg)}.aa-paw.right{right:29.2%;transform:rotate(-6deg)}
+      .aa-paw:before{content:"";position:absolute;inset:12% 14% 18%;border-radius:46%;background:radial-gradient(circle at 12% 34%,rgba(218,226,227,.46) 0 5%,transparent 6%),radial-gradient(circle at 38% 18%,rgba(218,226,227,.46) 0 5%,transparent 6%),radial-gradient(circle at 64% 18%,rgba(218,226,227,.46) 0 5%,transparent 6%),radial-gradient(circle at 88% 34%,rgba(218,226,227,.46) 0 5%,transparent 6%),radial-gradient(ellipse at 50% 94%,rgba(196,133,139,.34) 0 17%,transparent 18%)}
+      .aa-paw:after{content:"";position:absolute;left:20%;right:20%;top:10%;height:18%;border-top:1px solid rgba(225,235,236,.58);border-radius:50%}
     `;
     document.head.append(style);
     const overlay = document.createElement('div');
@@ -235,8 +241,9 @@ async function installCaptureSurface(page: Page, kind: 'helicopter' | 'cat'): Pr
     overlay.dataset.palette = palette.join(',');
     overlay.dataset.minimumProjectedBladeLength = String(rotorPresentation.mainMinimumProjectedBladeLengthPixels);
     overlay.dataset.minimumProjectedSweepSpan = String(rotorPresentation.mainMinimumProjectedSweepSpanPixels);
+    overlay.dataset.minimumProjectedArcSpan = String(rotorPresentation.mainMinimumProjectedArcSpanPixels);
     overlay.innerHTML = kind === 'helicopter'
-      ? '<div class="aa-main-rotor-stage" data-projection="broad-upper-windscreen-partial-sweep" data-contrast="graphite-physical-root-tip-v2" data-occlusion-order="rotor-plane<mast-hub<structural-ties<canopy-header"><div class="aa-main-rotor-plane"><i class="aa-main-rotor-blade"></i><i class="aa-main-rotor-blade"></i><i class="aa-main-rotor-blade"></i><i class="aa-main-rotor-blade"></i></div><i class="aa-main-rotor-mast"></i><i class="aa-main-rotor-hub"></i><i class="aa-main-rotor-structural-tie left"></i><i class="aa-main-rotor-structural-tie right"></i><i class="aa-main-rotor-canopy-header"></i></div><div class="aa-tail-rotor-camera"><div class="aa-tail-rotor-stage"><div class="aa-tail-rotor-plane"><i class="aa-tail-rotor-blade"></i><i class="aa-tail-rotor-blade"></i><i class="aa-tail-rotor-hub"></i></div><i class="aa-tail-boom-occluder"></i></div></div><i class="aa-canopy left"></i><i class="aa-canopy right"></i><i class="aa-glass left"></i><i class="aa-glass right"></i><i class="aa-brace left"></i><i class="aa-brace right"></i><i class="aa-reticle"></i><div class="aa-cockpit"><div class="aa-panel"><span>ALT / RADAR</span><strong id="aa-alt">024 M</strong></div><div class="aa-panel"><span>FLIGHT PATH</span><strong id="aa-heading">HOLD 000</strong></div><div class="aa-panel"><span>ROTOR / LINK</span><strong>ARMED</strong></div></div>'
+      ? '<div class="aa-main-rotor-stage" data-projection="perspective-elliptic-motion-arcs" data-contrast="graphite-low-contrast-motion-v1" data-occlusion-order="rotor-arcs<rotor-plane<mast-hub<structural-ties<canopy-header"><i class="aa-main-rotor-arc near"></i><i class="aa-main-rotor-arc mid"></i><i class="aa-main-rotor-arc far"></i><div class="aa-main-rotor-plane"><i class="aa-main-rotor-blade"></i><i class="aa-main-rotor-blade"></i><i class="aa-main-rotor-blade"></i><i class="aa-main-rotor-blade"></i></div><i class="aa-main-rotor-mast"></i><i class="aa-main-rotor-hub"></i><i class="aa-main-rotor-structural-tie left"></i><i class="aa-main-rotor-structural-tie right"></i><i class="aa-main-rotor-canopy-header"></i></div><div class="aa-tail-rotor-camera"><div class="aa-tail-rotor-stage"><div class="aa-tail-rotor-plane"><i class="aa-tail-rotor-blade"></i><i class="aa-tail-rotor-blade"></i><i class="aa-tail-rotor-hub"></i></div><i class="aa-tail-boom-occluder"></i></div></div><i class="aa-canopy left"></i><i class="aa-canopy right"></i><i class="aa-glass left"></i><i class="aa-glass right"></i><i class="aa-brace left"></i><i class="aa-brace right"></i><i class="aa-reticle"></i><div class="aa-cockpit"><div class="aa-panel"><span>ALT / RADAR</span><strong id="aa-alt">024 M</strong></div><div class="aa-panel"><span>VECTOR</span><strong id="aa-heading">HOLD 000</strong></div><div class="aa-panel"><span>ROTOR / LINK</span><strong>SYNC</strong></div></div>'
       : '<div class="aa-cat-crown"></div><div class="aa-ear left"></div><div class="aa-ear right"></div><div class="aa-foreleg left"></div><div class="aa-foreleg right"></div><div class="aa-paw left"></div><div class="aa-paw right"></div>';
     document.querySelector('#app')?.append(overlay);
   }, {
@@ -256,6 +263,9 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
   await page.route('**/v1/leaderboard?*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"entries":[]}' }));
   await page.route('**/v1/streak', (route) => route.fulfill({ status: 202, contentType: 'application/json', body: '{"accepted":true}' }));
   await page.goto(`http://127.0.0.1:${port}/?release=latest&renderer=webgpu&render=blender&seed=${definition.seed}&menuPreviewCapture=1`);
+  // TSX names nested helpers during transpilation. Playwright serializes this
+  // callback into the page realm, so provide the inert helper explicitly.
+  await page.evaluate('globalThis.__name = globalThis.__name || ((target) => target);');
   await page.waitForFunction(() => {
     const snapshot = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot(): any } }).__ATOMIC_ACRES_DEBUG__?.snapshot();
     return ['menu-video-ready', 'ready'].includes(snapshot?.bootstrap.stage)
@@ -395,6 +405,7 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
       const overlay = document.querySelector<HTMLElement>('#offline-menu-preview-overlay')!;
       const stage = overlay.querySelector<HTMLElement>('.aa-main-rotor-stage')!;
       const plane = overlay.querySelector<HTMLElement>('.aa-main-rotor-plane')!;
+      const arcs = [...overlay.querySelectorAll<HTMLElement>('.aa-main-rotor-arc')];
       const mast = overlay.querySelector<HTMLElement>('.aa-main-rotor-mast')!;
       const hub = overlay.querySelector<HTMLElement>('.aa-main-rotor-hub')!;
       const structuralTies = [...overlay.querySelectorAll<HTMLElement>('.aa-main-rotor-structural-tie')];
@@ -419,6 +430,7 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
       const after = getComputedStyle(plane, '::after');
       const blades = [...plane.querySelectorAll<HTMLElement>('.aa-main-rotor-blade')];
       const bladeRects = blades.map((blade) => blade.getBoundingClientRect());
+      const arcRects = arcs.map((arc) => arc.getBoundingClientRect());
       const bladeLengths = bladeRects.map((bladeRect) => Math.max(bladeRect.width, bladeRect.height));
       const bladeStyle = getComputedStyle(blades[0]!);
       const bladeBefore = getComputedStyle(blades[0]!, '::before');
@@ -440,8 +452,8 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
         const top = Math.max(frontRect.top, backRect.top);
         const bottom = Math.min(frontRect.bottom, backRect.bottom);
         if (right <= left || bottom <= top) return false;
-        for (const xRatio of [0.2, 0.5, 0.8]) {
-          for (const yRatio of [0.2, 0.5, 0.8]) {
+        for (const xRatio of [0.05, 0.25, 0.5, 0.75, 0.95]) {
+          for (const yRatio of [0.05, 0.25, 0.5, 0.75, 0.95]) {
             const stack = document.elementsFromPoint(left + (right - left) * xRatio, top + (bottom - top) * yRatio);
             const frontIndex = stack.indexOf(front);
             const backIndex = stack.indexOf(back);
@@ -474,11 +486,13 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
         stageHeightFraction: stage.offsetHeight / window.innerHeight,
         stageAreaFraction: stage.offsetWidth * stage.offsetHeight / (window.innerWidth * window.innerHeight),
         bladeCount: blades.length,
+        arcCount: arcs.length,
         temporalTrailCount,
         legibleBladeSweeps: bladeLengths.filter((length) => length >= projectedBladeThresholdPixels).length,
         projectedBladeThresholdPixels,
         shortestProjectedBladeLengthPixels: Math.min(...bladeLengths),
         projectedSweepSpanPixels: Math.max(0, visibleSweepRight - visibleSweepLeft),
+        projectedArcSpanPixels: Math.max(...arcRects.map((arcRect) => arcRect.width)),
         authoredBladeThicknessPixels: Number.parseFloat(bladeStyle.height),
         bladeOpacity: Number.parseFloat(bladeStyle.opacity),
         contrastMode: stage.dataset.contrast ?? null,
@@ -498,7 +512,8 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
         rightTieCanopyOcclusionSampled,
         hubCanopyOcclusionSampled,
         mastCanopyOcclusionSampled,
-        occlusionStackValid: stage.dataset.occlusionOrder === 'rotor-plane<mast-hub<structural-ties<canopy-header'
+        occlusionStackValid: stage.dataset.occlusionOrder === 'rotor-arcs<rotor-plane<mast-hub<structural-ties<canopy-header'
+          && arcs.every((arc) => zIndex(arc) < zIndex(plane))
           && zIndex(plane) < zIndex(mast)
           && zIndex(mast) <= zIndex(hub)
           && zIndex(hub) < zIndex(leftTie)
@@ -516,15 +531,18 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
         discYawResponseDegrees: Number(overlay.dataset.rotorDiscYawResponse),
       };
     }) : undefined;
-    if (rotorProjection && (rotorProjection.mode !== 'broad-upper-windscreen-partial-sweep'
+    if (rotorProjection && (rotorProjection.mode !== 'perspective-elliptic-motion-arcs'
       || rotorProjection.bladeCount !== choreography.helicopter.rotorPresentation.mainBladeCount
+      || rotorProjection.arcCount !== choreography.helicopter.rotorPresentation.mainArcCount
       || rotorProjection.temporalTrailCount !== choreography.helicopter.rotorPresentation.mainMotionBlurTrailCount
       || rotorProjection.legibleBladeSweeps < choreography.helicopter.rotorPresentation.mainMinimumLegibleBladeSweeps
       || rotorProjection.projectedBladeThresholdPixels !== choreography.helicopter.rotorPresentation.mainMinimumProjectedBladeLengthPixels
       || !Number.isFinite(rotorProjection.shortestProjectedBladeLengthPixels)
       || rotorProjection.projectedSweepSpanPixels < choreography.helicopter.rotorPresentation.mainMinimumProjectedSweepSpanPixels
+      || rotorProjection.projectedArcSpanPixels < choreography.helicopter.rotorPresentation.mainMinimumProjectedArcSpanPixels
       || rotorProjection.authoredBladeThicknessPixels < choreography.helicopter.rotorPresentation.mainMinimumAuthoredBladeThicknessPixels
       || rotorProjection.bladeOpacity < choreography.helicopter.rotorPresentation.mainMinimumBladeOpacity
+      || rotorProjection.bladeOpacity > choreography.helicopter.rotorPresentation.mainMaximumBladeOpacity
       || rotorProjection.contrastMode !== choreography.helicopter.rotorPresentation.mainContrastMode
       || rotorProjection.filledDiscDetected
       || rotorProjection.stageTopFraction > choreography.helicopter.rotorPresentation.mainMaximumStageTopFraction
@@ -565,7 +583,7 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
       || Math.abs(rotorProjection.poseBankDegrees) > choreography.helicopter.rotorPresentation.mainMaximumPoseBankDegrees
       || Math.abs(rotorProjection.discPitchResponseDegrees) > choreography.helicopter.rotorPresentation.mainMaximumDiscPitchResponseDegrees
       || Math.abs(rotorProjection.discYawResponseDegrees) > choreography.helicopter.rotorPresentation.mainMaximumDiscYawResponseDegrees)) {
-      throw new Error(`${arenaId} frame ${frame} violates the broad upper-windscreen rotor projection contract: ${JSON.stringify(rotorProjection)}`);
+      throw new Error(`${arenaId} frame ${frame} violates the perspective-elliptic rotor projection contract: ${JSON.stringify(rotorProjection)}`);
     }
     const framePath = path.join(directory, `frame-${String(frame).padStart(4, '0')}.png`);
     const seamSourcePath = path.join(directory, 'frame-0001.png');
@@ -645,8 +663,8 @@ async function main(): Promise<void> {
       throw new Error('Runtime capture inputs changed during authoring; all staged frames are rejected as stale');
     }
     const receipt = {
-      schemaVersion: 3,
-      captureId: 'pass65-authoritative-runtime-menu-preview-capture-v4',
+      schemaVersion: 4,
+      captureId: 'pass66-authoritative-runtime-menu-preview-capture-v1',
       generatedAt: '2026-07-29',
       recipeId: choreography.recipeId,
       recipeDigest: sha256(JSON.stringify(choreography)),
@@ -656,7 +674,7 @@ async function main(): Promise<void> {
       overlay: {
         scale: choreography.capture.overlayScale,
         palette: choreography.capture.overlayPalette,
-        mode: 'offline-baked-compact-black-grey',
+        mode: 'offline-baked-minimal-graphite-green',
         liveLoadingRenderer: false,
       },
       frameRoster: requestedFrames,

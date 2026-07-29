@@ -31,9 +31,9 @@ describe('canonical prerecorded menu preview choreography', () => {
   it('defines the same eight-second authored recipe for every selectable arena', () => {
     for (const arena of ARENA_SELECTIONS) {
       const definition = menuPreviewDefinition(arena.id);
-      expect(definition.recipeId).toBe('pass65-authoritative-runtime-menu-preview-v5');
+      expect(definition.recipeId).toBe('pass66-authoritative-runtime-menu-preview-v1');
       expect(definition.durationMs).toBe(8_000);
-      expect(definition.reviewFrames).toEqual([1, 48, 96, 144, 192]);
+      expect(definition.reviewFrames).toEqual([1, 60, 120, 180, 240]);
       expect(definition.label).toContain(arena.selectorLabel);
       expect(definition.fovDegrees).toBeGreaterThanOrEqual(60);
       expect(definition.fovDegrees).toBeLessThanOrEqual(70);
@@ -45,7 +45,7 @@ describe('canonical prerecorded menu preview choreography', () => {
       const definition = menuPreviewDefinition(arenaId);
       expect(definition.kind).toBe('helicopter');
       if (definition.kind !== 'helicopter') throw new Error('unreachable definition');
-      expect(definition.cockpitAssetId).toBe('pass65-compact-cockpit-overlay-v5');
+      expect(definition.cockpitAssetId).toBe('pass66-compact-cockpit-overlay-v1');
     }
     expect(menuPreviewDefinition('gun-range').kind).toBe('cat');
   });
@@ -56,8 +56,8 @@ describe('canonical prerecorded menu preview choreography', () => {
       const unique = new Set<string>();
       let heldFramePairs = 0;
       let previous = menuPreviewPose(arenaId, 0);
-      for (let frame = 1; frame <= 192; frame += 1) {
-        const timeMs = (frame - 1) / 191 * definition.durationMs;
+      for (let frame = 1; frame <= 240; frame += 1) {
+        const timeMs = (frame - 1) / 239 * definition.durationMs;
         const pose = menuPreviewPose(arenaId, timeMs);
         expectInsideSafeVolume(arenaId, pose.position);
         expect(Math.abs(pose.variance.pitchDegrees)).toBeLessThanOrEqual(0.8);
@@ -89,13 +89,13 @@ describe('canonical prerecorded menu preview choreography', () => {
     expect(definition.kind).toBe('cat');
     if (definition.kind !== 'cat') throw new Error('unreachable definition');
     expect(new Set(definition.momentLabels).size).toBe(8);
-    const deltaSeconds = definition.durationMs / 1_000 / 191;
+    const deltaSeconds = definition.durationMs / 1_000 / 239;
     const seenMoments = new Set<string>();
     let previous = menuPreviewPose('gun-range', 0);
     let previousVelocity = 0;
     let previousAngularVelocity = 0;
-    for (let frame = 2; frame <= 191; frame += 1) {
-      const timeMs = (frame - 1) / 191 * definition.durationMs;
+    for (let frame = 2; frame <= 239; frame += 1) {
+      const timeMs = (frame - 1) / 239 * definition.durationMs;
       const pose = menuPreviewPose('gun-range', timeMs);
       expectInsideSafeVolume('gun-range', pose.position);
       const velocity = distance(previous.position, pose.position) / deltaSeconds;

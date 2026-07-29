@@ -76,7 +76,7 @@ function canonicalArenaDependencies() {
 }
 
 function validateRecipe() {
-  if (choreography.schemaVersion !== 3 || choreography.recipeId !== 'pass65-authoritative-runtime-menu-preview-v5') {
+  if (choreography.schemaVersion !== 4 || choreography.recipeId !== 'pass66-authoritative-runtime-menu-preview-v1') {
     throw new Error('canonical authoritative-runtime choreography schema or recipe id is invalid');
   }
   if (choreography.capture?.source !== 'authoritative-runtime-arena'
@@ -96,7 +96,7 @@ function validateRecipe() {
     || choreography.reviewFrames.at(-1) !== choreography.frameCount) {
     throw new Error('reviewFrames must be unique and include the exact loop endpoints');
   }
-  if (choreography.media.cacheKey !== 'pass65-runtime-preview-v8') throw new Error('runtime preview cache key is stale');
+  if (choreography.media.cacheKey !== 'pass66-runtime-preview-v2') throw new Error('runtime preview cache key is stale');
   const rotor = choreography.helicopter?.rotorPresentation;
   const configuredRotorArea = rotor?.mainStageWidthPercent / 100 * rotor?.mainStageHeightPercent / 100;
   const configuredRotorTop = rotor?.mainStageTopPercent / 100;
@@ -106,12 +106,12 @@ function validateRecipe() {
   const configuredTieRight = configuredTieLeft + rotor?.mainStageWidthPercent * rotor?.mainStructuralTieWidthPercent / 100;
   const configuredHeaderLeft = configuredStageLeft + rotor?.mainStageWidthPercent * (100 - rotor?.mainCanopyHeaderWidthPercent) / 200;
   const configuredMaximumHorizontalShiftPercent = rotor?.mainMaximumPoseShiftPixels / choreography.capture.viewport[0] * 100;
-  if (rotor?.id !== 'perspective-projected-cockpit-rotor-rig-v3'
+  if (rotor?.id !== 'perspective-elliptic-cockpit-rotor-rig-v1'
     || rotor.mainTurnsPerLoop !== choreography.helicopter.rotorTurnsPerLoop
     || rotor.mainTurnsPerLoop <= 0
     || rotor.tailTurnsPerLoop !== rotor.mainTurnsPerLoop * 3
-    || rotor.mainDiscPitchDegrees < 72
-    || rotor.mainDiscPitchDegrees > 80
+    || rotor.mainDiscPitchDegrees < 78
+    || rotor.mainDiscPitchDegrees > 86
     || rotor.mainStageTopPercent < -3
     || rotor.mainStageTopPercent > 1
     || rotor.mainStageWidthPercent < 80
@@ -119,18 +119,23 @@ function validateRecipe() {
     || rotor.mainStageHeightPercent < 20
     || rotor.mainStageHeightPercent > 24
     || rotor.mainBladeCount !== 4
-    || rotor.mainBladeMode !== 'broad-clipped-temporal-sweeps-v2'
-    || rotor.mainContrastMode !== 'graphite-physical-root-tip-v2'
+    || rotor.mainArcCount !== 3
+    || rotor.mainBladeMode !== 'elliptic-motion-arcs-with-subdued-spokes-v1'
+    || rotor.mainContrastMode !== 'graphite-low-contrast-motion-v1'
     || rotor.mainFilledDisc !== false
     || rotor.mainMinimumLegibleBladeSweeps !== 2
-    || rotor.mainMinimumProjectedBladeLengthPixels < 220
-    || rotor.mainMinimumProjectedBladeLengthPixels > 320
-    || rotor.mainMinimumProjectedSweepSpanPixels < 560
-    || rotor.mainMinimumProjectedSweepSpanPixels > 720
-    || rotor.mainMinimumAuthoredBladeThicknessPixels < 4
-    || rotor.mainMinimumAuthoredBladeThicknessPixels > 8
-    || rotor.mainMinimumBladeOpacity < 0.72
-    || rotor.mainMinimumBladeOpacity > 0.9
+    || rotor.mainMinimumProjectedBladeLengthPixels < 260
+    || rotor.mainMinimumProjectedBladeLengthPixels > 420
+    || rotor.mainMinimumProjectedSweepSpanPixels < 680
+    || rotor.mainMinimumProjectedSweepSpanPixels > 960
+    || rotor.mainMinimumProjectedArcSpanPixels < 640
+    || rotor.mainMinimumProjectedArcSpanPixels > 1000
+    || rotor.mainMinimumAuthoredBladeThicknessPixels < 2
+    || rotor.mainMinimumAuthoredBladeThicknessPixels > 5
+    || rotor.mainMinimumBladeOpacity < 0.18
+    || rotor.mainMinimumBladeOpacity > 0.34
+    || rotor.mainMaximumBladeOpacity < rotor.mainMinimumBladeOpacity
+    || rotor.mainMaximumBladeOpacity > 0.42
     || rotor.mainMinimumScreenWidthFraction < 0.75
     || rotor.mainMaximumScreenWidthFraction > 0.92
     || rotor.mainStageWidthPercent / 100 < rotor.mainMinimumScreenWidthFraction
@@ -168,12 +173,12 @@ function validateRecipe() {
     || rotor.mainMaximumHubCanopyOcclusionFraction > 0.7
     || rotor.mainMinimumMastCanopyOverlapPixels < 6
     || rotor.mainMinimumMastCanopyOverlapPixels > 14
-    || rotor.mainCanopyHeaderWidthPercent < 36
-    || rotor.mainCanopyHeaderWidthPercent > 48
+    || rotor.mainCanopyHeaderWidthPercent < 28
+    || rotor.mainCanopyHeaderWidthPercent > 40
     || rotor.mainStructuralTieInsetPercent < 12
     || rotor.mainStructuralTieInsetPercent > 24
     || rotor.mainStructuralTieWidthPercent < 10
-    || rotor.mainStructuralTieWidthPercent > 20
+    || rotor.mainStructuralTieWidthPercent > 24
     || rotor.mainStructuralTieAngleDegrees < 4
     || rotor.mainStructuralTieAngleDegrees > 14
     || rotor.mainMinimumTieHeaderOverlapAreaPixels < 10
@@ -192,14 +197,14 @@ function validateRecipe() {
     || rotor.mainFarTrailDegrees < 7
     || rotor.mainFarTrailDegrees > 12
     || rotor.mainFarTrailDegrees <= rotor.mainNearTrailDegrees
-    || rotor.mainMotionBlurOpacity < 0.12
-    || rotor.mainMotionBlurOpacity > 0.22
+    || rotor.mainMotionBlurOpacity < 0.08
+    || rotor.mainMotionBlurOpacity > 0.16
     || rotor.poseResponsive !== true
     || rotor.tailDiscYawDegrees < 50
     || rotor.tailDiscYawDegrees > 75
     || rotor.tailCameraReflection !== true
     || !['mast-hub', 'structural-ties', 'canopy-header', 'tail-boom'].every((layer) => rotor.occlusionLayers?.includes(layer))) {
-    throw new Error('broad upper-windscreen main/tail rotor projection contract is invalid');
+    throw new Error('perspective-elliptic main/tail rotor projection contract is invalid');
   }
   for (const arena of arenas) {
     const recipe = choreography.arenas[arena];
@@ -231,8 +236,8 @@ async function assertFrames(arena, frames = undefined) {
 async function assertCaptureReceipt() {
   const receipt = JSON.parse(await readFile(captureReceiptPath, 'utf8'));
   const recipeDigest = createHash('sha256').update(JSON.stringify(choreography)).digest('hex');
-  if (receipt.schemaVersion !== 3
-    || receipt.captureId !== 'pass65-authoritative-runtime-menu-preview-capture-v4'
+  if (receipt.schemaVersion !== 4
+    || receipt.captureId !== 'pass66-authoritative-runtime-menu-preview-capture-v1'
     || receipt.recipeId !== choreography.recipeId
     || receipt.recipeDigest !== recipeDigest
     || receipt.source !== choreography.capture.source
@@ -303,15 +308,18 @@ async function assertCaptureReceipt() {
       }
       if (recipe.kind === 'helicopter') {
         const projection = frame.rotorProjection;
-        if (projection?.mode !== 'broad-upper-windscreen-partial-sweep'
+        if (projection?.mode !== 'perspective-elliptic-motion-arcs'
           || projection.bladeCount !== choreography.helicopter.rotorPresentation.mainBladeCount
+          || projection.arcCount !== choreography.helicopter.rotorPresentation.mainArcCount
           || projection.temporalTrailCount !== choreography.helicopter.rotorPresentation.mainMotionBlurTrailCount
           || projection.legibleBladeSweeps < choreography.helicopter.rotorPresentation.mainMinimumLegibleBladeSweeps
           || projection.projectedBladeThresholdPixels !== choreography.helicopter.rotorPresentation.mainMinimumProjectedBladeLengthPixels
           || !Number.isFinite(projection.shortestProjectedBladeLengthPixels)
           || projection.projectedSweepSpanPixels < choreography.helicopter.rotorPresentation.mainMinimumProjectedSweepSpanPixels
+          || projection.projectedArcSpanPixels < choreography.helicopter.rotorPresentation.mainMinimumProjectedArcSpanPixels
           || projection.authoredBladeThicknessPixels < choreography.helicopter.rotorPresentation.mainMinimumAuthoredBladeThicknessPixels
           || projection.bladeOpacity < choreography.helicopter.rotorPresentation.mainMinimumBladeOpacity
+          || projection.bladeOpacity > choreography.helicopter.rotorPresentation.mainMaximumBladeOpacity
           || projection.contrastMode !== choreography.helicopter.rotorPresentation.mainContrastMode
           || projection.filledDiscDetected !== false
           || projection.stageTopFraction > choreography.helicopter.rotorPresentation.mainMaximumStageTopFraction
@@ -353,7 +361,7 @@ async function assertCaptureReceipt() {
           || Math.abs(projection.discPitchResponseDegrees) > choreography.helicopter.rotorPresentation.mainMaximumDiscPitchResponseDegrees
           || Math.abs(projection.discYawResponseDegrees) > choreography.helicopter.rotorPresentation.mainMaximumDiscYawResponseDegrees
           || projection.poseTransform === 'none') {
-          throw new Error(`${evidence.arenaId} review frame ${frame.frame} does not prove the broad upper-windscreen rotor projection`);
+          throw new Error(`${evidence.arenaId} review frame ${frame.frame} does not prove the perspective-elliptic rotor projection`);
         }
       } else if (frame.rotorProjection !== undefined) {
         throw new Error(`${evidence.arenaId} cat review frame ${frame.frame} unexpectedly contains helicopter rotor evidence`);
@@ -387,14 +395,14 @@ function transcode(arena, outputRoot = runtimeRoot) {
     '-fflags', '+bitexact', '-map_metadata', '-1', '-map', '0:v:0', '-map', '1:a:0',
     '-t', String(choreography.durationSeconds),
   ];
-  run('ffmpeg', [...common, '-c:v', 'libx264', '-preset', 'slow', '-b:v', '850k', '-minrate', '700k', '-maxrate', '900k', '-bufsize', '1800k', '-flags:v', '+bitexact', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-c:a', 'aac', '-flags:a', '+bitexact', '-b:a', '64k', mp4]);
-  run('ffmpeg', [...common, '-c:v', 'libvpx-vp9', '-crf', '35', '-b:v', '820k', '-minrate', '650k', '-maxrate', '880k', '-bufsize', '1760k', '-row-mt', '1', '-deadline', 'good', '-cpu-used', '2', '-flags:v', '+bitexact', '-pix_fmt', 'yuv420p', '-c:a', 'libopus', '-flags:a', '+bitexact', '-b:a', '48k', webm]);
+  run('ffmpeg', [...common, '-c:v', 'libx264', '-preset', 'slow', '-profile:v', 'high', '-level:v', '3.1', '-b:v', '1250k', '-minrate', '1000k', '-maxrate', '1400k', '-bufsize', '2800k', '-g', '60', '-keyint_min', '60', '-sc_threshold', '0', '-threads:v', '1', '-x264-params', 'threads=1:lookahead_threads=1:sliced_threads=0', '-flags:v', '+bitexact', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-c:a', 'aac', '-threads:a', '1', '-flags:a', '+bitexact', '-b:a', '64k', mp4]);
+  run('ffmpeg', [...common, '-c:v', 'libvpx-vp9', '-crf', '33', '-b:v', '1180k', '-minrate', '900k', '-maxrate', '1350k', '-bufsize', '2700k', '-g', '60', '-row-mt', '1', '-deadline', 'good', '-cpu-used', '2', '-flags:v', '+bitexact', '-pix_fmt', 'yuv420p', '-c:a', 'libopus', '-flags:a', '+bitexact', '-b:a', '48k', webm]);
   run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-fflags', '+bitexact', '-i', path.join(frameRoot, arena, `frame-${String(recipe.posterFrame).padStart(4, '0')}.png`), '-map_metadata', '-1', '-frames:v', '1', '-c:v', 'libwebp', '-quality', '82', poster]);
 }
 
 function createReviewSheet(arena, outputRoot = reviewRoot) {
   const inputs = choreography.reviewFrames.flatMap((frame) => ['-i', path.join(frameRoot, arena, `frame-${String(frame).padStart(4, '0')}.png`)]);
-  const scales = choreography.reviewFrames.map((_, index) => `[${index}:v]scale=384:216:flags=lanczos[r${index}]`).join(';');
+  const scales = choreography.reviewFrames.map((_, index) => `[${index}:v]scale=480:270:flags=lanczos[r${index}]`).join(';');
   const labels = choreography.reviewFrames.map((_, index) => `[r${index}]`).join('');
   run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', ...inputs, '-filter_complex', `${scales};${labels}hstack=inputs=${choreography.reviewFrames.length}[review]`, '-map', '[review]', '-map_metadata', '-1', '-frames:v', '1', '-c:v', 'libwebp', '-quality', '86', path.join(outputRoot, `${arena}-review-frames.webp`)]);
 }
@@ -488,7 +496,7 @@ for (const arena of arenas) {
 }
 
 const provenance = {
-  schemaVersion: 3,
+  schemaVersion: 4,
   assetId: 'atomic-acres-pass65-prerecorded-menu-previews-2026-07-26',
   generatedAt: '2026-07-29',
   creator: 'Atomic Acres project',
@@ -527,13 +535,13 @@ const provenance = {
   sources,
   render: {
     masterFrames: `${choreography.frameCount} PNG frames per arena (intermediate frames excluded from git)`,
-    dimensions: '960x540',
+    dimensions: '1280x720',
     frameRate: choreography.fps,
     durationSeconds: choreography.durationSeconds,
     mapSource: 'Selected authoritative production runtime arena under hardware WebGPU',
     motion: 'Canonical deterministic cyclic camera paths over fixed runtime visual time',
-    helicopter: 'Broad upper-windscreen graphite rotor sweeps with restrained temporal trails, measured hub/mast/header occlusion, visible structural ties into both side canopy rails, and a sculpted three-panel cockpit with cyan/green avionics, canopy depth, glass, braces and a map-safe reticle baked offline',
-    cat: 'Expressive charcoal/silver feline crown, articulated ears, forelegs and coral-padded paws baked offline over the authoritative Gun Range moving-target scene',
+    helicopter: 'Perspective-aware elliptic rotor arcs with subdued moving spokes, measured hub/mast/header occlusion, visible structural ties into both side canopy rails, and a compact graphite cockpit with restrained green avionics and an unobstructed sightline baked offline',
+    cat: 'Compact charcoal/silver feline crown, articulated ears, forelegs and top-facing paws baked offline over the authoritative Gun Range moving-target scene',
     overlayScale: choreography.capture.overlayScale,
     audio: choreography.media.audioProfiles,
   },
@@ -555,8 +563,8 @@ record.sourceScript = relative(generatorPath);
 record.sourceScriptSha256 = provenance.generator.sha256;
 record.sourceProvenanceSha256 = await sha256(provenancePath);
 record.generatedAsOf = provenance.generatedAt;
-record.format = 'Four distinct 960x540 eight-second 24 FPS selected-map runtime captures, shipped as VP9/Opus WebM, H.264/AAC MP4 and static WebP posters, plus deterministic five-frame review evidence';
-record.modifications = 'Captured offline from each actual authoritative production WebGPU arena with deterministic camera and visual time. Three map flyovers bake broad upper-windscreen graphite rotor sweeps with dual restrained temporal trails, measured mast/hub/header occlusion, two visible structural ties into the side canopy rails, a clear tail optic and cyan/green cockpit avionics; Gun Range bakes an expressive charcoal/silver crown, articulated ears, forelegs and coral-padded paws. Runtime loading/menu playback remains prerecorded-only, reduced motion is poster-only, and no downloaded or sampled assets are used. The former byte-identical Gun Range media gate is explicitly superseded.';
+record.format = 'Four distinct 1280x720 eight-second 30 FPS selected-map runtime captures, shipped as VP9/Opus WebM, H.264/AAC MP4 and static WebP posters, plus deterministic five-frame review evidence';
+record.modifications = 'Captured offline from each actual authoritative production WebGPU arena with deterministic camera and visual time. Three map flyovers bake perspective-aware elliptic rotor arcs with subdued moving spokes, measured mast/hub/header occlusion, two visible structural ties into the side canopy rails, a restrained tail camera and compact green-on-graphite cockpit avionics; Gun Range bakes compact charcoal/silver ears, forelegs and top-facing paws. Runtime loading/menu playback remains prerecorded-only, reduced motion is poster-only, and no downloaded or sampled assets are used. The former byte-identical Gun Range media gate is explicitly superseded.';
 await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
 
 console.log(JSON.stringify({ releaseState: provenance.releaseState, recipeId: choreography.recipeId, source: choreography.capture.source, arenas, runtimeFiles: runtimeFiles.length, reviewSheets: reviewEvidence.length }, null, 2));

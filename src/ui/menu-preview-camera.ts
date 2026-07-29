@@ -26,7 +26,7 @@ type ArenaRecipeBase = Readonly<{
 
 type HelicopterRecipe = ArenaRecipeBase & Readonly<{
   kind: 'helicopter';
-  cockpitAssetId: 'pass65-compact-cockpit-overlay-v5';
+  cockpitAssetId: 'pass66-compact-cockpit-overlay-v1';
   centre: Vector3Tuple;
   radius: readonly [number, number];
   altitudeM: number;
@@ -49,7 +49,7 @@ type CatRecipe = ArenaRecipeBase & Readonly<{
 
 type ArenaRecipe = HelicopterRecipe | CatRecipe;
 type ChoreographyRecipe = Readonly<{
-  schemaVersion: 3;
+  schemaVersion: 4;
   recipeId: string;
   fps: number;
   durationSeconds: number;
@@ -61,7 +61,7 @@ type ChoreographyRecipe = Readonly<{
     holdFraction: number;
     rotorTurnsPerLoop: number;
     rotorPresentation: Readonly<{
-      id: 'perspective-projected-cockpit-rotor-rig-v3';
+      id: 'perspective-elliptic-cockpit-rotor-rig-v1';
       mainTurnsPerLoop: number;
       tailTurnsPerLoop: number;
       mainDiscPitchDegrees: number;
@@ -69,14 +69,17 @@ type ChoreographyRecipe = Readonly<{
       mainStageWidthPercent: number;
       mainStageHeightPercent: number;
       mainBladeCount: 4;
-      mainBladeMode: 'broad-clipped-temporal-sweeps-v2';
-      mainContrastMode: 'graphite-physical-root-tip-v2';
+      mainArcCount: 3;
+      mainBladeMode: 'elliptic-motion-arcs-with-subdued-spokes-v1';
+      mainContrastMode: 'graphite-low-contrast-motion-v1';
       mainFilledDisc: false;
       mainMinimumLegibleBladeSweeps: 2;
       mainMinimumProjectedBladeLengthPixels: number;
       mainMinimumProjectedSweepSpanPixels: number;
+      mainMinimumProjectedArcSpanPixels: number;
       mainMinimumAuthoredBladeThicknessPixels: number;
       mainMinimumBladeOpacity: number;
+      mainMaximumBladeOpacity: number;
       mainMinimumScreenWidthFraction: number;
       mainMaximumScreenWidthFraction: number;
       mainMinimumScreenHeightFraction: number;

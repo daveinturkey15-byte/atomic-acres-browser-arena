@@ -120,7 +120,7 @@ function validateVideo(file, videoCodec, audioCodec, recipe, arena) {
   const budget = recipe.media.encodingBudget;
   if (video?.codec_name !== videoCodec) failures.push(`${relative(file)} must use ${videoCodec} video`);
   if (audio?.codec_name !== audioCodec) failures.push(`${relative(file)} must include ${audioCodec} audio`);
-  if (video?.width !== 960 || video?.height !== 540) failures.push(`${relative(file)} must be 960x540`);
+  if (video?.width !== recipe.capture.viewport[0] || video?.height !== recipe.capture.viewport[1]) failures.push(`${relative(file)} must be ${recipe.capture.viewport.join('x')}`);
   if (video?.r_frame_rate !== `${recipe.fps}/1`) failures.push(`${relative(file)} must be ${recipe.fps} FPS`);
   if (frameCount !== recipe.frameCount) failures.push(`${relative(file)} must contain exactly ${recipe.frameCount} frames`);
   if (!Number.isFinite(duration) || Math.abs(duration - recipe.durationSeconds) > 0.08) failures.push(`${relative(file)} must be ${recipe.durationSeconds} seconds`);
@@ -162,12 +162,12 @@ function rotorContractFailures(recipe, generatorSource) {
   const configuredTieRight = configuredTieLeft + rotor?.mainStageWidthPercent * rotor?.mainStructuralTieWidthPercent / 100;
   const configuredHeaderLeft = configuredStageLeft + rotor?.mainStageWidthPercent * (100 - rotor?.mainCanopyHeaderWidthPercent) / 200;
   const configuredMaximumHorizontalShiftPercent = rotor?.mainMaximumPoseShiftPixels / recipe.capture?.viewport?.[0] * 100;
-  if (rotor?.id !== 'perspective-projected-cockpit-rotor-rig-v3'
+  if (rotor?.id !== 'perspective-elliptic-cockpit-rotor-rig-v1'
     || rotor.mainTurnsPerLoop !== recipe.helicopter?.rotorTurnsPerLoop
     || rotor.mainTurnsPerLoop <= 0
     || rotor.tailTurnsPerLoop !== rotor.mainTurnsPerLoop * 3
-    || rotor.mainDiscPitchDegrees < 72
-    || rotor.mainDiscPitchDegrees > 80) {
+    || rotor.mainDiscPitchDegrees < 78
+    || rotor.mainDiscPitchDegrees > 86) {
     issues.push('rotor identity, forward spin cadence, or perspective pitch drifted');
   }
   if (!Number.isFinite(configuredArea)
@@ -198,19 +198,24 @@ function rotorContractFailures(recipe, generatorSource) {
     issues.push('main rotor must occupy a broad but upper-windscreen-bounded transparent stage');
   }
   if (rotor.mainBladeCount !== 4
-    || rotor.mainBladeMode !== 'broad-clipped-temporal-sweeps-v2'
-    || rotor.mainContrastMode !== 'graphite-physical-root-tip-v2'
+    || rotor.mainArcCount !== 3
+    || rotor.mainBladeMode !== 'elliptic-motion-arcs-with-subdued-spokes-v1'
+    || rotor.mainContrastMode !== 'graphite-low-contrast-motion-v1'
     || rotor.mainFilledDisc !== false
     || rotor.mainMinimumLegibleBladeSweeps !== 2
-    || rotor.mainMinimumProjectedBladeLengthPixels < 220
-    || rotor.mainMinimumProjectedBladeLengthPixels > 320
-    || rotor.mainMinimumProjectedSweepSpanPixels < 560
-    || rotor.mainMinimumProjectedSweepSpanPixels > 720
-    || rotor.mainMinimumAuthoredBladeThicknessPixels < 4
-    || rotor.mainMinimumAuthoredBladeThicknessPixels > 8
-    || rotor.mainMinimumBladeOpacity < 0.72
-    || rotor.mainMinimumBladeOpacity > 0.9) {
-    issues.push('main rotor physical blade length, sweep span, thickness, or restrained alpha contract drifted');
+    || rotor.mainMinimumProjectedBladeLengthPixels < 260
+    || rotor.mainMinimumProjectedBladeLengthPixels > 420
+    || rotor.mainMinimumProjectedSweepSpanPixels < 680
+    || rotor.mainMinimumProjectedSweepSpanPixels > 960
+    || rotor.mainMinimumProjectedArcSpanPixels < 640
+    || rotor.mainMinimumProjectedArcSpanPixels > 1000
+    || rotor.mainMinimumAuthoredBladeThicknessPixels < 2
+    || rotor.mainMinimumAuthoredBladeThicknessPixels > 5
+    || rotor.mainMinimumBladeOpacity < 0.18
+    || rotor.mainMinimumBladeOpacity > 0.34
+    || rotor.mainMaximumBladeOpacity < rotor.mainMinimumBladeOpacity
+    || rotor.mainMaximumBladeOpacity > 0.42) {
+    issues.push('main rotor physical blade, elliptic arc, thickness, or subdued alpha contract drifted');
   }
   if (rotor.mainMotionBlurTrailCount !== 2
     || rotor.mainNearTrailDegrees < 3
@@ -218,8 +223,8 @@ function rotorContractFailures(recipe, generatorSource) {
     || rotor.mainFarTrailDegrees < 7
     || rotor.mainFarTrailDegrees > 12
     || rotor.mainFarTrailDegrees <= rotor.mainNearTrailDegrees
-    || rotor.mainMotionBlurOpacity < 0.12
-    || rotor.mainMotionBlurOpacity > 0.22) {
+    || rotor.mainMotionBlurOpacity < 0.08
+    || rotor.mainMotionBlurOpacity > 0.16) {
     issues.push('main rotor must use exactly two restrained temporal motion-blur trails');
   }
   if (rotor.mainMaximumPoseShiftPixels < 8
@@ -243,12 +248,12 @@ function rotorContractFailures(recipe, generatorSource) {
     || rotor.mainMaximumHubCanopyOcclusionFraction > 0.7
     || rotor.mainMinimumMastCanopyOverlapPixels < 6
     || rotor.mainMinimumMastCanopyOverlapPixels > 14
-    || rotor.mainCanopyHeaderWidthPercent < 36
-    || rotor.mainCanopyHeaderWidthPercent > 48
+    || rotor.mainCanopyHeaderWidthPercent < 28
+    || rotor.mainCanopyHeaderWidthPercent > 40
     || rotor.mainStructuralTieInsetPercent < 12
     || rotor.mainStructuralTieInsetPercent > 24
     || rotor.mainStructuralTieWidthPercent < 10
-    || rotor.mainStructuralTieWidthPercent > 20
+    || rotor.mainStructuralTieWidthPercent > 24
     || rotor.mainStructuralTieAngleDegrees < 4
     || rotor.mainStructuralTieAngleDegrees > 14
     || rotor.mainMinimumTieHeaderOverlapAreaPixels < 10
@@ -278,17 +283,19 @@ function rotorContractFailures(recipe, generatorSource) {
     const to = mainSource.indexOf(end, from + start.length);
     return from >= 0 && to > from ? mainSource.slice(from, to) : '';
   };
-  const stageRule = ruleSlice('.aa-main-rotor-stage{', '.aa-main-rotor-plane{');
+  const stageRule = ruleSlice('.aa-main-rotor-stage{', '.aa-main-rotor-arc{');
+  const arcRule = ruleSlice('.aa-main-rotor-arc{', '.aa-main-rotor-plane{');
   const planeRule = ruleSlice('.aa-main-rotor-plane{', '.aa-main-rotor-blade{');
   const bladeRule = ruleSlice('.aa-main-rotor-blade{', '.aa-main-rotor-blade:before,.aa-main-rotor-blade:after{');
   const tieRule = ruleSlice('.aa-main-rotor-structural-tie{', '.aa-main-rotor-structural-tie.left{');
   const canopyHeaderRule = ruleSlice('.aa-main-rotor-canopy-header{', '.aa-main-rotor-canopy-header:before{');
   const bladeElements = (generatorSource.match(/class="aa-main-rotor-blade"><\/i>/g) ?? []).length;
+  const arcElements = (generatorSource.match(/class="aa-main-rotor-arc (?:near|mid|far)"><\/i>/g) ?? []).length;
   const tieElements = (generatorSource.match(/class="aa-main-rotor-structural-tie (?:left|right)"><\/i>/g) ?? []).length;
   for (const marker of [
-    'data-projection="broad-upper-windscreen-partial-sweep"',
-    'data-contrast="graphite-physical-root-tip-v2"',
-    'data-occlusion-order="rotor-plane<mast-hub<structural-ties<canopy-header"',
+    'data-projection="perspective-elliptic-motion-arcs"',
+    'data-contrast="graphite-low-contrast-motion-v1"',
+    'data-occlusion-order="rotor-arcs<rotor-plane<mast-hub<structural-ties<canopy-header"',
     'top:${rotorPresentation.mainStageTopPercent}%',
     'width:${rotorPresentation.mainStageWidthPercent}%',
     'height:${rotorPresentation.mainStageHeightPercent}%',
@@ -303,6 +310,7 @@ function rotorContractFailures(recipe, generatorSource) {
     "overlay.dataset.rotorPoseResponsive = 'true'",
     'overlay.dataset.minimumProjectedBladeLength',
     'overlay.dataset.minimumProjectedSweepSpan',
+    'overlay.dataset.minimumProjectedArcSpan',
     'overlay.dataset.rotorDiscPitchResponse',
     'overlay.dataset.rotorDiscYawResponse',
     '.aa-main-rotor-mast',
@@ -327,9 +335,10 @@ function rotorContractFailures(recipe, generatorSource) {
     'tailOpticClear',
     'filledDiscDetected',
   ]) if (!generatorSource.includes(marker)) issues.push(`rotor generator is missing ${marker}`);
-  if (!mainSource || !stageRule || !planeRule || !bladeRule) issues.push('main rotor source boundary/stage/plane/blade rule is missing');
+  if (!mainSource || !stageRule || !arcRule || !planeRule || !bladeRule) issues.push('main rotor source boundary/stage/arc/plane/blade rule is missing');
   if (!mainSource.includes('overflow:hidden') || !stageRule.includes('isolation:isolate')) issues.push('main rotor projection must isolate and clip blade sweeps at the canopy viewport boundary');
   if (bladeElements !== rotor?.mainBladeCount) issues.push(`main rotor must emit exactly ${rotor?.mainBladeCount ?? 0} discrete radial blades, got ${bladeElements}`);
+  if (arcElements !== rotor?.mainArcCount || !arcRule.includes('border-top:2px solid') || !arcRule.includes('border-radius:50%')) issues.push(`main rotor must emit exactly ${rotor?.mainArcCount ?? 0} transparent elliptic motion arcs, got ${arcElements}`);
   if (tieElements !== 2 || !tieRule) issues.push(`main rotor must emit exactly two visible structural ties, got ${tieElements}`);
   if (/repeating-conic-gradient|\.aa-main-rotor-plane:(?:before|after)/.test(mainSource)) issues.push('main rotor regressed to a filled/full-disc pseudo surface');
   if (/background(?:-image)?\s*:/.test(stageRule)) issues.push('main rotor stage must remain transparent rather than becoming a large alpha fill');
@@ -338,17 +347,17 @@ function rotorContractFailures(recipe, generatorSource) {
   const authoredBladeHeight = Number(bladeRule.match(/height:(\d+(?:\.\d+)?)px/)?.[1]);
   if (!Number.isFinite(authoredBladeOpacity)
     || authoredBladeOpacity < rotor.mainMinimumBladeOpacity
-    || authoredBladeOpacity > 0.9
+    || authoredBladeOpacity > rotor.mainMaximumBladeOpacity
     || !Number.isFinite(authoredBladeHeight)
     || authoredBladeHeight < rotor.mainMinimumAuthoredBladeThicknessPixels
-    || authoredBladeHeight > 8) issues.push('authored blade alpha/thickness must stay physical and restrained');
+    || authoredBladeHeight > 5) issues.push('authored blade alpha/thickness must stay subdued and physically tapered');
   if (!canopyHeaderRule.includes('clip-path:polygon(')
     || !canopyHeaderRule.includes('background:linear-gradient(')
     || !canopyHeaderRule.includes('border-top:2px solid')
-    || !canopyHeaderRule.includes('z-index:5')) issues.push('canopy occluder must read as a structural cockpit header above the hub, mast, and ties');
-  if (!tieRule.includes('height:6px')
+    || !canopyHeaderRule.includes('z-index:6')) issues.push('canopy occluder must read as a structural cockpit header above the hub, mast, ties, and arcs');
+  if (!tieRule.includes('height:5px')
     || !tieRule.includes('background:linear-gradient(')
-    || !tieRule.includes('z-index:4')) issues.push('structural ties must remain visible physical members between the canopy header and side rails');
+    || !tieRule.includes('z-index:5')) issues.push('structural ties must remain visible physical members between the canopy header and side rails');
   if (!generatorSource.includes('.aa-tail-rotor-camera{position:absolute;z-index:8;')) issues.push('tail optic must remain above the clipped main-rotor stage');
   return issues;
 }
@@ -356,15 +365,18 @@ function rotorContractFailures(recipe, generatorSource) {
 function rotorProjectionFailures(recipe, projection) {
   const issues = [];
   const rotor = recipe.helicopter?.rotorPresentation;
-  if (projection?.mode !== 'broad-upper-windscreen-partial-sweep'
+  if (projection?.mode !== 'perspective-elliptic-motion-arcs'
     || projection.bladeCount !== rotor?.mainBladeCount
+    || projection.arcCount !== rotor?.mainArcCount
     || projection.temporalTrailCount !== rotor?.mainMotionBlurTrailCount
     || projection.legibleBladeSweeps < rotor?.mainMinimumLegibleBladeSweeps
     || projection.projectedBladeThresholdPixels !== rotor?.mainMinimumProjectedBladeLengthPixels
     || !Number.isFinite(projection.shortestProjectedBladeLengthPixels)
     || projection.projectedSweepSpanPixels < rotor?.mainMinimumProjectedSweepSpanPixels
+    || projection.projectedArcSpanPixels < rotor?.mainMinimumProjectedArcSpanPixels
     || projection.authoredBladeThicknessPixels < rotor?.mainMinimumAuthoredBladeThicknessPixels
     || projection.bladeOpacity < rotor?.mainMinimumBladeOpacity
+    || projection.bladeOpacity > rotor?.mainMaximumBladeOpacity
     || projection.contrastMode !== rotor?.mainContrastMode
     || projection.filledDiscDetected !== false
     || projection.stageTopFraction > rotor?.mainMaximumStageTopFraction
@@ -448,23 +460,25 @@ if (rotorOnly || rotorSelfTest) {
       },
     };
     const legacyTinyStarSource = source
-      .replace('data-projection="broad-upper-windscreen-partial-sweep"', 'data-projection="foreshortened-partial-sweep"')
-      .replace('data-contrast="graphite-physical-root-tip-v2"', 'data-contrast="graphite-root-fade-v1"')
-      .replace(' data-occlusion-order="rotor-plane<mast-hub<structural-ties<canopy-header"', '')
+      .replace('data-projection="perspective-elliptic-motion-arcs"', 'data-projection="foreshortened-partial-sweep"')
+      .replace('data-contrast="graphite-low-contrast-motion-v1"', 'data-contrast="graphite-root-fade-v1"')
+      .replace(' data-occlusion-order="rotor-arcs<rotor-plane<mast-hub<structural-ties<canopy-header"', '')
       .replace(/\s*\.aa-main-rotor-blade:before\{[^}]*\}/, '')
       .replaceAll('aa-main-rotor-canopy-header', 'aa-main-rotor-occluder');
     const mutations = [
-      ['legacy v2 tiny-star recipe', legacyTinyStarRecipe, source, /broad but upper-windscreen-bounded|physical blade length/],
+      ['legacy v2 tiny-star recipe', legacyTinyStarRecipe, source, /broad but upper-windscreen-bounded|physical blade|elliptic arc/],
       ['legacy v2 tiny-star source', recipe, legacyTinyStarSource, /rotor generator is missing|canopy occluder/],
-      ['filled-disc flag', { ...recipe, helicopter: { ...recipe.helicopter, rotorPresentation: { ...rotor, mainFilledDisc: true } } }, source, /physical blade length/],
+      ['filled-disc flag', { ...recipe, helicopter: { ...recipe.helicopter, rotorPresentation: { ...rotor, mainFilledDisc: true } } }, source, /physical blade|elliptic arc/],
       ['oversized stage', { ...recipe, helicopter: { ...recipe.helicopter, rotorPresentation: { ...rotor, mainStageWidthPercent: 96 } } }, source, /broad but upper-windscreen-bounded/],
       ['flat projection', { ...recipe, helicopter: { ...recipe.helicopter, rotorPresentation: { ...rotor, mainDiscPitchDegrees: 58 } } }, source, /perspective pitch/],
       ['single temporal trail', { ...recipe, helicopter: { ...recipe.helicopter, rotorPresentation: { ...rotor, mainMotionBlurTrailCount: 1 } } }, source, /exactly two restrained temporal/],
-      ['missing sweep span floor', { ...recipe, helicopter: { ...recipe.helicopter, rotorPresentation: { ...rotor, mainMinimumProjectedSweepSpanPixels: 108 } } }, source, /physical blade length/],
-      ['missing legibility floor', { ...recipe, helicopter: { ...recipe.helicopter, rotorPresentation: { ...rotor, mainMinimumLegibleBladeSweeps: 0 } } }, source, /physical blade length/],
+      ['missing sweep span floor', { ...recipe, helicopter: { ...recipe.helicopter, rotorPresentation: { ...rotor, mainMinimumProjectedSweepSpanPixels: 108 } } }, source, /physical blade|elliptic arc/],
+      ['missing arc span floor', { ...recipe, helicopter: { ...recipe.helicopter, rotorPresentation: { ...rotor, mainMinimumProjectedArcSpanPixels: 108 } } }, source, /physical blade|elliptic arc/],
+      ['missing legibility floor', { ...recipe, helicopter: { ...recipe.helicopter, rotorPresentation: { ...rotor, mainMinimumLegibleBladeSweeps: 0 } } }, source, /physical blade|elliptic arc/],
       ['filled conic surface', recipe, source.replace('.aa-tail-rotor-camera', '.aa-main-rotor-plane:before{background:repeating-conic-gradient(red,transparent)} .aa-tail-rotor-camera'), /filled\/full-disc/],
       ['alpha-washed stage', recipe, source.replace('overflow:hidden;isolation:isolate;', 'overflow:hidden;isolation:isolate;background:rgba(120,180,190,.35);'), /stage must remain transparent/],
-      ['floating canopy bar', recipe, source.replace('clip-path:polygon(8% 0,92% 0,100% 100%,0 100%);background:linear-gradient', 'background:linear-gradient'), /structural cockpit header/],
+      ['floating canopy bar', recipe, source.replace('clip-path:polygon(9% 0,91% 0,100% 100%,0 100%);background:linear-gradient', 'background:linear-gradient'), /structural cockpit header/],
+      ['missing elliptic arcs', recipe, source.replaceAll('aa-main-rotor-arc', 'aa-main-rotor-missing-arc'), /transparent elliptic motion arcs|rotor generator is missing/],
       ['missing structural ties', recipe, source.replaceAll('aa-main-rotor-structural-tie', 'aa-main-rotor-detached-tie'), /exactly two visible structural ties|rotor generator is missing/],
       ['disconnected structural ties', { ...recipe, helicopter: { ...recipe.helicopter, rotorPresentation: { ...rotor, mainStructuralTieInsetPercent: 34, mainStructuralTieWidthPercent: 8 } } }, source, /structural ties/],
     ];
@@ -474,13 +488,15 @@ if (rotorOnly || rotorSelfTest) {
       else if (!issues.some((issue) => expectedIssue.test(issue))) failures.push(`rotor self-test rejected ${label} for the wrong reason: ${issues.join(' | ')}`);
     }
     const validProjection = {
-      mode: 'broad-upper-windscreen-partial-sweep',
+      mode: 'perspective-elliptic-motion-arcs',
       bladeCount: rotor.mainBladeCount,
+      arcCount: rotor.mainArcCount,
       temporalTrailCount: rotor.mainMotionBlurTrailCount,
       legibleBladeSweeps: rotor.mainMinimumLegibleBladeSweeps,
       projectedBladeThresholdPixels: rotor.mainMinimumProjectedBladeLengthPixels,
       shortestProjectedBladeLengthPixels: rotor.mainMinimumProjectedBladeLengthPixels,
       projectedSweepSpanPixels: rotor.mainMinimumProjectedSweepSpanPixels,
+      projectedArcSpanPixels: rotor.mainMinimumProjectedArcSpanPixels,
       authoredBladeThicknessPixels: rotor.mainMinimumAuthoredBladeThicknessPixels,
       bladeOpacity: rotor.mainMinimumBladeOpacity,
       contrastMode: rotor.mainContrastMode,
@@ -564,24 +580,24 @@ const currentDependencyClosure = currentCanonicalDependencies
   ? await buildDependencyClosure(root, { extraPaths: currentCanonicalDependencies.arenas.flatMap((arena) => arena.localAssetPaths) })
   : null;
 
-if (choreography.schemaVersion !== 3 || choreography.recipeId !== 'pass65-authoritative-runtime-menu-preview-v5') failures.push('canonical runtime choreography schema/recipe drifted');
+if (choreography.schemaVersion !== 4 || choreography.recipeId !== 'pass66-authoritative-runtime-menu-preview-v1') failures.push('canonical runtime choreography schema/recipe drifted');
 if (choreography.capture?.source !== 'authoritative-runtime-arena' || choreography.capture?.backend !== 'webgpu' || choreography.capture?.overlayScale !== 0.5) failures.push('canonical capture must pin authoritative WebGPU arenas and half-scale overlays');
 if (choreography.frameCount !== choreography.fps * choreography.durationSeconds) failures.push('choreography frame count does not equal fps * duration');
 if (Object.keys(choreography.arenas).join(',') !== arenas.join(',')) failures.push('choreography arena roster/order drifted');
-if (provenance.schemaVersion !== 3 || provenance.releaseState !== 'HITL candidate only') failures.push('provenance must be schema 3 HITL-candidate media');
+if (provenance.schemaVersion !== 4 || provenance.releaseState !== 'HITL candidate only') failures.push('provenance must be schema 4 HITL-candidate media');
 if (!manifestRecord) failures.push(`assets.manifest.json is missing ${provenance.assetId}`);
 if (provenance.authoredCockpit?.assetId !== 'chopper-gunner-vehicle-v1' || provenance.authoredCockpit?.qualityTier !== 'LOD0') failures.push('provenance must retain the accepted LOD0 cockpit design reference');
 
 const recipeDigest = createHash('sha256').update(JSON.stringify(choreography)).digest('hex');
 failures.push(...rotorContractFailures(choreography, generatorSource));
-if (captureReceipt.schemaVersion !== 3
-  || captureReceipt.captureId !== 'pass65-authoritative-runtime-menu-preview-capture-v4'
+if (captureReceipt.schemaVersion !== 4
+  || captureReceipt.captureId !== 'pass66-authoritative-runtime-menu-preview-capture-v1'
   || captureReceipt.recipeId !== choreography.recipeId
   || captureReceipt.recipeDigest !== recipeDigest
   || captureReceipt.source !== 'authoritative-runtime-arena'
   || captureReceipt.backendRequired !== 'webgpu'
   || captureReceipt.overlay?.scale !== 0.5
-  || captureReceipt.overlay?.mode !== 'offline-baked-compact-black-grey'
+  || captureReceipt.overlay?.mode !== 'offline-baked-minimal-graphite-green'
   || captureReceipt.overlay?.liveLoadingRenderer !== false) failures.push('capture receipt does not prove the canonical offline runtime capture/overlay contract');
 if (JSON.stringify(captureReceipt.frameRoster) !== JSON.stringify(Array.from({ length: choreography.frameCount }, (_, index) => index + 1))) failures.push('capture receipt frame roster is not exact/full');
 if ((captureReceipt.arenas ?? []).map((entry) => entry.arenaId).join(',') !== arenas.join(',')) failures.push('capture receipt arena roster/order drifted');
@@ -605,15 +621,18 @@ for (const evidence of captureReceipt.arenas ?? []) {
     if (positionError > 0.01 || Math.abs(frame.requestedFov - frame.renderedFov) > 0.1 || frame.requestedFov !== recipe.fovDegrees || Math.abs(frame.fixedVisualTimeMs - expectedFixedTimeMs) > 0.01 || frame.aboveArenaFloor !== true || frame.insideHorizontalCollider !== false || !/^[0-9a-f]{64}$/.test(frame.pngSha256)) failures.push(`${evidence.arenaId} review frame ${frame.frame} camera/visual evidence is invalid`);
     if (recipe.kind === 'helicopter') {
       const projection = frame.rotorProjection;
-      if (projection?.mode !== 'broad-upper-windscreen-partial-sweep'
+      if (projection?.mode !== 'perspective-elliptic-motion-arcs'
         || projection.bladeCount !== choreography.helicopter.rotorPresentation.mainBladeCount
+        || projection.arcCount !== choreography.helicopter.rotorPresentation.mainArcCount
         || projection.temporalTrailCount !== choreography.helicopter.rotorPresentation.mainMotionBlurTrailCount
         || projection.legibleBladeSweeps < choreography.helicopter.rotorPresentation.mainMinimumLegibleBladeSweeps
         || projection.projectedBladeThresholdPixels !== choreography.helicopter.rotorPresentation.mainMinimumProjectedBladeLengthPixels
         || !Number.isFinite(projection.shortestProjectedBladeLengthPixels)
         || projection.projectedSweepSpanPixels < choreography.helicopter.rotorPresentation.mainMinimumProjectedSweepSpanPixels
+        || projection.projectedArcSpanPixels < choreography.helicopter.rotorPresentation.mainMinimumProjectedArcSpanPixels
         || projection.authoredBladeThicknessPixels < choreography.helicopter.rotorPresentation.mainMinimumAuthoredBladeThicknessPixels
         || projection.bladeOpacity < choreography.helicopter.rotorPresentation.mainMinimumBladeOpacity
+        || projection.bladeOpacity > choreography.helicopter.rotorPresentation.mainMaximumBladeOpacity
         || projection.contrastMode !== choreography.helicopter.rotorPresentation.mainContrastMode
         || projection.filledDiscDetected !== false
         || projection.stageTopFraction > choreography.helicopter.rotorPresentation.mainMaximumStageTopFraction
@@ -643,7 +662,7 @@ for (const evidence of captureReceipt.arenas ?? []) {
         || Math.abs(projection.poseBankDegrees) > choreography.helicopter.rotorPresentation.mainMaximumPoseBankDegrees
         || Math.abs(projection.discPitchResponseDegrees) > choreography.helicopter.rotorPresentation.mainMaximumDiscPitchResponseDegrees
         || Math.abs(projection.discYawResponseDegrees) > choreography.helicopter.rotorPresentation.mainMaximumDiscYawResponseDegrees
-        || projection.poseTransform === 'none') failures.push(`${evidence.arenaId} review frame ${frame.frame} does not prove the broad upper-windscreen rotor projection`);
+        || projection.poseTransform === 'none') failures.push(`${evidence.arenaId} review frame ${frame.frame} does not prove the perspective-elliptic rotor projection`);
       for (const issue of rotorProjectionFailures(choreography, projection)) failures.push(`${evidence.arenaId} review frame ${frame.frame}: ${issue}`);
     } else if (frame.rotorProjection !== undefined) failures.push(`${evidence.arenaId} cat review frame ${frame.frame} unexpectedly contains helicopter rotor evidence`);
   }
@@ -727,9 +746,10 @@ if (manifestRecord) {
   if (manifestRecord.sourceScript !== 'scripts/assets/generate-pass65-runtime-menu-previews.ts' || manifestRecord.sourceScriptSha256 !== provenance.generator.sha256) failures.push('manifest runtime generator record is stale');
   if (manifestRecord.sourceProvenanceSha256 !== await sha256(provenancePath)) failures.push('manifest provenance digest is stale');
   if (!manifestRecord.modifications.includes('actual authoritative production WebGPU arena')
-    || !manifestRecord.modifications.includes('cyan/green cockpit avionics')
+    || !manifestRecord.modifications.includes('green-on-graphite cockpit avionics')
+    || !manifestRecord.modifications.includes('perspective-aware elliptic rotor arcs')
     || !manifestRecord.modifications.includes('structural ties into the side canopy rails')
-    || !manifestRecord.modifications.includes('articulated ears, forelegs and coral-padded paws')) failures.push('manifest does not disclose authoritative runtime source and reviewed cockpit/cat overlay treatment');
+    || !manifestRecord.modifications.includes('charcoal/silver ears, forelegs and top-facing paws')) failures.push('manifest does not disclose authoritative runtime source and reviewed cockpit/cat overlay treatment');
 }
 
 const runtimeHashesByExtension = { mp4: new Set(), webm: new Set(), webp: new Set() };
@@ -737,13 +757,13 @@ for (const arena of arenas) {
   for (const extension of ['mp4', 'webm', 'webp']) runtimeHashesByExtension[extension].add(await sha256(path.join(root, `public/assets/original/menu-previews/${arena}.${extension}`)));
   validateVideo(path.join(root, `public/assets/original/menu-previews/${arena}.mp4`), 'h264', 'aac', choreography, arena);
   validateVideo(path.join(root, `public/assets/original/menu-previews/${arena}.webm`), 'vp9', 'opus', choreography, arena);
-  validateImage(path.join(root, `public/assets/original/menu-previews/${arena}.webp`), 960, 540, choreography.media.encodingBudget.maximumPosterBytes);
-  validateImage(path.join(root, `docs/assets/pass65-menu-previews/${arena}-review-frames.webp`), 1920, 216, choreography.media.encodingBudget.maximumReviewSheetBytes);
+  validateImage(path.join(root, `public/assets/original/menu-previews/${arena}.webp`), choreography.capture.viewport[0], choreography.capture.viewport[1], choreography.media.encodingBudget.maximumPosterBytes);
+  validateImage(path.join(root, `docs/assets/pass65-menu-previews/${arena}-review-frames.webp`), 2400, 270, choreography.media.encodingBudget.maximumReviewSheetBytes);
 }
 for (const [extension, hashes] of Object.entries(runtimeHashesByExtension)) if (hashes.size !== arenas.length) failures.push(`${extension} previews are not four distinct selected-map captures`);
 
 const documentationSource = await readFile(documentationPath, 'utf8');
-for (const marker of ['chromium.launch', 'createServer', 'menuPreviewPose', 'setCaptureCameraPose', 'authoritative-runtime-arena', 'offline-menu-preview-overlay', 'offline-baked-compact-black-grey', 'overlayScale', 'aa-canopy', 'aa-glass', 'aa-reticle', 'aa-foreleg', 'aa-main-rotor-plane', 'aa-main-rotor-hub', 'aa-main-rotor-structural-tie', 'aa-main-rotor-canopy-header', 'aa-main-rotor-blade:before', 'aa-main-rotor-blade:after', 'aa-tail-rotor-plane', 'aa-tail-boom-occluder', 'perspective:', 'rotateX(', 'rotateY(', 'document.elementsFromPoint', 'repeating-conic-gradient']) if (!generatorSource.includes(marker)) failures.push(`runtime capture generator is missing ${marker}`);
+for (const marker of ['chromium.launch', 'createServer', 'menuPreviewPose', 'setCaptureCameraPose', 'authoritative-runtime-arena', 'offline-menu-preview-overlay', 'offline-baked-minimal-graphite-green', 'overlayScale', 'aa-canopy', 'aa-glass', 'aa-reticle', 'aa-foreleg', 'aa-main-rotor-arc', 'aa-main-rotor-plane', 'aa-main-rotor-hub', 'aa-main-rotor-structural-tie', 'aa-main-rotor-canopy-header', 'aa-main-rotor-blade:before', 'aa-main-rotor-blade:after', 'aa-tail-rotor-plane', 'aa-tail-boom-occluder', 'perspective:', 'rotateX(', 'rotateY(', 'document.elementsFromPoint']) if (!generatorSource.includes(marker)) failures.push(`runtime capture generator is missing ${marker}`);
 for (const forbidden of ['import bpy', 'primitive_cube_add', 'generate_pass65_menu_previews.py']) if (generatorSource.includes(forbidden)) failures.push(`runtime capture generator still contains synthetic Blender authoring marker ${forbidden}`);
 if (!documentationSource.includes('npm run author:pass65:menu-previews') || !documentationSource.includes('actual authoritative map')) failures.push('authoring documentation does not describe the fail-closed runtime capture workflow');
 
@@ -751,6 +771,8 @@ const runtimeSource = await readFile(runtimeSourcePath, 'utf8');
 if (!runtimeSource.includes('<video id="menu-preview-video"') || !runtimeSource.includes('preload="metadata"') || runtimeSource.includes('<canvas') || !runtimeSource.includes('rendererSubmissions: 0') || !runtimeSource.includes(`const CACHE_KEY = '${choreography.media.cacheKey}'`) || !/if\s*\(reducedMotion\)\s*\{\s*video\.removeAttribute\('src'\)/.test(runtimeSource)) failures.push('menu runtime must remain one prerecorded video, zero submissions, and poster-only for reduced motion');
 const runtimeEntry = await readFile(runtimeEntryPath, 'utf8');
 if (!runtimeEntry.includes("from './ui/menu-preview-video'") || runtimeEntry.includes("from './ui/menu-preview-camera'")) failures.push('browser entry must own prerecorded media only and never import the offline camera evaluator');
+if (!runtimeEntry.includes("get('menuPreviewCapture') === '1'")
+  || !runtimeEntry.includes('document.hasFocus() && !offlineMenuPreviewCapture')) failures.push('offline capture watchdog exemption must remain explicitly query-gated and must not weaken normal gameplay stall detection');
 const cameraSource = await readFile(cameraEvaluatorPath, 'utf8');
 if (!cameraSource.includes('authoring/tests only') || !cameraSource.includes('xorshift32-cyclic-quintic-hold-v1')) failures.push('offline camera evaluator lost its authoring-only deterministic contract');
 
