@@ -27,6 +27,8 @@ export function createTacticalPolicy(options = {}) {
     contactSearchAfterMs: Math.max(0, Number(options.contactSearchAfterMs ?? 0)),
     contactSearchTurn: Math.max(0, Number(options.contactSearchTurn ?? 24)),
     contactSearchMinimapGuidance: options.contactSearchMinimapGuidance === true,
+    offensiveProfile: options.offensiveProfile === true,
+    offensiveContactCommitMs: Math.max(0, Number(options.offensiveContactCommitMs ?? 900)),
     bankLeadMinimumKills: Number(options.bankLeadMinimumKills ?? 0),
     bankLeadMinimumMargin: Number(options.bankLeadMinimumMargin ?? 1),
     killAnchorDurationMs: Number(options.killAnchorDurationMs ?? 0),
@@ -100,8 +102,13 @@ export function createTacticalPolicy(options = {}) {
     quickDeathCooldownFrames: 0,
     retreatReturnFireFrames: 0,
     lastConfirmedTargetAt: Number.NEGATIVE_INFINITY,
+    confirmedTargetSeen: false,
     contactSearchFrames: 0,
     minimapGuidedContactSearchFrames: 0,
+    offensivePursuitFrames: 0,
+    offensiveEngagementFrames: 0,
+    offensiveStableAimFrames: 0,
+    offensivePostShotStrafeFrames: 0,
     coverEngagementSuppressedFrames: 0,
     modeFrames: { roam: 0, engage: 0, retreat: 0, recover: 0, bank: 0, anchor: 0 },
   };
@@ -190,7 +197,10 @@ export function createTacticalPolicy(options = {}) {
         state.rawTargetObservationExpired = true;
         state.rawTargetObservationExpirations += 1;
       }
-      if (observation.active && observation.currentTarget) state.lastConfirmedTargetAt = now;
+      if (observation.active && observation.currentTarget) {
+        state.lastConfirmedTargetAt = now;
+        state.confirmedTargetSeen = true;
+      }
       if (observation.active && config.bankLeadMinimumKills > 0 && scoreFresh
         && kills >= config.bankLeadMinimumKills && kills - deaths >= config.bankLeadMinimumMargin) {
         state.leadBankActive = true;
@@ -216,6 +226,7 @@ export function createTacticalPolicy(options = {}) {
         state.respawnEscapeUntil = 0;
         state.quickDeathCooldownUntil = 0;
         state.respawnReentryUntil = 0;
+        state.confirmedTargetSeen = false;
       }
       const coverDecision = coverController.update({
         now,
@@ -299,6 +310,9 @@ export function createTacticalPolicy(options = {}) {
         reason = 'visible-kill-lead-bank';
       } else if (rawTarget && boundedRawObservation) {
         reason = 'candidate-observation-expired';
+      } else if (config.offensiveProfile && state.confirmedTargetSeen
+        && now - state.lastConfirmedTargetAt < config.offensiveContactCommitMs) {
+        reason = 'offensive-contact-pursuit';
       } else if (now < state.respawnReentryUntil) {
         reason = 'respawn-reentry';
       } else if (config.contactSearchAfterMs > 0 && now - state.lastConfirmedTargetAt >= config.contactSearchAfterMs) {
@@ -311,6 +325,15 @@ export function createTacticalPolicy(options = {}) {
       if (reason === 'respawn-reentry') state.respawnReentryFrames += 1;
       if (reason === 'quick-death-cooldown') state.quickDeathCooldownFrames += 1;
       if (reason === 'contact-search-sweep') state.contactSearchFrames += 1;
+      if (reason === 'offensive-contact-pursuit') state.offensivePursuitFrames += 1;
+      if (config.offensiveProfile && nextMode === 'engage' && observation.currentTarget) {
+        state.offensiveEngagementFrames += 1;
+        if (now - Number(observation.lastShotAt ?? Number.NEGATIVE_INFINITY) < config.postShotStrafeMs) {
+          state.offensivePostShotStrafeFrames += 1;
+        } else {
+          state.offensiveStableAimFrames += 1;
+        }
+      }
       const killAnchorActive = observation.active && now < state.killAnchorUntil;
       if (killAnchorActive) {
         state.killAnchorActiveFrames += 1;
@@ -367,7 +390,13 @@ export function createTacticalPolicy(options = {}) {
           }
         } else {
           const threat = observation.minimapThreat;
-          if (reason === 'respawn-reentry') {
+          if (reason === 'offensive-contact-pursuit') {
+            keys.push('KeyW', 'ShiftLeft');
+            if (observation.navigationTick) {
+              const bearing = Number(threat?.bearingRadians);
+              if (Number.isFinite(bearing)) turn = Math.abs(bearing) < 0.10 ? 0 : Math.sign(bearing) * Math.min(18, config.contactSearchTurn);
+            }
+          } else if (reason === 'respawn-reentry') {
             keys.push('KeyW', 'ShiftLeft');
             if (observation.navigationTick) turn = state.direction * 18;
           } else if (reason === 'contact-search-sweep') {
@@ -446,6 +475,10 @@ export function createTacticalPolicy(options = {}) {
         retreatReturnFireFrames: state.retreatReturnFireFrames,
         contactSearchFrames: state.contactSearchFrames,
         minimapGuidedContactSearchFrames: state.minimapGuidedContactSearchFrames,
+        offensivePursuitFrames: state.offensivePursuitFrames,
+        offensiveEngagementFrames: state.offensiveEngagementFrames,
+        offensiveStableAimFrames: state.offensiveStableAimFrames,
+        offensivePostShotStrafeFrames: state.offensivePostShotStrafeFrames,
         coverEngagementSuppressedFrames: state.coverEngagementSuppressedFrames,
         renderedCover: coverController.snapshot(),
         config: { ...config },

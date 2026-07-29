@@ -47,6 +47,7 @@ test('combat benchmark separates bots, practice targets, survival and control me
       respawnEscapeActivations: 3, respawnEscapeFrames: 27, respawnReentryFrames: 19,
       lastLifeDurationMs: 12_500, quickDeathStreak: 2, quickDeathReceipts: 4, quickDeathCooldownFrames: 29,
       retreatReturnFireFrames: 11, contactSearchFrames: 17, minimapGuidedContactSearchFrames: 9, coverEngagementSuppressedFrames: 6,
+      offensivePursuitFrames: 13, offensiveEngagementFrames: 21, offensiveStableAimFrames: 14, offensivePostShotStrafeFrames: 7,
       renderedCoverActivations: 5, renderedCoverAcquisitions: 3, renderedCoverProbeReversals: 2, renderedCoverAborts: 1,
       renderedCoverProbeFrames: 31, renderedCoverOcclusionFrames: 13, renderedCoverHoldFrames: 23,
       renderedCoverHealthGatedHoldFrames: 14,
@@ -90,6 +91,10 @@ test('combat benchmark separates bots, practice targets, survival and control me
   assert.equal(result.control.contactSearchFrames, 17);
   assert.equal(result.control.minimapGuidedContactSearchFrames, 9);
   assert.equal(result.control.coverEngagementSuppressedFrames, 6);
+  assert.equal(result.control.offensivePursuitFrames, 13);
+  assert.equal(result.control.offensiveEngagementFrames, 21);
+  assert.equal(result.control.offensiveStableAimFrames, 14);
+  assert.equal(result.control.offensivePostShotStrafeFrames, 7);
   assert.equal(result.control.renderedCoverActivations, 5);
   assert.equal(result.control.renderedCoverAcquisitions, 3);
   assert.equal(result.control.renderedCoverProbeReversals, 2);

@@ -278,6 +278,45 @@ test('contact search stays dormant initially, sweeps after a confirmed-target dr
   assert.equal(found.allowEngagement, true);
 });
 
+test('offensive profile pursues a recently lost rendered contact without granting fire', () => {
+  const policy = createTacticalPolicy({ offensiveProfile: true, offensiveContactCommitMs: 900, contactSearchTurn: 18 });
+  const engage = policy.update({
+    now: 100, active: true, health: 100, currentTarget: true,
+    movementCycle: 0, navigationTick: false, lastShotAt: Number.NEGATIVE_INFINITY,
+  });
+  assert.equal(engage.mode, 'engage');
+  assert.equal(engage.allowEngagement, true);
+  assert.deepEqual(engage.keys, []);
+
+  const pursuit = policy.update({
+    now: 300, active: true, health: 100, currentTarget: false,
+    movementCycle: 1, navigationTick: true,
+    minimapThreat: { bearingRadians: 0.7, distance: 24 },
+  });
+  assert.equal(pursuit.reason, 'offensive-contact-pursuit');
+  assert.deepEqual(pursuit.keys, ['KeyW', 'ShiftLeft']);
+  assert.equal(pursuit.turn, 18);
+  assert.equal(pursuit.allowEngagement, false);
+
+  const expired = policy.update({
+    now: 1101, active: true, health: 100, currentTarget: false,
+    movementCycle: 2, navigationTick: false,
+  });
+  assert.equal(expired.reason, 'roam-clear');
+  const snapshot = policy.snapshot();
+  assert.equal(snapshot.offensiveEngagementFrames, 1);
+  assert.equal(snapshot.offensiveStableAimFrames, 1);
+  assert.equal(snapshot.offensivePursuitFrames, 1);
+});
+
+test('offensive profile remains default-off after target loss', () => {
+  const policy = createTacticalPolicy({ offensiveContactCommitMs: 900 });
+  policy.update({ now: 100, active: true, health: 100, currentTarget: true, movementCycle: 0, navigationTick: false });
+  const decision = policy.update({ now: 300, active: true, health: 100, currentTarget: false, movementCycle: 1, navigationTick: false });
+  assert.equal(decision.reason, 'roam-clear');
+  assert.equal(policy.snapshot().offensivePursuitFrames, 0);
+});
+
 test('opt-in contact search turns toward the rendered player-up minimap bearing', () => {
   const policy = createTacticalPolicy({ contactSearchAfterMs: 1000, contactSearchTurn: 20, contactSearchMinimapGuidance: true });
   policy.update({ now: 100, active: true, health: 100, movementCycle: 0, navigationTick: false });
