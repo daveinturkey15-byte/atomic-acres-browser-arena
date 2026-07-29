@@ -22,7 +22,7 @@ export type WebGpuPresentationIdleState = Readonly<{
   pendingSince: number | null;
 }>;
 
-/** Keeps renderer target mutations queued until the one-deep GPU frontier is idle. */
+/** Keeps renderer target mutations queued until the bounded GPU frontier is fully idle. */
 export class DeferredAdaptivePixelRatio {
   private pendingPixelRatio: number | null = null;
 

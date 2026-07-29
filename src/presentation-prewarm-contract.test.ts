@@ -10,12 +10,26 @@ const presentationSources = [
 ] as const;
 
 describe('presentation prewarm startup contract', () => {
-  it('keeps one in-flight WebGPU submission while exposing truthful queue progress', () => {
+  it('keeps cold work one-deep and bounds warmed live work to a two-frame completion frontier', () => {
     const source = readFileSync(new URL('./rendering/render-runtime.ts', import.meta.url), 'utf8');
-    expect(source).toContain('MAX_IN_FLIGHT_SUBMISSIONS = 1');
+    expect(source).toContain("mode === 'warmed-live' ? 2 : 1");
+    expect(source).toContain('Forced WebGPU submission requires an idle completion frontier');
+    expect(source).toContain('await this.waitForSubmittedWork(12_000);');
+    expect(source).toContain('completionProbeTargetSequence: this.completionProbeTargetSequence');
     expect(source).toContain('submissionPacing: this.submissionPacing.summary()');
     expect(source).toContain('completionPacing: this.completionPacing.summary()');
     expect(source).toContain('maximumPendingForMs: Math.max(this.progressMaximumPendingForMs, pendingForMs)');
+    const legacy = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+    expect(legacy).toContain("matchState.phase === 'active'");
+    expect(legacy).toContain("menuLifecycle.surface === 'hidden' && arenaSelectionReady");
+    expect(legacy).toContain("? 'warmed-live'");
+    expect(legacy).toContain("submitWebGpuFrame(now, false, submissionMode)");
+    const coldSettlement = legacy.slice(
+      legacy.indexOf('async function settleWebGpuPresentation('),
+      legacy.indexOf('function buildSky()'),
+    );
+    expect(coldSettlement.indexOf('await flushWebGpuFrames(12_000);'))
+      .toBeLessThan(coldSettlement.indexOf('submitWebGpuFrame(performance.now(), true);'));
   });
 
   it.each(presentationSources)('%s scopes shader compilation to its presentation root', (path) => {
@@ -350,13 +364,18 @@ describe('presentation prewarm startup contract', () => {
       .toBeLessThan(captureIsolation.indexOf('await requireCaptureRecoveryCompletions'));
     expect(captureIsolation.indexOf('await requireCaptureRecoveryCompletions'))
       .toBeLessThan(captureIsolation.lastIndexOf('await pauseAndDrainPresentation'));
-    expect(source).toContain('advancedBy === 1');
+    expect(source).toContain('maximumInFlightSubmissions === 2');
+    expect(source).toContain("presentation.submissionMode === 'warmed-live'");
+    expect(source).toContain('advancedBy <= maximumInFlightSubmissions');
     expect(source).toContain('completionLatencyMs <= maximumCompletionMs');
+    expect(source).toContain('completionProgressGapMs <= maximumCompletionMs');
     expect(source).toContain('recoveryWindowMs >= minimumWindowMs');
     expect(source).toContain('minimumWindowMs: minimumCaptureRecoveryWindowMs');
-    expect(source).toContain('qualifyingCompletionCount: consecutiveCompletions.length');
-    expect(source).toContain('firstQualifyingCompletion: consecutiveCompletions[0]');
-    expect(source).toContain('lastQualifyingCompletion: consecutiveCompletions.at(-1)');
+    expect(source).toContain('qualifyingCompletionCount += advancedBy');
+    expect(source).toContain('qualifyingCompletionCount >= requiredCompletions');
+    expect(source).toContain('qualifyingFrontierCount: consecutiveCompletionFrontiers.length');
+    expect(source).toContain('firstQualifyingCompletion: consecutiveCompletionFrontiers[0]');
+    expect(source).toContain('lastQualifyingCompletion: consecutiveCompletionFrontiers.at(-1)');
     expect(source).toContain('liveLongTaskEvidence.entries.length < maximumLongTaskEntries');
     expect(source).toContain('maximumLongTaskEntries: maximumLiveLongTaskEntries');
     expect(source).toContain('recordEntries(longTaskSample.observer.takeRecords())');

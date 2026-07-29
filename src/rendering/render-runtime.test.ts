@@ -8,6 +8,7 @@ import {
   detectLivePresentationStall,
   shouldResetPresentationAfterSchedulerGap,
   formatWebGpuUncapturedError,
+  maximumInFlightWebGpuSubmissions,
   pendingCompletionStartAfterProgress,
   resolveRenderRuntimeRequest,
   sequenceProgressRate,
@@ -210,6 +211,8 @@ describe('Pass 64 render runtime boundary', () => {
   });
 
   it('bounds submissions while an earlier WebGPU completion probe is lagging', () => {
+    expect(maximumInFlightWebGpuSubmissions('serialized')).toBe(1);
+    expect(maximumInFlightWebGpuSubmissions('warmed-live')).toBe(2);
     expect(shouldBackpressureWebGpuSubmissions(null, 1_000, 250)).toBe(false);
     expect(shouldBackpressureWebGpuSubmissions(800, 1_049, 250)).toBe(false);
     expect(shouldBackpressureWebGpuSubmissions(800, 1_050, 250)).toBe(true);
@@ -270,6 +273,74 @@ describe('Pass 64 render runtime boundary', () => {
     await settleProbe();
     expect(runtime.submitFrame(120)).toBe(true);
     expect(pending).toHaveLength(1);
+  });
+
+  it('admits exactly two warmed-live frames behind one completion-frontier probe', async () => {
+    const pending: Array<() => void> = [];
+    const renderer = {
+      backend: { isWebGPUBackend: true },
+      info: { reset: vi.fn(), render: { calls: 1, triangles: 2, points: 0, lines: 0 } },
+    };
+    const render = vi.fn();
+    const device = {
+      queue: { onSubmittedWorkDone: () => new Promise<void>((resolve) => pending.push(resolve)) },
+      addEventListener: () => undefined,
+      lost: new Promise<never>(() => undefined),
+    };
+    const runtime = new (WebGpuRenderRuntime as unknown as new (
+      renderer: unknown,
+      pipeline: unknown,
+      identity: unknown,
+    ) => WebGpuRenderRuntime)(renderer, { render }, {
+      canvasAntialias: true,
+      canvasSamples: 4,
+      adapterLabel: 'test adapter',
+      adapterClass: 'GPUAdapter',
+      deviceClass: 'GPUDevice',
+      softwareAdapter: false,
+      device,
+    });
+    const settleProbe = async () => {
+      for (let turn = 0; turn < 6; turn += 1) await Promise.resolve();
+    };
+
+    expect(runtime.submitFrame(100, false, 'warmed-live')).toBe(true);
+    expect(runtime.submitFrame(110, false, 'warmed-live')).toBe(true);
+    expect(runtime.submitFrame(120, false, 'warmed-live')).toBe(false);
+    expect(render).toHaveBeenCalledTimes(2);
+    expect(pending).toHaveLength(1);
+    expect(runtime.presentationTelemetry()).toMatchObject({
+      submissionMode: 'warmed-live',
+      maximumInFlightSubmissions: 2,
+      inFlightSubmissions: 2,
+      completionProbeTargetSequence: 1,
+      completionProbeCount: 1,
+      submissionSequence: 2,
+      completedSequence: 0,
+    });
+    expect(() => runtime.submitFrame(125, true, 'serialized'))
+      .toThrow('Forced WebGPU submission requires an idle completion frontier');
+    expect(render).toHaveBeenCalledTimes(2);
+
+    pending.shift()?.();
+    await settleProbe();
+    expect(runtime.submitFrame(130, false, 'warmed-live')).toBe(true);
+    expect(pending).toHaveLength(1);
+    expect(runtime.presentationTelemetry()).toMatchObject({
+      inFlightSubmissions: 2,
+      completionProbeTargetSequence: 3,
+      completionProbeCount: 2,
+      submissionSequence: 3,
+      completedSequence: 1,
+    });
+    pending.shift()?.();
+    await settleProbe();
+    expect(runtime.presentationTelemetry()).toMatchObject({
+      inFlightSubmissions: 0,
+      completionProbeTargetSequence: null,
+      submissionSequence: 3,
+      completedSequence: 3,
+    });
   });
 
   it('rejects a second unresolved submission, times latency post-submit, and rebases hidden time', async () => {
@@ -428,6 +499,54 @@ describe('Pass 64 render runtime boundary', () => {
 
     await runtime.compileAndRender(tracerRoot, camera, scene);
     expect(render).toHaveBeenCalledTimes(2);
+  });
+
+  it('drains an admitted warmed frontier before a forced cold prewarm submission', async () => {
+    const pending: Array<() => void> = [];
+    const render = vi.fn();
+    const renderer = {
+      info: { reset: () => undefined, render: { calls: 1, triangles: 2, points: 0, lines: 0 } },
+    };
+    const device = {
+      queue: { onSubmittedWorkDone: () => new Promise<void>((resolve) => pending.push(resolve)) },
+      addEventListener: () => undefined,
+      lost: new Promise<never>(() => undefined),
+    };
+    const runtime = new (WebGpuRenderRuntime as unknown as new (
+      renderer: unknown,
+      pipeline: unknown,
+      identity: unknown,
+    ) => WebGpuRenderRuntime)(renderer, { render }, {
+      canvasAntialias: true,
+      canvasSamples: 4,
+      adapterLabel: 'test adapter',
+      adapterClass: 'GPUAdapter',
+      deviceClass: 'GPUDevice',
+      softwareAdapter: false,
+      device,
+    });
+    const scene = new THREE.Scene();
+    const root = new THREE.Group();
+    scene.add(root);
+
+    expect(runtime.submitFrame(100, false, 'warmed-live')).toBe(true);
+    const prewarm = runtime.compileAndRender(root, new THREE.PerspectiveCamera(), scene);
+    for (let turn = 0; turn < 4; turn += 1) await Promise.resolve();
+    expect(render).toHaveBeenCalledTimes(1);
+    expect(pending).toHaveLength(1);
+
+    pending.shift()?.();
+    for (let turn = 0; turn < 12 && render.mock.calls.length < 2; turn += 1) await Promise.resolve();
+    expect(render).toHaveBeenCalledTimes(2);
+    expect(pending).toHaveLength(1);
+    pending.shift()?.();
+    await prewarm;
+    expect(runtime.presentationTelemetry()).toMatchObject({
+      submissionMode: 'serialized',
+      submissionSequence: 2,
+      completedSequence: 2,
+      inFlightSubmissions: 0,
+    });
   });
 
   it('rejects a concurrent prewarm from a different scene', async () => {

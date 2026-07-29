@@ -6,6 +6,8 @@ import { FramePacingSampler, type FramePacingSummary } from '../frame-pacing';
 
 export type RenderBackendId = 'webgl2' | 'webgpu';
 
+export type WebGpuSubmissionMode = 'serialized' | 'warmed-live';
+
 export type RenderRuntimeRequest = Readonly<{
   requestedBackend: RenderBackendId;
   requireWebGPU: boolean;
@@ -56,6 +58,11 @@ export type RenderRuntimeHealthTelemetry = Readonly<{
 
 export type PresentationFreshnessTelemetry = Readonly<{
   status: 'synchronous' | 'warming' | 'healthy' | 'stalled' | 'device-lost' | 'failed';
+  submissionMode: 'synchronous' | WebGpuSubmissionMode;
+  maximumInFlightSubmissions: number;
+  inFlightSubmissions: number;
+  completionProbeTargetSequence: number | null;
+  completionProbeCount: number;
   submissionSequence: number;
   completedSequence: number;
   lastSubmittedAt: number | null;
@@ -142,7 +149,7 @@ export type LivePresentationStall = Readonly<{
 
 /**
  * Detects a foreground presentation stall without treating menus, hidden tabs,
- * explicit render pauses, or normal one-deep queue backpressure as missing
+ * explicit render pauses, or normal bounded queue backpressure as missing
  * submissions. Pending queue work retains its own independent fatal fence.
  */
 export function detectLivePresentationStall(input: Readonly<{
@@ -202,6 +209,10 @@ export function shouldBackpressureWebGpuSubmissions(
     && Number.isFinite(thresholdMs)
     && thresholdMs >= 0
     && now - pendingSince >= thresholdMs;
+}
+
+export function maximumInFlightWebGpuSubmissions(mode: WebGpuSubmissionMode): 1 | 2 {
+  return mode === 'warmed-live' ? 2 : 1;
 }
 
 export function pendingCompletionStartAfterProgress(input: Readonly<{
@@ -414,6 +425,11 @@ export class LegacyWebGlRenderRuntime {
     const pacing = emptyFramePacingSummary('synchronous WebGL presentation');
     return {
       status: lost ? 'device-lost' : 'synchronous',
+      submissionMode: 'synchronous',
+      maximumInFlightSubmissions: 0,
+      inFlightSubmissions: 0,
+      completionProbeTargetSequence: null,
+      completionProbeCount: 0,
       submissionSequence: 0,
       completedSequence: 0,
       lastSubmittedAt: null,
@@ -618,6 +634,9 @@ export class WebGpuRenderRuntime {
   private lastCompletedAt: number | null = null;
   private pendingCompletionStartedAt: number | null = null;
   private completionProbe: Promise<void> | null = null;
+  private completionProbeTargetSequence: number | null = null;
+  private completionProbeCount = 0;
+  private submissionMode: WebGpuSubmissionMode = 'serialized';
   private presentationPrewarmBatch: Promise<void> | null = null;
   private presentationPrewarmScene: THREE.Scene | null = null;
   private lastCompletionLatencyMs: number | null = null;
@@ -664,13 +683,10 @@ export class WebGpuRenderRuntime {
   private nextCompletionProbeAt = 0;
   private static readonly COMPLETION_PROBE_INTERVAL_MS = 250;
   private static readonly SUBMISSION_BACKPRESSURE_MS = 250;
-  // Three's WebGPU renderer owns mutable bind-group, render-target and texture
-  // state. Never begin a second presentation while the prior GPU submission is
-  // unresolved: overlapping cold scene/viewmodel compilation caused both long
-  // gameplay freezes and `Texture already initialized` failures on the HITL
-  // browser. Queue completion still advances in frontiers, but admission is
-  // deliberately serialized at the renderer boundary.
-  private static readonly MAX_IN_FLIGHT_SUBMISSIONS = 1;
+  // Cold compilation, prewarm, transitions and explicit renderer mutations
+  // remain one-deep. Only the already-fenced, warmed live path may keep two
+  // submissions in flight; that is the smallest frontier which avoids making
+  // every presented frame wait for its own queue-completion promise.
   // Cold shader/shadow compilation on the frozen owner hardware can retire in
   // ~2.4 s. Backpressure still stops new work at 250 ms; twelve seconds matches
   // the explicit cold-generation fence and distinguishes cold work from a hang.
@@ -863,6 +879,8 @@ export class WebGpuRenderRuntime {
     });
     const currentSubmissionGapMs = Math.max(0, now - this.progressLastSubmissionAt);
     const currentCompletionGapMs = Math.max(0, now - this.progressLastCompletionAt);
+    const inFlightSubmissions = Math.max(0, this.submissionSequence - this.completedSequence);
+    const maximumInFlightSubmissions = maximumInFlightWebGpuSubmissions(this.submissionMode);
     const status = classifyPresentationFreshness({
       deviceLost: this.deviceLost,
       completionFailures: this.completionFailures,
@@ -873,6 +891,11 @@ export class WebGpuRenderRuntime {
     });
     return {
       status,
+      submissionMode: this.submissionMode,
+      maximumInFlightSubmissions,
+      inFlightSubmissions,
+      completionProbeTargetSequence: this.completionProbeTargetSequence,
+      completionProbeCount: this.completionProbeCount,
       submissionSequence: this.submissionSequence,
       completedSequence: this.completedSequence,
       lastSubmittedAt: this.lastSubmittedAt,
@@ -886,8 +909,8 @@ export class WebGpuRenderRuntime {
         this.pendingCompletionStartedAt,
         now,
         WebGpuRenderRuntime.SUBMISSION_BACKPRESSURE_MS,
-        this.submissionSequence - this.completedSequence,
-        WebGpuRenderRuntime.MAX_IN_FLIGHT_SUBMISSIONS,
+        inFlightSubmissions,
+        maximumInFlightSubmissions,
       ),
       skippedSubmissions: this.skippedSubmissions,
       progress: {
@@ -913,7 +936,7 @@ export class WebGpuRenderRuntime {
     this.completionPacing.reset(reason);
     // Full lifecycle resets (not endurance-window samples) establish a new
     // foreground observation epoch. An unresolved queue item may remain, but
-    // hidden-tab time must not count against its one-second foreground fence.
+    // hidden-tab time must not count against its foreground completion fence.
     if (this.pendingCompletionStartedAt !== null) this.pendingCompletionStartedAt = now;
     this.resetPresentationProgressWindow(now);
   }
@@ -941,6 +964,8 @@ export class WebGpuRenderRuntime {
     const startedAt = now;
     this.pendingCompletionStartedAt ??= startedAt;
     this.nextCompletionProbeAt = now + WebGpuRenderRuntime.COMPLETION_PROBE_INTERVAL_MS;
+    this.completionProbeTargetSequence = sequence;
+    this.completionProbeCount += 1;
     const probe = queue.onSubmittedWorkDone()
       .then(() => {
         const completedAt = this.clock();
@@ -978,6 +1003,7 @@ export class WebGpuRenderRuntime {
       .finally(() => {
         if (this.completionProbe === probe) {
           this.completionProbe = null;
+          this.completionProbeTargetSequence = null;
           if (this.completedSequence >= this.submissionSequence) this.pendingCompletionStartedAt = null;
         }
       });
@@ -1105,6 +1131,10 @@ export class WebGpuRenderRuntime {
     this.presentationPrewarmScene = scene;
     let batch!: Promise<void>;
     batch = Promise.resolve().then(async () => {
+      // The caller pauses live admission before staging cold roots, but an
+      // already-admitted warmed frame may still own renderer resources. Drain
+      // that exact target before the forced one-deep compilation submission.
+      await this.waitForSubmittedWork(12_000);
       this.submitFrame(this.clock(), true);
       // Presentation-only effects prewarm behind the loading surface. Cold
       // Chrome/driver shader creation can exceed the live four-second fence,
@@ -1120,16 +1150,28 @@ export class WebGpuRenderRuntime {
     return batch;
   }
 
-  submitFrame(_frameTimestamp = this.clock(), force = false): boolean {
+  submitFrame(
+    _frameTimestamp = this.clock(),
+    force = false,
+    submissionMode: WebGpuSubmissionMode = 'serialized',
+  ): boolean {
     if (this.deviceLost) throw new Error(this.lastFailure ?? 'WebGPU device lost');
     if (this.uncapturedErrors > 0) throw new Error(this.lastFailure ?? 'WebGPU uncaptured error');
     const admissionCheckedAt = this.clock();
+    this.submissionMode = submissionMode;
+    const inFlightSubmissions = Math.max(0, this.submissionSequence - this.completedSequence);
+    const maximumInFlightSubmissions = maximumInFlightWebGpuSubmissions(submissionMode);
+    if (force && inFlightSubmissions > 0) {
+      throw new Error(
+        `Forced WebGPU submission requires an idle completion frontier; ${inFlightSubmissions} submission(s) remain`,
+      );
+    }
     if (!force && shouldBackpressureWebGpuSubmissions(
       this.pendingCompletionStartedAt,
       admissionCheckedAt,
       WebGpuRenderRuntime.SUBMISSION_BACKPRESSURE_MS,
-      this.submissionSequence - this.completedSequence,
-      WebGpuRenderRuntime.MAX_IN_FLIGHT_SUBMISSIONS,
+      inFlightSubmissions,
+      maximumInFlightSubmissions,
     )) {
       if (this.pendingCompletionStartedAt !== null) {
         this.progressMaximumPendingForMs = Math.max(
@@ -1157,10 +1199,9 @@ export class WebGpuRenderRuntime {
     this.submissionPacing.record(submissionGapMs);
     this.progressLastSubmissionAt = submittedAt;
     this.lastSubmittedAt = submittedAt;
-    // With a one-submission frontier, every admitted frame needs its own probe.
-    // Honouring the 250 ms sampling throttle here leaves the queue at depth one
-    // without a completion observer and forces the following display frame to
-    // be skipped merely to attach that probe.
+    // Attach one observer to the current completion frontier. A warmed live
+    // frame may join behind that target, but never creates a second mutable
+    // probe; the next observer is attached only after this frontier retires.
     this.scheduleCompletionProbe(submittedAt, true);
     return true;
   }

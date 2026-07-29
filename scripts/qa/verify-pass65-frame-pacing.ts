@@ -8,9 +8,14 @@ import { preview, type PreviewServer } from 'vite';
 import {
   PASS65_FRAME_PACING_THRESHOLDS,
   compareAtomicAgainstTerminal,
+  comparePresentationCadenceAgainstTerminal,
   summarizeFramePacingWindow,
+  summarizePresentationProgressWindow,
   validateFramePacingWindow,
+  validatePresentationProgressWindow,
   type FramePacingWindowSummary,
+  type PresentationProgressSnapshot,
+  type PresentationProgressWindowSummary,
 } from '../../src/pass65-frame-pacing-gate.ts';
 import { isFatalWebGpuConsoleWarning } from './pass65-browser-console-contract.mjs';
 
@@ -98,6 +103,10 @@ type RawFrameWindow = Readonly<{
     encodedBodySize: number;
     decodedBodySize: number;
   }>[];
+  presentation: Readonly<{
+    started: PresentationProgressSnapshot;
+    ended: PresentationProgressSnapshot;
+  }>;
 }>;
 
 type TrialReceipt = Readonly<{
@@ -113,6 +122,7 @@ type TrialReceipt = Readonly<{
   deployment: unknown;
   frameWindow: RawFrameWindow | null;
   frameSummary: FramePacingWindowSummary | null;
+  presentationSummary: PresentationProgressWindowSummary | null;
   performanceBudget: unknown;
   finalState: unknown;
 }>;
@@ -276,8 +286,24 @@ async function collectFrameWindow(page: Page, durationMs: number, deploymentStar
   return page.evaluate(async ({ duration, deploymentAt }) => {
     const target = globalThis as typeof globalThis & {
       __PASS65_FRAME_GATE__?: { observerSupported: boolean; longTasks: LongTask[] };
+      __ATOMIC_ACRES_DEBUG__?: { snapshot: () => Record<string, any> };
     };
     const gate = target.__PASS65_FRAME_GATE__ ?? { observerSupported: false, longTasks: [] };
+    const readPresentation = () => {
+      const presentation = target.__ATOMIC_ACRES_DEBUG__?.snapshot()?.render?.runtime?.presentation;
+      if (!presentation) throw new Error('Frame-pacing window requires WebGPU presentation telemetry');
+      return {
+        status: String(presentation.status),
+        submissionMode: String(presentation.submissionMode),
+        maximumInFlightSubmissions: Number(presentation.maximumInFlightSubmissions),
+        inFlightSubmissions: Number(presentation.inFlightSubmissions),
+        submissionSequence: Number(presentation.submissionSequence),
+        completedSequence: Number(presentation.completedSequence),
+        completionFailures: Number(presentation.completionFailures),
+        skippedSubmissions: Number(presentation.skippedSubmissions),
+      };
+    };
+    const presentationStarted = readPresentation();
     const intervalsMs: number[] = [];
     let startedAt = 0;
     let endedAt = 0;
@@ -299,6 +325,7 @@ async function collectFrameWindow(page: Page, durationMs: number, deploymentStar
       requestAnimationFrame(tick);
     });
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    const presentationEnded = readPresentation();
     const overlaps = (task: LongTask) => task.startTime < endedAt && task.startTime + task.duration > startedAt;
     const resources = performance.getEntriesByType('resource')
       .filter((entry) => entry.startTime >= deploymentAt)
@@ -324,6 +351,7 @@ async function collectFrameWindow(page: Page, durationMs: number, deploymentStar
       steadyLongTasks: gate.longTasks.filter(overlaps),
       allLongTasks: [...gate.longTasks],
       resources,
+      presentation: { started: presentationStarted, ended: presentationEnded },
     };
   }, { duration: durationMs, deploymentAt: deploymentStartedAt });
 }
@@ -339,6 +367,7 @@ async function runTrial(browser: Browser, repeat: number, arenaId: ArenaId): Pro
   let deployment: unknown = null;
   let frameWindow: RawFrameWindow | null = null;
   let frameSummary: FramePacingWindowSummary | null = null;
+  let presentationSummary: PresentationProgressWindowSummary | null = null;
   let performanceBudget: unknown = null;
   let finalState: unknown = null;
   const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
@@ -469,13 +498,24 @@ async function runTrial(browser: Browser, repeat: number, arenaId: ArenaId): Pro
     });
     deployment = { requestedAtMs: deploymentStartedAt, ...activeDeployment };
     await waitForRafDuration(page, warmupMs);
+    await page.waitForFunction(() => (
+      globalThis as typeof globalThis & {
+        __ATOMIC_ACRES_DEBUG__?: { admissionState: () => { matchPhase?: string } };
+      }
+    ).__ATOMIC_ACRES_DEBUG__?.admissionState().matchPhase === 'active', undefined, { timeout: 5_000 });
     frameWindow = await collectFrameWindow(page, windowMs, deploymentStartedAt);
     frameSummary = summarizeFramePacingWindow(frameWindow.intervalsMs, frameWindow.elapsedMs);
+    presentationSummary = summarizePresentationProgressWindow(
+      frameWindow.presentation.started,
+      frameWindow.presentation.ended,
+      frameWindow.elapsedMs,
+    );
     issues.push(...validateFramePacingWindow(
       frameSummary,
       frameWindow.steadyLongTasks.length,
       frameWindow.observerSupported,
     ));
+    issues.push(...validatePresentationProgressWindow(presentationSummary));
     try {
       performanceBudget = await page.evaluate(() => (
         globalThis as typeof globalThis & { __ATOMIC_ACRES_DEBUG__: { sampleArenaPerformanceBudget: () => Promise<unknown> } }
@@ -535,6 +575,7 @@ async function runTrial(browser: Browser, repeat: number, arenaId: ArenaId): Pro
     deployment,
     frameWindow,
     frameSummary,
+    presentationSummary,
     performanceBudget,
     finalState,
   });
@@ -546,16 +587,40 @@ function aggregateArena(trials: readonly TrialReceipt[], arenaId: ArenaId): Read
   windowMs: number;
   intervalsMs: readonly number[];
   summary: FramePacingWindowSummary | null;
+  presentation: Readonly<{
+    windowMs: number;
+    submissionAdvances: number;
+    completionAdvances: number;
+    submittedHz: number;
+    completedHz: number;
+  }> | null;
 }> {
   const selected = trials.filter((trial) => trial.arenaId === arenaId && trial.frameWindow !== null);
   const intervalsMs = selected.flatMap((trial) => trial.frameWindow?.intervalsMs ?? []);
   const totalWindowMs = selected.reduce((sum, trial) => sum + (trial.frameWindow?.elapsedMs ?? 0), 0);
+  const presentationWindows = selected
+    .map((trial) => trial.presentationSummary)
+    .filter((summary): summary is PresentationProgressWindowSummary => summary !== null);
+  const presentationWindowMs = presentationWindows.reduce((sum, summary) => sum + summary.windowMs, 0);
+  const submissionAdvances = presentationWindows.reduce((sum, summary) => sum + summary.submissionAdvances, 0);
+  const completionAdvances = presentationWindows.reduce((sum, summary) => sum + summary.completionAdvances, 0);
+  const presentation = presentationWindows.length === selected.length && presentationWindows.length > 0
+    && Number.isFinite(presentationWindowMs) && presentationWindowMs > 0
+    ? Object.freeze({
+        windowMs: Number(presentationWindowMs.toFixed(3)),
+        submissionAdvances,
+        completionAdvances,
+        submittedHz: Number((submissionAdvances * 1_000 / presentationWindowMs).toFixed(3)),
+        completedHz: Number((completionAdvances * 1_000 / presentationWindowMs).toFixed(3)),
+      })
+    : null;
   return Object.freeze({
     arenaId,
     trialCount: selected.length,
     windowMs: Number(totalWindowMs.toFixed(3)),
     intervalsMs: Object.freeze(intervalsMs),
     summary: intervalsMs.length > 0 ? summarizeFramePacingWindow(intervalsMs, totalWindowMs) : null,
+    presentation,
   });
 }
 
@@ -632,17 +697,30 @@ if (trials.length !== repeats * ARENA_IDS.length) runIssues.push(`incomplete-tri
 const atomic = aggregateArena(trials, 'atomic-acres');
 const terminal = aggregateArena(trials, 'skyline-terminal');
 const comparisons: Array<Readonly<{ scope: string; issues: readonly string[] }>> = [];
-if (atomic.summary && terminal.summary) {
-  comparisons.push({ scope: 'aggregate', issues: compareAtomicAgainstTerminal(atomic.summary, terminal.summary) });
+if (atomic.summary && terminal.summary && atomic.presentation && terminal.presentation) {
+  comparisons.push({
+    scope: 'aggregate',
+    issues: [
+      ...compareAtomicAgainstTerminal(atomic.summary, terminal.summary),
+      ...comparePresentationCadenceAgainstTerminal(atomic.presentation, terminal.presentation),
+    ],
+  });
 } else runIssues.push('aggregate-comparison-unavailable');
 for (let repeat = 0; repeat < repeats; repeat += 1) {
-  const atomicTrial = trials.find((trial) => trial.repeat === repeat && trial.arenaId === 'atomic-acres')?.frameSummary;
-  const terminalTrial = trials.find((trial) => trial.repeat === repeat && trial.arenaId === 'skyline-terminal')?.frameSummary;
-  if (!atomicTrial || !terminalTrial) {
+  const atomicTrial = trials.find((trial) => trial.repeat === repeat && trial.arenaId === 'atomic-acres');
+  const terminalTrial = trials.find((trial) => trial.repeat === repeat && trial.arenaId === 'skyline-terminal');
+  if (!atomicTrial?.frameSummary || !terminalTrial?.frameSummary
+    || !atomicTrial.presentationSummary || !terminalTrial.presentationSummary) {
     runIssues.push(`repeat-comparison-unavailable:r${repeat + 1}`);
     continue;
   }
-  comparisons.push({ scope: `repeat-${repeat + 1}`, issues: compareAtomicAgainstTerminal(atomicTrial, terminalTrial) });
+  comparisons.push({
+    scope: `repeat-${repeat + 1}`,
+    issues: [
+      ...compareAtomicAgainstTerminal(atomicTrial.frameSummary, terminalTrial.frameSummary),
+      ...comparePresentationCadenceAgainstTerminal(atomicTrial.presentationSummary, terminalTrial.presentationSummary),
+    ],
+  });
 }
 for (const comparison of comparisons) {
   runIssues.push(...comparison.issues.map((issue) => `${comparison.scope}:${issue}`));
@@ -697,11 +775,11 @@ const receipt = {
   comparisons,
   issues: finalIssues,
   claimStates: {
-    observed: 'Installed Chrome trial telemetry, exact rAF intervals, PerformanceObserver tasks, runtime/adapter/GPU state and renderer residency in this receipt.',
+    observed: 'Installed Chrome trial telemetry, exact rAF callback intervals, WebGPU submission/completion sequence rates, PerformanceObserver tasks, runtime/adapter/GPU state and renderer residency in this receipt.',
     inference: 'A passing receipt is strong same-machine evidence that steady native-WebGPU Quality presentation is bounded for these two deterministic solo traces.',
     assumption: 'Fresh automated contexts with deterministic forward movement approximate the owner steady gameplay workload; they do not reproduce every combat/support/input sequence.',
     unknown: headed ? 'Owner-specific free-look/combat/support feel remains HITL.' : 'Final exact-S0 foreground/headed and owner free-look/combat/support feel remain separate evidence.',
-    falsifiers: 'Any source/worktree mismatch, software/fallback backend, browser/GPU error, long task, >100ms frame, absolute tail breach or material Atomic-vs-Terminal delta fails this receipt.',
+    falsifiers: 'Any source/worktree mismatch, software/fallback backend, browser/GPU error, long task, >100ms callback frame, sub-45Hz WebGPU submission/completion progress, inconsistent two-frame frontier or material Atomic-vs-Terminal delta fails this receipt.',
   },
 };
 const serialized = `${JSON.stringify(receipt, null, 2)}\n`;
@@ -715,8 +793,8 @@ console.log(JSON.stringify({
   sourceSha,
   receiptPath,
   receiptSha256: digest,
-  atomic: atomic.summary,
-  terminal: terminal.summary,
+  atomic: { callbacks: atomic.summary, presentation: atomic.presentation },
+  terminal: { callbacks: terminal.summary, presentation: terminal.presentation },
   comparisons,
   issues: finalIssues,
 }, null, 2));

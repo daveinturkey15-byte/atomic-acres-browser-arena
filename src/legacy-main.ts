@@ -4,7 +4,7 @@ import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } f
 import { AdaptiveQualityController, DeferredAdaptivePixelRatio, adaptiveShadowsEnabled, classifyDisplayFrameMs, configuredAdaptiveQualityLevels } from './adaptive-quality';
 import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBudget } from './graphics-refinement';
 import { ArenaContrastLighting } from './arena-contrast-lighting';
-import { centeredReadbackRegion, detectLivePresentationStall, LegacyWebGlRenderRuntime, shouldResetPresentationAfterSchedulerGap, WebGpuRenderRuntime, resolveRenderRuntimeRequest } from './rendering/render-runtime';
+import { centeredReadbackRegion, detectLivePresentationStall, LegacyWebGlRenderRuntime, shouldResetPresentationAfterSchedulerGap, WebGpuRenderRuntime, resolveRenderRuntimeRequest, type WebGpuSubmissionMode } from './rendering/render-runtime';
 import { estimateResidentObjectMemory } from './rendering/resident-memory';
 import { ArenaVisualStreamController, loadArenaVisualModule, type ArenaVisualSwitchReceipt } from './rendering/arena-visual-stream';
 import { ArenaRenderWatchdog, auditArenaRenderLiveness } from './rendering/arena-render-watchdog';
@@ -1010,8 +1010,12 @@ const renderRuntime = runtimeRequest.requestedBackend === 'webgpu'
     });
 if (renderRuntime.backend === 'webgpu') renderRuntime.assertCandidateReady();
 const legacyRenderer = renderRuntime.backend === 'webgl2' ? renderRuntime.renderer : null;
-function submitWebGpuFrame(now = performance.now(), force = false): boolean {
-  return renderRuntime.backend === 'webgpu' && renderRuntime.submitFrame(now, force);
+function submitWebGpuFrame(
+  now = performance.now(),
+  force = false,
+  submissionMode: WebGpuSubmissionMode = 'serialized',
+): boolean {
+  return renderRuntime.backend === 'webgpu' && renderRuntime.submitFrame(now, force, submissionMode);
 }
 async function flushWebGpuFrames(timeoutMs = 4_000): Promise<void> {
   if (renderRuntime.backend === 'webgpu') await renderRuntime.waitForSubmittedWork(timeoutMs);
@@ -1351,6 +1355,7 @@ applyAdaptiveRenderBudget(adaptiveQuality.telemetry().pixelRatioCap);
 
 async function settleWebGpuPresentation(label: string, maximumLatencyMs = 500): Promise<void> {
   if (renderRuntime.backend !== 'webgpu') return;
+  await flushWebGpuFrames(12_000);
   const requiredConsecutiveHealthySamples = 3;
   const requiredConsecutiveMinimumTierSlowSamples = 3;
   let consecutiveHealthySamples = 0;
@@ -16144,6 +16149,7 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
     profileArenaTransition('coverage-submit-fence');
     renderRuntime.resetRenderInfo();
     if (renderRuntime.backend === 'webgpu') {
+      await flushWebGpuFrames(12_000);
       await withArenaFrustumCullingDisabled(presentationRoot, async () => {
         submitWebGpuFrame(performance.now(), true);
         // This is an admitted cold-generation fence, not the live-frame stall
@@ -16883,7 +16889,11 @@ function frame(now: number, scheduleNext = true): void {
       && document.visibilityState === 'visible' && document.hasFocus()) {
       let frameSubmitted = false;
       if (renderRuntime.backend === 'webgpu') {
-        frameSubmitted = submitWebGpuFrame(now);
+        const submissionMode: WebGpuSubmissionMode = gameStarted && matchState.phase === 'active'
+          && menuLifecycle.surface === 'hidden' && arenaSelectionReady && !renderSubmissionPaused
+          ? 'warmed-live'
+          : 'serialized';
+        frameSubmitted = submitWebGpuFrame(now, false, submissionMode);
       } else {
         atomicSignal?.render(scene, camera, VIEWMODEL_RENDER_LAYER);
         frameSubmitted = true;

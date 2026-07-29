@@ -132,6 +132,7 @@ function summarizeCaptureRecovery(recovery) {
     elapsedMs: recovery.elapsedMs,
     discardedCompletionCount: recovery.discardedCompletionCount,
     qualifyingCompletionCount: recovery.qualifyingCompletionCount,
+    qualifyingFrontierCount: recovery.qualifyingFrontierCount,
     firstQualifyingCompletion: recovery.firstQualifyingCompletion,
     lastQualifyingCompletion: recovery.lastQualifyingCompletion,
     observations: recovery.observations.slice(-12),
@@ -186,18 +187,21 @@ async function requireCaptureRecoveryCompletions(page, captureCompletionSequence
       }
       const startedAt = performance.now();
       const timeoutAt = startedAt + 12_000;
-      const consecutiveCompletions = [];
+      const consecutiveCompletionFrontiers = [];
       const observations = [];
       let observedCompletionSequence = baselineSequence;
+      let previousCompletionAt = startedAt;
       let discardedCompletionCount = 0;
+      let qualifyingCompletionCount = 0;
 
       const holdAndReject = (message) => {
         api.setRenderPaused(true);
         reject(new Error(`${message}: ${JSON.stringify({
           baselineSequence,
           observedCompletionSequence,
-          consecutiveCompletions,
+          consecutiveCompletionFrontiers,
           discardedCompletionCount,
+          qualifyingCompletionCount,
           observations,
         })}`));
       };
@@ -219,13 +223,19 @@ async function requireCaptureRecoveryCompletions(page, captureCompletionSequence
         if (presentation.completedSequence > observedCompletionSequence) {
           const advancedBy = presentation.completedSequence - observedCompletionSequence;
           const completionLatencyMs = presentation.lastCompletionLatencyMs;
+          const maximumInFlightSubmissions = presentation.maximumInFlightSubmissions;
           const observedAtMs = performance.now();
+          const completionProgressGapMs = presentation.lastCompletedAt - previousCompletionAt;
+          previousCompletionAt = presentation.lastCompletedAt;
           const observation = {
             observedAtMs,
             completedSequence: presentation.completedSequence,
             submissionSequence: presentation.submissionSequence,
             advancedBy,
             completionLatencyMs,
+            completionProgressGapMs,
+            submissionMode: presentation.submissionMode,
+            maximumInFlightSubmissions,
             lastSubmittedAt: presentation.lastSubmittedAt,
             lastCompletedAt: presentation.lastCompletedAt,
             status: presentation.status,
@@ -234,25 +244,41 @@ async function requireCaptureRecoveryCompletions(page, captureCompletionSequence
           if (observations.length > 12) observations.shift();
           observedCompletionSequence = presentation.completedSequence;
 
-          // MAX_IN_FLIGHT_SUBMISSIONS is one. Count only an individually
-          // observed game completion, never a batched frontier jump. The July
-          // 29 capture-tail failure crossed the hard 250 ms submission limit
-          // after a three-frame recovery, so recovery must now span that whole
-          // limit and contain at least 12 ordinary <= 50 ms completions. This
-          // proves sustained progress rather than one short compositor burst.
-          if (advancedBy === 1
+          // A warmed live probe may retire one or two submissions because only
+          // one queue observer owns each bounded completion frontier. Count the
+          // completed frames only when the observed jump fits the runtime's
+          // declared one-or-two-frame bound. Require both the owning queue probe
+          // and the interval since the prior observed completion to stay within
+          // 50 ms, so a late first frame cannot hide behind a younger frame in
+          // the same frontier. The July 29 capture-tail failure crossed the hard
+          // 250 ms submission limit after a three-frame recovery, so recovery
+          // must still span that whole limit and contain at least 12 ordinary
+          // completions. This proves sustained progress rather than one short
+          // compositor burst.
+          const boundedCompletionFrontier = Number.isSafeInteger(maximumInFlightSubmissions)
+            && presentation.submissionMode === 'warmed-live'
+            && maximumInFlightSubmissions === 2
+            && Number.isSafeInteger(advancedBy)
+            && advancedBy >= 1
+            && advancedBy <= maximumInFlightSubmissions;
+          if (boundedCompletionFrontier
             && presentation.status === 'healthy'
             && Number.isFinite(completionLatencyMs)
-            && completionLatencyMs <= maximumCompletionMs) {
-            consecutiveCompletions.push(observation);
+            && completionLatencyMs <= maximumCompletionMs
+            && Number.isFinite(completionProgressGapMs)
+            && completionProgressGapMs >= 0
+            && completionProgressGapMs <= maximumCompletionMs) {
+            consecutiveCompletionFrontiers.push(observation);
+            qualifyingCompletionCount += advancedBy;
           } else {
             discardedCompletionCount += advancedBy;
-            consecutiveCompletions.length = 0;
+            consecutiveCompletionFrontiers.length = 0;
+            qualifyingCompletionCount = 0;
           }
-          const recoveryWindowMs = consecutiveCompletions.length > 1
-            ? observedAtMs - consecutiveCompletions[0].observedAtMs
+          const recoveryWindowMs = consecutiveCompletionFrontiers.length > 1
+            ? observedAtMs - consecutiveCompletionFrontiers[0].observedAtMs
             : 0;
-          if (consecutiveCompletions.length >= requiredCompletions
+          if (qualifyingCompletionCount >= requiredCompletions
             && recoveryWindowMs >= minimumWindowMs) {
             // Hold in the same browser task that proves the sustained window;
             // the caller then drains any already-admitted frontier.
@@ -265,17 +291,18 @@ async function requireCaptureRecoveryCompletions(page, captureCompletionSequence
               recoveryWindowMs,
               elapsedMs: performance.now() - startedAt,
               discardedCompletionCount,
-              qualifyingCompletionCount: consecutiveCompletions.length,
-              firstQualifyingCompletion: consecutiveCompletions[0],
-              lastQualifyingCompletion: consecutiveCompletions.at(-1),
-              consecutiveCompletions: consecutiveCompletions.slice(),
+              qualifyingCompletionCount,
+              qualifyingFrontierCount: consecutiveCompletionFrontiers.length,
+              firstQualifyingCompletion: consecutiveCompletionFrontiers[0],
+              lastQualifyingCompletion: consecutiveCompletionFrontiers.at(-1),
+              consecutiveCompletionFrontiers: consecutiveCompletionFrontiers.slice(),
               observations,
             });
             return;
           }
         }
         if (performance.now() >= timeoutAt) {
-          holdAndReject(`Capture recovery did not establish ${requiredCompletions} ordinary completions across ${minimumWindowMs} ms within 12 seconds`);
+          holdAndReject(`Capture recovery did not establish ${requiredCompletions} bounded-frontier completions across ${minimumWindowMs} ms within 12 seconds`);
           return;
         }
         requestAnimationFrame(inspect);
@@ -309,8 +336,9 @@ async function captureCanvasOnly(page, clip) {
     });
     // page.screenshot() can return while Chrome compositor work remains queued
     // on the same adapter. Require a sustained 250 ms window containing at
-    // least 12 individually observed game completions at <= 50 ms before the
-    // next measured interval. This quarantine does not relax the live limits.
+    // least 12 game completions, observed through one-or-two-frame bounded
+    // frontiers at <= 50 ms, before the next measured interval. This quarantine
+    // does not relax the live limits.
     const recovery = await requireCaptureRecoveryCompletions(page, captureCompletionSequence);
     const progress = await pauseAndDrainPresentation(page);
     return { screenshot, progress, recovery, captureIsolationMs: Date.now() - captureIsolationStartedAt };

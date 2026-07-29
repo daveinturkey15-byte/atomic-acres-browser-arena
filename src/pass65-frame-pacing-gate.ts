@@ -25,6 +25,33 @@ export type FramePacingWindowSummary = Readonly<{
   longFrameRates: FrameTailRates;
 }>;
 
+export type PresentationProgressSnapshot = Readonly<{
+  status: string;
+  submissionMode: string;
+  maximumInFlightSubmissions: number;
+  inFlightSubmissions: number;
+  submissionSequence: number;
+  completedSequence: number;
+  completionFailures: number;
+  skippedSubmissions: number;
+}>;
+
+export type PresentationProgressWindowSummary = Readonly<{
+  windowMs: number;
+  started: PresentationProgressSnapshot;
+  ended: PresentationProgressSnapshot;
+  submissionAdvances: number;
+  completionAdvances: number;
+  submittedHz: number;
+  completedHz: number;
+  skippedSubmissionAdvances: number;
+}>;
+
+export type PresentationCadenceSummary = Readonly<{
+  submittedHz: number;
+  completedHz: number;
+}>;
+
 export type FramePacingThresholds = Readonly<{
   minimumWindowMs: number;
   minimumCadenceHz: number;
@@ -78,6 +105,87 @@ export const PASS65_FRAME_PACING_THRESHOLDS: FramePacingThresholds = Object.free
 
 function rounded(value: number): number {
   return Number(value.toFixed(3));
+}
+
+export function summarizePresentationProgressWindow(
+  started: PresentationProgressSnapshot,
+  ended: PresentationProgressSnapshot,
+  windowMs: number,
+): PresentationProgressWindowSummary {
+  const submissionAdvances = ended.submissionSequence - started.submissionSequence;
+  const completionAdvances = ended.completedSequence - started.completedSequence;
+  const rate = (advances: number) => Number.isFinite(windowMs) && windowMs > 0 && advances >= 0
+    ? rounded(advances * 1_000 / windowMs)
+    : 0;
+  return Object.freeze({
+    windowMs: rounded(windowMs),
+    started: Object.freeze({ ...started }),
+    ended: Object.freeze({ ...ended }),
+    submissionAdvances,
+    completionAdvances,
+    submittedHz: rate(submissionAdvances),
+    completedHz: rate(completionAdvances),
+    skippedSubmissionAdvances: ended.skippedSubmissions - started.skippedSubmissions,
+  });
+}
+
+export function validatePresentationProgressWindow(
+  summary: PresentationProgressWindowSummary,
+  thresholds: FramePacingThresholds = PASS65_FRAME_PACING_THRESHOLDS,
+): readonly string[] {
+  const issues: string[] = [];
+  const validateSnapshot = (label: 'start' | 'end', snapshot: PresentationProgressSnapshot) => {
+    if (snapshot.status !== 'healthy') issues.push(`presentation-${label}-not-healthy:${snapshot.status}`);
+    if (snapshot.submissionMode !== 'warmed-live') issues.push(`presentation-${label}-mode:${snapshot.submissionMode}`);
+    if (snapshot.maximumInFlightSubmissions !== 2) {
+      issues.push(`presentation-${label}-frontier-bound:${snapshot.maximumInFlightSubmissions}`);
+    }
+    const sequencesValid = Number.isSafeInteger(snapshot.submissionSequence)
+      && Number.isSafeInteger(snapshot.completedSequence)
+      && snapshot.submissionSequence >= 0
+      && snapshot.completedSequence >= 0
+      && snapshot.completedSequence <= snapshot.submissionSequence;
+    if (!sequencesValid) {
+      issues.push(`presentation-${label}-sequence-invalid:${snapshot.submissionSequence}/${snapshot.completedSequence}`);
+    } else {
+      const expectedInFlight = snapshot.submissionSequence - snapshot.completedSequence;
+      if (snapshot.inFlightSubmissions !== expectedInFlight
+        || expectedInFlight > snapshot.maximumInFlightSubmissions) {
+        issues.push(`presentation-${label}-in-flight-invalid:${snapshot.inFlightSubmissions}/${expectedInFlight}`);
+      }
+    }
+    if (snapshot.completionFailures !== 0) {
+      issues.push(`presentation-${label}-completion-failures:${snapshot.completionFailures}`);
+    }
+    if (!Number.isSafeInteger(snapshot.skippedSubmissions) || snapshot.skippedSubmissions < 0) {
+      issues.push(`presentation-${label}-skipped-invalid:${snapshot.skippedSubmissions}`);
+    }
+  };
+  validateSnapshot('start', summary.started);
+  validateSnapshot('end', summary.ended);
+
+  const windowValid = Number.isFinite(summary.windowMs) && summary.windowMs >= thresholds.minimumWindowMs;
+  if (!windowValid) issues.push(`presentation-window-too-short:${summary.windowMs}/${thresholds.minimumWindowMs}`);
+  const minimumAdvances = windowValid
+    ? Math.floor(summary.windowMs * thresholds.minimumCadenceHz / 1_000)
+    : 0;
+  if (summary.submissionAdvances < 0) {
+    issues.push(`presentation-submission-sequence-regressed:${summary.submissionAdvances}`);
+  } else if (windowValid && summary.submissionAdvances < minimumAdvances) {
+    issues.push(`presentation-submissions-below-${thresholds.minimumCadenceHz}hz:${summary.submissionAdvances}/${minimumAdvances}`);
+  }
+  if (summary.completionAdvances < 0) {
+    issues.push(`presentation-completion-sequence-regressed:${summary.completionAdvances}`);
+  } else if (windowValid && summary.completionAdvances < minimumAdvances) {
+    issues.push(`presentation-completions-below-${thresholds.minimumCadenceHz}hz:${summary.completionAdvances}/${minimumAdvances}`);
+  }
+  if (Math.abs(summary.submissionAdvances - summary.completionAdvances) > 2) {
+    issues.push(`presentation-frontier-drift:${summary.submissionAdvances}/${summary.completionAdvances}`);
+  }
+  if (!Number.isSafeInteger(summary.skippedSubmissionAdvances) || summary.skippedSubmissionAdvances < 0) {
+    issues.push(`presentation-skipped-sequence-invalid:${summary.skippedSubmissionAdvances}`);
+  }
+  return Object.freeze(issues);
 }
 
 function percentile(ordered: readonly number[], fraction: number): number {
@@ -188,6 +296,22 @@ export function compareAtomicAgainstTerminal(
   }
   if (atomic.longFrameRates.over50MsPer1000 > terminal.longFrameRates.over50MsPer1000 + delta.over50MsPer1000) {
     issues.push(`atomic-over-50ms-rate-materially-worse:${atomic.longFrameRates.over50MsPer1000}/${terminal.longFrameRates.over50MsPer1000}`);
+  }
+  return Object.freeze(issues);
+}
+
+export function comparePresentationCadenceAgainstTerminal(
+  atomic: PresentationCadenceSummary,
+  terminal: PresentationCadenceSummary,
+  thresholds: FramePacingThresholds = PASS65_FRAME_PACING_THRESHOLDS,
+): readonly string[] {
+  const delta = thresholds.atomicDelta;
+  const issues: string[] = [];
+  if (materiallyBelow(atomic.submittedHz, terminal.submittedHz, delta.cadenceFixedHz, delta.cadenceFraction)) {
+    issues.push(`atomic-submission-cadence-materially-worse:${atomic.submittedHz}/${terminal.submittedHz}`);
+  }
+  if (materiallyBelow(atomic.completedHz, terminal.completedHz, delta.cadenceFixedHz, delta.cadenceFraction)) {
+    issues.push(`atomic-completion-cadence-materially-worse:${atomic.completedHz}/${terminal.completedHz}`);
   }
   return Object.freeze(issues);
 }
