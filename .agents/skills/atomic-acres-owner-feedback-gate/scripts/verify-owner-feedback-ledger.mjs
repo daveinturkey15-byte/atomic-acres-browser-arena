@@ -12,6 +12,32 @@ const AGENTS_PATH = path.join(REPO_ROOT, 'AGENTS.md');
 const PACKAGE_PATH = path.join(REPO_ROOT, 'package.json');
 
 const TEXT_SOURCE_NORMALIZATION = 'UTF-8; CRLF converted to LF; one final LF added; text semantics unchanged';
+const REQUIRED_NATIVE_TESTS_BY_FEEDBACK = new Map([
+  ['HF-001', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE']],
+  ['HF-002', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE']],
+  ['HF-003', ['T-WEBGPU-ENDURANCE']],
+  ['HF-004', ['T-COLD-WEBGPU-ADMISSION']],
+  ['HF-038', ['T-WEBGPU-ENDURANCE']],
+  ['HF-041', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE', 'T-NATIVE-FRAME-PACING']],
+  ['HF-052', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE']],
+  ['HF-054', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE']],
+  ['HF-056', ['T-COLD-WEBGPU-ADMISSION']],
+  ['HF-064', ['T-WEBGPU-ENDURANCE']],
+  ['HF-065', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE', 'T-NATIVE-FRAME-PACING']],
+  ['HF-071', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE']],
+  ['HF-073', ['T-COLD-WEBGPU-ADMISSION']],
+  ['HF-085', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE', 'T-NATIVE-FRAME-PACING']],
+  ['HF-098', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE', 'T-NATIVE-FRAME-PACING']],
+  ['HF-106', ['T-NATIVE-FRAME-PACING']],
+  ['HF-112', ['T-NATIVE-FRAME-PACING']],
+  ['HF-115', ['T-NATIVE-FRAME-PACING']],
+  ['HF-117', ['T-WEBGPU-ENDURANCE', 'T-NATIVE-FRAME-PACING']],
+  ['HF-118', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE', 'T-NATIVE-FRAME-PACING']],
+  ['HF-121', ['T-WEBGPU-ENDURANCE', 'T-NATIVE-FRAME-PACING']],
+  ['HF-124', ['T-NATIVE-FRAME-PACING']],
+  ['HF-137', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE', 'T-NATIVE-FRAME-PACING']],
+  ['HF-138', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE', 'T-NATIVE-FRAME-PACING']],
+]);
 
 function error(errors, code, message) {
   errors.push(`${code}: ${message}`);
@@ -555,6 +581,11 @@ function validateGraph(graph, ledgerContext, packageJson, errors, options) {
     for (const duplicate of duplicateValues(artifactRefs)) error(errors, 'E_GRAPH_HF_ARTIFACT_DUPLICATE', `${feedbackId} duplicates ${duplicate}.`);
     for (const testRef of testRefs) if (!testIndex.has(testRef)) error(errors, 'E_GRAPH_HF_TEST_UNKNOWN', `${feedbackId} references ${testRef}.`);
     for (const artifactRef of artifactRefs) if (!artifactIndex.has(artifactRef)) error(errors, 'E_GRAPH_HF_ARTIFACT_UNKNOWN', `${feedbackId} references ${artifactRef}.`);
+    for (const requiredTestRef of REQUIRED_NATIVE_TESTS_BY_FEEDBACK.get(feedbackId) ?? []) {
+      if (!testRefs.includes(requiredTestRef)) {
+        error(errors, 'E_GRAPH_NATIVE_GATE_REQUIRED', `${feedbackId} must retain ${requiredTestRef}.`);
+      }
+    }
 
     if (options.candidateMode && ['P0', 'P1'].includes(ledgerRow.priority)) {
       if (verification.coverage !== 'complete') error(errors, 'E_CANDIDATE_COVERAGE', `${feedbackId} ${ledgerRow.priority} coverage is not complete.`);
@@ -712,6 +743,12 @@ function runSelfTest(ledger, matrix, agents, packageJson, graph) {
   const untestedStructural = structuredClone(graph);
   untestedStructural.feedbackNodes.find((node) => node.id === 'HF-001').verification.testRefs = [];
   expectRejected('untested structural outcome', 'E_GRAPH_TEST_REQUIRED', { graph: untestedStructural });
+  const missingNativeGate = structuredClone(graph);
+  missingNativeGate.feedbackNodes.find((node) => node.id === 'HF-001').verification.testRefs = [
+    'T-MENU-LIFECYCLE-E2E',
+    'T-WEBGPU-ENDURANCE',
+  ];
+  expectRejected('missing required native gate', 'E_GRAPH_NATIVE_GATE_REQUIRED', { graph: missingNativeGate });
 
   const readyLedger = candidateReadyLedger(ledger);
   const fixture = buildCandidateFixture(graph, readyLedger);

@@ -1257,6 +1257,28 @@
       ]
     },
     {
+      "id": "T-COLD-WEBGPU-ADMISSION",
+      "command": "npm run qa:pass65:cold-webgpu-admission",
+      "paths": [
+        "scripts/qa/verify-pass65-cold-webgpu-admission.mjs"
+      ]
+    },
+    {
+      "id": "T-WEBGPU-ENDURANCE",
+      "command": "npm run qa:pass65:webgpu-endurance",
+      "paths": [
+        "scripts/qa/verify-pass65-webgpu-endurance.mjs"
+      ]
+    },
+    {
+      "id": "T-NATIVE-FRAME-PACING",
+      "command": "npm run qa:pass65:frame-pacing",
+      "paths": [
+        "scripts/qa/verify-pass65-frame-pacing.ts",
+        "src/pass65-frame-pacing-gate.ts"
+      ]
+    },
+    {
       "id": "T-FOCUS-RECOVERY-E2E",
       "command": "npx playwright test tests/e2e/pass65-frame-pacing-focus.spec.ts --project=chromium --workers=1 --retries=0",
       "paths": [
@@ -1550,7 +1572,9 @@
       "verification": {
         "coverage": "partial",
         "testRefs": [
-          "T-MENU-LIFECYCLE-E2E"
+          "T-MENU-LIFECYCLE-E2E",
+          "T-COLD-WEBGPU-ADMISSION",
+          "T-WEBGPU-ENDURANCE"
         ],
         "artifactRefs": []
       }
@@ -1571,7 +1595,9 @@
         "coverage": "partial",
         "testRefs": [
           "T-LIFECYCLE-UNIT",
-          "T-FRAME-POLICY"
+          "T-FRAME-POLICY",
+          "T-COLD-WEBGPU-ADMISSION",
+          "T-WEBGPU-ENDURANCE"
         ],
         "artifactRefs": []
       }
@@ -1592,7 +1618,8 @@
         "coverage": "partial",
         "testRefs": [
           "T-LIFECYCLE-UNIT",
-          "T-MENU-LIFECYCLE-E2E"
+          "T-MENU-LIFECYCLE-E2E",
+          "T-WEBGPU-ENDURANCE"
         ],
         "artifactRefs": []
       }
@@ -1613,7 +1640,8 @@
         "coverage": "partial",
         "testRefs": [
           "T-PREVIEW-GATE",
-          "T-MENU-LIFECYCLE-E2E"
+          "T-MENU-LIFECYCLE-E2E",
+          "T-COLD-WEBGPU-ADMISSION"
         ],
         "artifactRefs": []
       }
@@ -2698,7 +2726,8 @@
       "verification": {
         "coverage": "partial",
         "testRefs": [
-          "T-DESTRUCTIBLE"
+          "T-DESTRUCTIBLE",
+          "T-WEBGPU-ENDURANCE"
         ],
         "artifactRefs": []
       }
@@ -2770,7 +2799,10 @@
         "coverage": "partial",
         "testRefs": [
           "T-FRAME-POLICY",
-          "T-MENU-LIFECYCLE-E2E"
+          "T-MENU-LIFECYCLE-E2E",
+          "T-COLD-WEBGPU-ADMISSION",
+          "T-WEBGPU-ENDURANCE",
+          "T-NATIVE-FRAME-PACING"
         ],
         "artifactRefs": []
       }
@@ -3100,7 +3132,9 @@
         "coverage": "partial",
         "testRefs": [
           "T-SUPPORT-RUNTIME",
-          "T-MENU-LIFECYCLE-E2E"
+          "T-MENU-LIFECYCLE-E2E",
+          "T-COLD-WEBGPU-ADMISSION",
+          "T-WEBGPU-ENDURANCE"
         ],
         "artifactRefs": []
       }
@@ -3150,7 +3184,9 @@
         "coverage": "partial",
         "testRefs": [
           "T-SUPPORT-RUNTIME",
-          "T-FRAME-POLICY"
+          "T-FRAME-POLICY",
+          "T-COLD-WEBGPU-ADMISSION",
+          "T-WEBGPU-ENDURANCE"
         ],
         "artifactRefs": []
       }
@@ -3200,7 +3236,8 @@
         "coverage": "partial",
         "testRefs": [
           "T-PREVIEW-GATE",
-          "T-MENU-LIFECYCLE-E2E"
+          "T-MENU-LIFECYCLE-E2E",
+          "T-COLD-WEBGPU-ADMISSION"
         ],
         "artifactRefs": []
       }
@@ -3383,7 +3420,8 @@
       "verification": {
         "coverage": "partial",
         "testRefs": [
-          "T-MENU-LIFECYCLE-E2E"
+          "T-MENU-LIFECYCLE-E2E",
+          "T-WEBGPU-ENDURANCE"
         ],
         "artifactRefs": []
       }
@@ -3402,7 +3440,10 @@
       "verification": {
         "coverage": "partial",
         "testRefs": [
-          "T-FRAME-POLICY"
+          "T-FRAME-POLICY",
+          "T-COLD-WEBGPU-ADMISSION",
+          "T-WEBGPU-ENDURANCE",
+          "T-NATIVE-FRAME-PACING"
         ],
         "artifactRefs": []
       }
@@ -3652,7 +3693,9 @@
           "T-ORDNANCE",
           "T-DESTRUCTIBLE",
           "T-SUPPORT-RUNTIME",
-          "T-NETWORK"
+          "T-NETWORK",
+          "T-COLD-WEBGPU-ADMISSION",
+          "T-WEBGPU-ENDURANCE"
         ],
         "artifactRefs": []
       }
@@ -3721,7 +3764,8 @@
         "coverage": "partial",
         "testRefs": [
           "T-PREVIEW-GATE",
-          "T-MENU-LIFECYCLE-E2E"
+          "T-MENU-LIFECYCLE-E2E",
+          "T-COLD-WEBGPU-ADMISSION"
         ],
         "artifactRefs": []
       }
@@ -3986,7 +4030,10 @@
         "testRefs": [
           "T-DRONE-GATE",
           "T-FRAME-POLICY",
-          "T-SUPPORT-RUNTIME"
+          "T-SUPPORT-RUNTIME",
+          "T-COLD-WEBGPU-ADMISSION",
+          "T-WEBGPU-ENDURANCE",
+          "T-NATIVE-FRAME-PACING"
         ],
         "artifactRefs": []
       }
@@ -4282,7 +4329,10 @@
         "coverage": "partial",
         "testRefs": [
           "T-FRAME-POLICY",
-          "T-LIFECYCLE-UNIT"
+          "T-LIFECYCLE-UNIT",
+          "T-COLD-WEBGPU-ADMISSION",
+          "T-WEBGPU-ENDURANCE",
+          "T-NATIVE-FRAME-PACING"
         ],
         "artifactRefs": []
       }
@@ -4465,7 +4515,8 @@
         "testRefs": [
           "T-SETTINGS",
           "T-FRAME-POLICY",
-          "T-PROFILE-AUTHORITY-UNIT"
+          "T-PROFILE-AUTHORITY-UNIT",
+          "T-NATIVE-FRAME-PACING"
         ],
         "artifactRefs": []
       }
@@ -4598,7 +4649,8 @@
         "coverage": "partial",
         "testRefs": [
           "T-SETTINGS",
-          "T-FRAME-POLICY"
+          "T-FRAME-POLICY",
+          "T-NATIVE-FRAME-PACING"
         ],
         "artifactRefs": []
       }
@@ -4664,7 +4716,8 @@
         "coverage": "partial",
         "testRefs": [
           "T-SETTINGS",
-          "T-FRAME-POLICY"
+          "T-FRAME-POLICY",
+          "T-NATIVE-FRAME-PACING"
         ],
         "artifactRefs": []
       }
@@ -4708,7 +4761,9 @@
         "coverage": "partial",
         "testRefs": [
           "T-MENU-LIFECYCLE-E2E",
-          "T-SETTINGS"
+          "T-SETTINGS",
+          "T-WEBGPU-ENDURANCE",
+          "T-NATIVE-FRAME-PACING"
         ],
         "artifactRefs": []
       }
@@ -4729,7 +4784,10 @@
         "coverage": "partial",
         "testRefs": [
           "T-FRAME-POLICY",
-          "T-LIFECYCLE-UNIT"
+          "T-LIFECYCLE-UNIT",
+          "T-COLD-WEBGPU-ADMISSION",
+          "T-WEBGPU-ENDURANCE",
+          "T-NATIVE-FRAME-PACING"
         ],
         "artifactRefs": []
       }
@@ -4799,7 +4857,9 @@
         "testRefs": [
           "T-FRAME-POLICY",
           "T-MENU-LIFECYCLE-E2E",
-          "T-FOCUS-RECOVERY-E2E"
+          "T-FOCUS-RECOVERY-E2E",
+          "T-WEBGPU-ENDURANCE",
+          "T-NATIVE-FRAME-PACING"
         ],
         "artifactRefs": []
       }
@@ -4866,7 +4926,8 @@
         "coverage": "partial",
         "testRefs": [
           "T-FRAME-POLICY",
-          "T-SETTINGS"
+          "T-SETTINGS",
+          "T-NATIVE-FRAME-PACING"
         ],
         "artifactRefs": []
       }
@@ -5171,7 +5232,10 @@
         "coverage": "partial",
         "testRefs": [
           "T-OWNER-GATE",
-          "T-LIFECYCLE-UNIT"
+          "T-LIFECYCLE-UNIT",
+          "T-COLD-WEBGPU-ADMISSION",
+          "T-WEBGPU-ENDURANCE",
+          "T-NATIVE-FRAME-PACING"
         ],
         "artifactRefs": []
       }
@@ -5195,7 +5259,10 @@
         "testRefs": [
           "T-FRAME-POLICY",
           "T-MENU-LIFECYCLE-E2E",
-          "T-SUPPORT-RUNTIME"
+          "T-SUPPORT-RUNTIME",
+          "T-COLD-WEBGPU-ADMISSION",
+          "T-WEBGPU-ENDURANCE",
+          "T-NATIVE-FRAME-PACING"
         ],
         "artifactRefs": []
       }

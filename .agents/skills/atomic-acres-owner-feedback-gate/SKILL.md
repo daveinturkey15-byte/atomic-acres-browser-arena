@@ -38,7 +38,7 @@ Preserve observations, inferences, assumptions, unknowns and falsifiers as disti
 - A current correction supersedes an older assumption explicitly; it does not silently rewrite history.
 - Every row has one accountable lane even when several specialists contribute.
 - Every non-blank line in each immutable normalized Pass 65 text source has an explicit atom count, and every atom has a stable source-scoped outcome ID. Every source outcome projection and all canonical supersessions are digest-checked.
-- Every feedback row has an executable test reference. Candidate P0/P1 rows additionally require complete coverage and a digest-checked receipt bound to the exact candidate SHA, build, verifier and environment.
+- Every feedback row has an executable test reference. Crash, freeze, loading, transition, support-stress and frame-pacing rows retain their explicit cold native-WebGPU, endurance and/or native frame-pacing gates; substituting a policy, unit or headless check fails structurally. Candidate P0/P1 rows additionally require complete coverage and a digest-checked receipt bound to the exact candidate SHA, build, verifier and environment.
 - Every `all maps`, `all weapons`, `all grenades`, `all peers`, `future additions`, persistence or cross-profile claim requires set-equality or mutation evidence, not representative spot checks.
 - Runtime evidence names the exact source/build, renderer/backend, map/profile, peer count and relevant seed. Headless topology proof is not native-GPU performance proof.
 - Visual taste, motion pleasure and final feel remain owner HITL judgments after deterministic mechanical and visual-regression gates pass.
@@ -54,7 +54,7 @@ node .agents/skills/atomic-acres-owner-feedback-gate/scripts/verify-owner-feedba
 npm run qa:pass65:owner-feedback:candidate
 ```
 
-The structural verifier must fail duplicate, skipped, malformed, unowned, unscoped, unmapped or untested feedback rows, source-outcome omissions/duplicates, stale owners or supersessions, unknown planning references and invalid artifact declarations. The candidate verifier additionally rejects every `OPEN` or merely `IMPLEMENTED` P0/P1 row and every P0/P1 row without complete, exact-SHA, digest-checked test evidence; only `VERIFIED` or `HITL` with such evidence may enter an immutable candidate. Its positive synthetic receipt fixture and omission/duplication/stale-owner/stale-supersession/missing-test/missing-artifact mutations are part of the skill contract.
+The structural verifier must fail duplicate, skipped, malformed, unowned, unscoped, unmapped or untested feedback rows, removal of a required native hardware gate, source-outcome omissions/duplicates, stale owners or supersessions, unknown planning references and invalid artifact declarations. The candidate verifier additionally rejects every `OPEN` or merely `IMPLEMENTED` P0/P1 row and every P0/P1 row without complete, exact-SHA, digest-checked test evidence; only `VERIFIED` or `HITL` with such evidence may enter an immutable candidate. Its positive synthetic receipt fixture and omission/duplication/stale-owner/stale-supersession/missing-test/missing-native-gate/missing-artifact mutations are part of the skill contract.
 
 ## Handoff
 
