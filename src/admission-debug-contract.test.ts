@@ -18,6 +18,7 @@ describe('allocation-light match admission observation contract', () => {
     expect(sampler).toContain('gameStarted,');
     expect(sampler).toContain('matchPhase: matchState.phase,');
     expect(sampler).toContain('arenaId: selectedArena.id,');
+    expect(sampler).toContain('arenaTransitionPhase,');
     expect(sampler).toContain('presentedGameplayFrame: lastGameplayPresentedFrame,');
     expect(sampler).toContain('matchAdmissionGeneration,');
     expect(sampler).not.toContain('snapshot(');
@@ -68,6 +69,7 @@ describe('allocation-light match admission observation contract', () => {
 
   it('starts hardware-WebGL2 admission timing from one trusted physical Solo click and a new match generation', () => {
     const source = readFileSync(new URL('../scripts/qa/verify-pass65-hardware-webgl2-admission.ts', import.meta.url), 'utf8');
+    const gameSource = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
     const arm = sourceSlice(
       source,
       'target.__PASS65_HARDWARE_WEBGL2_START_WATCH__ = () => {',
@@ -86,7 +88,23 @@ describe('allocation-light match admission observation contract', () => {
     expect(trustedStart).toContain('gate.deploymentStartedAt = performance.now();');
     expect(trustedStart).toContain('gate.expectedAdmissionGeneration = gate.armedBaselineGeneration + 1;');
     expect(trustedStart).toContain('state.matchAdmissionGeneration === gate.expectedAdmissionGeneration');
-    expect(trustedStart).toContain('state.gameStarted && state.presentedGameplayFrame > 0');
+    expect(trustedStart).toContain('readyGeneration === gate.expectedAdmissionGeneration && Number.isFinite(readyAt)');
+    expect(trustedStart).toContain('Number.isSafeInteger(readyPresentedGameplayFrame) && readyPresentedGameplayFrame >= 0');
+    expect(gameSource).toContain('delete deploymentTransition.dataset.readyGeneration;');
+    expect(gameSource).toContain('deploymentTransition.dataset.readyGeneration = String(matchAdmissionGeneration);');
+    expect(gameSource).toContain('deploymentTransition.dataset.readyPresentedGameplayFrame = String(lastGameplayPresentedFrame);');
+    expect(source).toContain('const expectedAdmissionGeneration = Number(baselines.armedBaselineGeneration) + 1;');
+    expect(source).toContain('bootstrap: state.bootstrap,');
+    expect(source).toContain('state?.matchAdmissionGeneration !== expectedGeneration');
+    expect(source).toContain('gate?.expectedAdmissionGeneration !== expectedGeneration');
+    expect(source).toContain('gate?.observedAdmissionGeneration !== expectedGeneration');
+    expect(source).toContain("return state.gameStarted && state.matchPhase === 'active'");
+    expect(source).toContain("state.arenaTransitionPhase === 'idle' && gate.activeAt !== null;");
+    expect(trustedStart).toContain("expectedGenerationActive && state.gameStarted && state.matchPhase === 'active'");
+    expect(trustedStart).toContain("state.arenaTransitionPhase === 'idle' && gate.activeAt === null");
+    expect(trustedStart).toContain('gate.presentedGameplayFrameAtReady = readyPresentedGameplayFrame;');
+    expect(trustedStart).toContain('gate.transitionReadyAt !== null');
+    expect(trustedStart).toContain('state.presentedGameplayFrame > gate.presentedGameplayFrameAtReady');
     expect(clickCapture).toContain('event.isTrusted');
     expect(clickCapture).toContain('beginTrustedAdmissionWatch();');
   });

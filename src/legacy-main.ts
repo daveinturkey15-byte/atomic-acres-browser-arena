@@ -1265,6 +1265,17 @@ type MatchAdmissionCadence = Readonly<{
   documentHasFocus: boolean;
 }>;
 let lastMatchAdmissionCadence: MatchAdmissionCadence | null = null;
+type WebGlReadyPrime = Readonly<{
+  startedAt: number;
+  synchronizedAt: number;
+  firstRenderedAt: number;
+  settledAt: number;
+  finalRenderedAt: number;
+  firstRenderDurationMs: number;
+  finalRenderDurationMs: number;
+  settleDelayMs: number;
+}>;
+let lastWebGlReadyPrime: WebGlReadyPrime | null = null;
 const displayCadencePromise = new Promise<number>((resolve) => {
   const samples: number[] = [];
   let previous = performance.now();
@@ -1416,6 +1427,76 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
   // candidate with admittedDegraded=true; the runtime records it and proceeds
   // so a background peer or transiently occluded window can still recover.
   bootstrapStage = 'ready';
+}
+
+function synchronizeFinalWebGlMatchPrimePresentation(): void {
+  if (!gameStarted || !player.alive) {
+    throw new Error('Final WebGL2 match prime requires a live respawned player');
+  }
+  // Match admission intentionally blocks updatePhysics while the prerecorded
+  // deployment surface is visible. Snap only presentation state here: never
+  // advance character physics, weapon actions, audio, authority or networking.
+  weaponBob = 0;
+  recoilVisual = 0;
+  recoilCamera = { pitch: 0, yaw: 0 };
+  landingImpulse = 0;
+  cameraHeightOffset = 0;
+  cameraRoll = 0;
+  camera.fov = preferredFov;
+  camera.updateProjectionMatrix();
+  camera.position.copy(player.position);
+  camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+  camera.updateMatrixWorld(true);
+  weaponView.setWeapon(player.weapon, true);
+  weaponView.snapToMatchStartRestPose(currentViewmodelSurfaceRetreat());
+  weaponView.setPresentationVisible(shouldShowWeaponViewmodel());
+  camera.updateMatrixWorld(true);
+}
+
+async function primeFinalWebGlMatchPresentation(): Promise<void> {
+  if (renderRuntime.backend === 'webgpu') return;
+  if (!atomicSignal) throw new Error('Final WebGL2 match prime requires the AtomicSignal pass');
+  bootstrapStage = 'verifying-first-presentation';
+  const startedAt = performance.now();
+  const priorRenderSubmissionPaused = renderSubmissionPaused;
+  const priorMatchAdmissionPresentationPaused = matchAdmissionPresentationPaused;
+  renderSubmissionPaused = true;
+  matchAdmissionPresentationPaused = true;
+  try {
+    synchronizeFinalWebGlMatchPrimePresentation();
+    const synchronizedAt = performance.now();
+    // Keep the deployment surface up for one compositor/driver settle boundary.
+    // The admission-presentation pause prevents the global frame loop from
+    // consuming gameplay, countdown, audio, HUD or network progression.
+    await new Promise<number>((resolve) => requestAnimationFrame(resolve));
+    const firstRenderStartedAt = performance.now();
+    atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);
+    const firstRenderedAt = performance.now();
+    // One more frozen settle boundary absorbs deferred driver work, then a
+    // second exact normal-frustum draw lands immediately before ready.
+    const settledAt = await new Promise<number>((resolve) => requestAnimationFrame(resolve));
+    const finalRenderStartedAt = performance.now();
+    atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);
+    const finalRenderedAt = performance.now();
+    lastWebGlReadyPrime = Object.freeze({
+      startedAt,
+      synchronizedAt,
+      firstRenderedAt,
+      settledAt,
+      finalRenderedAt,
+      firstRenderDurationMs: Number((firstRenderedAt - firstRenderStartedAt).toFixed(3)),
+      finalRenderDurationMs: Number((finalRenderedAt - finalRenderStartedAt).toFixed(3)),
+      settleDelayMs: Number((settledAt - firstRenderedAt).toFixed(3)),
+    });
+    bootstrapStage = 'ready';
+  } finally {
+    // The final synchronous WebGL draw can itself be expensive. Never feed its
+    // hidden duration into the first live simulation/adaptive-quality sample.
+    lastFrame = performance.now();
+    accumulator = 0;
+    matchAdmissionPresentationPaused = priorMatchAdmissionPresentationPaused;
+    renderSubmissionPaused = priorRenderSubmissionPaused;
+  }
 }
 
 function buildSky(): void {
@@ -2994,6 +3075,7 @@ let lastPlayerSpawnAudit: {
 } | null = null;
 let debugRenderPaused = new URLSearchParams(window.location.search).get('renderPaused') === '1';
 let renderSubmissionPaused = false;
+let matchAdmissionPresentationPaused = false;
 let arenaTransitionGeneration = 0;
 let arenaTransitionPhase: 'idle' | 'fencing' | 'preparing' | 'committing' | 'rolling-back' | 'failed' = 'idle';
 let arenaTransitionStartedAt: number | null = null;
@@ -7818,6 +7900,9 @@ function syncMenuLifecyclePresentation(): void {
 
 function prepareDeploymentTransition(): void {
   const preview = menuPreviewVideoDefinition(selectedArena.id);
+  delete deploymentTransition.dataset.readyAt;
+  delete deploymentTransition.dataset.readyGeneration;
+  delete deploymentTransition.dataset.readyPresentedGameplayFrame;
   deploymentTransitionPoster.src = preview.poster;
   deploymentTransitionPoster.width = preview.width;
   deploymentTransitionPoster.height = preview.height;
@@ -8052,6 +8137,7 @@ function respawn(
   forceNewLife = false,
   deploymentOverride?: CombatLoadoutSelection,
   pointerLockSource: PointerLockRequestSource = 'respawn',
+  broadcastState = true,
 ): void {
   const startsNewLife = !player.alive || forceNewLife;
   if (startsNewLife) {
@@ -8126,7 +8212,7 @@ function respawn(
   renderFieldKitSelection();
   element<HTMLElement>('#respawn').hidden = true;
   if (gameStarted && requestLock) requestGamePointerLock(pointerLockSource);
-  network.send(createStateMessage());
+  if (broadcastState) network.send(createStateMessage());
 }
 
 function applyLocalClassRedeploy(selection: CombatLoadoutSelection, requestLock: boolean): void {
@@ -8148,6 +8234,7 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   matchAdmissionGeneration += 1;
   lastGameplayPresentedFrame = 0;
   lastMatchAdmissionCadence = null;
+  lastWebGlReadyPrime = null;
   prepareDeploymentTransition();
   applyMenuLifecycle({ type: 'match-start' });
   syncMenuPreviewCanvasPlacement();
@@ -8162,10 +8249,14 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
     }
   }
   bootstrapStage = 'prewarming-weapon-catalog';
+  const matchStartWeapon = selectedArena.id === 'gun-range'
+    ? gunRangeSidearmForWeaponPrewarm()
+    : activeLoadoutSelection().primary;
   await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(
     selectedArena.id,
     gunRangeSidearmForWeaponPrewarm(),
   ));
+  await weaponView.prepareBrowserWeapon(matchStartWeapon);
   weaponView.setWeapon(player.weapon, true);
   killstreakLoadoutController.releaseAfterMatch();
   const frozenKillstreakLoadout = killstreakLoadoutController.freezeAtMatchStart();
@@ -8338,9 +8429,45 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   }
   resetWebGpuPresentationEpoch('match admitted', performance.now());
   gameStarted = true;
-  const matchStartedAt = performance.now();
-  beginMatchDiagnostics(mode, matchStartedAt);
   const matchRules = currentMatchRules();
+  overdriveClaimGeneration = -1;
+  overdriveClaimLastSentAt = Number.NEGATIVE_INFINITY;
+  overdriveSpawns = 0;
+  overdrivePickups = 0;
+  overdriveExpiries = 0;
+  overdriveRoot.visible = selectedArena.overdrive;
+  overdriveRoot.scale.setScalar(0.0001);
+  element<HTMLElement>('#overdrive-hud').hidden = true;
+  matchFinished = false;
+  previousHudScores = [0, 0];
+  if (respawnTimer) clearTimeout(respawnTimer);
+  respawnTimer = null;
+  respawnEndsAt = 0;
+  hudRoot.hidden = false;
+  element<HTMLElement>('#connection-pill').textContent = selectedArena.id === 'gun-range'
+    ? mode === 'solo' ? 'SOLO RANGE' : mode === 'host' ? 'RANGE HOST' : 'RANGE PEER'
+    : mode === 'solo' ? (selectedArena.soloBotCount === 1 ? '1V1 BOT' : 'BOT SKIRMISH') : mode === 'host' ? 'HOST' : 'PEER';
+  element<HTMLElement>('#match-mode-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE PRACTICE' : selectedArena.id === 'rustworks-1v1' ? (gameMode === 'solo' ? 'RUSTRIG DUEL' : 'RUSTRIG MATCH') : 'TEAM DEATHMATCH';
+  element<HTMLElement>('#score-limit').textContent = selectedArena.matchRules.scoreLimit === null ? '—' : String(selectedArena.matchRules.scoreLimit);
+  element<HTMLElement>('#aqua-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE' : 'AQUA';
+  element<HTMLElement>('#coral-label').textContent = selectedArena.id === 'gun-range' ? 'HITS' : 'CORAL';
+  element<HTMLElement>('#support-block').hidden = !selectedArena.fieldSupport;
+  element<HTMLElement>('#room-hud').textContent = network.roomCode ? `ROOM ${network.roomCode.slice(0, 8).toUpperCase()}` : '';
+  respawn(false, false, undefined, 'match-start', false);
+  addFeed(`Welcome to ${arena.label}`, 'gold');
+  if (selectedArena.id === 'gun-range') addFeed('100 / 200 / 300 POINT TARGETS · SCORE ATTACK', 'gold');
+  // Hide any retained pickup from the previous match. The authoritative
+  // railgun schedule is anchored only after the hidden presentation prime.
+  railgunPresentation.updateWorld(
+    createRailgunAuthorityState('disabled', 0, 0, railgunState.generation),
+    performance.now(),
+  );
+  renderTextChat();
+  await primeFinalWebGlMatchPresentation();
+  const matchStartedAt = performance.now();
+  lastFrame = matchStartedAt;
+  accumulator = 0;
+  beginMatchDiagnostics(mode, matchStartedAt);
   if (mode !== 'solo' && activeAtLocalMonoMs !== undefined) {
     const activeAt = activeAtLocalMonoMs;
     if (matchStartedAt < activeAt) {
@@ -8362,34 +8489,9 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
     matchState = createMatch(matchStartedAt, matchRules);
   }
   overdriveState = createOverdriveState(activeAtLocalMonoMs ?? matchStartedAt);
-  overdriveClaimGeneration = -1;
-  overdriveClaimLastSentAt = Number.NEGATIVE_INFINITY;
-  overdriveSpawns = 0;
-  overdrivePickups = 0;
-  overdriveExpiries = 0;
-  overdriveRoot.visible = selectedArena.overdrive;
-  overdriveRoot.scale.setScalar(0.0001);
-  element<HTMLElement>('#overdrive-hud').hidden = true;
   const railgunActiveAt = matchState.phase === 'active' ? matchState.phaseStartedAt : matchState.endsAt;
   initializeRailgunForMatch(railgunActiveAt);
-  matchFinished = false;
-  previousHudScores = [0, 0];
-  if (respawnTimer) clearTimeout(respawnTimer);
-  respawnTimer = null;
-  respawnEndsAt = 0;
-  hudRoot.hidden = false;
-  element<HTMLElement>('#connection-pill').textContent = selectedArena.id === 'gun-range'
-    ? mode === 'solo' ? 'SOLO RANGE' : mode === 'host' ? 'RANGE HOST' : 'RANGE PEER'
-    : mode === 'solo' ? (selectedArena.soloBotCount === 1 ? '1V1 BOT' : 'BOT SKIRMISH') : mode === 'host' ? 'HOST' : 'PEER';
-  element<HTMLElement>('#match-mode-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE PRACTICE' : selectedArena.id === 'rustworks-1v1' ? (gameMode === 'solo' ? 'RUSTRIG DUEL' : 'RUSTRIG MATCH') : 'TEAM DEATHMATCH';
-  element<HTMLElement>('#score-limit').textContent = selectedArena.matchRules.scoreLimit === null ? '—' : String(selectedArena.matchRules.scoreLimit);
-  element<HTMLElement>('#aqua-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE' : 'AQUA';
-  element<HTMLElement>('#coral-label').textContent = selectedArena.id === 'gun-range' ? 'HITS' : 'CORAL';
-  element<HTMLElement>('#support-block').hidden = !selectedArena.fieldSupport;
-  element<HTMLElement>('#room-hud').textContent = network.roomCode ? `ROOM ${network.roomCode.slice(0, 8).toUpperCase()}` : '';
-  respawn(false, false, undefined, 'match-start');
-  addFeed(`Welcome to ${arena.label}`, 'gold');
-  if (selectedArena.id === 'gun-range') addFeed('100 / 200 / 300 POINT TARGETS · SCORE ATTACK', 'gold');
+  player.invulnerableUntil = matchStartedAt + playerSpawnProtectionMs(activeSpawnMode());
   if (mode !== 'solo') {
     network.send({ type: 'join', player: snapshot() });
     if (mode === 'client') {
@@ -8400,9 +8502,10 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
       network.send(loadoutMessage);
     }
     sendLeaderboardSync();
-    if (mode === 'host') broadcastOverdriveState(matchStartedAt);
+    if (mode === 'host') broadcastOverdriveState(activeAtLocalMonoMs ?? matchStartedAt);
   }
-  renderTextChat();
+  deploymentTransition.dataset.readyPresentedGameplayFrame = String(lastGameplayPresentedFrame);
+  deploymentTransition.dataset.readyGeneration = String(matchAdmissionGeneration);
   deploymentTransition.dataset.readyAt = performance.now().toFixed(3);
   applyMenuLifecycle({ type: 'match-ready' });
   syncMenuPreviewCanvasPlacement();
@@ -14249,6 +14352,7 @@ function hideMatchCountdownCue(): void {
 }
 
 function updateMatchState(now: number): void {
+  if (matchAdmissionPresentationPaused) return;
   const previous = matchState.phase;
   const scores = teamScores();
   const rules = currentMatchRules();
@@ -16083,7 +16187,7 @@ function scheduleStateBroadcast(): void {
   if (stateBroadcastTimer) clearTimeout(stateBroadcastTimer);
   const delay = stateBroadcastWakeIntervalMs(network.role, gameStarted, player.alive, localSnapshotRateState.rateHz);
   stateBroadcastTimer = setTimeout(() => {
-    if (gameStarted && network.role !== 'offline' && player.alive) {
+    if (gameStarted && !matchAdmissionPresentationPaused && network.role !== 'offline' && player.alive) {
       const now = performance.now();
       localSnapshotRateState = updateSnapshotRate(localSnapshotRateState, {
         rttMs: hostTimeMapping.sampleCount > 0 ? hostTimeMapping.rttMs : localLobbyPingMs ?? 20,
@@ -16312,6 +16416,15 @@ function monitorSelectedArenaRender(now: number): void {
 }
 
 function frame(now: number, scheduleNext = true): void {
+  if (matchAdmissionPresentationPaused) {
+    // Hidden WebGL2 prime frames are GPU settle boundaries, not simulation
+    // ticks. Keep the next live delta bounded without consuming countdown,
+    // physics, bot, audio, HUD or network progression behind the transition.
+    lastFrame = now;
+    accumulator = 0;
+    if (scheduleNext) requestAnimationFrame(frame);
+    return;
+  }
   if (scheduleNext && !presentationFrameDue(now, lastPresentedFrameAt, graphicsRuntime.frameRateLimit)) {
     requestAnimationFrame(frame);
     return;
@@ -16873,6 +16986,7 @@ function sampleAdmissionState() {
     gameStarted,
     matchPhase: matchState.phase,
     arenaId: selectedArena.id,
+    arenaTransitionPhase,
     presentedGameplayFrame: lastGameplayPresentedFrame,
     matchAdmissionGeneration,
   };
@@ -17039,6 +17153,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       stage: bootstrapStage,
       error: bootstrapError,
       matchAdmissionCadence: lastMatchAdmissionCadence,
+      webGlReadyPrime: lastWebGlReadyPrime,
       menuDeploymentAssetsProfile: lastMenuDeploymentAssetsProfile,
       effectPrewarmProfile: lastArenaEffectPrewarmProfile,
     },

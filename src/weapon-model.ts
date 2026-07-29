@@ -701,6 +701,15 @@ export function updateImportedWeapon(root: THREE.Object3D, dt: number): void {
   runtime(root)?.mixer.update(Math.min(0.05, Math.max(0, dt)));
 }
 
+/** Clears retained firearm/knife actions without advancing presentation time. */
+export function resetImportedWeaponAnimations(root: THREE.Object3D): void {
+  const state = runtime(root);
+  if (!state) return;
+  state.mixer.stopAllAction();
+  for (const action of state.actions.values()) action.stop();
+  state.mixer.setTime(0);
+}
+
 export function fireImportedWeapon(root: THREE.Object3D): void {
   playMatching(root, 'fire');
 }

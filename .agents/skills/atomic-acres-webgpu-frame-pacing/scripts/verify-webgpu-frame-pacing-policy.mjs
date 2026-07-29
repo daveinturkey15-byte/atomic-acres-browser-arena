@@ -57,6 +57,10 @@ const SOURCE_PATHS = Object.freeze({
   hardwareWebGl2Gate: 'src/pass65-hardware-webgl2-admission-gate.ts',
   admissionDebugTest: 'src/admission-debug-contract.test.ts',
   presentationPrewarmTest: 'src/presentation-prewarm-contract.test.ts',
+  renderRuntime: 'src/rendering/render-runtime.ts',
+  weaponPresentation: 'src/weapon-presentation.ts',
+  weaponModel: 'src/weapon-model.ts',
+  operatorModel: 'src/operator-model.ts',
   atomicSpec: 'tests/e2e/atomic-acres.spec.ts',
   ownerFeedbackVerifier: '.agents/skills/atomic-acres-owner-feedback-gate/scripts/verify-owner-feedback-ledger.mjs',
   frameGate: 'src/pass65-frame-pacing-gate.ts',
@@ -208,7 +212,11 @@ export function auditRepositorySources(sources = readRepositorySources()) {
   for (const token of verifierTokens) requireText(sources.frameVerifier, token, 'native frame-pacing verifier', failures);
 
   const webGlMatchPrewarm = functionSlice(legacy, 'prewarmExactWebGlMatchComposition');
+  const finalWebGlPresentationSync = functionSlice(legacy, 'synchronizeFinalWebGlMatchPrimePresentation');
+  const finalWebGlMatchPrime = functionSlice(legacy, 'primeFinalWebGlMatchPresentation');
   const matchStart = functionSlice(legacy, 'startGame');
+  const stateBroadcast = functionSlice(legacy, 'scheduleStateBroadcast');
+  const matchStateUpdate = functionSlice(legacy, 'updateMatchState');
   for (const token of [
     "renderRuntime.backend !== 'webgl2' || !atomicSignal",
     'const priorCameraLayerMask = camera.layers.mask;',
@@ -217,6 +225,80 @@ export function auditRepositorySources(sources = readRepositorySources()) {
     'camera.layers.mask = priorCameraLayerMask;',
   ]) requireText(webGlMatchPrewarm, token, 'exact layered WebGL2 match prewarm', failures);
   requireText(matchStart, 'await prewarmExactWebGlMatchComposition();', 'WebGL2 match admission branch', failures);
+  requireText(matchStart, 'await weaponView.prepareBrowserWeapon(matchStartWeapon);', 'exact match-start viewmodel readiness', failures);
+  requireText(matchStart, 'await primeFinalWebGlMatchPresentation();', 'final hidden WebGL2 match prime', failures);
+  requireText(matchStart, 'deploymentTransition.dataset.readyPresentedGameplayFrame = String(lastGameplayPresentedFrame);', 'generation-ready presentation baseline', failures);
+  for (const token of [
+    'camera.position.copy(player.position);',
+    "camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');",
+    'weaponView.snapToMatchStartRestPose(currentViewmodelSurfaceRetreat());',
+    'camera.updateMatrixWorld(true);',
+  ]) requireText(finalWebGlPresentationSync, token, 'side-effect-bounded WebGL2 match presentation sync', failures);
+  if (finalWebGlPresentationSync.includes('updatePhysics(') || finalWebGlPresentationSync.includes('weaponView.update(')) {
+    failures.push('final WebGL2 presentation sync must not advance gameplay or weapon actions');
+  }
+  requireText(sources.weaponPresentation, 'async prepareBrowserWeapon(id: WeaponId): Promise<void> {', 'awaitable match-start viewmodel preparation API', failures);
+  const viewmodelSnap = sources.weaponPresentation.slice(
+    sources.weaponPresentation.indexOf('snapToMatchStartRestPose('),
+    sources.weaponPresentation.indexOf('private configureWeaponFlashlight('),
+  );
+  for (const token of [
+    'snapToMatchStartRestPose(surfaceRetreat = 0): void {',
+    'this.root.position.set(',
+    'this.root.rotation.set(0, weaponHipYaw(this.active), 0);',
+    'resetMinigunSpool(this.minigunSpool);',
+    'this.restoreRiggedArmBindPose();',
+    'this.poseRiggedFingers(reloadPose, false);',
+    'resetImportedWeaponAnimations(activeModel);',
+    'resetFirstPersonArmAnimations(this.authoredArmsRoot);',
+  ]) requireText(viewmodelSnap, token, 'side-effect-free match-start viewmodel snap', failures);
+  if (viewmodelSnap.indexOf('resetFirstPersonArmAnimations(this.authoredArmsRoot);')
+    > viewmodelSnap.indexOf('resetFirstPersonArmFingers(this.riggedFingerBones);')) {
+    failures.push('authored arm mixer must stop before restoring the canonical finger bind pose');
+  }
+  requireText(sources.weaponModel, 'export function resetImportedWeaponAnimations(', 'retained imported weapon animation reset', failures);
+  requireText(sources.operatorModel, 'export function resetFirstPersonArmAnimations(', 'retained first-person arm animation reset', failures);
+  for (const token of [
+    'const priorRenderSubmissionPaused = renderSubmissionPaused;',
+    'renderSubmissionPaused = true;',
+    'matchAdmissionPresentationPaused = true;',
+    'synchronizeFinalWebGlMatchPrimePresentation();',
+    'const synchronizedAt = performance.now();',
+    'await new Promise<number>((resolve) => requestAnimationFrame(resolve));',
+    'const finalRenderStartedAt = performance.now();\n    atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);',
+    'renderSubmissionPaused = priorRenderSubmissionPaused;',
+    'matchAdmissionPresentationPaused = priorMatchAdmissionPresentationPaused;',
+    'lastFrame = performance.now();',
+    'accumulator = 0;',
+  ]) requireText(finalWebGlMatchPrime, token, 'final hidden WebGL2 match prime', failures);
+  if (occurrences(finalWebGlMatchPrime, 'atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);') !== 2) {
+    failures.push('final hidden WebGL2 match prime must submit exactly two normal-frustum compositions');
+  }
+  requireText(sources.renderRuntime, 'const restoreVisibility = suppressUnrelatedWebGlRenderables(scene, root);', 'root-isolated WebGL2 effect prewarm', failures);
+  requireText(sources.renderRuntime, 'restoreVisibility();', 'WebGL2 effect prewarm visibility restore', failures);
+  for (const token of [
+    'if (matchAdmissionPresentationPaused) {',
+    'accumulator = 0;',
+    'if (scheduleNext) requestAnimationFrame(frame);',
+  ]) requireText(activeFrame, token, 'frozen hidden-prime frame loop', failures);
+  if (activeFrame.indexOf('if (matchAdmissionPresentationPaused) {') > activeFrame.indexOf('frameCount += 1;')
+    || activeFrame.indexOf('if (matchAdmissionPresentationPaused) {') > activeFrame.indexOf('presentationFrameDue(')) {
+    failures.push('hidden-prime progression guard must run before cadence limiting, frame accounting and gameplay updates');
+  }
+  requireText(matchStateUpdate, 'if (matchAdmissionPresentationPaused) return;', 'countdown/audio progression guard', failures);
+  requireText(stateBroadcast, 'gameStarted && !matchAdmissionPresentationPaused', 'state broadcast progression guard', failures);
+  const primeAt = matchStart.indexOf('await primeFinalWebGlMatchPresentation();');
+  const officialClockAt = matchStart.indexOf('const matchStartedAt = performance.now();');
+  for (const [label, token] of [
+    ['diagnostics', 'beginMatchDiagnostics(mode, matchStartedAt);'],
+    ['overdrive', 'overdriveState = createOverdriveState('],
+    ['railgun', 'initializeRailgunForMatch(railgunActiveAt);'],
+    ['spawn protection', 'player.invulnerableUntil = matchStartedAt'],
+  ]) {
+    if (primeAt < 0 || officialClockAt <= primeAt || matchStart.indexOf(token) <= officialClockAt) {
+      failures.push(`${label} clock must anchor after the final hidden WebGL presentation prime`);
+    }
+  }
   if (matchStart.includes('await renderRuntime.compileAndRender(scene, camera, scene);')) {
     failures.push('match admission must not regress to a raw whole-scene WebGL2 compile');
   }
@@ -262,7 +344,13 @@ export function auditRepositorySources(sources = readRepositorySources()) {
     "await page.locator('#solo').click()",
     'event.isTrusted',
     'matchAdmissionGeneration',
-    'state.gameStarted && state.presentedGameplayFrame > 0',
+    'gate.presentedGameplayFrameAtReady = readyPresentedGameplayFrame;',
+    'Number.isSafeInteger(readyPresentedGameplayFrame) && readyPresentedGameplayFrame >= 0',
+    'state.presentedGameplayFrame > gate.presentedGameplayFrameAtReady',
+    "expectedGenerationActive && state.gameStarted && state.matchPhase === 'active'",
+    'readyGeneration === gate.expectedAdmissionGeneration && Number.isFinite(readyAt)',
+    "state.arenaTransitionPhase === 'idle' && gate.activeAt === null",
+    "state.arenaTransitionPhase === 'idle' && gate.activeAt !== null;",
     'gate.readPixelsTripwireInstalled',
     "stack: new Error('WebGL2 readPixels tripwire').stack",
     'validateAdmissionReadPixels(completeAdmissionReadPixels, timing.transitionReadyAt)',
@@ -414,6 +502,25 @@ function runSelfTest() {
     ['weaken state-only ladder active timeout', 'atomicSpec', "admissionState().matchPhase === 'active',\n    undefined,\n    { timeout: 4_000 }", "admissionState().matchPhase === 'active',\n    undefined,\n    { timeout: 4_001 }"],
     ['weaken exact ladder activation projection wait', 'atomicSpec', "async () => (await debug(page)).fieldSupport.available['scout-sweep'],\n      { timeout: 2_000 },", "async () => (await debug(page)).fieldSupport.available['scout-sweep'],\n      { timeout: 2_001 },"],
     ['extend admission readback past transition-ready', 'hardwareWebGl2Verifier', 'validateAdmissionReadPixels(completeAdmissionReadPixels, timing.transitionReadyAt)', 'validateAdmissionReadPixels(completeAdmissionReadPixels, timing.firstGameplayPresentedAt)'],
+    ['remove root-isolated WebGL effect prewarm', 'renderRuntime', 'const restoreVisibility = suppressUnrelatedWebGlRenderables(scene, root);', 'const restoreVisibility = () => undefined;'],
+    ['remove final hidden WebGL match prime', 'legacyMain', 'await primeFinalWebGlMatchPresentation();', 'await Promise.resolve();'],
+    ['remove explicit final WebGL presentation sync', 'legacyMain', 'synchronizeFinalWebGlMatchPrimePresentation();', 'void 0;'],
+    ['remove exact match-start weapon readiness await', 'legacyMain', 'await weaponView.prepareBrowserWeapon(matchStartWeapon);', 'void matchStartWeapon;'],
+    ['remove side-effect-free viewmodel rest snap', 'weaponPresentation', 'snapToMatchStartRestPose(surfaceRetreat = 0): void {', 'removedMatchStartRestPose(surfaceRetreat = 0): void {'],
+    ['retain stale imported firearm animation', 'weaponPresentation', 'resetImportedWeaponAnimations(activeModel);', 'void activeModel;'],
+    ['retain stale authored arm animation', 'weaponPresentation', 'resetFirstPersonArmAnimations(this.authoredArmsRoot);', 'void this.authoredArmsRoot;'],
+    ['remove hidden-prime progression pause', 'legacyMain', 'matchAdmissionPresentationPaused = true;', 'matchAdmissionPresentationPaused = false;'],
+    ['advance global frame loop during hidden prime', 'legacyMain', 'if (matchAdmissionPresentationPaused) {', 'if (false) {'],
+    ['broadcast player state during hidden prime', 'legacyMain', 'gameStarted && !matchAdmissionPresentationPaused', 'gameStarted'],
+    ['start official clock before final hidden prime', 'legacyMain', 'const matchStartedAt = performance.now();', 'const matchStartedAt = 0;'],
+    ['leak hidden final draw into first live delta', 'legacyMain', 'lastFrame = performance.now();', 'void performance.now();'],
+    ['remove final synchronized WebGL prime draw', 'legacyMain', 'const finalRenderStartedAt = performance.now();\n    atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);', 'const finalRenderStartedAt = performance.now();'],
+    ['remove generation-ready presentation baseline', 'legacyMain', 'deploymentTransition.dataset.readyPresentedGameplayFrame = String(lastGameplayPresentedFrame);', 'deploymentTransition.dataset.readyPresentedGameplayFrame = "0";'],
+    ['accept stale ready timestamp from a prior admission', 'hardwareWebGl2Verifier', 'readyGeneration === gate.expectedAdmissionGeneration && Number.isFinite(readyAt)', 'Number.isFinite(readyAt)'],
+    ['accept hidden prime as first live presentation', 'hardwareWebGl2Verifier', 'state.presentedGameplayFrame > gate.presentedGameplayFrameAtReady', 'state.presentedGameplayFrame >= gate.presentedGameplayFrameAtReady'],
+    ['accept stale prior phase in admission watcher', 'hardwareWebGl2Verifier', "expectedGenerationActive && state.gameStarted && state.matchPhase === 'active'", "expectedGenerationActive && state.matchPhase === 'active'"],
+    ['accept preparing transition in admission watcher', 'hardwareWebGl2Verifier', "state.arenaTransitionPhase === 'idle' && gate.activeAt === null", "gate.activeAt === null"],
+    ['accept preparing transition in admission waiter', 'hardwareWebGl2Verifier', "state.arenaTransitionPhase === 'idle' && gate.activeAt !== null;", "gate.activeAt !== null;"],
     ['remove continuous post-ready capture', 'hardwareWebGl2Verifier', 'target.__PASS65_HARDWARE_WEBGL2_STEADY_HANDOFF__ = (timestamp) =>', 'target.__PASS65_HARDWARE_WEBGL2_STEADY_HANDOFF_REMOVED__ = (timestamp) =>'],
     ['remove steady gameplay progress proof', 'hardwareWebGl2Verifier', 'steady-gameplay-presentation-progress-invalid', 'steady-progress-proof-removed'],
     ['remove final global readPixels proof', 'hardwareWebGl2Verifier', 'validateAdmissionReadPixels(completeAdmissionReadPixels, timing.transitionReadyAt)', 'validateAdmissionReadPixels(admissionReadPixelsAtActive, timing.transitionReadyAt)'],

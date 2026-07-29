@@ -14,6 +14,7 @@ import {
   shouldBackpressureWebGpuSubmissions,
   toneMappingForMode,
   webGpuRenderInfoSnapshot,
+  LegacyWebGlRenderRuntime,
   WebGpuRenderRuntime,
 } from './render-runtime';
 import { assertTslCutoverReady, assertTslReviewAuthored, pendingTslMigrationIds, TSL_MIGRATION_INVENTORY } from './tsl-migration-inventory';
@@ -30,6 +31,51 @@ describe('Pass 64 render runtime boundary', () => {
     expect(toneMappingForMode('aces')).toBe(THREE.ACESFilmicToneMapping);
     expect(toneMappingForMode('agx')).toBe(THREE.AgXToneMapping);
     expect(toneMappingForMode('neutral')).toBe(THREE.NeutralToneMapping);
+  });
+
+  it('prewarms one WebGL presentation root without redrawing unrelated arena meshes', async () => {
+    const renderVisibility: Array<Readonly<{ arena: boolean; target: boolean; light: boolean }>> = [];
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const arena = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+    const target = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial());
+    const light = new THREE.AmbientLight(0xffffff);
+    scene.add(camera, arena, target, light);
+    const renderer = {
+      getContext: () => ({
+        getExtension: () => null,
+        getParameter: () => 'Test WebGL2 adapter',
+      }),
+      compileAsync: vi.fn(async () => undefined),
+      render: vi.fn(() => {
+        renderVisibility.push({ arena: arena.visible, target: target.visible, light: light.visible });
+      }),
+    };
+    const runtime = new (LegacyWebGlRenderRuntime as unknown as new (value: unknown) => LegacyWebGlRenderRuntime)(renderer);
+
+    await runtime.compileAndRender(target, camera, scene);
+
+    expect(renderer.compileAsync).toHaveBeenCalledWith(target, camera, scene);
+    expect(renderVisibility).toEqual([{ arena: false, target: true, light: true }]);
+    expect(arena.visible).toBe(true);
+    expect(target.visible).toBe(true);
+  });
+
+  it('restores unrelated WebGL arena visibility when a staged draw fails', async () => {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const arena = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+    const target = new THREE.Group();
+    scene.add(arena, target);
+    const renderer = {
+      getContext: () => ({ getExtension: () => null, getParameter: () => 'Test WebGL2 adapter' }),
+      compileAsync: vi.fn(async () => undefined),
+      render: vi.fn(() => { throw new Error('synthetic staged draw failure'); }),
+    };
+    const runtime = new (LegacyWebGlRenderRuntime as unknown as new (value: unknown) => LegacyWebGlRenderRuntime)(renderer);
+
+    await expect(runtime.compileAndRender(target, camera, scene)).rejects.toThrow('synthetic staged draw failure');
+    expect(arena.visible).toBe(true);
   });
 
   it('admits the cutover only after every custom GLSL owner has a verified TSL graph', () => {

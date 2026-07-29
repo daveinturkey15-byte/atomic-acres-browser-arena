@@ -125,6 +125,27 @@ afterEach(() => {
 });
 
 describe('Pass 65 managed weapon runtime behavior', () => {
+  it('awaits an exact WebGL match-start weapon before the synchronous visibility swap', async () => {
+    stubBrowserTextureLoading();
+    vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (
+      Promise.resolve(fakeGltfForUrl(String(url)))
+    )) as GLTFLoader['loadAsync']);
+    const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(), false);
+    await presentation.load();
+
+    await presentation.prepareBrowserWeapon('pistol');
+    const carbine = presentation.root.getObjectByName('carbine-pass65-first-person-model');
+    const pistol = presentation.root.getObjectByName('pistol-pass65-first-person-model');
+    expect(pistol).toBeDefined();
+    expect(pistol?.visible).toBe(false);
+
+    presentation.setWeapon('pistol', true);
+    presentation.snapToMatchStartRestPose();
+    expect(pistol?.visible).toBe(true);
+    expect(carbine?.visible).toBe(false);
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(2);
+  });
+
   it('keeps a rapid loadout switch atomic while initial browser assets are delayed', async () => {
     stubBrowserTextureLoading();
     const pending = new Map<string, Deferred<FakeGltf>>();

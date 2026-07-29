@@ -582,6 +582,16 @@ export function updateFirstPersonArmAnimations(root: THREE.Object3D, dt: number)
   if (runtime.activeAction && runtime.actions.get(runtime.activeAction)?.isRunning() !== true) runtime.activeAction = null;
 }
 
+/** Clears a retained first-person action without advancing its mixer clock. */
+export function resetFirstPersonArmAnimations(root: THREE.Object3D): void {
+  const runtime = firstPersonArmsRuntime(root);
+  if (!runtime) return;
+  runtime.mixer.stopAllAction();
+  for (const action of runtime.actions.values()) action.stop();
+  runtime.mixer.setTime(0);
+  runtime.activeAction = null;
+}
+
 export function firstPersonArmAnimationState(root: THREE.Object3D | undefined): Readonly<{
   clips: number;
   activeAction: string | null;

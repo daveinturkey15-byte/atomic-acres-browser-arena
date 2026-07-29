@@ -150,6 +150,49 @@ describe('first-person anatomical presentation', () => {
     expect(fired.passiveKnifeVisible).toBe(false);
   });
 
+  it('snaps retained match-start presentation state without advancing an action frame', () => {
+    const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
+    const presentation = new WeaponPresentation(camera, false);
+    presentation.setWeapon('minigun', true);
+    for (let frame = 0; frame < 20; frame += 1) {
+      presentation.update({ ...REST_POSE, moving: true, sprinting: true, ads: true, triggerHeld: true });
+    }
+    presentation.fire(0.02);
+    presentation.melee();
+
+    presentation.snapToMatchStartRestPose(0.12);
+
+    const state = presentation.presentationState();
+    expect(presentation.root.position.toArray()).toEqual([
+      HIP_VIEWMODEL_POSITION.x,
+      HIP_VIEWMODEL_POSITION.y,
+      HIP_VIEWMODEL_POSITION.z + 0.12,
+    ]);
+    expect(presentation.root.scale.toArray()).toEqual([
+      HIP_VIEWMODEL_SCALE,
+      HIP_VIEWMODEL_SCALE,
+      HIP_VIEWMODEL_SCALE,
+    ]);
+    expect(state).toMatchObject({
+      adsProgress: 0,
+      activeCasings: 0,
+      activeSmoke: 0,
+      shotsPresented: 0,
+      knifeVisible: false,
+      passiveKnifeVisible: false,
+      surfaceRetreat: 0.12,
+      meleeArmSource: 'inactive',
+      minigunSpool: { fraction: 0, phase: 'idle' },
+      actionContract: {
+        state: 'hip',
+        weapon: 'minigun',
+        aimBlend: 0,
+        reloadProgress: null,
+        meleeProgress: null,
+      },
+    });
+  });
+
   it('keeps every visible arm mesh opaque throughout ADS', async () => {
     const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250), false);
     await presentation.load();

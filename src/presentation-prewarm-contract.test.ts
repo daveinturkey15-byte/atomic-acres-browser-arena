@@ -141,6 +141,19 @@ describe('presentation prewarm startup contract', () => {
     expect(matchDeployment).toContain('await waitForStableMatchAdmissionCadence();');
     expect(matchDeployment.indexOf('await waitForStableMatchAdmissionCadence();'))
       .toBeLessThan(matchDeployment.indexOf('gameStarted = true;'));
+    expect(matchDeployment.indexOf('await primeFinalWebGlMatchPresentation();'))
+      .toBeLessThan(matchDeployment.indexOf('deploymentTransition.dataset.readyAt'));
+    expect(matchDeployment.indexOf('await primeFinalWebGlMatchPresentation();'))
+      .toBeLessThan(matchDeployment.indexOf('const matchStartedAt = performance.now();'));
+    expect(matchDeployment.indexOf('const matchStartedAt = performance.now();'))
+      .toBeLessThan(matchDeployment.indexOf('beginMatchDiagnostics(mode, matchStartedAt);'));
+    expect(matchDeployment.indexOf('const matchStartedAt = performance.now();'))
+      .toBeLessThan(matchDeployment.indexOf('overdriveState = createOverdriveState('));
+    expect(matchDeployment.indexOf('const matchStartedAt = performance.now();'))
+      .toBeLessThan(matchDeployment.indexOf('initializeRailgunForMatch(railgunActiveAt);'));
+    expect(matchDeployment.indexOf('const matchStartedAt = performance.now();'))
+      .toBeLessThan(matchDeployment.indexOf('player.invulnerableUntil = matchStartedAt'));
+    expect(matchDeployment).toContain('await weaponView.prepareBrowserWeapon(matchStartWeapon);');
     expect(matchDeployment).toContain('await prewarmExactWebGlMatchComposition();');
     expect(matchDeployment).not.toContain('await renderRuntime.compileAndRender(scene, camera, scene);');
     const webGlMatchPrewarm = source.slice(
@@ -152,11 +165,58 @@ describe('presentation prewarm startup contract', () => {
     expect(webGlMatchPrewarm).toContain('await withArenaFrustumCullingDisabled(scene, async () => {');
     expect(webGlMatchPrewarm).toContain('atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);');
     expect(webGlMatchPrewarm).toContain('camera.layers.mask = priorCameraLayerMask;');
+    const finalWebGlPrime = source.slice(
+      source.indexOf('async function primeFinalWebGlMatchPresentation()'),
+      source.indexOf('function buildSky()'),
+    );
+    const finalWebGlPresentationSync = source.slice(
+      source.indexOf('function synchronizeFinalWebGlMatchPrimePresentation()'),
+      source.indexOf('async function primeFinalWebGlMatchPresentation()'),
+    );
+    expect(finalWebGlPresentationSync).toContain('camera.position.copy(player.position);');
+    expect(finalWebGlPresentationSync).toContain("camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');");
+    expect(finalWebGlPresentationSync).toContain('weaponView.snapToMatchStartRestPose(currentViewmodelSurfaceRetreat());');
+    expect(finalWebGlPresentationSync).toContain('camera.updateMatrixWorld(true);');
+    expect(finalWebGlPresentationSync).not.toContain('updatePhysics(');
+    expect(finalWebGlPresentationSync).not.toContain('weaponView.update(');
+    expect(finalWebGlPrime).toContain("renderRuntime.backend === 'webgpu'");
+    expect(finalWebGlPrime).toContain('synchronizeFinalWebGlMatchPrimePresentation();');
+    expect(finalWebGlPrime).toContain('atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);');
+    expect(finalWebGlPrime).toContain('requestAnimationFrame(resolve)');
+    expect(finalWebGlPrime).toContain('renderSubmissionPaused = true;');
+    expect(finalWebGlPrime).toContain('renderSubmissionPaused = priorRenderSubmissionPaused;');
+    expect(finalWebGlPrime).toContain('matchAdmissionPresentationPaused = true;');
+    expect(finalWebGlPrime).toContain('matchAdmissionPresentationPaused = priorMatchAdmissionPresentationPaused;');
+    expect(finalWebGlPrime).toContain('lastFrame = performance.now();');
+    expect(finalWebGlPrime).toContain('accumulator = 0;');
+    expect(finalWebGlPrime.indexOf('synchronizeFinalWebGlMatchPrimePresentation();'))
+      .toBeLessThan(finalWebGlPrime.indexOf('atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);'));
+    expect(finalWebGlPrime.match(/atomicSignal\.render\(scene, camera, VIEWMODEL_RENDER_LAYER\);/g)).toHaveLength(2);
+    expect(finalWebGlPrime).not.toContain('lastGameplayPresentedFrame =');
+    expect(source).toContain('webGlReadyPrime: lastWebGlReadyPrime');
+    const frameLoop = source.slice(source.indexOf('function frame('), source.indexOf('// requestAnimationFrame is suspended'));
+    expect(frameLoop).toContain('if (matchAdmissionPresentationPaused) {');
+    expect(frameLoop.indexOf('if (matchAdmissionPresentationPaused) {')).toBeLessThan(frameLoop.indexOf('frameCount += 1;'));
+    expect(frameLoop.indexOf('if (matchAdmissionPresentationPaused) {')).toBeLessThan(frameLoop.indexOf('presentationFrameDue('));
+    expect(frameLoop).toContain('accumulator = 0;');
+    const stateBroadcast = source.slice(source.indexOf('function scheduleStateBroadcast()'), source.indexOf('scheduleStateBroadcast();'));
+    expect(stateBroadcast).toContain('gameStarted && !matchAdmissionPresentationPaused');
+    const matchStateUpdate = source.slice(source.indexOf('function updateMatchState('), source.indexOf('function endMatch('));
+    expect(matchStateUpdate).toContain('if (matchAdmissionPresentationPaused) return;');
+    const weaponPresentationSource = readFileSync(new URL('./weapon-presentation.ts', import.meta.url), 'utf8');
+    const matchStartSnap = weaponPresentationSource.slice(
+      weaponPresentationSource.indexOf('snapToMatchStartRestPose('),
+      weaponPresentationSource.indexOf('private configureWeaponFlashlight('),
+    );
+    expect(matchStartSnap).toContain('resetImportedWeaponAnimations(activeModel);');
+    expect(matchStartSnap).toContain('resetFirstPersonArmAnimations(this.authoredArmsRoot);');
+    expect(matchStartSnap.indexOf('resetFirstPersonArmAnimations(this.authoredArmsRoot);'))
+      .toBeLessThan(matchStartSnap.indexOf('resetFirstPersonArmFingers(this.riggedFingerBones);'));
     expect(source).toContain('const minimumStableWindowMs = 1_000;');
     expect(source).toContain('const hitchThresholdMs = 50;');
     const cadenceAdmission = source.slice(
       source.indexOf('async function waitForStableMatchAdmissionCadence()'),
-      source.indexOf('function buildSky()'),
+      source.indexOf('function synchronizeFinalWebGlMatchPrimePresentation()'),
     );
     expect(cadenceAdmission).toContain('admittedDegraded: true');
     expect(cadenceAdmission).toContain('visibilityState: document.visibilityState');

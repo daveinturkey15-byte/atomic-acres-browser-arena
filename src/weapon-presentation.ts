@@ -8,6 +8,7 @@ import {
   firstPersonArmAnimationState,
   loadFirstPersonArmsAsset,
   playFirstPersonArmAction,
+  resetFirstPersonArmAnimations,
   resetFirstPersonArmFingers,
   updateFirstPersonArmAnimations,
   type FirstPersonArmChain,
@@ -29,6 +30,7 @@ import {
   meleeImportedWeapon,
   releasePass65WeaponModel,
   reloadImportedWeapon,
+  resetImportedWeaponAnimations,
   updateImportedWeapon,
 } from './weapon-model';
 import { WEAPONS } from './gameplay';
@@ -199,6 +201,16 @@ export const HIP_VIEWMODEL_POSITION = Object.freeze({ x: 0.4, y: -0.42, z: -1.02
 export const HIP_VIEWMODEL_SCALE = 0.54;
 const ADS_VIEWMODEL_BASE_POSITION = Object.freeze({ x: 0.28, y: -0.34, z: -0.97 });
 const ADS_VIEWMODEL_SCALE = 0.64;
+
+function weaponHipYaw(weapon: WeaponId): number {
+  return weapon === 'carbine'
+    ? 0.18
+    : weapon === 'scattergun'
+      ? 0.16
+      : weapon === 'smg'
+        ? 0.14
+        : 0.1;
+}
 
 export type WeaponViewmodelGpuPrewarmContext = Readonly<{
   weaponId: WeaponId;
@@ -974,6 +986,33 @@ export class WeaponPresentation {
     }
   }
 
+  /**
+   * Makes one exact match-start viewmodel synchronously selectable. WebGL2 has
+   * no catalog GPU hook, so admission must still await asset creation instead
+   * of allowing setWeapon() to begin a live lazy swap after ready.
+   */
+  async prepareBrowserWeapon(id: WeaponId): Promise<void> {
+    if (!this.browserRuntime) return;
+    let model = this.models.get(id);
+    if (model && this.modelIsGpuReady(model)) return;
+    await loadPass65WeaponPresentation(id, 'first-person');
+    model = this.models.get(id);
+    if (!model) {
+      const loadedModel = this.createLoadedBrowserWeapon(id);
+      if (!loadedModel) throw new Error(`Pass 65 match-start viewmodel unavailable after load: ${id}`);
+      loadedModel.visible = false;
+      loadedModel.traverse((node) => { node.layers.mask = this.root.layers.mask; });
+      this.models.set(id, loadedModel);
+      this.modelLastUsed.set(id, ++this.modelUseCounter);
+      this.root.add(loadedModel);
+      model = loadedModel;
+    }
+    await this.prewarmBrowserModel(id, model, this.browserWeaponRequest);
+    if (!this.modelIsGpuReady(model)) {
+      throw new Error(`Pass 65 match-start viewmodel did not reach GPU readiness: ${id}`);
+    }
+  }
+
   private async performBrowserWeaponCatalogPrewarm(
     ids: readonly WeaponId[],
     onProgress?: (loaded: number, total: number) => void,
@@ -1331,6 +1370,128 @@ export class WeaponPresentation {
     this.viewmodelFill.intensity = visible
       ? Number(this.viewmodelFill.userData.authoredIntensity ?? 0)
       : 0;
+  }
+
+  /**
+   * Places the retained first-person presentation at the exact clean match-start
+   * pose without advancing clocks, actions, effect pools or gameplay state.
+   * Admission uses this while normal player simulation is deliberately blocked
+   * behind the prerecorded deployment surface.
+   */
+  snapToMatchStartRestPose(surfaceRetreat = 0): void {
+    this.recoil = 0;
+    this.reloadLastProgress = 0;
+    this.switchBlend = 1;
+    this.swayX = 0;
+    this.swayY = 0;
+    this.meleeStart = 0;
+    this.meleePresentationFrames = 0;
+    this.grenadeStart = 0;
+    this.meleePresentationActive = false;
+    this.meleePresentationMode = 'inactive';
+    this.shotStarted = -10_000;
+    this.presentedFireCycle = fireCycleAt(this.active, 10_000, 0);
+    this.pendingScattergunShell = false;
+    this.adsBlend = 0;
+    this.sprintBlend = 0;
+    this.weaponHeat = 0;
+    this.shotsPresented = 0;
+    this.surfaceRetreat = surfaceRetreat;
+    resetMinigunSpool(this.minigunSpool);
+
+    this.muzzleLight.intensity = 0;
+    this.muzzleFlash.visible = false;
+    for (const casing of this.casings) {
+      casing.active = false;
+      casing.life = 0;
+      casing.frames = 0;
+      casing.mesh.visible = false;
+    }
+    for (let slot = 0; slot < this.smokes.length; slot += 1) {
+      const smoke = this.smokes[slot];
+      const offset = slot * 3;
+      smoke.active = false;
+      smoke.life = 0;
+      this.smokePositions[offset] = 0;
+      this.smokePositions[offset + 1] = -10_000;
+      this.smokePositions[offset + 2] = 0;
+      this.smokeColors[offset] = 0;
+      this.smokeColors[offset + 1] = 0;
+      this.smokeColors[offset + 2] = 0;
+    }
+    this.smokePoints.visible = false;
+    (this.smokePoints.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+    (this.smokePoints.geometry.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
+
+    this.root.position.set(
+      HIP_VIEWMODEL_POSITION.x,
+      HIP_VIEWMODEL_POSITION.y,
+      HIP_VIEWMODEL_POSITION.z + surfaceRetreat,
+    );
+    this.root.rotation.set(0, weaponHipYaw(this.active), 0);
+    this.root.scale.setScalar(HIP_VIEWMODEL_SCALE);
+    this.meleeRig.visible = false;
+    this.meleeKnife.visible = false;
+    this.passiveKnife.visible = false;
+    this.restoreRiggedArmBindPose();
+    if (this.authoredArmsRoot) resetFirstPersonArmAnimations(this.authoredArmsRoot);
+    resetFirstPersonArmFingers(this.riggedFingerBones);
+
+    const activeModel = this.mountedModel();
+    if (activeModel) {
+      resetImportedWeaponAnimations(activeModel);
+      activeModel.visible = true;
+    }
+    if (this.authoredMeleeKnife) resetImportedWeaponAnimations(this.authoredMeleeKnife);
+    const reloadPose = reloadPoseAt(this.active, 0);
+    const bolt = activeModel?.getObjectByName('bolt-or-slide');
+    if (bolt) bolt.position.z = Number(bolt.userData.restZ ?? 0);
+    const pump = activeModel?.getObjectByName('pump');
+    if (pump) pump.position.z = Number(pump.userData.restZ ?? -0.48);
+    const magazineName = this.active === 'carbine'
+      ? 'curved-magazine'
+      : this.active === 'lmg'
+        ? 'lmg-box-magazine'
+        : this.active === 'pistol' || this.active === 'machine-pistol' || this.active === 'magnum'
+          ? 'pistol-magazine'
+          : 'straight-magazine';
+    const magazine = activeModel?.getObjectByName(magazineName);
+    if (magazine?.userData.restY !== undefined) {
+      magazine.position.set(
+        Number(magazine.userData.restX),
+        Number(magazine.userData.restY),
+        Number(magazine.userData.restZ),
+      );
+      magazine.rotation.z = Number(magazine.userData.restRotationZ);
+    }
+    const reloadShell = activeModel?.getObjectByName('reload-shell');
+    if (reloadShell) reloadShell.visible = false;
+    const arms = this.root.getObjectByName('first-person-arms');
+    if (arms) {
+      arms.visible = true;
+      arms.position.y = -0.075;
+      arms.scale.setScalar(1);
+      arms.traverse((node) => {
+        if (!(node instanceof THREE.Mesh)) return;
+        const materials = Array.isArray(node.material) ? node.material : [node.material];
+        for (const material of materials) {
+          material.transparent = false;
+          material.opacity = 1;
+          material.depthWrite = true;
+        }
+      });
+      this.solveArms(arms, activeModel, reloadPose);
+    }
+    this.poseRiggedFingers(reloadPose, false);
+    this.solveRiggedArms(activeModel, reloadPose);
+    this.actionContract = characterActionContract({
+      weapon: this.active,
+      aimBlend: 0,
+      sprintBlend: 0,
+      reloadProgress: null,
+      meleeProgress: null,
+    });
+    this.root.updateWorldMatrix(true, true);
   }
 
   private configureWeaponFlashlight(id: WeaponId): void {
@@ -2015,13 +2176,7 @@ export class WeaponPresentation {
     const minigunBarrels = this.models.get('minigun')?.getObjectByName('minigun-barrel-cluster');
     if (minigunBarrels) minigunBarrels.rotation.z = this.minigunSpool.angleRadians;
     const profile = weaponFamilyPresentation(this.active);
-    const hipYaw = this.active === 'carbine'
-      ? 0.18
-      : this.active === 'scattergun'
-        ? 0.16
-        : this.active === 'smg'
-          ? 0.14
-          : 0.1;
+    const hipYaw = weaponHipYaw(this.active);
     const shotAge = this.debugFireAgeMs ?? performance.now() - this.shotStarted;
     const fireCycle = fireCycleAt(this.active, shotAge, this.weaponHeat);
     this.presentedFireCycle = fireCycle;

@@ -336,6 +336,30 @@ function webGlAdapterLabel(renderer: THREE.WebGLRenderer): string {
   return info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : String(gl.getParameter(gl.RENDERER));
 }
 
+function suppressUnrelatedWebGlRenderables(scene: THREE.Scene, root: THREE.Object3D): () => void {
+  const retained = new Set<THREE.Object3D>();
+  root.traverse((node) => retained.add(node));
+  for (let node: THREE.Object3D | null = root; node; node = node.parent) retained.add(node);
+  scene.traverse((node) => {
+    if (!(node instanceof THREE.Light)) return;
+    for (let ancestor: THREE.Object3D | null = node; ancestor; ancestor = ancestor.parent) retained.add(ancestor);
+  });
+
+  const hidden = new Map<THREE.Object3D, boolean>();
+  scene.traverse((node) => {
+    const renderable = node instanceof THREE.Mesh
+      || node instanceof THREE.Line
+      || node instanceof THREE.Points
+      || node instanceof THREE.Sprite;
+    if (!renderable || retained.has(node) || !node.visible) return;
+    hidden.set(node, node.visible);
+    node.visible = false;
+  });
+  return () => {
+    for (const [node, visible] of hidden) node.visible = visible;
+  };
+}
+
 export class LegacyWebGlRenderRuntime {
   readonly backend = 'webgl2' as const;
   readonly renderer: THREE.WebGLRenderer;
@@ -494,8 +518,24 @@ export class LegacyWebGlRenderRuntime {
   }
 
   async compileAndRender(root: THREE.Object3D, camera: THREE.Camera, scene: THREE.Scene): Promise<void> {
+    let attachmentRoot = root;
+    while (attachmentRoot.parent) attachmentRoot = attachmentRoot.parent;
+    if (attachmentRoot !== scene) {
+      throw new Error('WebGL presentation prewarm root must be attached to the submitted scene');
+    }
     await this.compile(root, camera, scene);
-    this.renderer.render(scene, camera);
+    // Presentation pools stage exact-scale buffers and authored materials, but
+    // they must not redraw the complete cold arena once per effect family. The
+    // selected scene's lights remain available to the staged root; the final
+    // AtomicSignal coverage and match-composition renders still prove the full
+    // world. This removes redundant whole-map raster/driver work without
+    // deferring any effect geometry, texture, material or upload into combat.
+    const restoreVisibility = suppressUnrelatedWebGlRenderables(scene, root);
+    try {
+      this.renderer.render(scene, camera);
+    } finally {
+      restoreVisibility();
+    }
   }
 
   resetRenderInfo(): void {

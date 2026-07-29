@@ -141,6 +141,7 @@ type Instrumentation = Readonly<{
   readPixelsTripwireInstalled: boolean;
   expectedAdmissionGeneration: number | null;
   observedAdmissionGeneration: number | null;
+  presentedGameplayFrameAtReady: number | null;
   postReadyCaptureStartedAt: number | null;
   postReadyCaptureStoppedAt: number | null;
   postReadyIntervalsMs: readonly number[];
@@ -183,6 +184,7 @@ type ArenaReceipt = Readonly<{
     readPixelsTripwireInstalled: boolean;
     expectedAdmissionGeneration: number | null;
     observedAdmissionGeneration: number | null;
+    presentedGameplayFrameAtReady: number | null;
     postReadyFrameWindow: FrameWindow;
   }>;
   steady: Readonly<{
@@ -235,6 +237,7 @@ async function installInstrumentation(context: BrowserContext): Promise<void> {
       armedBaselineGeneration: number | null;
       expectedAdmissionGeneration: number | null;
       observedAdmissionGeneration: number | null;
+      presentedGameplayFrameAtReady: number | null;
       postReadyCaptureStartedAt: number | null;
       postReadyCaptureStoppedAt: number | null;
       postReadyPreviousRafAt: number | null;
@@ -258,6 +261,7 @@ async function installInstrumentation(context: BrowserContext): Promise<void> {
       armedBaselineGeneration: null,
       expectedAdmissionGeneration: null,
       observedAdmissionGeneration: null,
+      presentedGameplayFrameAtReady: null,
       postReadyCaptureStartedAt: null,
       postReadyCaptureStoppedAt: null,
       postReadyPreviousRafAt: null,
@@ -311,6 +315,7 @@ async function installInstrumentation(context: BrowserContext): Promise<void> {
       gate.activeAt = null;
       gate.expectedAdmissionGeneration = null;
       gate.observedAdmissionGeneration = null;
+      gate.presentedGameplayFrameAtReady = null;
       gate.postReadyCaptureStartedAt = null;
       gate.postReadyCaptureStoppedAt = null;
       gate.postReadyPreviousRafAt = null;
@@ -340,7 +345,8 @@ async function installInstrumentation(context: BrowserContext): Promise<void> {
       const watchAdmission = (timestamp: number) => {
         const api = (globalThis as typeof globalThis & {
           __ATOMIC_ACRES_DEBUG__?: { admissionState: () => {
-            gameStarted: boolean; matchPhase: string; presentedGameplayFrame: number; matchAdmissionGeneration: number;
+            gameStarted: boolean; matchPhase: string; arenaTransitionPhase: string;
+            presentedGameplayFrame: number; matchAdmissionGeneration: number;
           } };
         }).__ATOMIC_ACRES_DEBUG__;
         if (api) {
@@ -354,14 +360,26 @@ async function installInstrumentation(context: BrowserContext): Promise<void> {
           }
           const expectedGenerationActive = state.matchAdmissionGeneration === gate.expectedAdmissionGeneration;
           if (expectedGenerationActive && state.gameStarted && gate.transitionReadyAt === null) {
-            const readyAt = Number(document.querySelector<HTMLElement>('#deployment-transition')?.dataset.readyAt);
-            gate.transitionReadyAt = Number.isFinite(readyAt) ? readyAt : Number.NaN;
+            const transition = document.querySelector<HTMLElement>('#deployment-transition');
+            const readyGeneration = Number(transition?.dataset.readyGeneration);
+            const readyAt = Number(transition?.dataset.readyAt);
+            const readyPresentedGameplayFrame = Number(transition?.dataset.readyPresentedGameplayFrame);
+            if (readyGeneration === gate.expectedAdmissionGeneration && Number.isFinite(readyAt)
+              && Number.isSafeInteger(readyPresentedGameplayFrame) && readyPresentedGameplayFrame >= 0) {
+              gate.transitionReadyAt = readyAt;
+              gate.presentedGameplayFrameAtReady = readyPresentedGameplayFrame;
+            }
           }
-          if (expectedGenerationActive && state.gameStarted && state.presentedGameplayFrame > 0
+          if (expectedGenerationActive && state.gameStarted && gate.transitionReadyAt !== null
+            && gate.presentedGameplayFrameAtReady !== null
+            && state.presentedGameplayFrame > gate.presentedGameplayFrameAtReady
             && gate.firstGameplayPresentedAt === null) {
             gate.firstGameplayPresentedAt = performance.now();
           }
-          if (expectedGenerationActive && state.matchPhase === 'active' && gate.activeAt === null) gate.activeAt = performance.now();
+          if (expectedGenerationActive && state.gameStarted && state.matchPhase === 'active'
+            && state.arenaTransitionPhase === 'idle' && gate.activeAt === null) {
+            gate.activeAt = performance.now();
+          }
         }
         recordPostReadyFrame(timestamp);
         const admissionTimingComplete = gate.transitionReadyAt !== null
@@ -397,6 +415,7 @@ async function instrumentation(page: Page): Promise<Instrumentation> {
       readPixelsTripwireInstalled: gate.readPixelsTripwireInstalled,
       expectedAdmissionGeneration: gate.expectedAdmissionGeneration,
       observedAdmissionGeneration: gate.observedAdmissionGeneration,
+      presentedGameplayFrameAtReady: gate.presentedGameplayFrameAtReady,
       postReadyCaptureStartedAt: gate.postReadyCaptureStartedAt,
       postReadyCaptureStoppedAt: gate.postReadyCaptureStoppedAt,
       postReadyIntervalsMs: [...gate.postReadyIntervalsMs],
@@ -571,6 +590,7 @@ async function runArena(page: Page, arenaId: ArenaId, setPhase: (phase: string) 
       longTasks: LongTask[]; readPixels: WebGlReadPixelsEvent[]; deploymentStartedAt: number | null;
       transitionReadyAt: number | null; firstGameplayPresentedAt: number | null; activeAt: number | null;
       physicalSoloStarts: Array<{ at: number; isTrusted: boolean }>;
+      armedBaselineGeneration: number | null;
     }};
     const gate = target.__PASS65_HARDWARE_WEBGL2_GATE__;
     target.__PASS65_HARDWARE_WEBGL2_START_WATCH__();
@@ -579,8 +599,13 @@ async function runArena(page: Page, arenaId: ArenaId, setPhase: (phase: string) 
       readPixels: gate.readPixels.length,
       physicalSoloStarts: gate.physicalSoloStarts.length,
       deploymentStartedAt: gate.deploymentStartedAt,
+      armedBaselineGeneration: gate.armedBaselineGeneration,
     };
   });
+  if (!Number.isInteger(baselines.armedBaselineGeneration) || Number(baselines.armedBaselineGeneration) < 0) {
+    throw new Error(`Admission watch did not arm from a valid generation: ${baselines.armedBaselineGeneration}`);
+  }
+  const expectedAdmissionGeneration = Number(baselines.armedBaselineGeneration) + 1;
   await page.locator('#solo').click();
   const loading = await page.evaluate(() => {
     const node = document.querySelector<HTMLElement>('#deployment-transition');
@@ -599,13 +624,28 @@ async function runArena(page: Page, arenaId: ArenaId, setPhase: (phase: string) 
     issues.push(`deployment-surface-not-prerecorded:${JSON.stringify(loading)}`);
   }
 
-  await page.waitForFunction(() => {
-    const api = (globalThis as typeof globalThis & {
-      __ATOMIC_ACRES_DEBUG__?: { admissionState: () => { bootstrapStage: string; matchPhase: string } };
-    }).__ATOMIC_ACRES_DEBUG__;
+  await page.waitForFunction((expectedGeneration) => {
+    const target = globalThis as typeof globalThis & {
+      __ATOMIC_ACRES_DEBUG__?: { admissionState: () => {
+        bootstrapStage: string; gameStarted: boolean; matchPhase: string;
+        arenaTransitionPhase: string; matchAdmissionGeneration: number;
+      } };
+      __PASS65_HARDWARE_WEBGL2_GATE__?: {
+        expectedAdmissionGeneration: number | null;
+        observedAdmissionGeneration: number | null;
+        activeAt: number | null;
+      };
+    };
+    const api = target.__ATOMIC_ACRES_DEBUG__;
+    const gate = target.__PASS65_HARDWARE_WEBGL2_GATE__;
     const state = api?.admissionState();
-    return state?.matchPhase === 'active' || state?.bootstrapStage === 'failed';
-  }, undefined, { timeout: 20_000 });
+    if (state?.matchAdmissionGeneration !== expectedGeneration
+      || gate?.expectedAdmissionGeneration !== expectedGeneration
+      || gate?.observedAdmissionGeneration !== expectedGeneration) return false;
+    if (state.bootstrapStage === 'failed') return true;
+    return state.gameStarted && state.matchPhase === 'active'
+      && state.arenaTransitionPhase === 'idle' && gate.activeAt !== null;
+  }, expectedAdmissionGeneration, { timeout: 20_000 });
 
   const admitted = await instrumentation(page);
   const trustedStarts = admitted.physicalSoloStarts.slice(baselines.physicalSoloStarts);
@@ -643,6 +683,7 @@ async function runArena(page: Page, arenaId: ArenaId, setPhase: (phase: string) 
     const gl = canvas?.getContext('webgl2') ?? null;
     const debugInfo = gl?.getExtension('WEBGL_debug_renderer_info') ?? null;
     return {
+      bootstrap: state.bootstrap,
       gameStarted: state.gameStarted,
       frameCount: state.frameCount,
       matchPhase: state.matchPhase,
@@ -809,6 +850,7 @@ async function runArena(page: Page, arenaId: ArenaId, setPhase: (phase: string) 
       readPixelsTripwireInstalled: admitted.readPixelsTripwireInstalled,
       expectedAdmissionGeneration: admitted.expectedAdmissionGeneration,
       observedAdmissionGeneration: admitted.observedAdmissionGeneration,
+      presentedGameplayFrameAtReady: admitted.presentedGameplayFrameAtReady,
       postReadyFrameWindow,
     }),
     steady: Object.freeze({ requestedWindowMs, frameWindow, summary, progress }),
