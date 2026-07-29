@@ -5416,10 +5416,12 @@ function onNetworkMessage(message: GameMessage): void {
     killstreakSnapshot = message.snapshot;
     const actor = localKillstreakActorSnapshot();
     if (actor) {
-      const previouslyAvailable = new Set(previousActor?.available ?? []);
+      const previousCharges = new Map(previousActor?.availableCharges.map(({ id, count }) => [id, count]) ?? []);
       if (previousActor) {
-        for (const id of actor.available) {
-          if (!previouslyAvailable.has(id)) addFeed(`${GAMEPAD_SUPPORT_LABELS[id]} READY`, 'gold');
+        for (const { id, count } of actor.availableCharges) {
+          if (count > (previousCharges.get(id) ?? 0)) {
+            addFeed(`${GAMEPAD_SUPPORT_LABELS[id]} READY${count > 1 ? ` ×${count}` : ''}`, 'gold');
+          }
         }
       }
       bestStreakThisMatch = Math.max(bestStreakThisMatch, actor.streak);
@@ -11685,7 +11687,8 @@ function updateFieldSupportHud(): void {
     item.classList.toggle('ready', ready);
     item.classList.toggle('controller-selected', support === gamepadSupportSelection);
     const state = item.querySelector<HTMLElement>('.support-state');
-    if (state) state.textContent = ready ? 'READY' : 'LOCKED';
+    const charges = fieldSupport.availableCharges[support];
+    if (state) state.textContent = ready ? charges > 1 ? `READY ×${charges}` : 'READY' : 'LOCKED';
   });
   refreshSupportStatusHud(performance.now(), true);
 }
@@ -17297,6 +17300,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       careCapture: { status: localCareCaptureState.status, heldCrateId: careCaptureCrateId(localCareCaptureState) },
       bestStreakThisMatch,
       available: { ...localFieldSupportProjection().available },
+      availableCharges: { ...localFieldSupportProjection().availableCharges },
       scoutActive: performance.now() < scoutSweepUntil,
       scoutPulseVisible: scoutSweepPulseVisible(performance.now(), scoutSweepUntil),
       yardhawk: yardhawk ? {
@@ -18520,6 +18524,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     // browser task. Project and paint the resulting authority once so activation
     // endurance does not benchmark synthetic snapshot/HUD churn.
     refreshLocalKillstreakSnapshot();
+    bestStreakThisMatch = Math.max(bestStreakThisMatch, localFieldSupportProjection().streak);
     broadcastKillstreakState();
     updateFieldSupportHud();
   },

@@ -40,8 +40,10 @@ describe('field support rewards', () => {
     };
     const projection = projectFieldSupportActor({
       streak: 17,
+      cycleProgress: 3,
       loadout,
       available: ['yardhawk', 'tri-pass'],
+      availableCharges: [{ id: 'yardhawk', count: 3 }, { id: 'tri-pass', count: 1 }],
       revealedCareRewards: ['nuke'],
     });
     expect(projection.streak).toBe(17);
@@ -59,6 +61,7 @@ describe('field support rewards', () => {
       'drone-swarm': false,
       nuke: true,
     });
+    expect(projection.availableCharges).toMatchObject({ yardhawk: 3, 'tri-pass': 1, nuke: 0 });
     expect(projection.revealedCareReward).toBe('nuke');
     expect(Object.isFrozen(projection)).toBe(true);
     expect(Object.isFrozen(projection.available)).toBe(true);

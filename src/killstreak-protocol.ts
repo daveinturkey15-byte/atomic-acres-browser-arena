@@ -14,6 +14,8 @@ import {
   CARE_TARGET_MARKER_MAX_LIFETIME_MS,
   CARPET_TARGET_MARKER_MAX_LIFETIME_MS,
   MAX_RETAINED_CARE_REWARDS,
+  MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD,
+  MAX_REPLICATED_KILLSTREAK_STREAK,
   SUPPORT_TARGET_CORRIDOR_MAX_HALF_WIDTH_M,
   SUPPORT_TARGET_CORRIDOR_MAX_LENGTH_M,
 } from './killstreak-runtime';
@@ -232,14 +234,34 @@ function activationId(value: unknown): value is string {
 
 function isActorSnapshot(value: unknown): boolean {
   if (!object(value) || !exactKeys(value, [
-    'actorId', 'team', 'lifeId', 'streak', 'loadout', 'available', 'adrenalineRemainingMs', 'possession', 'revealedCareRewards',
+    'actorId', 'team', 'lifeId', 'streak', 'cycleProgress', 'loadout', 'available', 'availableCharges',
+    'adrenalineRemainingMs', 'possession', 'revealedCareRewards',
   ]) || !actorId(value.actorId) || (value.team !== 0 && value.team !== 1)
-    || !safeCounter(value.lifeId) || !safeCounter(value.streak, 100_000)
+    || !safeCounter(value.lifeId) || !safeCounter(value.streak, MAX_REPLICATED_KILLSTREAK_STREAK)
+    || !safeCounter(value.cycleProgress, 99)
     || !validateKillstreakLoadout(value.loadout).valid
     || !Array.isArray(value.available) || value.available.length > 5 || !value.available.every((id) => ids.has(String(id)))
+    || !Array.isArray(value.availableCharges) || value.availableCharges.length > 5
     || !finite(value.adrenalineRemainingMs, 0, 15_000)
     || !Array.isArray(value.revealedCareRewards) || value.revealedCareRewards.length > MAX_RETAINED_CARE_REWARDS
     || !value.revealedCareRewards.every((id) => ids.has(String(id)))) return false;
+  const loadout = value.loadout as KillstreakLoadoutV1;
+  const charges = value.availableCharges as unknown[];
+  if (!charges.every((charge) => object(charge)
+    && exactKeys(charge, ['id', 'count'])
+    && loadout.slots.includes(charge.id as Pass65KillstreakId)
+    && safeCounter(charge.count, MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD)
+    && Number(charge.count) > 0)) return false;
+  const chargedIds = charges.map((charge) => (charge as { id: Pass65KillstreakId }).id);
+  const expectedChargedIds = loadout.slots.filter((id) => chargedIds.includes(id));
+  if (new Set(chargedIds).size !== chargedIds.length
+    || value.available.length !== chargedIds.length
+    || !value.available.every((id, index) => id === chargedIds[index])
+    || !chargedIds.every((id, index) => id === expectedChargedIds[index])) return false;
+  const finalThreshold = Math.max(...loadout.slots.map((id) => (
+    PASS65_KILLSTREAK_CATALOG.definitions.find((definition) => definition.id === id)?.cost ?? 0
+  )));
+  if (Number(value.cycleProgress) >= finalThreshold) return false;
   if (value.possession === null) return true;
   return object(value.possession)
     && exactKeys(value.possession, ['kind', 'entityId'])
@@ -324,7 +346,7 @@ function isPlacementMarker(value: unknown): value is KillstreakPlacementMarkerSn
 
 function isRecipientSnapshot(value: unknown): value is KillstreakRecipientSnapshot {
   if (!object(value) || !exactKeys(value, ['schemaVersion', 'matchEpoch', 'revision', 'actors', 'entities', 'sensorContacts', 'placementMarkers'])
-    || value.schemaVersion !== 1 || !safeCounter(value.matchEpoch) || !safeCounter(value.revision)
+    || value.schemaVersion !== 2 || !safeCounter(value.matchEpoch) || !safeCounter(value.revision)
     || !Array.isArray(value.actors) || value.actors.length > 6 || !value.actors.every(isActorSnapshot)
     || !Array.isArray(value.entities) || value.entities.length > 32 || !value.entities.every(isEntitySnapshot)
     || !Array.isArray(value.sensorContacts) || value.sensorContacts.length > 16 || !value.sensorContacts.every(isSensorContact)

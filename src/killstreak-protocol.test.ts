@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseKillstreakLoadout } from './killstreak-catalog';
-import { HostKillstreakRuntime } from './killstreak-runtime';
+import { HostKillstreakRuntime, MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD } from './killstreak-runtime';
 import {
   admitKillstreakCareCaptureResultMessage,
   admitKillstreakStateMessage,
@@ -98,9 +98,11 @@ describe('killstreak protocol', () => {
     const runtime = new HostKillstreakRuntime(7);
     runtime.registerActor('owner', 0, 1, loadout);
     const message = { type: 'killstreak-state' as const, by: 'host', forPlayerId: 'owner', snapshot: runtime.snapshotFor('owner', 0), nonce: 1 };
+    expect(message.snapshot.schemaVersion).toBe(2);
     expect(isKillstreakProtocolMessage(message)).toBe(true);
     expect(isKillstreakHostAuthorityMessage(message)).toBe(true);
     expect(killstreakMessageBelongsToPlayer(message, 'owner')).toBe(true);
+    expect(isKillstreakProtocolMessage({ ...message, snapshot: { ...message.snapshot, schemaVersion: 1 } })).toBe(false);
     expect(isKillstreakProtocolMessage({ ...message, snapshot: { ...message.snapshot, entities: Array.from({ length: 33 }, () => ({ id: 'bad' })) } })).toBe(false);
     const privateCorridor = {
       id: 'ks-activation-7-1:carpet-corridor', activationId: 'ks-activation-7-1', source: 'carpet-bomber', shape: 'corridor',
@@ -173,6 +175,48 @@ describe('killstreak protocol', () => {
         }],
       },
     })).toBe(false);
+  });
+
+  it('admits canonical counted reward charges and rejects forged, duplicate, or mismatched banks', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout);
+    for (let index = 0; index < 45; index += 1) runtime.recordEligibleElimination('owner', 'weapon');
+    const snapshot = runtime.snapshotFor('owner', 1_000);
+    const message = { type: 'killstreak-state' as const, by: 'host', forPlayerId: 'owner', snapshot, nonce: 91 };
+    expect(snapshot.actors[0]).toMatchObject({
+      streak: 45,
+      cycleProgress: 0,
+      availableCharges: [
+        { id: 'scout-sweep', count: 3 },
+        { id: 'yardhawk', count: 3 },
+        { id: 'tri-pass', count: 3 },
+        { id: 'chopper', count: 3 },
+        { id: 'nuke', count: 3 },
+      ],
+    });
+    expect(isKillstreakProtocolMessage(message)).toBe(true);
+    const actor = snapshot.actors[0];
+    const withActor = (replacement: unknown) => ({
+      ...message,
+      snapshot: { ...snapshot, actors: [replacement] },
+    });
+    expect(isKillstreakProtocolMessage(withActor({ ...actor, availableCharges: [{ id: 'scout-sweep', count: 0 }] }))).toBe(false);
+    expect(isKillstreakProtocolMessage(withActor({
+      ...actor,
+      available: ['scout-sweep'],
+      availableCharges: [{ id: 'scout-sweep', count: MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD + 1 }],
+    }))).toBe(false);
+    expect(isKillstreakProtocolMessage(withActor({
+      ...actor,
+      availableCharges: [...actor.availableCharges, actor.availableCharges[0]],
+    }))).toBe(false);
+    expect(isKillstreakProtocolMessage(withActor({
+      ...actor,
+      available: [...actor.available].reverse(),
+      availableCharges: [...actor.availableCharges].reverse(),
+    }))).toBe(false);
+    expect(isKillstreakProtocolMessage(withActor({ ...actor, available: actor.available.slice(1) }))).toBe(false);
+    expect(isKillstreakProtocolMessage(withActor({ ...actor, cycleProgress: 15 }))).toBe(false);
   });
 
   it('rejects stale, duplicate, and forged host reward projections before they replace local state', () => {

@@ -18,6 +18,7 @@ import {
   DRONE_SWARM_DURATION_MS,
   HostKillstreakRuntime,
   MAX_RETAINED_CARE_REWARDS,
+  MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD,
   adrenalineModifiers,
   type KillstreakActivationIntent,
   type KillstreakWorld,
@@ -66,52 +67,120 @@ describe('host killstreak runtime', () => {
     expect(runtime.snapshotFor('owner', 0).actors[0].available).toEqual([
       'adrenaline', 'yardhawk', 'carpet-bomber', 'chopper', 'drone-swarm',
     ]);
+    expect(runtime.snapshotFor('owner', 0).actors[0].availableCharges).toEqual([
+      { id: 'adrenaline', count: 2 },
+      { id: 'yardhawk', count: 2 },
+      { id: 'carpet-bomber', count: 2 },
+      { id: 'chopper', count: 2 },
+      { id: 'drone-swarm', count: 1 },
+    ]);
     expect(runtime.recordEligibleElimination('owner', 'weapon')).toEqual([]);
     runtime.recordActorDeath('owner', 2);
     expect(runtime.snapshotFor('owner', 0).actors[0]).toMatchObject({
       lifeId: 2,
       streak: 0,
+      cycleProgress: 0,
       available: ['adrenaline', 'yardhawk', 'carpet-bomber', 'chopper', 'drone-swarm'],
     });
     runtime.recordActorDeath('owner', 3);
     expect(runtime.snapshotFor('owner', 0).actors[0]).toMatchObject({
       lifeId: 3,
       streak: 0,
+      cycleProgress: 0,
       available: ['adrenaline', 'yardhawk', 'carpet-bomber', 'chopper', 'drone-swarm'],
     });
   });
 
-  it('recycles the streak ladder after all five rewards are earned and spent without dying', () => {
+  it('banks three same-life ladder cycles without consumption and spends exactly one charge per accepted activation', () => {
     const runtime = new HostKillstreakRuntime(7);
     runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
-    earn(runtime, 15);
-    expect(runtime.snapshotFor('owner', 0).actors[0].available).toEqual(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke']);
+    earn(runtime, 45);
+    expect(runtime.snapshotFor('owner', 0).actors[0]).toMatchObject({
+      streak: 45,
+      cycleProgress: 0,
+      available: ['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke'],
+      availableCharges: [
+        { id: 'scout-sweep', count: 3 },
+        { id: 'yardhawk', count: 3 },
+        { id: 'tri-pass', count: 3 },
+        { id: 'chopper', count: 3 },
+        { id: 'nuke', count: 3 },
+      ],
+    });
+
     expect(runtime.activate(intent('scout-sweep', 1, 1), 1_000, DEFAULT_WORLD).accepted).toBe(true);
-    expect(runtime.activate(intent('yardhawk', 2, 2), 1_001, DEFAULT_WORLD).accepted).toBe(true);
-    expect(runtime.activate(intent('tri-pass', 3, 3), 1_002, DEFAULT_WORLD).accepted).toBe(true);
-    expect(runtime.activate(intent('chopper', 4, 4), 1_003, DEFAULT_WORLD).accepted).toBe(true);
-    expect(runtime.activate(intent('nuke', 5, 5), 1_004, DEFAULT_WORLD).accepted).toBe(true);
-    const recycled = runtime.snapshotFor('owner', 1_005).actors[0];
-    expect(recycled.streak).toBe(0);
-    expect(recycled.available).toEqual([]);
+    expect(runtime.snapshotFor('owner', 1_000).actors[0].availableCharges[0]).toEqual({ id: 'scout-sweep', count: 2 });
+    expect(runtime.activate(intent('scout-sweep', 1, 1), 1_001, DEFAULT_WORLD)).toMatchObject({
+      accepted: false,
+      reason: 'replayed-sequence',
+    });
+    expect(runtime.snapshotFor('owner', 1_001).actors[0].availableCharges[0]).toEqual({ id: 'scout-sweep', count: 2 });
+
+    earn(runtime, 5);
+    expect(runtime.snapshotFor('owner', 1_002).actors[0]).toMatchObject({
+      streak: 50,
+      cycleProgress: 5,
+      availableCharges: [
+        { id: 'scout-sweep', count: 3 },
+        { id: 'yardhawk', count: 4 },
+        { id: 'tri-pass', count: 3 },
+        { id: 'chopper', count: 3 },
+        { id: 'nuke', count: 3 },
+      ],
+    });
+    expect(runtime.activate(intent('scout-sweep', 1, 2), 1_003, DEFAULT_WORLD).accepted).toBe(true);
+    expect(runtime.snapshotFor('owner', 1_003).actors[0].availableCharges[0]).toEqual({ id: 'scout-sweep', count: 2 });
+  });
+
+  it('backpressures before a full reward bank instead of silently discarding an earned charge', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
+    earn(runtime, MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD * 15);
+    expect(runtime.snapshotFor('owner', 0).actors[0].availableCharges).toEqual([
+      { id: 'scout-sweep', count: MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD },
+      { id: 'yardhawk', count: MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD },
+      { id: 'tri-pass', count: MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD },
+      { id: 'chopper', count: MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD },
+      { id: 'nuke', count: MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD },
+    ]);
+
     earn(runtime, 2);
+    expect(runtime.recordEligibleElimination('owner', 'weapon')).toEqual([]);
+    expect(runtime.snapshotFor('owner', 0).actors[0].cycleProgress).toBe(2);
+    expect(runtime.activate(intent('scout-sweep', 1, 1), 1_000, DEFAULT_WORLD).accepted).toBe(true);
     expect(runtime.recordEligibleElimination('owner', 'weapon')).toEqual(['scout-sweep']);
-    expect(runtime.snapshotFor('owner', 1_006).actors[0].available).toEqual(['scout-sweep']);
+    const resumed = runtime.snapshotFor('owner', 1_001).actors[0];
+    expect(resumed.cycleProgress).toBe(3);
+    expect(resumed.availableCharges[0]).toEqual({
+      id: 'scout-sweep', count: MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD,
+    });
   });
 
   it('preserves earned rewards across repeated deaths and a transport rejoin while rejecting stale, duplicate, and forged activation claims', () => {
     const runtime = new HostKillstreakRuntime(7);
     runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
     const registeredRevision = runtime.snapshotFor('owner', 0).revision;
-    earn(runtime, 15);
-    expect(runtime.snapshotFor('owner', 0).revision).toBe(registeredRevision + 15);
+    earn(runtime, 18);
+    expect(runtime.snapshotFor('owner', 0)).toMatchObject({ revision: registeredRevision + 18 });
+    expect(runtime.snapshotFor('owner', 0).actors[0]).toMatchObject({ streak: 18, cycleProgress: 3 });
     runtime.recordActorDeath('owner', 2);
     runtime.recordActorDeath('owner', 3);
 
     // A network disconnect does not unregister the host actor. A reconnecting
     // recipient receives a fresh projection of the same canonical queue.
     const rejoined = runtime.snapshotFor('owner', 5_000).actors[0];
-    expect(rejoined).toMatchObject({ lifeId: 3, streak: 0 });
+    expect(rejoined).toMatchObject({
+      lifeId: 3,
+      streak: 0,
+      cycleProgress: 0,
+      availableCharges: [
+        { id: 'scout-sweep', count: 2 },
+        { id: 'yardhawk', count: 1 },
+        { id: 'tri-pass', count: 1 },
+        { id: 'chopper', count: 1 },
+        { id: 'nuke', count: 1 },
+      ],
+    });
     expect(rejoined.available).toEqual(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke']);
 
     expect(runtime.activate({

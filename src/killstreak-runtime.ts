@@ -45,6 +45,9 @@ export const SUPPORT_TARGET_CORRIDOR_MAX_LENGTH_M = 200;
 export const SUPPORT_TARGET_CORRIDOR_MAX_HALF_WIDTH_M = 12;
 export const MAX_ACTIVE_SUPPORT_ENTITIES = 32;
 export const MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP = 64;
+export const MAX_REPLICATED_KILLSTREAK_STREAK = 100_000;
+/** Recipient-protocol bound for a single banked reward count. */
+export const MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD = 255;
 /** Matches the strict recipient snapshot bound; a full queue leaves the crate claimable. */
 export const MAX_RETAINED_CARE_REWARDS = 8;
 
@@ -112,9 +115,13 @@ type ActorAuthorityState = {
   team: 0 | 1;
   lifeId: number;
   loadout: KillstreakLoadoutV1;
+  /** Continuous eligible eliminations in the current life; used by records/HUD. */
   streak: number;
+  /** Progress through the currently earning five-reward ladder cycle. */
+  cycleProgress: number;
   earned: Set<Pass65KillstreakId>;
-  available: Set<Pass65KillstreakId>;
+  /** Banked activations survive cycle rollover and death until used or epoch end. */
+  availableCharges: Map<Pass65KillstreakId, number>;
   careRewards: Pass65KillstreakId[];
   adrenalineUntilMs: number;
   possession: Readonly<{ kind: 'chopper-gunner' | 'piloted-drone'; entityId: string }> | null;
@@ -302,8 +309,10 @@ export type KillstreakActorSnapshot = Readonly<{
   team: 0 | 1;
   lifeId: number;
   streak: number;
+  cycleProgress: number;
   loadout: KillstreakLoadoutV1;
   available: readonly Pass65KillstreakId[];
+  availableCharges: readonly Readonly<{ id: Pass65KillstreakId; count: number }>[];
   adrenalineRemainingMs: number;
   possession: ActorAuthorityState['possession'];
   revealedCareRewards: readonly Pass65KillstreakId[];
@@ -333,7 +342,7 @@ export type KillstreakEntitySnapshot = Readonly<{
 }>;
 
 export type KillstreakRecipientSnapshot = Readonly<{
-  schemaVersion: 1;
+  schemaVersion: 2;
   matchEpoch: number;
   revision: number;
   actors: readonly KillstreakActorSnapshot[];
@@ -639,8 +648,9 @@ export class HostKillstreakRuntime {
       lifeId,
       loadout: parseKillstreakLoadout(loadout),
       streak: 0,
+      cycleProgress: 0,
       earned: new Set(),
-      available: new Set(),
+      availableCharges: new Map(),
       careRewards: [],
       adrenalineUntilMs: 0,
       possession: null,
@@ -653,14 +663,32 @@ export class HostKillstreakRuntime {
   recordEligibleElimination(actorId: string, source: 'weapon' | 'ordnance' | 'killstreak'): readonly Pass65KillstreakId[] {
     const actor = this.actors.get(actorId);
     if (!actor || source === 'killstreak') return [];
-    actor.streak += 1;
-    const newlyEarned: Pass65KillstreakId[] = [];
-    for (const id of actor.loadout.slots) {
+    actor.streak = Math.min(MAX_REPLICATED_KILLSTREAK_STREAK, actor.streak + 1);
+    const nextCycleProgress = actor.cycleProgress + 1;
+    const unlocks = actor.loadout.slots.filter((id) => {
       const definition = exactDefinition(id, this.catalog);
-      if (!definition || actor.earned.has(id) || actor.streak < definition.cost) continue;
+      return definition && !actor.earned.has(id) && nextCycleProgress >= definition.cost;
+    });
+    // Backpressure is explicit: never advance past an unlock whose bank cannot
+    // accept another charge. Spending one charge resumes progression on a later
+    // eligible elimination, so an earned reward is never silently discarded.
+    if (unlocks.some((id) => (
+      actor.availableCharges.get(id) ?? 0
+    ) >= MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD)) {
+      this.revision += 1;
+      return Object.freeze([]);
+    }
+    actor.cycleProgress = nextCycleProgress;
+    const newlyEarned: Pass65KillstreakId[] = [];
+    for (const id of unlocks) {
       actor.earned.add(id);
-      actor.available.add(id);
+      actor.availableCharges.set(id, (actor.availableCharges.get(id) ?? 0) + 1);
       newlyEarned.push(id);
+    }
+    const finalThreshold = Math.max(...actor.loadout.slots.map((id) => exactDefinition(id, this.catalog)?.cost ?? 0));
+    if (finalThreshold > 0 && actor.cycleProgress >= finalThreshold) {
+      actor.cycleProgress = 0;
+      actor.earned.clear();
     }
     // Streak is replicated authority too. Advancing the revision on every
     // eligible elimination lets recipients reject an older reward projection
@@ -669,22 +697,12 @@ export class HostKillstreakRuntime {
     return Object.freeze(newlyEarned);
   }
 
-  /**
-   * Pass 65: once every loadout reward has been earned and spent in one life,
-   * the streak recycles so continued kills earn the ladder again without dying.
-   */
-  private recycleStreakWhenExhausted(actor: ActorAuthorityState): void {
-    if (!actor.loadout.slots.every((id) => actor.earned.has(id))) return;
-    if (actor.loadout.slots.some((id) => actor.available.has(id))) return;
-    actor.streak = 0;
-    actor.earned.clear();
-  }
-
   recordActorDeath(actorId: string, nextLifeId: number): void {
     const actor = this.actors.get(actorId);
     if (!actor) return;
     actor.lifeId = nextLifeId;
     actor.streak = 0;
+    actor.cycleProgress = 0;
     actor.earned.clear();
     actor.adrenalineUntilMs = 0;
     actor.lastActivationSequence = -1;
@@ -793,7 +811,7 @@ export class HostKillstreakRuntime {
     const actualId = this.actualActivationId(actor, intent.slot);
     if (actualId !== intent.expectedId) return reject('selection-mismatch');
     const fromCare = intent.slot === 1 && actor.careRewards[0] === actualId;
-    if (!fromCare && !actor.available.has(actualId)) return reject('reward-not-earned');
+    if (!fromCare && (actor.availableCharges.get(actualId) ?? 0) < 1) return reject('reward-not-earned');
     if (this.seenActivationRequestIds.has(intent.activationId)) return reject('duplicate-activation-id');
     const entityNeed = actualId === 'drone-swarm' ? DRONE_SWARM_COUNT
       : actualId === 'care-package' ? 2
@@ -818,8 +836,9 @@ export class HostKillstreakRuntime {
     this.seenActivationRequestIds.add(intent.activationId);
     if (fromCare) actor.careRewards.shift();
     else {
-      actor.available.delete(actualId);
-      this.recycleStreakWhenExhausted(actor);
+      const remainingCharges = (actor.availableCharges.get(actualId) ?? 0) - 1;
+      if (remainingCharges > 0) actor.availableCharges.set(actualId, remainingCharges);
+      else actor.availableCharges.delete(actualId);
     }
     const entityIds: string[] = [];
     const requestedAnchor = finiteTuple(intent.anchor) ? this.clampAnchor(intent.anchor, world) : this.defaultAnchor(actor.actorId, world);
@@ -1828,8 +1847,13 @@ export class HostKillstreakRuntime {
       team: actor.team,
       lifeId: actor.lifeId,
       streak: actor.streak,
+      cycleProgress: actor.cycleProgress,
       loadout: parseKillstreakLoadout(actor.loadout),
-      available: Object.freeze(actor.loadout.slots.filter((id) => actor.available.has(id))),
+      available: Object.freeze(actor.loadout.slots.filter((id) => (actor.availableCharges.get(id) ?? 0) > 0)),
+      availableCharges: Object.freeze(actor.loadout.slots.flatMap((id) => {
+        const count = actor.availableCharges.get(id) ?? 0;
+        return count > 0 ? [Object.freeze({ id, count })] : [];
+      })),
       adrenalineRemainingMs: Math.max(0, actor.adrenalineUntilMs - nowMs),
       possession: actor.possession,
       revealedCareRewards: Object.freeze(actor.actorId === recipientActorId ? [...actor.careRewards] : []),
@@ -1904,7 +1928,7 @@ export class HostKillstreakRuntime {
       }));
     }
     return Object.freeze({
-      schemaVersion: 1,
+      schemaVersion: 2,
       matchEpoch: this.matchEpoch,
       revision: this.revision,
       actors: Object.freeze(actors),

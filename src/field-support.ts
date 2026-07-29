@@ -74,6 +74,10 @@ function supportFlags(value = false): Record<FieldSupportId, boolean> {
   return Object.fromEntries(FIELD_SUPPORT_IDS.map((id) => [id, value])) as Record<FieldSupportId, boolean>;
 }
 
+function supportCounts(): Record<FieldSupportId, number> {
+  return Object.fromEntries(FIELD_SUPPORT_IDS.map((id) => [id, 0])) as Record<FieldSupportId, number>;
+}
+
 /**
  * Read-only compatibility projection for the legacy HUD and input adapters.
  * Reward authority lives exclusively in HostKillstreakRuntime; this shape must
@@ -84,13 +88,16 @@ export type FieldSupportProjection = Readonly<{
   rewardCycle: number;
   loadout: KillstreakLoadoutV1;
   available: Readonly<Record<FieldSupportId, boolean>>;
+  availableCharges: Readonly<Record<FieldSupportId, number>>;
   revealedCareReward: FieldSupportId | null;
 }>;
 
 export type FieldSupportActorProjectionSource = Readonly<{
   streak: number;
+  cycleProgress: number;
   loadout: KillstreakLoadoutV1;
   available: readonly FieldSupportId[];
+  availableCharges: readonly Readonly<{ id: FieldSupportId; count: number }>[];
   revealedCareRewards: readonly FieldSupportId[];
 }>;
 
@@ -100,7 +107,11 @@ export function projectFieldSupportActor(
 ): FieldSupportProjection {
   const loadout = actor?.loadout ?? fallbackLoadout;
   const available = supportFlags();
-  for (const id of actor?.available ?? []) available[id] = true;
+  const availableCharges = supportCounts();
+  for (const charge of actor?.availableCharges ?? []) {
+    availableCharges[charge.id] = charge.count;
+    available[charge.id] = charge.count > 0;
+  }
   const revealedCareReward = actor?.revealedCareRewards[0] ?? null;
   if (revealedCareReward) {
     available[revealedCareReward] = true;
@@ -109,11 +120,13 @@ export function projectFieldSupportActor(
     available[loadout.slots[0]] = true;
   }
   const streak = Math.max(0, Math.floor(actor?.streak ?? 0));
+  const cycleProgress = Math.max(0, Math.floor(actor?.cycleProgress ?? 0));
   return Object.freeze({
     streak,
-    rewardCycle: streak % 7,
+    rewardCycle: cycleProgress,
     loadout,
     available: Object.freeze(available),
+    availableCharges: Object.freeze(availableCharges),
     revealedCareReward,
   });
 }

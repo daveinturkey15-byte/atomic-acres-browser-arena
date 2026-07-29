@@ -120,6 +120,7 @@ type DebugState = {
     rewardCycle: number;
     bestStreakThisMatch: number;
     available: Record<'scout-sweep' | 'yardhawk' | 'tri-pass' | 'hunter-swarm' | 'nuke', boolean>;
+    availableCharges: Record<'scout-sweep' | 'yardhawk' | 'tri-pass' | 'hunter-swarm' | 'nuke', number>;
     scoutActive: boolean;
     yardhawk: { active: boolean; phase: 'thrown' | 'homing' | null; targetId?: string; position?: number[]; armedInMs?: number };
     yardhawkExplosions: number;
@@ -1807,27 +1808,35 @@ test.describe('solo mechanics', () => {
     expect(state.fieldSupport.yardhawk.active).toBe(false);
   });
 
-  test('loops field-support progression after Tri-Pass so three more kills re-earn Scout Sweep', async ({ page }) => {
+  test('loops the selected five-slot ladder at its final threshold without requiring banked rewards to be spent', async ({ page }) => {
     await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
         earnSupport: (kills: number) => void;
         activateSupport: (id: 'scout-sweep') => void;
       } }).__ATOMIC_ACRES_DEBUG__;
-      api.earnSupport(3);
+      api.earnSupport(15);
       api.activateSupport('scout-sweep');
-      api.earnSupport(4);
     });
     const firstCycle = (await debug(page)).fieldSupport;
-    expect(firstCycle.streak).toBe(7);
+    expect(firstCycle.streak).toBe(15);
     expect(firstCycle.rewardCycle).toBe(0);
-    await page.evaluate(() => (window as unknown as {
-      __ATOMIC_ACRES_DEBUG__: { earnSupport: (kills: number) => void };
-    }).__ATOMIC_ACRES_DEBUG__.earnSupport(3));
+    expect(firstCycle.available['scout-sweep']).toBe(false);
+    expect(firstCycle.available.yardhawk).toBe(true);
+    await page.evaluate(() => {
+      const api = (window as unknown as {
+        __ATOMIC_ACRES_DEBUG__: { earnSupport: (kills: number) => void };
+      }).__ATOMIC_ACRES_DEBUG__;
+      api.earnSupport(15);
+      api.earnSupport(3);
+    });
     const looped = (await debug(page)).fieldSupport;
-    expect(looped.streak).toBe(10);
+    expect(looped.streak).toBe(33);
     expect(looped.rewardCycle).toBe(3);
-    expect(looped.bestStreakThisMatch).toBe(10);
+    expect(looped.bestStreakThisMatch).toBe(33);
     expect(looped.available['scout-sweep']).toBe(true);
+    expect(looped.availableCharges['scout-sweep']).toBe(2);
+    expect(looped.availableCharges.yardhawk).toBe(2);
+    await expect(page.locator('[data-support="scout-sweep"] .support-state')).toHaveText('READY ×2');
   });
 
   test('routes the bot from the interior ramp foot onto the upper floor instead of jamming', async ({ page }) => {
