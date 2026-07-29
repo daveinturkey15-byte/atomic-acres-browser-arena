@@ -4,6 +4,13 @@ import path from 'node:path';
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import {
+  buildDependencyClosure,
+  cacheFamilyLockFailures,
+  digestFinalMediaSet,
+  RETAINED_CACHE_FAMILY_BASELINE,
+  runIntegrityMutationSelfTest,
+} from '../assets/pass65-menu-preview-integrity.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const verifierPath = fileURLToPath(import.meta.url);
@@ -12,8 +19,13 @@ const provenancePath = path.join(sourceRoot, 'provenance.json');
 const choreographyPath = path.join(sourceRoot, 'choreography.json');
 const documentationPath = path.join(sourceRoot, 'README.md');
 const captureReceiptPath = path.join(sourceRoot, 'runtime-capture-receipt.json');
+const cacheFamilyLockPath = path.join(sourceRoot, 'cache-family-lock.json');
 const manifestPath = path.join(root, 'assets.manifest.json');
 const generatorPath = path.join(root, 'scripts/assets/generate-pass65-runtime-menu-previews.ts');
+const integrityPath = path.join(root, 'scripts/assets/pass65-menu-preview-integrity.mjs');
+const integrityTypesPath = path.join(root, 'scripts/assets/pass65-menu-preview-integrity.d.mts');
+const dependencyManifestPath = path.join(root, 'scripts/assets/pass65-menu-preview-arena-dependencies.ts');
+const dependencyPrinterPath = path.join(root, 'scripts/assets/print-pass65-menu-preview-arena-dependencies.ts');
 const finalizerPath = path.join(root, 'scripts/assets/finalize_pass65_menu_previews.mjs');
 const runtimeSourcePath = path.join(root, 'src/ui/menu-preview-video.ts');
 const runtimeEntryPath = path.join(root, 'src/legacy-main.ts');
@@ -22,23 +34,7 @@ const acceptedCockpitEvidence = 'docs/assets/pass65-vehicles/chopper/pass65-chop
 const acceptedCockpitDigest = '581c448b7d998a220ea69fb0c024d9553f40d9aea767b3d88b503780a64921d1';
 const arenas = ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range'];
 const helicopterArenas = arenas.slice(0, 3);
-const expectedRuntimeInputPaths = Object.freeze({
-  'atomic-acres': ['src/map.ts', 'src/arena-layout.ts', 'src/rendering/arenas/atomic-acres.ts'],
-  'skyline-terminal': ['src/additional-maps.ts', 'src/rendering/arenas/skyline-terminal.ts'],
-  'rustworks-1v1': ['src/additional-maps.ts', 'src/rendering/arenas/rustworks-1v1.ts'],
-  'gun-range': [
-    'src/additional-maps.ts',
-    'src/gun-range-armory.ts',
-    'src/gun-range-rack-presentation.ts',
-    'src/weapon-model.ts',
-    'src/rendering/arenas/gun-range.ts',
-    'public/assets/original/models/weapons/pass65-firearms/carbine/carbine-world-lod0.glb',
-    'public/assets/original/models/weapons/pass65-firearms/smg/smg-world-lod0.glb',
-    'public/assets/original/models/weapons/pass65-firearms/lmg/lmg-world-lod0.glb',
-    'public/assets/original/models/weapons/pass65-firearms/scattergun/scattergun-world-lod0.glb',
-    'public/assets/original/models/weapons/pass65-firearms/sniper/sniper-world-lod0.glb',
-  ],
-});
+const captureToolPaths = [generatorPath, integrityPath, integrityTypesPath, dependencyManifestPath];
 const supersededGunRangeDigests = Object.freeze({
   'public/assets/original/menu-previews/gun-range.mp4': '3de2c28899d32ee48b8a023613305690d59227b1e64189ffafaf1aa0b447fc13',
   'public/assets/original/menu-previews/gun-range.webm': '708bdf00af28906a8ce7b1605dc1c534c854c537fb82fecab62173dbce1e9885',
@@ -80,6 +76,10 @@ function runJson(command, args, label) {
     failures.push(`${label} did not return JSON: ${error.message}`);
     return null;
   }
+}
+
+function canonicalArenaDependencies() {
+  return runJson(process.execPath, ['--import', 'tsx', dependencyPrinterPath], 'canonical Pass 65 arena dependency manifest');
 }
 
 function inspectMedia(file) {
@@ -155,68 +155,265 @@ function rotorContractFailures(recipe, generatorSource) {
   const issues = [];
   const rotor = recipe.helicopter?.rotorPresentation;
   const configuredArea = rotor?.mainStageWidthPercent / 100 * rotor?.mainStageHeightPercent / 100;
-  if (rotor?.id !== 'perspective-projected-cockpit-rotor-rig-v2'
+  const configuredTop = rotor?.mainStageTopPercent / 100;
+  const configuredBottom = (rotor?.mainStageTopPercent + rotor?.mainStageHeightPercent) / 100;
+  const configuredStageLeft = (100 - rotor?.mainStageWidthPercent) / 2;
+  const configuredTieLeft = configuredStageLeft + rotor?.mainStageWidthPercent * rotor?.mainStructuralTieInsetPercent / 100;
+  const configuredTieRight = configuredTieLeft + rotor?.mainStageWidthPercent * rotor?.mainStructuralTieWidthPercent / 100;
+  const configuredHeaderLeft = configuredStageLeft + rotor?.mainStageWidthPercent * (100 - rotor?.mainCanopyHeaderWidthPercent) / 200;
+  const configuredMaximumHorizontalShiftPercent = rotor?.mainMaximumPoseShiftPixels / recipe.capture?.viewport?.[0] * 100;
+  if (rotor?.id !== 'perspective-projected-cockpit-rotor-rig-v3'
     || rotor.mainTurnsPerLoop !== recipe.helicopter?.rotorTurnsPerLoop
+    || rotor.mainTurnsPerLoop <= 0
     || rotor.tailTurnsPerLoop !== rotor.mainTurnsPerLoop * 3
-    || rotor.mainDiscPitchDegrees < 82
-    || rotor.mainDiscPitchDegrees > 84
-    || rotor.mainStageWidthPercent < 24
-    || rotor.mainStageWidthPercent > 34
-    || rotor.mainStageHeightPercent < 6
-    || rotor.mainStageHeightPercent > 9
-    || rotor.mainBladeCount !== 4
-    || rotor.mainBladeMode !== 'discrete-radial-sweeps-v1'
-    || rotor.mainContrastMode !== 'graphite-root-fade-v1'
+    || rotor.mainDiscPitchDegrees < 72
+    || rotor.mainDiscPitchDegrees > 80) {
+    issues.push('rotor identity, forward spin cadence, or perspective pitch drifted');
+  }
+  if (!Number.isFinite(configuredArea)
+    || !Number.isFinite(configuredTop)
+    || !Number.isFinite(configuredBottom)
+    || rotor.mainStageTopPercent < -3
+    || rotor.mainStageTopPercent > 1
+    || rotor.mainStageWidthPercent < 80
+    || rotor.mainStageWidthPercent > 88
+    || rotor.mainStageHeightPercent < 20
+    || rotor.mainStageHeightPercent > 24
+    || rotor.mainMinimumScreenWidthFraction < 0.75
+    || rotor.mainMaximumScreenWidthFraction > 0.92
+    || rotor.mainStageWidthPercent / 100 < rotor.mainMinimumScreenWidthFraction
+    || rotor.mainStageWidthPercent / 100 > rotor.mainMaximumScreenWidthFraction
+    || rotor.mainMinimumScreenHeightFraction < 0.16
+    || rotor.mainMaximumScreenHeightFraction > 0.26
+    || rotor.mainStageHeightPercent / 100 < rotor.mainMinimumScreenHeightFraction
+    || rotor.mainStageHeightPercent / 100 > rotor.mainMaximumScreenHeightFraction
+    || rotor.mainMinimumScreenAreaFraction < 0.13
+    || rotor.mainMaximumScreenAreaFraction > 0.22
+    || configuredArea < rotor.mainMinimumScreenAreaFraction
+    || configuredArea > rotor.mainMaximumScreenAreaFraction
+    || configuredTop > rotor.mainMaximumStageTopFraction
+    || configuredBottom < rotor.mainMinimumStageBottomFraction
+    || configuredBottom > rotor.mainMaximumStageBottomFraction
+    || rotor.mainMaximumStageBottomFraction >= 0.32) {
+    issues.push('main rotor must occupy a broad but upper-windscreen-bounded transparent stage');
+  }
+  if (rotor.mainBladeCount !== 4
+    || rotor.mainBladeMode !== 'broad-clipped-temporal-sweeps-v2'
+    || rotor.mainContrastMode !== 'graphite-physical-root-tip-v2'
     || rotor.mainFilledDisc !== false
     || rotor.mainMinimumLegibleBladeSweeps !== 2
-    || rotor.mainMinimumProjectedBladeLengthPixels < 48
-    || rotor.mainMinimumProjectedBladeLengthPixels > 70
-    || rotor.mainMinimumAuthoredBladeThicknessPixels < 1.5
-    || rotor.mainMinimumAuthoredBladeThicknessPixels > 3.5
-    || rotor.mainMinimumBladeOpacity < 0.85
-    || rotor.mainMinimumBladeOpacity > 1
-    || !Number.isFinite(configuredArea)
-    || configuredArea > rotor.mainMaximumScreenAreaFraction
-    || rotor.mainMaximumScreenAreaFraction > 0.025
-    || rotor.mainMaximumScreenHeightFraction > 0.08
-    || rotor.mainMaximumScreenHeightFraction < rotor.mainStageHeightPercent / 100
-    || rotor.mainMaximumPoseShiftPixels < 2
-    || rotor.mainMaximumPoseShiftPixels > 8
-    || rotor.mainMaximumPoseBankDegrees < 0.5
-    || rotor.mainMaximumPoseBankDegrees > 2.4
-    || rotor.mainMotionBlurOpacity < 0.08
-    || rotor.mainMotionBlurOpacity > 0.22
-    || rotor.poseResponsive !== true
-    || rotor.tailDiscYawDegrees < 50
+    || rotor.mainMinimumProjectedBladeLengthPixels < 220
+    || rotor.mainMinimumProjectedBladeLengthPixels > 320
+    || rotor.mainMinimumProjectedSweepSpanPixels < 560
+    || rotor.mainMinimumProjectedSweepSpanPixels > 720
+    || rotor.mainMinimumAuthoredBladeThicknessPixels < 4
+    || rotor.mainMinimumAuthoredBladeThicknessPixels > 8
+    || rotor.mainMinimumBladeOpacity < 0.72
+    || rotor.mainMinimumBladeOpacity > 0.9) {
+    issues.push('main rotor physical blade length, sweep span, thickness, or restrained alpha contract drifted');
+  }
+  if (rotor.mainMotionBlurTrailCount !== 2
+    || rotor.mainNearTrailDegrees < 3
+    || rotor.mainNearTrailDegrees > 6
+    || rotor.mainFarTrailDegrees < 7
+    || rotor.mainFarTrailDegrees > 12
+    || rotor.mainFarTrailDegrees <= rotor.mainNearTrailDegrees
+    || rotor.mainMotionBlurOpacity < 0.12
+    || rotor.mainMotionBlurOpacity > 0.22) {
+    issues.push('main rotor must use exactly two restrained temporal motion-blur trails');
+  }
+  if (rotor.mainMaximumPoseShiftPixels < 8
+    || rotor.mainMaximumPoseShiftPixels > 18
+    || rotor.mainMaximumVerticalPoseShiftPixels < 2
+    || rotor.mainMaximumVerticalPoseShiftPixels > 7
+    || rotor.mainMaximumPoseBankDegrees < 1
+    || rotor.mainMaximumPoseBankDegrees > 3
+    || rotor.mainMaximumDiscPitchResponseDegrees < 0.3
+    || rotor.mainMaximumDiscPitchResponseDegrees > 0.9
+    || rotor.mainMaximumDiscYawResponseDegrees < 0.4
+    || rotor.mainMaximumDiscYawResponseDegrees > 1.1
+    || rotor.poseResponsive !== true) {
+    issues.push('main rotor bounded stage and disc pose response contract drifted');
+  }
+  if (rotor.mainMinimumHubDiameterPixels < 16
+    || rotor.mainMinimumHubDiameterPixels > 30
+    || rotor.mainMinimumHubCanopyOverlapPixels < 2
+    || rotor.mainMinimumHubCanopyOverlapPixels > 8
+    || rotor.mainMaximumHubCanopyOcclusionFraction < 0.35
+    || rotor.mainMaximumHubCanopyOcclusionFraction > 0.7
+    || rotor.mainMinimumMastCanopyOverlapPixels < 6
+    || rotor.mainMinimumMastCanopyOverlapPixels > 14
+    || rotor.mainCanopyHeaderWidthPercent < 36
+    || rotor.mainCanopyHeaderWidthPercent > 48
+    || rotor.mainStructuralTieInsetPercent < 12
+    || rotor.mainStructuralTieInsetPercent > 24
+    || rotor.mainStructuralTieWidthPercent < 10
+    || rotor.mainStructuralTieWidthPercent > 20
+    || rotor.mainStructuralTieAngleDegrees < 4
+    || rotor.mainStructuralTieAngleDegrees > 14
+    || rotor.mainMinimumTieHeaderOverlapAreaPixels < 10
+    || rotor.mainMinimumTieHeaderOverlapAreaPixels > 120
+    || rotor.mainMinimumTieCanopyOverlapAreaPixels < 10
+    || rotor.mainMinimumTieCanopyOverlapAreaPixels > 120
+    || !Number.isFinite(configuredTieLeft)
+    || !Number.isFinite(configuredTieRight)
+    || !Number.isFinite(configuredHeaderLeft)
+    || !Number.isFinite(configuredMaximumHorizontalShiftPercent)
+    || configuredTieLeft + configuredMaximumHorizontalShiftPercent >= 24
+    || configuredTieRight <= configuredHeaderLeft
+    || !['mast-hub', 'structural-ties', 'canopy-header', 'tail-boom'].every((layer) => rotor.occlusionLayers?.includes(layer))) {
+    issues.push('hub, mast, structural ties, and canopy-header occlusion contract drifted');
+  }
+  if (rotor.tailDiscYawDegrees < 50
     || rotor.tailDiscYawDegrees > 75
-    || rotor.tailCameraReflection !== true
-    || !['mast-hub', 'canopy-header', 'tail-boom'].every((layer) => rotor.occlusionLayers?.includes(layer))) {
-    issues.push('perspective-aware main/tail rotor projection contract drifted');
+    || rotor.tailCameraReflection !== true) {
+    issues.push('tail-optic perspective contract drifted');
   }
 
   const mainStart = generatorSource.indexOf('.aa-main-rotor-stage');
   const tailStart = generatorSource.indexOf('.aa-tail-rotor-camera');
   const mainSource = mainStart >= 0 && tailStart > mainStart ? generatorSource.slice(mainStart, tailStart) : '';
-  const planeRule = mainSource.match(/\.aa-main-rotor-plane\{([^}]*)\}/)?.[1] ?? '';
+  const ruleSlice = (start, end) => {
+    const from = mainSource.indexOf(start);
+    const to = mainSource.indexOf(end, from + start.length);
+    return from >= 0 && to > from ? mainSource.slice(from, to) : '';
+  };
+  const stageRule = ruleSlice('.aa-main-rotor-stage{', '.aa-main-rotor-plane{');
+  const planeRule = ruleSlice('.aa-main-rotor-plane{', '.aa-main-rotor-blade{');
+  const bladeRule = ruleSlice('.aa-main-rotor-blade{', '.aa-main-rotor-blade:before,.aa-main-rotor-blade:after{');
+  const tieRule = ruleSlice('.aa-main-rotor-structural-tie{', '.aa-main-rotor-structural-tie.left{');
+  const canopyHeaderRule = ruleSlice('.aa-main-rotor-canopy-header{', '.aa-main-rotor-canopy-header:before{');
   const bladeElements = (generatorSource.match(/class="aa-main-rotor-blade"><\/i>/g) ?? []).length;
+  const tieElements = (generatorSource.match(/class="aa-main-rotor-structural-tie (?:left|right)"><\/i>/g) ?? []).length;
   for (const marker of [
-    'data-projection="foreshortened-partial-sweep"',
-    'data-contrast="graphite-root-fade-v1"',
+    'data-projection="broad-upper-windscreen-partial-sweep"',
+    'data-contrast="graphite-physical-root-tip-v2"',
+    'data-occlusion-order="rotor-plane<mast-hub<structural-ties<canopy-header"',
+    'top:${rotorPresentation.mainStageTopPercent}%',
     'width:${rotorPresentation.mainStageWidthPercent}%',
     'height:${rotorPresentation.mainStageHeightPercent}%',
+    '.aa-main-rotor-blade:before,.aa-main-rotor-blade:after',
+    '.aa-main-rotor-blade:before{',
     '.aa-main-rotor-blade:after',
     '--aa-main-rotor-shift-x',
     '--aa-main-rotor-shift-y',
     '--aa-main-rotor-bank',
+    '--aa-main-rotor-pitch-response',
+    '--aa-main-rotor-yaw-response',
     "overlay.dataset.rotorPoseResponsive = 'true'",
     'overlay.dataset.minimumProjectedBladeLength',
+    'overlay.dataset.minimumProjectedSweepSpan',
+    'overlay.dataset.rotorDiscPitchResponse',
+    'overlay.dataset.rotorDiscYawResponse',
+    '.aa-main-rotor-mast',
+    '.aa-main-rotor-hub',
+    '.aa-main-rotor-structural-tie',
+    '.aa-main-rotor-canopy-header',
+    'hubCanopyOverlapPixels',
+    'mastCanopyOverlapPixels',
+    'leftTieHeaderOverlapAreaPixels',
+    'rightTieHeaderOverlapAreaPixels',
+    'leftTieCanopyOverlapAreaPixels',
+    'rightTieCanopyOverlapAreaPixels',
+    'leftTieHeaderOcclusionSampled',
+    'rightTieHeaderOcclusionSampled',
+    'leftTieCanopyOcclusionSampled',
+    'rightTieCanopyOcclusionSampled',
+    'hubCanopyOcclusionSampled',
+    'mastCanopyOcclusionSampled',
+    'document.elementsFromPoint',
+    'occlusionStackValid',
+    'reticleClear',
+    'tailOpticClear',
     'filledDiscDetected',
   ]) if (!generatorSource.includes(marker)) issues.push(`rotor generator is missing ${marker}`);
-  if (!mainSource || !planeRule) issues.push('main rotor source boundary/rule is missing');
-  if (!mainSource.includes('overflow:hidden')) issues.push('main rotor projection must clip blade sweeps at the canopy viewport boundary');
+  if (!mainSource || !stageRule || !planeRule || !bladeRule) issues.push('main rotor source boundary/stage/plane/blade rule is missing');
+  if (!mainSource.includes('overflow:hidden') || !stageRule.includes('isolation:isolate')) issues.push('main rotor projection must isolate and clip blade sweeps at the canopy viewport boundary');
   if (bladeElements !== rotor?.mainBladeCount) issues.push(`main rotor must emit exactly ${rotor?.mainBladeCount ?? 0} discrete radial blades, got ${bladeElements}`);
+  if (tieElements !== 2 || !tieRule) issues.push(`main rotor must emit exactly two visible structural ties, got ${tieElements}`);
   if (/repeating-conic-gradient|\.aa-main-rotor-plane:(?:before|after)/.test(mainSource)) issues.push('main rotor regressed to a filled/full-disc pseudo surface');
+  if (/background(?:-image)?\s*:/.test(stageRule)) issues.push('main rotor stage must remain transparent rather than becoming a large alpha fill');
   if (/background(?:-image)?\s*:|border-radius\s*:/.test(planeRule)) issues.push('main rotor plane itself must remain transparent and geometry-free');
+  const authoredBladeOpacity = Number(bladeRule.match(/opacity:(\d+(?:\.\d+)?)/)?.[1]);
+  const authoredBladeHeight = Number(bladeRule.match(/height:(\d+(?:\.\d+)?)px/)?.[1]);
+  if (!Number.isFinite(authoredBladeOpacity)
+    || authoredBladeOpacity < rotor.mainMinimumBladeOpacity
+    || authoredBladeOpacity > 0.9
+    || !Number.isFinite(authoredBladeHeight)
+    || authoredBladeHeight < rotor.mainMinimumAuthoredBladeThicknessPixels
+    || authoredBladeHeight > 8) issues.push('authored blade alpha/thickness must stay physical and restrained');
+  if (!canopyHeaderRule.includes('clip-path:polygon(')
+    || !canopyHeaderRule.includes('background:linear-gradient(')
+    || !canopyHeaderRule.includes('border-top:2px solid')
+    || !canopyHeaderRule.includes('z-index:5')) issues.push('canopy occluder must read as a structural cockpit header above the hub, mast, and ties');
+  if (!tieRule.includes('height:6px')
+    || !tieRule.includes('background:linear-gradient(')
+    || !tieRule.includes('z-index:4')) issues.push('structural ties must remain visible physical members between the canopy header and side rails');
+  if (!generatorSource.includes('.aa-tail-rotor-camera{position:absolute;z-index:8;')) issues.push('tail optic must remain above the clipped main-rotor stage');
+  return issues;
+}
+
+function rotorProjectionFailures(recipe, projection) {
+  const issues = [];
+  const rotor = recipe.helicopter?.rotorPresentation;
+  if (projection?.mode !== 'broad-upper-windscreen-partial-sweep'
+    || projection.bladeCount !== rotor?.mainBladeCount
+    || projection.temporalTrailCount !== rotor?.mainMotionBlurTrailCount
+    || projection.legibleBladeSweeps < rotor?.mainMinimumLegibleBladeSweeps
+    || projection.projectedBladeThresholdPixels !== rotor?.mainMinimumProjectedBladeLengthPixels
+    || !Number.isFinite(projection.shortestProjectedBladeLengthPixels)
+    || projection.projectedSweepSpanPixels < rotor?.mainMinimumProjectedSweepSpanPixels
+    || projection.authoredBladeThicknessPixels < rotor?.mainMinimumAuthoredBladeThicknessPixels
+    || projection.bladeOpacity < rotor?.mainMinimumBladeOpacity
+    || projection.contrastMode !== rotor?.mainContrastMode
+    || projection.filledDiscDetected !== false
+    || projection.stageTopFraction > rotor?.mainMaximumStageTopFraction
+    || projection.stageBottomFraction < rotor?.mainMinimumStageBottomFraction
+    || projection.stageBottomFraction > rotor?.mainMaximumStageBottomFraction
+    || projection.stageWidthFraction < rotor?.mainMinimumScreenWidthFraction
+    || projection.stageWidthFraction > rotor?.mainMaximumScreenWidthFraction
+    || projection.stageHeightFraction < rotor?.mainMinimumScreenHeightFraction
+    || projection.stageHeightFraction > rotor?.mainMaximumScreenHeightFraction
+    || projection.stageAreaFraction < rotor?.mainMinimumScreenAreaFraction
+    || projection.stageAreaFraction > rotor?.mainMaximumScreenAreaFraction) {
+    issues.push('receipt rotor projection geometry or physical blade evidence is invalid');
+  }
+  if (projection?.hubDiameterPixels < rotor?.mainMinimumHubDiameterPixels
+    || projection?.hubCanopyOverlapPixels < rotor?.mainMinimumHubCanopyOverlapPixels
+    || projection?.hubCanopyOcclusionFraction > rotor?.mainMaximumHubCanopyOcclusionFraction
+    || projection?.mastCanopyOverlapPixels < rotor?.mainMinimumMastCanopyOverlapPixels
+    || projection?.hubCanopyOcclusionSampled !== true
+    || projection?.mastCanopyOcclusionSampled !== true
+    || projection?.occlusionStackValid !== true) {
+    issues.push('receipt must prove measured and sampled hub/mast/header occlusion');
+  }
+  if (projection?.structuralTieCount !== 2
+    || projection?.leftTieHeaderOverlapAreaPixels < rotor?.mainMinimumTieHeaderOverlapAreaPixels
+    || projection?.rightTieHeaderOverlapAreaPixels < rotor?.mainMinimumTieHeaderOverlapAreaPixels
+    || projection?.leftTieCanopyOverlapAreaPixels < rotor?.mainMinimumTieCanopyOverlapAreaPixels
+    || projection?.rightTieCanopyOverlapAreaPixels < rotor?.mainMinimumTieCanopyOverlapAreaPixels
+    || projection?.leftTieHeaderOcclusionSampled !== true
+    || projection?.rightTieHeaderOcclusionSampled !== true
+    || projection?.leftTieCanopyOcclusionSampled !== true
+    || projection?.rightTieCanopyOcclusionSampled !== true) {
+    issues.push('receipt must prove two connected and sampled structural ties from header to side canopy rails');
+  }
+  if (projection?.reticleClear !== true
+    || projection?.tailOpticClear !== true
+    || projection?.poseResponsive !== true
+    || !Number.isFinite(projection?.poseShiftXPixels)
+    || !Number.isFinite(projection?.poseShiftYPixels)
+    || !Number.isFinite(projection?.poseBankDegrees)
+    || !Number.isFinite(projection?.discPitchResponseDegrees)
+    || !Number.isFinite(projection?.discYawResponseDegrees)
+    || Math.abs(projection?.poseShiftXPixels) > rotor?.mainMaximumPoseShiftPixels
+    || Math.abs(projection?.poseShiftYPixels) > rotor?.mainMaximumVerticalPoseShiftPixels
+    || Math.abs(projection?.poseBankDegrees) > rotor?.mainMaximumPoseBankDegrees
+    || Math.abs(projection?.discPitchResponseDegrees) > rotor?.mainMaximumDiscPitchResponseDegrees
+    || Math.abs(projection?.discYawResponseDegrees) > rotor?.mainMaximumDiscYawResponseDegrees
+    || projection?.poseTransform === 'none') {
+    issues.push('receipt rotor visibility or bounded pose-response evidence is invalid');
+  }
   return issues;
 }
 
@@ -227,15 +424,111 @@ if (rotorOnly || rotorSelfTest) {
   const source = await readFile(generatorPath, 'utf8');
   failures.push(...rotorContractFailures(recipe, source));
   if (rotorSelfTest) {
+    const rotor = recipe.helicopter.rotorPresentation;
+    const legacyTinyStarRecipe = {
+      ...recipe,
+      helicopter: {
+        ...recipe.helicopter,
+        rotorPresentation: {
+          ...rotor,
+          id: 'perspective-projected-cockpit-rotor-rig-v2',
+          mainDiscPitchDegrees: 83,
+          mainStageTopPercent: 4.3,
+          mainStageWidthPercent: 28,
+          mainStageHeightPercent: 7,
+          mainBladeMode: 'discrete-radial-sweeps-v1',
+          mainContrastMode: 'graphite-root-fade-v1',
+          mainMinimumProjectedBladeLengthPixels: 54,
+          mainMinimumProjectedSweepSpanPixels: 108,
+          mainMinimumAuthoredBladeThicknessPixels: 2.5,
+          mainMinimumBladeOpacity: 0.9,
+          mainMotionBlurTrailCount: 1,
+          mainCanopyHeaderWidthPercent: 4,
+        },
+      },
+    };
+    const legacyTinyStarSource = source
+      .replace('data-projection="broad-upper-windscreen-partial-sweep"', 'data-projection="foreshortened-partial-sweep"')
+      .replace('data-contrast="graphite-physical-root-tip-v2"', 'data-contrast="graphite-root-fade-v1"')
+      .replace(' data-occlusion-order="rotor-plane<mast-hub<structural-ties<canopy-header"', '')
+      .replace(/\s*\.aa-main-rotor-blade:before\{[^}]*\}/, '')
+      .replaceAll('aa-main-rotor-canopy-header', 'aa-main-rotor-occluder');
     const mutations = [
-      ['filled-disc flag', { ...recipe, helicopter: { ...recipe.helicopter, rotorPresentation: { ...recipe.helicopter.rotorPresentation, mainFilledDisc: true } } }, source],
-      ['oversized stage', { ...recipe, helicopter: { ...recipe.helicopter, rotorPresentation: { ...recipe.helicopter.rotorPresentation, mainStageWidthPercent: 52 } } }, source],
-      ['flat projection', { ...recipe, helicopter: { ...recipe.helicopter, rotorPresentation: { ...recipe.helicopter.rotorPresentation, mainDiscPitchDegrees: 72 } } }, source],
-      ['missing legibility floor', { ...recipe, helicopter: { ...recipe.helicopter, rotorPresentation: { ...recipe.helicopter.rotorPresentation, mainMinimumLegibleBladeSweeps: 0 } } }, source],
-      ['filled conic surface', recipe, source.replace('.aa-tail-rotor-camera', '.aa-main-rotor-plane:before{background:repeating-conic-gradient(red,transparent)} .aa-tail-rotor-camera')],
+      ['legacy v2 tiny-star recipe', legacyTinyStarRecipe, source, /broad but upper-windscreen-bounded|physical blade length/],
+      ['legacy v2 tiny-star source', recipe, legacyTinyStarSource, /rotor generator is missing|canopy occluder/],
+      ['filled-disc flag', { ...recipe, helicopter: { ...recipe.helicopter, rotorPresentation: { ...rotor, mainFilledDisc: true } } }, source, /physical blade length/],
+      ['oversized stage', { ...recipe, helicopter: { ...recipe.helicopter, rotorPresentation: { ...rotor, mainStageWidthPercent: 96 } } }, source, /broad but upper-windscreen-bounded/],
+      ['flat projection', { ...recipe, helicopter: { ...recipe.helicopter, rotorPresentation: { ...rotor, mainDiscPitchDegrees: 58 } } }, source, /perspective pitch/],
+      ['single temporal trail', { ...recipe, helicopter: { ...recipe.helicopter, rotorPresentation: { ...rotor, mainMotionBlurTrailCount: 1 } } }, source, /exactly two restrained temporal/],
+      ['missing sweep span floor', { ...recipe, helicopter: { ...recipe.helicopter, rotorPresentation: { ...rotor, mainMinimumProjectedSweepSpanPixels: 108 } } }, source, /physical blade length/],
+      ['missing legibility floor', { ...recipe, helicopter: { ...recipe.helicopter, rotorPresentation: { ...rotor, mainMinimumLegibleBladeSweeps: 0 } } }, source, /physical blade length/],
+      ['filled conic surface', recipe, source.replace('.aa-tail-rotor-camera', '.aa-main-rotor-plane:before{background:repeating-conic-gradient(red,transparent)} .aa-tail-rotor-camera'), /filled\/full-disc/],
+      ['alpha-washed stage', recipe, source.replace('overflow:hidden;isolation:isolate;', 'overflow:hidden;isolation:isolate;background:rgba(120,180,190,.35);'), /stage must remain transparent/],
+      ['floating canopy bar', recipe, source.replace('clip-path:polygon(8% 0,92% 0,100% 100%,0 100%);background:linear-gradient', 'background:linear-gradient'), /structural cockpit header/],
+      ['missing structural ties', recipe, source.replaceAll('aa-main-rotor-structural-tie', 'aa-main-rotor-detached-tie'), /exactly two visible structural ties|rotor generator is missing/],
+      ['disconnected structural ties', { ...recipe, helicopter: { ...recipe.helicopter, rotorPresentation: { ...rotor, mainStructuralTieInsetPercent: 34, mainStructuralTieWidthPercent: 8 } } }, source, /structural ties/],
     ];
-    for (const [label, mutatedRecipe, mutatedSource] of mutations) {
-      if (rotorContractFailures(mutatedRecipe, mutatedSource).length === 0) failures.push(`rotor self-test did not reject ${label}`);
+    for (const [label, mutatedRecipe, mutatedSource, expectedIssue] of mutations) {
+      const issues = rotorContractFailures(mutatedRecipe, mutatedSource);
+      if (issues.length === 0) failures.push(`rotor self-test did not reject ${label}`);
+      else if (!issues.some((issue) => expectedIssue.test(issue))) failures.push(`rotor self-test rejected ${label} for the wrong reason: ${issues.join(' | ')}`);
+    }
+    const validProjection = {
+      mode: 'broad-upper-windscreen-partial-sweep',
+      bladeCount: rotor.mainBladeCount,
+      temporalTrailCount: rotor.mainMotionBlurTrailCount,
+      legibleBladeSweeps: rotor.mainMinimumLegibleBladeSweeps,
+      projectedBladeThresholdPixels: rotor.mainMinimumProjectedBladeLengthPixels,
+      shortestProjectedBladeLengthPixels: rotor.mainMinimumProjectedBladeLengthPixels,
+      projectedSweepSpanPixels: rotor.mainMinimumProjectedSweepSpanPixels,
+      authoredBladeThicknessPixels: rotor.mainMinimumAuthoredBladeThicknessPixels,
+      bladeOpacity: rotor.mainMinimumBladeOpacity,
+      contrastMode: rotor.mainContrastMode,
+      filledDiscDetected: false,
+      stageTopFraction: rotor.mainMaximumStageTopFraction,
+      stageBottomFraction: rotor.mainMinimumStageBottomFraction,
+      stageWidthFraction: rotor.mainMinimumScreenWidthFraction,
+      stageHeightFraction: rotor.mainMinimumScreenHeightFraction,
+      stageAreaFraction: rotor.mainMinimumScreenAreaFraction,
+      hubDiameterPixels: rotor.mainMinimumHubDiameterPixels,
+      hubCanopyOverlapPixels: rotor.mainMinimumHubCanopyOverlapPixels,
+      hubCanopyOcclusionFraction: rotor.mainMaximumHubCanopyOcclusionFraction,
+      mastCanopyOverlapPixels: rotor.mainMinimumMastCanopyOverlapPixels,
+      structuralTieCount: 2,
+      leftTieHeaderOverlapAreaPixels: rotor.mainMinimumTieHeaderOverlapAreaPixels,
+      rightTieHeaderOverlapAreaPixels: rotor.mainMinimumTieHeaderOverlapAreaPixels,
+      leftTieCanopyOverlapAreaPixels: rotor.mainMinimumTieCanopyOverlapAreaPixels,
+      rightTieCanopyOverlapAreaPixels: rotor.mainMinimumTieCanopyOverlapAreaPixels,
+      leftTieHeaderOcclusionSampled: true,
+      rightTieHeaderOcclusionSampled: true,
+      leftTieCanopyOcclusionSampled: true,
+      rightTieCanopyOcclusionSampled: true,
+      hubCanopyOcclusionSampled: true,
+      mastCanopyOcclusionSampled: true,
+      occlusionStackValid: true,
+      reticleClear: true,
+      tailOpticClear: true,
+      poseResponsive: true,
+      poseShiftXPixels: 0,
+      poseShiftYPixels: 0,
+      poseBankDegrees: 0,
+      discPitchResponseDegrees: 0,
+      discYawResponseDegrees: 0,
+      poseTransform: 'matrix(1, 0, 0, 1, 0, 0)',
+    };
+    if (rotorProjectionFailures(recipe, validProjection).length > 0) failures.push('rotor receipt self-test rejected its valid measured fixture');
+    for (const [label, mutation] of [
+      ['missing receipt tie', { structuralTieCount: 1 }],
+      ['disconnected receipt tie', { leftTieCanopyOverlapAreaPixels: 0 }],
+      ['unsampled receipt tie', { rightTieHeaderOcclusionSampled: false }],
+      ['declared-only hub overlap', { hubCanopyOcclusionSampled: false }],
+    ]) {
+      if (rotorProjectionFailures(recipe, { ...validProjection, ...mutation }).length === 0) failures.push(`rotor receipt self-test did not reject ${label}`);
+    }
+    try {
+      await runIntegrityMutationSelfTest();
+    } catch (error) {
+      failures.push(`preview integrity mutation self-test failed: ${error.message}`);
     }
   }
   if (failures.length > 0) {
@@ -243,7 +536,18 @@ if (rotorOnly || rotorSelfTest) {
     for (const failure of failures) console.error(`- ${failure}`);
     process.exit(1);
   }
-  console.log(JSON.stringify({ rotorContract: 'passed', selfTest: rotorSelfTest, mode: recipe.helicopter.rotorPresentation.mainBladeMode }, null, 2));
+  console.log(JSON.stringify({
+    rotorContract: 'passed',
+    selfTest: rotorSelfTest,
+    mode: recipe.helicopter.rotorPresentation.mainBladeMode,
+    stage: {
+      topPercent: recipe.helicopter.rotorPresentation.mainStageTopPercent,
+      widthPercent: recipe.helicopter.rotorPresentation.mainStageWidthPercent,
+      heightPercent: recipe.helicopter.rotorPresentation.mainStageHeightPercent,
+    },
+    projectedSweepFloorPixels: recipe.helicopter.rotorPresentation.mainMinimumProjectedSweepSpanPixels,
+    temporalTrailCount: recipe.helicopter.rotorPresentation.mainMotionBlurTrailCount,
+  }, null, 2));
   process.exit(0);
 }
 
@@ -251,10 +555,16 @@ const choreography = JSON.parse(await readFile(choreographyPath, 'utf8'));
 const generatorSource = await readFile(generatorPath, 'utf8');
 const provenance = JSON.parse(await readFile(provenancePath, 'utf8'));
 const captureReceipt = JSON.parse(await readFile(captureReceiptPath, 'utf8'));
+const cacheFamilyLock = JSON.parse(await readFile(cacheFamilyLockPath, 'utf8'));
 const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
 const manifestRecord = manifest.assets.find((asset) => asset.id === provenance.assetId);
+const currentCanonicalDependencies = canonicalArenaDependencies();
+if (currentCanonicalDependencies?.arenaOrder?.join(',') !== arenas.join(',')) failures.push('canonical arena dependency roster/order drifted');
+const currentDependencyClosure = currentCanonicalDependencies
+  ? await buildDependencyClosure(root, { extraPaths: currentCanonicalDependencies.arenas.flatMap((arena) => arena.localAssetPaths) })
+  : null;
 
-if (choreography.schemaVersion !== 3 || choreography.recipeId !== 'pass65-authoritative-runtime-menu-preview-v4') failures.push('canonical runtime choreography schema/recipe drifted');
+if (choreography.schemaVersion !== 3 || choreography.recipeId !== 'pass65-authoritative-runtime-menu-preview-v5') failures.push('canonical runtime choreography schema/recipe drifted');
 if (choreography.capture?.source !== 'authoritative-runtime-arena' || choreography.capture?.backend !== 'webgpu' || choreography.capture?.overlayScale !== 0.5) failures.push('canonical capture must pin authoritative WebGPU arenas and half-scale overlays');
 if (choreography.frameCount !== choreography.fps * choreography.durationSeconds) failures.push('choreography frame count does not equal fps * duration');
 if (Object.keys(choreography.arenas).join(',') !== arenas.join(',')) failures.push('choreography arena roster/order drifted');
@@ -264,7 +574,8 @@ if (provenance.authoredCockpit?.assetId !== 'chopper-gunner-vehicle-v1' || prove
 
 const recipeDigest = createHash('sha256').update(JSON.stringify(choreography)).digest('hex');
 failures.push(...rotorContractFailures(choreography, generatorSource));
-if (captureReceipt.captureId !== 'pass65-authoritative-runtime-menu-preview-capture-v2'
+if (captureReceipt.schemaVersion !== 3
+  || captureReceipt.captureId !== 'pass65-authoritative-runtime-menu-preview-capture-v4'
   || captureReceipt.recipeId !== choreography.recipeId
   || captureReceipt.recipeDigest !== recipeDigest
   || captureReceipt.source !== 'authoritative-runtime-arena'
@@ -277,6 +588,15 @@ if ((captureReceipt.arenas ?? []).map((entry) => entry.arenaId).join(',') !== ar
 for (const evidence of captureReceipt.arenas ?? []) {
   if (evidence.backend !== 'webgpu' || evidence.softwareAdapter !== false || evidence.constructionHistory?.length !== 1 || evidence.constructionHistory[0] !== evidence.arenaId || evidence.residentArenaRoots !== 1 || evidence.capturedFrames !== choreography.frameCount || evidence.viewmodelHidden !== true || evidence.colliders <= 0 || evidence.raycastMeshes <= 0) failures.push(`${evidence.arenaId} capture does not prove one authoritative hardware-WebGPU arena with the gameplay viewmodel excluded`);
   const recipe = choreography.arenas[evidence.arenaId];
+  const expectedFrameRoster = Array.from({ length: choreography.frameCount }, (_, index) => index + 1);
+  if (evidence.frameSet?.algorithm !== 'sha256-ordered-name-size-bytes-v1'
+    || evidence.frameSet?.domain !== `menu-preview-frames:${evidence.arenaId}`
+    || evidence.frameSet?.fileCount !== choreography.frameCount
+    || evidence.frameSet?.totalBytes < choreography.frameCount
+    || !/^[0-9a-f]{64}$/.test(evidence.frameSet?.sha256 ?? '')
+    || JSON.stringify(evidence.frameSet?.frameRoster) !== JSON.stringify(expectedFrameRoster)) {
+    failures.push(`${evidence.arenaId} capture receipt does not bind the full ordered staged-PNG set`);
+  }
   if ((evidence.reviewFrames ?? []).map((entry) => entry.frame).join(',') !== choreography.reviewFrames.join(',')) failures.push(`${evidence.arenaId} capture does not prove all deterministic review frames`);
   for (const frame of evidence.reviewFrames ?? []) {
     const positionError = Math.hypot(...frame.requestedPosition.map((value, index) => value - frame.renderedPosition[index]));
@@ -285,57 +605,118 @@ for (const evidence of captureReceipt.arenas ?? []) {
     if (positionError > 0.01 || Math.abs(frame.requestedFov - frame.renderedFov) > 0.1 || frame.requestedFov !== recipe.fovDegrees || Math.abs(frame.fixedVisualTimeMs - expectedFixedTimeMs) > 0.01 || frame.aboveArenaFloor !== true || frame.insideHorizontalCollider !== false || !/^[0-9a-f]{64}$/.test(frame.pngSha256)) failures.push(`${evidence.arenaId} review frame ${frame.frame} camera/visual evidence is invalid`);
     if (recipe.kind === 'helicopter') {
       const projection = frame.rotorProjection;
-      if (projection?.mode !== 'foreshortened-partial-sweep'
+      if (projection?.mode !== 'broad-upper-windscreen-partial-sweep'
         || projection.bladeCount !== choreography.helicopter.rotorPresentation.mainBladeCount
+        || projection.temporalTrailCount !== choreography.helicopter.rotorPresentation.mainMotionBlurTrailCount
         || projection.legibleBladeSweeps < choreography.helicopter.rotorPresentation.mainMinimumLegibleBladeSweeps
         || projection.projectedBladeThresholdPixels !== choreography.helicopter.rotorPresentation.mainMinimumProjectedBladeLengthPixels
         || !Number.isFinite(projection.shortestProjectedBladeLengthPixels)
+        || projection.projectedSweepSpanPixels < choreography.helicopter.rotorPresentation.mainMinimumProjectedSweepSpanPixels
         || projection.authoredBladeThicknessPixels < choreography.helicopter.rotorPresentation.mainMinimumAuthoredBladeThicknessPixels
         || projection.bladeOpacity < choreography.helicopter.rotorPresentation.mainMinimumBladeOpacity
         || projection.contrastMode !== choreography.helicopter.rotorPresentation.mainContrastMode
         || projection.filledDiscDetected !== false
-        || projection.stageAreaFraction > choreography.helicopter.rotorPresentation.mainMaximumScreenAreaFraction
+        || projection.stageTopFraction > choreography.helicopter.rotorPresentation.mainMaximumStageTopFraction
+        || projection.stageBottomFraction < choreography.helicopter.rotorPresentation.mainMinimumStageBottomFraction
+        || projection.stageBottomFraction > choreography.helicopter.rotorPresentation.mainMaximumStageBottomFraction
+        || projection.stageWidthFraction < choreography.helicopter.rotorPresentation.mainMinimumScreenWidthFraction
+        || projection.stageWidthFraction > choreography.helicopter.rotorPresentation.mainMaximumScreenWidthFraction
+        || projection.stageHeightFraction < choreography.helicopter.rotorPresentation.mainMinimumScreenHeightFraction
         || projection.stageHeightFraction > choreography.helicopter.rotorPresentation.mainMaximumScreenHeightFraction
+        || projection.stageAreaFraction < choreography.helicopter.rotorPresentation.mainMinimumScreenAreaFraction
+        || projection.stageAreaFraction > choreography.helicopter.rotorPresentation.mainMaximumScreenAreaFraction
+        || projection.hubDiameterPixels < choreography.helicopter.rotorPresentation.mainMinimumHubDiameterPixels
+        || projection.hubCanopyOverlapPixels < choreography.helicopter.rotorPresentation.mainMinimumHubCanopyOverlapPixels
+        || projection.hubCanopyOcclusionFraction > choreography.helicopter.rotorPresentation.mainMaximumHubCanopyOcclusionFraction
+        || projection.mastCanopyOverlapPixels < choreography.helicopter.rotorPresentation.mainMinimumMastCanopyOverlapPixels
+        || projection.occlusionStackValid !== true
+        || projection.reticleClear !== true
+        || projection.tailOpticClear !== true
+        || projection.poseResponsive !== true
         || !Number.isFinite(projection.poseShiftXPixels)
         || !Number.isFinite(projection.poseShiftYPixels)
         || !Number.isFinite(projection.poseBankDegrees)
-        || projection.poseTransform === 'none') failures.push(`${evidence.arenaId} review frame ${frame.frame} does not prove the partial foreshortened rotor projection`);
+        || !Number.isFinite(projection.discPitchResponseDegrees)
+        || !Number.isFinite(projection.discYawResponseDegrees)
+        || Math.abs(projection.poseShiftXPixels) > choreography.helicopter.rotorPresentation.mainMaximumPoseShiftPixels
+        || Math.abs(projection.poseShiftYPixels) > choreography.helicopter.rotorPresentation.mainMaximumVerticalPoseShiftPixels
+        || Math.abs(projection.poseBankDegrees) > choreography.helicopter.rotorPresentation.mainMaximumPoseBankDegrees
+        || Math.abs(projection.discPitchResponseDegrees) > choreography.helicopter.rotorPresentation.mainMaximumDiscPitchResponseDegrees
+        || Math.abs(projection.discYawResponseDegrees) > choreography.helicopter.rotorPresentation.mainMaximumDiscYawResponseDegrees
+        || projection.poseTransform === 'none') failures.push(`${evidence.arenaId} review frame ${frame.frame} does not prove the broad upper-windscreen rotor projection`);
+      for (const issue of rotorProjectionFailures(choreography, projection)) failures.push(`${evidence.arenaId} review frame ${frame.frame}: ${issue}`);
     } else if (frame.rotorProjection !== undefined) failures.push(`${evidence.arenaId} cat review frame ${frame.frame} unexpectedly contains helicopter rotor evidence`);
   }
   const firstReview = evidence.reviewFrames?.find((entry) => entry.frame === 1);
   const seamReview = evidence.reviewFrames?.find((entry) => entry.frame === choreography.frameCount);
   if (!firstReview || !seamReview || seamReview.seamSourceFrame !== 1 || seamReview.pngSha256 !== firstReview.pngSha256) failures.push(`${evidence.arenaId} does not prove an exact copied first/final loop seam`);
 }
-const expectedCaptureRuntime = ['src/legacy-main.ts', 'src/ui/menu-preview-camera.ts'];
-if (captureReceipt.runtimeInputs?.captureTool?.path !== 'scripts/assets/generate-pass65-runtime-menu-previews.ts') failures.push('capture receipt capture-tool path drifted');
-else await checkHash(generatorPath, captureReceipt.runtimeInputs.captureTool.sha256, 'captured generator input');
-if ((captureReceipt.runtimeInputs?.captureRuntime ?? []).map((entry) => entry.path).join(',') !== expectedCaptureRuntime.join(',')) failures.push('capture receipt capture-runtime input roster drifted');
-for (const record of captureReceipt.runtimeInputs?.captureRuntime ?? []) await checkHash(path.join(root, record.path), record.sha256, `captured runtime input ${record.path}`);
-for (const arena of arenas) {
-  const records = captureReceipt.runtimeInputs?.arenas?.[arena] ?? [];
-  if (records.map((entry) => entry.path).join(',') !== expectedRuntimeInputPaths[arena].join(',')) failures.push(`${arena} capture input roster drifted`);
-  for (const record of records) await checkHash(path.join(root, record.path), record.sha256, `captured ${arena} input ${record.path}`);
-}
+const expectedCaptureTools = captureToolPaths.map(relative);
+if ((captureReceipt.runtimeInputs?.captureTools ?? []).map((entry) => entry.path).join(',') !== expectedCaptureTools.join(',')) failures.push('capture receipt capture-tool roster drifted');
+for (const record of captureReceipt.runtimeInputs?.captureTools ?? []) await checkHash(path.join(root, record.path), record.sha256, `captured tool ${record.path}`);
+if (currentCanonicalDependencies
+  && JSON.stringify(captureReceipt.runtimeInputs?.canonicalArenaDependencies) !== JSON.stringify(currentCanonicalDependencies)) failures.push('capture receipt canonical arena dependency manifest drifted');
+if (currentDependencyClosure
+  && JSON.stringify(captureReceipt.runtimeInputs?.dependencyClosure) !== JSON.stringify(currentDependencyClosure)) failures.push('capture receipt recursive dependency closure drifted');
 
-await checkHash(path.join(root, acceptedCockpitEvidence), acceptedCockpitDigest, 'accepted cockpit evidence');
+const actualCockpitEvidenceDigest = await checkHash(path.join(root, acceptedCockpitEvidence), acceptedCockpitDigest, 'accepted cockpit evidence');
+if (provenance.authoredCockpit?.evidence !== acceptedCockpitEvidence
+  || provenance.authoredCockpit?.evidenceSha256 !== acceptedCockpitDigest
+  || provenance.authoredCockpit?.evidenceSha256 !== actualCockpitEvidenceDigest) failures.push('provenance cockpit evidence path/digest does not equal the accepted file bytes');
 await checkHash(choreographyPath, provenance.choreography.sha256, 'canonical choreography');
 await checkHash(documentationPath, provenance.documentation.sha256, 'preview authoring documentation');
 await checkHash(generatorPath, provenance.generator.sha256, 'runtime capture generator');
 await checkHash(finalizerPath, provenance.finalizer.sha256, 'preview finalizer');
 await checkHash(verifierPath, provenance.verification.sha256, 'production verifier');
 await checkHash(captureReceiptPath, provenance.captureReceipt.sha256, 'runtime capture receipt');
+await checkHash(cacheFamilyLockPath, provenance.cacheFamilyLock?.sha256, 'cache-family lock');
 await checkHash(path.join(root, provenance.authoredCockpit.path), provenance.authoredCockpit.sha256, 'authored cockpit design source');
-for (const record of provenance.captureRuntime ?? []) await checkHash(path.join(root, record.path), record.sha256);
-for (const source of provenance.sources ?? []) for (const record of source.runtimeSources ?? []) await checkHash(path.join(root, record.path), record.sha256);
+for (const record of provenance.captureTools ?? []) await checkHash(path.join(root, record.path), record.sha256);
+if ((provenance.captureTools ?? []).map((entry) => entry.path).join(',') !== expectedCaptureTools.join(',')) failures.push('provenance capture-tool roster drifted');
 for (const runtime of provenance.runtimeFiles ?? []) await checkHash(path.join(root, runtime.path), runtime.sha256);
 for (const review of provenance.reviewEvidence ?? []) await checkHash(path.join(root, review.path), review.sha256);
+
+const cacheLockIssues = cacheFamilyLockFailures(cacheFamilyLock, RETAINED_CACHE_FAMILY_BASELINE);
+for (const issue of cacheLockIssues) failures.push(`cache-family lock: ${issue}`);
+const actualFinalMediaSet = await digestFinalMediaSet(path.join(root, 'public/assets/original/menu-previews'), arenas);
+const currentCacheFamily = cacheFamilyLock.families?.find((family) => family.cacheKey === choreography.media.cacheKey);
+if (!currentCacheFamily
+  || currentCacheFamily.recipeId !== choreography.recipeId
+  || currentCacheFamily.finalMediaSetSha256 !== actualFinalMediaSet.sha256
+  || currentCacheFamily.fileCount !== actualFinalMediaSet.fileCount
+  || currentCacheFamily.totalBytes !== actualFinalMediaSet.totalBytes
+  || currentCacheFamily.recordedAt !== provenance.generatedAt) failures.push('current cache key is not append-only locked to the exact aggregate final-media bytes');
+if (provenance.cacheFamilyLock?.path !== relative(cacheFamilyLockPath)
+  || provenance.cacheFamilyLock?.cacheKey !== choreography.media.cacheKey
+  || provenance.cacheFamilyLock?.finalMediaSetSha256 !== actualFinalMediaSet.sha256) failures.push('provenance does not bind the current cache-family lock and aggregate final-media digest');
+if (currentCanonicalDependencies
+  && JSON.stringify(provenance.canonicalArenaDependencies) !== JSON.stringify(currentCanonicalDependencies)) failures.push('provenance canonical arena dependency manifest drifted');
+if (currentDependencyClosure) {
+  const expectedClosureSummary = {
+    schemaVersion: currentDependencyClosure.schemaVersion,
+    algorithm: currentDependencyClosure.algorithm,
+    roots: currentDependencyClosure.roots,
+    excludes: currentDependencyClosure.excludes,
+    extraPaths: currentDependencyClosure.extraPaths,
+    fileCount: currentDependencyClosure.fileCount,
+    totalBytes: currentDependencyClosure.totalBytes,
+    treeSha256: currentDependencyClosure.treeSha256,
+  };
+  if (JSON.stringify(provenance.dependencyClosure) !== JSON.stringify(expectedClosureSummary)) failures.push('provenance recursive dependency-closure summary drifted');
+}
 
 const expectedRuntime = arenas.flatMap((arena) => ['mp4', 'webm', 'webp'].map((extension) => `public/assets/original/menu-previews/${arena}.${extension}`)).sort();
 const actualRuntime = (provenance.runtimeFiles ?? []).map((entry) => entry.path).sort();
 if (JSON.stringify(actualRuntime) !== JSON.stringify(expectedRuntime)) failures.push('provenance runtime media inventory drifted');
 const expectedReview = arenas.map((arena) => `docs/assets/pass65-menu-previews/${arena}-review-frames.webp`).sort();
 if (JSON.stringify((provenance.reviewEvidence ?? []).map((entry) => entry.path).sort()) !== JSON.stringify(expectedReview)) failures.push('review evidence inventory drifted');
-if ((provenance.sources ?? []).map((entry) => entry.arenaId).join(',') !== arenas.join(',') || (provenance.sources ?? []).some((entry) => entry.source !== 'authoritative-runtime-arena' || entry.runtimeSources?.length < 2)) failures.push('provenance does not pin per-arena authoritative runtime source files');
+if ((provenance.sources ?? []).map((entry) => entry.arenaId).join(',') !== arenas.join(',')
+  || (provenance.sources ?? []).some((entry) => {
+    const canonical = currentCanonicalDependencies?.arenas.find((candidate) => candidate.arenaId === entry.arenaId);
+    return entry.source !== 'authoritative-runtime-arena'
+      || entry.dependencyClosureTreeSha256 !== currentDependencyClosure?.treeSha256
+      || JSON.stringify(entry.canonicalVisualModule) !== JSON.stringify(canonical);
+  })) failures.push('provenance does not pin each canonical visual module to the recursive dependency closure');
 
 for (const [file, oldDigest] of Object.entries(supersededGunRangeDigests)) {
   const actual = await sha256(path.join(root, file));
@@ -347,6 +728,7 @@ if (manifestRecord) {
   if (manifestRecord.sourceProvenanceSha256 !== await sha256(provenancePath)) failures.push('manifest provenance digest is stale');
   if (!manifestRecord.modifications.includes('actual authoritative production WebGPU arena')
     || !manifestRecord.modifications.includes('cyan/green cockpit avionics')
+    || !manifestRecord.modifications.includes('structural ties into the side canopy rails')
     || !manifestRecord.modifications.includes('articulated ears, forelegs and coral-padded paws')) failures.push('manifest does not disclose authoritative runtime source and reviewed cockpit/cat overlay treatment');
 }
 
@@ -361,7 +743,7 @@ for (const arena of arenas) {
 for (const [extension, hashes] of Object.entries(runtimeHashesByExtension)) if (hashes.size !== arenas.length) failures.push(`${extension} previews are not four distinct selected-map captures`);
 
 const documentationSource = await readFile(documentationPath, 'utf8');
-for (const marker of ['chromium.launch', 'createServer', 'menuPreviewPose', 'setCaptureCameraPose', 'authoritative-runtime-arena', 'offline-menu-preview-overlay', 'offline-baked-compact-black-grey', 'overlayScale', 'aa-canopy', 'aa-glass', 'aa-reticle', 'aa-foreleg', 'aa-main-rotor-plane', 'aa-main-rotor-hub', 'aa-main-rotor-occluder', 'aa-tail-rotor-plane', 'aa-tail-boom-occluder', 'perspective:', 'rotateX(', 'rotateY(', 'repeating-conic-gradient']) if (!generatorSource.includes(marker)) failures.push(`runtime capture generator is missing ${marker}`);
+for (const marker of ['chromium.launch', 'createServer', 'menuPreviewPose', 'setCaptureCameraPose', 'authoritative-runtime-arena', 'offline-menu-preview-overlay', 'offline-baked-compact-black-grey', 'overlayScale', 'aa-canopy', 'aa-glass', 'aa-reticle', 'aa-foreleg', 'aa-main-rotor-plane', 'aa-main-rotor-hub', 'aa-main-rotor-structural-tie', 'aa-main-rotor-canopy-header', 'aa-main-rotor-blade:before', 'aa-main-rotor-blade:after', 'aa-tail-rotor-plane', 'aa-tail-boom-occluder', 'perspective:', 'rotateX(', 'rotateY(', 'document.elementsFromPoint', 'repeating-conic-gradient']) if (!generatorSource.includes(marker)) failures.push(`runtime capture generator is missing ${marker}`);
 for (const forbidden of ['import bpy', 'primitive_cube_add', 'generate_pass65_menu_previews.py']) if (generatorSource.includes(forbidden)) failures.push(`runtime capture generator still contains synthetic Blender authoring marker ${forbidden}`);
 if (!documentationSource.includes('npm run author:pass65:menu-previews') || !documentationSource.includes('actual authoritative map')) failures.push('authoring documentation does not describe the fail-closed runtime capture workflow');
 

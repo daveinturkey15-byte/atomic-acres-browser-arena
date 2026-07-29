@@ -31,7 +31,7 @@ describe('canonical prerecorded menu preview choreography', () => {
   it('defines the same eight-second authored recipe for every selectable arena', () => {
     for (const arena of ARENA_SELECTIONS) {
       const definition = menuPreviewDefinition(arena.id);
-      expect(definition.recipeId).toBe('pass65-authoritative-runtime-menu-preview-v4');
+      expect(definition.recipeId).toBe('pass65-authoritative-runtime-menu-preview-v5');
       expect(definition.durationMs).toBe(8_000);
       expect(definition.reviewFrames).toEqual([1, 48, 96, 144, 192]);
       expect(definition.label).toContain(arena.selectorLabel);

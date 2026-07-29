@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "algorithm": "sha256-ordered-name-size-bytes-v1",
+  "families": [
+    {
+      "cacheKey": "pass65-runtime-preview-v7",
+      "recipeId": "pass65-authoritative-runtime-menu-preview-v4",
+      "finalMediaSetSha256": "352bfbbca5a2ad06b501997c6d34f64fa70a4ae7f7a20ad93b45c757a45c5576",
+      "fileCount": 12,
+      "totalBytes": 6672030,
+      "recordedAt": "2026-07-28"
+    }
+  ]
+}

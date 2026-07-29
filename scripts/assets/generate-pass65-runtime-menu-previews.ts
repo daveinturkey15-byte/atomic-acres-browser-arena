@@ -8,6 +8,8 @@ import { createServer, type ViteDevServer } from 'vite';
 import choreographyJson from '../../source-assets/menu/pass65-preview-masters/choreography.json';
 import { menuPreviewDefinition, menuPreviewPose } from '../../src/ui/menu-preview-camera';
 import type { ArenaId } from '../../src/map-selection';
+import { canonicalPass65PreviewArenaDependencies } from './pass65-menu-preview-arena-dependencies';
+import { buildDependencyClosure, digestOrderedFileSet } from './pass65-menu-preview-integrity.mjs';
 
 const root = path.resolve(process.cwd());
 const frameRoot = path.join(root, 'artifacts/pass65/menu-preview-master-frames');
@@ -17,25 +19,12 @@ const port = Number(process.env.AA_PREVIEW_PORT ?? '44166');
 const reviewOnly = process.env.AA_PREVIEW_REVIEW_ONLY === '1';
 const choreography = choreographyJson;
 const canonicalArenas = Object.keys(choreography.arenas) as ArenaId[];
-const captureRuntimePaths = ['src/legacy-main.ts', 'src/ui/menu-preview-camera.ts'] as const;
-const captureToolPath = 'scripts/assets/generate-pass65-runtime-menu-previews.ts';
-const arenaRuntimeSourcePaths: Readonly<Record<ArenaId, readonly string[]>> = Object.freeze({
-  'atomic-acres': ['src/map.ts', 'src/arena-layout.ts', 'src/rendering/arenas/atomic-acres.ts'],
-  'skyline-terminal': ['src/additional-maps.ts', 'src/rendering/arenas/skyline-terminal.ts'],
-  'rustworks-1v1': ['src/additional-maps.ts', 'src/rendering/arenas/rustworks-1v1.ts'],
-  'gun-range': [
-    'src/additional-maps.ts',
-    'src/gun-range-armory.ts',
-    'src/gun-range-rack-presentation.ts',
-    'src/weapon-model.ts',
-    'src/rendering/arenas/gun-range.ts',
-    'public/assets/original/models/weapons/pass65-firearms/carbine/carbine-world-lod0.glb',
-    'public/assets/original/models/weapons/pass65-firearms/smg/smg-world-lod0.glb',
-    'public/assets/original/models/weapons/pass65-firearms/lmg/lmg-world-lod0.glb',
-    'public/assets/original/models/weapons/pass65-firearms/scattergun/scattergun-world-lod0.glb',
-    'public/assets/original/models/weapons/pass65-firearms/sniper/sniper-world-lod0.glb',
-  ],
-});
+const captureToolPaths = [
+  'scripts/assets/generate-pass65-runtime-menu-previews.ts',
+  'scripts/assets/pass65-menu-preview-integrity.mjs',
+  'scripts/assets/pass65-menu-preview-integrity.d.mts',
+  'scripts/assets/pass65-menu-preview-arena-dependencies.ts',
+] as const;
 const selectedArenas = process.env.AA_PREVIEW_ARENAS
   ? process.env.AA_PREVIEW_ARENAS.split(',').map((value) => value.trim()).filter(Boolean) as ArenaId[]
   : canonicalArenas;
@@ -61,6 +50,10 @@ if (selectedArenas.some((arena) => !canonicalArenas.includes(arena))) {
 if (requestedFrames.some((frame) => !Number.isInteger(frame) || frame < 1 || frame > choreography.frameCount)) {
   throw new Error(`Requested frames must be integers in 1..${choreography.frameCount}`);
 }
+if (new Set(requestedFrames).size !== requestedFrames.length
+  || requestedFrames.some((frame, index) => index > 0 && frame <= requestedFrames[index - 1]!)) {
+  throw new Error('Requested frames must be unique and strictly ascending');
+}
 
 type CaptureEvidence = {
   arenaId: ArenaId;
@@ -77,6 +70,14 @@ type CaptureEvidence = {
   firstFrame: number;
   lastFrame: number;
   capturedFrames: number;
+  frameSet: {
+    algorithm: string;
+    domain: string;
+    fileCount: number;
+    totalBytes: number;
+    sha256: string;
+    frameRoster: number[];
+  };
   reviewFrames: Array<{
     frame: number;
     requestedPosition: readonly number[];
@@ -90,21 +91,46 @@ type CaptureEvidence = {
     seamSourceFrame?: number;
     rotorProjection?: {
       mode: string | null;
+      stageTopFraction: number;
+      stageBottomFraction: number;
       stageWidthFraction: number;
       stageHeightFraction: number;
       stageAreaFraction: number;
       bladeCount: number;
+      temporalTrailCount: number;
       legibleBladeSweeps: number;
       projectedBladeThresholdPixels: number;
       shortestProjectedBladeLengthPixels: number;
+      projectedSweepSpanPixels: number;
       authoredBladeThicknessPixels: number;
       bladeOpacity: number;
       contrastMode: string | null;
       filledDiscDetected: boolean;
+      hubDiameterPixels: number;
+      hubCanopyOverlapPixels: number;
+      hubCanopyOcclusionFraction: number;
+      mastCanopyOverlapPixels: number;
+      structuralTieCount: number;
+      leftTieHeaderOverlapAreaPixels: number;
+      rightTieHeaderOverlapAreaPixels: number;
+      leftTieCanopyOverlapAreaPixels: number;
+      rightTieCanopyOverlapAreaPixels: number;
+      leftTieHeaderOcclusionSampled: boolean;
+      rightTieHeaderOcclusionSampled: boolean;
+      leftTieCanopyOcclusionSampled: boolean;
+      rightTieCanopyOcclusionSampled: boolean;
+      hubCanopyOcclusionSampled: boolean;
+      mastCanopyOcclusionSampled: boolean;
+      occlusionStackValid: boolean;
+      reticleClear: boolean;
+      tailOpticClear: boolean;
       poseTransform: string;
+      poseResponsive: boolean;
       poseShiftXPixels: number;
       poseShiftYPixels: number;
       poseBankDegrees: number;
+      discPitchResponseDegrees: number;
+      discYawResponseDegrees: number;
     };
   }>;
 };
@@ -121,17 +147,19 @@ async function sourceDigest(relativePath: string): Promise<{ path: string; sha25
 }
 
 async function runtimeInputReceipt(): Promise<{
-  captureTool: { path: string; sha256: string };
-  captureRuntime: Array<{ path: string; sha256: string }>;
-  arenas: Record<string, Array<{ path: string; sha256: string }>>;
+  captureTools: Array<{ path: string; sha256: string }>;
+  canonicalArenaDependencies: Awaited<ReturnType<typeof canonicalPass65PreviewArenaDependencies>>;
+  dependencyClosure: Awaited<ReturnType<typeof buildDependencyClosure>>;
 }> {
+  const canonicalArenaDependencies = await canonicalPass65PreviewArenaDependencies();
+  if (canonicalArenaDependencies.arenaOrder.join(',') !== canonicalArenas.join(',')) {
+    throw new Error('Canonical arena dependency roster/order does not match preview choreography');
+  }
+  const extraPaths = canonicalArenaDependencies.arenas.flatMap((arena) => arena.localAssetPaths);
   return {
-    captureTool: await sourceDigest(captureToolPath),
-    captureRuntime: await Promise.all(captureRuntimePaths.map(sourceDigest)),
-    arenas: Object.fromEntries(await Promise.all(canonicalArenas.map(async (arenaId) => [
-      arenaId,
-      await Promise.all(arenaRuntimeSourcePaths[arenaId].map(sourceDigest)),
-    ]))),
+    captureTools: await Promise.all(captureToolPaths.map(sourceDigest)),
+    canonicalArenaDependencies,
+    dependencyClosure: await buildDependencyClosure(root, { extraPaths }),
   };
 }
 
@@ -156,15 +184,21 @@ async function installCaptureSurface(page: Page, kind: 'helicopter' | 'cat'): Pr
       #game{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;display:block!important}
       #offline-menu-preview-overlay{position:fixed;inset:0;z-index:2147483647;pointer-events:none;color:${palette[3]};font:600 9px/1.1 ui-monospace,Consolas,monospace;letter-spacing:.16em;text-shadow:0 1px 2px #000}
       #offline-menu-preview-overlay *{box-sizing:border-box}
-      .aa-main-rotor-stage{position:absolute;left:${(100 - rotorPresentation.mainStageWidthPercent) / 2}%;top:4.3%;width:${rotorPresentation.mainStageWidthPercent}%;height:${rotorPresentation.mainStageHeightPercent}%;perspective:760px;transform-style:preserve-3d;overflow:hidden;transform-origin:50% 82%;transform:translate3d(var(--aa-main-rotor-shift-x,0px),var(--aa-main-rotor-shift-y,0px),0) rotate(var(--aa-main-rotor-bank,0deg));filter:drop-shadow(0 2px 4px rgba(0,0,0,.84));opacity:.9}
-      .aa-main-rotor-plane{position:absolute;left:1%;right:1%;top:5%;height:62%;transform-origin:50% 52%;transform-style:preserve-3d;transform:rotateX(${rotorPresentation.mainDiscPitchDegrees}deg) rotateZ(var(--aa-main-rotor-angle,0deg))}
-      .aa-main-rotor-blade{position:absolute;left:49.7%;top:48%;width:47%;height:3px;transform-origin:.3% 50%;border-radius:0 90% 90% 0;background:linear-gradient(90deg,rgba(15,22,25,.9) 0%,rgba(36,51,56,.76) 38%,rgba(74,96,101,.42) 74%,transparent 100%);filter:blur(.18px);box-shadow:0 1px 1px rgba(0,0,0,.34);opacity:.94}
-      .aa-main-rotor-blade:after{content:"";position:absolute;left:4%;right:8%;top:-2px;height:3px;transform-origin:0 50%;transform:rotate(-5.5deg);border-radius:0 90% 90% 0;background:linear-gradient(90deg,rgba(184,226,230,${rotorPresentation.mainMotionBlurOpacity}) 0%,rgba(111,144,149,.13) 57%,transparent 100%);filter:blur(.72px)}
+      .aa-main-rotor-stage{position:absolute;z-index:1;left:${(100 - rotorPresentation.mainStageWidthPercent) / 2}%;top:${rotorPresentation.mainStageTopPercent}%;width:${rotorPresentation.mainStageWidthPercent}%;height:${rotorPresentation.mainStageHeightPercent}%;perspective:900px;transform-style:preserve-3d;overflow:hidden;isolation:isolate;transform-origin:50% 72%;transform:translate3d(var(--aa-main-rotor-shift-x,0px),var(--aa-main-rotor-shift-y,0px),0) rotate(var(--aa-main-rotor-bank,0deg));filter:drop-shadow(0 2px 5px rgba(0,0,0,.78));opacity:.96}
+      .aa-main-rotor-plane{position:absolute;z-index:1;left:-8%;right:-8%;top:-38%;height:185%;transform-origin:50% 52%;transform-style:preserve-3d;transform:rotateX(calc(${rotorPresentation.mainDiscPitchDegrees}deg + var(--aa-main-rotor-pitch-response,0deg))) rotateY(var(--aa-main-rotor-yaw-response,0deg)) rotateZ(var(--aa-main-rotor-angle,0deg))}
+      .aa-main-rotor-blade{position:absolute;left:50%;top:51%;width:48%;height:7px;transform-origin:0 50%;border-radius:2px 82% 82% 2px;background:linear-gradient(90deg,rgba(9,14,16,.97) 0%,rgba(20,29,32,.94) 19%,rgba(43,57,61,.82) 58%,rgba(90,112,116,.52) 82%,rgba(123,151,155,.14) 96%,transparent 100%);filter:blur(.12px);box-shadow:0 1px 1px rgba(0,0,0,.48),inset 0 1px rgba(186,218,220,.16);opacity:0.86}
+      .aa-main-rotor-blade:before,.aa-main-rotor-blade:after{content:"";position:absolute;left:1.5%;top:0;width:97%;height:7px;transform-origin:0 50%;border-radius:2px 85% 85% 2px;pointer-events:none}
+      .aa-main-rotor-blade:before{transform:rotate(-${rotorPresentation.mainNearTrailDegrees}deg) scaleX(.985);background:linear-gradient(90deg,rgba(165,202,205,${rotorPresentation.mainMotionBlurOpacity}) 0%,rgba(98,125,129,.15) 42%,rgba(99,128,132,.07) 74%,transparent 100%);filter:blur(1.05px)}
+      .aa-main-rotor-blade:after{transform:rotate(-${rotorPresentation.mainFarTrailDegrees}deg) scaleX(.95);background:linear-gradient(90deg,rgba(142,178,181,${(rotorPresentation.mainMotionBlurOpacity * 0.55).toFixed(3)}) 0%,rgba(84,109,112,.08) 43%,transparent 88%);filter:blur(1.55px)}
       .aa-main-rotor-blade:nth-child(2){transform:rotate(90deg)}.aa-main-rotor-blade:nth-child(3){transform:rotate(180deg)}.aa-main-rotor-blade:nth-child(4){transform:rotate(270deg)}
-      .aa-main-rotor-mast{position:absolute;left:49.75%;top:40%;width:.5%;height:48%;border-radius:3px;background:linear-gradient(90deg,#0b1012,${palette[2]} 50%,#080c0e);box-shadow:0 1px 3px #000;z-index:2}
-      .aa-main-rotor-hub{position:absolute;left:49%;top:33%;width:2%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 38% 30%,#d9edef,${palette[2]} 38%,${palette[0]} 78%);border:1px solid rgba(202,239,242,.5);box-shadow:0 1px 3px #000;z-index:3}
-      .aa-main-rotor-occluder{position:absolute;left:48%;right:48%;top:70%;height:29%;clip-path:polygon(20% 0,80% 0,100% 100%,0 100%);background:linear-gradient(180deg,#2a393d 0%,#11191c 58%,#050809 100%);border-top:1px solid rgba(167,224,230,.3);filter:drop-shadow(0 -1px 2px #000);z-index:4}
-      .aa-tail-rotor-camera{position:absolute;right:16.2%;top:8.2%;width:10.8%;height:8.8%;overflow:hidden;border:1px solid rgba(83,218,240,.36);border-radius:3px;background:linear-gradient(180deg,rgba(14,32,38,.54),rgba(2,8,11,.76));box-shadow:inset 0 0 8px rgba(35,194,221,.14),0 2px 5px #000;opacity:.68}
+      .aa-main-rotor-mast{position:absolute;left:49.4%;top:28%;width:1.2%;height:52%;border-radius:5px;background:linear-gradient(90deg,#070b0c 0%,#253438 26%,${palette[2]} 50%,#1a2528 72%,#070a0c 100%);box-shadow:0 2px 4px #000,inset 1px 0 rgba(203,236,238,.2);z-index:2}
+      .aa-main-rotor-hub{position:absolute;left:48.3%;top:50%;width:3.4%;height:17%;border-radius:48% 52% 44% 56%;background:radial-gradient(ellipse at 38% 28%,#d9edef 0%,${palette[2]} 30%,#202c30 58%,${palette[0]} 84%);border:1px solid rgba(202,239,242,.5);box-shadow:0 2px 4px #000,inset 0 1px rgba(224,248,249,.26);z-index:3}
+      .aa-main-rotor-structural-tie{position:absolute;top:62%;width:${rotorPresentation.mainStructuralTieWidthPercent}%;height:6px;border-top:1px solid rgba(181,222,226,.36);border-bottom:1px solid rgba(0,0,0,.72);border-radius:3px;background:linear-gradient(180deg,#53676b 0%,#1c292d 42%,#080d0f 100%);box-shadow:0 2px 4px #000,inset 0 1px rgba(218,244,246,.14);z-index:4}
+      .aa-main-rotor-structural-tie.left{left:${rotorPresentation.mainStructuralTieInsetPercent}%;transform-origin:100% 50%;transform:rotate(-${rotorPresentation.mainStructuralTieAngleDegrees}deg)}
+      .aa-main-rotor-structural-tie.right{right:${rotorPresentation.mainStructuralTieInsetPercent}%;transform-origin:0 50%;transform:rotate(${rotorPresentation.mainStructuralTieAngleDegrees}deg)}
+      .aa-main-rotor-canopy-header{position:absolute;left:${(100 - rotorPresentation.mainCanopyHeaderWidthPercent) / 2}%;right:${(100 - rotorPresentation.mainCanopyHeaderWidthPercent) / 2}%;top:62%;height:38%;clip-path:polygon(8% 0,92% 0,100% 100%,0 100%);background:linear-gradient(180deg,#394b50 0%,#1b282c 22%,#0b1215 58%,#040709 100%);border-top:2px solid rgba(177,226,231,.34);box-shadow:0 -2px 4px rgba(0,0,0,.86),inset 0 1px rgba(203,237,239,.14);filter:drop-shadow(0 -1px 2px #000);z-index:5}
+      .aa-main-rotor-canopy-header:before{content:"";position:absolute;left:12%;right:12%;top:5px;height:2px;background:linear-gradient(90deg,rgba(107,142,147,.18),rgba(181,222,226,.42) 50%,rgba(107,142,147,.18));box-shadow:20px 5px 0 -1px rgba(151,195,199,.18),-20px 5px 0 -1px rgba(151,195,199,.18)}
+      .aa-tail-rotor-camera{position:absolute;z-index:8;right:16.2%;top:8.2%;width:10.8%;height:8.8%;overflow:hidden;border:1px solid rgba(83,218,240,.36);border-radius:3px;background:linear-gradient(180deg,rgba(14,32,38,.54),rgba(2,8,11,.76));box-shadow:inset 0 0 8px rgba(35,194,221,.14),0 2px 5px #000;opacity:.68}
       .aa-tail-rotor-camera:before{content:"TAIL OPTIC";position:absolute;left:5%;top:5%;z-index:4;color:rgba(112,234,255,.7);font-size:5px;letter-spacing:.12em;text-shadow:0 1px #000}
       .aa-tail-rotor-stage{position:absolute;inset:6% 5%;perspective:180px;transform-style:preserve-3d}
       .aa-tail-rotor-plane{position:absolute;right:8%;top:10%;width:43%;height:76%;transform-origin:50% 50%;transform-style:preserve-3d;transform:rotateY(${rotorPresentation.tailDiscYawDegrees}deg) rotateZ(var(--aa-tail-rotor-angle,0deg))}
@@ -200,8 +234,9 @@ async function installCaptureSurface(page: Page, kind: 'helicopter' | 'cat'): Pr
     overlay.dataset.scale = String(scale);
     overlay.dataset.palette = palette.join(',');
     overlay.dataset.minimumProjectedBladeLength = String(rotorPresentation.mainMinimumProjectedBladeLengthPixels);
+    overlay.dataset.minimumProjectedSweepSpan = String(rotorPresentation.mainMinimumProjectedSweepSpanPixels);
     overlay.innerHTML = kind === 'helicopter'
-      ? '<div class="aa-main-rotor-stage" data-projection="foreshortened-partial-sweep" data-contrast="graphite-root-fade-v1"><div class="aa-main-rotor-plane"><i class="aa-main-rotor-blade"></i><i class="aa-main-rotor-blade"></i><i class="aa-main-rotor-blade"></i><i class="aa-main-rotor-blade"></i></div><i class="aa-main-rotor-mast"></i><i class="aa-main-rotor-hub"></i><i class="aa-main-rotor-occluder"></i></div><div class="aa-tail-rotor-camera"><div class="aa-tail-rotor-stage"><div class="aa-tail-rotor-plane"><i class="aa-tail-rotor-blade"></i><i class="aa-tail-rotor-blade"></i><i class="aa-tail-rotor-hub"></i></div><i class="aa-tail-boom-occluder"></i></div></div><i class="aa-canopy left"></i><i class="aa-canopy right"></i><i class="aa-glass left"></i><i class="aa-glass right"></i><i class="aa-brace left"></i><i class="aa-brace right"></i><i class="aa-reticle"></i><div class="aa-cockpit"><div class="aa-panel"><span>ALT / RADAR</span><strong id="aa-alt">024 M</strong></div><div class="aa-panel"><span>FLIGHT PATH</span><strong id="aa-heading">HOLD 000</strong></div><div class="aa-panel"><span>ROTOR / LINK</span><strong>ARMED</strong></div></div>'
+      ? '<div class="aa-main-rotor-stage" data-projection="broad-upper-windscreen-partial-sweep" data-contrast="graphite-physical-root-tip-v2" data-occlusion-order="rotor-plane<mast-hub<structural-ties<canopy-header"><div class="aa-main-rotor-plane"><i class="aa-main-rotor-blade"></i><i class="aa-main-rotor-blade"></i><i class="aa-main-rotor-blade"></i><i class="aa-main-rotor-blade"></i></div><i class="aa-main-rotor-mast"></i><i class="aa-main-rotor-hub"></i><i class="aa-main-rotor-structural-tie left"></i><i class="aa-main-rotor-structural-tie right"></i><i class="aa-main-rotor-canopy-header"></i></div><div class="aa-tail-rotor-camera"><div class="aa-tail-rotor-stage"><div class="aa-tail-rotor-plane"><i class="aa-tail-rotor-blade"></i><i class="aa-tail-rotor-blade"></i><i class="aa-tail-rotor-hub"></i></div><i class="aa-tail-boom-occluder"></i></div></div><i class="aa-canopy left"></i><i class="aa-canopy right"></i><i class="aa-glass left"></i><i class="aa-glass right"></i><i class="aa-brace left"></i><i class="aa-brace right"></i><i class="aa-reticle"></i><div class="aa-cockpit"><div class="aa-panel"><span>ALT / RADAR</span><strong id="aa-alt">024 M</strong></div><div class="aa-panel"><span>FLIGHT PATH</span><strong id="aa-heading">HOLD 000</strong></div><div class="aa-panel"><span>ROTOR / LINK</span><strong>ARMED</strong></div></div>'
       : '<div class="aa-cat-crown"></div><div class="aa-ear left"></div><div class="aa-ear right"></div><div class="aa-foreleg left"></div><div class="aa-foreleg right"></div><div class="aa-paw left"></div><div class="aa-paw right"></div>';
     document.querySelector('#app')?.append(overlay);
   }, {
@@ -279,16 +314,22 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
           const normalizedLateral = pose.variance.yawDegrees / rotorPose.maximumYawDegrees * 0.62
             + bankDegrees / rotorPose.maximumFlightBankDegrees * 0.38;
           const shiftXPixels = Math.max(-rotorPose.maximumShiftPixels, Math.min(rotorPose.maximumShiftPixels, normalizedLateral * rotorPose.maximumShiftPixels));
-          const maximumVerticalShift = rotorPose.maximumShiftPixels * 0.32;
-          const shiftYPixels = Math.max(-maximumVerticalShift, Math.min(maximumVerticalShift, -pose.variance.pitchDegrees / rotorPose.maximumPitchDegrees * maximumVerticalShift));
+          const shiftYPixels = Math.max(-rotorPose.maximumVerticalShiftPixels, Math.min(rotorPose.maximumVerticalShiftPixels, -pose.variance.pitchDegrees / rotorPose.maximumPitchDegrees * rotorPose.maximumVerticalShiftPixels));
           const presentationBankDegrees = Math.max(-rotorPose.maximumBankDegrees, Math.min(rotorPose.maximumBankDegrees, bankDegrees * 0.56));
+          const discPitchResponseDegrees = Math.max(-rotorPose.maximumDiscPitchResponseDegrees, Math.min(rotorPose.maximumDiscPitchResponseDegrees, -pose.variance.pitchDegrees * 0.72));
+          const discYawResponseDegrees = Math.max(-rotorPose.maximumDiscYawResponseDegrees, Math.min(rotorPose.maximumDiscYawResponseDegrees,
+            pose.variance.yawDegrees * 0.56 + bankDegrees / rotorPose.maximumFlightBankDegrees * rotorPose.maximumDiscYawResponseDegrees * 0.24));
           overlay.style.setProperty('--aa-main-rotor-shift-x', `${shiftXPixels.toFixed(3)}px`);
           overlay.style.setProperty('--aa-main-rotor-shift-y', `${shiftYPixels.toFixed(3)}px`);
           overlay.style.setProperty('--aa-main-rotor-bank', `${presentationBankDegrees.toFixed(3)}deg`);
+          overlay.style.setProperty('--aa-main-rotor-pitch-response', `${discPitchResponseDegrees.toFixed(3)}deg`);
+          overlay.style.setProperty('--aa-main-rotor-yaw-response', `${discYawResponseDegrees.toFixed(3)}deg`);
           overlay.dataset.rotorPoseResponsive = 'true';
           overlay.dataset.rotorShiftX = shiftXPixels.toFixed(3);
           overlay.dataset.rotorShiftY = shiftYPixels.toFixed(3);
           overlay.dataset.rotorBank = presentationBankDegrees.toFixed(3);
+          overlay.dataset.rotorDiscPitchResponse = discPitchResponseDegrees.toFixed(3);
+          overlay.dataset.rotorDiscYawResponse = discYawResponseDegrees.toFixed(3);
         }
         overlay.querySelector<HTMLElement>('#aa-alt')?.replaceChildren(`${Math.round(altitude).toString().padStart(3, '0')} M`);
         overlay.querySelector<HTMLElement>('#aa-heading')?.replaceChildren(`HDG ${Math.round(((yaw * 180 / Math.PI) % 360 + 360) % 360).toString().padStart(3, '0')}`);
@@ -316,7 +357,10 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
       altitude: pose.position[1],
       rotorPose: {
         maximumShiftPixels: choreography.helicopter.rotorPresentation.mainMaximumPoseShiftPixels,
+        maximumVerticalShiftPixels: choreography.helicopter.rotorPresentation.mainMaximumVerticalPoseShiftPixels,
         maximumBankDegrees: choreography.helicopter.rotorPresentation.mainMaximumPoseBankDegrees,
+        maximumDiscPitchResponseDegrees: choreography.helicopter.rotorPresentation.mainMaximumDiscPitchResponseDegrees,
+        maximumDiscYawResponseDegrees: choreography.helicopter.rotorPresentation.mainMaximumDiscYawResponseDegrees,
         maximumYawDegrees: choreography.helicopter.maximumYawDegrees,
         maximumPitchDegrees: choreography.helicopter.maximumPitchDegrees,
         maximumFlightBankDegrees: choreography.helicopter.maximumBankDegrees,
@@ -351,54 +395,177 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
       const overlay = document.querySelector<HTMLElement>('#offline-menu-preview-overlay')!;
       const stage = overlay.querySelector<HTMLElement>('.aa-main-rotor-stage')!;
       const plane = overlay.querySelector<HTMLElement>('.aa-main-rotor-plane')!;
+      const mast = overlay.querySelector<HTMLElement>('.aa-main-rotor-mast')!;
+      const hub = overlay.querySelector<HTMLElement>('.aa-main-rotor-hub')!;
+      const structuralTies = [...overlay.querySelectorAll<HTMLElement>('.aa-main-rotor-structural-tie')];
+      const leftTie = overlay.querySelector<HTMLElement>('.aa-main-rotor-structural-tie.left')!;
+      const rightTie = overlay.querySelector<HTMLElement>('.aa-main-rotor-structural-tie.right')!;
+      const canopyHeader = overlay.querySelector<HTMLElement>('.aa-main-rotor-canopy-header')!;
+      const leftCanopy = overlay.querySelector<HTMLElement>('.aa-canopy.left')!;
+      const rightCanopy = overlay.querySelector<HTMLElement>('.aa-canopy.right')!;
+      const tailOptic = overlay.querySelector<HTMLElement>('.aa-tail-rotor-camera')!;
+      const reticle = overlay.querySelector<HTMLElement>('.aa-reticle')!;
       const rect = stage.getBoundingClientRect();
+      const hubRect = hub.getBoundingClientRect();
+      const mastRect = mast.getBoundingClientRect();
+      const leftTieRect = leftTie.getBoundingClientRect();
+      const rightTieRect = rightTie.getBoundingClientRect();
+      const canopyHeaderRect = canopyHeader.getBoundingClientRect();
+      const leftCanopyRect = leftCanopy.getBoundingClientRect();
+      const rightCanopyRect = rightCanopy.getBoundingClientRect();
+      const reticleRect = reticle.getBoundingClientRect();
       const planeStyle = getComputedStyle(plane);
       const before = getComputedStyle(plane, '::before');
       const after = getComputedStyle(plane, '::after');
       const blades = [...plane.querySelectorAll<HTMLElement>('.aa-main-rotor-blade')];
-      const bladeLengths = blades.map((blade) => {
-        const bladeRect = blade.getBoundingClientRect();
-        return Math.max(bladeRect.width, bladeRect.height);
-      });
+      const bladeRects = blades.map((blade) => blade.getBoundingClientRect());
+      const bladeLengths = bladeRects.map((bladeRect) => Math.max(bladeRect.width, bladeRect.height));
       const bladeStyle = getComputedStyle(blades[0]!);
+      const bladeBefore = getComputedStyle(blades[0]!, '::before');
+      const bladeAfter = getComputedStyle(blades[0]!, '::after');
       const projectedBladeThresholdPixels = Number(overlay.dataset.minimumProjectedBladeLength);
+      const visibleSweepLeft = Math.max(rect.left, Math.min(...bladeRects.map((bladeRect) => bladeRect.left)));
+      const visibleSweepRight = Math.min(rect.right, Math.max(...bladeRects.map((bladeRect) => bladeRect.right)));
+      const intersectionHeight = (left: DOMRect, right: DOMRect): number => Math.max(0, Math.min(left.bottom, right.bottom) - Math.max(left.top, right.top));
+      const intersectionArea = (left: DOMRect, right: DOMRect): number => Math.max(0, Math.min(left.right, right.right) - Math.max(left.left, right.left))
+        * intersectionHeight(left, right);
+      const rectanglesOverlap = (left: DOMRect, right: DOMRect): boolean => left.left < right.right
+        && left.right > right.left
+        && left.top < right.bottom
+        && left.bottom > right.top;
+      const zIndex = (element: HTMLElement): number => Number.parseInt(getComputedStyle(element).zIndex, 10) || 0;
+      const sampleOcclusion = (front: HTMLElement, back: HTMLElement, frontRect: DOMRect, backRect: DOMRect): boolean => {
+        const left = Math.max(frontRect.left, backRect.left);
+        const right = Math.min(frontRect.right, backRect.right);
+        const top = Math.max(frontRect.top, backRect.top);
+        const bottom = Math.min(frontRect.bottom, backRect.bottom);
+        if (right <= left || bottom <= top) return false;
+        for (const xRatio of [0.2, 0.5, 0.8]) {
+          for (const yRatio of [0.2, 0.5, 0.8]) {
+            const stack = document.elementsFromPoint(left + (right - left) * xRatio, top + (bottom - top) * yRatio);
+            const frontIndex = stack.indexOf(front);
+            const backIndex = stack.indexOf(back);
+            if (frontIndex >= 0 && backIndex >= 0 && frontIndex < backIndex) return true;
+          }
+        }
+        return false;
+      };
+      const previousPointerEvents = overlay.style.pointerEvents;
+      overlay.style.pointerEvents = 'auto';
+      const hubCanopyOverlapPixels = intersectionHeight(hubRect, canopyHeaderRect);
+      const leftTieHeaderOcclusionSampled = sampleOcclusion(canopyHeader, leftTie, canopyHeaderRect, leftTieRect);
+      const rightTieHeaderOcclusionSampled = sampleOcclusion(canopyHeader, rightTie, canopyHeaderRect, rightTieRect);
+      const leftTieCanopyOcclusionSampled = sampleOcclusion(leftTie, leftCanopy, leftTieRect, leftCanopyRect);
+      const rightTieCanopyOcclusionSampled = sampleOcclusion(rightTie, rightCanopy, rightTieRect, rightCanopyRect);
+      const hubCanopyOcclusionSampled = sampleOcclusion(canopyHeader, hub, canopyHeaderRect, hubRect);
+      const mastCanopyOcclusionSampled = sampleOcclusion(canopyHeader, mast, canopyHeaderRect, mastRect);
+      overlay.style.pointerEvents = previousPointerEvents;
+      const temporalTrailCount = [bladeBefore, bladeAfter].filter((style) => style.content !== 'none'
+        && style.content !== 'normal'
+        && style.backgroundImage !== 'none').length;
       const hasPseudoSurface = [before, after].some((style) => style.content !== 'none' && style.content !== 'normal');
       const hasPlaneSurface = planeStyle.backgroundImage !== 'none'
         || !['rgba(0, 0, 0, 0)', 'transparent'].includes(planeStyle.backgroundColor);
       return {
         mode: stage.dataset.projection ?? null,
-        stageWidthFraction: rect.width / window.innerWidth,
-        stageHeightFraction: rect.height / window.innerHeight,
-        stageAreaFraction: rect.width * rect.height / (window.innerWidth * window.innerHeight),
+        stageTopFraction: rect.top / window.innerHeight,
+        stageBottomFraction: rect.bottom / window.innerHeight,
+        stageWidthFraction: stage.offsetWidth / window.innerWidth,
+        stageHeightFraction: stage.offsetHeight / window.innerHeight,
+        stageAreaFraction: stage.offsetWidth * stage.offsetHeight / (window.innerWidth * window.innerHeight),
         bladeCount: blades.length,
+        temporalTrailCount,
         legibleBladeSweeps: bladeLengths.filter((length) => length >= projectedBladeThresholdPixels).length,
         projectedBladeThresholdPixels,
         shortestProjectedBladeLengthPixels: Math.min(...bladeLengths),
+        projectedSweepSpanPixels: Math.max(0, visibleSweepRight - visibleSweepLeft),
         authoredBladeThicknessPixels: Number.parseFloat(bladeStyle.height),
         bladeOpacity: Number.parseFloat(bladeStyle.opacity),
         contrastMode: stage.dataset.contrast ?? null,
         filledDiscDetected: hasPseudoSurface || hasPlaneSurface,
+        hubDiameterPixels: Math.min(hubRect.width, hubRect.height),
+        hubCanopyOverlapPixels,
+        hubCanopyOcclusionFraction: hubCanopyOverlapPixels / Math.max(1, hubRect.height),
+        mastCanopyOverlapPixels: intersectionHeight(mastRect, canopyHeaderRect),
+        structuralTieCount: structuralTies.length,
+        leftTieHeaderOverlapAreaPixels: intersectionArea(leftTieRect, canopyHeaderRect),
+        rightTieHeaderOverlapAreaPixels: intersectionArea(rightTieRect, canopyHeaderRect),
+        leftTieCanopyOverlapAreaPixels: intersectionArea(leftTieRect, leftCanopyRect),
+        rightTieCanopyOverlapAreaPixels: intersectionArea(rightTieRect, rightCanopyRect),
+        leftTieHeaderOcclusionSampled,
+        rightTieHeaderOcclusionSampled,
+        leftTieCanopyOcclusionSampled,
+        rightTieCanopyOcclusionSampled,
+        hubCanopyOcclusionSampled,
+        mastCanopyOcclusionSampled,
+        occlusionStackValid: stage.dataset.occlusionOrder === 'rotor-plane<mast-hub<structural-ties<canopy-header'
+          && zIndex(plane) < zIndex(mast)
+          && zIndex(mast) <= zIndex(hub)
+          && zIndex(hub) < zIndex(leftTie)
+          && zIndex(hub) < zIndex(rightTie)
+          && zIndex(leftTie) < zIndex(canopyHeader)
+          && zIndex(rightTie) < zIndex(canopyHeader),
+        reticleClear: !rectanglesOverlap(rect, reticleRect),
+        tailOpticClear: zIndex(tailOptic) > zIndex(stage),
         poseTransform: getComputedStyle(stage).transform,
+        poseResponsive: overlay.dataset.rotorPoseResponsive === 'true',
         poseShiftXPixels: Number(overlay.dataset.rotorShiftX),
         poseShiftYPixels: Number(overlay.dataset.rotorShiftY),
         poseBankDegrees: Number(overlay.dataset.rotorBank),
+        discPitchResponseDegrees: Number(overlay.dataset.rotorDiscPitchResponse),
+        discYawResponseDegrees: Number(overlay.dataset.rotorDiscYawResponse),
       };
     }) : undefined;
-    if (rotorProjection && (rotorProjection.mode !== 'foreshortened-partial-sweep'
+    if (rotorProjection && (rotorProjection.mode !== 'broad-upper-windscreen-partial-sweep'
       || rotorProjection.bladeCount !== choreography.helicopter.rotorPresentation.mainBladeCount
+      || rotorProjection.temporalTrailCount !== choreography.helicopter.rotorPresentation.mainMotionBlurTrailCount
       || rotorProjection.legibleBladeSweeps < choreography.helicopter.rotorPresentation.mainMinimumLegibleBladeSweeps
       || rotorProjection.projectedBladeThresholdPixels !== choreography.helicopter.rotorPresentation.mainMinimumProjectedBladeLengthPixels
       || !Number.isFinite(rotorProjection.shortestProjectedBladeLengthPixels)
+      || rotorProjection.projectedSweepSpanPixels < choreography.helicopter.rotorPresentation.mainMinimumProjectedSweepSpanPixels
       || rotorProjection.authoredBladeThicknessPixels < choreography.helicopter.rotorPresentation.mainMinimumAuthoredBladeThicknessPixels
       || rotorProjection.bladeOpacity < choreography.helicopter.rotorPresentation.mainMinimumBladeOpacity
       || rotorProjection.contrastMode !== choreography.helicopter.rotorPresentation.mainContrastMode
       || rotorProjection.filledDiscDetected
-      || rotorProjection.stageAreaFraction > choreography.helicopter.rotorPresentation.mainMaximumScreenAreaFraction
+      || rotorProjection.stageTopFraction > choreography.helicopter.rotorPresentation.mainMaximumStageTopFraction
+      || rotorProjection.stageBottomFraction < choreography.helicopter.rotorPresentation.mainMinimumStageBottomFraction
+      || rotorProjection.stageBottomFraction > choreography.helicopter.rotorPresentation.mainMaximumStageBottomFraction
+      || rotorProjection.stageWidthFraction < choreography.helicopter.rotorPresentation.mainMinimumScreenWidthFraction
+      || rotorProjection.stageWidthFraction > choreography.helicopter.rotorPresentation.mainMaximumScreenWidthFraction
+      || rotorProjection.stageHeightFraction < choreography.helicopter.rotorPresentation.mainMinimumScreenHeightFraction
       || rotorProjection.stageHeightFraction > choreography.helicopter.rotorPresentation.mainMaximumScreenHeightFraction
+      || rotorProjection.stageAreaFraction < choreography.helicopter.rotorPresentation.mainMinimumScreenAreaFraction
+      || rotorProjection.stageAreaFraction > choreography.helicopter.rotorPresentation.mainMaximumScreenAreaFraction
+      || rotorProjection.hubDiameterPixels < choreography.helicopter.rotorPresentation.mainMinimumHubDiameterPixels
+      || rotorProjection.hubCanopyOverlapPixels < choreography.helicopter.rotorPresentation.mainMinimumHubCanopyOverlapPixels
+      || rotorProjection.hubCanopyOcclusionFraction > choreography.helicopter.rotorPresentation.mainMaximumHubCanopyOcclusionFraction
+      || rotorProjection.mastCanopyOverlapPixels < choreography.helicopter.rotorPresentation.mainMinimumMastCanopyOverlapPixels
+      || rotorProjection.structuralTieCount !== 2
+      || rotorProjection.leftTieHeaderOverlapAreaPixels < choreography.helicopter.rotorPresentation.mainMinimumTieHeaderOverlapAreaPixels
+      || rotorProjection.rightTieHeaderOverlapAreaPixels < choreography.helicopter.rotorPresentation.mainMinimumTieHeaderOverlapAreaPixels
+      || rotorProjection.leftTieCanopyOverlapAreaPixels < choreography.helicopter.rotorPresentation.mainMinimumTieCanopyOverlapAreaPixels
+      || rotorProjection.rightTieCanopyOverlapAreaPixels < choreography.helicopter.rotorPresentation.mainMinimumTieCanopyOverlapAreaPixels
+      || rotorProjection.leftTieHeaderOcclusionSampled !== true
+      || rotorProjection.rightTieHeaderOcclusionSampled !== true
+      || rotorProjection.leftTieCanopyOcclusionSampled !== true
+      || rotorProjection.rightTieCanopyOcclusionSampled !== true
+      || rotorProjection.hubCanopyOcclusionSampled !== true
+      || rotorProjection.mastCanopyOcclusionSampled !== true
+      || rotorProjection.occlusionStackValid !== true
+      || rotorProjection.reticleClear !== true
+      || rotorProjection.tailOpticClear !== true
+      || rotorProjection.poseResponsive !== true
       || !Number.isFinite(rotorProjection.poseShiftXPixels)
       || !Number.isFinite(rotorProjection.poseShiftYPixels)
-      || !Number.isFinite(rotorProjection.poseBankDegrees))) {
-      throw new Error(`${arenaId} frame ${frame} violates the partial foreshortened rotor projection contract: ${JSON.stringify(rotorProjection)}`);
+      || !Number.isFinite(rotorProjection.poseBankDegrees)
+      || !Number.isFinite(rotorProjection.discPitchResponseDegrees)
+      || !Number.isFinite(rotorProjection.discYawResponseDegrees)
+      || Math.abs(rotorProjection.poseShiftXPixels) > choreography.helicopter.rotorPresentation.mainMaximumPoseShiftPixels
+      || Math.abs(rotorProjection.poseShiftYPixels) > choreography.helicopter.rotorPresentation.mainMaximumVerticalPoseShiftPixels
+      || Math.abs(rotorProjection.poseBankDegrees) > choreography.helicopter.rotorPresentation.mainMaximumPoseBankDegrees
+      || Math.abs(rotorProjection.discPitchResponseDegrees) > choreography.helicopter.rotorPresentation.mainMaximumDiscPitchResponseDegrees
+      || Math.abs(rotorProjection.discYawResponseDegrees) > choreography.helicopter.rotorPresentation.mainMaximumDiscYawResponseDegrees)) {
+      throw new Error(`${arenaId} frame ${frame} violates the broad upper-windscreen rotor projection contract: ${JSON.stringify(rotorProjection)}`);
     }
     const framePath = path.join(directory, `frame-${String(frame).padStart(4, '0')}.png`);
     const seamSourcePath = path.join(directory, 'frame-0001.png');
@@ -427,6 +594,8 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
 
   const snapshot = await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot(): any } }).__ATOMIC_ACRES_DEBUG__.snapshot());
   if (errors.length > 0) throw new Error(`${arenaId} runtime capture errors: ${[...new Set(errors)].join(' | ')}`);
+  const frameNames = requestedFrames.map((frame) => `frame-${String(frame).padStart(4, '0')}.png`);
+  const frameSet = await digestOrderedFileSet(directory, frameNames, `menu-preview-frames:${arenaId}`);
   return {
     arenaId,
     kind: definition.kind,
@@ -442,6 +611,7 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
     firstFrame: Math.min(...requestedFrames),
     lastFrame: Math.max(...requestedFrames),
     capturedFrames: requestedFrames.length,
+    frameSet: { ...frameSet, frameRoster: [...requestedFrames] },
     reviewFrames: reviewFrameEvidence,
   };
 }
@@ -475,9 +645,9 @@ async function main(): Promise<void> {
       throw new Error('Runtime capture inputs changed during authoring; all staged frames are rejected as stale');
     }
     const receipt = {
-      schemaVersion: 1,
-      captureId: 'pass65-authoritative-runtime-menu-preview-capture-v2',
-      generatedAt: '2026-07-28',
+      schemaVersion: 3,
+      captureId: 'pass65-authoritative-runtime-menu-preview-capture-v4',
+      generatedAt: '2026-07-29',
       recipeId: choreography.recipeId,
       recipeDigest: sha256(JSON.stringify(choreography)),
       source: choreography.capture.source,

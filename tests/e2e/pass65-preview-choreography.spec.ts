@@ -68,10 +68,10 @@ test.describe('Pass 65 prerecorded menu previews', () => {
     expect(before.videoVolume).toBeLessThanOrEqual(0.22);
 
     for (const [arenaId, frame, presentation] of [
-      ['skyline-terminal', 'helicopter', 'menu-video-runtime-helo-terminal-v5'],
-      ['rustworks-1v1', 'helicopter', 'menu-video-runtime-helo-rustrig-v5'],
+      ['skyline-terminal', 'helicopter', 'menu-video-runtime-helo-terminal-v6'],
+      ['rustworks-1v1', 'helicopter', 'menu-video-runtime-helo-rustrig-v6'],
       ['gun-range', 'cat', 'menu-video-runtime-cat-gun-range-v4'],
-      ['atomic-acres', 'helicopter', 'menu-video-runtime-helo-nuke-town-v5'],
+      ['atomic-acres', 'helicopter', 'menu-video-runtime-helo-nuke-town-v6'],
     ] as const) {
       await page.locator(`.map-card[data-arena-id="${arenaId}"]`).click();
       const frameLocator = page.locator('#menu-preview-frame');
@@ -103,12 +103,12 @@ test.describe('Pass 65 prerecorded menu previews', () => {
     }
     await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-arena', 'gun-range');
     await expect.poll(async () => (await previewEvidence(page)).videoCurrentSrc, { timeout: 15_000 })
-      .toMatch(/\/menu-previews\/gun-range\.(webm|mp4)\?v=pass65-runtime-preview-v7$/);
+      .toMatch(/\/menu-previews\/gun-range\.(webm|mp4)\?v=pass65-runtime-preview-v8$/);
     await page.waitForTimeout(400);
     const final = await previewEvidence(page);
     expect(final.arenaId).toBe('gun-range');
     expect(final.sourceCount).toBe(2);
-    expect(final.videoCurrentSrc).toMatch(/\/menu-previews\/gun-range\.(webm|mp4)\?v=pass65-runtime-preview-v7$/);
+    expect(final.videoCurrentSrc).toMatch(/\/menu-previews\/gun-range\.(webm|mp4)\?v=pass65-runtime-preview-v8$/);
     expect(final.rendererEvidence.arenaConstructionCount).toBe(0);
   });
 

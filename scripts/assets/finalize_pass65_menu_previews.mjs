@@ -1,9 +1,18 @@
 import { createHash } from 'node:crypto';
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import {
+  appendCacheFamily,
+  buildDependencyClosure,
+  cacheFamilyLockFailures,
+  digestFinalMediaSet,
+  digestOrderedFrameSet,
+  RETAINED_CACHE_FAMILY_BASELINE,
+} from './pass65-menu-preview-integrity.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const frameRoot = path.join(root, 'artifacts/pass65/menu-preview-master-frames');
@@ -13,33 +22,23 @@ const reviewRoot = path.join(root, 'docs/assets/pass65-menu-previews');
 const choreographyPath = path.join(sourceRoot, 'choreography.json');
 const documentationPath = path.join(sourceRoot, 'README.md');
 const captureReceiptPath = path.join(sourceRoot, 'runtime-capture-receipt.json');
+const cacheFamilyLockPath = path.join(sourceRoot, 'cache-family-lock.json');
 const provenancePath = path.join(sourceRoot, 'provenance.json');
 const manifestPath = path.join(root, 'assets.manifest.json');
 const generatorPath = path.join(root, 'scripts/assets/generate-pass65-runtime-menu-previews.ts');
+const integrityPath = path.join(root, 'scripts/assets/pass65-menu-preview-integrity.mjs');
+const integrityTypesPath = path.join(root, 'scripts/assets/pass65-menu-preview-integrity.d.mts');
+const dependencyManifestPath = path.join(root, 'scripts/assets/pass65-menu-preview-arena-dependencies.ts');
+const dependencyPrinterPath = path.join(root, 'scripts/assets/print-pass65-menu-preview-arena-dependencies.ts');
 const finalizerPath = fileURLToPath(import.meta.url);
 const verifierPath = path.join(root, 'scripts/qa/verify-pass65-menu-preview-production.mjs');
-const cameraEvaluatorPath = path.join(root, 'src/ui/menu-preview-camera.ts');
-const runtimeEntryPath = path.join(root, 'src/legacy-main.ts');
 const chopperSourcePath = path.join(root, 'source-assets/blender/pass65-chopper-gunner.blend');
+const acceptedCockpitEvidence = 'docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png';
+const acceptedCockpitEvidencePath = path.join(root, acceptedCockpitEvidence);
+const acceptedCockpitDigest = '581c448b7d998a220ea69fb0c024d9553f40d9aea767b3d88b503780a64921d1';
 const choreography = JSON.parse(await readFile(choreographyPath, 'utf8'));
 const arenas = Object.keys(choreography.arenas);
-const runtimeSourcePaths = Object.freeze({
-  'atomic-acres': ['src/map.ts', 'src/arena-layout.ts', 'src/rendering/arenas/atomic-acres.ts'],
-  'skyline-terminal': ['src/additional-maps.ts', 'src/rendering/arenas/skyline-terminal.ts'],
-  'rustworks-1v1': ['src/additional-maps.ts', 'src/rendering/arenas/rustworks-1v1.ts'],
-  'gun-range': [
-    'src/additional-maps.ts',
-    'src/gun-range-armory.ts',
-    'src/gun-range-rack-presentation.ts',
-    'src/weapon-model.ts',
-    'src/rendering/arenas/gun-range.ts',
-    'public/assets/original/models/weapons/pass65-firearms/carbine/carbine-world-lod0.glb',
-    'public/assets/original/models/weapons/pass65-firearms/smg/smg-world-lod0.glb',
-    'public/assets/original/models/weapons/pass65-firearms/lmg/lmg-world-lod0.glb',
-    'public/assets/original/models/weapons/pass65-firearms/scattergun/scattergun-world-lod0.glb',
-    'public/assets/original/models/weapons/pass65-firearms/sniper/sniper-world-lod0.glb',
-  ],
-});
+const captureToolPaths = [generatorPath, integrityPath, integrityTypesPath, dependencyManifestPath];
 const supersededGunRange = Object.freeze({
   reason: 'HF-011 and R114 explicitly supersede the former byte-identical media gate.',
   files: Object.freeze({
@@ -61,10 +60,23 @@ function run(command, args) {
     maxBuffer: 64 * 1024 * 1024,
   });
   if (result.status !== 0) throw new Error(`${command} ${args.join(' ')} failed\n${result.stdout}\n${result.stderr}`);
+  return result;
+}
+
+function canonicalArenaDependencies() {
+  const result = run(process.execPath, ['--import', 'tsx', dependencyPrinterPath]);
+  let manifest;
+  try {
+    manifest = JSON.parse(result.stdout);
+  } catch (error) {
+    throw new Error(`Canonical arena dependency printer returned invalid JSON: ${error.message}`);
+  }
+  if (manifest.arenaOrder?.join(',') !== arenas.join(',')) throw new Error('canonical arena dependency roster/order drifted');
+  return manifest;
 }
 
 function validateRecipe() {
-  if (choreography.schemaVersion !== 3 || choreography.recipeId !== 'pass65-authoritative-runtime-menu-preview-v4') {
+  if (choreography.schemaVersion !== 3 || choreography.recipeId !== 'pass65-authoritative-runtime-menu-preview-v5') {
     throw new Error('canonical authoritative-runtime choreography schema or recipe id is invalid');
   }
   if (choreography.capture?.source !== 'authoritative-runtime-arena'
@@ -84,45 +96,110 @@ function validateRecipe() {
     || choreography.reviewFrames.at(-1) !== choreography.frameCount) {
     throw new Error('reviewFrames must be unique and include the exact loop endpoints');
   }
-  if (choreography.media.cacheKey !== 'pass65-runtime-preview-v7') throw new Error('runtime preview cache key is stale');
+  if (choreography.media.cacheKey !== 'pass65-runtime-preview-v8') throw new Error('runtime preview cache key is stale');
   const rotor = choreography.helicopter?.rotorPresentation;
   const configuredRotorArea = rotor?.mainStageWidthPercent / 100 * rotor?.mainStageHeightPercent / 100;
-  if (rotor?.id !== 'perspective-projected-cockpit-rotor-rig-v2'
+  const configuredRotorTop = rotor?.mainStageTopPercent / 100;
+  const configuredRotorBottom = (rotor?.mainStageTopPercent + rotor?.mainStageHeightPercent) / 100;
+  const configuredStageLeft = (100 - rotor?.mainStageWidthPercent) / 2;
+  const configuredTieLeft = configuredStageLeft + rotor?.mainStageWidthPercent * rotor?.mainStructuralTieInsetPercent / 100;
+  const configuredTieRight = configuredTieLeft + rotor?.mainStageWidthPercent * rotor?.mainStructuralTieWidthPercent / 100;
+  const configuredHeaderLeft = configuredStageLeft + rotor?.mainStageWidthPercent * (100 - rotor?.mainCanopyHeaderWidthPercent) / 200;
+  const configuredMaximumHorizontalShiftPercent = rotor?.mainMaximumPoseShiftPixels / choreography.capture.viewport[0] * 100;
+  if (rotor?.id !== 'perspective-projected-cockpit-rotor-rig-v3'
     || rotor.mainTurnsPerLoop !== choreography.helicopter.rotorTurnsPerLoop
+    || rotor.mainTurnsPerLoop <= 0
     || rotor.tailTurnsPerLoop !== rotor.mainTurnsPerLoop * 3
-    || rotor.mainDiscPitchDegrees < 82
-    || rotor.mainDiscPitchDegrees > 84
-    || rotor.mainStageWidthPercent < 24
-    || rotor.mainStageWidthPercent > 34
-    || rotor.mainStageHeightPercent < 6
-    || rotor.mainStageHeightPercent > 9
+    || rotor.mainDiscPitchDegrees < 72
+    || rotor.mainDiscPitchDegrees > 80
+    || rotor.mainStageTopPercent < -3
+    || rotor.mainStageTopPercent > 1
+    || rotor.mainStageWidthPercent < 80
+    || rotor.mainStageWidthPercent > 88
+    || rotor.mainStageHeightPercent < 20
+    || rotor.mainStageHeightPercent > 24
     || rotor.mainBladeCount !== 4
-    || rotor.mainBladeMode !== 'discrete-radial-sweeps-v1'
-    || rotor.mainContrastMode !== 'graphite-root-fade-v1'
+    || rotor.mainBladeMode !== 'broad-clipped-temporal-sweeps-v2'
+    || rotor.mainContrastMode !== 'graphite-physical-root-tip-v2'
     || rotor.mainFilledDisc !== false
     || rotor.mainMinimumLegibleBladeSweeps !== 2
-    || rotor.mainMinimumProjectedBladeLengthPixels < 48
-    || rotor.mainMinimumProjectedBladeLengthPixels > 70
-    || rotor.mainMinimumAuthoredBladeThicknessPixels < 1.5
-    || rotor.mainMinimumAuthoredBladeThicknessPixels > 3.5
-    || rotor.mainMinimumBladeOpacity < 0.85
-    || rotor.mainMinimumBladeOpacity > 1
+    || rotor.mainMinimumProjectedBladeLengthPixels < 220
+    || rotor.mainMinimumProjectedBladeLengthPixels > 320
+    || rotor.mainMinimumProjectedSweepSpanPixels < 560
+    || rotor.mainMinimumProjectedSweepSpanPixels > 720
+    || rotor.mainMinimumAuthoredBladeThicknessPixels < 4
+    || rotor.mainMinimumAuthoredBladeThicknessPixels > 8
+    || rotor.mainMinimumBladeOpacity < 0.72
+    || rotor.mainMinimumBladeOpacity > 0.9
+    || rotor.mainMinimumScreenWidthFraction < 0.75
+    || rotor.mainMaximumScreenWidthFraction > 0.92
+    || rotor.mainStageWidthPercent / 100 < rotor.mainMinimumScreenWidthFraction
+    || rotor.mainStageWidthPercent / 100 > rotor.mainMaximumScreenWidthFraction
+    || rotor.mainMinimumScreenHeightFraction < 0.16
+    || rotor.mainMaximumScreenHeightFraction > 0.26
+    || rotor.mainStageHeightPercent / 100 < rotor.mainMinimumScreenHeightFraction
+    || rotor.mainStageHeightPercent / 100 > rotor.mainMaximumScreenHeightFraction
+    || rotor.mainMinimumScreenAreaFraction < 0.13
+    || rotor.mainMaximumScreenAreaFraction > 0.22
+    || !Number.isFinite(configuredRotorArea)
+    || !Number.isFinite(configuredRotorTop)
+    || !Number.isFinite(configuredRotorBottom)
+    || configuredRotorArea < rotor.mainMinimumScreenAreaFraction
     || configuredRotorArea > rotor.mainMaximumScreenAreaFraction
-    || rotor.mainMaximumScreenAreaFraction > 0.025
-    || rotor.mainMaximumScreenHeightFraction > 0.08
-    || rotor.mainMaximumScreenHeightFraction < rotor.mainStageHeightPercent / 100
-    || rotor.mainMaximumPoseShiftPixels < 2
-    || rotor.mainMaximumPoseShiftPixels > 8
-    || rotor.mainMaximumPoseBankDegrees < 0.5
-    || rotor.mainMaximumPoseBankDegrees > 2.4
-    || rotor.mainMotionBlurOpacity < 0.08
+    || configuredRotorTop > rotor.mainMaximumStageTopFraction
+    || configuredRotorBottom < rotor.mainMinimumStageBottomFraction
+    || configuredRotorBottom > rotor.mainMaximumStageBottomFraction
+    || rotor.mainMaximumStageBottomFraction >= 0.32
+    || rotor.mainMaximumPoseShiftPixels < 8
+    || rotor.mainMaximumPoseShiftPixels > 18
+    || rotor.mainMaximumVerticalPoseShiftPixels < 2
+    || rotor.mainMaximumVerticalPoseShiftPixels > 7
+    || rotor.mainMaximumPoseBankDegrees < 1
+    || rotor.mainMaximumPoseBankDegrees > 3
+    || rotor.mainMaximumDiscPitchResponseDegrees < 0.3
+    || rotor.mainMaximumDiscPitchResponseDegrees > 0.9
+    || rotor.mainMaximumDiscYawResponseDegrees < 0.4
+    || rotor.mainMaximumDiscYawResponseDegrees > 1.1
+    || rotor.mainMinimumHubDiameterPixels < 16
+    || rotor.mainMinimumHubDiameterPixels > 30
+    || rotor.mainMinimumHubCanopyOverlapPixels < 2
+    || rotor.mainMinimumHubCanopyOverlapPixels > 8
+    || rotor.mainMaximumHubCanopyOcclusionFraction < 0.35
+    || rotor.mainMaximumHubCanopyOcclusionFraction > 0.7
+    || rotor.mainMinimumMastCanopyOverlapPixels < 6
+    || rotor.mainMinimumMastCanopyOverlapPixels > 14
+    || rotor.mainCanopyHeaderWidthPercent < 36
+    || rotor.mainCanopyHeaderWidthPercent > 48
+    || rotor.mainStructuralTieInsetPercent < 12
+    || rotor.mainStructuralTieInsetPercent > 24
+    || rotor.mainStructuralTieWidthPercent < 10
+    || rotor.mainStructuralTieWidthPercent > 20
+    || rotor.mainStructuralTieAngleDegrees < 4
+    || rotor.mainStructuralTieAngleDegrees > 14
+    || rotor.mainMinimumTieHeaderOverlapAreaPixels < 10
+    || rotor.mainMinimumTieHeaderOverlapAreaPixels > 120
+    || rotor.mainMinimumTieCanopyOverlapAreaPixels < 10
+    || rotor.mainMinimumTieCanopyOverlapAreaPixels > 120
+    || !Number.isFinite(configuredTieLeft)
+    || !Number.isFinite(configuredTieRight)
+    || !Number.isFinite(configuredHeaderLeft)
+    || !Number.isFinite(configuredMaximumHorizontalShiftPercent)
+    || configuredTieLeft + configuredMaximumHorizontalShiftPercent >= 24
+    || configuredTieRight <= configuredHeaderLeft
+    || rotor.mainMotionBlurTrailCount !== 2
+    || rotor.mainNearTrailDegrees < 3
+    || rotor.mainNearTrailDegrees > 6
+    || rotor.mainFarTrailDegrees < 7
+    || rotor.mainFarTrailDegrees > 12
+    || rotor.mainFarTrailDegrees <= rotor.mainNearTrailDegrees
+    || rotor.mainMotionBlurOpacity < 0.12
     || rotor.mainMotionBlurOpacity > 0.22
     || rotor.poseResponsive !== true
     || rotor.tailDiscYawDegrees < 50
     || rotor.tailDiscYawDegrees > 75
     || rotor.tailCameraReflection !== true
-    || !['mast-hub', 'canopy-header', 'tail-boom'].every((layer) => rotor.occlusionLayers?.includes(layer))) {
-    throw new Error('perspective-aware main/tail rotor projection contract is invalid');
+    || !['mast-hub', 'structural-ties', 'canopy-header', 'tail-boom'].every((layer) => rotor.occlusionLayers?.includes(layer))) {
+    throw new Error('broad upper-windscreen main/tail rotor projection contract is invalid');
   }
   for (const arena of arenas) {
     const recipe = choreography.arenas[arena];
@@ -154,8 +231,8 @@ async function assertFrames(arena, frames = undefined) {
 async function assertCaptureReceipt() {
   const receipt = JSON.parse(await readFile(captureReceiptPath, 'utf8'));
   const recipeDigest = createHash('sha256').update(JSON.stringify(choreography)).digest('hex');
-  if (receipt.schemaVersion !== 1
-    || receipt.captureId !== 'pass65-authoritative-runtime-menu-preview-capture-v2'
+  if (receipt.schemaVersion !== 3
+    || receipt.captureId !== 'pass65-authoritative-runtime-menu-preview-capture-v4'
     || receipt.recipeId !== choreography.recipeId
     || receipt.recipeDigest !== recipeDigest
     || receipt.source !== choreography.capture.source
@@ -171,25 +248,22 @@ async function assertCaptureReceipt() {
   if ((receipt.arenas ?? []).map((entry) => entry.arenaId).join(',') !== arenas.join(',')) {
     throw new Error('runtime capture receipt arena roster/order drifted');
   }
-  const expectedCaptureRuntime = ['src/legacy-main.ts', 'src/ui/menu-preview-camera.ts'];
-  if (receipt.runtimeInputs?.captureTool?.path !== relative(generatorPath)
-    || await sha256(generatorPath) !== receipt.runtimeInputs.captureTool.sha256) {
-    throw new Error('runtime capture receipt capture-tool digest is stale');
+  const expectedCaptureTools = captureToolPaths.map(relative);
+  if ((receipt.runtimeInputs?.captureTools ?? []).map((entry) => entry.path).join(',') !== expectedCaptureTools.join(',')) {
+    throw new Error('runtime capture receipt capture-tool roster drifted');
   }
-  if ((receipt.runtimeInputs?.captureRuntime ?? []).map((entry) => entry.path).join(',') !== expectedCaptureRuntime.join(',')) {
-    throw new Error('runtime capture receipt capture-runtime source roster drifted');
+  for (const record of receipt.runtimeInputs.captureTools) {
+    if (await sha256(path.join(root, record.path)) !== record.sha256) throw new Error(`runtime capture tool drifted after capture: ${record.path}`);
   }
-  for (const record of receipt.runtimeInputs.captureRuntime) {
-    if (await sha256(path.join(root, record.path)) !== record.sha256) throw new Error(`runtime capture input drifted after capture: ${record.path}`);
+  const currentCanonicalDependencies = canonicalArenaDependencies();
+  if (JSON.stringify(receipt.runtimeInputs?.canonicalArenaDependencies) !== JSON.stringify(currentCanonicalDependencies)) {
+    throw new Error('runtime capture receipt canonical arena dependencies drifted');
   }
-  for (const arena of arenas) {
-    const records = receipt.runtimeInputs?.arenas?.[arena] ?? [];
-    if (records.map((entry) => entry.path).join(',') !== runtimeSourcePaths[arena].join(',')) {
-      throw new Error(`${arena} runtime capture source roster drifted`);
-    }
-    for (const record of records) {
-      if (await sha256(path.join(root, record.path)) !== record.sha256) throw new Error(`runtime capture input drifted after capture: ${record.path}`);
-    }
+  const currentDependencyClosure = await buildDependencyClosure(root, {
+    extraPaths: currentCanonicalDependencies.arenas.flatMap((arena) => arena.localAssetPaths),
+  });
+  if (JSON.stringify(receipt.runtimeInputs?.dependencyClosure) !== JSON.stringify(currentDependencyClosure)) {
+    throw new Error('runtime capture dependency closure drifted after capture');
   }
   for (const evidence of receipt.arenas) {
     if (evidence.backend !== 'webgpu'
@@ -202,6 +276,12 @@ async function assertCaptureReceipt() {
       || evidence.colliders <= 0
       || evidence.raycastMeshes <= 0) {
       throw new Error(`${evidence.arenaId} receipt does not prove one healthy authoritative hardware-WebGPU arena`);
+    }
+    await assertFrames(evidence.arenaId);
+    const currentFrameSet = await digestOrderedFrameSet(frameRoot, evidence.arenaId, choreography.frameCount);
+    const expectedFrameSet = { ...currentFrameSet, frameRoster: expectedFrames };
+    if (JSON.stringify(evidence.frameSet) !== JSON.stringify(expectedFrameSet)) {
+      throw new Error(`${evidence.arenaId} staged PNG frame set no longer matches its capture receipt`);
     }
     const recipe = choreography.arenas[evidence.arenaId];
     if ((evidence.reviewFrames ?? []).map((entry) => entry.frame).join(',') !== choreography.reviewFrames.join(',')) {
@@ -217,27 +297,63 @@ async function assertCaptureReceipt() {
         || Math.abs(frame.fixedVisualTimeMs - expectedFixedTimeMs) > 0.01
         || frame.aboveArenaFloor !== true
         || frame.insideHorizontalCollider !== false
-        || !/^[0-9a-f]{64}$/.test(frame.pngSha256)) {
+        || !/^[0-9a-f]{64}$/.test(frame.pngSha256)
+        || await sha256(path.join(frameRoot, evidence.arenaId, `frame-${String(frame.frame).padStart(4, '0')}.png`)) !== frame.pngSha256) {
         throw new Error(`${evidence.arenaId} review frame ${frame.frame} camera/visual evidence is invalid`);
       }
       if (recipe.kind === 'helicopter') {
         const projection = frame.rotorProjection;
-        if (projection?.mode !== 'foreshortened-partial-sweep'
+        if (projection?.mode !== 'broad-upper-windscreen-partial-sweep'
           || projection.bladeCount !== choreography.helicopter.rotorPresentation.mainBladeCount
+          || projection.temporalTrailCount !== choreography.helicopter.rotorPresentation.mainMotionBlurTrailCount
           || projection.legibleBladeSweeps < choreography.helicopter.rotorPresentation.mainMinimumLegibleBladeSweeps
           || projection.projectedBladeThresholdPixels !== choreography.helicopter.rotorPresentation.mainMinimumProjectedBladeLengthPixels
           || !Number.isFinite(projection.shortestProjectedBladeLengthPixels)
+          || projection.projectedSweepSpanPixels < choreography.helicopter.rotorPresentation.mainMinimumProjectedSweepSpanPixels
           || projection.authoredBladeThicknessPixels < choreography.helicopter.rotorPresentation.mainMinimumAuthoredBladeThicknessPixels
           || projection.bladeOpacity < choreography.helicopter.rotorPresentation.mainMinimumBladeOpacity
           || projection.contrastMode !== choreography.helicopter.rotorPresentation.mainContrastMode
           || projection.filledDiscDetected !== false
-          || projection.stageAreaFraction > choreography.helicopter.rotorPresentation.mainMaximumScreenAreaFraction
+          || projection.stageTopFraction > choreography.helicopter.rotorPresentation.mainMaximumStageTopFraction
+          || projection.stageBottomFraction < choreography.helicopter.rotorPresentation.mainMinimumStageBottomFraction
+          || projection.stageBottomFraction > choreography.helicopter.rotorPresentation.mainMaximumStageBottomFraction
+          || projection.stageWidthFraction < choreography.helicopter.rotorPresentation.mainMinimumScreenWidthFraction
+          || projection.stageWidthFraction > choreography.helicopter.rotorPresentation.mainMaximumScreenWidthFraction
+          || projection.stageHeightFraction < choreography.helicopter.rotorPresentation.mainMinimumScreenHeightFraction
           || projection.stageHeightFraction > choreography.helicopter.rotorPresentation.mainMaximumScreenHeightFraction
+          || projection.stageAreaFraction < choreography.helicopter.rotorPresentation.mainMinimumScreenAreaFraction
+          || projection.stageAreaFraction > choreography.helicopter.rotorPresentation.mainMaximumScreenAreaFraction
+          || projection.hubDiameterPixels < choreography.helicopter.rotorPresentation.mainMinimumHubDiameterPixels
+          || projection.hubCanopyOverlapPixels < choreography.helicopter.rotorPresentation.mainMinimumHubCanopyOverlapPixels
+          || projection.hubCanopyOcclusionFraction > choreography.helicopter.rotorPresentation.mainMaximumHubCanopyOcclusionFraction
+          || projection.mastCanopyOverlapPixels < choreography.helicopter.rotorPresentation.mainMinimumMastCanopyOverlapPixels
+          || projection.structuralTieCount !== 2
+          || projection.leftTieHeaderOverlapAreaPixels < choreography.helicopter.rotorPresentation.mainMinimumTieHeaderOverlapAreaPixels
+          || projection.rightTieHeaderOverlapAreaPixels < choreography.helicopter.rotorPresentation.mainMinimumTieHeaderOverlapAreaPixels
+          || projection.leftTieCanopyOverlapAreaPixels < choreography.helicopter.rotorPresentation.mainMinimumTieCanopyOverlapAreaPixels
+          || projection.rightTieCanopyOverlapAreaPixels < choreography.helicopter.rotorPresentation.mainMinimumTieCanopyOverlapAreaPixels
+          || projection.leftTieHeaderOcclusionSampled !== true
+          || projection.rightTieHeaderOcclusionSampled !== true
+          || projection.leftTieCanopyOcclusionSampled !== true
+          || projection.rightTieCanopyOcclusionSampled !== true
+          || projection.hubCanopyOcclusionSampled !== true
+          || projection.mastCanopyOcclusionSampled !== true
+          || projection.occlusionStackValid !== true
+          || projection.reticleClear !== true
+          || projection.tailOpticClear !== true
+          || projection.poseResponsive !== true
           || !Number.isFinite(projection.poseShiftXPixels)
           || !Number.isFinite(projection.poseShiftYPixels)
           || !Number.isFinite(projection.poseBankDegrees)
+          || !Number.isFinite(projection.discPitchResponseDegrees)
+          || !Number.isFinite(projection.discYawResponseDegrees)
+          || Math.abs(projection.poseShiftXPixels) > choreography.helicopter.rotorPresentation.mainMaximumPoseShiftPixels
+          || Math.abs(projection.poseShiftYPixels) > choreography.helicopter.rotorPresentation.mainMaximumVerticalPoseShiftPixels
+          || Math.abs(projection.poseBankDegrees) > choreography.helicopter.rotorPresentation.mainMaximumPoseBankDegrees
+          || Math.abs(projection.discPitchResponseDegrees) > choreography.helicopter.rotorPresentation.mainMaximumDiscPitchResponseDegrees
+          || Math.abs(projection.discYawResponseDegrees) > choreography.helicopter.rotorPresentation.mainMaximumDiscYawResponseDegrees
           || projection.poseTransform === 'none') {
-          throw new Error(`${evidence.arenaId} review frame ${frame.frame} does not prove the partial foreshortened rotor projection`);
+          throw new Error(`${evidence.arenaId} review frame ${frame.frame} does not prove the broad upper-windscreen rotor projection`);
         }
       } else if (frame.rotorProjection !== undefined) {
         throw new Error(`${evidence.arenaId} cat review frame ${frame.frame} unexpectedly contains helicopter rotor evidence`);
@@ -249,7 +365,7 @@ async function assertCaptureReceipt() {
       throw new Error(`${evidence.arenaId} does not prove the exact copied first/final loop seam`);
     }
   }
-  return receipt;
+  return { receipt, currentCanonicalDependencies, currentDependencyClosure };
 }
 
 function audioSource(kind) {
@@ -259,12 +375,12 @@ function audioSource(kind) {
     : `aevalsrc=0.005*sin(2*PI*63*t)+0.0025*sin(2*PI*126*t)+0.0015*sin(2*PI*252*t):s=48000:d=${duration}`;
 }
 
-function transcode(arena) {
+function transcode(arena, outputRoot = runtimeRoot) {
   const recipe = choreography.arenas[arena];
   const input = path.join(frameRoot, arena, 'frame-%04d.png');
-  const mp4 = path.join(runtimeRoot, `${arena}.mp4`);
-  const webm = path.join(runtimeRoot, `${arena}.webm`);
-  const poster = path.join(runtimeRoot, `${arena}.webp`);
+  const mp4 = path.join(outputRoot, `${arena}.mp4`);
+  const webm = path.join(outputRoot, `${arena}.webm`);
+  const poster = path.join(outputRoot, `${arena}.webp`);
   const common = [
     '-hide_banner', '-loglevel', 'error', '-y', '-framerate', String(choreography.fps),
     '-start_number', '1', '-i', input, '-f', 'lavfi', '-i', audioSource(recipe.kind),
@@ -276,18 +392,20 @@ function transcode(arena) {
   run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-fflags', '+bitexact', '-i', path.join(frameRoot, arena, `frame-${String(recipe.posterFrame).padStart(4, '0')}.png`), '-map_metadata', '-1', '-frames:v', '1', '-c:v', 'libwebp', '-quality', '82', poster]);
 }
 
-function createReviewSheet(arena) {
+function createReviewSheet(arena, outputRoot = reviewRoot) {
   const inputs = choreography.reviewFrames.flatMap((frame) => ['-i', path.join(frameRoot, arena, `frame-${String(frame).padStart(4, '0')}.png`)]);
   const scales = choreography.reviewFrames.map((_, index) => `[${index}:v]scale=384:216:flags=lanczos[r${index}]`).join(';');
   const labels = choreography.reviewFrames.map((_, index) => `[r${index}]`).join('');
-  run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', ...inputs, '-filter_complex', `${scales};${labels}hstack=inputs=${choreography.reviewFrames.length}[review]`, '-map', '[review]', '-map_metadata', '-1', '-frames:v', '1', '-c:v', 'libwebp', '-quality', '86', path.join(reviewRoot, `${arena}-review-frames.webp`)]);
+  run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', ...inputs, '-filter_complex', `${scales};${labels}hstack=inputs=${choreography.reviewFrames.length}[review]`, '-map', '[review]', '-map_metadata', '-1', '-frames:v', '1', '-c:v', 'libwebp', '-quality', '86', path.join(outputRoot, `${arena}-review-frames.webp`)]);
 }
 
 async function fileRecord(file, extra = {}) {
   return { path: relative(file), sha256: await sha256(file), ...extra };
 }
 
-async function sourceRecord(arena) {
+function sourceRecord(arena, canonicalDependencies, dependencyClosure) {
+  const canonical = canonicalDependencies.arenas.find((entry) => entry.arenaId === arena);
+  if (!canonical) throw new Error(`Canonical dependency manifest is missing ${arena}`);
   return {
     arenaId: arena,
     kind: choreography.arenas[arena].kind,
@@ -295,7 +413,8 @@ async function sourceRecord(arena) {
     fovDegrees: choreography.arenas[arena].fovDegrees,
     reviewLabel: choreography.arenas[arena].reviewLabel,
     source: 'authoritative-runtime-arena',
-    runtimeSources: await Promise.all(runtimeSourcePaths[arena].map((file) => fileRecord(path.join(root, file)))),
+    canonicalVisualModule: canonical,
+    dependencyClosureTreeSha256: dependencyClosure.treeSha256,
   };
 }
 
@@ -314,18 +433,56 @@ if (process.env.AA_PREVIEW_REVIEW_ONLY === '1') {
   console.log(JSON.stringify({ reviewSheets: 'generated', frames: choreography.reviewFrames, arenas }, null, 2));
   process.exit(0);
 }
-const captureReceipt = await assertCaptureReceipt();
-for (const arena of arenas) {
-  await assertFrames(arena);
-  transcode(arena);
-  createReviewSheet(arena);
+const {
+  receipt: captureReceipt,
+  currentCanonicalDependencies,
+  currentDependencyClosure,
+} = await assertCaptureReceipt();
+const actualCockpitEvidenceDigest = await sha256(acceptedCockpitEvidencePath);
+if (actualCockpitEvidenceDigest !== acceptedCockpitDigest) {
+  throw new Error(`Accepted cockpit evidence digest drifted: expected ${acceptedCockpitDigest}, got ${actualCockpitEvidenceDigest}`);
+}
+const retainedCacheFamilyLock = JSON.parse(await readFile(cacheFamilyLockPath, 'utf8'));
+const retainedCacheLockIssues = cacheFamilyLockFailures(retainedCacheFamilyLock, RETAINED_CACHE_FAMILY_BASELINE);
+if (retainedCacheLockIssues.length > 0) throw new Error(retainedCacheLockIssues.join(' | '));
+const stagingRoot = await mkdtemp(path.join(os.tmpdir(), 'atomic-acres-pass65-menu-preview-finalize-'));
+const stagingRuntimeRoot = path.join(stagingRoot, 'runtime');
+const stagingReviewRoot = path.join(stagingRoot, 'review');
+let finalMediaSet;
+let nextCacheFamilyLock;
+try {
+  await mkdir(stagingRuntimeRoot, { recursive: true });
+  await mkdir(stagingReviewRoot, { recursive: true });
+  for (const arena of arenas) {
+    transcode(arena, stagingRuntimeRoot);
+    createReviewSheet(arena, stagingReviewRoot);
+  }
+  finalMediaSet = await digestFinalMediaSet(stagingRuntimeRoot, arenas);
+  const cacheResult = appendCacheFamily(retainedCacheFamilyLock, {
+    cacheKey: choreography.media.cacheKey,
+    recipeId: choreography.recipeId,
+    finalMediaSetSha256: finalMediaSet.sha256,
+    fileCount: finalMediaSet.fileCount,
+    totalBytes: finalMediaSet.totalBytes,
+    recordedAt: '2026-07-29',
+  });
+  nextCacheFamilyLock = cacheResult.lock;
+  for (const arena of arenas) {
+    for (const extension of ['mp4', 'webm', 'webp']) {
+      await copyFile(path.join(stagingRuntimeRoot, `${arena}.${extension}`), path.join(runtimeRoot, `${arena}.${extension}`));
+    }
+    await copyFile(path.join(stagingReviewRoot, `${arena}-review-frames.webp`), path.join(reviewRoot, `${arena}-review-frames.webp`));
+  }
+  if (cacheResult.appended) await writeFile(cacheFamilyLockPath, `${JSON.stringify(nextCacheFamilyLock, null, 2)}\n`, 'utf8');
+} finally {
+  await rm(stagingRoot, { recursive: true, force: true });
 }
 
 const sources = [];
 const runtimeFiles = [];
 const reviewEvidence = [];
 for (const arena of arenas) {
-  sources.push(await sourceRecord(arena));
+  sources.push(sourceRecord(arena, currentCanonicalDependencies, currentDependencyClosure));
   for (const extension of ['mp4', 'webm', 'webp']) runtimeFiles.push(await fileRecord(path.join(runtimeRoot, `${arena}.${extension}`), { arenaId: arena, extension }));
   reviewEvidence.push(await fileRecord(path.join(reviewRoot, `${arena}-review-frames.webp`), { arenaId: arena, frames: choreography.reviewFrames }));
 }
@@ -333,7 +490,7 @@ for (const arena of arenas) {
 const provenance = {
   schemaVersion: 3,
   assetId: 'atomic-acres-pass65-prerecorded-menu-previews-2026-07-26',
-  generatedAt: '2026-07-28',
+  generatedAt: '2026-07-29',
   creator: 'Atomic Acres project',
   license: 'Original project work',
   releaseState: 'HITL candidate only',
@@ -343,14 +500,29 @@ const provenance = {
   finalizer: await fileRecord(finalizerPath, { ffmpeg: 'required' }),
   verification: await fileRecord(verifierPath, { failClosed: true }),
   captureReceipt: await fileRecord(captureReceiptPath, { captureId: captureReceipt.captureId, backend: 'webgpu' }),
-  captureRuntime: await Promise.all([cameraEvaluatorPath, runtimeEntryPath].map((file) => fileRecord(file))),
+  captureTools: await Promise.all(captureToolPaths.map((file) => fileRecord(file))),
+  canonicalArenaDependencies: currentCanonicalDependencies,
+  dependencyClosure: {
+    schemaVersion: currentDependencyClosure.schemaVersion,
+    algorithm: currentDependencyClosure.algorithm,
+    roots: currentDependencyClosure.roots,
+    excludes: currentDependencyClosure.excludes,
+    extraPaths: currentDependencyClosure.extraPaths,
+    fileCount: currentDependencyClosure.fileCount,
+    totalBytes: currentDependencyClosure.totalBytes,
+    treeSha256: currentDependencyClosure.treeSha256,
+  },
+  cacheFamilyLock: await fileRecord(cacheFamilyLockPath, {
+    cacheKey: choreography.media.cacheKey,
+    finalMediaSetSha256: finalMediaSet.sha256,
+  }),
   authoredCockpit: {
     assetId: 'chopper-gunner-vehicle-v1',
     ...(await fileRecord(chopperSourcePath)),
     qualityTier: 'LOD0',
     role: 'visual design reference; compact black-grey treatment is baked offline over runtime footage',
-    evidence: 'docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png',
-    evidenceSha256: 'a09ec4d7344a369546fde3179b17012badf434681a37f9e8bab663a142ca3b8f',
+    evidence: acceptedCockpitEvidence,
+    evidenceSha256: actualCockpitEvidenceDigest,
   },
   sources,
   render: {
@@ -360,7 +532,7 @@ const provenance = {
     durationSeconds: choreography.durationSeconds,
     mapSource: 'Selected authoritative production runtime arena under hardware WebGPU',
     motion: 'Canonical deterministic cyclic camera paths over fixed runtime visual time',
-    helicopter: 'Graphite first-person rotor and sculpted three-panel cockpit with cyan/green avionics, canopy depth, glass, braces and a map-safe reticle baked offline',
+    helicopter: 'Broad upper-windscreen graphite rotor sweeps with restrained temporal trails, measured hub/mast/header occlusion, visible structural ties into both side canopy rails, and a sculpted three-panel cockpit with cyan/green avionics, canopy depth, glass, braces and a map-safe reticle baked offline',
     cat: 'Expressive charcoal/silver feline crown, articulated ears, forelegs and coral-padded paws baked offline over the authoritative Gun Range moving-target scene',
     overlayScale: choreography.capture.overlayScale,
     audio: choreography.media.audioProfiles,
@@ -384,7 +556,7 @@ record.sourceScriptSha256 = provenance.generator.sha256;
 record.sourceProvenanceSha256 = await sha256(provenancePath);
 record.generatedAsOf = provenance.generatedAt;
 record.format = 'Four distinct 960x540 eight-second 24 FPS selected-map runtime captures, shipped as VP9/Opus WebM, H.264/AAC MP4 and static WebP posters, plus deterministic five-frame review evidence';
-record.modifications = 'Captured offline from each actual authoritative production WebGPU arena with deterministic camera and visual time. Three map flyovers bake a graphite rotor, dimensional canopy and cyan/green cockpit avionics; Gun Range bakes an expressive charcoal/silver crown, articulated ears, forelegs and coral-padded paws. Runtime loading/menu playback remains prerecorded-only, reduced motion is poster-only, and no downloaded or sampled assets are used. The former byte-identical Gun Range media gate is explicitly superseded.';
+record.modifications = 'Captured offline from each actual authoritative production WebGPU arena with deterministic camera and visual time. Three map flyovers bake broad upper-windscreen graphite rotor sweeps with dual restrained temporal trails, measured mast/hub/header occlusion, two visible structural ties into the side canopy rails, a clear tail optic and cyan/green cockpit avionics; Gun Range bakes an expressive charcoal/silver crown, articulated ears, forelegs and coral-padded paws. Runtime loading/menu playback remains prerecorded-only, reduced motion is poster-only, and no downloaded or sampled assets are used. The former byte-identical Gun Range media gate is explicitly superseded.';
 await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
 
 console.log(JSON.stringify({ releaseState: provenance.releaseState, recipeId: choreography.recipeId, source: choreography.capture.source, arenas, runtimeFiles: runtimeFiles.length, reviewSheets: reviewEvidence.length }, null, 2));
