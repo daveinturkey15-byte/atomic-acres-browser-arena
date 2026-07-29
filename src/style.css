@@ -1,6 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Inter:wght@400;600;700&display=swap');
 @import url('./ui/tactical-ui.css');
 @import url('./ui/pass65-hud.css');
+@font-face{font-family:Inter;src:local('Inter'),local('Segoe UI Variable Text'),local('Segoe UI');font-style:normal;font-weight:100 900;font-display:swap}
+@font-face{font-family:'Barlow Condensed';src:local('Barlow Condensed'),local('Bahnschrift Condensed'),local('Arial Narrow');font-style:normal;font-weight:100 900;font-stretch:condensed;font-display:swap}
 
 @layer legacy {
 :root{font-family:Inter,system-ui,sans-serif;color:#f7ecd4;background:#10171b;font-synthesis:none;--aqua:#58e3dc;--coral:#ff765f;--gold:#f4c44f;--ink:#0c1519;--panel:rgba(12,21,25,.93)}

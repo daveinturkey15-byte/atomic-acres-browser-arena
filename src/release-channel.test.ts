@@ -41,4 +41,11 @@ describe('release channel entry routing', () => {
     expect(entryHtml).toContain('<link rel="icon" href="data:image/svg+xml,');
     expect(entryHtml).not.toMatch(/href=["']\/favicon\.ico/);
   });
+
+  it('keeps the tactical font stack local so offline play cannot stall or emit network errors', () => {
+    const style = readFileSync(new URL('./style.css', import.meta.url), 'utf8');
+    expect(style).not.toMatch(/@import\s+url\(["']?https?:/u);
+    expect(style).toContain("local('Segoe UI')");
+    expect(style).toContain("local('Bahnschrift Condensed')");
+  });
 });
