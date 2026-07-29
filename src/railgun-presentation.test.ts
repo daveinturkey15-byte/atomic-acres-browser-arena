@@ -137,6 +137,20 @@ describe('railgun presentation', () => {
     });
   });
 
+  it('deduplicates one shooter result without suppressing a later holder that reuses its shot id', () => {
+    const scene = new THREE.Scene();
+    const presentation = new RailgunPresentation(scene, new FakeElement() as unknown as HTMLElement, true);
+    const authority = createRailgunBeamAuthority(7, 'shared-shot-id-0001', [0, 1.7, 0], [0, 0, -1]);
+    const accepted: RailgunShotResultMessage = {
+      type: 'railgun-shot-result', protocolVersion: 6, by: 'host', forPlayerId: 'shooter-a', generation: 7,
+      shotId: authority.shotId, status: 'accepted-miss', reason: 'accepted', outcomes: [], beam: authority, nonce: 1,
+    };
+    expect(presentation.presentAcceptedResult(accepted, 1_000)).toBe(true);
+    expect(presentation.presentAcceptedResult({ ...accepted, nonce: 2 }, 1_001)).toBe(false);
+    expect(presentation.presentAcceptedResult({ ...accepted, forPlayerId: 'shooter-b', nonce: 3 }, 1_002)).toBe(true);
+    expect(presentation.telemetry()).toMatchObject({ activeBeams: 2, beamPresentations: 2 });
+  });
+
   it('never presents a rejected or identity-mismatched result', () => {
     const scene = new THREE.Scene();
     const presentation = new RailgunPresentation(scene, new FakeElement() as unknown as HTMLElement, true);

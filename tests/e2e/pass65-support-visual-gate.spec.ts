@@ -411,8 +411,8 @@ test.describe('Pass 65 support visual fail-closed gate', () => {
       expect(hostShot.railgun.presentation).toMatchObject({ lastPresentationStartOffsetM: 2.4, lastViewer: 'shooter' });
       expect(guestShot.railgun.presentation).toMatchObject({ lastPresentationStartOffsetM: 0, lastViewer: 'peer' });
       expect(hostShot.railgun.presentation.lastAcceptedBeam.shotId).toMatch(/:rail:\d+$/);
-      expect(hostShot.audio.railgun).toMatchObject({ local: 1, replicated: 0, layerCount: 8, pressureDuration: 0.62 });
-      expect(guestShot.audio.railgun).toMatchObject({ local: 0, replicated: 1, layerCount: 8, pressureDuration: 0.62 });
+      expect(hostShot.audio.railgun).toMatchObject({ local: 1, replicated: 0, layerCount: 10, pressureDuration: 0.62 });
+      expect(guestShot.audio.railgun).toMatchObject({ local: 0, replicated: 1, layerCount: 10, pressureDuration: 0.62 });
 
       const penetrationTrace = await host.evaluate((beam: { start: number[]; end: number[] }) => {
         const direction = beam.end.map((entry, axis) => (entry - beam.start[axis]) / 180) as [number, number, number];

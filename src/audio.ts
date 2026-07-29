@@ -64,7 +64,7 @@ export function flashbangAudioEnvelope(requestedAudioGain: number): FlashbangAud
 export const RAILGUN_REPORT_PROFILE = Object.freeze({
   ...WEAPON_REPORT_PROFILES.railgun,
   pressureDuration: 0.62,
-  layerCount: 8,
+  layerCount: 10,
 });
 
 export function railgunReportAttenuation(remote: boolean, distance: number): number {

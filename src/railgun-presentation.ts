@@ -227,7 +227,10 @@ export class RailgunPresentation {
     const authority = result.beam;
     if (result.status === 'rejected' || result.reason !== 'accepted' || !isRailgunBeamAuthority(authority)
       || authority.generation !== result.generation || authority.shotId !== result.shotId) return false;
-    const authorityKey = `${authority.generation}:${authority.shotId}`;
+    // A shot id is unique only within one shooter connection. Including both
+    // message owners prevents a later holder who reuses the same id from
+    // suppressing the shared beam and report for every observer.
+    const authorityKey = `${result.by}:${result.forPlayerId}:${authority.generation}:${authority.shotId}`;
     if (this.acceptedBeamKeys.has(authorityKey)) return false;
     const start = new THREE.Vector3(...authority.start);
     const end = new THREE.Vector3(...authority.end);

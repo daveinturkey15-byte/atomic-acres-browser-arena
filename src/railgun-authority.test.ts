@@ -170,17 +170,16 @@ describe('host-authoritative railgun', () => {
 
   it('validates bounded railgun protocol messages', () => {
     const beam = createRailgunBeamAuthority(1, 'shot-0001', [1, 2, 3], [0, 0, -1]);
-    expect(beam).toEqual({ generation: 1, shotId: 'shot-0001', start: [1, 2, 3], end: [1, 2, -177] });
-    expect(isRailgunBeamAuthority(beam)).toBe(true);
-    expect(isRailgunProtocolMessage({
+    const authorityState = createRailgunAuthorityState('atomic-acres', 1_000, 0, 1);
+    const claim = {
       type: 'railgun-claim-request', protocolVersion: 6, by: 'player-a', generation: 1,
       position: [1, 2, 3], nonce: 1,
-    }, 6)).toBe(true);
-    expect(isRailgunProtocolMessage({
+    } as const;
+    const request = {
       type: 'railgun-shot-request', protocolVersion: 6, by: 'player-a', generation: 1,
       shotId: 'shot-0001', origin: [1, 2, 3], direction: [0, 0, -1], fireTimeMs: 2_000, nonce: 2,
-    }, 6)).toBe(true);
-    expect(isRailgunProtocolMessage({
+    } as const;
+    const result = {
       type: 'railgun-shot-result', protocolVersion: 6, by: 'host', forPlayerId: 'player-a', generation: 1,
       shotId: 'shot-0001', status: 'accepted-hit', reason: 'accepted',
       outcomes: [
@@ -188,7 +187,27 @@ describe('host-authoritative railgun', () => {
         { target: 'player-c', damageRequested: 50, damageApplied: 40, resultingHealth: 0, died: true, distanceMeters: 24 },
         { target: 'player-d', damageRequested: 50, damageApplied: 10, resultingHealth: 0, died: true, distanceMeters: 36 },
       ], beam, nonce: 3,
-    }, 6)).toBe(true);
+    } as const;
+    const stateMessage = {
+      type: 'railgun-state', protocolVersion: 6, by: 'host', state: authorityState, nonce: 4,
+    } as const;
+    expect(beam).toEqual({ generation: 1, shotId: 'shot-0001', start: [1, 2, 3], end: [1, 2, -177] });
+    expect(isRailgunBeamAuthority(beam)).toBe(true);
+    expect(isRailgunProtocolMessage(claim, 6)).toBe(true);
+    expect(isRailgunProtocolMessage(request, 6)).toBe(true);
+    expect(isRailgunProtocolMessage(result, 6)).toBe(true);
+    expect(isRailgunProtocolMessage(stateMessage, 6)).toBe(true);
+    for (const message of [claim, request, result, stateMessage]) {
+      expect(isRailgunProtocolMessage({ ...message, unreviewedExtension: true }, 6)).toBe(false);
+    }
+    expect(isRailgunProtocolMessage({
+      ...stateMessage,
+      state: { ...authorityState, unreviewedExtension: true },
+    }, 6)).toBe(false);
+    expect(isRailgunProtocolMessage({
+      ...stateMessage,
+      state: { ...authorityState, spawnSite: { ...authorityState.spawnSite!, unreviewedExtension: true } },
+    }, 6)).toBe(false);
     expect(isRailgunProtocolMessage({
       type: 'railgun-shot-result', protocolVersion: 6, by: 'host', forPlayerId: 'player-a', generation: 1,
       shotId: 'shot-0001', status: 'accepted-hit', reason: 'accepted',

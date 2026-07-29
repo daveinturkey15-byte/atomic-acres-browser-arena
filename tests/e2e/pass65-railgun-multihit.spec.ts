@@ -329,7 +329,7 @@ test.describe('Pass 65 host-authoritative Railgun multi-hit gate', () => {
       expect(shooterShot.railgun.presentation).toMatchObject({ lastViewer: 'shooter', lastPresentationStartOffsetM: 2.4 });
       expect(hostShot.railgun.presentation).toMatchObject({ lastViewer: 'peer', lastPresentationStartOffsetM: 0 });
       expect(observerShot.railgun.presentation).toMatchObject({ lastViewer: 'peer', lastPresentationStartOffsetM: 0 });
-      expect(shooterShot.audio.railgun).toMatchObject({ local: 1, replicated: 0, lastSpatial: false, layerCount: 8, pressureDuration: 0.62 });
+      expect(shooterShot.audio.railgun).toMatchObject({ local: 1, replicated: 0, lastSpatial: false, layerCount: 10, pressureDuration: 0.62 });
       for (const observerAudio of [hostShot.audio.railgun, observerShot.audio.railgun]) {
         expect(observerAudio).toMatchObject({
           local: 0,
@@ -340,7 +340,7 @@ test.describe('Pass 65 host-authoritative Railgun multi-hit gate', () => {
             y: hostShot.railgun.presentation.lastAcceptedBeam.start[1],
             z: hostShot.railgun.presentation.lastAcceptedBeam.start[2],
           },
-          layerCount: 8,
+          layerCount: 10,
           pressureDuration: 0.62,
         });
       }

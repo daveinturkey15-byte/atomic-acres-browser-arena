@@ -73,7 +73,7 @@ test('railgun exits ADS, enforces the 1.5 second rechamber, and permits a releas
     acceptedBeam.end[1] - acceptedBeam.start[1],
     acceptedBeam.end[2] - acceptedBeam.start[2],
   )).toBeCloseTo(180, 5);
-  expect(first.audio.railgun).toMatchObject({ local: 1, layerCount: 8, pressureDuration: 0.62 });
+  expect(first.audio.railgun).toMatchObject({ local: 1, layerCount: 10, pressureDuration: 0.62 });
   expect(first.textChat.adsHeld).toBe(false);
 
   const presentationCountBeforeBlockedShot = first.railgun.presentation.beamPresentations;
