@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "kind": "atomic-player-profile-registry",
-  "createdAt": "2026-07-29T18:55:50Z",
+  "createdAt": "2026-07-29T19:06:06Z",
   "preservedCurrentProfileId": "legacy-offensive-accuracy-v2-frozen-20260729",
   "candidateProfileId": "one-v-one-semantic-v1-scaffold",
   "selectionRule": "The preserved current profile remains the rollback reference. The candidate is default-off, non-promoted and replay-only until explicit authorization plus hash-bound build, detector and calibration receipts.",
@@ -30,8 +30,8 @@
     },
     {
       "path": "scripts/agent-player/atomic-player-driver.mjs",
-      "sha256": "f2872bcb7995f78c458c10ce82df705451faa35e7e3bfce3f54bbb3386212ab1",
-      "bytes": 102338
+      "sha256": "bbc97b38d2f91ad26d7c6610beffdf446c6af1613445f8b5c5fc7b839d425fe4",
+      "bytes": 103834
     },
     {
       "path": "scripts/agent-player/one-v-one/profile-contract.mjs",

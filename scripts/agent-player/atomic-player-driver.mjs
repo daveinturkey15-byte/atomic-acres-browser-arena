@@ -706,6 +706,8 @@ async function run() {
   const oneVOneShadowReceipts = [];
   let oneVOneShadowSummary = null;
   let oneVOneShadowFirstConfirmedCaptured = false;
+  const oneVOneShadowConfirmedTrackIds = new Set();
+  const oneVOneShadowConfirmedTrackArtifacts = [];
   let rejectedScreenLockedFrames = 0;
   let visionFrames = 0;
   let activeVisionFrames = 0;
@@ -1115,6 +1117,30 @@ async function run() {
             detections: shadowDetections,
             motionSemantic: motionSemanticReceipt,
           });
+          if (shadowResult.telemetry.semanticAuthority
+            && shadowResult.track.state === 'CONFIRMED'
+            && shadowResult.track.trackId
+            && !oneVOneShadowConfirmedTrackIds.has(shadowResult.track.trackId)
+            && oneVOneShadowConfirmedTrackArtifacts.length < 80) {
+            oneVOneShadowConfirmedTrackIds.add(shadowResult.track.trackId);
+            const captureIndex = (oneVOneShadowConfirmedTrackArtifacts.length / 2) + 1;
+            const baseName = `one-v-one-shadow-confirmed-track-${String(captureIndex).padStart(2, '0')}`;
+            const rawFile = `${baseName}.jpg`;
+            const annotatedFile = `${baseName}-annotated.jpg`;
+            await writeFile(resolve(artifactDirectory, rawFile), vision.jpeg);
+            await writeFile(resolve(artifactDirectory, annotatedFile), await annotatedVisionJpeg(vision, tracking));
+            oneVOneShadowConfirmedTrackArtifacts.push(rawFile, annotatedFile);
+            actions.push({
+              atMs,
+              kind: 'one-v-one-shadow-confirmed-track-capture',
+              sourceSequence: shadowFrameSequence,
+              trackId: shadowResult.track.trackId,
+              rawFile,
+              annotatedFile,
+              motionSemantic: motionSemanticReceipt,
+              detections: shadowDetections,
+            });
+          }
           if (!oneVOneShadowFirstConfirmedCaptured && shadowResult.track.state === 'CONFIRMED') {
             await writeFile(resolve(artifactDirectory, 'one-v-one-shadow-first-confirmed.jpg'), vision.jpeg);
             oneVOneShadowFirstConfirmedCaptured = true;
@@ -2034,6 +2060,7 @@ async function run() {
         ...annotatedCandidateArtifacts,
         ...damageArtifacts,
         ...fireEvidenceFrames.map((entry) => entry.file),
+        ...oneVOneShadowConfirmedTrackArtifacts,
         shotEvidenceReceipt?.file ?? null,
         oneVOneShadowReceipts.length > 0 ? 'one-v-one-shadow-telemetry.json' : null,
         oneVOneShadowFirstConfirmedCaptured ? 'one-v-one-shadow-first-confirmed.jpg' : null,
