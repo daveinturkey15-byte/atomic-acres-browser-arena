@@ -109,7 +109,7 @@ type RailgunTrio = Readonly<{
   shooterId: string;
 }>;
 
-async function startRailgunTrio(browser: Browser): Promise<RailgunTrio> {
+async function startRailgunTrio(browser: Browser, observerTeam: '0' | '1' = '0'): Promise<RailgunTrio> {
   const context = await browser.newContext({ viewport: { width: 1_280, height: 720 }, deviceScaleFactor: 1 });
   const [host, shooter, observer] = await Promise.all([
     openPeer(context, 'RAILGUN HOST', 'railgun-host'),
@@ -125,7 +125,7 @@ async function startRailgunTrio(browser: Browser): Promise<RailgunTrio> {
   })));
   await host.locator('#team').selectOption('0');
   await shooter.locator('#team').selectOption('1');
-  await observer.locator('#team').selectOption('0');
+  await observer.locator('#team').selectOption(observerTeam);
   expect(await peerServerReady(), 'Local PeerJS signalling must be live before room creation').toBe(true);
   await host.locator('#host').click();
   await host.waitForFunction(() => Boolean(document.querySelector('#room-code')?.textContent?.trim()), undefined, { timeout: 30_000 });
@@ -153,7 +153,7 @@ async function startRailgunTrio(browser: Browser): Promise<RailgunTrio> {
   expect(Object.fromEntries(lobby.members.map((member: any) => [member.name, member.team]))).toEqual({
     'RAILGUN HOST': 0,
     'RAILGUN SHOOTER': 1,
-    'RAILGUN OBSERVER': 0,
+    'RAILGUN OBSERVER': Number(observerTeam),
   });
   const shooterId = lobby.members.find((member: any) => member.name === 'RAILGUN SHOOTER')?.id;
   expect(typeof shooterId).toBe('string');
@@ -399,6 +399,116 @@ test.describe('Pass 65 host-authoritative Railgun multi-hit gate', () => {
         async () => (await state(page)).railgun.presentation.activeBeams,
         { timeout: 3_000 },
       ).toBe(0)));
+      expect(errors).toEqual([]);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('pierces two aligned human peers for two exact 50-damage passes and credits both deaths to the host shooter', async ({ browser }) => {
+    test.setTimeout(180_000);
+    const trio = await startRailgunTrio(browser, '1');
+    const { context, host, shooter, observer, errors } = trio;
+    try {
+      const lobby = await host.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch);
+      const hostId = lobby.members.find((member: any) => member.name === 'RAILGUN HOST')?.id;
+      const shooterId = lobby.members.find((member: any) => member.name === 'RAILGUN SHOOTER')?.id;
+      const observerId = lobby.members.find((member: any) => member.name === 'RAILGUN OBSERVER')?.id;
+      expect(typeof hostId).toBe('string');
+      expect(typeof shooterId).toBe('string');
+      expect(typeof observerId).toBe('string');
+
+      const stagedPickup = await host.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.stageRailgunSpawn(0));
+      expect(stagedPickup).toMatchObject({ status: 'available', roundsRemaining: 8 });
+      expect(stagedPickup.pickupPosition).toHaveLength(3);
+      await host.evaluate((position) => {
+        const api = (window as any).__ATOMIC_ACRES_DEBUG__;
+        api.teleportPlayer(position[0], position[1], position[2], 0, 0);
+      }, stagedPickup.pickupPosition);
+      expect(await host.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.interactRailgun())).toBe(true);
+      await Promise.all([host, shooter, observer].map((page) => page.waitForFunction((holderId) => {
+        const snapshot = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+        return snapshot.railgun.status === 'held' && snapshot.railgun.holderId === holderId;
+      }, hostId, { timeout: 5_000 })));
+
+      await Promise.all([
+        host.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.teleportPlayer(0, 1.7, 30, 0, 0)),
+        shooter.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.teleportPlayer(0, 1.7, 18, 0, 0)),
+        observer.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.teleportPlayer(0, 1.7, 8, 0, 0)),
+      ]);
+      await host.waitForFunction(({ shooterId, observerId }) => {
+        const remotes = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers;
+        const byId = new Map(remotes.map((remote: any) => [remote.id, remote]));
+        const shooter = byId.get(shooterId) as any;
+        const observer = byId.get(observerId) as any;
+        const at = (remote: any, z: number) => remote?.authoritativePosition
+          && Math.abs(remote.authoritativePosition[0]) < 0.15
+          && Math.abs(remote.authoritativePosition[1] - 1.7) < 0.15
+          && Math.abs(remote.authoritativePosition[2] - z) < 0.15;
+        return at(shooter, 18) && at(observer, 8);
+      }, { shooterId, observerId }, { timeout: 10_000 });
+
+      const fireAndAwait = async (expectedPresentations: number): Promise<any> => {
+        await host.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.fireOnce());
+        await host.waitForFunction((presentations) => {
+          const railgun = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().railgun;
+          return railgun.presentation.beamPresentations === presentations
+            && railgun.lastAuthoritativeResult?.outcomes.length === 2;
+        }, expectedPresentations, { timeout: 5_000 });
+        const result = (await state(host)).railgun.lastAuthoritativeResult;
+        expect(result).toMatchObject({
+          forPlayerId: hostId,
+          status: 'accepted-hit',
+          reason: 'accepted',
+        });
+        expect(result.outcomes.map((outcome: any) => outcome.target)).toEqual([shooterId, observerId]);
+        expect(result.outcomes.map((outcome: any) => outcome.damageRequested)).toEqual([50, 50]);
+        expect(result.outcomes.map((outcome: any) => outcome.damageApplied)).toEqual([50, 50]);
+        // Remote interpolation can move a staged peer by millimetres between
+        // the two rechambered shots; retain the ordering/range oracle without
+        // pretending transport snapshots are bit-exact world positions.
+        expect(result.outcomes[0].distanceMeters).toBeCloseTo(12, 0);
+        expect(result.outcomes[1].distanceMeters).toBeCloseTo(22, 0);
+        return result;
+      };
+
+      const first = await fireAndAwait(1);
+      expect(first.outcomes.map((outcome: any) => ({ resultingHealth: outcome.resultingHealth, died: outcome.died }))).toEqual([
+        { resultingHealth: 50, died: false },
+        { resultingHealth: 50, died: false },
+      ]);
+      await host.waitForFunction(() => (
+        (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().railgun.chamberReadyAtHostTimeMs <= performance.now()
+      ), undefined, { timeout: 4_000 });
+      const second = await fireAndAwait(2);
+      expect(second.outcomes.map((outcome: any) => ({ resultingHealth: outcome.resultingHealth, died: outcome.died }))).toEqual([
+        { resultingHealth: 0, died: true },
+        { resultingHealth: 0, died: true },
+      ]);
+
+      await Promise.all([host, shooter, observer].map((page) => page.waitForFunction(({ hostId, shooterId, observerId }) => {
+        const snapshot = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+        const deaths = snapshot.railgun.deathPresentations;
+        return snapshot.railgun.presentation.beamPresentations === 2
+          && deaths.length === 2
+          && deaths.map((entry: any) => entry.victimId).join(',') === `${shooterId},${observerId}`
+          && deaths.every((entry: any) => entry.killerId === hostId);
+      }, { hostId, shooterId, observerId }, { timeout: 5_000 })));
+      const roleShots = await Promise.all([host, shooter, observer].map(state));
+      for (const shot of roleShots) {
+        expect(shot.railgun.deathPresentationCount).toBe(2);
+        expect(shot.railgun.deathPresentations.map((entry: any) => entry.victimId)).toEqual([shooterId, observerId]);
+        expect(shot.railgun.deathPresentations.every((entry: any) => entry.killerId === hostId)).toBe(true);
+      }
+      expect(roleShots[0].player.kills).toBe(2);
+      expect(roleShots[0].privateMatch.scores.find((score: any) => score.id === hostId)).toMatchObject({
+        kills: 2,
+        deaths: 0,
+        damageDealt: 200,
+      });
+      expect(roleShots[0].audio.railgun).toMatchObject({ local: 2, replicated: 0 });
+      expect(roleShots[1].audio.railgun).toMatchObject({ local: 0, replicated: 2, lastSpatial: true });
+      expect(roleShots[2].audio.railgun).toMatchObject({ local: 0, replicated: 2, lastSpatial: true });
       expect(errors).toEqual([]);
     } finally {
       await context.close();
