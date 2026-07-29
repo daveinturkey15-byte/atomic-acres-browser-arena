@@ -1,3 +1,5 @@
+import { supportForwardFromYawPitch, type SupportDirection } from './support-forward-axis';
+
 const clamp = (value: number, minimum: number, maximum: number): number => (
   Math.max(minimum, Math.min(maximum, Number.isFinite(value) ? value : 0))
 );
@@ -18,6 +20,8 @@ export type PilotedDroneControlAxes = Readonly<{
   strafe: number;
   vertical: number;
 }>;
+
+export type PilotedDroneWorldVelocity = SupportDirection;
 
 /**
  * Converts browser/gamepad screen-space look deltas to Three.js camera yaw and
@@ -84,4 +88,36 @@ export function pilotedDroneControlAxes(input: Readonly<{
     strafe: clamp(Number(input.keyboardRight) - Number(input.keyboardLeft) + gamepadX, -1, 1),
     vertical: clamp(Number(input.keyboardAscend) - Number(input.keyboardDescend) + gamepadVertical, -1, 1),
   });
+}
+
+/**
+ * Projects the signed input axes into the shared -Z-forward world convention
+ * and caps diagonal/combined travel at the standalone manual speed.
+ */
+export function pilotedDroneWorldVelocity(input: Readonly<{
+  yaw: number;
+  pitch: number;
+  axes: PilotedDroneControlAxes;
+  maximumSpeedMps: number;
+}>): PilotedDroneWorldVelocity {
+  const yaw = Number.isFinite(input.yaw) ? input.yaw : 0;
+  const pitch = clamp(input.pitch, -PILOTED_DRONE_VIEW_CONTRACT.maximumPitchRadians, PILOTED_DRONE_VIEW_CONTRACT.maximumPitchRadians);
+  const maximumSpeedMps = clamp(input.maximumSpeedMps, 0, 100);
+  const forward = supportForwardFromYawPitch(yaw, pitch);
+  const rightX = Math.cos(yaw);
+  const rightZ = -Math.sin(yaw);
+  let x = forward[0] * clamp(input.axes.thrust, -1, 1) + rightX * clamp(input.axes.strafe, -1, 1);
+  let y = forward[1] * clamp(input.axes.thrust, -1, 1) + clamp(input.axes.vertical, -1, 1);
+  let z = forward[2] * clamp(input.axes.thrust, -1, 1) + rightZ * clamp(input.axes.strafe, -1, 1);
+  const magnitude = Math.hypot(x, y, z);
+  if (magnitude > 1) {
+    x /= magnitude;
+    y /= magnitude;
+    z /= magnitude;
+  }
+  const canonical = (component: number): number => {
+    const scaled = component * maximumSpeedMps;
+    return Math.abs(scaled) < Number.EPSILON ? 0 : scaled;
+  };
+  return Object.freeze([canonical(x), canonical(y), canonical(z)] as const);
 }

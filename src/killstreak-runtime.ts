@@ -17,6 +17,8 @@ import {
   supportGunDamageAtDistance,
   type DroneGunProfile,
 } from './killstreak-support-catalog';
+import { DRONE_SWARM_ENGAGEMENT_FORMATION, droneSwarmEngagementPoint } from './killstreak-drone-formation';
+import { pilotedDroneWorldVelocity } from './killstreak-drone-input';
 import { supportForwardFromYawPitch, supportYawForDirection } from './support-forward-axis';
 
 export const ADRENALINE_DURATION_MS = 15_000;
@@ -1428,6 +1430,7 @@ export class HostKillstreakRuntime {
       else if (entity.kind === 'chopper') this.advanceChopper(entity, canonicalNowMs, dt, world, damageEvents);
       else this.advanceDrone(entity, canonicalNowMs, dt, world, damageEvents);
     }
+    this.enforceSwarmSeparation(dt, world);
     // Recipient admission is keyed by this aggregate revision. Every mutable
     // host step advances it so reordered snapshots cannot roll pose/ammo/fuel
     // backwards while carrying an equal top-level revision.
@@ -1612,18 +1615,16 @@ export class HostKillstreakRuntime {
       return;
     }
     if (playerControlled) {
-      const forward = supportForwardFromYawPitch(entity.yaw, entity.pitch);
-      const speed = DRONE_DEPLOYMENT_POLICY.manualHorizontalSpeedMps * entity.thrust;
-      // Level right vector for full quadcopter strafing: at yaw 0 forward is
-      // negative Z, so right is positive X. Without this axis the drone could
-      // only travel forward/back along its look direction.
-      const rightX = Math.cos(entity.yaw);
-      const rightZ = -Math.sin(entity.yaw);
-      const strafeSpeed = DRONE_DEPLOYMENT_POLICY.manualHorizontalSpeedMps * entity.strafe;
+      const velocity = pilotedDroneWorldVelocity({
+        yaw: entity.yaw,
+        pitch: entity.pitch,
+        axes: { thrust: entity.thrust, strafe: entity.strafe, vertical: entity.vertical },
+        maximumSpeedMps: DRONE_DEPLOYMENT_POLICY.manualHorizontalSpeedMps,
+      });
       const desired: [number, number, number] = [
-        clamp(entity.position[0] + (forward[0] * speed + rightX * strafeSpeed) * dt, world.bounds.minX + 0.35, world.bounds.maxX - 0.35),
-        clamp(entity.position[1] + (forward[1] * speed + entity.vertical * DRONE_DEPLOYMENT_POLICY.manualVerticalSpeedMps) * dt, world.bounds.floorY + 0.5, world.bounds.ceilingY - 0.5),
-        clamp(entity.position[2] + (forward[2] * speed + rightZ * strafeSpeed) * dt, world.bounds.minZ + 0.35, world.bounds.maxZ - 0.35),
+        clamp(entity.position[0] + velocity[0] * dt, world.bounds.minX + 0.35, world.bounds.maxX - 0.35),
+        clamp(entity.position[1] + velocity[1] * dt, world.bounds.floorY + 0.5, world.bounds.ceilingY - 0.5),
+        clamp(entity.position[2] + velocity[2] * dt, world.bounds.minZ + 0.35, world.bounds.maxZ - 0.35),
       ];
       const previous: SupportVec3 = [...entity.position];
       const next = resolveFlightPosition(previous, desired, 0.35, world);
@@ -1705,16 +1706,23 @@ export class HostKillstreakRuntime {
           const dy = target.position[1] + 1.5 - entity.position[1];
           const dz = target.position[2] - entity.position[2];
           const range = Math.max(0.001, Math.hypot(dx, dy, dz));
-          if (range > 7) this.moveDroneToward(
-            entity,
-            [target.position[0], target.position[1] + 1.5, target.position[2]],
-            entity.mode === 'piloted'
-              ? DRONE_DEPLOYMENT_POLICY.autonomousStandaloneSpeedMps
-              : 8,
-            7,
-            dt,
-            world,
-          );
+          if (entity.mode === 'swarm' && entity.swarmOrdinal !== null) {
+            const engagementPoint = droneSwarmEngagementPoint(target.position, {
+              activationId: entity.activationId,
+              targetId: target.id,
+              ordinal: entity.swarmOrdinal,
+            });
+            this.moveDroneToward(entity, engagementPoint, 8, 1, dt, world);
+          } else if (range > 7) {
+            this.moveDroneToward(
+              entity,
+              [target.position[0], target.position[1] + 1.5, target.position[2]],
+              DRONE_DEPLOYMENT_POLICY.autonomousStandaloneSpeedMps,
+              7,
+              dt,
+              world,
+            );
+          }
           const canHit = range <= gunProfile.maximumRangeM && lineOfSight(world, entity.position, target.position);
           const canFireOwnGun = canHit && nowMs >= entity.nextShotAtMs && entity.magazine > 0;
           const fireLaneAdmitted = entity.mode !== 'swarm' || this.claimSwarmFireLane(entity, nowMs, canFireOwnGun);
@@ -1818,6 +1826,76 @@ export class HostKillstreakRuntime {
     ];
     entity.position = [...next];
     entity.attitude = attitudeFromMotion(previous, next, entity.attitude);
+  }
+
+  private enforceSwarmSeparation(dt: number, world: KillstreakWorld): void {
+    if (dt <= 0) return;
+    const swarms = new Map<string, DroneEntity[]>();
+    for (const entity of this.entities.values()) {
+      if (entity.kind !== 'drone' || entity.mode !== 'swarm' || entity.swarmOrdinal === null) continue;
+      const group = swarms.get(entity.activationId) ?? [];
+      group.push(entity);
+      swarms.set(entity.activationId, group);
+    }
+    const minimum = DRONE_SWARM_ENGAGEMENT_FORMATION.minimumDesignedSeparationM;
+    for (const members of swarms.values()) {
+      members.sort((left, right) => left.swarmOrdinal! - right.swarmOrdinal! || left.id.localeCompare(right.id));
+      // A bounded deterministic relaxation prevents converging flight paths
+      // from stacking even before every drone reaches its authored slot.
+      for (let pass = 0; pass < 6; pass += 1) {
+        let adjusted = false;
+        for (let leftIndex = 0; leftIndex < members.length; leftIndex += 1) {
+          for (let rightIndex = leftIndex + 1; rightIndex < members.length; rightIndex += 1) {
+            const left = members[leftIndex]!;
+            const right = members[rightIndex]!;
+            let dx = right.position[0] - left.position[0];
+            let dy = right.position[1] - left.position[1];
+            let dz = right.position[2] - left.position[2];
+            let range = Math.hypot(dx, dy, dz);
+            if (range >= minimum) continue;
+            adjusted = true;
+            if (range < 0.0001) {
+              const phase = ((left.swarmOrdinal! * 17 + right.swarmOrdinal! * 31) % DRONE_SWARM_COUNT)
+                / DRONE_SWARM_COUNT * Math.PI * 2;
+              dx = Math.cos(phase);
+              dy = 0;
+              dz = Math.sin(phase);
+              range = 1;
+            }
+            const correction = (minimum - Math.min(range, minimum)) * 0.5;
+            const nx = dx / range;
+            const ny = dy / range;
+            const nz = dz / range;
+            const leftBefore: SupportVec3 = [...left.position];
+            const rightBefore: SupportVec3 = [...right.position];
+            const leftNext = resolveFlightPosition(leftBefore, [
+              left.position[0] - nx * correction,
+              left.position[1] - ny * correction,
+              left.position[2] - nz * correction,
+            ], 0.35, world);
+            const rightNext = resolveFlightPosition(rightBefore, [
+              right.position[0] + nx * correction,
+              right.position[1] + ny * correction,
+              right.position[2] + nz * correction,
+            ], 0.35, world);
+            const inverseDt = 1 / Math.max(dt, 0.001);
+            left.velocity = [
+              left.velocity[0] + (leftNext[0] - leftBefore[0]) * inverseDt,
+              left.velocity[1] + (leftNext[1] - leftBefore[1]) * inverseDt,
+              left.velocity[2] + (leftNext[2] - leftBefore[2]) * inverseDt,
+            ];
+            right.velocity = [
+              right.velocity[0] + (rightNext[0] - rightBefore[0]) * inverseDt,
+              right.velocity[1] + (rightNext[1] - rightBefore[1]) * inverseDt,
+              right.velocity[2] + (rightNext[2] - rightBefore[2]) * inverseDt,
+            ];
+            left.position = leftNext;
+            right.position = rightNext;
+          }
+        }
+        if (!adjusted) break;
+      }
+    }
   }
 
   private claimSwarmFireLane(entity: DroneEntity, nowMs: number, canHit: boolean): boolean {

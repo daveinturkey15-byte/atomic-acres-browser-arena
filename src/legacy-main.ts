@@ -188,7 +188,7 @@ import {
   glassAuthorityProjection,
   type GlassImpactProfile,
 } from './glass-authority';
-import { activeSoloBotTarget, arenaSelection, type ArenaId, type ArenaSelection } from './map-selection';
+import { activeSoloBotTarget, arenaSelection, soloLaunchLabel, type ArenaId, type ArenaSelection } from './map-selection';
 import { headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, tacticalMapToWorld, worldToMinimap, worldToTacticalMap, type MinimapLandmarkKind } from './minimap';
 import { authoredElevationAt, authoredVerticalRouteTarget, type ArenaVerticalNavigation } from './vertical-navigation';
 import { sourceScreenAngle } from './directional-hud';
@@ -197,7 +197,14 @@ import { arenaZoneLabel, classifyArenaZone } from './arena-storytelling';
 import { routeIdentityTelemetry } from './world-identity';
 import { damageNumberPresentation, roundStatSummary } from './player-feedback';
 import { SupportDamageFeedbackTelemetry, projectSupportDamageAnchor, type SupportDamageScreenAnchor } from './support-damage-feedback';
-import { primaryInteraction, type InteractionCandidate } from './interaction-arbitration';
+import { isHoldInteraction, primaryInteraction, type InteractionCandidate } from './interaction-arbitration';
+import {
+  createFInteractionPressState,
+  fInteractionHoldProgress,
+  reduceFInteractionPress,
+  type FInteractionCancelReason,
+  type FInteractionPressState,
+} from './interaction-press-lifecycle';
 import { LEADERBOARD_SEASON } from '../shared/leaderboard-season';
 import { createWorldIdentityPresentation, setWorldIdentityHouseShellPresentation, type WorldIdentityPresentation } from './world-identity-presentation';
 import { matchPresentationAt, respawnPresentation } from './match-presentation';
@@ -2764,6 +2771,9 @@ let lastBotEliminationProfile = {
   totalSyncMs: 0,
 };
 let killstreakMatchEpoch = 0;
+let fInteractionPressState: FInteractionPressState = createFInteractionPressState();
+let fInteractionPressSequence = 0;
+let lastFInteractionTransition: ReturnType<typeof reduceFInteractionPress> | null = null;
 let killstreakRuntime = new HostKillstreakRuntime(killstreakMatchEpoch);
 let killstreakActivationSequence = 0;
 let killstreakControlSequence = 0;
@@ -3449,6 +3459,7 @@ function interruptReload(force = false, now = performance.now()): void {
 }
 
 function clearGameplayInput(): void {
+  cancelFInteractionPress('manual-reset');
   releaseCareCapture();
   interruptReload(false);
   keys.clear();
@@ -6854,6 +6865,7 @@ function applyDamage(
   }
   if (player.hp <= 0) {
     interruptReload(true, now);
+    cancelFInteractionPress('death', now);
     player.alive = false;
     player.deaths += 1;
     if (network.role !== 'client') {
@@ -6966,14 +6978,17 @@ function interactWithGunRangeArmory(now = performance.now()): boolean {
   return true;
 }
 
-function interactWithWeaponPickup(now = performance.now()): boolean {
+function interactWithWeaponPickup(now = performance.now(), expectedTargetId?: string): boolean {
+  if (expectedTargetId && !fInteractionCandidates(now).some((candidate) => (
+    candidate.kind === 'weapon-pickup' && candidate.targetId === expectedTargetId && candidate.enabled !== false
+  ))) return false;
   return interactWithRailgunPickup(now) || interactWithGunRangeArmory(now) || interactWithDeathDrop(now);
 }
 
-function interactWithShedDoor(): boolean {
+function interactWithShedDoor(expectedPlacementId?: string): boolean {
   if (!interactiveWorldRuntime || !player.alive || matchState.phase !== 'active') return false;
   const nearest = interactiveWorldRuntime.nearestDoor(player.position);
-  if (!nearest || nearest.distance > 2.35) return false;
+  if (!nearest || nearest.distance > 2.35 || (expectedPlacementId && nearest.placementId !== expectedPlacementId)) return false;
   const actionSequence = interactiveWorldRuntime.nextInteractionSequence(nearest.placementId, player.id);
   if (actionSequence === null) return false;
   if (network.role === 'client') {
@@ -7128,15 +7143,15 @@ function updateDeathDrops(now: number): void {
   const prompt = element<HTMLElement>('#pickup-prompt');
   prompt.hidden = !nearbyRailgun && !nearby && !nearbyStation;
   if (nearbyRailgun) {
-    prompt.querySelector<HTMLElement>('span')!.textContent = 'PICK UP';
+    prompt.querySelector<HTMLElement>('span')!.textContent = 'TAP · PICK UP';
     prompt.querySelector<HTMLElement>('strong')!.textContent = WEAPONS.railgun.name.toUpperCase();
   } else if (nearbyStation) {
     const replenish = rangePrimaryUnlocked && nearbyStation.weapon === player.primaryWeapon;
-    prompt.querySelector<HTMLElement>('span')!.textContent = replenish ? 'REFILL' : 'EQUIP';
+    prompt.querySelector<HTMLElement>('span')!.textContent = replenish ? 'TAP · REFILL' : 'TAP · EQUIP';
     prompt.querySelector<HTMLElement>('strong')!.textContent = WEAPONS[nearbyStation.weapon].name.toUpperCase();
   } else if (nearby) {
     const replenish = nearby.weapon === player.primaryWeapon;
-    prompt.querySelector<HTMLElement>('span')!.textContent = replenish ? 'REPLENISH' : 'PICK UP';
+    prompt.querySelector<HTMLElement>('span')!.textContent = replenish ? 'TAP · REPLENISH' : 'TAP · PICK UP';
     prompt.querySelector<HTMLElement>('strong')!.textContent = WEAPONS[nearby.weapon].name.toUpperCase();
   }
 }
@@ -7708,6 +7723,7 @@ function processDeath(message: DeathMessage): void {
   if (message.victim === player.id && player.alive) {
     const now = performance.now();
     interruptReload(true, now);
+    cancelFInteractionPress('death', now);
     clearLocalFlashPresentation();
     player.hp = 0;
     player.alive = false;
@@ -8175,6 +8191,7 @@ function presentActiveMatchBackdrop(reason: 'escape' | 'debug-pause'): boolean {
 
 function openActiveMatchPause(reason: 'escape' | 'debug-pause'): void {
   if (!gameStarted || !player.alive || matchFinished || menuLifecycle.surface === 'paused-match') return;
+  cancelFInteractionPress('pause');
   clearGameplayInput();
   presentActiveMatchBackdrop(reason);
   applyMenuLifecycle({ type: 'pause-requested', reason });
@@ -8356,6 +8373,7 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   gamepadSupportSelection = frozenKillstreakLoadout.slots[0];
   syncFieldSupportRows(frozenKillstreakLoadout);
   killstreakMenuBinding.setMatchActive(true);
+  cancelFInteractionPress('epoch-change');
   killstreakMatchEpoch = mode === 'solo'
     ? killstreakMatchEpoch + 1
     : Math.max(1, Math.floor(privateMatchActiveAtEpochMs ?? Date.now()) % 1_000_000_000);
@@ -12126,8 +12144,8 @@ function updateSupportStatusHud(): void {
     element<HTMLElement>('#support-platform-altitude').textContent = `${Math.max(0, Math.round(ownedSupport.position[1] - (arena.bounds.minY ?? 0)))}`;
     element<HTMLElement>('#support-platform-speed').textContent = String(Math.round(Math.hypot(ownedSupport.velocity[0], ownedSupport.velocity[1], ownedSupport.velocity[2])));
     element<HTMLElement>('#support-control-action').textContent = possession
-      ? 'F EXIT · AI FLIGHT CONTINUES'
-      : ownedSupport.mode === 'swarm' ? 'AUTONOMOUS TARGETING' : 'F ENTER · AI FLIGHT CONTINUES';
+      ? 'HOLD F · EXIT · AI FLIGHT CONTINUES'
+      : ownedSupport.mode === 'swarm' ? 'AUTONOMOUS TARGETING' : 'HOLD F · ENTER · AI FLIGHT CONTINUES';
   }
   element<HTMLElement>('#chopper-damage-dealt').textContent = String(Math.round(
     ownedSupport ? supportDamageDealtByActivation.get(ownedSupport.activationId) ?? 0 : 0,
@@ -12140,8 +12158,8 @@ function refreshSupportStatusHud(now: number, force = false): void {
   updateSupportStatusHud();
 }
 
-function selectedFInteraction(now = performance.now()): InteractionCandidate | null {
-  if (!player.alive || matchState.phase !== 'active') return null;
+function fInteractionCandidates(now = performance.now()): readonly InteractionCandidate[] {
+  if (!player.alive || matchState.phase !== 'active') return [];
   const candidates: InteractionCandidate[] = [];
   const actor = localKillstreakActorSnapshot();
   if (actor?.possession) {
@@ -12198,13 +12216,68 @@ function selectedFInteraction(now = performance.now()): InteractionCandidate | n
   if (railgun) candidates.push({ kind: 'weapon-pickup', targetId: 'railgun', proximityM: 0, prompt: `PICK UP ${WEAPONS.railgun.name.toUpperCase()}` });
   else if (station) candidates.push({ kind: 'weapon-pickup', targetId: `station:${station.weapon}`, proximityM: 0, prompt: `${rangePrimaryUnlocked && station.weapon === player.primaryWeapon ? 'REFILL' : 'EQUIP'} ${WEAPONS[station.weapon].name.toUpperCase()}` });
   else if (drop) candidates.push({ kind: 'weapon-pickup', targetId: drop.id, proximityM: Math.hypot(drop.position.x - player.position.x, drop.position.y - player.position.y, drop.position.z - player.position.z), prompt: `${drop.weapon === player.primaryWeapon ? 'REPLENISH' : 'PICK UP'} ${WEAPONS[drop.weapon].name.toUpperCase()}` });
-  return primaryInteraction(candidates);
+  return candidates;
+}
+
+function selectedFInteraction(now = performance.now()): InteractionCandidate | null {
+  return primaryInteraction(fInteractionCandidates(now));
+}
+
+function applyFInteractionTransition(
+  transition: ReturnType<typeof reduceFInteractionPress>,
+): boolean {
+  if (transition.state !== fInteractionPressState || transition.commit || transition.cancellation) {
+    lastFInteractionTransition = transition;
+  }
+  fInteractionPressState = transition.state;
+  if (!transition.commit) return false;
+  return executePinnedFInteraction(transition.commit.candidate, transition.commit.committedAtMs);
+}
+
+function beginFInteractionPress(now = performance.now()): boolean {
+  return applyFInteractionTransition(reduceFInteractionPress(fInteractionPressState, {
+    type: 'press',
+    pressId: ++fInteractionPressSequence,
+    nowMs: now,
+    matchEpoch: killstreakMatchEpoch,
+    lifeId: localContinuity,
+    inputEligible: gameplayInputEnabled(),
+    candidates: fInteractionCandidates(now),
+  }));
+}
+
+function advanceFInteractionPress(now = performance.now()): boolean {
+  return applyFInteractionTransition(reduceFInteractionPress(fInteractionPressState, {
+    type: 'advance',
+    nowMs: now,
+    matchEpoch: killstreakMatchEpoch,
+    lifeId: localContinuity,
+    inputEligible: gameplayInputEnabled(),
+    candidates: fInteractionCandidates(now),
+  }));
+}
+
+function releaseFInteractionPress(now = performance.now()): boolean {
+  return applyFInteractionTransition(reduceFInteractionPress(fInteractionPressState, {
+    type: 'release',
+    nowMs: now,
+    matchEpoch: killstreakMatchEpoch,
+    lifeId: localContinuity,
+    inputEligible: gameplayInputEnabled(),
+    candidates: fInteractionCandidates(now),
+  }));
+}
+
+function cancelFInteractionPress(reason: FInteractionCancelReason, now = performance.now()): void {
+  if (fInteractionPressState.phase === 'idle') return;
+  applyFInteractionTransition(reduceFInteractionPress(fInteractionPressState, { type: 'cancel', nowMs: now, reason }));
 }
 
 function updateFInteractionPrompt(now = performance.now()): void {
   const supportPrompt = element<HTMLElement>('#support-interaction-prompt');
   const pickupPrompt = element<HTMLElement>('#pickup-prompt');
   if (pointSupportTargeting && !tacticalMapOpen) {
+    cancelFInteractionPress('manual-reset', now);
     supportPrompt.hidden = false;
     pickupPrompt.hidden = true;
     delete supportPrompt.dataset.interactionKind;
@@ -12213,7 +12286,13 @@ function updateFInteractionPrompt(now = performance.now()): void {
     if (label) label.textContent = 'LEFT CLICK or [F] to confirm target  [ESC] to cancel';
     return;
   }
-  const selected = selectedFInteraction(now);
+  advanceFInteractionPress(now);
+  const pressedCandidate = fInteractionPressState.phase === 'pressed'
+    ? fInteractionPressState.holdCandidate ?? fInteractionPressState.tapCandidate
+    : null;
+  const selected = fInteractionPressState.phase === 'committed'
+    ? null
+    : pressedCandidate ?? selectedFInteraction(now);
   const weaponPrompt = selected?.kind === 'weapon-pickup';
   supportPrompt.hidden = !selected || weaponPrompt;
   pickupPrompt.hidden = !selected || !weaponPrompt;
@@ -12221,13 +12300,20 @@ function updateFInteractionPrompt(now = performance.now()): void {
   delete supportPrompt.dataset.targetId;
   delete pickupPrompt.dataset.interactionKind;
   delete pickupPrompt.dataset.targetId;
+  delete supportPrompt.dataset.holdActive;
+  supportPrompt.style.setProperty('--f-hold-progress', '0%');
   if (!selected) return;
   const prompt = weaponPrompt ? pickupPrompt : supportPrompt;
   prompt.dataset.interactionKind = selected.kind;
   prompt.dataset.targetId = selected.targetId;
   if (!weaponPrompt) {
     const label = supportPrompt.querySelector<HTMLElement>('span');
-    if (label) label.textContent = selected.prompt;
+    const holdInteraction = isHoldInteraction(selected.kind);
+    if (label) label.textContent = `${holdInteraction ? 'HOLD F' : 'TAP F'} · ${selected.prompt}`;
+    if (holdInteraction && fInteractionPressState.phase === 'pressed') {
+      supportPrompt.dataset.holdActive = 'true';
+      supportPrompt.style.setProperty('--f-hold-progress', `${(fInteractionHoldProgress(fInteractionPressState, now) * 100).toFixed(1)}%`);
+    }
   }
 }
 
@@ -12609,15 +12695,13 @@ function interactWithSelectedKillstreakSupport(interaction: InteractionCandidate
   return true;
 }
 
-function executePrimaryFInteraction(now = performance.now()): boolean {
-  const interaction = selectedFInteraction(now);
-  if (!interaction) return false;
+function executePinnedFInteraction(interaction: InteractionCandidate, now = performance.now()): boolean {
   if (interaction.kind === 'support-exit'
     || interaction.kind === 'support-enter-drone'
     || interaction.kind === 'support-enter-chopper'
     || interaction.kind === 'care-package') return interactWithSelectedKillstreakSupport(interaction, now);
-  if (interaction.kind === 'shed-door') return interactWithShedDoor();
-  if (interaction.kind === 'weapon-pickup') return interactWithWeaponPickup(now);
+  if (interaction.kind === 'shed-door') return interactWithShedDoor(interaction.targetId);
+  if (interaction.kind === 'weapon-pickup') return interactWithWeaponPickup(now, interaction.targetId);
   return false;
 }
 
@@ -15638,10 +15722,11 @@ window.addEventListener('keydown', (event) => {
     if (event.code === 'KeyG' && !event.repeat) throwGrenade();
   }
   if (event.code === 'KeyF' && !event.repeat) {
+    const now = performance.now();
     if (pointSupportTargeting && !tacticalMapOpen) {
-      confirmCrosshairSupportTarget(performance.now());
+      confirmCrosshairSupportTarget(now);
     } else {
-      executePrimaryFInteraction();
+      beginFInteractionPress(now);
     }
   }
   if (event.code === 'Tab') {
@@ -15651,11 +15736,13 @@ window.addEventListener('keydown', (event) => {
   }
 });
 window.addEventListener('keyup', (event) => {
+  if (event.code === 'KeyF') releaseFInteractionPress(performance.now());
   keys.delete(event.code);
   if (event.code === 'Tab') element<HTMLElement>('#roster').hidden = true;
 });
 window.addEventListener('blur', () => {
   lastWindowBlurAt = performance.now();
+  cancelFInteractionPress('blur', lastWindowBlurAt);
   applyMenuLifecycle({ type: 'focus-lost' });
   reconcilePresentationScheduling('window focus lost');
 });
@@ -15760,7 +15847,7 @@ function syncArenaSelectionUi(): void {
   const soloButton = element<HTMLButtonElement>('#solo');
   const hostButton = element<HTMLButtonElement>('#host');
   const joinButton = element<HTMLButtonElement>('#join');
-  soloButton.textContent = selectedArena.id === 'gun-range' ? 'START RANGE' : selectedArena.id === 'rustworks-1v1' ? '1 BOT SKIRMISH' : 'BOT SKIRMISH';
+  soloButton.textContent = soloLaunchLabel(selectedArena);
   hostButton.textContent = 'HOST LOBBY';
   soloButton.disabled = !arenaSelectionReady;
   hostButton.disabled = !arenaSelectionReady || !selectedArena.multiplayer || !webRtcSupported;
@@ -17854,6 +17941,13 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       streak: localFieldSupportProjection().streak,
       rewardCycle: localFieldSupportProjection().rewardCycle,
       careCapture: { status: localCareCaptureState.status, heldCrateId: careCaptureCrateId(localCareCaptureState) },
+      fInteraction: {
+        state: fInteractionPressState,
+        lastCancellation: lastFInteractionTransition?.cancellation ?? null,
+        lastCommit: lastFInteractionTransition?.commit ?? null,
+        inputEligible: gameplayInputEnabled(),
+        candidates: fInteractionCandidates(performance.now()).map((candidate) => ({ ...candidate })),
+      },
       bestStreakThisMatch,
       available: { ...localFieldSupportProjection().available },
       availableCharges: { ...localFieldSupportProjection().availableCharges },

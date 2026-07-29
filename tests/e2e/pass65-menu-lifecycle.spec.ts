@@ -525,29 +525,37 @@ test.describe('Pass 65 active-match menu lifecycle', () => {
         phase: crate?.phase ?? null,
         heldCrateId: snapshot.fieldSupport.careCapture.heldCrateId,
         rewards: snapshot.killstreak.actors[0]?.revealedCareRewards.length ?? 0,
+        fInteraction: snapshot.fieldSupport.fInteraction,
       };
     });
 
     await expect.poll(careState, { timeout: 10_000 }).toMatchObject({ phase: 'landed', heldCrateId: null, rewards: 0 });
     await expect(page.locator('#support-interaction-prompt')).toBeVisible();
-    await expect(page.locator('#support-interaction-prompt')).toContainText('COLLECT KILLSTREAK');
+    await expect(page.locator('#support-interaction-prompt')).toContainText('TAP F · COLLECT KILLSTREAK');
 
-    await page.keyboard.down('f');
-    await expect.poll(careState).toMatchObject({ phase: 'capturing', rewards: 0 });
-    await page.keyboard.up('f');
+    const tapLifecycle = await page.evaluate(() => {
+      const debug = window.__ATOMIC_ACRES_DEBUG__;
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyF', key: 'f', bubbles: true }));
+      const down = (debug.snapshot() as any).fieldSupport.fInteraction;
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyF', key: 'f', bubbles: true }));
+      const up = (debug.snapshot() as any).fieldSupport.fInteraction;
+      return { down, up };
+    });
+    expect(tapLifecycle, JSON.stringify(tapLifecycle)).toMatchObject({
+      down: { state: { phase: 'pressed', tapCandidate: { kind: 'care-package' } } },
+      up: { state: { phase: 'idle' }, lastCommit: { phase: 'tap', candidate: { kind: 'care-package' } } },
+    });
     await expect.poll(careState).toMatchObject({ phase: 'capturing', rewards: 0 });
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.damage(5));
     await expect.poll(careState).toMatchObject({ phase: 'landed', heldCrateId: null, rewards: 0 });
 
     await page.keyboard.down('f');
-    await expect.poll(careState).toMatchObject({ phase: 'capturing', rewards: 0 });
     await page.evaluate(() => window.dispatchEvent(new Event('blur')));
     await expect.poll(careState).toMatchObject({ phase: 'landed', heldCrateId: null, rewards: 0 });
     await page.keyboard.up('f');
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
 
     await page.keyboard.down('f');
-    await expect.poll(careState).toMatchObject({ phase: 'capturing', rewards: 0 });
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.openMenu());
     await expect(page.locator('#menu')).toBeVisible();
     await expect.poll(careState).toMatchObject({ phase: 'landed', heldCrateId: null, rewards: 0 });

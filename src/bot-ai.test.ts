@@ -94,8 +94,8 @@ describe('chooseBotIntent', () => {
     expect(chooseBotIntent({ ...base, lastShotAt: 1_800 }).fire).toBe(false);
   });
 
-  it('uses two deliberately low-damage close-to-medium-range solo opponents', () => {
-    expect(SOLO_BOT_COUNT).toBe(2);
+  it('starts solo skirmishes with one deliberately low-damage close-to-medium-range opponent', () => {
+    expect(SOLO_BOT_COUNT).toBe(1);
     expect(BOT_FIRE_RANGE).toBe(22);
     expect(BOT_REACTION_DELAY).toBeGreaterThanOrEqual(600);
     expect(botAimJitter(8)).toBeLessThan(botAimJitter(16));
@@ -105,18 +105,18 @@ describe('chooseBotIntent', () => {
 
   it('adds ten-defeat reinforcements but caps an uncapped match at six rivals', () => {
     expect(BOT_DEATHS_PER_REINFORCEMENT).toBe(10);
-    expect(soloBotTargetForDeaths(0)).toBe(2);
-    expect(soloBotTargetForDeaths(9)).toBe(2);
-    expect(soloBotTargetForDeaths(10)).toBe(3);
-    expect(soloBotTargetForDeaths(19)).toBe(3);
-    expect(soloBotTargetForDeaths(20)).toBe(4);
-    expect(soloBotTargetForDeaths(29)).toBe(4);
-    expect(soloBotTargetForDeaths(30)).toBe(5);
-    expect(soloBotTargetForDeaths(39)).toBe(5);
-    expect(soloBotTargetForDeaths(40)).toBe(6);
+    expect(soloBotTargetForDeaths(0)).toBe(1);
+    expect(soloBotTargetForDeaths(9)).toBe(1);
+    expect(soloBotTargetForDeaths(10)).toBe(2);
+    expect(soloBotTargetForDeaths(19)).toBe(2);
+    expect(soloBotTargetForDeaths(20)).toBe(3);
+    expect(soloBotTargetForDeaths(29)).toBe(3);
+    expect(soloBotTargetForDeaths(30)).toBe(4);
+    expect(soloBotTargetForDeaths(39)).toBe(4);
+    expect(soloBotTargetForDeaths(40)).toBe(5);
     expect(MAX_SOLO_BOTS).toBe(6);
     expect(soloBotTargetForDeaths(100)).toBe(6);
-    expect(soloBotTargetForDeaths(Number.NaN)).toBe(2);
+    expect(soloBotTargetForDeaths(Number.NaN)).toBe(1);
   });
 
   it('honours reaction delay and accelerates follow-up shots inside a burst', () => {

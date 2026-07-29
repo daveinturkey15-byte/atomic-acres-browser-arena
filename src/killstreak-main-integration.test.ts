@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  primaryHoldInteraction,
   primaryInteraction,
+  primaryTapInteraction,
   type InteractionCandidate,
 } from './interaction-arbitration';
 
@@ -157,31 +159,47 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain('!flightSolids.some((solid) => sphereIntersectsBox(point, 0.35, solid))');
   });
 
-  it('routes F to gun-only chopper handoff, autonomous/manual drone toggle, care capture, or shed interaction before weapon pickup', () => {
-    expect(source).toContain("import { primaryInteraction, type InteractionCandidate } from './interaction-arbitration'");
+  it('routes one pinned F press through release-only taps and one-second support holds', () => {
+    expect(source).toContain("from './interaction-press-lifecycle';");
+    expect(source).toContain('function fInteractionCandidates(');
     expect(source).toContain('function selectedFInteraction(');
-    expect(source).toContain('function executePrimaryFInteraction(');
+    expect(source).toContain('function beginFInteractionPress(');
+    expect(source).toContain('function advanceFInteractionPress(');
+    expect(source).toContain('function releaseFInteractionPress(');
+    expect(source).toContain('function cancelFInteractionPress(');
+    expect(source).toContain('function executePinnedFInteraction(');
     expect(source).toContain("if (event.code === 'KeyF' && !event.repeat) {");
+    expect(source).toContain("if (event.code === 'KeyF') releaseFInteractionPress(performance.now());");
+    expect(source).toContain("cancelFInteractionPress('blur', lastWindowBlurAt);");
+    expect(source).toContain("cancelFInteractionPress('pause');");
+    expect(source).toContain("cancelFInteractionPress('death', now);");
+    expect(source).toContain("cancelFInteractionPress('epoch-change');");
     expect(source).toContain("interaction.kind === 'support-enter-chopper'");
     expect(source).toContain("interaction.kind === 'support-enter-drone'");
     expect(source).toContain("type: 'killstreak-care-capture-intent'");
     expect(source).not.toContain("if (event.code === 'KeyF') releaseCareCapture();");
-    expect(source).toMatch(/function clearGameplayInput\(\): void \{\s+releaseCareCapture\(\);/);
+    expect(source).toMatch(/function clearGameplayInput\(\): void \{\s+cancelFInteractionPress\('manual-reset'\);\s+releaseCareCapture\(\);/);
     expect(source).toContain('if (appliedDamage > 0) releaseCareCapture(now);');
     expect(source).toContain('killstreakRuntime.recordActorDamage(victimId)');
     expect(source).not.toMatch(/!interactWithKillstreakSupport\(\)[\s\S]{0,100}!interactWithShedDoor\(\)/);
+    const keydownStart = source.indexOf("if (event.code === 'KeyF' && !event.repeat) {");
+    const keydownEnd = source.indexOf("\n  if (event.code === 'Tab')", keydownStart);
+    expect(source.slice(keydownStart, keydownEnd)).toContain('beginFInteractionPress(now);');
+    expect(source.slice(keydownStart, keydownEnd)).not.toContain('executePinnedFInteraction(');
   });
 
-  it('integrates one world-over-support F contract for both drone and chopper possession', () => {
+  it('pins an independent nearby-world tap and global support hold from the same keydown', () => {
     const candidate = (kind: InteractionCandidate['kind'], targetId: string, proximityM: number): InteractionCandidate => ({
       kind, targetId, proximityM, prompt: kind,
     });
     for (const supportKind of ['support-exit', 'support-enter-drone', 'support-enter-chopper'] as const) {
       for (const worldKind of ['care-package', 'shed-door', 'weapon-pickup'] as const) {
-        expect(primaryInteraction([
+        const candidates = [
           candidate(supportKind, `support-${supportKind}`, 0),
           candidate(worldKind, `world-${worldKind}`, 1),
-        ])).toMatchObject({ kind: worldKind });
+        ];
+        expect(primaryTapInteraction(candidates)).toMatchObject({ kind: worldKind });
+        expect(primaryHoldInteraction(candidates)).toMatchObject({ kind: supportKind });
       }
     }
     expect(primaryInteraction([
@@ -196,7 +214,7 @@ describe('Pass 65 playable killstreak integration', () => {
   });
 
   it('offers only claimable landed crates and correlates pending, acknowledged, released and rejected capture state', () => {
-    const selectionStart = source.indexOf('function selectedFInteraction(');
+    const selectionStart = source.indexOf('function fInteractionCandidates(');
     const selectionEnd = source.indexOf('\nfunction updateFInteractionPrompt(', selectionStart);
     const selectionBlock = source.slice(selectionStart, selectionEnd);
     expect(selectionBlock).toContain('const activeCareCrateId = careCaptureCrateId(localCareCaptureState);');
@@ -204,7 +222,7 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(selectionBlock).not.toContain("crate.phase !== 'capturing'");
 
     const interactionStart = source.indexOf('function interactWithSelectedKillstreakSupport(');
-    const interactionEnd = source.indexOf('\nfunction executePrimaryFInteraction(', interactionStart);
+    const interactionEnd = source.indexOf('\nfunction executePinnedFInteraction(', interactionStart);
     const interactionBlock = source.slice(interactionStart, interactionEnd);
     expect(interactionBlock).toContain("if (!crate || crate.phase !== 'landed' || localCareCaptureState.status !== 'idle') return false;");
     expect(interactionBlock).toContain('const requested = requestCareCapture(localCareCaptureState, {');

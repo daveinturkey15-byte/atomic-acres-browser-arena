@@ -256,8 +256,8 @@ describe('drone centre-map deployment and movement', () => {
       manualEnd[1] - manualStart[1],
       manualEnd[2] - manualStart[2],
     );
-    expect(autonomousDistance).toBeCloseTo(2, 8);
-    expect(manualDistance).toBeCloseTo(1, 8);
+    expect(autonomousDistance).toBeCloseTo(0.6, 8);
+    expect(manualDistance).toBeCloseTo(0.3, 8);
     expect(autonomousDistance).toBeCloseTo(manualDistance * 2, 8);
 
     expect(manual.control({
@@ -293,14 +293,14 @@ describe('drone centre-map deployment and movement', () => {
     const forward = move(1);
     const reverse = move(-1);
     expect(forward[0]).toBeCloseTo(0, 8);
-    expect(forward[1]).toBeCloseTo(0.5, 8);
-    expect(forward[2]).toBeCloseTo(-Math.sqrt(3) / 2, 8);
+    expect(forward[1]).toBeCloseTo(0.15, 8);
+    expect(forward[2]).toBeCloseTo(-Math.sqrt(3) * 0.15, 8);
     expect(reverse[0]).toBeCloseTo(-forward[0], 8);
     expect(reverse[1]).toBeCloseTo(-forward[1], 8);
     expect(reverse[2]).toBeCloseTo(-forward[2], 8);
   });
 
-  it('keeps autonomous standalone no-target patrol at the same canonical 20m/s', () => {
+  it('keeps autonomous standalone no-target patrol at the canonical 6m/s', () => {
     const bounds = supportMapBounds[2];
     const noTargetWorld = world(bounds, [
       { id: 'owner', kind: 'player' as const, team: 0 as const, lifeId: 1, alive: true, position: [0, 1.7, 0] as const },
@@ -317,7 +317,30 @@ describe('drone centre-map deployment and movement', () => {
       end[0] - start[0],
       end[1] - start[1],
       end[2] - start[2],
-    )).toBeCloseTo(2, 8);
+    )).toBeCloseTo(0.6, 8);
+  });
+
+  it('keeps all 24 Swarm units separated in deterministic clusters while engaging one target', () => {
+    const bounds = supportMapBounds[0];
+    const target = { id: 'enemy', kind: 'player' as const, team: 1 as const, lifeId: 2, alive: true, position: [0, 1.7, 0] as const };
+    const supportWorld = world(bounds, [
+      { id: 'owner', kind: 'player' as const, team: 0 as const, lifeId: 1, alive: true, position: [0, 1.7, -20] as const },
+      target,
+    ]);
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'drone-swarm']));
+    earn(runtime, 15);
+    expect(runtime.activate(intent('drone-swarm', 5), 1_000, supportWorld).accepted).toBe(true);
+    runtime.advance(1_000, supportWorld);
+    for (let now = 1_100; now <= 9_000; now += 100) runtime.advance(now, supportWorld);
+    const positions = runtime.snapshotFor('owner', 9_000).entities.map((entity) => entity.position);
+    expect(positions).toHaveLength(DRONE_SWARM_COUNT);
+    expect(new Set(positions.map((position) => position.map((value) => value.toFixed(4)).join(':'))).size)
+      .toBe(DRONE_SWARM_COUNT);
+    expect(minimumPairDistance(positions)).toBeGreaterThan(1.25);
+    const spreadCentre = centroid(positions);
+    expect(spreadCentre[0]).toBeCloseTo(target.position[0], 0);
+    expect(spreadCentre[2]).toBeCloseTo(target.position[2], 0);
   });
 
   it('commits Carpet Bomber through the same admitted ground-X lifecycle before its visible aircraft moves', () => {

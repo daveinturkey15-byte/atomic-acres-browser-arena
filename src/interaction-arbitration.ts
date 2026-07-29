@@ -14,6 +14,9 @@ export type InteractionCandidate = Readonly<{
   enabled?: boolean;
 }>;
 
+export type TapInteractionKind = Extract<InteractionKind, 'care-package' | 'shed-door' | 'weapon-pickup'>;
+export type HoldInteractionKind = Exclude<InteractionKind, TapInteractionKind>;
+
 const INTERACTION_PRIORITY: Readonly<Record<InteractionKind, number>> = Object.freeze({
   // An eligible nearby world action always owns F before a support toggle.
   // Support enter/exit remains globally available when no world candidate wins.
@@ -37,6 +40,23 @@ export function primaryInteraction(candidates: readonly InteractionCandidate[]):
     .sort((left, right) => INTERACTION_PRIORITY[right.kind] - INTERACTION_PRIORITY[left.kind]
       || left.proximityM - right.proximityM
       || left.targetId.localeCompare(right.targetId))[0] ?? null;
+}
+
+export function isTapInteraction(kind: InteractionKind): kind is TapInteractionKind {
+  return kind === 'care-package' || kind === 'shed-door' || kind === 'weapon-pickup';
+}
+
+export function isHoldInteraction(kind: InteractionKind): kind is HoldInteractionKind {
+  return !isTapInteraction(kind);
+}
+
+/** Tap and hold pin separate winners on the same keydown. */
+export function primaryTapInteraction(candidates: readonly InteractionCandidate[]): InteractionCandidate | null {
+  return primaryInteraction(candidates.filter((candidate) => isTapInteraction(candidate.kind)));
+}
+
+export function primaryHoldInteraction(candidates: readonly InteractionCandidate[]): InteractionCandidate | null {
+  return primaryInteraction(candidates.filter((candidate) => isHoldInteraction(candidate.kind)));
 }
 
 export function interactionPriority(kind: InteractionKind): number {

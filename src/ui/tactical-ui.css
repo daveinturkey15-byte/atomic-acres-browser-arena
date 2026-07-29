@@ -2897,13 +2897,34 @@
 
   #support-combat-feedback { top: 18%; }
   #adrenaline-hud { top: 24%; border-color: var(--ui-amber); }
-  #support-interaction-prompt { bottom: 20%; grid-template-columns: auto auto; align-items: center; }
+  #support-interaction-prompt {
+    --f-hold-progress: 0%;
+    bottom: 20%;
+    grid-template-columns: auto auto;
+    align-items: center;
+  }
   #support-combat-feedback small,
   #adrenaline-hud small,
   #support-interaction-prompt span { color: var(--hud-muted); font: 800 9px/1 var(--ui-copy); letter-spacing: 0.12em; }
   #support-combat-feedback strong,
   #adrenaline-hud strong { font: 900 22px/1 var(--ui-display); letter-spacing: 0.08em; }
   #support-interaction-prompt kbd { padding: 7px 10px; background: var(--ui-cyan); color: #061014; font: 900 14px/1 var(--ui-copy); }
+  #support-interaction-prompt .f-hold-progress {
+    grid-column: 1 / -1;
+    width: 100%;
+    height: 3px;
+    overflow: hidden;
+    background: rgba(83, 237, 255, 0.16);
+    opacity: 0;
+  }
+  #support-interaction-prompt[data-hold-active="true"] .f-hold-progress { opacity: 1; }
+  #support-interaction-prompt .f-hold-progress b {
+    display: block;
+    width: var(--f-hold-progress);
+    height: 100%;
+    background: linear-gradient(90deg, var(--ui-cyan), #8effc6);
+    box-shadow: 0 0 12px rgba(83, 237, 255, 0.7);
+  }
 
   #support-combat-feedback {
     top: clamp(18px, 4vh, 48px);

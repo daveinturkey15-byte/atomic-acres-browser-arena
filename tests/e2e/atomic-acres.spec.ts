@@ -959,7 +959,7 @@ test.describe('boot and authored presentation', () => {
 
   test('menu exposes controls and accessibility settings', async ({ page }) => {
     await pageReady(page);
-    await expect(page.locator('#solo')).toHaveText('BOT SKIRMISH');
+    await expect(page.locator('#solo')).toHaveText('1 BOT SKIRMISH');
     await page.getByRole('tab', { name: 'OPTIONS' }).click();
     await expect(page.locator('#sensitivity')).toBeVisible();
     await expect(page.locator('#controller-sensitivity')).toBeVisible();
@@ -2697,7 +2697,7 @@ test.describe('solo mechanics', () => {
   });
 
   test('HUD reports match, stance, equipment and bots in roster', async ({ page }) => {
-    await expect(page.locator('#connection-pill')).toHaveText('BOT SKIRMISH');
+    await expect(page.locator('#connection-pill')).toHaveText('1V1 BOT');
     await expect(page.locator('#objective')).toContainText('FIVE MINUTES · MOST KILLS WINS');
     await expect(page.locator('#grenades')).toHaveText('FRAG ×1');
     await expect(page.locator('#minimap')).toBeVisible();

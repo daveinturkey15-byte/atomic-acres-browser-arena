@@ -37,7 +37,7 @@ export type BotIntent = {
   changeWaypoint: boolean;
 };
 
-export const SOLO_BOT_COUNT = 2;
+export const SOLO_BOT_COUNT = 1;
 export const MAX_SOLO_BOTS = 6;
 export const BOT_DEATHS_PER_REINFORCEMENT = 10;
 export const BOT_FIRE_RANGE = 22;

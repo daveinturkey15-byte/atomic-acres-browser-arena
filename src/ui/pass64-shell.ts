@@ -2,7 +2,7 @@ import { WEAPONS } from '../gameplay';
 import { FIELD_KITS } from '../loadout';
 import { WEAPON_CATALOG } from '../combat/weapon-catalog';
 import { GRENADE_CATALOG } from '../combat/grenade-catalog';
-import { ARENA_SELECTIONS } from '../map-selection';
+import { ARENA_SELECTIONS, soloLaunchLabel } from '../map-selection';
 import { CHAT_TEXT_MAX_CHARS } from '../text-chat';
 import { AUDIO_BUS_IDS } from '../pass65-settings';
 import { PASS65_KILLSTREAK_CATALOG } from '../killstreak-catalog';
@@ -113,7 +113,7 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
       <div class="menu-actions">
         <button id="resume" class="primary" hidden>RETURN TO MATCH</button>
         <button id="main-menu" hidden>MAIN MENU · CHANGE MAP</button>
-        <button id="solo" class="primary">BOT SKIRMISH</button>
+        <button id="solo" class="primary">${soloLaunchLabel(ARENA_SELECTIONS[0]!)}</button>
         <button id="host">HOST LOBBY</button>
       </div>
       <div class="join-row"><input id="room-input" placeholder="Paste room code" autocomplete="off"><button id="join">JOIN</button></div>
@@ -322,12 +322,12 @@ function hudMarkup(): string {
         <span>ALT <b id="support-platform-altitude">0</b>M</span><span>SPD <b id="support-platform-speed">0</b></span>
       </div>
       <strong class="support-damage-total"><span id="chopper-damage-dealt">0</span><small> DAMAGE</small></strong>
-      <footer id="support-control-action">F EXIT · AI FLIGHT CONTINUES</footer>
+      <footer id="support-control-action">HOLD F · EXIT · AI FLIGHT CONTINUES</footer>
     </section>
     <section id="adrenaline-hud" hidden aria-live="polite">
       <small>ADRENALINE ACTIVE</small><strong><span id="adrenaline-time">15.0</span>S</strong>
     </section>
-    <div id="support-interaction-prompt" hidden><kbd>F</kbd><span>COLLECT KILLSTREAK</span></div>
+    <div id="support-interaction-prompt" hidden><kbd>F</kbd><span>COLLECT KILLSTREAK</span><i class="f-hold-progress" aria-hidden="true"><b></b></i></div>
     <div id="crosshair"><i></i><i></i><i></i><i></i></div><div id="hitmarker">×</div>
     <div id="damage-numbers" aria-live="polite" aria-label="Damage dealt"></div>
     <div id="sniper-scope" hidden aria-label="3x sniper scope"><div class="scope-ring"></div><div class="scope-reticle"><i></i><b></b><span></span><em></em></div><small>3×</small></div>

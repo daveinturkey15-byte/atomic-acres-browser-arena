@@ -107,10 +107,10 @@ export const DRONE_DEPLOYMENT_POLICY = Object.freeze({
   spawnOrigin: 'deterministic-valid-centre-map-volume',
   minimumSpawnSeparationM: 1.15,
   maximumAdmissionProbesPerUnit: 36,
-  manualHorizontalSpeedMps: 10,
-  manualVerticalSpeedMps: 7,
+  manualHorizontalSpeedMps: 3,
+  manualVerticalSpeedMps: 3,
   autonomousStandaloneSpeedMultiplier: 2,
-  autonomousStandaloneSpeedMps: 20,
+  autonomousStandaloneSpeedMps: 6,
   swarmIngressSpeedMps: 22,
   swarmPatrolSpeedMps: 7,
 } as const);

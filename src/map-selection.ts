@@ -40,7 +40,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     titleAccent: 'TOWN',
     menuLede: 'Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 2× Damage Core.',
     summary: 'Authored neighbourhood team arena',
-    rulesLabel: '5 MIN · 2 BOTS · +1 / 10 DEFEATS · MAX 6',
+    rulesLabel: '5 MIN · 1 BOT · +1 / 10 DEFEATS · MAX 6',
     soloBotCount: SOLO_BOT_COUNT,
     maximumSoloBots: MAX_SOLO_BOTS,
     multiplayer: true,
@@ -58,7 +58,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     titleAccent: '',
     menuLede: 'Fight through an original airport concourse and jetliner apron with security chokes, a narrow gangway, and open tarmac sightlines.',
     summary: 'Airport terminal & jetliner apron · private lobbies up to 6',
-    rulesLabel: '5 MIN · HOST UP TO 6 · 2 BOTS SOLO',
+    rulesLabel: '5 MIN · HOST UP TO 6 · 1 BOT SOLO',
     soloBotCount: SOLO_BOT_COUNT,
     maximumSoloBots: MAX_SOLO_BOTS,
     multiplayer: true,
@@ -123,4 +123,9 @@ export function arenaSelection(id: string | null | undefined): ArenaSelection {
 export function activeSoloBotTarget(selection: ArenaSelection, cumulativeDeaths: number): number {
   if (selection.id !== 'atomic-acres') return selection.soloBotCount;
   return Math.min(selection.maximumSoloBots, soloBotTargetForDeaths(cumulativeDeaths));
+}
+
+export function soloLaunchLabel(selection: ArenaSelection): string {
+  if (selection.soloBotCount === 0) return 'START RANGE';
+  return `${selection.soloBotCount} BOT${selection.soloBotCount === 1 ? '' : 'S'} SKIRMISH`;
 }

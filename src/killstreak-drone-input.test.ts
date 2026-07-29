@@ -5,6 +5,7 @@ import {
   applyPilotedDronePointerDelta,
   applyPilotedDroneScreenLookDelta,
   pilotedDroneControlAxes,
+  pilotedDroneWorldVelocity,
 } from './killstreak-drone-input';
 
 describe('piloted drone first-person input contract', () => {
@@ -65,5 +66,40 @@ describe('piloted drone first-person input contract', () => {
     const forward = supportForwardFromYawPitch(pose.yaw, pose.pitch);
     expect(forward[0]).toBeGreaterThan(0);
     expect(forward[1]).toBeGreaterThan(0);
+  });
+
+  it('preserves every signed travel axis and caps diagonals at the manual speed', () => {
+    const velocity = (thrust: number, strafe: number, vertical: number) => pilotedDroneWorldVelocity({
+      yaw: 0,
+      pitch: 0,
+      axes: { thrust, strafe, vertical },
+      maximumSpeedMps: 3,
+    });
+    expect(velocity(1, 0, 0)).toEqual([0, 0, -3]);
+    expect(velocity(-1, 0, 0)).toEqual([0, 0, 3]);
+    expect(velocity(0, 1, 0)).toEqual([3, 0, 0]);
+    expect(velocity(0, -1, 0)).toEqual([-3, 0, 0]);
+    expect(velocity(0, 0, 1)).toEqual([0, 3, 0]);
+    expect(velocity(0, 0, -1)).toEqual([0, -3, 0]);
+    expect(Math.hypot(...velocity(1, 1, 1))).toBeCloseTo(3, 10);
+  });
+
+  it('moves along the full pitched aim vector without inverting forward or reverse', () => {
+    const forward = pilotedDroneWorldVelocity({
+      yaw: -Math.PI / 4,
+      pitch: Math.PI / 6,
+      axes: { thrust: 1, strafe: 0, vertical: 0 },
+      maximumSpeedMps: 3,
+    });
+    const reverse = pilotedDroneWorldVelocity({
+      yaw: -Math.PI / 4,
+      pitch: Math.PI / 6,
+      axes: { thrust: -1, strafe: 0, vertical: 0 },
+      maximumSpeedMps: 3,
+    });
+    expect(forward[0]).toBeGreaterThan(0);
+    expect(forward[1]).toBeGreaterThan(0);
+    expect(forward[2]).toBeLessThan(0);
+    expect(reverse).toEqual(forward.map((value) => -value));
   });
 });

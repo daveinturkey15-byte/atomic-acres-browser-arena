@@ -2624,7 +2624,7 @@
             "multiplayer": true,
             "reinforcementEveryDefeats": 10,
             "scoreLimit": null,
-            "soloBotCount": 2
+            "soloBotCount": 1
           },
           {
             "durationMs": 300000,
@@ -2651,7 +2651,7 @@
             "multiplayer": true,
             "reinforcementEveryDefeats": null,
             "scoreLimit": null,
-            "soloBotCount": 2
+            "soloBotCount": 1
           }
         ],
         "defaultDurationMs": 300000,
@@ -2673,7 +2673,7 @@
         ],
         "spawnIntervalMs": 120000
       },
-      "soloBotCount": 2,
+      "soloBotCount": 1,
       "weapons": [
         {
           "adsRecoilMultiplier": 0.72,

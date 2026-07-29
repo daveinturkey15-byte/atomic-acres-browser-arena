@@ -87,7 +87,9 @@ test('loads and prewarms the exact authored support-vehicle family before deploy
   })).toBe(true);
   await page.waitForFunction(() => (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).killstreak.entities
     .some((entity: any) => entity.kind === 'chopper'));
-  await page.keyboard.press('f');
+  await page.keyboard.down('f');
+  await page.waitForTimeout(1_050);
+  await page.keyboard.up('f');
   await page.waitForFunction(() => Boolean(
     (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).killstreakPresentation.firstPersonSightline,
   ));
