@@ -1,6 +1,7 @@
 import releaseChannelsJson from '../release-channels.json';
 import './style.css';
 import './ui/tactical-ui.css';
+import './ui/pass66-readability.css';
 import {
   releaseChannelDecision,
   stableReleaseUrl,

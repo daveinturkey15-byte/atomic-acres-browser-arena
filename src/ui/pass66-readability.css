@@ -1,0 +1,174 @@
+/*
+ * Pass 66 owner-HITL readability layer.
+ *
+ * This intentionally targets information-dense menu/review surfaces only.
+ * Gameplay HUD anchors keep their dedicated collision/layout contract in
+ * pass65-hud.css; enlarging those globally would recreate the overlaps this
+ * pass is meant to eliminate.
+ */
+:root {
+  --pass66-micro: clamp(10px, 0.62vw, 12px);
+  --pass66-copy: clamp(12px, 0.72vw, 14px);
+  --pass66-label: clamp(13px, 0.78vw, 15px);
+  --pass66-title: clamp(20px, 1.35vw, 28px);
+}
+
+#menu-meta-actions > button,
+#last-updated-btn {
+  min-height: 40px;
+  padding: 11px 15px;
+  font-size: var(--pass66-copy);
+  letter-spacing: 0.08em;
+}
+
+#project-map-panel {
+  width: min(1120px, calc(100vw - 40px));
+  max-height: min(86vh, 860px);
+  padding: clamp(22px, 2vw, 30px);
+  border-color: rgba(104, 231, 224, 0.38);
+  background:
+    radial-gradient(circle at 82% 4%, rgba(88, 227, 220, 0.1), transparent 31%),
+    linear-gradient(145deg, rgba(9, 21, 25, 0.99), rgba(4, 10, 13, 0.995));
+}
+
+.project-map-header small,
+.project-map-intro span small,
+.project-map-pages h3,
+.project-channel-state small,
+.project-node-heading span,
+.project-change-list span,
+.project-archive-list span,
+.project-change-list i,
+.project-archive-list time {
+  font-size: var(--pass66-micro);
+  line-height: 1.25;
+}
+
+.project-map-header strong { font-size: clamp(34px, 2.4vw, 44px); }
+.project-map-meta,
+#project-map-tabs button,
+.project-downloads button,
+.project-channel-state b,
+.project-tree p,
+.project-tree small,
+.project-node-paths code,
+.project-change-list p {
+  font-size: var(--pass66-copy);
+  line-height: 1.5;
+}
+
+.project-map-intro p,
+.project-page-lede,
+.project-boundaries li {
+  font-size: var(--pass66-label);
+  line-height: 1.55;
+}
+
+.project-node-heading strong,
+.project-change-list strong,
+.project-archive-list strong { font-size: var(--pass66-title); }
+
+#project-map-tabs button,
+.project-downloads button,
+#project-map-close { min-height: 42px; }
+
+#changelog-panel {
+  width: min(760px, calc(100vw - 36px));
+  max-height: min(84vh, 820px);
+  padding: clamp(22px, 2vw, 30px);
+  border-color: rgba(104, 231, 224, 0.36);
+  background:
+    radial-gradient(circle at 88% 0, rgba(244, 196, 79, 0.1), transparent 28%),
+    linear-gradient(145deg, rgba(9, 21, 25, 0.99), rgba(4, 10, 13, 0.995));
+}
+
+#changelog-panel .changelog-header small,
+.changelog-entry-pass > b,
+.changelog-entry-head time small,
+.changelog-areas span { font-size: var(--pass66-micro); }
+#changelog-panel .changelog-header strong { font-size: clamp(34px, 2.2vw, 42px); }
+.changelog-lede,
+#changelog-list > li > p,
+#changelog-list > li > ul > li { font-size: var(--pass66-copy); line-height: 1.55; }
+.changelog-lede b,
+.changelog-entry-pass > span,
+.changelog-entry-head time { font-size: var(--pass66-micro); line-height: 1.35; }
+#changelog-list > li > strong { font-size: var(--pass66-title); }
+#changelog-list > li { padding: 16px; }
+
+#private-lobby {
+  gap: 16px;
+  border-color: rgba(0, 109, 116, 0.52);
+  box-shadow: 0 22px 58px rgba(11, 30, 34, 0.18);
+}
+
+.private-lobby-heading small,
+.lobby-settings label,
+.lobby-player small,
+.lobby-player b,
+.lobby-player em,
+.lobby-dhv small,
+.lobby-dhv-badge,
+#lobby-guidance { font-size: var(--pass66-micro); line-height: 1.4; }
+.private-lobby-heading strong { font-size: clamp(34px, 2.3vw, 44px); }
+.lobby-settings select,
+.lobby-dhv select,
+.lobby-player strong,
+.lobby-actions button { font-size: var(--pass66-label); }
+.lobby-settings select,
+.lobby-dhv select,
+.lobby-actions button { min-height: 42px; }
+.lobby-player { min-height: 64px; padding: 10px 12px; }
+
+#last-match-reports {
+  min-height: 58px;
+  gap: 12px;
+  padding: 12px 14px;
+}
+#last-match-reports small { font-size: var(--pass66-micro); }
+#last-match-reports strong { font-size: clamp(18px, 1.25vw, 24px); }
+#last-match-reports button { min-height: 40px; font-size: var(--pass66-copy); }
+
+.kit-heading,
+.options-heading,
+.kit-heading small,
+.kit-card > span,
+.kit-card > b,
+.kit-card i,
+.kit-card em,
+.loadout-manager header span,
+.loadout-manager-grid label,
+.killstreak-slot-card > span,
+.killstreak-slot-card small,
+.killstreak-loadout-status { font-size: var(--pass66-micro); line-height: 1.4; }
+.kit-card p { min-height: 0; font-size: var(--pass66-copy); line-height: 1.5; }
+.kit-card > strong { font-size: clamp(25px, 1.7vw, 32px); }
+.loadout-manager header strong,
+.killstreak-slot-card > strong { font-size: var(--pass66-title); }
+.loadout-manager-grid input,
+.loadout-manager-grid select,
+.loadout-manager-grid button,
+.killstreak-slot-card select { min-height: 42px; font-size: var(--pass66-label); }
+.kit-card,
+.killstreak-slot-card { padding: clamp(15px, 1.25vw, 20px); }
+
+#roster-list > div { min-height: 42px; font-size: var(--pass66-copy); }
+#roster-list strong,
+#roster-list small { font-size: var(--pass66-micro); }
+
+@media (max-width: 700px) {
+  :root {
+    --pass66-micro: 10px;
+    --pass66-copy: 12px;
+    --pass66-label: 13px;
+  }
+
+  #project-map-panel,
+  #changelog-panel { width: calc(100vw - 20px); padding: 18px 15px; }
+  #project-map-panel { max-height: calc(100vh - 20px); }
+  #menu-meta-actions > button,
+  #last-updated-btn { min-height: 38px; padding: 9px 11px; }
+  .project-map-header strong,
+  #changelog-panel .changelog-header strong { font-size: 30px; }
+  .lobby-player { min-height: 58px; }
+}
