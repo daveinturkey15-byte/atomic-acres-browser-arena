@@ -89,6 +89,7 @@ export type PresentationProgressTelemetry = Readonly<{
   maximumSubmissionGapMs: number;
   maximumCompletionGapMs: number;
   maximumPendingForMs: number;
+  maximumCompletionLatencyMs: number;
   submissionPacing: FramePacingSummary;
   completionPacing: FramePacingSummary;
 }>;
@@ -453,6 +454,7 @@ export class LegacyWebGlRenderRuntime {
         maximumSubmissionGapMs: 0,
         maximumCompletionGapMs: 0,
         maximumPendingForMs: 0,
+        maximumCompletionLatencyMs: 0,
         submissionPacing: pacing,
         completionPacing: pacing,
       },
@@ -662,6 +664,7 @@ export class WebGpuRenderRuntime {
   private progressMaximumSubmissionGapMs = 0;
   private progressMaximumCompletionGapMs = 0;
   private progressMaximumPendingForMs = 0;
+  private progressMaximumCompletionLatencyMs = 0;
   private lastSubmittedRenderInfo: RenderInfoSnapshot = Object.freeze({ calls: 0, triangles: 0, points: 0, lines: 0 });
   private lightShadowAutoUpdate = true;
   private lightShadowNeedsUpdate = false;
@@ -690,9 +693,9 @@ export class WebGpuRenderRuntime {
   // Cold shader/shadow compilation on the frozen owner hardware can retire in
   // ~2.4 s. Backpressure still stops new work at 250 ms; twelve seconds matches
   // the explicit cold-generation fence and distinguishes cold work from a hang.
-  // Queue-latency adaptation handles bounded overload before gameplay. Keep
-  // the fatal fence for a genuinely non-progressing device, not a slow frame
-  // that can still retire and trigger a safe quality downshift.
+  // Admission rejects catastrophic completion latency, while bounded Custom
+  // adaptation uses only proven submitted-frame cadence. Keep the live fatal
+  // fence for a genuinely non-progressing device, not an isolated slow frame.
   private static readonly PRESENTATION_STALL_MS = 12_000;
 
   private constructor(
@@ -925,6 +928,7 @@ export class WebGpuRenderRuntime {
         maximumSubmissionGapMs: Math.max(this.progressMaximumSubmissionGapMs, currentSubmissionGapMs),
         maximumCompletionGapMs: Math.max(this.progressMaximumCompletionGapMs, currentCompletionGapMs),
         maximumPendingForMs: Math.max(this.progressMaximumPendingForMs, pendingForMs),
+        maximumCompletionLatencyMs: this.progressMaximumCompletionLatencyMs,
         submissionPacing: this.submissionPacing.summary(),
         completionPacing: this.completionPacing.summary(),
       },
@@ -952,6 +956,7 @@ export class WebGpuRenderRuntime {
     this.progressMaximumPendingForMs = this.pendingCompletionStartedAt === null
       ? 0
       : Math.max(0, now - this.pendingCompletionStartedAt);
+    this.progressMaximumCompletionLatencyMs = 0;
   }
 
   private scheduleCompletionProbe(now: number, force = false): Promise<void> | null {
@@ -986,6 +991,10 @@ export class WebGpuRenderRuntime {
         }
         this.lastCompletedAt = completedAt;
         this.lastCompletionLatencyMs = Math.max(0, completedAt - latencyStartedAt);
+        this.progressMaximumCompletionLatencyMs = Math.max(
+          this.progressMaximumCompletionLatencyMs,
+          this.lastCompletionLatencyMs,
+        );
         // A continuously busy queue is healthy when its completion frontier is
         // advancing. Measure pending age from the latest progress, not from the
         // moment any backlog first appeared, or long play is misclassified as

@@ -286,11 +286,11 @@ async function collectFrameWindow(page: Page, durationMs: number, deploymentStar
   return page.evaluate(async ({ duration, deploymentAt }) => {
     const target = globalThis as typeof globalThis & {
       __PASS65_FRAME_GATE__?: { observerSupported: boolean; longTasks: LongTask[] };
-      __ATOMIC_ACRES_DEBUG__?: { snapshot: () => Record<string, any> };
+      __ATOMIC_ACRES_DEBUG__?: { samplePresentationTelemetry: () => Record<string, any> };
     };
     const gate = target.__PASS65_FRAME_GATE__ ?? { observerSupported: false, longTasks: [] };
     const readPresentation = () => {
-      const presentation = target.__ATOMIC_ACRES_DEBUG__?.snapshot()?.render?.runtime?.presentation;
+      const presentation = target.__ATOMIC_ACRES_DEBUG__?.samplePresentationTelemetry();
       if (!presentation) throw new Error('Frame-pacing window requires WebGPU presentation telemetry');
       return {
         status: String(presentation.status),

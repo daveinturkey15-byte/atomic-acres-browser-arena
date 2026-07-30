@@ -62,6 +62,20 @@ export function shouldFreezeAdaptiveQualityForMatch(backend: 'webgpu' | 'webgl2'
   return backend === 'webgpu';
 }
 
+/** Rejects a catastrophic completed-queue sample; it never selects a quality tier. */
+export function assertWebGpuAdmissionCompletionLatency(
+  label: string,
+  completionLatencyMs: number | null,
+  maximumLatencyMs = 4_000,
+): asserts completionLatencyMs is number {
+  if (completionLatencyMs === null || !Number.isFinite(completionLatencyMs) || completionLatencyMs < 0) {
+    throw new Error(`${label} presentation completed without a valid queue-latency sample`);
+  }
+  if (completionLatencyMs > maximumLatencyMs) {
+    throw new Error(`${label} presentation completion latency ${completionLatencyMs.toFixed(1)}ms exceeded the ${maximumLatencyMs}ms admission limit`);
+  }
+}
+
 type AdaptiveQualityOptions = {
   profile: RenderProfile;
   targetFrameMs: number;
@@ -218,13 +232,20 @@ export class AdaptiveQualityController {
   }
 
   /**
-   * Applies one bounded, pre-game frame-pacing window without waiting for the
-   * live-play hysteresis counters. Admission owns a complete opaque
-   * render/fence cycle for every returned tier, so no cooldown is needed
-   * between these one-way calibration steps. Active play keeps the admitted
-   * tier fixed so a live framebuffer reallocation cannot hitch gameplay.
+   * Applies at most one pre-game downshift from a window of admitted WebGPU
+   * submission gaps. The fixed limits deliberately describe catastrophic
+   * under-performance, not monitor refresh: browser callbacks alone are not
+   * GPU evidence and a 144/180 Hz display must not force Quality to its floor.
+   * Active play keeps the admitted tier fixed so a framebuffer reallocation
+   * cannot hitch gameplay.
    */
-  calibrateDownshift(frameMsSamples: readonly number[], reason: string): number | null {
+  calibrateSevereAdmissionDownshift(
+    frameMsSamples: readonly number[],
+    reason: string,
+    p50LimitMs = 25,
+    p95LimitMs = 50,
+    minimumSamples = 24,
+  ): number | null {
     if (this.options.enabled === false || this.options.profile === 'compat') return null;
     const valid = frameMsSamples
       .filter((sample) => Number.isFinite(sample) && sample > 0 && sample <= 250)
@@ -236,34 +257,22 @@ export class AdaptiveQualityController {
     this.overloadSamples = 0;
     this.headroomSamples = 0;
     this.cooldownFrames = 0;
-    if (valid.length < 45) {
-      this.lastReason = `${reason}: ${valid.length}/45 valid calibration samples`;
+    if (valid.length < minimumSamples) {
+      this.lastReason = `${reason}: ${valid.length}/${minimumSamples} valid calibration samples`;
       return null;
     }
-    const downThreshold = this.options.targetFrameMs * 1.12;
-    if (this.p95Ms <= downThreshold) {
-      this.lastReason = `${reason}: p95 ${this.p95Ms.toFixed(1)}ms within ${downThreshold.toFixed(1)}ms budget`;
+    const severelyUnderperforming = this.p50Ms > p50LimitMs || this.p95Ms > p95LimitMs;
+    if (!severelyUnderperforming) {
+      this.lastReason = `${reason}: p50 ${this.p50Ms.toFixed(1)}ms/p95 ${this.p95Ms.toFixed(1)}ms within severe ${p50LimitMs.toFixed(1)}ms/${p95LimitMs.toFixed(1)}ms limits`;
       return null;
     }
     if (this.tier <= 0) {
-      this.lastReason = `${reason}: p95 ${this.p95Ms.toFixed(1)}ms above ${downThreshold.toFixed(1)}ms budget at minimum tier`;
+      this.lastReason = `${reason}: p50 ${this.p50Ms.toFixed(1)}ms/p95 ${this.p95Ms.toFixed(1)}ms exceeded severe ${p50LimitMs.toFixed(1)}ms/${p95LimitMs.toFixed(1)}ms limits at minimum tier`;
       return null;
     }
     this.tier -= 1;
     this.downshifts += 1;
-    this.lastReason = `${reason}: p95 ${this.p95Ms.toFixed(1)}ms above ${downThreshold.toFixed(1)}ms budget`;
-    return this.levels[this.tier];
-  }
-
-  forceDownshift(reason: string): number | null {
-    if (this.options.enabled === false || this.options.profile === 'compat' || this.tier <= 0) return null;
-    this.tier -= 1;
-    this.downshifts += 1;
-    this.overloadSamples = 0;
-    this.headroomSamples = 0;
-    this.samples.length = 0;
-    this.cooldownFrames = this.cooldownSamples;
-    this.lastReason = reason;
+    this.lastReason = `${reason}: p50 ${this.p50Ms.toFixed(1)}ms/p95 ${this.p95Ms.toFixed(1)}ms exceeded severe ${p50LimitMs.toFixed(1)}ms/${p95LimitMs.toFixed(1)}ms limits`;
     return this.levels[this.tier];
   }
 

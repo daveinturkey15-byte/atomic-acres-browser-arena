@@ -121,7 +121,6 @@ describe('fixed-tier WebGPU presentation epochs', () => {
       targetFrameMs: 1_000 / 60,
       initialPixelRatioCap: 1,
     });
-    const forceDownshift = vi.spyOn(adaptive, 'forceDownshift');
     const applyAdaptiveRenderBudget = vi.fn();
     const setGrassPixelRatio = vi.fn();
     const resize = vi.fn();
@@ -142,7 +141,6 @@ describe('fixed-tier WebGPU presentation epochs', () => {
     harness.monitorCompletedWebGpuQueueHealth(5_001);
 
     expect(resetPresentationProgressTelemetry).toHaveBeenCalledWith('tab visibility regained', 5_000);
-    expect(forceDownshift).not.toHaveBeenCalled();
     expect(adaptive.telemetry()).toMatchObject({ pixelRatioCap: 1, downshifts: 0 });
     expect(deferred.pending()).toBeNull();
     expect(harness.applyDeferredAdaptiveWebGpuRenderBudget(5_001)).toBe(false);
@@ -162,7 +160,6 @@ describe('fixed-tier WebGPU presentation epochs', () => {
     };
     harness.monitorCompletedWebGpuQueueHealth(5_600);
 
-    expect(forceDownshift).not.toHaveBeenCalled();
     expect(adaptive.telemetry()).toMatchObject({ pixelRatioCap: 1, downshifts: 0 });
     expect(deferred.pending()).toBeNull();
     expect(harness.applyDeferredAdaptiveWebGpuRenderBudget(5_601)).toBe(false);

@@ -343,6 +343,60 @@ describe('Pass 64 render runtime boundary', () => {
     });
   });
 
+  it('retains every completed-queue latency maximum in the current progress window', async () => {
+    let now = 0;
+    const pending: Array<() => void> = [];
+    const renderer = {
+      backend: { isWebGPUBackend: true },
+      info: { reset: vi.fn(), render: { calls: 1, triangles: 2, points: 0, lines: 0 } },
+    };
+    const device = {
+      queue: { onSubmittedWorkDone: () => new Promise<void>((resolve) => pending.push(resolve)) },
+      addEventListener: () => undefined,
+      lost: new Promise<never>(() => undefined),
+    };
+    const runtime = new (WebGpuRenderRuntime as unknown as new (
+      renderer: unknown,
+      pipeline: unknown,
+      identity: unknown,
+    ) => WebGpuRenderRuntime)(renderer, { render: vi.fn() }, {
+      canvasAntialias: true,
+      canvasSamples: 4,
+      adapterLabel: 'test adapter',
+      adapterClass: 'GPUAdapter',
+      deviceClass: 'GPUDevice',
+      softwareAdapter: false,
+      device,
+      now: () => now,
+    });
+    const settleProbe = async () => {
+      for (let turn = 0; turn < 6; turn += 1) await Promise.resolve();
+    };
+
+    runtime.resetPresentationProgressWindow(now);
+    expect(runtime.submitFrame(now)).toBe(true);
+    now = 80;
+    pending.shift()?.();
+    await settleProbe();
+    expect(runtime.presentationTelemetry(now)).toMatchObject({
+      lastCompletionLatencyMs: 80,
+      progress: { maximumCompletionLatencyMs: 80 },
+    });
+
+    now = 100;
+    expect(runtime.submitFrame(now)).toBe(true);
+    now = 110;
+    pending.shift()?.();
+    await settleProbe();
+    expect(runtime.presentationTelemetry(now)).toMatchObject({
+      lastCompletionLatencyMs: 10,
+      progress: { maximumCompletionLatencyMs: 80 },
+    });
+
+    runtime.resetPresentationProgressWindow(now);
+    expect(runtime.presentationTelemetry(now).progress.maximumCompletionLatencyMs).toBe(0);
+  });
+
   it('rejects a second unresolved submission, times latency post-submit, and rebases hidden time', async () => {
     let now = 100;
     const pending: Array<() => void> = [];
@@ -422,6 +476,7 @@ describe('Pass 64 render runtime boundary', () => {
       completedSequence: 1,
       pendingSince: null,
       lastCompletionLatencyMs: 25,
+      progress: { maximumCompletionLatencyMs: 25 },
     });
   });
 

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import './style.css';
 import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } from './atomic-signal';
-import { AdaptiveQualityController, DeferredAdaptivePixelRatio, adaptiveShadowsEnabled, classifyDisplayFrameMs, configuredAdaptiveQualityLevels, shouldFreezeAdaptiveQualityForMatch } from './adaptive-quality';
+import { AdaptiveQualityController, DeferredAdaptivePixelRatio, adaptiveShadowsEnabled, assertWebGpuAdmissionCompletionLatency, classifyDisplayFrameMs, configuredAdaptiveQualityLevels, shouldFreezeAdaptiveQualityForMatch } from './adaptive-quality';
 import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBudget } from './graphics-refinement';
 import { ArenaContrastLighting } from './arena-contrast-lighting';
 import { centeredReadbackRegion, detectLivePresentationStall, LegacyWebGlRenderRuntime, shouldResetPresentationAfterSchedulerGap, WebGpuRenderRuntime, resolveRenderRuntimeRequest, type WebGpuSubmissionMode } from './rendering/render-runtime';
@@ -1336,10 +1336,16 @@ const adaptiveQuality = new AdaptiveQualityController({
   levels: configuredAdaptiveLevels,
 });
 const deferredWebGpuAdaptivePixelRatio = new DeferredAdaptivePixelRatio();
-const MATCH_ADMISSION_ADAPTIVE_WARMUP_CALLBACKS = 8;
+const MATCH_ADMISSION_ADAPTIVE_WARMUP_SUBMISSIONS = 8;
 const MATCH_ADMISSION_ADAPTIVE_SAMPLE_COUNT = 60;
-const MATCH_ADMISSION_ADAPTIVE_MINIMUM_SAMPLES = 45;
+// A 1.5 s window on a genuinely weak ~30 Hz device yields roughly 36 admitted
+// gaps after warmup. Twenty-four samples preserve a meaningful p95 while still
+// allowing that exact severe-underperformance case to trigger one safe step.
+const MATCH_ADMISSION_ADAPTIVE_MINIMUM_SAMPLES = 24;
 const MATCH_ADMISSION_ADAPTIVE_WINDOW_TIMEOUT_MS = 1_500;
+const MATCH_ADMISSION_SEVERE_P50_MS = 25;
+const MATCH_ADMISSION_SEVERE_P95_MS = 50;
+const MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS = 4_000;
 type MatchAdmissionAdaptiveCalibration = Readonly<{
   label: string;
   status: 'stable' | 'skipped' | 'failed';
@@ -1350,11 +1356,17 @@ type MatchAdmissionAdaptiveCalibration = Readonly<{
     tier: number;
     pixelRatioCap: number;
     samples: number;
-    p50CallbackGapMs: number;
-    p95CallbackGapMs: number;
-    callbackCadenceHz: number;
-    maximumCallbackGapMs: number;
+    p50SubmissionGapMs: number;
+    p95SubmissionGapMs: number;
+    submittedCadenceHz: number;
+    maximumSubmissionGapMs: number;
     maximumQueueLatencyMs: number;
+    startingSubmissionSequence: number;
+    endingSubmissionSequence: number;
+    startingCompletedSequence: number;
+    endingCompletedSequence: number;
+    submissionAdvances: number;
+    completionAdvances: number;
     decision: 'stable' | 'downshift' | 'preset-locked' | 'insufficient-sample';
   }>[];
   startedAt: number;
@@ -1381,26 +1393,43 @@ function applyAdaptiveRenderBudget(pixelRatioCap: number): void {
 }
 applyAdaptiveRenderBudget(adaptiveQuality.telemetry().pixelRatioCap);
 
-async function collectMatchAdmissionCallbackGaps(): Promise<Readonly<{
+async function collectMatchAdmissionWebGpuSubmissionGaps(): Promise<Readonly<{
   status: 'sampled' | 'skipped';
   samples: readonly number[];
   maximumQueueLatencyMs: number;
+  startingSubmissionSequence: number;
+  startingCompletedSequence: number;
 }>> {
+  const before = renderRuntime.backend === 'webgpu' ? renderRuntime.presentationTelemetry() : null;
   if (renderRuntime.backend !== 'webgpu' || document.visibilityState !== 'visible' || !document.hasFocus()) {
-    return Object.freeze({ status: 'skipped', samples: Object.freeze([]), maximumQueueLatencyMs: 0 });
+    return Object.freeze({
+      status: 'skipped',
+      samples: Object.freeze([]),
+      maximumQueueLatencyMs: before?.lastCompletionLatencyMs ?? 0,
+      startingSubmissionSequence: before?.submissionSequence ?? 0,
+      startingCompletedSequence: before?.completedSequence ?? 0,
+    });
   }
-  await flushWebGpuFrames(12_000);
+  await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);
+  renderRuntime.resetPresentationProgressWindow(performance.now());
+  const startingPresentation = renderRuntime.presentationTelemetry();
   return new Promise((resolve, reject) => {
     const samples: number[] = [];
-    let warmupGapsRemaining = MATCH_ADMISSION_ADAPTIVE_WARMUP_CALLBACKS;
-    let priorCallbackAt: number | null = null;
-    let maximumQueueLatencyMs = 0;
+    let warmupGapsRemaining = MATCH_ADMISSION_ADAPTIVE_WARMUP_SUBMISSIONS;
+    let priorSubmittedAt: number | null = null;
+    let maximumQueueLatencyMs = startingPresentation.lastCompletionLatencyMs ?? 0;
     let finished = false;
     const finish = (status: 'sampled' | 'skipped'): void => {
       if (finished) return;
       finished = true;
       window.clearTimeout(timeout);
-      resolve(Object.freeze({ status, samples: Object.freeze([...samples]), maximumQueueLatencyMs }));
+      resolve(Object.freeze({
+        status,
+        samples: Object.freeze([...samples]),
+        maximumQueueLatencyMs,
+        startingSubmissionSequence: startingPresentation.submissionSequence,
+        startingCompletedSequence: startingPresentation.completedSequence,
+      }));
     };
     const timeout = window.setTimeout(() => finish(
       document.visibilityState === 'visible' && document.hasFocus() ? 'sampled' : 'skipped',
@@ -1412,18 +1441,25 @@ async function collectMatchAdmissionCallbackGaps(): Promise<Readonly<{
         return;
       }
       try {
+        const admitted = submitWebGpuFrame(now, false, 'warmed-live');
         const presentation = renderRuntime.presentationTelemetry(performance.now());
         if (presentation.status === 'stalled' || presentation.status === 'device-lost'
           || presentation.status === 'failed') {
           throw new Error(`Adaptive admission presentation was ${presentation.status}`);
         }
-        maximumQueueLatencyMs = Math.max(maximumQueueLatencyMs, presentation.lastCompletionLatencyMs ?? 0);
-        if (priorCallbackAt !== null) {
-          const callbackGapMs = Math.max(0, now - priorCallbackAt);
-          if (warmupGapsRemaining > 0) warmupGapsRemaining -= 1;
-          else samples.push(callbackGapMs);
+        maximumQueueLatencyMs = Math.max(
+          maximumQueueLatencyMs,
+          presentation.progress.maximumCompletionLatencyMs,
+          presentation.lastCompletionLatencyMs ?? 0,
+        );
+        if (admitted && presentation.lastSubmittedAt !== null) {
+          if (priorSubmittedAt !== null) {
+            const submissionGapMs = Math.max(0, presentation.lastSubmittedAt - priorSubmittedAt);
+            if (warmupGapsRemaining > 0) warmupGapsRemaining -= 1;
+            else samples.push(submissionGapMs);
+          }
+          priorSubmittedAt = presentation.lastSubmittedAt;
         }
-        priorCallbackAt = now;
         if (samples.length >= MATCH_ADMISSION_ADAPTIVE_SAMPLE_COUNT) {
           finish('sampled');
           return;
@@ -1450,13 +1486,18 @@ async function settleMatchAdmissionAdaptiveWebGpuPresentation(label: string): Pr
   const windows: Array<MatchAdmissionAdaptiveCalibration['windows'][number]> = [];
   try {
     if (presetPixelRatioCap !== initialPixelRatioCap) {
-      await flushWebGpuFrames(12_000);
+      await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);
       deferredWebGpuAdaptivePixelRatio.request(presetPixelRatioCap);
       if (!applyDeferredAdaptiveWebGpuRenderBudget(performance.now())) {
         throw new Error(`${label} preset seed resize was not admitted after its WebGPU completion fence`);
       }
       submitWebGpuFrame(performance.now(), true);
-      await flushWebGpuFrames(12_000);
+      await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);
+      assertWebGpuAdmissionCompletionLatency(
+        `${label} preset seed`,
+        renderRuntime.presentationTelemetry().lastCompletionLatencyMs,
+        MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS,
+      );
     }
     const current = adaptiveQuality.telemetry();
     if (!current.enabled || displayedGraphicsPreset !== 'custom') {
@@ -1465,16 +1506,25 @@ async function settleMatchAdmissionAdaptiveWebGpuPresentation(label: string): Pr
         tier: current.tier,
         pixelRatioCap: current.pixelRatioCap,
         samples: 0,
-        p50CallbackGapMs: 0,
-        p95CallbackGapMs: 0,
-        callbackCadenceHz: 0,
-        maximumCallbackGapMs: 0,
+        p50SubmissionGapMs: 0,
+        p95SubmissionGapMs: 0,
+        submittedCadenceHz: 0,
+        maximumSubmissionGapMs: 0,
         maximumQueueLatencyMs: presetPresentation.lastCompletionLatencyMs ?? 0,
+        startingSubmissionSequence: presetPresentation.submissionSequence,
+        endingSubmissionSequence: presetPresentation.submissionSequence,
+        startingCompletedSequence: presetPresentation.completedSequence,
+        endingCompletedSequence: presetPresentation.completedSequence,
+        submissionAdvances: 0,
+        completionAdvances: 0,
         decision: 'preset-locked',
       }));
     } else {
-      const sampled = await collectMatchAdmissionCallbackGaps();
-      await flushWebGpuFrames(12_000);
+      const sampled = await collectMatchAdmissionWebGpuSubmissionGaps();
+      await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);
+      const completedPresentation = renderRuntime.presentationTelemetry();
+      const submissionAdvances = completedPresentation.submissionSequence - sampled.startingSubmissionSequence;
+      const completionAdvances = completedPresentation.completedSequence - sampled.startingCompletedSequence;
       if (sampled.status === 'skipped') {
         matchWebGpuQualityFrozen = true;
         lastMatchAdmissionAdaptiveCalibration = Object.freeze({
@@ -1489,17 +1539,54 @@ async function settleMatchAdmissionAdaptiveWebGpuPresentation(label: string): Pr
         });
         return;
       }
-      const nextPixelRatio = adaptiveQuality.calibrateDownshift(sampled.samples, `${label} callback admission`);
+      if (submissionAdvances <= 0 || completionAdvances <= 0
+        || completedPresentation.completedSequence < completedPresentation.submissionSequence) {
+        throw new Error(`${label} adaptive admission lacked completed WebGPU evidence: ${JSON.stringify({
+          startingSubmissionSequence: sampled.startingSubmissionSequence,
+          endingSubmissionSequence: completedPresentation.submissionSequence,
+          startingCompletedSequence: sampled.startingCompletedSequence,
+          endingCompletedSequence: completedPresentation.completedSequence,
+        })}`);
+      }
+      const finalQueueLatencyMs = completedPresentation.lastCompletionLatencyMs;
+      assertWebGpuAdmissionCompletionLatency(
+        `${label} adaptive admission final completion`,
+        finalQueueLatencyMs,
+        MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS,
+      );
+      const maximumQueueLatencyMs = Math.max(
+        sampled.maximumQueueLatencyMs,
+        completedPresentation.progress.maximumCompletionLatencyMs,
+        finalQueueLatencyMs,
+      );
+      assertWebGpuAdmissionCompletionLatency(
+        `${label} adaptive admission`,
+        maximumQueueLatencyMs,
+        MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS,
+      );
+      const nextPixelRatio = adaptiveQuality.calibrateSevereAdmissionDownshift(
+        sampled.samples,
+        `${label} admitted WebGPU submission window`,
+        MATCH_ADMISSION_SEVERE_P50_MS,
+        MATCH_ADMISSION_SEVERE_P95_MS,
+        MATCH_ADMISSION_ADAPTIVE_MINIMUM_SAMPLES,
+      );
       const calibrated = adaptiveQuality.telemetry();
       windows.push(Object.freeze({
         tier: current.tier,
         pixelRatioCap: current.pixelRatioCap,
         samples: sampled.samples.length,
-        p50CallbackGapMs: calibrated.p50Ms,
-        p95CallbackGapMs: calibrated.p95Ms,
-        callbackCadenceHz: calibrated.p50Ms > 0 ? 1_000 / calibrated.p50Ms : 0,
-        maximumCallbackGapMs: Math.max(0, ...sampled.samples),
-        maximumQueueLatencyMs: sampled.maximumQueueLatencyMs,
+        p50SubmissionGapMs: calibrated.p50Ms,
+        p95SubmissionGapMs: calibrated.p95Ms,
+        submittedCadenceHz: calibrated.p50Ms > 0 ? 1_000 / calibrated.p50Ms : 0,
+        maximumSubmissionGapMs: Math.max(0, ...sampled.samples),
+        maximumQueueLatencyMs,
+        startingSubmissionSequence: sampled.startingSubmissionSequence,
+        endingSubmissionSequence: completedPresentation.submissionSequence,
+        startingCompletedSequence: sampled.startingCompletedSequence,
+        endingCompletedSequence: completedPresentation.completedSequence,
+        submissionAdvances,
+        completionAdvances,
         decision: sampled.samples.length < MATCH_ADMISSION_ADAPTIVE_MINIMUM_SAMPLES
           ? 'insufficient-sample'
           : nextPixelRatio === null ? 'stable' : 'downshift',
@@ -1524,7 +1611,12 @@ async function settleMatchAdmissionAdaptiveWebGpuPresentation(label: string): Pr
           throw new Error(`${label} adaptive admission resize was not admitted after its WebGPU completion fence`);
         }
         submitWebGpuFrame(performance.now(), true);
-        await flushWebGpuFrames(12_000);
+        await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);
+        assertWebGpuAdmissionCompletionLatency(
+          `${label} adaptive resize`,
+          renderRuntime.presentationTelemetry().lastCompletionLatencyMs,
+          MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS,
+        );
       }
     }
     matchWebGpuQualityFrozen = true;
@@ -1556,16 +1648,19 @@ async function settleMatchAdmissionAdaptiveWebGpuPresentation(label: string): Pr
 
 async function settleWebGpuPresentation(label: string): Promise<void> {
   if (renderRuntime.backend !== 'webgpu') return;
-  await flushWebGpuFrames(12_000);
+  await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);
   for (let sample = 0; sample < 3; sample += 1) {
     submitWebGpuFrame(performance.now(), true);
-    await flushWebGpuFrames(12_000);
+    await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);
     const presentation = renderRuntime.presentationTelemetry();
     if (presentation.status !== 'healthy') {
       throw new Error(`${label} presentation was not healthy: ${JSON.stringify(presentation)}`);
     }
-    const completionLatencyMs = presentation.lastCompletionLatencyMs;
-    if (completionLatencyMs === null) throw new Error(`${label} presentation completed without a queue-latency sample`);
+    assertWebGpuAdmissionCompletionLatency(
+      label,
+      presentation.lastCompletionLatencyMs,
+      MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS,
+    );
   }
   await settleMatchAdmissionAdaptiveWebGpuPresentation(label);
 }
@@ -17477,6 +17572,7 @@ const debugWindow = window as Window & {
   __ATOMIC_ACRES_DEBUG__?: {
     snapshot: () => Record<string, unknown>;
     admissionState: () => ReturnType<typeof sampleAdmissionState>;
+    samplePresentationTelemetry: () => ReturnType<typeof renderRuntime.presentationTelemetry>;
     sampleEnduranceHealth: () => ReturnType<typeof sampleEnduranceHealth>;
     sampleWeaponCatalogReadiness: () => ReturnType<typeof weaponView.browserCatalogReadiness>;
     sampleWeaponAssetCache: () => ReturnType<typeof pass65WeaponCacheTelemetry>;
@@ -17626,6 +17722,7 @@ const debugWindow = window as Window & {
 };
 debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   admissionState: sampleAdmissionState,
+  samplePresentationTelemetry: () => renderRuntime.presentationTelemetry(),
   sampleEnduranceHealth,
   sampleWeaponCatalogReadiness: () => weaponView.browserCatalogReadiness(),
   sampleWeaponAssetCache: () => pass65WeaponCacheTelemetry(),

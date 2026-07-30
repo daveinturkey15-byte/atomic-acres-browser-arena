@@ -3,27 +3,26 @@ import {
   AdaptiveQualityController,
   DeferredAdaptivePixelRatio,
   adaptiveShadowsEnabled,
+  assertWebGpuAdmissionCompletionLatency,
   classifyDisplayFrameMs,
   configuredAdaptiveQualityLevels,
   shouldFreezeAdaptiveQualityForMatch,
 } from './adaptive-quality';
 
 describe('adaptive quality controller', () => {
+  it('rejects a catastrophic admission completion without adapting from queue latency', () => {
+    expect(() => assertWebGpuAdmissionCompletionLatency('Initial match', 11_000)).toThrow(
+      'Initial match presentation completion latency 11000.0ms exceeded the 4000ms admission limit',
+    );
+    expect(() => assertWebGpuAdmissionCompletionLatency('Initial match', 4_000)).not.toThrow();
+    expect(() => assertWebGpuAdmissionCompletionLatency('Initial match', null)).toThrow(
+      'Initial match presentation completed without a valid queue-latency sample',
+    );
+  });
+
   it('freezes the admitted tier only for WebGPU and preserves WebGL2 live adaptation', () => {
     expect(shouldFreezeAdaptiveQualityForMatch('webgpu')).toBe(true);
     expect(shouldFreezeAdaptiveQualityForMatch('webgl2')).toBe(false);
-  });
-
-  it('can downshift from measured GPU queue latency without trusting rAF cadence', () => {
-    const controller = new AdaptiveQualityController({
-      profile: 'blender', targetFrameMs: 1_000 / 60, initialPixelRatioCap: 1,
-    });
-    expect(controller.forceDownshift('GPU queue latency 800ms')).toBe(0.85);
-    expect(controller.telemetry()).toMatchObject({
-      pixelRatioCap: 0.85,
-      downshifts: 1,
-      lastReason: 'GPU queue latency 800ms',
-    });
   });
 
   it('retains explicitly authored shadows throughout every non-compatibility ladder', () => {
@@ -81,26 +80,42 @@ describe('adaptive quality controller', () => {
     });
   });
 
-  it('calibrates one admission tier from a bounded admitted-submission window without live hysteresis', () => {
+  it('keeps a healthy admitted-submission window at the selected tier without live hysteresis', () => {
     const controller = new AdaptiveQualityController({
       profile: 'blender', targetFrameMs: 1_000 / 144, initialPixelRatioCap: 1,
     });
-    expect(controller.calibrateDownshift(Array(60).fill(9), 'Initial match')).toBe(0.85);
+    expect(controller.calibrateSevereAdmissionDownshift(Array(60).fill(9), 'Initial match')).toBeNull();
     expect(controller.telemetry()).toMatchObject({
-      pixelRatioCap: 0.85,
-      downshifts: 1,
+      pixelRatioCap: 1,
+      downshifts: 0,
       p50Ms: 9,
       p95Ms: 9,
       cooldownFrames: 0,
-      lastReason: 'Initial match: p95 9.0ms above 7.8ms budget',
+      lastReason: 'Initial match: p50 9.0ms/p95 9.0ms within severe 25.0ms/50.0ms limits',
     });
-    expect(controller.calibrateDownshift(Array(60).fill(7), 'Initial match')).toBeNull();
+    expect(controller.calibrateSevereAdmissionDownshift(Array(60).fill(7), 'Initial match')).toBeNull();
+    expect(controller.telemetry()).toMatchObject({
+      pixelRatioCap: 1,
+      downshifts: 0,
+      p50Ms: 7,
+      p95Ms: 7,
+      lastReason: 'Initial match: p50 7.0ms/p95 7.0ms within severe 25.0ms/50.0ms limits',
+    });
+  });
+
+  it('allows only one admission downshift for severe submitted-frame under-performance', () => {
+    const controller = new AdaptiveQualityController({
+      profile: 'blender', targetFrameMs: 1_000 / 180, initialPixelRatioCap: 1,
+    });
+    expect(controller.calibrateSevereAdmissionDownshift([
+      ...Array(56).fill(26), ...Array(4).fill(55),
+    ], 'Initial match')).toBe(0.85);
     expect(controller.telemetry()).toMatchObject({
       pixelRatioCap: 0.85,
       downshifts: 1,
-      p50Ms: 7,
-      p95Ms: 7,
-      lastReason: 'Initial match: p95 7.0ms within 7.8ms budget',
+      p50Ms: 26,
+      p95Ms: 55,
+      lastReason: 'Initial match: p50 26.0ms/p95 55.0ms exceeded severe 25.0ms/50.0ms limits',
     });
   });
 
@@ -108,12 +123,12 @@ describe('adaptive quality controller', () => {
     const controller = new AdaptiveQualityController({
       profile: 'blender', targetFrameMs: 1_000 / 144, initialPixelRatioCap: 0.55,
     });
-    expect(controller.calibrateDownshift(Array(60).fill(9), 'Initial match')).toBeNull();
+    expect(controller.calibrateSevereAdmissionDownshift(Array(60).fill(55), 'Initial match')).toBeNull();
     expect(controller.telemetry()).toMatchObject({
       pixelRatioCap: 0.55,
       downshifts: 0,
-      p95Ms: 9,
-      lastReason: 'Initial match: p95 9.0ms above 7.8ms budget at minimum tier',
+      p95Ms: 55,
+      lastReason: 'Initial match: p50 55.0ms/p95 55.0ms exceeded severe 25.0ms/50.0ms limits at minimum tier',
     });
   });
 
@@ -121,7 +136,7 @@ describe('adaptive quality controller', () => {
     const controller = new AdaptiveQualityController({
       profile: 'blender', targetFrameMs: 1_000 / 144, initialPixelRatioCap: 1,
     });
-    expect(controller.calibrateDownshift(Array(60).fill(9), 'First match')).toBe(0.85);
+    expect(controller.calibrateSevereAdmissionDownshift(Array(60).fill(55), 'First match')).toBe(0.85);
     expect(controller.seedPixelRatioCap(1, 'Quality preset match seed')).toBe(1);
     expect(controller.telemetry()).toMatchObject({
       pixelRatioCap: 1,
@@ -143,17 +158,19 @@ describe('adaptive quality controller', () => {
     expect(controller.telemetry()).toMatchObject({ levels: [0.55, 0.65, 0.75], pixelRatioCap: 0.75 });
   });
 
-  it('never treats a short or pathological admission sample as evidence to lower quality', () => {
+  it('uses the bounded timeout minimum and never treats a shorter sample as downshift evidence', () => {
     const controller = new AdaptiveQualityController({
       profile: 'performance', targetFrameMs: 1_000 / 60, initialPixelRatioCap: 0.75,
     });
-    expect(controller.calibrateDownshift([...Array(44).fill(25), 300, 0, Number.NaN], 'Initial match')).toBeNull();
+    expect(controller.calibrateSevereAdmissionDownshift([...Array(23).fill(55), 300, 0, Number.NaN], 'Initial match')).toBeNull();
     expect(controller.telemetry()).toMatchObject({
       pixelRatioCap: 0.75,
       downshifts: 0,
-      samples: 44,
-      lastReason: 'Initial match: 44/45 valid calibration samples',
+      samples: 23,
+      lastReason: 'Initial match: 23/24 valid calibration samples',
     });
+    expect(controller.calibrateSevereAdmissionDownshift(Array(24).fill(34), 'Initial match')).toBe(0.65);
+    expect(controller.telemetry()).toMatchObject({ pixelRatioCap: 0.65, downshifts: 1, samples: 24 });
   });
 
   it('downshifts after sustained overload without leaving the public profile floor', () => {

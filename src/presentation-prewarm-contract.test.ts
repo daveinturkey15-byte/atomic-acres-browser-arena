@@ -19,6 +19,7 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('submissionPacing: this.submissionPacing.summary()');
     expect(source).toContain('completionPacing: this.completionPacing.summary()');
     expect(source).toContain('maximumPendingForMs: Math.max(this.progressMaximumPendingForMs, pendingForMs)');
+    expect(source).toContain('maximumCompletionLatencyMs: this.progressMaximumCompletionLatencyMs');
     const legacy = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
     expect(legacy).toContain("matchState.phase === 'active'");
     expect(legacy).toContain("menuLifecycle.surface === 'hidden' && arenaSelectionReady");
@@ -28,23 +29,32 @@ describe('presentation prewarm startup contract', () => {
       legacy.indexOf('async function settleWebGpuPresentation('),
       legacy.indexOf('function buildSky()'),
     );
-    expect(coldSettlement.indexOf('await flushWebGpuFrames(12_000);'))
+    expect(coldSettlement).toContain('await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);');
+    expect(coldSettlement.indexOf('await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);'))
       .toBeLessThan(coldSettlement.indexOf('submitWebGpuFrame(performance.now(), true);'));
     expect(coldSettlement).not.toContain('forceDownshift(');
     const adaptiveAdmission = legacy.slice(
-      legacy.indexOf('async function collectMatchAdmissionCallbackGaps()'),
+      legacy.indexOf('async function collectMatchAdmissionWebGpuSubmissionGaps()'),
       legacy.indexOf('async function settleWebGpuPresentation('),
     );
-    expect(adaptiveAdmission).not.toContain("submitWebGpuFrame(now, false, 'warmed-live')");
-    expect(adaptiveAdmission).toContain('now - priorCallbackAt');
+    expect(adaptiveAdmission).toContain("submitWebGpuFrame(now, false, 'warmed-live')");
+    expect(adaptiveAdmission).toContain('presentation.lastSubmittedAt - priorSubmittedAt');
     expect(adaptiveAdmission).toContain('warmupGapsRemaining > 0');
     expect(legacy).toContain('MATCH_ADMISSION_ADAPTIVE_WINDOW_TIMEOUT_MS = 1_500');
-    expect(adaptiveAdmission).not.toContain('calibrateDownshift(sampled.maximumQueueLatencyMs');
-    expect(adaptiveAdmission).toContain('adaptiveQuality.calibrateDownshift(');
+    expect(legacy).toContain('MATCH_ADMISSION_ADAPTIVE_MINIMUM_SAMPLES = 24');
+    expect(legacy).toContain('MATCH_ADMISSION_SEVERE_P50_MS = 25');
+    expect(legacy).toContain('MATCH_ADMISSION_SEVERE_P95_MS = 50');
+    expect(adaptiveAdmission).not.toContain('calibrateSevereAdmissionDownshift(sampled.maximumQueueLatencyMs');
+    expect(adaptiveAdmission).toContain('assertWebGpuAdmissionCompletionLatency(');
+    expect(adaptiveAdmission).toContain('completedPresentation.progress.maximumCompletionLatencyMs');
+    expect(adaptiveAdmission).toContain('adaptiveQuality.calibrateSevereAdmissionDownshift(');
+    expect(adaptiveAdmission).toContain('submissionAdvances <= 0 || completionAdvances <= 0');
+    expect(adaptiveAdmission).toContain('completedPresentation.completedSequence < completedPresentation.submissionSequence');
     expect(adaptiveAdmission).toContain("displayedGraphicsPreset !== 'custom'");
     expect(adaptiveAdmission).toContain('deferredWebGpuAdaptivePixelRatio.request(nextPixelRatio);');
     expect(adaptiveAdmission).toContain('applyDeferredAdaptiveWebGpuRenderBudget(performance.now())');
-    expect(adaptiveAdmission.indexOf('await flushWebGpuFrames(12_000);'))
+    expect(adaptiveAdmission).toContain('await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);');
+    expect(adaptiveAdmission.indexOf('await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);'))
       .toBeLessThan(adaptiveAdmission.indexOf('applyDeferredAdaptiveWebGpuRenderBudget(performance.now())'));
     expect(coldSettlement).toContain('await settleMatchAdmissionAdaptiveWebGpuPresentation(label);');
     const readbackStart = legacy.indexOf('readbackWebGpuFrame: async () => {');
@@ -301,6 +311,8 @@ describe('presentation prewarm startup contract', () => {
       .toBeLessThan(arenaDeployment.indexOf('auditArenaRenderLiveness('));
     expect(source).toContain('await flushWebGpuFrames(12_000)');
     expect(source).toContain('for (let sample = 0; sample < 3; sample += 1)');
+    expect(source).toContain('MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS = 4_000');
+    expect(source).toContain('assertWebGpuAdmissionCompletionLatency(');
     expect(source).toContain('if (!isSharedMeshGeometry(geometry)) geometry.dispose();');
     expect(source).toContain("presentation.status === 'stalled'");
     expect(source).not.toContain('consecutiveMinimumTierSlowSamples');
@@ -626,6 +638,23 @@ describe('presentation prewarm startup contract', () => {
     expect(liveLoop).not.toContain('.snapshot()');
     expect(liveLoop).not.toContain('sampleRendererResidency');
     expect(verifierSource).toContain('api.setRenderPaused(true);\n      return {\n        state: api.snapshot(),\n        residency: api.sampleRendererResidency(),');
+  });
+
+  it('samples presentation progress without a full scene snapshot at frame-window boundaries', () => {
+    const runtimeSource = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+    expect(runtimeSource).toContain('samplePresentationTelemetry: () => ReturnType<typeof renderRuntime.presentationTelemetry>;');
+    expect(runtimeSource).toContain('samplePresentationTelemetry: () => renderRuntime.presentationTelemetry(),');
+
+    const verifierSource = readFileSync(new URL('../scripts/qa/verify-pass65-frame-pacing.ts', import.meta.url), 'utf8');
+    const frameWindow = verifierSource.slice(
+      verifierSource.indexOf('async function collectFrameWindow('),
+      verifierSource.indexOf('async function runTrial('),
+    );
+    expect(frameWindow).toContain('samplePresentationTelemetry: () => Record<string, any>');
+    expect(frameWindow).toContain('target.__ATOMIC_ACRES_DEBUG__?.samplePresentationTelemetry()');
+    expect(frameWindow).not.toContain('.snapshot()');
+    expect(frameWindow).toContain('const presentationStarted = readPresentation();');
+    expect(frameWindow).toContain('const presentationEnded = readPresentation();');
   });
 
   it('rejects degraded foreground cadence in the cold physical-menu gate', () => {
