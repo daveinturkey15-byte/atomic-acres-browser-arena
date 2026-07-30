@@ -10,6 +10,14 @@ import { classifyPaths } from './change-impact.mjs';
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const REPOSITORY_ROOT = resolve(dirname(SCRIPT_PATH), '..', '..');
 const POLICY_PATH = join(REPOSITORY_ROOT, 'acceptance', 'policy.json');
+const PASS66_MANIFEST_PATH = 'acceptance/pass-66.json';
+const PASS66_LEDGER_PATH = 'docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md';
+const PASS66_GRAPH_RELATIVE_PATH = 'docs/PASS65_OWNER_FEEDBACK_COMPLETENESS_GRAPH.json';
+const PASS66_GRAPH_PATH = join(REPOSITORY_ROOT, PASS66_GRAPH_RELATIVE_PATH);
+const PASS66_OWNER_ARTIFACT_ROOT = 'artifacts/pass65-owner-feedback/';
+const PASS66_HARDWARE_ARTIFACT_ROOT = 'artifacts/pass65/hardware-webgl2-admission/';
+const PASS66_HARDWARE_TEST_ID = 'T-COLD-HARDWARE-WEBGL2';
+const SHA40 = /^[0-9a-f]{40}$/;
 const LOCAL_EVIDENCE = new Set(['unit', 'contract', 'browser', 'trace']);
 const MECHANICAL_EVIDENCE = new Set(['unit', 'contract', 'browser', 'trace']);
 const ACCEPTANCE_TYPES = new Set(['mechanical', 'visual', 'human', 'mixed']);
@@ -73,8 +81,11 @@ function changedPaths(base, head) {
 }
 
 function changedManifestPaths(base, head, policy) {
-  const pattern = new RegExp(`^${policy.manifestDirectory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\/pass-[1-9][0-9]*\\.json$`);
-  return changedPaths(base, head).filter((path) => pattern.test(path));
+  const pattern = new RegExp(`^${policy.manifestDirectory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\/pass-([1-9][0-9]*)\\.json$`);
+  return changedPaths(base, head).filter((path) => {
+    const match = pattern.exec(path);
+    return match && Number(match[1]) >= policy.enforceFromPass;
+  });
 }
 
 function validateEvidence(requirement, errors, policy) {
@@ -171,6 +182,16 @@ export function validateAcceptanceManifest(manifest, options = {}) {
     || !isIsoDate(approval.approvedAt) || !nonEmpty(approval.evidence)) {
     errors.push(`humanAcceptance must be approved by ${policy.ownerHandle} with timestamped evidence`);
   }
+  if (manifest.releasePass === 'PASS 66' && approval && nonEmpty(approval.evidence)) {
+    const evidence = approval.evidence.toLowerCase();
+    const bindsStandingConditional = /\bstanding\s+conditional\b/.test(evidence);
+    const explicitlyDisclaimsInspection = /\b(?:did\s+not|has\s+not|was\s+not)\b/.test(evidence)
+      && /\b(?:inspect(?:ed|ion)?|test(?:ed|ing)?|review(?:ed)?)\b/.test(evidence)
+      && /\bpreview\b/.test(evidence);
+    if (!bindsStandingConditional || !explicitlyDisclaimsInspection) {
+      errors.push('PASS 66 humanAcceptance.evidence must bind Dave\'s standing conditional authorization and explicitly state that he did not inspect or test the immutable preview');
+    }
+  }
   if (preview && approval && isIsoDate(preview.createdAt) && isIsoDate(approval.approvedAt)
     && Date.parse(approval.approvedAt) < Date.parse(preview.createdAt)) {
     errors.push('humanAcceptance.approvedAt cannot precede preview.createdAt');
@@ -209,12 +230,91 @@ function readPolicy() {
   return policy;
 }
 
-export function classifyPreviewDelta(paths, manifestPath) {
+function pass66ReceiptPath(testId, previewSha) {
+  if (testId === PASS66_HARDWARE_TEST_ID) {
+    return `${PASS66_OWNER_ARTIFACT_ROOT}hardware-webgl2-admission-${previewSha}.json`;
+  }
+  const slug = String(testId).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return `${PASS66_OWNER_ARTIFACT_ROOT}${slug}-${previewSha}.json`;
+}
+
+export function pass66FinalizerOutputPaths(previewSha, graph = null) {
+  if (!SHA40.test(previewSha ?? '')) throw new Error('Pass 66 finalizer paths require an exact preview SHA');
+  const catalogGraph = graph ?? JSON.parse(readFileSync(PASS66_GRAPH_PATH, 'utf8'));
+  if (catalogGraph?.candidateEvidenceSourceSha !== previewSha) {
+    throw new Error(`Pass 66 graph candidateEvidenceSourceSha must equal preview ${previewSha}`);
+  }
+  if (!Array.isArray(catalogGraph.testCatalog) || !Array.isArray(catalogGraph.artifactCatalog)) {
+    throw new Error('Pass 66 graph must contain testCatalog and artifactCatalog arrays');
+  }
+  const testIds = catalogGraph.testCatalog.map((test) => test?.id);
+  if (testIds.some((testId) => typeof testId !== 'string' || !/^T-[A-Z0-9-]+$/.test(testId))
+    || new Set(testIds).size !== testIds.length) {
+    throw new Error('Pass 66 graph testCatalog IDs must be unique and canonical');
+  }
+  const expected = new Set([PASS66_MANIFEST_PATH, PASS66_LEDGER_PATH, PASS66_GRAPH_RELATIVE_PATH]);
+  const artifactTests = new Set();
+  for (const artifact of catalogGraph.artifactCatalog) {
+    if (artifact?.sourceSha !== previewSha || !Array.isArray(artifact.testRefs) || artifact.testRefs.length !== 1) {
+      throw new Error('Every Pass 66 finalizer artifact must attest one test at the exact preview SHA');
+    }
+    const [testId] = artifact.testRefs;
+    if (!testIds.includes(testId) || artifactTests.has(testId)) {
+      throw new Error(`Pass 66 finalizer artifact test is unknown or duplicated: ${testId}`);
+    }
+    artifactTests.add(testId);
+    const expectedReceiptPath = pass66ReceiptPath(testId, previewSha);
+    if (artifact.path !== expectedReceiptPath) {
+      throw new Error(`${testId} receipt path must be ${expectedReceiptPath}`);
+    }
+    expected.add(expectedReceiptPath);
+    if (testId === PASS66_HARDWARE_TEST_ID) {
+      const expectedDetailPath = `${PASS66_HARDWARE_ARTIFACT_ROOT}${previewSha}-receipt.json`;
+      const expectedManifestPath = `${PASS66_HARDWARE_ARTIFACT_ROOT}${previewSha}-dist-manifest.json`;
+      if (artifact.detailedReceiptPath !== expectedDetailPath || artifact.buildManifestPath !== expectedManifestPath) {
+        throw new Error(`${testId} must use the exact preview-bound hardware detail and build-manifest paths`);
+      }
+      expected.add(expectedDetailPath);
+      expected.add(expectedManifestPath);
+    }
+  }
+  const missingTests = testIds.filter((testId) => !artifactTests.has(testId));
+  if (missingTests.length > 0 || artifactTests.size !== testIds.length) {
+    throw new Error(`Pass 66 finalizer artifact catalog is incomplete; missing=${missingTests.join(',') || '<none>'}`);
+  }
+  return [...expected].sort();
+}
+
+export function classifyPreviewDelta(paths, manifestPath, previewSha = null, options = {}) {
+  const normalizedPaths = [...new Set(paths.map((path) => String(path).replaceAll('\\', '/')).filter(Boolean))].sort();
+  if (manifestPath === PASS66_MANIFEST_PATH) {
+    let expectedPaths;
+    try {
+      expectedPaths = pass66FinalizerOutputPaths(previewSha, options.graph ?? null);
+    } catch (error) {
+      return {
+        ok: false,
+        paths: normalizedPaths,
+        reason: `Pass 66 finalizer output contract is invalid (${error instanceof Error ? error.message : String(error)})`,
+      };
+    }
+    const expected = new Set(expectedPaths);
+    const actual = new Set(normalizedPaths);
+    const missing = expectedPaths.filter((path) => !actual.has(path));
+    const unexpected = normalizedPaths.filter((path) => !expected.has(path));
+    return missing.length === 0 && unexpected.length === 0
+      ? { ok: true, paths: normalizedPaths, reason: 'only the exact Pass 66 finalizer output set changed after preview' }
+      : {
+        ok: false,
+        paths: normalizedPaths,
+        reason: `Pass 66 post-preview delta differs from the exact finalizer output set (missing=${missing.join(',') || '<none>'}; unexpected=${unexpected.join(',') || '<none>'})`,
+      };
+  }
   // Test sources never enter the shipped Vite tree. They must still classify
   // as full CI impact in change-impact.mjs so the edited gate is exercised,
   // but correcting a non-shipping assertion must not invalidate approval of
   // byte-identical runtime output.
-  const relevantPaths = paths.filter((path) => path !== manifestPath && !/^tests\//.test(path));
+  const relevantPaths = normalizedPaths.filter((path) => path !== manifestPath && !/^tests\//.test(path));
   const classification = relevantPaths.length === 0 ? { mode: 'none' } : classifyPaths(relevantPaths);
   return classification.mode === 'none'
     ? { ok: true, paths: relevantPaths, reason: 'only process/acceptance paths changed after preview' }
@@ -227,7 +327,7 @@ function approvalStillMatchesPreview(manifestPath, previewSha, head) {
   } catch {
     return { ok: false, paths: [], reason: `preview source ${previewSha} is not an ancestor of ${head}` };
   }
-  return classifyPreviewDelta(changedPaths(previewSha, head), manifestPath);
+  return classifyPreviewDelta(changedPaths(previewSha, head), manifestPath, previewSha);
 }
 
 function writeReceipt(path, receipt) {
@@ -235,6 +335,16 @@ function writeReceipt(path, receipt) {
   const absolute = resolve(REPOSITORY_ROOT, path);
   mkdirSync(dirname(absolute), { recursive: true });
   writeFileSync(absolute, `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
+}
+
+export function selectCiAcceptanceManifest(impact, manifestPaths) {
+  if (!['none', 'smoke', 'full'].includes(impact)) throw new Error('--impact must be none, smoke, or full');
+  const manifests = [...new Set(manifestPaths.map((path) => String(path).replaceAll('\\', '/')).filter(Boolean))].sort();
+  if (impact === 'none' && manifests.length === 0) return null;
+  if (manifests.length !== 1) {
+    throw new Error(`runtime/release-shell or acceptance-finalizer changes must add or update exactly one enforced pass manifest; found ${manifests.length}`);
+  }
+  return manifests[0];
 }
 
 export function evaluateAcceptance(values) {
@@ -246,18 +356,21 @@ export function evaluateAcceptance(values) {
   let releasePass = values.pass;
 
   if (phase === 'ci') {
-    if (!['none', 'smoke', 'full'].includes(values.impact)) throw new Error('--impact must be none, smoke, or full');
-    if (values.impact === 'none') {
-      return { schemaVersion: 1, ok: true, phase, impact: values.impact, exempt: true, reason: 'process-only' };
-    }
     if (!/^[0-9a-f]{40}$/.test(values.base ?? '') || !/^[0-9a-f]{40}$/.test(head)) {
       throw new Error('CI acceptance needs full --base and --head SHAs');
     }
     const manifests = changedManifestPaths(values.base, head, policy);
-    if (manifests.length !== 1) {
-      throw new Error(`runtime/release-shell changes must add or update exactly one pass manifest; found ${manifests.length}`);
+    manifestPath = selectCiAcceptanceManifest(values.impact, manifests);
+    if (manifestPath === null) {
+      return {
+        schemaVersion: 1,
+        ok: true,
+        phase,
+        impact: values.impact,
+        exempt: true,
+        reason: 'process-only with no enforced pass manifest change',
+      };
     }
-    [manifestPath] = manifests;
   } else {
     const number = passNumber(releasePass);
     if (number === null) throw new Error('--pass must look like "PASS 62"');

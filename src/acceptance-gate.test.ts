@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { classifyPreviewDelta, validateAcceptanceManifest } from '../scripts/release/acceptance-gate.mjs';
+import {
+  classifyPreviewDelta,
+  selectCiAcceptanceManifest,
+  validateAcceptanceManifest,
+} from '../scripts/release/acceptance-gate.mjs';
 
 const policy = {
   schemaVersion: 1,
@@ -83,28 +87,62 @@ describe('release acceptance manifest', () => {
     expect(classifyPreviewDelta([manifestPath, 'src/release-channels.ts'], manifestPath)).toMatchObject({ ok: false });
   });
 
+  it('does not exempt a process-only CI delta that changes an enforced acceptance manifest', () => {
+    expect(selectCiAcceptanceManifest('none', [])).toBeNull();
+    expect(selectCiAcceptanceManifest('none', ['acceptance/pass-66.json'])).toBe('acceptance/pass-66.json');
+    expect(() => selectCiAcceptanceManifest('none', ['acceptance/pass-65.json', 'acceptance/pass-66.json'])).toThrow(/found 2/);
+    expect(() => selectCiAcceptanceManifest('full', [])).toThrow(/found 0/);
+  });
+
   it('retains preview approval only for the finalizer exact-SHA receipt set', () => {
     const manifestPath = 'acceptance/pass-66.json';
     const sha = 'a'.repeat(40);
+    const ownerReceipt = `artifacts/pass65-owner-feedback/t-owner-gate-${sha}.json`;
+    const hardwareReceipt = `artifacts/pass65-owner-feedback/hardware-webgl2-admission-${sha}.json`;
+    const hardwareDetail = `artifacts/pass65/hardware-webgl2-admission/${sha}-receipt.json`;
+    const hardwareManifest = `artifacts/pass65/hardware-webgl2-admission/${sha}-dist-manifest.json`;
+    const graph = {
+      candidateEvidenceSourceSha: sha,
+      testCatalog: [{ id: 'T-OWNER-GATE' }, { id: 'T-COLD-HARDWARE-WEBGL2' }],
+      artifactCatalog: [
+        { sourceSha: sha, testRefs: ['T-OWNER-GATE'], path: ownerReceipt },
+        {
+          sourceSha: sha,
+          testRefs: ['T-COLD-HARDWARE-WEBGL2'],
+          path: hardwareReceipt,
+          detailedReceiptPath: hardwareDetail,
+          buildManifestPath: hardwareManifest,
+        },
+      ],
+    };
     const finalizerPaths = [
       manifestPath,
       'docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md',
       'docs/PASS65_OWNER_FEEDBACK_COMPLETENESS_GRAPH.json',
-      `artifacts/pass65-owner-feedback/t-owner-gate-${sha}.json`,
-      `artifacts/pass65-owner-feedback/hardware-webgl2-admission-${sha}.json`,
-      `artifacts/pass65/hardware-webgl2-admission/${sha}-receipt.json`,
-      `artifacts/pass65/hardware-webgl2-admission/${sha}-dist-manifest.json`,
+      ownerReceipt,
+      hardwareReceipt,
+      hardwareDetail,
+      hardwareManifest,
     ];
-    expect(classifyPreviewDelta(finalizerPaths, manifestPath)).toMatchObject({ ok: true });
+    expect(classifyPreviewDelta(finalizerPaths, manifestPath, sha, { graph })).toMatchObject({ ok: true });
 
     for (const path of [
       `artifacts/pass65-owner-feedback/runtime-${sha}.json`,
+      `artifacts/pass65-owner-feedback/t-extra-${sha}.json`,
+      `artifacts/pass65-owner-feedback/t-owner-gate-${'b'.repeat(40)}.json`,
       `artifacts/pass65/hardware-webgl2-admission/${sha}-other.json`,
       'artifacts/pass65-owner-feedback/runtime.ts',
+      'tests/e2e/atomic-acres.spec.ts',
+      'docs/VERIFICATION_AND_RELEASE_HYGIENE.md',
+      '.github/workflows/verify.yml',
+      'scripts/release/acceptance-gate.mjs',
+      'acceptance/policy.json',
       'src/main.ts',
     ]) {
-      expect(classifyPreviewDelta([...finalizerPaths, path], manifestPath), path).toMatchObject({ ok: false });
+      expect(classifyPreviewDelta([...finalizerPaths, path], manifestPath, sha, { graph }), path).toMatchObject({ ok: false });
     }
+    expect(classifyPreviewDelta(finalizerPaths.slice(1), manifestPath, sha, { graph })).toMatchObject({ ok: false });
+    expect(classifyPreviewDelta(finalizerPaths, manifestPath, 'b'.repeat(40), { graph })).toMatchObject({ ok: false });
   });
 
   it('rejects an artifact reference that does not match the approved source SHA', () => {
@@ -113,6 +151,20 @@ describe('release acceptance manifest', () => {
     const result = validateAcceptanceManifest(manifest, { policy });
     expect(result.ok).toBe(false);
     expect(result.errors.join('\n')).toMatch(/match preview.sourceSha/);
+  });
+
+  it('requires the truthful standing-conditional, no-preview-inspection statement for Pass 66', () => {
+    const manifest = acceptedManifest();
+    manifest.releasePass = 'PASS 66';
+    manifest.preview.ref = `pr-preview-66-${manifest.preview.sourceSha}`;
+    manifest.humanAcceptance.evidence = 'Dave\'s standing conditional publication authorization is bound here; Dave did not inspect this immutable preview.';
+    expect(validateAcceptanceManifest(manifest, { policy })).toMatchObject({ ok: true });
+
+    manifest.humanAcceptance.evidence = 'Dave gave standing conditional publication authorization for this immutable preview.';
+    expect(validateAcceptanceManifest(manifest, { policy }).errors.join('\n')).toMatch(/did not inspect or test/);
+
+    manifest.humanAcceptance.evidence = 'Dave did not inspect this immutable preview; publication may proceed.';
+    expect(validateAcceptanceManifest(manifest, { policy }).errors.join('\n')).toMatch(/standing conditional/);
   });
 
   it('leaves exactly the owner-approval error on a complete pre-HITL manifest', () => {

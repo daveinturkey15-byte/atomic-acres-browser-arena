@@ -10,6 +10,11 @@ import {
   validateHardwareWebGl2BuildManifest,
   validateHardwareWebGl2DetailedReceipt,
 } from '../../../../scripts/qa/pass65-hardware-webgl2-receipt-contract.mjs';
+import {
+  FinalizationError,
+  artifactIdForTest,
+  validateExactArtifactCatalog,
+} from './finalize-pass66-owner-evidence.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '../../../..');
@@ -27,10 +32,8 @@ const CANDIDATE_EVIDENCE_PROCESS_FILES = new Set([
   'docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md',
   'docs/PASS65_OWNER_FEEDBACK_COMPLETENESS_GRAPH.json',
 ]);
-const CANDIDATE_EVIDENCE_JSON_ROOTS = Object.freeze([
-  'artifacts/pass65-owner-feedback/',
-  'artifacts/pass65/hardware-webgl2-admission/',
-]);
+const OWNER_EVIDENCE_ROOT = 'artifacts/pass65-owner-feedback/';
+const HARDWARE_EVIDENCE_ROOT = 'artifacts/pass65/hardware-webgl2-admission/';
 
 const TEXT_SOURCE_NORMALIZATION = 'UTF-8; CRLF converted to LF; one final LF added; text semantics unchanged';
 const HARDWARE_WEBGL2_FEEDBACK_IDS = Object.freeze([
@@ -125,17 +128,27 @@ function validateCommittedCandidateEvidence(relativePath, bytes, candidateLineag
   }
 }
 
-function isCandidateEvidenceProcessPath(relativePath) {
-  if (CANDIDATE_EVIDENCE_PROCESS_FILES.has(relativePath)) return true;
-  return CANDIDATE_EVIDENCE_JSON_ROOTS.some((root) => {
-    if (!relativePath.startsWith(root) || !relativePath.endsWith('.json')) return false;
-    const remainder = relativePath.slice(root.length);
-    return remainder.length > '.json'.length
-      && !remainder.split('/').some((segment) => segment === '' || segment === '.' || segment === '..');
-  });
+function receiptPathForTest(testId, sourceSha) {
+  if (testId === HARDWARE_WEBGL2_TEST_ID) {
+    return `${OWNER_EVIDENCE_ROOT}hardware-webgl2-admission-${sourceSha}.json`;
+  }
+  const slug = String(testId).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return `${OWNER_EVIDENCE_ROOT}${slug}-${sourceSha}.json`;
 }
 
-function validateCandidateEvidenceLineage(candidateSha, errors, options) {
+function exactCandidateOutputPaths(graph, candidateSha) {
+  const paths = new Set(CANDIDATE_EVIDENCE_PROCESS_FILES);
+  for (const artifact of graph?.artifactCatalog ?? []) {
+    if (typeof artifact?.path === 'string') paths.add(artifact.path.replaceAll('\\', '/'));
+    if ((artifact?.testRefs ?? []).includes(HARDWARE_WEBGL2_TEST_ID)) {
+      if (typeof artifact.detailedReceiptPath === 'string') paths.add(artifact.detailedReceiptPath.replaceAll('\\', '/'));
+      if (typeof artifact.buildManifestPath === 'string') paths.add(artifact.buildManifestPath.replaceAll('\\', '/'));
+    }
+  }
+  return paths;
+}
+
+function validateCandidateEvidenceLineage(candidateSha, graph, errors, options) {
   let currentSha = options.currentGitSha;
   let currentStatus = options.currentGitStatus;
   try {
@@ -174,12 +187,14 @@ function validateCandidateEvidenceLineage(candidateSha, errors, options) {
     changedPaths = [];
   }
   const normalized = [...new Set(changedPaths.map((entry) => String(entry).trim().replaceAll('\\', '/')).filter(Boolean))].sort();
-  const blocked = normalized.filter((entry) => !isCandidateEvidenceProcessPath(entry));
-  if (blocked.length > 0) {
+  const expected = exactCandidateOutputPaths(graph, candidateSha);
+  const blocked = normalized.filter((entry) => !expected.has(entry));
+  const missing = [...expected].filter((entry) => !normalized.includes(entry)).sort();
+  if (blocked.length > 0 || missing.length > 0) {
     error(
       errors,
       'E_CANDIDATE_FROZEN_DELTA',
-      `S0-to-current changes include forbidden runtime, release-shell, test, verifier, workflow or unknown paths: ${blocked.join(', ')}.`,
+      `S0-to-current changes must equal the exact finalizer output set; missing=${missing.join(', ') || '<none>'}; forbidden=${blocked.join(', ') || '<none>'}.`,
     );
   }
   return { currentSha, currentStatus, changedPaths: normalized };
@@ -542,13 +557,21 @@ function validateArtifacts(graph, artifactIndex, testIndex, feedbackById, errors
     error(errors, 'E_CANDIDATE_SOURCE_SHA', 'candidateEvidenceSourceSha must be an exact 40-character commit SHA.');
   }
   const candidateLineage = candidateMode && /^[0-9a-f]{40}$/.test(candidateSha ?? '')
-    ? validateCandidateEvidenceLineage(candidateSha, errors, options)
+    ? validateCandidateEvidenceLineage(candidateSha, graph, errors, options)
     : null;
   for (const artifact of artifactIndex.values()) {
     const relativePath = artifact.path;
+    const feedbackIds = Array.isArray(artifact.feedbackIds) ? artifact.feedbackIds : [];
+    const testRefs = Array.isArray(artifact.testRefs) ? artifact.testRefs : [];
     if (typeof relativePath !== 'string' || !relativePath.replace(/\\/g, '/').startsWith('artifacts/pass65-owner-feedback/')) {
       error(errors, 'E_GRAPH_ARTIFACT_PATH', `${artifact.id} must live below artifacts/pass65-owner-feedback/.`);
       continue;
+    }
+    if (candidateMode && testRefs.length === 1) {
+      const expectedPath = receiptPathForTest(testRefs[0], candidateSha);
+      if (relativePath.replaceAll('\\', '/') !== expectedPath) {
+        error(errors, 'E_CANDIDATE_ARTIFACT_PATH', `${artifact.id} must use canonical exact-S0 receipt path ${expectedPath}.`);
+      }
     }
     const artifactPath = repositoryFile(relativePath, errors, 'E_GRAPH_ARTIFACT_PATH', artifact.id);
     let bytes = options.artifactBytesByPath?.get(relativePath);
@@ -576,8 +599,6 @@ function validateArtifacts(graph, artifactIndex, testIndex, feedbackById, errors
       || artifact.result !== 'passed') {
       error(errors, 'E_GRAPH_ARTIFACT_METADATA', `${artifact.id} has incomplete verifier/build/result metadata.`);
     }
-    const feedbackIds = Array.isArray(artifact.feedbackIds) ? artifact.feedbackIds : [];
-    const testRefs = Array.isArray(artifact.testRefs) ? artifact.testRefs : [];
     for (const duplicate of duplicateValues(feedbackIds)) error(errors, 'E_GRAPH_ARTIFACT_FEEDBACK_DUPLICATE', `${artifact.id} duplicates ${duplicate}.`);
     for (const duplicate of duplicateValues(testRefs)) error(errors, 'E_GRAPH_ARTIFACT_TEST_DUPLICATE', `${artifact.id} duplicates ${duplicate}.`);
     for (const feedbackId of feedbackIds) if (!feedbackById.has(feedbackId)) error(errors, 'E_GRAPH_ARTIFACT_UNKNOWN_FEEDBACK', `${artifact.id} references ${feedbackId}.`);
@@ -616,6 +637,17 @@ function validateArtifacts(graph, artifactIndex, testIndex, feedbackById, errors
         error(errors, 'E_GRAPH_ARTIFACT_RECEIPT', `${artifact.id} receipt content does not exactly mirror its catalog entry.`);
       }
       if (hardwareWebGl2Artifact) {
+        if (candidateMode) {
+          const expectedDetailPath = `${HARDWARE_EVIDENCE_ROOT}${candidateSha}-receipt.json`;
+          const expectedManifestPath = `${HARDWARE_EVIDENCE_ROOT}${candidateSha}-dist-manifest.json`;
+          if (receipt.detailedReceiptPath !== expectedDetailPath || receipt.buildManifestPath !== expectedManifestPath) {
+            error(
+              errors,
+              'E_CANDIDATE_ARTIFACT_PATH',
+              `${artifact.id} hardware evidence must use ${expectedDetailPath} and ${expectedManifestPath}.`,
+            );
+          }
+        }
         const detailPath = repositoryFile(receipt.detailedReceiptPath, errors, 'E_HARDWARE_WEBGL2_DETAIL_PATH', `${artifact.id} detail`);
         const manifestPath = repositoryFile(receipt.buildManifestPath, errors, 'E_HARDWARE_WEBGL2_MANIFEST_PATH', `${artifact.id} manifest`);
         if (!String(receipt.detailedReceiptPath ?? '').replace(/\\/g, '/').startsWith('artifacts/pass65/hardware-webgl2-admission/')
@@ -677,10 +709,23 @@ function validateArtifacts(graph, artifactIndex, testIndex, feedbackById, errors
             error(errors, 'E_HARDWARE_WEBGL2_CURRENT_BUILD', `${artifact.id} current production dist/ manifest is not labelled with frozen S0 ${candidateSha}.`);
           }
           const chromePath = detailedReceipt.environment?.chromeExecutable;
-          let chromeBytes = options.chromeExecutableBytesByPath?.get(chromePath);
-          if (!chromeBytes && typeof chromePath === 'string' && fs.existsSync(chromePath)) chromeBytes = fs.readFileSync(chromePath);
-          if (!chromeBytes || sha256(chromeBytes) !== detailedReceipt.environment?.chromeExecutableSha256) {
+          const recordedChromeSha = detailedReceipt.environment?.chromeExecutableSha256;
+          const injectedChrome = options.chromeExecutableBytesByPath;
+          let chromeBytes;
+          let chromeAvailable = false;
+          if (injectedChrome !== undefined) {
+            chromeAvailable = injectedChrome?.has(chromePath) === true;
+            if (chromeAvailable) chromeBytes = injectedChrome.get(chromePath);
+          } else if (typeof chromePath === 'string' && fs.existsSync(chromePath)) {
+            chromeBytes = fs.readFileSync(chromePath);
+            chromeAvailable = true;
+          }
+          if (!/^[0-9a-f]{64}$/.test(recordedChromeSha ?? '')) {
+            error(errors, 'E_HARDWARE_WEBGL2_CHROME_DIGEST', `${artifact.id} detailed receipt lacks a valid installed Chrome executable digest.`);
+          } else if (chromeAvailable && (!chromeBytes || sha256(chromeBytes) !== recordedChromeSha)) {
             error(errors, 'E_HARDWARE_WEBGL2_CHROME_DIGEST', `${artifact.id} installed Chrome executable identity does not match the detailed receipt.`);
+          } else if (!chromeAvailable && !candidateMode) {
+            error(errors, 'E_HARDWARE_WEBGL2_CHROME_DIGEST', `${artifact.id} installed Chrome executable is unavailable for strict local verification.`);
           }
         }
       }
@@ -782,6 +827,14 @@ function validateGraph(graph, ledgerContext, packageJson, errors, options) {
   }
 
   const artifactIndex = uniqueIndex(graph.artifactCatalog, 'Artifact catalog', errors, 'E_GRAPH_ARTIFACT_DUPLICATE');
+  if (options.candidateMode) {
+    try {
+      validateExactArtifactCatalog(graph, [...artifactIndex.values()]);
+    } catch (caught) {
+      if (caught instanceof FinalizationError) errors.push(caught.message);
+      else error(errors, 'E_CANDIDATE_ARTIFACT_CATALOG', `Exact artifact-catalog validation failed: ${caught.message}.`);
+    }
+  }
   validateArtifacts(graph, artifactIndex, testIndex, feedbackById, errors, options);
 
   const graphNodes = Array.isArray(graph.feedbackNodes) ? graph.feedbackNodes : [];
@@ -888,86 +941,80 @@ function buildCandidateFixture(graph, ledger) {
   const fixtureGraph = structuredClone(graph);
   const sourceSha = 'a'.repeat(40);
   const environmentHash = 'b'.repeat(64);
-  const feedbackById = new Map(parseLedger(ledger).feedbackRows.map((row) => [row.id, row]));
-  const candidateIds = fixtureGraph.feedbackNodes
-    .filter((node) => ['P0', 'P1'].includes(feedbackById.get(node.id)?.priority))
-    .map((node) => node.id);
-  const testRefs = [...new Set(fixtureGraph.feedbackNodes
-    .filter((node) => candidateIds.includes(node.id))
-    .flatMap((node) => node.verification.testRefs))].filter((testRef) => testRef !== HARDWARE_WEBGL2_TEST_ID).sort();
-  const receipt = {
-    schemaVersion: 1,
-    kind: 'pass65-owner-feedback-evidence',
-    sourceSha,
-    buildId: 'self-test-fixture',
-    verifierId: 'owner-feedback-self-test',
-    verifierVersion: '1',
-    environmentHash,
-    result: 'passed',
-    feedbackIds: candidateIds,
-    testRefs,
-  };
-  const relativePath = 'artifacts/pass65-owner-feedback/self-test-evidence.json';
-  const bytes = Buffer.from(JSON.stringify(receipt), 'utf8');
-  const artifact = {
-    id: 'ART-SELFTEST-001',
-    path: relativePath,
-    sha256: sha256(bytes),
-    sourceSha,
-    buildId: receipt.buildId,
-    verifierId: receipt.verifierId,
-    verifierVersion: receipt.verifierVersion,
-    environmentHash,
-    result: 'passed',
-    feedbackIds: candidateIds,
-    testRefs,
-  };
+  const feedbackByTest = new Map(fixtureGraph.testCatalog.map((test) => [test.id, []]));
+  for (const node of fixtureGraph.feedbackNodes) {
+    for (const testRef of node.verification.testRefs) feedbackByTest.get(testRef)?.push(node.id);
+  }
+  for (const feedbackIds of feedbackByTest.values()) feedbackIds.sort();
+
   const hardwareFixture = createHardwareWebGl2ReceiptFixture(sourceSha);
-  const hardwareFeedbackIds = candidateIds.filter((feedbackId) => HARDWARE_WEBGL2_FEEDBACK_IDS.includes(feedbackId));
-  const hardwareDetailPath = 'artifacts/pass65/hardware-webgl2-admission/self-test-receipt.json';
-  const hardwareManifestPath = 'artifacts/pass65/hardware-webgl2-admission/self-test-dist-manifest.json';
-  const hardwareSidecarPath = 'artifacts/pass65-owner-feedback/self-test-hardware-webgl2.json';
-  const hardwareSidecar = {
-    schemaVersion: 2,
-    kind: 'pass65-owner-feedback-evidence',
-    sourceSha,
-    buildId: 'self-test-hardware-webgl2',
-    verifierId: 'pass65-installed-chrome-hardware-webgl2-admission',
-    verifierVersion: '1',
-    environmentHash: hardwareFixture.environmentHash,
-    result: 'passed',
-    feedbackIds: hardwareFeedbackIds,
-    testRefs: [HARDWARE_WEBGL2_TEST_ID],
-    detailedReceiptPath: hardwareDetailPath,
-    detailedReceiptSha256: hardwareFixture.detailedReceiptSha256,
-    buildManifestPath: hardwareManifestPath,
-    buildManifestSha256: hardwareFixture.buildManifestSha256,
-  };
-  const hardwareSidecarBytes = Buffer.from(JSON.stringify(hardwareSidecar), 'utf8');
-  const hardwareArtifact = {
-    id: 'ART-SELFTEST-HARDWARE-WEBGL2',
-    path: hardwareSidecarPath,
-    sha256: sha256(hardwareSidecarBytes),
-    ...hardwareSidecar,
-  };
-  delete hardwareArtifact.schemaVersion;
-  delete hardwareArtifact.kind;
+  const hardwareDetailPath = `${HARDWARE_EVIDENCE_ROOT}${sourceSha}-receipt.json`;
+  const hardwareManifestPath = `${HARDWARE_EVIDENCE_ROOT}${sourceSha}-dist-manifest.json`;
+  const artifacts = [];
+  const artifactBytesByPath = new Map();
+  for (const test of fixtureGraph.testCatalog) {
+    const feedbackIds = feedbackByTest.get(test.id) ?? [];
+    const relativePath = receiptPathForTest(test.id, sourceSha);
+    const receipt = test.id === HARDWARE_WEBGL2_TEST_ID ? {
+      schemaVersion: 2,
+      kind: 'pass65-owner-feedback-evidence',
+      sourceSha,
+      buildId: 'self-test-hardware-webgl2',
+      verifierId: 'pass65-installed-chrome-hardware-webgl2-admission',
+      verifierVersion: '1',
+      environmentHash: hardwareFixture.environmentHash,
+      result: 'passed',
+      feedbackIds,
+      testRefs: [test.id],
+      detailedReceiptPath: hardwareDetailPath,
+      detailedReceiptSha256: hardwareFixture.detailedReceiptSha256,
+      buildManifestPath: hardwareManifestPath,
+      buildManifestSha256: hardwareFixture.buildManifestSha256,
+    } : {
+      schemaVersion: 1,
+      kind: 'pass65-owner-feedback-evidence',
+      sourceSha,
+      buildId: `self-test-${test.id.toLowerCase()}`,
+      verifierId: test.id,
+      verifierVersion: '1',
+      environmentHash,
+      result: 'passed',
+      feedbackIds,
+      testRefs: [test.id],
+    };
+    const bytes = Buffer.from(JSON.stringify(receipt), 'utf8');
+    const artifact = {
+      id: artifactIdForTest(test.id),
+      path: relativePath,
+      sha256: sha256(bytes),
+      sourceSha: receipt.sourceSha,
+      buildId: receipt.buildId,
+      verifierId: receipt.verifierId,
+      verifierVersion: receipt.verifierVersion,
+      environmentHash: receipt.environmentHash,
+      result: receipt.result,
+      feedbackIds: receipt.feedbackIds,
+      testRefs: receipt.testRefs,
+      ...(receipt.schemaVersion === 2 ? {
+        detailedReceiptPath: receipt.detailedReceiptPath,
+        detailedReceiptSha256: receipt.detailedReceiptSha256,
+        buildManifestPath: receipt.buildManifestPath,
+        buildManifestSha256: receipt.buildManifestSha256,
+      } : {}),
+    };
+    artifacts.push(artifact);
+    artifactBytesByPath.set(relativePath, bytes);
+  }
+  artifacts.sort((left, right) => left.id.localeCompare(right.id));
+  artifactBytesByPath.set(hardwareDetailPath, hardwareFixture.detailedBytes);
+  artifactBytesByPath.set(hardwareManifestPath, hardwareFixture.manifestBytes);
 
   fixtureGraph.candidateEvidenceSourceSha = sourceSha;
-  fixtureGraph.artifactCatalog = [artifact, hardwareArtifact];
+  fixtureGraph.artifactCatalog = artifacts;
   for (const node of fixtureGraph.feedbackNodes) {
-    if (!candidateIds.includes(node.id)) continue;
     node.verification.coverage = 'complete';
-    node.verification.artifactRefs = HARDWARE_WEBGL2_FEEDBACK_IDS.includes(node.id)
-      ? [artifact.id, hardwareArtifact.id]
-      : [artifact.id];
+    node.verification.artifactRefs = [...new Set(node.verification.testRefs.map(artifactIdForTest))].sort();
   }
-  const artifactBytesByPath = new Map([
-    [relativePath, bytes],
-    [hardwareSidecarPath, hardwareSidecarBytes],
-    [hardwareDetailPath, hardwareFixture.detailedBytes],
-    [hardwareManifestPath, hardwareFixture.manifestBytes],
-  ]);
   return {
     graph: fixtureGraph,
     artifactBytesByPath,
@@ -983,10 +1030,7 @@ function buildCandidateFixture(graph, ledger) {
       'acceptance/pass-66.json',
       'docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md',
       'docs/PASS65_OWNER_FEEDBACK_COMPLETENESS_GRAPH.json',
-      relativePath,
-      hardwareSidecarPath,
-      hardwareDetailPath,
-      hardwareManifestPath,
+      ...artifactBytesByPath.keys(),
     ],
     currentBuildManifest: hardwareFixture.manifest,
   };
@@ -1139,13 +1183,44 @@ function runSelfTest(ledger, matrix, agents, packageJson, graph) {
   const missingHardwareArtifact = structuredClone(fixture.graph);
   missingHardwareArtifact.feedbackNodes.find((node) => node.id === 'HF-001').verification.artifactRefs =
     missingHardwareArtifact.feedbackNodes.find((node) => node.id === 'HF-001').verification.artifactRefs
-      .filter((artifactRef) => artifactRef !== 'ART-SELFTEST-HARDWARE-WEBGL2');
+      .filter((artifactRef) => artifactRef !== artifactIdForTest(HARDWARE_WEBGL2_TEST_ID));
   expectRejected('candidate missing exact hardware WebGL2 artifact', 'E_CANDIDATE_HARDWARE_WEBGL2_ARTIFACT_REQUIRED', {
     ledger: readyLedger, graph: missingHardwareArtifact, options: fixtureOptions,
   });
+  const prioritiesByFeedback = new Map(parseLedger(readyLedger).feedbackRows.map((row) => [row.id, row.priority]));
+  const p2OnlyTest = fixture.graph.testCatalog.find((test) => {
+    const feedbackIds = fixture.graph.feedbackNodes
+      .filter((node) => node.verification.testRefs.includes(test.id))
+      .map((node) => node.id);
+    return feedbackIds.length > 0 && feedbackIds.every((feedbackId) => prioritiesByFeedback.get(feedbackId) === 'P2');
+  });
+  if (!p2OnlyTest) {
+    failures.push('E_SELFTEST_FIXTURE: Exact-catalog mutation could not find a P2-only graph test.');
+  } else {
+    const missingP2Receipt = structuredClone(fixture.graph);
+    missingP2Receipt.artifactCatalog = missingP2Receipt.artifactCatalog
+      .filter((artifact) => !artifact.testRefs.includes(p2OnlyTest.id));
+    for (const node of missingP2Receipt.feedbackNodes) {
+      node.verification.artifactRefs = node.verification.artifactRefs
+        .filter((artifactRef) => artifactRef !== artifactIdForTest(p2OnlyTest.id));
+    }
+    expectRejected('candidate missing P2-only test receipt', 'E_ARTIFACT_TEST_SET', {
+      ledger: readyLedger,
+      graph: missingP2Receipt,
+      options: fixtureOptions,
+    });
+  }
   const wrongDigest = structuredClone(fixture.graph);
   wrongDigest.artifactCatalog[0].sha256 = '0'.repeat(64);
   expectRejected('candidate stale artifact digest', 'E_CANDIDATE_ARTIFACT_DIGEST', { ledger: readyLedger, graph: wrongDigest, options: fixtureOptions });
+  const nonCanonicalReceiptPath = structuredClone(fixture.graph);
+  const normalArtifact = nonCanonicalReceiptPath.artifactCatalog.find((artifact) => !artifact.testRefs.includes(HARDWARE_WEBGL2_TEST_ID));
+  normalArtifact.path = `artifacts/pass65-owner-feedback/renamed-${fixture.graph.candidateEvidenceSourceSha}.json`;
+  expectRejected('candidate noncanonical receipt path', 'E_CANDIDATE_ARTIFACT_PATH', {
+    ledger: readyLedger,
+    graph: nonCanonicalReceiptPath,
+    options: fixtureOptions,
+  });
   const untrackedArtifactBytes = new Map(fixture.committedArtifactBytesByPath);
   untrackedArtifactBytes.delete(fixture.graph.artifactCatalog[0].path);
   expectRejected('ignored local artifact is not candidate evidence', 'E_CANDIDATE_ARTIFACT_UNTRACKED', {
@@ -1334,10 +1409,51 @@ function runSelfTest(ledger, matrix, agents, packageJson, graph) {
       currentChangedPaths: [...fixture.currentChangedPaths, 'artifacts/pass65-owner-feedback/unchecked.bin'],
     },
   });
+  expectRejected('arbitrary JSON in owner evidence root after S0', 'E_CANDIDATE_FROZEN_DELTA', {
+    ledger: readyLedger,
+    graph: fixture.graph,
+    options: {
+      ...fixtureOptions,
+      currentChangedPaths: [...fixture.currentChangedPaths, `artifacts/pass65-owner-feedback/runtime-${fixture.graph.candidateEvidenceSourceSha}.json`],
+    },
+  });
+  expectRejected('canonical-looking extra receipt after S0', 'E_CANDIDATE_FROZEN_DELTA', {
+    ledger: readyLedger,
+    graph: fixture.graph,
+    options: {
+      ...fixtureOptions,
+      currentChangedPaths: [...fixture.currentChangedPaths, `artifacts/pass65-owner-feedback/t-extra-${fixture.graph.candidateEvidenceSourceSha}.json`],
+    },
+  });
+  expectRejected('wrong-SHA receipt after S0', 'E_CANDIDATE_FROZEN_DELTA', {
+    ledger: readyLedger,
+    graph: fixture.graph,
+    options: {
+      ...fixtureOptions,
+      currentChangedPaths: [...fixture.currentChangedPaths, `artifacts/pass65-owner-feedback/t-extra-${'b'.repeat(40)}.json`],
+    },
+  });
+  expectRejected('missing required finalizer output after S0', 'E_CANDIDATE_FROZEN_DELTA', {
+    ledger: readyLedger,
+    graph: fixture.graph,
+    options: { ...fixtureOptions, currentChangedPaths: fixture.currentChangedPaths.slice(1) },
+  });
   expectRejected('current dist manifest drift', 'E_HARDWARE_WEBGL2_CURRENT_BUILD', {
     ledger: readyLedger,
     graph: fixture.graph,
     options: { ...fixtureOptions, currentBuildManifest: { ...fixture.currentBuildManifest, files: [] } },
+  });
+  const unavailableChromeResult = validate(readyLedger, matrix, agents, packageJson, fixture.graph, {
+    ...fixtureOptions,
+    chromeExecutableBytesByPath: new Map(),
+  });
+  if (unavailableChromeResult.errors.some((entry) => entry.startsWith('E_HARDWARE_WEBGL2_CHROME_DIGEST:'))) {
+    failures.push('E_SELFTEST_MUTATION: Candidate mode rejected a digest-bound external Chrome executable that is unavailable on this machine.');
+  }
+  expectRejected('missing installed Chrome outside candidate mode', 'E_HARDWARE_WEBGL2_CHROME_DIGEST', {
+    ledger: readyLedger,
+    graph: fixture.graph,
+    options: { ...fixtureOptions, candidateMode: false, chromeExecutableBytesByPath: new Map() },
   });
   const forgedChromeBytes = new Map(fixture.chromeExecutableBytesByPath);
   forgedChromeBytes.set([...forgedChromeBytes.keys()][0], Buffer.from('forged chrome', 'utf8'));
