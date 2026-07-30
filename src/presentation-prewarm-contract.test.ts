@@ -256,7 +256,7 @@ describe('presentation prewarm startup contract', () => {
       source.indexOf('function buildSky()'),
     );
     const finalWebGlPresentationSync = source.slice(
-      source.indexOf('function synchronizeFinalWebGlMatchPrimePresentation()'),
+      source.indexOf('function synchronizeFrozenMatchPrimePresentation()'),
       source.indexOf('async function primeFinalWebGlMatchPresentation()'),
     );
     expect(finalWebGlPresentationSync).toContain('camera.position.copy(player.position);');
@@ -266,7 +266,7 @@ describe('presentation prewarm startup contract', () => {
     expect(finalWebGlPresentationSync).not.toContain('updatePhysics(');
     expect(finalWebGlPresentationSync).not.toContain('weaponView.update(');
     expect(finalWebGlPrime).toContain("renderRuntime.backend === 'webgpu'");
-    expect(finalWebGlPrime).toContain('synchronizeFinalWebGlMatchPrimePresentation();');
+    expect(finalWebGlPrime).toContain('synchronizeFrozenMatchPrimePresentation();');
     expect(finalWebGlPrime).toContain('atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);');
     expect(finalWebGlPresentationSync).not.toContain('function yieldPresentationFrameOrBackgroundTask()');
     expect(finalWebGlPrime).toContain('const nextForegroundPresentationFrame = async (): Promise<number> => {');
@@ -357,7 +357,7 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain("presentation.status === 'stalled'");
     expect(source).not.toContain('consecutiveMinimumTierSlowSamples');
     expect(source).not.toContain('Live WebGPU queue latency');
-    expect(matchDeployment).toContain("resetWebGpuPresentationEpoch('match admitted', performance.now());");
+    expect(matchDeployment).toContain("resetWebGpuPresentationEpoch('match admitted', lastFrame);");
     expect(matchDeployment).toContain('matchWebGpuQualityFrozen = shouldFreezeAdaptiveQualityForMatch(renderRuntime.backend);');
     expect(source).toContain("reconcilePresentationScheduling(document.hidden ? 'tab visibility hidden' : 'tab visibility regained');");
     expect(source).toContain("reconcilePresentationScheduling('window focus regained');");
@@ -441,7 +441,11 @@ describe('presentation prewarm startup contract', () => {
     expect(runtimeSource.match(/await prewarmRiggedOperatorActions\(/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
     expect(operatorPrewarm).toContain('...corpsePresentationPool.map((entry) => entry.root)');
     expect(operatorPrewarm).toContain('await withArenaFrustumCullingDisabled(scene, async () => {');
-    expect(operatorPrewarm).toContain('Promise.all(operatorRoots.map((root) => renderRuntime.compileAndRender(root, camera, scene)))');
+    expect(operatorPrewarm).toContain('const rootsPerSubmission = 2;');
+    expect(operatorPrewarm).toContain('const batch = operatorRoots.slice(offset, offset + rootsPerSubmission);');
+    expect(operatorPrewarm).toContain('await Promise.all(batch.map((root) => renderRuntime.compileAndRender(root, camera, scene)));');
+    expect(operatorPrewarm).toContain('await yieldDeploymentPrewarmFrame();');
+    expect(operatorPrewarm).not.toContain('Promise.all(operatorRoots.map((root) => renderRuntime.compileAndRender(root, camera, scene)))');
     expect(webGpuOperatorPrewarm).not.toContain('renderRuntime.compileAndRender(scene, camera, scene)');
     expect(runtimeSource).toContain('const restoreCorpsePoolPrewarm = stageCorpsePresentationPoolForPrewarm();\n  try {\n    await prewarmBotPresentations();\n  } catch (error) {\n    restoreCorpsePoolPrewarm();\n    throw error;\n  }');
     expect(runtimeSource).toContain('scheduleBrowserPreparationIdleTask(resolve, 180)');
