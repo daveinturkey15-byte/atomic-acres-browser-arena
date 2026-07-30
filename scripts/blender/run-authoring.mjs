@@ -73,11 +73,11 @@ function authorCrossbow() {
 }
 
 function authorOperatorArms() {
-  mkdirSync('public/assets/original/models/operators', { recursive: true });
+  if (!dryRun) mkdirSync('public/assets/original/models/operators', { recursive: true });
   const raw = 'artifacts/blender-operator-arms/djmaesen-prototype';
   const reviews = `${raw}/reviews`;
   const reviewWeapons = `${raw}/review-weapons`;
-  mkdirSync(reviewWeapons, { recursive: true });
+  if (!dryRun) mkdirSync(reviewWeapons, { recursive: true });
   const weaponSources = {
     pistol: 'public/assets/original/models/weapons/pass65-firearms/pistol/pistol-fp-lod0.glb',
     mp5: 'public/assets/original/models/weapons/pass65-firearms/mp5/mp5-fp-lod0.glb',
@@ -95,31 +95,33 @@ function authorOperatorArms() {
     `${raw}/pass65-first-person-arms-lod${lod}.glb`,
     `public/assets/original/models/operators/pass65-first-person-arms-lod${lod}.glb`,
   );
-  mkdirSync('public/assets/original/textures/operators/pass65-first-person-arms', { recursive: true });
-  for (const map of ['baseColor', 'normal', 'roughness', 'metallic']) copyFileSync(
-    `${raw}/textures/pass65-first-person-arms-${map}.png`,
-    `public/assets/original/textures/operators/pass65-first-person-arms/pass65-first-person-arms-${map}.png`,
-  );
-  copyFileSync(
-    `${raw}/pass65-first-person-arms-djmaesen-prototype.blend`,
-    'source-assets/blender/pass65-first-person-operator-arms.blend',
-  );
-  copyFileSync(
-    `${reviews}/weapon-contact-receipt.json`,
-    'source-assets/blender/pass65-first-person-operator-arms-contact-receipt.json',
-  );
-  mkdirSync('docs/assets/pass65-operators/first-person-arms', { recursive: true });
-  for (const label of [
-    'pistol-hip', 'mp5-hip', 'm4a1-hip', 'm4a1-grip-oblique',
-    'm4a1-ads', 'm4a1-reload', 'knife-contact',
-  ]) copyFileSync(
-    `${reviews}/pass65-djmaesen-arms-${label}.png`,
-    `docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-${label}.png`,
-  );
-  copyFileSync(
-    `${reviews}/pass65-djmaesen-arms-weapon-contact-sheet.png`,
-    'docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-contact-sheet.png',
-  );
+  if (!dryRun) {
+    mkdirSync('public/assets/original/textures/operators/pass65-first-person-arms', { recursive: true });
+    for (const map of ['baseColor', 'normal', 'roughness', 'metallic']) copyFileSync(
+      `${raw}/textures/pass65-first-person-arms-${map}.png`,
+      `public/assets/original/textures/operators/pass65-first-person-arms/pass65-first-person-arms-${map}.png`,
+    );
+    copyFileSync(
+      `${raw}/pass65-first-person-arms-djmaesen-prototype.blend`,
+      'source-assets/blender/pass65-first-person-operator-arms.blend',
+    );
+    copyFileSync(
+      `${reviews}/weapon-contact-receipt.json`,
+      'source-assets/blender/pass65-first-person-operator-arms-contact-receipt.json',
+    );
+    mkdirSync('docs/assets/pass65-operators/first-person-arms', { recursive: true });
+    for (const label of [
+      'pistol-hip', 'mp5-hip', 'm4a1-hip', 'm4a1-grip-oblique',
+      'm4a1-ads', 'm4a1-reload', 'knife-contact',
+    ]) copyFileSync(
+      `${reviews}/pass65-djmaesen-arms-${label}.png`,
+      `docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-${label}.png`,
+    );
+    copyFileSync(
+      `${reviews}/pass65-djmaesen-arms-weapon-contact-sheet.png`,
+      'docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-contact-sheet.png',
+    );
+  }
 }
 
 function authorSupportVehicles() {
