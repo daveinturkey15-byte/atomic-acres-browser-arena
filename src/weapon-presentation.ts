@@ -209,6 +209,8 @@ const MELEE_PRESENTATION_MS = 520;
 // that needs more than a small authored tolerance, so malformed assets cannot
 // be hidden by the runtime solver.
 const RIGGED_ARM_MAX_REACH_RATIO = 0.992;
+/** Unit -Z blade axis reused by the per-frame melee knife alignment. */
+const KNIFE_BLADE_AXIS = Object.freeze(new THREE.Vector3(0, 0, -1));
 export const HIP_VIEWMODEL_POSITION = Object.freeze({ x: 0.4, y: -0.42, z: -1.02 });
 export const HIP_VIEWMODEL_SCALE = 0.54;
 /** Camera-space Z clearance preventing thicker arm geometry from crossing the near plane. */
@@ -334,6 +336,7 @@ export class WeaponPresentation {
   private readonly meleePoseQuaternion = new THREE.Quaternion();
   private readonly meleeGripWorld = new THREE.Vector3();
   private readonly meleeSocketWorld = new THREE.Vector3();
+  private readonly frameTargetPosition = new THREE.Vector3();
   private authoredArmsRoot: THREE.Group | null = null;
   private riggedArmDiagnostics: Array<Record<string, unknown>> = [];
   private nextRiggedArmDiagnosticsAt = 0;
@@ -2180,7 +2183,7 @@ export class WeaponPresentation {
         const fingerDir = right.wrist.worldToLocal(right.finger.getWorldPosition(this.meleeGripWorld));
         if (fingerDir.lengthSq() > 1e-6) {
           fingerDir.normalize();
-          this.meleeKnife.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), fingerDir);
+          this.meleeKnife.quaternion.setFromUnitVectors(KNIFE_BLADE_AXIS as THREE.Vector3, fingerDir);
           this.meleeKnife.rotateZ(-0.2);
         }
       }
@@ -2552,7 +2555,7 @@ export class WeaponPresentation {
     const viewmodelBaseX = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.x, ADS_VIEWMODEL_BASE_POSITION.x, this.adsBlend);
     const viewmodelBaseY = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.y, ADS_VIEWMODEL_BASE_POSITION.y, this.adsBlend);
     const viewmodelBaseZ = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.z, ADS_VIEWMODEL_BASE_POSITION.z, this.adsBlend);
-    const targetPosition = new THREE.Vector3(
+    const targetPosition = this.frameTargetPosition.set(
       viewmodelBaseX + adsX + bobX + this.swayX - pose.lateralSpeed * 0.012 - meleeArc * 0.12 + grenadeArc * 0.18 + reloadStage.lateral,
       viewmodelBaseY + adsY + bobY + breath + sprintDrop + crouchLift + proneLift + switchDrop + reloadStage.lift - presentationKick * 0.095 - pose.landingImpulse * 0.075,
       viewmodelBaseZ + adsZ + (pose.surfaceRetreat ?? 0) - VIEWMODEL_NEAR_PLANE_CLEARANCE + presentationKick * profile.recoilTranslation * 1.12 - meleeArc * 0.18 + grenadeArc * 0.24,
