@@ -70,8 +70,8 @@ describe('smoke grenade volume presentation', () => {
           }
         });
       }
-      expect(geometries.size).toBe(4);
-      expect(materials.size).toBe(4);
+      expect(geometries.size).toBe(6);
+      expect(materials.size).toBe(6);
       expect(alphaTextures.size).toBe(4);
     });
     await Promise.all([
@@ -163,7 +163,7 @@ describe('smoke grenade volume presentation', () => {
     await expect(pool.prewarm(runtime, camera)).rejects.toThrow('disposed');
   });
 
-  it('uses two bounded draw calls and no per-frame scene allocations', () => {
+  it('uses two density draws plus a bounded on-demand corridor-mask draw and no per-frame scene allocations', () => {
     const scene = new THREE.Scene();
     const pool = new SmokeVolumePresentationPool(scene, 2);
     const roots = [...scene.children];
@@ -185,6 +185,7 @@ describe('smoke grenade volume presentation', () => {
     expect(scene.getObjectByName('smoke-grenade-dense-core')).toBeUndefined();
     expect(scene.getObjectByName('smoke-grenade-inner-density-cards')).toBeInstanceOf(THREE.InstancedMesh);
     expect(scene.getObjectByName('smoke-grenade-soft-edge-cards')).toBeInstanceOf(THREE.InstancedMesh);
+    expect(scene.getObjectByName('smoke-grenade-shot-corridor-masks')).toBeInstanceOf(THREE.InstancedMesh);
     expect((scene.getObjectByName('smoke-grenade-inner-density-cards') as THREE.InstancedMesh).count).toBe(SMOKE_PRESENTATION_CARD_COUNT);
     expect((scene.getObjectByName('smoke-grenade-soft-edge-cards') as THREE.InstancedMesh).count).toBe(SMOKE_PRESENTATION_CARD_COUNT);
     expect(pool.telemetry()).toMatchObject({ capacity: 2, active: 1, liveDisposals: 0 });
@@ -284,13 +285,22 @@ describe('smoke grenade volume presentation', () => {
     pool.update(lease, 2_000);
     const denseInnerOpacity = innerMaterial.opacity;
     const denseEdgeOpacity = edgeMaterial.opacity;
-    pool.disturb(lease, { x: 1, y: 0.2, z: -0.4 }, 1, 2_000);
+    pool.disturb(lease, { x: -6, y: 1.2, z: -2 }, { x: 6, y: 1.2, z: 2 }, 1, 2_000);
     pool.update(lease, 2_001);
+    const corridorMasks = scene.getObjectByName('smoke-grenade-shot-corridor-masks') as THREE.InstancedMesh;
     expect(inner.position.length()).toBeGreaterThan(0.3);
     expect(edge.position.length()).toBeGreaterThan(0.2);
     expect(inner.position.dot(edge.position)).toBeLessThan(0);
     expect(innerMaterial.opacity).toBeLessThan(denseInnerOpacity * 0.3);
     expect(edgeMaterial.opacity).toBeLessThan(denseEdgeOpacity * 0.6);
+    expect(corridorMasks.count).toBe(1);
+    expect(corridorMasks.visible).toBe(true);
+    expect((corridorMasks.material as THREE.MeshBasicMaterial)).toMatchObject({
+      colorWrite: false,
+      stencilWrite: true,
+      stencilFunc: THREE.AlwaysStencilFunc,
+    });
+    expect(innerMaterial).toMatchObject({ stencilWrite: true, stencilFunc: THREE.NotEqualStencilFunc });
     expect(scene.children).toEqual(rootsBefore);
     expect(pool.telemetry()).toMatchObject({ active: 1, liveDisposals: 0, cardsPerVolume: 3 });
     pool.terminalDispose();

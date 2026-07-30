@@ -11990,12 +11990,13 @@ function synchronizeSmokePresentation(snapshot: SmokeAuthoritySnapshot, nowHostT
     const observedCorridorIds = existing?.observedCorridorIds ?? new Set<string>();
     for (const corridor of volume.corridors) {
       if (observedCorridorIds.has(corridor.id)) continue;
-      const direction = new THREE.Vector3(
-        corridor.end.x - corridor.start.x,
-        corridor.end.y - corridor.start.y,
-        corridor.end.z - corridor.start.z,
+      smokeVolumePresentationPool.disturb(
+        presentationLease,
+        corridor.start,
+        corridor.end,
+        0.82,
+        corridor.createdAtHostTimeMs,
       );
-      smokeVolumePresentationPool.disturb(presentationLease, direction, 0.82, corridor.createdAtHostTimeMs);
     }
     observedCorridorIds.clear();
     for (const corridor of volume.corridors) observedCorridorIds.add(corridor.id);

@@ -1,7 +1,13 @@
 import * as THREE from 'three';
 import { yieldBrowserPreparationFrame } from './browser-preparation-scheduler';
 import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
-import { SMOKE_COLOUR_PALETTE, SMOKE_VOLUME_LIFETIME_MS } from './smoke-authority';
+import {
+  MAX_SMOKE_CORRIDORS_PER_VOLUME,
+  SMOKE_COLOUR_PALETTE,
+  SMOKE_CORRIDOR_LIFETIME_MS,
+  SMOKE_CORRIDOR_RADIUS_M,
+  SMOKE_VOLUME_LIFETIME_MS,
+} from './smoke-authority';
 
 export const SMOKE_PRESENTATION_CARD_COUNT = 3;
 export const SMOKE_PRESENTATION_LIFETIME_MS = SMOKE_VOLUME_LIFETIME_MS;
@@ -119,12 +125,15 @@ export class SmokeVolumePresentation {
   readonly root = new THREE.Group();
   private readonly innerGeometry = new THREE.PlaneGeometry(2, 2);
   private readonly edgeGeometry = new THREE.PlaneGeometry(2, 2);
+  private readonly corridorGeometry = new THREE.CylinderGeometry(1, 1, 2, 12, 1, true);
   private readonly innerAlphaTexture = radialAlphaTexture('smoke-grenade-inner-noise-alpha', SMOKE_ALPHA_TEXTURE_SIZE, 11, 0.58);
   private readonly edgeAlphaTexture = radialAlphaTexture('smoke-grenade-soft-radial-alpha', SMOKE_ALPHA_TEXTURE_SIZE, 29, 0.42);
   private readonly coreMaterial: THREE.MeshBasicMaterial;
   private readonly edgeMaterial: THREE.MeshBasicMaterial;
+  private readonly corridorMaterial: THREE.MeshBasicMaterial;
   private readonly innerCards: THREE.InstancedMesh;
   private readonly cards: THREE.InstancedMesh;
+  private readonly corridorMasks: THREE.InstancedMesh;
   private disposed = false;
   private active = false;
   private startsAtMs = 0;
@@ -137,6 +146,18 @@ export class SmokeVolumePresentation {
   private crowdingEdgeVisible = true;
   private crowdedCluster = false;
   private readonly disturbanceDirection = new THREE.Vector3();
+  private corridorCursor = 0;
+  private readonly corridorRecords = Array.from({ length: MAX_SMOKE_CORRIDORS_PER_VOLUME }, () => ({
+    position: new THREE.Vector3(),
+    quaternion: new THREE.Quaternion(),
+    createdAtMs: Number.NEGATIVE_INFINITY,
+  }));
+  private readonly corridorMatrix = new THREE.Matrix4();
+  private readonly corridorScale = new THREE.Vector3();
+  private readonly corridorStart = new THREE.Vector3();
+  private readonly corridorEnd = new THREE.Vector3();
+  private readonly corridorNearest = new THREE.Vector3();
+  private readonly corridorYAxis = new THREE.Vector3(0, 1, 0);
   private readonly envelope: MutableSmokePresentationEnvelope = {
     active: false, growth: 0, coreOpacity: 0, edgeOpacity: 0, lifetimeProgress: 0,
   };
@@ -160,6 +181,28 @@ export class SmokeVolumePresentation {
       transparent: true, opacity: 0, depthWrite: false, alphaTest: 0.015,
       side: THREE.DoubleSide, toneMapped: false,
     });
+    this.corridorMaterial = new THREE.MeshBasicMaterial({
+      name: 'smoke-grenade-shot-corridor-mask',
+      colorWrite: false,
+      depthTest: false,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      toneMapped: false,
+      stencilWrite: true,
+      stencilRef: 1,
+      stencilFunc: THREE.AlwaysStencilFunc,
+      stencilFail: THREE.KeepStencilOp,
+      stencilZFail: THREE.KeepStencilOp,
+      stencilZPass: THREE.ReplaceStencilOp,
+    });
+    for (const material of [this.coreMaterial, this.edgeMaterial]) {
+      material.stencilWrite = true;
+      material.stencilRef = 1;
+      material.stencilFunc = THREE.NotEqualStencilFunc;
+      material.stencilFail = THREE.KeepStencilOp;
+      material.stencilZFail = THREE.KeepStencilOp;
+      material.stencilZPass = THREE.KeepStencilOp;
+    }
     // Transparent DoubleSide materials otherwise render back and front passes,
     // doubling density and draw calls for every card batch.
     this.coreMaterial.forceSinglePass = true;
@@ -170,6 +213,16 @@ export class SmokeVolumePresentation {
     this.cards = new THREE.InstancedMesh(this.edgeGeometry, this.edgeMaterial, SMOKE_PRESENTATION_CARD_COUNT);
     this.cards.name = 'smoke-grenade-soft-edge-cards';
     this.cards.renderOrder = 19;
+    this.corridorMasks = new THREE.InstancedMesh(
+      this.corridorGeometry,
+      this.corridorMaterial,
+      MAX_SMOKE_CORRIDORS_PER_VOLUME,
+    );
+    this.corridorMasks.name = 'smoke-grenade-shot-corridor-masks';
+    this.corridorMasks.renderOrder = 17;
+    this.corridorMasks.count = 0;
+    this.corridorMasks.frustumCulled = false;
+    this.corridorMasks.raycast = () => undefined;
     for (let index = 0; index < SMOKE_PRESENTATION_CARD_COUNT; index += 1) {
       const yaw = index * Math.PI / SMOKE_PRESENTATION_CARD_COUNT;
       this.cardPosition.set((index - 1) * 0.045, index === 1 ? 0.055 : -0.025, 0);
@@ -185,7 +238,8 @@ export class SmokeVolumePresentation {
     this.innerCards.instanceMatrix.needsUpdate = true;
     this.cards.instanceMatrix.setUsage(THREE.StaticDrawUsage);
     this.cards.instanceMatrix.needsUpdate = true;
-    this.root.add(this.innerCards, this.cards);
+    this.corridorMasks.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.root.add(this.corridorMasks, this.innerCards, this.cards);
     this.root.visible = false;
   }
 
@@ -206,6 +260,9 @@ export class SmokeVolumePresentation {
     this.root.userData.smokeColourHex = colourHex;
     this.disturbedAtMs = Number.NEGATIVE_INFINITY;
     this.disturbance = 0;
+    this.corridorCursor = 0;
+    for (const record of this.corridorRecords) record.createdAtMs = Number.NEGATIVE_INFINITY;
+    this.corridorMasks.count = 0;
     this.innerCards.position.set(0, 0, 0);
     this.innerCards.rotation.z = 0;
     this.cards.position.set(0, 0, 0);
@@ -237,6 +294,22 @@ export class SmokeVolumePresentation {
     const crowdedDensityScale = this.crowdedCluster ? 1.65 : 1;
     this.coreMaterial.opacity = envelope.coreOpacity * densityScale * crowdedDensityScale * (1 - disturbancePulse * 0.88);
     this.edgeMaterial.opacity = envelope.edgeOpacity * densityScale * crowdedDensityScale * (1 - disturbancePulse * 0.7);
+    let activeCorridors = 0;
+    const localRadius = Math.max(0.001, this.radiusM);
+    for (const record of this.corridorRecords) {
+      if (nowMs - record.createdAtMs < 0 || nowMs - record.createdAtMs >= SMOKE_CORRIDOR_LIFETIME_MS) continue;
+      this.corridorScale.set(
+        SMOKE_CORRIDOR_RADIUS_M / localRadius,
+        1.08,
+        SMOKE_CORRIDOR_RADIUS_M / localRadius,
+      );
+      this.corridorMatrix.compose(record.position, record.quaternion, this.corridorScale);
+      this.corridorMasks.setMatrixAt(activeCorridors, this.corridorMatrix);
+      activeCorridors += 1;
+    }
+    this.corridorMasks.count = activeCorridors;
+    this.corridorMasks.visible = activeCorridors > 0;
+    if (activeCorridors > 0) this.corridorMasks.instanceMatrix.needsUpdate = true;
     return true;
   }
 
@@ -278,10 +351,28 @@ export class SmokeVolumePresentation {
     this.cards.count = cardCount;
   }
 
-  disturb(direction: Readonly<{ x: number; y: number; z: number }>, strength: number, nowMs: number): void {
+  disturb(
+    start: Readonly<{ x: number; y: number; z: number }>,
+    end: Readonly<{ x: number; y: number; z: number }>,
+    strength: number,
+    nowMs: number,
+  ): void {
     if (!this.active || this.disposed) return;
-    this.disturbanceDirection.set(direction.x, direction.y, direction.z);
+    this.corridorStart.set(start.x, start.y, start.z);
+    this.corridorEnd.set(end.x, end.y, end.z);
+    this.disturbanceDirection.copy(this.corridorEnd).sub(this.corridorStart);
     if (this.disturbanceDirection.lengthSq() > 1e-8) this.disturbanceDirection.normalize();
+    else return;
+    const along = THREE.MathUtils.clamp(
+      this.corridorNearest.copy(this.root.position).sub(this.corridorStart).dot(this.disturbanceDirection),
+      0,
+      this.corridorEnd.distanceTo(this.corridorStart),
+    );
+    this.corridorNearest.copy(this.corridorStart).addScaledVector(this.disturbanceDirection, along);
+    const record = this.corridorRecords[this.corridorCursor++ % this.corridorRecords.length]!;
+    record.position.copy(this.corridorNearest).sub(this.root.position).divideScalar(Math.max(0.001, this.radiusM));
+    record.quaternion.setFromUnitVectors(this.corridorYAxis, this.disturbanceDirection);
+    record.createdAtMs = nowMs;
     this.disturbance = clamp01(strength);
     this.disturbedAtMs = nowMs;
   }
@@ -295,22 +386,25 @@ export class SmokeVolumePresentation {
     this.innerCards.rotation.z = 0;
     this.cards.position.set(0, 0, 0);
     this.cards.rotation.z = 0;
+    this.corridorMasks.count = 0;
+    this.corridorMasks.visible = false;
   }
 
   isActive(): boolean {
     return this.active && this.root.visible && !this.disposed;
   }
 
-  telemetry(): Readonly<{ active: boolean; drawCalls: number; cards: number; qualityScale: number; crowded: boolean; coreOpacity: number; edgeOpacity: number; triangles: number }> {
+  telemetry(): Readonly<{ active: boolean; drawCalls: number; cards: number; corridors: number; qualityScale: number; crowded: boolean; coreOpacity: number; edgeOpacity: number; triangles: number }> {
     return Object.freeze({
       active: this.isActive(),
-      drawCalls: this.isActive() ? 1 + Number(this.cards.visible) : 0,
+      drawCalls: this.isActive() ? 1 + Number(this.cards.visible) + Number(this.corridorMasks.visible) : 0,
       cards: this.cards.count,
+      corridors: this.corridorMasks.count,
       qualityScale: this.qualityScale,
       crowded: this.crowdedCluster,
       coreOpacity: this.coreMaterial.opacity,
       edgeOpacity: this.edgeMaterial.opacity,
-      triangles: (this.innerCards.count + this.cards.count) * 2,
+      triangles: (this.innerCards.count + this.cards.count) * 2 + this.corridorMasks.count * 24,
     });
   }
 
@@ -321,8 +415,10 @@ export class SmokeVolumePresentation {
     this.root.removeFromParent();
     this.innerGeometry.dispose();
     this.edgeGeometry.dispose();
+    this.corridorGeometry.dispose();
     this.coreMaterial.dispose();
     this.edgeMaterial.dispose();
+    this.corridorMaterial.dispose();
     this.innerAlphaTexture.dispose();
     this.edgeAlphaTexture.dispose();
     this.root.visible = false;
@@ -430,6 +526,12 @@ export class SmokeVolumePresentationPool {
       // current instanced-card count. An inactive transparent slot can compile
       // successfully while leaving its first useful fragment work deferred.
       presentation.activate(localTarget, 0, SMOKE_PRESENTATION_LIFETIME_MS, 4.2);
+      presentation.disturb(
+        localTarget.clone().addScaledVector(forward, -5),
+        localTarget.clone().addScaledVector(forward, 5),
+        1,
+        SMOKE_PRESENTATION_GROW_MS,
+      );
       presentation.update(SMOKE_PRESENTATION_GROW_MS);
       presentation.root.traverse((node) => { node.frustumCulled = false; });
     }
@@ -499,12 +601,13 @@ export class SmokeVolumePresentationPool {
 
   disturb(
     lease: SmokeVolumePresentationLease,
-    direction: Readonly<{ x: number; y: number; z: number }>,
+    start: Readonly<{ x: number; y: number; z: number }>,
+    end: Readonly<{ x: number; y: number; z: number }>,
     strength: number,
     nowMs: number,
   ): void {
     const slot = this.slots[lease.slot];
-    if (slot?.generation === lease.generation) slot.presentation.disturb(direction, strength, nowMs);
+    if (slot?.generation === lease.generation) slot.presentation.disturb(start, end, strength, nowMs);
   }
 
   clear(): void {
