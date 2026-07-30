@@ -763,7 +763,7 @@ try {
       errors.push(message.text());
     }
   });
-  await page.goto(`http://127.0.0.1:${port}/?release=latest&renderer=webgpu&map=rustworks-1v1&render=blender&grass=on&mist=on&seed=6501${traceNodeBuilds ? '&traceNodeBuilds=1' : ''}`);
+  await page.goto(`http://127.0.0.1:${port}/?release=latest&renderer=webgpu&externalServices=off&map=rustworks-1v1&render=blender&grass=on&mist=on&seed=6501${traceNodeBuilds ? '&traceNodeBuilds=1' : ''}`);
   await page.addStyleTag({
     content: 'html[data-pass65-canvas-only="true"] body > :not(#app), html[data-pass65-canvas-only="true"] #app > :not(#game) { visibility: hidden !important; }',
   });

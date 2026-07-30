@@ -280,7 +280,7 @@ try {
     page.on('pageerror', (error) => errors.push(error.message));
     page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
     page.on('request', (request) => { if (request.resourceType() === 'script') scripts.push(request.url()); });
-    await page.goto(`http://127.0.0.1:${port}/?release=latest&renderer=webgpu&map=${arenaId}&render=blender&grass=on&mist=on&seed=6401`);
+    await page.goto(`http://127.0.0.1:${port}/?release=latest&renderer=webgpu&externalServices=off&map=${arenaId}&render=blender&grass=on&mist=on&seed=6401`);
     await page.waitForFunction(() => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
       const state = api?.snapshot();
@@ -521,7 +521,7 @@ try {
   switchPage.on('request', (request) => {
     if (request.resourceType() === 'script' && /\/rendering\/arenas\//.test(request.url())) switchScripts.push(request.url());
   });
-  await switchPage.goto(`http://127.0.0.1:${port}/?renderer=webgpu&map=atomic-acres&render=blender&seed=6401`);
+  await switchPage.goto(`http://127.0.0.1:${port}/?renderer=webgpu&externalServices=off&map=atomic-acres&render=blender&seed=6401`);
   await switchPage.waitForFunction(() => {
     const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
     return state?.weaponReady === true && state?.bootstrap?.stage === 'ready';

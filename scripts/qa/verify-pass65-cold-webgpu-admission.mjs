@@ -150,7 +150,7 @@ try {
       });
       await stubExternalServices(page);
 
-      await page.goto(`http://127.0.0.1:${port}/?release=latest&renderer=webgpu&render=blender&map=atomic-acres&seed=${65_100 + trial}`);
+      await page.goto(`http://127.0.0.1:${port}/?release=latest&renderer=webgpu&externalServices=off&render=blender&map=atomic-acres&seed=${65_100 + trial}`);
       await page.waitForFunction(() => {
         const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
         return state?.bootstrap.stage === 'ready'

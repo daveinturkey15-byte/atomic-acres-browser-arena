@@ -939,7 +939,7 @@ async function runTrial(trial: number): Promise<TrialReceipt> {
     if (headed) await page.bringToFront();
     phase = 'cold-menu';
     await page.goto(
-      `http://127.0.0.1:${port}/?release=latest&renderer=webgl2&render=performance&map=atomic-acres&seed=${6_500 + trial}`,
+      `http://127.0.0.1:${port}/?release=latest&renderer=webgl2&externalServices=off&render=performance&map=atomic-acres&seed=${6_500 + trial}`,
       { waitUntil: 'domcontentloaded', timeout: 60_000 },
     );
     await page.waitForFunction(() => {
