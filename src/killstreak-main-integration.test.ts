@@ -137,7 +137,7 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(targetingBlock).toContain("if (id === 'care-package' || id === 'carpet-bomber') {");
     expect(source).toContain('function updateCrosshairSupportPreview()');
     expect(source).toContain('function confirmCrosshairSupportTarget(');
-    expect(source).toContain('requestKillstreakActivation(targeting.id, confirmedAt, [point.x, point.y, point.z])');
+    expect(source).toMatch(/requestKillstreakActivation\(\s*targeting\.id,\s*confirmedAt,\s*\[point\.x, point\.y, point\.z\],\s*targeting\.id === 'carpet-bomber' \? crosshairPreviewFacing \?\? undefined : undefined,\s*\)/);
     expect(source).toContain('cancelSupportTargeting(true)');
     expect(source).toContain('let groundSampler: SupportPlacementGroundSampler | null = null;');
     expect(source).toContain('groundSampler ??= new SupportPlacementGroundSampler({');

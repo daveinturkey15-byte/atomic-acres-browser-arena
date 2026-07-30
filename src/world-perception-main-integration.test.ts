@@ -45,6 +45,8 @@ describe('world and perception runtime integration', () => {
 
   it('routes grenade and Carpet Bomber impacts through structural blast classes', () => {
     expect(source).toContain("'grenade-major-collapse'");
-    expect(source).toContain("impact.source === 'carpet-bomber' ? 'carpet-bomber-obliteration' : undefined");
+    expect(source).toContain("if (impact.source === 'carpet-bomber') {");
+    expect(source).toContain("shedBlastClass: 'carpet-bomber-obliteration'");
+    expect(source).toContain('applyInteractiveWorldExplosions(carpetWorldImpacts);');
   });
 });
