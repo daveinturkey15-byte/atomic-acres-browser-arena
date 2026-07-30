@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { HOUSE_LAYOUT } from './arena-layout';
@@ -18,6 +19,17 @@ function clearOfHouse(x: number, z: number, radius: number, house: ReturnType<ty
 }
 
 describe('Pass 32 neighbourhood placement', () => {
+  it('keeps Atomic fauna animation allocation-free inside the live update loop', () => {
+    const source = readFileSync(new URL('./environment-assets.ts', import.meta.url), 'utf8');
+    const update = source.slice(
+      source.indexOf('export function updateArenaArt('),
+      source.indexOf('/** Builds original Atomic Acres hero vehicles', source.indexOf('export function updateArenaArt(')),
+    );
+    expect(update).not.toContain('new THREE.');
+    expect(update).not.toContain('.entries()');
+    expect(update).toContain('arenaFlightMatrix.compose(');
+  });
+
   it('keeps every flower bed fully outside both house footprints', () => {
     const houses = HOUSE_LAYOUT.map((house) => createHouseArchitecture(house.team, house.x, house.z, house.facing));
     for (const [flowerX, flowerZ] of NEIGHBOURHOOD_FLOWER_BEDS) {

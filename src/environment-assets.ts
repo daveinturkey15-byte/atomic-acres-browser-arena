@@ -715,13 +715,20 @@ function addNarrativeDressing(root: THREE.Group, reduced: boolean): void {
   }
 }
 
-/** Updates only explicitly presentation-only arena nodes. */
+const arenaFlightMatrix = new THREE.Matrix4();
+const arenaFlightPosition = new THREE.Vector3();
+const arenaFlightRotation = new THREE.Quaternion();
+const arenaFlightEuler = new THREE.Euler();
+const arenaFlightScale = new THREE.Vector3();
+
+/** Updates only explicitly presentation-only arena nodes without per-instance frame allocations. */
 export function updateArenaArt(root: THREE.Group, now: number): void {
   const state = arenaAnimationAt(now);
   const rings = (root.userData.animationRings as THREE.Mesh[] | undefined) ?? [];
-  rings.forEach((ring, index) => {
+  for (let index = 0; index < rings.length; index += 1) {
+    const ring = rings[index];
     ring.rotation.y = state.landmarkYaw * (index % 2 === 0 ? 1 : -1) + index * Math.PI / 3;
-  });
+  }
   const nucleus = root.userData.animationNucleus as THREE.Object3D | undefined;
   if (nucleus) nucleus.scale.setScalar(0.96 + state.beaconPulse * 0.08);
   const beacon = root.userData.animationBeacon as THREE.Mesh | undefined;
@@ -730,30 +737,32 @@ export function updateArenaArt(root: THREE.Group, now: number): void {
     const material = beacon.material;
     if (material instanceof THREE.MeshStandardMaterial) material.emissiveIntensity = 1.7 + state.beaconPulse * 2;
   }
-  const updateFlights = (mesh: THREE.InstancedMesh | undefined, flights: FaunaFlight[], flutter: boolean): void => {
-    if (!mesh) return;
+  const updateFlights = (mesh: THREE.InstancedMesh | undefined, flights: FaunaFlight[] | undefined, flutter: boolean): void => {
+    if (!mesh || !flights) return;
     const seconds = now * 0.001;
-    const matrix = new THREE.Matrix4();
-    for (const [index, flight] of flights.entries()) {
+    for (let index = 0; index < flights.length; index += 1) {
+      const flight = flights[index];
       const angle = flight.phase + seconds * flight.speed;
-      const position = new THREE.Vector3(
+      arenaFlightPosition.set(
         flight.x + Math.cos(angle) * flight.radius,
         flight.height + Math.sin(angle * (flutter ? 3.7 : 1.9)) * (flutter ? 0.18 : 0.6),
         flight.z + Math.sin(angle) * flight.radius,
       );
-      const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+      arenaFlightEuler.set(
         flutter ? Math.sin(angle * 8) * 0.25 : 0,
         -angle + Math.PI / 2,
         flutter ? Math.sin(angle * 12) * 0.45 : Math.sin(angle * 2) * 0.12,
-      ));
+      );
+      arenaFlightRotation.setFromEuler(arenaFlightEuler);
       const pulse = flutter ? 0.72 + Math.abs(Math.sin(angle * 11)) * 0.55 : 1;
-      matrix.compose(position, rotation, new THREE.Vector3(pulse, 1, pulse));
-      mesh.setMatrixAt(index, matrix);
+      arenaFlightScale.set(pulse, 1, pulse);
+      arenaFlightMatrix.compose(arenaFlightPosition, arenaFlightRotation, arenaFlightScale);
+      mesh.setMatrixAt(index, arenaFlightMatrix);
     }
     mesh.instanceMatrix.needsUpdate = true;
   };
-  updateFlights(root.userData.animationButterflies as THREE.InstancedMesh | undefined, (root.userData.butterflyFlights as FaunaFlight[] | undefined) ?? [], true);
-  updateFlights(root.userData.animationBirds as THREE.InstancedMesh | undefined, (root.userData.birdFlights as FaunaFlight[] | undefined) ?? [], false);
+  updateFlights(root.userData.animationButterflies as THREE.InstancedMesh | undefined, root.userData.butterflyFlights as FaunaFlight[] | undefined, true);
+  updateFlights(root.userData.animationBirds as THREE.InstancedMesh | undefined, root.userData.birdFlights as FaunaFlight[] | undefined, false);
 }
 
 /** Builds original Atomic Acres hero vehicles and environmental props. */
