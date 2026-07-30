@@ -80,6 +80,8 @@ describe('Pass 66 two-channel release topology', () => {
   });
 
   it('moves the candidate under experimental and reconstructs only stable Pass 63 from Git blobs', () => {
+    expect(staging).toContain('process.env.RELEASE_DIST_ROOT');
+    expect(staging).toContain('process.env.RELEASE_TOPOLOGY_RECEIPT_PATH');
     expect(staging).toContain("renameSync(join(distRoot, 'index.html'), join(experimentalRoot, 'index.html'))");
     expect(staging).toContain("const stable = stagePinned('recent-stable', config.stable)");
     expect(staging).toContain("channel: liveChannelId");

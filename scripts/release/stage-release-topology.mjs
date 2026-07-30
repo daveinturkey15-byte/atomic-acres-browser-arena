@@ -3,10 +3,19 @@ import { execFileSync } from 'node:child_process';
 import {
   copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync,
 } from 'node:fs';
-import { dirname, join, relative, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 const repositoryRoot = resolve(import.meta.dirname, '..', '..');
-const distRoot = join(repositoryRoot, 'dist');
+const configuredDistRoot = process.env.RELEASE_DIST_ROOT;
+if (configuredDistRoot && !isAbsolute(configuredDistRoot)) throw new Error('RELEASE_DIST_ROOT must be absolute');
+const distRoot = configuredDistRoot ? resolve(configuredDistRoot) : join(repositoryRoot, 'dist');
+const configuredTopologyReceipt = process.env.RELEASE_TOPOLOGY_RECEIPT_PATH;
+if (configuredTopologyReceipt && !isAbsolute(configuredTopologyReceipt)) {
+  throw new Error('RELEASE_TOPOLOGY_RECEIPT_PATH must be absolute');
+}
+const topologyReceiptPath = configuredTopologyReceipt
+  ? resolve(configuredTopologyReceipt)
+  : join(repositoryRoot, 'artifacts', 'pipeline', 'release-topology.json');
 const config = JSON.parse(readFileSync(join(repositoryRoot, 'release-channels.json'), 'utf8'));
 const sourceSha = process.env.SOURCE_SHA ?? execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repositoryRoot, encoding: 'utf8' }).trim();
 const releasePass = process.env.RELEASE_PASS ?? config.experimental.pass;
@@ -152,13 +161,13 @@ const publicConfig = Object.fromEntries(['experimental', 'stable'].map((key) => 
 }]));
 writeFileSync(join(distRoot, 'release-channel-config.js'), `window.__ATOMIC_ACRES_RELEASE_CHANNELS__=${JSON.stringify(publicConfig)};\n`);
 
-mkdirSync(join(repositoryRoot, 'artifacts', 'pipeline'), { recursive: true });
+mkdirSync(dirname(topologyReceiptPath), { recursive: true });
 const topology = {
   schemaVersion: 4, sourceSha, releasePass,
   root: { kind: 'chooser-only', files: ['index.html', 'release-shell.css', 'release-shell.js', 'release-channel-config.js'] },
   channels: { experimental, stable },
 };
-writeFileSync(join(repositoryRoot, 'artifacts', 'pipeline', 'release-topology.json'), `${JSON.stringify(topology, null, 2)}\n`);
+writeFileSync(topologyReceiptPath, `${JSON.stringify(topology, null, 2)}\n`);
 console.log(JSON.stringify({ releaseTopology: 'ok', sourceSha, channels: {
   experimental: { pass: experimental.releasePass, sourceSha, digest: experimental.treeSha256 },
   stable: { pass: stable.releasePass, pagesSha: stable.pagesSha, digest: stable.treeSha256 },

@@ -117,10 +117,12 @@ describe('production release workflow', () => {
     expect(packageJson.scripts['qa:playwright-topology']).toBe('node scripts/qa/run-playwright-with-topology.mjs');
     expect(playwrightConfig).toContain("const externalPreview = process.env.QA_EXTERNAL_PREVIEW === '1'");
     expect(playwrightConfig).toContain('webServer: externalPreview ? undefined :');
-    expect(ownedPlaywrightRunner).toContain("await build();");
+    expect(ownedPlaywrightRunner).toContain('outDir: temporaryDist');
     expect(ownedPlaywrightRunner).toContain("['scripts/release/stage-release-topology.mjs']");
+    expect(ownedPlaywrightRunner).toContain('RELEASE_DIST_ROOT: temporaryDist');
     expect(ownedPlaywrightRunner).toContain("QA_EXTERNAL_PREVIEW: '1'");
     expect(ownedPlaywrightRunner).toContain('httpServer.closeAllConnections?.()');
+    expect(ownedPlaywrightRunner).toContain('removeTemporaryTopology();');
     const playwrightCommands = ownerFeedbackGraph.testCatalog
       .map(({ command }: { command: string }) => command)
       .filter((command: string) => command.includes('playwright'));
