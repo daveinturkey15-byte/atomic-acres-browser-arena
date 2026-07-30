@@ -5,7 +5,7 @@ export type GlassPhase = 'intact' | 'cracked' | 'breached' | 'detached';
 export type GlassImpactProfile = 'knife' | 'bullet' | 'explosion';
 
 export const GLASS_DAMAGE_PROFILE_Q: Readonly<Record<GlassImpactProfile, number>> = Object.freeze({
-  knife: 1_000,
+  knife: 350,
   bullet: 1_000,
   explosion: 2_000,
 });

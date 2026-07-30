@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  GLASS_DAMAGE_PROFILE_Q,
   admitCrossbowThroughGlass,
   admitGlassImpact,
   createGlassState,
@@ -7,6 +8,45 @@ import {
 } from './glass-authority';
 
 describe('glass authority', () => {
+  it('gives knife, bullet and explosion impacts distinct authoritative outcomes', () => {
+    expect(GLASS_DAMAGE_PROFILE_Q).toEqual({ knife: 350, bullet: 1_000, explosion: 2_000 });
+
+    const impact = (profile: 'knife' | 'bullet' | 'explosion') => admitGlassImpact(
+      createGlassState(`pane-${profile}`, 3),
+      {
+        isHost: true,
+        matchEpoch: 3,
+        expectedRevision: 0,
+        impactId: `${profile}:guest-a:17:0`,
+        tick: 12,
+        profile,
+      },
+    ).state;
+
+    expect(impact('knife')).toMatchObject({ phase: 'cracked', damageQ: 350 });
+    expect(impact('bullet')).toMatchObject({ phase: 'breached', damageQ: 1_000 });
+    expect(impact('explosion')).toMatchObject({ phase: 'detached', damageQ: 2_000 });
+  });
+
+  it('accumulates replicated knife impacts deterministically before opening an aperture', () => {
+    const applyKnife = (state: ReturnType<typeof createGlassState>, revision: number) => admitGlassImpact(state, {
+      isHost: true,
+      matchEpoch: 5,
+      expectedRevision: revision,
+      impactId: `knife:guest-a:${70 + revision}:${revision}`,
+      tick: 20 + revision,
+      profile: 'knife',
+    }).state;
+    let host = createGlassState('pane-knife-host', 5);
+    let replica = createGlassState('pane-knife-host', 5);
+    for (let revision = 0; revision < 3; revision += 1) {
+      host = applyKnife(host, revision);
+      replica = applyKnife(replica, revision);
+      expect(replica).toEqual(host);
+    }
+    expect(host).toMatchObject({ phase: 'breached', revision: 3, damageQ: 1_050 });
+  });
+
   it('owns intact, cracked, breached and detached transitions with one revision stream', () => {
     const initial = createGlassState('house-1:window-1', 7);
     const cracked = admitGlassImpact(initial, {
@@ -50,6 +90,11 @@ describe('glass authority', () => {
   it('allows a crossbow only through an existing or exactly same-tick admitted breach', () => {
     const initial = createGlassState('pane-crossbow', 9);
     expect(admitCrossbowThroughGlass(initial, { matchEpoch: 9, observedRevision: 0, tick: 20 }))
+      .toEqual({ passes: false, reason: 'solid-glass' });
+    const cracked = admitGlassImpact(initial, {
+      isHost: true, matchEpoch: 9, expectedRevision: 0, impactId: 'knife:host:1:0', tick: 20, profile: 'knife',
+    }).state;
+    expect(admitCrossbowThroughGlass(cracked, { matchEpoch: 9, observedRevision: 1, tick: 20 }))
       .toEqual({ passes: false, reason: 'solid-glass' });
     const breach = admitGlassImpact(initial, {
       isHost: true, matchEpoch: 9, expectedRevision: 0, impactId: 'shot:host:1', tick: 20, profile: 'bullet',

@@ -7805,6 +7805,8 @@ function breakHouseWindow(
   origin = camera.getWorldPosition(new THREE.Vector3()),
   kind: WindowBreakMessage['kind'] = 'shot',
   actionNonce?: number,
+  impactOwnerId = player.id,
+  impactNonce = randomNonce(),
 ): boolean {
   const window = arena.breakableWindows.find((candidate) => candidate.id === windowId);
   if (!window) return false;
@@ -7812,7 +7814,7 @@ function breakHouseWindow(
     ? window.glassState
     : createGlassState(window.id, interactiveWorldMatchEpoch);
   const profile: GlassImpactProfile = kind === 'explosive' ? 'explosion' : kind === 'knife' ? 'knife' : 'bullet';
-  const impactId = `${profile}:${player.id}:${actionNonce ?? randomNonce()}:${state.revision}`;
+  const impactId = `${profile}:${impactOwnerId}:${impactNonce}:${state.revision}`;
   const result = admitGlassImpact(state, {
     // Network-originated mutations reach this point only after the existing
     // host/replica admission checks. Offline/local host actions are authority.
@@ -7827,6 +7829,20 @@ function breakHouseWindow(
   window.glassState = result.state;
   const projection = glassAuthorityProjection(result.state);
   invalidateActiveWorldCollisionCache();
+  // A knife can crack a pane without opening it, so every admitted mutation
+  // must replicate or peers will disagree before the eventual breach.
+  if (replicate) {
+    const message: WindowBreakMessage = {
+      type: 'window-break',
+      by: player.id,
+      windowId,
+      origin: origin.toArray(),
+      kind,
+      ...(kind === 'explosive' ? { actionNonce } : {}),
+      nonce: impactNonce,
+    };
+    network.send(network.role === 'host' ? canonicalHostWindowBreak(message, performance.now()) : message);
+  }
   if (!projection.apertureOpen) {
     window.broken = false;
     window.mesh.visible = projection.paneVisible;
@@ -7841,18 +7857,6 @@ function breakHouseWindow(
   spawnImpactFlash(point, 'glass', normal);
   spawnGlassShards(point, normal);
   audio.impact('glass', point.distanceTo(camera.position));
-  if (replicate) {
-    const message: WindowBreakMessage = {
-      type: 'window-break',
-      by: player.id,
-      windowId,
-      origin: origin.toArray(),
-      kind,
-      ...(kind === 'explosive' ? { actionNonce } : {}),
-      nonce: randomNonce(),
-    };
-    network.send(network.role === 'host' ? canonicalHostWindowBreak(message, performance.now()) : message);
-  }
   return true;
 }
 
@@ -7944,7 +7948,17 @@ function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
   }
   processedNonces.add(message.nonce);
   const normal = centre.clone().sub(origin).normalize().multiplyScalar(-1);
-  breakHouseWindow(message.windowId, centre, normal, false, origin);
+  breakHouseWindow(
+    message.windowId,
+    centre,
+    normal,
+    false,
+    origin,
+    message.kind ?? 'shot',
+    message.actionNonce,
+    message.by,
+    message.nonce,
+  );
   if (network.role === 'host') network.send(canonicalHostWindowBreak({ ...message, origin: canonicalOriginTuple as [number, number, number] }, now), message.by);
   trimNonceSet();
 }
