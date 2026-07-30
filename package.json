@@ -61,6 +61,8 @@
     "qa:pass65:rustrig-lighting": "playwright test tests/e2e/pass65-rustrig-container-lighting.spec.ts --project=chromium --workers=1 --retries=0",
     "qa:pass65:owner-feedback": "node .agents/skills/atomic-acres-owner-feedback-gate/scripts/verify-owner-feedback-ledger.mjs --self-test",
     "qa:pass65:owner-feedback:candidate": "node .agents/skills/atomic-acres-owner-feedback-gate/scripts/verify-owner-feedback-ledger.mjs --self-test --candidate",
+    "finalize:pass66:owner-evidence": "node .agents/skills/atomic-acres-owner-feedback-gate/scripts/finalize-pass66-owner-evidence.mjs",
+    "qa:pass66:owner-evidence-finalizer": "node --test .agents/skills/atomic-acres-owner-feedback-gate/scripts/finalize-pass66-owner-evidence.test.mjs && node .agents/skills/atomic-acres-owner-feedback-gate/scripts/finalize-pass66-owner-evidence.mjs --self-test",
     "qa:text-integrity": "node scripts/qa/verify-text-source-integrity.mjs",
     "qa:pass65:drone-asset": "node scripts/qa/verify-pass65-drone-production.mjs",
     "qa:pass65:ordnance-assets": "node scripts/qa/verify-pass65-semtex-production.mjs",
