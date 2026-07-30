@@ -71,6 +71,12 @@ describe('production release workflow', () => {
     const exactCheckout = 'ref: ${{ github.event.pull_request.head.sha || github.sha }}';
     expect(verifyWorkflow.match(new RegExp(exactCheckout.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))?.length).toBe(6);
     expect(verifyWorkflow).toContain('HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}');
+    const staticJob = verifyWorkflow.slice(
+      verifyWorkflow.indexOf('static-and-unit:'),
+      verifyWorkflow.indexOf('requirements-acceptance:'),
+    );
+    expect(staticJob).toContain(exactCheckout);
+    expect(staticJob).toContain('fetch-depth: 0');
   });
 
   it('blocks production on accepted requirements and verifies the canonical site after Pages builds', () => {
