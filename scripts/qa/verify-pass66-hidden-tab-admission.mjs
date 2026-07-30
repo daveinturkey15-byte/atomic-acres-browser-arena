@@ -480,6 +480,13 @@ let cover;
 let displayPowerOwner = null;
 let foregroundWindowHandle = null;
 let receipt = null;
+const checkpoints = {
+  initial: null,
+  beforeRelease: null,
+  afterCpuProgress: null,
+  afterHidden: null,
+  recovered: null,
+};
 try {
   displayPowerOwner = await acquireDisplayPowerRequest();
   chrome = spawn(executablePath, chromeArgs, { stdio: 'ignore', windowsHide: false });
@@ -592,11 +599,13 @@ try {
     input.dispatchEvent(new Event('change', { bubbles: true }));
   })()`, true);
   const initial = await sample(game, cover);
+  checkpoints.initial = initial;
   await trustedClick(game, '#solo');
   await withTimeout(assetBarrierObserved, 30_000, 'held first-person weapon CPU asset request');
   await activateTarget(port, coverTarget.id);
   await waitForTabOwnership(game, cover, 'cover', 5_000, 'real cover foreground and game-tab visibility loss');
   const beforeRelease = await sample(game, cover);
+  checkpoints.beforeRelease = beforeRelease;
   heldAssetReleased = true;
   await Promise.all(heldRequestIds.splice(0).map((requestId) => game.command('Fetch.continueRequest', { requestId })));
   const afterCpuProgress = await waitForNodeSample(game, cover, (checkpoint) => (
@@ -607,8 +616,10 @@ try {
     && hasExactBrowserWeaponCatalog(checkpoint)
     && checkpoint.transition.profile?.phases.some((entry) => entry.phase === REQUIRED_BACKGROUND_CPU_PHASE)
   ), maximumHiddenPreparationMs, 'hidden fetch/decode/CPU preparation');
+  checkpoints.afterCpuProgress = afterCpuProgress;
   await delay(minimumHiddenObservationMs);
   const afterHidden = await sample(game, cover);
+  checkpoints.afterHidden = afterHidden;
   const hiddenFailures = hiddenCheckpointFailures({ beforeRelease, afterHidden, heldAssetRequests });
   if (hiddenFailures.length > 0) throw new Error(`hidden checkpoint failed: ${hiddenFailures.join('; ')}`);
 
@@ -626,6 +637,7 @@ try {
     && checkpoint.audio.contexts.every((context) => context.state === 'running')
   ), maximumForegroundRecoveryMs, 'foreground match recovery');
   recovered.foregroundRecoveryMs = Date.now() - foregroundStartedAt;
+  checkpoints.recovered = recovered;
   const recoveryFailures = recoveredCheckpointFailures({ beforeRelease, afterHidden, recovered, maximumRecoveryMs: maximumForegroundRecoveryMs });
   const fatalErrors = uniqueFatalErrors(errors);
   if (fatalErrors.length > 0) recoveryFailures.push(`browser/GPU errors: ${fatalErrors.join(' | ')}`);
@@ -678,7 +690,10 @@ try {
     checkedAt: new Date().toISOString(),
     sourceRevision,
     executablePath,
-    partialReceipt: receipt,
+    partialReceipt: {
+      foregroundWindowHandle,
+      checkpoints,
+    },
     error: error instanceof Error ? error.message : String(error),
   }, null, 2)}\n`, 'utf8');
   throw error;

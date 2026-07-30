@@ -148,6 +148,31 @@ test('owns a hidden display-power request for the exact gate lifetime and resets
   );
 });
 
+test('persists every named gate checkpoint into failure evidence without changing acceptance', () => {
+  for (const name of ['initial', 'beforeRelease', 'afterCpuProgress', 'afterHidden', 'recovered']) {
+    assert.match(verifierSource, new RegExp(`checkpoints\\.${name} = ${name}`));
+  }
+  assert.match(verifierSource, /partialReceipt: \{\s*\n\s*foregroundWindowHandle,\s*\n\s*checkpoints,\s*\n\s*\}/);
+  for (const field of ['constructionCount', 'constructionHistory', 'constructedArenaIds', 'residentArenaRoots']) {
+    assert.match(verifierSource, new RegExp(`${field}: state\\.arenaSelection\\.streaming\\.${field}`));
+  }
+  assert.match(verifierSource, /activeRoots: state\.arenaSelection\.activeRoots/);
+  for (const field of ['generation', 'phase', 'failure', 'renderSubmissionPaused', 'profile']) {
+    assert.match(verifierSource, new RegExp(`${field}: transition\\.${field}`));
+  }
+  assert.match(verifierSource, /checkpoint\.coverDocument = await documentState\(cover\)/);
+  assert.equal(
+    verifierSource.match(/maximumHiddenPreparationMs, 'hidden fetch\/decode\/CPU preparation'/g)?.length,
+    1,
+    'checkpoint persistence must not widen or duplicate the hidden timeout',
+  );
+  assert.equal(
+    verifierSource.match(/maximumForegroundRecoveryMs, 'foreground match recovery'/g)?.length,
+    1,
+    'checkpoint persistence must not widen or duplicate the recovery timeout',
+  );
+});
+
 test('accepts hidden CPU progress only when frames, WebGPU submission, authority, audio and generation stay paused', () => {
   const beforeRelease = checkpoint();
   const afterHidden = checkpoint({
