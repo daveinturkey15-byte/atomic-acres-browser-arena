@@ -144,6 +144,44 @@ async function activateTarget(port, targetId) {
   if (!response.ok) throw new Error(`Chrome refused to activate native tab ${targetId}: ${response.status}`);
 }
 
+function bringGateChromeWindowToForeground(processId) {
+  if (!Number.isSafeInteger(processId) || processId <= 0) throw new Error(`invalid gate Chrome process id: ${processId}`);
+  const script = `$ErrorActionPreference = 'Stop'
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class Pass66GateWindow {
+  [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+}
+'@
+$targetPid = ${processId}
+$deadline = [DateTime]::UtcNow.AddSeconds(5)
+do {
+  $target = Get-Process -Id $targetPid -ErrorAction Stop
+  $handle = $target.MainWindowHandle
+  if ($handle -ne [IntPtr]::Zero) { break }
+  Start-Sleep -Milliseconds 50
+} while ([DateTime]::UtcNow -lt $deadline)
+if ($handle -eq [IntPtr]::Zero) { throw 'gate Chrome child did not expose a native main window' }
+$shell = New-Object -ComObject WScript.Shell
+[void]$shell.AppActivate($targetPid)
+[void][Pass66GateWindow]::ShowWindowAsync($handle, 9)
+[void][Pass66GateWindow]::SetForegroundWindow($handle)
+Start-Sleep -Milliseconds 150
+if ([Pass66GateWindow]::GetForegroundWindow() -ne $handle) { throw 'gate Chrome child did not become the OS foreground window' }
+$handle.ToInt64()`;
+  return execFileSync('C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe', [
+    '-NoProfile',
+    '-NonInteractive',
+    '-WindowStyle',
+    'Hidden',
+    '-Command',
+    script,
+  ], { encoding: 'utf8', windowsHide: true }).trim();
+}
+
 async function documentState(client) {
   return client.evaluate('({visibilityState:document.visibilityState,hasFocus:document.hasFocus()})');
 }
@@ -282,6 +320,7 @@ let chrome;
 let browserClient;
 let game;
 let cover;
+let foregroundWindowHandle = null;
 let receipt = null;
 try {
   chrome = spawn(executablePath, chromeArgs, { stdio: 'ignore', windowsHide: false });
@@ -292,6 +331,7 @@ try {
   browserClient = await CdpClient.connect(discovery.version.webSocketDebuggerUrl);
   game = await CdpClient.connect(gameTarget.webSocketDebuggerUrl);
   cover = await CdpClient.connect(coverTarget.webSocketDebuggerUrl);
+  foregroundWindowHandle = bringGateChromeWindowToForeground(chrome.pid);
 
   const errors = [];
   let heldAssetRequests = 0;
@@ -443,6 +483,7 @@ try {
       version: discovery.version.Browser,
       headed: true,
       automation: 'direct-cdp',
+      foregroundWindowHandle,
       launchArgs: chromeArgs.map((argument) => argument.startsWith('--user-data-dir=') ? '--user-data-dir=<isolated-temp-profile>' : argument),
       backgroundThrottlingBypassFlags: [],
     },
