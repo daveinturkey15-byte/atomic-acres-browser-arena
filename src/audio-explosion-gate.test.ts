@@ -3,6 +3,7 @@ import {
   ArenaAudio,
   EXPLOSION_AUDIO_COALESCE_MS,
   GRENADE_FUSE_BEEP_START_MS,
+  OVERDRIVE_AVAILABLE_CUE_PROFILE,
   admitExplosionAudioMix,
   createExplosionAudioGate,
   grenadeFuseBeepIntervalMs,
@@ -37,6 +38,18 @@ describe('explosion audio admission', () => {
     expect(audio.telemetry()).toMatchObject({
       ambience: { continuousSources: 0, busGain: 0.12 },
       grenadeFuse: { beeps: 0, startMs: GRENADE_FUSE_BEEP_START_MS },
+    });
+  });
+
+  it('keeps the 2x-core availability cue tonal and explicitly broadband-free', () => {
+    expect(OVERDRIVE_AVAILABLE_CUE_PROFILE.broadbandNoiseLayers).toBe(0);
+    expect(OVERDRIVE_AVAILABLE_CUE_PROFILE.maximumDurationSeconds).toBeLessThanOrEqual(0.55);
+    expect(OVERDRIVE_AVAILABLE_CUE_PROFILE.announcementTones.map((layer) => layer.frequencyHz)).toEqual([330, 495]);
+    expect(OVERDRIVE_AVAILABLE_CUE_PROFILE.ambienceTone.frequencyHz).toBe(660);
+    expect(OVERDRIVE_AVAILABLE_CUE_PROFILE.transient).toMatchObject({
+      startFrequencyHz: 1_650,
+      endFrequencyHz: 2_350,
+      wave: 'triangle',
     });
   });
 });

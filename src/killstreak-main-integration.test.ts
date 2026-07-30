@@ -125,6 +125,8 @@ describe('Pass 65 playable killstreak integration', () => {
     const block = source.slice(start, end);
     expect(block).toContain("possession.kind === 'chopper-gunner'");
     expect(block).toContain('chopperGunnerCameraOrigin(entity.position, entity.attitude)');
+    expect(block).toContain('killstreakPossessionCameraScratch.set(origin[0], origin[1], origin[2])');
+    expect(block).not.toContain('new THREE.Vector3(...chopperGunnerCameraOrigin');
   });
 
   it('uses a world-space crosshair for Care/Carpet placement and host-owned surface height', () => {
@@ -138,6 +140,10 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain('function updateCrosshairSupportPreview()');
     expect(source).toContain('function confirmCrosshairSupportTarget(');
     expect(source).toMatch(/requestKillstreakActivation\(\s*targeting\.id,\s*confirmedAt,\s*\[point\.x, point\.y, point\.z\],\s*targeting\.id === 'carpet-bomber' \? crosshairPreviewFacing \?\? undefined : undefined,\s*\)/);
+    expect(source).toContain("targeting.id === 'carpet-bomber' ? crosshairPreviewFacing ?? undefined : undefined");
+    expect(source).toContain("label.textContent = 'LEFT CLICK or [F] to confirm target  [RMB] to cancel'");
+    expect(source).toContain("? 'CLICK ONE LOCATION TO CONFIRM · <kbd>RMB</kbd> CANCELS AND REFUNDS'");
+    expect(source).not.toContain("LEFT CLICK or [F] to confirm target  [ESC] to cancel");
     expect(source).toContain('cancelSupportTargeting(true)');
     expect(source).toContain('let groundSampler: SupportPlacementGroundSampler | null = null;');
     expect(source).toContain('groundSampler ??= new SupportPlacementGroundSampler({');

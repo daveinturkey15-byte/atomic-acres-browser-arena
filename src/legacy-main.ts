@@ -13051,7 +13051,7 @@ function updateFInteractionPrompt(now = performance.now()): void {
     delete supportPrompt.dataset.interactionKind;
     delete supportPrompt.dataset.targetId;
     const label = supportPrompt.querySelector<HTMLElement>('span');
-    if (label) label.textContent = 'LEFT CLICK or [F] to confirm target  [ESC] to cancel';
+    if (label) label.textContent = 'LEFT CLICK or [F] to confirm target  [RMB] to cancel';
     return;
   }
   advanceFInteractionPress(now);
@@ -13609,6 +13609,8 @@ function syncActiveSupportRotorAudio(now: number): void {
   audio.syncChopperRotors(activeSupportRotorAudioSources);
 }
 
+const killstreakPossessionCameraScratch = new THREE.Vector3();
+
 function updateKillstreakPossession(now: number): void {
   const possession = localKillstreakActorSnapshot()?.possession;
   if (!possession) {
@@ -13625,9 +13627,13 @@ function updateKillstreakPossession(now: number): void {
     return;
   }
   killstreakPresentation.setFirstPersonEntity(entity.id);
-  const position = possession.kind === 'chopper-gunner'
-    ? new THREE.Vector3(...chopperGunnerCameraOrigin(entity.position, entity.attitude))
-    : killstreakPresentation.firstPersonCameraAnchor(entity.id) ?? new THREE.Vector3(...entity.position);
+  let position = killstreakPresentation.firstPersonCameraAnchor(entity.id);
+  if (possession.kind === 'chopper-gunner') {
+    const origin = chopperGunnerCameraOrigin(entity.position, entity.attitude);
+    position = killstreakPossessionCameraScratch.set(origin[0], origin[1], origin[2]);
+  } else if (!position) {
+    position = killstreakPossessionCameraScratch.set(entity.position[0], entity.position[1], entity.position[2]);
+  }
   camera.position.copy(position);
   if (camera.near !== 0.35) {
     camera.near = 0.35;
@@ -14417,7 +14423,7 @@ function drawStrikeMap(now = performance.now()): void {
     ? 'SELECT DELIVERY AREA'
     : 'SELECT THREE TARGETS';
   element<HTMLElement>('#strike-target-help').innerHTML = pointSupportTargeting
-    ? 'CLICK ONE LOCATION TO CONFIRM · <kbd>ESC</kbd> CANCELS AND REFUNDS'
+    ? 'CLICK ONE LOCATION TO CONFIRM · <kbd>RMB</kbd> CANCELS AND REFUNDS'
     : 'CLICK THREE LOCATIONS · <kbd>ESC</kbd> CANCELS AND REFUNDS';
   element<HTMLElement>('#strike-target-count').textContent = `${points.length} / ${targetCount}`;
   lastStrikeMapDrawAt = now;

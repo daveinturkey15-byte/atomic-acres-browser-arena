@@ -67,6 +67,18 @@ export const RAILGUN_REPORT_PROFILE = Object.freeze({
   layerCount: 10,
 });
 
+/** Tonal-only 2x-core spawn cue. No broadband/noise layer may regress here. */
+export const OVERDRIVE_AVAILABLE_CUE_PROFILE = Object.freeze({
+  broadbandNoiseLayers: 0,
+  maximumDurationSeconds: 0.55,
+  announcementTones: Object.freeze([
+    Object.freeze({ frequencyHz: 330, durationSeconds: 0.16, volume: 0.04, wave: 'square' as const, delaySeconds: 0 }),
+    Object.freeze({ frequencyHz: 495, durationSeconds: 0.20, volume: 0.05, wave: 'triangle' as const, delaySeconds: 0.12 }),
+  ]),
+  ambienceTone: Object.freeze({ frequencyHz: 660, durationSeconds: 0.30, volume: 0.06, wave: 'sine' as const, delaySeconds: 0.25 }),
+  transient: Object.freeze({ startFrequencyHz: 1_650, endFrequencyHz: 2_350, durationSeconds: 0.13, volume: 0.025, wave: 'triangle' as const, delaySeconds: 0.05 }),
+} as const);
+
 export function railgunReportAttenuation(remote: boolean, distance: number): number {
   return remote ? Math.max(0.1, 0.68 * (1 - Math.min(1, Math.max(0, distance) / 130))) : 1;
 }
@@ -907,10 +919,21 @@ export class ArenaAudio {
   }
 
   overdriveAvailable(): void {
-    this.tone(330, 0.16, 0.04, 'square', this.announcements);
-    this.tone(495, 0.2, 0.05, 'triangle', this.announcements, 0.12);
-    this.tone(660, 0.3, 0.06, 'sine', this.ambience, 0.25);
-    this.noise({ duration: 0.32, volume: 0.035, filter: 'bandpass', frequency: 1_850, q: 0.9, delay: 0.05 }, this.announcements);
+    for (const tone of OVERDRIVE_AVAILABLE_CUE_PROFILE.announcementTones) {
+      this.tone(tone.frequencyHz, tone.durationSeconds, tone.volume, tone.wave, this.announcements, tone.delaySeconds);
+    }
+    const ambience = OVERDRIVE_AVAILABLE_CUE_PROFILE.ambienceTone;
+    this.tone(ambience.frequencyHz, ambience.durationSeconds, ambience.volume, ambience.wave, this.ambience, ambience.delaySeconds);
+    const transient = OVERDRIVE_AVAILABLE_CUE_PROFILE.transient;
+    this.sweep(
+      transient.startFrequencyHz,
+      transient.endFrequencyHz,
+      transient.durationSeconds,
+      transient.volume,
+      transient.wave,
+      this.announcements,
+      transient.delaySeconds,
+    );
   }
 
   overdriveExpire(): void {
