@@ -308,17 +308,27 @@ test.describe('Pass 65 support visual fail-closed gate', () => {
       await expect(host.locator('#strike-map-overlay')).toBeHidden();
       await expect.poll(async () => (await state(host)).fieldSupport.targetingMode).toBe('carpet-bomber');
       const carpetCrosshairTarget = await aimCrosshairAtGround(host, 0.42, 0.61);
-      await host.locator('#game').click({ force: true });
-      await expect.poll(async () => (await state(host)).fieldSupport.targetingMode).toBeNull();
+      const [carpetActivationHandle] = await Promise.all([
+        host.waitForFunction(() => {
+          const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+          const aircraft = snapshot.killstreak.entities.find((entity: any) => (
+            entity.kind === 'aircraft' && String(entity.id).includes('carpet-aircraft')
+          ));
+          return snapshot.fieldSupport.targetingMode === null && aircraft?.phase === 'inbound'
+            ? { targetingMode: snapshot.fieldSupport.targetingMode, aircraft }
+            : false;
+        }, undefined, { polling: 16, timeout: 3_000 }),
+        host.locator('#game').click({ force: true }),
+      ]);
+      const carpetActivationState = await carpetActivationHandle.jsonValue() as any;
+      expect(carpetActivationState.targetingMode).toBeNull();
+      const carpetAircraft = carpetActivationState.aircraft;
+      expect(carpetAircraft).toMatchObject({ kind: 'aircraft', phase: 'inbound' });
       await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(null));
       await expect.poll(async () => (await state(host)).killstreakPresentation.markerDetails.length).toBe(2);
       await expect.poll(async () => (await state(guest)).killstreakPresentation.markerDetails.length).toBe(1);
       const hostCarpetMarkers = (await state(host)).killstreakPresentation.markerDetails;
       const guestCarpetMarkers = (await state(guest)).killstreakPresentation.markerDetails;
-      const carpetAircraft = (await state(host)).killstreak.entities.find((entity: any) => (
-        entity.kind === 'aircraft' && String(entity.id).includes('carpet-aircraft')
-      ));
-      expect(carpetAircraft).toMatchObject({ kind: 'aircraft', phase: 'inbound' });
       const hostTarget = hostCarpetMarkers.find((marker: any) => marker.shape === 'ground-x');
       const corridor = hostCarpetMarkers.find((marker: any) => marker.shape === 'corridor');
       expect(hostTarget).toMatchObject({ source: 'carpet-bomber', audience: 'all-combatants', halfWidthM: null });
@@ -382,17 +392,26 @@ test.describe('Pass 65 support visual fail-closed gate', () => {
         window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(5, 9, -40, 0.83, -0.22);
       });
 
-      await expect.poll(async () => {
-        await host.evaluate(() => (window.__ATOMIC_ACRES_DEBUG__ as any).fireOnce());
-        return (await state(host)).railgun.roundsRemaining;
-      }, { timeout: 3_000 }).toBe(7);
-      await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.presentation.activeBeams === 1, undefined, {
-        timeout: 3_000,
+      const guestBeamObservation = guest.waitForFunction(() => {
+        const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+        return snapshot.railgun.presentation.activeBeams === 1
+          ? { railgun: snapshot.railgun, audio: { railgun: snapshot.audio.railgun } }
+          : false;
+      }, undefined, { polling: 16, timeout: 3_000 });
+      const hostShot = await host.evaluate(() => {
+        const api = window.__ATOMIC_ACRES_DEBUG__ as any;
+        api.fireOnce();
+        const snapshot = api.snapshot();
+        return { railgun: snapshot.railgun, audio: { railgun: snapshot.audio.railgun } };
       });
-      await Promise.all([host, guest].map((page) => page.evaluate(() => {
-        window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true);
-      })));
-      const [hostShot, guestShot] = await Promise.all([state(host), state(guest)]);
+      expect(hostShot.railgun.roundsRemaining).toBe(7);
+      const guestShot = await (await guestBeamObservation).jsonValue() as any;
+      await Promise.all([host, guest].map((page) => page.evaluate(() => new Promise<void>((resolveFrame) => {
+        requestAnimationFrame(() => {
+          window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true);
+          resolveFrame();
+        });
+      }))));
       for (const shot of [hostShot, guestShot]) {
         expect(shot.railgun.presentation).toMatchObject({
           activeBeams: 1,
