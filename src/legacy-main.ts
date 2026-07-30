@@ -14804,7 +14804,7 @@ function activateFieldSupport(id: FieldSupportId): void {
     beginPointSupportTargeting('carpet-bomber');
   } else if (activatedId === 'piloted-drone') {
     if (!requestKillstreakActivation(activatedId, now, [player.position.x, player.position.y, player.position.z])) return;
-    addFeed('PILOTED DRONE · 20 ROUNDS + ONE SPARE CLIP · F EXITS', 'gold');
+    addFeed('PILOTED DRONE · 20 LOADED + 60 RESERVE · FOUR MAGAZINES · F EXITS', 'gold');
   } else if (activatedId === 'chopper') {
     if (!requestKillstreakActivation(activatedId, now)) return;
     addFeed('CHOPPER GUNNER · AI ONLINE · F TO TAKE / RELEASE GUN · 30 SEC', 'gold');

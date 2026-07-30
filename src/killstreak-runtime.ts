@@ -204,8 +204,8 @@ type DroneEntity = EntityBase & {
   swarmIngressTarget: [number, number, number] | null;
   swarmPatrolTarget: [number, number, number] | null;
   swarmPatrolRefreshAtMs: number;
-  /** Host-derived floor: half-way from local ground to admitted spawn height. */
-  swarmMinimumAltitudeY: number | null;
+  /** Immutable admitted spawn height used to derive local terrain midpoints. */
+  swarmAdmittedSpawnY: number | null;
 };
 
 type CareCrateEntity = EntityBase & {
@@ -492,6 +492,28 @@ function actorPosition(world: KillstreakWorld, actorId: string): SupportVec3 | n
 function supportGroundHeight(world: KillstreakWorld, x: number, z: number): number {
   const queried = world.groundHeightAt?.(x, z);
   return clamp(Number.isFinite(queried) ? queried! : world.bounds.floorY, world.bounds.floorY, world.bounds.ceilingY - 0.5);
+}
+
+/**
+ * Dynamic terrain/roof clearance for a swarm step. Both ends are sampled so a
+ * raised surface between snapshots cannot be crossed using a stale flat-ground
+ * floor. The nominal floor is exactly halfway to the admitted spawn height.
+ */
+export function droneSwarmStepMinimumAltitudeY(
+  admittedSpawnY: number,
+  current: SupportVec3,
+  desired: SupportVec3,
+  world: KillstreakWorld,
+): number {
+  const midpointAt = (x: number, z: number) => {
+    const surfaceY = supportGroundHeight(world, x, z);
+    return clamp(
+      surfaceY + Math.max(1, (admittedSpawnY - surfaceY) * 0.5),
+      world.bounds.floorY + 1,
+      world.bounds.ceilingY - 0.5,
+    );
+  };
+  return Math.max(midpointAt(current[0], current[2]), midpointAt(desired[0], desired[2]));
 }
 
 function exactDefinition(id: string, catalog: KillstreakCatalog<string>) {
@@ -1038,7 +1060,7 @@ export class HostKillstreakRuntime {
         swarmIngressTarget: null,
         swarmPatrolTarget: null,
         swarmPatrolRefreshAtMs: Number.POSITIVE_INFINITY,
-        swarmMinimumAltitudeY: null,
+        swarmAdmittedSpawnY: null,
       });
       entityIds.push(id);
     } else if (actualId === 'drone-swarm') {
@@ -1082,12 +1104,7 @@ export class HostKillstreakRuntime {
           swarmIngressTarget: [...ingressTarget],
           swarmPatrolTarget: null,
           swarmPatrolRefreshAtMs: nowMs + 2_000,
-          swarmMinimumAltitudeY: clamp(
-            supportGroundHeight(world, admittedSpawn[0], admittedSpawn[2])
-              + (admittedSpawn[1] - supportGroundHeight(world, admittedSpawn[0], admittedSpawn[2])) * 0.5,
-            world.bounds.floorY + 1,
-            world.bounds.ceilingY - 0.5,
-          ),
+          swarmAdmittedSpawnY: admittedSpawn[1],
         });
         entityIds.push(id);
       }
@@ -1742,8 +1759,12 @@ export class HostKillstreakRuntime {
               targetId: target.id,
               ordinal: entity.swarmOrdinal,
             });
-            const localGround = supportGroundHeight(world, engagementPoint[0], engagementPoint[2]);
-            const minimumY = Math.max(entity.swarmMinimumAltitudeY ?? localGround + 1, localGround + 1);
+            const minimumY = droneSwarmStepMinimumAltitudeY(
+              entity.swarmAdmittedSpawnY ?? entity.position[1],
+              entity.position,
+              engagementPoint,
+              world,
+            );
             this.moveDroneToward(
               entity,
               [engagementPoint[0], Math.max(engagementPoint[1], minimumY), engagementPoint[2]],
@@ -1790,13 +1811,18 @@ export class HostKillstreakRuntime {
             const row = Math.floor(group / 3);
             const xAlpha = 0.16 + column * 0.34 + (unit(entity.seed, 100 + epoch * 2) - 0.5) * 0.12;
             const zAlpha = 0.24 + row * 0.52 + (unit(entity.seed, 101 + epoch * 2) - 0.5) * 0.16;
+            const patrolX = clamp(world.bounds.minX + (world.bounds.maxX - world.bounds.minX) * xAlpha, world.bounds.minX + 0.5, world.bounds.maxX - 0.5);
+            const patrolZ = clamp(world.bounds.minZ + (world.bounds.maxZ - world.bounds.minZ) * zAlpha, world.bounds.minZ + 0.5, world.bounds.maxZ - 0.5);
+            const desiredPatrol: SupportVec3 = [patrolX, entity.position[1], patrolZ];
             entity.swarmPatrolTarget = [
-              clamp(world.bounds.minX + (world.bounds.maxX - world.bounds.minX) * xAlpha, world.bounds.minX + 0.5, world.bounds.maxX - 0.5),
-              clamp(Math.max(
-                entity.swarmMinimumAltitudeY ?? world.bounds.floorY + 1,
-                world.bounds.floorY + 4 + (entity.swarmOrdinal % 4) * 1.2,
-              ), world.bounds.floorY + 1, world.bounds.ceilingY - 0.5),
-              clamp(world.bounds.minZ + (world.bounds.maxZ - world.bounds.minZ) * zAlpha, world.bounds.minZ + 0.5, world.bounds.maxZ - 0.5),
+              patrolX,
+              droneSwarmStepMinimumAltitudeY(
+                entity.swarmAdmittedSpawnY ?? entity.position[1],
+                entity.position,
+                desiredPatrol,
+                world,
+              ),
+              patrolZ,
             ];
             entity.swarmPatrolRefreshAtMs = nowMs + 6_000;
           } else if (entity.mode === 'piloted' && (reachedWaypoint || nowMs >= entity.swarmPatrolRefreshAtMs)) {

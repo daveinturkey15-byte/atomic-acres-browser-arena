@@ -20,6 +20,7 @@ import {
   MAX_RETAINED_CARE_REWARDS,
   MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD,
   adrenalineModifiers,
+  droneSwarmStepMinimumAltitudeY,
   type KillstreakActivationIntent,
   type KillstreakWorld,
 } from './killstreak-runtime';
@@ -570,6 +571,26 @@ describe('host killstreak runtime', () => {
     expect(attacks).toHaveLength(1);
     expect(attacks.every((event) => event.damage > 1 && event.targetLifeId > 0)).toBe(true);
     expect(runtime.advance(1_000 + DRONE_SWARM_DURATION_MS, DEFAULT_WORLD).expiredEntityIds).toHaveLength(DRONE_SWARM_COUNT);
+  });
+
+  it('derives the swarm altitude floor from seeded local terrain and roof midpoints at both step ends', () => {
+    const world: KillstreakWorld = {
+      ...DEFAULT_WORLD,
+      groundHeightAt: (x, z) => (x >= 0 ? 10 : 2) + (Math.abs(Math.round(z)) % 3),
+    };
+    const admittedSpawnY = 18;
+    for (let seed = 1; seed <= 24; seed += 1) {
+      const current: readonly [number, number, number] = [seed % 2 === 0 ? -8 : 8, admittedSpawnY, (seed * 7) % 11 - 5];
+      const desired: readonly [number, number, number] = [seed % 2 === 0 ? 8 : -8, 0, (seed * 13) % 13 - 6];
+      const currentSurface = world.groundHeightAt!(current[0], current[2]);
+      const desiredSurface = world.groundHeightAt!(desired[0], desired[2]);
+      const expected = Math.max(
+        currentSurface + Math.max(1, (admittedSpawnY - currentSurface) * 0.5),
+        desiredSurface + Math.max(1, (admittedSpawnY - desiredSurface) * 0.5),
+      );
+      expect(droneSwarmStepMinimumAltitudeY(admittedSpawnY, current, desired, world)).toBeCloseTo(expected, 8);
+    }
+    expect(droneSwarmStepMinimumAltitudeY(18, [-8, 18, 0], [8, 0, 0], world)).toBe(14);
   });
 
   it('evaluates each owner hostile set once per host step for the full 24-drone swarm', () => {
