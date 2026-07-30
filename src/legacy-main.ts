@@ -494,6 +494,7 @@ import { InteractiveWorldRuntime } from './interactive-world-runtime';
 import { shedPlacementsForArena } from './destructible-shed-registry';
 import { FIELD_SHED_EXPLOSION_DAMAGE_MULTIPLIER } from './destructible-shed-definition';
 import { canAdmitMajorDebris, SHARED_MAJOR_DEBRIS_BUDGET } from './major-debris-budget';
+import { createFracturedWindowDebrisVisual } from './window-glass-debris-presentation';
 import {
   INTERACTIVE_WORLD_SCHEMA_VERSION,
   type InteractiveWorldSnapshotMessage,
@@ -7284,50 +7285,11 @@ function spawnPersistentWindowDebris(window: ArenaMap['breakableWindows'][number
   const direction = normal.lengthSq() > 1e-6 ? normal.clone().normalize() : new THREE.Vector3(0, 0.15, 1).normalize();
   centre.addScaledVector(direction, Math.max(0.06, halfExtents.z * 1.4));
 
-  const root = new THREE.Group();
-  root.name = id;
+  const root = createFracturedWindowDebrisVisual({ id, halfExtents, reducedRenderMode });
   root.position.copy(centre);
   root.quaternion.copy(paneRotation);
   root.userData.persistentMajorDebris = true;
   root.userData.windowId = window.id;
-  const pane = new THREE.Mesh(
-    new THREE.BoxGeometry(halfExtents.x * 2, halfExtents.y * 2, halfExtents.z * 2),
-    new THREE.MeshPhysicalMaterial({
-      color: 0x8ad9e8,
-      emissive: 0x0b3241,
-      emissiveIntensity: 0.22,
-      roughness: 0.16,
-      metalness: 0.04,
-      transparent: true,
-      opacity: 0.52,
-      transmission: reducedRenderMode ? 0 : 0.18,
-      thickness: halfExtents.z * 2,
-      clearcoat: 0.8,
-      clearcoatRoughness: 0.2,
-      side: THREE.DoubleSide,
-      depthWrite: true,
-    }),
-  );
-  pane.name = `${id}:pane`;
-  const edges = new THREE.LineSegments(
-    new THREE.EdgesGeometry(pane.geometry),
-    new THREE.LineBasicMaterial({ color: 0xbaf5ff, transparent: true, opacity: 0.72, toneMapped: false }),
-  );
-  edges.name = `${id}:edges`;
-  const frontZ = halfExtents.z + 0.004;
-  const crackGeometry = new THREE.BufferGeometry();
-  crackGeometry.setAttribute('position', new THREE.Float32BufferAttribute([
-    0, 0, frontZ, halfExtents.x * 0.72, halfExtents.y * 0.52, frontZ,
-    0, 0, frontZ, -halfExtents.x * 0.64, halfExtents.y * 0.62, frontZ,
-    0, 0, frontZ, halfExtents.x * 0.28, -halfExtents.y * 0.78, frontZ,
-    -halfExtents.x * 0.2, halfExtents.y * 0.18, frontZ, -halfExtents.x * 0.78, -halfExtents.y * 0.26, frontZ,
-  ], 3));
-  const cracks = new THREE.LineSegments(
-    crackGeometry,
-    new THREE.LineBasicMaterial({ color: 0xe1fbff, transparent: true, opacity: 0.62, toneMapped: false }),
-  );
-  cracks.name = `${id}:cracks`;
-  root.add(pane, edges, cracks);
   scene.add(root);
 
   const definition: MajorDebrisBodyDefinition = Object.freeze({
