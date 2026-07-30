@@ -336,12 +336,14 @@ import {
   createDeathDrop,
   deathDropAmmoAvailable,
   deathDropAvailable,
+  deathDropWeaponPickupAvailable,
   deathDropWeaponAvailable,
   isPrimaryWeaponId,
   nearestDeathDrop,
   nearestScavengeDeathDrop,
   pruneDeathDrops,
   scavengeDeathDrop,
+  selectDeathDropWeaponPickup,
   type DeathDrop,
 } from './death-drops';
 import { DeathDropPresentationPool } from './death-drop-presentation';
@@ -7614,9 +7616,9 @@ function nearbyGunRangeWeaponStation(): GunRangeWeaponStation | null {
   return nearestGunRangeWeaponStation(player.position);
 }
 
-function interactWithGunRangeArmory(now = performance.now()): boolean {
+function interactWithGunRangeArmory(now = performance.now(), expectedWeapon?: PrimaryWeaponId): boolean {
   const station = nearbyGunRangeWeaponStation();
-  if (!station) return false;
+  if (!station || (expectedWeapon && station.weapon !== expectedWeapon)) return false;
   interruptReload(true, now);
   const changedWeapon = !rangePrimaryUnlocked || player.primaryWeapon !== station.weapon;
   player.primaryWeapon = station.weapon;
@@ -7634,9 +7636,14 @@ function interactWithGunRangeArmory(now = performance.now()): boolean {
 }
 
 function interactWithWeaponPickup(now = performance.now(), expectedTargetId?: string): boolean {
-  if (expectedTargetId && !fInteractionCandidates(now).some((candidate) => (
-    candidate.kind === 'weapon-pickup' && candidate.targetId === expectedTargetId && candidate.enabled !== false
-  ))) return false;
+  if (expectedTargetId === 'railgun') return interactWithRailgunPickup(now);
+  if (expectedTargetId?.startsWith('station:')) {
+    const expectedWeapon = expectedTargetId.slice('station:'.length);
+    return isPrimaryWeaponId(expectedWeapon as WeaponId)
+      ? interactWithGunRangeArmory(now, expectedWeapon as PrimaryWeaponId)
+      : false;
+  }
+  if (expectedTargetId) return interactWithDeathDrop(now, expectedTargetId);
   return interactWithRailgunPickup(now) || interactWithGunRangeArmory(now) || interactWithDeathDrop(now);
 }
 
@@ -7678,12 +7685,15 @@ function interactWithShedDoor(expectedPlacementId?: string): boolean {
   return true;
 }
 
-function interactWithDeathDrop(now = performance.now()): boolean {
+function interactWithDeathDrop(now = performance.now(), expectedTargetId?: string): boolean {
   if (!player.alive || matchState.phase !== 'active') return false;
-  const candidates = deathDrops
-    .map((entity) => entity.drop)
-    .filter((drop) => deathDropWeaponAvailable(drop, now) && (drop.weapon !== player.primaryWeapon || deathDropAmmoAvailable(drop, now)));
-  const drop = nearestDeathDrop(candidates, player.position, DEATH_DROP_INTERACTION_RANGE, now, 'weapon');
+  const drop = selectDeathDropWeaponPickup(
+    deathDrops.map((entity) => entity.drop),
+    player.position,
+    player.primaryWeapon,
+    now,
+    expectedTargetId,
+  );
   if (!drop) return false;
   const entity = deathDrops.find((candidate) => candidate.drop.id === drop.id);
   if (!entity) return false;
@@ -7789,7 +7799,7 @@ function updateDeathDrops(now: number): void {
   }
   const candidates = deathDrops
     .map((entity) => entity.drop)
-    .filter((drop) => deathDropWeaponAvailable(drop, now) && (drop.weapon !== player.primaryWeapon || deathDropAmmoAvailable(drop, now)));
+    .filter((drop) => deathDropWeaponPickupAvailable(drop, player.primaryWeapon, now));
   const nearbyStation = nearbyGunRangeWeaponStation();
   const nearbyRailgun = player.alive && railgunPickupNearby();
   const nearby = player.alive && !nearbyRailgun && !nearbyStation
@@ -12946,16 +12956,18 @@ function fInteractionCandidates(now = performance.now()): readonly InteractionCa
     }
   }
 
-  const playerEye = { x: player.position.x, y: player.position.y + 1.1, z: player.position.z };
   const activeCareCrateId = careCaptureCrateId(localCareCaptureState);
+  let careLineOfSightSolids: ArenaMap['colliders'] | null = null;
   for (const crate of killstreakSnapshot.entities) {
     if (crate.kind !== 'care-crate' || crate.phase !== 'landed' || crate.id === activeCareCrateId) continue;
     const proximity = Math.hypot(crate.position[0] - player.position.x, crate.position[1] - player.position.y, crate.position[2] - player.position.z);
-    const lineOfSight = proximity <= 2.75 && !arena.colliders.some((box) => segmentIntersectsBox(
-      playerEye,
-      { x: crate.position[0], y: crate.position[1] + 0.45, z: crate.position[2] },
-      box,
-    ));
+    // Match HostKillstreakRuntime.beginCareCapture exactly: actor position,
+    // crate position and active-world collision authority use one predicate.
+    const lineOfSight = proximity <= 2.75 && killstreakLineOfSight(
+      careLineOfSightSolids ??= activeWorldColliders(),
+      [player.position.x, player.position.y, player.position.z],
+      crate.position,
+    );
     const enemySteal = actor != null && crate.team !== actor.team;
     candidates.push({
       kind: 'care-package',
@@ -12968,17 +12980,27 @@ function fInteractionCandidates(now = performance.now()): readonly InteractionCa
   }
 
   const door = interactiveWorldRuntime?.nearestDoor(player.position);
-  if (door) candidates.push({ kind: 'shed-door', targetId: door.placementId, proximityM: door.distance, prompt: 'OPEN / CLOSE DOOR', enabled: door.distance <= 2.35 });
+  if (door && interactiveWorldRuntime) candidates.push({
+    kind: 'shed-door',
+    targetId: door.placementId,
+    proximityM: door.distance,
+    prompt: 'OPEN / CLOSE DOOR',
+    enabled: door.distance <= 2.35 && interactiveWorldLineOfSight(
+      door.placementId,
+      player.position,
+      door.centre,
+      interactiveWorldRuntime.collisions(),
+    ),
+  });
 
   const railgun = railgunPickupNearby();
   const station = nearbyGunRangeWeaponStation();
   const drop = !railgun && !station
-    ? nearestDeathDrop(
-      deathDrops.map((entity) => entity.drop).filter((entry) => deathDropWeaponAvailable(entry, now)),
+    ? selectDeathDropWeaponPickup(
+      deathDrops.map((entity) => entity.drop),
       player.position,
-      DEATH_DROP_INTERACTION_RANGE,
+      player.primaryWeapon,
       now,
-      'weapon',
     )
     : null;
   if (railgun) candidates.push({ kind: 'weapon-pickup', targetId: 'railgun', proximityM: 0, prompt: `PICK UP ${WEAPONS.railgun.name.toUpperCase()}` });
@@ -13140,6 +13162,18 @@ function killstreakActorModifiers(actorId: string, now: number): Readonly<{ dama
   return { damage: active ? 1.1 : 1, movement: active ? 1.1 : 1, reloadDuration: active ? 0.9 : 1 };
 }
 
+function killstreakLineOfSight(
+  solids: ArenaMap['colliders'],
+  from: readonly [number, number, number],
+  to: readonly [number, number, number],
+): boolean {
+  return !solids.some((box) => segmentIntersectsBox(
+    { x: from[0], y: from[1], z: from[2] },
+    { x: to[0], y: to[1], z: to[2] },
+    box,
+  ));
+}
+
 function killstreakWorldState(): KillstreakWorld {
   const targets: KillstreakWorld['targets'][number][] = [];
   targets.push({
@@ -13204,11 +13238,7 @@ function killstreakWorldState(): KillstreakWorld {
     },
     targets,
     areHostile: (ownerId, ownerTeam, target) => areCombatantsHostile(ownerId, ownerTeam, target.id, target.team),
-    hasLineOfSight: (from, to) => !flightSolids.some((box) => segmentIntersectsBox(
-      { x: from[0], y: from[1], z: from[2] },
-      { x: to[0], y: to[1], z: to[2] },
-      box,
-    )),
+    hasLineOfSight: (from, to) => killstreakLineOfSight(flightSolids, from, to),
     groundHeightAt,
     resolveFlightPosition: (from, desired, radius) => {
       const result = resolveSupportFlightStep({

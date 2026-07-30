@@ -73,6 +73,16 @@ export function deathDropWeaponAvailable(drop: DeathDrop, now: number): boolean 
   return isPrimaryWeaponId(drop.weapon) && drop.weaponConsumedAt === null && now < drop.expiresAt;
 }
 
+/** The single eligibility predicate shared by weapon prompts and consumption. */
+export function deathDropWeaponPickupAvailable(
+  drop: DeathDrop,
+  equippedPrimary: PrimaryWeaponId,
+  now: number,
+): boolean {
+  return deathDropWeaponAvailable(drop, now)
+    && (drop.weapon !== equippedPrimary || deathDropAmmoAvailable(drop, now));
+}
+
 export function deathDropAvailable(drop: DeathDrop, now: number): boolean {
   return now < drop.expiresAt && (drop.ammoConsumedAt === null || deathDropWeaponAvailable(drop, now));
 }
@@ -106,6 +116,22 @@ export function nearestDeathDrop(
     }
   }
   return nearest;
+}
+
+export function selectDeathDropWeaponPickup(
+  drops: readonly DeathDrop[],
+  position: DropPoint,
+  equippedPrimary: PrimaryWeaponId,
+  now = performance.now(),
+  expectedTargetId?: string,
+  range = DEATH_DROP_INTERACTION_RANGE,
+): DeathDrop | null {
+  const eligible = drops.filter((drop) => deathDropWeaponPickupAvailable(drop, equippedPrimary, now));
+  if (expectedTargetId !== undefined) {
+    const expected = eligible.find((drop) => drop.id === expectedTargetId);
+    return expected ? nearestDeathDrop([expected], position, range, now, 'weapon') : null;
+  }
+  return nearestDeathDrop(eligible, position, range, now, 'weapon');
 }
 
 export function nearestScavengeDeathDrop(

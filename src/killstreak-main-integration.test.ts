@@ -8,6 +8,7 @@ import {
 } from './interaction-arbitration';
 
 const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+const deathDropSource = readFileSync(new URL('./death-drops.ts', import.meta.url), 'utf8');
 
 describe('Pass 65 playable killstreak integration', () => {
   it('freezes the persisted five-slot selection at match start and maps keys 3-7 by slot order', () => {
@@ -199,6 +200,41 @@ describe('Pass 65 playable killstreak integration', () => {
     const keydownEnd = source.indexOf("\n  if (event.code === 'Tab')", keydownStart);
     expect(source.slice(keydownStart, keydownEnd)).toContain('beginFInteractionPress(now);');
     expect(source.slice(keydownStart, keydownEnd)).not.toContain('executePinnedFInteraction(');
+  });
+
+  it('makes every visible world prompt an exact-target authority transaction', () => {
+    const selectionStart = source.indexOf('function fInteractionCandidates(');
+    const selectionEnd = source.indexOf('\nfunction selectedFInteraction(', selectionStart);
+    const selectionBlock = source.slice(selectionStart, selectionEnd);
+    expect(selectionBlock).toContain("let careLineOfSightSolids: ArenaMap['colliders'] | null = null;");
+    expect(selectionBlock).toContain('careLineOfSightSolids ??= activeWorldColliders()');
+    expect(selectionBlock).toContain('killstreakLineOfSight(');
+    expect(selectionBlock).toContain('[player.position.x, player.position.y, player.position.z]');
+    expect(selectionBlock).toContain('crate.position,');
+    expect(selectionBlock).toContain('interactiveWorldLineOfSight(');
+    expect(selectionBlock).toContain('interactiveWorldRuntime.collisions()');
+    expect(selectionBlock).toContain('selectDeathDropWeaponPickup(');
+
+    const worldStart = source.indexOf('function killstreakWorldState()');
+    const worldEnd = source.indexOf('\nfunction localKillstreakActorSnapshot(', worldStart);
+    expect(source.slice(worldStart, worldEnd)).toContain(
+      'hasLineOfSight: (from, to) => killstreakLineOfSight(flightSolids, from, to)',
+    );
+
+    const pickupStart = source.indexOf('function interactWithWeaponPickup(');
+    const pickupEnd = source.indexOf('\nfunction interactWithShedDoor(', pickupStart);
+    const pickupBlock = source.slice(pickupStart, pickupEnd);
+    expect(pickupBlock).toContain("if (expectedTargetId === 'railgun') return interactWithRailgunPickup(now);");
+    expect(pickupBlock).toContain("if (expectedTargetId?.startsWith('station:'))");
+    expect(pickupBlock).toContain('if (expectedTargetId) return interactWithDeathDrop(now, expectedTargetId);');
+
+    const dropStart = source.indexOf('function interactWithDeathDrop(');
+    const dropEnd = source.indexOf('\nfunction autoScavengeDeathDrop(', dropStart);
+    expect(source.slice(dropStart, dropEnd)).toContain('selectDeathDropWeaponPickup(');
+    expect(source.slice(dropStart, dropEnd)).toContain('expectedTargetId,');
+    expect(deathDropSource).toContain('deathDropWeaponPickupAvailable(drop, equippedPrimary, now)');
+    expect(deathDropSource).toContain("const expected = eligible.find((drop) => drop.id === expectedTargetId);");
+    expect(deathDropSource).toContain("nearestDeathDrop([expected], position, range, now, 'weapon')");
   });
 
   it('pins an independent nearby-world tap and global support hold from the same keydown', () => {

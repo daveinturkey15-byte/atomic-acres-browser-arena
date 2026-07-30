@@ -5,11 +5,13 @@ import {
   createDeathDrop,
   deathDropAmmoAvailable,
   deathDropAvailable,
+  deathDropWeaponPickupAvailable,
   deathDropWeaponAvailable,
   nearestDeathDrop,
   nearestScavengeDeathDrop,
   pruneDeathDrops,
   scavengeDeathDrop,
+  selectDeathDropWeaponPickup,
 } from './death-drops';
 
 describe('death-drop inventory contract', () => {
@@ -74,6 +76,35 @@ describe('death-drop inventory contract', () => {
     expect(result.inventory).toEqual({ primary: 'sniper', ammo: 2, reserve: 25 });
     expect(deathDropAvailable(result.drop, 1_101)).toBe(false);
     expect(consumeDeathDropWeapon(result.drop, result.inventory, 25, 1_200).consumed).toBe(false);
+  });
+
+  it('uses one predicate for same-primary prompts and consumption after ammo scavenging', () => {
+    const samePrimary = createDeathDrop('same-primary', 'carbine', { x: 0.5, y: 0, z: 0 }, 10, 20, 1_000);
+    const scavenged = scavengeDeathDrop(samePrimary, { weapon: 'carbine', reserve: 0, grenades: 0 }, 120, 1_100);
+    expect(scavenged.scavenged).toBe(true);
+    expect(deathDropWeaponAvailable(scavenged.drop, 1_200)).toBe(true);
+    expect(deathDropWeaponPickupAvailable(scavenged.drop, 'carbine', 1_200)).toBe(false);
+    expect(selectDeathDropWeaponPickup([scavenged.drop], { x: 0, y: 0, z: 0 }, 'carbine', 1_200)).toBeNull();
+    expect(consumeDeathDropWeapon(scavenged.drop, { primary: 'carbine', ammo: 30, reserve: 20 }, 120, 1_200).consumed).toBe(false);
+  });
+
+  it('never substitutes nearby drop B when prompted expected drop A becomes invalid', () => {
+    const expectedA = createDeathDrop('expected-a', 'carbine', { x: 0.6, y: 0, z: 0 }, 10, 20, 1_000);
+    const nearbyB = createDeathDrop('nearby-b', 'smg', { x: 0.8, y: 0, z: 0 }, 10, 20, 1_000);
+    const consumedA = { ...expectedA, weaponConsumedAt: 1_100 };
+    expect(selectDeathDropWeaponPickup(
+      [consumedA, nearbyB],
+      { x: 0, y: 0, z: 0 },
+      'sniper',
+      1_200,
+      'expected-a',
+    )).toBeNull();
+    expect(selectDeathDropWeaponPickup(
+      [consumedA, nearbyB],
+      { x: 0, y: 0, z: 0 },
+      'sniper',
+      1_200,
+    )?.id).toBe('nearby-b');
   });
 
   it('uses tight horizontal walk-over range while preserving wider F interaction and expiry pruning', () => {
