@@ -83,6 +83,30 @@ describe('release acceptance manifest', () => {
     expect(classifyPreviewDelta([manifestPath, 'src/release-channels.ts'], manifestPath)).toMatchObject({ ok: false });
   });
 
+  it('retains preview approval only for the finalizer exact-SHA receipt set', () => {
+    const manifestPath = 'acceptance/pass-66.json';
+    const sha = 'a'.repeat(40);
+    const finalizerPaths = [
+      manifestPath,
+      'docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md',
+      'docs/PASS65_OWNER_FEEDBACK_COMPLETENESS_GRAPH.json',
+      `artifacts/pass65-owner-feedback/t-owner-gate-${sha}.json`,
+      `artifacts/pass65-owner-feedback/hardware-webgl2-admission-${sha}.json`,
+      `artifacts/pass65/hardware-webgl2-admission/${sha}-receipt.json`,
+      `artifacts/pass65/hardware-webgl2-admission/${sha}-dist-manifest.json`,
+    ];
+    expect(classifyPreviewDelta(finalizerPaths, manifestPath)).toMatchObject({ ok: true });
+
+    for (const path of [
+      `artifacts/pass65-owner-feedback/runtime-${sha}.json`,
+      `artifacts/pass65/hardware-webgl2-admission/${sha}-other.json`,
+      'artifacts/pass65-owner-feedback/runtime.ts',
+      'src/main.ts',
+    ]) {
+      expect(classifyPreviewDelta([...finalizerPaths, path], manifestPath), path).toMatchObject({ ok: false });
+    }
+  });
+
   it('rejects an artifact reference that does not match the approved source SHA', () => {
     const manifest = acceptedManifest();
     manifest.preview.ref = `pr-preview-1-${'f'.repeat(40)}`;
