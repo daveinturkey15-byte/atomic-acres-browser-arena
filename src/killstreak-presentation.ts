@@ -19,15 +19,13 @@ const EMBER_GRAVITY_MPS2 = 11.25;
 const MAX_SENSOR_CONTACTS = 16;
 const MAX_PLACEMENT_MARKERS = 8;
 const PREWARM_STATE_ROOTS_PER_TASK = 4;
+const SUPPORT_STATIC_TRANSFORMS_PER_TASK = 4;
 
 async function yieldPresentationPreparation(): Promise<void> {
-  await new Promise<void>((resolve) => {
-    if (typeof globalThis.requestAnimationFrame === 'function') {
-      globalThis.requestAnimationFrame(() => resolve());
-    } else {
-      globalThis.setTimeout(resolve, 0);
-    }
-  });
+  // Presentation preparation must continue while the document is hidden.
+  // requestAnimationFrame is suspended/throttled in that state, which used to
+  // leave deployment preparation waiting indefinitely after a tab switch.
+  await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 0));
 }
 
 async function yieldPresentationCpuTask(): Promise<void> {
@@ -463,7 +461,10 @@ async function supportTextureContentDigests(gltf: GLTF): Promise<ReadonlyMap<THR
   return digests;
 }
 
-function loadSupportVehicleLod(asset: string): Promise<LoadedSupportVehicleLod> {
+function loadSupportVehicleLod(
+  asset: string,
+  family: SupportVehicleAssetFamily,
+): Promise<LoadedSupportVehicleLod> {
   return new Promise((resolve, reject) => {
     let settled = false;
     const timer = globalThis.setTimeout(() => {
@@ -482,6 +483,11 @@ function loadSupportVehicleLod(asset: string): Promise<LoadedSupportVehicleLod> 
         const contentDigests = await supportTextureContentDigests(gltf);
         supportVehicleTextureCanonicalizer.canonicalize(scene, contentDigests);
         markSharedPresentationAsset(scene);
+        // Static batching is template work, not instance work. Build it once
+        // while this LOD is entering the retained cache; all later support-pool
+        // instances clone the already optimized hierarchy and share its GPU
+        // resources instead of repeating geometry transforms and merges.
+        await optimizeAuthoredSupportLevel(scene, family, gltf.animations);
         if (settled) return;
         settled = true;
         globalThis.clearTimeout(timer);
@@ -536,7 +542,10 @@ export function loadSupportVehiclePresentations(): Promise<void> {
       // LODs within a family are sequential, so the global cap is also the
       // exact maximum number of simultaneous Meshopt/GLTF decode jobs.
       const lods: LoadedSupportVehicleLod[] = [];
-      for (const asset of SUPPORT_VEHICLE_ASSETS[family]) lods.push(await loadSupportVehicleLod(asset));
+      for (const asset of SUPPORT_VEHICLE_ASSETS[family]) {
+        lods.push(await loadSupportVehicleLod(asset, family));
+        await yieldPresentationPreparation();
+      }
       const missing = SUPPORT_VEHICLE_REQUIRED_NODES[family].filter((name) => lods[0]?.scene.getObjectByName(name) === undefined);
       if (missing.length > 0) throw new Error(`${family}: authored LOD0 missing ${missing.join(', ')}`);
       if (new Set(lods.map((lod) => lod.asset)).size !== SUPPORT_VEHICLE_ASSETS[family].length) {
@@ -684,12 +693,12 @@ function supportAnimationTargetNames(animations: readonly THREE.AnimationClip[])
   return names;
 }
 
-function batchAuthoredSupportStaticMeshes(
+async function batchAuthoredSupportStaticMeshes(
   anchor: THREE.Object3D,
   family: SupportVehicleAssetFamily,
   scope: string,
   allowAnimatedAnchor = false,
-): Readonly<{ sourceMeshes: number; batches: number }> {
+): Promise<Readonly<{ sourceMeshes: number; batches: number }>> {
   anchor.updateWorldMatrix(true, true);
   const anchorInverse = new THREE.Matrix4().copy(anchor.matrixWorld).invert();
   const groups = new Map<string, THREE.Mesh[]>();
@@ -713,10 +722,12 @@ function batchAuthoredSupportStaticMeshes(
   let batches = 0;
   for (const sources of groups.values()) {
     if (sources.length < 2) continue;
-    const transformed = sources.map((source) => {
+    const transformed: THREE.BufferGeometry[] = [];
+    for (const [index, source] of sources.entries()) {
       const localMatrix = new THREE.Matrix4().multiplyMatrices(anchorInverse, source.matrixWorld);
-      return source.geometry.clone().applyMatrix4(localMatrix);
-    });
+      transformed.push(source.geometry.clone().applyMatrix4(localMatrix));
+      if ((index + 1) % SUPPORT_STATIC_TRANSFORMS_PER_TASK === 0) await yieldPresentationCpuTask();
+    }
     const geometry = mergeGeometries(transformed, false);
     for (const entry of transformed) entry.dispose();
     if (!geometry) continue;
@@ -739,15 +750,17 @@ function batchAuthoredSupportStaticMeshes(
     }
     sourceMeshes += sources.length;
     batches += 1;
+    await yieldPresentationCpuTask();
   }
   return Object.freeze({ sourceMeshes, batches });
 }
 
-function optimizeAuthoredSupportLevel(
+async function optimizeAuthoredSupportLevel(
   level: THREE.Group,
   family: SupportVehicleAssetFamily,
   animations: readonly THREE.AnimationClip[],
-): void {
+): Promise<void> {
+  if (level.userData.supportStaticBatchOptimized === true) return;
   const animatedTargets: THREE.Object3D[] = [];
   for (const targetName of supportAnimationTargetNames(animations)) {
     const target = level.getObjectByName(targetName);
@@ -755,12 +768,11 @@ function optimizeAuthoredSupportLevel(
     target.userData.supportAnimationTarget = true;
     animatedTargets.push(target);
   }
-  const animatedStats = animatedTargets.map((target, index) => batchAuthoredSupportStaticMeshes(
-    target,
-    family,
-    `animated-${index + 1}`,
-    true,
-  ));
+  const animatedStats: Readonly<{ sourceMeshes: number; batches: number }>[] = [];
+  for (const [index, target] of animatedTargets.entries()) {
+    animatedStats.push(await batchAuthoredSupportStaticMeshes(target, family, `animated-${index + 1}`, true));
+    await yieldPresentationCpuTask();
+  }
   const cockpit = family === 'chopper' ? level.getObjectByName('chopper-first-person-cockpit') : null;
   const gunnerSightline = family === 'chopper' ? level.getObjectByName('chopper-gunner-sightline') : null;
   if (gunnerSightline) {
@@ -771,16 +783,19 @@ function optimizeAuthoredSupportLevel(
   const gunnerWeaponView = family === 'chopper' ? level.getObjectByName('chopper-gunner-weapon-view') : null;
   if (gunnerWeaponView) gunnerWeaponView.userData.supportStaticBatchBoundary = true;
   const gunnerWeaponStats = gunnerWeaponView
-    ? batchAuthoredSupportStaticMeshes(gunnerWeaponView, family, 'gunner-weapon')
+    ? await batchAuthoredSupportStaticMeshes(gunnerWeaponView, family, 'gunner-weapon')
     : Object.freeze({ sourceMeshes: 0, batches: 0 });
+  await yieldPresentationCpuTask();
   const gunnerSightlineStats = gunnerSightline
-    ? batchAuthoredSupportStaticMeshes(gunnerSightline, family, 'gunner-sightline')
+    ? await batchAuthoredSupportStaticMeshes(gunnerSightline, family, 'gunner-sightline')
     : Object.freeze({ sourceMeshes: 0, batches: 0 });
+  await yieldPresentationCpuTask();
   const cockpitStats = cockpit
-    ? batchAuthoredSupportStaticMeshes(cockpit, family, 'cockpit')
+    ? await batchAuthoredSupportStaticMeshes(cockpit, family, 'cockpit')
     : Object.freeze({ sourceMeshes: 0, batches: 0 });
   if (cockpit) cockpit.userData.supportStaticBatchBoundary = true;
-  const exteriorStats = batchAuthoredSupportStaticMeshes(level, family, 'exterior');
+  await yieldPresentationCpuTask();
+  const exteriorStats = await batchAuthoredSupportStaticMeshes(level, family, 'exterior');
   level.userData.supportStaticBatchStats = Object.freeze({
     sourceMeshes: gunnerWeaponStats.sourceMeshes + gunnerSightlineStats.sourceMeshes + cockpitStats.sourceMeshes + exteriorStats.sourceMeshes
       + animatedStats.reduce((total, stats) => total + stats.sourceMeshes, 0),
@@ -788,6 +803,8 @@ function optimizeAuthoredSupportLevel(
       + animatedStats.reduce((total, stats) => total + stats.batches, 0),
     animatedTargets: animatedTargets.length,
   });
+  level.userData.supportStaticBatchOptimized = true;
+  await yieldPresentationCpuTask();
 }
 
 type PresentedEntityPoolKey = 'chopper' | 'care-aircraft' | 'carpet-aircraft' | 'care-crate' | 'piloted-drone' | 'swarm-drone';
@@ -995,7 +1012,6 @@ function buildAuthoredSupportVehicle(family: SupportVehicleAssetFamily): Present
   for (const [index, source] of template.lods.entries()) {
     const level = source.scene.clone(true);
     level.name = `${runtimeName}-authored-lod${index}`;
-    optimizeAuthoredSupportLevel(level, family, source.animations);
     level.scale.setScalar(SUPPORT_VEHICLE_TARGET_DIMENSIONS[family] / Math.max(0.001, source.sourceMaxDimension));
     level.userData.presentationAsset = source.asset;
     const cockpit = level.getObjectByName('chopper-first-person-cockpit');

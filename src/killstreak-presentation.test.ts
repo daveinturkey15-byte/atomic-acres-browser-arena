@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import {
   HUNTER_DRONE_ASSET,
@@ -25,6 +26,45 @@ describe('authored support shadow budget', () => {
     expect(authoredSupportMaterialCastsShadow('chopper', 'MAT_Pass65Chopper_CanopyGlass')).toBe(false);
     expect(authoredSupportMaterialCastsShadow('drone', 'MAT_HunterDrone_IdentityLight')).toBe(false);
     expect(authoredSupportMaterialCastsShadow('drone', 'MAT_FutureDrone_Gunmetal')).toBe(false);
+  });
+});
+
+describe('authored support preparation scheduling', () => {
+  it('optimizes retained LOD templates once and keeps runtime pool construction clone-only', () => {
+    const source = readFileSync(new URL('./killstreak-presentation.ts', import.meta.url), 'utf8');
+    const loadLod = source.slice(
+      source.indexOf('function loadSupportVehicleLod('),
+      source.indexOf('async function allSettledBounded'),
+    );
+    const buildVehicle = source.slice(
+      source.indexOf('function buildAuthoredSupportVehicle('),
+      source.indexOf('function buildProceduralChopperFallback('),
+    );
+    expect(loadLod).toContain('await optimizeAuthoredSupportLevel(scene, family, gltf.animations);');
+    expect(buildVehicle).toContain('const level = source.scene.clone(true);');
+    expect(buildVehicle).not.toContain('optimizeAuthoredSupportLevel(');
+    expect(source).toContain('level.userData.supportStaticBatchOptimized = true;');
+  });
+
+  it('finishes cooperative pool preparation when hidden-tab animation frames are suspended', async () => {
+    const suspendedAnimationFrame = vi.fn(() => 1);
+    vi.stubGlobal('requestAnimationFrame', suspendedAnimationFrame);
+    const presentation = new KillstreakPresentation(new THREE.Scene());
+    let watchdog: ReturnType<typeof globalThis.setTimeout> | undefined;
+    try {
+      await Promise.race([
+        presentation.prewarmAuthoredAssets(),
+        new Promise<never>((_, reject) => {
+          watchdog = globalThis.setTimeout(() => reject(new Error('preparation waited for a hidden-tab animation frame')), 10_000);
+        }),
+      ]);
+      expect(suspendedAnimationFrame).not.toHaveBeenCalled();
+      expect(presentation.telemetry().prewarmed).toBe(6);
+    } finally {
+      if (watchdog !== undefined) globalThis.clearTimeout(watchdog);
+      presentation.dispose();
+      vi.unstubAllGlobals();
+    }
   });
 });
 
