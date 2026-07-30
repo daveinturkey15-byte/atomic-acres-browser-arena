@@ -70,7 +70,7 @@ Sections 3–12 are owned by the integrator and independent QA lanes. They must 
 - Inspect exterior fly-by and cockpit-adjacent moments. The canopy, frame, restrained instruments, interior/exterior materials, LODs and silhouette read as sleek and intentional rather than a hollow/blocky shell.
 - Watch the Gun Range cat body/head/look-at path through a full loop. It notices purposeful details, moves comfortably, never clips, closes the loop cleanly and remains a joy to watch rather than idle camera drift.
 - Enable reduced motion. Each preview keeps a strong, informative composition without rapid travel or disappearing content.
-- Rapidly click Nuke Town â†’ Terminal â†’ RustRig â†’ Gun Range and back. The latest selection wins without black/stale frames, jank or retained decoders. Telemetry remains at zero arena constructions, gameplay pipeline compiles and WebGPU submissions until Deploy is pressed.
+- Rapidly click Nuke Town → Terminal → RustRig → Gun Range and back. The latest selection wins without black/stale frames, jank or retained decoders. Telemetry remains at zero arena constructions, gameplay pipeline compiles and WebGPU submissions until Deploy is pressed.
 
 ### Graphics
 

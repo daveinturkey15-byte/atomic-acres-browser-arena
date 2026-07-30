@@ -2582,7 +2582,7 @@ async function ensureAtomicQualityPresentation(): Promise<THREE.Group | null> {
       arenaVisualStream.recordSelectedAssetRequest('atomic-acres', BLENDER_ARENA_ASSET);
       const art = await loadBlenderArena(scene, authority, (loaded, total) => {
         const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
-        setStatus(`Streaming Nuke Town Quality art ${percent}%â€¦`);
+        setStatus(`Streaming Nuke Town Quality art ${percent}%...`);
       });
       blenderArenaActive = true;
       arenaArtRoot = art.root;
@@ -2597,7 +2597,7 @@ async function ensureAtomicQualityPresentation(): Promise<THREE.Group | null> {
       markBlenderArenaFallback(error);
       console.error('[Nuke Town Quality Graphics asset load failed; using authored fallback]', error);
       const fallback = await loadArenaArt(scene, (loaded, total) => {
-        setStatus(`Quality Graphics fallback ${loaded}/${total}â€¦`);
+        setStatus(`Quality Graphics fallback ${loaded}/${total}...`);
       }, false);
       blenderArenaActive = false;
       arenaArtRoot = fallback.root;

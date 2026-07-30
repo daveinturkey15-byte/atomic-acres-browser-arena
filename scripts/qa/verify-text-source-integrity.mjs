@@ -17,11 +17,19 @@ function validateTextBytes(bytes) {
   const failures = [];
   if (bytes.length === 0) failures.push('is unexpectedly empty');
   if (bytes.includes(0)) failures.push('contains NUL bytes');
+  let text = null;
   try {
-    new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } catch {
     failures.push('is not valid UTF-8');
   }
+  if (text !== null && (
+    /\u00c2[\u0080-\u00bf\u2000-\u20cf]/u.test(text)
+    || /\u00c3[\u0080-\u00bf]/u.test(text)
+    || /\u00e2[\u0080-\u00bf\u2000-\u20cf]/u.test(text)
+    || /\u00ef\u00bb\u00bf/u.test(text)
+    || /\u00f0[\u0080-\u00bf\u0178]/u.test(text)
+  )) failures.push('contains a common UTF-8 mojibake sequence');
   return failures;
 }
 
@@ -41,6 +49,11 @@ function runSelfTest() {
   assert.deepEqual(validateTextBytes(Buffer.alloc(0)), ['is unexpectedly empty']);
   assert.deepEqual(validateTextBytes(Buffer.from([0x61, 0x00, 0x62])), ['contains NUL bytes']);
   assert.deepEqual(validateTextBytes(Buffer.from([0xc3, 0x28])), ['is not valid UTF-8']);
+  assert.deepEqual(
+    validateTextBytes(Buffer.from(String.fromCodePoint(0x00e2, 0x20ac, 0x00a6), 'utf8')),
+    ['contains a common UTF-8 mojibake sequence'],
+  );
+  assert.deepEqual(validateTextBytes(Buffer.from('café\n', 'utf8')), []);
   assert.deepEqual(
     validateTextBytes(Buffer.from([0x00, 0xc3, 0x28])),
     ['contains NUL bytes', 'is not valid UTF-8'],
