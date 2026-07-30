@@ -7,7 +7,9 @@ import {
   FORBIDDEN_BACKGROUND_BYPASS_FLAGS,
   PASS66_HIDDEN_TAB_GATE_SCHEMA,
   REQUIRED_BACKGROUND_CPU_PHASE,
+  REQUIRED_HELD_CPU_ASSET,
   assertHeadedChromeLaunchContract,
+  hasExactBrowserWeaponCatalog,
   hiddenCheckpointFailures,
   recoveredCheckpointFailures,
 } from './pass66-hidden-tab-contract.mjs';
@@ -79,8 +81,9 @@ async function sample(page) {
       runtime: state.render.runtime,
       audio: window.__PASS66_AUDIO_AUDIT__.snapshot(),
       interactiveWorldTick: state.interactiveWorld.tick,
+      weaponCatalog: api.sampleWeaponCatalogReadiness(),
       assetResources: performance.getEntriesByType('resource')
-        .filter((entry) => /\/assets\/original\/models\/atomic-acres-blender-arena\.glb(?:\?|$)/.test(entry.name))
+        .filter((entry) => entry.name.includes('/assets/original/models/weapons/pass65-firearms/flashlight-pistol/flashlight-pistol-fp-lod0.glb'))
         .map((entry) => ({
           name: new URL(entry.name, location.href).pathname,
           startTime: entry.startTime,
@@ -192,7 +195,7 @@ try {
     });
   });
   await stubExternalServices(game);
-  await game.route('**/assets/original/models/atomic-acres-blender-arena.glb*', async (route) => {
+  await game.route(`**${REQUIRED_HELD_CPU_ASSET}*`, async (route) => {
     heldAssetRequests += 1;
     observeAssetBarrier();
     await assetBarrierReleased;
@@ -215,9 +218,7 @@ try {
     return state?.bootstrap.stage === 'ready'
       && state?.render.runtime.actualBackend === 'webgpu'
       && state?.render.runtime.softwareAdapter === false
-      && state?.arenaSelection.streaming.constructionCount === 0
-      && state?.bootstrap.menuDeploymentAssetsProfile?.completed === true
-      && api.sampleWeaponAssetCache().runtimeCorpus.ready === true;
+      && state?.arenaSelection.streaming.constructionCount === 0;
   }, undefined, { timeout: 60_000 });
   await game.locator('#player-name').fill('Pass 66 Hidden Tab QA');
   const initial = await sample(game);
@@ -225,7 +226,7 @@ try {
     throw new Error(`installed Chrome did not grant the game tab foreground ownership: ${JSON.stringify(initial.document)}`);
   }
   await game.locator('#solo').click();
-  await withTimeout(assetBarrierObserved, 30_000, 'Atomic Acres held asset request');
+  await withTimeout(assetBarrierObserved, 30_000, 'held first-person weapon CPU asset request');
   await cover.bringToFront();
   await waitForNodeSample(game, (checkpoint) => (
     checkpoint.document.visibilityState === 'hidden' && !checkpoint.document.hasFocus
@@ -235,6 +236,7 @@ try {
   const afterCpuProgress = await waitForNodeSample(game, (checkpoint) => (
     checkpoint.document.visibilityState === 'hidden'
     && checkpoint.assetResources.length >= 1
+    && hasExactBrowserWeaponCatalog(checkpoint)
     && checkpoint.transition.profile?.phases.some((entry) => entry.phase === REQUIRED_BACKGROUND_CPU_PHASE)
   ), maximumHiddenPreparationMs, 'hidden fetch/decode/CPU preparation');
   await delay(minimumHiddenObservationMs);
@@ -280,7 +282,7 @@ try {
       backgroundThrottlingBypassFlags: [],
     },
     contract: {
-      heldAsset: '/assets/original/models/atomic-acres-blender-arena.glb',
+      heldAsset: REQUIRED_HELD_CPU_ASSET,
       heldAssetRequests,
       minimumHiddenObservationMs,
       maximumHiddenPreparationMs,
@@ -299,6 +301,7 @@ try {
     sourceRevision,
     browserVersion,
     hiddenCpuPhase: afterCpuProgress.transition.profile?.phases.at(-1)?.phase ?? null,
+    hiddenRetainedWeaponIds: afterCpuProgress.weaponCatalog.retained,
     hiddenSubmissionAdvance: afterHidden.presentation.submissionSequence - beforeRelease.presentation.submissionSequence,
     foregroundRecoveryMs: recovered.foregroundRecoveryMs,
     receipt: `${artifactRoot}/exact-sha-receipt.json`,

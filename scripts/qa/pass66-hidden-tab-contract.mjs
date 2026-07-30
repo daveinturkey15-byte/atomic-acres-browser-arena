@@ -9,6 +9,32 @@ export const FORBIDDEN_BACKGROUND_BYPASS_FLAGS = Object.freeze([
 
 export const REQUIRED_BACKGROUND_CPU_PHASE = 'weapon-catalog-prewarm';
 
+// This is deliberately frozen in the external gate instead of trusting the
+// candidate's own expectedIds field. A candidate cannot make an incomplete
+// catalog pass by shrinking both its implementation and its self-report.
+export const REQUIRED_BROWSER_WEAPON_IDS = Object.freeze([
+  'carbine',
+  'smg',
+  'lmg',
+  'scattergun',
+  'sniper',
+  'mini-uzi',
+  'mp5',
+  'm4a1',
+  'ak-47',
+  'minigun',
+  'm14-ebr',
+  'slug-shotgun',
+  'pistol',
+  'machine-pistol',
+  'magnum',
+  'flashlight-pistol',
+  'explosive-crossbow',
+  'railgun',
+]);
+
+export const REQUIRED_HELD_CPU_ASSET = '/assets/original/models/weapons/pass65-firearms/flashlight-pistol/flashlight-pistol-fp-lod0.glb';
+
 export function assertHeadedChromeLaunchContract({ headless, executablePath, args, ignoreDefaultArgs }) {
   if (headless !== false) throw new Error('Pass 66 hidden-tab admission requires headed Chrome');
   if (typeof executablePath !== 'string' || !/[/\\]Google[/\\]Chrome[/\\]Application[/\\]chrome\.exe$/i.test(executablePath)) {
@@ -31,6 +57,29 @@ function audioStates(checkpoint) {
   return checkpoint.audio.contexts.map((context) => context.state);
 }
 
+function exactArray(actual, expected) {
+  return Array.isArray(actual)
+    && actual.length === expected.length
+    && actual.every((value, index) => value === expected[index]);
+}
+
+export function hasExactBrowserWeaponCatalog(checkpoint) {
+  return exactArray(checkpoint.weaponCatalog?.retained, REQUIRED_BROWSER_WEAPON_IDS)
+    && checkpoint.weaponCatalog?.retainedCount === REQUIRED_BROWSER_WEAPON_IDS.length
+    && checkpoint.weaponCatalog?.loaded === REQUIRED_BROWSER_WEAPON_IDS.length
+    && checkpoint.weaponCatalog?.available === REQUIRED_BROWSER_WEAPON_IDS.length
+    && checkpoint.weaponCatalog?.maximumRetained === REQUIRED_BROWSER_WEAPON_IDS.length;
+}
+
+function completedHeldCpuAsset(checkpoint) {
+  return checkpoint.assetResources.some((resource) => (
+    typeof resource.name === 'string'
+    && resource.name.endsWith(REQUIRED_HELD_CPU_ASSET)
+    && Number.isFinite(resource.responseEnd)
+    && resource.responseEnd > 0
+  ));
+}
+
 export function hiddenCheckpointFailures({ beforeRelease, afterHidden, heldAssetRequests }) {
   const failures = [];
   const beforePhases = transitionPhaseNames(beforeRelease);
@@ -41,12 +90,22 @@ export function hiddenCheckpointFailures({ beforeRelease, afterHidden, heldAsset
   if (afterHidden.document.visibilityState !== 'hidden' || afterHidden.document.hasFocus) {
     failures.push('the game tab did not remain genuinely hidden during background preparation');
   }
-  if (heldAssetRequests < 1 || afterHidden.assetResources.length < 1) {
-    failures.push('the held Atomic Acres asset did not complete while hidden');
+  if (heldAssetRequests < 1 || !completedHeldCpuAsset(afterHidden)) {
+    failures.push('the exact held first-person weapon CPU asset did not complete while hidden');
   }
   if (!hiddenPhases.includes(REQUIRED_BACKGROUND_CPU_PHASE)
     || hiddenPhases.length <= beforePhases.length) {
     failures.push(`background CPU preparation did not reach ${REQUIRED_BACKGROUND_CPU_PHASE}`);
+  }
+  if (hasExactBrowserWeaponCatalog(beforeRelease)) {
+    failures.push('the browser weapon CPU catalog was already complete before the held asset was released');
+  }
+  if (!hasExactBrowserWeaponCatalog(afterHidden)) {
+    failures.push(`hidden CPU preparation did not commit the exact ${REQUIRED_BROWSER_WEAPON_IDS.length}-weapon retained catalog`);
+  }
+  if (!Number.isSafeInteger(beforeRelease.weaponCatalog?.loaded)
+    || afterHidden.weaponCatalog?.loaded <= beforeRelease.weaponCatalog.loaded) {
+    failures.push('the browser weapon loaded-model count did not advance while hidden');
   }
   if (afterHidden.presentation.submissionSequence !== beforeRelease.presentation.submissionSequence) {
     failures.push('WebGPU submissionSequence advanced while hidden');

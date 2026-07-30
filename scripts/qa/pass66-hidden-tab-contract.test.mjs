@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   FORBIDDEN_BACKGROUND_BYPASS_FLAGS,
+  REQUIRED_BROWSER_WEAPON_IDS,
+  REQUIRED_HELD_CPU_ASSET,
   assertHeadedChromeLaunchContract,
   hiddenCheckpointFailures,
   recoveredCheckpointFailures,
@@ -22,6 +24,15 @@ function checkpoint(overrides = {}) {
     runtime: { actualBackend: 'webgpu', softwareAdapter: false, deviceLost: false, uncapturedErrors: 0 },
     audio: { contexts: [{ state: 'suspended' }], suspendCalls: 1, resumeCalls: 1 },
     interactiveWorldTick: 0,
+    weaponCatalog: {
+      retained: ['carbine'],
+      retainedCount: 1,
+      loaded: 1,
+      available: REQUIRED_BROWSER_WEAPON_IDS.length,
+      maximumRetained: REQUIRED_BROWSER_WEAPON_IDS.length,
+      gpuReady: 0,
+      prewarming: true,
+    },
     assetResources: [],
     streaming: {
       constructionCount: 1,
@@ -81,7 +92,16 @@ test('requires real headed installed Chrome without background-throttling bypass
 test('accepts hidden CPU progress only when frames, WebGPU submission, authority, audio and generation stay paused', () => {
   const beforeRelease = checkpoint();
   const afterHidden = checkpoint({
-    assetResources: [{ name: '/assets/original/models/atomic-acres-blender-arena.glb', responseEnd: 123 }],
+    assetResources: [{ name: REQUIRED_HELD_CPU_ASSET, responseEnd: 123 }],
+    weaponCatalog: {
+      retained: [...REQUIRED_BROWSER_WEAPON_IDS],
+      retainedCount: REQUIRED_BROWSER_WEAPON_IDS.length,
+      loaded: REQUIRED_BROWSER_WEAPON_IDS.length,
+      available: REQUIRED_BROWSER_WEAPON_IDS.length,
+      maximumRetained: REQUIRED_BROWSER_WEAPON_IDS.length,
+      gpuReady: 0,
+      prewarming: true,
+    },
     transition: {
       ...beforeRelease.transition,
       profile: { phases: [
@@ -113,6 +133,66 @@ test('accepts hidden CPU progress only when frames, WebGPU submission, authority
     afterHidden: { ...afterHidden, interactiveWorldTick: beforeRelease.interactiveWorldTick + 1 },
     heldAssetRequests: 1,
   }).join(' | '), /offline interactive-world authority advanced while hidden/);
+});
+
+test('rejects a phase-only claim and incomplete or self-reordered retained weapon IDs', () => {
+  const beforeRelease = checkpoint();
+  const afterHidden = checkpoint({
+    assetResources: [{ name: REQUIRED_HELD_CPU_ASSET, responseEnd: 123 }],
+    weaponCatalog: {
+      retained: [...REQUIRED_BROWSER_WEAPON_IDS],
+      retainedCount: REQUIRED_BROWSER_WEAPON_IDS.length,
+      loaded: REQUIRED_BROWSER_WEAPON_IDS.length,
+      available: REQUIRED_BROWSER_WEAPON_IDS.length,
+      maximumRetained: REQUIRED_BROWSER_WEAPON_IDS.length,
+      gpuReady: 0,
+      prewarming: true,
+    },
+    transition: {
+      ...beforeRelease.transition,
+      profile: { phases: [
+        { phase: 'quality-presentation' },
+        { phase: 'weapon-catalog-prewarm' },
+      ] },
+    },
+  });
+
+  const phaseOnly = {
+    ...afterHidden,
+    weaponCatalog: { ...beforeRelease.weaponCatalog },
+  };
+  assert.match(hiddenCheckpointFailures({
+    beforeRelease,
+    afterHidden: phaseOnly,
+    heldAssetRequests: 1,
+  }).join(' | '), /did not commit the exact 18-weapon retained catalog.*loaded-model count did not advance/);
+
+  const incomplete = {
+    ...afterHidden,
+    weaponCatalog: {
+      ...afterHidden.weaponCatalog,
+      retained: REQUIRED_BROWSER_WEAPON_IDS.slice(0, -1),
+      retainedCount: REQUIRED_BROWSER_WEAPON_IDS.length - 1,
+    },
+  };
+  assert.match(hiddenCheckpointFailures({
+    beforeRelease,
+    afterHidden: incomplete,
+    heldAssetRequests: 1,
+  }).join(' | '), /did not commit the exact 18-weapon retained catalog/);
+
+  const reordered = {
+    ...afterHidden,
+    weaponCatalog: {
+      ...afterHidden.weaponCatalog,
+      retained: [...REQUIRED_BROWSER_WEAPON_IDS].reverse(),
+    },
+  };
+  assert.match(hiddenCheckpointFailures({
+    beforeRelease,
+    afterHidden: reordered,
+    heldAssetRequests: 1,
+  }).join(' | '), /did not commit the exact 18-weapon retained catalog/);
 });
 
 test('accepts one healthy foreground recovery of the same generation and root', () => {
