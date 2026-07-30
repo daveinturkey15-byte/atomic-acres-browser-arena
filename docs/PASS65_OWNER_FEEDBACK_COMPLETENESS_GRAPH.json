@@ -189,13 +189,42 @@
       "outcomeProjectionSha256": "d7c1620bb45219bb043907fbbc6c2406e8f38943940e97d9f616f96b7743a87d"
     },
     {
+      "id": "SRC-CODEX-V66-JUL30-001",
+      "kind": "codex-owner-feedback",
+      "externalLocator": "codex-task:pass66-hitl-correction-2026-07-30",
+      "rawByteLength": 1698,
+      "rawSha256": "571a39979490e532bbf17b48cfdf47192ed5122d75b81de9dff5911f2f33303d",
+      "rawEndsWithCrLf": false,
+      "normalizedRepositoryPath": "docs/pass65-sources/codex-owner-feedback-v66-2026-07-30.txt",
+      "normalization": "UTF-8; CRLF converted to LF; one final LF added; text semantics unchanged",
+      "normalizedByteLength": 1679,
+      "normalizedSha256": "ee25be42766db9130b34c3e055921da5f8532249ebe51208bcd2d58484b3a17e",
+      "outcomeCollection": "codexV66July30Outcomes",
+      "outcomeIdPrefix": "V66JUL30",
+      "outcomeCount": 18,
+      "lineAtomCounts": {
+        "1": 2,
+        "3": 4,
+        "5": 2,
+        "7": 2,
+        "9": 1,
+        "11": 1,
+        "13": 1,
+        "15": 1,
+        "17": 2,
+        "19": 1,
+        "21": 1
+      },
+      "outcomeProjectionSha256": "03300513cc9bd26c967c1e02dc7bfee838bf9afe7341b2363a1d4ba204d3cbf6"
+    },
+    {
       "id": "SRC-CORRECTION-LEDGER-001",
       "kind": "canonical-correction-ledger",
       "repositoryPath": "docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md",
       "ledgerVersion": 1,
-      "latestFeedbackId": "HF-181",
-      "outcomeCount": 181,
-      "stateIndependentOutcomeSha256": "f66cd57d3244e16f038be936c42f54060100fba048cf63cd2931b0edae4e3b5e"
+      "latestFeedbackId": "HF-190",
+      "outcomeCount": 190,
+      "stateIndependentOutcomeSha256": "9a9cc5ea390a8ac2402b1e6f745fe19060fa2435c3d5e39740d41a41edb8172b"
     },
     {
       "id": "SRC-PLANNING-MATRIX-001",
@@ -879,7 +908,7 @@
     "outcomeIdTemplate": "CORR-{feedbackId}",
     "sourceLocatorTemplate": "{feedbackId}.observation",
     "feedbackIdStart": "HF-001",
-    "feedbackIdEnd": "HF-181"
+    "feedbackIdEnd": "HF-190"
   },
   "supersessions": [
     {
@@ -1297,6 +1326,18 @@
         "HF-181"
       ],
       "canonicalText": "`DEC-13` drone combat balance now separates the variants: Piloted Drone per-hit damage is exactly `0.5 *` the inspected shared baseline and Drone Swarm per-hit damage is exactly `3 *` that baseline. The variants retain one authored visual asset family, but the earlier identical immutable gun-profile requirement is retired for damage; ammo, cadence, control, lifetime and feedback remain explicit per variant."
+    },
+    {
+      "id": "SUP-029",
+      "ledgerOrdinal": 29,
+      "sourceOutcomeIds": [
+        "V66JUL30-012",
+        "CORR-HF-187"
+      ],
+      "feedbackIds": [
+        "HF-187"
+      ],
+      "canonicalText": "Support possession no longer uses hold-`F`. After activation, pressing the same currently bound killstreak slot key again toggles Piloted Drone or Chopper Gunner entry/exit exactly once; in the inspected binding these are slots `4` and `6`. `F` remains the tap-only world interaction coordinator. This supersedes the support-hold portion of supersession 22 and the support-toggle clauses in R504, R507 and R609 without weakening world-interaction priority."
     }
   ],
   "testCatalog": [
@@ -6018,7 +6059,8 @@
       "id": "HF-152",
       "sourceOutcomeIds": [
         "CORR-HF-152",
-        "V66JUL29-024"
+        "V66JUL29-024",
+        "V66JUL30-008"
       ],
       "planningRequirementIds": [
         "R307",
@@ -6107,7 +6149,8 @@
       "id": "HF-155",
       "sourceOutcomeIds": [
         "CORR-HF-155",
-        "V66JUL29-027"
+        "V66JUL29-027",
+        "V66JUL30-011"
       ],
       "planningRequirementIds": [
         "R400",
@@ -6276,7 +6319,7 @@
     },
     {
       "id": "HF-162",
-      "sourceOutcomeIds": ["CORR-HF-162"],
+      "sourceOutcomeIds": ["CORR-HF-162", "V66JUL30-007"],
       "planningRequirementIds": ["R105", "R108", "R109", "R608"],
       "canonicalOwner": "Operator rig/viewmodel",
       "ownerSource": "SRC-CORRECTION-LEDGER-001",
@@ -6284,7 +6327,7 @@
     },
     {
       "id": "HF-163",
-      "sourceOutcomeIds": ["CORR-HF-163"],
+      "sourceOutcomeIds": ["CORR-HF-163", "V66JUL30-007"],
       "planningRequirementIds": ["R105", "R107", "R108", "R608"],
       "canonicalOwner": "Operator/weapon animation",
       "ownerSource": "SRC-CORRECTION-LEDGER-001",
@@ -6300,7 +6343,7 @@
     },
     {
       "id": "HF-165",
-      "sourceOutcomeIds": ["CORR-HF-165"],
+      "sourceOutcomeIds": ["CORR-HF-165", "V66JUL30-018"],
       "planningRequirementIds": ["R304", "R307", "R308", "R609"],
       "canonicalOwner": "Support spatial-audio/mixer",
       "ownerSource": "SRC-CORRECTION-LEDGER-001",
@@ -6332,7 +6375,7 @@
     },
     {
       "id": "HF-169",
-      "sourceOutcomeIds": ["CORR-HF-169"],
+      "sourceOutcomeIds": ["CORR-HF-169", "V66JUL30-011", "V66JUL30-017"],
       "planningRequirementIds": ["R223", "R236", "R400", "R401", "R402", "R403", "R404", "R405", "R406", "R407", "R408", "R409", "R410", "R411", "R412", "R413", "R510"],
       "canonicalOwner": "Material/destructible-world authority",
       "ownerSource": "SRC-CORRECTION-LEDGER-001",
@@ -6396,7 +6439,7 @@
     },
     {
       "id": "HF-177",
-      "sourceOutcomeIds": ["CORR-HF-177"],
+      "sourceOutcomeIds": ["CORR-HF-177", "V66JUL30-014"],
       "planningRequirementIds": ["R307", "R400", "R401", "R402", "R403", "R404", "R405", "R406", "R407", "R408", "R409", "R410", "R411", "R412", "R413", "R505", "R608", "R610"],
       "canonicalOwner": "Destructible-world/support/runtime",
       "ownerSource": "SRC-CORRECTION-LEDGER-001",
@@ -6420,7 +6463,7 @@
     },
     {
       "id": "HF-180",
-      "sourceOutcomeIds": ["CORR-HF-180"],
+      "sourceOutcomeIds": ["CORR-HF-180", "V66JUL30-014"],
       "planningRequirementIds": ["R307", "R400", "R401", "R402", "R403", "R404", "R405", "R406", "R407", "R408", "R409", "R410", "R411", "R412", "R413", "R505", "R510", "R608", "R610"],
       "canonicalOwner": "Support/runtime/destruction integrator",
       "ownerSource": "SRC-CORRECTION-LEDGER-001",
@@ -6433,6 +6476,78 @@
       "canonicalOwner": "Drone combat/balance authority",
       "ownerSource": "SRC-CORRECTION-LEDGER-001",
       "verification": {"coverage": "partial", "testRefs": ["T-KILLSTREAK-CATALOG", "T-SUPPORT-RUNTIME", "T-SUPPORT-DAMAGE", "T-NETWORK"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-182",
+      "sourceOutcomeIds": ["CORR-HF-182", "V66JUL30-001", "V66JUL30-002"],
+      "planningRequirementIds": ["R108", "R600", "R608", "R609"],
+      "canonicalOwner": "Loadout UI/weapon asset projection",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-WEAPON-ASSET-GATE", "T-WEAPON-CATALOG", "T-HUD-UNIT", "T-HUD-E2E"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-183",
+      "sourceOutcomeIds": ["CORR-HF-183", "V66JUL30-003", "V66JUL30-004"],
+      "planningRequirementIds": ["R108", "R232", "R600", "R608", "R609"],
+      "canonicalOwner": "Arsenal balance analytics/UI",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-WEAPON-CATALOG", "T-HUD-UNIT", "T-HUD-E2E"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-184",
+      "sourceOutcomeIds": ["CORR-HF-184", "V66JUL30-005"],
+      "planningRequirementIds": ["R114", "R600", "R608", "R609"],
+      "canonicalOwner": "Killstreak menu/HUD",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-HUD-UNIT", "T-HUD-E2E", "T-KILLSTREAK-CATALOG"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-185",
+      "sourceOutcomeIds": ["CORR-HF-185", "V66JUL30-006"],
+      "planningRequirementIds": ["R112", "R114", "R307", "R600", "R608", "R609", "R610"],
+      "canonicalOwner": "Killstreak preview-media UI",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-PREVIEW-GATE", "T-HUD-UNIT", "T-HUD-E2E", "T-LIFECYCLE-UNIT"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-186",
+      "sourceOutcomeIds": ["CORR-HF-186", "V66JUL30-009", "V66JUL30-010"],
+      "planningRequirementIds": ["R307", "R610"],
+      "canonicalOwner": "Arena admission/runtime",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-COLD-WEBGPU-ADMISSION", "T-WEBGPU-ENDURANCE", "T-MENU-LIFECYCLE-E2E", "T-NATIVE-FRAME-PACING"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-187",
+      "sourceOutcomeIds": ["CORR-HF-187", "V66JUL30-012"],
+      "planningRequirementIds": ["R504", "R507", "R510", "R609"],
+      "canonicalOwner": "Support possession/input lifecycle",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-INTERACTION", "T-SUPPORT-RUNTIME", "T-SUPPORT-VISUAL-E2E"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-188",
+      "sourceOutcomeIds": ["CORR-HF-188", "V66JUL30-013"],
+      "planningRequirementIds": ["R110", "R509", "R605", "R608"],
+      "canonicalOwner": "Terminal geometry/collision authority",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-ADDITIONAL-MAPS", "T-PROFILE-AUTHORITY-UNIT", "T-PROFILE-AUTHORITY-E2E"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-189",
+      "sourceOutcomeIds": ["CORR-HF-189", "V66JUL30-015"],
+      "planningRequirementIds": ["R105", "R108", "R307", "R610"],
+      "canonicalOwner": "Sniper viewmodel/frame pacing",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-WEAPON-PRESENTATION", "T-COLD-WEBGPU-ADMISSION", "T-NATIVE-FRAME-PACING"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-190",
+      "sourceOutcomeIds": ["CORR-HF-190", "V66JUL30-016"],
+      "planningRequirementIds": ["R105", "R307", "R602", "R603", "R610"],
+      "canonicalOwner": "Death/respawn frame pacing",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-OPERATOR-GATE", "T-WEAPON-PRESENTATION", "T-NATIVE-FRAME-PACING", "T-WEBGPU-ENDURANCE", "T-NETWORK"], "artifactRefs": []}
     }
   ],
   "desktopUntitledOutcomes": [
@@ -8007,5 +8122,25 @@
         "R609"
       ]
     }
+  ],
+  "codexV66July30Outcomes": [
+    {"id":"V66JUL30-001","sourceLocator":"L1#1","normalizedOutcome":"Field Kit weapon images use a still render derived from each exact canonical weapon asset rather than a generic image.","feedbackIds":["HF-182"],"planningRequirementIds":["R108","R600","R608","R609"]},
+    {"id":"V66JUL30-002","sourceLocator":"L1#2","normalizedOutcome":"Improve Field Kit stat bars and project the same complete statistics presentation into every custom profile card and inspector.","feedbackIds":["HF-182"],"planningRequirementIds":["R108","R600","R608","R609"]},
+    {"id":"V66JUL30-003","sourceLocator":"L3#1","normalizedOutcome":"Expose damage per second calculated truthfully from canonical damage, pellet count and fire rate so weapon balance can be inspected.","feedbackIds":["HF-183"],"planningRequirementIds":["R108","R232","R600","R608","R609"]},
+    {"id":"V66JUL30-004","sourceLocator":"L3#2","normalizedOutcome":"Show recoil, range and penetration or wallbang statistics alongside DPS so an ideal cyclic number is not mistaken for practical effectiveness.","feedbackIds":["HF-183"],"planningRequirementIds":["R108","R232","R600","R608","R609"]},
+    {"id":"V66JUL30-005","sourceLocator":"L3#3","normalizedOutcome":"Improve the Killstreak menu layout so available choices and equipped slots are not bunched together.","feedbackIds":["HF-184"],"planningRequirementIds":["R114","R600","R608","R609"]},
+    {"id":"V66JUL30-006","sourceLocator":"L3#4","normalizedOutcome":"Hovering or keyboard-focusing a selected equipped killstreak presents its own small demonstration to the right of the menu.","feedbackIds":["HF-185"],"planningRequirementIds":["R112","R114","R307","R600","R608","R609","R610"]},
+    {"id":"V66JUL30-007","sourceLocator":"L5#1","normalizedOutcome":"Complete the first-person arms and knife artwork, implementation and scale rather than deferring them.","feedbackIds":["HF-162","HF-163"],"planningRequirementIds":["R105","R107","R108","R109","R608"]},
+    {"id":"V66JUL30-008","sourceLocator":"L5#2","normalizedOutcome":"Generation-owned map loading and preparation should continue when the browser loses foreground focus, within the no-hidden-presentation contract.","feedbackIds":["HF-152"],"planningRequirementIds":["R307","R608","R610"]},
+    {"id":"V66JUL30-009","sourceLocator":"L7#1","normalizedOutcome":"Launching a solo Nuke Town match must not crash or strand deployment.","feedbackIds":["HF-186"],"planningRequirementIds":["R307","R610"]},
+    {"id":"V66JUL30-010","sourceLocator":"L7#2","normalizedOutcome":"Launching a solo Terminal match must not crash or strand deployment.","feedbackIds":["HF-186"],"planningRequirementIds":["R307","R610"]},
+    {"id":"V66JUL30-011","sourceLocator":"L9#1","normalizedOutcome":"Broken glass falls, settles and stops participating in player-blocking physics while retaining bounded visual evidence.","feedbackIds":["HF-155","HF-169"],"planningRequirementIds":["R400","R409","R410","R411","R412","R510","R608"]},
+    {"id":"V66JUL30-012","sourceLocator":"L11#1","normalizedOutcome":"Replace hold-F support possession with pressing the active reward slot key again: inspected slot 4 for Piloted Drone and slot 6 for Chopper Gunner.","feedbackIds":["HF-187"],"planningRequirementIds":["R504","R507","R510","R609"]},
+    {"id":"V66JUL30-013","sourceLocator":"L13#1","normalizedOutcome":"Remove unexplained invisible walls from Terminal without deleting intentional visible or boundary collision.","feedbackIds":["HF-188"],"planningRequirementIds":["R110","R509","R605","R608"]},
+    {"id":"V66JUL30-014","sourceLocator":"L15#1","normalizedOutcome":"A Carpet Bomber strike on the green destructible shed must complete its collapse without crashing the match.","feedbackIds":["HF-177","HF-180"],"planningRequirementIds":["R307","R400","R408","R409","R412","R505","R510","R608","R610"]},
+    {"id":"V66JUL30-015","sourceLocator":"L17#1","normalizedOutcome":"Sniper-family ADS must stop causing visible freezes.","feedbackIds":["HF-189"],"planningRequirementIds":["R105","R108","R307","R610"]},
+    {"id":"V66JUL30-016","sourceLocator":"L17#2","normalizedOutcome":"Player death and respawn presentation must stop causing visible freezes.","feedbackIds":["HF-190"],"planningRequirementIds":["R105","R307","R602","R603","R610"]},
+    {"id":"V66JUL30-017","sourceLocator":"L19#1","normalizedOutcome":"Knife damage must discover and break Atomic Acres glass through the same authoritative glass lifecycle.","feedbackIds":["HF-169"],"planningRequirementIds":["R236","R400","R410","R510"]},
+    {"id":"V66JUL30-018","sourceLocator":"L21#1","normalizedOutcome":"Identify and remove the recurring white-noise-like sound observed around one minute into Atomic Acres.","feedbackIds":["HF-165"],"planningRequirementIds":["R304","R307","R308","R609"]}
   ]
 }
