@@ -154,6 +154,10 @@ public static class Pass66GateWindow {
   [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr insertAfter, int x, int y, int width, int height, uint flags);
 }
 '@
 $targetPid = ${processId}
@@ -165,12 +169,17 @@ do {
   Start-Sleep -Milliseconds 50
 } while ([DateTime]::UtcNow -lt $deadline)
 if ($handle -eq [IntPtr]::Zero) { throw 'gate Chrome child did not expose a native main window' }
+$ownerPid = [uint32]0
+[void][Pass66GateWindow]::GetWindowThreadProcessId($handle, [ref]$ownerPid)
+if ($ownerPid -ne $targetPid) { throw 'gate Chrome HWND did not belong to the launched child PID' }
 $shell = New-Object -ComObject WScript.Shell
 [void]$shell.AppActivate($targetPid)
-[void][Pass66GateWindow]::ShowWindowAsync($handle, 9)
+[void][Pass66GateWindow]::ShowWindowAsync($handle, 3)
+[void][Pass66GateWindow]::SetWindowPos($handle, [IntPtr](-1), 0, 0, 0, 0, 0x0043)
 [void][Pass66GateWindow]::SetForegroundWindow($handle)
 Start-Sleep -Milliseconds 150
 if ([Pass66GateWindow]::GetForegroundWindow() -ne $handle) { throw 'gate Chrome child did not become the OS foreground window' }
+if (-not [Pass66GateWindow]::IsWindowVisible($handle) -or [Pass66GateWindow]::IsIconic($handle)) { throw 'gate Chrome child was not visible and restored' }
 $handle.ToInt64()`;
   return execFileSync('C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe', [
     '-NoProfile',
