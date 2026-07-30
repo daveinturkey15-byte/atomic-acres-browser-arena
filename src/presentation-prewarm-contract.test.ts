@@ -401,6 +401,15 @@ describe('presentation prewarm startup contract', () => {
     expect(weaponPrewarm).not.toContain('multiplyScalar(0.0001)');
     expect(source).toContain('await renderRuntime.compileAndRender(weaponView.root, camera, scene);');
     expect(source).not.toContain('await renderRuntime.compileAndRender(priorStates[0].model, camera, scene);');
+    const preparedSwitchExercise = source.slice(
+      source.indexOf('async function exercisePreparedWebGpuWeaponSwitches()'),
+      source.indexOf('async function waitForStableMatchAdmissionCadence()'),
+    );
+    expect(preparedSwitchExercise).toContain("const exercisesSniperScope = weaponId === 'sniper';");
+    expect(preparedSwitchExercise).toContain('camera.fov = magnifiedFovDegrees(preferredFov, 3);');
+    expect(preparedSwitchExercise).toContain('sniperScopeOverlay.hidden = false;');
+    expect(preparedSwitchExercise).toContain('weaponView.suppressForSniperScope(true);');
+    expect(preparedSwitchExercise).toContain('sniperScopeOverlay.hidden = true;');
     expect(source).toContain('streamedWeaponGpuPrewarmer,');
     expect(source).toContain('streamedWeaponCatalogGpuPrewarmer,');
     expect(menuLoadoutApply).toContain('const retainedCatalog = menuDeploymentAssetsPromise');

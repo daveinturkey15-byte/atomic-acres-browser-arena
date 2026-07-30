@@ -1554,6 +1554,23 @@ export class WeaponPresentation {
   }
 
   /**
+   * Keep the prepared viewmodel render objects resident while the full-screen
+   * sniper optic owns the sight picture. Removing the root from the render list
+   * forced Three's WebGPU ScenePass node graph to rebuild on the first scoped
+   * frame; a near-zero exact-scale draw suppresses the model without changing
+   * the retained render vocabulary.
+   */
+  suppressForSniperScope(suppressed: boolean): void {
+    this.root.visible = true;
+    this.root.scale.setScalar(suppressed
+      ? 0.0001
+      : THREE.MathUtils.lerp(HIP_VIEWMODEL_SCALE, ADS_VIEWMODEL_SCALE, this.adsBlend));
+    this.viewmodelFill.intensity = suppressed
+      ? 0
+      : Number(this.viewmodelFill.userData.authoredIntensity ?? 0);
+  }
+
+  /**
    * Places the retained first-person presentation at the exact clean match-start
    * pose without advancing clocks, actions, effect pools or gameplay state.
    * Admission uses this while normal player simulation is deliberately blocked

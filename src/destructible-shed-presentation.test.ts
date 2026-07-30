@@ -5,6 +5,7 @@ import {
   advanceShedDoor,
   applyShedExplosion,
   applyShedSheetImpact,
+  applyShedStructuralBlast,
   createInitialShedState,
   resetShedState,
   validateDestructibleShedDefinition,
@@ -358,6 +359,26 @@ describe('Pass 65 destructible shed presentation', () => {
     expect(fracturedShell.geometry.getAttribute('position').count).toBeLessThan(intactVertexCount);
     expect(debris.count).toBe(1);
     expect(presentation.telemetry(fractured.state)).toMatchObject({ activeDraws: 6, detachedChunks: 1, dents: 1 });
+    presentation.dispose();
+  });
+
+  it('keeps an empty shell valid when Carpet Bomber detaches every panel at once', () => {
+    const initial = createInitialShedState(FIELD_SHED_DEFINITION, placement, 8);
+    const presentation = createFieldShedPresentation(placement, initial);
+    const obliterated = applyShedStructuralBlast(FIELD_SHED_DEFINITION, initial, {
+      isHost: true,
+      matchEpoch: 8,
+      expectedRevision: initial.revision,
+      blastId: 'carpet-bomber-obliteration-8-1',
+      blastClass: 'carpet-bomber-obliteration',
+      originLocal: { x: 0, y: 1.2, z: 0 },
+    });
+
+    expect(obliterated.accepted).toBe(true);
+    expect(() => presentation.sync(obliterated.state)).not.toThrow();
+    const shell = presentation.root.getObjectByName('field-shed-damageable-shell') as THREE.Mesh;
+    expect(shell.geometry.getAttribute('position')).toBeUndefined();
+    expect(presentation.telemetry(obliterated.state)).toMatchObject({ detachedChunks: 6 });
     presentation.dispose();
   });
 });

@@ -438,7 +438,13 @@ export class DestructibleShedPresentation {
         if (!surfaceState || surfaceState.stage === 'detached') continue;
         staticGeometries.push(transformedPanelGeometry(surfaceDefinition, surfaceState));
       }
-      const shellGeometry = mergeGeometries(staticGeometries, false) ?? new THREE.BufferGeometry();
+      // BufferGeometryUtils assumes at least one source geometry. A structural
+      // Carpet Bomber blast legitimately detaches every static panel in one
+      // transaction, so preserve an empty shell without entering the merge
+      // helper's first-geometry attribute path.
+      const shellGeometry = staticGeometries.length > 0
+        ? mergeGeometries(staticGeometries, false) ?? new THREE.BufferGeometry()
+        : new THREE.BufferGeometry();
       staticGeometries.forEach((geometry) => geometry.dispose());
       const oldShell = this.shell;
       const oldShellGeometry = oldShell.geometry;

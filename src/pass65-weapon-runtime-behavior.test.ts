@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { poseOperator, setOperatorWeapon } from './art-kit';
-import { WeaponPresentation, type WeaponViewmodelCatalogGpuPrewarmEntry } from './weapon-presentation';
+import { WeaponPresentation, HIP_VIEWMODEL_SCALE, type WeaponViewmodelCatalogGpuPrewarmEntry } from './weapon-presentation';
 import { WEAPON_IDS, type WeaponId } from './protocol';
 import { RUNTIME_WEAPON_RETENTION_LIMIT } from './weapon-prewarm-catalog';
 import {
@@ -189,6 +189,17 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(pistol?.visible).toBe(true);
     expect(carbine?.visible).toBe(false);
     expect(releasePass65WeaponModelsIn(presentation.root)).toBe(2);
+  });
+
+  it('suppresses the sniper viewmodel without removing its prepared WebGPU render vocabulary', () => {
+    const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(), false);
+    presentation.suppressForSniperScope(true);
+
+    expect(presentation.root.visible).toBe(true);
+    expect(presentation.root.scale.toArray()).toEqual([0.0001, 0.0001, 0.0001]);
+    presentation.suppressForSniperScope(false);
+    expect(presentation.root.visible).toBe(true);
+    expect(presentation.root.scale.toArray()).toEqual([HIP_VIEWMODEL_SCALE, HIP_VIEWMODEL_SCALE, HIP_VIEWMODEL_SCALE]);
   });
 
   it('keeps a rapid loadout switch atomic while initial browser assets are delayed', async () => {

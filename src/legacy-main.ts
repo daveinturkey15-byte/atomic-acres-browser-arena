@@ -1728,9 +1728,31 @@ async function exercisePreparedWebGpuWeaponSwitches(): Promise<void> {
       // behind the deployment surface, never against a synthetic compile root.
       weaponView.setWeapon(weaponId, true);
       weaponView.snapToMatchStartRestPose(currentViewmodelSurfaceRetreat());
+      const exercisesSniperScope = weaponId === 'sniper';
+      if (exercisesSniperScope) {
+        // The first live magnified frame previously paid for both the scoped
+        // WebGPU composition and full-screen reticle raster (300-440 ms on the
+        // retained RTX/Chrome path). Exercise that exact state behind the
+        // opaque deployment surface without advancing simulation or input.
+        camera.fov = magnifiedFovDegrees(preferredFov, 3);
+        camera.updateProjectionMatrix();
+        weaponView.suppressForSniperScope(true);
+        sniperScopeOverlay.hidden = false;
+        hudRoot.classList.add('sniper-scope-active');
+      }
       camera.updateMatrixWorld(true);
-      await submitForegroundWebGpuFrame();
-      await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);
+      try {
+        await submitForegroundWebGpuFrame();
+        await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);
+      } finally {
+        if (exercisesSniperScope) {
+          sniperScopeOverlay.hidden = true;
+          hudRoot.classList.remove('sniper-scope-active');
+          weaponView.suppressForSniperScope(false);
+          camera.fov = preferredFov;
+          camera.updateProjectionMatrix();
+        }
+      }
       const presentation = renderRuntime.presentationTelemetry();
       if (presentation.status !== 'healthy') {
         throw new Error(`Prepared ${weaponId} switch exercise was ${presentation.status}: ${presentation.lastFailure ?? 'unknown failure'}`);
@@ -13755,7 +13777,8 @@ function updatePass65KillstreakRuntime(now: number): void {
   refreshSupportStatusHud(now);
   const possession = localKillstreakActorSnapshot()?.possession;
   document.documentElement.dataset.killstreakPossession = possession?.kind ?? 'none';
-  weaponView.setPresentationVisible(shouldShowWeaponViewmodel());
+  if (sniperScopeActive) weaponView.suppressForSniperScope(true);
+  else weaponView.setPresentationVisible(shouldShowWeaponViewmodel());
   updateKillstreakPossession(now);
 }
 
@@ -15301,7 +15324,11 @@ function updatePhysics(dt: number): void {
       ? magnifiedFovDegrees(preferredFov, DMR_THERMAL_MAGNIFICATION)
       : Math.max(55, preferredFov - 20);
   const targetFov = adsHeld ? aimingFov : currentSprinting ? preferredFov + 4.5 : preferredFov;
-  camera.fov = player.weapon === 'sniper' ? targetFov : damp(camera.fov, targetFov, 10, dt);
+  // A one-frame 82 -> 32 degree sniper projection jump invalidated most of the
+  // visible render list at once and forced a measured WebGPU ScenePass rebuild.
+  // Keep the optic fast, but distribute the frustum transition over the same
+  // bounded ADS settle interval as the physical weapon pose.
+  camera.fov = damp(camera.fov, targetFov, player.weapon === 'sniper' ? 18 : 10, dt);
   camera.updateProjectionMatrix();
   sniperScopeActive = player.alive
     && player.weapon === 'sniper'
@@ -15316,7 +15343,8 @@ function updatePhysics(dt: number): void {
     && weaponView.adsProgress() >= 0.9
     && Math.abs(camera.fov - aimingFov) < 0.35;
   hudRoot.classList.toggle('dmr-thermal-active', dmrThermalActive);
-  weaponView.setPresentationVisible(shouldShowWeaponViewmodel());
+  if (sniperScopeActive) weaponView.suppressForSniperScope(true);
+  else weaponView.setPresentationVisible(shouldShowWeaponViewmodel());
   camera.position.copy(player.position);
   camera.position.y += cameraHeightOffset - landingImpulse * 0.035 * accessibilityRuntime.weaponMotionScale;
   camera.rotation.y = player.yaw + recoilCamera.yaw;
@@ -19129,7 +19157,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       magnification: 3,
       baseFov: preferredFov,
       cameraFov: camera.fov,
-      viewmodelVisible: weaponView.root.visible,
+      // The scoped presentation remains resident at imperceptible scale so the
+      // WebGPU render vocabulary stays warm. Expose the player-visible state,
+      // not the implementation detail used to avoid a first-ADS pipeline stall.
+      viewmodelVisible: weaponView.root.visible && !sniperScopeActive,
     },
     weaponActionHistory: [...weaponActionHistory],
     menuVisible: !menu.classList.contains('hidden'),
