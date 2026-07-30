@@ -1308,6 +1308,13 @@
       "command": "npx playwright test tests/e2e/pass65-menu-lifecycle.spec.ts --project=chromium --workers=1 --retries=0",
       "paths": [
         "tests/e2e/pass65-menu-lifecycle.spec.ts"
+      ],
+      "evidenceKinds": [
+        "browser",
+        "visual"
+      ],
+      "visualArtifactPaths": [
+        "artifacts/pass65/menu-lifecycle"
       ]
     },
     {
@@ -1322,14 +1329,24 @@
       "command": "npx playwright test tests/e2e/pass64-hud-menu.spec.ts --project=chromium --workers=1 --retries=0",
       "paths": [
         "tests/e2e/pass64-hud-menu.spec.ts"
+      ],
+      "evidenceKinds": [
+        "browser",
+        "visual"
+      ],
+      "visualArtifactPaths": [
+        "artifacts/pass64/ui-review",
+        "artifacts/pass65/graphics-options",
+        "artifacts/pass65/hud-review"
       ]
     },
     {
       "id": "T-HUD-UNIT",
-      "command": "npx vitest run src/ui/pass65-hud-layout.test.ts src/ui/surface-registry.test.ts",
+      "command": "npx vitest run src/ui/pass65-hud-layout.test.ts src/ui/surface-registry.test.ts src/sensory-feedback.test.ts",
       "paths": [
         "src/ui/pass65-hud-layout.test.ts",
-        "src/ui/surface-registry.test.ts"
+        "src/ui/surface-registry.test.ts",
+        "src/sensory-feedback.test.ts"
       ]
     },
     {
@@ -1345,6 +1362,13 @@
       "command": "npx playwright test tests/e2e/pass65-support-visual-gate.spec.ts --project=chromium --workers=1 --retries=0",
       "paths": [
         "tests/e2e/pass65-support-visual-gate.spec.ts"
+      ],
+      "evidenceKinds": [
+        "browser",
+        "visual"
+      ],
+      "visualArtifactPaths": [
+        "artifacts/pass65/support-visual-gate"
       ]
     },
     {
@@ -1352,6 +1376,13 @@
       "command": "npm run qa:pass65:support-vehicles",
       "paths": [
         "scripts/qa/verify-pass65-support-vehicle-production.mjs"
+      ],
+      "evidenceKinds": [
+        "contract",
+        "visual"
+      ],
+      "visualArtifactPaths": [
+        "docs/assets/pass65-vehicles"
       ]
     },
     {
@@ -1359,6 +1390,13 @@
       "command": "npm run qa:pass65:menu-previews",
       "paths": [
         "scripts/qa/verify-pass65-menu-preview-production.mjs"
+      ],
+      "evidenceKinds": [
+        "contract",
+        "visual"
+      ],
+      "visualArtifactPaths": [
+        "docs/assets/pass65-menu-previews"
       ]
     },
     {
@@ -1366,6 +1404,13 @@
       "command": "npm run qa:pass65:drone-asset",
       "paths": [
         "scripts/qa/verify-pass65-drone-production.mjs"
+      ],
+      "evidenceKinds": [
+        "contract",
+        "visual"
+      ],
+      "visualArtifactPaths": [
+        "docs/assets/pass65-drone"
       ]
     },
     {
@@ -1373,6 +1418,13 @@
       "command": "npm run qa:pass65:ordnance-assets",
       "paths": [
         "scripts/qa/verify-pass65-semtex-production.mjs"
+      ],
+      "evidenceKinds": [
+        "contract",
+        "visual"
+      ],
+      "visualArtifactPaths": [
+        "docs/assets/pass65-ordnance"
       ]
     },
     {
@@ -1380,13 +1432,30 @@
       "command": "npm run qa:pass65:operator-assets",
       "paths": [
         "scripts/qa/verify-pass65-operator-production.mjs"
+      ],
+      "evidenceKinds": [
+        "contract",
+        "visual"
+      ],
+      "visualArtifactPaths": [
+        "docs/assets/pass65-operators/third-person"
       ]
     },
     {
       "id": "T-WEAPON-ASSET-GATE",
-      "command": "npm run qa:pass65:weapon-assets",
+      "command": "npm run qa:pass66:weapon-assets-evidence",
       "paths": [
-        "scripts/qa/verify-pass65-weapon-production.mjs"
+        "scripts/qa/verify-pass65-weapon-production.mjs",
+        "scripts/qa/verify-pass65-first-person-arms-visual.mjs"
+      ],
+      "evidenceKinds": [
+        "browser",
+        "visual"
+      ],
+      "visualArtifactPaths": [
+        "artifacts/pass65/first-person-arms-visual-gate",
+        "docs/assets/pass65-operators/first-person-arms",
+        "docs/assets/pass65-weapons"
       ]
     },
     {
@@ -1408,6 +1477,13 @@
       "command": "npm run qa:pass65:cold-webgpu-admission",
       "paths": [
         "scripts/qa/verify-pass65-cold-webgpu-admission.mjs"
+      ],
+      "evidenceKinds": [
+        "browser",
+        "visual"
+      ],
+      "visualArtifactPaths": [
+        "artifacts/pass65/cold-webgpu-admission"
       ]
     },
     {
@@ -1415,6 +1491,13 @@
       "command": "npm run qa:pass65:webgpu-endurance",
       "paths": [
         "scripts/qa/verify-pass65-webgpu-endurance.mjs"
+      ],
+      "evidenceKinds": [
+        "browser",
+        "visual"
+      ],
+      "visualArtifactPaths": [
+        "artifacts/pass65/webgpu-endurance"
       ]
     },
     {
@@ -1423,6 +1506,9 @@
       "paths": [
         "scripts/qa/verify-pass65-frame-pacing.ts",
         "src/pass65-frame-pacing-gate.ts"
+      ],
+      "evidenceKinds": [
+        "browser"
       ]
     },
     {
@@ -1435,6 +1521,9 @@
         "src/pass65-hardware-webgl2-admission-gate.test.ts",
         "src/admission-debug-contract.test.ts",
         "src/presentation-prewarm-contract.test.ts"
+      ],
+      "evidenceKinds": [
+        "browser"
       ]
     },
     {
@@ -1470,6 +1559,9 @@
         "src/railgun-presentation.test.ts",
         "src/railgun-result-delivery-contract.test.ts",
         "src/audio-railgun.test.ts"
+      ],
+      "evidenceKinds": [
+        "browser"
       ]
     },
     {
@@ -1495,6 +1587,15 @@
       "command": "npx playwright test tests/e2e/pass64-hud-menu.spec.ts --project=chromium --workers=1 --retries=0",
       "paths": [
         "tests/e2e/pass64-hud-menu.spec.ts"
+      ],
+      "evidenceKinds": [
+        "browser",
+        "visual"
+      ],
+      "visualArtifactPaths": [
+        "artifacts/pass64/ui-review",
+        "artifacts/pass65/graphics-options",
+        "artifacts/pass65/hud-review"
       ]
     },
     {
@@ -1666,10 +1767,11 @@
     },
     {
       "id": "T-AUDIO",
-      "command": "npx vitest run src/sound-event-inventory.test.ts src/weapon-audio-profiles.test.ts",
+      "command": "npx vitest run src/sound-event-inventory.test.ts src/weapon-audio-profiles.test.ts src/sensory-feedback.test.ts",
       "paths": [
         "src/sound-event-inventory.test.ts",
-        "src/weapon-audio-profiles.test.ts"
+        "src/weapon-audio-profiles.test.ts",
+        "src/sensory-feedback.test.ts"
       ]
     },
     {
@@ -1707,11 +1809,29 @@
       ]
     },
     {
-      "id": "T-CHANGELOG",
-      "command": "npx vitest run src/changelog.test.ts",
+      "id": "T-RELEASE-SHELL",
+      "command": "npm run qa:pass66:release-shell-evidence",
       "paths": [
         "src/changelog.ts",
-        "src/changelog.test.ts"
+        "src/changelog.test.ts",
+        "src/release-topology.test.ts",
+        "src/release-pipeline.test.ts",
+        "src/release-channel.test.ts",
+        "src/release-change-impact.test.ts",
+        "src/release-benchmark.test.ts",
+        "src/acceptance-gate.test.ts",
+        "src/project-map.test.ts",
+        "src/pass65-release-foundation-evidence.test.ts",
+        "tests/e2e/release-channel-chooser.spec.ts",
+        "src/release-identity.ts",
+        "docs/PASS65_P0_RELEASE_FOUNDATION_2026-07-25.md"
+      ],
+      "evidenceKinds": [
+        "browser",
+        "visual"
+      ],
+      "visualArtifactPaths": [
+        "artifacts/pass66/release-shell"
       ]
     }
   ],
@@ -2615,6 +2735,7 @@
       "verification": {
         "coverage": "partial",
         "testRefs": [
+          "T-LEADERBOARD",
           "T-PRIVACY-UNIT",
           "T-PRIVACY-E2E"
         ],
@@ -3011,9 +3132,12 @@
         "CORR-HF-043"
       ],
       "planningRequirementIds": [
+        "R002",
+        "R003",
         "R004",
         "R005",
         "R006",
+        "R009",
         "R606",
         "R607",
         "R610",
@@ -3024,7 +3148,8 @@
       "verification": {
         "coverage": "partial",
         "testRefs": [
-          "T-FRAME-POLICY"
+          "T-FRAME-POLICY",
+          "T-RELEASE-SHELL"
         ],
         "artifactRefs": []
       }
@@ -3434,8 +3559,10 @@
       "verification": {
         "coverage": "partial",
         "testRefs": [
+          "T-COLD-WEBGPU-ADMISSION",
           "T-RENDERER-INVENTORY",
-          "T-SETTINGS"
+          "T-SETTINGS",
+          "T-WEBGPU-ENDURANCE"
         ],
         "artifactRefs": []
       }
@@ -3709,8 +3836,13 @@
         "SPEC-045"
       ],
       "planningRequirementIds": [
+        "R001",
         "R005",
+        "R101",
+        "R102",
+        "R103",
         "R111",
+        "R303",
         "R600",
         "R608",
         "R611",
@@ -3721,7 +3853,10 @@
       "verification": {
         "coverage": "partial",
         "testRefs": [
-          "T-OWNER-GATE"
+          "T-AUDIO",
+          "T-HUD-UNIT",
+          "T-OWNER-GATE",
+          "T-RELEASE-SHELL"
         ],
         "artifactRefs": []
       }
@@ -3750,8 +3885,10 @@
       "verification": {
         "coverage": "partial",
         "testRefs": [
+          "T-COLD-WEBGPU-ADMISSION",
           "T-RENDERER-INVENTORY",
-          "T-SETTINGS"
+          "T-SETTINGS",
+          "T-WEBGPU-ENDURANCE"
         ],
         "artifactRefs": []
       }
@@ -3794,6 +3931,9 @@
         "SPEC-045"
       ],
       "planningRequirementIds": [
+        "R101",
+        "R102",
+        "R103",
         "R200",
         "R201",
         "R202",
@@ -3817,6 +3957,7 @@
         "R234",
         "R235",
         "R236",
+        "R303",
         "R400",
         "R401",
         "R402",
@@ -3862,6 +4003,8 @@
       "verification": {
         "coverage": "partial",
         "testRefs": [
+          "T-AUDIO",
+          "T-HUD-UNIT",
           "T-KILLSTREAK-CATALOG",
           "T-ORDNANCE",
           "T-DESTRUCTIBLE",
@@ -4520,6 +4663,7 @@
       ],
       "planningRequirementIds": [
         "R005",
+        "R009",
         "R610",
         "R613"
       ],
@@ -4796,6 +4940,8 @@
         "V66JUL29-019"
       ],
       "planningRequirementIds": [
+        "R002",
+        "R007",
         "R010",
         "R612"
       ],
@@ -4804,7 +4950,7 @@
       "verification": {
         "coverage": "partial",
         "testRefs": [
-          "T-CHANGELOG"
+          "T-RELEASE-SHELL"
         ],
         "artifactRefs": []
       }
@@ -5142,7 +5288,9 @@
         "V66JUL29-019"
       ],
       "planningRequirementIds": [
+        "R002",
         "R005",
+        "R007",
         "R608",
         "R610",
         "R613"
@@ -5409,6 +5557,7 @@
       ],
       "planningRequirementIds": [
         "R005",
+        "R009",
         "R610",
         "R613"
       ],

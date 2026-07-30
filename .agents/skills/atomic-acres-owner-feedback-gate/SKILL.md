@@ -56,6 +56,30 @@ npm run qa:pass65:owner-feedback:candidate
 
 The structural verifier must fail duplicate, skipped, malformed, unowned, unscoped, unmapped or untested feedback rows, removal of a required native hardware gate, source-outcome omissions/duplicates, stale owners or supersessions, unknown planning references and invalid artifact declarations. The candidate verifier additionally rejects every `OPEN` or merely `IMPLEMENTED` P0/P1 row and every P0/P1 row without complete, exact-SHA, digest-checked test evidence; only `VERIFIED` or `HITL` with such evidence may enter an immutable candidate. Its positive synthetic receipt fixture and omission/duplication/stale-owner/stale-supersession/missing-test/missing-native-gate/missing-artifact mutations are part of the skill contract.
 
+## Exact-S0 Pass 66 evidence runner
+
+Use `npm run run:pass66:owner-evidence -- ...` only from a clean frozen S0 worktree with the exact production `dist/` already built. Generated receipts and logs stay below ignored `artifacts/`; they are evidence for the finalizer, never committed source.
+
+```powershell
+npm run qa:pass66:owner-evidence-runner
+npm run run:pass66:owner-evidence -- --list
+npm run run:pass66:owner-evidence -- --dry-run --source-sha <exact-S0-SHA>
+npm run run:pass66:owner-evidence -- --run --select T-HUD-UNIT,T-AUDIO --source-sha <exact-S0-SHA>
+npm run run:pass66:owner-evidence -- --resume --source-sha <exact-S0-SHA>
+```
+
+`--run` executes every selected catalog command exactly once without a shell; `--resume` consumes only an already-current receipt and otherwise executes the exact command, including when a prior receipt exists but is malformed or stale. A normal schema-v1 receipt is written atomically only after exit zero and a second clean source/build/environment/verifier check. Its `buildId` also binds the recursive digest of every explicit visual output. Browser claims must resolve to a declared Playwright/Chromium execution path. Every image/video included below a dynamic `artifacts/` visual path must be freshly written by that exact command; one fresh frame cannot carry stale siblings. Checked-in contact sheets below `docs/assets/` count only when the associated exact command validates those bytes. A visual matrix row is emitted as `mixed` only when graph-linked exact evidence includes both browser execution and digest-bound visual output; missing browser or visual coverage is fatal rather than downgraded to mechanical.
+
+`T-COLD-HARDWARE-WEBGL2` is deliberately exceptional: `--run` executes its exact catalog command and then validates the original command-produced schema-v2 owner artifact, detailed receipt, current `dist/` manifest, environment and installed Chrome digest. The runner never replaces or wraps that artifact. `--resume` may consume it only when every current exact-S0 binding still validates.
+
+After all 52 exact receipts validate, generate the deterministic 160-feedback/99-requirement finalizer input:
+
+```powershell
+npm run run:pass66:owner-evidence -- --emit-finalizer-input artifacts/pass66-owner-evidence-runner/finalizer-input.json --source-sha <exact-S0-SHA> --feedback-received-at <ISO-UTC> --preview-ref <immutable-preview-ref> --preview-created-at <ISO-UTC> --acceptance-mode pre-approval
+```
+
+The generator rejects missing, extra or duplicate receipts, orphan catalog commands/requirements, stale visual bytes and unrelated feedback IDs. Use `--acceptance-mode approved` only with Dave's later exact-preview authorization plus `--approved-at` and concrete `--approval-evidence`; do not fabricate it during pre-approval construction.
+
 ## Handoff
 
 Report the feedback IDs changed, exact paths/commit, observations versus inferences, commands and artifacts, remaining unknowns/falsifiers, and whether the candidate is merely implemented, mechanically verified, or genuinely ready for immutable HITL. Never claim publish readiness without an exact-SHA acceptance binding and separate publish instruction. For Pass 66, Dave's standing conditional instruction is that separate instruction: bind it only after the immutable preview exists and all blocking gates are green, record the actual binding time, and state explicitly that it is not evidence Dave tested that preview. Any runtime or release-shell drift invalidates the binding.

@@ -213,7 +213,9 @@ The feedback IDs remain the correction source; these ranges bind each row back t
 | HF-027–HF-031 | R300, R301, R306, R613 |
 | HF-032–HF-038 | R110, R111, R234, R307, R400–R413, R605, R610 |
 | HF-039–HF-040 | R233, R236, R504, R509, R510 |
-| HF-041–HF-044 | R004, R005, R006, R606, R607, R610, R613 |
+| HF-041–HF-042 | R004, R005, R006, R606, R607, R610, R613 |
+| HF-043 | R002, R003, R004, R005, R006, R009, R606, R607, R610, R613 |
+| HF-044 | R004, R005, R006, R606, R607, R610, R613 |
 | HF-045–HF-051 | R108, R109, R304, R501–R507, R510, R608, R609 |
 | HF-052–HF-055 | R307, R504, R507, R510, R605, R610 |
 | HF-056 | R112–R114, R307, R608–R610 |
@@ -226,9 +228,9 @@ The feedback IDs remain the correction source; these ranges bind each row back t
 | HF-066 | R502, R505, R510, R609 |
 | HF-067 | R109, R232, R236, R601, R608 |
 | HF-068 | R504, R506, R507, R510, R609 |
-| HF-069 | R005, R111, R600, R608, R611, R613 |
+| HF-069 | R001, R005, R101-R103, R111, R303, R600, R608, R611, R613 |
 | HF-070 | R100, R111, R300-R302, R307, R308, R608, R610, R613 |
-| HF-071 | R200-R205, R220-R236, R400-R413, R500-R512, R600-R610, R613 |
+| HF-071 | R101-R103, R200-R205, R220-R236, R303, R400-R413, R500-R512, R600-R610, R613 |
 | HF-072 | R008, R105-R115, R236, R300, R402, R608, R613 |
 | HF-073 | R112, R114, R608, R610 |
 | HF-074 | R112, R608, R609 |
@@ -256,7 +258,7 @@ The feedback IDs remain the correction source; these ranges bind each row back t
 | HF-096 | R405, R406, R410 |
 | HF-097 | R500, R510 |
 | HF-098 | R606, R610 |
-| HF-099 | R005, R610, R613 |
+| HF-099 | R005, R009, R610, R613 |
 | HF-100 | R236, R510 |
 | HF-101 | R236, R510, R608 |
 | HF-102 | R236, R609 |
@@ -268,7 +270,7 @@ The feedback IDs remain the correction source; these ranges bind each row back t
 | HF-108 | R300, R301, R605, R606 |
 | HF-109 | R112, R114, R608 |
 | HF-110 | R114, R608, R609 |
-| HF-111 | R010, R612 |
+| HF-111 | R002, R007, R010, R612 |
 | HF-112 | R300, R301, R306, R606 |
 | HF-113 | R300, R302, R306 |
 | HF-114 | R300, R302, R306 |
@@ -283,7 +285,7 @@ The feedback IDs remain the correction source; these ranges bind each row back t
 | HF-123 | R302, R306 |
 | HF-124 | R300, R301, R307, R606, R610 |
 | HF-125 | R507, R509, R510 |
-| HF-126 | R005, R608, R610, R613 |
+| HF-126 | R002, R005, R007, R608, R610, R613 |
 | HF-127 | R505, R510, R609 |
 | HF-128 | R112, R113, R608, R610 |
 | HF-129 | R507, R509, R510 |
@@ -294,7 +296,7 @@ The feedback IDs remain the correction source; these ranges bind each row back t
 | HF-134 | R108, R504, R608 |
 | HF-135 | R109, R504, R608, R609 |
 | HF-136 | R400-R413, R608 |
-| HF-137 | R005, R610, R613 |
+| HF-137 | R005, R009, R610, R613 |
 | HF-138 | R006, R606, R610, R613 |
 | HF-139 | R109, R510, R600-R603, R607, R608 |
 | HF-140 | R109, R307, R308, R601, R607, R608, R609 |

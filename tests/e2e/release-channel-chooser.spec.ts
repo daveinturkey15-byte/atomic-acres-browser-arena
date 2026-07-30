@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
+import { resolve } from 'node:path';
 
-test('offers only Pass 66 The Big One and stable Pass 63 before the menu loads', async ({ page }) => {
+test('offers only Pass 66 The Big One and stable Pass 63 before the menu loads', async ({ page }, testInfo) => {
   await page.goto('/?release=choose&renderer=webgl2');
 
   await expect(page.locator('#release-channel-gate')).toBeVisible();
@@ -14,6 +16,12 @@ test('offers only Pass 66 The Big One and stable Pass 63 before the menu loads',
   await expect(page.locator('[data-release-choice="stable"]')).toContainText('STABLE');
   await expect(page.locator('#release-channel-gate')).not.toContainText('PASS 65');
   await expect(page.locator('#release-channel-gate')).not.toContainText('PASS 59');
+
+  const artifactRoot = resolve(process.cwd(), 'artifacts/pass66/release-shell');
+  mkdirSync(artifactRoot, { recursive: true });
+  const screenshot = resolve(artifactRoot, 'the-big-one-live-pass63-stable.png');
+  await page.screenshot({ path: screenshot, animations: 'disabled', fullPage: true });
+  await testInfo.attach('the-big-one-live-pass63-stable', { path: screenshot, contentType: 'image/png' });
 
   await page.locator('[data-release-choice="experimental"]').click();
   await expect(page).toHaveURL(/\/channels\/the-big-one\/.*release=latest/);

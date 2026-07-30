@@ -156,6 +156,46 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     await testInfo.attach('advanced-webgpu-controls-1280x720', { path: screenshot, contentType: 'image/png' });
   });
 
+  test('exposes every independent audio bus, applies it live, and persists it', async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await ready(page);
+    await page.locator('#menu-tab-options').click();
+    await expect(page.locator('[data-audio-bus]')).toHaveCount(8);
+    await expect(page.locator('[data-audio-mute]')).toHaveCount(8);
+    await expect(page.locator('.audio-setting-row > span')).toHaveText([
+      'MASTER', 'SFX', 'MOVEMENT', 'UI', 'ANNOUNCEMENTS', 'AMBIENCE', 'MENU MUSIC', 'GAME MUSIC',
+    ]);
+
+    await page.locator('#audio-sfx-gain').evaluate((node) => {
+      const input = node as HTMLInputElement;
+      input.value = '37';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.locator('#audio-sfx-mute').check();
+    expect(await page.evaluate(() => {
+      const requested = window.__ATOMIC_ACRES_DEBUG__.snapshot().settings.requested as {
+        audio: { gains: { sfx: number }; mutes: { sfx: boolean } };
+      };
+      return { gain: requested.audio.gains.sfx, muted: requested.audio.mutes.sfx };
+    })).toEqual({ gain: 37, muted: true });
+    expect(await page.evaluate((key) => {
+      const profile = JSON.parse(localStorage.getItem(key) ?? 'null');
+      return { gain: profile?.settings?.audio?.gains?.sfx, muted: profile?.settings?.audio?.mutes?.sfx };
+    }, PLAYER_PROFILE_STORAGE_KEY)).toEqual({ gain: 37, muted: true });
+
+    const directory = resolve(process.cwd(), 'artifacts/pass65/graphics-options');
+    mkdirSync(directory, { recursive: true });
+    const screenshot = resolve(directory, 'audio-mixer-1280x720.png');
+    await page.screenshot({ path: screenshot, animations: 'disabled', fullPage: true });
+    await testInfo.attach('audio-mixer-1280x720', { path: screenshot, contentType: 'image/png' });
+
+    await page.reload();
+    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 30_000 });
+    await page.locator('#menu-tab-options').click();
+    await expect(page.locator('#audio-sfx-gain')).toHaveValue('37');
+    await expect(page.locator('#audio-sfx-mute')).toBeChecked();
+  });
+
   test('batches Advanced Graphics edits and commits Custom once when Options closes', async ({ page }) => {
     await ready(page);
     await page.locator('#menu-tab-options').click();
