@@ -534,6 +534,12 @@ describe('killstreak presentation', () => {
       bounded: true,
     });
     expect(presentation.root.getObjectByName('chopper-sleek-cockpit-canopy')).toBeDefined();
+    expect(presentation.root.getObjectByName('chopper-armoured-belly')).toBeDefined();
+    expect(presentation.root.getObjectByName('chopper-armoured-nose')).toBeDefined();
+    expect(presentation.root.getObjectByName('chopper-engine-pod-1')).toBeDefined();
+    expect(presentation.root.getObjectByName('chopper-engine-pod--1')).toBeDefined();
+    expect(presentation.root.getObjectByName('chopper-rocket-pod-1')).toBeDefined();
+    expect(presentation.root.getObjectByName('chopper-tail-stabilizer')).toBeDefined();
     expect(presentation.root.getObjectByName('pass65-care-package-aircraft')).toBeDefined();
     expect(presentation.root.getObjectByName('care-package-parachute')).toBeDefined();
     expect(presentation.root.getObjectByName('pass65-swarm-drone')).toBeDefined();
@@ -574,6 +580,11 @@ describe('killstreak presentation', () => {
       hudVisible: true,
       weaponVisible: true,
     });
+    const redundantPossessionTraverse = vi.spyOn(chopper, 'traverse');
+    presentation.setFirstPersonEntity('ks-1-chopper-1');
+    presentation.setFirstPersonEntity('ks-1-chopper-1');
+    expect(redundantPossessionTraverse).not.toHaveBeenCalled();
+    redundantPossessionTraverse.mockRestore();
     const cameraQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.12, 0.8, 0, 'YXZ'));
     presentation.alignFirstPersonCockpit('ks-1-chopper-1', cameraQuaternion);
     const cockpitWorldQuaternion = chopper.getObjectByName('chopper-first-person-cockpit')!

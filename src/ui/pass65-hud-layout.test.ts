@@ -37,4 +37,11 @@ describe('Pass 65 modern tactical HUD layout contract', () => {
     expect(hudCss).toContain('@keyframes pass65HudCountdownRing');
     expect(hudCss).toMatch(/prefers-reduced-motion:\s*reduce[\s\S]*?#countdown\.countdown-cue-active[\s\S]*?animation:\s*none/);
   });
+
+  it('keeps the possessed chopper HUD minimal, legible, and free of exterior rotor presentation', () => {
+    expect(tacticalCss).toContain('#support-combat-feedback[data-support-kind="chopper"][data-possessed="true"]');
+    expect(tacticalCss).toMatch(/data-support-kind="chopper"[\s\S]*?#support-platform-name\s*\{\s*font-size:\s*17px/);
+    expect(tacticalCss).toMatch(/data-support-kind="chopper"[\s\S]*?\.support-optic-frame\s*\{[\s\S]*?width:\s*min\(62vw, 820px\)/);
+    expect(shell).toContain('class="support-optic-frame" aria-hidden="true"');
+  });
 });

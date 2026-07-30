@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
   AUDIO_RUNTIME_BUDGET,
   ARENA_AUDIO_DEFINITIONS,
@@ -68,6 +69,14 @@ describe('spatial audio contracts', () => {
       expect(definition.modulationDepth).toBeGreaterThan(0);
       expect(definition.modulationDepth).toBeLessThanOrEqual(0.2);
     }
+    const audioSource = readFileSync(new URL('./audio.ts', import.meta.url), 'utf8');
+    const arenaBed = audioSource.slice(
+      audioSource.indexOf('private startArenaBed('),
+      audioSource.indexOf('private startLowHealthLoops('),
+    );
+    expect(arenaBed).toContain("const air = this.context.createOscillator();");
+    expect(arenaBed).toContain("air.type = 'triangle';");
+    expect(arenaBed).not.toContain('const air = this.context.createBufferSource();');
   });
 
   it('maps footsteps to each arena dominant authored walkable material', () => {

@@ -1198,7 +1198,7 @@ export class ArenaAudio {
   }
 
   private startArenaBed(arenaId: ArenaId): void {
-    if (!this.context || !this.ambience || !this.noiseBuffer) return;
+    if (!this.context || !this.ambience) return;
     const definition = ARENA_AUDIO_DEFINITIONS[arenaId];
     const now = this.context.currentTime;
     const tone = this.context.createOscillator();
@@ -1228,13 +1228,17 @@ export class ArenaAudio {
       toneGain.disconnect();
       tonePanner.disconnect();
     }
-    const air = this.context.createBufferSource();
+    // A continuous white-noise source remained audible as the intermittent
+    // hiss players associated with support/drone spawns. Use a narrow,
+    // deterministic triangle bed instead; transient weapon/smoke noise keeps
+    // its own bounded one-shot paths and no longer exposes a broadband floor.
+    const air = this.context.createOscillator();
     const airFilter = this.context.createBiquadFilter();
     const airLowpass = this.context.createBiquadFilter();
     const airGain = this.context.createGain();
     const airPanner = this.context.createPanner();
-    air.buffer = this.noiseBuffer;
-    air.loop = true;
+    air.type = 'triangle';
+    air.frequency.value = definition.airFrequencyHz;
     airFilter.type = 'bandpass';
     airFilter.frequency.value = definition.airFrequencyHz;
     airFilter.Q.value = definition.airQ;
@@ -1250,10 +1254,8 @@ export class ArenaAudio {
     airPanner.positionX.value = definition.airPosition.x;
     airPanner.positionY.value = definition.airPosition.y;
     airPanner.positionZ.value = definition.airPosition.z;
-    // The loop is deliberately narrow and gently animated. A broad, static
-    // white-noise bed reads as intermittent hiss after loud combat tails,
-    // especially on headsets; the second filter removes that broadband floor
-    // without spending another continuous voice.
+    // Keep the tonal air bed narrow and gently animated without adding another
+    // continuous voice or a broadband noise floor.
     airFilter.frequency.setValueAtTime(definition.airFrequencyHz, now);
     const halfCycleSeconds = 0.5 / definition.modulationHz;
     const scheduledHalfCycles = Math.ceil(120 / halfCycleSeconds);
@@ -1266,7 +1268,7 @@ export class ArenaAudio {
     }
     air.connect(airFilter).connect(airLowpass).connect(airGain).connect(airPanner).connect(this.ambience);
     if (this.registerVoice(air, this.ambience, 1)) {
-      air.start(now, presentationRandom() * this.noiseBuffer.duration);
+      air.start(now);
       this.arenaSources.push(air);
       this.arenaNodes.push(airFilter, airLowpass, airGain, airPanner);
     } else {

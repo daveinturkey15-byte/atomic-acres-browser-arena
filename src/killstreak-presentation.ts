@@ -1082,6 +1082,31 @@ function buildProceduralChopperFallback(): PresentedEntity {
   tail.position.z = 1.95;
   const fin = mesh(new THREE.BoxGeometry(0.08, 0.75, 0.55), 0xe0b94f, 'chopper-tail-fin');
   fin.position.set(0, 0.35, 3.03);
+  const belly = mesh(new THREE.BoxGeometry(1.12, 0.34, 2.15), 0x101b1f, 'chopper-armoured-belly');
+  belly.position.set(0, -0.38, 0.08);
+  const noseArmour = mesh(new THREE.BoxGeometry(0.94, 0.48, 0.72), 0x24383d, 'chopper-armoured-nose');
+  noseArmour.position.set(0, -0.12, -1.52);
+  noseArmour.rotation.x = -0.12;
+  const stabilizer = mesh(new THREE.BoxGeometry(1.42, 0.06, 0.38), 0x263a3f, 'chopper-tail-stabilizer');
+  stabilizer.position.set(0, 0.08, 2.62);
+  const stubWings = [-1, 1].map((side) => {
+    const wing = mesh(new THREE.BoxGeometry(1.02, 0.10, 0.48), 0x1c2d32, `chopper-stub-wing-${side}`);
+    wing.position.set(side * 0.96, -0.13, 0.05);
+    wing.rotation.z = side * -0.08;
+    return wing;
+  });
+  const enginePods = [-1, 1].map((side) => {
+    const pod = mesh(new THREE.CylinderGeometry(0.24, 0.29, 1.18, 12), 0x273b40, `chopper-engine-pod-${side}`);
+    pod.rotation.x = Math.PI / 2;
+    pod.position.set(side * 0.64, 0.28, 0.36);
+    return pod;
+  });
+  const rocketPods = [-1, 1].map((side) => {
+    const pod = mesh(new THREE.CylinderGeometry(0.17, 0.19, 0.92, 12), 0x11191c, `chopper-rocket-pod-${side}`);
+    pod.rotation.x = Math.PI / 2;
+    pod.position.set(side * 1.14, -0.28, -0.05);
+    return pod;
+  });
   const gun = mesh(new THREE.CylinderGeometry(0.08, 0.11, 0.95, 10), 0x0b1012, 'chopper-player-gun');
   gun.rotation.x = Math.PI / 2;
   gun.position.set(0, -0.58, -0.72);
@@ -1167,7 +1192,11 @@ function buildProceduralChopperFallback(): PresentedEntity {
     skid.position.set(side * 0.58, -0.67, 0.15);
     return skid;
   });
-  root.add(fuselage, rearFuselage, canopy, glareshield, tail, fin, gun, gunMuzzle, cameraSocket, cockpit, rotor, tailRotor, ...skids);
+  root.add(
+    fuselage, rearFuselage, canopy, glareshield, belly, noseArmour, tail, fin, stabilizer,
+    ...stubWings, ...enginePods, ...rocketPods,
+    gun, gunMuzzle, cameraSocket, cockpit, rotor, tailRotor, ...skids,
+  );
   root.userData.forwardAxis = [0, 0, -1];
   root.userData.audioSemanticIds = ['chopper-low-loop', 'chopper-gun-report'];
   root.userData.weaponFeedback = [...SUPPORT_WEAPON_FEEDBACK_CONTRACT];
