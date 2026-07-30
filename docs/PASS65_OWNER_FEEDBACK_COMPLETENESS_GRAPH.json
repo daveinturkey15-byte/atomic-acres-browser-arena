@@ -1312,7 +1312,7 @@
     },
     {
       "id": "T-MENU-LIFECYCLE-E2E",
-      "command": "npx playwright test tests/e2e/pass65-menu-lifecycle.spec.ts --project=chromium --workers=1 --retries=0",
+      "command": "npm run qa:playwright-topology -- tests/e2e/pass65-menu-lifecycle.spec.ts --project=chromium --workers=1 --retries=0",
       "paths": [
         "tests/e2e/pass65-menu-lifecycle.spec.ts"
       ],
@@ -1326,14 +1326,14 @@
     },
     {
       "id": "T-CARE-LATCH-E2E",
-      "command": "npx playwright test tests/e2e/pass65-menu-lifecycle.spec.ts --project=chromium --workers=1 --retries=0 --grep \"latches one F press\"",
+      "command": "npm run qa:playwright-topology -- tests/e2e/pass65-menu-lifecycle.spec.ts --project=chromium --workers=1 --retries=0 --grep \"latches one F press\"",
       "paths": [
         "tests/e2e/pass65-menu-lifecycle.spec.ts"
       ]
     },
     {
       "id": "T-HUD-E2E",
-      "command": "npx playwright test tests/e2e/pass64-hud-menu.spec.ts --project=chromium --workers=1 --retries=0",
+      "command": "npm run qa:playwright-topology -- tests/e2e/pass64-hud-menu.spec.ts --project=chromium --workers=1 --retries=0",
       "paths": [
         "tests/e2e/pass64-hud-menu.spec.ts"
       ],
@@ -1366,7 +1366,7 @@
     },
     {
       "id": "T-SUPPORT-VISUAL-E2E",
-      "command": "npx playwright test tests/e2e/pass65-support-visual-gate.spec.ts --project=chromium --workers=1 --retries=0",
+      "command": "npm run qa:playwright-topology -- tests/e2e/pass65-support-visual-gate.spec.ts --project=chromium --workers=1 --retries=0",
       "paths": [
         "tests/e2e/pass65-support-visual-gate.spec.ts"
       ],
@@ -1535,7 +1535,7 @@
     },
     {
       "id": "T-FOCUS-RECOVERY-E2E",
-      "command": "npx playwright test tests/e2e/pass65-frame-pacing-focus.spec.ts --project=chromium --workers=1 --retries=0",
+      "command": "npm run qa:playwright-topology -- tests/e2e/pass65-frame-pacing-focus.spec.ts --project=chromium --workers=1 --retries=0",
       "paths": [
         "tests/e2e/pass65-frame-pacing-focus.spec.ts"
       ]
@@ -1551,7 +1551,7 @@
     },
     {
       "id": "T-PROFILE-AUTHORITY-E2E",
-      "command": "npx playwright test tests/e2e/atomic-acres.spec.ts --project=chromium --workers=1 --retries=0 -g \"keeps substantial Atomic Acres collision identical\"",
+      "command": "npm run qa:playwright-topology -- tests/e2e/atomic-acres.spec.ts --project=chromium --workers=1 --retries=0 -g \"keeps substantial Atomic Acres collision identical\"",
       "paths": [
         "tests/e2e/atomic-acres.spec.ts"
       ]
@@ -1591,7 +1591,7 @@
     },
     {
       "id": "T-PRIVACY-E2E",
-      "command": "npx playwright test tests/e2e/pass64-hud-menu.spec.ts --project=chromium --workers=1 --retries=0",
+      "command": "npm run qa:playwright-topology -- tests/e2e/pass64-hud-menu.spec.ts --project=chromium --workers=1 --retries=0",
       "paths": [
         "tests/e2e/pass64-hud-menu.spec.ts"
       ],
@@ -1685,7 +1685,7 @@
     },
     {
       "id": "T-FLASH-E2E",
-      "command": "npx playwright test tests/e2e/pass65-flash-authority.spec.ts --project=chromium --workers=1 --retries=0",
+      "command": "npm run qa:playwright-topology -- tests/e2e/pass65-flash-authority.spec.ts --project=chromium --workers=1 --retries=0",
       "paths": [
         "tests/e2e/pass65-flash-authority.spec.ts"
       ]

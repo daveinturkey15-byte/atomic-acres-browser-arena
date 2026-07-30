@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const previewPort = Number(process.env.QA_PREVIEW_PORT ?? '4173');
+const externalPreview = process.env.QA_EXTERNAL_PREVIEW === '1';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -36,7 +37,7 @@ export default defineConfig({
       use: { ...devices['Desktop Safari'], viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 },
     },
   ],
-  webServer: {
+  webServer: externalPreview ? undefined : {
     command: 'node scripts/qa/playwright-web-server.mjs',
     port: previewPort,
     reuseExistingServer: !process.env.CI,

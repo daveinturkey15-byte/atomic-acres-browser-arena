@@ -11,6 +11,10 @@ const agentContract = readFileSync('AGENTS.md', 'utf8');
 const contributionGuide = readFileSync('docs/CONTRIBUTION_AND_RELEASE_PIPELINE.md', 'utf8');
 const pass66ExecutionPlan = readFileSync('docs/PASS66_HITL_EXECUTION_PLAN_2026-07-29.md', 'utf8');
 const ownerFeedbackSkill = readFileSync('.agents/skills/atomic-acres-owner-feedback-gate/SKILL.md', 'utf8');
+const playwrightConfig = readFileSync('playwright.config.ts', 'utf8');
+const ownedPlaywrightRunner = readFileSync('scripts/qa/run-playwright-with-topology.mjs', 'utf8');
+const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
+const ownerFeedbackGraph = JSON.parse(readFileSync('docs/PASS65_OWNER_FEEDBACK_COMPLETENESS_GRAPH.json', 'utf8'));
 
 describe('production release workflow', () => {
   it('configures a repository-local bot identity before publishing gh-pages', () => {
@@ -107,6 +111,35 @@ describe('production release workflow', () => {
     expect(verifyWorkflow).toContain('pr-preview-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}');
     expect(verifyWorkflow).toContain('pipeline-metrics:');
     expect(verifyWorkflow).toContain('scripts/release/workflow-metrics.mjs');
+  });
+
+  it('owns and closes the local preview lifecycle for every catalogued Playwright gate', () => {
+    expect(packageJson.scripts['qa:playwright-topology']).toBe('node scripts/qa/run-playwright-with-topology.mjs');
+    expect(playwrightConfig).toContain("const externalPreview = process.env.QA_EXTERNAL_PREVIEW === '1'");
+    expect(playwrightConfig).toContain('webServer: externalPreview ? undefined :');
+    expect(ownedPlaywrightRunner).toContain("await build();");
+    expect(ownedPlaywrightRunner).toContain("['scripts/release/stage-release-topology.mjs']");
+    expect(ownedPlaywrightRunner).toContain("QA_EXTERNAL_PREVIEW: '1'");
+    expect(ownedPlaywrightRunner).toContain('httpServer.closeAllConnections?.()');
+    const playwrightCommands = ownerFeedbackGraph.testCatalog
+      .map(({ command }: { command: string }) => command)
+      .filter((command: string) => command.includes('playwright'));
+    expect(playwrightCommands).toHaveLength(8);
+    expect(playwrightCommands.every((command: string) => command.startsWith('npm run qa:playwright-topology -- '))).toBe(true);
+    const catalogScripts = new Set<string>();
+    const queue = ownerFeedbackGraph.testCatalog
+      .map(({ command }: { command: string }) => /^npm run ([^\s]+)/u.exec(command)?.[1])
+      .filter((script: string | undefined): script is string => Boolean(script));
+    while (queue.length > 0) {
+      const script = queue.shift()!;
+      if (catalogScripts.has(script)) continue;
+      catalogScripts.add(script);
+      const command = packageJson.scripts[script] ?? '';
+      for (const match of command.matchAll(/npm run ([A-Za-z0-9:._-]+)/gu)) queue.push(match[1]);
+    }
+    expect([...catalogScripts]
+      .filter((script) => /(?:^|&&\s*)playwright test/u.test(packageJson.scripts[script] ?? '')))
+      .toEqual([]);
   });
 
   it('makes exact Pass 66 evidence and real preview provenance mandatory in the required acceptance job', () => {

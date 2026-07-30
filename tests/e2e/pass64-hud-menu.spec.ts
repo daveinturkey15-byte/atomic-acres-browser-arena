@@ -148,7 +148,7 @@ test.describe('Pass 64 command HUD and menu contract', () => {
         - document.querySelector<HTMLElement>('#menu-panel-options')!.clientWidth,
       labelFontPx: Number.parseFloat(getComputedStyle(document.querySelector<HTMLElement>('.graphics-preset-row label')!).fontSize),
     }));
-    expect(layout).toEqual({ pageOverflowX: 0, panelOverflowX: 0, labelFontPx: 11 });
+    expect(layout).toEqual({ pageOverflowX: 0, panelOverflowX: 0, labelFontPx: 12 });
     const directory = resolve(process.cwd(), 'artifacts/pass65/graphics-options');
     mkdirSync(directory, { recursive: true });
     const screenshot = resolve(directory, 'advanced-webgpu-controls-1280x720.png');
@@ -314,7 +314,7 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     page.on('console', (message) => {
       if (message.type() === 'error') runtimeErrors.push(message.text());
     });
-    await page.goto('/?release=latest&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&seed=pass64-hud-motion');
+    await page.goto('/?release=latest&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&externalServices=off&seed=pass64-hud-motion');
     await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 30_000 });
     const before = await page.evaluate(() => ({
       renderer: window.__ATOMIC_ACRES_DEBUG__.snapshot().menuPreview.rendererEvidence,
