@@ -92,9 +92,9 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(block).not.toContain('recordSupport');
   });
 
-  it('reports the exact four-magazine piloted-drone ammunition contract', () => {
-    expect(source).toContain('PILOTED DRONE · 20 LOADED + 60 RESERVE · FOUR MAGAZINES · F EXITS');
-    expect(source).not.toContain('PILOTED DRONE · 20 ROUNDS + ONE SPARE CLIP');
+  it('reports the slot-key-toggle piloted-drone ammunition contract', () => {
+    expect(source).toContain('PILOTED DRONE · 20 ROUNDS + ONE SPARE CLIP · PRESS SLOT KEY AGAIN TO ENTER');
+    expect(source).not.toContain('PILOTED DRONE · 20 LOADED + 60 RESERVE · FOUR MAGAZINES · F EXITS');
   });
 
   it('binds legacy offensive effects to the exact host-admitted activation request', () => {

@@ -30,9 +30,11 @@ describe('Pass 66 tactical UI overhaul', () => {
     expect(markup).toContain('data-loadout-grenade-detail');
   });
 
-  it('adds presentation-only killstreak demos and minimal video cockpit symbology', () => {
+  it('adds a sticky killstreak demo rail and minimal video cockpit symbology', () => {
     const streaks = killstreakLoadoutPanelMarkup();
-    expect(streaks.match(/data-killstreak-preview=/g)).toHaveLength(5);
+    expect(streaks).toContain('id="killstreak-demo-rail"');
+    expect(streaks).toContain('data-demo-poster');
+    expect(streaks).not.toContain('data-killstreak-preview=');
     const preview = menuPreviewVideoMarkup();
     expect(preview).toContain('class="preview-cockpit-hud"');
     expect(preview).toContain('class="cockpit-instruments"');
