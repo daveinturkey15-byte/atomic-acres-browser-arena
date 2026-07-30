@@ -1275,41 +1275,24 @@ function applyRiggedWeaponGrip(rig: Extract<OperatorRig, { rigged: true }>, weap
   };
 }
 
-export function setOperatorWeapon(
-  root: THREE.Group,
+/**
+ * Builds the exact third-person weapon presentation mounted by operators.
+ *
+ * Browser callers deliberately receive `null` until the authored world asset
+ * has loaded; mounting a procedural stand-in would make retained GPU
+ * vocabulary readiness differ from the model a bot actually equips. Node-side
+ * contract tests retain the deterministic procedural presentation.
+ */
+export function createOperatorWeaponPresentation(
   weaponId: WeaponId,
   flattenMaterials = false,
-  retirePrevious?: (root: THREE.Object3D, afterFence?: () => void) => void,
-): void {
-  const rig = operatorRig(root);
-  if (!rig || rig.weaponId === weaponId && rig.weapon) return;
+): THREE.Group | null {
   const browserRuntime = typeof document !== 'undefined';
-  const presentationGeneration = capturePass65PresentationGeneration(root);
-  if (browserRuntime && root.userData.pass65PendingWorldWeapon === weaponId) return;
   // Third-person mounting must use the socket-native authored model. Pass 16's
   // imported scene could place visible bounds metres away from WristR even
   // while the root socket itself was correct.
   const authoredWorldWeapon = browserRuntime ? createImportedWeaponModel(weaponId, flattenMaterials) : null;
-  if (browserRuntime && !authoredWorldWeapon) {
-    root.userData.pass65PendingWorldWeapon = weaponId;
-    const request = Number(root.userData.pass65WorldWeaponRequest ?? 0) + 1;
-    root.userData.pass65WorldWeaponRequest = request;
-    void loadPass65WeaponPresentation(weaponId, 'world').then(() => {
-      const currentRig = operatorRig(root);
-      if (!currentRig || !isPass65PresentationGenerationCurrent(root, presentationGeneration)
-        || root.userData.pass65PendingWorldWeapon !== weaponId
-        || root.userData.pass65WorldWeaponRequest !== request) return;
-      delete root.userData.pass65PendingWorldWeapon;
-      setOperatorWeapon(root, weaponId, flattenMaterials, retirePrevious);
-    }).catch((error: unknown) => {
-      if (root.userData.pass65PendingWorldWeapon !== weaponId
-        || root.userData.pass65WorldWeaponRequest !== request) return;
-      delete root.userData.pass65PendingWorldWeapon;
-      root.userData.pass65WorldWeaponLoadError = error instanceof Error ? error.message : String(error);
-      console.error(`Pass 65 authored world weapon load failed for ${weaponId}`, error);
-    });
-    return;
-  }
+  if (browserRuntime && !authoredWorldWeapon) return null;
   const weapon = authoredWorldWeapon ?? buildWeaponModel(weaponId, flattenMaterials, false);
   optimizeAttachedWeapon(
     weapon,
@@ -1333,6 +1316,41 @@ export function setOperatorWeapon(
       node.raycast = () => undefined;
     }
   });
+  return weapon;
+}
+
+export function setOperatorWeapon(
+  root: THREE.Group,
+  weaponId: WeaponId,
+  flattenMaterials = false,
+  retirePrevious?: (root: THREE.Object3D, afterFence?: () => void) => void,
+): void {
+  const rig = operatorRig(root);
+  if (!rig || rig.weaponId === weaponId && rig.weapon) return;
+  const browserRuntime = typeof document !== 'undefined';
+  const presentationGeneration = capturePass65PresentationGeneration(root);
+  if (browserRuntime && root.userData.pass65PendingWorldWeapon === weaponId) return;
+  const weapon = createOperatorWeaponPresentation(weaponId, flattenMaterials);
+  if (!weapon) {
+    root.userData.pass65PendingWorldWeapon = weaponId;
+    const request = Number(root.userData.pass65WorldWeaponRequest ?? 0) + 1;
+    root.userData.pass65WorldWeaponRequest = request;
+    void loadPass65WeaponPresentation(weaponId, 'world').then(() => {
+      const currentRig = operatorRig(root);
+      if (!currentRig || !isPass65PresentationGenerationCurrent(root, presentationGeneration)
+        || root.userData.pass65PendingWorldWeapon !== weaponId
+        || root.userData.pass65WorldWeaponRequest !== request) return;
+      delete root.userData.pass65PendingWorldWeapon;
+      setOperatorWeapon(root, weaponId, flattenMaterials, retirePrevious);
+    }).catch((error: unknown) => {
+      if (root.userData.pass65PendingWorldWeapon !== weaponId
+        || root.userData.pass65WorldWeaponRequest !== request) return;
+      delete root.userData.pass65PendingWorldWeapon;
+      root.userData.pass65WorldWeaponLoadError = error instanceof Error ? error.message : String(error);
+      console.error(`Pass 65 authored world weapon load failed for ${weaponId}`, error);
+    });
+    return;
+  }
   if (rig.weapon) {
     const previous = rig.weapon;
     rig.weaponSocket.remove(previous);
