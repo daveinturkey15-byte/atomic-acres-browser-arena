@@ -131,6 +131,23 @@ test('uses one exact native HWND activation and trusted browser input for the ad
   assert.doesNotMatch(verifierSource, /document\.querySelector\('#solo'\)\.click\(\)/);
 });
 
+test('owns a hidden display-power request for the exact gate lifetime and resets it fail-closed', () => {
+  assert.match(verifierSource, /SetThreadExecutionState\(\$continuous -bor \$displayRequired\)/);
+  assert.match(verifierSource, /\$released = \[Pass66DisplayPowerOwner\]::SetThreadExecutionState\(\$continuous\)/);
+  assert.match(verifierSource, /'-WindowStyle',\s*\n\s*'Hidden'/);
+  assert.match(verifierSource, /stdio: \['pipe', 'pipe', 'pipe'\], windowsHide: true/);
+  assert.match(verifierSource, /display-power owner readiness/);
+  assert.match(verifierSource, /display-power owner exited before explicit release/);
+  assert.match(verifierSource, /if \(owner\.process\.exitCode === null\) owner\.process\.kill\(\)/);
+  assert.match(verifierSource, /displayPowerOwner = await acquireDisplayPowerRequest\(\);\s*\n\s*chrome = spawn/);
+  assert.match(verifierSource, /await releaseDisplayPowerRequest\(displayPowerOwner\);\s*\n\s*displayPowerOwner = null;\s*\n\s*\n\s*receipt =/);
+  assert.equal(
+    verifierSource.match(/releaseDisplayPowerRequest\(displayPowerOwner\)/g)?.length,
+    2,
+    'the request must release before a pass receipt and from the failure cleanup path',
+  );
+});
+
 test('accepts hidden CPU progress only when frames, WebGPU submission, authority, audio and generation stay paused', () => {
   const beforeRelease = checkpoint();
   const afterHidden = checkpoint({

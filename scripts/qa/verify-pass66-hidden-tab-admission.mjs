@@ -21,6 +21,9 @@ const maximumHiddenPreparationMs = 30_000;
 const minimumHiddenObservationMs = 1_500;
 const maximumForegroundRecoveryMs = 20_000;
 const artifactRoot = 'artifacts/pass66/hidden-tab-admission';
+const displayPowerReadySignal = 'PASS66_DISPLAY_POWER_READY';
+const displayPowerReleaseSignal = 'PASS66_DISPLAY_POWER_RELEASE';
+const displayPowerOwnerTimeoutMs = 5_000;
 const chromeCandidates = [
   process.env.PASS66_CHROME_PATH,
   process.env.PASS65_CHROME_PATH,
@@ -37,6 +40,98 @@ if (execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim())
 }
 
 const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+async function waitForProcessExit(process, timeoutMs) {
+  if (process.exitCode !== null || process.signalCode !== null) {
+    return { code: process.exitCode, signal: process.signalCode };
+  }
+  return withTimeout(new Promise((resolve) => {
+    const onExit = (code, signal) => resolve({ code, signal });
+    process.once('exit', onExit);
+    if (process.exitCode !== null || process.signalCode !== null) {
+      process.off('exit', onExit);
+      resolve({ code: process.exitCode, signal: process.signalCode });
+    }
+  }), timeoutMs, 'display-power owner exit');
+}
+
+async function acquireDisplayPowerRequest() {
+  const script = `$ErrorActionPreference = 'Stop'
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class Pass66DisplayPowerOwner {
+  [DllImport("kernel32.dll")]
+  public static extern uint SetThreadExecutionState(uint flags);
+}
+'@
+$continuous = [uint32]::Parse('80000000', [Globalization.NumberStyles]::HexNumber)
+$displayRequired = [uint32]2
+$previous = [Pass66DisplayPowerOwner]::SetThreadExecutionState($continuous -bor $displayRequired)
+if ($previous -eq 0) { throw 'failed to acquire display-required execution state' }
+[Console]::Out.WriteLine('${displayPowerReadySignal}')
+[Console]::Out.Flush()
+try {
+  $release = [Console]::In.ReadLine()
+  if ($release -ne '${displayPowerReleaseSignal}') { throw 'display-power owner lost its release channel' }
+} finally {
+  $released = [Pass66DisplayPowerOwner]::SetThreadExecutionState($continuous)
+  if ($released -eq 0) { throw 'failed to release display-required execution state' }
+}`;
+  const owner = spawn('C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe', [
+    '-NoProfile',
+    '-NonInteractive',
+    '-WindowStyle',
+    'Hidden',
+    '-Command',
+    script,
+  ], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+  let stdout = '';
+  let stderr = '';
+  owner.stdout.setEncoding('utf8');
+  owner.stderr.setEncoding('utf8');
+  owner.stdout.on('data', (chunk) => { stdout += chunk; });
+  owner.stderr.on('data', (chunk) => { stderr += chunk; });
+  try {
+    await withTimeout(new Promise((resolve, reject) => {
+      const inspectReady = () => {
+        if (stdout.split(/\r?\n/u).includes(displayPowerReadySignal)) resolve();
+      };
+      owner.stdout.on('data', inspectReady);
+      owner.once('error', reject);
+      owner.once('exit', (code, signal) => reject(new Error(
+        `display-power owner exited before readiness (code=${code}, signal=${signal}, stderr=${stderr.trim() || 'none'})`,
+      )));
+      inspectReady();
+    }), displayPowerOwnerTimeoutMs, 'display-power owner readiness');
+  } catch (error) {
+    if (owner.exitCode === null) owner.kill();
+    try { await waitForProcessExit(owner, displayPowerOwnerTimeoutMs); } catch { /* termination is already fail-closed */ }
+    throw error;
+  }
+  if (owner.exitCode !== null || owner.signalCode !== null) {
+    throw new Error('display-power owner did not remain alive after readiness');
+  }
+  return { process: owner, stderr: () => stderr };
+}
+
+async function releaseDisplayPowerRequest(owner) {
+  if (owner.process.exitCode !== null || owner.process.signalCode !== null) {
+    throw new Error(`display-power owner exited before explicit release (code=${owner.process.exitCode}, stderr=${owner.stderr().trim() || 'none'})`);
+  }
+  owner.process.stdin.end(`${displayPowerReleaseSignal}\n`);
+  let exit;
+  try {
+    exit = await waitForProcessExit(owner.process, displayPowerOwnerTimeoutMs);
+  } catch (error) {
+    if (owner.process.exitCode === null) owner.process.kill();
+    try { await waitForProcessExit(owner.process, displayPowerOwnerTimeoutMs); } catch { /* OS drops the request when the owner exits */ }
+    throw error;
+  }
+  if (exit.code !== 0) {
+    throw new Error(`display-power owner failed to release cleanly (code=${exit.code}, signal=${exit.signal}, stderr=${owner.stderr().trim() || 'none'})`);
+  }
+}
 
 function withTimeout(promise, milliseconds, label) {
   let timer;
@@ -382,9 +477,11 @@ let chrome;
 let browserClient;
 let game;
 let cover;
+let displayPowerOwner = null;
 let foregroundWindowHandle = null;
 let receipt = null;
 try {
+  displayPowerOwner = await acquireDisplayPowerRequest();
   chrome = spawn(executablePath, chromeArgs, { stdio: 'ignore', windowsHide: false });
   const discovery = await discoverChrome(port);
   const gameTarget = discovery.targets.find((target) => target.type === 'page' && target.url === seedUrls[0]);
@@ -534,6 +631,11 @@ try {
   if (fatalErrors.length > 0) recoveryFailures.push(`browser/GPU errors: ${fatalErrors.join(' | ')}`);
   if (recoveryFailures.length > 0) throw new Error(`foreground checkpoint failed: ${recoveryFailures.join('; ')}`);
 
+  // A successful receipt is impossible unless the scoped power request both
+  // remained alive for the complete admission and explicitly reset itself.
+  await releaseDisplayPowerRequest(displayPowerOwner);
+  displayPowerOwner = null;
+
   receipt = {
     schema: PASS66_HIDDEN_TAB_GATE_SCHEMA,
     gate: 'pass66-real-headed-chrome-hidden-tab-admission',
@@ -591,5 +693,9 @@ try {
     await Promise.race([new Promise((resolve) => chrome.once('exit', resolve)), delay(2_000)]);
     if (chrome.exitCode === null) chrome.kill();
   }
-  try { await rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch { /* Chrome can retain its profile lock briefly */ }
+  try {
+    if (displayPowerOwner) await releaseDisplayPowerRequest(displayPowerOwner);
+  } finally {
+    try { await rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch { /* Chrome can retain its profile lock briefly */ }
+  }
 }
