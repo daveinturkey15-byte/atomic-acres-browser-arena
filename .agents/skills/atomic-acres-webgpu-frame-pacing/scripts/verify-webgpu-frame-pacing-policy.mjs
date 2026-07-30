@@ -338,7 +338,7 @@ export function auditRepositorySources(sources = readRepositorySources()) {
 
   for (const token of [
     'Pass 65 hardware-WebGL2 QA requires PASS65_CHROME_PATH or installed Google Chrome',
-    "renderer=webgl2&render=performance&map=atomic-acres",
+    "renderer=webgl2&externalServices=off&render=performance&map=atomic-acres",
     "profilePath = await mkdtemp(path.join(tmpdir(), 'pass65-webgl2-'))",
     'chromium.launchPersistentContext(profilePath',
     "await page.locator('#solo').click()",
