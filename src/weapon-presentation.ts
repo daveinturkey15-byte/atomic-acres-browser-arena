@@ -260,6 +260,14 @@ export type WeaponPresentationLoadOptions = Readonly<{
 export class WeaponPresentation {
   static readonly MAX_RETAINED_WEBGPU_WEAPONS = RUNTIME_WEAPON_RETENTION_LIMIT;
   static readonly CATALOG_GPU_MODELS_PER_SUBMISSION = 2;
+  static readonly CATALOG_GPU_SINGLETON_WEAPONS: ReadonlySet<WeaponId> = new Set([
+    'pistol',
+    'machine-pistol',
+    'magnum',
+    'flashlight-pistol',
+    'explosive-crossbow',
+    'railgun',
+  ]);
   readonly root = new THREE.Group();
   private readonly browserRuntime: boolean;
   private readonly models = new Map<WeaponId, THREE.Object3D>();
@@ -1088,7 +1096,7 @@ export class WeaponPresentation {
         return pending ? [pending] : [];
       }));
       const batchEntries = entries.filter(({ model }) => !this.modelIsGpuReady(model));
-      gpuSubmissionBatches = Math.ceil(batchEntries.length / WeaponPresentation.CATALOG_GPU_MODELS_PER_SUBMISSION);
+      gpuSubmissionBatches = this.browserCatalogGpuSubmissionBatches(batchEntries).length;
       const flashlightEntries = batchEntries.filter(({ weaponId }) => WEAPONS[weaponId].flashlight !== null);
       if (flashlightEntries[0]) this.configureWeaponFlashlight(flashlightEntries[0].weaponId);
       try {
@@ -1386,12 +1394,12 @@ export class WeaponPresentation {
     const promiseRegistry = this.gpuPrewarmPromises;
     let promise: Promise<void>;
     promise = Promise.resolve().then(async () => {
-      for (let offset = 0; offset < entries.length; offset += WeaponPresentation.CATALOG_GPU_MODELS_PER_SUBMISSION) {
+      const batches = this.browserCatalogGpuSubmissionBatches(entries);
+      for (const [batchIndex, batch] of batches.entries()) {
         if (readinessGeneration !== this.gpuReadinessGeneration) break;
-        const batch = entries.slice(offset, offset + WeaponPresentation.CATALOG_GPU_MODELS_PER_SUBMISSION);
         await this.catalogGpuPrewarmer!(batch, { requestGeneration });
         if (readinessGeneration !== this.gpuReadinessGeneration) break;
-        if (offset + WeaponPresentation.CATALOG_GPU_MODELS_PER_SUBMISSION < entries.length) {
+        if (batchIndex + 1 < batches.length) {
           // End the current browser task between renderer submissions so the
           // prerecorded loading/menu video and accessibility UI can present.
           // One giant 17-model node build created a measured 1.24s long task.
@@ -1418,6 +1426,28 @@ export class WeaponPresentation {
     });
     for (const { model } of entries) promiseRegistry.set(model, promise);
     return promise;
+  }
+
+  private browserCatalogGpuSubmissionBatches(
+    entries: readonly WeaponViewmodelCatalogGpuPrewarmEntry[],
+  ): readonly (readonly WeaponViewmodelCatalogGpuPrewarmEntry[])[] {
+    const batches: WeaponViewmodelCatalogGpuPrewarmEntry[][] = [];
+    for (let offset = 0; offset < entries.length;) {
+      const current = entries[offset]!;
+      const next = entries[offset + 1];
+      // The retained sidearm/special families caused the only two catalog
+      // Long Tasks in the exact cold receipt (69/59 ms). Submit them alone so
+      // every model remains genuinely drawn while the browser task stays under
+      // the preserved 50 ms gameplay threshold. Ordinary rifles retain the
+      // measured two-model throughput bound.
+      const submissionSize = WeaponPresentation.CATALOG_GPU_SINGLETON_WEAPONS.has(current.weaponId)
+        || next && WeaponPresentation.CATALOG_GPU_SINGLETON_WEAPONS.has(next.weaponId)
+        ? 1
+        : WeaponPresentation.CATALOG_GPU_MODELS_PER_SUBMISSION;
+      batches.push(entries.slice(offset, offset + submissionSize));
+      offset += submissionSize;
+    }
+    return batches;
   }
 
   private retireRejectedBrowserModel(id: WeaponId, model: THREE.Object3D): void {

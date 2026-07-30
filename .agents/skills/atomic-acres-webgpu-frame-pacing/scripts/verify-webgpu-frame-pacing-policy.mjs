@@ -212,7 +212,8 @@ export function auditRepositorySources(sources = readRepositorySources()) {
   for (const token of verifierTokens) requireText(sources.frameVerifier, token, 'native frame-pacing verifier', failures);
 
   const webGlMatchPrewarm = functionSlice(legacy, 'prewarmExactWebGlMatchComposition');
-  const finalWebGlPresentationSync = functionSlice(legacy, 'synchronizeFinalWebGlMatchPrimePresentation');
+  const finalMatchPresentationSync = functionSlice(legacy, 'synchronizeFrozenMatchPrimePresentation');
+  const finalWebGpuMatchPrime = functionSlice(legacy, 'primeFinalWebGpuMatchPresentation');
   const finalWebGlMatchPrime = functionSlice(legacy, 'primeFinalWebGlMatchPresentation');
   const matchStart = functionSlice(legacy, 'startGame');
   const stateBroadcast = functionSlice(legacy, 'scheduleStateBroadcast');
@@ -226,6 +227,7 @@ export function auditRepositorySources(sources = readRepositorySources()) {
   ]) requireText(webGlMatchPrewarm, token, 'exact layered WebGL2 match prewarm', failures);
   requireText(matchStart, 'await prewarmExactWebGlMatchComposition();', 'WebGL2 match admission branch', failures);
   requireText(matchStart, 'await weaponView.prepareBrowserWeapon(matchStartWeapon);', 'exact match-start viewmodel readiness', failures);
+  requireText(matchStart, 'await primeFinalWebGpuMatchPresentation();', 'final hidden WebGPU match prime', failures);
   requireText(matchStart, 'await primeFinalWebGlMatchPresentation();', 'final hidden WebGL2 match prime', failures);
   requireText(matchStart, 'deploymentTransition.dataset.readyPresentedGameplayFrame = String(lastGameplayPresentedFrame);', 'generation-ready presentation baseline', failures);
   for (const token of [
@@ -233,10 +235,18 @@ export function auditRepositorySources(sources = readRepositorySources()) {
     "camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');",
     'weaponView.snapToMatchStartRestPose(currentViewmodelSurfaceRetreat());',
     'camera.updateMatrixWorld(true);',
-  ]) requireText(finalWebGlPresentationSync, token, 'side-effect-bounded WebGL2 match presentation sync', failures);
-  if (finalWebGlPresentationSync.includes('updatePhysics(') || finalWebGlPresentationSync.includes('weaponView.update(')) {
-    failures.push('final WebGL2 presentation sync must not advance gameplay or weapon actions');
+  ]) requireText(finalMatchPresentationSync, token, 'side-effect-bounded frozen match presentation sync', failures);
+  if (finalMatchPresentationSync.includes('updatePhysics(') || finalMatchPresentationSync.includes('weaponView.update(')) {
+    failures.push('final frozen match presentation sync must not advance gameplay or weapon actions');
   }
+  for (const token of [
+    "renderRuntime.backend !== 'webgpu'",
+    'renderSubmissionPaused = true;',
+    'synchronizeFrozenMatchPrimePresentation();',
+    'await submitForegroundWebGpuFrame();',
+    'await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);',
+    'renderSubmissionPaused = submissionWasPaused;',
+  ]) requireText(finalWebGpuMatchPrime, token, 'final hidden WebGPU match prime', failures);
   requireText(sources.weaponPresentation, 'async prepareBrowserWeapon(id: WeaponId): Promise<void> {', 'awaitable match-start viewmodel preparation API', failures);
   const viewmodelSnap = sources.weaponPresentation.slice(
     sources.weaponPresentation.indexOf('snapToMatchStartRestPose('),
@@ -262,7 +272,7 @@ export function auditRepositorySources(sources = readRepositorySources()) {
     'const priorRenderSubmissionPaused = renderSubmissionPaused;',
     'renderSubmissionPaused = true;',
     'matchAdmissionPresentationPaused = true;',
-    'synchronizeFinalWebGlMatchPrimePresentation();',
+    'synchronizeFrozenMatchPrimePresentation();',
     'const synchronizedAt = performance.now();',
     'await new Promise<number>((resolve) => requestAnimationFrame(resolve));',
     'const finalRenderStartedAt = performance.now();\n    atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);',
@@ -504,7 +514,8 @@ function runSelfTest() {
     ['extend admission readback past transition-ready', 'hardwareWebGl2Verifier', 'validateAdmissionReadPixels(completeAdmissionReadPixels, timing.transitionReadyAt)', 'validateAdmissionReadPixels(completeAdmissionReadPixels, timing.firstGameplayPresentedAt)'],
     ['remove root-isolated WebGL effect prewarm', 'renderRuntime', 'const restoreVisibility = suppressUnrelatedWebGlRenderables(scene, root);', 'const restoreVisibility = () => undefined;'],
     ['remove final hidden WebGL match prime', 'legacyMain', 'await primeFinalWebGlMatchPresentation();', 'await Promise.resolve();'],
-    ['remove explicit final WebGL presentation sync', 'legacyMain', 'synchronizeFinalWebGlMatchPrimePresentation();', 'void 0;'],
+    ['remove explicit final WebGL presentation sync', 'legacyMain', 'try {\n    synchronizeFrozenMatchPrimePresentation();\n    const synchronizedAt', 'try {\n    void 0;\n    const synchronizedAt'],
+    ['remove final hidden WebGPU match prime', 'legacyMain', 'await primeFinalWebGpuMatchPresentation();', 'await Promise.resolve();'],
     ['remove exact match-start weapon readiness await', 'legacyMain', 'await weaponView.prepareBrowserWeapon(matchStartWeapon);', 'void matchStartWeapon;'],
     ['remove side-effect-free viewmodel rest snap', 'weaponPresentation', 'snapToMatchStartRestPose(surfaceRetreat = 0): void {', 'removedMatchStartRestPose(surfaceRetreat = 0): void {'],
     ['retain stale imported firearm animation', 'weaponPresentation', 'resetImportedWeaponAnimations(activeModel);', 'void activeModel;'],

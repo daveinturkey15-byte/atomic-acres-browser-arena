@@ -30,6 +30,21 @@ function deferred<T>(): Deferred<T> {
   return { promise, resolve, reject };
 }
 
+function expectedCatalogGpuBatchCount(ids: readonly WeaponId[]): number {
+  let batches = 0;
+  for (let offset = 0; offset < ids.length;) {
+    const current = ids[offset]!;
+    const next = ids[offset + 1];
+    const submissionSize = WeaponPresentation.CATALOG_GPU_SINGLETON_WEAPONS.has(current)
+      || next && WeaponPresentation.CATALOG_GPU_SINGLETON_WEAPONS.has(next)
+      ? 1
+      : WeaponPresentation.CATALOG_GPU_MODELS_PER_SUBMISSION;
+    offset += submissionSize;
+    batches += 1;
+  }
+  return batches;
+}
+
 function weaponIdFromUrl(url: string): Pass65AuthoredFirearmId {
   const match = url.match(/pass65-firearms\/([^/]+)\//);
   const id = match?.[1] as Pass65AuthoredFirearmId | undefined;
@@ -343,9 +358,7 @@ describe('Pass 65 managed weapon runtime behavior', () => {
 
     expect(loadSpy).toHaveBeenCalledTimes(assetLoadsAfterStaging);
     expect(individualPrewarmer).not.toHaveBeenCalled();
-    expect(catalogPrewarmer).toHaveBeenCalledTimes(Math.ceil(
-      WEAPON_IDS.length / WeaponPresentation.CATALOG_GPU_MODELS_PER_SUBMISSION,
-    ));
+    expect(catalogPrewarmer).toHaveBeenCalledTimes(expectedCatalogGpuBatchCount(WEAPON_IDS));
     expect(presentation.root.visible).toBe(false);
     expect(presentation.browserCatalogReadiness()).toMatchObject({
       retained: WEAPON_IDS,
@@ -524,14 +537,17 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     ]);
 
     expect(individualPrewarmer).toHaveBeenCalledTimes(1);
-    expect(catalogPrewarmer).toHaveBeenCalledTimes(Math.ceil(
-      (WEAPON_IDS.length - 1) / WeaponPresentation.CATALOG_GPU_MODELS_PER_SUBMISSION,
-    ));
+    const expectedIds = WEAPON_IDS.filter((id) => id !== 'carbine');
+    expect(catalogPrewarmer).toHaveBeenCalledTimes(expectedCatalogGpuBatchCount(expectedIds));
     const entries = catalogPrewarmer.mock.calls.flatMap(([batch]) => batch);
-    expect(entries.map((entry) => entry.weaponId)).toEqual(WEAPON_IDS.filter((id) => id !== 'carbine'));
+    expect(entries.map((entry) => entry.weaponId)).toEqual(expectedIds);
     expect(entries.every((entry) => entry.model.visible === false)).toBe(true);
     expect(catalogPrewarmer.mock.calls.every(([batch]) => (
       batch.length <= WeaponPresentation.CATALOG_GPU_MODELS_PER_SUBMISSION
+    ))).toBe(true);
+    expect(catalogPrewarmer.mock.calls.every(([batch]) => (
+      batch.length === 1
+      || batch.every((entry) => !WeaponPresentation.CATALOG_GPU_SINGLETON_WEAPONS.has(entry.weaponId))
     ))).toBe(true);
     expect(presentation.presentationState().browserWeaponCatalog).toMatchObject({
       retainedCount: WEAPON_IDS.length,
@@ -591,7 +607,7 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(loadSpy).toHaveBeenCalledTimes(assetLoads);
     expect(individualPrewarmer).toHaveBeenCalledTimes(1);
     expect(catalogPrewarmer).toHaveBeenCalledTimes(
-      initialCatalogSubmissions + Math.ceil(WEAPON_IDS.length / WeaponPresentation.CATALOG_GPU_MODELS_PER_SUBMISSION),
+      initialCatalogSubmissions + expectedCatalogGpuBatchCount(WEAPON_IDS),
     );
     expect(presentation.browserCatalogReadiness()).toMatchObject({
       retainedCount: WEAPON_IDS.length,

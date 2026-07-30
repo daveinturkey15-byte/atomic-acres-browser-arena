@@ -1697,6 +1697,52 @@ async function settleWebGpuPresentation(label: string): Promise<void> {
   await settleMatchAdmissionAdaptiveWebGpuPresentation(label);
 }
 
+async function exercisePreparedWebGpuWeaponSwitches(): Promise<void> {
+  if (renderRuntime.backend !== 'webgpu') return;
+  const readinessBefore = weaponView.browserCatalogReadiness();
+  if (readinessBefore.retainedCount === 0
+    || readinessBefore.loaded !== readinessBefore.retainedCount
+    || readinessBefore.gpuReady !== readinessBefore.retainedCount) {
+    throw new Error(`Prepared weapon-switch exercise requires an exact GPU-ready catalog: ${JSON.stringify(readinessBefore)}`);
+  }
+  const restoreWeapon = player.weapon;
+  camera.fov = preferredFov;
+  camera.updateProjectionMatrix();
+  camera.position.copy(player.position);
+  camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+  camera.updateMatrixWorld(true);
+  await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);
+  try {
+    for (const [index, weaponId] of readinessBefore.retained.entries()) {
+      // Catalog batching proves every model can draw, while this final state
+      // walk proves the real exclusive-visibility, socket, rig and flashlight
+      // state used by setWeapon(). It runs against the completed match scene
+      // behind the deployment surface, never against a synthetic compile root.
+      weaponView.setWeapon(weaponId, true);
+      weaponView.snapToMatchStartRestPose(currentViewmodelSurfaceRetreat());
+      camera.updateMatrixWorld(true);
+      await submitForegroundWebGpuFrame();
+      await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);
+      const presentation = renderRuntime.presentationTelemetry();
+      if (presentation.status !== 'healthy') {
+        throw new Error(`Prepared ${weaponId} switch exercise was ${presentation.status}: ${presentation.lastFailure ?? 'unknown failure'}`);
+      }
+      if (index + 1 < readinessBefore.retained.length) await yieldBrowserPreparationFrame();
+    }
+  } finally {
+    weaponView.setWeapon(restoreWeapon, true);
+    weaponView.snapToMatchStartRestPose(currentViewmodelSurfaceRetreat());
+    camera.updateMatrixWorld(true);
+  }
+  const readinessAfter = weaponView.browserCatalogReadiness();
+  if (readinessAfter.retainedCount !== readinessBefore.retainedCount
+    || readinessAfter.loaded !== readinessBefore.loaded
+    || readinessAfter.gpuReady !== readinessBefore.gpuReady
+    || readinessAfter.unpreparedSwitches !== readinessBefore.unpreparedSwitches) {
+    throw new Error(`Prepared weapon-switch exercise changed catalog readiness: ${JSON.stringify({ readinessBefore, readinessAfter })}`);
+  }
+}
+
 async function waitForStableMatchAdmissionCadence(): Promise<void> {
   const minimumStableWindowMs = 1_000;
   const maximumWaitMs = 5_000;
@@ -1926,9 +1972,9 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
   bootstrapStage = 'ready';
 }
 
-function synchronizeFinalWebGlMatchPrimePresentation(): void {
-  if (!gameStarted || !player.alive) {
-    throw new Error('Final WebGL2 match prime requires a live respawned player');
+function synchronizeFrozenMatchPrimePresentation(): void {
+  if ((!gameStarted && !matchStartPreparing) || !player.alive) {
+    throw new Error('Final WebGL2 match prime requires a prepared respawned player');
   }
   // Match admission intentionally blocks updatePhysics while the prerecorded
   // deployment surface is visible. Snap only presentation state here: never
@@ -1948,6 +1994,25 @@ function synchronizeFinalWebGlMatchPrimePresentation(): void {
   weaponView.snapToMatchStartRestPose(currentViewmodelSurfaceRetreat());
   weaponView.setPresentationVisible(shouldShowWeaponViewmodel());
   camera.updateMatrixWorld(true);
+}
+
+async function primeFinalWebGpuMatchPresentation(): Promise<void> {
+  if (renderRuntime.backend !== 'webgpu') return;
+  const submissionWasPaused = renderSubmissionPaused;
+  renderSubmissionPaused = true;
+  try {
+    synchronizeFrozenMatchPrimePresentation();
+    for (let sample = 0; sample < 2; sample += 1) {
+      await submitForegroundWebGpuFrame();
+      await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);
+      const presentation = renderRuntime.presentationTelemetry();
+      if (presentation.status !== 'healthy') {
+        throw new Error(`Final match WebGPU prime was ${presentation.status}: ${presentation.lastFailure ?? 'unknown failure'}`);
+      }
+    }
+  } finally {
+    renderSubmissionPaused = submissionWasPaused;
+  }
 }
 
 async function primeFinalWebGlMatchPresentation(): Promise<void> {
@@ -1970,7 +2035,7 @@ async function primeFinalWebGlMatchPresentation(): Promise<void> {
     }
   };
   try {
-    synchronizeFinalWebGlMatchPrimePresentation();
+    synchronizeFrozenMatchPrimePresentation();
     const synchronizedAt = performance.now();
     // Keep the deployment surface up for one compositor/driver settle boundary.
     // The admission-presentation pause prevents the global frame loop from
@@ -8994,6 +9059,7 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   try {
     setStatus(`Preparing ${selectedArena.displayName} operators and viewmodel…`);
     if (renderRuntime.backend === 'webgpu') {
+      await exercisePreparedWebGpuWeaponSwitches();
       await settleWebGpuPresentation('Initial match');
       restoreCorpsePoolPrewarm();
       // Match-only operators, support pools and their prewarm bookkeeping are
@@ -9016,8 +9082,6 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   lastFrame = performance.now();
   accumulator = 0;
   matchWebGpuQualityFrozen = shouldFreezeAdaptiveQualityForMatch(renderRuntime.backend);
-  resetWebGpuPresentationEpoch('match admitted', performance.now());
-  gameStarted = true;
   const matchRules = currentMatchRules();
   overdriveClaimGeneration = -1;
   overdriveClaimLastSentAt = Number.NEGATIVE_INFINITY;
@@ -9052,7 +9116,12 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
     performance.now(),
   );
   renderTextChat();
+  // Match-start DOM, spawn and retained-presentation bookkeeping previously
+  // shared one browser task with the first live frame. End that preparation
+  // task while gameplay is still frozen behind the deployment surface.
+  await yieldDeploymentPrewarmFrame();
   await primeFinalWebGlMatchPresentation();
+  await primeFinalWebGpuMatchPresentation();
   const matchStartedAt = performance.now();
   lastFrame = matchStartedAt;
   accumulator = 0;
@@ -9081,6 +9150,7 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   const railgunActiveAt = matchState.phase === 'active' ? matchState.phaseStartedAt : matchState.endsAt;
   initializeRailgunForMatch(railgunActiveAt);
   player.invulnerableUntil = matchStartedAt + playerSpawnProtectionMs(activeSpawnMode());
+  await yieldDeploymentPrewarmFrame();
   if (mode !== 'solo') {
     network.send({ type: 'join', player: snapshot() });
     if (mode === 'client') {
@@ -9093,6 +9163,14 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
     sendLeaderboardSync();
     if (mode === 'host') broadcastOverdriveState(activeAtLocalMonoMs ?? matchStartedAt);
   }
+  // gameStarted is the public/live admission bit observed by the render loop,
+  // debug API and release gates. Publish it only after every synchronous match
+  // mutation and both CPU task boundaries have completed, so no caller can
+  // enter a prepared switch while startGame is still finishing.
+  lastFrame = performance.now();
+  accumulator = 0;
+  resetWebGpuPresentationEpoch('match admitted', lastFrame);
+  gameStarted = true;
   deploymentTransition.dataset.readyPresentedGameplayFrame = String(lastGameplayPresentedFrame);
   deploymentTransition.dataset.readyGeneration = String(matchAdmissionGeneration);
   deploymentTransition.dataset.readyAt = performance.now().toFixed(3);
@@ -10366,7 +10444,16 @@ async function prewarmBotPresentations(): Promise<void> {
     // draw. WebGL retains its single exact-composition compile below.
     await withArenaFrustumCullingDisabled(scene, async () => {
       if (renderRuntime.backend === 'webgpu') {
-        await Promise.all(operatorRoots.map((root) => renderRuntime.compileAndRender(root, camera, scene)));
+        // A single cold submission containing every active, dormant and corpse
+        // skeleton produced a measured 227 ms browser task on the release
+        // machine. Keep every exact instance in the readiness proof, but bound
+        // each node-build wave and end the browser task between waves.
+        const rootsPerSubmission = 2;
+        for (let offset = 0; offset < operatorRoots.length; offset += rootsPerSubmission) {
+          const batch = operatorRoots.slice(offset, offset + rootsPerSubmission);
+          await Promise.all(batch.map((root) => renderRuntime.compileAndRender(root, camera, scene)));
+          if (offset + rootsPerSubmission < operatorRoots.length) await yieldDeploymentPrewarmFrame();
+        }
       } else {
         await renderRuntime.compileAndRender(scene, camera, scene);
       }
