@@ -243,6 +243,15 @@ export type WeaponViewmodelCatalogGpuPrewarmer = (
   context: Readonly<{ requestGeneration: number }>,
 ) => Promise<void>;
 
+export type WeaponPresentationLoadOptions = Readonly<{
+  /**
+   * Menu/bootstrap preparation may decode and retain presentation assets, but
+   * it must not exercise renderer hooks or reveal the camera-space root before
+   * the selected arena owns the final lighting/TSL graph.
+   */
+  mode?: 'active' | 'asset-only';
+}>;
+
 /** Original first-person weapon presentation with ADS, sprint, recoil, melee and staged reload motion. */
 export class WeaponPresentation {
   static readonly MAX_RETAINED_WEBGPU_WEAPONS = RUNTIME_WEAPON_RETENTION_LIMIT;
@@ -825,9 +834,14 @@ export class WeaponPresentation {
     this.meleeKnife.visible = false;
   }
 
-  async load(onProgress?: (loaded: number, total: number) => void): Promise<void> {
+  async load(
+    onProgress?: (loaded: number, total: number) => void,
+    options: WeaponPresentationLoadOptions = {},
+  ): Promise<void> {
     const browserRuntime = typeof document !== 'undefined';
+    const assetOnly = browserRuntime && options.mode === 'asset-only';
     const initialWeapon = this.active;
+    if (assetOnly) this.setPresentationVisible(false);
     if (browserRuntime) {
       await Promise.all([
         loadPass65WeaponPresentation(initialWeapon, 'first-person'),
@@ -945,7 +959,7 @@ export class WeaponPresentation {
       this.root.add(model);
       onProgress?.(index + 1, ids.length);
     });
-    if (browserRuntime && this.gpuPrewarmer) {
+    if (browserRuntime && this.gpuPrewarmer && !assetOnly) {
       const initialModel = this.models.get(initialWeapon);
       if (!initialModel) throw new Error(`Pass 65 initial first-person asset unavailable after load: ${initialWeapon}`);
       try {
@@ -955,7 +969,7 @@ export class WeaponPresentation {
         throw error;
       }
     }
-    this.setWeapon(this.active, true);
+    if (!assetOnly) this.setWeapon(this.active, true);
     if (browserRuntime) this.trimBrowserWeaponModels();
   }
 

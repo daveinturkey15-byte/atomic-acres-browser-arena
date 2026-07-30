@@ -19810,7 +19810,7 @@ const menuDeploymentAssetsCoordinator = new PriorityPreparationCoordinator(yield
 
 async function prepareMenuWeaponAsset(): Promise<void> {
   if (menuWeaponAssetPromise) return menuWeaponAssetPromise;
-  menuWeaponAssetPromise = weaponView.load().then(() => {
+  menuWeaponAssetPromise = weaponView.load(undefined, { mode: 'asset-only' }).then(() => {
     // Decoding the shared viewmodel after the video menu becomes interactive
     // preserves legacy readiness consumers without compiling or submitting a
     // selected gameplay arena.
@@ -19876,7 +19876,10 @@ async function prepareSharedGameplayAssets(): Promise<void> {
     // First-person geometry is composited after world depth is cleared. Contact
     // retreat still keeps it tucked near walls without world geometry cutting
     // holes through hands and weapons.
-    weaponView.setWeapon(player.weapon, true);
+    // WebGPU menu preparation is asset-only: selecting a model here would call
+    // the renderer hook before the selected arena owns its final TSL graph.
+    // WebGL2 has no injected hook and retains its existing eager selection.
+    if (renderRuntime.backend !== 'webgpu') weaponView.setWeapon(player.weapon, true);
     weaponView.setPresentationVisible(false);
   })().catch((error) => {
     sharedGameplayAssetsPromise = null;

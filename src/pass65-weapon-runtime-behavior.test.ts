@@ -269,7 +269,7 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(releasePass65WeaponModelsIn(presentation.root)).toBe(2);
   });
 
-  it('stages the complete browser catalog without claiming final-pipeline GPU readiness', async () => {
+  it('keeps menu/bootstrap weapon and arm assets hidden and CPU-only until arena-bound catalog prewarm', async () => {
     stubBrowserTextureLoading();
     const loadSpy = vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (
       Promise.resolve(fakeGltfForUrl(String(url)))
@@ -281,7 +281,7 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     const presentation = new WeaponPresentation(
       new THREE.PerspectiveCamera(), false, undefined, individualPrewarmer, catalogPrewarmer,
     );
-    await presentation.load();
+    await presentation.load(undefined, { mode: 'asset-only' });
     const initialModel = presentation.root.getObjectByName('carbine-pass65-first-person-model');
 
     await presentation.prepareBrowserWeaponCatalogAssets(WEAPON_IDS);
@@ -292,13 +292,17 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     ]));
     expect([...stagedModels.values()].every(Boolean)).toBe(true);
     expect(stagedModels.get('carbine')).toBe(initialModel);
-    expect(individualPrewarmer).toHaveBeenCalledTimes(1);
+    expect(presentation.root.visible).toBe(false);
+    expect(presentation.root.getObjectByName('first-person-arms')).toBeDefined();
+    expect(presentation.root.getObjectByName('field-knife-pass65-first-person-model')).toBeDefined();
+    expect([...stagedModels.values()].every((model) => model?.visible === false)).toBe(true);
+    expect(individualPrewarmer).not.toHaveBeenCalled();
     expect(catalogPrewarmer).not.toHaveBeenCalled();
     expect(presentation.browserCatalogReadiness()).toMatchObject({
       retained: WEAPON_IDS,
       retainedCount: WEAPON_IDS.length,
       loaded: WEAPON_IDS.length,
-      gpuReady: 1,
+      gpuReady: 0,
       prewarming: false,
       unpreparedSwitches: 0,
       lastPrewarmProfile: null,
@@ -308,10 +312,11 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     await presentation.prewarmBrowserWeaponCatalog(WEAPON_IDS);
 
     expect(loadSpy).toHaveBeenCalledTimes(assetLoadsAfterStaging);
-    expect(individualPrewarmer).toHaveBeenCalledTimes(1);
+    expect(individualPrewarmer).not.toHaveBeenCalled();
     expect(catalogPrewarmer).toHaveBeenCalledTimes(Math.ceil(
-      (WEAPON_IDS.length - 1) / WeaponPresentation.CATALOG_GPU_MODELS_PER_SUBMISSION,
+      WEAPON_IDS.length / WeaponPresentation.CATALOG_GPU_MODELS_PER_SUBMISSION,
     ));
+    expect(presentation.root.visible).toBe(false);
     expect(presentation.browserCatalogReadiness()).toMatchObject({
       retained: WEAPON_IDS,
       retainedCount: WEAPON_IDS.length,
