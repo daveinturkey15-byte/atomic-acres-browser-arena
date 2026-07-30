@@ -64,6 +64,7 @@
     "finalize:pass66:owner-evidence": "node .agents/skills/atomic-acres-owner-feedback-gate/scripts/finalize-pass66-owner-evidence.mjs",
     "qa:pass66:owner-evidence-finalizer": "node --test .agents/skills/atomic-acres-owner-feedback-gate/scripts/finalize-pass66-owner-evidence.test.mjs && node .agents/skills/atomic-acres-owner-feedback-gate/scripts/finalize-pass66-owner-evidence.mjs --self-test",
     "qa:text-integrity": "node scripts/qa/verify-text-source-integrity.mjs",
+    "qa:lockfile": "node scripts/qa/verify-npm10-lockfile.mjs",
     "qa:pass65:drone-asset": "node scripts/qa/verify-pass65-drone-production.mjs",
     "qa:pass65:ordnance-assets": "node scripts/qa/verify-pass65-semtex-production.mjs",
     "qa:pass65:support-vehicles": "node scripts/qa/verify-pass65-support-vehicle-production.mjs",
@@ -92,11 +93,11 @@
     "verify:provenance": "node scripts/qa/verify-asset-provenance.mjs",
     "verify:killstreak-catalog": "node scripts/qa/verify-pass65-killstreak-catalog.mjs",
     "lint": "npm run qa:text-integrity && tsc --noEmit && tsc --noEmit -p worker/tsconfig.json",
-    "verify:pass25a:core": "npm run lint && npm run verify:gameplay-contract && npm run verify:provenance && npm run verify:killstreak-catalog && npm run verify:benchmark && npm test && npm run leaderboard:check && npm run qa:asset-provenance && npm run build && npm run verify:release-tree && npm run audit:dependencies",
+    "verify:pass25a:core": "npm run qa:lockfile && npm run lint && npm run verify:gameplay-contract && npm run verify:provenance && npm run verify:killstreak-catalog && npm run verify:benchmark && npm test && npm run leaderboard:check && npm run qa:asset-provenance && npm run build && npm run verify:release-tree && npm run audit:dependencies",
     "verify:pass25a": "node scripts/qa/run-pass25a-verification.mjs",
-    "verify": "npm run lint && npm run verify:gameplay-contract && npm run verify:provenance && npm run verify:killstreak-catalog && npm test && npm run leaderboard:check && npm run qa:asset-provenance && npm run build && npm run verify:release-tree && npm run audit:dependencies && npm run test:e2e",
+    "verify": "npm run qa:lockfile && npm run lint && npm run verify:gameplay-contract && npm run verify:provenance && npm run verify:killstreak-catalog && npm test && npm run leaderboard:check && npm run qa:asset-provenance && npm run build && npm run verify:release-tree && npm run audit:dependencies && npm run test:e2e",
     "pipeline:doctor": "node scripts/release/pipeline-guard.mjs doctor",
-    "pipeline:preflight": "node scripts/release/pipeline-guard.mjs contribute",
+    "pipeline:preflight": "npm run qa:lockfile && node scripts/release/pipeline-guard.mjs contribute",
     "pipeline:release-check": "node scripts/release/pipeline-guard.mjs release",
     "stage:release-topology": "node scripts/release/stage-release-topology.mjs",
     "verify:release-topology": "node scripts/qa/verify-release-topology.mjs",
@@ -138,5 +139,6 @@
   "name": "atomic-acres-browser-arena",
   "version": "1.0.0",
   "description": "Original retro-future browser arena FPS with peer-to-peer multiplayer",
-  "private": true
+  "private": true,
+  "packageManager": "npm@10.9.8"
 }
