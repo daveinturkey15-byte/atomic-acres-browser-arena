@@ -13,13 +13,13 @@ describe('persistent physical house-window debris integration', () => {
     expect(source).toContain('spawnPersistentWindowDebris(window, normal)');
   });
 
-  it('updates the visible fragment from its physical body and does not age-dispose it', () => {
+  it('updates the visible fragment while falling, then retires only its movement body when settled', () => {
     const start = source.indexOf('function spawnPersistentWindowDebris(');
     const end = source.indexOf('\nfunction clearPersistentWindowDebris(', start);
     const block = source.slice(start, end);
     expect(start).toBeGreaterThan(-1);
     expect(end).toBeGreaterThan(start);
-    expect(block).toContain('persistentWindowDebris.set(id, { id, windowId: window.id, root, definition })');
+    expect(block).toContain('persistentWindowDebris.set(id, { id, windowId: window.id, root, definition, physicsActive: true })');
     expect(block).not.toContain('setTimeout');
     expect(block).not.toContain('expiresAt');
     expect(block).toContain('root.userData.persistentMajorDebris = true');
@@ -28,6 +28,10 @@ describe('persistent physical house-window debris integration', () => {
     expect(block).not.toContain('root.visible = false');
     expect(source).toContain('entry.root.position.set(snapshot.position.x, snapshot.position.y, snapshot.position.z)');
     expect(source).toContain('entry.root.quaternion.set(snapshot.rotation.x, snapshot.rotation.y, snapshot.rotation.z, snapshot.rotation.w)');
+    expect(source).toContain('.filter((entry) => entry.physicsActive)');
+    expect(source).toContain('if (snapshot.sleeping) {');
+    expect(source).toContain('entry.physicsActive = false;');
+    expect(source).toContain('if (retireSettledPhysics) syncInteractiveWorldPhysics();');
   });
 
   it('clears the persistent major pane only at the explicit window reset boundary', () => {
@@ -48,7 +52,7 @@ describe('persistent physical house-window debris integration', () => {
     expect(source).toContain('spawnPersistentWindowDebris(window, normal)');
   });
 
-  it('lets later explosions re-impulse both shed and persistent window bodies', () => {
+  it('lets later explosions re-impulse only still-active shed and falling window bodies', () => {
     const start = source.indexOf('function applyInteractiveWorldExplosion(');
     const end = source.indexOf('\ndocument.documentElement.dataset.arenaId', start);
     const block = source.slice(start, end);

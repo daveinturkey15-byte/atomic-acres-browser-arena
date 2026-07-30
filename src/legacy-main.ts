@@ -315,6 +315,10 @@ import {
   type FieldSupportId,
   type TriPassTargeting,
 } from './field-support';
+import {
+  controllableKillstreakId,
+  selectControllableSupportEntity,
+} from './killstreak-slot-possession';
 import { GrenadeWorldPresentationPool, grenadePresentationTelemetry, loadGrenadePresentation } from './grenade-presentation';
 import {
   EXPLOSIVE_BOLT_ARM_DELAY_MS,
@@ -2413,6 +2417,7 @@ type PersistentWindowDebris = {
   windowId: string;
   root: THREE.Group;
   definition: MajorDebrisBodyDefinition;
+  physicsActive: boolean;
 };
 const persistentWindowDebris = new Map<string, PersistentWindowDebris>();
 
@@ -2509,8 +2514,8 @@ function syncInteractiveWorldPhysics(authoritativeResync = false): void {
       ...activeGlassDynamicColliders(),
     ],
   );
-  if (!interactiveWorldRuntime) return;
   characterPhysics.syncMajorDebrisBodies(activeMajorDebrisPhysicsBodies(), authoritativeResync);
+  if (!interactiveWorldRuntime) return;
   for (const mesh of interactiveWorldRuntime.housePresentationRaycastMeshes()) {
     if (!arena.raycastMeshes.includes(mesh)) arena.raycastMeshes.push(mesh);
   }
@@ -2522,6 +2527,7 @@ function activeMajorDebrisPhysicsBodies(): readonly MajorDebrisBodyDefinition[] 
   const runtimeBodies = interactiveWorldRuntime?.majorDebrisPhysicsBodies() ?? [];
   const capacity = Math.max(0, MAX_MAJOR_DEBRIS_BODIES - runtimeBodies.length);
   const windowBodies = [...persistentWindowDebris.values()]
+    .filter((entry) => entry.physicsActive)
     .sort((left, right) => left.id.localeCompare(right.id))
     .slice(0, Math.min(capacity, SHARED_MAJOR_DEBRIS_BUDGET.window))
     .map((entry) => entry.definition);
@@ -2533,13 +2539,22 @@ function activeMajorDebrisPhysicsBodies(): readonly MajorDebrisBodyDefinition[] 
 function updatePersistentWindowDebrisPhysics(): void {
   if (!characterPhysics || persistentWindowDebris.size === 0) return;
   const snapshots = new Map(characterPhysics.majorDebrisSnapshots().map((snapshot) => [snapshot.id, snapshot]));
+  let retireSettledPhysics = false;
   for (const entry of persistentWindowDebris.values()) {
+    if (!entry.physicsActive) continue;
     const snapshot = snapshots.get(entry.id);
     if (!snapshot) continue;
     entry.root.position.set(snapshot.position.x, snapshot.position.y, snapshot.position.z);
     entry.root.quaternion.set(snapshot.rotation.x, snapshot.rotation.y, snapshot.rotation.z, snapshot.rotation.w);
     entry.definition = majorDebrisDefinitionFromSnapshot(entry.definition, snapshot);
+    if (snapshot.sleeping) {
+      // HF-155: the shards remain as persistent visual evidence, but a settled
+      // pane-sized Rapier cuboid must not remain an invisible movement blocker.
+      entry.physicsActive = false;
+      retireSettledPhysics = true;
+    }
   }
+  if (retireSettledPhysics) syncInteractiveWorldPhysics();
 }
 
 function majorDebrisDefinitionFromSnapshot(
@@ -2762,7 +2777,14 @@ function activeBallisticSurfaces(activeArena: ArenaMap = arena): readonly Ballis
 
 function activeRaycastMeshes(activeArena: ArenaMap = arena): THREE.Object3D[] {
   const runtimeOwnsHouseMeshes = activeArena === arena && interactiveWorldRuntime !== null;
-  return activeArena.raycastMeshes.filter((object) => {
+  const candidates = [...new Set([
+    ...activeArena.raycastMeshes,
+    // HF-169: Quality binds Atomic's semantic panes to authored GLB meshes.
+    // Include the current pane mesh so knife/world raycasts use the same glass
+    // authority lifecycle as ballistic shots even while the procedural root is hidden.
+    ...activeArena.breakableWindows.map((pane) => pane.mesh),
+  ])];
+  return candidates.filter((object) => {
     if (runtimeOwnsHouseMeshes && object.userData.dynamicAuthorityReplacement === true) return false;
     if (activeArena !== arena) return true;
     let ancestor = object.parent;
@@ -7962,7 +7984,7 @@ function spawnPersistentWindowDebris(window: ArenaMap['breakableWindows'][number
     }),
     sleeping: false,
   });
-  persistentWindowDebris.set(id, { id, windowId: window.id, root, definition });
+  persistentWindowDebris.set(id, { id, windowId: window.id, root, definition, physicsActive: true });
   syncInteractiveWorldPhysics();
 }
 
@@ -12916,9 +12938,12 @@ function updateSupportStatusHud(): void {
     element<HTMLElement>('#support-platform-time').textContent = (ownedSupport.expiresInMs / 1_000).toFixed(1);
     element<HTMLElement>('#support-platform-altitude').textContent = `${Math.max(0, Math.round(ownedSupport.position[1] - (arena.bounds.minY ?? 0)))}`;
     element<HTMLElement>('#support-platform-speed').textContent = String(Math.round(Math.hypot(ownedSupport.velocity[0], ownedSupport.velocity[1], ownedSupport.velocity[2])));
+    const supportId = ownedSupport.kind === 'chopper' ? 'chopper' : 'piloted-drone';
+    const supportIndex = localFieldSupportProjection().loadout.slots.indexOf(supportId);
+    const controlKey = supportIndex >= 0 ? String(supportIndex + 3) : 'SLOT KEY';
     element<HTMLElement>('#support-control-action').textContent = possession
-      ? 'HOLD F · EXIT · AI FLIGHT CONTINUES'
-      : ownedSupport.mode === 'swarm' ? 'AUTONOMOUS TARGETING' : 'HOLD F · ENTER · AI FLIGHT CONTINUES';
+      ? `PRESS ${controlKey} · EXIT · AI FLIGHT CONTINUES`
+      : ownedSupport.mode === 'swarm' ? 'AUTONOMOUS TARGETING' : `PRESS ${controlKey} · ENTER · AI FLIGHT CONTINUES`;
   }
   element<HTMLElement>('#chopper-damage-dealt').textContent = String(Math.round(
     ownedSupport ? supportDamageDealtByActivation.get(ownedSupport.activationId) ?? 0 : 0,
@@ -12935,29 +12960,6 @@ function fInteractionCandidates(now = performance.now()): readonly InteractionCa
   if (!player.alive || matchState.phase !== 'active') return [];
   const candidates: InteractionCandidate[] = [];
   const actor = localKillstreakActorSnapshot();
-  if (actor?.possession) {
-    candidates.push({
-      kind: 'support-exit',
-      targetId: actor.possession.entityId,
-      proximityM: 0,
-      prompt: actor.possession.kind === 'chopper-gunner' ? 'EXIT CHOPPER GUNNER' : 'EXIT DRONE - AUTONOMOUS CONTROL',
-    });
-  }
-  if (!actor?.possession) {
-    for (const entity of killstreakSnapshot.entities) {
-      if (entity.ownerId !== player.id || entity.expiresInMs <= 0) continue;
-      const proximity = Math.hypot(
-        entity.position[0] - player.position.x,
-        entity.position[1] - player.position.y,
-        entity.position[2] - player.position.z,
-      );
-      if (entity.kind === 'drone' && entity.mode === 'piloted') {
-        candidates.push({ kind: 'support-enter-drone', targetId: entity.id, proximityM: proximity, prompt: 'ENTER DRONE - FIRST PERSON' });
-      } else if (entity.kind === 'chopper') {
-        candidates.push({ kind: 'support-enter-chopper', targetId: entity.id, proximityM: proximity, prompt: 'ENTER CHOPPER GUNNER - FIRST PERSON' });
-      }
-    }
-  }
 
   const activeCareCrateId = careCaptureCrateId(localCareCaptureState);
   let careLineOfSightSolids: ArenaMap['colliders'] | null = null;
@@ -13459,23 +13461,29 @@ function requestKillstreakControl(
   return true;
 }
 
+function activateOrToggleFieldSupportSlot(slotIndex: number, now = performance.now()): void {
+  const fieldSupport = localFieldSupportProjection();
+  const id = fieldSupport.loadout.slots[slotIndex];
+  if (!id) return;
+  if (!controllableKillstreakId(id)) {
+    if (!localKillstreakActorSnapshot()?.possession) activateFieldSupport(id);
+    return;
+  }
+  const entity = selectControllableSupportEntity(id, player.id, killstreakSnapshot.entities);
+  if (!entity) {
+    if (!localKillstreakActorSnapshot()?.possession) activateFieldSupport(id);
+    return;
+  }
+  const action = id === 'chopper' ? 'toggle-chopper-gunner' : 'toggle-piloted-drone';
+  const entering = localKillstreakActorSnapshot()?.possession?.entityId !== entity.id;
+  const accepted = requestKillstreakControl(entity.id, action, {}, now);
+  if (!accepted) return;
+  addFeed(id === 'chopper'
+    ? entering ? 'CHOPPER GUNNER - FIRST-PERSON CONTROL' : 'CHOPPER GUNNER - AI CONTROL'
+    : entering ? 'PILOTED DRONE - FIRST-PERSON CONTROL' : 'PILOTED DRONE - AUTONOMOUS CONTROL', 'gold');
+}
+
 function interactWithSelectedKillstreakSupport(interaction: InteractionCandidate, now = performance.now()): boolean {
-  if (interaction.kind === 'support-exit') {
-    const possession = localKillstreakActorSnapshot()?.possession;
-    if (!possession || possession.entityId !== interaction.targetId) return false;
-    const action = possession.kind === 'chopper-gunner' ? 'toggle-chopper-gunner' : 'toggle-piloted-drone';
-    const accepted = requestKillstreakControl(possession.entityId, action, {}, now);
-    if (accepted) addFeed(possession.kind === 'chopper-gunner' ? 'CHOPPER GUNNER - AI CONTROL' : 'PILOTED DRONE - AUTONOMOUS CONTROL', 'gold');
-    return accepted;
-  }
-  if (interaction.kind === 'support-enter-drone' || interaction.kind === 'support-enter-chopper') {
-    const entity = killstreakSnapshot.entities.find((entry) => entry.id === interaction.targetId && entry.ownerId === player.id && entry.expiresInMs > 0);
-    if (!entity) return false;
-    const action = interaction.kind === 'support-enter-drone' ? 'toggle-piloted-drone' : 'toggle-chopper-gunner';
-    const accepted = requestKillstreakControl(entity.id, action, {}, now);
-    if (accepted) addFeed(interaction.kind === 'support-enter-drone' ? 'PILOTED DRONE - FIRST-PERSON CONTROL' : 'CHOPPER GUNNER - FIRST-PERSON CONTROL', 'gold');
-    return accepted;
-  }
   if (interaction.kind !== 'care-package') return false;
   const crate = killstreakSnapshot.entities.find((entity) => entity.id === interaction.targetId && entity.kind === 'care-crate');
   if (!crate || crate.phase !== 'landed' || localCareCaptureState.status !== 'idle') return false;
@@ -13525,10 +13533,7 @@ function interactWithSelectedKillstreakSupport(interaction: InteractionCandidate
 }
 
 function executePinnedFInteraction(interaction: InteractionCandidate, now = performance.now()): boolean {
-  if (interaction.kind === 'support-exit'
-    || interaction.kind === 'support-enter-drone'
-    || interaction.kind === 'support-enter-chopper'
-    || interaction.kind === 'care-package') return interactWithSelectedKillstreakSupport(interaction, now);
+  if (interaction.kind === 'care-package') return interactWithSelectedKillstreakSupport(interaction, now);
   if (interaction.kind === 'shed-door') return interactWithShedDoor(interaction.targetId);
   if (interaction.kind === 'weapon-pickup') return interactWithWeaponPickup(now, interaction.targetId);
   return false;
@@ -14837,10 +14842,10 @@ function activateFieldSupport(id: FieldSupportId): void {
     beginPointSupportTargeting('carpet-bomber');
   } else if (activatedId === 'piloted-drone') {
     if (!requestKillstreakActivation(activatedId, now, [player.position.x, player.position.y, player.position.z])) return;
-    addFeed('PILOTED DRONE · 20 LOADED + 60 RESERVE · FOUR MAGAZINES · F EXITS', 'gold');
+    addFeed('PILOTED DRONE · 20 ROUNDS + ONE SPARE CLIP · PRESS SLOT KEY AGAIN TO ENTER', 'gold');
   } else if (activatedId === 'chopper') {
     if (!requestKillstreakActivation(activatedId, now)) return;
-    addFeed('CHOPPER GUNNER · AI ONLINE · F TO TAKE / RELEASE GUN · 30 SEC', 'gold');
+    addFeed('CHOPPER GUNNER · AI ONLINE · PRESS SLOT KEY AGAIN TO TAKE / RELEASE GUN · 30 SEC', 'gold');
   } else if (activatedId === 'drone-swarm') {
     const ingressFacing = camera.getWorldDirection(new THREE.Vector3());
     if (!requestKillstreakActivation(
@@ -16613,12 +16618,12 @@ window.addEventListener('keydown', (event) => {
     if ((event.code === 'KeyZ' || event.code === 'ControlLeft') && !event.repeat) requestStance('toggle-prone');
     if (event.code === 'Digit1') switchWeapon(0);
     if (event.code === 'Digit2') switchWeapon(1);
-    const supportSlot = ['Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7'].indexOf(event.code);
-    if (supportSlot >= 0 && !event.repeat) activateFieldSupport(localFieldSupportProjection().loadout.slots[supportSlot]);
     if (event.code === 'KeyR') reload();
     if (event.code === 'KeyV' && !event.repeat) melee();
     if (event.code === 'KeyG' && !event.repeat) throwGrenade();
   }
+  const supportSlot = ['Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7'].indexOf(event.code);
+  if (supportSlot >= 0 && !event.repeat) activateOrToggleFieldSupportSlot(supportSlot);
   if (event.code === 'KeyF' && !event.repeat) {
     const now = performance.now();
     if (pointSupportTargeting && !tacticalMapOpen) {

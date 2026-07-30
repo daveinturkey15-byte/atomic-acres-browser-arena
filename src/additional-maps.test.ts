@@ -946,6 +946,48 @@ describe('additional authored maps', () => {
     expect((fuselagePlaceholder.material as THREE.Material).colorWrite).toBe(false);
   });
 
+  it('HF-188 binds every retained Terminal placeholder collider to visible authored presentation in every profile', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const audit = map.root.userData.skylineCollisionPresentationAudit as {
+      version: string;
+      entries: Array<{ placeholder: string; authorityId: string | null; presentationNames: string[] }>;
+      unownedPlaceholders: string[];
+    };
+    expect(audit.version).toBe('hf-188-profile-authority-v1');
+    expect(audit.entries.length).toBeGreaterThan(0);
+    expect(audit.unownedPlaceholders).toEqual([]);
+    expect(audit.entries.every((entry) => entry.authorityId && entry.presentationNames.length > 0)).toBe(true);
+
+    for (const profile of ['performance', 'blender', 'compat'] as const) {
+      applyAdditionalMapPresentationProfile(map.root, profile);
+      for (const entry of audit.entries) {
+        const placeholder = map.root.getObjectByName(entry.placeholder) as THREE.Mesh;
+        const materials = Array.isArray(placeholder.material) ? placeholder.material : [placeholder.material];
+        expect(placeholder.userData.skylineCollisionPresentationVisible, `${profile}:${entry.placeholder}:binding`).toBe(true);
+        expect(materials.every((material) => !material.colorWrite && !material.depthWrite), `${profile}:${entry.placeholder}:hidden-proxy`).toBe(true);
+        expect(entry.presentationNames.some((name) => map.root.getObjectByName(name)?.visible), `${profile}:${entry.placeholder}:presentation`).toBe(true);
+      }
+    }
+
+    const engine = map.root.getObjectByName('skyline-jetliner-engine-1') as THREE.Mesh<THREE.BoxGeometry>;
+    const fuel = map.root.getObjectByName('skyline-fuel-trailer') as THREE.Mesh<THREE.BoxGeometry>;
+    expect(engine.geometry.parameters).toMatchObject({ width: 1.9, height: 1.9, depth: 4.1 });
+    expect(fuel.geometry.parameters).toMatchObject({ width: 5.2, height: 2.2, depth: 2.2 });
+    expect(audit.entries.filter((entry) => entry.placeholder.includes('skyline-tarmac-cargo-'))).toHaveLength(10);
+
+    for (const name of new Set(audit.entries.flatMap((entry) => entry.presentationNames))) {
+      const presentation = map.root.getObjectByName(name);
+      if (presentation) presentation.visible = false;
+    }
+    applyAdditionalMapPresentationProfile(map.root, 'performance');
+    for (const entry of audit.entries) {
+      const placeholder = map.root.getObjectByName(entry.placeholder) as THREE.Mesh;
+      const materials = Array.isArray(placeholder.material) ? placeholder.material : [placeholder.material];
+      expect(placeholder.userData.skylineCollisionPresentationVisible, entry.placeholder).toBe(false);
+      expect(materials.every((material) => material.colorWrite && material.depthWrite), entry.placeholder).toBe(true);
+    }
+  });
+
   it('gives the Quality aircraft a separate BackSide cabin roof without closing the boarding aperture', () => {
     const map = buildSkylineTerminal(new THREE.Scene());
     const ceilingShells = [

@@ -1304,17 +1304,31 @@ export function applyAdditionalMapPresentationProfile(
   });
   root.traverse((node) => {
     if (!(node instanceof THREE.Mesh) || node.userData.skylineQualityPlaceholder !== true) return;
-    // These meshes retain collision/ballistic authority only. Their former
-    // visible-box role made Performance and Compatibility collide with shapes
-    // the player could not see after the higher-fidelity silhouette was hidden.
+    const authorityId = node.userData.skylineCollisionAuthorityId as string | undefined;
+    let visiblePresentation = false;
+    if (authorityId) {
+      root.traverse((candidate) => {
+        if (candidate === node
+          || candidate.userData.skylineCollisionAuthorityId !== authorityId
+          || !candidate.visible
+          || candidate.userData.skylineQualityPlaceholder === true
+          || !(candidate instanceof THREE.Mesh)) return;
+        const candidateMaterials = Array.isArray(candidate.material) ? candidate.material : [candidate.material];
+        if (candidateMaterials.some((material) => material.visible && material.colorWrite)) visiblePresentation = true;
+      });
+    }
+    // HF-188: collision authority may be hidden only while an explicitly
+    // bound authored presentation is visible in the active profile. Missing
+    // ownership fails visible instead of leaving a mystery blocker.
     node.castShadow = false;
     node.receiveShadow = false;
     const materials = Array.isArray(node.material) ? node.material : [node.material];
     for (const material of materials) {
-      material.colorWrite = false;
-      material.depthWrite = false;
+      material.colorWrite = !visiblePresentation;
+      material.depthWrite = !visiblePresentation;
       material.needsUpdate = true;
     }
+    node.userData.skylineCollisionPresentationVisible = visiblePresentation;
   });
   return { hidden, shown };
 }
@@ -2177,9 +2191,11 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     position: [number, number, number],
     size: [number, number, number],
     material: THREE.MeshStandardMaterial,
+    collisionAuthorityId: string,
   ): THREE.Mesh => {
     const mesh = box(builder, name, position, size, material.clone());
     mesh.userData.skylineQualityPlaceholder = true;
+    mesh.userData.skylineCollisionAuthorityId = collisionAuthorityId;
     return mesh;
   };
   type SkylineWalkablePlatform = Readonly<{
@@ -2200,7 +2216,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     options: Readonly<{ qualityPlaceholder?: boolean; qualityPresentationName?: string }> = {},
   ): THREE.Mesh => {
     const mesh = options.qualityPlaceholder
-      ? qualityPlaceholderBox(presentationName, position, size, material)
+      ? qualityPlaceholderBox(presentationName, position, size, material, options.qualityPresentationName ?? id)
       : box(builder, presentationName, position, size, material);
     const bounds = builder.physicsColliders[builder.physicsColliders.length - 1];
     walkablePlatforms.push({
@@ -2640,7 +2656,13 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   // leaf, frame, header, threshold or sign may make this route read as an
   // opaque portal.
 
-  qualityPlaceholderBox('skyline-jetliner-fuselage-top', [0, 5.8, 2.0], [36.0, 1.2, 4.2], planeHullMat);
+  qualityPlaceholderBox(
+    'skyline-jetliner-fuselage-top',
+    [0, 5.8, 2.0],
+    [36.0, 1.2, 4.2],
+    planeHullMat,
+    'jetliner-fuselage-roof',
+  );
   addWalkablePlatform('jetliner-cabin', 'skyline-jetliner-cabin-floor', [0, 2.4, 2.0], [35.0, 0.3, 3.8], floorMat);
   // Split the north fuselage wall around the jetbridge doorway. A single solid
   // wall made the authored bridge-to-cabin route stop outside the aircraft.
@@ -2674,6 +2696,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   for (const shell of fuselageShells) {
     shell.userData.assetOwner = 'skyline-terminal';
     shell.userData.rustworksDetail = 'core';
+    shell.userData.skylineCollisionAuthorityId = 'jetliner-fuselage-roof';
   }
   // The exterior half-cylinder is intentionally FrontSide. From the cabin its
   // backfaces disappear, which made the aircraft roof look absent in Quality.
@@ -2695,6 +2718,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     shell.userData.rustworksDetail = 'core';
     shell.userData.interiorFaceOrientation = 'back-side';
     shell.userData.boardingAperturePreserved = true;
+    shell.userData.skylineCollisionAuthorityId = 'jetliner-fuselage-roof';
   }
   detailBox('quality-aircraft', 'skyline-quality-fuselage-door-crown', [0, 6.08, 2], [3.8, 0.58, 4.15], planeHullMat, 'quality');
   const qualityNose = detailMesh(
@@ -2810,8 +2834,8 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   };
   addWingAuthority('port', 3.6, 16.8, 'skyline-quality-wing-port');
   addWingAuthority('starboard', 0.4, -16.8, 'skyline-quality-wing-starboard');
-  qualityPlaceholderBox('skyline-jetliner-engine-1', [0, 1.6, 12.0], [2.2, 2.2, 4.5], engineMat);
-  qualityPlaceholderBox('skyline-jetliner-engine-2', [0, 1.6, -8.0], [2.2, 2.2, 4.5], engineMat);
+  qualityPlaceholderBox('skyline-jetliner-engine-1', [0, 1.6, 12.0], [1.9, 1.9, 4.1], engineMat, 'jetliner-engine-nacelles');
+  qualityPlaceholderBox('skyline-jetliner-engine-2', [0, 1.6, -8.0], [1.9, 1.9, 4.1], engineMat, 'jetliner-engine-nacelles');
   const portWing = detailMesh(
     'quality-aircraft',
     'skyline-quality-wing-port',
@@ -2821,6 +2845,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   );
   portWing.userData.assetOwner = 'skyline-terminal';
   portWing.userData.rustworksDetail = 'core';
+  portWing.userData.skylineCollisionAuthorityId = 'skyline-quality-wing-port';
   const starboardWing = detailMesh(
     'quality-aircraft',
     'skyline-quality-wing-starboard',
@@ -2830,6 +2855,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   );
   starboardWing.userData.assetOwner = 'skyline-terminal';
   starboardWing.userData.rustworksDetail = 'core';
+  starboardWing.userData.skylineCollisionAuthorityId = 'skyline-quality-wing-starboard';
   detailBox('aircraft-skin', 'skyline-wingtip-port', [0, 2.99, 18.42], [5.1, 0.08, 0.14], planeStripeMat);
   detailBox('aircraft-skin', 'skyline-wingtip-starboard', [0, 2.99, -14.42], [5.1, 0.08, 0.14], planeStripeMat);
   detailBox('aircraft-skin', 'skyline-wing-navigation-port', [-2.35, 3.06, 18.48], [0.42, 0.16, 0.16], practicalMat);
@@ -2841,6 +2867,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   engineNacelles.userData.presentationOnly = true;
   engineNacelles.userData.rustworksDetail = 'core';
   engineNacelles.userData.skylineCluster = 'aircraft-skin';
+  engineNacelles.userData.skylineCollisionAuthorityId = 'jetliner-engine-nacelles';
   const nacelleMatrix = new THREE.Matrix4();
   const nacelleRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, Math.PI / 2));
   for (const [index, z] of [12, -8].entries()) {
@@ -2869,7 +2896,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   detailBox('floor-language', 'skyline-airstair-comb-foot', [21.35, 0.08, 2], [0.5, 0.04, 2.15], hazardMat);
   detailBox('floor-language', 'skyline-airstair-comb-top', [17.45, 2.7, 2], [0.5, 0.04, 2.15], hazardMat);
 
-  qualityPlaceholderBox('skyline-fuel-trailer', [-10, 1.2, 18], [5.8, 2.4, 2.6], hazardMat);
+  qualityPlaceholderBox('skyline-fuel-trailer', [-10, 1.5, 18], [5.2, 2.2, 2.2], hazardMat, 'fuel-trailer');
   const fuelTank = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 5.2, 14), cargoMat);
   fuelTank.name = 'skyline-fuel-trailer-tank';
   fuelTank.rotation.z = Math.PI / 2;
@@ -2881,6 +2908,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   fuelTank.userData.rustworksDetail = 'core';
   fuelTank.userData.skylineCluster = 'service-equipment';
   fuelTank.userData.assetOwner = 'skyline-terminal';
+  fuelTank.userData.skylineCollisionAuthorityId = 'fuel-trailer';
   fuelTank.raycast = () => undefined;
   root.add(fuelTank);
   detailBox('service-equipment', 'skyline-fuel-trailer-chassis', [-10, 0.38, 18], [6.1, 0.28, 2.3], structureMat, 'performance');
@@ -2906,7 +2934,9 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     [12, 26, cargoMat],
     [0, 28, trimMat],
   ] as const) {
-    qualityPlaceholderBox(`skyline-tarmac-cargo-${x}-${z}`, [x, 1.3, z], [4.5, 2.6, 2.6], col);
+    const cargoAuthorityId = `tarmac-cargo-${x}-${z}`;
+    qualityPlaceholderBox(`skyline-tarmac-cargo-${x}-${z}-lower`, [x, 0.975, z], [4.5, 1.95, 2.6], col, cargoAuthorityId);
+    qualityPlaceholderBox(`skyline-tarmac-cargo-${x}-${z}-upper`, [x + 0.15, 2.275, z], [3.74, 0.65, 2.6], col, cargoAuthorityId);
     const shell = detailMesh(
       'service-equipment',
       `skyline-quality-uld-${x}-${z}`,
@@ -2916,6 +2946,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     );
     shell.userData.assetOwner = 'skyline-terminal';
     shell.userData.rustworksDetail = 'core';
+    shell.userData.skylineCollisionAuthorityId = cargoAuthorityId;
     detailBox('service-equipment', `skyline-uld-rail-${x}-${z}`, [x, 1.42, z + 1.34], [4.15, 0.12, 0.08], hazardMat, 'quality');
   }
 
@@ -2958,6 +2989,39 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   ];
 
   root.userData.skylinePresentationBatches = batchPresentationOnlyBoxes(root, 'skyline');
+  const collisionPresentationAudit: Array<Readonly<{
+    placeholder: string;
+    authorityId: string | null;
+    presentationNames: readonly string[];
+  }>> = [];
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh) || node.userData.skylineQualityPlaceholder !== true) return;
+    const authorityId = node.userData.skylineCollisionAuthorityId as string | undefined;
+    const presentationNames: string[] = [];
+    if (authorityId) {
+      root.traverse((candidate) => {
+        if (candidate !== node
+          && candidate instanceof THREE.Mesh
+          && candidate.userData.skylineQualityPlaceholder !== true
+          && candidate.userData.skylineCollisionAuthorityId === authorityId) {
+          presentationNames.push(candidate.name);
+        }
+      });
+    }
+    collisionPresentationAudit.push(Object.freeze({
+      placeholder: node.name,
+      authorityId: authorityId ?? null,
+      presentationNames: Object.freeze(presentationNames.sort()),
+    }));
+  });
+  root.userData.skylineCollisionPresentationAudit = Object.freeze({
+    version: 'hf-188-profile-authority-v1',
+    entries: Object.freeze(collisionPresentationAudit.sort((left, right) => left.placeholder.localeCompare(right.placeholder))),
+    unownedPlaceholders: Object.freeze(collisionPresentationAudit
+      .filter((entry) => !entry.authorityId || entry.presentationNames.length === 0)
+      .map((entry) => entry.placeholder)
+      .sort()),
+  });
   root.userData.skylineOpeningAudit = skylineOpeningParityAudit(builder, [
     {
       id: 'terminal-gate',

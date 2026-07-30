@@ -1,17 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import {
-  primaryHoldInteraction,
-  primaryInteraction,
-  primaryTapInteraction,
-  type InteractionCandidate,
-} from './interaction-arbitration';
 
 const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
 const deathDropSource = readFileSync(new URL('./death-drops.ts', import.meta.url), 'utf8');
 
 describe('Pass 65 playable killstreak integration', () => {
-  it('freezes the persisted five-slot selection at match start and maps keys 3-7 by slot order', () => {
+  it('freezes the persisted five-slot selection and routes keys 3-7 through activation or possession', () => {
     expect(source).toContain('killstreakLoadoutController.freezeAtMatchStart()');
     expect(source).toContain('projectFieldSupportActor(');
     expect(source).not.toContain('let fieldSupport =');
@@ -20,7 +14,8 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).not.toContain('recordSupportDeath(');
     expect(source).not.toContain('consumeFieldSupport(');
     expect(source).toContain("['Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7'].indexOf(event.code)");
-    expect(source).toContain('activateFieldSupport(localFieldSupportProjection().loadout.slots[supportSlot])');
+    expect(source).toContain('activateOrToggleFieldSupportSlot(supportSlot)');
+    expect(source).toContain('selectControllableSupportEntity(id, player.id, killstreakSnapshot.entities)');
     expect(source).not.toContain("activateFieldSupport('hunter-swarm');");
   });
 
@@ -171,7 +166,7 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain('!flightSolids.some((solid) => sphereIntersectsBox(point, 0.35, solid))');
   });
 
-  it('routes one pinned F press through immediate lone taps and one-second support holds', () => {
+  it('routes one pinned F press only through exact world interactions', () => {
     expect(source).toContain("from './interaction-press-lifecycle';");
     expect(source).toContain('function fInteractionCandidates(');
     expect(source).toContain('function selectedFInteraction(');
@@ -184,13 +179,16 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain("if (event.code === 'KeyF') {");
     expect(source).toContain('releaseFInteractionPress(now);');
     expect(source).toContain('if (localCareCaptureRequiresHold) releaseCareCapture(now);');
-    expect(source).toContain('TAP F · ${pinnedTap.prompt} / HOLD F · ${pinnedHold.prompt}');
     expect(source).toContain("cancelFInteractionPress('blur', lastWindowBlurAt);");
     expect(source).toContain("cancelFInteractionPress('pause');");
     expect(source).toContain("cancelFInteractionPress('death', now);");
     expect(source).toContain("cancelFInteractionPress('epoch-change');");
-    expect(source).toContain("interaction.kind === 'support-enter-chopper'");
-    expect(source).toContain("interaction.kind === 'support-enter-drone'");
+    const candidatesStart = source.indexOf('function fInteractionCandidates(');
+    const candidatesEnd = source.indexOf('\nfunction selectedFInteraction(', candidatesStart);
+    const candidatesBlock = source.slice(candidatesStart, candidatesEnd);
+    expect(candidatesBlock).not.toContain("'support-enter-chopper'");
+    expect(candidatesBlock).not.toContain("'support-enter-drone'");
+    expect(candidatesBlock).not.toContain("'support-exit'");
     expect(source).toContain("type: 'killstreak-care-capture-intent'");
     expect(source).toMatch(/function clearGameplayInput\(\): void \{\s+cancelFInteractionPress\('manual-reset'\);\s+releaseCareCapture\(\);/);
     expect(source).toContain('if (appliedDamage > 0) releaseCareCapture(now);');
@@ -237,29 +235,16 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(deathDropSource).toContain("nearestDeathDrop([expected], position, range, now, 'weapon')");
   });
 
-  it('pins an independent nearby-world tap and global support hold from the same keydown', () => {
-    const candidate = (kind: InteractionCandidate['kind'], targetId: string, proximityM: number): InteractionCandidate => ({
-      kind, targetId, proximityM, prompt: kind,
-    });
-    for (const supportKind of ['support-exit', 'support-enter-drone', 'support-enter-chopper'] as const) {
-      for (const worldKind of ['care-package', 'shed-door', 'weapon-pickup'] as const) {
-        const candidates = [
-          candidate(supportKind, `support-${supportKind}`, 0),
-          candidate(worldKind, `world-${worldKind}`, 1),
-        ];
-        expect(primaryTapInteraction(candidates)).toMatchObject({ kind: worldKind });
-        expect(primaryHoldInteraction(candidates)).toMatchObject({ kind: supportKind });
-      }
-    }
-    expect(primaryInteraction([
-      candidate('support-enter-drone', 'global-drone', 999),
-    ])).toMatchObject({ kind: 'support-enter-drone' });
-    expect(primaryInteraction([
-      candidate('support-enter-chopper', 'global-chopper', 999),
-    ])).toMatchObject({ kind: 'support-enter-chopper' });
-    expect(primaryInteraction([
-      candidate('support-exit', 'possessed-chopper', 0),
-    ])).toMatchObject({ kind: 'support-exit' });
+  it('supersedes and exits possession with the equipped support slot key, never F', () => {
+    const start = source.indexOf('function activateOrToggleFieldSupportSlot(');
+    const end = source.indexOf('\nfunction interactWithSelectedKillstreakSupport(', start);
+    const block = source.slice(start, end);
+    expect(block).toContain("const action = id === 'chopper' ? 'toggle-chopper-gunner' : 'toggle-piloted-drone'");
+    expect(block).toContain('requestKillstreakControl(entity.id, action, {}, now)');
+    expect(block).toContain('localKillstreakActorSnapshot()?.possession?.entityId !== entity.id');
+    expect(block).toContain('if (!localKillstreakActorSnapshot()?.possession) activateFieldSupport(id)');
+    expect(source).toContain("const supportSlot = ['Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7'].indexOf(event.code)");
+    expect(source).toContain('if (supportSlot >= 0 && !event.repeat) activateOrToggleFieldSupportSlot(supportSlot)');
   });
 
   it('offers only claimable landed crates and correlates pending, acknowledged, released and rejected capture state', () => {

@@ -140,6 +140,14 @@ type MinigunDriveLoop = {
 
 type ChopperRotorLoop = MinigunDriveLoop & { panner: PannerNode };
 
+type ContinuousVoiceScope = 'arena' | 'low-health';
+
+type ContinuousVoiceOwnership = Readonly<{
+  scope: ContinuousVoiceScope;
+  nodes: readonly AudioNode[];
+  gains: readonly GainNode[];
+}>;
+
 /** Layered, original procedural arena mix. No sampled or proprietary game audio is used. */
 export class ArenaAudio {
   private context: AudioContext | null = null;
@@ -192,7 +200,8 @@ export class ArenaAudio {
   private readonly railgunSpatialTimers: ReturnType<typeof setTimeout>[] = [];
   private railgunSpatialChainCount = 0;
   private flashbangs = { plays: 0, lastAudioGain: 0, immediateOnsets: 0, scheduledBeeps: 0 };
-  private activeVoices = new Map<AudioScheduledSourceNode, { id: number; bus: AudioBusId; startedAt: number; priority: number; spatial: boolean; distance: number }>();
+  private activeVoices = new Map<AudioScheduledSourceNode, { id: number; bus: AudioBusId; startedAt: number; priority: number; spatial: boolean; distance: number; protectedContinuous: boolean }>();
+  private readonly continuousVoiceOwners = new Map<AudioScheduledSourceNode, ContinuousVoiceOwnership>();
   private nextVoiceId = 1;
   private voicesDropped = 0;
   private voicesStolen = 0;
@@ -1111,7 +1120,14 @@ export class ArenaAudio {
     node.gain.setTargetAtTime(this.busBaseGain(id) * scalar, this.context?.currentTime ?? 0, 0.018);
   }
 
-  private registerVoice(source: AudioScheduledSourceNode, destination: AudioNode, priority: number, spatial = false, distance = 0): boolean {
+  private registerVoice(
+    source: AudioScheduledSourceNode,
+    destination: AudioNode,
+    priority: number,
+    spatial = false,
+    distance = 0,
+    protectedContinuous = false,
+  ): boolean {
     const bus = this.busIdentity.get(destination) ?? 'sfx';
     const reservedSpatial = this.spatialReportDestinations.has(destination);
     const admittedSpatial = spatial || reservedSpatial;
@@ -1129,7 +1145,8 @@ export class ArenaAudio {
       return false;
     }
     if (overGlobal || overBus) {
-      const candidates = overBus ? busVoices : [...this.activeVoices.entries()];
+      const candidates = (overBus ? busVoices : [...this.activeVoices.entries()])
+        .filter(([, voice]) => !voice.protectedContinuous);
       const candidateId = String(this.nextVoiceId);
       const selected = selectVoiceToSteal(
         candidates.map(([, voice]) => ({
@@ -1154,6 +1171,7 @@ export class ArenaAudio {
       priority,
       spatial: admittedSpatial,
       distance: admittedDistance,
+      protectedContinuous,
     };
     this.activeVoices.set(source, voice);
     source.onended = () => {
@@ -1163,8 +1181,52 @@ export class ArenaAudio {
     return true;
   }
 
+  private registerContinuousVoice(
+    source: AudioScheduledSourceNode,
+    destination: AudioNode,
+    priority: number,
+    scope: ContinuousVoiceScope,
+    nodes: readonly AudioNode[],
+    gains: readonly GainNode[] = [],
+  ): boolean {
+    if (!this.registerVoice(source, destination, priority, false, 0, true)) return false;
+    this.continuousVoiceOwners.set(source, Object.freeze({
+      scope,
+      nodes: Object.freeze([...nodes]),
+      gains: Object.freeze([...gains]),
+    }));
+    const previousEnded = source.onended;
+    source.onended = (event) => {
+      previousEnded?.call(source, event);
+      this.releaseContinuousVoice(source);
+    };
+    return true;
+  }
+
+  private releaseContinuousVoice(source: AudioScheduledSourceNode): void {
+    const owner = this.continuousVoiceOwners.get(source);
+    if (!owner) return;
+    this.continuousVoiceOwners.delete(source);
+    const sources = owner.scope === 'arena' ? this.arenaSources : this.lowHealthSources;
+    const sourceIndex = sources.indexOf(source);
+    if (sourceIndex >= 0) sources.splice(sourceIndex, 1);
+    const ownedNodes = owner.scope === 'arena' ? this.arenaNodes : this.lowHealthNodes;
+    for (const node of owner.nodes) {
+      const nodeIndex = ownedNodes.indexOf(node);
+      if (nodeIndex >= 0) ownedNodes.splice(nodeIndex, 1);
+      node.disconnect();
+    }
+    if (owner.scope === 'low-health') {
+      for (const gain of owner.gains) {
+        const gainIndex = this.lowHealthGains.indexOf(gain);
+        if (gainIndex >= 0) this.lowHealthGains.splice(gainIndex, 1);
+      }
+    }
+  }
+
   private stopSource(source: AudioScheduledSourceNode): void {
     try { source.stop(); } catch { /* already stopped */ }
+    this.releaseContinuousVoice(source);
     this.activeVoices.delete(source);
     source.disconnect();
   }
@@ -1242,7 +1304,7 @@ export class ArenaAudio {
     tonePanner.positionY.value = definition.bedPosition.y;
     tonePanner.positionZ.value = definition.bedPosition.z;
     tone.connect(toneFilter).connect(toneGain).connect(tonePanner).connect(this.ambience);
-    if (this.registerVoice(tone, this.ambience, 1)) {
+    if (this.registerContinuousVoice(tone, this.ambience, 1, 'arena', [toneFilter, toneGain, tonePanner])) {
       tone.start(now);
       this.arenaSources.push(tone);
       this.arenaNodes.push(toneFilter, toneGain, tonePanner);
@@ -1251,10 +1313,9 @@ export class ArenaAudio {
       toneGain.disconnect();
       tonePanner.disconnect();
     }
-    // A continuous white-noise source remained audible as the intermittent
-    // hiss players associated with support/drone spawns. Use a narrow,
-    // deterministic triangle bed instead; transient weapon/smoke noise keeps
-    // its own bounded one-shot paths and no longer exposes a broadband floor.
+    // HF-165: never use an indefinite white-noise buffer for arena ambience.
+    // A filtered, gently modulated oscillator retains air movement without the
+    // recurring broadband hiss that became obvious after loud combat tails.
     const air = this.context.createOscillator();
     const airFilter = this.context.createBiquadFilter();
     const airLowpass = this.context.createBiquadFilter();
@@ -1277,20 +1338,21 @@ export class ArenaAudio {
     airPanner.positionX.value = definition.airPosition.x;
     airPanner.positionY.value = definition.airPosition.y;
     airPanner.positionZ.value = definition.airPosition.z;
-    // Keep the tonal air bed narrow and gently animated without adding another
-    // continuous voice or a broadband noise floor.
-    airFilter.frequency.setValueAtTime(definition.airFrequencyHz, now);
+    // HF-165: never use an indefinite white-noise buffer for arena ambience.
+    // A filtered, gently modulated oscillator retains air movement without the
+    // recurring broadband hiss that became obvious after loud combat tails.
+    air.frequency.setValueAtTime(definition.airFrequencyHz, now);
     const halfCycleSeconds = 0.5 / definition.modulationHz;
     const scheduledHalfCycles = Math.ceil(120 / halfCycleSeconds);
     for (let step = 1; step <= scheduledHalfCycles; step += 1) {
       const direction = step % 2 === 0 ? -1 : 1;
-      airFilter.frequency.exponentialRampToValueAtTime(
+      air.frequency.exponentialRampToValueAtTime(
         definition.airFrequencyHz * (1 + definition.modulationDepth * direction),
         now + halfCycleSeconds * step,
       );
     }
     air.connect(airFilter).connect(airLowpass).connect(airGain).connect(airPanner).connect(this.ambience);
-    if (this.registerVoice(air, this.ambience, 1)) {
+    if (this.registerContinuousVoice(air, this.ambience, 1, 'arena', [airFilter, airLowpass, airGain, airPanner])) {
       air.start(now);
       this.arenaSources.push(air);
       this.arenaNodes.push(airFilter, airLowpass, airGain, airPanner);
@@ -1315,7 +1377,7 @@ export class ArenaAudio {
     breathFilter.Q.value = 0.8;
     breathGain.gain.value = 0.0001;
     breath.connect(breathFilter).connect(breathGain).connect(this.feedback);
-    if (this.registerVoice(breath, this.feedback, 5)) {
+    if (this.registerContinuousVoice(breath, this.feedback, 5, 'low-health', [breathFilter, breathGain], [breathGain])) {
       breath.start(now, presentationRandom() * this.noiseBuffer.duration);
       this.lowHealthSources.push(breath);
       this.lowHealthGains.push(breathGain);
@@ -1330,7 +1392,7 @@ export class ArenaAudio {
     heartbeat.frequency.value = 54;
     heartbeatGain.gain.value = 0.0001;
     heartbeat.connect(heartbeatGain).connect(this.feedback);
-    if (this.registerVoice(heartbeat, this.feedback, 5)) {
+    if (this.registerContinuousVoice(heartbeat, this.feedback, 5, 'low-health', [heartbeatGain], [heartbeatGain])) {
       heartbeat.start(now);
       this.lowHealthSources.push(heartbeat);
       this.lowHealthGains.push(heartbeatGain);

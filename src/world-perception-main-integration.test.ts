@@ -16,6 +16,12 @@ describe('world and perception runtime integration', () => {
   });
 
   it('routes knife, explosion and railgun through the same authoritative glass lifecycle', () => {
+    const raycastStart = source.indexOf('function activeRaycastMeshes(');
+    const raycastEnd = source.indexOf('\nfunction traceWeaponPath(', raycastStart);
+    const raycastBlock = source.slice(raycastStart, raycastEnd);
+    expect(raycastBlock).toContain('...activeArena.breakableWindows.map((pane) => pane.mesh)');
+    expect(raycastBlock).toContain('const candidates = [...new Set([');
+
     const meleeStart = source.indexOf('function melee()');
     const meleeEnd = source.indexOf('\nconst explosiveBoltTargetBuffer', meleeStart);
     expect(source.slice(meleeStart, meleeEnd)).toContain("'knife',");

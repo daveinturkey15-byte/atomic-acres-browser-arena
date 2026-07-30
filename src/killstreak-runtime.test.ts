@@ -271,6 +271,34 @@ describe('host killstreak runtime', () => {
     expect(runtime.control({ by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2, entityId, action: 'toggle-chopper-gunner' }, 3)).toMatchObject({ accepted: false, reason: 'identity-mismatch' });
   });
 
+  it('HF-187 atomically supersedes drone possession with chopper and toggles the selected slot platform back to AI', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'piloted-drone', 'tri-pass', 'chopper', 'nuke']));
+    earn(runtime, 8);
+    const droneId = runtime.activate(intent('piloted-drone', 2, 1), 1_000, DEFAULT_WORLD).entityIds[0];
+    const chopperId = runtime.activate(intent('chopper', 4, 2), 1_001, DEFAULT_WORLD).entityIds[0];
+
+    expect(runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 1, entityId: droneId, action: 'toggle-piloted-drone',
+    }, 1_002).accepted).toBe(true);
+    expect(runtime.snapshotFor('owner', 1_002).actors[0].possession).toEqual({ kind: 'piloted-drone', entityId: droneId });
+
+    expect(runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2, entityId: chopperId, action: 'toggle-chopper-gunner',
+    }, 1_003).accepted).toBe(true);
+    let snapshot = runtime.snapshotFor('owner', 1_003);
+    expect(snapshot.actors[0].possession).toEqual({ kind: 'chopper-gunner', entityId: chopperId });
+    expect(snapshot.entities.find((entity) => entity.id === droneId)?.mode).toBe('piloted');
+    expect(snapshot.entities.find((entity) => entity.id === chopperId)?.gunController).toBe('owner-player');
+
+    expect(runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 3, entityId: chopperId, action: 'toggle-chopper-gunner',
+    }, 1_004).accepted).toBe(true);
+    snapshot = runtime.snapshotFor('owner', 1_004);
+    expect(snapshot.actors[0].possession).toBeNull();
+    expect(snapshot.entities.find((entity) => entity.id === chopperId)?.gunController).toBe('ai');
+  });
+
   it('ends chopper possession on disconnect, resumes AI, and preserves rewards for a replacement transport', () => {
     const runtime = new HostKillstreakRuntime(7);
     runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'chopper', 'tri-pass', 'nuke']));
