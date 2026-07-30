@@ -482,7 +482,16 @@ describe('Pass 64 render runtime boundary', () => {
 
   it('prewarms only the submitted TSL render-pipeline context', async () => {
     const compileAsync = vi.fn(async () => undefined);
-    const render = vi.fn();
+    const visibility: Array<Readonly<{ arena: boolean; staged: boolean; light: boolean }>> = [];
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const arena = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+    const staged = new THREE.Mesh(new THREE.SphereGeometry(), new THREE.MeshBasicMaterial());
+    const light = new THREE.AmbientLight();
+    scene.add(camera, arena, staged, light);
+    const render = vi.fn(() => {
+      visibility.push({ arena: arena.visible, staged: staged.visible, light: light.visible });
+    });
     const renderer = {
       compileAsync,
       info: { reset: () => undefined, render: { calls: 1, triangles: 2, points: 0, lines: 0 } },
@@ -505,19 +514,22 @@ describe('Pass 64 render runtime boundary', () => {
       softwareAdapter: false,
       device,
     });
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera();
-    const staged = new THREE.Group();
-    scene.add(camera, staged);
-
     await runtime.compileAndRender(staged, camera, scene);
 
     expect(compileAsync).not.toHaveBeenCalled();
     expect(render).toHaveBeenCalledTimes(1);
+    expect(visibility).toEqual([{ arena: false, staged: true, light: true }]);
+    expect(arena.visible).toBe(true);
+    expect(staged.visible).toBe(true);
   });
 
   it('coalesces concurrently staged presentation roots into one fenced scene submission', async () => {
-    const render = vi.fn();
+    const visibility: Array<Readonly<{
+      arena: boolean;
+      tracer: boolean;
+      smoke: boolean;
+      light: boolean;
+    }>> = [];
     const renderer = {
       compileAsync: vi.fn(async () => undefined),
       info: { reset: () => undefined, render: { calls: 1, triangles: 2, points: 0, lines: 0 } },
@@ -527,6 +539,21 @@ describe('Pass 64 render runtime boundary', () => {
       addEventListener: () => undefined,
       lost: new Promise<never>(() => undefined),
     };
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const arena = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+    const tracerRoot = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.LineBasicMaterial());
+    const smokeRoot = new THREE.Mesh(new THREE.PlaneGeometry(), new THREE.MeshBasicMaterial());
+    const light = new THREE.DirectionalLight();
+    scene.add(camera, arena, tracerRoot, smokeRoot, light);
+    const render = vi.fn(() => {
+      visibility.push({
+        arena: arena.visible,
+        tracer: tracerRoot.visible,
+        smoke: smokeRoot.visible,
+        light: light.visible,
+      });
+    });
     const runtime = new (WebGpuRenderRuntime as unknown as new (
       renderer: unknown,
       pipeline: unknown,
@@ -540,20 +567,72 @@ describe('Pass 64 render runtime boundary', () => {
       softwareAdapter: false,
       device,
     });
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera();
-    const tracerRoot = new THREE.Group();
-    const smokeRoot = new THREE.Group();
-    scene.add(camera, tracerRoot, smokeRoot);
-
     await Promise.all([
       runtime.compileAndRender(tracerRoot, camera, scene),
       runtime.compileAndRender(smokeRoot, camera, scene),
     ]);
     expect(render).toHaveBeenCalledTimes(1);
+    expect(visibility[0]).toEqual({ arena: false, tracer: true, smoke: true, light: true });
+    expect([arena.visible, tracerRoot.visible, smokeRoot.visible, light.visible]).toEqual([true, true, true, true]);
 
     await runtime.compileAndRender(tracerRoot, camera, scene);
     expect(render).toHaveBeenCalledTimes(2);
+    expect(visibility[1]).toEqual({ arena: false, tracer: true, smoke: false, light: true });
+    expect([arena.visible, tracerRoot.visible, smokeRoot.visible, light.visible]).toEqual([true, true, true, true]);
+  });
+
+  it('queues a root staged after encoding begins for a later exact submission', async () => {
+    const pending: Array<() => void> = [];
+    const snapshots: Array<Readonly<{ arena: boolean; first: boolean; second: boolean }>> = [];
+    const renderer = {
+      info: { reset: () => undefined, render: { calls: 1, triangles: 2, points: 0, lines: 0 } },
+    };
+    const device = {
+      queue: { onSubmittedWorkDone: () => new Promise<void>((resolve) => pending.push(resolve)) },
+      addEventListener: () => undefined,
+      lost: new Promise<never>(() => undefined),
+    };
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const arena = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+    const firstRoot = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+    const secondRoot = new THREE.Mesh(new THREE.SphereGeometry(), new THREE.MeshBasicMaterial());
+    scene.add(camera, arena, firstRoot, secondRoot);
+    const render = vi.fn(() => {
+      snapshots.push({ arena: arena.visible, first: firstRoot.visible, second: secondRoot.visible });
+    });
+    const runtime = new (WebGpuRenderRuntime as unknown as new (
+      renderer: unknown,
+      pipeline: unknown,
+      identity: unknown,
+    ) => WebGpuRenderRuntime)(renderer, { render }, {
+      canvasAntialias: true,
+      canvasSamples: 4,
+      adapterLabel: 'test adapter',
+      adapterClass: 'GPUAdapter',
+      deviceClass: 'GPUDevice',
+      softwareAdapter: false,
+      device,
+    });
+
+    const first = runtime.compileAndRender(firstRoot, camera, scene);
+    for (let turn = 0; turn < 8 && render.mock.calls.length === 0; turn += 1) await Promise.resolve();
+    expect(render).toHaveBeenCalledTimes(1);
+    const second = runtime.compileAndRender(secondRoot, camera, scene);
+    expect(render).toHaveBeenCalledTimes(1);
+
+    pending.shift()?.();
+    await first;
+    for (let turn = 0; turn < 16 && render.mock.calls.length < 2; turn += 1) await Promise.resolve();
+    expect(render).toHaveBeenCalledTimes(2);
+    pending.shift()?.();
+    await second;
+
+    expect(snapshots).toEqual([
+      { arena: false, first: true, second: false },
+      { arena: false, first: false, second: true },
+    ]);
+    expect([arena.visible, firstRoot.visible, secondRoot.visible]).toEqual([true, true, true]);
   });
 
   it('drains an admitted warmed frontier before a forced cold prewarm submission', async () => {
@@ -646,9 +725,19 @@ describe('Pass 64 render runtime boundary', () => {
   });
 
   it('clears a failed prewarm batch so a later submission can retry', async () => {
+    const scene = new THREE.Scene();
+    const arena = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+    const root = new THREE.Mesh(new THREE.SphereGeometry(), new THREE.MeshBasicMaterial());
+    scene.add(arena, root);
+    const visibility: Array<Readonly<{ arena: boolean; root: boolean }>> = [];
     const render = vi.fn()
-      .mockImplementationOnce(() => { throw new Error('synthetic pipeline build failure'); })
-      .mockImplementation(() => undefined);
+      .mockImplementationOnce(() => {
+        visibility.push({ arena: arena.visible, root: root.visible });
+        throw new Error('synthetic pipeline build failure');
+      })
+      .mockImplementation(() => {
+        visibility.push({ arena: arena.visible, root: root.visible });
+      });
     const renderer = {
       compileAsync: vi.fn(async () => undefined),
       info: { reset: () => undefined, render: { calls: 1, triangles: 2, points: 0, lines: 0 } },
@@ -671,14 +760,16 @@ describe('Pass 64 render runtime boundary', () => {
       softwareAdapter: false,
       device,
     });
-    const scene = new THREE.Scene();
-    const root = new THREE.Group();
-    scene.add(root);
-
     await expect(runtime.compileAndRender(root, new THREE.PerspectiveCamera(), scene))
       .rejects.toThrow('synthetic pipeline build failure');
+    expect([arena.visible, root.visible]).toEqual([true, true]);
     await runtime.compileAndRender(root, new THREE.PerspectiveCamera(), scene);
     expect(render).toHaveBeenCalledTimes(2);
+    expect(visibility).toEqual([
+      { arena: false, root: true },
+      { arena: false, root: true },
+    ]);
+    expect([arena.visible, root.visible]).toEqual([true, true]);
   });
 
   it('restarts pending age when the completion frontier advances and clears it when caught up', () => {

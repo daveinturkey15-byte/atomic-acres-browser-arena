@@ -348,10 +348,15 @@ function webGlAdapterLabel(renderer: THREE.WebGLRenderer): string {
   return info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : String(gl.getParameter(gl.RENDERER));
 }
 
-function suppressUnrelatedWebGlRenderables(scene: THREE.Scene, root: THREE.Object3D): () => void {
+function suppressUnrelatedRenderables(
+  scene: THREE.Scene,
+  roots: readonly THREE.Object3D[],
+): () => void {
   const retained = new Set<THREE.Object3D>();
-  root.traverse((node) => retained.add(node));
-  for (let node: THREE.Object3D | null = root; node; node = node.parent) retained.add(node);
+  for (const root of roots) {
+    root.traverse((node) => retained.add(node));
+    for (let node: THREE.Object3D | null = root; node; node = node.parent) retained.add(node);
+  }
   scene.traverse((node) => {
     if (!(node instanceof THREE.Light)) return;
     for (let ancestor: THREE.Object3D | null = node; ancestor; ancestor = ancestor.parent) retained.add(ancestor);
@@ -548,7 +553,7 @@ export class LegacyWebGlRenderRuntime {
     // AtomicSignal coverage and match-composition renders still prove the full
     // world. This removes redundant whole-map raster/driver work without
     // deferring any effect geometry, texture, material or upload into combat.
-    const restoreVisibility = suppressUnrelatedWebGlRenderables(scene, root);
+    const restoreVisibility = suppressUnrelatedRenderables(scene, [root]);
     try {
       this.renderer.render(scene, camera);
     } finally {
@@ -641,6 +646,8 @@ export class WebGpuRenderRuntime {
   private submissionMode: WebGpuSubmissionMode = 'serialized';
   private presentationPrewarmBatch: Promise<void> | null = null;
   private presentationPrewarmScene: THREE.Scene | null = null;
+  private readonly presentationPrewarmRoots = new Set<THREE.Object3D>();
+  private presentationPrewarmCollecting = false;
   private lastCompletionLatencyMs: number | null = null;
   private completionFailures = 0;
   private lastFailure: string | null = null;
@@ -1116,7 +1123,7 @@ export class WebGpuRenderRuntime {
     await this.renderer.compileAsync(root, camera, scene);
   }
 
-  async compileAndRender(root: THREE.Object3D, _camera: THREE.Camera, scene: THREE.Scene): Promise<void> {
+  async compileAndRender(root: THREE.Object3D, camera: THREE.Camera, scene: THREE.Scene): Promise<void> {
     let attachmentRoot = root;
     while (attachmentRoot.parent) attachmentRoot = attachmentRoot.parent;
     if (attachmentRoot !== scene) {
@@ -1126,7 +1133,14 @@ export class WebGpuRenderRuntime {
       if (this.presentationPrewarmScene !== scene) {
         throw new Error('WebGPU presentation prewarm batch cannot span multiple submitted scenes');
       }
-      return this.presentationPrewarmBatch;
+      if (this.presentationPrewarmCollecting) {
+        this.presentationPrewarmRoots.add(root);
+        return this.presentationPrewarmBatch;
+      }
+      // A root staged after encoding began was not part of that submission.
+      // Queue it behind the active fence; sibling late arrivals will still
+      // coalesce into the next microtask batch.
+      return this.presentationPrewarmBatch.then(() => this.compileAndRender(root, camera, scene));
     }
     // compileAsync() uses Three's default renderer context, while gameplay is
     // submitted through the TSL/HDR RenderPipeline. Building both contexts
@@ -1134,17 +1148,27 @@ export class WebGpuRenderRuntime {
     // forced pipeline submission compiles the exact context and the queue fence
     // below makes that work an admission boundary rather than a gameplay hitch.
     // Defer one microtask so independently staged presentation roots can join
-    // the same exact scene submission. Rendering the whole TSL/HDR scene once
-    // already compiles every visible staged root; submitting and fencing that
-    // identical scene once per effect only multiplies cold admission time.
+    // one exact TSL/HDR submission. Keep the selected scene's lights and the
+    // complete post-processing graph, while masking unrelated arena meshes so
+    // effect batches do not repeatedly rebuild and draw the complete cold map.
     this.presentationPrewarmScene = scene;
+    this.presentationPrewarmRoots.clear();
+    this.presentationPrewarmRoots.add(root);
+    this.presentationPrewarmCollecting = true;
     let batch!: Promise<void>;
     batch = Promise.resolve().then(async () => {
+      this.presentationPrewarmCollecting = false;
+      const roots = [...this.presentationPrewarmRoots];
       // The caller pauses live admission before staging cold roots, but an
       // already-admitted warmed frame may still own renderer resources. Drain
       // that exact target before the forced one-deep compilation submission.
       await this.waitForSubmittedWork(12_000);
-      this.submitFrame(this.clock(), true);
+      const restoreVisibility = suppressUnrelatedRenderables(scene, roots);
+      try {
+        this.submitFrame(this.clock(), true);
+      } finally {
+        restoreVisibility();
+      }
       // Presentation-only effects prewarm behind the loading surface. Cold
       // Chrome/driver shader creation can exceed the live four-second fence,
       // especially when each QA page owns a fresh WebGPU device.
@@ -1153,6 +1177,8 @@ export class WebGpuRenderRuntime {
       if (this.presentationPrewarmBatch === batch) {
         this.presentationPrewarmBatch = null;
         this.presentationPrewarmScene = null;
+        this.presentationPrewarmRoots.clear();
+        this.presentationPrewarmCollecting = false;
       }
     });
     this.presentationPrewarmBatch = batch;
