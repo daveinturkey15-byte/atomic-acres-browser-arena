@@ -19,7 +19,7 @@ import {
   SUPPORT_TARGET_CORRIDOR_MAX_HALF_WIDTH_M,
   SUPPORT_TARGET_CORRIDOR_MAX_LENGTH_M,
 } from './killstreak-runtime';
-import { DRONE_GUN_PROFILE_ID } from './killstreak-support-catalog';
+import { DRONE_SUPPORT_DEFINITIONS } from './killstreak-support-catalog';
 
 export type KillstreakLoadoutIntentMessage = Readonly<{
   type: 'killstreak-loadout-intent';
@@ -283,8 +283,8 @@ function isEntitySnapshot(value: unknown): boolean {
   if (value.kind === 'drone') {
     if (value.mode !== 'piloted' && value.mode !== 'swarm') return false;
     if (!safeCounter(value.magazine, 20)
-      || (value.mode === 'piloted' ? !safeCounter(value.reserveClips, 1) : value.reserveClips !== null)
-      || value.gunProfileId !== DRONE_GUN_PROFILE_ID) return false;
+      || (value.mode === 'piloted' ? !safeCounter(value.reserveClips, 3) : value.reserveClips !== null)
+      || value.gunProfileId !== DRONE_SUPPORT_DEFINITIONS[value.mode].gunProfileId) return false;
   } else if (value.mode !== null || value.magazine !== null || value.reserveClips !== null || value.gunProfileId !== null) return false;
   const phaseValid = value.kind === 'aircraft' ? value.phase === 'inbound' || value.phase === 'active' || value.phase === 'outbound'
     : value.kind === 'chopper' ? value.phase === 'inbound' || value.phase === 'orbiting' || value.phase === 'outbound'

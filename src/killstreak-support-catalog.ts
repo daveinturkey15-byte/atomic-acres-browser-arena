@@ -1,7 +1,13 @@
-export const DRONE_GUN_PROFILE_ID = 'drone-gun-standard-v1' as const;
+/** Frozen inspected baseline; variants derive exact multipliers from this row. */
+export const DRONE_GUN_PROFILE_ID = 'drone-gun-inspected-baseline-v1' as const;
+export const PILOTED_DRONE_GUN_PROFILE_ID = 'piloted-drone-gun-half-baseline-v1' as const;
+export const DRONE_SWARM_GUN_PROFILE_ID = 'drone-swarm-gun-triple-baseline-v1' as const;
+export type DroneGunProfileId = typeof DRONE_GUN_PROFILE_ID
+  | typeof PILOTED_DRONE_GUN_PROFILE_ID
+  | typeof DRONE_SWARM_GUN_PROFILE_ID;
 
 export type DroneGunProfile = Readonly<{
-  id: typeof DRONE_GUN_PROFILE_ID;
+  id: DroneGunProfileId;
   damage: number;
   minimumDamage: number;
   falloffStartM: number;
@@ -34,6 +40,19 @@ export const DRONE_GUN_PROFILE: DroneGunProfile = Object.freeze({
   penetration: 'solid-occluded',
   criticalHits: false,
 });
+
+function scaledDroneGunProfile(id: DroneGunProfileId, multiplier: number): DroneGunProfile {
+  return Object.freeze({
+    ...DRONE_GUN_PROFILE,
+    id,
+    damage: DRONE_GUN_PROFILE.damage * multiplier,
+    minimumDamage: DRONE_GUN_PROFILE.minimumDamage * multiplier,
+  });
+}
+
+/** Exact user-approved combat variants; all non-damage behavior stays baseline-identical. */
+export const PILOTED_DRONE_GUN_PROFILE = scaledDroneGunProfile(PILOTED_DRONE_GUN_PROFILE_ID, 0.5);
+export const DRONE_SWARM_GUN_PROFILE = scaledDroneGunProfile(DRONE_SWARM_GUN_PROFILE_ID, 3);
 
 /**
  * Swarm coordination is an activation-level pressure budget, not a second gun
@@ -117,9 +136,9 @@ export const DRONE_DEPLOYMENT_POLICY = Object.freeze({
 
 export type DroneSupportDefinition = Readonly<{
   mode: DroneSupportMode;
-  gunProfileId: typeof DRONE_GUN_PROFILE_ID;
+  gunProfileId: DroneGunProfileId;
   magazineSize: 20;
-  reservePolicy: 'two-magazines-total' | 'unlimited-reloads-until-expiry';
+  reservePolicy: 'four-magazines-total' | 'unlimited-reloads-until-expiry';
   lifetimeMs: number;
   sensorProfileId: typeof PILOTED_DRONE_SENSOR_PROFILE.id | null;
   presentationFamilyId: typeof DRONE_PRESENTATION_FAMILY_ID;
@@ -129,9 +148,9 @@ export type DroneSupportDefinition = Readonly<{
 export const DRONE_SUPPORT_DEFINITIONS: Readonly<Record<DroneSupportMode, DroneSupportDefinition>> = Object.freeze({
   piloted: Object.freeze({
     mode: 'piloted',
-    gunProfileId: DRONE_GUN_PROFILE_ID,
+    gunProfileId: PILOTED_DRONE_GUN_PROFILE_ID,
     magazineSize: 20,
-    reservePolicy: 'two-magazines-total',
+    reservePolicy: 'four-magazines-total',
     lifetimeMs: 30_000,
     sensorProfileId: PILOTED_DRONE_SENSOR_PROFILE.id,
     presentationFamilyId: DRONE_PRESENTATION_FAMILY_ID,
@@ -139,7 +158,7 @@ export const DRONE_SUPPORT_DEFINITIONS: Readonly<Record<DroneSupportMode, DroneS
   }),
   swarm: Object.freeze({
     mode: 'swarm',
-    gunProfileId: DRONE_GUN_PROFILE_ID,
+    gunProfileId: DRONE_SWARM_GUN_PROFILE_ID,
     magazineSize: 20,
     reservePolicy: 'unlimited-reloads-until-expiry',
     lifetimeMs: 60_000,
@@ -151,10 +170,9 @@ export const DRONE_SUPPORT_DEFINITIONS: Readonly<Record<DroneSupportMode, DroneS
 
 export function droneGunProfileFor(mode: DroneSupportMode): DroneGunProfile {
   const definition = DRONE_SUPPORT_DEFINITIONS[mode];
-  if (definition.gunProfileId !== DRONE_GUN_PROFILE.id) {
-    throw new Error(`${mode} drone references an unknown gun profile`);
-  }
-  return DRONE_GUN_PROFILE;
+  const profile = mode === 'piloted' ? PILOTED_DRONE_GUN_PROFILE : DRONE_SWARM_GUN_PROFILE;
+  if (definition.gunProfileId !== profile.id) throw new Error(`${mode} drone references an unknown gun profile`);
+  return profile;
 }
 
 export function standaloneDroneController(requested: StandaloneDroneController): StandaloneDroneController {

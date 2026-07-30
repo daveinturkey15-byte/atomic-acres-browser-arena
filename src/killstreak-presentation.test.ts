@@ -13,7 +13,7 @@ import {
   supportVehiclePresentationTelemetry,
 } from './killstreak-presentation';
 import type { KillstreakImpactEvent, KillstreakRecipientSnapshot } from './killstreak-runtime';
-import { DRONE_GUN_PROFILE_ID } from './killstreak-support-catalog';
+import { DRONE_SWARM_GUN_PROFILE_ID, PILOTED_DRONE_GUN_PROFILE_ID } from './killstreak-support-catalog';
 import { SUPPORT_VEHICLE_PRESENTATION_CONTRACT, missingSupportNodes, supportForwardAlignment } from './support-vehicle-presentation-contract';
 
 describe('authored support shadow budget', () => {
@@ -95,7 +95,7 @@ const snapshot = (
     expiresInMs: 10_000,
     magazine: index <= 2 ? null : 20,
     reserveClips: null,
-    gunProfileId: index <= 2 ? null : DRONE_GUN_PROFILE_ID,
+    gunProfileId: index <= 2 ? null : DRONE_SWARM_GUN_PROFILE_ID,
     gunController: index === 0 ? 'ai' : null,
     captureActorId: null,
     captureProgress: null,
@@ -704,22 +704,25 @@ describe('killstreak presentation', () => {
     presentation.dispose();
   });
 
-  it('uses the exact same visual and gun family for standalone and swarm drones', () => {
+  it('uses one visual family with distinct authoritative gun variants', () => {
     const scene = new THREE.Scene();
     const presentation = new KillstreakPresentation(scene);
     const swarmSnapshot = snapshot(4);
     const droneEntity = swarmSnapshot.entities[3]!;
-    presentation.sync({ ...swarmSnapshot, entities: [{ ...droneEntity, id: 'standalone', mode: 'piloted' }] }, 1_000);
+    presentation.sync({
+      ...swarmSnapshot,
+      entities: [{ ...droneEntity, id: 'standalone', mode: 'piloted', gunProfileId: PILOTED_DRONE_GUN_PROFILE_ID }],
+    }, 1_000);
     const standalone = presentation.root.getObjectByName('pass65-piloted-drone') as THREE.Group;
     expect(standalone.userData).toMatchObject({
       presentationFamilyId: 'hunter-drone-visual-family-v1',
-      gunProfileId: DRONE_GUN_PROFILE_ID,
+      gunProfileId: PILOTED_DRONE_GUN_PROFILE_ID,
     });
     expect(standalone.getObjectByName('drone-mounted-gun')).toBeDefined();
     presentation.sync({ ...swarmSnapshot, entities: [{ ...droneEntity, id: 'swarm', mode: 'swarm' }] }, 1_016);
     const swarm = presentation.root.getObjectByName('pass65-swarm-drone') as THREE.Group;
     expect(swarm.userData.presentationFamilyId).toBe(standalone.userData.presentationFamilyId);
-    expect(swarm.userData.gunProfileId).toBe(standalone.userData.gunProfileId);
+    expect(swarm.userData.gunProfileId).toBe(DRONE_SWARM_GUN_PROFILE_ID);
     expect(swarm.getObjectByName('drone-mounted-gun')).toBeDefined();
     presentation.dispose();
   });

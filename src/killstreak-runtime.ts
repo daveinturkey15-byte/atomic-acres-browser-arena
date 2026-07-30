@@ -9,12 +9,13 @@ import {
   CHOPPER_GUN_PROFILE,
   CHOPPER_GUNNER_RAY_POLICY,
   DRONE_GUN_PROFILE,
-  DRONE_GUN_PROFILE_ID,
   DRONE_DEPLOYMENT_POLICY,
   DRONE_SWARM_FIRE_LANE_INTERVAL_MS,
   DRONE_SUPPORT_DEFINITIONS,
   PILOTED_DRONE_SENSOR_PROFILE,
+  droneGunProfileFor,
   supportGunDamageAtDistance,
+  type DroneGunProfileId,
   type DroneGunProfile,
 } from './killstreak-support-catalog';
 import { DRONE_SWARM_ENGAGEMENT_FORMATION, droneSwarmEngagementPoint } from './killstreak-drone-formation';
@@ -32,7 +33,8 @@ export const DRONE_SWARM_DURATION_MS = DRONE_SUPPORT_DEFINITIONS.swarm.lifetimeM
 export const DRONE_SWARM_COUNT = 24;
 export const DRONE_HEALTH = 50;
 export const DRONE_MAGAZINE_SIZE = DRONE_GUN_PROFILE.magazineSize;
-export const PILOTED_DRONE_RESERVE_CLIPS = 1;
+/** Three reserve magazines plus the loaded magazine: exactly 20 + 60 rounds. */
+export const PILOTED_DRONE_RESERVE_CLIPS = 3;
 export const CARE_AIRCRAFT_DURATION_MS = 7_000;
 export const CARE_AIRCRAFT_DROP_DELAY_MS = 800;
 export const CARE_CRATE_DESCENT_MS = 5_200;
@@ -193,7 +195,7 @@ type DroneEntity = EntityBase & {
   strafe: number;
   vertical: number;
   pendingPlayerFire: boolean;
-  gunProfileId: typeof DRONE_GUN_PROFILE_ID;
+  gunProfileId: DroneGunProfileId;
   nextSensorRefreshAtMs: number;
   sensorContacts: DroneSensorContact[];
   /** Stable host-authored formation slot; null for the standalone drone. */
@@ -202,6 +204,8 @@ type DroneEntity = EntityBase & {
   swarmIngressTarget: [number, number, number] | null;
   swarmPatrolTarget: [number, number, number] | null;
   swarmPatrolRefreshAtMs: number;
+  /** Host-derived floor: half-way from local ground to admitted spawn height. */
+  swarmMinimumAltitudeY: number | null;
 };
 
 type CareCrateEntity = EntityBase & {
@@ -346,7 +350,7 @@ export type KillstreakEntitySnapshot = Readonly<{
   expiresInMs: number;
   magazine: number | null;
   reserveClips: number | null;
-  gunProfileId: typeof DRONE_GUN_PROFILE_ID | null;
+  gunProfileId: DroneGunProfileId | null;
   gunController: 'ai' | 'owner-player' | null;
   captureActorId: string | null;
   captureProgress: number | null;
@@ -973,7 +977,7 @@ export class HostKillstreakRuntime {
       });
       entityIds.push(id, aircraftId);
     } else if (actualId === 'carpet-bomber') {
-      const plan = this.carpetImpactPattern(anchor, seed, world);
+      const plan = this.carpetImpactPattern(anchor, seed, world, intent.facing);
       const impacts = plan.impacts;
       const groundAnchor: SupportVec3 = Object.freeze([...anchor] as [number, number, number]);
       const aircraftId = this.nextEntityId('carpet-aircraft');
@@ -1034,6 +1038,7 @@ export class HostKillstreakRuntime {
         swarmIngressTarget: null,
         swarmPatrolTarget: null,
         swarmPatrolRefreshAtMs: Number.POSITIVE_INFINITY,
+        swarmMinimumAltitudeY: null,
       });
       entityIds.push(id);
     } else if (actualId === 'drone-swarm') {
@@ -1077,6 +1082,12 @@ export class HostKillstreakRuntime {
           swarmIngressTarget: [...ingressTarget],
           swarmPatrolTarget: null,
           swarmPatrolRefreshAtMs: nowMs + 2_000,
+          swarmMinimumAltitudeY: clamp(
+            supportGroundHeight(world, admittedSpawn[0], admittedSpawn[2])
+              + (admittedSpawn[1] - supportGroundHeight(world, admittedSpawn[0], admittedSpawn[2])) * 0.5,
+            world.bounds.floorY + 1,
+            world.bounds.ceilingY - 0.5,
+          ),
         });
         entityIds.push(id);
       }
@@ -1117,8 +1128,16 @@ export class HostKillstreakRuntime {
     ], world);
   }
 
-  private carpetImpactPattern(anchor: SupportVec3, seed: number, world: KillstreakWorld): CarpetImpactPlan {
-    const angle = unit(seed, 1) * Math.PI * 2;
+  private carpetImpactPattern(
+    anchor: SupportVec3,
+    seed: number,
+    world: KillstreakWorld,
+    requestedFacing?: SupportVec3,
+  ): CarpetImpactPlan {
+    const requestedLength = requestedFacing ? Math.hypot(requestedFacing[0], requestedFacing[2]) : 0;
+    const angle = requestedFacing && Number.isFinite(requestedLength) && requestedLength > 0.001
+      ? Math.atan2(requestedFacing[2] / requestedLength, requestedFacing[0] / requestedLength)
+      : unit(seed, 1) * Math.PI * 2;
     const forward: readonly [number, number] = [Math.cos(angle), Math.sin(angle)];
     const side: readonly [number, number] = [-forward[1], forward[0]];
     const impacts = Object.freeze(Array.from({ length: CARPET_BOMBER_IMPACT_COUNT }, (_, index) => {
@@ -1236,7 +1255,9 @@ export class HostKillstreakRuntime {
         if (entity.gunController === 'ai' || entity.gunController.actorId !== actor.actorId || entity.gunController.lifeId !== actor.lifeId) return reject('not-gun-controller');
         entity.aimYaw = clamp(intent.yawQ ?? entity.aimYaw, -Math.PI, Math.PI);
         entity.aimPitch = clamp(intent.pitchQ ?? entity.aimPitch, -1.2, 0.5);
-        entity.pendingPlayerFire ||= intent.fire === true;
+        // Fire is a held-state intent. Assignment (rather than OR-latching)
+        // makes release authoritative and lets the host apply the slow cadence.
+        entity.pendingPlayerFire = intent.fire === true;
       } else if (entity.kind === 'drone' && entity.mode === 'piloted') {
         if (actor.possession?.kind !== 'piloted-drone' || actor.possession.entityId !== entity.id) return reject('not-drone-controller');
         entity.yaw = clamp(intent.yawQ ?? entity.yaw, -Math.PI, Math.PI);
@@ -1244,7 +1265,7 @@ export class HostKillstreakRuntime {
         entity.thrust = clamp(intent.thrustQ ?? entity.thrust, -1, 1);
         entity.strafe = clamp(intent.strafeQ ?? entity.strafe, -1, 1);
         entity.vertical = clamp(intent.verticalQ ?? entity.vertical, -1, 1);
-        entity.pendingPlayerFire ||= intent.fire === true;
+        entity.pendingPlayerFire = intent.fire === true;
         entity.nextSensorRefreshAtMs = Math.min(entity.nextSensorRefreshAtMs, nowMs);
       } else return reject('wrong-entity-kind');
       entity.revision += 1;
@@ -1594,7 +1615,7 @@ export class HostKillstreakRuntime {
       }
     }
     entity.nextShotAtMs = nowMs + CHOPPER_GUN_PROFILE.cadenceMs;
-    entity.pendingPlayerFire = false;
+    if (entity.gunController === 'ai') entity.pendingPlayerFire = false;
   }
 
   private advanceDrone(
@@ -1606,8 +1627,8 @@ export class HostKillstreakRuntime {
   ): void {
     const owner = this.actors.get(entity.ownerId);
     if (!owner) return;
-    if (entity.gunProfileId !== DRONE_GUN_PROFILE_ID) throw new Error(`unknown drone gun profile ${entity.gunProfileId}`);
-    const gunProfile: DroneGunProfile = DRONE_GUN_PROFILE;
+    const gunProfile: DroneGunProfile = droneGunProfileFor(entity.mode);
+    if (entity.gunProfileId !== gunProfile.id) throw new Error(`unknown ${entity.mode} drone gun profile ${entity.gunProfileId}`);
     const playerControlled = entity.mode === 'piloted'
       && owner.possession?.kind === 'piloted-drone'
       && owner.possession.entityId === entity.id;
@@ -1667,7 +1688,6 @@ export class HostKillstreakRuntime {
           entity.magazine -= 1;
         }
         entity.nextShotAtMs = nowMs + gunProfile.cadenceMs;
-        entity.pendingPlayerFire = false;
       }
     } else {
       const ingressActive = entity.mode === 'swarm'
@@ -1722,7 +1742,16 @@ export class HostKillstreakRuntime {
               targetId: target.id,
               ordinal: entity.swarmOrdinal,
             });
-            this.moveDroneToward(entity, engagementPoint, 8, 1, dt, world);
+            const localGround = supportGroundHeight(world, engagementPoint[0], engagementPoint[2]);
+            const minimumY = Math.max(entity.swarmMinimumAltitudeY ?? localGround + 1, localGround + 1);
+            this.moveDroneToward(
+              entity,
+              [engagementPoint[0], Math.max(engagementPoint[1], minimumY), engagementPoint[2]],
+              8,
+              1,
+              dt,
+              world,
+            );
           } else if (range > 7) {
             this.moveDroneToward(
               entity,
@@ -1763,7 +1792,10 @@ export class HostKillstreakRuntime {
             const zAlpha = 0.24 + row * 0.52 + (unit(entity.seed, 101 + epoch * 2) - 0.5) * 0.16;
             entity.swarmPatrolTarget = [
               clamp(world.bounds.minX + (world.bounds.maxX - world.bounds.minX) * xAlpha, world.bounds.minX + 0.5, world.bounds.maxX - 0.5),
-              clamp(world.bounds.floorY + 4 + (entity.swarmOrdinal % 4) * 1.2, world.bounds.floorY + 1, world.bounds.ceilingY - 0.5),
+              clamp(Math.max(
+                entity.swarmMinimumAltitudeY ?? world.bounds.floorY + 1,
+                world.bounds.floorY + 4 + (entity.swarmOrdinal % 4) * 1.2,
+              ), world.bounds.floorY + 1, world.bounds.ceilingY - 0.5),
               clamp(world.bounds.minZ + (world.bounds.maxZ - world.bounds.minZ) * zAlpha, world.bounds.minZ + 0.5, world.bounds.maxZ - 0.5),
             ];
             entity.swarmPatrolRefreshAtMs = nowMs + 6_000;

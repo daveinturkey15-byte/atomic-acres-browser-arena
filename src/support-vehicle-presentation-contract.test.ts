@@ -27,7 +27,10 @@ describe('support vehicle authored orientation contract', () => {
       SUPPORT_VEHICLE_PRESENTATION_CONTRACT.drone.weaponFeedback,
     );
     expect(SUPPORT_VEHICLE_PRESENTATION_CONTRACT.drone.visualFamilyId).toBe('hunter-drone-visual-family-v1');
-    expect(SUPPORT_VEHICLE_PRESENTATION_CONTRACT.drone.gunProfileId).toBe('drone-gun-standard-v1');
+    expect(SUPPORT_VEHICLE_PRESENTATION_CONTRACT.drone.gunProfileIds).toEqual({
+      piloted: 'piloted-drone-gun-half-baseline-v1',
+      swarm: 'drone-swarm-gun-triple-baseline-v1',
+    });
     expect(SUPPORT_VEHICLE_PRESENTATION_CONTRACT.chopper.possessedView).toEqual({
       visibleOnlyBelow: 'chopper-gunner-sightline',
       requiredVisibleNodes: ['chopper-cockpit-hud-glass', 'chopper-cockpit-hud-target-ring', 'chopper-gunner-weapon-view'],

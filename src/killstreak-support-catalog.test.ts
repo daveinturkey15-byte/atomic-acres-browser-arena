@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   CHOPPER_GUN_PROFILE,
   DRONE_GUN_PROFILE,
-  DRONE_GUN_PROFILE_ID,
+  PILOTED_DRONE_GUN_PROFILE,
+  PILOTED_DRONE_GUN_PROFILE_ID,
+  DRONE_SWARM_GUN_PROFILE,
+  DRONE_SWARM_GUN_PROFILE_ID,
   DRONE_DEPLOYMENT_POLICY,
   DRONE_SWARM_FIRE_LANE_INTERVAL_MS,
   DRONE_SUPPORT_DEFINITIONS,
@@ -14,11 +17,11 @@ import {
 } from './killstreak-support-catalog';
 
 describe('Pass 65 support catalog', () => {
-  it('gives piloted and swarm drones the exact same immutable gun profile', () => {
-    expect(DRONE_SUPPORT_DEFINITIONS.piloted.gunProfileId).toBe(DRONE_GUN_PROFILE_ID);
-    expect(DRONE_SUPPORT_DEFINITIONS.swarm.gunProfileId).toBe(DRONE_GUN_PROFILE_ID);
-    expect(droneGunProfileFor('piloted')).toBe(DRONE_GUN_PROFILE);
-    expect(droneGunProfileFor('swarm')).toBe(DRONE_GUN_PROFILE);
+  it('derives exact immutable piloted and swarm damage variants from one inspected baseline', () => {
+    expect(DRONE_SUPPORT_DEFINITIONS.piloted.gunProfileId).toBe(PILOTED_DRONE_GUN_PROFILE_ID);
+    expect(DRONE_SUPPORT_DEFINITIONS.swarm.gunProfileId).toBe(DRONE_SWARM_GUN_PROFILE_ID);
+    expect(droneGunProfileFor('piloted')).toBe(PILOTED_DRONE_GUN_PROFILE);
+    expect(droneGunProfileFor('swarm')).toBe(DRONE_SWARM_GUN_PROFILE);
     expect(Object.isFrozen(DRONE_GUN_PROFILE)).toBe(true);
     expect(DRONE_GUN_PROFILE).toMatchObject({
       damage: 12,
@@ -35,10 +38,13 @@ describe('Pass 65 support catalog', () => {
     expect(supportGunDamageAtDistance(DRONE_GUN_PROFILE, 0)).toBe(12);
     expect(supportGunDamageAtDistance(DRONE_GUN_PROFILE, 45)).toBe(8);
     expect(supportGunDamageAtDistance(DRONE_GUN_PROFILE, 46)).toBe(0);
-    const representativeDamage = supportGunDamageAtDistance(DRONE_GUN_PROFILE, 31.5);
-    const coordinatedSwarmOpenExposureSeconds = 100 / (representativeDamage * (1_000 / DRONE_SWARM_FIRE_LANE_INTERVAL_MS));
-    expect(coordinatedSwarmOpenExposureSeconds).toBeGreaterThan(4);
-    expect(coordinatedSwarmOpenExposureSeconds).toBeLessThan(6);
+    expect(PILOTED_DRONE_GUN_PROFILE.damage).toBe(DRONE_GUN_PROFILE.damage * 0.5);
+    expect(PILOTED_DRONE_GUN_PROFILE.minimumDamage).toBe(DRONE_GUN_PROFILE.minimumDamage * 0.5);
+    expect(DRONE_SWARM_GUN_PROFILE.damage).toBe(DRONE_GUN_PROFILE.damage * 3);
+    expect(DRONE_SWARM_GUN_PROFILE.minimumDamage).toBe(DRONE_GUN_PROFILE.minimumDamage * 3);
+    expect(PILOTED_DRONE_GUN_PROFILE.cadenceMs).toBe(DRONE_GUN_PROFILE.cadenceMs);
+    expect(DRONE_SWARM_GUN_PROFILE.cadenceMs).toBe(DRONE_GUN_PROFILE.cadenceMs);
+    expect(DRONE_SWARM_FIRE_LANE_INTERVAL_MS).toBeGreaterThan(DRONE_GUN_PROFILE.cadenceMs);
   });
 
   it('gives chopper fire a distinct non-critical authored profile', () => {

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { DRONE_GUN_PROFILE_ID, DRONE_PRESENTATION_FAMILY_ID } from './killstreak-support-catalog';
+import { DRONE_PRESENTATION_FAMILY_ID, DRONE_SUPPORT_DEFINITIONS } from './killstreak-support-catalog';
 import { SUPPORT_FORWARD_AXIS } from './support-forward-axis';
 export { SUPPORT_FORWARD_AXIS } from './support-forward-axis';
 
@@ -17,7 +17,10 @@ export const SUPPORT_VEHICLE_PRESENTATION_CONTRACT = Object.freeze({
   forwardAxis: SUPPORT_FORWARD_AXIS,
   drone: Object.freeze({
     visualFamilyId: DRONE_PRESENTATION_FAMILY_ID,
-    gunProfileId: DRONE_GUN_PROFILE_ID,
+    gunProfileIds: Object.freeze({
+      piloted: DRONE_SUPPORT_DEFINITIONS.piloted.gunProfileId,
+      swarm: DRONE_SUPPORT_DEFINITIONS.swarm.gunProfileId,
+    }),
     requiredNodes: Object.freeze([
       'drone-body', 'drone-optic', 'drone-mounted-gun', 'drone-gun-muzzle-socket',
       'drone-first-person-camera-socket', 'drone-rotors',

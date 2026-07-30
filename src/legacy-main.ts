@@ -2861,32 +2861,59 @@ function applyInteractiveWorldExplosion(
   maximumDamage: number,
   shedBlastClass?: 'grenade-major-collapse' | 'carpet-bomber-obliteration',
 ): boolean {
-  if (!interactiveWorldRuntime?.hasHostAuthority() || radius <= 0 || maximumDamage <= 0) return false;
+  return applyInteractiveWorldExplosions([{ point, radius, maximumDamage, shedBlastClass }]);
+}
+
+/**
+ * Apply a same-frame support salvo as one world transaction. Carpet catch-up
+ * can deliver several admitted impacts after a long frame; rebuilding physics
+ * and broadcasting a reliable snapshot for each individual bomb caused the
+ * reported hitch/crash. Mutations now settle once and each debris body receives
+ * only its strongest same-frame impulse.
+ */
+function applyInteractiveWorldExplosions(requests: readonly Readonly<{
+  point: THREE.Vector3;
+  radius: number;
+  maximumDamage: number;
+  shedBlastClass?: 'grenade-major-collapse' | 'carpet-bomber-obliteration';
+}>[]): boolean {
+  if (!interactiveWorldRuntime?.hasHostAuthority()) return false;
+  const admitted = requests.filter((request) => request.radius > 0 && request.maximumDamage > 0);
+  if (admitted.length === 0) return false;
   // Shed panels need the stronger close-blast calibration, while house
   // fragments retain the weapon's authored damage instead of inheriting a
   // global 4x multiplier.
-  const mutations = interactiveWorldRuntime.applyExplosionAt({
-    origin: point,
-    radius,
-    maximumDamageQ: Math.max(1, Math.round(maximumDamage)),
-    shedMaximumDamageQ: Math.max(1, Math.round(maximumDamage * FIELD_SHED_EXPLOSION_DAMAGE_MULTIPLIER)),
-    shedBlastClass,
-  });
+  let mutations = 0;
+  for (const request of admitted) {
+    mutations += interactiveWorldRuntime.applyExplosionAt({
+      origin: request.point,
+      radius: request.radius,
+      maximumDamageQ: Math.max(1, Math.round(request.maximumDamage)),
+      shedMaximumDamageQ: Math.max(1, Math.round(request.maximumDamage * FIELD_SHED_EXPLOSION_DAMAGE_MULTIPLIER)),
+      shedBlastClass: request.shedBlastClass,
+    });
+  }
   let debrisImpulses = 0;
   if (mutations > 0) syncInteractiveWorldPhysics();
   if (characterPhysics) {
+    const strongestByBody = new Map<string, { direction: THREE.Vector3; magnitude: number }>();
     for (const body of activeMajorDebrisPhysicsBodies()) {
       const bodyPosition = new THREE.Vector3(body.position.x, body.position.y, body.position.z);
-      const distance = bodyPosition.distanceTo(point);
-      if (distance > radius) continue;
-      const direction = bodyPosition.sub(point);
-      if (direction.lengthSq() < 1e-6) direction.set(0, 1, 0);
-      else direction.normalize().addScaledVector(new THREE.Vector3(0, 1, 0), 0.32).normalize();
-      // Pass 65: launch freshly detached panels hard enough to visibly fly (physics caps at 80).
-      if (characterPhysics.applyMajorDebrisImpulse(
-        body.id,
-        direction.multiplyScalar(Math.min(64, Math.max(6, maximumDamage * 0.3 * (1 - distance / radius)))),
-      )) debrisImpulses += 1;
+      for (const request of admitted) {
+        const distance = bodyPosition.distanceTo(request.point);
+        if (distance > request.radius) continue;
+        const magnitude = Math.min(64, Math.max(6, request.maximumDamage * 0.3 * (1 - distance / request.radius)));
+        if ((strongestByBody.get(body.id)?.magnitude ?? -1) >= magnitude) continue;
+        const direction = bodyPosition.clone().sub(request.point);
+        if (direction.lengthSq() < 1e-6) direction.set(0, 1, 0);
+        else direction.normalize().addScaledVector(THREE.Object3D.DEFAULT_UP, 0.32).normalize();
+        strongestByBody.set(body.id, { direction, magnitude });
+      }
+    }
+    for (const [bodyId, impulse] of strongestByBody) {
+      if (characterPhysics.applyMajorDebrisImpulse(bodyId, impulse.direction.multiplyScalar(impulse.magnitude))) {
+        debrisImpulses += 1;
+      }
     }
   }
   if (mutations <= 0 && debrisImpulses <= 0) return false;
@@ -3399,6 +3426,7 @@ let tacticalMapOpen = false;
 let lastStrikeMapDrawAt = Number.NEGATIVE_INFINITY;
 let crosshairPreviewMarker: THREE.Group | null = null;
 let crosshairPreviewLastPoint: THREE.Vector3 | null = null;
+let crosshairPreviewFacing: [number, number, number] | null = null;
 const crosshairSupportRaycaster = new THREE.Raycaster();
 const crosshairSupportScreenCenter = new THREE.Vector2(0, 0);
 const crosshairSupportFloorPoint = new THREE.Vector3();
@@ -13607,20 +13635,24 @@ function updatePass65KillstreakRuntime(now: number): void {
     const result = killstreakRuntime.advance(now, killstreakWorldState());
     const applied = result.damageEvents.map(applyKillstreakDamageEvent).filter((event): event is KillstreakDamageEvent => event !== null && event.damage > 0);
     for (const event of applied) recordOwnerSupportDamage(event);
+    const carpetWorldImpacts: Array<{
+      point: THREE.Vector3;
+      radius: number;
+      maximumDamage: number;
+      shedBlastClass: 'carpet-bomber-obliteration';
+    }> = [];
     for (const impact of result.impactEvents) {
       if (impact.phase !== 'impact') continue;
       const point = new THREE.Vector3(...impact.position);
-      applyInteractiveWorldExplosion(
-        point,
-        4.5,
-        240,
-        impact.source === 'carpet-bomber' ? 'carpet-bomber-obliteration' : undefined,
-      );
       if (impact.source === 'carpet-bomber') {
+        carpetWorldImpacts.push({ point, radius: 4.5, maximumDamage: 240, shedBlastClass: 'carpet-bomber-obliteration' });
         audio.explosion(now);
         supportExplosionPresentation.emit(point, 4.5, now);
+      } else {
+        applyInteractiveWorldExplosion(point, 4.5, 240);
       }
     }
+    applyInteractiveWorldExplosions(carpetWorldImpacts);
     killstreakPresentation.presentImpacts(result.impactEvents, now);
     refreshLocalKillstreakSnapshot(now,
       result.damageEvents.length > 0 || result.impactEvents.length > 0 || result.expiredEntityIds.length > 0);
@@ -14391,6 +14423,7 @@ function cancelSupportTargeting(refund: boolean, reacquirePointer = true): void 
     crosshairPreviewMarker = null;
   }
   crosshairPreviewLastPoint = null;
+  crosshairPreviewFacing = null;
   triPassTargeting = null;
   pointSupportTargeting = null;
   tacticalMapOpen = false;
@@ -14425,11 +14458,21 @@ function updateCrosshairSupportPreview(): void {
       crosshairPreviewMarker.visible = false;
     }
     crosshairPreviewLastPoint = null;
+    crosshairPreviewFacing = null;
     return;
   }
   const clampedY = THREE.MathUtils.clamp(point.y, floorY, ceilingY - 0.5);
   const anchor = new THREE.Vector3(point.x, clampedY, point.z);
   crosshairPreviewLastPoint = anchor;
+  const awayX = anchor.x - player.position.x;
+  const awayZ = anchor.z - player.position.z;
+  const awayLength = Math.hypot(awayX, awayZ);
+  const fallbackX = crosshairSupportRaycaster.ray.direction.x;
+  const fallbackZ = crosshairSupportRaycaster.ray.direction.z;
+  const fallbackLength = Math.max(0.001, Math.hypot(fallbackX, fallbackZ));
+  crosshairPreviewFacing = awayLength > 0.25
+    ? [awayX / awayLength, 0, awayZ / awayLength]
+    : [fallbackX / fallbackLength, 0, fallbackZ / fallbackLength];
   if (!crosshairPreviewMarker) {
     crosshairPreviewMarker = new THREE.Group();
     crosshairPreviewMarker.name = 'crosshair-support-preview';
@@ -14485,7 +14528,39 @@ function updateCrosshairSupportPreview(): void {
     dot.renderOrder = 19;
     dot.raycast = () => undefined;
     crosshairPreviewMarker.add(dot);
+
+    const arrow = new THREE.Group();
+    arrow.name = 'carpet-preview-direction-arrow';
+    const arrowMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff253f,
+      transparent: true,
+      opacity: 0.72,
+      depthTest: true,
+      depthWrite: false,
+      toneMapped: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
+    });
+    const shaft = new THREE.Mesh(new THREE.BoxGeometry(16, 0.04, 0.34), arrowMaterial);
+    shaft.name = 'carpet-preview-direction-shaft';
+    shaft.position.x = 8.5;
+    shaft.renderOrder = 18;
+    shaft.raycast = () => undefined;
+    const head = new THREE.Mesh(new THREE.ConeGeometry(0.95, 2.2, 12), arrowMaterial);
+    head.name = 'carpet-preview-direction-head';
+    head.position.x = 17;
+    head.rotation.z = -Math.PI / 2;
+    head.renderOrder = 18;
+    head.raycast = () => undefined;
+    arrow.add(shaft, head);
+    crosshairPreviewMarker.add(arrow);
     scene.add(crosshairPreviewMarker);
+  }
+  const arrow = crosshairPreviewMarker.getObjectByName('carpet-preview-direction-arrow');
+  if (arrow) {
+    arrow.visible = pointSupportTargeting.id === 'carpet-bomber';
+    if (crosshairPreviewFacing) arrow.rotation.y = -Math.atan2(crosshairPreviewFacing[2], crosshairPreviewFacing[0]);
   }
   crosshairPreviewMarker.position.copy(anchor);
   crosshairPreviewMarker.position.y += 0.055;
@@ -14497,7 +14572,12 @@ function confirmCrosshairSupportTarget(confirmedAt = performance.now()): boolean
   const targeting = pointSupportTargeting;
   const point = crosshairPreviewLastPoint;
   if (!point) return false;
-  if (!requestKillstreakActivation(targeting.id, confirmedAt, [point.x, point.y, point.z])) {
+  if (!requestKillstreakActivation(
+    targeting.id,
+    confirmedAt,
+    [point.x, point.y, point.z],
+    targeting.id === 'carpet-bomber' ? crosshairPreviewFacing ?? undefined : undefined,
+  )) {
     addFeed(`${GAMEPAD_SUPPORT_LABELS[targeting.id]} AUTHORITY REJECTED · REWARD RETAINED`, 'coral');
     cancelSupportTargeting(false);
     return true;
@@ -16423,11 +16503,6 @@ window.addEventListener('keydown', (event) => {
     resumeActiveMatchFromMenu();
     return;
   }
-  if (pointSupportTargeting && !tacticalMapOpen && event.code === 'Escape' && !event.repeat) {
-    event.preventDefault();
-    cancelSupportTargeting(true);
-    return;
-  }
   if (tacticalMapOpen && event.code === 'Escape' && !event.repeat) {
     event.preventDefault();
     cancelSupportTargeting(true);
@@ -16527,6 +16602,11 @@ canvas.addEventListener('mousedown', (event) => {
   if (pointSupportTargeting && !tacticalMapOpen && event.button === 0) {
     event.preventDefault();
     confirmCrosshairSupportTarget(performance.now());
+    return;
+  }
+  if (pointSupportTargeting && !tacticalMapOpen && event.button === 2) {
+    event.preventDefault();
+    cancelSupportTargeting(true);
     return;
   }
   if (event.button === 2) {

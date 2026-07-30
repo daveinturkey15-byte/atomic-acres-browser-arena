@@ -4,7 +4,7 @@ import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { DroneSensorContact, KillstreakEntitySnapshot, KillstreakImpactEvent, KillstreakPlacementMarkerSnapshot, KillstreakRecipientSnapshot } from './killstreak-runtime';
-import { DRONE_GUN_PROFILE_ID, DRONE_PRESENTATION_FAMILY_ID } from './killstreak-support-catalog';
+import { DRONE_PRESENTATION_FAMILY_ID, DRONE_SUPPORT_DEFINITIONS } from './killstreak-support-catalog';
 import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 import { SUPPORT_WEAPON_FEEDBACK_CONTRACT } from './support-vehicle-presentation-contract';
 import { yieldBrowserCpuTask, yieldBrowserPreparationFrame } from './browser-preparation-scheduler';
@@ -601,6 +601,8 @@ type PresentedEntity = Readonly<{
   attitudeEuler: THREE.Euler;
   mixers: readonly THREE.AnimationMixer[];
   authored: boolean;
+  cameraSocket: THREE.Object3D | null;
+  cockpit: THREE.Object3D | null;
 }>;
 
 function presentedEntity(
@@ -617,6 +619,10 @@ function presentedEntity(
     attitudeEuler: new THREE.Euler(0, 0, 0, 'YXZ'),
     mixers: Object.freeze([...mixers]),
     authored,
+    cameraSocket: root.getObjectByName('drone-first-person-camera-socket')
+      ?? root.getObjectByName('chopper-first-person-camera-socket')
+      ?? null,
+    cockpit: root.getObjectByName('chopper-first-person-cockpit') ?? null,
   });
 }
 
@@ -1205,7 +1211,7 @@ function buildDrone(mode: 'piloted' | 'swarm' | null): PresentedEntity {
     root.userData.pass65KillstreakPresentation = true;
     root.userData.authoredHunterDrone = true;
     root.userData.presentationFamilyId = DRONE_PRESENTATION_FAMILY_ID;
-    root.userData.gunProfileId = DRONE_GUN_PROFILE_ID;
+    root.userData.gunProfileId = DRONE_SUPPORT_DEFINITIONS[mode ?? 'swarm'].gunProfileId;
     root.userData.forwardAxis = [0, 0, -1];
     root.userData.weaponFeedback = [...SUPPORT_WEAPON_FEEDBACK_CONTRACT];
     markSharedPresentationAsset(root);
@@ -1221,7 +1227,7 @@ function buildDrone(mode: 'piloted' | 'swarm' | null): PresentedEntity {
   root.name = mode === 'piloted' ? 'pass65-piloted-drone' : 'pass65-swarm-drone';
   root.userData.pass65KillstreakPresentation = true;
   root.userData.presentationFamilyId = DRONE_PRESENTATION_FAMILY_ID;
-  root.userData.gunProfileId = DRONE_GUN_PROFILE_ID;
+  root.userData.gunProfileId = DRONE_SUPPORT_DEFINITIONS[mode ?? 'swarm'].gunProfileId;
   root.userData.forwardAxis = [0, 0, -1];
   root.userData.weaponFeedback = [...SUPPORT_WEAPON_FEEDBACK_CONTRACT];
   // Standalone and swarm drones deliberately share the same machine family;
@@ -1525,6 +1531,10 @@ export class KillstreakPresentation {
   private readonly swarmInverseRootMatrix = new THREE.Matrix4();
   private readonly swarmInstanceMatrix = new THREE.Matrix4();
   private readonly swarmSourceWorldMatrix = new THREE.Matrix4();
+  private readonly firstPersonAnchorScratch = new THREE.Vector3();
+  private readonly firstPersonForwardScratch = new THREE.Vector3();
+  private readonly firstPersonSocketQuaternionScratch = new THREE.Quaternion();
+  private readonly firstPersonRootQuaternionScratch = new THREE.Quaternion();
   private readonly sensorRoot = new THREE.Group();
   private readonly sensorSilhouettes: THREE.Group[];
   private visibleSensorContacts = 0;
@@ -2209,6 +2219,9 @@ export class KillstreakPresentation {
         presented = this.acquirePresentedEntity(entity);
         this.entities.set(entity.id, presented);
         if (presented.root.parent !== this.root) this.root.add(presented.root);
+        if (presented.root.userData.presentationPoolKey !== 'swarm-drone') {
+          setSupportFirstPersonVisibility(presented.root, entity.id === this.firstPersonEntityId);
+        }
       }
       presented.target.fromArray(entity.position);
       presented.attitudeEuler.set(entity.attitude[0], entity.attitude[1], entity.attitude[2], 'YXZ');
@@ -2246,7 +2259,6 @@ export class KillstreakPresentation {
       presented.root.userData.gunController = entity.gunController;
     }
     this.syncSwarmInstancing();
-    this.applyFirstPersonVisibility();
     this.syncSensorContacts(snapshot.sensorContacts);
     this.syncPlacementMarkers(snapshot.placementMarkers, snapshot.revision, nowMs);
     for (const flash of this.impactFlashPool) {
@@ -2431,6 +2443,7 @@ export class KillstreakPresentation {
   }
 
   setFirstPersonEntity(id: string | null): void {
+    if (id === this.firstPersonEntityId) return;
     this.firstPersonEntityId = id;
     const presented = id ? this.entities.get(id) : null;
     if (presented) {
@@ -2443,23 +2456,25 @@ export class KillstreakPresentation {
   }
 
   firstPersonCameraAnchor(id: string): THREE.Vector3 | null {
-    const root = this.entities.get(id)?.root;
+    const presented = this.entities.get(id);
+    const root = presented?.root;
+    const socket = presented?.cameraSocket;
     if (!root) return null;
-    const socket = root.getObjectByName('drone-first-person-camera-socket')
-      ?? root.getObjectByName('chopper-first-person-camera-socket');
     if (!socket) return null;
     root.updateMatrixWorld(true);
-    const anchor = socket.getWorldPosition(new THREE.Vector3());
-    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(socket.getWorldQuaternion(new THREE.Quaternion()));
+    const anchor = socket.getWorldPosition(this.firstPersonAnchorScratch);
+    const forward = this.firstPersonForwardScratch.set(0, 0, -1)
+      .applyQuaternion(socket.getWorldQuaternion(this.firstPersonSocketQuaternionScratch));
     return anchor.addScaledVector(forward, 0.08);
   }
 
   alignFirstPersonCockpit(id: string, cameraWorldQuaternion: THREE.Quaternion): void {
-    const root = this.entities.get(id)?.root;
-    const cockpit = root?.getObjectByName('chopper-first-person-cockpit');
+    const presented = this.entities.get(id);
+    const root = presented?.root;
+    const cockpit = presented?.cockpit;
     if (!root || !cockpit) return;
     root.updateWorldMatrix(true, false);
-    const inverseParent = root.getWorldQuaternion(new THREE.Quaternion()).invert();
+    const inverseParent = root.getWorldQuaternion(this.firstPersonRootQuaternionScratch).invert();
     cockpit.quaternion.copy(inverseParent.multiply(cameraWorldQuaternion));
   }
 

@@ -13,7 +13,10 @@ import {
 } from './killstreak-runtime';
 import {
   DRONE_GUN_PROFILE,
-  DRONE_GUN_PROFILE_ID,
+  DRONE_SWARM_GUN_PROFILE,
+  DRONE_SWARM_GUN_PROFILE_ID,
+  PILOTED_DRONE_GUN_PROFILE,
+  PILOTED_DRONE_GUN_PROFILE_ID,
   DRONE_SWARM_FIRE_LANE_INTERVAL_MS,
 } from './killstreak-support-catalog';
 import { supportForwardFromYawPitch } from './support-forward-axis';
@@ -53,7 +56,7 @@ function activation(expectedId: KillstreakActivationIntent['expectedId'], slot: 
 }
 
 describe('Pass 65 killstreak blockers', () => {
-  it('uses one byte-identical solid-occluded gun profile for both drone modes', () => {
+  it('uses authoritative half-baseline and triple-baseline drone variants', () => {
     const pilot = new HostKillstreakRuntime(7);
     pilot.registerActor('owner', 0, 1, pilotedLoadout);
     earn(pilot, 5);
@@ -67,10 +70,10 @@ describe('Pass 65 killstreak blockers', () => {
     const pilotEntity = pilot.snapshotFor('owner', 1_000).entities[0];
     const swarmEntities = swarm.snapshotFor('owner', 1_000).entities;
     expect(pilotEntity).toMatchObject({
-      mode: 'piloted', gunProfileId: DRONE_GUN_PROFILE_ID, magazine: 20, reserveClips: 1,
+      mode: 'piloted', gunProfileId: PILOTED_DRONE_GUN_PROFILE_ID, magazine: 20, reserveClips: 3,
     });
     expect(swarmEntities).toHaveLength(DRONE_SWARM_COUNT);
-    expect(swarmEntities.every((entity) => entity.gunProfileId === pilotEntity.gunProfileId
+    expect(swarmEntities.every((entity) => entity.gunProfileId === DRONE_SWARM_GUN_PROFILE_ID
       && entity.magazine === DRONE_GUN_PROFILE.magazineSize && entity.reserveClips === null)).toBe(true);
 
     const entityId = pilotEntity.id;
@@ -78,7 +81,7 @@ describe('Pass 65 killstreak blockers', () => {
       by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 1, entityId, action: 'pilot-control',
       yawQ: 0, pitchQ: 0, thrustQ: 0, verticalQ: 0, fire: true,
     }, 1_001);
-    expect(pilot.advance(1_001, baseWorld()).damageEvents[0]).toMatchObject({ damage: DRONE_GUN_PROFILE.damage });
+    expect(pilot.advance(1_001, baseWorld()).damageEvents[0]).toMatchObject({ damage: PILOTED_DRONE_GUN_PROFILE.damage });
     pilot.control({
       by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2, entityId, action: 'pilot-control',
       yawQ: 0, pitchQ: 0, thrustQ: 0, verticalQ: 0, fire: true,
@@ -91,12 +94,13 @@ describe('Pass 65 killstreak blockers', () => {
     const firstSwarmAt = 3_001;
     const firstSwarm = swarm.advance(firstSwarmAt, baseWorld()).damageEvents;
     expect(firstSwarm).toHaveLength(1);
-    expect(firstSwarm[0].damage).toBeGreaterThan(1);
+    expect(firstSwarm[0].damage).toBeGreaterThan(DRONE_GUN_PROFILE.damage);
+    expect(firstSwarm[0].damage).toBeLessThanOrEqual(DRONE_SWARM_GUN_PROFILE.damage);
     expect(swarm.advance(firstSwarmAt + DRONE_SWARM_FIRE_LANE_INTERVAL_MS - 1, baseWorld()).damageEvents).toHaveLength(0);
     expect(swarm.advance(firstSwarmAt + DRONE_SWARM_FIRE_LANE_INTERVAL_MS, baseWorld()).damageEvents).toHaveLength(1);
   });
 
-  it('enforces piloted 2x20 ammo and swarm unlimited 20-round reload loops inside their hard lifetimes', () => {
+  it('enforces piloted 20+60 ammo and swarm unlimited 20-round reload loops inside their hard lifetimes', () => {
     const pilot = new HostKillstreakRuntime(7);
     pilot.registerActor('owner', 0, 1, pilotedLoadout);
     earn(pilot, 5);
@@ -114,11 +118,13 @@ describe('Pass 65 killstreak blockers', () => {
       }
     };
     firePilotMagazine();
-    expect(pilot.snapshotFor('owner', now).entities[0]).toMatchObject({ phase: 'reloading', magazine: 0, reserveClips: 1 });
-    now += DRONE_GUN_PROFILE.reloadMs;
-    pilot.advance(now, baseWorld());
-    expect(pilot.snapshotFor('owner', now).entities[0]).toMatchObject({ magazine: 20, reserveClips: 0 });
-    firePilotMagazine();
+    expect(pilot.snapshotFor('owner', now).entities[0]).toMatchObject({ phase: 'reloading', magazine: 0, reserveClips: 3 });
+    for (let reserve = 2; reserve >= 0; reserve -= 1) {
+      now += DRONE_GUN_PROFILE.reloadMs;
+      pilot.advance(now, baseWorld());
+      expect(pilot.snapshotFor('owner', now).entities[0]).toMatchObject({ magazine: 20, reserveClips: reserve });
+      firePilotMagazine();
+    }
     expect(pilot.snapshotFor('owner', now).actors[0].possession).toBeNull();
     expect(pilot.snapshotFor('owner', now).entities[0]).toMatchObject({ magazine: 0, reserveClips: 0 });
 
