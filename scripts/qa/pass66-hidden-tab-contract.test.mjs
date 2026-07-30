@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
   FORBIDDEN_BACKGROUND_BYPASS_FLAGS,
@@ -10,6 +11,18 @@ import {
 } from './pass66-hidden-tab-contract.mjs';
 
 const chrome = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const verifierSource = readFileSync(new URL('./verify-pass66-hidden-tab-admission.mjs', import.meta.url), 'utf8');
+
+assert.equal(
+  REQUIRED_HELD_CPU_ASSET,
+  '/assets/original/models/weapons/pass65-firearms/smg/smg-fp-lod0.glb',
+  'the hidden gate must hold the first missing catalog viewmodel so the exact catalog advances while hidden',
+);
+assert.deepEqual(
+  REQUIRED_BROWSER_WEAPON_IDS.slice(0, 2),
+  ['carbine', 'smg'],
+  'the SMG sentinel is valid only while carbine is the active shared asset and SMG is the first catalog-only request',
+);
 
 function checkpoint(overrides = {}) {
   return {
@@ -106,6 +119,16 @@ test('requires direct-CDP headed installed Chrome with two native seed tabs and 
       seedUrls: invalidSeeds,
     }), /two command-line-seeded native Chrome tabs/);
   }
+});
+
+test('uses one exact native HWND activation and trusted browser input for the admission gesture', () => {
+  assert.match(verifierSource, /AttachThreadInput\(\$currentThread, \$foregroundThread, \$true\)/);
+  assert.match(verifierSource, /AttachThreadInput\(\$currentThread, \$targetThread, \$true\)/);
+  assert.match(verifierSource, /AttachThreadInput\(\$currentThread, \$targetThread, \$false\)/);
+  assert.match(verifierSource, /Input\.dispatchMouseEvent', \{ type: 'mousePressed'/);
+  assert.match(verifierSource, /Input\.dispatchMouseEvent', \{ type: 'mouseReleased'/);
+  assert.match(verifierSource, /await trustedClick\(game, '#solo'\)/);
+  assert.doesNotMatch(verifierSource, /document\.querySelector\('#solo'\)\.click\(\)/);
 });
 
 test('accepts hidden CPU progress only when frames, WebGPU submission, authority, audio and generation stay paused', () => {

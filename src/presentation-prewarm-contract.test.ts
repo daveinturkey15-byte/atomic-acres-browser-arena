@@ -204,8 +204,10 @@ describe('presentation prewarm startup contract', () => {
     expect(sharedAssets).toContain('const botWeaponVocabulary = runPhase(');
     expect(sharedAssets).toContain("'bot-weapon-vocabulary'");
     expect(sharedAssets).toContain('botWeaponGpuVocabulary.prepareCpu(checkpoint)');
-    expect(sharedAssets).toContain('const firstPersonCatalog = sharedAssets.then(');
-    expect(sharedAssets).toContain('await Promise.all([worldDropCorpus, firstPersonCatalog, botWeaponVocabulary]);');
+    expect(sharedAssets).toContain('const menuWeaponAsset = prepareMenuWeaponAsset();');
+    expect(sharedAssets).toContain('const firstPersonCatalog = menuWeaponAsset.then(');
+    expect(sharedAssets).not.toContain('const firstPersonCatalog = sharedAssets.then(');
+    expect(sharedAssets).toContain('await Promise.all([sharedAssets, worldDropCorpus, firstPersonCatalog, botWeaponVocabulary]);');
     expect(source).toContain('menuDeploymentAssetsProfile: lastMenuDeploymentAssetsProfile');
     expect(arenaPresentationPrewarm).toContain("['tracers-impacts', () => Promise.all([");
     expect(arenaPresentationPrewarm).toContain("['death-drops', () => deathDropPresentationPool.prewarm(");

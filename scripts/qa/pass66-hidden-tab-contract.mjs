@@ -33,7 +33,11 @@ export const REQUIRED_BROWSER_WEAPON_IDS = Object.freeze([
   'railgun',
 ]);
 
-export const REQUIRED_HELD_CPU_ASSET = '/assets/original/models/weapons/pass65-firearms/flashlight-pistol/flashlight-pistol-fp-lod0.glb';
+// The active carbine is loaded by shared menu readiness. Hold the first missing
+// catalog-only source before releasing the tab; the exact 18-ID catalog,
+// loaded-count advance and zero hidden GPU-submission checks below then force
+// the remaining 17 viewmodels through genuine background CPU preparation.
+export const REQUIRED_HELD_CPU_ASSET = '/assets/original/models/weapons/pass65-firearms/smg/smg-fp-lod0.glb';
 
 export function assertHeadedChromeLaunchContract({ headless, executablePath, args, automation, seedUrls }) {
   if (headless !== false) throw new Error('Pass 66 hidden-tab admission requires headed Chrome');

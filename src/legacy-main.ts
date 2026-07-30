@@ -20096,13 +20096,19 @@ function prepareMenuDeploymentAssets(priority: PreparationPriority = 'deployment
       // no ownership dependency. Start both after one priority checkpoint so
       // an early Deploy escalation can reuse the work instead of waiting for
       // two serial multi-second decode lanes.
+      // The first-person catalog shares only the selected menu weapon with the
+      // broader operator/grenade/support corpus. Start that narrow dependency
+      // immediately so unrelated authored assets cannot delay deployment's
+      // exact browser-weapon barrier; prepareSharedGameplayAssets reuses the
+      // same promise and remains fully awaited below.
+      const menuWeaponAsset = prepareMenuWeaponAsset();
       const sharedAssets = runPhase('shared-assets', () => prepareSharedGameplayAssets());
       const worldDropCorpus = runPhase('world-drop-corpus', () => prewarmPass65RuntimeWeaponCorpus(checkpoint));
       const botWeaponVocabulary = runPhase(
         'bot-weapon-vocabulary',
         () => botWeaponGpuVocabulary.prepareCpu(checkpoint),
       );
-      const firstPersonCatalog = sharedAssets.then(() => renderRuntime.backend === 'webgpu'
+      const firstPersonCatalog = menuWeaponAsset.then(() => renderRuntime.backend === 'webgpu'
         // Menu preparation owns CPU assets/residency only. GPU readiness is
         // established after the selected arena installs its exact TSL/light
         // graph; claiming it against the bootstrap graph created false-ready
@@ -20115,7 +20121,7 @@ function prepareMenuDeploymentAssets(priority: PreparationPriority = 'deployment
         : undefined);
       // Attach both independent lanes immediately so a failure in one cannot
       // leave the other as an unobserved rejection while rollback begins.
-      await Promise.all([worldDropCorpus, firstPersonCatalog, botWeaponVocabulary]);
+      await Promise.all([sharedAssets, worldDropCorpus, firstPersonCatalog, botWeaponVocabulary]);
       const completedAt = performance.now();
       const phases = orderedPhases();
       lastMenuDeploymentAssetsProfile = Object.freeze({

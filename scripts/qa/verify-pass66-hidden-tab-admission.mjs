@@ -159,6 +159,11 @@ public static class Pass66GateWindow {
   [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern IntPtr SetActiveWindow(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern IntPtr SetFocus(IntPtr hWnd);
+  [DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
+  [DllImport("user32.dll")] public static extern bool AttachThreadInput(uint sourceThreadId, uint targetThreadId, bool attach);
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hWnd);
@@ -191,15 +196,29 @@ do {
 } while ([DateTime]::UtcNow -lt $deadline)
 if ($handle -eq [IntPtr]::Zero) { throw 'gate Chrome child did not expose a native main window' }
 $ownerPid = [uint32]0
-[void][Pass66GateWindow]::GetWindowThreadProcessId($handle, [ref]$ownerPid)
+$targetThread = [Pass66GateWindow]::GetWindowThreadProcessId($handle, [ref]$ownerPid)
 if ($ownerPid -ne $targetPid) { throw 'gate Chrome HWND did not belong to the launched child PID' }
 $shell = New-Object -ComObject WScript.Shell
 [void]$shell.AppActivate($targetPid)
-[void][Pass66GateWindow]::ShowWindowAsync($handle, 3)
-[void][Pass66GateWindow]::SetWindowPos($handle, [IntPtr](-1), 0, 0, 1600, 900, 0x0040)
-[void][Pass66GateWindow]::SetForegroundWindow($handle)
-Start-Sleep -Milliseconds 150
-if ([Pass66GateWindow]::GetForegroundWindow() -ne $handle) { throw 'gate Chrome child did not become the OS foreground window' }
+$foreground = [Pass66GateWindow]::GetForegroundWindow()
+$foregroundPid = [uint32]0
+$foregroundThread = [Pass66GateWindow]::GetWindowThreadProcessId($foreground, [ref]$foregroundPid)
+$currentThread = [Pass66GateWindow]::GetCurrentThreadId()
+$attachedForeground = $foregroundThread -ne 0 -and $foregroundThread -ne $currentThread -and [Pass66GateWindow]::AttachThreadInput($currentThread, $foregroundThread, $true)
+$attachedTarget = $targetThread -ne 0 -and $targetThread -ne $currentThread -and [Pass66GateWindow]::AttachThreadInput($currentThread, $targetThread, $true)
+try {
+  [void][Pass66GateWindow]::ShowWindowAsync($handle, 3)
+  [void][Pass66GateWindow]::SetWindowPos($handle, [IntPtr](-1), 0, 0, 1600, 900, 0x0040)
+  [void][Pass66GateWindow]::BringWindowToTop($handle)
+  [void][Pass66GateWindow]::SetForegroundWindow($handle)
+  [void][Pass66GateWindow]::SetActiveWindow($handle)
+  [void][Pass66GateWindow]::SetFocus($handle)
+  Start-Sleep -Milliseconds 150
+  if ([Pass66GateWindow]::GetForegroundWindow() -ne $handle) { throw 'gate Chrome child did not become the OS foreground window' }
+} finally {
+  if ($attachedTarget) { [void][Pass66GateWindow]::AttachThreadInput($currentThread, $targetThread, $false) }
+  if ($attachedForeground) { [void][Pass66GateWindow]::AttachThreadInput($currentThread, $foregroundThread, $false) }
+}
 if (-not [Pass66GateWindow]::IsWindowVisible($handle) -or [Pass66GateWindow]::IsIconic($handle)) { throw 'gate Chrome child was not visible and restored' }
 $handle.ToInt64()`;
   return execFileSync('C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe', [
@@ -214,6 +233,17 @@ $handle.ToInt64()`;
 
 async function documentState(client) {
   return client.evaluate('({visibilityState:document.visibilityState,hasFocus:document.hasFocus()})');
+}
+
+async function trustedClick(client, selector) {
+  const point = await client.evaluate(`(() => {
+    const target = document.querySelector(${JSON.stringify(selector)});
+    if (!target) throw new Error('trusted-click target missing');
+    const rect = target.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  })()`);
+  await client.command('Input.dispatchMouseEvent', { type: 'mousePressed', ...point, button: 'left', clickCount: 1 });
+  await client.command('Input.dispatchMouseEvent', { type: 'mouseReleased', ...point, button: 'left', clickCount: 1 });
 }
 
 async function waitForTabOwnership(game, cover, expected, timeoutMs, label) {
@@ -465,7 +495,7 @@ try {
     input.dispatchEvent(new Event('change', { bubbles: true }));
   })()`, true);
   const initial = await sample(game, cover);
-  await game.evaluate(`document.querySelector('#solo').click()`, true);
+  await trustedClick(game, '#solo');
   await withTimeout(assetBarrierObserved, 30_000, 'held first-person weapon CPU asset request');
   await activateTarget(port, coverTarget.id);
   await waitForTabOwnership(game, cover, 'cover', 5_000, 'real cover foreground and game-tab visibility loss');
