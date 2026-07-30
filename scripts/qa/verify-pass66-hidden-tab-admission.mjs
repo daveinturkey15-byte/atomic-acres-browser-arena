@@ -150,7 +150,12 @@ function bringGateChromeWindowToForeground(processId) {
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
 public static class Pass66GateWindow {
+  public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+  [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lParam);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int maximumCount);
+  [DllImport("user32.dll")] public static extern int GetWindowTextLength(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
@@ -158,13 +163,29 @@ public static class Pass66GateWindow {
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr insertAfter, int x, int y, int width, int height, uint flags);
+  public static IntPtr FindSeedWindow(uint processId) {
+    IntPtr found = IntPtr.Zero;
+    EnumWindows(delegate(IntPtr hWnd, IntPtr lParam) {
+      uint owner;
+      GetWindowThreadProcessId(hWnd, out owner);
+      if (owner != processId || !IsWindowVisible(hWnd)) return true;
+      int length = GetWindowTextLength(hWnd);
+      if (length < 1) return true;
+      StringBuilder title = new StringBuilder(length + 1);
+      GetWindowText(hWnd, title, title.Capacity);
+      if (title.ToString().IndexOf("Pass 66", StringComparison.OrdinalIgnoreCase) < 0) return true;
+      found = hWnd;
+      return false;
+    }, IntPtr.Zero);
+    return found;
+  }
 }
 '@
 $targetPid = ${processId}
 $deadline = [DateTime]::UtcNow.AddSeconds(5)
 do {
-  $target = Get-Process -Id $targetPid -ErrorAction Stop
-  $handle = $target.MainWindowHandle
+  [void](Get-Process -Id $targetPid -ErrorAction Stop)
+  $handle = [Pass66GateWindow]::FindSeedWindow([uint32]$targetPid)
   if ($handle -ne [IntPtr]::Zero) { break }
   Start-Sleep -Milliseconds 50
 } while ([DateTime]::UtcNow -lt $deadline)
