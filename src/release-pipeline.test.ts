@@ -13,6 +13,8 @@ const pass66ExecutionPlan = readFileSync('docs/PASS66_HITL_EXECUTION_PLAN_2026-0
 const ownerFeedbackSkill = readFileSync('.agents/skills/atomic-acres-owner-feedback-gate/SKILL.md', 'utf8');
 const playwrightConfig = readFileSync('playwright.config.ts', 'utf8');
 const ownedPlaywrightRunner = readFileSync('scripts/qa/run-playwright-with-topology.mjs', 'utf8');
+const nightlyPropertyRunner = readFileSync('scripts/qa/run-pass25a-nightly-property.mjs', 'utf8');
+const mutationRunner = readFileSync('scripts/qa/run-pass25a-mutation.mjs', 'utf8');
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
 const ownerFeedbackGraph = JSON.parse(readFileSync('docs/PASS65_OWNER_FEEDBACK_COMPLETENESS_GRAPH.json', 'utf8'));
 
@@ -142,6 +144,27 @@ describe('production release workflow', () => {
     expect([...catalogScripts]
       .filter((script) => /(?:^|&&\s*)playwright test/u.test(packageJson.scripts[script] ?? '')))
       .toEqual([]);
+  });
+
+  it('runs the exact 100000-sequence nightly property gate without POSIX-only environment syntax', () => {
+    const command = packageJson.scripts['test:property:nightly'];
+    expect(command).toBe('node scripts/qa/run-pass25a-nightly-property.mjs');
+    expect(command).not.toMatch(/(?:^|\s)[A-Z_][A-Z0-9_]*=[^\s]+\s/u);
+    expect(nightlyPropertyRunner).toContain('const NIGHTLY_PROPERTY_RUNS = 100_000;');
+    expect(nightlyPropertyRunner).toContain('PASS25_PROPERTY_RUNS: String(NIGHTLY_PROPERTY_RUNS)');
+    expect(nightlyPropertyRunner).toContain("[vitestCli, 'run', 'src/gameplay-state-property.test.ts']");
+    expect(nightlyPropertyRunner).toContain('spawnSync(process.execPath');
+  });
+
+  it('runs the exact 50-sequence mutation gate without POSIX-only environment syntax', () => {
+    const command = packageJson.scripts['test:mutation'];
+    expect(command).toBe('node scripts/qa/run-pass25a-mutation.mjs');
+    expect(command).not.toMatch(/(?:^|\s)[A-Z_][A-Z0-9_]*=[^\s]+\s/u);
+    expect(mutationRunner).toContain('const MUTATION_PROPERTY_RUNS = 50;');
+    expect(mutationRunner).toContain('PASS25_PROPERTY_RUNS: String(MUTATION_PROPERTY_RUNS)');
+    expect(mutationRunner).toContain("[strykerCli, 'run', ...process.argv.slice(2)]");
+    expect(mutationRunner).toContain("../../node_modules/@stryker-mutator/core/bin/stryker.js");
+    expect(mutationRunner).toContain('spawnSync(process.execPath');
   });
 
   it('makes exact Pass 66 evidence and real preview provenance mandatory in the required acceptance job', () => {
