@@ -4,7 +4,9 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 import { isFatalWebGpuConsoleWarning } from './pass65-browser-console-contract.mjs';
 import {
+  FORBIDDEN_BACKGROUND_BYPASS_FLAGS,
   PASS66_HIDDEN_TAB_GATE_SCHEMA,
+  REQUIRED_BACKGROUND_CPU_PHASE,
   assertHeadedChromeLaunchContract,
   hiddenCheckpointFailures,
   recoveredCheckpointFailures,
@@ -29,6 +31,7 @@ const launchOptions = {
   headless: false,
   executablePath,
   args: ['--enable-unsafe-webgpu'],
+  ignoreDefaultArgs: [...FORBIDDEN_BACKGROUND_BYPASS_FLAGS],
 };
 assertHeadedChromeLaunchContract(launchOptions);
 
@@ -75,9 +78,7 @@ async function sample(page) {
       presentation: api.samplePresentationTelemetry(),
       runtime: state.render.runtime,
       audio: window.__PASS66_AUDIO_AUDIT__.snapshot(),
-      interactiveWorldTick: state.interactiveWorld.envelope?.tick
-        ?? state.interactiveWorld.telemetry?.tick
-        ?? null,
+      interactiveWorldTick: state.interactiveWorld.tick,
       assetResources: performance.getEntriesByType('resource')
         .filter((entry) => /\/assets\/original\/models\/atomic-acres-blender-arena\.glb(?:\?|$)/.test(entry.name))
         .map((entry) => ({
@@ -234,7 +235,7 @@ try {
   const afterCpuProgress = await waitForNodeSample(game, (checkpoint) => (
     checkpoint.document.visibilityState === 'hidden'
     && checkpoint.assetResources.length >= 1
-    && checkpoint.transition.profile?.phases.some((entry) => entry.phase === 'prewarm-batched-effects')
+    && checkpoint.transition.profile?.phases.some((entry) => entry.phase === REQUIRED_BACKGROUND_CPU_PHASE)
   ), maximumHiddenPreparationMs, 'hidden fetch/decode/CPU preparation');
   await delay(minimumHiddenObservationMs);
   const afterHidden = await sample(game);
@@ -275,6 +276,7 @@ try {
       version: browserVersion,
       headed: true,
       launchArgs: launchOptions.args,
+      ignoredPlaywrightDefaultArgs: launchOptions.ignoreDefaultArgs,
       backgroundThrottlingBypassFlags: [],
     },
     contract: {

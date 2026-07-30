@@ -1,17 +1,21 @@
 export const PASS66_HIDDEN_TAB_GATE_SCHEMA = 'atomic-acres/pass66-hidden-tab-admission@1';
 
 export const FORBIDDEN_BACKGROUND_BYPASS_FLAGS = Object.freeze([
+  '--disable-background-networking',
   '--disable-background-timer-throttling',
   '--disable-renderer-backgrounding',
   '--disable-backgrounding-occluded-windows',
 ]);
 
-export const REQUIRED_BACKGROUND_CPU_PHASE = 'prewarm-batched-effects';
+export const REQUIRED_BACKGROUND_CPU_PHASE = 'weapon-catalog-prewarm';
 
-export function assertHeadedChromeLaunchContract({ headless, executablePath, args }) {
+export function assertHeadedChromeLaunchContract({ headless, executablePath, args, ignoreDefaultArgs }) {
   if (headless !== false) throw new Error('Pass 66 hidden-tab admission requires headed Chrome');
   if (typeof executablePath !== 'string' || !/[/\\]Google[/\\]Chrome[/\\]Application[/\\]chrome\.exe$/i.test(executablePath)) {
     throw new Error('Pass 66 hidden-tab admission requires installed Google Chrome');
+  }
+  if (JSON.stringify(ignoreDefaultArgs) !== JSON.stringify(FORBIDDEN_BACKGROUND_BYPASS_FLAGS)) {
+    throw new Error(`Pass 66 hidden-tab admission must remove exactly Playwright's forbidden defaults: ${FORBIDDEN_BACKGROUND_BYPASS_FLAGS.join(', ')}`);
   }
   const forbidden = FORBIDDEN_BACKGROUND_BYPASS_FLAGS.filter((flag) => args.includes(flag));
   if (forbidden.length > 0) {
@@ -50,7 +54,10 @@ export function hiddenCheckpointFailures({ beforeRelease, afterHidden, heldAsset
   if (afterHidden.frameCount !== beforeRelease.frameCount) {
     failures.push('the gameplay presentation frame count advanced while hidden');
   }
-  if (afterHidden.interactiveWorldTick !== beforeRelease.interactiveWorldTick) {
+  if (!Number.isSafeInteger(beforeRelease.interactiveWorldTick) || beforeRelease.interactiveWorldTick < 0
+    || !Number.isSafeInteger(afterHidden.interactiveWorldTick) || afterHidden.interactiveWorldTick < 0) {
+    failures.push('the canonical interactiveWorldTick was missing or non-integral');
+  } else if (afterHidden.interactiveWorldTick !== beforeRelease.interactiveWorldTick) {
     failures.push('offline interactive-world authority advanced while hidden');
   }
   if (afterHidden.presentationScheduling.mode !== 'paused-offline') {

@@ -45,14 +45,36 @@ test('requires real headed installed Chrome without background-throttling bypass
     headless: false,
     executablePath: chrome,
     args: ['--enable-unsafe-webgpu'],
+    ignoreDefaultArgs: [...FORBIDDEN_BACKGROUND_BYPASS_FLAGS],
   }));
-  assert.throws(() => assertHeadedChromeLaunchContract({ headless: true, executablePath: chrome, args: [] }), /headed Chrome/);
+  assert.throws(() => assertHeadedChromeLaunchContract({
+    headless: true,
+    executablePath: chrome,
+    args: [],
+    ignoreDefaultArgs: [...FORBIDDEN_BACKGROUND_BYPASS_FLAGS],
+  }), /headed Chrome/);
   for (const flag of FORBIDDEN_BACKGROUND_BYPASS_FLAGS) {
     assert.throws(() => assertHeadedChromeLaunchContract({
       headless: false,
       executablePath: chrome,
       args: [flag],
+      ignoreDefaultArgs: [...FORBIDDEN_BACKGROUND_BYPASS_FLAGS],
     }), /forbids browser throttling bypasses/);
+  }
+  const defaultArgMutations = [
+    undefined,
+    [],
+    FORBIDDEN_BACKGROUND_BYPASS_FLAGS.slice(0, -1),
+    [...FORBIDDEN_BACKGROUND_BYPASS_FLAGS].reverse(),
+    [...FORBIDDEN_BACKGROUND_BYPASS_FLAGS, '--disable-features=CalculateNativeWinOcclusion'],
+  ];
+  for (const ignoreDefaultArgs of defaultArgMutations) {
+    assert.throws(() => assertHeadedChromeLaunchContract({
+      headless: false,
+      executablePath: chrome,
+      args: ['--enable-unsafe-webgpu'],
+      ignoreDefaultArgs,
+    }), /must remove exactly Playwright's forbidden defaults/);
   }
 });
 
@@ -65,7 +87,7 @@ test('accepts hidden CPU progress only when frames, WebGPU submission, authority
       profile: { phases: [
         { phase: 'quality-presentation' },
         { phase: 'material-tuning' },
-        { phase: 'prewarm-batched-effects' },
+        { phase: 'weapon-catalog-prewarm' },
       ] },
     },
   });
@@ -79,6 +101,18 @@ test('accepts hidden CPU progress only when frames, WebGPU submission, authority
     },
     heldAssetRequests: 1,
   }).join(' | '), /submissionSequence advanced while hidden.*Web Audio was not suspended/);
+  for (const interactiveWorldTick of [null, Number.NaN, 0.5, -1]) {
+    assert.match(hiddenCheckpointFailures({
+      beforeRelease,
+      afterHidden: { ...afterHidden, interactiveWorldTick },
+      heldAssetRequests: 1,
+    }).join(' | '), /canonical interactiveWorldTick was missing or non-integral/);
+  }
+  assert.match(hiddenCheckpointFailures({
+    beforeRelease,
+    afterHidden: { ...afterHidden, interactiveWorldTick: beforeRelease.interactiveWorldTick + 1 },
+    heldAssetRequests: 1,
+  }).join(' | '), /offline interactive-world authority advanced while hidden/);
 });
 
 test('accepts one healthy foreground recovery of the same generation and root', () => {
