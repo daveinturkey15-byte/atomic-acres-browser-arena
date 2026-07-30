@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import './style.css';
 import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } from './atomic-signal';
-import { AdaptiveQualityController, DeferredAdaptivePixelRatio, adaptiveShadowsEnabled, classifyDisplayFrameMs, configuredAdaptiveQualityLevels } from './adaptive-quality';
+import { AdaptiveQualityController, DeferredAdaptivePixelRatio, adaptiveShadowsEnabled, classifyDisplayFrameMs, configuredAdaptiveQualityLevels, shouldFreezeAdaptiveQualityForMatch } from './adaptive-quality';
 import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBudget } from './graphics-refinement';
 import { ArenaContrastLighting } from './arena-contrast-lighting';
 import { centeredReadbackRegion, detectLivePresentationStall, LegacyWebGlRenderRuntime, shouldResetPresentationAfterSchedulerGap, WebGpuRenderRuntime, resolveRenderRuntimeRequest, type WebGpuSubmissionMode } from './rendering/render-runtime';
@@ -1336,6 +1336,32 @@ const adaptiveQuality = new AdaptiveQualityController({
   levels: configuredAdaptiveLevels,
 });
 const deferredWebGpuAdaptivePixelRatio = new DeferredAdaptivePixelRatio();
+const MATCH_ADMISSION_ADAPTIVE_WARMUP_CALLBACKS = 8;
+const MATCH_ADMISSION_ADAPTIVE_SAMPLE_COUNT = 60;
+const MATCH_ADMISSION_ADAPTIVE_MINIMUM_SAMPLES = 45;
+const MATCH_ADMISSION_ADAPTIVE_WINDOW_TIMEOUT_MS = 1_500;
+type MatchAdmissionAdaptiveCalibration = Readonly<{
+  label: string;
+  status: 'stable' | 'skipped' | 'failed';
+  initialPixelRatioCap: number;
+  presetPixelRatioCap: number;
+  finalPixelRatioCap: number;
+  windows: readonly Readonly<{
+    tier: number;
+    pixelRatioCap: number;
+    samples: number;
+    p50CallbackGapMs: number;
+    p95CallbackGapMs: number;
+    callbackCadenceHz: number;
+    maximumCallbackGapMs: number;
+    maximumQueueLatencyMs: number;
+    decision: 'stable' | 'downshift' | 'preset-locked' | 'insufficient-sample';
+  }>[];
+  startedAt: number;
+  completedAt: number;
+}>;
+let lastMatchAdmissionAdaptiveCalibration: MatchAdmissionAdaptiveCalibration | null = null;
+let matchWebGpuQualityFrozen = false;
 renderRuntime.setPixelRatio(Math.min(window.devicePixelRatio, adaptiveQuality.telemetry().pixelRatioCap));
 let activeArenaVisualDefinition: ArenaVisualDefinition | null = null;
 
@@ -1355,14 +1381,183 @@ function applyAdaptiveRenderBudget(pixelRatioCap: number): void {
 }
 applyAdaptiveRenderBudget(adaptiveQuality.telemetry().pixelRatioCap);
 
-async function settleWebGpuPresentation(label: string, maximumLatencyMs = 500): Promise<void> {
+async function collectMatchAdmissionCallbackGaps(): Promise<Readonly<{
+  status: 'sampled' | 'skipped';
+  samples: readonly number[];
+  maximumQueueLatencyMs: number;
+}>> {
+  if (renderRuntime.backend !== 'webgpu' || document.visibilityState !== 'visible' || !document.hasFocus()) {
+    return Object.freeze({ status: 'skipped', samples: Object.freeze([]), maximumQueueLatencyMs: 0 });
+  }
+  await flushWebGpuFrames(12_000);
+  return new Promise((resolve, reject) => {
+    const samples: number[] = [];
+    let warmupGapsRemaining = MATCH_ADMISSION_ADAPTIVE_WARMUP_CALLBACKS;
+    let priorCallbackAt: number | null = null;
+    let maximumQueueLatencyMs = 0;
+    let finished = false;
+    const finish = (status: 'sampled' | 'skipped'): void => {
+      if (finished) return;
+      finished = true;
+      window.clearTimeout(timeout);
+      resolve(Object.freeze({ status, samples: Object.freeze([...samples]), maximumQueueLatencyMs }));
+    };
+    const timeout = window.setTimeout(() => finish(
+      document.visibilityState === 'visible' && document.hasFocus() ? 'sampled' : 'skipped',
+    ), MATCH_ADMISSION_ADAPTIVE_WINDOW_TIMEOUT_MS);
+    const sample = (now: number): void => {
+      if (finished) return;
+      if (document.visibilityState !== 'visible' || !document.hasFocus()) {
+        finish('skipped');
+        return;
+      }
+      try {
+        const presentation = renderRuntime.presentationTelemetry(performance.now());
+        if (presentation.status === 'stalled' || presentation.status === 'device-lost'
+          || presentation.status === 'failed') {
+          throw new Error(`Adaptive admission presentation was ${presentation.status}`);
+        }
+        maximumQueueLatencyMs = Math.max(maximumQueueLatencyMs, presentation.lastCompletionLatencyMs ?? 0);
+        if (priorCallbackAt !== null) {
+          const callbackGapMs = Math.max(0, now - priorCallbackAt);
+          if (warmupGapsRemaining > 0) warmupGapsRemaining -= 1;
+          else samples.push(callbackGapMs);
+        }
+        priorCallbackAt = now;
+        if (samples.length >= MATCH_ADMISSION_ADAPTIVE_SAMPLE_COUNT) {
+          finish('sampled');
+          return;
+        }
+        requestAnimationFrame(sample);
+      } catch (error) {
+        finished = true;
+        window.clearTimeout(timeout);
+        reject(error);
+      }
+    };
+    requestAnimationFrame(sample);
+  });
+}
+
+async function settleMatchAdmissionAdaptiveWebGpuPresentation(label: string): Promise<void> {
+  if (renderRuntime.backend !== 'webgpu') return;
+  const startedAt = performance.now();
+  const initialPixelRatioCap = adaptiveQuality.telemetry().pixelRatioCap;
+  const presetPixelRatioCap = adaptiveQuality.seedPixelRatioCap(
+    activeRenderConfig.pixelRatioCap,
+    `${displayedGraphicsPreset} preset match seed`,
+  );
+  const windows: Array<MatchAdmissionAdaptiveCalibration['windows'][number]> = [];
+  try {
+    if (presetPixelRatioCap !== initialPixelRatioCap) {
+      await flushWebGpuFrames(12_000);
+      deferredWebGpuAdaptivePixelRatio.request(presetPixelRatioCap);
+      if (!applyDeferredAdaptiveWebGpuRenderBudget(performance.now())) {
+        throw new Error(`${label} preset seed resize was not admitted after its WebGPU completion fence`);
+      }
+      submitWebGpuFrame(performance.now(), true);
+      await flushWebGpuFrames(12_000);
+    }
+    const current = adaptiveQuality.telemetry();
+    if (!current.enabled || displayedGraphicsPreset !== 'custom') {
+      const presetPresentation = renderRuntime.presentationTelemetry();
+      windows.push(Object.freeze({
+        tier: current.tier,
+        pixelRatioCap: current.pixelRatioCap,
+        samples: 0,
+        p50CallbackGapMs: 0,
+        p95CallbackGapMs: 0,
+        callbackCadenceHz: 0,
+        maximumCallbackGapMs: 0,
+        maximumQueueLatencyMs: presetPresentation.lastCompletionLatencyMs ?? 0,
+        decision: 'preset-locked',
+      }));
+    } else {
+      const sampled = await collectMatchAdmissionCallbackGaps();
+      await flushWebGpuFrames(12_000);
+      if (sampled.status === 'skipped') {
+        matchWebGpuQualityFrozen = true;
+        lastMatchAdmissionAdaptiveCalibration = Object.freeze({
+          label,
+          status: 'skipped',
+          initialPixelRatioCap,
+          presetPixelRatioCap,
+          finalPixelRatioCap: adaptiveQuality.telemetry().pixelRatioCap,
+          windows: Object.freeze([...windows]),
+          startedAt,
+          completedAt: performance.now(),
+        });
+        return;
+      }
+      const nextPixelRatio = adaptiveQuality.calibrateDownshift(sampled.samples, `${label} callback admission`);
+      const calibrated = adaptiveQuality.telemetry();
+      windows.push(Object.freeze({
+        tier: current.tier,
+        pixelRatioCap: current.pixelRatioCap,
+        samples: sampled.samples.length,
+        p50CallbackGapMs: calibrated.p50Ms,
+        p95CallbackGapMs: calibrated.p95Ms,
+        callbackCadenceHz: calibrated.p50Ms > 0 ? 1_000 / calibrated.p50Ms : 0,
+        maximumCallbackGapMs: Math.max(0, ...sampled.samples),
+        maximumQueueLatencyMs: sampled.maximumQueueLatencyMs,
+        decision: sampled.samples.length < MATCH_ADMISSION_ADAPTIVE_MINIMUM_SAMPLES
+          ? 'insufficient-sample'
+          : nextPixelRatio === null ? 'stable' : 'downshift',
+      }));
+      if (sampled.samples.length < MATCH_ADMISSION_ADAPTIVE_MINIMUM_SAMPLES) {
+        matchWebGpuQualityFrozen = true;
+        lastMatchAdmissionAdaptiveCalibration = Object.freeze({
+          label,
+          status: 'skipped',
+          initialPixelRatioCap,
+          presetPixelRatioCap,
+          finalPixelRatioCap: adaptiveQuality.telemetry().pixelRatioCap,
+          windows: Object.freeze([...windows]),
+          startedAt,
+          completedAt: performance.now(),
+        });
+        return;
+      }
+      if (nextPixelRatio !== null) {
+        deferredWebGpuAdaptivePixelRatio.request(nextPixelRatio);
+        if (!applyDeferredAdaptiveWebGpuRenderBudget(performance.now())) {
+          throw new Error(`${label} adaptive admission resize was not admitted after its WebGPU completion fence`);
+        }
+        submitWebGpuFrame(performance.now(), true);
+        await flushWebGpuFrames(12_000);
+      }
+    }
+    matchWebGpuQualityFrozen = true;
+    lastMatchAdmissionAdaptiveCalibration = Object.freeze({
+      label,
+      status: 'stable',
+      initialPixelRatioCap,
+      presetPixelRatioCap,
+      finalPixelRatioCap: adaptiveQuality.telemetry().pixelRatioCap,
+      windows: Object.freeze([...windows]),
+      startedAt,
+      completedAt: performance.now(),
+    });
+  } catch (error) {
+    matchWebGpuQualityFrozen = false;
+    lastMatchAdmissionAdaptiveCalibration = Object.freeze({
+      label,
+      status: 'failed',
+      initialPixelRatioCap,
+      presetPixelRatioCap,
+      finalPixelRatioCap: adaptiveQuality.telemetry().pixelRatioCap,
+      windows: Object.freeze([...windows]),
+      startedAt,
+      completedAt: performance.now(),
+    });
+    throw error;
+  }
+}
+
+async function settleWebGpuPresentation(label: string): Promise<void> {
   if (renderRuntime.backend !== 'webgpu') return;
   await flushWebGpuFrames(12_000);
-  const requiredConsecutiveHealthySamples = 3;
-  const requiredConsecutiveMinimumTierSlowSamples = 3;
-  let consecutiveHealthySamples = 0;
-  let consecutiveMinimumTierSlowSamples = 0;
-  for (;;) {
+  for (let sample = 0; sample < 3; sample += 1) {
     submitWebGpuFrame(performance.now(), true);
     await flushWebGpuFrames(12_000);
     const presentation = renderRuntime.presentationTelemetry();
@@ -1371,31 +1566,8 @@ async function settleWebGpuPresentation(label: string, maximumLatencyMs = 500): 
     }
     const completionLatencyMs = presentation.lastCompletionLatencyMs;
     if (completionLatencyMs === null) throw new Error(`${label} presentation completed without a queue-latency sample`);
-    if (completionLatencyMs <= maximumLatencyMs) {
-      consecutiveMinimumTierSlowSamples = 0;
-      consecutiveHealthySamples += 1;
-      if (consecutiveHealthySamples >= requiredConsecutiveHealthySamples) return;
-      continue;
-    }
-    consecutiveHealthySamples = 0;
-    const nextPixelRatio = adaptiveQuality.forceDownshift(
-      `${label} WebGPU queue latency ${Math.round(completionLatencyMs)}ms exceeded ${maximumLatencyMs}ms`,
-    );
-    if (nextPixelRatio === null) {
-      consecutiveMinimumTierSlowSamples += 1;
-      if (consecutiveMinimumTierSlowSamples < requiredConsecutiveMinimumTierSlowSamples) continue;
-      throw new Error(
-        `${label} WebGPU queue latency remained ${Math.round(completionLatencyMs)}ms for ${consecutiveMinimumTierSlowSamples} consecutive samples at the minimum quality tier`,
-      );
-    }
-    consecutiveMinimumTierSlowSamples = 0;
-    deferredWebGpuAdaptivePixelRatio.request(nextPixelRatio);
-    if (!applyDeferredAdaptiveWebGpuRenderBudget(performance.now())) {
-      throw new Error(`${label} adaptive resize was not admitted after its WebGPU completion fence`);
-    }
-    // The next forced RenderPipeline submission compiles the resized TSL/HDR
-    // context directly; a default-context compile would only duplicate it.
   }
+  await settleMatchAdmissionAdaptiveWebGpuPresentation(label);
 }
 
 async function waitForStableMatchAdmissionCadence(): Promise<void> {
@@ -3116,9 +3288,8 @@ let lastFrame = performance.now();
 let lastPresentedFrameAt = lastFrame;
 let lastWindowBlurAt = -Infinity;
 const framePacing = new FramePacingSampler();
-const LIVE_WEBGPU_QUEUE_DOWNSHIFT_MS = 250;
 const LIVE_WEBGPU_PRESENTATION_STALL_MS = 1_000;
-let lastAdaptedWebGpuCompletionSequence = 0;
+let lastObservedWebGpuCompletionSequence = 0;
 
 function resetWebGpuPresentationEpoch(reason: string, now: number): void {
   renderRuntime.resetPresentationProgressTelemetry(reason, now);
@@ -3126,7 +3297,7 @@ function resetWebGpuPresentationEpoch(reason: string, now: number): void {
   // A completion which retired during a hidden/pre-admission epoch is not live
   // foreground performance evidence. Consume its sequence and discard any
   // queued resize so refocus cannot apply a stale downshift to HDR targets.
-  lastAdaptedWebGpuCompletionSequence = renderRuntime.presentationTelemetry(now).completedSequence;
+  lastObservedWebGpuCompletionSequence = renderRuntime.presentationTelemetry(now).completedSequence;
   deferredWebGpuAdaptivePixelRatio.clear();
 }
 let lastHudAt = 0;
@@ -8321,6 +8492,7 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   const requiredName = requirePlayerName();
   if (!requiredName) return;
   matchStartPreparing = true;
+  matchWebGpuQualityFrozen = false;
   matchAdmissionGeneration += 1;
   lastGameplayPresentedFrame = 0;
   lastMatchAdmissionCadence = null;
@@ -8518,6 +8690,7 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
     restoreCorpsePoolPrewarm();
     renderSubmissionPaused = priorRenderSubmissionPaused;
   }
+  matchWebGpuQualityFrozen = shouldFreezeAdaptiveQualityForMatch(renderRuntime.backend);
   resetWebGpuPresentationEpoch('match admitted', performance.now());
   gameStarted = true;
   const matchRules = currentMatchRules();
@@ -16343,6 +16516,7 @@ function returnToMainMenu(): void {
   resetPrivateLobbyState();
   gameStarted = false;
   matchFinished = false;
+  matchWebGpuQualityFrozen = false;
   killstreakLoadoutController.releaseAfterMatch();
   killstreakMenuBinding.setMatchActive(false);
   weaponView.setPresentationVisible(false);
@@ -16578,27 +16752,15 @@ function applyDeferredAdaptiveWebGpuRenderBudget(now: number): boolean {
   return true;
 }
 
-function adaptToCompletedWebGpuQueueLatency(now: number): void {
+function monitorCompletedWebGpuQueueHealth(now: number): void {
   if (renderRuntime.backend !== 'webgpu') return;
   const presentation = renderRuntime.presentationTelemetry(now);
-  if (presentation.completedSequence <= lastAdaptedWebGpuCompletionSequence) return;
-  lastAdaptedWebGpuCompletionSequence = presentation.completedSequence;
-  const completionLatencyMs = presentation.lastCompletionLatencyMs;
-  const adaptiveEligible = gameStarted && matchState.phase === 'active' && document.visibilityState === 'visible'
-    && menu.classList.contains('hidden') && !renderSubmissionPaused && !debugRenderPaused;
-  if (completionLatencyMs === null || !adaptiveEligible) {
-    adaptiveQuality.record(completionLatencyMs ?? 0, false);
-    return;
+  if (presentation.status === 'stalled' || presentation.status === 'device-lost'
+    || presentation.status === 'failed') {
+    throw new Error(`Live WebGPU presentation was ${presentation.status}: ${presentation.lastFailure ?? 'no failure detail'}`);
   }
-  // Sample once per completed queue frontier. This catches sustained 5-20 FPS
-  // GPU throughput even while requestAnimationFrame itself remains fast.
-  const nextPixelRatio = completionLatencyMs > LIVE_WEBGPU_QUEUE_DOWNSHIFT_MS
-    ? adaptiveQuality.forceDownshift(
-        `Live WebGPU queue latency ${Math.round(completionLatencyMs)}ms exceeded ${LIVE_WEBGPU_QUEUE_DOWNSHIFT_MS}ms`,
-      )
-    : adaptiveQuality.record(completionLatencyMs, true);
-  if (nextPixelRatio === null) return;
-  deferredWebGpuAdaptivePixelRatio.request(nextPixelRatio);
+  if (presentation.completedSequence <= lastObservedWebGpuCompletionSequence) return;
+  lastObservedWebGpuCompletionSequence = presentation.completedSequence;
 }
 
 function selectedArenaPresentationRoot(): THREE.Group {
@@ -16758,7 +16920,7 @@ function frame(now: number, scheduleNext = true): void {
       && shouldResetPresentationAfterSchedulerGap(rawFrameMs, LIVE_WEBGPU_PRESENTATION_STALL_MS)) {
       resetWebGpuPresentationEpoch('foreground scheduler gap', now);
     }
-    adaptToCompletedWebGpuQueueLatency(now);
+    monitorCompletedWebGpuQueueHealth(now);
     // The HUD must report even pathologically slow software-rendered frames.
     // Adaptive quality still receives the unclamped sample and independently
     // rejects values above its 250 ms control window.
@@ -16766,14 +16928,17 @@ function frame(now: number, scheduleNext = true): void {
     if (scheduleNext && gameStarted && matchState.phase === 'active') matchDiagnostics?.recordFrame(rawFrameMs);
     const adaptivePixelRatio = scheduleNext && renderRuntime.backend !== 'webgpu' ? adaptiveQuality.record(
       rawFrameMs,
-      gameStarted && menu.classList.contains('hidden') && document.visibilityState === 'visible' && !debugRenderPaused,
+      !matchWebGpuQualityFrozen && gameStarted && menu.classList.contains('hidden')
+        && document.visibilityState === 'visible' && !debugRenderPaused,
     ) : null;
     if (adaptivePixelRatio !== null) {
       applyAdaptiveRenderBudget(adaptivePixelRatio);
       grassSystem?.setAdaptivePixelRatio(adaptivePixelRatio);
       resize();
     }
-    if (renderRuntime.backend === 'webgpu') applyDeferredAdaptiveWebGpuRenderBudget(now);
+    if (renderRuntime.backend === 'webgpu' && !matchWebGpuQualityFrozen) {
+      applyDeferredAdaptiveWebGpuRenderBudget(now);
+    }
     if (now - lastFpsHudAt >= 250) {
       // Sorting three 180-sample pacing windows is HUD work, not frame work.
       // Keep it on the four-Hz display cadence so uncapped WebGPU does not
@@ -18273,6 +18438,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       minimapRenders: minimapRenderCount,
       minimapTargetHz: MINIMAP_RENDER_HZ,
       adaptive: adaptiveQuality.telemetry(),
+      adaptiveAdmission: lastMatchAdmissionAdaptiveCalibration,
+      adaptiveMatchFrozen: matchWebGpuQualityFrozen,
       graphicsRefinement: graphicsRefinement.telemetry(),
       arenaContrastLighting: arenaContrastLighting.telemetry(),
       worldLocalLightOcclusion: auditLocalLightOcclusion(scene, 1),

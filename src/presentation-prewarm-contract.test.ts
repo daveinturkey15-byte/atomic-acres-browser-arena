@@ -30,6 +30,23 @@ describe('presentation prewarm startup contract', () => {
     );
     expect(coldSettlement.indexOf('await flushWebGpuFrames(12_000);'))
       .toBeLessThan(coldSettlement.indexOf('submitWebGpuFrame(performance.now(), true);'));
+    expect(coldSettlement).not.toContain('forceDownshift(');
+    const adaptiveAdmission = legacy.slice(
+      legacy.indexOf('async function collectMatchAdmissionCallbackGaps()'),
+      legacy.indexOf('async function settleWebGpuPresentation('),
+    );
+    expect(adaptiveAdmission).not.toContain("submitWebGpuFrame(now, false, 'warmed-live')");
+    expect(adaptiveAdmission).toContain('now - priorCallbackAt');
+    expect(adaptiveAdmission).toContain('warmupGapsRemaining > 0');
+    expect(legacy).toContain('MATCH_ADMISSION_ADAPTIVE_WINDOW_TIMEOUT_MS = 1_500');
+    expect(adaptiveAdmission).not.toContain('calibrateDownshift(sampled.maximumQueueLatencyMs');
+    expect(adaptiveAdmission).toContain('adaptiveQuality.calibrateDownshift(');
+    expect(adaptiveAdmission).toContain("displayedGraphicsPreset !== 'custom'");
+    expect(adaptiveAdmission).toContain('deferredWebGpuAdaptivePixelRatio.request(nextPixelRatio);');
+    expect(adaptiveAdmission).toContain('applyDeferredAdaptiveWebGpuRenderBudget(performance.now())');
+    expect(adaptiveAdmission.indexOf('await flushWebGpuFrames(12_000);'))
+      .toBeLessThan(adaptiveAdmission.indexOf('applyDeferredAdaptiveWebGpuRenderBudget(performance.now())'));
+    expect(coldSettlement).toContain('await settleMatchAdmissionAdaptiveWebGpuPresentation(label);');
     const readbackStart = legacy.indexOf('readbackWebGpuFrame: async () => {');
     const readback = legacy.slice(readbackStart, legacy.indexOf('sampleRendererResidency:', readbackStart));
     expect(readback).toContain('const previousRenderPaused = debugRenderPaused;');
@@ -39,6 +56,22 @@ describe('presentation prewarm startup contract', () => {
       .toBeLessThan(readback.indexOf('submitWebGpuFrame(performance.now(), true);'));
     expect(readback).toContain('finally {');
     expect(readback).toContain('debugRenderPaused = previousRenderPaused;');
+  });
+
+  it('locks the admitted preset tier for active play and never reallocates from queue latency', () => {
+    const legacy = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+    const healthMonitor = legacy.slice(
+      legacy.indexOf('function monitorCompletedWebGpuQueueHealth('),
+      legacy.indexOf('function selectedArenaPresentationRoot('),
+    );
+    expect(healthMonitor).toContain("presentation.status === 'stalled'");
+    expect(healthMonitor).not.toContain('adaptiveQuality.record(');
+    expect(healthMonitor).not.toContain('forceDownshift(');
+    expect(healthMonitor).not.toContain('deferredWebGpuAdaptivePixelRatio.request(');
+    expect(legacy).toContain("if (renderRuntime.backend === 'webgpu' && !matchWebGpuQualityFrozen)");
+    expect(legacy).toContain('!matchWebGpuQualityFrozen && gameStarted');
+    expect(legacy).toContain('matchWebGpuQualityFrozen = true;');
+    expect(legacy).toContain('matchWebGpuQualityFrozen = shouldFreezeAdaptiveQualityForMatch(renderRuntime.backend);');
   });
 
   it.each(presentationSources)('%s scopes shader compilation to its presentation root', (path) => {
@@ -261,24 +294,26 @@ describe('presentation prewarm startup contract', () => {
     expect(cadenceAdmission).toContain('exact-SHA cold WebGPU release gate rejects');
     expect(source).toContain('matchAdmissionCadence: lastMatchAdmissionCadence');
     expect(source).toContain('submitWebGpuFrame(performance.now(), true)');
+    expect(matchDeployment.indexOf("await settleWebGpuPresentation('Initial match');"))
+      .toBeLessThan(matchDeployment.indexOf('await smokeVolumePresentationPool.prewarm('));
     expect(arenaDeployment).toContain('await withArenaFrustumCullingDisabled(presentationRoot, async () => {');
     expect(arenaDeployment.indexOf('withArenaFrustumCullingDisabled(presentationRoot'))
       .toBeLessThan(arenaDeployment.indexOf('auditArenaRenderLiveness('));
     expect(source).toContain('await flushWebGpuFrames(12_000)');
-    expect(source).toContain('const requiredConsecutiveHealthySamples = 3;');
-    expect(source).toContain('const requiredConsecutiveMinimumTierSlowSamples = 3;');
+    expect(source).toContain('for (let sample = 0; sample < 3; sample += 1)');
     expect(source).toContain('if (!isSharedMeshGeometry(geometry)) geometry.dispose();');
-    expect(source).toContain('if (consecutiveMinimumTierSlowSamples < requiredConsecutiveMinimumTierSlowSamples) continue;');
-    expect(source).toContain('WebGPU queue latency remained ${Math.round(completionLatencyMs)}ms for ${consecutiveMinimumTierSlowSamples} consecutive samples at the minimum quality tier');
-    expect(source).toContain('adaptiveQuality.forceDownshift(');
+    expect(source).toContain("presentation.status === 'stalled'");
+    expect(source).not.toContain('consecutiveMinimumTierSlowSamples');
+    expect(source).not.toContain('Live WebGPU queue latency');
     expect(matchDeployment).toContain("resetWebGpuPresentationEpoch('match admitted', performance.now());");
+    expect(matchDeployment).toContain('matchWebGpuQualityFrozen = shouldFreezeAdaptiveQualityForMatch(renderRuntime.backend);');
     expect(source).toContain("reconcilePresentationScheduling(document.hidden ? 'tab visibility hidden' : 'tab visibility regained');");
     expect(source).toContain("reconcilePresentationScheduling('window focus regained');");
     const presentationEpochReset = source.slice(
       source.indexOf('function resetWebGpuPresentationEpoch('),
       source.indexOf('let lastHudAt'),
     );
-    expect(presentationEpochReset).toContain('lastAdaptedWebGpuCompletionSequence = renderRuntime.presentationTelemetry(now).completedSequence;');
+    expect(presentationEpochReset).toContain('lastObservedWebGpuCompletionSequence = renderRuntime.presentationTelemetry(now).completedSequence;');
     expect(presentationEpochReset).toContain('deferredWebGpuAdaptivePixelRatio.clear();');
     expect(source).toContain("source: 'webgpu-submission' as const");
     expect(source).toContain('LIVE_WEBGPU_PRESENTATION_STALL_MS = 1_000');
@@ -289,9 +324,9 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('backpressureActive: presentation.backpressureActive');
     expect(source).toContain('debugRenderPaused,');
     expect(source).toContain('renderSubmissionPaused,');
-    expect(source).toContain('adaptToCompletedWebGpuQueueLatency(now);');
+    expect(source).toContain('monitorCompletedWebGpuQueueHealth(now);');
     expect(source).toContain('deferredWebGpuAdaptivePixelRatio.takeWhenPresentationIdle(');
-    expect(source).toContain("if (renderRuntime.backend === 'webgpu') applyDeferredAdaptiveWebGpuRenderBudget(now);");
+    expect(source).toContain("if (renderRuntime.backend === 'webgpu' && !matchWebGpuQualityFrozen)");
     expect(source).toContain('cadenceWithNoProgressAge(');
     const fpsHudCadence = source.slice(
       source.indexOf('if (now - lastFpsHudAt >= 250) {'),

@@ -5,9 +5,15 @@ import {
   adaptiveShadowsEnabled,
   classifyDisplayFrameMs,
   configuredAdaptiveQualityLevels,
+  shouldFreezeAdaptiveQualityForMatch,
 } from './adaptive-quality';
 
 describe('adaptive quality controller', () => {
+  it('freezes the admitted tier only for WebGPU and preserves WebGL2 live adaptation', () => {
+    expect(shouldFreezeAdaptiveQualityForMatch('webgpu')).toBe(true);
+    expect(shouldFreezeAdaptiveQualityForMatch('webgl2')).toBe(false);
+  });
+
   it('can downshift from measured GPU queue latency without trusting rAF cadence', () => {
     const controller = new AdaptiveQualityController({
       profile: 'blender', targetFrameMs: 1_000 / 60, initialPixelRatioCap: 1,
@@ -72,6 +78,81 @@ describe('adaptive quality controller', () => {
       samples: 0, p50Ms: 0, p95Ms: 0, cooldownFrames: 0,
       pixelRatioCap: 1, downshifts: 0,
       lastReason: 'tab visibility regained',
+    });
+  });
+
+  it('calibrates one admission tier from a bounded admitted-submission window without live hysteresis', () => {
+    const controller = new AdaptiveQualityController({
+      profile: 'blender', targetFrameMs: 1_000 / 144, initialPixelRatioCap: 1,
+    });
+    expect(controller.calibrateDownshift(Array(60).fill(9), 'Initial match')).toBe(0.85);
+    expect(controller.telemetry()).toMatchObject({
+      pixelRatioCap: 0.85,
+      downshifts: 1,
+      p50Ms: 9,
+      p95Ms: 9,
+      cooldownFrames: 0,
+      lastReason: 'Initial match: p95 9.0ms above 7.8ms budget',
+    });
+    expect(controller.calibrateDownshift(Array(60).fill(7), 'Initial match')).toBeNull();
+    expect(controller.telemetry()).toMatchObject({
+      pixelRatioCap: 0.85,
+      downshifts: 1,
+      p50Ms: 7,
+      p95Ms: 7,
+      lastReason: 'Initial match: p95 7.0ms within 7.8ms budget',
+    });
+  });
+
+  it('reports an over-budget minimum tier truthfully instead of claiming it met budget', () => {
+    const controller = new AdaptiveQualityController({
+      profile: 'blender', targetFrameMs: 1_000 / 144, initialPixelRatioCap: 0.55,
+    });
+    expect(controller.calibrateDownshift(Array(60).fill(9), 'Initial match')).toBeNull();
+    expect(controller.telemetry()).toMatchObject({
+      pixelRatioCap: 0.55,
+      downshifts: 0,
+      p95Ms: 9,
+      lastReason: 'Initial match: p95 9.0ms above 7.8ms budget at minimum tier',
+    });
+  });
+
+  it('re-seeds every match at the selected preset cap without manufacturing an upshift', () => {
+    const controller = new AdaptiveQualityController({
+      profile: 'blender', targetFrameMs: 1_000 / 144, initialPixelRatioCap: 1,
+    });
+    expect(controller.calibrateDownshift(Array(60).fill(9), 'First match')).toBe(0.85);
+    expect(controller.seedPixelRatioCap(1, 'Quality preset match seed')).toBe(1);
+    expect(controller.telemetry()).toMatchObject({
+      pixelRatioCap: 1,
+      samples: 0,
+      p50Ms: 0,
+      p95Ms: 0,
+      downshifts: 1,
+      upshifts: 0,
+      lastReason: 'Quality preset match seed',
+    });
+  });
+
+  it('seeds Performance at its deterministic authored cap', () => {
+    const controller = new AdaptiveQualityController({
+      profile: 'performance', targetFrameMs: 1_000 / 144, initialPixelRatioCap: 0.75,
+      levels: configuredAdaptiveQualityLevels('performance', 0.75, true),
+    });
+    expect(controller.seedPixelRatioCap(0.75, 'Performance preset match seed')).toBe(0.75);
+    expect(controller.telemetry()).toMatchObject({ levels: [0.55, 0.65, 0.75], pixelRatioCap: 0.75 });
+  });
+
+  it('never treats a short or pathological admission sample as evidence to lower quality', () => {
+    const controller = new AdaptiveQualityController({
+      profile: 'performance', targetFrameMs: 1_000 / 60, initialPixelRatioCap: 0.75,
+    });
+    expect(controller.calibrateDownshift([...Array(44).fill(25), 300, 0, Number.NaN], 'Initial match')).toBeNull();
+    expect(controller.telemetry()).toMatchObject({
+      pixelRatioCap: 0.75,
+      downshifts: 0,
+      samples: 44,
+      lastReason: 'Initial match: 44/45 valid calibration samples',
     });
   });
 

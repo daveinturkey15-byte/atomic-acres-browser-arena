@@ -4,15 +4,17 @@ import { describe, expect, it, vi } from 'vitest';
 import { AdaptiveQualityController, DeferredAdaptivePixelRatio } from './adaptive-quality';
 
 type Presentation = Readonly<{
+  status: 'healthy' | 'stalled' | 'device-lost' | 'failed';
   submissionSequence: number;
   completedSequence: number;
   pendingSince: number | null;
   lastCompletionLatencyMs: number | null;
+  lastFailure: string | null;
 }>;
 
 type RuntimeHarness = Readonly<{
   resetWebGpuPresentationEpoch: (reason: string, now: number) => void;
-  adaptToCompletedWebGpuQueueLatency: (now: number) => void;
+  monitorCompletedWebGpuQueueHealth: (now: number) => void;
   applyDeferredAdaptiveWebGpuRenderBudget: (now: number) => boolean;
 }>;
 
@@ -48,20 +50,13 @@ function buildRuntimeHarness(input: Readonly<{
   );
   const harnessSource = ts.transpileModule(`
     function createHarness() {
-      let lastAdaptedWebGpuCompletionSequence = 0;
-      const LIVE_WEBGPU_QUEUE_DOWNSHIFT_MS = 250;
-      const gameStarted = true;
-      const matchState = { phase: 'active' };
-      const renderSubmissionPaused = false;
-      const debugRenderPaused = false;
-      const document = { visibilityState: 'visible' };
-      const menu = { classList: { contains: (token: string) => token === 'hidden' } };
+      let lastObservedWebGpuCompletionSequence = 0;
       const grassSystem = { setAdaptivePixelRatio: setGrassPixelRatio };
       ${epochReset}
       ${adaptiveLifecycle}
       return {
         resetWebGpuPresentationEpoch,
-        adaptToCompletedWebGpuQueueLatency,
+        monitorCompletedWebGpuQueueHealth,
         applyDeferredAdaptiveWebGpuRenderBudget,
       };
     }
@@ -97,22 +92,26 @@ function buildRuntimeHarness(input: Readonly<{
   );
 }
 
-describe('live WebGPU adaptive presentation epochs', () => {
-  it('consumes a stale completion and discards its deferred resize before foreground adaptation resumes', () => {
+describe('fixed-tier WebGPU presentation epochs', () => {
+  it('consumes stale work, rejects catastrophic health, and never converts latency into a live resize', () => {
     let presentation: Presentation = {
+      status: 'healthy',
       submissionSequence: 8,
       completedSequence: 7,
       pendingSince: 4_000,
       lastCompletionLatencyMs: 700,
+      lastFailure: null,
     };
     const resetPresentationProgressTelemetry = vi.fn(() => {
       // Reproduce a hidden-epoch completion retiring while refocus establishes
       // the new foreground telemetry window.
       presentation = {
+        status: 'healthy',
         submissionSequence: 8,
         completedSequence: 8,
         pendingSince: null,
         lastCompletionLatencyMs: 700,
+        lastFailure: null,
       };
     });
     const deferred = new DeferredAdaptivePixelRatio();
@@ -140,7 +139,7 @@ describe('live WebGPU adaptive presentation epochs', () => {
     });
 
     harness.resetWebGpuPresentationEpoch('tab visibility regained', 5_000);
-    harness.adaptToCompletedWebGpuQueueLatency(5_001);
+    harness.monitorCompletedWebGpuQueueHealth(5_001);
 
     expect(resetPresentationProgressTelemetry).toHaveBeenCalledWith('tab visibility regained', 5_000);
     expect(forceDownshift).not.toHaveBeenCalled();
@@ -151,22 +150,29 @@ describe('live WebGPU adaptive presentation epochs', () => {
     expect(setGrassPixelRatio).not.toHaveBeenCalled();
     expect(resize).not.toHaveBeenCalled();
 
-    // The epoch reset must consume only the stale frontier. The first actual
-    // foreground completion remains eligible for the normal adaptive path.
+    // A newly completed but slow foreground frontier is health evidence only;
+    // active play retains the preset tier and never reallocates its targets.
     presentation = {
+      status: 'healthy',
       submissionSequence: 9,
       completedSequence: 9,
       pendingSince: null,
       lastCompletionLatencyMs: 600,
+      lastFailure: null,
     };
-    harness.adaptToCompletedWebGpuQueueLatency(5_600);
+    harness.monitorCompletedWebGpuQueueHealth(5_600);
 
-    expect(forceDownshift).toHaveBeenCalledTimes(1);
-    expect(adaptive.telemetry()).toMatchObject({ pixelRatioCap: 0.85, downshifts: 1 });
-    expect(deferred.pending()).toBe(0.85);
-    expect(harness.applyDeferredAdaptiveWebGpuRenderBudget(5_601)).toBe(true);
-    expect(applyAdaptiveRenderBudget).toHaveBeenCalledWith(0.85);
-    expect(setGrassPixelRatio).toHaveBeenCalledWith(0.85);
-    expect(resize).toHaveBeenCalledTimes(1);
+    expect(forceDownshift).not.toHaveBeenCalled();
+    expect(adaptive.telemetry()).toMatchObject({ pixelRatioCap: 1, downshifts: 0 });
+    expect(deferred.pending()).toBeNull();
+    expect(harness.applyDeferredAdaptiveWebGpuRenderBudget(5_601)).toBe(false);
+    expect(applyAdaptiveRenderBudget).not.toHaveBeenCalled();
+    expect(setGrassPixelRatio).not.toHaveBeenCalled();
+    expect(resize).not.toHaveBeenCalled();
+
+    presentation = { ...presentation, status: 'stalled', lastFailure: 'completion frontier stopped' };
+    expect(() => harness.monitorCompletedWebGpuQueueHealth(20_000)).toThrow(
+      'Live WebGPU presentation was stalled: completion frontier stopped',
+    );
   });
 });

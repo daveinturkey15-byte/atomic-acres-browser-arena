@@ -57,6 +57,11 @@ export function adaptiveShadowsEnabled(profile: RenderProfile, authoredShadows: 
   return profile !== 'compat' && authoredShadows && Number.isFinite(pixelRatioCap) && pixelRatioCap > 0;
 }
 
+/** WebGPU target reallocations are admission-only; WebGL2 retains its established live controller. */
+export function shouldFreezeAdaptiveQualityForMatch(backend: 'webgpu' | 'webgl2'): boolean {
+  return backend === 'webgpu';
+}
+
 type AdaptiveQualityOptions = {
   profile: RenderProfile;
   targetFrameMs: number;
@@ -195,6 +200,59 @@ export class AdaptiveQualityController {
     this.p50Ms = 0;
     this.p95Ms = 0;
     this.lastReason = reason;
+  }
+
+  /** Re-anchors a new match to the player's selected preset before any opaque admission sample. */
+  seedPixelRatioCap(pixelRatioCap: number, reason: string): number {
+    const closest = this.levels.reduce((best, level, index) =>
+      Math.abs(level - pixelRatioCap) < Math.abs(this.levels[best] - pixelRatioCap) ? index : best, 0);
+    this.tier = closest;
+    this.samples.length = 0;
+    this.overloadSamples = 0;
+    this.headroomSamples = 0;
+    this.cooldownFrames = 0;
+    this.p50Ms = 0;
+    this.p95Ms = 0;
+    this.lastReason = reason;
+    return this.levels[this.tier];
+  }
+
+  /**
+   * Applies one bounded, pre-game frame-pacing window without waiting for the
+   * live-play hysteresis counters. Admission owns a complete opaque
+   * render/fence cycle for every returned tier, so no cooldown is needed
+   * between these one-way calibration steps. Active play keeps the admitted
+   * tier fixed so a live framebuffer reallocation cannot hitch gameplay.
+   */
+  calibrateDownshift(frameMsSamples: readonly number[], reason: string): number | null {
+    if (this.options.enabled === false || this.options.profile === 'compat') return null;
+    const valid = frameMsSamples
+      .filter((sample) => Number.isFinite(sample) && sample > 0 && sample <= 250)
+      .slice(-120);
+    this.samples.splice(0, this.samples.length, ...valid);
+    const sorted = [...valid].sort((left, right) => left - right);
+    this.p50Ms = percentile(sorted, 0.5);
+    this.p95Ms = percentile(sorted, 0.95);
+    this.overloadSamples = 0;
+    this.headroomSamples = 0;
+    this.cooldownFrames = 0;
+    if (valid.length < 45) {
+      this.lastReason = `${reason}: ${valid.length}/45 valid calibration samples`;
+      return null;
+    }
+    const downThreshold = this.options.targetFrameMs * 1.12;
+    if (this.p95Ms <= downThreshold) {
+      this.lastReason = `${reason}: p95 ${this.p95Ms.toFixed(1)}ms within ${downThreshold.toFixed(1)}ms budget`;
+      return null;
+    }
+    if (this.tier <= 0) {
+      this.lastReason = `${reason}: p95 ${this.p95Ms.toFixed(1)}ms above ${downThreshold.toFixed(1)}ms budget at minimum tier`;
+      return null;
+    }
+    this.tier -= 1;
+    this.downshifts += 1;
+    this.lastReason = `${reason}: p95 ${this.p95Ms.toFixed(1)}ms above ${downThreshold.toFixed(1)}ms budget`;
+    return this.levels[this.tier];
   }
 
   forceDownshift(reason: string): number | null {
