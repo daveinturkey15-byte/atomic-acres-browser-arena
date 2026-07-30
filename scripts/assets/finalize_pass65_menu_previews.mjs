@@ -96,7 +96,7 @@ function validateRecipe() {
     || choreography.reviewFrames.at(-1) !== choreography.frameCount) {
     throw new Error('reviewFrames must be unique and include the exact loop endpoints');
   }
-  if (choreography.media.cacheKey !== 'pass66-runtime-preview-v2') throw new Error('runtime preview cache key is stale');
+  if (choreography.media.cacheKey !== 'pass66-runtime-preview-v3') throw new Error('runtime preview cache key is stale');
   const rotor = choreography.helicopter?.rotorPresentation;
   const configuredRotorArea = rotor?.mainStageWidthPercent / 100 * rotor?.mainStageHeightPercent / 100;
   const configuredRotorTop = rotor?.mainStageTopPercent / 100;

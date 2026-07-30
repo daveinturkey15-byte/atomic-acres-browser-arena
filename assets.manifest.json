@@ -447,7 +447,7 @@
       "sourceScript": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
       "sourceScriptSha256": "44123c993085db075a92fb4421d895a5884f0ab5dcb3417b6ad0ae7f1e7b7b1e",
       "sourceProvenance": "source-assets/menu/pass65-preview-masters/provenance.json",
-      "sourceProvenanceSha256": "b8e3240c2173b5afdc0ea53c4635f432e0d2ca3b9c598ae1f26004df029f9175",
+      "sourceProvenanceSha256": "4042801c5fc5dc4e7bbd3d53d1dfdf25bf397e1f295eb56b6c1e4f0df5ef217f",
       "format": "Four distinct 1280x720 eight-second 30 FPS selected-map runtime captures, shipped as VP9/Opus WebM, H.264/AAC MP4 and static WebP posters, plus deterministic five-frame review evidence",
       "modifications": "Captured offline from each actual authoritative production WebGPU arena with deterministic camera and visual time. Three map flyovers bake perspective-aware elliptic rotor arcs with subdued moving spokes, measured mast/hub/header occlusion, two visible structural ties into the side canopy rails, a restrained tail camera and compact green-on-graphite cockpit avionics; Gun Range bakes compact charcoal/silver ears, forelegs and top-facing paws. Runtime loading/menu playback remains prerecorded-only, reduced motion is poster-only, and no downloaded or sampled assets are used. The former byte-identical Gun Range media gate is explicitly superseded.",
       "attributionRequired": false

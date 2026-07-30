@@ -3,7 +3,7 @@
   "captureId": "pass66-authoritative-runtime-menu-preview-capture-v1",
   "generatedAt": "2026-07-29",
   "recipeId": "pass66-authoritative-runtime-menu-preview-v1",
-  "recipeDigest": "53ecc711e5344c181635f17d68340f9601b8e614f5b1f89813eddd84322e12eb",
+  "recipeDigest": "81c278bc5575c3bdaafa2a844fd13e6fadea30bb122307b42e580cb7e1210746",
   "source": "authoritative-runtime-arena",
   "backendRequired": "webgpu",
   "viewport": [
@@ -390,9 +390,9 @@
         "public/assets/original/models/weapons/pass65-firearms/sniper/sniper-world-lod0.glb",
         "public/assets/third-party/quaternius/animated-guns"
       ],
-      "fileCount": 869,
-      "totalBytes": 97991688,
-      "treeSha256": "b6047a65c4c3053b0b666d6118c37837df940c7d4a2fe6fc2dae6dffcaaff528",
+      "fileCount": 878,
+      "totalBytes": 99963822,
+      "treeSha256": "94a0f9d326b1db86bd8aec59e208eab0257851b6b8e7459b4f04a2e586e0b58d",
       "files": [
         {
           "path": "public/assets/original/models/atomic-acres-blender-arena.glb",
@@ -406,13 +406,13 @@
         },
         {
           "path": "public/assets/original/models/operators/pass65-first-person-arms-lod0.glb",
-          "sizeBytes": 368596,
-          "sha256": "ce00d43b67e7c820d8ecb26a4237978567c66529535aa2a9fccad0e355c1f11b"
+          "sizeBytes": 404600,
+          "sha256": "1cf9dc34038f3f35dcd394909f6a08e48307690f576823b6c443c11bf3b32e25"
         },
         {
           "path": "public/assets/original/models/operators/pass65-first-person-arms-lod1.glb",
-          "sizeBytes": 359428,
-          "sha256": "5cc84ff064f14a53fe67714347c3ad49abf88c7c724f84c4033d57b028387efb"
+          "sizeBytes": 386472,
+          "sha256": "ccf0c5ad60da303c283046649743d2ecae3a31f70f3829e8802795148071c9e3"
         },
         {
           "path": "public/assets/original/models/operators/pass65-third-person-operator-lod0.glb",
@@ -1166,23 +1166,23 @@
         },
         {
           "path": "public/assets/original/textures/operators/pass65-first-person-arms/pass65-first-person-arms-baseColor.png",
-          "sizeBytes": 380357,
-          "sha256": "efcce565b81ed28e61b530bc77d57f31f20ba274d3e982902a48b805254ae23c"
+          "sizeBytes": 1065859,
+          "sha256": "d222dee1c8a169e5f4667b91ef327752e49c21c00c18af23adc49034e68ba38b"
         },
         {
           "path": "public/assets/original/textures/operators/pass65-first-person-arms/pass65-first-person-arms-metallic.png",
-          "sizeBytes": 5805,
-          "sha256": "a92653d0ff3499d538ff310bc32d121a99981a238e563cf977d8115a89954803"
+          "sizeBytes": 20726,
+          "sha256": "b423c3205b957f68b072235b9343520f84b1adde4b216bd44893a20e9398f704"
         },
         {
           "path": "public/assets/original/textures/operators/pass65-first-person-arms/pass65-first-person-arms-normal.png",
-          "sizeBytes": 329004,
-          "sha256": "e7f2071073fab2d95ca66ff1fdfa0eea73094ea5855bd82e2fabaa44ea8ccfde"
+          "sizeBytes": 1077030,
+          "sha256": "58948e90fa391de01dcf5f2bed98d19f1a8e5d729e29bb3c0a0708558b824d43"
         },
         {
           "path": "public/assets/original/textures/operators/pass65-first-person-arms/pass65-first-person-arms-roughness.png",
-          "sizeBytes": 174685,
-          "sha256": "e4e6f51425cecaa5a841de5debaf74c87a909508922c092f0ba12e3e9811d8b1"
+          "sizeBytes": 505926,
+          "sha256": "5ef34ec574d1675f033a2de5ecb94bf90ae0dfaaccae9acde1da6ae3fbc44e58"
         },
         {
           "path": "public/assets/original/textures/operators/pass65-third-person-operator/pass65-third-person-operator-skin-baseColor.png",
@@ -2411,18 +2411,18 @@
         },
         {
           "path": "src/acceptance-gate.test.ts",
-          "sizeBytes": 4491,
-          "sha256": "83c6c48fd6fde2aee752f3acd10c2aa079194e0dff05a64fdbb89ffe54e832fc"
+          "sizeBytes": 8360,
+          "sha256": "ae93a3c2c984088dd862b0e4e796a5bc70b6c367f89135c9af969c498747cd32"
         },
         {
           "path": "src/adaptive-quality.test.ts",
-          "sizeBytes": 8163,
-          "sha256": "18aafe76682370696d5d40d10f9a4fe0cee7bc7d2f7859a8681993dd331a54b1"
+          "sizeBytes": 12695,
+          "sha256": "7b67b79745d20caae2838b6141db1fd655b0ce173fd061904d51daf744dd2715"
         },
         {
           "path": "src/adaptive-quality.ts",
-          "sizeBytes": 9689,
-          "sha256": "3529b782e89834070993afdef9d0ff842f91602c3a6cfe97f2b1530e47c543b7"
+          "sizeBytes": 12908,
+          "sha256": "fe8fa70aa3db43f5fe71889a4b514a9605a033926cbe944cfebc7300e0a71df8"
         },
         {
           "path": "src/additional-maps.test.ts",
@@ -2491,8 +2491,8 @@
         },
         {
           "path": "src/assets-manifest.test.ts",
-          "sizeBytes": 4767,
-          "sha256": "e9df9b15a4b479b0dddd1effe642a379821abf9acb5c914079183098c10b83b5"
+          "sizeBytes": 7013,
+          "sha256": "01dfa0a884ed89844fb08d03efed23ba9ea653131f1f73c6cede2f9c0f067f02"
         },
         {
           "path": "src/async-serial-queue.test.ts",
@@ -2586,18 +2586,18 @@
         },
         {
           "path": "src/blender-authoring-fail-closed.test.ts",
-          "sizeBytes": 1524,
-          "sha256": "6bef231356a549f99b11ee11ce24707346d9bf3e9646f1004458ef1792d61e8e"
+          "sizeBytes": 2144,
+          "sha256": "135635fa01228a07c38f517b153bc2bad5f3e39e41bec89535eac2a778f6357a"
         },
         {
           "path": "src/blender-environment.test.ts",
-          "sizeBytes": 10154,
-          "sha256": "aff55ad7770daf4909d8236ee3484cd4470654be2662ee60d36e37286e156802"
+          "sizeBytes": 10345,
+          "sha256": "81c3ccae4acaa2fc84b8650172d6905b82687bcdb3f0abee83922cc9c3642db1"
         },
         {
           "path": "src/blender-environment.ts",
-          "sizeBytes": 11848,
-          "sha256": "a6b9d247cfd1d66358b3429e1df3e7bf5d72f5fc1aebcef7086bbd6741436f91"
+          "sizeBytes": 12316,
+          "sha256": "5e9156e485b6e3b63e5483cf20947bedd44a387327b39cebcf61c0386bd72d5b"
         },
         {
           "path": "src/blender-lighting.test.ts",
@@ -2616,18 +2616,18 @@
         },
         {
           "path": "src/bootstrap.ts",
-          "sizeBytes": 2806,
-          "sha256": "937ce47fb601fa7396a72abc68f1b7deeca3a228532d54b7b223b36c4b04ee27"
+          "sizeBytes": 2803,
+          "sha256": "2698acd0f2953aa0b9ca8c52fb2a614c76b8b9efa5b61029d5f35770304cc26a"
         },
         {
           "path": "src/bot-ai.test.ts",
-          "sizeBytes": 10487,
-          "sha256": "131bf2c07f348f0654d29efe2e17c9ed6b1dceaa53ba8d9ebcfcb7a52bea4548"
+          "sizeBytes": 10504,
+          "sha256": "54606ae223c15d238e223cbf3ad43dd887b248c20c171af8bc2f6e44bb00cb5d"
         },
         {
           "path": "src/bot-ai.ts",
           "sizeBytes": 9128,
-          "sha256": "a57661cb2cd71c3e2b69348ec809322b6488d98c6f08833f132d271849a87f4d"
+          "sha256": "3a06d325ca00c921d63c75fff9ecaeb9647a2201d71add0a53f960b201877040"
         },
         {
           "path": "src/bot-arsenal.test.ts",
@@ -2672,12 +2672,12 @@
         {
           "path": "src/changelog.test.ts",
           "sizeBytes": 4880,
-          "sha256": "9b467db7a2acec61b9a71b4c100c16d9de819db394f94808357eee3cfe14aa78"
+          "sha256": "337e67bc951162b37b464096d1a338ae58dbc13ecb04f34e0f2ab4e7b033f8d4"
         },
         {
           "path": "src/changelog.ts",
-          "sizeBytes": 28083,
-          "sha256": "acfd3ca34a833dff4fe2663b44e83df48a178fef25108fad094355a9b90dd6ef"
+          "sizeBytes": 28280,
+          "sha256": "6c0264a3b0eeb500b501955a8cde8fd385ffe64ca3124cf3ceb345d51a0027fd"
         },
         {
           "path": "src/character-presentation-contract.test.ts",
@@ -2936,13 +2936,18 @@
         },
         {
           "path": "src/environment-assets.test.ts",
-          "sizeBytes": 4882,
-          "sha256": "28ced178a1a4492083a2fc3155792703a7b2a7cf8b428203b6f8952afdcfc593"
+          "sizeBytes": 5488,
+          "sha256": "8093600af4d4a12572fd9e19d9189203dfde59169a841792d3e581404d79cc2b"
         },
         {
           "path": "src/environment-assets.ts",
-          "sizeBytes": 44684,
-          "sha256": "f4a84c7f6944b5261f67cbc7c8753a30dfccad86ad81960904dd15a699cb2c8e"
+          "sizeBytes": 45095,
+          "sha256": "239b02db31c1e28dbc0f373e4323d0e90cd16bcb783cab7d082c2a857012fecf"
+        },
+        {
+          "path": "src/external-services-qa-contract.test.ts",
+          "sizeBytes": 1070,
+          "sha256": "01e93762cf362bd3b5ee9089f231b4767128be83008acf9ab25a35a4dc7b97c2"
         },
         {
           "path": "src/field-support.test.ts",
@@ -3051,13 +3056,13 @@
         },
         {
           "path": "src/global-leaderboard.test.ts",
-          "sizeBytes": 4430,
-          "sha256": "6cf1ebd9616bf84c397ba82555acb72d187b32e1a1a3495cadeae4dd4d2f2a94"
+          "sizeBytes": 4784,
+          "sha256": "97adfafd9f1665c1850f130ebd944c3db5db3ba84936c712685c8daedccd7531"
         },
         {
           "path": "src/global-leaderboard.ts",
-          "sizeBytes": 3600,
-          "sha256": "44962378f5d43d98097bbef9fea2ba6ea1ed1f3485d209d081f41082747e8169"
+          "sizeBytes": 3808,
+          "sha256": "c1fff53cc54426aab7a8d50b68c550a1e849c389d25c83c8a958b939d38f4c4b"
         },
         {
           "path": "src/gpu-resource-ownership.test.ts",
@@ -3331,13 +3336,23 @@
         },
         {
           "path": "src/interaction-arbitration.test.ts",
-          "sizeBytes": 2632,
-          "sha256": "181623fcc338815c50249828121266f74aad91fbc9a940783e74c2f5968c8389"
+          "sizeBytes": 3247,
+          "sha256": "e46444bcd664ab2b2b8c678b69b3cd17a3698a453f04e05925f94c1f0dc0a967"
         },
         {
           "path": "src/interaction-arbitration.ts",
-          "sizeBytes": 1581,
-          "sha256": "b7f3164d191e1400bdd4c1a25567c59f9bba3f55d1efeda5cd87b0a0cbc928de"
+          "sizeBytes": 2561,
+          "sha256": "adaeccdad601cd145e6916eb8e18faa1be768c353334fd95c0d3c40d4e933c65"
+        },
+        {
+          "path": "src/interaction-press-lifecycle.test.ts",
+          "sizeBytes": 5294,
+          "sha256": "d93e88a11652dde1e338abb1f1adb5a1afb1a9f1893b8b70775905f793034a4b"
+        },
+        {
+          "path": "src/interaction-press-lifecycle.ts",
+          "sizeBytes": 6076,
+          "sha256": "2037ff4e9ec68be9257010bb9817afefaffb90cb5e997d0810b885d4062e46e4"
         },
         {
           "path": "src/interactive-world-protocol.test.ts",
@@ -3386,18 +3401,28 @@
         },
         {
           "path": "src/killstreak-drone-deployment.test.ts",
-          "sizeBytes": 17591,
-          "sha256": "4a17b2afbd0a1a6dd6ef51fc1374fb6f3885993c19fffe0d55374f2f347368ca"
+          "sizeBytes": 19020,
+          "sha256": "c3e4eb2a26919ce67d8bc840c0f8cf82877a1ed5124bd47354d68a5add0b8ddd"
+        },
+        {
+          "path": "src/killstreak-drone-formation.test.ts",
+          "sizeBytes": 3090,
+          "sha256": "33a8e3cb959096e146205499ea4de423ef92450a620101f7f7f87b418a679e8e"
+        },
+        {
+          "path": "src/killstreak-drone-formation.ts",
+          "sizeBytes": 2443,
+          "sha256": "feffea54188b97bd2c858809d08bd316e3da939b8ebe8c2e338f9998710127b3"
         },
         {
           "path": "src/killstreak-drone-input.test.ts",
-          "sizeBytes": 3226,
-          "sha256": "5f67804f3c1163cab172cd6b61e06f4191782e341dc35cdfa82c49449dd946ce"
+          "sizeBytes": 4588,
+          "sha256": "a634d4d58d5d00928f651421d6612b04e5bed2f47e0380ebfd8c5bd8188d008f"
         },
         {
           "path": "src/killstreak-drone-input.ts",
-          "sizeBytes": 3354,
-          "sha256": "5bccf2ad18a03e3c14c3e4d2f790049a5a7a1dca38863b0d932a7e84c5f0c794"
+          "sizeBytes": 4889,
+          "sha256": "513838a3f534fa99775154803107778f4455c74e48cddc67885bddb0e584e4b5"
         },
         {
           "path": "src/killstreak-flight-navigation.test.ts",
@@ -3421,8 +3446,8 @@
         },
         {
           "path": "src/killstreak-main-integration.test.ts",
-          "sizeBytes": 15736,
-          "sha256": "6a82ab1d28e4d4299c357e02157c533be313696b4ab87b673a801547097134c2"
+          "sizeBytes": 16970,
+          "sha256": "11ab739c23a361fbaafd6e27afa8806b73659d99a5a82ee1320907213b421e95"
         },
         {
           "path": "src/killstreak-presentation.test.ts",
@@ -3451,8 +3476,8 @@
         },
         {
           "path": "src/killstreak-runtime.ts",
-          "sizeBytes": 96006,
-          "sha256": "45b40f3f93ab0785dabe281faa7413a44c346ee0cee8c519747657f143af3026"
+          "sizeBytes": 99537,
+          "sha256": "2fa673697ce25fa83cbc47d0e30637fb26826ba275420dcdde1aeb20c017179b"
         },
         {
           "path": "src/killstreak-support-catalog.test.ts",
@@ -3461,8 +3486,8 @@
         },
         {
           "path": "src/killstreak-support-catalog.ts",
-          "sizeBytes": 5957,
-          "sha256": "c25bacaeef518a41c93607527fdb7a56e31f1d8c9dc302f797592534e40a4147"
+          "sizeBytes": 5955,
+          "sha256": "690380554a42b08f39e739928989828b346211298c2483858e164142f6beb4eb"
         },
         {
           "path": "src/lag-compensation.test.ts",
@@ -3486,8 +3511,8 @@
         },
         {
           "path": "src/legacy-main.ts",
-          "sizeBytes": 881967,
-          "sha256": "85d9759052d39218736f923dcb19354e856abf5039d292e497645de4b0de4c81"
+          "sizeBytes": 897938,
+          "sha256": "82ae075a18246910274313e4c8f5dda993a2f36136b0616cd5b9ad6e386fd719"
         },
         {
           "path": "src/loadout-preset-schema.test.ts",
@@ -3511,8 +3536,8 @@
         },
         {
           "path": "src/main.ts",
-          "sizeBytes": 1071,
-          "sha256": "7b3a49617844f2ef92d7e874b1e2fd6529608485a84a13abdbeda0a40c70d45d"
+          "sizeBytes": 1080,
+          "sha256": "dc81c7535b312f788cfbebffa4e9987d8daf3f506ec4700182c63343ba96f019"
         },
         {
           "path": "src/major-debris-budget.test.ts",
@@ -3526,13 +3551,13 @@
         },
         {
           "path": "src/map-selection.test.ts",
-          "sizeBytes": 3680,
-          "sha256": "a6974bbb8bae7f2824f701e7d270079a8b0c4989e65347ce93bf89f99a137704"
+          "sizeBytes": 4027,
+          "sha256": "dfca0e7426a6ff28c08cbcaa5a2f166e9527b1217c7a5d5e83aa032ed2e8ba87"
         },
         {
           "path": "src/map-selection.ts",
-          "sizeBytes": 4877,
-          "sha256": "716651292725dd063111a2a0a105c0ffcb4f103750ded28bcddbe68cadbf714b"
+          "sizeBytes": 5098,
+          "sha256": "9dd5ad4539e9bdc8a06966accb6c92dc7ccd86de56e06899e8cfff8021da0290"
         },
         {
           "path": "src/map.test.ts",
@@ -3691,8 +3716,8 @@
         },
         {
           "path": "src/operator-model.ts",
-          "sizeBytes": 42017,
-          "sha256": "4f62a3e99bb7d06fa5aa732fedc2cc44a1a4be8e87a1d171cef3c77e78751cfd"
+          "sizeBytes": 42141,
+          "sha256": "4dc37cec65ee4944770ab7e3f9b23f0be8233a7947771745eabc187d7bdcb458"
         },
         {
           "path": "src/overdrive.test.ts",
@@ -3741,13 +3766,13 @@
         },
         {
           "path": "src/pass65-frame-pacing-gate.test.ts",
-          "sizeBytes": 3204,
-          "sha256": "4249546b2390458b331d4036ff8785627650697d0f1f8475a1528d26e4c1f1ab"
+          "sizeBytes": 6610,
+          "sha256": "73c75cf97d3966336313120d9629c8f2adf9a4dd44b1d6e347ce8cc065a98eaa"
         },
         {
           "path": "src/pass65-frame-pacing-gate.ts",
-          "sizeBytes": 8363,
-          "sha256": "7d12723d6097cb44e470fb5f11510b061aeccc4ed4010b4d332c197d1480987d"
+          "sizeBytes": 14129,
+          "sha256": "308a13758f68badd18eb1edc6e662b10ace6dfa5cdfb8d26a6e7d0709fb466bb"
         },
         {
           "path": "src/pass65-gameplay-hotpaths.test.ts",
@@ -3763,6 +3788,11 @@
           "path": "src/pass65-hardware-webgl2-admission-gate.ts",
           "sizeBytes": 6425,
           "sha256": "2316cb5f78c1ec65ba5c4cefba5f8ba3f8b63a9eb82ed275a414dc7ce72d8b11"
+        },
+        {
+          "path": "src/pass65-release-foundation-evidence.test.ts",
+          "sizeBytes": 1983,
+          "sha256": "78ee3fed1b0d852b70b9e121badbb7703f95272949b3bb0faced852a4fc9de72"
         },
         {
           "path": "src/pass65-renderer-feature-inventory.test.ts",
@@ -3855,14 +3885,19 @@
           "sha256": "5bafc20a98fbc598d023383a9393cde13aba69c10c45ad489d924807fceb39a9"
         },
         {
+          "path": "src/pr-preview-provenance.test.ts",
+          "sizeBytes": 16761,
+          "sha256": "3d88866253fb5bee94b9637137630e06883ce96dcdcd3ea78c66ba30e3ae69a7"
+        },
+        {
           "path": "src/presentation-animation-reset.test.ts",
           "sizeBytes": 2257,
           "sha256": "2181f0ebda15a5d297f21e9d13e95b1b9f80df5fa58570bc43df74d23a268a27"
         },
         {
           "path": "src/presentation-prewarm-contract.test.ts",
-          "sizeBytes": 45810,
-          "sha256": "9531a176ce2a95fa8be27743fa9f454214d1eeab84d44d555ce52a4b64f8d56e"
+          "sizeBytes": 54772,
+          "sha256": "608329c607fc793d10d87f84a8850beca33122c46c7ee0f0213a4619a76d41fd"
         },
         {
           "path": "src/presentation-scheduling-lifecycle.test.ts",
@@ -3901,13 +3936,13 @@
         },
         {
           "path": "src/project-map.test.ts",
-          "sizeBytes": 2862,
-          "sha256": "85970f40ceb027798519eb0bfbbda721e384bfd8bd95db25c4902c272487e618"
+          "sizeBytes": 2857,
+          "sha256": "76b31fe332d6ff7478c34712f232a026acb2966d9d3b0f3fd94c6fcc11dd6421"
         },
         {
           "path": "src/project-map.ts",
-          "sizeBytes": 15172,
-          "sha256": "048067c10cc4347282ae388a2ec0fbfe023d0c8fb089ff9be33a6623f5970e0b"
+          "sizeBytes": 15291,
+          "sha256": "1d6c51064af8f445fd070c71b39d003cbe8ac862f70162bb41683ca28edbb96a"
         },
         {
           "path": "src/protocol.test.ts",
@@ -3951,13 +3986,13 @@
         },
         {
           "path": "src/release-change-impact.test.ts",
-          "sizeBytes": 1155,
-          "sha256": "66a17cf33626ab5a2af1c518f925f5720dcd868a548f2a28617f8ccfd1f5fd3a"
+          "sizeBytes": 2520,
+          "sha256": "a531df7457f24add8fd8135403fa97f03d43c2d05fee86b622ab9b8cacbc03e6"
         },
         {
           "path": "src/release-channel.test.ts",
-          "sizeBytes": 2239,
-          "sha256": "e79a86093e7525bf229c2941dbe615a293ac66fb85ba9477ed0a19fe4f66cad0"
+          "sizeBytes": 2607,
+          "sha256": "d758c02dfb0af988c9ac6b0a61ec614628345dfab18c4b5e38969b9bfabf4577"
         },
         {
           "path": "src/release-channel.ts",
@@ -3966,18 +4001,18 @@
         },
         {
           "path": "src/release-identity.ts",
-          "sizeBytes": 676,
-          "sha256": "f3b1429d8fed223bd99e88fe678af3e101b8789e235e793ee6234342fb8e1930"
+          "sizeBytes": 664,
+          "sha256": "d9c6f43751a408cb569281709acb86d42d3a57eff85d105df33328f5eba495aa"
         },
         {
           "path": "src/release-pipeline.test.ts",
-          "sizeBytes": 5824,
-          "sha256": "6f24a4d1282f9c176990ddd6ab7dacb13c704bcd4e2da87274e973b639fc9e7a"
+          "sizeBytes": 13540,
+          "sha256": "9bbe0b1867d24aa7af7d8435077a76b9c6a0e6df25dd01a576e1f5d2b46aab61"
         },
         {
           "path": "src/release-topology.test.ts",
-          "sizeBytes": 5946,
-          "sha256": "07b42d74222e667da1ce49ce056e421cf4c4afc27eb55e2e342a163fef61041e"
+          "sizeBytes": 6099,
+          "sha256": "061d85cb489f0f7673d4103b8ae478f268a7083e920f20893dbf04fae037592b"
         },
         {
           "path": "src/remote-grenade-admission.test.ts",
@@ -4156,13 +4191,13 @@
         },
         {
           "path": "src/rendering/render-runtime.test.ts",
-          "sizeBytes": 22569,
-          "sha256": "181c125c71e171a128e51c4d58128c35d9093eec36ce87215889b6dca589862d"
+          "sizeBytes": 28900,
+          "sha256": "45c5bc7266961d9f507a190eaefe550645cb3f831447789a24d072b5089c4d33"
         },
         {
           "path": "src/rendering/render-runtime.ts",
-          "sizeBytes": 49380,
-          "sha256": "073babbe7be848cedf329ce327ab6444b85ce185b455a676076ca69091e50f78"
+          "sizeBytes": 51530,
+          "sha256": "a31e4bfb6e861cf487ffacc65df47b4787af1b55018fce716b969d8c40a52b5f"
         },
         {
           "path": "src/rendering/resident-memory.test.ts",
@@ -4366,8 +4401,8 @@
         },
         {
           "path": "src/style.css",
-          "sizeBytes": 70428,
-          "sha256": "78da74dd5b44f525fcde2b166db2aef13d44fd76bf17f9321c1e2a11c8e61efe"
+          "sizeBytes": 70646,
+          "sha256": "c0f0df6dfd77164a04d7e974a2d22e9ea80b92594e9c3fa6d3c0dfd35786bcd8"
         },
         {
           "path": "src/support-damage-feedback.test.ts",
@@ -4512,22 +4547,22 @@
         {
           "path": "src/ui/menu-preview-video.test.ts",
           "sizeBytes": 2832,
-          "sha256": "2393b3e98823a4cfa8ad3730077fd71d4823f47dbfdb3ce5f7ecd9525dc6f03d"
+          "sha256": "37db536a9a241358b23f78b6abcfe344f6372fb27be066a8baf47155028a9b2c"
         },
         {
           "path": "src/ui/menu-preview-video.ts",
           "sizeBytes": 12791,
-          "sha256": "49c1996e5b4e4a34fa3808f698404d98f929045b267585a7a768d0555da1c68f"
+          "sha256": "84c5184bed91aa59d2af21752759b6b802131c6ea7f74d7a545faf8dc35e95f7"
         },
         {
           "path": "src/ui/pass64-shell.test.ts",
-          "sizeBytes": 5743,
-          "sha256": "a7703c2b05d478965b569aa0172af538ba760bce0cb4403584cdbefa868a7de1"
+          "sizeBytes": 5835,
+          "sha256": "f0ff93ad1ad64f5724aeeaf39f5ad398a502d2d8a12cf7409f73442bd57f8814"
         },
         {
           "path": "src/ui/pass64-shell.ts",
-          "sizeBytes": 27370,
-          "sha256": "6ee3736b3a78606a7032c03ab8cde50bac64ba0382d644112875c585f4815e7f"
+          "sizeBytes": 27492,
+          "sha256": "afad5e0d2f4cc93e48ba21cbcdb7cd873036b7a210a8504ff8b26122c19f8629"
         },
         {
           "path": "src/ui/pass65-hud-layout.test.ts",
@@ -4541,13 +4576,13 @@
         },
         {
           "path": "src/ui/pass66-readability.css",
-          "sizeBytes": 5321,
-          "sha256": "e1ab068e72dad5947df1998d1a9788b52727b96fdb4e0365dc1d2b6e1c775a5a"
+          "sizeBytes": 8985,
+          "sha256": "4f16425e38e1ef80e7d2986caf6a761d5aefdef45dd3f33e12dd9b2be3d33111"
         },
         {
           "path": "src/ui/pass66-readability.test.ts",
-          "sizeBytes": 1490,
-          "sha256": "c240fd805f78999b44aa2dbbf5099e400e78d820a009a0d86a590dfcd6467364"
+          "sizeBytes": 1920,
+          "sha256": "c7b45b479f765bee7a9d0efce7739d122fb9cdc07160cc07023f162c07732ec0"
         },
         {
           "path": "src/ui/project-map-dialog.css",
@@ -4561,8 +4596,8 @@
         },
         {
           "path": "src/ui/project-map-dialog.ts",
-          "sizeBytes": 8102,
-          "sha256": "3fa7cbaef93a50720ca3f1c75dbdbb098664416c21469c0d3bb1c6d45f000782"
+          "sizeBytes": 8176,
+          "sha256": "63379555bf69e7f9b0d74e8b3105d83dee354b948dea6f69bdf918efba0fcfbe"
         },
         {
           "path": "src/ui/release-history-dialog.ts",
@@ -4581,8 +4616,8 @@
         },
         {
           "path": "src/ui/tactical-ui.css",
-          "sizeBytes": 82416,
-          "sha256": "e717ec35bc42d33c75845f4460fad2b2bfbabe842e885892b8fff22cd112e2d5"
+          "sizeBytes": 82980,
+          "sha256": "7d49bbbfd3e15e24a0efda37895ef4b685703cc3375f1b6eb6bb71f0d7d7ba31"
         },
         {
           "path": "src/vertical-navigation.test.ts",
@@ -4621,8 +4656,8 @@
         },
         {
           "path": "src/weapon-asset-production-contract.test.ts",
-          "sizeBytes": 10346,
-          "sha256": "e51b91b5caf425ff070f48e56b4796b6bd582d661aeacd0f3f5b895f3aafe414"
+          "sizeBytes": 10362,
+          "sha256": "8a6c333a4b062b062d32affd4d023fe664f2838b22869af4cbbbf82356a91f0c"
         },
         {
           "path": "src/weapon-audio-profiles.test.ts",
@@ -4681,8 +4716,8 @@
         },
         {
           "path": "src/weapon-presentation.ts",
-          "sizeBytes": 114951,
-          "sha256": "53206503752e56a1a368558ab6c67df251dbc1ac92b413b62c99b39d3267d73c"
+          "sizeBytes": 116194,
+          "sha256": "cd64ea6f2be50274f390d0f94d49ad849fce87d46568c500b82d9df75ed0c73f"
         },
         {
           "path": "src/weapon-prewarm-catalog.test.ts",
@@ -4701,8 +4736,8 @@
         },
         {
           "path": "src/webgpu-adaptive-epoch.integration.test.ts",
-          "sizeBytes": 6430,
-          "sha256": "4341c43637e58c3b9d9d6ff29676512af31a4f537511d1a6a691a9c42f4cfa84"
+          "sizeBytes": 6398,
+          "sha256": "32c1c70b901ad1d68fdf35b72a864cb206091761bb3db6111ca298a910a5fdc6"
         },
         {
           "path": "src/window-breaks.test.ts",
@@ -4713,6 +4748,16 @@
           "path": "src/window-breaks.ts",
           "sizeBytes": 1596,
           "sha256": "2d4d2986f27dd3b932e8ed65bb3fe5c1a420c5f8b408c681f6189bbe936dfda4"
+        },
+        {
+          "path": "src/window-glass-debris-presentation.test.ts",
+          "sizeBytes": 2655,
+          "sha256": "e9f50d4c587357934312a50a49ab8a4069b11adec139dfb43e658bbc8c3ae52c"
+        },
+        {
+          "path": "src/window-glass-debris-presentation.ts",
+          "sizeBytes": 3023,
+          "sha256": "b4949441dbbf1dc24f32ad0a1f569fa8e8db7725a1306f03e611b6a72342a490"
         },
         {
           "path": "src/world-identity-presentation.test.ts",
@@ -4764,8 +4809,8 @@
         "algorithm": "sha256-ordered-name-size-bytes-v1",
         "domain": "menu-preview-frames:atomic-acres",
         "fileCount": 240,
-        "totalBytes": 191659533,
-        "sha256": "4f27994275682a7d593b4d2c589a867d2239a29b90a6a4c1da9ef479243f3668",
+        "totalBytes": 208207481,
+        "sha256": "a2b66a0ca56e5a6d0ae213b9710b37dc9822f3fce93d15debd44edb4c245ce9f",
         "frameRoster": [
           1,
           2,
@@ -5027,7 +5072,7 @@
           "fixedVisualTimeMs": 65000,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "fc4852e3239d1f1c71162aee1d7c0eb10cd7721e180fc12035e1115e8ca682eb",
+          "pngSha256": "b668300a299eefd09c68822d1bbb9bb3448ef5dd4261139ae667a63ff763dd66",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.021080999904208714,
@@ -5091,7 +5136,7 @@
           "fixedVisualTimeMs": 66974.89539748954,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "7e5733a4d1b864c9d070a0dce3f782f78b9e3a9e8bfb99b073398add1dab3db7",
+          "pngSha256": "84ab3d12e0ff97e26bd6c7f05bb17691488aa89958c2ec9074b294484ca7bf1d",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.020440171824561225,
@@ -5155,7 +5200,7 @@
           "fixedVisualTimeMs": 68983.26359832636,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "bd12d7e3403137ec55e05ac0681045e6c628ea968cee214cf993ed5045a41dd4",
+          "pngSha256": "cc91f96a5966d05eb3a8641ea59648c0db167f316f807dff87a334a6e118aa63",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.01937614017062717,
@@ -5219,7 +5264,7 @@
           "fixedVisualTimeMs": 70991.63179916318,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "3f5f9baefdaeaa609dcfff4af35490657c451ca69da0d54f75488b460f6df8f5",
+          "pngSha256": "aabaab9a06c0764f4f0419d49a90dfa5024cddc147833bab60c4bb09fda24d00",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.037695002555847165,
@@ -5283,7 +5328,7 @@
           "fixedVisualTimeMs": 65000,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "fc4852e3239d1f1c71162aee1d7c0eb10cd7721e180fc12035e1115e8ca682eb",
+          "pngSha256": "b668300a299eefd09c68822d1bbb9bb3448ef5dd4261139ae667a63ff763dd66",
           "seamSourceFrame": 1,
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
@@ -5354,8 +5399,8 @@
         "algorithm": "sha256-ordered-name-size-bytes-v1",
         "domain": "menu-preview-frames:skyline-terminal",
         "fileCount": 240,
-        "totalBytes": 98175021,
-        "sha256": "ea10cef7248b0b4c2f27b94e47e6a349957bf4888f702790f51c6598ab046681",
+        "totalBytes": 111173186,
+        "sha256": "f9e3b13942d4f02cba96f621c81f0f712a08161bf5a71674636bd789cf2fa30b",
         "frameRoster": [
           1,
           2,
@@ -5681,7 +5726,7 @@
           "fixedVisualTimeMs": 66974.89539748954,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "dfa6b86598d72c5415a0fcfea4d167661f778cfcbf5aa5a1a8439cdd78a24537",
+          "pngSha256": "62718a6bfcd979684667b6d194aa96229ee520b08ad19454843dafe3a73732a5",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.02505436208513048,
@@ -5745,7 +5790,7 @@
           "fixedVisualTimeMs": 68983.26359832636,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "37397f31d62e6b851564b016f29dc64fc547c1f99d2ff95dfcccf7e339bf8e22",
+          "pngSha256": "3b87ceb094bbe7b01e60d00e71850ba577e03d703745da9f31c42694c83bbdff",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.020275488164689805,
@@ -5809,7 +5854,7 @@
           "fixedVisualTimeMs": 70991.63179916318,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "231d0f921d576a19b940c4ae44b041f62415a685f8d26104555b172ee67c2ccc",
+          "pngSha256": "f9d2d25d4ec8ee46abfc416450bbd8c3f64357ef4e01cecae9a52b218f82d726",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.02142097420162625,
@@ -5944,8 +5989,8 @@
         "algorithm": "sha256-ordered-name-size-bytes-v1",
         "domain": "menu-preview-frames:rustworks-1v1",
         "fileCount": 240,
-        "totalBytes": 150633571,
-        "sha256": "19a725dcbe9e360a71d1049872f2c1ccb1655b1541de421c2a3912f68cbf5896",
+        "totalBytes": 185167187,
+        "sha256": "e2b2297fba7026ccd0b28a96f6d6354ae2da56c7ad160903b0f242a0bd273006",
         "frameRoster": [
           1,
           2,
@@ -6207,7 +6252,7 @@
           "fixedVisualTimeMs": 65000,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "34b82dde76134c51cfa3fc0428986cc92ca351f5219ba08555ddc5f46c0721b5",
+          "pngSha256": "03f5a4103762c9c2b18ed0625f5763bc0c66062f680e724f69dbaf2d0aba4cba",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.020263327492607966,
@@ -6271,7 +6316,7 @@
           "fixedVisualTimeMs": 66974.89539748954,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "f75cadd6daa86c0819b3545a13d735d306ebc9da27ab3cd5001a5d88e34bc67b",
+          "pngSha256": "8c548a94bdc6f6c9f9a9ec02dafbd3850ca2966b69d7364112f44b090c4f4d06",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.021996829244825575,
@@ -6335,7 +6380,7 @@
           "fixedVisualTimeMs": 68983.26359832636,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "9cad9c8b8ac02a86b11c65ae95f63af56213b3a46ea3110ee92f131db8ddeede",
+          "pngSha256": "a2e7291bf80d80d31fb5d4f4a2d31ba1ebe4ce55b7d8981a30c597d197db50a1",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.020378171073065863,
@@ -6399,7 +6444,7 @@
           "fixedVisualTimeMs": 70991.63179916318,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "98e5243036386867e4c87d42179822d134baa82ffd4c23a58a2702945bff596b",
+          "pngSha256": "68a200a12af749106efa93202e6ea79a49debbb022faa81902229d531b70ecfe",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.02128285434510973,
@@ -6463,7 +6508,7 @@
           "fixedVisualTimeMs": 65000,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "34b82dde76134c51cfa3fc0428986cc92ca351f5219ba08555ddc5f46c0721b5",
+          "pngSha256": "03f5a4103762c9c2b18ed0625f5763bc0c66062f680e724f69dbaf2d0aba4cba",
           "seamSourceFrame": 1,
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
@@ -6534,8 +6579,8 @@
         "algorithm": "sha256-ordered-name-size-bytes-v1",
         "domain": "menu-preview-frames:gun-range",
         "fileCount": 240,
-        "totalBytes": 91504098,
-        "sha256": "360563dbe0963984c1a7c25850b9e8b23bccf0370a7ee9cb4de7fc31912e745c",
+        "totalBytes": 113700777,
+        "sha256": "8a0cb95fef3e031e1c44840ef00135c0feae790a9ddc2e0548465a6c9d1896a5",
         "frameRoster": [
           1,
           2,
@@ -6797,7 +6842,7 @@
           "fixedVisualTimeMs": 65000,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "410fbe03fa81517186916b3ba5c80dd74d7357c8a34feae26c385398c9a85f47"
+          "pngSha256": "209fee277728d582fb4e8cd8d2d6c92c281a9044b6baa441c8d67e96571d96e0"
         },
         {
           "frame": 60,
@@ -6816,7 +6861,7 @@
           "fixedVisualTimeMs": 66974.89539748954,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "72f934a2cc33c3155234ecf7ff9edc9901b50df31d62be5e4f41e05e94710f76"
+          "pngSha256": "f8413b06affeec3a2a07dd3c8af503c30ab14f376f83949a8cba08319f21c99b"
         },
         {
           "frame": 120,
@@ -6835,7 +6880,7 @@
           "fixedVisualTimeMs": 68983.26359832636,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "50e3fa0c2140b5907d3a46a444f26d102aa3c143eb1ae613be3a79eb1ff8bfa8"
+          "pngSha256": "4b24647e666d9aef388539d154af24674c679f5c4489383d010e6711957808e3"
         },
         {
           "frame": 180,
@@ -6854,7 +6899,7 @@
           "fixedVisualTimeMs": 70991.63179916318,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "fc26f5f17f7a25b083271229c5fe894a6ec6c0bae6825684612ab48a0661f3ef"
+          "pngSha256": "3fa1d9b2c9711bc189a071d646c6e517a5c4afdf2af1570c8c0c2aabe43e3510"
         },
         {
           "frame": 240,
@@ -6873,7 +6918,7 @@
           "fixedVisualTimeMs": 65000,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "410fbe03fa81517186916b3ba5c80dd74d7357c8a34feae26c385398c9a85f47",
+          "pngSha256": "209fee277728d582fb4e8cd8d2d6c92c281a9044b6baa441c8d67e96571d96e0",
           "seamSourceFrame": 1
         }
       ]
