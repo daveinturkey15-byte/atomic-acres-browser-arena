@@ -25,6 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
       - name: Classify verification impact
         id: impact
@@ -43,6 +44,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -82,15 +85,29 @@ jobs:
         run: npm run audit:dependencies
 
   requirements-acceptance:
-    needs: classify-change
+    needs: [classify-change, static-and-unit]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Build exact frozen-evidence candidate bytes
+        if: hashFiles('acceptance/pass-66.json') != ''
+        run: npm run build
+      - name: Verify exact Pass 66 evidence catalog and frozen runtime
+        if: hashFiles('acceptance/pass-66.json') != ''
+        run: npm run qa:pass65:owner-feedback:candidate
+      - name: Verify immutable Pass 66 preview provenance and bytes
+        if: hashFiles('acceptance/pass-66.json') != ''
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/release/verify-pr-preview-provenance.mjs --manifest acceptance/pass-66.json --output artifacts/pipeline/pr-preview-provenance.json
       - name: Verify complete requirement-to-evidence coverage and exact preview approval
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
@@ -102,7 +119,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: acceptance-coverage-${{ github.event.pull_request.head.sha || github.sha }}
-          path: artifacts/pipeline/acceptance-coverage.json
+          path: |
+            artifacts/pipeline/acceptance-coverage.json
+            artifacts/pipeline/pr-preview-provenance.json
           if-no-files-found: warn
           retention-days: 30
 
@@ -115,6 +134,8 @@ jobs:
         run: echo "mode=${{ needs.classify-change.outputs.mode }} reason=${{ needs.classify-change.outputs.reason }}"
       - uses: actions/checkout@v4
         if: needs.classify-change.outputs.mode != 'none'
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v4
         if: needs.classify-change.outputs.mode != 'none'
         with:
@@ -143,6 +164,8 @@ jobs:
         run: echo "mode=${{ needs.classify-change.outputs.mode }} reason=${{ needs.classify-change.outputs.reason }}"
       - uses: actions/checkout@v4
         if: needs.classify-change.outputs.mode != 'none'
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v4
         if: needs.classify-change.outputs.mode != 'none'
         with:
@@ -163,6 +186,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22

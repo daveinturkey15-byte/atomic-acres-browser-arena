@@ -67,17 +67,33 @@ describe('production release workflow', () => {
     expect(diagnosticsPreviewRunner).not.toContain("VITE_MATCH_BUILD_ID: 'pass64-browser-candidate'");
   });
 
+  it('checks out the real PR head SHA rather than GitHub synthetic merge bytes', () => {
+    const exactCheckout = 'ref: ${{ github.event.pull_request.head.sha || github.sha }}';
+    expect(verifyWorkflow.match(new RegExp(exactCheckout.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))?.length).toBe(6);
+    expect(verifyWorkflow).toContain('HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}');
+  });
+
   it('blocks production on accepted requirements and verifies the canonical site after Pages builds', () => {
+    const candidateBuildStep = workflow.indexOf('Build exact frozen-evidence candidate bytes');
+    const candidateEvidenceStep = workflow.indexOf('Verify exact Pass 66 evidence catalog and frozen runtime');
+    const previewProvenanceStep = workflow.indexOf('Verify immutable Pass 66 preview provenance and bytes');
     const acceptanceStep = workflow.indexOf('Validate accepted requirement manifest');
     const publishStep = workflow.indexOf('Publish complete exact dist snapshot');
     const pagesStep = workflow.indexOf('Wait for exact Pages build');
     const liveStep = workflow.indexOf('Verify canonical live release');
     const receiptStep = workflow.indexOf('Write acceptance-bound production receipt and timings');
+    expect(candidateBuildStep).toBeGreaterThan(-1);
+    expect(candidateEvidenceStep).toBeGreaterThan(candidateBuildStep);
+    expect(previewProvenanceStep).toBeGreaterThan(candidateEvidenceStep);
+    expect(acceptanceStep).toBeGreaterThan(previewProvenanceStep);
     expect(acceptanceStep).toBeGreaterThan(-1);
     expect(acceptanceStep).toBeLessThan(publishStep);
     expect(liveStep).toBeGreaterThan(pagesStep);
     expect(receiptStep).toBeGreaterThan(liveStep);
     expect(workflow).toContain('QA_OUTPUT: artifacts/pipeline/live-release-smoke.json');
+    expect(workflow).toContain('npm run qa:pass65:owner-feedback:candidate');
+    expect(workflow).toContain('scripts/release/verify-pr-preview-provenance.mjs');
+    expect(workflow).toContain('checks: read');
   });
 
   it('publishes immutable PR previews while requirement acceptance and timing remain explicit jobs', () => {
@@ -85,6 +101,28 @@ describe('production release workflow', () => {
     expect(verifyWorkflow).toContain('pr-preview-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}');
     expect(verifyWorkflow).toContain('pipeline-metrics:');
     expect(verifyWorkflow).toContain('scripts/release/workflow-metrics.mjs');
+  });
+
+  it('makes exact Pass 66 evidence and real preview provenance mandatory in the required acceptance job', () => {
+    const acceptanceJob = verifyWorkflow.indexOf('requirements-acceptance:');
+    const metricsJob = verifyWorkflow.indexOf('pipeline-metrics:');
+    const section = verifyWorkflow.slice(acceptanceJob, metricsJob);
+    const installStep = section.indexOf('npm ci --ignore-scripts');
+    const buildStep = section.indexOf('Build exact frozen-evidence candidate bytes');
+    const candidateStep = section.indexOf('Verify exact Pass 66 evidence catalog and frozen runtime');
+    const provenanceStep = section.indexOf('Verify immutable Pass 66 preview provenance and bytes');
+    const acceptanceStep = section.indexOf('Verify complete requirement-to-evidence coverage and exact preview approval');
+
+    expect(section).toContain('needs: [classify-change, static-and-unit]');
+    expect(installStep).toBeGreaterThan(-1);
+    expect(buildStep).toBeGreaterThan(installStep);
+    expect(candidateStep).toBeGreaterThan(buildStep);
+    expect(provenanceStep).toBeGreaterThan(candidateStep);
+    expect(acceptanceStep).toBeGreaterThan(provenanceStep);
+    expect(section).toContain('npm run qa:pass65:owner-feedback:candidate');
+    expect(section).toContain('scripts/release/verify-pr-preview-provenance.mjs');
+    expect(section).toContain('GITHUB_TOKEN: ${{ github.token }}');
+    expect(section).toContain('artifacts/pipeline/pr-preview-provenance.json');
   });
 
   it('records the schema 3 two-channel topology in the production receipt', () => {
