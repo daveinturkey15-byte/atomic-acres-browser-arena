@@ -10,11 +10,13 @@ import {
   validateHardwareWebGl2BuildManifest,
   validateHardwareWebGl2DetailedReceipt,
 } from '../../../../scripts/qa/pass65-hardware-webgl2-receipt-contract.mjs';
+import { validateAcceptanceManifest } from '../../../../scripts/release/acceptance-gate.mjs';
 import {
   FinalizationError,
   artifactIdForTest,
   validateExactArtifactCatalog,
 } from './finalize-pass66-owner-evidence.mjs';
+import { evidenceKindsForTest, requirementNeedsVisual } from './run-pass66-owner-evidence.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '../../../..');
@@ -23,12 +25,14 @@ const MATRIX_PATH = path.join(REPO_ROOT, 'docs', 'PASS65_REQUIREMENTS_MATRIX.md'
 const GRAPH_PATH = path.join(REPO_ROOT, 'docs', 'PASS65_OWNER_FEEDBACK_COMPLETENESS_GRAPH.json');
 const AGENTS_PATH = path.join(REPO_ROOT, 'AGENTS.md');
 const PACKAGE_PATH = path.join(REPO_ROOT, 'package.json');
+const ACCEPTANCE_POLICY_PATH = path.join(REPO_ROOT, 'acceptance', 'policy.json');
+const PASS66_ACCEPTANCE_PATH = 'acceptance/pass-66.json';
 
 // S0M may bind frozen S0 evidence, but it may not revise the code, test or
 // release-shell contract that produced that evidence. Keep this narrower than
 // the generic post-preview acceptance allowance for test-only corrections.
 const CANDIDATE_EVIDENCE_PROCESS_FILES = new Set([
-  'acceptance/pass-66.json',
+  PASS66_ACCEPTANCE_PATH,
   'docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md',
   'docs/PASS65_OWNER_FEEDBACK_COMPLETENESS_GRAPH.json',
 ]);
@@ -146,6 +150,168 @@ function exactCandidateOutputPaths(graph, candidateSha) {
     }
   }
   return paths;
+}
+
+function expectedCandidateAcceptanceRequirements(matrixRows, graph, feedbackById, artifactIndex, candidateSha) {
+  const testIndex = new Map((graph?.testCatalog ?? []).map((test) => [test.id, test]));
+  return matrixRows.map((row, index) => {
+    const nodes = (graph?.feedbackNodes ?? []).filter((node) => node.planningRequirementIds?.includes(row.id));
+    if (nodes.length === 0) throw new Error(`${row.id} has no graph-linked feedback node.`);
+    const testRefs = [...new Set(nodes.flatMap((node) => node.verification?.testRefs ?? []))].sort();
+    if (testRefs.length === 0) throw new Error(`${row.id} has no graph-linked test.`);
+    const needsVisual = requirementNeedsVisual({
+      requirement: row.requirement,
+      expected: row.expected,
+      falsifier: row.falsifier,
+      requiredEvidence: row.evidence,
+    });
+    const evidence = [];
+    for (const testRef of testRefs) {
+      const test = testIndex.get(testRef);
+      const artifact = artifactIndex.get(artifactIdForTest(testRef));
+      if (!test || !artifact) throw new Error(`${row.id}/${testRef} lacks its canonical test or artifact.`);
+      const kinds = evidenceKindsForTest(test).kinds;
+      const mechanicalKind = ['browser', 'unit', 'contract'].find((kind) => kinds.includes(kind));
+      if (!mechanicalKind) throw new Error(`${row.id}/${testRef} lacks a mechanical evidence kind.`);
+      const feedbackIds = nodes
+        .filter((node) => ['P0', 'P1'].includes(feedbackById.get(node.id)?.priority)
+          && node.verification?.testRefs?.includes(testRef))
+        .map((node) => node.id)
+        .sort();
+      evidence.push({
+        kind: mechanicalKind,
+        ref: String(test.paths?.[0] ?? '').replaceAll('\\', '/'),
+        command: test.command,
+        note: `Exact-S0 ${testRef} receipt exercises the graph-linked falsifier coverage for ${row.id}.`,
+        artifactId: artifact.id,
+        artifactSha256: artifact.sha256,
+        sourceSha: candidateSha,
+        testRef,
+        feedbackIds,
+      });
+    }
+    if (needsVisual) {
+      const browserRefs = testRefs.filter((testRef) => evidenceKindsForTest(testIndex.get(testRef)).kinds.includes('browser'));
+      const visualRefs = testRefs.filter((testRef) => evidenceKindsForTest(testIndex.get(testRef)).kinds.includes('visual'));
+      if (browserRefs.length === 0 || visualRefs.length === 0) {
+        throw new Error(`${row.id} visual projection lacks graph-linked browser or visual evidence.`);
+      }
+      for (const testRef of visualRefs) {
+        const artifact = artifactIndex.get(artifactIdForTest(testRef));
+        const visualDigest = /-visual-([0-9a-f]{64})$/.exec(artifact?.buildId ?? '')?.[1];
+        if (!visualDigest) throw new Error(`${row.id}/${testRef} artifact build identity lacks its visual digest.`);
+        const feedbackIds = nodes
+          .filter((node) => ['P0', 'P1'].includes(feedbackById.get(node.id)?.priority)
+            && node.verification?.testRefs?.includes(testRef))
+          .map((node) => node.id)
+          .sort();
+        evidence.push({
+          kind: 'visual',
+          ref: `artifact://pass66-exact-s0/${candidateSha}/${testRef}/${visualDigest}`,
+          note: `Digest-bound ${testRef} visual output was produced or validated by the exact-S0 command for ${row.id}.`,
+          artifactId: artifact.id,
+          artifactSha256: artifact.sha256,
+          sourceSha: candidateSha,
+          testRef,
+          feedbackIds,
+        });
+      }
+    }
+    evidence.sort((left, right) => left.kind.localeCompare(right.kind)
+      || left.testRef.localeCompare(right.testRef)
+      || left.artifactId.localeCompare(right.artifactId)
+      || left.ref.localeCompare(right.ref));
+    return {
+      id: `R${index + 1}`,
+      planningRequirementId: row.id,
+      summary: `${row.id} - ${row.requirement}`,
+      expected: row.expected,
+      falsifier: row.falsifier,
+      acceptance: needsVisual ? 'mixed' : 'mechanical',
+      state: 'verified',
+      evidence,
+    };
+  });
+}
+
+function validateCandidateAcceptanceProjection({
+  graph, matrixRows, feedbackById, artifactIndex, candidateLineage, errors, options,
+}) {
+  if (!candidateLineage?.currentSha) return;
+  const bytes = committedCandidateEvidenceBytes(candidateLineage.currentSha, PASS66_ACCEPTANCE_PATH, options);
+  if (!bytes) {
+    error(errors, 'E_CANDIDATE_ACCEPTANCE_MISSING', `${PASS66_ACCEPTANCE_PATH} is not committed in current S0M HEAD.`);
+    return;
+  }
+  let manifest;
+  try {
+    manifest = JSON.parse(bytes.toString('utf8'));
+  } catch (caught) {
+    error(errors, 'E_CANDIDATE_ACCEPTANCE_JSON', `${PASS66_ACCEPTANCE_PATH} is not valid JSON: ${caught.message}.`);
+    return;
+  }
+  const expectedTopLevelKeys = [
+    'feedbackReceivedAt', 'humanAcceptance', 'preview', 'releasePass', 'requirements', 'schemaVersion', 'status',
+  ];
+  const actualTopLevelKeys = manifest && typeof manifest === 'object' && !Array.isArray(manifest)
+    ? Object.keys(manifest).sort()
+    : [];
+  if (!sameArray(actualTopLevelKeys, expectedTopLevelKeys)) {
+    error(
+      errors,
+      'E_CANDIDATE_ACCEPTANCE_PROJECTION',
+      `Pass 66 acceptance top-level keys differ; expected=${expectedTopLevelKeys.join(',')}; actual=${actualTopLevelKeys.join(',') || '<none>'}.`,
+    );
+  }
+  let generic;
+  try {
+    const policy = JSON.parse(fs.readFileSync(ACCEPTANCE_POLICY_PATH, 'utf8'));
+    generic = validateAcceptanceManifest(manifest, { policy });
+  } catch (caught) {
+    error(errors, 'E_CANDIDATE_ACCEPTANCE_GENERIC', `Pass 66 generic acceptance validation could not run: ${caught.message}.`);
+  }
+  if (generic && !generic.ok) {
+    error(errors, 'E_CANDIDATE_ACCEPTANCE_GENERIC', generic.errors.join('; '));
+  }
+  const candidateSha = graph.candidateEvidenceSourceSha;
+  if (manifest?.releasePass !== 'PASS 66' || manifest?.preview?.sourceSha !== candidateSha) {
+    error(errors, 'E_CANDIDATE_ACCEPTANCE_PROJECTION', `Pass 66 acceptance must bind release PASS 66 and frozen S0 ${candidateSha}.`);
+  }
+  if (matrixRows.length !== 99) {
+    error(errors, 'E_CANDIDATE_ACCEPTANCE_PROJECTION', `Pass 66 canonical planning matrix has ${matrixRows.length} rows; expected exactly 99.`);
+    return;
+  }
+  let expectedRequirements;
+  try {
+    expectedRequirements = expectedCandidateAcceptanceRequirements(
+      matrixRows,
+      graph,
+      feedbackById,
+      artifactIndex,
+      candidateSha,
+    );
+  } catch (caught) {
+    error(errors, 'E_CANDIDATE_ACCEPTANCE_PROJECTION', `Canonical 99-row acceptance projection could not be built: ${caught.message}.`);
+    return;
+  }
+  if (!Array.isArray(manifest?.requirements) || manifest.requirements.length !== expectedRequirements.length) {
+    error(
+      errors,
+      'E_CANDIDATE_ACCEPTANCE_PROJECTION',
+      `Pass 66 acceptance has ${Array.isArray(manifest?.requirements) ? manifest.requirements.length : 0} requirements; expected exact matrix count ${expectedRequirements.length}.`,
+    );
+    return;
+  }
+  for (let index = 0; index < expectedRequirements.length; index += 1) {
+    if (JSON.stringify(manifest.requirements[index]) !== JSON.stringify(expectedRequirements[index])) {
+      error(
+        errors,
+        'E_CANDIDATE_ACCEPTANCE_PROJECTION',
+        `Pass 66 requirement ${index + 1}/${expectedRequirements[index].planningRequirementId} differs from the exact matrix/graph/artifact projection.`,
+      );
+      break;
+    }
+  }
 }
 
 function validateCandidateEvidenceLineage(candidateSha, graph, errors, options) {
@@ -733,6 +899,7 @@ function validateArtifacts(graph, artifactIndex, testIndex, feedbackById, errors
       error(errors, 'E_GRAPH_ARTIFACT_RECEIPT', `${artifact.id} evidence is not a valid canonical JSON receipt: ${caught.message}`);
     }
   }
+  return candidateLineage;
 }
 
 function validateGraph(graph, ledgerContext, packageJson, errors, options) {
@@ -835,7 +1002,18 @@ function validateGraph(graph, ledgerContext, packageJson, errors, options) {
       else error(errors, 'E_CANDIDATE_ARTIFACT_CATALOG', `Exact artifact-catalog validation failed: ${caught.message}.`);
     }
   }
-  validateArtifacts(graph, artifactIndex, testIndex, feedbackById, errors, options);
+  const candidateLineage = validateArtifacts(graph, artifactIndex, testIndex, feedbackById, errors, options);
+  if (options.candidateMode) {
+    validateCandidateAcceptanceProjection({
+      graph,
+      matrixRows,
+      feedbackById,
+      artifactIndex,
+      candidateLineage,
+      errors,
+      options,
+    });
+  }
 
   const graphNodes = Array.isArray(graph.feedbackNodes) ? graph.feedbackNodes : [];
   const nodeIndex = uniqueIndex(graphNodes, 'Feedback node', errors, 'E_GRAPH_HF_DUPLICATE');
@@ -937,7 +1115,7 @@ function candidateReadyLedger(ledger) {
   }).join('\n');
 }
 
-function buildCandidateFixture(graph, ledger) {
+function buildCandidateFixture(graph, ledger, matrix) {
   const fixtureGraph = structuredClone(graph);
   const sourceSha = 'a'.repeat(40);
   const environmentHash = 'b'.repeat(64);
@@ -955,6 +1133,9 @@ function buildCandidateFixture(graph, ledger) {
   for (const test of fixtureGraph.testCatalog) {
     const feedbackIds = feedbackByTest.get(test.id) ?? [];
     const relativePath = receiptPathForTest(test.id, sourceSha);
+    const visualDigest = test.id !== HARDWARE_WEBGL2_TEST_ID && evidenceKindsForTest(test).kinds.includes('visual')
+      ? sha256(Buffer.from(`self-test-visual-${test.id}`, 'utf8'))
+      : null;
     const receipt = test.id === HARDWARE_WEBGL2_TEST_ID ? {
       schemaVersion: 2,
       kind: 'pass65-owner-feedback-evidence',
@@ -974,7 +1155,7 @@ function buildCandidateFixture(graph, ledger) {
       schemaVersion: 1,
       kind: 'pass65-owner-feedback-evidence',
       sourceSha,
-      buildId: `self-test-${test.id.toLowerCase()}`,
+      buildId: `self-test-${test.id.toLowerCase()}${visualDigest ? `-visual-${visualDigest}` : ''}`,
       verifierId: test.id,
       verifierVersion: '1',
       environmentHash,
@@ -1015,10 +1196,41 @@ function buildCandidateFixture(graph, ledger) {
     node.verification.coverage = 'complete';
     node.verification.artifactRefs = [...new Set(node.verification.testRefs.map(artifactIdForTest))].sort();
   }
+  const feedbackById = new Map(parseLedger(ledger).feedbackRows.map((row) => [row.id, row]));
+  const matrixRows = parseMatrix(matrix);
+  const artifactIndex = new Map(artifacts.map((artifact) => [artifact.id, artifact]));
+  const acceptanceManifest = {
+    schemaVersion: 1,
+    releasePass: 'PASS 66',
+    feedbackReceivedAt: '2026-07-29T00:00:00Z',
+    status: 'accepted',
+    preview: {
+      kind: 'github-actions-artifact',
+      ref: `pr-preview-66-${sourceSha}`,
+      sourceSha,
+      createdAt: '2026-07-30T00:00:00Z',
+    },
+    humanAcceptance: {
+      state: 'approved',
+      approvedBy: 'Dave',
+      approvedAt: '2026-07-30T00:01:00Z',
+      evidence: 'Dave\'s standing conditional publication authorization is bound here; Dave did not inspect this immutable preview.',
+    },
+    requirements: expectedCandidateAcceptanceRequirements(
+      matrixRows,
+      fixtureGraph,
+      feedbackById,
+      artifactIndex,
+      sourceSha,
+    ),
+  };
+  const committedArtifactBytesByPath = new Map(artifactBytesByPath);
+  committedArtifactBytesByPath.set(PASS66_ACCEPTANCE_PATH, Buffer.from(`${JSON.stringify(acceptanceManifest, null, 2)}\n`, 'utf8'));
   return {
     graph: fixtureGraph,
+    acceptanceManifest,
     artifactBytesByPath,
-    committedArtifactBytesByPath: new Map(artifactBytesByPath),
+    committedArtifactBytesByPath,
     chromeExecutableBytesByPath: new Map([[
       hardwareFixture.detailedReceipt.environment.chromeExecutable,
       hardwareFixture.chromeExecutableBytes,
@@ -1067,10 +1279,13 @@ function mutateHardwareDetailedFixture(fixture, mutate) {
   const sidecarBytes = Buffer.from(JSON.stringify(hardwareSidecarFromArtifact(artifact)), 'utf8');
   artifact.sha256 = sha256(sidecarBytes);
   artifactBytesByPath.set(artifact.path, sidecarBytes);
+  const committedArtifactBytesByPath = new Map(fixture.committedArtifactBytesByPath);
+  committedArtifactBytesByPath.set(artifact.detailedReceiptPath, detailBytes);
+  committedArtifactBytesByPath.set(artifact.path, sidecarBytes);
   return {
     graph,
     artifactBytesByPath,
-    committedArtifactBytesByPath: new Map(artifactBytesByPath),
+    committedArtifactBytesByPath,
     chromeExecutableBytesByPath: fixture.chromeExecutableBytesByPath,
     currentGitSha: fixture.currentGitSha,
     currentGitStatus: fixture.currentGitStatus,
@@ -1157,7 +1372,7 @@ function runSelfTest(ledger, matrix, agents, packageJson, graph) {
   expectRejected('no-op hardware WebGL2 package command', 'E_HARDWARE_WEBGL2_PACKAGE_COMMAND', { packageJson: noOpHardwarePackage });
 
   const readyLedger = candidateReadyLedger(ledger);
-  const fixture = buildCandidateFixture(graph, readyLedger);
+  const fixture = buildCandidateFixture(graph, readyLedger, matrix);
   const fixtureOptions = {
     candidateMode: true,
     artifactBytesByPath: fixture.artifactBytesByPath,
@@ -1174,6 +1389,80 @@ function runSelfTest(ledger, matrix, agents, packageJson, graph) {
     failures.push(`E_SELFTEST_CANDIDATE_FIXTURE: Candidate-ready fixture failed: ${candidateResult.errors[0]}.`);
     return failures;
   }
+
+  function rejectAcceptanceMutation(name, mutate) {
+    const manifest = structuredClone(fixture.acceptanceManifest);
+    mutate(manifest);
+    const committedArtifactBytesByPath = new Map(fixture.committedArtifactBytesByPath);
+    committedArtifactBytesByPath.set(
+      PASS66_ACCEPTANCE_PATH,
+      Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`, 'utf8'),
+    );
+    expectRejected(name, 'E_CANDIDATE_ACCEPTANCE_PROJECTION', {
+      ledger: readyLedger,
+      graph: fixture.graph,
+      options: { ...fixtureOptions, committedArtifactBytesByPath },
+    });
+  }
+
+  rejectAcceptanceMutation('candidate one-row fabricated acceptance manifest', (manifest) => {
+    manifest.requirements = manifest.requirements.slice(0, 1);
+  });
+  rejectAcceptanceMutation('candidate extra acceptance requirement', (manifest) => {
+    manifest.requirements.push(structuredClone(manifest.requirements.at(-1)));
+  });
+  rejectAcceptanceMutation('candidate reordered acceptance requirements', (manifest) => {
+    [manifest.requirements[0], manifest.requirements[1]] = [manifest.requirements[1], manifest.requirements[0]];
+  });
+  for (const [name, field, value] of [
+    ['planning ID substitution', 'planningRequirementId', 'R999'],
+    ['summary substitution', 'summary', 'R001 - Fabricated summary'],
+    ['expected-outcome substitution', 'expected', 'Fabricated expected result.'],
+    ['falsifier substitution', 'falsifier', 'Fabricated falsifier.'],
+    ['acceptance substitution', 'acceptance', 'human'],
+  ]) {
+    rejectAcceptanceMutation(`candidate ${name}`, (manifest) => { manifest.requirements[0][field] = value; });
+  }
+  rejectAcceptanceMutation('candidate substituted evidence artifact', (manifest) => {
+    const evidence = manifest.requirements[0].evidence[0];
+    evidence.artifactId = fixture.graph.artifactCatalog.find((artifact) => artifact.id !== evidence.artifactId).id;
+  });
+  rejectAcceptanceMutation('candidate forged evidence artifact digest', (manifest) => {
+    manifest.requirements[0].evidence[0].artifactSha256 = '0'.repeat(64);
+  });
+  rejectAcceptanceMutation('candidate forged evidence source SHA', (manifest) => {
+    manifest.requirements[0].evidence[0].sourceSha = 'b'.repeat(40);
+  });
+  rejectAcceptanceMutation('candidate substituted evidence test', (manifest) => {
+    const evidence = manifest.requirements[0].evidence[0];
+    evidence.testRef = fixture.graph.testCatalog.find((test) => test.id !== evidence.testRef).id;
+  });
+  rejectAcceptanceMutation('candidate forged evidence feedback set', (manifest) => {
+    const evidence = manifest.requirements.flatMap((requirement) => requirement.evidence)
+      .find((entry) => entry.feedbackIds.length > 0);
+    evidence.feedbackIds = evidence.feedbackIds.slice(1);
+  });
+  rejectAcceptanceMutation('candidate acceptance top-level extension', (manifest) => {
+    manifest.fabricatedApproval = true;
+  });
+  rejectAcceptanceMutation('candidate wrong release identity', (manifest) => {
+    manifest.releasePass = 'PASS 65';
+  });
+  const missingAcceptanceBytes = new Map(fixture.committedArtifactBytesByPath);
+  missingAcceptanceBytes.delete(PASS66_ACCEPTANCE_PATH);
+  expectRejected('candidate missing committed Pass 66 acceptance', 'E_CANDIDATE_ACCEPTANCE_MISSING', {
+    ledger: readyLedger,
+    graph: fixture.graph,
+    options: { ...fixtureOptions, committedArtifactBytesByPath: missingAcceptanceBytes },
+  });
+  const malformedAcceptanceBytes = new Map(fixture.committedArtifactBytesByPath);
+  malformedAcceptanceBytes.set(PASS66_ACCEPTANCE_PATH, Buffer.from('{', 'utf8'));
+  expectRejected('candidate malformed committed Pass 66 acceptance', 'E_CANDIDATE_ACCEPTANCE_JSON', {
+    ledger: readyLedger,
+    graph: fixture.graph,
+    options: { ...fixtureOptions, committedArtifactBytesByPath: malformedAcceptanceBytes },
+  });
+
   const missingTest = structuredClone(fixture.graph);
   missingTest.feedbackNodes.find((node) => node.id === 'HF-001').verification.testRefs = [];
   expectRejected('candidate missing test', 'E_CANDIDATE_TEST_REQUIRED', { ledger: readyLedger, graph: missingTest, options: fixtureOptions });
