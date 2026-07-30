@@ -98,6 +98,12 @@ test('canonical graph deterministically covers 55 commands, 160 feedback rows, a
   assert.deepEqual(validatePass66BlockingCatalog(graph).testIds, [
     PASS66_BROWSER_FOREGROUND_TEST_ID,
     PASS66_HIDDEN_TAB_TEST_ID,
+    'T-SUPPORT-RUNTIME',
+    'T-INTERACTION',
+    'T-WEAPON-PRESENTATION',
+    'T-DESTRUCTIBLE',
+    'T-ADDITIONAL-MAPS',
+    'T-BOTS',
   ]);
   assert.deepEqual(coverage.feedbackByTest.get(PASS66_BROWSER_FOREGROUND_TEST_ID), ['HF-152']);
   assert.deepEqual(coverage.feedbackByTest.get(PASS66_HIDDEN_TAB_TEST_ID), ['HF-152']);
@@ -116,6 +122,64 @@ test('blocking Pass 66 scheduling evidence rejects synchronized removal or comma
   substituted.testCatalog.find((testEntry) => testEntry.id === PASS66_BROWSER_FOREGROUND_TEST_ID).command =
     'npx vitest run src/browser-preparation-scheduler.test.ts';
   assert.throws(() => validatePass66BlockingCatalog(substituted), codeIs('E_GRAPH_PASS66_TEST_CONTRACT'));
+});
+
+test('direct gameplay falsifiers reject dropped semantic tests or feedback mappings', () => {
+  const { graph } = loadCanonical();
+  const contracts = [
+    {
+      testId: 'T-SUPPORT-RUNTIME',
+      requiredPath: 'src/killstreak-drone-deployment.test.ts',
+      feedbackIds: ['HF-142', 'HF-143'],
+    },
+    {
+      testId: 'T-INTERACTION',
+      requiredPath: 'src/interaction-press-lifecycle.test.ts',
+      feedbackIds: ['HF-144'],
+    },
+    {
+      testId: 'T-WEAPON-PRESENTATION',
+      requiredPath: 'src/operator-model.test.ts',
+      feedbackIds: ['HF-157'],
+    },
+    {
+      testId: 'T-DESTRUCTIBLE',
+      requiredPath: 'src/glass-main-integration.test.ts',
+      feedbackIds: ['HF-154', 'HF-155', 'HF-157', 'HF-158'],
+    },
+    {
+      testId: 'T-ADDITIONAL-MAPS',
+      requiredPath: 'src/additional-maps.test.ts',
+      feedbackIds: ['HF-157'],
+    },
+    {
+      testId: 'T-BOTS',
+      requiredPath: 'src/bot-perception-authority.test.ts',
+      feedbackIds: ['HF-159', 'HF-160'],
+    },
+  ];
+
+  for (const contract of contracts) {
+    const substituted = structuredClone(graph);
+    const testEntry = substituted.testCatalog.find((entry) => entry.id === contract.testId);
+    testEntry.command = testEntry.command.replace(` ${contract.requiredPath}`, '');
+    assert.throws(
+      () => validatePass66BlockingCatalog(substituted),
+      codeIs('E_GRAPH_PASS66_TEST_CONTRACT'),
+      `${contract.testId} must execute ${contract.requiredPath}`,
+    );
+
+    for (const feedbackId of contract.feedbackIds) {
+      const unmapped = structuredClone(graph);
+      const feedback = unmapped.feedbackNodes.find((node) => node.id === feedbackId);
+      feedback.verification.testRefs = feedback.verification.testRefs.filter((testRef) => testRef !== contract.testId);
+      assert.throws(
+        () => validatePass66BlockingCatalog(unmapped),
+        codeIs('E_GRAPH_PASS66_GATE_REQUIRED'),
+        `${feedbackId} must remain mapped to ${contract.testId}`,
+      );
+    }
+  }
 });
 
 test('coverage fails missing, extra, duplicate, and unknown graph relationships', () => {

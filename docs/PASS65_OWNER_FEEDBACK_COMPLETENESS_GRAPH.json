@@ -1657,12 +1657,15 @@
     },
     {
       "id": "T-SUPPORT-RUNTIME",
-      "command": "npx vitest run src/field-support.test.ts src/killstreak-runtime.test.ts src/killstreak-protocol.test.ts src/killstreak-main-integration.test.ts",
+      "command": "npx vitest run src/field-support.test.ts src/killstreak-runtime.test.ts src/killstreak-protocol.test.ts src/killstreak-main-integration.test.ts src/killstreak-drone-input.test.ts src/killstreak-drone-formation.test.ts src/killstreak-drone-deployment.test.ts",
       "paths": [
         "src/field-support.test.ts",
         "src/killstreak-runtime.test.ts",
         "src/killstreak-protocol.test.ts",
-        "src/killstreak-main-integration.test.ts"
+        "src/killstreak-main-integration.test.ts",
+        "src/killstreak-drone-input.test.ts",
+        "src/killstreak-drone-formation.test.ts",
+        "src/killstreak-drone-deployment.test.ts"
       ]
     },
     {
@@ -1722,9 +1725,12 @@
     },
     {
       "id": "T-WEAPON-PRESENTATION",
-      "command": "npx vitest run src/weapon-presentation-state.test.ts src/pass65-crossbow-arms-runtime-contract.test.ts",
+      "command": "npx vitest run src/weapon-presentation-state.test.ts src/weapon-presentation-anatomy.test.ts src/operator-model.test.ts src/hit-proxies.test.ts src/pass65-crossbow-arms-runtime-contract.test.ts",
       "paths": [
         "src/weapon-presentation-state.test.ts",
+        "src/weapon-presentation-anatomy.test.ts",
+        "src/operator-model.test.ts",
+        "src/hit-proxies.test.ts",
         "src/pass65-crossbow-arms-runtime-contract.test.ts"
       ]
     },
@@ -1747,21 +1753,25 @@
     },
     {
       "id": "T-DESTRUCTIBLE",
-      "command": "npx vitest run src/destructible-world.test.ts src/destructible-shed-presentation.test.ts src/destructible-shed-map-parity.test.ts src/destructible-shed-registry.test.ts src/interactive-world-runtime.test.ts src/physics.test.ts src/persistent-window-debris-integration.test.ts src/major-debris-budget.test.ts src/house-destruction.test.ts src/house-destruction-presentation.test.ts src/house-destruction-runtime.test.ts src/house-destruction-map-parity.test.ts src/house-destruction-live-integration.test.ts",
+      "command": "npx vitest run src/destructible-world.test.ts src/shed-structural-authority.test.ts src/destructible-shed-presentation.test.ts src/destructible-shed-map-parity.test.ts src/destructible-shed-registry.test.ts src/interactive-world-runtime.test.ts src/physics.test.ts src/glass-authority.test.ts src/glass-main-integration.test.ts src/persistent-window-debris-integration.test.ts src/major-debris-budget.test.ts src/house-destruction.test.ts src/house-destruction-presentation.test.ts src/house-destruction-runtime.test.ts src/house-destruction-map-parity.test.ts src/house-destruction-live-integration.test.ts src/world-perception-main-integration.test.ts",
       "paths": [
         "src/destructible-world.test.ts",
+        "src/shed-structural-authority.test.ts",
         "src/destructible-shed-presentation.test.ts",
         "src/destructible-shed-map-parity.test.ts",
         "src/destructible-shed-registry.test.ts",
         "src/interactive-world-runtime.test.ts",
         "src/physics.test.ts",
+        "src/glass-authority.test.ts",
+        "src/glass-main-integration.test.ts",
         "src/persistent-window-debris-integration.test.ts",
         "src/major-debris-budget.test.ts",
         "src/house-destruction.test.ts",
         "src/house-destruction-presentation.test.ts",
         "src/house-destruction-runtime.test.ts",
         "src/house-destruction-map-parity.test.ts",
-        "src/house-destruction-live-integration.test.ts"
+        "src/house-destruction-live-integration.test.ts",
+        "src/world-perception-main-integration.test.ts"
       ]
     },
     {
@@ -1774,9 +1784,10 @@
     },
     {
       "id": "T-INTERACTION",
-      "command": "npx vitest run src/interaction-arbitration.test.ts src/killstreak-main-integration.test.ts",
+      "command": "npx vitest run src/interaction-arbitration.test.ts src/interaction-press-lifecycle.test.ts src/killstreak-main-integration.test.ts",
       "paths": [
         "src/interaction-arbitration.test.ts",
+        "src/interaction-press-lifecycle.test.ts",
         "src/killstreak-main-integration.test.ts"
       ]
     },
@@ -1824,10 +1835,12 @@
     },
     {
       "id": "T-BOTS",
-      "command": "npx vitest run src/bot-arsenal.test.ts src/bot-ai.test.ts",
+      "command": "npx vitest run src/bot-arsenal.test.ts src/bot-ai.test.ts src/bot-perception-authority.test.ts src/world-perception-main-integration.test.ts",
       "paths": [
         "src/bot-arsenal.test.ts",
-        "src/bot-ai.test.ts"
+        "src/bot-ai.test.ts",
+        "src/bot-perception-authority.test.ts",
+        "src/world-perception-main-integration.test.ts"
       ]
     },
     {
@@ -6161,6 +6174,8 @@
         "testRefs": [
           "T-LIFECYCLE-UNIT",
           "T-WEAPON-PRESENTATION",
+          "T-DESTRUCTIBLE",
+          "T-ADDITIONAL-MAPS",
           "T-NETWORK"
         ],
         "artifactRefs": []

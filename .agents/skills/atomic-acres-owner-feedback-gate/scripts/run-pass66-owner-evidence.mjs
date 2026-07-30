@@ -94,6 +94,7 @@ const PASS66_BLOCKING_TEST_CONTRACTS = Object.freeze([
       'src/presentation-prewarm-contract.test.ts',
     ]),
     evidenceKinds: Object.freeze([]),
+    feedbackIds: Object.freeze(['HF-152']),
   }),
   Object.freeze({
     id: PASS66_HIDDEN_TAB_TEST_ID,
@@ -104,6 +105,92 @@ const PASS66_BLOCKING_TEST_CONTRACTS = Object.freeze([
       'scripts/qa/verify-pass66-hidden-tab-admission.mjs',
     ]),
     evidenceKinds: Object.freeze(['browser']),
+    feedbackIds: Object.freeze(['HF-152']),
+  }),
+  Object.freeze({
+    id: 'T-SUPPORT-RUNTIME',
+    command: 'npx vitest run src/field-support.test.ts src/killstreak-runtime.test.ts src/killstreak-protocol.test.ts src/killstreak-main-integration.test.ts src/killstreak-drone-input.test.ts src/killstreak-drone-formation.test.ts src/killstreak-drone-deployment.test.ts',
+    paths: Object.freeze([
+      'src/field-support.test.ts',
+      'src/killstreak-runtime.test.ts',
+      'src/killstreak-protocol.test.ts',
+      'src/killstreak-main-integration.test.ts',
+      'src/killstreak-drone-input.test.ts',
+      'src/killstreak-drone-formation.test.ts',
+      'src/killstreak-drone-deployment.test.ts',
+    ]),
+    evidenceKinds: Object.freeze([]),
+    feedbackIds: Object.freeze(['HF-142', 'HF-143']),
+  }),
+  Object.freeze({
+    id: 'T-INTERACTION',
+    command: 'npx vitest run src/interaction-arbitration.test.ts src/interaction-press-lifecycle.test.ts src/killstreak-main-integration.test.ts',
+    paths: Object.freeze([
+      'src/interaction-arbitration.test.ts',
+      'src/interaction-press-lifecycle.test.ts',
+      'src/killstreak-main-integration.test.ts',
+    ]),
+    evidenceKinds: Object.freeze([]),
+    feedbackIds: Object.freeze(['HF-144']),
+  }),
+  Object.freeze({
+    id: 'T-WEAPON-PRESENTATION',
+    command: 'npx vitest run src/weapon-presentation-state.test.ts src/weapon-presentation-anatomy.test.ts src/operator-model.test.ts src/hit-proxies.test.ts src/pass65-crossbow-arms-runtime-contract.test.ts',
+    paths: Object.freeze([
+      'src/weapon-presentation-state.test.ts',
+      'src/weapon-presentation-anatomy.test.ts',
+      'src/operator-model.test.ts',
+      'src/hit-proxies.test.ts',
+      'src/pass65-crossbow-arms-runtime-contract.test.ts',
+    ]),
+    evidenceKinds: Object.freeze([]),
+    feedbackIds: Object.freeze(['HF-157']),
+  }),
+  Object.freeze({
+    id: 'T-DESTRUCTIBLE',
+    command: 'npx vitest run src/destructible-world.test.ts src/shed-structural-authority.test.ts src/destructible-shed-presentation.test.ts src/destructible-shed-map-parity.test.ts src/destructible-shed-registry.test.ts src/interactive-world-runtime.test.ts src/physics.test.ts src/glass-authority.test.ts src/glass-main-integration.test.ts src/persistent-window-debris-integration.test.ts src/major-debris-budget.test.ts src/house-destruction.test.ts src/house-destruction-presentation.test.ts src/house-destruction-runtime.test.ts src/house-destruction-map-parity.test.ts src/house-destruction-live-integration.test.ts src/world-perception-main-integration.test.ts',
+    paths: Object.freeze([
+      'src/destructible-world.test.ts',
+      'src/shed-structural-authority.test.ts',
+      'src/destructible-shed-presentation.test.ts',
+      'src/destructible-shed-map-parity.test.ts',
+      'src/destructible-shed-registry.test.ts',
+      'src/interactive-world-runtime.test.ts',
+      'src/physics.test.ts',
+      'src/glass-authority.test.ts',
+      'src/glass-main-integration.test.ts',
+      'src/persistent-window-debris-integration.test.ts',
+      'src/major-debris-budget.test.ts',
+      'src/house-destruction.test.ts',
+      'src/house-destruction-presentation.test.ts',
+      'src/house-destruction-runtime.test.ts',
+      'src/house-destruction-map-parity.test.ts',
+      'src/house-destruction-live-integration.test.ts',
+      'src/world-perception-main-integration.test.ts',
+    ]),
+    evidenceKinds: Object.freeze([]),
+    feedbackIds: Object.freeze(['HF-154', 'HF-155', 'HF-157', 'HF-158']),
+  }),
+  Object.freeze({
+    id: 'T-ADDITIONAL-MAPS',
+    command: 'npx vitest run src/additional-maps.test.ts',
+    paths: Object.freeze([
+      'src/additional-maps.test.ts',
+    ]),
+    evidenceKinds: Object.freeze([]),
+    feedbackIds: Object.freeze(['HF-157']),
+  }),
+  Object.freeze({
+    id: 'T-BOTS',
+    command: 'npx vitest run src/bot-arsenal.test.ts src/bot-ai.test.ts src/bot-perception-authority.test.ts src/world-perception-main-integration.test.ts',
+    paths: Object.freeze([
+      'src/bot-arsenal.test.ts',
+      'src/bot-ai.test.ts',
+      'src/bot-perception-authority.test.ts',
+      'src/world-perception-main-integration.test.ts',
+    ]),
+    evidenceKinds: Object.freeze([]),
+    feedbackIds: Object.freeze(['HF-159', 'HF-160']),
   }),
 ]);
 
@@ -123,10 +210,14 @@ export function validatePass66BlockingCatalog(graph) {
       fail('E_GRAPH_PASS66_TEST_CONTRACT', `${contract.id} differs from its exact blocking Pass 66 command, verifier paths or evidence kind.`);
     }
   }
-  const feedback = (graph?.feedbackNodes ?? []).find((node) => node?.id === 'HF-152');
-  const testRefs = feedback?.verification?.testRefs ?? [];
   for (const contract of PASS66_BLOCKING_TEST_CONTRACTS) {
-    if (!testRefs.includes(contract.id)) fail('E_GRAPH_PASS66_GATE_REQUIRED', `HF-152 must retain ${contract.id}.`);
+    for (const feedbackId of contract.feedbackIds) {
+      const feedback = (graph?.feedbackNodes ?? []).find((node) => node?.id === feedbackId);
+      const testRefs = feedback?.verification?.testRefs ?? [];
+      if (!testRefs.includes(contract.id)) {
+        fail('E_GRAPH_PASS66_GATE_REQUIRED', `${feedbackId} must retain ${contract.id}.`);
+      }
+    }
   }
   return { testIds: PASS66_BLOCKING_TEST_CONTRACTS.map((contract) => contract.id) };
 }
