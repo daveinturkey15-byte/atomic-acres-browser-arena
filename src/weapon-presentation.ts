@@ -251,8 +251,9 @@ export class WeaponPresentation {
   private readonly browserRuntime: boolean;
   private readonly models = new Map<WeaponId, THREE.Object3D>();
   private readonly modelLastUsed = new Map<WeaponId, number>();
-  private readonly gpuReadyModels = new WeakSet<THREE.Object3D>();
-  private readonly gpuPrewarmPromises = new WeakMap<THREE.Object3D, Promise<void>>();
+  private gpuReadyModels = new WeakSet<THREE.Object3D>();
+  private gpuPrewarmPromises = new WeakMap<THREE.Object3D, Promise<void>>();
+  private gpuReadinessGeneration = 0;
   private browserCatalogPrewarmPromise: Promise<void> | null = null;
   private readonly browserResidentWeaponIds = new Set<WeaponId>();
   private unpreparedBrowserSwitches = 0;
@@ -1192,6 +1193,19 @@ export class WeaponPresentation {
     });
   }
 
+  /**
+   * Invalidates only renderer-pipeline-dependent readiness. Retained models,
+   * decoded assets and the requested resident catalog stay intact so the final
+   * TSL/HDR graph can re-prewarm the same instances without another asset load.
+   */
+  invalidateBrowserWeaponGpuReadinessForPipelineChange(): void {
+    if (!this.browserRuntime || !this.gpuPrewarmer) return;
+    this.gpuReadinessGeneration += 1;
+    this.gpuReadyModels = new WeakSet<THREE.Object3D>();
+    this.gpuPrewarmPromises = new WeakMap<THREE.Object3D, Promise<void>>();
+    this.browserCatalogPrewarmPromise = null;
+  }
+
   private createLoadedBrowserWeapon(id: WeaponId): THREE.Group | null {
     return id === 'explosive-crossbow'
       ? createPass65CrossbowModel(this.flattenMaterials, 'first-person')
@@ -1244,15 +1258,22 @@ export class WeaponPresentation {
     if (this.modelIsGpuReady(model)) return Promise.resolve();
     const pending = this.gpuPrewarmPromises.get(model);
     if (pending) return pending;
-    const promise = Promise.resolve().then(() => this.gpuPrewarmer!(model, {
+    const readinessGeneration = this.gpuReadinessGeneration;
+    const promiseRegistry = this.gpuPrewarmPromises;
+    let promise: Promise<void>;
+    promise = Promise.resolve().then(() => this.gpuPrewarmer!(model, {
       weaponId: id,
       requestGeneration,
-    })).then(() => {
-      this.gpuReadyModels.add(model);
+    })).then(async () => {
+      if (readinessGeneration !== this.gpuReadinessGeneration) {
+        if (this.models.get(id) === model) await this.prewarmBrowserModel(id, model, requestGeneration);
+        return;
+      }
+      if (this.models.get(id) === model) this.gpuReadyModels.add(model);
     }).finally(() => {
-      this.gpuPrewarmPromises.delete(model);
+      if (promiseRegistry.get(model) === promise) promiseRegistry.delete(model);
     });
-    this.gpuPrewarmPromises.set(model, promise);
+    promiseRegistry.set(model, promise);
     return promise;
   }
 
@@ -1262,10 +1283,26 @@ export class WeaponPresentation {
     yieldToBrowser?: () => Promise<void>,
   ): Promise<void> {
     if (entries.length === 0) return Promise.resolve();
-    const promise = Promise.resolve().then(async () => {
+    const pending = [...new Set(entries.flatMap(({ model }) => {
+      const operation = this.gpuPrewarmPromises.get(model);
+      return operation ? [operation] : [];
+    }))];
+    if (pending.length > 0) {
+      return Promise.all(pending).then(() => this.prewarmBrowserCatalogModels(
+        entries.filter(({ model }) => !this.modelIsGpuReady(model)),
+        requestGeneration,
+        yieldToBrowser,
+      ));
+    }
+    const readinessGeneration = this.gpuReadinessGeneration;
+    const promiseRegistry = this.gpuPrewarmPromises;
+    let promise: Promise<void>;
+    promise = Promise.resolve().then(async () => {
       for (let offset = 0; offset < entries.length; offset += WeaponPresentation.CATALOG_GPU_MODELS_PER_SUBMISSION) {
+        if (readinessGeneration !== this.gpuReadinessGeneration) break;
         const batch = entries.slice(offset, offset + WeaponPresentation.CATALOG_GPU_MODELS_PER_SUBMISSION);
         await this.catalogGpuPrewarmer!(batch, { requestGeneration });
+        if (readinessGeneration !== this.gpuReadinessGeneration) break;
         if (offset + WeaponPresentation.CATALOG_GPU_MODELS_PER_SUBMISSION < entries.length) {
           // End the current browser task between renderer submissions so the
           // prerecorded loading/menu video and accessibility UI can present.
@@ -1279,14 +1316,24 @@ export class WeaponPresentation {
           }
         }
       }
-    }).then(() => {
-      for (const { model } of entries) this.gpuReadyModels.add(model);
+    }).then(async () => {
+      if (readinessGeneration !== this.gpuReadinessGeneration) {
+        await this.prewarmBrowserCatalogModels(
+          entries.filter(({ weaponId, model }) => this.models.get(weaponId) === model),
+          requestGeneration,
+          yieldToBrowser,
+        );
+        return;
+      }
+      for (const { weaponId, model } of entries) {
+        if (this.models.get(weaponId) === model) this.gpuReadyModels.add(model);
+      }
     }).finally(() => {
       for (const { model } of entries) {
-        if (this.gpuPrewarmPromises.get(model) === promise) this.gpuPrewarmPromises.delete(model);
+        if (promiseRegistry.get(model) === promise) promiseRegistry.delete(model);
       }
     });
-    for (const { model } of entries) this.gpuPrewarmPromises.set(model, promise);
+    for (const { model } of entries) promiseRegistry.set(model, promise);
     return promise;
   }
 
