@@ -193,9 +193,9 @@
       "kind": "canonical-correction-ledger",
       "repositoryPath": "docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md",
       "ledgerVersion": 1,
-      "latestFeedbackId": "HF-160",
-      "outcomeCount": 160,
-      "stateIndependentOutcomeSha256": "7cba230b4d0e4f199a1ad313537e133bf452fed3131ad0e8b5b4fe83286b1c37"
+      "latestFeedbackId": "HF-181",
+      "outcomeCount": 181,
+      "stateIndependentOutcomeSha256": "f66cd57d3244e16f038be936c42f54060100fba048cf63cd2931b0edae4e3b5e"
     },
     {
       "id": "SRC-PLANNING-MATRIX-001",
@@ -879,7 +879,7 @@
     "outcomeIdTemplate": "CORR-{feedbackId}",
     "sourceLocatorTemplate": "{feedbackId}.observation",
     "feedbackIdStart": "HF-001",
-    "feedbackIdEnd": "HF-160"
+    "feedbackIdEnd": "HF-181"
   },
   "supersessions": [
     {
@@ -1286,6 +1286,17 @@
         "HF-158"
       ],
       "canonicalText": "Glass lifecycle is authoritative across presentation, collision and ballistics. Intact and cracked panes block projectiles; only an admitted simultaneous break or pre-existing breached aperture permits pass-through, and detached panes cannot retain intact collision or damage state."
+    },
+    {
+      "id": "SUP-028",
+      "ledgerOrdinal": 28,
+      "sourceOutcomeIds": [
+        "CORR-HF-181"
+      ],
+      "feedbackIds": [
+        "HF-181"
+      ],
+      "canonicalText": "`DEC-13` drone combat balance now separates the variants: Piloted Drone per-hit damage is exactly `0.5 *` the inspected shared baseline and Drone Swarm per-hit damage is exactly `3 *` that baseline. The variants retain one authored visual asset family, but the earlier identical immutable gun-profile requirement is retired for damage; ammo, cadence, control, lifetime and feedback remain explicit per variant."
     }
   ],
   "testCatalog": [
@@ -6254,6 +6265,174 @@
         ],
         "artifactRefs": []
       }
+    },
+    {
+      "id": "HF-161",
+      "sourceOutcomeIds": ["CORR-HF-161"],
+      "planningRequirementIds": ["R112", "R113", "R608", "R609"],
+      "canonicalOwner": "Preview-media/HUD forge",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-PREVIEW-GATE", "T-HUD-UNIT", "T-HUD-E2E"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-162",
+      "sourceOutcomeIds": ["CORR-HF-162"],
+      "planningRequirementIds": ["R105", "R108", "R109", "R608"],
+      "canonicalOwner": "Operator rig/viewmodel",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-OPERATOR-GATE", "T-WEAPON-PRESENTATION", "T-NATIVE-FRAME-PACING"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-163",
+      "sourceOutcomeIds": ["CORR-HF-163"],
+      "planningRequirementIds": ["R105", "R107", "R108", "R608"],
+      "canonicalOwner": "Operator/weapon animation",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-OPERATOR-GATE", "T-WEAPON-PRESENTATION"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-164",
+      "sourceOutcomeIds": ["CORR-HF-164"],
+      "planningRequirementIds": ["R109", "R307", "R608", "R610"],
+      "canonicalOwner": "Viewmodel/frame pacing",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-WEAPON-PRESENTATION", "T-COLD-WEBGPU-ADMISSION", "T-NATIVE-FRAME-PACING"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-165",
+      "sourceOutcomeIds": ["CORR-HF-165"],
+      "planningRequirementIds": ["R304", "R307", "R308", "R609"],
+      "canonicalOwner": "Support spatial-audio/mixer",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-AUDIO", "T-SUPPORT-VISUAL-E2E", "T-SUPPORT-RUNTIME"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-166",
+      "sourceOutcomeIds": ["CORR-HF-166"],
+      "planningRequirementIds": ["R100", "R105", "R109", "R400", "R608"],
+      "canonicalOwner": "Player movement/viewmodel/rig",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-OPERATOR-GATE", "T-WEAPON-PRESENTATION", "T-PROFILE-AUTHORITY-UNIT", "T-PROFILE-AUTHORITY-E2E"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-167",
+      "sourceOutcomeIds": ["CORR-HF-167"],
+      "planningRequirementIds": ["R505", "R507", "R510", "R609"],
+      "canonicalOwner": "Input/interaction coordinator",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-INTERACTION", "T-CARE-LATCH-E2E", "T-SUPPORT-VISUAL-E2E"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-168",
+      "sourceOutcomeIds": ["CORR-HF-168"],
+      "planningRequirementIds": ["R400", "R401", "R402", "R403", "R404", "R405", "R406", "R407", "R408", "R409", "R410", "R411", "R412", "R413", "R502", "R505", "R510", "R609"],
+      "canonicalOwner": "World-pickup/care authority",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-INTERACTION", "T-CARE-LATCH-E2E", "T-SUPPORT-RUNTIME", "T-ADDITIONAL-MAPS"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-169",
+      "sourceOutcomeIds": ["CORR-HF-169"],
+      "planningRequirementIds": ["R223", "R236", "R400", "R401", "R402", "R403", "R404", "R405", "R406", "R407", "R408", "R409", "R410", "R411", "R412", "R413", "R510"],
+      "canonicalOwner": "Material/destructible-world authority",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-DESTRUCTIBLE", "T-RAILGUN", "T-ORDNANCE", "T-REMOTE-STICKY-AUTHORITY"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-170",
+      "sourceOutcomeIds": ["CORR-HF-170"],
+      "planningRequirementIds": ["R505", "R510", "R609"],
+      "canonicalOwner": "Carpet Bomber targeting/HUD",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-SUPPORT-RUNTIME", "T-SUPPORT-VISUAL-E2E", "T-HUD-UNIT"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-171",
+      "sourceOutcomeIds": ["CORR-HF-171"],
+      "planningRequirementIds": ["R108", "R504", "R608", "R609"],
+      "canonicalOwner": "Chopper asset/HUD forge",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-SUPPORT-VEHICLE-GATE", "T-SUPPORT-VISUAL-E2E", "T-HUD-E2E"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-172",
+      "sourceOutcomeIds": ["CORR-HF-172"],
+      "planningRequirementIds": ["R304", "R504", "R508", "R609"],
+      "canonicalOwner": "Chopper combat/presentation",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-SUPPORT-RUNTIME", "T-SUPPORT-DAMAGE", "T-AUDIO", "T-SUPPORT-VISUAL-E2E"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-173",
+      "sourceOutcomeIds": ["CORR-HF-173"],
+      "planningRequirementIds": ["R506", "R507", "R509", "R510"],
+      "canonicalOwner": "Drone authority/catalog",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-KILLSTREAK-CATALOG", "T-SUPPORT-RUNTIME", "T-NETWORK"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-174",
+      "sourceOutcomeIds": ["CORR-HF-174"],
+      "planningRequirementIds": ["R307", "R504", "R507", "R608", "R610"],
+      "canonicalOwner": "Support/frame pacing",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-FRAME-POLICY", "T-NATIVE-FRAME-PACING", "T-SUPPORT-VISUAL-E2E"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-175",
+      "sourceOutcomeIds": ["CORR-HF-175"],
+      "planningRequirementIds": ["R506", "R509", "R510", "R511"],
+      "canonicalOwner": "Drone Swarm navigation/formation",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-DRONE-GATE", "T-SUPPORT-RUNTIME", "T-NETWORK"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-176",
+      "sourceOutcomeIds": ["CORR-HF-176"],
+      "planningRequirementIds": ["R234", "R307", "R400", "R509", "R510", "R608"],
+      "canonicalOwner": "Smoke authority/presentation",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-SMOKE", "T-NATIVE-FRAME-PACING", "T-SUPPORT-VISUAL-E2E"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-177",
+      "sourceOutcomeIds": ["CORR-HF-177"],
+      "planningRequirementIds": ["R307", "R400", "R401", "R402", "R403", "R404", "R405", "R406", "R407", "R408", "R409", "R410", "R411", "R412", "R413", "R505", "R608", "R610"],
+      "canonicalOwner": "Destructible-world/support/runtime",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-DESTRUCTIBLE", "T-SUPPORT-RUNTIME", "T-NATIVE-FRAME-PACING", "T-WEBGPU-ENDURANCE", "T-NETWORK"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-178",
+      "sourceOutcomeIds": ["CORR-HF-178"],
+      "planningRequirementIds": ["R300", "R306", "R502", "R505", "R609"],
+      "canonicalOwner": "Support targeting/input lifecycle",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-SUPPORT-RUNTIME", "T-MENU-LIFECYCLE-E2E", "T-SUPPORT-VISUAL-E2E"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-179",
+      "sourceOutcomeIds": ["CORR-HF-179"],
+      "planningRequirementIds": ["R307", "R504", "R507", "R510", "R608", "R610"],
+      "canonicalOwner": "Support possession/frame pacing",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-COLD-WEBGPU-ADMISSION", "T-NATIVE-FRAME-PACING", "T-SUPPORT-VISUAL-E2E", "T-FRAME-POLICY"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-180",
+      "sourceOutcomeIds": ["CORR-HF-180"],
+      "planningRequirementIds": ["R307", "R400", "R401", "R402", "R403", "R404", "R405", "R406", "R407", "R408", "R409", "R410", "R411", "R412", "R413", "R505", "R510", "R608", "R610"],
+      "canonicalOwner": "Support/runtime/destruction integrator",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-SUPPORT-RUNTIME", "T-DESTRUCTIBLE", "T-NATIVE-FRAME-PACING", "T-WEBGPU-ENDURANCE", "T-NETWORK"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-181",
+      "sourceOutcomeIds": ["CORR-HF-181"],
+      "planningRequirementIds": ["R304", "R506", "R507", "R508", "R509", "R510"],
+      "canonicalOwner": "Drone combat/balance authority",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-KILLSTREAK-CATALOG", "T-SUPPORT-RUNTIME", "T-SUPPORT-DAMAGE", "T-NETWORK"], "artifactRefs": []}
     }
   ],
   "desktopUntitledOutcomes": [
