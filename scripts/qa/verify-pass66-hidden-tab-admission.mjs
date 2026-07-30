@@ -196,7 +196,7 @@ if ($ownerPid -ne $targetPid) { throw 'gate Chrome HWND did not belong to the la
 $shell = New-Object -ComObject WScript.Shell
 [void]$shell.AppActivate($targetPid)
 [void][Pass66GateWindow]::ShowWindowAsync($handle, 3)
-[void][Pass66GateWindow]::SetWindowPos($handle, [IntPtr](-1), 0, 0, 0, 0, 0x0043)
+[void][Pass66GateWindow]::SetWindowPos($handle, [IntPtr](-1), 0, 0, 1600, 900, 0x0040)
 [void][Pass66GateWindow]::SetForegroundWindow($handle)
 Start-Sleep -Milliseconds 150
 if ([Pass66GateWindow]::GetForegroundWindow() -ne $handle) { throw 'gate Chrome child did not become the OS foreground window' }
@@ -342,6 +342,8 @@ const chromeArgs = [
   '--enable-unsafe-webgpu',
   '--no-first-run',
   '--no-default-browser-check',
+  '--window-position=0,0',
+  '--window-size=1600,900',
   ...seedUrls,
 ];
 assertHeadedChromeLaunchContract({ headless: false, executablePath, args: chromeArgs, automation: 'direct-cdp', seedUrls });
