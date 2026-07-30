@@ -35,17 +35,30 @@ export const REQUIRED_BROWSER_WEAPON_IDS = Object.freeze([
 
 export const REQUIRED_HELD_CPU_ASSET = '/assets/original/models/weapons/pass65-firearms/flashlight-pistol/flashlight-pistol-fp-lod0.glb';
 
-export function assertHeadedChromeLaunchContract({ headless, executablePath, args, ignoreDefaultArgs }) {
+export function assertHeadedChromeLaunchContract({ headless, executablePath, args, automation, seedUrls }) {
   if (headless !== false) throw new Error('Pass 66 hidden-tab admission requires headed Chrome');
   if (typeof executablePath !== 'string' || !/[/\\]Google[/\\]Chrome[/\\]Application[/\\]chrome\.exe$/i.test(executablePath)) {
     throw new Error('Pass 66 hidden-tab admission requires installed Google Chrome');
   }
-  if (JSON.stringify(ignoreDefaultArgs) !== JSON.stringify(FORBIDDEN_BACKGROUND_BYPASS_FLAGS)) {
-    throw new Error(`Pass 66 hidden-tab admission must remove exactly Playwright's forbidden defaults: ${FORBIDDEN_BACKGROUND_BYPASS_FLAGS.join(', ')}`);
+  if (automation !== 'direct-cdp') {
+    throw new Error('Pass 66 hidden-tab admission requires direct CDP so Playwright cannot force focus emulation');
   }
-  const forbidden = FORBIDDEN_BACKGROUND_BYPASS_FLAGS.filter((flag) => args.includes(flag));
+  if (!Array.isArray(args)) throw new Error('Pass 66 hidden-tab admission requires explicit Chrome arguments');
+  const forbidden = args.filter((argument) => (
+    FORBIDDEN_BACKGROUND_BYPASS_FLAGS.includes(argument)
+    || /(?:disable|bypass).*(?:background|renderer|occlusion|throttl)/i.test(argument)
+  ));
   if (forbidden.length > 0) {
     throw new Error(`Pass 66 hidden-tab admission forbids browser throttling bypasses: ${forbidden.join(', ')}`);
+  }
+  if (args.filter((argument) => argument.startsWith('--remote-debugging-port=')).length !== 1
+    || args.filter((argument) => argument.startsWith('--user-data-dir=')).length !== 1
+    || !args.includes('--enable-unsafe-webgpu')) {
+    throw new Error('Pass 66 hidden-tab admission requires one direct CDP port, one isolated Chrome profile and native WebGPU');
+  }
+  if (!Array.isArray(seedUrls) || seedUrls.length !== 2
+    || !seedUrls.every((url) => typeof url === 'string' && url.startsWith('file:///') && args.includes(url))) {
+    throw new Error('Pass 66 hidden-tab admission requires exactly two command-line-seeded native Chrome tabs');
   }
 }
 
@@ -87,8 +100,14 @@ export function hiddenCheckpointFailures({ beforeRelease, afterHidden, heldAsset
   if (beforeRelease.document.visibilityState !== 'hidden' || beforeRelease.document.hasFocus) {
     failures.push('the game tab was not genuinely hidden before the asset barrier opened');
   }
+  if (beforeRelease.coverDocument?.visibilityState !== 'visible' || !beforeRelease.coverDocument?.hasFocus) {
+    failures.push('the real cover tab did not own the foreground before the asset barrier opened');
+  }
   if (afterHidden.document.visibilityState !== 'hidden' || afterHidden.document.hasFocus) {
     failures.push('the game tab did not remain genuinely hidden during background preparation');
+  }
+  if (afterHidden.coverDocument?.visibilityState !== 'visible' || !afterHidden.coverDocument?.hasFocus) {
+    failures.push('the real cover tab did not remain foreground during background preparation');
   }
   if (heldAssetRequests < 1 || !completedHeldCpuAsset(afterHidden)) {
     failures.push('the exact held first-person weapon CPU asset did not complete while hidden');
@@ -141,6 +160,9 @@ export function recoveredCheckpointFailures({ beforeRelease, afterHidden, recove
   const failures = [];
   if (recovered.document.visibilityState !== 'visible' || !recovered.document.hasFocus) {
     failures.push('the game tab did not regain foreground ownership');
+  }
+  if (recovered.coverDocument?.visibilityState !== 'hidden' || recovered.coverDocument?.hasFocus) {
+    failures.push('the native cover tab did not yield foreground ownership on recovery');
   }
   if (recovered.foregroundRecoveryMs > maximumRecoveryMs) {
     failures.push(`foreground recovery ${recovered.foregroundRecoveryMs}ms exceeded ${maximumRecoveryMs}ms`);

@@ -14,6 +14,7 @@ const chrome = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 function checkpoint(overrides = {}) {
   return {
     document: { visibilityState: 'hidden', hasFocus: false },
+    coverDocument: { visibilityState: 'visible', hasFocus: true },
     frameCount: 7,
     gameStarted: false,
     matchPhase: 'warmup',
@@ -51,41 +52,59 @@ function checkpoint(overrides = {}) {
   };
 }
 
-test('requires real headed installed Chrome without background-throttling bypass flags', () => {
+test('requires direct-CDP headed installed Chrome with two native seed tabs and no background bypasses', () => {
+  const seedUrls = ['file:///C:/Temp/game.html', 'file:///C:/Temp/cover.html'];
+  const baseArgs = [
+    '--remote-debugging-port=43123',
+    '--user-data-dir=C:/Temp/pass66-profile',
+    '--enable-unsafe-webgpu',
+    ...seedUrls,
+  ];
   assert.doesNotThrow(() => assertHeadedChromeLaunchContract({
     headless: false,
     executablePath: chrome,
-    args: ['--enable-unsafe-webgpu'],
-    ignoreDefaultArgs: [...FORBIDDEN_BACKGROUND_BYPASS_FLAGS],
+    args: baseArgs,
+    automation: 'direct-cdp',
+    seedUrls,
   }));
   assert.throws(() => assertHeadedChromeLaunchContract({
     headless: true,
     executablePath: chrome,
-    args: [],
-    ignoreDefaultArgs: [...FORBIDDEN_BACKGROUND_BYPASS_FLAGS],
+    args: baseArgs,
+    automation: 'direct-cdp',
+    seedUrls,
   }), /headed Chrome/);
   for (const flag of FORBIDDEN_BACKGROUND_BYPASS_FLAGS) {
     assert.throws(() => assertHeadedChromeLaunchContract({
       headless: false,
       executablePath: chrome,
-      args: [flag],
-      ignoreDefaultArgs: [...FORBIDDEN_BACKGROUND_BYPASS_FLAGS],
+      args: [...baseArgs, flag],
+      automation: 'direct-cdp',
+      seedUrls,
     }), /forbids browser throttling bypasses/);
   }
-  const defaultArgMutations = [
-    undefined,
-    [],
-    FORBIDDEN_BACKGROUND_BYPASS_FLAGS.slice(0, -1),
-    [...FORBIDDEN_BACKGROUND_BYPASS_FLAGS].reverse(),
-    [...FORBIDDEN_BACKGROUND_BYPASS_FLAGS, '--disable-features=CalculateNativeWinOcclusion'],
-  ];
-  for (const ignoreDefaultArgs of defaultArgMutations) {
+  assert.throws(() => assertHeadedChromeLaunchContract({
+    headless: false,
+    executablePath: chrome,
+    args: baseArgs,
+    automation: 'playwright',
+    seedUrls,
+  }), /requires direct CDP/);
+  assert.throws(() => assertHeadedChromeLaunchContract({
+    headless: false,
+    executablePath: chrome,
+    args: [...baseArgs, '--disable-features=CalculateNativeWinOcclusion'],
+    automation: 'direct-cdp',
+    seedUrls,
+  }), /forbids browser throttling bypasses/);
+  for (const invalidSeeds of [undefined, seedUrls.slice(0, 1), [...seedUrls].reverse().slice(0, 1), ['about:blank', seedUrls[1]]]) {
     assert.throws(() => assertHeadedChromeLaunchContract({
       headless: false,
       executablePath: chrome,
-      args: ['--enable-unsafe-webgpu'],
-      ignoreDefaultArgs,
-    }), /must remove exactly Playwright's forbidden defaults/);
+      args: baseArgs,
+      automation: 'direct-cdp',
+      seedUrls: invalidSeeds,
+    }), /two command-line-seeded native Chrome tabs/);
   }
 });
 
@@ -200,6 +219,7 @@ test('accepts one healthy foreground recovery of the same generation and root', 
   const afterHidden = checkpoint();
   const recovered = checkpoint({
     document: { visibilityState: 'visible', hasFocus: true },
+    coverDocument: { visibilityState: 'hidden', hasFocus: false },
     gameStarted: true,
     matchPhase: 'active',
     foregroundRecoveryMs: 8_400,
