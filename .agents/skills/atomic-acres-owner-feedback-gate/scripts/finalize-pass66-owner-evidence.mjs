@@ -290,6 +290,72 @@ function validateReceiptMetadata(receipt, artifactSpec, sourceSha, feedbackIds, 
   return { receiptFeedback, receiptTests };
 }
 
+export function artifactIdForTest(testId) {
+  return `ART-P66-${testId.replace(/^T-/, '')}`;
+}
+
+export function validateExactArtifactCatalog(graph, catalog) {
+  const tests = uniqueIndex(graph?.testCatalog, 'id', 'testCatalog');
+  const feedbackNodes = uniqueIndex(graph?.feedbackNodes, 'id', 'feedbackNodes');
+  const expectedFeedbackByTest = new Map([...tests.keys()].map((testId) => [testId, []]));
+  for (const node of feedbackNodes.values()) {
+    const rawTestRefs = node.verification?.testRefs;
+    if (!Array.isArray(rawTestRefs)) fail('E_INPUT_SHAPE', `${node.id}.verification.testRefs must be an array.`);
+    if (rawTestRefs.some((testRef) => typeof testRef !== 'string' || testRef.length === 0)) {
+      fail('E_INPUT_SHAPE', `${node.id}.verification.testRefs contains an empty or non-string value.`);
+    }
+    const testRefs = [...new Set(rawTestRefs)].sort();
+    if (testRefs.length !== rawTestRefs.length) fail('E_INPUT_DUPLICATE', `${node.id}.verification.testRefs contains duplicate values.`);
+    for (const testRef of testRefs) {
+      if (!tests.has(testRef)) fail('E_ARTIFACT_TEST', `${node.id} references unknown ${testRef}.`);
+      expectedFeedbackByTest.get(testRef).push(node.id);
+    }
+  }
+  for (const feedbackIds of expectedFeedbackByTest.values()) feedbackIds.sort();
+
+  if (!Array.isArray(catalog)) fail('E_INPUT_SHAPE', 'artifactCatalog must be an array.');
+  const receiptByTest = new Map();
+  for (const artifact of catalog) {
+    const testRefs = sortedUnique(artifact?.testRefs, `${artifact?.id ?? '<unknown>'}.testRefs`);
+    if (testRefs.length !== 1) {
+      fail('E_ARTIFACT_TEST_CARDINALITY', `${artifact?.id ?? '<unknown>'} must attest exactly one catalog test.`);
+    }
+    const [testId] = testRefs;
+    if (!tests.has(testId)) fail('E_ARTIFACT_TEST', `${artifact.id} references unknown ${testId}.`);
+    if (receiptByTest.has(testId)) {
+      fail('E_ARTIFACT_TEST_DUPLICATE', `${testId} has more than one evidence receipt.`);
+    }
+    const expectedArtifactId = artifactIdForTest(testId);
+    if (artifact.id !== expectedArtifactId) {
+      fail('E_ARTIFACT_CANONICAL_ID', `${testId} must use artifact ID ${expectedArtifactId}, not ${artifact.id}.`);
+    }
+    if (artifact.verifierId !== testId) {
+      fail('E_ARTIFACT_VERIFIER', `${artifact.id} verifierId must be ${testId}, not ${artifact.verifierId ?? '<missing>'}.`);
+    }
+    const actualFeedback = sortedUnique(artifact.feedbackIds, `${artifact.id}.feedbackIds`);
+    const expectedFeedback = expectedFeedbackByTest.get(testId);
+    if (JSON.stringify(actualFeedback) !== JSON.stringify(expectedFeedback)) {
+      fail(
+        'E_ARTIFACT_FEEDBACK_SET',
+        `${artifact.id} feedbackIds differ from graph-derived ${testId} coverage; expected=${expectedFeedback.join(',') || '<none>'}; actual=${actualFeedback.join(',') || '<none>'}.`,
+      );
+    }
+    receiptByTest.set(testId, artifact);
+  }
+
+  const expectedTests = [...tests.keys()].sort();
+  const actualTests = [...receiptByTest.keys()].sort();
+  if (JSON.stringify(actualTests) !== JSON.stringify(expectedTests)) {
+    const missing = expectedTests.filter((testId) => !receiptByTest.has(testId));
+    const extra = actualTests.filter((testId) => !tests.has(testId));
+    fail(
+      'E_ARTIFACT_TEST_SET',
+      `Evidence receipts differ from the exact graph test catalog; missing=${missing.join(',') || '<none>'}; extra=${extra.join(',') || '<none>'}.`,
+    );
+  }
+  return catalog;
+}
+
 function buildArtifactCatalog(planArtifacts, sourceSha, graph, readBytes, repoRoot) {
   const feedbackIds = new Set(graph.feedbackNodes?.map((node) => node.id) ?? []);
   const testIds = new Set(graph.testCatalog?.map((test) => test.id) ?? []);
@@ -341,6 +407,7 @@ function buildArtifactCatalog(planArtifacts, sourceSha, graph, readBytes, repoRo
     }
   }
   catalog.sort((left, right) => left.id.localeCompare(right.id) || left.path.localeCompare(right.path));
+  validateExactArtifactCatalog(graph, catalog);
   return { catalog, receiptById, requiredCommitPaths };
 }
 
@@ -734,8 +801,8 @@ export function createSelfTestFixture() {
     ],
   };
   const receipts = [
-    createReceipt({ sourceSha, buildId: 'fixture-a', verifierId: 'fixture-a', environmentHash, feedbackIds: ['HF-001'], testRefs: ['T-A'] }),
-    createReceipt({ sourceSha, buildId: 'fixture-b', verifierId: 'fixture-b', environmentHash, feedbackIds: ['HF-002'], testRefs: ['T-B'] }),
+    createReceipt({ sourceSha, buildId: 'fixture-a', verifierId: 'T-A', environmentHash, feedbackIds: ['HF-001'], testRefs: ['T-A'] }),
+    createReceipt({ sourceSha, buildId: 'fixture-b', verifierId: 'T-B', environmentHash, feedbackIds: ['HF-002', 'HF-003'], testRefs: ['T-B'] }),
   ];
   const receiptPaths = [
     `${OWNER_ARTIFACT_ROOT}fixture-a.json`,
@@ -755,29 +822,29 @@ export function createSelfTestFixture() {
       createdAt: '2026-07-30T00:00:00Z',
     },
     artifacts: receiptPaths.map((receiptPath, index) => ({
-      id: `ART-FIXTURE-${index + 1}`,
+      id: artifactIdForTest(graph.testCatalog[index].id),
       path: receiptPath,
       sha256: sha256(bytesByPath.get(receiptPath)),
     })),
     feedbackEvidence: [
-      { feedbackId: 'HF-001', state: 'VERIFIED', testEvidence: [{ testRef: 'T-A', artifactId: 'ART-FIXTURE-1' }] },
-      { feedbackId: 'HF-002', state: 'VERIFIED', testEvidence: [{ testRef: 'T-B', artifactId: 'ART-FIXTURE-2' }] },
+      { feedbackId: 'HF-001', state: 'VERIFIED', testEvidence: [{ testRef: 'T-A', artifactId: 'ART-P66-A' }] },
+      { feedbackId: 'HF-002', state: 'VERIFIED', testEvidence: [{ testRef: 'T-B', artifactId: 'ART-P66-B' }] },
     ],
     requirementEvidence: [
       {
         planningRequirementId: 'R001', acceptance: 'mechanical', evidence: [{
-          kind: 'contract', ref: 'scripts/release/acceptance-gate.mjs', testRef: 'T-A', artifactId: 'ART-FIXTURE-1',
+          kind: 'contract', ref: 'scripts/release/acceptance-gate.mjs', testRef: 'T-A', artifactId: 'ART-P66-A',
           feedbackIds: ['HF-001'], note: 'Exact fixture receipt exercises the runtime falsifier.',
         }],
       },
       {
         planningRequirementId: 'R002', acceptance: 'mixed', evidence: [
           {
-            kind: 'browser', ref: '.agents/skills/atomic-acres-owner-feedback-gate/scripts/finalize-pass66-owner-evidence.test.mjs', testRef: 'T-B', artifactId: 'ART-FIXTURE-2',
+            kind: 'browser', ref: '.agents/skills/atomic-acres-owner-feedback-gate/scripts/finalize-pass66-owner-evidence.test.mjs', testRef: 'T-B', artifactId: 'ART-P66-B',
             feedbackIds: ['HF-002'], note: 'Served fixture exercises the visual browser falsifier.',
           },
           {
-            kind: 'visual', ref: 'artifact://pass66-fixture/contact-sheet', testRef: 'T-B', artifactId: 'ART-FIXTURE-2',
+            kind: 'visual', ref: 'artifact://pass66-fixture/contact-sheet', testRef: 'T-B', artifactId: 'ART-P66-B',
             feedbackIds: ['HF-002'], note: 'Digest-bound contact sheet records the inspected visual state.',
           },
         ],
@@ -829,7 +896,7 @@ export function runSelfTest() {
   rejected('dirty S0', 'E_SOURCE_DIRTY', (candidate) => { candidate.sourceState.status = ' M src/runtime.ts'; });
   rejected('runtime drift', 'E_SOURCE_RUNTIME_DRIFT', (candidate) => { candidate.sourceState.changedPaths = ['src/runtime.ts']; });
   rejected('incomplete row tests', 'E_ROW_TEST_SET', (candidate) => { candidate.plan.feedbackEvidence[0].testEvidence = []; });
-  rejected('row/test not attested by receipt', 'E_ROW_ARTIFACT_ATTESTATION', (candidate) => { candidate.plan.feedbackEvidence[0].testEvidence[0].artifactId = 'ART-FIXTURE-2'; });
+  rejected('row/test not attested by receipt', 'E_ROW_ARTIFACT_ATTESTATION', (candidate) => { candidate.plan.feedbackEvidence[0].testEvidence[0].artifactId = 'ART-P66-B'; });
   rejected('wrong artifact digest', 'E_ARTIFACT_DIGEST', (candidate) => { candidate.plan.artifacts[0].sha256 = '0'.repeat(64); });
   rejected('artifact bound to another source SHA', 'E_ARTIFACT_SOURCE_SHA', (candidate) => {
     const artifact = candidate.plan.artifacts[0];
