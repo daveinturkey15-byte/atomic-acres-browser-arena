@@ -4,6 +4,7 @@ import { BOT_WEAPON_POOL } from './bot-arsenal';
 import type { WeaponId } from './protocol';
 import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 import { disposePass65WeaponModel, loadPass65WeaponPresentation } from './weapon-model';
+import { yieldBrowserCpuTask } from './browser-preparation-scheduler';
 
 const EXPECTED_BOT_WEAPON_IDS: readonly WeaponId[] = Object.freeze([...BOT_WEAPON_POOL]);
 
@@ -26,7 +27,7 @@ export type BotWeaponGpuVocabularyTelemetry = Readonly<{
 export type BotWeaponCpuYield = () => Promise<void>;
 
 function defaultCpuYield(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
+  return yieldBrowserCpuTask();
 }
 
 /**

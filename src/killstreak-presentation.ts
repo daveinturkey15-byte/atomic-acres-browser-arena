@@ -7,6 +7,7 @@ import type { DroneSensorContact, KillstreakEntitySnapshot, KillstreakImpactEven
 import { DRONE_GUN_PROFILE_ID, DRONE_PRESENTATION_FAMILY_ID } from './killstreak-support-catalog';
 import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 import { SUPPORT_WEAPON_FEEDBACK_CONTRACT } from './support-vehicle-presentation-contract';
+import { yieldBrowserCpuTask, yieldBrowserPreparationFrame } from './browser-preparation-scheduler';
 
 const MAX_PRESENTED_ENTITIES = 32;
 const MAX_IMPACT_FLASHES = 20;
@@ -25,11 +26,11 @@ async function yieldPresentationPreparation(): Promise<void> {
   // Presentation preparation must continue while the document is hidden.
   // requestAnimationFrame is suspended/throttled in that state, which used to
   // leave deployment preparation waiting indefinitely after a tab switch.
-  await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 0));
+  await yieldBrowserPreparationFrame();
 }
 
 async function yieldPresentationCpuTask(): Promise<void> {
-  await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 0));
+  await yieldBrowserCpuTask();
 }
 
 export const HUNTER_DRONE_ASSET = './assets/original/models/support/hunter-drone-lod0.glb';

@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import type { GrenadeId } from './combat/grenade-catalog';
 import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
+import { yieldBrowserCpuTask } from './browser-preparation-scheduler';
 
 export const FRAG_GRENADE_ASSET = './assets/original/models/frag-grenade.glb';
 export const FRAG_GRENADE_MAX_DIMENSION = 0.46;
@@ -285,7 +286,7 @@ export class GrenadeWorldPresentationPool {
         if (typeof document !== 'undefined'
           && built % GRENADE_WORLD_PRESENTATION_BUILD_BATCH_SIZE === 0
           && built < this.capacityPerFamily * 2) {
-          await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 0));
+          await yieldBrowserCpuTask();
         }
       }
     }

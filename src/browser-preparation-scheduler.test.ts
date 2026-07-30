@@ -1,11 +1,49 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  BrowserCpuTaskLane,
   browserOwnsForegroundPresentation,
   scheduleBrowserPreparationIdleTask,
   waitForVisibleBrowserPreparation,
   yieldBrowserPreparationFrame,
   yieldVisibleBrowserPresentationFrame,
 } from './browser-preparation-scheduler';
+
+function manualMessageChannel(options: Readonly<{ throwOnPost?: boolean }> = {}): Readonly<{
+  channel: MessageChannel;
+  dispatchOne: () => void;
+  pendingCount: () => number;
+  port1Close: ReturnType<typeof vi.fn>;
+  port2Close: ReturnType<typeof vi.fn>;
+}> {
+  const pending: unknown[] = [];
+  const port1Close = vi.fn();
+  const port2Close = vi.fn();
+  const port1 = {
+    onmessage: null as ((event: MessageEvent) => void) | null,
+    start: vi.fn(),
+    close: port1Close,
+  };
+  const port2 = {
+    onmessage: null,
+    start: vi.fn(),
+    close: port2Close,
+    postMessage: (value: unknown) => {
+      if (options.throwOnPost) throw new DOMException('closed port', 'InvalidStateError');
+      pending.push(value);
+    },
+  };
+  return {
+    channel: { port1, port2 } as unknown as MessageChannel,
+    dispatchOne: () => {
+      if (pending.length === 0) throw new Error('No queued MessageChannel turn');
+      const data = pending.shift();
+      port1.onmessage?.({ data } as MessageEvent);
+    },
+    pendingCount: () => pending.length,
+    port1Close,
+    port2Close,
+  };
+}
 
 type VisibilityDocument = {
   visibilityState: DocumentVisibilityState;
@@ -42,6 +80,86 @@ afterEach(() => {
 });
 
 describe('browser preparation scheduler', () => {
+  it('runs one CPU callback per MessageChannel turn in FIFO order and closes both drained ports', async () => {
+    const manual = manualMessageChannel();
+    const createMessageChannel = vi.fn(() => manual.channel);
+    const scheduleTimer = vi.fn();
+    const lane = new BrowserCpuTaskLane({ createMessageChannel, scheduleTimer });
+    const order: string[] = [];
+
+    lane.schedule(() => order.push('first'));
+    lane.schedule(() => order.push('second'));
+
+    expect(createMessageChannel).toHaveBeenCalledTimes(1);
+    expect(manual.pendingCount()).toBe(1);
+    expect(lane.telemetry()).toMatchObject({ queuedTasks: 2, postedTurns: 1, channelActive: true });
+    manual.dispatchOne();
+    await Promise.resolve();
+
+    expect(order).toEqual(['first']);
+    expect(manual.pendingCount()).toBe(1);
+    expect(lane.telemetry()).toMatchObject({ queuedTasks: 1, postedTurns: 2, channelActive: true });
+    manual.dispatchOne();
+    await Promise.resolve();
+
+    expect(order).toEqual(['first', 'second']);
+    expect(lane.telemetry()).toMatchObject({
+      queuedTasks: 0,
+      completedTasks: 2,
+      channelActive: false,
+      cleanupCount: 1,
+    });
+    expect(manual.port1Close).toHaveBeenCalledTimes(1);
+    expect(manual.port2Close).toHaveBeenCalledTimes(1);
+    expect(scheduleTimer).not.toHaveBeenCalled();
+  });
+
+  it('removes a failed-post callback before exact-once timer fallback', () => {
+    const manual = manualMessageChannel({ throwOnPost: true });
+    const timers: Array<() => void> = [];
+    const lane = new BrowserCpuTaskLane({
+      createMessageChannel: () => manual.channel,
+      scheduleTimer: (task) => { timers.push(task); },
+    });
+    const task = vi.fn();
+
+    lane.schedule(task);
+
+    expect(lane.telemetry()).toMatchObject({
+      queuedTasks: 0,
+      channelActive: false,
+      fallbackTasks: 1,
+      completedTasks: 0,
+      cleanupCount: 1,
+    });
+    expect(timers).toHaveLength(1);
+    expect(manual.pendingCount()).toBe(0);
+    timers[0]!();
+    expect(task).toHaveBeenCalledTimes(1);
+    expect(lane.telemetry().completedTasks).toBe(1);
+  });
+
+  it('falls back cleanly when MessageChannel is unavailable or construction fails', () => {
+    const timers: Array<() => void> = [];
+    const task = vi.fn();
+    const unavailable = new BrowserCpuTaskLane({
+      createMessageChannel: () => null,
+      scheduleTimer: (scheduled) => { timers.push(scheduled); },
+    });
+    unavailable.schedule(task);
+    expect(unavailable.telemetry()).toMatchObject({ queuedTasks: 0, fallbackTasks: 1, channelActive: false });
+
+    const failed = new BrowserCpuTaskLane({
+      createMessageChannel: () => { throw new Error('constructor rejected'); },
+      scheduleTimer: (scheduled) => { timers.push(scheduled); },
+    });
+    failed.schedule(task);
+    expect(failed.telemetry()).toMatchObject({ queuedTasks: 0, fallbackTasks: 1, channelActive: false });
+
+    for (const scheduled of timers) scheduled();
+    expect(task).toHaveBeenCalledTimes(2);
+  });
+
   it('reports foreground ownership only for a visible focused browser document', () => {
     vi.stubGlobal('document', { visibilityState: 'visible', hasFocus: () => false });
     expect(browserOwnsForegroundPresentation()).toBe(false);

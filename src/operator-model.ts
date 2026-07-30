@@ -6,6 +6,7 @@ import { markMeshGeometriesShared } from './gpu-resource-ownership';
 import type { Team } from './protocol';
 import { objectLocalGeometryBounds } from './character-presentation-contract';
 import { solveTwoBoneElbow } from './ik';
+import { yieldBrowserCpuTask } from './browser-preparation-scheduler';
 
 export const BOT_EMISSIVE_BRIGHTNESS_SCALE = 0.5;
 
@@ -643,7 +644,7 @@ async function performRiggedOperatorActionPrewarm(
     if (typeof document !== 'undefined'
       && (index + 1) % RIGGED_OPERATOR_ACTIONS_PER_TASK === 0
       && index + 1 < actionNames.length) {
-      await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 0));
+      await yieldBrowserCpuTask();
     }
   }
   return bound;
