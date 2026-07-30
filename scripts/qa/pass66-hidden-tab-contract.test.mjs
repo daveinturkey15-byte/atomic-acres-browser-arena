@@ -152,7 +152,7 @@ test('persists every named gate checkpoint into failure evidence without changin
   for (const name of ['initial', 'beforeRelease', 'afterCpuProgress', 'afterHidden', 'recovered']) {
     assert.match(verifierSource, new RegExp(`checkpoints\\.${name} = ${name}`));
   }
-  assert.match(verifierSource, /partialReceipt: \{\s*\n\s*foregroundWindowHandle,\s*\n\s*checkpoints,\s*\n\s*\}/);
+  assert.match(verifierSource, /partialReceipt: \{\s*\n\s*foregroundWindowHandle,\s*\n\s*lastBootstrapProbe,\s*\n\s*checkpoints,\s*\n\s*\}/);
   for (const field of ['constructionCount', 'constructionHistory', 'constructedArenaIds', 'residentArenaRoots']) {
     assert.match(verifierSource, new RegExp(`${field}: state\\.arenaSelection\\.streaming\\.${field}`));
   }
@@ -171,6 +171,23 @@ test('persists every named gate checkpoint into failure evidence without changin
     1,
     'checkpoint persistence must not widen or duplicate the recovery timeout',
   );
+});
+
+test('retains one bounded bootstrap probe before full checkpoint sampling is available', () => {
+  assert.match(verifierSource, /let lastBootstrapProbe = null/);
+  assert.match(verifierSource, /stage: state\.bootstrap\.stage/);
+  assert.match(verifierSource, /menuDeploymentAssets: state\.bootstrap\.menuDeploymentAssets/);
+  assert.match(verifierSource, /menuDeploymentAssetsProfile: state\.bootstrap\.menuDeploymentAssetsProfile/);
+  for (const field of ['actualBackend', 'adapterLabel', 'adapterClass', 'deviceClass', 'softwareAdapter', 'deviceLost', 'uncapturedErrors']) {
+    assert.match(verifierSource, new RegExp(`${field}: runtime\\.${field}`));
+  }
+  assert.match(verifierSource, /constructionHistory: streaming\.constructionHistory\.slice\(-16\)/);
+  assert.match(verifierSource, /constructedArenaIds: streaming\.constructedArenaIds\.slice\(-16\)/);
+  assert.match(verifierSource, /coverDocument: await documentState\(cover\)/);
+  assert.match(verifierSource, /fatalErrors: uniqueFatalErrors\(errors\)\.slice\(-16\)\.map/);
+  assert.match(verifierSource, /partialReceipt: \{\s*\n\s*foregroundWindowHandle,\s*\n\s*lastBootstrapProbe,\s*\n\s*checkpoints/);
+  assert.match(verifierSource, /const readyDeadline = Date\.now\(\) \+ 60_000/);
+  assert.match(verifierSource, /Pass 66 game bootstrap did not become ready within 60000ms/);
 });
 
 test('accepts hidden CPU progress only when frames, WebGPU submission, authority, audio and generation stay paused', () => {

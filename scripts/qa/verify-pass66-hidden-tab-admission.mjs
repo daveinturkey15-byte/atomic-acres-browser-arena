@@ -480,6 +480,7 @@ let cover;
 let displayPowerOwner = null;
 let foregroundWindowHandle = null;
 let receipt = null;
+let lastBootstrapProbe = null;
 const checkpoints = {
   initial: null,
   beforeRelease: null,
@@ -577,16 +578,63 @@ try {
   const readyDeadline = Date.now() + 60_000;
   while (Date.now() < readyDeadline) {
     try {
-      const ready = await game.evaluate(`(() => {
+      const bootstrapProbe = await game.evaluate(`(() => {
         const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
-        return state?.bootstrap.stage === 'ready'
+        const runtime = state?.render.runtime;
+        const streaming = state?.arenaSelection.streaming;
+        return {
+          sampledAt: performance.now(),
+          debugSurfaceReady: Boolean(state),
+          document: { visibilityState: document.visibilityState, hasFocus: document.hasFocus() },
+          ready: state?.bootstrap.stage === 'ready'
           && state?.render.runtime.actualBackend === 'webgpu'
           && state?.render.runtime.softwareAdapter === false
-          && state?.arenaSelection.streaming.constructionCount === 0;
+          && state?.arenaSelection.streaming.constructionCount === 0,
+          bootstrap: state ? {
+            stage: state.bootstrap.stage,
+            error: state.bootstrap.error,
+            menuDeploymentAssets: state.bootstrap.menuDeploymentAssets,
+            menuDeploymentAssetsProfile: state.bootstrap.menuDeploymentAssetsProfile,
+          } : null,
+          runtime: runtime ? {
+            requestedBackend: runtime.requestedBackend,
+            actualBackend: runtime.actualBackend,
+            initialized: runtime.initialized,
+            failClosed: runtime.failClosed,
+            adapterLabel: runtime.adapterLabel,
+            adapterClass: runtime.adapterClass,
+            deviceClass: runtime.deviceClass,
+            softwareAdapter: runtime.softwareAdapter,
+            deviceLost: runtime.deviceLost,
+            uncapturedErrors: runtime.uncapturedErrors,
+            lastUncapturedError: runtime.lastUncapturedError,
+          } : null,
+          streaming: streaming ? {
+            constructionCount: streaming.constructionCount,
+            constructionHistory: streaming.constructionHistory.slice(-16),
+            constructedArenaIds: streaming.constructedArenaIds.slice(-16),
+            residentArenaRoots: streaming.residentArenaRoots,
+          } : null,
+        };
       })()`);
-      if (ready) break;
-    } catch {
-      // The app has not installed its debug surface yet.
+      lastBootstrapProbe = {
+        ...bootstrapProbe,
+        coverDocument: await documentState(cover),
+        fatalErrors: uniqueFatalErrors(errors).slice(-16).map((message) => message.slice(0, 1_000)),
+      };
+      if (bootstrapProbe.ready) break;
+    } catch (error) {
+      lastBootstrapProbe = {
+        sampledAt: null,
+        debugSurfaceReady: false,
+        document: null,
+        coverDocument: null,
+        bootstrap: null,
+        runtime: null,
+        streaming: null,
+        fatalErrors: uniqueFatalErrors(errors).slice(-16).map((message) => message.slice(0, 1_000)),
+        evaluationError: (error instanceof Error ? error.message : String(error)).slice(0, 1_000),
+      };
     }
     await delay(100);
   }
@@ -692,6 +740,7 @@ try {
     executablePath,
     partialReceipt: {
       foregroundWindowHandle,
+      lastBootstrapProbe,
       checkpoints,
     },
     error: error instanceof Error ? error.message : String(error),
