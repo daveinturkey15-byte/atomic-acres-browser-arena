@@ -254,7 +254,8 @@ export class WeaponPresentation {
   private gpuReadyModels = new WeakSet<THREE.Object3D>();
   private gpuPrewarmPromises = new WeakMap<THREE.Object3D, Promise<void>>();
   private gpuReadinessGeneration = 0;
-  private browserCatalogPrewarmPromise: Promise<void> | null = null;
+  /** Serializes asset-only staging and renderer-dependent catalog prewarm. */
+  private browserCatalogOperationPromise: Promise<void> | null = null;
   private readonly browserResidentWeaponIds = new Set<WeaponId>();
   private unpreparedBrowserSwitches = 0;
   private lastUnpreparedBrowserSwitch: Readonly<{
@@ -972,26 +973,52 @@ export class WeaponPresentation {
     yieldToBrowser?: () => Promise<void>,
   ): Promise<void> {
     if (!this.browserRuntime || !this.gpuPrewarmer) return;
-    const ids = [...new Set(requestedIds)];
-    if (ids.length === 0 || ids.length > WeaponPresentation.MAX_RETAINED_WEBGPU_WEAPONS) {
-      throw new Error(`Pass 65 WebGPU weapon prewarm requires 1-${WeaponPresentation.MAX_RETAINED_WEBGPU_WEAPONS} unique models`);
-    }
-    if (this.browserCatalogPrewarmPromise) {
-      await this.browserCatalogPrewarmPromise;
+    const ids = this.normalizeBrowserWeaponCatalog(requestedIds);
+    if (this.browserCatalogOperationPromise) {
+      await this.browserCatalogOperationPromise;
       return this.prewarmBrowserWeaponCatalog(ids, onProgress, yieldToBrowser);
     }
     const exactSetReady = ids.length === this.browserResidentWeaponIds.size
       && ids.every((id) => {
         const model = this.models.get(id);
         return this.browserResidentWeaponIds.has(id) && model !== undefined && this.modelIsGpuReady(model);
-      });
+    });
     if (exactSetReady) return;
     const operation = this.performBrowserWeaponCatalogPrewarm(ids, onProgress, yieldToBrowser);
-    this.browserCatalogPrewarmPromise = operation;
+    this.browserCatalogOperationPromise = operation;
     try {
       await operation;
     } finally {
-      if (this.browserCatalogPrewarmPromise === operation) this.browserCatalogPrewarmPromise = null;
+      if (this.browserCatalogOperationPromise === operation) this.browserCatalogOperationPromise = null;
+    }
+  }
+
+  /**
+   * Loads, creates and retains one browser viewmodel catalog without submitting
+   * renderer work or claiming pipeline readiness. Menu preparation uses this
+   * before the final arena TSL/HDR graph exists; deployment can then GPU-prewarm
+   * the exact same model instances without another asset request or decode.
+   */
+  async prepareBrowserWeaponCatalogAssets(
+    requestedIds: readonly WeaponId[],
+    onProgress?: (loaded: number, total: number) => void,
+    yieldToBrowser?: () => Promise<void>,
+  ): Promise<void> {
+    if (!this.browserRuntime) return;
+    const ids = this.normalizeBrowserWeaponCatalog(requestedIds);
+    if (this.browserCatalogOperationPromise) {
+      await this.browserCatalogOperationPromise;
+      return this.prepareBrowserWeaponCatalogAssets(ids, onProgress, yieldToBrowser);
+    }
+    const exactSetResident = ids.length === this.browserResidentWeaponIds.size
+      && ids.every((id) => this.browserResidentWeaponIds.has(id) && this.models.has(id));
+    if (exactSetResident) return;
+    const operation = this.performBrowserWeaponCatalogAssetPreparation(ids, onProgress, yieldToBrowser);
+    this.browserCatalogOperationPromise = operation;
+    try {
+      await operation;
+    } finally {
+      if (this.browserCatalogOperationPromise === operation) this.browserCatalogOperationPromise = null;
     }
   }
 
@@ -1028,37 +1055,12 @@ export class WeaponPresentation {
     yieldToBrowser?: () => Promise<void>,
   ): Promise<void> {
     const prewarmStartedAt = performance.now();
-    let assetLoadMs = 0;
-    let modelCreateMs = 0;
-    let newlyCreated = 0;
     const assetPrepareStartedAt = performance.now();
-    const entries: WeaponViewmodelCatalogGpuPrewarmEntry[] = [];
-    // Load then immediately acquire each cache-backed clone. A wider decode
-    // burst can exceed the two-source soft cache before awaiting owners acquire
-    // refs, evicting a just-decoded source. Keep this atomic ownership boundary
-    // serial; native profiling shows GPU preparation, not this subsecond phase,
-    // dominates cold admission.
-    for (const id of ids) {
-      const assetLoadStartedAt = performance.now();
-      await loadPass65WeaponPresentation(id, 'first-person');
-      assetLoadMs += performance.now() - assetLoadStartedAt;
-      const modelCreateStartedAt = performance.now();
-      let model = this.models.get(id);
-      if (!model) {
-        const loadedModel = this.createLoadedBrowserWeapon(id);
-        if (!loadedModel) throw new Error(`Pass 65 first-person catalog asset unavailable after load: ${id}`);
-        model = loadedModel;
-        model.visible = false;
-        model.traverse((node) => { node.layers.mask = this.root.layers.mask; });
-        this.models.set(id, model);
-        this.modelLastUsed.set(id, ++this.modelUseCounter);
-        this.root.add(model);
-        newlyCreated += 1;
-      }
-      entries.push(Object.freeze({ weaponId: id, model }));
-      modelCreateMs += performance.now() - modelCreateStartedAt;
-      await yieldToBrowser?.();
-    }
+    const { entries, assetLoadMs, modelCreateMs, newlyCreated } = await this.prepareBrowserCatalogEntries(
+      ids,
+      undefined,
+      yieldToBrowser,
+    );
     const assetPrepareWallMs = performance.now() - assetPrepareStartedAt;
 
     const gpuPrewarmStartedAt = performance.now();
@@ -1087,8 +1089,7 @@ export class WeaponPresentation {
       } finally {
         if (flashlightEntries.length > 0) this.configureWeaponFlashlight(this.active);
       }
-      entries.forEach(({ weaponId }, index) => {
-        this.browserResidentWeaponIds.add(weaponId);
+      entries.forEach((_entry, index) => {
         onProgress?.(index + 1, ids.length);
       });
     } else {
@@ -1112,25 +1113,13 @@ export class WeaponPresentation {
             this.configureWeaponFlashlight(this.active);
           }
         }
-        this.browserResidentWeaponIds.add(id);
         onProgress?.(index + 1, ids.length);
         await yieldToBrowser?.();
       }
     }
     const gpuPrewarmMs = performance.now() - gpuPrewarmStartedAt;
     const cleanupStartedAt = performance.now();
-    const desired = new Set(ids);
-    for (const id of [...this.browserResidentWeaponIds]) {
-      if (!desired.has(id)) this.browserResidentWeaponIds.delete(id);
-    }
-    for (const [id, model] of [...this.models]) {
-      if (desired.has(id) || id === this.active || this.gpuPrewarmPromises.has(model)) continue;
-      this.models.delete(id);
-      this.modelLastUsed.delete(id);
-      this.root.remove(model);
-      if (this.retireModel) this.retireModel(model, () => releasePass65WeaponModel(model));
-      else disposePass65WeaponModel(model);
-    }
+    this.commitBrowserResidentCatalog(ids);
     const activeModel = this.models.get(this.active);
     if (!activeModel || !this.modelIsGpuReady(activeModel)) {
       throw new Error(`Pass 65 active first-person catalog model was not GPU-ready: ${this.active}`);
@@ -1152,6 +1141,92 @@ export class WeaponPresentation {
     });
   }
 
+  private normalizeBrowserWeaponCatalog(requestedIds: readonly WeaponId[]): WeaponId[] {
+    const ids = [...new Set(requestedIds)];
+    if (ids.length === 0 || ids.length > WeaponPresentation.MAX_RETAINED_WEBGPU_WEAPONS) {
+      throw new Error(`Pass 65 browser weapon catalog requires 1-${WeaponPresentation.MAX_RETAINED_WEBGPU_WEAPONS} unique models`);
+    }
+    return ids;
+  }
+
+  private async prepareBrowserCatalogEntries(
+    ids: readonly WeaponId[],
+    onProgress?: (loaded: number, total: number) => void,
+    yieldToBrowser?: () => Promise<void>,
+  ): Promise<Readonly<{
+    entries: readonly WeaponViewmodelCatalogGpuPrewarmEntry[];
+    assetLoadMs: number;
+    modelCreateMs: number;
+    newlyCreated: number;
+  }>> {
+    let assetLoadMs = 0;
+    let modelCreateMs = 0;
+    let newlyCreated = 0;
+    const entries: WeaponViewmodelCatalogGpuPrewarmEntry[] = [];
+    // Load then immediately acquire each cache-backed clone. A wider decode
+    // burst can exceed the two-source soft cache before awaiting owners acquire
+    // refs, evicting a just-decoded source. Existing retained models already own
+    // their source refs and must not re-enter the loader during final GPU prewarm.
+    for (const [index, id] of ids.entries()) {
+      let model = this.models.get(id);
+      if (!model) {
+        const assetLoadStartedAt = performance.now();
+        await loadPass65WeaponPresentation(id, 'first-person');
+        assetLoadMs += performance.now() - assetLoadStartedAt;
+        const modelCreateStartedAt = performance.now();
+        // A live switch can finish the same load while catalog preparation is
+        // awaiting. Re-read the map before creating so one ID keeps one instance.
+        model = this.models.get(id);
+        if (!model) {
+          const loadedModel = this.createLoadedBrowserWeapon(id);
+          if (!loadedModel) throw new Error(`Pass 65 first-person catalog asset unavailable after load: ${id}`);
+          model = loadedModel;
+          model.visible = false;
+          model.traverse((node) => { node.layers.mask = this.root.layers.mask; });
+          this.models.set(id, model);
+          this.modelLastUsed.set(id, ++this.modelUseCounter);
+          this.root.add(model);
+          newlyCreated += 1;
+        }
+        modelCreateMs += performance.now() - modelCreateStartedAt;
+      }
+      entries.push(Object.freeze({ weaponId: id, model }));
+      onProgress?.(index + 1, ids.length);
+      await yieldToBrowser?.();
+    }
+    return Object.freeze({ entries: Object.freeze(entries), assetLoadMs, modelCreateMs, newlyCreated });
+  }
+
+  private async performBrowserWeaponCatalogAssetPreparation(
+    ids: readonly WeaponId[],
+    onProgress?: (loaded: number, total: number) => void,
+    yieldToBrowser?: () => Promise<void>,
+  ): Promise<void> {
+    await this.prepareBrowserCatalogEntries(ids, onProgress, yieldToBrowser);
+    this.commitBrowserResidentCatalog(ids);
+  }
+
+  private commitBrowserResidentCatalog(ids: readonly WeaponId[]): void {
+    const desired = new Set(ids);
+    // Commit only after every requested model exists. Rebuilding the Set also
+    // makes the latest serialized request's order and membership authoritative.
+    this.browserResidentWeaponIds.clear();
+    for (const id of ids) this.browserResidentWeaponIds.add(id);
+    for (const [id, model] of [...this.models]) {
+      if (
+        desired.has(id)
+        || id === this.active
+        || model.visible
+        || this.gpuPrewarmPromises.has(model)
+      ) continue;
+      this.models.delete(id);
+      this.modelLastUsed.delete(id);
+      this.root.remove(model);
+      if (this.retireModel) this.retireModel(model, () => releasePass65WeaponModel(model));
+      else disposePass65WeaponModel(model);
+    }
+  }
+
   isReady(): boolean {
     return typeof document !== 'undefined' ? this.models.has(this.active) : this.models.size === Object.keys(WEAPONS).length;
   }
@@ -1167,7 +1242,7 @@ export class WeaponPresentation {
     return Object.freeze({
       retainedCount: this.browserResidentWeaponIds.size,
       loaded: this.models.size,
-      prewarming: this.browserCatalogPrewarmPromise !== null,
+      prewarming: this.browserCatalogOperationPromise !== null,
       unpreparedSwitches: this.unpreparedBrowserSwitches,
       maximumRetained: WeaponPresentation.MAX_RETAINED_WEBGPU_WEAPONS,
     });
@@ -1184,7 +1259,7 @@ export class WeaponPresentation {
         0,
       ),
       available: Object.keys(WEAPONS).length,
-      prewarming: this.browserCatalogPrewarmPromise !== null,
+      prewarming: this.browserCatalogOperationPromise !== null,
       unpreparedSwitches: this.unpreparedBrowserSwitches,
       lastUnpreparedSwitch: this.lastUnpreparedBrowserSwitch,
       maximumRetained: WeaponPresentation.MAX_RETAINED_WEBGPU_WEAPONS,
@@ -1203,7 +1278,6 @@ export class WeaponPresentation {
     this.gpuReadinessGeneration += 1;
     this.gpuReadyModels = new WeakSet<THREE.Object3D>();
     this.gpuPrewarmPromises = new WeakMap<THREE.Object3D, Promise<void>>();
-    this.browserCatalogPrewarmPromise = null;
   }
 
   private createLoadedBrowserWeapon(id: WeaponId): THREE.Group | null {
@@ -1213,7 +1287,7 @@ export class WeaponPresentation {
   }
 
   private trimBrowserWeaponModels(): void {
-    if (this.browserCatalogPrewarmPromise) return;
+    if (this.browserCatalogOperationPromise) return;
     const retainedLimit = Math.max(2, this.browserResidentWeaponIds.size);
     while (this.models.size > retainedLimit) {
       const victim = [...this.models.keys()]
@@ -1339,6 +1413,7 @@ export class WeaponPresentation {
 
   private retireRejectedBrowserModel(id: WeaponId, model: THREE.Object3D): void {
     if (this.models.get(id) !== model || this.gpuReadyModels.has(model)) return;
+    this.browserResidentWeaponIds.delete(id);
     this.models.delete(id);
     this.modelLastUsed.delete(id);
     this.root.remove(model);
@@ -1410,7 +1485,10 @@ export class WeaponPresentation {
       // Keep the last complete viewmodel mounted while the requested authored
       // model is loading. The completion callback performs the visibility swap
       // atomically and is generation guarded by browserWeaponRequest.
-      if (this.browserResidentWeaponIds.size > 0 && !this.browserResidentWeaponIds.has(id)) {
+      if (
+        this.browserResidentWeaponIds.size > 0
+        && (!this.browserResidentWeaponIds.has(id) || !activeModel || !this.modelIsGpuReady(activeModel))
+      ) {
         this.unpreparedBrowserSwitches += 1;
         this.lastUnpreparedBrowserSwitch = Object.freeze({
           requested: id,

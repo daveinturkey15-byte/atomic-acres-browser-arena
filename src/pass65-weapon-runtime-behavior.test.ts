@@ -269,6 +269,107 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(releasePass65WeaponModelsIn(presentation.root)).toBe(2);
   });
 
+  it('stages the complete browser catalog without claiming final-pipeline GPU readiness', async () => {
+    stubBrowserTextureLoading();
+    const loadSpy = vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (
+      Promise.resolve(fakeGltfForUrl(String(url)))
+    )) as GLTFLoader['loadAsync']);
+    const individualPrewarmer = vi.fn(async () => undefined);
+    const catalogPrewarmer = vi.fn(async (
+      _entries: readonly WeaponViewmodelCatalogGpuPrewarmEntry[],
+    ) => undefined);
+    const presentation = new WeaponPresentation(
+      new THREE.PerspectiveCamera(), false, undefined, individualPrewarmer, catalogPrewarmer,
+    );
+    await presentation.load();
+    const initialModel = presentation.root.getObjectByName('carbine-pass65-first-person-model');
+
+    await presentation.prepareBrowserWeaponCatalogAssets(WEAPON_IDS);
+
+    const stagedModels = new Map(WEAPON_IDS.map((id) => [
+      id,
+      presentation.root.getObjectByName(`${id}-pass65-first-person-model`),
+    ]));
+    expect([...stagedModels.values()].every(Boolean)).toBe(true);
+    expect(stagedModels.get('carbine')).toBe(initialModel);
+    expect(individualPrewarmer).toHaveBeenCalledTimes(1);
+    expect(catalogPrewarmer).not.toHaveBeenCalled();
+    expect(presentation.browserCatalogReadiness()).toMatchObject({
+      retained: WEAPON_IDS,
+      retainedCount: WEAPON_IDS.length,
+      loaded: WEAPON_IDS.length,
+      gpuReady: 1,
+      prewarming: false,
+      unpreparedSwitches: 0,
+      lastPrewarmProfile: null,
+    });
+    const assetLoadsAfterStaging = loadSpy.mock.calls.length;
+
+    await presentation.prewarmBrowserWeaponCatalog(WEAPON_IDS);
+
+    expect(loadSpy).toHaveBeenCalledTimes(assetLoadsAfterStaging);
+    expect(individualPrewarmer).toHaveBeenCalledTimes(1);
+    expect(catalogPrewarmer).toHaveBeenCalledTimes(Math.ceil(
+      (WEAPON_IDS.length - 1) / WeaponPresentation.CATALOG_GPU_MODELS_PER_SUBMISSION,
+    ));
+    expect(presentation.browserCatalogReadiness()).toMatchObject({
+      retained: WEAPON_IDS,
+      retainedCount: WEAPON_IDS.length,
+      loaded: WEAPON_IDS.length,
+      gpuReady: WEAPON_IDS.length,
+      prewarming: false,
+      lastPrewarmProfile: expect.objectContaining({ newlyCreated: 0 }),
+    });
+    for (const [id, model] of stagedModels) {
+      expect(presentation.root.getObjectByName(`${id}-pass65-first-person-model`)).toBe(model);
+    }
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(PASS65_AUTHORED_FIREARM_IDS.length);
+  });
+
+  it('serializes asset-only catalog generations so the latest request owns residency', async () => {
+    stubBrowserTextureLoading();
+    vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (
+      Promise.resolve(fakeGltfForUrl(String(url)))
+    )) as GLTFLoader['loadAsync']);
+    const individualPrewarmer = vi.fn(async () => undefined);
+    const catalogPrewarmer = vi.fn(async () => undefined);
+    const presentation = new WeaponPresentation(
+      new THREE.PerspectiveCamera(), false, undefined, individualPrewarmer, catalogPrewarmer,
+    );
+    await presentation.load();
+    const initialModel = presentation.root.getObjectByName('carbine-pass65-first-person-model');
+    const firstYield = deferred<void>();
+    let shouldBlock = true;
+    const yieldToBrowser = vi.fn(() => {
+      if (!shouldBlock) return Promise.resolve();
+      shouldBlock = false;
+      return firstYield.promise;
+    });
+
+    const older = presentation.prepareBrowserWeaponCatalogAssets(['carbine', 'mp5'], undefined, yieldToBrowser);
+    await flushPromises();
+    expect(yieldToBrowser).toHaveBeenCalledTimes(1);
+    const newer = presentation.prepareBrowserWeaponCatalogAssets(['carbine', 'm4a1']);
+    expect(presentation.browserCatalogReadiness()).toMatchObject({ prewarming: true });
+    firstYield.resolve();
+    await Promise.all([older, newer]);
+
+    expect(presentation.browserCatalogReadiness()).toMatchObject({
+      retained: ['carbine', 'm4a1'],
+      retainedCount: 2,
+      loaded: 2,
+      gpuReady: 1,
+      prewarming: false,
+      unpreparedSwitches: 0,
+    });
+    expect(presentation.root.getObjectByName('carbine-pass65-first-person-model')).toBe(initialModel);
+    expect(presentation.root.getObjectByName('m4a1-pass65-first-person-model')).toBeDefined();
+    expect(presentation.root.getObjectByName('mp5-pass65-first-person-model')).toBeUndefined();
+    expect(individualPrewarmer).toHaveBeenCalledTimes(1);
+    expect(catalogPrewarmer).not.toHaveBeenCalled();
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(2);
+  });
+
   it('prewarms and pins every reachable WebGPU weapon before live switches', async () => {
     stubBrowserTextureLoading();
     const loadSpy = vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (
