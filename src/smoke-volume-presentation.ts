@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { yieldBrowserPreparationFrame } from './browser-preparation-scheduler';
 import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
-import { SMOKE_VOLUME_LIFETIME_MS } from './smoke-authority';
+import { SMOKE_COLOUR_PALETTE, SMOKE_VOLUME_LIFETIME_MS } from './smoke-authority';
 
 export const SMOKE_PRESENTATION_CARD_COUNT = 3;
 export const SMOKE_PRESENTATION_LIFETIME_MS = SMOKE_VOLUME_LIFETIME_MS;
@@ -55,8 +55,8 @@ function writeSmokePresentationEnvelope(
   // Authority decides whether smoke blocks sight. Presentation density stays
   // below a solid shell so entering one volume cannot become a flat whiteout;
   // overlapping volumes still converge to deliberately dense obscuration.
-  target.coreOpacity = 0.42 * density;
-  target.edgeOpacity = 0.22 * density;
+  target.coreOpacity = 0.58 * density;
+  target.edgeOpacity = 0.3 * density;
   target.lifetimeProgress = clamp01(ageMs / lifetimeMs);
   return target;
 }
@@ -194,12 +194,16 @@ export class SmokeVolumePresentation {
     startsAtMs: number,
     expiresAtMs: number,
     radiusM: number,
+    colourHex: number = SMOKE_COLOUR_PALETTE[0],
   ): void {
     if (this.disposed) return;
     this.active = true;
     this.startsAtMs = startsAtMs;
     this.expiresAtMs = expiresAtMs;
     this.radiusM = Math.max(0, radiusM);
+    this.coreMaterial.color.setHex(colourHex);
+    this.edgeMaterial.color.setHex(colourHex).lerp(new THREE.Color(0xffffff), 0.28);
+    this.root.userData.smokeColourHex = colourHex;
     this.disturbedAtMs = Number.NEGATIVE_INFINITY;
     this.disturbance = 0;
     this.innerCards.position.set(0, 0, 0);
@@ -222,17 +226,17 @@ export class SmokeVolumePresentation {
     this.root.rotation.z = Math.sin(envelope.lifetimeProgress * Math.PI * 2) * 0.035;
     const disturbanceAge = Math.max(0, nowMs - this.disturbedAtMs);
     const disturbancePulse = disturbanceAge < 900 ? this.disturbance * (1 - disturbanceAge / 900) : 0;
-    this.innerCards.position.copy(this.disturbanceDirection).multiplyScalar(disturbancePulse * 0.42);
-    this.cards.position.copy(this.disturbanceDirection).multiplyScalar(-disturbancePulse * 0.26);
-    this.innerCards.rotation.z = disturbancePulse * 0.18;
-    this.cards.rotation.z = -disturbancePulse * 0.14;
+    this.innerCards.position.copy(this.disturbanceDirection).multiplyScalar(disturbancePulse * 0.78);
+    this.cards.position.copy(this.disturbanceDirection).multiplyScalar(-disturbancePulse * 0.56);
+    this.innerCards.rotation.z = disturbancePulse * 0.28;
+    this.cards.rotation.z = -disturbancePulse * 0.22;
     const densityScale = 0.72 + this.qualityScale * 0.28;
     // Compensate for the crowded-cluster two-card fill budget with density,
     // which is cheap and keeps overlapping smoke at least as obscuring as one
     // isolated three-card volume without restoring the discarded overdraw.
     const crowdedDensityScale = this.crowdedCluster ? 1.65 : 1;
-    this.coreMaterial.opacity = envelope.coreOpacity * densityScale * crowdedDensityScale * (1 - disturbancePulse * 0.78);
-    this.edgeMaterial.opacity = envelope.edgeOpacity * densityScale * crowdedDensityScale * (1 - disturbancePulse * 0.48);
+    this.coreMaterial.opacity = envelope.coreOpacity * densityScale * crowdedDensityScale * (1 - disturbancePulse * 0.88);
+    this.edgeMaterial.opacity = envelope.edgeOpacity * densityScale * crowdedDensityScale * (1 - disturbancePulse * 0.7);
     return true;
   }
 
@@ -465,6 +469,7 @@ export class SmokeVolumePresentationPool {
     startsAtMs: number,
     expiresAtMs: number,
     radiusM: number,
+    colourHex: number = SMOKE_COLOUR_PALETTE[0],
   ): SmokeVolumePresentationLease {
     let slotIndex = this.slots.findIndex(({ presentation }) => !presentation.isActive());
     if (slotIndex < 0) {
@@ -473,7 +478,7 @@ export class SmokeVolumePresentationPool {
     }
     const slot = this.slots[slotIndex]!;
     slot.generation += 1;
-    slot.presentation.activate(position, startsAtMs, expiresAtMs, radiusM);
+    slot.presentation.activate(position, startsAtMs, expiresAtMs, radiusM, colourHex);
     this.rebalanceOverlappingVolumes();
     this.emissions += 1;
     return Object.freeze({ slot: slotIndex, generation: slot.generation });

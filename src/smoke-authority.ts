@@ -1,8 +1,17 @@
 import type { SmokeCorridor, SmokeVolume, Vec3 } from './combat/ordnance';
 
-export const SMOKE_AUTHORITY_SCHEMA_VERSION = 1;
-export const SMOKE_VOLUME_LIFETIME_MS = 12_000;
+export const SMOKE_AUTHORITY_SCHEMA_VERSION = 2;
+export const SMOKE_VOLUME_MIN_LIFETIME_MS = 5_000;
+export const SMOKE_VOLUME_LIFETIME_MS = 10_000;
 export const SMOKE_VOLUME_RADIUS_M = 4.2;
+export const SMOKE_COLOUR_PALETTE = Object.freeze([
+  0x526f78,
+  0x5b7064,
+  0x68627b,
+  0x7b655f,
+  0x746f52,
+  0x5f6977,
+] as const);
 export const SMOKE_CORRIDOR_LIFETIME_MS = 900;
 export const SMOKE_CORRIDOR_RADIUS_M = 0.42;
 export const MAX_ACTIVE_SMOKE_VOLUMES = 12;
@@ -24,6 +33,7 @@ export type SmokeCorridorSnapshot = SmokeCorridor & Readonly<{
 export type SmokeVolumeSnapshot = Omit<SmokeVolume, 'corridors'> & Readonly<{
   ownerId: string;
   actionNonce: number;
+  colourHex: number;
   corridors: readonly SmokeCorridorSnapshot[];
 }>;
 
@@ -153,6 +163,29 @@ function corridorId(volume: SmokeVolumeSnapshot, shotResultId: string, pelletInd
   return `${volume.id}:corridor:${shotResultId}:${pelletIndex}`;
 }
 
+function appearanceHash(matchEpoch: number, ownerId: string, actionNonce: number): number {
+  let hash = (2166136261 ^ matchEpoch ^ actionNonce) >>> 0;
+  for (let index = 0; index < ownerId.length; index += 1) {
+    hash ^= ownerId.charCodeAt(index);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  hash ^= actionNonce >>> 16;
+  return Math.imul(hash, 2246822519) >>> 0;
+}
+
+export function smokeAppearanceFor(
+  matchEpoch: number,
+  ownerId: string,
+  actionNonce: number,
+): Readonly<{ lifetimeMs: number; colourHex: number }> {
+  const hash = appearanceHash(matchEpoch, ownerId, actionNonce);
+  const lifetimeRange = SMOKE_VOLUME_LIFETIME_MS - SMOKE_VOLUME_MIN_LIFETIME_MS;
+  return Object.freeze({
+    lifetimeMs: SMOKE_VOLUME_MIN_LIFETIME_MS + (hash % (lifetimeRange + 1)),
+    colourHex: SMOKE_COLOUR_PALETTE[(hash >>> 16) % SMOKE_COLOUR_PALETTE.length]!,
+  });
+}
+
 export class SmokeAuthority {
   private role: SmokeAuthorityRole;
   private matchEpoch: number;
@@ -199,12 +232,14 @@ export class SmokeAuthority {
       return false;
     }
     const radiusM = input.radiusM ?? SMOKE_VOLUME_RADIUS_M;
-    const lifetimeMs = input.lifetimeMs ?? SMOKE_VOLUME_LIFETIME_MS;
+    const appearance = smokeAppearanceFor(this.matchEpoch, input.ownerId, input.actionNonce);
+    const lifetimeMs = input.lifetimeMs ?? appearance.lifetimeMs;
     if (!canonicalActorId(input.ownerId)
       || !Number.isSafeInteger(input.actionNonce) || input.actionNonce < 0 || input.actionNonce > 0xffffffff
       || !finiteVec3(input.centre) || !finiteTime(input.startsAtHostTimeMs)
       || !Number.isFinite(radiusM) || radiusM < 0.25 || radiusM > 8
-      || !Number.isFinite(lifetimeMs) || lifetimeMs < 250 || lifetimeMs > SMOKE_VOLUME_LIFETIME_MS) {
+      || !Number.isFinite(lifetimeMs)
+      || lifetimeMs < SMOKE_VOLUME_MIN_LIFETIME_MS || lifetimeMs > SMOKE_VOLUME_LIFETIME_MS) {
       this.rejectedMalformed += 1;
       return false;
     }
@@ -222,6 +257,7 @@ export class SmokeAuthority {
       id,
       ownerId: input.ownerId,
       actionNonce: input.actionNonce,
+      colourHex: appearance.colourHex,
       centre: input.centre,
       radiusM,
       startsAtMs: input.startsAtHostTimeMs,

@@ -729,6 +729,7 @@ type GrenadeEntity = {
 };
 
 type RuntimeSmokeVolume = Omit<SmokeVolume, 'corridors'> & {
+  colourHex: number;
   corridors: SmokeCorridorSnapshot[];
   observedCorridorIds: Set<string>;
   presentationLease: SmokeVolumePresentationLease;
@@ -11845,6 +11846,7 @@ function synchronizeSmokePresentation(snapshot: SmokeAuthoritySnapshot, nowHostT
       volume.startsAtMs,
       volume.expiresAtMs,
       volume.radiusM,
+      volume.colourHex,
     );
     const observedCorridorIds = existing?.observedCorridorIds ?? new Set<string>();
     for (const corridor of volume.corridors) {
@@ -11864,6 +11866,7 @@ function synchronizeSmokePresentation(snapshot: SmokeAuthoritySnapshot, nowHostT
       radiusM: volume.radiusM,
       startsAtMs: volume.startsAtMs,
       expiresAtMs: volume.expiresAtMs,
+      colourHex: volume.colourHex,
       corridors: [...volume.corridors],
       observedCorridorIds,
       presentationLease,

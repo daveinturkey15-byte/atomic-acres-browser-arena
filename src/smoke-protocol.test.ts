@@ -38,6 +38,11 @@ describe('smoke protocol', () => {
     expect(messageBelongsToPlayer(valid, 'guest')).toBe(false);
     expect(isSmokeStateMessage({ ...valid, guestAuthority: true })).toBe(false);
     expect(isSmokeStateMessage({ ...valid, snapshot: { ...valid.snapshot, matchEpoch: 0 } })).toBe(false);
+    const volume = valid.snapshot.volumes[0]!;
+    expect(isSmokeStateMessage({
+      ...valid,
+      snapshot: { ...valid.snapshot, volumes: [{ ...volume, colourHex: 0xff00ff }] },
+    })).toBe(false);
   });
 
   it('rejects forged corridor geometry, identity, lifetime, and unbounded collections', () => {

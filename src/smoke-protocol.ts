@@ -5,6 +5,8 @@ import {
   MAX_SMOKE_SHOT_SEGMENT_METERS,
   SMOKE_AUTHORITY_SCHEMA_VERSION,
   SMOKE_CORRIDOR_LIFETIME_MS,
+  SMOKE_COLOUR_PALETTE,
+  SMOKE_VOLUME_MIN_LIFETIME_MS,
   SMOKE_VOLUME_LIFETIME_MS,
   type SmokeAuthoritySnapshot,
   type SmokeCorridorSnapshot,
@@ -86,17 +88,20 @@ function isCorridor(value: unknown, volume: SmokeVolumeSnapshot): value is Smoke
 function isVolume(value: unknown): value is SmokeVolumeSnapshot {
   if (!isRecord(value)
     || !exactKeys(value, [
-      'id', 'ownerId', 'actionNonce', 'centre', 'radiusM', 'startsAtMs', 'expiresAtMs', 'corridors',
+      'id', 'ownerId', 'actionNonce', 'colourHex', 'centre', 'radiusM', 'startsAtMs', 'expiresAtMs', 'corridors',
     ])
     || !canonicalEntityId(value.id, 128)
     || !canonicalActorId(value.ownerId)
     || value.id !== `smoke-${value.ownerId}-${value.actionNonce}`
     || !boundedInteger(value.actionNonce, 0, 0xffffffff)
+    || !boundedInteger(value.colourHex, 0, 0xffffff)
+    || !SMOKE_COLOUR_PALETTE.includes(value.colourHex as typeof SMOKE_COLOUR_PALETTE[number])
     || !isVec3(value.centre)
     || !finiteNumber(value.radiusM, 0.25, 8)
     || !finiteNumber(value.startsAtMs, 0, Number.MAX_SAFE_INTEGER)
     || !finiteNumber(value.expiresAtMs, 0, Number.MAX_SAFE_INTEGER)
     || Number(value.expiresAtMs) <= Number(value.startsAtMs)
+    || Number(value.expiresAtMs) - Number(value.startsAtMs) < SMOKE_VOLUME_MIN_LIFETIME_MS
     || Number(value.expiresAtMs) - Number(value.startsAtMs) > SMOKE_VOLUME_LIFETIME_MS
     || !Array.isArray(value.corridors) || value.corridors.length > MAX_SMOKE_CORRIDORS_PER_VOLUME) return false;
   const candidate = value as unknown as SmokeVolumeSnapshot;

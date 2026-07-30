@@ -9,16 +9,30 @@ import {
 } from './smoke-volume-presentation';
 
 describe('smoke grenade volume presentation', () => {
-  it('has a deterministic dense centre, soft edge and fixed lifetime', () => {
+  it('has a dense centre, soft edge and authority-provided lifetime', () => {
     const start = 1_000;
     const end = start + SMOKE_PRESENTATION_LIFETIME_MS;
     expect(smokePresentationEnvelopeAt(start - 1, start, end).active).toBe(false);
     const dense = smokePresentationEnvelopeAt(start + 1_000, start, end);
     expect(dense).toMatchObject({ active: true, growth: 1 });
     expect(dense.coreOpacity).toBeGreaterThan(0.35);
-    expect(dense.coreOpacity).toBeLessThan(0.5);
+    expect(dense.coreOpacity).toBeGreaterThan(0.5);
+    expect(dense.coreOpacity).toBeLessThan(0.65);
     expect(dense.edgeOpacity).toBeLessThan(dense.coreOpacity);
     expect(smokePresentationEnvelopeAt(end, start, end).active).toBe(false);
+  });
+
+  it('applies the replicated smoke colour to both pooled density layers', () => {
+    const scene = new THREE.Scene();
+    const pool = new SmokeVolumePresentationPool(scene, 1);
+    pool.emit({ x: 0, y: 1, z: 0 }, 1_000, 9_000, 4.2, 0x68627b);
+    const root = pool.root.children[0]!;
+    const inner = root.getObjectByName('smoke-grenade-inner-density-cards') as THREE.InstancedMesh;
+    const edge = root.getObjectByName('smoke-grenade-soft-edge-cards') as THREE.InstancedMesh;
+    expect(root.userData.smokeColourHex).toBe(0x68627b);
+    expect((inner.material as THREE.MeshBasicMaterial).color.getHex()).toBe(0x68627b);
+    expect((edge.material as THREE.MeshBasicMaterial).color.getHex()).not.toBe(0x68627b);
+    pool.terminalDispose();
   });
 
   it('GPU-prewarms every unique smoke slot resource once and restores exact inert state', async () => {

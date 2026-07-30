@@ -3,8 +3,11 @@ import {
   MAX_ACTIVE_SMOKE_VOLUMES,
   MAX_SMOKE_CORRIDORS_PER_VOLUME,
   SMOKE_CORRIDOR_LIFETIME_MS,
+  SMOKE_COLOUR_PALETTE,
+  SMOKE_VOLUME_MIN_LIFETIME_MS,
   SMOKE_VOLUME_LIFETIME_MS,
   SmokeAuthority,
+  smokeAppearanceFor,
   type SmokeShotAdmission,
 } from './smoke-authority';
 
@@ -31,6 +34,23 @@ function register(authority: SmokeAuthority, actionNonce = 41, at = 1_000): bool
 }
 
 describe('SmokeAuthority', () => {
+  it('derives a replicated colour and a deterministic five-to-ten second lifetime per throw', () => {
+    const first = smokeAppearanceFor(7, 'host-player', 41);
+    const repeated = smokeAppearanceFor(7, 'host-player', 41);
+    const next = smokeAppearanceFor(7, 'host-player', 42);
+    expect(first).toEqual(repeated);
+    expect(first.lifetimeMs).toBeGreaterThanOrEqual(SMOKE_VOLUME_MIN_LIFETIME_MS);
+    expect(first.lifetimeMs).toBeLessThanOrEqual(SMOKE_VOLUME_LIFETIME_MS);
+    expect(SMOKE_COLOUR_PALETTE).toContain(first.colourHex);
+    expect(next).not.toEqual(first);
+
+    const authority = new SmokeAuthority(7, 'host');
+    expect(register(authority)).toBe(true);
+    const volume = authority.snapshot(1_000).volumes[0]!;
+    expect(volume.expiresAtMs - volume.startsAtMs).toBe(first.lifetimeMs);
+    expect(volume.colourHex).toBe(first.colourHex);
+  });
+
   it('allows only host authority to create volumes or corridors', () => {
     const replica = new SmokeAuthority(7, 'replica');
     expect(register(replica)).toBe(false);
