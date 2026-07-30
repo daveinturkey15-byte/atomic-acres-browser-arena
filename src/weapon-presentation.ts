@@ -184,9 +184,9 @@ const FINGER_SPREAD: Readonly<Record<FirstPersonFingerBone['digit'], number>> = 
   thumb: -0.05,
 });
 const MELEE_ARM_POSES: Readonly<Record<'rightShoulder' | 'rightElbow' | 'rightWrist', MeleeBonePose>> = Object.freeze({
-  rightShoulder: { windup: [0.04, -0.05, 0.08], thrust: [-0.08, -0.1, 0.14] },
-  rightElbow: { windup: [-0.06, 0.02, -0.03], thrust: [-0.12, 0.01, -0.06] },
-  rightWrist: { windup: [-0.04, -0.02, 0.06], thrust: [-0.08, -0.03, 0.1] },
+  rightShoulder: { windup: [0.06, -0.08, 0.12], thrust: [-0.14, -0.16, 0.22] },
+  rightElbow: { windup: [-0.1, 0.04, -0.05], thrust: [-0.2, 0.02, -0.1] },
+  rightWrist: { windup: [-0.06, -0.04, 0.1], thrust: [-0.14, -0.06, 0.18] },
 });
 
 function weaponFingerCurlScale(weapon: WeaponId, finger: FirstPersonFingerBone): number {
@@ -211,6 +211,8 @@ const MELEE_PRESENTATION_MS = 520;
 const RIGGED_ARM_MAX_REACH_RATIO = 0.992;
 export const HIP_VIEWMODEL_POSITION = Object.freeze({ x: 0.4, y: -0.42, z: -1.02 });
 export const HIP_VIEWMODEL_SCALE = 0.54;
+/** Camera-space Z clearance preventing thicker arm geometry from crossing the near plane. */
+export const VIEWMODEL_NEAR_PLANE_CLEARANCE = 0.06;
 const ADS_VIEWMODEL_BASE_POSITION = Object.freeze({ x: 0.28, y: -0.34, z: -0.97 });
 const ADS_VIEWMODEL_SCALE = 0.64;
 
@@ -815,7 +817,9 @@ export class WeaponPresentation {
     this.meleeKnife.rotation.set(0, 0, 0);
     // The complete viewmodel root is deliberately reduced, so retain physical
     // authority while scaling the presentation around its aligned grip socket.
-    this.meleeKnife.scale.setScalar(1.45);
+    // A lower scale reduces angular amplification at the blade tip during wrist
+    // rotation, keeping the handle visibly seated in the palm.
+    this.meleeKnife.scale.setScalar(1.18);
 
     exportedWristSocket.userData.authoredRigAttachment = true;
     exportedWristSocket.add(this.meleeKnife);
@@ -2170,6 +2174,16 @@ export class WeaponPresentation {
     }
     this.root.updateWorldMatrix(true, true);
     if (this.authoredMeleeKnife && this.authoredMeleeSocket) {
+      // Re-align the knife blade axis to the current finger direction each frame
+      // so the handle stays visibly seated in the palm through windup/thrust/recovery.
+      if (right) {
+        const fingerDir = right.wrist.worldToLocal(right.finger.getWorldPosition(this.meleeGripWorld));
+        if (fingerDir.lengthSq() > 1e-6) {
+          fingerDir.normalize();
+          this.meleeKnife.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), fingerDir);
+          this.meleeKnife.rotateZ(-0.2);
+        }
+      }
       const grip = this.authoredMeleeKnife.getObjectByName('grip-socket-r');
       if (grip) {
         this.authoredMeleeGripError = grip.getWorldPosition(this.meleeGripWorld)
@@ -2541,7 +2555,7 @@ export class WeaponPresentation {
     const targetPosition = new THREE.Vector3(
       viewmodelBaseX + adsX + bobX + this.swayX - pose.lateralSpeed * 0.012 - meleeArc * 0.12 + grenadeArc * 0.18 + reloadStage.lateral,
       viewmodelBaseY + adsY + bobY + breath + sprintDrop + crouchLift + proneLift + switchDrop + reloadStage.lift - presentationKick * 0.095 - pose.landingImpulse * 0.075,
-      viewmodelBaseZ + adsZ + (pose.surfaceRetreat ?? 0) + presentationKick * profile.recoilTranslation * 1.12 - meleeArc * 0.18 + grenadeArc * 0.24,
+      viewmodelBaseZ + adsZ + (pose.surfaceRetreat ?? 0) - VIEWMODEL_NEAR_PLANE_CLEARANCE + presentationKick * profile.recoilTranslation * 1.12 - meleeArc * 0.18 + grenadeArc * 0.24,
     );
     this.surfaceRetreat = pose.surfaceRetreat ?? 0;
     this.root.position.lerp(targetPosition, smoothing(18));
