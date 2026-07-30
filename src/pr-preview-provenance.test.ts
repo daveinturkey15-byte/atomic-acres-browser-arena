@@ -32,7 +32,7 @@ function acceptedManifest() {
       state: 'approved',
       approvedBy: 'Dave',
       approvedAt: '2026-07-30T03:30:00Z',
-      evidence: 'Standing publication instruction bound after the immutable preview existed.',
+      evidence: 'Dave\'s standing conditional publication instruction is bound after preview creation; Dave did not inspect or test this immutable preview.',
     },
     requirements: [{
       id: 'R1',
