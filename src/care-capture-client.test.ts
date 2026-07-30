@@ -71,5 +71,8 @@ describe('care capture client authority state', () => {
     expect(applyCareCaptureProjection(acknowledged, {
       revision: 33, cratePhase: null, captureActorId: null,
     }).transition).toBe('completed');
+    expect(applyCareCaptureProjection(acknowledged, {
+      revision: 32, cratePhase: null, captureActorId: null,
+    })).toEqual({ state: { status: 'idle' }, transition: 'completed' });
   });
 });

@@ -1297,6 +1297,16 @@ export class HostKillstreakRuntime {
     if (!position || distance(position, entity.position) > 2.75 || !lineOfSight(world, position, entity.position)) {
       return Object.freeze({ accepted: false, reason: 'capture-admission-failed' });
     }
+    // Owner/team pickup is a tap interaction: once the host has admitted the
+    // prompt's range and LOS contract, the reward transfers immediately and
+    // exactly once. Enemy theft retains the longer continuous-hold lifecycle
+    // below.
+    if (actor.team === entity.team) {
+      actor.careRewards.push(entity.reward);
+      this.entities.delete(entity.id);
+      this.revision += 1;
+      return Object.freeze({ accepted: true, reason: 'accepted' });
+    }
     entity.phase = 'capturing';
     entity.captureActorId = actorId;
     entity.captureStartedAtMs = nowMs;

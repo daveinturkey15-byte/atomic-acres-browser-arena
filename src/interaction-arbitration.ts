@@ -12,6 +12,8 @@ export type InteractionCandidate = Readonly<{
   prompt: string;
   proximityM: number;
   enabled?: boolean;
+  /** Enemy care theft begins on press but remains held under host authority. */
+  requiresSustainedHold?: boolean;
 }>;
 
 export type TapInteractionKind = Extract<InteractionKind, 'care-package' | 'shed-door' | 'weapon-pickup'>;

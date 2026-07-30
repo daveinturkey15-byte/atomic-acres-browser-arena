@@ -24,18 +24,13 @@ const sample = (nowMs: number, candidates: readonly InteractionCandidate[]) => (
 });
 
 describe('pinned F press lifecycle', () => {
-  it('commits a tap only on release before 1,000 ms', () => {
+  it('commits a lone tap action immediately on keydown', () => {
     const door = candidate('shed-door', 'door-a');
     const pressed = reduceFInteractionPress(createFInteractionPressState(), {
       type: 'press', pressId: 1, ...sample(100, [door]),
     });
-    expect(pressed.commit).toBeNull();
-    expect(pressed.state).toMatchObject({ phase: 'pressed', tapCandidate: door, holdCandidate: null });
-    expect(reduceFInteractionPress(pressed.state, { type: 'advance', ...sample(999, [door]) }).commit).toBeNull();
-
-    const released = reduceFInteractionPress(pressed.state, { type: 'release', ...sample(1_099, [door]) });
-    expect(released.commit).toMatchObject({ pressId: 1, phase: 'tap', candidate: door });
-    expect(released.state).toEqual({ phase: 'idle' });
+    expect(pressed.commit).toMatchObject({ pressId: 1, phase: 'tap', candidate: door, committedAtMs: 100 });
+    expect(pressed.state).toEqual({ phase: 'idle' });
   });
 
   it('commits support hold exactly once when the threshold is reached', () => {
@@ -77,14 +72,27 @@ describe('pinned F press lifecycle', () => {
     }).commit).toMatchObject({ phase: 'hold', candidate: { targetId: 'chopper-a' } });
   });
 
+  it.each([
+    candidate('weapon-pickup', 'drop-a'),
+    candidate('care-package', 'crate-a'),
+  ])('guarantees the prompted lone $kind action on the press edge', (worldAction) => {
+    const transition = reduceFInteractionPress(createFInteractionPressState(), {
+      type: 'press', pressId: 30, ...sample(3_000, [worldAction]),
+    });
+    expect(transition).toMatchObject({
+      state: { phase: 'idle' },
+      commit: { phase: 'tap', candidate: { kind: worldAction.kind, targetId: worldAction.targetId } },
+    });
+  });
+
   it('never retargets a pinned press when a different candidate appears', () => {
     const crateA = candidate('care-package', 'crate-a');
     const crateB = candidate('care-package', 'crate-b', 0.1);
     const pressed = reduceFInteractionPress(createFInteractionPressState(), {
-      type: 'press', pressId: 4, ...sample(1_000, [crateA]),
+      type: 'press', pressId: 4, ...sample(1_000, [crateA, candidate('support-enter-drone', 'drone-a')]),
     });
     const invalidated = reduceFInteractionPress(pressed.state, {
-      type: 'release', ...sample(1_100, [crateB]),
+      type: 'release', ...sample(1_100, [crateB, candidate('support-enter-drone', 'drone-a')]),
     });
     expect(invalidated).toMatchObject({ state: { phase: 'idle' }, commit: null, cancellation: 'target-invalid' });
   });

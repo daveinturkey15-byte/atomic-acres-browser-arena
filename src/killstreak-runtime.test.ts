@@ -685,67 +685,74 @@ describe('host killstreak runtime', () => {
     runtime.advance(7_100, DEFAULT_WORLD);
     expect(runtime.beginCareCapture('owner', 99, entityId, 7_100, DEFAULT_WORLD)).toMatchObject({ accepted: false, reason: 'identity-mismatch' });
     expect(runtime.beginCareCapture('owner', 1, entityId, 7_100, DEFAULT_WORLD).accepted).toBe(true);
-    expect(runtime.snapshotFor('owner', 7_100).entities[0]).toMatchObject({
-      captureActorId: 'owner', phase: 'capturing', revealedReward: null,
-    });
-    runtime.advance(8_349, DEFAULT_WORLD);
-    expect(runtime.snapshotFor('owner', 8_349).actors[0].revealedCareRewards).toEqual([]);
-    runtime.advance(8_350, DEFAULT_WORLD);
-    const owner = runtime.snapshotFor('owner', 8_350);
-    expect(owner.entities).toHaveLength(0);
+    const owner = runtime.snapshotFor('owner', 7_100);
+    expect(owner.entities.some((entity) => entity.id === entityId)).toBe(false);
     expect(owner.actors[0].revealedCareRewards).toHaveLength(1);
-    expect(runtime.snapshotFor('other', 8_350).actors[0].revealedCareRewards).toEqual([]);
+    expect(runtime.snapshotFor('other', 7_100).actors[0].revealedCareRewards).toEqual([]);
   });
 
   it('requires continuous care capture through release, damage, range, LOS, death and exactly-once completion', () => {
     const runtime = new HostKillstreakRuntime(7);
     runtime.registerActor('owner', 0, 1, loadout(['care-package', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
+    runtime.registerActor('thief', 1, 1, loadout(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
+    const thiefWorld: KillstreakWorld = {
+      ...DEFAULT_WORLD,
+      targets: [
+        ...DEFAULT_WORLD.targets,
+        { id: 'thief', kind: 'player', team: 1, lifeId: 1, alive: true, position: [0, 1.7, 0] },
+      ],
+    };
     earn(runtime, 4);
     const entityId = runtime.activate(intent('care-package', 1), 1_000, DEFAULT_WORLD).entityIds[0];
     runtime.advance(7_100, DEFAULT_WORLD);
 
-    expect(runtime.beginCareCapture('owner', 1, entityId, 7_100, DEFAULT_WORLD).accepted).toBe(true);
-    expect(runtime.interruptCareCapture('owner', 99)).toBe(false);
-    expect(runtime.interruptCareCapture('owner', 1)).toBe(true);
+    expect(runtime.beginCareCapture('thief', 1, entityId, 7_100, thiefWorld).accepted).toBe(true);
+    expect(runtime.interruptCareCapture('thief', 99)).toBe(false);
+    expect(runtime.interruptCareCapture('thief', 1)).toBe(true);
     expect(runtime.advance(9_000, DEFAULT_WORLD).damageEvents).toEqual([]);
-    expect(runtime.snapshotFor('owner', 9_000)).toMatchObject({
-      entities: [expect.objectContaining({ id: entityId, phase: 'landed', captureProgress: null })],
-      actors: [expect.objectContaining({ revealedCareRewards: [] })],
-    });
+    expect(runtime.snapshotFor('thief', 9_000).entities)
+      .toEqual(expect.arrayContaining([expect.objectContaining({ id: entityId, phase: 'landed', captureProgress: null })]));
+    expect(runtime.snapshotFor('thief', 9_000).actors.find((actor) => actor.actorId === 'thief')?.revealedCareRewards).toEqual([]);
 
-    expect(runtime.beginCareCapture('owner', 1, entityId, 9_000, DEFAULT_WORLD).accepted).toBe(true);
-    expect(runtime.recordActorDamage('owner')).toBe(true);
-    expect(runtime.recordActorDamage('owner')).toBe(false);
-    expect(runtime.snapshotFor('owner', 9_001).entities[0]).toMatchObject({ phase: 'landed', captureProgress: null });
+    expect(runtime.beginCareCapture('thief', 1, entityId, 9_000, thiefWorld).accepted).toBe(true);
+    expect(runtime.recordActorDamage('thief')).toBe(true);
+    expect(runtime.recordActorDamage('thief')).toBe(false);
+    expect(runtime.snapshotFor('thief', 9_001).entities[0]).toMatchObject({ phase: 'landed', captureProgress: null });
 
-    expect(runtime.beginCareCapture('owner', 1, entityId, 9_100, DEFAULT_WORLD).accepted).toBe(true);
-    const beforeRangeRevision = runtime.snapshotFor('owner', 9_100).revision;
+    expect(runtime.beginCareCapture('thief', 1, entityId, 9_100, thiefWorld).accepted).toBe(true);
+    const beforeRangeRevision = runtime.snapshotFor('thief', 9_100).revision;
     const outOfRangeWorld: KillstreakWorld = {
-      ...DEFAULT_WORLD,
-      targets: DEFAULT_WORLD.targets.map((target) => target.id === 'owner'
+      ...thiefWorld,
+      targets: thiefWorld.targets.map((target) => target.id === 'thief'
         ? { ...target, position: [20, 1.7, 20] }
         : target),
     };
     runtime.advance(9_200, outOfRangeWorld);
-    expect(runtime.snapshotFor('owner', 9_200)).toMatchObject({
+    expect(runtime.snapshotFor('thief', 9_200)).toMatchObject({
       revision: expect.any(Number),
       entities: [expect.objectContaining({ phase: 'landed', captureProgress: null })],
     });
-    expect(runtime.snapshotFor('owner', 9_200).revision).toBeGreaterThan(beforeRangeRevision);
+    expect(runtime.snapshotFor('thief', 9_200).revision).toBeGreaterThan(beforeRangeRevision);
 
-    expect(runtime.beginCareCapture('owner', 1, entityId, 9_300, DEFAULT_WORLD).accepted).toBe(true);
-    runtime.advance(9_400, { ...DEFAULT_WORLD, hasLineOfSight: () => false });
-    expect(runtime.snapshotFor('owner', 9_400).entities[0]).toMatchObject({ phase: 'landed', captureProgress: null });
+    expect(runtime.beginCareCapture('thief', 1, entityId, 9_300, thiefWorld).accepted).toBe(true);
+    runtime.advance(9_400, { ...thiefWorld, hasLineOfSight: () => false });
+    expect(runtime.snapshotFor('thief', 9_400).entities[0]).toMatchObject({ phase: 'landed', captureProgress: null });
 
-    expect(runtime.beginCareCapture('owner', 1, entityId, 9_500, DEFAULT_WORLD).accepted).toBe(true);
-    runtime.recordActorDeath('owner', 2);
-    expect(runtime.snapshotFor('owner', 9_501).entities[0]).toMatchObject({ phase: 'landed', captureProgress: null });
+    expect(runtime.beginCareCapture('thief', 1, entityId, 9_500, thiefWorld).accepted).toBe(true);
+    runtime.recordActorDeath('thief', 2);
+    expect(runtime.snapshotFor('thief', 9_501).entities[0]).toMatchObject({ phase: 'landed', captureProgress: null });
 
-    expect(runtime.beginCareCapture('owner', 2, entityId, 9_600, DEFAULT_WORLD).accepted).toBe(true);
-    runtime.advance(10_850, DEFAULT_WORLD);
-    expect(runtime.snapshotFor('owner', 10_850).actors[0].revealedCareRewards).toHaveLength(1);
-    runtime.advance(20_000, DEFAULT_WORLD);
-    expect(runtime.snapshotFor('owner', 20_000).actors[0].revealedCareRewards).toHaveLength(1);
+    const thiefLifeTwoWorld: KillstreakWorld = {
+      ...thiefWorld,
+      targets: thiefWorld.targets.map((target) => target.id === 'thief' ? { ...target, lifeId: 2 } : target),
+    };
+    expect(runtime.beginCareCapture('thief', 2, entityId, 9_600, thiefLifeTwoWorld).accepted).toBe(true);
+    runtime.advance(12_099, thiefLifeTwoWorld);
+    expect(runtime.snapshotFor('thief', 12_099).actors.find((actor) => actor.actorId === 'thief')?.revealedCareRewards).toEqual([]);
+    runtime.advance(12_100, thiefLifeTwoWorld);
+    expect(runtime.snapshotFor('thief', 12_100).actors.find((actor) => actor.actorId === 'thief')?.revealedCareRewards).toHaveLength(1);
+    runtime.advance(20_000, thiefLifeTwoWorld);
+    expect(runtime.snapshotFor('thief', 20_000).actors.find((actor) => actor.actorId === 'thief')?.revealedCareRewards).toHaveLength(1);
   });
 
   it('bounds the private care queue to the recipient protocol and leaves overflow crates claimable', () => {
@@ -799,14 +806,14 @@ describe('host killstreak runtime', () => {
       targets: [
         ...DEFAULT_WORLD.targets,
         { id: 'second-owner', kind: 'player', team: 0, lifeId: 1, alive: true, position: [0, 1.7, 0] },
-        { id: 'collector', kind: 'player', team: 0, lifeId: 1, alive: true, position: [0, 1.7, 0] },
+        { id: 'collector', kind: 'player', team: 1, lifeId: 1, alive: true, position: [0, 1.7, 0] },
       ],
     };
     const runtime = new HostKillstreakRuntime(7);
     const careLoadout = loadout(['care-package', 'yardhawk', 'tri-pass', 'chopper', 'nuke']);
     runtime.registerActor('owner', 0, 1, careLoadout);
     runtime.registerActor('second-owner', 0, 1, careLoadout);
-    runtime.registerActor('collector', 0, 1, loadout(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
+    runtime.registerActor('collector', 1, 1, loadout(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
     earn(runtime, 4);
     earn(runtime, 4, 'second-owner');
     const firstCrateId = runtime.activate(intent('care-package', 1, 1, 'activation-care-first'), 1_000, world).entityIds[0];
@@ -823,21 +830,25 @@ describe('host killstreak runtime', () => {
   it('interrupts care capture on disconnect without revealing or consuming its reward', () => {
     const runtime = new HostKillstreakRuntime(7);
     runtime.registerActor('owner', 0, 1, loadout(['care-package', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
+    runtime.registerActor('thief', 1, 1, loadout(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
+    const thiefWorld: KillstreakWorld = {
+      ...DEFAULT_WORLD,
+      targets: [...DEFAULT_WORLD.targets, { id: 'thief', kind: 'player', team: 1, lifeId: 1, alive: true, position: [0, 1.7, 0] }],
+    };
     earn(runtime, 4);
     const crateId = runtime.activate(intent('care-package', 1), 1_000, DEFAULT_WORLD).entityIds[0];
     runtime.advance(7_000, DEFAULT_WORLD);
-    expect(runtime.beginCareCapture('owner', 1, crateId, 7_000, DEFAULT_WORLD).accepted).toBe(true);
+    expect(runtime.beginCareCapture('thief', 1, crateId, 7_000, thiefWorld).accepted).toBe(true);
 
-    runtime.recordActorDisconnect('owner');
-    expect(runtime.snapshotFor('owner', 7_500)).toMatchObject({
+    runtime.recordActorDisconnect('thief');
+    expect(runtime.snapshotFor('thief', 7_500)).toMatchObject({
       entities: expect.arrayContaining([expect.objectContaining({ id: crateId, phase: 'landed', captureProgress: null })]),
-      actors: [expect.objectContaining({ actorId: 'owner', revealedCareRewards: [] })],
+      actors: expect.arrayContaining([expect.objectContaining({ actorId: 'thief', revealedCareRewards: [] })]),
     });
-    runtime.advance(9_000, DEFAULT_WORLD);
-    expect(runtime.snapshotFor('owner', 9_000).actors[0].revealedCareRewards).toEqual([]);
+    runtime.advance(9_000, thiefWorld);
+    expect(runtime.snapshotFor('thief', 9_000).actors.find((actor) => actor.actorId === 'thief')?.revealedCareRewards).toEqual([]);
     expect(runtime.beginCareCapture('owner', 1, crateId, 9_000, DEFAULT_WORLD).accepted).toBe(true);
-    runtime.advance(10_250, DEFAULT_WORLD);
-    expect(runtime.snapshotFor('owner', 10_250).actors[0].revealedCareRewards).toHaveLength(1);
+    expect(runtime.snapshotFor('owner', 9_000).actors.find((actor) => actor.actorId === 'owner')?.revealedCareRewards).toHaveLength(1);
   });
 
   it('advances aggregate revisions with moving support and never rewinds on a regressed host clock', () => {

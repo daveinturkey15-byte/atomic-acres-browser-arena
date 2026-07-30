@@ -5,7 +5,10 @@ export type GlassPhase = 'intact' | 'cracked' | 'breached' | 'detached';
 export type GlassImpactProfile = 'knife' | 'bullet' | 'explosion';
 
 export const GLASS_DAMAGE_PROFILE_Q: Readonly<Record<GlassImpactProfile, number>> = Object.freeze({
-  knife: 350,
+  // One admitted melee strike must open a readable aperture. The former
+  // crack-only value kept the unchanged pane mesh/collider in place and made
+  // a valid knife hit appear to do nothing.
+  knife: 1_000,
   bullet: 1_000,
   explosion: 2_000,
 });

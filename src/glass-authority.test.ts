@@ -9,7 +9,7 @@ import {
 
 describe('glass authority', () => {
   it('gives knife, bullet and explosion impacts distinct authoritative outcomes', () => {
-    expect(GLASS_DAMAGE_PROFILE_Q).toEqual({ knife: 350, bullet: 1_000, explosion: 2_000 });
+    expect(GLASS_DAMAGE_PROFILE_Q).toEqual({ knife: 1_000, bullet: 1_000, explosion: 2_000 });
 
     const impact = (profile: 'knife' | 'bullet' | 'explosion') => admitGlassImpact(
       createGlassState(`pane-${profile}`, 3),
@@ -23,12 +23,12 @@ describe('glass authority', () => {
       },
     ).state;
 
-    expect(impact('knife')).toMatchObject({ phase: 'cracked', damageQ: 350 });
+    expect(impact('knife')).toMatchObject({ phase: 'breached', damageQ: 1_000 });
     expect(impact('bullet')).toMatchObject({ phase: 'breached', damageQ: 1_000 });
     expect(impact('explosion')).toMatchObject({ phase: 'detached', damageQ: 2_000 });
   });
 
-  it('accumulates replicated knife impacts deterministically before opening an aperture', () => {
+  it('can still accumulate explicitly admitted low-energy impacts deterministically', () => {
     const applyKnife = (state: ReturnType<typeof createGlassState>, revision: number) => admitGlassImpact(state, {
       isHost: true,
       matchEpoch: 5,
@@ -36,6 +36,7 @@ describe('glass authority', () => {
       impactId: `knife:guest-a:${70 + revision}:${revision}`,
       tick: 20 + revision,
       profile: 'knife',
+      damageQ: 350,
     }).state;
     let host = createGlassState('pane-knife-host', 5);
     let replica = createGlassState('pane-knife-host', 5);
@@ -92,7 +93,7 @@ describe('glass authority', () => {
     expect(admitCrossbowThroughGlass(initial, { matchEpoch: 9, observedRevision: 0, tick: 20 }))
       .toEqual({ passes: false, reason: 'solid-glass' });
     const cracked = admitGlassImpact(initial, {
-      isHost: true, matchEpoch: 9, expectedRevision: 0, impactId: 'knife:host:1:0', tick: 20, profile: 'knife',
+      isHost: true, matchEpoch: 9, expectedRevision: 0, impactId: 'chip:host:1:0', tick: 20, profile: 'knife', damageQ: 350,
     }).state;
     expect(admitCrossbowThroughGlass(cracked, { matchEpoch: 9, observedRevision: 1, tick: 20 }))
       .toEqual({ passes: false, reason: 'solid-glass' });

@@ -149,19 +149,21 @@ export function reduceFInteractionPress(
     const tapCandidate = cloneCandidate(primaryTapInteraction(event.candidates));
     const holdCandidate = cloneCandidate(primaryHoldInteraction(event.candidates));
     if (!tapCandidate && !holdCandidate) return unchanged(IDLE);
-    return Object.freeze({
-      state: Object.freeze({
-        phase: 'pressed',
-        pressId: event.pressId,
-        pressedAtMs: event.nowMs,
-        matchEpoch: event.matchEpoch,
-        lifeId: event.lifeId,
-        tapCandidate,
-        holdCandidate,
-      }),
-      commit: null,
-      cancellation: null,
+    const pressedState = Object.freeze({
+      phase: 'pressed' as const,
+      pressId: event.pressId,
+      pressedAtMs: event.nowMs,
+      matchEpoch: event.matchEpoch,
+      lifeId: event.lifeId,
+      tapCandidate,
+      holdCandidate,
     });
+    // A lone world action has no competing hold meaning, so delaying it until
+    // keyup only makes pickups, crates and doors feel unresponsive. Preserve
+    // the release/hold discriminator solely for the genuine overlap case.
+    return tapCandidate && !holdCandidate
+      ? committed(pressedState, 'tap', tapCandidate, event.nowMs)
+      : Object.freeze({ state: pressedState, commit: null, cancellation: null });
   }
   if (state.phase === 'idle') return unchanged(state);
   if (state.phase === 'committed') {

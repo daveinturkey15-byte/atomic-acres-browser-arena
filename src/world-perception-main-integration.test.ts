@@ -15,6 +15,27 @@ describe('world and perception runtime integration', () => {
     expect(source).toMatch(/window\.glassState = result\.state;[\s\S]*syncInteractiveWorldPhysics\(\);/);
   });
 
+  it('routes knife, explosion and railgun through the same authoritative glass lifecycle', () => {
+    const meleeStart = source.indexOf('function melee()');
+    const meleeEnd = source.indexOf('\nconst explosiveBoltTargetBuffer', meleeStart);
+    expect(source.slice(meleeStart, meleeEnd)).toContain("'knife',");
+
+    const blastStart = source.indexOf('function breakWindowsInGrenadeBlast(');
+    const blastEnd = source.indexOf('\nfunction synchronizeSmokePresentation(', blastStart);
+    const blastBlock = source.slice(blastStart, blastEnd);
+    expect(blastBlock).toContain('for (const pane of arena.breakableWindows)');
+    expect(blastBlock).toContain("breakHouseWindow(pane.id, centre, normal, replicate, point, 'explosive', actionNonce)");
+
+    const railStart = source.indexOf('function breakWindowsAlongBallisticTrace(');
+    const railEnd = source.indexOf('\nfunction canonicalHostWindowBreak(', railStart);
+    const railBlock = source.slice(railStart, railEnd);
+    expect(railBlock).toContain('impact.surface.breakableWindowId');
+    expect(railBlock).toContain('visited.has(windowId)');
+    expect(source.match(/breakWindowsAlongBallisticTrace\(railgunTrace,/g)).toHaveLength(2);
+    expect(glassSource).toContain('knife: 1_000');
+    expect(glassSource).toContain('explosion: 2_000');
+  });
+
   it('feeds semantic smoke and admitted flash state into live bot fire decisions', () => {
     expect(source).toContain('smokeDensity: smokeDensityAlongRay(origin, target, smokeVolumes, nowHostTimeMs)');
     expect(source).toContain('fireSuppressed: !bot.perceptionCanFire');

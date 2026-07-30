@@ -3334,6 +3334,7 @@ let killstreakRuntime = new HostKillstreakRuntime(killstreakMatchEpoch);
 let killstreakActivationSequence = 0;
 let killstreakControlSequence = 0;
 let localCareCaptureState = createCareCaptureClientState();
+let localCareCaptureRequiresHold = false;
 let killstreakSnapshot: KillstreakRecipientSnapshot = killstreakRuntime.snapshotFor(null, 0);
 let lastKillstreakStateBroadcastAt = Number.NEGATIVE_INFINITY;
 const LOCAL_KILLSTREAK_SNAPSHOT_REFRESH_INTERVAL_MS = 50;
@@ -6195,6 +6196,7 @@ function onNetworkMessage(message: GameMessage): void {
     localCareCaptureState = applied.state;
     if (applied.transition === 'acknowledged') addFeed('CARE PACKAGE - SECURING', 'gold');
     else if (applied.transition === 'rejected') {
+      localCareCaptureRequiresHold = false;
       addFeed(`CARE PACKAGE - CLAIM REJECTED (${message.reason.replaceAll('-', ' ').toUpperCase()})`, 'coral');
     }
     return;
@@ -7926,7 +7928,7 @@ function breakHouseWindow(
   if (replicate) {
     const message: WindowBreakMessage = {
       type: 'window-break',
-      by: player.id,
+      by: impactOwnerId,
       windowId,
       origin: origin.toArray(),
       kind,
@@ -7950,6 +7952,36 @@ function breakHouseWindow(
   spawnGlassShards(point, normal);
   audio.impact('glass', point.distanceTo(camera.position));
   return true;
+}
+
+function breakWindowsAlongBallisticTrace(
+  trace: BallisticTrace,
+  origin: THREE.Vector3,
+  direction: THREE.Vector3,
+  impactOwnerId: string,
+): number {
+  const unitDirection = direction.clone().normalize();
+  const visited = new Set<string>();
+  let broken = 0;
+  for (const impact of trace.impacts) {
+    const windowId = impact.surface.breakableWindowId;
+    if (!windowId || visited.has(windowId)) continue;
+    visited.add(windowId);
+    const point = origin.clone().addScaledVector(unitDirection, impact.entryDistance);
+    const normal = new THREE.Vector3(impact.entryNormal.x, impact.entryNormal.y, impact.entryNormal.z);
+    if (breakHouseWindow(
+      windowId,
+      point,
+      normal,
+      true,
+      origin,
+      'shot',
+      undefined,
+      impactOwnerId,
+      randomNonce(),
+    )) broken += 1;
+  }
+  return broken;
 }
 
 function canonicalHostWindowBreak(message: WindowBreakMessage, now: number): WindowBreakMessage {
@@ -8974,6 +9006,7 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   killstreakActivationSequence = 0;
   killstreakControlSequence = 0;
   localCareCaptureState = createCareCaptureClientState();
+  localCareCaptureRequiresHold = false;
   displayedCareReward = null;
   appliedKillstreakDamageResults.clear();
   killstreakRegisteredActors.clear();
@@ -9549,6 +9582,9 @@ function resolveRailgunShot(request: RailgunShotRequestMessage): RailgunShotResu
   }
   applyRailgunState(fired.state);
   broadcastRailgunState();
+  const railgunTrace = traceWeaponPath(origin, normalized, RAILGUN_BEAM_LENGTH_M, 'railgun');
+  breakWindowsAlongBallisticTrace(railgunTrace, origin, normalized, request.by);
+  applyInteractiveWorldBallisticTrace(railgunTrace, origin, normalized, 'railgun');
   const outcomes = admission.targets.flatMap(({ target, distance }) => {
     const outcome = applyAuthoritativeRailgunDamage(request.by, target, distance);
     return outcome ? [outcome] : [];
@@ -9630,7 +9666,9 @@ function tryFireRailgun(now: number): void {
   if (!fired.accepted) return;
   applyRailgunState(fired.state);
   broadcastRailgunState();
-  applyInteractiveWorldBallisticTrace(traceWeaponPath(origin, direction, RAILGUN_BEAM_LENGTH_M, 'railgun'), origin, direction, 'railgun');
+  const railgunTrace = traceWeaponPath(origin, direction, RAILGUN_BEAM_LENGTH_M, 'railgun');
+  breakWindowsAlongBallisticTrace(railgunTrace, origin, direction, player.id);
+  applyInteractiveWorldBallisticTrace(railgunTrace, origin, direction, 'railgun');
   applyKillstreakEntityShot(player.id, player.team, origin, [direction], 'railgun', now);
   const outcomes = (hostAdmission?.targets ?? []).flatMap(({ target, distance }) => {
     const outcome = applyAuthoritativeRailgunDamage(player.id, target, distance);
@@ -12849,7 +12887,15 @@ function fInteractionCandidates(now = performance.now()): readonly InteractionCa
       { x: crate.position[0], y: crate.position[1] + 0.45, z: crate.position[2] },
       box,
     ));
-    candidates.push({ kind: 'care-package', targetId: crate.id, proximityM: proximity, prompt: 'COLLECT KILLSTREAK', enabled: lineOfSight });
+    const enemySteal = actor != null && crate.team !== actor.team;
+    candidates.push({
+      kind: 'care-package',
+      targetId: crate.id,
+      proximityM: proximity,
+      prompt: enemySteal ? 'STEAL KILLSTREAK' : 'COLLECT KILLSTREAK',
+      enabled: lineOfSight,
+      ...(enemySteal ? { requiresSustainedHold: true } : {}),
+    });
   }
 
   const door = interactiveWorldRuntime?.nearestDoor(player.position);
@@ -12940,6 +12986,21 @@ function updateFInteractionPrompt(now = performance.now()): void {
     return;
   }
   advanceFInteractionPress(now);
+  const activeCareCrateId = careCaptureCrateId(localCareCaptureState);
+  const activeCareCrate = activeCareCrateId
+    ? killstreakSnapshot.entities.find((entity) => entity.id === activeCareCrateId && entity.kind === 'care-crate')
+    : null;
+  if (localCareCaptureRequiresHold && activeCareCrate) {
+    supportPrompt.hidden = false;
+    pickupPrompt.hidden = true;
+    supportPrompt.dataset.interactionKind = 'care-package';
+    supportPrompt.dataset.targetId = activeCareCrate.id;
+    supportPrompt.dataset.holdActive = 'true';
+    supportPrompt.style.setProperty('--f-hold-progress', `${((activeCareCrate.captureProgress ?? 0) * 100).toFixed(1)}%`);
+    const label = supportPrompt.querySelector<HTMLElement>('span');
+    if (label) label.textContent = 'HOLD F · STEAL KILLSTREAK';
+    return;
+  }
   const pressedCandidate = fInteractionPressState.phase === 'pressed'
     ? fInteractionPressState.holdCandidate ?? fInteractionPressState.tapCandidate
     : null;
@@ -12961,8 +13022,13 @@ function updateFInteractionPrompt(now = performance.now()): void {
   prompt.dataset.targetId = selected.targetId;
   if (!weaponPrompt) {
     const label = supportPrompt.querySelector<HTMLElement>('span');
-    const holdInteraction = isHoldInteraction(selected.kind);
-    if (label) label.textContent = `${holdInteraction ? 'HOLD F' : 'TAP F'} · ${selected.prompt}`;
+    const holdInteraction = isHoldInteraction(selected.kind) || selected.requiresSustainedHold === true;
+    const pinnedTap = fInteractionPressState.phase === 'pressed' ? fInteractionPressState.tapCandidate : null;
+    const pinnedHold = fInteractionPressState.phase === 'pressed' ? fInteractionPressState.holdCandidate : null;
+    const dualIntent = pinnedTap && pinnedHold;
+    if (label) label.textContent = dualIntent
+      ? `TAP F · ${pinnedTap.prompt} / HOLD F · ${pinnedHold.prompt}`
+      : `${holdInteraction ? 'HOLD F' : 'TAP F'} · ${selected.prompt}`;
     if (holdInteraction && fInteractionPressState.phase === 'pressed') {
       supportPrompt.dataset.holdActive = 'true';
       supportPrompt.style.setProperty('--f-hold-progress', `${(fInteractionHoldProgress(fInteractionPressState, now) * 100).toFixed(1)}%`);
@@ -13122,7 +13188,10 @@ function refreshLocalKillstreakSnapshot(now = performance.now(), force = true): 
     });
     localCareCaptureState = reconciliation.state;
     if (reconciliation.transition === 'interrupted') {
+      localCareCaptureRequiresHold = false;
       addFeed('CARE PACKAGE - CLAIM INTERRUPTED / UNAVAILABLE', 'coral');
+    } else if (reconciliation.transition === 'completed' || reconciliation.transition === 'released') {
+      localCareCaptureRequiresHold = false;
     }
   }
   const actor = localKillstreakActorSnapshot();
@@ -13308,6 +13377,7 @@ function interactWithSelectedKillstreakSupport(interaction: InteractionCandidate
   if (interaction.kind !== 'care-package') return false;
   const crate = killstreakSnapshot.entities.find((entity) => entity.id === interaction.targetId && entity.kind === 'care-crate');
   if (!crate || crate.phase !== 'landed' || localCareCaptureState.status !== 'idle') return false;
+  localCareCaptureRequiresHold = interaction.requiresSustainedHold === true;
   const sequence = ++killstreakControlSequence;
   const requested = requestCareCapture(localCareCaptureState, {
     actorId: player.id,
@@ -13316,7 +13386,10 @@ function interactWithSelectedKillstreakSupport(interaction: InteractionCandidate
     sequence,
     currentRevision: killstreakSnapshot.revision,
   });
-  if (requested.transition !== 'requested') return false;
+  if (requested.transition !== 'requested') {
+    localCareCaptureRequiresHold = false;
+    return false;
+  }
   localCareCaptureState = requested.state;
   if (network.role === 'client') {
     network.send({
@@ -13339,6 +13412,7 @@ function interactWithSelectedKillstreakSupport(interaction: InteractionCandidate
   });
   localCareCaptureState = result.state;
   if (!admission.accepted) {
+    localCareCaptureRequiresHold = false;
     addFeed(`CARE PACKAGE - CLAIM REJECTED (${admission.reason.replaceAll('-', ' ').toUpperCase()})`, 'coral');
     return false;
   }
@@ -13360,10 +13434,14 @@ function executePinnedFInteraction(interaction: InteractionCandidate, now = perf
 
 function releaseCareCapture(now = performance.now()): void {
   const crateId = careCaptureCrateId(localCareCaptureState);
-  if (!crateId) return;
+  if (!crateId) {
+    localCareCaptureRequiresHold = false;
+    return;
+  }
   const sequence = ++killstreakControlSequence;
   const release = requestCareCaptureRelease(localCareCaptureState, sequence, killstreakSnapshot.revision);
   if (release.transition !== 'release-requested') return;
+  localCareCaptureRequiresHold = false;
   localCareCaptureState = release.state;
   if (network.role === 'client') {
     network.send({
@@ -14828,6 +14906,7 @@ function clearGrenades(): void {
 
 function clearFieldSupport(): void {
   localCareCaptureState = createCareCaptureClientState();
+  localCareCaptureRequiresHold = false;
   lastKillstreakControlSentAt = Number.NEGATIVE_INFINITY;
   lastLocalKillstreakSnapshotRefreshAt = Number.NEGATIVE_INFINITY;
   lastSupportRotorAudioRefreshAt = Number.NEGATIVE_INFINITY;
@@ -16400,7 +16479,11 @@ window.addEventListener('keydown', (event) => {
   }
 });
 window.addEventListener('keyup', (event) => {
-  if (event.code === 'KeyF') releaseFInteractionPress(performance.now());
+  if (event.code === 'KeyF') {
+    const now = performance.now();
+    releaseFInteractionPress(now);
+    if (localCareCaptureRequiresHold) releaseCareCapture(now);
+  }
   keys.delete(event.code);
   if (event.code === 'Tab') element<HTMLElement>('#roster').hidden = true;
 });

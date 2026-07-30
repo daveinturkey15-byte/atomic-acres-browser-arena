@@ -153,7 +153,11 @@ export function applyCareCaptureProjection(
 ): CareCaptureClientUpdate {
   if (state.status === 'idle' || state.status === 'pending') return update(state, 'none');
   const baseline = state.status === 'acknowledged' ? state.acknowledgedAtRevision : state.requestedAtRevision;
-  if (!Number.isSafeInteger(projection.revision) || projection.revision <= baseline) return update(state, 'none');
+  if (!Number.isSafeInteger(projection.revision) || projection.revision < baseline) return update(state, 'none');
+  // An allied tap can transfer/delete the crate in the same authoritative
+  // revision as its correlated acknowledgement. That exact projection is
+  // completion evidence, not a stale snapshot.
+  if (projection.revision === baseline && projection.cratePhase !== null) return update(state, 'none');
   const stillCapturing = projection.cratePhase === 'capturing' && projection.captureActorId === state.actorId;
   if (stillCapturing) return update(state, 'none');
   if (state.status === 'release-requested') return update(IDLE, 'released');
