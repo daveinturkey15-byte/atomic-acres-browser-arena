@@ -60,6 +60,8 @@ export type WeaponPose = {
   lateralSpeed: number;
   /** Presentation-only camera-space retreat from nearby walls/floor. */
   surfaceRetreat?: number;
+  /** Presentation-only vertical clearance from nearby floor geometry. */
+  surfaceLift?: number;
   /** Authoritative gameplay reload progress. Null means no active reload. */
   reloadProgress: number | null;
   /** Presentation input only; host shot admission owns the legal spin-up tick. */
@@ -2410,7 +2412,7 @@ export class WeaponPresentation {
     const sprintDrop = this.sprintBlend * -0.16;
     const stanceHipBlend = 1 - this.adsBlend;
     const crouchLift = pose.crouched ? 0.035 * stanceHipBlend : 0;
-    const proneLift = pose.prone ? 0.018 * stanceHipBlend : 0;
+    const proneLift = (pose.prone ? 0.018 * stanceHipBlend : 0) + (pose.surfaceLift ?? 0);
     const switchDrop = (1 - this.switchBlend) * -0.34;
 
     const reloadProgress = pose.reloadProgress ?? 0;

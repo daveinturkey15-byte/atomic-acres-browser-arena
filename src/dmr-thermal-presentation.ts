@@ -1,8 +1,10 @@
 import * as THREE from 'three';
+import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 
 export const DMR_THERMAL_MAGNIFICATION = 2.5;
 export const DMR_THERMAL_MAX_CONTACTS = 16;
 export const DMR_THERMAL_WORLD_DRAW_CALLS = 2;
+export const DMR_THERMAL_OCCLUSION_CHECKS_PER_FRAME = 2;
 export const DMR_THERMAL_TARGET_POLICY = 'living-friendly-and-hostile' as const;
 export const DMR_THERMAL_OCCLUSION_POLICY = 'smoke-bypass-solid-block' as const;
 
@@ -36,6 +38,12 @@ export function selectDmrThermalContacts(
     selected.push(contact);
   }
   return Object.freeze(selected);
+}
+
+/** Hard per-frame budget for the solid-occlusion sampler used by the live optic. */
+export function dmrThermalOcclusionBudget(contactCount: number): number {
+  if (!Number.isFinite(contactCount)) return 0;
+  return Math.min(DMR_THERMAL_OCCLUSION_CHECKS_PER_FRAME, Math.max(0, Math.floor(contactCount)));
 }
 
 function thermalSilhouetteTexture(width = 32, height = 64): THREE.DataTexture {
@@ -129,6 +137,8 @@ export class DmrThermalPresentation {
   private active = false;
   private visibleHostiles = 0;
   private visibleFriendlies = 0;
+  private gpuPrewarmGeneration = -1;
+  private gpuPrewarmPromise: Promise<void> | null = null;
 
   constructor(private readonly scene: THREE.Scene, private readonly overlay: HTMLElement) {
     this.worldRoot.name = 'm14-ebr-smoke-only-thermal-silhouettes';
@@ -146,6 +156,59 @@ export class DmrThermalPresentation {
       this.worldRoot.add(instances);
     }
     scene.add(this.worldRoot);
+  }
+
+  async prewarm(
+    runtime: PresentationPrewarmRuntime,
+    camera: THREE.Camera,
+    sceneGeneration = 0,
+  ): Promise<void> {
+    if (this.gpuPrewarmGeneration === sceneGeneration) return;
+    while (this.gpuPrewarmPromise) {
+      await this.gpuPrewarmPromise;
+      if (this.gpuPrewarmGeneration === sceneGeneration) return;
+    }
+    const operation = this.performGpuPrewarm(runtime, camera, sceneGeneration);
+    this.gpuPrewarmPromise = operation;
+    try {
+      await operation;
+    } finally {
+      if (this.gpuPrewarmPromise === operation) this.gpuPrewarmPromise = null;
+    }
+  }
+
+  private async performGpuPrewarm(
+    runtime: PresentationPrewarmRuntime,
+    camera: THREE.Camera,
+    sceneGeneration: number,
+  ): Promise<void> {
+    const visible = this.worldRoot.visible;
+    const hostileCount = this.hostileInstances.count;
+    const friendlyCount = this.friendlyInstances.count;
+    camera.updateWorldMatrix(true, false);
+    const cameraPosition = camera.getWorldPosition(new THREE.Vector3());
+    const forward = camera.getWorldDirection(new THREE.Vector3());
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0).normalize();
+    const stage = (instances: THREE.InstancedMesh, lateral: number) => {
+      const position = cameraPosition.clone().addScaledVector(forward, 7).addScaledVector(right, lateral);
+      this.instanceMatrix.compose(position, camera.quaternion, this.instanceScale);
+      instances.setMatrixAt(0, this.instanceMatrix);
+      instances.count = 1;
+      instances.instanceMatrix.needsUpdate = true;
+    };
+    this.worldRoot.visible = true;
+    stage(this.hostileInstances, -0.55);
+    stage(this.friendlyInstances, 0.55);
+    try {
+      await runtime.compileAndRender(this.worldRoot, camera, this.scene);
+      this.gpuPrewarmGeneration = sceneGeneration;
+    } finally {
+      this.worldRoot.visible = visible;
+      this.hostileInstances.count = hostileCount;
+      this.friendlyInstances.count = friendlyCount;
+      this.hostileInstances.instanceMatrix.needsUpdate = true;
+      this.friendlyInstances.instanceMatrix.needsUpdate = true;
+    }
   }
 
   private domContact(index: number): HTMLElement {
@@ -206,6 +269,8 @@ export class DmrThermalPresentation {
     friendlies: number;
     maximumContacts: number;
     worldDrawCalls: typeof DMR_THERMAL_WORLD_DRAW_CALLS;
+    occlusionChecksPerFrame: typeof DMR_THERMAL_OCCLUSION_CHECKS_PER_FRAME;
+    gpuPrewarmGeneration: number;
     targetPolicy: typeof DMR_THERMAL_TARGET_POLICY;
     occlusionPolicy: typeof DMR_THERMAL_OCCLUSION_POLICY;
   }> {
@@ -216,6 +281,8 @@ export class DmrThermalPresentation {
       friendlies: this.visibleFriendlies,
       maximumContacts: DMR_THERMAL_MAX_CONTACTS,
       worldDrawCalls: DMR_THERMAL_WORLD_DRAW_CALLS,
+      occlusionChecksPerFrame: DMR_THERMAL_OCCLUSION_CHECKS_PER_FRAME,
+      gpuPrewarmGeneration: this.gpuPrewarmGeneration,
       targetPolicy: DMR_THERMAL_TARGET_POLICY,
       occlusionPolicy: DMR_THERMAL_OCCLUSION_POLICY,
     });

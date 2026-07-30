@@ -139,7 +139,7 @@ import { GUN_RANGE_WEAPON_STATIONS, nearestGunRangeWeaponStation, type GunRangeW
 import { loadGunRangeRackPresentation } from './gun-range-rack-presentation';
 import { menuWeaponPrewarmCatalog, weaponPrewarmCatalogForArena } from './weapon-prewarm-catalog';
 import { ArenaAudio, GRENADE_FUSE_BEEP_START_MS, crossbowFuseBeepIntervalMs, grenadeFuseBeepIntervalMs } from './audio';
-import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes } from './collision';
+import { clampPointToBounds, damp, firstSegmentBoxHit, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes } from './collision';
 import {
   applyPenetrationDamage,
   ballisticImpactSurface,
@@ -515,9 +515,9 @@ import {
   type WeaponViewmodelCatalogGpuPrewarmer,
   type WeaponViewmodelGpuPrewarmer,
 } from './weapon-presentation';
-import { magnifiedFovDegrees, viewmodelSurfaceRetreat } from './weapon-presentation-state';
+import { magnifiedFovDegrees, viewmodelObstructionPose, type ViewmodelObstructionPose } from './weapon-presentation-state';
 import { RailgunPresentation, type RailgunThermalContact } from './railgun-presentation';
-import { DMR_THERMAL_MAGNIFICATION, DmrThermalPresentation, type DmrThermalContact } from './dmr-thermal-presentation';
+import { DMR_THERMAL_MAGNIFICATION, DMR_THERMAL_MAX_CONTACTS, DmrThermalPresentation, dmrThermalOcclusionBudget, type DmrThermalContact } from './dmr-thermal-presentation';
 import {
   SmokeVolumePresentationPool,
   type SmokeVolumePresentationLease,
@@ -5656,21 +5656,47 @@ function stanceEyeHeight(stance: PlayerSnapshot['stance']): number {
   return stance === 'prone' ? 0.61 : stance === 'crouch' ? 1.16 : 1.7;
 }
 
+const viewmodelProbeDirection = new THREE.Vector3();
+const viewmodelProbeRight = new THREE.Vector3();
+const viewmodelProbeUp = new THREE.Vector3();
+const viewmodelProbeStart = new THREE.Vector3();
+const viewmodelProbeEnd = new THREE.Vector3();
+const viewmodelProbeRotation = new THREE.Euler(0, 0, 0, 'YXZ');
+const VIEWMODEL_PROBE_LENGTH_M = 1.45;
+const VIEWMODEL_PROBE_OFFSETS = Object.freeze([
+  Object.freeze({ right: 0, up: 0 }),
+  Object.freeze({ right: -0.19, up: -0.04 }),
+  Object.freeze({ right: 0.19, up: -0.04 }),
+  Object.freeze({ right: 0, up: -0.22 }),
+]);
+
+function currentViewmodelObstructionPose(): ViewmodelObstructionPose {
+  viewmodelProbeRotation.set(player.pitch, player.yaw, 0, 'YXZ');
+  viewmodelProbeDirection.set(0, 0, -1).applyEuler(viewmodelProbeRotation).normalize();
+  viewmodelProbeRight.set(1, 0, 0).applyEuler(viewmodelProbeRotation).normalize();
+  viewmodelProbeUp.set(0, 1, 0).applyEuler(viewmodelProbeRotation).normalize();
+  const colliders = activeWorldColliders();
+  let nearestForward: number | null = null;
+  for (const offset of VIEWMODEL_PROBE_OFFSETS) {
+    viewmodelProbeStart.copy(player.position)
+      .addScaledVector(viewmodelProbeRight, offset.right)
+      .addScaledVector(viewmodelProbeUp, offset.up);
+    viewmodelProbeEnd.copy(viewmodelProbeStart).addScaledVector(viewmodelProbeDirection, VIEWMODEL_PROBE_LENGTH_M);
+    const hit = firstSegmentBoxHit(viewmodelProbeStart, viewmodelProbeEnd, colliders, 0.075);
+    if (!hit) continue;
+    const distance = hit.time * VIEWMODEL_PROBE_LENGTH_M;
+    nearestForward = nearestForward === null ? distance : Math.min(nearestForward, distance);
+  }
+  viewmodelProbeStart.copy(player.position);
+  viewmodelProbeEnd.copy(player.position);
+  viewmodelProbeEnd.y -= 1.05;
+  const floorHit = firstSegmentBoxHit(viewmodelProbeStart, viewmodelProbeEnd, colliders, 0.035);
+  const floorClearance = floorHit ? floorHit.time * 1.05 : null;
+  return viewmodelObstructionPose(nearestForward, player.stance === 'prone', floorClearance);
+}
+
 function currentViewmodelSurfaceRetreat(): number {
-  const direction = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(player.pitch, player.yaw, 0, 'YXZ')).normalize();
-  let nearest: number | null = null;
-  for (let distance = 0.2; distance <= 1.2; distance += 0.1) {
-    const sample = player.position.clone().addScaledVector(direction, distance);
-    if (!isBlocked(sample, activeWorldColliders(), 0.09)) continue;
-    nearest = distance;
-    break;
-  }
-  if (direction.y < -0.04) {
-    const floorY = player.position.y - stanceEyeHeight(player.stance);
-    const floorDistance = (player.position.y - floorY) / -direction.y;
-    if (floorDistance >= 0 && floorDistance <= 1.2) nearest = nearest === null ? floorDistance : Math.min(nearest, floorDistance);
-  }
-  return viewmodelSurfaceRetreat(nearest, player.stance === 'prone');
+  return currentViewmodelObstructionPose().retreat;
 }
 
 function interpolatePlayerSnapshot(before: PlayerSnapshot, after: PlayerSnapshot, alpha: number): PlayerSnapshot {
@@ -9653,10 +9679,15 @@ type RuntimeDmrThermalContact = {
   position: THREE.Vector3;
   living: boolean;
   solidOccluded: boolean;
+  occlusionSampled: boolean;
+  lastOcclusionPosition: THREE.Vector3;
+  lastOcclusionObserver: THREE.Vector3;
 };
 
 const dmrThermalContactBuffer: RuntimeDmrThermalContact[] = [];
 const dmrThermalContactCache = new Map<string, RuntimeDmrThermalContact>();
+let dmrThermalOcclusionCursor = 0;
+let dmrThermalWasActive = false;
 
 function acquireDmrThermalContact(id: string, kind: 'player' | 'bot'): RuntimeDmrThermalContact {
   const key = `${kind}:${id}`;
@@ -9669,13 +9700,20 @@ function acquireDmrThermalContact(id: string, kind: 'player' | 'bot'): RuntimeDm
     position: new THREE.Vector3(),
     living: false,
     solidOccluded: true,
+    occlusionSampled: false,
+    lastOcclusionPosition: new THREE.Vector3(),
+    lastOcclusionObserver: new THREE.Vector3(),
   };
   dmrThermalContactCache.set(key, created);
   return created;
 }
 
-function dmrThermalSolidOccluded(observer: THREE.Vector3, contact: THREE.Vector3): boolean {
-  for (const box of activeWorldColliders()) {
+function dmrThermalSolidOccluded(
+  observer: THREE.Vector3,
+  contact: THREE.Vector3,
+  colliders: ArenaMap['colliders'],
+): boolean {
+  for (const box of colliders) {
     if (segmentIntersectsBox(observer, contact, box)) return true;
   }
   return false;
@@ -9686,22 +9724,48 @@ function dmrThermalContacts(): readonly DmrThermalContact[] {
   const observer = camera.position;
   dmrThermalContactBuffer.length = 0;
   for (const remote of remotes.values()) {
+    if (dmrThermalContactBuffer.length >= DMR_THERMAL_MAX_CONTACTS) break;
     const contact = acquireDmrThermalContact(remote.snapshot.id, 'player');
     contact.position.copy(remote.target);
     contact.position.y += 1.05;
     contact.relation = mode === 'tdm' && remote.snapshot.team === player.team ? 'friendly' : 'hostile';
     contact.living = remote.snapshot.hp > 0;
-    contact.solidOccluded = dmrThermalSolidOccluded(observer, contact.position);
+    if (!contact.occlusionSampled
+      || contact.position.distanceToSquared(contact.lastOcclusionPosition) > 0.16
+      || observer.distanceToSquared(contact.lastOcclusionObserver) > 0.16) contact.solidOccluded = true;
     dmrThermalContactBuffer.push(contact);
   }
   for (const bot of bots.values()) {
+    if (dmrThermalContactBuffer.length >= DMR_THERMAL_MAX_CONTACTS) break;
     const contact = acquireDmrThermalContact(bot.id, 'bot');
     contact.position.copy(bot.position);
     contact.position.y += 1.05;
     contact.relation = mode === 'tdm' && bot.team === player.team ? 'friendly' : 'hostile';
     contact.living = bot.alive;
-    contact.solidOccluded = dmrThermalSolidOccluded(observer, contact.position);
+    if (!contact.occlusionSampled
+      || contact.position.distanceToSquared(contact.lastOcclusionPosition) > 0.16
+      || observer.distanceToSquared(contact.lastOcclusionObserver) > 0.16) contact.solidOccluded = true;
     dmrThermalContactBuffer.push(contact);
+  }
+  const contactCount = dmrThermalContactBuffer.length;
+  const budget = dmrThermalOcclusionBudget(contactCount);
+  const colliders = budget > 0 ? activeWorldColliders() : [];
+  let checked = 0;
+  let inspected = 0;
+  while (checked < budget && inspected < contactCount) {
+    const index = dmrThermalOcclusionCursor % contactCount;
+    dmrThermalOcclusionCursor = (index + 1) % contactCount;
+    inspected += 1;
+    const contact = dmrThermalContactBuffer[index];
+    if (!contact.living) {
+      contact.solidOccluded = true;
+      continue;
+    }
+    contact.solidOccluded = dmrThermalSolidOccluded(observer, contact.position, colliders);
+    contact.occlusionSampled = true;
+    contact.lastOcclusionPosition.copy(contact.position);
+    contact.lastOcclusionObserver.copy(observer);
+    checked += 1;
   }
   return dmrThermalContactBuffer;
 }
@@ -9709,8 +9773,17 @@ function dmrThermalContacts(): readonly DmrThermalContact[] {
 function updateDmrThermal(): void {
   if (!dmrThermalActive) {
     dmrThermalPresentation.update(camera, [], false);
+    if (dmrThermalWasActive) {
+      dmrThermalOcclusionCursor = 0;
+      for (const contact of dmrThermalContactCache.values()) {
+        contact.solidOccluded = true;
+        contact.occlusionSampled = false;
+      }
+    }
+    dmrThermalWasActive = false;
     return;
   }
+  dmrThermalWasActive = true;
   dmrThermalPresentation.update(camera, dmrThermalContacts(), true);
 }
 
@@ -14952,6 +15025,7 @@ function updatePhysics(dt: number): void {
   const railgunReloadProgress = player.weapon === 'railgun' && railgunRechamberPresentationActive
     ? THREE.MathUtils.clamp(1 - Math.max(0, railgunState.chamberReadyAtHostTimeMs - currentHostTimeMs()) / RAILGUN_RECHAMBER_MS, 0, 1)
     : 0;
+  const viewmodelObstruction = currentViewmodelObstructionPose();
   const weaponActionEvents = weaponView.update({
     dt,
     moving,
@@ -14963,7 +15037,8 @@ function updatePhysics(dt: number): void {
     landingImpulse: landingImpulse * accessibilityRuntime.weaponMotionScale,
     lateralSpeed: lateralSpeed * accessibilityRuntime.weaponMotionScale,
     reloadProgress: debugReloadProgress ?? (player.weapon === 'railgun' ? railgunReloadProgress : gameplayReloadProgress(player.reloadState, performance.now())),
-    surfaceRetreat: currentViewmodelSurfaceRetreat(),
+    surfaceRetreat: viewmodelObstruction.retreat,
+    surfaceLift: viewmodelObstruction.lift,
     triggerHeld,
   });
   audio.minigunDrive(
@@ -20273,6 +20348,7 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
       ['tracers-impacts', () => Promise.all([
         tracerPool.prewarm(renderRuntime, camera, sceneGeneration),
         impactPresentation.prewarm(renderRuntime, camera, sceneGeneration),
+        dmrThermalPresentation.prewarm(renderRuntime, camera, sceneGeneration),
       ])],
       ['explosions', () => Promise.all([
         grenadeExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration),
@@ -20315,6 +20391,7 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
   bootstrapStage = 'prewarming-combat-impacts';
   profileArenaTransition('prewarm-impacts');
   await impactPresentation.prewarm(renderRuntime, camera, sceneGeneration);
+  await dmrThermalPresentation.prewarm(renderRuntime, camera, sceneGeneration);
   bootstrapStage = 'prewarming-grenade-explosion';
   profileArenaTransition('prewarm-grenade-explosion');
   await grenadeExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration);

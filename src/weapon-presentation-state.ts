@@ -15,6 +15,11 @@ export type HitReactionState = {
   roll: number;
 };
 
+export type ViewmodelObstructionPose = Readonly<{
+  retreat: number;
+  lift: number;
+}>;
+
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
 const finite = (value: number, fallback = 0): number => Number.isFinite(value) ? value : fallback;
 export const ADS_IN_RESPONSE_PER_SECOND = 22;
@@ -46,13 +51,33 @@ export function advanceWeaponHeat(current: number, fired: boolean, dt: number, w
   return clamp01(cooled + (fired ? perShot : 0));
 }
 
-/** Pulls camera-attached arms behind nearby world geometry without changing aim rays. */
-export function viewmodelSurfaceRetreat(nearestSurfaceMeters: number | null, prone: boolean): number {
-  const distance = nearestSurfaceMeters === null || !Number.isFinite(nearestSurfaceMeters)
+/**
+ * Keeps camera-attached geometry inside the player's free-space envelope.
+ * This is presentation-only: it never changes the camera, gameplay ray, or
+ * authoritative character capsule.
+ */
+export function viewmodelObstructionPose(
+  nearestForwardSurfaceMeters: number | null,
+  prone: boolean,
+  floorClearanceMeters: number | null = null,
+): ViewmodelObstructionPose {
+  const distance = nearestForwardSurfaceMeters === null || !Number.isFinite(nearestForwardSurfaceMeters)
     ? Number.POSITIVE_INFINITY
-    : Math.max(0, nearestSurfaceMeters);
-  const obstruction = distance >= 1.2 ? 0 : (1 - distance / 1.2) * 0.52;
-  return Math.min(0.56, Math.max(0, obstruction + (prone ? 0.045 : 0)));
+    : Math.max(0, nearestForwardSurfaceMeters);
+  const obstruction = distance >= 1.45 ? 0 : (1 - distance / 1.45) * 0.62;
+  const floorClearance = floorClearanceMeters === null || !Number.isFinite(floorClearanceMeters)
+    ? Number.POSITIVE_INFINITY
+    : Math.max(0, floorClearanceMeters);
+  const floorPressure = floorClearance >= 0.82 ? 0 : (1 - floorClearance / 0.82);
+  return {
+    retreat: Math.min(0.7, Math.max(0, obstruction + (prone ? 0.09 : 0))),
+    lift: Math.min(0.2, Math.max(0, (prone ? 0.115 : 0) + floorPressure * (prone ? 0.075 : 0.04))),
+  };
+}
+
+/** Backwards-compatible scalar used by non-runtime presentation tests/tools. */
+export function viewmodelSurfaceRetreat(nearestSurfaceMeters: number | null, prone: boolean): number {
+  return viewmodelObstructionPose(nearestSurfaceMeters, prone).retreat;
 }
 
 /** Deterministic visual fire-cycle envelope. Gameplay recoil and hit rays remain authoritative elsewhere. */

@@ -1,11 +1,15 @@
 import * as THREE from 'three';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 import {
   DMR_THERMAL_MAGNIFICATION,
   DMR_THERMAL_MAX_CONTACTS,
+  DMR_THERMAL_OCCLUSION_CHECKS_PER_FRAME,
   DMR_THERMAL_OCCLUSION_POLICY,
   DMR_THERMAL_TARGET_POLICY,
   DMR_THERMAL_WORLD_DRAW_CALLS,
+  DmrThermalPresentation,
+  dmrThermalOcclusionBudget,
   selectDmrThermalContacts,
   type DmrThermalContact,
 } from './dmr-thermal-presentation';
@@ -52,5 +56,33 @@ describe('M14 EBR 2.5x thermal presentation policy', () => {
     const contacts = Array.from({ length: DMR_THERMAL_MAX_CONTACTS + 8 }, (_, index) => contact(`contact-${index}`));
     contacts.push(contact('contact-0'));
     expect(selectDmrThermalContacts(contacts)).toHaveLength(DMR_THERMAL_MAX_CONTACTS);
+  });
+
+  it('hard-bounds expensive solid-occlusion work per display frame', () => {
+    expect(DMR_THERMAL_OCCLUSION_CHECKS_PER_FRAME).toBe(2);
+    expect(dmrThermalOcclusionBudget(0)).toBe(0);
+    expect(dmrThermalOcclusionBudget(1)).toBe(1);
+    expect(dmrThermalOcclusionBudget(DMR_THERMAL_MAX_CONTACTS)).toBe(2);
+    expect(dmrThermalOcclusionBudget(Number.NaN)).toBe(0);
+  });
+
+  it('prewarms both thermal material variants once per scene generation and restores dormancy', async () => {
+    const scene = new THREE.Scene();
+    const overlay = { hidden: true } as HTMLElement;
+    const presentation = new DmrThermalPresentation(scene, overlay);
+    const compileAndRender = vi.fn(async () => undefined);
+    const runtime = { compileAndRender } as unknown as PresentationPrewarmRuntime;
+    const camera = new THREE.PerspectiveCamera(76, 1, 0.08, 180);
+    camera.position.set(0, 1.7, 0);
+    scene.add(camera);
+
+    await presentation.prewarm(runtime, camera, 7);
+    await presentation.prewarm(runtime, camera, 7);
+
+    expect(compileAndRender).toHaveBeenCalledTimes(1);
+    expect(compileAndRender).toHaveBeenCalledWith(presentation.worldRoot, camera, scene);
+    expect(presentation.worldRoot.visible).toBe(false);
+    expect(presentation.telemetry().gpuPrewarmGeneration).toBe(7);
+    presentation.terminalDispose();
   });
 });
