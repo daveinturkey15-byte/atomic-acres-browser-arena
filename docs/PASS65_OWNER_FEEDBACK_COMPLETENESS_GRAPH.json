@@ -1304,6 +1304,13 @@
       ]
     },
     {
+      "id": "T-LOCKFILE",
+      "command": "npm run qa:lockfile",
+      "paths": [
+        "scripts/qa/verify-npm10-lockfile.mjs"
+      ]
+    },
+    {
       "id": "T-MENU-LIFECYCLE-E2E",
       "command": "npx playwright test tests/e2e/pass65-menu-lifecycle.spec.ts --project=chromium --workers=1 --retries=0",
       "paths": [
@@ -3149,6 +3156,7 @@
         "coverage": "partial",
         "testRefs": [
           "T-FRAME-POLICY",
+          "T-LOCKFILE",
           "T-RELEASE-SHELL"
         ],
         "artifactRefs": []
@@ -3854,7 +3862,9 @@
         "coverage": "partial",
         "testRefs": [
           "T-AUDIO",
+          "T-HUD-E2E",
           "T-HUD-UNIT",
+          "T-LOCKFILE",
           "T-OWNER-GATE",
           "T-RELEASE-SHELL"
         ],
@@ -4004,6 +4014,7 @@
         "coverage": "partial",
         "testRefs": [
           "T-AUDIO",
+          "T-HUD-E2E",
           "T-HUD-UNIT",
           "T-KILLSTREAK-CATALOG",
           "T-ORDNANCE",
@@ -4674,6 +4685,7 @@
         "testRefs": [
           "T-OWNER-GATE",
           "T-FRAME-POLICY",
+          "T-LOCKFILE",
           "T-TEXT-INTEGRITY"
         ],
         "artifactRefs": []
@@ -5301,6 +5313,7 @@
         "coverage": "partial",
         "testRefs": [
           "T-OWNER-GATE",
+          "T-LOCKFILE",
           "T-TEXT-INTEGRITY"
         ],
         "artifactRefs": []

@@ -52,9 +52,9 @@ function artifactFor(testId) {
   };
 }
 
-test('canonical graph deterministically covers 52 commands, 160 feedback rows, and all 99 requirements', () => {
+test('canonical graph deterministically covers 53 commands, 160 feedback rows, and all 99 requirements', () => {
   const { graph, matrixRows, ledgerRows, coverage } = loadCanonical();
-  assert.equal(coverage.testCount, 52);
+  assert.equal(coverage.testCount, 53);
   assert.equal(coverage.feedbackCount, 160);
   assert.equal(coverage.requirementCount, 99);
   assert.deepEqual(coverage.orphanTests, []);
