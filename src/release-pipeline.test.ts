@@ -6,6 +6,11 @@ const verifyWorkflow = readFileSync('.github/workflows/verify.yml', 'utf8');
 const receiptWriter = readFileSync('scripts/release/write-production-receipt.mjs', 'utf8');
 const productionEnv = readFileSync('.env.production', 'utf8');
 const diagnosticsPreviewRunner = readFileSync('scripts/qa/run-pass64-diagnostics-browser.mjs', 'utf8');
+const liveTopologyVerifier = readFileSync('scripts/qa/verify-release-topology-browser.mjs', 'utf8');
+const agentContract = readFileSync('AGENTS.md', 'utf8');
+const contributionGuide = readFileSync('docs/CONTRIBUTION_AND_RELEASE_PIPELINE.md', 'utf8');
+const pass66ExecutionPlan = readFileSync('docs/PASS66_HITL_EXECUTION_PLAN_2026-07-29.md', 'utf8');
+const ownerFeedbackSkill = readFileSync('.agents/skills/atomic-acres-owner-feedback-gate/SKILL.md', 'utf8');
 
 describe('production release workflow', () => {
   it('configures a repository-local bot identity before publishing gh-pages', () => {
@@ -91,5 +96,34 @@ describe('production release workflow', () => {
 
   it('does not use a blocking GitHub Actions watcher inside the workflow', () => {
     expect(workflow).not.toContain('gh run watch');
+  });
+
+  it('binds the live browser proof to Pass 66, both Pass 63 provenance layers, aliases, and Last Release', () => {
+    expect(liveTopologyVerifier).toContain("verifyChoice('experimental', 'channels/the-big-one', 'PASS 66', 'pass66')");
+    expect(liveTopologyVerifier).toContain("verifyChoice('stable', 'channels/recent-stable', 'PASS 63', 'pass63')");
+    expect(liveTopologyVerifier).toContain('pinned-channel-provenance.json');
+    expect(liveTopologyVerifier).toContain('Stable embedded runtime digest');
+    expect(liveTopologyVerifier).toContain("verifyLegacyRoute('latest'");
+    expect(liveTopologyVerifier).toContain("verifyLegacyRoute('normal'");
+    expect(liveTopologyVerifier).toContain("verifyLegacyRoute('room'");
+    expect(liveTopologyVerifier).toContain('Last Release timestamp is not a published instant');
+    expect(liveTopologyVerifier).not.toContain("'channels/the-big-one', 'PASS 65'");
+  });
+
+  it('records the narrow standing Pass 66 authorization without fabricating preview HITL', () => {
+    for (const source of [agentContract, contributionGuide, pass66ExecutionPlan, ownerFeedbackSkill]) {
+      expect(source).toContain('standing conditional');
+      expect(source).toMatch(/does not claim|not evidence|must explicitly avoid claiming|Dave did not/u);
+    }
+    expect(agentContract).toContain('Pass 65 must never be promoted');
+    expect(contributionGuide).toContain('Pass 65 is superseded audit evidence and must never be promoted');
+    expect(pass66ExecutionPlan).not.toContain('Stop. Do not publish Version 66.');
+  });
+
+  it('permits only one fenced retained-asset menu compile after first-frame media readiness', () => {
+    expect(agentContract).toContain("Only after the selected video's first frame is visible");
+    expect(agentContract).toContain('one fenced, isolated submission');
+    expect(agentContract).toContain('construct zero gameplay arenas');
+    expect(agentContract).toContain('run zero live preview rendering or physics');
   });
 });

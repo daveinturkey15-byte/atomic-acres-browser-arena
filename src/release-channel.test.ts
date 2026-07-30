@@ -14,18 +14,18 @@ describe('release channel entry routing', () => {
     expect(releaseChannelDecision('?release=choose', 'localhost', canonical)).toBe('choose');
   });
 
-  it('routes latest, normal and experimental aliases to live Pass 63', () => {
+  it('routes latest, normal and experimental aliases to live Pass 66', () => {
     expect(releaseChannelDecision('?release=latest', canonical, canonical)).toBe('latest');
     expect(releaseChannelDecision('?release=normal', canonical, canonical)).toBe('latest');
     expect(releaseChannelDecision('?release=experimental', canonical, canonical)).toBe('latest');
     expect(releaseChannelDecision('?release=stable', canonical, canonical)).toBe('stable');
   });
 
-  it('keeps room invitations on the live Pass 63 multiplayer client', () => {
+  it('keeps room invitations on the live Pass 66 multiplayer client', () => {
     expect(releaseChannelDecision('?room=abc&autojoin=1&release=choose', canonical, canonical)).toBe('latest');
   });
 
-  it('resolves the pinned Pass 62 tree beneath the repository Pages root and bypasses its archived chooser', () => {
+  it('resolves the pinned Pass 63 tree beneath the repository Pages root and bypasses its archived chooser', () => {
     expect(stableReleaseUrl(
       'https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/',
       'channels/recent-stable',

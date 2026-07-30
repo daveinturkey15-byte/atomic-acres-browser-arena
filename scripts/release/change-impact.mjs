@@ -78,7 +78,7 @@ function changedPaths(base, head) {
   return paths;
 }
 
-function outputsFor(classification) {
+export function outputsFor(classification) {
   if (classification.mode === 'none') {
     return { ...classification, windows_groups: '', linux_groups: '' };
   }
@@ -87,8 +87,8 @@ function outputsFor(classification) {
   }
   return {
     ...classification,
-    windows_groups: 'pass25a-capability-chromium,boot-and-authored,pass64-hud-contracts,pass64-renderer-foundation',
-    linux_groups: 'pass25a-baseline,pass25a-capability-chromium,pass64-hud-contracts,pass64-renderer-foundation',
+    windows_groups: 'release-shell,pass25a-capability-chromium,boot-and-authored,pass64-hud-contracts,pass64-renderer-foundation',
+    linux_groups: 'release-shell,pass25a-baseline,pass25a-capability-chromium,pass64-hud-contracts,pass64-renderer-foundation',
   };
 }
 

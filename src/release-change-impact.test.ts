@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyPaths } from '../scripts/release/change-impact.mjs';
+import { classifyPaths, outputsFor } from '../scripts/release/change-impact.mjs';
 
 describe('release change impact', () => {
   it('skips expensive browser groups for process-only changes', () => {
@@ -21,5 +21,11 @@ describe('release change impact', () => {
     expect(classifyPaths(['src/network.ts'])).toEqual({ mode: 'full', reason: 'runtime-or-unclassified' });
     expect(classifyPaths(['mystery/new-surface.bin'])).toEqual({ mode: 'full', reason: 'runtime-or-unclassified' });
     expect(classifyPaths([])).toEqual({ mode: 'full', reason: 'empty-or-unresolvable-diff' });
+  });
+
+  it('keeps the release chooser contract in both full browser matrices', () => {
+    const output = outputsFor(classifyPaths(['src/network.ts']));
+    expect(output.windows_groups.split(',')).toContain('release-shell');
+    expect(output.linux_groups.split(',')).toContain('release-shell');
   });
 });

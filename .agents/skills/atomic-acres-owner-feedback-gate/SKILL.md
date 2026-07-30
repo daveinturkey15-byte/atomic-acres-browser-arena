@@ -30,7 +30,7 @@ Preserve observations, inferences, assumptions, unknowns and falsifiers as disti
 7. Update the canonical source of truth before downstream consumers. Weapons, grenades, killstreaks, renderer features, interactions and evidence inventories must project automatically or fail synthetic add/rename/retire mutations.
 8. Implement the smallest coherent owned change. Never create another raw `F` listener, hand-maintained content mirror, no-op graphics setting, presentation-only collision, or client-authored combat result.
 9. Run `npm run qa:pass65:owner-feedback`, the affected domain gates, and the exact runtime/browser/hardware/network evidence named by each row.
-10. Move states only with evidence: `OPEN` means not implemented, `IMPLEMENTED` means code exists, `VERIFIED` means mechanical falsifiers passed at the stated source identity, and `HITL` means the immutable candidate is ready for Dave's taste/owner decision. Publication remains a separate explicit gate.
+10. Move states only with evidence: `OPEN` means not implemented, `IMPLEMENTED` means code exists, `VERIFIED` means mechanical falsifiers passed at the stated source identity, and `HITL` means the immutable candidate is ready for Dave's taste/owner decision. Publication remains a separate explicit gate. For Pass 66 only, Dave has already supplied that separate standing conditional publication instruction; it applies only after the exact candidate is genuinely green and does not promote unverified rows.
 
 ## Completeness invariants
 
@@ -41,7 +41,7 @@ Preserve observations, inferences, assumptions, unknowns and falsifiers as disti
 - Every feedback row has an executable test reference. Crash, freeze, loading, transition, support-stress and frame-pacing rows retain their explicit cold native-WebGPU, endurance and/or native frame-pacing gates; substituting a policy, unit or headless check fails structurally. Candidate P0/P1 rows additionally require complete coverage and a digest-checked receipt bound to the exact candidate SHA, build, verifier and environment.
 - Every `all maps`, `all weapons`, `all grenades`, `all peers`, `future additions`, persistence or cross-profile claim requires set-equality or mutation evidence, not representative spot checks.
 - Runtime evidence names the exact source/build, renderer/backend, map/profile, peer count and relevant seed. Headless topology proof is not native-GPU performance proof.
-- Visual taste, motion pleasure and final feel remain owner HITL judgments after deterministic mechanical and visual-regression gates pass.
+- Visual taste, motion pleasure and final feel remain owner HITL judgments after deterministic mechanical and visual-regression gates pass. An owner may waive another subjective feedback round, as Dave has for Pass 66, but that waiver is not evidence that the owner inspected the immutable preview and does not waive deterministic visual gates.
 - `IMPLEMENTED` is never promoted to `VERIFIED` because the same author says it works.
 
 ## Mechanical gate
@@ -58,4 +58,4 @@ The structural verifier must fail duplicate, skipped, malformed, unowned, unscop
 
 ## Handoff
 
-Report the feedback IDs changed, exact paths/commit, observations versus inferences, commands and artifacts, remaining unknowns/falsifiers, and whether the candidate is merely implemented, mechanically verified, or genuinely ready for immutable HITL. Never claim publish readiness without Dave's exact-SHA approval and separate publish instruction.
+Report the feedback IDs changed, exact paths/commit, observations versus inferences, commands and artifacts, remaining unknowns/falsifiers, and whether the candidate is merely implemented, mechanically verified, or genuinely ready for immutable HITL. Never claim publish readiness without an exact-SHA acceptance binding and separate publish instruction. For Pass 66, Dave's standing conditional instruction is that separate instruction: bind it only after the immutable preview exists and all blocking gates are green, record the actual binding time, and state explicitly that it is not evidence Dave tested that preview. Any runtime or release-shell drift invalidates the binding.

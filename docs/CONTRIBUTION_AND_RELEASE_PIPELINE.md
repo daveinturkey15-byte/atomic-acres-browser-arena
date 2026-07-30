@@ -50,6 +50,8 @@ The machine name identifies where the bytes originated; the harness identifies w
 8. Dave tests that immutable preview. Record its exact source SHA and timestamp in the manifest, add Dave's approval, and push only the manifest/process update. Any later runtime or release-shell change invalidates approval and requires a new preview.
 9. Stop at handoff. The contributor does not merge or deploy.
 
+Pass 66 has one explicit, narrow authorization exception. Dave has already instructed the release owner to publish Version 66 as **The Big One** when the frozen candidate is genuinely green, without waiting for another subjective HITL feedback round, while keeping byte-exact Pass 63 Stable and never publishing Pass 65. The immutable preview, exact-SHA gates and acceptance manifest are still mandatory. Only after that preview exists may a process-only acceptance update bind the standing instruction to its exact SHA and actual binding time; it must state truthfully that Dave did not perform a new inspection of that preview. Any later runtime or release-shell drift invalidates the binding. This exception does not apply to another pass.
+
 Before implementation, declare one mechanically conservative impact class:
 
 | Class | Typical paths | Required browser work |
@@ -119,12 +121,12 @@ The first successful exact-SHA receipt plus cache-busted live smoke is the termi
 
 ## Player release channels
 
-The canonical root is a chooser, not a gameplay build. Pass 66 source stages schema 4 locally with exactly two intended choices, but this source configuration is not evidence that Pass 66 is approved, published, or live:
+The canonical root is a chooser, not a gameplay build. Pass 66 source stages schema 4 locally with exactly two intended choices, but this source configuration is not evidence that Pass 66 is published or live:
 
-- **The Big One** is the unpublished Pass 66 exact-SHA HITL candidate staged at `channels/the-big-one`. It may become Live only after Dave approves the immutable preview, the approval-only lineage and exact-main checks pass, and the protected production workflow is explicitly dispatched.
+- **The Big One** is the unpublished Pass 66 live target staged at `channels/the-big-one`. Dave's standing conditional instruction authorizes its promotion without another subjective HITL round only after an immutable preview exists, all blocking mechanical and visual evidence is green, the truthful process-only acceptance binding and exact-main checks pass, and the protected production workflow is dispatched.
 - **New Netcode** remains the immutable Stable channel pinned to the released Pass 63 source `1bd55076c952080d5f7a8a5b0b8869aaa0646a76`, Pages SHA `2201a606a8c9f83d441036eac07dc140bd7e63f5`, exact historical `channels/experimental-netcode-pass` subtree, 119-file runtime set, and tree digest `61666de694ea6bd62391c1e0661ffcc2864142bb569407c93a2ebdfd28031ce7`.
 
-Pass 64 remains the currently published failed-regression comparator until a later approved promotion; it is never Stable. Its published source `5075a52d80c6db69a97ed53acc2df5368728371a`, Pages SHA `8326c95659a9fb8c5979c13f9b88126c4ffb85f7`, 130-file channel and digest `ffd3e130d005e9321976795fe2d5cadfd9965ebb27dc0bbff0c1609816cff20b` stay separately identified in candidate project-map evidence.
+Pass 64 remains the currently published failed-regression comparator only until the authorized Pass 66 promotion succeeds; it is never Stable. Its published source `5075a52d80c6db69a97ed53acc2df5368728371a`, Pages SHA `8326c95659a9fb8c5979c13f9b88126c4ffb85f7`, 130-file channel and digest `ffd3e130d005e9321976795fe2d5cadfd9965ebb27dc0bbff0c1609816cff20b` stay separately identified in candidate project-map evidence. Pass 65 is superseded audit evidence and must never be promoted.
 
 The Stable channel is a Git commit identity, not a moving branch or manually copied folder. During an authorized promotion, `scripts/release/stage-release-topology.mjs` reconstructs Pass 63 only from the source and Pages commits pinned in `release-channels.json`, places the exact Pass 66 build under `channels/the-big-one`, replaces the root with the two-choice chooser, and records provenance plus tree digests. `scripts/qa/verify-release-topology.mjs` byte-compares every archived Pass 63 file to its pinned Git blob before deployment. Only after a successful protected promotion do room invitations and legacy `latest` or `normal` links become live Pass 66 routes. The separate Pass 62 benchmark record remains immutable offline/reconstructible historical evidence.
 

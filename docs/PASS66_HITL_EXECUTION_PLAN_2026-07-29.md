@@ -13,7 +13,7 @@ Target outcome: one clean immutable Version 66 candidate promoted as `The Big On
 - Pass 65 is superseded and its draft PR is closed. Its exact branch/SHA remains audit evidence only and may not be promoted.
 - Pass 66 contains every correction after the inspected Pass 65 SHA and is the sole live candidate.
 - Dave explicitly removed the discretionary HITL feedback round and authorized protected publication when Pass 66 is complete and green. This does not authorize a fabricated/backdated acceptance receipt, a weakened exact-SHA gate or a manual Pages push.
-- The integrator freezes the final immutable Pass 66 SHA, records only truthful acceptance evidence permitted by the repository contract, and uses the protected workflow. If the exact-SHA gate still requires a post-preview owner acknowledgement, that acknowledgement is the only remaining owner interaction; no new subjective review round is implied.
+- The integrator freezes the final immutable Pass 66 SHA, records only truthful acceptance evidence permitted by the repository contract, and uses the protected workflow. After the immutable preview exists, a process-only acceptance update may bind Dave's standing conditional instruction to that exact green SHA at the real binding time; it must explicitly avoid claiming that Dave inspected that preview. No new subjective review round or owner interaction is required.
 - No specialist may edit `main`, `gh-pages`, Pass 63 artifacts, production workflow receipts or release metadata.
 
 ## 2. Priority law
@@ -158,8 +158,8 @@ Owned outcomes: `HF-005`–`HF-007`, `HF-027`–`HF-031`, `HF-057`–`HF-059`, `
 6. Run catalog mutations, static/type/build, all focused suites and responsive visual checks.
 7. Run real installed-Chrome all-map native-WebGPU endurance and frame-tail trials on a clean idle machine.
 8. Freeze one exact candidate SHA and build manifest.
-9. Serve that exact build locally and give Dave a concise ordered HITL route.
-10. Stop. Do not publish Version 66.
+9. Create and serve the immutable preview, then bind the already-recorded standing conditional publication instruction to that exact SHA in a process-only acceptance update without representing it as owner preview testing.
+10. Require the corrected owner-feedback candidate gate and all five protected PR/main checks, promote only through `release-production`, and verify Pass 66 Live plus the byte-exact Pass 63 Stable channel on the canonical HTTPS site.
 
 ## 7. Minimum mechanical gate
 
@@ -173,4 +173,4 @@ Owned outcomes: `HF-005`–`HF-007`, `HF-027`–`HF-031`, `HF-057`–`HF-059`, `
 - Production asset, weapon, arms, support vehicle, preview media and provenance gates.
 - Responsive captures at desktop, laptop, ultrawide, narrow and high-DPI plus live HUD, lobby return and match end.
 
-No P0 or P1 moves from `IMPLEMENTED` to `VERIFIED` without exact-SHA evidence. Owner taste remains `HITL` after mechanical evidence is green.
+No P0 or P1 moves from `IMPLEMENTED` to `VERIFIED` without exact-SHA evidence. Dave has waived a further subjective HITL feedback round for Pass 66 only; that waiver changes neither evidence state nor the requirement for deterministic visual gates.
