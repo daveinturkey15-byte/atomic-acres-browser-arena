@@ -239,6 +239,7 @@ async function assertCaptureReceipt() {
   const recipeDigest = createHash('sha256').update(JSON.stringify(choreography)).digest('hex');
   if (receipt.schemaVersion !== 4
     || receipt.captureId !== 'pass66-authoritative-runtime-menu-preview-capture-v1'
+    || receipt.generatedAt !== generatedAt
     || receipt.recipeId !== choreography.recipeId
     || receipt.recipeDigest !== recipeDigest
     || receipt.source !== choreography.capture.source

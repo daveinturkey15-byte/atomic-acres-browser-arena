@@ -32,6 +32,7 @@ const runtimeEntryPath = path.join(root, 'src/legacy-main.ts');
 const cameraEvaluatorPath = path.join(root, 'src/ui/menu-preview-camera.ts');
 const acceptedCockpitEvidence = 'docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png';
 const acceptedCockpitDigest = '581c448b7d998a220ea69fb0c024d9553f40d9aea767b3d88b503780a64921d1';
+const requiredGenerationDate = '2026-07-30';
 const arenas = ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range'];
 const helicopterArenas = arenas.slice(0, 3);
 const captureToolPaths = [generatorPath, integrityPath, integrityTypesPath, dependencyManifestPath];
@@ -585,7 +586,7 @@ if (choreography.media?.cacheKey !== 'pass66-runtime-preview-v4') failures.push(
 if (choreography.capture?.source !== 'authoritative-runtime-arena' || choreography.capture?.backend !== 'webgpu' || choreography.capture?.overlayScale !== 0.5) failures.push('canonical capture must pin authoritative WebGPU arenas and half-scale overlays');
 if (choreography.frameCount !== choreography.fps * choreography.durationSeconds) failures.push('choreography frame count does not equal fps * duration');
 if (Object.keys(choreography.arenas).join(',') !== arenas.join(',')) failures.push('choreography arena roster/order drifted');
-if (provenance.schemaVersion !== 4 || provenance.releaseState !== 'HITL candidate only') failures.push('provenance must be schema 4 HITL-candidate media');
+if (provenance.schemaVersion !== 4 || provenance.releaseState !== 'HITL candidate only' || provenance.generatedAt !== requiredGenerationDate) failures.push('provenance must be schema 4 HITL-candidate media for the current capture date');
 if (!manifestRecord) failures.push(`assets.manifest.json is missing ${provenance.assetId}`);
 if (provenance.authoredCockpit?.assetId !== 'chopper-gunner-vehicle-v1' || provenance.authoredCockpit?.qualityTier !== 'LOD0') failures.push('provenance must retain the accepted LOD0 cockpit design reference');
 
@@ -593,6 +594,7 @@ const recipeDigest = createHash('sha256').update(JSON.stringify(choreography)).d
 failures.push(...rotorContractFailures(choreography, generatorSource));
 if (captureReceipt.schemaVersion !== 4
   || captureReceipt.captureId !== 'pass66-authoritative-runtime-menu-preview-capture-v1'
+  || captureReceipt.generatedAt !== requiredGenerationDate
   || captureReceipt.recipeId !== choreography.recipeId
   || captureReceipt.recipeDigest !== recipeDigest
   || captureReceipt.source !== 'authoritative-runtime-arena'

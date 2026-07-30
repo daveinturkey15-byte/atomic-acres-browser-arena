@@ -17,6 +17,7 @@ const receiptPath = path.join(root, 'source-assets/menu/pass65-preview-masters/r
 const reviewReceiptPath = path.join(root, 'artifacts/pass65/menu-preview-rotor-review/runtime-capture-receipt.json');
 const port = Number(process.env.AA_PREVIEW_PORT ?? '44166');
 const reviewOnly = process.env.AA_PREVIEW_REVIEW_ONLY === '1';
+const generatedAt = '2026-07-30';
 const choreography = choreographyJson;
 const canonicalArenas = Object.keys(choreography.arenas) as ArenaId[];
 const captureToolPaths = [
@@ -665,7 +666,7 @@ async function main(): Promise<void> {
     const receipt = {
       schemaVersion: 4,
       captureId: 'pass66-authoritative-runtime-menu-preview-capture-v1',
-      generatedAt: '2026-07-29',
+      generatedAt,
       recipeId: choreography.recipeId,
       recipeDigest: sha256(JSON.stringify(choreography)),
       source: choreography.capture.source,
