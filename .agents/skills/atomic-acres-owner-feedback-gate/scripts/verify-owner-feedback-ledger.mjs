@@ -19,6 +19,19 @@ const GRAPH_PATH = path.join(REPO_ROOT, 'docs', 'PASS65_OWNER_FEEDBACK_COMPLETEN
 const AGENTS_PATH = path.join(REPO_ROOT, 'AGENTS.md');
 const PACKAGE_PATH = path.join(REPO_ROOT, 'package.json');
 
+// S0M may bind frozen S0 evidence, but it may not revise the code, test or
+// release-shell contract that produced that evidence. Keep this narrower than
+// the generic post-preview acceptance allowance for test-only corrections.
+const CANDIDATE_EVIDENCE_PROCESS_FILES = new Set([
+  'acceptance/pass-66.json',
+  'docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md',
+  'docs/PASS65_OWNER_FEEDBACK_COMPLETENESS_GRAPH.json',
+]);
+const CANDIDATE_EVIDENCE_JSON_ROOTS = Object.freeze([
+  'artifacts/pass65-owner-feedback/',
+  'artifacts/pass65/hardware-webgl2-admission/',
+]);
+
 const TEXT_SOURCE_NORMALIZATION = 'UTF-8; CRLF converted to LF; one final LF added; text semantics unchanged';
 const HARDWARE_WEBGL2_FEEDBACK_IDS = Object.freeze([
   'HF-001', 'HF-002', 'HF-003', 'HF-041', 'HF-064',
@@ -69,6 +82,107 @@ function canonicalDigest(value) {
 
 function git(...args) {
   return execFileSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8' }).trim();
+}
+
+function gitIsAncestor(ancestor, descendant) {
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', ancestor, descendant], {
+      cwd: REPO_ROOT,
+      stdio: 'ignore',
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function gitChangedPaths(base, head) {
+  return git('diff', '--name-only', '--no-renames', '--diff-filter=ACDMRTUXB', base, head)
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((entry) => entry.replaceAll('\\', '/'));
+}
+
+function committedCandidateEvidenceBytes(currentSha, relativePath, options) {
+  if (options.committedArtifactBytesByPath !== undefined) {
+    const bytes = options.committedArtifactBytesByPath?.get(relativePath);
+    return bytes === undefined ? null : Buffer.from(bytes);
+  }
+  try {
+    return execFileSync('git', ['show', `${currentSha}:${relativePath}`], { cwd: REPO_ROOT });
+  } catch {
+    return null;
+  }
+}
+
+function validateCommittedCandidateEvidence(relativePath, bytes, candidateLineage, errors, options, label) {
+  if (!candidateLineage?.currentSha) return;
+  const committedBytes = committedCandidateEvidenceBytes(candidateLineage.currentSha, relativePath, options);
+  if (!committedBytes) {
+    error(errors, 'E_CANDIDATE_ARTIFACT_UNTRACKED', `${label} is not tracked in current S0M HEAD.`);
+  } else if (!Buffer.from(bytes).equals(committedBytes)) {
+    error(errors, 'E_CANDIDATE_ARTIFACT_COMMITTED_BYTES', `${label} differs from the bytes tracked in current S0M HEAD.`);
+  }
+}
+
+function isCandidateEvidenceProcessPath(relativePath) {
+  if (CANDIDATE_EVIDENCE_PROCESS_FILES.has(relativePath)) return true;
+  return CANDIDATE_EVIDENCE_JSON_ROOTS.some((root) => {
+    if (!relativePath.startsWith(root) || !relativePath.endsWith('.json')) return false;
+    const remainder = relativePath.slice(root.length);
+    return remainder.length > '.json'.length
+      && !remainder.split('/').some((segment) => segment === '' || segment === '.' || segment === '..');
+  });
+}
+
+function validateCandidateEvidenceLineage(candidateSha, errors, options) {
+  let currentSha = options.currentGitSha;
+  let currentStatus = options.currentGitStatus;
+  try {
+    if (currentSha === undefined) currentSha = git('rev-parse', 'HEAD');
+    if (currentStatus === undefined) currentStatus = git('status', '--porcelain', '--untracked-files=all');
+  } catch (caught) {
+    error(errors, 'E_CANDIDATE_CURRENT_SOURCE', `Candidate verification could not resolve the current Git source: ${caught.message}.`);
+    return { currentSha: null, currentStatus: null, changedPaths: [] };
+  }
+  if (!/^[0-9a-f]{40}$/.test(currentSha ?? '')) {
+    error(errors, 'E_CANDIDATE_CURRENT_SOURCE', 'Current candidate HEAD must be an exact 40-character commit SHA.');
+  }
+  if (currentStatus !== '') {
+    error(errors, 'E_CANDIDATE_CURRENT_SOURCE', 'Candidate verification requires a clean current worktree, including no untracked evidence files.');
+  }
+
+  const ancestor = options.candidateIsAncestor ?? (
+    /^[0-9a-f]{40}$/.test(candidateSha ?? '')
+      && /^[0-9a-f]{40}$/.test(currentSha ?? '')
+      && gitIsAncestor(candidateSha, currentSha)
+  );
+  if (!ancestor) {
+    error(errors, 'E_CANDIDATE_SOURCE_ANCESTRY', `Frozen evidence source ${candidateSha} is not an ancestor of current HEAD ${currentSha}.`);
+  }
+
+  let changedPaths = options.currentChangedPaths;
+  if (changedPaths === undefined && ancestor) {
+    try {
+      changedPaths = gitChangedPaths(candidateSha, currentSha);
+    } catch (caught) {
+      error(errors, 'E_CANDIDATE_FROZEN_DELTA', `Candidate verification could not diff frozen S0 against current HEAD: ${caught.message}.`);
+    }
+  }
+  if (!Array.isArray(changedPaths)) {
+    error(errors, 'E_CANDIDATE_FROZEN_DELTA', 'Candidate verification could not resolve the S0-to-current changed-path set.');
+    changedPaths = [];
+  }
+  const normalized = [...new Set(changedPaths.map((entry) => String(entry).trim().replaceAll('\\', '/')).filter(Boolean))].sort();
+  const blocked = normalized.filter((entry) => !isCandidateEvidenceProcessPath(entry));
+  if (blocked.length > 0) {
+    error(
+      errors,
+      'E_CANDIDATE_FROZEN_DELTA',
+      `S0-to-current changes include forbidden runtime, release-shell, test, verifier, workflow or unknown paths: ${blocked.join(', ')}.`,
+    );
+  }
+  return { currentSha, currentStatus, changedPaths: normalized };
 }
 
 function currentBuildManifest(sourceSha, directory = path.join(REPO_ROOT, 'dist')) {
@@ -427,6 +541,9 @@ function validateArtifacts(graph, artifactIndex, testIndex, feedbackById, errors
   if (candidateMode && !/^[0-9a-f]{40}$/.test(candidateSha ?? '')) {
     error(errors, 'E_CANDIDATE_SOURCE_SHA', 'candidateEvidenceSourceSha must be an exact 40-character commit SHA.');
   }
+  const candidateLineage = candidateMode && /^[0-9a-f]{40}$/.test(candidateSha ?? '')
+    ? validateCandidateEvidenceLineage(candidateSha, errors, options)
+    : null;
   for (const artifact of artifactIndex.values()) {
     const relativePath = artifact.path;
     if (typeof relativePath !== 'string' || !relativePath.replace(/\\/g, '/').startsWith('artifacts/pass65-owner-feedback/')) {
@@ -441,6 +558,9 @@ function validateArtifacts(graph, artifactIndex, testIndex, feedbackById, errors
       continue;
     }
     if (!Buffer.isBuffer(bytes)) bytes = Buffer.from(bytes);
+    if (candidateMode) {
+      validateCommittedCandidateEvidence(relativePath, bytes, candidateLineage, errors, options, artifact.id);
+    }
     if (!/^[0-9a-f]{64}$/.test(artifact.sha256 ?? '') || sha256(bytes) !== artifact.sha256) {
       error(errors, 'E_CANDIDATE_ARTIFACT_DIGEST', `${artifact.id} digest does not match its evidence bytes.`);
     }
@@ -512,6 +632,26 @@ function validateArtifacts(graph, artifactIndex, testIndex, feedbackById, errors
         if (!manifestBytes || receiptSha256(manifestBytes) !== receipt.buildManifestSha256) {
           error(errors, 'E_HARDWARE_WEBGL2_BUILD_DIGEST', `${artifact.id} build manifest is missing or has a forged digest.`);
         }
+        if (candidateMode && detailBytes) {
+          validateCommittedCandidateEvidence(
+            receipt.detailedReceiptPath,
+            detailBytes,
+            candidateLineage,
+            errors,
+            options,
+            `${artifact.id} detailed receipt`,
+          );
+        }
+        if (candidateMode && manifestBytes) {
+          validateCommittedCandidateEvidence(
+            receipt.buildManifestPath,
+            manifestBytes,
+            candidateLineage,
+            errors,
+            options,
+            `${artifact.id} build manifest`,
+          );
+        }
         if (detailBytes && manifestBytes) {
           const detailedReceipt = JSON.parse(Buffer.from(detailBytes).toString('utf8'));
           const manifest = JSON.parse(Buffer.from(manifestBytes).toString('utf8'));
@@ -523,11 +663,6 @@ function validateArtifacts(graph, artifactIndex, testIndex, feedbackById, errors
           for (const failure of validateHardwareWebGl2BuildManifest(manifest, { sourceSha: artifact.sourceSha })) {
             error(errors, 'E_HARDWARE_WEBGL2_BUILD_CONTRACT', `${artifact.id} ${failure}.`);
           }
-          const currentSha = options.currentGitSha ?? git('rev-parse', 'HEAD');
-          const currentStatus = options.currentGitStatus ?? git('status', '--porcelain', '--untracked-files=all');
-          if (currentSha !== artifact.sourceSha || currentStatus !== '') {
-            error(errors, 'E_HARDWARE_WEBGL2_CURRENT_SOURCE', `${artifact.id} does not match the current clean candidate HEAD.`);
-          }
           let liveBuildManifest = options.currentBuildManifest;
           if (!liveBuildManifest) {
             try { liveBuildManifest = currentBuildManifest(artifact.sourceSha); }
@@ -537,6 +672,9 @@ function validateArtifacts(graph, artifactIndex, testIndex, feedbackById, errors
           }
           if (liveBuildManifest && JSON.stringify(liveBuildManifest) !== JSON.stringify(manifest)) {
             error(errors, 'E_HARDWARE_WEBGL2_CURRENT_BUILD', `${artifact.id} bound manifest differs from the current production dist/ bytes.`);
+          }
+          if (candidateLineage && liveBuildManifest?.sourceSha !== candidateSha) {
+            error(errors, 'E_HARDWARE_WEBGL2_CURRENT_BUILD', `${artifact.id} current production dist/ manifest is not labelled with frozen S0 ${candidateSha}.`);
           }
           const chromePath = detailedReceipt.environment?.chromeExecutable;
           let chromeBytes = options.chromeExecutableBytesByPath?.get(chromePath);
@@ -824,20 +962,32 @@ function buildCandidateFixture(graph, ledger) {
       ? [artifact.id, hardwareArtifact.id]
       : [artifact.id];
   }
+  const artifactBytesByPath = new Map([
+    [relativePath, bytes],
+    [hardwareSidecarPath, hardwareSidecarBytes],
+    [hardwareDetailPath, hardwareFixture.detailedBytes],
+    [hardwareManifestPath, hardwareFixture.manifestBytes],
+  ]);
   return {
     graph: fixtureGraph,
-    artifactBytesByPath: new Map([
-      [relativePath, bytes],
-      [hardwareSidecarPath, hardwareSidecarBytes],
-      [hardwareDetailPath, hardwareFixture.detailedBytes],
-      [hardwareManifestPath, hardwareFixture.manifestBytes],
-    ]),
+    artifactBytesByPath,
+    committedArtifactBytesByPath: new Map(artifactBytesByPath),
     chromeExecutableBytesByPath: new Map([[
       hardwareFixture.detailedReceipt.environment.chromeExecutable,
       hardwareFixture.chromeExecutableBytes,
     ]]),
-    currentGitSha: sourceSha,
+    currentGitSha: 'c'.repeat(40),
     currentGitStatus: '',
+    candidateIsAncestor: true,
+    currentChangedPaths: [
+      'acceptance/pass-66.json',
+      'docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md',
+      'docs/PASS65_OWNER_FEEDBACK_COMPLETENESS_GRAPH.json',
+      relativePath,
+      hardwareSidecarPath,
+      hardwareDetailPath,
+      hardwareManifestPath,
+    ],
     currentBuildManifest: hardwareFixture.manifest,
   };
 }
@@ -876,9 +1026,12 @@ function mutateHardwareDetailedFixture(fixture, mutate) {
   return {
     graph,
     artifactBytesByPath,
+    committedArtifactBytesByPath: new Map(artifactBytesByPath),
     chromeExecutableBytesByPath: fixture.chromeExecutableBytesByPath,
     currentGitSha: fixture.currentGitSha,
     currentGitStatus: fixture.currentGitStatus,
+    candidateIsAncestor: fixture.candidateIsAncestor,
+    currentChangedPaths: fixture.currentChangedPaths,
     currentBuildManifest: fixture.currentBuildManifest,
   };
 }
@@ -964,9 +1117,12 @@ function runSelfTest(ledger, matrix, agents, packageJson, graph) {
   const fixtureOptions = {
     candidateMode: true,
     artifactBytesByPath: fixture.artifactBytesByPath,
+    committedArtifactBytesByPath: fixture.committedArtifactBytesByPath,
     chromeExecutableBytesByPath: fixture.chromeExecutableBytesByPath,
     currentGitSha: fixture.currentGitSha,
     currentGitStatus: fixture.currentGitStatus,
+    candidateIsAncestor: fixture.candidateIsAncestor,
+    currentChangedPaths: fixture.currentChangedPaths,
     currentBuildManifest: fixture.currentBuildManifest,
   };
   const candidateResult = validate(readyLedger, matrix, agents, packageJson, fixture.graph, fixtureOptions);
@@ -990,6 +1146,28 @@ function runSelfTest(ledger, matrix, agents, packageJson, graph) {
   const wrongDigest = structuredClone(fixture.graph);
   wrongDigest.artifactCatalog[0].sha256 = '0'.repeat(64);
   expectRejected('candidate stale artifact digest', 'E_CANDIDATE_ARTIFACT_DIGEST', { ledger: readyLedger, graph: wrongDigest, options: fixtureOptions });
+  const untrackedArtifactBytes = new Map(fixture.committedArtifactBytesByPath);
+  untrackedArtifactBytes.delete(fixture.graph.artifactCatalog[0].path);
+  expectRejected('ignored local artifact is not candidate evidence', 'E_CANDIDATE_ARTIFACT_UNTRACKED', {
+    ledger: readyLedger,
+    graph: fixture.graph,
+    options: { ...fixtureOptions, committedArtifactBytesByPath: untrackedArtifactBytes },
+  });
+  const committedArtifactDrift = new Map(fixture.committedArtifactBytesByPath);
+  committedArtifactDrift.set(fixture.graph.artifactCatalog[0].path, Buffer.from('different committed receipt', 'utf8'));
+  expectRejected('working artifact differs from committed evidence', 'E_CANDIDATE_ARTIFACT_COMMITTED_BYTES', {
+    ledger: readyLedger,
+    graph: fixture.graph,
+    options: { ...fixtureOptions, committedArtifactBytesByPath: committedArtifactDrift },
+  });
+  const hardwareArtifact = fixture.graph.artifactCatalog.find((artifact) => artifact.testRefs?.includes(HARDWARE_WEBGL2_TEST_ID));
+  const untrackedHardwareDetail = new Map(fixture.committedArtifactBytesByPath);
+  untrackedHardwareDetail.delete(hardwareArtifact.detailedReceiptPath);
+  expectRejected('hardware detail is not committed at S0M', 'E_CANDIDATE_ARTIFACT_UNTRACKED', {
+    ledger: readyLedger,
+    graph: fixture.graph,
+    options: { ...fixtureOptions, committedArtifactBytesByPath: untrackedHardwareDetail },
+  });
 
   function rejectDetailedMutation(name, mutate) {
     const candidate = mutateHardwareDetailedFixture(fixture, mutate);
@@ -1098,11 +1276,63 @@ function runSelfTest(ledger, matrix, agents, packageJson, graph) {
   rejectDetailedMutation('head drift in detailed source', (detail) => { detail.source.endingSha = 'f'.repeat(40); });
   rejectDetailedMutation('stale build digest in detail', (detail) => { detail.source.buildManifestSha256 = 'f'.repeat(64); });
 
-  expectRejected('current candidate HEAD drift', 'E_HARDWARE_WEBGL2_CURRENT_SOURCE', {
-    ledger: readyLedger, graph: fixture.graph, options: { ...fixtureOptions, currentGitSha: 'f'.repeat(40) },
+  expectRejected('candidate S0 is not an ancestor of S0M', 'E_CANDIDATE_SOURCE_ANCESTRY', {
+    ledger: readyLedger, graph: fixture.graph, options: { ...fixtureOptions, candidateIsAncestor: false },
   });
-  expectRejected('current candidate dirty tree', 'E_HARDWARE_WEBGL2_CURRENT_SOURCE', {
+  expectRejected('current candidate HEAD is not exact', 'E_CANDIDATE_CURRENT_SOURCE', {
+    ledger: readyLedger, graph: fixture.graph, options: { ...fixtureOptions, currentGitSha: 'not-a-commit' },
+  });
+  expectRejected('current candidate dirty tree', 'E_CANDIDATE_CURRENT_SOURCE', {
     ledger: readyLedger, graph: fixture.graph, options: { ...fixtureOptions, currentGitStatus: ' M src/legacy-main.ts' },
+  });
+  expectRejected('runtime drift after S0', 'E_CANDIDATE_FROZEN_DELTA', {
+    ledger: readyLedger,
+    graph: fixture.graph,
+    options: { ...fixtureOptions, currentChangedPaths: [...fixture.currentChangedPaths, 'src/legacy-main.ts'] },
+  });
+  expectRejected('release-shell drift after S0', 'E_CANDIDATE_FROZEN_DELTA', {
+    ledger: readyLedger,
+    graph: fixture.graph,
+    options: { ...fixtureOptions, currentChangedPaths: [...fixture.currentChangedPaths, 'release-channels.json'] },
+  });
+  expectRejected('wrong release-pass acceptance manifest after S0', 'E_CANDIDATE_FROZEN_DELTA', {
+    ledger: readyLedger,
+    graph: fixture.graph,
+    options: { ...fixtureOptions, currentChangedPaths: [...fixture.currentChangedPaths, 'acceptance/pass-65.json'] },
+  });
+  expectRejected('test drift after S0', 'E_CANDIDATE_FROZEN_DELTA', {
+    ledger: readyLedger,
+    graph: fixture.graph,
+    options: { ...fixtureOptions, currentChangedPaths: [...fixture.currentChangedPaths, 'tests/e2e/atomic-acres.spec.ts'] },
+  });
+  expectRejected('owner-gate verifier drift after S0', 'E_CANDIDATE_FROZEN_DELTA', {
+    ledger: readyLedger,
+    graph: fixture.graph,
+    options: {
+      ...fixtureOptions,
+      currentChangedPaths: [
+        ...fixture.currentChangedPaths,
+        '.agents/skills/atomic-acres-owner-feedback-gate/scripts/verify-owner-feedback-ledger.mjs',
+      ],
+    },
+  });
+  expectRejected('workflow drift after S0', 'E_CANDIDATE_FROZEN_DELTA', {
+    ledger: readyLedger,
+    graph: fixture.graph,
+    options: { ...fixtureOptions, currentChangedPaths: [...fixture.currentChangedPaths, '.github/workflows/verify.yml'] },
+  });
+  expectRejected('unknown path drift after S0', 'E_CANDIDATE_FROZEN_DELTA', {
+    ledger: readyLedger,
+    graph: fixture.graph,
+    options: { ...fixtureOptions, currentChangedPaths: [...fixture.currentChangedPaths, 'mystery/evidence.bin'] },
+  });
+  expectRejected('non-JSON evidence payload after S0', 'E_CANDIDATE_FROZEN_DELTA', {
+    ledger: readyLedger,
+    graph: fixture.graph,
+    options: {
+      ...fixtureOptions,
+      currentChangedPaths: [...fixture.currentChangedPaths, 'artifacts/pass65-owner-feedback/unchecked.bin'],
+    },
   });
   expectRejected('current dist manifest drift', 'E_HARDWARE_WEBGL2_CURRENT_BUILD', {
     ledger: readyLedger,
