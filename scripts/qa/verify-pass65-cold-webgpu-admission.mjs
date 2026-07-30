@@ -13,6 +13,8 @@ const maximumColdTransitionMs = 10_000;
 const maximumMenuDeploymentPrewarmMs = 10_000;
 const maximumWeaponCatalogPrewarmMs = 5_000;
 const maximumEffectPrewarmMs = 4_500;
+const maximumAdmissionGapMs = 50;
+const traceNodeBuilds = process.env.PASS65_TRACE_NODE_BUILDS === '1';
 const artifactRoot = 'artifacts/pass65/cold-webgpu-admission';
 const chromeCandidates = [
   process.env.PASS65_CHROME_PATH,
@@ -150,7 +152,7 @@ try {
       });
       await stubExternalServices(page);
 
-      await page.goto(`http://127.0.0.1:${port}/?release=latest&renderer=webgpu&externalServices=off&render=blender&map=atomic-acres&traceNodeBuilds=1&seed=${65_100 + trial}`);
+      await page.goto(`http://127.0.0.1:${port}/?release=latest&renderer=webgpu&externalServices=off&render=blender&map=atomic-acres&seed=${65_100 + trial}${traceNodeBuilds ? '&traceNodeBuilds=1' : ''}`);
       await page.waitForFunction(() => {
         const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
         return state?.bootstrap.stage === 'ready'
@@ -339,9 +341,19 @@ try {
         failures.push(`runtime weapon corpus residency was incomplete: ${JSON.stringify(after.weaponAssetCache.resident)}`);
       }
       if (!after.gameStarted || after.arenaId !== 'atomic-acres' || !after.originalArtLoaded) failures.push('Atomic Acres did not become the playable arena');
-      if (!after.bootstrap.matchAdmissionCadence
-        || after.bootstrap.matchAdmissionCadence.admittedDegraded !== false
-        || after.bootstrap.matchAdmissionCadence.visibilityState !== 'visible') {
+      const admissionCadence = after.bootstrap.matchAdmissionCadence;
+      if (!admissionCadence
+        || admissionCadence.backend !== 'webgpu'
+        || admissionCadence.admittedDegraded !== false
+        || admissionCadence.visibilityState !== 'visible'
+        || admissionCadence.drained !== true
+        || admissionCadence.submissionAdvances <= 0
+        || admissionCadence.completionAdvances <= 0
+        || admissionCadence.endingCompletedSequence !== admissionCadence.endingSubmissionSequence
+        || admissionCadence.maximumSubmissionGapMs > maximumAdmissionGapMs
+        || admissionCadence.maximumCompletionGapMs > maximumAdmissionGapMs
+        || admissionCadence.maximumPendingForMs > maximumAdmissionGapMs
+        || admissionCadence.maximumCompletionLatencyMs > maximumAdmissionGapMs) {
         failures.push(`foreground match admission was degraded: ${JSON.stringify(after.bootstrap.matchAdmissionCadence)}`);
       }
       if (after.renderProfile !== 'blender'

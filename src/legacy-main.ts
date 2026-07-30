@@ -1288,11 +1288,23 @@ type BootstrapStage =
 let bootstrapStage: BootstrapStage = 'loading-module-assets';
 let bootstrapError: string | null = null;
 type MatchAdmissionCadence = Readonly<{
+  backend: 'webgpu' | 'webgl2';
   waitedMs: number;
   stableWindowMs: number;
   samples: number;
   resets: number;
   maximumGapMs: number;
+  startingSubmissionSequence: number;
+  endingSubmissionSequence: number;
+  startingCompletedSequence: number;
+  endingCompletedSequence: number;
+  submissionAdvances: number;
+  completionAdvances: number;
+  maximumSubmissionGapMs: number;
+  maximumCompletionGapMs: number;
+  maximumPendingForMs: number;
+  maximumCompletionLatencyMs: number;
+  drained: boolean;
   admittedDegraded: boolean;
   visibilityState: DocumentVisibilityState;
   documentHasFocus: boolean;
@@ -1670,7 +1682,18 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
   const maximumWaitMs = 5_000;
   const hitchThresholdMs = 50;
   bootstrapStage = 'verifying-first-presentation';
-  lastMatchAdmissionCadence = await new Promise<MatchAdmissionCadence>((resolve) => {
+  if (renderRuntime.backend === 'webgpu') {
+    await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);
+    renderRuntime.resetPresentationProgressWindow(performance.now());
+  }
+  const startingPresentation = renderRuntime.backend === 'webgpu'
+    ? renderRuntime.presentationTelemetry()
+    : null;
+  const sampledCadence = await new Promise<Omit<MatchAdmissionCadence,
+    'endingSubmissionSequence' | 'endingCompletedSequence' | 'submissionAdvances' | 'completionAdvances'
+    | 'maximumSubmissionGapMs' | 'maximumCompletionGapMs' | 'maximumPendingForMs'
+    | 'maximumCompletionLatencyMs' | 'drained'
+  >>((resolve, reject) => {
     const startedAt = performance.now();
     let stableSince = startedAt;
     let previousAt = 0;
@@ -1679,23 +1702,67 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
     let maximumGapMs = 0;
     const sample = (now: number): void => {
       samples += 1;
+      let resetStableWindow = false;
       if (previousAt > 0) {
         const gapMs = Math.max(0, now - previousAt);
         maximumGapMs = Math.max(maximumGapMs, gapMs);
-        if (gapMs > hitchThresholdMs) {
-          stableSince = now;
-          resets += 1;
-        }
+        if (gapMs > hitchThresholdMs) resetStableWindow = true;
       }
       previousAt = now;
+      let presentationProgressReady = renderRuntime.backend === 'webgl2';
+      if (renderRuntime.backend === 'webgpu'
+        && document.visibilityState === 'visible' && document.hasFocus()) {
+        // Render the exact staged gameplay composition while the prerecorded
+        // transition remains opaque. This advances no simulation, authority,
+        // input, networking or audio; it proves real submitted/completed frames
+        // instead of declaring an idle requestAnimationFrame loop hitch-free.
+        try {
+          submitWebGpuFrame(now, false, 'warmed-live');
+          const presentation = renderRuntime.presentationTelemetry(performance.now());
+          if (presentation.status === 'device-lost' || presentation.status === 'failed') {
+            reject(new Error(`Match admission renderer was ${presentation.status}: ${presentation.lastFailure ?? 'unknown failure'}`));
+            return;
+          }
+          if (presentation.status === 'stalled') {
+            resetStableWindow = true;
+          }
+          const progress = presentation.progress;
+          presentationProgressReady = progress.submissionAdvances > 0
+            && progress.completionAdvances > 0
+            && progress.maximumSubmissionGapMs <= hitchThresholdMs
+            && progress.maximumCompletionGapMs <= hitchThresholdMs
+            && progress.currentSubmissionGapMs <= hitchThresholdMs
+            && progress.currentCompletionGapMs <= hitchThresholdMs;
+          if (!presentationProgressReady && (
+            progress.maximumSubmissionGapMs > hitchThresholdMs
+            || progress.maximumCompletionGapMs > hitchThresholdMs
+            || progress.currentSubmissionGapMs > hitchThresholdMs
+            || progress.currentCompletionGapMs > hitchThresholdMs
+          )) resetStableWindow = true;
+        } catch (error) {
+          reject(error);
+          return;
+        }
+      }
+      if (resetStableWindow) {
+        stableSince = now;
+        resets += 1;
+        if (renderRuntime.backend === 'webgpu') {
+          renderRuntime.resetPresentationProgressWindow(performance.now());
+        }
+        presentationProgressReady = renderRuntime.backend === 'webgl2';
+      }
       const waitedMs = Math.max(0, now - startedAt);
-      if (now - stableSince >= minimumStableWindowMs) {
+      if (now - stableSince >= minimumStableWindowMs && presentationProgressReady) {
         resolve(Object.freeze({
+          backend: renderRuntime.backend,
           waitedMs,
           stableWindowMs: now - stableSince,
           samples,
           resets,
           maximumGapMs,
+          startingSubmissionSequence: startingPresentation?.submissionSequence ?? 0,
+          startingCompletedSequence: startingPresentation?.completedSequence ?? 0,
           admittedDegraded: false,
           visibilityState: document.visibilityState,
           documentHasFocus: document.hasFocus(),
@@ -1708,11 +1775,14 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
         // telemetry must record that degraded cadence, not turn it into a
         // fatal error that bounces one multiplayer peer back to the menu.
         resolve(Object.freeze({
+          backend: renderRuntime.backend,
           waitedMs,
           stableWindowMs: now - stableSince,
           samples,
           resets,
           maximumGapMs,
+          startingSubmissionSequence: startingPresentation?.submissionSequence ?? 0,
+          startingCompletedSequence: startingPresentation?.completedSequence ?? 0,
           admittedDegraded: true,
           visibilityState: document.visibilityState,
           documentHasFocus: document.hasFocus(),
@@ -1722,6 +1792,42 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
       requestAnimationFrame(sample);
     };
     requestAnimationFrame(sample);
+  });
+  if (renderRuntime.backend === 'webgpu') {
+    await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);
+  }
+  const endingPresentation = renderRuntime.backend === 'webgpu'
+    ? renderRuntime.presentationTelemetry()
+    : null;
+  const endingSubmissionSequence = endingPresentation?.submissionSequence ?? 0;
+  const endingCompletedSequence = endingPresentation?.completedSequence ?? 0;
+  const submissionAdvances = endingSubmissionSequence - sampledCadence.startingSubmissionSequence;
+  const completionAdvances = endingCompletedSequence - sampledCadence.startingCompletedSequence;
+  const maximumSubmissionGapMs = endingPresentation?.progress.maximumSubmissionGapMs ?? 0;
+  const maximumCompletionGapMs = endingPresentation?.progress.maximumCompletionGapMs ?? 0;
+  const maximumPendingForMs = endingPresentation?.progress.maximumPendingForMs ?? 0;
+  const maximumCompletionLatencyMs = endingPresentation?.progress.maximumCompletionLatencyMs ?? 0;
+  const drained = renderRuntime.backend === 'webgl2' || (
+    submissionAdvances > 0
+    && completionAdvances > 0
+    && endingCompletedSequence === endingSubmissionSequence
+    && maximumSubmissionGapMs <= hitchThresholdMs
+    && maximumCompletionGapMs <= hitchThresholdMs
+    && maximumPendingForMs <= hitchThresholdMs
+    && maximumCompletionLatencyMs <= hitchThresholdMs
+  );
+  lastMatchAdmissionCadence = Object.freeze({
+    ...sampledCadence,
+    endingSubmissionSequence,
+    endingCompletedSequence,
+    submissionAdvances,
+    completionAdvances,
+    maximumSubmissionGapMs,
+    maximumCompletionGapMs,
+    maximumPendingForMs,
+    maximumCompletionLatencyMs,
+    drained,
+    admittedDegraded: sampledCadence.admittedDegraded || !drained,
   });
   // Never bounce a player back to the menu merely because a browser cadence
   // sample was degraded. The exact-SHA cold WebGPU release gate rejects a
@@ -2442,12 +2548,19 @@ async function configurePlayableArenaVisuals(arenaId: ArenaId, root: THREE.Group
   applySelectedArenaVisualDefinition(module.definition);
   if (renderRuntime.backend === 'webgpu') {
     if (pass64TslSystems) pass64TslSystems.applyDefinition(module.definition);
-    else pass64TslSystems = createPass64TslSceneSystems(scene, camera, renderRuntime.renderPipeline, module.definition, {
-      principalSamples: graphicsRuntime.antialiasSamples === 4 ? 4 : graphicsRuntime.antialiasSamples === 2 ? 2 : 1,
-      volumetricScale: graphicsRuntime.volumetricScale,
-      ambientOcclusion: graphicsRuntime.ambientOcclusion,
-      post: graphicsRuntime.post,
-    });
+    else {
+      pass64TslSystems = createPass64TslSceneSystems(scene, camera, renderRuntime.renderPipeline, module.definition, {
+        principalSamples: graphicsRuntime.antialiasSamples === 4 ? 4 : graphicsRuntime.antialiasSamples === 2 ? 2 : 1,
+        volumetricScale: graphicsRuntime.volumetricScale,
+        ambientOcclusion: graphicsRuntime.ambientOcclusion,
+        post: graphicsRuntime.post,
+      });
+      // Menu preparation retains and decodes every viewmodel against the
+      // renderer's bootstrap output. Only this first real TSL/HDR graph creation
+      // invalidates that pipeline-dependent GPU receipt; the retained models
+      // are re-prewarmed below without another asset load.
+      weaponView.invalidateBrowserWeaponGpuReadinessForPipelineChange();
+    }
     appliedTslArenaDefinitions += 1;
     renderRuntime.setRenderTargetTelemetry(pass64TslSystems.principalHdrTarget.samples, pass64TslSystems.bloomSamples);
     const traversal = auditRuntimeTslTraversal(scene, pass64TslSystems.compiledPipelineIds);
@@ -8755,14 +8868,6 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
     setStatus(`Preparing ${selectedArena.displayName} operators and viewmodel…`);
     if (renderRuntime.backend === 'webgpu') {
       await settleWebGpuPresentation('Initial match');
-      // Initial-match admission may lower the internal render scale and resize
-      // Three's HDR context. Smoke, projectile and support pipelines compiled
-      // before that final context can otherwise rebuild when first combined in
-      // combat. Rehearse them after the final context settles, while the opaque
-      // deployment surface still owns presentation.
-      await smokeVolumePresentationPool.prewarm(renderRuntime, camera, -killstreakMatchEpoch);
-      await prewarmExplosiveBoltPresentation(-killstreakMatchEpoch);
-      await killstreakPresentation.prewarm(renderRuntime, camera, -killstreakMatchEpoch);
       restoreCorpsePoolPrewarm();
       // Match-only operators, support pools and their prewarm bookkeeping are
       // created immediately before this boundary. Keep the opaque deployment
@@ -8779,6 +8884,10 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
     restoreCorpsePoolPrewarm();
     renderSubmissionPaused = priorRenderSubmissionPaused;
   }
+  // Admission can legitimately span several seconds of cold renderer work.
+  // None of that scheduler time may enter the first live simulation delta.
+  lastFrame = performance.now();
+  accumulator = 0;
   matchWebGpuQualityFrozen = shouldFreezeAdaptiveQualityForMatch(renderRuntime.backend);
   resetWebGpuPresentationEpoch('match admitted', performance.now());
   gameStarted = true;
@@ -19858,52 +19967,44 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
     bootstrapStage = 'prewarming-batched-presentations';
     profileArenaTransition('prewarm-batched-effects');
     const startedAt = performance.now();
-    const groups: Array<{ name: string; startedAt: number; completedAt: number; durationMs: number }> = [];
-    const runGroup = async (name: string, operation: () => Promise<unknown>): Promise<void> => {
+    const runGroup = async (name: string, operation: () => Promise<unknown>) => {
       const groupStartedAt = performance.now();
       await operation();
       const completedAt = performance.now();
-      groups.push({
+      return {
         name,
         startedAt: groupStartedAt,
         completedAt,
         durationMs: Number((completedAt - groupStartedAt).toFixed(3)),
-      });
+      };
     };
-    // Keep exact-scene coalescing within small compatible families, then end
-    // the browser task before staging the next family. Coalescing all eleven
-    // roots produced a measured 1.17s node/pipeline build on native WebGPU.
-    await runGroup('tracers-impacts', () => Promise.all([
-      tracerPool.prewarm(renderRuntime, camera, sceneGeneration),
-      impactPresentation.prewarm(renderRuntime, camera, sceneGeneration),
-    ]));
-    await yieldDeploymentPrewarmFrame();
-    await runGroup('explosions', () => Promise.all([
-      grenadeExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration),
-      supportExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration),
-    ]));
-    await yieldDeploymentPrewarmFrame();
-    await runGroup('death-drops', () => deathDropPresentationPool.prewarm(
-      renderRuntime, camera, player.weapon,
-    ));
-    await yieldDeploymentPrewarmFrame();
-    await runGroup('world-ordnance', () => prewarmGrenadeWorldPresentations(sceneGeneration));
-    await yieldDeploymentPrewarmFrame();
-    await runGroup('nuke-overdrive-bolts', () => Promise.all([
-      prewarmNukePresentation(),
-      prewarmOverdrivePresentation(),
-      prewarmExplosiveBoltPresentation(sceneGeneration),
-    ]));
-    await yieldDeploymentPrewarmFrame();
-    await runGroup('smoke-volumes', () => smokeVolumePresentationPool.prewarm(
-      renderRuntime, camera, sceneGeneration,
-    ));
-    await yieldDeploymentPrewarmFrame();
-    // Killstreak prewarm retains its own exact vocabulary, three LOD bands,
-    // 24-drone formation and possessed-cockpit submissions.
-    await runGroup('killstreak-vocabulary', () => killstreakPresentation.prewarm(
-      renderRuntime, camera, sceneGeneration,
-    ));
+    const groupDefinitions = [
+      ['tracers-impacts', () => Promise.all([
+        tracerPool.prewarm(renderRuntime, camera, sceneGeneration),
+        impactPresentation.prewarm(renderRuntime, camera, sceneGeneration),
+      ])],
+      ['explosions', () => Promise.all([
+        grenadeExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration),
+        supportExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration),
+      ])],
+      ['death-drops', () => deathDropPresentationPool.prewarm(renderRuntime, camera, player.weapon)],
+      ['world-ordnance', () => prewarmGrenadeWorldPresentations(sceneGeneration)],
+      ['nuke-overdrive-bolts', () => Promise.all([
+        prewarmNukePresentation(),
+        prewarmOverdrivePresentation(),
+        prewarmExplosiveBoltPresentation(sceneGeneration),
+      ])],
+      ['smoke-volumes', () => smokeVolumePresentationPool.prewarm(renderRuntime, camera, sceneGeneration)],
+      // This retains the complete vehicle/effect vocabulary, three authored LOD
+      // bands, 24-drone formation and possessed-cockpit submissions. Its
+      // internal CPU yields naturally place later exact draws in bounded waves.
+      ['killstreak-vocabulary', () => killstreakPresentation.prewarm(renderRuntime, camera, sceneGeneration)],
+    ] as const;
+    // Start every compatible family in one call stack. RenderRuntime coalesces
+    // their first exact roots into one masked TSL/HDR submission, while
+    // Promise.all preserves the seven-name evidence order regardless of which
+    // family completes first.
+    const groups = await Promise.all(groupDefinitions.map(([name, operation]) => runGroup(name, operation)));
     lastArenaEffectPrewarmProfile = Object.freeze({
       sceneGeneration,
       durationMs: Number((performance.now() - startedAt).toFixed(3)),

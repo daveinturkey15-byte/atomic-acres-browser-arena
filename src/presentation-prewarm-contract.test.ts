@@ -194,24 +194,19 @@ describe('presentation prewarm startup contract', () => {
     expect(sharedAssets).toContain("await runPhase('first-person-catalog'");
     expect(sharedAssets).toContain("await runPhase('world-drop-corpus'");
     expect(source).toContain('menuDeploymentAssetsProfile: lastMenuDeploymentAssetsProfile');
-    expect(arenaPresentationPrewarm).toContain("await runGroup('tracers-impacts'");
-    expect(arenaPresentationPrewarm).toContain("await runGroup('death-drops'");
-    expect(arenaPresentationPrewarm).toContain("await runGroup('world-ordnance'");
-    expect(arenaPresentationPrewarm).not.toContain("runGroup('world-drops-ordnance'");
-    expect(arenaPresentationPrewarm).toContain("await runGroup('killstreak-vocabulary'");
-    expect(arenaPresentationPrewarm).toContain('await yieldDeploymentPrewarmFrame();');
-    expect(matchDeployment).toContain('await killstreakPresentation.prewarm(renderRuntime, camera, -killstreakMatchEpoch);');
-    expect(matchDeployment).toContain('await smokeVolumePresentationPool.prewarm(renderRuntime, camera, -killstreakMatchEpoch);');
-    expect(matchDeployment).toContain('await prewarmExplosiveBoltPresentation(-killstreakMatchEpoch);');
-    expect(matchDeployment.indexOf('await spawnBots()'))
-      .toBeLessThan(matchDeployment.indexOf('await killstreakPresentation.prewarm(renderRuntime, camera, -killstreakMatchEpoch);'));
+    expect(arenaPresentationPrewarm).toContain("['tracers-impacts', () => Promise.all([");
+    expect(arenaPresentationPrewarm).toContain("['death-drops', () => deathDropPresentationPool.prewarm(");
+    expect(arenaPresentationPrewarm).toContain("['world-ordnance', () => prewarmGrenadeWorldPresentations(sceneGeneration)]");
+    expect(arenaPresentationPrewarm).not.toContain("['world-drops-ordnance'");
+    expect(arenaPresentationPrewarm).toContain("['killstreak-vocabulary', () => killstreakPresentation.prewarm(");
+    expect(arenaPresentationPrewarm).toContain('const groups = await Promise.all(groupDefinitions.map(');
+    expect(arenaPresentationPrewarm).not.toContain('await yieldDeploymentPrewarmFrame();');
+    expect(matchDeployment).not.toContain('await killstreakPresentation.prewarm(renderRuntime, camera, -killstreakMatchEpoch);');
+    expect(matchDeployment).not.toContain('await smokeVolumePresentationPool.prewarm(renderRuntime, camera, -killstreakMatchEpoch);');
+    expect(matchDeployment).not.toContain('await prewarmExplosiveBoltPresentation(-killstreakMatchEpoch);');
     expect(matchDeployment).toContain("await settleWebGpuPresentation('Initial match')");
-    expect(matchDeployment.indexOf("await settleWebGpuPresentation('Initial match')"))
-      .toBeLessThan(matchDeployment.indexOf('await smokeVolumePresentationPool.prewarm(renderRuntime, camera, -killstreakMatchEpoch);'));
-    expect(matchDeployment.indexOf('await smokeVolumePresentationPool.prewarm(renderRuntime, camera, -killstreakMatchEpoch);'))
-      .toBeLessThan(matchDeployment.indexOf('await prewarmExplosiveBoltPresentation(-killstreakMatchEpoch);'));
-    expect(matchDeployment.indexOf('await prewarmExplosiveBoltPresentation(-killstreakMatchEpoch);'))
-      .toBeLessThan(matchDeployment.indexOf('await killstreakPresentation.prewarm(renderRuntime, camera, -killstreakMatchEpoch);'));
+    expect(arenaDeployment.indexOf('await prewarmArenaBoundGameplayPresentations(arenaTransitionGeneration);'))
+      .toBeLessThan(source.indexOf('async function startGame('));
     expect(matchDeployment).toContain('await waitForStableMatchAdmissionCadence();');
     expect(matchDeployment.indexOf('await waitForStableMatchAdmissionCadence();'))
       .toBeLessThan(matchDeployment.indexOf('gameStarted = true;'));
@@ -299,13 +294,19 @@ describe('presentation prewarm startup contract', () => {
     expect(cadenceAdmission).toContain('admittedDegraded: true');
     expect(cadenceAdmission).toContain('visibilityState: document.visibilityState');
     expect(cadenceAdmission).toContain('documentHasFocus: document.hasFocus()');
-    expect(cadenceAdmission).not.toContain('reject(');
-    expect(cadenceAdmission).not.toContain('throw new Error(');
+    expect(cadenceAdmission).toContain('reject(new Error(`Match admission renderer was ${presentation.status}');
+    expect(cadenceAdmission).toContain('reject(error);');
+    expect(cadenceAdmission).toContain("submitWebGpuFrame(now, false, 'warmed-live')");
+    expect(cadenceAdmission).toContain('progress.submissionAdvances > 0');
+    expect(cadenceAdmission).toContain('progress.completionAdvances > 0');
+    expect(cadenceAdmission).toContain('endingCompletedSequence === endingSubmissionSequence');
+    expect(cadenceAdmission).toContain('maximumCompletionLatencyMs <= hitchThresholdMs');
+    expect(cadenceAdmission).toContain('admittedDegraded: sampledCadence.admittedDegraded || !drained');
     expect(cadenceAdmission).toContain('exact-SHA cold WebGPU release gate rejects');
     expect(source).toContain('matchAdmissionCadence: lastMatchAdmissionCadence');
     expect(source).toContain('submitWebGpuFrame(performance.now(), true)');
     expect(matchDeployment.indexOf("await settleWebGpuPresentation('Initial match');"))
-      .toBeLessThan(matchDeployment.indexOf('await smokeVolumePresentationPool.prewarm('));
+      .toBeLessThan(matchDeployment.indexOf('await waitForStableMatchAdmissionCadence();'));
     expect(arenaDeployment).toContain('await withArenaFrustumCullingDisabled(presentationRoot, async () => {');
     expect(arenaDeployment.indexOf('withArenaFrustumCullingDisabled(presentationRoot'))
       .toBeLessThan(arenaDeployment.indexOf('auditArenaRenderLiveness('));
@@ -660,8 +661,14 @@ describe('presentation prewarm startup contract', () => {
   it('rejects degraded foreground cadence in the cold physical-menu gate', () => {
     const source = readFileSync(new URL('../scripts/qa/verify-pass65-cold-webgpu-admission.mjs', import.meta.url), 'utf8');
     expect(source).toContain("state.bootstrap.stage === 'failed'");
-    expect(source).toContain('after.bootstrap.matchAdmissionCadence.admittedDegraded !== false');
-    expect(source).toContain("after.bootstrap.matchAdmissionCadence.visibilityState !== 'visible'");
+    expect(source).toContain('admissionCadence.admittedDegraded !== false');
+    expect(source).toContain("admissionCadence.visibilityState !== 'visible'");
+    expect(source).toContain("admissionCadence.backend !== 'webgpu'");
+    expect(source).toContain('admissionCadence.drained !== true');
+    expect(source).toContain('admissionCadence.submissionAdvances <= 0');
+    expect(source).toContain('admissionCadence.completionAdvances <= 0');
+    expect(source).toContain('admissionCadence.endingCompletedSequence !== admissionCadence.endingSubmissionSequence');
+    expect(source).toContain('admissionCadence.maximumCompletionLatencyMs > maximumAdmissionGapMs');
     expect(source).toContain('const maximumColdTransitionMs = 10_000;');
     expect(source).toContain('const maximumMenuDeploymentPrewarmMs = 10_000;');
     expect(source).toContain('const maximumPreparedSwitchFrameMs = 50;');
