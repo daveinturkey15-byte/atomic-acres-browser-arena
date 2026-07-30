@@ -54,6 +54,12 @@ function checkpoint(overrides = {}) {
       residentArenaRoots: 1,
       activeRoots: ['atomic-acres'],
     },
+    playableScene: {
+      arenaId: 'atomic-acres',
+      authoritativeArenaRoots: 1,
+      authoritativeArenaRootIsGameplayRoot: true,
+      duplicateArenaRoots: false,
+    },
     transition: {
       generation: 1,
       phase: 'preparing',
@@ -157,6 +163,10 @@ test('persists every named gate checkpoint into failure evidence without changin
     assert.match(verifierSource, new RegExp(`${field}: state\\.arenaSelection\\.streaming\\.${field}`));
   }
   assert.match(verifierSource, /activeRoots: state\.arenaSelection\.activeRoots/);
+  assert.match(verifierSource, /arenaId: state\.render\.playableScene\.arena\?\.arenaId \?\? null/);
+  for (const field of ['authoritativeArenaRoots', 'authoritativeArenaRootIsGameplayRoot', 'duplicateArenaRoots']) {
+    assert.match(verifierSource, new RegExp(`${field}: state\\.render\\.playableScene\\.${field}`));
+  }
   for (const field of ['generation', 'phase', 'failure', 'renderSubmissionPaused', 'profile']) {
     assert.match(verifierSource, new RegExp(`${field}: transition\\.${field}`));
   }
@@ -296,7 +306,7 @@ test('rejects a phase-only claim and incomplete or self-reordered retained weapo
   }).join(' | '), /did not commit the exact 18-weapon retained catalog/);
 });
 
-test('accepts one healthy foreground recovery of the same generation and root', () => {
+test('accepts one healthy Quality foreground recovery with a hidden procedural cache root and one canonical authority root', () => {
   const beforeRelease = checkpoint();
   const afterHidden = checkpoint();
   const recovered = checkpoint({
@@ -323,6 +333,13 @@ test('accepts one healthy foreground recovery of the same generation and root', 
       phase: 'idle',
       renderSubmissionPaused: false,
     },
+    streaming: {
+      ...beforeRelease.streaming,
+      // Quality art intentionally presents while the collision-authority
+      // procedural root stays hidden; this legacy visibility list is
+      // diagnostic and must not redefine scene-root authority.
+      activeRoots: [],
+    },
   });
   assert.deepEqual(recoveredCheckpointFailures({
     beforeRelease,
@@ -339,5 +356,47 @@ test('accepts one healthy foreground recovery of the same generation and root', 
       streaming: { ...recovered.streaming, residentArenaRoots: 2 },
     },
     maximumRecoveryMs: 20_000,
-  }).join(' | '), /exactly one lifecycle recovery.*exactly one active Atomic Acres root/);
+  }).join(' | '), /exactly one lifecycle recovery.*exactly one authoritative Atomic Acres gameplay root/);
+});
+
+test('rejects zero, duplicate, wrong-arena and non-gameplay authoritative recovery roots', () => {
+  const beforeRelease = checkpoint();
+  const afterHidden = checkpoint();
+  const recovered = checkpoint({
+    document: { visibilityState: 'visible', hasFocus: true },
+    coverDocument: { visibilityState: 'hidden', hasFocus: false },
+    gameStarted: true,
+    matchPhase: 'active',
+    foregroundRecoveryMs: 8_400,
+    presentationScheduling: { mode: 'foreground-presentation', recoveryCount: 1 },
+    admission: { matchAdmissionGeneration: 1, presentedGameplayFrame: 12 },
+    audio: { contexts: [{ state: 'running' }], suspendCalls: 1, resumeCalls: 2 },
+    bootstrap: {
+      matchAdmissionCadence: {
+        backend: 'webgpu',
+        admittedDegraded: false,
+        visibilityState: 'visible',
+        drained: true,
+        endingSubmissionSequence: 12,
+        endingCompletedSequence: 12,
+      },
+    },
+    transition: { ...beforeRelease.transition, phase: 'idle', renderSubmissionPaused: false },
+    streaming: { ...beforeRelease.streaming, activeRoots: [] },
+  });
+  const invalidTopologies = [
+    { ...recovered.playableScene, authoritativeArenaRoots: 0 },
+    { ...recovered.playableScene, authoritativeArenaRoots: 2, duplicateArenaRoots: true },
+    { ...recovered.playableScene, arenaId: 'gun-range' },
+    { ...recovered.playableScene, authoritativeArenaRootIsGameplayRoot: false },
+    { ...recovered.playableScene, duplicateArenaRoots: true },
+  ];
+  for (const playableScene of invalidTopologies) {
+    assert.match(recoveredCheckpointFailures({
+      beforeRelease,
+      afterHidden,
+      recovered: { ...recovered, playableScene },
+      maximumRecoveryMs: 20_000,
+    }).join(' | '), /exactly one authoritative Atomic Acres gameplay root/);
+  }
 });

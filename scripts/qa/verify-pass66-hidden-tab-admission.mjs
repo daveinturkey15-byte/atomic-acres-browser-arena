@@ -385,6 +385,12 @@ const snapshotExpression = `(() => {
         duration: entry.duration,
         decodedBodySize: 'decodedBodySize' in entry ? entry.decodedBodySize : null,
       })),
+    playableScene: {
+      arenaId: state.render.playableScene.arena?.arenaId ?? null,
+      authoritativeArenaRoots: state.render.playableScene.authoritativeArenaRoots,
+      authoritativeArenaRootIsGameplayRoot: state.render.playableScene.authoritativeArenaRootIsGameplayRoot,
+      duplicateArenaRoots: state.render.playableScene.duplicateArenaRoots,
+    },
     streaming: {
       constructionCount: state.arenaSelection.streaming.constructionCount,
       constructionHistory: state.arenaSelection.streaming.constructionHistory,

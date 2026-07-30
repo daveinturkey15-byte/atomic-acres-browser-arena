@@ -180,9 +180,11 @@ export function recoveredCheckpointFailures({ beforeRelease, afterHidden, recove
   }
   if (recovered.streaming.constructionCount !== 1
     || recovered.streaming.residentArenaRoots !== 1
-    || recovered.streaming.activeRoots.length !== 1
-    || recovered.streaming.activeRoots[0] !== 'atomic-acres') {
-    failures.push('foreground recovery did not retain exactly one active Atomic Acres root');
+    || recovered.playableScene?.arenaId !== 'atomic-acres'
+    || recovered.playableScene?.authoritativeArenaRoots !== 1
+    || recovered.playableScene?.authoritativeArenaRootIsGameplayRoot !== true
+    || recovered.playableScene?.duplicateArenaRoots !== false) {
+    failures.push('foreground recovery did not retain exactly one authoritative Atomic Acres gameplay root');
   }
   if (!recovered.gameStarted || recovered.matchPhase === 'ended'
     || recovered.transition.phase !== 'idle' || recovered.transition.failure !== null
