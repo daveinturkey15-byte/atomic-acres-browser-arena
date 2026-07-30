@@ -14,6 +14,7 @@ import { PASS66_RELEASE_IDENTITY } from '../release-identity';
 import { advancedGraphicsMarkup } from './advanced-graphics-controls';
 import './advanced-graphics.css';
 import { menuPreviewVideoDefinition, menuPreviewVideoMarkup } from './menu-preview-video';
+import { weaponMenuPresentationMarkup } from './field-kit-weapon-presentation';
 
 export type Pass64ShellViewModel = Readonly<{
   playerName: string;
@@ -57,18 +58,22 @@ function fieldKitCardsMarkup(): string {
       return `<span><small>${label}</small><i style="--kit-stat:${value * 20}%"></i><b>${value}</b></span>`;
     }).join('')}</div>
     <i>${kit.traits.join(' · ')}</i>
+    ${weaponMenuPresentationMarkup(kit.weapon)}
     <em>SELECTED</em>
   </button>`).join('');
 }
 
 function customPresetCardsMarkup(): string {
+  const defaultPrimaryIds = ['m4a1', 'mp5', 'm14-ebr'] as const;
   const cards = [1, 2, 3].map((index) => `<button type="button" class="kit-card custom-kit-card" data-custom-preset-id="custom-${index}" aria-pressed="false">
     <span>CUSTOM LOADOUT // 0${index}</span>
     <strong data-custom-name>Custom ${index}</strong>
     <b data-custom-equipment>CONFIGURE PRIMARY · SECONDARY · GRENADE</b>
     <div class="kit-weapon-silhouette" data-weapon-family="custom" aria-hidden="true"><i></i><i></i><i></i></div>
     <p>Persistent operator-defined equipment. Changes queue safely for the next deployment.</p>
-    <i>1 primary · 1 secondary · 1 grenade</i><em>SELECTED</em>
+    <i>1 primary · 1 secondary · 1 grenade</i>
+    ${weaponMenuPresentationMarkup(defaultPrimaryIds[index - 1]!)}
+    <em>SELECTED</em>
   </button>`).join('');
   return `${cards}<button id="loadout-manage" type="button" class="kit-card manage-kit-card" aria-controls="loadout-manager" aria-expanded="false">
     <span>LOADOUT ADMIN</span><strong>Manage/Rename</strong><b>EDIT THE THREE CUSTOM SLOTS</b>

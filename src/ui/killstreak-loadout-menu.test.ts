@@ -11,6 +11,8 @@ describe('killstreak loadout menu projection', () => {
     }
     expect(html).toContain('Slots 3 and 4 must be different');
     expect(html).toContain('Nuke and Drone Swarm share slot 5');
+    expect(html).toContain('class="killstreak-loadout-layout"');
+    expect(html).toContain('id="killstreak-demo-rail"');
+    expect(html).not.toContain('<canvas');
   });
 });
-

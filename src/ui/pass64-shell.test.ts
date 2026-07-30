@@ -46,6 +46,10 @@ describe('Pass 66 command shell', () => {
     expect(markup).toContain('<option value="smoke">Smoke</option>');
     expect(markup).toContain('<option value="flash">Flashbang</option>');
     expect(markup).toContain('<option value="semtex">Semtex</option>');
+    expect(markup.match(/data-weapon-presentation/g)).toHaveLength(7);
+    expect(markup.match(/data-weapon-metric="damage"/g)).toHaveLength(7);
+    expect(markup).toContain('pass65-firearms/carbine-hero-quarter.webp');
+    expect(markup).toContain('pass65-firearms/m4a1-hero-quarter.webp');
   });
 
   it('exposes four simple graphics modes and keeps WebGPU tuning under Advanced Graphics', () => {

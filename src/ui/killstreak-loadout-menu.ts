@@ -7,6 +7,10 @@ import {
   DEFAULT_KILLSTREAK_LOADOUT,
   type KillstreakLoadoutController,
 } from '../killstreak-loadout';
+import {
+  bindKillstreakDemoRail,
+  killstreakDemoRailMarkup,
+} from './killstreak-demo-presentation';
 
 function escapeHtml(value: string): string {
   return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
@@ -26,15 +30,19 @@ export function killstreakLoadoutPanelMarkup(): string {
     return `<label class="killstreak-slot-card" data-killstreak-slot-card="${slot.slot}">
       <span>SLOT ${slot.slot} · KEY ${slot.slot + 2}</span>
       <strong>${family}</strong>
-      <div class="killstreak-demo" data-killstreak-preview="${slot.slot}" aria-hidden="true"><i></i><b></b><em></em><small>TACTICAL DEMO</small></div>
-      <select data-killstreak-slot="${slot.slot}" aria-label="Killstreak slot ${slot.slot}">${options}</select>
-      <small data-killstreak-detail="${slot.slot}"></small>
+      <select data-killstreak-slot="${slot.slot}" aria-label="Killstreak slot ${slot.slot}" aria-describedby="killstreak-detail-${slot.slot}">${options}</select>
+      <small id="killstreak-detail-${slot.slot}" data-killstreak-detail="${slot.slot}"></small>
     </label>`;
   }).join('');
   return `<div id="menu-panel-streaks" class="menu-panel" role="tabpanel" aria-labelledby="menu-tab-streaks" data-menu-panel="streaks" hidden>
     <div class="kit-heading"><div><b>KILLSTREAKS</b><span>Five family-constrained rewards. Selection locks when the match starts.</span></div><small>Slots 3 and 4 must be different · Nuke and Drone Swarm share slot 5.</small></div>
-    <div class="killstreak-slot-grid">${slots}</div>
-    <p id="killstreak-loadout-status" class="killstreak-loadout-status" aria-live="polite">LOADOUT READY · KEYS 3–7 FOLLOW SLOT ORDER</p>
+    <div class="killstreak-loadout-layout">
+      <section class="killstreak-equipped-chain" aria-label="Equipped killstreak chain">
+        <div class="killstreak-slot-grid">${slots}</div>
+        <p id="killstreak-loadout-status" class="killstreak-loadout-status" aria-live="polite">LOADOUT READY · KEYS 3–7 FOLLOW SLOT ORDER</p>
+      </section>
+      ${killstreakDemoRailMarkup(DEFAULT_KILLSTREAK_LOADOUT.slots[0])}
+    </div>
   </div>`;
 }
 
@@ -63,7 +71,16 @@ export function bindKillstreakLoadoutMenu(
 ): KillstreakMenuBinding {
   const selects = [...root.querySelectorAll<HTMLSelectElement>('[data-killstreak-slot]')];
   const status = root.querySelector<HTMLElement>('#killstreak-loadout-status');
+  const demo = bindKillstreakDemoRail(root, controller.selected.slots[0]);
   let matchActive = false;
+  let previewedSlot = 1;
+  const previewSlot = (select: HTMLSelectElement): void => {
+    previewedSlot = Number(select.dataset.killstreakSlot);
+    demo.show(select.value as Pass65KillstreakId);
+    root.querySelectorAll<HTMLElement>('[data-killstreak-slot-card]').forEach((card) => {
+      card.classList.toggle('is-previewed', Number(card.dataset.killstreakSlotCard) === previewedSlot);
+    });
+  };
   const sync = (): void => {
     const selected = controller.selected;
     selects.forEach((select, index) => {
@@ -73,11 +90,16 @@ export function bindKillstreakLoadoutMenu(
       for (const option of [...select.options]) option.disabled = otherHeavy !== null && option.value === otherHeavy;
     });
     renderDetails(root, controller);
+    const activePreview = selects.find((select) => Number(select.dataset.killstreakSlot) === previewedSlot) ?? selects[0];
+    if (activePreview) previewSlot(activePreview);
     if (status) status.textContent = matchActive
       ? 'MATCH ACTIVE · SELECTION FROZEN'
       : 'LOADOUT SAVED · KEYS 3–7 FOLLOW SLOT ORDER';
   };
   for (const select of selects) {
+    const card = select.closest<HTMLElement>('[data-killstreak-slot-card]');
+    card?.addEventListener('pointerenter', () => previewSlot(select));
+    card?.addEventListener('focusin', () => previewSlot(select));
     select.addEventListener('change', () => {
       const slot = Number(select.dataset.killstreakSlot) as 1 | 2 | 3 | 4 | 5;
       const id = select.value as Pass65KillstreakId;
@@ -87,6 +109,7 @@ export function bindKillstreakLoadoutMenu(
       } catch (error) {
         if (status) status.textContent = error instanceof Error ? error.message.toUpperCase() : 'SELECTION REJECTED';
       }
+      previewSlot(select);
       sync();
     });
   }

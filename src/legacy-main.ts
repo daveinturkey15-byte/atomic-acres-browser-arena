@@ -66,6 +66,7 @@ import { latestChangelogEntry } from './changelog';
 import { bindReleaseHistoryDialog } from './ui/release-history-dialog';
 import { bindProjectMapDialog } from './ui/project-map-dialog';
 import { bindKillstreakLoadoutMenu, type KillstreakMenuBinding } from './ui/killstreak-loadout-menu';
+import { applyWeaponMenuPresentation } from './ui/field-kit-weapon-presentation';
 import { assertUiSurfaceInventory } from './ui/surface-registry';
 import { createPass64ShellViewModel, renderPass64Shell } from './ui/pass64-shell';
 import { bindAdvancedGraphicsControls } from './ui/advanced-graphics-controls';
@@ -5594,6 +5595,8 @@ function renderFieldKitSelection(): void {
     if (equipmentLabel && preset) {
       equipmentLabel.textContent = `${WEAPONS[preset.primary as WeaponId].name} · ${WEAPONS[preset.secondary as WeaponId].name} · ${preset.grenade.toUpperCase()}`;
     }
+    const presentation = card.querySelector<HTMLElement>('[data-weapon-presentation]');
+    if (presentation && preset) applyWeaponMenuPresentation(presentation, preset.primary as WeaponId);
   });
   renderCustomLoadoutEditor();
 }

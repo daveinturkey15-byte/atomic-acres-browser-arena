@@ -42,4 +42,13 @@ describe('Pass 66 dense-surface readability contract', () => {
     expect(css).toContain('#menu-panel-options .audio-setting-row');
     expect(css).toContain('color: #c4d8d7');
   });
+
+  it('keeps Field Kit metrics and the killstreak demo rail responsive and motion-safe', () => {
+    expect(css).toContain('.weapon-menu-presentation');
+    expect(css).toContain('.weapon-menu-metric[data-weapon-metric=\'recoil-load\']');
+    expect(css).toContain('.killstreak-loadout-layout');
+    expect(css).toContain('.killstreak-demo-rail[data-motion=\'poster\']');
+    expect(css).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(css).toMatch(/@media \(max-width: 900px\)[\s\S]*\.killstreak-loadout-layout \{ grid-template-columns: 1fr; \}/u);
+  });
 });

@@ -252,6 +252,358 @@
 #advanced-graphics .advanced-graphics-unavailable > small,
 #advanced-graphics .advanced-graphics-range output { font-size: var(--pass66-micro); }
 
+/* HF-182/HF-183: asset-backed Field Kit inspection with catalog-derived,
+ * independently labelled combat facts. The bars visualize each stated value;
+ * there is deliberately no synthetic balance/quality score. */
+#menu-panel-kit .kit-card:not(.manage-kit-card) {
+  min-height: 430px;
+}
+
+.weapon-menu-presentation {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.78fr) minmax(210px, 1.22fr);
+  gap: 14px;
+  margin-top: 18px;
+  padding: 14px;
+  border: 1px solid rgba(112, 238, 225, 0.2);
+  background:
+    radial-gradient(circle at 92% 4%, rgba(112, 238, 225, 0.08), transparent 38%),
+    linear-gradient(145deg, #0b171d, #071116);
+  text-align: left;
+}
+
+.weapon-menu-still {
+  position: relative;
+  min-width: 0;
+  min-height: 178px;
+  overflow: hidden;
+  border: 1px solid rgba(112, 238, 225, 0.24);
+  background: #0b141a;
+}
+
+.weapon-menu-still::after {
+  content: 'ASSET-BACKED STILL';
+  position: absolute;
+  left: 8px;
+  bottom: 7px;
+  padding: 4px 6px;
+  background: rgba(4, 10, 14, 0.82);
+  color: #84eee4;
+  font: 800 var(--pass66-micro)/1 var(--ui-copy, Inter, sans-serif);
+  letter-spacing: 0.1em;
+}
+
+.weapon-menu-still img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 178px;
+  object-fit: cover;
+  object-position: center;
+  filter: saturate(0.82) contrast(1.06) brightness(0.88);
+}
+
+.weapon-menu-stat-deck,
+.weapon-menu-metrics,
+.weapon-menu-metric,
+.weapon-menu-metric > span,
+.weapon-menu-stat-heading {
+  display: grid;
+}
+
+.weapon-menu-stat-deck { align-content: start; gap: 9px; min-width: 0; }
+.weapon-menu-stat-heading { gap: 3px; }
+.weapon-menu-stat-heading > b {
+  overflow: hidden;
+  color: #f2fbfa;
+  font: 900 var(--pass66-label)/1 var(--ui-display, 'Barlow Condensed', sans-serif);
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.weapon-menu-stat-heading > small {
+  color: #79b9b6;
+  font: 800 var(--pass66-micro)/1.25 var(--ui-copy, Inter, sans-serif);
+  letter-spacing: 0.07em;
+}
+
+.weapon-menu-metrics {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 11px;
+}
+
+.weapon-menu-metric { min-width: 0; gap: 4px; }
+.weapon-menu-metric > span {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: end;
+}
+.weapon-menu-metric b,
+.weapon-menu-metric strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.weapon-menu-metric b {
+  color: #8ba5a7;
+  font: 800 var(--pass66-micro)/1 var(--ui-copy, Inter, sans-serif);
+  letter-spacing: 0.08em;
+}
+.weapon-menu-metric strong {
+  color: #eff8f7;
+  font: 900 var(--pass66-micro)/1 var(--ui-copy, Inter, sans-serif);
+  font-variant-numeric: tabular-nums;
+}
+.weapon-menu-metric > i {
+  height: 5px;
+  overflow: hidden;
+  background: rgba(142, 167, 170, 0.17);
+}
+.weapon-menu-metric > i > i {
+  display: block;
+  width: var(--weapon-metric-fill, 0%);
+  height: 100%;
+  background: linear-gradient(90deg, #2daeb1, #78eee2);
+}
+.weapon-menu-metric[data-weapon-metric='recoil-load'] > i > i,
+.weapon-menu-metric[data-weapon-metric='ads-cone'] > i > i {
+  background: linear-gradient(90deg, #ffca57, #ff735f);
+}
+
+/* HF-184/HF-185: readable equipped chain plus a bounded local presentation
+ * rail. It owns only DOM/poster media and never submits the gameplay renderer. */
+#menu-panel-streaks {
+  padding: 34px;
+  overflow: auto;
+  background:
+    radial-gradient(circle at 80% 14%, rgba(0, 109, 116, 0.08), transparent 30%),
+    rgba(248, 250, 246, 0.94);
+}
+
+#menu.pass64-command-deck:has(#menu-panel-streaks.active) {
+  width: auto;
+}
+
+.killstreak-loadout-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.42fr) minmax(310px, 0.78fr);
+  align-items: start;
+  gap: 18px;
+}
+
+.killstreak-equipped-chain { min-width: 0; }
+.killstreak-slot-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.killstreak-slot-card {
+  min-height: 146px;
+  padding: 17px;
+  border-color: rgba(101, 220, 216, 0.18);
+  background:
+    radial-gradient(circle at 100% 0, rgba(112, 238, 225, 0.08), transparent 42%),
+    linear-gradient(145deg, #0c1a20, #071116);
+  box-shadow: 0 12px 28px rgba(7, 20, 24, 0.12);
+}
+.killstreak-slot-card:nth-child(5) { grid-column: 1 / -1; }
+.killstreak-slot-card.is-previewed {
+  border-color: var(--killstreak-demo-accent, #70eee1);
+  box-shadow: inset 3px 0 var(--killstreak-demo-accent, #70eee1), 0 15px 34px rgba(7, 20, 24, 0.2);
+}
+.killstreak-slot-card > span { color: #72e4e0; }
+.killstreak-slot-card > strong { min-height: 0; color: #f2fbfa; }
+.killstreak-slot-card small { color: #a3b8ba; }
+.killstreak-slot-card select {
+  min-height: 44px;
+  border-color: rgba(112, 238, 225, 0.28);
+  background: #101f25;
+  color: #f1faf9;
+}
+
+.killstreak-demo-rail {
+  position: sticky;
+  top: 0;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--killstreak-demo-accent) 45%, #31464c);
+  background:
+    radial-gradient(circle at 86% 4%, color-mix(in srgb, var(--killstreak-demo-accent) 15%, transparent), transparent 35%),
+    linear-gradient(145deg, #0b171d, #050d11);
+  box-shadow: 0 20px 46px rgba(4, 12, 16, 0.25);
+  color: #eff9f8;
+}
+
+.killstreak-demo-rail > header { display: grid; gap: 5px; margin-bottom: 12px; }
+.killstreak-demo-rail > header small {
+  color: var(--killstreak-demo-accent);
+  font: 800 var(--pass66-micro)/1 var(--ui-copy, Inter, sans-serif);
+  letter-spacing: 0.15em;
+}
+.killstreak-demo-rail > header strong {
+  font: 900 clamp(26px, 2vw, 38px)/0.9 var(--ui-display, 'Barlow Condensed', sans-serif);
+  letter-spacing: 0.045em;
+}
+
+.killstreak-demo-viewport {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--killstreak-demo-accent) 32%, #2b4147);
+  background: #03080b;
+}
+.killstreak-demo-viewport::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(2, 8, 11, 0.08), rgba(2, 8, 11, 0.72));
+  pointer-events: none;
+}
+.killstreak-demo-viewport > img,
+.killstreak-demo-viewport > video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(0.58) contrast(1.18) brightness(0.62);
+}
+.killstreak-demo-mode {
+  position: absolute;
+  z-index: 4;
+  left: 9px;
+  bottom: 8px;
+  padding: 4px 6px;
+  background: rgba(3, 10, 14, 0.82);
+  color: #dff8f5;
+  font: 800 var(--pass66-micro)/1 var(--ui-copy, Inter, sans-serif);
+  letter-spacing: 0.08em;
+}
+
+.killstreak-demo-choreography { position: absolute; z-index: 3; inset: 10%; color: var(--killstreak-demo-accent); }
+.killstreak-demo-choreography > i { position: absolute; display: block; }
+.demo-scan {
+  left: 50%;
+  top: 50%;
+  width: 52%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  opacity: 0.72;
+}
+.demo-scan::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 46%;
+  height: 1px;
+  transform-origin: left;
+  background: currentColor;
+}
+.demo-path { left: 8%; top: 49%; width: 84%; height: 2px; background: currentColor; box-shadow: 0 0 12px currentColor; }
+.demo-platform {
+  left: 12%;
+  top: 40%;
+  width: 34px;
+  height: 14px;
+  border: 2px solid currentColor;
+  background: rgba(5, 16, 20, 0.86);
+  clip-path: polygon(0 35%, 68% 35%, 82% 0, 100% 0, 92% 50%, 100% 100%, 82% 100%, 68% 65%, 0 65%);
+}
+.demo-payload { left: 48%; top: 46%; width: 9px; height: 9px; border: 2px solid currentColor; transform: rotate(45deg); }
+.demo-node { width: 8px; height: 8px; border: 1px solid currentColor; border-radius: 50%; background: currentColor; box-shadow: 0 0 10px currentColor; }
+.demo-node-a { left: 24%; top: 28%; }
+.demo-node-b { left: 67%; top: 35%; }
+.demo-node-c { left: 52%; top: 72%; }
+
+.killstreak-demo-rail[data-motion='animated'] .demo-scan::after { animation: killstreakDemoSweep 2.4s linear infinite; }
+.killstreak-demo-rail[data-motion='animated'] .demo-platform { animation: killstreakDemoIngress 3.2s ease-in-out infinite; }
+.killstreak-demo-rail[data-motion='animated'] .demo-payload { animation: killstreakDemoDrop 2.2s ease-in infinite; }
+.killstreak-demo-rail[data-motion='animated'] .demo-node { animation: killstreakDemoPing 1.7s ease-in-out infinite alternate; }
+.killstreak-demo-rail[data-motion='animated'] .demo-node-b { animation-delay: -0.55s; }
+.killstreak-demo-rail[data-motion='animated'] .demo-node-c { animation-delay: -1.1s; }
+.killstreak-demo-rail[data-demo-kind='adrenaline-pulse'] .demo-path,
+.killstreak-demo-rail[data-demo-kind='adrenaline-pulse'] .demo-platform,
+.killstreak-demo-rail[data-demo-kind='adrenaline-pulse'] .demo-payload { display: none; }
+.killstreak-demo-rail[data-demo-kind='tri-pass'] .demo-path { box-shadow: 0 -22px currentColor, 0 22px currentColor, 0 0 12px currentColor; }
+.killstreak-demo-rail[data-demo-kind='hunter-cluster'] .demo-path,
+.killstreak-demo-rail[data-demo-kind='hunter-cluster'] .demo-payload,
+.killstreak-demo-rail[data-demo-kind='drone-cloud'] .demo-path,
+.killstreak-demo-rail[data-demo-kind='drone-cloud'] .demo-payload { display: none; }
+.killstreak-demo-rail[data-demo-kind='nuke-warning'] .demo-platform,
+.killstreak-demo-rail[data-demo-kind='nuke-warning'] .demo-path,
+.killstreak-demo-rail[data-demo-kind='nuke-warning'] .demo-payload,
+.killstreak-demo-rail[data-demo-kind='nuke-warning'] .demo-node { display: none; }
+.killstreak-demo-rail[data-demo-kind='nuke-warning'] .demo-scan { width: 72%; border-width: 3px; box-shadow: 0 0 40px currentColor; }
+.killstreak-demo-rail[data-demo-kind='nuke-warning'] .killstreak-demo-choreography::after {
+  content: '03';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  color: #fff5ef;
+  font: 900 56px/1 var(--ui-display, 'Barlow Condensed', sans-serif);
+  text-shadow: 0 0 22px currentColor;
+}
+
+@keyframes killstreakDemoSweep { to { transform: rotate(1turn); } }
+@keyframes killstreakDemoIngress { 0%, 12% { translate: -20% 0; opacity: 0; } 28%, 72% { opacity: 1; } 88%, 100% { translate: 190px 0; opacity: 0; } }
+@keyframes killstreakDemoDrop { 0%, 35% { translate: 0 -24px; opacity: 0; } 45% { opacity: 1; } 85%, 100% { translate: 0 62px; opacity: 0; } }
+@keyframes killstreakDemoPing { from { scale: 0.7; opacity: 0.45; } to { scale: 1.25; opacity: 1; } }
+
+.killstreak-demo-rail > p {
+  margin: 13px 0;
+  color: #aec1c2;
+  font: 600 var(--pass66-copy)/1.5 var(--ui-copy, Inter, sans-serif);
+}
+.killstreak-demo-rail > ol { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.killstreak-demo-rail > ol li { display: grid; grid-template-columns: 28px 1fr; align-items: center; gap: 8px; }
+.killstreak-demo-rail > ol i {
+  display: grid;
+  place-items: center;
+  height: 24px;
+  border: 1px solid color-mix(in srgb, var(--killstreak-demo-accent) 45%, #31464c);
+  color: var(--killstreak-demo-accent);
+  font: 800 var(--pass66-micro)/1 var(--ui-copy, Inter, sans-serif);
+  font-style: normal;
+}
+.killstreak-demo-rail > ol span { color: #dce8e7; font: 700 var(--pass66-micro)/1.3 var(--ui-copy, Inter, sans-serif); }
+.killstreak-demo-rail > footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(112, 238, 225, 0.15);
+  color: #718b8e;
+  font: 800 var(--pass66-micro)/1 var(--ui-copy, Inter, sans-serif);
+  letter-spacing: 0.07em;
+}
+.killstreak-demo-rail > footer b { color: #86d5d0; }
+
+html[data-reduced-motion='true'] .killstreak-demo-choreography > i,
+html[data-reduced-motion='true'] .killstreak-demo-choreography::after,
+.killstreak-demo-rail[data-motion='poster'] .killstreak-demo-choreography > i,
+.killstreak-demo-rail[data-motion='poster'] .killstreak-demo-choreography::after {
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .killstreak-demo-choreography > i,
+  .killstreak-demo-choreography::after { animation: none !important; }
+}
+
+@media (max-width: 1180px) {
+  .weapon-menu-presentation { grid-template-columns: 1fr; }
+  .weapon-menu-still { min-height: 160px; max-height: 210px; }
+  .killstreak-loadout-layout { grid-template-columns: minmax(0, 1fr) minmax(280px, 0.72fr); }
+}
+
+@media (max-width: 900px) {
+  #menu-panel-streaks { padding: 22px; }
+  .killstreak-loadout-layout { grid-template-columns: 1fr; }
+  .killstreak-demo-rail { position: relative; }
+}
+
 @media (max-width: 700px) {
   :root {
     --pass66-micro: 10px;
@@ -269,4 +621,10 @@
   .lobby-player { min-height: 58px; }
   #menu-panel-options .audio-settings-grid { grid-template-columns: 1fr; }
   #menu-panel-options .audio-setting-row { grid-template-columns: minmax(88px, auto) minmax(100px, 1fr) auto auto; }
+  #menu-panel-kit .kit-card:not(.manage-kit-card) { min-height: 0; }
+  .weapon-menu-presentation { grid-template-columns: 1fr; }
+  .weapon-menu-metrics { grid-template-columns: 1fr; }
+  .killstreak-slot-grid { grid-template-columns: 1fr; }
+  .killstreak-slot-card:nth-child(5) { grid-column: auto; }
+  .killstreak-demo-rail > footer { display: grid; }
 }

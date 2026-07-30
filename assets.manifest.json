@@ -445,7 +445,7 @@
       "license": "Original project work",
       "files": "public/assets/original/menu-previews/*",
       "sourceScript": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
-      "sourceScriptSha256": "44123c993085db075a92fb4421d895a5884f0ab5dcb3417b6ad0ae7f1e7b7b1e",
+      "sourceScriptSha256": "cfe96df62efa7a5785030b1e5d9ab0cce8e28648eefa1ada5522189ed5229154",
       "sourceProvenance": "source-assets/menu/pass65-preview-masters/provenance.json",
       "sourceProvenanceSha256": "4042801c5fc5dc4e7bbd3d53d1dfdf25bf397e1f295eb56b6c1e4f0df5ef217f",
       "format": "Four distinct 1280x720 eight-second 30 FPS selected-map runtime captures, shipped as VP9/Opus WebM, H.264/AAC MP4 and static WebP posters, plus deterministic five-frame review evidence",
