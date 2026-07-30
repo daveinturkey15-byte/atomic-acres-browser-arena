@@ -22,6 +22,8 @@ const ACCEPTANCE_PATH = 'acceptance/pass-66.json';
 const OWNER_ARTIFACT_ROOT = 'artifacts/pass65-owner-feedback/';
 const HARDWARE_ARTIFACT_ROOT = 'artifacts/pass65/hardware-webgl2-admission/';
 const HARDWARE_WEBGL2_TEST_ID = 'T-COLD-HARDWARE-WEBGL2';
+const HARDWARE_WEBGL2_VERIFIER_ID = 'pass65-installed-chrome-hardware-webgl2-admission';
+const HARDWARE_WEBGL2_VERIFIER_VERSION = '1';
 const SHA40 = /^[0-9a-f]{40}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
@@ -294,6 +296,10 @@ export function artifactIdForTest(testId) {
   return `ART-P66-${testId.replace(/^T-/, '')}`;
 }
 
+function verifierIdForTest(testId) {
+  return testId === HARDWARE_WEBGL2_TEST_ID ? HARDWARE_WEBGL2_VERIFIER_ID : testId;
+}
+
 export function validateExactArtifactCatalog(graph, catalog) {
   const tests = uniqueIndex(graph?.testCatalog, 'id', 'testCatalog');
   const feedbackNodes = uniqueIndex(graph?.feedbackNodes, 'id', 'feedbackNodes');
@@ -329,8 +335,15 @@ export function validateExactArtifactCatalog(graph, catalog) {
     if (artifact.id !== expectedArtifactId) {
       fail('E_ARTIFACT_CANONICAL_ID', `${testId} must use artifact ID ${expectedArtifactId}, not ${artifact.id}.`);
     }
-    if (artifact.verifierId !== testId) {
-      fail('E_ARTIFACT_VERIFIER', `${artifact.id} verifierId must be ${testId}, not ${artifact.verifierId ?? '<missing>'}.`);
+    const expectedVerifierId = verifierIdForTest(testId);
+    if (artifact.verifierId !== expectedVerifierId) {
+      fail('E_ARTIFACT_VERIFIER', `${artifact.id} verifierId must be ${expectedVerifierId}, not ${artifact.verifierId ?? '<missing>'}.`);
+    }
+    if (testId === HARDWARE_WEBGL2_TEST_ID && artifact.verifierVersion !== HARDWARE_WEBGL2_VERIFIER_VERSION) {
+      fail(
+        'E_ARTIFACT_VERIFIER_VERSION',
+        `${artifact.id} verifierVersion must be ${HARDWARE_WEBGL2_VERIFIER_VERSION}, not ${artifact.verifierVersion ?? '<missing>'}.`,
+      );
     }
     const actualFeedback = sortedUnique(artifact.feedbackIds, `${artifact.id}.feedbackIds`);
     const expectedFeedback = expectedFeedbackByTest.get(testId);

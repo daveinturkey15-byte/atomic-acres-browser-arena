@@ -283,8 +283,8 @@ test('hardware WebGL2 consumes the original exact schema-v2 owner artifact and r
     kind: 'pass65-owner-feedback-evidence',
     sourceSha,
     buildId: `pass66-s0-${sourceSha}`,
-    verifierId: 'T-COLD-HARDWARE-WEBGL2',
-    verifierVersion: digest,
+    verifierId: 'pass65-installed-chrome-hardware-webgl2-admission',
+    verifierVersion: '1',
     environmentHash: fixture.environmentHash,
     result: 'passed',
     feedbackIds,
@@ -320,6 +320,9 @@ test('hardware WebGL2 consumes the original exact schema-v2 owner artifact and r
   assert.equal(accepted.receipt.schemaVersion, 2);
   assert.equal(accepted.sha256, sha256(bytes.get(ownerPath)));
   assert.throws(() => validate({ ...owner, schemaVersion: 1 }), codeIs('E_HARDWARE_SCHEMA'));
+  assert.throws(() => validate({ ...owner, verifierId: 'T-COLD-HARDWARE-WEBGL2' }), codeIs('E_HARDWARE_VERIFIER'));
+  assert.throws(() => validate({ ...owner, verifierId: 'pass65-installed-chrome-hardware-webgl2-admission-v2' }), codeIs('E_HARDWARE_VERIFIER'));
+  assert.throws(() => validate({ ...owner, verifierVersion: '2' }), codeIs('E_HARDWARE_VERIFIER'));
   assert.throws(() => validate({ ...owner, feedbackIds: ['HF-041'] }), codeIs('E_HARDWARE_FEEDBACK'));
   assert.throws(() => validate({ ...owner, detailedReceiptSha256: '0'.repeat(64) }), codeIs('E_HARDWARE_DIGEST'));
   assert.throws(() => validate(owner, { ...fixture.manifest, files: [...fixture.manifest.files, { path: 'extra.js', bytes: 1, sha256: digest }] }), codeIs('E_HARDWARE_BUILD'));

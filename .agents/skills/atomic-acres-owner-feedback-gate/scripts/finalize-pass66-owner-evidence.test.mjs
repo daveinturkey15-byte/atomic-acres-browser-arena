@@ -17,6 +17,8 @@ import {
 
 const temporaryRoots = [];
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
+const hardwareTestId = 'T-COLD-HARDWARE-WEBGL2';
+const hardwareVerifierId = 'pass65-installed-chrome-hardware-webgl2-admission';
 
 afterEach(() => {
   for (const root of temporaryRoots.splice(0)) fs.rmSync(root, { recursive: true, force: true });
@@ -43,7 +45,8 @@ function exactCatalogForGraph(graph) {
   }
   return graph.testCatalog.map((test) => ({
     id: artifactIdForTest(test.id),
-    verifierId: test.id,
+    verifierId: test.id === hardwareTestId ? hardwareVerifierId : test.id,
+    verifierVersion: test.id === hardwareTestId ? '1' : 'fixture',
     testRefs: [test.id],
     feedbackIds: feedbackByTest.get(test.id).sort(),
   }));
@@ -114,6 +117,24 @@ describe('Pass 66 owner-evidence finalizer', () => {
     const graph = JSON.parse(fs.readFileSync(path.join(repoRoot, 'docs/PASS65_OWNER_FEEDBACK_COMPLETENESS_GRAPH.json'), 'utf8'));
     const catalog = exactCatalogForGraph(graph);
     assert.doesNotThrow(() => validateExactArtifactCatalog(graph, catalog));
+    const hardwareArtifact = catalog.find((artifact) => artifact.testRefs[0] === hardwareTestId);
+    assert.ok(hardwareArtifact, `${hardwareTestId} must remain in the frozen graph`);
+    assert.equal(hardwareArtifact.verifierId, hardwareVerifierId);
+    assert.equal(hardwareArtifact.verifierVersion, '1');
+
+    const wrongHardwareVerifier = structuredClone(catalog);
+    wrongHardwareVerifier.find((artifact) => artifact.testRefs[0] === hardwareTestId).verifierId = hardwareTestId;
+    assert.throws(
+      () => validateExactArtifactCatalog(graph, wrongHardwareVerifier),
+      errorCode('E_ARTIFACT_VERIFIER'),
+    );
+
+    const wrongHardwareVersion = structuredClone(catalog);
+    wrongHardwareVersion.find((artifact) => artifact.testRefs[0] === hardwareTestId).verifierVersion = '2';
+    assert.throws(
+      () => validateExactArtifactCatalog(graph, wrongHardwareVersion),
+      errorCode('E_ARTIFACT_VERIFIER_VERSION'),
+    );
 
     for (const testId of ['T-LEADERBOARD', 'T-PRIVACY-UNIT', 'T-PRIVACY-E2E']) {
       assert.ok(graph.testCatalog.some((test) => test.id === testId), `${testId} must remain in the frozen graph`);

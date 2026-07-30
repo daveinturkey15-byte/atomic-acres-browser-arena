@@ -22,6 +22,8 @@ const OWNER_ROOT = 'artifacts/pass65-owner-feedback';
 const HARDWARE_ROOT = 'artifacts/pass65/hardware-webgl2-admission';
 const RUNNER_ROOT = 'artifacts/pass66-owner-evidence-runner';
 const HARDWARE_TEST_ID = 'T-COLD-HARDWARE-WEBGL2';
+const HARDWARE_VERIFIER_ID = 'pass65-installed-chrome-hardware-webgl2-admission';
+const HARDWARE_VERIFIER_VERSION = '1';
 const SHA40 = /^[0-9a-f]{40}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const TEST_ID = /^T-[A-Z0-9-]+$/;
@@ -532,6 +534,12 @@ export function validateHardwareArtifact({
   if (receipt.schemaVersion !== 2) fail('E_HARDWARE_SCHEMA', 'Hardware WebGL2 evidence must be the original schema-v2 owner artifact, never a wrapper.');
   if (receipt.kind !== 'pass65-owner-feedback-evidence' || receipt.sourceSha !== sourceSha || receipt.result !== 'passed') {
     fail('E_HARDWARE_IDENTITY', 'Hardware owner artifact is not a passed exact-S0 owner receipt.');
+  }
+  if (receipt.verifierId !== HARDWARE_VERIFIER_ID || receipt.verifierVersion !== HARDWARE_VERIFIER_VERSION) {
+    fail(
+      'E_HARDWARE_VERIFIER',
+      `Hardware owner artifact must use verifier ${HARDWARE_VERIFIER_ID} version ${HARDWARE_VERIFIER_VERSION}.`,
+    );
   }
   if (!sameArray(sortedUnique(receipt.feedbackIds, 'hardware.feedbackIds', FEEDBACK_ID), sortedUnique(expectedFeedbackIds, 'expected hardware feedback', FEEDBACK_ID))) {
     fail('E_HARDWARE_FEEDBACK', 'Hardware owner artifact feedback IDs differ from the graph-derived exact set.');
