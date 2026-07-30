@@ -3650,12 +3650,6 @@ let debugAdsOverride: boolean | null = null;
 let debugReloadProgress: number | null = null;
 let characterPhysics: CharacterPhysics | null = null;
 let arenaSelectionReady = false;
-// Launch controls remain closed until the retained, arena-independent runtime
-// corpus is actually ready. The prerecorded menu remains interactive while
-// this background work runs; a player can never turn an idle preload into an
-// eleven-second, apparently frozen deployment by clicking during its first
-// generation.
-let menuDeploymentAssetsReady = false;
 let arenaSelectionTask: Promise<void> = Promise.resolve();
 
 killstreakMenuBinding = bindKillstreakLoadoutMenu(document, killstreakLoadoutController, () => {
@@ -16095,13 +16089,11 @@ function syncArenaSelectionUi(): void {
   const soloButton = element<HTMLButtonElement>('#solo');
   const hostButton = element<HTMLButtonElement>('#host');
   const joinButton = element<HTMLButtonElement>('#join');
-  soloButton.textContent = menuDeploymentAssetsReady
-    ? soloLaunchLabel(selectedArena)
-    : 'PREPARING DEPLOYMENT';
+  soloButton.textContent = soloLaunchLabel(selectedArena);
   hostButton.textContent = 'HOST LOBBY';
-  soloButton.disabled = !arenaSelectionReady || !menuDeploymentAssetsReady;
-  hostButton.disabled = !arenaSelectionReady || !menuDeploymentAssetsReady || !selectedArena.multiplayer || !webRtcSupported;
-  joinButton.disabled = !arenaSelectionReady || !menuDeploymentAssetsReady || !selectedArena.multiplayer || !webRtcSupported;
+  soloButton.disabled = !arenaSelectionReady;
+  hostButton.disabled = !arenaSelectionReady || !selectedArena.multiplayer || !webRtcSupported;
+  joinButton.disabled = !arenaSelectionReady || !selectedArena.multiplayer || !webRtcSupported;
   element<HTMLInputElement>('#room-input').disabled = !selectedArena.multiplayer;
   element<HTMLElement>('#arena-title').innerHTML = selectedArena.titleAccent
     ? `${selectedArena.titleLead} <span>${selectedArena.titleAccent}</span>`
@@ -19845,15 +19837,8 @@ function prepareMenuDeploymentAssets(priority: PreparationPriority = 'deployment
     }
   });
   menuDeploymentAssetsPromise = operation;
-  void operation.then(() => {
-    if (menuDeploymentAssetsPromise !== operation) return;
-    menuDeploymentAssetsReady = true;
-    syncArenaSelectionUi();
-  }, () => {
-    if (menuDeploymentAssetsPromise !== operation) return;
-    menuDeploymentAssetsPromise = null;
-    menuDeploymentAssetsReady = false;
-    syncArenaSelectionUi();
+  void operation.catch(() => {
+    if (menuDeploymentAssetsPromise === operation) menuDeploymentAssetsPromise = null;
   });
   return operation;
 }

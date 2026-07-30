@@ -176,11 +176,11 @@ describe('presentation prewarm startup contract', () => {
     expect(menuBootstrap).toContain("document.documentElement.dataset.gameplayArena = 'deferred-until-deployment'");
     expect(arenaDeployment).toContain('await prepareMenuDeploymentAssets()');
     expect(sharedAssets).toContain('menuDeploymentAssetsCoordinator.prepare(priority');
-    expect(source).toContain("let menuDeploymentAssetsReady = false;");
-    expect(source).toContain("? soloLaunchLabel(selectedArena)\n    : 'PREPARING DEPLOYMENT';");
-    expect(source).toContain('soloButton.disabled = !arenaSelectionReady || !menuDeploymentAssetsReady;');
-    expect(sharedAssets).toContain('menuDeploymentAssetsReady = true;');
-    expect(sharedAssets).toContain('menuDeploymentAssetsReady = false;');
+    expect(source).toContain('soloButton.textContent = soloLaunchLabel(selectedArena);');
+    expect(source).toContain('soloButton.disabled = !arenaSelectionReady;');
+    expect(source).toContain('hostButton.disabled = !arenaSelectionReady || !selectedArena.multiplayer || !webRtcSupported;');
+    expect(source).toContain('joinButton.disabled = !arenaSelectionReady || !selectedArena.multiplayer || !webRtcSupported;');
+    expect(source).not.toContain('menuDeploymentAssetsReady');
     expect(sharedAssets).toContain('weaponView.prewarmBrowserWeaponCatalog(');
     expect(sharedAssets).toContain('prewarmPass65RuntimeWeaponCorpus(checkpoint)');
     expect(menuBootstrap).toContain('menuPreviewVideoController.whenFirstFramePresented().then(() => {');
