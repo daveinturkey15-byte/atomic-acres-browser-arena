@@ -72,7 +72,7 @@ npm run run:pass66:owner-evidence -- --resume --source-sha <exact-S0-SHA>
 
 `T-COLD-HARDWARE-WEBGL2` is deliberately exceptional: `--run` executes its exact catalog command and then validates the original command-produced schema-v2 owner artifact, detailed receipt, current `dist/` manifest, environment and installed Chrome digest. The runner never replaces or wraps that artifact. `--resume` may consume it only when every current exact-S0 binding still validates.
 
-After all 52 exact receipts validate, generate the deterministic 160-feedback/99-requirement finalizer input:
+After all 53 exact receipts validate, generate the deterministic 160-feedback/99-requirement finalizer input:
 
 ```powershell
 npm run run:pass66:owner-evidence -- --emit-finalizer-input artifacts/pass66-owner-evidence-runner/finalizer-input.json --source-sha <exact-S0-SHA> --feedback-received-at <ISO-UTC> --preview-ref <immutable-preview-ref> --preview-created-at <ISO-UTC> --acceptance-mode pre-approval
