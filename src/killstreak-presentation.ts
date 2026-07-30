@@ -1914,10 +1914,12 @@ export class KillstreakPresentation {
     });
 
     // Three r185 owns per-Object3D render bindings even when authored clones
-    // share geometry and materials. Submit every bounded instance, including
-    // all 24 swarm drones, before any of them can enter a live frame. Families
-    // are split across fenced batches so one hidden warm-up frame cannot become
-    // a giant GPU spike of its own.
+    // share geometry and materials. Submit every bounded instance before any
+    // of them can enter a live frame. Keep the complete vocabulary in one
+    // bounded submission: compileAndRender already owns a queue fence and a
+    // complete TSL/HDR frame, so splitting these roots repeated that full frame
+    // and its fence for each arbitrary pair without reducing the amount of
+    // support geometry that had to be compiled.
     const entityRoots = [
       ...[...this.entityPools.entries()].flatMap(([key, pool]) => (
         key === 'swarm-drone' ? [] : pool.map((entry) => entry.root)
@@ -1930,15 +1932,7 @@ export class KillstreakPresentation {
       ...this.emberPool.map((entry) => entry.root),
     ];
     const overlayRoots: THREE.Object3D[] = [...this.sensorSilhouettes, ...stagedMarkerRoots];
-    const entityBatches: THREE.Object3D[][] = [];
-    if (typeof document === 'undefined') {
-      entityBatches.push(entityRoots);
-    } else {
-      for (let offset = 0; offset < entityRoots.length; offset += 2) {
-        entityBatches.push(entityRoots.slice(offset, offset + 2));
-      }
-    }
-    const stagedBatches = [...entityBatches, effectRoots, overlayRoots].filter((batch) => batch.length > 0);
+    const stagedBatches = [[...entityRoots, ...effectRoots, ...overlayRoots]].filter((batch) => batch.length > 0);
     const stagedRoots = stagedBatches.flat();
     const liveActivationEntries = [
       ...(this.entityPools.get('chopper') ?? []).slice(0, 1),

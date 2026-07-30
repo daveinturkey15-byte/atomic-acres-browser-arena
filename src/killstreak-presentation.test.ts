@@ -344,8 +344,8 @@ describe('killstreak presentation', () => {
       expect(stagedCamera).toBe(camera);
       expect(parentScene).toBe(scene);
       expect(chopper.scale.toArray()).toEqual([2, 3, 4]);
-      expect(chopper.frustumCulled).toBe(compilePass >= 4);
-      expect(chopperChild.frustumCulled).toBe(compilePass >= 4);
+      expect(chopper.frustumCulled).toBe(compilePass >= 2);
+      expect(chopperChild.frustumCulled).toBe(compilePass >= 2);
       expect(swarmBatches.every((batch) => batch.count === 24)).toBe(true);
       if (compilePass === 1) {
         expect(chopper.visible).toBe(true);
@@ -354,7 +354,12 @@ describe('killstreak presentation', () => {
         expect(presentation.root.getObjectByName('prewarmed-swarm-drone-24')?.visible).toBe(false);
         expect(presentation.root.getObjectByName('pass65-swarm-instanced-batch-1')?.visible).toBe(true);
         expect(presentation.root.getObjectByName('pass65-swarm-instanced-batch-12')?.visible).toBe(true);
-        expect(presentation.root.getObjectByName('pass65-impact-flash-pool-20')?.visible).toBe(false);
+        expect(presentation.root.getObjectByName('pass65-impact-flash-pool-20')?.visible).toBe(true);
+        expect(presentation.root.getObjectByName('pass65-bomb-shell-pool-20')?.visible).toBe(true);
+        expect(presentation.root.getObjectByName('pass65-ember-pool-120')?.visible).toBe(true);
+        expect(presentation.root.getObjectByName('piloted-drone-hostile-sensor-16')?.visible).toBe(true);
+        expect(presentation.root.getObjectByName('prewarmed-support-placement-ground-x')?.visible).toBe(true);
+        expect(presentation.root.getObjectByName('prewarmed-support-placement-corridor')?.visible).toBe(true);
         expect(lod.autoUpdate).toBe(false);
         expect(lod0.visible).toBe(true);
         expect(lod1.visible).toBe(true);
@@ -363,19 +368,7 @@ describe('killstreak presentation', () => {
         presentation.clear();
         expect(swarmBatches.every((batch) => batch.count === 24)).toBe(true);
         expect(chopper.visible).toBe(true);
-      } else if (compilePass === 2) {
-        expect(chopper.visible).toBe(false);
-        expect(presentation.root.getObjectByName('pass65-impact-flash-pool-20')?.visible).toBe(true);
-        expect(presentation.root.getObjectByName('pass65-bomb-shell-pool-20')?.visible).toBe(true);
-        expect(presentation.root.getObjectByName('pass65-ember-pool-120')?.visible).toBe(true);
-        expect(presentation.root.getObjectByName('piloted-drone-hostile-sensor-16')?.visible).toBe(false);
-      } else if (compilePass === 3) {
-        expect(chopper.visible).toBe(false);
-        expect(presentation.root.getObjectByName('pass65-impact-flash-pool-20')?.visible).toBe(false);
-        expect(presentation.root.getObjectByName('piloted-drone-hostile-sensor-16')?.visible).toBe(true);
-        expect(presentation.root.getObjectByName('prewarmed-support-placement-ground-x')?.visible).toBe(true);
-        expect(presentation.root.getObjectByName('prewarmed-support-placement-corridor')?.visible).toBe(true);
-      } else if (compilePass >= 4 && compilePass <= 6) {
+      } else if (compilePass >= 2 && compilePass <= 4) {
         expect(chopper.visible).toBe(true);
         expect(presentation.root.getObjectByName('prewarmed-swarm-drone-1')?.visible).toBe(false);
         expect(presentation.root.getObjectByName('prewarmed-swarm-drone-24')?.visible).toBe(false);
@@ -386,7 +379,7 @@ describe('killstreak presentation', () => {
         expect([lod0.visible, lod1.visible].filter(Boolean)).toHaveLength(1);
         expect(gunnerHudMaterial.depthWrite).toBe(true);
       } else {
-        expect(compilePass).toBe(7);
+        expect(compilePass).toBe(5);
         expect(chopper.visible).toBe(true);
         expect(presentation.root.getObjectByName('prewarmed-swarm-drone-24')?.visible).toBe(false);
         expect(chopperFuselage.visible).toBe(false);
@@ -402,7 +395,7 @@ describe('killstreak presentation', () => {
       presentation.prewarm({ compileAndRender }, camera),
     ]);
     await presentation.prewarm({ compileAndRender }, camera);
-    expect(compileAndRender).toHaveBeenCalledTimes(7);
+    expect(compileAndRender).toHaveBeenCalledTimes(5);
     expect(chopper.visible).toBe(false);
     expect(chopper.scale.toArray()).toEqual([2, 3, 4]);
     expect(chopper.frustumCulled).toBe(true);
@@ -422,15 +415,10 @@ describe('killstreak presentation', () => {
     presentation.dispose();
   });
 
-  it('splits native browser support render-object construction into two-root submissions', async () => {
+  it('coalesces the complete native browser support vocabulary into one fenced submission', async () => {
     const scene = new THREE.Scene();
     const presentation = new KillstreakPresentation(scene);
     const camera = new THREE.PerspectiveCamera();
-    const entityRootCount = presentation.root.children.filter((node) => (
-      node.userData.swarmInstancedPresentation === true
-      || typeof node.userData.presentationPoolKey === 'string'
-        && node.userData.presentationPoolKey !== 'swarm-drone'
-    )).length;
     vi.stubGlobal('document', {});
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
       callback(performance.now());
@@ -439,7 +427,8 @@ describe('killstreak presentation', () => {
     try {
       const compileAndRender = vi.fn(async () => undefined);
       await presentation.prewarm({ compileAndRender }, camera, 12);
-      expect(compileAndRender).toHaveBeenCalledTimes(Math.ceil(entityRootCount / 2) + 6);
+      // Complete vocabulary, three exact live LOD bands, possessed cockpit.
+      expect(compileAndRender).toHaveBeenCalledTimes(5);
     } finally {
       vi.unstubAllGlobals();
       presentation.dispose();
@@ -474,7 +463,7 @@ describe('killstreak presentation', () => {
     await presentation.prewarmAuthoredAssets();
     const rebuiltRuntime = { compileAndRender: vi.fn(async () => undefined) };
     await presentation.prewarm(rebuiltRuntime, camera);
-    expect(rebuiltRuntime.compileAndRender).toHaveBeenCalledTimes(7);
+    expect(rebuiltRuntime.compileAndRender).toHaveBeenCalledTimes(5);
     presentation.dispose();
     await expect(presentation.prewarm(rebuiltRuntime, camera)).rejects.toThrow('disposed');
   }, 15_000);
@@ -486,9 +475,9 @@ describe('killstreak presentation', () => {
     const compileAndRender = vi.fn(async () => undefined);
     await presentation.prewarm({ compileAndRender }, camera, 4);
     await presentation.prewarm({ compileAndRender }, camera, 4);
-    expect(compileAndRender).toHaveBeenCalledTimes(7);
+    expect(compileAndRender).toHaveBeenCalledTimes(5);
     await presentation.prewarm({ compileAndRender }, camera, 5);
-    expect(compileAndRender).toHaveBeenCalledTimes(14);
+    expect(compileAndRender).toHaveBeenCalledTimes(10);
     presentation.dispose();
   });
 
