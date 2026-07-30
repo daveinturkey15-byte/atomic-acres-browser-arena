@@ -16,7 +16,13 @@ import {
   artifactIdForTest,
   validateExactArtifactCatalog,
 } from './finalize-pass66-owner-evidence.mjs';
-import { evidenceKindsForTest, requirementNeedsVisual } from './run-pass66-owner-evidence.mjs';
+import {
+  PASS66_BROWSER_FOREGROUND_TEST_ID,
+  PASS66_HIDDEN_TAB_TEST_ID,
+  evidenceKindsForTest,
+  requirementNeedsVisual,
+  validatePass66BlockingCatalog,
+} from './run-pass66-owner-evidence.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '../../../..');
@@ -38,6 +44,9 @@ const CANDIDATE_EVIDENCE_PROCESS_FILES = new Set([
 ]);
 const OWNER_EVIDENCE_ROOT = 'artifacts/pass65-owner-feedback/';
 const HARDWARE_EVIDENCE_ROOT = 'artifacts/pass65/hardware-webgl2-admission/';
+const REQUIRED_PASS66_TESTS_BY_FEEDBACK = new Map([
+  ['HF-152', [PASS66_BROWSER_FOREGROUND_TEST_ID, PASS66_HIDDEN_TAB_TEST_ID]],
+]);
 
 const TEXT_SOURCE_NORMALIZATION = 'UTF-8; CRLF converted to LF; one final LF added; text semantics unchanged';
 const HARDWARE_WEBGL2_FEEDBACK_IDS = Object.freeze([
@@ -977,6 +986,14 @@ function validateGraph(graph, ledgerContext, packageJson, errors, options) {
   if (packageJson.scripts?.['qa:pass65:hardware-webgl2-admission'] !== expectedHardwareWebGl2Command) {
     error(errors, 'E_HARDWARE_WEBGL2_PACKAGE_COMMAND', 'hardware-WebGL2 candidate command must retain policy, production build and exact verifier execution.');
   }
+  const expectedHiddenTabContractCommand = 'node --test scripts/qa/pass66-hidden-tab-contract.test.mjs';
+  if (packageJson.scripts?.['qa:pass66:hidden-tab:contract'] !== expectedHiddenTabContractCommand) {
+    error(errors, 'E_PASS66_HIDDEN_TAB_PACKAGE_COMMAND', 'Pass 66 hidden-tab contract command must execute the exact fail-closed contract test.');
+  }
+  const expectedHiddenTabCommand = 'npm run qa:pass66:hidden-tab:contract && npm run build && node scripts/qa/run-with-preview-server.mjs node scripts/qa/verify-pass66-hidden-tab-admission.mjs';
+  if (packageJson.scripts?.['qa:pass66:hidden-tab'] !== expectedHiddenTabCommand) {
+    error(errors, 'E_PASS66_HIDDEN_TAB_PACKAGE_COMMAND', 'Pass 66 hidden-tab gate must retain its contract test, production build and real headed-Chrome verifier.');
+  }
   for (const test of testIndex.values()) {
     if (!/^T-[A-Z0-9-]+$/.test(test.id) || typeof test.command !== 'string' || test.command.length < 5 || /[\r\n]|&&|\|\||;|`|\$\(/.test(test.command)) {
       error(errors, 'E_GRAPH_TEST_COMMAND', `${test.id} has an invalid or compound executable command.`);
@@ -991,6 +1008,11 @@ function validateGraph(graph, ledgerContext, packageJson, errors, options) {
       const testPath = repositoryFile(relativePath, errors, 'E_GRAPH_TEST_PATH', `${test.id} path`);
       if (testPath && !fs.existsSync(testPath)) error(errors, 'E_GRAPH_TEST_PATH_MISSING', `${test.id} path ${relativePath} does not exist.`);
     }
+  }
+  try {
+    validatePass66BlockingCatalog(graph);
+  } catch (caught) {
+    errors.push(caught instanceof Error ? caught.message : `E_GRAPH_PASS66_TEST_CONTRACT: ${String(caught)}`);
   }
 
   const artifactIndex = uniqueIndex(graph.artifactCatalog, 'Artifact catalog', errors, 'E_GRAPH_ARTIFACT_DUPLICATE');
@@ -1061,6 +1083,11 @@ function validateGraph(graph, ledgerContext, packageJson, errors, options) {
     for (const requiredTestRef of REQUIRED_NATIVE_TESTS_BY_FEEDBACK.get(feedbackId) ?? []) {
       if (!testRefs.includes(requiredTestRef)) {
         error(errors, 'E_GRAPH_NATIVE_GATE_REQUIRED', `${feedbackId} must retain ${requiredTestRef}.`);
+      }
+    }
+    for (const requiredTestRef of REQUIRED_PASS66_TESTS_BY_FEEDBACK.get(feedbackId) ?? []) {
+      if (!testRefs.includes(requiredTestRef)) {
+        error(errors, 'E_GRAPH_PASS66_GATE_REQUIRED', `${feedbackId} must retain ${requiredTestRef}.`);
       }
     }
 
@@ -1370,6 +1397,24 @@ function runSelfTest(ledger, matrix, agents, packageJson, graph) {
   const noOpHardwarePackage = structuredClone(packageJson);
   noOpHardwarePackage.scripts['qa:pass65:hardware-webgl2-admission'] = 'node -e "process.exit(0)"';
   expectRejected('no-op hardware WebGL2 package command', 'E_HARDWARE_WEBGL2_PACKAGE_COMMAND', { packageJson: noOpHardwarePackage });
+  for (const testId of [PASS66_BROWSER_FOREGROUND_TEST_ID, PASS66_HIDDEN_TAB_TEST_ID]) {
+    const missingPass66Gate = structuredClone(graph);
+    missingPass66Gate.feedbackNodes.find((node) => node.id === 'HF-152').verification.testRefs =
+      missingPass66Gate.feedbackNodes.find((node) => node.id === 'HF-152').verification.testRefs
+        .filter((testRef) => testRef !== testId);
+    expectRejected(`missing required ${testId}`, 'E_GRAPH_PASS66_GATE_REQUIRED', { graph: missingPass66Gate });
+  }
+  const substitutedPass66Command = structuredClone(graph);
+  substitutedPass66Command.testCatalog.find((test) => test.id === PASS66_HIDDEN_TAB_TEST_ID).command = 'npm run qa:pass66:hidden-tab:contract';
+  expectRejected('substituted Pass 66 hidden-tab graph command', 'E_GRAPH_PASS66_TEST_CONTRACT', { graph: substitutedPass66Command });
+  const downgradedPass66BrowserEvidence = structuredClone(graph);
+  downgradedPass66BrowserEvidence.testCatalog.find((test) => test.id === PASS66_HIDDEN_TAB_TEST_ID).evidenceKinds = ['contract'];
+  expectRejected('downgraded Pass 66 hidden-tab browser evidence', 'E_GRAPH_PASS66_TEST_CONTRACT', { graph: downgradedPass66BrowserEvidence });
+  for (const packageScriptId of ['qa:pass66:hidden-tab:contract', 'qa:pass66:hidden-tab']) {
+    const noOpHiddenTabPackage = structuredClone(packageJson);
+    noOpHiddenTabPackage.scripts[packageScriptId] = 'node -e "process.exit(0)"';
+    expectRejected(`no-op ${packageScriptId} package command`, 'E_PASS66_HIDDEN_TAB_PACKAGE_COMMAND', { packageJson: noOpHiddenTabPackage });
+  }
 
   const readyLedger = candidateReadyLedger(ledger);
   const fixture = buildCandidateFixture(graph, readyLedger, matrix);

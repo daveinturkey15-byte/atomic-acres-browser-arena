@@ -24,6 +24,8 @@ const RUNNER_ROOT = 'artifacts/pass66-owner-evidence-runner';
 const HARDWARE_TEST_ID = 'T-COLD-HARDWARE-WEBGL2';
 const HARDWARE_VERIFIER_ID = 'pass65-installed-chrome-hardware-webgl2-admission';
 const HARDWARE_VERIFIER_VERSION = '1';
+export const PASS66_BROWSER_FOREGROUND_TEST_ID = 'T-BROWSER-FOREGROUND-POLICY';
+export const PASS66_HIDDEN_TAB_TEST_ID = 'T-HIDDEN-TAB-ADMISSION';
 const SHA40 = /^[0-9a-f]{40}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const TEST_ID = /^T-[A-Z0-9-]+$/;
@@ -79,6 +81,54 @@ function sortedUnique(values, label, pattern) {
 
 function sameArray(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+const PASS66_BLOCKING_TEST_CONTRACTS = Object.freeze([
+  Object.freeze({
+    id: PASS66_BROWSER_FOREGROUND_TEST_ID,
+    command: 'npx vitest run src/browser-preparation-scheduler.test.ts src/rendering/render-runtime.test.ts src/presentation-scheduling-lifecycle.test.ts src/presentation-prewarm-contract.test.ts',
+    paths: Object.freeze([
+      'src/browser-preparation-scheduler.test.ts',
+      'src/rendering/render-runtime.test.ts',
+      'src/presentation-scheduling-lifecycle.test.ts',
+      'src/presentation-prewarm-contract.test.ts',
+    ]),
+    evidenceKinds: Object.freeze([]),
+  }),
+  Object.freeze({
+    id: PASS66_HIDDEN_TAB_TEST_ID,
+    command: 'npm run qa:pass66:hidden-tab',
+    paths: Object.freeze([
+      'scripts/qa/pass66-hidden-tab-contract.mjs',
+      'scripts/qa/pass66-hidden-tab-contract.test.mjs',
+      'scripts/qa/verify-pass66-hidden-tab-admission.mjs',
+    ]),
+    evidenceKinds: Object.freeze(['browser']),
+  }),
+]);
+
+export function validatePass66BlockingCatalog(graph) {
+  const tests = new Map();
+  for (const test of graph?.testCatalog ?? []) {
+    if (tests.has(test?.id)) fail('E_GRAPH_PASS66_TEST_CONTRACT', `Pass 66 test catalog duplicates ${String(test?.id)}.`);
+    tests.set(test?.id, test);
+  }
+  for (const contract of PASS66_BLOCKING_TEST_CONTRACTS) {
+    const test = tests.get(contract.id);
+    if (!test
+      || test.command !== contract.command
+      || !sameArray(test.paths, contract.paths)
+      || !sameArray(test.evidenceKinds ?? [], contract.evidenceKinds)
+      || test.visualArtifactPaths !== undefined) {
+      fail('E_GRAPH_PASS66_TEST_CONTRACT', `${contract.id} differs from its exact blocking Pass 66 command, verifier paths or evidence kind.`);
+    }
+  }
+  const feedback = (graph?.feedbackNodes ?? []).find((node) => node?.id === 'HF-152');
+  const testRefs = feedback?.verification?.testRefs ?? [];
+  for (const contract of PASS66_BLOCKING_TEST_CONTRACTS) {
+    if (!testRefs.includes(contract.id)) fail('E_GRAPH_PASS66_GATE_REQUIRED', `HF-152 must retain ${contract.id}.`);
+  }
+  return { testIds: PASS66_BLOCKING_TEST_CONTRACTS.map((contract) => contract.id) };
 }
 
 function cells(line) {
@@ -1020,6 +1070,7 @@ async function main(argv) {
   const repoRoot = DEFAULT_REPO_ROOT;
   const graphBytes = fs.readFileSync(path.join(repoRoot, GRAPH_PATH));
   const graph = JSON.parse(graphBytes.toString('utf8'));
+  validatePass66BlockingCatalog(graph);
   const ledgerRows = parseLedger(fs.readFileSync(path.join(repoRoot, LEDGER_PATH), 'utf8'));
   const matrixRows = parseMatrix(fs.readFileSync(path.join(repoRoot, MATRIX_PATH), 'utf8'));
   const coverage = analyzeCoverage(graph, matrixRows, ledgerRows);

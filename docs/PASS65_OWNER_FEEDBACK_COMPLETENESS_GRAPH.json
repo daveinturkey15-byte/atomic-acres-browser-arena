@@ -1480,6 +1480,28 @@
       ]
     },
     {
+      "id": "T-BROWSER-FOREGROUND-POLICY",
+      "command": "npx vitest run src/browser-preparation-scheduler.test.ts src/rendering/render-runtime.test.ts src/presentation-scheduling-lifecycle.test.ts src/presentation-prewarm-contract.test.ts",
+      "paths": [
+        "src/browser-preparation-scheduler.test.ts",
+        "src/rendering/render-runtime.test.ts",
+        "src/presentation-scheduling-lifecycle.test.ts",
+        "src/presentation-prewarm-contract.test.ts"
+      ]
+    },
+    {
+      "id": "T-HIDDEN-TAB-ADMISSION",
+      "command": "npm run qa:pass66:hidden-tab",
+      "paths": [
+        "scripts/qa/pass66-hidden-tab-contract.mjs",
+        "scripts/qa/pass66-hidden-tab-contract.test.mjs",
+        "scripts/qa/verify-pass66-hidden-tab-admission.mjs"
+      ],
+      "evidenceKinds": [
+        "browser"
+      ]
+    },
+    {
       "id": "T-COLD-WEBGPU-ADMISSION",
       "command": "npm run qa:pass65:cold-webgpu-admission",
       "paths": [
@@ -5985,6 +6007,8 @@
         "coverage": "partial",
         "testRefs": [
           "T-FRAME-POLICY",
+          "T-BROWSER-FOREGROUND-POLICY",
+          "T-HIDDEN-TAB-ADMISSION",
           "T-COLD-WEBGPU-ADMISSION",
           "T-WEBGPU-ENDURANCE",
           "T-NATIVE-FRAME-PACING"

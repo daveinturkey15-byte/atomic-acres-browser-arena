@@ -14,6 +14,10 @@ import {
   validateExactArtifactCatalog,
   writeFinalizationOutputs,
 } from './finalize-pass66-owner-evidence.mjs';
+import {
+  PASS66_BROWSER_FOREGROUND_TEST_ID,
+  PASS66_HIDDEN_TAB_TEST_ID,
+} from './run-pass66-owner-evidence.mjs';
 
 const temporaryRoots = [];
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
@@ -116,6 +120,7 @@ describe('Pass 66 owner-evidence finalizer', () => {
   it('requires the exact canonical graph catalog, including every P2-only test', () => {
     const graph = JSON.parse(fs.readFileSync(path.join(repoRoot, 'docs/PASS65_OWNER_FEEDBACK_COMPLETENESS_GRAPH.json'), 'utf8'));
     const catalog = exactCatalogForGraph(graph);
+    assert.equal(catalog.length, 55);
     assert.doesNotThrow(() => validateExactArtifactCatalog(graph, catalog));
     const hardwareArtifact = catalog.find((artifact) => artifact.testRefs[0] === hardwareTestId);
     assert.ok(hardwareArtifact, `${hardwareTestId} must remain in the frozen graph`);
@@ -137,6 +142,13 @@ describe('Pass 66 owner-evidence finalizer', () => {
     );
 
     for (const testId of ['T-LEADERBOARD', 'T-PRIVACY-UNIT', 'T-PRIVACY-E2E']) {
+      assert.ok(graph.testCatalog.some((test) => test.id === testId), `${testId} must remain in the frozen graph`);
+      assert.throws(
+        () => validateExactArtifactCatalog(graph, catalog.filter((artifact) => artifact.testRefs[0] !== testId)),
+        errorCode('E_ARTIFACT_TEST_SET'),
+      );
+    }
+    for (const testId of [PASS66_BROWSER_FOREGROUND_TEST_ID, PASS66_HIDDEN_TAB_TEST_ID]) {
       assert.ok(graph.testCatalog.some((test) => test.id === testId), `${testId} must remain in the frozen graph`);
       assert.throws(
         () => validateExactArtifactCatalog(graph, catalog.filter((artifact) => artifact.testRefs[0] !== testId)),

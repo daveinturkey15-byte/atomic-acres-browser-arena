@@ -6,6 +6,8 @@ import test from 'node:test';
 import { createHardwareWebGl2ReceiptFixture } from '../../../../scripts/qa/pass65-hardware-webgl2-receipt-contract.mjs';
 import {
   EvidenceRunnerError,
+  PASS66_BROWSER_FOREGROUND_TEST_ID,
+  PASS66_HIDDEN_TAB_TEST_ID,
   analyzeCoverage,
   attestNormalCommandAfterPass,
   buildMappings,
@@ -23,6 +25,7 @@ import {
   validateEvidenceClaims,
   validateHardwareArtifact,
   validateNormalReceipt,
+  validatePass66BlockingCatalog,
 } from './run-pass66-owner-evidence.mjs';
 
 const repoRoot = path.resolve(import.meta.dirname, '../../../..');
@@ -38,6 +41,7 @@ function codeIs(expected) {
 
 function loadCanonical() {
   const graph = JSON.parse(fs.readFileSync(graphPath, 'utf8'));
+  validatePass66BlockingCatalog(graph);
   const matrixRows = parseMatrix(fs.readFileSync(matrixPath, 'utf8'));
   const ledgerRows = parseLedger(fs.readFileSync(ledgerPath, 'utf8'));
   const coverage = requireCompleteCoverage(analyzeCoverage(graph, matrixRows, ledgerRows));
@@ -52,9 +56,9 @@ function artifactFor(testId) {
   };
 }
 
-test('canonical graph deterministically covers 53 commands, 160 feedback rows, and all 99 requirements', () => {
+test('canonical graph deterministically covers 55 commands, 160 feedback rows, and all 99 requirements', () => {
   const { graph, matrixRows, ledgerRows, coverage } = loadCanonical();
-  assert.equal(coverage.testCount, 53);
+  assert.equal(coverage.testCount, 55);
   assert.equal(coverage.feedbackCount, 160);
   assert.equal(coverage.requirementCount, 99);
   assert.deepEqual(coverage.orphanTests, []);
@@ -91,6 +95,27 @@ test('canonical graph deterministically covers 53 commands, 160 feedback rows, a
   for (const feedbackIds of coverage.feedbackByTest.values()) {
     assert.deepEqual(feedbackIds, [...feedbackIds].sort());
   }
+  assert.deepEqual(validatePass66BlockingCatalog(graph).testIds, [
+    PASS66_BROWSER_FOREGROUND_TEST_ID,
+    PASS66_HIDDEN_TAB_TEST_ID,
+  ]);
+  assert.deepEqual(coverage.feedbackByTest.get(PASS66_BROWSER_FOREGROUND_TEST_ID), ['HF-152']);
+  assert.deepEqual(coverage.feedbackByTest.get(PASS66_HIDDEN_TAB_TEST_ID), ['HF-152']);
+});
+
+test('blocking Pass 66 scheduling evidence rejects synchronized removal or command substitution', () => {
+  const { graph } = loadCanonical();
+  const removed = structuredClone(graph);
+  removed.testCatalog = removed.testCatalog.filter((testEntry) => testEntry.id !== PASS66_HIDDEN_TAB_TEST_ID);
+  removed.feedbackNodes.find((node) => node.id === 'HF-152').verification.testRefs =
+    removed.feedbackNodes.find((node) => node.id === 'HF-152').verification.testRefs
+      .filter((testRef) => testRef !== PASS66_HIDDEN_TAB_TEST_ID);
+  assert.throws(() => validatePass66BlockingCatalog(removed), codeIs('E_GRAPH_PASS66_TEST_CONTRACT'));
+
+  const substituted = structuredClone(graph);
+  substituted.testCatalog.find((testEntry) => testEntry.id === PASS66_BROWSER_FOREGROUND_TEST_ID).command =
+    'npx vitest run src/browser-preparation-scheduler.test.ts';
+  assert.throws(() => validatePass66BlockingCatalog(substituted), codeIs('E_GRAPH_PASS66_TEST_CONTRACT'));
 });
 
 test('coverage fails missing, extra, duplicate, and unknown graph relationships', () => {
