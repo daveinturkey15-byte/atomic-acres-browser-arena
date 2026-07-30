@@ -91,6 +91,11 @@ export function menuPreviewVideoMarkup(arenaId: ArenaId = 'atomic-acres'): strin
       <source src="${definition.webm}" type="video/webm; codecs=vp9,opus">
       <source src="${definition.mp4}" type="video/mp4; codecs=avc1.64001f,mp4a.40.2">
     </video>
+    <div class="preview-cockpit-hud" aria-hidden="true">
+      <div class="cockpit-heading"><span>33</span><b>N</b><span>03</span></div>
+      <div class="cockpit-pitch"><i></i><i></i><i></i><i></i><b></b></div>
+      <div class="cockpit-instruments"><span><small>ALT</small><b>024 M</b></span><span><small>HDG</small><b>049</b></span><span><small>ROTOR</small><b>ARMED</b></span></div>
+    </div>
     <span class="menu-preview-fallback" aria-hidden="true">PREVIEW STANDBY</span>
   </div>`;
 }

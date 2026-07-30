@@ -26,6 +26,7 @@ export function killstreakLoadoutPanelMarkup(): string {
     return `<label class="killstreak-slot-card" data-killstreak-slot-card="${slot.slot}">
       <span>SLOT ${slot.slot} · KEY ${slot.slot + 2}</span>
       <strong>${family}</strong>
+      <div class="killstreak-demo" data-killstreak-preview="${slot.slot}" aria-hidden="true"><i></i><b></b><em></em><small>TACTICAL DEMO</small></div>
       <select data-killstreak-slot="${slot.slot}" aria-label="Killstreak slot ${slot.slot}">${options}</select>
       <small data-killstreak-detail="${slot.slot}"></small>
     </label>`;
@@ -41,6 +42,11 @@ function renderDetails(root: ParentNode, controller: KillstreakLoadoutController
   controller.selected.slots.forEach((id, index) => {
     const definition = PASS65_KILLSTREAK_CATALOG.definitions.find((entry) => entry.id === id)!;
     const detail = root.querySelector<HTMLElement>(`[data-killstreak-detail="${index + 1}"]`);
+    const preview = root.querySelector<HTMLElement>(`[data-killstreak-preview="${index + 1}"]`);
+    if (preview) {
+      preview.dataset.killstreak = definition.id;
+      preview.setAttribute('aria-label', `${definition.displayName} tactical demonstration`);
+    }
     if (detail) detail.textContent = `${definition.activation.toUpperCase()} · ${definition.durationMs === 0 ? 'IMMEDIATE' : `${definition.durationMs / 1_000}s`} · ${definition.displayName}`;
   });
 }
@@ -90,4 +96,3 @@ export function bindKillstreakLoadoutMenu(
     setMatchActive: (active: boolean) => { matchActive = active; sync(); },
   });
 }
-

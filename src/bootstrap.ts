@@ -2,6 +2,7 @@ import releaseChannelsJson from '../release-channels.json';
 import './style.css';
 import './ui/tactical-ui.css';
 import './ui/pass66-readability.css';
+import './ui/pass66-overhaul.css';
 import {
   releaseChannelDecision,
   stableReleaseUrl,

@@ -49,7 +49,13 @@ function fieldKitCardsMarkup(): string {
     <span>${kit.role}</span>
     <strong>${kit.title}</strong>
     <b>${WEAPONS[kit.weapon].name} · ${WEAPONS[kit.sidearm].name}</b>
+    <div class="kit-weapon-silhouette" data-weapon-family="${kit.weapon}" aria-hidden="true"><i></i><i></i><i></i></div>
     <p>${kit.summary}</p>
+    <div class="kit-stat-strip" aria-label="${kit.traits.join(', ')}">${kit.traits.map((trait) => {
+      const [label, rawValue] = trait.split(' ');
+      const value = Math.max(1, Math.min(5, Number(rawValue) || 1));
+      return `<span><small>${label}</small><i style="--kit-stat:${value * 20}%"></i><b>${value}</b></span>`;
+    }).join('')}</div>
     <i>${kit.traits.join(' · ')}</i>
     <em>SELECTED</em>
   </button>`).join('');
@@ -60,6 +66,7 @@ function customPresetCardsMarkup(): string {
     <span>CUSTOM LOADOUT // 0${index}</span>
     <strong data-custom-name>Custom ${index}</strong>
     <b data-custom-equipment>CONFIGURE PRIMARY · SECONDARY · GRENADE</b>
+    <div class="kit-weapon-silhouette" data-weapon-family="custom" aria-hidden="true"><i></i><i></i><i></i></div>
     <p>Persistent operator-defined equipment. Changes queue safely for the next deployment.</p>
     <i>1 primary · 1 secondary · 1 grenade</i><em>SELECTED</em>
   </button>`).join('');
@@ -157,13 +164,26 @@ function fieldKitPanelMarkup(): string {
     <div class="kit-grid custom-kit-grid">${customPresetCardsMarkup()}</div>
     <section id="loadout-manager" class="loadout-manager" hidden aria-label="Manage and rename custom loadouts">
       <header><span>MANAGE / RENAME</span><strong>THREE CUSTOM SLOTS</strong></header>
+      <div class="loadout-manager-workspace">
       <div class="loadout-manager-grid">
         <label>SLOT<select id="loadout-manage-preset"><option value="custom-1">Custom 1</option><option value="custom-2">Custom 2</option><option value="custom-3">Custom 3</option></select></label>
         <label>NAME<input id="loadout-preset-name" type="text" maxlength="32" autocomplete="off"></label>
         <label>PRIMARY<select id="loadout-primary">${weaponOptionsMarkup('primary')}</select></label>
         <label>SECONDARY<select id="loadout-secondary">${weaponOptionsMarkup('secondary')}</select></label>
         <label>GRENADE<select id="loadout-grenade">${grenadeOptionsMarkup()}</select></label>
-        <button id="loadout-save" type="button">SAVE PRESET</button>
+        <button id="loadout-save" type="button">SAVE LOADOUT</button>
+      </div>
+      <aside id="loadout-inspector" class="loadout-inspector" aria-live="polite">
+        <div class="loadout-inspector-art" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div><small>PRIMARY WEAPON</small><strong data-loadout-inspector-name>HK416</strong><span data-loadout-inspector-meta>AUTOMATIC / 650 RPM</span></div>
+        <dl class="loadout-inspector-stats">
+          <div><dt>DAMAGE</dt><dd><i data-loadout-stat="damage"></i><b data-loadout-value="damage">31</b></dd></div>
+          <div><dt>FIRE RATE</dt><dd><i data-loadout-stat="fire-rate"></i><b data-loadout-value="fire-rate">650</b></dd></div>
+          <div><dt>RANGE</dt><dd><i data-loadout-stat="range"></i><b data-loadout-value="range">72m</b></dd></div>
+          <div><dt>CONTROL</dt><dd><i data-loadout-stat="control"></i><b data-loadout-value="control">72</b></dd></div>
+        </dl>
+        <p data-loadout-grenade-detail>FRAG / TIMED EXPLOSIVE / ONE CARRIED</p>
+      </aside>
       </div>
     </section>
   </div>`;
@@ -259,6 +279,11 @@ function deploymentTransitionMarkup(): string {
     <img id="deployment-transition-poster" src="${preview.poster}" width="${preview.width}" height="${preview.height}" alt="" decoding="async" fetchpriority="high">
     <video id="deployment-transition-video" width="${preview.width}" height="${preview.height}" muted playsinline preload="none" hidden aria-hidden="true"></video>
     <div class="deployment-transition-scrim" aria-hidden="true"></div>
+    <div class="preview-cockpit-hud deployment-cockpit-hud" aria-hidden="true">
+      <div class="cockpit-heading"><span>33</span><b>N</b><span>03</span></div>
+      <div class="cockpit-pitch"><i></i><i></i><i></i><i></i><b></b></div>
+      <div class="cockpit-instruments"><span><small>ALT</small><b>024 M</b></span><span><small>HDG</small><b>049</b></span><span><small>ROTOR</small><b>ARMED</b></span></div>
+    </div>
     <div class="deployment-transition-console">
       <small id="deployment-transition-kicker">THE BIG ONE // DEPLOYMENT STREAM</small>
       <strong id="deployment-transition-title">NUKE TOWN</strong>

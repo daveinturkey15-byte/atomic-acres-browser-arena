@@ -5505,6 +5505,44 @@ function renderCustomLoadoutEditor(): void {
   element<HTMLSelectElement>('#loadout-primary').value = preset.primary;
   element<HTMLSelectElement>('#loadout-secondary').value = preset.secondary;
   element<HTMLSelectElement>('#loadout-grenade').value = preset.grenade;
+  renderLoadoutInspector();
+}
+
+function renderLoadoutInspector(): void {
+  const inspector = document.querySelector<HTMLElement>('#loadout-inspector');
+  const primarySelect = document.querySelector<HTMLSelectElement>('#loadout-primary');
+  const grenadeSelect = document.querySelector<HTMLSelectElement>('#loadout-grenade');
+  if (!inspector || !primarySelect || !grenadeSelect) return;
+  const weapon = WEAPON_CATALOG.find((definition) => definition.id === primarySelect.value);
+  if (!weapon) return;
+  inspector.dataset.weapon = weapon.id;
+  const name = inspector.querySelector<HTMLElement>('[data-loadout-inspector-name]');
+  const meta = inspector.querySelector<HTMLElement>('[data-loadout-inspector-meta]');
+  if (name) name.textContent = weapon.displayName.toUpperCase();
+  if (meta) meta.textContent = `${weapon.fireMode.toUpperCase()} / ${weapon.rpm} RPM / ${weapon.penetration.calibreLabel.toUpperCase()}`;
+  const control = Math.round(Math.max(8, Math.min(100, 100 - (weapon.recoil.pitchRadians + weapon.recoil.yawRadians) * 760)));
+  const stats = {
+    damage: { value: String(Math.round(weapon.damage.base * weapon.pellets)), percent: Math.min(100, weapon.damage.base * weapon.pellets) },
+    'fire-rate': { value: String(weapon.rpm), percent: Math.min(100, weapon.rpm / 12) },
+    range: { value: `${weapon.damage.falloffEndM}m`, percent: Math.min(100, weapon.damage.falloffEndM / 1.2) },
+    control: { value: String(control), percent: control },
+  } as const;
+  for (const [id, stat] of Object.entries(stats)) {
+    const bar = inspector.querySelector<HTMLElement>(`[data-loadout-stat="${id}"]`);
+    const value = inspector.querySelector<HTMLElement>(`[data-loadout-value="${id}"]`);
+    bar?.style.setProperty('--loadout-stat', `${stat.percent}%`);
+    if (value) value.textContent = stat.value;
+  }
+  const grenadeDetail = inspector.querySelector<HTMLElement>('[data-loadout-grenade-detail]');
+  if (grenadeDetail) {
+    const profiles: Record<string, string> = {
+      frag: 'FRAG / TIMED EXPLOSIVE / AREA DAMAGE',
+      smoke: 'SMOKE / 150% VOLUME / SHOT CORRIDORS',
+      flash: 'FLASHBANG / IMPACT DETONATION / BLINDS TARGETS',
+      semtex: 'SEMTEX / STICKS ON IMPACT / HIGH BLAST DAMAGE',
+    };
+    grenadeDetail.textContent = `${profiles[grenadeSelect.value] ?? grenadeSelect.value.toUpperCase()} / ONE CARRIED`;
+  }
 }
 
 function renderFieldKitSelection(): void {
@@ -5636,6 +5674,8 @@ element<HTMLSelectElement>('#loadout-manage-preset').addEventListener('change', 
   managedPresetId = (event.currentTarget as HTMLSelectElement).value as LoadoutPresetId;
   renderCustomLoadoutEditor();
 });
+element<HTMLSelectElement>('#loadout-primary').addEventListener('change', renderLoadoutInspector);
+element<HTMLSelectElement>('#loadout-grenade').addEventListener('change', renderLoadoutInspector);
 element<HTMLButtonElement>('#loadout-save').addEventListener('click', saveManagedPreset);
 element<HTMLButtonElement>('#field-kit-redeploy').addEventListener('click', () => {
   const selection = activeLoadoutSelection();
