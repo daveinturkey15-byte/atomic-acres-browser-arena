@@ -53,6 +53,8 @@
     "qa:pass63:text-chat": "playwright test tests/e2e/pass63-text-chat.spec.ts --project=chromium --workers=1 --retries=0",
     "qa:pass64:webgpu": "node scripts/qa/verify-pass64-webgpu.mjs",
     "qa:pass65:cold-webgpu-admission": "node scripts/qa/verify-pass65-cold-webgpu-admission.mjs",
+    "qa:pass66:hidden-tab:contract": "node --test scripts/qa/pass66-hidden-tab-contract.test.mjs",
+    "qa:pass66:hidden-tab": "npm run qa:pass66:hidden-tab:contract && npm run build && node scripts/qa/run-with-preview-server.mjs node scripts/qa/verify-pass66-hidden-tab-admission.mjs",
     "qa:pass65:weapon-switch-webgpu": "npm run build && node scripts/qa/run-with-preview-server.mjs node scripts/qa/verify-pass65-weapon-switch-webgpu.mjs",
     "qa:pass65:webgpu-endurance": "node scripts/qa/verify-pass65-webgpu-endurance.mjs",
     "qa:pass65:frame-pacing-policy": "node .agents/skills/atomic-acres-webgpu-frame-pacing/scripts/verify-webgpu-frame-pacing-policy.mjs --self-test",
