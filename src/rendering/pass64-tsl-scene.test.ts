@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { RenderPipeline } from 'three/webgpu';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ARENA_VISUAL_REGISTRY } from './arena-visual-stream';
 import {
   assertRuntimeTslTraversal,
@@ -87,6 +87,85 @@ describe('Pass 64 authored TSL pipeline set', () => {
     );
     expect(audit.legacyShaderMaterials).toHaveLength(1);
     expect(() => assertRuntimeTslTraversal(audit)).toThrow(/legacy shader materials remain/);
+  });
+
+  it('precompiles against the exact ScenePass HDR target and MRT before restoring renderer state', async () => {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const previousTarget = new THREE.RenderTarget(2, 2);
+    const previousMrt = { name: 'previous-mrt' };
+    let currentTarget: THREE.RenderTarget | null = previousTarget;
+    let currentMrt: unknown = previousMrt;
+    let systems: ReturnType<typeof createPass64TslSceneSystems>;
+    const renderer = {
+      getRenderTarget: vi.fn(() => currentTarget),
+      getMRT: vi.fn(() => currentMrt),
+      setRenderTarget: vi.fn((target: THREE.RenderTarget | null) => { currentTarget = target; }),
+      setMRT: vi.fn((value: unknown) => { currentMrt = value; }),
+      compileAsync: vi.fn(async (root: THREE.Object3D, activeCamera: THREE.Camera, targetScene: THREE.Scene) => {
+        expect(root.name).toBe('exact-coverage-root');
+        expect(activeCamera).toBe(camera);
+        expect(targetScene).toBe(scene);
+        expect(currentTarget).toBe(systems.principalHdrTarget);
+        expect(currentMrt).not.toBe(previousMrt);
+        expect(currentMrt).not.toBeNull();
+      }),
+    };
+    const renderPipeline = { outputNode: null, renderer } as unknown as RenderPipeline;
+    const definition = (await ARENA_VISUAL_REGISTRY['atomic-acres']()).definition;
+    systems = createPass64TslSceneSystems(scene, camera, renderPipeline, definition, {
+      principalSamples: 2,
+      volumetricScale: 1,
+      ambientOcclusion: {
+        quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52,
+      },
+      post: {
+        bloomStrength: 0.14, exposureScale: 1, toneMapping: 'aces', filmGrainScale: 1, vignetteStrength: 0,
+      },
+    });
+    const root = new THREE.Group();
+    root.name = 'exact-coverage-root';
+    scene.add(root);
+
+    await systems.precompileExactScenePass(root);
+
+    expect(renderer.compileAsync).toHaveBeenCalledTimes(1);
+    expect(renderer.setRenderTarget.mock.calls.map(([target]) => target)).toEqual([
+      systems.principalHdrTarget,
+      previousTarget,
+    ]);
+    expect(renderer.setMRT.mock.calls.at(-1)?.[0]).toBe(previousMrt);
+    expect(currentTarget).toBe(previousTarget);
+    expect(currentMrt).toBe(previousMrt);
+    systems.dispose();
+    previousTarget.dispose();
+  });
+
+  it('restores the prior renderer target and MRT when exact ScenePass compilation fails', async () => {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const previousTarget = new THREE.RenderTarget(2, 2);
+    const previousMrt = { name: 'previous-mrt' };
+    let currentTarget: THREE.RenderTarget | null = previousTarget;
+    let currentMrt: unknown = previousMrt;
+    const renderer = {
+      getRenderTarget: vi.fn(() => currentTarget),
+      getMRT: vi.fn(() => currentMrt),
+      setRenderTarget: vi.fn((target: THREE.RenderTarget | null) => { currentTarget = target; }),
+      setMRT: vi.fn((value: unknown) => { currentMrt = value; }),
+      compileAsync: vi.fn(async () => { throw new Error('synthetic compile failure'); }),
+    };
+    const renderPipeline = { outputNode: null, renderer } as unknown as RenderPipeline;
+    const definition = (await ARENA_VISUAL_REGISTRY['atomic-acres']()).definition;
+    const systems = createPass64TslSceneSystems(scene, camera, renderPipeline, definition);
+    const root = new THREE.Group();
+    scene.add(root);
+
+    await expect(systems.precompileExactScenePass(root)).rejects.toThrow('synthetic compile failure');
+    expect(currentTarget).toBe(previousTarget);
+    expect(currentMrt).toBe(previousMrt);
+    systems.dispose();
+    previousTarget.dispose();
   });
 
   it('allocates the selected HDR samples and applies bounded volumetric/post settings', async () => {

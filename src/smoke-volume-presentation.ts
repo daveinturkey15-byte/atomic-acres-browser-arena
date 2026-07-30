@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { yieldBrowserPreparationFrame } from './browser-preparation-scheduler';
 import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 import { SMOKE_VOLUME_LIFETIME_MS } from './smoke-authority';
 
@@ -440,10 +441,7 @@ export class SmokeVolumePresentationPool {
           await runtime.compileAndRender(this.root, camera, parentScene);
           for (const { presentation } of batch) presentation.root.visible = false;
           if (offset + batchSize < this.slots.length) {
-            await new Promise<void>((resolve) => {
-              if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => resolve());
-              else globalThis.setTimeout(resolve, 0);
-            });
+            await yieldBrowserPreparationFrame();
           }
         }
       }

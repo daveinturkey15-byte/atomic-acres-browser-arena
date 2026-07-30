@@ -125,6 +125,36 @@ afterEach(() => {
 });
 
 describe('Pass 65 managed weapon runtime behavior', () => {
+  it('finishes catalog GPU batches and drop-knife staging while animation frames are suspended hidden', async () => {
+    stubBrowserTextureLoading();
+    vi.stubGlobal('document', { visibilityState: 'hidden' });
+    const suspendedAnimationFrame = vi.fn(() => 1);
+    vi.stubGlobal('requestAnimationFrame', suspendedAnimationFrame);
+    const loadSpy = vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (
+      Promise.resolve(fakeGltfForUrl(String(url)))
+    )) as GLTFLoader['loadAsync']);
+    const presentation = new WeaponPresentation(
+      new THREE.PerspectiveCamera(),
+      false,
+      undefined,
+      vi.fn(async () => undefined),
+      vi.fn(async () => undefined),
+    );
+
+    await presentation.load();
+    await presentation.prewarmBrowserWeaponCatalog(WEAPON_IDS);
+    await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 0));
+
+    expect(suspendedAnimationFrame).not.toHaveBeenCalled();
+    expect(presentation.browserCatalogReadiness()).toMatchObject({
+      loaded: WEAPON_IDS.length,
+      gpuReady: WEAPON_IDS.length,
+      prewarming: false,
+    });
+    expect(loadSpy.mock.calls.some(([url]) => String(url).endsWith('pass65-field-knife-drop-lod0.glb'))).toBe(true);
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(PASS65_AUTHORED_FIREARM_IDS.length);
+  });
+
   it('awaits an exact WebGL match-start weapon before the synchronous visibility swap', async () => {
     stubBrowserTextureLoading();
     vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (

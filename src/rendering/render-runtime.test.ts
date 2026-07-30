@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import {
   awaitSubmissionCompletionTarget,
@@ -19,6 +19,8 @@ import {
   WebGpuRenderRuntime,
 } from './render-runtime';
 import { assertTslCutoverReady, assertTslReviewAuthored, pendingTslMigrationIds, TSL_MIGRATION_INVENTORY } from './tsl-migration-inventory';
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe('Pass 64 render runtime boundary', () => {
   it('makes WebGPU fail-closed by default and keeps WebGL2 behind an explicit compatibility query', () => {
@@ -77,6 +79,197 @@ describe('Pass 64 render runtime boundary', () => {
 
     await expect(runtime.compileAndRender(target, camera, scene)).rejects.toThrow('synthetic staged draw failure');
     expect(arena.visible).toBe(true);
+  });
+
+  it('keeps WebGL and WebGPU presentation prewarms paused until a hidden tab owns the foreground', async () => {
+    let visibilityState: DocumentVisibilityState = 'hidden';
+    const listeners = new Set<EventListenerOrEventListenerObject>();
+    vi.stubGlobal('document', {
+      get visibilityState() { return visibilityState; },
+      hasFocus: () => true,
+      addEventListener: (_type: string, listener: EventListenerOrEventListenerObject) => listeners.add(listener),
+      removeEventListener: (_type: string, listener: EventListenerOrEventListenerObject) => listeners.delete(listener),
+    });
+    const makeScene = () => {
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera();
+      const root = new THREE.Group();
+      scene.add(camera, root);
+      return { scene, camera, root };
+    };
+    const webGlScene = makeScene();
+    const webGlRenderer = {
+      getContext: () => ({ getExtension: () => null, getParameter: () => 'Test WebGL2 adapter' }),
+      compileAsync: vi.fn(async () => undefined),
+      render: vi.fn(),
+    };
+    const webGlRuntime = new (LegacyWebGlRenderRuntime as unknown as new (
+      value: unknown,
+    ) => LegacyWebGlRenderRuntime)(webGlRenderer);
+    const webGpuScene = makeScene();
+    const webGpuRender = vi.fn();
+    const webGpuRuntime = new (WebGpuRenderRuntime as unknown as new (
+      renderer: unknown,
+      pipeline: unknown,
+      identity: unknown,
+    ) => WebGpuRenderRuntime)({
+      info: { reset: () => undefined, render: { calls: 1, triangles: 2, points: 0, lines: 0 } },
+    }, { render: webGpuRender }, {
+      canvasAntialias: true,
+      canvasSamples: 4,
+      adapterLabel: 'test adapter',
+      adapterClass: 'GPUAdapter',
+      deviceClass: 'GPUDevice',
+      softwareAdapter: false,
+      device: {
+        queue: { onSubmittedWorkDone: async () => undefined },
+        addEventListener: () => undefined,
+        lost: new Promise<never>(() => undefined),
+      },
+    });
+
+    const webGlPending = webGlRuntime.compileAndRender(webGlScene.root, webGlScene.camera, webGlScene.scene);
+    const webGpuPending = webGpuRuntime.compileAndRender(webGpuScene.root, webGpuScene.camera, webGpuScene.scene);
+    for (let turn = 0; turn < 4; turn += 1) await Promise.resolve();
+    // Compile-only preparation is allowed to progress while hidden; only the
+    // authored presentation draw remains foreground-owned.
+    expect(webGlRenderer.compileAsync).toHaveBeenCalledTimes(1);
+    expect(webGlRenderer.render).not.toHaveBeenCalled();
+    expect(webGpuRender).not.toHaveBeenCalled();
+
+    visibilityState = 'visible';
+    for (const listener of [...listeners]) {
+      if (typeof listener === 'function') listener(new Event('visibilitychange'));
+      else listener.handleEvent(new Event('visibilitychange'));
+    }
+    await Promise.all([webGlPending, webGpuPending]);
+
+    expect(webGlRenderer.compileAsync).toHaveBeenCalledTimes(1);
+    expect(webGlRenderer.render).toHaveBeenCalledTimes(1);
+    expect(webGpuRender).toHaveBeenCalledTimes(1);
+    expect(listeners).toHaveLength(0);
+  });
+
+  it('rechecks WebGL foreground ownership after an asynchronous compile finishes', async () => {
+    let visibilityState: DocumentVisibilityState = 'visible';
+    const listeners = new Set<EventListenerOrEventListenerObject>();
+    vi.stubGlobal('document', {
+      get visibilityState() { return visibilityState; },
+      hasFocus: () => true,
+      addEventListener: (_type: string, listener: EventListenerOrEventListenerObject) => listeners.add(listener),
+      removeEventListener: (_type: string, listener: EventListenerOrEventListenerObject) => listeners.delete(listener),
+    });
+    let releaseCompile!: () => void;
+    const renderer = {
+      getContext: () => ({ getExtension: () => null, getParameter: () => 'Test WebGL2 adapter' }),
+      compileAsync: vi.fn(() => new Promise<void>((resolve) => { releaseCompile = resolve; })),
+      render: vi.fn(),
+    };
+    const runtime = new (LegacyWebGlRenderRuntime as unknown as new (
+      value: unknown,
+    ) => LegacyWebGlRenderRuntime)(renderer);
+    const scene = new THREE.Scene();
+    const root = new THREE.Group();
+    scene.add(root);
+    const pending = runtime.compileAndRender(root, new THREE.PerspectiveCamera(), scene);
+    for (let turn = 0; turn < 4 && !renderer.compileAsync.mock.calls.length; turn += 1) await Promise.resolve();
+
+    visibilityState = 'hidden';
+    releaseCompile();
+    for (let turn = 0; turn < 4; turn += 1) await Promise.resolve();
+    expect(renderer.render).not.toHaveBeenCalled();
+
+    visibilityState = 'visible';
+    for (const listener of [...listeners]) {
+      if (typeof listener === 'function') listener(new Event('visibilitychange'));
+      else listener.handleEvent(new Event('visibilitychange'));
+    }
+    await pending;
+    expect(renderer.render).toHaveBeenCalledTimes(1);
+  });
+
+  it('rechecks WebGPU foreground ownership after an admitted queue fence retires', async () => {
+    let visibilityState: DocumentVisibilityState = 'visible';
+    const listeners = new Set<EventListenerOrEventListenerObject>();
+    vi.stubGlobal('document', {
+      get visibilityState() { return visibilityState; },
+      hasFocus: () => true,
+      addEventListener: (_type: string, listener: EventListenerOrEventListenerObject) => listeners.add(listener),
+      removeEventListener: (_type: string, listener: EventListenerOrEventListenerObject) => listeners.delete(listener),
+    });
+    const fences: Array<() => void> = [];
+    const render = vi.fn();
+    const runtime = new (WebGpuRenderRuntime as unknown as new (
+      renderer: unknown,
+      pipeline: unknown,
+      identity: unknown,
+    ) => WebGpuRenderRuntime)({
+      info: { reset: () => undefined, render: { calls: 1, triangles: 2, points: 0, lines: 0 } },
+    }, { render }, {
+      canvasAntialias: true,
+      canvasSamples: 4,
+      adapterLabel: 'test adapter',
+      adapterClass: 'GPUAdapter',
+      deviceClass: 'GPUDevice',
+      softwareAdapter: false,
+      device: {
+        queue: { onSubmittedWorkDone: () => new Promise<void>((resolve) => fences.push(resolve)) },
+        addEventListener: () => undefined,
+        lost: new Promise<never>(() => undefined),
+      },
+    });
+    const scene = new THREE.Scene();
+    const root = new THREE.Group();
+    scene.add(root);
+    expect(runtime.submitFrame(100, true)).toBe(true);
+    const pending = runtime.compileAndRender(root, new THREE.PerspectiveCamera(), scene);
+    for (let turn = 0; turn < 8 && fences.length < 1; turn += 1) await Promise.resolve();
+
+    visibilityState = 'hidden';
+    fences.shift()?.();
+    for (let turn = 0; turn < 8; turn += 1) await Promise.resolve();
+    expect(render).toHaveBeenCalledTimes(1);
+
+    visibilityState = 'visible';
+    for (const listener of [...listeners]) {
+      if (typeof listener === 'function') listener(new Event('visibilitychange'));
+      else listener.handleEvent(new Event('visibilitychange'));
+    }
+    for (let turn = 0; turn < 8 && render.mock.calls.length < 2; turn += 1) await Promise.resolve();
+    expect(render).toHaveBeenCalledTimes(2);
+    fences.shift()?.();
+    await pending;
+  });
+
+  it('rejects a WebGPU submission at the runtime boundary while hidden', () => {
+    vi.stubGlobal('document', { visibilityState: 'hidden', hasFocus: () => true });
+    const render = vi.fn();
+    const runtime = new (WebGpuRenderRuntime as unknown as new (
+      renderer: unknown,
+      pipeline: unknown,
+      identity: unknown,
+    ) => WebGpuRenderRuntime)({
+      info: { reset: vi.fn(), render: { calls: 0, triangles: 0, points: 0, lines: 0 } },
+    }, { render }, {
+      canvasAntialias: true,
+      canvasSamples: 4,
+      adapterLabel: 'test adapter',
+      adapterClass: 'GPUAdapter',
+      deviceClass: 'GPUDevice',
+      softwareAdapter: false,
+      device: {
+        queue: { onSubmittedWorkDone: async () => undefined },
+        addEventListener: () => undefined,
+        lost: new Promise<never>(() => undefined),
+      },
+    });
+
+    expect(runtime.submitFrame(100, true)).toBe(false);
+    expect(render).not.toHaveBeenCalled();
+    expect(runtime.presentationTelemetry()).toMatchObject({
+      submissionSequence: 0,
+      completedSequence: 0,
+    });
   });
 
   it('admits the cutover only after every custom GLSL owner has a verified TSL graph', () => {

@@ -18,6 +18,7 @@ import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem } from './water-system';
 import { PASS66_RELEASE_IDENTITY } from './release-identity';
 import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon, waitForPendingArtTextures } from './art-kit';
+import { BotWeaponGpuVocabulary } from './bot-weapon-gpu-vocabulary';
 import {
   invalidatePass65PresentationTree,
   pass65WeaponCacheTelemetry,
@@ -78,6 +79,12 @@ import {
 import { MenuPreviewVideoController, menuPreviewVideoDefinition } from './ui/menu-preview-video';
 import { PresentationSchedulingLifecycle, type PresentationSchedulingDecision } from './presentation-scheduling-lifecycle';
 import { PriorityPreparationCoordinator, type PreparationPriority } from './priority-preparation-coordinator';
+import {
+  browserOwnsForegroundPresentation,
+  scheduleBrowserPreparationIdleTask,
+  waitForVisibleBrowserPreparation,
+  yieldBrowserPreparationFrame,
+} from './browser-preparation-scheduler';
 import { flyingCatPose } from './gun-range-cat-choreography';
 import { KillstreakLoadoutController } from './killstreak-loadout';
 import type { KillstreakLoadoutV1, Pass65KillstreakId } from './killstreak-catalog';
@@ -1017,7 +1024,24 @@ function submitWebGpuFrame(
   force = false,
   submissionMode: WebGpuSubmissionMode = 'serialized',
 ): boolean {
-  return renderRuntime.backend === 'webgpu' && renderRuntime.submitFrame(now, force, submissionMode);
+  // Every asynchronous preparation path is expected to await the foreground
+  // barrier before a forced submission. Refuse the residual visibility race at
+  // this final synchronous boundary as defense in depth.
+  return browserOwnsForegroundPresentation()
+    && renderRuntime.backend === 'webgpu'
+    && renderRuntime.submitFrame(now, force, submissionMode);
+}
+async function submitForegroundWebGpuFrame(
+  force = true,
+  submissionMode: WebGpuSubmissionMode = 'serialized',
+): Promise<void> {
+  if (renderRuntime.backend !== 'webgpu') {
+    throw new Error('Foreground WebGPU submission requires the native WebGPU runtime');
+  }
+  while (true) {
+    await waitForVisibleBrowserPreparation();
+    if (submitWebGpuFrame(performance.now(), force, submissionMode)) return;
+  }
 }
 async function flushWebGpuFrames(timeoutMs = 4_000): Promise<void> {
   if (renderRuntime.backend === 'webgpu') await renderRuntime.waitForSubmittedWork(timeoutMs);
@@ -1045,13 +1069,7 @@ let gpuRetirementDisposedGeometries = 0;
 let gpuRetirementFailures = 0;
 
 async function yieldDeferredGpuRetirementTask(): Promise<void> {
-  await new Promise<void>((resolve) => {
-    if (typeof requestAnimationFrame === 'function' && document.visibilityState === 'visible') {
-      requestAnimationFrame(() => resolve());
-    } else {
-      globalThis.setTimeout(resolve, 0);
-    }
-  });
+  await yieldBrowserPreparationFrame();
 }
 
 function disposeDetachedRootResources(root: THREE.Object3D): void {
@@ -1204,6 +1222,7 @@ document.documentElement.dataset.webglContext = 'ready';
 renderRuntime.setPixelRatio(Math.min(window.devicePixelRatio, activeRenderConfig.pixelRatioCap));
 
 const scene = new THREE.Scene();
+const botWeaponGpuVocabulary = new BotWeaponGpuVocabulary(scene, flattenOperatorMaterials);
 const killstreakPresentation = new KillstreakPresentation(
   scene,
   (root) => scheduleDeferredGpuRetirement(root, root.userData.authoredSharedAsset !== true),
@@ -1267,6 +1286,7 @@ type BootstrapStage =
   | 'prewarming-batched-presentations'
   | 'prewarming-grenade-world-presentations'
   | 'prewarming-killstreak-presentations'
+  | 'prewarming-bot-world-weapons'
   | 'prewarming-smoke-presentations'
   | 'prewarming-combat-tracers'
   | 'prewarming-combat-impacts'
@@ -1503,7 +1523,7 @@ async function settleMatchAdmissionAdaptiveWebGpuPresentation(label: string): Pr
       if (!applyDeferredAdaptiveWebGpuRenderBudget(performance.now())) {
         throw new Error(`${label} preset seed resize was not admitted after its WebGPU completion fence`);
       }
-      submitWebGpuFrame(performance.now(), true);
+      await submitForegroundWebGpuFrame();
       await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);
       assertWebGpuAdmissionCompletionLatency(
         `${label} preset seed`,
@@ -1622,7 +1642,7 @@ async function settleMatchAdmissionAdaptiveWebGpuPresentation(label: string): Pr
         if (!applyDeferredAdaptiveWebGpuRenderBudget(performance.now())) {
           throw new Error(`${label} adaptive admission resize was not admitted after its WebGPU completion fence`);
         }
-        submitWebGpuFrame(performance.now(), true);
+        await submitForegroundWebGpuFrame();
         await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);
         assertWebGpuAdmissionCompletionLatency(
           `${label} adaptive resize`,
@@ -1662,7 +1682,7 @@ async function settleWebGpuPresentation(label: string): Promise<void> {
   if (renderRuntime.backend !== 'webgpu') return;
   await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);
   for (let sample = 0; sample < 3; sample += 1) {
-    submitWebGpuFrame(performance.now(), true);
+    await submitForegroundWebGpuFrame();
     await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);
     const presentation = renderRuntime.presentationTelemetry();
     if (presentation.status !== 'healthy') {
@@ -1684,8 +1704,11 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
   bootstrapStage = 'verifying-first-presentation';
   if (renderRuntime.backend === 'webgpu') {
     await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);
-    renderRuntime.resetPresentationProgressWindow(performance.now());
   }
+  // Asset/decode/compile work may finish in the background, but admission and
+  // the official match clock remain owned by one foreground presentation epoch.
+  await waitForVisibleBrowserPreparation();
+  if (renderRuntime.backend === 'webgpu') renderRuntime.resetPresentationProgressWindow(performance.now());
   const startingPresentation = renderRuntime.backend === 'webgpu'
     ? renderRuntime.presentationTelemetry()
     : null;
@@ -1700,7 +1723,97 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
     let samples = 0;
     let resets = 0;
     let maximumGapMs = 0;
-    const sample = (now: number): void => {
+    let settled = false;
+    let frameRequest: number | null = null;
+    let watchdog: ReturnType<typeof setTimeout> | null = null;
+    let foregroundEpochStartedAt = startedAt;
+    let foregroundEpochs = 0;
+    const ownsForeground = (): boolean => document.visibilityState === 'visible' && document.hasFocus();
+    const stopSchedulers = (): void => {
+      if (frameRequest !== null) cancelAnimationFrame(frameRequest);
+      frameRequest = null;
+      if (watchdog !== null) globalThis.clearTimeout(watchdog);
+      watchdog = null;
+    };
+    const detachOwnershipListeners = (): void => {
+      document.removeEventListener('visibilitychange', onOwnershipChange);
+      window.removeEventListener('focus', onOwnershipChange);
+      window.removeEventListener('blur', onOwnershipChange);
+    };
+    const finish = (now: number, admittedDegraded: boolean): void => {
+      if (settled) return;
+      settled = true;
+      stopSchedulers();
+      detachOwnershipListeners();
+      resolve(Object.freeze({
+        backend: renderRuntime.backend,
+        waitedMs: Math.max(0, now - startedAt),
+        stableWindowMs: Math.max(0, now - stableSince),
+        samples,
+        resets,
+        maximumGapMs,
+        startingSubmissionSequence: startingPresentation?.submissionSequence ?? 0,
+        startingCompletedSequence: startingPresentation?.completedSequence ?? 0,
+        admittedDegraded,
+        visibilityState: document.visibilityState,
+        documentHasFocus: document.hasFocus(),
+      }));
+    };
+    const fail = (error: unknown): void => {
+      if (settled) return;
+      settled = true;
+      stopSchedulers();
+      detachOwnershipListeners();
+      reject(error);
+    };
+    let sample!: FrameRequestCallback;
+    const pauseSampling = (): void => {
+      if (frameRequest !== null) cancelAnimationFrame(frameRequest);
+      frameRequest = null;
+      if (watchdog !== null) globalThis.clearTimeout(watchdog);
+      watchdog = null;
+      previousAt = 0;
+    };
+    const scheduleSample = (): void => {
+      if (settled || frameRequest !== null || !ownsForeground()) return;
+      frameRequest = requestAnimationFrame(sample);
+    };
+    const armForegroundWatchdog = (): void => {
+      if (watchdog !== null) globalThis.clearTimeout(watchdog);
+      watchdog = globalThis.setTimeout(() => {
+        watchdog = null;
+        if (!ownsForeground()) {
+          pauseSampling();
+          return;
+        }
+        finish(performance.now(), true);
+      }, maximumWaitMs);
+    };
+    const resumeSampling = (): void => {
+      if (settled || !ownsForeground() || frameRequest !== null) return;
+      const now = performance.now();
+      if (foregroundEpochs > 0) resets += 1;
+      foregroundEpochs += 1;
+      foregroundEpochStartedAt = now;
+      stableSince = now;
+      previousAt = 0;
+      if (renderRuntime.backend === 'webgpu') {
+        renderRuntime.resetPresentationProgressWindow(now);
+      }
+      armForegroundWatchdog();
+      scheduleSample();
+    };
+    function onOwnershipChange(): void {
+      if (ownsForeground()) resumeSampling();
+      else pauseSampling();
+    };
+    sample = (now: number): void => {
+      frameRequest = null;
+      if (settled) return;
+      if (!ownsForeground()) {
+        pauseSampling();
+        return;
+      }
       samples += 1;
       let resetStableWindow = false;
       if (previousAt > 0) {
@@ -1720,7 +1833,7 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
           submitWebGpuFrame(now, false, 'warmed-live');
           const presentation = renderRuntime.presentationTelemetry(performance.now());
           if (presentation.status === 'device-lost' || presentation.status === 'failed') {
-            reject(new Error(`Match admission renderer was ${presentation.status}: ${presentation.lastFailure ?? 'unknown failure'}`));
+            fail(new Error(`Match admission renderer was ${presentation.status}: ${presentation.lastFailure ?? 'unknown failure'}`));
             return;
           }
           if (presentation.status === 'stalled') {
@@ -1740,7 +1853,7 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
             || progress.currentCompletionGapMs > hitchThresholdMs
           )) resetStableWindow = true;
         } catch (error) {
-          reject(error);
+          fail(error);
           return;
         }
       }
@@ -1752,50 +1865,27 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
         }
         presentationProgressReady = renderRuntime.backend === 'webgl2';
       }
-      const waitedMs = Math.max(0, now - startedAt);
       if (now - stableSince >= minimumStableWindowMs && presentationProgressReady) {
-        resolve(Object.freeze({
-          backend: renderRuntime.backend,
-          waitedMs,
-          stableWindowMs: now - stableSince,
-          samples,
-          resets,
-          maximumGapMs,
-          startingSubmissionSequence: startingPresentation?.submissionSequence ?? 0,
-          startingCompletedSequence: startingPresentation?.completedSequence ?? 0,
-          admittedDegraded: false,
-          visibilityState: document.visibilityState,
-          documentHasFocus: document.hasFocus(),
-        }));
+        finish(now, false);
         return;
       }
-      if (waitedMs >= maximumWaitMs) {
-        // A backgrounded tab can be throttled to roughly one animation frame
-        // per second even when its GPU work is fully retired. Admission
-        // telemetry must record that degraded cadence, not turn it into a
-        // fatal error that bounces one multiplayer peer back to the menu.
-        resolve(Object.freeze({
-          backend: renderRuntime.backend,
-          waitedMs,
-          stableWindowMs: now - stableSince,
-          samples,
-          resets,
-          maximumGapMs,
-          startingSubmissionSequence: startingPresentation?.submissionSequence ?? 0,
-          startingCompletedSequence: startingPresentation?.completedSequence ?? 0,
-          admittedDegraded: true,
-          visibilityState: document.visibilityState,
-          documentHasFocus: document.hasFocus(),
-        }));
+      if (now - foregroundEpochStartedAt >= maximumWaitMs) {
+        // Degrade only a genuinely foreground cadence stall. Hidden time never
+        // consumes this budget or advances the official match timeline.
+        finish(now, true);
         return;
       }
-      requestAnimationFrame(sample);
+      scheduleSample();
     };
-    requestAnimationFrame(sample);
+    document.addEventListener('visibilitychange', onOwnershipChange);
+    window.addEventListener('focus', onOwnershipChange);
+    window.addEventListener('blur', onOwnershipChange);
+    resumeSampling();
   });
   if (renderRuntime.backend === 'webgpu') {
     await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);
   }
+  await waitForVisibleBrowserPreparation();
   const endingPresentation = renderRuntime.backend === 'webgpu'
     ? renderRuntime.presentationTelemetry()
     : null;
@@ -1869,19 +1959,29 @@ async function primeFinalWebGlMatchPresentation(): Promise<void> {
   const priorMatchAdmissionPresentationPaused = matchAdmissionPresentationPaused;
   renderSubmissionPaused = true;
   matchAdmissionPresentationPaused = true;
+  const nextForegroundPresentationFrame = async (): Promise<number> => {
+    while (true) {
+      await waitForVisibleBrowserPreparation();
+      const frameAt = await new Promise<number>((resolve) => requestAnimationFrame(resolve));
+      // A tab switch can race the callback. Accept only a compositor boundary
+      // that still owns both visibility and focus; never use a timer to author
+      // the transition-covered WebGL composition in the background.
+      if (document.visibilityState === 'visible' && document.hasFocus()) return frameAt;
+    }
+  };
   try {
     synchronizeFinalWebGlMatchPrimePresentation();
     const synchronizedAt = performance.now();
     // Keep the deployment surface up for one compositor/driver settle boundary.
     // The admission-presentation pause prevents the global frame loop from
     // consuming gameplay, countdown, audio, HUD or network progression.
-    await new Promise<number>((resolve) => requestAnimationFrame(resolve));
+    await nextForegroundPresentationFrame();
     const firstRenderStartedAt = performance.now();
     atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);
     const firstRenderedAt = performance.now();
     // One more frozen settle boundary absorbs deferred driver work, then a
     // second exact normal-frustum draw lands immediately before ready.
-    const settledAt = await new Promise<number>((resolve) => requestAnimationFrame(resolve));
+    const settledAt = await nextForegroundPresentationFrame();
     const finalRenderStartedAt = performance.now();
     atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);
     const finalRenderedAt = performance.now();
@@ -2547,6 +2647,13 @@ async function configurePlayableArenaVisuals(arenaId: ArenaId, root: THREE.Group
   activeArenaVisualDefinition = module.definition;
   applySelectedArenaVisualDefinition(module.definition);
   if (renderRuntime.backend === 'webgpu') {
+    // Browser assets survive map changes, but their GPU receipts are tied to
+    // the active TSL/HDR light graph. Every committed definition can replace
+    // the practical-light topology and therefore its LightsNode/cache key.
+    // Invalidate before either the initial graph creation or a later map's
+    // definition is applied; the arena-bound catalog prewarm below proves the
+    // same retained model identities before any viewmodel is visible.
+    weaponView.invalidateBrowserWeaponGpuReadinessForPipelineChange();
     if (pass64TslSystems) pass64TslSystems.applyDefinition(module.definition);
     else {
       pass64TslSystems = createPass64TslSceneSystems(scene, camera, renderRuntime.renderPipeline, module.definition, {
@@ -2555,11 +2662,6 @@ async function configurePlayableArenaVisuals(arenaId: ArenaId, root: THREE.Group
         ambientOcclusion: graphicsRuntime.ambientOcclusion,
         post: graphicsRuntime.post,
       });
-      // Menu preparation retains and decodes every viewmodel against the
-      // renderer's bootstrap output. Only this first real TSL/HDR graph creation
-      // invalidates that pipeline-dependent GPU receipt; the retained models
-      // are re-prewarmed below without another asset load.
-      weaponView.invalidateBrowserWeaponGpuReadinessForPipelineChange();
     }
     appliedTslArenaDefinitions += 1;
     renderRuntime.setRenderTargetTelemetry(pass64TslSystems.principalHdrTarget.samples, pass64TslSystems.bloomSamples);
@@ -5162,7 +5264,11 @@ const runStreamedWeaponCatalogGpuPrewarm: WeaponViewmodelCatalogGpuPrewarmer = a
           // ancestry. Reveal that chain only for this fenced upload frame or a
           // compile-only receipt could still leave first draw work in combat.
           for (const { model } of priorStates) revealAncestors(model);
-          await renderRuntime.compileAndRender(priorStates[0].model, camera, scene);
+          // The scoped runtime now treats the supplied root as the exact warm
+          // vocabulary. Submit the shared viewmodel root so every visible model
+          // in this catalog batch is retained; passing only the first entry
+          // would mask its sibling and create a false GPU-ready receipt.
+          await renderRuntime.compileAndRender(weaponView.root, camera, scene);
           const presentation = renderRuntime.presentationTelemetry();
           if (presentation.status !== 'healthy') {
             throw new Error(`Streamed ${priorStates.map(({ weaponId }) => weaponId).join(', ')} viewmodel prewarm was ${presentation.status}`);
@@ -5261,14 +5367,13 @@ function applyMenuLoadoutImmediately(): void {
     return;
   }
   const generation = ++menuLoadoutPresentationGeneration;
-  const selectedWeapon = player.weapon;
   const retainedCatalog = menuDeploymentAssetsPromise
     ? WEAPON_IDS
     : menuWeaponPrewarmCatalog(selection.primary, selection.secondary);
-  void weaponView.prewarmBrowserWeaponCatalog(retainedCatalog).then(() => {
-    if (generation !== menuLoadoutPresentationGeneration || gameStarted || player.weapon !== selectedWeapon) return;
-    weaponView.setWeapon(selectedWeapon, true);
-  }).catch((error: unknown) => {
+  // The menu owns prerecorded video, not a live viewmodel. Retain exact CPU
+  // assets only; the selected arena's TSL/light graph establishes GPU-ready
+  // state and atomically selects this weapon during deployment.
+  void weaponView.prepareBrowserWeaponCatalogAssets(retainedCatalog).catch((error: unknown) => {
     if (generation !== menuLoadoutPresentationGeneration) return;
     setStatus(`Selected loadout presentation could not be prepared: ${error instanceof Error ? error.message : String(error)}`, 'warn');
   });
@@ -7957,6 +8062,7 @@ async function prewarmExactWebGlMatchComposition(): Promise<void> {
     await withArenaFrustumCullingDisabled(scene, async () => {
       // Keep this identical to the live WebGL2 frame path: world-only first,
       // then the viewmodel layer after clearDepth through AtomicSignalPass.
+      await waitForVisibleBrowserPreparation();
       atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);
     });
   } finally {
@@ -8427,7 +8533,8 @@ function pauseBackdropCompositorSupported(): boolean {
 }
 
 function presentPauseOnlyWebGlBackdrop(reason: 'escape' | 'debug-pause'): boolean {
-  if (renderRuntime.backend !== 'webgl2' || !atomicSignal) return false;
+  if (renderRuntime.backend !== 'webgl2' || !atomicSignal
+    || document.visibilityState !== 'visible' || !document.hasFocus()) return false;
   const sourceWidth = Math.max(1, canvas.width);
   const sourceHeight = Math.max(1, canvas.height);
   const scale = Math.min(
@@ -8848,6 +8955,12 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   else if (mode === 'host') await spawnBots(privateMatchConfig.hostedBotCount);
   await ensureCorpsePresentationPool();
   const restoreCorpsePoolPrewarm = stageCorpsePresentationPoolForPrewarm();
+  try {
+    await prewarmBotPresentations();
+  } catch (error) {
+    restoreCorpsePoolPrewarm();
+    throw error;
+  }
   // Compile and retire the first complete gameplay presentation while the
   // transition surface still owns the screen. Bot operators, the selected
   // viewmodel and their textures do not exist in the menu-only bootstrap
@@ -10217,7 +10330,12 @@ function spawnBot(index: number, hosted = false, dormantPresentation = false): v
 }
 
 async function prewarmBotPresentations(): Promise<void> {
-  if (bots.size === 0 && dormantBots.size === 0) {
+  const operatorRoots = [
+    ...[...bots.values()].map((bot) => bot.root),
+    ...[...dormantBots.values()].map((bot) => bot.root),
+    ...corpsePresentationPool.map((entry) => entry.root),
+  ];
+  if (operatorRoots.length === 0) {
     dormantBotsPrewarmed = true;
     return;
   }
@@ -10228,9 +10346,17 @@ async function prewarmBotPresentations(): Promise<void> {
     bot.root.scale.setScalar(0.0001);
   }
   try {
-    // Never let cold operator shaders enter the live frame loop. Completion of
-    // this hidden first submission is the boundary between loading and play.
-    await renderRuntime.compileAndRender(scene, camera, scene);
+    // Never let cold operator shaders enter the live frame loop. WebGPU roots
+    // staged in one microtask coalesce into one exact TSL/HDR submission while
+    // the already-covered map is masked, avoiding a second cold full-scene
+    // draw. WebGL retains its single exact-composition compile below.
+    await withArenaFrustumCullingDisabled(scene, async () => {
+      if (renderRuntime.backend === 'webgpu') {
+        await Promise.all(operatorRoots.map((root) => renderRuntime.compileAndRender(root, camera, scene)));
+      } else {
+        await renderRuntime.compileAndRender(scene, camera, scene);
+      }
+    });
     dormantBotsPrewarmed = true;
   } finally {
     for (const bot of dormantBots.values()) {
@@ -10308,7 +10434,6 @@ async function spawnBots(hostedCount?: HostedBotCount): Promise<void> {
   }
   lastBotSpawnIndices.clear();
   for (const [team, index] of activeSpawnHistory) lastBotSpawnIndices.set(team, index);
-  await prewarmBotPresentations();
   if (selectedArena.soloBotCount > 0) {
     addFeed(`${selectedArena.soloBotCount} low-damage hostile operator${selectedArena.soloBotCount === 1 ? '' : 's'} deployed`, 'coral');
   }
@@ -15868,17 +15993,26 @@ let lastPresentationSchedulingDecision: PresentationSchedulingDecision = present
   currentPresentationSchedulingInput(),
   'initial',
 );
+let browserPresentationOwned = browserOwnsForegroundPresentation();
 let hostedBackgroundNetworkHeartbeatCount = 0;
 
 function reconcilePresentationScheduling(reason: string): PresentationSchedulingDecision {
-  const decision = presentationSchedulingLifecycle.observe(currentPresentationSchedulingInput(), reason);
+  const input = currentPresentationSchedulingInput();
+  const decision = presentationSchedulingLifecycle.observe(input, reason);
+  const ownsBrowserPresentation = input.pageVisible && input.windowFocused;
+  const lostBrowserPresentation = browserPresentationOwned && !ownsBrowserPresentation;
+  const regainedBrowserPresentation = !browserPresentationOwned && ownsBrowserPresentation;
+  browserPresentationOwned = ownsBrowserPresentation;
   lastPresentationSchedulingDecision = decision;
-  if (decision.leftForeground) {
+  if (decision.leftForeground || lostBrowserPresentation) {
     clearGameplayInput();
+  }
+  if (!ownsBrowserPresentation) {
     audio.suspend();
     accumulator = 0;
     lastFrame = performance.now();
   }
+  if (regainedBrowserPresentation && !decision.resumedForeground) audio.resume();
   if (decision.resumedForeground) {
     recoverFromSchedulingInterruption(`${reason} · recovery ${decision.recoveryGeneration}`);
     accumulator = 0;
@@ -16483,13 +16617,30 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
     renderRuntime.resetRenderInfo();
     if (renderRuntime.backend === 'webgpu') {
       await flushWebGpuFrames(12_000);
-      await withArenaFrustumCullingDisabled(presentationRoot, async () => {
-        submitWebGpuFrame(performance.now(), true);
+      const exactScenePass = pass64TslSystems;
+      if (!exactScenePass) {
+        throw new Error('WebGPU arena coverage requires the exact Pass 64 ScenePass graph');
+      }
+      await withArenaFrustumCullingDisabled(scene, async () => {
+        // Three yields between node shader stages/render objects during this
+        // exact HDR/MRT compile, preventing one monolithic first-coverage CPU
+        // task. The forced full draw below remains the authoritative geometry,
+        // shadow-caster, post-graph and queue-completion proof.
+        await exactScenePass.precompileExactScenePass(scene);
+        // The asynchronous ScenePass compiler may finish after a tab switch.
+        // Reacquire foreground ownership at the forced full-coverage draw.
+        await waitForVisibleBrowserPreparation();
+        // Earlier masked weapon/effect submissions can consume Three's static
+        // LightShadow flag while the arena is suppressed. Re-arm it only after
+        // the exact compile and immediately before the complete coverage draw.
+        requestStaticShadowRefresh();
+        await submitForegroundWebGpuFrame();
         // This is an admitted cold-generation fence, not the live-frame stall
         // budget. Keep the longer allowance behind the menu/loading surface.
         await flushWebGpuFrames(12_000);
       });
     } else {
+      await waitForVisibleBrowserPreparation();
       atomicSignal?.render(scene, camera, VIEWMODEL_RENDER_LAYER);
     }
     const readiness = auditArenaRenderLiveness(
@@ -17358,7 +17509,7 @@ async function sampleArenaPerformanceBudget(): Promise<ArenaPerformanceBudgetSam
     for (let index = 0; index < 7; index += 1) {
       const started = performance.now();
       renderRuntime.resetRenderInfo();
-      submitWebGpuFrame(performance.now(), true);
+      await submitForegroundWebGpuFrame();
       await flushWebGpuFrames();
       queueMs.push(performance.now() - started);
     }
@@ -17836,6 +17987,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       menuDeploymentAssetsProfile: lastMenuDeploymentAssetsProfile,
       menuDeploymentAssets: menuDeploymentAssetsCoordinator.snapshot(),
       effectPrewarmProfile: lastArenaEffectPrewarmProfile,
+      botWeaponVocabulary: botWeaponGpuVocabulary.telemetry(),
     },
     gameStarted,
     frameCount,
@@ -17971,6 +18123,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
             : null,
     },
     interactiveWorld: {
+      tick: interactiveWorldTick,
       telemetry: interactiveWorldRuntime?.telemetry() ?? null,
       envelope: interactiveWorldRuntime?.stateEnvelope() ?? null,
       presentationRootInScene: interactiveWorldRuntime?.root.parent === scene,
@@ -19259,6 +19412,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     if (renderRuntime.backend === 'webgpu') {
       throw new Error('Synchronous WebGL shadow readback is compatibility-only; use readbackWebGpuFrame()');
     }
+    if (document.visibilityState !== 'visible' || !document.hasFocus()) {
+      throw new Error('Synchronous WebGL shadow readback requires foreground presentation ownership');
+    }
     if (!debugShadowProbe) {
       debugShadowProbe = new THREE.Mesh(
         new THREE.BoxGeometry(0.9, 2, 0.9),
@@ -19302,7 +19458,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       // boundary. A warmed frame admitted between the first drain and this
       // forced readback submission would violate its required idle frontier.
       await flushWebGpuFrames();
-      submitWebGpuFrame(performance.now(), true);
+      await submitForegroundWebGpuFrame();
       await flushWebGpuFrames();
       const target = pass64TslSystems.principalHdrTarget;
       const { x, y, width, height } = centeredReadbackRegion(target.width, target.height);
@@ -19797,13 +19953,9 @@ let sharedGameplayAssetsPromise: Promise<void> | null = null;
 let menuDeploymentAssetsPromise: Promise<void> | null = null;
 
 function yieldMenuPreparationIdleSlice(): Promise<void> {
-  return new Promise<void>((resolve) => {
-    if (typeof window.requestIdleCallback === 'function') {
-      window.requestIdleCallback(() => resolve(), { timeout: 180 });
-      return;
-    }
-    window.setTimeout(resolve, document.visibilityState === 'visible' ? 16 : 50);
-  });
+  // The shared idle scheduler preserves requestIdleCallback while visible and
+  // transfers ownership to a timer if the tab hides before that callback runs.
+  return new Promise<void>((resolve) => scheduleBrowserPreparationIdleTask(resolve, 180));
 }
 
 const menuDeploymentAssetsCoordinator = new PriorityPreparationCoordinator(yieldMenuPreparationIdleSlice);
@@ -19900,14 +20052,23 @@ let lastMenuDeploymentAssetsProfile: Readonly<{
 function prepareMenuDeploymentAssets(priority: PreparationPriority = 'deployment'): Promise<void> {
   const operation = menuDeploymentAssetsCoordinator.prepare(priority, async ({ checkpoint }) => {
     const startedAt = performance.now();
-    const phases: Array<{ name: string; durationMs: number }> = [];
+    const phaseDurations = new Map<string, number>();
     const runPhase = async (name: string, task: () => Promise<unknown>): Promise<void> => {
       await checkpoint();
       const phaseStartedAt = performance.now();
       await task();
-      phases.push({ name, durationMs: Number((performance.now() - phaseStartedAt).toFixed(3)) });
+      phaseDurations.set(name, Number((performance.now() - phaseStartedAt).toFixed(3)));
       await checkpoint();
     };
+    const orderedPhases = (): Array<{ name: string; durationMs: number }> => [
+      'shared-assets',
+      ...(renderRuntime.backend === 'webgpu' ? ['first-person-catalog'] : []),
+      'bot-weapon-vocabulary',
+      'world-drop-corpus',
+    ].flatMap((name) => {
+      const durationMs = phaseDurations.get(name);
+      return durationMs === undefined ? [] : [{ name, durationMs }];
+    });
     lastMenuDeploymentAssetsProfile = Object.freeze({
       startedAt,
       completedAt: null,
@@ -19917,16 +20078,32 @@ function prepareMenuDeploymentAssets(priority: PreparationPriority = 'deployment
       phases: Object.freeze([]),
     });
     try {
-      await runPhase('shared-assets', () => prepareSharedGameplayAssets());
-      if (renderRuntime.backend === 'webgpu') {
-        await runPhase('first-person-catalog', () => weaponView.prewarmBrowserWeaponCatalog(
+      // Shared operator/support loads and the retained world/drop corpus have
+      // no ownership dependency. Start both after one priority checkpoint so
+      // an early Deploy escalation can reuse the work instead of waiting for
+      // two serial multi-second decode lanes.
+      const sharedAssets = runPhase('shared-assets', () => prepareSharedGameplayAssets());
+      const worldDropCorpus = runPhase('world-drop-corpus', () => prewarmPass65RuntimeWeaponCorpus(checkpoint));
+      const botWeaponVocabulary = runPhase(
+        'bot-weapon-vocabulary',
+        () => botWeaponGpuVocabulary.prepareCpu(checkpoint),
+      );
+      const firstPersonCatalog = sharedAssets.then(() => renderRuntime.backend === 'webgpu'
+        // Menu preparation owns CPU assets/residency only. GPU readiness is
+        // established after the selected arena installs its exact TSL/light
+        // graph; claiming it against the bootstrap graph created false-ready
+        // models and first-switch hitches.
+        ? runPhase('first-person-catalog', () => weaponView.prepareBrowserWeaponCatalogAssets(
           WEAPON_IDS,
           undefined,
           checkpoint,
-        ));
-      }
-      await runPhase('world-drop-corpus', () => prewarmPass65RuntimeWeaponCorpus(checkpoint));
+        ))
+        : undefined);
+      // Attach both independent lanes immediately so a failure in one cannot
+      // leave the other as an unobserved rejection while rollback begins.
+      await Promise.all([worldDropCorpus, firstPersonCatalog, botWeaponVocabulary]);
       const completedAt = performance.now();
+      const phases = orderedPhases();
       lastMenuDeploymentAssetsProfile = Object.freeze({
         startedAt,
         completedAt,
@@ -19937,6 +20114,7 @@ function prepareMenuDeploymentAssets(priority: PreparationPriority = 'deployment
       });
     } catch (error) {
       const completedAt = performance.now();
+      const phases = orderedPhases();
       lastMenuDeploymentAssetsProfile = Object.freeze({
         startedAt,
         completedAt,
@@ -19962,7 +20140,7 @@ let lastArenaEffectPrewarmProfile: Readonly<{
 }> | null = null;
 
 async function yieldDeploymentPrewarmFrame(): Promise<void> {
-  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  await yieldBrowserPreparationFrame();
 }
 
 async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): Promise<void> {
@@ -19998,6 +20176,12 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
         prewarmExplosiveBoltPresentation(sceneGeneration),
       ])],
       ['smoke-volumes', () => smokeVolumePresentationPool.prewarm(renderRuntime, camera, sceneGeneration)],
+      ['bot-world-weapons', () => botWeaponGpuVocabulary.prewarm(
+        renderRuntime,
+        camera,
+        sceneGeneration,
+        yieldDeploymentPrewarmFrame,
+      )],
       // This retains the complete vehicle/effect vocabulary, three authored LOD
       // bands, 24-drone formation and possessed-cockpit submissions. Its
       // internal CPU yields naturally place later exact draws in bounded waves.
@@ -20005,7 +20189,7 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
     ] as const;
     // Start every compatible family in one call stack. RenderRuntime coalesces
     // their first exact roots into one masked TSL/HDR submission, while
-    // Promise.all preserves the seven-name evidence order regardless of which
+    // Promise.all preserves the eight-name evidence order regardless of which
     // family completes first.
     const groups = await Promise.all(groupDefinitions.map(([name, operation]) => runGroup(name, operation)));
     lastArenaEffectPrewarmProfile = Object.freeze({
@@ -20042,6 +20226,9 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
   bootstrapStage = 'prewarming-killstreak-presentations';
   profileArenaTransition('prewarm-killstreaks');
   await killstreakPresentation.prewarm(renderRuntime, camera, sceneGeneration);
+  bootstrapStage = 'prewarming-bot-world-weapons';
+  profileArenaTransition('prewarm-bot-world-weapons');
+  await botWeaponGpuVocabulary.prewarm(renderRuntime, camera, sceneGeneration, yieldDeploymentPrewarmFrame);
   bootstrapStage = 'prewarming-smoke-presentations';
   profileArenaTransition('prewarm-smoke');
   await smokeVolumePresentationPool.prewarm(renderRuntime, camera, sceneGeneration);

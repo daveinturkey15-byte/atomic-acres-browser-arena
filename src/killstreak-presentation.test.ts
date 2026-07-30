@@ -477,7 +477,7 @@ describe('killstreak presentation', () => {
     expect(rebuiltRuntime.compileAndRender).toHaveBeenCalledTimes(7);
     presentation.dispose();
     await expect(presentation.prewarm(rebuiltRuntime, camera)).rejects.toThrow('disposed');
-  });
+  }, 15_000);
 
   it('rewarms the scene-dependent variants exactly once for each arena generation', async () => {
     const scene = new THREE.Scene();

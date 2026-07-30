@@ -4,6 +4,10 @@ import { presentationRandom } from './runtime-random';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { buildWeaponModel, optimizeAttachedWeapon, roundedBox, texturedMaterial } from './art-kit';
 import {
+  scheduleBrowserPreparationIdleTask,
+  yieldBrowserPreparationFrame,
+} from './browser-preparation-scheduler';
+import {
   createFirstPersonRiggedArms,
   firstPersonArmAnimationState,
   loadFirstPersonArmsAsset,
@@ -887,11 +891,7 @@ export class WeaponPresentation {
           this.root.userData.pass65FieldKnifeDropLoadError = error instanceof Error ? error.message : String(error);
         });
       };
-      const idleCallback = (window as Window & {
-        requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
-      }).requestIdleCallback;
-      if (typeof idleCallback === 'function') idleCallback.call(window, prewarmDropKnife, { timeout: 2_000 });
-      else globalThis.setTimeout(prewarmDropKnife, 0);
+      scheduleBrowserPreparationIdleTask(prewarmDropKnife);
     }
 
     const ids = browserRuntime ? [initialWeapon] : Object.keys(WEAPONS) as WeaponId[];
@@ -1396,12 +1396,7 @@ export class WeaponPresentation {
           // prerecorded loading/menu video and accessibility UI can present.
           // One giant 17-model node build created a measured 1.24s long task.
           if (yieldToBrowser) await yieldToBrowser();
-          else {
-            await new Promise<void>((resolve) => {
-              if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => resolve());
-              else globalThis.setTimeout(resolve, 0);
-            });
-          }
+          else await yieldBrowserPreparationFrame();
         }
       }
     }).then(async () => {

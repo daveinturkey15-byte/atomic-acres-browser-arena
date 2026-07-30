@@ -92,7 +92,7 @@ describe('Gun Range authored rack presentation', () => {
     expect(deployment.indexOf('await ensureSelectedQualityPresentation(selectedArena.id)'))
       .toBeLessThan(deployment.indexOf('batchSelectedArenaPresentation()'));
     expect(deployment.indexOf('batchSelectedArenaPresentation()'))
-      .toBeLessThan(deployment.indexOf('submitWebGpuFrame(performance.now(), true)'));
+      .toBeLessThan(deployment.indexOf('await submitForegroundWebGpuFrame()'));
     expect(source).toContain('rackPresentation: arena.root.userData.gunRangeRackPresentation ?? null');
     expect(source).toContain('authored: rackModel?.userData.projectOriginalWeapon === true');
     expect(source).toContain('deliveryVariant: rackModel?.userData.deliveryVariant ?? null');

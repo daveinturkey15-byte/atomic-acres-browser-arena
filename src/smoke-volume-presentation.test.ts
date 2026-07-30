@@ -78,11 +78,9 @@ describe('smoke grenade volume presentation', () => {
     const scene = new THREE.Scene();
     const pool = new SmokeVolumePresentationPool(scene, 12);
     const camera = new THREE.PerspectiveCamera();
-    vi.stubGlobal('document', {});
-    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
-      callback(performance.now());
-      return 1;
-    });
+    vi.stubGlobal('document', { visibilityState: 'hidden' });
+    const suspendedAnimationFrame = vi.fn(() => 1);
+    vi.stubGlobal('requestAnimationFrame', suspendedAnimationFrame);
     try {
       const visiblePerSubmission: number[] = [];
       const compileAndRender = vi.fn(async () => {
@@ -91,6 +89,7 @@ describe('smoke grenade volume presentation', () => {
       await pool.prewarm({ compileAndRender }, camera, 9);
       expect(compileAndRender).toHaveBeenCalledTimes(6);
       expect(visiblePerSubmission).toEqual([2, 2, 2, 2, 2, 2]);
+      expect(suspendedAnimationFrame).not.toHaveBeenCalled();
       expect(pool.root.children.every((root) => !root.visible)).toBe(true);
     } finally {
       vi.unstubAllGlobals();

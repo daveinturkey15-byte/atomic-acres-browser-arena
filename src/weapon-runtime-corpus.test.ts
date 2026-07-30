@@ -53,10 +53,31 @@ function embeddedImageDigests(path: string): readonly string[] {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   vi.resetModules();
 });
 
 describe('Pass 65 menu-video runtime weapon corpus', () => {
+  it('finishes its default cooperative decode lane while hidden animation frames are suspended', async () => {
+    vi.resetModules();
+    const suspendedAnimationFrame = vi.fn(() => 1);
+    vi.stubGlobal('document', { visibilityState: 'hidden' });
+    vi.stubGlobal('requestAnimationFrame', suspendedAnimationFrame);
+    vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (
+      Promise.resolve(fakeGltf(String(url)))
+    )) as unknown as GLTFLoader['loadAsync']);
+    const weaponModel = await import('./weapon-model');
+
+    await weaponModel.prewarmPass65RuntimeWeaponCorpus();
+
+    expect(suspendedAnimationFrame).not.toHaveBeenCalled();
+    expect(weaponModel.pass65WeaponCacheTelemetry().runtimeCorpus).toMatchObject({
+      ready: true,
+      prewarming: false,
+      profile: expect.objectContaining({ completed: true, error: null }),
+    });
+  });
+
   it('keeps the checked-in world/drop corpus inside the explicit compressed budget', async () => {
     const { PASS65_RUNTIME_WEAPON_CORPUS_BUDGET } = await import('./weapon-model');
     const files: string[] = [];

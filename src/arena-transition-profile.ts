@@ -24,6 +24,7 @@ export type ArenaTransitionProfilePhase =
   | 'prewarm-overdrive'
   | 'prewarm-grenade-world'
   | 'prewarm-killstreaks'
+  | 'prewarm-bot-world-weapons'
   | 'prewarm-smoke'
   | 'prewarm-explosive-bolts'
   | 'coverage-submit-fence'

@@ -185,8 +185,9 @@ export class BotWeaponGpuVocabulary {
       throw error;
     } finally {
       for (const [node, frustumCulled] of frustumStates) node.frustumCulled = frustumCulled;
-      // The exact cache-owning clones remain attached for zero-allocation bot
-      // swaps, but no vocabulary geometry may leak into live presentation.
+      // Exact cache-owning clones stay attached so their authored shader,
+      // texture and layout vocabulary remains warm. Live bot swaps still own
+      // their distinct presentation clones; no vocabulary geometry may leak.
       this.root.visible = false;
     }
   }

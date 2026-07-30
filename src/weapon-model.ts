@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
+import { yieldBrowserPreparationFrame } from './browser-preparation-scheduler';
 import { cloneMeshGeometriesForOwner } from './gpu-resource-ownership';
 import { WEAPON_IDS, type WeaponId } from './protocol';
 
@@ -328,11 +329,7 @@ function runtimeCorpusReady(): boolean {
 }
 
 async function defaultRuntimeCorpusYield(): Promise<void> {
-  if (typeof document === 'undefined') return;
-  await new Promise<void>((resolve) => {
-    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => resolve());
-    else globalThis.setTimeout(resolve, 0);
-  });
+  await yieldBrowserPreparationFrame();
 }
 
 /**

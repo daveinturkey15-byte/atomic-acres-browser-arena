@@ -3,6 +3,10 @@ import type { RenderPipeline, WebGPURenderer } from 'three/webgpu';
 import { assertTslCutoverReady } from './tsl-migration-inventory';
 import type { ToneMappingMode } from '../graphics-settings-registry';
 import { FramePacingSampler, type FramePacingSummary } from '../frame-pacing';
+import {
+  browserOwnsForegroundPresentation,
+  waitForVisibleBrowserPreparation,
+} from '../browser-preparation-scheduler';
 
 export type RenderBackendId = 'webgl2' | 'webgpu';
 
@@ -377,6 +381,10 @@ function suppressUnrelatedRenderables(
   };
 }
 
+function suppressUnrelatedWebGlRenderables(scene: THREE.Scene, root: THREE.Object3D): () => void {
+  return suppressUnrelatedRenderables(scene, [root]);
+}
+
 export class LegacyWebGlRenderRuntime {
   readonly backend = 'webgl2' as const;
   readonly renderer: THREE.WebGLRenderer;
@@ -547,17 +555,27 @@ export class LegacyWebGlRenderRuntime {
       throw new Error('WebGL presentation prewarm root must be attached to the submitted scene');
     }
     await this.compile(root, camera, scene);
+    // compileAsync can outlive the foreground turn that admitted it. Recheck
+    // immediately before the synchronous draw so a mid-compile tab switch can
+    // never leak one hidden WebGL frame.
     // Presentation pools stage exact-scale buffers and authored materials, but
     // they must not redraw the complete cold arena once per effect family. The
     // selected scene's lights remain available to the staged root; the final
     // AtomicSignal coverage and match-composition renders still prove the full
     // world. This removes redundant whole-map raster/driver work without
     // deferring any effect geometry, texture, material or upload into combat.
-    const restoreVisibility = suppressUnrelatedRenderables(scene, [root]);
-    try {
-      this.renderer.render(scene, camera);
-    } finally {
-      restoreVisibility();
+    while (true) {
+      await waitForVisibleBrowserPreparation();
+      const restoreVisibility = suppressUnrelatedWebGlRenderables(scene, root);
+      try {
+        // The visibility traversal itself can race a tab switch. Recheck at
+        // the final synchronous boundary and retry without authoring a frame.
+        if (!browserOwnsForegroundPresentation()) continue;
+        this.renderer.render(scene, camera);
+        return;
+      } finally {
+        restoreVisibility();
+      }
     }
   }
 
@@ -1129,6 +1147,10 @@ export class WebGpuRenderRuntime {
     if (attachmentRoot !== scene) {
       throw new Error('WebGPU presentation prewarm root must be attached to the submitted scene');
     }
+    // Never encode a forced TSL/HDR presentation frame for a hidden tab. CPU,
+    // network and decode preparation remain independent of this foreground
+    // ownership boundary and can finish before the tab becomes visible again.
+    await waitForVisibleBrowserPreparation();
     if (this.presentationPrewarmBatch) {
       if (this.presentationPrewarmScene !== scene) {
         throw new Error('WebGPU presentation prewarm batch cannot span multiple submitted scenes');
@@ -1163,11 +1185,18 @@ export class WebGpuRenderRuntime {
       // already-admitted warmed frame may still own renderer resources. Drain
       // that exact target before the forced one-deep compilation submission.
       await this.waitForSubmittedWork(12_000);
-      const restoreVisibility = suppressUnrelatedRenderables(scene, roots);
-      try {
-        this.submitFrame(this.clock(), true);
-      } finally {
-        restoreVisibility();
+      // Queue retirement may finish after the browser lost focus. Reacquire
+      // foreground ownership at the actual encode boundary, not only when the
+      // caller entered this method.
+      let submitted = false;
+      while (!submitted) {
+        await waitForVisibleBrowserPreparation();
+        const restoreVisibility = suppressUnrelatedRenderables(scene, roots);
+        try {
+          submitted = this.submitFrame(this.clock(), true);
+        } finally {
+          restoreVisibility();
+        }
       }
       // Presentation-only effects prewarm behind the loading surface. Cold
       // Chrome/driver shader creation can exceed the live four-second fence,
@@ -1192,6 +1221,7 @@ export class WebGpuRenderRuntime {
   ): boolean {
     if (this.deviceLost) throw new Error(this.lastFailure ?? 'WebGPU device lost');
     if (this.uncapturedErrors > 0) throw new Error(this.lastFailure ?? 'WebGPU uncaptured error');
+    if (!browserOwnsForegroundPresentation()) return false;
     const admissionCheckedAt = this.clock();
     this.submissionMode = submissionMode;
     const inFlightSubmissions = Math.max(0, this.submissionSequence - this.completedSequence);

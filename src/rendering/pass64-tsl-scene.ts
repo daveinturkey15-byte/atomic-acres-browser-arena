@@ -82,6 +82,12 @@ export type Pass64TslSceneSystems = Readonly<{
     strength: number;
   }>;
   compiledPipelineIds: readonly string[];
+  /**
+   * Asynchronously compiles visible descendants against the exact principal
+   * HDR target/MRT used by the live ScenePass. The caller still owns the final
+   * forced RenderPipeline submission and completion fence.
+   */
+  precompileExactScenePass(root: THREE.Object3D): Promise<void>;
   applyDefinition(definition: ArenaVisualDefinition): void;
   setReviewCamera(camera: ArenaReviewCamera): void;
   clearReviewCamera(): void;
@@ -517,6 +523,28 @@ export function createPass64TslSceneSystems(
       ...graphics.ambientOcclusion,
     }),
     compiledPipelineIds,
+    precompileExactScenePass: async (precompileRoot) => {
+      let attachmentRoot = precompileRoot;
+      while (attachmentRoot.parent) attachmentRoot = attachmentRoot.parent;
+      if (attachmentRoot !== scene) {
+        throw new Error('Pass 64 exact ScenePass precompile root must be attached to the submitted scene');
+      }
+      const renderer = renderPipeline.renderer;
+      const previousRenderTarget = renderer.getRenderTarget();
+      const previousMrt = renderer.getMRT();
+      renderer.setRenderTarget(scenePass.renderTarget);
+      renderer.setMRT(scenePass.getMRT());
+      try {
+        // Three r185 yields between node shader stages and render objects here,
+        // avoiding one monolithic first RenderPipeline encoding task. Binding
+        // the ScenePass target and MRT preserves the live pipeline cache keys;
+        // a default-canvas compile would not warm the HDR/MRT path.
+        await renderer.compileAsync(precompileRoot, camera, scene);
+      } finally {
+        renderer.setRenderTarget(previousRenderTarget);
+        renderer.setMRT(previousMrt);
+      }
+    },
     applyDefinition: (nextDefinition) => {
       activeDefinition = nextDefinition;
       activeReviewCamera = null;
