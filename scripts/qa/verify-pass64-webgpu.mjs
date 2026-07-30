@@ -523,25 +523,63 @@ try {
   });
   await switchPage.goto(`http://127.0.0.1:${port}/?renderer=webgpu&externalServices=off&map=atomic-acres&render=blender&seed=6401`);
   await switchPage.waitForFunction(() => {
-    const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
-    return state?.weaponReady === true && state?.bootstrap?.stage === 'ready';
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    const state = api?.snapshot();
+    const catalog = api?.sampleWeaponCatalogReadiness();
+    const preparation = state?.bootstrap?.menuDeploymentAssetsProfile;
+    return state?.weaponReady === true
+      && state?.bootstrap?.stage === 'ready'
+      && preparation?.completed === true
+      && preparation?.error === null
+      && catalog?.prewarming === false
+      && catalog?.loaded === catalog?.available
+      && catalog?.gpuReady === catalog?.available
+      && catalog?.retainedCount === catalog?.available;
   }, undefined, { timeout: 60_000 });
   const deferredMenuState = await switchPage.evaluate(() => {
-    const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    const state = api.snapshot();
+    const presentation = state.render.runtime.presentation;
     return {
       constructionCount: state.arenaSelection.streaming.constructionCount,
       residentArenaRoots: state.arenaSelection.streaming.residentArenaRoots,
-      submissionSequence: state.render.runtime.presentation.submissionSequence,
+      submissionSequence: presentation.submissionSequence,
+      completedSequence: presentation.completedSequence,
+      presentationStatus: presentation.status,
+      completionFailures: presentation.completionFailures,
+      deviceLost: state.render.runtime.deviceLost,
+      uncapturedErrors: state.render.runtime.uncapturedErrors,
       gameplayArena: document.documentElement.dataset.gameplayArena,
       previewMode: document.documentElement.dataset.menuPreview,
+      menuVisible: document.querySelector('#menu')?.classList.contains('hidden') === false,
+      gameStarted: state.gameStarted,
+      preparation: state.bootstrap.menuDeploymentAssetsProfile,
+      weaponCatalog: api.sampleWeaponCatalogReadiness(),
     };
   });
   if (deferredMenuState.constructionCount !== 0
     || deferredMenuState.residentArenaRoots !== 0
-    || deferredMenuState.submissionSequence !== 0
+    // A single fenced TSL/HDR submission compiles the isolated retained-asset
+    // vocabulary after the prerecorded video is visible. It is not a gameplay
+    // frame: no arena root exists, the menu remains visible, and the exact
+    // completion frontier must already be drained before this evidence sample.
+    || deferredMenuState.submissionSequence !== 1
+    || deferredMenuState.completedSequence !== deferredMenuState.submissionSequence
+    || deferredMenuState.presentationStatus !== 'healthy'
+    || deferredMenuState.completionFailures !== 0
+    || deferredMenuState.deviceLost !== false
+    || deferredMenuState.uncapturedErrors !== 0
     || deferredMenuState.gameplayArena !== 'deferred-until-deployment'
-    || deferredMenuState.previewMode !== 'prerecorded-video') {
-    throw new Error(`Prerecorded menu eagerly constructed or submitted gameplay: ${JSON.stringify(deferredMenuState)}`);
+    || deferredMenuState.previewMode !== 'prerecorded-video'
+    || deferredMenuState.menuVisible !== true
+    || deferredMenuState.gameStarted !== false
+    || deferredMenuState.preparation?.completed !== true
+    || deferredMenuState.preparation?.error !== null
+    || deferredMenuState.weaponCatalog?.prewarming !== false
+    || deferredMenuState.weaponCatalog?.loaded !== deferredMenuState.weaponCatalog?.available
+    || deferredMenuState.weaponCatalog?.gpuReady !== deferredMenuState.weaponCatalog?.available
+    || deferredMenuState.weaponCatalog?.retainedCount !== deferredMenuState.weaponCatalog?.available) {
+    throw new Error(`Prerecorded menu violated deferred-gameplay or bounded retained-asset preparation: ${JSON.stringify(deferredMenuState)}`);
   }
   const switchReceipts = [];
   const maximumResidentTextureBytes = 768 * 1024 * 1024;

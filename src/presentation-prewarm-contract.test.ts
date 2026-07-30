@@ -615,6 +615,32 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('firstSwitchAudit.before.gpuReady !== firstSwitchAudit.before.available');
   });
 
+  it('keeps prerecorded-menu gameplay deferred while proving the one fenced retained-asset submission', () => {
+    const source = readFileSync(new URL('../scripts/qa/verify-pass64-webgpu.mjs', import.meta.url), 'utf8');
+    const gate = source.slice(
+      source.indexOf('const deferredMenuState = await switchPage.evaluate'),
+      source.indexOf('const switchReceipts = [];'),
+    );
+    expect(gate).toContain('constructionCount: state.arenaSelection.streaming.constructionCount');
+    expect(gate).toContain('residentArenaRoots: state.arenaSelection.streaming.residentArenaRoots');
+    expect(gate).toContain("gameplayArena !== 'deferred-until-deployment'");
+    expect(gate).toContain("previewMode !== 'prerecorded-video'");
+    expect(gate).toContain('menuVisible !== true');
+    expect(gate).toContain('gameStarted !== false');
+    expect(gate).toContain('submissionSequence !== 1');
+    expect(gate).toContain('completedSequence !== deferredMenuState.submissionSequence');
+    expect(gate).toContain("presentationStatus !== 'healthy'");
+    expect(gate).toContain('completionFailures !== 0');
+    expect(gate).toContain('deviceLost !== false');
+    expect(gate).toContain('uncapturedErrors !== 0');
+    expect(gate).toContain('preparation?.completed !== true');
+    expect(gate).toContain('preparation?.error !== null');
+    expect(gate).toContain('weaponCatalog?.loaded !== deferredMenuState.weaponCatalog?.available');
+    expect(gate).toContain('weaponCatalog?.gpuReady !== deferredMenuState.weaponCatalog?.available');
+    expect(gate).toContain('weaponCatalog?.retainedCount !== deferredMenuState.weaponCatalog?.available');
+    expect(gate).not.toContain('submissionSequence !== 0');
+  });
+
   it('adds the four readiness terms and bootstrap stage to timeout evidence', () => {
     const source = readFileSync(new URL('../tests/e2e/atomic-acres.spec.ts', import.meta.url), 'utf8');
     for (const term of ['statusKind', 'soloDisabled', 'weaponReady', 'originalArtLoaded', 'bootstrap']) {
