@@ -13,14 +13,40 @@ export const FINAL_MEDIA_EXTENSIONS = Object.freeze(['mp4', 'webm', 'webp']);
 export const RETAINED_CACHE_FAMILY_BASELINE = Object.freeze({
   schemaVersion: CACHE_FAMILY_LOCK_SCHEMA_VERSION,
   algorithm: FINAL_MEDIA_SET_ALGORITHM,
-  families: Object.freeze([Object.freeze({
-    cacheKey: 'pass65-runtime-preview-v7',
-    recipeId: 'pass65-authoritative-runtime-menu-preview-v4',
-    finalMediaSetSha256: '352bfbbca5a2ad06b501997c6d34f64fa70a4ae7f7a20ad93b45c757a45c5576',
-    fileCount: 12,
-    totalBytes: 6672030,
-    recordedAt: '2026-07-28',
-  })]),
+  families: Object.freeze([
+    Object.freeze({
+      cacheKey: 'pass65-runtime-preview-v7',
+      recipeId: 'pass65-authoritative-runtime-menu-preview-v4',
+      finalMediaSetSha256: '352bfbbca5a2ad06b501997c6d34f64fa70a4ae7f7a20ad93b45c757a45c5576',
+      fileCount: 12,
+      totalBytes: 6672030,
+      recordedAt: '2026-07-28',
+    }),
+    Object.freeze({
+      cacheKey: 'pass66-runtime-preview-v1',
+      recipeId: 'pass66-authoritative-runtime-menu-preview-v1',
+      finalMediaSetSha256: 'b20c52a5a6787f722b71550011e31954f1bfa6c1a28c5440e4b13da9aa0d2969',
+      fileCount: 12,
+      totalBytes: 9982260,
+      recordedAt: '2026-07-29',
+    }),
+    Object.freeze({
+      cacheKey: 'pass66-runtime-preview-v2',
+      recipeId: 'pass66-authoritative-runtime-menu-preview-v1',
+      finalMediaSetSha256: 'e0ccb5e4ab0d24ca784851043d55f5a1faa2568ae679068b2fc7f677fc8a264e',
+      fileCount: 12,
+      totalBytes: 10130001,
+      recordedAt: '2026-07-29',
+    }),
+    Object.freeze({
+      cacheKey: 'pass66-runtime-preview-v3',
+      recipeId: 'pass66-authoritative-runtime-menu-preview-v1',
+      finalMediaSetSha256: '632fcf631f27a43e4815f4e8c920c35a8c16ebf59271449f5a3b7a5d52d0be97',
+      fileCount: 12,
+      totalBytes: 10559132,
+      recordedAt: '2026-07-29',
+    }),
+  ]),
 });
 
 function slash(value) {
@@ -255,6 +281,20 @@ export async function runIntegrityMutationSelfTest() {
     if (!cacheFamilyLockFailures(rewritten, initialLock).some((issue) => issue.includes('rewrote retained entry'))) {
       throw new Error('cache-family self-test missed retained-entry rewriting');
     }
+    const appendedEntry = {
+      cacheKey: 'pass66-runtime-preview-v4',
+      recipeId: 'fixture-v2',
+      finalMediaSetSha256: '3'.repeat(64),
+      fileCount: 12,
+      totalBytes: 144,
+      recordedAt: '2026-07-30',
+    };
+    const appended = appendCacheFamily(initialLock, appendedEntry);
+    if (!appended.appended
+      || JSON.stringify(appended.lock.families.slice(0, initialLock.families.length)) !== JSON.stringify(initialLock.families)
+      || JSON.stringify(appended.lock.families.at(-1)) !== JSON.stringify(appendedEntry)) {
+      throw new Error('cache-family self-test did not append a new family after retained history');
+    }
     return Object.freeze({
       dependencyIncludedMutationRejected: true,
       dependencyAssetMutationRejected: true,
@@ -262,6 +302,7 @@ export async function runIntegrityMutationSelfTest() {
       stagedFrameMutationRejected: true,
       cacheKeyReuseRejected: true,
       cacheAppendOnlyRewriteRejected: true,
+      cacheAppendPreservesHistory: true,
     });
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });

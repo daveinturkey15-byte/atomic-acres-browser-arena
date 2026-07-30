@@ -36,6 +36,7 @@ const chopperSourcePath = path.join(root, 'source-assets/blender/pass65-chopper-
 const acceptedCockpitEvidence = 'docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png';
 const acceptedCockpitEvidencePath = path.join(root, acceptedCockpitEvidence);
 const acceptedCockpitDigest = '581c448b7d998a220ea69fb0c024d9553f40d9aea767b3d88b503780a64921d1';
+const generatedAt = '2026-07-30';
 const choreography = JSON.parse(await readFile(choreographyPath, 'utf8'));
 const arenas = Object.keys(choreography.arenas);
 const captureToolPaths = [generatorPath, integrityPath, integrityTypesPath, dependencyManifestPath];
@@ -96,7 +97,7 @@ function validateRecipe() {
     || choreography.reviewFrames.at(-1) !== choreography.frameCount) {
     throw new Error('reviewFrames must be unique and include the exact loop endpoints');
   }
-  if (choreography.media.cacheKey !== 'pass66-runtime-preview-v3') throw new Error('runtime preview cache key is stale');
+  if (choreography.media.cacheKey !== 'pass66-runtime-preview-v4') throw new Error('runtime preview cache key is stale');
   const rotor = choreography.helicopter?.rotorPresentation;
   const configuredRotorArea = rotor?.mainStageWidthPercent / 100 * rotor?.mainStageHeightPercent / 100;
   const configuredRotorTop = rotor?.mainStageTopPercent / 100;
@@ -472,7 +473,7 @@ try {
     finalMediaSetSha256: finalMediaSet.sha256,
     fileCount: finalMediaSet.fileCount,
     totalBytes: finalMediaSet.totalBytes,
-    recordedAt: '2026-07-29',
+    recordedAt: generatedAt,
   });
   nextCacheFamilyLock = cacheResult.lock;
   for (const arena of arenas) {
@@ -498,7 +499,7 @@ for (const arena of arenas) {
 const provenance = {
   schemaVersion: 4,
   assetId: 'atomic-acres-pass65-prerecorded-menu-previews-2026-07-26',
-  generatedAt: '2026-07-29',
+  generatedAt,
   creator: 'Atomic Acres project',
   license: 'Original project work',
   releaseState: 'HITL candidate only',

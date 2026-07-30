@@ -581,6 +581,7 @@ const currentDependencyClosure = currentCanonicalDependencies
   : null;
 
 if (choreography.schemaVersion !== 4 || choreography.recipeId !== 'pass66-authoritative-runtime-menu-preview-v1') failures.push('canonical runtime choreography schema/recipe drifted');
+if (choreography.media?.cacheKey !== 'pass66-runtime-preview-v4') failures.push('canonical runtime preview cache family is not the unused Pass 66 v4 family');
 if (choreography.capture?.source !== 'authoritative-runtime-arena' || choreography.capture?.backend !== 'webgpu' || choreography.capture?.overlayScale !== 0.5) failures.push('canonical capture must pin authoritative WebGPU arenas and half-scale overlays');
 if (choreography.frameCount !== choreography.fps * choreography.durationSeconds) failures.push('choreography frame count does not equal fps * duration');
 if (Object.keys(choreography.arenas).join(',') !== arenas.join(',')) failures.push('choreography arena roster/order drifted');

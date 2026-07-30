@@ -8,7 +8,7 @@
   "reviewFrames": [1, 60, 120, 180, 240],
   "runtimeContract": "prerecorded compressed media only; static poster for reduced motion; zero arena construction or gameplay renderer submissions",
   "media": {
-    "cacheKey": "pass66-runtime-preview-v3",
+    "cacheKey": "pass66-runtime-preview-v4",
     "containers": ["webm", "mp4"],
     "poster": "webp",
     "encodingBudget": {
