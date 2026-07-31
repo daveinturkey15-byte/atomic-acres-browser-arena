@@ -29,6 +29,21 @@ function roomIdentityLeaseKey(roomCode: string): string {
   return `atomic-acres:room-identity-owner:${roomCode}`;
 }
 
+const LAST_ROOM_KEY = 'atomic-acres:last-room';
+
+/** Remember the most recently joined room so a crashed player can be offered a
+    one-click rejoin on reload instead of re-pasting the code. */
+export function saveLastRoomCode(roomCode: string, persistentStorage: StorageLike): void {
+  try { persistentStorage.setItem(LAST_ROOM_KEY, roomCode); } catch { /* Rejoin affordance is best effort. */ }
+}
+
+export function loadLastRoomCode(persistentStorage: StorageLike): string | null {
+  try {
+    const value = persistentStorage.getItem(LAST_ROOM_KEY);
+    return typeof value === 'string' && value.length > 0 ? value : null;
+  } catch { return null; }
+}
+
 function validIdentity(value: unknown): value is RoomRejoinIdentity {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<RoomRejoinIdentity>;

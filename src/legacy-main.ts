@@ -355,7 +355,7 @@ import {
 } from './death-drops';
 import { DeathDropPresentationPool } from './death-drop-presentation';
 import { ArenaNetwork } from './network';
-import { loadRoomRejoinIdentity, releaseRoomRejoinIdentityLease, saveRoomRejoinIdentity } from './room-rejoin-identity';
+import { loadRoomRejoinIdentity, releaseRoomRejoinIdentityLease, saveRoomRejoinIdentity, saveLastRoomCode, loadLastRoomCode } from './room-rejoin-identity';
 import {
   HIGH_SCORE_STORAGE_KEY,
   HIGH_SCORE_SCHEMA_VERSION,
@@ -4623,6 +4623,7 @@ function saveActiveRoomIdentity(roomCode: string): void {
     Date.now(),
     roomIdentityTabId,
   );
+  saveLastRoomCode(roomCode, localStorage);
   activeRoomIdentityCode = roomCode;
 }
 
@@ -16562,6 +16563,12 @@ resize();
 const launchParams = new URLSearchParams(window.location.search);
 const invitedRoom = launchParams.get('room')?.trim() ?? '';
 if (invitedRoom) element<HTMLInputElement>('#room-input').value = invitedRoom;
+else {
+  // A player who crashed or closed the tab lands back on the menu with no room
+  // code. Pre-fill the last room they were in so rejoining is one click.
+  const lastRoom = loadLastRoomCode(localStorage);
+  if (lastRoom) element<HTMLInputElement>('#room-input').value = lastRoom;
+}
 const invitedName = launchParams.get('name');
 const normalizedInvitedName = normalizeRequiredPlayerName(invitedName ?? '');
 if (normalizedInvitedName) element<HTMLInputElement>('#player-name').value = normalizedInvitedName;
