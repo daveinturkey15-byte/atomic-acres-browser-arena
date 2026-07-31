@@ -493,11 +493,19 @@ export function createFirstPersonRiggedArms(flattenMaterials: boolean): FirstPer
     if (!(node instanceof THREE.Mesh)) return;
     node.castShadow = false;
     node.receiveShadow = false;
+    // Camera-space viewmodels must never frustum-cull: the repartitioned
+    // four-skin delivery keeps rest-pose bounds that do not track the posed
+    // IK chains, which silently dropped whole arms from the render list.
+    node.frustumCulled = false;
     const prepare = (material: THREE.Material) => {
       const result = materialForFirstPerson(material, flattenMaterials);
       result.transparent = false;
       result.opacity = 1;
       result.depthWrite = true;
+      // The thicker authored sleeves can legitimately intersect the near
+      // plane in tight stances; render interiors so a clipped sleeve reads
+      // as solid cloth instead of vanishing through backface culling.
+      result.side = THREE.DoubleSide;
       return result;
     };
     if (Array.isArray(node.material)) node.material = node.material.map(prepare);
