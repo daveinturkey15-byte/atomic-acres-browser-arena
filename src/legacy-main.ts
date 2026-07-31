@@ -338,6 +338,7 @@ import {
   DEATH_DROP_INTERACTION_RANGE,
   DEATH_DROP_SCAVENGE_RANGE,
   MAX_DEATH_DROPS,
+  DEATH_DROP_LIFETIME_MS,
   consumeDeathDropWeapon,
   createDeathDrop,
   deathDropAmmoAvailable,
@@ -7832,6 +7833,11 @@ function interactWithDeathDrop(now = performance.now(), expectedTargetId?: strin
   if (!result.consumed) return false;
   interruptReload(true, now);
   entity.drop = result.drop;
+  // Owner requirement: the swapped-out weapon and its ammo stay on the ground
+  // for a full 30 seconds from the swap so the player can re-swap freely. The
+  // drop otherwise kept its original (possibly near-expired) creation time and
+  // despawned almost immediately after the exchange.
+  entity.drop.expiresAt = now + DEATH_DROP_LIFETIME_MS;
   player.primaryWeapon = result.inventory.primary;
   player.ammo[result.inventory.primary] = result.inventory.ammo;
   player.reserve[result.inventory.primary] = result.inventory.reserve;
@@ -16407,6 +16413,7 @@ const sensitivityInput = element<HTMLInputElement>('#sensitivity');
 const controllerSensitivityInput = element<HTMLInputElement>('#controller-sensitivity');
 const fovInput = element<HTMLInputElement>('#field-of-view');
 const graphicsProfileInput = element<HTMLSelectElement>('#graphics-profile');
+const graphicsSaveButton = element<HTMLButtonElement>('#graphics-save');
 const reducedMotionInput = element<HTMLInputElement>('#reduced-motion');
 const reducedDamageFlashInput = element<HTMLInputElement>('#reduced-damage-flash');
 const reducedSensoryEffectsInput = element<HTMLInputElement>('#reduced-sensory-effects');
@@ -16543,6 +16550,35 @@ graphicsProfileInput.addEventListener('change', () => {
     advancedGraphicsBinding.refresh({ schemaVersion: 1, preset, ...GRAPHICS_PRESET_VALUES[preset as keyof typeof GRAPHICS_PRESET_VALUES] });
   }
   refreshGraphicsPendingBadge();
+});
+
+/**
+ * Apply the presentation-side effects budget for the saved settings right now,
+ * so a graphics change is visible immediately even though the full renderer
+ * rebuild (render scale, MSAA, AO, shadows) still happens at the next menu
+ * boundary. This is what makes the SAVE button feel like it does something.
+ */
+function applyLiveGraphicsEffects(): void {
+  if (!applyPresentationEffectsBudget) return;
+  const live = resolveGraphicsRuntime(pass65Settings.graphics, renderRuntime.backend === 'webgl2');
+  applyPresentationEffectsBudget(applyGraphicsPreferenceBudget(
+    graphicsEffectsBudget(live.renderProfile, adaptiveQuality.telemetry().pixelRatioCap),
+  ));
+}
+
+graphicsSaveButton.addEventListener('click', () => {
+  const hadPending = pendingGraphicsPreset !== null || advancedGraphicsBinding.hasPendingEdits();
+  flushPendingGraphics();
+  if (!hadPending) {
+    setStatus('Graphics already saved · no pending changes.');
+    return;
+  }
+  applyLiveGraphicsEffects();
+  if (gameStarted) {
+    setStatus('GRAPHICS SAVED · effects applied now · full renderer rebuild on your next deployment.');
+  } else {
+    setStatus('GRAPHICS SAVED · applying renderer settings.');
+  }
 });
 
 for (const id of AUDIO_BUS_IDS) {

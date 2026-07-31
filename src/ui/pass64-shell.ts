@@ -207,7 +207,7 @@ function optionsPanelMarkup(): string {
       <label>FIELD OF VIEW<input id="field-of-view" type="range" min="70" max="100" step="1" value="82"></label>
     </div>
     <section id="graphics-settings" class="settings-section" aria-labelledby="graphics-settings-title">
-      <header><b id="graphics-settings-title">GRAPHICS</b><span id="graphics-effective">EFFECTIVE: QUALITY</span></header>
+      <header><b id="graphics-settings-title">GRAPHICS</b><span id="graphics-effective">EFFECTIVE: QUALITY</span><button id="graphics-save" type="button">SAVE GRAPHICS</button></header>
       <div class="graphics-preset-row">
         <label>GRAPHICS MODE<select id="graphics-profile"><option value="high">QUALITY</option><option value="performance">PERFORMANCE</option><option value="max">MAX</option><option value="custom">CUSTOM</option></select></label>
         <p>Quality is the balanced default. Performance reduces presentation cost. Max cranks every setting. Editing any advanced control saves the mode as Custom.</p>
