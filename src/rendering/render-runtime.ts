@@ -335,15 +335,20 @@ export type PresentationPrewarmRuntime = Readonly<{
   compileAndRender(root: THREE.Object3D, camera: THREE.Camera, scene: THREE.Scene): Promise<void>;
 }>;
 
-export function resolveRenderRuntimeRequest(search: string): RenderRuntimeRequest {
+export function resolveRenderRuntimeRequest(search: string, webGpuAvailable = true): RenderRuntimeRequest {
   const query = new URLSearchParams(search);
-  const requestedBackend = query.get('renderer') === 'webgl2' ? 'webgl2' : 'webgpu';
-  return {
-    requestedBackend,
-    // WebGPU is a renderer contract, not a feature-detection hint. Silent
-    // WebGL fallback would make the HITL evidence and rollback boundary false.
-    requireWebGPU: requestedBackend === 'webgpu',
-  };
+  const explicit = query.get('renderer');
+  // An explicit ?renderer=webgpu stays a hard WebGPU contract (HITL evidence and
+  // rollback boundary must not silently become WebGL2). ?renderer=webgl2 forces
+  // the compatibility backend.
+  if (explicit === 'webgl2') return { requestedBackend: 'webgl2', requireWebGPU: false };
+  if (explicit === 'webgpu') return { requestedBackend: 'webgpu', requireWebGPU: true };
+  // Default: prefer WebGPU, but on browsers that do not expose it at all
+  // (Firefox and Safari ship without WebGPU; older Edge too) gracefully use
+  // WebGL2 so the game still runs. The backend reported back is still the true
+  // one, so nothing is misrepresented as WebGPU.
+  if (!webGpuAvailable) return { requestedBackend: 'webgl2', requireWebGPU: false };
+  return { requestedBackend: 'webgpu', requireWebGPU: true };
 }
 
 function webGlAdapterLabel(renderer: THREE.WebGLRenderer): string {

@@ -1014,20 +1014,43 @@ document.documentElement.dataset.graphicsToneMapping = graphicsRuntime.post.tone
 document.documentElement.dataset.reducedSensory = accessibilityRuntime.reducedSensory ? 'true' : 'false';
 document.documentElement.dataset.reducedMotion = accessibilityRuntime.reducedMotion ? 'true' : 'false';
 document.documentElement.style.setProperty('--damage-flash-scale', String(accessibilityRuntime.damageFlashScale));
-const runtimeRequest = resolveRenderRuntimeRequest(window.location.search);
-const renderRuntime = runtimeRequest.requestedBackend === 'webgpu'
-  ? await WebGpuRenderRuntime.create({
+const runtimeRequest = resolveRenderRuntimeRequest(
+  window.location.search,
+  typeof navigator !== 'undefined' && typeof (navigator as Navigator & { gpu?: unknown }).gpu !== 'undefined',
+);
+async function createWebGl2Runtime(): Promise<LegacyWebGlRenderRuntime> {
+  return LegacyWebGlRenderRuntime.create({
+    canvas,
+    alpha: false,
+    antialias: activeRenderConfig.antialias,
+    powerPreference: 'high-performance',
+  });
+}
+let renderRuntime: WebGpuRenderRuntime | LegacyWebGlRenderRuntime;
+if (runtimeRequest.requestedBackend === 'webgpu') {
+  try {
+    renderRuntime = await WebGpuRenderRuntime.create({
       canvas,
       antialias: graphicsRuntime.antialiasSamples > 0,
       samples: Math.max(1, graphicsRuntime.antialiasSamples),
       requireWebGPU: true,
-    })
-  : await LegacyWebGlRenderRuntime.create({
-      canvas,
-      alpha: false,
-      antialias: activeRenderConfig.antialias,
-      powerPreference: 'high-performance',
     });
+  } catch (webGpuError) {
+    // An explicit ?renderer=webgpu must fail closed (HITL contract). An
+    // auto-selected WebGPU that fails at init (present but broken adapter) falls
+    // back to WebGL2 so the game still runs on that browser/GPU combination.
+    const forcedWebGpu = new URLSearchParams(window.location.search).get('renderer') === 'webgpu';
+    if (forcedWebGpu) throw webGpuError;
+    appendClientRuntimeLog({
+      kind: 'error',
+      message: `WebGPU init failed, falling back to WebGL2: ${webGpuError instanceof Error ? webGpuError.message : String(webGpuError)}`,
+      stack: webGpuError instanceof Error ? webGpuError.stack : undefined,
+    }, clientPersistentStorage());
+    renderRuntime = await createWebGl2Runtime();
+  }
+} else {
+  renderRuntime = await createWebGl2Runtime();
+}
 if (renderRuntime.backend === 'webgpu') renderRuntime.assertCandidateReady();
 const legacyRenderer = renderRuntime.backend === 'webgl2' ? renderRuntime.renderer : null;
 function submitWebGpuFrame(

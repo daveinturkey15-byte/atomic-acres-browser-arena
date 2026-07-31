@@ -30,6 +30,15 @@ describe('Pass 64 render runtime boundary', () => {
     expect(resolveRenderRuntimeRequest('?renderer=webgl2')).toEqual({ requestedBackend: 'webgl2', requireWebGPU: false });
   });
 
+  it('falls back to WebGL2 on browsers without WebGPU unless WebGPU is explicitly forced', () => {
+    // Firefox/Safari/older Edge expose no navigator.gpu: the default request
+    // must gracefully use WebGL2 so the game still runs there.
+    expect(resolveRenderRuntimeRequest('', false)).toEqual({ requestedBackend: 'webgl2', requireWebGPU: false });
+    expect(resolveRenderRuntimeRequest('?renderer=webgl2', false)).toEqual({ requestedBackend: 'webgl2', requireWebGPU: false });
+    // An explicit ?renderer=webgpu stays a hard contract even when unavailable.
+    expect(resolveRenderRuntimeRequest('?renderer=webgpu', false)).toEqual({ requestedBackend: 'webgpu', requireWebGPU: true });
+  });
+
   it('maps every exposed tone-mapping label to a real Three renderer mode', () => {
     expect(toneMappingForMode('aces')).toBe(THREE.ACESFilmicToneMapping);
     expect(toneMappingForMode('agx')).toBe(THREE.AgXToneMapping);
