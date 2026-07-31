@@ -192,7 +192,9 @@ describe('Pass 65 managed weapon runtime behavior', () => {
   });
 
   it('suppresses the sniper viewmodel without removing its prepared WebGPU render vocabulary', () => {
-    const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(), false);
+    // Canonical 75deg/16:9 framing: the viewmodel screen-scale compensation is
+    // exactly 1 here, so the unsuppressed scale is the authored hip scale.
+    const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250), false);
     presentation.suppressForSniperScope(true);
 
     expect(presentation.root.visible).toBe(true);

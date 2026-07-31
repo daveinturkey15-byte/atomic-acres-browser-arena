@@ -92,23 +92,23 @@ html[data-reduced-motion=true] *,html[data-reduced-motion=true] *::before,html[d
 @media(max-width:700px){#network-strip{right:12px;top:42px;max-width:50vw;font-size:7px}#combat-stats{left:12px;bottom:88px;padding:5px 7px;font-size:7px}#roster-list>div{grid-template-columns:minmax(90px,1fr) 34px 34px 90px 50px 58px;gap:5px;font-size:10px}#roster-list strong,#roster-list small{font-size:8px}}
 @media(max-height:600px) and (min-width:701px){#minimap{width:240px;height:240px}#map-heading{width:240px}#location-label{top:338px;width:240px}}
 
-/* Pass 66 scope correction: the camera already magnifies; the overlay must stay a
-   clean, fully transparent sight picture. The old radial surround was 96% opaque
-   black, which read to the owner as the screen fading to black the moment they
-   aimed down the sniper. Only a faint vignette and a crisp reticle remain. */
-#sniper-scope{position:absolute;inset:0;z-index:12;pointer-events:none;background:radial-gradient(circle at 50% 50%,transparent 0 46%,rgba(3,8,10,.18) 60%,rgba(3,8,10,.42) 100%)}
+/* Pass 66 scope correction: true camera magnification with a proper black scope
+   surround (the owner wants the surround kept) but a large, feathered sight
+   circle so aiming reads as looking through an optic, not the screen fading to
+   black the way the death wash does. */
+#sniper-scope{position:absolute;inset:0;z-index:12;pointer-events:none;background:radial-gradient(circle at 50% 50%,transparent 0 min(42vh,32vw),rgba(1,3,4,.55) calc(min(42vh,32vw) + 14px),rgba(1,3,4,.97) calc(min(42vh,32vw) + 46px),#010304 100%)}
 #sniper-scope[hidden]{display:none}
 #hud.sniper-scope-active>:not(#sniper-scope):not(#crosshair){opacity:1!important;z-index:13}
 #hud.sniper-scope-active>#crosshair{opacity:0!important}
-#sniper-scope .scope-ring{position:absolute;left:50%;top:50%;width:min(86vh,64vw);aspect-ratio:1;transform:translate(-50%,-50%);border:1px solid rgba(142,232,238,.28);border-radius:50%;box-shadow:inset 0 0 0 1px rgba(4,15,18,.25)}
-#sniper-scope .scope-reticle{position:absolute;left:50%;top:50%;width:min(86vh,64vw);aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;overflow:hidden;filter:drop-shadow(0 0 1px rgba(0,0,0,.6))}
-#sniper-scope .scope-reticle::before,#sniper-scope .scope-reticle::after{content:'';position:absolute;left:50%;top:50%;background:rgba(233,255,250,.92);transform:translate(-50%,-50%)}
+#sniper-scope .scope-ring{position:absolute;left:50%;top:50%;width:min(84vh,64vw);aspect-ratio:1;transform:translate(-50%,-50%);border:5px solid #0d1517;border-radius:50%;box-shadow:inset 0 0 0 2px rgba(142,232,238,.22),inset 0 0 42px rgba(4,15,18,.4),0 0 0 2px #000}
+#sniper-scope .scope-reticle{position:absolute;left:50%;top:50%;width:min(84vh,64vw);aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;overflow:hidden;filter:drop-shadow(0 0 1px rgba(0,0,0,.6))}
+#sniper-scope .scope-reticle::before,#sniper-scope .scope-reticle::after{content:'';position:absolute;left:50%;top:50%;background:rgba(6,16,17,.92);transform:translate(-50%,-50%)}
 #sniper-scope .scope-reticle::before{width:1px;height:100%}#sniper-scope .scope-reticle::after{width:100%;height:1px}
 #sniper-scope .scope-reticle i{position:absolute;left:50%;top:50%;width:5px;height:5px;transform:translate(-50%,-50%);border:1px solid rgba(233,255,250,.95);border-radius:50%;background:rgba(8,20,22,.55);box-shadow:0 0 4px rgba(0,0,0,.7)}
-#sniper-scope .scope-reticle b{position:absolute;left:50%;top:52%;width:2px;height:24%;transform:translateX(-50%);background:linear-gradient(rgba(233,255,250,.92) 0 38%,transparent 38% 48%,rgba(233,255,250,.92) 48% 52%,transparent 52% 62%,rgba(233,255,250,.92) 62%)}
-#sniper-scope .scope-reticle span,#sniper-scope .scope-reticle em{position:absolute;top:50%;width:9%;height:4px;border-top:1px solid rgba(233,255,250,.85);border-bottom:1px solid rgba(233,255,250,.6);transform:translateY(-50%)}
+#sniper-scope .scope-reticle b{position:absolute;left:50%;top:52%;width:2px;height:24%;transform:translateX(-50%);background:linear-gradient(rgba(6,16,17,.92) 0 38%,transparent 38% 48%,rgba(6,16,17,.92) 48% 52%,transparent 52% 62%,rgba(6,16,17,.92) 62%)}
+#sniper-scope .scope-reticle span,#sniper-scope .scope-reticle em{position:absolute;top:50%;width:9%;height:4px;border-top:1px solid rgba(6,16,17,.9);border-bottom:1px solid rgba(6,16,17,.72);transform:translateY(-50%)}
 #sniper-scope .scope-reticle span{left:24%}#sniper-scope .scope-reticle em{right:24%}
-#sniper-scope>small{position:absolute;left:50%;top:calc(50% - min(43vh,32vw) + 16px);transform:translateX(-50%);font:900 11px/1 Inter;letter-spacing:.22em;color:rgba(221,247,241,.85);text-shadow:0 1px 3px #000}
+#sniper-scope>small{position:absolute;left:50%;top:calc(50% - min(42vh,32vw) + 16px);transform:translateX(-50%);font:900 11px/1 Inter;letter-spacing:.22em;color:rgba(221,247,241,.85);text-shadow:0 1px 3px #000}
 
 /* Pass 28: Atomic Signal owns grade/dither/vignette in one GPU pass. Retire the
    older CSS overlays while it is active so the scene is graded exactly once. */

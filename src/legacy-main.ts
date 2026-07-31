@@ -7648,6 +7648,10 @@ function applyDamage(
     requestAnimationFrame(() => damageFlash.classList.add('pulse'));
   }
   if (player.hp <= 0) {
+    // When a killstreak event dealt the lethal blow, the caller owns the death
+    // bookkeeping and runs it after the killstreak update settles. Bail here so
+    // the death is processed exactly once, not re-entrantly inside advance().
+    if (deferredLocalKillstreakDeath) return;
     interruptReload(true, now);
     cancelFInteractionPress('death', now);
     player.alive = false;
@@ -7838,6 +7842,14 @@ function interactWithDeathDrop(now = performance.now(), expectedTargetId?: strin
   // drop otherwise kept its original (possibly near-expired) creation time and
   // despawned almost immediately after the exchange.
   entity.drop.expiresAt = now + DEATH_DROP_LIFETIME_MS;
+  // On a real weapon swap the gun you dropped must land at YOUR feet (where
+  // the one you just picked up was), not back at the old drop's position - so
+  // you can swap straight back. A replenish keeps the same gun, so it stays put.
+  if (result.mode !== 'replenish') {
+    const floorY = player.position.y - stanceEyeHeight(player.stance) + 0.18;
+    entity.drop.position = { x: player.position.x, y: floorY, z: player.position.z };
+    entity.root.position.set(player.position.x, floorY, player.position.z);
+  }
   player.primaryWeapon = result.inventory.primary;
   player.ammo[result.inventory.primary] = result.inventory.ammo;
   player.reserve[result.inventory.primary] = result.inventory.reserve;
@@ -10128,9 +10140,12 @@ function updateRailgun(now: number): void {
   }
   railgunPresentation.updateWorld(railgunState, now);
   // The optic is an authority-side thermal scope: it engages on a settled aim,
-  // and the reveal itself is drawn by the exact-pose thermal ghosts.
+  // and the reveal itself is drawn by the exact-pose thermal ghosts. The reveal
+  // must stay live for the whole aim hold - gating it on the per-shot re-ADS
+  // flag turned see-through-walls off the instant the player fired, which read
+  // as the railgun scope having lost the feature entirely.
   const thermalActive = localHoldsRailgun() && player.weapon === 'railgun' && adsHeld
-    && !railgunAdsResetRequired && weaponView.adsProgress() >= 0.6;
+    && weaponView.adsProgress() >= 0.6;
   railgunThermalRevealActive = thermalActive;
   // Exact-pose thermal ghosts replace the procedural capsule mannequins; the
   // railgun overlay chrome stays, the fake silhouettes never place.
@@ -13766,6 +13781,36 @@ function releaseCareCapture(now = performance.now()): void {
   }
 }
 
+/**
+ * Set when a killstreak damage event lethally hits the local player mid-loop.
+ * The death bookkeeping is deferred to finishDeferredLocalKillstreakDeath so it
+ * never mutates the killstreak runtime re-entrantly inside advance().
+ */
+let deferredLocalKillstreakDeath: { attacker: string; cause: KillCause } | null = null;
+
+function finishDeferredLocalKillstreakDeath(now = performance.now()): void {
+  const pending = deferredLocalKillstreakDeath;
+  deferredLocalKillstreakDeath = null;
+  if (!pending || player.alive || player.hp > 0) return;
+  interruptReload(true, now);
+  cancelFInteractionPress('death', now);
+  player.alive = false;
+  player.deaths += 1;
+  if (network.role !== 'client') {
+    killstreakRuntime.recordActorDeath(player.id, localContinuity + 1);
+    refreshLocalKillstreakSnapshot(now);
+    broadcastKillstreakState(now);
+  }
+  updateFieldSupportHud();
+  const death: DeathMessage = { type: 'death', killer: pending.attacker, victim: player.id, cause: pending.cause, nonce: randomNonce() };
+  if (network.role !== 'client') {
+    network.send(death);
+    processDeath(death);
+  }
+  scheduleLocalRespawn(now);
+  document.exitPointerLock();
+}
+
 function applyKillstreakDamageEvent(event: KillstreakDamageEvent): KillstreakDamageEvent | null {
   if (appliedKillstreakDamageResults.has(event.resultId)) return null;
   appliedKillstreakDamageResults.add(event.resultId);
@@ -13777,8 +13822,17 @@ function applyKillstreakDamageEvent(event: KillstreakDamageEvent): KillstreakDam
   if (event.targetId === player.id) {
     if (event.targetLifeId !== localContinuity) return null;
     const before = player.hp;
+    // A lethal hit from the player's OWN killstreak (e.g. standing in a carpet
+    // bomb) used to run the full death sequence re-entrantly inside the damage
+    // event loop - mutating the killstreak runtime and broadcasting snapshots
+    // mid-advance, which crashed. Apply only the health loss here and defer the
+    // death bookkeeping until the killstreak update has fully settled.
     applyDamage(event.damage, event.ownerId, 1, true, cause);
-    return { ...event, damage: Math.max(0, before - player.hp) };
+    const applied = Math.max(0, before - player.hp);
+    if (player.hp <= 0 && player.alive) {
+      deferredLocalKillstreakDeath = { attacker: event.ownerId, cause };
+    }
+    return { ...event, damage: applied };
   }
   const bot = bots.get(event.targetId);
   if (bot && network.role !== 'client') {
@@ -13957,6 +14011,9 @@ function updatePass65KillstreakRuntime(now: number): void {
       network.send(message);
     }
     if (network.role === 'host' && now - lastKillstreakStateBroadcastAt >= 100) broadcastKillstreakState(now);
+    // A lethal self-hit from a carpet bomb (or similar) deferred its death until
+    // here, so the runtime is no longer mid-advance when it is processed.
+    finishDeferredLocalKillstreakDeath(now);
   }
   killstreakPresentation.sync(killstreakSnapshot, now);
   syncActiveSupportRotorAudio(now);
