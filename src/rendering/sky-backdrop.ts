@@ -48,17 +48,72 @@ const SKY_BACKDROP_GRADIENTS: Readonly<Record<SkyBackdropPreset, readonly Gradie
   ] as const),
 });
 
+/**
+ * Per-preset cloud fields baked into the backdrop so every backend (WebGPU and
+ * WebGL2/Firefox alike) gets a real sky with clouds, not a flat gradient.
+ * Bands are vertical fractions of the texture (0 = zenith, 1 = horizon).
+ */
+const SKY_BACKDROP_CLOUDS: Readonly<Record<SkyBackdropPreset, Readonly<{
+  count: number;
+  bandTop: number;
+  bandBottom: number;
+  rgb: [number, number, number];
+  alpha: number;
+  scale: number;
+} | null>>> = Object.freeze({
+  'sunset-farmland': Object.freeze({ count: 26, bandTop: 0.42, bandBottom: 0.82, rgb: [255, 176, 122] as [number, number, number], alpha: 0.5, scale: 1 }),
+  'industrial-night': Object.freeze({ count: 10, bandTop: 0.5, bandBottom: 0.8, rgb: [70, 96, 120] as [number, number, number], alpha: 0.22, scale: 1.2 }),
+  'airport-dawn': Object.freeze({ count: 30, bandTop: 0.34, bandBottom: 0.86, rgb: [255, 255, 255] as [number, number, number], alpha: 0.62, scale: 1 }),
+  'indoor-range': null,
+});
+
+function skyRandom(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 0x1_0000_0000;
+  };
+}
+
+function paintClouds(context: CanvasRenderingContext2D, preset: SkyBackdropPreset, width: number, height: number): void {
+  const config = SKY_BACKDROP_CLOUDS[preset];
+  if (!config) return;
+  const random = skyRandom(preset.length * 7919 + 13);
+  const [r, g, b] = config.rgb;
+  for (let index = 0; index < config.count; index += 1) {
+    const cx = random() * width;
+    const cy = (config.bandTop + random() * (config.bandBottom - config.bandTop)) * height;
+    const puffs = 5 + Math.floor(random() * 5);
+    const baseRadius = (18 + random() * 30) * config.scale;
+    for (let puff = 0; puff < puffs; puff += 1) {
+      const px = cx + (random() - 0.5) * baseRadius * 3.4;
+      const py = cy + (random() - 0.5) * baseRadius * 0.9;
+      const radius = baseRadius * (0.5 + random() * 0.7);
+      const density = config.alpha * (0.4 + random() * 0.6);
+      const blob = context.createRadialGradient(px, py, 0, px, py, radius);
+      blob.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${density.toFixed(3)})`);
+      blob.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+      context.fillStyle = blob;
+      context.beginPath();
+      context.arc(px, py, radius, 0, Math.PI * 2);
+      context.fill();
+    }
+  }
+}
+
 function gradientTexture(preset: SkyBackdropPreset): THREE.Texture {
+  const width = 512;
   const height = 256;
   const canvas = document.createElement('canvas');
-  canvas.width = 8;
+  canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext('2d');
   if (!context) throw new Error('Sky backdrop requires a 2D context');
   const gradient = context.createLinearGradient(0, 0, 0, height);
   for (const [offset, css] of SKY_BACKDROP_GRADIENTS[preset]) gradient.addColorStop(offset, css);
   context.fillStyle = gradient;
-  context.fillRect(0, 0, canvas.width, height);
+  context.fillRect(0, 0, width, height);
+  paintClouds(context, preset, width, height);
   const texture = new THREE.CanvasTexture(canvas);
   texture.name = `pass66-sky-backdrop-${preset}`;
   texture.colorSpace = THREE.SRGBColorSpace;
