@@ -167,7 +167,6 @@ import {
   computeFallDamage,
   computeRecoilImpulse,
   computeSpread,
-  botScaledDamage,
   admittedPlayerDamage,
   createMatch,
   grenadeDamage,
@@ -11524,6 +11523,18 @@ function acceptHostedBotDamage(message: BotDamageMessage): void {
   }
   trimNonceSet();
 }
+
+/**
+ * Owner feedback: hosted bots in multiplayer felt like fodder next to how they
+ * play in skirmish. The shared 0.25 multiplier is explicitly tuned for SOLO
+ * bots; in a hosted multiplayer match the bots fight real players and need to be
+ * a genuine threat, so they hit harder there.
+ */
+const HOSTED_BOT_DAMAGE_MULTIPLIER = 0.55;
+function botCombatDamage(rawDamage: number): number {
+  const multiplier = gameMode === 'solo' ? BOT_DAMAGE_MULTIPLIER : HOSTED_BOT_DAMAGE_MULTIPLIER;
+  return Math.max(0, Number.isFinite(rawDamage) ? rawDamage : 0) * multiplier;
+}
 function updateBots(dt: number, now: number): void {
   if ((gameMode !== 'solo' && gameMode !== 'host') || matchState.phase !== 'active') return;
   let botIndex = 0;
@@ -11740,7 +11751,7 @@ function updateBots(dt: number, now: number): void {
         }
         if (resolution.hitTarget) {
           hitTarget = true;
-          damage += botScaledDamage(applyPenetrationDamage(
+          damage += botCombatDamage(applyPenetrationDamage(
             computeDamage(botWeapon, distance, 'body'),
             resolution.damageMultiplier,
           ));
@@ -12722,7 +12733,7 @@ function explodeGrenade(entity: GrenadeEntity): void {
   if (entity.ownerKind === 'bot') {
     const blocked = activeWorldColliders().some((box) => segmentIntersectsBox(point, player.position, box));
     const distance = player.position.distanceTo(point);
-    const damage = blocked ? 0 : botScaledDamage(blastDamage(distance, player.stance === 'prone'));
+    const damage = blocked ? 0 : botCombatDamage(blastDamage(distance, player.stance === 'prone'));
     lastBotGrenadeDamage = damage;
     if (damage > 0 && player.alive) {
       applyDamage(damage, entity.ownerId, 0, false, { kind: 'grenade' });
