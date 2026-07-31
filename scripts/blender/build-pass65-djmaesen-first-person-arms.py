@@ -875,10 +875,10 @@ def partition_render_batches(mesh, armature, materials, root_key, source_triangl
                 json.dumps(boundary_loop_records(glove)),
             )
     sleeve_radial_scale = env_float(
-        "PASS65_SLEEVE_RADIAL_SCALE", 1.00, 0.72, 1.08,
+        "PASS65_SLEEVE_RADIAL_SCALE", 0.86, 0.48, 0.86,
     )
     firing_sleeve_radial_scale = env_float(
-        "PASS65_FIRING_SLEEVE_RADIAL_SCALE", 0.78, 0.62, 0.92,
+        "PASS65_FIRING_SLEEVE_RADIAL_SCALE", 0.56, 0.48, 0.66,
     )
     for sleeve in sleeves:
         refine_sleeve_profile(
@@ -2713,7 +2713,7 @@ batches, delivery_triangles = partition_render_batches(
     source_mesh, armature, materials, root_key, source_triangles, authored_cap_triangles,
 )
 refine_hand_proportions(
-    batches, armature, float(os.environ.get("PASS65_HAND_SCALE", "1.0")),
+    batches, armature, float(os.environ.get("PASS65_HAND_SCALE", "0.86")),
 )
 author_first_person_shoulder_anchors(armature, batches)
 root = configure_asset_root(
