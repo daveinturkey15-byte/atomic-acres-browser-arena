@@ -18,12 +18,13 @@ const SKY_BACKDROP_GRADIENTS: Readonly<Record<SkyBackdropPreset, readonly Gradie
   // Deep sunset: indigo zenith through violet and a broad burnt-orange band
   // into a glowing gold horizon. Owner wanted a much richer Atomic Acres sky.
   'sunset-farmland': Object.freeze([
-    [0, '#1b1140'],
-    [0.22, '#3a1d5e'],
-    [0.44, '#7a2f68'],
-    [0.62, '#c14a3f'],
-    [0.78, '#ef7d3a'],
-    [0.9, '#f7a94b'],
+    [0, '#150d38'],
+    [0.18, '#2c1654'],
+    [0.38, '#5c2566'],
+    [0.55, '#9c3a5e'],
+    [0.68, '#d4553f'],
+    [0.8, '#f07f36'],
+    [0.9, '#fca94a'],
     [1, '#ffd98a'],
   ] as const),
   // True night: near-black zenith with a faint aurora-green horizon lift.
@@ -75,24 +76,73 @@ function skyRandom(seed: number): () => number {
   };
 }
 
+/**
+ * Per-preset sun disc baked into the backdrop. x is a horizontal fraction of the
+ * texture width, y a vertical fraction (0 = zenith, 1 = horizon).
+ */
+const SKY_BACKDROP_SUN: Readonly<Record<SkyBackdropPreset, Readonly<{
+  x: number;
+  y: number;
+  coreRgb: [number, number, number];
+  glowRgb: [number, number, number];
+  coreRadius: number;
+  glowRadius: number;
+} | null>>> = Object.freeze({
+  'sunset-farmland': Object.freeze({ x: 0.3, y: 0.86, coreRgb: [255, 236, 190] as [number, number, number], glowRgb: [255, 158, 64] as [number, number, number], coreRadius: 26, glowRadius: 120 }),
+  'industrial-night': null,
+  'airport-dawn': Object.freeze({ x: 0.72, y: 0.62, coreRgb: [255, 252, 240] as [number, number, number], glowRgb: [255, 240, 205] as [number, number, number], coreRadius: 20, glowRadius: 90 }),
+  'indoor-range': null,
+});
+
+function paintSun(context: CanvasRenderingContext2D, preset: SkyBackdropPreset, width: number, height: number): void {
+  const sun = SKY_BACKDROP_SUN[preset];
+  if (!sun) return;
+  const cx = sun.x * width;
+  const cy = sun.y * height;
+  const [gr, gg, gb] = sun.glowRgb;
+  const glow = context.createRadialGradient(cx, cy, 0, cx, cy, sun.glowRadius);
+  glow.addColorStop(0, `rgba(${gr}, ${gg}, ${gb}, 0.85)`);
+  glow.addColorStop(0.4, `rgba(${gr}, ${gg}, ${gb}, 0.32)`);
+  glow.addColorStop(1, `rgba(${gr}, ${gg}, ${gb}, 0)`);
+  context.fillStyle = glow;
+  context.beginPath();
+  context.arc(cx, cy, sun.glowRadius, 0, Math.PI * 2);
+  context.fill();
+  const [cr, cg, cb] = sun.coreRgb;
+  const core = context.createRadialGradient(cx, cy, 0, cx, cy, sun.coreRadius);
+  core.addColorStop(0, `rgba(${cr}, ${cg}, ${cb}, 1)`);
+  core.addColorStop(0.7, `rgba(${cr}, ${cg}, ${cb}, 0.9)`);
+  core.addColorStop(1, `rgba(${cr}, ${cg}, ${cb}, 0)`);
+  context.fillStyle = core;
+  context.beginPath();
+  context.arc(cx, cy, sun.coreRadius, 0, Math.PI * 2);
+  context.fill();
+}
+
 function paintClouds(context: CanvasRenderingContext2D, preset: SkyBackdropPreset, width: number, height: number): void {
   const config = SKY_BACKDROP_CLOUDS[preset];
   if (!config) return;
   const random = skyRandom(preset.length * 7919 + 13);
   const [r, g, b] = config.rgb;
+  const sun = SKY_BACKDROP_SUN[preset];
   for (let index = 0; index < config.count; index += 1) {
     const cx = random() * width;
     const cy = (config.bandTop + random() * (config.bandBottom - config.bandTop)) * height;
     const puffs = 5 + Math.floor(random() * 5);
     const baseRadius = (18 + random() * 30) * config.scale;
+    // Clouds nearer the sun pick up its warm light for a lit-edge look.
+    const sunLift = sun ? Math.max(0, 1 - Math.hypot(cx - sun.x * width, cy - sun.y * height) / (sun.glowRadius * 2.2)) : 0;
     for (let puff = 0; puff < puffs; puff += 1) {
       const px = cx + (random() - 0.5) * baseRadius * 3.4;
       const py = cy + (random() - 0.5) * baseRadius * 0.9;
       const radius = baseRadius * (0.5 + random() * 0.7);
       const density = config.alpha * (0.4 + random() * 0.6);
+      const lr = Math.min(255, Math.round(r + (255 - r) * sunLift * 0.5));
+      const lg = Math.min(255, Math.round(g + (255 - g) * sunLift * 0.35));
+      const lb = Math.min(255, Math.round(b + (255 - b) * sunLift * 0.2));
       const blob = context.createRadialGradient(px, py, 0, px, py, radius);
-      blob.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${density.toFixed(3)})`);
-      blob.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+      blob.addColorStop(0, `rgba(${lr}, ${lg}, ${lb}, ${density.toFixed(3)})`);
+      blob.addColorStop(1, `rgba(${lr}, ${lg}, ${lb}, 0)`);
       context.fillStyle = blob;
       context.beginPath();
       context.arc(px, py, radius, 0, Math.PI * 2);
@@ -113,6 +163,7 @@ function gradientTexture(preset: SkyBackdropPreset): THREE.Texture {
   for (const [offset, css] of SKY_BACKDROP_GRADIENTS[preset]) gradient.addColorStop(offset, css);
   context.fillStyle = gradient;
   context.fillRect(0, 0, width, height);
+  paintSun(context, preset, width, height);
   paintClouds(context, preset, width, height);
   const texture = new THREE.CanvasTexture(canvas);
   texture.name = `pass66-sky-backdrop-${preset}`;

@@ -11040,7 +11040,14 @@ function broadcastHostedBotState(): void {
 
 function acceptHostedBotState(message: BotStateMessage): void {
   if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || message.seq <= lastHostedBotStateSeq) return;
-  if (message.bots.length !== privateMatchConfig.hostedBotCount) return;
+  // The host is authoritative for how many bots are in play. Previously a guest
+  // whose local hostedBotCount had drifted from the host's rejected EVERY bot
+  // update, so bots only ever worked for the host. Sync the local count to the
+  // received list (when it is a valid count) instead of dropping the message.
+  if (message.bots.length !== privateMatchConfig.hostedBotCount) {
+    if (!isHostedBotCount(message.bots.length)) return;
+    privateMatchConfig = { ...privateMatchConfig, hostedBotCount: message.bots.length };
+  }
   lastHostedBotStateSeq = message.seq;
   const incomingIds = new Set(message.bots.map((snapshot) => snapshot.id));
   for (const snapshot of message.bots) {
