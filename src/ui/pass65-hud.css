@@ -707,4 +707,39 @@
       opacity: 0.72;
     }
   }
+
+  /*
+   * Death/respawn presentation: a slow compositor-only black wash while the
+   * respawn timer runs, then one brief white flash as the new life begins.
+   * Pure CSS opacity on a DOM overlay; zero canvas readback, zero GPU work.
+   */
+  #death-fade {
+    position: absolute;
+    inset: 0;
+    z-index: 11;
+    background: #000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 1.55s ease-in;
+  }
+
+  #death-fade.death-wash {
+    opacity: 0.94;
+  }
+
+  #death-fade.respawn-flash {
+    background: #fff;
+    transition: none;
+    animation: pass66-respawn-flash 0.42s ease-out forwards;
+  }
+
+  @keyframes pass66-respawn-flash {
+    0% { opacity: 0.85; }
+    100% { opacity: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #death-fade { transition: opacity 0.2s linear; }
+    #death-fade.respawn-flash { animation: none; opacity: 0; }
+  }
 }

@@ -61,8 +61,8 @@ function writeSmokePresentationEnvelope(
   // Authority decides whether smoke blocks sight. Presentation density stays
   // below a solid shell so entering one volume cannot become a flat whiteout;
   // overlapping volumes still converge to deliberately dense obscuration.
-  target.coreOpacity = 0.58 * density;
-  target.edgeOpacity = 0.3 * density;
+  target.coreOpacity = 0.74 * density;
+  target.edgeOpacity = 0.42 * density;
   target.lifetimeProgress = clamp01(ageMs / lifetimeMs);
   return target;
 }

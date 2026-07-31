@@ -84,6 +84,9 @@ export const CHOPPER_GUNNER_RAY_POLICY = Object.freeze({
   cameraSocketLocalM: Object.freeze([0, 0.74, -0.38] as const),
   cameraForwardNudgeM: 0.08,
   muzzleSocketLocalM: Object.freeze([0, -0.82, -3.32] as const),
+  // HF-135 deliberately replaced a forgiving cone with a tight centre-ray
+  // capsule: off-crosshair targets must never register. Do not widen this to
+  // make hits easier; missing shots are reported through presentation feedback.
   targetRadiusM: 0.62,
 } as const);
 

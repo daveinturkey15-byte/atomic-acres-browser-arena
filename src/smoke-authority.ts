@@ -4,13 +4,19 @@ export const SMOKE_AUTHORITY_SCHEMA_VERSION = 2;
 export const SMOKE_VOLUME_MIN_LIFETIME_MS = 5_000;
 export const SMOKE_VOLUME_LIFETIME_MS = 10_000;
 export const SMOKE_VOLUME_RADIUS_M = 4.2;
+/**
+ * Each smoke grenade picks one of these deterministically from its action hash,
+ * so every deployment reads as a visibly distinct coloured cloud while staying
+ * replicated identically on every peer. Saturation is deliberately raised over
+ * the original near-grey set so the colours are actually tellable apart.
+ */
 export const SMOKE_COLOUR_PALETTE = Object.freeze([
-  0x526f78,
-  0x5b7064,
-  0x68627b,
-  0x7b655f,
-  0x746f52,
-  0x5f6977,
+  0x3f7f96,
+  0x4f9163,
+  0x7a5aa6,
+  0xb2653f,
+  0xa89a3c,
+  0x9c4560,
 ] as const);
 export const SMOKE_CORRIDOR_LIFETIME_MS = 900;
 export const SMOKE_CORRIDOR_RADIUS_M = 0.42;

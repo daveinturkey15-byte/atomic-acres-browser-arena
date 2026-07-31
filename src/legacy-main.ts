@@ -319,6 +319,7 @@ import {
   controllableKillstreakId,
   selectControllableSupportEntity,
 } from './killstreak-slot-possession';
+import { CHOPPER_GUN_PROFILE, DRONE_GUN_PROFILE } from './killstreak-support-catalog';
 import { GrenadeWorldPresentationPool, grenadePresentationTelemetry, loadGrenadePresentation } from './grenade-presentation';
 import {
   EXPLOSIVE_BOLT_ARM_DELAY_MS,
@@ -7535,6 +7536,12 @@ function updateSensoryFeedback(now: number): void {
 
 function scheduleLocalRespawn(now = performance.now()): void {
   element<HTMLElement>('#respawn').hidden = false;
+  // Wash the screen to black across the respawn wait instead of holding a
+  // single hard frame. This is a compositor-only opacity transition, so it
+  // cannot contend with the render loop or read back the game canvas.
+  const fade = element<HTMLElement>('#death-fade');
+  fade.classList.remove('respawn-flash');
+  fade.classList.add('death-wash');
   if (respawnTimer) return;
   respawnEndsAt = now + 1_900;
   respawnTimer = setTimeout(() => {
@@ -9055,6 +9062,15 @@ function respawn(
   }
   renderFieldKitSelection();
   element<HTMLElement>('#respawn').hidden = true;
+  if (startsNewLife) {
+    // End the black wash with one brief white flash so the new life reads as a
+    // deliberate transition rather than a dropped frame.
+    const fade = element<HTMLElement>('#death-fade');
+    fade.classList.remove('death-wash');
+    fade.classList.remove('respawn-flash');
+    void fade.offsetWidth;
+    fade.classList.add('respawn-flash');
+  }
   if (gameStarted && requestLock) requestGamePointerLock(pointerLockSource);
   if (broadcastState) network.send(createStateMessage());
 }
@@ -13681,6 +13697,12 @@ function syncActiveSupportRotorAudio(now: number): void {
 }
 
 const killstreakPossessionCameraScratch = new THREE.Vector3();
+/**
+ * Host authority owns support hits, but it only emits an event when a shot
+ * connects. Without a local report the mounted gun read as completely broken
+ * on every miss, so mirror the admitted cadence as presentation-only feedback.
+ */
+let nextLocalSupportGunReportAt = 0;
 
 function updateKillstreakPossession(now: number): void {
   const possession = localKillstreakActorSnapshot()?.possession;
@@ -13715,6 +13737,14 @@ function updateKillstreakPossession(now: number): void {
   camera.rotation.x = player.pitch;
   killstreakPresentation.alignFirstPersonCockpit(entity.id, camera.quaternion);
   weaponView.setPresentationVisible(false);
+  if (triggerHeld && now >= nextLocalSupportGunReportAt) {
+    audio.supportGun(possession.kind === 'chopper-gunner' ? 'chopper' : 'drone');
+    nextLocalSupportGunReportAt = now + (possession.kind === 'chopper-gunner'
+      ? CHOPPER_GUN_PROFILE.cadenceMs
+      : DRONE_GUN_PROFILE.cadenceMs);
+  } else if (!triggerHeld) {
+    nextLocalSupportGunReportAt = 0;
+  }
   if (now - lastKillstreakControlSentAt < 50) return;
   const droneAxes = pilotedDroneControlAxes({
     keyboardForward: keys.has('KeyW'),
@@ -17298,6 +17328,7 @@ function resetForMode(): void {
   element<HTMLElement>('#banner').hidden = true;
   element<HTMLElement>('#countdown').hidden = true;
   element<HTMLElement>('#respawn').hidden = true;
+  element<HTMLElement>('#death-fade').classList.remove('death-wash', 'respawn-flash');
   rangePrimaryUnlocked = false;
   const menuLoadout = activeLoadoutSelection();
   player.primaryWeapon = selectedArena.id === 'gun-range' ? 'carbine' : menuLoadout.primary;

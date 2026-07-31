@@ -16,8 +16,8 @@ describe('smoke grenade volume presentation', () => {
     const dense = smokePresentationEnvelopeAt(start + 1_000, start, end);
     expect(dense).toMatchObject({ active: true, growth: 1 });
     expect(dense.coreOpacity).toBeGreaterThan(0.35);
-    expect(dense.coreOpacity).toBeGreaterThan(0.5);
-    expect(dense.coreOpacity).toBeLessThan(0.65);
+    expect(dense.coreOpacity).toBeGreaterThan(0.65);
+    expect(dense.coreOpacity).toBeLessThan(0.8);
     expect(dense.edgeOpacity).toBeLessThan(dense.coreOpacity);
     expect(smokePresentationEnvelopeAt(end, start, end).active).toBe(false);
   });

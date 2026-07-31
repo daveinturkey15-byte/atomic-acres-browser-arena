@@ -335,6 +335,7 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('shot', 'message.weapon,true,origin.distanceTo(camera.position)', 3, ['weapon.report.world']),
   runtimeCallsite('shot', 'player.weapon', 1, ['weapon.report.local']),
   runtimeCallsite('supportGun', "drone ? 'drone' : 'chopper'", 1, ['support.chopper-gun', 'support.drone-gun']),
+  runtimeCallsite('supportGun', "possession.kind === 'chopper-gunner' ? 'chopper' : 'drone'", 1, ['support.chopper-gun', 'support.drone-gun']),
   runtimeCallsite('supportInbound', "'tri-pass'", 1, ['support.inbound']),
   runtimeCallsite('supportInbound', "'yardhawk'", 1, ['support.inbound']),
   runtimeCallsite('supportInbound', 'message.source', 1, ['support.inbound']),

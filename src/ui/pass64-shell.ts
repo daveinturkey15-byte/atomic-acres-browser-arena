@@ -364,6 +364,7 @@ function hudMarkup(): string {
     <div id="overdrive-hud" hidden><small>2× DAMAGE</small><strong id="overdrive-time">30.0</strong><span>OVERDRIVE</span></div>
     <div id="power-announcement" hidden aria-live="assertive"><small>MID-MAP POWER WEAPON</small><strong>2× DAMAGE</strong><span>30 SECONDS</span></div>
     <div id="pickup-prompt" hidden><kbd>F</kbd><span>PICK UP</span><strong></strong></div>
+    <div id="death-fade" aria-hidden="true"></div>
     <div id="respawn" hidden><strong>ELIMINATED</strong><span id="respawn-countdown">REDEPLOYING</span></div>
     <div id="countdown" role="status" aria-live="assertive" aria-atomic="true" hidden></div>
     <div id="banner" hidden></div>

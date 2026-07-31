@@ -3372,7 +3372,7 @@
           "reload": 2.35,
           "reportGain": 1.08,
           "reserve": 80,
-          "rpm": 300,
+          "rpm": 150,
           "spinUpMs": 0,
           "sustainedSpreadPerShot": 0.004,
           "switchSeconds": 0.66
@@ -3998,7 +3998,10 @@
       "pass65-hitl-minigun-no-crit-and-25-percent-damage-reduction",
       "pass65-hitl-crossbow-compact-1.5x-optic",
       "pass65-canonical-bot-weapon-and-grenade-cycles",
-      "pass65-atomic-ten-defeat-reinforcements"
+      "pass65-atomic-ten-defeat-reinforcements",
+      "pass66-hitl-m14-half-fire-rate-and-through-wall-thermal",
+      "pass66-hitl-drone-swarm-thirty-second-lifetime",
+      "pass66-hitl-carpet-bomber-friendly-fire"
     ]
   }
 }

@@ -13,6 +13,7 @@ import {
 } from './killstreak-runtime';
 import {
   DRONE_GUN_PROFILE,
+  DRONE_SUPPORT_DEFINITIONS,
   DRONE_SWARM_GUN_PROFILE,
   DRONE_SWARM_GUN_PROFILE_ID,
   PILOTED_DRONE_GUN_PROFILE,
@@ -134,7 +135,10 @@ describe('Pass 65 killstreak blockers', () => {
     swarm.activate(activation('drone-swarm', 5), 1_000, baseWorld());
     now = 2_000;
     let admittedSwarmShots = 0;
-    while (now < 59_000) {
+    // Sample inside the swarm's own catalog lifetime so the assertion follows the
+    // authoritative duration instead of a hard-coded window.
+    const swarmExpiresAtMs = 1_000 + DRONE_SUPPORT_DEFINITIONS.swarm.lifetimeMs;
+    while (now < swarmExpiresAtMs - DRONE_SWARM_FIRE_LANE_INTERVAL_MS) {
       admittedSwarmShots += swarm.advance(now, baseWorld()).damageEvents.length;
       now += DRONE_SWARM_FIRE_LANE_INTERVAL_MS;
     }
