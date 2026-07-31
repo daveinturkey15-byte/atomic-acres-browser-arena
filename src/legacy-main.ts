@@ -68,7 +68,7 @@ import { bindProjectMapDialog } from './ui/project-map-dialog';
 import { bindKillstreakLoadoutMenu, type KillstreakMenuBinding } from './ui/killstreak-loadout-menu';
 import { applyWeaponMenuPresentation } from './ui/field-kit-weapon-presentation';
 import { assertUiSurfaceInventory } from './ui/surface-registry';
-import { createPass64ShellViewModel, renderPass64Shell } from './ui/pass64-shell';
+import { createPass64ShellViewModel, renderPass64Shell, weaponRealStatStripMarkup } from './ui/pass64-shell';
 import { bindAdvancedGraphicsControls } from './ui/advanced-graphics-controls';
 import { ADVANCED_GRAPHICS_CONTROLS, GRAPHICS_CAPABILITY_NOTICES, GRAPHICS_PRESET_VALUES } from './graphics-settings-registry';
 import {
@@ -5729,6 +5729,8 @@ function renderFieldKitSelection(): void {
     }
     const presentation = card.querySelector<HTMLElement>('[data-weapon-presentation]');
     if (presentation && preset) applyWeaponMenuPresentation(presentation, preset.primary as WeaponId);
+    const statsContainer = card.querySelector<HTMLElement>('[data-custom-stats]');
+    if (statsContainer && preset) statsContainer.innerHTML = weaponRealStatStripMarkup(preset.primary as WeaponId);
   });
   renderCustomLoadoutEditor();
 }

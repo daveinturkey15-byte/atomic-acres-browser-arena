@@ -25,7 +25,9 @@ describe('Pass 66 tactical UI overhaul', () => {
       'loadout-secondary', 'loadout-grenade', 'loadout-save', 'loadout-inspector',
       'graphics-profile', 'advanced-graphics', 'audio-settings', 'support-block',
     ]) expect(markup).toContain(`id="${id}"`);
-    expect(markup).toContain('class="kit-stat-strip"');
+    expect(markup).toContain('class="kit-stat-strip kit-stat-strip-real"');
+    expect(markup).toContain('class="kit-dps"');
+    expect(markup).toContain('IDEAL BODY DPS');
     expect(markup).toContain('data-loadout-stat="damage"');
     expect(markup).toContain('data-loadout-grenade-detail');
   });

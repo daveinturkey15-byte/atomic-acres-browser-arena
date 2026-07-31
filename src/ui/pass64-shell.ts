@@ -51,12 +51,7 @@ function fieldKitCardsMarkup(): string {
     <strong>${kit.title}</strong>
     <b>${WEAPONS[kit.weapon].name} · ${WEAPONS[kit.sidearm].name}</b>
     <p>${kit.summary}</p>
-    <div class="kit-stat-strip" aria-label="${kit.traits.join(', ')}">${kit.traits.map((trait) => {
-      const [label, rawValue] = trait.split(' ');
-      const value = Math.max(1, Math.min(5, Number(rawValue) || 1));
-      return `<span><small>${label}</small><i style="--kit-stat:${value * 20}%"></i><b>${value}</b></span>`;
-    }).join('')}</div>
-    <i>${kit.traits.join(' · ')}</i>
+    ${weaponRealStatStripMarkup(kit.weapon)}
     ${weaponMenuPresentationMarkup(kit.weapon)}
     <em>SELECTED</em>
   </button>`).join('');
@@ -69,6 +64,7 @@ function customPresetCardsMarkup(): string {
     <strong data-custom-name>Custom ${index}</strong>
     <b data-custom-equipment>CONFIGURE PRIMARY · SECONDARY · GRENADE</b>
     <p>Persistent operator-defined equipment. Changes queue safely for the next deployment.</p>
+    <div data-custom-stats>${weaponRealStatStripMarkup(defaultPrimaryIds[index - 1]!)}</div>
     <i>1 primary · 1 secondary · 1 grenade</i>
     ${weaponMenuPresentationMarkup(defaultPrimaryIds[index - 1]!)}
     <em>SELECTED</em>
@@ -85,6 +81,31 @@ function weaponOptionsMarkup(slot: 'primary' | 'secondary'): string {
     .filter((weapon) => weapon.slot === slot && weapon.policies.loadout === 'eligible')
     .map((weapon) => `<option value="${weapon.id}">${weapon.displayName}</option>`)
     .join('');
+}
+
+/**
+ * Owner request: profile cards must show the weapon's REAL stats and overall
+ * DPS (the same figures as the loadout inspector), not abstract 1-5 traits, so
+ * each kit's gun can be compared at a glance. Mirrors the inspector's maths.
+ */
+export function weaponRealStatStripMarkup(weaponId: string): string {
+  const weapon = WEAPONS[weaponId as keyof typeof WEAPONS];
+  if (!weapon) return '';
+  const pellets = Math.max(1, weapon.pellets);
+  const damage = Math.round(weapon.damage * pellets);
+  const control = Math.round(Math.max(8, Math.min(100, 100 - (weapon.recoilPitch + weapon.recoilYaw) * 760)));
+  const dps = Math.round(weapon.damage * pellets * (weapon.rpm / 60));
+  const stats: Array<[string, string, number]> = [
+    ['DAMAGE', String(damage), Math.min(100, damage)],
+    ['RATE', `${weapon.rpm}`, Math.min(100, weapon.rpm / 12)],
+    ['RANGE', `${weapon.falloffEnd}m`, Math.min(100, weapon.falloffEnd / 1.2)],
+    ['CONTROL', String(control), control],
+    ['WALL', `${weapon.penetration.maxPenetratedSurfaces}`, Math.min(100, weapon.penetration.maxPenetratedSurfaces * 22 + weapon.penetration.penetrationPower * 3)],
+  ];
+  const rows = stats.map(([label, value, percent]) => (
+    `<span><small>${label}</small><i style="--kit-stat:${Math.max(4, Math.min(100, percent))}%"></i><b>${value}</b></span>`
+  )).join('');
+  return `<div class="kit-stat-strip kit-stat-strip-real">${rows}<span class="kit-dps"><small>IDEAL BODY DPS</small><b>${dps}</b></span></div>`;
 }
 
 function grenadeOptionsMarkup(): string {
