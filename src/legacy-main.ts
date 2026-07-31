@@ -525,7 +525,7 @@ import {
   type WeaponViewmodelGpuPrewarmer,
 } from './weapon-presentation';
 import { magnifiedFovDegrees, viewmodelObstructionPose, type ViewmodelObstructionPose } from './weapon-presentation-state';
-import { RailgunPresentation } from './railgun-presentation';
+import { RailgunPresentation, type RailgunThermalContact } from './railgun-presentation';
 import { DMR_THERMAL_MAGNIFICATION, DMR_THERMAL_MAX_CONTACTS, DmrThermalPresentation, dmrThermalOcclusionBudget, type DmrThermalContact } from './dmr-thermal-presentation';
 import { ThermalGhostPresentation, type ThermalGhostTarget } from './thermal-ghost-presentation';
 import { applySkyBackdrop } from './rendering/sky-backdrop';
@@ -1281,10 +1281,9 @@ camera.rotation.order = 'YXZ';
 scene.add(camera);
 const railgunPresentation = new RailgunPresentation(scene, element<HTMLElement>('#railgun-thermal'), reducedRenderMode);
 const dmrThermalPresentation = new DmrThermalPresentation(scene, element<HTMLElement>('#dmr-thermal'));
-// Owner direction: through-wall reveals show the actual posed combatant with
-// thermal shading, never a generic silhouette overlay.
+// Through-wall reveals: the M14 DMR shows the actual posed combatant via exact-
+// pose thermal ghosts; the railgun keeps its signature cyan silhouette scope.
 const thermalGhostPresentation = new ThermalGhostPresentation();
-let railgunThermalRevealActive = false;
 const smokeVolumePresentationPool = new SmokeVolumePresentationPool(scene);
 smokeVolumePresentationPool.setQualityScale(graphicsRuntime.smokeScale);
 const VIEWMODEL_RENDER_LAYER = 2;
@@ -10088,30 +10087,23 @@ function prewarmThermalGhostPipelines(): void {
 }
 
 function updateThermalGhosts(): void {
-  const active = dmrThermalActive || railgunThermalRevealActive;
+  // Exact-pose thermal ghosts are the M14 DMR's reveal. The railgun keeps its
+  // signature cyan silhouette scope (its unique selling point), so ghosts are
+  // driven only by the DMR optic to avoid double-drawing on the railgun.
+  const active = dmrThermalActive;
   if (!active) {
     thermalGhostPresentation.sync([], false);
     return;
   }
   const mode = gameMode === 'solo' ? 'tdm' : privateMatchMode;
-  // Railgun-only reveals follow the canonical hostile eligibility contract;
-  // the DMR optic shows both relations with team-explicit shading.
-  const hostileOnly = !dmrThermalActive;
-  const observer = { id: player.id, team: player.team };
   const targets: ThermalGhostTarget[] = [];
   for (const remote of remotes.values()) {
     if (remote.snapshot.hp <= 0) continue;
-    if (hostileOnly && !railgunThermalTargetEligible(observer, {
-      id: remote.snapshot.id, team: remote.snapshot.team, alive: remote.snapshot.hp > 0, kind: 'player',
-    }, mode)) continue;
     const relation = mode === 'tdm' && remote.snapshot.team === player.team ? 'friendly' as const : 'hostile' as const;
     targets.push({ id: remote.snapshot.id, relation, root: remote.root });
   }
   for (const bot of bots.values()) {
     if (!bot.alive) continue;
-    if (hostileOnly && !railgunThermalTargetEligible(observer, {
-      id: bot.id, team: bot.team, alive: bot.alive, kind: 'bot',
-    }, mode)) continue;
     const relation = mode === 'tdm' && bot.team === player.team ? 'friendly' as const : 'hostile' as const;
     targets.push({ id: bot.id, relation, root: bot.root });
   }
@@ -10139,17 +10131,38 @@ function updateRailgun(now: number): void {
     railgunRechamberPresentationActive = false;
   }
   railgunPresentation.updateWorld(railgunState, now);
-  // The optic is an authority-side thermal scope: it engages on a settled aim,
-  // and the reveal itself is drawn by the exact-pose thermal ghosts. The reveal
-  // must stay live for the whole aim hold - gating it on the per-shot re-ADS
+  // The optic is an authority-side thermal scope: it engages on a settled aim
+  // and must stay live for the whole aim hold - gating it on the per-shot re-ADS
   // flag turned see-through-walls off the instant the player fired, which read
   // as the railgun scope having lost the feature entirely.
   const thermalActive = localHoldsRailgun() && player.weapon === 'railgun' && adsHeld
     && weaponView.adsProgress() >= 0.6;
-  railgunThermalRevealActive = thermalActive;
-  // Exact-pose thermal ghosts replace the procedural capsule mannequins; the
-  // railgun overlay chrome stays, the fake silhouettes never place.
-  railgunPresentation.updateThermal(camera, [], thermalActive);
+  // The railgun's signature see-through-walls reveal: cyan thermal silhouettes
+  // of hostile combatants drawn with depth testing disabled so they read through
+  // geometry. This is the weapon's unique selling point and must always work.
+  railgunPresentation.updateThermal(camera, thermalActive ? railgunThermalContacts() : [], thermalActive);
+}
+
+/** Hostile combatants to reveal through walls while the railgun scope is up. */
+function railgunThermalContacts(): RailgunThermalContact[] {
+  const mode = gameMode === 'solo' ? 'tdm' : privateMatchMode;
+  const observer = { id: player.id, team: player.team };
+  const contacts: RailgunThermalContact[] = [];
+  for (const remote of remotes.values()) {
+    if (remote.snapshot.hp <= 0) continue;
+    if (!railgunThermalTargetEligible(observer, {
+      id: remote.snapshot.id, team: remote.snapshot.team, alive: remote.snapshot.hp > 0, kind: 'player',
+    }, mode)) continue;
+    contacts.push({ id: remote.snapshot.id, kind: 'player', position: remote.target.clone() });
+  }
+  for (const bot of bots.values()) {
+    if (!bot.alive) continue;
+    if (!railgunThermalTargetEligible(observer, {
+      id: bot.id, team: bot.team, alive: bot.alive, kind: 'bot',
+    }, mode)) continue;
+    contacts.push({ id: bot.id, kind: 'bot', position: bot.position.clone().add(new THREE.Vector3(0, 1.05, 0)) });
+  }
+  return contacts;
 }
 
 function admittedAdsHeld(rawHeld: boolean): boolean {
@@ -17616,7 +17629,6 @@ function resetForMode(): void {
   railgunPresentation.resetBeams();
   railgunPresentation.updateWorld(railgunState, performance.now());
   railgunPresentation.updateThermal(camera, [], false);
-  railgunThermalRevealActive = false;
   thermalGhostPresentation.clear();
   authorizedRemoteRedeploys.clear();
   resetBreakableWindows();
