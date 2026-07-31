@@ -117,40 +117,40 @@
     "placeholderStatus": "forbidden-and-not-present",
     "sourceBlend": {
       "path": "source-assets/blender/pass65-first-person-operator-arms.blend",
-      "sha256": "3b97e7e256c15d7a9437e0a2e3c86e7d1ddd1c3765b91678884786315aefe08d"
+      "sha256": "c03d275143c2677363dad6801a9c7fab68ee207373452a00f03d7b1ce175e5bd"
     },
     "sourceScript": {
       "path": "scripts/blender/build-pass65-djmaesen-first-person-arms.py",
-      "sha256": "8946d81748ba0b2c26dc4c552661001ea1c19e307e0761f0ce460c72d5d41f04"
+      "sha256": "1acd75ec3be19ef07a28ab6ced7559debbb36cf95abdc091de092d226610d4a7"
     },
     "firstPersonGlbs": [
       {
         "path": "public/assets/original/models/operators/pass65-first-person-arms-lod0.glb",
-        "sha256": "1cf9dc34038f3f35dcd394909f6a08e48307690f576823b6c443c11bf3b32e25",
+        "sha256": "11dce2412b82d09bdfe0aa8170c2705eebe3fba823eac8e6b1b477cc7803959b",
         "lod": 0,
         "triangles": 7207,
-        "bytes": 404600,
+        "bytes": 404912,
         "skinnedMeshNodes": 4,
         "renderPrimitives": 4,
         "skins": 4,
         "sourceWeightedParts": 16,
         "bones": 37,
-        "blendedVertexCount": 3195,
+        "blendedVertexCount": 3196,
         "multiBoneWeightedParts": 4,
         "knifeSocketParent": "WristR"
       },
       {
         "path": "public/assets/original/models/operators/pass65-first-person-arms-lod1.glb",
-        "sha256": "ccf0c5ad60da303c283046649743d2ecae3a31f70f3829e8802795148071c9e3",
+        "sha256": "436bde2f13a155bb53caa4ee2e4df0ef50e9fcb2969a026a31972d38f673b8c5",
         "lod": 1,
         "triangles": 5040,
-        "bytes": 386472,
+        "bytes": 386628,
         "skinnedMeshNodes": 4,
         "renderPrimitives": 4,
         "skins": 4,
         "sourceWeightedParts": 16,
         "bones": 37,
-        "blendedVertexCount": 2287,
+        "blendedVertexCount": 2282,
         "multiBoneWeightedParts": 4,
         "knifeSocketParent": "WristR"
       }
@@ -183,7 +183,7 @@
     },
     "provenance": {
       "path": "source-assets/blender/pass65-first-person-operator-arms.provenance.json",
-      "sha256": "b1d368f674d9c491dc31d3131ac157de66e04711a2ef75368f388d8222808888"
+      "sha256": "63e8352125e31666ec181fa7f5907223052ab4532f8479408bce77d4a42e8e3c"
     },
     "bones": [
       "Root",
@@ -267,49 +267,49 @@
       "renders": [
         {
           "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-pistol-hip.png",
-          "sha256": "6f85aa305657ae03dc5197e93f15663923a336da2e4073ca886e639d1531a363",
+          "sha256": "690ab9e3982e725abcd72465c301d43ce2e083e8b02c0f51c05f79af6842012b",
           "width": 960,
           "height": 540,
           "cameraId": "pistol-hip"
         },
         {
           "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-mp5-hip.png",
-          "sha256": "f2bf8fbcdf1a433f2182224f3a147576cbafddeedf99a9779e69ccf753e539b3",
+          "sha256": "02b86b00dfc9a41c8426ddd20fb1fa090f209947ee1c0f131e66779ca473b616",
           "width": 960,
           "height": 540,
           "cameraId": "mp5-hip"
         },
         {
           "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-m4a1-hip.png",
-          "sha256": "6216483405ec641ff248aa375b55ff5ad5aef8614c0d3fb0cbcb67af30d277a7",
+          "sha256": "39e0c3a30ae3952f923c465c8777dc9af8f0abf39c2a9703f30b377f4a09e000",
           "width": 960,
           "height": 540,
           "cameraId": "m4a1-hip"
         },
         {
           "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-m4a1-grip-oblique.png",
-          "sha256": "58b0a3ab54c1e53812e4de290d5c99da85c33f6f6ec2b80d7fe262709ba0a866",
+          "sha256": "1fb8dfec1f194580bce56ad1459ae59b46127f0613b34b5f382f2a7640ee1310",
           "width": 960,
           "height": 540,
           "cameraId": "m4a1-grip-oblique"
         },
         {
           "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-m4a1-ads.png",
-          "sha256": "1fa06e305ef445004450a766bf188f1e714a07dfe40463a10ea5036699981dbb",
+          "sha256": "968d75bc64aa5b29acb05d2b2c723070404847910b3ad50e977db9a158cc670b",
           "width": 960,
           "height": 540,
           "cameraId": "m4a1-ads"
         },
         {
           "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-m4a1-reload.png",
-          "sha256": "7a020ac9f6a3c5f6dbd493afd9ea7e803fd748e05a40bf3fa45384503f714cd9",
+          "sha256": "421f66b1553628392949fa69007f8b4ae3ffa012dbd151756b66b70dfe8ff1a5",
           "width": 960,
           "height": 540,
           "cameraId": "m4a1-reload"
         },
         {
           "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-knife-contact.png",
-          "sha256": "197ff22fb1af2b36efe2e60828b6962ec5c472cf1cee3efcd57da6d93502af99",
+          "sha256": "22d75a882ce8333d6a27eadc66f8abbf4d980105fc757b8834ff84f1d8c61570",
           "width": 960,
           "height": 540,
           "cameraId": "knife-contact"
@@ -317,13 +317,13 @@
       ],
       "contactSheet": {
         "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-contact-sheet.png",
-        "sha256": "0d08ae1d554da2b4bd7e19662e91d3e42efe6266aa2a3678fcfae35d9160d936",
+        "sha256": "a157d037f0eec14f58c09eaaea73a7df41e73a8f7f0efd30ab6c354a2c9bca39",
         "width": 2880,
         "height": 1620
       },
       "contactReceipt": {
         "path": "source-assets/blender/pass65-first-person-operator-arms-contact-receipt.json",
-        "sha256": "2c8fe7c04bfac7a66d6a13ff21f0154984a38fb33520857c62db836cedb7a439"
+        "sha256": "cffcc6760785e86cbc1549fd6b4ba4571fa94f258b3bc70c7c169347e744c8ab"
       }
     },
     "technicalAudit": {
@@ -331,7 +331,7 @@
         {
           "lod": 0,
           "triangles": 7207,
-          "bytes": 404600,
+          "bytes": 404912,
           "meshNodes": 4,
           "skinnedMeshNodes": 4,
           "renderPrimitives": 4,
@@ -358,14 +358,14 @@
           "externalUris": 0,
           "gripContactReceipts": {
             "m4a1": {
-              "rightError": 0.000004083968743962646,
-              "leftError": 0.002423617313833653,
+              "rightError": 3.451527198056409e-7,
+              "leftError": 0.0027864050026630387,
               "scale": 0.41999998688697815,
-              "rightContacts": 846,
-              "leftContacts": 142
+              "rightContacts": 1281,
+              "leftContacts": 199
             }
           },
-          "blendedVertexCount": 3195,
+          "blendedVertexCount": 3196,
           "multiBoneWeightedParts": 4,
           "blendedJointPairs": [
             "Index1L:Index2L",
@@ -445,7 +445,7 @@
         {
           "lod": 1,
           "triangles": 5040,
-          "bytes": 386472,
+          "bytes": 386628,
           "meshNodes": 4,
           "skinnedMeshNodes": 4,
           "renderPrimitives": 4,
@@ -472,14 +472,14 @@
           "externalUris": 0,
           "gripContactReceipts": {
             "m4a1": {
-              "rightError": 0.000004083968743962646,
-              "leftError": 0.002423617313833653,
+              "rightError": 3.451527198056409e-7,
+              "leftError": 0.0027864050026630387,
               "scale": 0.41999998688697815,
-              "rightContacts": 846,
-              "leftContacts": 142
+              "rightContacts": 1281,
+              "leftContacts": 199
             }
           },
-          "blendedVertexCount": 2287,
+          "blendedVertexCount": 2282,
           "multiBoneWeightedParts": 4,
           "blendedJointPairs": [
             "Index1L:Index2L",
@@ -500,7 +500,6 @@
             "LowerArmL:Pinky1L",
             "LowerArmL:Ring1L",
             "LowerArmL:Thumb1L",
-            "LowerArmL:Thumb2L",
             "LowerArmL:UpperArmL",
             "LowerArmL:WristL",
             "LowerArmR:Middle1R",

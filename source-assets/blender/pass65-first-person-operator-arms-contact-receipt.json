@@ -227,126 +227,126 @@
           0.08,
           0.82
         ],
-        "handScale": 0.86,
+        "handScale": 1.0,
         "proximalGloveOverlapPalmFraction": 0.1
       },
       "postHandScale": {
         "contract": "connected-bounded-three-phalanx-chain-v2",
         "digits": {
           "IndexL": {
-            "distalDirectionAlignment": 1.0000000707805157,
-            "distalToMiddleRatio": 0.7200006207649169,
+            "distalDirectionAlignment": 1.0000000521540642,
+            "distalToMiddleRatio": 0.7199996934886432,
             "maximumJointGapSourceUnits": 0.0,
-            "proximalToMiddleRatio": 1.366394926627593,
+            "proximalToMiddleRatio": 1.3663942369369326,
             "segmentLengthsSourceUnits": [
-              2.76041841506958,
-              2.0202200412750244,
-              1.4545596837997437
+              3.2097890377044678,
+              2.3490943908691406,
+              1.6913472414016724
             ]
           },
           "IndexR": {
-            "distalDirectionAlignment": 1.0000000707805157,
-            "distalToMiddleRatio": 0.7200004366598355,
+            "distalDirectionAlignment": 1.0000000521540642,
+            "distalToMiddleRatio": 0.7199996143234193,
             "maximumJointGapSourceUnits": 0.0,
-            "proximalToMiddleRatio": 1.3663951311248181,
+            "proximalToMiddleRatio": 1.3663940711360154,
             "segmentLengthsSourceUnits": [
-              2.760418176651001,
-              2.020219564437866,
-              1.4545589685440063
+              3.2097883224487305,
+              2.3490941524505615,
+              1.6913468837738037
             ]
           },
           "MiddleL": {
-            "distalDirectionAlignment": 1.0000001564621925,
-            "distalToMiddleRatio": 0.7200002746635064,
+            "distalDirectionAlignment": 0.9999998733401299,
+            "distalToMiddleRatio": 0.7200001514170745,
             "maximumJointGapSourceUnits": 0.0,
-            "proximalToMiddleRatio": 1.1099957796895845,
+            "proximalToMiddleRatio": 1.1099956467591068,
             "segmentLengthsSourceUnits": [
-              3.00618052482605,
-              2.7082810401916504,
-              1.949963092803955
+              3.495558023452759,
+              3.1491637229919434,
+              2.2673983573913574
             ]
           },
           "MiddleR": {
-            "distalDirectionAlignment": 1.0000001564621925,
-            "distalToMiddleRatio": 0.7200004155167695,
+            "distalDirectionAlignment": 0.9999998733401299,
+            "distalToMiddleRatio": 0.7200001635304777,
             "maximumJointGapSourceUnits": 0.0,
-            "proximalToMiddleRatio": 1.1099960041724222,
+            "proximalToMiddleRatio": 1.109995671741941,
             "segmentLengthsSourceUnits": [
-              3.0061798095703125,
-              2.708279848098755,
-              1.9499626159667969
+              3.4955573081970215,
+              3.149163007736206,
+              2.267397880554199
             ]
           },
           "PinkyL": {
-            "distalDirectionAlignment": 1.0000000894069672,
-            "distalToMiddleRatio": 0.7200018154359129,
+            "distalDirectionAlignment": 0.9999999403953552,
+            "distalToMiddleRatio": 0.7200002512929078,
             "maximumJointGapSourceUnits": 0.0,
-            "proximalToMiddleRatio": 1.352849314490317,
+            "proximalToMiddleRatio": 1.3528472359001702,
             "segmentLengthsSourceUnits": [
-              2.38430118560791,
-              1.7624292373657227,
-              1.2689522504806519
+              2.7724413871765137,
+              2.0493381023406982,
+              1.4755239486694336
             ]
           },
           "PinkyR": {
-            "distalDirectionAlignment": 1.0000000894069672,
-            "distalToMiddleRatio": 0.720001747796721,
+            "distalDirectionAlignment": 0.9999999403953552,
+            "distalToMiddleRatio": 0.7200002187179267,
             "maximumJointGapSourceUnits": 0.0,
-            "proximalToMiddleRatio": 1.3528489086551652,
+            "proximalToMiddleRatio": 1.3528471606108559,
             "segmentLengthsSourceUnits": [
-              2.384300470352173,
-              1.7624292373657227,
-              1.2689521312713623
+              2.7724409103393555,
+              2.049337863922119,
+              1.4755237102508545
             ]
           },
           "RingL": {
-            "distalDirectionAlignment": 1.0000000223517418,
-            "distalToMiddleRatio": 0.7199998635216882,
+            "distalDirectionAlignment": 0.9999999776482582,
+            "distalToMiddleRatio": 0.7199996576671155,
             "maximumJointGapSourceUnits": 0.0,
-            "proximalToMiddleRatio": 1.100940591464779,
+            "proximalToMiddleRatio": 1.1009393777366254,
             "segmentLengthsSourceUnits": [
-              2.7695093154907227,
-              2.515584707260132,
-              1.811220645904541
+              3.22035813331604,
+              2.925100326538086,
+              2.1060712337493896
             ]
           },
           "RingR": {
-            "distalDirectionAlignment": 0.999999962747097,
-            "distalToMiddleRatio": 0.7199996417443298,
+            "distalDirectionAlignment": 1.000000037252903,
+            "distalToMiddleRatio": 0.7199996837494663,
             "maximumJointGapSourceUnits": 0.0,
-            "proximalToMiddleRatio": 1.1009407149418393,
+            "proximalToMiddleRatio": 1.1009395901164862,
             "segmentLengthsSourceUnits": [
-              2.7695088386535645,
-              2.5155839920043945,
-              1.811219573020935
+              3.2203571796417236,
+              2.9250988960266113,
+              2.1060702800750732
             ]
           },
           "ThumbL": {
-            "distalDirectionAlignment": 1.0,
-            "distalToMiddleRatio": 0.7199991922738872,
+            "distalDirectionAlignment": 0.9999999506399035,
+            "distalToMiddleRatio": 0.7199999323635238,
             "maximumJointGapSourceUnits": 0.0,
-            "proximalToMiddleRatio": 1.635036926899724,
+            "proximalToMiddleRatio": 1.6350377786280068,
             "segmentLengthsSourceUnits": [
-              3.6678969860076904,
-              2.2433114051818848,
-              1.6151823997497559
+              4.26499605178833,
+              2.6085000038146973,
+              1.8781198263168335
             ]
           },
           "ThumbR": {
-            "distalDirectionAlignment": 1.0,
-            "distalToMiddleRatio": 0.7199990562357047,
+            "distalDirectionAlignment": 0.9999999506399035,
+            "distalToMiddleRatio": 0.719999820854755,
             "maximumJointGapSourceUnits": 0.0,
-            "proximalToMiddleRatio": 1.6350369943912981,
+            "proximalToMiddleRatio": 1.6350376291845152,
             "segmentLengthsSourceUnits": [
-              3.6678967475891113,
-              2.2433111667633057,
-              1.6151819229125977
+              4.26499605178833,
+              2.6085002422332764,
+              1.878119707107544
             ]
           }
         },
         "maximumJointGapSourceUnits": 0.0,
-        "maximumSegmentSourceUnits": 3.6678969860076904,
-        "minimumDistalDirectionAlignment": 0.999999962747097,
+        "maximumSegmentSourceUnits": 4.26499605178833,
+        "minimumDistalDirectionAlignment": 0.9999998733401299,
         "passed": true
       }
     }
@@ -355,14 +355,14 @@
     {
       "view": "pistol-hip",
       "weapon": "pistol",
-      "rightSocketErrorM": 5.024258366756705e-06,
+      "rightSocketErrorM": 3.5112713777864513e-07,
       "leftSocketErrorM": 8.940696716308594e-08,
-      "rightReachRatio": 0.7810195751622528,
+      "rightReachRatio": 0.7564315861242471,
       "leftReachRatio": 0.33227625119808324,
       "rightSolvedWristTarget": [
-        -0.023011943325400352,
-        0.4534790515899658,
-        -0.20311932265758514
+        -0.025166578590869904,
+        0.43249523639678955,
+        -0.20629096031188965
       ],
       "leftSolvedWristTarget": [
         -0.3199999928474426,
@@ -394,47 +394,47 @@
             -0.5799999237060547
           ],
           "palm": [
-            -0.3466479182243347,
-            0.5256443023681641,
-            -0.6039791107177734
+            -0.35098588466644287,
+            0.5460979342460632,
+            -0.6078826785087585
           ]
         },
         "R": {
           "shoulder": [
-            0.22296707332134247,
+            0.22296704351902008,
             0.10818655043840408,
             -0.4301181435585022
           ],
           "elbow": [
-            0.18036416172981262,
-            0.41567501425743103,
-            -0.42749354243278503
+            0.17739617824554443,
+            0.41523706912994385,
+            -0.4338985085487366
           ],
           "wrist": [
-            -0.0230119489133358,
-            0.45347917079925537,
-            -0.20311914384365082
+            -0.02516661025583744,
+            0.43249544501304626,
+            -0.2062908262014389
           ],
           "palm": [
-            -4.53554093837738e-06,
-            0.580001175403595,
-            -0.18000181019306183
+            3.3527612686157227e-07,
+            0.5799999833106995,
+            -0.17999990284442902
           ]
         }
       },
       "selfIntersection": {
         "crossArmTriangleOverlapCount": 0,
         "crossArmPairsByRegion": {},
-        "minimumNonAdjacentDigitJointSeparationM": 0.009405344619598023,
+        "minimumNonAdjacentDigitJointSeparationM": 0.010936399531303612,
         "passed": true
       },
       "weaponCollision": {
-        "totalTrianglePairCount": 652,
-        "intentionalHandContactPairCount": 652,
+        "totalTrianglePairCount": 704,
+        "intentionalHandContactPairCount": 704,
         "forbiddenPenetrationPairCount": 0,
         "pairsByRenderRegion": {
-          "glove:R": 542,
-          "skin:R": 110
+          "glove:R": 599,
+          "skin:R": 105
         },
         "forbiddenCentroidBounds": null,
         "forbiddenSamples": [],
@@ -449,7 +449,7 @@
         "passed": true
       },
       "leftHandWeaponContactPairs": 0,
-      "rightHandWeaponContactPairs": 652,
+      "rightHandWeaponContactPairs": 704,
       "leftHandContactRequired": false,
       "passed": true,
       "screenOccupancy": {
@@ -473,19 +473,19 @@
     {
       "view": "mp5-hip",
       "weapon": "mp5",
-      "rightSocketErrorM": 4.5162415802049825e-06,
-      "leftSocketErrorM": 0.00246977916566154,
-      "rightReachRatio": 0.7859127841663,
-      "leftReachRatio": 0.825509223584419,
+      "rightSocketErrorM": 3.853923206987507e-07,
+      "leftSocketErrorM": 0.002842726167288071,
+      "rightReachRatio": 0.76248306622159,
+      "leftReachRatio": 0.8071650165397223,
       "rightSolvedWristTarget": [
-        -0.024344321340322495,
-        0.4527907967567444,
-        -0.197226881980896
+        -0.026884261518716812,
+        0.4317362904548645,
+        -0.1994251161813736
       ],
       "leftSolvedWristTarget": [
-        -0.14680269360542297,
-        0.672751247882843,
-        -0.07059092819690704
+        -0.1631654053926468,
+        0.6590839624404907,
+        -0.07042117416858673
       ],
       "socketAnchor": "mean-digit-base-palm",
       "supportMode": "two-hand-support",
@@ -521,9 +521,9 @@
         },
         "targets": {
           "Index": [
-            -0.005062967538833618,
-            0.7788197994232178,
-            -0.07497479766607285
+            -0.00342891039326787,
+            0.7808962464332581,
+            -0.07422848045825958
           ],
           "Middle": [
             0.0005246303626336157,
@@ -531,61 +531,61 @@
             -0.0862417221069336
           ],
           "Ring": [
-            -0.004971228539943695,
-            0.7491199970245361,
-            -0.09602376073598862
+            0.0013561928644776344,
+            0.7489772439002991,
+            -0.09900663048028946
           ],
           "Pinky": [
-            -0.05067864805459976,
-            0.7464614510536194,
-            -0.08871707320213318
+            -0.05016345530748367,
+            0.7453394532203674,
+            -0.08902227878570557
           ],
           "Thumb": [
-            -0.060252778232097626,
-            0.7392430901527405,
-            -0.059711307287216187
+            -0.062058813869953156,
+            0.7378590106964111,
+            -0.05956025794148445
           ]
         },
         "reach": {
           "Index": {
-            "chainReachM": 0.07482241439528776,
-            "requestedReachRatio": 0.9766958795681818,
-            "resolvedReachRatio": 0.9399998944065031,
-            "clamped": true
+            "chainReachM": 0.08700275951706177,
+            "requestedReachRatio": 0.897176003718323,
+            "resolvedReachRatio": 0.897176003718323,
+            "clamped": false
           },
           "Middle": {
-            "chainReachM": 0.09197309977063768,
-            "requestedReachRatio": 0.7070817078964182,
-            "resolvedReachRatio": 0.7070817078964182,
+            "chainReachM": 0.10694547339606608,
+            "requestedReachRatio": 0.6336415543261796,
+            "resolvedReachRatio": 0.6336415543261796,
             "clamped": false
           },
           "Ring": {
-            "chainReachM": 0.08515588911042017,
-            "requestedReachRatio": 1.0221636572580535,
-            "resolvedReachRatio": 0.9399999724648632,
-            "clamped": true
+            "chainReachM": 0.09901839360911936,
+            "requestedReachRatio": 0.9305278280170696,
+            "resolvedReachRatio": 0.9305278280170696,
+            "clamped": false
           },
           "Pinky": {
-            "chainReachM": 0.06498822493312945,
-            "requestedReachRatio": 1.7892704236452273,
-            "resolvedReachRatio": 0.9399999437615049,
+            "chainReachM": 0.07556759374946881,
+            "requestedReachRatio": 1.6595369320378253,
+            "resolvedReachRatio": 0.9399998426318269,
             "clamped": true
           },
           "Thumb": {
-            "chainReachM": 0.0903166875150173,
-            "requestedReachRatio": 1.5349781208809132,
-            "resolvedReachRatio": 0.9399999412687388,
+            "chainReachM": 0.10501946070642254,
+            "requestedReachRatio": 1.4700061421296258,
+            "resolvedReachRatio": 0.9400000366034461,
             "clamped": true
           }
         },
         "tipErrorsM": {
-          "Index": 0.0020104605862440055,
-          "Middle": 0.00047804709128316186,
-          "Ring": 0.0014652251109065712,
-          "Pinky": 0.0014586676447418921,
-          "Thumb": 0.0013614447939795664
+          "Index": 0.0014018947727271291,
+          "Middle": 4.558668774597303e-05,
+          "Ring": 0.0014415485862988807,
+          "Pinky": 0.0013591823519544502,
+          "Thumb": 0.0014589048809660681
         },
-        "maximumTipErrorM": 0.0020104605862440055,
+        "maximumTipErrorM": 0.0014589048809660681,
         "passed": true
       },
       "reloadDigitWrap": null,
@@ -599,59 +599,59 @@
             -0.47999992966651917
           ],
           "elbow": [
-            -0.35694804787635803,
-            0.6314968466758728,
-            -0.28801190853118896
+            -0.3768535852432251,
+            0.6212798953056335,
+            -0.2849975824356079
           ],
           "wrist": [
-            -0.14680269360542297,
-            0.672751247882843,
-            -0.07059094309806824
+            -0.16316546499729156,
+            0.659084141254425,
+            -0.07042106986045837
           ],
           "palm": [
-            -0.05089816451072693,
-            0.7607265114784241,
-            -0.08218304812908173
+            -0.05107057839632034,
+            0.7609269022941589,
+            -0.08246490359306335
           ]
         },
         "R": {
           "shoulder": [
-            0.22296707332134247,
+            0.22296704351902008,
             0.10818655043840408,
             -0.4301181435585022
           ],
           "elbow": [
-            0.1791357398033142,
-            0.41539475321769714,
-            -0.42157500982284546
+            0.1759558469057083,
+            0.4150255024433136,
+            -0.42682650685310364
           ],
           "wrist": [
-            -0.024344343692064285,
-            0.45279091596603394,
-            -0.19722677767276764
+            -0.026884272694587708,
+            0.43173637986183167,
+            -0.19942504167556763
           ],
           "palm": [
-            -4.0121376514434814e-06,
-            0.5800010561943054,
-            -0.18000178039073944
+            3.203749656677246e-07,
+            0.5799998641014099,
+            -0.17999982833862305
           ]
         }
       },
       "selfIntersection": {
         "crossArmTriangleOverlapCount": 0,
         "crossArmPairsByRegion": {},
-        "minimumNonAdjacentDigitJointSeparationM": 0.009405286798999008,
+        "minimumNonAdjacentDigitJointSeparationM": 0.010936409489968768,
         "passed": true
       },
       "weaponCollision": {
-        "totalTrianglePairCount": 669,
-        "intentionalHandContactPairCount": 669,
+        "totalTrianglePairCount": 724,
+        "intentionalHandContactPairCount": 724,
         "forbiddenPenetrationPairCount": 0,
         "pairsByRenderRegion": {
-          "glove:R": 134,
-          "glove:L": 80,
-          "skin:R": 127,
-          "skin:L": 328
+          "glove:R": 164,
+          "glove:L": 73,
+          "skin:R": 147,
+          "skin:L": 340
         },
         "forbiddenCentroidBounds": null,
         "forbiddenSamples": [],
@@ -665,8 +665,8 @@
         ],
         "passed": true
       },
-      "leftHandWeaponContactPairs": 408,
-      "rightHandWeaponContactPairs": 261,
+      "leftHandWeaponContactPairs": 413,
+      "rightHandWeaponContactPairs": 311,
       "leftHandContactRequired": true,
       "passed": true,
       "screenOccupancy": {
@@ -690,19 +690,19 @@
     {
       "view": "m4a1-hip",
       "weapon": "m4a1",
-      "rightSocketErrorM": 4.083968743962646e-06,
-      "leftSocketErrorM": 0.002423617313833653,
-      "rightReachRatio": 0.7889400447238958,
-      "leftReachRatio": 0.7865366181681277,
+      "rightSocketErrorM": 3.451527198056409e-07,
+      "leftSocketErrorM": 0.0027864050026630387,
+      "rightReachRatio": 0.7662155456677627,
+      "leftReachRatio": 0.7686655809374368,
       "rightSolvedWristTarget": [
-        -0.02511800266802311,
-        0.4525257349014282,
-        -0.1938209980726242
+        -0.02788569964468479,
+        0.43145567178726196,
+        -0.19546417891979218
       ],
       "leftSolvedWristTarget": [
-        -0.16800996661186218,
-        0.6638626456260681,
-        -0.08822310715913773
+        -0.1845940500497818,
+        0.6504684090614319,
+        -0.08837874233722687
       ],
       "socketAnchor": "mean-digit-base-palm",
       "supportMode": "two-hand-support",
@@ -738,9 +738,9 @@
         },
         "targets": {
           "Index": [
-            -0.02547384425997734,
-            0.7686576843261719,
-            -0.09094004333019257
+            -0.023409772664308548,
+            0.7711699604988098,
+            -0.08993427455425262
           ],
           "Middle": [
             -0.01946800947189331,
@@ -748,61 +748,61 @@
             -0.10151319205760956
           ],
           "Ring": [
-            -0.02454087883234024,
-            0.7389636635780334,
-            -0.11097829788923264
+            -0.018649695441126823,
+            0.7388930320739746,
+            -0.11378947645425797
           ],
           "Pinky": [
-            -0.07034982740879059,
-            0.7361667156219482,
-            -0.10232583433389664
+            -0.06978228688240051,
+            0.7349815368652344,
+            -0.10257136076688766
           ],
           "Thumb": [
-            -0.08141151070594788,
-            0.730160117149353,
-            -0.07606767117977142
+            -0.08329544961452484,
+            0.7288832664489746,
+            -0.07592897117137909
           ]
         },
         "reach": {
           "Index": {
-            "chainReachM": 0.07482234488634575,
-            "requestedReachRatio": 0.9854869250990967,
-            "resolvedReachRatio": 0.9399997804704203,
-            "clamped": true
+            "chainReachM": 0.08700272198305939,
+            "requestedReachRatio": 0.9049872107642405,
+            "resolvedReachRatio": 0.9049872107642405,
+            "clamped": false
           },
           "Middle": {
-            "chainReachM": 0.09197297619687489,
-            "requestedReachRatio": 0.7078865845080121,
-            "resolvedReachRatio": 0.7078865845080121,
+            "chainReachM": 0.10694535203585188,
+            "requestedReachRatio": 0.634501083536708,
+            "resolvedReachRatio": 0.634501083536708,
             "clamped": false
           },
           "Ring": {
-            "chainReachM": 0.08515572470310968,
-            "requestedReachRatio": 1.0166585777903594,
-            "resolvedReachRatio": 0.9399999587222905,
-            "clamped": true
+            "chainReachM": 0.09901824885555127,
+            "requestedReachRatio": 0.9253075575691824,
+            "resolvedReachRatio": 0.9253075575691824,
+            "clamped": false
           },
           "Pinky": {
-            "chainReachM": 0.06498814097554123,
-            "requestedReachRatio": 1.7890881105828378,
-            "resolvedReachRatio": 0.9400000621781822,
+            "chainReachM": 0.07556758233116528,
+            "requestedReachRatio": 1.6589264584904515,
+            "resolvedReachRatio": 0.9400002137414368,
             "clamped": true
           },
           "Thumb": {
-            "chainReachM": 0.09031662670177079,
-            "requestedReachRatio": 1.5445322892266566,
-            "resolvedReachRatio": 0.9400002477762652,
+            "chainReachM": 0.10501941472269352,
+            "requestedReachRatio": 1.4781013796857982,
+            "resolvedReachRatio": 0.9399998193643825,
             "clamped": true
           }
         },
         "tipErrorsM": {
-          "Index": 0.002029068226542251,
-          "Middle": 0.0005241821933657228,
-          "Ring": 0.0014465831227746123,
-          "Pinky": 0.001411841751998168,
-          "Thumb": 0.0013063407475987759
+          "Index": 0.0014550435077969057,
+          "Middle": 6.589162899702859e-05,
+          "Ring": 0.0014316903511933374,
+          "Pinky": 0.0014577533452785018,
+          "Thumb": 0.0014020363728768014
         },
-        "maximumTipErrorM": 0.002029068226542251,
+        "maximumTipErrorM": 0.0014577533452785018,
         "passed": true
       },
       "reloadDigitWrap": null,
@@ -850,58 +850,58 @@
             -0.47999992966651917
           ],
           "elbow": [
-            -0.38449469208717346,
-            0.630947470664978,
-            -0.30079251527786255
+            -0.4038347899913788,
+            0.6191818714141846,
+            -0.29835349321365356
           ],
           "wrist": [
-            -0.16801011562347412,
-            0.6638628244400024,
-            -0.08822318911552429
+            -0.18459412455558777,
+            0.6504685282707214,
+            -0.08837863802909851
           ],
           "palm": [
-            -0.07095085084438324,
-            0.750887393951416,
-            -0.09704528748989105
+            -0.07112492620944977,
+            0.7511037588119507,
+            -0.09729808568954468
           ]
         },
         "R": {
           "shoulder": [
-            0.22296707332134247,
+            0.22296704351902008,
             0.10818655043840408,
             -0.4301181435585022
           ],
           "elbow": [
-            0.1784217655658722,
-            0.4151765704154968,
-            -0.4181227684020996
+            0.17513035237789154,
+            0.4148261845111847,
+            -0.4227144718170166
           ],
           "wrist": [
-            -0.025118067860603333,
-            0.45252588391304016,
-            -0.19382087886333466
+            -0.02788570523262024,
+            0.43145570158958435,
+            -0.1954641044139862
           ],
           "palm": [
-            -3.6116689443588257e-06,
-            0.5800008773803711,
-            -0.18000169098377228
+            2.7008354663848877e-07,
+            0.5799998641014099,
+            -0.17999982833862305
           ]
         }
       },
       "selfIntersection": {
         "crossArmTriangleOverlapCount": 0,
         "crossArmPairsByRegion": {},
-        "minimumNonAdjacentDigitJointSeparationM": 0.009405305223423099,
+        "minimumNonAdjacentDigitJointSeparationM": 0.010936394531177082,
         "passed": true
       },
       "weaponCollision": {
-        "totalTrianglePairCount": 988,
-        "intentionalHandContactPairCount": 988,
+        "totalTrianglePairCount": 1480,
+        "intentionalHandContactPairCount": 1480,
         "forbiddenPenetrationPairCount": 0,
         "pairsByRenderRegion": {
-          "glove:R": 656,
-          "skin:R": 190,
-          "skin:L": 142
+          "glove:R": 805,
+          "skin:R": 476,
+          "skin:L": 199
         },
         "forbiddenCentroidBounds": null,
         "forbiddenSamples": [],
@@ -915,8 +915,8 @@
         ],
         "passed": true
       },
-      "leftHandWeaponContactPairs": 142,
-      "rightHandWeaponContactPairs": 846,
+      "leftHandWeaponContactPairs": 199,
+      "rightHandWeaponContactPairs": 1281,
       "leftHandContactRequired": true,
       "passed": true,
       "screenOccupancy": {
@@ -940,19 +940,19 @@
     {
       "view": "m4a1-grip-oblique",
       "weapon": "m4a1",
-      "rightSocketErrorM": 4.083968743962646e-06,
-      "leftSocketErrorM": 0.002423617313833653,
-      "rightReachRatio": 0.7889400447238958,
-      "leftReachRatio": 0.7865366181681277,
+      "rightSocketErrorM": 3.451527198056409e-07,
+      "leftSocketErrorM": 0.0027864050026630387,
+      "rightReachRatio": 0.7662155456677627,
+      "leftReachRatio": 0.7686655809374368,
       "rightSolvedWristTarget": [
-        -0.02511800266802311,
-        0.4525257349014282,
-        -0.1938209980726242
+        -0.02788569964468479,
+        0.43145567178726196,
+        -0.19546417891979218
       ],
       "leftSolvedWristTarget": [
-        -0.16800996661186218,
-        0.6638626456260681,
-        -0.08822310715913773
+        -0.1845940500497818,
+        0.6504684090614319,
+        -0.08837874233722687
       ],
       "socketAnchor": "mean-digit-base-palm",
       "supportMode": "two-hand-support",
@@ -988,9 +988,9 @@
         },
         "targets": {
           "Index": [
-            -0.02547384425997734,
-            0.7686576843261719,
-            -0.09094004333019257
+            -0.023409772664308548,
+            0.7711699604988098,
+            -0.08993427455425262
           ],
           "Middle": [
             -0.01946800947189331,
@@ -998,61 +998,61 @@
             -0.10151319205760956
           ],
           "Ring": [
-            -0.02454087883234024,
-            0.7389636635780334,
-            -0.11097829788923264
+            -0.018649695441126823,
+            0.7388930320739746,
+            -0.11378947645425797
           ],
           "Pinky": [
-            -0.07034982740879059,
-            0.7361667156219482,
-            -0.10232583433389664
+            -0.06978228688240051,
+            0.7349815368652344,
+            -0.10257136076688766
           ],
           "Thumb": [
-            -0.08141151070594788,
-            0.730160117149353,
-            -0.07606767117977142
+            -0.08329544961452484,
+            0.7288832664489746,
+            -0.07592897117137909
           ]
         },
         "reach": {
           "Index": {
-            "chainReachM": 0.07482234488634575,
-            "requestedReachRatio": 0.9854869250990967,
-            "resolvedReachRatio": 0.9399997804704203,
-            "clamped": true
+            "chainReachM": 0.08700272198305939,
+            "requestedReachRatio": 0.9049872107642405,
+            "resolvedReachRatio": 0.9049872107642405,
+            "clamped": false
           },
           "Middle": {
-            "chainReachM": 0.09197297619687489,
-            "requestedReachRatio": 0.7078865845080121,
-            "resolvedReachRatio": 0.7078865845080121,
+            "chainReachM": 0.10694535203585188,
+            "requestedReachRatio": 0.634501083536708,
+            "resolvedReachRatio": 0.634501083536708,
             "clamped": false
           },
           "Ring": {
-            "chainReachM": 0.08515572470310968,
-            "requestedReachRatio": 1.0166585777903594,
-            "resolvedReachRatio": 0.9399999587222905,
-            "clamped": true
+            "chainReachM": 0.09901824885555127,
+            "requestedReachRatio": 0.9253075575691824,
+            "resolvedReachRatio": 0.9253075575691824,
+            "clamped": false
           },
           "Pinky": {
-            "chainReachM": 0.06498814097554123,
-            "requestedReachRatio": 1.7890881105828378,
-            "resolvedReachRatio": 0.9400000621781822,
+            "chainReachM": 0.07556758233116528,
+            "requestedReachRatio": 1.6589264584904515,
+            "resolvedReachRatio": 0.9400002137414368,
             "clamped": true
           },
           "Thumb": {
-            "chainReachM": 0.09031662670177079,
-            "requestedReachRatio": 1.5445322892266566,
-            "resolvedReachRatio": 0.9400002477762652,
+            "chainReachM": 0.10501941472269352,
+            "requestedReachRatio": 1.4781013796857982,
+            "resolvedReachRatio": 0.9399998193643825,
             "clamped": true
           }
         },
         "tipErrorsM": {
-          "Index": 0.002029068226542251,
-          "Middle": 0.0005241821933657228,
-          "Ring": 0.0014465831227746123,
-          "Pinky": 0.001411841751998168,
-          "Thumb": 0.0013063407475987759
+          "Index": 0.0014550435077969057,
+          "Middle": 6.589162899702859e-05,
+          "Ring": 0.0014316903511933374,
+          "Pinky": 0.0014577533452785018,
+          "Thumb": 0.0014020363728768014
         },
-        "maximumTipErrorM": 0.002029068226542251,
+        "maximumTipErrorM": 0.0014577533452785018,
         "passed": true
       },
       "reloadDigitWrap": null,
@@ -1100,58 +1100,58 @@
             -0.47999992966651917
           ],
           "elbow": [
-            -0.38449469208717346,
-            0.630947470664978,
-            -0.30079251527786255
+            -0.4038347899913788,
+            0.6191818714141846,
+            -0.29835349321365356
           ],
           "wrist": [
-            -0.16801011562347412,
-            0.6638628244400024,
-            -0.08822318911552429
+            -0.18459412455558777,
+            0.6504685282707214,
+            -0.08837863802909851
           ],
           "palm": [
-            -0.07095085084438324,
-            0.750887393951416,
-            -0.09704528748989105
+            -0.07112492620944977,
+            0.7511037588119507,
+            -0.09729808568954468
           ]
         },
         "R": {
           "shoulder": [
-            0.22296707332134247,
+            0.22296704351902008,
             0.10818655043840408,
             -0.4301181435585022
           ],
           "elbow": [
-            0.1784217655658722,
-            0.4151765704154968,
-            -0.4181227684020996
+            0.17513035237789154,
+            0.4148261845111847,
+            -0.4227144718170166
           ],
           "wrist": [
-            -0.025118067860603333,
-            0.45252588391304016,
-            -0.19382087886333466
+            -0.02788570523262024,
+            0.43145570158958435,
+            -0.1954641044139862
           ],
           "palm": [
-            -3.6116689443588257e-06,
-            0.5800008773803711,
-            -0.18000169098377228
+            2.7008354663848877e-07,
+            0.5799998641014099,
+            -0.17999982833862305
           ]
         }
       },
       "selfIntersection": {
         "crossArmTriangleOverlapCount": 0,
         "crossArmPairsByRegion": {},
-        "minimumNonAdjacentDigitJointSeparationM": 0.009405305223423099,
+        "minimumNonAdjacentDigitJointSeparationM": 0.010936394531177082,
         "passed": true
       },
       "weaponCollision": {
-        "totalTrianglePairCount": 988,
-        "intentionalHandContactPairCount": 988,
+        "totalTrianglePairCount": 1480,
+        "intentionalHandContactPairCount": 1480,
         "forbiddenPenetrationPairCount": 0,
         "pairsByRenderRegion": {
-          "glove:R": 656,
-          "skin:R": 190,
-          "skin:L": 142
+          "glove:R": 805,
+          "skin:R": 476,
+          "skin:L": 199
         },
         "forbiddenCentroidBounds": null,
         "forbiddenSamples": [],
@@ -1165,8 +1165,8 @@
         ],
         "passed": true
       },
-      "leftHandWeaponContactPairs": 142,
-      "rightHandWeaponContactPairs": 846,
+      "leftHandWeaponContactPairs": 199,
+      "rightHandWeaponContactPairs": 1281,
       "leftHandContactRequired": true,
       "passed": true,
       "screenOccupancy": {
@@ -1190,19 +1190,19 @@
     {
       "view": "m4a1-ads",
       "weapon": "m4a1",
-      "rightSocketErrorM": 4.083968743962646e-06,
-      "leftSocketErrorM": 0.002423617313833653,
-      "rightReachRatio": 0.7889400447238958,
-      "leftReachRatio": 0.7865366181681277,
+      "rightSocketErrorM": 3.451527198056409e-07,
+      "leftSocketErrorM": 0.0027864050026630387,
+      "rightReachRatio": 0.7662155456677627,
+      "leftReachRatio": 0.7686655809374368,
       "rightSolvedWristTarget": [
-        -0.02511800266802311,
-        0.4525257349014282,
-        -0.1938209980726242
+        -0.02788569964468479,
+        0.43145567178726196,
+        -0.19546417891979218
       ],
       "leftSolvedWristTarget": [
-        -0.16800996661186218,
-        0.6638626456260681,
-        -0.08822310715913773
+        -0.1845940500497818,
+        0.6504684090614319,
+        -0.08837874233722687
       ],
       "socketAnchor": "mean-digit-base-palm",
       "supportMode": "two-hand-support",
@@ -1238,9 +1238,9 @@
         },
         "targets": {
           "Index": [
-            -0.02547384425997734,
-            0.7686576843261719,
-            -0.09094004333019257
+            -0.023409772664308548,
+            0.7711699604988098,
+            -0.08993427455425262
           ],
           "Middle": [
             -0.01946800947189331,
@@ -1248,61 +1248,61 @@
             -0.10151319205760956
           ],
           "Ring": [
-            -0.02454087883234024,
-            0.7389636635780334,
-            -0.11097829788923264
+            -0.018649695441126823,
+            0.7388930320739746,
+            -0.11378947645425797
           ],
           "Pinky": [
-            -0.07034982740879059,
-            0.7361667156219482,
-            -0.10232583433389664
+            -0.06978228688240051,
+            0.7349815368652344,
+            -0.10257136076688766
           ],
           "Thumb": [
-            -0.08141151070594788,
-            0.730160117149353,
-            -0.07606767117977142
+            -0.08329544961452484,
+            0.7288832664489746,
+            -0.07592897117137909
           ]
         },
         "reach": {
           "Index": {
-            "chainReachM": 0.07482234488634575,
-            "requestedReachRatio": 0.9854869250990967,
-            "resolvedReachRatio": 0.9399997804704203,
-            "clamped": true
+            "chainReachM": 0.08700272198305939,
+            "requestedReachRatio": 0.9049872107642405,
+            "resolvedReachRatio": 0.9049872107642405,
+            "clamped": false
           },
           "Middle": {
-            "chainReachM": 0.09197297619687489,
-            "requestedReachRatio": 0.7078865845080121,
-            "resolvedReachRatio": 0.7078865845080121,
+            "chainReachM": 0.10694535203585188,
+            "requestedReachRatio": 0.634501083536708,
+            "resolvedReachRatio": 0.634501083536708,
             "clamped": false
           },
           "Ring": {
-            "chainReachM": 0.08515572470310968,
-            "requestedReachRatio": 1.0166585777903594,
-            "resolvedReachRatio": 0.9399999587222905,
-            "clamped": true
+            "chainReachM": 0.09901824885555127,
+            "requestedReachRatio": 0.9253075575691824,
+            "resolvedReachRatio": 0.9253075575691824,
+            "clamped": false
           },
           "Pinky": {
-            "chainReachM": 0.06498814097554123,
-            "requestedReachRatio": 1.7890881105828378,
-            "resolvedReachRatio": 0.9400000621781822,
+            "chainReachM": 0.07556758233116528,
+            "requestedReachRatio": 1.6589264584904515,
+            "resolvedReachRatio": 0.9400002137414368,
             "clamped": true
           },
           "Thumb": {
-            "chainReachM": 0.09031662670177079,
-            "requestedReachRatio": 1.5445322892266566,
-            "resolvedReachRatio": 0.9400002477762652,
+            "chainReachM": 0.10501941472269352,
+            "requestedReachRatio": 1.4781013796857982,
+            "resolvedReachRatio": 0.9399998193643825,
             "clamped": true
           }
         },
         "tipErrorsM": {
-          "Index": 0.002029068226542251,
-          "Middle": 0.0005241821933657228,
-          "Ring": 0.0014465831227746123,
-          "Pinky": 0.001411841751998168,
-          "Thumb": 0.0013063407475987759
+          "Index": 0.0014550435077969057,
+          "Middle": 6.589162899702859e-05,
+          "Ring": 0.0014316903511933374,
+          "Pinky": 0.0014577533452785018,
+          "Thumb": 0.0014020363728768014
         },
-        "maximumTipErrorM": 0.002029068226542251,
+        "maximumTipErrorM": 0.0014577533452785018,
         "passed": true
       },
       "reloadDigitWrap": null,
@@ -1350,58 +1350,58 @@
             -0.47999992966651917
           ],
           "elbow": [
-            -0.38449469208717346,
-            0.630947470664978,
-            -0.30079251527786255
+            -0.4038347899913788,
+            0.6191818714141846,
+            -0.29835349321365356
           ],
           "wrist": [
-            -0.16801011562347412,
-            0.6638628244400024,
-            -0.08822318911552429
+            -0.18459412455558777,
+            0.6504685282707214,
+            -0.08837863802909851
           ],
           "palm": [
-            -0.07095085084438324,
-            0.750887393951416,
-            -0.09704528748989105
+            -0.07112492620944977,
+            0.7511037588119507,
+            -0.09729808568954468
           ]
         },
         "R": {
           "shoulder": [
-            0.22296707332134247,
+            0.22296704351902008,
             0.10818655043840408,
             -0.4301181435585022
           ],
           "elbow": [
-            0.1784217655658722,
-            0.4151765704154968,
-            -0.4181227684020996
+            0.17513035237789154,
+            0.4148261845111847,
+            -0.4227144718170166
           ],
           "wrist": [
-            -0.025118067860603333,
-            0.45252588391304016,
-            -0.19382087886333466
+            -0.02788570523262024,
+            0.43145570158958435,
+            -0.1954641044139862
           ],
           "palm": [
-            -3.6116689443588257e-06,
-            0.5800008773803711,
-            -0.18000169098377228
+            2.7008354663848877e-07,
+            0.5799998641014099,
+            -0.17999982833862305
           ]
         }
       },
       "selfIntersection": {
         "crossArmTriangleOverlapCount": 0,
         "crossArmPairsByRegion": {},
-        "minimumNonAdjacentDigitJointSeparationM": 0.009405305223423099,
+        "minimumNonAdjacentDigitJointSeparationM": 0.010936394531177082,
         "passed": true
       },
       "weaponCollision": {
-        "totalTrianglePairCount": 988,
-        "intentionalHandContactPairCount": 988,
+        "totalTrianglePairCount": 1480,
+        "intentionalHandContactPairCount": 1480,
         "forbiddenPenetrationPairCount": 0,
         "pairsByRenderRegion": {
-          "glove:R": 656,
-          "skin:R": 190,
-          "skin:L": 142
+          "glove:R": 805,
+          "skin:R": 476,
+          "skin:L": 199
         },
         "forbiddenCentroidBounds": null,
         "forbiddenSamples": [],
@@ -1415,8 +1415,8 @@
         ],
         "passed": true
       },
-      "leftHandWeaponContactPairs": 142,
-      "rightHandWeaponContactPairs": 846,
+      "leftHandWeaponContactPairs": 199,
+      "rightHandWeaponContactPairs": 1281,
       "leftHandContactRequired": true,
       "passed": true,
       "adsSight": {
@@ -1476,19 +1476,19 @@
     {
       "view": "m4a1-reload",
       "weapon": "m4a1",
-      "rightSocketErrorM": 4.083968743962646e-06,
-      "leftSocketErrorM": 0.012498906654423584,
-      "rightReachRatio": 0.7889400447238958,
-      "leftReachRatio": 0.6493853879785649,
+      "rightSocketErrorM": 3.451527198056409e-07,
+      "leftSocketErrorM": 0.014518918954878637,
+      "rightReachRatio": 0.7662155456677627,
+      "leftReachRatio": 0.6432723344952471,
       "rightSolvedWristTarget": [
-        -0.02511800266802311,
-        0.4525257349014282,
-        -0.1938209980726242
+        -0.02788569964468479,
+        0.43145567178726196,
+        -0.19546417891979218
       ],
       "leftSolvedWristTarget": [
-        -0.24724552035331726,
-        0.5524171590805054,
-        -0.2210095226764679
+        -0.26635393500328064,
+        0.5455606579780579,
+        -0.2146402895450592
       ],
       "socketAnchor": "mean-digit-base-palm",
       "supportMode": "two-hand-support",
@@ -1540,9 +1540,9 @@
             -0.2795233726501465
           ],
           "Pinky": [
-            -0.15110626816749573,
-            0.5604982376098633,
-            -0.2974754571914673
+            -0.15067312121391296,
+            0.5575231313705444,
+            -0.29968777298927307
           ],
           "Thumb": [
             -0.15277700126171112,
@@ -1552,73 +1552,73 @@
         },
         "reach": {
           "Index": {
-            "chainReachM": 0.0748223980967005,
-            "requestedReachRatio": 0.5127387536384205,
-            "resolvedReachRatio": 0.5127387536384205,
+            "chainReachM": 0.08700275517720517,
+            "requestedReachRatio": 0.3969842991292897,
+            "resolvedReachRatio": 0.3969842991292897,
             "clamped": false
           },
           "Middle": {
-            "chainReachM": 0.0919730386479357,
-            "requestedReachRatio": 0.5277274617063576,
-            "resolvedReachRatio": 0.5277274617063576,
+            "chainReachM": 0.106945395055902,
+            "requestedReachRatio": 0.4455237500236263,
+            "resolvedReachRatio": 0.4455237500236263,
             "clamped": false
           },
           "Ring": {
-            "chainReachM": 0.085155797731827,
-            "requestedReachRatio": 0.838355520959991,
-            "resolvedReachRatio": 0.838355520959991,
+            "chainReachM": 0.09901832023362733,
+            "requestedReachRatio": 0.7571304645017497,
+            "resolvedReachRatio": 0.7571304645017497,
             "clamped": false
           },
           "Pinky": {
-            "chainReachM": 0.06498817602110503,
-            "requestedReachRatio": 1.408341459559121,
-            "resolvedReachRatio": 0.9400002022196767,
+            "chainReachM": 0.07556751697367756,
+            "requestedReachRatio": 1.301970527102705,
+            "resolvedReachRatio": 0.9399998949146043,
             "clamped": true
           },
           "Thumb": {
-            "chainReachM": 0.0903167306078945,
-            "requestedReachRatio": 0.784772301883072,
-            "resolvedReachRatio": 0.784772301883072,
+            "chainReachM": 0.10501942411635375,
+            "requestedReachRatio": 0.7820346571983557,
+            "resolvedReachRatio": 0.7820346571983557,
             "clamped": false
           }
         },
         "tipErrorsM": {
-          "Index": 0.00038146599688839426,
-          "Middle": 0.0001393571930914427,
-          "Ring": 0.0010459777840633635,
-          "Pinky": 0.0014366167092480786,
-          "Thumb": 0.0013849549334133907
+          "Index": 0.0006602856117599037,
+          "Middle": 0.0009848242326917446,
+          "Ring": 0.0006799062483138537,
+          "Pinky": 0.0013448425226983236,
+          "Thumb": 0.0007577407586806335
         },
         "evaluatedTips": {
           "Index": [
-            -0.13271896541118622,
-            0.5382596254348755,
-            -0.21905753016471863
+            -0.13283826410770416,
+            0.538732647895813,
+            -0.21997568011283875
           ],
           "Middle": [
-            -0.13271693885326385,
-            0.5383260250091553,
-            -0.24750778079032898
+            -0.13244354724884033,
+            0.5375281572341919,
+            -0.24744409322738647
           ],
           "Ring": [
-            -0.13320347666740417,
-            0.5393673777580261,
-            -0.2792638838291168
+            -0.1330798715353012,
+            0.5390327572822571,
+            -0.27935880422592163
           ],
           "Pinky": [
-            -0.15197254717350006,
-            0.5615384578704834,
-            -0.2969944477081299
+            -0.15155422687530518,
+            0.5584603548049927,
+            -0.2992955148220062
           ],
           "Thumb": [
-            -0.1539144665002823,
-            0.5403815507888794,
-            -0.20616674423217773
+            -0.1534367799758911,
+            0.540337860584259,
+            -0.20573265850543976
           ]
         },
         "orderedFingerCues": true,
         "thumbOpposed": true,
-        "maximumTipErrorM": 0.0014366167092480786,
+        "maximumTipErrorM": 0.0013448425226983236,
         "passed": true
       },
       "reloadMagazine": {
@@ -1765,59 +1765,59 @@
             -0.559999942779541
           ],
           "elbow": [
-            -0.49235981702804565,
-            0.5600025653839111,
-            -0.4026578366756439
+            -0.5100718140602112,
+            0.5432239770889282,
+            -0.398299902677536
           ],
           "wrist": [
-            -0.24724560976028442,
-            0.5524172782897949,
-            -0.22100943326950073
+            -0.2663539946079254,
+            0.5455607175827026,
+            -0.21464020013809204
           ],
           "palm": [
-            -0.1334819793701172,
-            0.588123619556427,
-            -0.2744365930557251
+            -0.1339567005634308,
+            0.5874315500259399,
+            -0.27628418803215027
           ]
         },
         "R": {
           "shoulder": [
-            0.22296707332134247,
+            0.22296704351902008,
             0.10818655043840408,
             -0.4301181435585022
           ],
           "elbow": [
-            0.1784217655658722,
-            0.4151765704154968,
-            -0.4181227684020996
+            0.17513035237789154,
+            0.4148261845111847,
+            -0.4227144718170166
           ],
           "wrist": [
-            -0.025118067860603333,
-            0.45252588391304016,
-            -0.19382087886333466
+            -0.02788570523262024,
+            0.43145570158958435,
+            -0.1954641044139862
           ],
           "palm": [
-            -3.6116689443588257e-06,
-            0.5800008773803711,
-            -0.18000169098377228
+            2.7008354663848877e-07,
+            0.5799998641014099,
+            -0.17999982833862305
           ]
         }
       },
       "selfIntersection": {
         "crossArmTriangleOverlapCount": 0,
         "crossArmPairsByRegion": {},
-        "minimumNonAdjacentDigitJointSeparationM": 0.009405305223423099,
+        "minimumNonAdjacentDigitJointSeparationM": 0.010936394531177082,
         "passed": true
       },
       "weaponCollision": {
-        "totalTrianglePairCount": 1165,
-        "intentionalHandContactPairCount": 1165,
+        "totalTrianglePairCount": 1539,
+        "intentionalHandContactPairCount": 1539,
         "forbiddenPenetrationPairCount": 0,
         "pairsByRenderRegion": {
-          "glove:L": 296,
-          "glove:R": 601,
-          "skin:L": 253,
-          "skin:R": 15
+          "glove:L": 318,
+          "glove:R": 747,
+          "skin:L": 252,
+          "skin:R": 222
         },
         "forbiddenCentroidBounds": null,
         "forbiddenSamples": [],
@@ -1831,8 +1831,8 @@
         ],
         "passed": true
       },
-      "leftHandWeaponContactPairs": 549,
-      "rightHandWeaponContactPairs": 616,
+      "leftHandWeaponContactPairs": 570,
+      "rightHandWeaponContactPairs": 969,
       "leftHandContactRequired": true,
       "passed": true,
       "screenOccupancy": {
@@ -1856,26 +1856,26 @@
     {
       "view": "knife-contact",
       "weapon": "knife",
-      "rightSocketErrorM": 4.1935584781975413e-07,
+      "rightSocketErrorM": 8.052488792493428e-07,
       "leftSocketErrorM": 6.664001874625056e-08,
-      "rightReachRatio": 0.8307404973272549,
+      "rightReachRatio": 0.8163496307766572,
       "leftReachRatio": 0.29047150927733845,
       "rightSolvedWristTarget": [
-        0.04724602401256561,
-        0.4693896174430847,
-        -0.11360207200050354
+        0.03994615375995636,
+        0.449701726436615,
+        -0.1101127564907074
       ],
       "knifeGripSocketErrorM": 0.0,
       "knifeAttachmentContract": "anatomical-palm-to-grip-v1",
       "exportedKnifeSocketWorld": [
-        0.07438506186008453,
-        -0.06634509563446045,
-        0.7793743014335632
+        0.04952205717563629,
+        -0.08450019359588623,
+        0.784141480922699
       ],
       "selfIntersection": {
         "crossArmTriangleOverlapCount": 0,
         "crossArmPairsByRegion": {},
-        "minimumNonAdjacentDigitJointSeparationM": 0.008176314807829061,
+        "minimumNonAdjacentDigitJointSeparationM": 0.00950737570422786,
         "passed": true
       },
       "weaponCollision": {
