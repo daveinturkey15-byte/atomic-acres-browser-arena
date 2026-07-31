@@ -60,9 +60,20 @@ describe('Pass 64 authored TSL pipeline set', () => {
     expect(systems.root.getObjectByName('Pass 64 TSL grass')?.visible).toBe(false);
     const dust = systems.root.getObjectByName('Pass 64 TSL deterministic dust') as THREE.Points;
     expect(dust.geometry.drawRange.count).toBe(96);
+    // Pass 66 owner skies: RustRig carries the night layers, Atomic Acres the
+    // orange/purple painted clouds, and Terminal a half-covered day bank.
+    expect(systems.root.getObjectByName('Pass 66 night stars')?.visible).toBe(true);
+    expect(systems.root.getObjectByName('Pass 66 galaxy band')?.visible).toBe(true);
+    expect(systems.root.getObjectByName('Pass 66 aurora curtains')?.visible).toBe(true);
+    expect(systems.root.getObjectByName('Pass 66 painted clouds')?.visible).toBe(false);
     systems.applyDefinition(definition);
     expect(water.visible).toBe(false);
     expect(systems.root.getObjectByName('Pass 64 TSL grass')?.visible).toBe(true);
+    expect(systems.root.getObjectByName('Pass 66 night stars')?.visible).toBe(false);
+    const paintedClouds = systems.root.getObjectByName('Pass 66 painted clouds') as THREE.Group;
+    expect(paintedClouds.visible).toBe(true);
+    expect((paintedClouds.userData.primaryMaterial as THREE.MeshBasicMaterial).color.getHex()).toBe(0xff934a);
+    expect((paintedClouds.userData.secondaryMaterial as THREE.MeshBasicMaterial).color.getHex()).toBe(0x9f6fe8);
     const reviewCamera = { ...definition.reviewCameras[0], fixedTimeMs: 63_321, seed: 9_117 };
     systems.setReviewCamera(reviewCamera);
     systems.update(999_999);

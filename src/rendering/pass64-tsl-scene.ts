@@ -160,6 +160,135 @@ function makeSky(): THREE.Object3D {
   return sky;
 }
 
+/**
+ * Pass 66 painted sky layers. Deterministic, presentation-only dressing far
+ * outside the arena bounds; per-preset visibility/tints are applied by
+ * applyArenaSystemLayout. Materials ignore scene fog so the backdrop cannot
+ * be washed out by the gameplay fog band.
+ */
+function skyDomePoint(index: number, seed: number, radius: number, minimumY: number): [number, number, number] {
+  const theta = seededUnit(index, 1, seed) * Math.PI * 2;
+  const y = minimumY + seededUnit(index, 2, seed) * (1 - minimumY);
+  const horizontal = Math.sqrt(Math.max(0, 1 - y * y));
+  return [Math.cos(theta) * horizontal * radius, y * radius, Math.sin(theta) * horizontal * radius];
+}
+
+function makeNightStars(): THREE.Points {
+  const count = 900;
+  const positions = new Float32Array(count * 3);
+  for (let index = 0; index < count; index += 1) {
+    const [x, y, z] = skyDomePoint(index, 6601, 396, 0.05);
+    positions.set([x, y, z], index * 3);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const material = new THREE.PointsMaterial({
+    name: 'pass66-night-stars', color: 0xf3f7ff, size: 1.35, sizeAttenuation: false,
+    transparent: true, opacity: 0.9, depthWrite: false, fog: false,
+  });
+  const stars = new THREE.Points(geometry, material);
+  stars.name = 'Pass 66 night stars';
+  stars.frustumCulled = false;
+  stars.visible = false;
+  return stars;
+}
+
+function makeGalaxyBand(): THREE.Points {
+  const count = 1_500;
+  const positions = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
+  const bandTilt = 0.62;
+  const core = new THREE.Color(0xcfd8ff);
+  const dust = new THREE.Color(0x8f7bd8);
+  for (let index = 0; index < count; index += 1) {
+    // Concentrate along one tilted great-circle band with gaussian-ish spread.
+    const along = (seededUnit(index, 1, 7702) - 0.5) * Math.PI * 1.9;
+    const spread = (seededUnit(index, 2, 7702) + seededUnit(index, 3, 7702) - 1) * 0.16;
+    const direction = new THREE.Vector3(Math.cos(along), Math.sin(along) * Math.sin(bandTilt) + spread, Math.sin(along) * Math.cos(bandTilt));
+    direction.normalize();
+    if (direction.y < 0.04) direction.y = 0.04 + Math.abs(spread);
+    direction.normalize().multiplyScalar(392);
+    positions.set([direction.x, direction.y, direction.z], index * 3);
+    const tint = core.clone().lerp(dust, seededUnit(index, 4, 7702));
+    colors.set([tint.r, tint.g, tint.b], index * 3);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  const material = new THREE.PointsMaterial({
+    name: 'pass66-galaxy-band', vertexColors: true, size: 2.1, sizeAttenuation: false,
+    transparent: true, opacity: 0.5, depthWrite: false, fog: false, blending: THREE.AdditiveBlending,
+  });
+  const galaxy = new THREE.Points(geometry, material);
+  galaxy.name = 'Pass 66 galaxy band';
+  galaxy.frustumCulled = false;
+  galaxy.visible = false;
+  return galaxy;
+}
+
+function makeAuroraCurtains(): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'Pass 66 aurora curtains';
+  const palette = [0x3ef2a5, 0x39d7c9, 0x63e07f];
+  for (const [index, hex] of palette.entries()) {
+    const geometry = new THREE.PlaneGeometry(300 - index * 40, 74 - index * 10, 36, 1);
+    const positionsAttr = geometry.getAttribute('position') as THREE.BufferAttribute;
+    for (let vertex = 0; vertex < positionsAttr.count; vertex += 1) {
+      const x = positionsAttr.getX(vertex);
+      // Waved lower hem so the curtains read as ribbons, not billboards.
+      positionsAttr.setZ(vertex, Math.sin(x * 0.045 + index * 1.7) * 14);
+      if (positionsAttr.getY(vertex) < 0) {
+        positionsAttr.setY(vertex, positionsAttr.getY(vertex) + Math.sin(x * 0.08 + index) * 9);
+      }
+    }
+    positionsAttr.needsUpdate = true;
+    geometry.computeVertexNormals();
+    const material = new THREE.MeshBasicMaterial({
+      name: `pass66-aurora-${index}`, color: hex, transparent: true, opacity: 0.16 + index * 0.04,
+      depthWrite: false, fog: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+    });
+    const curtain = new THREE.Mesh(geometry, material);
+    curtain.name = `pass66-aurora-curtain-${index}`;
+    curtain.position.set(-30 + index * 34, 168 + index * 26, -286 + index * 30);
+    curtain.rotation.x = -0.28;
+    curtain.frustumCulled = false;
+    group.add(curtain);
+  }
+  group.visible = false;
+  return group;
+}
+
+function makePaintedClouds(): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'Pass 66 painted clouds';
+  const primary = new THREE.MeshBasicMaterial({
+    name: 'pass66-cloud-primary', color: 0xffffff, transparent: true, opacity: 0.5,
+    depthWrite: false, fog: false, side: THREE.DoubleSide,
+  });
+  const secondary = new THREE.MeshBasicMaterial({
+    name: 'pass66-cloud-secondary', color: 0xe8f2f8, transparent: true, opacity: 0.42,
+    depthWrite: false, fog: false, side: THREE.DoubleSide,
+  });
+  group.userData.primaryMaterial = primary;
+  group.userData.secondaryMaterial = secondary;
+  for (let index = 0; index < 10; index += 1) {
+    const [x, y, z] = skyDomePoint(index, 8803, 330, 0.16);
+    const width = 64 + seededUnit(index, 5, 8803) * 58;
+    const cloud = new THREE.Mesh(
+      new THREE.PlaneGeometry(width, width * 0.3, 1, 1),
+      index % 2 === 0 ? primary : secondary,
+    );
+    cloud.name = `pass66-cloud-${index}`;
+    cloud.position.set(x, Math.min(y, 176), z);
+    cloud.lookAt(0, cloud.position.y * 0.7, 0);
+    cloud.frustumCulled = false;
+    cloud.userData.cloudOrdinal = index;
+    group.add(cloud);
+  }
+  group.visible = false;
+  return group;
+}
+
 function makeMist(definition: ArenaVisualDefinition): THREE.Group {
   const root = new THREE.Group();
   root.name = 'Pass 64 TSL mist';
@@ -310,9 +439,43 @@ function applyArenaSystemLayout(
   const water = root.getObjectByName('Pass 64 TSL perimeter water');
   if (water) water.visible = definition.id === 'rustworks-1v1';
   const sky = root.getObjectByName('Pass 64 TSL atmosphere sky') as SkyMesh | undefined;
+  const preset = definition.atmosphere.preset;
   if (sky) {
     sky.turbidity.value = definition.atmosphere.clouds ? 4.2 : 1.2;
     sky.rayleigh.value = definition.atmosphere.clouds ? 1.75 : 0.85;
+    // Owner-directed per-arena skies: RustRig is true night, Atomic Acres is a
+    // deep sunset carrying orange/purple cloud paint, Terminal is plain day.
+    if (preset === 'industrial-night') sky.sunPosition.value.set(0.3, -0.16, -0.35).normalize();
+    else if (preset === 'sunset-farmland') sky.sunPosition.value.set(0.62, 0.11, -0.3).normalize();
+    else sky.sunPosition.value.set(0.45, 0.72, -0.22).normalize();
+  }
+  const nightLayersVisible = preset === 'industrial-night';
+  const stars = root.getObjectByName('Pass 66 night stars');
+  if (stars) stars.visible = nightLayersVisible;
+  const galaxy = root.getObjectByName('Pass 66 galaxy band');
+  if (galaxy) galaxy.visible = nightLayersVisible;
+  const aurora = root.getObjectByName('Pass 66 aurora curtains');
+  if (aurora) aurora.visible = nightLayersVisible;
+  const clouds = root.getObjectByName('Pass 66 painted clouds') as THREE.Group | undefined;
+  if (clouds) {
+    clouds.visible = preset === 'sunset-farmland' || preset === 'airport-dawn';
+    const primary = clouds.userData.primaryMaterial as THREE.MeshBasicMaterial;
+    const secondary = clouds.userData.secondaryMaterial as THREE.MeshBasicMaterial;
+    if (preset === 'sunset-farmland') {
+      primary.color.setHex(0xff934a);
+      secondary.color.setHex(0x9f6fe8);
+      primary.opacity = 0.55;
+      secondary.opacity = 0.48;
+    } else {
+      primary.color.setHex(0xffffff);
+      secondary.color.setHex(0xe9f3f9);
+      primary.opacity = 0.5;
+      secondary.opacity = 0.42;
+    }
+    // Terminal reads "half sun half cloud": show only half of the bank.
+    clouds.children.forEach((cloud, index) => {
+      cloud.visible = preset !== 'airport-dawn' || index % 2 === 0;
+    });
   }
   root.userData.tslArenaVisualDefinitionId = definition.id;
   root.userData.tslAtmosphere = { ...definition.atmosphere };
@@ -491,6 +654,10 @@ export function createPass64TslSceneSystems(
   root.userData.pass64TslPresentation = true;
   root.add(
     makeSky(),
+    makeNightStars(),
+    makeGalaxyBand(),
+    makeAuroraCurtains(),
+    makePaintedClouds(),
     makeMist(definition),
     makeSmoke(definition),
     makeDust(definition),
