@@ -18004,6 +18004,33 @@ function monitorSelectedArenaRender(now: number): void {
   }
 }
 
+/**
+ * Runtime error trap. A gameplay throw must never hard-freeze the session: the
+ * error is captured to the console and to a small on-screen log (so it can be
+ * read back without opening devtools), and the frame loop keeps running.
+ */
+const runtimeErrorLog: string[] = [];
+let consecutiveFrameErrors = 0;
+
+function reportRuntimeError(context: string, error: unknown): void {
+  const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  const stack = error instanceof Error && error.stack ? error.stack.split('\n').slice(1, 4).join(' | ').trim() : '';
+  const entry = `[${context}] ${message}${stack ? ` @ ${stack}` : ''}`;
+  console.error(`[atomic-acres:${context}]`, error);
+  if (runtimeErrorLog[runtimeErrorLog.length - 1] !== entry) {
+    runtimeErrorLog.push(entry);
+    if (runtimeErrorLog.length > 8) runtimeErrorLog.shift();
+  }
+  const el = document.getElementById('runtime-error-log');
+  if (el) {
+    el.hidden = false;
+    el.textContent = runtimeErrorLog.join('\n');
+  }
+}
+
+window.addEventListener('error', (event) => reportRuntimeError('window', event.error ?? event.message));
+window.addEventListener('unhandledrejection', (event) => reportRuntimeError('promise', event.reason));
+
 function frame(now: number, scheduleNext = true): void {
   const schedulingDecision = reconcilePresentationScheduling('animation frame eligibility');
   if (schedulingDecision.mode !== 'foreground-presentation') {
@@ -18161,10 +18188,22 @@ function frame(now: number, scheduleNext = true): void {
       if (recentFrameWorkMs.length > FRAME_WORK_SAMPLE_LIMIT) {
         recentFrameWorkMs.splice(0, recentFrameWorkMs.length - FRAME_WORK_SAMPLE_LIMIT);
       }
+      consecutiveFrameErrors = 0;
       requestAnimationFrame(frame);
     }
   } catch (error) {
-    showFatalError(error);
+    // A single bad frame (e.g. entering the chopper gunner, a semtex blast, a
+    // hot graphics swap) used to call showFatalError and stop scheduling frames
+    // entirely - the whole session froze and looked like a crash. Keep the loop
+    // alive, surface the error on screen for diagnosis, and only give up after a
+    // sustained run of consecutive failures.
+    reportRuntimeError('frame', error);
+    consecutiveFrameErrors += 1;
+    if (consecutiveFrameErrors >= 60) {
+      showFatalError(error);
+      return;
+    }
+    if (scheduleNext) requestAnimationFrame(frame);
   }
 }
 
