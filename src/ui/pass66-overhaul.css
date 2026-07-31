@@ -338,11 +338,11 @@
   .kit-card > i { color: #667a7d; font-size: 10px; }
   .kit-card em { color: var(--p66-cyan); font-size: 10px; }
 
-  .kit-stat-strip { display: grid; gap: 7px; margin: 12px 0 12px; }
-  .kit-stat-strip span { display: grid; grid-template-columns: 64px 1fr 20px; align-items: center; gap: 8px; }
-  .kit-stat-strip small { color: var(--p66-muted); font-size: 11px; text-transform: uppercase; }
-  .kit-stat-strip i { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--p66-cyan) var(--kit-stat), #d8e1de var(--kit-stat)); }
-  .kit-stat-strip b { color: var(--p66-ink); font-size: 12px; text-align: right; }
+  .kit-stat-strip { display: grid; gap: 9px; margin: 12px 0 12px; }
+  .kit-stat-strip span { display: grid; grid-template-columns: 76px 1fr 26px; align-items: center; gap: 10px; }
+  .kit-stat-strip small { color: var(--p66-ink); font-size: 12px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+  .kit-stat-strip i { height: 9px; border-radius: 4px; background: linear-gradient(90deg, var(--p66-cyan) var(--kit-stat), #d8e1de var(--kit-stat)); box-shadow: inset 0 0 0 1px rgba(20, 40, 42, 0.12); }
+  .kit-stat-strip b { color: var(--p66-ink); font-size: 14px; font-weight: 900; text-align: right; }
 
   .manage-kit-card {
     display: grid;
