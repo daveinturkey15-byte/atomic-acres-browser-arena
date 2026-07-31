@@ -85,10 +85,14 @@ export const CHOPPER_GUNNER_RAY_POLICY = Object.freeze({
   cameraSocketLocalM: Object.freeze([0, 0.74, -0.38] as const),
   cameraForwardNudgeM: 0.08,
   muzzleSocketLocalM: Object.freeze([0, -0.82, -3.32] as const),
-  // HF-135 deliberately replaced a forgiving cone with a tight centre-ray
-  // capsule: off-crosshair targets must never register. Do not widen this to
-  // make hits easier; missing shots are reported through presentation feedback.
-  targetRadiusM: 0.62,
+  /**
+   * HF-135 replaced a forgiving cone with a centre-ray capsule so off-crosshair
+   * targets can never register. The owner reported twice that a 0.62 m capsule
+   * made held fire from orbit altitude feel completely dead, so this is widened
+   * to one torso width. It remains a centre-ray capsule: a target a full 2 m off
+   * the crosshair is still rejected, and it must never become a cone again.
+   */
+  targetRadiusM: 1,
 } as const);
 
 export type SupportGunDamageProfile = Pick<

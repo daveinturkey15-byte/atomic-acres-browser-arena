@@ -2457,6 +2457,17 @@ type PersistentWindowDebris = {
   root: THREE.Group;
   definition: MajorDebrisBodyDefinition;
   physicsActive: boolean;
+  /**
+   * Presentation-only fall used when Rapier never publishes a pose for this
+   * body (no character physics on this profile, or the shared major-debris
+   * partition was already full). Without it the shards froze mid-air in the
+   * window opening instead of settling on the ground.
+   */
+  fallbackVelocity: THREE.Vector3;
+  fallbackAngular: THREE.Vector3;
+  fallbackRestY: number;
+  fallbackSettled: boolean;
+  receivedPhysicsPose: boolean;
 };
 const persistentWindowDebris = new Map<string, PersistentWindowDebris>();
 
@@ -2575,22 +2586,49 @@ function activeMajorDebrisPhysicsBodies(): readonly MajorDebrisBodyDefinition[] 
   return Object.freeze(bodies);
 }
 
-function updatePersistentWindowDebrisPhysics(): void {
-  if (!characterPhysics || persistentWindowDebris.size === 0) return;
-  const snapshots = new Map(characterPhysics.majorDebrisSnapshots().map((snapshot) => [snapshot.id, snapshot]));
+function updatePersistentWindowDebrisPhysics(dt = 1 / SIMULATION_HZ): void {
+  if (persistentWindowDebris.size === 0) return;
+  const snapshots = characterPhysics
+    ? new Map(characterPhysics.majorDebrisSnapshots().map((snapshot) => [snapshot.id, snapshot]))
+    : new Map<string, MajorDebrisBodySnapshot>();
+  const fallbackDt = Math.min(0.05, Math.max(0, dt));
   let retireSettledPhysics = false;
   for (const entry of persistentWindowDebris.values()) {
-    if (!entry.physicsActive) continue;
     const snapshot = snapshots.get(entry.id);
-    if (!snapshot) continue;
-    entry.root.position.set(snapshot.position.x, snapshot.position.y, snapshot.position.z);
-    entry.root.quaternion.set(snapshot.rotation.x, snapshot.rotation.y, snapshot.rotation.z, snapshot.rotation.w);
-    entry.definition = majorDebrisDefinitionFromSnapshot(entry.definition, snapshot);
-    if (snapshot.sleeping) {
-      // HF-155: the shards remain as persistent visual evidence, but a settled
-      // pane-sized Rapier cuboid must not remain an invisible movement blocker.
-      entry.physicsActive = false;
-      retireSettledPhysics = true;
+    if (snapshot) {
+      entry.receivedPhysicsPose = true;
+      if (!entry.physicsActive) continue;
+      entry.root.position.set(snapshot.position.x, snapshot.position.y, snapshot.position.z);
+      entry.root.quaternion.set(snapshot.rotation.x, snapshot.rotation.y, snapshot.rotation.z, snapshot.rotation.w);
+      entry.definition = majorDebrisDefinitionFromSnapshot(entry.definition, snapshot);
+      if (snapshot.sleeping) {
+        // HF-155: the shards remain as persistent visual evidence, but a settled
+        // pane-sized Rapier cuboid must not remain an invisible movement blocker.
+        entry.physicsActive = false;
+        retireSettledPhysics = true;
+      }
+      continue;
+    }
+    // No authoritative pose for this body. Owner-visible requirement: broken
+    // glass must always reach the ground, so integrate a bounded presentation
+    // fall instead of leaving the shards frozen in the window opening.
+    if (entry.receivedPhysicsPose || entry.fallbackSettled) continue;
+    entry.fallbackVelocity.y -= 9.81 * fallbackDt;
+    entry.root.position.addScaledVector(entry.fallbackVelocity, fallbackDt);
+    entry.root.rotation.x += entry.fallbackAngular.x * fallbackDt;
+    entry.root.rotation.y += entry.fallbackAngular.y * fallbackDt;
+    entry.root.rotation.z += entry.fallbackAngular.z * fallbackDt;
+    if (entry.root.position.y <= entry.fallbackRestY) {
+      entry.root.position.y = entry.fallbackRestY;
+      entry.root.rotation.x = 0;
+      entry.root.rotation.z = 0;
+      entry.fallbackVelocity.set(0, 0, 0);
+      entry.fallbackAngular.set(0, 0, 0);
+      entry.fallbackSettled = true;
+      if (entry.physicsActive) {
+        entry.physicsActive = false;
+        retireSettledPhysics = true;
+      }
     }
   }
   if (retireSettledPhysics) syncInteractiveWorldPhysics();
@@ -8029,7 +8067,27 @@ function spawnPersistentWindowDebris(window: ArenaMap['breakableWindows'][number
     }),
     sleeping: false,
   });
-  persistentWindowDebris.set(id, { id, windowId: window.id, root, definition, physicsActive: true });
+  persistentWindowDebris.set(id, {
+    id,
+    windowId: window.id,
+    root,
+    definition,
+    physicsActive: true,
+    fallbackVelocity: new THREE.Vector3(
+      definition.linearVelocity.x,
+      definition.linearVelocity.y,
+      definition.linearVelocity.z,
+    ),
+    fallbackAngular: new THREE.Vector3(
+      definition.angularVelocity.x,
+      definition.angularVelocity.y,
+      definition.angularVelocity.z,
+    ),
+    // Settle on the arena floor beneath the pane, not at the pane's own height.
+    fallbackRestY: halfExtents.y,
+    fallbackSettled: false,
+    receivedPhysicsPose: false,
+  });
   syncInteractiveWorldPhysics();
 }
 
@@ -10024,8 +10082,10 @@ function updateRailgun(now: number): void {
     railgunRechamberPresentationActive = false;
   }
   railgunPresentation.updateWorld(railgunState, now);
+  // The optic is an authority-side thermal scope: it engages on a settled aim,
+  // and the reveal itself is drawn by the exact-pose thermal ghosts.
   const thermalActive = localHoldsRailgun() && player.weapon === 'railgun' && adsHeld
-    && !railgunAdsResetRequired && weaponView.adsProgress() >= 0.82;
+    && !railgunAdsResetRequired && weaponView.adsProgress() >= 0.6;
   railgunThermalRevealActive = thermalActive;
   // Exact-pose thermal ghosts replace the procedural capsule mannequins; the
   // railgun overlay chrome stays, the fake silhouettes never place.
@@ -10034,7 +10094,14 @@ function updateRailgun(now: number): void {
 
 function admittedAdsHeld(rawHeld: boolean): boolean {
   if (!railgunAdsResetRequired) return rawHeld;
-  if (!rawHeld && weaponView.adsProgress() <= 0.05) railgunAdsResetRequired = false;
+  // One deliberate re-ADS is required per railgun shot, but the gate previously
+  // also waited for the viewmodel to settle all the way back to the hip pose.
+  // Holding the aim button therefore left ADS - and the thermal reveal - dead
+  // for the rest of the life. A detected release is enough to re-arm.
+  if (!rawHeld) {
+    railgunAdsResetRequired = false;
+    return false;
+  }
   return false;
 }
 
@@ -10099,6 +10166,10 @@ function finishReload(now: number): void {
 function tryFire(now: number): void {
   if (!player.alive || !gameStarted || (!debugInputUnlocked && document.pointerLockElement !== canvas) || matchState.phase !== 'active') return;
   if (pointSupportTargeting && !tacticalMapOpen) return;
+  // While piloting a drone or manning the chopper gun the trigger belongs to
+  // that platform's host-admitted weapon. Rapid clicking previously discharged
+  // the carried firearm from inside the cockpit.
+  if (localKillstreakActorSnapshot()?.possession) return;
   if (currentSprinting) {
     currentSprinting = false;
     sprintRecoveryUntil = Math.max(sprintRecoveryUntil, now + 150);
@@ -14152,7 +14223,8 @@ function detonateHunterDrone(drone: HunterDroneEntity, point: THREE.Vector3): vo
   const blastNonce = randomNonce();
   const supportNonce = localSupportNonces.get('hunter-swarm');
   for (const bot of bots.values()) {
-    if (!bot.alive || bot.team === player.team) continue;
+    // Explosive friendly fire: the swarm blast does not check team affiliation.
+    if (!bot.alive) continue;
     const target = bot.position.clone().add(new THREE.Vector3(0, 1.1, 0));
     const distance = target.distanceTo(point);
     if (activeWorldColliders().some((box) => segmentIntersectsBox(point, target, box))) continue;
@@ -14160,7 +14232,7 @@ function detonateHunterDrone(drone: HunterDroneEntity, point: THREE.Vector3): vo
     if (damage > 0) applyBotDamage(bot, damage, 'body', { kind: 'killstreak', effect: 'hunter-swarm' });
   }
   for (const remote of remotes.values()) {
-    if (!areCombatantsHostile(player.id, player.team, remote.snapshot.id, remote.snapshot.team) || remote.snapshot.hp <= 0) continue;
+    if (remote.snapshot.id === player.id || remote.snapshot.hp <= 0) continue;
     const target = remote.target.clone().add(new THREE.Vector3(0, 1.1, 0));
     const distance = target.distanceTo(point);
     if (activeWorldColliders().some((box) => segmentIntersectsBox(point, target, box))) continue;
@@ -14388,7 +14460,9 @@ function supportBlast(
   const blastNonce = randomNonce();
   const supportNonce = localSupportNonces.get(explosiveSource);
   for (const remote of remotes.values()) {
-    if (!areCombatantsHostile(player.id, player.team, remote.snapshot.id, remote.snapshot.team) || remote.snapshot.hp <= 0) continue;
+    // Owner requirement: every explosive applies friendly fire. Only the
+    // detonating player themself is excluded here; teammates take the blast.
+    if (remote.snapshot.id === player.id || remote.snapshot.hp <= 0) continue;
     if (supportNonce === undefined) {
       supportNetworkHitTelemetry[explosiveSource].missingAuthorization += 1;
       continue;
@@ -14947,7 +15021,7 @@ function activateFieldSupport(id: FieldSupportId): void {
       [player.position.x, player.position.y, player.position.z],
       [ingressFacing.x, 0, ingressFacing.z],
     )) return;
-    addFeed('DRONE SWARM · 24 DRONES · 60 SEC', 'gold');
+    addFeed('DRONE SWARM · 24 DRONES · 30 SEC', 'gold');
   }
   updateFieldSupportHud();
 }
@@ -17841,7 +17915,7 @@ function frame(now: number, scheduleNext = true): void {
       accumulator -= step;
       iterations += 1;
     }
-    updatePersistentWindowDebrisPhysics();
+    updatePersistentWindowDebrisPhysics(frameDt);
     if (triggerHeld && WEAPONS[player.weapon].automatic && !localKillstreakActorSnapshot()?.possession) tryFire(now);
     finishReload(now);
     const visualNow = debugCaptureFixedVisualTimeMs ?? now;

@@ -19,7 +19,12 @@ describe('persistent physical house-window debris integration', () => {
     const block = source.slice(start, end);
     expect(start).toBeGreaterThan(-1);
     expect(end).toBeGreaterThan(start);
-    expect(block).toContain('persistentWindowDebris.set(id, { id, windowId: window.id, root, definition, physicsActive: true })');
+    expect(block).toContain('persistentWindowDebris.set(id, {');
+    expect(block).toContain('physicsActive: true,');
+    // Owner requirement: shards always reach the ground, so the record carries a
+    // presentation-only fall used when Rapier publishes no pose for the body.
+    expect(block).toContain('fallbackSettled: false,');
+    expect(block).toContain('receivedPhysicsPose: false,');
     expect(block).not.toContain('setTimeout');
     expect(block).not.toContain('expiresAt');
     expect(block).toContain('root.userData.persistentMajorDebris = true');

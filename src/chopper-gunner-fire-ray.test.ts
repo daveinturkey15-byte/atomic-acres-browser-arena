@@ -105,7 +105,10 @@ describe('HF-135 authoritative Chopper Gunner fire ray', () => {
     runtime.advance(1_599, world());
     let entity = activeChopper(runtime, 1_599);
     let ray = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, 0, -0.2);
-    const oldConeTarget = target('off-crosshair', pointAlong(ray, 10, 1));
+    // The capsule is one torso wide (owner balance), so the off-crosshair probe
+    // sits a full 2 m perpendicular: still firmly outside the centre ray. The
+    // contract being defended is "no forgiving cone", not a specific radius.
+    const oldConeTarget = target('off-crosshair', pointAlong(ray, 10, 2));
     expect(runtime.control({
       by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2, entityId,
       action: 'pilot-control', yawQ: 0, pitchQ: -0.2, fire: true,
