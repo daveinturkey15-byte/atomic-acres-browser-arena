@@ -196,7 +196,7 @@ import {
   glassAuthorityProjection,
   type GlassImpactProfile,
 } from './glass-authority';
-import { activeSoloBotTarget, arenaSelection, soloLaunchLabel, type ArenaId, type ArenaSelection } from './map-selection';
+import { activeSoloBotTarget, arenaSelection, soloLaunchLabel, ARENA_SELECTIONS, type ArenaId, type ArenaSelection } from './map-selection';
 import { headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, tacticalMapToWorld, worldToMinimap, worldToTacticalMap, type MinimapLandmarkKind } from './minimap';
 import { authoredElevationAt, authoredVerticalRouteTarget, type ArenaVerticalNavigation } from './vertical-navigation';
 import { sourceScreenAngle } from './directional-hud';
@@ -5367,6 +5367,9 @@ function renderPrivateLobby(): void {
   element<HTMLElement>('#lobby-capacity-label').textContent = `${connectedCount} / ${capacity}`;
   element<HTMLElement>('#private-lobby-title').textContent = snapshot?.phase === 'active' ? 'MATCH IN PROGRESS' : snapshot?.phase === 'countdown' ? 'DEPLOYING' : 'WAITING ROOM';
   const hostControls = network.role === 'host' && (snapshot?.phase ?? 'waiting') === 'waiting';
+  const arenaInput = element<HTMLSelectElement>('#lobby-arena');
+  arenaInput.value = snapshot?.config.arenaId ?? privateMatchConfig.arenaId;
+  arenaInput.disabled = !hostControls;
   const modeInput = element<HTMLSelectElement>('#lobby-mode');
   const capacityInput = element<HTMLSelectElement>('#lobby-capacity');
   const botInput = element<HTMLSelectElement>('#lobby-bots');
@@ -17835,19 +17838,23 @@ element<HTMLButtonElement>('#lobby-balance').addEventListener('click', () => {
 });
 const updateLobbyConfigFromUi = (): void => {
   if (network.role !== 'host') return;
-  const rangeLobby = privateMatchConfig.arenaId === 'gun-range';
+  const requestedArena = element<HTMLSelectElement>('#lobby-arena').value as ArenaId;
+  const arenaId: ArenaId = ARENA_SELECTIONS.some((entry) => entry.id === requestedArena) ? requestedArena : privateMatchConfig.arenaId;
+  const rangeLobby = arenaId === 'gun-range';
   const mode: MatchMode = rangeLobby || element<HTMLSelectElement>('#lobby-mode').value === 'ffa' ? 'ffa' : 'tdm';
   const capacity = element<HTMLSelectElement>('#lobby-capacity').value === '6' ? 6 : 4;
   const requestedBots = Number(element<HTMLSelectElement>('#lobby-bots').value);
   const hostedBotCount: HostedBotCount = rangeLobby ? 0 : isHostedBotCount(requestedBots) ? requestedBots : 0;
   applyHostLobbyConfig({
     ...privateMatchConfig,
+    arenaId,
     mode,
     capacity,
     hostedBotCount,
     autoBalance: !rangeLobby && mode === 'tdm' && element<HTMLInputElement>('#lobby-auto-balance').checked,
   });
 };
+element<HTMLSelectElement>('#lobby-arena').addEventListener('change', updateLobbyConfigFromUi);
 element<HTMLSelectElement>('#lobby-mode').addEventListener('change', updateLobbyConfigFromUi);
 element<HTMLSelectElement>('#lobby-capacity').addEventListener('change', updateLobbyConfigFromUi);
 element<HTMLSelectElement>('#lobby-bots').addEventListener('change', updateLobbyConfigFromUi);
