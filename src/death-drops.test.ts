@@ -58,14 +58,24 @@ describe('death-drop inventory contract', () => {
     expect(consumeDeathDropWeapon(drop, { primary: 'carbine', ammo: 30, reserve: 110 }, 120, 1_100).consumed).toBe(false);
   });
 
-  it('keeps the dropped weapon independently selectable after walk-over scavenging', () => {
+  it('puts your swapped-out gun back into the drop so you can re-swap freely', () => {
     const drop = createDeathDrop('death-2', 'sniper', { x: 0, y: 0, z: 0 }, 5, 6, 1_000);
     const scavenged = scavengeDeathDrop(drop, { weapon: 'carbine', reserve: 100, grenades: 0 }, 120, 1_100);
     const picked = consumeDeathDropWeapon(scavenged.drop, { primary: 'carbine', ammo: 30, reserve: 120 }, 25, 1_200);
     expect(picked.consumed).toBe(true);
     expect(picked.mode).toBe('pickup');
     expect(picked.inventory).toEqual({ primary: 'sniper', ammo: 5, reserve: 0 });
-    expect(deathDropAvailable(picked.drop, 1_201)).toBe(false);
+    // The carbine you dropped goes into the drop, selectable again.
+    expect(picked.drop.weapon).toBe('carbine');
+    expect(picked.drop.ammo).toBe(30);
+    expect(picked.drop.reserve).toBe(120);
+    expect(deathDropAvailable(picked.drop, 1_201)).toBe(true);
+    expect(deathDropWeaponPickupAvailable(picked.drop, 'sniper', 1_201)).toBe(true);
+    // Swapping back returns the sniper to the drop.
+    const swappedBack = consumeDeathDropWeapon(picked.drop, picked.inventory, 25, 1_300);
+    expect(swappedBack.consumed).toBe(true);
+    expect(swappedBack.inventory.primary).toBe('carbine');
+    expect(swappedBack.drop.weapon).toBe('sniper');
   });
 
   it('explicitly replenishes a matching gun only when its ammo payload remains', () => {

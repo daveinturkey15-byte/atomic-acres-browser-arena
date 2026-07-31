@@ -171,6 +171,27 @@ export class DeathDropPresentationPool {
     }
   }
 
+  /**
+   * Swap the visible weapon model on an active drop. Used when a player picks a
+   * gun up and their old one takes its place, so the ground model always matches
+   * what is actually in the drop.
+   */
+  setWeapon(root: THREE.Object3D, weaponId: WeaponId, color: number): void {
+    const slot = this.slots.find((candidate) => candidate.root === root);
+    if (!slot || !slot.active || slot.weaponId === weaponId) return;
+    slot.weaponId = weaponId;
+    slot.request += 1;
+    if (typeof document !== 'undefined') {
+      for (const previous of [...slot.weapon.children]) {
+        this.retireAuthoredModel(previous);
+      }
+      this.installWeapon(slot, weaponId, slot.request);
+    }
+    slot.root.traverse((node) => {
+      if (node instanceof THREE.Mesh && node.material instanceof THREE.MeshBasicMaterial) node.material.color.setHex(color);
+    });
+  }
+
   async prewarm(runtime: PresentationPrewarmRuntime, camera: THREE.Camera, weaponId: WeaponId = 'carbine'): Promise<void> {
     if (this.wasPrewarmed) return;
     const parentScene = this.root.parent;

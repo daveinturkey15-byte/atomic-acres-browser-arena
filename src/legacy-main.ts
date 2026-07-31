@@ -7730,6 +7730,9 @@ function removeDeathDrop(entity: DeathDropEntity): void {
 function updateDeathDropPresentation(entity: DeathDropEntity, now = performance.now()): void {
   const ammoAvailable = deathDropAmmoAvailable(entity.drop, now);
   const weaponAvailable = deathDropWeaponAvailable(entity.drop, now);
+  // Keep the ground model in sync with what the drop actually holds - after a
+  // swap the player's old gun takes the drop's place and must be shown.
+  deathDropPresentationPool.setWeapon(entity.root, entity.drop.weapon, WEAPONS[entity.drop.weapon].color);
   const model = entity.root.getObjectByName('death-drop-weapon');
   const beacon = entity.root.getObjectByName('death-drop-beacon');
   const ring = entity.root.getObjectByName('death-drop-ring') as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> | undefined;

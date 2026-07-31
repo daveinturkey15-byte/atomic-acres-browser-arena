@@ -222,7 +222,17 @@ export function consumeDeathDropWeapon(
       ammo: Math.min(spec.mag, Math.max(1, finiteRound(drop.ammo))),
       reserve: 0,
     },
-    drop: { ...drop, weaponConsumedAt: now },
+    // Owner requirement: the gun you swapped out (with its magazine and reserve)
+    // goes INTO this drop instead of being deleted, and the consumed flags are
+    // cleared, so you can immediately pick it back up and re-swap freely.
+    drop: {
+      ...drop,
+      weapon: inventory.primary,
+      ammo: finiteRound(inventory.ammo),
+      reserve: finiteRound(inventory.reserve),
+      weaponConsumedAt: null,
+      ammoConsumedAt: null,
+    },
   };
 }
 
