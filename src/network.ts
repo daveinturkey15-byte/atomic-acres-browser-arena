@@ -49,19 +49,20 @@ const EVENT_LABEL = 'atomic-acres-events-v1';
 const RECONNECT_WINDOW_MS = 90_000;
 const RECONNECT_DELAYS_MS = [500, 1_500, 3_000, 5_000] as const;
 
-function createArenaPeer(): Peer {
+function createArenaPeer(preferredId?: string): Peer {
   const params = new URLSearchParams(window.location.search);
   const localQa = params.get('multiplayerQa') === '1' && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
   const port = Number(params.get('peerQaPort'));
   if (localQa && Number.isInteger(port) && port >= 1_024 && port <= 65_535) {
-    return new Peer({
+    const options = {
       host: window.location.hostname,
       port,
       path: '/peerjs',
       secure: false,
-    });
+    };
+    return preferredId ? new Peer(preferredId, options) : new Peer(options);
   }
-  return new Peer();
+  return preferredId ? new Peer(preferredId) : new Peer();
 }
 
 function qaEventImpairment(): Readonly<{ delayMs: number; jitterMs: number }> {
@@ -209,13 +210,17 @@ export class ArenaNetwork {
     if (this.role === 'host') this.guestResumeTokens.delete(playerId);
   }
 
-  host(onReady: () => void): void {
+  host(onReady: () => void, preferredRoomCode?: string): void {
     this.close();
     this.manualClose = false;
     this.role = 'host';
     this.onReady = onReady;
     this.onStatus('Opening a secure peer lobby…');
-    const peer = createArenaPeer();
+    // A crashed host can reclaim their previous room code so guests who still
+    // have it saved rejoin the same lobby. If the signalling server still holds
+    // the ID (unavailable-id), fall back to a fresh random room.
+    const preferred = preferredRoomCode?.trim() ?? '';
+    const peer = preferred ? createArenaPeer(preferred) : createArenaPeer();
     this.peer = peer;
     peer.on('open', (id) => {
       if (this.peer !== peer || this.role !== 'host' || this.manualClose) return;
@@ -229,7 +234,13 @@ export class ArenaNetwork {
       else connection.close();
     });
     peer.on('error', (error) => {
-      if (this.peer === peer && this.role === 'host' && !this.manualClose) this.onStatus(this.describeError(error), 'error');
+      if (this.peer !== peer || this.role !== 'host' || this.manualClose) return;
+      if (preferred && (error as { type?: string }).type === 'unavailable-id') {
+        this.onStatus('Previous room code is still locked — opening a fresh lobby', 'warn');
+        this.host(onReady);
+        return;
+      }
+      this.onStatus(this.describeError(error), 'error');
     });
     peer.on('disconnected', () => {
       if (this.peer !== peer || this.role !== 'host' || this.manualClose) return;

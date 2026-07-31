@@ -4749,7 +4749,20 @@ function broadcastHostLobby(phase: LobbySnapshot['phase'] = privateLobbySnapshot
   renderTextChat();
 }
 
+const LAST_HOSTED_ROOM_KEY = 'atomic-acres:last-hosted-room';
+function saveLastHostedRoomCode(roomCode: string): void {
+  const trimmed = roomCode.trim();
+  if (!trimmed) return;
+  try { localStorage.setItem(LAST_HOSTED_ROOM_KEY, trimmed); } catch { /* Rehost affordance is best effort. */ }
+}
+function loadLastHostedRoomCode(): string | null {
+  try { return localStorage.getItem(LAST_HOSTED_ROOM_KEY); } catch { return null; }
+}
+
 function initializeHostLobby(): void {
+  // Remember the room code so a host who crashes can reclaim it on rehost,
+  // letting guests who still have it saved rejoin the same lobby.
+  saveLastHostedRoomCode(network.roomCode);
   privateMatchConfig = selectedArena.id === 'gun-range'
     ? { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range', mode: 'ffa', hostedBotCount: 0, autoBalance: false, durationMs: selectedArena.matchRules.durationMs ?? 120_000 }
     : { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: selectedArena.id };
@@ -17824,7 +17837,9 @@ element<HTMLButtonElement>('#host').addEventListener('click', () => {
   resetPrivateLobbyState();
   player.team = Number(element<HTMLSelectElement>('#team').value) === 1 ? 1 : 0;
   network.setCapacity(DEFAULT_PRIVATE_MATCH_CONFIG.capacity);
-  network.host(initializeHostLobby);
+  // Reclaim the previous room code if we have one (host crash recovery); the
+  // network layer falls back to a fresh code if the server still holds it.
+  network.host(initializeHostLobby, loadLastHostedRoomCode() ?? undefined);
 });
 element<HTMLButtonElement>('#join').addEventListener('click', () => {
   if (!requirePlayerName()) return;
