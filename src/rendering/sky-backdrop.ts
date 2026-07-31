@@ -15,13 +15,16 @@ type GradientStop = readonly [offset: number, css: string];
  * with no visible sky at all.
  */
 const SKY_BACKDROP_GRADIENTS: Readonly<Record<SkyBackdropPreset, readonly GradientStop[]>> = Object.freeze({
-  // Deep sunset: violet zenith into burnt orange at the horizon.
+  // Deep sunset: indigo zenith through violet and a broad burnt-orange band
+  // into a glowing gold horizon. Owner wanted a much richer Atomic Acres sky.
   'sunset-farmland': Object.freeze([
-    [0, '#2a1a4d'],
-    [0.34, '#6c3b7a'],
-    [0.62, '#c8613f'],
-    [0.84, '#f2a15a'],
-    [1, '#f6d2a1'],
+    [0, '#1b1140'],
+    [0.22, '#3a1d5e'],
+    [0.44, '#7a2f68'],
+    [0.62, '#c14a3f'],
+    [0.78, '#ef7d3a'],
+    [0.9, '#f7a94b'],
+    [1, '#ffd98a'],
   ] as const),
   // True night: near-black zenith with a faint aurora-green horizon lift.
   'industrial-night': Object.freeze([
