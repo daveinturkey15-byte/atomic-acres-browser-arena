@@ -144,38 +144,38 @@
       "files": [
         {
           "path": "public/assets/original/models/support/pass65-care-aircraft-lod0.glb",
-          "sha256": "3efe7f742a6c37da770504f5d7cf036bac1c154f081b578450897ac38c01c1a3",
+          "sha256": "cf87311ad07bb8fb02e0413365364fc8e36e736c0b7890e87a77334d6210d274",
           "lod": 0,
           "triangles": 4972,
-          "bytes": 155428
+          "bytes": 156360
         },
         {
           "path": "public/assets/original/models/support/pass65-care-aircraft-lod1.glb",
-          "sha256": "f3a0192a674f88830f2dfdef82ca17bd4256e5c33dd73887267285b1d8565fed",
+          "sha256": "2da31ce77deb071cd00ab868bf0a0929eed67c3c214b01b9827f9ab2ae82a654",
           "lod": 1,
           "triangles": 4672,
-          "bytes": 151320
+          "bytes": 147892
         },
         {
           "path": "public/assets/original/models/support/pass65-care-aircraft-lod2.glb",
-          "sha256": "cf3abb0f126f1ec3cd86bf49fe94cc065665fead9c1442b93b1f0d4137a4b6d0",
+          "sha256": "745833de7e6feff2489b9e0b2bdafbd7cbe29d77d75dd5648dd3fd7bec10dcc3",
           "lod": 2,
           "triangles": 4328,
-          "bytes": 150556
+          "bytes": 153852
         },
         {
           "path": "public/assets/original/models/support/pass65-carpet-aircraft-lod0.glb",
-          "sha256": "8d6cf7322f81584b9e1b10977c14dea38b19019c70ab2157642d76273c9d36b2",
+          "sha256": "ce927de84b6cc2108aa04b2e93ae0ffaf265e8b4a4083439bb0f0c7dab5b735e",
           "lod": 0,
           "triangles": 6844,
-          "bytes": 162676
+          "bytes": 159476
         },
         {
           "path": "public/assets/original/models/support/pass65-carpet-aircraft-lod1.glb",
-          "sha256": "5a98dbc942ef62cf1bb18db63ce695a5d1a658ce1a30de78a64d7dea62066f75",
+          "sha256": "cb8cd16905abf0dcaefa6560ee177ef120e8b555a8684058c5b548bf32b60177",
           "lod": 1,
           "triangles": 6044,
-          "bytes": 155820
+          "bytes": 158800
         },
         {
           "path": "public/assets/original/models/support/pass65-carpet-aircraft-lod2.glb",
@@ -224,11 +224,11 @@
         }
       ],
       "sourceBlend": "source-assets/blender/pass65-support-aircraft-family.blend",
-      "sourceBlendSha256": "1902a7a38c0a466855939f194873e1be6a8f0c0444074f34138e617963091ffd",
+      "sourceBlendSha256": "f29f0d50a6d3ab742f506db7441cabf4e8792b32cef4dd01fea3fbed9ef97572",
       "sourceScript": "scripts/blender/create-pass65-support-vehicles.py",
-      "sourceScriptSha256": "e6b3c602fa6818a8292e0b071df7f023d527564b5657b55291b669b1b7ac0b25",
+      "sourceScriptSha256": "86d90e47e93e7d04e2705e8b08615323385ed24e22e70b59a68189584877bdac",
       "sourceProvenance": "source-assets/blender/pass65-support-aircraft-family.provenance.json",
-      "sourceProvenanceSha256": "68f22321a2ba264661333f2ee84854d8d19efb9c5d75ad6e3ce3dc2b88eda7dc",
+      "sourceProvenanceSha256": "38c1c228564e8403f5d508d868ecac0e1e32f98476fca6d58e5d2f588535de0a",
       "preview": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-contact-sheet.png",
       "format": "Distinct Care transport and Carpet bomber three-LOD GLBs plus two-LOD parachute crate, embedded WebP PBR maps, semantic cargo/bomb sockets and authored actions",
       "modifications": "Project-original fixed-wing support family with correct local -Z forward contract, animated propellers/engines/doors/bay/racks and a visible parachute crate. Runtime gameplay authority remains TypeScript-owned.",
@@ -244,24 +244,24 @@
       "files": [
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod0.glb",
-          "sha256": "ecf252f51e683320c0668bf484afb6a41c6c7fe76c9eee501fab234ac256e356",
+          "sha256": "9d5936ce16ae4aeccf3291c7f2d9aa041f823cf96d2fddf80d35fee5bb284c73",
           "lod": 0,
-          "triangles": 73200,
-          "bytes": 802292
+          "triangles": 75944,
+          "bytes": 840660
         },
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod1.glb",
-          "sha256": "9d59fe48c608bf355dd4a6a00b5644a3b61dc949c46c82292c6d6a4c4afe0d6e",
+          "sha256": "044b33914aa1ee79485ebe761d425e321a578b251e7050c46d4273baf718c90f",
           "lod": 1,
-          "triangles": 30784,
-          "bytes": 549764
+          "triangles": 33128,
+          "bytes": 578756
         },
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod2.glb",
-          "sha256": "a0fff39d989f3b0840ac2169952ad4be1636ad3b64e00e3ac0198640224666f7",
+          "sha256": "339110af1ca885f8ba2a47a62a26cd0f1ed5ac8a6bfb534705158fbb23e9e4d9",
           "lod": 2,
-          "triangles": 18008,
-          "bytes": 404016
+          "triangles": 19880,
+          "bytes": 435660
         },
         {
           "path": "public/assets/original/textures/support/pass65-chopper-albedo.png",
@@ -289,11 +289,11 @@
         }
       ],
       "sourceBlend": "source-assets/blender/pass65-chopper-gunner.blend",
-      "sourceBlendSha256": "7320007b182ab11cab0f8fc11eaf6d66daf37955d79f4cdf65fa1b0802768bdf",
+      "sourceBlendSha256": "81a84cd3e9d265cddb305ad54926f11e71a6ff705d1f07e3bb0e78b88fdf77b9",
       "sourceScript": "scripts/blender/create-pass65-support-vehicles.py",
-      "sourceScriptSha256": "e6b3c602fa6818a8292e0b071df7f023d527564b5657b55291b669b1b7ac0b25",
+      "sourceScriptSha256": "86d90e47e93e7d04e2705e8b08615323385ed24e22e70b59a68189584877bdac",
       "sourceProvenance": "source-assets/blender/pass65-chopper-gunner.provenance.json",
-      "sourceProvenanceSha256": "fd65cbb4664aaa09dba8a9b11be649ec38f713ce2fc711ef42f8673003a57055",
+      "sourceProvenanceSha256": "5a76a4ef08bda39c991c073d0e44eb4dc0a241067370d7ef086a470c123e0e45",
       "preview": "docs/assets/pass65-vehicles/chopper/pass65-chopper-contact-sheet.png",
       "format": "Three strict decreasing optimized self-contained glTF 2.0 binary LODs with embedded WebP PBR maps, complete rear fuselage/tail, authored unobstructed gunner sightline/HUD/weapon view, exterior rotors/gun/sockets and eight animation clips",
       "modifications": "Project-original support helicopter with substantial rear cabin and tail volume plus a possessed-view-only gunner sightline that excludes exterior shell and rotors. Runtime gameplay authority remains TypeScript-owned; procedural geometry is non-release fallback only.",

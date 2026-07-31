@@ -175,7 +175,7 @@
   "authoredCockpit": {
     "assetId": "chopper-gunner-vehicle-v1",
     "path": "source-assets/blender/pass65-chopper-gunner.blend",
-    "sha256": "7320007b182ab11cab0f8fc11eaf6d66daf37955d79f4cdf65fa1b0802768bdf",
+    "sha256": "81a84cd3e9d265cddb305ad54926f11e71a6ff705d1f07e3bb0e78b88fdf77b9",
     "qualityTier": "LOD0",
     "role": "visual design reference; compact black-grey treatment is baked offline over runtime footage",
     "evidence": "docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png",

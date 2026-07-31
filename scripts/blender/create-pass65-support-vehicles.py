@@ -448,6 +448,24 @@ def build_chopper(lod: int, materials):
             materials["armor"], body, max(10, segments // 2),
         ).location.x = side * 0.91
         wing_panel(f"Chopper_Sponson_{side}_LOD{lod}", side, -0.08, 1.70, 1.34, 0.18, 0.68, -0.24, 0.16, materials["armor"], root)
+        # Stub-wing ordnance per the owner's attack-helicopter reference: a rocket
+        # pod on the inner hardpoint and a missile on the outer one.
+        cylinder(
+            f"Chopper_RocketPod_{side}_LOD{lod}", (side * 1.16, -0.34, -0.08), 0.17, 0.66,
+            materials["dark"], root, rotation=(math.pi / 2, 0, 0), vertices=max(10, segments // 2), bevel=0.02,
+        )
+        if lod < 2:
+            for tube in range(2):
+                cylinder(
+                    f"Chopper_RocketTube_{side}_{tube}_LOD{lod}",
+                    (side * (1.08 + tube * 0.16), -0.34, -0.44), 0.05, 0.70,
+                    materials["metal"], root, rotation=(math.pi / 2, 0, 0), vertices=8, bevel=0.006,
+                )
+        strut_between(
+            f"Chopper_Missile_{side}_LOD{lod}", (side * 1.58, -0.38, 0.22),
+            (side * 1.58, -0.38, -0.66), 0.078, materials["metal"], root, max(8, segments // 3),
+        )
+        wedge(f"Chopper_MissileFin_{side}_LOD{lod}", (side * 1.58, -0.38, 0.26), (0.02, 0.22, 0.18), materials["accent"], root)
         strut_between(f"Chopper_Skid_{side}_LOD{lod}", (side * 0.91, -1.42, -1.02), (side * 0.91, 1.23, -1.02), 0.072, materials["metal"], root, max(10, segments // 2))
         for y in (-0.84, 0.70):
             strut_between(f"Chopper_SkidStrut_{side}_{y}_LOD{lod}", (side * 0.70, y, -0.52), (side * 0.91, y, -1.02), 0.052, materials["metal"], root, max(10, segments // 2))
@@ -493,6 +511,22 @@ def build_chopper(lod: int, materials):
     for side in (-1, 1):
         strut_between(f"Chopper_CanopyLowerRail_{side}_LOD{lod}", (side * 0.77, 0.52, 0.22), (side * 0.26, 2.43, -0.02), 0.043, materials["frame"], canopy_group, 10)
         strut_between(f"Chopper_CanopyPillar_{side}_LOD{lod}", (side * 0.74, 1.12, 0.08), (side * 0.57, 1.17, 1.00), 0.040, materials["frame"], canopy_group, 10)
+
+    # Nose sensor turret (TADS-style) per the owner's reference: a rotating optic
+    # ball above the chin gun with a forward-facing lens.
+    sensor = empty("chopper-nose-sensor", (0, 0, 0), root, "nose-sensor")
+    sphere(
+        f"Chopper_SensorTurret_LOD{lod}", (0, 2.66, 0.78), (0.26, 0.22, 0.26),
+        materials["dark"], sensor, max(12, segments // 2), max(8, rings // 2),
+    )
+    cylinder(
+        f"Chopper_SensorLens_LOD{lod}", (0, 2.66, 1.02), 0.10, 0.08,
+        materials["hudglass"], sensor, rotation=(math.pi / 2, 0, 0), vertices=max(10, segments // 2),
+    )
+    cylinder(
+        f"Chopper_SensorMast_LOD{lod}", (0, 2.50, 0.78), 0.06, 0.20,
+        materials["metal"], sensor, vertices=max(8, segments // 3),
+    )
 
     cockpit = empty("chopper-first-person-cockpit", (0, 0, 0), root, "first-person-cockpit")
     cockpit["first_person_cockpit"] = True

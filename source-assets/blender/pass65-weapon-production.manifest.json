@@ -788,41 +788,41 @@
       "runtimeForwardAxis": "-Z",
       "sourceBlend": {
         "path": "source-assets/blender/pass65-chopper-gunner.blend",
-        "sha256": "7320007b182ab11cab0f8fc11eaf6d66daf37955d79f4cdf65fa1b0802768bdf"
+        "sha256": "81a84cd3e9d265cddb305ad54926f11e71a6ff705d1f07e3bb0e78b88fdf77b9"
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-support-vehicles.py",
-        "sha256": "e6b3c602fa6818a8292e0b071df7f023d527564b5657b55291b669b1b7ac0b25"
+        "sha256": "86d90e47e93e7d04e2705e8b08615323385ed24e22e70b59a68189584877bdac"
       },
       "worldGlbs": [
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod0.glb",
-          "sha256": "ecf252f51e683320c0668bf484afb6a41c6c7fe76c9eee501fab234ac256e356",
+          "sha256": "9d5936ce16ae4aeccf3291c7f2d9aa041f823cf96d2fddf80d35fee5bb284c73",
           "lod": 0,
-          "triangles": 73200,
-          "bytes": 802292
+          "triangles": 75944,
+          "bytes": 840660
         },
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod1.glb",
-          "sha256": "9d59fe48c608bf355dd4a6a00b5644a3b61dc949c46c82292c6d6a4c4afe0d6e",
+          "sha256": "044b33914aa1ee79485ebe761d425e321a578b251e7050c46d4273baf718c90f",
           "lod": 1,
-          "triangles": 30784,
-          "bytes": 549764
+          "triangles": 33128,
+          "bytes": 578756
         },
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod2.glb",
-          "sha256": "a0fff39d989f3b0840ac2169952ad4be1636ad3b64e00e3ac0198640224666f7",
+          "sha256": "339110af1ca885f8ba2a47a62a26cd0f1ed5ac8a6bfb534705158fbb23e9e4d9",
           "lod": 2,
-          "triangles": 18008,
-          "bytes": 404016
+          "triangles": 19880,
+          "bytes": 435660
         }
       ],
       "firstPersonGlb": {
         "path": "public/assets/original/models/support/pass65-chopper-gunner-lod0.glb",
-        "sha256": "ecf252f51e683320c0668bf484afb6a41c6c7fe76c9eee501fab234ac256e356",
+        "sha256": "9d5936ce16ae4aeccf3291c7f2d9aa041f823cf96d2fddf80d35fee5bb284c73",
         "lod": 0,
-        "triangles": 73200,
-        "bytes": 802292
+        "triangles": 75944,
+        "bytes": 840660
       },
       "pbrMaps": {
         "baseColor": {
@@ -852,7 +852,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-chopper-gunner.provenance.json",
-        "sha256": "fd65cbb4664aaa09dba8a9b11be649ec38f713ce2fc711ef42f8673003a57055"
+        "sha256": "5a76a4ef08bda39c991c073d0e44eb4dc0a241067370d7ef086a470c123e0e45"
       },
       "sockets": [
         "chopper-first-person-camera-socket",
@@ -897,28 +897,28 @@
         "renders": [
           {
             "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-exterior-front-quarter.png",
-            "sha256": "5394a3b53f9487e42b8487148d8dfd31900bcce4a155360f06614bca31435ea1",
+            "sha256": "2d6d6114cfc6b5d8475f0330a106d612c9fcd66520b136d6335b4e6f9fc914fb",
             "cameraId": "exterior-front-quarter",
             "width": 512,
             "height": 512
           },
           {
             "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-rotor-gun-profile.png",
-            "sha256": "7867bd7bc7947198582c2faa7de6cf6cae7247b6735cae5c6c2cc5b80546974f",
+            "sha256": "c909ad06e80ddc41430e86304ffd4d70a2626c9fe21f9b0efa774458e1034a25",
             "cameraId": "rotor-gun-profile",
             "width": 512,
             "height": 512
           },
           {
             "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-rear-fuselage-quarter.png",
-            "sha256": "a37bdee03b4c0349a5611b336e67271fa0fae3799339152c97a11b0d3be7c62b",
+            "sha256": "2358f1a6e19cf7d4de0024d524aaa3368586606dc3b75daac7f08b6e2aa094ce",
             "cameraId": "rear-fuselage-quarter",
             "width": 512,
             "height": 512
           },
           {
             "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png",
-            "sha256": "581c448b7d998a220ea69fb0c024d9553f40d9aea767b3d88b503780a64921d1",
+            "sha256": "d027178915b0a4ae9544fa9403421310c1ffc30f47902d9c3023ace52a722475",
             "cameraId": "accepted-first-person-instruments",
             "width": 960,
             "height": 540
@@ -926,14 +926,14 @@
         ],
         "contactSheet": {
           "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-contact-sheet.png",
-          "sha256": "f2291a87a8855007f9e7cedb7d17a3369044b831110b3521699906424df639ec",
+          "sha256": "f96cd1da0b4735f449c322255ab6b6473ba9de2560e56acd0133fa663b07c356",
           "cameraId": "accepted-contact-sheet",
           "width": 1024,
           "height": 1024
         },
         "acceptedFirstPersonFrame": {
           "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png",
-          "sha256": "581c448b7d998a220ea69fb0c024d9553f40d9aea767b3d88b503780a64921d1",
+          "sha256": "d027178915b0a4ae9544fa9403421310c1ffc30f47902d9c3023ace52a722475",
           "cameraId": "accepted-first-person-instruments",
           "width": 960,
           "height": 540
@@ -943,9 +943,9 @@
         "lods": [
           {
             "lod": 0,
-            "triangles": 73200,
-            "bytes": 802292,
-            "meshNodes": 198,
+            "triangles": 75944,
+            "bytes": 840660,
+            "meshNodes": 211,
             "materials": 19,
             "images": 4,
             "animations": [
@@ -962,9 +962,9 @@
           },
           {
             "lod": 1,
-            "triangles": 30784,
-            "bytes": 549764,
-            "meshNodes": 190,
+            "triangles": 33128,
+            "bytes": 578756,
+            "meshNodes": 203,
             "materials": 19,
             "images": 4,
             "animations": [
@@ -981,9 +981,9 @@
           },
           {
             "lod": 2,
-            "triangles": 18008,
-            "bytes": 404016,
-            "meshNodes": 99,
+            "triangles": 19880,
+            "bytes": 435660,
+            "meshNodes": 108,
             "materials": 19,
             "images": 4,
             "animations": [
@@ -1013,11 +1013,11 @@
       "runtimeForwardAxis": "-Z",
       "sourceBlend": {
         "path": "source-assets/blender/pass65-support-aircraft-family.blend",
-        "sha256": "1902a7a38c0a466855939f194873e1be6a8f0c0444074f34138e617963091ffd"
+        "sha256": "f29f0d50a6d3ab742f506db7441cabf4e8792b32cef4dd01fea3fbed9ef97572"
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-support-vehicles.py",
-        "sha256": "e6b3c602fa6818a8292e0b071df7f023d527564b5657b55291b669b1b7ac0b25"
+        "sha256": "86d90e47e93e7d04e2705e8b08615323385ed24e22e70b59a68189584877bdac"
       },
       "pbrMaps": {
         "baseColor": {
@@ -1047,31 +1047,31 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-support-aircraft-family.provenance.json",
-        "sha256": "68f22321a2ba264661333f2ee84854d8d19efb9c5d75ad6e3ce3dc2b88eda7dc"
+        "sha256": "38c1c228564e8403f5d508d868ecac0e1e32f98476fca6d58e5d2f588535de0a"
       },
       "variants": {
         "care": {
           "worldGlbs": [
             {
               "path": "public/assets/original/models/support/pass65-care-aircraft-lod0.glb",
-              "sha256": "3efe7f742a6c37da770504f5d7cf036bac1c154f081b578450897ac38c01c1a3",
+              "sha256": "cf87311ad07bb8fb02e0413365364fc8e36e736c0b7890e87a77334d6210d274",
               "lod": 0,
               "triangles": 4972,
-              "bytes": 155428
+              "bytes": 156360
             },
             {
               "path": "public/assets/original/models/support/pass65-care-aircraft-lod1.glb",
-              "sha256": "f3a0192a674f88830f2dfdef82ca17bd4256e5c33dd73887267285b1d8565fed",
+              "sha256": "2da31ce77deb071cd00ab868bf0a0929eed67c3c214b01b9827f9ab2ae82a654",
               "lod": 1,
               "triangles": 4672,
-              "bytes": 151320
+              "bytes": 147892
             },
             {
               "path": "public/assets/original/models/support/pass65-care-aircraft-lod2.glb",
-              "sha256": "cf3abb0f126f1ec3cd86bf49fe94cc065665fead9c1442b93b1f0d4137a4b6d0",
+              "sha256": "745833de7e6feff2489b9e0b2bdafbd7cbe29d77d75dd5648dd3fd7bec10dcc3",
               "lod": 2,
               "triangles": 4328,
-              "bytes": 150556
+              "bytes": 153852
             }
           ],
           "requiredNodes": [
@@ -1102,17 +1102,17 @@
           "worldGlbs": [
             {
               "path": "public/assets/original/models/support/pass65-carpet-aircraft-lod0.glb",
-              "sha256": "8d6cf7322f81584b9e1b10977c14dea38b19019c70ab2157642d76273c9d36b2",
+              "sha256": "ce927de84b6cc2108aa04b2e93ae0ffaf265e8b4a4083439bb0f0c7dab5b735e",
               "lod": 0,
               "triangles": 6844,
-              "bytes": 162676
+              "bytes": 159476
             },
             {
               "path": "public/assets/original/models/support/pass65-carpet-aircraft-lod1.glb",
-              "sha256": "5a98dbc942ef62cf1bb18db63ce695a5d1a658ce1a30de78a64d7dea62066f75",
+              "sha256": "cb8cd16905abf0dcaefa6560ee177ef120e8b555a8684058c5b548bf32b60177",
               "lod": 1,
               "triangles": 6044,
-              "bytes": 155820
+              "bytes": 158800
             },
             {
               "path": "public/assets/original/models/support/pass65-carpet-aircraft-lod2.glb",
@@ -1186,28 +1186,28 @@
         "renders": [
           {
             "path": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-care-front-quarter.png",
-            "sha256": "91850dbe69c11ff95355a52f287cfbb78b9962807e2c7a0dc7d0a9fe6b5bb02a",
+            "sha256": "be5214d8fd9f45850b5c1c78ed69dd8f084d576297a11c37c9e024b408adc30a",
             "cameraId": "care-front-quarter",
             "width": 512,
             "height": 512
           },
           {
             "path": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-care-cargo-parachute.png",
-            "sha256": "c20223f4413d83e383313d80056d023e06a97dd9ed7af6bf016fa179158a06bf",
+            "sha256": "8dc464c1583c03a5c5ecda2b3370c7422015f02dea4a9b3103565b1970d9a978",
             "cameraId": "care-cargo-parachute",
             "width": 512,
             "height": 512
           },
           {
             "path": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-carpet-front-quarter.png",
-            "sha256": "acc7be0ed92af353fb0f0981aca3c496ce833f20e642d45fe90786b8da537f95",
+            "sha256": "f8bfb20792b55e3b4a51ec6dbf52a5ea692903ffb1ef9ff2b9f737bac94359ef",
             "cameraId": "carpet-front-quarter",
             "width": 512,
             "height": 512
           },
           {
             "path": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-carpet-bomb-bay.png",
-            "sha256": "1c52c9cc17db4df4b50750938b5a6e2b0eaeada7e1867e6c333382c000a04c55",
+            "sha256": "6ea6103fe47009c6da42add3cf8a9784799d9a49739ead9ae403c0ca2636e935",
             "cameraId": "carpet-bomb-bay",
             "width": 512,
             "height": 512
@@ -1226,7 +1226,7 @@
           {
             "lod": 0,
             "triangles": 4972,
-            "bytes": 155428,
+            "bytes": 156360,
             "meshNodes": 34,
             "materials": 7,
             "images": 4,
@@ -1241,7 +1241,7 @@
           {
             "lod": 1,
             "triangles": 4672,
-            "bytes": 151320,
+            "bytes": 147892,
             "meshNodes": 34,
             "materials": 7,
             "images": 4,
@@ -1256,7 +1256,7 @@
           {
             "lod": 2,
             "triangles": 4328,
-            "bytes": 150556,
+            "bytes": 153852,
             "meshNodes": 26,
             "materials": 7,
             "images": 4,
@@ -1273,7 +1273,7 @@
           {
             "lod": 0,
             "triangles": 6844,
-            "bytes": 162676,
+            "bytes": 159476,
             "meshNodes": 48,
             "materials": 6,
             "images": 4,
@@ -1288,7 +1288,7 @@
           {
             "lod": 1,
             "triangles": 6044,
-            "bytes": 155820,
+            "bytes": 158800,
             "meshNodes": 44,
             "materials": 6,
             "images": 4,
