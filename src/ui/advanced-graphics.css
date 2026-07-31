@@ -26,7 +26,7 @@
 }
 
 #advanced-graphics .advanced-graphics-category > header small {
-  color: var(--ui-cyan, #54d9ec);
+  color: var(--ui-accent-readable, #0b6b78);
   font-size: 8px;
   letter-spacing: 0.08em;
 }
@@ -57,6 +57,9 @@
 #advanced-graphics .advanced-graphics-unavailable > span {
   grid-area: label;
   min-width: 0;
+  /* Owner HITL: labels were washing out on the light panel. Force a near-black
+     ink so every control name reads regardless of inherited theme colour. */
+  color: var(--ui-text, #142326);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.07em;
@@ -67,7 +70,9 @@
 #advanced-graphics .advanced-graphics-unavailable > small {
   grid-area: help;
   max-width: 48ch;
-  color: color-mix(in srgb, currentColor 70%, transparent);
+  /* 70% currentColor mixed to transparent read as faint grey on white; use a
+     solid mid-ink that keeps a 4.5:1+ ratio on the light panel. */
+  color: var(--ui-text-muted, #48585c);
   font-size: 9px;
   line-height: 1.35;
 }
@@ -93,7 +98,8 @@
 
 #advanced-graphics .advanced-graphics-range output {
   min-height: 12px;
-  color: var(--ui-cyan, #54d9ec);
+  /* Bright cyan failed contrast on the white panel; use a deep readable teal. */
+  color: var(--ui-accent-readable, #0b6b78);
   font-size: 9px;
   font-weight: 800;
   text-align: right;

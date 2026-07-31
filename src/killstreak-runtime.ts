@@ -2104,10 +2104,12 @@ export class HostKillstreakRuntime {
     output: KillstreakDamageEvent[],
     friendlyFire = false,
   ): void {
-    // Carpet Bomber saturation blast ignores team affiliation: it damages every
-    // living combatant inside the blast radius (friendly fire) except its owner.
+    // Carpet Bomber saturation blast ignores team affiliation AND ownership: it
+    // damages every living combatant inside the blast radius, including the
+    // caller who dropped it. The owner previously walked through their own
+    // bombs unharmed; the owner directive is that the blast hurts everyone.
     const candidates = friendlyFire
-      ? world.targets.filter((target) => target.alive && target.id !== owner.actorId && (target.kind === 'player' || target.kind === 'bot'))
+      ? world.targets.filter((target) => target.alive && (target.kind === 'player' || target.kind === 'bot'))
       : this.hostileTargets(world, owner.actorId, owner.team);
     for (const target of candidates) {
       const range = distance(origin, target.position);

@@ -1753,6 +1753,10 @@ async function exercisePreparedWebGpuWeaponSwitches(): Promise<void> {
         camera.fov = magnifiedFovDegrees(preferredFov, DMR_THERMAL_MAGNIFICATION);
         camera.updateProjectionMatrix();
         hudRoot.classList.add('dmr-thermal-active');
+        // First ADS otherwise compiled the through-wall ghost pipelines on the
+        // live frame and froze the optic. Build ghosts for one live combatant of
+        // each relation behind the deployment surface so both pipelines exist.
+        prewarmThermalGhostPipelines();
       }
       camera.updateMatrixWorld(true);
       try {
@@ -1767,6 +1771,7 @@ async function exercisePreparedWebGpuWeaponSwitches(): Promise<void> {
           camera.updateProjectionMatrix();
         } else if (exercisesDmrThermal) {
           hudRoot.classList.remove('dmr-thermal-active');
+          thermalGhostPresentation.sync([], false);
           camera.fov = preferredFov;
           camera.updateProjectionMatrix();
         }
@@ -10041,6 +10046,27 @@ function updateDmrThermal(): void {
   // The generic billboard silhouettes are superseded by exact-pose thermal
   // ghosts; keep the bounded DOM markers, hide the sprite layer.
   dmrThermalPresentation.worldRoot.visible = false;
+}
+
+/**
+ * Compile the through-wall ghost pipelines during match admission instead of on
+ * the player's first ADS. Builds one hostile and one friendly ghost set from
+ * whatever live combatants exist, so both relation materials reach the GPU
+ * behind the opaque deployment surface. The caller clears the ghosts again.
+ */
+function prewarmThermalGhostPipelines(): void {
+  const targets: ThermalGhostTarget[] = [];
+  for (const bot of bots.values()) {
+    if (!bot.alive) continue;
+    targets.push({ id: `prewarm-bot-${bot.id}`, relation: 'hostile', root: bot.root });
+    break;
+  }
+  for (const remote of remotes.values()) {
+    if (remote.snapshot.hp <= 0) continue;
+    targets.push({ id: `prewarm-remote-${remote.snapshot.id}`, relation: 'friendly', root: remote.root });
+    break;
+  }
+  if (targets.length > 0) thermalGhostPresentation.sync(targets, true);
 }
 
 function updateThermalGhosts(): void {

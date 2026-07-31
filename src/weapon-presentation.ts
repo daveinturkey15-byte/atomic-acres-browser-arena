@@ -218,6 +218,23 @@ export const VIEWMODEL_NEAR_PLANE_CLEARANCE = 0.06;
 const ADS_VIEWMODEL_BASE_POSITION = Object.freeze({ x: 0.28, y: -0.34, z: -0.97 });
 const ADS_VIEWMODEL_SCALE = 0.64;
 
+/**
+ * The viewmodel is framed for a 16:9 viewport. Wider or taller displays shrink
+ * the arms' on-screen size and pull them off the bottom edge, so they read as
+ * tiny floating hands on large monitors. Scale the rig up with aspect ratio and
+ * drop it toward the HUD so the arms always connect to the bottom of the frame.
+ */
+const VIEWMODEL_REFERENCE_ASPECT = 16 / 9;
+
+function viewmodelAspectScale(aspect: number): number {
+  const normalized = Number.isFinite(aspect) && aspect > 0 ? aspect : VIEWMODEL_REFERENCE_ASPECT;
+  return THREE.MathUtils.clamp(normalized / VIEWMODEL_REFERENCE_ASPECT, 1, 1.55);
+}
+
+function cameraAspect(camera: THREE.Camera): number {
+  return camera instanceof THREE.PerspectiveCamera ? camera.aspect : VIEWMODEL_REFERENCE_ASPECT;
+}
+
 function weaponHipYaw(weapon: WeaponId): number {
   return weapon === 'carbine'
     ? 0.18
@@ -1571,7 +1588,7 @@ export class WeaponPresentation {
     this.root.visible = true;
     this.root.scale.setScalar(suppressed
       ? 0.0001
-      : THREE.MathUtils.lerp(HIP_VIEWMODEL_SCALE, ADS_VIEWMODEL_SCALE, this.adsBlend));
+      : THREE.MathUtils.lerp(HIP_VIEWMODEL_SCALE, ADS_VIEWMODEL_SCALE, this.adsBlend) * viewmodelAspectScale(cameraAspect(this.camera)));
     this.viewmodelFill.intensity = suppressed
       ? 0
       : Number(this.viewmodelFill.userData.authoredIntensity ?? 0);
@@ -2341,7 +2358,7 @@ export class WeaponPresentation {
     this.swayX = THREE.MathUtils.lerp(this.swayX, 0, smoothing(7));
     this.swayY = THREE.MathUtils.lerp(this.swayY, 0, smoothing(7));
     this.adsBlend = advanceAdsBlend(this.adsBlend, pose.ads, pose.dt, this.active);
-    this.root.scale.setScalar(THREE.MathUtils.lerp(HIP_VIEWMODEL_SCALE, ADS_VIEWMODEL_SCALE, this.adsBlend));
+    this.root.scale.setScalar(THREE.MathUtils.lerp(HIP_VIEWMODEL_SCALE, ADS_VIEWMODEL_SCALE, this.adsBlend) * viewmodelAspectScale(cameraAspect(this.camera)));
     this.sprintBlend = THREE.MathUtils.lerp(this.sprintBlend, pose.sprinting ? 1 : 0, smoothing(13));
     this.muzzleFlash.visible = this.muzzleLight.intensity > 0.45;
     const arms = this.root.getObjectByName('first-person-arms');
@@ -2557,7 +2574,8 @@ export class WeaponPresentation {
     const grenadeArc = this.grenadeStart > 0 && grenadeProgress < 1 ? Math.sin(grenadeProgress * Math.PI) : 0;
 
     const viewmodelBaseX = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.x, ADS_VIEWMODEL_BASE_POSITION.x, this.adsBlend);
-    const viewmodelBaseY = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.y, ADS_VIEWMODEL_BASE_POSITION.y, this.adsBlend);
+    const viewmodelBaseY = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.y, ADS_VIEWMODEL_BASE_POSITION.y, this.adsBlend)
+      - (viewmodelAspectScale(cameraAspect(this.camera)) - 1) * 0.4;
     const viewmodelBaseZ = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.z, ADS_VIEWMODEL_BASE_POSITION.z, this.adsBlend);
     // Aiming down sights is a real improvement on every weapon: idle bob, breath
     // and mouse sway collapse as the blend completes, so the sight settles on the

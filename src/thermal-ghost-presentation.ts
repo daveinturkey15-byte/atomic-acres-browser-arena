@@ -13,14 +13,18 @@ export const THERMAL_GHOST_FRIENDLY_HEX = 0x63ecff;
 export const THERMAL_GHOST_MAX_TARGETS = 16;
 
 function ghostMaterial(name: string, colorHex: number): THREE.MeshBasicMaterial {
+  // Normal (not additive) blending: additive washed the tint out against bright
+  // arena backgrounds and read as nothing. A solid, depth-ignoring fill draws
+  // the combatant's exact body outline on top of walls, which is the reveal the
+  // owner asked for.
   return new THREE.MeshBasicMaterial({
     name,
     color: colorHex,
     transparent: true,
-    opacity: 0.62,
+    opacity: 0.9,
     depthTest: false,
     depthWrite: false,
-    blending: THREE.AdditiveBlending,
+    blending: THREE.NormalBlending,
     toneMapped: false,
     side: THREE.FrontSide,
   });
@@ -93,7 +97,7 @@ export class ThermalGhostPresentation {
     ghost.matrixAutoUpdate = false;
     ghost.matrix.identity();
     ghost.frustumCulled = false;
-    ghost.renderOrder = 9;
+    ghost.renderOrder = 999;
     ghost.castShadow = false;
     ghost.receiveShadow = false;
     ghost.raycast = () => undefined;
