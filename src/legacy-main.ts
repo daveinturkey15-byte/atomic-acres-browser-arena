@@ -524,8 +524,9 @@ import {
   type WeaponViewmodelGpuPrewarmer,
 } from './weapon-presentation';
 import { magnifiedFovDegrees, viewmodelObstructionPose, type ViewmodelObstructionPose } from './weapon-presentation-state';
-import { RailgunPresentation, type RailgunThermalContact } from './railgun-presentation';
+import { RailgunPresentation } from './railgun-presentation';
 import { DMR_THERMAL_MAGNIFICATION, DMR_THERMAL_MAX_CONTACTS, DmrThermalPresentation, dmrThermalOcclusionBudget, type DmrThermalContact } from './dmr-thermal-presentation';
+import { ThermalGhostPresentation, type ThermalGhostTarget } from './thermal-ghost-presentation';
 import {
   SmokeVolumePresentationPool,
   type SmokeVolumePresentationLease,
@@ -1278,6 +1279,10 @@ camera.rotation.order = 'YXZ';
 scene.add(camera);
 const railgunPresentation = new RailgunPresentation(scene, element<HTMLElement>('#railgun-thermal'), reducedRenderMode);
 const dmrThermalPresentation = new DmrThermalPresentation(scene, element<HTMLElement>('#dmr-thermal'));
+// Owner direction: through-wall reveals show the actual posed combatant with
+// thermal shading, never a generic silhouette overlay.
+const thermalGhostPresentation = new ThermalGhostPresentation();
+let railgunThermalRevealActive = false;
 const smokeVolumePresentationPool = new SmokeVolumePresentationPool(scene);
 smokeVolumePresentationPool.setQualityScale(graphicsRuntime.smokeScale);
 const VIEWMODEL_RENDER_LAYER = 2;
@@ -9849,19 +9854,6 @@ function tryFireRailgun(now: number): void {
   }
 }
 
-function railgunThermalContacts(): RailgunThermalContact[] {
-  const mode = gameMode === 'solo' ? 'tdm' : privateMatchMode;
-  const observer = { id: player.id, team: player.team };
-  return [
-    ...[...remotes.values()].filter((remote) => railgunThermalTargetEligible(observer, {
-      id: remote.snapshot.id, team: remote.snapshot.team, alive: remote.snapshot.hp > 0, kind: 'player',
-    }, mode)).map((remote) => ({ id: remote.snapshot.id, kind: 'player' as const, position: remote.target.clone().add(new THREE.Vector3(0, 1.05, 0)) })),
-    ...[...bots.values()].filter((bot) => railgunThermalTargetEligible(observer, {
-      id: bot.id, team: bot.team, alive: bot.alive, kind: 'bot',
-    }, mode)).map((bot) => ({ id: bot.id, kind: 'bot' as const, position: bot.position.clone().add(new THREE.Vector3(0, 1.05, 0)) })),
-  ];
-}
-
 type RuntimeDmrThermalContact = {
   id: string;
   kind: 'player' | 'bot';
@@ -9975,6 +9967,40 @@ function updateDmrThermal(): void {
   }
   dmrThermalWasActive = true;
   dmrThermalPresentation.update(camera, dmrThermalContacts(), true);
+  // The generic billboard silhouettes are superseded by exact-pose thermal
+  // ghosts; keep the bounded DOM markers, hide the sprite layer.
+  dmrThermalPresentation.worldRoot.visible = false;
+}
+
+function updateThermalGhosts(): void {
+  const active = dmrThermalActive || railgunThermalRevealActive;
+  if (!active) {
+    thermalGhostPresentation.sync([], false);
+    return;
+  }
+  const mode = gameMode === 'solo' ? 'tdm' : privateMatchMode;
+  // Railgun-only reveals follow the canonical hostile eligibility contract;
+  // the DMR optic shows both relations with team-explicit shading.
+  const hostileOnly = !dmrThermalActive;
+  const observer = { id: player.id, team: player.team };
+  const targets: ThermalGhostTarget[] = [];
+  for (const remote of remotes.values()) {
+    if (remote.snapshot.hp <= 0) continue;
+    if (hostileOnly && !railgunThermalTargetEligible(observer, {
+      id: remote.snapshot.id, team: remote.snapshot.team, alive: remote.snapshot.hp > 0, kind: 'player',
+    }, mode)) continue;
+    const relation = mode === 'tdm' && remote.snapshot.team === player.team ? 'friendly' as const : 'hostile' as const;
+    targets.push({ id: remote.snapshot.id, relation, root: remote.root });
+  }
+  for (const bot of bots.values()) {
+    if (!bot.alive) continue;
+    if (hostileOnly && !railgunThermalTargetEligible(observer, {
+      id: bot.id, team: bot.team, alive: bot.alive, kind: 'bot',
+    }, mode)) continue;
+    const relation = mode === 'tdm' && bot.team === player.team ? 'friendly' as const : 'hostile' as const;
+    targets.push({ id: bot.id, relation, root: bot.root });
+  }
+  thermalGhostPresentation.sync(targets, true);
 }
 
 function updateRailgun(now: number): void {
@@ -10000,7 +10026,10 @@ function updateRailgun(now: number): void {
   railgunPresentation.updateWorld(railgunState, now);
   const thermalActive = localHoldsRailgun() && player.weapon === 'railgun' && adsHeld
     && !railgunAdsResetRequired && weaponView.adsProgress() >= 0.82;
-  railgunPresentation.updateThermal(camera, railgunThermalContacts(), thermalActive);
+  railgunThermalRevealActive = thermalActive;
+  // Exact-pose thermal ghosts replace the procedural capsule mannequins; the
+  // railgun overlay chrome stays, the fake silhouettes never place.
+  railgunPresentation.updateThermal(camera, [], thermalActive);
 }
 
 function admittedAdsHeld(rawHeld: boolean): boolean {
@@ -17321,6 +17350,8 @@ function resetForMode(): void {
   railgunPresentation.resetBeams();
   railgunPresentation.updateWorld(railgunState, performance.now());
   railgunPresentation.updateThermal(camera, [], false);
+  railgunThermalRevealActive = false;
+  thermalGhostPresentation.clear();
   authorizedRemoteRedeploys.clear();
   resetBreakableWindows();
   for (const id of remotes.keys()) removeRemote(id, 'cleared', false);
@@ -17824,6 +17855,7 @@ function frame(now: number, scheduleNext = true): void {
     updateOverdrive(now);
     updateRailgun(now);
     updateDmrThermal();
+    updateThermalGhosts();
     updateDeathDrops(now);
     updateFInteractionPrompt(now);
     if (debugCaptureCameraActive) {
