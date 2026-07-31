@@ -69,9 +69,12 @@ type SupportVehicleTemplate = Readonly<{ family: SupportVehicleAssetFamily; lods
 const SUPPORT_VEHICLE_LOAD_TIMEOUT_MS = 20_000;
 const SUPPORT_VEHICLE_MAX_CONCURRENT_DECODES = 2;
 const SUPPORT_VEHICLE_TARGET_DIMENSIONS: Readonly<Record<SupportVehicleAssetFamily, number>> = Object.freeze({
-  chopper: 6.2,
-  care: 10.2,
-  carpet: 10.8,
+  // Owner HITL: vehicles read as incomplete slabs because a ~10m aircraft at a
+  // 25-60m engagement distance is a sliver on screen. Scaled to read as real
+  // craft from the ground; the crate keeps its capture-gameplay footprint.
+  chopper: 8.4,
+  care: 16,
+  carpet: 17,
   crate: 3.2,
 });
 const SUPPORT_VEHICLE_REQUIRED_NODES: Readonly<Record<SupportVehicleAssetFamily, readonly string[]>> = Object.freeze({
@@ -1033,7 +1036,11 @@ function buildAuthoredSupportVehicle(family: SupportVehicleAssetFamily): Present
     }
     markSharedPresentationAsset(level);
     if (family === 'chopper') applyAuthoredSupportShadowBudget(level, 'chopper');
-    lod.addLevel(level, [0, 34, 68][index] ?? index * 34);
+    // Support vehicles operate 18-30m above the arena, so the old 34m/68m
+    // switches meant players almost never saw LOD0's full detailing - the
+    // authored craft read as low-poly slabs. One or two active vehicles can
+    // afford LOD0 at every practical gameplay distance.
+    lod.addLevel(level, [0, 95, 190][index] ?? index * 95);
     const mixer = new THREE.AnimationMixer(level);
     for (const clipName of SUPPORT_VEHICLE_LOOP_ACTIONS[family]) {
       const clip = source.animations.find((candidate) => candidate.name === clipName);
