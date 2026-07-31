@@ -13208,7 +13208,10 @@ function preferredOwnedSupportEntity(): KillstreakRecipientSnapshot['entities'][
 function updateSupportStatusHud(): void {
   const actor = localKillstreakActorSnapshot();
   const adrenalineRemainingMs = Math.max(0, actor?.adrenalineRemainingMs ?? 0);
-  const adrenalineActive = adrenalineRemainingMs > 0;
+  // Adrenaline is a match-only boost. Gate its HUD to an active match so a boost
+  // that is still ticking when the match ends cannot bleed into the lobby and
+  // clutter/break the waiting-room UI (owner: "adrenaline rush messed up the lobby").
+  const adrenalineActive = adrenalineRemainingMs > 0 && matchState.phase === 'active' && player.alive;
   const adrenalineHud = element<HTMLElement>('#adrenaline-hud');
   adrenalineHud.hidden = !adrenalineActive;
   element<HTMLElement>('#adrenaline-time').textContent = (adrenalineRemainingMs / 1_000).toFixed(1);
@@ -13466,6 +13469,9 @@ function recordOwnerSupportDamage(event: KillstreakDamageEvent): void {
 }
 
 function killstreakActorModifiers(actorId: string, now: number): Readonly<{ damage: number; movement: number; reloadDuration: number }> {
+  // No boost outside an active match, so a lingering adrenaline timer can never
+  // affect lobby/menu movement or reloads.
+  if (matchState.phase !== 'active') return { damage: 1, movement: 1, reloadDuration: 1 };
   if (network.role !== 'client') return killstreakRuntime.modifiersForActor(actorId, now);
   const actor = killstreakSnapshot.actors.find((entry) => entry.actorId === actorId);
   const active = (actor?.adrenalineRemainingMs ?? 0) > 0;
