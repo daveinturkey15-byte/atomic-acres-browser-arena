@@ -69,8 +69,10 @@ const RAW_B1_WEAPON_DEFINITIONS = [
   },
   {
     id: 'scattergun', displayName: 'Remington 870', slot: 'primary', family: 'shotgun',
-    fireKind: 'pellet', fireMode: 'semi', rpm: 82, pellets: 9, spinUpMs: 0, movementMultiplier: 1,
-    damage: { policy: 'standard', base: 12, minimum: 5, falloffStartM: 10, falloffEndM: 38, headMultiplier: 1.35, limbMultiplier: 0.86 },
+    // Pump cadence lifted so the one-range specialist is not strictly worse
+    // than every SMG inside its own 10-38m bracket.
+    fireKind: 'pellet', fireMode: 'semi', rpm: 95, pellets: 9, spinUpMs: 0, movementMultiplier: 1,
+    damage: { policy: 'standard', base: 13, minimum: 5, falloffStartM: 10, falloffEndM: 38, headMultiplier: 1.35, limbMultiplier: 0.86 },
     spread: { hipRadians: 0.082, adsMultiplier: 0.74, movementMultiplier: 1.24, standMultiplier: 1, crouchMultiplier: 0.88, proneMultiplier: 0.8, sustainedPerShot: 0.0024, maximumRadians: 0.112 },
     recoil: { pitchRadians: 0.052, yawRadians: 0.012, recoveryPerSecond: 8, adsMultiplier: 0.84, standMultiplier: 1, crouchMultiplier: 0.9, proneMultiplier: 0.8, deterministicPatternId: 'scattergun-pattern-v1' },
     ammo: { magazine: 8, reserve: 40, reloadSeconds: 2.35, emptyReloadSeconds: 2.7, switchSeconds: 0.62 },
@@ -213,7 +215,10 @@ const RAW_B1_WEAPON_DEFINITIONS = [
   {
     id: 'm14-ebr', displayName: 'M14 EBR', slot: 'primary', family: 'marksman',
     fireKind: 'hitscan', fireMode: 'semi', rpm: 150, pellets: 1, spinUpMs: 0, movementMultiplier: 0.94,
-    damage: { policy: 'standard', base: 49, minimum: 32, falloffStartM: 38, falloffEndM: 100, headMultiplier: 1.7, limbMultiplier: 0.82 },
+    // Owner halved the fire rate for the through-wall thermal role; damage is
+    // compensated so a settled two-shot body kill stays competitive with the
+    // 336-350 DPS automatics after recoil, rarity and range are considered.
+    damage: { policy: 'standard', base: 62, minimum: 40, falloffStartM: 38, falloffEndM: 100, headMultiplier: 1.7, limbMultiplier: 0.82 },
     spread: { hipRadians: 0.032, adsMultiplier: 0.08, movementMultiplier: 1.85, standMultiplier: 1, crouchMultiplier: 0.7, proneMultiplier: 0.5, sustainedPerShot: 0.004, maximumRadians: 0.062 },
     recoil: { pitchRadians: 0.045, yawRadians: 0.012, recoveryPerSecond: 7.5, adsMultiplier: 0.62, standMultiplier: 1, crouchMultiplier: 0.74, proneMultiplier: 0.5, deterministicPatternId: 'm14-ebr-pattern-v1' },
     ammo: { magazine: 20, reserve: 80, reloadSeconds: 2.35, emptyReloadSeconds: 2.65, switchSeconds: 0.66 },

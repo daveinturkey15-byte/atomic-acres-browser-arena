@@ -2834,7 +2834,7 @@
           "color": 16747099,
           "crouchRecoilMultiplier": 0.9,
           "crouchSpreadMultiplier": 0.88,
-          "damage": 12,
+          "damage": 13,
           "falloffEnd": 38,
           "falloffStart": 10,
           "fireKind": "pellet",
@@ -2870,7 +2870,7 @@
           "reload": 2.35,
           "reportGain": 1.14,
           "reserve": 40,
-          "rpm": 82,
+          "rpm": 95,
           "spinUpMs": 0,
           "sustainedSpreadPerShot": 0.0024,
           "switchSeconds": 0.62
@@ -3330,7 +3330,7 @@
           "color": 10283775,
           "crouchRecoilMultiplier": 0.74,
           "crouchSpreadMultiplier": 0.7,
-          "damage": 49,
+          "damage": 62,
           "falloffEnd": 100,
           "falloffStart": 38,
           "fireKind": "hitscan",
@@ -3341,7 +3341,7 @@
           "limbMultiplier": 0.82,
           "mag": 20,
           "maximumSpread": 0.062,
-          "minimumDamage": 32,
+          "minimumDamage": 40,
           "movementMultiplier": 0.94,
           "movementSpreadMultiplier": 1.85,
           "muzzleFlashScale": 1.08,
@@ -4001,7 +4001,9 @@
       "pass65-atomic-ten-defeat-reinforcements",
       "pass66-hitl-m14-half-fire-rate-and-through-wall-thermal",
       "pass66-hitl-drone-swarm-thirty-second-lifetime",
-      "pass66-hitl-carpet-bomber-friendly-fire"
+      "pass66-hitl-carpet-bomber-friendly-fire",
+      "pass66-hitl-balance-m14-62-damage-compensation",
+      "pass66-hitl-balance-scattergun-95rpm-13-damage"
     ]
   }
 }

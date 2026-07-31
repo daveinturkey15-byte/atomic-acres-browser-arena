@@ -57,6 +57,8 @@ const contract = {
       'pass66-hitl-m14-half-fire-rate-and-through-wall-thermal',
       'pass66-hitl-drone-swarm-thirty-second-lifetime',
       'pass66-hitl-carpet-bomber-friendly-fire',
+      'pass66-hitl-balance-m14-62-damage-compensation',
+      'pass66-hitl-balance-scattergun-95rpm-13-damage',
     ],
     generatedBy: 'scripts/qa/generate-pass25a-baselines.ts',
     dependencies,

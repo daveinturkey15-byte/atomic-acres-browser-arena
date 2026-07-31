@@ -28,6 +28,9 @@ function compatibilityProjection(definition: Record<string, any>): Record<string
   if (copy.id === 'scattergun') {
     delete copy.damage;
     delete copy.spread;
+    // Pass 66 owner balance pass approved a pump-cadence lift alongside the
+    // per-pellet damage retune.
+    delete copy.rpm;
   }
   if (copy.id === 'minigun') delete copy.damage;
   if (copy.id === 'magnum') delete copy.penetration.calibreLabel;

@@ -279,13 +279,15 @@ describe('weapon tuning', () => {
     );
   });
 
-  it('uses coherent per-pellet Remington 870 damage without changing cadence or pellet count', () => {
+  it('uses coherent per-pellet Remington 870 damage at the owner-approved pump cadence', () => {
     const shotgun = WEAPONS.scattergun;
-    expect(shotgun.damage).toBe(12);
+    // Pass 66 owner balance pass: 13 per pellet at 95 rpm so the close-range
+    // specialist is not strictly outclassed by SMGs inside its own bracket.
+    expect(shotgun.damage).toBe(13);
     expect(shotgun.minimumDamage).toBe(5);
     expect(shotgun.pellets).toBe(9);
-    expect(computeDamage(shotgun, 5, 'body') * shotgun.pellets).toBe(108);
-    expect(shotgun.rpm).toBe(82);
+    expect(computeDamage(shotgun, 5, 'body') * shotgun.pellets).toBe(117);
+    expect(shotgun.rpm).toBe(95);
   });
 
   it('builds bounded directional recoil and recovers it toward rest', () => {

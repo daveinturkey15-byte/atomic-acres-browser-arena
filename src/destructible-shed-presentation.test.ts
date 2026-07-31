@@ -379,10 +379,15 @@ describe('Pass 65 destructible shed presentation', () => {
     expect(() => presentation.sync(obliterated.state)).not.toThrow();
     const shell = presentation.root.getObjectByName('field-shed-damageable-shell') as THREE.Mesh;
     expect(shell.geometry.getAttribute('position')).toBeUndefined();
-    // The structural frame must collapse with the panels instead of leaving a
-    // floating skeleton after a full obliteration.
+    // Owner direction: the structural frame must break with the panels. After a
+    // full obliteration the members stay visible but topple into a deterministic
+    // wreckage layout lying on the ground instead of floating as a skeleton.
     const frame = presentation.root.getObjectByName('field-shed-structural-frame') as THREE.InstancedMesh;
-    expect(frame.visible).toBe(false);
+    expect(frame.visible).toBe(true);
+    const toppled = new THREE.Matrix4();
+    frame.getMatrixAt(4, toppled); // ridge beam: stood at y=3.45
+    const toppledPosition = new THREE.Vector3().setFromMatrixPosition(toppled);
+    expect(toppledPosition.y).toBeLessThan(0.4);
     expect(presentation.telemetry(obliterated.state)).toMatchObject({ detachedChunks: 6, frameCollapsed: true });
     presentation.dispose();
   });

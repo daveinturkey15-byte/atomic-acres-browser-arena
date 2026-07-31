@@ -180,23 +180,54 @@ function placeBoxInstance(
 }
 
 function createFrame(material: THREE.Material): THREE.InstancedMesh {
-  const placements: ReadonlyArray<readonly [THREE.Vector3, THREE.Vector3, THREE.Quaternion?]> = [
-    ...[-1.8, 1.8].flatMap((x) => [-2.1, 2.1].map((z) => [new THREE.Vector3(x, 1.3, z), new THREE.Vector3(0.11, 1.3, 0.11)] as const)),
-    [new THREE.Vector3(0, 3.45, 0), new THREE.Vector3(0.09, 0.09, 2.22)] as const,
-    ...[-2.1, 2.1].map((z) => [new THREE.Vector3(0, 2.43, z), new THREE.Vector3(1.8, 0.09, 0.09)] as const),
-    ...[-1.8, 1.8].map((x) => [new THREE.Vector3(x, 2.43, 0), new THREE.Vector3(0.09, 0.09, 2.1)] as const),
-    ...[-2.1, 2.1].map((z) => [new THREE.Vector3(0, 0.12, z), new THREE.Vector3(1.8, 0.08, 0.08)] as const),
-    ...[-1.8, 1.8].map((x) => [new THREE.Vector3(x, 0.12, 0), new THREE.Vector3(0.08, 0.08, 2.1)] as const),
-    [new THREE.Vector3(-0.78, 1.1, 2.13), new THREE.Vector3(0.07, 1.1, 0.07)] as const,
-    [new THREE.Vector3(0.78, 1.1, 2.13), new THREE.Vector3(0.07, 1.1, 0.07)] as const,
-  ];
-  const frame = new THREE.InstancedMesh(new THREE.BoxGeometry(2, 2, 2), material, placements.length);
+  const frame = new THREE.InstancedMesh(new THREE.BoxGeometry(2, 2, 2), material, SHED_FRAME_PLACEMENTS.length);
   frame.name = 'field-shed-structural-frame';
-  placements.forEach(([position, scale, rotation], index) => placeBoxInstance(frame, index, position, scale, rotation));
+  SHED_FRAME_PLACEMENTS.forEach(([position, scale, rotation], index) => placeBoxInstance(frame, index, position, scale, rotation));
   frame.instanceMatrix.needsUpdate = true;
   frame.castShadow = true;
   frame.receiveShadow = true;
   return frame;
+}
+
+const SHED_FRAME_PLACEMENTS: ReadonlyArray<readonly [THREE.Vector3, THREE.Vector3, THREE.Quaternion?]> = [
+  ...[-1.8, 1.8].flatMap((x) => [-2.1, 2.1].map((z) => [new THREE.Vector3(x, 1.3, z), new THREE.Vector3(0.11, 1.3, 0.11)] as const)),
+  [new THREE.Vector3(0, 3.45, 0), new THREE.Vector3(0.09, 0.09, 2.22)] as const,
+  ...[-2.1, 2.1].map((z) => [new THREE.Vector3(0, 2.43, z), new THREE.Vector3(1.8, 0.09, 0.09)] as const),
+  ...[-1.8, 1.8].map((x) => [new THREE.Vector3(x, 2.43, 0), new THREE.Vector3(0.09, 0.09, 2.1)] as const),
+  ...[-2.1, 2.1].map((z) => [new THREE.Vector3(0, 0.12, z), new THREE.Vector3(1.8, 0.08, 0.08)] as const),
+  ...[-1.8, 1.8].map((x) => [new THREE.Vector3(x, 0.12, 0), new THREE.Vector3(0.08, 0.08, 2.1)] as const),
+  [new THREE.Vector3(-0.78, 1.1, 2.13), new THREE.Vector3(0.07, 1.1, 0.07)] as const,
+  [new THREE.Vector3(0.78, 1.1, 2.13), new THREE.Vector3(0.07, 1.1, 0.07)] as const,
+];
+
+/**
+ * Deterministic toppled layout for a fully obliterated shed. Each frame member
+ * ends lying flat near where it stood, fanned outward with a seeded yaw, so the
+ * skeleton reads as broken wreckage on the ground rather than disappearing.
+ */
+function placeToppledFrame(frame: THREE.InstancedMesh): void {
+  SHED_FRAME_PLACEMENTS.forEach(([position, scale], index) => {
+    const unit = deterministicFrameUnit(index);
+    const longest = Math.max(scale.x, scale.y, scale.z);
+    const yaw = Math.atan2(position.x, position.z) + (unit - 0.5) * 1.4;
+    const fallen = new THREE.Vector3(
+      position.x * 1.18 + Math.sin(yaw) * 0.35,
+      Math.min(scale.x, scale.y, scale.z) + 0.02 + index * 0.012,
+      position.z * 1.18 + Math.cos(yaw) * 0.35,
+    );
+    // Lie along the member's longest axis on the ground plane.
+    const flatScale = new THREE.Vector3(Math.min(scale.x, 0.12), Math.min(scale.y, scale.z, 0.12), longest);
+    const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, (unit - 0.5) * 0.18));
+    placeBoxInstance(frame, index, fallen, flatScale, rotation);
+  });
+  frame.instanceMatrix.needsUpdate = true;
+}
+
+function deterministicFrameUnit(index: number): number {
+  let hash = 0x811c9dc5 ^ (index + 1);
+  hash = Math.imul(hash, 0x01000193);
+  hash ^= hash >>> 15;
+  return (hash >>> 0) / 0x1_0000_0000;
 }
 
 function damageableSheetMesh(
@@ -334,6 +365,7 @@ export class DestructibleShedPresentation {
   private readonly doorHinge = new THREE.Group();
   private door: THREE.Mesh;
   private readonly structuralFrame: THREE.InstancedMesh;
+  private frameToppled = false;
   private readonly apertureRims: THREE.InstancedMesh;
   private readonly dents: THREE.InstancedMesh;
   private readonly debris: THREE.InstancedMesh;
@@ -573,12 +605,22 @@ export class DestructibleShedPresentation {
     if (this.debris.instanceColor) this.debris.instanceColor.needsUpdate = true;
     // The structural frame is not a separate damage body, but leaving the bare
     // skeleton floating after every panel detaches read as broken geometry.
-    // Once the shed is fully obliterated the frame collapses with the shell.
+    // Owner direction: the frame must break too - once the shed is fully
+    // obliterated its members topple and lie on the ground as wreckage.
     const staticSurfaces = this.definition.surfaces.filter((surface) => surface.role !== 'door');
     const allStaticDetached = staticSurfaces.length > 0 && staticSurfaces.every((surfaceDefinition) => (
       state.surfaces.find((surface) => surface.surfaceId === surfaceDefinition.id)?.stage === 'detached'
     ));
-    this.structuralFrame.visible = !allStaticDetached;
+    if (allStaticDetached && !this.frameToppled) {
+      placeToppledFrame(this.structuralFrame);
+      this.frameToppled = true;
+    } else if (!allStaticDetached && this.frameToppled) {
+      SHED_FRAME_PLACEMENTS.forEach(([position, scale, rotation], index) => (
+        placeBoxInstance(this.structuralFrame, index, position, scale, rotation)
+      ));
+      this.structuralFrame.instanceMatrix.needsUpdate = true;
+      this.frameToppled = false;
+    }
     this.revision = state.revision;
     this.root.userData.worldRevision = state.revision;
   }
@@ -597,7 +639,7 @@ export class DestructibleShedPresentation {
       dents: state.surfaces.reduce((sum, surface) => sum + surface.dents.length, 0),
       detachedChunks: state.detachedChunkIds.length,
       retiredGeometries: this.retiredGeometries.size,
-      frameCollapsed: !this.structuralFrame.visible,
+      frameCollapsed: this.frameToppled,
     });
   }
 
