@@ -5902,6 +5902,27 @@ function interpolatePlayerSnapshot(before: PlayerSnapshot, after: PlayerSnapshot
   };
 }
 
+/**
+ * Owner request: a slight orange highlight on other players in multiplayer so
+ * they read as live combatants at a glance. Materials are cloned per remote so
+ * the shared operator material pool is never contaminated.
+ */
+function applyRemotePlayerHighlight(operator: THREE.Object3D): void {
+  operator.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    if (node.userData.authoritativeProxy === true || node.userData.presentationOnly === true) return;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    const highlighted = materials.map((material) => {
+      if (!(material instanceof THREE.MeshStandardMaterial)) return material;
+      const clone = material.clone();
+      clone.emissive = new THREE.Color(0xff7a2a);
+      clone.emissiveIntensity = 0.16;
+      return clone;
+    });
+    node.material = Array.isArray(node.material) ? highlighted : highlighted[0];
+  });
+}
+
 function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
   const root = new THREE.Group();
   root.name = 'remote-player-world';
@@ -5916,6 +5937,7 @@ function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
   });
   root.userData.operator = operator;
   root.add(operator);
+  applyRemotePlayerHighlight(operator);
 
   const labelCanvas = document.createElement('canvas');
   labelCanvas.width = 256;

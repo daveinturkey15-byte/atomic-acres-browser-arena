@@ -16,6 +16,24 @@ function escapeHtml(value: string): string {
   return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 }
 
+/**
+ * Owner request: plain-language descriptions of what each killstreak IS and
+ * DOES, shown in the loadout menu so every reward is self-explanatory.
+ */
+const KILLSTREAK_DESCRIPTIONS: Readonly<Record<string, string>> = Object.freeze({
+  'scout-sweep': 'Reveals every enemy on your minimap for 12s.',
+  'adrenaline': '+10% damage and move speed, -10% reload time for 15s.',
+  'care-package': 'Calls a supply crate you can capture for a bonus reward.',
+  'yardhawk': 'Autonomous turret that hunts and shoots enemies for 15s.',
+  'piloted-drone': 'Take first-person control of an armed drone for 30s.',
+  'tri-pass': 'Three aircraft strafe a line you place on the map.',
+  'carpet-bomber': 'Bombs saturate a target point - hurts everyone, including you.',
+  'hunter-swarm': 'Five drones dive on the nearest enemies for 20s.',
+  'chopper': 'Gun a chopper from first person; press its key again to take the gun.',
+  'drone-swarm': '24 drones patrol and engage enemies for 60s.',
+  'nuke': 'Instantly wipes every enemy on the map. The ultimate.',
+});
+
 export function killstreakLoadoutPanelMarkup(): string {
   const slots = PASS65_KILLSTREAK_SLOT_DEFINITIONS.map((slot, index) => {
     const options = slot.allowedIds.map((id) => {
@@ -55,7 +73,10 @@ function renderDetails(root: ParentNode, controller: KillstreakLoadoutController
       preview.dataset.killstreak = definition.id;
       preview.setAttribute('aria-label', `${definition.displayName} tactical demonstration`);
     }
-    if (detail) detail.textContent = `${definition.activation.toUpperCase()} · ${definition.durationMs === 0 ? 'IMMEDIATE' : `${definition.durationMs / 1_000}s`} · ${definition.displayName}`;
+    if (detail) {
+      const description = KILLSTREAK_DESCRIPTIONS[definition.id] ?? '';
+      detail.textContent = `${definition.activation.toUpperCase()} · ${definition.durationMs === 0 ? 'IMMEDIATE' : `${definition.durationMs / 1_000}s`} · ${definition.displayName}${description ? ` — ${description}` : ''}`;
+    }
   });
 }
 
