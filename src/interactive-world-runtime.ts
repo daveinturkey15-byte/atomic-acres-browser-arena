@@ -897,7 +897,11 @@ export class InteractiveWorldRuntime {
       if (request.shedBlastClass) {
         const localOrigin = inverseTransformPoint(request.origin, shed.placement);
         const shedDistance = Math.hypot(localOrigin.x, Math.max(0, localOrigin.y - 1.5), localOrigin.z);
-        if (shedDistance <= request.radius + 2.6) {
+        // Owner requirement: a saturation blast that lands on or beside the shed
+        // must bring it down on its own - no walking up to nudge the wreckage.
+        // The generous buffer means a carpet-bomb corridor across the shed's
+        // position collapses it even when individual bombs land a few metres out.
+        if (shedDistance <= request.radius + 5) {
           const structural = applyShedStructuralBlast(shed.definition, shed.state, {
             isHost: this.hostAuthority,
             matchEpoch: this.matchEpoch,
