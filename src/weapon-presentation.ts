@@ -211,12 +211,12 @@ const MELEE_PRESENTATION_MS = 520;
 const RIGGED_ARM_MAX_REACH_RATIO = 0.992;
 /** Unit -Z blade axis reused by the per-frame melee knife alignment. */
 const KNIFE_BLADE_AXIS = Object.freeze(new THREE.Vector3(0, 0, -1));
-export const HIP_VIEWMODEL_POSITION = Object.freeze({ x: 0.4, y: -0.42, z: -1.02 });
-export const HIP_VIEWMODEL_SCALE = 0.54;
+export const HIP_VIEWMODEL_POSITION = Object.freeze({ x: 0.4, y: -0.5, z: -1.02 });
+export const HIP_VIEWMODEL_SCALE = 0.66;
 /** Camera-space Z clearance preventing thicker arm geometry from crossing the near plane. */
 export const VIEWMODEL_NEAR_PLANE_CLEARANCE = 0.06;
-const ADS_VIEWMODEL_BASE_POSITION = Object.freeze({ x: 0.28, y: -0.34, z: -0.97 });
-const ADS_VIEWMODEL_SCALE = 0.64;
+const ADS_VIEWMODEL_BASE_POSITION = Object.freeze({ x: 0.28, y: -0.4, z: -0.97 });
+const ADS_VIEWMODEL_SCALE = 0.78;
 
 /**
  * The viewmodel is framed for a 16:9 viewport at the default field of view.

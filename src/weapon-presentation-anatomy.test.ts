@@ -35,7 +35,7 @@ describe('first-person anatomical presentation', () => {
     for (let frame = 0; frame < 180; frame += 1) presentation.update({ ...REST_POSE, ads: true });
     const state = presentation.presentationState();
     expect(state.adsProgress).toBeGreaterThan(0.999);
-    expect(presentation.root.scale.x).toBeCloseTo(0.64, 3);
+    expect(presentation.root.scale.x).toBeCloseTo(0.78, 3);
     expect(state.sightOffset?.[0]).toBeCloseTo(0, 3);
     expect(state.sightOffset?.[1]).toBeCloseTo(0, 3);
   });
