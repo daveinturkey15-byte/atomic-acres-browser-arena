@@ -325,7 +325,12 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'm
     exposure: 1, toneMapping: 'aces', filmGrain: 0.32, vignette: 0.16,
   }),
   max: Object.freeze({
-    renderScale: 1.25, adaptiveResolution: false, targetFps: 240, frameRateLimit: 0,
+    // Max deliberately selects the highest supported values, but it must stay as
+    // rock solid as Quality and Performance. Adaptive resolution is a distress
+    // valve rather than a quality reduction: with it disabled a 1.25x supersample
+    // on top of MSAA 4x had no way to recover, stalling match admission into a
+    // load failure. Keep the supersample slightly lower and leave the valve on.
+    renderScale: 1.15, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'dynamic',
     indirectLighting: 'high', ambientOcclusion: 'ultra', reflectionQuality: 'high', volumetricQuality: 'ultra', smokeQuality: 'ultra',
     particleQuality: 'ultra', anisotropy: 16, decalQuality: 'ultra', bloomQuality: 'cinematic',

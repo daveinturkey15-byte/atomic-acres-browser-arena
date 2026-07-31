@@ -37,8 +37,10 @@ describe('Pass 65 settings contract', () => {
   it('uses Performance on constrained machines and keeps Max available to internal benchmarks', () => {
     expect(createDefaultPass65Settings({ hardwareConcurrency: 4, deviceMemoryGb: 4 }).graphics.preset).toBe('performance');
     const max = normalizePass65Settings({ graphics: { preset: 'max' } });
+    // Max keeps every highest-supported value but retains the adaptive-resolution
+    // distress valve so it is as load-stable as Quality and Performance.
     expect(resolveGraphicsRuntime(max.graphics)).toMatchObject({
-      renderProfile: 'blender', renderScale: 1.25, adaptive: false, shadows: true,
+      renderProfile: 'blender', renderScale: 1.15, adaptive: true, shadows: true,
       shadowUpdateMode: 'dynamic', maximumAnisotropy: 16,
       ambientOcclusion: { quality: 'ultra', enabled: true, resolutionScale: 0.75, samples: 16 },
     });
@@ -66,7 +68,7 @@ describe('Pass 65 settings contract', () => {
       targetFps: 240, frameRateLimit: 0, shadows: 'high',
     });
     expect(legacyMax.graphics).toMatchObject({
-      preset: 'max', renderScale: 1.25, adaptiveResolution: false,
+      preset: 'max', renderScale: 1.15, adaptiveResolution: true,
       targetFps: 240, frameRateLimit: 0, shadows: 'high',
     });
   });
