@@ -13903,10 +13903,27 @@ const killstreakPossessionCameraScratch = new THREE.Vector3();
  */
 let nextLocalSupportGunReportAt = 0;
 
+/**
+ * First-person cockpit HUD for the Chopper Gunner and Piloted Drone: a gunsight
+ * reticle plus hull/ammo readouts, shown only while the player is at the
+ * controls. Presentation-only; values mirror the authoritative entity snapshot.
+ */
+function syncGunnerCockpitHud(entity: { health: number; magazine: number | null }): void {
+  const hud = element<HTMLElement>('#gunner-cockpit-hud');
+  hud.hidden = false;
+  element<HTMLElement>('#gunner-hull').textContent = String(Math.max(0, Math.round(entity.health)));
+  element<HTMLElement>('#gunner-ammo').textContent = entity.magazine === null ? '∞' : String(entity.magazine);
+}
+
+function hideGunnerCockpitHud(): void {
+  element<HTMLElement>('#gunner-cockpit-hud').hidden = true;
+}
+
 function updateKillstreakPossession(now: number): void {
   const possession = localKillstreakActorSnapshot()?.possession;
   if (!possession) {
     killstreakPresentation.setFirstPersonEntity(null);
+    hideGunnerCockpitHud();
     if (camera.near !== 0.08) {
       camera.near = 0.08;
       camera.updateProjectionMatrix();
@@ -13916,6 +13933,7 @@ function updateKillstreakPossession(now: number): void {
   const entity = killstreakSnapshot.entities.find((entry) => entry.id === possession.entityId);
   if (!entity) {
     killstreakPresentation.setFirstPersonEntity(null);
+    hideGunnerCockpitHud();
     return;
   }
   killstreakPresentation.setFirstPersonEntity(entity.id);
@@ -13936,6 +13954,7 @@ function updateKillstreakPossession(now: number): void {
   camera.rotation.x = player.pitch;
   killstreakPresentation.alignFirstPersonCockpit(entity.id, camera.quaternion);
   weaponView.setPresentationVisible(false);
+  syncGunnerCockpitHud(entity);
   if (triggerHeld && now >= nextLocalSupportGunReportAt) {
     audio.supportGun(possession.kind === 'chopper-gunner' ? 'chopper' : 'drone');
     // Owner feedback: it was hard to tell the mounted gun was actually firing.

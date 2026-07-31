@@ -367,6 +367,11 @@ function hudMarkup(): string {
     <div id="power-announcement" hidden aria-live="assertive"><small>MID-MAP POWER WEAPON</small><strong>2× DAMAGE</strong><span>30 SECONDS</span></div>
     <div id="pickup-prompt" hidden><kbd>F</kbd><span>PICK UP</span><strong></strong></div>
     <div id="killstreak-enter-prompt" hidden aria-live="polite"></div>
+    <div id="gunner-cockpit-hud" hidden aria-hidden="true">
+      <div class="gunner-reticle"><i></i><b></b><span class="tl"></span><span class="tr"></span><span class="bl"></span><span class="br"></span></div>
+      <div class="gunner-readout"><small>HULL</small><strong id="gunner-hull">100</strong></div>
+      <div class="gunner-readout right"><small>AMMO</small><strong id="gunner-ammo">∞</strong></div>
+    </div>
     <pre id="runtime-error-log" hidden aria-hidden="true"></pre>
     <div id="death-fade" aria-hidden="true"></div>
     <div id="respawn" hidden><strong>ELIMINATED</strong><span id="respawn-countdown">REDEPLOYING</span></div>

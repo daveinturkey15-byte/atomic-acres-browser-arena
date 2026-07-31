@@ -779,6 +779,86 @@
     display: none;
   }
 
+  /* First-person Chopper Gunner / Piloted Drone cockpit HUD: a gunsight reticle
+     plus hull and ammo readouts, styled after the owner's reference photos. */
+  #gunner-cockpit-hud {
+    position: absolute;
+    inset: 0;
+    z-index: 13;
+    pointer-events: none;
+  }
+
+  #gunner-cockpit-hud[hidden] {
+    display: none;
+  }
+
+  #gunner-cockpit-hud .gunner-reticle {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: min(20vh, 16vw);
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+  }
+
+  #gunner-cockpit-hud .gunner-reticle i,
+  #gunner-cockpit-hud .gunner-reticle b {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    background: rgba(120, 255, 170, 0.92);
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.8);
+    transform: translate(-50%, -50%);
+  }
+
+  #gunner-cockpit-hud .gunner-reticle i { width: 2px; height: 34%; }
+  #gunner-cockpit-hud .gunner-reticle b { width: 34%; height: 2px; }
+
+  #gunner-cockpit-hud .gunner-reticle span {
+    position: absolute;
+    width: 16%;
+    height: 16%;
+    border: 0 solid rgba(120, 255, 170, 0.9);
+  }
+
+  #gunner-cockpit-hud .gunner-reticle .tl { left: 6%; top: 6%; border-left-width: 3px; border-top-width: 3px; }
+  #gunner-cockpit-hud .gunner-reticle .tr { right: 6%; top: 6%; border-right-width: 3px; border-top-width: 3px; }
+  #gunner-cockpit-hud .gunner-reticle .bl { left: 6%; bottom: 6%; border-left-width: 3px; border-bottom-width: 3px; }
+  #gunner-cockpit-hud .gunner-reticle .br { right: 6%; bottom: 6%; border-right-width: 3px; border-bottom-width: 3px; }
+
+  #gunner-cockpit-hud .gunner-readout {
+    position: absolute;
+    bottom: 12vh;
+    left: 8vw;
+    padding: 10px 18px;
+    border: 1px solid rgba(120, 255, 170, 0.5);
+    border-radius: 4px;
+    background: rgba(4, 14, 10, 0.6);
+    color: #b8ffd6;
+    text-align: left;
+  }
+
+  #gunner-cockpit-hud .gunner-readout.right {
+    left: auto;
+    right: 8vw;
+    text-align: right;
+  }
+
+  #gunner-cockpit-hud .gunner-readout small {
+    display: block;
+    font: 800 12px/1 Inter, system-ui, sans-serif;
+    letter-spacing: 0.22em;
+    color: rgba(120, 255, 170, 0.8);
+  }
+
+  #gunner-cockpit-hud .gunner-readout strong {
+    display: block;
+    margin-top: 4px;
+    font: 900 40px/1 Inter, system-ui, sans-serif;
+    color: #eafff3;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+  }
+
   #death-fade.respawn-flash {
     background: #fff;
     transition: none;
