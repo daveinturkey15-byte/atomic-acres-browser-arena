@@ -13938,6 +13938,15 @@ function updateKillstreakPossession(now: number): void {
   weaponView.setPresentationVisible(false);
   if (triggerHeld && now >= nextLocalSupportGunReportAt) {
     audio.supportGun(possession.kind === 'chopper-gunner' ? 'chopper' : 'drone');
+    // Owner feedback: it was hard to tell the mounted gun was actually firing.
+    // Stream a bright tracer down the aim line on every admitted shot so the
+    // trigger is unmistakable (presentation-only; the host owns real hits).
+    if (possession.kind === 'chopper-gunner') {
+      const muzzle = camera.getWorldPosition(new THREE.Vector3());
+      const aim = camera.getWorldDirection(new THREE.Vector3());
+      muzzle.addScaledVector(aim, 1.4).y -= 0.18;
+      spawnTracer(muzzle, muzzle.clone().addScaledVector(aim, 130), 0xffb347);
+    }
     nextLocalSupportGunReportAt = now + (possession.kind === 'chopper-gunner'
       ? CHOPPER_GUN_PROFILE.cadenceMs
       : DRONE_GUN_PROFILE.cadenceMs);
@@ -13967,15 +13976,46 @@ function updateKillstreakPossession(now: number): void {
   lastKillstreakControlSentAt = now;
 }
 
+/**
+ * Owner requirement: when a Chopper Gunner or Piloted Drone is live and waiting,
+ * the "press the killstreak key again to enter" call-out must be unmissable - a
+ * large bold centred banner, not a small feed line. It shows until the player
+ * takes control (or the asset expires), and hides the moment they enter.
+ */
+function syncKillstreakEnterPrompt(): void {
+  const prompt = element<HTMLElement>('#killstreak-enter-prompt');
+  let message = '';
+  if (gameStarted && matchState.phase === 'active' && player.alive) {
+    const possession = localKillstreakActorSnapshot()?.possession;
+    for (const entity of killstreakSnapshot.entities) {
+      if (entity.ownerId !== player.id || entity.expiresInMs <= 0) continue;
+      const entered = possession?.entityId === entity.id;
+      if (entered) continue;
+      if (entity.kind === 'chopper') {
+        message = 'CHOPPER GUNNER READY · PRESS ITS KILLSTREAK KEY AGAIN TO ENTER GUNNER';
+        break;
+      }
+      if (entity.kind === 'drone' && entity.mode === 'piloted') {
+        message = 'PILOTED DRONE READY · PRESS ITS KILLSTREAK KEY AGAIN TO FLY';
+        break;
+      }
+    }
+  }
+  prompt.hidden = message === '';
+  if (message !== '') prompt.textContent = message;
+}
+
 function updatePass65KillstreakRuntime(now: number): void {
   if (!gameStarted) {
     audio.syncChopperRotors([]);
     killstreakPresentation.clear();
+    syncKillstreakEnterPrompt();
     return;
   }
   if (matchState.phase === 'ended') {
     audio.syncChopperRotors([]);
     killstreakPresentation.clear();
+    syncKillstreakEnterPrompt();
     return;
   }
   if (network.role !== 'client' && matchState.phase === 'active') {
@@ -14017,6 +14057,7 @@ function updatePass65KillstreakRuntime(now: number): void {
   }
   killstreakPresentation.sync(killstreakSnapshot, now);
   syncActiveSupportRotorAudio(now);
+  syncKillstreakEnterPrompt();
   refreshSupportStatusHud(now);
   const possession = localKillstreakActorSnapshot()?.possession;
   document.documentElement.dataset.killstreakPossession = possession?.kind ?? 'none';

@@ -722,9 +722,35 @@
     pointer-events: none;
     transition: opacity 1.55s ease-in;
   }
-
   #death-fade.death-wash {
     opacity: 0.94;
+  }
+
+  /* Owner requirement: the "press the killstreak key again to enter gunner"
+     call-out must be impossible to miss - large, bold, centred. */
+  #killstreak-enter-prompt {
+    position: absolute;
+    left: 50%;
+    top: 26%;
+    transform: translateX(-50%);
+    z-index: 14;
+    max-width: min(92vw, 900px);
+    padding: 18px 34px;
+    border: 2px solid var(--p66-amber-bright, #ff9d24);
+    border-radius: 6px;
+    background: rgba(6, 12, 14, 0.82);
+    color: #ffe6bd;
+    font: 900 clamp(22px, 3.4vw, 40px)/1.15 Inter, system-ui, sans-serif;
+    letter-spacing: 0.06em;
+    text-align: center;
+    text-transform: uppercase;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+    box-shadow: 0 6px 30px rgba(0, 0, 0, 0.55);
+    pointer-events: none;
+  }
+
+  #killstreak-enter-prompt[hidden] {
+    display: none;
   }
 
   #death-fade.respawn-flash {
