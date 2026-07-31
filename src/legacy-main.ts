@@ -636,7 +636,7 @@ window.addEventListener('error', (event) => {
   appendClientRuntimeLog({
     kind: 'error', message: event.message || 'unknown error', source: event.filename,
     line: event.lineno, column: event.colno, stack: event.error?.stack,
-  }, clientSessionStorage());
+  }, clientPersistentStorage());
   console.error('[Nuke Town runtime error]', event.message || 'unknown error', event.error?.stack || '');
 });
 window.addEventListener('unhandledrejection', (event) => {
@@ -645,7 +645,7 @@ window.addEventListener('unhandledrejection', (event) => {
     kind: 'unhandled-rejection',
     message: event.reason instanceof Error ? event.reason.message : String(event.reason),
     stack: event.reason instanceof Error ? event.reason.stack : undefined,
-  }, clientSessionStorage());
+  }, clientPersistentStorage());
   console.error('[Nuke Town unhandled rejection]', reason);
 });
 
@@ -4798,6 +4798,17 @@ function admitLobbyJoin(message: LobbyJoinMessage): void {
     const restored = { ...existing, name: message.name, connected: true, pingMs: message.playerId === player.id ? 0 : existing.pingMs };
     hostLobbyMembers.set(message.playerId, restored);
     network.setPlayerTeam(message.playerId, restored.team);
+    // Desync fix: a player rejoining mid-match previously only caught up on the
+    // next periodic state tick, leaving them out of sync with the host and bots
+    // (evidence: connection-epoch-mismatch / unknown-sender rejections in match
+    // diagnostics). Force an immediate reliable resync of the authoritative
+    // state so they land on the current match, not a stale one.
+    if (gameStarted && matchState.phase === 'active') {
+      network.sendStateCommitReliably(createStateMessage());
+      broadcastInteractiveWorldState(true);
+      broadcastKillstreakState(performance.now());
+      broadcastHostedBotState();
+    }
   } else {
     if (currentPhase !== 'waiting') {
       rejectLobbyPlayer(message.playerId, 'match-active');
@@ -18087,6 +18098,13 @@ function reportRuntimeError(context: string, error: unknown): void {
   const stack = error instanceof Error && error.stack ? error.stack.split('\n').slice(1, 4).join(' | ').trim() : '';
   const entry = `[${context}] ${message}${stack ? ` @ ${stack}` : ''}`;
   console.error(`[atomic-acres:${context}]`, error);
+  // Persist the full stack trace into the client runtime log so it lands in the
+  // post-match diagnostics JSON (host and guest alike), not just the console.
+  appendClientRuntimeLog({
+    kind: 'error',
+    message: `[${context}] ${message}`,
+    stack: error instanceof Error ? error.stack : undefined,
+  }, clientPersistentStorage());
   if (runtimeErrorLog[runtimeErrorLog.length - 1] !== entry) {
     runtimeErrorLog.push(entry);
     if (runtimeErrorLog.length > 8) runtimeErrorLog.shift();
