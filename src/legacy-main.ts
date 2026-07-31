@@ -1729,6 +1729,7 @@ async function exercisePreparedWebGpuWeaponSwitches(): Promise<void> {
       weaponView.setWeapon(weaponId, true);
       weaponView.snapToMatchStartRestPose(currentViewmodelSurfaceRetreat());
       const exercisesSniperScope = weaponId === 'sniper';
+      const exercisesDmrThermal = weaponId === 'm14-ebr';
       if (exercisesSniperScope) {
         // The first live magnified frame previously paid for both the scoped
         // WebGPU composition and full-screen reticle raster (300-440 ms on the
@@ -1739,6 +1740,12 @@ async function exercisePreparedWebGpuWeaponSwitches(): Promise<void> {
         weaponView.suppressForSniperScope(true);
         sniperScopeOverlay.hidden = false;
         hudRoot.classList.add('sniper-scope-active');
+      } else if (exercisesDmrThermal) {
+        // The M14 thermal optic pays the same first-magnified-frame cost as the
+        // sniper scope. Exercise the thermal composition state here too.
+        camera.fov = magnifiedFovDegrees(preferredFov, DMR_THERMAL_MAGNIFICATION);
+        camera.updateProjectionMatrix();
+        hudRoot.classList.add('dmr-thermal-active');
       }
       camera.updateMatrixWorld(true);
       try {
@@ -1749,6 +1756,10 @@ async function exercisePreparedWebGpuWeaponSwitches(): Promise<void> {
           sniperScopeOverlay.hidden = true;
           hudRoot.classList.remove('sniper-scope-active');
           weaponView.suppressForSniperScope(false);
+          camera.fov = preferredFov;
+          camera.updateProjectionMatrix();
+        } else if (exercisesDmrThermal) {
+          hudRoot.classList.remove('dmr-thermal-active');
           camera.fov = preferredFov;
           camera.updateProjectionMatrix();
         }
@@ -15328,7 +15339,7 @@ function updatePhysics(dt: number): void {
   // visible render list at once and forced a measured WebGPU ScenePass rebuild.
   // Keep the optic fast, but distribute the frustum transition over the same
   // bounded ADS settle interval as the physical weapon pose.
-  camera.fov = damp(camera.fov, targetFov, player.weapon === 'sniper' ? 18 : 10, dt);
+  camera.fov = damp(camera.fov, targetFov, player.weapon === 'sniper' || player.weapon === 'm14-ebr' ? 18 : 10, dt);
   camera.updateProjectionMatrix();
   sniperScopeActive = player.alive
     && player.weapon === 'sniper'

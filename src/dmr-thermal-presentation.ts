@@ -6,7 +6,7 @@ export const DMR_THERMAL_MAX_CONTACTS = 16;
 export const DMR_THERMAL_WORLD_DRAW_CALLS = 2;
 export const DMR_THERMAL_OCCLUSION_CHECKS_PER_FRAME = 2;
 export const DMR_THERMAL_TARGET_POLICY = 'living-friendly-and-hostile' as const;
-export const DMR_THERMAL_OCCLUSION_POLICY = 'smoke-bypass-solid-block' as const;
+export const DMR_THERMAL_OCCLUSION_POLICY = 'through-wall-reveal' as const;
 
 export type DmrThermalRelation = 'friendly' | 'hostile';
 
@@ -21,8 +21,9 @@ export type DmrThermalContact = Readonly<{
 
 /**
  * Team policy is intentionally inclusive: every living combatant is shown,
- * hostiles in amber and friendlies in cyan. Smoke is not an input because the
- * optic ignores smoke presentation only; any solid occlusion rejects first.
+ * hostiles in amber and friendlies in cyan. Smoke and solid geometry are both
+ * presentation-transparent to the optic: silhouettes reveal through walls.
+ * Ballistic authority is unchanged; bullets still obey penetration rules.
  */
 export function selectDmrThermalContacts(
   contacts: readonly DmrThermalContact[],
@@ -33,7 +34,7 @@ export function selectDmrThermalContacts(
   const boundedMaximum = Math.max(0, Math.min(DMR_THERMAL_MAX_CONTACTS, Math.floor(maximum)));
   for (const contact of contacts) {
     if (selected.length >= boundedMaximum) break;
-    if (!contact.living || contact.solidOccluded || contact.id.length === 0 || seen.has(contact.id)) continue;
+    if (!contact.living || contact.id.length === 0 || seen.has(contact.id)) continue;
     seen.add(contact.id);
     selected.push(contact);
   }
@@ -100,7 +101,7 @@ export class DmrThermalPresentation {
     transparent: true,
     opacity: 0.78,
     alphaTest: 0.08,
-    depthTest: true,
+    depthTest: false,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     toneMapped: false,
@@ -113,7 +114,7 @@ export class DmrThermalPresentation {
     transparent: true,
     opacity: 0.72,
     alphaTest: 0.08,
-    depthTest: true,
+    depthTest: false,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     toneMapped: false,
@@ -141,9 +142,9 @@ export class DmrThermalPresentation {
   private gpuPrewarmPromise: Promise<void> | null = null;
 
   constructor(private readonly scene: THREE.Scene, private readonly overlay: HTMLElement) {
-    this.worldRoot.name = 'm14-ebr-smoke-only-thermal-silhouettes';
+    this.worldRoot.name = 'm14-ebr-through-wall-thermal-silhouettes';
     this.worldRoot.userData.presentationOnly = true;
-    this.worldRoot.userData.solidOcclusionRequired = true;
+    this.worldRoot.userData.solidOcclusionRequired = false;
     this.worldRoot.visible = false;
     this.hostileInstances.name = 'm14-ebr-thermal-hostile-instances';
     this.friendlyInstances.name = 'm14-ebr-thermal-friendly-instances';
@@ -235,7 +236,7 @@ export class DmrThermalPresentation {
     let visible = 0;
     for (const contact of candidates) {
       if (visible >= DMR_THERMAL_MAX_CONTACTS) break;
-      if (!contact.living || contact.solidOccluded || contact.id.length === 0 || this.seen.has(contact.id)) continue;
+      if (!contact.living || contact.id.length === 0 || this.seen.has(contact.id)) continue;
       this.seen.add(contact.id);
       this.projected.copy(contact.position).project(camera);
       if (this.projected.z < -1 || this.projected.z > 1

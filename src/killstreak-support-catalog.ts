@@ -161,7 +161,7 @@ export const DRONE_SUPPORT_DEFINITIONS: Readonly<Record<DroneSupportMode, DroneS
     gunProfileId: DRONE_SWARM_GUN_PROFILE_ID,
     magazineSize: 20,
     reservePolicy: 'unlimited-reloads-until-expiry',
-    lifetimeMs: 60_000,
+    lifetimeMs: 30_000,
     sensorProfileId: null,
     presentationFamilyId: DRONE_PRESENTATION_FAMILY_ID,
     controllerOptions: Object.freeze(['ai'] as const),

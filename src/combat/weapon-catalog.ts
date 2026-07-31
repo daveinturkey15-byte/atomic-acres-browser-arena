@@ -212,7 +212,7 @@ const RAW_B1_WEAPON_DEFINITIONS = [
   },
   {
     id: 'm14-ebr', displayName: 'M14 EBR', slot: 'primary', family: 'marksman',
-    fireKind: 'hitscan', fireMode: 'semi', rpm: 300, pellets: 1, spinUpMs: 0, movementMultiplier: 0.94,
+    fireKind: 'hitscan', fireMode: 'semi', rpm: 150, pellets: 1, spinUpMs: 0, movementMultiplier: 0.94,
     damage: { policy: 'standard', base: 49, minimum: 32, falloffStartM: 38, falloffEndM: 100, headMultiplier: 1.7, limbMultiplier: 0.82 },
     spread: { hipRadians: 0.032, adsMultiplier: 0.08, movementMultiplier: 1.85, standMultiplier: 1, crouchMultiplier: 0.7, proneMultiplier: 0.5, sustainedPerShot: 0.004, maximumRadians: 0.062 },
     recoil: { pitchRadians: 0.045, yawRadians: 0.012, recoveryPerSecond: 7.5, adsMultiplier: 0.62, standMultiplier: 1, crouchMultiplier: 0.74, proneMultiplier: 0.5, deterministicPatternId: 'm14-ebr-pattern-v1' },

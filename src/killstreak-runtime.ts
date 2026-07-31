@@ -1462,6 +1462,7 @@ export class HostKillstreakRuntime {
           canonicalNowMs,
           world,
           damageEvents,
+          true,
         );
       }
       if (canonicalNowMs >= bomber.expiresAtMs || bomber.nextImpactOrdinal >= bomber.impacts.length) this.carpetBombers.delete(activationId);
@@ -2101,8 +2102,14 @@ export class HostKillstreakRuntime {
     nowMs: number,
     world: KillstreakWorld,
     output: KillstreakDamageEvent[],
+    friendlyFire = false,
   ): void {
-    for (const target of this.hostileTargets(world, owner.actorId, owner.team)) {
+    // Carpet Bomber saturation blast ignores team affiliation: it damages every
+    // living combatant inside the blast radius (friendly fire) except its owner.
+    const candidates = friendlyFire
+      ? world.targets.filter((target) => target.alive && target.id !== owner.actorId && (target.kind === 'player' || target.kind === 'bot'))
+      : this.hostileTargets(world, owner.actorId, owner.team);
+    for (const target of candidates) {
       const range = distance(origin, target.position);
       if (range > radius || !lineOfSight(world, origin, target.position) || output.length >= MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP) continue;
       const damage = Math.max(1, Math.round(maximum * (1 - range / radius * 0.75)));

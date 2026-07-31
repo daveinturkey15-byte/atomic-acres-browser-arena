@@ -93,7 +93,6 @@ export function menuPreviewVideoMarkup(arenaId: ArenaId = 'atomic-acres'): strin
     </video>
     <div class="preview-cockpit-hud" aria-hidden="true">
       <div class="cockpit-heading"><span>33</span><b>N</b><span>03</span></div>
-      <div class="cockpit-pitch"><i></i><i></i><i></i><i></i><b></b></div>
       <div class="cockpit-instruments"><span><small>ALT</small><b>024 M</b></span><span><small>HDG</small><b>049</b></span><span><small>ROTOR</small><b>ARMED</b></span></div>
     </div>
     <span class="menu-preview-fallback" aria-hidden="true">PREVIEW STANDBY</span>

@@ -50,7 +50,6 @@ function fieldKitCardsMarkup(): string {
     <span>${kit.role}</span>
     <strong>${kit.title}</strong>
     <b>${WEAPONS[kit.weapon].name} · ${WEAPONS[kit.sidearm].name}</b>
-    <div class="kit-weapon-silhouette" data-weapon-family="${kit.weapon}" aria-hidden="true"><i></i><i></i><i></i></div>
     <p>${kit.summary}</p>
     <div class="kit-stat-strip" aria-label="${kit.traits.join(', ')}">${kit.traits.map((trait) => {
       const [label, rawValue] = trait.split(' ');
@@ -69,7 +68,6 @@ function customPresetCardsMarkup(): string {
     <span>CUSTOM LOADOUT // 0${index}</span>
     <strong data-custom-name>Custom ${index}</strong>
     <b data-custom-equipment>CONFIGURE PRIMARY · SECONDARY · GRENADE</b>
-    <div class="kit-weapon-silhouette" data-weapon-family="custom" aria-hidden="true"><i></i><i></i><i></i></div>
     <p>Persistent operator-defined equipment. Changes queue safely for the next deployment.</p>
     <i>1 primary · 1 secondary · 1 grenade</i>
     ${weaponMenuPresentationMarkup(defaultPrimaryIds[index - 1]!)}
@@ -179,7 +177,6 @@ function fieldKitPanelMarkup(): string {
         <button id="loadout-save" type="button">SAVE LOADOUT</button>
       </div>
       <aside id="loadout-inspector" class="loadout-inspector" aria-live="polite">
-        <div class="loadout-inspector-art" aria-hidden="true"><i></i><i></i><i></i></div>
         <div><small>PRIMARY WEAPON</small><strong data-loadout-inspector-name>HK416</strong><span data-loadout-inspector-meta>AUTOMATIC / 650 RPM</span></div>
         <dl class="loadout-inspector-stats">
           <div><dt>DAMAGE</dt><dd><i data-loadout-stat="damage"></i><b data-loadout-value="damage">31</b></dd></div>
@@ -286,7 +283,6 @@ function deploymentTransitionMarkup(): string {
     <div class="deployment-transition-scrim" aria-hidden="true"></div>
     <div class="preview-cockpit-hud deployment-cockpit-hud" aria-hidden="true">
       <div class="cockpit-heading"><span>33</span><b>N</b><span>03</span></div>
-      <div class="cockpit-pitch"><i></i><i></i><i></i><i></i><b></b></div>
       <div class="cockpit-instruments"><span><small>ALT</small><b>024 M</b></span><span><small>HDG</small><b>049</b></span><span><small>ROTOR</small><b>ARMED</b></span></div>
     </div>
     <div class="deployment-transition-console">

@@ -35,21 +35,21 @@ describe('M14 EBR 2.5x thermal presentation policy', () => {
     expect(DMR_THERMAL_MAGNIFICATION).toBe(2.5);
     expect(DMR_THERMAL_WORLD_DRAW_CALLS).toBe(2);
     expect(DMR_THERMAL_TARGET_POLICY).toBe('living-friendly-and-hostile');
-    expect(DMR_THERMAL_OCCLUSION_POLICY).toBe('smoke-bypass-solid-block');
+    expect(DMR_THERMAL_OCCLUSION_POLICY).toBe('through-wall-reveal');
     expect(selected.map(({ id, relation }) => ({ id, relation }))).toEqual([
       { id: 'hostile', relation: 'hostile' },
       { id: 'friendly', relation: 'friendly' },
     ]);
   });
 
-  it('never admits dead targets or targets behind static/dynamic solid occlusion', () => {
+  it('never admits dead targets but reveals living targets through solid occlusion', () => {
     const selected = selectDmrThermalContacts([
       contact('dead', { living: false }),
       contact('static-wall', { solidOccluded: true }),
       contact('dynamic-wall', { solidOccluded: true, relation: 'friendly' }),
       contact('clear'),
     ]);
-    expect(selected.map(({ id }) => id)).toEqual(['clear']);
+    expect(selected.map(({ id }) => id)).toEqual(['static-wall', 'dynamic-wall', 'clear']);
   });
 
   it('deduplicates and hard-bounds presentation contacts', () => {

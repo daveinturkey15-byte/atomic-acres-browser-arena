@@ -117,14 +117,10 @@ function beatsMarkup(definitionValue: KillstreakDemoDefinition): string {
 
 export function killstreakDemoRailMarkup(initialId: Pass65KillstreakId): string {
   const initial = KILLSTREAK_DEMO_MEDIA[initialId];
-  return `<aside id="killstreak-demo-rail" class="killstreak-demo-rail" aria-labelledby="killstreak-demo-title" data-demo-id="${initial.id}" data-demo-kind="${initial.kind}" data-motion="animated" style="--killstreak-demo-accent:${initial.accent}">
+  return `<aside id="killstreak-demo-rail" class="killstreak-demo-rail" aria-labelledby="killstreak-demo-title" data-demo-id="${initial.id}" data-demo-kind="${initial.kind}" data-motion="static" style="--killstreak-demo-accent:${initial.accent}">
     <header><small data-demo-eyebrow>${initial.eyebrow}</small><strong id="killstreak-demo-title" data-demo-title>${initial.title}</strong></header>
     <div class="killstreak-demo-viewport">
       <img data-demo-poster src="${initial.media.posterPath}" alt="${escapeHtml(`${initial.title} local presentation poster`)}" width="640" height="360" loading="lazy" decoding="async">
-      <div class="killstreak-demo-choreography" aria-hidden="true">
-        <i class="demo-scan"></i><i class="demo-path"></i><i class="demo-platform"></i><i class="demo-payload"></i>
-        <i class="demo-node demo-node-a"></i><i class="demo-node demo-node-b"></i><i class="demo-node demo-node-c"></i>
-      </div>
       <span class="killstreak-demo-mode" data-demo-mode>PREAUTHORED LOCAL PRESENTATION</span>
     </div>
     <p data-demo-summary>${escapeHtml(initial.summary)}</p>
