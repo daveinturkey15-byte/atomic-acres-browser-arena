@@ -150,7 +150,9 @@ function tagPipeline(material: THREE.Material, pipelineId: string): void {
 function makeSky(): THREE.Object3D {
   const sky = new SkyMesh();
   sky.name = 'Pass 64 TSL atmosphere sky';
-  sky.scale.setScalar(420);
+  // The gameplay camera's far plane is 180 m. A 420 m dome was entirely outside
+  // the frustum, so no sky reached the framebuffer on any arena.
+  sky.scale.setScalar(174);
   sky.turbidity.value = 4.2;
   sky.rayleigh.value = 1.75;
   sky.mieCoefficient.value = 0.004;
@@ -161,11 +163,13 @@ function makeSky(): THREE.Object3D {
 }
 
 /**
- * Pass 66 painted sky layers. Deterministic, presentation-only dressing far
- * outside the arena bounds; per-preset visibility/tints are applied by
- * applyArenaSystemLayout. Materials ignore scene fog so the backdrop cannot
- * be washed out by the gameplay fog band.
+ * Pass 66 painted sky layers. Deterministic, presentation-only dressing placed
+ * inside the gameplay camera's far plane (180 m) so it is never frustum-clipped;
+ * per-preset visibility/tints are applied by applyArenaSystemLayout. Materials
+ * ignore scene fog so the backdrop cannot be washed out by the gameplay fog band.
  */
+const SKY_LAYER_RADIUS = 168;
+
 function skyDomePoint(index: number, seed: number, radius: number, minimumY: number): [number, number, number] {
   const theta = seededUnit(index, 1, seed) * Math.PI * 2;
   const y = minimumY + seededUnit(index, 2, seed) * (1 - minimumY);
@@ -177,7 +181,7 @@ function makeNightStars(): THREE.Points {
   const count = 900;
   const positions = new Float32Array(count * 3);
   for (let index = 0; index < count; index += 1) {
-    const [x, y, z] = skyDomePoint(index, 6601, 396, 0.05);
+    const [x, y, z] = skyDomePoint(index, 6601, SKY_LAYER_RADIUS, 0.05);
     positions.set([x, y, z], index * 3);
   }
   const geometry = new THREE.BufferGeometry();
@@ -207,7 +211,7 @@ function makeGalaxyBand(): THREE.Points {
     const direction = new THREE.Vector3(Math.cos(along), Math.sin(along) * Math.sin(bandTilt) + spread, Math.sin(along) * Math.cos(bandTilt));
     direction.normalize();
     if (direction.y < 0.04) direction.y = 0.04 + Math.abs(spread);
-    direction.normalize().multiplyScalar(392);
+    direction.normalize().multiplyScalar(SKY_LAYER_RADIUS * 0.99);
     positions.set([direction.x, direction.y, direction.z], index * 3);
     const tint = core.clone().lerp(dust, seededUnit(index, 4, 7702));
     colors.set([tint.r, tint.g, tint.b], index * 3);
@@ -249,7 +253,7 @@ function makeAuroraCurtains(): THREE.Group {
     });
     const curtain = new THREE.Mesh(geometry, material);
     curtain.name = `pass66-aurora-curtain-${index}`;
-    curtain.position.set(-30 + index * 34, 168 + index * 26, -286 + index * 30);
+    curtain.position.set(-30 + index * 34, 96 + index * 12, -132 + index * 14);
     curtain.rotation.x = -0.28;
     curtain.frustumCulled = false;
     group.add(curtain);
@@ -272,14 +276,14 @@ function makePaintedClouds(): THREE.Group {
   group.userData.primaryMaterial = primary;
   group.userData.secondaryMaterial = secondary;
   for (let index = 0; index < 10; index += 1) {
-    const [x, y, z] = skyDomePoint(index, 8803, 330, 0.16);
-    const width = 64 + seededUnit(index, 5, 8803) * 58;
+    const [x, y, z] = skyDomePoint(index, 8803, SKY_LAYER_RADIUS * 0.86, 0.16);
+    const width = 52 + seededUnit(index, 5, 8803) * 46;
     const cloud = new THREE.Mesh(
       new THREE.PlaneGeometry(width, width * 0.3, 1, 1),
       index % 2 === 0 ? primary : secondary,
     );
     cloud.name = `pass66-cloud-${index}`;
-    cloud.position.set(x, Math.min(y, 176), z);
+    cloud.position.set(x, Math.min(y, 118), z);
     cloud.lookAt(0, cloud.position.y * 0.7, 0);
     cloud.frustumCulled = false;
     cloud.userData.cloudOrdinal = index;

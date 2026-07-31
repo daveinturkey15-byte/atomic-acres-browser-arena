@@ -163,8 +163,6 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
 function fieldKitPanelMarkup(): string {
   return `<div id="menu-panel-kit" class="menu-panel" role="tabpanel" aria-labelledby="menu-tab-kit" data-menu-panel="kit" hidden>
     <div class="kit-heading"><div><b>FIELD KIT</b><span>Choose one of exactly three custom presets or a curated kit.</span></div><small>One primary · one secondary · one selected grenade. Mid-life changes queue for redeploy.</small></div>
-    <div class="kit-grid custom-kit-grid">${customPresetCardsMarkup()}</div>
-    <div class="kit-grid curated-kit-grid">${fieldKitCardsMarkup()}</div>
     <section id="loadout-manager" class="loadout-manager" hidden aria-label="Manage and rename custom loadouts">
       <header><span>MANAGE / RENAME</span><strong>THREE CUSTOM SLOTS</strong></header>
       <div class="loadout-manager-workspace">
@@ -183,11 +181,15 @@ function fieldKitPanelMarkup(): string {
           <div><dt>FIRE RATE</dt><dd><i data-loadout-stat="fire-rate"></i><b data-loadout-value="fire-rate">650</b></dd></div>
           <div><dt>RANGE</dt><dd><i data-loadout-stat="range"></i><b data-loadout-value="range">72m</b></dd></div>
           <div><dt>CONTROL</dt><dd><i data-loadout-stat="control"></i><b data-loadout-value="control">72</b></dd></div>
+          <div><dt>WALLBANG</dt><dd><i data-loadout-stat="wallbang"></i><b data-loadout-value="wallbang">2</b></dd></div>
         </dl>
+        <p class="loadout-inspector-dps"><small>IDEAL BODY DPS</small><strong data-loadout-value="dps">336</strong></p>
         <p data-loadout-grenade-detail>FRAG / TIMED EXPLOSIVE / ONE CARRIED</p>
       </aside>
       </div>
     </section>
+    <div class="kit-grid custom-kit-grid">${customPresetCardsMarkup()}</div>
+    <div class="kit-grid curated-kit-grid">${fieldKitCardsMarkup()}</div>
   </div>`;
 }
 
@@ -290,7 +292,7 @@ function deploymentTransitionMarkup(): string {
       <strong id="deployment-transition-title">NUKE TOWN</strong>
       <span id="deployment-transition-status">Preparing authoritative arena state…</span>
       <i aria-hidden="true"><b></b></i>
-      <em>PRERECORDED VIDEO ACTIVE · ZERO LIVE PREVIEW RENDERING · GAMEPLAY CLOCK PAUSED</em>
+      <em>TYPICAL LOAD 5–15 SECONDS · KEEP THIS TAB IN FOREGROUND · SWITCHING TABS PAUSES ARENA PREPARATION</em>
     </div>
   </section>`;
 }

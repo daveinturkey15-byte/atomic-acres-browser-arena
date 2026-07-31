@@ -1898,7 +1898,11 @@ export class WeaponPresentation {
   }
 
   private centerSightReference(model: THREE.Object3D | undefined): void {
-    const lock = THREE.MathUtils.smoothstep(this.adsBlend, 0.72, 0.98);
+    // The alignment previously only ramped in over the last quarter of the aim
+    // blend, so the sight snapped onto the crosshair at the very end and every
+    // weapon read as roughly-aimed. Engaging earlier and reaching a full lock
+    // gives every gun a precise, settled sight picture for the whole hold.
+    const lock = THREE.MathUtils.smoothstep(this.adsBlend, 0.32, 0.88);
     if (lock <= 0) return;
     const sight = this.sightReference(model);
     if (!sight) return;
@@ -2555,20 +2559,24 @@ export class WeaponPresentation {
     const viewmodelBaseX = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.x, ADS_VIEWMODEL_BASE_POSITION.x, this.adsBlend);
     const viewmodelBaseY = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.y, ADS_VIEWMODEL_BASE_POSITION.y, this.adsBlend);
     const viewmodelBaseZ = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.z, ADS_VIEWMODEL_BASE_POSITION.z, this.adsBlend);
+    // Aiming down sights is a real improvement on every weapon: idle bob, breath
+    // and mouse sway collapse as the blend completes, so the sight settles on the
+    // crosshair with a clear, unobstructed picture instead of drifting around it.
+    const aimSteady = 1 - this.adsBlend * 0.86;
     const targetPosition = this.frameTargetPosition.set(
-      viewmodelBaseX + adsX + bobX + this.swayX - pose.lateralSpeed * 0.012 - meleeArc * 0.12 + grenadeArc * 0.18 + reloadStage.lateral,
-      viewmodelBaseY + adsY + bobY + breath + sprintDrop + crouchLift + proneLift + switchDrop + reloadStage.lift - presentationKick * 0.095 - pose.landingImpulse * 0.075,
+      viewmodelBaseX + adsX + (bobX + this.swayX) * aimSteady - pose.lateralSpeed * 0.012 * aimSteady - meleeArc * 0.12 + grenadeArc * 0.18 + reloadStage.lateral,
+      viewmodelBaseY + adsY + (bobY + breath) * aimSteady + sprintDrop + crouchLift + proneLift + switchDrop + reloadStage.lift - presentationKick * 0.095 - pose.landingImpulse * 0.075 * aimSteady,
       viewmodelBaseZ + adsZ + (pose.surfaceRetreat ?? 0) - VIEWMODEL_NEAR_PLANE_CLEARANCE + presentationKick * profile.recoilTranslation * 1.12 - meleeArc * 0.18 + grenadeArc * 0.24,
     );
     this.surfaceRetreat = pose.surfaceRetreat ?? 0;
     this.root.position.lerp(targetPosition, smoothing(18));
-    this.root.rotation.x = THREE.MathUtils.lerp(this.root.rotation.x, presentationKick * profile.recoilRotation * 1.15 - this.swayY - grenadeArc * 0.42 + reloadStage.pitch, smoothing(22));
+    this.root.rotation.x = THREE.MathUtils.lerp(this.root.rotation.x, presentationKick * profile.recoilRotation * 1.15 - this.swayY * aimSteady - grenadeArc * 0.42 + reloadStage.pitch, smoothing(22));
     this.root.rotation.y = THREE.MathUtils.lerp(
       this.root.rotation.y,
-      hipYaw * (1 - this.adsBlend) - this.swayX * 2 - this.sprintBlend * 0.38 - meleeArc * 0.18,
+      hipYaw * (1 - this.adsBlend) - this.swayX * 2 * aimSteady - this.sprintBlend * 0.38 - meleeArc * 0.18,
       smoothing(13),
     );
-    this.root.rotation.z = THREE.MathUtils.lerp(this.root.rotation.z, reloadStage.roll - this.sprintBlend * 0.22 - pose.lateralSpeed * (pose.prone ? 0.01 : 0.025) + meleeArc * 0.12 + shotRoll, smoothing(13));
+    this.root.rotation.z = THREE.MathUtils.lerp(this.root.rotation.z, reloadStage.roll - this.sprintBlend * 0.22 - pose.lateralSpeed * (pose.prone ? 0.01 : 0.025) * aimSteady + meleeArc * 0.12 + shotRoll, smoothing(13));
     this.centerSightReference(activeModel);
     if (arms && !meleeActive) this.solveArms(arms, activeModel, reloadPose);
     if (!authoredMeleeActive) this.solveRiggedArms(activeModel, reloadPose);

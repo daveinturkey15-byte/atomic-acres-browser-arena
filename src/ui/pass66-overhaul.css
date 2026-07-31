@@ -347,8 +347,22 @@
   .manage-kit-card {
     display: grid;
     align-content: center;
-    border-style: dashed;
-    background: linear-gradient(145deg, #eef5f2, #fff);
+    border-style: solid;
+    /* Owner feedback: this is the control that opens the loadout swap menu, so it
+     * must read as the obvious dark action rather than a faint dashed card. */
+    border-color: var(--p66-cyan-bright);
+    background: linear-gradient(150deg, #14282c, #0b181c);
+    box-shadow: var(--p66-shadow);
+  }
+  .manage-kit-card span { color: var(--p66-cyan-bright); }
+  .manage-kit-card strong { color: #fff; }
+  .manage-kit-card > b { color: var(--p66-amber-bright); }
+  .manage-kit-card p,
+  .manage-kit-card > i { color: #bcd0ce; }
+  .manage-kit-card:hover,
+  .manage-kit-card[aria-expanded='true'] {
+    border-color: #7ff6ff;
+    background: linear-gradient(150deg, #1b363b, #102125);
   }
 
   .loadout-manager {
@@ -362,7 +376,7 @@
   }
   .loadout-manager header span { color: var(--p66-cyan-bright); font-size: 11px; }
   .loadout-manager header strong { color: #fff; font-size: 24px; }
-  .loadout-manager-workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 0.48fr); gap: 20px; }
+  .loadout-manager-workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 0.62fr); gap: 22px; }
   .loadout-manager-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-content: start; }
   .loadout-manager-grid label { color: #bcd0ce; font-size: 11px; }
   .loadout-manager-grid input,
@@ -371,21 +385,35 @@
   .loadout-manager-grid button { grid-column: 1 / -1; border-color: var(--p66-cyan-bright); background: #006d74; color: #fff; }
 
   .loadout-inspector {
-    padding: 18px;
-    border: 1px solid rgba(82, 238, 243, 0.26);
+    padding: 22px;
+    border: 1px solid rgba(82, 238, 243, 0.32);
     border-radius: 5px;
     background: #0e1e21;
   }
-  .loadout-inspector small { color: #82aaa8; font-size: 11px; letter-spacing: 0.08em; }
-  .loadout-inspector strong { display: block; margin-top: 6px; color: #fff; font: 800 32px/1 var(--ui-display); }
-  .loadout-inspector span { display: block; margin-top: 6px; color: var(--p66-cyan-bright); font-size: 13px; }
-  .loadout-inspector-stats { display: grid; gap: 11px; margin: 18px 0; }
-  .loadout-inspector-stats > div { display: grid; grid-template-columns: 84px 1fr; align-items: center; gap: 10px; }
-  .loadout-inspector-stats dt { color: #96acab; font-size: 12px; }
-  .loadout-inspector-stats dd { display: grid; grid-template-columns: 1fr 46px; align-items: center; gap: 8px; margin: 0; }
-  .loadout-inspector-stats dd i { height: 7px; border-radius: 3px; background: linear-gradient(90deg, var(--p66-cyan-bright) var(--loadout-stat, 50%), #294347 var(--loadout-stat, 50%)); }
-  .loadout-inspector-stats dd b { color: #fff; font-size: 13px; text-align: right; }
-  .loadout-inspector > p { margin: 0; padding-top: 12px; border-top: 1px solid #2b4548; color: #e9bb72; font-size: 12px; line-height: 1.5; }
+  .loadout-inspector small { color: #82aaa8; font-size: 12px; letter-spacing: 0.08em; }
+  .loadout-inspector strong { display: block; margin-top: 6px; color: #fff; font: 800 34px/1 var(--ui-display); }
+  .loadout-inspector span { display: block; margin-top: 7px; color: var(--p66-cyan-bright); font-size: 14px; }
+  .loadout-inspector-stats { display: grid; gap: 14px; margin: 20px 0; }
+  .loadout-inspector-stats > div { display: grid; grid-template-columns: 104px 1fr; align-items: center; gap: 12px; }
+  .loadout-inspector-stats dt { color: #b6cbca; font-size: 13px; letter-spacing: 0.04em; }
+  .loadout-inspector-stats dd { display: grid; grid-template-columns: 1fr 84px; align-items: center; gap: 10px; margin: 0; }
+  .loadout-inspector-stats dd i { height: 10px; border-radius: 5px; background: linear-gradient(90deg, var(--p66-cyan-bright) var(--loadout-stat, 50%), #294347 var(--loadout-stat, 50%)); }
+  .loadout-inspector-stats dd b { color: #fff; font-size: 15px; font-weight: 800; text-align: right; }
+  /* The overall damage-per-second summary is the headline number. */
+  .loadout-inspector-dps {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 0 14px;
+    padding: 12px 14px;
+    border: 1px solid var(--p66-amber-bright);
+    border-radius: 4px;
+    background: rgba(255, 157, 36, 0.12);
+  }
+  .loadout-inspector-dps small { color: var(--p66-amber-bright); font-size: 12px; letter-spacing: 0.1em; }
+  .loadout-inspector-dps strong { margin: 0; color: #ffd39a; font: 900 38px/1 var(--ui-display); }
+  .loadout-inspector > p[data-loadout-grenade-detail] { margin: 0; padding-top: 12px; border-top: 1px solid #2b4548; color: #e9bb72; font-size: 12px; line-height: 1.5; }
 
   #menu-panel-streaks { min-height: 100%; }
   .killstreak-slot-grid { grid-template-columns: repeat(5, minmax(190px, 1fr)); gap: 13px; }

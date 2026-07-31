@@ -527,6 +527,7 @@ import { magnifiedFovDegrees, viewmodelObstructionPose, type ViewmodelObstructio
 import { RailgunPresentation } from './railgun-presentation';
 import { DMR_THERMAL_MAGNIFICATION, DMR_THERMAL_MAX_CONTACTS, DmrThermalPresentation, dmrThermalOcclusionBudget, type DmrThermalContact } from './dmr-thermal-presentation';
 import { ThermalGhostPresentation, type ThermalGhostTarget } from './thermal-ghost-presentation';
+import { applySkyBackdrop } from './rendering/sky-backdrop';
 import {
   SmokeVolumePresentationPool,
   type SmokeVolumePresentationLease,
@@ -2784,6 +2785,10 @@ function applySelectedArenaVisualDefinition(definition: ArenaVisualDefinition): 
   sunLight.shadow.camera.far = Math.min(sunLight.shadow.camera.far, definition.shadows.maximumDistance);
   sunLight.shadow.camera.updateProjectionMatrix();
   arenaContrastLighting.applyDefinition(definition);
+  // Backend-agnostic sky. WebGPU also draws the TSL dome and painted layers on
+  // top, but this gradient guarantees a real sky on the WebGL2 compatibility
+  // path used by Firefox/Safari, and behind the fog band on every arena.
+  applySkyBackdrop(scene, definition.atmosphere.preset);
   appliedArenaVisualPolicy = Object.freeze({
     definitionId: definition.id,
     sun: Object.freeze({ color: definition.lighting.sunColor, intensity: definition.lighting.sunIntensity }),
@@ -5623,11 +5628,17 @@ function renderLoadoutInspector(): void {
   if (name) name.textContent = weapon.displayName.toUpperCase();
   if (meta) meta.textContent = `${weapon.fireMode.toUpperCase()} / ${weapon.rpm} RPM / ${weapon.penetration.calibreLabel.toUpperCase()}`;
   const control = Math.round(Math.max(8, Math.min(100, 100 - (weapon.recoil.pitchRadians + weapon.recoil.yawRadians) * 760)));
+  // Ideal cyclic body DPS from canonical damage x pellets x rounds-per-second.
+  const idealDps = Math.round(weapon.damage.base * weapon.pellets * (weapon.rpm / 60));
   const stats = {
     damage: { value: String(Math.round(weapon.damage.base * weapon.pellets)), percent: Math.min(100, weapon.damage.base * weapon.pellets) },
     'fire-rate': { value: String(weapon.rpm), percent: Math.min(100, weapon.rpm / 12) },
     range: { value: `${weapon.damage.falloffEndM}m`, percent: Math.min(100, weapon.damage.falloffEndM / 1.2) },
     control: { value: String(control), percent: control },
+    wallbang: {
+      value: `${weapon.penetration.maximumSurfaces} surface${weapon.penetration.maximumSurfaces === 1 ? '' : 's'}`,
+      percent: Math.min(100, weapon.penetration.maximumSurfaces * 22 + weapon.penetration.power * 3),
+    },
   } as const;
   for (const [id, stat] of Object.entries(stats)) {
     const bar = inspector.querySelector<HTMLElement>(`[data-loadout-stat="${id}"]`);
@@ -5635,6 +5646,8 @@ function renderLoadoutInspector(): void {
     bar?.style.setProperty('--loadout-stat', `${stat.percent}%`);
     if (value) value.textContent = stat.value;
   }
+  const dpsValue = inspector.querySelector<HTMLElement>('[data-loadout-value="dps"]');
+  if (dpsValue) dpsValue.textContent = String(idealDps);
   const grenadeDetail = inspector.querySelector<HTMLElement>('[data-loadout-grenade-detail]');
   if (grenadeDetail) {
     const profiles: Record<string, string> = {
