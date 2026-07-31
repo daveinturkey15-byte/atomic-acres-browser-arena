@@ -33,8 +33,8 @@ export const DRONE_SWARM_DURATION_MS = DRONE_SUPPORT_DEFINITIONS.swarm.lifetimeM
 export const DRONE_SWARM_COUNT = 24;
 export const DRONE_HEALTH = 50;
 export const DRONE_MAGAZINE_SIZE = DRONE_GUN_PROFILE.magazineSize;
-/** Three reserve magazines plus the loaded magazine: exactly 20 + 60 rounds. */
-export const PILOTED_DRONE_RESERVE_CLIPS = 3;
+/** Two reserve magazines plus the loaded magazine: exactly 20 + 40 rounds. */
+export const PILOTED_DRONE_RESERVE_CLIPS = 2;
 export const CARE_AIRCRAFT_DURATION_MS = 7_000;
 export const CARE_AIRCRAFT_DROP_DELAY_MS = 800;
 export const CARE_CRATE_DESCENT_MS = 5_200;

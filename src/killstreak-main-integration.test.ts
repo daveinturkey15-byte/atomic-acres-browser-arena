@@ -93,7 +93,7 @@ describe('Pass 65 playable killstreak integration', () => {
   });
 
   it('reports the slot-key-toggle piloted-drone ammunition contract', () => {
-    expect(source).toContain('PILOTED DRONE · 20 ROUNDS + ONE SPARE CLIP · PRESS SLOT KEY AGAIN TO ENTER');
+    expect(source).toContain('PILOTED DRONE · 20 ROUNDS + TWO SPARE CLIPS · PRESS SLOT KEY AGAIN TO ENTER');
     expect(source).not.toContain('PILOTED DRONE · 20 LOADED + 60 RESERVE · FOUR MAGAZINES · F EXITS');
   });
 

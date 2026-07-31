@@ -671,7 +671,7 @@ describe('host killstreak runtime', () => {
     runtime.registerActor('other', 1, 9, loadout(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
     earn(runtime, 5);
     const entityId = runtime.activate(intent('piloted-drone', 2), 1_000, DEFAULT_WORLD).entityIds[0];
-    expect(runtime.snapshotFor('owner', 1_000).entities[0]).toMatchObject({ magazine: 20, reserveClips: 3, mode: 'piloted' });
+    expect(runtime.snapshotFor('owner', 1_000).entities[0]).toMatchObject({ magazine: 20, reserveClips: 2, mode: 'piloted' });
     expect(runtime.snapshotFor('owner', 1_000).actors[0].possession).toBeNull();
     expect(runtime.advance(1_001, DEFAULT_WORLD).damageEvents[0]).toMatchObject({ source: 'piloted-drone', ownerId: 'owner' });
     expect(runtime.control({

@@ -29,7 +29,7 @@ describe('support vehicle authored orientation contract', () => {
     expect(SUPPORT_VEHICLE_PRESENTATION_CONTRACT.drone.visualFamilyId).toBe('hunter-drone-visual-family-v1');
     expect(SUPPORT_VEHICLE_PRESENTATION_CONTRACT.drone.gunProfileIds).toEqual({
       piloted: 'piloted-drone-gun-half-baseline-v1',
-      swarm: 'drone-swarm-gun-triple-baseline-v1',
+      swarm: 'drone-swarm-gun-double-baseline-v1',
     });
     expect(SUPPORT_VEHICLE_PRESENTATION_CONTRACT.chopper.possessedView).toEqual({
       visibleOnlyBelow: 'chopper-gunner-sightline',

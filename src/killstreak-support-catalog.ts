@@ -1,7 +1,7 @@
 /** Frozen inspected baseline; variants derive exact multipliers from this row. */
 export const DRONE_GUN_PROFILE_ID = 'drone-gun-inspected-baseline-v1' as const;
 export const PILOTED_DRONE_GUN_PROFILE_ID = 'piloted-drone-gun-half-baseline-v1' as const;
-export const DRONE_SWARM_GUN_PROFILE_ID = 'drone-swarm-gun-triple-baseline-v1' as const;
+export const DRONE_SWARM_GUN_PROFILE_ID = 'drone-swarm-gun-double-baseline-v1' as const;
 export type DroneGunProfileId = typeof DRONE_GUN_PROFILE_ID
   | typeof PILOTED_DRONE_GUN_PROFILE_ID
   | typeof DRONE_SWARM_GUN_PROFILE_ID;
@@ -52,7 +52,8 @@ function scaledDroneGunProfile(id: DroneGunProfileId, multiplier: number): Drone
 
 /** Exact user-approved combat variants; all non-damage behavior stays baseline-identical. */
 export const PILOTED_DRONE_GUN_PROFILE = scaledDroneGunProfile(PILOTED_DRONE_GUN_PROFILE_ID, 0.5);
-export const DRONE_SWARM_GUN_PROFILE = scaledDroneGunProfile(DRONE_SWARM_GUN_PROFILE_ID, 3);
+// Pass 66.1 owner balance: swarm per-shot damage shaved by a third (3x -> 2x baseline).
+export const DRONE_SWARM_GUN_PROFILE = scaledDroneGunProfile(DRONE_SWARM_GUN_PROFILE_ID, 2);
 
 /**
  * Swarm coordination is an activation-level pressure budget, not a second gun
@@ -141,7 +142,7 @@ export type DroneSupportDefinition = Readonly<{
   mode: DroneSupportMode;
   gunProfileId: DroneGunProfileId;
   magazineSize: 20;
-  reservePolicy: 'four-magazines-total' | 'unlimited-reloads-until-expiry';
+  reservePolicy: 'three-magazines-total' | 'unlimited-reloads-until-expiry';
   lifetimeMs: number;
   sensorProfileId: typeof PILOTED_DRONE_SENSOR_PROFILE.id | null;
   presentationFamilyId: typeof DRONE_PRESENTATION_FAMILY_ID;
@@ -153,7 +154,7 @@ export const DRONE_SUPPORT_DEFINITIONS: Readonly<Record<DroneSupportMode, DroneS
     mode: 'piloted',
     gunProfileId: PILOTED_DRONE_GUN_PROFILE_ID,
     magazineSize: 20,
-    reservePolicy: 'four-magazines-total',
+    reservePolicy: 'three-magazines-total',
     lifetimeMs: 30_000,
     sensorProfileId: PILOTED_DRONE_SENSOR_PROFILE.id,
     presentationFamilyId: DRONE_PRESENTATION_FAMILY_ID,

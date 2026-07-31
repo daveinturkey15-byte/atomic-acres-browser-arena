@@ -40,8 +40,8 @@ describe('Pass 65 support catalog', () => {
     expect(supportGunDamageAtDistance(DRONE_GUN_PROFILE, 46)).toBe(0);
     expect(PILOTED_DRONE_GUN_PROFILE.damage).toBe(DRONE_GUN_PROFILE.damage * 0.5);
     expect(PILOTED_DRONE_GUN_PROFILE.minimumDamage).toBe(DRONE_GUN_PROFILE.minimumDamage * 0.5);
-    expect(DRONE_SWARM_GUN_PROFILE.damage).toBe(DRONE_GUN_PROFILE.damage * 3);
-    expect(DRONE_SWARM_GUN_PROFILE.minimumDamage).toBe(DRONE_GUN_PROFILE.minimumDamage * 3);
+    expect(DRONE_SWARM_GUN_PROFILE.damage).toBe(DRONE_GUN_PROFILE.damage * 2);
+    expect(DRONE_SWARM_GUN_PROFILE.minimumDamage).toBe(DRONE_GUN_PROFILE.minimumDamage * 2);
     expect(PILOTED_DRONE_GUN_PROFILE.cadenceMs).toBe(DRONE_GUN_PROFILE.cadenceMs);
     expect(DRONE_SWARM_GUN_PROFILE.cadenceMs).toBe(DRONE_GUN_PROFILE.cadenceMs);
     expect(DRONE_SWARM_FIRE_LANE_INTERVAL_MS).toBeGreaterThan(DRONE_GUN_PROFILE.cadenceMs);

@@ -14906,7 +14906,7 @@ function activateFieldSupport(id: FieldSupportId): void {
     beginPointSupportTargeting('carpet-bomber');
   } else if (activatedId === 'piloted-drone') {
     if (!requestKillstreakActivation(activatedId, now, [player.position.x, player.position.y, player.position.z])) return;
-    addFeed('PILOTED DRONE · 20 ROUNDS + ONE SPARE CLIP · PRESS SLOT KEY AGAIN TO ENTER', 'gold');
+    addFeed('PILOTED DRONE · 20 ROUNDS + TWO SPARE CLIPS · PRESS SLOT KEY AGAIN TO ENTER', 'gold');
   } else if (activatedId === 'chopper') {
     if (!requestKillstreakActivation(activatedId, now)) return;
     addFeed('CHOPPER GUNNER · AI ONLINE · PRESS SLOT KEY AGAIN TO TAKE / RELEASE GUN · 30 SEC', 'gold');

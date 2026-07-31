@@ -162,9 +162,9 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
 
 function fieldKitPanelMarkup(): string {
   return `<div id="menu-panel-kit" class="menu-panel" role="tabpanel" aria-labelledby="menu-tab-kit" data-menu-panel="kit" hidden>
-    <div class="kit-heading"><div><b>FIELD KIT</b><span>Choose a curated kit or one of exactly three custom presets.</span></div><small>One primary · one secondary · one selected grenade. Mid-life changes queue for redeploy.</small></div>
-    <div class="kit-grid curated-kit-grid">${fieldKitCardsMarkup()}</div>
+    <div class="kit-heading"><div><b>FIELD KIT</b><span>Choose one of exactly three custom presets or a curated kit.</span></div><small>One primary · one secondary · one selected grenade. Mid-life changes queue for redeploy.</small></div>
     <div class="kit-grid custom-kit-grid">${customPresetCardsMarkup()}</div>
+    <div class="kit-grid curated-kit-grid">${fieldKitCardsMarkup()}</div>
     <section id="loadout-manager" class="loadout-manager" hidden aria-label="Manage and rename custom loadouts">
       <header><span>MANAGE / RENAME</span><strong>THREE CUSTOM SLOTS</strong></header>
       <div class="loadout-manager-workspace">
