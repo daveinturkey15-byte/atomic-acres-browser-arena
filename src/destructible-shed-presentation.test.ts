@@ -49,6 +49,7 @@ describe('Pass 65 destructible shed presentation', () => {
       dents: 0,
       detachedChunks: 0,
       retiredGeometries: 0,
+      frameCollapsed: false,
     });
     presentation.dispose();
   });
@@ -378,7 +379,21 @@ describe('Pass 65 destructible shed presentation', () => {
     expect(() => presentation.sync(obliterated.state)).not.toThrow();
     const shell = presentation.root.getObjectByName('field-shed-damageable-shell') as THREE.Mesh;
     expect(shell.geometry.getAttribute('position')).toBeUndefined();
-    expect(presentation.telemetry(obliterated.state)).toMatchObject({ detachedChunks: 6 });
+    // The structural frame must collapse with the panels instead of leaving a
+    // floating skeleton after a full obliteration.
+    const frame = presentation.root.getObjectByName('field-shed-structural-frame') as THREE.InstancedMesh;
+    expect(frame.visible).toBe(false);
+    expect(presentation.telemetry(obliterated.state)).toMatchObject({ detachedChunks: 6, frameCollapsed: true });
+    presentation.dispose();
+  });
+
+  it('keeps the structural frame standing while any panel remains attached', () => {
+    const initial = createInitialShedState(FIELD_SHED_DEFINITION, placement, 8);
+    const presentation = createFieldShedPresentation(placement, initial);
+    presentation.sync(initial);
+    const frame = presentation.root.getObjectByName('field-shed-structural-frame') as THREE.InstancedMesh;
+    expect(frame.visible).toBe(true);
+    expect(presentation.telemetry(initial)).toMatchObject({ frameCollapsed: false });
     presentation.dispose();
   });
 });

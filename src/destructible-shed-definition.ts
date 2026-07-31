@@ -60,7 +60,11 @@ export const FIELD_SHED_DEFINITION: DestructibleShedDefinition = Object.freeze({
   preauthoredChunkIds: Object.freeze([
     'chunk-door', 'chunk-north', 'chunk-east', 'chunk-west', 'chunk-roof-east', 'chunk-roof-west',
   ]),
-  thresholds: Object.freeze({ dentDamageQ: 20, perforateEnergyQ: 45, detachDamageQ: 220 }),
+  // Pass 66.1 owner requirement: every catalogue firearm must punch a visible
+  // see-through hole in sheet metal. The weakest round (12ga pellet, 22Q after
+  // fmj scaling) must clear the perforate threshold; dents remain for sub-20Q
+  // fragments and the detach threshold is unchanged.
+  thresholds: Object.freeze({ dentDamageQ: 20, perforateEnergyQ: 21, detachDamageQ: 220 }),
   caps: Object.freeze({
     apertures: SHED_MAX_APERTURES,
     dents: SHED_MAX_DENTS,

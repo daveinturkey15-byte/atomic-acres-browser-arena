@@ -313,6 +313,7 @@ export type ShedPresentationTelemetry = Readonly<{
   dents: number;
   detachedChunks: number;
   retiredGeometries: number;
+  frameCollapsed: boolean;
 }>;
 
 function presentationTopologySignature(state: ShedState): string {
@@ -332,6 +333,7 @@ export class DestructibleShedPresentation {
   private shell: THREE.Mesh;
   private readonly doorHinge = new THREE.Group();
   private door: THREE.Mesh;
+  private readonly structuralFrame: THREE.InstancedMesh;
   private readonly apertureRims: THREE.InstancedMesh;
   private readonly dents: THREE.InstancedMesh;
   private readonly debris: THREE.InstancedMesh;
@@ -380,6 +382,7 @@ export class DestructibleShedPresentation {
     this.root.add(this.doorHinge);
 
     const frame = createFrame(this.frameMaterial);
+    this.structuralFrame = frame;
     this.root.add(frame);
     const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x3f4741, metalness: 0.22, roughness: 0.82 });
     floorMaterial.name = FIELD_SHED_MATERIAL_IDS.floor;
@@ -568,6 +571,14 @@ export class DestructibleShedPresentation {
     });
     this.debris.instanceMatrix.needsUpdate = true;
     if (this.debris.instanceColor) this.debris.instanceColor.needsUpdate = true;
+    // The structural frame is not a separate damage body, but leaving the bare
+    // skeleton floating after every panel detaches read as broken geometry.
+    // Once the shed is fully obliterated the frame collapses with the shell.
+    const staticSurfaces = this.definition.surfaces.filter((surface) => surface.role !== 'door');
+    const allStaticDetached = staticSurfaces.length > 0 && staticSurfaces.every((surfaceDefinition) => (
+      state.surfaces.find((surface) => surface.surfaceId === surfaceDefinition.id)?.stage === 'detached'
+    ));
+    this.structuralFrame.visible = !allStaticDetached;
     this.revision = state.revision;
     this.root.userData.worldRevision = state.revision;
   }
@@ -586,6 +597,7 @@ export class DestructibleShedPresentation {
       dents: state.surfaces.reduce((sum, surface) => sum + surface.dents.length, 0),
       detachedChunks: state.detachedChunkIds.length,
       retiredGeometries: this.retiredGeometries.size,
+      frameCollapsed: !this.structuralFrame.visible,
     });
   }
 
