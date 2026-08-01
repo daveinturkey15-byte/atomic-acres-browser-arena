@@ -382,6 +382,37 @@
     background: linear-gradient(150deg, #1b363b, #102125);
   }
 
+  /* Custom presets are persistent loadouts, not generic white cards. Keep their
+     complete hierarchy readable before hover/focus so the saved gun, grenade
+     and canonical stat projection can be scanned at a glance. */
+  .custom-kit-grid .kit-card:not(.manage-kit-card) {
+    border-color: #3d5f5c;
+    background: linear-gradient(150deg, #16302f, #0d1e20);
+    color: #eef6f4;
+  }
+  .custom-kit-grid .kit-card:not(.manage-kit-card) > span { color: #8fd8d2; }
+  .custom-kit-grid .kit-card:not(.manage-kit-card) > strong { color: #fff; }
+  .custom-kit-grid .kit-card:not(.manage-kit-card) > b { color: #ffc46b; }
+  .custom-kit-grid .kit-card:not(.manage-kit-card) p { color: #c4d8d5; }
+  .custom-kit-grid .kit-card:not(.manage-kit-card) > i { color: #a9bfbc; }
+  .custom-kit-grid .kit-card:not(.manage-kit-card) em { color: #7ff6ff; }
+  .custom-kit-grid .kit-card:not(.manage-kit-card) .kit-stat-strip small { color: #e8f4f2; }
+  .custom-kit-grid .kit-card:not(.manage-kit-card) .kit-stat-strip b { color: #fff; }
+  .custom-kit-grid .kit-card:not(.manage-kit-card) .kit-stat-strip i {
+    background: linear-gradient(90deg, #35e0d6 var(--kit-stat), #24413f var(--kit-stat));
+  }
+  .custom-kit-grid .kit-card:not(.manage-kit-card) .kit-stat-strip .kit-dps {
+    border-color: #ffc46b;
+    background: rgba(255, 196, 107, 0.1);
+  }
+  .custom-kit-grid .kit-card:not(.manage-kit-card) .kit-stat-strip .kit-dps small { color: #ffc46b; }
+  .custom-kit-grid .kit-card:not(.manage-kit-card) .kit-stat-strip .kit-dps b { color: #fff; }
+  .custom-kit-grid .kit-card:not(.manage-kit-card).selected {
+    border-color: #7ff6ff;
+    background: linear-gradient(125deg, #1d4a47, #102826 55%);
+    box-shadow: inset 4px 0 #7ff6ff, var(--p66-shadow);
+  }
+
   .loadout-manager {
     margin-top: 18px;
     padding: 20px;

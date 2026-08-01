@@ -860,6 +860,54 @@
     text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
   }
 
+  /* Each firearm projects its own canonical sight signature. The marker stays
+     on the authoritative centre ray; scoped weapons suppress it in favour of
+     their dedicated magnified/thermal overlays. */
+  #crosshair.ads::after {
+    width: var(--ads-dot-size, 4px);
+    height: var(--ads-dot-size, 4px);
+    background: var(--ads-color, #ff5f56);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.95), 0 0 7px var(--ads-color, #ff5f56);
+  }
+
+  #crosshair.ads::before {
+    width: var(--ads-ring-size, 24px);
+    height: var(--ads-ring-size, 24px);
+    border-color: color-mix(in srgb, var(--ads-color, #ff5f56) 78%, transparent);
+    border-radius: 50%;
+    background: transparent;
+    transform: translate(-50%, -50%) rotate(var(--ads-rotation, 0deg));
+  }
+
+  #crosshair.ads[data-ads-marker='aperture']::before { border-style: dashed; border-width: 1px; }
+  #crosshair.ads[data-ads-marker='posts']::before {
+    border: 0;
+    border-top: 2px solid var(--ads-color);
+    border-bottom: 2px solid var(--ads-color);
+    border-radius: 0;
+  }
+  #crosshair.ads[data-ads-marker='bead']::before {
+    border-width: 0 0 2px;
+    border-radius: 0;
+    height: calc(var(--ads-ring-size) / 2);
+  }
+  #crosshair.ads[data-ads-marker='diamond']::before { border-radius: 2px; }
+  #crosshair.ads[data-ads-marker='chevron']::before {
+    width: calc(var(--ads-ring-size) * 0.72);
+    height: calc(var(--ads-ring-size) * 0.72);
+    border-width: 2px 0 0 2px;
+    border-radius: 0;
+    transform: translate(-50%, -30%) rotate(45deg);
+  }
+  #crosshair.ads[data-ads-marker='cross']::before {
+    border: 0;
+    border-radius: 0;
+    background:
+      linear-gradient(var(--ads-color), var(--ads-color)) center / 2px 100% no-repeat,
+      linear-gradient(90deg, var(--ads-color), var(--ads-color)) center / 100% 2px no-repeat;
+  }
+  #crosshair.ads[data-ads-marker='scope'] { opacity: 0; }
+
   #death-fade.respawn-flash {
     background: #fff;
     transition: none;

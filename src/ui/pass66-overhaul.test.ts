@@ -30,6 +30,9 @@ describe('Pass 66 tactical UI overhaul', () => {
     expect(markup).toContain('IDEAL BODY DPS');
     expect(markup).toContain('data-loadout-stat="damage"');
     expect(markup).toContain('data-loadout-grenade-detail');
+    expect(css).toContain('.custom-kit-grid .kit-card:not(.manage-kit-card)');
+    expect(css).toContain('background: linear-gradient(150deg, #16302f, #0d1e20)');
+    expect(css).toContain('.custom-kit-grid .kit-card:not(.manage-kit-card) .kit-stat-strip small { color: #e8f4f2; }');
   });
 
   it('adds a sticky killstreak demo rail and minimal video cockpit symbology', () => {
