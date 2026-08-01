@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "id": "tycho-active-abstraction-v1",
+  "version": 1,
+  "name": "Tycho active-abstraction quick-death model",
+  "track": "legacy-controller",
+  "purpose": "A bounded Pass 63 Stable combat experiment that preserves G0031 aim/fire authority and invokes a typed lifecycle world model only after a verified sub-30-second death.",
+  "paper": {
+    "source": "arXiv:2607.28287",
+    "adaptation": "partial stochastic lifecycle model; not a claim of deterministic game simulation",
+    "functions": {
+      "init": "previous rendered life duration plus bounded quick-death streak",
+      "transition": "classify one life boundary and update the hidden streak",
+      "render": "predict one escape/re-entry tactical mode",
+      "outcome": "interrupt spawn cascades while preserving confirmed-target engagement",
+      "metareasoning": "bypass on ordinary lives; use only after a verified quick death; invalidate on target, damage, death, or match end"
+    }
+  },
+  "priorComparables": ["G0031", "G0101", "G0102", "G0105", "G0106", "G0113", "G0114", "G0115"],
+  "knownFailureReferences": [
+    "Always-on respawn escape had isolated wins but failed replication.",
+    "Quick-death adaptation layered over an always-on base path did not pass promotion gates.",
+    "This candidate therefore sets the base escape to zero and uses the model only when the compact life-boundary abstraction is supported."
+  ],
+  "runtime": {
+    "profile": "atomicplayer",
+    "provider": "openai-codex",
+    "model": "gpt-5.6-sol",
+    "reasoningEffort": "high",
+    "serviceTier": "priority",
+    "liveInputAuthority": "deterministic-rendered-pixel-javascript-only",
+    "deployedChannel": "stable",
+    "deployedPass": "PASS 63",
+    "durationSeconds": 330,
+    "fieldKit": "carbine",
+    "requiredWeapon": "M86 CARBINE",
+    "operatorProfile": "g0031-balanced-v1"
+  },
+  "configuration": {
+    "programmaticWorldModel": true,
+    "tacticalPolicy": "state-machine-v1",
+    "automaticCombatFire": true,
+    "alwaysAds": false,
+    "burstShots": 1,
+    "firePulseMs": 72,
+    "fireCooldownMs": 420,
+    "fireAlignmentMaximum": 0.02,
+    "postShotStrafeMs": 650,
+    "retreatHealth": 45,
+    "retreatDamage": 18,
+    "retreatDurationMs": 1600,
+    "recoveryDurationMs": 1100,
+    "recoveryCooldownMs": 3600,
+    "closeThreatDistance": 18,
+    "sprintThreatDistance": 30,
+    "routeSweepInterval": 36,
+    "routeSweepTurn": 18,
+    "finishWindowMs": 0,
+    "maximumShotPulses": 96,
+    "respawnEscapeDurationMs": 0,
+    "respawnReentryDurationMs": 2000,
+    "respawnQuickDeathWindowMs": 30000,
+    "respawnQuickDeathEscapeBonusMs": 1600,
+    "respawnQuickDeathCooldownMs": 6000,
+    "lowHealthEvade": false,
+    "retreatReturnFire": false,
+    "contactSearchAfterMs": 0,
+    "killAnchorDurationMs": 0,
+    "rawTargetObserveDurationMs": 0,
+    "renderedCover": false,
+    "maximumGrenades": 0
+  },
+  "hardGates": {
+    "strictPublishedUrl": true,
+    "stablePass63": true,
+    "fairness": true,
+    "expectedRemotePlayers": 0,
+    "wrongWeaponSelections": 0,
+    "outOfRangeShots": 0,
+    "unconfirmedShots": 0,
+    "inputReleaseFailures": 0,
+    "officialReportRequired": true,
+    "archiveRequired": true
+  },
+  "evaluation": {
+    "comparisonBaselineGameId": "G0031",
+    "comparisonGroup": "weapon:CARBINE",
+    "successGate": {
+      "minimumKills": 2,
+      "minimumKd": 0.5,
+      "minimumAccuracyPercent": 40,
+      "maximumDeaths": 8,
+      "worldModelUsesMinimum": 1,
+      "hardGateFailures": 0
+    },
+    "singleRunStatus": "experimental evidence only; never promotion",
+    "promotionRule": "Three consecutive valid passing repetitions with model-use attribution and zero retained regressions."
+  },
+  "rollback": {
+    "disable": "PROGRAMMATIC_WORLD_MODEL=false and restore all G0031 values",
+    "snapshotManifest": "/root/.hermes/backups/programmatic-world-model-20260801T173317Z/manifest.json"
+  }
+}

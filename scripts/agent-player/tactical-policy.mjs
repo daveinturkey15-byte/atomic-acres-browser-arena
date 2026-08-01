@@ -1,4 +1,5 @@
 import { createRenderedCoverController } from './rendered-cover-controller.mjs';
+import { evaluateRespawnWorldModel } from './programmatic-world-model.mjs';
 
 const clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, value));
 
@@ -51,6 +52,7 @@ export function createTacticalPolicy(options = {}) {
     respawnQuickDeathWindowMs: Math.max(0, Number(options.respawnQuickDeathWindowMs ?? 0)),
     respawnQuickDeathEscapeBonusMs: Math.max(0, Number(options.respawnQuickDeathEscapeBonusMs ?? 0)),
     respawnQuickDeathCooldownMs: Math.max(0, Number(options.respawnQuickDeathCooldownMs ?? 0)),
+    programmaticWorldModel: options.programmaticWorldModel === true,
     retreatReturnFire: options.retreatReturnFire === true,
     retreatReturnFireMinimumHealth: Number(options.retreatReturnFireMinimumHealth ?? 30),
     contactSearchAfterMs: Math.max(0, Number(options.contactSearchAfterMs ?? 0)),
@@ -136,6 +138,9 @@ export function createTacticalPolicy(options = {}) {
     quickDeathReceipts: 0,
     quickDeathCooldownUntil: 0,
     quickDeathCooldownFrames: 0,
+    worldModelReceipts: 0,
+    worldModelUses: 0,
+    lastWorldModelReceipt: null,
     retreatReturnFireFrames: 0,
     lastConfirmedTargetAt: Number.NEGATIVE_INFINITY,
     confirmedTargetSeen: false,
@@ -183,12 +188,14 @@ export function createTacticalPolicy(options = {}) {
           state.pendingRespawn = true;
           if (state.currentLifeStartedAt !== null) {
             state.lastLifeDurationMs = Math.max(0, now - state.currentLifeStartedAt);
-            if (config.respawnQuickDeathWindowMs > 0
-              && state.lastLifeDurationMs < config.respawnQuickDeathWindowMs) {
-              state.quickDeathStreak += 1;
-              state.quickDeathReceipts += 1;
-            } else {
-              state.quickDeathStreak = 0;
+            if (!config.programmaticWorldModel) {
+              if (config.respawnQuickDeathWindowMs > 0
+                && state.lastLifeDurationMs < config.respawnQuickDeathWindowMs) {
+                state.quickDeathStreak += 1;
+                state.quickDeathReceipts += 1;
+              } else {
+                state.quickDeathStreak = 0;
+              }
             }
           }
         }
@@ -199,15 +206,38 @@ export function createTacticalPolicy(options = {}) {
           state.currentLifeStartedAt = now;
           state.lastConfirmedTargetAt = now;
         } else if (state.pendingRespawn) {
-          const quickDeathBonus = state.quickDeathStreak > 0
-            ? config.respawnQuickDeathEscapeBonusMs * Math.min(state.quickDeathStreak, 2)
-            : 0;
-          const escapeDurationMs = config.respawnEscapeDurationMs + quickDeathBonus;
+          let escapeDurationMs;
+          let worldModelReceipt = null;
+          if (config.programmaticWorldModel) {
+            worldModelReceipt = evaluateRespawnWorldModel({
+              now,
+              previousLifeAgeMs: state.lastLifeDurationMs,
+              priorQuickDeathStreak: state.quickDeathStreak,
+              quickDeathWindowMs: config.respawnQuickDeathWindowMs,
+              baseEscapeDurationMs: config.respawnEscapeDurationMs,
+              quickDeathEscapeBonusMs: config.respawnQuickDeathEscapeBonusMs,
+              quickDeathCooldownMs: config.respawnQuickDeathCooldownMs,
+              reentryDurationMs: config.respawnReentryDurationMs,
+            });
+            state.quickDeathStreak = worldModelReceipt.transition.quickDeathStreak;
+            if (worldModelReceipt.transition.observedQuickDeath) state.quickDeathReceipts += 1;
+            state.worldModelReceipts += 1;
+            if (worldModelReceipt.useModel) state.worldModelUses += 1;
+            state.lastWorldModelReceipt = worldModelReceipt;
+            escapeDurationMs = worldModelReceipt.render.escapeDurationMs;
+          } else {
+            const quickDeathBonus = state.quickDeathStreak > 0
+              ? config.respawnQuickDeathEscapeBonusMs * Math.min(state.quickDeathStreak, 2)
+              : 0;
+            escapeDurationMs = config.respawnEscapeDurationMs + quickDeathBonus;
+          }
           if (escapeDurationMs > 0) {
             state.direction *= -1;
             state.respawnEscapeUntil = now + escapeDurationMs;
-            state.quickDeathCooldownUntil = state.respawnEscapeUntil
-              + (state.quickDeathStreak > 0 ? config.respawnQuickDeathCooldownMs : 0);
+            state.quickDeathCooldownUntil = worldModelReceipt
+              ? worldModelReceipt.transition.nextCooldownUntil
+              : state.respawnEscapeUntil
+                + (state.quickDeathStreak > 0 ? config.respawnQuickDeathCooldownMs : 0);
             state.respawnReentryUntil = state.quickDeathCooldownUntil + config.respawnReentryDurationMs;
             state.respawnEscapeActivations += 1;
           }
@@ -243,6 +273,20 @@ export function createTacticalPolicy(options = {}) {
       if (observation.active && observation.currentTarget) {
         state.lastConfirmedTargetAt = now;
         state.confirmedTargetSeen = true;
+      }
+      if (config.programmaticWorldModel
+        && (observation.currentTarget || damageDelta > 0)
+        && (state.respawnEscapeUntil > now || state.quickDeathCooldownUntil > now || state.respawnReentryUntil > now)) {
+        state.respawnEscapeUntil = 0;
+        state.quickDeathCooldownUntil = 0;
+        state.respawnReentryUntil = 0;
+        if (state.lastWorldModelReceipt) {
+          state.lastWorldModelReceipt = {
+            ...state.lastWorldModelReceipt,
+            invalidatedAt: now,
+            invalidatedBy: observation.currentTarget ? 'visible-target' : 'new-damage',
+          };
+        }
       }
       if (observation.active && config.bankLeadMinimumKills > 0 && scoreFresh
         && kills >= config.bankLeadMinimumKills && kills - deaths >= config.bankLeadMinimumMargin) {
@@ -546,6 +590,9 @@ export function createTacticalPolicy(options = {}) {
         quickDeathStreak: state.quickDeathStreak,
         quickDeathReceipts: state.quickDeathReceipts,
         quickDeathCooldownFrames: state.quickDeathCooldownFrames,
+        worldModelReceipts: state.worldModelReceipts,
+        worldModelUses: state.worldModelUses,
+        lastWorldModelReceipt: state.lastWorldModelReceipt,
         retreatReturnFireFrames: state.retreatReturnFireFrames,
         contactSearchFrames: state.contactSearchFrames,
         minimapGuidedContactSearchFrames: state.minimapGuidedContactSearchFrames,

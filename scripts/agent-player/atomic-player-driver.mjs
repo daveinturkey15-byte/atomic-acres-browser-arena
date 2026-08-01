@@ -607,6 +607,7 @@ async function run() {
   const respawnQuickDeathWindowMs = integerArg(args['respawn-quick-death-window'], 0, 0, 120_000);
   const respawnQuickDeathEscapeBonusMs = integerArg(args['respawn-quick-death-escape-bonus'], 0, 0, 10_000);
   const respawnQuickDeathCooldownMs = integerArg(args['respawn-quick-death-cooldown'], 0, 0, 30_000);
+  const programmaticWorldModel = args['programmatic-world-model'] === 'true';
   const retreatReturnFire = args['retreat-return-fire'] === 'true';
   const retreatReturnFireMinimumHealth = integerArg(args['retreat-return-fire-min-health'], 30, 1, 100);
   const contactSearchAfterMs = integerArg(args['contact-search-after'], 0, 0, 120_000);
@@ -927,6 +928,7 @@ async function run() {
           respawnQuickDeathWindowMs,
           respawnQuickDeathEscapeBonusMs,
           respawnQuickDeathCooldownMs,
+          programmaticWorldModel,
           retreatReturnFire,
           retreatReturnFireMinimumHealth,
           contactSearchAfterMs,
@@ -1838,6 +1840,7 @@ async function run() {
         respawnQuickDeathWindowMs,
         respawnQuickDeathEscapeBonusMs,
         respawnQuickDeathCooldownMs,
+        programmaticWorldModel,
         retreatReturnFire,
         retreatReturnFireMinimumHealth,
         contactSearchAfterMs,
@@ -1963,6 +1966,9 @@ async function run() {
         quickDeathStreak: tacticalPolicyReceipt?.quickDeathStreak ?? 0,
         quickDeathReceipts: tacticalPolicyReceipt?.quickDeathReceipts ?? 0,
         quickDeathCooldownFrames: tacticalPolicyReceipt?.quickDeathCooldownFrames ?? 0,
+        worldModelReceipts: tacticalPolicyReceipt?.worldModelReceipts ?? 0,
+        worldModelUses: tacticalPolicyReceipt?.worldModelUses ?? 0,
+        lastWorldModelReceipt: tacticalPolicyReceipt?.lastWorldModelReceipt ?? null,
         retreatReturnFireFrames: tacticalPolicyReceipt?.retreatReturnFireFrames ?? 0,
         contactSearchFrames: tacticalPolicyReceipt?.contactSearchFrames ?? 0,
         minimapGuidedContactSearchFrames: tacticalPolicyReceipt?.minimapGuidedContactSearchFrames ?? 0,

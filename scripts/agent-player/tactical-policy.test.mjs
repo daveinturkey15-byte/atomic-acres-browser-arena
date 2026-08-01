@@ -531,3 +531,33 @@ test('a candidate absent past reset receives one fresh bounded observation windo
   assert.equal(reacquired.reason, 'candidate-observation');
   assert.equal(policy.snapshot().rawTargetObservationExpirations, 1);
 });
+
+test('programmatic lifecycle model selectively escapes quick deaths and invalidates on visible contact', () => {
+  const policy = createTacticalPolicy({
+    programmaticWorldModel: true,
+    respawnEscapeDurationMs: 0,
+    respawnReentryDurationMs: 2_000,
+    respawnQuickDeathWindowMs: 30_000,
+    respawnQuickDeathEscapeBonusMs: 1_600,
+    respawnQuickDeathCooldownMs: 6_000,
+  });
+  policy.update({ now: 1_000, active: true, health: 100, movementCycle: 0 });
+  policy.update({ now: 11_000, active: false, health: 0, movementCycle: 1 });
+  const respawn = policy.update({ now: 12_000, active: true, health: 100, movementCycle: 2 });
+  assert.equal(respawn.reason, 'respawn-escape');
+  assert.ok(respawn.keys.includes('KeyS'));
+  assert.equal(policy.snapshot().worldModelReceipts, 1);
+  assert.equal(policy.snapshot().worldModelUses, 1);
+  assert.equal(policy.snapshot().lastWorldModelReceipt.render.escapeDurationMs, 1_600);
+
+  const contact = policy.update({
+    now: 12_050,
+    active: true,
+    health: 100,
+    currentTarget: true,
+    movementCycle: 3,
+  });
+  assert.equal(contact.mode, 'engage');
+  assert.equal(contact.allowEngagement, true);
+  assert.equal(policy.snapshot().lastWorldModelReceipt.invalidatedBy, 'visible-target');
+});

@@ -30,8 +30,8 @@
     },
     {
       "path": "scripts/agent-player/atomic-player-driver.mjs",
-      "sha256": "bbc97b38d2f91ad26d7c6610beffdf446c6af1613445f8b5c5fc7b839d425fe4",
-      "bytes": 103834
+      "sha256": "b67aa6a45ba3c258f5224654faead08b4364ca36cd29b8e7d255c02e15ace37e",
+      "bytes": 104207
     },
     {
       "path": "scripts/agent-player/one-v-one/profile-contract.mjs",
@@ -137,18 +137,33 @@
       "path": "scripts/agent-player/profiles/README.md",
       "sha256": "7e0c1092b557916af3bc7285ee145a6cce17a03917d3b79937a3524362defbd7",
       "bytes": 5094
+    },
+    {
+      "path": "scripts/agent-player/tactical-policy.mjs",
+      "sha256": "d915b8ac7c0d4dfd90e2904e7b11db74fc8bc9e2bf0b51ee84b921dc2c5bde8d",
+      "bytes": 30499
+    },
+    {
+      "path": "scripts/agent-player/programmatic-world-model.mjs",
+      "sha256": "bd87c894be4736d7e72dcf806d487eb9d2699a664b2aada7855d133f6d95e531",
+      "bytes": 2485
+    },
+    {
+      "path": "scripts/agent-player/profiles/tycho-active-abstraction-v1.profile.json",
+      "sha256": "268d7a729702478506070cab7b5662594d701de976616ec611045076f54f601b",
+      "bytes": 3911
     }
   ],
   "launcherSurfaces": [
     {
       "path": "/root/.hermes/scripts/run_atomic_player_campaign.sh",
-      "sha256": "ef4574a1188f956b5068ab0197d4ae3991dfe8ad8504f69a8c5f04b09a00db29",
-      "bytes": 10709
+      "sha256": "5f059f38173f6e829858935dd41fb4fa284789e03a92e3e312bd482b38b163ae",
+      "bytes": 10954
     },
     {
       "path": "/root/.hermes/scripts/run_atomic_player_game.ps1",
-      "sha256": "1084913a22bccad766effff2ca4d2b6f38b1709541c1bb237e975c2ade347cf7",
-      "bytes": 9527
+      "sha256": "4edc1ba0888aaa661d670a15d1ae93c668bf577cc7eab3fa4f4ff0a7d4aac739",
+      "bytes": 9688
     }
   ],
   "replay": {
