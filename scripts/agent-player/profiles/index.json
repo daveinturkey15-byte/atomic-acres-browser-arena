@@ -157,8 +157,8 @@
   "launcherSurfaces": [
     {
       "path": "/root/.hermes/scripts/run_atomic_player_campaign.sh",
-      "sha256": "5f059f38173f6e829858935dd41fb4fa284789e03a92e3e312bd482b38b163ae",
-      "bytes": 10954
+      "sha256": "45c903bc44c75c8df2fa117e565df8f2427f6237012e2f9cdfbcb2066bf93d61",
+      "bytes": 11081
     },
     {
       "path": "/root/.hermes/scripts/run_atomic_player_game.ps1",
