@@ -187,6 +187,7 @@ import {
   type Stance,
 } from './gameplay';
 import { preserveSoloCountdownCue, type MatchCountdownCue } from './match-countdown-continuity';
+import { adsSightProfile } from './ads-sight-profile';
 import { ArenaMap, buildArena } from './map';
 import {
   admitCrossbowThroughGlass,
@@ -16487,6 +16488,15 @@ function updateHud(now: number): void {
   const crosshair = element<HTMLElement>('#crosshair');
   crosshair.style.setProperty('--spread', `${crosshairGap}px`);
   crosshair.classList.toggle('ads', adsSettled);
+  if (crosshair.dataset.weapon !== player.weapon) {
+    const sight = adsSightProfile(player.weapon);
+    crosshair.dataset.weapon = player.weapon;
+    crosshair.dataset.adsMarker = sight.marker;
+    crosshair.style.setProperty('--ads-color', sight.color);
+    crosshair.style.setProperty('--ads-ring-size', `${sight.ringSizePx}px`);
+    crosshair.style.setProperty('--ads-dot-size', `${sight.dotSizePx}px`);
+    crosshair.style.setProperty('--ads-rotation', `${sight.rotationDeg}deg`);
+  }
   const [aqua, coral] = teamScores();
   const scores: [number, number] = [aqua, coral];
   const presentation = matchPresentationAt(matchState, now, scores, player.team, currentMatchRules(), arena.label);

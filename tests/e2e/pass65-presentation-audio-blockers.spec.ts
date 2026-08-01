@@ -79,7 +79,7 @@ test('bounds M14 smoke thermal, pre-shot minigun spool/audio, and passive knife 
     friendlies: 0,
     worldDrawCalls: 2,
     targetPolicy: 'living-friendly-and-hostile',
-    occlusionPolicy: 'smoke-bypass-solid-block',
+    occlusionPolicy: 'through-wall-reveal',
   });
   await expect(page.locator('#dmr-thermal')).toBeVisible();
 

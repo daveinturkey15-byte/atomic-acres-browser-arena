@@ -37,6 +37,21 @@ test.describe('Pass 66 Field Kit and killstreak menu correction', () => {
     await expect(page.locator('[data-custom-preset-id="custom-1"] [data-weapon-metric="fire-rate"] [data-weapon-metric-value]'))
       .toHaveText('600 RPM');
 
+    const idleCustomCardStyle = await page.locator('[data-custom-preset-id="custom-2"]').evaluate((card) => {
+      const title = card.querySelector('strong')!;
+      const description = card.querySelector('p')!;
+      const style = getComputedStyle(card);
+      return {
+        backgroundImage: style.backgroundImage,
+        titleColor: getComputedStyle(title).color,
+        descriptionColor: getComputedStyle(description).color,
+      };
+    });
+    expect(idleCustomCardStyle.backgroundImage).toContain('linear-gradient');
+    expect(idleCustomCardStyle.backgroundImage).not.toBe('none');
+    expect(idleCustomCardStyle.titleColor).toBe('rgb(255, 255, 255)');
+    expect(idleCustomCardStyle.descriptionColor).toBe('rgb(196, 216, 213)');
+
     const output = resolve(process.cwd(), 'artifacts/pass66/ui-correction');
     mkdirSync(output, { recursive: true });
     await page.screenshot({ path: resolve(output, 'field-kit-1600x900.png'), animations: 'disabled' });

@@ -241,10 +241,26 @@ export class MenuPreviewVideoController {
     poster.hidden = false;
     video.hidden = reducedMotion;
 
+    // Safari/WebKit can visibly present the poster while never dispatching a
+    // usable video loadeddata/playing event for the selected codec. The poster
+    // is a valid first frame, so it must release deployment preparation instead
+    // of leaving weaponReady false forever. Video playback may still replace it
+    // later without changing generation ownership.
+    const resolvePresentedPoster = () => {
+      if (generation !== this.generation || definition.arenaId !== this.selected.arenaId) return;
+      if (frame.dataset.mediaState === 'loading') frame.dataset.mediaState = 'poster-ready';
+      this.resolveFirstFrame(generation);
+    };
+    if (poster.complete) queueMicrotask(resolvePresentedPoster);
+    else {
+      poster.addEventListener('load', resolvePresentedPoster, { once: true, signal: this.switchAbort.signal });
+      poster.addEventListener('error', resolvePresentedPoster, { once: true, signal: this.switchAbort.signal });
+    }
+    void poster.decode().then(resolvePresentedPoster).catch(() => {});
+
     if (reducedMotion) {
       video.removeAttribute('src');
       video.load();
-      void poster.decode().catch(() => {}).then(() => this.resolveFirstFrame(generation));
       return;
     }
 

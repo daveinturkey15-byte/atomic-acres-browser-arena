@@ -2127,6 +2127,7 @@ test.describe('solo mechanics', () => {
     });
     expect(reticle).toEqual({ offsetX: 0, offsetY: 0, dotVisible: true });
 
+    const sightSignatures = new Map<string, string>();
     for (const weapon of ['carbine', 'smg', 'lmg', 'scattergun', 'sniper', 'pistol', 'machine-pistol'] as const) {
       await page.evaluate((weaponId) => {
         const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
@@ -2141,6 +2142,18 @@ test.describe('solo mechanics', () => {
         api.setAds(true);
       }, weapon);
       await expect.poll(async () => (await debug(page)).weaponPresentation.adsProgress).toBeGreaterThan(0.98);
+      const sightSignature = await page.locator('#crosshair').evaluate((node) => {
+        const style = getComputedStyle(node);
+        return [
+          (node as HTMLElement).dataset.weapon,
+          (node as HTMLElement).dataset.adsMarker,
+          style.getPropertyValue('--ads-color').trim(),
+          style.getPropertyValue('--ads-ring-size').trim(),
+          style.getPropertyValue('--ads-dot-size').trim(),
+        ].join('|');
+      });
+      expect(sightSignatures.has(sightSignature), `${weapon} reused another weapon's ADS signature`).toBe(false);
+      sightSignatures.set(sightSignature, weapon);
       await expect.poll(async () => {
         const offset = (await debug(page)).weaponPresentation.sightOffset;
         return offset ? Math.hypot(...offset) : Number.POSITIVE_INFINITY;
