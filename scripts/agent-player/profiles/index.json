@@ -30,8 +30,8 @@
     },
     {
       "path": "scripts/agent-player/atomic-player-driver.mjs",
-      "sha256": "b67aa6a45ba3c258f5224654faead08b4364ca36cd29b8e7d255c02e15ace37e",
-      "bytes": 104207
+      "sha256": "d3842f4efe0d2d595f24711d8fc24ebe516a66e876cfebb89cc0ee8e6c603787",
+      "bytes": 104566
     },
     {
       "path": "scripts/agent-player/one-v-one/profile-contract.mjs",

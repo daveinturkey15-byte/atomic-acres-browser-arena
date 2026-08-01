@@ -476,9 +476,18 @@ async function selectVisibleFieldKit(page, requested, artifactDirectory) {
 }
 
 async function downloadVisibleMatchReport(page, selector, outputPath) {
-  const downloadPromise = page.waitForEvent('download', { timeout: 20_000 });
-  await page.locator(selector).click({ timeout: 20_000 });
-  const download = await downloadPromise;
+  const control = page.locator(selector);
+  if (!await control.isVisible().catch(() => false)) {
+    // The live build can leave the post-match pause/menu overlay above the
+    // summary. Close it through the ordinary keyboard boundary before using
+    // the visible report controls.
+    await page.keyboard.press('Escape');
+  }
+  await control.waitFor({ state: 'visible', timeout: 20_000 });
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: 20_000 }),
+    control.click({ timeout: 20_000 }),
+  ]);
   await download.saveAs(outputPath);
   const parsed = JSON.parse(await readFile(outputPath, 'utf8'));
   return { suggestedFilename: download.suggestedFilename(), outputPath, parsed };
