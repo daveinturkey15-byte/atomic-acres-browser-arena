@@ -170,6 +170,16 @@ describe('flare projectile system', () => {
       accepted: true, released: 1,
     });
     expect(system.inspectActiveReplicas(5_200)).toEqual([]);
+
+    const spawnCountBeforeRestore = system.telemetry().spawnCount;
+    const restored = Object.freeze({
+      ...burning, snapshotSeq: 4, sampledAtHostTimeMs: 1_400, nonce: 4,
+    });
+    expect(system.reconcilePresentationState(restored, 1_400, 5_300)).toMatchObject({
+      accepted: true, created: 0, updated: 1,
+    });
+    expect(system.telemetry().spawnCount).toBe(spawnCountBeforeRestore);
+    expect(system.inspectActiveReplicas(5_300)).toHaveLength(1);
   });
 
   it('restores authority at a negative virtual clock, skips downtime pulses, and prunes expired burns without callbacks', () => {
