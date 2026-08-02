@@ -392,12 +392,26 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
         maximumFlightBankDegrees: choreography.helicopter.maximumBankDegrees,
       },
     });
-    await page.waitForFunction((minimum) => {
-      const snapshot = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot(): any } }).__ATOMIC_ACRES_DEBUG__.snapshot();
-      return snapshot.frameCount >= minimum.frameCount + 4
-        && snapshot.render.runtime.presentation.submissionSequence >= minimum.submissionSequence + 3
-        && snapshot.sniperScope.viewmodelVisible === false;
-    }, before);
+    try {
+      await page.waitForFunction((minimum) => {
+        const snapshot = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot(): any } }).__ATOMIC_ACRES_DEBUG__.snapshot();
+        return snapshot.frameCount >= minimum.frameCount + 4
+          && snapshot.render.runtime.presentation.submissionSequence >= minimum.submissionSequence + 3
+          && snapshot.sniperScope.viewmodelVisible === false;
+      }, before, { timeout: 60_000 });
+    } catch (error) {
+      const stalled = await page.evaluate(() => {
+        const snapshot = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot(): any } }).__ATOMIC_ACRES_DEBUG__.snapshot();
+        return {
+          frameCount: snapshot.frameCount,
+          submissionSequence: snapshot.render.runtime.presentation.submissionSequence,
+          presentationStatus: snapshot.render.runtime.presentation.status,
+          viewmodelVisible: snapshot.sniperScope.viewmodelVisible,
+          runtimeErrors: snapshot.render.runtime.errors,
+        };
+      }).catch((snapshotError) => ({ snapshotError: snapshotError instanceof Error ? snapshotError.message : String(snapshotError) }));
+      throw new Error(`${arenaId} frame ${frame} did not advance the requested capture presentation: ${JSON.stringify({ before, stalled })}`, { cause: error });
+    }
     const rendered = await page.evaluate(() => {
       const snapshot = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot(): any } }).__ATOMIC_ACRES_DEBUG__.snapshot();
       return {
@@ -667,12 +681,15 @@ async function main(): Promise<void> {
   try {
     server = await createServer({ root, server: { host: '127.0.0.1', port, strictPort: true }, logLevel: 'error' });
     await server.listen();
-    browser = await chromium.launch({
-      headless: true,
-      executablePath,
-      args: ['--enable-unsafe-webgpu', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'],
-    });
     for (const arenaId of selectedArenas) {
+      // A fresh browser owns each 1440p arena capture. This prevents delayed
+      // WebGPU resource retirement from an earlier 240-frame arena from
+      // starving the final arena while preserving one exact input receipt.
+      browser = await chromium.launch({
+        headless: true,
+        executablePath,
+        args: ['--enable-unsafe-webgpu', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'],
+      });
       const page = await browser.newPage({
         viewport: { width: choreography.capture.viewport[0], height: choreography.capture.viewport[1] },
         deviceScaleFactor: 1,
@@ -681,6 +698,8 @@ async function main(): Promise<void> {
         evidence.push(await captureArena(page, arenaId));
       } finally {
         await page.close();
+        await browser.close();
+        browser = undefined;
       }
     }
     const finalRuntimeInputs = await runtimeInputReceipt();
