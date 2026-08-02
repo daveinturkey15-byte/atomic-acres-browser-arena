@@ -6,8 +6,8 @@
     "description": "Pass 66: the current live target, promoted only after exact-SHA verification."
   },
   "experimental": {
-    "label": "THE BIG ONE v67",
-    "description": "Pass 67 live release while byte-exact Pass 63 remains the stable rollback.",
+    "label": "THE BIG ONE v77.1",
+    "description": "Pass 77.1 live release while byte-exact Pass 63 remains the stable rollback.",
     "pass": "PASS 66",
     "path": "channels/the-big-one"
   },
