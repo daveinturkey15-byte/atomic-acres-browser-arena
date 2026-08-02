@@ -83,6 +83,24 @@ describe('character presentation contracts', () => {
     expect(measureCameraFraming(arm, camera)?.nearPlaneClear).toBe(false);
   });
 
+  it('uses the live deformed bounds for skinned arms instead of the stale bind geometry box', () => {
+    const camera = new THREE.PerspectiveCamera(70, 16 / 9, 0.1, 100);
+    const geometry = new THREE.BoxGeometry(4, 4, 4);
+    geometry.computeBoundingBox();
+    const arm = new THREE.SkinnedMesh(geometry);
+    arm.position.z = -1;
+    arm.boundingBox = new THREE.Box3(
+      new THREE.Vector3(-0.1, -0.1, -0.1),
+      new THREE.Vector3(0.1, 0.1, 0.1),
+    );
+    const computeLiveBounds = vi.spyOn(arm, 'computeBoundingBox').mockImplementation(() => undefined);
+
+    expect(measureCameraFraming(arm, camera)).toMatchObject({
+      finite: true, nearPlaneClear: true, intersectsViewport: true,
+    });
+    expect(computeLiveBounds).toHaveBeenCalledOnce();
+  });
+
   it('can exclude intentionally off-screen roots from critical action framing', () => {
     const camera = new THREE.PerspectiveCamera(70, 16 / 9, 0.1, 100);
     const assembly = new THREE.Group();

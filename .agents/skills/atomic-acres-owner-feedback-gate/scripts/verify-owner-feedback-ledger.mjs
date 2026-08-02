@@ -46,12 +46,29 @@ const OWNER_EVIDENCE_ROOT = 'artifacts/pass65-owner-feedback/';
 const HARDWARE_EVIDENCE_ROOT = 'artifacts/pass65/hardware-webgl2-admission/';
 const REQUIRED_PASS66_TESTS_BY_FEEDBACK = new Map([
   ['HF-152', [PASS66_BROWSER_FOREGROUND_TEST_ID, PASS66_HIDDEN_TAB_TEST_ID]],
+  ['HF-191', ['T-ADS-SIGHT-CATALOG', 'T-SCOPED-ADS', 'T-RAILGUN']],
+  ['HF-192', ['T-FIELD-KIT-MENU']],
+  ['HF-193', ['T-SKY-WEBGPU']],
+  ['HF-194', ['T-VIEWMODEL-FRAMING']],
+  ['HF-195', ['T-SUPPORT-VEHICLE-GATE']],
+  ['HF-196', ['T-TIMED-MAP-WEAPONS', 'T-MULTIPLAYER-STABILITY']],
+  ['HF-197', ['T-GUN-RANGE-TEST-BAY']],
+  ['HF-198', ['T-RUSTRIG-PHYSICS', 'T-PRONE-CONTACT-MATRIX']],
+  ['HF-199', ['T-SUPPORT-OPERATE-PROMPT', 'T-SUPPORT-DAMAGE', 'T-MULTIPLAYER-STABILITY']],
+  ['HF-200', ['T-BROWSER-ADMISSION', 'T-INSTALLED-FIREFOX', PASS66_BROWSER_FOREGROUND_TEST_ID, PASS66_HIDDEN_TAB_TEST_ID]],
+  ['HF-201', ['T-DIAGNOSTICS']],
+  ['HF-202', ['T-DIAGNOSTICS']],
+  ['HF-203', ['T-AUDIO-LONG-RUN']],
+  ['HF-204', ['T-MULTIPLAYER-STABILITY', 'T-PASS63-MULTIPLAYER-COMPARATOR']],
+  ['HF-205', ['T-MULTIPLAYER-STABILITY', 'T-BOTS']],
+  ['HF-206', ['T-PICKUP-REPICK']],
+  ['HF-207', ['T-PREVIEW-GATE', 'T-KILLSTREAK-DEMO-VIDEOS']],
 ]);
 
 const TEXT_SOURCE_NORMALIZATION = 'UTF-8; CRLF converted to LF; one final LF added; text semantics unchanged';
 const HARDWARE_WEBGL2_FEEDBACK_IDS = Object.freeze([
   'HF-001', 'HF-002', 'HF-003', 'HF-041', 'HF-064',
-  'HF-065', 'HF-098', 'HF-118', 'HF-138',
+  'HF-065', 'HF-098', 'HF-118', 'HF-138', 'HF-191', 'HF-200',
 ]);
 const REQUIRED_NATIVE_TESTS_BY_FEEDBACK = new Map([
   ['HF-001', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE']],
@@ -78,6 +95,11 @@ const REQUIRED_NATIVE_TESTS_BY_FEEDBACK = new Map([
   ['HF-124', ['T-NATIVE-FRAME-PACING']],
   ['HF-137', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE', 'T-NATIVE-FRAME-PACING']],
   ['HF-138', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE', 'T-NATIVE-FRAME-PACING']],
+  ['HF-191', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE', 'T-NATIVE-FRAME-PACING']],
+  ['HF-193', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE']],
+  ['HF-198', ['T-NATIVE-FRAME-PACING']],
+  ['HF-199', ['T-WEBGPU-ENDURANCE']],
+  ['HF-200', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE', 'T-NATIVE-FRAME-PACING']],
 ]);
 for (const feedbackId of HARDWARE_WEBGL2_FEEDBACK_IDS) {
   const required = REQUIRED_NATIVE_TESTS_BY_FEEDBACK.get(feedbackId) ?? [];
@@ -990,9 +1012,9 @@ function validateGraph(graph, ledgerContext, packageJson, errors, options) {
   if (packageJson.scripts?.['qa:pass66:hidden-tab:contract'] !== expectedHiddenTabContractCommand) {
     error(errors, 'E_PASS66_HIDDEN_TAB_PACKAGE_COMMAND', 'Pass 66 hidden-tab contract command must execute the exact fail-closed contract test.');
   }
-  const expectedHiddenTabCommand = 'npm run qa:pass66:hidden-tab:contract && npm run build && node scripts/qa/run-with-preview-server.mjs node scripts/qa/verify-pass66-hidden-tab-admission.mjs';
+  const expectedHiddenTabCommand = 'npm run qa:pass66:hidden-tab:contract && npm run build && npm run stage:release-topology && node scripts/qa/run-with-preview-server.mjs node scripts/qa/run-pass66-hidden-tab-matrix.mjs';
   if (packageJson.scripts?.['qa:pass66:hidden-tab'] !== expectedHiddenTabCommand) {
-    error(errors, 'E_PASS66_HIDDEN_TAB_PACKAGE_COMMAND', 'Pass 66 hidden-tab gate must retain its contract test, production build and real headed-Chrome verifier.');
+    error(errors, 'E_PASS66_HIDDEN_TAB_PACKAGE_COMMAND', 'Pass 66 hidden-tab gate must retain its contract test, production build and complete selected-map real headed-Chrome matrix.');
   }
   for (const test of testIndex.values()) {
     if (!/^T-[A-Z0-9-]+$/.test(test.id) || typeof test.command !== 'string' || test.command.length < 5 || /[\r\n]|&&|\|\||;|`|\$\(/.test(test.command)) {

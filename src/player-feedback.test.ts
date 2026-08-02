@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { damageNumberPresentation, roundStatSummary, THIRD_PERSON_WEAPON_SCALE } from './player-feedback';
+import { WEAPON_IDS } from './protocol';
 
 describe('player feedback presentation', () => {
   it('keeps every third-person weapon within the reduced silhouette envelope', () => {
-    expect(Object.values(THIRD_PERSON_WEAPON_SCALE)).toHaveLength(18);
+    expect(Object.keys(THIRD_PERSON_WEAPON_SCALE).sort()).toEqual([...WEAPON_IDS].sort());
     expect(Math.max(...Object.values(THIRD_PERSON_WEAPON_SCALE))).toBeLessThanOrEqual(0.54);
     expect(Math.min(...Object.values(THIRD_PERSON_WEAPON_SCALE))).toBeGreaterThanOrEqual(0.4);
   });

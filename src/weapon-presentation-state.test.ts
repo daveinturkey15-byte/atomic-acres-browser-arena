@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { advanceAdsBlend, advanceWeaponHeat, fireCycleAt, hitReactionAt, magnifiedFovDegrees, viewmodelObstructionPose, viewmodelSurfaceRetreat } from './weapon-presentation-state';
+import {
+  advanceAdsBlend,
+  advanceWeaponHeat,
+  fireCycleAt,
+  hitReactionAt,
+  magnifiedFovDegrees,
+  viewmodelFloorClearance,
+  viewmodelObstructionPose,
+  viewmodelSurfaceRetreat,
+} from './weapon-presentation-state';
 
 describe('weapon presentation state', () => {
   it('accumulates and cools bounded weapon heat', () => {
@@ -75,5 +84,13 @@ describe('weapon presentation state', () => {
     expect(viewmodelObstructionPose(null, true, 0.61).lift).toBeGreaterThanOrEqual(0.13);
     expect(viewmodelObstructionPose(0.2, true, 0.2).retreat).toBeLessThanOrEqual(0.7);
     expect(viewmodelObstructionPose(0.2, true, 0.2).lift).toBeLessThanOrEqual(0.2);
+  });
+
+  it('uses grounded stance height when an authored floor is a raycast plane', () => {
+    expect(viewmodelFloorClearance(null, true, 0.61)).toBeCloseTo(0.61, 8);
+    expect(viewmodelFloorClearance(0.42, true, 0.61)).toBeCloseTo(0.42, 8);
+    expect(viewmodelFloorClearance(null, false, 0.61)).toBeNull();
+    expect(viewmodelObstructionPose(null, true, viewmodelFloorClearance(null, true, 0.61)).lift)
+      .toBeGreaterThanOrEqual(0.13);
   });
 });

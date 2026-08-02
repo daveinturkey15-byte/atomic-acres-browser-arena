@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseKillstreakLoadout } from './killstreak-catalog';
+import { PASS65_KILLSTREAK_CATALOG, parseKillstreakLoadout } from './killstreak-catalog';
 import {
   ADRENALINE_DAMAGE_MULTIPLIER,
   ADRENALINE_DURATION_MS,
@@ -55,6 +55,48 @@ function intent(
 }
 
 describe('host killstreak runtime', () => {
+  it('routes secure test-bay grants through normal host activation without consuming real care rewards', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
+
+    expect(runtime.grantTrainingReward('owner', 1, 'piloted-drone', {
+      arenaId: 'gun-range', stationKind: 'secure-test-bay', authorityRole: 'offline',
+    })).toEqual({ accepted: true, reason: 'accepted' });
+    expect(runtime.snapshotFor('owner', 100).actors[0].revealedCareRewards).toEqual(['piloted-drone']);
+    expect(runtime.activate(intent('piloted-drone', 1), 100, DEFAULT_WORLD)).toMatchObject({
+      accepted: true,
+      activatedId: 'piloted-drone',
+    });
+    expect(runtime.snapshotFor('owner', 101).actors[0].revealedCareRewards).toEqual([]);
+  });
+
+  it('admits every catalog support from an isolated secure test-bay station through the canonical runtime', () => {
+    for (const [index, definition] of PASS65_KILLSTREAK_CATALOG.definitions.entries()) {
+      const runtime = new HostKillstreakRuntime(7);
+      runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
+      expect(runtime.grantTrainingReward('owner', 1, definition.id, {
+        arenaId: 'gun-range', stationKind: 'secure-test-bay', authorityRole: 'host',
+      })).toEqual({ accepted: true, reason: 'accepted' });
+      expect(runtime.activate(intent(definition.id, 1, index + 1), 1_000, DEFAULT_WORLD)).toMatchObject({
+        accepted: true,
+        activatedId: definition.id,
+      });
+    }
+  });
+
+  it('fails closed for spoofed test-bay context, stale lives and missing actors', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
+    const valid = { arenaId: 'gun-range', stationKind: 'secure-test-bay', authorityRole: 'host' } as const;
+    expect(runtime.grantTrainingReward('missing', 1, 'chopper', valid).reason).toBe('unknown-actor');
+    expect(runtime.grantTrainingReward('owner', 2, 'chopper', valid).reason).toBe('life-mismatch');
+    expect(runtime.grantTrainingReward('owner', 1, 'chopper', {
+      ...valid,
+      arenaId: 'atomic-acres',
+    } as unknown as typeof valid).reason).toBe('invalid-training-context');
+    expect(runtime.snapshotFor('owner', 100).actors[0].revealedCareRewards).toEqual([]);
+  });
+
   it('earns only the frozen five-slot selection and retains unconsumed rewards across lives', () => {
     const runtime = new HostKillstreakRuntime(7);
     runtime.registerActor('owner', 0, 1, loadout(['adrenaline', 'yardhawk', 'carpet-bomber', 'chopper', 'drone-swarm']));

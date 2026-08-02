@@ -8,7 +8,13 @@ export const DEPENDENCY_TREE_ALGORITHM = 'sha256-path-size-file-digest-v1';
 export const FINAL_MEDIA_SET_ALGORITHM = 'sha256-ordered-name-size-bytes-v1';
 export const CACHE_FAMILY_LOCK_SCHEMA_VERSION = 1;
 export const DEPENDENCY_ROOTS = Object.freeze(['src', 'public/assets/original']);
-export const DEPENDENCY_EXCLUDES = Object.freeze(['public/assets/original/menu-previews/']);
+export const DEPENDENCY_EXCLUDES = Object.freeze([
+  'public/assets/original/menu-previews/',
+  // Killstreak demos are authored only after menu previews are finalized.
+  // Excluding that downstream output makes the provenance graph acyclic:
+  // killstreak capture binds menu previews, never the other way around.
+  'public/assets/original/killstreak-demo/',
+]);
 export const FINAL_MEDIA_EXTENSIONS = Object.freeze(['mp4', 'webm', 'webp']);
 export const RETAINED_CACHE_FAMILY_BASELINE = Object.freeze({
   schemaVersion: CACHE_FAMILY_LOCK_SCHEMA_VERSION,
@@ -150,7 +156,7 @@ export async function buildDependencyClosure(repositoryRoot, options = {}) {
   const excludes = ensureUniqueOrdered(options.excludes ?? DEPENDENCY_EXCLUDES).map((value) => value.endsWith('/') ? value : `${value}/`);
   const extraPaths = [...new Set((options.extraPaths ?? []).map(normalizedRelative))].sort((left, right) => left.localeCompare(right, 'en'));
   for (const extraPath of extraPaths) {
-    if (isExcluded(extraPath, excludes)) throw new Error(`Canonical dependency points into excluded generated preview output: ${extraPath}`);
+    if (isExcluded(extraPath, excludes)) throw new Error(`Canonical dependency points into excluded generated media output: ${extraPath}`);
   }
   const records = new Map();
   for (const root of roots) await collectDependencyPath(repositoryRoot, root, excludes, records);
@@ -231,10 +237,12 @@ export async function runIntegrityMutationSelfTest() {
   try {
     await mkdir(path.join(temporaryRoot, 'src'), { recursive: true });
     await mkdir(path.join(temporaryRoot, 'public/assets/original/menu-previews'), { recursive: true });
+    await mkdir(path.join(temporaryRoot, 'public/assets/original/killstreak-demo'), { recursive: true });
     await mkdir(path.join(temporaryRoot, 'public/assets/original/models'), { recursive: true });
     await writeFile(path.join(temporaryRoot, 'src/main.ts'), 'export const value = 1;\n', 'utf8');
     await writeFile(path.join(temporaryRoot, 'public/assets/original/models/map.glb'), Buffer.from([1, 2, 3, 4]));
     await writeFile(path.join(temporaryRoot, 'public/assets/original/menu-previews/generated.webp'), Buffer.from([8, 8, 8]));
+    await writeFile(path.join(temporaryRoot, 'public/assets/original/killstreak-demo/generated.mp4'), Buffer.from([7, 7, 7]));
     const baseline = await buildDependencyClosure(temporaryRoot, { extraPaths: ['public/assets/original/models/'] });
     await writeFile(path.join(temporaryRoot, 'src/main.ts'), 'export const value = 2;\n', 'utf8');
     const includedMutation = await buildDependencyClosure(temporaryRoot, { extraPaths: ['public/assets/original/models/'] });
@@ -247,6 +255,9 @@ export async function runIntegrityMutationSelfTest() {
     await writeFile(path.join(temporaryRoot, 'public/assets/original/menu-previews/generated.webp'), Buffer.from([9, 9, 9]));
     const excludedMutation = await buildDependencyClosure(temporaryRoot, { extraPaths: ['public/assets/original/models/'] });
     if (excludedMutation.treeSha256 !== baseline.treeSha256) throw new Error('dependency closure self-test admitted generated preview output');
+    await writeFile(path.join(temporaryRoot, 'public/assets/original/killstreak-demo/generated.mp4'), Buffer.from([6, 6, 6]));
+    const downstreamMutation = await buildDependencyClosure(temporaryRoot, { extraPaths: ['public/assets/original/models/'] });
+    if (downstreamMutation.treeSha256 !== baseline.treeSha256) throw new Error('dependency closure self-test admitted downstream killstreak media output');
 
     const frameDirectory = path.join(temporaryRoot, 'frames/atomic-acres');
     await mkdir(frameDirectory, { recursive: true });
@@ -282,12 +293,12 @@ export async function runIntegrityMutationSelfTest() {
       throw new Error('cache-family self-test missed retained-entry rewriting');
     }
     const appendedEntry = {
-      cacheKey: 'pass66-runtime-preview-v4',
+      cacheKey: 'pass66-runtime-preview-v5',
       recipeId: 'fixture-v2',
       finalMediaSetSha256: '3'.repeat(64),
       fileCount: 12,
       totalBytes: 144,
-      recordedAt: '2026-07-30',
+      recordedAt: '2026-08-02',
     };
     const appended = appendCacheFamily(initialLock, appendedEntry);
     if (!appended.appended

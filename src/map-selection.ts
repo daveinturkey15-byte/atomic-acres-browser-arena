@@ -98,7 +98,9 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     soloBotCount: 0,
     maximumSoloBots: 0,
     multiplayer: true,
-    fieldSupport: false,
+    // Support rewards are not earned in the range, but the secure test bay
+    // grants one host-authoritative training activation at a time.
+    fieldSupport: true,
     overdrive: false,
     matchRules: Object.freeze({ durationMs: GUN_RANGE_ROUND_MS, scoreLimit: null }),
   }),

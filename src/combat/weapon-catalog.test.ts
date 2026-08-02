@@ -21,6 +21,8 @@ const PASS65_WEAPON_IDS = [
   'flashlight-pistol', 'explosive-crossbow',
 ] as const;
 
+const PASS66_SPECIAL_WEAPON_IDS = ['flamethrower', 'flare-gun'] as const;
+
 function compatibilityProjection(definition: Record<string, any>): Record<string, any> {
   const copy = structuredClone(definition);
   delete copy.displayName;
@@ -38,10 +40,11 @@ function compatibilityProjection(definition: Record<string, any>): Record<string
 }
 
 describe('Pass 65 canonical weapon catalog', () => {
-  it('contains exactly the protocol-v8 roster in a stable enumeration order', () => {
-    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(9);
+  it('contains exactly the current-protocol roster in a stable enumeration order', () => {
+    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(13);
     expect(LEGACY_WEAPON_ENUMERATION_ORDER).toEqual([
       ...PASS65_WEAPON_IDS,
+      ...PASS66_SPECIAL_WEAPON_IDS,
     ]);
     expect(WEAPON_CATALOG.map((definition) => definition.id)).toEqual(LEGACY_WEAPON_ENUMERATION_ORDER);
     expect(new Set(WEAPON_CATALOG.map((definition) => definition.id))).toEqual(new Set(WEAPON_IDS));
@@ -87,6 +90,16 @@ describe('Pass 65 canonical weapon catalog', () => {
       optic: { kind: 'standard', magnification: 1.5 },
       policies: { authority: 'host-projectile-v1' },
     });
+    expect(byId.flamethrower).toMatchObject({
+      displayName: 'M2 Flamethrower', slot: 'special', fireKind: 'hitscan', fireMode: 'automatic',
+      damage: { minimum: 0, falloffStartM: 8, falloffEndM: 18 },
+      policies: { loadout: 'pickup-only', bot: 'eligible', drop: 'map-pickup', authority: 'host-shot-v1' },
+    });
+    expect(byId['flare-gun']).toMatchObject({
+      displayName: 'Orion Flare Pistol', slot: 'special', fireKind: 'projectile', projectileId: 'signal-flare-v1',
+      damage: { base: 42, minimum: 42 },
+      policies: { loadout: 'pickup-only', bot: 'eligible', drop: 'map-pickup', authority: 'host-projectile-v1' },
+    });
   });
 
   it('keeps the Uzi materially distinct from both shipped SMG comparators', () => {
@@ -124,5 +137,7 @@ describe('Pass 65 canonical weapon catalog', () => {
       policies: { loadout: 'pickup-only', range: { kind: 'never' }, authority: 'host-railgun-v1' },
       penetration: { power: 100_000, maximumSurfaces: 64 },
     });
+    expect(byId.flamethrower.policies.loadout).toBe('pickup-only');
+    expect(byId['flare-gun'].policies.loadout).toBe('pickup-only');
   });
 });

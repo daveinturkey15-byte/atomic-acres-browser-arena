@@ -4,6 +4,9 @@ export type InteractionKind =
   | 'support-enter-chopper'
   | 'care-package'
   | 'shed-door'
+  | 'timed-map-weapon'
+  | 'test-bay-weapon'
+  | 'test-bay-support'
   | 'weapon-pickup';
 
 export type InteractionCandidate = Readonly<{
@@ -16,7 +19,8 @@ export type InteractionCandidate = Readonly<{
   requiresSustainedHold?: boolean;
 }>;
 
-export type TapInteractionKind = Extract<InteractionKind, 'care-package' | 'shed-door' | 'weapon-pickup'>;
+export type TapInteractionKind = Extract<InteractionKind,
+  'care-package' | 'shed-door' | 'timed-map-weapon' | 'test-bay-weapon' | 'test-bay-support' | 'weapon-pickup'>;
 export type HoldInteractionKind = Exclude<InteractionKind, TapInteractionKind>;
 
 const INTERACTION_PRIORITY: Readonly<Record<InteractionKind, number>> = Object.freeze({
@@ -24,7 +28,10 @@ const INTERACTION_PRIORITY: Readonly<Record<InteractionKind, number>> = Object.f
   // Support enter/exit remains globally available when no world candidate wins.
   'care-package': 3_000,
   'shed-door': 2_900,
+  'timed-map-weapon': 2_875,
+  'test-bay-weapon': 2_850,
   'weapon-pickup': 2_800,
+  'test-bay-support': 2_750,
   'support-exit': 2_000,
   'support-enter-drone': 1_500,
   'support-enter-chopper': 1_500,
@@ -45,7 +52,8 @@ export function primaryInteraction(candidates: readonly InteractionCandidate[]):
 }
 
 export function isTapInteraction(kind: InteractionKind): kind is TapInteractionKind {
-  return kind === 'care-package' || kind === 'shed-door' || kind === 'weapon-pickup';
+  return kind === 'care-package' || kind === 'shed-door' || kind === 'timed-map-weapon' || kind === 'test-bay-weapon'
+    || kind === 'test-bay-support' || kind === 'weapon-pickup';
 }
 
 export function isHoldInteraction(kind: InteractionKind): kind is HoldInteractionKind {

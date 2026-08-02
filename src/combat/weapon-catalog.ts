@@ -25,6 +25,8 @@ export const LEGACY_WEAPON_ENUMERATION_ORDER = Object.freeze([
   'slug-shotgun',
   'flashlight-pistol',
   'explosive-crossbow',
+  'flamethrower',
+  'flare-gun',
 ] as const satisfies readonly WeaponId[]);
 
 const RAW_B1_WEAPON_DEFINITIONS = [
@@ -266,6 +268,34 @@ const RAW_B1_WEAPON_DEFINITIONS = [
     optic: { kind: 'standard', magnification: 1.5, solidOcclusion: 'required' }, projectileId: 'explosive-bolt-v1',
     policies: { loadout: 'eligible', bot: 'never', drop: 'droppable', range: { kind: 'never' }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-projectile-v1' },
     modelSetId: 'explosive-crossbow-model-set-v1', presentationId: 'explosive-crossbow-family-view-v1', audioId: 'explosive-crossbow-audio-v1', provenanceId: 'explosive-crossbow-procedural-cc0-v1', evidenceIds: ['r223-explosive-crossbow', 'r232-explosive-crossbow'],
+  },
+  {
+    id: 'flamethrower', displayName: 'M2 Flamethrower', slot: 'special', family: 'launcher',
+    // The authoritative stream adapter owns the hard 18 m reach and burn volume;
+    // this hitscan projection keeps current bot cadence fail-closed and deterministic.
+    fireKind: 'hitscan', fireMode: 'automatic', rpm: 600, pellets: 1, spinUpMs: 180, movementMultiplier: 0.82,
+    damage: { policy: 'standard', base: 9, minimum: 0, falloffStartM: 8, falloffEndM: 18, headMultiplier: 1, limbMultiplier: 1 },
+    spread: { hipRadians: 0.038, adsMultiplier: 0.72, movementMultiplier: 1.4, standMultiplier: 1, crouchMultiplier: 0.9, proneMultiplier: 0.82, sustainedPerShot: 0.0008, maximumRadians: 0.055 },
+    recoil: { pitchRadians: 0.004, yawRadians: 0.003, recoveryPerSecond: 18, adsMultiplier: 0.9, standMultiplier: 1, crouchMultiplier: 0.9, proneMultiplier: 0.82, deterministicPatternId: 'flamethrower-pattern-v1' },
+    ammo: { magazine: 100, reserve: 100, reloadSeconds: 3.8, emptyReloadSeconds: 4.2, switchSeconds: 0.85 },
+    penetration: { calibreLabel: 'ignited fuel stream', power: 0, fmjMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 0, energyFalloffEndM: 18, minimumEnergyRetention: 0, minimumWallDamageMultiplier: 0, maximumSurfaces: 0 },
+    effects: { tracerColorHex: 0xff7a24, muzzleFlashScale: 1.8, reportGain: 0.92, flashlight: null },
+    optic: null, projectileId: null,
+    policies: { loadout: 'pickup-only', bot: 'eligible', drop: 'map-pickup', range: { kind: 'never' }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-shot-v1' },
+    modelSetId: 'flamethrower-model-set-v1', presentationId: 'flamethrower-family-view-v1', audioId: 'flamethrower-audio-v1', provenanceId: 'flamethrower-original-project-v1', evidenceIds: ['pass66-flamethrower-canonical-family'],
+  },
+  {
+    id: 'flare-gun', displayName: 'Orion Flare Pistol', slot: 'special', family: 'launcher',
+    fireKind: 'projectile', fireMode: 'semi', rpm: 24, pellets: 1, spinUpMs: 0, movementMultiplier: 1,
+    damage: { policy: 'standard', base: 42, minimum: 42, falloffStartM: 45, falloffEndM: 90, headMultiplier: 1, limbMultiplier: 1 },
+    spread: { hipRadians: 0.04, adsMultiplier: 0.2, movementMultiplier: 1.5, standMultiplier: 1, crouchMultiplier: 0.82, proneMultiplier: 0.72, sustainedPerShot: 0, maximumRadians: 0.04 },
+    recoil: { pitchRadians: 0.035, yawRadians: 0.006, recoveryPerSecond: 8, adsMultiplier: 0.75, standMultiplier: 1, crouchMultiplier: 0.84, proneMultiplier: 0.72, deterministicPatternId: 'flare-gun-pattern-v1' },
+    ammo: { magazine: 1, reserve: 5, reloadSeconds: 2.1, emptyReloadSeconds: 2.1, switchSeconds: 0.42 },
+    penetration: { calibreLabel: '37 mm signal flare', power: 0, fmjMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 0, energyFalloffEndM: 1, minimumEnergyRetention: 0, minimumWallDamageMultiplier: 0, maximumSurfaces: 0 },
+    effects: { tracerColorHex: 0xff3c20, muzzleFlashScale: 0.9, reportGain: 0.82, flashlight: null },
+    optic: { kind: 'standard', magnification: 1.1, solidOcclusion: 'required' }, projectileId: 'signal-flare-v1',
+    policies: { loadout: 'pickup-only', bot: 'eligible', drop: 'map-pickup', range: { kind: 'never' }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-projectile-v1' },
+    modelSetId: 'flare-gun-model-set-v1', presentationId: 'flare-gun-family-view-v1', audioId: 'flare-gun-audio-v1', provenanceId: 'flare-gun-original-project-v1', evidenceIds: ['pass66-flare-gun-canonical-family'],
   },
 ] as const satisfies readonly WeaponDefinition[];
 

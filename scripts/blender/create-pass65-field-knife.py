@@ -160,8 +160,16 @@ def cylinder(name, location, radius, depth, material, parent, vertices, rotation
 
 
 def blade_mesh(name, detail, material, parent):
-    outline = [(-0.12, 0.24), (-0.16, 0.08), (-0.155, -0.48), (-0.11, -0.92), (0, -1.18), (0.11, -0.92), (0.15, -0.5), (0.13, 0.08), (0.09, 0.24)]
-    thickness = 0.032
+    # Compact drop-point profile.  The previous parallel-sided slab read as a
+    # machete in the first-person camera; this spine, belly and reinforced tip
+    # keep a believable field-knife blade-to-handle ratio.
+    outline = [
+        (-0.100, 0.24), (-0.122, 0.10), (-0.128, -0.35),
+        (-0.104, -0.70), (-0.040, -0.93), (0.0, -1.02),
+        (0.038, -0.93), (0.108, -0.70), (0.132, -0.18),
+        (0.118, 0.10), (0.092, 0.24),
+    ]
+    thickness = 0.028
     vertices = [(x, y, z) for z in (-thickness, thickness) for x, y in outline]
     count = len(outline)
     faces = [tuple(range(count)), tuple(range(count, count * 2))]
@@ -179,7 +187,75 @@ def blade_mesh(name, detail, material, parent):
     bpy.ops.mesh.select_all(action="SELECT")
     bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.03)
     bpy.ops.object.mode_set(mode="OBJECT")
-    return finish(obj, material, parent, 0.008, 3 if detail > 0.9 else 2 if detail > 0.55 else 1, "field-knife-blade")
+    return finish(obj, material, parent, 0.006, 3 if detail > 0.9 else 2 if detail > 0.55 else 1, "field-knife-blade")
+
+
+def blade_edge_mesh(name, material, parent):
+    """Author a narrow polished cutting bevel instead of a painted edge."""
+    outline = [
+        (0.105, 0.10), (0.132, -0.18), (0.108, -0.70),
+        (0.038, -0.93), (0.0, -1.02), (0.018, -0.90),
+        (0.086, -0.68), (0.108, -0.18),
+    ]
+    thickness = 0.030
+    vertices = [(x, y, z) for z in (-thickness, thickness) for x, y in outline]
+    count = len(outline)
+    faces = [tuple(range(count)), tuple(reversed(range(count, count * 2)))]
+    for index in range(count):
+        following = (index + 1) % count
+        faces.append((index, following, following + count, index + count))
+    mesh = bpy.data.meshes.new(f"{name}_Mesh")
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    bpy.context.view_layer.objects.active = obj
+    obj.select_set(True)
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.03)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    return finish(obj, material, parent, 0.0025, 2, "field-knife-cutting-edge")
+
+
+def handle_scale_mesh(name, side, detail, material, parent):
+    """Build one contoured G10 slab on the real blade-thickness axis."""
+    sections = (
+        (0.30, 0.075), (0.40, 0.100), (0.60, 0.108),
+        (0.80, 0.102), (0.94, 0.078),
+    )
+    half_depth = 0.026 if detail > 0.6 else 0.022
+    inner_z = side * 0.030
+    outer_z = side * (0.030 + half_depth * 2.0)
+    vertices = []
+    for y, half_width in sections:
+        vertices.extend((
+            (-half_width, y, inner_z), (half_width, y, inner_z),
+            (-half_width, y, outer_z), (half_width, y, outer_z),
+        ))
+    faces = []
+    for section in range(len(sections) - 1):
+        base = section * 4
+        following = base + 4
+        faces.extend((
+            (base, base + 1, following + 1, following),
+            (base + 2, following + 2, following + 3, base + 3),
+            (base, following, following + 2, base + 2),
+            (base + 1, base + 3, following + 3, following + 1),
+        ))
+    faces.extend(((0, 2, 3, 1), tuple(reversed(range((len(sections) - 1) * 4, len(sections) * 4)))))
+    mesh = bpy.data.meshes.new(f"{name}_Mesh")
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    bpy.context.view_layer.objects.active = obj
+    obj.select_set(True)
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(58), island_margin=0.035)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    return finish(obj, material, parent, 0.010, 3 if detail > 0.65 else 2)
 
 
 def add_action(obj, name, positions=None, rotations=None):
@@ -235,35 +311,53 @@ def build(delivery, suffix, detail, materials):
     root["presentation_only"] = True
     root["opaque_material_contract"] = True
     driver = empty("field-knife-action-driver", (0, 0, 0), root, "animation-root")
+    root["visual_revision"] = "compact-drop-point-g10-v2"
+    root["grip_profile"] = "contoured-two-slab-full-tang"
     blade = blade_mesh(f"FieldKnife_Blade_{suffix}", detail, materials["blade"], driver)
-    fuller = cube("FieldKnife_Fuller", (0, -0.42, 0.037), (0.085, 0.75, 0.011), materials["fuller"], blade, 0.006, 2, canonical="field-knife-fuller")
+    blade_edge_mesh(f"FieldKnife_CuttingEdge_{suffix}", materials["edge"], blade)
+    fuller = cube("FieldKnife_Fuller", (0, -0.38, 0.031), (0.070, 0.62, 0.008), materials["fuller"], blade, 0.004, 2, canonical="field-knife-fuller")
     fuller["recessed_blade_detail"] = True
+    cube(f"FieldKnife_Swedge_{suffix}", (-0.047, -0.80, 0.031), (0.055, 0.30, 0.008), materials["edge"], blade, 0.003, 2, rotation=(0, 0, math.radians(-14)))
     guard = empty("field-knife-guard", (0, 0, 0), driver, "guard")
-    cube("FieldKnife_GuardBody", (0, 0.25, 0), (0.39, 0.085, 0.095), materials["metal"], guard, 0.025, 2)
+    cube("FieldKnife_GuardBody", (0, 0.25, 0), (0.35, 0.080, 0.105), materials["metal"], guard, 0.020, 3)
+    for side in (-1, 1):
+        cube(
+            f"FieldKnife_GuardQuillon_{side}", (side * 0.155, 0.27, -0.010),
+            (0.095, 0.055, 0.085), materials["metal"], guard, 0.015, 2,
+            rotation=(0, math.radians(side * 10), math.radians(side * 12)),
+        )
     tang = empty("field-knife-full-tang", (0, 0, 0), driver, "full-tang")
-    cube("FieldKnife_Tang", (0, 0.61, 0), (0.155, 0.68, 0.07), materials["metal"], tang, 0.018, 2)
+    cube("FieldKnife_Tang", (0, 0.62, 0), (0.155, 0.70, 0.064), materials["metal"], tang, 0.014, 2)
     grip = empty("field-knife-g10-grip", (0, 0, 0), driver, "grip")
     for side in (-1, 1):
-        cube(f"FieldKnife_HandleScale_{side}", (side * 0.052, 0.61, 0), (0.075, 0.63, 0.12), materials["handle"], grip, 0.035, 3 if detail > 0.65 else 2)
-    ribs = 8 if detail > 0.9 else 6 if detail > 0.6 else 4 if detail > 0.4 else 2
+        handle_scale_mesh(f"FieldKnife_HandleScale_{side}", side, detail, materials["handle"], grip)
+    ribs = 7 if detail > 0.9 else 5 if detail > 0.6 else 3 if detail > 0.4 else 2
     segments = 24 if detail > 0.9 else 18 if detail > 0.6 else 12 if detail > 0.4 else 8
     for index in range(ribs):
-        cube(f"FieldKnife_GripRib_{index}", (0, 0.35 + index * 0.075, 0.067), (0.17, 0.025, 0.018), materials["rubber"], grip, 0.006, 1)
+        for side in (-1, 1):
+            cube(
+                f"FieldKnife_GripChevron_{side}_{index}",
+                (0, 0.385 + index * 0.078, side * 0.087),
+                (0.150, 0.022, 0.010), materials["rubber"], grip, 0.004, 1,
+                rotation=(0, 0, math.radians(side * (12 if index % 2 == 0 else -12))),
+            )
     screw_count = 3 if detail > 0.55 else 2
     for index in range(screw_count):
-        for side in (-1, 1):
-            cylinder(f"FieldKnife_HandleScrew_{side}_{index}", (side * 0.092, 0.42 + index * 0.18, 0), 0.019, 0.018, materials["accent"], grip, segments, rotation=(0, math.pi / 2, 0))
+        cylinder(
+            f"FieldKnife_HandleScrew_{index}", (0, 0.42 + index * 0.22, 0),
+            0.018, 0.19, materials["accent"], grip, segments,
+        )
     serrations = 6 if detail > 0.9 else 4 if detail > 0.6 else 3 if detail > 0.4 else 1
     serration_root = empty("field-knife-spine-serrations", (0, 0, 0), blade, "serrations")
     for index in range(serrations):
-        cube(f"FieldKnife_Serration_{index}", (-0.135, -0.12 - index * 0.075, 0), (0.035, 0.04, 0.085), materials["metal"], serration_root, 0.004, 1, rotation=(0, 0, math.radians(32)))
+        cube(f"FieldKnife_Serration_{index}", (-0.123, -0.08 - index * 0.065, 0), (0.028, 0.036, 0.074), materials["metal"], serration_root, 0.003, 1, rotation=(0, 0, math.radians(28)))
     pommel = empty("field-knife-pommel", (0, 0, 0), driver, "pommel")
-    cube("FieldKnife_PommelBody", (0, 0.98, 0), (0.19, 0.13, 0.13), materials["metal"], pommel, 0.035, 2)
-    cylinder("FieldKnife_LanyardHole", (0, 0.98, 0), 0.034, 0.15, materials["fuller"], pommel, segments, rotation=(0, math.pi / 2, 0), canonical="field-knife-lanyard-hole")
+    cube("FieldKnife_PommelBody", (0, 0.99, 0), (0.17, 0.12, 0.14), materials["metal"], pommel, 0.028, 3)
+    cylinder("FieldKnife_LanyardHole", (0, 0.99, 0), 0.030, 0.15, materials["fuller"], pommel, segments, canonical="field-knife-lanyard-hole")
     for name, position, semantic in (
-        ("grip-socket-r", (0, 0.61, 0), "rightGrip"),
-        ("blade-tip-socket", (0, -1.2, 0), "bladeTip"),
-        ("blade-edge-socket", (0.13, -0.56, 0), "bladeEdge"),
+        ("grip-socket-r", (0, 0.62, 0), "rightGrip"),
+        ("blade-tip-socket", (0, -1.04, 0), "bladeTip"),
+        ("blade-edge-socket", (0.11, -0.56, 0), "bladeEdge"),
         ("pommel-socket", (0, 1.06, 0), "pommel"),
     ):
         empty(name, position, root, semantic)
@@ -373,9 +467,10 @@ reset()
 images = {kind: texture(kind) for kind in ("baseColor", "normal", "roughness", "metallic")}
 handle_images = {**images, "baseColor": texture("handleBaseColor")}
 materials = {
-    "blade": pbr_material("MAT_Pass65_FieldKnife_Blade_PBR", images, (0.38, 0.43, 0.44, 1), 0.9, 0.25),
-    "handle": pbr_material("MAT_Pass65_FieldKnife_G10_PBR", handle_images, (0.18, 0.21, 0.2, 1), 0.04, 0.75),
-    "metal": simple_material("MAT_Pass65_FieldKnife_Gunmetal", (0.12, 0.15, 0.16, 1), 0.86, 0.3),
+    "blade": pbr_material("MAT_Pass65_FieldKnife_Blade_PBR", images, (0.22, 0.25, 0.26, 1), 0.9, 0.32),
+    "handle": pbr_material("MAT_Pass65_FieldKnife_G10_PBR", handle_images, (0.12, 0.15, 0.15, 1), 0.04, 0.76),
+    "edge": simple_material("MAT_Pass65_FieldKnife_HonedEdge", (0.48, 0.53, 0.54, 1), 0.95, 0.17),
+    "metal": simple_material("MAT_Pass65_FieldKnife_Gunmetal", (0.10, 0.13, 0.14, 1), 0.88, 0.34),
     "fuller": simple_material("MAT_Pass65_FieldKnife_Fuller", (0.025, 0.035, 0.04, 1), 0.76, 0.2),
     "rubber": simple_material("MAT_Pass65_FieldKnife_Rubber", (0.035, 0.045, 0.04, 1), 0.02, 0.9),
     "accent": simple_material("MAT_Pass65_FieldKnife_Accent", (0.73, 0.45, 0.16, 1), 0.65, 0.28),

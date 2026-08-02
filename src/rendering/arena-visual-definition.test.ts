@@ -43,6 +43,8 @@ describe('Pass 64 arena visual definitions', () => {
     const overview = definition.reviewCameras.find((entry) => entry.id === 'gun-range-overview');
     const neonLanes = definition.reviewCameras.find((entry) => entry.id === 'gun-range-neon-lanes');
     const lateralTargets = definition.reviewCameras.find((entry) => entry.id === 'gun-range-lateral-targets');
+    const testBayCorridor = definition.reviewCameras.find((entry) => entry.id === 'gun-range-test-bay-corridor');
+    const testBayOverview = definition.reviewCameras.find((entry) => entry.id === 'gun-range-test-bay-overview');
     expect(overview).toBeDefined();
     expect(overview!.position[1]).toBeLessThan(7.1);
     expect(overview!.position[2]).toBeGreaterThan(11);
@@ -56,6 +58,16 @@ describe('Pass 64 arena visual definitions', () => {
       position: [0, 2.45, -18.5],
       target: [0, 1.72, -29],
       purpose: 'geometry',
+    });
+    expect(testBayCorridor).toMatchObject({
+      position: [24, 2.25, 10.25],
+      target: [51.5, 2.15, 12],
+      purpose: 'geometry',
+    });
+    expect(testBayOverview).toMatchObject({
+      position: [92, 4.3, 34],
+      target: [72, 1.2, 1],
+      purpose: 'overview',
     });
   });
 
@@ -250,6 +262,137 @@ describe('Pass 64 arena visual streaming transaction', () => {
     expect(receipt.requestedResources).toEqual(['./selected.glb']);
     expect(() => stream.recordSelectedAssetRequest('atomic-acres', './wrong.glb')).toThrow(/undeclared or unselected/);
     expect(() => stream.recordSelectedAssetRequest('skyline-terminal', './selected.glb')).toThrow(/no active matching/);
+  });
+
+  it('rolls back root ownership, metadata, visibility, order and controller state when adoption assertion fails', async () => {
+    const scene = new THREE.Scene();
+    const staging = new THREE.Group();
+    const stagedBefore = new THREE.Group();
+    const candidate = new THREE.Group();
+    const stagedAfter = new THREE.Group();
+    candidate.visible = false;
+    candidate.userData.arenaVisualDefinitionId = 'staged-marker';
+    candidate.userData.arenaVisualGeneration = 77;
+    staging.add(stagedBefore, candidate, stagedAfter);
+    const previous = new THREE.Group();
+    const unexpected = new THREE.Group();
+    unexpected.userData.arenaVisualDefinitionId = 'unexpected-root';
+    const stream = new ArenaVisualStreamController(scene, fakeRegistry());
+    const previousReceipt = await stream.adoptGameplayRoot('atomic-acres', previous);
+    scene.add(unexpected);
+    const sceneBefore = [...scene.children];
+    const stagingBefore = [...staging.children];
+
+    await expect(stream.adoptGameplayRoot('skyline-terminal', candidate)).rejects.toThrow(
+      /Expected one authoritative arena presentation root, found 2/,
+    );
+
+    expect(scene.children).toEqual(sceneBefore);
+    expect(staging.children).toEqual(stagingBefore);
+    expect(previous.parent).toBe(scene);
+    expect(previous.visible).toBe(true);
+    expect(previous.userData).toMatchObject({
+      authoritativeArenaId: 'atomic-acres',
+      arenaVisualDefinitionId: 'atomic-acres',
+      arenaVisualGeneration: 1,
+    });
+    expect(candidate.parent).toBe(staging);
+    expect(candidate.visible).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(candidate.userData, 'authoritativeArenaId')).toBe(false);
+    expect(candidate.userData).toMatchObject({
+      arenaVisualDefinitionId: 'staged-marker',
+      arenaVisualGeneration: 77,
+    });
+    expect(() => stream.recordSelectedAssetRequest('atomic-acres', './selected.glb')).not.toThrow();
+    expect(previousReceipt.requestedResources).toEqual(['./selected.glb']);
+    expect(() => stream.recordSelectedAssetRequest('skyline-terminal', './selected.glb')).toThrow(/no active matching/);
+  });
+
+  it('leaves the exact prior gameplay transaction active when module loading fails', async () => {
+    const scene = new THREE.Scene();
+    const staging = new THREE.Group();
+    const previous = new THREE.Group();
+    const candidate = new THREE.Group();
+    candidate.visible = false;
+    staging.add(candidate);
+    const registry: ArenaVisualRegistry = {
+      ...fakeRegistry(),
+      'skyline-terminal': async () => { throw new Error('module unavailable'); },
+    };
+    const stream = new ArenaVisualStreamController(scene, registry);
+    const previousReceipt = await stream.adoptGameplayRoot('atomic-acres', previous);
+
+    await expect(stream.adoptGameplayRoot('skyline-terminal', candidate)).rejects.toThrow('module unavailable');
+
+    expect(scene.children).toEqual([previous]);
+    expect(previous.visible).toBe(true);
+    expect(previous.userData.arenaVisualDefinitionId).toBe('atomic-acres');
+    expect(staging.children).toEqual([candidate]);
+    expect(candidate.visible).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(candidate.userData, 'authoritativeArenaId')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(candidate.userData, 'arenaVisualDefinitionId')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(candidate.userData, 'arenaVisualGeneration')).toBe(false);
+    expect(() => stream.recordSelectedAssetRequest('atomic-acres', './selected.glb')).not.toThrow();
+    expect(previousReceipt.requestedResources).toEqual(['./selected.glb']);
+  });
+
+  it('does not let an aborted stale adoption roll back its committed successor', async () => {
+    const scene = new THREE.Scene();
+    const staging = new THREE.Group();
+    const previous = new THREE.Group();
+    const staleCandidate = new THREE.Group();
+    const successor = new THREE.Group();
+    staleCandidate.visible = false;
+    staging.add(staleCandidate);
+    let resolveStaleModule!: (module: { definition: ArenaVisualDefinition }) => void;
+    const staleModule = new Promise<{ definition: ArenaVisualDefinition }>((resolve) => {
+      resolveStaleModule = resolve;
+    });
+    const registry: ArenaVisualRegistry = {
+      ...fakeRegistry(),
+      'skyline-terminal': () => staleModule,
+    };
+    const stream = new ArenaVisualStreamController(scene, registry);
+    await stream.adoptGameplayRoot('atomic-acres', previous);
+    const staleAdoption = stream.adoptGameplayRoot('skyline-terminal', staleCandidate);
+    const staleFailure = expect(staleAdoption).rejects.toMatchObject({ name: 'AbortError' });
+    await Promise.resolve();
+
+    const successorReceipt = await stream.adoptGameplayRoot('gun-range', successor);
+    resolveStaleModule({ definition: fakeDefinition('skyline-terminal') });
+    await staleFailure;
+
+    expect(successorReceipt).toMatchObject({ arenaId: 'gun-range', generation: 3 });
+    expect(scene.children).toEqual([successor]);
+    expect(successor.userData).toMatchObject({
+      authoritativeArenaId: 'gun-range',
+      arenaVisualDefinitionId: 'gun-range',
+      arenaVisualGeneration: 3,
+    });
+    expect(staging.children).toEqual([staleCandidate]);
+    expect(staleCandidate.visible).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(staleCandidate.userData, 'authoritativeArenaId')).toBe(false);
+    expect(() => stream.recordSelectedAssetRequest('gun-range', './selected.glb')).not.toThrow();
+  });
+
+  it('discards only the exact failed gameplay root and removes its authority metadata', async () => {
+    const scene = new THREE.Scene();
+    const failed = new THREE.Group();
+    const successor = new THREE.Group();
+    const stream = new ArenaVisualStreamController(scene, fakeRegistry());
+    await stream.adoptGameplayRoot('atomic-acres', failed);
+
+    expect(stream.discardGameplayRoot('skyline-terminal', failed)).toBe(false);
+    expect(scene.children).toEqual([failed]);
+    expect(stream.discardGameplayRoot('atomic-acres', successor)).toBe(false);
+    expect(stream.discardGameplayRoot('atomic-acres', failed)).toBe(true);
+
+    expect(scene.children).toEqual([]);
+    expect(failed.visible).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(failed.userData, 'authoritativeArenaId')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(failed.userData, 'arenaVisualDefinitionId')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(failed.userData, 'arenaVisualGeneration')).toBe(false);
+    expect(() => stream.recordSelectedAssetRequest('atomic-acres', './selected.glb')).toThrow(/no active matching/);
   });
 
   it('keeps exactly one presentation root and idempotently disposes the previous arena', async () => {

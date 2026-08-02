@@ -1,11 +1,8 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
-import { spawn, type ChildProcess } from 'node:child_process';
-import http from 'node:http';
-import { resolve } from 'node:path';
-import { ROOM_CHAT_IDLE_FADE_MS } from '../../src/room-chat-presentation';
+import { startOwnedPeerServer, type OwnedPeerServer } from './pass66-e2e-support';
 
 const peerPort = 9_063;
-let peerProcess: ChildProcess | null = null;
+let peerServer: OwnedPeerServer | null = null;
 
 test.use({
   launchOptions: {
@@ -19,45 +16,21 @@ test.use({
   },
   viewport: { width: 1_920, height: 1_080 },
 });
-
-async function peerServerReady(): Promise<boolean> {
-  return new Promise((resolveReady) => {
-    const request = http.get(`http://127.0.0.1:${peerPort}/peerjs`, (response) => {
-      response.resume();
-      resolveReady(response.statusCode !== undefined && response.statusCode < 500);
-    });
-    request.once('error', () => resolveReady(false));
-    request.setTimeout(250, () => {
-      request.destroy();
-      resolveReady(false);
-    });
-  });
-}
+test.describe.configure({ timeout: 240_000 });
 
 test.beforeAll(async () => {
-  peerProcess = spawn(process.execPath, [
-    resolve('node_modules/peer/dist/bin/peerjs.js'),
-    '--host', '127.0.0.1',
-    '--port', String(peerPort),
-    '--path', '/peerjs',
-    '--no-allow_discovery',
-  ], { cwd: process.cwd(), stdio: 'ignore', windowsHide: true });
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    if (await peerServerReady()) return;
-    if (peerProcess.exitCode !== null) throw new Error(`Local PeerJS server exited with ${peerProcess.exitCode}`);
-    await new Promise((resolveWait) => setTimeout(resolveWait, 100));
-  }
-  throw new Error('Local PeerJS server did not become ready');
+  peerServer = await startOwnedPeerServer(peerPort, '/peerjs');
 });
 
-test.afterAll(() => {
-  if (peerProcess?.exitCode === null) peerProcess.kill();
-  peerProcess = null;
+test.afterAll(async () => {
+  await peerServer?.stop();
+  peerServer = null;
 });
 
 async function openPlayer(context: BrowserContext, name: string, seed: string): Promise<Page> {
   const page = await context.newPage();
   const url = new URL('/', test.info().project.use.baseURL as string);
+  url.searchParams.set('release', 'latest');
   url.searchParams.set('renderer', 'webgl2');
   url.searchParams.set('render', 'compat');
   url.searchParams.set('signal', 'off');
@@ -111,10 +84,12 @@ async function chatPlacement(page: Page): Promise<Record<string, string | number
   });
 }
 
-test('shares safe authoritative history in lobby and match, gates input, and restores it on rejoin', async ({ browser }) => {
-  const context = await browser.newContext({ viewport: { width: 1_920, height: 1_080 } });
-  const host = await openPlayer(context, 'Host 63', 'pass63-chat-host');
-  const guest = await openPlayer(context, 'Guest 63', 'pass63-chat-guest');
+test('shares safe chat and restores identity plus authoritative hosted bots on rejoin', async ({ browser }) => {
+  const hostContext = await browser.newContext({ viewport: { width: 1_920, height: 1_080 } });
+  const guestContext = await browser.newContext({ viewport: { width: 1_920, height: 1_080 } });
+  try {
+  const host = await openPlayer(hostContext, 'Host 63', 'pass63-chat-host');
+  const guest = await openPlayer(guestContext, 'Guest 63', 'pass63-chat-guest');
 
   await host.click('#host');
   await host.waitForFunction(() => Boolean(document.querySelector('#room-code')?.textContent?.trim()));
@@ -125,6 +100,10 @@ test('shares safe authoritative history in lobby and match, gates input, and res
     host.waitForFunction(() => document.querySelectorAll('#lobby-roster .lobby-player').length === 2),
     guest.waitForFunction(() => document.querySelectorAll('#lobby-roster .lobby-player').length === 2),
   ]);
+  await host.locator('#lobby-bots').selectOption('2');
+  await Promise.all([host, guest].map((page) => page.waitForFunction(() => (
+    (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch?.hostedBotCount === 2
+  ))));
 
   await sendChat(host, 'Host says hello.');
   await expect(host.locator('#text-chat-log')).toContainText('Host says hello.');
@@ -150,10 +129,8 @@ test('shares safe authoritative history in lobby and match, gates input, and res
   expect((await chatSnapshot(host)).entries).toHaveLength(beforeSpoof);
   expect((await chatSnapshot(guest)).entries).toHaveLength(beforeSpoof);
 
-  await expect(guest.locator('#text-chat')).toHaveAttribute('data-visible', 'false', {
-    timeout: ROOM_CHAT_IDLE_FADE_MS + 3_000,
-  });
-  await expect(guest.locator('#text-chat')).toHaveCSS('opacity', '0');
+  await expect(guest.locator('#text-chat')).toHaveAttribute('data-visible', 'true');
+  await expect(guest.locator('#private-lobby > #text-chat')).toHaveCount(1);
   await openChat(guest);
   await expect(guest.locator('#text-chat')).toHaveAttribute('data-visible', 'true');
   await expect(guest.locator('#text-chat')).toHaveCSS('opacity', '1');
@@ -166,17 +143,28 @@ test('shares safe authoritative history in lobby and match, gates input, and res
   await expect(guest.locator('#text-chat-input')).toHaveValue('');
   await expect(host.locator('#text-chat')).toHaveAttribute('data-context', 'lobby');
   const lobbyChatPlacement = await chatPlacement(host);
+  expect(lobbyChatPlacement.position).toBe('relative');
 
   await host.click('#lobby-ready');
   await guest.click('#lobby-ready');
   await expect(host.locator('#lobby-start')).toBeEnabled();
   await host.click('#lobby-start');
   await Promise.all([
-    host.waitForFunction(() => (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().gameStarted === true),
-    guest.waitForFunction(() => (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().gameStarted === true),
+    host.waitForFunction(() => {
+      const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+      return state.gameStarted === true && state.matchPhase === 'active' && state.bots.length === 2;
+    }, undefined, { timeout: 60_000 }),
+    guest.waitForFunction(() => {
+      const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+      return state.gameStarted === true && state.matchPhase === 'active' && state.bots.length === 2;
+    }, undefined, { timeout: 60_000 }),
   ]);
+  await host.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true));
   await expect(host.locator('#text-chat')).toHaveAttribute('data-context', 'game');
-  expect(await chatPlacement(host)).toEqual(lobbyChatPlacement);
+  await expect(host.locator('#app > #text-chat')).toHaveCount(1);
+  const gameChatPlacement = await chatPlacement(host);
+  expect(gameChatPlacement.position).toBe('fixed');
+  expect(gameChatPlacement).not.toEqual(lobbyChatPlacement);
 
   await sendChat(guest, 'Live match check.');
   await expect(host.locator('#text-chat-log')).toContainText('Live match check.');
@@ -184,33 +172,121 @@ test('shares safe authoritative history in lobby and match, gates input, and res
   await expect(host.locator('#text-chat')).toHaveAttribute('data-visible', 'true');
   await expect(guest.locator('#text-chat')).toHaveAttribute('data-visible', 'true');
 
-  const overlapAudit = await host.evaluate(() => {
-    const rect = (selector: string) => document.querySelector<HTMLElement>(selector)?.getBoundingClientRect() ?? null;
-    const chat = rect('#text-chat');
-    const core = ['#health-block', '#weapon-block', '#support-block', '#minimap'].map((selector) => ({ selector, rect: rect(selector) }));
-    const overlaps = (a: DOMRect, b: DOMRect) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
-    return {
-      viewport: [window.innerWidth, window.innerHeight],
-      chat: chat ? { left: chat.left, top: chat.top, right: chat.right, bottom: chat.bottom } : null,
-      collisions: chat ? core.filter((item) => item.rect && overlaps(chat, item.rect)).map((item) => item.selector) : ['missing-chat'],
-    };
-  });
-  expect(overlapAudit.viewport).toEqual([1_920, 1_080]);
-  expect(overlapAudit.chat).not.toBeNull();
-  expect(overlapAudit.collisions).toEqual([]);
+  for (const viewport of [
+    { width: 1_280, height: 720 },
+    { width: 1_920, height: 1_080 },
+    { width: 2_560, height: 1_440 },
+    { width: 3_840, height: 2_160 },
+    { width: 3_440, height: 1_440 },
+  ]) {
+    await host.setViewportSize(viewport);
+    const overlapAudit = await host.evaluate(() => {
+      const rect = (selector: string) => document.querySelector<HTMLElement>(selector)?.getBoundingClientRect() ?? null;
+      const chat = rect('#text-chat');
+      const core = ['#health-block', '#weapon-block', '#support-block', '#minimap'].map((selector) => ({ selector, rect: rect(selector) }));
+      const overlaps = (a: DOMRect, b: DOMRect) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+      return {
+        viewport: [window.innerWidth, window.innerHeight],
+        chat: chat ? { left: chat.left, top: chat.top, right: chat.right, bottom: chat.bottom } : null,
+        collisions: chat ? core.filter((item) => item.rect && overlaps(chat, item.rect)).map((item) => item.selector) : ['missing-chat'],
+      };
+    });
+    expect(overlapAudit.viewport).toEqual([viewport.width, viewport.height]);
+    expect(overlapAudit.chat, `${viewport.width}x${viewport.height}: chat`).not.toBeNull();
+    expect(overlapAudit.collisions, `${viewport.width}x${viewport.height}: collisions`).toEqual([]);
+  }
+  await host.setViewportSize({ width: 1_920, height: 1_080 });
 
   const expectedHistory = (await chatSnapshot(host)).entries.map((entry: any) => entry.text);
+  const beforeRejoin = await guest.evaluate(() => {
+    const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+    return {
+      playerId: state.privateMatch.members.find((member: any) => member.name === 'Guest 63')?.id,
+      bots: state.bots.map((bot: any) => ({ id: bot.id, weapon: bot.weapon, hp: bot.hp, alive: bot.alive })),
+    };
+  });
+  const reliableCommitsBeforeRejoin = await host.evaluate(() => (
+    (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().networkLifecycle.reliableStateCommitMirrors
+  ));
   await guest.reload({ waitUntil: 'domcontentloaded' });
   await host.waitForFunction(() => document.querySelector('#lobby-roster')?.textContent?.includes('REJOINING'));
   await guest.waitForFunction(() => (window as any).__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true);
+  await expect(guest.locator('#room-input')).toHaveValue(roomCode);
+  await expect(guest.locator('#join')).toHaveText('REJOIN LAST MATCH');
+  await expect(guest.locator('#join')).toHaveAttribute('data-rejoin-available', 'true');
   await guest.fill('#player-name', 'Guest 63');
-  await guest.fill('#room-input', roomCode);
   await guest.click('#join');
+  await guest.waitForFunction(() => {
+    const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+    return state.gameStarted === true
+      && state.matchPhase === 'active'
+      && state.bots.length === 2
+      && state.remotePlayers.length === 1
+      && state.privateMatch?.members.every((member: any) => member.connected);
+  }, undefined, { timeout: 60_000 });
+  await host.waitForFunction(() => {
+    const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+    return state.remotePlayers.length === 1
+      && state.privateMatch?.members.every((member: any) => member.connected);
+  });
   await guest.waitForFunction((count) => (
     (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().textChat.entries.length === count
   ), expectedHistory.length);
   expect((await chatSnapshot(guest)).entries.map((entry: any) => entry.text)).toEqual(expectedHistory);
   await expect(guest.locator('#text-chat-log')).toContainText('Live match check.');
+  const afterRejoin = await guest.evaluate(() => {
+    const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+    return {
+      playerId: state.privateMatch.members.find((member: any) => member.name === 'Guest 63')?.id,
+      bots: state.bots.map((bot: any) => ({
+        id: bot.id,
+        weapon: bot.weapon,
+        hp: bot.hp,
+        alive: bot.alive,
+        visible: bot.rootVisible,
+        presentationReady: bot.presentationReady,
+      })),
+    };
+  });
+  expect(afterRejoin.playerId).toBe(beforeRejoin.playerId);
+  expect(afterRejoin.bots.map(({ visible: _visible, presentationReady: _ready, ...bot }: any) => bot)).toEqual(beforeRejoin.bots);
+  expect(afterRejoin.bots.every((bot: any) => bot.visible && bot.presentationReady)).toBe(true);
+  await expect.poll(async () => host.evaluate(() => (
+    (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().networkLifecycle.reliableStateCommitMirrors
+  ))).toBeGreaterThan(reliableCommitsBeforeRejoin);
 
-  await context.close();
+  const hostConsensus = await host.evaluate(() => {
+    const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+    return {
+      arenaId: state.arenaSelection.id,
+      matchPhase: state.matchPhase,
+      activeAtEpochMs: state.privateMatch.activeAtEpochMs,
+      hostedBotCount: state.privateMatch.hostedBotCount,
+      memberIds: state.privateMatch.members.map((member: any) => member.id).sort(),
+      scores: state.privateMatch.scores
+        .map((score: any) => ({ id: score.id, kills: score.kills, deaths: score.deaths }))
+        .sort((a: any, b: any) => a.id.localeCompare(b.id)),
+      botIds: state.bots.map((bot: any) => bot.id).sort(),
+      matchEpoch: state.killstreak.matchEpoch,
+    };
+  });
+  await expect.poll(async () => guest.evaluate(() => {
+    const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+    return {
+      arenaId: state.arenaSelection.id,
+      matchPhase: state.matchPhase,
+      activeAtEpochMs: state.privateMatch.activeAtEpochMs,
+      hostedBotCount: state.privateMatch.hostedBotCount,
+      memberIds: state.privateMatch.members.map((member: any) => member.id).sort(),
+      scores: state.privateMatch.scores
+        .map((score: any) => ({ id: score.id, kills: score.kills, deaths: score.deaths }))
+        .sort((a: any, b: any) => a.id.localeCompare(b.id)),
+      botIds: state.bots.map((bot: any) => bot.id).sort(),
+      matchEpoch: state.killstreak.matchEpoch,
+    };
+  }), { timeout: 15_000 }).toEqual(hostConsensus);
+
+  } finally {
+    await Promise.allSettled([hostContext.close(), guestContext.close()]);
+  }
 });

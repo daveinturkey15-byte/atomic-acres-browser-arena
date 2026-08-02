@@ -35,7 +35,7 @@ export type PracticeTarget = {
   maxHealth: number;
   health: number;
   alwaysCritical?: boolean;
-  kind?: 'plate' | 'flying-cat';
+  kind?: 'plate' | 'flying-cat' | 'training-dummy';
 };
 export type BreakableWindow = { id: string; mesh: THREE.Mesh; broken: boolean; glassState?: GlassState };
 export type ArenaMap = {

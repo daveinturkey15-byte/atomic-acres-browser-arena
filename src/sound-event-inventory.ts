@@ -1,4 +1,5 @@
 import { AUDIO_BUS_IDS, type AudioBusId } from './audio-buses';
+import { WEAPON_IDS } from './protocol';
 
 export { AUDIO_BUS_IDS };
 export type { AudioBusId };
@@ -88,6 +89,7 @@ export const REQUIRED_SOUND_EVENT_IDS = Object.freeze([
   'support.drone-possession',
   'support.drone-sensor',
   'interaction.pickup',
+  'test-bay.door-thump',
   'shed.door-motion',
   'shed.damage',
   'shed.debris-impact',
@@ -291,7 +293,7 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('coverImpact', 'position.distanceTo(player.position)', 1, ['world.projectile-impact']),
   runtimeCallsite('crossbowFuseBeep', 'bolt.mesh.position,remainingMs,now', 1, ['ordnance.crossbow-fuse-beep']),
   runtimeCallsite('damage', '', 1, ['combat.damage-taken']),
-  runtimeCallsite('empty', '', 2, ['weapon.dry-fire']),
+  runtimeCallsite('empty', '', 3, ['weapon.dry-fire']),
   runtimeCallsite('explosion', 'afterPresentationDetach', 1, ['ordnance.frag-explosion']),
   runtimeCallsite('explosion', 'detonatedAt', 1, ['ordnance.frag-explosion']),
   runtimeCallsite('explosion', 'now', 2, ['support.legacy-explosion']),
@@ -302,7 +304,7 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('grenadeBounce', 'impactSpeed', 1, ['ordnance.grenade-bounce']),
   runtimeCallsite('grenadeBounce', 'Math.abs(incoming)', 1, ['ordnance.grenade-bounce']),
   runtimeCallsite('grenadeFuseBeep', 'fuseRemainingMs,now', 1, ['ordnance.frag-fuse-beep']),
-  runtimeCallsite('hit', 'false', 2, ['combat.hit-confirm']),
+  runtimeCallsite('hit', 'false', 3, ['combat.hit-confirm']),
   runtimeCallsite('hit', 'headshot', 2, ['combat.hit-confirm']),
   runtimeCallsite('hit', "hit.zone === 'head'", 1, ['combat.hit-confirm']),
   runtimeCallsite('hit', "zone === 'head'", 1, ['combat.hit-confirm']),
@@ -330,8 +332,11 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('setArenaZone', 'arenaZone', 1, ['ambience.zone-transition']),
   runtimeCallsite('setLowHealthFeedback', '{ active: false, severity: 0, vignetteOpacity: 0, breathingGain: 0, heartbeatGain: 0, pulseHz: 0 }', 1, ['player.low-health-breathing', 'player.low-health-heartbeat']),
   runtimeCallsite('setLowHealthFeedback', 'lowHealth.presentation', 1, ['player.low-health-breathing', 'player.low-health-heartbeat']),
+  runtimeCallsite('shot', 'admitted.weapon,true,origin.distanceTo(camera.position)', 1, ['weapon.report.world']),
   runtimeCallsite('shot', 'bot.weapon,true', 1, ['weapon.report.world']),
   runtimeCallsite('shot', "'explosive-crossbow',true,new THREE.Vector3(...request.origin).distanceTo(camera.position)", 1, ['weapon.report.world']),
+  runtimeCallsite('shot', "'flare-gun',true,new THREE.Vector3(...request.origin).distanceTo(camera.position)", 1, ['weapon.report.world']),
+  runtimeCallsite('shot', "'flare-gun',true,origin.distanceTo(camera.position)", 1, ['weapon.report.world']),
   runtimeCallsite('shot', 'message.weapon,true,origin.distanceTo(camera.position)', 3, ['weapon.report.world']),
   runtimeCallsite('shot', 'player.weapon', 1, ['weapon.report.local']),
   runtimeCallsite('supportGun', "drone ? 'drone' : 'chopper'", 1, ['support.chopper-gun', 'support.drone-gun']),
@@ -341,8 +346,9 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('supportInbound', 'message.source', 1, ['support.inbound']),
   runtimeCallsite('syncChopperRotors', '[]', 2, ['support.chopper-rotor']),
   runtimeCallsite('syncChopperRotors', 'activeSupportRotorAudioSources', 1, ['support.chopper-rotor']),
+  runtimeCallsite('testBayDoorThump', 'player.position.distanceTo(new THREE.Vector3(trigger.x, trigger.y, trigger.z))', 1, ['test-bay.door-thump']),
   runtimeCallsite('weaponAction', 'player.weapon,event', 1, ['weapon.reload-mechanic']),
-  runtimeCallsite('weaponSwitch', '', 4, ['weapon.switch', 'interaction.weapon-pickup']),
+  runtimeCallsite('weaponSwitch', '', 6, ['weapon.switch', 'interaction.weapon-pickup']),
   runtimeCallsite('worldFootstep', 'footstep.position,footstep.surface,footstep.movement,isFootstepOccluded(footstep.position)', 3, ['movement.footstep.world']),
 ]);
 
@@ -496,26 +502,10 @@ function plannedEvent(input: PlannedEventInput): SoundEventInventoryEntry {
   });
 }
 
-export const PASS64_WEAPON_AUDIO_VARIANTS = Object.freeze([
-  'carbine',
-  'smg',
-  'lmg',
-  'scattergun',
-  'sniper',
-  'mini-uzi',
-  'mp5',
-  'm4a1',
-  'ak-47',
-  'minigun',
-  'm14-ebr',
-  'slug-shotgun',
-  'pistol',
-  'machine-pistol',
-  'magnum',
-  'flashlight-pistol',
-  'explosive-crossbow',
-  'railgun',
-] as const);
+// Compatibility export retained for existing event receipts. The variants are
+// projected from the protocol registry so a canonical weapon cannot silently
+// ship without report and world-report coverage.
+export const PASS64_WEAPON_AUDIO_VARIANTS = Object.freeze([...WEAPON_IDS]);
 
 export const PASS65_PLANNED_WEAPON_AUDIO_ROLES = Object.freeze([
   'micro-smg',
@@ -933,6 +923,14 @@ const events: SoundEventInventoryEntry[] = [
     coverageDetail: 'Pickup success/failure needs bounded local feedback and a non-audio state indication.',
   }),
   existingEvent({
+    id: 'test-bay.door-thump', family: 'interactive-world', bus: 'sfx', delivery: 'world-spatial',
+    spatialProfileId: 'test-bay-door-world-v1', variants: ['secure-open-release'],
+    emitterSymbols: ['testBayDoorThump'],
+    contractRefs: ['R308'],
+    concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'arena-generation',
+    coverageDetail: 'The admitted closed-to-opening edge delivers one dedicated bounded spatial thump; closure does not replay it and shed-door synthesis is not reused.',
+  }),
+  existingEvent({
     id: 'shed.door-motion', family: 'interactive-world', bus: 'sfx', delivery: 'world-spatial',
     spatialProfileId: 'shed-mechanism-world-v1', variants: ['open-start', 'open-loop', 'close-start', 'close-loop', 'latched', 'interrupted'],
     emitterSymbols: ['shedDoorMotion'], contractRefs: ['R403', 'R405', 'R411', 'R308'],
@@ -1006,7 +1004,7 @@ export const SOUND_EVENT_INVENTORY_DOCUMENT = Object.freeze({
   schemaVersion: SOUND_EVENT_INVENTORY_SCHEMA_VERSION,
   events: SOUND_EVENT_INVENTORY,
 });
-export const SOUND_EVENT_INVENTORY_SHA256 = '9f9b3cfbbd4ad0b883dc45acce28096e47c5cc87284bd5deec672b035b668b0a';
+export const SOUND_EVENT_INVENTORY_SHA256 = '42ed79298b2605006b716a69ae653018b6fa54db0d6a133acac789dcbb9b6565';
 
 export type SoundEventInventoryVerificationOptions = Readonly<{
   observedRuntimeEmitterSymbols?: readonly string[];

@@ -44,4 +44,12 @@ describe('Pass 65 modern tactical HUD layout contract', () => {
     expect(tacticalCss).toMatch(/data-support-kind="chopper"[\s\S]*?\.support-optic-frame\s*\{[\s\S]*?width:\s*min\(62vw, 820px\)/);
     expect(shell).toContain('class="support-optic-frame" aria-hidden="true"');
   });
+
+  it('enhances the existing support action row without a duplicate operate banner', () => {
+    expect(shell).not.toContain('id="killstreak-enter-prompt"');
+    expect(shell).toContain('<footer id="support-control-action">');
+    expect(hudCss).toMatch(/#support-control-action\s*\{[\s\S]*?font:\s*800 clamp\(10px, 0\.56vw, 13px\)/);
+    expect(hudCss).toContain('#support-combat-feedback[data-awaiting-operation="true"] #support-control-action');
+    expect(hudCss).not.toContain('#killstreak-enter-prompt');
+  });
 });

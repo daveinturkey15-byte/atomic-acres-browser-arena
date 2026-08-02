@@ -17,11 +17,18 @@ import {
   fitCanvasText,
   rustworksDeckTopY,
   updateGunRangePresentation,
+  updateGunRangeTestBayDoor,
 } from './additional-maps';
+import {
+  GUN_RANGE_TEST_BAY_CONTRACT,
+  createGunRangeTestBayDoorState,
+  gunRangeTestBayDoorDynamicColliders,
+} from './gun-range-test-bay';
 import type { ArenaMap } from './map';
 import type { Stance } from './gameplay';
 import { CharacterPhysics, STANCE_SHAPES } from './physics';
 import { definition as rustworksVisualDefinition } from './rendering/arenas/rustworks-1v1';
+import { definition as gunRangeVisualDefinition } from './rendering/arenas/gun-range';
 import { definition as terminalVisualDefinition } from './rendering/arenas/skyline-terminal';
 
 type RouteAnchor = { id: string; position: [number, number, number] };
@@ -630,11 +637,12 @@ describe('additional authored maps', () => {
     const map = buildGunRange(new THREE.Scene());
     expect(map.id).toBe('gun-range');
     expect(map.label).toBe('Indoor Gun Range');
-    expect(map.targets).toHaveLength(16);
-    expect(map.targets.filter((target) => target.distanceBand === 'near')).toHaveLength(7);
-    expect(map.targets.filter((target) => target.distanceBand === 'mid')).toHaveLength(6);
-    expect(map.targets.filter((target) => target.distanceBand === 'far')).toHaveLength(3);
-    expect(map.targets.map((target) => target.scoreValue).sort((a, b) => a - b)).toEqual([
+    const scoreRangeTargets = map.targets.filter((target) => target.kind !== 'training-dummy');
+    expect(scoreRangeTargets).toHaveLength(16);
+    expect(scoreRangeTargets.filter((target) => target.distanceBand === 'near')).toHaveLength(7);
+    expect(scoreRangeTargets.filter((target) => target.distanceBand === 'mid')).toHaveLength(6);
+    expect(scoreRangeTargets.filter((target) => target.distanceBand === 'far')).toHaveLength(3);
+    expect(scoreRangeTargets.map((target) => target.scoreValue).sort((a, b) => a - b)).toEqual([
       50, 50, 50, 50, 100, 100, 100, 200, 200, 200, 250, 250, 300, 300, 300, 500,
     ]);
     expect(map.targets.every((target) => target.root.userData.scoreValue === target.scoreValue)).toBe(true);
@@ -677,6 +685,7 @@ describe('additional authored maps', () => {
     expect(presentationBatches.batches).toBeGreaterThan(0);
     expect(presentationBatches.savedDrawCalls).toBeGreaterThanOrEqual(24);
     expect(map.root.children.some((node) => node.name.startsWith('gun-range-presentation-batch-') && node.visible)).toBe(true);
+    expect(visibleMeshDrawUpperBound(map.root)).toBeLessThanOrEqual(gunRangeVisualDefinition.budgets.maximumDrawCalls);
     expect(auditLocalLightOcclusion(map.root)).toMatchObject({
       activeLocalLights: 0,
       emissiveOnlySources: 16,
@@ -709,9 +718,69 @@ describe('additional authored maps', () => {
     const stations = map.root.children.filter((child) => child.name.startsWith('gun-range-weapon-station-'));
     expect(stations).toHaveLength(5);
     expect(stations.map((station) => station.userData.weapon)).toEqual(['carbine', 'smg', 'lmg', 'scattergun', 'sniper']);
+    const testDummies = map.targets.filter((target) => target.kind === 'training-dummy');
+    expect(testDummies).toHaveLength(4);
+    expect(testDummies.every((target) => target.maxHealth === 300 && target.root.userData.armed === false)).toBe(true);
     expect(map.bounds.maxX - map.bounds.minX).toBeGreaterThanOrEqual(40);
     expect(map.bounds.maxZ - map.bounds.minZ).toBeGreaterThanOrEqual(67);
     expectGunRangeSpawnContract(map);
+  });
+
+  it('builds a collision-backed five-second tunnel and a fail-closed canonical test-bay plan', async () => {
+    const map = buildGunRange(new THREE.Scene());
+    const requiredGeometry = [
+      'gun-range-test-bay-corridor-floor',
+      'gun-range-test-bay-corridor-north-wall',
+      'gun-range-test-bay-corridor-south-wall',
+      'gun-range-test-bay-corridor-ceiling',
+      'gun-range-test-bay-secure-door-leaf',
+      'gun-range-test-bay-floor',
+      'gun-range-test-bay-ceiling',
+      'gun-range-test-bay-east-wall',
+      'gun-range-test-bay-north-wall',
+      'gun-range-test-bay-south-wall',
+    ];
+    for (const name of requiredGeometry) expect(map.root.getObjectByName(name), name).toBeTruthy();
+    expect(map.root.userData.gunRangeTestBayContract).toBe(GUN_RANGE_TEST_BAY_CONTRACT);
+    expect(map.root.userData.gunRangeTestBayRuntime).toEqual({
+      structure: 'implemented',
+      slowUnarmedTargets: 'implemented',
+      doorHelper: 'integrated-by-main-runtime',
+      supportActivation: 'host-authoritative-training-integration',
+      weaponInteraction: 'canonical-training-integration',
+    });
+    expect(namedPrefixCount(map.root, 'gun-range-test-bay-support-pad-')).toBe(
+      GUN_RANGE_TEST_BAY_CONTRACT.supportStations.length,
+    );
+    expect(namedPrefixCount(map.root, 'gun-range-test-bay-weapon-marker-')).toBe(
+      GUN_RANGE_TEST_BAY_CONTRACT.weaponStations.length,
+    );
+
+    // The east wall really is split: movement and ballistics have no static
+    // blocker through the corridor aperture, while both jamb regions remain solid.
+    const portalProbe = { x: 20.5, y: 1.7, z: 12 };
+    expect(isBlocked(portalProbe, map.colliders, 0.38)).toBe(false);
+    expect(isBlocked({ x: 20.5, y: 1.7, z: 5 }, map.colliders, 0.38)).toBe(true);
+    expect(map.shotSurfaces.some((surface) => (
+      surface.bounds.minX <= portalProbe.x && surface.bounds.maxX >= portalProbe.x
+      && surface.bounds.minZ <= portalProbe.z && surface.bounds.maxZ >= portalProbe.z
+      && (surface.bounds.minY ?? -Infinity) <= portalProbe.y && (surface.bounds.maxY ?? Infinity) >= portalProbe.y
+    ))).toBe(false);
+
+    await traverseRoute(map, [
+      { id: 'range-entry', position: [18, 1.7, 12] },
+      { id: 'corridor-entry', position: [22, 1.7, 12] },
+      { id: 'secure-door', position: [51, 1.7, 12] },
+      { id: 'test-bay-centre', position: [72, 1.7, 6] },
+    ]);
+
+    const closed = createGunRangeTestBayDoorState(0);
+    expect(gunRangeTestBayDoorDynamicColliders(closed)).toHaveLength(1);
+    const frame = updateGunRangeTestBayDoor(map.root, 0, GUN_RANGE_TEST_BAY_CONTRACT.door.trigger);
+    expect(frame).toMatchObject({ audioIntent: 'secure-door-opening-thump' });
+    expect(frame.dynamicColliders).toHaveLength(1);
+    const leaf = map.root.getObjectByName('gun-range-test-bay-secure-door-leaf');
+    expect(leaf?.userData.phase).toBe('opening');
   });
 
   it('physically contains the Gun Range player at all four map edges', async () => {

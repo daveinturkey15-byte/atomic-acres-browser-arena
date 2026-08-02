@@ -54,6 +54,7 @@ type VisibilityDocument = {
 function visibilityDocument(initial: DocumentVisibilityState): Readonly<{
   document: VisibilityDocument;
   setVisibility: (visibility: DocumentVisibilityState) => void;
+  listenerCount: () => number;
 }> {
   let current = initial;
   const listeners = new Set<EventListenerOrEventListenerObject>();
@@ -71,6 +72,7 @@ function visibilityDocument(initial: DocumentVisibilityState): Readonly<{
         else listener.handleEvent(new Event('visibilitychange'));
       }
     },
+    listenerCount: () => listeners.size,
   };
 }
 
@@ -210,6 +212,40 @@ describe('browser preparation scheduler', () => {
     expect(completed).toBe(true);
   });
 
+  it('rechecks foreground ownership after every listener is registered', async () => {
+    let visibility: DocumentVisibilityState = 'hidden';
+    const listeners = new Set<EventListenerOrEventListenerObject>();
+    vi.stubGlobal('document', {
+      get visibilityState() { return visibility; },
+      hasFocus: () => true,
+      addEventListener: (_type: string, listener: EventListenerOrEventListenerObject) => {
+        listeners.add(listener);
+        // Model an engine that updates ownership before it dispatches the
+        // queued visibility event. The post-registration read must release the
+        // waiter without depending on that later event.
+        visibility = 'visible';
+      },
+      removeEventListener: (_type: string, listener: EventListenerOrEventListenerObject) => listeners.delete(listener),
+    });
+
+    await expect(waitForVisibleBrowserPreparation()).resolves.toBeUndefined();
+    expect(listeners.size).toBe(0);
+  });
+
+  it('cancels a hidden foreground wait and removes its ownership listeners', async () => {
+    const visibility = visibilityDocument('hidden');
+    const abort = new AbortController();
+    const reason = new DOMException('superseded admission', 'AbortError');
+    vi.stubGlobal('document', visibility.document);
+
+    const pending = waitForVisibleBrowserPreparation(abort.signal);
+    expect(visibility.listenerCount()).toBe(1);
+    abort.abort(reason);
+
+    await expect(pending).rejects.toBe(reason);
+    expect(visibility.listenerCount()).toBe(0);
+  });
+
   it('requests an actual compositor frame only after presentation regains the foreground', async () => {
     const visibility = visibilityDocument('hidden');
     let frameCallback: FrameRequestCallback | null = null;
@@ -229,6 +265,118 @@ describe('browser preparation scheduler', () => {
     (frameCallback as FrameRequestCallback | null)?.(123.5);
 
     await expect(pending).resolves.toBe(123.5);
+  });
+
+  it('cancels and retries the real frame across hidden and focus ownership oscillation', async () => {
+    let visibility: DocumentVisibilityState = 'visible';
+    let focused = true;
+    const documentListeners = new Map<string, Set<EventListenerOrEventListenerObject>>();
+    const windowListeners = new Map<string, Set<EventListenerOrEventListenerObject>>();
+    const listenersFor = (
+      target: Map<string, Set<EventListenerOrEventListenerObject>>,
+      type: string,
+    ): Set<EventListenerOrEventListenerObject> => {
+      const existing = target.get(type);
+      if (existing) return existing;
+      const created = new Set<EventListenerOrEventListenerObject>();
+      target.set(type, created);
+      return created;
+    };
+    const dispatch = (
+      target: Map<string, Set<EventListenerOrEventListenerObject>>,
+      type: string,
+    ): void => {
+      for (const listener of [...listenersFor(target, type)]) {
+        const event = new Event(type);
+        if (typeof listener === 'function') listener(event);
+        else listener.handleEvent(event);
+      }
+    };
+    vi.stubGlobal('document', {
+      get visibilityState() { return visibility; },
+      hasFocus: () => focused,
+      addEventListener: (type: string, listener: EventListenerOrEventListenerObject) => listenersFor(documentListeners, type).add(listener),
+      removeEventListener: (type: string, listener: EventListenerOrEventListenerObject) => listenersFor(documentListeners, type).delete(listener),
+    });
+    vi.stubGlobal('window', {
+      addEventListener: (type: string, listener: EventListenerOrEventListenerObject) => listenersFor(windowListeners, type).add(listener),
+      removeEventListener: (type: string, listener: EventListenerOrEventListenerObject) => listenersFor(windowListeners, type).delete(listener),
+    });
+    let nextFrameHandle = 0;
+    const frameCallbacks = new Map<number, FrameRequestCallback>();
+    const requestFrame = vi.fn((callback: FrameRequestCallback) => {
+      nextFrameHandle += 1;
+      frameCallbacks.set(nextFrameHandle, callback);
+      return nextFrameHandle;
+    });
+    const cancelFrame = vi.fn();
+    vi.stubGlobal('requestAnimationFrame', requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', cancelFrame);
+    let completed = false;
+    const pending = yieldVisibleBrowserPresentationFrame().then((at) => {
+      completed = true;
+      return at;
+    });
+
+    for (let turn = 0; turn < 4 && requestFrame.mock.calls.length < 1; turn += 1) await Promise.resolve();
+    expect(requestFrame).toHaveBeenCalledTimes(1);
+    visibility = 'hidden';
+    focused = false;
+    dispatch(documentListeners, 'visibilitychange');
+    dispatch(windowListeners, 'blur');
+    await Promise.resolve();
+    expect(cancelFrame).toHaveBeenCalledWith(1);
+    expect(completed).toBe(false);
+
+    visibility = 'visible';
+    dispatch(documentListeners, 'visibilitychange');
+    await Promise.resolve();
+    expect(requestFrame).toHaveBeenCalledTimes(1);
+    focused = true;
+    dispatch(windowListeners, 'focus');
+    for (let turn = 0; turn < 4 && requestFrame.mock.calls.length < 2; turn += 1) await Promise.resolve();
+    expect(requestFrame).toHaveBeenCalledTimes(2);
+
+    focused = false;
+    dispatch(windowListeners, 'blur');
+    await Promise.resolve();
+    expect(cancelFrame).toHaveBeenCalledWith(2);
+    focused = true;
+    dispatch(windowListeners, 'focus');
+    for (let turn = 0; turn < 4 && requestFrame.mock.calls.length < 3; turn += 1) await Promise.resolve();
+    expect(requestFrame).toHaveBeenCalledTimes(3);
+
+    // Even if a browser delivers callbacks that were already cancelled, they
+    // cannot become a hidden or stale successful presentation boundary.
+    frameCallbacks.get(1)?.(101);
+    frameCallbacks.get(2)?.(202);
+    await Promise.resolve();
+    expect(completed).toBe(false);
+    frameCallbacks.get(3)?.(303);
+
+    await expect(pending).resolves.toBe(303);
+    expect([...documentListeners.values()].every((listeners) => listeners.size === 0)).toBe(true);
+    expect([...windowListeners.values()].every((listeners) => listeners.size === 0)).toBe(true);
+  });
+
+  it('aborts a requested presentation frame without accepting it as success', async () => {
+    const visibility = visibilityDocument('visible');
+    const abort = new AbortController();
+    const reason = new DOMException('admission replaced', 'AbortError');
+    const requestFrame = vi.fn(() => 41);
+    const cancelFrame = vi.fn();
+    vi.stubGlobal('document', visibility.document);
+    vi.stubGlobal('requestAnimationFrame', requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', cancelFrame);
+    const pending = yieldVisibleBrowserPresentationFrame(abort.signal);
+
+    for (let turn = 0; turn < 4 && requestFrame.mock.calls.length < 1; turn += 1) await Promise.resolve();
+    expect(requestFrame).toHaveBeenCalledTimes(1);
+    abort.abort(reason);
+
+    await expect(pending).rejects.toBe(reason);
+    expect(cancelFrame).toHaveBeenCalledWith(41);
+    expect(visibility.listenerCount()).toBe(0);
   });
 
   it('waits for window focus when a visible document does not own presentation', async () => {

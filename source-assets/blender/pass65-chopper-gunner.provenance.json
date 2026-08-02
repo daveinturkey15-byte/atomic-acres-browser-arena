@@ -5,19 +5,22 @@
   "creator": "Atomic Acres project",
   "owner": "Atomic Acres project",
   "created": "2026-07-26",
+  "refined": "2026-08-02",
   "license": "Project-original; no third-party meshes or textures",
   "blenderVersion": "5.1.2",
   "generator": {
     "path": "scripts/blender/create-pass65-support-vehicles.py",
-    "sha256": "86d90e47e93e7d04e2705e8b08615323385ed24e22e70b59a68189584877bdac"
+    "sha256": "d0bdf98635e25b38348149d02cc990157aac367108468fdd177437c7d256e8f4"
   },
   "runtimeForwardAxis": "-Z",
-  "blenderAuthoringForwardAxis": "-Y converted to glTF -Z by Y-up export",
+  "blenderAuthoringForwardAxis": "+Y converted to glTF -Z by Y-up export",
   "presentationOnly": true,
   "inspirationBoundary": "Original stylized near-future support helicopter. No copied commercial-game geometry, texture, logo, HUD, animation, UI, or audio.",
+  "visualRevision": "close-range-tandem-armored-airframe-v4",
+  "detailContract": "layered-armour-framed-canopy-fasteners-sensors-ordnance-mechanics-v4",
   "sourceBlend": {
     "path": "source-assets/blender/pass65-chopper-gunner.blend",
-    "sha256": "81a84cd3e9d265cddb305ad54926f11e71a6ff705d1f07e3bb0e78b88fdf77b9"
+    "sha256": "f6df54593f798a4f851837d1c9baa114ae8e655aaaadf3bb564c7b6680a87f31"
   },
   "sharedConsumers": [
     "menu-prerecorded-map-preview",
@@ -27,37 +30,37 @@
   "worldGlbs": [
     {
       "path": "public/assets/original/models/support/pass65-chopper-gunner-lod0.glb",
-      "sha256": "9d5936ce16ae4aeccf3291c7f2d9aa041f823cf96d2fddf80d35fee5bb284c73",
+      "sha256": "905477c22b5d21eba650e618793f67c932cc9b349af4e31e2a1b6a6eca2ac7d8",
       "lod": 0,
-      "triangles": 75944,
-      "bytes": 840660
+      "triangles": 59740,
+      "bytes": 943932
     },
     {
       "path": "public/assets/original/models/support/pass65-chopper-gunner-lod1.glb",
-      "sha256": "044b33914aa1ee79485ebe761d425e321a578b251e7050c46d4273baf718c90f",
+      "sha256": "2df9641a2c79c2c500464e98e9cdf1a400cb7271d5bfa74ec38e7468828a1877",
       "lod": 1,
-      "triangles": 33128,
-      "bytes": 578756
+      "triangles": 49920,
+      "bytes": 844092
     },
     {
       "path": "public/assets/original/models/support/pass65-chopper-gunner-lod2.glb",
-      "sha256": "339110af1ca885f8ba2a47a62a26cd0f1ed5ac8a6bfb534705158fbb23e9e4d9",
+      "sha256": "c14d3b385a2850de56cee00a832381a1fcca06c0e452540654bc0772af88f1fd",
       "lod": 2,
-      "triangles": 19880,
-      "bytes": 435660
+      "triangles": 29068,
+      "bytes": 570300
     }
   ],
   "firstPersonGlb": {
     "path": "public/assets/original/models/support/pass65-chopper-gunner-lod0.glb",
-    "sha256": "9d5936ce16ae4aeccf3291c7f2d9aa041f823cf96d2fddf80d35fee5bb284c73",
+    "sha256": "905477c22b5d21eba650e618793f67c932cc9b349af4e31e2a1b6a6eca2ac7d8",
     "lod": 0,
-    "triangles": 75944,
-    "bytes": 840660
+    "triangles": 59740,
+    "bytes": 943932
   },
   "pbrMaps": {
     "baseColor": {
       "path": "public/assets/original/textures/support/pass65-chopper-albedo.png",
-      "sha256": "bc729d8572e00ce6fbf712543071556a15e7ed970fea279c9582cf8f2199c6a3",
+      "sha256": "3e99137cf87a5968a68cf675fc7ade2598341f8871ecd32bf51a0e54683dfef2",
       "width": 512,
       "height": 512
     },
@@ -75,7 +78,7 @@
     },
     "emissive": {
       "path": "public/assets/original/textures/support/pass65-chopper-emissive.png",
-      "sha256": "ed9974eee6effb11d2b86bc2d58405054dc1ffdc1202458759221419a4bf0c71",
+      "sha256": "55aea7bfe6f9c90c71df2379611c12eada3014444ccbce4f3352d3303077a44f",
       "width": 512,
       "height": 512
     }
@@ -122,7 +125,7 @@
   "review": {
     "acceptedFirstPersonFrame": {
       "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png",
-      "sha256": "d027178915b0a4ae9544fa9403421310c1ffc30f47902d9c3023ace52a722475",
+      "sha256": "b75d0ca8dc8b8be61c93e06a737029ad679f480d27eea56edc66dadcd00fba9e",
       "cameraId": "accepted-first-person-instruments",
       "width": 960,
       "height": 540
@@ -130,28 +133,42 @@
     "renders": [
       {
         "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-exterior-front-quarter.png",
-        "sha256": "2d6d6114cfc6b5d8475f0330a106d612c9fcd66520b136d6335b4e6f9fc914fb",
+        "sha256": "ae804f65b7b19acb51b430e93e809228d0388cd54e081b991e768612785cb1c1",
         "cameraId": "exterior-front-quarter",
         "width": 512,
         "height": 512
       },
       {
         "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-rotor-gun-profile.png",
-        "sha256": "c909ad06e80ddc41430e86304ffd4d70a2626c9fe21f9b0efa774458e1034a25",
+        "sha256": "08880b8f985a4f143883745f53bd55afc6bba129ff884fe54180c35b910a675e",
         "cameraId": "rotor-gun-profile",
         "width": 512,
         "height": 512
       },
       {
         "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-rear-fuselage-quarter.png",
-        "sha256": "2358f1a6e19cf7d4de0024d524aaa3368586606dc3b75daac7f08b6e2aa094ce",
+        "sha256": "40aad0bb12f953bd528fd40349a4a74a96a3baf75c63ec8bf02e125ae227a7d3",
         "cameraId": "rear-fuselage-quarter",
         "width": 512,
         "height": 512
       },
       {
+        "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-canopy-armour-closeup.png",
+        "sha256": "71d4672c577b78b2c8de290eddba5a9967c76e38f92c194e4022a6e18e5c9101",
+        "cameraId": "canopy-armour-closeup",
+        "width": 512,
+        "height": 512
+      },
+      {
+        "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-ordnance-mechanics-closeup.png",
+        "sha256": "a55a950e87375fb071fe3f9be601ddfd333fe002bf7981348af2b1c8289b8772",
+        "cameraId": "ordnance-mechanics-closeup",
+        "width": 512,
+        "height": 512
+      },
+      {
         "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png",
-        "sha256": "d027178915b0a4ae9544fa9403421310c1ffc30f47902d9c3023ace52a722475",
+        "sha256": "b75d0ca8dc8b8be61c93e06a737029ad679f480d27eea56edc66dadcd00fba9e",
         "cameraId": "accepted-first-person-instruments",
         "width": 960,
         "height": 540
@@ -159,20 +176,20 @@
     ],
     "contactSheet": {
       "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-contact-sheet.png",
-      "sha256": "f96cd1da0b4735f449c322255ab6b6473ba9de2560e56acd0133fa663b07c356",
+      "sha256": "54a1ce8a69a1c3568f5fde64c568b9224ff7142d5cde77d1833c2041fd555347",
       "cameraId": "accepted-contact-sheet",
-      "width": 1024,
+      "width": 1536,
       "height": 1024
     },
-    "acceptance": "parent visual gate APPROVE after original-resolution rear-quarter and unobstructed 960x540 gunner-sightline inspection"
+    "acceptance": "mechanical authoring review only; independent visual QA and owner HITL remain required"
   },
   "runtimeAudit": {
     "lods": [
       {
         "lod": 0,
-        "triangles": 75944,
-        "bytes": 840660,
-        "meshNodes": 211,
+        "triangles": 59740,
+        "bytes": 943932,
+        "meshNodes": 360,
         "materials": 19,
         "images": 4,
         "animations": [
@@ -185,13 +202,46 @@
           "Chopper_Tracer_Pulse",
           "Chopper_Tail_Rotor_Loop"
         ],
-        "externalUris": 0
+        "externalUris": 0,
+        "detailCounts": {
+          "Chopper_ArmoredNose_": 1,
+          "Chopper_CheekArmor_": 2,
+          "Chopper_TandemPilotCanopy_": 1,
+          "Chopper_TandemGunnerCanopy_": 1,
+          "Chopper_TandemDivider_": 2,
+          "Chopper_CanopyCrossBrace_": 3,
+          "Chopper_EngineIntake_": 2,
+          "Chopper_EngineExhaust_": 2,
+          "Chopper_RocketPod_": 2,
+          "Chopper_RocketPodMuzzleCollar_": 2,
+          "Chopper_RocketTube_": 14,
+          "Chopper_Missile_": 4,
+          "Chopper_SensorLens_": 2,
+          "Chopper_RotorYoke_": 2,
+          "Chopper_MainBladeGrip_": 4,
+          "Chopper_TailBladeGrip_": 4,
+          "Chopper_TailGearbox_": 1,
+          "Chopper_GunBarrelCollar_": 3,
+          "Chopper_GunArmourShroud_": 2,
+          "Chopper_SkidDamper_": 4,
+          "Chopper_OverlappingArmorPlate_": 8,
+          "Chopper_ArmorFastener_": 16,
+          "Chopper_DorsalArmorPanel_": 1,
+          "Chopper_NoseArmorCap_": 1,
+          "Chopper_EngineDeckLouver_": 4,
+          "Chopper_CanopyArmourBrow_": 2,
+          "Chopper_CanopyRoofArmor_": 1,
+          "Chopper_CanopyArmorBolt_": 4,
+          "Chopper_FuselagePanelSeam_": 6,
+          "Chopper_GunFeedLink_": 5,
+          "Chopper_SkidWearShoe_": 4
+        }
       },
       {
         "lod": 1,
-        "triangles": 33128,
-        "bytes": 578756,
-        "meshNodes": 203,
+        "triangles": 49920,
+        "bytes": 844092,
+        "meshNodes": 301,
         "materials": 19,
         "images": 4,
         "animations": [
@@ -204,13 +254,38 @@
           "Chopper_Tracer_Pulse",
           "Chopper_Tail_Rotor_Loop"
         ],
-        "externalUris": 0
+        "externalUris": 0,
+        "detailCounts": {
+          "Chopper_ArmoredNose_": 1,
+          "Chopper_CheekArmor_": 2,
+          "Chopper_TandemPilotCanopy_": 1,
+          "Chopper_TandemGunnerCanopy_": 1,
+          "Chopper_TandemDivider_": 2,
+          "Chopper_CanopyCrossBrace_": 3,
+          "Chopper_EngineIntake_": 2,
+          "Chopper_EngineExhaust_": 2,
+          "Chopper_RocketPod_": 2,
+          "Chopper_RocketPodMuzzleCollar_": 2,
+          "Chopper_RocketTube_": 8,
+          "Chopper_Missile_": 2,
+          "Chopper_SensorLens_": 2,
+          "Chopper_RotorYoke_": 2,
+          "Chopper_MainBladeGrip_": 4,
+          "Chopper_TailBladeGrip_": 4,
+          "Chopper_TailGearbox_": 1,
+          "Chopper_GunBarrelCollar_": 3,
+          "Chopper_GunArmourShroud_": 2,
+          "Chopper_SkidDamper_": 4,
+          "Chopper_OverlappingArmorPlate_": 4,
+          "Chopper_DorsalArmorPanel_": 1,
+          "Chopper_CanopyArmourBrow_": 2
+        }
       },
       {
         "lod": 2,
-        "triangles": 19880,
-        "bytes": 435660,
-        "meshNodes": 108,
+        "triangles": 29068,
+        "bytes": 570300,
+        "meshNodes": 164,
         "materials": 19,
         "images": 4,
         "animations": [
@@ -223,7 +298,29 @@
           "Chopper_Tracer_Pulse",
           "Chopper_Tail_Rotor_Loop"
         ],
-        "externalUris": 0
+        "externalUris": 0,
+        "detailCounts": {
+          "Chopper_ArmoredNose_": 1,
+          "Chopper_CheekArmor_": 2,
+          "Chopper_TandemPilotCanopy_": 1,
+          "Chopper_TandemGunnerCanopy_": 1,
+          "Chopper_TandemDivider_": 2,
+          "Chopper_CanopyCrossBrace_": 3,
+          "Chopper_EngineIntake_": 2,
+          "Chopper_EngineExhaust_": 2,
+          "Chopper_RocketPod_": 2,
+          "Chopper_RocketPodMuzzleCollar_": 2,
+          "Chopper_RocketTube_": 2,
+          "Chopper_Missile_": 2,
+          "Chopper_SensorLens_": 2,
+          "Chopper_RotorYoke_": 2,
+          "Chopper_MainBladeGrip_": 4,
+          "Chopper_TailBladeGrip_": 4,
+          "Chopper_TailGearbox_": 1,
+          "Chopper_GunBarrelCollar_": 3,
+          "Chopper_GunArmourShroud_": 2,
+          "Chopper_SkidDamper_": 4
+        }
       }
     ],
     "compressedGeometry": "EXT_meshopt_compression plus KHR_mesh_quantization",

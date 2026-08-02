@@ -18,15 +18,15 @@
   },
   "geometryModule": {
     "path": "scripts/blender/pass65_weapon_production_geometry.py",
-    "sha256": "70a191c14928ec95d9aefdc41a10cd94662bd44f684fb21f3149d88a813c38b8"
+    "sha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276"
   },
   "sourceBlend": {
     "path": "source-assets/blender/pass65-weapon-families.blend",
-    "sha256": "6a8c458807efedaaca6234ae33d91a204dcacf96cefb7cb201585f90807e8754"
+    "sha256": "650f0286bc702996887fc80d291494d86f040a5f5ae3d1712aa8f61d7695f892"
   },
   "sourceSpec": {
     "path": "source-assets/blender/pass65-weapon-family-specs.json",
-    "sha256": "3e8cff133381c65a514a2a5f97a348a4229208dc014de0bf9bad53432255cebf"
+    "sha256": "86d8568971b88f84438330875ddc295d4cf823bf1a648197bc36df0c095cd706"
   },
   "runtimeForwardAxis": "-Z",
   "visualRevision": "m4a1-production-hero-v3",

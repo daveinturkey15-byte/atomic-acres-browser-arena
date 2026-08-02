@@ -61,6 +61,12 @@ export const DEFAULT_PRIVATE_MATCH_CONFIG: PrivateMatchConfig = Object.freeze({
 });
 
 export const REJOIN_GRACE_MS = 90_000;
+export const MAX_PRIVATE_MATCH_DURATION_MS = 900_000;
+// A reclaimed host has a fresh performance-time origin. Preserve the original
+// match start as a bounded historical timestamp so guests can reconstruct the
+// remaining clock instead of rejecting an otherwise valid recovery envelope.
+export const MIN_RECOVERED_HOST_START_TIME_MS = -MAX_PRIVATE_MATCH_DURATION_MS;
+export const MAX_HOST_START_FUTURE_LEAD_MS = 10_000;
 
 export function rejoinReservationExpired(disconnectedAtMonoMs: number, nowMonoMs: number): boolean {
   return Number.isFinite(disconnectedAtMonoMs) && Number.isFinite(nowMonoMs)
@@ -88,7 +94,7 @@ export function isPrivateMatchConfig(value: unknown): value is PrivateMatchConfi
     && typeof config.autoBalance === 'boolean'
     && Number.isSafeInteger(config.durationMs)
     && Number(config.durationMs) >= 60_000
-    && Number(config.durationMs) <= 900_000
+    && Number(config.durationMs) <= MAX_PRIVATE_MATCH_DURATION_MS
     && (config.arenaId !== 'gun-range' || config.mode === 'ffa' && config.hostedBotCount === 0 && config.autoBalance === false);
 }
 
@@ -151,7 +157,9 @@ export function isLobbySnapshot(value: unknown): value is LobbySnapshot {
   if (new Set(snapshot.scores.map((score) => score.id)).size !== snapshot.scores.length) return false;
   if (!Number.isFinite(snapshot.snapshotHostTimeMs) || Number(snapshot.snapshotHostTimeMs) < 0) return false;
   const validHostStart = snapshot.activeAtHostTimeMs === null
-    || Number.isFinite(snapshot.activeAtHostTimeMs) && Number(snapshot.activeAtHostTimeMs) >= 0;
+    || Number.isFinite(snapshot.activeAtHostTimeMs)
+      && Number(snapshot.activeAtHostTimeMs) >= MIN_RECOVERED_HOST_START_TIME_MS
+      && Number(snapshot.activeAtHostTimeMs) <= Number(snapshot.snapshotHostTimeMs) + MAX_HOST_START_FUTURE_LEAD_MS;
   const validEpochStart = snapshot.activeAtEpochMs === null
     || Number.isFinite(snapshot.activeAtEpochMs) && Number(snapshot.activeAtEpochMs) >= 0 && Number(snapshot.activeAtEpochMs) <= 10_000_000_000_000;
   return validHostStart && validEpochStart && (snapshot.activeAtHostTimeMs === null) === (snapshot.activeAtEpochMs === null);

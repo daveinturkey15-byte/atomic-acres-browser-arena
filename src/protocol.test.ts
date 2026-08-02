@@ -5,6 +5,7 @@ import { MULTIPLAYER_PROTOCOL_VERSION, isGameMessage, isHostAuthorityMessage, is
 import { advanceRailgunAuthority, createRailgunAuthorityState, RAILGUN_SPAWN_DELAY_MS } from './railgun-authority';
 import { shedPlacementsForArena } from './destructible-shed-registry';
 import { InteractiveWorldRuntime } from './interactive-world-runtime';
+import { BOT_WEAPON_PRESENTATION_SCHEMA_VERSION } from './bot-weapon-presentation';
 
 const player = {
   id: 'abc', name: 'Tester', team: 0 as const,
@@ -18,6 +19,32 @@ describe('network protocol guards', () => {
   it('accepts a bounded valid player snapshot and known stance', () => {
     expect(isPlayerSnapshot(player)).toBe(true);
     expect(isGameMessage(state({ ...player, stance: 'prone' as const }))).toBe(true);
+  });
+
+  it('accepts only a compact inventory projection bound to the state sequence', () => {
+    const combatInventory = {
+      revision: player.seq,
+      primary: { weapon: 'carbine', ammo: 19, reserve: 100 },
+      sidearm: { weapon: 'pistol', ammo: 11, reserve: 48 },
+      grenades: 0,
+    } as const;
+    expect(isGameMessage({ ...state(), combatInventory })).toBe(true);
+    expect(isGameMessage({ ...state(), combatInventory: { ...combatInventory, revision: player.seq - 1 } })).toBe(false);
+    expect(isGameMessage({
+      ...state(),
+      combatInventory: { ...combatInventory, primary: { ...combatInventory.primary, weapon: 'smg' } },
+    })).toBe(false);
+    expect(isGameMessage({
+      ...state(),
+      combatInventory: { ...combatInventory, ammo: { carbine: 19 } },
+    })).toBe(false);
+  });
+
+  it('admits equipped pickup-only specials without admitting them into loadout slots', () => {
+    expect(isPlayerSnapshot({ ...player, weapon: 'flamethrower' })).toBe(true);
+    expect(isPlayerSnapshot({ ...player, weapon: 'flare-gun' })).toBe(true);
+    expect(isPlayerSnapshot({ ...player, primary: 'flamethrower', weapon: 'flamethrower' })).toBe(false);
+    expect(isPlayerSnapshot({ ...player, secondary: 'flare-gun', weapon: 'flare-gun' })).toBe(false);
   });
 
   it('rejects malformed or unbounded messages', () => {
@@ -60,14 +87,17 @@ describe('network protocol guards', () => {
       direction: [0, 0, -1] as [number, number, number],
       pelletDirections: [[0, 0, -1]] as [number, number, number][],
       nonce: 41,
-    };
+    } as const;
     const result = {
       type: 'shot-result' as const,
       protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
       by: 'host',
       forPlayerId: 'abc',
       shotId: request.shotId,
+      connectionEpoch: request.connectionEpoch,
+      lifeId: request.lifeId,
       shotSeq: request.shotSeq,
+      weapon: request.weapon,
       status: 'accepted-hit' as const,
       reason: 'none' as const,
       fireTimeMs: request.fireTimeMs,
@@ -75,17 +105,25 @@ describe('network protocol guards', () => {
       receivedAtHostTimeMs: 2_520,
       resolvedAtHostTimeMs: 2_521,
       appliedRewindMs: 80,
+      combatInventory: {
+        revision: 8,
+        primary: { weapon: 'carbine' as const, ammo: 19, reserve: 100 },
+        sidearm: { weapon: 'pistol' as const, ammo: 12, reserve: 48 },
+        grenades: 1 as const,
+      },
       outcomes: [{
         target: 'host', pelletHits: 1, damage: 31.4, rawDamage: 31.4, resultingHealth: 68.6,
         died: false, hitZone: 'body' as const, wallbang: false, penetrationMultiplier: 1,
       }],
       nonce: 42,
-    };
+    } as const;
     expect(isGameMessage(request)).toBe(true);
     expect(isGameMessage(result)).toBe(true);
     expect(isGameMessage({ ...request, protocolVersion: 1 })).toBe(false);
     expect(isGameMessage({ ...request, targetViewTimeMs: request.fireTimeMs + 1 })).toBe(false);
     expect(isGameMessage({ ...request, direction: [0, 0, -0.5] })).toBe(false);
+    expect(isGameMessage({ ...result, combatInventory: null })).toBe(false);
+    expect(isGameMessage({ ...result, connectionEpoch: 'wrong' })).toBe(false);
     expect(isGameMessage({ ...result, outcomes: [{ ...result.outcomes[0], damage: 401 }] })).toBe(false);
     expect(isGameMessage({ ...result, outcomes: [{ ...result.outcomes[0], rawDamage: 30 }] })).toBe(false);
   });
@@ -173,12 +211,52 @@ describe('network protocol guards', () => {
     expect(isHostAuthorityMessage(botState)).toBe(true);
     expect(isStateTrafficMessage(botState)).toBe(true);
     expect(isGameMessage(botDamage)).toBe(true);
+    expect(isGameMessage({ ...botDamage, weapon: 'flare-gun', presentation: 'signal-flare-projectile' })).toBe(true);
+    expect(isGameMessage({ ...botDamage, presentation: 'fake-projectile' })).toBe(false);
+    expect(isGameMessage({ ...botDamage, weapon: 'flare-gun' })).toBe(false);
+    expect(isGameMessage({ ...botDamage, presentation: 'signal-flare-projectile' })).toBe(false);
+    expect(isGameMessage({ ...botDamage, weapon: 'flamethrower', presentation: 'flamethrower-stream' })).toBe(true);
+    expect(isGameMessage({ ...botDamage, weapon: 'flamethrower' })).toBe(true);
+    expect(isGameMessage({ ...botDamage, weapon: 'flamethrower', presentation: 'signal-flare-projectile' })).toBe(false);
     expect(isGameMessage({ ...botState, bots: [{ ...bot, weapon: 'pistol' }] })).toBe(true);
     expect(isGameMessage({ ...botDamage, weapon: 'pistol' })).toBe(true);
     expect(isGameMessage({ ...botState, bots: [{ ...bot, weapon: 'minigun' }] })).toBe(false);
     expect(isHostAuthorityMessage(botDamage)).toBe(true);
     expect(isGameMessage({ ...botDamage, healthAfter: 85 })).toBe(false);
     expect(isGameMessage({ ...botState, bots: [bot, bot] })).toBe(false);
+
+    const botFlamePresentation = {
+      type: 'bot-weapon-presentation' as const,
+      schemaVersion: BOT_WEAPON_PRESENTATION_SCHEMA_VERSION,
+      by: 'host',
+      matchEpoch: 7,
+      botId: bot.id,
+      weapon: 'flamethrower' as const,
+      presentation: 'flamethrower-stream' as const,
+      origin: [1, 1.4, 2] as const,
+      end: [1, 1.4, -8] as const,
+      actionNonce: 31,
+      nonce: 32,
+    };
+    const botFlarePresentation = {
+      type: 'bot-weapon-presentation' as const,
+      schemaVersion: BOT_WEAPON_PRESENTATION_SCHEMA_VERSION,
+      by: 'host',
+      matchEpoch: 7,
+      botId: bot.id,
+      weapon: 'flare-gun' as const,
+      presentation: 'signal-flare-launch' as const,
+      origin: [1, 1.4, 2] as const,
+      actionNonce: 33,
+      nonce: 34,
+    };
+    expect(isGameMessage(botFlamePresentation)).toBe(true);
+    expect(isGameMessage(botFlarePresentation)).toBe(true);
+    expect(isHostAuthorityMessage(botFlamePresentation)).toBe(true);
+    expect(isStateTrafficMessage(botFlamePresentation)).toBe(false);
+    expect(messageBelongsToPlayer(botFlamePresentation, 'host')).toBe(true);
+    expect(isGameMessage({ ...botFlamePresentation, damage: 1 })).toBe(false);
+    expect(isGameMessage({ ...botFlarePresentation, presentation: 'signal-flare-projectile' })).toBe(false);
   });
 
   it('admits score snapshots for the maximum six-player/four-bot lobby', () => {
@@ -245,6 +323,35 @@ describe('network protocol guards', () => {
     expect(isHostAuthorityMessage(redeployCommit)).toBe(true);
     expect(isGameMessage({ ...redeploy, primary: 'laser' })).toBe(false);
     expect(isGameMessage({ ...redeploy, protocolVersion: MULTIPLAYER_PROTOCOL_VERSION - 1 })).toBe(false);
+  });
+
+  it('validates authenticated reload intents and canonical host results', () => {
+    const intent = {
+      type: 'reload-intent' as const, protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      by: 'abc', connectionEpoch: 'connection_epoch_abc', lifeId: 3,
+      actionSequence: 4, weapon: 'carbine' as const, action: 'start' as const, nonce: 194,
+    } as const;
+    const result = {
+      type: 'reload-result' as const, protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      by: 'host', forPlayerId: 'abc', connectionEpoch: intent.connectionEpoch, lifeId: intent.lifeId,
+      actionSequence: intent.actionSequence, weapon: intent.weapon, status: 'started' as const,
+      reason: 'accepted' as const, completesAtHostTimeMs: 4_200, shotSequenceWatermark: 2,
+      combatInventory: {
+        revision: 11,
+        primary: { weapon: 'carbine' as const, ammo: 7, reserve: 100 },
+        sidearm: { weapon: 'pistol' as const, ammo: 12, reserve: 48 },
+        grenades: 1 as const,
+      },
+      nonce: 195,
+    } as const;
+    expect(isGameMessage(intent)).toBe(true);
+    expect(messageBelongsToPlayer(intent, 'abc')).toBe(true);
+    expect(isHostAuthorityMessage(intent)).toBe(false);
+    expect(isGameMessage(result)).toBe(true);
+    expect(isHostAuthorityMessage(result)).toBe(true);
+    expect(isGameMessage({ ...intent, actionSequence: -1 })).toBe(false);
+    expect(isGameMessage({ ...intent, weapon: 'railgun' })).toBe(false);
+    expect(isGameMessage({ ...result, combatInventory: { ...result.combatInventory, revision: -1 } })).toBe(false);
   });
 
   it('admits versioned railgun requests and host state only on the reliable authority lane', () => {
@@ -370,6 +477,17 @@ describe('network protocol guards', () => {
     expect(isGameMessage({ ...join, resumeToken: 'short' })).toBe(false);
     expect(isGameMessage(lobbyState)).toBe(true);
     expect(isGameMessage({ type: 'lobby-start', by: 'host', activeAtHostTimeMs: 4_000, activeAtEpochMs: 1_700_000_004_000, hostSentTimeMs: 1_000, revision: 3, nonce: 4 })).toBe(true);
+    expect(isGameMessage({ type: 'lobby-start', by: 'host', activeAtHostTimeMs: -25_000, activeAtEpochMs: 1_700_000_004_000, hostSentTimeMs: 1_000, revision: 3, nonce: 5 })).toBe(true);
+    expect(isGameMessage({
+      ...lobbyState,
+      snapshot: { ...lobbyState.snapshot, phase: 'active', activeAtHostTimeMs: -25_000, activeAtEpochMs: 1_700_000_004_000 },
+    })).toBe(true);
+    expect(isGameMessage({ type: 'lobby-start', by: 'host', activeAtHostTimeMs: -900_001, activeAtEpochMs: 1_700_000_004_000, hostSentTimeMs: 1_000, revision: 3, nonce: 6 })).toBe(false);
+    expect(isGameMessage({ type: 'lobby-start', by: 'host', activeAtHostTimeMs: 11_001, activeAtEpochMs: 1_700_000_004_000, hostSentTimeMs: 1_000, revision: 3, nonce: 7 })).toBe(false);
+    expect(isGameMessage({
+      ...lobbyState,
+      snapshot: { ...lobbyState.snapshot, phase: 'countdown', activeAtHostTimeMs: 11_001, activeAtEpochMs: 1_700_000_004_000 },
+    })).toBe(false);
     expect(isGameMessage({ type: 'lobby-handicap', by: 'host', dhv: 'X', nonce: 3 })).toBe(true);
     expect(isGameMessage({ type: 'lobby-handicap', by: 'host', dhv: 9, nonce: 3 })).toBe(false);
     expect(isHostAuthorityMessage(lobbyState)).toBe(true);

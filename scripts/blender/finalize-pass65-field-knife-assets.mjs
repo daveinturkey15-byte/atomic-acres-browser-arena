@@ -68,8 +68,9 @@ const provenance = {
   title: 'Pass 65 project-original fixed-blade tactical field knife',
   creator: 'Atomic Acres project', owner: 'Atomic Acres project', created: '2026-07-26',
   license: 'Project-original; no third-party meshes or textures',
-  inspirationBoundary: 'Original full-tang fixed blade with G10 scales, recessed fuller, spine serrations, guard, screws and lanyard pommel. No copied commercial-game geometry, textures, logos, animation, UI or audio.',
+  inspirationBoundary: 'Original compact drop-point full-tang field knife with a physical honed bevel, swedge, recessed fuller, contoured G10 scales, chevron grip, spine jimping, guard, fasteners and lanyard pommel. No copied commercial-game geometry, textures, logos, animation, UI or audio.',
   blenderVersion: '5.1.2', generator: sourceScript, sourceBlend,
+  visualRevision: 'compact-drop-point-g10-v2',
   runtimeForwardAxis: '-Z', deliveries, pbrMaps,
   requiredNodes: REQUIRED_FIELD_KNIFE_NODES,
   animationClips: REQUIRED_FIELD_KNIFE_ACTIONS,
@@ -89,6 +90,7 @@ const entry = {
   currentRuntimeSource: deliveries.firstPersonGlbs[0].path,
   runtimeIntegrationState: 'bounded-lazy-runtime-selection',
   placeholderStatus: 'forbidden-and-not-present',
+  visualRevision: 'compact-drop-point-g10-v2',
   runtimeForwardAxis: '-Z', sourceBlend, sourceScript,
   ...deliveries, pbrMaps, provenance: provenanceRecord,
   sockets: ['rightGrip', 'bladeTip', 'bladeEdge', 'pommel'],
@@ -122,7 +124,7 @@ const assetRecord = {
   sourceProvenance: provenanceRecord.path, sourceProvenanceSha256: provenanceRecord.sha256,
   preview: contactSheet.path,
   format: 'Two first-person, two world and one dedicated drop optimized self-contained glTF 2.0 binaries with Meshopt geometry, embedded WebP PBR textures, authored melee sockets and seven action clips',
-  modifications: 'Project-original full-tang tactical field knife authored in Blender with a shaped blade, recessed fuller, serrated spine, guard, G10 handle scales, grip ribs, fasteners, pommel and lanyard hole. Gameplay authority remains TypeScript-owned.',
+  modifications: 'Project-original compact drop-point full-tang field knife authored in Blender with a physical honed cutting bevel, swedge, recessed fuller, spine jimping, sculpted guard, correctly layered contoured G10 slabs, chevron grip inlays, through-fasteners, pommel and lanyard hole. Gameplay authority remains TypeScript-owned.',
   attributionRequired: false,
 };
 const existing = assetManifest.assets.findIndex((candidate) => candidate.id === assetRecord.id);

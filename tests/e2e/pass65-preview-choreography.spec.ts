@@ -66,6 +66,10 @@ test.describe('Pass 65 prerecorded menu previews', () => {
     expect(before.videoMuted).toBe(true);
     expect(before.videoVolume).toBeGreaterThanOrEqual(0);
     expect(before.videoVolume).toBeLessThanOrEqual(0.22);
+    await expect(page.locator('#menu-preview-video')).toHaveAttribute('width', '2560');
+    await expect(page.locator('#menu-preview-video')).toHaveAttribute('height', '1440');
+    await expect(page.locator('#menu-preview-poster')).toHaveAttribute('width', '2560');
+    await expect(page.locator('#menu-preview-poster')).toHaveAttribute('height', '1440');
 
     for (const [arenaId, frame, presentation] of [
       ['skyline-terminal', 'helicopter', 'menu-video-runtime-helo-terminal-v7'],
@@ -103,12 +107,12 @@ test.describe('Pass 65 prerecorded menu previews', () => {
     }
     await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-arena', 'gun-range');
     await expect.poll(async () => (await previewEvidence(page)).videoCurrentSrc, { timeout: 15_000 })
-      .toMatch(/\/menu-previews\/gun-range\.(webm|mp4)\?v=pass66-runtime-preview-v4$/);
+      .toMatch(/\/menu-previews\/gun-range\.(webm|mp4)\?v=pass66-runtime-preview-v5$/);
     await page.waitForTimeout(400);
     const final = await previewEvidence(page);
     expect(final.arenaId).toBe('gun-range');
     expect(final.sourceCount).toBe(2);
-    expect(final.videoCurrentSrc).toMatch(/\/menu-previews\/gun-range\.(webm|mp4)\?v=pass66-runtime-preview-v4$/);
+    expect(final.videoCurrentSrc).toMatch(/\/menu-previews\/gun-range\.(webm|mp4)\?v=pass66-runtime-preview-v5$/);
     expect(final.rendererEvidence.arenaConstructionCount).toBe(0);
   });
 

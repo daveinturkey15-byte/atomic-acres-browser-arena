@@ -171,6 +171,127 @@ export function auditSupportVehicleGlb(json, bytes, family, lod) {
   if (root?.extras?.runtime_forward_axis !== '-Z') failures.push(`${family} LOD${lod}: root does not declare runtime -Z forward`);
   if (root?.extras?.presentation_only !== true) failures.push(`${family} LOD${lod}: presentation-only boundary missing`);
   if (spec.variant && root?.extras?.presentation_variant !== spec.variant) failures.push(`${family} LOD${lod}: wrong presentation variant`);
+  const detailCounts = {};
+  if (family === 'chopper') {
+    if (root?.extras?.visual_revision !== 'close-range-tandem-armored-airframe-v4'
+      || root?.extras?.detail_contract !== 'layered-armour-framed-canopy-fasteners-sensors-ordnance-mechanics-v4') {
+      failures.push(`chopper LOD${lod}: authored airframe refinement contract missing`);
+    }
+    const requiredDetail = [
+      ['Chopper_ArmoredNose_', 1],
+      ['Chopper_CheekArmor_', 2],
+      ['Chopper_TandemPilotCanopy_', 1],
+      ['Chopper_TandemGunnerCanopy_', 1],
+      ['Chopper_TandemDivider_', 2],
+      ['Chopper_CanopyCrossBrace_', 3],
+      ['Chopper_EngineIntake_', 2],
+      ['Chopper_EngineExhaust_', 2],
+      ['Chopper_RocketPod_', 2],
+      ['Chopper_RocketPodMuzzleCollar_', 2],
+      ['Chopper_RocketTube_', lod === 0 ? 14 : lod === 1 ? 8 : 2],
+      ['Chopper_Missile_', lod === 0 ? 4 : 2],
+      ['Chopper_SensorLens_', 2],
+      ['Chopper_RotorYoke_', 2],
+      ['Chopper_MainBladeGrip_', 4],
+      ['Chopper_TailBladeGrip_', 4],
+      ['Chopper_TailGearbox_', 1],
+      ['Chopper_GunBarrelCollar_', 3],
+      ['Chopper_GunArmourShroud_', 2],
+      ['Chopper_SkidDamper_', 4],
+    ];
+    if (lod === 0) requiredDetail.push(
+      ['Chopper_OverlappingArmorPlate_', 8], ['Chopper_ArmorFastener_', 16],
+      ['Chopper_DorsalArmorPanel_', 1], ['Chopper_NoseArmorCap_', 1],
+      ['Chopper_EngineDeckLouver_', 4], ['Chopper_CanopyArmourBrow_', 2],
+      ['Chopper_CanopyRoofArmor_', 1], ['Chopper_CanopyArmorBolt_', 4],
+      ['Chopper_FuselagePanelSeam_', 6], ['Chopper_GunFeedLink_', 5],
+      ['Chopper_SkidWearShoe_', 4],
+    );
+    else if (lod === 1) requiredDetail.push(
+      ['Chopper_OverlappingArmorPlate_', 4], ['Chopper_DorsalArmorPanel_', 1],
+      ['Chopper_CanopyArmourBrow_', 2],
+    );
+    for (const [prefix, minimum] of requiredDetail) {
+      const count = nodes.filter((node) => node.name?.startsWith(prefix)).length;
+      detailCounts[prefix] = count;
+      if (count < minimum) failures.push(`chopper LOD${lod}: ${prefix} detail count ${count} is below ${minimum}`);
+    }
+  } else if (family === 'care') {
+    if (root?.extras?.visual_revision !== 'close-range-heavy-cargo-aircraft-v4'
+      || root?.extras?.detail_contract !== 'framed-flightdeck-panelled-hull-ramp-bogie-turbofans-v4') {
+      failures.push(`care LOD${lod}: heavy cargo-aircraft refinement contract missing`);
+    }
+    const requiredDetail = [
+      ['Care_FlightDeckOuterFrame_', 2], ['Care_TurbofanIntakeRing_', 4],
+      ['Care_TurbofanExhaustRing_', 4], ['Care_PropBlade_', lod === 0 ? 40 : lod === 1 ? 28 : 16],
+      ['Care_FuselagePanel_', 10], ['Care_MainGearSponson_', 2],
+      ['Care_RearCargoRamp_', 1], ['Care_RearCargoAperture_', 1],
+      ['Care_NoseWheel_', 2], ['Care_MainWheel_', lod < 2 ? 6 : 4],
+    ];
+    if (lod < 2) requiredDetail.push(
+      ['Care_WingPanelBreak_', 6], ['Care_RampTrack_', 3],
+      ['Care_RampCrossRib_', 3], ['Care_RampHinge_', 2],
+      ['Care_RampLockHousing_', 2], ['Care_MainGearBogieBeam_', 2],
+    );
+    if (lod === 0) requiredDetail.push(
+      ['Care_FlightDeckArmourBrow_', 1], ['Care_FlightDeckCheekArmor_', 2],
+      ['Care_FlightDeckFastener_', 6], ['Care_FlightDeckFrontPane_', 4],
+      ['Care_FlightDeckFrontMullion_', 3], ['Care_RearApertureHeader_', 1],
+      ['Care_RearApertureFrame_', 2], ['Care_FuselageLongitudinalBreak_', 4],
+      ['Care_FuselageServiceHatch_', 6], ['Care_FuselageServiceLatch_', 6],
+      ['Care_NoseWheelHub_', 2], ['Care_MainGearDragBrace_', 2], ['Care_MainWheelHub_', 6],
+    );
+    for (const [prefix, minimum] of requiredDetail) {
+      const count = nodes.filter((node) => node.name?.startsWith(prefix)).length;
+      detailCounts[prefix] = count;
+      if (count < minimum) failures.push(`care LOD${lod}: ${prefix} detail count ${count} is below ${minimum}`);
+    }
+  } else if (family === 'carpet') {
+    if (root?.extras?.visual_revision !== 'close-range-stealth-flying-wing-v4'
+      || root?.extras?.detail_contract !== 'framed-intakes-service-panels-bay-structure-tailless-v4') {
+      failures.push(`carpet LOD${lod}: stealth flying-wing refinement contract missing`);
+    }
+    const requiredDetail = [
+      ['Carpet_BlendedCentreBody_', 1], ['Carpet_SweptWing_', 2],
+      ['Carpet_TrailingControl_', 6], ['Carpet_BuriedIntake_', 4],
+      ['Carpet_IntakeLip_', 4], ['Carpet_FanBlade_', lod === 0 ? 32 : lod === 1 ? 24 : 12],
+      ['Carpet_ExhaustSlot_', 4], ['Carpet_BombBayCavity_', 1], ['Carpet_BombBayRail_', 3],
+    ];
+    if (lod < 2) requiredDetail.push(
+      ['Carpet_WingPanelSeam_', 8], ['Carpet_BombBayCrossFrame_', 4],
+      ['Carpet_BombBaySideFrame_', 2], ['Carpet_BombDoorHinge_', 4],
+    );
+    if (lod === 0) requiredDetail.push(
+      ['Carpet_WingServicePanel_', 6], ['Carpet_WingServiceLatch_', 6],
+      ['Carpet_IntakeSplitter_', 4], ['Carpet_IntakeFrame_', 8],
+    );
+    for (const [prefix, minimum] of requiredDetail) {
+      const count = nodes.filter((node) => node.name?.startsWith(prefix)).length;
+      detailCounts[prefix] = count;
+      if (count < minimum) failures.push(`carpet LOD${lod}: ${prefix} detail count ${count} is below ${minimum}`);
+    }
+    if (nodes.some((node) => /^Carpet_(?:TailFin|TailPlane)_/u.test(node.name ?? ''))) {
+      failures.push(`carpet LOD${lod}: conventional tail surfaces violate the flying-wing silhouette contract`);
+    }
+  } else if (family === 'crate') {
+    if (root?.extras?.visual_revision !== 'close-range-rigged-pallet-drop-v4'
+      || root?.extras?.detail_contract !== 'corner-guards-buckles-latches-crossweb-ribbed-canopy-v4') {
+      failures.push(`crate LOD${lod}: parachute/crate refinement contract missing`);
+    }
+    const requiredDetail = [
+      ['Care_CrateLid_', 1], ['Care_CratePallet_', 1], ['Care_CratePalletSlat_', 3],
+      ['Care_CrateCornerGuard_', 4], ['Care_CrateBuckle_', 2],
+      ['Care_ParachuteRib_', lod === 0 ? 12 : 8], ['Care_ParachuteSkirt_', 1], ['Care_ParachuteVent_', 1],
+    ];
+    if (lod === 0) requiredDetail.push(
+      ['Care_CrateLatch_', 4], ['Care_CrateLatchPin_', 4], ['Care_PalletTieDownCleat_', 4],
+    );
+    for (const [prefix, minimum] of requiredDetail) {
+      const count = nodes.filter((node) => node.name?.startsWith(prefix)).length;
+      detailCounts[prefix] = count;
+      if (count < minimum) failures.push(`crate LOD${lod}: ${prefix} detail count ${count} is below ${minimum}`);
+    }
+  }
 
   for (const socket of spec.sockets) {
     const index = nodeIndex.get(socket);
@@ -207,12 +328,22 @@ export function auditSupportVehicleGlb(json, bytes, family, lod) {
     if (!(json.extensionsUsed ?? []).includes(extension)) failures.push(`${family} LOD${lod}: optimized extension ${extension} missing`);
   }
   const triangles = primitiveTriangles(json);
-  if (triangles < 600 || triangles > 80_000) failures.push(`${family} LOD${lod}: ${triangles} triangles outside bounded budget`);
+  const triangleRanges = {
+    chopper: [[45_000, 60_000], [36_000, 50_000], [20_000, 32_000]],
+    care: [[16_000, 18_000], [13_000, 16_000], [10_000, 13_000]],
+    carpet: [[10_500, 12_000], [8_500, 9_800], [4_800, 5_800]],
+    crate: [[5_500, 7_000], [4_000, 5_000]],
+  };
+  const [minimum, maximum] = triangleRanges[family]?.[lod] ?? [Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY];
+  if (triangles < minimum || triangles > maximum) {
+    failures.push(`${family} LOD${lod}: ${triangles} triangles outside authored ${minimum}-${maximum} budget`);
+  }
   if (bytes < 70_000 || bytes > 3_000_000) failures.push(`${family} LOD${lod}: ${bytes} bytes outside optimized budget`);
   return Object.freeze({
     failures: Object.freeze(failures), triangles, bytes,
     meshNodes: nodes.filter((node) => typeof node.mesh === 'number').length,
     materials: (json.materials ?? []).length, images: (json.images ?? []).length,
     animations: Object.freeze([...animations.keys()]), externalUris: (json.images ?? []).filter((image) => image.uri).length + (json.buffers ?? []).filter((buffer) => buffer.uri).length,
+    detailCounts: Object.freeze(detailCounts),
   });
 }

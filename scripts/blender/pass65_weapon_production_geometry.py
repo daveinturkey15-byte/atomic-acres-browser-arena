@@ -917,6 +917,132 @@ def usp45(f: Forge):
     ),"hammer-fired-tactical-pistol-threaded-barrel-suppressor-paddle-control-weapon-light"
 
 
+def m2_flamethrower(f: Forge):
+    """Project-original M2-inspired pressure wand with a readable fuel system."""
+    platform = f.empty("m2-flamethrower-pressure-platform", f.frame, "signature")
+    receiver = f.empty("m2-flamethrower-valve-receiver", f.receiver, "signature")
+    f.prism(
+        "M2_ValveReceiver",
+        ((.31, .2, .17, .035), (.08, .24, .2, .035), (-.3, .2, .16, .04)),
+        "primary", receiver, .18,
+    )
+    f.cube("M2_ValveBlock", (0, -.29, .04), (.23, .18, .2), "metal", receiver, bevel=.018)
+    f.pistol_grip("M2_RearGrip", .13, -.11, .15, .29, material="polymer", parent=platform)
+    f.open_trigger("M2", -.02, -.115, .15, .16, platform)
+
+    lance = f.empty("m2-flamethrower-lance", platform, "signature")
+    f.barrel_y("M2_FuelLance", -.25, -1.0, .045, .046, "metal", lance)
+    f.barrel_y("M2_LanceHeatJacket", -.43, -.83, .045, .068, "primary", lance)
+    if f.high:
+        for index in range(6 if f.hero else 4):
+            y = -.47 - index * .06
+            f.torus("M2_HeatShieldRib", (0, y, .045), .07, .006, "metal", lance,
+                    rotation=(math.pi / 2, 0, 0), segments=max(12, f.seg))
+    igniter = f.empty("m2-flamethrower-pilot-igniter", lance, "signature")
+    f.cylinder("M2_IgniterCage", (0, -1.035, .045), .09, .12, "primary", igniter,
+               rotation=(math.pi / 2, 0, 0), vertices=max(14, f.seg), bevel=.005)
+    f.cylinder("M2_IgniterNozzle", (0, -1.105, .045), .047, .04, "metal", igniter,
+               rotation=(math.pi / 2, 0, 0), vertices=max(12, f.seg), bevel=.002)
+    f.cylinder("M2_PilotTip", (.055, -1.095, .075), .015, .075, "emissive", igniter,
+               rotation=(math.pi / 2, 0, 0), vertices=max(10, f.seg), bevel=.001)
+
+    magazine = f.empty("weapon-magazine", f.frame, "magazine")
+    tanks = f.empty("m2-flamethrower-twin-fuel-tanks", magazine, "signature")
+    for side in (-1, 1):
+        f.cylinder(f"M2_FuelTank{side}", (side * .145, .28, -.08), .115, .55, "primary", tanks,
+                   rotation=(0, 0, 0), vertices=max(14, f.seg), bevel=.008)
+        f.cylinder(f"M2_TankCap{side}", (side * .145, .28, .215), .055, .045, "accent", tanks,
+                   vertices=max(10, f.seg), bevel=.003)
+        if f.high:
+            for band in (-.24, -.02, .17):
+                f.torus(f"M2_TankBand{side}", (side * .145, .28, band), .118, .008, "metal", tanks,
+                        segments=max(12, f.seg))
+    hose = f.empty("m2-flamethrower-armoured-hose", platform, "signature")
+    hose_points = [(-.12, .17, -.23), (-.2, -.02, -.25), (-.18, -.25, -.16), (-.11, -.38, -.04)]
+    for index in range(len(hose_points) - 1):
+        f.between(f"M2_HoseSection{index}", hose_points[index], hose_points[index + 1], .024,
+                  "rubber", hose, vertices=max(10, f.seg), bevel=.002)
+    controls = f.empty("m2-flamethrower-valve-controls", f.action, "signature")
+    f.cylinder("M2_ValveWheel", (.15, -.21, .075), .065, .018, "accent", controls,
+               rotation=(0, math.pi / 2, 0), vertices=max(12, f.seg), bevel=.002)
+    f.cube("M2_DeadmanLever", (0, .04, -.12), (.055, .19, .035), "metal", controls,
+           rotation=(math.radians(-8), 0, 0), bevel=.004)
+    if f.high:
+        gauge = f.empty("m2-flamethrower-pressure-gauge", controls, "manufactured-detail")
+        f.cylinder("M2_GaugeBody", (-.15, -.2, .11), .06, .025, "primary", gauge,
+                   rotation=(0, math.pi / 2, 0), vertices=max(12, f.seg), bevel=.002)
+        f.cylinder("M2_GaugeFace", (-.166, -.2, .11), .05, .006, "lens", gauge,
+                   rotation=(0, math.pi / 2, 0), vertices=max(12, f.seg), bevel=0)
+
+    stock = f.empty("weapon-stock", f.frame, "stock")
+    f.between("M2_ShoulderBraceTop", (-.1, .24, .02), (-.13, .58, .0), .018, "metal", stock)
+    f.between("M2_ShoulderBraceBottom", (.1, .24, -.13), (.13, .58, -.08), .018, "metal", stock)
+    f.cube("M2_ShoulderPad", (0, .6, -.04), (.28, .05, .22), "rubber", stock, bevel=.025)
+
+    optic = f.empty("weapon-optic", f.frame, "optic")
+    f.cube("M2_RearNotch", (0, .16, .245), (.11, .04, .045), "primary", optic, bevel=.004)
+    f.cube("M2_FrontPost", (0, -.84, .2), (.035, .035, .12), "primary", optic, bevel=.004)
+    return stock, magazine, optic, f.socket_set(
+        grip=(0, .17, -.34), support=(-.12, -.45, -.08), reload=(-.18, .22, -.2),
+        magazine=(0, .28, -.08), muzzle=(0, -1.13, .045), eject=(.17, -.2, .08),
+        optic=(0, -.22, .225), rear_sight=(0, .16, .245), front_sight=(0, -.84, .2),
+    ), "pressure-fed-twin-tank-armoured-hose-valve-receiver-heat-jacket-pilot-igniter"
+
+
+def orion_flare_gun(f: Forge):
+    """Project-original break-action 37 mm signal pistol; no explosive payload geometry."""
+    platform = f.empty("orion-flare-pistol-break-action", f.frame, "signature")
+    frame = f.empty("orion-flare-pistol-reinforced-frame", f.receiver, "signature")
+    f.prism(
+        "Orion_Frame",
+        ((.23, .13, .085, .015), (.05, .18, .13, .01), (-.2, .17, .12, .015)),
+        "polymer", frame, .28,
+    )
+    f.pistol_grip("Orion_Grip", .12, -.06, .15, .31, material="polymer", parent=platform)
+    f.open_trigger("Orion", -.015, -.08, .145, .15, platform)
+
+    barrel = f.empty("orion-flare-pistol-break-barrel", f.action, "signature")
+    f.cylinder("Orion_Barrel", (0, -.31, .075), .092, .57, "primary", barrel,
+               rotation=(math.pi / 2, 0, 0), vertices=max(16, f.seg), bevel=.008)
+    f.cylinder("Orion_BreechRing", (0, -.05, .075), .108, .105, "metal", barrel,
+               rotation=(math.pi / 2, 0, 0), vertices=max(16, f.seg), bevel=.006)
+    f.cylinder("Orion_MuzzleBezel", (0, -.61, .075), .1, .045, "accent", barrel,
+               rotation=(math.pi / 2, 0, 0), vertices=max(14, f.seg), bevel=.004)
+    f.cylinder("Orion_Bore", (0, -.638, .075), .061, .012, "rubber", barrel,
+               rotation=(math.pi / 2, 0, 0), vertices=max(14, f.seg), bevel=0)
+    hinge = f.empty("orion-flare-pistol-hinge-latch", platform, "signature")
+    f.cylinder("Orion_HingePin", (0, -.04, -.025), .045, .24, "metal", hinge,
+               rotation=(0, math.pi / 2, 0), vertices=max(12, f.seg), bevel=.003)
+    f.cube("Orion_TopLatch", (0, .025, .165), (.16, .1, .045), "accent", hinge, bevel=.008)
+    if f.high:
+        for side in (-1, 1):
+            f.cube(f"Orion_BarrelFlat{side}", (side * .085, -.3, .075), (.014, .38, .13),
+                   "metal", barrel, bevel=.002)
+        f.cube("Orion_Extractor", (.075, -.035, .075), (.025, .08, .075), "accent", barrel, bevel=.003)
+
+    magazine = f.empty("weapon-magazine", f.frame, "magazine")
+    flare = f.empty("orion-flare-pistol-signal-cartridge", magazine, "signature")
+    f.cylinder("Orion_FlareCase", (0, -.04, .075), .058, .16, "accent", flare,
+               rotation=(math.pi / 2, 0, 0), vertices=max(12, f.seg), bevel=.002)
+    f.cylinder("Orion_FlareRim", (0, .045, .075), .068, .018, "metal", flare,
+               rotation=(math.pi / 2, 0, 0), vertices=max(12, f.seg), bevel=.001)
+    hammer = f.empty("orion-flare-pistol-external-hammer", f.action, "signature")
+    f.prism("Orion_Hammer", ((.18, .055, .04, .105), (.25, .045, .07, .17)),
+            "metal", hammer, .22)
+
+    optic = f.empty("weapon-optic", f.frame, "optic")
+    rear = f.empty("orion-flare-pistol-rear-sight", optic, "signature")
+    front = f.empty("orion-flare-pistol-front-sight", optic, "signature")
+    f.cube("Orion_RearBase", (0, .14, .205), (.105, .04, .038), "primary", rear, bevel=.004)
+    f.cube("Orion_FrontPost", (0, -.53, .205), (.032, .035, .065), "accent", front, bevel=.004)
+    stock = f.empty("weapon-stock", f.frame, "stock")
+    return stock, magazine, optic, f.socket_set(
+        grip=(0, .18, -.27), support=(-.07, -.28, -.03), reload=(-.08, -.02, .08),
+        magazine=(0, -.04, .075), muzzle=(0, -.66, .075), eject=(.08, -.035, .075),
+        optic=(0, -.18, .205), rear_sight=(0, .14, .205), front_sight=(0, -.53, .205),
+    ), "break-action-37mm-signal-pistol-reinforced-frame-hinge-latch-external-hammer"
+
+
 BUILDERS = {
     "carbine": hk416,
     "ak-47": ak47,
@@ -934,6 +1060,8 @@ BUILDERS = {
     "machine-pistol": glock18,
     "magnum": desert_eagle,
     "flashlight-pistol": usp45,
+    "flamethrower": m2_flamethrower,
+    "flare-gun": orion_flare_gun,
 }
 
 

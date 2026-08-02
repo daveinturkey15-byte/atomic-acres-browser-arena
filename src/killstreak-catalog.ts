@@ -1,3 +1,5 @@
+import { DRONE_SUPPORT_LIFETIMES_MS } from './killstreak-support-catalog';
+
 export const CARE_PACKAGE_KILLSTREAK_ID = 'care-package';
 export const NUKE_KILLSTREAK_ID = 'nuke';
 export const CARE_PACKAGE_FIXED_DENOMINATOR = 100;
@@ -219,12 +221,12 @@ export const PASS65_KILLSTREAK_SOURCES = freezeSourceDefinitions([
   { id: 'adrenaline', displayName: 'Adrenaline Boost', cost: 3, tier: 'low', availability: 'selectable', carePackageBaseWeightUnits: 24, relationship: 'scout-sweep-slot-alternative', activation: 'instant', durationMs: 15_000, repeatable: false },
   { id: 'care-package', displayName: 'Care Package', cost: 4, tier: 'low', availability: 'selectable', carePackageBaseWeightUnits: 0, relationship: 'nonrecursive-slot-1', activation: 'instant', durationMs: 60_000, repeatable: false },
   { id: 'yardhawk', displayName: 'Yardhawk', cost: 5, tier: 'mid', availability: 'selectable', carePackageBaseWeightUnits: 16, relationship: 'retained-slot-2', activation: 'instant', durationMs: 15_000, repeatable: false },
-  { id: 'piloted-drone', displayName: 'Piloted Drone', cost: 5, tier: 'mid', availability: 'selectable', carePackageBaseWeightUnits: 16, relationship: 'yardhawk-slot-alternative', activation: 'possession', durationMs: 30_000, repeatable: false },
+  { id: 'piloted-drone', displayName: 'Piloted Drone', cost: 5, tier: 'mid', availability: 'selectable', carePackageBaseWeightUnits: 16, relationship: 'yardhawk-slot-alternative', activation: 'possession', durationMs: DRONE_SUPPORT_LIFETIMES_MS.piloted, repeatable: false },
   { id: 'tri-pass', displayName: 'Tri-Pass Strike', cost: 7, tier: 'high', availability: 'selectable', carePackageBaseWeightUnits: 12, relationship: 'retained-slot-3-or-4', activation: 'target-line', durationMs: 12_000, repeatable: false },
   { id: 'carpet-bomber', displayName: 'Carpet Bomber', cost: 7, tier: 'high', availability: 'selectable', carePackageBaseWeightUnits: 12, relationship: 'slot-3-or-4-alternative', activation: 'target-point', durationMs: 12_000, repeatable: false },
   { id: 'hunter-swarm', displayName: 'Hunter Swarm', cost: 8, tier: 'high', availability: 'selectable', carePackageBaseWeightUnits: 9, relationship: 'retained-slot-3-or-4', activation: 'instant', durationMs: 20_000, repeatable: false },
   { id: 'chopper', displayName: 'Chopper Gunner', cost: 8, tier: 'high', availability: 'selectable', carePackageBaseWeightUnits: 9, relationship: 'slot-3-or-4-alternative', activation: 'instant', durationMs: 30_000, repeatable: false },
-  { id: 'drone-swarm', displayName: 'Drone Swarm', cost: 15, tier: 'top', availability: 'selectable', carePackageBaseWeightUnits: 1, relationship: 'nuke-slot-alternative', activation: 'instant', durationMs: 60_000, repeatable: false },
+  { id: 'drone-swarm', displayName: 'Drone Swarm', cost: 15, tier: 'top', availability: 'selectable', carePackageBaseWeightUnits: 1, relationship: 'nuke-slot-alternative', activation: 'instant', durationMs: DRONE_SUPPORT_LIFETIMES_MS.swarm, repeatable: false },
   { id: 'nuke', displayName: 'Nuke', cost: 15, tier: 'top', availability: 'selectable', carePackageBaseWeightUnits: 0, relationship: 'drone-swarm-slot-alternative-and-one-percent-care-reward', activation: 'instant', durationMs: 0, repeatable: false },
 ] as const satisfies readonly KillstreakCatalogSourceDefinition[]);
 

@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 
@@ -61,19 +61,46 @@ test.describe('Pass 66 Field Kit and killstreak menu correction', () => {
   test('previews the equipped streak on hover/focus without gameplay render ownership', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 1600, height: 900 });
     await ready(page);
+    const arenaConstructionBefore = await page.evaluate(() => (
+      window.__ATOMIC_ACRES_DEBUG__.snapshot().arenaSelection.streaming.constructionHistory
+    ));
     await page.locator('#menu-tab-streaks').click();
 
     const rail = page.locator('#killstreak-demo-rail');
+    const decoder = rail.locator('video[data-demo-video]');
     await expect(rail).toBeVisible();
+    await expect(decoder).toHaveCount(1);
     await page.locator('[data-killstreak-slot-card="4"]').hover();
     await expect(rail).toHaveAttribute('data-demo-id', 'chopper');
+    await expect(decoder).toHaveAttribute('src', './assets/original/killstreak-demo/chopper.mp4');
     await page.locator('[data-killstreak-slot="5"]').focus();
     await expect(rail).toHaveAttribute('data-demo-id', 'nuke');
+    await expect(decoder).toHaveAttribute('src', './assets/original/killstreak-demo/nuke.mp4');
     await page.locator('[data-killstreak-slot="1"]').selectOption('adrenaline');
     await expect(rail).toHaveAttribute('data-demo-id', 'adrenaline');
     await expect(page.locator('#killstreak-demo-title')).toHaveText('ADRENALINE BOOST');
     await expect(rail.locator('canvas')).toHaveCount(0);
-    await expect(rail.locator('video')).toHaveCount(0);
+    await expect(decoder).toHaveCount(1);
+    await expect(decoder).toHaveAttribute('data-demo-id', 'adrenaline');
+    await expect.poll(async () => decoder.evaluate((element) => ({
+      ready: (element as HTMLVideoElement).readyState >= HTMLMediaElement.HAVE_CURRENT_DATA,
+      paused: (element as HTMLVideoElement).paused,
+    }))).toEqual({ ready: true, paused: false });
+    await expect(rail).toHaveAttribute('data-media', 'video');
+    await expect(rail.locator('[data-demo-toggle]')).toBeVisible();
+    await rail.locator('[data-demo-toggle]').click();
+    await expect.poll(async () => decoder.evaluate((element) => (element as HTMLVideoElement).paused)).toBe(true);
+    await expect(rail.locator('[data-demo-toggle]')).toHaveText('PLAY');
+    await rail.locator('[data-demo-toggle]').click();
+    await expect.poll(async () => decoder.evaluate((element) => (element as HTMLVideoElement).paused)).toBe(false);
+    await page.locator('#menu-tab-kit').click();
+    await expect(decoder).not.toHaveAttribute('src', /.+/u);
+    await expect.poll(async () => decoder.evaluate((element) => (element as HTMLVideoElement).paused)).toBe(true);
+    await page.locator('#menu-tab-streaks').click();
+    await expect(decoder).toHaveAttribute('src', './assets/original/killstreak-demo/adrenaline.mp4');
+    await expect.poll(async () => decoder.evaluate((element) => (element as HTMLVideoElement).paused)).toBe(false);
+    expect(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().arenaSelection.streaming.constructionHistory))
+      .toEqual(arenaConstructionBefore);
 
     const layout = await page.evaluate(() => {
       const panel = document.querySelector<HTMLElement>('#menu-panel-streaks')!;
@@ -102,8 +129,10 @@ test.describe('Pass 66 Field Kit and killstreak menu correction', () => {
     await page.locator('#menu-tab-streaks').click();
     const rail = page.locator('#killstreak-demo-rail');
     await expect(rail).toHaveAttribute('data-motion', 'poster');
-    await expect(rail.locator('[data-demo-mode]')).toHaveText('REDUCED MOTION · POSTER ONLY');
-    await expect(rail.locator('video')).toHaveCount(0);
+    await expect(rail.locator('[data-demo-mode]')).toHaveText('REDUCED MOTION / REAL POSTER');
+    await expect(rail.locator('video')).toHaveCount(1);
+    await expect(rail.locator('video')).not.toHaveAttribute('src', /.+/u);
+    await expect(rail.locator('[data-demo-toggle]')).toBeHidden();
     expect(await page.evaluate(() => ({
       pageOverflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       panelOverflowX: document.querySelector<HTMLElement>('#menu-panel-streaks')!.scrollWidth
@@ -111,6 +140,57 @@ test.describe('Pass 66 Field Kit and killstreak menu correction', () => {
       columnCount: getComputedStyle(document.querySelector<HTMLElement>('.killstreak-loadout-layout')!)
         .gridTemplateColumns.split(' ').length,
     }))).toEqual({ pageOverflowX: 0, panelOverflowX: 0, columnCount: 1 });
+  });
+
+  test('reuses one decoder through rapid selection races and releases it off-surface', async ({ page }) => {
+    const knownGoodVideo = readFileSync(resolve(process.cwd(), 'public/assets/original/menu-previews/gun-range.mp4'));
+    await page.route('**/assets/original/killstreak-demo/*.mp4', (route) => route.fulfill({
+      status: 200,
+      contentType: 'video/mp4',
+      body: knownGoodVideo,
+    }));
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await ready(page);
+    const constructionBefore = await page.evaluate(() => (
+      window.__ATOMIC_ACRES_DEBUG__.snapshot().arenaSelection.streaming.constructionHistory
+    ));
+    await page.locator('#menu-tab-streaks').click();
+    const rail = page.locator('#killstreak-demo-rail');
+    const decoder = rail.locator('video[data-demo-video]');
+    await expect.poll(async () => decoder.evaluate((element) => (element as HTMLVideoElement).paused)).toBe(false);
+    for (const slot of [2, 4, 1, 3, 5]) {
+      await page.locator(`[data-killstreak-slot="${slot}"]`).focus();
+    }
+    await expect(rail).toHaveAttribute('data-demo-id', 'nuke');
+    await expect(decoder).toHaveCount(1);
+    await expect(decoder).toHaveAttribute('data-demo-id', 'nuke');
+    await expect(decoder).toHaveAttribute('src', './assets/original/killstreak-demo/nuke.mp4');
+    await expect(rail).toHaveAttribute('data-media', 'video');
+
+    await page.evaluate(() => { document.documentElement.dataset.reducedMotion = 'true'; });
+    await expect(rail).toHaveAttribute('data-motion', 'poster');
+    await expect(decoder).not.toHaveAttribute('src', /.+/u);
+    await expect.poll(async () => decoder.evaluate((element) => (element as HTMLVideoElement).paused)).toBe(true);
+    await page.evaluate(() => { delete document.documentElement.dataset.reducedMotion; });
+    await expect(decoder).toHaveAttribute('src', './assets/original/killstreak-demo/nuke.mp4');
+    await expect.poll(async () => decoder.evaluate((element) => (element as HTMLVideoElement).paused)).toBe(false);
+    await page.locator('#menu-tab-kit').click();
+    await expect(decoder).not.toHaveAttribute('src', /.+/u);
+    expect(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().arenaSelection.streaming.constructionHistory))
+      .toEqual(constructionBefore);
+  });
+
+  test('falls back to the verified poster when local video decoding fails', async ({ page }) => {
+    await page.route('**/assets/original/killstreak-demo/*.mp4', (route) => route.fulfill({ status: 415, body: '' }));
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await ready(page);
+    await page.locator('#menu-tab-streaks').click();
+    const rail = page.locator('#killstreak-demo-rail');
+    await expect(rail).toHaveAttribute('data-media', 'poster');
+    await expect(rail.locator('[data-demo-mode]')).toHaveText('REAL POSTER / VIDEO UNAVAILABLE');
+    await expect(rail.locator('[data-demo-poster]')).toBeVisible();
+    await expect(rail.locator('video[data-demo-video]')).toHaveCount(1);
+    await expect(rail.locator('canvas')).toHaveCount(0);
   });
 
   test('keeps both corrected menu surfaces bounded across the retained desktop matrix', async ({ page }) => {

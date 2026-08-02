@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "pass65-project-original-firearm-corpus-v1",
-  "title": "Pass 65 project-original seventeen-firearm presentation corpus",
+  "title": "Pass 65/66 project-original nineteen-firearm presentation corpus",
   "creator": "Atomic Acres project",
   "owner": "Atomic Acres project",
   "created": "2026-07-26",
@@ -14,15 +14,15 @@
   },
   "geometryModule": {
     "path": "scripts/blender/pass65_weapon_production_geometry.py",
-    "sha256": "70a191c14928ec95d9aefdc41a10cd94662bd44f684fb21f3149d88a813c38b8"
+    "sha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276"
   },
   "sourceBlend": {
     "path": "source-assets/blender/pass65-weapon-families.blend",
-    "sha256": "6a8c458807efedaaca6234ae33d91a204dcacf96cefb7cb201585f90807e8754"
+    "sha256": "650f0286bc702996887fc80d291494d86f040a5f5ae3d1712aa8f61d7695f892"
   },
   "sourceSpec": {
     "path": "source-assets/blender/pass65-weapon-family-specs.json",
-    "sha256": "3e8cff133381c65a514a2a5f97a348a4229208dc014de0bf9bad53432255cebf"
+    "sha256": "86d8568971b88f84438330875ddc295d4cf823bf1a648197bc36df0c095cd706"
   },
   "weaponIds": [
     "carbine",
@@ -41,7 +41,9 @@
     "minigun",
     "m14-ebr",
     "slug-shotgun",
-    "flashlight-pistol"
+    "flashlight-pistol",
+    "flamethrower",
+    "flare-gun"
   ],
   "displayNames": {
     "carbine": "HK416",
@@ -60,13 +62,15 @@
     "minigun": "M134 Minigun",
     "m14-ebr": "M14 EBR",
     "slug-shotgun": "Benelli M4 Slug",
-    "flashlight-pistol": "HK USP .45 Tactical"
+    "flashlight-pistol": "HK USP .45 Tactical",
+    "flamethrower": "M2 Flamethrower",
+    "flare-gun": "Orion Flare Pistol"
   },
   "runtimeForwardAxis": "-Z",
   "visualRevision": "platform-production-hero-v4",
   "materialLanguage": "platform-authentic-metal-polymer-pbr-v4",
   "deliveriesPerWeapon": 6,
-  "independentBinaryCount": 102,
+  "independentBinaryCount": 114,
   "independentBinaryHashes": [
     "5e015b68b554d78a619bebbc29a0079bedb8b15f55abdeb7ec4788ce05fa129e",
     "1c998f772831293ea1d251d3ea781c912f2c08966d10b8e3ecd60182cd3f9868",
@@ -169,86 +173,106 @@
     "aa9ba5fd4a4c6b4be42611b36343f2cf59f92dd201140195efcb0b8db5194e58",
     "34ab7cfe698b0c9dfdb79d6f6174dc654fbb7f1f962e02fcdabbd3add7712944",
     "ec66bad6b97d0706072fb9d92badff381b51a6ddf3991a7d91706f909f5ca90c",
-    "bac2010aac5ec1ae42135747893c75220145072fb01834fa8df214359fcb2f18"
+    "bac2010aac5ec1ae42135747893c75220145072fb01834fa8df214359fcb2f18",
+    "38a0dcb260763de46575cb92c7091b0f199613b99df6cbc94ac5e5fd4150fd0c",
+    "84d7f12c11b2d4fc8d83c9622eacc0000bfe2ee76cbe94c7d5abb047524bcb3d",
+    "c0e9280dd9c4ad5a518ee84ebb48aef70088445d9d64cdab358be7e4b6c04679",
+    "d8ce9ea39eb58a2b2146c5e3dbc3a92d86d66ca290a3c5c2642ef952ff7a231e",
+    "c4f38f75e4b7262c9764a0b8c8ae291f8b74e8f08e656c3790537c78153967ff",
+    "4d2ab7e0de8b7caf3fcd1e6aa11d40bfa340f1ff4770f32beedc1041015cb3d7",
+    "d1610e21e095c60bb7c61c295fe4bed83286f3f25cf39ff70edbdf5a85d8d869",
+    "5f6b74d84ba8f7ce937efa8f8f1d775eebe4de88e63a445dfbee3a91dfe57dda",
+    "7df598157c9143367c3e223f767996aec7e33d01b548b16f024fabeaf0627d27",
+    "a4125cdfb7e3760f534aa6233992c8d9c5bbce7a470eebdd5f27a54530147801",
+    "d1b2a9dfeb0f7fd8a6a78f2bbcd0863507185c2ac590ec7175e791e3d5848dfb",
+    "d11f4608da0dd75692e9f994c9ff072df8315a9ca62fbd9c2b7440d1629e222d"
   ],
-  "uniqueHeroSilhouetteReceipts": 17,
-  "uniqueHeroMotionReceipts": 17,
-  "uniquePlatformAnatomyReceipts": 17,
-  "uniqueBaseColorReceipts": 17,
+  "uniqueHeroSilhouetteReceipts": 19,
+  "uniqueHeroMotionReceipts": 19,
+  "uniquePlatformAnatomyReceipts": 19,
+  "uniqueBaseColorReceipts": 19,
   "weaponProvenances": [
     {
       "path": "source-assets/blender/pass65-weapons/carbine.provenance.json",
-      "sha256": "35d86afa22bc9544c36513e7feb2323b532d47f924c96d08c450e63beea185d9"
+      "sha256": "6c5a97de3fdd09dc01e79ba7279fe8da2aa2e7751ae090a933d3c95ea96ad2a2"
     },
     {
       "path": "source-assets/blender/pass65-weapons/smg.provenance.json",
-      "sha256": "38d82c6ebfef462f00021bf1220395f402b202f757aa7e7dfa084ae19aa0140b"
+      "sha256": "30444ff1f7f46f87aaa0ff83100736150c02f54063c272f116167bd481aead78"
     },
     {
       "path": "source-assets/blender/pass65-weapons/lmg.provenance.json",
-      "sha256": "c81febfe7e4a5fce27a8364d4a064ac859110e4c94f9380e7b91178d762c8a74"
+      "sha256": "871e469c14d2f4ef5c214210a9ca4f8f6eabe67ab65a152ca3b19db89694e121"
     },
     {
       "path": "source-assets/blender/pass65-weapons/scattergun.provenance.json",
-      "sha256": "bf9b6046d3b52208ea4ff4c7f2ea2c13dd791129c83230e52b4e9454d465917a"
+      "sha256": "276720e41be32ff24b34746054331ca514f228b01978e16d12bc40a99207f6d9"
     },
     {
       "path": "source-assets/blender/pass65-weapons/sniper.provenance.json",
-      "sha256": "ec2a2f87337b9918b395afbc42af8340b1d35829d29f0787373d6b8f384df7c1"
+      "sha256": "07512c86a2f367b0bf28c094c0602c9aeed45b93592d014f292fdd1b9e2c4fcc"
     },
     {
       "path": "source-assets/blender/pass65-weapons/railgun.provenance.json",
-      "sha256": "7279bd93a9a58a225f4e9aa4d2619ce409452237c9204a05e19c32889d859639"
+      "sha256": "b7b95e5ebcee0435e7d96eb05fe5d51fdd9289471ae338b3f98a449ff79f77ef"
     },
     {
       "path": "source-assets/blender/pass65-weapons/pistol.provenance.json",
-      "sha256": "e53421eefa542a7479b5ef00d487c26e997ca04914c8183473802a2e25b69d75"
+      "sha256": "b77361c8c944843e6ddb5aead39cc177dc86b7d1876e59e6b12b579e012bbd65"
     },
     {
       "path": "source-assets/blender/pass65-weapons/magnum.provenance.json",
-      "sha256": "d8a4083e9eef5ea74dd196d5177b4843b71678bf05c513ed075887e14e9ce656"
+      "sha256": "b91b76f33089951b4bff0146bdcfe5113ab538497d07974f219a27986ae3ca85"
     },
     {
       "path": "source-assets/blender/pass65-weapons/machine-pistol.provenance.json",
-      "sha256": "f431f83ec6f690844e58d114511567649fb532c0c0464f95b9e3836ea04ba16a"
+      "sha256": "a18be6b0733d8d9d2bb1606ec3e6595d654d595d242bc03a855c7eeca2cf59f5"
     },
     {
       "path": "source-assets/blender/pass65-weapons/mini-uzi.provenance.json",
-      "sha256": "a7ad64ace6dd000e83fef80cd71e639ab72e3430d3d83e78375d4dc89c6e9e01"
+      "sha256": "44441cc749f4b644082aa11a3516df2d6a6421b41256e8cb3610a84ecad7a752"
     },
     {
       "path": "source-assets/blender/pass65-weapons/mp5.provenance.json",
-      "sha256": "a3652c589eb69b96f2cfde9a88d134d1ba00d2bd032a8e668188fa1b7b327f4d"
+      "sha256": "c5b39849763b4e3ad83c18601afa3dfc4ddf1ee14602d961fb595b430b935669"
     },
     {
       "path": "source-assets/blender/pass65-weapons/m4a1.provenance.json",
-      "sha256": "a9c815acefd0beda95f24891f72218fa60c9a4c37c1e4e9ab94c095809e7abc1"
+      "sha256": "6e6e554e638b5b169fec702d131b5ec2f075d6118d293332199c63e7a737057a"
     },
     {
       "path": "source-assets/blender/pass65-weapons/ak-47.provenance.json",
-      "sha256": "e16571d08fde0a2c2d0d87411956b97cdb0186a1f5b73a680d4ee45e429c122f"
+      "sha256": "6d9009c18ee4ab8cb39cc8a77e264f2881676fd2aef98cc1b17ad9682e1fb644"
     },
     {
       "path": "source-assets/blender/pass65-weapons/minigun.provenance.json",
-      "sha256": "e2edc0da4a498a125e19cf9614f830b3f4a2ebe76bc9c7e51745cbb0f9f77de3"
+      "sha256": "3b36b00d1cdb9a79ec773855f9e7bd29472800f5ea8b26a60d8262f014c61926"
     },
     {
       "path": "source-assets/blender/pass65-weapons/m14-ebr.provenance.json",
-      "sha256": "8a8b5424b52f9f44418516552274d6dc5059c9bcdb6f5a5ff8af88bb60b26637"
+      "sha256": "404002ebcfe80f31b1c0cfef1df304848eb932a0464ee267bed48aa4fa8b7ce2"
     },
     {
       "path": "source-assets/blender/pass65-weapons/slug-shotgun.provenance.json",
-      "sha256": "77a3524a352d8897e8bcd1c73b8ba3716971c36503d505f2b6fe54c16a492c5d"
+      "sha256": "45471cf8105589dcf65b6d0491e23d8069ffdd772a0e66acc0fcda1b9c5a0989"
     },
     {
       "path": "source-assets/blender/pass65-weapons/flashlight-pistol.provenance.json",
-      "sha256": "ea62ef2d38e6cc0259a0c29907437484b8cea18773625987d1307e0a9a90fbb9"
+      "sha256": "78a823fbacad68315ba3bcfa474dc355d7137db0dc4d91066a5a154d5ed3b4f6"
+    },
+    {
+      "path": "source-assets/blender/pass65-weapons/flamethrower.provenance.json",
+      "sha256": "a3a10ce157e3f6ec0a2d591f14dbc44f71ce7de90a0554a7d7a0b93c933ec163"
+    },
+    {
+      "path": "source-assets/blender/pass65-weapons/flare-gun.provenance.json",
+      "sha256": "248a0221219c5e2fd85199b583c5984563aa9f6756320823e2bebe9ad06575ad"
     }
   ],
   "review": {
     "contactSheet": {
       "path": "docs/assets/pass65-weapons/firearms/pass65-weapon-family-contact-sheet.png",
-      "sha256": "0500adc8d2eda76aba76c47758a702051e6942fcbe5168b8fdbda495958937ce",
+      "sha256": "c779f10997d0afa2cf1b3048d94735c7ddd4c07117ad3820cbf3bfc7a632ac59",
       "width": 2400,
       "height": 1440
     }

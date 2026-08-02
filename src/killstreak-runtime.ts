@@ -55,6 +55,9 @@ export const MAX_REPLICATED_KILLSTREAK_STREAK = 100_000;
 export const MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD = 255;
 /** Matches the strict recipient snapshot bound; a full queue leaves the crate claimable. */
 export const MAX_RETAINED_CARE_REWARDS = 8;
+export const KILLSTREAK_RUNTIME_CHECKPOINT_SCHEMA_VERSION = 1;
+export const MAX_KILLSTREAK_CHECKPOINT_ACTORS = 10;
+export const MAX_KILLSTREAK_CHECKPOINT_SEEN_ACTIVATIONS = 512;
 const CHOPPER_GUNNER_CAMERA_ORIGIN_LOCAL = Object.freeze([
   CHOPPER_GUNNER_RAY_POLICY.cameraSocketLocalM[0],
   CHOPPER_GUNNER_RAY_POLICY.cameraSocketLocalM[1],
@@ -138,6 +141,8 @@ type ActorAuthorityState = {
   /** Banked activations survive cycle rollover and death until used or epoch end. */
   availableCharges: Map<Pass65KillstreakId, number>;
   careRewards: Pass65KillstreakId[];
+  /** One test-bay reward, kept separate so training can never consume or replace a real care-package reward. */
+  trainingReward: Pass65KillstreakId | null;
   adrenalineUntilMs: number;
   possession: Readonly<{ kind: 'chopper-gunner' | 'piloted-drone'; entityId: string }> | null;
   lastActivationSequence: number;
@@ -306,6 +311,17 @@ export type KillstreakAdmission = Readonly<{
   entityIds: readonly string[];
 }>;
 
+export type KillstreakTrainingGrantContext = Readonly<{
+  arenaId: 'gun-range';
+  stationKind: 'secure-test-bay';
+  authorityRole: 'offline' | 'host';
+}>;
+
+export type KillstreakTrainingGrant = Readonly<{
+  accepted: boolean;
+  reason: 'accepted' | 'unknown-actor' | 'life-mismatch' | 'invalid-training-context' | 'unknown-reward';
+}>;
+
 export type CareCaptureAdmissionReason =
   | 'accepted'
   | 'identity-mismatch'
@@ -367,6 +383,127 @@ export type KillstreakRecipientSnapshot = Readonly<{
   sensorContacts: readonly DroneSensorContact[];
   placementMarkers: readonly KillstreakPlacementMarkerSnapshot[];
 }>;
+
+export type KillstreakActorCheckpoint = Readonly<{
+  actorId: string;
+  team: 0 | 1;
+  lifeId: number;
+  loadout: KillstreakLoadoutV1;
+  streak: number;
+  cycleProgress: number;
+  earned: readonly Pass65KillstreakId[];
+  availableCharges: readonly Readonly<{ id: Pass65KillstreakId; count: number }>[];
+  careRewards: readonly Pass65KillstreakId[];
+  adrenalineRemainingMs: number;
+  lastActivationSequence: number;
+  lastControlSequence: number;
+}>;
+
+/**
+ * Crash-recovery state for the actor-owned reward ladder only. Active support
+ * entities and possession are deliberately excluded: a replacement document
+ * cannot safely continue their frame-time physics or input ownership.
+ */
+export type KillstreakRuntimeCheckpoint = Readonly<{
+  schemaVersion: typeof KILLSTREAK_RUNTIME_CHECKPOINT_SCHEMA_VERSION;
+  matchEpoch: number;
+  revision: number;
+  entityCounter: number;
+  activationCounter: number;
+  resultCounter: number;
+  seenActivationRequestIds: readonly string[];
+  actors: readonly KillstreakActorCheckpoint[];
+}>;
+
+function isCheckpointRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function hasCheckpointKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
+  return Object.keys(value).length === keys.length
+    && keys.every((key) => Object.hasOwn(value, key));
+}
+
+function isCheckpointInteger(value: unknown, minimum: number, maximum: number): boolean {
+  return Number.isSafeInteger(value) && Number(value) >= minimum && Number(value) <= maximum;
+}
+
+function isCheckpointKillstreakId(value: unknown): value is Pass65KillstreakId {
+  return typeof value === 'string'
+    && PASS65_KILLSTREAK_CATALOG.definitions.some((definition) => definition.id === value);
+}
+
+function isKillstreakActorCheckpoint(value: unknown): value is KillstreakActorCheckpoint {
+  if (!isCheckpointRecord(value) || !hasCheckpointKeys(value, [
+    'actorId', 'team', 'lifeId', 'loadout', 'streak', 'cycleProgress', 'earned',
+    'availableCharges', 'careRewards', 'adrenalineRemainingMs',
+    'lastActivationSequence', 'lastControlSequence',
+  ])) return false;
+  let loadout: KillstreakLoadoutV1;
+  try {
+    loadout = parseKillstreakLoadout(value.loadout);
+  } catch {
+    return false;
+  }
+  if (typeof value.actorId !== 'string' || !/^[A-Za-z0-9_-]{1,80}$/.test(value.actorId)
+    || value.team !== 0 && value.team !== 1
+    || !isCheckpointInteger(value.lifeId, 0, 1_000_000_000)
+    || !isCheckpointInteger(value.streak, 0, MAX_REPLICATED_KILLSTREAK_STREAK)
+    || !isCheckpointInteger(value.cycleProgress, 0, MAX_REPLICATED_KILLSTREAK_STREAK)
+    || !Number.isFinite(value.adrenalineRemainingMs)
+    || Number(value.adrenalineRemainingMs) < 0
+    || Number(value.adrenalineRemainingMs) > ADRENALINE_DURATION_MS
+    || !isCheckpointInteger(value.lastActivationSequence, -1, 1_000_000_000)
+    || !isCheckpointInteger(value.lastControlSequence, -1, 1_000_000_000)
+    || !Array.isArray(value.earned)
+    || !Array.isArray(value.availableCharges)
+    || !Array.isArray(value.careRewards)
+    || value.careRewards.length > MAX_RETAINED_CARE_REWARDS) return false;
+
+  const finalThreshold = Math.max(...loadout.slots.map((id) => exactDefinition(id, PASS65_KILLSTREAK_CATALOG)?.cost ?? 0));
+  if (Number(value.cycleProgress) >= finalThreshold || Number(value.streak) < Number(value.cycleProgress)) return false;
+  const earned = value.earned as unknown[];
+  if (earned.length > loadout.slots.length || !earned.every(isCheckpointKillstreakId)
+    || new Set(earned).size !== earned.length
+    || earned.some((id) => !loadout.slots.includes(id as Pass65KillstreakId))) return false;
+  const expectedEarned = loadout.slots.filter((id) => (
+    (exactDefinition(id, PASS65_KILLSTREAK_CATALOG)?.cost ?? Number.POSITIVE_INFINITY) <= Number(value.cycleProgress)
+  ));
+  if (earned.length !== expectedEarned.length || expectedEarned.some((id) => !earned.includes(id))) return false;
+
+  const charges = value.availableCharges as unknown[];
+  const chargeIds: Pass65KillstreakId[] = [];
+  for (const charge of charges) {
+    if (!isCheckpointRecord(charge) || !hasCheckpointKeys(charge, ['id', 'count'])
+      || !isCheckpointKillstreakId(charge.id) || !loadout.slots.includes(charge.id)
+      || !isCheckpointInteger(charge.count, 1, MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD)) return false;
+    chargeIds.push(charge.id);
+  }
+  return new Set(chargeIds).size === chargeIds.length
+    && (value.careRewards as unknown[]).every(isCheckpointKillstreakId);
+}
+
+export function isKillstreakRuntimeCheckpoint(value: unknown): value is KillstreakRuntimeCheckpoint {
+  if (!isCheckpointRecord(value) || !hasCheckpointKeys(value, [
+    'schemaVersion', 'matchEpoch', 'revision', 'entityCounter', 'activationCounter',
+    'resultCounter', 'seenActivationRequestIds', 'actors',
+  ])) return false;
+  if (value.schemaVersion !== KILLSTREAK_RUNTIME_CHECKPOINT_SCHEMA_VERSION
+    || !isCheckpointInteger(value.matchEpoch, 0, 999_999_999)
+    || !isCheckpointInteger(value.revision, 0, 1_000_000_000)
+    || !isCheckpointInteger(value.entityCounter, 0, 1_000_000_000)
+    || !isCheckpointInteger(value.activationCounter, 0, 1_000_000_000)
+    || !isCheckpointInteger(value.resultCounter, 0, 1_000_000_000)
+    || !Array.isArray(value.seenActivationRequestIds)
+    || value.seenActivationRequestIds.length > MAX_KILLSTREAK_CHECKPOINT_SEEN_ACTIVATIONS
+    || !value.seenActivationRequestIds.every((id) => typeof id === 'string' && /^[A-Za-z0-9_-]{8,80}$/.test(id))
+    || new Set(value.seenActivationRequestIds).size !== value.seenActivationRequestIds.length
+    || !Array.isArray(value.actors)
+    || value.actors.length > MAX_KILLSTREAK_CHECKPOINT_ACTORS
+    || !value.actors.every(isKillstreakActorCheckpoint)) return false;
+  const actorIds = (value.actors as KillstreakActorCheckpoint[]).map((actor) => actor.actorId);
+  return new Set(actorIds).size === actorIds.length;
+}
 
 export const CHOPPER_MOTION_VARIANCE = Object.freeze({
   maximumPitchRadians: 0.12,
@@ -760,12 +897,94 @@ export class HostKillstreakRuntime {
       earned: new Set(),
       availableCharges: new Map(),
       careRewards: [],
+      trainingReward: null,
       adrenalineUntilMs: 0,
       possession: null,
       lastActivationSequence: -1,
       lastControlSequence: -1,
     });
     this.revision += 1;
+  }
+
+  checkpoint(nowMs: number): KillstreakRuntimeCheckpoint | null {
+    if (!Number.isFinite(nowMs)
+      || this.actors.size > MAX_KILLSTREAK_CHECKPOINT_ACTORS
+      || this.seenActivationRequestIds.size > MAX_KILLSTREAK_CHECKPOINT_SEEN_ACTIVATIONS) return null;
+    const actors = [...this.actors.values()]
+      .sort((left, right) => left.actorId.localeCompare(right.actorId))
+      .map((actor): KillstreakActorCheckpoint => Object.freeze({
+        actorId: actor.actorId,
+        team: actor.team,
+        lifeId: actor.lifeId,
+        loadout: parseKillstreakLoadout(actor.loadout),
+        streak: actor.streak,
+        cycleProgress: actor.cycleProgress,
+        earned: Object.freeze(actor.loadout.slots.filter((id) => actor.earned.has(id))),
+        availableCharges: Object.freeze(actor.loadout.slots.flatMap((id) => {
+          const count = actor.availableCharges.get(id) ?? 0;
+          return count > 0 ? [Object.freeze({ id, count })] : [];
+        })),
+        careRewards: Object.freeze([...actor.careRewards]),
+        adrenalineRemainingMs: Math.max(0, actor.adrenalineUntilMs - nowMs),
+        lastActivationSequence: actor.lastActivationSequence,
+        lastControlSequence: actor.lastControlSequence,
+      }));
+    const checkpoint: KillstreakRuntimeCheckpoint = Object.freeze({
+      schemaVersion: KILLSTREAK_RUNTIME_CHECKPOINT_SCHEMA_VERSION,
+      matchEpoch: this.matchEpoch,
+      revision: this.revision,
+      entityCounter: this.entityCounter,
+      activationCounter: this.activationCounter,
+      resultCounter: this.resultCounter,
+      seenActivationRequestIds: Object.freeze([...this.seenActivationRequestIds].sort()),
+      actors: Object.freeze(actors),
+    });
+    return isKillstreakRuntimeCheckpoint(checkpoint) ? checkpoint : null;
+  }
+
+  /** Restore once into a fresh runtime; caller resets disconnected transport sequences afterwards. */
+  restoreCheckpoint(checkpoint: unknown, nowMs: number, downtimeMs = 0): boolean {
+    if (!Number.isFinite(nowMs)
+      || !Number.isFinite(downtimeMs)
+      || downtimeMs < 0
+      || !isKillstreakRuntimeCheckpoint(checkpoint)
+      || checkpoint.matchEpoch !== this.matchEpoch
+      || this.actors.size !== 0
+      || this.entities.size !== 0
+      || this.carpetBombers.size !== 0
+      || this.timedActivations.size !== 0
+      || this.swarmFireLanes.size !== 0
+      || this.seenActivationRequestIds.size !== 0
+      || this.revision !== 0
+      || this.entityCounter !== 0
+      || this.activationCounter !== 0
+      || this.resultCounter !== 0
+      || this.lastAdvancedAtMs !== 0) return false;
+
+    const restoredActors = checkpoint.actors.map((actor): ActorAuthorityState => ({
+      actorId: actor.actorId,
+      team: actor.team,
+      lifeId: actor.lifeId,
+      loadout: parseKillstreakLoadout(actor.loadout),
+      streak: actor.streak,
+      cycleProgress: actor.cycleProgress,
+      earned: new Set(actor.earned),
+      availableCharges: new Map(actor.availableCharges.map((charge) => [charge.id, charge.count])),
+      careRewards: [...actor.careRewards],
+      trainingReward: null,
+      adrenalineUntilMs: nowMs + Math.max(0, actor.adrenalineRemainingMs - downtimeMs),
+      possession: null,
+      lastActivationSequence: actor.lastActivationSequence,
+      lastControlSequence: actor.lastControlSequence,
+    }));
+    for (const actor of restoredActors) this.actors.set(actor.actorId, actor);
+    for (const requestId of checkpoint.seenActivationRequestIds) this.seenActivationRequestIds.add(requestId);
+    this.revision = checkpoint.revision;
+    this.entityCounter = checkpoint.entityCounter;
+    this.activationCounter = checkpoint.activationCounter;
+    this.resultCounter = checkpoint.resultCounter;
+    this.lastAdvancedAtMs = nowMs;
+    return true;
   }
 
   recordEligibleElimination(actorId: string, source: 'weapon' | 'ordnance' | 'killstreak'): readonly Pass65KillstreakId[] {
@@ -805,6 +1024,11 @@ export class HostKillstreakRuntime {
     return Object.freeze(newlyEarned);
   }
 
+  /** Host-owned life identity used to rebind an authenticated replacement transport. */
+  actorLifeId(actorId: string): number | null {
+    return this.actors.get(actorId)?.lifeId ?? null;
+  }
+
   recordActorDeath(actorId: string, nextLifeId: number): void {
     const actor = this.actors.get(actorId);
     if (!actor) return;
@@ -812,6 +1036,7 @@ export class HostKillstreakRuntime {
     actor.streak = 0;
     actor.cycleProgress = 0;
     actor.earned.clear();
+    actor.trainingReward = null;
     actor.adrenalineUntilMs = 0;
     actor.lastActivationSequence = -1;
     actor.lastControlSequence = -1;
@@ -841,6 +1066,7 @@ export class HostKillstreakRuntime {
     if (!actor) return;
     actor.lastActivationSequence = -1;
     actor.lastControlSequence = -1;
+    actor.trainingReward = null;
     this.restoreActorControl(actor, true);
     for (const entity of this.entities.values()) {
       if (entity.kind === 'chopper' && entity.ownerId === actorId && entity.gunController !== 'ai') {
@@ -879,6 +1105,7 @@ export class HostKillstreakRuntime {
   endMatch(): readonly string[] {
     for (const actor of this.actors.values()) {
       actor.adrenalineUntilMs = 0;
+      actor.trainingReward = null;
       this.restoreActorControl(actor, true);
     }
     const expired = [...this.entities.keys()];
@@ -901,8 +1128,32 @@ export class HostKillstreakRuntime {
   }
 
   private actualActivationId(actor: ActorAuthorityState, slot: 1 | 2 | 3 | 4 | 5): Pass65KillstreakId {
+    if (slot === 1 && actor.trainingReward) return actor.trainingReward;
     if (slot === 1 && actor.careRewards.length > 0) return actor.careRewards[0];
     return actor.loadout.slots[slot - 1];
+  }
+
+  /**
+   * Host/offline-only bridge for the secure Gun Range test bay. The next
+   * activation still traverses the normal activation admission, entity caps,
+   * placement, damage and replication path; this grants no client authority.
+   */
+  grantTrainingReward(
+    actorId: string,
+    lifeId: number,
+    id: Pass65KillstreakId,
+    context: KillstreakTrainingGrantContext,
+  ): KillstreakTrainingGrant {
+    const reject = (reason: KillstreakTrainingGrant['reason']): KillstreakTrainingGrant => Object.freeze({ accepted: false, reason });
+    if (context.arenaId !== 'gun-range' || context.stationKind !== 'secure-test-bay'
+      || context.authorityRole !== 'offline' && context.authorityRole !== 'host') return reject('invalid-training-context');
+    const actor = this.actors.get(actorId);
+    if (!actor) return reject('unknown-actor');
+    if (actor.lifeId !== lifeId) return reject('life-mismatch');
+    if (!exactDefinition(id, this.catalog)) return reject('unknown-reward');
+    actor.trainingReward = id;
+    this.revision += 1;
+    return Object.freeze({ accepted: true, reason: 'accepted' });
   }
 
   activate(intent: KillstreakActivationIntent, nowMs: number, world: KillstreakWorld): KillstreakAdmission {
@@ -918,8 +1169,9 @@ export class HostKillstreakRuntime {
     if (!Number.isFinite(nowMs)) return reject('invalid-time');
     const actualId = this.actualActivationId(actor, intent.slot);
     if (actualId !== intent.expectedId) return reject('selection-mismatch');
-    const fromCare = intent.slot === 1 && actor.careRewards[0] === actualId;
-    if (!fromCare && (actor.availableCharges.get(actualId) ?? 0) < 1) return reject('reward-not-earned');
+    const fromTraining = intent.slot === 1 && actor.trainingReward === actualId;
+    const fromCare = !fromTraining && intent.slot === 1 && actor.careRewards[0] === actualId;
+    if (!fromTraining && !fromCare && (actor.availableCharges.get(actualId) ?? 0) < 1) return reject('reward-not-earned');
     if (this.seenActivationRequestIds.has(intent.activationId)) return reject('duplicate-activation-id');
     const entityNeed = actualId === 'drone-swarm' ? DRONE_SWARM_COUNT
       : actualId === 'care-package' ? 2
@@ -942,7 +1194,8 @@ export class HostKillstreakRuntime {
     }
     actor.lastActivationSequence = intent.sequence;
     this.seenActivationRequestIds.add(intent.activationId);
-    if (fromCare) actor.careRewards.shift();
+    if (fromTraining) actor.trainingReward = null;
+    else if (fromCare) actor.careRewards.shift();
     else {
       const remainingCharges = (actor.availableCharges.get(actualId) ?? 0) - 1;
       if (remainingCharges > 0) actor.availableCharges.set(actualId, remainingCharges);
@@ -1577,6 +1830,13 @@ export class HostKillstreakRuntime {
   ): void {
     const elapsed = clamp((nowMs - entity.createdAtMs) / CHOPPER_DURATION_MS, 0, 1);
     entity.phase = elapsed < 0.08 ? 'inbound' : elapsed > 0.9 ? 'outbound' : 'orbiting';
+    // The accepted gun intent was authored against the last recipient snapshot
+    // and its exact possessed camera pose. Resolve that shot before integrating
+    // this frame's AI-flight movement; movement-first made a 10-15 m/s platform
+    // miss a centre-ray target every low-FPS frame even while the crosshair was
+    // correctly tracking it. Authority, LOS and cadence remain host-owned.
+    const firingPosition: SupportVec3 = [...entity.position];
+    const firingAttitude: SupportVec3 = [...entity.attitude];
     const pose = chopperRoutePose(entity.seed, entity.createdAtMs, nowMs, entity.routeCentre, world.bounds);
     const previous: SupportVec3 = [...entity.position];
     const next = resolveFlightPosition(previous, pose.position, 1.25, world);
@@ -1594,21 +1854,21 @@ export class HostKillstreakRuntime {
     const owner = this.actors.get(entity.ownerId);
     if (!owner) return;
     if (entity.gunController === 'ai') {
-      const target = this.nearestVisibleTarget(entity.position, owner.actorId, owner.team, world);
+      const target = this.nearestVisibleTarget(firingPosition, owner.actorId, owner.team, world);
       if (target) {
-        const admittedDamage = supportGunDamageAtDistance(CHOPPER_GUN_PROFILE, distance(entity.position, target.position));
+        const admittedDamage = supportGunDamageAtDistance(CHOPPER_GUN_PROFILE, distance(firingPosition, target.position));
         if (admittedDamage > 0) damageEvents.push(this.damageEvent(
           entity.activationId,
           'chopper',
           owner.actorId,
           target,
           admittedDamage,
-          entity.position,
+          firingPosition,
           nowMs,
         ));
       }
     } else {
-      const ray = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, entity.aimYaw, entity.aimPitch);
+      const ray = chopperGunnerAuthoritativeRay(firingPosition, firingAttitude, entity.aimYaw, entity.aimPitch);
       const hit = this.visibleTargetAlongRay(
         ray.origin,
         ray.direction,
@@ -2205,7 +2465,9 @@ export class HostKillstreakRuntime {
       })),
       adrenalineRemainingMs: Math.max(0, actor.adrenalineUntilMs - nowMs),
       possession: actor.possession,
-      revealedCareRewards: Object.freeze(actor.actorId === recipientActorId ? [...actor.careRewards] : []),
+      revealedCareRewards: Object.freeze(actor.actorId === recipientActorId
+        ? [...(actor.trainingReward ? [actor.trainingReward] : []), ...actor.careRewards]
+        : []),
     }));
     const entities = [...this.entities.values()].sort((left, right) => left.id.localeCompare(right.id)).map((entity): KillstreakEntitySnapshot => {
       const captureProgress = entity.kind === 'care-crate' && entity.captureStartedAtMs !== null && entity.captureActorId

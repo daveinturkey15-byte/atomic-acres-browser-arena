@@ -1,5 +1,6 @@
 import { buildRustworks1v1, RUSTWORKS_CONTAINER_LIGHTS, RUSTWORKS_WORK_LIGHTS } from '../../additional-maps';
 import { createProceduralArenaVisualDefinition, type ArenaPracticalDefinition } from '../arena-visual-definition';
+import { RUSTWORKS_GENERATED_SKY_ASSET_URL } from '../sky-backdrop';
 import { budgets, camera, colorPipeline, SHARED_GAMEPLAY_ASSETS } from './shared';
 
 const towerPracticals: readonly ArenaPracticalDefinition[] = RUSTWORKS_WORK_LIGHTS.map((fixture, index) => Object.freeze({
@@ -66,7 +67,7 @@ export const definition = createProceduralArenaVisualDefinition({
   moduleId: 'arena.visual.rustworks-1v1.v1',
   // The duplicate Blender tower is retained as source evidence only. Runtime
   // presentation uses the procedural authority and requests no retired GLB.
-  assetDependencies: [],
+  assetDependencies: [RUSTWORKS_GENERATED_SKY_ASSET_URL],
   sharedAssetDependencies: SHARED_GAMEPLAY_ASSETS,
   lighting: {
     sunColor: 0xe2ebff, sunIntensity: 3.6, ambientColor: 0x718aa5, ambientIntensity: 0.72,

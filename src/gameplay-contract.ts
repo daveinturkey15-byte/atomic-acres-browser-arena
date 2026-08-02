@@ -52,6 +52,10 @@ const renderProfiles: readonly RenderProfile[] = ['performance', 'blender', 'com
 // UI card order is a presentation choice. Keep the frozen Pass 62 gameplay
 // contract order stable so a naming/menu pass cannot rewrite benchmark bytes.
 const GAMEPLAY_CONTRACT_ARENA_IDS = ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal'] as const;
+// Host-authoritative map pickups are verified by their own protocol and
+// lifecycle contracts. Do not let adding one rewrite the retained pre-HITL
+// gameplay benchmark or its bot-arsenal bytes.
+const AUTHORITY_OWNED_SPECIAL_WEAPON_IDS = new Set(['railgun', 'flamethrower', 'flare-gun']);
 const movementContexts = {
   walk: { crouched: false, prone: false, ads: false, sprinting: false, grounded: true },
   sprint: { crouched: false, prone: false, ads: false, sprinting: true, grounded: true },
@@ -79,7 +83,7 @@ export function buildGameplayContract(): Record<string, unknown> {
     combat: {
       botDamageMultiplier: BOT_DAMAGE_MULTIPLIER,
       soloBotCount: SOLO_BOT_COUNT,
-      botWeapons: [...BOT_WEAPON_POOL],
+      botWeapons: BOT_WEAPON_POOL.filter((weapon) => !AUTHORITY_OWNED_SPECIAL_WEAPON_IDS.has(weapon)),
       botGrenade: {
         families: [...BOT_GRENADE_POOL],
         damageMultiplier: BOT_DAMAGE_MULTIPLIER,
@@ -88,9 +92,11 @@ export function buildGameplayContract(): Record<string, unknown> {
         cooldownMs: BOT_GRENADE_COOLDOWN_MS,
         maximumActive: 1,
       },
-      // Pass 62 remains the immutable rollback gameplay benchmark. Pass 64's
-      // HITL railgun candidate is verified by its own authority contract.
-      weapons: Object.values(WEAPONS).filter((weapon) => weapon.id !== 'railgun').map((weapon) => ({ ...weapon })),
+      // Pass 62 remains the immutable rollback gameplay benchmark. Later
+      // host-authoritative pickup weapons are verified by their own contracts.
+      weapons: Object.values(WEAPONS)
+        .filter((weapon) => !AUTHORITY_OWNED_SPECIAL_WEAPON_IDS.has(weapon.id))
+        .map((weapon) => ({ ...weapon })),
       grenade: { radius: GRENADE_RADIUS, maximumDamage: GRENADE_MAX_DAMAGE },
       melee: { cooldownMs: MELEE_COOLDOWN_MS, range: MELEE_RANGE, damage: MELEE_DAMAGE },
       match: {

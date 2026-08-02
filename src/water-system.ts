@@ -11,15 +11,33 @@ export type WaterTelemetry = Readonly<{
   nearSize: number;
   horizonRadius: number;
   physicsActive: boolean;
+  waveBands: number;
+  waveAuthority: typeof RUSTWORKS_OCEAN_AUTHORITY_ID;
 }>;
 
-const OCEAN_WAVES = [
-  { x: 0.91, z: 0.41, frequency: 0.0118, speed: 0.38, weight: 0.68, phase: 0.31, warpX: -0.43, warpZ: 0.90, warpFrequency: 0.0062, warpSpeed: -0.11, warpAmount: 0.72, warpPhase: 0.90 },
-  { x: -0.22, z: 0.98, frequency: 0.0185, speed: 0.54, weight: 0.41, phase: 1.73, warpX: 0.84, warpZ: 0.54, warpFrequency: 0.0090, warpSpeed: 0.16, warpAmount: 0.55, warpPhase: 2.10 },
-  { x: 0.65, z: -0.76, frequency: 0.0290, speed: 0.72, weight: 0.24, phase: 3.14, warpX: 0.76, warpZ: 0.65, warpFrequency: 0.0140, warpSpeed: -0.22, warpAmount: 0.42, warpPhase: 4.20 },
-  { x: -0.95, z: -0.31, frequency: 0.0460, speed: 0.96, weight: 0.13, phase: 4.86, warpX: -0.31, warpZ: 0.95, warpFrequency: 0.0210, warpSpeed: 0.29, warpAmount: 0.31, warpPhase: 1.40 },
-  { x: 0.37, z: 0.93, frequency: 0.0740, speed: 1.36, weight: 0.065, phase: 5.77, warpX: -0.93, warpZ: 0.37, warpFrequency: 0.0350, warpSpeed: -0.41, warpAmount: 0.22, warpPhase: 3.30 },
-] as const;
+export const RUSTWORKS_OCEAN_AUTHORITY_ID = 'shared-render-physics-ocean-spectrum' as const;
+
+export const OCEAN_WAVES = Object.freeze([
+  // Long storm swells plus progressively tighter chop. The previous 85-530 m
+  // wavelengths looked like a handful of enormous flat polygons from the rig;
+  // this 22-180 m spectrum preserves the large displacement while making the
+  // physical surface read continuously at player height.
+  { x: 0.91, z: 0.41, frequency: 0.035, speed: 0.55, weight: 0.68, phase: 0.31, warpX: -0.43, warpZ: 0.90, warpFrequency: 0.012, warpSpeed: -0.17, warpAmount: 0.72, warpPhase: 0.90 },
+  { x: -0.22, z: 0.98, frequency: 0.061, speed: 0.78, weight: 0.41, phase: 1.73, warpX: 0.84, warpZ: 0.54, warpFrequency: 0.019, warpSpeed: 0.24, warpAmount: 0.55, warpPhase: 2.10 },
+  { x: 0.65, z: -0.76, frequency: 0.105, speed: 1.10, weight: 0.24, phase: 3.14, warpX: 0.76, warpZ: 0.65, warpFrequency: 0.032, warpSpeed: -0.34, warpAmount: 0.42, warpPhase: 4.20 },
+  { x: -0.95, z: -0.31, frequency: 0.175, speed: 1.52, weight: 0.13, phase: 4.86, warpX: -0.31, warpZ: 0.95, warpFrequency: 0.052, warpSpeed: 0.45, warpAmount: 0.31, warpPhase: 1.40 },
+  { x: 0.37, z: 0.93, frequency: 0.290, speed: 2.05, weight: 0.065, phase: 5.77, warpX: -0.93, warpZ: 0.37, warpFrequency: 0.090, warpSpeed: -0.62, warpAmount: 0.22, warpPhase: 3.30 },
+] as const);
+
+export const RUSTWORKS_OCEAN_AMPLITUDE = Object.freeze({
+  compat: 1.15,
+  performance: 1.15,
+  blender: 1.55,
+} as const);
+
+export function rustworksOceanAmplitude(profile: RenderProfile): number {
+  return RUSTWORKS_OCEAN_AMPLITUDE[profile];
+}
 
 export function sampleOceanWave(x: number, z: number, timeSeconds: number, amplitude: number): {
   height: number;
@@ -101,7 +119,7 @@ export class WaterSystem {
     this.enabled = arenaId === 'rustworks-1v1';
     this.night = options?.night ?? arenaId === 'rustworks-1v1';
     this.waterLevel = options?.waterLevel ?? (this.enabled ? -19.5 : -0.55);
-    this.waveAmp = profile === 'blender' ? 1.55 : 1.15;
+    this.waveAmp = rustworksOceanAmplitude(profile);
     this.segments = profile === 'blender' ? 160 : 96;
     // WebGPU owns the visible water through Pass64TslSceneSystems. This object
     // remains the deterministic CPU water/physics authority only.
@@ -136,6 +154,8 @@ export class WaterSystem {
     const deep = this.night ? new THREE.Color(0x020814) : new THREE.Color(0x0a3a4a);
     const shallow = this.night ? new THREE.Color(0x0a2a44) : new THREE.Color(0x2a8fa8);
     const foam = this.night ? new THREE.Color(0x7ec8e8) : new THREE.Color(0xd8f4ff);
+    const glslWaveExpression = OCEAN_WAVES.map((wave) => `sampleWave(p, vec2(${wave.x.toFixed(6)}, ${wave.z.toFixed(6)}), ${wave.frequency.toFixed(6)}, ${wave.speed.toFixed(6)}, ${wave.weight.toFixed(6)}, ${wave.phase.toFixed(6)}, vec2(${wave.warpX.toFixed(6)}, ${wave.warpZ.toFixed(6)}), ${wave.warpFrequency.toFixed(6)}, ${wave.warpSpeed.toFixed(6)}, ${wave.warpAmount.toFixed(6)}, ${wave.warpPhase.toFixed(6)})`)
+      .join('\n            + ');
     this.material = new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: true,
@@ -189,11 +209,7 @@ export class WaterSystem {
           vec3 p = position;
           // Deterministically warped long swells avoid the repeating sine-grid
           // look while keeping the CPU buoyancy sampler exactly in agreement.
-          vec3 wave = sampleWave(p, vec2(0.91, 0.41), 0.0118, 0.38, 0.68, 0.31, vec2(-0.43, 0.90), 0.0062, -0.11, 0.72, 0.90)
-            + sampleWave(p, vec2(-0.22, 0.98), 0.0185, 0.54, 0.41, 1.73, vec2(0.84, 0.54), 0.0090, 0.16, 0.55, 2.10)
-            + sampleWave(p, vec2(0.65, -0.76), 0.0290, 0.72, 0.24, 3.14, vec2(0.76, 0.65), 0.0140, -0.22, 0.42, 4.20)
-            + sampleWave(p, vec2(-0.95, -0.31), 0.0460, 0.96, 0.13, 4.86, vec2(-0.31, 0.95), 0.0210, 0.29, 0.31, 1.40)
-            + sampleWave(p, vec2(0.37, 0.93), 0.0740, 1.36, 0.065, 5.77, vec2(-0.93, 0.37), 0.0350, -0.41, 0.22, 3.30);
+          vec3 wave = ${glslWaveExpression};
           p.y += wave.x;
           vNormalW = normalize(mat3(modelMatrix) * vec3(-wave.y, 1.0, -wave.z));
           vSlope = length(wave.yz);
@@ -341,6 +357,8 @@ export class WaterSystem {
       nearSize: this.nearSize,
       horizonRadius: this.horizonRadius,
       physicsActive: this.enabled,
+      waveBands: OCEAN_WAVES.length,
+      waveAuthority: RUSTWORKS_OCEAN_AUTHORITY_ID,
     };
   }
 }

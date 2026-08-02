@@ -79,6 +79,7 @@ describe('Pass 66 command shell', () => {
     expect(markup).toContain('id="support-platform-ammo"');
     expect(markup).toContain('id="support-platform-time"');
     expect(markup).toContain('id="support-control-action"');
+    expect(markup).not.toContain('id="killstreak-enter-prompt"');
     expect(markup).toContain('id="adrenaline-hud"');
     expect(markup).toContain('id="adrenaline-time"');
     expect(markup).toContain('id="support-interaction-prompt"');

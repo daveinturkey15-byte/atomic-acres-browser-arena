@@ -17,6 +17,7 @@ export type Pass65WeaponVariant = Pass65CrossbowVariant;
 export const PASS65_AUTHORED_FIREARM_IDS = Object.freeze([
   'carbine', 'smg', 'lmg', 'scattergun', 'sniper', 'railgun', 'pistol', 'magnum', 'machine-pistol',
   'mini-uzi', 'mp5', 'm4a1', 'ak-47', 'minigun', 'm14-ebr', 'slug-shotgun', 'flashlight-pistol',
+  'flamethrower', 'flare-gun',
 ] as const satisfies readonly WeaponId[]);
 export type Pass65AuthoredFirearmId = (typeof PASS65_AUTHORED_FIREARM_IDS)[number];
 

@@ -7,6 +7,7 @@ import { createHardwareWebGl2ReceiptFixture } from '../../../../scripts/qa/pass6
 import {
   EvidenceRunnerError,
   PASS66_BROWSER_FOREGROUND_TEST_ID,
+  PASS66_EXACT_PACKAGE_SCRIPTS,
   PASS66_HIDDEN_TAB_TEST_ID,
   analyzeCoverage,
   attestNormalCommandAfterPass,
@@ -26,6 +27,7 @@ import {
   validateHardwareArtifact,
   validateNormalReceipt,
   validatePass66BlockingCatalog,
+  validatePass66ExactPackageScripts,
 } from './run-pass66-owner-evidence.mjs';
 
 const repoRoot = path.resolve(import.meta.dirname, '../../../..');
@@ -56,10 +58,38 @@ function artifactFor(testId) {
   };
 }
 
-test('canonical graph deterministically covers 55 commands, 160 feedback rows, and all 99 requirements', () => {
+const exactPass66TestIds = [
+  PASS66_BROWSER_FOREGROUND_TEST_ID,
+  PASS66_HIDDEN_TAB_TEST_ID,
+  'T-SUPPORT-RUNTIME',
+  'T-INTERACTION',
+  'T-WEAPON-PRESENTATION',
+  'T-DESTRUCTIBLE',
+  'T-ADDITIONAL-MAPS',
+  'T-BOTS',
+  'T-MULTIPLAYER-STABILITY',
+  'T-PASS61-NETCODE',
+  'T-PRIVATE-LOBBY',
+  'T-PASS63-MULTIPLAYER-COMPARATOR',
+  'T-ADS-SIGHT-CATALOG',
+  'T-SCOPED-ADS',
+  'T-SKY-WEBGPU',
+  'T-VIEWMODEL-FRAMING',
+  'T-PRONE-CONTACT-MATRIX',
+  'T-SUPPORT-OPERATE-PROMPT',
+  'T-AUDIO-LONG-RUN',
+  'T-KILLSTREAK-DEMO-VIDEOS',
+  'T-BROWSER-ADMISSION',
+  'T-INSTALLED-FIREFOX',
+  'T-GUN-RANGE-TEST-BAY',
+  'T-TIMED-MAP-WEAPONS',
+  'T-RAILGUN',
+];
+
+test('canonical graph deterministically covers 75 commands, 207 feedback rows, and all 99 requirements', () => {
   const { graph, matrixRows, ledgerRows, coverage } = loadCanonical();
-  assert.equal(coverage.testCount, 55);
-  assert.equal(coverage.feedbackCount, 160);
+  assert.equal(coverage.testCount, 75);
+  assert.equal(coverage.feedbackCount, 207);
   assert.equal(coverage.requirementCount, 99);
   assert.deepEqual(coverage.orphanTests, []);
   assert.deepEqual(coverage.orphanRequirements, []);
@@ -77,7 +107,7 @@ test('canonical graph deterministically covers 55 commands, 160 feedback rows, a
     visualByTest,
     sourceSha,
   });
-  assert.equal(mappings.allFeedbackCoverage.length, 160);
+  assert.equal(mappings.allFeedbackCoverage.length, 207);
   assert.equal(mappings.requirementEvidence.length, 99);
   assert.deepEqual(
     mappings.allFeedbackCoverage.map((entry) => entry.feedbackId),
@@ -95,18 +125,45 @@ test('canonical graph deterministically covers 55 commands, 160 feedback rows, a
   for (const feedbackIds of coverage.feedbackByTest.values()) {
     assert.deepEqual(feedbackIds, [...feedbackIds].sort());
   }
-  assert.deepEqual(validatePass66BlockingCatalog(graph).testIds, [
-    PASS66_BROWSER_FOREGROUND_TEST_ID,
-    PASS66_HIDDEN_TAB_TEST_ID,
-    'T-SUPPORT-RUNTIME',
-    'T-INTERACTION',
-    'T-WEAPON-PRESENTATION',
-    'T-DESTRUCTIBLE',
-    'T-ADDITIONAL-MAPS',
-    'T-BOTS',
-  ]);
-  assert.deepEqual(coverage.feedbackByTest.get(PASS66_BROWSER_FOREGROUND_TEST_ID), ['HF-152']);
-  assert.deepEqual(coverage.feedbackByTest.get(PASS66_HIDDEN_TAB_TEST_ID), ['HF-152']);
+  assert.deepEqual(validatePass66BlockingCatalog(graph).testIds, exactPass66TestIds);
+  assert.deepEqual(coverage.feedbackByTest.get(PASS66_BROWSER_FOREGROUND_TEST_ID), ['HF-152', 'HF-200']);
+  assert.deepEqual(coverage.feedbackByTest.get(PASS66_HIDDEN_TAB_TEST_ID), ['HF-152', 'HF-200']);
+});
+
+test('exact Pass 66 package aliases reject missing or substituted aggregate launchers', () => {
+  assert.deepEqual(
+    validatePass66ExactPackageScripts(PASS66_EXACT_PACKAGE_SCRIPTS).scriptIds,
+    Object.keys(PASS66_EXACT_PACKAGE_SCRIPTS),
+  );
+  for (const scriptId of Object.keys(PASS66_EXACT_PACKAGE_SCRIPTS)) {
+    const substituted = { ...PASS66_EXACT_PACKAGE_SCRIPTS, [scriptId]: 'node scripts/qa/not-the-owned-gate.mjs' };
+    assert.throws(
+      () => validatePass66ExactPackageScripts(substituted),
+      codeIs('E_GRAPH_PASS66_PACKAGE_SCRIPT'),
+      `${scriptId} substitution must fail`,
+    );
+  }
+});
+
+test('every exact Pass 66 aggregate gate rejects catalog removal or command substitution', () => {
+  const { graph } = loadCanonical();
+  for (const testId of exactPass66TestIds) {
+    const removed = structuredClone(graph);
+    removed.testCatalog = removed.testCatalog.filter((testEntry) => testEntry.id !== testId);
+    assert.throws(
+      () => validatePass66BlockingCatalog(removed),
+      codeIs('E_GRAPH_PASS66_TEST_CONTRACT'),
+      `${testId} removal must fail`,
+    );
+
+    const substituted = structuredClone(graph);
+    substituted.testCatalog.find((testEntry) => testEntry.id === testId).command = 'npm run test';
+    assert.throws(
+      () => validatePass66BlockingCatalog(substituted),
+      codeIs('E_GRAPH_PASS66_TEST_CONTRACT'),
+      `${testId} substitution must fail`,
+    );
+  }
 });
 
 test('blocking Pass 66 scheduling evidence rejects synchronized removal or command substitution', () => {

@@ -235,6 +235,29 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(deathDropSource).toContain("nearestDeathDrop([expected], position, range, now, 'weapon')");
   });
 
+  it('routes secure test-bay stations through canonical weapon and support authority', () => {
+    const candidateStart = source.indexOf('function fInteractionCandidates(');
+    const candidateEnd = source.indexOf('\nfunction selectedFInteraction(', candidateStart);
+    const candidates = source.slice(candidateStart, candidateEnd);
+    expect(candidates).toContain("kind: 'test-bay-weapon'");
+    expect(candidates).toContain("kind: 'test-bay-support'");
+    expect(source).toContain('grantTrainingRailgun(railgunState, player.id');
+    expect(source).toContain('killstreakRuntime.grantTrainingReward(player.id, localContinuity, id');
+    expect(source).toContain("if (network.role === 'client') {");
+    expect(source).toContain('activateFieldSupport(id);');
+    const worldStart = source.indexOf('function killstreakWorldState()');
+    const worldEnd = source.indexOf('\nfunction refreshLocalKillstreakSnapshot(', worldStart);
+    const world = source.slice(worldStart, worldEnd);
+    expect(world).toContain("target.kind !== 'training-dummy'");
+    expect(world).toContain("kind: 'bot'");
+    const damageStart = source.indexOf('function applyKillstreakDamageEvent(');
+    const damageEnd = source.indexOf('\nlet lastKillstreakControlSentAt', damageStart);
+    const damage = source.slice(damageStart, damageEnd);
+    expect(damage).toContain("target.kind === 'training-dummy'");
+    expect(damage).toContain('hitPracticeTarget(practiceTarget.id, event.damage');
+    expect(damage).toContain('{ weaponOrEffect: event.source }');
+  });
+
   it('supersedes and exits possession with the equipped support slot key, never F', () => {
     const start = source.indexOf('function activateOrToggleFieldSupportSlot(');
     const end = source.indexOf('\nfunction interactWithSelectedKillstreakSupport(', start);
@@ -287,5 +310,13 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain('* killstreakActorModifiers(player.id, now).damage');
     expect(source).toContain('maxSpeed: baseProfile.maxSpeed * movementBoost');
     expect(source).toContain('(reloadState.endsAt - reloadStartedAt) * reloadDuration');
+    const modifierStart = source.indexOf('function killstreakActorModifiers(');
+    const modifierEnd = source.indexOf('\nfunction killstreakLineOfSight(', modifierStart);
+    const modifierBlock = source.slice(modifierStart, modifierEnd);
+    expect(modifierBlock).toContain("if (matchState.phase !== 'active') return { damage: 1, movement: 1, reloadDuration: 1 };");
+    const hudStart = source.indexOf('function updateSupportStatusHud(');
+    const hudEnd = source.indexOf('\nfunction refreshLocalKillstreakSnapshot(', hudStart);
+    const hudBlock = source.slice(hudStart, hudEnd);
+    expect(hudBlock).toContain("adrenalineRemainingMs > 0 && matchState.phase === 'active' && player.alive");
   });
 });

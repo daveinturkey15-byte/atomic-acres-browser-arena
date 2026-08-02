@@ -72,7 +72,9 @@ npm run run:pass66:owner-evidence -- --resume --source-sha <exact-S0-SHA>
 
 `T-COLD-HARDWARE-WEBGL2` is deliberately exceptional: `--run` executes its exact catalog command and then validates the original command-produced schema-v2 owner artifact, detailed receipt, current `dist/` manifest, environment and installed Chrome digest. The runner never replaces or wraps that artifact. `--resume` may consume it only when every current exact-S0 binding still validates.
 
-After all 55 exact receipts validate, including the narrow browser-foreground policy unit gate and the real headed installed-Chrome hidden-tab admission gate, generate the deterministic 160-feedback/99-requirement finalizer input:
+The catalog is fail-closed over the exact package aliases for multiplayer stability, Pass 61 netcode, private lobby, the byte-exact Pass 63 comparator, full ADS catalog, scoped ADS, WebGPU sky, viewmodel framing, prone contact, compact support-operation prompt, hidden-tab admission, long-run audio, final killstreak demo media, cross-browser admission, Gun Range test bay, timed map weapons and Railgun. Scoped ADS, test-bay and timed-weapon browser proofs use the shared release-topology launcher; they are not ad-hoc dev-server runs. Alias substitution, test removal or feedback detachment fails the runner's static contract.
+
+After all 75 exact receipts validate, including the narrow browser-foreground policy unit gate, the real headed installed-Chrome three-map hidden-tab admission matrix and installed-Firefox admission, generate the deterministic 207-feedback/99-requirement finalizer input:
 
 ```powershell
 npm run run:pass66:owner-evidence -- --emit-finalizer-input artifacts/pass66-owner-evidence-runner/finalizer-input.json --source-sha <exact-S0-SHA> --feedback-received-at <ISO-UTC> --preview-ref <immutable-preview-ref> --preview-created-at <ISO-UTC> --acceptance-mode pre-approval

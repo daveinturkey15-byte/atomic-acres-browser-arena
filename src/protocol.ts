@@ -15,6 +15,8 @@ import {
   isLobbySnapshot,
   isPlayerScore,
   isPrivateMatchConfig,
+  MAX_HOST_START_FUTURE_LEAD_MS,
+  MIN_RECOVERED_HOST_START_TIME_MS,
   type LobbySnapshot,
   type PlayerScore,
   type PrivateMatchConfig,
@@ -48,18 +50,33 @@ import {
   isFlashProtocolMessage,
   type FlashProtocolMessage,
 } from './flash-protocol';
+import {
+  isTimedMapWeaponProtocolMessage,
+  type TimedMapWeaponProtocolMessage,
+  type TimedMapWeaponStateMessage,
+} from './timed-map-weapon-protocol';
+import {
+  isFlarePresentationProtocolMessage,
+  type FlarePresentationProtocolMessage,
+  type FlarePresentationStateMessage,
+} from './flare-presentation-protocol';
+import {
+  isBotWeaponPresentationMessage,
+  type BotWeaponPresentationMessage,
+} from './bot-weapon-presentation';
 import { GRENADE_IDS, type GrenadeId } from './combat/grenade-catalog';
+import { validateKillstreakLoadout, type KillstreakLoadoutV1 } from './killstreak-catalog';
 
 export { GRENADE_IDS, type GrenadeId } from './combat/grenade-catalog';
 
 export type Team = 0 | 1;
-export const MULTIPLAYER_PROTOCOL_VERSION = 9;
+export const MULTIPLAYER_PROTOCOL_VERSION = 13;
 export type PrimaryWeaponId =
   | 'carbine' | 'smg' | 'lmg' | 'scattergun' | 'sniper'
   | 'mini-uzi' | 'mp5' | 'm4a1' | 'ak-47' | 'minigun' | 'm14-ebr' | 'slug-shotgun';
 export type SidearmWeaponId =
   | 'pistol' | 'machine-pistol' | 'magnum' | 'flashlight-pistol' | 'explosive-crossbow';
-export type SpecialWeaponId = 'railgun';
+export type SpecialWeaponId = 'railgun' | 'flamethrower' | 'flare-gun';
 export type WeaponId = PrimaryWeaponId | SidearmWeaponId | SpecialWeaponId;
 
 export const PRIMARY_WEAPON_IDS: readonly PrimaryWeaponId[] = Object.freeze([
@@ -69,7 +86,37 @@ export const PRIMARY_WEAPON_IDS: readonly PrimaryWeaponId[] = Object.freeze([
 export const SIDEARM_WEAPON_IDS: readonly SidearmWeaponId[] = Object.freeze([
   'pistol', 'machine-pistol', 'magnum', 'flashlight-pistol', 'explosive-crossbow',
 ]);
-export const WEAPON_IDS: readonly WeaponId[] = Object.freeze([...PRIMARY_WEAPON_IDS, ...SIDEARM_WEAPON_IDS, 'railgun']);
+export const SPECIAL_WEAPON_IDS: readonly SpecialWeaponId[] = Object.freeze([
+  'railgun', 'flamethrower', 'flare-gun',
+]);
+export const WEAPON_IDS: readonly WeaponId[] = Object.freeze([
+  ...PRIMARY_WEAPON_IDS,
+  ...SIDEARM_WEAPON_IDS,
+  ...SPECIAL_WEAPON_IDS,
+]);
+export type OrdinaryWeaponId = PrimaryWeaponId | SidearmWeaponId;
+export const ORDINARY_WEAPON_IDS: readonly OrdinaryWeaponId[] = Object.freeze([
+  ...PRIMARY_WEAPON_IDS,
+  ...SIDEARM_WEAPON_IDS,
+]);
+export type GuestCombatInventory = Readonly<{
+  ammo: Readonly<Record<OrdinaryWeaponId, number>>;
+  reserve: Readonly<Record<OrdinaryWeaponId, number>>;
+  grenades: 0 | 1;
+}>;
+export type GuestCombatWeaponProjection<TWeapon extends OrdinaryWeaponId> = Readonly<{
+  weapon: TWeapon;
+  ammo: number;
+  reserve: number;
+}>;
+/** Compact transient projection. The host retains the full ordinary-weapon
+ * ledger; state traffic carries only the two equipped ordinary weapons. */
+export type GuestCombatInventoryProjection = Readonly<{
+  revision: number;
+  primary: GuestCombatWeaponProjection<PrimaryWeaponId>;
+  sidearm: GuestCombatWeaponProjection<SidearmWeaponId>;
+  grenades: 0 | 1;
+}>;
 export const MAX_MATCH_SCORE_ENTRIES = 10;
 
 export type PlayerSnapshot = {
@@ -99,6 +146,7 @@ export type StateMessage = {
   hostTimeMs: number;
   continuity: number;
   rateHz: 20 | 30 | 40;
+  combatInventory?: GuestCombatInventoryProjection;
 };
 export type ShotMessage = {
   type: 'shot';
@@ -114,7 +162,7 @@ export type ShotMessage = {
 export type ShotRejectReason = 'none' | 'protocol-mismatch' | 'unknown-sender' | 'duplicate' | 'sequence-gap'
   | 'weapon-mismatch' | 'cadence' | 'spin-up' | 'stale' | 'future' | 'invalid-direction' | 'invalid-pellets'
   | 'bad-origin' | 'missing-history' | 'continuity-mismatch' | 'connection-epoch-mismatch'
-  | 'life-mismatch' | 'shooter-dead' | 'invalid-timeline' | 'obstructed' | 'malformed';
+  | 'life-mismatch' | 'shooter-dead' | 'invalid-timeline' | 'empty-magazine' | 'obstructed' | 'malformed';
 export type ShotRequestMessage = {
   type: 'shot-request';
   protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
@@ -164,7 +212,10 @@ export type ShotResultMessage = {
   by: string;
   forPlayerId: string;
   shotId: string;
+  connectionEpoch: string;
+  lifeId: number;
   shotSeq: number;
+  weapon: WeaponId;
   status: 'accepted-hit' | 'accepted-miss' | 'rejected';
   reason: ShotRejectReason;
   fireTimeMs: number;
@@ -172,6 +223,10 @@ export type ShotResultMessage = {
   receivedAtHostTimeMs: number | null;
   resolvedAtHostTimeMs: number | null;
   appliedRewindMs: number;
+  /** Host-canonical equipped inventory after this ordinary shot was resolved.
+   * Reliable event-lane ordering plus shotSeq prevents an older repair from
+   * refilling a later shot. Special weapons do not use this ledger. */
+  combatInventory: GuestCombatInventoryProjection | null;
   outcomes: ShotOutcome[];
   nonce: number;
 };
@@ -258,6 +313,7 @@ export type BotStateMessage = { type: 'bot-state'; by: string; seq: number; bots
 export type BotDamageMessage = {
   type: 'bot-damage'; by: string; botId: string; target: string; weapon: WeaponId;
   origin: [number, number, number]; direction: [number, number, number];
+  presentation?: 'ballistic-ray' | 'flamethrower-stream' | 'signal-flare-projectile';
   damageApplied: number; healthBefore: number; healthAfter: number; nonce: number;
 };
 export type PickupMessage = {
@@ -323,6 +379,64 @@ export type LobbyJoinMessage = {
   resumeToken: string;
   nonce: number;
 };
+/**
+ * Host-authored replacement-document bootstrap. A reconnecting guest cannot
+ * publish movement until it has applied this retained pose, combat loadout,
+ * health and life identity and acknowledged the exact connection epoch.
+ */
+export type GuestResumeAuthorityMessage = {
+  type: 'guest-resume-authority';
+  protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
+  by: string;
+  forPlayerId: string;
+  connectionEpoch: string;
+  matchEpoch: number;
+  worldRevision: number;
+  attempt: number;
+  placementReason: 'retained' | 'safe-fallback';
+  player: PlayerSnapshot;
+  combatInventory: GuestCombatInventory;
+  combatInventoryRevision: number;
+  continuity: number;
+  respawnRemainingMs: number;
+  loadout: KillstreakLoadoutV1;
+  nonce: number;
+};
+export type GuestResumeNackReason = 'world-repair-timeout' | 'blocked-pose' | 'stance-rejected';
+export type GuestResumeNackMessage = {
+  type: 'guest-resume-nack';
+  protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
+  by: string;
+  connectionEpoch: string;
+  matchEpoch: number;
+  worldRevision: number;
+  authorityNonce: number;
+  attempt: number;
+  reason: GuestResumeNackReason;
+  nonce: number;
+};
+export type GuestResumeFailureMessage = {
+  type: 'guest-resume-failure';
+  protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
+  by: string;
+  forPlayerId: string;
+  connectionEpoch: string;
+  matchEpoch: number;
+  worldRevision: number;
+  authorityNonce: number;
+  attempt: number;
+  reason: 'retry-ceiling' | 'no-safe-pose';
+  nonce: number;
+};
+export type GuestResumeAckMessage = {
+  type: 'guest-resume-ack';
+  protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
+  by: string;
+  connectionEpoch: string;
+  matchEpoch: number;
+  authorityNonce: number;
+  nonce: number;
+};
 export type LobbyReadyMessage = { type: 'lobby-ready'; by: string; ready: boolean; nonce: number };
 export type LobbyTeamMessage = { type: 'lobby-team'; by: string; team: Team; nonce: number };
 export type LobbyHandicapMessage = { type: 'lobby-handicap'; by: string; dhv: Dhv; nonce: number };
@@ -334,6 +448,37 @@ export type RedeployCommitMessage = {
   type: 'redeploy-commit'; protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
   by: string; target: string; primary: PrimaryWeaponId; secondary: SidearmWeaponId; grenade: GrenadeId;
   hostTimeMs: number; nonce: number;
+};
+export type ReloadIntentMessage = {
+  type: 'reload-intent';
+  protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
+  by: string;
+  connectionEpoch: string;
+  lifeId: number;
+  actionSequence: number;
+  weapon: OrdinaryWeaponId;
+  action: 'start' | 'cancel';
+  nonce: number;
+};
+export type ReloadResultReason = 'accepted' | 'action-sequence' | 'connection-epoch' | 'life-mismatch'
+  | 'weapon-mismatch' | 'shooter-dead' | 'already-pending' | 'nothing-to-reload'
+  | 'no-pending-reload' | 'cancelled' | 'expired' | 'committed';
+export type ReloadResultMessage = {
+  type: 'reload-result';
+  protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
+  by: string;
+  forPlayerId: string;
+  connectionEpoch: string;
+  lifeId: number;
+  actionSequence: number;
+  weapon: OrdinaryWeaponId;
+  status: 'started' | 'committed' | 'cancelled' | 'rejected';
+  reason: ReloadResultReason;
+  completesAtHostTimeMs: number | null;
+  /** Highest ordinary-shot sequence already reflected in combatInventory. */
+  shotSequenceWatermark: number;
+  combatInventory: GuestCombatInventoryProjection;
+  nonce: number;
 };
 export type LobbyConfigMessage = { type: 'lobby-config'; by: string; config: PrivateMatchConfig; nonce: number };
 export type LobbyBalanceMessage = { type: 'lobby-balance'; by: string; nonce: number };
@@ -369,13 +514,15 @@ export type ChatHistoryMessage = {
 };
 
 export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | ShotRequestMessage | TriggerStateMessage | ShotResultMessage | StateFeedbackMessage | MeleeMessage | GrenadeThrowMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
-  | LobbyJoinMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | RedeployRequestMessage | RedeployCommitMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage
+  | LobbyJoinMessage | GuestResumeAuthorityMessage | GuestResumeAckMessage | GuestResumeNackMessage | GuestResumeFailureMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | RedeployRequestMessage | RedeployCommitMessage | ReloadIntentMessage | ReloadResultMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage
   | ChatSubmitMessage | ChatMessage | ChatHistoryMessage | RailgunClaimRequestMessage | RailgunShotRequestMessage | RailgunShotResultMessage | RailgunStateMessage
-  | KillstreakProtocolMessage | InteractiveWorldProtocolMessage | SmokeProtocolMessage | FlashProtocolMessage;
+  | KillstreakProtocolMessage | InteractiveWorldProtocolMessage | SmokeProtocolMessage | FlashProtocolMessage
+  | TimedMapWeaponProtocolMessage | FlarePresentationProtocolMessage | BotWeaponPresentationMessage;
 
 const weapons = new Set<WeaponId>(WEAPON_IDS);
 const primaryWeapons = new Set<PrimaryWeaponId>(PRIMARY_WEAPON_IDS);
 const sidearmWeapons = new Set<SidearmWeaponId>(SIDEARM_WEAPON_IDS);
+const specialWeapons = new Set<SpecialWeaponId>(SPECIAL_WEAPON_IDS);
 const grenades = new Set<GrenadeId>(GRENADE_IDS);
 const offensiveSupportSources = new Set<OffensiveSupportSource>(['yardhawk', 'tri-pass', 'hunter-swarm', 'nuke']);
 
@@ -394,7 +541,46 @@ export function isPlayerSnapshot(value: unknown): value is PlayerSnapshot {
     && sidearmWeapons.has(p.secondary as SidearmWeaponId)
     && grenades.has(p.grenade as GrenadeId)
     && weapons.has(p.weapon as WeaponId)
-    && (p.weapon === p.primary || p.weapon === p.secondary || p.weapon === 'magnum' || p.weapon === 'railgun');
+    && (p.weapon === p.primary || p.weapon === p.secondary || p.weapon === 'magnum'
+      || specialWeapons.has(p.weapon as SpecialWeaponId));
+}
+
+export function isGuestCombatInventory(value: unknown): value is GuestCombatInventory {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const inventory = value as Record<string, unknown>;
+  if (!Object.hasOwn(inventory, 'ammo') || !Object.hasOwn(inventory, 'reserve') || !Object.hasOwn(inventory, 'grenades')
+    || Object.keys(inventory).some((key) => key !== 'ammo' && key !== 'reserve' && key !== 'grenades')) return false;
+  const exactCounters = (candidate: unknown): candidate is Readonly<Record<OrdinaryWeaponId, number>> => {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return false;
+    const record = candidate as Record<string, unknown>;
+    return Object.keys(record).length === ORDINARY_WEAPON_IDS.length
+      && ORDINARY_WEAPON_IDS.every((weapon) => Object.hasOwn(record, weapon)
+        && Number.isSafeInteger(record[weapon]) && Number(record[weapon]) >= 0 && Number(record[weapon]) <= 10_000);
+  };
+  return exactCounters(inventory.ammo) && exactCounters(inventory.reserve)
+    && (inventory.grenades === 0 || inventory.grenades === 1);
+}
+
+export function isGuestCombatInventoryProjection(value: unknown): value is GuestCombatInventoryProjection {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const projection = value as Record<string, unknown>;
+  if (Object.keys(projection).length !== 4
+    || !['revision', 'primary', 'sidearm', 'grenades'].every((key) => Object.hasOwn(projection, key))) return false;
+  const weaponProjection = (candidate: unknown, kind: 'primary' | 'sidearm'): boolean => {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return false;
+    const counter = candidate as Record<string, unknown>;
+    return Object.keys(counter).length === 3
+      && ['weapon', 'ammo', 'reserve'].every((key) => Object.hasOwn(counter, key))
+      && (kind === 'primary'
+        ? primaryWeapons.has(counter.weapon as PrimaryWeaponId)
+        : sidearmWeapons.has(counter.weapon as SidearmWeaponId))
+      && Number.isSafeInteger(counter.ammo) && Number(counter.ammo) >= 0 && Number(counter.ammo) <= 10_000
+      && Number.isSafeInteger(counter.reserve) && Number(counter.reserve) >= 0 && Number(counter.reserve) <= 10_000;
+  };
+  return Number.isSafeInteger(projection.revision) && Number(projection.revision) >= 0
+    && weaponProjection(projection.primary, 'primary')
+    && weaponProjection(projection.sidearm, 'sidearm')
+    && (projection.grenades === 0 || projection.grenades === 1);
 }
 
 function isOptionalCombatTiming(value: unknown): boolean {
@@ -439,7 +625,7 @@ const shotRejectReasons = new Set<ShotRejectReason>([
   'none', 'protocol-mismatch', 'unknown-sender', 'duplicate', 'sequence-gap', 'weapon-mismatch', 'cadence',
   'spin-up', 'stale', 'future', 'invalid-direction', 'invalid-pellets', 'bad-origin', 'missing-history',
   'continuity-mismatch', 'connection-epoch-mismatch', 'life-mismatch', 'shooter-dead',
-  'invalid-timeline', 'obstructed', 'malformed',
+  'invalid-timeline', 'empty-magazine', 'obstructed', 'malformed',
 ]);
 
 export function isGameMessage(value: unknown): value is GameMessage {
@@ -447,14 +633,74 @@ export function isGameMessage(value: unknown): value is GameMessage {
   if (isInteractiveWorldProtocolMessage(value)) return true;
   if (isSmokeProtocolMessage(value)) return true;
   if (isFlashProtocolMessage(value)) return true;
+  if (isTimedMapWeaponProtocolMessage(value)) return true;
+  if (isFlarePresentationProtocolMessage(value)) return true;
+  if (isBotWeaponPresentationMessage(value)) return true;
   if (!value || typeof value !== 'object') return false;
   const msg = value as Record<string, unknown>;
   switch (msg.type) {
     case 'join':
       return isPlayerSnapshot(msg.player);
+    case 'guest-resume-authority':
+      return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
+        && typeof msg.by === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(msg.by)
+        && typeof msg.forPlayerId === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(msg.forPlayerId)
+        && msg.by !== msg.forPlayerId
+        && typeof msg.connectionEpoch === 'string' && msg.connectionEpoch.length >= 8 && msg.connectionEpoch.length <= 128
+        && /^[A-Za-z0-9_-]+$/.test(msg.connectionEpoch)
+        && Number.isSafeInteger(msg.matchEpoch) && Number(msg.matchEpoch) >= 0
+        && Number.isSafeInteger(msg.worldRevision) && Number(msg.worldRevision) >= 0
+        && Number.isSafeInteger(msg.attempt) && Number(msg.attempt) >= 0 && Number(msg.attempt) <= 2
+        && (msg.placementReason === 'retained' || msg.placementReason === 'safe-fallback')
+        && (Number(msg.attempt) === 0 ? msg.placementReason === 'retained' : msg.placementReason === 'safe-fallback')
+        && isPlayerSnapshot(msg.player) && msg.player.id === msg.forPlayerId
+        && isGuestCombatInventory(msg.combatInventory)
+        && Number.isSafeInteger(msg.combatInventoryRevision) && Number(msg.combatInventoryRevision) >= 0
+        && Number.isSafeInteger(msg.continuity) && Number(msg.continuity) >= 0
+        && Number.isFinite(msg.respawnRemainingMs) && Number(msg.respawnRemainingMs) >= 0 && Number(msg.respawnRemainingMs) <= 10_000
+        && (msg.player.hp > 0 ? Number(msg.respawnRemainingMs) === 0 : Number(msg.respawnRemainingMs) > 0)
+        && validateKillstreakLoadout(msg.loadout).valid
+        && Number.isSafeInteger(msg.nonce) && Number(msg.nonce) >= 0;
+    case 'guest-resume-ack':
+      return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
+        && typeof msg.by === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(msg.by)
+        && typeof msg.connectionEpoch === 'string' && msg.connectionEpoch.length >= 8 && msg.connectionEpoch.length <= 128
+        && /^[A-Za-z0-9_-]+$/.test(msg.connectionEpoch)
+        && Number.isSafeInteger(msg.matchEpoch) && Number(msg.matchEpoch) >= 0
+        && Number.isSafeInteger(msg.authorityNonce) && Number(msg.authorityNonce) >= 0
+        && Number.isSafeInteger(msg.nonce) && Number(msg.nonce) >= 0;
+    case 'guest-resume-nack':
+      return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
+        && typeof msg.by === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(msg.by)
+        && typeof msg.connectionEpoch === 'string' && /^[A-Za-z0-9_-]{8,128}$/.test(msg.connectionEpoch)
+        && Number.isSafeInteger(msg.matchEpoch) && Number(msg.matchEpoch) >= 0
+        && Number.isSafeInteger(msg.worldRevision) && Number(msg.worldRevision) >= 0
+        && Number.isSafeInteger(msg.authorityNonce) && Number(msg.authorityNonce) >= 0
+        && Number.isSafeInteger(msg.attempt) && Number(msg.attempt) >= 0 && Number(msg.attempt) <= 2
+        && (msg.reason === 'world-repair-timeout' || msg.reason === 'blocked-pose' || msg.reason === 'stance-rejected')
+        && Number.isSafeInteger(msg.nonce) && Number(msg.nonce) >= 0;
+    case 'guest-resume-failure':
+      return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
+        && typeof msg.by === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(msg.by)
+        && typeof msg.forPlayerId === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(msg.forPlayerId)
+        && msg.by !== msg.forPlayerId
+        && typeof msg.connectionEpoch === 'string' && /^[A-Za-z0-9_-]{8,128}$/.test(msg.connectionEpoch)
+        && Number.isSafeInteger(msg.matchEpoch) && Number(msg.matchEpoch) >= 0
+        && Number.isSafeInteger(msg.worldRevision) && Number(msg.worldRevision) >= 0
+        && Number.isSafeInteger(msg.authorityNonce) && Number(msg.authorityNonce) >= 0
+        && Number.isSafeInteger(msg.attempt) && Number(msg.attempt) >= 0 && Number(msg.attempt) <= 2
+        && (msg.reason === 'retry-ceiling' || msg.reason === 'no-safe-pose')
+        && Number.isSafeInteger(msg.nonce) && Number(msg.nonce) >= 0;
     case 'state':
-      return isPlayerSnapshot(msg.player)
-        && Number.isFinite(msg.hostTimeMs) && Number(msg.hostTimeMs) >= 0
+      if (!isPlayerSnapshot(msg.player)) return false;
+      if (msg.combatInventory !== undefined) {
+        if (!isGuestCombatInventoryProjection(msg.combatInventory)) return false;
+        if (msg.combatInventory.revision !== msg.player.seq
+          || msg.combatInventory.primary.weapon !== msg.player.primary
+          || msg.combatInventory.sidearm.weapon !== msg.player.secondary
+            && msg.combatInventory.sidearm.weapon !== 'magnum') return false;
+      }
+      return Number.isFinite(msg.hostTimeMs) && Number(msg.hostTimeMs) >= 0
         && Number.isSafeInteger(msg.continuity) && Number(msg.continuity) >= 0
         && (msg.rateHz === 20 || msg.rateHz === 30 || msg.rateHz === 40);
     case 'shot':
@@ -501,7 +747,10 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
         && typeof msg.forPlayerId === 'string' && msg.forPlayerId.length > 0 && msg.forPlayerId.length <= 80
         && typeof msg.shotId === 'string' && msg.shotId.length >= 8 && msg.shotId.length <= 128
+        && typeof msg.connectionEpoch === 'string' && /^[a-zA-Z0-9_-]{8,128}$/.test(msg.connectionEpoch)
+        && Number.isSafeInteger(msg.lifeId) && Number(msg.lifeId) >= 0
         && Number.isSafeInteger(msg.shotSeq) && Number(msg.shotSeq) >= 0
+        && weapons.has(msg.weapon as WeaponId)
         && (msg.status === 'accepted-hit' || msg.status === 'accepted-miss' || msg.status === 'rejected')
         && shotRejectReasons.has(msg.reason as ShotRejectReason)
         && Number.isFinite(msg.fireTimeMs) && Number(msg.fireTimeMs) >= 0
@@ -512,6 +761,10 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && (msg.receivedAtHostTimeMs === null || msg.resolvedAtHostTimeMs === null
           || Number(msg.resolvedAtHostTimeMs) >= Number(msg.receivedAtHostTimeMs))
         && Number.isFinite(msg.appliedRewindMs) && Number(msg.appliedRewindMs) >= 0 && Number(msg.appliedRewindMs) <= 250
+        && (msg.combatInventory === null || isGuestCombatInventoryProjection(msg.combatInventory))
+        && (specialWeapons.has(msg.weapon as SpecialWeaponId)
+          ? msg.combatInventory === null
+          : msg.combatInventory !== null || msg.reason === 'unknown-sender')
         && Array.isArray(msg.outcomes) && msg.outcomes.length <= 6
         && msg.outcomes.every((outcome) => {
           if (!outcome || typeof outcome !== 'object') return false;
@@ -608,6 +861,15 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && typeof msg.botId === 'string' && /^host-bot-[0-3]$/.test(msg.botId)
         && typeof msg.target === 'string' && msg.target.length > 0 && msg.target.length <= 80
         && weapons.has(msg.weapon as WeaponId)
+        && (msg.weapon === 'flare-gun'
+          ? msg.presentation === 'signal-flare-projectile'
+          : msg.weapon === 'flamethrower'
+            // Legacy bot-damage packets did not carry a presentation tag. Keep
+            // decoding them, but the current host always emits the explicit
+            // stream tag and a separate hit-or-miss presentation action.
+            ? msg.presentation === undefined || msg.presentation === 'ballistic-ray'
+              || msg.presentation === 'flamethrower-stream'
+            : msg.presentation === undefined || msg.presentation === 'ballistic-ray')
         && Array.isArray(msg.origin) && msg.origin.length === 3 && msg.origin.every(Number.isFinite)
         && Array.isArray(msg.direction) && msg.direction.length === 3 && msg.direction.every(Number.isFinite)
         && Number.isFinite(msg.damageApplied) && Number(msg.damageApplied) > 0 && Number(msg.damageApplied) <= 100
@@ -706,6 +968,41 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && grenades.has(msg.grenade as GrenadeId)
         && Number.isFinite(msg.hostTimeMs) && Number(msg.hostTimeMs) >= 0
         && Number.isFinite(msg.nonce);
+    case 'reload-intent':
+      return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
+        && typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && typeof msg.connectionEpoch === 'string' && /^[a-zA-Z0-9_-]{8,128}$/.test(msg.connectionEpoch)
+        && Number.isSafeInteger(msg.lifeId) && Number(msg.lifeId) >= 0
+        && Number.isSafeInteger(msg.actionSequence) && Number(msg.actionSequence) >= 0 && Number(msg.actionSequence) <= 1_000_000_000
+        && ORDINARY_WEAPON_IDS.includes(msg.weapon as OrdinaryWeaponId)
+        && (msg.action === 'start' || msg.action === 'cancel')
+        && Number.isSafeInteger(msg.nonce) && Number(msg.nonce) >= 0;
+    case 'reload-result':
+      return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
+        && typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && typeof msg.forPlayerId === 'string' && msg.forPlayerId.length > 0 && msg.forPlayerId.length <= 80
+        && typeof msg.connectionEpoch === 'string' && /^[a-zA-Z0-9_-]{8,128}$/.test(msg.connectionEpoch)
+        && Number.isSafeInteger(msg.lifeId) && Number(msg.lifeId) >= 0
+        && Number.isSafeInteger(msg.actionSequence) && Number(msg.actionSequence) >= 0 && Number(msg.actionSequence) <= 1_000_000_000
+        && ORDINARY_WEAPON_IDS.includes(msg.weapon as OrdinaryWeaponId)
+        && (msg.status === 'started' || msg.status === 'committed' || msg.status === 'cancelled' || msg.status === 'rejected')
+        && (msg.reason === 'accepted' || msg.reason === 'action-sequence' || msg.reason === 'connection-epoch'
+          || msg.reason === 'life-mismatch' || msg.reason === 'weapon-mismatch' || msg.reason === 'shooter-dead'
+          || msg.reason === 'already-pending' || msg.reason === 'nothing-to-reload'
+          || msg.reason === 'no-pending-reload' || msg.reason === 'cancelled' || msg.reason === 'expired'
+          || msg.reason === 'committed')
+        && (msg.completesAtHostTimeMs === null || Number.isFinite(msg.completesAtHostTimeMs) && Number(msg.completesAtHostTimeMs) >= 0)
+        && Number.isSafeInteger(msg.shotSequenceWatermark) && Number(msg.shotSequenceWatermark) >= -1
+        && (msg.status === 'started'
+          ? msg.reason === 'accepted' && msg.completesAtHostTimeMs !== null
+          : msg.status === 'committed'
+            ? msg.reason === 'committed' && msg.completesAtHostTimeMs === null
+            : msg.status === 'cancelled'
+              ? msg.reason !== 'accepted' && msg.reason !== 'committed' && msg.completesAtHostTimeMs === null
+              : msg.reason !== 'accepted' && msg.reason !== 'committed' && msg.reason !== 'cancelled'
+                && msg.completesAtHostTimeMs === null)
+        && isGuestCombatInventoryProjection(msg.combatInventory)
+        && Number.isSafeInteger(msg.nonce) && Number(msg.nonce) >= 0;
     case 'railgun-claim-request':
     case 'railgun-shot-request':
     case 'railgun-shot-result':
@@ -721,7 +1018,9 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && isLobbySnapshot(msg.snapshot) && Number.isFinite(msg.nonce);
     case 'lobby-start':
       return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
-        && Number.isFinite(msg.activeAtHostTimeMs) && Number(msg.activeAtHostTimeMs) >= 0
+        && Number.isFinite(msg.activeAtHostTimeMs)
+        && Number(msg.activeAtHostTimeMs) >= MIN_RECOVERED_HOST_START_TIME_MS
+        && Number(msg.activeAtHostTimeMs) <= Number(msg.hostSentTimeMs) + MAX_HOST_START_FUTURE_LEAD_MS
         && Number.isFinite(msg.activeAtEpochMs) && Number(msg.activeAtEpochMs) >= 0 && Number(msg.activeAtEpochMs) <= 10_000_000_000_000
         && Number.isFinite(msg.hostSentTimeMs) && Number(msg.hostSentTimeMs) >= 0
         && Number.isSafeInteger(msg.revision) && Number(msg.revision) >= 0
@@ -786,10 +1085,18 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
   if (isInteractiveWorldProtocolMessage(message)) return message.by === playerId;
   if (isSmokeProtocolMessage(message)) return message.by === playerId;
   if (isFlashProtocolMessage(message)) return message.by === playerId;
+  if (isTimedMapWeaponProtocolMessage(message)) return message.by === playerId;
+  if (isFlarePresentationProtocolMessage(message)) return message.by === playerId;
+  if (isBotWeaponPresentationMessage(message)) return message.by === playerId;
   switch (message.type) {
     case 'join':
     case 'state':
       return message.player.id === playerId;
+    case 'guest-resume-authority':
+    case 'guest-resume-ack':
+    case 'guest-resume-nack':
+    case 'guest-resume-failure':
+      return message.by === playerId;
     case 'bot-state':
     case 'bot-damage':
       return message.by === playerId;
@@ -816,6 +1123,8 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'lobby-handicap':
     case 'redeploy-request':
     case 'redeploy-commit':
+    case 'reload-intent':
+    case 'reload-result':
     case 'railgun-claim-request':
     case 'railgun-shot-request':
     case 'railgun-shot-result':
@@ -847,6 +1156,8 @@ export function isHostAuthorityMessage(message: GameMessage): boolean {
     || message.type === 'interactive-world-snapshot'
     || message.type === 'smoke-state'
     || message.type === 'lobby-config'
+    || message.type === 'guest-resume-authority'
+    || message.type === 'guest-resume-failure'
     || message.type === 'lobby-state'
     || message.type === 'lobby-start'
     || message.type === 'lobby-reject'
@@ -856,7 +1167,11 @@ export function isHostAuthorityMessage(message: GameMessage): boolean {
     || message.type === 'chat-message'
     || message.type === 'chat-history'
     || message.type === 'redeploy-commit'
+    || message.type === 'reload-result'
     || message.type === 'railgun-state'
+    || message.type === 'timed-map-weapon-state'
+    || message.type === 'flare-presentation-state'
+    || message.type === 'bot-weapon-presentation'
     || message.type === 'railgun-shot-result'
     || message.type === 'bot-state'
     || message.type === 'bot-damage'
@@ -864,9 +1179,10 @@ export function isHostAuthorityMessage(message: GameMessage): boolean {
     || message.type === 'window-break' && message.hostAuthority !== undefined;
 }
 
-export function isStateTrafficMessage(message: GameMessage): message is StateMessage | BotStateMessage | RailgunStateMessage | KillstreakStateMessage | InteractiveWorldSnapshotMessage | SmokeStateMessage {
+export function isStateTrafficMessage(message: GameMessage): message is StateMessage | BotStateMessage | RailgunStateMessage | KillstreakStateMessage | InteractiveWorldSnapshotMessage | SmokeStateMessage | TimedMapWeaponStateMessage | FlarePresentationStateMessage {
   return message.type === 'state' || message.type === 'bot-state' || message.type === 'railgun-state'
-    || message.type === 'killstreak-state' || message.type === 'interactive-world-snapshot' || message.type === 'smoke-state';
+    || message.type === 'killstreak-state' || message.type === 'interactive-world-snapshot' || message.type === 'smoke-state'
+    || message.type === 'timed-map-weapon-state' || message.type === 'flare-presentation-state';
 }
 
 export function sanitizeName(value: string): string {

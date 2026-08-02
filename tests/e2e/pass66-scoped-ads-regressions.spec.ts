@@ -2,8 +2,12 @@ import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 
+const renderer = process.env.PASS66_ADS_RENDERER ?? 'webgl2';
+const renderProfile = process.env.PASS66_ADS_RENDER_PROFILE ?? (renderer === 'webgpu' ? 'blender' : 'compat');
+
 async function deploy(page: Page): Promise<number> {
-  await page.goto('/?release=latest&map=rustworks-1v1&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&externalServices=off&seed=pass66-scoped-ads');
+  const requireWebGpu = renderer === 'webgpu' ? '&requireWebGPU=1' : '';
+  await page.goto(`/?release=latest&map=rustworks-1v1&renderer=${renderer}${requireWebGpu}&render=${renderProfile}&grass=off&mist=off&clouds=off&rays=off&externalServices=off&seed=pass66-scoped-ads`);
   await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 30_000 });
   const startedAt = Date.now();
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.startSolo());
@@ -43,19 +47,27 @@ async function enterAds(page: Page, weapon: 'sniper' | 'm14-ebr'): Promise<{ ela
 }
 
 test('M40 and M14 enter readable scoped ADS without a whiteout or frame-loop freeze at 1440p and 4K', async ({ page }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(renderer === 'webgpu' ? 150_000 : 90_000);
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.stack ?? error.message));
   await page.setViewportSize({ width: 2560, height: 1440 });
   const deploymentMs = await deploy(page);
   expect(deploymentMs).toBeLessThan(30_000);
+  if (renderer === 'webgpu') {
+    expect(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().render.runtime)).toMatchObject({
+      actualBackend: 'webgpu',
+      deviceLost: false,
+      uncapturedErrors: 0,
+      presentation: { status: 'healthy' },
+    });
+  }
 
   const output = resolve(process.cwd(), 'artifacts/pass66/scoped-ads');
   mkdirSync(output, { recursive: true });
   for (const viewport of [{ width: 2560, height: 1440 }, { width: 3840, height: 2160 }]) {
     await page.setViewportSize(viewport);
     await page.waitForTimeout(1_000);
-    await page.screenshot({ path: resolve(output, `hip-${viewport.width}x${viewport.height}.png`), animations: 'disabled' });
+    await page.screenshot({ path: resolve(output, `hip-${renderer}-${viewport.width}x${viewport.height}.png`), animations: 'disabled' });
 
     const sniperAdmission = await enterAds(page, 'sniper');
     expect(sniperAdmission.elapsedMs).toBeLessThan(2_500);
@@ -80,13 +92,21 @@ test('M40 and M14 enter readable scoped ADS without a whiteout or frame-loop fre
     expect(sniperPicture.diameter).toBeGreaterThan(Math.min(viewport.height, viewport.width) * 0.5);
     expect(sniperPicture.opaqueWhiteLayer).toBe(false);
     expect(sniperPicture.opaqueBlackLayer).toBe(false);
-    await page.screenshot({ path: resolve(output, `m40-${viewport.width}x${viewport.height}.png`), animations: 'disabled' });
+    await page.screenshot({ path: resolve(output, `m40-${renderer}-${viewport.width}x${viewport.height}.png`), animations: 'disabled' });
 
     const m14Admission = await enterAds(page, 'm14-ebr');
     expect(m14Admission.elapsedMs).toBeLessThan(2_500);
     expect(m14Admission.frameDelta).toBeGreaterThan(0);
     await expect(page.locator('#dmr-thermal')).toBeVisible();
-    await page.screenshot({ path: resolve(output, `m14-ebr-${viewport.width}x${viewport.height}.png`), animations: 'disabled' });
+    await page.screenshot({ path: resolve(output, `m14-ebr-${renderer}-${viewport.width}x${viewport.height}.png`), animations: 'disabled' });
+  }
+  if (renderer === 'webgpu') {
+    expect(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().render.runtime)).toMatchObject({
+      actualBackend: 'webgpu',
+      deviceLost: false,
+      uncapturedErrors: 0,
+      presentation: { status: 'healthy' },
+    });
   }
   expect(pageErrors).toEqual([]);
 });

@@ -140,6 +140,43 @@ export function claimRailgun(
   };
 }
 
+/**
+ * Re-arms the canonical railgun only from the secure Gun Range test bay. This
+ * is host/offline authority, never a peer claim, and deliberately resets the
+ * finite eight-round training magazine without weakening normal match rules.
+ */
+export function grantTrainingRailgun(
+  state: RailgunAuthorityState,
+  playerId: string,
+  context: Readonly<{
+    arenaId: 'gun-range';
+    stationKind: 'secure-test-bay';
+    authorityRole: 'offline' | 'host';
+  }>,
+): { accepted: boolean; state: RailgunAuthorityState } {
+  if (!validPlayerId(playerId) || context.arenaId !== 'gun-range'
+    || context.stationKind !== 'secure-test-bay'
+    || context.authorityRole !== 'offline' && context.authorityRole !== 'host') {
+    return { accepted: false, state };
+  }
+  return {
+    accepted: true,
+    state: {
+      ...state,
+      revision: state.revision + 1,
+      status: 'held',
+      spawnAtHostTimeMs: null,
+      spawnSite: null,
+      pickupPosition: null,
+      holderId: playerId,
+      roundsRemaining: RAILGUN_TOTAL_ROUNDS,
+      chamberReadyAtHostTimeMs: 0,
+      announcementSent: true,
+      processedShotIds: [],
+    },
+  };
+}
+
 export function advanceRailgunChamber(state: RailgunAuthorityState, now: number): RailgunAuthorityState {
   if (state.status !== 'held' || state.roundsRemaining <= 0 || state.chamberReadyAtHostTimeMs <= 0 || !validHostTime(now)) return state;
   return now >= state.chamberReadyAtHostTimeMs ? { ...state, revision: state.revision + 1, chamberReadyAtHostTimeMs: 0 } : state;

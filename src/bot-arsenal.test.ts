@@ -4,12 +4,17 @@ import { GRENADE_CATALOG } from './combat/grenade-catalog';
 import { WEAPON_CATALOG } from './combat/weapon-catalog';
 import {
   BOT_GRENADE_POOL,
+  BOT_STARTING_WEAPON_POOL,
+  BOT_SUPPORTED_FIRE_KINDS,
   BOT_WEAPON_DEFINITIONS,
   BOT_WEAPON_POOL,
   assignBotGrenades,
   assignBotWeapons,
   botWeaponBurstSize,
+  botWeaponFireAdapter,
+  botWeaponFireAdapterFor,
   botWeaponFireInterval,
+  botSignalFlareAimDirection,
   projectBotGrenadeIds,
   projectBotWeaponIds,
   type BotGrenadeProjectionSource,
@@ -37,6 +42,7 @@ function expectCompleteCycles<T>(values: readonly T[], source: readonly T[]): vo
 const weaponSources = (): BotWeaponProjectionSource[] => WEAPON_CATALOG.map((definition) => ({
   id: definition.id,
   fireKind: definition.fireKind,
+  projectileId: definition.projectileId,
   policies: { bot: definition.policies.bot },
 }));
 
@@ -56,9 +62,22 @@ describe('catalog-derived bot arsenal', () => {
     expect(new Set(BOT_WEAPON_POOL).size).toBe(BOT_WEAPON_POOL.length);
     expect(new Set(BOT_GRENADE_POOL).size).toBe(BOT_GRENADE_POOL.length);
     expect(BOT_WEAPON_POOL).toEqual(expect.arrayContaining([
-      'mini-uzi', 'mp5', 'm4a1', 'ak-47', 'm14-ebr', 'slug-shotgun', 'pistol', 'machine-pistol',
+      'mini-uzi', 'mp5', 'm4a1', 'ak-47', 'm14-ebr', 'slug-shotgun', 'pistol', 'machine-pistol', 'flamethrower',
+      'flare-gun',
     ]));
     expect(BOT_GRENADE_POOL).toEqual(['frag', 'smoke', 'flash', 'semtex']);
+  });
+
+  it('keeps pickup-only specials adapter-ready without granting them as ordinary spawn loadouts', () => {
+    const expectedStartingPool = WEAPON_CATALOG
+      .filter((definition) => definition.policies.bot === 'eligible' && definition.policies.loadout !== 'pickup-only')
+      .map((definition) => definition.id);
+    expect(BOT_STARTING_WEAPON_POOL).toEqual(expectedStartingPool);
+    expect(BOT_WEAPON_POOL).toContain('flamethrower');
+    expect(BOT_WEAPON_POOL).toContain('flare-gun');
+    expect(BOT_STARTING_WEAPON_POOL).not.toContain('flamethrower');
+    expect(BOT_STARTING_WEAPON_POOL).not.toContain('flare-gun');
+    expect(new Set(BOT_STARTING_WEAPON_POOL).size).toBe(BOT_STARTING_WEAPON_POOL.length);
   });
 
   it('automatically follows synthetic add-two, rename and retire mutations without a bot mirror', () => {
@@ -66,8 +85,8 @@ describe('catalog-derived bot arsenal', () => {
     const firstEligible = weapons.find((definition) => definition.policies.bot === 'eligible')!;
     const addedWeapons = [
       ...weapons,
-      { id: 'future-bot-rifle', fireKind: 'hitscan', policies: { bot: 'eligible' } },
-      { id: 'future-bot-slug', fireKind: 'slug', policies: { bot: 'eligible' } },
+      { id: 'future-bot-rifle', fireKind: 'hitscan', projectileId: null, policies: { bot: 'eligible' } },
+      { id: 'future-bot-slug', fireKind: 'slug', projectileId: null, policies: { bot: 'eligible' } },
     ] as const satisfies readonly BotWeaponProjectionSource[];
     expect(projectBotWeaponIds(addedWeapons)).toEqual(expect.arrayContaining(['future-bot-rifle', 'future-bot-slug']));
 
@@ -84,7 +103,7 @@ describe('catalog-derived bot arsenal', () => {
     expect(() => projectBotWeaponIds([...weapons, weapons[0]!])).toThrow(/Duplicate canonical weapon IDs/);
     expect(() => projectBotWeaponIds([
       ...weapons,
-      { id: 'future-projectile-without-adapter', fireKind: 'projectile', policies: { bot: 'eligible' } },
+      { id: 'future-projectile-without-adapter', fireKind: 'projectile', projectileId: 'future-orb', policies: { bot: 'eligible' } },
     ])).toThrow(/fire-kind adapter/);
 
     const grenades = grenadeSources();
@@ -117,7 +136,7 @@ describe('catalog-derived bot arsenal', () => {
 
   it('derives cadence and burst behavior for every eligible fire kind', () => {
     expect(new Set(BOT_WEAPON_DEFINITIONS.map((definition) => definition.fireKind))).toEqual(
-      new Set(['hitscan', 'pellet', 'slug']),
+      new Set(BOT_SUPPORTED_FIRE_KINDS),
     );
     for (const definition of BOT_WEAPON_DEFINITIONS) {
       const burst = botWeaponBurstSize(definition.id as typeof BOT_WEAPON_POOL[number], 3);
@@ -130,5 +149,26 @@ describe('catalog-derived bot arsenal', () => {
         expect(burst).toBe(1);
       }
     }
+  });
+
+  it('routes the pickup-only flare through its projectile simulation and rejects generic projectile fallthrough', () => {
+    expect(botWeaponFireAdapter('flare-gun')).toBe('signal-flare-projectile');
+    expect(botWeaponFireAdapter('carbine')).toBe('ballistic-ray');
+    expect(botWeaponFireAdapterFor({ fireKind: 'projectile', projectileId: 'explosive-bolt-v1' })).toBeNull();
+    expect(botWeaponFireAdapterFor({ fireKind: 'projectile', projectileId: null })).toBeNull();
+    expect(botWeaponFireAdapterFor({ fireKind: 'hitscan', projectileId: 'fake-projectile' })).toBeNull();
+
+    const direction = botSignalFlareAimDirection(
+      { x: 0, y: 1.4, z: 0 },
+      { x: 0, y: 1.4, z: -22 },
+    );
+    expect(direction).not.toBeNull();
+    expect(Math.hypot(...direction!)).toBeCloseTo(1, 12);
+    expect(direction![1]).toBeGreaterThan(0);
+    expect(direction![2]).toBeLessThan(-0.99);
+    expect(botSignalFlareAimDirection(
+      { x: 1, y: 2, z: 3 },
+      { x: 1, y: 2, z: 3 },
+    )).toBeNull();
   });
 });

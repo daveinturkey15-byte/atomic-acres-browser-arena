@@ -82,6 +82,8 @@ const PROFILES: Record<WeaponId, WeaponFamilyPresentation> = {
   'slug-shotgun': { ...BASE_PROFILES.scattergun, flashScale: 1.32, recoilTranslation: 0.23, requiredDetails: [...BASE_PROFILES.scattergun.requiredDetails, 'slug-saddle'] },
   'flashlight-pistol': { ...BASE_PROFILES.pistol, flashScale: 1.3, recoilTranslation: 0.15, smokeBase: 1.5, requiredDetails: [...BASE_PROFILES.pistol.requiredDetails, 'always-on-flashlight'] },
   'explosive-crossbow': { ...BASE_PROFILES.pistol, sightHeight: 0.2, flashScale: 0, recoilTranslation: 0.05, smokeBase: 0, requiredDetails: ['crossbow-limb-left', 'crossbow-limb-right', 'crossbow-string', 'bolt-rail'] },
+  flamethrower: { ...BASE_PROFILES.lmg, sightHeight: 0.18, adsY: 0.22, flashScale: 1.8, recoilTranslation: 0.06, recoilRotation: 0.08, actionTravel: 0.03, smokeBase: 3.4, requiredDetails: ['flamethrower-fuel-tank-left', 'flamethrower-fuel-tank-right', 'flamethrower-hose', 'flamethrower-igniter', 'flamethrower-heat-shield', 'bolt-or-slide'] },
+  'flare-gun': { ...BASE_PROFILES.pistol, sightHeight: 0.16, adsY: 0.286, flashScale: 0.9, recoilTranslation: 0.1, actionTravel: 0.14, smokeBase: 1.2, requiredDetails: ['flare-gun-break-barrel', 'flare-gun-latch', 'flare-gun-front-sight', 'flare-gun-rear-sight', 'flare-gun-trigger-guard', 'bolt-or-slide'] },
 };
 
 export function weaponFamilyPresentation(weapon: WeaponId): WeaponFamilyPresentation {

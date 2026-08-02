@@ -5,43 +5,60 @@
   "creator": "Atomic Acres project",
   "owner": "Atomic Acres project",
   "created": "2026-07-26",
+  "refined": "2026-08-02",
   "license": "Project-original; no third-party meshes or textures",
   "blenderVersion": "5.1.2",
   "generator": {
     "path": "scripts/blender/create-pass65-support-vehicles.py",
-    "sha256": "86d90e47e93e7d04e2705e8b08615323385ed24e22e70b59a68189584877bdac"
+    "sha256": "d0bdf98635e25b38348149d02cc990157aac367108468fdd177437c7d256e8f4"
   },
   "runtimeForwardAxis": "-Z",
-  "blenderAuthoringForwardAxis": "-Y converted to glTF -Z by Y-up export",
+  "blenderAuthoringForwardAxis": "+Y converted to glTF -Z by Y-up export",
   "presentationOnly": true,
   "inspirationBoundary": "Original stylized fixed-wing support family. No copied commercial-game geometry, texture, logo, animation, UI, or audio.",
   "sourceBlend": {
     "path": "source-assets/blender/pass65-support-aircraft-family.blend",
-    "sha256": "f29f0d50a6d3ab742f506db7441cabf4e8792b32cef4dd01fea3fbed9ef97572"
+    "sha256": "37c9ea9e49bd1319c90a9d452ed643ba6fe3a33d6809e244e71f6e9ecdae7f83"
   },
   "variants": {
     "care": {
+      "visualRevision": "close-range-heavy-cargo-aircraft-v4",
+      "detailContract": "framed-flightdeck-panelled-hull-ramp-bogie-turbofans-v4",
+      "triangleRange": {
+        "lod0": [
+          16000,
+          18000
+        ],
+        "lod1": [
+          13000,
+          16000
+        ],
+        "lod2": [
+          10000,
+          13000
+        ]
+      },
       "worldGlbs": [
         {
           "path": "public/assets/original/models/support/pass65-care-aircraft-lod0.glb",
-          "sha256": "cf87311ad07bb8fb02e0413365364fc8e36e736c0b7890e87a77334d6210d274",
+          "sha256": "6819fe3e4ba330a98e90df6ba657a71b01fa342cac4c1332525e10962ffe3b4b",
           "lod": 0,
-          "triangles": 4972,
-          "bytes": 156360
+          "triangles": 17192,
+          "bytes": 323132
         },
         {
           "path": "public/assets/original/models/support/pass65-care-aircraft-lod1.glb",
-          "sha256": "2da31ce77deb071cd00ab868bf0a0929eed67c3c214b01b9827f9ab2ae82a654",
+          "sha256": "a967fbbf9e1e62c466f2eb0568a1cd39caf3d305d308f6a875158066266fae5f",
           "lod": 1,
-          "triangles": 4672,
-          "bytes": 147892
+          "triangles": 13500,
+          "bytes": 288800
         },
         {
           "path": "public/assets/original/models/support/pass65-care-aircraft-lod2.glb",
-          "sha256": "745833de7e6feff2489b9e0b2bdafbd7cbe29d77d75dd5648dd3fd7bec10dcc3",
+          "sha256": "6846244d228d3663650ddc69b835a0c23513dcb010ca80027ed4118e78339965",
           "lod": 2,
-          "triangles": 4328,
-          "bytes": 153852
+          "triangles": 11016,
+          "bytes": 245560
         }
       ],
       "requiredNodes": [
@@ -69,27 +86,43 @@
       ]
     },
     "carpet": {
+      "visualRevision": "close-range-stealth-flying-wing-v4",
+      "detailContract": "framed-intakes-service-panels-bay-structure-tailless-v4",
+      "triangleRange": {
+        "lod0": [
+          10500,
+          12000
+        ],
+        "lod1": [
+          8500,
+          9800
+        ],
+        "lod2": [
+          4800,
+          5800
+        ]
+      },
       "worldGlbs": [
         {
           "path": "public/assets/original/models/support/pass65-carpet-aircraft-lod0.glb",
-          "sha256": "ce927de84b6cc2108aa04b2e93ae0ffaf265e8b4a4083439bb0f0c7dab5b735e",
+          "sha256": "1bd86e1afaf434c04dc667c4ad12d905f903af3ae6058b5cd40b7c1438c6f626",
           "lod": 0,
-          "triangles": 6844,
-          "bytes": 159476
+          "triangles": 11658,
+          "bytes": 252848
         },
         {
           "path": "public/assets/original/models/support/pass65-carpet-aircraft-lod1.glb",
-          "sha256": "cb8cd16905abf0dcaefa6560ee177ef120e8b555a8684058c5b548bf32b60177",
+          "sha256": "6ae3ecd0ccf46753c7cc07e3e83e226d3dbe19561c260266ba08e8ce2205e4a3",
           "lod": 1,
-          "triangles": 6044,
-          "bytes": 158800
+          "triangles": 9128,
+          "bytes": 225112
         },
         {
           "path": "public/assets/original/models/support/pass65-carpet-aircraft-lod2.glb",
-          "sha256": "74b5dc4c51f5acd161f1a650145338c6c3bdcc1f1b585230ecf62973af314100",
+          "sha256": "677758aa88fa7e5ac522f4d2eb53b9450ccf4905e4091013c9de0ab186fd131a",
           "lod": 2,
-          "triangles": 4116,
-          "bytes": 148748
+          "triangles": 5112,
+          "bytes": 179408
         }
       ],
       "requiredNodes": [
@@ -119,20 +152,32 @@
       ]
     },
     "parachuteCrate": {
+      "visualRevision": "close-range-rigged-pallet-drop-v4",
+      "detailContract": "corner-guards-buckles-latches-crossweb-ribbed-canopy-v4",
+      "triangleRange": {
+        "lod0": [
+          5500,
+          7000
+        ],
+        "lod1": [
+          4000,
+          5000
+        ]
+      },
       "worldGlbs": [
         {
           "path": "public/assets/original/models/support/pass65-care-crate-lod0.glb",
-          "sha256": "7eb35d28741d9effe8c6e5869767bb4c86235bbf573e60ea7eb8f5b6a774bb12",
+          "sha256": "c2fc77b2d9dac12a972530a71670b08c4c19d27ee27946cc66b8be7e0dc0b812",
           "lod": 0,
-          "triangles": 1300,
-          "bytes": 107980
+          "triangles": 6384,
+          "bytes": 170292
         },
         {
           "path": "public/assets/original/models/support/pass65-care-crate-lod1.glb",
-          "sha256": "ca0a8bd4d811f5c39725a3a9d7710f31ceb037680f08fc49edbf5ff013b9daf4",
+          "sha256": "fbd3e5d6a32ccb2376a3673334c599b94a451b60f2d60d9fc2536e80d1dc9e86",
           "lod": 1,
-          "triangles": 828,
-          "bytes": 103724
+          "triangles": 4416,
+          "bytes": 149448
         }
       ],
       "requiredNodes": [
@@ -155,7 +200,7 @@
   "pbrMaps": {
     "baseColor": {
       "path": "public/assets/original/textures/support/pass65-support-aircraft-albedo.png",
-      "sha256": "5146c85eacb76e3c1cf55a50d3efe3a2bafa01b36298652437b41ba75fcc29b9",
+      "sha256": "b2a1c5cc389787ad1a2e5b699260682f5598838aee0e74e58e8815bed1dbd7eb",
       "width": 512,
       "height": 512
     },
@@ -173,7 +218,7 @@
     },
     "emissive": {
       "path": "public/assets/original/textures/support/pass65-support-aircraft-emissive.png",
-      "sha256": "ed9974eee6effb11d2b86bc2d58405054dc1ffdc1202458759221419a4bf0c71",
+      "sha256": "55aea7bfe6f9c90c71df2379611c12eada3014444ccbce4f3352d3303077a44f",
       "width": 512,
       "height": 512
     }
@@ -182,28 +227,63 @@
     "renders": [
       {
         "path": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-care-front-quarter.png",
-        "sha256": "be5214d8fd9f45850b5c1c78ed69dd8f084d576297a11c37c9e024b408adc30a",
+        "sha256": "1553415464ab6a9ec4df6b7b31c4e27a50a48e3583bc5e93d5d4ce1696d718bb",
         "cameraId": "care-front-quarter",
         "width": 512,
         "height": 512
       },
       {
+        "path": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-care-flightdeck-gear.png",
+        "sha256": "85c8f59ae06da57f88255fd3c811808f796b044a80661b6af8be0fa7c2ac9d4e",
+        "cameraId": "care-flightdeck-gear",
+        "width": 512,
+        "height": 512
+      },
+      {
+        "path": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-care-rear-ramp.png",
+        "sha256": "521343ec5c3faf7b31f7c169244ef2de6d9e6a481f65d693e1cb40747d3468bb",
+        "cameraId": "care-rear-ramp",
+        "width": 512,
+        "height": 512
+      },
+      {
         "path": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-care-cargo-parachute.png",
-        "sha256": "8dc464c1583c03a5c5ecda2b3370c7422015f02dea4a9b3103565b1970d9a978",
+        "sha256": "38892cf807efa079699d538762ee4ddd698da2a0b46ff6b28d7540bf7d1efea4",
         "cameraId": "care-cargo-parachute",
         "width": 512,
         "height": 512
       },
       {
+        "path": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-care-crate-hardware.png",
+        "sha256": "40b089c821da16ff2468899a3ab6b7b6e005ee0c7dc562af0bec5270ddcebb67",
+        "cameraId": "care-crate-hardware",
+        "width": 512,
+        "height": 512
+      },
+      {
         "path": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-carpet-front-quarter.png",
-        "sha256": "f8bfb20792b55e3b4a51ec6dbf52a5ea692903ffb1ef9ff2b9f737bac94359ef",
+        "sha256": "4489d0b2a91f3161bb9de188b2a2176d64a4155f92e3ff0f932f0c9c1957a290",
         "cameraId": "carpet-front-quarter",
         "width": 512,
         "height": 512
       },
       {
+        "path": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-carpet-intake-panels.png",
+        "sha256": "bf1bf70ebd6961adf8fbb7e3faf75a39a6bae661fb6b8ee2b90deb7bd6c4457f",
+        "cameraId": "carpet-intake-panels",
+        "width": 512,
+        "height": 512
+      },
+      {
+        "path": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-carpet-planform-top.png",
+        "sha256": "a0c637fc74a03bbd6f97e5081f1dcd07813c8a1494218d58216f0c34645d4196",
+        "cameraId": "carpet-planform-top",
+        "width": 512,
+        "height": 512
+      },
+      {
         "path": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-carpet-bomb-bay.png",
-        "sha256": "6ea6103fe47009c6da42add3cf8a9784799d9a49739ead9ae403c0ca2636e935",
+        "sha256": "66970d3b8df5d1a2152c0cac8e0dcc290c392275b8363a64a3254e5cb2c9ab48",
         "cameraId": "carpet-bomb-bay",
         "width": 512,
         "height": 512
@@ -211,20 +291,20 @@
     ],
     "contactSheet": {
       "path": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-contact-sheet.png",
-      "sha256": "7ab0f045f1a75caefb5515999d90698684b48be3f032accf2276c7b4a6fe8e8d",
+      "sha256": "bc9c7e82ada54d6688c925e1a758a4c1f76d05f676b2a7d97f5df7e2f570fab2",
       "cameraId": "aircraft-contact-sheet",
-      "width": 1024,
-      "height": 1024
+      "width": 1536,
+      "height": 1536
     }
   },
   "runtimeAudit": {
     "careLods": [
       {
         "lod": 0,
-        "triangles": 4972,
-        "bytes": 156360,
-        "meshNodes": 34,
-        "materials": 7,
+        "triangles": 17192,
+        "bytes": 323132,
+        "meshNodes": 164,
+        "materials": 11,
         "images": 4,
         "animations": [
           "Care_Cargo_Door_Open",
@@ -232,14 +312,45 @@
           "Care_Aircraft_Quiet_Loop",
           "Care_Aircraft_Propellers_Loop"
         ],
-        "externalUris": 0
+        "externalUris": 0,
+        "detailCounts": {
+          "Care_FlightDeckOuterFrame_": 2,
+          "Care_TurbofanIntakeRing_": 4,
+          "Care_TurbofanExhaustRing_": 4,
+          "Care_PropBlade_": 40,
+          "Care_FuselagePanel_": 10,
+          "Care_MainGearSponson_": 2,
+          "Care_RearCargoRamp_": 1,
+          "Care_RearCargoAperture_": 1,
+          "Care_NoseWheel_": 2,
+          "Care_MainWheel_": 6,
+          "Care_WingPanelBreak_": 6,
+          "Care_RampTrack_": 3,
+          "Care_RampCrossRib_": 3,
+          "Care_RampHinge_": 2,
+          "Care_RampLockHousing_": 2,
+          "Care_MainGearBogieBeam_": 2,
+          "Care_FlightDeckArmourBrow_": 1,
+          "Care_FlightDeckCheekArmor_": 2,
+          "Care_FlightDeckFastener_": 6,
+          "Care_FlightDeckFrontPane_": 4,
+          "Care_FlightDeckFrontMullion_": 3,
+          "Care_RearApertureHeader_": 1,
+          "Care_RearApertureFrame_": 2,
+          "Care_FuselageLongitudinalBreak_": 4,
+          "Care_FuselageServiceHatch_": 6,
+          "Care_FuselageServiceLatch_": 6,
+          "Care_NoseWheelHub_": 2,
+          "Care_MainGearDragBrace_": 2,
+          "Care_MainWheelHub_": 6
+        }
       },
       {
         "lod": 1,
-        "triangles": 4672,
-        "bytes": 147892,
-        "meshNodes": 34,
-        "materials": 7,
+        "triangles": 13500,
+        "bytes": 288800,
+        "meshNodes": 107,
+        "materials": 11,
         "images": 4,
         "animations": [
           "Care_Cargo_Door_Open",
@@ -247,14 +358,32 @@
           "Care_Aircraft_Quiet_Loop",
           "Care_Aircraft_Propellers_Loop"
         ],
-        "externalUris": 0
+        "externalUris": 0,
+        "detailCounts": {
+          "Care_FlightDeckOuterFrame_": 2,
+          "Care_TurbofanIntakeRing_": 4,
+          "Care_TurbofanExhaustRing_": 4,
+          "Care_PropBlade_": 28,
+          "Care_FuselagePanel_": 10,
+          "Care_MainGearSponson_": 2,
+          "Care_RearCargoRamp_": 1,
+          "Care_RearCargoAperture_": 1,
+          "Care_NoseWheel_": 2,
+          "Care_MainWheel_": 6,
+          "Care_WingPanelBreak_": 6,
+          "Care_RampTrack_": 3,
+          "Care_RampCrossRib_": 3,
+          "Care_RampHinge_": 2,
+          "Care_RampLockHousing_": 2,
+          "Care_MainGearBogieBeam_": 2
+        }
       },
       {
         "lod": 2,
-        "triangles": 4328,
-        "bytes": 153852,
-        "meshNodes": 26,
-        "materials": 7,
+        "triangles": 11016,
+        "bytes": 245560,
+        "meshNodes": 73,
+        "materials": 11,
         "images": 4,
         "animations": [
           "Care_Cargo_Door_Open",
@@ -262,16 +391,28 @@
           "Care_Aircraft_Quiet_Loop",
           "Care_Aircraft_Propellers_Loop"
         ],
-        "externalUris": 0
+        "externalUris": 0,
+        "detailCounts": {
+          "Care_FlightDeckOuterFrame_": 2,
+          "Care_TurbofanIntakeRing_": 4,
+          "Care_TurbofanExhaustRing_": 4,
+          "Care_PropBlade_": 16,
+          "Care_FuselagePanel_": 10,
+          "Care_MainGearSponson_": 2,
+          "Care_RearCargoRamp_": 1,
+          "Care_RearCargoAperture_": 1,
+          "Care_NoseWheel_": 2,
+          "Care_MainWheel_": 4
+        }
       }
     ],
     "carpetLods": [
       {
         "lod": 0,
-        "triangles": 6844,
-        "bytes": 159476,
-        "meshNodes": 48,
-        "materials": 6,
+        "triangles": 11658,
+        "bytes": 252848,
+        "meshNodes": 115,
+        "materials": 10,
         "images": 4,
         "animations": [
           "Carpet_Bomb_Bay_Open",
@@ -279,14 +420,33 @@
           "Carpet_Aircraft_Engine_Loop",
           "Carpet_Aircraft_Quiet_Loop"
         ],
-        "externalUris": 0
+        "externalUris": 0,
+        "detailCounts": {
+          "Carpet_BlendedCentreBody_": 1,
+          "Carpet_SweptWing_": 2,
+          "Carpet_TrailingControl_": 6,
+          "Carpet_BuriedIntake_": 4,
+          "Carpet_IntakeLip_": 4,
+          "Carpet_FanBlade_": 32,
+          "Carpet_ExhaustSlot_": 4,
+          "Carpet_BombBayCavity_": 1,
+          "Carpet_BombBayRail_": 3,
+          "Carpet_WingPanelSeam_": 8,
+          "Carpet_BombBayCrossFrame_": 4,
+          "Carpet_BombBaySideFrame_": 2,
+          "Carpet_BombDoorHinge_": 4,
+          "Carpet_WingServicePanel_": 6,
+          "Carpet_WingServiceLatch_": 6,
+          "Carpet_IntakeSplitter_": 4,
+          "Carpet_IntakeFrame_": 8
+        }
       },
       {
         "lod": 1,
-        "triangles": 6044,
-        "bytes": 158800,
-        "meshNodes": 44,
-        "materials": 6,
+        "triangles": 9128,
+        "bytes": 225112,
+        "meshNodes": 79,
+        "materials": 10,
         "images": 4,
         "animations": [
           "Carpet_Bomb_Bay_Open",
@@ -294,14 +454,29 @@
           "Carpet_Aircraft_Engine_Loop",
           "Carpet_Aircraft_Quiet_Loop"
         ],
-        "externalUris": 0
+        "externalUris": 0,
+        "detailCounts": {
+          "Carpet_BlendedCentreBody_": 1,
+          "Carpet_SweptWing_": 2,
+          "Carpet_TrailingControl_": 6,
+          "Carpet_BuriedIntake_": 4,
+          "Carpet_IntakeLip_": 4,
+          "Carpet_FanBlade_": 24,
+          "Carpet_ExhaustSlot_": 4,
+          "Carpet_BombBayCavity_": 1,
+          "Carpet_BombBayRail_": 3,
+          "Carpet_WingPanelSeam_": 8,
+          "Carpet_BombBayCrossFrame_": 4,
+          "Carpet_BombBaySideFrame_": 2,
+          "Carpet_BombDoorHinge_": 4
+        }
       },
       {
         "lod": 2,
-        "triangles": 4116,
-        "bytes": 148748,
-        "meshNodes": 26,
-        "materials": 5,
+        "triangles": 5112,
+        "bytes": 179408,
+        "meshNodes": 43,
+        "materials": 8,
         "images": 4,
         "animations": [
           "Carpet_Bomb_Bay_Open",
@@ -309,37 +484,71 @@
           "Carpet_Aircraft_Engine_Loop",
           "Carpet_Aircraft_Quiet_Loop"
         ],
-        "externalUris": 0
+        "externalUris": 0,
+        "detailCounts": {
+          "Carpet_BlendedCentreBody_": 1,
+          "Carpet_SweptWing_": 2,
+          "Carpet_TrailingControl_": 6,
+          "Carpet_BuriedIntake_": 4,
+          "Carpet_IntakeLip_": 4,
+          "Carpet_FanBlade_": 12,
+          "Carpet_ExhaustSlot_": 4,
+          "Carpet_BombBayCavity_": 1,
+          "Carpet_BombBayRail_": 3
+        }
       }
     ],
     "crateLods": [
       {
         "lod": 0,
-        "triangles": 1300,
-        "bytes": 107980,
-        "meshNodes": 16,
-        "materials": 4,
+        "triangles": 6384,
+        "bytes": 170292,
+        "meshNodes": 55,
+        "materials": 8,
         "images": 4,
         "animations": [
           "Care_Parachute_Sway_Loop",
           "Care_Parachute_Collapse",
           "Care_Parachute_Lines_Loop"
         ],
-        "externalUris": 0
+        "externalUris": 0,
+        "detailCounts": {
+          "Care_CrateLid_": 1,
+          "Care_CratePallet_": 1,
+          "Care_CratePalletSlat_": 3,
+          "Care_CrateCornerGuard_": 4,
+          "Care_CrateBuckle_": 2,
+          "Care_ParachuteRib_": 12,
+          "Care_ParachuteSkirt_": 1,
+          "Care_ParachuteVent_": 1,
+          "Care_CrateLatch_": 4,
+          "Care_CrateLatchPin_": 4,
+          "Care_PalletTieDownCleat_": 4
+        }
       },
       {
         "lod": 1,
-        "triangles": 828,
-        "bytes": 103724,
-        "meshNodes": 12,
-        "materials": 4,
+        "triangles": 4416,
+        "bytes": 149448,
+        "meshNodes": 33,
+        "materials": 8,
         "images": 4,
         "animations": [
           "Care_Parachute_Sway_Loop",
           "Care_Parachute_Collapse",
           "Care_Parachute_Lines_Loop"
         ],
-        "externalUris": 0
+        "externalUris": 0,
+        "detailCounts": {
+          "Care_CrateLid_": 1,
+          "Care_CratePallet_": 1,
+          "Care_CratePalletSlat_": 3,
+          "Care_CrateCornerGuard_": 4,
+          "Care_CrateBuckle_": 2,
+          "Care_ParachuteRib_": 8,
+          "Care_ParachuteSkirt_": 1,
+          "Care_ParachuteVent_": 1
+        }
       }
     ],
     "compressedGeometry": "EXT_meshopt_compression plus KHR_mesh_quantization",

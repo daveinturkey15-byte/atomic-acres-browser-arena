@@ -1,25 +1,38 @@
 import { chromium } from '@playwright/test';
-import { spawn } from 'node:child_process';
-import http from 'node:http';
-import { resolve } from 'node:path';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname, isAbsolute } from 'node:path';
 
-const baseUrl = process.env.QA_BASE_URL ?? 'http://127.0.0.1:4180/';
-const peerPort = Number(process.env.QA_PEER_PORT ?? 9011);
-const peerProcess = spawn(process.execPath, [resolve('node_modules/peer/dist/bin/peerjs.js'), '--port', String(peerPort), '--path', '/peerjs'], {
-  cwd: process.cwd(), stdio: 'ignore', windowsHide: true,
+const baseUrl = process.env.QA_BASE_URL ?? '';
+const peerPort = Number(process.env.QA_PEER_PORT ?? Number.NaN);
+const peerPath = process.env.QA_PEER_PATH ?? '';
+const expectedGate = process.env.PASS66_OWNED_GATE ?? '';
+const expectedSourceSha = process.env.PASS66_OWNED_SOURCE_SHA ?? '';
+const expectedTreeSha256 = process.env.PASS66_OWNED_TREE_SHA256 ?? '';
+const expectedFileCount = Number(process.env.PASS66_OWNED_FILE_COUNT ?? Number.NaN);
+const receiptPath = process.env.PASS66_OWNED_RECEIPT_PATH ?? '';
+
+if (expectedGate !== 'pass61-netcode'
+  || !/^https?:\/\/127\.0\.0\.1:\d+\/channels\/the-big-one\/$/u.test(baseUrl)
+  || !/^[a-f0-9]{40}$/u.test(expectedSourceSha)
+  || !/^[a-f0-9]{64}$/u.test(expectedTreeSha256)
+  || !Number.isSafeInteger(expectedFileCount) || expectedFileCount < 2
+  || !isAbsolute(receiptPath)
+  || !Number.isInteger(peerPort) || peerPort < 1_024 || peerPort > 65_535
+  || !/^\/peerjs-[a-f0-9]{24}$/u.test(peerPath)) {
+  throw new Error('Pass 61 authoritative-netcode QA must run through the clean-SHA owned Pass 66 verifier wrapper');
+}
+
+const provenanceResponse = await fetch(new URL('channel-provenance.json', baseUrl), {
+  signal: AbortSignal.timeout(10_000),
+  cache: 'no-store',
 });
-for (let attempt = 0; attempt < 100; attempt += 1) {
-  const ready = await new Promise((done) => {
-    const request = http.get(`http://127.0.0.1:${peerPort}/peerjs`, (response) => {
-      response.resume();
-      done(response.statusCode !== undefined && response.statusCode < 500);
-    });
-    request.once('error', () => done(false));
-    request.setTimeout(250, () => { request.destroy(); done(false); });
-  });
-  if (ready) break;
-  if (peerProcess.exitCode !== null) throw new Error(`Local PeerJS server exited with ${peerProcess.exitCode}`);
-  await new Promise((done) => setTimeout(done, 100));
+if (!provenanceResponse.ok) throw new Error(`Candidate provenance returned HTTP ${provenanceResponse.status}`);
+const servedCandidate = await provenanceResponse.json();
+if (servedCandidate?.schemaVersion !== 4 || servedCandidate.channel !== 'the-big-one'
+  || servedCandidate.releasePass !== 'PASS 66' || servedCandidate.path !== 'channels/the-big-one'
+  || servedCandidate.sourceSha !== expectedSourceSha || servedCandidate.treeSha256 !== expectedTreeSha256
+  || servedCandidate.exactRootFileCount !== expectedFileCount) {
+  throw new Error(`Served candidate provenance mismatch: ${JSON.stringify(servedCandidate)}`);
 }
 const browser = await chromium.launch({
   headless: true,
@@ -38,11 +51,11 @@ async function openPlayer(name) {
     if (message.type() === 'error' && !message.text().startsWith('Failed to load resource:')) errors.push(`${name}: ${message.text()}`);
   });
   const url = new URL(baseUrl);
-  url.searchParams.set('release', 'latest');
   url.searchParams.set('renderer', 'webgl2');
   url.searchParams.set('render', 'compat');
   url.searchParams.set('multiplayerQa', '1');
   url.searchParams.set('peerQaPort', String(peerPort));
+  url.searchParams.set('peerQaPath', peerPath);
   url.searchParams.set('eventDelayQaMs', '10');
   url.searchParams.set('eventJitterQaMs', '6');
   await page.goto(url.toString());
@@ -166,6 +179,18 @@ try {
     && hostTiming.appliedRewindHistogram.rejected === 0
     && hostState.networkLifecycle.eventChannelOrdered === true;
   const result = {
+    schemaVersion: 1,
+    schema: 'atomic-acres/pass61-authoritative-netcode@1',
+    status: 'PASS',
+    gate: expectedGate,
+    sourceSha: expectedSourceSha,
+    servedCandidate,
+    ownedPeer: {
+      host: '127.0.0.1',
+      port: peerPort,
+      path: peerPath,
+      localOnly: true,
+    },
     errors,
     impairment: guestState.networkLifecycle,
     hostAccepted,
@@ -187,8 +212,11 @@ try {
   console.log(JSON.stringify(result, null, 2));
   if (errors.length > 0 || !result.exactAgreement || !resolverMatchesReportedRewind
     || !authoredTimeline || !delayFitsRewindBudget || !transportTimingCaptured
-    || result.hostHealthAfter >= 100) process.exitCode = 1;
+    || result.hostHealthAfter >= 100) {
+    throw new Error('Pass 61 authoritative-netcode invariants failed');
+  }
+  await mkdir(dirname(receiptPath), { recursive: true });
+  await writeFile(receiptPath, `${JSON.stringify(result, null, 2)}\n`, 'utf8');
 } finally {
   await browser.close();
-  peerProcess.kill();
 }

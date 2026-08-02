@@ -25,6 +25,22 @@ const finite = (value: number, fallback = 0): number => Number.isFinite(value) ?
 export const ADS_IN_RESPONSE_PER_SECOND = 22;
 export const ADS_OUT_RESPONSE_PER_SECOND = 18;
 
+/**
+ * A number of authored floors are raycast planes rather than movement boxes.
+ * When the player is grounded, stance eye height is the exact presentation
+ * clearance even if the downward box probe has no hit. Airborne poses retain
+ * null so a jump/fall cannot invent a floor underneath the camera.
+ */
+export function viewmodelFloorClearance(
+  probedMeters: number | null,
+  grounded: boolean,
+  stanceEyeHeightMeters: number,
+): number | null {
+  if (probedMeters !== null && Number.isFinite(probedMeters)) return Math.max(0, probedMeters);
+  if (!grounded || !Number.isFinite(stanceEyeHeightMeters) || stanceEyeHeightMeters <= 0) return null;
+  return stanceEyeHeightMeters;
+}
+
 /** Converts a base vertical field of view into a true angular magnification. */
 export function magnifiedFovDegrees(baseFovDegrees: number, magnification: number): number {
   const safeBase = Math.min(120, Math.max(10, finite(baseFovDegrees, 76)));

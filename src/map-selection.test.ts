@@ -55,12 +55,12 @@ describe('opening arena selection', () => {
     });
   });
 
-  it('enables every killstreak arena except the dedicated gun range', () => {
+  it('enables support presentation in every arena, including Gun Range training stations', () => {
     expect(Object.fromEntries(ARENA_SELECTIONS.map((entry) => [entry.id, entry.fieldSupport]))).toEqual({
       'atomic-acres': true,
       'skyline-terminal': true,
       'rustworks-1v1': true,
-      'gun-range': false,
+      'gun-range': true,
     });
   });
 

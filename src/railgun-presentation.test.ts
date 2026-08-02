@@ -209,12 +209,19 @@ describe('railgun presentation', () => {
     camera.updateProjectionMatrix();
     const contacts = [{ id: 'bot-1', kind: 'bot' as const, position: new THREE.Vector3(0, 0, -5) }];
     presentation.updateThermal(camera, contacts, true);
-    expect(presentation.telemetry()).toMatchObject({ thermalContacts: 1, worldSilhouettes: 1 });
+    expect(presentation.telemetry()).toMatchObject({
+      thermalContacts: 1,
+      worldSilhouettes: 1,
+      thermalThroughGeometry: true,
+    });
     const silhouette = scene.getObjectByName('railgun-thermal-silhouette-1') as THREE.Group;
     expect(silhouette.visible).toBe(true);
     const head = silhouette.getObjectByName('thermal-head') as THREE.Mesh;
     expect((head.material as THREE.MeshBasicMaterial).depthTest).toBe(false);
     expect((head.material as THREE.MeshBasicMaterial).color.getHex()).toBe(0x2bdcff);
+    (head.material as THREE.MeshBasicMaterial).depthWrite = true;
+    expect(presentation.telemetry().thermalThroughGeometry).toBe(false);
+    (head.material as THREE.MeshBasicMaterial).depthWrite = false;
     presentation.updateThermal(camera, contacts, true);
     expect(thermal.childElementCount).toBe(1);
   });

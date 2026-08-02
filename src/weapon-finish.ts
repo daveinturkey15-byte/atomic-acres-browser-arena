@@ -58,6 +58,8 @@ export const WEAPON_FINISH_PROFILES: Record<WeaponId, WeaponFinishProfile> = {
   'slug-shotgun': { id: 'benelli-m4-satin-v1', albedo: path('scattergun'), normal: path('scattergun', '-normal'), roughness: path('scattergun', '-roughness'), metalness: 0.54, normalScale: 0.3, textureRepeat: 2 },
   'flashlight-pistol': { id: 'usp45-tactical-v1', albedo: path('pistol'), normal: path('pistol', '-normal'), roughness: path('pistol', '-roughness'), metalness: 0.66, normalScale: 0.28, textureRepeat: 2 },
   'explosive-crossbow': { id: 'tac15-carbon-v1', albedo: path('pistol'), normal: path('pistol', '-normal'), roughness: path('pistol', '-roughness'), metalness: 0.42, normalScale: 0.32, textureRepeat: 2 },
+  flamethrower: { id: 'm2-heat-weathered-v1', albedo: path('lmg'), normal: path('lmg', '-normal'), roughness: path('lmg', '-roughness'), metalness: 0.64, normalScale: 0.4, textureRepeat: 2 },
+  'flare-gun': { id: 'orion-signal-red-v1', albedo: path('pistol'), normal: path('pistol', '-normal'), roughness: path('pistol', '-roughness'), metalness: 0.38, normalScale: 0.28, textureRepeat: 2 },
 };
 
 export function weaponFinishProfile(weapon: WeaponId): WeaponFinishProfile {

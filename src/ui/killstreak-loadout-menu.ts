@@ -7,6 +7,7 @@ import {
   DEFAULT_KILLSTREAK_LOADOUT,
   type KillstreakLoadoutController,
 } from '../killstreak-loadout';
+import { NUKE_WARNING_MS } from '../field-support';
 import {
   bindKillstreakDemoRail,
   killstreakDemoRailMarkup,
@@ -16,23 +17,43 @@ function escapeHtml(value: string): string {
   return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 }
 
+export function activeKillstreakDurationMs(id: Pass65KillstreakId): number {
+  const definition = PASS65_KILLSTREAK_CATALOG.definitions.find((entry) => entry.id === id);
+  if (!definition) throw new Error(`Unknown killstreak ${id}`);
+  return definition.durationMs;
+}
+
+function killstreakDurationSeconds(id: Pass65KillstreakId): number {
+  const durationMs = activeKillstreakDurationMs(id);
+  if (durationMs <= 0 || durationMs % 1_000 !== 0) {
+    throw new Error(`Killstreak ${id} requires a positive whole-second duration`);
+  }
+  return durationMs / 1_000;
+}
+
 /**
  * Owner request: plain-language descriptions of what each killstreak IS and
  * DOES, shown in the loadout menu so every reward is self-explanatory.
  */
-const KILLSTREAK_DESCRIPTIONS: Readonly<Record<string, string>> = Object.freeze({
+export const KILLSTREAK_DESCRIPTIONS: Readonly<Record<Pass65KillstreakId, string>> = Object.freeze({
   'scout-sweep': 'Reveals every enemy on your minimap for 12s.',
   'adrenaline': '+10% damage and move speed, -10% reload time for 15s.',
   'care-package': 'Calls a supply crate you can capture for a bonus reward.',
-  'yardhawk': 'Autonomous turret that hunts and shoots enemies for 15s.',
-  'piloted-drone': 'Take first-person control of an armed drone for 30s.',
+  'yardhawk': 'Throws a homing hunter-killer that pursues one enemy and explodes.',
+  'piloted-drone': `Take first-person control of an armed drone for ${killstreakDurationSeconds('piloted-drone')}s.`,
   'tri-pass': 'Three aircraft strafe a line you place on the map.',
   'carpet-bomber': 'Bombs saturate a target point - hurts everyone, including you.',
   'hunter-swarm': 'Five drones dive on the nearest enemies for 20s.',
   'chopper': 'Gun a chopper from first person; press its key again to take the gun.',
-  'drone-swarm': '24 drones patrol and engage enemies for 60s.',
-  'nuke': 'Instantly wipes every enemy on the map. The ultimate.',
+  'drone-swarm': `24 drones patrol and engage enemies for ${killstreakDurationSeconds('drone-swarm')}s.`,
+  'nuke': `Starts a ${NUKE_WARNING_MS / 1_000}-second global warning, then wipes every enemy on the map.`,
 });
+
+export function killstreakTimingLabel(id: Pass65KillstreakId): string {
+  if (id === 'nuke') return `${NUKE_WARNING_MS / 1_000}s WARNING`;
+  const durationMs = activeKillstreakDurationMs(id);
+  return durationMs === 0 ? 'IMMEDIATE' : `${durationMs / 1_000}s`;
+}
 
 export function killstreakLoadoutPanelMarkup(): string {
   const slots = PASS65_KILLSTREAK_SLOT_DEFINITIONS.map((slot, index) => {
@@ -74,8 +95,9 @@ function renderDetails(root: ParentNode, controller: KillstreakLoadoutController
       preview.setAttribute('aria-label', `${definition.displayName} tactical demonstration`);
     }
     if (detail) {
-      const description = KILLSTREAK_DESCRIPTIONS[definition.id] ?? '';
-      detail.textContent = `${definition.activation.toUpperCase()} · ${definition.durationMs === 0 ? 'IMMEDIATE' : `${definition.durationMs / 1_000}s`} · ${definition.displayName}${description ? ` — ${description}` : ''}`;
+      const description = KILLSTREAK_DESCRIPTIONS[definition.id];
+      const activation = definition.id === 'nuke' ? 'ARMED' : definition.activation.toUpperCase();
+      detail.textContent = `${activation} · ${killstreakTimingLabel(definition.id)} · ${definition.displayName}${description ? ` — ${description}` : ''}`;
     }
   });
 }

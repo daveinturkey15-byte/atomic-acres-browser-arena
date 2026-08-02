@@ -48,6 +48,114 @@ export type FlashbangAudioEnvelope = Readonly<{
   onsetDelayMs: 0;
 }>;
 
+type AudioContextConstructor = new (contextOptions?: AudioContextOptions) => AudioContext;
+
+export type BrowserAudioContextResolution = Readonly<{
+  constructor: AudioContextConstructor | null;
+  source: 'standard' | 'webkit' | 'unavailable';
+}>;
+
+export type AudioOutputProbe = Readonly<{
+  available: boolean;
+  sampleRate: number;
+  fftSize: number;
+  rms: number;
+  peak: number;
+  crestFactor: number;
+  spectralFlatness: number;
+  highFrequencyEnergyRatio: number;
+  suspiciousBroadbandHiss: boolean;
+}>;
+
+const EMPTY_AUDIO_OUTPUT_PROBE: AudioOutputProbe = Object.freeze({
+  available: false,
+  sampleRate: 0,
+  fftSize: 0,
+  rms: 0,
+  peak: 0,
+  crestFactor: 0,
+  spectralFlatness: 0,
+  highFrequencyEnergyRatio: 0,
+  suspiciousBroadbandHiss: false,
+});
+
+/**
+ * Measures the final compressed mix, not source counts or configured gains.
+ * Persistent broadband hiss has a materially flatter spectrum and more energy
+ * above 3 kHz than the two intentional low-frequency arena oscillators.
+ */
+export function analyzeAudioOutput(
+  timeDomain: Float32Array,
+  frequencyDb: Float32Array,
+  sampleRate: number,
+): AudioOutputProbe {
+  if (timeDomain.length === 0 || frequencyDb.length === 0 || !Number.isFinite(sampleRate) || sampleRate <= 0) {
+    return EMPTY_AUDIO_OUTPUT_PROBE;
+  }
+  let squared = 0;
+  let peak = 0;
+  for (const sample of timeDomain) {
+    const finite = Number.isFinite(sample) ? sample : 0;
+    squared += finite * finite;
+    peak = Math.max(peak, Math.abs(finite));
+  }
+  const rms = Math.sqrt(squared / timeDomain.length);
+  const nyquist = sampleRate / 2;
+  const binWidth = nyquist / frequencyDb.length;
+  let spectralCount = 0;
+  let logarithmicPower = 0;
+  let totalPower = 0;
+  let highFrequencyPower = 0;
+  for (let index = 0; index < frequencyDb.length; index += 1) {
+    const frequency = index * binWidth;
+    if (frequency < 80 || frequency > Math.min(12_000, nyquist)) continue;
+    const db = Number.isFinite(frequencyDb[index]) ? frequencyDb[index]! : -120;
+    const power = Math.pow(10, Math.max(-120, Math.min(0, db)) / 10);
+    totalPower += power;
+    if (frequency >= 3_000) highFrequencyPower += power;
+    logarithmicPower += Math.log(Math.max(power, 1e-12));
+    spectralCount += 1;
+  }
+  const arithmeticMean = spectralCount > 0 ? totalPower / spectralCount : 0;
+  const geometricMean = spectralCount > 0 ? Math.exp(logarithmicPower / spectralCount) : 0;
+  const spectralFlatness = arithmeticMean > 1e-12 ? Math.min(1, geometricMean / arithmeticMean) : 0;
+  const highFrequencyEnergyRatio = totalPower > 1e-12 ? Math.min(1, highFrequencyPower / totalPower) : 0;
+  const crestFactor = rms > 1e-9 ? peak / rms : 0;
+  return Object.freeze({
+    available: true,
+    sampleRate,
+    fftSize: timeDomain.length,
+    rms: Number(rms.toFixed(8)),
+    peak: Number(peak.toFixed(8)),
+    crestFactor: Number(crestFactor.toFixed(6)),
+    spectralFlatness: Number(spectralFlatness.toFixed(8)),
+    highFrequencyEnergyRatio: Number(highFrequencyEnergyRatio.toFixed(8)),
+    suspiciousBroadbandHiss: rms >= 0.002
+      && spectralFlatness >= 0.5
+      && highFrequencyEnergyRatio >= 0.18,
+  });
+}
+
+/**
+ * Safari/WebKit exposed Web Audio through webkitAudioContext before the
+ * standard constructor. Resolve both without evaluating an absent global
+ * binding; engines with neither capability deliberately remain silent.
+ */
+export function resolveBrowserAudioContext(
+  scope: Readonly<{
+    AudioContext?: AudioContextConstructor;
+    webkitAudioContext?: AudioContextConstructor;
+  }> = globalThis as typeof globalThis & { webkitAudioContext?: AudioContextConstructor },
+): BrowserAudioContextResolution {
+  if (typeof scope.AudioContext === 'function') {
+    return Object.freeze({ constructor: scope.AudioContext, source: 'standard' });
+  }
+  if (typeof scope.webkitAudioContext === 'function') {
+    return Object.freeze({ constructor: scope.webkitAudioContext, source: 'webkit' });
+  }
+  return Object.freeze({ constructor: null, source: 'unavailable' });
+}
+
 export function flashbangAudioEnvelope(requestedAudioGain: number): FlashbangAudioEnvelope {
   const audioGain = Math.max(0, Math.min(1, Number.isFinite(requestedAudioGain) ? requestedAudioGain : 0));
   return Object.freeze({
@@ -77,6 +185,19 @@ export const OVERDRIVE_AVAILABLE_CUE_PROFILE = Object.freeze({
   ]),
   ambienceTone: Object.freeze({ frequencyHz: 660, durationSeconds: 0.30, volume: 0.06, wave: 'sine' as const, delaySeconds: 0.25 }),
   transient: Object.freeze({ startFrequencyHz: 1_650, endFrequencyHz: 2_350, durationSeconds: 0.13, volume: 0.025, wave: 'triangle' as const, delaySeconds: 0.05 }),
+} as const);
+
+/** Dedicated secure test-bay door identity; it must never alias shed motion. */
+export const TEST_BAY_DOOR_THUMP_PROFILE = Object.freeze({
+  maximumDistanceM: 42,
+  maximumDurationSeconds: 0.24,
+  layers: Object.freeze({
+    latch: Object.freeze({ frequencyHz: 188, durationSeconds: 0.045, volume: 0.055, wave: 'square' as const, delaySeconds: 0 }),
+    pressure: Object.freeze({ frequencyHz: 72, durationSeconds: 0.22, volume: 0.09, wave: 'triangle' as const, delaySeconds: 0.012 }),
+    mechanism: Object.freeze({ startFrequencyHz: 108, endFrequencyHz: 38, durationSeconds: 0.2, volume: 0.068, wave: 'triangle' as const, delaySeconds: 0.018 }),
+    body: Object.freeze({ frequencyHz: 620, durationSeconds: 0.09, volume: 0.052, filter: 'bandpass' as const, q: 0.72, delaySeconds: 0.006 }),
+  }),
+  shedEmitterReused: false,
 } as const);
 
 export function railgunReportAttenuation(remote: boolean, distance: number): number {
@@ -151,7 +272,11 @@ type ContinuousVoiceOwnership = Readonly<{
 /** Layered, original procedural arena mix. No sampled or proprietary game audio is used. */
 export class ArenaAudio {
   private context: AudioContext | null = null;
+  private contextSource: 'uninitialized' | 'failed' | BrowserAudioContextResolution['source'] = 'uninitialized';
   private master: GainNode | null = null;
+  private outputAnalyser: AnalyserNode | null = null;
+  private outputTimeDomain: Float32Array<ArrayBuffer> | null = null;
+  private outputFrequencyDb: Float32Array<ArrayBuffer> | null = null;
   private weapons: GainNode | null = null;
   private feedback: GainNode | null = null;
   private movement: GainNode | null = null;
@@ -223,29 +348,77 @@ export class ArenaAudio {
 
   unlock(): void {
     if (!this.context) {
-      this.context = new AudioContext();
-      const compressor = this.context.createDynamicsCompressor();
-      compressor.threshold.value = -12;
-      compressor.knee.value = 8;
-      compressor.ratio.value = 6;
-      compressor.attack.value = 0.002;
-      compressor.release.value = 0.18;
-      this.master = this.context.createGain();
-      this.master.gain.value = 0.34;
-      this.master.connect(compressor).connect(this.context.destination);
-      this.buses.set('master', this.master);
-      this.busIdentity.set(this.master, 'master');
-      this.weapons = this.createBus('sfx', 0.78);
-      this.feedback = this.weapons;
-      this.movement = this.createBus('movement', 0.34);
-      this.ui = this.createBus('ui', 0.42);
-      this.announcements = this.createBus('announcements', 0.5);
-      this.ambience = this.createBus('ambience', 0.12);
-      this.createBus('menu-music', 0.18);
-      this.createBus('game-music', 0.16);
-      this.noiseBuffer = this.createNoiseBuffer(1.2);
-      for (const id of AUDIO_BUS_IDS) this.applyBusSetting(id);
-      if (this.activeArena) this.startArenaBed(this.activeArena);
+      if (this.contextSource === 'unavailable' || this.contextSource === 'failed') return;
+      const resolution = resolveBrowserAudioContext();
+      this.contextSource = resolution.source;
+      if (!resolution.constructor) return;
+      let candidate: AudioContext | null = null;
+      try {
+        candidate = new resolution.constructor();
+        this.context = candidate;
+        const compressor = this.context.createDynamicsCompressor();
+        compressor.threshold.value = -12;
+        compressor.knee.value = 8;
+        compressor.ratio.value = 6;
+        compressor.attack.value = 0.002;
+        compressor.release.value = 0.18;
+        this.master = this.context.createGain();
+        this.master.gain.value = 0.34;
+        this.master.connect(compressor);
+        if (typeof this.context.createAnalyser === 'function') {
+          this.outputAnalyser = this.context.createAnalyser();
+          this.outputAnalyser.fftSize = 2_048;
+          this.outputAnalyser.smoothingTimeConstant = 0;
+          this.outputAnalyser.minDecibels = -100;
+          this.outputAnalyser.maxDecibels = -20;
+          this.outputTimeDomain = new Float32Array(this.outputAnalyser.fftSize);
+          this.outputFrequencyDb = new Float32Array(this.outputAnalyser.frequencyBinCount);
+          compressor.connect(this.outputAnalyser).connect(this.context.destination);
+        } else {
+          compressor.connect(this.context.destination);
+        }
+        this.buses.set('master', this.master);
+        this.busIdentity.set(this.master, 'master');
+        this.weapons = this.createBus('sfx', 0.78);
+        this.feedback = this.weapons;
+        this.movement = this.createBus('movement', 0.34);
+        this.ui = this.createBus('ui', 0.42);
+        this.announcements = this.createBus('announcements', 0.5);
+        this.ambience = this.createBus('ambience', 0.12);
+        this.createBus('menu-music', 0.18);
+        this.createBus('game-music', 0.16);
+        this.noiseBuffer = this.createNoiseBuffer(1.2);
+        for (const id of AUDIO_BUS_IDS) this.applyBusSetting(id);
+        if (this.activeArena) this.startArenaBed(this.activeArena);
+      } catch {
+        // Audio is optional. A sandbox/device policy may expose a constructor
+        // that still throws, or reject one of the initial graph nodes. Tear
+        // down the partial graph and keep gameplay admission error-free.
+        for (const source of this.arenaSources.splice(0)) {
+          try { source.stop(); } catch { /* source may not have started */ }
+          try { source.disconnect(); } catch { /* partial browser node */ }
+        }
+        for (const node of [...this.buses.values()]) {
+          try { node.disconnect(); } catch { /* partial browser node */ }
+        }
+        this.context = null;
+        this.master = null;
+        this.outputAnalyser = null;
+        this.outputTimeDomain = null;
+        this.outputFrequencyDb = null;
+        this.weapons = null;
+        this.feedback = null;
+        this.movement = null;
+        this.ui = null;
+        this.announcements = null;
+        this.ambience = null;
+        this.buses.clear();
+        this.busIdentity.clear();
+        this.noiseBuffer = null;
+        this.contextSource = 'failed';
+        if (candidate && candidate.state !== 'closed') void candidate.close().catch(() => undefined);
+        return;
+      }
     }
     if (this.context.state === 'suspended') void this.context.resume();
   }
@@ -276,7 +449,11 @@ export class ArenaAudio {
     this.railgunSpatialChainCount = 0;
     const context = this.context;
     this.context = null;
+    this.contextSource = 'uninitialized';
     this.master = null;
+    this.outputAnalyser = null;
+    this.outputTimeDomain = null;
+    this.outputFrequencyDb = null;
     this.weapons = null;
     this.feedback = null;
     this.movement = null;
@@ -517,6 +694,44 @@ export class ArenaAudio {
     const attenuation = Math.max(0.08, 1 - Math.min(1, distance / 34));
     this.impact('metal', distance);
     this.sweep(118, 72, 0.13, 0.032 * attenuation, 'triangle', this.feedback, 0.012);
+  }
+
+  testBayDoorThump(distance = 0): void {
+    const profile = TEST_BAY_DOOR_THUMP_PROFILE;
+    const attenuation = Math.max(0.08, 1 - Math.min(1, Math.max(0, distance) / profile.maximumDistanceM));
+    this.tone(
+      profile.layers.latch.frequencyHz,
+      profile.layers.latch.durationSeconds,
+      profile.layers.latch.volume * attenuation,
+      profile.layers.latch.wave,
+      this.feedback,
+      profile.layers.latch.delaySeconds,
+    );
+    this.tone(
+      profile.layers.pressure.frequencyHz,
+      profile.layers.pressure.durationSeconds,
+      profile.layers.pressure.volume * attenuation,
+      profile.layers.pressure.wave,
+      this.feedback,
+      profile.layers.pressure.delaySeconds,
+    );
+    this.sweep(
+      profile.layers.mechanism.startFrequencyHz,
+      profile.layers.mechanism.endFrequencyHz,
+      profile.layers.mechanism.durationSeconds,
+      profile.layers.mechanism.volume * attenuation,
+      profile.layers.mechanism.wave,
+      this.feedback,
+      profile.layers.mechanism.delaySeconds,
+    );
+    this.noise({
+      duration: profile.layers.body.durationSeconds,
+      volume: profile.layers.body.volume * attenuation,
+      filter: profile.layers.body.filter,
+      frequency: profile.layers.body.frequencyHz,
+      q: profile.layers.body.q,
+      delay: profile.layers.body.delaySeconds,
+    }, this.feedback);
   }
 
   nearMiss(strength: number): void {
@@ -971,6 +1186,10 @@ export class ArenaAudio {
   }
 
   telemetry(): {
+    context: {
+      source: 'uninitialized' | 'failed' | BrowserAudioContextResolution['source'];
+      state: AudioContextState | 'unavailable' | 'failed' | 'locked';
+    };
     explosionMix: ExplosionAudioGate & { coalesceMs: number };
     ambience: { continuousSources: number; busGain: number; arena: ArenaId | null };
     grenadeFuse: { beeps: number; startMs: number };
@@ -989,6 +1208,7 @@ export class ArenaAudio {
       pressureDuration: number;
     };
     flashbang: { plays: number; lastAudioGain: number; immediateOnsets: number; scheduledBeeps: number; maximumTailMs: number };
+    outputProbe: AudioOutputProbe;
     runtime: { voices: number; spatialChains: number; spatialPoolSize: number; stolen: number; dropped: number; globalCap: number; spatialCap: number };
     buses: Record<AudioBusId, { configuredGain: number; muted: boolean; effectiveGain: number }>;
   } {
@@ -998,7 +1218,18 @@ export class ArenaAudio {
       const fallbackGain = this.busBaseGain(id) * (muted ? 0 : configuredGain / 100);
       return [id, { configuredGain, muted, effectiveGain: this.buses.get(id)?.gain.value ?? fallbackGain }];
     })) as Record<AudioBusId, { configuredGain: number; muted: boolean; effectiveGain: number }>;
+    let outputProbe = EMPTY_AUDIO_OUTPUT_PROBE;
+    if (this.outputAnalyser && this.outputTimeDomain && this.outputFrequencyDb && this.context) {
+      this.outputAnalyser.getFloatTimeDomainData(this.outputTimeDomain);
+      this.outputAnalyser.getFloatFrequencyData(this.outputFrequencyDb);
+      outputProbe = analyzeAudioOutput(this.outputTimeDomain, this.outputFrequencyDb, this.context.sampleRate);
+    }
     return {
+      context: {
+        source: this.contextSource,
+        state: this.context?.state
+          ?? (this.contextSource === 'unavailable' ? 'unavailable' : this.contextSource === 'failed' ? 'failed' : 'locked'),
+      },
       explosionMix: { ...this.explosionAudioGate, coalesceMs: EXPLOSION_AUDIO_COALESCE_MS },
       ambience: { continuousSources: this.arenaSources.length, busGain: this.ambience?.gain.value ?? 0.12, arena: this.activeArena },
       grenadeFuse: { beeps: this.grenadeFuseBeeps, startMs: GRENADE_FUSE_BEEP_START_MS },
@@ -1030,6 +1261,7 @@ export class ArenaAudio {
       },
       railgun: { ...this.railgunReports, layerCount: RAILGUN_REPORT_PROFILE.layerCount, pressureDuration: RAILGUN_REPORT_PROFILE.pressureDuration },
       flashbang: { ...this.flashbangs, maximumTailMs: FLASHBANG_AUDIO_PROFILE.maximumTailMs },
+      outputProbe,
       runtime: {
         voices: this.activeVoices.size,
         spatialChains: this.spatialChains + this.arenaSources.length,

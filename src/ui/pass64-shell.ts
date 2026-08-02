@@ -314,7 +314,7 @@ function deploymentTransitionMarkup(): string {
       <strong id="deployment-transition-title">NUKE TOWN</strong>
       <span id="deployment-transition-status">Preparing authoritative arena state…</span>
       <i aria-hidden="true"><b></b></i>
-      <em>TYPICAL LOAD 5–15 SECONDS · KEEP THIS TAB IN FOREGROUND · SWITCHING TABS PAUSES ARENA PREPARATION</em>
+      <em>TYPICAL LOAD 5–15 SECONDS · MAP PREPARATION CONTINUES IN THE BACKGROUND · RETURN HERE TO ENTER</em>
     </div>
   </section>`;
 }
@@ -372,7 +372,7 @@ function hudMarkup(): string {
         <span>ALT <b id="support-platform-altitude">0</b>M</span><span>SPD <b id="support-platform-speed">0</b></span>
       </div>
       <strong class="support-damage-total"><span id="chopper-damage-dealt">0</span><small> DAMAGE</small></strong>
-      <footer id="support-control-action">HOLD F · EXIT · AI FLIGHT CONTINUES</footer>
+      <footer id="support-control-action">PRESS ITS SLOT KEY · OPERATE · AI FLIGHT CONTINUES</footer>
     </section>
     <section id="adrenaline-hud" hidden aria-live="polite">
       <small>ADRENALINE ACTIVE</small><strong><span id="adrenaline-time">15.0</span>S</strong>
@@ -388,7 +388,6 @@ function hudMarkup(): string {
     <div id="overdrive-hud" hidden><small>2× DAMAGE</small><strong id="overdrive-time">30.0</strong><span>OVERDRIVE</span></div>
     <div id="power-announcement" hidden aria-live="assertive"><small>MID-MAP POWER WEAPON</small><strong>2× DAMAGE</strong><span>30 SECONDS</span></div>
     <div id="pickup-prompt" hidden><kbd>F</kbd><span>PICK UP</span><strong></strong></div>
-    <div id="killstreak-enter-prompt" hidden aria-live="polite"></div>
     <div id="gunner-cockpit-hud" hidden aria-hidden="true">
       <div class="gunner-reticle"><i></i><b></b><span class="tl"></span><span class="tr"></span><span class="bl"></span><span class="br"></span></div>
       <div class="gunner-readout"><small>HULL</small><strong id="gunner-hull">100</strong></div>

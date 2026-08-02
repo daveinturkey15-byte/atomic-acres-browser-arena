@@ -60,6 +60,21 @@ describe('Pass 65 killstreak loadout persistence', () => {
     expect(controller.freezeAtMatchStart().slots[4]).toBe('nuke');
   });
 
+  it('reconciles only the frozen match projection from authenticated host authority', () => {
+    const storage = new MemoryStorage();
+    const controller = new KillstreakLoadoutController(storage);
+    expect(() => controller.reconcileActiveMatchAuthority(DEFAULT_KILLSTREAK_LOADOUT)).toThrow(/outside an active match/);
+    controller.select(5, 'drone-swarm');
+    const editableBefore = controller.selected;
+    controller.freezeAtMatchStart();
+    const hostLoadout = replaceKillstreakSlot(DEFAULT_KILLSTREAK_LOADOUT, 1, 'care-package');
+    expect(controller.reconcileActiveMatchAuthority(hostLoadout)).toEqual(hostLoadout);
+    expect(controller.activeMatch).toEqual(hostLoadout);
+    expect(controller.selected).toEqual(editableBefore);
+    controller.releaseAfterMatch();
+    expect(controller.selected).toEqual(editableBefore);
+  });
+
   it('supports a canonical profile-backed repository without touching the legacy key', () => {
     const storage = new MemoryStorage();
     const persisted: unknown[] = [];

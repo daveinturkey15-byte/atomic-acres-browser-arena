@@ -12,10 +12,8 @@ import {
  * admitted by deployment prewarm automatically instead of regressing later.
  */
 export const RUNTIME_WEAPON_RETENTION_LIMIT = WEAPON_IDS.length;
-export const GUN_RANGE_FIELD_TEST_WEAPONS = Object.freeze([
-  'explosive-crossbow',
-  'm14-ebr',
-] as const satisfies readonly WeaponId[]);
+/** Secure test-bay stations expose the entire canonical runtime catalog. */
+export const GUN_RANGE_FIELD_TEST_WEAPONS: readonly WeaponId[] = WEAPON_IDS;
 
 function uniqueWeaponIds(ids: readonly WeaponId[]): readonly WeaponId[] {
   return Object.freeze([...new Set(ids)]);
@@ -32,7 +30,8 @@ export function menuWeaponPrewarmCatalog(
 /**
  * Every weapon that can become the local first-person view during this arena.
  * Normal matches permit any loadout on redeploy, every primary as a corpse
- * pickup, and the railgun, so the canonical set is intentionally exhaustive.
+ * pickup, and all host-authoritative map specials, so the canonical set is
+ * intentionally exhaustive.
  */
 export function weaponPrewarmCatalogForArena(
   _arenaId: ArenaId,
