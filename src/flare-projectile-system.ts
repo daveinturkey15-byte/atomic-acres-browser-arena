@@ -393,11 +393,19 @@ export class FlareProjectileSystem {
           poolExhaustions += 1;
           continue;
         }
+        const previouslyAdmitted = this.admittedKeys.has(key);
         this.admittedKeys.add(key);
         while (this.admittedKeys.size > 128) this.admittedKeys.delete(this.admittedKeys.values().next().value!);
         this.activeByKey.set(key, entity);
-        this.spawnCount += 1;
-        created += 1;
+        if (previouslyAdmitted) {
+          // The event lane may have already presented and locally retired this
+          // identity before a newer reliable snapshot arrives. Restore its
+          // presentation without counting a second logical flare.
+          updated += 1;
+        } else {
+          this.spawnCount += 1;
+          created += 1;
+        }
       } else {
         updated += 1;
       }
