@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { configureRuntimeRandom } from './runtime-random';
 import { LEADERBOARD_SEASON } from '../shared/leaderboard-season';
-import { MULTIPLAYER_PROTOCOL_VERSION, isGameMessage, isHostAuthorityMessage, isPlayerSnapshot, isStateTrafficMessage, messageBelongsToPlayer, sanitizeName, type ChatHistoryMessage, type ChatMessage, type ChatSubmitMessage, type GrenadeThrowMessage, type LeaderboardSyncMessage, type RedeployCommitMessage, type RedeployRequestMessage, type SupportActivateMessage, type TriggerStateMessage } from './protocol';
+import { MULTIPLAYER_PROTOCOL_VERSION, isGameMessage, isHostAuthorityMessage, isPlayerSnapshot, isStateTrafficMessage, messageBelongsToPlayer, sanitizeName, type ChatHistoryMessage, type ChatMessage, type ChatSubmitMessage, type GrenadeResultMessage, type GrenadeThrowMessage, type LeaderboardSyncMessage, type RedeployCommitMessage, type RedeployRequestMessage, type SupportActivateMessage, type TriggerStateMessage } from './protocol';
 import { advanceRailgunAuthority, createRailgunAuthorityState, RAILGUN_SPAWN_DELAY_MS } from './railgun-authority';
 import { shedPlacementsForArena } from './destructible-shed-registry';
 import { InteractiveWorldRuntime } from './interactive-world-runtime';
@@ -166,11 +166,27 @@ describe('network protocol guards', () => {
     expect(messageBelongsToPlayer(activation, 'a')).toBe(true);
     const grenadeThrow: GrenadeThrowMessage = {
       type: 'grenade-throw', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
-      by: 'a', grenade: 'frag', lifeId: 2, actionSequence: 0,
+      by: 'a', connectionEpoch: 'connection_epoch_a', grenade: 'frag', lifeId: 2, actionSequence: 0,
       origin: [0, 1.7, 0], velocity: [0, 5.2, -13], actionNonce: 9, nonce: 10,
     };
     expect(isGameMessage(grenadeThrow)).toBe(true);
     expect(messageBelongsToPlayer(grenadeThrow, 'a')).toBe(true);
+    const grenadeResult: GrenadeResultMessage = {
+      type: 'grenade-result', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      by: 'host', forPlayerId: 'a', connectionEpoch: 'connection_epoch_a', lifeId: 2,
+      actionSequence: 0, actionNonce: 9, status: 'accepted', shotSequenceWatermark: 7,
+      combatInventory: {
+        revision: 8,
+        primary: { weapon: 'carbine', ammo: 29, reserve: 120 },
+        sidearm: { weapon: 'pistol', ammo: 15, reserve: 60 },
+        grenades: 0,
+      },
+      nonce: 11,
+    };
+    expect(isGameMessage(grenadeResult)).toBe(true);
+    expect(isHostAuthorityMessage(grenadeResult)).toBe(true);
+    expect(isGameMessage({ ...grenadeResult, connectionEpoch: 'short' })).toBe(false);
+    expect(isGameMessage({ ...grenadeResult, shotSequenceWatermark: -2 })).toBe(false);
   });
 
   it('treats canonical sticky hit and window envelopes as host-only authority', () => {

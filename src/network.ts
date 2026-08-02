@@ -36,6 +36,7 @@ type GuestBundle = {
   team: Team;
   events: DataConnection;
   state: DataConnection | null;
+  lastValidMessageMonoMs: number;
 };
 
 type LobbyRejectReason = Extract<GameMessage, { type: 'lobby-reject' }>['reason'];
@@ -167,6 +168,13 @@ export function localQaPeerPath(value: string | null): string {
   return value !== null && /^\/peerjs-[a-f0-9]{24}$/.test(value) ? value : '/peerjs';
 }
 
+export function localQaRtcConfiguration(): RTCConfiguration {
+  // Owned localhost QA peers never require NAT traversal. Inheriting PeerJS's
+  // public STUN/TURN defaults adds external DNS/network variance to a gate
+  // whose signalling and media path are intentionally machine-local.
+  return { iceServers: [] };
+}
+
 function createArenaPeer(preferredId?: string): Peer {
   const params = new URLSearchParams(window.location.search);
   const localQa = params.get('multiplayerQa') === '1' && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
@@ -177,6 +185,7 @@ function createArenaPeer(preferredId?: string): Peer {
       port,
       path: localQaPeerPath(params.get('peerQaPath')),
       secure: false,
+      config: localQaRtcConfiguration(),
     };
     return preferredId ? new Peer(preferredId, options) : new Peer(options);
   }
@@ -668,6 +677,13 @@ export class ArenaNetwork {
     return [...this.guestBundles.values()].filter((bundle) => bundle.admitted).map((bundle) => bundle.playerId);
   }
 
+  activePlayerIds(maxSilenceMs: number, nowMonoMs = performance.now()): string[] {
+    if (!Number.isFinite(maxSilenceMs) || maxSilenceMs < 0 || !Number.isFinite(nowMonoMs)) return [];
+    return [...this.guestBundles.values()]
+      .filter((bundle) => bundle.admitted && nowMonoMs - bundle.lastValidMessageMonoMs <= maxSilenceMs)
+      .map((bundle) => bundle.playerId);
+  }
+
   stateBufferedPressure(playerId?: string): number {
     const amount = this.role === 'client'
       ? this.hostStateConnection?.dataChannel?.bufferedAmount ?? this.hostEventConnection?.dataChannel?.bufferedAmount ?? 0
@@ -956,6 +972,7 @@ export class ArenaNetwork {
           team: requestedTeam,
           events: connection,
           state: this.pendingStateConnections.get(pendingStateKey) ?? null,
+          lastValidMessageMonoMs: performance.now(),
         };
         this.pendingStateConnections.delete(pendingStateKey);
         this.guestTransportGenerations.set(playerId, transportGeneration);
@@ -992,6 +1009,7 @@ export class ArenaNetwork {
       if (!current || !isCurrentGuestEventConnection(current.events, connection)) return;
       if (!current.admitted) return;
       if (isHostAuthorityMessage(payload) || !messageBelongsToPlayer(payload, playerId)) return;
+      current.lastValidMessageMonoMs = performance.now();
       if (payload.type === 'state') {
         // The sender selects exactly one lane. Always admit state arriving on
         // the reliable lane so a remotely closed transient channel cannot
@@ -1070,6 +1088,7 @@ export class ArenaNetwork {
       if (!playerId || !messageBelongsToPlayer(payload, playerId)) return;
       const bundle = this.guestBundles.get(playerId);
       if (!bundle?.admitted || !isCurrentGuestStateConnection(bundle.state, connection)) return;
+      bundle.lastValidMessageMonoMs = performance.now();
       this.onMessage(payload);
     });
     connection.on('close', () => {

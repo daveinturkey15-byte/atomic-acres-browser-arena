@@ -64,6 +64,27 @@ describe('legacy match admission integration', () => {
     expect(failure).toContain("return matchAdmissionResult(token, 'superseded', error);");
   });
 
+  it('publishes an already-active host admission and uses that revision as the guest world-ready retry fence', () => {
+    const accept = slice('function acceptLobbyState(', 'function authorizeRedeploy(');
+    const admitted = slice("resetWebGpuPresentationEpoch('match admitted', lastFrame);", 'if (recoveredHostRespawnDelayMs !== null');
+    expect(accept).toContain("previousSnapshot?.phase !== 'active' && message.snapshot.phase === 'active'");
+    expect(accept).toContain('lastClientWorldRepairConnectionEpoch !== localConnectionEpoch || enteringActiveLobby');
+    expect(accept).toContain('sendClientWorldRepairReady();');
+    expect(admitted).toContain("mode === 'host' && matchState.phase === 'active'");
+    expect(admitted).toContain("broadcastHostLobby('active');");
+    expect(admitted.indexOf('gameStarted = true;')).toBeLessThan(admitted.indexOf("broadcastHostLobby('active');"));
+  });
+
+  it('commits rematch continuity before the one-shot guest loadout registration', () => {
+    const repair = slice('function sendClientWorldRepairReady(', 'function rejectLobbyPlayer(');
+    const joinAt = repair.indexOf("network.send({ type: 'join', player: snapshot() });");
+    const stateAt = repair.indexOf('network.sendStateCommitReliably(createStateMessage());');
+    const loadoutAt = repair.indexOf('network.send(loadoutMessage);');
+    expect(joinAt).toBeGreaterThanOrEqual(0);
+    expect(stateAt).toBeGreaterThan(joinAt);
+    expect(loadoutAt).toBeGreaterThan(stateAt);
+  });
+
   it('evicts and fence-retires only the exact failed arena generation', () => {
     const construction = slice('function constructArena(', 'function ensureArenaConstructed(');
     const arena = slice('async function performArenaSelection(', 'function activateArenaSelection(');

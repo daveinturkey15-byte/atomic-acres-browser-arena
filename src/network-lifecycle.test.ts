@@ -17,6 +17,7 @@ import {
   isCurrentGuestStateConnection,
   joinTimeoutAction,
   localQaPeerPath,
+  localQaRtcConfiguration,
   nextTransportGeneration,
   replaceGuestPeerOwner,
   stateTrafficUsesFallback,
@@ -107,6 +108,7 @@ describe('local QA PeerJS path ownership', () => {
     expect(localQaPeerPath('/peerjs-0123456789ABCDEF01234567')).toBe('/peerjs');
     expect(localQaPeerPath('/peerjs-0123456789abcdef01234567/peers')).toBe('/peerjs');
     expect(localQaPeerPath(null)).toBe('/peerjs');
+    expect(localQaRtcConfiguration()).toEqual({ iceServers: [] });
   });
 });
 
@@ -667,5 +669,24 @@ describe('guest event connection lifecycle', () => {
     expect(delivered).toEqual([{ type: 'leave', playerId: 'player-1', voluntary: true }]);
     expect(statuses).toEqual([['1 guest connection', 'ok'], ['A guest left the lobby', 'ok']]);
     expect(connection.open).toBe(false);
+  });
+
+  it('expires an admitted zombie channel by authenticated message activity, not its open bit', () => {
+    vi.stubGlobal('window', {
+      location: { search: '', hostname: 'localhost' },
+      setTimeout: (callback: () => void) => { callback(); return 0; },
+    });
+    const network = new ArenaNetwork(() => undefined, () => undefined);
+    const internals = network as unknown as NetworkInternals;
+    internals.role = 'host';
+    const connection = new FakeConnection('peer-zombie');
+    internals.wireGuestEvents(connection as unknown as DataConnection);
+    const token = '12345678-1234-1234-1234-123456789abc';
+    connection.emit('data', lobbyJoin(token));
+    expect(network.confirmPlayerAdmission('player-1', token, 'connection_epoch_player_1')).toBe(true);
+    const bundle = internals.guestBundles.get('player-1') as unknown as { lastValidMessageMonoMs: number };
+    expect(network.activePlayerIds(12_000, bundle.lastValidMessageMonoMs + 11_999)).toEqual(['player-1']);
+    expect(network.activePlayerIds(12_000, bundle.lastValidMessageMonoMs + 12_001)).toEqual([]);
+    expect(connection.open).toBe(true);
   });
 });

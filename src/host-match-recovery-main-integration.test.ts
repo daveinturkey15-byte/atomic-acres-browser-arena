@@ -56,10 +56,22 @@ describe('same-browser hosted active-match recovery integration', () => {
     expect(admittedAt).toBeGreaterThanOrEqual(0);
     expect(repairJoinAt).toBeGreaterThan(admittedAt);
     const lobbyAdmission = functionBody('acceptLobbyState', 'authorizeRedeploy');
-    expect(lobbyAdmission).toContain('lastClientWorldRepairConnectionEpoch !== localConnectionEpoch');
+    expect(lobbyAdmission).toContain('lastClientWorldRepairConnectionEpoch !== localConnectionEpoch || enteringActiveLobby');
     expect(lobbyAdmission).toContain('sendClientWorldRepairReady()');
     expect(main).toContain('broadcastHostedBotState(true)');
     expect(main).toContain('broadcastKillstreakState(performance.now(), true)');
+  });
+
+  it('lets exact resume liveness supersede a retired document without treating pose silence as a disconnect', () => {
+    const ack = functionBody('acceptGuestResumeAck', 'sendGuestResumeFailure');
+    expect(ack).toContain('hostDisconnectedAt.delete(message.by)');
+    expect(ack).toContain("hostLobbyMembers.set(message.by, { ...member, connected: true })");
+    expect(ack).toContain("broadcastHostLobby(privateLobbySnapshot?.phase ?? 'active')");
+    const remotes = functionBody('updateRemotes', 'teamScores');
+    expect(remotes).toContain("network.role === 'host' ? new Set(network.activePlayerIds(12_000, now)) : null");
+    expect(remotes).toContain('if (activeGuestIds?.has(id)) continue;');
+    expect(remotes.indexOf('if (activeGuestIds?.has(id)) continue;'))
+      .toBeLessThan(remotes.indexOf("removeRemote(id, 'timed out')"));
   });
 
   it('repairs the reliable world revision before resume authority and retries a reordered nonce after convergence', () => {

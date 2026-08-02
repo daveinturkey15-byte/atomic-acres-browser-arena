@@ -61,6 +61,13 @@ describe('host-canonical sticky authority integration', () => {
     expect(main).toContain("if (network.role === 'host') return;");
   });
 
+  it('keeps the duplicate-delivery QA proof on one target life', () => {
+    const qaSticky = block('function authorStickyEffectForQa(', '\nfunction replayStickyEffectForQa(');
+    expect(qaSticky).toContain('const qaDamage = Math.min(35, stuckDamage);');
+    expect(qaSticky).toContain('damage: qaDamage');
+    expect(qaSticky).toContain('lastDamageAtHostTimeMs: now + 300_000');
+  });
+
   it('does not auto-relay guest window claims and emits only canonical host window authority', () => {
     expect(network).toContain("payload.type === 'overdrive-claim' || payload.type === 'hit' || payload.type === 'window-break'");
     const windows = block('function acceptRemoteWindowBreak(', '\nfunction resetBreakableWindows(');

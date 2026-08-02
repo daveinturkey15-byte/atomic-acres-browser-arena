@@ -726,6 +726,7 @@ import {
   SPECIAL_WEAPON_IDS,
   GRENADE_IDS,
   GrenadeId,
+  GrenadeResultMessage,
   RedeployCommitMessage,
   RedeployRequestMessage,
   ReloadIntentMessage,
@@ -4115,6 +4116,32 @@ function sendRemoteReloadResult(
   network.sendToPlayer(playerId, result);
 }
 
+function sendRemoteGrenadeResult(
+  request: Extract<GameMessage, { type: 'grenade-throw' }>,
+  status: GrenadeResultMessage['status'],
+): void {
+  const remote = remotes.get(request.by);
+  const connectionEpoch = hostLobbyConnectionEpochs.get(request.by);
+  const combatInventory = remoteCombatInventoryProjection(request.by);
+  if (!remote || !connectionEpoch || !combatInventory) return;
+  const result: GrenadeResultMessage = {
+    type: 'grenade-result', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+    by: player.id, forPlayerId: request.by, connectionEpoch, lifeId: remote.continuity,
+    actionSequence: request.actionSequence, actionNonce: request.actionNonce, status,
+    shotSequenceWatermark: authoritativeShotAdmissions.get(request.by)?.highestShotSeq ?? -1,
+    combatInventory,
+    nonce: randomNonce(),
+  };
+  network.sendToPlayer(request.by, result);
+}
+
+function acceptLocalGrenadeResult(message: GrenadeResultMessage): void {
+  if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId
+    || message.forPlayerId !== player.id || message.connectionEpoch !== localConnectionEpoch
+    || message.lifeId !== localContinuity || message.actionSequence >= localGrenadeActionSequence) return;
+  applyLocalCombatInventoryProjection(message.combatInventory, true, message.shotSequenceWatermark);
+}
+
 function scheduleRemoteReloadCommit(playerId: string, state: GuestReloadAuthorityState): void {
   const pending = state.pending;
   if (!pending) return;
@@ -5880,6 +5907,11 @@ function sendLobbyJoin(): void {
 function sendClientWorldRepairReady(loadout = killstreakLoadoutController.activeMatch ?? killstreakLoadoutController.selected): void {
   if (network.role !== 'client' || !gameStarted) return;
   network.send({ type: 'join', player: snapshot() });
+  // The reliable state commit is ordered before the loadout intent on the
+  // event lane. On a rematch the host has rebuilt the remote at continuity 1;
+  // this observed state advances it to the guest's current life before the
+  // one-shot loadout registration validates that life.
+  network.sendStateCommitReliably(createStateMessage());
   const loadoutMessage: KillstreakLoadoutIntentMessage = {
     type: 'killstreak-loadout-intent', by: player.id, matchEpoch: killstreakMatchEpoch,
     lifeId: localContinuity, sequence: 0, loadout, nonce: randomNonce(),
@@ -6024,6 +6056,16 @@ function acceptGuestResumeAck(message: GuestResumeAckMessage): boolean {
   }) || hostLobbyConnectionEpochs.get(message.by) !== message.connectionEpoch) return true;
   processedNonces.add(message.nonce);
   pendingGuestAuthorityRepairs.delete(message.by);
+  const member = hostLobbyMembers.get(message.by);
+  if (member && !member.connected) {
+    // This ACK can only arrive on the current admitted event connection and is
+    // bound to the exact replacement connection epoch and authority nonce. It
+    // therefore supersedes a late disconnect notification from the retired
+    // document and is the strongest available lobby-liveness observation.
+    hostDisconnectedAt.delete(message.by);
+    hostLobbyMembers.set(message.by, { ...member, connected: true });
+    broadcastHostLobby(privateLobbySnapshot?.phase ?? 'active');
+  }
   trimNonceSet();
   return true;
 }
@@ -6889,6 +6931,7 @@ function acceptLobbyState(message: LobbyStateMessage): void {
   if (network.role !== 'client' || message.by !== message.snapshot.hostId) return;
   if (privateLobbySnapshot && message.snapshot.revision < privateLobbySnapshot.revision) return;
   const previousSnapshot = privateLobbySnapshot;
+  const enteringActiveLobby = previousSnapshot?.phase !== 'active' && message.snapshot.phase === 'active';
   const newerRevision = previousSnapshot === null || message.snapshot.revision > previousSnapshot.revision;
   if (newerRevision && previousSnapshot !== null && lobbyAuthoritySupersedesActiveAdmission({
     arenaId: message.snapshot.config.arenaId,
@@ -6931,11 +6974,13 @@ function acceptLobbyState(message: LobbyStateMessage): void {
     && message.snapshot.phase !== 'waiting' && !gameStarted) {
     void beginPrivateMatch('client', message.snapshot.activeAtHostTimeMs, message.snapshot.activeAtEpochMs, message.snapshot.snapshotHostTimeMs);
   } else if (gameStarted && message.snapshot.phase !== 'waiting' && message.snapshot.phase !== 'ended'
-    && lastClientWorldRepairConnectionEpoch !== localConnectionEpoch) {
-    // A same-document guest already owns its arena when a recovered host admits
-    // the replacement transport. Re-emit the normal world-ready handshake once
-    // for this connection epoch so canonical bot/world/health repair is not
-    // waiting on a match bootstrap that will intentionally never rerun.
+    && (lastClientWorldRepairConnectionEpoch !== localConnectionEpoch || enteringActiveLobby)) {
+    // The host's first authoritative active-lobby revision is also the proof
+    // that its gameplay receiver is live. Re-emit the world-ready handshake at
+    // that boundary because a faster guest can finish streaming first and its
+    // initial join/loadout packets are intentionally ignored by the host until
+    // host gameStarted is true. The connection-epoch branch retains the same
+    // repair for a replacement document joining an already-active match.
     sendClientWorldRepairReady();
   }
 }
@@ -8181,7 +8226,15 @@ function onNetworkMessage(message: GameMessage): void {
     if (network.role !== 'host' || message.matchEpoch !== killstreakMatchEpoch || killstreakRegisteredActors.has(message.by)) return;
     const member = privateLobbySnapshot?.members.find((entry) => entry.id === message.by);
     const remote = remotes.get(message.by);
-    if (!member || !remote || message.lifeId !== remote.continuity) return;
+    // Guest and host arena streaming finish independently. The guest advances
+    // its life exactly once at match admission, while the host may still hold
+    // the authenticated lobby snapshot from the prior life when this reliable
+    // loadout intent arrives. Admit only that bounded initial +1 transition;
+    // later replacement documents retain an already-registered host actor and
+    // cannot use this path to advance continuity.
+    const initialLifeAccepted = remote !== undefined
+      && (message.lifeId === remote.continuity || message.lifeId === remote.continuity + 1);
+    if (!member?.connected || !remote || !initialLifeAccepted) return;
     killstreakRuntime.registerActor(message.by, member.team, message.lifeId, message.loadout);
     killstreakRegisteredActors.add(message.by);
     broadcastKillstreakState();
@@ -8815,15 +8868,24 @@ function onNetworkMessage(message: GameMessage): void {
     const state = remoteGrenadeAuthorities.get(message.by);
     const sender = remotes.get(message.by);
     if (!state || !sender) return;
+    if (network.role === 'host' && message.connectionEpoch !== hostLobbyConnectionEpochs.get(message.by)) return;
     const admission = admitRemoteGrenadeThrow(state, message, sender.snapshot, performance.now());
-    if (!admission.accepted) return;
+    if (!admission.accepted) {
+      if (network.role === 'host') sendRemoteGrenadeResult(message, 'rejected');
+      return;
+    }
     remoteGrenadeAuthorities.set(message.by, admission.state);
     const inventory = remoteCombatInventories.get(message.by);
     if (inventory) {
       setRemoteCombatInventory(message.by, setGuestCombatInventoryGrenades(inventory, admission.state.remaining));
     }
+    if (network.role === 'host') sendRemoteGrenadeResult(message, 'accepted');
     presentRemoteGrenade(message, sender.snapshot.team);
     if (network.role === 'host') network.send(message);
+    return;
+  }
+  if (message.type === 'grenade-result') {
+    acceptLocalGrenadeResult(message);
     return;
   }
   if (message.type === 'shot') {
@@ -9293,11 +9355,15 @@ function authorStickyEffectForQa(source: StickyAttachmentSource): QaStickyEffect
   const baseRadiusM = source === 'semtex' ? semtexBlastRadiusM(false) : explosiveBoltBlastRadiusM(false);
   const stuckRadiusM = source === 'semtex' ? semtexBlastRadiusM(true) : explosiveBoltBlastRadiusM(true);
   const healthBefore = health.hp;
+  // The QA replay proves receiver-side idempotency on one actor life. Keep the
+  // authored hit non-lethal so a slow browser cannot respawn between snapshots
+  // and make a correctly deduplicated replay look like a health rollback.
+  const qaDamage = Math.min(35, stuckDamage);
   sendAuthoritativeHit({
     type: 'hit',
     by: player.id,
     target: remote.snapshot.id,
-    damage: Math.min(100, stuckDamage),
+    damage: qaDamage,
     kind: 'explosive',
     explosiveSource: source === 'semtex' ? 'grenade' : 'explosive-crossbow',
     origin,
@@ -9308,6 +9374,15 @@ function authorStickyEffectForQa(source: StickyAttachmentSource): QaStickyEffect
   const canonical = lastQaStickyAuthoritativeHits.get(source);
   const healthAfter = remoteHealthAuthorities.get(remote.snapshot.id)?.hp ?? healthBefore;
   if (!canonical || canonical.actionNonce !== actionNonce || healthAfter >= healthBefore) return null;
+  const qaHealth = remoteHealthAuthorities.get(remote.snapshot.id);
+  if (qaHealth?.alive) {
+    // Keep this bounded authority/rejoin proof independent of frame rate and
+    // arena reload duration. The next admitted hit replaces this timestamp.
+    remoteHealthAuthorities.set(remote.snapshot.id, Object.freeze({
+      ...qaHealth,
+      lastDamageAtHostTimeMs: now + 300_000,
+    }));
+  }
   return Object.freeze({
     source,
     targetId: remote.snapshot.id,
@@ -12066,6 +12141,13 @@ async function startGame(
   resetWebGpuPresentationEpoch('match admitted', lastFrame);
   assertMatchAdmissionCurrent(token);
   gameStarted = true;
+  if (mode === 'host' && matchState.phase === 'active' && privateLobbySnapshot?.phase !== 'active') {
+    // A cold admission can finish after the shared active timestamp, creating
+    // an already-active match without the normal warmup -> active transition.
+    // Publish the active lobby revision now so guests have an authoritative
+    // receiver-ready fence and the lobby never remains stuck on countdown.
+    broadcastHostLobby('active');
+  }
   if (recoveredHostRespawnDelayMs !== null && !player.alive) {
     scheduleLocalRespawn(performance.now(), recoveredHostRespawnDelayMs);
   }
@@ -15760,6 +15842,7 @@ function throwGrenade(): void {
   const actionNonce = randomNonce();
   network.send({
     type: 'grenade-throw', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION, by: player.id,
+    connectionEpoch: localConnectionEpoch,
     grenade: player.selectedGrenade,
     lifeId: localContinuity,
     actionSequence: localGrenadeActionSequence,
@@ -16144,7 +16227,7 @@ function applyFlashGrenade(point: THREE.Vector3, entity: GrenadeEntity, nowHostT
     if (!bot.alive) continue;
     const botEyes = bot.position.clone().add(new THREE.Vector3(0, 1.42, 0));
     const botOccluded = activeWorldColliders().some((box) => segmentIntersectsBox(point, botEyes, box));
-    const botLook = new THREE.Vector3(Math.sin(bot.root.rotation.y), 0, -Math.cos(bot.root.rotation.y));
+    const botLook = flashLookDirection(bot.root.rotation.y, 0);
     const botExposure = calculateFlashExposure({
       origin: point,
       eyes: botEyes,
@@ -19391,6 +19474,7 @@ function interpolationSourceSnapshotRateHz(): 20 | 30 | 40 {
 
 function updateRemotes(dt: number, now: number): void {
   if (remotes.size === 0) return;
+  const activeGuestIds = network.role === 'host' ? new Set(network.activePlayerIds(12_000, now)) : null;
   const hostNow = currentHostTimeMs();
   recordCombatantPose(localPositionHistory, {
     at: hostNow, x: player.position.x, y: player.position.y, z: player.position.z,
@@ -19415,6 +19499,12 @@ function updateRemotes(dt: number, now: number): void {
   }, now);
   for (const [id, remote] of remotes) {
     if (now - remote.lastSeen > 12_000) {
+      // Movement freshness and authenticated activity are distinct authorities.
+      // A replacement can pause or rebind its lossy state lane while clock
+      // pings continue on the reliable lane. Retain that live actor, but do not
+      // trust PeerJS `open` forever after a renderer crash leaves a zombie RTC
+      // channel with no authenticated messages.
+      if (activeGuestIds?.has(id)) continue;
       removeRemote(id, 'timed out');
       continue;
     }
@@ -22596,6 +22686,7 @@ const debugWindow = window as Window & {
       effect: 'smoke' | 'flash';
       botId: string;
       targetId: string;
+      targetHealthAfterEffect: number;
       volumeId: string | null;
       preLockId: string | null;
       postLockId: string | null;
@@ -23847,12 +23938,18 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       };
       applyFlashGrenade(point, entity, nowHostTimeMs);
     }
+    // This QA stage proves perception authority, not bot DPS. Freeze immediately
+    // after authoring the effect and expose the host ledger baseline so an
+    // already-authored ray cannot be misclassified as flash/smoke damage.
+    botsFrozen = true;
+    const targetHealthAfterEffect = remoteHealthAuthorities.get(remote.snapshot.id)?.hp ?? remote.snapshot.hp;
     const observedAtHostTimeMs = currentHostTimeMs();
     broadcastHostedBotState(true);
     return {
       effect,
       botId: bot.id,
       targetId: remote.snapshot.id,
+      targetHealthAfterEffect,
       volumeId,
       preLockId,
       postLockId: bot.perception.targetLockId,

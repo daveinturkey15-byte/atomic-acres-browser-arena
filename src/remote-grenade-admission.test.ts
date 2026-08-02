@@ -22,7 +22,7 @@ const sender: PlayerSnapshot = {
 };
 const thrown = (nonce: number): GrenadeThrowMessage => ({
   type: 'grenade-throw', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
-  by: sender.id, grenade: 'frag', lifeId: 4, actionSequence: nonce,
+  by: sender.id, connectionEpoch: 'connection_epoch_guest', grenade: 'frag', lifeId: 4, actionSequence: nonce,
   origin: [1, 1.7, 2], velocity: [0, 5.2, -13], actionNonce: nonce, nonce: nonce + 10,
 });
 
