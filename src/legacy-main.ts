@@ -83,6 +83,11 @@ import { createPass64ShellViewModel, renderPass64Shell, weaponRealStatStripMarku
 import { bindAdvancedGraphicsControls } from './ui/advanced-graphics-controls';
 import { ADVANCED_GRAPHICS_CONTROLS, GRAPHICS_CAPABILITY_NOTICES, GRAPHICS_PRESET_VALUES } from './graphics-settings-registry';
 import {
+  MobileTouchControls,
+  readMobileControlsPreference,
+  writeMobileControlsPreference,
+} from './mobile-touch-controls';
+import {
   INITIAL_MENU_LIFECYCLE_STATE,
   reduceMenuLifecycle,
   type MenuLifecycleEvent,
@@ -4587,6 +4592,7 @@ let gamepadAdsArmed = true;
 
 let previousGamepadButtons: boolean[] = [];
 let gamepadSupportSelection: FieldSupportId = 'scout-sweep';
+let mobileTouchControls: MobileTouchControls | null = null;
 let playerGrounded = false;
 let wasGrounded = false;
 let sensitivity = 1;
@@ -19319,8 +19325,8 @@ function updatePhysics(dt: number): void {
   if (!playerSimulationEnabled() || !characterPhysics) return;
   const forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
   const right = new THREE.Vector3(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
-  const forwardInput = THREE.MathUtils.clamp(Number(keys.has('KeyW')) - Number(keys.has('KeyS')) - gamepadMove.y, -1, 1);
-  const strafeInput = THREE.MathUtils.clamp(Number(keys.has('KeyD')) - Number(keys.has('KeyA')) + gamepadMove.x, -1, 1);
+  const forwardInput = THREE.MathUtils.clamp(Number(keys.has('KeyW')) - Number(keys.has('KeyS')) - gamepadMove.y - (mobileTouchControls?.state.moveY ?? 0), -1, 1);
+  const strafeInput = THREE.MathUtils.clamp(Number(keys.has('KeyD')) - Number(keys.has('KeyA')) + gamepadMove.x + (mobileTouchControls?.state.moveX ?? 0), -1, 1);
   const input = forward.clone().multiplyScalar(forwardInput).addScaledVector(right, strafeInput);
   if (input.lengthSq() > 1) input.normalize();
   const now = performance.now();
@@ -20548,6 +20554,12 @@ fovInput.addEventListener('input', () => {
   preferredFov = Number(fovInput.value);
   persistControlPreferences({ fieldOfView: preferredFov });
 });
+const mobileTouchToggle = element<HTMLInputElement>('#mobile-touch-controls-toggle');
+mobileTouchToggle.checked = readMobileControlsPreference();
+mobileTouchToggle.addEventListener('change', () => {
+  setMobileControlsEnabled(mobileTouchToggle.checked);
+});
+initMobileTouchControls();
 graphicsProfileInput.addEventListener('change', () => {
   const preset = graphicsProfileInput.value as GraphicsPreset;
   pendingGraphicsPreset = preset;
@@ -20794,6 +20806,45 @@ function pollGamepad(dt: number): void {
     }
   }
   previousGamepadButtons = buttons;
+}
+
+function initMobileTouchControls(): void {
+  if (mobileTouchControls) return;
+  mobileTouchControls = new MobileTouchControls({
+    onFireDown: () => setLocalTriggerHeld(true),
+    onFireUp: () => setLocalTriggerHeld(false),
+    onJump: () => {
+      if (!gameplayInputEnabled()) return;
+      if (player.stance !== 'stand') requestStance('stand');
+      jumpQueuedAt = performance.now();
+    },
+    onReload: () => { if (gameplayInputEnabled()) reload(); },
+    onAdsDown: () => { adsHeld = admittedAdsHeld(true); },
+    onAdsUp: () => { adsHeld = admittedAdsHeld(false); },
+    onCrouch: () => { if (gameplayInputEnabled()) requestStance('toggle-crouch'); },
+    onGrenade: () => { if (gameplayInputEnabled()) throwGrenade(); },
+    onMelee: () => { if (gameplayInputEnabled()) melee(); },
+  });
+  mobileTouchControls.mount(document.body);
+  mobileTouchControls.setEnabled(readMobileControlsPreference());
+}
+
+function setMobileControlsEnabled(enabled: boolean): void {
+  initMobileTouchControls();
+  mobileTouchControls?.setEnabled(enabled);
+  writeMobileControlsPreference(enabled);
+}
+
+function pollMobileTouch(): void {
+  const touch = mobileTouchControls;
+  if (!touch || !touch.isEnabled()) return;
+  if (touch.state.firing) setLocalTriggerHeld(true);
+  if (touch.state.ads) adsHeld = admittedAdsHeld(true);
+  const look = touch.consumeLookDelta();
+  if (!gameplayInputEnabled() || (look.x === 0 && look.y === 0)) return;
+  const lookScale = sensitivity * (adsHeld ? 0.62 : 1);
+  player.yaw -= look.x * lookScale;
+  player.pitch = THREE.MathUtils.clamp(player.pitch - look.y * lookScale, -1.42, 1.42);
 }
 
 textChatForm.addEventListener('submit', (event) => {
@@ -22158,6 +22209,7 @@ function frame(now: number, scheduleNext = true): void {
     const frameDt = Math.min(0.05, rawFrameMs / 1000);
     lastFrame = now;
     pollGamepad(frameDt);
+    pollMobileTouch();
     accumulator += frameDt;
     const step = 1 / SIMULATION_HZ;
     let iterations = 0;

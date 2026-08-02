@@ -253,6 +253,13 @@ function optionsPanelMarkup(): string {
         <label>WEAPON MOTION<input id="weapon-motion-scale" type="range" min="0" max="1" step="0.05" value="1"></label>
       </div>
     </section>
+    <section id="touch-controls-settings" class="settings-section" aria-labelledby="touch-controls-settings-title">
+      <header><b id="touch-controls-settings-title">TOUCH / MOBILE CONTROLS</b><span>ON-SCREEN THUMBSTICKS + BUTTONS</span></header>
+      <div class="settings-grid">
+        <label class="setting-check"><input id="mobile-touch-controls-toggle" type="checkbox"> ENABLE MOBILE TOUCH CONTROLS</label>
+      </div>
+      <p>Shows a left movement thumbstick, a right drag-to-aim surface, and FIRE / JUMP / ADS / RELOAD / CROUCH / GRENADE / KNIFE buttons. Auto-detected on touch devices; toggle here to force it on or off.</p>
+    </section>
     <section id="privacy-settings" class="settings-section" aria-labelledby="privacy-settings-title">
       <header><b id="privacy-settings-title">PRIVACY + ONLINE SHARING</b><span id="global-leaderboard-sharing-state">SHARING OFF</span></header>
       <div class="privacy-setting-row">
