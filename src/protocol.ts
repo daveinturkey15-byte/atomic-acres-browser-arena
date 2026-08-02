@@ -70,7 +70,7 @@ import { validateKillstreakLoadout, type KillstreakLoadoutV1 } from './killstrea
 export { GRENADE_IDS, type GrenadeId } from './combat/grenade-catalog';
 
 export type Team = 0 | 1;
-export const MULTIPLAYER_PROTOCOL_VERSION = 13;
+export const MULTIPLAYER_PROTOCOL_VERSION = 14;
 export type PrimaryWeaponId =
   | 'carbine' | 'smg' | 'lmg' | 'scattergun' | 'sniper'
   | 'mini-uzi' | 'mp5' | 'm4a1' | 'ak-47' | 'minigun' | 'm14-ebr' | 'slug-shotgun';
@@ -251,6 +251,7 @@ export type GrenadeThrowMessage = {
   type: 'grenade-throw';
   protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
   by: string;
+  connectionEpoch: string;
   grenade: GrenadeId;
   lifeId: number;
   actionSequence: number;
@@ -258,6 +259,20 @@ export type GrenadeThrowMessage = {
   velocity: [number, number, number];
   actionNonce: number;
   timing?: CombatTiming;
+  nonce: number;
+};
+export type GrenadeResultMessage = {
+  type: 'grenade-result';
+  protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
+  by: string;
+  forPlayerId: string;
+  connectionEpoch: string;
+  lifeId: number;
+  actionSequence: number;
+  actionNonce: number;
+  status: 'accepted' | 'rejected';
+  shotSequenceWatermark: number;
+  combatInventory: GuestCombatInventoryProjection;
   nonce: number;
 };
 export type ExplosiveSource = 'grenade' | 'explosive-crossbow' | 'yardhawk' | 'tri-pass' | 'hunter-swarm' | 'nuke';
@@ -513,7 +528,7 @@ export type ChatHistoryMessage = {
   by: string; forPlayerId: string; entries: ChatEntry[]; nonce: number;
 };
 
-export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | ShotRequestMessage | TriggerStateMessage | ShotResultMessage | StateFeedbackMessage | MeleeMessage | GrenadeThrowMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
+export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | ShotRequestMessage | TriggerStateMessage | ShotResultMessage | StateFeedbackMessage | MeleeMessage | GrenadeThrowMessage | GrenadeResultMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
   | LobbyJoinMessage | GuestResumeAuthorityMessage | GuestResumeAckMessage | GuestResumeNackMessage | GuestResumeFailureMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | RedeployRequestMessage | RedeployCommitMessage | ReloadIntentMessage | ReloadResultMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage
   | ChatSubmitMessage | ChatMessage | ChatHistoryMessage | RailgunClaimRequestMessage | RailgunShotRequestMessage | RailgunShotResultMessage | RailgunStateMessage
   | KillstreakProtocolMessage | InteractiveWorldProtocolMessage | SmokeProtocolMessage | FlashProtocolMessage
@@ -795,6 +810,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
     case 'grenade-throw':
       return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
         && typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && typeof msg.connectionEpoch === 'string' && /^[a-zA-Z0-9_-]{8,128}$/.test(msg.connectionEpoch)
         && grenades.has(msg.grenade as GrenadeId)
         && Number.isSafeInteger(msg.lifeId) && Number(msg.lifeId) >= 0
         && Number.isSafeInteger(msg.actionSequence) && Number(msg.actionSequence) >= 0
@@ -803,6 +819,18 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && Number.isFinite(msg.actionNonce)
         && isOptionalCombatTiming(msg.timing)
         && Number.isFinite(msg.nonce);
+    case 'grenade-result':
+      return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
+        && typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && typeof msg.forPlayerId === 'string' && msg.forPlayerId.length > 0 && msg.forPlayerId.length <= 80
+        && typeof msg.connectionEpoch === 'string' && /^[a-zA-Z0-9_-]{8,128}$/.test(msg.connectionEpoch)
+        && Number.isSafeInteger(msg.lifeId) && Number(msg.lifeId) >= 0
+        && Number.isSafeInteger(msg.actionSequence) && Number(msg.actionSequence) >= 0 && Number(msg.actionSequence) <= 1_000_000_000
+        && Number.isFinite(msg.actionNonce)
+        && (msg.status === 'accepted' || msg.status === 'rejected')
+        && Number.isSafeInteger(msg.shotSequenceWatermark) && Number(msg.shotSequenceWatermark) >= -1
+        && isGuestCombatInventoryProjection(msg.combatInventory)
+        && Number.isSafeInteger(msg.nonce) && Number(msg.nonce) >= 0;
     case 'hit':
       return typeof msg.by === 'string' && typeof msg.target === 'string'
         && Number.isFinite(msg.damage) && Number(msg.damage) > 0 && Number(msg.damage) <= 100
@@ -1109,6 +1137,7 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'state-feedback':
     case 'melee':
     case 'grenade-throw':
+    case 'grenade-result':
     case 'hit':
     case 'support-activate':
     case 'ping':
@@ -1163,6 +1192,7 @@ export function isHostAuthorityMessage(message: GameMessage): boolean {
     || message.type === 'lobby-reject'
     || message.type === 'clock-pong'
     || message.type === 'shot-result'
+    || message.type === 'grenade-result'
     || message.type === 'match-score'
     || message.type === 'chat-message'
     || message.type === 'chat-history'

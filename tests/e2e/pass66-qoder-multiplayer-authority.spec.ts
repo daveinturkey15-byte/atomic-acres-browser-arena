@@ -103,6 +103,13 @@ async function rejoinGuest(guest: Page, roomCode: string, name: string): Promise
   }, undefined, { timeout: 75_000 });
 }
 
+async function settleCrashPrimitive(operation: Promise<unknown>, timeoutMs = 5_000): Promise<void> {
+  await Promise.race([
+    operation.then(() => undefined, () => undefined),
+    new Promise<void>((resolveTimeout) => setTimeout(resolveTimeout, timeoutMs)),
+  ]);
+}
+
 function ladderProjection(state: any): any[] {
   return state.killstreak.actors.map((actor: any) => ({
     actorId: actor.actorId,
@@ -234,7 +241,7 @@ test('post-death ladders survive authenticated replacements and an immediate hos
     // but do not mistake Chromium's crash diagnostic for a game page error.
     host.removeAllListeners('pageerror');
     const cdp = await hostContext.newCDPSession(host);
-    await cdp.send('Page.crash').catch(() => undefined);
+    await settleCrashPrimitive(cdp.send('Page.crash'));
     host = await openPlayer(hostContext, 'Ladder Host', 'pass66-ladder-host-recovery');
     host.on('pageerror', (error) => errors.push(`recovered host: ${error.message}`));
     await expect(host.locator('#host')).toHaveText('RESUME HOSTED MATCH');
@@ -373,7 +380,6 @@ test('host-authoritative facing flash and semantic smoke break bot lock while th
     );
     host.on('pageerror', (error) => errors.push(`host: ${error.message}`));
     guest.on('pageerror', (error) => errors.push(`guest: ${error.message}`));
-    const hpBeforeFlash = await guest.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().player.hp as number);
     const flash = await host.evaluate(() => (
       (window as any).__ATOMIC_ACRES_DEBUG__.stageBotPerceptionAgainstRemote('flash')
     ));
@@ -383,10 +389,12 @@ test('host-authoritative facing flash and semantic smoke break bot lock while th
       const bot = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().bots.find((candidate: any) => candidate.id === botId);
       return bot?.perception ?? null;
     }, flash.botId)).toMatchObject({ targetLockId: null, canFire: false });
+    await expect.poll(async () => guest.evaluate(() => (
+      (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().player.hp
+    ))).toBe(flash.targetHealthAfterEffect);
     await guest.waitForTimeout(500);
-    expect(await guest.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().player.hp)).toBe(hpBeforeFlash);
+    expect(await guest.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().player.hp)).toBe(flash.targetHealthAfterEffect);
 
-    const hpBeforeSmoke = await guest.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().player.hp as number);
     const smoke = await host.evaluate(() => (
       (window as any).__ATOMIC_ACRES_DEBUG__.stageBotPerceptionAgainstRemote('smoke')
     ));
@@ -402,7 +410,7 @@ test('host-authoritative facing flash and semantic smoke break bot lock while th
       };
     }, smoke.botId)).toMatchObject({ activeSmoke: 1, smokeVolumes: 1, botVisible: true });
     await guest.waitForTimeout(750);
-    expect(await guest.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().player.hp)).toBe(hpBeforeSmoke);
+    expect(await guest.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().player.hp)).toBe(smoke.targetHealthAfterEffect);
     await expect.poll(async () => host.evaluate((botId) => {
       const bot = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().bots.find((candidate: any) => candidate.id === botId);
       return bot?.perception ?? null;

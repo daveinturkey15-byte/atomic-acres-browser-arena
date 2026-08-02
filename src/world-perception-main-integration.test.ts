@@ -47,6 +47,8 @@ describe('world and perception runtime integration', () => {
     expect(source).toContain('fireSuppressed: !bot.perceptionCanFire');
     expect(source).toContain('bot.perception = admission.state;');
     expect(source).toContain('bot.burstShots = 0;');
+    expect(source).toContain('const botLook = flashLookDirection(bot.root.rotation.y, 0);');
+    expect(source).not.toContain('const botLook = new THREE.Vector3(Math.sin(bot.root.rotation.y), 0, -Math.cos(bot.root.rotation.y));');
   });
 
   it('routes grenade and Carpet Bomber impacts through structural blast classes', () => {

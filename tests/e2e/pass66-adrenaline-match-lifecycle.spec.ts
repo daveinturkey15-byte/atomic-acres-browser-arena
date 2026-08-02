@@ -95,6 +95,13 @@ async function baseAdrenalineState(page: Page): Promise<any> {
   });
 }
 
+async function settleCrashPrimitive<T>(operation: Promise<T>, timeoutMs = 5_000): Promise<T | null> {
+  return Promise.race([
+    operation,
+    new Promise<null>((resolveTimeout) => setTimeout(() => resolveTimeout(null), timeoutMs)),
+  ]);
+}
+
 test('Adrenaline ends at the round boundary and cannot resurrect through lobby, rematch, or crash rejoin', async ({ browser, browserName }) => {
   test.skip(browserName !== 'chromium', 'The renderer-crash primitive and two-peer lifecycle proof are Chromium-only.');
   test.setTimeout(renderer === 'webgpu' ? 420_000 : 300_000);
@@ -199,12 +206,28 @@ test('Adrenaline ends at the round boundary and cannot resurrect through lobby, 
   await guest.locator('#lobby-ready').click();
   await expect(host.locator('#lobby-start')).toBeEnabled();
   await host.locator('#lobby-start').click();
-  await Promise.all([host, guest].map((page) => page.waitForFunction((priorEpoch) => {
-    const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-    return state.gameStarted && state.matchPhase === 'active'
-      && state.adrenalineRuntime.matchEpoch !== priorEpoch
-      && state.killstreak.actors.length === 2;
-  }, firstEpoch, { timeout: renderer === 'webgpu' ? 120_000 : 60_000 })));
+  try {
+    await Promise.all([host, guest].map((page) => page.waitForFunction((priorEpoch) => {
+      const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+      return state.gameStarted && state.matchPhase === 'active'
+        && state.adrenalineRuntime.matchEpoch !== priorEpoch
+        && state.killstreak.actors.length === 2;
+    }, firstEpoch, { timeout: renderer === 'webgpu' ? 120_000 : 60_000 })));
+  } catch (error) {
+    const [hostFailure, guestFailure] = await Promise.all([host, guest].map((page) => page.evaluate(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+      return {
+        admission: window.__ATOMIC_ACRES_DEBUG__.admissionState(),
+        epoch: state.adrenalineRuntime.matchEpoch,
+        lobby: state.privateMatch,
+        localContinuity: state.networkSync.localContinuity,
+        actors: state.killstreak.actors.map((actor: any) => ({ actorId: actor.actorId, lifeId: actor.lifeId })),
+        remotes: state.remotePlayers.map((remote: any) => ({ id: remote.id, continuity: remote.continuity, seq: remote.seq })),
+        network: state.networkLifecycle,
+      };
+    })));
+    throw new Error(`Rematch authority did not converge: ${JSON.stringify({ host: hostFailure, guest: guestFailure })}`, { cause: error });
+  }
   const rematchHost = await baseAdrenalineState(host);
   const rematchGuest = await baseAdrenalineState(guest);
   expect(rematchHost.epoch).not.toBe(firstEpoch);
@@ -231,11 +254,8 @@ test('Adrenaline ends at the round boundary and cannot resurrect through lobby, 
     (error: unknown) => ({ status: 'rejected' as const, message: error instanceof Error ? error.message : String(error) }),
   );
   expect(await rendererCrashEvent).toBe(crashedGuest);
-  const crashOutcome = await Promise.race([
-    crashCommandOutcome,
-    new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error('CDP Page.crash did not settle after the renderer crash event')), 5_000)),
-  ]);
-  if (crashOutcome.status === 'rejected') expect(crashOutcome.message).toMatch(/crash|closed|target/i);
+  const crashOutcome = await settleCrashPrimitive(crashCommandOutcome);
+  if (crashOutcome?.status === 'rejected') expect(crashOutcome.message).toMatch(/crash|closed|target/i);
   await host.waitForFunction((id) => (
     window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch?.members
       .some((member: any) => member.id === id && !member.connected)

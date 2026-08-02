@@ -29,6 +29,14 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain('killstreakPresentation.presentImpacts(message.impacts, presentedAt)');
   });
 
+  it('admits the one-life guest match-start race without granting replacement continuity', () => {
+    expect(source).toContain('message.lifeId === remote.continuity || message.lifeId === remote.continuity + 1');
+    expect(source).toContain('if (!member?.connected || !remote || !initialLifeAccepted) return;');
+    expect(source.indexOf('killstreakRegisteredActors.has(message.by)')).toBeLessThan(
+      source.indexOf('message.lifeId === remote.continuity || message.lifeId === remote.continuity + 1'),
+    );
+  });
+
   it('keeps host authority per-frame while bounding only the immutable local presentation snapshot', () => {
     expect(source).toContain('const LOCAL_KILLSTREAK_SNAPSHOT_REFRESH_INTERVAL_MS = 50;');
     const updateStart = source.indexOf('function updatePass65KillstreakRuntime(');
