@@ -156,6 +156,7 @@ test('final receipt binds exact runtime, test matrix and five physical peer iden
     runner: {
       browser: 'chromium', workers: 1, retries: 0, externalPreview: true, baseUrl,
       args: [
+        'test',
         ...PASS66_MULTIPLAYER_SPECS.map(({ path }) => path),
         '--project=chromium', '--workers=1', '--retries=0', '--reporter=json',
       ],

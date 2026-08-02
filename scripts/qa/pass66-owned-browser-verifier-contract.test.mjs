@@ -226,6 +226,7 @@ test('requires the exact nine-test multiplayer matrix and five tokenized peer id
     runner: {
       browser: 'chromium', workers: 1, retries: 0, externalPreview: true, baseUrl,
       args: [
+        'test',
         ...PASS66_MULTIPLAYER_SPECS.map(({ path }) => path),
         '--project=chromium', '--workers=1', '--retries=0', '--reporter=json',
       ],

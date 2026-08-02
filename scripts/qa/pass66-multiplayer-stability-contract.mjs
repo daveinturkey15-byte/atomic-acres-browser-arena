@@ -215,6 +215,7 @@ export function multiplayerStabilityReceiptFailures(value, expected) {
     errors.push('multiplayer stability served candidate changed during verification');
   }
   const expectedArgs = [
+    'test',
     ...PASS66_MULTIPLAYER_SPECS.map(({ path }) => path),
     '--project=chromium', '--workers=1', '--retries=0', '--reporter=json',
   ];
