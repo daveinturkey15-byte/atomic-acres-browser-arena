@@ -20,7 +20,7 @@
   "detailContract": "layered-armour-framed-canopy-fasteners-sensors-ordnance-mechanics-v4",
   "sourceBlend": {
     "path": "source-assets/blender/pass65-chopper-gunner.blend",
-    "sha256": "f6df54593f798a4f851837d1c9baa114ae8e655aaaadf3bb564c7b6680a87f31"
+    "sha256": "6d645dc3bdf6ce6990f3c5b292cee4296d4be60ba755c4b6d163fa5f5ed1a8e0"
   },
   "sharedConsumers": [
     "menu-prerecorded-map-preview",
@@ -30,32 +30,32 @@
   "worldGlbs": [
     {
       "path": "public/assets/original/models/support/pass65-chopper-gunner-lod0.glb",
-      "sha256": "905477c22b5d21eba650e618793f67c932cc9b349af4e31e2a1b6a6eca2ac7d8",
+      "sha256": "fba45762d0fb0cb7cc68a58e791b50fc8243a03489ca528d3273e2fba5e1afcb",
       "lod": 0,
       "triangles": 59740,
-      "bytes": 943932
+      "bytes": 951740
     },
     {
       "path": "public/assets/original/models/support/pass65-chopper-gunner-lod1.glb",
-      "sha256": "2df9641a2c79c2c500464e98e9cdf1a400cb7271d5bfa74ec38e7468828a1877",
+      "sha256": "c737b8b6c332ecf414890a170c07852197b6223178947ff17c1b0ec01ae8237d",
       "lod": 1,
       "triangles": 49920,
-      "bytes": 844092
+      "bytes": 844688
     },
     {
       "path": "public/assets/original/models/support/pass65-chopper-gunner-lod2.glb",
-      "sha256": "c14d3b385a2850de56cee00a832381a1fcca06c0e452540654bc0772af88f1fd",
+      "sha256": "a96352c773caf04c8649253d22fa2420a14963d7344b94b9a928aa1b867c5115",
       "lod": 2,
       "triangles": 29068,
-      "bytes": 570300
+      "bytes": 562896
     }
   ],
   "firstPersonGlb": {
     "path": "public/assets/original/models/support/pass65-chopper-gunner-lod0.glb",
-    "sha256": "905477c22b5d21eba650e618793f67c932cc9b349af4e31e2a1b6a6eca2ac7d8",
+    "sha256": "fba45762d0fb0cb7cc68a58e791b50fc8243a03489ca528d3273e2fba5e1afcb",
     "lod": 0,
     "triangles": 59740,
-    "bytes": 943932
+    "bytes": 951740
   },
   "pbrMaps": {
     "baseColor": {
@@ -125,7 +125,7 @@
   "review": {
     "acceptedFirstPersonFrame": {
       "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png",
-      "sha256": "b75d0ca8dc8b8be61c93e06a737029ad679f480d27eea56edc66dadcd00fba9e",
+      "sha256": "680a235168bfa0021232aa1e7cfe6332b91616f60bd5369b9fea60e110f9b4be",
       "cameraId": "accepted-first-person-instruments",
       "width": 960,
       "height": 540
@@ -133,42 +133,42 @@
     "renders": [
       {
         "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-exterior-front-quarter.png",
-        "sha256": "ae804f65b7b19acb51b430e93e809228d0388cd54e081b991e768612785cb1c1",
+        "sha256": "9eea7657545ff8a5f235a95641c315e7865abb22060f72c1030828e08f955a29",
         "cameraId": "exterior-front-quarter",
         "width": 512,
         "height": 512
       },
       {
         "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-rotor-gun-profile.png",
-        "sha256": "08880b8f985a4f143883745f53bd55afc6bba129ff884fe54180c35b910a675e",
+        "sha256": "6ab3fb88c9d8488e7b0b0ea7b3f8d6968c7411b592b2ec63c3a2fe6cb3da826c",
         "cameraId": "rotor-gun-profile",
         "width": 512,
         "height": 512
       },
       {
         "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-rear-fuselage-quarter.png",
-        "sha256": "40aad0bb12f953bd528fd40349a4a74a96a3baf75c63ec8bf02e125ae227a7d3",
+        "sha256": "0ff2f36a67577aa9c0f2ce20fa8c9f6a218ecf26e163c42ebb4a750e11b605a7",
         "cameraId": "rear-fuselage-quarter",
         "width": 512,
         "height": 512
       },
       {
         "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-canopy-armour-closeup.png",
-        "sha256": "71d4672c577b78b2c8de290eddba5a9967c76e38f92c194e4022a6e18e5c9101",
+        "sha256": "962f9956e7e2ff2f391ea23d4b068fdf15a8afeb697509470a06ac18a0ca1f32",
         "cameraId": "canopy-armour-closeup",
         "width": 512,
         "height": 512
       },
       {
         "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-ordnance-mechanics-closeup.png",
-        "sha256": "a55a950e87375fb071fe3f9be601ddfd333fe002bf7981348af2b1c8289b8772",
+        "sha256": "cdad3267e043253cb20464d15f6844f90061e1ba55a86332e576c662ac44e120",
         "cameraId": "ordnance-mechanics-closeup",
         "width": 512,
         "height": 512
       },
       {
         "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png",
-        "sha256": "b75d0ca8dc8b8be61c93e06a737029ad679f480d27eea56edc66dadcd00fba9e",
+        "sha256": "680a235168bfa0021232aa1e7cfe6332b91616f60bd5369b9fea60e110f9b4be",
         "cameraId": "accepted-first-person-instruments",
         "width": 960,
         "height": 540
@@ -188,7 +188,7 @@
       {
         "lod": 0,
         "triangles": 59740,
-        "bytes": 943932,
+        "bytes": 951740,
         "meshNodes": 360,
         "materials": 19,
         "images": 4,
@@ -240,7 +240,7 @@
       {
         "lod": 1,
         "triangles": 49920,
-        "bytes": 844092,
+        "bytes": 844688,
         "meshNodes": 301,
         "materials": 19,
         "images": 4,
@@ -284,7 +284,7 @@
       {
         "lod": 2,
         "triangles": 29068,
-        "bytes": 570300,
+        "bytes": 562896,
         "meshNodes": 164,
         "materials": 19,
         "images": 4,
