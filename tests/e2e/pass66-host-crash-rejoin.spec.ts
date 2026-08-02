@@ -108,10 +108,27 @@ test('a crashed host explicitly resumes the same active room and guests plus bot
     debug.fireOnce();
     debug.throwGrenade();
   });
-  await expect.poll(async () => guest.evaluate(() => {
-    const inventory = window.__ATOMIC_ACRES_DEBUG__.snapshot().player.combatInventory;
-    return { sniper: inventory.ammo.sniper, grenades: inventory.grenades };
-  })).toEqual({ sniper: 4, grenades: 0 });
+  try {
+    await expect.poll(async () => guest.evaluate(() => {
+      const inventory = window.__ATOMIC_ACRES_DEBUG__.snapshot().player.combatInventory;
+      return { sniper: inventory.ammo.sniper, grenades: inventory.grenades };
+    })).toEqual({ sniper: 4, grenades: 0 });
+  } catch (error) {
+    const [hostFailure, guestFailure] = await Promise.all([host, guest].map((page) => page.evaluate(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+      return {
+        localContinuity: state.networkSync.localContinuity,
+        player: { weapon: state.player.weapon, combatInventory: state.player.combatInventory },
+        remotes: state.remotePlayers.map((remote: any) => ({
+          id: remote.id, weapon: remote.weapon, continuity: remote.continuity,
+          combatInventory: remote.combatInventory,
+        })),
+        shotProtocol: state.networkSync.shotProtocol,
+        lifecycle: state.networkLifecycle,
+      };
+    })));
+    throw new Error(`Initial host-owned inventory actions did not converge: ${JSON.stringify({ host: hostFailure, guest: guestFailure })}`, { cause: error });
+  }
   await guest.waitForTimeout(1_200);
   await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.fireOnce());
   const stagedOrdinaryInventory = {

@@ -8758,7 +8758,18 @@ function onNetworkMessage(message: GameMessage): void {
         remote.claimEligibleAt = Math.max(remote.claimEligibleAt, now + 1_500);
       }
       const claimedContinuity = message.type === 'state' ? message.continuity : remote.continuity;
-      const registeredActorLifeId = network.role === 'host' ? killstreakRuntime.actorLifeId(incoming.id) : null;
+      let registeredActorLifeId = network.role === 'host' ? killstreakRuntime.actorLifeId(incoming.id) : null;
+      if (network.role === 'host' && localMultiplayerQa && movement.resynchronized
+        && registeredActorLifeId !== null && claimedContinuity === registeredActorLifeId + 1) {
+        // The QA teleport helper deliberately starts a new continuity domain so
+        // large deterministic staging moves bypass ordinary movement bounds.
+        // Advance the corresponding host support life once as well; otherwise
+        // the host pins movement to the prior support life and correctly rejects
+        // every subsequent shot/grenade as a life mismatch.
+        killstreakRuntime.recordActorDeath(incoming.id, claimedContinuity);
+        registeredActorLifeId = claimedContinuity;
+        broadcastKillstreakState();
+      }
       const admittedContinuity = network.role === 'host'
         ? registeredActorLifeId !== null
           ? registeredActorLifeId
