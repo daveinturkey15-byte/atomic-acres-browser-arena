@@ -27,7 +27,7 @@ function expectDeepFrozen(value: unknown): void {
 
 describe('Pass 65 runtime weapon adapter', () => {
   it('projects the complete current-protocol roster in canonical order', () => {
-    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(13);
+    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(14);
     expect(Object.keys(LEGACY_WEAPONS)).toEqual(WEAPON_CATALOG.map((weapon) => weapon.id));
     expect(Object.keys(LEGACY_WEAPONS).slice(0, 9)).toEqual(legacyBaseline.legacyEnumerationOrder);
     expect(LEGACY_WEAPONS.carbine).toMatchObject({ id: 'carbine', name: 'HK416', damage: 31, mag: 30 });
@@ -103,9 +103,9 @@ describe('Pass 65 runtime weapon adapter', () => {
   });
 
   it('preserves magnum and railgun special behavior plus current range/loadout routes', () => {
-    expect(computeDamage(WEAPONS.magnum, 10, 'head')).toBe(100);
-    expect(computeDamage(WEAPONS.magnum, 10, 'body')).toBe(0);
-    expect(computeDamage(WEAPONS.magnum, 10, 'limb')).toBe(0);
+    expect(computeDamage(WEAPONS.magnum, 10, 'head')).toBe(99);
+    expect(computeDamage(WEAPONS.magnum, 10, 'body')).toBe(52);
+    expect(computeDamage(WEAPONS.magnum, 10, 'limb')).toBe(39);
     expect(computeDamage(WEAPONS.railgun, 220, 'head')).toBe(50);
     expect(computeDamage(WEAPONS.railgun, 220, 'body')).toBe(50);
     expect(WEAPONS.railgun.penetration).toMatchObject({

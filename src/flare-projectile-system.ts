@@ -498,20 +498,33 @@ export class FlareProjectileSystem {
     const entity = this.entities[0];
     if (!entity) return;
     camera.updateWorldMatrix(true, false);
-    const priorVisible = entity.root.visible;
-    const priorPosition = entity.root.position.clone();
-    const priorLight = entity.light.intensity;
-    entity.root.position.copy(camera.getWorldPosition(new THREE.Vector3()))
-      .addScaledVector(camera.getWorldDirection(new THREE.Vector3()), 4);
-    entity.root.visible = true;
-    entity.light.intensity = Number(entity.light.userData.baseIntensity ?? 0);
+    // Activate every pooled flare light at once while compiling so the worst-case
+    // dynamic light count is pre-compiled. A single first-shot flare otherwise
+    // changed the effective light count on the live frame and forced a WebGPU
+    // material rebuild (the reported flare micro-freeze).
+    const priorStates = this.entities.map((entry) => ({
+      visible: entry.root.visible,
+      position: entry.root.position.clone(),
+      intensity: entry.light.intensity,
+    }));
+    const cameraPosition = camera.getWorldPosition(new THREE.Vector3());
+    const cameraDirection = camera.getWorldDirection(new THREE.Vector3());
+    this.entities.forEach((entry, index) => {
+      entry.root.position.copy(cameraPosition)
+        .addScaledVector(cameraDirection, 4 + index * 0.35);
+      entry.root.visible = true;
+      entry.light.intensity = Number(entry.light.userData.baseIntensity ?? 0);
+    });
     try {
       await runtime.compileAndRender(this.root, camera, this.root.parent as THREE.Scene);
       this.prewarmGeneration = sceneGeneration;
     } finally {
-      entity.root.visible = priorVisible;
-      entity.root.position.copy(priorPosition);
-      entity.light.intensity = priorLight;
+      this.entities.forEach((entry, index) => {
+        const prior = priorStates[index]!;
+        entry.root.visible = prior.visible;
+        entry.root.position.copy(prior.position);
+        entry.light.intensity = prior.intensity;
+      });
     }
   }
 

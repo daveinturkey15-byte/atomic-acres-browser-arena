@@ -439,7 +439,7 @@ export class RailgunPresentation {
     const material = new THREE.MeshBasicMaterial({
       color: 0x2bdcff,
       transparent: true,
-      opacity: 0.74,
+      opacity: 0.9,
       depthTest: false,
       depthWrite: false,
       blending: THREE.AdditiveBlending,

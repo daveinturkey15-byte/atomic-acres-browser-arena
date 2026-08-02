@@ -126,14 +126,14 @@ const RAW_B1_WEAPON_DEFINITIONS = [
   {
     id: 'magnum', displayName: 'Desert Eagle .50 AE', slot: 'secondary', family: 'sidearm',
     fireKind: 'hitscan', fireMode: 'semi', rpm: 90, pellets: 1, spinUpMs: 0, movementMultiplier: 1,
-    damage: { policy: 'head-only', base: 100, minimum: 100, falloffStartM: 120, falloffEndM: 120, headMultiplier: 1, limbMultiplier: 0 },
+    damage: { policy: 'standard', base: 52, minimum: 34, falloffStartM: 18, falloffEndM: 55, headMultiplier: 1.9, limbMultiplier: 0.75 },
     spread: { hipRadians: 0.026, adsMultiplier: 0.3, movementMultiplier: 1.5, standMultiplier: 1, crouchMultiplier: 0.8, proneMultiplier: 0.68, sustainedPerShot: 0.006, maximumRadians: 0.06 },
     recoil: { pitchRadians: 0.05, yawRadians: 0.012, recoveryPerSecond: 8, adsMultiplier: 0.74, standMultiplier: 1, crouchMultiplier: 0.84, proneMultiplier: 0.68, deterministicPatternId: 'magnum-pattern-v1' },
     ammo: { magazine: 6, reserve: 30, reloadSeconds: 1.75, emptyReloadSeconds: 2, switchSeconds: 0.34 },
     penetration: { calibreLabel: '.50 AE', power: 4.7, fmjMultiplier: 1.08, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 30, energyFalloffEndM: 82, minimumEnergyRetention: 0.4, minimumWallDamageMultiplier: 0.3, maximumSurfaces: 1 },
     effects: { tracerColorHex: 0xffd36a, muzzleFlashScale: 1.12, reportGain: 1.2, flashlight: null },
     optic: null, projectileId: null,
-    policies: { loadout: 'never', bot: 'never', drop: 'never', range: { kind: 'entitlement-only', entitlementPolicyId: 'dhv-x-sidearm-v1' }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-shot-v1' },
+    policies: { loadout: 'eligible', bot: 'eligible', drop: 'droppable', range: { kind: 'companion-sidearm', primaryIds: ['carbine', 'smg', 'lmg', 'scattergun', 'sniper'] }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-shot-v1' },
     modelSetId: 'magnum-model-set-v1', presentationId: 'magnum-view-v1', audioId: 'magnum-audio-v1', provenanceId: 'magnum-provenance-v1', evidenceIds: ['r232-magnum'],
   },
   {

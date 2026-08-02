@@ -203,130 +203,82 @@ export function yieldBrowserPreparationFrame(): Promise<void> {
   });
 }
 
+const FOREGROUND_WAIT_FALLBACK_MS = 8_000;
+
 /**
  * Waits for a browser-visible task turn without ever authoring a hidden
  * presentation frame. CPU/network/decode preparation uses the timer-backed
  * helper above; renderer submissions use this foreground ownership barrier.
+ * A bounded fallback timer prevents indefinite hangs when the browser does
+ * not report focus (RDP, occluded windows, some Windows configurations).
  */
-function browserPreparationAbortReason(signal: AbortSignal): unknown {
-  return signal.reason ?? new DOMException('Browser presentation wait aborted', 'AbortError');
-}
-
 export function waitForVisibleBrowserPreparation(signal?: AbortSignal): Promise<void> {
-  if (signal?.aborted) return Promise.reject(browserPreparationAbortReason(signal));
   if (typeof document === 'undefined'
     || typeof document.addEventListener !== 'function'
     || typeof document.removeEventListener !== 'function'
     || browserOwnsForegroundPresentation()) return Promise.resolve();
+  if (signal?.aborted) return Promise.reject(signal.reason);
   return new Promise<void>((resolve, reject) => {
+    let settled = false;
     const foregroundWindow = typeof window !== 'undefined'
       && typeof window.addEventListener === 'function'
       && typeof window.removeEventListener === 'function'
       ? window
       : null;
-    let settled = false;
     const cleanup = (): void => {
+      globalThis.clearTimeout(fallbackHandle);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       foregroundWindow?.removeEventListener('focus', onWindowFocus);
       signal?.removeEventListener('abort', onAbort);
     };
-    const finishIfForeground = (): void => {
-      if (settled || !browserOwnsForegroundPresentation()) return;
+    const finish = (): void => {
+      if (settled) return;
       settled = true;
       cleanup();
       resolve();
     };
-    const onVisibilityChange = (): void => finishIfForeground();
-    const onWindowFocus = (): void => finishIfForeground();
     const onAbort = (): void => {
       if (settled) return;
       settled = true;
       cleanup();
-      reject(browserPreparationAbortReason(signal!));
+      reject(signal?.reason);
     };
+    const finishIfForeground = (): void => {
+      if (!browserOwnsForegroundPresentation()) return;
+      finish();
+    };
+    const onVisibilityChange = (): void => finishIfForeground();
+    const onWindowFocus = (): void => finishIfForeground();
+    const fallbackHandle = globalThis.setTimeout(finish, FOREGROUND_WAIT_FALLBACK_MS);
+    signal?.addEventListener('abort', onAbort, { once: true });
     document.addEventListener('visibilitychange', onVisibilityChange);
     foregroundWindow?.addEventListener('focus', onWindowFocus);
-    signal?.addEventListener('abort', onAbort, { once: true });
-    // Ownership can change while the browser queues visibility/focus delivery.
-    // Recheck after every listener is attached so the wait cannot miss that
-    // transition even on engines with unusual focus-event ordering.
-    if (signal?.aborted) onAbort();
-    else finishIfForeground();
+    // Recheck after registration: ownership may have changed between the
+    // initial gate and the listener wiring.
+    finishIfForeground();
   });
 }
 
 /** One actual compositor boundary, retried if visibility changes before rAF. */
 export async function yieldVisibleBrowserPresentationFrame(signal?: AbortSignal): Promise<number> {
-  if (signal?.aborted) throw browserPreparationAbortReason(signal);
   if (typeof document === 'undefined' || typeof requestAnimationFrame !== 'function') {
     return performance.now();
   }
   while (true) {
+    if (signal?.aborted) throw signal.reason;
     await waitForVisibleBrowserPreparation(signal);
-    const frame = await new Promise<number | null>((resolve, reject) => {
-      const foregroundWindow = typeof window !== 'undefined'
-        && typeof window.addEventListener === 'function'
-        && typeof window.removeEventListener === 'function'
-        ? window
-        : null;
-      const canObserveVisibility = typeof document.addEventListener === 'function'
-        && typeof document.removeEventListener === 'function';
-      let settled = false;
-      let frameHandle: number | null = null;
-      const cleanup = (): void => {
-        if (canObserveVisibility) document.removeEventListener('visibilitychange', onOwnershipChange);
-        foregroundWindow?.removeEventListener('focus', onOwnershipChange);
-        foregroundWindow?.removeEventListener('blur', onOwnershipChange);
+    const frame = await new Promise<Readonly<{ at: number; visible: boolean }>>((resolve, reject) => {
+      const handle = requestAnimationFrame((at) => {
         signal?.removeEventListener('abort', onAbort);
-      };
-      const cancelRequestedFrame = (): void => {
-        if (frameHandle === null || typeof cancelAnimationFrame !== 'function') return;
-        cancelAnimationFrame(frameHandle);
-        frameHandle = null;
-      };
-      const retryAfterOwnershipLoss = (): void => {
-        if (settled) return;
-        settled = true;
-        cancelRequestedFrame();
-        cleanup();
-        resolve(null);
-      };
-      const onOwnershipChange = (): void => {
-        if (!browserOwnsForegroundPresentation()) retryAfterOwnershipLoss();
-      };
-      const onAbort = (): void => {
-        if (settled) return;
-        settled = true;
-        cancelRequestedFrame();
-        cleanup();
-        reject(browserPreparationAbortReason(signal!));
-      };
-      if (canObserveVisibility) document.addEventListener('visibilitychange', onOwnershipChange);
-      foregroundWindow?.addEventListener('focus', onOwnershipChange);
-      foregroundWindow?.addEventListener('blur', onOwnershipChange);
-      signal?.addEventListener('abort', onAbort, { once: true });
-      if (signal?.aborted) {
-        onAbort();
-        return;
-      }
-      // Close the foreground-to-rAF ownership race after the listeners exist.
-      if (!browserOwnsForegroundPresentation()) {
-        retryAfterOwnershipLoss();
-        return;
-      }
-      frameHandle = requestAnimationFrame((at) => {
-        if (settled) return;
-        frameHandle = null;
-        if (!browserOwnsForegroundPresentation()) {
-          retryAfterOwnershipLoss();
-          return;
-        }
-        settled = true;
-        cleanup();
-        resolve(at);
+        resolve({ at, visible: browserOwnsForegroundPresentation() });
       });
+      const onAbort = (): void => {
+        if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(handle);
+        reject(signal?.reason);
+      };
+      signal?.addEventListener('abort', onAbort, { once: true });
     });
-    if (frame !== null) return frame;
+    if (frame.visible) return frame.at;
   }
 }
 

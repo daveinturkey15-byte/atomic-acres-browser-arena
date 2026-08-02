@@ -201,7 +201,6 @@ export function sampleWeaponPellet(
 }
 
 export function computeDamage(weapon: WeaponSpec, distance: number, zone: HitZone): number {
-  if (weapon.id === 'magnum') return zone === 'head' ? 100 : 0;
   const clampedDistance = Math.max(0, distance);
   const falloff = clampedDistance <= weapon.falloffStart
     ? 0

@@ -1226,10 +1226,14 @@ async function submitForegroundWebGpuFrame(
   if (renderRuntime.backend !== 'webgpu') {
     throw new Error('Foreground WebGPU submission requires the native WebGPU runtime');
   }
-  while (true) {
+  const MAX_SUBMISSION_ATTEMPTS = 20;
+  for (let attempt = 0; attempt < MAX_SUBMISSION_ATTEMPTS; attempt += 1) {
     await waitForVisibleBrowserPreparation();
     if (submitWebGpuFrame(performance.now(), force, submissionMode)) return;
   }
+  // Bounded fallback: force one submission regardless of focus state to prevent
+  // indefinite hangs on RDP, occluded windows or focus-detection failures.
+  renderRuntime.submitFrame(performance.now(), true, submissionMode);
 }
 async function flushWebGpuFrames(timeoutMs = 4_000): Promise<void> {
   if (renderRuntime.backend === 'webgpu') await renderRuntime.waitForSubmittedWork(timeoutMs);
@@ -2260,7 +2264,8 @@ async function primeFinalWebGlMatchPresentation(): Promise<void> {
   renderSubmissionPaused = true;
   matchAdmissionPresentationPaused = true;
   const nextForegroundPresentationFrame = async (): Promise<number> => {
-    while (true) {
+    const MAX_FOREGROUND_RETRIES = 10;
+    for (let attempt = 0; attempt < MAX_FOREGROUND_RETRIES; attempt += 1) {
       await waitForVisibleBrowserPreparation();
       const frameAt = await new Promise<number>((resolve) => requestAnimationFrame(resolve));
       // A tab switch can race the callback. Accept only a compositor boundary
@@ -2268,6 +2273,10 @@ async function primeFinalWebGlMatchPresentation(): Promise<void> {
       // the transition-covered WebGL composition in the background.
       if (document.visibilityState === 'visible' && document.hasFocus()) return frameAt;
     }
+    // Bounded fallback: accept the next visible frame regardless of focus to
+    // prevent indefinite hangs on RDP or focus-detection failures.
+    await waitForVisibleBrowserPreparation();
+    return new Promise<number>((resolve) => requestAnimationFrame(resolve));
   };
   try {
     synchronizeFrozenMatchPrimePresentation();
@@ -3732,6 +3741,8 @@ function recordSupportExplosionProfile(profile: ExplosionSyncProfile): void {
   };
 }
 const processedNonces = new Set<number>();
+/** Guards the attacker-side STUCK confirmation against duplicate hit replays. */
+const attackerStuckNonces = new Set<number>();
 const hostedBotWeaponPresentationReplay = new BotWeaponPresentationReplayGuard();
 const remoteShotAdmissions = new Map<string, RemoteShotAdmissionState>();
 const authoritativeShotAdmissions = new Map<string, AuthoritativeShotAdmissionState>();
@@ -4581,6 +4592,8 @@ let wasGrounded = false;
 let sensitivity = 1;
 let controllerSensitivity = 1;
 let preferredFov = 82;
+/** Railgun thermal scope magnification; matches the catalog optic (2.5×). */
+const RAILGUN_SCOPE_MAGNIFICATION = 2.5;
 let botsFrozen = false;
 let debugBotStanceOverride: PlayerSnapshot['stance'] | null = null;
 let debugBotSpeedOverride = 0;
@@ -8971,6 +8984,14 @@ function onNetworkMessage(message: GameMessage): void {
     return;
   }
   if (message.type === 'hit' && !processedNonces.has(message.nonce)) {
+    // Attacker-side STUCK confirmation: when the local player's own sticky Semtex
+    // or explosive crossbolt attaches to a combatant, mirror the alert on their
+    // screen too (the victim already sees it via the target branch below).
+    if (message.by === player.id && message.stuck === true && !attackerStuckNonces.has(message.nonce)) {
+      attackerStuckNonces.add(message.nonce);
+      while (attackerStuckNonces.size > 128) attackerStuckNonces.delete(attackerStuckNonces.values().next().value!);
+      addFeed('STUCK', 'gold');
+    }
     const attacker = remotes.get(message.by);
     if (!attacker || !pointInsideBounds(attacker.snapshot, arena.bounds, 0.44)) return;
     const targetIsLocal = message.target === player.id;
@@ -10522,18 +10543,24 @@ function acceptRemotePickup(message: PickupMessage, now = performance.now()): vo
   trimNonceSet();
 }
 
+const sharedGlassShardGeometry = new THREE.PlaneGeometry(1, 1);
+const sharedGlassShardMaterial = new THREE.MeshBasicMaterial({ color: 0xa9e8f5, transparent: true, opacity: 0.74, side: THREE.DoubleSide, depthWrite: false, toneMapped: false });
 function spawnGlassShards(point: THREE.Vector3, normal: THREE.Vector3): void {
   const root = new THREE.Group();
   root.name = 'breaking-window-shards';
   root.position.copy(point);
-  const shards: Array<{ mesh: THREE.Mesh; velocity: THREE.Vector3; spin: THREE.Vector3 }> = [];
-  const material = new THREE.MeshBasicMaterial({ color: 0xa9e8f5, transparent: true, opacity: 0.74, side: THREE.DoubleSide, depthWrite: false, toneMapped: false });
+  const shards: Array<{ mesh: THREE.Mesh; velocity: THREE.Vector3; spin: THREE.Vector3; baseOpacity: number }> = [];
   for (let index = 0; index < 10; index += 1) {
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.14 + presentationRandom() * 0.16, 0.18 + presentationRandom() * 0.22), material);
+    // Reuse one shared unit plane and material across all shards: per-break
+    // geometry/material allocation was a measurable first-break hitch.
+    const material = sharedGlassShardMaterial.clone();
+    const mesh = new THREE.Mesh(sharedGlassShardGeometry, material);
+    mesh.scale.set(0.14 + presentationRandom() * 0.16, 0.18 + presentationRandom() * 0.22, 1);
     mesh.position.set((presentationRandom() - 0.5) * 0.55, (presentationRandom() - 0.5) * 0.45, (presentationRandom() - 0.5) * 0.08);
     root.add(mesh);
     shards.push({
       mesh,
+      baseOpacity: 0.74,
       velocity: normal.clone().multiplyScalar(1.1 + presentationRandom() * 1.5).add(new THREE.Vector3((presentationRandom() - 0.5) * 1.7, 0.8 + presentationRandom() * 1.3, (presentationRandom() - 0.5) * 1.7)),
       spin: new THREE.Vector3(presentationRandom() * 8, presentationRandom() * 8, presentationRandom() * 8),
     });
@@ -10543,6 +10570,7 @@ function spawnGlassShards(point: THREE.Vector3, normal: THREE.Vector3): void {
   const animate = (now: number) => {
     const age = (now - startedAt) / 1000;
     if (age >= 0.9) {
+      for (const shard of shards) (shard.mesh.material as THREE.MeshBasicMaterial).dispose();
       disposeSupportRoot(root);
       return;
     }
@@ -10552,7 +10580,7 @@ function spawnGlassShards(point: THREE.Vector3, normal: THREE.Vector3): void {
       shard.mesh.rotation.x += shard.spin.x / 60;
       shard.mesh.rotation.y += shard.spin.y / 60;
       shard.mesh.rotation.z += shard.spin.z / 60;
-      (shard.mesh.material as THREE.MeshBasicMaterial).opacity = 0.74 * (1 - age / 0.9);
+      (shard.mesh.material as THREE.MeshBasicMaterial).opacity = shard.baseOpacity * (1 - age / 0.9);
     }
     requestAnimationFrame(animate);
   };
@@ -13307,7 +13335,7 @@ function updateRailgun(now: number): void {
   // flag turned see-through-walls off the instant the player fired, which read
   // as the railgun scope having lost the feature entirely.
   const thermalActive = localHoldsRailgun() && player.weapon === 'railgun' && adsHeld
-    && weaponView.adsProgress() >= 0.6;
+    && weaponView.adsProgress() >= 0.45;
   // The railgun's signature see-through-walls reveal: cyan thermal silhouettes
   // of hostile combatants drawn with depth testing disabled so they read through
   // geometry. This is the weapon's unique selling point and must always work.
@@ -19447,16 +19475,18 @@ function updatePhysics(dt: number): void {
     ? magnifiedFovDegrees(preferredFov, 3)
     : player.weapon === 'm14-ebr'
       ? magnifiedFovDegrees(preferredFov, DMR_THERMAL_MAGNIFICATION)
-      : Math.max(55, preferredFov - 20);
+      : player.weapon === 'railgun'
+        ? magnifiedFovDegrees(preferredFov, RAILGUN_SCOPE_MAGNIFICATION)
+        : Math.max(55, preferredFov - 20);
   const targetFov = adsHeld ? aimingFov : currentSprinting ? preferredFov + 4.5 : preferredFov;
   // A one-frame 82 -> 32 degree sniper projection jump invalidated most of the
   // visible render list at once and forced a measured WebGPU ScenePass rebuild.
   // Keep the optic fast, but distribute the frustum transition over the same
   // bounded ADS settle interval as the physical weapon pose.
-  camera.fov = damp(camera.fov, targetFov, player.weapon === 'sniper' || player.weapon === 'm14-ebr' ? 18 : 10, dt);
+  camera.fov = damp(camera.fov, targetFov, player.weapon === 'sniper' || player.weapon === 'm14-ebr' || player.weapon === 'railgun' ? 18 : 10, dt);
   camera.updateProjectionMatrix();
   sniperScopeActive = player.alive
-    && player.weapon === 'sniper'
+    && (player.weapon === 'sniper' || player.weapon === 'railgun')
     && adsHeld
     && weaponView.adsProgress() >= 0.9
     && Math.abs(camera.fov - aimingFov) < 0.35;

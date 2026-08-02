@@ -46,11 +46,12 @@ describe('solo bot tuning', () => {
 });
 
 describe('headshot damage contract', () => {
-  it('keeps the DHV X magnum binary: lethal head, zero body or limb', () => {
+  it('keeps the Deagle as a high-damage balanced sidearm: strong head, standard body and limb', () => {
     expect(WEAPONS.magnum.rpm).toBe(90);
-    expect(computeDamage(WEAPONS.magnum, 10, 'head')).toBe(100);
-    expect(computeDamage(WEAPONS.magnum, 10, 'body')).toBe(0);
-    expect(computeDamage(WEAPONS.magnum, 10, 'limb')).toBe(0);
+    expect(computeDamage(WEAPONS.magnum, 10, 'head')).toBe(99);
+    expect(computeDamage(WEAPONS.magnum, 10, 'body')).toBe(52);
+    expect(computeDamage(WEAPONS.magnum, 10, 'limb')).toBe(39);
+    expect(isSingleShotLethalFromFullHp(WEAPONS.magnum, 'head')).toBe(false);
   });
   it('preserves the legacy 1.5× baseline and pins deliberate specialist exceptions', () => {
     expect(HEADSHOT_DAMAGE_MULTIPLIER).toBe(1.5);

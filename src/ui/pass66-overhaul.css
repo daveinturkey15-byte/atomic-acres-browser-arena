@@ -367,20 +367,28 @@
     border-style: solid;
     /* Owner feedback: this is the control that opens the loadout swap menu, so it
      * must read as the obvious dark action rather than a faint dashed card. */
-    border-color: var(--p66-cyan-bright);
-    background: linear-gradient(150deg, #14282c, #0b181c);
+    border-color: #5fd4cc;
+    background: linear-gradient(150deg, #1d3a3f, #12262a);
     box-shadow: var(--p66-shadow);
   }
   .manage-kit-card span { color: var(--p66-cyan-bright); }
   .manage-kit-card strong { color: #fff; }
   .manage-kit-card > b { color: var(--p66-amber-bright); }
   .manage-kit-card p,
-  .manage-kit-card > i { color: #bcd0ce; }
+  .manage-kit-card > i { color: #d0e4e2; }
   .manage-kit-card:hover,
+  .manage-kit-card:focus-visible,
   .manage-kit-card[aria-expanded='true'] {
     border-color: #7ff6ff;
-    background: linear-gradient(150deg, #1b363b, #102125);
+    background: linear-gradient(150deg, #234549, #163034);
   }
+
+  /* Owner feedback: the kit cards now use the real stat strip (kit-stat-strip-real)
+     with IDEAL BODY DPS. Hide the older detailed metric deck but retain the
+     weapon still image. */
+  .kit-card .weapon-menu-stat-deck { display: none; }
+  .kit-card .weapon-menu-presentation { display: block; }
+  .kit-card .weapon-menu-still img { width: 100%; height: auto; border-radius: 4px; }
 
   /* Custom presets are persistent loadouts, not generic white cards. Keep their
      complete hierarchy readable before hover/focus so the saved gun, grenade

@@ -35,13 +35,18 @@ function compatibilityProjection(definition: Record<string, any>): Record<string
     delete copy.rpm;
   }
   if (copy.id === 'minigun') delete copy.damage;
-  if (copy.id === 'magnum') delete copy.penetration.calibreLabel;
+  if (copy.id === 'magnum') {
+    delete copy.penetration.calibreLabel;
+    // Pass 66.5 owner request: Deagle is now a standard balanced sidearm.
+    delete copy.damage;
+    delete copy.policies;
+  }
   return copy;
 }
 
 describe('Pass 65 canonical weapon catalog', () => {
   it('contains exactly the current-protocol roster in a stable enumeration order', () => {
-    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(13);
+    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(14);
     expect(LEGACY_WEAPON_ENUMERATION_ORDER).toEqual([
       ...PASS65_WEAPON_IDS,
       ...PASS66_SPECIAL_WEAPON_IDS,
@@ -129,9 +134,10 @@ describe('Pass 65 canonical weapon catalog', () => {
 
   it('retains special pickup and entitlement-only metadata', () => {
     const byId = Object.fromEntries(WEAPON_CATALOG.map((definition) => [definition.id, definition]));
+    expect(byId.magnum.policies.loadout).toBe('eligible');
     expect(byId.magnum.policies.range).toEqual({
-      kind: 'entitlement-only',
-      entitlementPolicyId: 'dhv-x-sidearm-v1',
+      kind: 'companion-sidearm',
+      primaryIds: ['carbine', 'smg', 'lmg', 'scattergun', 'sniper'],
     });
     expect(byId.railgun).toMatchObject({
       policies: { loadout: 'pickup-only', range: { kind: 'never' }, authority: 'host-railgun-v1' },

@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 
-export const REMOTE_HUMAN_READABILITY_COLOR = 0xff7a2a;
-export const REMOTE_HUMAN_READABILITY_INTENSITY = 0.11;
-export const REMOTE_HUMAN_READABILITY_MIX = 0.36;
+export const REMOTE_HUMAN_READABILITY_COLOR = 0xff8c3a;
+export const REMOTE_HUMAN_READABILITY_INTENSITY = 0.06;
+export const REMOTE_HUMAN_READABILITY_MIX = 0.18;
 
 type EmissiveMaterial = THREE.MeshStandardMaterial | THREE.MeshLambertMaterial | THREE.MeshPhongMaterial;
 

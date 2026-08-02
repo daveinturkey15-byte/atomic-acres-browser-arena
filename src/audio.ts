@@ -777,8 +777,12 @@ export class ArenaAudio {
   }
 
   melee(): void {
-    this.noise({ duration: 0.13, volume: 0.08, filter: 'bandpass', frequency: 460, q: 0.7 }, this.feedback);
-    this.sweep(135, 62, 0.11, 0.075, 'sawtooth', this.feedback);
+    // Blade slash: a fast high whoosh that tears downward, a low body thump and
+    // a brief metallic ring so the knife reads as a real cutting edge.
+    this.noise({ duration: 0.09, volume: 0.062, filter: 'bandpass', frequency: 2_600, q: 1.2 }, this.feedback);
+    this.sweep(1_900, 320, 0.1, 0.05, 'sawtooth', this.feedback);
+    this.noise({ duration: 0.12, volume: 0.05, filter: 'bandpass', frequency: 420, q: 0.7 }, this.feedback);
+    this.tone(1_240, 0.05, 0.016, 'triangle', this.feedback, 0.028);
   }
 
   footstep(surface: FootstepSurface | SpatialFootstepSurface, sprinting = false, crouched = false): void {

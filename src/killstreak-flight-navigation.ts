@@ -48,7 +48,10 @@ export const PASS65_FLIGHT_NAVIGATION: Readonly<Record<ArenaId, ArenaFlightNavig
     { id: 'tower-overflight', xQ: 0, zQ: 0, altitudeM: 20 },
   ]),
   'gun-range': definition('gun-range', 18, [
-    { id: 'range-lane', xQ: 0, zQ: 0, altitudeM: 4.5 },
+    // The killstreak test bay occupies the east block (x 51.5-100, z -26-38).
+    // Centre the flight portal on the bay interior so support aircraft spawn
+    // and recover inside the large room rather than at the map centre outside it.
+    { id: 'range-lane', xQ: 0.6, zQ: 0.26, altitudeM: 4.5 },
   ]),
   'skyline-terminal': definition('skyline-terminal', 42, [
     { id: 'open-apron', xQ: 0, zQ: -0.52, altitudeM: 9 },
