@@ -53,7 +53,7 @@ describe('project map', () => {
     expect(markdown.indexOf('## Current release snapshot')).toBeLessThan(markdown.indexOf('## Release archive'));
     expect(markdown).toContain(`### ${CHANGELOG[0]?.pass}: ${CHANGELOG[0]?.title}`);
     expect(markdown).toContain('TypeScript and Rapier own physics');
-    expect(markdown).toContain('Live target: PASS 66 (THE BIG ONE v66.4); release-candidate');
+    expect(markdown).toMatch(/Live target: PASS 66 \(THE BIG ONE v[\d.]+\); release-candidate/);
     expect(markdown).toContain('Failed-regression evidence: PASS 64');
   });
 

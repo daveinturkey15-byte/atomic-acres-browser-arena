@@ -264,21 +264,53 @@ export async function yieldVisibleBrowserPresentationFrame(signal?: AbortSignal)
   if (typeof document === 'undefined' || typeof requestAnimationFrame !== 'function') {
     return performance.now();
   }
+  const foregroundWindow = typeof window !== 'undefined'
+    && typeof window.addEventListener === 'function'
+    && typeof window.removeEventListener === 'function'
+    ? window
+    : null;
   while (true) {
     if (signal?.aborted) throw signal.reason;
     await waitForVisibleBrowserPreparation(signal);
-    const frame = await new Promise<Readonly<{ at: number; visible: boolean }>>((resolve, reject) => {
-      const handle = requestAnimationFrame((at) => {
+    // Resolves with the frame time on a valid foreground boundary, or null when
+    // ownership is lost mid-frame so the outer loop waits and requests again. A
+    // cancelled request never resolves, even if the browser still fires it.
+    const frame = await new Promise<number | null>((resolve, reject) => {
+      let settled = false;
+      let frameHandle = 0;
+      const cleanup = (): void => {
+        document.removeEventListener('visibilitychange', onForegroundLoss);
+        foregroundWindow?.removeEventListener('blur', onForegroundLoss);
         signal?.removeEventListener('abort', onAbort);
-        resolve({ at, visible: browserOwnsForegroundPresentation() });
-      });
+      };
+      const cancelPending = (): void => {
+        if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frameHandle);
+      };
+      const onForegroundLoss = (): void => {
+        if (settled || browserOwnsForegroundPresentation()) return;
+        settled = true;
+        cancelPending();
+        cleanup();
+        resolve(null);
+      };
       const onAbort = (): void => {
-        if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(handle);
+        if (settled) return;
+        settled = true;
+        cancelPending();
+        cleanup();
         reject(signal?.reason);
       };
+      frameHandle = requestAnimationFrame((at) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(browserOwnsForegroundPresentation() ? at : null);
+      });
+      document.addEventListener('visibilitychange', onForegroundLoss);
+      foregroundWindow?.addEventListener('blur', onForegroundLoss);
       signal?.addEventListener('abort', onAbort, { once: true });
     });
-    if (frame.visible) return frame.at;
+    if (frame !== null) return frame;
   }
 }
 
