@@ -451,6 +451,11 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
       const bladeStyle = getComputedStyle(blades[0]!);
       const bladeBefore = getComputedStyle(blades[0]!, '::before');
       const bladeAfter = getComputedStyle(blades[0]!, '::after');
+      const overlayRect = overlay.getBoundingClientRect();
+      const authoredScaleX = overlayRect.width / Math.max(1, overlay.offsetWidth);
+      const authoredScaleY = overlayRect.height / Math.max(1, overlay.offsetHeight);
+      const authoredStageWidth = stage.offsetWidth * authoredScaleX;
+      const authoredStageHeight = stage.offsetHeight * authoredScaleY;
       const projectedBladeThresholdPixels = Number(overlay.dataset.minimumProjectedBladeLength);
       const visibleSweepLeft = Math.max(rect.left, Math.min(...bladeRects.map((bladeRect) => bladeRect.left)));
       const visibleSweepRight = Math.min(rect.right, Math.max(...bladeRects.map((bladeRect) => bladeRect.right)));
@@ -498,9 +503,13 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
         mode: stage.dataset.projection ?? null,
         stageTopFraction: rect.top / window.innerHeight,
         stageBottomFraction: rect.bottom / window.innerHeight,
-        stageWidthFraction: rect.width / window.innerWidth,
-        stageHeightFraction: rect.height / window.innerHeight,
-        stageAreaFraction: rect.width * rect.height / (window.innerWidth * window.innerHeight),
+        // The capture overlay is authored at the reference viewport and then
+        // scaled losslessly to 1440p. Measure the authored stage envelope at
+        // output scale, excluding the permitted pose rotation/translation
+        // that expands getBoundingClientRect near the loop extremes.
+        stageWidthFraction: authoredStageWidth / window.innerWidth,
+        stageHeightFraction: authoredStageHeight / window.innerHeight,
+        stageAreaFraction: authoredStageWidth * authoredStageHeight / (window.innerWidth * window.innerHeight),
         bladeCount: blades.length,
         arcCount: arcs.length,
         temporalTrailCount,
