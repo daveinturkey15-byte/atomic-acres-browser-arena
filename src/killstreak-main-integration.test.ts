@@ -37,6 +37,13 @@ describe('Pass 65 playable killstreak integration', () => {
     );
   });
 
+  it('keeps QA teleport continuity aligned with host support authority', () => {
+    expect(source).toContain("network.role === 'host' && localMultiplayerQa && movement.resynchronized");
+    expect(source).toContain('claimedContinuity === registeredActorLifeId + 1');
+    expect(source).toContain('killstreakRuntime.recordActorDeath(incoming.id, claimedContinuity);');
+    expect(source).toContain('registeredActorLifeId = claimedContinuity;');
+  });
+
   it('keeps host authority per-frame while bounding only the immutable local presentation snapshot', () => {
     expect(source).toContain('const LOCAL_KILLSTREAK_SNAPSHOT_REFRESH_INTERVAL_MS = 50;');
     const updateStart = source.indexOf('function updatePass65KillstreakRuntime(');
