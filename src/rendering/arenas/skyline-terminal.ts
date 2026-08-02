@@ -1,12 +1,13 @@
 import { buildSkylineTerminal } from '../../additional-maps';
 import { createProceduralArenaVisualDefinition } from '../arena-visual-definition';
+import { TERMINAL_GENERATED_SKY_ASSET_URL } from '../sky-backdrop';
 import { budgets, camera, colorPipeline, SHARED_GAMEPLAY_ASSETS } from './shared';
 
 export const definition = createProceduralArenaVisualDefinition({
   id: 'skyline-terminal',
   displayLabel: 'Terminal',
   moduleId: 'arena.visual.skyline-terminal.v1',
-  assetDependencies: [],
+  assetDependencies: [TERMINAL_GENERATED_SKY_ASSET_URL],
   sharedAssetDependencies: SHARED_GAMEPLAY_ASSETS,
   lighting: {
     sunColor: 0xeaf7ff, sunIntensity: 2.9, ambientColor: 0x8aa5af, ambientIntensity: 0.38,

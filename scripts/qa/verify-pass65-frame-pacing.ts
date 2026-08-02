@@ -18,6 +18,7 @@ import {
   type PresentationProgressWindowSummary,
 } from '../../src/pass65-frame-pacing-gate.ts';
 import { isFatalWebGpuConsoleWarning } from './pass65-browser-console-contract.mjs';
+import { GRAPHICS_PRESET_VALUES } from '../../src/graphics-settings-registry.ts';
 
 const ARTIFACT_ROOT = 'artifacts/pass65/frame-pacing';
 const VIEWPORT = Object.freeze({ width: 2_560, height: 1_440 });
@@ -49,10 +50,20 @@ const requestedGtao = (process.env.PASS65_FRAME_PACING_GTAO ?? 'off').toLowerCas
 if (!gtaoValues.has(requestedGtao as GtaoQuality)) {
   throw new Error(`PASS65_FRAME_PACING_GTAO must be off, low, high or ultra; received ${requestedGtao}`);
 }
-const gtaoQuality = requestedGtao as GtaoQuality;
-const requestedGraphicsPreset = gtaoQuality === 'off' ? 'high' : 'custom';
-// The explicit render=blender review override is intentionally surfaced as High while preserving Custom internals.
-const expectedDisplayedGraphicsPreset = 'high';
+const graphicsPresetValues = new Set(['performance', 'high', 'max', 'custom'] as const);
+type RequestedGraphicsPreset = 'performance' | 'high' | 'max' | 'custom';
+const requestedPresetValue = (
+  process.env.PASS65_FRAME_PACING_PRESET ?? (requestedGtao === 'off' ? 'high' : 'custom')
+).toLowerCase();
+if (!graphicsPresetValues.has(requestedPresetValue as RequestedGraphicsPreset)) {
+  throw new Error(`PASS65_FRAME_PACING_PRESET must be performance, high, max or custom; received ${requestedPresetValue}`);
+}
+const requestedGraphicsPreset = requestedPresetValue as RequestedGraphicsPreset;
+const gtaoQuality = requestedGraphicsPreset === 'custom'
+  ? requestedGtao as GtaoQuality
+  : GRAPHICS_PRESET_VALUES[requestedGraphicsPreset].ambientOcclusion;
+const expectedRenderProfile = requestedGraphicsPreset === 'performance' ? 'performance' : 'blender';
+const expectedDisplayedGraphicsPreset = requestedGraphicsPreset;
 const chromeCandidates = [
   process.env.PASS65_CHROME_PATH,
   process.env.PASS64_CHROME_PATH,
@@ -395,7 +406,7 @@ async function runTrial(browser: Browser, repeat: number, arenaId: ArenaId): Pro
     if (headed) await page.bringToFront();
     const seed = 6_505 + repeat;
     await page.goto(
-      `http://127.0.0.1:${port}/?release=latest&renderer=webgpu&externalServices=off&map=${arenaId}&render=blender&grass=on&mist=on&seed=${seed}`,
+      `http://127.0.0.1:${port}/?release=latest&renderer=webgpu&externalServices=off&map=${arenaId}&grass=on&mist=on&seed=${seed}`,
       { waitUntil: 'domcontentloaded', timeout: 60_000 },
     );
     await page.waitForFunction(() => {
@@ -431,7 +442,7 @@ async function runTrial(browser: Browser, repeat: number, arenaId: ArenaId): Pro
       || before.streaming?.residentArenaRoots !== 0) {
       issues.push(`menu-eagerly-prepared-gameplay:${JSON.stringify({ gameplayArena: before.gameplayArena, streaming: before.streaming })}`);
     }
-    if (before.renderProfile !== 'blender'
+    if (before.renderProfile !== expectedRenderProfile
       || before.graphicsPreset?.requestedPreset !== requestedGraphicsPreset
       || before.graphicsPreset?.effectivePreset !== requestedGraphicsPreset
       || before.graphicsPreset?.ambientOcclusion?.quality !== gtaoQuality
@@ -757,9 +768,15 @@ const receipt = {
   configuration: {
     viewport: VIEWPORT,
     deviceScaleFactor: 1,
-    graphicsPreset: requestedGraphicsPreset === 'high' ? 'Quality/high' : 'Custom',
+    graphicsPreset: requestedGraphicsPreset === 'high'
+      ? 'Quality/high'
+      : requestedGraphicsPreset === 'performance'
+        ? 'Performance'
+        : requestedGraphicsPreset === 'max'
+          ? 'Max'
+          : 'Custom',
     gtaoQuality,
-    renderProfile: 'blender',
+    renderProfile: expectedRenderProfile,
     backend: 'webgpu-required',
     bots: 'frozen-after-explicit-solo-deployment',
     movement: 'forward-sprint-during-warmup-and-sample',
@@ -784,9 +801,13 @@ const receipt = {
 };
 const serialized = `${JSON.stringify(receipt, null, 2)}\n`;
 const digest = createHash('sha256').update(serialized).digest('hex');
-const receiptPath = `${ARTIFACT_ROOT}/${sourceSha}-receipt.json`;
+const receiptSuffix = requestedGraphicsPreset === 'high' && gtaoQuality === 'off'
+  ? ''
+  : `-${requestedGraphicsPreset}${requestedGraphicsPreset === 'custom' ? `-${gtaoQuality}` : ''}`;
+const receiptName = `${sourceSha}${receiptSuffix}-receipt.json`;
+const receiptPath = `${ARTIFACT_ROOT}/${receiptName}`;
 await writeFile(receiptPath, serialized, 'utf8');
-await writeFile(`${receiptPath}.sha256`, `${digest}  ${sourceSha}-receipt.json\n`, 'utf8');
+await writeFile(`${receiptPath}.sha256`, `${digest}  ${receiptName}\n`, 'utf8');
 
 console.log(JSON.stringify({
   status: receipt.status,

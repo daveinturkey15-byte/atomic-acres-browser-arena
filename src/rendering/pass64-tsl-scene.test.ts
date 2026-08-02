@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { RenderPipeline } from 'three/webgpu';
+import { SkyMesh } from 'three/addons/objects/SkyMesh.js';
 import { describe, expect, it, vi } from 'vitest';
 import { ARENA_VISUAL_REGISTRY } from './arena-visual-stream';
 import {
@@ -8,6 +9,7 @@ import {
   createPass64TslSceneSystems,
 } from './pass64-tsl-scene';
 import { canonicalTslDescriptor, tslDescriptorSha256, TSL_MIGRATION_INVENTORY } from './tsl-migration-inventory';
+import { OCEAN_WAVES, RUSTWORKS_OCEAN_AMPLITUDE, RUSTWORKS_OCEAN_AUTHORITY_ID } from '../water-system';
 
 describe('Pass 64 authored TSL pipeline set', () => {
   it('has stable unique SHA-256 descriptors for all seven former GLSL owners', async () => {
@@ -54,26 +56,88 @@ describe('Pass 64 authored TSL pipeline set', () => {
     const water = systems.root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh;
     water.geometry.computeBoundingBox();
     expect(water.visible).toBe(true);
-    expect(water.userData).toMatchObject({ waveBands: 3, waveAuthority: 'presentation-only-tsl' });
+    expect(water.userData).toMatchObject({
+      waveBands: OCEAN_WAVES.length,
+      waveAmplitude: RUSTWORKS_OCEAN_AMPLITUDE.blender,
+      waveAuthority: RUSTWORKS_OCEAN_AUTHORITY_ID,
+      waveNormalAuthority: RUSTWORKS_OCEAN_AUTHORITY_ID,
+      surfaceSegments: 256,
+    });
+    expect((water.geometry as THREE.PlaneGeometry).parameters.widthSegments).toBe(256);
+    const waterMaterial = water.material as THREE.Material & { positionNode?: unknown; normalNode?: unknown };
+    expect(waterMaterial.positionNode).toBeTruthy();
+    expect(waterMaterial.normalNode).toBeTruthy();
+    expect(waterMaterial).toMatchObject({ transparent: false, opacity: 1, depthWrite: true });
+    const oceanHorizon = water.getObjectByName('Pass 66 curved RustRig ocean horizon') as THREE.Mesh;
+    expect(oceanHorizon).toBeInstanceOf(THREE.Mesh);
+    expect(oceanHorizon.userData).toMatchObject({
+      horizonRadius: 3_200,
+      radialSegments: 24,
+      curvatureDrop: 90,
+    });
+    expect(oceanHorizon.frustumCulled).toBe(false);
     expect(systems.root.getObjectByName('Pass 64 TSL mist')?.children).toHaveLength(5);
     expect(water.geometry.boundingBox?.getCenter(new THREE.Vector3()).y).toBeCloseTo(-19.5);
     expect(systems.root.getObjectByName('Pass 64 TSL grass')?.visible).toBe(false);
     const dust = systems.root.getObjectByName('Pass 64 TSL deterministic dust') as THREE.Points;
     expect(dust.geometry.drawRange.count).toBe(96);
-    // Pass 66 owner skies: RustRig carries the night layers, Atomic Acres the
-    // orange/purple painted clouds, and Terminal a half-covered day bank.
-    expect(systems.root.getObjectByName('Pass 66 night stars')?.visible).toBe(true);
-    expect(systems.root.getObjectByName('Pass 66 galaxy band')?.visible).toBe(true);
-    expect(systems.root.getObjectByName('Pass 66 aurora curtains')?.visible).toBe(true);
-    expect(systems.root.getObjectByName('Pass 66 painted clouds')?.visible).toBe(false);
+    // Each arena's selected scene background is the sole sky owner. Legacy
+    // point stars, galaxy, aurora, atmosphere dome and cloud veil stay out of
+    // live presentation so they cannot add squares, wash or double exposure.
+    expect(systems.root.getObjectByName('Pass 66 night stars')?.visible).toBe(false);
+    expect(systems.root.getObjectByName('Pass 66 galaxy band')?.visible).toBe(false);
+    expect(systems.root.getObjectByName('Pass 66 aurora curtains')?.visible).toBe(false);
+    expect(systems.root.getObjectByName('Pass 66 seamless cloud veil')?.visible).toBe(false);
     systems.applyDefinition(definition);
     expect(water.visible).toBe(false);
     expect(systems.root.getObjectByName('Pass 64 TSL grass')?.visible).toBe(true);
     expect(systems.root.getObjectByName('Pass 66 night stars')?.visible).toBe(false);
-    const paintedClouds = systems.root.getObjectByName('Pass 66 painted clouds') as THREE.Group;
-    expect(paintedClouds.visible).toBe(true);
-    expect((paintedClouds.userData.primaryMaterial as THREE.MeshBasicMaterial).color.getHex()).toBe(0xff934a);
-    expect((paintedClouds.userData.secondaryMaterial as THREE.MeshBasicMaterial).color.getHex()).toBe(0x9f6fe8);
+    const atmosphereSky = systems.root.getObjectByName('Pass 64 TSL atmosphere sky') as SkyMesh;
+    const atmosphereOpacity = atmosphereSky.userData.opacityUniform as { value: number };
+    expect(atmosphereSky.visible).toBe(false);
+    expect(atmosphereSky.material.transparent).toBe(true);
+    expect(atmosphereOpacity.value).toBe(0);
+    const cloudVeil = systems.root.getObjectByName('Pass 66 seamless cloud veil') as THREE.Group;
+    expect(cloudVeil.visible).toBe(false);
+    expect(cloudVeil.children).toHaveLength(2);
+    expect(cloudVeil.children.every((layer) => layer instanceof THREE.Mesh && layer.geometry instanceof THREE.SphereGeometry)).toBe(true);
+    expect((cloudVeil.userData.cloudTexture as THREE.DataTexture).image).toMatchObject({ width: 1_024, height: 512 });
+    const primaryCloudMaterial = cloudVeil.userData.primaryMaterial as THREE.MeshBasicMaterial;
+    const secondaryCloudMaterial = cloudVeil.userData.secondaryMaterial as THREE.MeshBasicMaterial;
+    expect(primaryCloudMaterial.opacity).toBe(0);
+    expect(secondaryCloudMaterial.opacity).toBe(0);
+    expect(systems.root.userData.tslSkyComposition).toEqual({
+      sceneBackgroundDominant: true,
+      atmosphereSkyVisible: false,
+      cloudVeilVisible: false,
+    });
+    const retainedSkyUuid = atmosphereSky.uuid;
+    const retainedSkyMaterialUuid = atmosphereSky.material.uuid;
+    const retainedCloudTexture = cloudVeil.userData.cloudTexture as THREE.DataTexture;
+    const retainedCloudTextureUuid = retainedCloudTexture.uuid;
+    const skyDispose = vi.spyOn(atmosphereSky.material, 'dispose');
+    const cloudTextureDispose = vi.spyOn(retainedCloudTexture, 'dispose');
+    const terminalDefinition = (await ARENA_VISUAL_REGISTRY['skyline-terminal']()).definition;
+    systems.applyDefinition(terminalDefinition);
+    expect(systems.root.getObjectByName('Pass 64 TSL atmosphere sky')?.visible).toBe(false);
+    expect(atmosphereOpacity.value).toBe(0);
+    expect(cloudVeil.visible).toBe(false);
+    expect(primaryCloudMaterial.opacity).toBe(0);
+    expect(secondaryCloudMaterial.opacity).toBe(0);
+    expect(systems.root.userData.tslSkyComposition).toEqual({
+      sceneBackgroundDominant: true,
+      atmosphereSkyVisible: false,
+      cloudVeilVisible: false,
+    });
+    systems.applyDefinition(definition);
+    expect(atmosphereSky.uuid).toBe(retainedSkyUuid);
+    expect(atmosphereSky.material.uuid).toBe(retainedSkyMaterialUuid);
+    expect((cloudVeil.userData.cloudTexture as THREE.DataTexture).uuid).toBe(retainedCloudTextureUuid);
+    expect(atmosphereOpacity.value).toBe(0);
+    expect(primaryCloudMaterial.opacity).toBe(0);
+    expect(secondaryCloudMaterial.opacity).toBe(0);
+    expect(skyDispose).not.toHaveBeenCalled();
+    expect(cloudTextureDispose).not.toHaveBeenCalled();
     const reviewCamera = { ...definition.reviewCameras[0], fixedTimeMs: 63_321, seed: 9_117 };
     systems.setReviewCamera(reviewCamera);
     systems.update(999_999);
@@ -197,6 +261,7 @@ describe('Pass 64 authored TSL pipeline set', () => {
         filmGrainScale: 0,
         vignetteStrength: 0.35,
       },
+      oceanWaveAmplitude: RUSTWORKS_OCEAN_AMPLITUDE.performance,
     });
     expect(systems.principalHdrTarget.samples).toBe(2);
     expect(systems.principalHdrTarget.textures.map(({ name }) => name)).toEqual(['output', 'normal']);
@@ -209,6 +274,11 @@ describe('Pass 64 authored TSL pipeline set', () => {
       ambientOcclusion: {
         quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52,
       },
+    });
+    expect((systems.root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh).userData).toMatchObject({
+      waveBands: OCEAN_WAVES.length,
+      waveAmplitude: RUSTWORKS_OCEAN_AMPLITUDE.performance,
+      waveAuthority: RUSTWORKS_OCEAN_AUTHORITY_ID,
     });
     const dust = systems.root.getObjectByName('Pass 64 TSL deterministic dust') as THREE.Points;
     expect(dust.geometry.drawRange.count).toBe(48);

@@ -20,6 +20,18 @@ import {
 } from './render-runtime';
 import { assertTslCutoverReady, assertTslReviewAuthored, pendingTslMigrationIds, TSL_MIGRATION_INVENTORY } from './tsl-migration-inventory';
 
+function deferredQueueProbe(publishCompletion: () => void): Readonly<{
+  promise: Promise<void>;
+  resolve: () => void;
+}> {
+  let resolveSource!: () => void;
+  const source = new Promise<void>((resolve) => { resolveSource = resolve; });
+  return {
+    promise: source.then(() => publishCompletion()),
+    resolve: resolveSource,
+  };
+}
+
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Pass 64 render runtime boundary', () => {
@@ -1017,5 +1029,54 @@ describe('Pass 64 render runtime boundary', () => {
       failure: () => null,
       timeoutMs: 1_000,
     })).rejects.toThrow('did not advance');
+  });
+
+  it('accepts completion published by the real probe chain before the timeout boundary check', async () => {
+    vi.useFakeTimers();
+    try {
+      let completed = 0;
+      const probe = deferredQueueProbe(() => { completed = 1; });
+      const pending = awaitSubmissionCompletionTarget({
+        targetSequence: 1,
+        completedSequence: () => completed,
+        createProbe: () => probe.promise,
+        failure: () => null,
+        timeoutMs: 100,
+      });
+      const assertion = expect(pending).resolves.toBeUndefined();
+      // Queue the probe publication first, then fire the timer before flushing
+      // microtasks. The boundary recheck must observe the probe chain's update.
+      probe.resolve();
+      vi.advanceTimersByTime(100);
+      await assertion;
+      expect(completed).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('rejects when the timeout boundary is queued before the real probe chain publishes completion', async () => {
+    vi.useFakeTimers();
+    try {
+      let completed = 6;
+      const probe = deferredQueueProbe(() => { completed = 7; });
+      const pending = awaitSubmissionCompletionTarget({
+        targetSequence: 7,
+        completedSequence: () => completed,
+        createProbe: () => probe.promise,
+        failure: () => null,
+        timeoutMs: 100,
+      });
+      const assertion = expect(pending).rejects.toThrow('exceeded 100 ms for submission 7');
+      // Fire the timer first, then settle the probe before microtasks flush.
+      // The deadline check is already ahead in the queue and must fail closed.
+      vi.advanceTimersByTime(100);
+      probe.resolve();
+      await assertion;
+      await probe.promise;
+      expect(completed).toBe(7);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

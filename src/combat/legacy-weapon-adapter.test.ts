@@ -26,13 +26,15 @@ function expectDeepFrozen(value: unknown): void {
 }
 
 describe('Pass 65 runtime weapon adapter', () => {
-  it('projects the complete protocol-v8 roster in canonical order', () => {
-    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(9);
+  it('projects the complete current-protocol roster in canonical order', () => {
+    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(13);
     expect(Object.keys(LEGACY_WEAPONS)).toEqual(WEAPON_CATALOG.map((weapon) => weapon.id));
     expect(Object.keys(LEGACY_WEAPONS).slice(0, 9)).toEqual(legacyBaseline.legacyEnumerationOrder);
     expect(LEGACY_WEAPONS.carbine).toMatchObject({ id: 'carbine', name: 'HK416', damage: 31, mag: 30 });
     expect(LEGACY_WEAPONS.minigun).toMatchObject({ spinUpMs: 1200, movementMultiplier: 0.8, mag: 240 });
     expect(LEGACY_WEAPONS['explosive-crossbow']).toMatchObject({ fireKind: 'projectile', projectileId: 'explosive-bolt-v1' });
+    expect(LEGACY_WEAPONS.flamethrower).toMatchObject({ fireKind: 'hitscan', automatic: true, mag: 100 });
+    expect(LEGACY_WEAPONS['flare-gun']).toMatchObject({ fireKind: 'projectile', projectileId: 'signal-flare-v1', mag: 1 });
     expect(WEAPONS).toBe(LEGACY_WEAPONS);
   });
 
@@ -42,7 +44,7 @@ describe('Pass 65 runtime weapon adapter', () => {
 
   it('rejects missing, duplicate, unknown, and reordered catalogs without a fallback', () => {
     expect(() => adaptWeaponCatalogToLegacy(WEAPON_CATALOG.slice(0, -1)))
-      .toThrow(/missing explosive-crossbow/);
+      .toThrow(/missing flare-gun/);
 
     const duplicate = [...WEAPON_CATALOG.slice(0, -1), WEAPON_CATALOG[0]];
     expect(() => adaptWeaponCatalogToLegacy(duplicate)).toThrow(/duplicate weapon id "carbine"/);
@@ -123,5 +125,7 @@ describe('Pass 65 runtime weapon adapter', () => {
     expect(FIELD_KITS.map((kit) => kit.weapon)).toEqual(['carbine', 'smg', 'scattergun', 'sniper']);
     expect(FIELD_KITS.flatMap((kit) => [kit.weapon, kit.sidearm])).not.toContain('magnum');
     expect(FIELD_KITS.flatMap((kit) => [kit.weapon, kit.sidearm])).not.toContain('railgun');
+    expect(FIELD_KITS.flatMap((kit) => [kit.weapon, kit.sidearm])).not.toContain('flamethrower');
+    expect(FIELD_KITS.flatMap((kit) => [kit.weapon, kit.sidearm])).not.toContain('flare-gun');
   });
 });

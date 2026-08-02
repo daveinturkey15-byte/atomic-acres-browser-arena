@@ -113,6 +113,18 @@
       "length": 0.66, "width": 0.22, "height": 0.24, "receiverLength": 0.5, "barrelRadius": 0.03,
       "primary": "354047", "accent": "d7b26a", "polymer": "151b1e", "magazineStyle": "pistol-heavy", "stockStyle": "none", "opticStyle": "iron", "actionStyle": "slide", "motionScale": 0.97,
       "signatureNodes": ["usp45-threaded-barrel", "usp45-underbarrel-flashlight", "usp45-paddle-control"]
+    },
+    {
+      "id": "flamethrower", "displayName": "M2 Flamethrower", "family": "launcher", "designId": "m2-pressure-wand-twin-tank-v1",
+      "length": 1.72, "width": 0.55, "height": 0.62, "receiverLength": 0.68, "barrelRadius": 0.046,
+      "primary": "4a4037", "accent": "e26f2b", "polymer": "171b1b", "magazineStyle": "twin-pressure-tank", "stockStyle": "shoulder-brace", "opticStyle": "open-iron", "actionStyle": "valve", "motionScale": 0.99,
+      "signatureNodes": ["m2-flamethrower-pressure-platform", "m2-flamethrower-twin-fuel-tanks", "m2-flamethrower-armoured-hose", "m2-flamethrower-pilot-igniter"]
+    },
+    {
+      "id": "flare-gun", "displayName": "Orion Flare Pistol", "family": "launcher", "designId": "orion-break-action-signal-v1",
+      "length": 0.78, "width": 0.24, "height": 0.34, "receiverLength": 0.45, "barrelRadius": 0.092,
+      "primary": "a93427", "accent": "f2a33b", "polymer": "241819", "magazineStyle": "single-signal-cartridge", "stockStyle": "none", "opticStyle": "open-iron", "actionStyle": "break-action", "motionScale": 0.77,
+      "signatureNodes": ["orion-flare-pistol-break-action", "orion-flare-pistol-break-barrel", "orion-flare-pistol-hinge-latch", "orion-flare-pistol-signal-cartridge"]
     }
   ]
 }

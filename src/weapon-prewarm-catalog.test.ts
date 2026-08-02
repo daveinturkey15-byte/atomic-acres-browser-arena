@@ -25,6 +25,6 @@ describe('Pass 65 first-person weapon prewarm authority', () => {
     expect(weaponPrewarmCatalogForArena('gun-range', 'pistol')).toBe(WEAPON_IDS);
     expect(weaponPrewarmCatalogForArena('gun-range', 'magnum')).toBe(WEAPON_IDS);
     expect(GUN_RANGE_WEAPON_STATIONS.every((station) => WEAPON_IDS.includes(station.weapon))).toBe(true);
-    expect(GUN_RANGE_FIELD_TEST_WEAPONS.every((weapon) => WEAPON_IDS.includes(weapon))).toBe(true);
+    expect([...GUN_RANGE_FIELD_TEST_WEAPONS].sort()).toEqual([...WEAPON_IDS].sort());
   });
 });

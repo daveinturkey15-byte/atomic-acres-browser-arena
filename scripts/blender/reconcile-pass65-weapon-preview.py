@@ -98,7 +98,17 @@ def rebuild_contact_sheet():
 
 bpy.ops.wm.open_mainfile(filepath=str(CANONICAL_BLEND))
 old_roots = roots_for(set(weapon_ids))
-assert_delivery_set(old_roots, set(weapon_ids), "canonical")
+if old_roots:
+    # Existing families may be replaced only as a complete delivery set. A new
+    # family is admitted from the isolated preview when no canonical root with
+    # that stable ID exists yet.
+    assert_delivery_set(old_roots, {root.get("weapon_id") for root in old_roots}, "canonical")
+    partially_present = {
+        weapon_id for weapon_id in weapon_ids
+        if 0 < len([root for root in old_roots if root.get("weapon_id") == weapon_id]) < len(SPEC["deliveries"])
+    }
+    if partially_present:
+        raise RuntimeError(f"Partial canonical families cannot be reconciled: {sorted(partially_present)}")
 for root in old_roots:
     for obj in reversed([root, *list(root.children_recursive)]):
         if obj.name in bpy.data.objects:
@@ -126,8 +136,11 @@ for obj in loaded_objects:
 all_ids = {weapon["id"] for weapon in SPEC["weapons"]}
 canonical_roots = roots_for(all_ids)
 assert_delivery_set(canonical_roots, all_ids, "reconciled canonical")
-if len(canonical_roots) != len(SPEC["weapons"]) * len(SPEC["deliveries"]):
-    raise RuntimeError(f"Reconciled canonical root count is {len(canonical_roots)}, expected 102")
+expected_root_count = len(SPEC["weapons"]) * len(SPEC["deliveries"])
+if len(canonical_roots) != expected_root_count:
+    raise RuntimeError(
+        f"Reconciled canonical root count is {len(canonical_roots)}, expected {expected_root_count}"
+    )
 
 bpy.ops.wm.save_as_mainfile(filepath=str(CANONICAL_BLEND))
 rebuild_contact_sheet()

@@ -221,7 +221,7 @@ def build_textures():
         luminance = red * 0.2126 + green * 0.7152 + blue * 0.0722
         # Lift crushed black cloth, reduce the dirty brown cast, and retain the
         # source weave/creases instead of synthesizing replacement UV detail.
-        value = min(0.34, 0.007 + math.pow(max(luminance, 0.0), 0.92) * 0.45)
+        value = min(0.42, 0.012 + math.pow(max(luminance, 0.0), 0.90) * 0.52)
         residual_r = (red - luminance) * 0.16
         residual_g = (green - luminance) * 0.12
         residual_b = (blue - luminance) * 0.10
@@ -338,11 +338,11 @@ def build_materials(images):
     return {
         "sleeve": pbr_material(
             "MAT_Pass65_Arms_Sleeve_PBR", images["tactical"], images,
-            (0.92, 0.97, 1.0), 0.82,
+            (0.96, 0.985, 1.0), 0.80,
         ),
         "glove": pbr_material(
             "MAT_Pass65_Arms_Glove_PBR", images["tactical"], images,
-            (0.78, 0.86, 0.92), 0.76,
+            (0.86, 0.92, 0.96), 0.74,
         ),
         "accent": pbr_material(
             "MAT_Pass65_Arms_WristAccent_PBR", images["tactical"], images,
@@ -875,10 +875,10 @@ def partition_render_batches(mesh, armature, materials, root_key, source_triangl
                 json.dumps(boundary_loop_records(glove)),
             )
     sleeve_radial_scale = env_float(
-        "PASS65_SLEEVE_RADIAL_SCALE", 1.00, 0.72, 1.08,
+        "PASS65_SLEEVE_RADIAL_SCALE", 1.04, 0.72, 1.10,
     )
     firing_sleeve_radial_scale = env_float(
-        "PASS65_FIRING_SLEEVE_RADIAL_SCALE", 0.78, 0.62, 0.92,
+        "PASS65_FIRING_SLEEVE_RADIAL_SCALE", 0.92, 0.62, 1.05,
     )
     for sleeve in sleeves:
         refine_sleeve_profile(
@@ -903,15 +903,13 @@ def partition_render_batches(mesh, armature, materials, root_key, source_triangl
 def refine_hand_proportions(batches, armature, hand_scale: float) -> None:
     """Scale each complete hand branch about its wrist in bind space.
 
-    The licensed scan has hero-render hands that are intentionally broad near
-    the lens.  At the actual 16:9 gameplay FOV that silhouette is larger than
-    the M4/MP5 controls and hides the articulated digits.  Scaling the real
-    glove/skin vertices together with all thirty digit bones preserves source
-    topology, UVs, weights, and finger animation.  The glove now uses a smooth
-    wrist-to-palm taper so the authored cuff ring remains full-size and closed;
-    uniformly shrinking that ring caused the rejected open-cuff silhouette.
+    The full licensed glove/skin vertices and all thirty digit bones scale
+    together, preserving source topology, UVs, weights, and finger animation.
+    A small hero-view enlargement keeps fingers readable at 1440p, 4K and
+    ultrawide without scaling the cuff seam away from the forearm.  The smooth
+    wrist-to-palm taper leaves the authored cuff ring full-size and closed.
     """
-    if not 0.75 <= hand_scale <= 1.0:
+    if not 0.75 <= hand_scale <= 1.10:
         raise RuntimeError(f"hand scale outside reviewed range: {hand_scale}")
     wrists = {
         side: armature.data.bones[f"Wrist{side}"].head_local.copy()
@@ -997,7 +995,7 @@ def refine_hand_proportions(batches, armature, hand_scale: float) -> None:
     rig_integrity = json.loads(armature["rig_integrity"])
     rig_integrity["postHandScale"] = canonical_digit_segment_metrics(armature)
     rig_integrity["handProportioning"] = {
-        "contract": "full-cuff-smooth-palm-taper-v1",
+        "contract": "full-cuff-smooth-palm-hero-scale-v2",
         "handScale": hand_scale,
         "gloveTaperNormalizedRange": [0.08, 0.82],
         "proximalGloveOverlapPalmFraction": 0.10,
@@ -1168,12 +1166,12 @@ def configure_asset_root(
     root["blender_authoring_forward_axis"] = "+Y"
     root["opaque_material_contract"] = True
     root["presentation_only"] = True
-    root["visual_revision"] = "licensed-anatomical-viewmodel-v7"
-    root["limb_profile_contract"] = "licensed-human-skin-and-glove-deformation-v1"
-    root["hand_pose_contract"] = "licensed-articulated-fingerless-glove-grip-v1"
-    root["glove_construction_contract"] = "opaque-uv-preserved-licensed-human-hand-v1"
-    root["shoulder_entry_contract"] = "weighted-capped-frame-edge-sleeve-v1"
-    root["weapon_grip_review_contract"] = "seven-view-actual-weapon-contact-v1"
+    root["visual_revision"] = "licensed-anatomical-viewmodel-v8"
+    root["limb_profile_contract"] = "hero-scale-connected-forearm-deformation-v2"
+    root["hand_pose_contract"] = "licensed-articulated-weapon-and-knife-grip-v2"
+    root["glove_construction_contract"] = "opaque-uv-preserved-scaled-anatomical-hand-v2"
+    root["shoulder_entry_contract"] = "weighted-capped-fps-frame-edge-sleeve-v2"
+    root["weapon_grip_review_contract"] = "seven-view-actual-weapon-contact-v2"
     root["runtime_animation_contract"] = "authored-fingers-under-runtime-chain-ik-v1"
     root["finger_segment_count"] = 30
     root["source_vertex_count"] = 4026
@@ -1199,13 +1197,20 @@ def configure_asset_root(
     root["texture_grade_contract"] = "source-uv-preserved-charcoal-navy-teal-pbr-v1"
     root["weapon_grip_review_frames"] = 7
     root["reviewed_hand_scale_from_source"] = float(
-        os.environ.get("PASS65_HAND_SCALE", "1.0")
+        os.environ.get("PASS65_HAND_SCALE", "1.04")
+    )
+    root["authoring_uniform_scale_m_per_source_unit"] = 0.0128
+    root["support_forearm_radial_scale"] = float(
+        os.environ.get("PASS65_SLEEVE_RADIAL_SCALE", "1.04")
+    )
+    root["firing_forearm_radial_scale"] = float(
+        os.environ.get("PASS65_FIRING_SLEEVE_RADIAL_SCALE", "0.92")
     )
 
     transform = (
         Matrix.Translation((0.0, 0.40, -0.37))
         @ Matrix.Rotation(math.pi, 4, "Z")
-        @ Matrix.Scale(0.0120, 4)
+        @ Matrix.Scale(0.0128, 4)
     )
     armature.name = "pass65-first-person-arms-skeleton-LOD0"
     armature["asset_id"] = ASSET_ID
@@ -1769,6 +1774,53 @@ def mesh_world_bounds(objects):
     }
 
 
+def point_bounds_distance(point: Vector, minimum: Vector, maximum: Vector) -> float:
+    return Vector((
+        max(minimum[axis] - point[axis], 0.0, point[axis] - maximum[axis])
+        for axis in range(3)
+    )).length
+
+
+def knife_grip_contact_metrics(armature, review):
+    """Bind the knife review to the authored G10 handle, not only its empty."""
+    handle_meshes = []
+    for obj in review["imported"]:
+        if obj.type != "MESH":
+            continue
+        current = obj
+        while current is not None:
+            canonical = current.get("canonical_node_name")
+            if canonical == "field-knife-g10-grip" or "HandleScale" in current.name:
+                handle_meshes.append(obj)
+                break
+            current = current.parent
+    handle_meshes = list(dict.fromkeys(handle_meshes))
+    if len(handle_meshes) < 2:
+        raise RuntimeError(
+            f"knife review requires both authored G10 scales, found {[obj.name for obj in handle_meshes]}"
+        )
+    bounds = mesh_world_bounds(handle_meshes)
+    palm = hand_palm_world(armature, "R")
+    tips = {
+        digit: bone_tail_world(armature, f"{digit}3R")
+        for digit in ("Index", "Middle", "Ring", "Pinky", "Thumb")
+    }
+    palm_clearance = point_bounds_distance(palm, bounds["minimum"], bounds["maximum"])
+    digit_clearances = {
+        digit: point_bounds_distance(point, bounds["minimum"], bounds["maximum"])
+        for digit, point in tips.items()
+    }
+    contact_count = sum(clearance <= 0.075 for clearance in digit_clearances.values())
+    return {
+        "contract": "anatomical-palm-and-digit-to-authored-g10-bounds-v1",
+        "handleBounds": {key: tuple(value) for key, value in bounds.items()},
+        "palmClearanceM": palm_clearance,
+        "digitClearancesM": digit_clearances,
+        "digitContactCount": contact_count,
+        "passed": palm_clearance <= 0.055 and contact_count >= 3,
+    }
+
+
 def import_review_weapon(weapon_id: str, scale: float, right_target: Vector):
     source = REVIEW_WEAPON_DIR / f"{weapon_id}-uncompressed.glb"
     if not source.exists():
@@ -1789,7 +1841,14 @@ def import_review_weapon(weapon_id: str, scale: float, right_target: Vector):
             obj.parent = group
             obj.matrix_world = world
     group.scale = (scale, scale, scale)
-    if weapon_id != "knife":
+    if weapon_id == "knife":
+        # Present the blade in a natural hammer grip with a slight inward cant;
+        # the grip socket is translated after this rotation, so contact remains
+        # exact while the wrist no longer reads as a flat vertical clamp.
+        group.rotation_euler = (
+            math.radians(-8.0), math.radians(7.0), math.radians(10.0),
+        )
+    else:
         group.rotation_euler = (math.radians(-2.0), 0.0, math.radians(-4.0))
     bpy.context.view_layer.update()
 
@@ -2470,9 +2529,9 @@ def render_contact_sheet(root, armature, batches):
     backdrop.name = "DJMaesen_Prototype_Review_Backdrop"
     backdrop.data.materials.append(stage_material)
     for name, location, energy, color, size in (
-        ("Arms_Key", (-2.4, -1.8, 3.0), 430, (0.52, 0.76, 1.0), 2.0),
-        ("Arms_Rim", (2.2, 1.2, 2.2), 310, (0.12, 0.82, 0.92), 1.5),
-        ("Arms_Fill", (0.0, 3.0, 1.0), 220, (0.36, 0.54, 0.70), 2.4),
+        ("Arms_Key", (-2.4, -1.8, 3.0), 560, (0.58, 0.78, 1.0), 2.0),
+        ("Arms_Rim", (2.2, 1.2, 2.2), 360, (0.16, 0.78, 0.88), 1.5),
+        ("Arms_Fill", (0.0, 3.0, 1.0), 320, (0.42, 0.58, 0.72), 2.4),
     ):
         bpy.ops.object.light_add(type="AREA", location=location)
         light = bpy.context.object
@@ -2496,7 +2555,7 @@ def render_contact_sheet(root, armature, batches):
     scene.render.image_settings.color_mode = "RGBA"
     scene.world.color = (0.002, 0.004, 0.008)
     scene.view_settings.look = "AgX - Medium High Contrast"
-    scene.view_settings.exposure = -1.0
+    scene.view_settings.exposure = -0.45
     scene.render.film_transparent = False
 
     camera.data.sensor_fit = "HORIZONTAL"
@@ -2540,8 +2599,31 @@ def render_contact_sheet(root, armature, batches):
             for track in armature.animation_data.nla_tracks:
                 track.mute = True
             melee_target = Vector((0.09, 0.59, -0.14))
+            grip = review["right"]
+            knife_forward = (
+                review["muzzle"].matrix_world.translation
+                - grip.matrix_world.translation
+            ).normalized()
+            # A real hammer grip keeps the blade axis and metacarpal axis close,
+            # but not perfectly collinear.  The earlier straight-wrist solve
+            # put the long FPS grip through the cuff even though the fingers
+            # contacted correctly.  Add a bounded lateral wrist flex so the
+            # palm stays on the authored socket and the cuff clears the pommel.
+            knife_hand_forward = (
+                knife_forward
+                + env_vector("PASS65_KNIFE_WRIST_FORWARD_TRIM", (-0.32, 0.0, 0.0))
+            ).normalized()
+            # `hand_palm_world()` is an anatomical centreline anchor, whereas
+            # the knife socket is authored on the grip centreline.  Offset the
+            # solved palm towards the camera-left grip face so real glove
+            # triangles close around the G10 slabs instead of passing a loose
+            # bounding-box proximity test beside them.
+            knife_palm_target = melee_target + env_vector(
+                "PASS65_KNIFE_PALM_SURFACE_TRIM", (-0.030, 0.0, 0.0),
+            )
             error, reach, right_wrist_target = pose_hand_to_socket(
-                armature, "R", melee_target, Vector((0.08, 1.0, -0.10)),
+                armature, "R", knife_palm_target, knife_hand_forward,
+                roll_degrees=-10.0,
             )
             # Keep the complete support chain below the lower-left frustum for
             # the one-handed stab. It is still posed and skinned, never scaled
@@ -2553,9 +2635,9 @@ def render_contact_sheet(root, armature, batches):
             exported_socket = next(
                 obj for obj in armature.children if obj.name.startswith("right-wrist-knife-socket")
             )
-            grip = review["right"]
             review["group"].location += melee_target - grip.matrix_world.translation
             bpy.context.view_layer.update()
+            knife_grip_contact = knife_grip_contact_metrics(armature, review)
             metrics = {
                 "rightSocketErrorM": error,
                 "leftSocketErrorM": left_error,
@@ -2565,7 +2647,9 @@ def render_contact_sheet(root, armature, batches):
                 "knifeGripSocketErrorM": (
                     melee_target - grip.matrix_world.translation
                 ).length,
-                "knifeAttachmentContract": "anatomical-palm-to-grip-v1",
+                "knifeAttachmentContract": "anatomical-palm-surface-to-grip-v2",
+                "knifePalmSurfaceTrimM": tuple(knife_palm_target - melee_target),
+                "knifeGripContact": knife_grip_contact,
                 "exportedKnifeSocketWorld": tuple(exported_socket.matrix_world.translation),
             }
         else:
@@ -2588,6 +2672,7 @@ def render_contact_sheet(root, armature, batches):
             (left_socket == "left" and weapon_id in {"mp5", "m4a1"})
             or (left_socket == "reload" and weapon_id == "m4a1")
         )
+        metrics["rightHandContactRequired"] = weapon_id == "knife"
         metrics["passed"] = (
             metrics["rightSocketErrorM"] <= 0.02
             and (metrics["leftSocketErrorM"] is None or metrics["leftSocketErrorM"] <= 0.02)
@@ -2595,6 +2680,7 @@ def render_contact_sheet(root, armature, batches):
             and intersections["passed"]
             and weapon_collisions["passed"]
             and (not metrics["leftHandContactRequired"] or left_hand_contacts >= 12)
+            and (not metrics["rightHandContactRequired"] or right_hand_contacts >= 12)
             and (
                 metrics.get("supportDigitWrap") is None
                 or metrics["supportDigitWrap"]["passed"]
@@ -2602,6 +2688,10 @@ def render_contact_sheet(root, armature, batches):
             and (
                 metrics.get("reloadDigitWrap") is None
                 or metrics["reloadDigitWrap"]["passed"]
+            )
+            and (
+                metrics.get("knifeGripContact") is None
+                or metrics["knifeGripContact"]["passed"]
             )
         )
 
@@ -2713,7 +2803,7 @@ batches, delivery_triangles = partition_render_batches(
     source_mesh, armature, materials, root_key, source_triangles, authored_cap_triangles,
 )
 refine_hand_proportions(
-    batches, armature, float(os.environ.get("PASS65_HAND_SCALE", "1.0")),
+    batches, armature, float(os.environ.get("PASS65_HAND_SCALE", "1.04")),
 )
 author_first_person_shoulder_anchors(armature, batches)
 root = configure_asset_root(

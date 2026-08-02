@@ -16,7 +16,7 @@ const REST_POSE = {
 };
 
 describe('first-person anatomical presentation', () => {
-  it('starts materially smaller, lower and farther right at the hip', () => {
+  it('starts at the readable hip framing shared by high-resolution displays', () => {
     const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250), false);
     expect(presentation.root.scale.x).toBeCloseTo(HIP_VIEWMODEL_SCALE, 8);
     expect(presentation.root.scale.y).toBeCloseTo(HIP_VIEWMODEL_SCALE, 8);
@@ -28,14 +28,26 @@ describe('first-person anatomical presentation', () => {
     ]);
   });
 
-  it('returns to the full-size dynamically centred sight picture in ADS', async () => {
+  it('applies the authored floor-clearance lift while prone instead of reporting a no-op', () => {
+    const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
+    const baseline = new WeaponPresentation(camera, false);
+    const cleared = new WeaponPresentation(camera, false);
+    for (let frame = 0; frame < 180; frame += 1) {
+      baseline.update({ ...REST_POSE, prone: true, surfaceLift: 0 });
+      cleared.update({ ...REST_POSE, prone: true, surfaceLift: 0.34 });
+    }
+    expect(cleared.presentationState().surfaceLift).toBeCloseTo(0.34, 8);
+    expect(cleared.root.position.y - baseline.root.position.y).toBeCloseTo(0.34, 3);
+  });
+
+  it('returns to the resolution-stable dynamically centred sight picture in ADS', async () => {
     const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
     const presentation = new WeaponPresentation(camera, false);
     await presentation.load();
     for (let frame = 0; frame < 180; frame += 1) presentation.update({ ...REST_POSE, ads: true });
     const state = presentation.presentationState();
     expect(state.adsProgress).toBeGreaterThan(0.999);
-    expect(presentation.root.scale.x).toBeCloseTo(0.78, 3);
+    expect(presentation.root.scale.x).toBeCloseTo(0.76, 3);
     expect(state.sightOffset?.[0]).toBeCloseTo(0, 3);
     expect(state.sightOffset?.[1]).toBeCloseTo(0, 3);
   });

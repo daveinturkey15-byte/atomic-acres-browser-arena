@@ -93,6 +93,8 @@ function evidenceFor(label, state, screenshot, cadence = null) {
     authoredFingerBoneCount: presentation.authoredFingerBoneCount,
     authoredArmAnimation: presentation.authoredArmAnimation,
     armFraming: presentation.armFraming,
+    meleeKnifeFraming: presentation.meleeKnifeFraming,
+    viewmodelViewport: presentation.viewmodelViewport,
     riggedArms: presentation.riggedArms,
     cadence,
     melee: {
@@ -100,6 +102,7 @@ function evidenceFor(label, state, screenshot, cadence = null) {
       knifeVisible: presentation.knifeVisible,
       knifeParent: presentation.authoredMeleeKnifeParent,
       gripError: presentation.authoredMeleeGripError,
+      handContactError: presentation.authoredMeleeHandContactError,
       bindPoseRestored: presentation.riggedMeleeBindPoseRestoredExactly,
     },
   });
@@ -270,6 +273,11 @@ try {
     if (presentation.knifeVisible !== true) violations.push(`${label}: authored knife is not visible`);
     if (presentation.authoredMeleeKnifeParent !== 'right-wrist-knife-socket') violations.push(`${label}: knife is not attached to the exported wrist socket`);
     if (!Number.isFinite(presentation.authoredMeleeGripError) || presentation.authoredMeleeGripError > 0.001) violations.push(`${label}: knife grip error ${presentation.authoredMeleeGripError}`);
+    if (!Number.isFinite(presentation.authoredMeleeHandContactError) || presentation.authoredMeleeHandContactError > 0.015) violations.push(`${label}: knife-to-visible-hand contact error ${presentation.authoredMeleeHandContactError}`);
+    if (!presentation.meleeKnifeFraming?.finite || !presentation.meleeKnifeFraming?.nearPlaneClear
+      || !presentation.meleeKnifeFraming?.intersectsViewport) {
+      violations.push(`${label}: knife is nonfinite, near-plane clipped, or offscreen`);
+    }
     if (presentation.browserProceduralMeleeArmViolation || presentation.proceduralMeleeArmVisible) violations.push(`${label}: procedural browser melee fallback is visible`);
     if (presentation.passiveKnifeVisible) violations.push(`${label}: passive floating knife is visible`);
     if (!presentation.riggedArms.some((arm) => arm.side === 'right' && arm.knifeAttachedToRightWrist === true)) violations.push(`${label}: right wrist attachment telemetry failed`);

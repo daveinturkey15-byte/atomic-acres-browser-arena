@@ -113,7 +113,7 @@ describe('Pass 65 menu-video runtime weapon corpus', () => {
     }
   });
 
-  it('decodes each bounded source once and survives two complete 18-weapon world/drop cycles', async () => {
+  it('decodes each bounded source once and survives two complete canonical world/drop cycles', async () => {
     vi.resetModules();
     const loadSpy = vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (
       Promise.resolve(fakeGltf(String(url)))
@@ -179,8 +179,10 @@ describe('Pass 65 menu-video runtime weapon corpus', () => {
     expect(loadSpy).toHaveBeenCalledTimes(decodedLoads);
     for (const model of firstPersonModels) weaponModel.disposePass65WeaponModel(model);
     const finalTelemetry = weaponModel.pass65WeaponCacheTelemetry();
-    expect(finalTelemetry.entries.filter((entry) => entry.variant === 'world')).toHaveLength(17);
-    expect(finalTelemetry.entries.filter((entry) => entry.variant === 'drop')).toHaveLength(17);
+    expect(finalTelemetry.entries.filter((entry) => entry.variant === 'world'))
+      .toHaveLength(weaponModel.PASS65_AUTHORED_FIREARM_IDS.length);
+    expect(finalTelemetry.entries.filter((entry) => entry.variant === 'drop'))
+      .toHaveLength(weaponModel.PASS65_AUTHORED_FIREARM_IDS.length);
     expect(finalTelemetry.entries.every((entry) => entry.refs === 0)).toBe(true);
   });
 });

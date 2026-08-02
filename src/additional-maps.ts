@@ -5,7 +5,18 @@ import { createBallisticSurface, type BallisticMaterialId, type BallisticSurface
 import type { Box2 } from './collision';
 import { WEAPONS } from './gameplay';
 import { GUN_RANGE_WEAPON_STATIONS } from './gun-range-armory';
+import {
+  GUN_RANGE_TEST_BAY_CONTRACT,
+  advanceGunRangeTestBayDoor,
+  createGunRangeTestBayDoorState,
+  gunRangeTestBayDoorDynamicColliders,
+  gunRangeTestBayDoorLeafBounds,
+  gunRangeTestBayDummyPose,
+  type GunRangeTestBayDoorState,
+  type GunRangeTestBayDummyDefinition,
+} from './gun-range-test-bay';
 import type { ArenaMap, BreakableWindow, PracticeTarget } from './map';
+import type { DynamicWorldCollider } from './physics';
 import type { Team } from './protocol';
 import { createRustworksWelshFlag } from './rustworks-flag';
 import { makeEmissiveOnly } from './rendering/light-occlusion';
@@ -1560,6 +1571,111 @@ function flyingBlackCat(targets: PracticeTarget[], root: THREE.Group): void {
   });
 }
 
+type GunRangeTestDummyPresentation = Readonly<{
+  root: THREE.Group;
+  definition: GunRangeTestBayDummyDefinition;
+}>;
+
+export type GunRangeTestBayDoorFrame = Readonly<{
+  state: GunRangeTestBayDoorState;
+  audioIntent: 'secure-door-opening-thump' | null;
+  collisionChanged: boolean;
+  dynamicColliders: readonly DynamicWorldCollider[];
+}>;
+
+function gunRangeTrainingDummy(
+  builder: Builder,
+  targets: PracticeTarget[],
+  definition: GunRangeTestBayDummyDefinition,
+  index: number,
+): GunRangeTestDummyPresentation {
+  const root = new THREE.Group();
+  root.name = `gun-range-${definition.id}`;
+  root.userData.targetId = definition.id;
+  root.userData.targetKind = 'training-dummy';
+  root.userData.armed = false;
+  root.userData.walkSpeedMps = definition.speedMps;
+  root.userData.scoreValue = 250;
+  root.userData.maxHealth = 300;
+  // Review capture and compatibility renderers must not turn the slow targets
+  // into black silhouettes when authored practical lights are culled. These
+  // are painted training robots, so an unlit albedo is also semantically apt.
+  const shell = new THREE.MeshBasicMaterial({ color: index % 2 === 0 ? 0xb9c8ca : 0x9aabad, toneMapped: false });
+  const armour = new THREE.MeshBasicMaterial({ color: index % 2 === 0 ? 0x279aa0 : 0xb87832, toneMapped: false });
+  const joint = new THREE.MeshBasicMaterial({ color: 0x263337, toneMapped: false });
+  const parts: THREE.Mesh[] = [];
+  const part = (
+    name: string,
+    geometry: THREE.BufferGeometry,
+    material: THREE.Material,
+    position: [number, number, number],
+    hitZone: 'head' | 'body' | 'limb',
+  ): THREE.Mesh => {
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = `gun-range-${definition.id}-${name}`;
+    mesh.position.set(...position);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.userData.targetRoot = root;
+    mesh.userData.targetId = definition.id;
+    mesh.userData.hitZone = hitZone;
+    mesh.userData.impactSurface = 'metal';
+    root.add(mesh);
+    builder.raycastMeshes.push(mesh);
+    parts.push(mesh);
+    return mesh;
+  };
+  part('torso', new THREE.BoxGeometry(0.72, 0.94, 0.38), armour, [0, 1.32, 0], 'body');
+  part('pelvis', new THREE.BoxGeometry(0.55, 0.34, 0.34), shell, [0, 0.72, 0], 'body');
+  part('head', new THREE.SphereGeometry(0.27, 14, 10), shell, [0, 2.08, 0], 'head');
+  for (const side of [-1, 1] as const) {
+    part(`arm-${side}`, new THREE.CapsuleGeometry(0.105, 0.62, 4, 8), shell, [side * 0.52, 1.28, 0], 'limb').rotation.z = side * 0.13;
+    part(`leg-${side}`, new THREE.CapsuleGeometry(0.13, 0.72, 4, 8), joint, [side * 0.2, 0.24, 0], 'limb');
+  }
+  root.userData.targetMeshes = parts;
+  root.position.set(definition.start.x, definition.start.y, definition.start.z);
+  builder.root.add(root);
+  targets.push({
+    id: definition.id,
+    root,
+    active: true,
+    respawnAt: 0,
+    respawnDelayMs: 2_500,
+    scoreValue: 250,
+    distanceBand: 'mid',
+    maxHealth: 300,
+    health: 300,
+    kind: 'training-dummy',
+  });
+  return Object.freeze({ root, definition });
+}
+
+function syncGunRangeTestBayDoorLeaf(root: THREE.Object3D, state: GunRangeTestBayDoorState): void {
+  const leaf = root.getObjectByName('gun-range-test-bay-secure-door-leaf');
+  if (!leaf) return;
+  const bounds = gunRangeTestBayDoorLeafBounds(state);
+  leaf.position.y = ((bounds.minY ?? 0) + (bounds.maxY ?? 0)) / 2;
+  leaf.userData.phase = state.phase;
+  leaf.userData.openness = state.openness;
+}
+
+/**
+ * Narrow frame API for the main runtime. The caller owns audio delivery and
+ * must merge dynamicColliders into the existing Rapier reconciliation set.
+ */
+export function updateGunRangeTestBayDoor(
+  root: THREE.Object3D,
+  nowMs: number,
+  observerPosition: Readonly<{ x: number; y: number; z: number }>,
+): GunRangeTestBayDoorFrame {
+  const prior = (root.userData.gunRangeTestBayDoorState as GunRangeTestBayDoorState | undefined)
+    ?? createGunRangeTestBayDoorState(nowMs);
+  const step = advanceGunRangeTestBayDoor(prior, nowMs, observerPosition);
+  root.userData.gunRangeTestBayDoorState = step.state;
+  syncGunRangeTestBayDoorLeaf(root, step.state);
+  return Object.freeze({ ...step, dynamicColliders: gunRangeTestBayDoorDynamicColliders(step.state) });
+}
+
 export function buildGunRange(scene: THREE.Scene): ArenaMap {
   const root = new THREE.Group();
   root.name = 'Acres Indoor Gun Range arena';
@@ -1606,9 +1722,139 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   // acoustic/ballistic inserts preserve contrast without turning the room black.
   box(builder, 'gun-range-backstop', [0, 3.6, -49], [42, 7.2, 1.2], dark);
   box(builder, 'gun-range-left-wall', [-20.5, 3.6, -14.5], [1, 7.2, 70], wall);
-  box(builder, 'gun-range-right-wall', [20.5, 3.6, -14.5], [1, 7.2, 70], wall);
+  // Split the east wall around the 8 m test-bay portal. The two solids retain
+  // the original shell identity while leaving movement and shots genuinely
+  // clear through z=8..16; no opaque/collider plane masks the new opening.
+  box(builder, 'gun-range-right-wall', [20.5, 3.6, -20.5], [1, 7.2, 57], wall);
+  box(builder, 'gun-range-right-wall', [20.5, 3.6, 18], [1, 7.2, 4], wall);
   box(builder, 'gun-range-rear-wall', [0, 3.6, 20], [42, 7.2, 1], wall);
   box(builder, 'gun-range-ceiling', [0, 7.1, -14.5], [42, 0.45, 70], ceiling, { solid: false, shots: true });
+
+  // Pass 66 grey-room annex. Ordinary forward walk is 6.15 m/s, so the
+  // 30.75 m entry-to-door approach is exactly five seconds without sprinting.
+  const testBayWall = terminalSurfaceMaterial('panel', 0x9aa3a6, '#4e5a5e', 0.62, 0.48, [6, 4]);
+  testBayWall.name = 'GunRange_TestBay_GreyWall_PanelTexture';
+  testBayWall.emissive.setHex(0x465155);
+  testBayWall.emissiveIntensity = 0.52;
+  const testBayFloor = terminalSurfaceMaterial('concrete', 0x596164, '#a5afb2', 0.88, 0.16, [12, 16]);
+  testBayFloor.name = 'GunRange_TestBay_GreyFloor_Texture';
+  testBayFloor.emissive.setHex(0x293235);
+  testBayFloor.emissiveIntensity = 0.42;
+  const testBayCeiling = terminalSurfaceMaterial('panel', 0x525d61, '#192225', 0.7, 0.5, [10, 8]);
+  testBayCeiling.name = 'GunRange_TestBay_GreyCeiling_PanelTexture';
+  testBayCeiling.emissive.setHex(0x252f32);
+  testBayCeiling.emissiveIntensity = 0.4;
+  const testBayCyan = new THREE.MeshBasicMaterial({ color: 0x35b9b6, toneMapped: false });
+  const testBayAmber = new THREE.MeshBasicMaterial({ color: 0xd49742, toneMapped: false });
+  const testBayVisibleFloor = new THREE.MeshBasicMaterial({ color: 0x303c40, toneMapped: false });
+  const testBayVisibleWall = new THREE.MeshBasicMaterial({ color: 0x465358, toneMapped: false });
+  const testBayVisibleCeiling = new THREE.MeshBasicMaterial({ color: 0x263237, toneMapped: false });
+  const secureDoorMaterial = new THREE.MeshStandardMaterial({ color: 0x283236, emissive: 0x14262a, emissiveIntensity: 0.48, roughness: 0.5, metalness: 0.78 });
+
+  box(builder, 'gun-range-test-bay-corridor-floor', [35.75, -0.08, 12], [30.5, 0.16, 8], testBayFloor, { solid: false, shots: true });
+  box(builder, 'gun-range-test-bay-corridor-north-wall', [35.75, 2.6, 7.75], [30.5, 5.2, 0.5], testBayWall, { ballisticMaterial: 'structural-metal' });
+  box(builder, 'gun-range-test-bay-corridor-south-wall', [35.75, 2.6, 16.25], [30.5, 5.2, 0.5], testBayWall, { ballisticMaterial: 'structural-metal' });
+  box(builder, 'gun-range-test-bay-corridor-ceiling', [35.75, 5.15, 12], [30.5, 0.35, 8.5], testBayCeiling, { solid: false, shots: true });
+  // Thin unlit interior skins guarantee a readable grey-room silhouette in
+  // deterministic captures without becoming collision or shot authority.
+  for (const skin of [
+    box(builder, 'gun-range-test-bay-corridor-floor-skin', [35.75, 0.012, 12], [30.25, 0.024, 7.55], testBayVisibleFloor, { solid: false, shots: false, cast: false }),
+    box(builder, 'gun-range-test-bay-corridor-north-skin', [35.75, 2.55, 8.015], [30.25, 4.9, 0.03], testBayVisibleWall, { solid: false, shots: false, cast: false }),
+    box(builder, 'gun-range-test-bay-corridor-south-skin', [35.75, 2.55, 15.985], [30.25, 4.9, 0.03], testBayVisibleWall, { solid: false, shots: false, cast: false }),
+    box(builder, 'gun-range-test-bay-corridor-ceiling-skin', [35.75, 4.955, 12], [30.25, 0.03, 7.55], testBayVisibleCeiling, { solid: false, shots: false, cast: false }),
+  ]) skin.userData.presentationBatchCandidate = false;
+  for (const x of [24, 29, 34, 39, 44, 49]) {
+    const ceilingRib = box(builder, 'gun-range-test-bay-corridor-light-rib', [x, 4.88, 12], [0.18, 0.12, 7.2], x % 2 === 0 ? testBayCyan : testBayAmber, { solid: false, shots: false, cast: false });
+    ceilingRib.userData.presentationBatchCandidate = false;
+    for (const [sideIndex, z] of [8.03, 15.97].entries()) {
+      const wallRib = box(builder, 'gun-range-test-bay-corridor-wall-rib', [x, 2.45, z], [0.16, 4.55, 0.08], sideIndex === 0 ? testBayCyan : testBayAmber, { solid: false, shots: false, cast: false });
+      wallRib.userData.presentationBatchCandidate = false;
+    }
+  }
+  for (const guide of [
+    box(builder, 'gun-range-test-bay-corridor-guide-cyan', [35.75, 0.025, 9.15], [30.5, 0.05, 0.18], testBayCyan, { solid: false, shots: false, cast: false }),
+    box(builder, 'gun-range-test-bay-corridor-guide-amber', [35.75, 0.026, 14.85], [30.5, 0.052, 0.18], testBayAmber, { solid: false, shots: false, cast: false }),
+    box(builder, 'gun-range-test-bay-corridor-wall-guide-cyan', [35.75, 1.12, 8.03], [30.5, 0.15, 0.08], testBayCyan, { solid: false, shots: false, cast: false }),
+    box(builder, 'gun-range-test-bay-corridor-wall-guide-amber', [35.75, 1.12, 15.97], [30.5, 0.15, 0.08], testBayAmber, { solid: false, shots: false, cast: false }),
+  ]) guide.userData.presentationBatchCandidate = false;
+
+  // Large 48.5 x 64 m bay: west wall is split around the secure door aperture.
+  box(builder, 'gun-range-test-bay-floor', [75.75, -0.08, 6], [48.5, 0.16, 64], testBayFloor, { solid: false, shots: true });
+  box(builder, 'gun-range-test-bay-ceiling', [75.75, 8.35, 6], [48.5, 0.35, 64], testBayCeiling, { solid: false, shots: true });
+  box(builder, 'gun-range-test-bay-east-wall', [100.25, 4.25, 6], [0.5, 8.5, 64.5], testBayWall, { ballisticMaterial: 'structural-metal' });
+  box(builder, 'gun-range-test-bay-north-wall', [75.75, 4.25, -26.25], [49, 8.5, 0.5], testBayWall, { ballisticMaterial: 'structural-metal' });
+  box(builder, 'gun-range-test-bay-south-wall', [75.75, 4.25, 38.25], [49, 8.5, 0.5], testBayWall, { ballisticMaterial: 'structural-metal' });
+  box(builder, 'gun-range-test-bay-west-wall-north', [51.75, 4.25, -9], [0.5, 8.5, 34], testBayWall, { ballisticMaterial: 'structural-metal' });
+  box(builder, 'gun-range-test-bay-west-wall-south', [51.75, 4.25, 27], [0.5, 8.5, 22], testBayWall, { ballisticMaterial: 'structural-metal' });
+  for (const skin of [
+    box(builder, 'gun-range-test-bay-floor-skin', [75.75, 0.012, 6], [48, 0.024, 63.5], testBayVisibleFloor, { solid: false, shots: false, cast: false }),
+    box(builder, 'gun-range-test-bay-ceiling-skin', [75.75, 8.155, 6], [48, 0.03, 63.5], testBayVisibleCeiling, { solid: false, shots: false, cast: false }),
+    box(builder, 'gun-range-test-bay-east-wall-skin', [99.985, 4.15, 6], [0.03, 8, 63.5], testBayVisibleWall, { solid: false, shots: false, cast: false }),
+    box(builder, 'gun-range-test-bay-north-wall-skin', [75.75, 4.15, -25.985], [48, 8, 0.03], testBayVisibleWall, { solid: false, shots: false, cast: false }),
+    box(builder, 'gun-range-test-bay-south-wall-skin', [75.75, 4.15, 37.985], [48, 8, 0.03], testBayVisibleWall, { solid: false, shots: false, cast: false }),
+  ]) skin.userData.presentationBatchCandidate = false;
+  box(builder, 'gun-range-test-bay-door-frame-top', [51.75, 7.45, 12], [1.05, 1.9, 8.5], secureDoorMaterial, { ballisticMaterial: 'structural-metal' });
+  box(builder, 'gun-range-test-bay-door-rail-north', [51.6, 3.3, 8.05], [0.3, 6.6, 0.3], secureDoorMaterial, { solid: false, shots: false });
+  box(builder, 'gun-range-test-bay-door-rail-south', [51.6, 3.3, 15.95], [0.3, 6.6, 0.3], secureDoorMaterial, { solid: false, shots: false });
+  const secureDoor = box(builder, 'gun-range-test-bay-secure-door-leaf', [51.5, 10.25, 12], [0.7, 6.5, 7.6], secureDoorMaterial, { solid: false, shots: false });
+  secureDoor.userData.presentationBatchCandidate = false;
+  secureDoor.userData.dynamic = true;
+  secureDoor.userData.authorityId = GUN_RANGE_TEST_BAY_CONTRACT.door.id;
+  secureDoor.userData.portalCollisionStatus = 'runtime-helper-required';
+  secureDoor.userData.defaultFailsOpen = true;
+  for (const z of [-19, -7, 5, 17, 29]) {
+    box(builder, 'gun-range-test-bay-ceiling-light', [75.5, 8.02, z], [35, 0.12, 0.3], z % 2 === 0 ? testBayAmber : testBayCyan, { solid: false, shots: false, cast: false });
+  }
+  for (const x of [59, 67, 75, 83, 91, 99]) {
+    const grid = box(builder, 'gun-range-test-bay-floor-grid-x', [x, 0.023, 6], [0.11, 0.046, 62], x % 2 === 0 ? testBayAmber : testBayCyan, { solid: false, shots: false, cast: false });
+    grid.userData.presentationBatchCandidate = false;
+  }
+  for (const z of [-20, -10, 0, 10, 20, 30]) {
+    const grid = box(builder, 'gun-range-test-bay-floor-grid-z', [75.75, 0.024, z], [47, 0.048, 0.11], z % 20 === 0 ? testBayAmber : testBayCyan, { solid: false, shots: false, cast: false });
+    grid.userData.presentationBatchCandidate = false;
+  }
+
+  const testBaySign = rangeSign('SECURE SYSTEMS TEST BAY', 0x53ded8, 'gun-range-test-bay-sign', [13.5, 0.95]);
+  if (testBaySign) {
+    testBaySign.position.set(52.15, 6.65, 12);
+    testBaySign.rotation.y = -Math.PI / 2;
+    if (!Array.isArray(testBaySign.material)) testBaySign.material.side = THREE.FrontSide;
+    root.add(testBaySign);
+  }
+  const supportSign = rangeSign('ALL SUPPORT SYSTEMS', 0xf0b24b, 'gun-range-test-bay-support-sign', [11.5, 0.82]);
+  if (supportSign) {
+    supportSign.position.set(99.85, 6.6, 6);
+    supportSign.rotation.y = -Math.PI / 2;
+    if (!Array.isArray(supportSign.material)) supportSign.material.side = THREE.FrontSide;
+    root.add(supportSign);
+  }
+
+  // These pads are honest structural stations. Their canonical IDs are
+  // projected from the killstreak catalog; the main runtime consumes the IDs
+  // through the normal host-authoritative support and weapon admission paths.
+  for (const [index, station] of GUN_RANGE_TEST_BAY_CONTRACT.supportStations.entries()) {
+    const pad = box(builder, `gun-range-test-bay-support-pad-${station.id}`, [station.position.x, 0.06, station.position.z], [5.6, 0.12, 5.6], index % 2 === 0 ? testBayAmber : testBayCyan, { solid: false, shots: false, cast: false });
+    pad.userData.supportId = station.id;
+    pad.userData.runtimeStatus = station.runtimeStatus;
+  }
+  for (const [index, station] of GUN_RANGE_TEST_BAY_CONTRACT.weaponStations.entries()) {
+    const marker = box(builder, `gun-range-test-bay-weapon-marker-${station.id}`, [station.position.x, 0.055, station.position.z], [4.8, 0.11, 0.5], index % 2 === 0 ? testBayCyan : testBayAmber, { solid: false, shots: false, cast: false });
+    marker.userData.weaponId = station.id;
+    marker.userData.runtimeStatus = station.runtimeStatus;
+  }
+
+  const testDummyPresentations = GUN_RANGE_TEST_BAY_CONTRACT.dummies.map(
+    (definition, index) => gunRangeTrainingDummy(builder, targets, definition, index),
+  );
+  root.userData.gunRangeTestDummies = testDummyPresentations;
+  root.userData.gunRangeTestBayContract = GUN_RANGE_TEST_BAY_CONTRACT;
+  root.userData.gunRangeTestBayRuntime = Object.freeze({
+    structure: 'implemented',
+    slowUnarmedTargets: 'implemented',
+    doorHelper: 'integrated-by-main-runtime',
+    supportActivation: 'host-authoritative-training-integration',
+    weaponInteraction: 'canonical-training-integration',
+  });
 
   // Suspended acoustic baffles and side ventilation sell the large industrial
   // interior while leaving the floor plan broad and readable.
@@ -1811,7 +2057,7 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     houses: [],
     breakableWindows: [],
     physicalCover: [],
-    bounds: { minX: -20, maxX: 20, minZ: -48, maxZ: 19.5 },
+    bounds: { minX: -20, maxX: 100, minZ: -48, maxZ: 38 },
     houseTelemetry: emptyTelemetry(),
   };
 }
@@ -1837,6 +2083,27 @@ export function updateGunRangePresentation(root: THREE.Object3D, nowMs: number):
       + Number(target.userData.lateralPhaseRadians);
     target.position.x = Number(target.userData.lateralOriginX)
       + Math.sin(phase) * Number(target.userData.lateralAmplitudeM);
+  });
+  const testDummies = root.userData.gunRangeTestDummies as GunRangeTestDummyPresentation[] | undefined;
+  testDummies?.forEach(({ root: dummy, definition }, index) => {
+    const pose = gunRangeTestBayDummyPose(definition, nowMs);
+    dummy.position.set(
+      pose.position.x,
+      pose.position.y + Math.abs(Math.sin(nowMs * 0.004 + index)) * 0.025,
+      pose.position.z,
+    );
+    dummy.rotation.y = pose.yawRadians;
+    const arms = [
+      dummy.getObjectByName(`gun-range-${definition.id}-arm--1`),
+      dummy.getObjectByName(`gun-range-${definition.id}-arm-1`),
+    ];
+    const legs = [
+      dummy.getObjectByName(`gun-range-${definition.id}-leg--1`),
+      dummy.getObjectByName(`gun-range-${definition.id}-leg-1`),
+    ];
+    const stride = Math.sin(nowMs * 0.0045 + index * 0.8) * 0.26;
+    arms.forEach((limb, limbIndex) => { if (limb) limb.rotation.x = limbIndex === 0 ? stride : -stride; });
+    legs.forEach((limb, limbIndex) => { if (limb) limb.rotation.x = limbIndex === 0 ? -stride : stride; });
   });
 }
 

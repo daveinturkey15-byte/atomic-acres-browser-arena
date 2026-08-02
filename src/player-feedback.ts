@@ -20,6 +20,8 @@ export const THIRD_PERSON_WEAPON_SCALE: Readonly<Record<WeaponId, number>> = Obj
   'slug-shotgun': 0.46,
   'flashlight-pistol': 0.54,
   'explosive-crossbow': 0.5,
+  flamethrower: 0.42,
+  'flare-gun': 0.54,
 });
 
 export type DamageNumberPresentation = Readonly<{

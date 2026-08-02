@@ -26,6 +26,31 @@ const HARDWARE_VERIFIER_ID = 'pass65-installed-chrome-hardware-webgl2-admission'
 const HARDWARE_VERIFIER_VERSION = '1';
 export const PASS66_BROWSER_FOREGROUND_TEST_ID = 'T-BROWSER-FOREGROUND-POLICY';
 export const PASS66_HIDDEN_TAB_TEST_ID = 'T-HIDDEN-TAB-ADMISSION';
+export const PASS66_EXACT_PACKAGE_SCRIPTS = Object.freeze({
+  'qa:pass66:owned-browser-verifier-contract': 'node --test scripts/qa/pass66-owned-browser-verifier-contract.test.mjs',
+  'qa:pass66:multiplayer-stability': 'node --test scripts/qa/pass66-multiplayer-stability-contract.test.mjs && npm run qa:pass66:owned-browser-verifier-contract && node scripts/qa/run-pass66-owned-browser-verifier.mjs multiplayer-stability',
+  'qa:pass61:netcode': 'npm run qa:pass66:owned-browser-verifier-contract && node scripts/qa/run-pass66-owned-browser-verifier.mjs pass61-netcode',
+  'qa:private-lobby': 'npm run qa:pass66:owned-browser-verifier-contract && node scripts/qa/run-pass66-owned-browser-verifier.mjs private-lobby',
+  'qa:pass66:pass63-multiplayer-comparator': 'node scripts/qa/run-pass66-pass63-multiplayer-comparator.mjs',
+  'qa:pass66:ads-catalog': 'npm run qa:pass66:ads-catalog:edge-webgl2 && npm run qa:pass66:ads-catalog:edge-webgpu',
+  'qa:pass66:ads-catalog:edge-webgl2': 'node scripts/qa/run-pass66-ads-sight-catalog.mjs edge-webgl2',
+  'qa:pass66:ads-catalog:edge-webgpu': 'node scripts/qa/run-pass66-ads-sight-catalog.mjs edge-webgpu',
+  'qa:pass66:sky-webgpu': 'node scripts/qa/verify-pass66-atomic-sky-webgpu.mjs',
+  'qa:pass66:viewmodel-framing': 'node scripts/qa/verify-pass66-viewmodel-framing.mjs',
+  'qa:pass66:prone-contact-matrix': 'node scripts/qa/run-pass66-prone-contact-matrix.mjs',
+  'qa:pass66:support-operate-prompt': 'npm run qa:pass66:owned-browser-verifier-contract && node scripts/qa/run-pass66-owned-browser-verifier.mjs support-operate-prompt',
+  'qa:pass66:hidden-tab': 'npm run qa:pass66:hidden-tab:contract && npm run build && npm run stage:release-topology && node scripts/qa/run-with-preview-server.mjs node scripts/qa/run-pass66-hidden-tab-matrix.mjs',
+  'qa:pass66:hidden-tab:contract': 'node --test scripts/qa/pass66-hidden-tab-contract.test.mjs',
+  'qa:pass66:audio-long-run': 'node scripts/qa/run-pass66-audio-long-run.mjs',
+  'qa:pass66:killstreak-demo-videos': 'tsx scripts/qa/finalize-pass66-killstreak-demo-media.ts --verify-only',
+  'qa:pass66:installed-firefox': 'npm run qa:pass66:owned-browser-verifier-contract && node scripts/qa/run-pass66-owned-browser-verifier.mjs installed-firefox',
+  'qa:pass66:browser-admission': 'npm run qa:pass66:browser-admission:edge-webgl2 && npm run qa:pass66:browser-admission:edge-webgpu && npm run qa:pass66:browser-admission:webkit',
+  'qa:pass66:browser-admission:edge-webgl2': 'node scripts/qa/run-pass66-browser-admission.mjs edge-webgl2',
+  'qa:pass66:browser-admission:edge-webgpu': 'node scripts/qa/run-pass66-browser-admission.mjs edge-webgpu',
+  'qa:pass66:browser-admission:webkit': 'node scripts/qa/run-pass66-browser-admission.mjs webkit',
+  'qa:playwright-topology': 'node scripts/qa/run-playwright-with-topology.mjs',
+  'qa:pass64:railgun': 'npm run qa:playwright-topology -- tests/e2e/pass64-railgun.spec.ts tests/e2e/pass65-railgun-multihit.spec.ts --project=chromium --workers=1 --retries=0',
+});
 const SHA40 = /^[0-9a-f]{40}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const TEST_ID = /^T-[A-Z0-9-]+$/;
@@ -102,6 +127,7 @@ const PASS66_BLOCKING_TEST_CONTRACTS = Object.freeze([
     paths: Object.freeze([
       'scripts/qa/pass66-hidden-tab-contract.mjs',
       'scripts/qa/pass66-hidden-tab-contract.test.mjs',
+      'scripts/qa/run-pass66-hidden-tab-matrix.mjs',
       'scripts/qa/verify-pass66-hidden-tab-admission.mjs',
     ]),
     evidenceKinds: Object.freeze(['browser']),
@@ -192,9 +218,246 @@ const PASS66_BLOCKING_TEST_CONTRACTS = Object.freeze([
     evidenceKinds: Object.freeze([]),
     feedbackIds: Object.freeze(['HF-159', 'HF-160']),
   }),
+  Object.freeze({
+    id: 'T-MULTIPLAYER-STABILITY',
+    command: 'npm run qa:pass66:multiplayer-stability',
+    paths: Object.freeze([
+      'package.json',
+      'scripts/qa/pass66-multiplayer-stability-contract.mjs',
+      'scripts/qa/pass66-multiplayer-stability-contract.test.mjs',
+      'scripts/qa/pass66-owned-browser-verifier-contract.mjs',
+      'scripts/qa/pass66-owned-browser-verifier-contract.test.mjs',
+      'scripts/qa/run-pass66-owned-browser-verifier.mjs',
+      'scripts/qa/verify-pass66-multiplayer-stability.mjs',
+      'tests/e2e/pass66-e2e-support.ts',
+      'tests/e2e/pass66-host-crash-rejoin.spec.ts',
+      'tests/e2e/pass66-owner-feedback-multiplayer-ui.spec.ts',
+      'tests/e2e/pass66-timed-map-weapons-multiplayer-rejoin.spec.ts',
+      'tests/e2e/pass66-qoder-multiplayer-authority.spec.ts',
+      'tests/e2e/pass66-adrenaline-match-lifecycle.spec.ts',
+    ]),
+    evidenceKinds: Object.freeze(['browser']),
+    feedbackIds: Object.freeze(['HF-071', 'HF-138']),
+  }),
+  Object.freeze({
+    id: 'T-PASS61-NETCODE',
+    command: 'npm run qa:pass61:netcode',
+    paths: Object.freeze([
+      'package.json',
+      'scripts/qa/pass66-owned-browser-verifier-contract.mjs',
+      'scripts/qa/pass66-owned-browser-verifier-contract.test.mjs',
+      'scripts/qa/run-pass66-owned-browser-verifier.mjs',
+      'scripts/qa/verify-pass61-authoritative-netcode.mjs',
+    ]),
+    evidenceKinds: Object.freeze(['browser']),
+    feedbackIds: Object.freeze(['HF-071']),
+  }),
+  Object.freeze({
+    id: 'T-PRIVATE-LOBBY',
+    command: 'npm run qa:private-lobby',
+    paths: Object.freeze([
+      'package.json',
+      'scripts/qa/pass66-owned-browser-verifier-contract.mjs',
+      'scripts/qa/pass66-owned-browser-verifier-contract.test.mjs',
+      'scripts/qa/run-pass66-owned-browser-verifier.mjs',
+      'scripts/qa/verify-private-lobby.mjs',
+    ]),
+    evidenceKinds: Object.freeze(['browser']),
+    feedbackIds: Object.freeze(['HF-064', 'HF-150']),
+  }),
+  Object.freeze({
+    id: 'T-PASS63-MULTIPLAYER-COMPARATOR',
+    command: 'npm run qa:pass66:pass63-multiplayer-comparator',
+    paths: Object.freeze([
+      'package.json',
+      'scripts/qa/run-pass66-pass63-multiplayer-comparator.mjs',
+      'src/pass66-pass63-multiplayer-comparator-contract.ts',
+      'src/pass66-pass63-multiplayer-comparator-contract.test.ts',
+      'tests/e2e/pass66-pass63-multiplayer-comparator.spec.ts',
+    ]),
+    evidenceKinds: Object.freeze(['browser']),
+    feedbackIds: Object.freeze(['HF-071', 'HF-138']),
+  }),
+  Object.freeze({
+    id: 'T-ADS-SIGHT-CATALOG',
+    command: 'npm run qa:pass66:ads-catalog',
+    paths: Object.freeze([
+      'package.json',
+      'scripts/qa/run-pass66-ads-sight-catalog.mjs',
+      'src/ads-sight-profile.ts',
+      'tests/e2e/pass66-ads-sight-catalog.spec.ts',
+    ]),
+    evidenceKinds: Object.freeze(['browser', 'visual']),
+    visualArtifactPaths: Object.freeze(['artifacts/pass66/ads-sight-catalog']),
+    feedbackIds: Object.freeze(['HF-023', 'HF-164', 'HF-189']),
+  }),
+  Object.freeze({
+    id: 'T-SCOPED-ADS',
+    command: 'npm run qa:playwright-topology -- tests/e2e/pass66-scoped-ads-regressions.spec.ts --project=chromium --workers=1 --retries=0',
+    paths: Object.freeze([
+      'package.json',
+      'tests/e2e/pass66-scoped-ads-regressions.spec.ts',
+    ]),
+    evidenceKinds: Object.freeze(['browser', 'visual']),
+    visualArtifactPaths: Object.freeze(['artifacts/pass66/scoped-ads']),
+    feedbackIds: Object.freeze(['HF-023', 'HF-164', 'HF-189']),
+  }),
+  Object.freeze({
+    id: 'T-SKY-WEBGPU',
+    command: 'npm run qa:pass66:sky-webgpu',
+    paths: Object.freeze([
+      'package.json',
+      'scripts/qa/verify-pass66-atomic-sky-webgpu.mjs',
+      'src/rendering/sky-backdrop.ts',
+      'src/rendering/sky-backdrop.test.ts',
+    ]),
+    evidenceKinds: Object.freeze(['browser', 'visual']),
+    visualArtifactPaths: Object.freeze(['artifacts/pass66/sky-backdrops']),
+    feedbackIds: Object.freeze(['HF-072', 'HF-138']),
+  }),
+  Object.freeze({
+    id: 'T-VIEWMODEL-FRAMING',
+    command: 'npm run qa:pass66:viewmodel-framing',
+    paths: Object.freeze([
+      'package.json',
+      'scripts/qa/verify-pass66-viewmodel-framing.mjs',
+      'src/viewmodel-framing.test.ts',
+    ]),
+    evidenceKinds: Object.freeze(['browser', 'visual']),
+    visualArtifactPaths: Object.freeze(['artifacts/pass66/viewmodel-framing']),
+    feedbackIds: Object.freeze(['HF-162', 'HF-163', 'HF-166']),
+  }),
+  Object.freeze({
+    id: 'T-PRONE-CONTACT-MATRIX',
+    command: 'npm run qa:pass66:prone-contact-matrix',
+    paths: Object.freeze([
+      'package.json',
+      'scripts/qa/run-pass66-prone-contact-matrix.mjs',
+      'tests/e2e/pass66-prone-contact-matrix.spec.ts',
+    ]),
+    evidenceKinds: Object.freeze(['browser']),
+    feedbackIds: Object.freeze(['HF-157', 'HF-166']),
+  }),
+  Object.freeze({
+    id: 'T-SUPPORT-OPERATE-PROMPT',
+    command: 'npm run qa:pass66:support-operate-prompt',
+    paths: Object.freeze([
+      'package.json',
+      'scripts/qa/pass66-owned-browser-verifier-contract.mjs',
+      'scripts/qa/pass66-owned-browser-verifier-contract.test.mjs',
+      'scripts/qa/run-pass66-owned-browser-verifier.mjs',
+      'scripts/qa/run-pass66-support-operate-prompt-evidence.mjs',
+      'tests/e2e/pass66-support-operate-prompt.spec.ts',
+    ]),
+    evidenceKinds: Object.freeze(['browser', 'visual']),
+    visualArtifactPaths: Object.freeze(['artifacts/pass66/support-operate-prompt']),
+    feedbackIds: Object.freeze(['HF-150', 'HF-187']),
+  }),
+  Object.freeze({
+    id: 'T-AUDIO-LONG-RUN',
+    command: 'npm run qa:pass66:audio-long-run',
+    paths: Object.freeze([
+      'package.json',
+      'scripts/qa/run-pass66-audio-long-run.mjs',
+      'src/pass66-audio-long-run-runner.test.ts',
+      'tests/e2e/pass66-audio-long-run.spec.ts',
+    ]),
+    evidenceKinds: Object.freeze(['browser']),
+    feedbackIds: Object.freeze(['HF-141', 'HF-165']),
+  }),
+  Object.freeze({
+    id: 'T-KILLSTREAK-DEMO-VIDEOS',
+    command: 'npm run qa:pass66:killstreak-demo-videos',
+    paths: Object.freeze([
+      'package.json',
+      'scripts/qa/finalize-pass66-killstreak-demo-media.ts',
+      'src/killstreak-demo-capture-contract.ts',
+      'src/killstreak-demo-published-media.test.ts',
+      'source-assets/killstreak-demo/pass66-real-test-bay-capture-receipt.json',
+      'public/assets/original/killstreak-demo/manifest.json',
+    ]),
+    evidenceKinds: Object.freeze(['contract']),
+    feedbackIds: Object.freeze(['HF-148', 'HF-185']),
+  }),
+  Object.freeze({
+    id: 'T-BROWSER-ADMISSION',
+    command: 'npm run qa:pass66:browser-admission',
+    paths: Object.freeze([
+      'package.json',
+      'scripts/qa/run-pass66-browser-admission.mjs',
+      'tests/e2e/pass66-browser-admission-cycles.spec.ts',
+    ]),
+    evidenceKinds: Object.freeze(['browser']),
+    feedbackIds: Object.freeze(['HF-001', 'HF-002', 'HF-186']),
+  }),
+  Object.freeze({
+    id: 'T-INSTALLED-FIREFOX',
+    command: 'npm run qa:pass66:installed-firefox',
+    paths: Object.freeze([
+      'package.json',
+      'scripts/qa/pass66-owned-browser-verifier-contract.mjs',
+      'scripts/qa/pass66-owned-browser-verifier-contract.test.mjs',
+      'scripts/qa/run-pass66-owned-browser-verifier.mjs',
+      'scripts/qa/verify-installed-firefox.mjs',
+    ]),
+    evidenceKinds: Object.freeze(['browser']),
+    feedbackIds: Object.freeze(['HF-200']),
+  }),
+  Object.freeze({
+    id: 'T-GUN-RANGE-TEST-BAY',
+    command: 'npm run qa:playwright-topology -- tests/e2e/pass66-gun-range-test-bay.spec.ts --project=chromium --workers=1 --retries=0',
+    paths: Object.freeze([
+      'package.json',
+      'src/gun-range-test-bay.ts',
+      'src/gun-range-test-bay.test.ts',
+      'tests/e2e/pass66-gun-range-test-bay.spec.ts',
+    ]),
+    evidenceKinds: Object.freeze(['browser', 'visual']),
+    visualArtifactPaths: Object.freeze(['artifacts/pass66/gun-range-test-bay']),
+    feedbackIds: Object.freeze(['HF-013', 'HF-071', 'HF-148']),
+  }),
+  Object.freeze({
+    id: 'T-TIMED-MAP-WEAPONS',
+    command: 'npm run qa:playwright-topology -- tests/e2e/pass66-timed-map-weapons.spec.ts --project=chromium --workers=1 --retries=0',
+    paths: Object.freeze([
+      'package.json',
+      'src/timed-map-weapon-authority.ts',
+      'src/timed-map-weapon-authority.test.ts',
+      'tests/e2e/pass66-timed-map-weapons.spec.ts',
+    ]),
+    evidenceKinds: Object.freeze(['browser']),
+    feedbackIds: Object.freeze(['HF-061', 'HF-071']),
+  }),
+  Object.freeze({
+    id: 'T-RAILGUN',
+    command: 'npm run qa:pass64:railgun',
+    paths: Object.freeze([
+      'tests/e2e/pass64-railgun.spec.ts',
+      'tests/e2e/pass65-railgun-multihit.spec.ts',
+      'src/railgun-authority.test.ts',
+      'src/railgun-presentation.test.ts',
+      'src/railgun-result-delivery-contract.test.ts',
+      'src/audio-railgun.test.ts',
+    ]),
+    evidenceKinds: Object.freeze(['browser']),
+    feedbackIds: Object.freeze(['HF-067', 'HF-139', 'HF-140', 'HF-153', 'HF-169']),
+  }),
 ]);
 
-export function validatePass66BlockingCatalog(graph) {
+export function validatePass66ExactPackageScripts(packageScripts) {
+  for (const [scriptId, exactCommand] of Object.entries(PASS66_EXACT_PACKAGE_SCRIPTS)) {
+    if (packageScripts?.[scriptId] !== exactCommand) {
+      fail('E_GRAPH_PASS66_PACKAGE_SCRIPT', `${scriptId} differs from its exact Pass 66 package command.`);
+    }
+  }
+  return { scriptIds: Object.keys(PASS66_EXACT_PACKAGE_SCRIPTS) };
+}
+
+export function validatePass66BlockingCatalog(graph, packageScripts = null) {
+  const resolvedPackageScripts = packageScripts ?? JSON.parse(
+    fs.readFileSync(path.join(DEFAULT_REPO_ROOT, 'package.json'), 'utf8'),
+  ).scripts;
+  validatePass66ExactPackageScripts(resolvedPackageScripts);
   const tests = new Map();
   for (const test of graph?.testCatalog ?? []) {
     if (tests.has(test?.id)) fail('E_GRAPH_PASS66_TEST_CONTRACT', `Pass 66 test catalog duplicates ${String(test?.id)}.`);
@@ -206,7 +469,7 @@ export function validatePass66BlockingCatalog(graph) {
       || test.command !== contract.command
       || !sameArray(test.paths, contract.paths)
       || !sameArray(test.evidenceKinds ?? [], contract.evidenceKinds)
-      || test.visualArtifactPaths !== undefined) {
+      || !sameArray(test.visualArtifactPaths ?? [], contract.visualArtifactPaths ?? [])) {
       fail('E_GRAPH_PASS66_TEST_CONTRACT', `${contract.id} differs from its exact blocking Pass 66 command, verifier paths or evidence kind.`);
     }
   }

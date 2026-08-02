@@ -111,6 +111,41 @@ describe('bounded downloadable match diagnostics', () => {
     expect(MAX_DAMAGE_LEDGER_EVENTS).toBeGreaterThan(MAX_DIAGNOSTIC_EVENTS);
   });
 
+  it('keeps sanitized multiline client stacks in the local technical receipt only', () => {
+    const diagnostics = logger();
+    const retainedMarker = 'end-of-second-frame';
+    diagnostics.setFinalState({
+      clientRuntimeLog: [{
+        timestamp: new Date(0).toISOString(),
+        kind: 'network-warning',
+        message: 'Peer failed token=do-not-export Bearer header-secret',
+        source: 'https://dave:password@192.168.1.42/client.js?resumeToken=query-secret',
+        stack: [
+          'Error: credential=stack-secret',
+          `    at connect (https://arena.example/client.js?token=stack-query:10:2) ${'useful frame context '.repeat(16)}${retainedMarker}`,
+          '    at boot (C:\\Users\\david\\atomic-acres\\src\\main.ts:20:4)',
+        ].join('\n'),
+      }],
+    });
+    const local = JSON.parse(diagnostics.export().json);
+    const runtime = local.finalState.clientRuntimeLog[0];
+    expect(runtime.stack).toContain('\n');
+    expect(runtime.stack).toContain(retainedMarker);
+    expect(runtime.stack).toContain('C:\\Users\\[user]\\atomic-acres\\src\\main.ts:20:4');
+    for (const secret of ['do-not-export', 'header-secret', 'dave', 'password', '192.168.1.42', 'query-secret', 'stack-secret', 'stack-query']) {
+      expect(JSON.stringify(runtime)).not.toContain(secret);
+    }
+
+    const remote = diagnostics.remoteEnvelope({
+      completedAtEpochMs: 1_800_000, pass: 'PASS 66', backend: 'webgpu', durationMs: 1,
+      network: { rttMs: null, jitterMs: 0, clockOffsetMs: 0, interpolationDelayMs: 0, receiverSequenceGaps: 0, receiverReordered: 0, droppedDamageEvents: 0 },
+      participants: [{ id: 'local-player', kind: 'player', team: 'team-1', kills: 0, deaths: 0, damageDealt: 0, damageTaken: 0, finalHealth: 100 }],
+      local: { kills: 0, deaths: 0, shotsFired: 0, hitShots: 0, damageDealt: 0, damageTaken: 0, headshots: 0 },
+    });
+    expect(JSON.stringify(remote)).not.toContain('clientRuntimeLog');
+    expect(JSON.stringify(remote)).not.toContain(retainedMarker);
+  });
+
   it('derives a compact remote envelope with ordered health, regen, admission, net, performance and final evidence', () => {
     const diagnostics = logger();
     diagnostics.record({

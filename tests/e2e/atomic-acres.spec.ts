@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
-import { BOT_GRENADE_POOL, BOT_WEAPON_POOL } from '../../src/bot-ai';
+import { BOT_GRENADE_POOL, BOT_STARTING_WEAPON_POOL } from '../../src/bot-ai';
 import { HIGH_SCORE_SCHEMA_VERSION, HIGH_SCORE_STORAGE_KEY } from '../../src/high-scores';
 
 type DebugState = {
@@ -271,6 +271,7 @@ type DebugState = {
     modelVisibleMeshCount: number;
     adsProgress: number;
     surfaceRetreat: number;
+    surfaceLift: number;
     sightOffset: [number, number] | null;
     armsVisible: boolean;
     armMeshCount: number;
@@ -1208,10 +1209,10 @@ test.describe('solo mechanics', () => {
     }
   });
 
-  test('spawns two matching rigged low-damage combat bots and they navigate', async ({ page }) => {
+  test('spawns one rigged low-damage combat bot and it navigates', async ({ page }) => {
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setBotsFrozen: (frozen: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setBotsFrozen(false));
     const before = await debug(page);
-    expect(before.bots).toHaveLength(2);
+    expect(before.bots).toHaveLength(1);
     expect(before.bots.every((bot) => bot.alive)).toBe(true);
     expect(before.bots.every((bot) => bot.operatorModel !== null
       && bot.operatorModel.source === 'Atomic Acres Pass 65 operator / Quaternius CC0 derivative'
@@ -1269,10 +1270,10 @@ test.describe('solo mechanics', () => {
     expect(initial.bots.every((bot) => bot.presentationWeaponSafe)).toBe(true);
     expect(initial.botEscalation).toMatchObject({
       deaths: 0,
-      initialBots: 2,
-      targetBots: 2,
-      activeBots: 2,
-      dormantBots: 4,
+      initialBots: 1,
+      targetBots: 1,
+      activeBots: 1,
+      dormantBots: 5,
       dormantBotsPrewarmed: true,
       dynamicReinforcementLights: 0,
       maximumBots: 6,
@@ -1281,37 +1282,51 @@ test.describe('solo mechanics', () => {
     for (let death = 1; death <= 10; death += 1) {
       await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { damageBot: (amount: number) => void } }).__ATOMIC_ACRES_DEBUG__.damageBot(999));
       await expect.poll(async () => (await debug(page)).botEscalation.deaths).toBe(death);
-      if (death % 2 === 0) {
-        await expect.poll(async () => (await debug(page)).bots.filter((bot) => bot.alive).length, { timeout: 5_000 }).toBe(death === 10 ? 3 : 2);
-        const respawned = await debug(page);
-        expect(respawned.bots.every((bot) => bot.presentationWeaponSafe)).toBe(true);
-        respawned.bots.forEach((bot) => {
-          observedWeapons.add(bot.weapon);
-          observedGrenades.add(bot.grenade);
-        });
-      }
+      await expect.poll(async () => (await debug(page)).bots.filter((bot) => bot.alive).length, { timeout: 5_000 }).toBe(death === 10 ? 2 : 1);
+      const respawned = await debug(page);
+      expect(respawned.bots.every((bot) => bot.presentationWeaponSafe)).toBe(true);
+      respawned.bots.forEach((bot) => {
+        observedWeapons.add(bot.weapon);
+        observedGrenades.add(bot.grenade);
+      });
     }
     const escalated = await debug(page);
     expect(escalated.botEscalation).toMatchObject({
       deaths: 10,
-      initialBots: 2,
-      targetBots: 3,
-      activeBots: 3,
-      dormantBots: 3,
+      initialBots: 1,
+      targetBots: 2,
+      activeBots: 2,
+      dormantBots: 4,
       dormantBotsPrewarmed: true,
       dynamicReinforcementLights: 0,
       maximumBots: 6,
       nextReinforcementAt: 20,
     });
-    expect(escalated.bots).toHaveLength(3);
-    expect(escalated.bots[2]).toMatchObject({ alive: true, neonHaze: true, presentationReady: true, presentationWeaponSafe: true });
+    expect(escalated.bots).toHaveLength(2);
+    expect(escalated.bots[1]).toMatchObject({ alive: true, neonHaze: true, presentationReady: true, presentationWeaponSafe: true });
     escalated.bots.forEach((bot) => {
       observedWeapons.add(bot.weapon);
       observedGrenades.add(bot.grenade);
     });
-    expect(observedWeapons).toEqual(new Set(BOT_WEAPON_POOL));
+
+    // Starting with one bot yields twelve visible arsenal assignments through
+    // the tenth defeat (initial + ten respawns + the earned reinforcement).
+    // Exercise two more ordinary respawns so the served shuffle bag still
+    // demonstrates every canonical starting weapon without allowing host-owned
+    // timed pickups to leak into random spawn kits.
+    for (let death = 11; death <= 12; death += 1) {
+      await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { damageBot: (amount: number) => void } }).__ATOMIC_ACRES_DEBUG__.damageBot(999));
+      await expect.poll(async () => (await debug(page)).botEscalation.deaths).toBe(death);
+      await expect.poll(async () => (await debug(page)).bots.filter((bot) => bot.alive).length, { timeout: 5_000 }).toBe(2);
+      const respawned = await debug(page);
+      respawned.bots.forEach((bot) => {
+        observedWeapons.add(bot.weapon);
+        observedGrenades.add(bot.grenade);
+      });
+    }
+    expect(observedWeapons).toEqual(new Set(BOT_STARTING_WEAPON_POOL));
     expect(observedGrenades).toEqual(new Set(BOT_GRENADE_POOL));
-    expect(escalated.bots[2].operatorModel).toMatchObject({
+    expect(escalated.bots[1].operatorModel).toMatchObject({
       source: 'Atomic Acres Pass 65 operator / Quaternius CC0 derivative',
       appearance: 'neon-purple', skinnedMeshes: 9, pbrMaterials: 4,
     });
@@ -1767,21 +1782,32 @@ test.describe('solo mechanics', () => {
     await expect(page.locator('#menu-download-match-technical')).toHaveText('TECHNICAL DEBUG JSON');
   });
 
-  test('retreats the first-person weapon and arms before they intersect a nearby wall', async ({ page }) => {
+  test('retreats and lifts the first-person weapon before wall or prone-floor intersection', async ({ page }) => {
     await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
         setBotsFrozen: (frozen: boolean) => void;
         teleportPlayer: (x: number, y: number, z: number, yaw: number, pitch: number) => void;
       } }).__ATOMIC_ACRES_DEBUG__;
       api.setBotsFrozen(true);
-      api.teleportPlayer(12, 1.7, -32.55, 0, 0);
+      // The Pass 66 Gun Range extension turned the old 12/-32.55 fixture into
+      // open floor. Face the retained west-wall collider so this continues to
+      // exercise a real forward obstruction as well as prone-floor clearance.
+      api.teleportPlayer(-19.65, 1.7, -14.5, Math.PI / 2, 0);
     });
     await expect.poll(async () => (await debug(page)).weaponPresentation.surfaceRetreat).toBeGreaterThan(0.15);
     await page.evaluate(() => {
-      (window as unknown as { __ATOMIC_ACRES_DEBUG__: { teleportPlayer: (x: number, y: number, z: number, yaw: number, pitch: number) => void } })
-        .__ATOMIC_ACRES_DEBUG__.teleportPlayer(0, 1.7, 0, Math.PI / 2, 0);
+      (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setStance: (stance: 'prone') => void } })
+        .__ATOMIC_ACRES_DEBUG__.setStance('prone');
     });
-    await expect.poll(async () => (await debug(page)).weaponPresentation.surfaceRetreat).toBe(0);
+    await expect.poll(async () => (await debug(page)).player.stance).toBe('prone');
+    await expect.poll(async () => (await debug(page)).weaponPresentation.surfaceLift).toBeGreaterThanOrEqual(0.13);
+    await expect.poll(async () => (await debug(page)).weaponPresentation.surfaceRetreat).toBeGreaterThan(0.15);
+    await page.evaluate(() => {
+      (window as unknown as { __ATOMIC_ACRES_DEBUG__: { teleportPlayer: (x: number, y: number, z: number, yaw: number, pitch: number) => void } })
+        .__ATOMIC_ACRES_DEBUG__.teleportPlayer(0, 0.7, 0, Math.PI / 2, 0);
+    });
+    await expect.poll(async () => (await debug(page)).weaponPresentation.surfaceRetreat).toBeCloseTo(0.09, 2);
+    await expect.poll(async () => (await debug(page)).weaponPresentation.surfaceLift).toBeGreaterThanOrEqual(0.13);
   });
 
   test('throws a homing Yardhawk and resolves its hunter-killer explosion', async ({ page }) => {
@@ -2108,9 +2134,23 @@ test.describe('solo mechanics', () => {
       }, replacement);
     }
 
+    const swappedOutPrimary = (await debug(page)).player.primaryWeapon;
     await page.keyboard.press('KeyF');
     await expect.poll(async () => (await debug(page)).player.primaryWeapon).toBe(targetDrop.weapon);
-    await expect.poll(async () => (await debug(page)).deathDrops.some((drop) => drop.id === targetDrop.id)).toBe(false);
+    await expect.poll(async () => (await debug(page)).deathDrops.find((drop) => drop.id === targetDrop.id)).toMatchObject({
+      weapon: swappedOutPrimary,
+      weaponAvailable: true,
+    });
+
+    // Exact owner regression: the gun just swapped onto the ground remains an
+    // independent pickup at the player's feet, so pressing F again swaps back
+    // instead of deleting it or selecting a different nearby corpse drop.
+    await page.keyboard.press('KeyF');
+    await expect.poll(async () => (await debug(page)).player.primaryWeapon).toBe(swappedOutPrimary);
+    await expect.poll(async () => (await debug(page)).deathDrops.find((drop) => drop.id === targetDrop.id)).toMatchObject({
+      weapon: targetDrop.weapon,
+      weaponAvailable: true,
+    });
   });
 
   test('keeps the permanent reticle and every physical ADS sight on the authoritative centre ray', async ({ page }) => {

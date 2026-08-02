@@ -139,8 +139,7 @@ describe('HF-135 authoritative Chopper Gunner fire ray', () => {
     expect(farResult.damageEvents).toHaveLength(1);
     expect(farResult.damageEvents[0]).toMatchObject({ targetId: 'far-centre', source: 'chopper' });
     expect(farResult.damageEvents[0]!.damage).toBeLessThanOrEqual(CHOPPER_GUN_PROFILE.damage);
-    const after = activeChopper(runtime, 2_160);
-    const admittedRay = chopperGunnerAuthoritativeRay(after.position, after.attitude, -Math.PI / 2, 0.5);
+    const admittedRay = ray;
     vecClose(farResult.damageEvents[0]!.origin, admittedRay.origin);
     vecClose(farResult.damageEvents[0]!.tracerOrigin, admittedRay.tracerOrigin);
     const endpointDelta = farResult.damageEvents[0]!.endpoint.map((value, axis) => value - admittedRay.origin[axis]) as unknown as SupportVec3;
@@ -177,6 +176,27 @@ describe('HF-135 authoritative Chopper Gunner fire ray', () => {
     )).toBeGreaterThan(0.5);
   });
 
+  it('resolves an accepted player shot from its snapshot camera before a low-FPS flight step', () => {
+    const { runtime, entityId } = setupPlayerGunner();
+    runtime.advance(1_599, world());
+    const firingEntity = activeChopper(runtime, 1_599);
+    const ray = chopperGunnerAuthoritativeRay(firingEntity.position, firingEntity.attitude, 2.7, -0.55);
+    const movingFrameTarget = target('low-fps-centre', pointAlong(ray, 34));
+    expect(runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2, entityId,
+      action: 'pilot-control', yawQ: 2.7, pitchQ: -0.55, fire: true,
+    }, 1_599).accepted).toBe(true);
+    const result = runtime.advance(1_719, world([movingFrameTarget]));
+    expect(result.damageEvents).toHaveLength(1);
+    expect(result.damageEvents[0]).toMatchObject({ targetId: 'low-fps-centre', source: 'chopper' });
+    vecClose(result.damageEvents[0]!.origin, ray.origin);
+    expect(Math.hypot(
+      activeChopper(runtime, 1_719).position[0] - firingEntity.position[0],
+      activeChopper(runtime, 1_719).position[1] - firingEntity.position[1],
+      activeChopper(runtime, 1_719).position[2] - firingEntity.position[2],
+    )).toBeGreaterThan(CHOPPER_GUNNER_RAY_POLICY.targetRadiusM);
+  });
+
   it('switches only player fire to the camera ray and restores unchanged AI root fire on exit', () => {
     const runtime = new HostKillstreakRuntime(7);
     runtime.registerActor('owner', 0, 1, LOADOUT);
@@ -186,8 +206,9 @@ describe('HF-135 authoritative Chopper Gunner fire ray', () => {
       by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 1, slot: 4,
       activationId: 'activation-chopper-lifecycle', expectedId: 'chopper', anchor: [0, 0, 0],
     }, 1_000, world([aiTarget])).entityIds[0]!;
+    const firstAiFiringEntity = activeChopper(runtime, 1_000);
     const firstAi = runtime.advance(1_600, world([aiTarget])).damageEvents[0]!;
-    vecClose(firstAi.origin, activeChopper(runtime, 1_600).position);
+    vecClose(firstAi.origin, firstAiFiringEntity.position);
     vecClose(firstAi.tracerOrigin, firstAi.origin);
     vecClose(firstAi.endpoint, firstAi.targetPosition);
 
@@ -214,9 +235,10 @@ describe('HF-135 authoritative Chopper Gunner fire ray', () => {
       by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 3, entityId,
       action: 'toggle-chopper-gunner',
     }, 1_881).accepted).toBe(true);
+    const resumedAiFiringEntity = activeChopper(runtime, 1_881);
     const resumedAi = runtime.advance(2_160, world([aiTarget])).damageEvents[0]!;
     expect(runtime.snapshotFor('owner', 2_160).actors[0]!.possession).toBeNull();
-    vecClose(resumedAi.origin, activeChopper(runtime, 2_160).position);
+    vecClose(resumedAi.origin, resumedAiFiringEntity.position);
     vecClose(resumedAi.tracerOrigin, resumedAi.origin);
     vecClose(resumedAi.endpoint, resumedAi.targetPosition);
   });

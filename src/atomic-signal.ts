@@ -236,6 +236,10 @@ export const ATOMIC_SIGNAL_FRAGMENT = /* glsl */`
 
     color = max(color, vec3(0.0));
     color = atomicAcesFilmicToneMapping(color);
+    // Contrast, saturation and the restrained split tint are display-referred
+    // grades. Applying the 0.5 contrast pivot to tone-mapped linear values
+    // crushes valid indoor midtones to zero before sRGB encoding.
+    color = linearToSrgb(color);
 
     float luma = luminance(color);
     color = mix(vec3(luma), color, saturation);
@@ -250,7 +254,7 @@ export const ATOMIC_SIGNAL_FRAGMENT = /* glsl */`
     float edge = smoothstep(0.32, 1.30, dot(centered, centered));
     color *= 1.0 - edge * vignette;
 
-    vec3 encoded = linearToSrgb(clamp(color, 0.0, 1.0));
+    vec3 encoded = clamp(color, 0.0, 1.0);
     encoded += (orderedDither(gl_FragCoord.xy) - 0.46875) * (dither / 255.0);
     gl_FragColor = vec4(clamp(encoded, 0.0, 1.0), 1.0);
   }
@@ -320,6 +324,94 @@ export function atomicSignalEffectsTextureSamples(config: AtomicSignalConfig, bu
   if (budget.contactShadowStrength > 0) samples += 4;
   if (budget.bloomStrength > 0) samples += 18;
   return samples;
+}
+
+type LayeredSceneRenderer = Pick<THREE.WebGLRenderer, 'autoClear' | 'clearDepth' | 'render'>;
+
+/** Draws only the world layers and restores the caller's camera mask. */
+export function renderSceneWithoutOverlayLayer(
+  renderer: Pick<THREE.WebGLRenderer, 'render'>,
+  scene: THREE.Scene,
+  camera: THREE.Camera,
+  overlayLayer: number | null,
+): void {
+  if (overlayLayer === null) {
+    renderer.render(scene, camera);
+    return;
+  }
+  const previousLayerMask = camera.layers.mask;
+  try {
+    camera.layers.disable(overlayLayer);
+    renderer.render(scene, camera);
+  } finally {
+    camera.layers.mask = previousLayerMask;
+  }
+}
+
+/**
+ * Draws one depth-independent overlay into the currently bound target without
+ * clearing its colour. The overlay keeps its own normal depth buffer, so the
+ * weapon still self-occludes correctly while remaining independent of walls.
+ */
+export function renderSceneOverlayLayer(
+  renderer: LayeredSceneRenderer,
+  scene: THREE.Scene,
+  camera: THREE.Camera,
+  overlayLayer: number,
+): void {
+  const previousLayerMask = camera.layers.mask;
+  const previousAutoClear = renderer.autoClear;
+  const previousBackground = scene.background;
+  try {
+    renderer.autoClear = false;
+    renderer.clearDepth();
+    camera.layers.set(overlayLayer);
+    scene.background = null;
+    renderer.render(scene, camera);
+  } finally {
+    scene.background = previousBackground;
+    camera.layers.mask = previousLayerMask;
+    renderer.autoClear = previousAutoClear;
+  }
+}
+
+/**
+ * Draws the world and then the depth-independent viewmodel layer. Three renders
+ * `scene.background` for every scene submission, irrespective of camera layers.
+ * Suppress it for the overlay submission or the second draw overwrites the
+ * entire world with the sky backdrop before drawing the weapon.
+ */
+export function renderSceneWithOverlayLayer(
+  renderer: LayeredSceneRenderer,
+  scene: THREE.Scene,
+  camera: THREE.Camera,
+  overlayLayer: number | null,
+): void {
+  if (overlayLayer === null) {
+    renderer.render(scene, camera);
+    return;
+  }
+  renderSceneWithoutOverlayLayer(renderer, scene, camera, overlayLayer);
+  renderSceneOverlayLayer(renderer, scene, camera, overlayLayer);
+}
+
+/** Draws an isolated effects layer without leaking the arena backdrop into it. */
+export function renderSceneLayerWithoutBackground(
+  renderer: Pick<THREE.WebGLRenderer, 'render'>,
+  scene: THREE.Scene,
+  camera: THREE.Camera,
+  layer: number,
+): void {
+  const previousLayerMask = camera.layers.mask;
+  const previousBackground = scene.background;
+  try {
+    camera.layers.set(layer);
+    scene.background = null;
+    renderer.render(scene, camera);
+  } finally {
+    scene.background = previousBackground;
+    camera.layers.mask = previousLayerMask;
+  }
 }
 
 export class AtomicSignalPass {
@@ -476,31 +568,21 @@ export class AtomicSignalPass {
   }
 
   private renderScene(scene: THREE.Scene, camera: THREE.Camera, overlayLayer: number | null): void {
-    if (overlayLayer === null) {
-      this.renderer.render(scene, camera);
-      return;
-    }
-    const previousLayerMask = camera.layers.mask;
-    const previousAutoClear = this.renderer.autoClear;
-    try {
-      camera.layers.disable(overlayLayer);
-      this.renderer.render(scene, camera);
-      this.renderer.autoClear = false;
-      this.renderer.clearDepth();
-      camera.layers.set(overlayLayer);
-      this.renderer.render(scene, camera);
-    } finally {
-      camera.layers.mask = previousLayerMask;
-      this.renderer.autoClear = previousAutoClear;
-    }
+    renderSceneWithOverlayLayer(this.renderer, scene, camera, overlayLayer);
   }
 
   private renderDirect(scene: THREE.Scene, camera: THREE.Camera, overlayLayer: number | null): void {
     const previousToneMapping = this.renderer.toneMapping;
-    this.renderer.toneMapping = this.screenToneMapping;
-    this.renderer.setRenderTarget(null);
-    this.renderScene(scene, camera, overlayLayer);
-    this.renderer.toneMapping = previousToneMapping;
+    try {
+      this.renderer.toneMapping = this.screenToneMapping;
+      this.renderer.setRenderTarget(null);
+      // A post-process failure must retain the same isolated first-person
+      // overlay contract as the healthy path. Dropping the overlay here made
+      // the weapon disappear exactly when Atomic Signal failed closed.
+      renderSceneWithOverlayLayer(this.renderer, scene, camera, overlayLayer);
+    } finally {
+      this.renderer.toneMapping = previousToneMapping;
+    }
   }
 
   private renderSelectiveBloom(scene: THREE.Scene, camera: THREE.Camera): void {
@@ -509,11 +591,10 @@ export class AtomicSignalPass {
     const previousClearColor = this.renderer.getClearColor(new THREE.Color()).clone();
     const previousClearAlpha = this.renderer.getClearAlpha();
     try {
-      camera.layers.set(SELECTIVE_BLOOM_LAYER);
       this.renderer.setRenderTarget(this.bloomTarget);
       this.renderer.setClearColor(0x000000, 0);
       this.renderer.clear(true, true, false);
-      this.renderer.render(scene, camera);
+      renderSceneLayerWithoutBackground(this.renderer, scene, camera, SELECTIVE_BLOOM_LAYER);
     } finally {
       camera.layers.mask = previousLayerMask;
       this.renderer.setClearColor(previousClearColor, previousClearAlpha);

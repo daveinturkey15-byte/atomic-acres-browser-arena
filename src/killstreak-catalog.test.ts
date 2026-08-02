@@ -12,6 +12,7 @@ import {
   validateKillstreakLoadout,
   type KillstreakCatalogSourceDefinition,
 } from './killstreak-catalog';
+import { DRONE_SUPPORT_LIFETIMES_MS } from './killstreak-support-catalog';
 
 const decisionReceiptPath = fileURLToPath(new URL('../docs/PASS65_DECISION_RECEIPTS.json', import.meta.url));
 const decisionReceipts = JSON.parse(readFileSync(decisionReceiptPath, 'utf8')) as {
@@ -32,6 +33,12 @@ function withoutDerivedWeight<T extends { carePackageWeightUnits: number }>(entr
   const { carePackageWeightUnits, ...authored } = entry;
   void carePackageWeightUnits;
   return authored;
+}
+
+function withLaterOwnerCorrections<T extends Record<string, unknown>>(entry: T): T {
+  return entry.id === 'drone-swarm'
+    ? { ...entry, durationMs: DRONE_SUPPORT_LIFETIMES_MS.swarm }
+    : entry;
 }
 
 function source(id: string): KillstreakCatalogSourceDefinition {
@@ -65,9 +72,11 @@ describe('Pass 65 canonical killstreak catalog', () => {
     const frozenRuntimeRows = PASS65_KILLSTREAK_CATALOG.definitions.filter((entry) => frozenIds.has(entry.id));
     expect(receipt?.status).toBe('FROZEN');
     expect(PASS65_KILLSTREAK_CATALOG.definitions.length).toBeGreaterThanOrEqual(frozenCatalog.length);
-    expect(frozenRuntimeRows.map(withoutDerivedWeight)).toEqual(frozenCatalog.map(withoutDerivedWeight));
+    expect(frozenRuntimeRows.map(withoutDerivedWeight)).toEqual(
+      frozenCatalog.map(withLaterOwnerCorrections).map(withoutDerivedWeight),
+    );
     if (PASS65_KILLSTREAK_CATALOG.definitions.length === frozenCatalog.length) {
-      expect(PASS65_KILLSTREAK_CATALOG.definitions).toEqual(frozenCatalog);
+      expect(PASS65_KILLSTREAK_CATALOG.definitions).toEqual(frozenCatalog.map(withLaterOwnerCorrections));
     }
     expect(PASS65_KILLSTREAK_SLOT_DEFINITIONS).toEqual(receipt?.value?.selectionPolicy?.slots);
     expect(receipt?.value?.selectionPolicy?.mutuallyExclusiveGroups).toEqual([['nuke', 'drone-swarm']]);

@@ -10,9 +10,10 @@ export function roomChatPresentation(
   available: boolean,
   open: boolean,
   lastActivityAtMs: number | null,
+  persistentWhenIdle = false,
 ): RoomChatPresentation {
   if (!available) return { visible: false, fadeAfterMs: null };
-  if (open) return { visible: true, fadeAfterMs: null };
+  if (open || persistentWhenIdle) return { visible: true, fadeAfterMs: null };
   if (lastActivityAtMs === null) return { visible: false, fadeAfterMs: null };
   const remainingMs = Math.max(0, ROOM_CHAT_IDLE_FADE_MS - Math.max(0, nowMs - lastActivityAtMs));
   return remainingMs > 0

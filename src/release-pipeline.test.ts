@@ -125,10 +125,25 @@ describe('production release workflow', () => {
     expect(ownedPlaywrightRunner).toContain("QA_EXTERNAL_PREVIEW: '1'");
     expect(ownedPlaywrightRunner).toContain('httpServer.closeAllConnections?.()');
     expect(ownedPlaywrightRunner).toContain('removeTemporaryTopology();');
-    const playwrightCommands = ownerFeedbackGraph.testCatalog
-      .map(({ command }: { command: string }) => command)
-      .filter((command: string) => command.includes('playwright'));
-    expect(playwrightCommands).toHaveLength(8);
+    const playwrightTests = ownerFeedbackGraph.testCatalog
+      .filter(({ command }: { command: string }) => command.includes('playwright'));
+    expect(playwrightTests.map(({ id }: { id: string }) => id)).toEqual([
+      'T-MENU-LIFECYCLE-E2E',
+      'T-CARE-LATCH-E2E',
+      'T-HUD-E2E',
+      'T-SUPPORT-VISUAL-E2E',
+      'T-FOCUS-RECOVERY-E2E',
+      'T-PROFILE-AUTHORITY-E2E',
+      'T-PRIVACY-E2E',
+      'T-FLASH-E2E',
+      'T-SCOPED-ADS',
+      'T-GUN-RANGE-TEST-BAY',
+      'T-TIMED-MAP-WEAPONS',
+      'T-FIELD-KIT-MENU',
+      'T-RUSTRIG-PHYSICS',
+      'T-PICKUP-REPICK',
+    ]);
+    const playwrightCommands = playwrightTests.map(({ command }: { command: string }) => command);
     expect(playwrightCommands.every((command: string) => command.startsWith('npm run qa:playwright-topology -- '))).toBe(true);
     const catalogScripts = new Set<string>();
     const queue = ownerFeedbackGraph.testCatalog

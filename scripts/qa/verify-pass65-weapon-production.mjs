@@ -24,6 +24,7 @@ const requiredWeaponIds = Object.freeze([
   'carbine', 'smg', 'lmg', 'scattergun', 'sniper', 'railgun', 'pistol', 'magnum', 'machine-pistol',
   'mini-uzi', 'mp5', 'm4a1', 'ak-47', 'minigun', 'm14-ebr', 'slug-shotgun',
   'flashlight-pistol', 'explosive-crossbow',
+  'flamethrower', 'flare-gun',
 ]);
 const sha256 = async (file) => createHash('sha256').update(await readFile(file)).digest('hex');
 const failures = [];
@@ -268,12 +269,12 @@ if (manifest.operatorArms?.releaseState !== 'release-ready') {
     if (arms.renderBudget?.[field] !== expected) failures.push(`operator arms: render budget ${field} must equal ${expected}`);
   }
   for (const [field, expected] of Object.entries({
-    visualRevision: 'licensed-anatomical-viewmodel-v7',
-    limbProfileContract: 'licensed-human-skin-and-glove-deformation-v1',
-    handPoseContract: 'licensed-articulated-fingerless-glove-grip-v1',
-    shoulderEntryContract: 'weighted-capped-frame-edge-sleeve-v1',
-    gloveConstructionContract: 'opaque-uv-preserved-licensed-human-hand-v1',
-    weaponGripReviewContract: 'seven-view-actual-weapon-contact-v1',
+    visualRevision: 'licensed-anatomical-viewmodel-v8',
+    limbProfileContract: 'hero-scale-connected-forearm-deformation-v2',
+    handPoseContract: 'licensed-articulated-weapon-and-knife-grip-v2',
+    shoulderEntryContract: 'weighted-capped-fps-frame-edge-sleeve-v2',
+    gloveConstructionContract: 'opaque-uv-preserved-scaled-anatomical-hand-v2',
+    weaponGripReviewContract: 'seven-view-actual-weapon-contact-v2',
     weightingContract: 'adjacent-bone-normalized-blend-v5',
     runtimeAnimationContract: 'authored-fingers-under-runtime-chain-ik-v1',
     fingerSegmentCount: 30,

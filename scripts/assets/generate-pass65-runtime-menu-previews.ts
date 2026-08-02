@@ -17,8 +17,8 @@ const receiptPath = path.join(root, 'source-assets/menu/pass65-preview-masters/r
 const reviewReceiptPath = path.join(root, 'artifacts/pass65/menu-preview-rotor-review/runtime-capture-receipt.json');
 const port = Number(process.env.AA_PREVIEW_PORT ?? '44166');
 const reviewOnly = process.env.AA_PREVIEW_REVIEW_ONLY === '1';
-const generatedAt = '2026-07-30';
 const choreography = choreographyJson;
+const generatedAt = choreography.generatedAt;
 const canonicalArenas = Object.keys(choreography.arenas) as ArenaId[];
 const captureToolPaths = [
   'scripts/assets/generate-pass65-runtime-menu-previews.ts',
@@ -42,8 +42,21 @@ const chromeCandidates = [
 const executablePath = chromeCandidates.find((candidate) => existsSync(candidate));
 
 if (!executablePath) throw new Error('Authoritative preview capture requires installed Google Chrome with WebGPU support');
-if (choreography.schemaVersion !== 4 || choreography.capture.source !== 'authoritative-runtime-arena') {
-  throw new Error('Pass 66 runtime capture requires canonical schema 4 authoritative-runtime choreography');
+if (choreography.schemaVersion !== 4
+  || choreography.recipeId !== 'pass66-authoritative-runtime-menu-preview-v2'
+  || choreography.captureId !== 'pass66-authoritative-runtime-menu-preview-capture-v2'
+  || choreography.generatedAt !== '2026-08-02'
+  || choreography.media.cacheKey !== 'pass66-runtime-preview-v5'
+  || choreography.fps !== 30
+  || choreography.durationSeconds !== 8
+  || choreography.frameCount !== 240
+  || choreography.capture.source !== 'authoritative-runtime-arena'
+  || choreography.capture.viewport[0] !== 2560
+  || choreography.capture.viewport[1] !== 1440
+  || choreography.capture.overlayReferenceViewport[0] !== 1280
+  || choreography.capture.overlayReferenceViewport[1] !== 720
+  || choreography.capture.overlayOutputScale !== 2) {
+  throw new Error('Pass 66 runtime capture requires the canonical 2560x1440 schema 4 authoritative-runtime choreography');
 }
 if (selectedArenas.some((arena) => !canonicalArenas.includes(arena))) {
   throw new Error(`AA_PREVIEW_ARENAS contains an unknown arena: ${selectedArenas.join(', ')}`);
@@ -177,7 +190,7 @@ function cameraAngles(position: readonly number[], target: readonly number[]): {
 }
 
 async function installCaptureSurface(page: Page, kind: 'helicopter' | 'cat'): Promise<void> {
-  await page.evaluate(({ kind, palette, scale, rotorPresentation }) => {
+  await page.evaluate(({ kind, palette, scale, referenceViewport, outputScale, rotorPresentation }) => {
     document.querySelector('#offline-menu-preview-overlay')?.remove();
     const style = document.createElement('style');
     style.id = 'offline-menu-preview-capture-style';
@@ -185,7 +198,7 @@ async function installCaptureSurface(page: Page, kind: 'helicopter' | 'cat'): Pr
       html,body,#app{width:100%;height:100%;margin:0!important;overflow:hidden!important;background:#000!important}
       #app>*:not(#game):not(#offline-menu-preview-overlay){display:none!important}
       #game{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;display:block!important}
-      #offline-menu-preview-overlay{position:fixed;inset:0;z-index:2147483647;pointer-events:none;color:${palette[3]};font:600 9px/1.1 ui-monospace,Consolas,monospace;letter-spacing:.16em;text-shadow:0 1px 2px #000}
+      #offline-menu-preview-overlay{position:fixed;left:0;top:0;width:${referenceViewport[0]}px;height:${referenceViewport[1]}px;z-index:2147483647;pointer-events:none;color:${palette[3]};font:600 9px/1.1 ui-monospace,Consolas,monospace;letter-spacing:.16em;text-shadow:0 1px 2px #000;transform:scale(${outputScale});transform-origin:0 0}
       #offline-menu-preview-overlay *{box-sizing:border-box}
       .aa-main-rotor-stage{position:absolute;z-index:1;left:${(100 - rotorPresentation.mainStageWidthPercent) / 2}%;top:${rotorPresentation.mainStageTopPercent}%;width:${rotorPresentation.mainStageWidthPercent}%;height:${rotorPresentation.mainStageHeightPercent}%;perspective:1400px;transform-style:preserve-3d;overflow:hidden;isolation:isolate;transform-origin:50% 68%;transform:translate3d(var(--aa-main-rotor-shift-x,0px),var(--aa-main-rotor-shift-y,0px),0) rotate(var(--aa-main-rotor-bank,0deg));filter:drop-shadow(0 2px 4px rgba(0,0,0,.62));opacity:.9}
       .aa-main-rotor-arc{position:absolute;z-index:1;left:4%;right:4%;height:52%;border-radius:50%;border-top:2px solid rgba(151,190,193,.22);filter:blur(1.1px);transform-origin:50% 100%;pointer-events:none}
@@ -251,6 +264,8 @@ async function installCaptureSurface(page: Page, kind: 'helicopter' | 'cat'): Pr
     kind,
     palette: choreography.capture.overlayPalette,
     scale: choreography.capture.overlayScale,
+    referenceViewport: choreography.capture.overlayReferenceViewport,
+    outputScale: choreography.capture.overlayOutputScale,
     rotorPresentation: choreography.helicopter.rotorPresentation,
   });
 }
@@ -483,9 +498,9 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
         mode: stage.dataset.projection ?? null,
         stageTopFraction: rect.top / window.innerHeight,
         stageBottomFraction: rect.bottom / window.innerHeight,
-        stageWidthFraction: stage.offsetWidth / window.innerWidth,
-        stageHeightFraction: stage.offsetHeight / window.innerHeight,
-        stageAreaFraction: stage.offsetWidth * stage.offsetHeight / (window.innerWidth * window.innerHeight),
+        stageWidthFraction: rect.width / window.innerWidth,
+        stageHeightFraction: rect.height / window.innerHeight,
+        stageAreaFraction: rect.width * rect.height / (window.innerWidth * window.innerHeight),
         bladeCount: blades.length,
         arcCount: arcs.length,
         temporalTrailCount,
@@ -665,7 +680,7 @@ async function main(): Promise<void> {
     }
     const receipt = {
       schemaVersion: 4,
-      captureId: 'pass66-authoritative-runtime-menu-preview-capture-v1',
+      captureId: choreography.captureId,
       generatedAt,
       recipeId: choreography.recipeId,
       recipeDigest: sha256(JSON.stringify(choreography)),
@@ -674,6 +689,8 @@ async function main(): Promise<void> {
       viewport: choreography.capture.viewport,
       overlay: {
         scale: choreography.capture.overlayScale,
+        referenceViewport: choreography.capture.overlayReferenceViewport,
+        outputScale: choreography.capture.overlayOutputScale,
         palette: choreography.capture.overlayPalette,
         mode: 'offline-baked-minimal-graphite-green',
         liveLoadingRenderer: false,

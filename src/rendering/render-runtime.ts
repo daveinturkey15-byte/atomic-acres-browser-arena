@@ -252,9 +252,24 @@ export async function awaitSubmissionCompletionTarget(input: Readonly<{
 }>): Promise<void> {
   if (input.completedSequence() >= input.targetSequence) return;
   let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
-  const timeout = new Promise<never>((_resolve, reject) => {
+  const timeout = new Promise<void>((resolve, reject) => {
     timeoutHandle = setTimeout(
-      () => reject(new Error(`WebGPU queue completion exceeded ${input.timeoutMs} ms for submission ${input.targetSequence}`)),
+      () => {
+        // A queue probe can advance the shared completion frontier in the same
+        // turn that the deadline fires. Give that already-settling work one
+        // microtask to publish its state, then keep the original deadline
+        // fail-closed if the captured target is still incomplete.
+        void Promise.resolve().then(() => {
+          const failure = input.failure();
+          if (failure) {
+            reject(new Error(`WebGPU queue completion failed: ${failure}`));
+          } else if (input.completedSequence() >= input.targetSequence) {
+            resolve();
+          } else {
+            reject(new Error(`WebGPU queue completion exceeded ${input.timeoutMs} ms for submission ${input.targetSequence}`));
+          }
+        });
+      },
       input.timeoutMs,
     );
   });

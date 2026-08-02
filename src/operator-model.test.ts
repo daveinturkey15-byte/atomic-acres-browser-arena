@@ -2,9 +2,11 @@ import * as THREE from 'three';
 import { describe, expect, it, vi } from 'vitest';
 import {
   BOT_EMISSIVE_BRIGHTNESS_SCALE,
+  FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY,
   RIGGED_OPERATOR_RUNTIME_ACTION_NAMES,
   applyBotEmissiveBrightness,
   createOperatorInstanceMaterialResolver,
+  firstPersonArmMaterialReadabilityProfile,
   isEmbeddedWeaponObjectName,
   riggedStanceTarget,
   riggedOperatorRuntimeClips,
@@ -12,6 +14,23 @@ import {
 } from './operator-model';
 
 describe('rigged operator presentation contract', () => {
+  it('bounds first-person readability fill without flattening PBR into self-lit plastic', () => {
+    const profiles = [
+      firstPersonArmMaterialReadabilityProfile('Skin'),
+      firstPersonArmMaterialReadabilityProfile('Arms_Glove_PBR'),
+      firstPersonArmMaterialReadabilityProfile('Arms_FingerGlove_PBR'),
+      firstPersonArmMaterialReadabilityProfile('Arms_Sleeve_PBR'),
+      firstPersonArmMaterialReadabilityProfile('Arms_ArmorPad_PBR'),
+    ];
+    expect(profiles.every((profile) => profile !== null)).toBe(true);
+    for (const profile of profiles) {
+      expect(profile!.emissiveIntensity).toBeGreaterThan(0);
+      expect(profile!.emissiveIntensity).toBeLessThanOrEqual(FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY);
+    }
+    expect(firstPersonArmMaterialReadabilityProfile('Arms_Glove_PBR')?.emissiveIntensity).toBeGreaterThan(0.6);
+    expect(firstPersonArmMaterialReadabilityProfile('unrelated-world-operator')).toBeNull();
+  });
+
   it('halves bot emissive brightness idempotently without changing base colour', () => {
     const root = new THREE.Group();
     const material = new THREE.MeshStandardMaterial({ color: 0xd85cff, emissive: 0x7d16bd, emissiveIntensity: 1.2 });

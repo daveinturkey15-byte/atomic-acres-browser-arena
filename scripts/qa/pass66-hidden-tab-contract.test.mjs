@@ -5,6 +5,7 @@ import {
   FORBIDDEN_BACKGROUND_BYPASS_FLAGS,
   REQUIRED_BROWSER_WEAPON_IDS,
   REQUIRED_HELD_CPU_ASSET,
+  REQUIRED_SELECTED_ARENA_CONTRACTS,
   assertHeadedChromeLaunchContract,
   hiddenCheckpointFailures,
   recoveredCheckpointFailures,
@@ -12,6 +13,13 @@ import {
 
 const chrome = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const verifierSource = readFileSync(new URL('./verify-pass66-hidden-tab-admission.mjs', import.meta.url), 'utf8');
+const matrixSource = readFileSync(new URL('./run-pass66-hidden-tab-matrix.mjs', import.meta.url), 'utf8');
+const atomicArenaContract = REQUIRED_SELECTED_ARENA_CONTRACTS['atomic-acres'];
+const atomicHeldMapAssetRequests = Object.fromEntries(atomicArenaContract.heldAssets.map((asset) => [asset, 1]));
+
+function completedAtomicMapResources() {
+  return atomicArenaContract.heldAssets.map((name, index) => ({ name, responseEnd: 200 + index }));
+}
 
 assert.equal(
   REQUIRED_HELD_CPU_ASSET,
@@ -48,6 +56,13 @@ function checkpoint(overrides = {}) {
       prewarming: true,
     },
     assetResources: [],
+    skyBackdrop: {
+      preset: atomicArenaContract.skyPreset,
+      status: 'asset-loading',
+      source: 'procedural-canvas',
+      assetUrl: atomicArenaContract.skyAsset,
+    },
+    qualityAssetStreaming: { atomicAcres: 'loading', rustworks: 'idle' },
     streaming: {
       constructionCount: 1,
       constructedArenaIds: ['atomic-acres'],
@@ -146,12 +161,32 @@ test('owns a hidden display-power request for the exact gate lifetime and resets
   assert.match(verifierSource, /display-power owner exited before explicit release/);
   assert.match(verifierSource, /if \(owner\.process\.exitCode === null\) owner\.process\.kill\(\)/);
   assert.match(verifierSource, /displayPowerOwner = await acquireDisplayPowerRequest\(\);\s*\n\s*chrome = spawn/);
-  assert.match(verifierSource, /await releaseDisplayPowerRequest\(displayPowerOwner\);\s*\n\s*displayPowerOwner = null;\s*\n\s*\n\s*receipt =/);
+  const explicitRelease = verifierSource.indexOf('await releaseDisplayPowerRequest(displayPowerOwner);');
+  const finalSourceCheck = verifierSource.indexOf("const endingRevision = execFileSync('git', ['rev-parse', 'HEAD']", explicitRelease);
+  const passReceipt = verifierSource.indexOf('receipt = {', finalSourceCheck);
+  assert.ok(explicitRelease >= 0 && finalSourceCheck > explicitRelease && passReceipt > finalSourceCheck,
+    'the display-power request must release before final source validation and pass receipt creation');
   assert.equal(
     verifierSource.match(/releaseDisplayPowerRequest\(displayPowerOwner\)/g)?.length,
     2,
     'the request must release before a pass receipt and from the failure cleanup path',
   );
+});
+
+test('binds every hidden-tab map receipt to one clean staged exact-SHA candidate', () => {
+  assert.match(matrixSource, /rmSync\(artifactRoot, \{ recursive: true, force: true \}\)/);
+  assert.match(matrixSource, /\['status', '--porcelain', '--untracked-files=all'\]/);
+  assert.match(matrixSource, /channel-provenance\.json/);
+  assert.match(matrixSource, /servedCandidate\.sourceSha !== sourceSha/);
+  assert.match(matrixSource, /PASS66_HIDDEN_TAB_SOURCE_SHA: sourceSha/);
+  assert.match(matrixSource, /receipt\.sourceState\?\.cleanAfter !== true/);
+  assert.match(matrixSource, /if \(sourceStatus\(\) \|\| endingSha !== sourceSha\)/);
+  assert.match(verifierSource, /await rm\(artifactRoot, \{ recursive: true, force: true \}\)/);
+  assert.match(verifierSource, /expectedSourceRevision !== sourceRevision/);
+  assert.match(verifierSource, /await readServedCandidate\(\)/);
+  assert.match(verifierSource, /value\.treeSha256 !== expectedTreeSha256/);
+  assert.match(verifierSource, /endingStatus \|\| endingRevision !== sourceRevision/);
+  assert.match(verifierSource, /servedCandidate,/);
 });
 
 test('persists every named gate checkpoint into failure evidence without changing acceptance', () => {
@@ -203,7 +238,17 @@ test('retains one bounded bootstrap probe before full checkpoint sampling is ava
 test('accepts hidden CPU progress only when frames, WebGPU submission, authority, audio and generation stay paused', () => {
   const beforeRelease = checkpoint();
   const afterHidden = checkpoint({
-    assetResources: [{ name: REQUIRED_HELD_CPU_ASSET, responseEnd: 123 }],
+    assetResources: [
+      { name: REQUIRED_HELD_CPU_ASSET, responseEnd: 123 },
+      ...completedAtomicMapResources(),
+    ],
+    skyBackdrop: {
+      preset: atomicArenaContract.skyPreset,
+      status: 'asset-ready',
+      source: 'generated-equirectangular-webp',
+      assetUrl: atomicArenaContract.skyAsset,
+    },
+    qualityAssetStreaming: { atomicAcres: 'ready', rustworks: 'idle' },
     weaponCatalog: {
       retained: [...REQUIRED_BROWSER_WEAPON_IDS],
       retainedCount: REQUIRED_BROWSER_WEAPON_IDS.length,
@@ -222,7 +267,12 @@ test('accepts hidden CPU progress only when frames, WebGPU submission, authority
       ] },
     },
   });
-  assert.deepEqual(hiddenCheckpointFailures({ beforeRelease, afterHidden, heldAssetRequests: 1 }), []);
+  assert.deepEqual(hiddenCheckpointFailures({
+    beforeRelease,
+    afterHidden,
+    heldAssetRequests: 1,
+    heldMapAssetRequests: atomicHeldMapAssetRequests,
+  }), []);
   assert.match(hiddenCheckpointFailures({
     beforeRelease,
     afterHidden: {
@@ -246,10 +296,89 @@ test('accepts hidden CPU progress only when frames, WebGPU submission, authority
   }).join(' | '), /offline interactive-world authority advanced while hidden/);
 });
 
+test('requires exact selected-map fetch and decoded-sky proof for every outdoor arena', () => {
+  for (const [selectedArenaId, arenaContract] of Object.entries(REQUIRED_SELECTED_ARENA_CONTRACTS)) {
+    const beforeRelease = checkpoint({
+      streaming: {
+        constructionCount: 1,
+        constructedArenaIds: [selectedArenaId],
+        residentArenaRoots: 1,
+        activeRoots: [selectedArenaId],
+      },
+    });
+    const heldMapAssetRequests = Object.fromEntries(arenaContract.heldAssets.map((asset) => [asset, 1]));
+    const qualityAssetStreaming = selectedArenaId === 'atomic-acres'
+      ? { atomicAcres: 'ready', rustworks: 'idle' }
+      : selectedArenaId === 'rustworks-1v1'
+        ? { atomicAcres: 'idle', rustworks: 'ready' }
+        : { atomicAcres: 'idle', rustworks: 'idle' };
+    const afterHidden = checkpoint({
+      assetResources: [
+        { name: REQUIRED_HELD_CPU_ASSET, responseEnd: 123 },
+        ...arenaContract.heldAssets.map((name, index) => ({ name, responseEnd: 200 + index })),
+      ],
+      skyBackdrop: {
+        preset: arenaContract.skyPreset,
+        status: 'asset-ready',
+        source: 'generated-equirectangular-webp',
+        assetUrl: arenaContract.skyAsset,
+      },
+      qualityAssetStreaming,
+      weaponCatalog: {
+        retained: [...REQUIRED_BROWSER_WEAPON_IDS],
+        retainedCount: REQUIRED_BROWSER_WEAPON_IDS.length,
+        loaded: REQUIRED_BROWSER_WEAPON_IDS.length,
+        available: REQUIRED_BROWSER_WEAPON_IDS.length,
+        maximumRetained: REQUIRED_BROWSER_WEAPON_IDS.length,
+        gpuReady: 0,
+        prewarming: true,
+      },
+      streaming: {
+        constructionCount: 1,
+        constructedArenaIds: [selectedArenaId],
+        residentArenaRoots: 1,
+        activeRoots: [selectedArenaId],
+      },
+      transition: {
+        ...beforeRelease.transition,
+        profile: { phases: [
+          { phase: 'quality-presentation' },
+          { phase: 'weapon-catalog-prewarm' },
+        ] },
+      },
+    });
+    assert.deepEqual(hiddenCheckpointFailures({
+      beforeRelease,
+      afterHidden,
+      heldAssetRequests: 1,
+      selectedArenaId,
+      heldMapAssetRequests,
+    }), []);
+    const missingSky = { ...afterHidden, skyBackdrop: { ...afterHidden.skyBackdrop, status: 'asset-loading' } };
+    assert.match(hiddenCheckpointFailures({
+      beforeRelease,
+      afterHidden: missingSky,
+      heldAssetRequests: 1,
+      selectedArenaId,
+      heldMapAssetRequests,
+    }).join(' | '), /sky image did not finish decode and admission while hidden/);
+  }
+});
+
 test('rejects a phase-only claim and incomplete or self-reordered retained weapon IDs', () => {
   const beforeRelease = checkpoint();
   const afterHidden = checkpoint({
-    assetResources: [{ name: REQUIRED_HELD_CPU_ASSET, responseEnd: 123 }],
+    assetResources: [
+      { name: REQUIRED_HELD_CPU_ASSET, responseEnd: 123 },
+      ...completedAtomicMapResources(),
+    ],
+    skyBackdrop: {
+      preset: atomicArenaContract.skyPreset,
+      status: 'asset-ready',
+      source: 'generated-equirectangular-webp',
+      assetUrl: atomicArenaContract.skyAsset,
+    },
+    qualityAssetStreaming: { atomicAcres: 'ready', rustworks: 'idle' },
     weaponCatalog: {
       retained: [...REQUIRED_BROWSER_WEAPON_IDS],
       retainedCount: REQUIRED_BROWSER_WEAPON_IDS.length,
@@ -276,7 +405,7 @@ test('rejects a phase-only claim and incomplete or self-reordered retained weapo
     beforeRelease,
     afterHidden: phaseOnly,
     heldAssetRequests: 1,
-  }).join(' | '), /did not commit the exact 18-weapon retained catalog.*loaded-model count did not advance/);
+  }).join(' | '), /did not commit the exact 20-weapon retained catalog.*loaded-model count did not advance/);
 
   const incomplete = {
     ...afterHidden,
@@ -290,7 +419,7 @@ test('rejects a phase-only claim and incomplete or self-reordered retained weapo
     beforeRelease,
     afterHidden: incomplete,
     heldAssetRequests: 1,
-  }).join(' | '), /did not commit the exact 18-weapon retained catalog/);
+  }).join(' | '), /did not commit the exact 20-weapon retained catalog/);
 
   const reordered = {
     ...afterHidden,
@@ -303,7 +432,7 @@ test('rejects a phase-only claim and incomplete or self-reordered retained weapo
     beforeRelease,
     afterHidden: reordered,
     heldAssetRequests: 1,
-  }).join(' | '), /did not commit the exact 18-weapon retained catalog/);
+  }).join(' | '), /did not commit the exact 20-weapon retained catalog/);
 });
 
 test('accepts one healthy Quality foreground recovery with a hidden procedural cache root and one canonical authority root', () => {
@@ -356,7 +485,7 @@ test('accepts one healthy Quality foreground recovery with a hidden procedural c
       streaming: { ...recovered.streaming, residentArenaRoots: 2 },
     },
     maximumRecoveryMs: 20_000,
-  }).join(' | '), /exactly one lifecycle recovery.*exactly one authoritative Atomic Acres gameplay root/);
+  }).join(' | '), /exactly one lifecycle recovery.*exactly one authoritative atomic-acres gameplay root/);
 });
 
 test('rejects zero, duplicate, wrong-arena and non-gameplay authoritative recovery roots', () => {
@@ -397,6 +526,6 @@ test('rejects zero, duplicate, wrong-arena and non-gameplay authoritative recove
       afterHidden,
       recovered: { ...recovered, playableScene },
       maximumRecoveryMs: 20_000,
-    }).join(' | '), /exactly one authoritative Atomic Acres gameplay root/);
+    }).join(' | '), /exactly one authoritative atomic-acres gameplay root/);
   }
 });

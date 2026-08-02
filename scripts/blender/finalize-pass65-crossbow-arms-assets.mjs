@@ -32,6 +32,11 @@ const armsContact = JSON.parse(await readFile(absolute(armsContactReceipt.path),
 if (armsContact.verdict !== 'pass' || armsContact.evidence?.length !== 7 || armsContact.violations?.length !== 0) {
   throw new Error('DJMaesen arms require seven passing deterministic weapon-contact views');
 }
+const knifeContact = armsContact.evidence.find((entry) => entry.view === 'knife-contact')?.knifeGripContact;
+if (knifeContact?.contract !== 'anatomical-palm-and-digit-to-authored-g10-bounds-v1'
+  || knifeContact?.passed !== true || knifeContact?.digitContactCount < 3) {
+  throw new Error('DJMaesen arms require a passing authored G10 knife-grip contact receipt');
+}
 const armsSourceFiles = [
   'license.txt', 'scene.bin', 'scene.gltf',
   'textures/material_diffuse.png', 'textures/material_normal.png',
@@ -165,12 +170,12 @@ const armsProvenance = {
   firstPersonGlbs: armsGlbs, pbrMaps: armsPbrMaps,
   requiredBones: REQUIRED_ARM_BONES, requiredSockets: REQUIRED_ARM_SOCKETS, animationClips: REQUIRED_CORE_ACTIONS,
   materialContract: 'All visible materials OPAQUE with depth writes; no alpha fading or see-through anatomy.',
-  visualRevision: 'licensed-anatomical-viewmodel-v7',
-  limbProfileContract: 'licensed-human-skin-and-glove-deformation-v1',
-  handPoseContract: 'licensed-articulated-fingerless-glove-grip-v1',
-  shoulderEntryContract: 'weighted-capped-frame-edge-sleeve-v1',
-  gloveConstructionContract: 'opaque-uv-preserved-licensed-human-hand-v1',
-  weaponGripReviewContract: 'seven-view-actual-weapon-contact-v1',
+  visualRevision: 'licensed-anatomical-viewmodel-v8',
+  limbProfileContract: 'hero-scale-connected-forearm-deformation-v2',
+  handPoseContract: 'licensed-articulated-weapon-and-knife-grip-v2',
+  shoulderEntryContract: 'weighted-capped-fps-frame-edge-sleeve-v2',
+  gloveConstructionContract: 'opaque-uv-preserved-scaled-anatomical-hand-v2',
+  weaponGripReviewContract: 'seven-view-actual-weapon-contact-v2',
   weightingContract: 'adjacent-bone-normalized-blend-v5',
   runtimeAnimationContract: 'authored-fingers-under-runtime-chain-ik-v1',
   fingerSegmentCount: 30,
@@ -179,9 +184,9 @@ const armsProvenance = {
   modifications: [
     'Removed unrelated source Icosphere object.',
     'Retargeted the 47-joint source to the 37-bone runtime contract and collapsed terminal tip joints.',
-    'Adapted bind shoulders, sleeves, hands and finger poses for the first-person camera and actual weapon sockets.',
+    'Adapted bind shoulders, larger connected forearms, hero-scale hands and finger poses for the first-person camera and actual weapon sockets.',
     'Capped proximal sleeves, converted source specular-glossiness maps to metallic-roughness PBR, and authored four skinned batches.',
-    'Added four gameplay sockets, thirteen action clips, a reduced LOD1, and seven deterministic weapon-contact reviews.',
+    'Added four gameplay sockets, thirteen action clips, a reduced LOD1, seven deterministic weapon-contact reviews and an authored G10 knife-grip proximity receipt.',
   ],
   removedObjects: ['Icosphere'], sourceJointCount: 47, runtimeBoneCount: 37,
   review: {
@@ -226,12 +231,12 @@ productionManifest.operatorArms = {
   pbrMaps: armsPbrMaps, provenance: armsProvenanceRecord,
   bones: REQUIRED_ARM_BONES, sockets: REQUIRED_ARM_SOCKETS, actions: REQUIRED_CORE_ACTIONS,
   materialContract: 'opaque-depth-writing',
-  visualRevision: 'licensed-anatomical-viewmodel-v7',
-  limbProfileContract: 'licensed-human-skin-and-glove-deformation-v1',
-  handPoseContract: 'licensed-articulated-fingerless-glove-grip-v1',
-  shoulderEntryContract: 'weighted-capped-frame-edge-sleeve-v1',
-  gloveConstructionContract: 'opaque-uv-preserved-licensed-human-hand-v1',
-  weaponGripReviewContract: 'seven-view-actual-weapon-contact-v1',
+  visualRevision: 'licensed-anatomical-viewmodel-v8',
+  limbProfileContract: 'hero-scale-connected-forearm-deformation-v2',
+  handPoseContract: 'licensed-articulated-weapon-and-knife-grip-v2',
+  shoulderEntryContract: 'weighted-capped-fps-frame-edge-sleeve-v2',
+  gloveConstructionContract: 'opaque-uv-preserved-scaled-anatomical-hand-v2',
+  weaponGripReviewContract: 'seven-view-actual-weapon-contact-v2',
   weightingContract: 'adjacent-bone-normalized-blend-v5',
   runtimeAnimationContract: 'authored-fingers-under-runtime-chain-ik-v1',
   fingerSegmentCount: 30,
@@ -275,7 +280,7 @@ const assetRecords = [
     sourceProvenance: armsProvenanceRecord.path, sourceProvenanceSha256: armsProvenanceRecord.sha256,
     preview: armsContactSheet.path,
     format: 'Two decreasing optimized self-contained glTF 2.0 skinned LODs with 37-bone dedicated skeleton, four material-compatible skinned renderables per LOD, embedded WebP PBR textures, opaque materials and thirteen action clips',
-    modifications: 'Removed the unrelated Icosphere; retargeted 47 source joints to the 37-bone runtime rig; collapsed terminal tip joints into distal phalanges; adapted bind shoulders, sleeves, hand proportions and real weapon grips for the FPS camera; capped proximal sleeves; converted specular-glossiness maps to metallic-roughness PBR; authored four disjoint skinned batches, four gameplay sockets, thirteen action clips, a true reduced LOD1, and seven strict contact views.',
+    modifications: 'Removed the unrelated Icosphere; retargeted 47 source joints to the 37-bone runtime rig; collapsed terminal tip joints into distal phalanges; enlarged the complete connected forearm/hand presentation while preserving weights and cuff overlap; refined real firearm and G10 knife grips for the FPS camera; lifted crushed charcoal PBR response; capped proximal sleeves; authored four disjoint skinned batches, four gameplay sockets, thirteen action clips, a true reduced LOD1, and seven strict contact views.',
     attributionRequired: true,
   },
   {

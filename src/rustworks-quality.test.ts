@@ -36,7 +36,7 @@ describe('Rustworks Quality Graphics parity', () => {
     expect(skyline.exposure).toBeLessThanOrEqual(1.05);
   });
 
-  it('adds flood lights, starfield, and richer materials for the night rig', () => {
+  it('adds flood lights and richer materials while the panorama solely owns the night sky', () => {
     const scene = new THREE.Scene();
     const map = buildRustworks1v1(scene);
     const lights = createRustworksQualityLights(map.root, 'blender');
@@ -56,8 +56,7 @@ describe('Rustworks Quality Graphics parity', () => {
     const enhanced = enhanceRustworksQualityMaterials(map.root, 'blender');
     expect(enhanced).toBeGreaterThan(10);
     const stars = ensureRustworksStarfield(scene, 'rustworks-1v1');
-    expect(stars).not.toBeNull();
-    expect(stars?.visible).toBe(true);
+    expect(stars).toBeNull();
     setRustworksQualityPresentationActive(true, 'blender');
     expect(rustworksQualityTelemetry('blender', 'rustworks-1v1').active).toBe(true);
     expect(rustworksQualityTelemetry('blender', 'rustworks-1v1').night).toBe(true);

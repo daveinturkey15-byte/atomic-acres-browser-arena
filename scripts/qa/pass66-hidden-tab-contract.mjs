@@ -1,4 +1,4 @@
-export const PASS66_HIDDEN_TAB_GATE_SCHEMA = 'atomic-acres/pass66-hidden-tab-admission@1';
+export const PASS66_HIDDEN_TAB_GATE_SCHEMA = 'atomic-acres/pass66-hidden-tab-admission@2';
 
 export const FORBIDDEN_BACKGROUND_BYPASS_FLAGS = Object.freeze([
   '--disable-background-networking',
@@ -31,13 +31,43 @@ export const REQUIRED_BROWSER_WEAPON_IDS = Object.freeze([
   'flashlight-pistol',
   'explosive-crossbow',
   'railgun',
+  'flamethrower',
+  'flare-gun',
 ]);
 
 // The active carbine is loaded by shared menu readiness. Hold the first missing
-// catalog-only source before releasing the tab; the exact 18-ID catalog,
+// catalog-only source before releasing the tab; the exact 20-ID catalog,
 // loaded-count advance and zero hidden GPU-submission checks below then force
-// the remaining 17 viewmodels through genuine background CPU preparation.
+// the remaining 19 viewmodels through genuine background CPU preparation.
 export const REQUIRED_HELD_CPU_ASSET = '/assets/original/models/weapons/pass65-firearms/smg/smg-fp-lod0.glb';
+
+// These paths are frozen outside the runtime's self-report. Every outdoor map
+// must prove that at least one selected-map image finishes fetch and decode
+// while the real game tab is hidden. Atomic Acres also holds its authored GLB,
+// so the highest-cost arena cannot pass on the sky sentinel alone.
+export const REQUIRED_SELECTED_ARENA_CONTRACTS = Object.freeze({
+  'atomic-acres': Object.freeze({
+    skyPreset: 'sunset-farmland',
+    skyAsset: '/assets/original/skies/atomic-acres-sunset.webp',
+    heldAssets: Object.freeze([
+      '/assets/original/skies/atomic-acres-sunset.webp',
+      '/assets/original/models/atomic-acres-blender-arena.glb',
+    ]),
+    qualityState: 'ready',
+  }),
+  'rustworks-1v1': Object.freeze({
+    skyPreset: 'industrial-night',
+    skyAsset: '/assets/original/skies/rustworks-industrial-night.webp',
+    heldAssets: Object.freeze(['/assets/original/skies/rustworks-industrial-night.webp']),
+    qualityState: 'ready',
+  }),
+  'skyline-terminal': Object.freeze({
+    skyPreset: 'airport-dawn',
+    skyAsset: '/assets/original/skies/terminal-airport-dawn.webp',
+    heldAssets: Object.freeze(['/assets/original/skies/terminal-airport-dawn.webp']),
+    qualityState: null,
+  }),
+});
 
 export function assertHeadedChromeLaunchContract({ headless, executablePath, args, automation, seedUrls }) {
   if (headless !== false) throw new Error('Pass 66 hidden-tab admission requires headed Chrome');
@@ -97,8 +127,25 @@ function completedHeldCpuAsset(checkpoint) {
   ));
 }
 
-export function hiddenCheckpointFailures({ beforeRelease, afterHidden, heldAssetRequests }) {
+function completedHeldMapAsset(checkpoint, asset) {
+  return checkpoint.assetResources.some((resource) => (
+    typeof resource.name === 'string'
+    && resource.name.endsWith(asset)
+    && Number.isFinite(resource.responseEnd)
+    && resource.responseEnd > 0
+  ));
+}
+
+export function hiddenCheckpointFailures({
+  beforeRelease,
+  afterHidden,
+  heldAssetRequests,
+  selectedArenaId = 'atomic-acres',
+  heldMapAssetRequests = {},
+}) {
   const failures = [];
+  const arenaContract = REQUIRED_SELECTED_ARENA_CONTRACTS[selectedArenaId];
+  if (!arenaContract) failures.push(`no frozen selected-map contract exists for ${selectedArenaId}`);
   const beforePhases = transitionPhaseNames(beforeRelease);
   const hiddenPhases = transitionPhaseNames(afterHidden);
   if (beforeRelease.document.visibilityState !== 'hidden' || beforeRelease.document.hasFocus) {
@@ -115,6 +162,22 @@ export function hiddenCheckpointFailures({ beforeRelease, afterHidden, heldAsset
   }
   if (heldAssetRequests < 1 || !completedHeldCpuAsset(afterHidden)) {
     failures.push('the exact held first-person weapon CPU asset did not complete while hidden');
+  }
+  if (arenaContract) {
+    for (const asset of arenaContract.heldAssets) {
+      if ((heldMapAssetRequests[asset] ?? 0) < 1 || !completedHeldMapAsset(afterHidden, asset)) {
+        failures.push(`the exact held ${selectedArenaId} asset ${asset} did not complete while hidden`);
+      }
+    }
+    if (afterHidden.skyBackdrop?.preset !== arenaContract.skyPreset
+      || afterHidden.skyBackdrop?.status !== 'asset-ready'
+      || afterHidden.skyBackdrop?.assetUrl !== arenaContract.skyAsset) {
+      failures.push(`the selected ${selectedArenaId} sky image did not finish decode and admission while hidden`);
+    }
+    if (arenaContract.qualityState !== null
+      && afterHidden.qualityAssetStreaming?.[selectedArenaId === 'atomic-acres' ? 'atomicAcres' : 'rustworks'] !== arenaContract.qualityState) {
+      failures.push(`the selected ${selectedArenaId} quality presentation did not reach ${arenaContract.qualityState} while hidden`);
+    }
   }
   if (!hiddenPhases.includes(REQUIRED_BACKGROUND_CPU_PHASE)
     || hiddenPhases.length <= beforePhases.length) {
@@ -154,13 +217,19 @@ export function hiddenCheckpointFailures({ beforeRelease, afterHidden, heldAsset
   }
   if (afterHidden.streaming.constructionCount !== 1
     || afterHidden.streaming.constructedArenaIds.length !== 1
-    || afterHidden.streaming.constructedArenaIds[0] !== 'atomic-acres') {
+    || afterHidden.streaming.constructedArenaIds[0] !== selectedArenaId) {
     failures.push('the hidden deployment constructed more than one arena authority root');
   }
   return failures;
 }
 
-export function recoveredCheckpointFailures({ beforeRelease, afterHidden, recovered, maximumRecoveryMs }) {
+export function recoveredCheckpointFailures({
+  beforeRelease,
+  afterHidden,
+  recovered,
+  maximumRecoveryMs,
+  selectedArenaId = 'atomic-acres',
+}) {
   const failures = [];
   if (recovered.document.visibilityState !== 'visible' || !recovered.document.hasFocus) {
     failures.push('the game tab did not regain foreground ownership');
@@ -180,11 +249,11 @@ export function recoveredCheckpointFailures({ beforeRelease, afterHidden, recove
   }
   if (recovered.streaming.constructionCount !== 1
     || recovered.streaming.residentArenaRoots !== 1
-    || recovered.playableScene?.arenaId !== 'atomic-acres'
+    || recovered.playableScene?.arenaId !== selectedArenaId
     || recovered.playableScene?.authoritativeArenaRoots !== 1
     || recovered.playableScene?.authoritativeArenaRootIsGameplayRoot !== true
     || recovered.playableScene?.duplicateArenaRoots !== false) {
-    failures.push('foreground recovery did not retain exactly one authoritative Atomic Acres gameplay root');
+    failures.push(`foreground recovery did not retain exactly one authoritative ${selectedArenaId} gameplay root`);
   }
   if (!recovered.gameStarted || recovered.matchPhase === 'ended'
     || recovered.transition.phase !== 'idle' || recovered.transition.failure !== null

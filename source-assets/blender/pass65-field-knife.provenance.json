@@ -6,67 +6,68 @@
   "owner": "Atomic Acres project",
   "created": "2026-07-26",
   "license": "Project-original; no third-party meshes or textures",
-  "inspirationBoundary": "Original full-tang fixed blade with G10 scales, recessed fuller, spine serrations, guard, screws and lanyard pommel. No copied commercial-game geometry, textures, logos, animation, UI or audio.",
+  "inspirationBoundary": "Original compact drop-point full-tang field knife with a physical honed bevel, swedge, recessed fuller, contoured G10 scales, chevron grip, spine jimping, guard, fasteners and lanyard pommel. No copied commercial-game geometry, textures, logos, animation, UI or audio.",
   "blenderVersion": "5.1.2",
   "generator": {
     "path": "scripts/blender/create-pass65-field-knife.py",
-    "sha256": "73a4699c3f22af8611bfab3bcbac57748075fd532f8252165b87a1b91d7a1f21"
+    "sha256": "51d4c5ccc3319c78293b36bd44b72d6bb8e8f7624207bb2403eca7964f22d655"
   },
   "sourceBlend": {
     "path": "source-assets/blender/pass65-field-knife.blend",
-    "sha256": "ab7ea5c986e3fdb6a218ea084e89b3f8c5db12437f570c998ee8e16bfd25dbfc"
+    "sha256": "4666f01c9263fcf52681ea49a8c2af50024dd2aa8e1db5ed341246ca7d8b958b"
   },
+  "visualRevision": "compact-drop-point-g10-v2",
   "runtimeForwardAxis": "-Z",
   "deliveries": {
     "firstPersonGlbs": [
       {
         "path": "public/assets/original/models/weapons/pass65-field-knife/pass65-field-knife-fp-lod0.glb",
-        "sha256": "5b12c5a94a00bbbc255c2b9ef8d446b321710e998f6eea74ecc5bd8d0e1c02a3",
+        "sha256": "982e51c5eba6c9fc30897b23fbc4886263c9e27242a107cff80e55952334bf85",
         "variant": "first-person-lod0",
         "lod": 0,
-        "triangles": 2976,
-        "bytes": 125912,
-        "meshNodes": 28
+        "triangles": 3380,
+        "bytes": 156980,
+        "meshNodes": 35
       },
       {
         "path": "public/assets/original/models/weapons/pass65-field-knife/pass65-field-knife-fp-lod1.glb",
-        "sha256": "cf3934b96b5139251f6f1ce313baf8edd6280ffaba906c1919dfc5d4f69e7b28",
+        "sha256": "0e5ef7882927d1a39eaa763777b8a89ddae22bba6f1b9c77114849f6c4361e10",
         "variant": "first-person-lod1",
         "lod": 1,
-        "triangles": 2380,
-        "bytes": 117756,
-        "meshNodes": 24
+        "triangles": 2832,
+        "bytes": 154416,
+        "meshNodes": 29
       }
     ],
     "worldGlbs": [
       {
         "path": "public/assets/original/models/weapons/pass65-field-knife/pass65-field-knife-world-lod0.glb",
-        "sha256": "ee65853903955df86d2799f8f88d2825c4c95bc499c8ea687474d463200d91b2",
+        "sha256": "bec9122488dcf13d5a5da2bb8d1ef818e290191fa868adfb6fc31222f2c1e21d",
         "variant": "world-lod0",
         "lod": 0,
-        "triangles": 2380,
-        "bytes": 124732,
-        "meshNodes": 24
+        "triangles": 2832,
+        "bytes": 154280,
+        "meshNodes": 29
       },
       {
         "path": "public/assets/original/models/weapons/pass65-field-knife/pass65-field-knife-world-lod1.glb",
-        "sha256": "2f5cc4f3fa80e2c1c9f0065306af204c559286438ffb6ab9c8e61a15e8d86f64",
+        "sha256": "9b2aa2e683524194d39348f23683e453d1c9fed1fc59f1eb70e298a01869605b",
         "variant": "world-lod1",
         "lod": 1,
-        "triangles": 1512,
-        "bytes": 110060,
-        "meshNodes": 19
+        "triangles": 2136,
+        "bytes": 139748,
+        "meshNodes": 23
       }
     ],
     "dropGlbs": [
       {
         "path": "public/assets/original/models/weapons/pass65-field-knife/pass65-field-knife-drop-lod0.glb",
-        "sha256": "c20d7d9dc0673af67f2784691f97b7cb7d057c3073aebf2b4b84e6500a46ebda",
+        "sha256": "943a06c17a899b4f4c081362a580d23569d039649884a1c42f459504b8f36745",
         "variant": "drop-lod0",
         "lod": 0,
-        "triangles": 1768,
-        "bytes": 107452,
-        "meshNodes": 21
+        "triangles": 2324,
+        "bytes": 142464,
+        "meshNodes": 24
       }
     ]
   },
@@ -132,28 +133,28 @@
     "renders": [
       {
         "path": "docs/assets/pass65-weapons/field-knife/pass65-field-knife-hero-quarter.png",
-        "sha256": "5526acbaf343e5ce65b82d0d9da558ef48eede3841e100529743af76a441a8d9",
+        "sha256": "5c5f65730bfc940c217ca314bff7b82f7f59b66d33c3ad507c9cc18980139137",
         "width": 480,
         "height": 360,
         "cameraId": "hero-quarter"
       },
       {
         "path": "docs/assets/pass65-weapons/field-knife/pass65-field-knife-blade-profile.png",
-        "sha256": "3bc8307ed18c628de08d237c4f8a4dfd8c2da33d8acb7093f18f4e6439c762b2",
+        "sha256": "c020af99ac2e885134aed1c71ee378c37afe9800ac179cf6458bbe73b8d41e66",
         "width": 480,
         "height": 360,
         "cameraId": "blade-profile"
       },
       {
         "path": "docs/assets/pass65-weapons/field-knife/pass65-field-knife-grip-closeup.png",
-        "sha256": "58f0743b4bc1252119181b669f307c970e8a48b975a186af762ba8a9332902ed",
+        "sha256": "ea803ffcba434269b5ea7c56294f9c041238664c0e41135dffcc56ef568a8d6d",
         "width": 480,
         "height": 360,
         "cameraId": "grip-closeup"
       },
       {
         "path": "docs/assets/pass65-weapons/field-knife/pass65-field-knife-melee-action.png",
-        "sha256": "e54054f856e806319d80de49657e73c276d796b0eff32cf6f621911af19bfbda",
+        "sha256": "990e8d35244aa2d5d1f448c0af3d30b38442cc93e35da3ecc3e97df3a22030a1",
         "width": 480,
         "height": 360,
         "cameraId": "melee-action"
@@ -161,7 +162,7 @@
     ],
     "contactSheet": {
       "path": "docs/assets/pass65-weapons/field-knife/pass65-field-knife-contact-sheet.png",
-      "sha256": "daa3f7abdfe92d6e98152cb1cabb76f3d59cede33a5b6d13508588a6463b3e4d",
+      "sha256": "eb31c1f8162eeb1ce9ecdb2cbad51eaa06c7bd5281c4623e9e99864ac12492d6",
       "width": 960,
       "height": 720
     }
@@ -170,10 +171,10 @@
     "deliveries": [
       {
         "variant": "first-person-lod0",
-        "triangles": 2976,
-        "bytes": 125912,
-        "meshNodes": 28,
-        "materials": 6,
+        "triangles": 3380,
+        "bytes": 156980,
+        "meshNodes": 35,
+        "materials": 7,
         "images": 4,
         "animations": [
           "equip",
@@ -189,10 +190,10 @@
       },
       {
         "variant": "first-person-lod1",
-        "triangles": 2380,
-        "bytes": 117756,
-        "meshNodes": 24,
-        "materials": 6,
+        "triangles": 2832,
+        "bytes": 154416,
+        "meshNodes": 29,
+        "materials": 7,
         "images": 4,
         "animations": [
           "equip",
@@ -208,10 +209,10 @@
       },
       {
         "variant": "world-lod0",
-        "triangles": 2380,
-        "bytes": 124732,
-        "meshNodes": 24,
-        "materials": 6,
+        "triangles": 2832,
+        "bytes": 154280,
+        "meshNodes": 29,
+        "materials": 7,
         "images": 4,
         "animations": [
           "equip",
@@ -227,10 +228,10 @@
       },
       {
         "variant": "world-lod1",
-        "triangles": 1512,
-        "bytes": 110060,
-        "meshNodes": 19,
-        "materials": 6,
+        "triangles": 2136,
+        "bytes": 139748,
+        "meshNodes": 23,
+        "materials": 7,
         "images": 4,
         "animations": [
           "equip",
@@ -246,10 +247,10 @@
       },
       {
         "variant": "drop-lod0",
-        "triangles": 1768,
-        "bytes": 107452,
-        "meshNodes": 21,
-        "materials": 6,
+        "triangles": 2324,
+        "bytes": 142464,
+        "meshNodes": 24,
+        "materials": 7,
         "images": 4,
         "animations": [
           "equip",

@@ -390,6 +390,8 @@ const PROCEDURAL_WEAPON_BASE: Partial<Record<WeaponId, WeaponId>> = {
   'slug-shotgun': 'scattergun',
   'flashlight-pistol': 'pistol',
   'explosive-crossbow': 'pistol',
+  flamethrower: 'lmg',
+  'flare-gun': 'pistol',
 };
 
 function buildProceduralWeaponVariant(id: WeaponId, baseId: WeaponId, flattenMaterials: boolean): THREE.Group {
@@ -456,6 +458,28 @@ function buildProceduralWeaponVariant(id: WeaponId, baseId: WeaponId, flattenMat
     string.rotation.z = Math.PI / 2;
     string.position.set(0, 0.09, -0.66);
     root.add(string);
+  } else if (id === 'flamethrower') {
+    const inheritedMagazine = root.getObjectByName('magazine');
+    if (inheritedMagazine) inheritedMagazine.visible = false;
+    for (const side of [-1, 1]) {
+      const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.54, 14), metal);
+      tank.name = side < 0 ? 'flamethrower-fuel-tank-left' : 'flamethrower-fuel-tank-right';
+      tank.position.set(side * 0.16, -0.18, 0.04);
+      root.add(tank);
+    }
+    const hose = new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.018, 8, 22, Math.PI * 1.4), dark);
+    hose.name = 'flamethrower-hose';
+    hose.rotation.set(Math.PI / 2, 0, -0.3);
+    hose.position.set(-0.1, -0.22, -0.36);
+    root.add(hose);
+    part(root, roundedBox('flamethrower-heat-shield', [0.22, 0.18, 0.68], dark, 0.035, 3), [0, 0.02, -0.66]);
+    part(root, roundedBox('flamethrower-igniter', [0.09, 0.1, 0.16], accent, 0.02, 2), [0.09, 0.04, -1.04]);
+  } else if (id === 'flare-gun') {
+    part(root, roundedBox('flare-gun-break-barrel', [0.22, 0.2, 0.58], metal, 0.05, 4), [0, 0.08, -0.46]);
+    part(root, roundedBox('flare-gun-latch', [0.14, 0.07, 0.11], accent, 0.018, 2), [0, 0.21, -0.12]);
+    part(root, roundedBox('flare-gun-front-sight', [0.035, 0.075, 0.05], accent, 0.008, 2), [0, 0.24, -0.7]);
+    part(root, roundedBox('flare-gun-rear-sight', [0.12, 0.06, 0.05], dark, 0.008, 2), [0, 0.24, -0.18]);
+    part(root, roundedBox('flare-gun-trigger-guard', [0.2, 0.05, 0.2], dark, 0.02, 2), [0, -0.14, -0.1]);
   }
   return root;
 }
@@ -1137,6 +1161,8 @@ const RIGGED_SUPPORT_GRIP_POSITION: Record<WeaponId, [number, number, number]> =
   'slug-shotgun': [-0.03, -0.025, 0.29],
   'flashlight-pistol': [-0.06, -0.15, 0.03],
   'explosive-crossbow': [-0.06, -0.12, -0.25],
+  flamethrower: [-0.06, -0.13, -0.3],
+  'flare-gun': [-0.06, -0.15, 0.03],
 };
 
 /** Rotate one animated bone toward a world-space target without rewriting bind offsets. */

@@ -1,6 +1,13 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { WaterSystem, sampleOceanWave } from './water-system';
+import {
+  OCEAN_WAVES,
+  RUSTWORKS_OCEAN_AUTHORITY_ID,
+  RUSTWORKS_OCEAN_AMPLITUDE,
+  WaterSystem,
+  rustworksOceanAmplitude,
+  sampleOceanWave,
+} from './water-system';
 
 describe('WaterSystem', () => {
   it('builds deep ocean under a raised Rustworks oil-rig deck', () => {
@@ -12,8 +19,10 @@ describe('WaterSystem', () => {
       arenaId: 'rustworks-1v1',
       physicsActive: true,
       waterLevel: -19.5,
+      waveBands: OCEAN_WAVES.length,
+      waveAuthority: RUSTWORKS_OCEAN_AUTHORITY_ID,
     });
-    expect(water.telemetry().waveAmp).toBeGreaterThan(1);
+    expect(water.telemetry().waveAmp).toBe(RUSTWORKS_OCEAN_AMPLITUDE.blender);
     expect(water.telemetry().nearSize).toBe(960);
     expect(water.telemetry().horizonRadius).toBe(3_200);
     expect(water.root.children.length).toBe(2);
@@ -32,6 +41,9 @@ describe('WaterSystem', () => {
   });
 
   it('uses the same deterministic multi-direction wave field for rendering and physics', () => {
+    expect(OCEAN_WAVES).toHaveLength(5);
+    expect(rustworksOceanAmplitude('performance')).toBe(1.15);
+    expect(rustworksOceanAmplitude('blender')).toBe(1.55);
     const first = sampleOceanWave(42, -18, 7.25, 1.9);
     const repeat = sampleOceanWave(42, -18, 7.25, 1.9);
     const later = sampleOceanWave(42, -18, 8.25, 1.9);
@@ -42,6 +54,21 @@ describe('WaterSystem', () => {
     expect(first.normal.length()).toBeCloseTo(1, 6);
     expect(first.normal.y).toBeGreaterThan(0.9);
     expect(Number.isFinite(first.verticalVelocity)).toBe(true);
+
+    const field = [];
+    for (let time = 0; time <= 8; time += 0.5) {
+      for (let x = -120; x <= 120; x += 12) {
+        for (let z = -120; z <= 120; z += 12) {
+          field.push(sampleOceanWave(x, z, time, RUSTWORKS_OCEAN_AMPLITUDE.blender));
+        }
+      }
+    }
+    const heights = field.map((sample) => sample.height);
+    const velocities = field.map((sample) => sample.verticalVelocity);
+    expect(Math.max(...heights)).toBeGreaterThan(1);
+    expect(Math.min(...heights)).toBeLessThan(-1);
+    expect(Math.max(...heights) - Math.min(...heights)).toBeGreaterThan(2.5);
+    expect(Math.max(...velocities) - Math.min(...velocities)).toBeGreaterThan(1);
   });
 
   it('stays off for gun range', () => {

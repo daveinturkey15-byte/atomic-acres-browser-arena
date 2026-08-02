@@ -35,9 +35,9 @@ const verifierPath = path.join(root, 'scripts/qa/verify-pass65-menu-preview-prod
 const chopperSourcePath = path.join(root, 'source-assets/blender/pass65-chopper-gunner.blend');
 const acceptedCockpitEvidence = 'docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png';
 const acceptedCockpitEvidencePath = path.join(root, acceptedCockpitEvidence);
-const acceptedCockpitDigest = '581c448b7d998a220ea69fb0c024d9553f40d9aea767b3d88b503780a64921d1';
-const generatedAt = '2026-07-30';
+const acceptedCockpitDigest = 'b75d0ca8dc8b8be61c93e06a737029ad679f480d27eea56edc66dadcd00fba9e';
 const choreography = JSON.parse(await readFile(choreographyPath, 'utf8'));
+const generatedAt = choreography.generatedAt;
 const arenas = Object.keys(choreography.arenas);
 const captureToolPaths = [generatorPath, integrityPath, integrityTypesPath, dependencyManifestPath];
 const supersededGunRange = Object.freeze({
@@ -77,17 +77,28 @@ function canonicalArenaDependencies() {
 }
 
 function validateRecipe() {
-  if (choreography.schemaVersion !== 4 || choreography.recipeId !== 'pass66-authoritative-runtime-menu-preview-v1') {
+  if (choreography.schemaVersion !== 4
+    || choreography.recipeId !== 'pass66-authoritative-runtime-menu-preview-v2'
+    || choreography.captureId !== 'pass66-authoritative-runtime-menu-preview-capture-v2'
+    || choreography.generatedAt !== '2026-08-02') {
     throw new Error('canonical authoritative-runtime choreography schema or recipe id is invalid');
   }
   if (choreography.capture?.source !== 'authoritative-runtime-arena'
     || choreography.capture?.backend !== 'webgpu'
     || choreography.capture?.rendererRequired !== true
-    || choreography.capture?.overlayScale !== 0.5) {
+    || choreography.capture?.overlayScale !== 0.5
+    || choreography.capture?.overlayReferenceViewport?.[0] !== 1280
+    || choreography.capture?.overlayReferenceViewport?.[1] !== 720
+    || choreography.capture?.overlayOutputScale !== 2) {
     throw new Error('capture must require authoritative WebGPU arenas and the reviewed half-scale overlay');
   }
-  if (choreography.frameCount !== choreography.fps * choreography.durationSeconds) {
-    throw new Error('frameCount must equal fps * durationSeconds');
+  if (choreography.fps !== 30
+    || choreography.durationSeconds !== 8
+    || choreography.frameCount !== 240
+    || choreography.frameCount !== choreography.fps * choreography.durationSeconds
+    || choreography.capture.viewport?.[0] !== 2560
+    || choreography.capture.viewport?.[1] !== 1440) {
+    throw new Error('canonical menu-preview masters must be exactly 2560x1440, 30 FPS, eight seconds and 240 frames');
   }
   if (arenas.join(',') !== 'atomic-acres,skyline-terminal,rustworks-1v1,gun-range') {
     throw new Error(`unexpected canonical arena order/set: ${arenas.join(',')}`);
@@ -97,7 +108,60 @@ function validateRecipe() {
     || choreography.reviewFrames.at(-1) !== choreography.frameCount) {
     throw new Error('reviewFrames must be unique and include the exact loop endpoints');
   }
-  if (choreography.media.cacheKey !== 'pass66-runtime-preview-v4') throw new Error('runtime preview cache key is stale');
+  if (choreography.media.cacheKey !== 'pass66-runtime-preview-v5') throw new Error('runtime preview cache key is stale');
+  const budget = choreography.media.encodingBudget;
+  if (budget?.minimumAverageBitrateKbps !== 3000
+    || budget?.maximumAverageBitrateKbps !== 9000
+    || budget?.maximumBytesPerVideo !== 9500000
+    || budget?.maximumPosterBytes !== 1500000
+    || budget?.maximumReviewSheetBytes !== 1200000) {
+    throw new Error('1440p menu-preview encoding/file-size budget drifted');
+  }
+  const mp4 = choreography.media.encodingProfiles?.mp4;
+  const webm = choreography.media.encodingProfiles?.webm;
+  const images = choreography.media.encodingProfiles?.images;
+  const colour = choreography.media.encodingProfiles?.colour;
+  if (mp4?.encoder !== 'libx264'
+    || mp4?.videoCodec !== 'h264'
+    || mp4?.profile !== 'high'
+    || mp4?.level !== '5.0'
+    || mp4?.codecTag !== 'avc1'
+    || mp4?.rfc6381 !== 'avc1.640032'
+    || mp4?.audioCodec !== 'aac'
+    || mp4?.audioRfc6381 !== 'mp4a.40.2'
+    || mp4?.targetVideoBitrateKbps !== 7500
+    || mp4?.minimumVideoBitrateKbps !== 6000
+    || mp4?.maximumVideoBitrateKbps !== 8500
+    || mp4?.bufferSizeKbps !== 17000
+    || mp4?.audioBitrateKbps !== 64
+    || mp4?.mimeType !== 'video/mp4; codecs="avc1.640032,mp4a.40.2"') {
+    throw new Error('canonical H.264 High Level 5.0 1440p profile drifted');
+  }
+  if (webm?.encoder !== 'libvpx-vp9'
+    || webm?.videoCodec !== 'vp9'
+    || webm?.profile !== 0
+    || webm?.audioCodec !== 'opus'
+    || webm?.targetVideoBitrateKbps !== 6000
+    || webm?.minimumVideoBitrateKbps !== 4500
+    || webm?.maximumVideoBitrateKbps !== 7500
+    || webm?.bufferSizeKbps !== 15000
+    || webm?.crf !== 28
+    || webm?.cpuUsed !== 2
+    || webm?.audioBitrateKbps !== 48
+    || webm?.mimeType !== 'video/webm; codecs="vp9,opus"') {
+    throw new Error('canonical VP9 1440p profile drifted');
+  }
+  if (images?.posterQuality !== 88
+    || images?.reviewFrameWidth !== 640
+    || images?.reviewFrameHeight !== 360
+    || images?.reviewQuality !== 88
+    || colour?.pixelFormat !== 'yuv420p'
+    || colour?.primaries !== 'bt709'
+    || colour?.transfer !== 'bt709'
+    || colour?.space !== 'bt709'
+    || colour?.range !== 'tv') {
+    throw new Error('canonical 1440p image or BT.709 delivery profile drifted');
+  }
   const rotor = choreography.helicopter?.rotorPresentation;
   const configuredRotorArea = rotor?.mainStageWidthPercent / 100 * rotor?.mainStageHeightPercent / 100;
   const configuredRotorTop = rotor?.mainStageTopPercent / 100;
@@ -106,7 +170,8 @@ function validateRecipe() {
   const configuredTieLeft = configuredStageLeft + rotor?.mainStageWidthPercent * rotor?.mainStructuralTieInsetPercent / 100;
   const configuredTieRight = configuredTieLeft + rotor?.mainStageWidthPercent * rotor?.mainStructuralTieWidthPercent / 100;
   const configuredHeaderLeft = configuredStageLeft + rotor?.mainStageWidthPercent * (100 - rotor?.mainCanopyHeaderWidthPercent) / 200;
-  const configuredMaximumHorizontalShiftPercent = rotor?.mainMaximumPoseShiftPixels / choreography.capture.viewport[0] * 100;
+  const configuredMaximumHorizontalShiftPercent = rotor?.mainMaximumPoseShiftPixels
+    * choreography.capture.overlayOutputScale / choreography.capture.viewport[0] * 100;
   if (rotor?.id !== 'perspective-elliptic-cockpit-rotor-rig-v1'
     || rotor.mainTurnsPerLoop !== choreography.helicopter.rotorTurnsPerLoop
     || rotor.mainTurnsPerLoop <= 0
@@ -125,12 +190,12 @@ function validateRecipe() {
     || rotor.mainContrastMode !== 'graphite-low-contrast-motion-v1'
     || rotor.mainFilledDisc !== false
     || rotor.mainMinimumLegibleBladeSweeps !== 2
-    || rotor.mainMinimumProjectedBladeLengthPixels < 260
-    || rotor.mainMinimumProjectedBladeLengthPixels > 420
-    || rotor.mainMinimumProjectedSweepSpanPixels < 680
-    || rotor.mainMinimumProjectedSweepSpanPixels > 960
-    || rotor.mainMinimumProjectedArcSpanPixels < 640
-    || rotor.mainMinimumProjectedArcSpanPixels > 1000
+    || rotor.mainMinimumProjectedBladeLengthPixels < 520
+    || rotor.mainMinimumProjectedBladeLengthPixels > 840
+    || rotor.mainMinimumProjectedSweepSpanPixels < 1360
+    || rotor.mainMinimumProjectedSweepSpanPixels > 1920
+    || rotor.mainMinimumProjectedArcSpanPixels < 1280
+    || rotor.mainMinimumProjectedArcSpanPixels > 2000
     || rotor.mainMinimumAuthoredBladeThicknessPixels < 2
     || rotor.mainMinimumAuthoredBladeThicknessPixels > 5
     || rotor.mainMinimumBladeOpacity < 0.18
@@ -166,14 +231,14 @@ function validateRecipe() {
     || rotor.mainMaximumDiscPitchResponseDegrees > 0.9
     || rotor.mainMaximumDiscYawResponseDegrees < 0.4
     || rotor.mainMaximumDiscYawResponseDegrees > 1.1
-    || rotor.mainMinimumHubDiameterPixels < 16
-    || rotor.mainMinimumHubDiameterPixels > 30
-    || rotor.mainMinimumHubCanopyOverlapPixels < 2
-    || rotor.mainMinimumHubCanopyOverlapPixels > 8
+    || rotor.mainMinimumHubDiameterPixels < 32
+    || rotor.mainMinimumHubDiameterPixels > 60
+    || rotor.mainMinimumHubCanopyOverlapPixels < 4
+    || rotor.mainMinimumHubCanopyOverlapPixels > 16
     || rotor.mainMaximumHubCanopyOcclusionFraction < 0.35
     || rotor.mainMaximumHubCanopyOcclusionFraction > 0.7
-    || rotor.mainMinimumMastCanopyOverlapPixels < 6
-    || rotor.mainMinimumMastCanopyOverlapPixels > 14
+    || rotor.mainMinimumMastCanopyOverlapPixels < 12
+    || rotor.mainMinimumMastCanopyOverlapPixels > 28
     || rotor.mainCanopyHeaderWidthPercent < 28
     || rotor.mainCanopyHeaderWidthPercent > 40
     || rotor.mainStructuralTieInsetPercent < 12
@@ -182,10 +247,10 @@ function validateRecipe() {
     || rotor.mainStructuralTieWidthPercent > 24
     || rotor.mainStructuralTieAngleDegrees < 4
     || rotor.mainStructuralTieAngleDegrees > 14
-    || rotor.mainMinimumTieHeaderOverlapAreaPixels < 10
-    || rotor.mainMinimumTieHeaderOverlapAreaPixels > 120
-    || rotor.mainMinimumTieCanopyOverlapAreaPixels < 10
-    || rotor.mainMinimumTieCanopyOverlapAreaPixels > 120
+    || rotor.mainMinimumTieHeaderOverlapAreaPixels < 40
+    || rotor.mainMinimumTieHeaderOverlapAreaPixels > 480
+    || rotor.mainMinimumTieCanopyOverlapAreaPixels < 40
+    || rotor.mainMinimumTieCanopyOverlapAreaPixels > 480
     || !Number.isFinite(configuredTieLeft)
     || !Number.isFinite(configuredTieRight)
     || !Number.isFinite(configuredHeaderLeft)
@@ -238,13 +303,15 @@ async function assertCaptureReceipt() {
   const receipt = JSON.parse(await readFile(captureReceiptPath, 'utf8'));
   const recipeDigest = createHash('sha256').update(JSON.stringify(choreography)).digest('hex');
   if (receipt.schemaVersion !== 4
-    || receipt.captureId !== 'pass66-authoritative-runtime-menu-preview-capture-v1'
+    || receipt.captureId !== choreography.captureId
     || receipt.generatedAt !== generatedAt
     || receipt.recipeId !== choreography.recipeId
     || receipt.recipeDigest !== recipeDigest
     || receipt.source !== choreography.capture.source
     || receipt.backendRequired !== 'webgpu'
     || receipt.overlay?.scale !== 0.5
+    || JSON.stringify(receipt.overlay?.referenceViewport) !== JSON.stringify(choreography.capture.overlayReferenceViewport)
+    || receipt.overlay?.outputScale !== choreography.capture.overlayOutputScale
     || receipt.overlay?.liveLoadingRenderer !== false) {
     throw new Error('runtime capture receipt does not match the canonical offline authoring contract');
   }
@@ -385,28 +452,164 @@ function audioSource(kind) {
     : `aevalsrc=0.005*sin(2*PI*63*t)+0.0025*sin(2*PI*126*t)+0.0015*sin(2*PI*252*t):s=48000:d=${duration}`;
 }
 
+const rate = (value) => `${value}k`;
+
+function probeMedia(file) {
+  const result = run('ffprobe', [
+    '-v', 'error', '-count_frames',
+    '-show_entries', 'format=duration,size,bit_rate:stream=index,codec_type,codec_name,codec_tag_string,profile,level,pix_fmt,color_range,color_space,color_transfer,color_primaries,width,height,r_frame_rate,nb_read_frames,duration',
+    '-of', 'json', file,
+  ]);
+  try {
+    return JSON.parse(result.stdout);
+  } catch (error) {
+    throw new Error(`ffprobe returned invalid JSON for ${relative(file)}: ${error.message}`);
+  }
+}
+
+function assertStagedVideo(file, profile) {
+  const probe = probeMedia(file);
+  const video = probe.streams?.find((stream) => stream.codec_type === 'video');
+  const audio = probe.streams?.find((stream) => stream.codec_type === 'audio');
+  const duration = Number(probe.format?.duration ?? video?.duration);
+  const sizeBytes = Number(probe.format?.size);
+  const averageBitrateKbps = Number.isFinite(Number(probe.format?.bit_rate))
+    ? Number(probe.format.bit_rate) / 1000
+    : sizeBytes * 8 / duration / 1000;
+  const budget = choreography.media.encodingBudget;
+  const colour = choreography.media.encodingProfiles.colour;
+  if (video?.codec_name !== profile.videoCodec
+    || audio?.codec_name !== profile.audioCodec
+    || video?.width !== choreography.capture.viewport[0]
+    || video?.height !== choreography.capture.viewport[1]
+    || video?.r_frame_rate !== `${choreography.fps}/1`
+    || Number(video?.nb_read_frames) !== choreography.frameCount
+    || !Number.isFinite(duration)
+    || Math.abs(duration - choreography.durationSeconds) > 0.08
+    || video?.pix_fmt !== colour.pixelFormat
+    || video?.color_primaries !== colour.primaries
+    || video?.color_transfer !== colour.transfer
+    || video?.color_space !== colour.space
+    || video?.color_range !== colour.range) {
+    throw new Error(`${relative(file)} does not satisfy the canonical 2560x1440/30 FPS/BT.709 stream contract`);
+  }
+  if (profile.videoCodec === 'h264'
+    && (String(video?.profile ?? '').toLowerCase() !== profile.profile
+      || Number(video?.level) !== Number(profile.level) * 10
+      || video?.codec_tag_string !== profile.codecTag)) {
+    throw new Error(`${relative(file)} is not H.264 High Level 5.0 with an avc1 sample entry`);
+  }
+  if (!Number.isFinite(sizeBytes)
+    || sizeBytes > budget.maximumBytesPerVideo
+    || !Number.isFinite(averageBitrateKbps)
+    || averageBitrateKbps < budget.minimumAverageBitrateKbps
+    || averageBitrateKbps > budget.maximumAverageBitrateKbps) {
+    throw new Error(`${relative(file)} violates the 1440p bitrate/file-size budget (${averageBitrateKbps.toFixed(1)} kbps, ${sizeBytes} bytes)`);
+  }
+}
+
+function assertStagedImage(file, width, height, maximumBytes) {
+  const probe = probeMedia(file);
+  const image = probe.streams?.find((stream) => stream.codec_type === 'video');
+  const sizeBytes = Number(probe.format?.size);
+  if (image?.codec_name !== 'webp'
+    || image?.width !== width
+    || image?.height !== height
+    || !Number.isFinite(sizeBytes)
+    || sizeBytes > maximumBytes) {
+    throw new Error(`${relative(file)} violates the ${width}x${height} WebP/${maximumBytes}-byte contract`);
+  }
+}
+
+function assertStagedMedia(arena, runtimeOutputRoot, reviewOutputRoot) {
+  assertStagedVideo(path.join(runtimeOutputRoot, `${arena}.mp4`), choreography.media.encodingProfiles.mp4);
+  assertStagedVideo(path.join(runtimeOutputRoot, `${arena}.webm`), choreography.media.encodingProfiles.webm);
+  assertStagedImage(
+    path.join(runtimeOutputRoot, `${arena}.webp`),
+    choreography.capture.viewport[0],
+    choreography.capture.viewport[1],
+    choreography.media.encodingBudget.maximumPosterBytes,
+  );
+  assertStagedImage(
+    path.join(reviewOutputRoot, `${arena}-review-frames.webp`),
+    choreography.media.encodingProfiles.images.reviewFrameWidth * choreography.reviewFrames.length,
+    choreography.media.encodingProfiles.images.reviewFrameHeight,
+    choreography.media.encodingBudget.maximumReviewSheetBytes,
+  );
+}
+
 function transcode(arena, outputRoot = runtimeRoot) {
   const recipe = choreography.arenas[arena];
   const input = path.join(frameRoot, arena, 'frame-%04d.png');
   const mp4 = path.join(outputRoot, `${arena}.mp4`);
   const webm = path.join(outputRoot, `${arena}.webm`);
   const poster = path.join(outputRoot, `${arena}.webp`);
+  const mp4Profile = choreography.media.encodingProfiles.mp4;
+  const webmProfile = choreography.media.encodingProfiles.webm;
+  const images = choreography.media.encodingProfiles.images;
+  const colour = choreography.media.encodingProfiles.colour;
   const common = [
     '-hide_banner', '-loglevel', 'error', '-y', '-framerate', String(choreography.fps),
     '-start_number', '1', '-i', input, '-f', 'lavfi', '-i', audioSource(recipe.kind),
     '-fflags', '+bitexact', '-map_metadata', '-1', '-map', '0:v:0', '-map', '1:a:0',
     '-t', String(choreography.durationSeconds),
   ];
-  run('ffmpeg', [...common, '-c:v', 'libx264', '-preset', 'slow', '-profile:v', 'high', '-level:v', '3.1', '-b:v', '1250k', '-minrate', '1000k', '-maxrate', '1400k', '-bufsize', '2800k', '-g', '60', '-keyint_min', '60', '-sc_threshold', '0', '-threads:v', '1', '-x264-params', 'threads=1:lookahead_threads=1:sliced_threads=0', '-flags:v', '+bitexact', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-c:a', 'aac', '-threads:a', '1', '-flags:a', '+bitexact', '-b:a', '64k', mp4]);
-  run('ffmpeg', [...common, '-c:v', 'libvpx-vp9', '-crf', '33', '-b:v', '1180k', '-minrate', '900k', '-maxrate', '1350k', '-bufsize', '2700k', '-g', '60', '-row-mt', '1', '-deadline', 'good', '-cpu-used', '2', '-flags:v', '+bitexact', '-pix_fmt', 'yuv420p', '-c:a', 'libopus', '-flags:a', '+bitexact', '-b:a', '48k', webm]);
-  run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-fflags', '+bitexact', '-i', path.join(frameRoot, arena, `frame-${String(recipe.posterFrame).padStart(4, '0')}.png`), '-map_metadata', '-1', '-frames:v', '1', '-c:v', 'libwebp', '-quality', '82', poster]);
+  const colourArgs = [
+    '-pix_fmt', colour.pixelFormat,
+    '-color_primaries', colour.primaries,
+    '-color_trc', colour.transfer,
+    '-colorspace', colour.space,
+    '-color_range', colour.range,
+  ];
+  run('ffmpeg', [
+    ...common,
+    '-c:v', mp4Profile.encoder,
+    '-preset', 'slow',
+    '-profile:v', mp4Profile.profile,
+    '-level:v', mp4Profile.level,
+    '-tag:v', mp4Profile.codecTag,
+    '-b:v', rate(mp4Profile.targetVideoBitrateKbps),
+    '-minrate', rate(mp4Profile.minimumVideoBitrateKbps),
+    '-maxrate', rate(mp4Profile.maximumVideoBitrateKbps),
+    '-bufsize', rate(mp4Profile.bufferSizeKbps),
+    '-g', '60', '-keyint_min', '60', '-sc_threshold', '0',
+    '-threads:v', '1',
+    '-x264-params', 'threads=1:lookahead_threads=1:sliced_threads=0:nal-hrd=vbr:force-cfr=1',
+    '-flags:v', '+bitexact',
+    ...colourArgs,
+    '-movflags', '+faststart',
+    '-c:a', mp4Profile.audioCodec,
+    '-threads:a', '1',
+    '-flags:a', '+bitexact',
+    '-b:a', rate(mp4Profile.audioBitrateKbps),
+    mp4,
+  ]);
+  run('ffmpeg', [
+    ...common,
+    '-c:v', webmProfile.encoder,
+    '-profile:v', String(webmProfile.profile),
+    '-crf', String(webmProfile.crf),
+    '-b:v', rate(webmProfile.targetVideoBitrateKbps),
+    '-minrate', rate(webmProfile.minimumVideoBitrateKbps),
+    '-maxrate', rate(webmProfile.maximumVideoBitrateKbps),
+    '-bufsize', rate(webmProfile.bufferSizeKbps),
+    '-g', '60', '-row-mt', '1', '-deadline', 'good', '-cpu-used', String(webmProfile.cpuUsed),
+    '-flags:v', '+bitexact',
+    ...colourArgs,
+    '-c:a', webmProfile.audioCodec,
+    '-flags:a', '+bitexact',
+    '-b:a', rate(webmProfile.audioBitrateKbps),
+    webm,
+  ]);
+  run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-fflags', '+bitexact', '-i', path.join(frameRoot, arena, `frame-${String(recipe.posterFrame).padStart(4, '0')}.png`), '-map_metadata', '-1', '-frames:v', '1', '-c:v', 'libwebp', '-quality', String(images.posterQuality), poster]);
 }
 
 function createReviewSheet(arena, outputRoot = reviewRoot) {
+  const images = choreography.media.encodingProfiles.images;
   const inputs = choreography.reviewFrames.flatMap((frame) => ['-i', path.join(frameRoot, arena, `frame-${String(frame).padStart(4, '0')}.png`)]);
-  const scales = choreography.reviewFrames.map((_, index) => `[${index}:v]scale=480:270:flags=lanczos[r${index}]`).join(';');
+  const scales = choreography.reviewFrames.map((_, index) => `[${index}:v]scale=${images.reviewFrameWidth}:${images.reviewFrameHeight}:flags=lanczos[r${index}]`).join(';');
   const labels = choreography.reviewFrames.map((_, index) => `[r${index}]`).join('');
-  run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', ...inputs, '-filter_complex', `${scales};${labels}hstack=inputs=${choreography.reviewFrames.length}[review]`, '-map', '[review]', '-map_metadata', '-1', '-frames:v', '1', '-c:v', 'libwebp', '-quality', '86', path.join(outputRoot, `${arena}-review-frames.webp`)]);
+  run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', ...inputs, '-filter_complex', `${scales};${labels}hstack=inputs=${choreography.reviewFrames.length}[review]`, '-map', '[review]', '-map_metadata', '-1', '-frames:v', '1', '-c:v', 'libwebp', '-quality', String(images.reviewQuality), path.join(outputRoot, `${arena}-review-frames.webp`)]);
 }
 
 async function fileRecord(file, extra = {}) {
@@ -466,6 +669,7 @@ try {
   for (const arena of arenas) {
     transcode(arena, stagingRuntimeRoot);
     createReviewSheet(arena, stagingReviewRoot);
+    assertStagedMedia(arena, stagingRuntimeRoot, stagingReviewRoot);
   }
   finalMediaSet = await digestFinalMediaSet(stagingRuntimeRoot, arenas);
   const cacheResult = appendCacheFamily(retainedCacheFamilyLock, {
@@ -537,7 +741,7 @@ const provenance = {
   sources,
   render: {
     masterFrames: `${choreography.frameCount} PNG frames per arena (intermediate frames excluded from git)`,
-    dimensions: '1280x720',
+    dimensions: choreography.capture.viewport.join('x'),
     frameRate: choreography.fps,
     durationSeconds: choreography.durationSeconds,
     mapSource: 'Selected authoritative production runtime arena under hardware WebGPU',
@@ -545,7 +749,11 @@ const provenance = {
     helicopter: 'Perspective-aware elliptic rotor arcs with subdued moving spokes, measured hub/mast/header occlusion, visible structural ties into both side canopy rails, and a compact graphite cockpit with restrained green avionics and an unobstructed sightline baked offline',
     cat: 'Compact charcoal/silver feline crown, articulated ears, forelegs and top-facing paws baked offline over the authoritative Gun Range moving-target scene',
     overlayScale: choreography.capture.overlayScale,
+    overlayReferenceViewport: choreography.capture.overlayReferenceViewport,
+    overlayOutputScale: choreography.capture.overlayOutputScale,
     audio: choreography.media.audioProfiles,
+    encodingProfiles: choreography.media.encodingProfiles,
+    encodingBudget: choreography.media.encodingBudget,
   },
   runtimeContract: choreography.runtimeContract,
   runtimeFiles,
@@ -565,8 +773,8 @@ record.sourceScript = relative(generatorPath);
 record.sourceScriptSha256 = provenance.generator.sha256;
 record.sourceProvenanceSha256 = await sha256(provenancePath);
 record.generatedAsOf = provenance.generatedAt;
-record.format = 'Four distinct 1280x720 eight-second 30 FPS selected-map runtime captures, shipped as VP9/Opus WebM, H.264/AAC MP4 and static WebP posters, plus deterministic five-frame review evidence';
-record.modifications = 'Captured offline from each actual authoritative production WebGPU arena with deterministic camera and visual time. Three map flyovers bake perspective-aware elliptic rotor arcs with subdued moving spokes, measured mast/hub/header occlusion, two visible structural ties into the side canopy rails, a restrained tail camera and compact green-on-graphite cockpit avionics; Gun Range bakes compact charcoal/silver ears, forelegs and top-facing paws. Runtime loading/menu playback remains prerecorded-only, reduced motion is poster-only, and no downloaded or sampled assets are used. The former byte-identical Gun Range media gate is explicitly superseded.';
+record.format = 'Four distinct 2560x1440 eight-second 30 FPS selected-map runtime captures, shipped as high-bitrate VP9/Opus WebM, H.264 High Level 5.0/AAC MP4 and full-resolution static WebP posters, plus deterministic five-frame review evidence';
+record.modifications = 'Captured offline at native 1440p from each actual authoritative production WebGPU arena with deterministic camera and visual time; the reviewed 1280x720 logical overlay is losslessly authored at exact 2x output scale so its fixed-pixel details retain their intended proportions. Three map flyovers bake perspective-aware elliptic rotor arcs with subdued moving spokes, measured mast/hub/header occlusion, two visible structural ties into the side canopy rails, a restrained tail camera and compact green-on-graphite cockpit avionics; Gun Range bakes compact charcoal/silver ears, forelegs and top-facing paws. Runtime loading/menu playback remains one selected metadata-preload decoder with poster-first readiness, reduced motion is poster-only, and no downloaded or sampled assets are used. The former byte-identical Gun Range media gate is explicitly superseded.';
 await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
 
 console.log(JSON.stringify({ releaseState: provenance.releaseState, recipeId: choreography.recipeId, source: choreography.capture.source, arenas, runtimeFiles: runtimeFiles.length, reviewSheets: reviewEvidence.length }, null, 2));

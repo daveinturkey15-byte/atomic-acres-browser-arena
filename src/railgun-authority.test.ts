@@ -19,6 +19,7 @@ import {
   createRailgunAuthorityState,
   dropRailgun,
   fireRailgun,
+  grantTrainingRailgun,
   isRailgunBeamAuthority,
   isStaleRailgunAuthorityState,
   railgunStateResyncDue,
@@ -99,6 +100,23 @@ describe('host-authoritative railgun', () => {
     expect(state).toMatchObject({ status: 'depleted', roundsRemaining: 0 });
     expect(replenishRailgunAmmo(state)).toEqual({ replenished: false, state });
     expect(fireRailgun(state, 'player-a', 'shot-9999', 999_999).accepted).toBe(false);
+  });
+
+  it('re-arms only at the secure host/offline Gun Range test station', () => {
+    const disabled = createRailgunAuthorityState('gun-range', 0, 0, 4);
+    const granted = grantTrainingRailgun(disabled, 'player-a', {
+      arenaId: 'gun-range', stationKind: 'secure-test-bay', authorityRole: 'offline',
+    });
+    expect(granted).toMatchObject({
+      accepted: true,
+      state: { generation: 4, revision: 1, status: 'held', holderId: 'player-a', roundsRemaining: RAILGUN_TOTAL_ROUNDS },
+    });
+    expect(grantTrainingRailgun(granted.state, 'player-a', {
+      arenaId: 'atomic-acres', stationKind: 'secure-test-bay', authorityRole: 'host',
+    } as unknown as Parameters<typeof grantTrainingRailgun>[2])).toEqual({ accepted: false, state: granted.state });
+    expect(grantTrainingRailgun(granted.state, 'player-a', {
+      arenaId: 'gun-range', stationKind: 'secure-test-bay', authorityRole: 'client',
+    } as unknown as Parameters<typeof grantTrainingRailgun>[2])).toEqual({ accepted: false, state: granted.state });
   });
 
   it('drops and reclaims remaining rounds without refilling', () => {

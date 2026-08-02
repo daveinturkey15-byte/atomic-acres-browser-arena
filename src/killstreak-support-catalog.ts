@@ -153,13 +153,19 @@ export type DroneSupportDefinition = Readonly<{
   controllerOptions: readonly StandaloneDroneController[];
 }>;
 
+/** Later owner correction: both standalone and 24-unit swarm support expire after 30 seconds. */
+export const DRONE_SUPPORT_LIFETIMES_MS = Object.freeze({
+  piloted: 30_000,
+  swarm: 30_000,
+} as const satisfies Readonly<Record<DroneSupportMode, number>>);
+
 export const DRONE_SUPPORT_DEFINITIONS: Readonly<Record<DroneSupportMode, DroneSupportDefinition>> = Object.freeze({
   piloted: Object.freeze({
     mode: 'piloted',
     gunProfileId: PILOTED_DRONE_GUN_PROFILE_ID,
     magazineSize: 20,
     reservePolicy: 'three-magazines-total',
-    lifetimeMs: 30_000,
+    lifetimeMs: DRONE_SUPPORT_LIFETIMES_MS.piloted,
     sensorProfileId: PILOTED_DRONE_SENSOR_PROFILE.id,
     presentationFamilyId: DRONE_PRESENTATION_FAMILY_ID,
     controllerOptions: Object.freeze(['ai', 'owner-player'] as const),
@@ -169,7 +175,7 @@ export const DRONE_SUPPORT_DEFINITIONS: Readonly<Record<DroneSupportMode, DroneS
     gunProfileId: DRONE_SWARM_GUN_PROFILE_ID,
     magazineSize: 20,
     reservePolicy: 'unlimited-reloads-until-expiry',
-    lifetimeMs: 30_000,
+    lifetimeMs: DRONE_SUPPORT_LIFETIMES_MS.swarm,
     sensorProfileId: null,
     presentationFamilyId: DRONE_PRESENTATION_FAMILY_ID,
     controllerOptions: Object.freeze(['ai'] as const),

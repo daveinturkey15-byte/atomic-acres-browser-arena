@@ -15,6 +15,90 @@
       "attributionRequired": false
     },
     {
+      "id": "atomic-acres-generated-sunset-sky-2026-08-01",
+      "kind": "original-project-ai-assisted-equirectangular-sky",
+      "creator": "Atomic Acres project / OpenAI image generation",
+      "source": "OpenAI image generation with owner-authored Atomic Acres sky direction",
+      "generatedAsOf": "2026-08-01",
+      "license": "Original project AI-assisted artwork",
+      "files": "public/assets/original/skies/atomic-acres-sunset.webp",
+      "sha256": "7a1ad1c445af528afb461d0e3bc5ad5607618dd87df078529fdc41e7d071396b",
+      "sourceImage": "source-assets/skies/atomic-acres-sunset-generated.png",
+      "sourceImageSha256": "d7dc7c7393e7a81726e80548e11dc21071de77063a17c7fb762900ef2497670f",
+      "sourceProvenance": "source-assets/skies/atomic-acres-sunset.provenance.json",
+      "sourceProvenanceSha256": "6497e03c4208f1a92522457b1f425b72d9dac84a0c0f56710ae11043d8c60270",
+      "sourceScript": "scripts/assets/author-pass66-sky-backdrops.py",
+      "sourceScriptSha256": "56a388c7c270e338f09f0d7567a2a187c17055687a3bd39f4fe490cd38d06047",
+      "owner": "src/rendering/sky-backdrop.ts",
+      "qualityTier": "production-atmosphere",
+      "materialFamily": "equirectangular-srgb-scene-background",
+      "textureDensity": "4096x2048, exactly 2:1, approximately 11.38 longitudinal texels per degree",
+      "triangleRange": [
+        0,
+        0
+      ],
+      "placeholderStatus": "production",
+      "format": "4096x2048 quality-96 lossy WebP, 1120742 bytes, asynchronous presentation enhancement over the immediate 2048x1024 procedural CanvasTexture fallback",
+      "modifications": "The corrected non-mirrored source candidate is preserved byte-for-byte. The hash-pinned official Real-ESRGAN x4plus NCNN/Vulkan authoring tool restores detail to 7096x3548 with a 256px tile; Lanczos reduction, a 48px periodic seam feather and quality-96 WebP delivery produce the 4096x2048 runtime. Author-time source-relative entropy, luminance, variance, detail and encoded-size gates precede atomic replacement. No crop, terrain, text, geometry, gameplay authority or synchronous load dependency is added. The first vertically mirrored candidate remains rejected and absent.",
+      "attributionRequired": false
+    },
+    {
+      "id": "rustworks-generated-industrial-night-sky-2026-08-02",
+      "kind": "original-project-ai-assisted-equirectangular-sky",
+      "creator": "Atomic Acres project / OpenAI image generation",
+      "source": "OpenAI image generation with owner-authored RustRig sky direction",
+      "generatedAsOf": "2026-08-02",
+      "license": "Original project AI-assisted artwork",
+      "files": "public/assets/original/skies/rustworks-industrial-night.webp",
+      "sha256": "d5a0fc1d1f60678fa78f22a8b89fd1df2a9aab14998e5a75576bb92393b08450",
+      "sourceImage": "source-assets/skies/rustworks-industrial-night-generated.png",
+      "sourceImageSha256": "68661cd803ba11e2663e86fb67bb03d09a47cff9e66e9d1cbf1984dfb1ecb531",
+      "sourceProvenance": "source-assets/skies/rustworks-industrial-night.provenance.json",
+      "sourceProvenanceSha256": "29427a1b6aaa706e8161d8dfd65f03444e0fdbee5b8b353107ec97c6ed071518",
+      "sourceScript": "scripts/assets/author-pass66-sky-backdrops.py",
+      "sourceScriptSha256": "56a388c7c270e338f09f0d7567a2a187c17055687a3bd39f4fe490cd38d06047",
+      "owner": "src/rendering/sky-backdrop.ts",
+      "qualityTier": "production-atmosphere",
+      "materialFamily": "equirectangular-srgb-scene-background",
+      "textureDensity": "4096x2048, exactly 2:1, approximately 11.38 longitudinal texels per degree",
+      "triangleRange": [
+        0,
+        0
+      ],
+      "placeholderStatus": "production",
+      "format": "4096x2048 quality-96 lossy WebP, 825088 bytes, asynchronous presentation enhancement over the immediate 2048x1024 procedural CanvasTexture fallback",
+      "modifications": "The object-free source candidate is preserved byte-for-byte. The hash-pinned official Real-ESRGAN x4plus NCNN/Vulkan authoring tool restores detail to 7096x3548 with a 256px tile; Lanczos reduction, a 48px periodic seam feather and quality-96 WebP delivery produce the 4096x2048 runtime. Author-time source-relative entropy, luminance, variance, detail and encoded-size gates precede atomic replacement. No crop, rig, floating asset, text, geometry, gameplay authority or synchronous load dependency is added.",
+      "attributionRequired": false
+    },
+    {
+      "id": "terminal-generated-airport-dawn-sky-2026-08-02",
+      "kind": "original-project-ai-assisted-equirectangular-sky",
+      "creator": "Atomic Acres project / OpenAI image generation",
+      "source": "OpenAI image generation with owner-authored Terminal sky direction",
+      "generatedAsOf": "2026-08-02",
+      "license": "Original project AI-assisted artwork",
+      "files": "public/assets/original/skies/terminal-airport-dawn.webp",
+      "sha256": "e36b73cfe0c291d25815e04a67c36921a6a1259049531371d35d96a04b307600",
+      "sourceImage": "source-assets/skies/terminal-airport-dawn-generated.png",
+      "sourceImageSha256": "85d363e75f9bc36d084a9e28da4708b38fde6b0952ff95a2f338f00bfd6f8a68",
+      "sourceProvenance": "source-assets/skies/terminal-airport-dawn.provenance.json",
+      "sourceProvenanceSha256": "a661ab60cd15fee69394c6e4607c83ae228ea05386296ac14ab67883dd0950a2",
+      "sourceScript": "scripts/assets/author-pass66-sky-backdrops.py",
+      "sourceScriptSha256": "56a388c7c270e338f09f0d7567a2a187c17055687a3bd39f4fe490cd38d06047",
+      "owner": "src/rendering/sky-backdrop.ts",
+      "qualityTier": "production-atmosphere",
+      "materialFamily": "equirectangular-srgb-scene-background",
+      "textureDensity": "4096x2048, exactly 2:1, approximately 11.38 longitudinal texels per degree",
+      "triangleRange": [
+        0,
+        0
+      ],
+      "placeholderStatus": "production",
+      "format": "4096x2048 quality-96 lossy WebP, 985934 bytes, asynchronous presentation enhancement over the immediate 2048x1024 procedural CanvasTexture fallback",
+      "modifications": "The object-free source candidate is preserved byte-for-byte. The hash-pinned official Real-ESRGAN x4plus NCNN/Vulkan authoring tool restores detail to 7096x3548 with a 256px tile; Lanczos reduction, a 48px periodic seam feather and quality-96 WebP delivery produce the 4096x2048 runtime. Author-time source-relative entropy, luminance, variance, detail and encoded-size gates precede atomic replacement. No crop, aircraft, contrail, floating asset, text, geometry, gameplay authority or synchronous load dependency is added.",
+      "attributionRequired": false
+    },
+    {
       "id": "atomic-acres-frag-grenade-2026-07-25",
       "kind": "original-project-3d-model",
       "creator": "Atomic Acres project / Jigglyclaw",
@@ -101,14 +185,14 @@
       "license": "Original project work",
       "files": "public/assets/original/**/pass65-field-knife-*",
       "sourceBlend": "source-assets/blender/pass65-field-knife.blend",
-      "sourceBlendSha256": "ab7ea5c986e3fdb6a218ea084e89b3f8c5db12437f570c998ee8e16bfd25dbfc",
+      "sourceBlendSha256": "4666f01c9263fcf52681ea49a8c2af50024dd2aa8e1db5ed341246ca7d8b958b",
       "sourceScript": "scripts/blender/create-pass65-field-knife.py",
-      "sourceScriptSha256": "73a4699c3f22af8611bfab3bcbac57748075fd532f8252165b87a1b91d7a1f21",
+      "sourceScriptSha256": "51d4c5ccc3319c78293b36bd44b72d6bb8e8f7624207bb2403eca7964f22d655",
       "sourceProvenance": "source-assets/blender/pass65-field-knife.provenance.json",
-      "sourceProvenanceSha256": "806bd547652f2bcca360b2af97e412062ca7ed9b8c0ca549691664ef2eaddc88",
+      "sourceProvenanceSha256": "ffb20f9cf30dd9d1342ab564783cb913412645a4eafdd799bbbb2436364a86fd",
       "preview": "docs/assets/pass65-weapons/field-knife/pass65-field-knife-contact-sheet.png",
       "format": "Two first-person, two world and one dedicated drop optimized self-contained glTF 2.0 binaries with Meshopt geometry, embedded WebP PBR textures, authored melee sockets and seven action clips",
-      "modifications": "Project-original full-tang tactical field knife authored in Blender with a shaped blade, recessed fuller, serrated spine, guard, G10 handle scales, grip ribs, fasteners, pommel and lanyard hole. Gameplay authority remains TypeScript-owned.",
+      "modifications": "Project-original compact drop-point full-tang field knife authored in Blender with a physical honed cutting bevel, swedge, recessed fuller, spine jimping, sculpted guard, correctly layered contoured G10 slabs, chevron grip inlays, through-fasteners, pommel and lanyard hole. Gameplay authority remains TypeScript-owned.",
       "attributionRequired": false
     },
     {
@@ -120,17 +204,17 @@
       "license": "Original project work",
       "files": "public/assets/original/**/pass65-firearms/**",
       "sourceBlend": "source-assets/blender/pass65-weapon-families.blend",
-      "sourceBlendSha256": "6a8c458807efedaaca6234ae33d91a204dcacf96cefb7cb201585f90807e8754",
+      "sourceBlendSha256": "650f0286bc702996887fc80d291494d86f040a5f5ae3d1712aa8f61d7695f892",
       "sourceScript": "scripts/blender/create-pass65-weapon-families.py",
       "sourceScriptSha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178",
       "geometryModule": "scripts/blender/pass65_weapon_production_geometry.py",
-      "geometryModuleSha256": "70a191c14928ec95d9aefdc41a10cd94662bd44f684fb21f3149d88a813c38b8",
+      "geometryModuleSha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276",
       "sourceSpec": "source-assets/blender/pass65-weapon-family-specs.json",
-      "sourceSpecSha256": "3e8cff133381c65a514a2a5f97a348a4229208dc014de0bf9bad53432255cebf",
+      "sourceSpecSha256": "86d8568971b88f84438330875ddc295d4cf823bf1a648197bc36df0c095cd706",
       "sourceProvenance": "source-assets/blender/pass65-weapon-families.provenance.json",
-      "sourceProvenanceSha256": "c5cea9e1da8970e4966c1b01fe6b831d80212f622373e1150bd2882b14ac1df9",
+      "sourceProvenanceSha256": "ad875d90df95b6755a7ed0d9f4f06e076564d2036fe6b0123861cbd6f8221f73",
       "preview": "docs/assets/pass65-weapons/firearms/pass65-weapon-family-contact-sheet.png",
-      "format": "Seventeen unique firearm families; each has two first-person, three world and one independently exported drop optimized self-contained glTF 2.0 binary with Meshopt geometry, embedded WebP PBR textures, authored sockets and thirteen core action clips",
+      "format": "Nineteen unique firearm families; each has two first-person, three world and one independently exported drop optimized self-contained glTF 2.0 binary with Meshopt geometry, embedded WebP PBR textures, authored sockets and thirteen core action clips",
       "modifications": "Project-original platform-specific silhouettes, materials, reload components, optics and action motion authored in Blender from a checked-in deterministic specification. Real platform names are catalog labels only; no commercial-game geometry, textures, logos or extracted assets are used. Gameplay authority remains TypeScript-owned.",
       "attributionRequired": false
     },
@@ -144,63 +228,63 @@
       "files": [
         {
           "path": "public/assets/original/models/support/pass65-care-aircraft-lod0.glb",
-          "sha256": "cf87311ad07bb8fb02e0413365364fc8e36e736c0b7890e87a77334d6210d274",
+          "sha256": "6819fe3e4ba330a98e90df6ba657a71b01fa342cac4c1332525e10962ffe3b4b",
           "lod": 0,
-          "triangles": 4972,
-          "bytes": 156360
+          "triangles": 17192,
+          "bytes": 323132
         },
         {
           "path": "public/assets/original/models/support/pass65-care-aircraft-lod1.glb",
-          "sha256": "2da31ce77deb071cd00ab868bf0a0929eed67c3c214b01b9827f9ab2ae82a654",
+          "sha256": "a967fbbf9e1e62c466f2eb0568a1cd39caf3d305d308f6a875158066266fae5f",
           "lod": 1,
-          "triangles": 4672,
-          "bytes": 147892
+          "triangles": 13500,
+          "bytes": 288800
         },
         {
           "path": "public/assets/original/models/support/pass65-care-aircraft-lod2.glb",
-          "sha256": "745833de7e6feff2489b9e0b2bdafbd7cbe29d77d75dd5648dd3fd7bec10dcc3",
+          "sha256": "6846244d228d3663650ddc69b835a0c23513dcb010ca80027ed4118e78339965",
           "lod": 2,
-          "triangles": 4328,
-          "bytes": 153852
+          "triangles": 11016,
+          "bytes": 245560
         },
         {
           "path": "public/assets/original/models/support/pass65-carpet-aircraft-lod0.glb",
-          "sha256": "ce927de84b6cc2108aa04b2e93ae0ffaf265e8b4a4083439bb0f0c7dab5b735e",
+          "sha256": "1bd86e1afaf434c04dc667c4ad12d905f903af3ae6058b5cd40b7c1438c6f626",
           "lod": 0,
-          "triangles": 6844,
-          "bytes": 159476
+          "triangles": 11658,
+          "bytes": 252848
         },
         {
           "path": "public/assets/original/models/support/pass65-carpet-aircraft-lod1.glb",
-          "sha256": "cb8cd16905abf0dcaefa6560ee177ef120e8b555a8684058c5b548bf32b60177",
+          "sha256": "6ae3ecd0ccf46753c7cc07e3e83e226d3dbe19561c260266ba08e8ce2205e4a3",
           "lod": 1,
-          "triangles": 6044,
-          "bytes": 158800
+          "triangles": 9128,
+          "bytes": 225112
         },
         {
           "path": "public/assets/original/models/support/pass65-carpet-aircraft-lod2.glb",
-          "sha256": "74b5dc4c51f5acd161f1a650145338c6c3bdcc1f1b585230ecf62973af314100",
+          "sha256": "677758aa88fa7e5ac522f4d2eb53b9450ccf4905e4091013c9de0ab186fd131a",
           "lod": 2,
-          "triangles": 4116,
-          "bytes": 148748
+          "triangles": 5112,
+          "bytes": 179408
         },
         {
           "path": "public/assets/original/models/support/pass65-care-crate-lod0.glb",
-          "sha256": "7eb35d28741d9effe8c6e5869767bb4c86235bbf573e60ea7eb8f5b6a774bb12",
+          "sha256": "c2fc77b2d9dac12a972530a71670b08c4c19d27ee27946cc66b8be7e0dc0b812",
           "lod": 0,
-          "triangles": 1300,
-          "bytes": 107980
+          "triangles": 6384,
+          "bytes": 170292
         },
         {
           "path": "public/assets/original/models/support/pass65-care-crate-lod1.glb",
-          "sha256": "ca0a8bd4d811f5c39725a3a9d7710f31ceb037680f08fc49edbf5ff013b9daf4",
+          "sha256": "fbd3e5d6a32ccb2376a3673334c599b94a451b60f2d60d9fc2536e80d1dc9e86",
           "lod": 1,
-          "triangles": 828,
-          "bytes": 103724
+          "triangles": 4416,
+          "bytes": 149448
         },
         {
           "path": "public/assets/original/textures/support/pass65-support-aircraft-albedo.png",
-          "sha256": "5146c85eacb76e3c1cf55a50d3efe3a2bafa01b36298652437b41ba75fcc29b9",
+          "sha256": "b2a1c5cc389787ad1a2e5b699260682f5598838aee0e74e58e8815bed1dbd7eb",
           "width": 512,
           "height": 512
         },
@@ -218,20 +302,20 @@
         },
         {
           "path": "public/assets/original/textures/support/pass65-support-aircraft-emissive.png",
-          "sha256": "ed9974eee6effb11d2b86bc2d58405054dc1ffdc1202458759221419a4bf0c71",
+          "sha256": "55aea7bfe6f9c90c71df2379611c12eada3014444ccbce4f3352d3303077a44f",
           "width": 512,
           "height": 512
         }
       ],
       "sourceBlend": "source-assets/blender/pass65-support-aircraft-family.blend",
-      "sourceBlendSha256": "f29f0d50a6d3ab742f506db7441cabf4e8792b32cef4dd01fea3fbed9ef97572",
+      "sourceBlendSha256": "37c9ea9e49bd1319c90a9d452ed643ba6fe3a33d6809e244e71f6e9ecdae7f83",
       "sourceScript": "scripts/blender/create-pass65-support-vehicles.py",
-      "sourceScriptSha256": "86d90e47e93e7d04e2705e8b08615323385ed24e22e70b59a68189584877bdac",
+      "sourceScriptSha256": "d0bdf98635e25b38348149d02cc990157aac367108468fdd177437c7d256e8f4",
       "sourceProvenance": "source-assets/blender/pass65-support-aircraft-family.provenance.json",
-      "sourceProvenanceSha256": "38c1c228564e8403f5d508d868ecac0e1e32f98476fca6d58e5d2f588535de0a",
+      "sourceProvenanceSha256": "4cabc4d0c631ca192813807dbaef8446035346e2532cd753d48ae3f12c20d207",
       "preview": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-contact-sheet.png",
-      "format": "Distinct Care transport and Carpet bomber three-LOD GLBs plus two-LOD parachute crate, embedded WebP PBR maps, semantic cargo/bomb sockets and authored actions",
-      "modifications": "Project-original fixed-wing support family with correct local -Z forward contract, animated propellers/engines/doors/bay/racks and a visible parachute crate. Runtime gameplay authority remains TypeScript-owned.",
+      "format": "Distinct heavy four-turbofan Care transport and tailless flying-wing Carpet bomber three-LOD GLBs plus two-LOD rigged parachute crate, embedded WebP PBR maps, semantic cargo/bomb sockets and authored actions",
+      "modifications": "Project-original close-range v4 support family: Care adds raised hull breaks, service hatches/latches, framed flight-deck armour, four high-bypass turbofans, hubbed landing-gear bogies and a ribbed hinged rear ramp; Carpet adds framed split buried intakes, service panels and a cross-braced animated bomb bay while remaining a tailless blended flying wing; the drop asset adds visible latches and pallet tie-down hardware to its cross webbing and ribbed scalloped canopy. The local -Z runtime-forward contract and all gameplay-owned sockets remain unchanged.",
       "attributionRequired": false
     },
     {
@@ -244,28 +328,28 @@
       "files": [
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod0.glb",
-          "sha256": "9d5936ce16ae4aeccf3291c7f2d9aa041f823cf96d2fddf80d35fee5bb284c73",
+          "sha256": "905477c22b5d21eba650e618793f67c932cc9b349af4e31e2a1b6a6eca2ac7d8",
           "lod": 0,
-          "triangles": 75944,
-          "bytes": 840660
+          "triangles": 59740,
+          "bytes": 943932
         },
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod1.glb",
-          "sha256": "044b33914aa1ee79485ebe761d425e321a578b251e7050c46d4273baf718c90f",
+          "sha256": "2df9641a2c79c2c500464e98e9cdf1a400cb7271d5bfa74ec38e7468828a1877",
           "lod": 1,
-          "triangles": 33128,
-          "bytes": 578756
+          "triangles": 49920,
+          "bytes": 844092
         },
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod2.glb",
-          "sha256": "339110af1ca885f8ba2a47a62a26cd0f1ed5ac8a6bfb534705158fbb23e9e4d9",
+          "sha256": "c14d3b385a2850de56cee00a832381a1fcca06c0e452540654bc0772af88f1fd",
           "lod": 2,
-          "triangles": 19880,
-          "bytes": 435660
+          "triangles": 29068,
+          "bytes": 570300
         },
         {
           "path": "public/assets/original/textures/support/pass65-chopper-albedo.png",
-          "sha256": "bc729d8572e00ce6fbf712543071556a15e7ed970fea279c9582cf8f2199c6a3",
+          "sha256": "3e99137cf87a5968a68cf675fc7ade2598341f8871ecd32bf51a0e54683dfef2",
           "width": 512,
           "height": 512
         },
@@ -283,20 +367,20 @@
         },
         {
           "path": "public/assets/original/textures/support/pass65-chopper-emissive.png",
-          "sha256": "ed9974eee6effb11d2b86bc2d58405054dc1ffdc1202458759221419a4bf0c71",
+          "sha256": "55aea7bfe6f9c90c71df2379611c12eada3014444ccbce4f3352d3303077a44f",
           "width": 512,
           "height": 512
         }
       ],
       "sourceBlend": "source-assets/blender/pass65-chopper-gunner.blend",
-      "sourceBlendSha256": "81a84cd3e9d265cddb305ad54926f11e71a6ff705d1f07e3bb0e78b88fdf77b9",
+      "sourceBlendSha256": "f6df54593f798a4f851837d1c9baa114ae8e655aaaadf3bb564c7b6680a87f31",
       "sourceScript": "scripts/blender/create-pass65-support-vehicles.py",
-      "sourceScriptSha256": "86d90e47e93e7d04e2705e8b08615323385ed24e22e70b59a68189584877bdac",
+      "sourceScriptSha256": "d0bdf98635e25b38348149d02cc990157aac367108468fdd177437c7d256e8f4",
       "sourceProvenance": "source-assets/blender/pass65-chopper-gunner.provenance.json",
-      "sourceProvenanceSha256": "5a76a4ef08bda39c991c073d0e44eb4dc0a241067370d7ef086a470c123e0e45",
+      "sourceProvenanceSha256": "595d7980bfb11d69ebf79a5f26eebadbcdc8503b347e97be33d56e7ee64f800b",
       "preview": "docs/assets/pass65-vehicles/chopper/pass65-chopper-contact-sheet.png",
-      "format": "Three strict decreasing optimized self-contained glTF 2.0 binary LODs with embedded WebP PBR maps, complete rear fuselage/tail, authored unobstructed gunner sightline/HUD/weapon view, exterior rotors/gun/sockets and eight animation clips",
-      "modifications": "Project-original support helicopter with substantial rear cabin and tail volume plus a possessed-view-only gunner sightline that excludes exterior shell and rotors. Runtime gameplay authority remains TypeScript-owned; procedural geometry is non-release fallback only.",
+      "format": "Three strict decreasing optimized self-contained glTF 2.0 binary LODs with embedded WebP PBR maps, complete armoured tandem attack-helicopter silhouette, authored unobstructed gunner sightline/HUD/weapon view, detailed exterior rotors/gun/sockets and eight animation clips",
+      "modifications": "Project-original close-range v4 tandem attack-helicopter refinement with overlapping side and dorsal armour, raised fasteners and louvers, faceted framed pilot/gunner glazing, armoured nose and cheeks, restrained olive PBR, separated dual-aperture nose sensor, braced pylons, forward-aligned finned missiles, collared seven-tube rocket pods, mechanical rotor yokes/pitch links, tail gearbox, gun armour/feed chute and damped skid gear. Possessed view still excludes exterior shell and rotors; runtime gameplay authority remains TypeScript-owned.",
       "attributionRequired": false
     },
     {
@@ -370,14 +454,14 @@
       ],
       "files": "public/assets/original/**/pass65-first-person-arms-*",
       "sourceBlend": "source-assets/blender/pass65-first-person-operator-arms.blend",
-      "sourceBlendSha256": "c03d275143c2677363dad6801a9c7fab68ee207373452a00f03d7b1ce175e5bd",
+      "sourceBlendSha256": "cfcdca753520317b110179c675b6196156593dfc209ca4b7ea9ced8e7f3e17fa",
       "sourceScript": "scripts/blender/build-pass65-djmaesen-first-person-arms.py",
-      "sourceScriptSha256": "1acd75ec3be19ef07a28ab6ced7559debbb36cf95abdc091de092d226610d4a7",
+      "sourceScriptSha256": "ea5a42f332a7fbf44f922ee5f2526e46ffa3e520491e9dfe754778dadbd0bc0f",
       "sourceProvenance": "source-assets/blender/pass65-first-person-operator-arms.provenance.json",
-      "sourceProvenanceSha256": "63e8352125e31666ec181fa7f5907223052ab4532f8479408bce77d4a42e8e3c",
+      "sourceProvenanceSha256": "95d33318fa868d3c962d5fb0ca7984864ef4b01dd0f55d9e50adde1f36fd0628",
       "preview": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-contact-sheet.png",
       "format": "Two decreasing optimized self-contained glTF 2.0 skinned LODs with 37-bone dedicated skeleton, four material-compatible skinned renderables per LOD, embedded WebP PBR textures, opaque materials and thirteen action clips",
-      "modifications": "Removed the unrelated Icosphere; retargeted 47 source joints to the 37-bone runtime rig; collapsed terminal tip joints into distal phalanges; adapted bind shoulders, sleeves, hand proportions and real weapon grips for the FPS camera; capped proximal sleeves; converted specular-glossiness maps to metallic-roughness PBR; authored four disjoint skinned batches, four gameplay sockets, thirteen action clips, a true reduced LOD1, and seven strict contact views.",
+      "modifications": "Removed the unrelated Icosphere; retargeted 47 source joints to the 37-bone runtime rig; collapsed terminal tip joints into distal phalanges; enlarged the complete connected forearm/hand presentation while preserving weights and cuff overlap; refined real firearm and G10 knife grips for the FPS camera; lifted crushed charcoal PBR response; capped proximal sleeves; authored four disjoint skinned batches, four gameplay sockets, thirteen action clips, a true reduced LOD1, and seven strict contact views.",
       "attributionRequired": true
     },
     {
@@ -448,8 +532,75 @@
       "sourceScriptSha256": "cfe96df62efa7a5785030b1e5d9ab0cce8e28648eefa1ada5522189ed5229154",
       "sourceProvenance": "source-assets/menu/pass65-preview-masters/provenance.json",
       "sourceProvenanceSha256": "4042801c5fc5dc4e7bbd3d53d1dfdf25bf397e1f295eb56b6c1e4f0df5ef217f",
-      "format": "Four distinct 1280x720 eight-second 30 FPS selected-map runtime captures, shipped as VP9/Opus WebM, H.264/AAC MP4 and static WebP posters, plus deterministic five-frame review evidence",
-      "modifications": "Captured offline from each actual authoritative production WebGPU arena with deterministic camera and visual time. Three map flyovers bake perspective-aware elliptic rotor arcs with subdued moving spokes, measured mast/hub/header occlusion, two visible structural ties into the side canopy rails, a restrained tail camera and compact green-on-graphite cockpit avionics; Gun Range bakes compact charcoal/silver ears, forelegs and top-facing paws. Runtime loading/menu playback remains prerecorded-only, reduced motion is poster-only, and no downloaded or sampled assets are used. The former byte-identical Gun Range media gate is explicitly superseded.",
+      "format": "Four distinct 2560x1440 eight-second 30 FPS selected-map runtime captures, shipped as high-bitrate VP9/Opus WebM, H.264 High Level 5.0/AAC MP4 and full-resolution static WebP posters, plus deterministic five-frame review evidence",
+      "modifications": "Captured offline at native 1440p from each actual authoritative production WebGPU arena with deterministic camera and visual time; the reviewed 1280x720 logical overlay is losslessly authored at exact 2x output scale so its fixed-pixel details retain their intended proportions. Three map flyovers bake perspective-aware elliptic rotor arcs with subdued moving spokes, measured mast/hub/header occlusion, two visible structural ties into the side canopy rails, a restrained tail camera and compact green-on-graphite cockpit avionics; Gun Range bakes compact charcoal/silver ears, forelegs and top-facing paws. Runtime loading/menu playback remains one selected metadata-preload decoder with poster-first readiness, reduced motion is poster-only, and no downloaded or sampled assets are used. The former byte-identical Gun Range media gate is explicitly superseded.",
+      "attributionRequired": false
+    },
+    {
+      "id": "atomic-acres-pass66-real-gun-range-killstreak-demo-posters-2026-08-02",
+      "kind": "original-project-browser-captured-authoritative-runtime-poster-family",
+      "creator": "Atomic Acres project",
+      "source": "tests/e2e/pass66-gun-range-killstreak-demo-capture.spec.ts",
+      "generatedAsOf": "2026-08-02",
+      "license": "Original project work",
+      "files": [
+        {
+          "path": "public/assets/original/killstreak-demo/scout-sweep.jpg",
+          "sha256": "536af552c9f19c4cd4f6d8ecde2c3eddbf33330cf2e6dd7e7ffd837577111230"
+        },
+        {
+          "path": "public/assets/original/killstreak-demo/adrenaline.jpg",
+          "sha256": "b43a4bf89bf20b8392843a2652664e2823e3b3fdf25f300a64bc3bac618c3967"
+        },
+        {
+          "path": "public/assets/original/killstreak-demo/care-package.jpg",
+          "sha256": "67b0fff02ea1571f771f4be60a0e1fbab11c1507ba707772e5c914288f89931b"
+        },
+        {
+          "path": "public/assets/original/killstreak-demo/yardhawk.jpg",
+          "sha256": "2e799b9dd4dd41c1182cbcccfc45c5274420fbb1840835438dc0545c87665203"
+        },
+        {
+          "path": "public/assets/original/killstreak-demo/piloted-drone.jpg",
+          "sha256": "c6ce8cd03ecfe47b48c449c23ec005e82c9bc9bb2ba3fe5e7ec44e850dc55d75"
+        },
+        {
+          "path": "public/assets/original/killstreak-demo/tri-pass.jpg",
+          "sha256": "fb5df06a0a015313e6077c45e7e07a5121c3340e18f6b05ed75e4d8ea851b597"
+        },
+        {
+          "path": "public/assets/original/killstreak-demo/carpet-bomber.jpg",
+          "sha256": "b4036f834f3e191cd7cd9244c89e7d3b2707c36367aaccfb41373242668912ab"
+        },
+        {
+          "path": "public/assets/original/killstreak-demo/hunter-swarm.jpg",
+          "sha256": "4bd2d6024c13cf505e92e328bf69c88bc06517ada6793f7bf9fc23237cbf75b4"
+        },
+        {
+          "path": "public/assets/original/killstreak-demo/chopper.jpg",
+          "sha256": "ebd2b82fb1cb08ad212ab28898524f9cd17d9435b18536150edf91c3bde1eda3"
+        },
+        {
+          "path": "public/assets/original/killstreak-demo/drone-swarm.jpg",
+          "sha256": "b0f9cf5e353bb756795a01df5c119e4fcd05931857e627f7cade766b1989ea04"
+        },
+        {
+          "path": "public/assets/original/killstreak-demo/nuke.jpg",
+          "sha256": "e092a02621160a7e547fddbaca18740760f6cf5176a01a3ef42023da55489f9c"
+        },
+        {
+          "path": "public/assets/original/killstreak-demo/manifest.json",
+          "sha256": "3ff6e9abcc6178ca5f7b2e240b065c48765496a9ab47200d3c43572c9e08c533"
+        }
+      ],
+      "sourceScript": "tests/e2e/pass66-gun-range-killstreak-demo-capture.spec.ts",
+      "sourceScriptSha256": "14b332f52e3d23fbc9836a1cffce223b32d4ce4c912e82cde45b4e4c917952d5",
+      "sourceSpec": "scripts/qa/finalize-pass66-killstreak-demo-media.ts",
+      "sourceSpecSha256": "783b49844fbf455527b6171d21320c46a26b45040187966ca2a7b34d78745ceb",
+      "sourceProvenance": "source-assets/killstreak-demo/pass66-real-test-bay-capture-receipt.json",
+      "sourceProvenanceSha256": "c03cfa106a1ae7cb81e244b789451a66f74b411a2cde03e210b531cb368e2dc0",
+      "format": "Eleven distinct 960x540 JPEG poster frames from the real Gun Range grey test bay, one per canonical support, plus a fail-closed digest and capture-proof manifest",
+      "modifications": "Each clean-session Chromium frame is admitted only after its nearby canonical station wins the actual keyboard F press lifecycle, the normal host/offline training grant traverses canonical activation, and support-specific runtime telemetry proves the expected effect. No video is claimed; the menu decodes these bounded local posters and starts no live gameplay renderer.",
       "attributionRequired": false
     },
     {

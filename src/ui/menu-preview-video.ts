@@ -13,12 +13,14 @@ export type MenuPreviewVideoDefinition = Readonly<{
   mp4: string;
   poster: string;
   durationSeconds: 8;
-  width: 1280;
-  height: 720;
+  width: 2560;
+  height: 1440;
 }>;
 
 const ROOT = './assets/original/menu-previews';
-const CACHE_KEY = 'pass66-runtime-preview-v4';
+const CACHE_KEY = 'pass66-runtime-preview-v5';
+const WEBM_MIME_TYPE = 'video/webm; codecs="vp9,opus"';
+const MP4_MIME_TYPE = 'video/mp4; codecs="avc1.640032,mp4a.40.2"';
 
 export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
   'atomic-acres': Object.freeze({
@@ -32,8 +34,8 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     mp4: `${ROOT}/atomic-acres.mp4?v=${CACHE_KEY}`,
     poster: `${ROOT}/atomic-acres.webp?v=${CACHE_KEY}`,
     durationSeconds: 8,
-    width: 1280,
-    height: 720,
+    width: 2560,
+    height: 1440,
   }),
   'skyline-terminal': Object.freeze({
     arenaId: 'skyline-terminal',
@@ -46,8 +48,8 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     mp4: `${ROOT}/skyline-terminal.mp4?v=${CACHE_KEY}`,
     poster: `${ROOT}/skyline-terminal.webp?v=${CACHE_KEY}`,
     durationSeconds: 8,
-    width: 1280,
-    height: 720,
+    width: 2560,
+    height: 1440,
   }),
   'rustworks-1v1': Object.freeze({
     arenaId: 'rustworks-1v1',
@@ -60,8 +62,8 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     mp4: `${ROOT}/rustworks-1v1.mp4?v=${CACHE_KEY}`,
     poster: `${ROOT}/rustworks-1v1.webp?v=${CACHE_KEY}`,
     durationSeconds: 8,
-    width: 1280,
-    height: 720,
+    width: 2560,
+    height: 1440,
   }),
   'gun-range': Object.freeze({
     arenaId: 'gun-range',
@@ -74,8 +76,8 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     mp4: `${ROOT}/gun-range.mp4?v=${CACHE_KEY}`,
     poster: `${ROOT}/gun-range.webp?v=${CACHE_KEY}`,
     durationSeconds: 8,
-    width: 1280,
-    height: 720,
+    width: 2560,
+    height: 1440,
   }),
 } satisfies Record<ArenaId, MenuPreviewVideoDefinition>);
 
@@ -88,8 +90,8 @@ export function menuPreviewVideoMarkup(arenaId: ArenaId = 'atomic-acres'): strin
   return `<div id="menu-preview-frame" data-frame="${definition.frame}" data-arena="${definition.arenaId}" data-motion="video" data-presentation="${definition.presentationId}" data-renderer-submissions="0" data-media-state="poster">
     <img id="menu-preview-poster" src="${definition.poster}" width="${definition.width}" height="${definition.height}" alt="" decoding="async" fetchpriority="high">
     <video id="menu-preview-video" width="${definition.width}" height="${definition.height}" autoplay loop muted playsinline preload="metadata" poster="${definition.poster}" aria-hidden="true">
-      <source src="${definition.webm}" type="video/webm; codecs=vp9,opus">
-      <source src="${definition.mp4}" type="video/mp4; codecs=avc1.64001f,mp4a.40.2">
+      <source src="${definition.webm}" type='${WEBM_MIME_TYPE}'>
+      <source src="${definition.mp4}" type='${MP4_MIME_TYPE}'>
     </video>
     <div class="preview-cockpit-hud" aria-hidden="true">
       <div class="cockpit-heading"><span>33</span><b>N</b><span>03</span></div>
@@ -265,8 +267,8 @@ export class MenuPreviewVideoController {
     }
 
     for (const source of [
-      { src: definition.webm, type: 'video/webm; codecs="vp9,opus"' },
-      { src: definition.mp4, type: 'video/mp4; codecs="avc1.64001f,mp4a.40.2"' },
+      { src: definition.webm, type: WEBM_MIME_TYPE },
+      { src: definition.mp4, type: MP4_MIME_TYPE },
     ]) {
       const element = document.createElement('source');
       element.src = source.src;

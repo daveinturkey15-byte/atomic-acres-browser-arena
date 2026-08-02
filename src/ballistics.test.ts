@@ -44,10 +44,15 @@ describe('shared wall-penetration authority', () => {
   });
 
   it('gives every weapon a bounded calibre, distance, FMJ, and residual-damage profile', () => {
+    const noWallPenetration = new Set(['explosive-crossbow', 'flamethrower', 'flare-gun']);
+    expect(Object.values(WEAPONS)
+      .filter((weapon) => weapon.penetration.maxPenetratedSurfaces === 0)
+      .map((weapon) => weapon.id)
+      .sort()).toEqual([...noWallPenetration].sort());
     for (const weapon of Object.values(WEAPONS)) {
       const profile = weapon.penetration;
       expect(profile.caliber.length, weapon.id).toBeGreaterThan(2);
-      if (weapon.fireKind === 'projectile') {
+      if (noWallPenetration.has(weapon.id)) {
         expect(profile.penetrationPower, weapon.id).toBe(0);
         expect(profile.maxPenetratedSurfaces, weapon.id).toBe(0);
         expect(profile.minimumEnergyRetention, weapon.id).toBe(0);
@@ -160,10 +165,20 @@ describe('shared wall-penetration authority', () => {
   it('classifies every current additional-map shot blocker with unique authority', () => {
     for (const build of [buildArena, buildRustworks1v1, buildGunRange, buildSkylineTerminal]) {
       const arena = build(new THREE.Scene());
-      expect(arena.shotSurfaces.length).toBe(arena.raycastMeshes.length);
+      const dynamicTargetMeshes = arena.raycastMeshes.filter((mesh) => (
+        typeof mesh.userData.ballisticSurfaceId !== 'string'
+      ));
+      expect(dynamicTargetMeshes.every((mesh) => (
+        typeof mesh.userData.targetId === 'string'
+        && mesh.userData.targetRoot instanceof THREE.Group
+        && (mesh.userData.hitZone === 'head' || mesh.userData.hitZone === 'body' || mesh.userData.hitZone === 'limb')
+      ))).toBe(true);
+      expect(arena.shotSurfaces.length + dynamicTargetMeshes.length).toBe(arena.raycastMeshes.length);
       expect(arena.shotSurfaces.filter((entry) => entry.classification === 'fallback')).toEqual([]);
       expect(new Set(arena.shotSurfaces.map((entry) => entry.id)).size).toBe(arena.shotSurfaces.length);
-      expect(arena.raycastMeshes.every((mesh) => typeof mesh.userData.ballisticSurfaceId === 'string')).toBe(true);
+      expect(arena.raycastMeshes.every((mesh) => (
+        typeof mesh.userData.ballisticSurfaceId === 'string' || dynamicTargetMeshes.includes(mesh)
+      ))).toBe(true);
     }
   });
 });

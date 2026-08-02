@@ -1,0 +1,77 @@
+ok we are on version 66.2 or something now of atomic acres, its really coming together just needs some last adjustments, heres a list, get working on it
+
+m40 ads is broken it just goes all white?
+
+manage loadout in field kit for the customers should hav ebetter colours, cant read it properly unless moused over atm
+
+skybox is still trash and rubbish
+
+arms and animations etc are still really bad and small etc
+
+apparently - The chopper/care/carpet silhouette models are upgraded; if want them even more detailed (full Apache-level fidelity like every panel in your reference sheet), that's another authoring pass — but they now read as proper armed attack helicopters, not blocks. get cracking on it
+
+the little red circle when ADS on every gun being the same is not good, sort that out, they all need their own good ADS which is clear and makes sense
+
+m14 ABR STILL FREEZES WHEN YOU ADS, sort it
+
+I specced this stuff previously see if you can find it - flamethrower spawns top of rust rig half way, and flare gun in terminal in the plane half way in match
+
+Flamethrower + flare gun: new weapons must project through the full canonical catalog (protocol, bots, audio, authored GLB families, provenance) or they fail the repo's own release gates. Half-wiring them would ship a broken gate or a fake weapon.
+Live grey-room killstreak demos: a new rendered demo-stage feature; the reference image is preserved in-repo ready for that build-out.this is an area off the side down a 5 second corridor walkway of the gunrange where you can test all the killstreaks, video of this in practice can be used for thumbnails when selecting killstreaks too
+
+the grey room should be in a tunnel to the opposite side of the shooting range, it takes 5 seconds to traverse it and walk through a big secure door that opens when youre close with a thump, and then youre in a large test bay where you can actively summon all killstreaks on test dummies that walk around like bots but slowly without guns. and you can test all weapons there too
+
+quality of skybox in all maps needs to be much higher, no big blockytextures orra ssets flying in the sky
+
+bring back the real physics big volatile waves around the map in rustrig, big water big physics
+
+sort the physics regression where I clip when I go prone with my gun on lots of floor and walls etc
+
+bring the piloted drone ready bold text down to be just below the info box at the top, and increase the text in the info box a little
+
+still issues loading into maps quite a lot, needs a real fix, across all browser types etc too
+
+When controlling chopper gunner, it does no damage? sort that, rosshair is good now
+
+
+ensure all of this was properly done?
+can we have a
+stack trace when things break, server and player side?
+
+when crash as host, can rejoin? so back in lobby stuck
+
+multipalyer continues to have major desync when peopel join the server after crashing
+
+dane sent json, i can provide it, has some stats from a multiplayer game
+make it easy to change map when lobby host
+Descrptions of wha tkill streaks are and do
+adrtenlien rush in host lobby messed me up
+
+bots only work for host atm, not guests, sort that?
+when reconnecter to lobby, sometimes out of sync with host and botsa
+bots do not behave the same way as skirmish, sort it?
+add slight orange highlight to other players in multiplayer,
+
+if host or guest crashes, option to rejoin the game, not currently present
+
+chat box in game and in lobby in a better spot and clearer it exists
+
+also - ensure we work across more browsers than chrome, firefox etc need to wrok too
+
+
+continue building this stuff, i will play the other build which is already live on the web
+
+get the stuff which will be all the blender stuff etc you said, and anything else you miss, dont worry about shed door for now, jsut get everything in I said
+
+you still didnt sort the field kit menu like i said btw? dont forget things, thney arelal important mate.
+
+the sky on acres still looks trash
+
+the big bold "press its key again to operate" on piloetd drone etc is way too big and messy, i meant use existing text about it but enhance it at the top of the screen
+
+arms and knives and animations still suck, even if you did some FOV adjustment, doesnt work, I am on a 1440p monior and its shit, some of us use 4k, jsut ensure it works for all of us based on our resoultions etc . be smart
+i sort of half crashed when loading it, had to click join again then it was instant, you didnt fix that?
+
+the old ADS scope with railgun still gon, used to be cool and see thorugh walls etc, was the unique selling point? sort it! i hate all this regressoion lol
+
+tried to pickup a gun then pickup the one i jsut swapped, still broken? i asked for so many things and you have not done them, so annoyed, go back through all my asks and ensure they are in you have SO much info from me!!

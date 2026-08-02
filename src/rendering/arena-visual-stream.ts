@@ -50,6 +50,69 @@ function detachedGameplayPresentationInventory(root: THREE.Group): { geometries:
   return { geometries: geometries.size, materials: materials.size };
 }
 
+const GAMEPLAY_AUTHORITY_KEYS = [
+  'authoritativeArenaId',
+  'arenaVisualDefinitionId',
+  'arenaVisualGeneration',
+] as const;
+
+type GameplayAuthorityKey = typeof GAMEPLAY_AUTHORITY_KEYS[number];
+
+type GameplayRootTransactionSnapshot = Readonly<{
+  root: THREE.Group;
+  parent: THREE.Object3D | null;
+  parentIndex: number;
+  visible: boolean;
+  authority: Readonly<Record<GameplayAuthorityKey, Readonly<{ present: boolean; value: unknown }>>>;
+}>;
+
+function captureGameplayRootTransaction(root: THREE.Group): GameplayRootTransactionSnapshot {
+  const authority = Object.fromEntries(GAMEPLAY_AUTHORITY_KEYS.map((key) => [key, Object.freeze({
+    present: Object.prototype.hasOwnProperty.call(root.userData, key),
+    value: root.userData[key],
+  })])) as Record<GameplayAuthorityKey, Readonly<{ present: boolean; value: unknown }>>;
+  return Object.freeze({
+    root,
+    parent: root.parent,
+    parentIndex: root.parent?.children.indexOf(root) ?? -1,
+    visible: root.visible,
+    authority: Object.freeze(authority),
+  });
+}
+
+function restoreGameplayRootTransactions(snapshots: readonly GameplayRootTransactionSnapshot[]): void {
+  const uniqueSnapshots = snapshots.filter((snapshot, index) => (
+    snapshots.findIndex((candidate) => candidate.root === snapshot.root) === index
+  ));
+  for (const snapshot of uniqueSnapshots) snapshot.root.removeFromParent();
+  for (const snapshot of uniqueSnapshots) {
+    snapshot.root.visible = snapshot.visible;
+    for (const key of GAMEPLAY_AUTHORITY_KEYS) {
+      const property = snapshot.authority[key];
+      if (property.present) snapshot.root.userData[key] = property.value;
+      else delete snapshot.root.userData[key];
+    }
+  }
+  const byParent = new Map<THREE.Object3D, GameplayRootTransactionSnapshot[]>();
+  for (const snapshot of uniqueSnapshots) {
+    if (!snapshot.parent) continue;
+    const siblings = byParent.get(snapshot.parent) ?? [];
+    siblings.push(snapshot);
+    byParent.set(snapshot.parent, siblings);
+  }
+  for (const [parent, siblings] of byParent) {
+    siblings.sort((left, right) => left.parentIndex - right.parentIndex);
+    for (const snapshot of siblings) {
+      parent.add(snapshot.root);
+      const addedIndex = parent.children.indexOf(snapshot.root);
+      const targetIndex = Math.min(Math.max(0, snapshot.parentIndex), parent.children.length - 1);
+      if (addedIndex === targetIndex) continue;
+      parent.children.splice(addedIndex, 1);
+      parent.children.splice(targetIndex, 0, snapshot.root);
+    }
+  }
+}
+
 export class ArenaVisualStreamController {
   private generation = 0;
   private pendingAbort: AbortController | null = null;
@@ -121,44 +184,72 @@ export class ArenaVisualStreamController {
     this.pendingAbort = abort;
     const generation = this.generation + 1;
     this.generation = generation;
-    const module = await loadArenaVisualModule(arenaId, this.registry);
-    if (abort.signal.aborted || generation !== this.generation) throw new DOMException('Stale arena visual adoption', 'AbortError');
-    if (root.userData.authoritativeArenaId !== undefined && root.userData.authoritativeArenaId !== arenaId) {
-      throw new Error(`${arenaId} definition cannot adopt ${String(root.userData.authoritativeArenaId)} gameplay authority`);
+    let transaction: Readonly<{
+      previousRoot: THREE.Group | null;
+      previousDefinition: ArenaVisualDefinition | null;
+      previousRequests: string[];
+      roots: readonly GameplayRootTransactionSnapshot[];
+    }> | null = null;
+    try {
+      const module = await loadArenaVisualModule(arenaId, this.registry);
+      if (abort.signal.aborted || generation !== this.generation) throw new DOMException('Stale arena visual adoption', 'AbortError');
+      if (root.userData.authoritativeArenaId !== undefined && root.userData.authoritativeArenaId !== arenaId) {
+        throw new Error(`${arenaId} definition cannot adopt ${String(root.userData.authoritativeArenaId)} gameplay authority`);
+      }
+      const previous = this.activeGameplayRoot;
+      const retiredPresentationInventory = previous && previous !== root
+        ? detachedGameplayPresentationInventory(previous)
+        : { geometries: 0, materials: 0 };
+      transaction = Object.freeze({
+        previousRoot: previous,
+        previousDefinition: this.activeGameplayDefinition,
+        previousRequests: this.activeGameplayRequests,
+        roots: Object.freeze([
+          captureGameplayRootTransaction(root),
+          ...(previous && previous !== root ? [captureGameplayRootTransaction(previous)] : []),
+        ]),
+      });
+      if (previous && previous !== root) {
+        previous.removeFromParent();
+        previous.visible = false;
+        delete previous.userData.arenaVisualDefinitionId;
+        delete previous.userData.arenaVisualGeneration;
+      }
+      root.userData.authoritativeArenaId = arenaId;
+      root.userData.arenaVisualDefinitionId = module.definition.id;
+      root.userData.arenaVisualGeneration = generation;
+      root.visible = true;
+      if (root.parent !== this.scene) this.scene.add(root);
+      const activeRoots = this.scene.children.filter((node) => node.userData.arenaVisualDefinitionId !== undefined);
+      if (activeRoots.length !== 1 || activeRoots[0] !== root) {
+        throw new Error(`Expected one authoritative arena presentation root, found ${activeRoots.length}`);
+      }
+      const selectedRequests: string[] = [];
+      this.activeGameplayRoot = root;
+      this.activeGameplayDefinition = module.definition;
+      this.activeGameplayRequests = selectedRequests;
+      if (this.pendingAbort === abort) this.pendingAbort = null;
+      return {
+        arenaId,
+        generation,
+        moduleId: module.definition.moduleId,
+        // Keep the receipt array live so selected quality assets loaded after
+        // the atomic root adoption remain bound to the same generation receipt.
+        requestedResources: selectedRequests,
+        activePresentationRoots: 1,
+        authority: 'gameplay-root-adopted',
+        retiredPresentationInventory,
+      };
+    } catch (error) {
+      if (transaction) {
+        restoreGameplayRootTransactions(transaction.roots);
+        this.activeGameplayRoot = transaction.previousRoot;
+        this.activeGameplayDefinition = transaction.previousDefinition;
+        this.activeGameplayRequests = transaction.previousRequests;
+      }
+      if (this.pendingAbort === abort) this.pendingAbort = null;
+      throw error;
     }
-    const previous = this.activeGameplayRoot;
-    let retiredPresentationInventory = { geometries: 0, materials: 0 };
-    if (previous && previous !== root) {
-      previous.removeFromParent();
-      previous.visible = false;
-      delete previous.userData.arenaVisualDefinitionId;
-      delete previous.userData.arenaVisualGeneration;
-      retiredPresentationInventory = detachedGameplayPresentationInventory(previous);
-    }
-    root.userData.authoritativeArenaId = arenaId;
-    root.userData.arenaVisualDefinitionId = module.definition.id;
-    root.userData.arenaVisualGeneration = generation;
-    root.visible = true;
-    if (root.parent !== this.scene) this.scene.add(root);
-    this.activeGameplayRoot = root;
-    this.activeGameplayDefinition = module.definition;
-    this.activeGameplayRequests = [];
-    this.pendingAbort = null;
-    const activeRoots = this.scene.children.filter((node) => node.userData.arenaVisualDefinitionId !== undefined);
-    if (activeRoots.length !== 1 || activeRoots[0] !== root) {
-      throw new Error(`Expected one authoritative arena presentation root, found ${activeRoots.length}`);
-    }
-    return {
-      arenaId,
-      generation,
-      moduleId: module.definition.moduleId,
-      // Keep the receipt array live so selected quality assets loaded after the
-      // atomic root adoption remain bound to the same generation receipt.
-      requestedResources: this.activeGameplayRequests,
-      activePresentationRoots: 1,
-      authority: 'gameplay-root-adopted',
-      retiredPresentationInventory,
-    };
   }
 
   recordSelectedAssetRequest(arenaId: ArenaId, url: string): void {
@@ -192,6 +283,20 @@ export class ArenaVisualStreamController {
     const activeRoots = this.scene.children.filter((node) => node.userData.arenaVisualDefinitionId !== undefined);
     if (activeRoots.length !== 1 || activeRoots[0] !== root) return false;
     return changed;
+  }
+
+  /** Releases the exact failed gameplay generation without touching a successor. */
+  discardGameplayRoot(arenaId: ArenaId, root: THREE.Group): boolean {
+    if (this.activeGameplayRoot !== root || this.activeGameplayDefinition?.id !== arenaId) return false;
+    root.removeFromParent();
+    root.visible = false;
+    delete root.userData.authoritativeArenaId;
+    delete root.userData.arenaVisualDefinitionId;
+    delete root.userData.arenaVisualGeneration;
+    this.activeGameplayRoot = null;
+    this.activeGameplayDefinition = null;
+    this.activeGameplayRequests = [];
+    return true;
   }
 
   dispose(): void {

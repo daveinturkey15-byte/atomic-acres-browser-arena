@@ -121,6 +121,15 @@ export class KillstreakLoadoutController {
     return this.activeMatch!;
   }
 
+  /** Replace only the running-match projection after an authenticated host
+   * resume. The editable/persisted menu choice remains local and will become
+   * eligible again when the match ends. */
+  reconcileActiveMatchAuthority(loadout: KillstreakLoadoutV1): KillstreakLoadoutV1 {
+    if (!this.frozenMatch) throw new Error('cannot reconcile killstreak authority outside an active match');
+    this.frozenMatch = cloneLoadout(loadout);
+    return this.activeMatch!;
+  }
+
   releaseAfterMatch(): void {
     this.frozenMatch = null;
   }

@@ -1,4 +1,5 @@
 import type { Pass65KillstreakId } from '../killstreak-catalog';
+import { killstreakDemoPosterPath, killstreakDemoVideoPath } from '../killstreak-demo-capture-contract';
 
 export type KillstreakDemoKind =
   | 'radar-sweep'
@@ -15,8 +16,7 @@ export type KillstreakDemoKind =
 
 export type KillstreakDemoMedia = Readonly<{
   posterPath: string;
-  /** Optional future prerecorded media. Null means the local DOM presentation is authoritative. */
-  videoPath: string | null;
+  videoPath: string;
 }>;
 
 export type KillstreakDemoDefinition = Readonly<{
@@ -30,10 +30,6 @@ export type KillstreakDemoDefinition = Readonly<{
   media: KillstreakDemoMedia;
 }>;
 
-const ATOMIC_POSTER = './assets/original/menu-previews/atomic-acres.webp';
-const TERMINAL_POSTER = './assets/original/menu-previews/skyline-terminal.webp';
-const RUSTRIG_POSTER = './assets/original/menu-previews/rustworks-1v1.webp';
-
 function definition(value: KillstreakDemoDefinition): KillstreakDemoDefinition {
   return Object.freeze({ ...value, beats: Object.freeze([...value.beats]) as KillstreakDemoDefinition['beats'], media: Object.freeze(value.media) });
 }
@@ -41,69 +37,69 @@ function definition(value: KillstreakDemoDefinition): KillstreakDemoDefinition {
 export const KILLSTREAK_DEMO_MEDIA: Readonly<Record<Pass65KillstreakId, KillstreakDemoDefinition>> = Object.freeze({
   'scout-sweep': definition({
     id: 'scout-sweep', kind: 'radar-sweep', eyebrow: 'RECON PULSE', title: 'SCOUT SWEEP',
-    summary: 'A bounded scan presentation shows the short reveal cadence without starting the arena renderer.',
+    summary: 'A verified test-bay clip shows the real short reveal cadence without starting a menu gameplay renderer.',
     accent: '#70eee1', beats: ['Emit tactical sweep', 'Resolve enemy pings', 'Expire after scan window'],
-    media: { posterPath: ATOMIC_POSTER, videoPath: null },
+    media: { posterPath: killstreakDemoPosterPath('scout-sweep'), videoPath: killstreakDemoVideoPath('scout-sweep') },
   }),
   adrenaline: definition({
     id: 'adrenaline', kind: 'adrenaline-pulse', eyebrow: 'MOMENTUM SURGE', title: 'ADRENALINE BOOST',
-    summary: 'A compact pulse deck previews the timed operator boost and its clear recovery phase.',
+    summary: 'A verified test-bay clip shows the timed operator boost and its clear recovery phase.',
     accent: '#ffb44f', beats: ['Inject boost', 'Hold timed advantage', 'Recover to baseline'],
-    media: { posterPath: RUSTRIG_POSTER, videoPath: null },
+    media: { posterPath: killstreakDemoPosterPath('adrenaline'), videoPath: killstreakDemoVideoPath('adrenaline') },
   }),
   'care-package': definition({
     id: 'care-package', kind: 'cargo-drop', eyebrow: 'CARGO DELIVERY', title: 'CARE PACKAGE',
-    summary: 'The local presentation traces aircraft ingress, parachute descent and the collection window.',
+    summary: 'The real test-bay recording follows aircraft ingress, parachute descent and the collection window.',
     accent: '#ffca57', beats: ['Mark delivery point', 'Aircraft crosses theatre', 'Parachute crate for collection'],
-    media: { posterPath: ATOMIC_POSTER, videoPath: null },
+    media: { posterPath: killstreakDemoPosterPath('care-package'), videoPath: killstreakDemoVideoPath('care-package') },
   }),
   yardhawk: definition({
     id: 'yardhawk', kind: 'yardhawk-orbit', eyebrow: 'AUTONOMOUS HUNTER', title: 'YARDHAWK',
-    summary: 'A single hunter maintains an elevated orbit before committing to a verified target.',
+    summary: 'The real test-bay recording shows a single hunter orbiting before it commits to a target.',
     accent: '#72e7ff', beats: ['Spawn above map centre', 'Acquire visible target', 'Attack then re-form orbit'],
-    media: { posterPath: TERMINAL_POSTER, videoPath: null },
+    media: { posterPath: killstreakDemoPosterPath('yardhawk'), videoPath: killstreakDemoVideoPath('yardhawk') },
   }),
   'piloted-drone': definition({
     id: 'piloted-drone', kind: 'pilot-feed', eyebrow: 'OPTIONAL POSSESSION', title: 'PILOTED DRONE',
-    summary: 'The feed preview distinguishes autonomous patrol from the optional first-person gun control window.',
-    accent: '#7be9de', beats: ['Deploy at map centre', 'Patrol autonomously', 'Hold to possess or exit'],
-    media: { posterPath: TERMINAL_POSTER, videoPath: null },
+    summary: 'The real test-bay recording distinguishes autonomous patrol from the optional gun-control window.',
+    accent: '#7be9de', beats: ['Deploy at map centre', 'Patrol autonomously', 'Press its assigned key again to operate'],
+    media: { posterPath: killstreakDemoPosterPath('piloted-drone'), videoPath: killstreakDemoVideoPath('piloted-drone') },
   }),
   'tri-pass': definition({
     id: 'tri-pass', kind: 'tri-pass', eyebrow: 'THREE-LANE STRIKE', title: 'TRI-PASS STRIKE',
-    summary: 'Three separated attack lanes traverse the selected line with readable spacing and timing.',
+    summary: 'The real test-bay recording shows three attack lanes crossing the selected line with readable spacing.',
     accent: '#ff735f', beats: ['Author target line', 'Commit three passes', 'Clear strike corridor'],
-    media: { posterPath: RUSTRIG_POSTER, videoPath: null },
+    media: { posterPath: killstreakDemoPosterPath('tri-pass'), videoPath: killstreakDemoVideoPath('tri-pass') },
   }),
   'carpet-bomber': definition({
     id: 'carpet-bomber', kind: 'carpet-run', eyebrow: 'DIRECTIONAL PAYLOAD', title: 'CARPET BOMBER',
-    summary: 'The presentation previews caller-relative direction, the red corridor and the ordered payload run.',
+    summary: 'The real test-bay recording shows caller-relative direction, the red corridor and the payload run.',
     accent: '#ff685d', beats: ['Place target X', 'Confirm away-facing corridor', 'Aircraft releases ordered payload'],
-    media: { posterPath: ATOMIC_POSTER, videoPath: null },
+    media: { posterPath: killstreakDemoPosterPath('carpet-bomber'), videoPath: killstreakDemoVideoPath('carpet-bomber') },
   }),
   'hunter-swarm': definition({
     id: 'hunter-swarm', kind: 'hunter-cluster', eyebrow: 'CLUSTERED HUNTERS', title: 'HUNTER SWARM',
-    summary: 'A spread formation separates into target clusters without stacking individual airframes.',
+    summary: 'The real test-bay recording shows the spread formation separating into target clusters.',
     accent: '#79efe3', beats: ['Spawn spread formation', 'Assign target clusters', 'Maintain separation while engaging'],
-    media: { posterPath: RUSTRIG_POSTER, videoPath: null },
+    media: { posterPath: killstreakDemoPosterPath('hunter-swarm'), videoPath: killstreakDemoVideoPath('hunter-swarm') },
   }),
   chopper: definition({
     id: 'chopper', kind: 'chopper-orbit', eyebrow: 'AIRBORNE GUN PLATFORM', title: 'CHOPPER GUNNER',
-    summary: 'An elevated orbit and clean gunner sightline preview autonomous flight with optional weapon control.',
-    accent: '#5ce9ff', beats: ['Enter authored orbit', 'Track visible targets', 'Hold to gun; release to exit'],
-    media: { posterPath: TERMINAL_POSTER, videoPath: null },
+    summary: 'The real test-bay recording shows the elevated orbit, damage and optional gunner-control sightline.',
+    accent: '#5ce9ff', beats: ['Enter authored orbit', 'Track visible targets', 'Press its assigned key again to operate'],
+    media: { posterPath: killstreakDemoPosterPath('chopper'), videoPath: killstreakDemoVideoPath('chopper') },
   }),
   nuke: definition({
     id: 'nuke', kind: 'nuke-warning', eyebrow: 'ULTIMATE WARNING', title: 'NUKE',
-    summary: 'A static theatre poster carries the global warning and countdown choreography without simulating a match.',
+    summary: 'The real test-bay recording carries the global warning and visible countdown from normal activation.',
     accent: '#ff5f4c', beats: ['Broadcast global warning', 'Run visible countdown', 'Resolve match-ending strike'],
-    media: { posterPath: ATOMIC_POSTER, videoPath: null },
+    media: { posterPath: killstreakDemoPosterPath('nuke'), videoPath: killstreakDemoVideoPath('nuke') },
   }),
   'drone-swarm': definition({
     id: 'drone-swarm', kind: 'drone-cloud', eyebrow: 'ULTIMATE AIRSPACE', title: 'DRONE SWARM',
-    summary: 'Multiple separated clusters hold a safe terrain-relative altitude while distributing targets.',
+    summary: 'The real test-bay recording shows separated clusters holding altitude while distributing targets.',
     accent: '#8ef6df', beats: ['Fill centre airspace', 'Spread into clusters', 'Engage without ground-hugging'],
-    media: { posterPath: RUSTRIG_POSTER, videoPath: null },
+    media: { posterPath: killstreakDemoPosterPath('drone-swarm'), videoPath: killstreakDemoVideoPath('drone-swarm') },
   }),
 });
 
@@ -117,44 +113,102 @@ function beatsMarkup(definitionValue: KillstreakDemoDefinition): string {
 
 export function killstreakDemoRailMarkup(initialId: Pass65KillstreakId): string {
   const initial = KILLSTREAK_DEMO_MEDIA[initialId];
-  return `<aside id="killstreak-demo-rail" class="killstreak-demo-rail" aria-labelledby="killstreak-demo-title" data-demo-id="${initial.id}" data-demo-kind="${initial.kind}" data-motion="static" style="--killstreak-demo-accent:${initial.accent}">
+  return `<aside id="killstreak-demo-rail" class="killstreak-demo-rail" aria-labelledby="killstreak-demo-title" data-demo-id="${initial.id}" data-demo-kind="${initial.kind}" data-motion="inactive" data-media="poster" style="--killstreak-demo-accent:${initial.accent}">
     <header><small data-demo-eyebrow>${initial.eyebrow}</small><strong id="killstreak-demo-title" data-demo-title>${initial.title}</strong></header>
     <div class="killstreak-demo-viewport">
-      <img data-demo-poster src="${initial.media.posterPath}" alt="${escapeHtml(`${initial.title} local presentation poster`)}" width="640" height="360" loading="lazy" decoding="async">
-      <span class="killstreak-demo-mode" data-demo-mode>PREAUTHORED LOCAL PRESENTATION</span>
+      <img data-demo-poster src="${initial.media.posterPath}" alt="${escapeHtml(`${initial.title} real Gun Range test-bay capture`)}" width="960" height="540" loading="lazy" decoding="async">
+      <video data-demo-video muted loop playsinline preload="metadata" poster="${initial.media.posterPath}" aria-hidden="true"></video>
+      <span class="killstreak-demo-mode" data-demo-mode>VERIFIED REAL TEST BAY MEDIA</span>
+      <button class="killstreak-demo-toggle" type="button" data-demo-toggle aria-label="Pause killstreak demonstration" hidden>PAUSE</button>
     </div>
     <p data-demo-summary>${escapeHtml(initial.summary)}</p>
     <ol data-demo-beats>${beatsMarkup(initial)}</ol>
-    <footer><span>BOUNDED UI MEDIA</span><b>NO LIVE GAMEPLAY RENDER</b></footer>
+    <footer><span data-demo-footer-media>VERIFIED LOCAL POSTER</span><b>NO LIVE MENU RENDER</b></footer>
   </aside>`;
 }
 
 export type KillstreakDemoRailBinding = Readonly<{
   show: (id: Pass65KillstreakId) => void;
   syncMotion: () => void;
+  dispose: () => void;
 }>;
 
 export function bindKillstreakDemoRail(root: ParentNode, initialId: Pass65KillstreakId): KillstreakDemoRailBinding {
   const rail = root.querySelector<HTMLElement>('#killstreak-demo-rail');
-  if (!rail) return Object.freeze({ show: () => undefined, syncMotion: () => undefined });
+  if (!rail) return Object.freeze({ show: () => undefined, syncMotion: () => undefined, dispose: () => undefined });
   const motionMedia = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const panel = rail.closest<HTMLElement>('[data-menu-panel="streaks"]');
+  const video = rail.querySelector<HTMLVideoElement>('video[data-demo-video]');
+  const poster = rail.querySelector<HTMLImageElement>('[data-demo-poster]');
+  const mode = rail.querySelector<HTMLElement>('[data-demo-mode]');
+  const footerMedia = rail.querySelector<HTMLElement>('[data-demo-footer-media]');
+  const toggle = rail.querySelector<HTMLButtonElement>('[data-demo-toggle]');
   let currentId = initialId;
+  let sourceGeneration = 0;
+  let manualPaused = false;
+  let activeSourceUrl = '';
 
   const reducedMotion = (): boolean => motionMedia.matches || document.documentElement.dataset.reducedMotion === 'true';
-  const syncMotion = (): void => {
-    const posterOnly = reducedMotion();
-    rail.dataset.motion = posterOnly ? 'poster' : 'animated';
-    const mode = rail.querySelector<HTMLElement>('[data-demo-mode]');
-    if (mode) mode.textContent = posterOnly ? 'REDUCED MOTION · POSTER ONLY' : 'PREAUTHORED LOCAL PRESENTATION';
-    const video = rail.querySelector<HTMLVideoElement>('video[data-demo-video]');
-    if (video) {
-      if (posterOnly) video.pause();
-      else void video.play().catch(() => undefined);
+  const panelVisible = (): boolean => document.visibilityState === 'visible' && (panel === null || !panel.hidden);
+  const setPosterState = (label: string): void => {
+    rail.dataset.media = 'poster';
+    if (mode) mode.textContent = label;
+    if (footerMedia) footerMedia.textContent = 'VERIFIED LOCAL POSTER';
+    if (toggle) toggle.hidden = true;
+  };
+  const releaseDecoder = (): void => {
+    sourceGeneration += 1;
+    if (!video) return;
+    video.pause();
+    video.removeAttribute('src');
+    delete video.dataset.demoId;
+    activeSourceUrl = '';
+    video.load();
+  };
+  const playCurrent = (): void => {
+    const next = KILLSTREAK_DEMO_MEDIA[currentId];
+    if (!video || reducedMotion() || !panelVisible()) {
+      releaseDecoder();
+      setPosterState(reducedMotion() ? 'REDUCED MOTION / REAL POSTER' : 'VERIFIED REAL TEST BAY MEDIA');
+      return;
     }
+    const sourceChanged = video.getAttribute('src') !== next.media.videoPath || video.dataset.demoId !== currentId;
+    if (sourceChanged) {
+      sourceGeneration += 1;
+      video.pause();
+      video.poster = next.media.posterPath;
+      video.src = next.media.videoPath;
+      video.dataset.demoId = currentId;
+      activeSourceUrl = new URL(next.media.videoPath, document.baseURI).href;
+      video.load();
+      setPosterState('LOADING VERIFIED LOCAL VIDEO');
+    }
+    rail.dataset.motion = 'video';
+    if (manualPaused) {
+      rail.dataset.media = video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA ? 'video' : 'poster';
+      if (mode) mode.textContent = 'VERIFIED REAL TEST BAY VIDEO / PAUSED';
+      if (footerMedia) footerMedia.textContent = 'VERIFIED LOCAL VIDEO';
+      if (toggle) {
+        toggle.hidden = false;
+        toggle.textContent = 'PLAY';
+        toggle.setAttribute('aria-label', 'Play killstreak demonstration');
+      }
+      return;
+    }
+    const generation = sourceGeneration;
+    void video.play().catch(() => {
+      if (generation !== sourceGeneration || video.dataset.demoId !== currentId) return;
+      setPosterState('REAL POSTER / VIDEO UNAVAILABLE');
+    });
+  };
+  const syncMotion = (): void => {
+    rail.dataset.motion = reducedMotion() ? 'poster' : panelVisible() ? 'video' : 'inactive';
+    playCurrent();
   };
 
   const show = (id: Pass65KillstreakId): void => {
     currentId = id;
+    manualPaused = false;
     const next = KILLSTREAK_DEMO_MEDIA[id];
     rail.dataset.demoId = id;
     rail.dataset.demoKind = next.kind;
@@ -162,35 +216,71 @@ export function bindKillstreakDemoRail(root: ParentNode, initialId: Pass65Killst
     const eyebrow = rail.querySelector<HTMLElement>('[data-demo-eyebrow]');
     const title = rail.querySelector<HTMLElement>('[data-demo-title]');
     const summary = rail.querySelector<HTMLElement>('[data-demo-summary]');
-    const poster = rail.querySelector<HTMLImageElement>('[data-demo-poster]');
     const beats = rail.querySelector<HTMLOListElement>('[data-demo-beats]');
     if (eyebrow) eyebrow.textContent = next.eyebrow;
     if (title) title.textContent = next.title;
     if (summary) summary.textContent = next.summary;
     if (poster) {
       poster.src = next.media.posterPath;
-      poster.alt = `${next.title} local presentation poster`;
+      poster.alt = `${next.title} real Gun Range test-bay capture`;
     }
     if (beats) beats.innerHTML = beatsMarkup(next);
 
-    rail.querySelector<HTMLVideoElement>('video[data-demo-video]')?.remove();
-    if (next.media.videoPath !== null && !reducedMotion()) {
-      const video = document.createElement('video');
-      video.dataset.demoVideo = '';
-      video.src = next.media.videoPath;
-      video.muted = true;
-      video.loop = true;
-      video.playsInline = true;
-      video.preload = 'metadata';
-      rail.querySelector('.killstreak-demo-viewport')?.prepend(video);
-      void video.play().catch(() => undefined);
-    }
     syncMotion();
   };
 
-  motionMedia.addEventListener('change', () => { show(currentId); });
+  const onMotionChange = (): void => syncMotion();
+  const onPlaying = (): void => {
+    if (!video || video.dataset.demoId !== currentId || video.currentSrc !== activeSourceUrl
+      || reducedMotion() || !panelVisible()) return;
+    rail.dataset.media = 'video';
+    if (mode) mode.textContent = 'VERIFIED REAL GUN RANGE VIDEO';
+    if (footerMedia) footerMedia.textContent = 'VERIFIED LOCAL VIDEO';
+    if (toggle) {
+      toggle.hidden = false;
+      toggle.textContent = 'PAUSE';
+      toggle.setAttribute('aria-label', 'Pause killstreak demonstration');
+    }
+  };
+  const onVideoError = (): void => {
+    if (!video || video.dataset.demoId !== currentId || video.src !== activeSourceUrl) return;
+    setPosterState('REAL POSTER / VIDEO UNAVAILABLE');
+  };
+  const onToggle = (): void => {
+    if (!video || reducedMotion() || !panelVisible()) return;
+    manualPaused = !video.paused;
+    if (manualPaused) {
+      video.pause();
+      rail.dataset.media = video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA ? 'video' : 'poster';
+      if (mode) mode.textContent = 'VERIFIED REAL TEST BAY VIDEO / PAUSED';
+      if (toggle) {
+        toggle.textContent = 'PLAY';
+        toggle.setAttribute('aria-label', 'Play killstreak demonstration');
+      }
+    } else {
+      playCurrent();
+    }
+  };
+  motionMedia.addEventListener('change', onMotionChange);
+  document.addEventListener('visibilitychange', onMotionChange);
+  video?.addEventListener('playing', onPlaying);
+  video?.addEventListener('error', onVideoError);
+  toggle?.addEventListener('click', onToggle);
   const observer = new MutationObserver(() => syncMotion());
   observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-reduced-motion'] });
+  if (panel) observer.observe(panel, { attributes: true, attributeFilter: ['hidden'] });
   show(initialId);
-  return Object.freeze({ show, syncMotion });
+  return Object.freeze({
+    show,
+    syncMotion,
+    dispose: () => {
+      observer.disconnect();
+      motionMedia.removeEventListener('change', onMotionChange);
+      document.removeEventListener('visibilitychange', onMotionChange);
+      video?.removeEventListener('playing', onPlaying);
+      video?.removeEventListener('error', onVideoError);
+      toggle?.removeEventListener('click', onToggle);
+      releaseDecoder();
+    },
+  });
 }

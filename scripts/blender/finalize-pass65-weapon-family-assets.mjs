@@ -172,7 +172,7 @@ if (heroSilhouettes.size !== spec.weapons.length || heroAnimationSignatures.size
 const corpusProvenance = {
   schemaVersion: 1,
   id: spec.assetFamilyId,
-  title: 'Pass 65 project-original seventeen-firearm presentation corpus',
+  title: 'Pass 65/66 project-original nineteen-firearm presentation corpus',
   creator: 'Atomic Acres project', owner: 'Atomic Acres project', created: '2026-07-26',
   license: 'Project-original; no third-party meshes or textures',
   inspirationBoundary: spec.sourcePolicy,
@@ -202,6 +202,11 @@ const productionManifest = JSON.parse(await readFile(productionManifestPath, 'ut
 const supportVehicleSnapshot = JSON.stringify(productionManifest.supportVehicles ?? []);
 const replacementById = new Map(weaponEntries.map((entry) => [entry.id, entry]));
 productionManifest.weapons = productionManifest.weapons.map((entry) => replacementById.get(entry.id) ?? entry);
+for (const entry of weaponEntries) {
+  if (!productionManifest.weapons.some((candidate) => candidate.id === entry.id)) {
+    productionManifest.weapons.push(entry);
+  }
+}
 productionManifest.requirements.dropLodCount = 1;
 if (JSON.stringify(productionManifest.supportVehicles ?? []) !== supportVehicleSnapshot) {
   throw new Error('Firearm finalization must preserve every existing support-vehicle production record byte-for-byte');
@@ -231,7 +236,7 @@ const assetRecord = {
   sourceProvenance: corpusProvenanceRecord.path,
   sourceProvenanceSha256: corpusProvenanceRecord.sha256,
   preview: contactSheet.path,
-  format: 'Seventeen unique firearm families; each has two first-person, three world and one independently exported drop optimized self-contained glTF 2.0 binary with Meshopt geometry, embedded WebP PBR textures, authored sockets and thirteen core action clips',
+  format: 'Nineteen unique firearm families; each has two first-person, three world and one independently exported drop optimized self-contained glTF 2.0 binary with Meshopt geometry, embedded WebP PBR textures, authored sockets and thirteen core action clips',
   modifications: 'Project-original platform-specific silhouettes, materials, reload components, optics and action motion authored in Blender from a checked-in deterministic specification. Real platform names are catalog labels only; no commercial-game geometry, textures, logos or extracted assets are used. Gameplay authority remains TypeScript-owned.',
   attributionRequired: false,
 };

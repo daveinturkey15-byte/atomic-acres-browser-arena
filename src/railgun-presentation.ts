@@ -511,6 +511,7 @@ export class RailgunPresentation {
     thermalActive: boolean;
     thermalContacts: number;
     worldSilhouettes: number;
+    thermalThroughGeometry: boolean;
     activeBeams: number;
     beamPresentations: number;
     lastBeamLengthM: number;
@@ -541,6 +542,17 @@ export class RailgunPresentation {
     modelId: string;
     authoredWorldModel: boolean;
   }> {
+    const thermalThroughGeometry = this.thermalWorldContacts.every((silhouette) => {
+      let throughGeometry = true;
+      silhouette.traverse((node) => {
+        if (!(node instanceof THREE.Mesh)) return;
+        const materials = Array.isArray(node.material) ? node.material : [node.material];
+        if (materials.some((material) => material.depthTest !== false || material.depthWrite !== false)) {
+          throughGeometry = false;
+        }
+      });
+      return throughGeometry;
+    });
     const throughGeometry = this.beams.every(({
       core, bloom, shock, filaments, launchCore, launchCorona, launchRing, launchBridge, launchSparks,
     }) => {
@@ -570,6 +582,7 @@ export class RailgunPresentation {
       thermalActive: !this.thermalRoot.hidden,
       thermalContacts: this.visibleThermalContacts,
       worldSilhouettes: this.thermalWorldContacts.filter((contact) => contact.visible).length,
+      thermalThroughGeometry,
       activeBeams: this.beams.filter((beam) => beam.root.visible).length,
       beamPresentations: this.beamPresentations,
       lastBeamLengthM: this.lastBeamLengthM,

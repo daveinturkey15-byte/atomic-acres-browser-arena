@@ -87,9 +87,9 @@ test('loads and prewarms the exact authored support-vehicle family before deploy
   })).toBe(true);
   await page.waitForFunction(() => (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).killstreak.entities
     .some((entity: any) => entity.kind === 'chopper'));
-  await page.keyboard.down('f');
-  await page.waitForTimeout(1_050);
-  await page.keyboard.up('f');
+  // Possession uses the owned streak slot again; F is reserved for world
+  // interaction priority (pickups, care crates and the test-bay door).
+  await page.keyboard.press('6');
   await page.waitForFunction(() => Boolean(
     (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).killstreakPresentation.firstPersonSightline,
   ));

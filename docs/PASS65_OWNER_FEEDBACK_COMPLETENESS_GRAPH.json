@@ -215,16 +215,40 @@
         "19": 1,
         "21": 1
       },
-      "outcomeProjectionSha256": "03300513cc9bd26c967c1e02dc7bfee838bf9afe7341b2363a1d4ba204d3cbf6"
+      "outcomeProjectionSha256": "467be55cfafd2b3eeea6dc3579cf6ae76a5a146d31f7a9df1449e2bfaf47953c"
+    },
+    {
+      "id": "SRC-CODEX-V66-AUG01-001",
+      "kind": "codex-owner-feedback",
+      "externalLocator": "codex-task:pass66-final-adjustments-2026-08-01",
+      "rawByteLength": 4922,
+      "rawSha256": "bb609db1f7feeb8ded0036717b842466fd8567cc9b16822107ff22e381fd7fd7",
+      "rawEndsWithCrLf": false,
+      "normalizedRepositoryPath": "docs/pass65-sources/codex-owner-feedback-v66-2026-08-01.txt",
+      "normalization": "UTF-8; CRLF converted to LF; one final LF added; text semantics unchanged",
+      "normalizedByteLength": 4847,
+      "normalizedSha256": "1f2948a8480ff54040762ed19b55fa06ba6630abbed3706f5c22cac10a136fb5",
+      "outcomeCollection": "codexV66August01Outcomes",
+      "outcomeIdPrefix": "V66AUG01",
+      "outcomeCount": 47,
+      "lineAtomCounts": {
+        "1": 1, "3": 1, "5": 1, "7": 1, "9": 1, "11": 1, "13": 1, "15": 1,
+        "17": 1, "19": 1, "20": 2, "22": 1, "24": 1, "26": 1, "28": 1, "30": 1,
+        "32": 1, "34": 1, "37": 1, "38": 1, "39": 1, "41": 1, "43": 1, "45": 1,
+        "46": 1, "47": 1, "48": 1, "50": 1, "51": 1, "52": 1, "53": 1, "55": 1,
+        "57": 1, "59": 1, "62": 1, "64": 3, "66": 1, "68": 1, "70": 1, "72": 1,
+        "73": 1, "75": 1, "77": 2
+      },
+      "outcomeProjectionSha256": "3ca8c67de52624a300963e11eb301f21ba0194220d2d6c1321f580b9037d90cc"
     },
     {
       "id": "SRC-CORRECTION-LEDGER-001",
       "kind": "canonical-correction-ledger",
       "repositoryPath": "docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md",
       "ledgerVersion": 1,
-      "latestFeedbackId": "HF-190",
-      "outcomeCount": 190,
-      "stateIndependentOutcomeSha256": "9a9cc5ea390a8ac2402b1e6f745fe19060fa2435c3d5e39740d41a41edb8172b"
+      "latestFeedbackId": "HF-207",
+      "outcomeCount": 207,
+      "stateIndependentOutcomeSha256": "924b9cd77d5d6dd4d7113ac0d941fa34c405ef97bc8147ffa8b766166d30e4b1"
     },
     {
       "id": "SRC-PLANNING-MATRIX-001",
@@ -908,7 +932,7 @@
     "outcomeIdTemplate": "CORR-{feedbackId}",
     "sourceLocatorTemplate": "{feedbackId}.observation",
     "feedbackIdStart": "HF-001",
-    "feedbackIdEnd": "HF-190"
+    "feedbackIdEnd": "HF-207"
   },
   "supersessions": [
     {
@@ -1547,6 +1571,7 @@
       "paths": [
         "scripts/qa/pass66-hidden-tab-contract.mjs",
         "scripts/qa/pass66-hidden-tab-contract.test.mjs",
+        "scripts/qa/run-pass66-hidden-tab-matrix.mjs",
         "scripts/qa/verify-pass66-hidden-tab-admission.mjs"
       ],
       "evidenceKinds": [
@@ -1903,6 +1928,298 @@
       ]
     },
     {
+      "id": "T-MULTIPLAYER-STABILITY",
+      "command": "npm run qa:pass66:multiplayer-stability",
+      "paths": [
+        "package.json",
+        "scripts/qa/pass66-multiplayer-stability-contract.mjs",
+        "scripts/qa/pass66-multiplayer-stability-contract.test.mjs",
+        "scripts/qa/pass66-owned-browser-verifier-contract.mjs",
+        "scripts/qa/pass66-owned-browser-verifier-contract.test.mjs",
+        "scripts/qa/run-pass66-owned-browser-verifier.mjs",
+        "scripts/qa/verify-pass66-multiplayer-stability.mjs",
+        "tests/e2e/pass66-e2e-support.ts",
+        "tests/e2e/pass66-host-crash-rejoin.spec.ts",
+        "tests/e2e/pass66-owner-feedback-multiplayer-ui.spec.ts",
+        "tests/e2e/pass66-timed-map-weapons-multiplayer-rejoin.spec.ts",
+        "tests/e2e/pass66-qoder-multiplayer-authority.spec.ts",
+        "tests/e2e/pass66-adrenaline-match-lifecycle.spec.ts"
+      ],
+      "evidenceKinds": [
+        "browser"
+      ]
+    },
+    {
+      "id": "T-PASS61-NETCODE",
+      "command": "npm run qa:pass61:netcode",
+      "paths": [
+        "package.json",
+        "scripts/qa/pass66-owned-browser-verifier-contract.mjs",
+        "scripts/qa/pass66-owned-browser-verifier-contract.test.mjs",
+        "scripts/qa/run-pass66-owned-browser-verifier.mjs",
+        "scripts/qa/verify-pass61-authoritative-netcode.mjs"
+      ],
+      "evidenceKinds": [
+        "browser"
+      ]
+    },
+    {
+      "id": "T-PRIVATE-LOBBY",
+      "command": "npm run qa:private-lobby",
+      "paths": [
+        "package.json",
+        "scripts/qa/pass66-owned-browser-verifier-contract.mjs",
+        "scripts/qa/pass66-owned-browser-verifier-contract.test.mjs",
+        "scripts/qa/run-pass66-owned-browser-verifier.mjs",
+        "scripts/qa/verify-private-lobby.mjs"
+      ],
+      "evidenceKinds": [
+        "browser"
+      ]
+    },
+    {
+      "id": "T-PASS63-MULTIPLAYER-COMPARATOR",
+      "command": "npm run qa:pass66:pass63-multiplayer-comparator",
+      "paths": [
+        "package.json",
+        "scripts/qa/run-pass66-pass63-multiplayer-comparator.mjs",
+        "src/pass66-pass63-multiplayer-comparator-contract.ts",
+        "src/pass66-pass63-multiplayer-comparator-contract.test.ts",
+        "tests/e2e/pass66-pass63-multiplayer-comparator.spec.ts"
+      ],
+      "evidenceKinds": [
+        "browser"
+      ]
+    },
+    {
+      "id": "T-ADS-SIGHT-CATALOG",
+      "command": "npm run qa:pass66:ads-catalog",
+      "paths": [
+        "package.json",
+        "scripts/qa/run-pass66-ads-sight-catalog.mjs",
+        "src/ads-sight-profile.ts",
+        "tests/e2e/pass66-ads-sight-catalog.spec.ts"
+      ],
+      "evidenceKinds": [
+        "browser",
+        "visual"
+      ],
+      "visualArtifactPaths": [
+        "artifacts/pass66/ads-sight-catalog"
+      ]
+    },
+    {
+      "id": "T-SCOPED-ADS",
+      "command": "npm run qa:playwright-topology -- tests/e2e/pass66-scoped-ads-regressions.spec.ts --project=chromium --workers=1 --retries=0",
+      "paths": [
+        "package.json",
+        "tests/e2e/pass66-scoped-ads-regressions.spec.ts"
+      ],
+      "evidenceKinds": [
+        "browser",
+        "visual"
+      ],
+      "visualArtifactPaths": [
+        "artifacts/pass66/scoped-ads"
+      ]
+    },
+    {
+      "id": "T-SKY-WEBGPU",
+      "command": "npm run qa:pass66:sky-webgpu",
+      "paths": [
+        "package.json",
+        "scripts/qa/verify-pass66-atomic-sky-webgpu.mjs",
+        "src/rendering/sky-backdrop.ts",
+        "src/rendering/sky-backdrop.test.ts"
+      ],
+      "evidenceKinds": [
+        "browser",
+        "visual"
+      ],
+      "visualArtifactPaths": [
+        "artifacts/pass66/sky-backdrops"
+      ]
+    },
+    {
+      "id": "T-VIEWMODEL-FRAMING",
+      "command": "npm run qa:pass66:viewmodel-framing",
+      "paths": [
+        "package.json",
+        "scripts/qa/verify-pass66-viewmodel-framing.mjs",
+        "src/viewmodel-framing.test.ts"
+      ],
+      "evidenceKinds": [
+        "browser",
+        "visual"
+      ],
+      "visualArtifactPaths": [
+        "artifacts/pass66/viewmodel-framing"
+      ]
+    },
+    {
+      "id": "T-PRONE-CONTACT-MATRIX",
+      "command": "npm run qa:pass66:prone-contact-matrix",
+      "paths": [
+        "package.json",
+        "scripts/qa/run-pass66-prone-contact-matrix.mjs",
+        "tests/e2e/pass66-prone-contact-matrix.spec.ts"
+      ],
+      "evidenceKinds": [
+        "browser"
+      ]
+    },
+    {
+      "id": "T-SUPPORT-OPERATE-PROMPT",
+      "command": "npm run qa:pass66:support-operate-prompt",
+      "paths": [
+        "package.json",
+        "scripts/qa/pass66-owned-browser-verifier-contract.mjs",
+        "scripts/qa/pass66-owned-browser-verifier-contract.test.mjs",
+        "scripts/qa/run-pass66-owned-browser-verifier.mjs",
+        "scripts/qa/run-pass66-support-operate-prompt-evidence.mjs",
+        "tests/e2e/pass66-support-operate-prompt.spec.ts"
+      ],
+      "evidenceKinds": [
+        "browser",
+        "visual"
+      ],
+      "visualArtifactPaths": [
+        "artifacts/pass66/support-operate-prompt"
+      ]
+    },
+    {
+      "id": "T-AUDIO-LONG-RUN",
+      "command": "npm run qa:pass66:audio-long-run",
+      "paths": [
+        "package.json",
+        "scripts/qa/run-pass66-audio-long-run.mjs",
+        "src/pass66-audio-long-run-runner.test.ts",
+        "tests/e2e/pass66-audio-long-run.spec.ts"
+      ],
+      "evidenceKinds": [
+        "browser"
+      ]
+    },
+    {
+      "id": "T-KILLSTREAK-DEMO-VIDEOS",
+      "command": "npm run qa:pass66:killstreak-demo-videos",
+      "paths": [
+        "package.json",
+        "scripts/qa/finalize-pass66-killstreak-demo-media.ts",
+        "src/killstreak-demo-capture-contract.ts",
+        "src/killstreak-demo-published-media.test.ts",
+        "source-assets/killstreak-demo/pass66-real-test-bay-capture-receipt.json",
+        "public/assets/original/killstreak-demo/manifest.json"
+      ],
+      "evidenceKinds": [
+        "contract"
+      ]
+    },
+    {
+      "id": "T-BROWSER-ADMISSION",
+      "command": "npm run qa:pass66:browser-admission",
+      "paths": [
+        "package.json",
+        "scripts/qa/run-pass66-browser-admission.mjs",
+        "tests/e2e/pass66-browser-admission-cycles.spec.ts"
+      ],
+      "evidenceKinds": [
+        "browser"
+      ]
+    },
+    {
+      "id": "T-GUN-RANGE-TEST-BAY",
+      "command": "npm run qa:playwright-topology -- tests/e2e/pass66-gun-range-test-bay.spec.ts --project=chromium --workers=1 --retries=0",
+      "paths": [
+        "package.json",
+        "src/gun-range-test-bay.ts",
+        "src/gun-range-test-bay.test.ts",
+        "tests/e2e/pass66-gun-range-test-bay.spec.ts"
+      ],
+      "evidenceKinds": [
+        "browser",
+        "visual"
+      ],
+      "visualArtifactPaths": [
+        "artifacts/pass66/gun-range-test-bay"
+      ]
+    },
+    {
+      "id": "T-TIMED-MAP-WEAPONS",
+      "command": "npm run qa:playwright-topology -- tests/e2e/pass66-timed-map-weapons.spec.ts --project=chromium --workers=1 --retries=0",
+      "paths": [
+        "package.json",
+        "src/timed-map-weapon-authority.ts",
+        "src/timed-map-weapon-authority.test.ts",
+        "tests/e2e/pass66-timed-map-weapons.spec.ts"
+      ],
+      "evidenceKinds": [
+        "browser"
+      ]
+    },
+    {
+      "id": "T-FIELD-KIT-MENU",
+      "command": "npm run qa:playwright-topology -- tests/e2e/pass66-field-kit-killstreak-menu.spec.ts --project=chromium --workers=1 --retries=0",
+      "paths": [
+        "package.json",
+        "src/ui/field-kit-weapon-presentation.ts",
+        "src/ui/field-kit-weapon-presentation.test.ts",
+        "src/ui/killstreak-loadout-menu.ts",
+        "tests/e2e/pass66-field-kit-killstreak-menu.spec.ts"
+      ],
+      "evidenceKinds": ["browser", "visual"],
+      "visualArtifactPaths": ["artifacts/pass66/ui-correction"]
+    },
+    {
+      "id": "T-RUSTRIG-PHYSICS",
+      "command": "npm run qa:playwright-topology -- tests/e2e/rustworks-refinement.spec.ts --project=chromium --workers=1 --retries=0",
+      "paths": [
+        "package.json",
+        "src/water-system.ts",
+        "src/water-system.test.ts",
+        "src/rendering/pass64-tsl-scene.ts",
+        "tests/e2e/rustworks-refinement.spec.ts"
+      ],
+      "evidenceKinds": ["browser"]
+    },
+    {
+      "id": "T-INSTALLED-FIREFOX",
+      "command": "npm run qa:pass66:installed-firefox",
+      "paths": [
+        "package.json",
+        "scripts/qa/pass66-owned-browser-verifier-contract.mjs",
+        "scripts/qa/pass66-owned-browser-verifier-contract.test.mjs",
+        "scripts/qa/run-pass66-owned-browser-verifier.mjs",
+        "scripts/qa/verify-installed-firefox.mjs"
+      ],
+      "evidenceKinds": ["browser"]
+    },
+    {
+      "id": "T-DIAGNOSTICS",
+      "command": "npm run diagnostics:check",
+      "paths": [
+        "package.json",
+        "shared/match-diagnostics-schema.test.ts",
+        "src/match-diagnostics.test.ts",
+        "src/match-diagnostics-upload.test.ts",
+        "src/pass64-diagnostics-collector.test.ts",
+        "src/pass64-diagnostics-analyzer.test.ts",
+        "worker/src/index.test.ts"
+      ],
+      "evidenceKinds": ["unit", "contract"]
+    },
+    {
+      "id": "T-PICKUP-REPICK",
+      "command": "npm run qa:playwright-topology -- tests/e2e/atomic-acres.spec.ts --project=chromium --workers=1 --retries=0 --grep \"sniper lethality, marksman auto sidearm, walk-over scavenging and independent F weapon pickup all hold\"",
+      "paths": [
+        "package.json",
+        "src/death-drops.ts",
+        "src/death-drops.test.ts",
+        "tests/e2e/atomic-acres.spec.ts"
+      ],
+      "evidenceKinds": ["browser"]
+    },
+    {
       "id": "T-RELEASE-SHELL",
       "command": "npm run qa:pass66:release-shell-evidence",
       "paths": [
@@ -1952,7 +2269,8 @@
           "T-MENU-LIFECYCLE-E2E",
           "T-COLD-WEBGPU-ADMISSION",
           "T-WEBGPU-ENDURANCE",
-          "T-COLD-HARDWARE-WEBGL2"
+          "T-COLD-HARDWARE-WEBGL2",
+          "T-BROWSER-ADMISSION"
         ],
         "artifactRefs": []
       }
@@ -1976,7 +2294,8 @@
           "T-FRAME-POLICY",
           "T-COLD-WEBGPU-ADMISSION",
           "T-WEBGPU-ENDURANCE",
-          "T-COLD-HARDWARE-WEBGL2"
+          "T-COLD-HARDWARE-WEBGL2",
+          "T-BROWSER-ADMISSION"
         ],
         "artifactRefs": []
       }
@@ -2239,7 +2558,8 @@
       "verification": {
         "coverage": "partial",
         "testRefs": [
-          "T-ADDITIONAL-MAPS"
+          "T-ADDITIONAL-MAPS",
+          "T-GUN-RANGE-TEST-BAY"
         ],
         "artifactRefs": []
       }
@@ -2582,7 +2902,9 @@
         "coverage": "partial",
         "testRefs": [
           "T-WEAPON-CATALOG",
-          "T-WEAPON-ASSET-GATE"
+          "T-WEAPON-ASSET-GATE",
+          "T-ADS-SIGHT-CATALOG",
+          "T-SCOPED-ADS"
         ],
         "artifactRefs": []
       }
@@ -3753,7 +4075,8 @@
       "verification": {
         "coverage": "partial",
         "testRefs": [
-          "T-BOTS"
+          "T-BOTS",
+          "T-TIMED-MAP-WEAPONS"
         ],
         "artifactRefs": []
       }
@@ -3818,7 +4141,8 @@
         "testRefs": [
           "T-MENU-LIFECYCLE-E2E",
           "T-WEBGPU-ENDURANCE",
-          "T-COLD-HARDWARE-WEBGL2"
+          "T-COLD-HARDWARE-WEBGL2",
+          "T-PRIVATE-LOBBY"
         ],
         "artifactRefs": []
       }
@@ -3931,7 +4255,10 @@
         "SPEC-035",
         "SPEC-036",
         "SPEC-040",
-        "SPEC-045"
+        "SPEC-045",
+        "V66AUG01-020",
+        "V66AUG01-039",
+        "V66AUG01-047"
       ],
       "planningRequirementIds": [
         "R001",
@@ -4112,7 +4439,12 @@
           "T-SUPPORT-RUNTIME",
           "T-NETWORK",
           "T-COLD-WEBGPU-ADMISSION",
-          "T-WEBGPU-ENDURANCE"
+          "T-WEBGPU-ENDURANCE",
+          "T-MULTIPLAYER-STABILITY",
+          "T-PASS61-NETCODE",
+          "T-PASS63-MULTIPLAYER-COMPARATOR",
+          "T-GUN-RANGE-TEST-BAY",
+          "T-TIMED-MAP-WEAPONS"
         ],
         "artifactRefs": []
       }
@@ -4159,7 +4491,8 @@
           "T-WEAPON-ASSET-GATE",
           "T-OPERATOR-GATE",
           "T-PROVENANCE",
-          "T-PREVIEW-GATE"
+          "T-PREVIEW-GATE",
+          "T-SKY-WEBGPU"
         ],
         "artifactRefs": []
       }
@@ -5704,7 +6037,10 @@
           "T-WEBGPU-ENDURANCE",
           "T-NATIVE-FRAME-PACING",
           "T-TEXT-INTEGRITY",
-          "T-COLD-HARDWARE-WEBGL2"
+          "T-COLD-HARDWARE-WEBGL2",
+          "T-MULTIPLAYER-STABILITY",
+          "T-PASS63-MULTIPLAYER-COMPARATOR",
+          "T-SKY-WEBGPU"
         ],
         "artifactRefs": []
       }
@@ -5781,7 +6117,8 @@
         "coverage": "partial",
         "testRefs": [
           "T-AUDIO",
-          "T-MENU-LIFECYCLE-E2E"
+          "T-MENU-LIFECYCLE-E2E",
+          "T-AUDIO-LONG-RUN"
         ],
         "artifactRefs": []
       }
@@ -5977,7 +6314,9 @@
         "testRefs": [
           "T-KILLSTREAK-CATALOG",
           "T-HUD-E2E",
-          "T-PREVIEW-GATE"
+          "T-PREVIEW-GATE",
+          "T-KILLSTREAK-DEMO-VIDEOS",
+          "T-GUN-RANGE-TEST-BAY"
         ],
         "artifactRefs": []
       }
@@ -6027,7 +6366,9 @@
         "testRefs": [
           "T-HUD-UNIT",
           "T-HUD-E2E",
-          "T-MENU-LIFECYCLE-E2E"
+          "T-MENU-LIFECYCLE-E2E",
+          "T-PRIVATE-LOBBY",
+          "T-SUPPORT-OPERATE-PROMPT"
         ],
         "artifactRefs": []
       }
@@ -6230,7 +6571,8 @@
           "T-WEAPON-PRESENTATION",
           "T-DESTRUCTIBLE",
           "T-ADDITIONAL-MAPS",
-          "T-NETWORK"
+          "T-NETWORK",
+          "T-PRONE-CONTACT-MATRIX"
         ],
         "artifactRefs": []
       }
@@ -6323,7 +6665,7 @@
       "planningRequirementIds": ["R105", "R108", "R109", "R608"],
       "canonicalOwner": "Operator rig/viewmodel",
       "ownerSource": "SRC-CORRECTION-LEDGER-001",
-      "verification": {"coverage": "partial", "testRefs": ["T-OPERATOR-GATE", "T-WEAPON-PRESENTATION", "T-NATIVE-FRAME-PACING"], "artifactRefs": []}
+      "verification": {"coverage": "partial", "testRefs": ["T-OPERATOR-GATE", "T-WEAPON-PRESENTATION", "T-NATIVE-FRAME-PACING", "T-VIEWMODEL-FRAMING"], "artifactRefs": []}
     },
     {
       "id": "HF-163",
@@ -6331,7 +6673,7 @@
       "planningRequirementIds": ["R105", "R107", "R108", "R608"],
       "canonicalOwner": "Operator/weapon animation",
       "ownerSource": "SRC-CORRECTION-LEDGER-001",
-      "verification": {"coverage": "partial", "testRefs": ["T-OPERATOR-GATE", "T-WEAPON-PRESENTATION"], "artifactRefs": []}
+      "verification": {"coverage": "partial", "testRefs": ["T-OPERATOR-GATE", "T-WEAPON-PRESENTATION", "T-VIEWMODEL-FRAMING"], "artifactRefs": []}
     },
     {
       "id": "HF-164",
@@ -6339,7 +6681,7 @@
       "planningRequirementIds": ["R109", "R307", "R608", "R610"],
       "canonicalOwner": "Viewmodel/frame pacing",
       "ownerSource": "SRC-CORRECTION-LEDGER-001",
-      "verification": {"coverage": "partial", "testRefs": ["T-WEAPON-PRESENTATION", "T-COLD-WEBGPU-ADMISSION", "T-NATIVE-FRAME-PACING"], "artifactRefs": []}
+      "verification": {"coverage": "partial", "testRefs": ["T-WEAPON-PRESENTATION", "T-COLD-WEBGPU-ADMISSION", "T-NATIVE-FRAME-PACING", "T-ADS-SIGHT-CATALOG", "T-SCOPED-ADS"], "artifactRefs": []}
     },
     {
       "id": "HF-165",
@@ -6347,7 +6689,7 @@
       "planningRequirementIds": ["R304", "R307", "R308", "R609"],
       "canonicalOwner": "Support spatial-audio/mixer",
       "ownerSource": "SRC-CORRECTION-LEDGER-001",
-      "verification": {"coverage": "partial", "testRefs": ["T-AUDIO", "T-SUPPORT-VISUAL-E2E", "T-SUPPORT-RUNTIME"], "artifactRefs": []}
+      "verification": {"coverage": "partial", "testRefs": ["T-AUDIO", "T-SUPPORT-VISUAL-E2E", "T-SUPPORT-RUNTIME", "T-AUDIO-LONG-RUN"], "artifactRefs": []}
     },
     {
       "id": "HF-166",
@@ -6355,7 +6697,7 @@
       "planningRequirementIds": ["R100", "R105", "R109", "R400", "R608"],
       "canonicalOwner": "Player movement/viewmodel/rig",
       "ownerSource": "SRC-CORRECTION-LEDGER-001",
-      "verification": {"coverage": "partial", "testRefs": ["T-OPERATOR-GATE", "T-WEAPON-PRESENTATION", "T-PROFILE-AUTHORITY-UNIT", "T-PROFILE-AUTHORITY-E2E"], "artifactRefs": []}
+      "verification": {"coverage": "partial", "testRefs": ["T-OPERATOR-GATE", "T-WEAPON-PRESENTATION", "T-PROFILE-AUTHORITY-UNIT", "T-PROFILE-AUTHORITY-E2E", "T-VIEWMODEL-FRAMING", "T-PRONE-CONTACT-MATRIX"], "artifactRefs": []}
     },
     {
       "id": "HF-167",
@@ -6507,7 +6849,7 @@
       "planningRequirementIds": ["R112", "R114", "R307", "R600", "R608", "R609", "R610"],
       "canonicalOwner": "Killstreak preview-media UI",
       "ownerSource": "SRC-CORRECTION-LEDGER-001",
-      "verification": {"coverage": "partial", "testRefs": ["T-PREVIEW-GATE", "T-HUD-UNIT", "T-HUD-E2E", "T-LIFECYCLE-UNIT"], "artifactRefs": []}
+      "verification": {"coverage": "partial", "testRefs": ["T-PREVIEW-GATE", "T-HUD-UNIT", "T-HUD-E2E", "T-LIFECYCLE-UNIT", "T-KILLSTREAK-DEMO-VIDEOS"], "artifactRefs": []}
     },
     {
       "id": "HF-186",
@@ -6515,7 +6857,7 @@
       "planningRequirementIds": ["R307", "R610"],
       "canonicalOwner": "Arena admission/runtime",
       "ownerSource": "SRC-CORRECTION-LEDGER-001",
-      "verification": {"coverage": "partial", "testRefs": ["T-COLD-WEBGPU-ADMISSION", "T-WEBGPU-ENDURANCE", "T-MENU-LIFECYCLE-E2E", "T-NATIVE-FRAME-PACING"], "artifactRefs": []}
+      "verification": {"coverage": "partial", "testRefs": ["T-COLD-WEBGPU-ADMISSION", "T-WEBGPU-ENDURANCE", "T-MENU-LIFECYCLE-E2E", "T-NATIVE-FRAME-PACING", "T-BROWSER-ADMISSION"], "artifactRefs": []}
     },
     {
       "id": "HF-187",
@@ -6523,7 +6865,7 @@
       "planningRequirementIds": ["R504", "R507", "R510", "R609"],
       "canonicalOwner": "Support possession/input lifecycle",
       "ownerSource": "SRC-CORRECTION-LEDGER-001",
-      "verification": {"coverage": "partial", "testRefs": ["T-INTERACTION", "T-SUPPORT-RUNTIME", "T-SUPPORT-VISUAL-E2E"], "artifactRefs": []}
+      "verification": {"coverage": "partial", "testRefs": ["T-INTERACTION", "T-SUPPORT-RUNTIME", "T-SUPPORT-VISUAL-E2E", "T-SUPPORT-OPERATE-PROMPT"], "artifactRefs": []}
     },
     {
       "id": "HF-188",
@@ -6539,7 +6881,7 @@
       "planningRequirementIds": ["R105", "R108", "R307", "R610"],
       "canonicalOwner": "Sniper viewmodel/frame pacing",
       "ownerSource": "SRC-CORRECTION-LEDGER-001",
-      "verification": {"coverage": "partial", "testRefs": ["T-WEAPON-PRESENTATION", "T-COLD-WEBGPU-ADMISSION", "T-NATIVE-FRAME-PACING"], "artifactRefs": []}
+      "verification": {"coverage": "partial", "testRefs": ["T-WEAPON-PRESENTATION", "T-COLD-WEBGPU-ADMISSION", "T-NATIVE-FRAME-PACING", "T-ADS-SIGHT-CATALOG", "T-SCOPED-ADS"], "artifactRefs": []}
     },
     {
       "id": "HF-190",
@@ -6548,6 +6890,142 @@
       "canonicalOwner": "Death/respawn frame pacing",
       "ownerSource": "SRC-CORRECTION-LEDGER-001",
       "verification": {"coverage": "partial", "testRefs": ["T-OPERATOR-GATE", "T-WEAPON-PRESENTATION", "T-NATIVE-FRAME-PACING", "T-WEBGPU-ENDURANCE", "T-NETWORK"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-191",
+      "sourceOutcomeIds": ["CORR-HF-191", "V66AUG01-002", "V66AUG01-007", "V66AUG01-008", "V66AUG01-045"],
+      "planningRequirementIds": ["R105", "R108", "R307", "R510", "R608", "R610"],
+      "canonicalOwner": "ADS/viewmodel/rendering integration",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-ADS-SIGHT-CATALOG", "T-SCOPED-ADS", "T-RAILGUN", "T-COLD-WEBGPU-ADMISSION", "T-WEBGPU-ENDURANCE", "T-NATIVE-FRAME-PACING", "T-COLD-HARDWARE-WEBGL2"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-192",
+      "sourceOutcomeIds": ["CORR-HF-192", "V66AUG01-003", "V66AUG01-040"],
+      "planningRequirementIds": ["R108", "R232", "R600", "R608", "R609"],
+      "canonicalOwner": "Loadout UI/combat-registry projection",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-FIELD-KIT-MENU", "T-HUD-E2E", "T-HUD-UNIT", "T-WEAPON-CATALOG", "T-PERSISTENCE"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-193",
+      "sourceOutcomeIds": ["CORR-HF-193", "V66AUG01-004", "V66AUG01-014", "V66AUG01-041"],
+      "planningRequirementIds": ["R100", "R105", "R109", "R400", "R401", "R402", "R403", "R404", "R405", "R406", "R407", "R408", "R409", "R410", "R411", "R412", "R413", "R608", "R610"],
+      "canonicalOwner": "Arena atmosphere/visual QA",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-SKY-WEBGPU", "T-PRODUCTION-ASSETS", "T-PROFILE-AUTHORITY-UNIT", "T-PROFILE-AUTHORITY-E2E", "T-COLD-WEBGPU-ADMISSION", "T-WEBGPU-ENDURANCE"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-194",
+      "sourceOutcomeIds": ["CORR-HF-194", "V66AUG01-005", "V66AUG01-037", "V66AUG01-043"],
+      "planningRequirementIds": ["R105", "R108", "R109", "R608", "R609"],
+      "canonicalOwner": "Operator rig/viewmodel forge",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-VIEWMODEL-FRAMING", "T-WEAPON-PRESENTATION", "T-OPERATOR-GATE"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-195",
+      "sourceOutcomeIds": ["CORR-HF-195", "V66AUG01-006", "V66AUG01-037"],
+      "planningRequirementIds": ["R112", "R113", "R304", "R504", "R608", "R609"],
+      "canonicalOwner": "Support vehicle asset forge",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-SUPPORT-VEHICLE-GATE", "T-SUPPORT-VISUAL-E2E", "T-PROVENANCE", "T-PREVIEW-GATE"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-196",
+      "sourceOutcomeIds": ["CORR-HF-196", "V66AUG01-009", "V66AUG01-010"],
+      "planningRequirementIds": ["R220", "R221", "R222", "R223", "R224", "R225", "R226", "R227", "R228", "R229", "R230", "R231", "R232", "R233", "R234", "R235", "R236", "R304", "R506", "R507", "R508", "R509", "R510", "R608", "R609", "R613"],
+      "canonicalOwner": "Timed weapon/content integration",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-TIMED-MAP-WEAPONS", "T-WEAPON-ASSET-GATE", "T-WEAPON-CATALOG", "T-BOTS", "T-AUDIO", "T-NETWORK", "T-MULTIPLAYER-STABILITY"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-197",
+      "sourceOutcomeIds": ["CORR-HF-197", "V66AUG01-011", "V66AUG01-013"],
+      "planningRequirementIds": ["R304", "R500", "R501", "R502", "R503", "R504", "R505", "R506", "R507", "R508", "R509", "R510", "R511", "R512", "R608", "R609"],
+      "canonicalOwner": "Gun Range world/gameplay integration",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-GUN-RANGE-TEST-BAY", "T-ADDITIONAL-MAPS", "T-SUPPORT-RUNTIME", "T-WEAPON-CATALOG"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-198",
+      "sourceOutcomeIds": ["CORR-HF-198", "V66AUG01-015", "V66AUG01-016"],
+      "planningRequirementIds": ["R105", "R110", "R307", "R400", "R401", "R402", "R403", "R404", "R405", "R406", "R407", "R408", "R409", "R410", "R411", "R412", "R413", "R509", "R605", "R608"],
+      "canonicalOwner": "World/player physics integration",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-RUSTRIG-PHYSICS", "T-PRONE-CONTACT-MATRIX", "T-VIEWMODEL-FRAMING", "T-PROFILE-AUTHORITY-UNIT", "T-PROFILE-AUTHORITY-E2E", "T-NATIVE-FRAME-PACING"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-199",
+      "sourceOutcomeIds": ["CORR-HF-199", "V66AUG01-017", "V66AUG01-019", "V66AUG01-027", "V66AUG01-042"],
+      "planningRequirementIds": ["R114", "R304", "R500", "R501", "R502", "R503", "R504", "R505", "R506", "R507", "R508", "R509", "R510", "R511", "R512", "R600", "R608", "R609"],
+      "canonicalOwner": "Support authority/HUD integration",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-SUPPORT-OPERATE-PROMPT", "T-SUPPORT-DAMAGE", "T-MULTIPLAYER-STABILITY", "T-KILLSTREAK-CATALOG", "T-HUD-E2E", "T-WEBGPU-ENDURANCE"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-200",
+      "sourceOutcomeIds": ["CORR-HF-200", "V66AUG01-018", "V66AUG01-035", "V66AUG01-044"],
+      "planningRequirementIds": ["R307", "R608", "R610"],
+      "canonicalOwner": "Browser compatibility/loading lifecycle",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-BROWSER-ADMISSION", "T-INSTALLED-FIREFOX", "T-COLD-WEBGPU-ADMISSION", "T-WEBGPU-ENDURANCE", "T-NATIVE-FRAME-PACING", "T-COLD-HARDWARE-WEBGL2", "T-LIFECYCLE-UNIT", "T-BROWSER-FOREGROUND-POLICY", "T-HIDDEN-TAB-ADMISSION"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-201",
+      "sourceOutcomeIds": ["CORR-HF-201", "V66AUG01-022"],
+      "planningRequirementIds": ["R006", "R606", "R610", "R613"],
+      "canonicalOwner": "Diagnostics/observability and Worker boundary",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-DIAGNOSTICS", "T-HUD-E2E", "T-NETWORK"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-202",
+      "sourceOutcomeIds": ["CORR-HF-202", "V66AUG01-025"],
+      "planningRequirementIds": ["R006", "R606", "R610", "R613"],
+      "canonicalOwner": "Multiplayer diagnostics analysis",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-DIAGNOSTICS", "T-NETWORK"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-203",
+      "sourceOutcomeIds": ["CORR-HF-203", "V66JUL30-018"],
+      "planningRequirementIds": ["R109", "R307", "R308", "R601", "R608", "R609"],
+      "canonicalOwner": "Spatial-audio/mixer lifecycle",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-AUDIO", "T-AUDIO-LONG-RUN", "T-MENU-LIFECYCLE-E2E", "T-SUPPORT-RUNTIME"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-204",
+      "sourceOutcomeIds": ["CORR-HF-204", "V66AUG01-023", "V66AUG01-024", "V66AUG01-030", "V66AUG01-033"],
+      "planningRequirementIds": ["R005", "R006", "R009", "R307", "R606", "R608", "R610", "R613"],
+      "canonicalOwner": "Multiplayer recovery/netcode integration",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-MULTIPLAYER-STABILITY", "T-PASS61-NETCODE", "T-PASS63-MULTIPLAYER-COMPARATOR", "T-PRIVATE-LOBBY", "T-NETWORK"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-205",
+      "sourceOutcomeIds": ["CORR-HF-205", "V66AUG01-026", "V66AUG01-027", "V66AUG01-028", "V66AUG01-029", "V66AUG01-030", "V66AUG01-031", "V66AUG01-032", "V66AUG01-034"],
+      "planningRequirementIds": ["R005", "R009", "R114", "R304", "R305", "R506", "R507", "R508", "R509", "R510", "R600", "R608", "R609", "R610", "R613"],
+      "canonicalOwner": "Hosted-session authority/UI integration",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-MULTIPLAYER-STABILITY", "T-PASS63-MULTIPLAYER-COMPARATOR", "T-BOTS", "T-HUD-E2E", "T-KILLSTREAK-CATALOG", "T-PRIVATE-LOBBY"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-206",
+      "sourceOutcomeIds": ["CORR-HF-206", "V66AUG01-046"],
+      "planningRequirementIds": ["R400", "R401", "R402", "R403", "R404", "R405", "R406", "R407", "R408", "R409", "R410", "R411", "R412", "R413", "R502", "R505", "R510", "R609"],
+      "canonicalOwner": "World-pickup/interaction authority",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-PICKUP-REPICK", "T-INTERACTION", "T-ADDITIONAL-MAPS", "T-NETWORK"], "artifactRefs": []}
+    },
+    {
+      "id": "HF-207",
+      "sourceOutcomeIds": ["CORR-HF-207", "V66AUG01-012"],
+      "planningRequirementIds": ["R112", "R114", "R307", "R600", "R608", "R609", "R610"],
+      "canonicalOwner": "Prerecorded media forge/lifecycle",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {"coverage": "partial", "testRefs": ["T-PREVIEW-GATE", "T-KILLSTREAK-DEMO-VIDEOS", "T-FIELD-KIT-MENU", "T-MENU-LIFECYCLE-E2E"], "artifactRefs": []}
     }
   ],
   "desktopUntitledOutcomes": [
@@ -8141,6 +8619,55 @@
     {"id":"V66JUL30-015","sourceLocator":"L17#1","normalizedOutcome":"Sniper-family ADS must stop causing visible freezes.","feedbackIds":["HF-189"],"planningRequirementIds":["R105","R108","R307","R610"]},
     {"id":"V66JUL30-016","sourceLocator":"L17#2","normalizedOutcome":"Player death and respawn presentation must stop causing visible freezes.","feedbackIds":["HF-190"],"planningRequirementIds":["R105","R307","R602","R603","R610"]},
     {"id":"V66JUL30-017","sourceLocator":"L19#1","normalizedOutcome":"Knife damage must discover and break Atomic Acres glass through the same authoritative glass lifecycle.","feedbackIds":["HF-169"],"planningRequirementIds":["R236","R400","R410","R510"]},
-    {"id":"V66JUL30-018","sourceLocator":"L21#1","normalizedOutcome":"Identify and remove the recurring white-noise-like sound observed around one minute into Atomic Acres.","feedbackIds":["HF-165"],"planningRequirementIds":["R304","R307","R308","R609"]}
+    {"id":"V66JUL30-018","sourceLocator":"L21#1","normalizedOutcome":"Identify and remove the recurring white-noise-like sound observed around one minute into Atomic Acres.","feedbackIds":["HF-165","HF-203"],"planningRequirementIds":["R304","R307","R308","R609"]}
+  ],
+  "codexV66August01Outcomes": [
+    {"id":"V66AUG01-001","sourceLocator":"L1#1","normalizedOutcome":"Record the approximate version and instruction to begin as session context only.","feedbackIds":[],"planningRequirementIds":[],"disposition":"excluded-nonproduct","exclusionReason":"Version approximation and instruction to start work are session context, not an independently testable product behavior."},
+    {"id":"V66AUG01-002","sourceLocator":"L3#1","normalizedOutcome":"M40 ADS must never replace the scoped view with an opaque white frame.","feedbackIds":["HF-191"],"planningRequirementIds":["R105","R108","R307","R610"]},
+    {"id":"V66AUG01-003","sourceLocator":"L5#1","normalizedOutcome":"Manage Loadout Field Kit content must remain readable without hover using persistent high-contrast colours.","feedbackIds":["HF-192"],"planningRequirementIds":["R108","R600","R608","R609"]},
+    {"id":"V66AUG01-004","sourceLocator":"L7#1","normalizedOutcome":"Replace the rejected low-quality skybox presentation.","feedbackIds":["HF-193"],"planningRequirementIds":["R100","R105","R109","R608","R610"]},
+    {"id":"V66AUG01-005","sourceLocator":"L9#1","normalizedOutcome":"Rework first-person arms and animations so their scale and quality are acceptable.","feedbackIds":["HF-194"],"planningRequirementIds":["R105","R108","R109","R608","R609"]},
+    {"id":"V66AUG01-006","sourceLocator":"L11#1","normalizedOutcome":"Perform the requested higher-fidelity authored pass on Chopper, Care Package and Carpet Bomber vehicle models.","feedbackIds":["HF-195"],"planningRequirementIds":["R112","R113","R304","R504","R608","R609"]},
+    {"id":"V66AUG01-007","sourceLocator":"L13#1","normalizedOutcome":"Every canonical weapon needs its own clear and mechanically meaningful ADS presentation instead of one shared red circle.","feedbackIds":["HF-191"],"planningRequirementIds":["R105","R108","R510","R608"]},
+    {"id":"V66AUG01-008","sourceLocator":"L15#1","normalizedOutcome":"M14 EBR ADS must stop freezing gameplay.","feedbackIds":["HF-191"],"planningRequirementIds":["R105","R108","R307","R610"]},
+    {"id":"V66AUG01-009","sourceLocator":"L17#1","normalizedOutcome":"Spawn Flamethrower on top of RustRig and Flare Gun inside the Terminal aircraft at the authoritative match halfway point.","feedbackIds":["HF-196"],"planningRequirementIds":["R220","R223","R304","R506","R509","R510","R608","R609"]},
+    {"id":"V66AUG01-010","sourceLocator":"L19#1","normalizedOutcome":"Flamethrower and Flare Gun must project through protocol, bots, audio, authored GLB families and provenance rather than ship half-wired.","feedbackIds":["HF-196"],"planningRequirementIds":["R220","R223","R304","R506","R507","R508","R509","R510","R608","R609","R613"]},
+    {"id":"V66AUG01-011","sourceLocator":"L20#1","normalizedOutcome":"Build a real off-range grey-room killstreak demo stage reached through an approximately five-second corridor.","feedbackIds":["HF-197"],"planningRequirementIds":["R304","R500","R501","R502","R503","R504","R505","R506","R507","R508","R509","R510","R511","R512","R608","R609"]},
+    {"id":"V66AUG01-012","sourceLocator":"L20#2","normalizedOutcome":"Use real test-bay killstreak demonstrations as the source for killstreak-selection thumbnail video media.","feedbackIds":["HF-207"],"planningRequirementIds":["R112","R114","R307","R600","R608","R609","R610"]},
+    {"id":"V66AUG01-013","sourceLocator":"L22#1","normalizedOutcome":"Gun Range test bay requires the full tunnel, proximity thump door, large room, slow unarmed dummies and stations for every weapon and killstreak.","feedbackIds":["HF-197"],"planningRequirementIds":["R304","R500","R501","R502","R503","R504","R505","R506","R507","R508","R509","R510","R511","R512","R608","R609"]},
+    {"id":"V66AUG01-014","sourceLocator":"L24#1","normalizedOutcome":"Every map sky must avoid block textures and unexplained floating sky geometry or assets.","feedbackIds":["HF-193"],"planningRequirementIds":["R100","R105","R109","R400","R608","R610"]},
+    {"id":"V66AUG01-015","sourceLocator":"L26#1","normalizedOutcome":"Restore large volatile render-and-physics water waves around RustRig.","feedbackIds":["HF-198"],"planningRequirementIds":["R105","R110","R400","R509","R605","R608"]},
+    {"id":"V66AUG01-016","sourceLocator":"L28#1","normalizedOutcome":"Prone weapon, arms and player presentation must not clip through floors or walls.","feedbackIds":["HF-198"],"planningRequirementIds":["R105","R110","R307","R400","R509","R605","R608"]},
+    {"id":"V66AUG01-017","sourceLocator":"L30#1","normalizedOutcome":"Move Piloted Drone readiness guidance into the existing top information area and increase that compact information text slightly.","feedbackIds":["HF-199"],"planningRequirementIds":["R114","R304","R500","R504","R600","R608","R609"]},
+    {"id":"V66AUG01-018","sourceLocator":"L32#1","normalizedOutcome":"Map loading must receive a durable fix across supported browser families.","feedbackIds":["HF-200"],"planningRequirementIds":["R307","R608","R610"]},
+    {"id":"V66AUG01-019","sourceLocator":"L34#1","normalizedOutcome":"Chopper Gunner fire must apply authoritative damage while retaining the accepted crosshair.","feedbackIds":["HF-199"],"planningRequirementIds":["R304","R504","R505","R507","R509","R510","R608","R609"]},
+    {"id":"V66AUG01-020","sourceLocator":"L37#1","normalizedOutcome":"Mechanically account for every requested outcome rather than relying on prose completion claims.","feedbackIds":["HF-069"],"planningRequirementIds":["R001","R005","R101","R102","R103","R111","R303","R600","R608","R611","R613"]},
+    {"id":"V66AUG01-021","sourceLocator":"L38#1","normalizedOutcome":"Treat the incomplete phrase as context for the stack-trace request on the following line.","feedbackIds":[],"planningRequirementIds":[],"disposition":"excluded-nonproduct","exclusionReason":"The source line is an incomplete sentence fragment whose only product meaning is fully represented by the following stack-trace line."},
+    {"id":"V66AUG01-022","sourceLocator":"L39#1","normalizedOutcome":"Provide bounded stack traces when player/client or host/server failures occur.","feedbackIds":["HF-201"],"planningRequirementIds":["R006","R606","R610","R613"]},
+    {"id":"V66AUG01-023","sourceLocator":"L41#1","normalizedOutcome":"A crashed host must be offered a rejoin path instead of remaining stuck back in the lobby.","feedbackIds":["HF-204"],"planningRequirementIds":["R005","R006","R009","R307","R606","R608","R610","R613"]},
+    {"id":"V66AUG01-024","sourceLocator":"L43#1","normalizedOutcome":"Late join after a crash must not cause major multiplayer desynchronization.","feedbackIds":["HF-204"],"planningRequirementIds":["R005","R006","R009","R307","R606","R608","R610","R613"]},
+    {"id":"V66AUG01-025","sourceLocator":"L45#1","normalizedOutcome":"Analyze Dane's supplied multiplayer JSON against the canonical diagnostics schema once the external file is provided.","feedbackIds":["HF-202"],"planningRequirementIds":["R006","R606","R610","R613"]},
+    {"id":"V66AUG01-026","sourceLocator":"L46#1","normalizedOutcome":"Make the active map easy for the host to change from the lobby and converge the selection to guests.","feedbackIds":["HF-205"],"planningRequirementIds":["R005","R009","R304","R305","R600","R608","R609","R610"]},
+    {"id":"V66AUG01-027","sourceLocator":"L47#1","normalizedOutcome":"Show concise truthful descriptions of what every selectable killstreak does.","feedbackIds":["HF-199","HF-205"],"planningRequirementIds":["R114","R304","R500","R501","R502","R503","R504","R505","R506","R507","R508","R509","R510","R511","R512","R600","R608","R609"]},
+    {"id":"V66AUG01-028","sourceLocator":"L48#1","normalizedOutcome":"Adrenaline Rush must not corrupt hosted-lobby, round-boundary, rematch or reconnect state.","feedbackIds":["HF-205"],"planningRequirementIds":["R005","R009","R304","R506","R507","R508","R509","R510","R608","R609","R610"]},
+    {"id":"V66AUG01-029","sourceLocator":"L50#1","normalizedOutcome":"Hosted bots and their outcomes must work for and remain visible to guests, not only the host.","feedbackIds":["HF-205"],"planningRequirementIds":["R005","R009","R304","R506","R507","R508","R509","R510","R608","R609","R610"]},
+    {"id":"V66AUG01-030","sourceLocator":"L51#1","normalizedOutcome":"Lobby reconnect must converge host and guest state including the bot roster and results.","feedbackIds":["HF-204","HF-205"],"planningRequirementIds":["R005","R006","R009","R304","R307","R506","R509","R510","R606","R608","R609","R610","R613"]},
+    {"id":"V66AUG01-031","sourceLocator":"L52#1","normalizedOutcome":"Hosted bots must use the same canonical behavior and combat path as solo skirmish bots.","feedbackIds":["HF-205"],"planningRequirementIds":["R005","R009","R304","R506","R507","R508","R509","R510","R608","R609","R610"]},
+    {"id":"V66AUG01-032","sourceLocator":"L53#1","normalizedOutcome":"Other multiplayer players receive a slight orange readability highlight without through-wall disclosure.","feedbackIds":["HF-205"],"planningRequirementIds":["R005","R009","R114","R600","R608","R609"]},
+    {"id":"V66AUG01-033","sourceLocator":"L55#1","normalizedOutcome":"Both host and guest crashes must expose an explicit in-game rejoin option.","feedbackIds":["HF-204"],"planningRequirementIds":["R005","R006","R009","R307","R606","R608","R610","R613"]},
+    {"id":"V66AUG01-034","sourceLocator":"L57#1","normalizedOutcome":"Lobby and in-match chat must be clearly discoverable, legible and positioned without HUD overlap.","feedbackIds":["HF-205"],"planningRequirementIds":["R005","R009","R114","R600","R608","R609"]},
+    {"id":"V66AUG01-035","sourceLocator":"L59#1","normalizedOutcome":"Atomic Acres must support advertised non-Chromium browsers including installed Firefox.","feedbackIds":["HF-200"],"planningRequirementIds":["R307","R608","R610"]},
+    {"id":"V66AUG01-036","sourceLocator":"L62#1","normalizedOutcome":"Continue implementation while the owner plays the existing live build.","feedbackIds":[],"planningRequirementIds":[],"disposition":"excluded-nonproduct","exclusionReason":"This is a scheduling and current-build-use instruction, not an independently falsifiable Atomic Acres runtime behavior."},
+    {"id":"V66AUG01-037","sourceLocator":"L64#1","normalizedOutcome":"Complete the previously requested Blender-authored arms, knife and support-vehicle asset work.","feedbackIds":["HF-194","HF-195"],"planningRequirementIds":["R105","R108","R109","R112","R113","R304","R504","R608","R609"]},
+    {"id":"V66AUG01-038","sourceLocator":"L64#2","normalizedOutcome":"Do not include the shed-door request in this correction wave.","feedbackIds":[],"planningRequirementIds":[],"disposition":"excluded-nonproduct","exclusionReason":"The owner explicitly deferred the shed-door work, so treating it as a required current product outcome would contradict the source."},
+    {"id":"V66AUG01-039","sourceLocator":"L64#3","normalizedOutcome":"Ensure no other Atomic Acres request in the supplied history is silently omitted.","feedbackIds":["HF-069"],"planningRequirementIds":["R001","R005","R101","R102","R103","R111","R303","R600","R608","R611","R613"]},
+    {"id":"V66AUG01-040","sourceLocator":"L66#1","normalizedOutcome":"Treat the repeated Field Kit complaint as a current acceptance regression, not an already-closed older request.","feedbackIds":["HF-192"],"planningRequirementIds":["R108","R232","R600","R608","R609"]},
+    {"id":"V66AUG01-041","sourceLocator":"L68#1","normalizedOutcome":"Nuke Town sky quality remains explicitly rejected until the current visual gate and owner review pass.","feedbackIds":["HF-193"],"planningRequirementIds":["R100","R105","R109","R400","R608","R610"]},
+    {"id":"V66AUG01-042","sourceLocator":"L70#1","normalizedOutcome":"Remove the oversized operate banner and enhance only the compact existing top information text for Piloted Drone and similar possessed supports.","feedbackIds":["HF-199"],"planningRequirementIds":["R114","R304","R500","R504","R600","R608","R609"]},
+    {"id":"V66AUG01-043","sourceLocator":"L72#1","normalizedOutcome":"Arms, knife and action animations must scale and frame correctly at 1440p, 4K and other supported resolutions.","feedbackIds":["HF-194"],"planningRequirementIds":["R105","R108","R109","R608","R609"]},
+    {"id":"V66AUG01-044","sourceLocator":"L73#1","normalizedOutcome":"A map load that appears half-crashed and succeeds only after clicking Join again is a failed admission transaction.","feedbackIds":["HF-200"],"planningRequirementIds":["R307","R608","R610"]},
+    {"id":"V66AUG01-045","sourceLocator":"L75#1","normalizedOutcome":"Restore Railgun's distinctive ADS scope that reveals valid hostile silhouettes through walls.","feedbackIds":["HF-191"],"planningRequirementIds":["R105","R108","R307","R510","R608","R610"]},
+    {"id":"V66AUG01-046","sourceLocator":"L77#1","normalizedOutcome":"Allow the player to pick up the gun just swapped onto the ground and swap back exactly once.","feedbackIds":["HF-206"],"planningRequirementIds":["R400","R401","R402","R403","R404","R405","R406","R407","R408","R409","R410","R411","R412","R413","R502","R505","R510","R609"]},
+    {"id":"V66AUG01-047","sourceLocator":"L77#2","normalizedOutcome":"Re-audit the full Atomic Acres owner-request history so prior asks cannot disappear behind completion claims.","feedbackIds":["HF-069"],"planningRequirementIds":["R001","R005","R101","R102","R103","R111","R303","R600","R608","R611","R613"]}
   ]
 }

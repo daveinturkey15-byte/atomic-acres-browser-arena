@@ -10,6 +10,14 @@ const presentationSources = [
 ] as const;
 
 describe('presentation prewarm startup contract', () => {
+  it('keeps WebKit on real basic-depth shadows instead of invalid PCF comparison samplers', () => {
+    const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+    expect(source).toContain("const shadowSamplerMode = webGlShadowSamplerMode(navigator.userAgent);");
+    expect(source).toContain("shadowSamplerMode === 'basic-depth' ? THREE.BasicShadowMap : THREE.PCFShadowMap");
+    expect(source.match(/type: webGlShadowMapType/g)).toHaveLength(2);
+    expect(source).not.toContain('type: THREE.PCFShadowMap');
+  });
+
   it('keeps cold work one-deep and bounds warmed live work to a two-frame completion frontier', () => {
     const source = readFileSync(new URL('./rendering/render-runtime.ts', import.meta.url), 'utf8');
     expect(source).toContain("mode === 'warmed-live' ? 2 : 1");
@@ -134,7 +142,11 @@ describe('presentation prewarm startup contract', () => {
     expect(source).not.toContain('const renderer = renderRuntime.renderer as unknown as THREE.WebGLRenderer');
     expect(source).toContain("bootstrapStage = 'prewarming-grenade-explosion'");
     expect(source).toContain("bootstrapStage = 'prewarming-explosive-bolts'");
-    expect(arenaPresentationPrewarm).toContain('await prewarmExplosiveBoltPresentation(sceneGeneration);');
+    expect(arenaPresentationPrewarm).toContain('await Promise.all([');
+    expect(arenaPresentationPrewarm).toContain('prewarmExplosiveBoltPresentation(sceneGeneration),');
+    expect(arenaPresentationPrewarm).toContain('timedMapWeaponPresentation.prewarm(renderRuntime, camera, sceneGeneration),');
+    expect(arenaPresentationPrewarm).toContain('flareProjectileSystem.prewarm(renderRuntime, camera, sceneGeneration),');
+    expect(arenaPresentationPrewarm).toContain('flamethrowerStreamPresentation.prewarm(renderRuntime, camera, sceneGeneration),');
     expect(arenaPresentationPrewarm).toContain('await prewarmGrenadeWorldPresentations(sceneGeneration);');
     expect(arenaPresentationPrewarm).toContain('await tracerPool.prewarm(renderRuntime, camera, sceneGeneration);');
     expect(arenaPresentationPrewarm).toContain('await impactPresentation.prewarm(renderRuntime, camera, sceneGeneration);');
@@ -236,7 +248,7 @@ describe('presentation prewarm startup contract', () => {
     expect(matchDeployment.indexOf('const matchStartedAt = performance.now();'))
       .toBeLessThan(matchDeployment.indexOf('overdriveState = createOverdriveState('));
     expect(matchDeployment.indexOf('const matchStartedAt = performance.now();'))
-      .toBeLessThan(matchDeployment.indexOf('initializeRailgunForMatch(railgunActiveAt);'));
+      .toBeLessThan(matchDeployment.indexOf('initializeRailgunForMatch(railgunActiveAt'));
     expect(matchDeployment.indexOf('const matchStartedAt = performance.now();'))
       .toBeLessThan(matchDeployment.indexOf('player.invulnerableUntil = matchStartedAt'));
     expect(matchDeployment).toContain('await weaponView.prepareBrowserWeapon(matchStartWeapon);');

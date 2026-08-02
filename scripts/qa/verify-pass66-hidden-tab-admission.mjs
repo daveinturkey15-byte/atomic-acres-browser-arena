@@ -10,6 +10,7 @@ import {
   PASS66_HIDDEN_TAB_GATE_SCHEMA,
   REQUIRED_BACKGROUND_CPU_PHASE,
   REQUIRED_HELD_CPU_ASSET,
+  REQUIRED_SELECTED_ARENA_CONTRACTS,
   assertHeadedChromeLaunchContract,
   hasExactBrowserWeaponCatalog,
   hiddenCheckpointFailures,
@@ -20,7 +21,16 @@ const baseUrl = process.env.QA_BASE_URL ?? 'http://127.0.0.1:4180/';
 const maximumHiddenPreparationMs = 30_000;
 const minimumHiddenObservationMs = 1_500;
 const maximumForegroundRecoveryMs = 20_000;
-const artifactRoot = 'artifacts/pass66/hidden-tab-admission';
+const selectedArenaId = process.env.PASS66_HIDDEN_TAB_MAP ?? 'atomic-acres';
+const selectedArenaContract = REQUIRED_SELECTED_ARENA_CONTRACTS[selectedArenaId];
+if (!selectedArenaContract) {
+  throw new Error(`Pass 66 hidden-tab admission has no selected-map contract for ${selectedArenaId}`);
+}
+const requiredHeldAssetPaths = [REQUIRED_HELD_CPU_ASSET, ...selectedArenaContract.heldAssets];
+const artifactRoot = `artifacts/pass66/hidden-tab-admission/${selectedArenaId}`;
+const expectedSourceRevision = process.env.PASS66_HIDDEN_TAB_SOURCE_SHA ?? '';
+const expectedTreeSha256 = process.env.PASS66_HIDDEN_TAB_TREE_SHA256 ?? '';
+const expectedFileCount = Number(process.env.PASS66_HIDDEN_TAB_FILE_COUNT ?? Number.NaN);
 const displayPowerReadySignal = 'PASS66_DISPLAY_POWER_READY';
 const displayPowerReleaseSignal = 'PASS66_DISPLAY_POWER_RELEASE';
 const displayPowerOwnerTimeoutMs = 5_000;
@@ -35,8 +45,16 @@ const executablePath = chromeCandidates.find((candidate) => existsSync(candidate
 if (!executablePath) throw new Error('Pass 66 hidden-tab admission requires installed Google Chrome');
 
 const sourceRevision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-if (execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim()) {
-  throw new Error('Pass 66 hidden-tab admission requires a clean tracked worktree');
+await rm(artifactRoot, { recursive: true, force: true });
+await mkdir(artifactRoot, { recursive: true });
+if (!/^[a-f0-9]{40}$/u.test(sourceRevision)
+  || expectedSourceRevision !== sourceRevision
+  || !/^[a-f0-9]{64}$/u.test(expectedTreeSha256)
+  || !Number.isSafeInteger(expectedFileCount) || expectedFileCount < 2) {
+  throw new Error('Pass 66 hidden-tab admission must run through the clean staged-topology matrix wrapper');
+}
+if (execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { encoding: 'utf8' }).trim()) {
+  throw new Error('Pass 66 hidden-tab admission requires a clean tracked and untracked worktree');
 }
 
 const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -143,6 +161,21 @@ function withTimeout(promise, milliseconds, label) {
 
 function uniqueFatalErrors(errors) {
   return [...new Set(errors)].filter((message) => !/favicon|leaderboard|Failed to fetch/i.test(message));
+}
+
+async function readServedCandidate() {
+  const response = await fetch(new URL('/channels/the-big-one/channel-provenance.json', baseUrl), {
+    cache: 'no-store',
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!response.ok) throw new Error(`Pass 66 candidate provenance returned HTTP ${response.status}`);
+  const value = await response.json();
+  if (value?.schemaVersion !== 4 || value.channel !== 'the-big-one' || value.releasePass !== 'PASS 66'
+    || value.path !== 'channels/the-big-one' || value.sourceSha !== expectedSourceRevision
+    || value.treeSha256 !== expectedTreeSha256 || value.exactRootFileCount !== expectedFileCount) {
+    throw new Error(`Pass 66 served candidate provenance mismatch: ${JSON.stringify(value)}`);
+  }
+  return value;
 }
 
 async function availablePort() {
@@ -362,6 +395,7 @@ const snapshotExpression = `(() => {
   const api = window.__ATOMIC_ACRES_DEBUG__;
   const state = api.snapshot();
   const transition = state.arenaSelection.streaming.transition;
+  const requiredHeldAssetPaths = ${JSON.stringify(requiredHeldAssetPaths)};
   return {
     sampledAt: performance.now(),
     document: { visibilityState: document.visibilityState, hasFocus: document.hasFocus() },
@@ -377,7 +411,7 @@ const snapshotExpression = `(() => {
     interactiveWorldTick: state.interactiveWorld.tick,
     weaponCatalog: api.sampleWeaponCatalogReadiness(),
     assetResources: performance.getEntriesByType('resource')
-      .filter((entry) => entry.name.includes('${REQUIRED_HELD_CPU_ASSET}'))
+      .filter((entry) => requiredHeldAssetPaths.some((asset) => new URL(entry.name, location.href).pathname.endsWith(asset)))
       .map((entry) => ({
         name: new URL(entry.name, location.href).pathname,
         startTime: entry.startTime,
@@ -385,6 +419,8 @@ const snapshotExpression = `(() => {
         duration: entry.duration,
         decodedBodySize: 'decodedBodySize' in entry ? entry.decodedBodySize : null,
       })),
+    skyBackdrop: state.render.skyBackdrop,
+    qualityAssetStreaming: state.render.qualityAssetStreaming,
     playableScene: {
       arenaId: state.render.playableScene.arena?.arenaId ?? null,
       authoritativeArenaRoots: state.render.playableScene.authoritativeArenaRoots,
@@ -459,7 +495,6 @@ function audioAuditInit() {
   });
 }
 
-await mkdir(artifactRoot, { recursive: true });
 const profile = await mkdtemp(join(tmpdir(), 'atomic-acres-pass66-hidden-tab-'));
 const gameSeedPath = join(profile, 'pass66-game-tab.html');
 const coverSeedPath = join(profile, 'pass66-cover-tab.html');
@@ -487,6 +522,7 @@ let displayPowerOwner = null;
 let foregroundWindowHandle = null;
 let receipt = null;
 let lastBootstrapProbe = null;
+let servedCandidate = null;
 const checkpoints = {
   initial: null,
   beforeRelease: null,
@@ -495,6 +531,7 @@ const checkpoints = {
   recovered: null,
 };
 try {
+  servedCandidate = await readServedCandidate();
   displayPowerOwner = await acquireDisplayPowerRequest();
   chrome = spawn(executablePath, chromeArgs, { stdio: 'ignore', windowsHide: false });
   const discovery = await discoverChrome(port);
@@ -508,8 +545,10 @@ try {
 
   const errors = [];
   let heldAssetRequests = 0;
+  const heldMapAssetRequests = Object.fromEntries(selectedArenaContract.heldAssets.map((asset) => [asset, 0]));
   let heldAssetReleased = false;
   const heldRequestIds = [];
+  const observedHeldAssets = new Set();
   let observeAssetBarrier;
   const assetBarrierObserved = new Promise((resolve) => { observeAssetBarrier = resolve; });
   const recordAsyncError = (error) => errors.push(error instanceof Error ? error.message : String(error));
@@ -525,12 +564,15 @@ try {
   game.on('Fetch.requestPaused', (event) => {
     void (async () => {
       const url = event.request.url;
-      if (url.includes(REQUIRED_HELD_CPU_ASSET)) {
-        heldAssetRequests += 1;
+      const heldAsset = requiredHeldAssetPaths.find((asset) => url.includes(asset));
+      if (heldAsset) {
+        if (heldAsset === REQUIRED_HELD_CPU_ASSET) heldAssetRequests += 1;
+        else heldMapAssetRequests[heldAsset] += 1;
         if (heldAssetReleased) await game.command('Fetch.continueRequest', { requestId: event.requestId });
         else {
           heldRequestIds.push(event.requestId);
-          observeAssetBarrier();
+          observedHeldAssets.add(heldAsset);
+          if (observedHeldAssets.size === requiredHeldAssetPaths.length) observeAssetBarrier();
         }
         return;
       }
@@ -566,7 +608,7 @@ try {
       { urlPattern: 'https://fonts.googleapis.com/*' },
       { urlPattern: '*/v1/leaderboard?*' },
       { urlPattern: '*/v1/streak*' },
-      { urlPattern: `*${REQUIRED_HELD_CPU_ASSET}*` },
+      ...requiredHeldAssetPaths.map((asset) => ({ urlPattern: `*${asset}*` })),
     ] }),
     cover.command('Runtime.enable'),
   ]);
@@ -576,7 +618,7 @@ try {
   url.searchParams.set('renderer', 'webgpu');
   url.searchParams.set('externalServices', 'off');
   url.searchParams.set('render', 'blender');
-  url.searchParams.set('map', 'atomic-acres');
+  url.searchParams.set('map', selectedArenaId);
   url.searchParams.set('seed', '660152');
   await activateTarget(port, gameTarget.id);
   await waitForTabOwnership(game, cover, 'game', 5_000, 'initial real game-tab ownership');
@@ -655,7 +697,7 @@ try {
   const initial = await sample(game, cover);
   checkpoints.initial = initial;
   await trustedClick(game, '#solo');
-  await withTimeout(assetBarrierObserved, 30_000, 'held first-person weapon CPU asset request');
+  await withTimeout(assetBarrierObserved, 30_000, `held CPU and ${selectedArenaId} asset requests`);
   await activateTarget(port, coverTarget.id);
   await waitForTabOwnership(game, cover, 'cover', 5_000, 'real cover foreground and game-tab visibility loss');
   const beforeRelease = await sample(game, cover);
@@ -666,15 +708,23 @@ try {
     checkpoint.document.visibilityState === 'hidden'
     && checkpoint.coverDocument.visibilityState === 'visible'
     && checkpoint.coverDocument.hasFocus
-    && checkpoint.assetResources.length >= 1
+    && checkpoint.assetResources.length >= requiredHeldAssetPaths.length
     && hasExactBrowserWeaponCatalog(checkpoint)
+    && checkpoint.skyBackdrop?.status === 'asset-ready'
+    && selectedArenaContract.heldAssets.every((asset) => checkpoint.assetResources.some((resource) => resource.name.endsWith(asset)))
     && checkpoint.transition.profile?.phases.some((entry) => entry.phase === REQUIRED_BACKGROUND_CPU_PHASE)
   ), maximumHiddenPreparationMs, 'hidden fetch/decode/CPU preparation');
   checkpoints.afterCpuProgress = afterCpuProgress;
   await delay(minimumHiddenObservationMs);
   const afterHidden = await sample(game, cover);
   checkpoints.afterHidden = afterHidden;
-  const hiddenFailures = hiddenCheckpointFailures({ beforeRelease, afterHidden, heldAssetRequests });
+  const hiddenFailures = hiddenCheckpointFailures({
+    beforeRelease,
+    afterHidden,
+    heldAssetRequests,
+    selectedArenaId,
+    heldMapAssetRequests,
+  });
   if (hiddenFailures.length > 0) throw new Error(`hidden checkpoint failed: ${hiddenFailures.join('; ')}`);
 
   const foregroundStartedAt = Date.now();
@@ -692,7 +742,13 @@ try {
   ), maximumForegroundRecoveryMs, 'foreground match recovery');
   recovered.foregroundRecoveryMs = Date.now() - foregroundStartedAt;
   checkpoints.recovered = recovered;
-  const recoveryFailures = recoveredCheckpointFailures({ beforeRelease, afterHidden, recovered, maximumRecoveryMs: maximumForegroundRecoveryMs });
+  const recoveryFailures = recoveredCheckpointFailures({
+    beforeRelease,
+    afterHidden,
+    recovered,
+    maximumRecoveryMs: maximumForegroundRecoveryMs,
+    selectedArenaId,
+  });
   const fatalErrors = uniqueFatalErrors(errors);
   if (fatalErrors.length > 0) recoveryFailures.push(`browser/GPU errors: ${fatalErrors.join(' | ')}`);
   if (recoveryFailures.length > 0) throw new Error(`foreground checkpoint failed: ${recoveryFailures.join('; ')}`);
@@ -702,12 +758,26 @@ try {
   await releaseDisplayPowerRequest(displayPowerOwner);
   displayPowerOwner = null;
 
+  const endingRevision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  const endingStatus = execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { encoding: 'utf8' }).trim();
+  if (endingStatus || endingRevision !== sourceRevision) {
+    throw new Error(`Pass 66 hidden-tab source drifted during ${selectedArenaId} verification (${sourceRevision} -> ${endingRevision})`);
+  }
+
   receipt = {
     schema: PASS66_HIDDEN_TAB_GATE_SCHEMA,
     gate: 'pass66-real-headed-chrome-hidden-tab-admission',
     verdict: 'pass',
     checkedAt: new Date().toISOString(),
     sourceRevision,
+    sourceState: {
+      revision: sourceRevision,
+      endingRevision,
+      cleanBefore: true,
+      cleanAfter: true,
+      expectedRevision: expectedSourceRevision,
+    },
+    servedCandidate,
     browser: {
       executablePath,
       version: discovery.version.Browser,
@@ -717,7 +787,16 @@ try {
       launchArgs: chromeArgs.map((argument) => argument.startsWith('--user-data-dir=') ? '--user-data-dir=<isolated-temp-profile>' : argument),
       backgroundThrottlingBypassFlags: [],
     },
-    contract: { heldAsset: REQUIRED_HELD_CPU_ASSET, heldAssetRequests, minimumHiddenObservationMs, maximumHiddenPreparationMs, maximumForegroundRecoveryMs },
+    contract: {
+      selectedArenaId,
+      heldCpuAsset: REQUIRED_HELD_CPU_ASSET,
+      heldCpuAssetRequests: heldAssetRequests,
+      heldMapAssets: selectedArenaContract.heldAssets,
+      heldMapAssetRequests,
+      minimumHiddenObservationMs,
+      maximumHiddenPreparationMs,
+      maximumForegroundRecoveryMs,
+    },
     initial,
     beforeRelease,
     afterCpuProgress,
@@ -729,6 +808,9 @@ try {
   console.log(JSON.stringify({
     pass: true,
     sourceRevision,
+    expectedSourceRevision,
+    servedCandidate,
+    selectedArenaId,
     browserVersion: discovery.version.Browser,
     hiddenCpuPhase: afterCpuProgress.transition.profile?.phases.at(-1)?.phase ?? null,
     hiddenRetainedWeaponIds: afterCpuProgress.weaponCatalog.retained,

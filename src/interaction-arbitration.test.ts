@@ -16,7 +16,7 @@ const candidate = (kind: InteractionCandidate['kind'], targetId: string, proximi
 
 describe('shared F interaction arbitration', () => {
   it('keeps every eligible nearby world action ahead of drone/chopper entry and exit', () => {
-    const worldKinds = ['care-package', 'shed-door', 'weapon-pickup'] as const;
+    const worldKinds = ['care-package', 'shed-door', 'timed-map-weapon', 'test-bay-weapon', 'weapon-pickup', 'test-bay-support'] as const;
     const supportKinds = ['support-enter-drone', 'support-enter-chopper', 'support-exit'] as const;
     for (const worldKind of worldKinds) {
       for (const supportKind of supportKinds) {
@@ -34,7 +34,10 @@ describe('shared F interaction arbitration', () => {
       candidate('support-exit', 'possessed-drone', 0),
       { ...candidate('care-package', 'crate', 0.1), enabled: false },
       { ...candidate('shed-door', 'door', 0.1), enabled: false },
+      { ...candidate('timed-map-weapon', 'timed-special', 0.1), enabled: false },
+      { ...candidate('test-bay-weapon', 'training-weapon', 0.1), enabled: false },
       { ...candidate('weapon-pickup', 'weapon', 0.1), enabled: false },
+      { ...candidate('test-bay-support', 'training-support', 0.1), enabled: false },
     ])).toMatchObject({ kind: 'support-exit', targetId: 'possessed-drone' });
   });
 
@@ -73,5 +76,13 @@ describe('shared F interaction arbitration', () => {
     ];
     expect(primaryTapInteraction(candidates)).toMatchObject({ kind: 'shed-door', targetId: 'door-a' });
     expect(primaryHoldInteraction(candidates)).toMatchObject({ kind: 'support-enter-chopper', targetId: 'chopper-a' });
+  });
+
+  it('prefers a test-bay weapon over overlapping support pads while keeping both tap interactions', () => {
+    const winner = primaryTapInteraction([
+      candidate('test-bay-support', 'chopper', 0.1),
+      candidate('test-bay-weapon', 'm14-ebr', 1.9),
+    ]);
+    expect(winner).toMatchObject({ kind: 'test-bay-weapon', targetId: 'm14-ebr' });
   });
 });

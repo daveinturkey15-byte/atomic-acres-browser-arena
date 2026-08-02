@@ -235,12 +235,12 @@ export function auditOperatorArmsGlb(json, lod, bytes) {
     && deliveryRoot?.extras?.creator === 'DJMaesen; Atomic Acres integration'
     && deliveryRoot?.extras?.license === 'CC-BY-4.0'
     && deliveryRoot?.extras?.source_mirror_commit === '96fdc4c94ba6c37786b0af6e8caf44b6cf2913f0'
-    && deliveryRoot?.extras?.visual_revision === 'licensed-anatomical-viewmodel-v7'
-    && deliveryRoot?.extras?.limb_profile_contract === 'licensed-human-skin-and-glove-deformation-v1'
-    && deliveryRoot?.extras?.hand_pose_contract === 'licensed-articulated-fingerless-glove-grip-v1'
-    && deliveryRoot?.extras?.shoulder_entry_contract === 'weighted-capped-frame-edge-sleeve-v1'
-    && deliveryRoot?.extras?.glove_construction_contract === 'opaque-uv-preserved-licensed-human-hand-v1'
-    && deliveryRoot?.extras?.weapon_grip_review_contract === 'seven-view-actual-weapon-contact-v1';
+    && deliveryRoot?.extras?.visual_revision === 'licensed-anatomical-viewmodel-v8'
+    && deliveryRoot?.extras?.limb_profile_contract === 'hero-scale-connected-forearm-deformation-v2'
+    && deliveryRoot?.extras?.hand_pose_contract === 'licensed-articulated-weapon-and-knife-grip-v2'
+    && deliveryRoot?.extras?.shoulder_entry_contract === 'weighted-capped-fps-frame-edge-sleeve-v2'
+    && deliveryRoot?.extras?.glove_construction_contract === 'opaque-uv-preserved-scaled-anatomical-hand-v2'
+    && deliveryRoot?.extras?.weapon_grip_review_contract === 'seven-view-actual-weapon-contact-v2';
   const legacyContract = !licensedDerivative
     && deliveryRoot?.extras?.visual_revision === 'continuous-manifold-viewmodel-v6'
     && deliveryRoot?.extras?.limb_profile_contract === 'continuous-shoulder-elbow-wrist-manifold-shell-v6'

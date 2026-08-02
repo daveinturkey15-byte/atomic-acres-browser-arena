@@ -18,7 +18,7 @@ const collect = (owner, entry) => {
   }
 };
 
-if (manifest.weapons?.length !== 18) failures.push(`weapon manifest must contain 18 entries, found ${manifest.weapons?.length ?? 0}`);
+if (manifest.weapons?.length !== 20) failures.push(`weapon manifest must contain 20 entries, found ${manifest.weapons?.length ?? 0}`);
 for (const weapon of manifest.weapons ?? []) {
   if (weapon.releaseState !== 'release-ready') failures.push(`${weapon.id}: GLB validation requires a release-ready entry`);
   collect(weapon.id, weapon);

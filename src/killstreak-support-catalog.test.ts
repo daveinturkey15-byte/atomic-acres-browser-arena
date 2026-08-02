@@ -8,6 +8,7 @@ import {
   DRONE_SWARM_GUN_PROFILE_ID,
   DRONE_DEPLOYMENT_POLICY,
   DRONE_SWARM_FIRE_LANE_INTERVAL_MS,
+  DRONE_SUPPORT_LIFETIMES_MS,
   DRONE_SUPPORT_DEFINITIONS,
   PILOTED_DRONE_SENSOR_PROFILE,
   DRONE_PRESENTATION_FAMILY_ID,
@@ -78,6 +79,12 @@ describe('Pass 65 support catalog', () => {
     expect(DRONE_SUPPORT_DEFINITIONS.swarm.controllerOptions).toEqual(['ai']);
     expect(standaloneDroneController('ai')).toBe('ai');
     expect(standaloneDroneController('owner-player')).toBe('owner-player');
+  });
+
+  it('pins the later owner-corrected support lifetimes at thirty seconds', () => {
+    expect(DRONE_SUPPORT_LIFETIMES_MS).toEqual({ piloted: 30_000, swarm: 30_000 });
+    expect(DRONE_SUPPORT_DEFINITIONS.piloted.lifetimeMs).toBe(DRONE_SUPPORT_LIFETIMES_MS.piloted);
+    expect(DRONE_SUPPORT_DEFINITIONS.swarm.lifetimeMs).toBe(DRONE_SUPPORT_LIFETIMES_MS.swarm);
   });
 
   it('freezes centre-map deployment and an exactly two-times autonomous standalone speed', () => {

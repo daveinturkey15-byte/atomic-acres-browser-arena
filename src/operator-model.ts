@@ -370,31 +370,39 @@ export function createOperatorInstanceMaterialResolver(
   };
 }
 
+export const FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY = 0.7;
+
+export function firstPersonArmMaterialReadabilityProfile(materialName: string): Readonly<{
+  emissive: number;
+  emissiveIntensity: number;
+  color?: number;
+}> | null {
+  const normalized = materialName.toLowerCase();
+  if (normalized === 'skin') return Object.freeze({ emissive: 0x0a1416, emissiveIntensity: 0.18, color: 0x324249 });
+  if (normalized.includes('arms_glove') || normalized.includes('arms_fingerglove')) {
+    return Object.freeze({ emissive: 0x2f6b78, emissiveIntensity: 0.68 });
+  }
+  if (normalized.includes('arms_sleeve')) return Object.freeze({ emissive: 0x285c68, emissiveIntensity: 0.62 });
+  if (normalized.includes('arms_armorpad')) {
+    return Object.freeze({ emissive: 0x2d6570, emissiveIntensity: 0.66, color: 0x41656f });
+  }
+  return null;
+}
+
 function materialForFirstPerson(material: THREE.Material, flattenMaterials: boolean): THREE.Material {
   const result = materialForTeam(material, 0, flattenMaterials);
-  const materialName = material.name.toLowerCase();
-  if (result instanceof THREE.MeshStandardMaterial && materialName === 'skin') {
-    // Dark tactical gloves read more cleanly than bare low-poly fingertips
-    // when the articulated hand wraps around compact weapon geometry.
-    result.color.setHex(0x243238);
+  const profile = firstPersonArmMaterialReadabilityProfile(material.name);
+  if (result instanceof THREE.MeshStandardMaterial && profile) {
+    // Preserve the licensed base-color, normal, roughness and metallic maps.
+    // A bounded cool emissive lift keeps fingers and sleeves readable in the
+    // darkest arenas without turning them into flat self-lit plastic.
+    result.emissive.setHex(profile.emissive);
+    result.emissiveIntensity = Math.min(profile.emissiveIntensity, FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY);
+    if (profile.color !== undefined) result.color.setHex(profile.color);
+  }
+  if (result instanceof THREE.MeshStandardMaterial && material.name.toLowerCase() === 'skin') {
     result.roughness = 0.92;
     result.metalness = 0;
-    result.emissive.setHex(0x05090a);
-    result.emissiveIntensity = flattenMaterials ? 0.24 : 0.08;
-  } else if (result instanceof THREE.MeshStandardMaterial
-    && (materialName.includes('arms_glove') || materialName.includes('arms_fingerglove'))) {
-    // The source texture remains tactical navy. A restrained cool fill keeps
-    // articulated digits readable against black receivers in the indoor Gun
-    // Range without flattening the baked normal/roughness response.
-    result.emissive.setHex(0x285866);
-    result.emissiveIntensity = flattenMaterials ? 0.58 : 0.48;
-  } else if (result instanceof THREE.MeshStandardMaterial && materialName.includes('arms_sleeve')) {
-    result.emissive.setHex(0x1c424d);
-    result.emissiveIntensity = flattenMaterials ? 0.5 : 0.4;
-  } else if (result instanceof THREE.MeshStandardMaterial && materialName.includes('arms_armorpad')) {
-    result.color.setHex(0x31505a);
-    result.emissive.setHex(0x204954);
-    result.emissiveIntensity = flattenMaterials ? 0.52 : 0.42;
   }
   return result;
 }

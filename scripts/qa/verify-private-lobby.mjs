@@ -1,8 +1,36 @@
 import { mkdir, writeFile } from 'node:fs/promises';
+import { isAbsolute, dirname } from 'node:path';
 import { chromium } from '@playwright/test';
 
-const baseUrl = process.argv[2] ?? process.env.QA_BASE_URL ?? 'http://127.0.0.1:4180/';
-const peerPort = Number(process.argv[3] ?? process.env.QA_PEER_PORT ?? 0);
+const baseUrl = process.env.QA_BASE_URL ?? '';
+const peerPort = Number(process.env.QA_PEER_PORT ?? Number.NaN);
+const peerPath = process.env.QA_PEER_PATH ?? '';
+const expectedGate = process.env.PASS66_OWNED_GATE ?? '';
+const expectedSourceSha = process.env.PASS66_OWNED_SOURCE_SHA ?? '';
+const expectedTreeSha256 = process.env.PASS66_OWNED_TREE_SHA256 ?? '';
+const expectedFileCount = Number(process.env.PASS66_OWNED_FILE_COUNT ?? Number.NaN);
+const receiptPath = process.env.PASS66_OWNED_RECEIPT_PATH ?? '';
+
+if (expectedGate !== 'private-lobby' || !/^https?:\/\/127\.0\.0\.1:\d+\/channels\/the-big-one\/$/u.test(baseUrl)
+  || !/^[a-f0-9]{40}$/u.test(expectedSourceSha) || !/^[a-f0-9]{64}$/u.test(expectedTreeSha256)
+  || !Number.isSafeInteger(expectedFileCount) || expectedFileCount < 2 || !isAbsolute(receiptPath)
+  || !Number.isInteger(peerPort) || peerPort < 1_024 || peerPort > 65_535
+  || !/^\/peerjs-[a-f0-9]{24}$/u.test(peerPath)) {
+  throw new Error('Private-lobby QA must run through the clean-SHA owned Pass 66 verifier wrapper');
+}
+
+const provenanceResponse = await fetch(new URL('channel-provenance.json', baseUrl), {
+  signal: AbortSignal.timeout(10_000),
+  cache: 'no-store',
+});
+if (!provenanceResponse.ok) throw new Error(`Candidate provenance returned HTTP ${provenanceResponse.status}`);
+const servedCandidate = await provenanceResponse.json();
+if (servedCandidate?.schemaVersion !== 4 || servedCandidate.channel !== 'the-big-one'
+  || servedCandidate.releasePass !== 'PASS 66' || servedCandidate.path !== 'channels/the-big-one'
+  || servedCandidate.sourceSha !== expectedSourceSha || servedCandidate.treeSha256 !== expectedTreeSha256
+  || servedCandidate.exactRootFileCount !== expectedFileCount) {
+  throw new Error(`Served candidate provenance mismatch: ${JSON.stringify(servedCandidate)}`);
+}
 const browser = await chromium.launch({
   headless: process.env.QA_HEADED !== '1',
   args: [
@@ -27,7 +55,8 @@ async function openPlayer(label) {
   url.searchParams.set('render', 'compat');
   url.searchParams.set('multiplayerQa', '1');
   url.searchParams.set('seed', `pass38-private-${label}`);
-  if (peerPort) url.searchParams.set('peerQaPort', String(peerPort));
+  url.searchParams.set('peerQaPort', String(peerPort));
+  url.searchParams.set('peerQaPath', peerPath);
   await page.goto(url.toString());
   await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 60_000 });
   await page.waitForFunction(
@@ -52,14 +81,13 @@ async function verifySoloHostStart(label, hostedBotCount) {
   const host = await openPlayer(label);
   await host.click('#host');
   await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch?.members.length === 1, undefined, { timeout: 45_000 });
-  const blockedBeforeReady = await host.locator('#lobby-start').isDisabled();
+  const startActsAsReadyCommit = !(await host.locator('#lobby-start').isDisabled());
   if (hostedBotCount > 0) {
     await host.selectOption('#lobby-bots', String(hostedBotCount));
     await host.waitForFunction((count) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch?.hostedBotCount === count, hostedBotCount, { timeout: 15_000 });
   }
-  await host.click('#lobby-ready');
-  await host.waitForFunction(() => document.querySelector('#lobby-start')?.disabled === false, undefined, { timeout: 15_000 });
-  const enabledWhenReady = !(await host.locator('#lobby-start').isDisabled());
+  // A solo host's START action is the host ready commit; exercise that direct
+  // path instead of claiming it after separately clicking READY.
   await host.click('#lobby-start');
   await host.waitForFunction((count) => {
     const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
@@ -67,8 +95,7 @@ async function verifySoloHostStart(label, hostedBotCount) {
   }, hostedBotCount, { timeout: 45_000 });
   const state = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
   const result = {
-    blockedBeforeReady,
-    enabledWhenReady,
+    startActsAsReadyCommit,
     active: state.matchPhase === 'active',
     humans: state.privateMatch.members.filter((member) => member.connected).length,
     bots: state.bots.length,
@@ -167,6 +194,10 @@ try {
   await guests[0].screenshot({ path: 'artifacts/pass38/private-lobby-guest-six-player.png', fullPage: true });
   await host.click('#lobby-start');
   await Promise.all([host, ...guests].map((page) => page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().matchPhase === 'active', undefined, { timeout: 45_000 })));
+  await Promise.all([host, ...guests].map((page) => page.waitForFunction(() => {
+    const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+    return state?.matchPhase === 'active' && state.remotes === 5;
+  }, undefined, { timeout: 45_000 })));
 
   const states = await Promise.all([host, ...guests].map((page) => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot())));
   const timers = await Promise.all([host, ...guests].map((page) => page.textContent('#timer')));
@@ -198,7 +229,13 @@ try {
     && rejoinState.networkLifecycle.eventChannels === 1 && rejoinState.networkLifecycle.stateChannels === 1;
 
   const report = {
-    schema: 'atomic-acres/pass38-private-lobby@1',
+    schemaVersion: 1,
+    status: 'PASS',
+    gate: 'private-lobby',
+    sourceSha: expectedSourceSha,
+    servedCandidate,
+    schema: 'atomic-acres/pass66-private-lobby@2',
+    ownedPeer: { host: '127.0.0.1', port: peerPort, path: peerPath, localOnly: true },
     errors,
     soloHostNoBots,
     soloHostWithBots,
@@ -231,14 +268,10 @@ try {
     rejoinIdentityPreserved,
     rejoinRecovered,
   };
-  await mkdir('artifacts/pass38', { recursive: true });
-  await writeFile('artifacts/pass38/private-lobby-six-player.json', `${JSON.stringify(report, null, 2)}\n`);
-  console.log(JSON.stringify(report, null, 2));
-
   const pass = errors.length === 0
-    && soloHostNoBots.blockedBeforeReady && soloHostNoBots.enabledWhenReady
+    && soloHostNoBots.startActsAsReadyCommit
     && soloHostNoBots.active && soloHostNoBots.humans === 1 && soloHostNoBots.bots === 0
-    && soloHostWithBots.blockedBeforeReady && soloHostWithBots.enabledWhenReady
+    && soloHostWithBots.startActsAsReadyCommit
     && soloHostWithBots.active && soloHostWithBots.humans === 1 && soloHostWithBots.bots === 4
     && roomCode.length === 36
     && balancedTeams[0] === 2 && balancedTeams[1] === 2
@@ -262,7 +295,10 @@ try {
       && state.networkLifecycle.stateChannelMaxRetransmits === 0)
     && states[0].networkLifecycle.selfStateEchoesSuppressed > 0
     && rejoinGraceVisible && rejoinIdentityPreserved && rejoinRecovered;
-  if (!pass) process.exitCode = 1;
+  if (!pass) throw new Error(`Private-lobby convergence contract failed: ${JSON.stringify(report)}`);
+  await mkdir(dirname(receiptPath), { recursive: true });
+  await writeFile(receiptPath, `${JSON.stringify(report, null, 2)}\n`);
+  console.log(JSON.stringify(report, null, 2));
 } finally {
   await browser.close();
 }

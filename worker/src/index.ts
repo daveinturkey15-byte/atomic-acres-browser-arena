@@ -54,6 +54,27 @@ function json(body: unknown, status: number, origin: string | null, env: Env): R
   return new Response(status === 204 ? null : JSON.stringify(body), { status, headers });
 }
 
+export type ServerErrorTrace = Readonly<{
+  incidentId: string;
+  name: string;
+  message: string;
+  stack: string;
+}>;
+
+/**
+ * Preserve a bounded provider-side stack without echoing implementation details,
+ * request bodies, player identity or credentials back to the browser.
+ */
+export function serverErrorTrace(error: unknown, incidentId: string = crypto.randomUUID()): ServerErrorTrace {
+  const source = error instanceof Error ? error : new Error(String(error));
+  return Object.freeze({
+    incidentId: incidentId.slice(0, 80),
+    name: source.name.slice(0, 80),
+    message: source.message.slice(0, 512),
+    stack: (source.stack ?? `${source.name}: ${source.message}`).slice(0, 4_096),
+  });
+}
+
 export function allowedOrigin(origin: string, configured: string): boolean {
   if (!origin) return false;
   const allowed = configured.split(',').map((value) => value.trim()).filter(Boolean);
@@ -283,8 +304,9 @@ export default {
       if (request.method === 'POST' && path === '/v1/match-diagnostics') return await submitMatchDiagnostics(request, env, origin, context);
       return json({ error: 'not found' }, 404, origin, env);
     } catch (error) {
-      console.error('Leaderboard request failed', error instanceof Error ? error.message : String(error));
-      return json({ error: 'service unavailable' }, 503, origin, env);
+      const trace = serverErrorTrace(error);
+      console.error('Atomic Acres service request failed', trace);
+      return json({ error: 'service unavailable', incidentId: trace.incidentId }, 503, origin, env);
     }
   },
   async scheduled(controller: ScheduledController, env: Env, context: ExecutionContext): Promise<void> {

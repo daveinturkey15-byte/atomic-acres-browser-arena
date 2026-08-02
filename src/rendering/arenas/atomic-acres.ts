@@ -1,12 +1,16 @@
 import { buildArena } from '../../map';
 import { createProceduralArenaVisualDefinition } from '../arena-visual-definition';
+import { ATOMIC_ACRES_GENERATED_SKY_ASSET_URL } from '../sky-backdrop';
 import { budgets, camera, colorPipeline, SHARED_GAMEPLAY_ASSETS } from './shared';
 
 export const definition = createProceduralArenaVisualDefinition({
   id: 'atomic-acres',
   displayLabel: 'Nuke Town',
   moduleId: 'arena.visual.atomic-acres.v1',
-  assetDependencies: ['./assets/original/models/atomic-acres-blender-arena.glb?v=pass63-20260724-apertures1'],
+  assetDependencies: [
+    './assets/original/models/atomic-acres-blender-arena.glb?v=pass63-20260724-apertures1',
+    ATOMIC_ACRES_GENERATED_SKY_ASSET_URL,
+  ],
   sharedAssetDependencies: SHARED_GAMEPLAY_ASSETS,
   lighting: {
     sunColor: 0xfff1ce, sunIntensity: 3.2, ambientColor: 0x8fb0bf, ambientIntensity: 0.42,

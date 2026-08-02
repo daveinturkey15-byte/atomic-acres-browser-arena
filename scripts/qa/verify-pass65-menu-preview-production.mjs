@@ -31,8 +31,8 @@ const runtimeSourcePath = path.join(root, 'src/ui/menu-preview-video.ts');
 const runtimeEntryPath = path.join(root, 'src/legacy-main.ts');
 const cameraEvaluatorPath = path.join(root, 'src/ui/menu-preview-camera.ts');
 const acceptedCockpitEvidence = 'docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png';
-const acceptedCockpitDigest = '581c448b7d998a220ea69fb0c024d9553f40d9aea767b3d88b503780a64921d1';
-const requiredGenerationDate = '2026-07-30';
+const acceptedCockpitDigest = 'b75d0ca8dc8b8be61c93e06a737029ad679f480d27eea56edc66dadcd00fba9e';
+const requiredGenerationDate = '2026-08-02';
 const arenas = ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range'];
 const helicopterArenas = arenas.slice(0, 3);
 const captureToolPaths = [generatorPath, integrityPath, integrityTypesPath, dependencyManifestPath];
@@ -84,7 +84,7 @@ function canonicalArenaDependencies() {
 }
 
 function inspectMedia(file) {
-  return runJson('ffprobe', ['-v', 'error', '-count_frames', '-show_entries', 'format=duration,size,bit_rate:stream=index,codec_type,codec_name,width,height,r_frame_rate,nb_read_frames,duration', '-of', 'json', file], `ffprobe ${relative(file)}`);
+  return runJson('ffprobe', ['-v', 'error', '-count_frames', '-show_entries', 'format=duration,size,bit_rate:stream=index,codec_type,codec_name,codec_tag_string,profile,level,pix_fmt,color_range,color_space,color_transfer,color_primaries,width,height,r_frame_rate,nb_read_frames,duration', '-of', 'json', file], `ffprobe ${relative(file)}`);
 }
 
 function audioPeakDb(file) {
@@ -109,22 +109,35 @@ function meanAbsoluteDifference(left, right) {
   return total / left.length;
 }
 
-function validateVideo(file, videoCodec, audioCodec, recipe, arena) {
+function validateVideo(file, container, recipe, arena) {
   const probe = inspectMedia(file);
   if (!probe) return;
   const video = probe.streams?.find((stream) => stream.codec_type === 'video');
   const audio = probe.streams?.find((stream) => stream.codec_type === 'audio');
+  const encoding = recipe.media.encodingProfiles[container];
+  const colour = recipe.media.encodingProfiles.colour;
   const duration = Number(probe.format?.duration ?? video?.duration);
   const frameCount = Number(video?.nb_read_frames);
   const sizeBytes = Number(probe.format?.size);
-  const averageBitrateKbps = Number(probe.format?.bit_rate) / 1000;
+  const averageBitrateKbps = Number.isFinite(Number(probe.format?.bit_rate))
+    ? Number(probe.format.bit_rate) / 1000
+    : sizeBytes * 8 / duration / 1000;
   const budget = recipe.media.encodingBudget;
-  if (video?.codec_name !== videoCodec) failures.push(`${relative(file)} must use ${videoCodec} video`);
-  if (audio?.codec_name !== audioCodec) failures.push(`${relative(file)} must include ${audioCodec} audio`);
+  if (video?.codec_name !== encoding.videoCodec) failures.push(`${relative(file)} must use ${encoding.videoCodec} video`);
+  if (audio?.codec_name !== encoding.audioCodec) failures.push(`${relative(file)} must include ${encoding.audioCodec} audio`);
   if (video?.width !== recipe.capture.viewport[0] || video?.height !== recipe.capture.viewport[1]) failures.push(`${relative(file)} must be ${recipe.capture.viewport.join('x')}`);
   if (video?.r_frame_rate !== `${recipe.fps}/1`) failures.push(`${relative(file)} must be ${recipe.fps} FPS`);
   if (frameCount !== recipe.frameCount) failures.push(`${relative(file)} must contain exactly ${recipe.frameCount} frames`);
   if (!Number.isFinite(duration) || Math.abs(duration - recipe.durationSeconds) > 0.08) failures.push(`${relative(file)} must be ${recipe.durationSeconds} seconds`);
+  if (video?.pix_fmt !== colour.pixelFormat
+    || video?.color_primaries !== colour.primaries
+    || video?.color_transfer !== colour.transfer
+    || video?.color_space !== colour.space
+    || video?.color_range !== colour.range) failures.push(`${relative(file)} must declare the canonical BT.709 limited-range ${colour.pixelFormat} delivery metadata`);
+  if (container === 'mp4'
+    && (String(video?.profile ?? '').toLowerCase() !== encoding.profile
+      || Number(video?.level) !== Number(encoding.level) * 10
+      || video?.codec_tag_string !== encoding.codecTag)) failures.push(`${relative(file)} must be H.264 High Level 5.0 with an avc1 sample entry`);
   if (!Number.isFinite(sizeBytes) || sizeBytes > budget.maximumBytesPerVideo) failures.push(`${relative(file)} exceeds the ${budget.maximumBytesPerVideo}-byte budget`);
   if (!Number.isFinite(averageBitrateKbps) || averageBitrateKbps < budget.minimumAverageBitrateKbps || averageBitrateKbps > budget.maximumAverageBitrateKbps) {
     failures.push(`${relative(file)} average bitrate ${averageBitrateKbps.toFixed(1)} kbps violates ${budget.minimumAverageBitrateKbps}..${budget.maximumAverageBitrateKbps} kbps`);
@@ -139,7 +152,7 @@ function validateVideo(file, videoCodec, audioCodec, recipe, arena) {
   const motionDifference = meanAbsoluteDifference(first, middle);
   if (seamDifference > 8.5) failures.push(`${relative(file)} loop seam visual delta is too high: ${seamDifference.toFixed(3)}`);
   if (motionDifference < 1.5) failures.push(`${relative(file)} appears static: midpoint delta ${motionDifference.toFixed(3)}`);
-  mediaAudits.push({ path: relative(file), videoCodec: video?.codec_name, audioCodec: audio?.codec_name, frameCount, durationSeconds: duration, sizeBytes, averageBitrateKbps, audioPeakDb: peak, seamMeanAbsoluteDifference: seamDifference, midpointMeanAbsoluteDifference: motionDifference });
+  mediaAudits.push({ path: relative(file), videoCodec: video?.codec_name, audioCodec: audio?.codec_name, profile: video?.profile, level: video?.level, codecTag: video?.codec_tag_string, colour: { pixelFormat: video?.pix_fmt, range: video?.color_range, space: video?.color_space, transfer: video?.color_transfer, primaries: video?.color_primaries }, frameCount, durationSeconds: duration, sizeBytes, averageBitrateKbps, audioPeakDb: peak, seamMeanAbsoluteDifference: seamDifference, midpointMeanAbsoluteDifference: motionDifference });
 }
 
 function validateImage(file, width, height, maximumBytes) {
@@ -162,7 +175,8 @@ function rotorContractFailures(recipe, generatorSource) {
   const configuredTieLeft = configuredStageLeft + rotor?.mainStageWidthPercent * rotor?.mainStructuralTieInsetPercent / 100;
   const configuredTieRight = configuredTieLeft + rotor?.mainStageWidthPercent * rotor?.mainStructuralTieWidthPercent / 100;
   const configuredHeaderLeft = configuredStageLeft + rotor?.mainStageWidthPercent * (100 - rotor?.mainCanopyHeaderWidthPercent) / 200;
-  const configuredMaximumHorizontalShiftPercent = rotor?.mainMaximumPoseShiftPixels / recipe.capture?.viewport?.[0] * 100;
+  const configuredMaximumHorizontalShiftPercent = rotor?.mainMaximumPoseShiftPixels
+    * recipe.capture?.overlayOutputScale / recipe.capture?.viewport?.[0] * 100;
   if (rotor?.id !== 'perspective-elliptic-cockpit-rotor-rig-v1'
     || rotor.mainTurnsPerLoop !== recipe.helicopter?.rotorTurnsPerLoop
     || rotor.mainTurnsPerLoop <= 0
@@ -204,12 +218,12 @@ function rotorContractFailures(recipe, generatorSource) {
     || rotor.mainContrastMode !== 'graphite-low-contrast-motion-v1'
     || rotor.mainFilledDisc !== false
     || rotor.mainMinimumLegibleBladeSweeps !== 2
-    || rotor.mainMinimumProjectedBladeLengthPixels < 260
-    || rotor.mainMinimumProjectedBladeLengthPixels > 420
-    || rotor.mainMinimumProjectedSweepSpanPixels < 680
-    || rotor.mainMinimumProjectedSweepSpanPixels > 960
-    || rotor.mainMinimumProjectedArcSpanPixels < 640
-    || rotor.mainMinimumProjectedArcSpanPixels > 1000
+    || rotor.mainMinimumProjectedBladeLengthPixels < 520
+    || rotor.mainMinimumProjectedBladeLengthPixels > 840
+    || rotor.mainMinimumProjectedSweepSpanPixels < 1360
+    || rotor.mainMinimumProjectedSweepSpanPixels > 1920
+    || rotor.mainMinimumProjectedArcSpanPixels < 1280
+    || rotor.mainMinimumProjectedArcSpanPixels > 2000
     || rotor.mainMinimumAuthoredBladeThicknessPixels < 2
     || rotor.mainMinimumAuthoredBladeThicknessPixels > 5
     || rotor.mainMinimumBladeOpacity < 0.18
@@ -241,14 +255,14 @@ function rotorContractFailures(recipe, generatorSource) {
     || rotor.poseResponsive !== true) {
     issues.push('main rotor bounded stage and disc pose response contract drifted');
   }
-  if (rotor.mainMinimumHubDiameterPixels < 16
-    || rotor.mainMinimumHubDiameterPixels > 30
-    || rotor.mainMinimumHubCanopyOverlapPixels < 2
-    || rotor.mainMinimumHubCanopyOverlapPixels > 8
+  if (rotor.mainMinimumHubDiameterPixels < 32
+    || rotor.mainMinimumHubDiameterPixels > 60
+    || rotor.mainMinimumHubCanopyOverlapPixels < 4
+    || rotor.mainMinimumHubCanopyOverlapPixels > 16
     || rotor.mainMaximumHubCanopyOcclusionFraction < 0.35
     || rotor.mainMaximumHubCanopyOcclusionFraction > 0.7
-    || rotor.mainMinimumMastCanopyOverlapPixels < 6
-    || rotor.mainMinimumMastCanopyOverlapPixels > 14
+    || rotor.mainMinimumMastCanopyOverlapPixels < 12
+    || rotor.mainMinimumMastCanopyOverlapPixels > 28
     || rotor.mainCanopyHeaderWidthPercent < 28
     || rotor.mainCanopyHeaderWidthPercent > 40
     || rotor.mainStructuralTieInsetPercent < 12
@@ -257,10 +271,10 @@ function rotorContractFailures(recipe, generatorSource) {
     || rotor.mainStructuralTieWidthPercent > 24
     || rotor.mainStructuralTieAngleDegrees < 4
     || rotor.mainStructuralTieAngleDegrees > 14
-    || rotor.mainMinimumTieHeaderOverlapAreaPixels < 10
-    || rotor.mainMinimumTieHeaderOverlapAreaPixels > 120
-    || rotor.mainMinimumTieCanopyOverlapAreaPixels < 10
-    || rotor.mainMinimumTieCanopyOverlapAreaPixels > 120
+    || rotor.mainMinimumTieHeaderOverlapAreaPixels < 40
+    || rotor.mainMinimumTieHeaderOverlapAreaPixels > 480
+    || rotor.mainMinimumTieCanopyOverlapAreaPixels < 40
+    || rotor.mainMinimumTieCanopyOverlapAreaPixels > 480
     || !Number.isFinite(configuredTieLeft)
     || !Number.isFinite(configuredTieRight)
     || !Number.isFinite(configuredHeaderLeft)
@@ -581,10 +595,68 @@ const currentDependencyClosure = currentCanonicalDependencies
   ? await buildDependencyClosure(root, { extraPaths: currentCanonicalDependencies.arenas.flatMap((arena) => arena.localAssetPaths) })
   : null;
 
-if (choreography.schemaVersion !== 4 || choreography.recipeId !== 'pass66-authoritative-runtime-menu-preview-v1') failures.push('canonical runtime choreography schema/recipe drifted');
-if (choreography.media?.cacheKey !== 'pass66-runtime-preview-v4') failures.push('canonical runtime preview cache family is not the unused Pass 66 v4 family');
-if (choreography.capture?.source !== 'authoritative-runtime-arena' || choreography.capture?.backend !== 'webgpu' || choreography.capture?.overlayScale !== 0.5) failures.push('canonical capture must pin authoritative WebGPU arenas and half-scale overlays');
-if (choreography.frameCount !== choreography.fps * choreography.durationSeconds) failures.push('choreography frame count does not equal fps * duration');
+if (choreography.schemaVersion !== 4
+  || choreography.recipeId !== 'pass66-authoritative-runtime-menu-preview-v2'
+  || choreography.captureId !== 'pass66-authoritative-runtime-menu-preview-capture-v2'
+  || choreography.generatedAt !== requiredGenerationDate) failures.push('canonical runtime choreography schema/recipe/capture identity drifted');
+if (choreography.media?.cacheKey !== 'pass66-runtime-preview-v5') failures.push('canonical runtime preview cache family is not the unused Pass 66 v5 family');
+if (choreography.capture?.source !== 'authoritative-runtime-arena'
+  || choreography.capture?.backend !== 'webgpu'
+  || choreography.capture?.overlayScale !== 0.5
+  || choreography.capture?.overlayReferenceViewport?.[0] !== 1280
+  || choreography.capture?.overlayReferenceViewport?.[1] !== 720
+  || choreography.capture?.overlayOutputScale !== 2) failures.push('canonical capture must pin authoritative WebGPU arenas and the reviewed half-scale overlay authored losslessly into 1440p');
+if (choreography.fps !== 30
+  || choreography.durationSeconds !== 8
+  || choreography.frameCount !== 240
+  || choreography.frameCount !== choreography.fps * choreography.durationSeconds
+  || choreography.capture?.viewport?.[0] !== 2560
+  || choreography.capture?.viewport?.[1] !== 1440) failures.push('canonical capture must be exactly 2560x1440, 30 FPS, eight seconds and 240 frames');
+const encodingBudget = choreography.media?.encodingBudget;
+if (encodingBudget?.minimumAverageBitrateKbps !== 3000
+  || encodingBudget?.maximumAverageBitrateKbps !== 9000
+  || encodingBudget?.maximumBytesPerVideo !== 9500000
+  || encodingBudget?.maximumPosterBytes !== 1500000
+  || encodingBudget?.maximumReviewSheetBytes !== 1200000) failures.push('canonical 1440p bitrate/file-size budget drifted');
+const mp4Encoding = choreography.media?.encodingProfiles?.mp4;
+const webmEncoding = choreography.media?.encodingProfiles?.webm;
+const imageEncoding = choreography.media?.encodingProfiles?.images;
+const colourEncoding = choreography.media?.encodingProfiles?.colour;
+if (mp4Encoding?.encoder !== 'libx264'
+  || mp4Encoding?.videoCodec !== 'h264'
+  || mp4Encoding?.profile !== 'high'
+  || mp4Encoding?.level !== '5.0'
+  || mp4Encoding?.codecTag !== 'avc1'
+  || mp4Encoding?.rfc6381 !== 'avc1.640032'
+  || mp4Encoding?.audioCodec !== 'aac'
+  || mp4Encoding?.audioRfc6381 !== 'mp4a.40.2'
+  || mp4Encoding?.targetVideoBitrateKbps !== 7500
+  || mp4Encoding?.minimumVideoBitrateKbps !== 6000
+  || mp4Encoding?.maximumVideoBitrateKbps !== 8500
+  || mp4Encoding?.bufferSizeKbps !== 17000
+  || mp4Encoding?.audioBitrateKbps !== 64
+  || mp4Encoding?.mimeType !== 'video/mp4; codecs="avc1.640032,mp4a.40.2"') failures.push('canonical H.264 High Level 5.0 1440p profile drifted');
+if (webmEncoding?.encoder !== 'libvpx-vp9'
+  || webmEncoding?.videoCodec !== 'vp9'
+  || webmEncoding?.profile !== 0
+  || webmEncoding?.audioCodec !== 'opus'
+  || webmEncoding?.targetVideoBitrateKbps !== 6000
+  || webmEncoding?.minimumVideoBitrateKbps !== 4500
+  || webmEncoding?.maximumVideoBitrateKbps !== 7500
+  || webmEncoding?.bufferSizeKbps !== 15000
+  || webmEncoding?.crf !== 28
+  || webmEncoding?.cpuUsed !== 2
+  || webmEncoding?.audioBitrateKbps !== 48
+  || webmEncoding?.mimeType !== 'video/webm; codecs="vp9,opus"') failures.push('canonical VP9 1440p profile drifted');
+if (imageEncoding?.posterQuality !== 88
+  || imageEncoding?.reviewFrameWidth !== 640
+  || imageEncoding?.reviewFrameHeight !== 360
+  || imageEncoding?.reviewQuality !== 88
+  || colourEncoding?.pixelFormat !== 'yuv420p'
+  || colourEncoding?.primaries !== 'bt709'
+  || colourEncoding?.transfer !== 'bt709'
+  || colourEncoding?.space !== 'bt709'
+  || colourEncoding?.range !== 'tv') failures.push('canonical 1440p image/BT.709 delivery profile drifted');
 if (Object.keys(choreography.arenas).join(',') !== arenas.join(',')) failures.push('choreography arena roster/order drifted');
 if (provenance.schemaVersion !== 4 || provenance.releaseState !== 'HITL candidate only' || provenance.generatedAt !== requiredGenerationDate) failures.push('provenance must be schema 4 HITL-candidate media for the current capture date');
 if (!manifestRecord) failures.push(`assets.manifest.json is missing ${provenance.assetId}`);
@@ -593,13 +665,15 @@ if (provenance.authoredCockpit?.assetId !== 'chopper-gunner-vehicle-v1' || prove
 const recipeDigest = createHash('sha256').update(JSON.stringify(choreography)).digest('hex');
 failures.push(...rotorContractFailures(choreography, generatorSource));
 if (captureReceipt.schemaVersion !== 4
-  || captureReceipt.captureId !== 'pass66-authoritative-runtime-menu-preview-capture-v1'
+  || captureReceipt.captureId !== choreography.captureId
   || captureReceipt.generatedAt !== requiredGenerationDate
   || captureReceipt.recipeId !== choreography.recipeId
   || captureReceipt.recipeDigest !== recipeDigest
   || captureReceipt.source !== 'authoritative-runtime-arena'
   || captureReceipt.backendRequired !== 'webgpu'
   || captureReceipt.overlay?.scale !== 0.5
+  || JSON.stringify(captureReceipt.overlay?.referenceViewport) !== JSON.stringify(choreography.capture.overlayReferenceViewport)
+  || captureReceipt.overlay?.outputScale !== choreography.capture.overlayOutputScale
   || captureReceipt.overlay?.mode !== 'offline-baked-minimal-graphite-green'
   || captureReceipt.overlay?.liveLoadingRenderer !== false) failures.push('capture receipt does not prove the canonical offline runtime capture/overlay contract');
 if (JSON.stringify(captureReceipt.frameRoster) !== JSON.stringify(Array.from({ length: choreography.frameCount }, (_, index) => index + 1))) failures.push('capture receipt frame roster is not exact/full');
@@ -748,30 +822,55 @@ for (const [file, oldDigest] of Object.entries(supersededGunRangeDigests)) {
 if (manifestRecord) {
   if (manifestRecord.sourceScript !== 'scripts/assets/generate-pass65-runtime-menu-previews.ts' || manifestRecord.sourceScriptSha256 !== provenance.generator.sha256) failures.push('manifest runtime generator record is stale');
   if (manifestRecord.sourceProvenanceSha256 !== await sha256(provenancePath)) failures.push('manifest provenance digest is stale');
-  if (!manifestRecord.modifications.includes('actual authoritative production WebGPU arena')
+  if (!manifestRecord.format.includes('2560x1440')
+    || !manifestRecord.format.includes('H.264 High Level 5.0')
+    || !manifestRecord.modifications.includes('native 1440p')
+    || !manifestRecord.modifications.includes('exact 2x output scale')
+    || !manifestRecord.modifications.includes('actual authoritative production WebGPU arena')
     || !manifestRecord.modifications.includes('green-on-graphite cockpit avionics')
     || !manifestRecord.modifications.includes('perspective-aware elliptic rotor arcs')
     || !manifestRecord.modifications.includes('structural ties into the side canopy rails')
-    || !manifestRecord.modifications.includes('charcoal/silver ears, forelegs and top-facing paws')) failures.push('manifest does not disclose authoritative runtime source and reviewed cockpit/cat overlay treatment');
+    || !manifestRecord.modifications.includes('charcoal/silver ears, forelegs and top-facing paws')
+    || !manifestRecord.modifications.includes('one selected metadata-preload decoder with poster-first readiness')) failures.push('manifest does not disclose the 1440p authoritative runtime source, bounded playback, and reviewed cockpit/cat overlay treatment');
 }
+
+if (provenance.render?.dimensions !== '2560x1440'
+  || JSON.stringify(provenance.render?.overlayReferenceViewport) !== JSON.stringify(choreography.capture.overlayReferenceViewport)
+  || provenance.render?.overlayOutputScale !== choreography.capture.overlayOutputScale
+  || JSON.stringify(provenance.render?.encodingProfiles) !== JSON.stringify(choreography.media.encodingProfiles)
+  || JSON.stringify(provenance.render?.encodingBudget) !== JSON.stringify(choreography.media.encodingBudget)) failures.push('provenance does not bind the exact 1440p render/encoding contract');
 
 const runtimeHashesByExtension = { mp4: new Set(), webm: new Set(), webp: new Set() };
 for (const arena of arenas) {
   for (const extension of ['mp4', 'webm', 'webp']) runtimeHashesByExtension[extension].add(await sha256(path.join(root, `public/assets/original/menu-previews/${arena}.${extension}`)));
-  validateVideo(path.join(root, `public/assets/original/menu-previews/${arena}.mp4`), 'h264', 'aac', choreography, arena);
-  validateVideo(path.join(root, `public/assets/original/menu-previews/${arena}.webm`), 'vp9', 'opus', choreography, arena);
+  validateVideo(path.join(root, `public/assets/original/menu-previews/${arena}.mp4`), 'mp4', choreography, arena);
+  validateVideo(path.join(root, `public/assets/original/menu-previews/${arena}.webm`), 'webm', choreography, arena);
   validateImage(path.join(root, `public/assets/original/menu-previews/${arena}.webp`), choreography.capture.viewport[0], choreography.capture.viewport[1], choreography.media.encodingBudget.maximumPosterBytes);
-  validateImage(path.join(root, `docs/assets/pass65-menu-previews/${arena}-review-frames.webp`), 2400, 270, choreography.media.encodingBudget.maximumReviewSheetBytes);
+  validateImage(
+    path.join(root, `docs/assets/pass65-menu-previews/${arena}-review-frames.webp`),
+    choreography.media.encodingProfiles.images.reviewFrameWidth * choreography.reviewFrames.length,
+    choreography.media.encodingProfiles.images.reviewFrameHeight,
+    choreography.media.encodingBudget.maximumReviewSheetBytes,
+  );
 }
 for (const [extension, hashes] of Object.entries(runtimeHashesByExtension)) if (hashes.size !== arenas.length) failures.push(`${extension} previews are not four distinct selected-map captures`);
 
 const documentationSource = await readFile(documentationPath, 'utf8');
-for (const marker of ['chromium.launch', 'createServer', 'menuPreviewPose', 'setCaptureCameraPose', 'authoritative-runtime-arena', 'offline-menu-preview-overlay', 'offline-baked-minimal-graphite-green', 'overlayScale', 'aa-canopy', 'aa-glass', 'aa-reticle', 'aa-foreleg', 'aa-main-rotor-arc', 'aa-main-rotor-plane', 'aa-main-rotor-hub', 'aa-main-rotor-structural-tie', 'aa-main-rotor-canopy-header', 'aa-main-rotor-blade:before', 'aa-main-rotor-blade:after', 'aa-tail-rotor-plane', 'aa-tail-boom-occluder', 'perspective:', 'rotateX(', 'rotateY(', 'document.elementsFromPoint']) if (!generatorSource.includes(marker)) failures.push(`runtime capture generator is missing ${marker}`);
+for (const marker of ['chromium.launch', 'createServer', 'menuPreviewPose', 'setCaptureCameraPose', 'authoritative-runtime-arena', 'offline-menu-preview-overlay', 'offline-baked-minimal-graphite-green', 'overlayScale', 'overlayReferenceViewport', 'overlayOutputScale', 'transform:scale(${outputScale})', 'aa-canopy', 'aa-glass', 'aa-reticle', 'aa-foreleg', 'aa-main-rotor-arc', 'aa-main-rotor-plane', 'aa-main-rotor-hub', 'aa-main-rotor-structural-tie', 'aa-main-rotor-canopy-header', 'aa-main-rotor-blade:before', 'aa-main-rotor-blade:after', 'aa-tail-rotor-plane', 'aa-tail-boom-occluder', 'perspective:', 'rotateX(', 'rotateY(', 'document.elementsFromPoint']) if (!generatorSource.includes(marker)) failures.push(`runtime capture generator is missing ${marker}`);
 for (const forbidden of ['import bpy', 'primitive_cube_add', 'generate_pass65_menu_previews.py']) if (generatorSource.includes(forbidden)) failures.push(`runtime capture generator still contains synthetic Blender authoring marker ${forbidden}`);
 if (!documentationSource.includes('npm run author:pass65:menu-previews') || !documentationSource.includes('actual authoritative map')) failures.push('authoring documentation does not describe the fail-closed runtime capture workflow');
 
 const runtimeSource = await readFile(runtimeSourcePath, 'utf8');
-if (!runtimeSource.includes('<video id="menu-preview-video"') || !runtimeSource.includes('preload="metadata"') || runtimeSource.includes('<canvas') || !runtimeSource.includes('rendererSubmissions: 0') || !runtimeSource.includes(`const CACHE_KEY = '${choreography.media.cacheKey}'`) || !/if\s*\(reducedMotion\)\s*\{\s*video\.removeAttribute\('src'\)/.test(runtimeSource)) failures.push('menu runtime must remain one prerecorded video, zero submissions, and poster-only for reduced motion');
+if (!runtimeSource.includes('<video id="menu-preview-video"')
+  || !runtimeSource.includes('preload="metadata"')
+  || runtimeSource.includes('<canvas')
+  || !runtimeSource.includes('rendererSubmissions: 0')
+  || !runtimeSource.includes(`const CACHE_KEY = '${choreography.media.cacheKey}'`)
+  || !runtimeSource.includes(`const WEBM_MIME_TYPE = '${choreography.media.encodingProfiles.webm.mimeType}'`)
+  || !runtimeSource.includes(`const MP4_MIME_TYPE = '${choreography.media.encodingProfiles.mp4.mimeType}'`)
+  || !runtimeSource.includes('width: 2560;')
+  || !runtimeSource.includes('height: 1440;')
+  || !/if\s*\(reducedMotion\)\s*\{\s*video\.removeAttribute\('src'\)/.test(runtimeSource)) failures.push('menu runtime must remain one 1440p prerecorded selected decoder, zero submissions, and poster-only for reduced motion');
 const runtimeEntry = await readFile(runtimeEntryPath, 'utf8');
 if (!runtimeEntry.includes("from './ui/menu-preview-video'") || runtimeEntry.includes("from './ui/menu-preview-camera'")) failures.push('browser entry must own prerecorded media only and never import the offline camera evaluator');
 if (!runtimeEntry.includes("get('menuPreviewCapture') === '1'")

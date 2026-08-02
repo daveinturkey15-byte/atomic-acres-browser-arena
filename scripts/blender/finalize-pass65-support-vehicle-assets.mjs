@@ -67,19 +67,26 @@ const chopperRenders = await Promise.all([
   reviewRecord('docs/assets/pass65-vehicles/chopper/pass65-chopper-exterior-front-quarter.png', 'exterior-front-quarter', 512, 512),
   reviewRecord('docs/assets/pass65-vehicles/chopper/pass65-chopper-rotor-gun-profile.png', 'rotor-gun-profile', 512, 512),
   reviewRecord('docs/assets/pass65-vehicles/chopper/pass65-chopper-rear-fuselage-quarter.png', 'rear-fuselage-quarter', 512, 512),
+  reviewRecord('docs/assets/pass65-vehicles/chopper/pass65-chopper-canopy-armour-closeup.png', 'canopy-armour-closeup', 512, 512),
+  reviewRecord('docs/assets/pass65-vehicles/chopper/pass65-chopper-ordnance-mechanics-closeup.png', 'ordnance-mechanics-closeup', 512, 512),
   reviewRecord('docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png', 'accepted-first-person-instruments', 960, 540),
 ]);
 const chopperContactSheet = await reviewRecord(
-  'docs/assets/pass65-vehicles/chopper/pass65-chopper-contact-sheet.png', 'accepted-contact-sheet', 1024, 1024,
+  'docs/assets/pass65-vehicles/chopper/pass65-chopper-contact-sheet.png', 'accepted-contact-sheet', 1536, 1024,
 );
 const aircraftRenders = await Promise.all([
   reviewRecord('docs/assets/pass65-vehicles/aircraft/pass65-aircraft-care-front-quarter.png', 'care-front-quarter', 512, 512),
+  reviewRecord('docs/assets/pass65-vehicles/aircraft/pass65-aircraft-care-flightdeck-gear.png', 'care-flightdeck-gear', 512, 512),
+  reviewRecord('docs/assets/pass65-vehicles/aircraft/pass65-aircraft-care-rear-ramp.png', 'care-rear-ramp', 512, 512),
   reviewRecord('docs/assets/pass65-vehicles/aircraft/pass65-aircraft-care-cargo-parachute.png', 'care-cargo-parachute', 512, 512),
+  reviewRecord('docs/assets/pass65-vehicles/aircraft/pass65-aircraft-care-crate-hardware.png', 'care-crate-hardware', 512, 512),
   reviewRecord('docs/assets/pass65-vehicles/aircraft/pass65-aircraft-carpet-front-quarter.png', 'carpet-front-quarter', 512, 512),
+  reviewRecord('docs/assets/pass65-vehicles/aircraft/pass65-aircraft-carpet-intake-panels.png', 'carpet-intake-panels', 512, 512),
+  reviewRecord('docs/assets/pass65-vehicles/aircraft/pass65-aircraft-carpet-planform-top.png', 'carpet-planform-top', 512, 512),
   reviewRecord('docs/assets/pass65-vehicles/aircraft/pass65-aircraft-carpet-bomb-bay.png', 'carpet-bomb-bay', 512, 512),
 ]);
 const aircraftContactSheet = await reviewRecord(
-  'docs/assets/pass65-vehicles/aircraft/pass65-aircraft-contact-sheet.png', 'aircraft-contact-sheet', 1024, 1024,
+  'docs/assets/pass65-vehicles/aircraft/pass65-aircraft-contact-sheet.png', 'aircraft-contact-sheet', 1536, 1536,
 );
 
 const compactAudit = (audits) => audits.map(({ failures: _failures, ...audit }) => audit);
@@ -87,11 +94,12 @@ const sharedBoundary = {
   creator: 'Atomic Acres project',
   owner: 'Atomic Acres project',
   created: '2026-07-26',
+  refined: '2026-08-02',
   license: 'Project-original; no third-party meshes or textures',
   blenderVersion: '5.1.2',
   generator: sourceScript,
   runtimeForwardAxis: '-Z',
-  blenderAuthoringForwardAxis: '-Y converted to glTF -Z by Y-up export',
+  blenderAuthoringForwardAxis: '+Y converted to glTF -Z by Y-up export',
   presentationOnly: true,
 };
 const reproducibilityBoundary = {
@@ -108,6 +116,8 @@ const chopperProvenance = {
   title: 'Pass 65 Chopper Gunner authored vehicle and first-person cockpit',
   ...sharedBoundary,
   inspirationBoundary: 'Original stylized near-future support helicopter. No copied commercial-game geometry, texture, logo, HUD, animation, UI, or audio.',
+  visualRevision: 'close-range-tandem-armored-airframe-v4',
+  detailContract: 'layered-armour-framed-canopy-fasteners-sensors-ordnance-mechanics-v4',
   sourceBlend: chopperSourceBlend,
   sharedConsumers: ['menu-prerecorded-map-preview', 'ai-flown-chopper-gunner', 'player-optional-chopper-gunner'],
   worldGlbs: chopper.records,
@@ -117,10 +127,10 @@ const chopperProvenance = {
   sockets: SUPPORT_VEHICLE_SPECS.chopper.sockets,
   animationClips: SUPPORT_VEHICLE_SPECS.chopper.actions,
   review: {
-    acceptedFirstPersonFrame: chopperRenders[3],
+    acceptedFirstPersonFrame: chopperRenders[5],
     renders: chopperRenders,
     contactSheet: chopperContactSheet,
-    acceptance: 'parent visual gate APPROVE after original-resolution rear-quarter and unobstructed 960x540 gunner-sightline inspection',
+    acceptance: 'mechanical authoring review only; independent visual QA and owner HITL remain required',
   },
   runtimeAudit: {
     lods: compactAudit(chopper.audits),
@@ -144,9 +154,33 @@ const aircraftProvenance = {
   inspirationBoundary: 'Original stylized fixed-wing support family. No copied commercial-game geometry, texture, logo, animation, UI, or audio.',
   sourceBlend: aircraftSourceBlend,
   variants: {
-    care: { worldGlbs: care.records, requiredNodes: SUPPORT_VEHICLE_SPECS.care.nodes, sockets: SUPPORT_VEHICLE_SPECS.care.sockets, animationClips: SUPPORT_VEHICLE_SPECS.care.actions },
-    carpet: { worldGlbs: carpet.records, requiredNodes: SUPPORT_VEHICLE_SPECS.carpet.nodes, sockets: SUPPORT_VEHICLE_SPECS.carpet.sockets, animationClips: SUPPORT_VEHICLE_SPECS.carpet.actions },
-    parachuteCrate: { worldGlbs: crate.records, requiredNodes: SUPPORT_VEHICLE_SPECS.crate.nodes, sockets: SUPPORT_VEHICLE_SPECS.crate.sockets, animationClips: SUPPORT_VEHICLE_SPECS.crate.actions },
+    care: {
+      visualRevision: 'close-range-heavy-cargo-aircraft-v4',
+      detailContract: 'framed-flightdeck-panelled-hull-ramp-bogie-turbofans-v4',
+      triangleRange: { lod0: [16_000, 18_000], lod1: [13_000, 16_000], lod2: [10_000, 13_000] },
+      worldGlbs: care.records,
+      requiredNodes: SUPPORT_VEHICLE_SPECS.care.nodes,
+      sockets: SUPPORT_VEHICLE_SPECS.care.sockets,
+      animationClips: SUPPORT_VEHICLE_SPECS.care.actions,
+    },
+    carpet: {
+      visualRevision: 'close-range-stealth-flying-wing-v4',
+      detailContract: 'framed-intakes-service-panels-bay-structure-tailless-v4',
+      triangleRange: { lod0: [10_500, 12_000], lod1: [8_500, 9_800], lod2: [4_800, 5_800] },
+      worldGlbs: carpet.records,
+      requiredNodes: SUPPORT_VEHICLE_SPECS.carpet.nodes,
+      sockets: SUPPORT_VEHICLE_SPECS.carpet.sockets,
+      animationClips: SUPPORT_VEHICLE_SPECS.carpet.actions,
+    },
+    parachuteCrate: {
+      visualRevision: 'close-range-rigged-pallet-drop-v4',
+      detailContract: 'corner-guards-buckles-latches-crossweb-ribbed-canopy-v4',
+      triangleRange: { lod0: [5_500, 7_000], lod1: [4_000, 5_000] },
+      worldGlbs: crate.records,
+      requiredNodes: SUPPORT_VEHICLE_SPECS.crate.nodes,
+      sockets: SUPPORT_VEHICLE_SPECS.crate.sockets,
+      animationClips: SUPPORT_VEHICLE_SPECS.crate.actions,
+    },
   },
   pbrMaps: aircraftPbrMaps,
   review: { renders: aircraftRenders, contactSheet: aircraftContactSheet },
@@ -175,12 +209,13 @@ const replaceSupport = (id, entry) => {
 replaceSupport('chopper-gunner-vehicle-v1', {
   id: 'chopper-gunner-vehicle-v1', releaseState: 'release-ready', sourceKind: 'project-original-blender', owner: 'Atomic Acres project',
   qualityTier: 'hero-support-vehicle-and-first-person-cockpit', materialFamily: 'tactical-gunmetal-cyan-green-orange-pbr',
-  textureDensity: '512px project-owned PBR map set', triangleRange: { lod0: [60_000, 80_000], lod1: [25_000, 40_000], lod2: [14_000, 25_000] },
+  textureDensity: '512px project-owned PBR map set', triangleRange: { lod0: [45_000, 60_000], lod1: [36_000, 50_000], lod2: [20_000, 32_000] },
   placeholderStatus: 'forbidden-and-not-present', sharedConsumers: chopperProvenance.sharedConsumers, runtimeForwardAxis: '-Z',
+  visualRevision: chopperProvenance.visualRevision, detailContract: chopperProvenance.detailContract,
   sourceBlend: chopperSourceBlend, sourceScript, worldGlbs: chopper.records, firstPersonGlb: chopper.records[0], pbrMaps: chopperPbrMaps,
   provenance: chopperProvenanceRecord, sockets: SUPPORT_VEHICLE_SPECS.chopper.sockets,
   semanticNodes: SUPPORT_VEHICLE_SPECS.chopper.nodes, actions: SUPPORT_VEHICLE_SPECS.chopper.actions,
-  review: { renders: chopperRenders, contactSheet: chopperContactSheet, acceptedFirstPersonFrame: chopperRenders[3] },
+  review: { renders: chopperRenders, contactSheet: chopperContactSheet, acceptedFirstPersonFrame: chopperRenders[5] },
   technicalAudit: { lods: compactAudit(chopper.audits) },
 });
 replaceSupport('support-aircraft-family-v1', {
@@ -207,8 +242,8 @@ upsertAsset({
   sourceScript: sourceScript.path, sourceScriptSha256: sourceScript.sha256,
   sourceProvenance: chopperProvenanceRecord.path, sourceProvenanceSha256: chopperProvenanceRecord.sha256,
   preview: chopperContactSheet.path,
-  format: 'Three strict decreasing optimized self-contained glTF 2.0 binary LODs with embedded WebP PBR maps, complete rear fuselage/tail, authored unobstructed gunner sightline/HUD/weapon view, exterior rotors/gun/sockets and eight animation clips',
-  modifications: 'Project-original support helicopter with substantial rear cabin and tail volume plus a possessed-view-only gunner sightline that excludes exterior shell and rotors. Runtime gameplay authority remains TypeScript-owned; procedural geometry is non-release fallback only.',
+  format: 'Three strict decreasing optimized self-contained glTF 2.0 binary LODs with embedded WebP PBR maps, complete armoured tandem attack-helicopter silhouette, authored unobstructed gunner sightline/HUD/weapon view, detailed exterior rotors/gun/sockets and eight animation clips',
+  modifications: 'Project-original close-range v4 tandem attack-helicopter refinement with overlapping side and dorsal armour, raised fasteners and louvers, faceted framed pilot/gunner glazing, armoured nose and cheeks, restrained olive PBR, separated dual-aperture nose sensor, braced pylons, forward-aligned finned missiles, collared seven-tube rocket pods, mechanical rotor yokes/pitch links, tail gearbox, gun armour/feed chute and damped skid gear. Possessed view still excludes exterior shell and rotors; runtime gameplay authority remains TypeScript-owned.',
   attributionRequired: false,
 });
 upsertAsset({
@@ -218,8 +253,8 @@ upsertAsset({
   sourceScript: sourceScript.path, sourceScriptSha256: sourceScript.sha256,
   sourceProvenance: aircraftProvenanceRecord.path, sourceProvenanceSha256: aircraftProvenanceRecord.sha256,
   preview: aircraftContactSheet.path,
-  format: 'Distinct Care transport and Carpet bomber three-LOD GLBs plus two-LOD parachute crate, embedded WebP PBR maps, semantic cargo/bomb sockets and authored actions',
-  modifications: 'Project-original fixed-wing support family with correct local -Z forward contract, animated propellers/engines/doors/bay/racks and a visible parachute crate. Runtime gameplay authority remains TypeScript-owned.',
+  format: 'Distinct heavy four-turbofan Care transport and tailless flying-wing Carpet bomber three-LOD GLBs plus two-LOD rigged parachute crate, embedded WebP PBR maps, semantic cargo/bomb sockets and authored actions',
+  modifications: 'Project-original close-range v4 support family: Care adds raised hull breaks, service hatches/latches, framed flight-deck armour, four high-bypass turbofans, hubbed landing-gear bogies and a ribbed hinged rear ramp; Carpet adds framed split buried intakes, service panels and a cross-braced animated bomb bay while remaining a tailless blended flying wing; the drop asset adds visible latches and pallet tie-down hardware to its cross webbing and ribbed scalloped canopy. The local -Z runtime-forward contract and all gameplay-owned sockets remain unchanged.',
   attributionRequired: false,
 });
 await writeFile(assetManifestPath, `${JSON.stringify(assetManifest, null, 2)}\n`, 'utf8');
