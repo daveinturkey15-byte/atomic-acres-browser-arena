@@ -4520,6 +4520,7 @@ let debugCaptureOrbit: {
   centerX: number; centerY: number; centerZ: number;
   radius: number; orbitRate: number; yawRate: number;
   baseYaw: number; pitch: number; fov: number;
+  lookAtX: number | null; lookAtY: number | null; lookAtZ: number | null;
   startedAtMs: number;
 } | null = null;
 let matchState: MatchState = createMatch(performance.now(), selectedArena.matchRules);
@@ -22836,7 +22837,12 @@ function frame(now: number, scheduleNext = true): void {
           debugCaptureOrbit.centerY,
           debugCaptureOrbit.centerZ + Math.cos(orbitAngle) * debugCaptureOrbit.radius,
         );
-        debugCaptureCameraYaw = debugCaptureOrbit.baseYaw + orbitElapsed * debugCaptureOrbit.yawRate;
+        debugCaptureCameraYaw = debugCaptureOrbit.lookAtX !== null
+          ? Math.atan2(
+            debugCaptureOrbit.lookAtX - debugCaptureCameraPosition.x,
+            debugCaptureOrbit.lookAtZ! - debugCaptureCameraPosition.z,
+          )
+          : debugCaptureOrbit.baseYaw + orbitElapsed * debugCaptureOrbit.yawRate;
         debugCaptureCameraPitch = debugCaptureOrbit.pitch;
         camera.position.copy(debugCaptureCameraPosition);
       } else {
@@ -23453,6 +23459,9 @@ const debugWindow = window as Window & {
       baseYaw: number;
       pitch: number;
       fov?: number;
+      lookAtX?: number;
+      lookAtY?: number;
+      lookAtZ?: number;
     } | null) => void;
     setArenaReviewCamera: (cameraId: string) => boolean;
     setPass64SystemVisibility: (name: 'sky' | 'mist' | 'smoke' | 'dust' | 'grass' | 'water', visible: boolean) => boolean;
@@ -25126,6 +25135,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       baseYaw: orbit.baseYaw,
       pitch: THREE.MathUtils.clamp(orbit.pitch, -1.5, 1.5),
       fov: THREE.MathUtils.clamp(Number.isFinite(orbit.fov) ? orbit.fov! : camera.fov, 35, 100),
+      lookAtX: orbit.lookAtX ?? null,
+      lookAtY: orbit.lookAtY ?? null,
+      lookAtZ: orbit.lookAtZ ?? null,
       startedAtMs: performance.now(),
     };
     debugCaptureCameraActive = true;

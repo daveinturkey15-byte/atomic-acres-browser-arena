@@ -752,19 +752,22 @@ async function captureSupport(
     // while the minimap radar pulse stays the subject.
     if (id === 'scout-sweep') {
       const orbitPose = overviewCameraPose(id, station!.position);
-      await page.evaluate((pose) => {
+      await page.evaluate(({ pose, target }) => {
         window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraOrbit({
           centerX: pose.position[0],
           centerY: pose.position[1],
           centerZ: pose.position[2],
           radius: 2.4,
           orbitRate: 0.22,
-          yawRate: 0.4,
+          yawRate: 0,
           baseYaw: pose.yaw,
           pitch: pose.pitch,
           fov: pose.fov,
+          lookAtX: target.x,
+          lookAtY: target.y,
+          lookAtZ: target.z,
         });
-      }, orbitPose);
+      }, { pose: orbitPose, target: { x: station!.position.x, y: 1.1, z: station!.position.z } });
     }
     await startCaptureTelemetryProbe(page, id, baseline);
     const clipStartedAt = Date.now();
