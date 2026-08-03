@@ -20679,7 +20679,9 @@ function updateHud(now: number): void {
   // Hide the HUD crosshair the moment ADS is held: the coloured marker must
   // never layer over the real sight, not even during the transition.
   crosshair.hidden = adsHeld;
-  crosshair.classList.remove('ads');
+  // Keep the marker-state class live (the sight catalog and CSS key off it)
+  // while the element itself stays hidden under the physical ADS picture.
+  crosshair.classList.toggle('ads', adsHeld);
   if (crosshair.dataset.weapon !== player.weapon) {
     const sight = adsSightProfile(player.weapon);
     crosshair.dataset.weapon = player.weapon;

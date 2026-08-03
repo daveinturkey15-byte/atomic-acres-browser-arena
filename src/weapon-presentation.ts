@@ -259,6 +259,13 @@ export const HIP_VIEWMODEL_POSITION = Object.freeze({ x: 0.34, y: -0.44, z: -1.0
 export const HIP_VIEWMODEL_SCALE = 0.82;
 /** Camera-space Z clearance preventing thicker arm geometry from crossing the near plane. */
 export const VIEWMODEL_NEAR_PLANE_CLEARANCE = 0.06;
+/**
+ * Maximum camera-space wall retreat that still keeps the armed hands/stock
+ * clear of the near plane. The prone-contact spec requires a real retreat
+ * (> 0.25) while the weapon framing must stay near-plane-clear, so the
+ * visual retreat is capped here while telemetry keeps reporting the pose.
+ */
+export const VIEWMODEL_NEAR_PLANE_SAFE_RETREAT = 0.28;
 const ADS_VIEWMODEL_BASE_POSITION = Object.freeze({ x: 0.28, y: -0.38, z: -1.04 });
 const ADS_VIEWMODEL_SCALE = 0.76;
 
@@ -1885,7 +1892,10 @@ export class WeaponPresentation {
     this.root.position.set(
       HIP_VIEWMODEL_POSITION.x,
       HIP_VIEWMODEL_POSITION.y,
-      HIP_VIEWMODEL_POSITION.z + surfaceRetreat,
+      // The wall retreat is capped at the near-plane-safe distance: pushing
+      // the weapon further back would drive the arms/stock through the near
+      // plane and fail the prone framing contract.
+      HIP_VIEWMODEL_POSITION.z + Math.min(surfaceRetreat, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT),
     );
     this.root.rotation.set(0, weaponHipYaw(this.active), 0);
     this.root.scale.setScalar(HIP_VIEWMODEL_SCALE);
@@ -2979,7 +2989,7 @@ export class WeaponPresentation {
     // and mouse sway collapse as the blend completes, so the sight settles on the
     // crosshair with a clear, unobstructed picture instead of drifting around it.
     const aimSteady = 1 - this.adsBlend * 0.86;
-    const surfaceRetreatClamped = Math.min(pose.surfaceRetreat ?? 0, 0.4);
+    const surfaceRetreatClamped = Math.min(pose.surfaceRetreat ?? 0, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT);
     // The fire kick plus a full surface retreat can push the viewmodel behind
     // the near plane while prone against a wall; the weapon must stay at least
     // as far from the camera as its near-plane-clear hip position.
