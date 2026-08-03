@@ -2992,8 +2992,11 @@ export class WeaponPresentation {
     const surfaceRetreatClamped = Math.min(pose.surfaceRetreat ?? 0, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT);
     // The fire kick plus a full surface retreat can push the viewmodel behind
     // the near plane while prone against a wall; the weapon must stay at least
-    // as far from the camera as its near-plane-clear hip position.
-    const fireNearPlaneFloorZ = viewmodelBaseZ + surfaceRetreatClamped;
+    // as far from the camera as its near-plane-clear hip position, and the
+    // recoil pitch swings the stock back toward the camera, so the floor
+    // carries an extra stock-swing allowance during the fire kick.
+    const fireNearPlaneFloorZ = viewmodelBaseZ + surfaceRetreatClamped
+      - (presentationKick > 0.05 ? 0.1 : 0);
     const targetPosition = this.frameTargetPosition.set(
       viewmodelBaseX + adsX + (bobX + this.swayX) * aimSteady - pose.lateralSpeed * 0.012 * aimSteady + meleeArc * viewmodelMeleeScreenOffset(this.camera) + grenadeArc * 0.18 + reloadStage.lateral,
       viewmodelBaseY + adsY + (bobY + breath) * aimSteady + sprintDrop + crouchLift + proneLift + switchDrop + reloadStage.lift - presentationKick * 0.095 - pose.landingImpulse * 0.075 * aimSteady + meleeArc * 0.26,
