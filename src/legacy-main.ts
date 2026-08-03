@@ -4850,7 +4850,7 @@ function clearGameplayInput(): void {
   mouseTriggerHeld = false;
   mouseAdsHeld = false;
   setLocalTriggerHeld(false);
-  adsHeld = false;
+  adsHeld = debugAdsOverride ?? false;
   sniperScopeActive = false;
   dmrThermalActive = false;
   sniperScopeOverlay.hidden = true;
