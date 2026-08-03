@@ -166,7 +166,7 @@ async function captureIsolatedReticle(page: Page, weapon: WeaponId): Promise<Rea
     style.textContent = `
       html, body, #hud { background: #02080b !important; }
       body > :not(#hud), canvas, #hud > * { visibility: hidden !important; }
-      #hud, #crosshair, #sniper-scope:not([hidden]), #dmr-thermal:not([hidden]), #railgun-thermal:not([hidden]),
+      #hud, html body #crosshair, #sniper-scope:not([hidden]), #dmr-thermal:not([hidden]), #railgun-thermal:not([hidden]),
       #crosshair::before, #crosshair::after, #sniper-scope *, #dmr-thermal *, #railgun-thermal * {
         visibility: visible !important;
       }

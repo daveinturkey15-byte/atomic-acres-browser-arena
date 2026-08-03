@@ -42,7 +42,7 @@ const { execSync } = require('child_process');
     await page.goto('http://localhost:4173/channels/the-big-one/?qa=1', { waitUntil: 'domcontentloaded', timeout: 30000 });
     // Wait for the game module + debug API to be live.
     let debugReady = false;
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 90; i++) {
       await page.waitForTimeout(1000);
       debugReady = await page.evaluate(() => Boolean(window.__ATOMIC_ACRES_DEBUG__?.snapshot));
       if (debugReady) break;
@@ -53,7 +53,6 @@ const { execSync } = require('child_process');
       console.log('last page error:', errs);
       return;
     }
-    await page.waitForTimeout(2000);
     const state = await page.evaluate(() => {
       const d = window.__ATOMIC_ACRES_DEBUG__;
       d.startSolo();
@@ -65,7 +64,7 @@ const { execSync } = require('child_process');
     console.log('state:', JSON.stringify(state));
     // Wait for the game HUD to actually deploy.
     let deployed = false;
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 90; i++) {
       await page.waitForTimeout(1000);
       deployed = await page.evaluate(() => {
         const hud = document.querySelector('#hud');
@@ -100,8 +99,29 @@ const { execSync } = require('child_process');
       };
     });
     console.log('crosshair:', JSON.stringify(probe, null, 1));
+    // Mirror the e2e isolated-reticle CSS to reproduce the black capture.
+    await page.evaluate(() => {
+      const style = document.createElement('style');
+      style.id = 'probe-isolated';
+      style.textContent = `
+        html, body, #hud { background: #02080b !important; }
+        body > :not(#hud), canvas, #hud > * { visibility: hidden !important; }
+        #hud, html body #crosshair, #sniper-scope:not([hidden]), #dmr-thermal:not([hidden]), #railgun-thermal:not([hidden]),
+        #crosshair::before, #crosshair::after, #sniper-scope *, #dmr-thermal *, #railgun-thermal * {
+          visibility: visible !important;
+        }
+        #crosshair { display: block !important; }
+        #hud::before, #hud::after { display: none !important; }
+      `;
+      document.head.append(style);
+    });
+    await page.waitForTimeout(500);
+    const isolated = await page.screenshot({ path: '/tmp/ads-isolated.png', clip: { x: 640 - 160, y: 360 - 160, width: 320, height: 320 } });
+    console.log('isolated screenshot bytes:', isolated.length);
     const img = await page.screenshot({ path: '/tmp/ads-probe.png', clip: { x: 640 - 160, y: 360 - 160, width: 320, height: 320 } });
     console.log('screenshot bytes:', img.length);
+    const full = await page.screenshot({ path: '/tmp/ads-probe-full.png' });
+    console.log('full screenshot bytes:', full.length);
   } finally {
     await browser.close();
     try { process.kill(-server.pid); } catch { }
