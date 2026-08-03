@@ -748,9 +748,9 @@ async function captureSupport(
     // HUD-overview streaks hold a fixed camera; with a static bay the clip
     // reads as frozen under the near-duplicate cadence gate (the 750 ms F
     // lead-in alone exceeds the longest-run limit). Orbit slowly around the
-    // bay for the scout sweep so the clip carries genuine cinematic motion
-    // while the minimap radar pulse stays the subject.
-    if (id === 'scout-sweep') {
+    // station so the clip carries genuine cinematic motion while the HUD
+    // effect stays the subject.
+    if (id === 'scout-sweep' || id === 'adrenaline') {
       const stationTarget = { x: station!.position.x, y: 1.1, z: station!.position.z };
       await page.evaluate((target) => {
         window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraOrbit({
