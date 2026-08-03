@@ -2979,10 +2979,18 @@ export class WeaponPresentation {
     // and mouse sway collapse as the blend completes, so the sight settles on the
     // crosshair with a clear, unobstructed picture instead of drifting around it.
     const aimSteady = 1 - this.adsBlend * 0.86;
+    const surfaceRetreatClamped = Math.min(pose.surfaceRetreat ?? 0, 0.4);
+    // The fire kick plus a full surface retreat can push the viewmodel behind
+    // the near plane while prone against a wall; the weapon must stay at least
+    // as far from the camera as its near-plane-clear hip position.
+    const fireNearPlaneFloorZ = viewmodelBaseZ + surfaceRetreatClamped;
     const targetPosition = this.frameTargetPosition.set(
       viewmodelBaseX + adsX + (bobX + this.swayX) * aimSteady - pose.lateralSpeed * 0.012 * aimSteady + meleeArc * viewmodelMeleeScreenOffset(this.camera) + grenadeArc * 0.18 + reloadStage.lateral,
       viewmodelBaseY + adsY + (bobY + breath) * aimSteady + sprintDrop + crouchLift + proneLift + switchDrop + reloadStage.lift - presentationKick * 0.095 - pose.landingImpulse * 0.075 * aimSteady + meleeArc * 0.26,
-      viewmodelBaseZ + adsZ + Math.min(pose.surfaceRetreat ?? 0, 0.4) - VIEWMODEL_NEAR_PLANE_CLEARANCE + presentationKick * profile.recoilTranslation * 1.12 + grenadeArc * 0.24,
+      Math.max(
+        viewmodelBaseZ + adsZ + surfaceRetreatClamped - VIEWMODEL_NEAR_PLANE_CLEARANCE + presentationKick * profile.recoilTranslation * 1.12 + grenadeArc * 0.24,
+        fireNearPlaneFloorZ,
+      ),
     );
     this.surfaceRetreat = pose.surfaceRetreat ?? 0;
     this.surfaceLift = pose.surfaceLift ?? 0;
