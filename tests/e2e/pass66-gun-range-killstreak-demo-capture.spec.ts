@@ -510,6 +510,17 @@ async function startCaptureTelemetryProbe(
     document.addEventListener('freeze', () => recordLifecycle('freeze'));
     document.addEventListener('resume', () => recordLifecycle('resume'));
     window.addEventListener('pagehide', () => recordLifecycle('pagehide'));
+    const recordScheduler = () => {
+      const snap = api.snapshot();
+      state.lifecycle.push({
+        at: Number((performance.now() - startedAt).toFixed(1)),
+        event: `frame=${snap.frameCount} decision=${JSON.stringify(snap.presentationScheduling?.lastDecision)}`,
+        state: document.visibilityState,
+        focus: document.hasFocus(),
+      });
+    };
+    const schedulerTimer = window.setInterval(recordScheduler, 500);
+    window.addEventListener('pagehide', () => window.clearInterval(schedulerTimer), { once: true });
     const visible = (selector: string) => {
       const element = document.querySelector<HTMLElement>(selector);
       if (!element || element.hidden) return false;
