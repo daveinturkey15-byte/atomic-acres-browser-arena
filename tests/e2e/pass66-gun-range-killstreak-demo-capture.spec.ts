@@ -775,7 +775,13 @@ async function captureSupport(
     const videoArtifactPath = resolve(stagingRoot, `${id}.mp4`);
     encodeClip(rawPath, videoArtifactPath, trimStartMs, clipDurationMs);
     const videoBytes = readFileSync(videoArtifactPath);
-    const videoProbe = await probeH264Mp4(videoArtifactPath);
+    let videoProbe;
+    try {
+      videoProbe = await probeH264Mp4(videoArtifactPath);
+    } catch (error) {
+      const telemetryTrace = captureTelemetry.cadence.samples.map((sample) => `${sample.elapsedMs}ms#${sample.presentedFrame}`).slice(0, 40).join(' ');
+      throw new Error(`${String((error as Error).message)} · probe=[${telemetryTrace}]`);
+    }
     expect(videoProbe.width).toBe(KILLSTREAK_DEMO_CAPTURE_VIEWPORT.width);
     expect(videoProbe.height).toBe(KILLSTREAK_DEMO_CAPTURE_VIEWPORT.height);
     expect(videoProbe.hasAudio).toBe(false);
