@@ -519,7 +519,7 @@ async function startCaptureTelemetryProbe(
       const rv = (k: string) => String(review?.[k] ?? '?');
       state.lifecycle.push({
         at: Number((performance.now() - startedAt).toFixed(1)),
-        event: `frame=${snap.frameCount} presented=${presented} cam=${rv('captureCameraActive')} orbit=${rv('captureCameraOrbit')} reviewCam=${rv('cameraId')} rsp=${rv('renderSubmissionPaused')} paused=${rv('matchAdmissionPresentationPaused')} glLost=${rv('webglContextLost')} focus=${document.hasFocus()} vis=${document.visibilityState} transHidden=${transition?.hidden ?? 'na'} hudHidden=${hud?.hidden ?? 'na'}`,
+        event: `frame=${snap.frameCount} presented=${presented} cam=${rv('captureCameraActive')} orbit=${rv('captureCameraOrbit')} pos=${rv('captureCameraX')},${rv('captureCameraY')},${rv('captureCameraZ')} yaw=${rv('captureCameraYaw')} orbMs=${rv('captureOrbitElapsedMs')} reviewCam=${rv('cameraId')} rsp=${rv('renderSubmissionPaused')} paused=${rv('matchAdmissionPresentationPaused')} glLost=${rv('webglContextLost')} focus=${document.hasFocus()} vis=${document.visibilityState} transHidden=${transition?.hidden ?? 'na'} hudHidden=${hud?.hidden ?? 'na'}`,
         state: document.visibilityState,
         focus: document.hasFocus(),
       });
