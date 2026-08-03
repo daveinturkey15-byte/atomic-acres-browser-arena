@@ -30,7 +30,7 @@ describe('project map', () => {
     // front of the combined changes list instead of duplicating the pass.
     expect(bundle.changes).toEqual([
       PROJECT_MAP_RELEASE,
-      ...CHANGELOG.filter((entry) => entry.pass !== PROJECT_MAP_RELEASE.pass),
+      ...CHANGELOG.filter((entry) => entry.id !== PROJECT_MAP_RELEASE.id),
     ]);
     expect(bundle.current.releaseState).toBe('release-candidate');
     expect(bundle.publishedChannels.liveTarget).toMatchObject({

@@ -57,7 +57,7 @@ describe('Pass 66 two-channel release topology', () => {
     expect(shell).toContain("['experimental', 'stable']");
     expect(shell).not.toContain("['normal', 'stable', 'experimental']");
     expect(shell).toContain("key === 'stable' ? 'STABLE' : 'LIVE'");
-    expect(shellHtml).toContain('Pass 66');
+    expect(shellHtml).toContain('Pass 67');
     expect(shellHtml).toContain('The Big One');
     expect(shellHtml).toContain('byte-exact Pass 63 production release');
     expect(shellHtml).toContain('Nuke Town');

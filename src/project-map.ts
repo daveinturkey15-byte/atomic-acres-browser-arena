@@ -257,7 +257,7 @@ export function createProjectMapBundle(
       architectureRevision: 'pass66-big-one-v1',
       releaseState: release.releasedAt === PENDING_PRODUCTION_RELEASE ? 'release-candidate' : 'released',
       release,
-      previousRelease: entries.find((entry) => entry.pass !== release.pass)?.pass ?? null,
+      previousRelease: entries.find((entry) => entry.id !== release.id)?.pass ?? null,
     },
     publishedChannels: {
       schemaVersion: releaseChannelsJson.schemaVersion,
@@ -288,7 +288,7 @@ export function createProjectMapBundle(
     },
     operatingBoundaries: PROJECT_OPERATING_BOUNDARIES,
     architecture: PROJECT_MAP_TREE,
-    changes: Object.freeze([release, ...entries.filter((entry) => entry.pass !== release.pass)]),
+    changes: Object.freeze([release, ...entries.filter((entry) => entry.id !== release.id)]),
     archive: entries,
   };
 }
