@@ -216,12 +216,12 @@ const RAW_B1_WEAPON_DEFINITIONS = [
   },
   {
     id: 'm14-ebr', displayName: 'M14 EBR', slot: 'primary', family: 'marksman',
-    fireKind: 'hitscan', fireMode: 'semi', rpm: 75, pellets: 1, spinUpMs: 0, movementMultiplier: 0.94,
+    fireKind: 'hitscan', fireMode: 'semi', rpm: 37, pellets: 1, spinUpMs: 0, movementMultiplier: 0.94,
     damage: { policy: 'standard', base: 62, minimum: 40, falloffStartM: 38, falloffEndM: 100, headMultiplier: 1.7, limbMultiplier: 0.82 },
     spread: { hipRadians: 0.032, adsMultiplier: 0.08, movementMultiplier: 1.85, standMultiplier: 1, crouchMultiplier: 0.7, proneMultiplier: 0.5, sustainedPerShot: 0.004, maximumRadians: 0.062 },
     recoil: { pitchRadians: 0.045, yawRadians: 0.012, recoveryPerSecond: 7.5, adsMultiplier: 0.62, standMultiplier: 1, crouchMultiplier: 0.74, proneMultiplier: 0.5, deterministicPatternId: 'm14-ebr-pattern-v1' },
     ammo: { magazine: 20, reserve: 80, reloadSeconds: 2.35, emptyReloadSeconds: 2.65, switchSeconds: 0.66 },
-    penetration: { calibreLabel: '7.62 mm', power: 2.2, fmjMultiplier: 1.16, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 45, energyFalloffEndM: 112, minimumEnergyRetention: 0.68, minimumWallDamageMultiplier: 0.47, maximumSurfaces: 3 },
+    penetration: { calibreLabel: '7.62 mm', power: 0.55, fmjMultiplier: 1.16, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 45, energyFalloffEndM: 112, minimumEnergyRetention: 0.68, minimumWallDamageMultiplier: 0.12, maximumSurfaces: 1 },
     effects: { tracerColorHex: 0x9ceaff, muzzleFlashScale: 1.08, reportGain: 1.08, flashlight: null },
     optic: { kind: 'thermal-smoke-only', magnification: 2.5, solidOcclusion: 'required', targetPolicy: 'living-targets-through-smoke', authority: 'presentation-only' }, projectileId: null,
     policies: { loadout: 'eligible', bot: 'eligible', drop: 'droppable', range: { kind: 'never' }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-shot-v1' },
@@ -271,7 +271,7 @@ const RAW_B1_WEAPON_DEFINITIONS = [
     // The authoritative stream adapter owns the hard 18 m reach and burn volume;
     // this hitscan projection keeps current bot cadence fail-closed and deterministic.
     fireKind: 'hitscan', fireMode: 'automatic', rpm: 600, pellets: 1, spinUpMs: 180, movementMultiplier: 0.82,
-    damage: { policy: 'standard', base: 27, minimum: 0, falloffStartM: 8, falloffEndM: 18, headMultiplier: 1, limbMultiplier: 1 },
+    damage: { policy: 'standard', base: 81, minimum: 0, falloffStartM: 8, falloffEndM: 18, headMultiplier: 1, limbMultiplier: 1 },
     spread: { hipRadians: 0.038, adsMultiplier: 0.72, movementMultiplier: 1.4, standMultiplier: 1, crouchMultiplier: 0.9, proneMultiplier: 0.82, sustainedPerShot: 0.0008, maximumRadians: 0.055 },
     recoil: { pitchRadians: 0.004, yawRadians: 0.003, recoveryPerSecond: 18, adsMultiplier: 0.9, standMultiplier: 1, crouchMultiplier: 0.9, proneMultiplier: 0.82, deterministicPatternId: 'flamethrower-pattern-v1' },
     ammo: { magazine: 100, reserve: 100, reloadSeconds: 3.8, emptyReloadSeconds: 4.2, switchSeconds: 0.85 },

@@ -3360,10 +3360,10 @@
             "energyFalloffEnd": 112,
             "energyFalloffStart": 45,
             "fmjMultiplier": 1.16,
-            "maxPenetratedSurfaces": 3,
+            "maxPenetratedSurfaces": 1,
             "minimumEnergyRetention": 0.68,
-            "minimumWallDamageMultiplier": 0.47,
-            "penetrationPower": 2.2
+            "minimumWallDamageMultiplier": 0.12,
+            "penetrationPower": 0.55
           },
           "projectileId": null,
           "proneRecoilMultiplier": 0.5,
@@ -3373,7 +3373,7 @@
           "reload": 2.35,
           "reportGain": 1.08,
           "reserve": 80,
-          "rpm": 75,
+          "rpm": 37,
           "spinUpMs": 0,
           "sustainedSpreadPerShot": 0.004,
           "switchSeconds": 0.66

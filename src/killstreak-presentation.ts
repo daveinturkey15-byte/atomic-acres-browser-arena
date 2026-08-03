@@ -2273,18 +2273,20 @@ export class KillstreakPresentation {
       const possessed = entity.id === this.firstPersonEntityId;
       const phaseReset = !firstProjection && presented.root.userData.supportSnapshotPhase !== entity.phase;
       const teleported = !firstProjection && presented.root.position.distanceToSquared(presented.target) > 64;
-      if (firstProjection || phaseReset || teleported || possessed && firstProjection) {
+      if (firstProjection || phaseReset || teleported || possessed) {
+        // Possessed entities are refreshed at frame cadence while possessed
+        // (see refreshLocalKillstreakSnapshot), so an exact snap is already
+        // smooth at high refresh rates and the camera/HUD ray never lags the
+        // authoritative pose. Only remote observers lerp between snapshots.
         presented.root.position.copy(presented.target);
         // Preserve the canonical authored YXZ components on deterministic
         // snaps; assigning the equivalent quaternion can re-express the Euler
         // triplet near a gimbal boundary even though orientation is unchanged.
         presented.root.rotation.copy(presented.attitudeEuler);
       } else {
-        // Possessed entities are refreshed at frame cadence while possessed
-        // (see refreshLocalKillstreakSnapshot), so a tight lerp keeps the
-        // first-person camera silky at high refresh rates instead of stepping
-        // at the 20 Hz recipient-snapshot cadence.
-        const blend = possessed ? 0.55 : 0.38;
+        // Sparse-snapshot presentation smoothing keeps remote support craft
+        // from stepping at the 20 Hz recipient-snapshot cadence.
+        const blend = 0.38;
         presented.root.position.lerp(presented.target, blend);
         presented.root.quaternion.slerp(presented.attitudeTarget, blend);
       }

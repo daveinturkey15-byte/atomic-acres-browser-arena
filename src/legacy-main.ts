@@ -1497,7 +1497,7 @@ const flareProjectileSystem = new FlareProjectileSystem(scene, reducedRenderMode
 const flamethrowerStreamPresentation = new FlamethrowerStreamSystem(scene, reducedRenderMode);
 const FLAMETHROWER_GROUND_FIRE_RADIUS_M = 1.8;
 const FLAMETHROWER_GROUND_FIRE_PULSE_MS = 500;
-const FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE = 2;
+const FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE = 6;
 const FLAMETHROWER_GROUND_FIRE_CAPACITY = 24;
 type FlamethrowerGroundFire = {
   ownerId: string;

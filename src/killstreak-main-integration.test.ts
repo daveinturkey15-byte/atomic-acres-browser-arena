@@ -13,7 +13,7 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).not.toContain('recordSupportElimination(');
     expect(source).not.toContain('recordSupportDeath(');
     expect(source).not.toContain('consumeFieldSupport(');
-    expect(source).toContain("['Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7'].indexOf(event.code)");
+    expect(source).toContain('GAMEPLAY_ACTIONS.findIndex((action) => action.startsWith(\'support-\')');
     expect(source).toContain('activateOrToggleFieldSupportSlot(supportSlot)');
     expect(source).toContain('selectControllableSupportEntity(id, player.id, killstreakSnapshot.entities)');
     expect(source).not.toContain("activateFieldSupport('hunter-swarm');");
@@ -58,7 +58,7 @@ describe('Pass 65 playable killstreak integration', () => {
     const refreshStart = source.indexOf('function refreshLocalKillstreakSnapshot(');
     const refreshEnd = source.indexOf('\nfunction broadcastKillstreakState(', refreshStart);
     const refreshBlock = source.slice(refreshStart, refreshEnd);
-    expect(refreshBlock).toContain('if (!force && !clockRegressed');
+    expect(refreshBlock).toContain('const clockRegressed = now < lastLocalKillstreakSnapshotRefreshAt;');
     expect(refreshBlock).toContain('killstreakRuntime.snapshotFor(player.id, now)');
     expect(source).toContain('lastLocalKillstreakSnapshotRefreshAt = Number.NEGATIVE_INFINITY;\n  broadcastKillstreakState(now);');
 
@@ -190,8 +190,8 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain('function releaseFInteractionPress(');
     expect(source).toContain('function cancelFInteractionPress(');
     expect(source).toContain('function executePinnedFInteraction(');
-    expect(source).toContain("if (event.code === 'KeyF' && !event.repeat) {");
-    expect(source).toContain("if (event.code === 'KeyF') {");
+    expect(source).toContain("if (actionMatchesCode('interact', event.code, keyProfile) && !event.repeat) {");
+    expect(source).toContain("if (actionMatchesCode('interact', event.code, activeKeyBindingProfile())) {");
     expect(source).toContain('releaseFInteractionPress(now);');
     expect(source).toContain('if (localCareCaptureRequiresHold) releaseCareCapture(now);');
     expect(source).toContain("cancelFInteractionPress('blur', lastWindowBlurAt);");
@@ -209,8 +209,8 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain('if (appliedDamage > 0) releaseCareCapture(now);');
     expect(source).toContain('killstreakRuntime.recordActorDamage(victimId)');
     expect(source).not.toMatch(/!interactWithKillstreakSupport\(\)[\s\S]{0,100}!interactWithShedDoor\(\)/);
-    const keydownStart = source.indexOf("if (event.code === 'KeyF' && !event.repeat) {");
-    const keydownEnd = source.indexOf("\n  if (event.code === 'Tab')", keydownStart);
+    const keydownStart = source.indexOf("if (actionMatchesCode('interact', event.code, keyProfile) && !event.repeat) {");
+    const keydownEnd = source.indexOf("\n  if (actionMatchesCode('scoreboard', event.code, activeKeyBindingProfile())) {", keydownStart);
     expect(source.slice(keydownStart, keydownEnd)).toContain('beginFInteractionPress(now);');
     expect(source.slice(keydownStart, keydownEnd)).not.toContain('executePinnedFInteraction(');
   });
@@ -281,7 +281,7 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(block).toContain('requestKillstreakControl(entity.id, action, {}, now)');
     expect(block).toContain('localKillstreakActorSnapshot()?.possession?.entityId !== entity.id');
     expect(block).toContain('if (!localKillstreakActorSnapshot()?.possession) activateFieldSupport(id)');
-    expect(source).toContain("const supportSlot = ['Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7'].indexOf(event.code)");
+    expect(source).toContain('GAMEPLAY_ACTIONS.findIndex((action) => action.startsWith(\'support-\')');
     expect(source).toContain('if (supportSlot >= 0 && !event.repeat) activateOrToggleFieldSupportSlot(supportSlot)');
   });
 

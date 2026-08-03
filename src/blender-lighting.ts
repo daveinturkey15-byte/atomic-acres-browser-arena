@@ -197,9 +197,28 @@ const COMPAT_LIGHTING: ArenaLightingProfile = {
   godRayLobes: 0,
 };
 
+/**
+ * RustRig (rustworks-1v1) +25% brightness: owner feedback that the darkest
+ * corridors and interior pockets were pitch black. Lift the ambient,
+ * hemisphere, sun and fill contributions together (+25% each) and nudge
+ * exposure so the whole map keeps its contrast without washing out. Derived
+ * from BLENDER_LIGHTING so the blend/performance/compat family stays intact.
+ */
+const RUSTWORKS_BRIGHTENING: Readonly<Partial<ArenaLightingProfile>> = Object.freeze({
+  ambientIntensity: 0.225,
+  hemisphereIntensity: 0.875,
+  sunIntensity: 3.9375,
+  fillIntensity: 0.275,
+  interiorLightIntensity: 18.75,
+  exposure: 1.275,
+});
+
 export function arenaLightingProfile(profile: RenderProfile, arenaId?: string): ArenaLightingProfile {
+  const base = profile === 'blender' ? BLENDER_LIGHTING : profile === 'compat' ? COMPAT_LIGHTING : DEFAULT_LIGHTING;
   const source = arenaId === 'atomic-acres' && profile !== 'compat'
     ? profile === 'blender' ? ATOMIC_BLENDER_LIGHTING : ATOMIC_DEFAULT_LIGHTING
-    : profile === 'blender' ? BLENDER_LIGHTING : profile === 'compat' ? COMPAT_LIGHTING : DEFAULT_LIGHTING;
+    : arenaId === 'rustworks-1v1' && profile !== 'compat'
+      ? { ...base, ...RUSTWORKS_BRIGHTENING }
+      : base;
   return { ...source, sunPosition: [...source.sunPosition], fillPosition: [...source.fillPosition] };
 }

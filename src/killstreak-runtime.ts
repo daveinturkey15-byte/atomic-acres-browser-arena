@@ -554,6 +554,8 @@ type SupportRayTargetHit = Readonly<{
   target: KillstreakTarget;
   endpoint: SupportVec3;
   distance: number;
+  /** True when the centre ray was occluded but the wallbang rule admits the shot at reduced damage. */
+  wallbanged: boolean;
 }>;
 
 function rotateSupportOffsetYXZ(offset: SupportVec3, attitude: SupportVec3): SupportVec3 {
@@ -1879,7 +1881,10 @@ export class HostKillstreakRuntime {
         true,
       );
       if (hit) {
-        const admittedDamage = supportGunDamageAtDistance(CHOPPER_GUN_PROFILE, hit.distance);
+        const distanceDamage = supportGunDamageAtDistance(CHOPPER_GUN_PROFILE, hit.distance);
+        // Through-wall admission costs half the autocannon damage; clear
+        // centre-ray shots deal the full profile damage.
+        const admittedDamage = hit.wallbanged ? distanceDamage * 0.5 : distanceDamage;
         if (admittedDamage > 0) damageEvents.push(this.damageEvent(
           entity.activationId,
           'chopper',
@@ -2348,15 +2353,15 @@ export class HostKillstreakRuntime {
         origin[1] + direction[1] * entryDistance,
         origin[2] + direction[2] * entryDistance,
       ] as const);
-      // Owner direction: the Chopper Gunner's heavy autocannon must hit
-      // reliably from orbit. LOS gating made damage feel random (a low wall
-      // edge or the chopper's own altitude silently blocked the ray) and
-      // previously wallbanged inconsistently. Player-controlled fire now uses
-      // the same through-wall authority as the railgun: full damage through
-      // solid cover. AI gunners keep LOS gating so bots don't shoot through
-      // the whole map.
-      if (!wallbang && !lineOfSight(world, origin, endpoint)) continue;
-      hits.push(Object.freeze({ target, endpoint, distance: entryDistance }));
+      const clear = lineOfSight(world, origin, endpoint);
+      // Owner rule: the Chopper Gunner's heavy autocannon must hit reliably
+      // from orbit. LOS is still evaluated from the camera origin (so a wall
+      // edge that occludes the aircraft root doesn't eat the shot), but an
+      // occluded centre ray is not a miss: the through-wall rule admits the
+      // target at 50% damage. Without this, hits felt random because a low
+      // wall or corner silently swallowed the ray.
+      if (!clear && !wallbang) continue;
+      hits.push(Object.freeze({ target, endpoint, distance: entryDistance, wallbanged: !clear }));
     }
     return hits.sort((left, right) => left.distance - right.distance || left.target.id.localeCompare(right.target.id))[0] ?? null;
   }
