@@ -512,15 +512,47 @@ async function startCaptureTelemetryProbe(
     window.addEventListener('pagehide', () => recordLifecycle('pagehide'));
     const recordScheduler = () => {
       const snap = api.snapshot();
+      const review = snap.deterministicReview as { cameraId?: string | null; fixedTimeMs?: number | null; tslTimeMs?: number | null } | undefined;
       state.lifecycle.push({
         at: Number((performance.now() - startedAt).toFixed(1)),
-        event: `frame=${snap.frameCount} decision=${JSON.stringify(snap.presentationScheduling?.lastDecision)}`,
+        event: `frame=${snap.frameCount} decision=${JSON.stringify(snap.presentationScheduling?.lastDecision)} review=${JSON.stringify(review)}`,
         state: document.visibilityState,
         focus: document.hasFocus(),
       });
     };
     const schedulerTimer = window.setInterval(recordScheduler, 500);
     window.addEventListener('pagehide', () => window.clearInterval(schedulerTimer), { once: true });
+    const recordDomAudit = (atMs: number) => {
+      const canvases = [...document.querySelectorAll('canvas')].map((canvas) => {
+        const style = getComputedStyle(canvas);
+        const rect = canvas.getBoundingClientRect();
+        return {
+          id: canvas.id || null,
+          cls: canvas.className || null,
+          w: Math.round(rect.width), h: Math.round(rect.height),
+          display: style.display,
+          z: style.zIndex,
+          pos: style.position,
+        };
+      });
+      const center = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
+      const preview = document.querySelector<HTMLVideoElement>('#menu-preview-video, .menu-preview-video, video');
+      const transition = document.querySelector<HTMLElement>('#deployment-transition');
+      state.lifecycle.push({
+        at: atMs,
+        event: `dom=${JSON.stringify({
+          canvases,
+          topAtCenter: center ? `${center.tagName}#${center.id || ''}.${(center.className || '').toString().slice(0, 24)}` : null,
+          preview: preview ? { hidden: preview.hidden, parent: preview.parentElement?.id || preview.parentElement?.className || null, w: preview.getBoundingClientRect().width } : null,
+          transitionHidden: transition?.hidden ?? null,
+        })}`,
+        state: document.visibilityState,
+        focus: document.hasFocus(),
+      });
+    };
+    recordDomAudit(0);
+    window.setTimeout(() => recordDomAudit(1500), 1_500);
+    window.setTimeout(() => recordDomAudit(3500), 3_500);
     const visible = (selector: string) => {
       const element = document.querySelector<HTMLElement>(selector);
       if (!element || element.hidden) return false;
