@@ -10,10 +10,10 @@ import {
 } from './changelog';
 
 describe('changelog', () => {
-  it('keeps the pending Pass 66 release first until production injects its timestamp', () => {
+  it('keeps the pending Pass 68 release first until production injects its timestamp', () => {
     expect(CHANGELOG.length).toBeGreaterThan(0);
     const latest = latestChangelogEntry();
-    expect(latest.id).toBe('pass66');
+    expect(latest.id).toBe('pass68');
     expect(latest.id).toBe(CHANGELOG[0]?.id);
     expect(formatChangelogTimestamp('2026-07-22T15:43:16+01:00')).toBe('22 JUL 2026 · 15:43 BST');
     expect(formatChangelogTimestampDetail('2026-07-22T15:43:16+01:00')).toBe(

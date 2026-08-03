@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { buildOperator } from './art-kit';
 import { classifyImpactSurface } from './combat-feedback';
 import { createBallisticSurface, type BallisticMaterialId, type BallisticSurface } from './ballistics';
 import type { Box2 } from './collision';
@@ -1597,6 +1598,54 @@ function gunRangeTrainingDummy(
   root.userData.walkSpeedMps = definition.speedMps;
   root.userData.scoreValue = 250;
   root.userData.maxHealth = 300;
+  // Owner direction: the killstreak-room training bots must look like the
+  // combatants in real matches. Use the canonical rigged operator family when
+  // its authored GLB has loaded; the painted training robot remains only as a
+  // pre-load fixture and is replaced as soon as the shared rig is ready.
+  const rigged = (() => {
+    try {
+      return buildOperator(index % 2 === 0 ? 1 : 0, `gun-range-${definition.id}`, false, 'carbine', 'team');
+    } catch {
+      // Canonical rig not loaded yet (e.g. headless/unit environments): fall
+      // back to the painted training robot below. Live deployment always loads
+      // the rig before arena construction, so gameplay uses the rigged model.
+      return null;
+    }
+  })();
+  if (rigged) {
+    rigged.position.set(0, 0, 0);
+    rigged.userData.targetRoot = root;
+    rigged.userData.targetId = definition.id;
+    rigged.traverse((node) => {
+      node.userData.targetRoot = root;
+      node.userData.targetId = definition.id;
+      if (node instanceof THREE.Mesh) node.userData.impactSurface = 'metal';
+    });
+    root.add(rigged);
+    const parts: THREE.Mesh[] = [];
+    rigged.traverse((node) => {
+      if (!(node instanceof THREE.Mesh) || node.userData.authoritativeProxy === true) return;
+      parts.push(node);
+      builder.raycastMeshes.push(node);
+    });
+    root.userData.targetMeshes = parts;
+    root.userData.riggedOperator = true;
+    root.position.set(definition.start.x, definition.start.y, definition.start.z);
+    builder.root.add(root);
+    targets.push({
+      id: definition.id,
+      root,
+      active: true,
+      respawnAt: 0,
+      respawnDelayMs: 2_500,
+      scoreValue: 250,
+      distanceBand: 'mid',
+      maxHealth: 300,
+      health: 300,
+      kind: 'training-dummy',
+    });
+    return Object.freeze({ root, definition });
+  }
   // Review capture and compatibility renderers must not turn the slow targets
   // into black silhouettes when authored practical lights are culled. These
   // are painted training robots, so an unlit albedo is also semantically apt.

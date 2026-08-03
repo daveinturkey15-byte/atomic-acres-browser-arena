@@ -3363,7 +3363,7 @@
             "maxPenetratedSurfaces": 3,
             "minimumEnergyRetention": 0.68,
             "minimumWallDamageMultiplier": 0.47,
-            "penetrationPower": 8.8
+            "penetrationPower": 2.2
           },
           "projectileId": null,
           "proneRecoilMultiplier": 0.5,
@@ -3373,7 +3373,7 @@
           "reload": 2.35,
           "reportGain": 1.08,
           "reserve": 80,
-          "rpm": 150,
+          "rpm": 75,
           "spinUpMs": 0,
           "sustainedSpreadPerShot": 0.004,
           "switchSeconds": 0.66
@@ -4004,7 +4004,11 @@
       "pass66-hitl-drone-swarm-thirty-second-lifetime",
       "pass66-hitl-carpet-bomber-friendly-fire",
       "pass66-hitl-balance-m14-62-damage-compensation",
-      "pass66-hitl-balance-scattergun-95rpm-13-damage"
+      "pass66-hitl-balance-scattergun-95rpm-13-damage",
+      "pass68-m14-ebr-75-percent-wallbang-reduction-half-fire-rate",
+      "pass68-flamethrower-triple-damage-and-five-second-ground-fire",
+      "pass68-flare-gun-five-second-burn",
+      "pass68-adrenaline-instant-regen-restart-plus-one-hp-per-second"
     ]
   }
 }

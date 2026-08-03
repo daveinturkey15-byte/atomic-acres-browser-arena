@@ -38,12 +38,36 @@ export function resolveProductionReleasedAt(
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
   Object.freeze({
+    id: 'pass68',
+    pass: 'PASS 68',
+    title: 'Stability, Range & Combat Corrections',
+    releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
+    areas: Object.freeze(['STABILITY', 'COMBAT', 'GUN RANGE', 'LOADING', 'HUD', 'LIGHTING']),
+    summary: 'Pass 68 freezes Pass 67.1 as the Stable Singleplayer channel and fixes the owner-reported freeze, loading, balance, gun-range and presentation issues.',
+    highlights: Object.freeze([
+      'Maps keep loading in the background when the tab loses focus - only audio and the render loop pause, never GLB/texture/audio decode',
+      'The deployment surface now shows a real progress bar with percentage, ETA and a clear 100% = IN GAME completion state',
+      'Rare weapons (flamethrower, flare gun, railgun) announce RARE WEAPON SPAWNED when they appear',
+      'Flamethrower and flare fire stays burning on the floor for five seconds like napalm and damages anyone who stands in it',
+      'Flamethrower damage tripled; M14 EBR wall penetration reduced 75% and its fire rate halved',
+      'Adrenaline Boost instantly restarts health regeneration and adds passive +1 HP/s for its duration',
+      'Gun Range test bay is three times larger and the two-minute round timer freezes and resets each time you enter the killstreak area',
+      'Killstreak-room training bots now use the same rigged operator models as real matches',
+      'Piloted Drone and Chopper Gunner views drop internal resolution ~25% so altitude views stay smooth',
+      'A Palantir-style logo flashes on every HUD for half a second when Drone Swarm deploys; the US flag flashes when a Nuke is called',
+      'RustRig darkness lifted ~25% - brighter ambient fill and exposure in the darkest corners',
+      'Scoped ADS sights are aligned per weapon (iron sights and optics only, no artificial reticle overlay once aimed)',
+      'Glass-break debris and shader work is pre-built and deferred so breaking windows no longer hitches',
+      'Pass 67.1 is pinned as the Stable Singleplayer channel, flagged as needing multiplayer testing',
+    ]),
+  }),
+  Object.freeze({
     id: 'pass66',
     pass: 'PASS 67.1',
     title: 'The Big One — Mobile Controls & Polish',
-    releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
+    releasedAt: '2026-08-03T11:34:38+01:00',
     areas: Object.freeze(['MOBILE', 'STABILITY', 'COMBAT', 'AI', 'VEHICLES', 'DESTRUCTION', 'HUD', 'GRAPHICS']),
-    summary: 'Pass 67.1 ships The Big One with full touch support - dual on-screen thumbsticks, action buttons and a landscape-locked compact HUD - plus un-mirrored first-person arms, a glass-break frame-hitch fix, scoped-ADS repairs and regenerated chopper-gunner / carpet-bomber support aircraft, while the byte-exact Pass 63 build remains selectable as Stable.',
+    summary: 'Pass 67.1 ships The Big One with full touch support - dual on-screen thumbsticks, action buttons and a landscape-locked compact HUD - plus un-mirrored first-person arms, a glass-break frame-hitch fix, scoped-ADS repairs and regenerated chopper-gunner / carpet-bomber support aircraft, now pinned as the Stable Singleplayer build awaiting multiplayer testing.',
     highlights: Object.freeze([
       'Mobile play adds a left move thumbstick, a right look/aim thumbstick and FIRE / JUMP / ADS / RELOAD / CROUCH / GRENADE / KNIFE buttons, with an options toggle and auto-detection on touch devices',
       'Starting a match on mobile enters fullscreen and locks to landscape, and the HUD compacts so consoles never overlap the on-screen controls; a rotate hint covers devices without an orientation-lock API',

@@ -1508,18 +1508,18 @@ function updateFlamethrowerGroundFires(now: number): void {
       // Damage players/bots within the ground fire radius.
       const r2 = FLAMETHROWER_GROUND_FIRE_RADIUS_M * FLAMETHROWER_GROUND_FIRE_RADIUS_M;
       if (player.alive && player.position.distanceToSquared(fire.point) < r2
-        && (network.role !== 'host' || areHostile(fire.ownerTeam, player.team))) {
-        applyLocalDamage(FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, 'flamethrower-ground-fire', fire.ownerId);
+        && areCombatantsHostile(fire.ownerId, fire.ownerTeam, player.id, player.team)) {
+        applyDamage(FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, fire.ownerId, 1, false, { kind: 'killstreak', effect: 'carpet-bomber' });
       }
       for (const bot of [...bots.values()]) {
         if (!bot.alive) continue;
         const dx = bot.position.x - fire.point.x;
         const dz = bot.position.z - fire.point.z;
-        if (dx * dx + dz * dz < r2 && areHostile(fire.ownerTeam, bot.team)) {
-          applyBotDamage(bot, FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, 'body', { weaponOrEffect: 'flamethrower-ground-fire' }, fire.ownerId);
+        if (dx * dx + dz * dz < r2 && areCombatantsHostile(fire.ownerId, fire.ownerTeam, bot.id, bot.team)) {
+          applyBotDamage(bot, FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, 'body', { kind: 'killstreak', effect: 'carpet-bomber' }, fire.ownerId);
         }
       }
-      spawnImpactFlash(fire.point, 'fire', new THREE.Vector3(0, 1, 0));
+      spawnImpactFlash(fire.point, 'concrete', new THREE.Vector3(0, 1, 0));
     }
   }
 }
@@ -1690,8 +1690,10 @@ let matchWebGpuQualityFrozen = false;
 renderRuntime.setPixelRatio(Math.min(window.devicePixelRatio, adaptiveQuality.telemetry().pixelRatioCap));
 let activeArenaVisualDefinition: ArenaVisualDefinition | null = null;
 
+let possessionRenderPixelRatioScale = 1;
+
 function applyAdaptiveRenderBudget(pixelRatioCap: number): void {
-  renderRuntime.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatioCap));
+  renderRuntime.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatioCap * possessionRenderPixelRatioScale));
   const effectsBudget = applyGraphicsPreferenceBudget(graphicsEffectsBudget(renderProfile, pixelRatioCap));
   graphicsRefinement.setBudget(effectsBudget);
   atomicSignal?.setEffectsBudget(effectsBudget);
@@ -13729,7 +13731,7 @@ function tryFire(now: number): void {
           ownerTeam: player.team,
           point: authoritativeEnd.clone(),
           actionNonce: randomNonce(),
-          expiresAt: now + 5_000,
+          expiresAt: now + FLAMETHROWER_GROUND_FIRE_DURATION_MS,
           nextPulseAt: now + FLAMETHROWER_GROUND_FIRE_PULSE_MS,
         });
       }
@@ -17842,6 +17844,15 @@ function hideGunnerCockpitHud(): void {
 
 function updateKillstreakPossession(now: number): void {
   const possession = localKillstreakActorSnapshot()?.possession;
+  // Piloted Drone / Chopper Gunner views render the full arena from altitude;
+  // drop the internal render resolution ~25% while possessed so frame time
+  // stays smooth (restored on exit).
+  const desiredScale = possession ? 0.75 : 1;
+  if (possessionRenderPixelRatioScale !== desiredScale) {
+    possessionRenderPixelRatioScale = desiredScale;
+    applyAdaptiveRenderBudget(adaptiveQuality.telemetry().pixelRatioCap);
+    resize();
+  }
   if (!possession) {
     killstreakPresentation.setFirstPersonEntity(null);
     hideGunnerCockpitHud();
@@ -19472,9 +19483,12 @@ function updatePhysics(dt: number): void {
   player.velocity.x = integrated.x;
   player.velocity.z = integrated.z;
 
-  if (player.hp < 100 && now - lastDamageAt >= 5_000) {
+  // Adrenaline boost instantly restarts health regen and adds +1 hp/s passive
+  // regen for its duration. The 5s damage-delay is waived while the boost runs.
+  const adrenalineActive = (localKillstreakActorSnapshot()?.adrenalineRemainingMs ?? 0) > 0;
+  if (player.hp < 100 && (adrenalineActive || now - lastDamageAt >= 5_000)) {
     const healthBeforeRegen = player.hp;
-    player.hp = Math.min(100, player.hp + 18 * dt);
+    player.hp = Math.min(100, player.hp + (adrenalineActive ? 19 : 18) * dt);
     if (Math.floor(healthBeforeRegen) !== Math.floor(player.hp) || player.hp === 100) {
       recordMatchDiagnostic('health-regen', 'accepted', {
         actorId: player.id,

@@ -193,7 +193,7 @@ describe('flare projectile system', () => {
     source.update(0.05, 550, callbacks({ onBurnPulse: pulse }));
     const checkpoint = source.checkpointAuthority(550)!;
     expect(checkpoint.effects[0]).toMatchObject({
-      phase: 'burn', remainingMs: 3_500, nextBurnPulseRemainingMs: 500, burnPulseIndex: 1,
+      phase: 'burn', remainingMs: 4_500, nextBurnPulseRemainingMs: 500, burnPulseIndex: 1,
     });
 
     const restored = new FlareProjectileSystem(new THREE.Scene(), true);
@@ -202,13 +202,13 @@ describe('flare projectile system', () => {
       accepted: true, restored: 1, skippedExpired: 0, skippedBurnPulses: 2, poolExhaustions: 0,
     });
     expect(restored.inspectActiveReplicas(-1_000)[0]).toMatchObject({
-      ownerId: 'guest-1', authority: true, phase: 'burn', remainingMs: 2_300,
+      ownerId: 'guest-1', authority: true, phase: 'burn', remainingMs: 3_300,
     });
     expect(pulse).not.toHaveBeenCalled();
 
     const expired = new FlareProjectileSystem(new THREE.Scene(), true);
-    expect(expired.restoreAuthorityCheckpoint(checkpoint, 3_500, 0)).toEqual({
-      accepted: true, restored: 0, skippedExpired: 1, skippedBurnPulses: 7, poolExhaustions: 0,
+    expect(expired.restoreAuthorityCheckpoint(checkpoint, 5_000, 0)).toEqual({
+      accepted: true, restored: 0, skippedExpired: 1, skippedBurnPulses: 9, poolExhaustions: 0,
     });
     expect(expired.inspectActiveReplicas(0)).toEqual([]);
   });

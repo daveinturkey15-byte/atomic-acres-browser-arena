@@ -25,17 +25,17 @@ describe('Pass 66 two-channel release topology', () => {
     });
   });
 
-  it('uses schema 4 and pins stable Pass 63 by exact production source, Pages subtree, and runtime digest', () => {
+  it('uses schema 4 and pins stable Pass 67.1 by exact production source, Pages subtree, and runtime digest', () => {
     expect(config.schemaVersion).toBe(4);
     expect(config.stable).toEqual({
-      pass: 'PASS 63',
-      label: 'NEW NETCODE',
+      pass: 'PASS 67.1',
+      label: 'STABLE SINGLEPLAYER',
       description: expect.any(String),
-      sourceSha: '1bd55076c952080d5f7a8a5b0b8869aaa0646a76',
-      pagesSha: '2201a606a8c9f83d441036eac07dc140bd7e63f5',
-      pagesPath: 'channels/experimental-netcode-pass',
-      runtimeFileCount: 119,
-      runtimeTreeSha256: '61666de694ea6bd62391c1e0661ffcc2864142bb569407c93a2ebdfd28031ce7',
+      sourceSha: '8c3ad1cd4d819aba79f07c01c16c8c4294fd14c1',
+      pagesSha: '271cea28299570af8def30e879701ddbd3c4bc12',
+      pagesPath: 'channels/recent-stable',
+      runtimeFileCount: 508,
+      runtimeTreeSha256: 'd8d444578e83a408c2e4d63ca4d1c2c5b705521f565fee6a58daffeb1e205ce9',
       path: 'channels/recent-stable',
     });
   });
@@ -53,13 +53,13 @@ describe('Pass 66 two-channel release topology', () => {
     expect(JSON.stringify(config)).not.toContain('channels/new-netcode');
   });
 
-  it('renders exactly live Pass 66 The Big One and stable Pass 63 choices', () => {
+  it('renders exactly live Pass 68 The Big One and stable Pass 67.1 choices', () => {
     expect(shell).toContain("['experimental', 'stable']");
     expect(shell).not.toContain("['normal', 'stable', 'experimental']");
     expect(shell).toContain("key === 'stable' ? 'STABLE' : 'LIVE'");
-    expect(shellHtml).toContain('Pass 67');
+    expect(shellHtml).toContain('Pass 68');
     expect(shellHtml).toContain('The Big One');
-    expect(shellHtml).toContain('byte-exact Pass 63 production release');
+    expect(shellHtml).toContain('stable singleplayer');
     expect(shellHtml).toContain('Nuke Town');
     expect(shellHtml).not.toContain('Atomic Acres');
     expect(shellHtml).not.toContain('Pass 59');
