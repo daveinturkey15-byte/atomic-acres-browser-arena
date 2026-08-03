@@ -948,6 +948,44 @@ export function applyShedStructuralBlast(
   }
 
   if (request.blastClass === 'carpet-bomber-obliteration') {
+    // Owner requirement: a bomb must knock the shed over by itself. Blast-
+    // detached panels get an outward throw from the blast origin plus a pitch
+    // so they visibly fly out and settle flat as wreckage instead of standing
+    // upright waiting for a player push. All values derive from the chunk id
+    // so the replicated host state stays deterministic.
+    const clampSpeed = (value: number, maximum: number): number => Math.max(-maximum, Math.min(maximum, value));
+    const thrown = majorDebris.map((body) => {
+      if (body.velocityQ.xQ !== 0 || body.velocityQ.yQ !== 0 || body.velocityQ.zQ !== 0) return body;
+      let hash = 0x811c9dc5 ^ (body.chunkId.length + 1);
+      for (let index = 0; index < body.chunkId.length; index += 1) {
+        hash = Math.imul(hash ^ body.chunkId.charCodeAt(index), 0x01000193);
+      }
+      hash >>>= 0;
+      const unit = (n: number): number => ((hash >>> n) & 0xffff) / 0xffff;
+      const awayX = body.poseQ.position.xQ / 1_000 - request.originLocal.x;
+      const awayZ = body.poseQ.position.zQ / 1_000 - request.originLocal.z;
+      const away = Math.hypot(awayX, awayZ);
+      const outward = away > 0.05 ? 1 / away : 0;
+      return Object.freeze({
+        ...body,
+        velocityQ: Object.freeze({
+          xQ: Math.round(clampSpeed(awayX * outward * (3.0 + unit(0) * 1.4), 9) * 1_000),
+          yQ: Math.round(clampSpeed(2.2 + unit(8) * 1.8, 9) * 1_000),
+          zQ: Math.round(clampSpeed(awayZ * outward * (3.0 + unit(16) * 1.4), 9) * 1_000),
+        }),
+        angularVelocityQ: Object.freeze({
+          xQ: Math.round((unit(24) * 2 - 1) * 4.2 * 1_000),
+          yQ: Math.round((unit(32) * 2 - 1) * 1.6 * 1_000),
+          zQ: Math.round((unit(40) * 2 - 1) * 4.2 * 1_000),
+        }),
+        flat: false,
+        sleeping: false,
+      });
+    });
+    majorDebris = Object.freeze(thrown);
+    // Every remaining surface (including non-detachable fixed panels) is
+    // forced to detached so the intact shell cannot linger beside the
+    // thrown wreckage.
     surfaces = Object.freeze(surfaces.map((surface) => surface.stage === 'detached' ? surface : Object.freeze({
       ...surface,
       healthQ: 1_000_000,

@@ -2273,15 +2273,20 @@ export class KillstreakPresentation {
       const possessed = entity.id === this.firstPersonEntityId;
       const phaseReset = !firstProjection && presented.root.userData.supportSnapshotPhase !== entity.phase;
       const teleported = !firstProjection && presented.root.position.distanceToSquared(presented.target) > 64;
-      if (firstProjection || phaseReset || teleported || possessed) {
+      if (firstProjection || phaseReset || teleported || possessed && firstProjection) {
         presented.root.position.copy(presented.target);
         // Preserve the canonical authored YXZ components on deterministic
         // snaps; assigning the equivalent quaternion can re-express the Euler
         // triplet near a gimbal boundary even though orientation is unchanged.
         presented.root.rotation.copy(presented.attitudeEuler);
       } else {
-        presented.root.position.lerp(presented.target, 0.38);
-        presented.root.quaternion.slerp(presented.attitudeTarget, 0.38);
+        // Possessed entities are refreshed at frame cadence while possessed
+        // (see refreshLocalKillstreakSnapshot), so a tight lerp keeps the
+        // first-person camera silky at high refresh rates instead of stepping
+        // at the 20 Hz recipient-snapshot cadence.
+        const blend = possessed ? 0.55 : 0.38;
+        presented.root.position.lerp(presented.target, blend);
+        presented.root.quaternion.slerp(presented.attitudeTarget, blend);
       }
       presented.root.userData.supportSnapshotPhase = entity.phase;
       for (const mixer of presented.mixers) mixer.setTime(nowMs / 1_000);

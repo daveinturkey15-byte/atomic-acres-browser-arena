@@ -97,7 +97,10 @@ export function createFracturedWindowDebrisVisual(options: WindowGlassDebrisVisu
   root.userData.fragmentCount = WINDOW_GLASS_DEBRIS_FRAGMENT_COUNT;
   root.userData.intactPaneMeshCount = 0;
 
-  const shardMaterial = (options.reducedRenderMode ? sharedShardMaterialReduced : sharedShardMaterialTemplate).clone();
+  // Reuse the single prewarmed material instance for every break. Cloning per
+  // break creates a new RenderObject whose first draw triggers a WebGPU shader
+  // pipeline compile on the shot frame (the reported glass-break freeze).
+  const shardMaterial = options.reducedRenderMode ? sharedShardMaterialReduced : sharedShardMaterialTemplate;
   const depthScale = Math.max(0.006, options.halfExtents.z * 0.32);
   const shards = new THREE.Mesh(sharedShardGeometry, shardMaterial);
   shards.name = `${options.id}:shard-cluster`;
@@ -132,11 +135,8 @@ export async function prewarmFracturedWindowDebrisVisual(
     await runtime.compileAndRender(root, camera, scene);
   } finally {
     root.removeFromParent();
-    const shards = root.getObjectByName('prewarmed-window-debris:shard-cluster');
-    if (shards instanceof THREE.Mesh) {
-      const materials = Array.isArray(shards.material) ? shards.material : [shards.material];
-      for (const material of materials) material.dispose();
-    }
+    // The debris visuals now share the single prewarmed material instance, so
+    // never dispose it here - live breaks reuse the same pipeline.
     root.clear();
   }
 }

@@ -2718,6 +2718,7 @@ function invalidateActiveWorldCollisionCache(): void {
 let gunRangeTestBayDoorColliders: readonly DynamicWorldCollider[] = [];
 let gunRangeTestBayDoorColliderArena: THREE.Object3D | null = null;
 let gunRangeTestBayTimerResetLastEpoch = -1;
+let gunRangeTestBayPlayerWasInside = false;
 
 function activeGunRangeTestBayDoorColliders(activeArena: ArenaMap = arena): readonly DynamicWorldCollider[] {
   return activeArena === arena && selectedArena.id === 'gun-range'
@@ -3254,7 +3255,15 @@ function applyInteractiveWorldExplosions(requests: readonly Readonly<{
       }
     }
     for (const [bodyId, impulse] of strongestByBody) {
-      if (characterPhysics.applyMajorDebrisImpulse(bodyId, impulse.direction.multiplyScalar(impulse.magnitude))) {
+      // Apply the blast at a raised point on the panel (upper half) so the
+      // impulse creates toppling torque: a centre-of-mass impulse only slides
+      // upright panels, which read as "still standing, needs a push". A bomb
+      // must knock the shed over on its own.
+      const body = activeMajorDebrisPhysicsBodies().find((candidate) => candidate.id === bodyId);
+      const raisedPoint = body
+        ? new THREE.Vector3(body.position.x, body.position.y + 1.1, body.position.z)
+        : impulse.direction.clone();
+      if (characterPhysics.applyMajorDebrisImpulse(bodyId, impulse.direction.multiplyScalar(impulse.magnitude), raisedPoint)) {
         debrisImpulses += 1;
       }
     }
@@ -5698,9 +5707,32 @@ function createHostMatchCheckpoint(
   return checkpoint;
 }
 
-function persistActiveHostMatchCheckpoint(): boolean {
+let lastHostCheckpointPersistAtEpochMs = 0;
+let hostCheckpointPersistScheduled = false;
+/**
+ * Persist the bounded host checkpoint. Serializing the entire match state
+ * (bots, inventories, flare projectiles) and writing localStorage on the shot
+ * frame caused the reported flare-gun freeze. Writes are throttled to the
+ * documented two-second cadence and deferred to the idle lane; the most recent
+ * state is always what gets written.
+ */
+function persistActiveHostMatchCheckpoint(force = false): boolean {
   const storage = clientPersistentStorage();
   if (!storage) return false;
+  const nowEpochMs = Date.now();
+  if (!force && nowEpochMs - lastHostCheckpointPersistAtEpochMs < 2_000) {
+    if (!hostCheckpointPersistScheduled) {
+      hostCheckpointPersistScheduled = true;
+      scheduleBrowserPreparationIdleTask(() => {
+        hostCheckpointPersistScheduled = false;
+        lastHostCheckpointPersistAtEpochMs = Date.now();
+        const checkpoint = createHostMatchCheckpoint();
+        if (checkpoint) saveHostMatchCheckpoint(storage, checkpoint);
+      });
+    }
+    return true;
+  }
+  lastHostCheckpointPersistAtEpochMs = nowEpochMs;
   const checkpoint = createHostMatchCheckpoint();
   return checkpoint ? saveHostMatchCheckpoint(storage, checkpoint) : false;
 }
@@ -10686,16 +10718,34 @@ function persistentWindowDebrisId(windowId: string): string {
   return `window-debris:${canonical}`;
 }
 
+const pendingWindowDebrisSpawns = new Set<string>();
 function spawnPersistentWindowDebris(window: ArenaMap['breakableWindows'][number], normal: THREE.Vector3): void {
   const id = persistentWindowDebrisId(window.id);
-  if (persistentWindowDebris.has(id)) return;
+  if (persistentWindowDebris.has(id) || pendingWindowDebrisSpawns.has(id)) return;
   const counts = Object.freeze({
     shed: interactiveWorldRuntime?.shedMajorBodyCount() ?? 0,
     house: interactiveWorldRuntime?.houseMajorBodyCount() ?? 0,
     window: persistentWindowDebris.size,
   });
   if (!canAdmitMajorDebris(counts, 'window')) return;
+  pendingWindowDebrisSpawns.add(id);
+  // The pane transform, bounding-box analysis and the fractured-shard material
+  // clone all trigger real work (and a WebGPU shader compile for the cloned
+  // material) on the shot frame. Defer the whole spawn to the idle lane so a
+  // glass break never hitches; the pane visibility/authority is already
+  // committed and nothing gameplay-critical reads this debris synchronously.
+  scheduleBrowserPreparationIdleTask(() => {
+    pendingWindowDebrisSpawns.delete(id);
+    if (persistentWindowDebris.has(id)) return;
+    spawnPersistentWindowDebrisSynchronously(window, normal, id);
+  });
+}
 
+function spawnPersistentWindowDebrisSynchronously(
+  window: ArenaMap['breakableWindows'][number],
+  normal: THREE.Vector3,
+  id: string,
+): void {
   window.mesh.updateWorldMatrix(true, false);
   window.mesh.geometry.computeBoundingBox();
   const localSize = window.mesh.geometry.boundingBox?.getSize(new THREE.Vector3()) ?? new THREE.Vector3(1.4, 1.2, 0.04);
@@ -13724,8 +13774,10 @@ function tryFire(now: number): void {
     const visualStart = weaponView.muzzleWorldPosition(new THREE.Vector3()) ?? origin;
     if (flamethrowerShot) {
       flamethrowerStreamPresentation.emit(visualStart, authoritativeEnd, now);
-      // Spawn ground fire at impact point (stays 5s like napalm).
-      if (flamethrowerGroundFires.length < FLAMETHROWER_GROUND_FIRE_CAPACITY) {
+      // Spawn visible napalm ground fire at impact point (stays 5s like
+      // napalm) plus the damage lane.
+      const ignited = flamethrowerStreamPresentation.igniteGround(authoritativeEnd, now);
+      if (ignited && flamethrowerGroundFires.length < FLAMETHROWER_GROUND_FIRE_CAPACITY) {
         flamethrowerGroundFires.push({
           ownerId: player.id,
           ownerTeam: player.team,
@@ -15819,6 +15871,9 @@ function finishPendingFlareShot(
 
 function handleFlareImpact(impact: FlareProjectileImpact): void {
   timedMapWeaponAudit.flareImpacts += 1;
+  // Flare fire also ignites the floor like napalm for its full burn duration.
+  const groundPoint = new THREE.Vector3(impact.point.x, Math.max(0.06, impact.point.y), impact.point.z);
+  flamethrowerStreamPresentation.igniteGround(groundPoint, performance.now());
   const outcome = impact.authority && impact.target
     ? applyFlareTargetDamage(impact.target, impact.ownerId, impact.actionNonce, impact.directDamage, impact.point)
     : null;
@@ -17372,7 +17427,12 @@ function killstreakWorldState(): KillstreakWorld {
 function refreshLocalKillstreakSnapshot(now = performance.now(), force = true): boolean {
   if (network.role !== 'client') {
     const clockRegressed = now < lastLocalKillstreakSnapshotRefreshAt;
-    if (!force && !clockRegressed
+    // While the local player is piloting a drone/chopper gunner, refresh at
+    // frame cadence so the first-person camera follows the host runtime
+    // smoothly (120 Hz+ displays otherwise step at the 20 Hz recipient
+    // cadence and read as choppy despite a high frame rate).
+    const possessed = localKillstreakActorSnapshot()?.possession != null;
+    if (!force && !possessed && !clockRegressed
       && now - lastLocalKillstreakSnapshotRefreshAt < LOCAL_KILLSTREAK_SNAPSHOT_REFRESH_INTERVAL_MS) return false;
     killstreakSnapshot = killstreakRuntime.snapshotFor(player.id, now);
     lastLocalKillstreakSnapshotRefreshAt = now;
@@ -20362,16 +20422,20 @@ function updateHud(now: number): void {
   if (now - lastHudAt < 100) return;
   lastHudAt = now;
   if (gameStarted) {
-    // Gun Range: freeze and reset the 2-minute timer each time the player
-    // enters the killstreak test bay area.
+    // Gun Range: freeze and reset the 2-minute timer every time the player
+    // enters the killstreak test bay area, and keep it frozen while inside.
     if (selectedArena.id === 'gun-range' && matchState.phase === 'active' && player.alive) {
       const bay = GUN_RANGE_TEST_BAY_CONTRACT.bay.bounds;
       const inBay = player.position.x >= bay.minX && player.position.x <= bay.maxX
         && player.position.z >= bay.minZ && player.position.z <= bay.maxZ;
-      if (inBay && gunRangeTestBayTimerResetLastEpoch !== interactiveWorldMatchEpoch) {
+      const entered = inBay && !gunRangeTestBayPlayerWasInside;
+      gunRangeTestBayPlayerWasInside = inBay;
+      if (entered || inBay && gunRangeTestBayTimerResetLastEpoch !== interactiveWorldMatchEpoch) {
         gunRangeTestBayTimerResetLastEpoch = interactiveWorldMatchEpoch;
         const rules = currentMatchRules();
         const durationMs = rules.durationMs ?? 120_000;
+        // Freeze at the full duration: reset on every fresh entry, then keep
+        // the end anchored to now while inside so the clock never counts down.
         matchState = { phase: 'active', phaseStartedAt: now, endsAt: now + durationMs, winner: null };
       }
     }
