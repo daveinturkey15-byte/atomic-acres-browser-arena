@@ -3032,7 +3032,7 @@ export class WeaponPresentation {
         if (framing && Number.isFinite(framing.nearestDepth)) nearestDepth = Math.min(nearestDepth, framing.nearestDepth);
       }
       if (arms?.visible) {
-        const framing = measureCameraFraming(arms, this.camera, isAuthoredArmMesh);
+        const framing = measureCameraFraming(arms, this.camera);
         if (framing && Number.isFinite(framing.nearestDepth)) nearestDepth = Math.min(nearestDepth, framing.nearestDepth);
       }
       if (Number.isFinite(nearestDepth)) {
