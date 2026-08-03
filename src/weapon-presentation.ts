@@ -3018,6 +3018,18 @@ export class WeaponPresentation {
     this.centerSightReference(activeModel);
     if (arms && !meleeActive) this.solveArms(arms, activeModel, reloadPose);
     if (!authoredMeleeActive) this.solveRiggedArms(activeModel, reloadPose);
+    // Near-plane safety net: the recoil pitch can swing a viewmodel corner back
+    // toward the camera in a way that depends on arena geometry and camera
+    // pitch, so a fixed retreat floor is not enough. While the fire kick is
+    // active, push the weapon forward just enough that every bounding-box
+    // corner clears the near plane. Bounded to the kick window.
+    if (presentationKick > 0.05 && activeModel?.visible) {
+      const framing = measureCameraFraming(activeModel, this.camera);
+      if (framing && !framing.nearPlaneClear && Number.isFinite(framing.nearestDepth)) {
+        const push = Math.max(0, this.camera.near + 0.02 - framing.nearestDepth);
+        if (push > 0) this.root.position.z -= push;
+      }
+    }
     return actionEvents;
   }
 }

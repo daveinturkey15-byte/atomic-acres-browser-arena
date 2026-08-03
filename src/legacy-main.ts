@@ -19867,7 +19867,7 @@ function updatePhysics(dt: number): void {
   camera.fov = damp(camera.fov, targetFov, player.weapon === 'sniper' || player.weapon === 'm14-ebr' || player.weapon === 'railgun' ? 18 : 10, dt);
   camera.updateProjectionMatrix();
   sniperScopeActive = player.alive
-    && (player.weapon === 'sniper' || player.weapon === 'railgun')
+    && player.weapon === 'sniper'
     && adsHeld
     && weaponView.adsProgress() >= 0.9
     && Math.abs(camera.fov - aimingFov) < 0.35;
