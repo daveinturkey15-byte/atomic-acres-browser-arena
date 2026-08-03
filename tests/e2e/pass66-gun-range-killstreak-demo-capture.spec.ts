@@ -139,7 +139,7 @@ async function servedCandidateProvenance(): Promise<ServedCandidateProvenance> {
   const response = await fetch(provenanceUrl);
   if (!response.ok) throw new Error(`Candidate provenance request failed: ${response.status} ${provenanceUrl}`);
   const value = await response.json() as Record<string, unknown>;
-  if (value.schemaVersion !== 4 || value.channel !== 'the-big-one' || value.releasePass !== 'PASS 66'
+  if (value.schemaVersion !== 4 || value.channel !== 'the-big-one' || value.releasePass !== 'PASS 68'
     || value.path !== 'channels/the-big-one' || value.sourceSha !== expectedSourceSha
     || typeof value.treeSha256 !== 'string' || !/^[a-f0-9]{64}$/u.test(value.treeSha256)
     || !Number.isSafeInteger(value.exactRootFileCount) || (value.exactRootFileCount as number) <= 0) {
