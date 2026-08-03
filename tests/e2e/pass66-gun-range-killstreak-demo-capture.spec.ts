@@ -745,7 +745,13 @@ async function captureSupport(
     const baseline = await activationBaseline(page);
     await runtimeHealth(page);
     await applyCameraPose(page, overviewCameraPose(id, station!.position));
-    if (id === 'scout-sweep') {
+    // HUD-overview streaks hold a fixed camera; with a static bay the clip
+    // reads as frozen under the near-duplicate cadence gate (the 750 ms F
+    // lead-in alone exceeds the longest-run limit), and world-subject
+    // aircraft are small against the bay at the 96x54 probe. Circle the
+    // station while tracking it so the F target stays under the crosshair
+    // AND the clip carries real cinematic motion from its first frame.
+    {
       const stationTarget = { x: station!.position.x, y: 1.1, z: station!.position.z };
       await page.evaluate((target) => {
         window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraOrbit({
@@ -798,19 +804,6 @@ async function captureSupport(
     const proof = await runtimeProof(page, id, baseline);
     expect(proof.count, `${id} must produce its support-specific runtime evidence`).toBeGreaterThanOrEqual(expectedProof.minimumCount);
     expect(proof.revision, `${id} must advance canonical killstreak authority`).toBeGreaterThan(baseline.revision);
-
-    // Activation is live; the fixed overview camera alone reads as frozen at
-    // the 96x54 probe (the world-subject aircraft are small against the bay),
-    // so sweep the camera yaw across the bay for real cinematic motion.
-    if (id !== 'scout-sweep') {
-      const orbitPose = overviewCameraPose(id, station!.position);
-      await page.evaluate((pose) => {
-        window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraOrbit({
-          centerX: pose.position[0], centerY: pose.position[1], centerZ: pose.position[2],
-          radius: 3, orbitRate: 0.15, yawRate: 0.35, baseYaw: pose.yaw, pitch: 0.06, fov: pose.fov,
-        });
-      }, orbitPose);
-    }
 
     const visualSetup = await establishVisualSetup(page, id, baseline, station!.position);
     const visualProofObservedAt = Date.now();
