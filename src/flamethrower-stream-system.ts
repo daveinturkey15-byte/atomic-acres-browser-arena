@@ -225,6 +225,11 @@ export class FlamethrowerStreamSystem {
     const start = camera.getWorldPosition(new THREE.Vector3());
     const end = start.clone().addScaledVector(camera.getWorldDirection(new THREE.Vector3()), 8);
     this.emit(start, end, performance.now());
+    // Ignite a ground patch so the ground-fire InstancedMesh pipeline is
+    // compiled during deployment. Without this, the first live flare/flame
+    // ground hit draws a never-compiled material and hitches the shot frame
+    // (the reported flare-gun freeze).
+    this.igniteGround(start.clone().addScaledVector(camera.getWorldDirection(new THREE.Vector3()), 2.4), performance.now());
     this.light.visible = true;
     this.light.intensity = Number(this.light.userData.baseIntensity ?? 14);
     try {
@@ -246,7 +251,9 @@ export class FlamethrowerStreamSystem {
       this.light.visible = state.lightVisible;
       this.light.intensity = state.lightIntensity;
       this.light.position.copy(state.lightPosition);
+      this.groundActive.fill(0);
       this.writeMatrices();
+      this.writeGroundMatrices(0);
     }
   }
 

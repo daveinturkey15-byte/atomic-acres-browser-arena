@@ -104,7 +104,7 @@ function interact(state: ShedState, tick: number, sequence: number) {
 describe('Pass 65 destructible-world authority', () => {
   it('freezes exact consumers, caps, identifiers and definition geometry', () => {
     expect(validateDestructibleShedDefinition(definition)).toEqual([]);
-    expect(definition.caps).toEqual({ apertures: 32, dents: 24, majorChunks: 6, arenaAwakeMajorBodies: 18 });
+    expect(definition.caps).toEqual({ apertures: SHED_MAX_APERTURES, dents: SHED_MAX_DENTS, majorChunks: 6, arenaAwakeMajorBodies: 18 });
     expect(definition.consumers).toEqual([
       'movement', 'ballistics', 'grenades', 'ai-los', 'support-targeting', 'spawn-nav', 'rendering',
     ]);
@@ -274,7 +274,7 @@ describe('Pass 65 destructible-world authority', () => {
     for (let index = 0; index < SHED_MAX_APERTURES; index += 1) {
       const result = applyShedSheetImpact(definition, apertureState, {
         isHost: true, matchEpoch: 11, expectedRevision: apertureState.revision, surfaceId: 'wall-north',
-        uQ: -9_000 + index * 500, vQ: 0, radiusUQ: 100, radiusVQ: 100,
+        uQ: -8_000 + (index % 20) * 400, vQ: (index % 5) * 1_000, radiusUQ: 100, radiusVQ: 100,
         damageQ: 45, penetrationEnergyQ: 45,
       });
       expect(result.accepted).toBe(true);
@@ -291,7 +291,7 @@ describe('Pass 65 destructible-world authority', () => {
     for (let index = 0; index < SHED_MAX_DENTS; index += 1) {
       const result = applyShedSheetImpact(definition, dentState, {
         isHost: true, matchEpoch: 11, expectedRevision: dentState.revision, surfaceId: 'wall-east',
-        uQ: -9_000 + index * 600, vQ: 0, radiusUQ: 100, radiusVQ: 100,
+        uQ: -8_000 + (index % 20) * 400, vQ: (index % 5) * 1_000, radiusUQ: 100, radiusVQ: 100,
         damageQ: 20, penetrationEnergyQ: 0,
       });
       expect(result.accepted).toBe(true);

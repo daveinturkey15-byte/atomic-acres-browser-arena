@@ -1505,17 +1505,17 @@ function updateFlamethrowerGroundFires(now: number): void {
     }
     if (now >= fire.nextPulseAt) {
       fire.nextPulseAt = now + FLAMETHROWER_GROUND_FIRE_PULSE_MS;
-      // Damage players/bots within the ground fire radius.
+      // Napalm burns EVERYONE who stands in it - self, friends and enemies
+      // alike (same friendly-fire rule as the Carpet Bomber).
       const r2 = FLAMETHROWER_GROUND_FIRE_RADIUS_M * FLAMETHROWER_GROUND_FIRE_RADIUS_M;
-      if (player.alive && player.position.distanceToSquared(fire.point) < r2
-        && areCombatantsHostile(fire.ownerId, fire.ownerTeam, player.id, player.team)) {
+      if (player.alive && player.position.distanceToSquared(fire.point) < r2) {
         applyDamage(FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, fire.ownerId, 1, false, { kind: 'killstreak', effect: 'carpet-bomber' });
       }
       for (const bot of [...bots.values()]) {
         if (!bot.alive) continue;
         const dx = bot.position.x - fire.point.x;
         const dz = bot.position.z - fire.point.z;
-        if (dx * dx + dz * dz < r2 && areCombatantsHostile(fire.ownerId, fire.ownerTeam, bot.id, bot.team)) {
+        if (dx * dx + dz * dz < r2) {
           applyBotDamage(bot, FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, 'body', { kind: 'killstreak', effect: 'carpet-bomber' }, fire.ownerId);
         }
       }
@@ -18013,6 +18013,18 @@ function updatePass65KillstreakRuntime(now: number): void {
       const point = new THREE.Vector3(...impact.position);
       if (impact.source === 'carpet-bomber') {
         carpetWorldImpacts.push({ point, radius: 4.5, maximumDamage: 240, shedBlastClass: 'carpet-bomber-obliteration' });
+        // Carpet bombs leave burning napalm on the ground too.
+        if (flamethrowerGroundFires.length < FLAMETHROWER_GROUND_FIRE_CAPACITY) {
+          flamethrowerStreamPresentation.igniteGround(point, now);
+          flamethrowerGroundFires.push({
+            ownerId: player.id,
+            ownerTeam: player.team,
+            point: point.clone(),
+            actionNonce: randomNonce(),
+            expiresAt: now + FLAMETHROWER_GROUND_FIRE_DURATION_MS,
+            nextPulseAt: now + FLAMETHROWER_GROUND_FIRE_PULSE_MS,
+          });
+        }
         audio.explosion(now);
         supportExplosionPresentation.emit(point, 4.5, now);
       } else {

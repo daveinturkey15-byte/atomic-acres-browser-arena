@@ -1,8 +1,8 @@
 import { canonicalSha256 } from './canonical-state';
 import type { Point3 } from './collision';
 
-export const SHED_MAX_APERTURES = 32;
-export const SHED_MAX_DENTS = 24;
+export const SHED_MAX_APERTURES = 96;
+export const SHED_MAX_DENTS = 64;
 export const SHED_MAX_MAJOR_CHUNKS = 6;
 export const ARENA_MAX_AWAKE_SHED_BODIES = 18;
 export const SHED_DOOR_TRAVEL_TICKS = 60;
