@@ -1,9 +1,0 @@
-{
-  "schemaVersion": 4,
-  "channel": "experimental-netcode-pass",
-  "releasePass": "PASS 63",
-  "sourceSha": "1bd55076c952080d5f7a8a5b0b8869aaa0646a76",
-  "path": "channels/experimental-netcode-pass",
-  "exactRootFileCount": 119,
-  "treeSha256": "61666de694ea6bd62391c1e0661ffcc2864142bb569407c93a2ebdfd28031ce7"
-}
