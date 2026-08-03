@@ -688,18 +688,17 @@ async function captureSupport(
     if (id === 'scout-sweep') {
       const orbitPose = overviewCameraPose(id, station!.position);
       await page.evaluate((pose) => {
-        const startedAt = performance.now();
-        window.setInterval(() => {
-          const elapsed = (performance.now() - startedAt) / 1_000;
-          window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(
-            pose.position[0] + Math.sin(elapsed * 0.22) * 2.4,
-            pose.position[1],
-            pose.position[2] + Math.cos(elapsed * 0.22) * 2.4,
-            pose.yaw + elapsed * 0.4,
-            pose.pitch,
-            pose.fov,
-          );
-        }, 80);
+        window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraOrbit({
+          centerX: pose.position[0],
+          centerY: pose.position[1],
+          centerZ: pose.position[2],
+          radius: 2.4,
+          orbitRate: 0.22,
+          yawRate: 0.4,
+          baseYaw: pose.yaw,
+          pitch: pose.pitch,
+          fov: pose.fov,
+        });
       }, orbitPose);
     }
     await startCaptureTelemetryProbe(page, id, baseline);

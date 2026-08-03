@@ -4512,6 +4512,16 @@ let debugCaptureCameraUsesQuaternion = false;
 let debugCaptureCameraFov: number | null = null;
 let debugCaptureFixedVisualTimeMs: number | null = null;
 let debugCaptureViewmodelHidden = false;
+// Optional game-loop-owned orbit for capture cameras. Page-context intervals
+// are throttled when the tab loses focus (which the F-arbitration key press
+// provokes), freezing the clip; driving the orbit from the presentation loop
+// keeps the camera in continuous motion exactly while frames are presented.
+let debugCaptureOrbit: {
+  centerX: number; centerY: number; centerZ: number;
+  radius: number; orbitRate: number; yawRate: number;
+  baseYaw: number; pitch: number; fov: number;
+  startedAtMs: number;
+} | null = null;
 let matchState: MatchState = createMatch(performance.now(), selectedArena.matchRules);
 let matchFinished = false;
 let matchDiagnostics: MatchDiagnostics | null = null;
@@ -22818,7 +22828,20 @@ function frame(now: number, scheduleNext = true): void {
     updateDeathDrops(now);
     updateFInteractionPrompt(now);
     if (debugCaptureCameraActive) {
-      camera.position.copy(debugCaptureCameraPosition);
+      if (debugCaptureOrbit) {
+        const orbitElapsed = Math.max(0, now - debugCaptureOrbit.startedAtMs) / 1_000;
+        const orbitAngle = orbitElapsed * debugCaptureOrbit.orbitRate;
+        debugCaptureCameraPosition.set(
+          debugCaptureOrbit.centerX + Math.sin(orbitAngle) * debugCaptureOrbit.radius,
+          debugCaptureOrbit.centerY,
+          debugCaptureOrbit.centerZ + Math.cos(orbitAngle) * debugCaptureOrbit.radius,
+        );
+        debugCaptureCameraYaw = debugCaptureOrbit.baseYaw + orbitElapsed * debugCaptureOrbit.yawRate;
+        debugCaptureCameraPitch = debugCaptureOrbit.pitch;
+        camera.position.copy(debugCaptureCameraPosition);
+      } else {
+        camera.position.copy(debugCaptureCameraPosition);
+      }
       if (debugCaptureCameraUsesQuaternion) camera.quaternion.copy(debugCaptureCameraQuaternion);
       else camera.rotation.set(debugCaptureCameraPitch, debugCaptureCameraYaw, 0, 'YXZ');
       if (debugCaptureCameraFov !== null) {
@@ -23420,6 +23443,17 @@ const debugWindow = window as Window & {
       fixedVisualTimeMs?: number,
       seed?: number,
     ) => void;
+    setCaptureCameraOrbit: (orbit: {
+      centerX: number;
+      centerY: number;
+      centerZ: number;
+      radius: number;
+      orbitRate: number;
+      yawRate: number;
+      baseYaw: number;
+      pitch: number;
+      fov?: number;
+    } | null) => void;
     setArenaReviewCamera: (cameraId: string) => boolean;
     setPass64SystemVisibility: (name: 'sky' | 'mist' | 'smoke' | 'dust' | 'grass' | 'water', visible: boolean) => boolean;
     setCaptureViewmodelHidden: (hidden: boolean) => void;
@@ -25004,6 +25038,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     debugCaptureCameraActive = [x, y, z, yaw, pitch].every(Number.isFinite);
     debugCaptureCameraUsesQuaternion = false;
     if (!debugCaptureCameraActive) {
+      debugCaptureOrbit = null;
       debugCaptureCameraFov = null;
       debugCaptureFixedVisualTimeMs = null;
       pass64TslSystems?.clearReviewCamera();
@@ -25059,6 +25094,32 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       activeArenaReviewExposure = null;
       activeArenaReviewHud = null;
     }
+  },
+  setCaptureCameraOrbit: (orbit) => {
+    // Game-loop-owned cinematic drift for capture cameras. Runs every
+    // presented frame so the motion survives focus loss and page-timer
+    // throttling; pass null to disable.
+    if (orbit === null) {
+      debugCaptureOrbit = null;
+      return;
+    }
+    debugCaptureOrbit = {
+      centerX: orbit.centerX,
+      centerY: orbit.centerY,
+      centerZ: orbit.centerZ,
+      radius: Math.max(0, orbit.radius),
+      orbitRate: orbit.orbitRate,
+      yawRate: orbit.yawRate,
+      baseYaw: orbit.baseYaw,
+      pitch: THREE.MathUtils.clamp(orbit.pitch, -1.5, 1.5),
+      fov: THREE.MathUtils.clamp(Number.isFinite(orbit.fov) ? orbit.fov! : camera.fov, 35, 100),
+      startedAtMs: performance.now(),
+    };
+    debugCaptureCameraActive = true;
+    debugCaptureCameraUsesQuaternion = false;
+    debugCaptureCameraFov = debugCaptureOrbit.fov;
+    camera.fov = debugCaptureOrbit.fov;
+    camera.updateProjectionMatrix();
   },
   setArenaReviewCamera: (cameraId) => {
     const reviewCamera = activeArenaVisualDefinition?.reviewCameras.find((entry) => entry.id === cameraId);
