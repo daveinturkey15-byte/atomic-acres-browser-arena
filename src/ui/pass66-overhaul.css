@@ -800,3 +800,60 @@
   color: #ffd9cf;
 }
 #mobile-touch-controls .mtc-fire:active { background: rgba(150, 45, 28, 0.8); }
+
+/* Mobile live-play compact HUD. Applied only while the touch overlay is active
+   (body.mtc-live) so desktop and menu layouts are untouched. Lifts the bottom
+   consoles above the thumbsticks and collapses the support list so nothing
+   overlaps the on-screen controls. */
+body.mtc-live #hud {
+  --hud-edge: 8px;
+  --hud-map-width: 128px;
+}
+body.mtc-live .hud-map-console { top: 84px; width: var(--hud-map-width); padding: 6px; }
+body.mtc-live #minimap { width: 100%; height: auto; }
+body.mtc-live .hud-mission-console { right: var(--hud-edge); }
+body.mtc-live #matchbar { min-height: 52px; padding: 7px 8px; }
+body.mtc-live #timer { font-size: 24px; }
+body.mtc-live #scoreline b { font-size: 18px; }
+body.mtc-live #objective, body.mtc-live .hud-performance-row { display: none; }
+
+/* Operator (bottom-left) sits above the move thumbstick. */
+body.mtc-live .hud-operator-console { bottom: 172px; width: min(150px, 40vw); padding: 8px; }
+body.mtc-live #health-block b { font-size: 34px; }
+body.mtc-live #combat-stats { display: none; }
+
+/* Weapon (bottom-right) sits above the look thumbstick. */
+body.mtc-live .hud-weapon-console { bottom: 172px; right: var(--hud-edge); width: min(150px, 42vw); }
+body.mtc-live #weapon-block #ammo { font-size: 40px; }
+body.mtc-live .reserve-stack em { font-size: 20px; }
+
+/* Collapse the killstreak list to a slim top-centre streak pill so it never
+   covers the action buttons. */
+body.mtc-live #support-block { left: 50%; right: auto; transform: translateX(-50%); top: 8px; bottom: auto; width: auto; padding: 6px 10px; }
+body.mtc-live #support-block .support-list, body.mtc-live #support-block .support-help { display: none; }
+body.mtc-live .support-heading { min-height: 0; margin-bottom: 0; }
+
+body.mtc-live #killfeed { top: 132px; width: 160px; }
+body.mtc-live #damage-feeds { top: 160px; width: min(200px, 52vw); }
+body.mtc-live #pause-hint { display: none; }
+
+/* Portrait fallback (iOS has no orientation-lock API): prompt the player to
+   rotate rather than presenting a cramped, overlapping portrait HUD. */
+@media (orientation: portrait) {
+  body.mtc-live::after {
+    content: 'ROTATE DEVICE · LANDSCAPE RECOMMENDED';
+    position: fixed;
+    left: 50%;
+    top: 10px;
+    transform: translateX(-50%);
+    z-index: 120;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: rgba(7, 18, 24, 0.85);
+    border: 1px solid rgba(127, 246, 255, 0.5);
+    color: #d9f6f4;
+    font: 700 12px/1 'Barlow Condensed', 'Bahnschrift Condensed', 'Arial Narrow', sans-serif;
+    letter-spacing: 0.08em;
+    pointer-events: none;
+  }
+}

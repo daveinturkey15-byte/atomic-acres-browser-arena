@@ -20844,7 +20844,15 @@ function pollMobileTouch(): void {
   // The overlay only ever intercepts input while a match is live and the menu
   // is closed; otherwise it stays hidden so menus, lobby and options remain
   // tappable even when the mobile-controls toggle is enabled.
-  touch.setInMatch(gameStarted && matchState.phase === 'active' && menu.classList.contains('hidden'));
+  const inMatch = gameStarted && matchState.phase === 'active' && menu.classList.contains('hidden');
+  touch.setInMatch(inMatch);
+  const live = inMatch && touch.isEnabled();
+  if (live !== mobilePresentationActive) {
+    mobilePresentationActive = live;
+    document.body.classList.toggle('mtc-live', live);
+    if (live) requestMobileLandscapePresentation();
+    else releaseMobileLandscapePresentation();
+  }
   if (!touch.isEnabled()) return;
   if (touch.state.firing) setLocalTriggerHeld(true);
   if (touch.state.ads) adsHeld = admittedAdsHeld(true);
@@ -20853,6 +20861,34 @@ function pollMobileTouch(): void {
   const lookScale = sensitivity * (adsHeld ? 0.62 : 1);
   player.yaw -= look.x * lookScale;
   player.pitch = THREE.MathUtils.clamp(player.pitch - look.y * lookScale, -1.42, 1.42);
+}
+
+let mobilePresentationActive = false;
+
+/**
+ * Mobile play is authored for landscape: enter fullscreen (a prerequisite for
+ * orientation lock on Android) and lock to landscape. Best-effort - iOS Safari
+ * has no orientation-lock API, so the CSS portrait hint covers that case.
+ */
+function requestMobileLandscapePresentation(): void {
+  const docEl = document.documentElement as HTMLElement & { requestFullscreen?: () => Promise<void> };
+  const lock = (): void => {
+    const orientation = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
+    orientation.lock?.('landscape').catch(() => {});
+  };
+  if (!document.fullscreenElement && typeof docEl.requestFullscreen === 'function') {
+    docEl.requestFullscreen().then(lock).catch(() => {});
+  } else {
+    lock();
+  }
+}
+
+function releaseMobileLandscapePresentation(): void {
+  const orientation = screen.orientation as ScreenOrientation & { unlock?: () => void };
+  orientation.unlock?.();
+  if (document.fullscreenElement && typeof document.exitFullscreen === 'function') {
+    document.exitFullscreen().catch(() => {});
+  }
 }
 
 textChatForm.addEventListener('submit', (event) => {
