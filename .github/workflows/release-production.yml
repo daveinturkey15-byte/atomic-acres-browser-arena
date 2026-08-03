@@ -69,7 +69,12 @@ jobs:
         run: npm run verify:release-tree
       - name: Install topology browser
         run: npx playwright install --with-deps chromium
-      - name: Stage live Pass 66 The Big One and byte-exact stable Pass 63
+      - name: Rebuild Pass 63 rollback from approved source
+        run: |
+          git worktree add artifacts/pass63-rollback-src ac85e9b8b46cc2370aee903d564ecf3c4682b24c
+          (cd artifacts/pass63-rollback-src && npm ci --ignore-scripts && VITE_MATCH_BUILD_ID=ac85e9b8b46cc2370aee903d564ecf3c4682b24c VITE_RELEASED_AT="$RELEASE_BUILT_AT" npm run build)
+          echo "RELEASE_ROLLBACK_DIST=$(pwd)/artifacts/pass63-rollback-src/dist" >> "$GITHUB_ENV"
+      - name: Stage live Pass 68 The Big One, byte-exact stable Pass 67.1 and rebuilt Pass 63 rollback
         run: |
           git fetch --no-tags origin gh-pages:refs/remotes/origin/gh-pages
           npm run verify:benchmark -- --verify-git
@@ -79,6 +84,7 @@ jobs:
         env:
           SOURCE_SHA: ${{ inputs.source_sha }}
           RELEASE_PASS: ${{ inputs.release_pass }}
+          RELEASE_ROLLBACK_DIST: ${{ env.RELEASE_ROLLBACK_DIST }}
       - name: Configure release commit identity
         run: |
           git config user.name "github-actions[bot]"

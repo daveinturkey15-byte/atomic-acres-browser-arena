@@ -33,12 +33,15 @@ const exactSha = (value, label) => {
 };
 exactSha(sourceSha, 'SOURCE_SHA');
 if (config.schemaVersion !== 4) throw new Error('release-channels.json schemaVersion must be 4');
-if (config.experimental.pass !== 'PASS 66' || !config.experimental.label.startsWith('THE BIG ONE')
+if (config.experimental.pass !== 'PASS 68' || !config.experimental.label.startsWith('THE BIG ONE')
   || config.experimental.path !== 'channels/the-big-one') {
-  throw new Error('Pass 66 production topology must stage THE BIG ONE at channels/the-big-one');
+  throw new Error('Pass 68 production topology must stage THE BIG ONE at channels/the-big-one');
 }
-if (config.stable.pass !== 'PASS 63' || config.stable.label !== 'NEW NETCODE') {
-  throw new Error('Pass 63 must remain the byte-exact stable channel');
+if (config.stable.pass !== 'PASS 67.1' || config.stable.label !== 'STABLE SINGLEPLAYER') {
+  throw new Error('Pass 67.1 must remain the byte-exact stable singleplayer channel');
+}
+if (config.rollback && (config.rollback.pass !== 'PASS 63' || config.rollback.path !== 'channels/pass63-rollback')) {
+  throw new Error('Rollback must be the Pass 63 rebuild at channels/pass63-rollback');
 }
 if (releasePass !== config.experimental.pass) throw new Error(`Expected ${config.experimental.pass}, received ${releasePass}`);
 if (!existsSync(join(distRoot, 'index.html')) || !existsSync(join(distRoot, 'assets'))) throw new Error(`${releasePass} candidate dist is incomplete`);
@@ -153,10 +156,55 @@ const experimental = {
 };
 writeFileSync(join(experimentalRoot, 'channel-provenance.json'), `${JSON.stringify(experimental, null, 2)}\n`);
 
+let rollback = null;
+if (config.rollback) {
+  // The Pass 63 rollback is a deterministic rebuild from its approved source
+  // SHA, staged from a separately built subtree (RELEASE_ROLLBACK_DIST) because
+  // the original Pass 63 Pages deploy is not byte-retrievable. Provenance is
+  // honest: exact source SHA + rebuiltFromSource, never a false byte-exact claim.
+  const configuredRollbackDist = process.env.RELEASE_ROLLBACK_DIST;
+  const rollbackRequired = process.env.REQUIRE_ROLLBACK_CHANNEL === '1';
+  if (!configuredRollbackDist || !isAbsolute(configuredRollbackDist)) {
+    if (!rollbackRequired) {
+      // Browser-QA previews (killstreak capture, HUD e2e) exercise the live
+      // candidate + byte-exact stable topology; the Pass 63 rebuild subtree is
+      // only staged by the production workflow that builds it.
+      console.log(`[stage-release-topology] skipping ${config.rollback.pass} rollback (RELEASE_ROLLBACK_DIST unset; preview topology)`);
+    } else {
+      throw new Error('RELEASE_ROLLBACK_DIST must be an absolute path to the Pass 63 rebuilt dist');
+    }
+  } else {
+  const rollbackDist = resolve(configuredRollbackDist);
+  const rollbackSourceSha = exactSha(config.rollback.sourceSha, 'rollback.sourceSha');
+  const rollbackFiles = walkFiles(rollbackDist).filter((path) => path.endsWith('index.html') || path.includes(`${sep}assets${sep}`));
+  if (!rollbackFiles.some((path) => path.endsWith('index.html'))
+    || !rollbackFiles.some((path) => path.includes(`${sep}assets${sep}`))) {
+    throw new Error(`${config.rollback.pass} rebuilt dist is incomplete`);
+  }
+  const rollbackRoot = channelRoot(config.rollback.path);
+  for (const path of rollbackFiles) {
+    const target = resolve(rollbackRoot, relative(rollbackDist, path));
+    if (!target.startsWith(`${rollbackRoot}${sep}`)) throw new Error(`Unsafe rollback path: ${path}`);
+    mkdirSync(dirname(target), { recursive: true });
+    copyFileSync(path, target);
+  }
+  const rollbackEvidence = rollbackFiles.filter((path) => path.endsWith('.js') && readFileSync(path).includes(Buffer.from(config.rollback.pass)));
+  if (rollbackEvidence.length === 0) throw new Error(`${config.rollback.pass} rebuilt dist does not contain ${config.rollback.pass}`);
+  rollback = {
+    schemaVersion: 4, channel: 'rollback', releasePass: config.rollback.pass,
+    sourceSha: rollbackSourceSha, path: config.rollback.path,
+    exactRootFileCount: rollbackFiles.length,
+    treeSha256: treeDigest(rollbackRoot, rollbackFiles.map((path) => resolve(rollbackRoot, relative(rollbackDist, path)))),
+    rebuiltFromSource: true, passEvidenceFiles: rollbackEvidence.map((path) => relative(rollbackRoot, resolve(rollbackRoot, relative(rollbackDist, path)))),
+  };
+  writeFileSync(join(rollbackRoot, 'channel-provenance.json'), `${JSON.stringify(rollback, null, 2)}\n`);
+  }
+}
+
 for (const file of ['index.html', 'release-shell.css', 'release-shell.js']) {
   copyFileSync(join(repositoryRoot, 'release-shell', file), join(distRoot, file));
 }
-const publicConfig = Object.fromEntries(['experimental', 'stable'].map((key) => [key, {
+const publicConfig = Object.fromEntries(['experimental', 'stable', 'rollback'].filter((key) => config[key] && (key !== 'rollback' || rollback)).map((key) => [key, {
   label: config[key].label, description: config[key].description, pass: config[key].pass, path: config[key].path,
 }]));
 writeFileSync(join(distRoot, 'release-channel-config.js'), `window.__ATOMIC_ACRES_RELEASE_CHANNELS__=${JSON.stringify(publicConfig)};\n`);
@@ -165,10 +213,11 @@ mkdirSync(dirname(topologyReceiptPath), { recursive: true });
 const topology = {
   schemaVersion: 4, sourceSha, releasePass,
   root: { kind: 'chooser-only', files: ['index.html', 'release-shell.css', 'release-shell.js', 'release-channel-config.js'] },
-  channels: { experimental, stable },
+  channels: Object.fromEntries(Object.entries({ experimental, stable, rollback }).filter(([, channel]) => channel)),
 };
 writeFileSync(topologyReceiptPath, `${JSON.stringify(topology, null, 2)}\n`);
 console.log(JSON.stringify({ releaseTopology: 'ok', sourceSha, channels: {
   experimental: { pass: experimental.releasePass, sourceSha, digest: experimental.treeSha256 },
   stable: { pass: stable.releasePass, pagesSha: stable.pagesSha, digest: stable.treeSha256 },
+  ...(rollback ? { rollback: { pass: rollback.releasePass, sourceSha: rollback.sourceSha, digest: rollback.treeSha256 } } : {}),
 } }));

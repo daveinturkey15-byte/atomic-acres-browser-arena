@@ -228,7 +228,7 @@ try {
   const chooser = await observedPage();
   try {
     chooserLabels = await openChooser(chooser.page);
-    for (const choice of ['experimental', 'stable']) {
+    for (const choice of ['experimental', 'stable', 'rollback']) {
       if (await chooser.page.locator(`[data-release-choice="${choice}"]`).count() !== 1) {
         throw new Error(`Missing unique ${choice} chooser action: ${JSON.stringify(chooserLabels)}`);
       }
@@ -237,8 +237,9 @@ try {
     await chooser.close();
   }
 
-  await verifyChoice('experimental', 'channels/the-big-one', 'PASS 66', 'pass66');
-  await verifyChoice('stable', 'channels/recent-stable', 'PASS 63', 'pass63');
+  await verifyChoice('experimental', 'channels/the-big-one', 'PASS 68', 'pass68');
+  await verifyChoice('stable', 'channels/recent-stable', 'PASS 67.1', 'pass671');
+  await verifyChoice('rollback', 'channels/pass63-rollback', 'PASS 63', 'pass63');
   if (releasePass && !normalizedPass(routes.experimental.eyebrow).includes(normalizedPass(releasePass))) {
     throw new Error(`Experimental runtime ${routes.experimental.eyebrow} does not match ${releasePass}`);
   }

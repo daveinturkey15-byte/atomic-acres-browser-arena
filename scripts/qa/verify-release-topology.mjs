@@ -12,21 +12,24 @@ if (!rootIndex.includes('release-shell.js') || rootIndex.includes('type="module"
 }
 const publicConfigSource = readFileSync(join(dist, 'release-channel-config.js'), 'utf8');
 const publicConfig = JSON.parse(publicConfigSource.slice(publicConfigSource.indexOf('=') + 1).replace(/;\s*$/, ''));
-if (JSON.stringify(Object.keys(publicConfig)) !== JSON.stringify(['experimental', 'stable'])) {
-  throw new Error(`Root chooser must expose only experimental and stable: ${Object.keys(publicConfig).join(', ')}`);
+const rollbackStaged = Boolean(config.rollback && existsSync(join(dist, config.rollback.path)));
+const expectedChannelKeys = rollbackStaged ? ['experimental', 'stable', 'rollback'] : ['experimental', 'stable'];
+if (JSON.stringify(Object.keys(publicConfig)) !== JSON.stringify(expectedChannelKeys)) {
+  throw new Error(`Root chooser must expose exactly ${expectedChannelKeys.join(', ')}: ${Object.keys(publicConfig).join(', ')}`);
 }
-if (publicConfig.experimental.pass !== 'PASS 66' || publicConfig.experimental.label !== 'THE BIG ONE'
+if (publicConfig.experimental.pass !== 'PASS 68' || publicConfig.experimental.label !== 'THE BIG ONE'
   || publicConfig.experimental.path !== 'channels/the-big-one') {
-  throw new Error('Root chooser is missing live Pass 66 THE BIG ONE');
+  throw new Error('Root chooser is missing live Pass 68 THE BIG ONE');
 }
-if (publicConfig.stable.pass !== 'PASS 63' || publicConfig.stable.label !== 'NEW NETCODE') {
-  throw new Error('Root chooser is missing stable Pass 63 new netcode');
+if (publicConfig.stable.pass !== 'PASS 67.1' || publicConfig.stable.label !== 'STABLE SINGLEPLAYER') {
+  throw new Error('Root chooser is missing stable Pass 67.1 singleplayer');
 }
 const stagedChannelDirectories = readdirSync(join(dist, 'channels'), { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name)
   .sort();
-if (JSON.stringify(stagedChannelDirectories) !== JSON.stringify(['recent-stable', 'the-big-one'])) {
+const expectedDirectories = rollbackStaged ? ['pass63-rollback', 'recent-stable', 'the-big-one'] : ['recent-stable', 'the-big-one'];
+if (JSON.stringify(stagedChannelDirectories) !== JSON.stringify(expectedDirectories)) {
   throw new Error(`Unexpected staged channels: ${stagedChannelDirectories.join(', ')}`);
 }
 
@@ -59,12 +62,31 @@ if (stableProvenance.schemaVersion !== 4
   || stableProvenance.pagesPath !== config.stable.pagesPath
   || stableProvenance.pinnedRuntime?.exactRootFileCount !== config.stable.runtimeFileCount
   || stableProvenance.pinnedRuntime?.treeSha256 !== config.stable.runtimeTreeSha256) {
-  throw new Error('Stable Pass 63 provenance does not match the exact configured source and Pages SHAs');
+  throw new Error('Stable Pass 67.1 provenance does not match the exact configured source and Pages SHAs');
 }
 const experimentalRoot = resolve(dist, config.experimental.path);
 if (!existsSync(join(experimentalRoot, 'index.html')) || !existsSync(join(experimentalRoot, 'assets'))) throw new Error('Experimental channel is incomplete');
 const experimentalAssets = readdirSync(join(experimentalRoot, 'assets')).filter((name) => name.endsWith('.js'));
 if (!experimentalAssets.some((name) => readFileSync(join(experimentalRoot, 'assets', name)).includes(Buffer.from(config.experimental.pass)))) {
   throw new Error(`Experimental channel does not contain ${config.experimental.pass}`);
+}
+if (config.rollback && existsSync(join(dist, config.rollback.path))) {
+  const rollbackRoot = resolve(dist, config.rollback.path);
+  if (!rollbackRoot.startsWith(`${dist}${sep}`)) throw new Error('Unsafe rollback channel');
+  if (!existsSync(join(rollbackRoot, 'index.html')) || !existsSync(join(rollbackRoot, 'assets'))) {
+    throw new Error(`${config.rollback.pass} rollback channel is incomplete`);
+  }
+  const rollbackAssets = readdirSync(join(rollbackRoot, 'assets')).filter((name) => name.endsWith('.js'));
+  if (!rollbackAssets.some((name) => readFileSync(join(rollbackRoot, 'assets', name)).includes(Buffer.from(config.rollback.pass)))) {
+    throw new Error(`Rollback channel does not contain ${config.rollback.pass}`);
+  }
+  const rollbackProvenance = JSON.parse(readFileSync(join(rollbackRoot, 'channel-provenance.json'), 'utf8'));
+  if (rollbackProvenance.schemaVersion !== 4
+    || rollbackProvenance.releasePass !== config.rollback.pass
+    || rollbackProvenance.sourceSha !== config.rollback.sourceSha
+    || rollbackProvenance.path !== config.rollback.path
+    || rollbackProvenance.rebuiltFromSource !== true) {
+    throw new Error('Rollback provenance does not match the configured Pass 63 rebuilt-source record');
+  }
 }
 console.log(JSON.stringify({ releaseTopology: 'verified', stableFiles, experimentalAssets: experimentalAssets.length }));

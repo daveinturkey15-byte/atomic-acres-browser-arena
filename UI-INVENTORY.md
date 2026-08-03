@@ -12,7 +12,8 @@
 
 ## customPresetCardsMarkup
 [ ] #custom-${index}
-[ ] #loadout-manage
+[ ] [data-custom-modify] (nested EDIT rows open the loadout manager scoped to that preset)
+[ ] #loadout-manager
 
 ## deploymentPanelMarkup
 [ ] #menu-panel-deploy
@@ -85,6 +86,8 @@
 [ ] #graphics-effective
 [ ] #graphics-save
 [ ] #graphics-profile
+[ ] #game-refresh-settings
+[ ] #hard-refresh-button (mobile Ctrl+Shift+R equivalent; clears caches + reloads)
 [ ] #advanced-graphics
 [ ] #audio-settings
 [ ] #audio-settings-title

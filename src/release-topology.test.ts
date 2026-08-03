@@ -53,10 +53,12 @@ describe('Pass 66 two-channel release topology', () => {
     expect(JSON.stringify(config)).not.toContain('channels/new-netcode');
   });
 
-  it('renders exactly live Pass 68 The Big One and stable Pass 67.1 choices', () => {
-    expect(shell).toContain("['experimental', 'stable']");
+  it('renders exactly live Pass 68 The Big One, stable Pass 67.1 and rollback Pass 63 choices', () => {
+    expect(shell).toContain("['experimental', 'stable', 'rollback']");
     expect(shell).not.toContain("['normal', 'stable', 'experimental']");
-    expect(shell).toContain("key === 'stable' ? 'STABLE' : 'LIVE'");
+    expect(shell).toContain("key === 'stable' ? 'STABLE' : key === 'rollback' ? 'ROLLBACK' : 'LIVE'");
+    expect(shell).toContain("requested === 'rollback') return route('rollback')");
+    expect(shell).toContain("if (!channel) continue");
     expect(shellHtml).toContain('Pass 68');
     expect(shellHtml).toContain('The Big One');
     expect(shellHtml).toContain('stable singleplayer');
@@ -79,7 +81,7 @@ describe('Pass 66 two-channel release topology', () => {
     expect(shell).toContain('localStorage.removeItem(key)');
   });
 
-  it('moves the candidate under experimental and reconstructs only stable Pass 63 from Git blobs', () => {
+  it('moves the candidate under experimental and reconstructs only stable Pass 67.1 from Git blobs', () => {
     expect(staging).toContain('process.env.RELEASE_DIST_ROOT');
     expect(staging).toContain('process.env.RELEASE_TOPOLOGY_RECEIPT_PATH');
     expect(staging).toContain("renameSync(join(distRoot, 'index.html'), join(experimentalRoot, 'index.html'))");
@@ -88,7 +90,8 @@ describe('Pass 66 two-channel release topology', () => {
     expect(staging).toContain('channel.pagesPath');
     expect(staging).toContain("'pinned-channel-provenance.json'");
     expect(staging).not.toContain("stagePinned('new-netcode'");
-    expect(staging).toContain("channels: { experimental, stable }");
+    expect(staging).toContain("channels: Object.fromEntries(Object.entries({ experimental, stable, rollback })");
+    expect(staging).toContain("RELEASE_ROLLBACK_DIST");
     expect(staging).toContain("schemaVersion: 4");
   });
 
