@@ -3,12 +3,15 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { chromium } from '@playwright/test';
+import { verifyProductionReleaseTimestamp } from '../release/release-timestamp-contract.mjs';
 
 const baseUrl = process.env.QA_BASE_URL ?? 'http://127.0.0.1:4180/';
 const releasePass = process.env.RELEASE_PASS ?? null;
 const sourceSha = process.env.SOURCE_SHA ?? null;
 const outputPath = process.env.QA_OUTPUT ?? null;
 const screenshotDirectory = process.env.QA_SCREENSHOT_DIR ?? null;
+const expectedReleasedAt = process.env.RELEASE_BUILT_AT?.trim() || null;
+if (expectedReleasedAt && !releasePass) throw new Error('RELEASE_PASS is required with RELEASE_BUILT_AT');
 const rootUrl = new URL(baseUrl);
 if (sourceSha) rootUrl.searchParams.set('qa', sourceSha);
 // The production runner is intentionally GPU-less. Route/chooser validation
@@ -86,7 +89,18 @@ async function verifyRuntime(page, expectedPath, expectedPass) {
   if (!normalizedPass(runtimeIdentity).includes(normalizedPass(expectedPass))) {
     throw new Error(`Runtime ${runtimeIdentity} does not match ${expectedPass}`);
   }
-  return runtimeIdentity;
+  const lastReleaseLabel = (await page.locator('#last-updated-btn').textContent())?.trim() ?? null;
+  const releasedAt = await page.locator('#changelog-list > li:first-child time').getAttribute('datetime');
+  const releaseState = (await page.locator('#changelog-list > li:first-child .changelog-entry-pass b').textContent())?.trim() ?? null;
+  if (expectedReleasedAt && normalizedPass(expectedPass) === normalizedPass(releasePass)) {
+    verifyProductionReleaseTimestamp({
+      expectedReleasedAt,
+      observedReleasedAt: releasedAt,
+      observedLabel: lastReleaseLabel,
+      observedState: releaseState,
+    });
+  }
+  return { runtimeIdentity, lastReleaseLabel, releasedAt, releaseState };
 }
 
 async function verifyChoice(choice, expectedPath, expectedPass) {
@@ -97,12 +111,12 @@ async function verifyChoice(choice, expectedPath, expectedPass) {
     const button = page.locator(`[data-release-choice="${choice}"]`);
     const label = (await button.textContent())?.trim() ?? '';
     await button.click();
-    const eyebrow = await verifyRuntime(page, expectedPath, expectedPass);
+    const runtime = await verifyRuntime(page, expectedPath, expectedPass);
     if (screenshotDirectory) {
       mkdirSync(screenshotDirectory, { recursive: true });
       await page.screenshot({ path: join(screenshotDirectory, `${choice}.png`), fullPage: true });
     }
-    routes[choice] = { label, url: page.url(), eyebrow };
+    routes[choice] = { label, url: page.url(), eyebrow: runtime.runtimeIdentity, ...runtime };
   } finally {
     await observed.close();
   }
@@ -115,8 +129,8 @@ async function verifyLegacyRoute(name, configure) {
     const url = new URL(rootUrl);
     configure(url.searchParams);
     await page.goto(url.toString(), { waitUntil: 'domcontentloaded' });
-    const eyebrow = await verifyRuntime(page, 'channels/experimental-netcode-pass', 'PASS 64');
-    routes[name] = { url: page.url(), eyebrow };
+    const runtime = await verifyRuntime(page, 'channels/experimental-netcode-pass', 'PASS 64');
+    routes[name] = { url: page.url(), eyebrow: runtime.runtimeIdentity, ...runtime };
   } finally {
     await observed.close();
   }
