@@ -680,6 +680,28 @@ async function captureSupport(
     const baseline = await activationBaseline(page);
     await runtimeHealth(page);
     await applyCameraPose(page, overviewCameraPose(id, station!.position));
+    // HUD-overview streaks hold a fixed camera; with a static bay the clip
+    // reads as frozen under the near-duplicate cadence gate (the 750 ms F
+    // lead-in alone exceeds the longest-run limit). Orbit slowly around the
+    // bay for the scout sweep so the clip carries genuine cinematic motion
+    // while the minimap radar pulse stays the subject.
+    if (id === 'scout-sweep') {
+      const orbitPose = overviewCameraPose(id, station!.position);
+      await page.evaluate((pose) => {
+        const startedAt = performance.now();
+        window.setInterval(() => {
+          const elapsed = (performance.now() - startedAt) / 1_000;
+          window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(
+            pose.position[0] + Math.sin(elapsed * 0.22) * 2.4,
+            pose.position[1],
+            pose.position[2] + Math.cos(elapsed * 0.22) * 2.4,
+            pose.yaw + elapsed * 0.4,
+            pose.pitch,
+            pose.fov,
+          );
+        }, 80);
+      }, orbitPose);
+    }
     await startCaptureTelemetryProbe(page, id, baseline);
     const clipStartedAt = Date.now();
     await page.waitForTimeout(750);
