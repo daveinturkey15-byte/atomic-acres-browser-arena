@@ -3026,7 +3026,8 @@ export class WeaponPresentation {
     if (presentationKick > 0.05 && activeModel?.visible) {
       const framing = measureCameraFraming(activeModel, this.camera);
       if (framing && !framing.nearPlaneClear && Number.isFinite(framing.nearestDepth)) {
-        const push = Math.max(0, this.camera.near + 0.02 - framing.nearestDepth);
+        const cameraNear = this.camera instanceof THREE.PerspectiveCamera ? this.camera.near : 0.08;
+        const push = Math.max(0, cameraNear + 0.02 - framing.nearestDepth);
         if (push > 0) this.root.position.z -= push;
       }
     }
