@@ -58,6 +58,9 @@ async function deploy(page: Page): Promise<void> {
     api.aimAtBot('body');
   });
   await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().matchPhase === 'active', undefined, { timeout: 60_000 });
+  // The asynchronous match admission resets botsFrozen when the match begins,
+  // so re-freeze after the phase is live. Otherwise frozen bots revive mid-sweep.
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true));
 }
 
 async function equipForEvidence(page: Page, weapon: WeaponId): Promise<number> {
