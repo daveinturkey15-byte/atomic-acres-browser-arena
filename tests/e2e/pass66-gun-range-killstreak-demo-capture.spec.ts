@@ -477,6 +477,7 @@ async function startCaptureTelemetryProbe(
       milestones: Set<string>;
       rafId: number;
       intervalId: number;
+      lifecycle: Array<{ at: number; event: string; state: string; focus: boolean }>;
     };
     const captureWindow = window as unknown as { __PASS66_KILLSTREAK_CAPTURE_PROBE__?: ProbeState };
     if (captureWindow.__PASS66_KILLSTREAK_CAPTURE_PROBE__) throw new Error('capture telemetry probe already active');
@@ -493,7 +494,22 @@ async function startCaptureTelemetryProbe(
       milestones: new Set<string>(),
       rafId: 0,
       intervalId: 0,
+      lifecycle: [],
     };
+    const recordLifecycle = (event: string) => {
+      state.lifecycle.push({
+        at: Number((performance.now() - startedAt).toFixed(1)),
+        event,
+        state: document.visibilityState,
+        focus: document.hasFocus(),
+      });
+    };
+    document.addEventListener('visibilitychange', () => recordLifecycle('visibilitychange'));
+    window.addEventListener('focus', () => recordLifecycle('focus'));
+    window.addEventListener('blur', () => recordLifecycle('blur'));
+    document.addEventListener('freeze', () => recordLifecycle('freeze'));
+    document.addEventListener('resume', () => recordLifecycle('resume'));
+    window.addEventListener('pagehide', () => recordLifecycle('pagehide'));
     const visible = (selector: string) => {
       const element = document.querySelector<HTMLElement>(selector);
       if (!element || element.hidden) return false;
@@ -609,6 +625,7 @@ async function stopCaptureTelemetryProbe(
       presentedFrameEnd,
       samples: state.samples,
       milestones: [...state.milestones],
+      lifecycle: state.lifecycle,
     };
   });
   const samples = raw.samples.map((sample): KillstreakDemoRuntimeCadenceSample => Object.freeze({ ...sample }));
@@ -632,6 +649,7 @@ async function stopCaptureTelemetryProbe(
       samples: Object.freeze(samples),
     }),
     milestones: Object.freeze(milestones),
+    lifecycle: Object.freeze(raw.lifecycle),
   });
 }
 
@@ -780,7 +798,8 @@ async function captureSupport(
       videoProbe = await probeH264Mp4(videoArtifactPath);
     } catch (error) {
       const telemetryTrace = captureTelemetry.cadence.samples.map((sample) => `${sample.elapsedMs}ms#${sample.presentedFrame}`).slice(0, 40).join(' ');
-      throw new Error(`${String((error as Error).message)} · probe=[${telemetryTrace}]`);
+      const lifecycleTrace = captureTelemetry.lifecycle.map((entry) => `${entry.at}ms:${entry.event}/${entry.state}/${entry.focus ? 'F' : 'nf'}`).slice(0, 24).join(' ');
+      throw new Error(`${String((error as Error).message)} · probe=[${telemetryTrace}] · lifecycle=[${lifecycleTrace}]`);
     }
     expect(videoProbe.width).toBe(KILLSTREAK_DEMO_CAPTURE_VIEWPORT.width);
     expect(videoProbe.height).toBe(KILLSTREAK_DEMO_CAPTURE_VIEWPORT.height);
