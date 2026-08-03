@@ -22844,7 +22844,18 @@ function frame(now: number, scheduleNext = true): void {
             debugCaptureOrbit.lookAtZ! - debugCaptureCameraPosition.z,
           )
           : debugCaptureOrbit.baseYaw + orbitElapsed * debugCaptureOrbit.yawRate;
-        debugCaptureCameraPitch = debugCaptureOrbit.pitch;
+        if (debugCaptureOrbit.lookAtY !== null && debugCaptureOrbit.lookAtX !== null) {
+          const lookHoriz = Math.hypot(
+            debugCaptureOrbit.lookAtX - debugCaptureCameraPosition.x,
+            debugCaptureOrbit.lookAtZ! - debugCaptureCameraPosition.z,
+          );
+          debugCaptureCameraPitch = Math.atan2(
+            debugCaptureOrbit.lookAtY - debugCaptureCameraPosition.y,
+            Math.max(lookHoriz, 0.001),
+          );
+        } else {
+          debugCaptureCameraPitch = debugCaptureOrbit.pitch;
+        }
         camera.position.copy(debugCaptureCameraPosition);
       } else {
         camera.position.copy(debugCaptureCameraPosition);
