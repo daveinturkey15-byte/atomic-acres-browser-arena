@@ -751,23 +751,29 @@ async function captureSupport(
     // station so the clip carries genuine cinematic motion while the HUD
     // effect stays the subject.
     if (id === 'scout-sweep' || id === 'adrenaline') {
-      const stationTarget = { x: station!.position.x, y: 1.1, z: station!.position.z };
-      await page.evaluate((target) => {
-        window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraOrbit({
-          centerX: target.x,
-          centerY: target.y,
-          centerZ: target.z,
-          radius: 6,
-          orbitRate: 0.25,
-          yawRate: 0,
-          baseYaw: 0,
-          pitch: 0.06,
-          fov: 60,
-          lookAtX: target.x,
-          lookAtY: target.y,
-          lookAtZ: target.z,
-        });
-      }, stationTarget);
+      const orbitPose = overviewCameraPose(id, station!.position);
+      if (id === 'scout-sweep') {
+        // Circle the station while tracking it: the north wall and ceiling
+        // lights give the scout view enough structure for parallax motion.
+        const stationTarget = { x: station!.position.x, y: 1.1, z: station!.position.z };
+        await page.evaluate((target) => {
+          window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraOrbit({
+            centerX: target.x, centerY: target.y, centerZ: target.z,
+            radius: 6, orbitRate: 0.25, yawRate: 0, baseYaw: 0, pitch: 0.06, fov: 60,
+            lookAtX: target.x, lookAtY: target.y, lookAtZ: target.z,
+          });
+        }, stationTarget);
+      } else {
+        // The adrenaline station sits mid-bay over flat floor; circling it
+        // barely changes pixels at the probe. Sweep the camera yaw across the
+        // bay instead so walls, grid and lights pan through the frame.
+        await page.evaluate((pose) => {
+          window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraOrbit({
+            centerX: pose.position[0], centerY: pose.position[1], centerZ: pose.position[2],
+            radius: 3, orbitRate: 0.15, yawRate: 0.35, baseYaw: pose.yaw, pitch: 0.06, fov: pose.fov,
+          });
+        }, orbitPose);
+      }
     }
     await startCaptureTelemetryProbe(page, id, baseline);
     const clipStartedAt = Date.now();
