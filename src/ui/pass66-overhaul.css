@@ -361,24 +361,24 @@
   .kit-stat-strip .kit-dps small { color: var(--p66-amber, #c98a35); font-size: 11px; font-weight: 800; letter-spacing: 0.08em; }
   .kit-stat-strip .kit-dps b { color: var(--p66-ink); font-size: 18px; font-weight: 900; }
 
-  .manage-kit-card {
+  /* Scoped to .custom-kit-grid so the dark action styling out-specifies the
+     white `.custom-kit-grid .kit-card` base (owner: manage card must be dark). */
+  .custom-kit-grid .manage-kit-card {
     display: grid;
     align-content: center;
     border-style: solid;
-    /* Owner feedback: this is the control that opens the loadout swap menu, so it
-     * must read as the obvious dark action rather than a faint dashed card. */
     border-color: #5fd4cc;
     background: linear-gradient(150deg, #1d3a3f, #12262a);
     box-shadow: var(--p66-shadow);
   }
-  .manage-kit-card span { color: var(--p66-cyan-bright); }
-  .manage-kit-card strong { color: #fff; }
-  .manage-kit-card > b { color: var(--p66-amber-bright); }
-  .manage-kit-card p,
-  .manage-kit-card > i { color: #d0e4e2; }
-  .manage-kit-card:hover,
-  .manage-kit-card:focus-visible,
-  .manage-kit-card[aria-expanded='true'] {
+  .custom-kit-grid .manage-kit-card span { color: var(--p66-cyan-bright); }
+  .custom-kit-grid .manage-kit-card strong { color: #fff; }
+  .custom-kit-grid .manage-kit-card > b { color: var(--p66-amber-bright); }
+  .custom-kit-grid .manage-kit-card p,
+  .custom-kit-grid .manage-kit-card > i { color: #d0e4e2; }
+  .custom-kit-grid .manage-kit-card:hover,
+  .custom-kit-grid .manage-kit-card:focus-visible,
+  .custom-kit-grid .manage-kit-card[aria-expanded='true'] {
     border-color: #7ff6ff;
     background: linear-gradient(150deg, #234549, #163034);
   }
