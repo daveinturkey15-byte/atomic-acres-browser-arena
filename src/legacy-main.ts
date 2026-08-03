@@ -7882,8 +7882,9 @@ const viewmodelProbeRotation = new THREE.Euler(0, 0, 0, 'YXZ');
 const VIEWMODEL_PROBE_LENGTH_M = 1.45;
 const VIEWMODEL_PROBE_OFFSETS = Object.freeze([
   Object.freeze({ right: 0, up: 0 }),
-  Object.freeze({ right: -0.19, up: -0.04 }),
-  Object.freeze({ right: 0.19, up: -0.04 }),
+  Object.freeze({ right: -0.19, up: 0.04 }),
+  Object.freeze({ right: 0.19, up: 0.04 }),
+  Object.freeze({ right: 0, up: 0.24 }),
   Object.freeze({ right: 0, up: -0.22 }),
 ]);
 
@@ -20626,8 +20627,9 @@ function updateHud(now: number): void {
   const crosshair = element<HTMLElement>('#crosshair');
   crosshair.style.setProperty('--spread', `${crosshairGap}px`);
   // The physical viewmodel sight/full-screen optic is the complete ADS picture.
-  // Never layer the old coloured HUD marker over it once the aim has settled.
-  crosshair.hidden = adsSettled;
+  // Hide the HUD crosshair the moment ADS is held: the coloured marker must
+  // never layer over the real sight, not even during the transition.
+  crosshair.hidden = adsHeld;
   crosshair.classList.remove('ads');
   if (crosshair.dataset.weapon !== player.weapon) {
     const sight = adsSightProfile(player.weapon);

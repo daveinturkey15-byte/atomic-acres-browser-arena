@@ -2173,6 +2173,32 @@ export class WeaponPresentation {
     this.root.updateWorldMatrix(true, true);
   }
 
+  private adsOpticHidden = false;
+  private adsOpticHiddenWeapon: WeaponId | null = null;
+
+  /**
+   * Keeps the authored holo-optic housing out of the ADS sightline. The
+   * carbine/M4A1/AK-47 first-person GLBs centre their ADS camera on the iron
+   * rear-sight socket while the taller optic shell sits above it; leaving the
+   * shell visible during ADS blocks the centred sight picture. Hidden at
+   * 85%+ aim blend and restored as the weapon lowers.
+   */
+  private applyAdsOpticClearance(adsBlend: number): void {
+    const hideOptic = adsBlend >= 0.85;
+    if (hideOptic === this.adsOpticHidden && this.adsOpticHiddenWeapon === this.active) return;
+    const model = this.mountedModel();
+    const opticNames = ['hk416-holographic-optic', 'weapon-optic'];
+    if (model) {
+      for (const name of opticNames) {
+        const optic = model.getObjectByName(name);
+        if (!optic) continue;
+        optic.visible = !hideOptic;
+      }
+    }
+    this.adsOpticHidden = hideOptic;
+    this.adsOpticHiddenWeapon = this.active;
+  }
+
   presentationState() {
     const model = this.mountedModel();
     const requiredDetails = weaponFamilyPresentation(this.active).requiredDetails;
@@ -2708,6 +2734,11 @@ export class WeaponPresentation {
     this.swayX = THREE.MathUtils.lerp(this.swayX, 0, smoothing(7));
     this.swayY = THREE.MathUtils.lerp(this.swayY, 0, smoothing(7));
     this.adsBlend = advanceAdsBlend(this.adsBlend, pose.ads, pose.dt, this.active);
+    // Authored holo-optic rifles (carbine, M4A1, AK-47) mount their optic
+    // housing above the iron-sight socket the ADS camera centres on. Shoulder
+    // the housing out of the sightline while aiming so the centred sight
+    // picture is unobstructed; it returns when the weapon lowers.
+    this.applyAdsOpticClearance(this.adsBlend);
     this.root.scale.setScalar(THREE.MathUtils.lerp(HIP_VIEWMODEL_SCALE, ADS_VIEWMODEL_SCALE, this.adsBlend) * viewmodelScreenScale(this.camera));
     this.sprintBlend = THREE.MathUtils.lerp(this.sprintBlend, pose.sprinting ? 1 : 0, smoothing(13));
     this.muzzleFlash.visible = this.muzzleLight.intensity > 0.45;
@@ -2935,7 +2966,7 @@ export class WeaponPresentation {
     const targetPosition = this.frameTargetPosition.set(
       viewmodelBaseX + adsX + (bobX + this.swayX) * aimSteady - pose.lateralSpeed * 0.012 * aimSteady + meleeArc * viewmodelMeleeScreenOffset(this.camera) + grenadeArc * 0.18 + reloadStage.lateral,
       viewmodelBaseY + adsY + (bobY + breath) * aimSteady + sprintDrop + crouchLift + proneLift + switchDrop + reloadStage.lift - presentationKick * 0.095 - pose.landingImpulse * 0.075 * aimSteady + meleeArc * 0.26,
-      viewmodelBaseZ + adsZ + Math.min(pose.surfaceRetreat ?? 0, 0.22) - VIEWMODEL_NEAR_PLANE_CLEARANCE + presentationKick * profile.recoilTranslation * 1.12 + grenadeArc * 0.24,
+      viewmodelBaseZ + adsZ + Math.min(pose.surfaceRetreat ?? 0, 0.4) - VIEWMODEL_NEAR_PLANE_CLEARANCE + presentationKick * profile.recoilTranslation * 1.12 + grenadeArc * 0.24,
     );
     this.surfaceRetreat = pose.surfaceRetreat ?? 0;
     this.surfaceLift = pose.surfaceLift ?? 0;

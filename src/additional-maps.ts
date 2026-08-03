@@ -1799,6 +1799,7 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   const testBayVisibleWall = new THREE.MeshBasicMaterial({ color: 0x465358, toneMapped: false });
   const testBayVisibleCeiling = new THREE.MeshBasicMaterial({ color: 0x263237, toneMapped: false });
   const secureDoorMaterial = new THREE.MeshStandardMaterial({ color: 0x283236, emissive: 0x14262a, emissiveIntensity: 0.48, roughness: 0.5, metalness: 0.78 });
+  const secureDoorPanelMaterial = terminalSurfaceMaterial('panel', 0x283236, '#4a5a5e', 0.52, 0.74, [2, 3]);
 
   box(builder, 'gun-range-test-bay-corridor-floor', [35.75, -0.08, 12], [30.5, 0.16, 8], testBayFloor, { solid: false, shots: true });
   box(builder, 'gun-range-test-bay-corridor-north-wall', [35.75, 2.6, 7.75], [30.5, 5.2, 0.5], testBayWall, { ballisticMaterial: 'structural-metal' });
@@ -1828,31 +1829,40 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   ]) guide.userData.presentationBatchCandidate = false;
 
   // Large 48.5 x 64 m bay: west wall is split around the secure door aperture.
+  // Owner direction: the killstreak-testing room roof is three times taller so
+  // chopper/drone altitudes read realistically; the bay clears 25.5 m.
   box(builder, 'gun-range-test-bay-floor', [75.75, -0.08, 6], [48.5, 0.16, 64], testBayFloor, { solid: false, shots: true });
-  box(builder, 'gun-range-test-bay-ceiling', [75.75, 8.35, 6], [48.5, 0.35, 64], testBayCeiling, { solid: false, shots: true });
-  box(builder, 'gun-range-test-bay-east-wall', [100.25, 4.25, 6], [0.5, 8.5, 64.5], testBayWall, { ballisticMaterial: 'structural-metal' });
-  box(builder, 'gun-range-test-bay-north-wall', [75.75, 4.25, -26.25], [49, 8.5, 0.5], testBayWall, { ballisticMaterial: 'structural-metal' });
-  box(builder, 'gun-range-test-bay-south-wall', [75.75, 4.25, 38.25], [49, 8.5, 0.5], testBayWall, { ballisticMaterial: 'structural-metal' });
-  box(builder, 'gun-range-test-bay-west-wall-north', [51.75, 4.25, -9], [0.5, 8.5, 34], testBayWall, { ballisticMaterial: 'structural-metal' });
-  box(builder, 'gun-range-test-bay-west-wall-south', [51.75, 4.25, 27], [0.5, 8.5, 22], testBayWall, { ballisticMaterial: 'structural-metal' });
+  box(builder, 'gun-range-test-bay-ceiling', [75.75, 25.35, 6], [48.5, 0.35, 64], testBayCeiling, { solid: false, shots: true });
+  box(builder, 'gun-range-test-bay-east-wall', [100.25, 13.25, 6], [0.5, 25.5, 64.5], testBayWall, { ballisticMaterial: 'structural-metal' });
+  box(builder, 'gun-range-test-bay-north-wall', [75.75, 13.25, -26.25], [49, 25.5, 0.5], testBayWall, { ballisticMaterial: 'structural-metal' });
+  box(builder, 'gun-range-test-bay-south-wall', [75.75, 13.25, 38.25], [49, 25.5, 0.5], testBayWall, { ballisticMaterial: 'structural-metal' });
+  box(builder, 'gun-range-test-bay-west-wall-north', [51.75, 13.25, -9], [0.5, 25.5, 34], testBayWall, { ballisticMaterial: 'structural-metal' });
+  box(builder, 'gun-range-test-bay-west-wall-south', [51.75, 13.25, 27], [0.5, 25.5, 22], testBayWall, { ballisticMaterial: 'structural-metal' });
   for (const skin of [
     box(builder, 'gun-range-test-bay-floor-skin', [75.75, 0.012, 6], [48, 0.024, 63.5], testBayVisibleFloor, { solid: false, shots: false, cast: false }),
-    box(builder, 'gun-range-test-bay-ceiling-skin', [75.75, 8.155, 6], [48, 0.03, 63.5], testBayVisibleCeiling, { solid: false, shots: false, cast: false }),
-    box(builder, 'gun-range-test-bay-east-wall-skin', [99.985, 4.15, 6], [0.03, 8, 63.5], testBayVisibleWall, { solid: false, shots: false, cast: false }),
-    box(builder, 'gun-range-test-bay-north-wall-skin', [75.75, 4.15, -25.985], [48, 8, 0.03], testBayVisibleWall, { solid: false, shots: false, cast: false }),
-    box(builder, 'gun-range-test-bay-south-wall-skin', [75.75, 4.15, 37.985], [48, 8, 0.03], testBayVisibleWall, { solid: false, shots: false, cast: false }),
+    box(builder, 'gun-range-test-bay-ceiling-skin', [75.75, 25.155, 6], [48, 0.03, 63.5], testBayVisibleCeiling, { solid: false, shots: false, cast: false }),
+    box(builder, 'gun-range-test-bay-east-wall-skin', [99.985, 13.15, 6], [0.03, 24.5, 63.5], testBayVisibleWall, { solid: false, shots: false, cast: false }),
+    box(builder, 'gun-range-test-bay-north-wall-skin', [75.75, 13.15, -25.985], [48, 24.5, 0.03], testBayVisibleWall, { solid: false, shots: false, cast: false }),
+    box(builder, 'gun-range-test-bay-south-wall-skin', [75.75, 13.15, 37.985], [48, 24.5, 0.03], testBayVisibleWall, { solid: false, shots: false, cast: false }),
   ]) skin.userData.presentationBatchCandidate = false;
   box(builder, 'gun-range-test-bay-door-frame-top', [51.75, 7.45, 12], [1.05, 1.9, 8.5], secureDoorMaterial, { ballisticMaterial: 'structural-metal' });
   box(builder, 'gun-range-test-bay-door-rail-north', [51.6, 3.3, 8.05], [0.3, 6.6, 0.3], secureDoorMaterial, { solid: false, shots: false });
   box(builder, 'gun-range-test-bay-door-rail-south', [51.6, 3.3, 15.95], [0.3, 6.6, 0.3], secureDoorMaterial, { solid: false, shots: false });
-  const secureDoor = box(builder, 'gun-range-test-bay-secure-door-leaf', [51.5, 10.25, 12], [0.7, 6.5, 7.6], secureDoorMaterial, { solid: false, shots: false });
+  // Secure door leaf: textured armour panels with amber/cyan status edge
+  // lights so the door reads as the room's gameplay entrance from both faces.
+  const secureDoor = box(builder, 'gun-range-test-bay-secure-door-leaf', [51.5, 10.25, 12], [0.7, 6.5, 7.6], secureDoorPanelMaterial, { solid: false, shots: false });
   secureDoor.userData.presentationBatchCandidate = false;
   secureDoor.userData.dynamic = true;
   secureDoor.userData.authorityId = GUN_RANGE_TEST_BAY_CONTRACT.door.id;
   secureDoor.userData.portalCollisionStatus = 'runtime-helper-required';
   secureDoor.userData.defaultFailsOpen = true;
+  for (const [z, side] of [[7.1, 'north'], [16.9, 'south']] as const) {
+    const edge = box(builder, `gun-range-test-bay-door-edge-${side}`, [51.5, 10.25, z], [0.71, 6.5, 0.09], z < 12 ? testBayAmber : testBayCyan, { solid: false, shots: false, cast: false });
+    edge.userData.presentationBatchCandidate = false;
+    edge.userData.dynamic = true;
+  }
   for (const z of [-19, -7, 5, 17, 29]) {
-    box(builder, 'gun-range-test-bay-ceiling-light', [75.5, 8.02, z], [35, 0.12, 0.3], z % 2 === 0 ? testBayAmber : testBayCyan, { solid: false, shots: false, cast: false });
+    box(builder, 'gun-range-test-bay-ceiling-light', [75.5, 25.02, z], [35, 0.12, 0.3], z % 2 === 0 ? testBayAmber : testBayCyan, { solid: false, shots: false, cast: false });
   }
   for (const x of [59, 67, 75, 83, 91, 99]) {
     const grid = box(builder, 'gun-range-test-bay-floor-grid-x', [x, 0.023, 6], [0.11, 0.046, 62], x % 2 === 0 ? testBayAmber : testBayCyan, { solid: false, shots: false, cast: false });
