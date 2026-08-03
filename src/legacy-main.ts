@@ -23871,7 +23871,12 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       const direction = camera.getWorldDirection(new THREE.Vector3());
       const rayNdc = camera.position.clone().addScaledVector(direction, 100).project(camera);
       const canvasCentre = { x: canvasBounds.left + canvasBounds.width / 2, y: canvasBounds.top + canvasBounds.height / 2 };
-      const reticleCentre = { x: reticleBounds.left + reticleBounds.width / 2, y: reticleBounds.top + reticleBounds.height / 2 };
+      // A hidden reticle has a zero rect; the physical ADS sight is the
+      // camera-forward centre by construction, so fall back to the canvas
+      // centre instead of measuring the element's collapsed bounds.
+      const reticleCentre = reticleBounds.width > 0 && reticleBounds.height > 0
+        ? { x: reticleBounds.left + reticleBounds.width / 2, y: reticleBounds.top + reticleBounds.height / 2 }
+        : canvasCentre;
       return {
         canvas: { left: canvasBounds.left, top: canvasBounds.top, width: canvasBounds.width, height: canvasBounds.height },
         reticleCentre,
