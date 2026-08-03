@@ -512,10 +512,12 @@ async function startCaptureTelemetryProbe(
     window.addEventListener('pagehide', () => recordLifecycle('pagehide'));
     const recordScheduler = () => {
       const snap = api.snapshot();
-      const review = snap.deterministicReview as { cameraId?: string | null; fixedTimeMs?: number | null; tslTimeMs?: number | null } | undefined;
+      const presented = Number(api.admissionState().presentedGameplayFrame);
+      const transition = document.querySelector<HTMLElement>('#deployment-transition');
+      const hud = document.querySelector<HTMLElement>('#hud-root, #hud');
       state.lifecycle.push({
         at: Number((performance.now() - startedAt).toFixed(1)),
-        event: `frame=${snap.frameCount} decision=${JSON.stringify(snap.presentationScheduling?.lastDecision)} review=${JSON.stringify(review)}`,
+        event: `frame=${snap.frameCount} presented=${presented} decision=${JSON.stringify(snap.presentationScheduling?.lastDecision)} focus=${document.hasFocus()} vis=${document.visibilityState} transHidden=${transition?.hidden ?? 'na'} hudHidden=${hud?.hidden ?? 'na'}`,
         state: document.visibilityState,
         focus: document.hasFocus(),
       });
