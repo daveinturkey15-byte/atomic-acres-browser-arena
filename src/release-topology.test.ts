@@ -98,8 +98,8 @@ describe('Pass 66 two-channel release topology', () => {
     expect(playwrightServer.indexOf('stage-release-topology.mjs')).toBeLessThan(playwrightServer.indexOf('const server = await preview'));
   });
 
-  it('tracks the Pass 66 acceptance lifecycle without allowing premature publication', () => {
-    const manifestPath = 'acceptance/pass-66.json';
+  it('tracks the current release acceptance lifecycle without allowing premature publication', () => {
+    const manifestPath = 'acceptance/pass-68.json';
     if (!existsSync(manifestPath)) {
       expect(() => evaluateAcceptance({ phase: 'release', pass: PASS66_RELEASE_IDENTITY.pass }))
         .toThrow(`acceptance manifest does not exist: ${manifestPath}`);

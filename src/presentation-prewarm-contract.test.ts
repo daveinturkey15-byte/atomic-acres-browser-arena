@@ -140,8 +140,8 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('overdriveRoot.add(overdriveCore, ...overdriveRings, overdrivePedestal, quadWorldIcon, quadBeacon);');
     expect(source).not.toContain("overdriveRoot.visible = gameStarted && matchState.phase === 'active';");
     expect(source).not.toContain('const renderer = renderRuntime.renderer as unknown as THREE.WebGLRenderer');
-    expect(source).toContain("bootstrapStage = 'prewarming-grenade-explosion'");
-    expect(source).toContain("bootstrapStage = 'prewarming-explosive-bolts'");
+    expect(source).toContain("setBootstrapStage('prewarming-grenade-explosion')");
+    expect(source).toContain("setBootstrapStage('prewarming-explosive-bolts')");
     expect(arenaPresentationPrewarm).toContain('await Promise.all([');
     expect(arenaPresentationPrewarm).toContain('prewarmExplosiveBoltPresentation(sceneGeneration),');
     expect(arenaPresentationPrewarm).toContain('timedMapWeaponPresentation.prewarm(renderRuntime, camera, sceneGeneration),');
@@ -166,7 +166,7 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('await grenadeWorldPresentationPool.prewarm(renderRuntime, camera, sceneGeneration);');
     expect(source).not.toContain('createGrenadePresentation(');
     expect(source).not.toContain('disposeGrenadePresentation(');
-    expect(source).toContain("bootstrapStage = 'prewarming-weapon-catalog'");
+    expect(source).toContain("setBootstrapStage('prewarming-weapon-catalog')");
     expect(matchDeployment).toContain('await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(');
     expect(matchDeployment).toContain("const arenaTransitionDetail = arenaTransitionFailure ? `: ${arenaTransitionFailure}` : '';");
     expect(matchDeployment).toContain('did not commit before match start${arenaTransitionDetail}');
@@ -177,9 +177,9 @@ describe('presentation prewarm startup contract', () => {
     expect(arenaDeployment).toContain('await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(');
     expect(arenaDeployment.indexOf('weaponPrewarmCatalogForArena('))
       .toBeLessThan(arenaDeployment.indexOf('respawn(false);'));
-    expect(source).toContain("bootstrapStage = 'prewarming-killstreak-presentations'");
+    expect(source).toContain("setBootstrapStage('prewarming-killstreak-presentations')");
     expect(arenaPresentationPrewarm).toContain('await killstreakPresentation.prewarm(renderRuntime, camera, sceneGeneration);');
-    expect(source).toContain("bootstrapStage = 'prewarming-smoke-presentations'");
+    expect(source).toContain("setBootstrapStage('prewarming-smoke-presentations')");
     expect(arenaPresentationPrewarm).toContain('await smokeVolumePresentationPool.prewarm(renderRuntime, camera, sceneGeneration);');
     expect(sharedAssets).not.toContain('killstreakPresentation.prewarm(renderRuntime');
     expect(sharedAssets).not.toContain('smokeVolumePresentationPool.prewarm(renderRuntime');
@@ -191,7 +191,7 @@ describe('presentation prewarm startup contract', () => {
       .toBeLessThan(arenaVisualConfiguration.indexOf('if (pass64TslSystems) pass64TslSystems.applyDefinition'));
     expect(arenaDeployment.indexOf('respawn(false);'))
       .toBeLessThan(arenaDeployment.indexOf('await prewarmArenaBoundGameplayPresentations(arenaTransitionGeneration);'));
-    expect(source).toContain("bootstrapStage = 'prewarming-overdrive'");
+    expect(source).toContain("setBootstrapStage('prewarming-overdrive')");
     expect(menuBootstrap).toContain("document.documentElement.dataset.gameplayArena = 'deferred-until-deployment'");
     expect(arenaDeployment).toContain('await prepareMenuDeploymentAssets()');
     expect(sharedAssets).toContain('menuDeploymentAssetsCoordinator.prepare(priority');
@@ -209,7 +209,7 @@ describe('presentation prewarm startup contract', () => {
     expect(menuReturn).toContain('arenaSelectionReady = true;');
     expect(menuReturn).toContain('menuPreviewVideoController.whenFirstFramePresented()');
     expect(menuReturn).toContain("prepareMenuDeploymentAssets('idle')");
-    expect(menuBootstrap).toContain("bootstrapStage = 'ready';");
+    expect(matchDeployment).toContain("setBootstrapStage('ready');");
     expect(sharedAssets).toContain("const sharedAssets = runPhase('shared-assets'");
     expect(sharedAssets).toContain("? runPhase('first-person-catalog'");
     expect(sharedAssets).toContain("const worldDropCorpus = runPhase('world-drop-corpus'");
@@ -429,7 +429,7 @@ describe('presentation prewarm startup contract', () => {
     expect(menuLoadoutApply).not.toContain('weaponView.prewarmBrowserWeaponCatalog(');
     const webGpuMenuPreparation = menuLoadoutApply.slice(menuLoadoutApply.indexOf('const generation'));
     expect(webGpuMenuPreparation).not.toContain('weaponView.setWeapon(');
-    expect(source).toContain("bootstrapStage = 'ready'");
+    expect(source).toContain("setBootstrapStage('ready')");
   });
 
   it('yields cold pool construction, vocabulary state walks and fenced retirement cleanup', () => {

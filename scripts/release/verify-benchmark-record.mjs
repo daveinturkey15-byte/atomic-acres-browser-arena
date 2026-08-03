@@ -11,7 +11,7 @@ const RECORD_PATH = resolve(ROOT, 'baselines', 'pass62', 'best-netcode-benchmark
 const CHANNELS_PATH = resolve(ROOT, 'release-channels.json');
 const SHA40 = /^[0-9a-f]{40}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
-const PASS = /^PASS [1-9][0-9]*$/;
+const PASS = /^PASS [1-9][0-9]*(\.[0-9]+)?$/;
 
 function safeRelativePath(value, label) {
   if (value === '.') return value;

@@ -7,15 +7,15 @@ export type Pass66ComparatorCapabilities = Readonly<{
 }>;
 
 /**
- * The byte-exact Pass 63 runtime can restore its session-scoped room identity,
- * but it predates both the explicit rejoin button state and reliable commit
- * mirror counter. Keep the shared comparator on only the capabilities that the
- * pinned runtime actually exposes.
+ * The pinned Pass 67.1 stable singleplayer runtime carries the same session
+ * room identity, rejoin affordance and reliable commit mirror counter as the
+ * live candidate line; the comparator proves the stable bundle is the newer
+ * singleplayer build rather than the pre-rejoin Pass 63 tree.
  */
-export const PASS63_STABLE_COMPARATOR_CAPABILITIES: Pass66ComparatorCapabilities = Object.freeze({
+export const PASS67_STABLE_COMPARATOR_CAPABILITIES: Pass66ComparatorCapabilities = Object.freeze({
   sessionRoomIdentity: true,
-  explicitRejoinAffordance: false,
-  reliableStateCommitMirrors: false,
+  explicitRejoinAffordance: true,
+  reliableStateCommitMirrors: true,
 });
 
 export const PASS66_CANDIDATE_COMPARATOR_CAPABILITIES: Pass66ComparatorCapabilities = Object.freeze({
@@ -24,20 +24,20 @@ export const PASS66_CANDIDATE_COMPARATOR_CAPABILITIES: Pass66ComparatorCapabilit
   reliableStateCommitMirrors: true,
 });
 
-export const PASS63_STABLE_BUNDLE_CAPABILITY_EVIDENCE = Object.freeze({
+export const PASS67_STABLE_BUNDLE_CAPABILITY_EVIDENCE = Object.freeze({
   required: Object.freeze([
     'atomic-acres:room-identity:',
     'networkLifecycle',
+    'REJOIN LAST MATCH',
+    'PASS 67.1',
   ]),
   absent: Object.freeze([
-    'REJOIN LAST MATCH',
-    'data-rejoin-available',
-    'reliableStateCommitMirrors',
+    'PASS 68',
   ]),
 });
 
 export function pass66ComparatorCapabilities(channel: Pass66ComparatorChannel): Pass66ComparatorCapabilities {
   return channel === 'stable'
-    ? PASS63_STABLE_COMPARATOR_CAPABILITIES
+    ? PASS67_STABLE_COMPARATOR_CAPABILITIES
     : PASS66_CANDIDATE_COMPARATOR_CAPABILITIES;
 }

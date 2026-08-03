@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  PASS63_STABLE_BUNDLE_CAPABILITY_EVIDENCE,
-  PASS63_STABLE_COMPARATOR_CAPABILITIES,
+  PASS67_STABLE_BUNDLE_CAPABILITY_EVIDENCE,
+  PASS67_STABLE_COMPARATOR_CAPABILITIES,
   PASS66_CANDIDATE_COMPARATOR_CAPABILITIES,
   pass66ComparatorCapabilities,
 } from './pass66-pass63-multiplayer-comparator-contract';
@@ -33,24 +33,24 @@ function pinnedStableJavascript(): string {
   })).join('\n');
 }
 
-describe('Pass 66 versus pinned Pass 63 multiplayer comparator contract', () => {
+describe('Pass 66 versus pinned Pass 67.1 multiplayer comparator contract', () => {
   it('derives the stable capability boundary from the byte-exact pinned Pages bundle', () => {
     const bundle = pinnedStableJavascript();
-    for (const literal of PASS63_STABLE_BUNDLE_CAPABILITY_EVIDENCE.required) {
-      expect(bundle, `pinned Pass 63 exposes ${literal}`).toContain(literal);
+    for (const literal of PASS67_STABLE_BUNDLE_CAPABILITY_EVIDENCE.required) {
+      expect(bundle, `pinned Pass 67.1 exposes ${literal}`).toContain(literal);
     }
-    for (const literal of PASS63_STABLE_BUNDLE_CAPABILITY_EVIDENCE.absent) {
-      expect(bundle, `pinned Pass 63 does not expose ${literal}`).not.toContain(literal);
+    for (const literal of PASS67_STABLE_BUNDLE_CAPABILITY_EVIDENCE.absent) {
+      expect(bundle, `pinned Pass 67.1 does not expose ${literal}`).not.toContain(literal);
     }
   });
 
   it('keeps Pass 66-only affordance and mirror checks out of the stable scenario', () => {
-    expect(pass66ComparatorCapabilities('stable')).toBe(PASS63_STABLE_COMPARATOR_CAPABILITIES);
+    expect(pass66ComparatorCapabilities('stable')).toBe(PASS67_STABLE_COMPARATOR_CAPABILITIES);
     expect(pass66ComparatorCapabilities('candidate')).toBe(PASS66_CANDIDATE_COMPARATOR_CAPABILITIES);
-    expect(PASS63_STABLE_COMPARATOR_CAPABILITIES).toEqual({
+    expect(PASS67_STABLE_COMPARATOR_CAPABILITIES).toEqual({
       sessionRoomIdentity: true,
-      explicitRejoinAffordance: false,
-      reliableStateCommitMirrors: false,
+      explicitRejoinAffordance: true,
+      reliableStateCommitMirrors: true,
     });
     expect(PASS66_CANDIDATE_COMPARATOR_CAPABILITIES).toEqual({
       sessionRoomIdentity: true,

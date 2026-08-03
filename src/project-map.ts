@@ -54,19 +54,21 @@ export type ProjectMapBundle = Readonly<{
  * unpublished pass from appearing as live release history.
  */
 export const PROJECT_MAP_RELEASE: ChangelogEntry = Object.freeze({
-  id: 'pass66',
+  id: 'pass68',
   pass: PASS66_RELEASE_IDENTITY.pass,
   title: 'The Big One',
   releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
   areas: Object.freeze(['WEBGPU', 'COMBAT', 'KILLSTREAKS', 'DESTRUCTION', 'AUDIO', 'MAPS', 'HITL']),
-  summary: 'Pass 66: The Big One is the current exact-SHA release target. Pass 63 remains the byte-exact stable rollback and Pass 64 remains failed-regression evidence only.',
+  summary: 'Pass 68: stability, loading, gun range and combat corrections. Pass 67.1 is pinned as the stable singleplayer release; Pass 64 remains failed-regression evidence only.',
   highlights: Object.freeze([
-    'The normal gameplay route is fail-closed hardware WebGPU with TSL-owned atmosphere and HDR presentation; WebGL2 remains an explicit rollback-compatible route',
-    'Nuke Town, Terminal, RustRig and Gun Range each own a streamed ArenaVisualDefinition with deterministic review cameras and budgets',
-    'The HUD, lobby, map selection, loadout and match overlays use the new command interface without dropping gameplay controls',
-    'Private-match rematches, authoritative health regeneration and duplicate result handling have dedicated regression coverage',
-    'The Railgun spawns during Nuke Town matches with finite ammunition, rechamber cadence, wall penetration and hostile thermal identification',
-    'Pass 63 is retained byte-exact as the stable rollback; Pass 64 is never promoted to Stable and remains failed-regression evidence only',
+    'Maps keep loading in the background when the tab loses focus; the deployment surface shows a real percentage/ETA progress bar up to 100% = IN GAME',
+    'Flamethrower and flare fire stays on the floor for five seconds like napalm and damages anyone standing in it; flamethrower damage is tripled',
+    'M14 EBR wall penetration is reduced 75% and its fire rate halved; Adrenaline instantly restarts health regen and adds passive +1 HP/s',
+    'Gun Range test bay is three times larger with the two-minute timer freezing and resetting on killstreak-area entry; training bots use the canonical rigged operators',
+    'Piloted Drone and Chopper Gunner views render at reduced internal resolution so altitude combat stays smooth',
+    'A Palantir-style logo flashes on every HUD when Drone Swarm deploys and the US flag flashes when a Nuke is called',
+    'RustRig darkness is lifted roughly 25% in the darkest corners; scoped ADS uses aligned iron sights and optics only',
+    'Pass 67.1 is pinned as the Stable Singleplayer build, flagged as needing multiplayer testing; Pass 64 is never promoted to Stable and remains failed-regression evidence only',
   ]),
 });
 

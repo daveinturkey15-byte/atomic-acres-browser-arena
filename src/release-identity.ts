@@ -1,5 +1,5 @@
 export const PASS66_RELEASE_IDENTITY = Object.freeze({
-  pass: 'PASS 66',
+  pass: 'PASS 68',
   label: 'THE BIG ONE v68',
   state: 'RELEASE CANDIDATE',
   route: 'channels/the-big-one',
