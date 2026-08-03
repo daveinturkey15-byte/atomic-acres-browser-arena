@@ -21587,7 +21587,7 @@ canvas.addEventListener('mousedown', (event) => {
   }
   if (event.button === 2) {
     mouseAdsHeld = true;
-    adsHeld = admittedAdsHeld(true);
+    adsHeld = admittedAdsHeld(debugAdsOverride ?? true);
     return;
   }
   if (event.button !== 0) return;
@@ -21599,7 +21599,7 @@ window.addEventListener('mouseup', (event) => {
   if (event.button === 0) mouseTriggerHeld = false;
   if (event.button === 2) mouseAdsHeld = false;
   setLocalTriggerHeld(mouseTriggerHeld);
-  adsHeld = admittedAdsHeld(mouseAdsHeld);
+  adsHeld = admittedAdsHeld(debugAdsOverride ?? mouseAdsHeld);
 });
 document.addEventListener('pointerlockchange', () => {
   if (document.pointerLockElement === canvas) {
