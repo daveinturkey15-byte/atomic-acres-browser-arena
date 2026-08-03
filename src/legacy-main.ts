@@ -18485,21 +18485,126 @@ function detonateHunterDrone(drone: HunterDroneEntity, point: THREE.Vector3): vo
 }
 
 let killstreakLogoFlashTimeout: ReturnType<typeof setTimeout> | null = null;
-function flashKillstreakLogo(symbol: string, className: string): void {
+
+function drawPalantirLogo(): HTMLCanvasElement | null {
+  if (typeof document === 'undefined') return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+  // Fiery halo
+  const halo = context.createRadialGradient(256, 256, 90, 256, 256, 250);
+  halo.addColorStop(0, 'rgba(255,170,80,0.95)');
+  halo.addColorStop(0.45, 'rgba(214,84,26,0.55)');
+  halo.addColorStop(1, 'rgba(60,10,2,0)');
+  context.fillStyle = halo;
+  context.fillRect(0, 0, 512, 512);
+  // Orb body
+  const orb = context.createRadialGradient(210, 210, 30, 256, 256, 168);
+  orb.addColorStop(0, '#7a4a2a');
+  orb.addColorStop(0.55, '#3a2010');
+  orb.addColorStop(1, '#120804');
+  context.fillStyle = orb;
+  context.beginPath();
+  context.arc(256, 256, 168, 0, Math.PI * 2);
+  context.fill();
+  // Fiery iris ring
+  context.strokeStyle = '#ff8c3a';
+  context.lineWidth = 16;
+  context.beginPath();
+  context.arc(256, 256, 96, 0, Math.PI * 2);
+  context.stroke();
+  context.strokeStyle = 'rgba(255,200,120,0.85)';
+  context.lineWidth = 5;
+  context.beginPath();
+  context.arc(256, 256, 96, 0, Math.PI * 2);
+  context.stroke();
+  // Vertical pupil
+  const pupil = context.createLinearGradient(256, 168, 256, 344);
+  pupil.addColorStop(0, '#ffd9a8');
+  pupil.addColorStop(0.5, '#ff5a1e');
+  pupil.addColorStop(1, '#7a1400');
+  context.fillStyle = pupil;
+  context.fillRect(224, 176, 64, 160);
+  // Glare
+  context.fillStyle = 'rgba(255,240,214,0.5)';
+  context.beginPath();
+  context.arc(206, 198, 34, 0, Math.PI * 2);
+  context.fill();
+  return canvas;
+}
+
+function drawUsFlagLogo(): HTMLCanvasElement | null {
+  if (typeof document === 'undefined') return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = 640;
+  canvas.height = 384;
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+  const stripeHeight = 384 / 13;
+  for (let stripe = 0; stripe < 13; stripe += 1) {
+    context.fillStyle = stripe % 2 === 0 ? '#b22234' : '#ffffff';
+    context.fillRect(0, stripe * stripeHeight, 640, stripeHeight);
+  }
+  // Canton
+  context.fillStyle = '#3c3b6e';
+  context.fillRect(0, 0, 256, 7 * stripeHeight);
+  // 50 stars: 9 rows alternating 6/5
+  const starRadius = 6.4;
+  const star = (cx: number, cy: number, radius: number) => {
+    context.beginPath();
+    for (let point = 0; point < 10; point += 1) {
+      const angle = -Math.PI / 2 + point * Math.PI / 5;
+      const r = point % 2 === 0 ? radius : radius * 0.44;
+      const x = cx + Math.cos(angle) * r;
+      const y = cy + Math.sin(angle) * r;
+      if (point === 0) context.moveTo(x, y);
+      else context.lineTo(x, y);
+    }
+    context.closePath();
+  };
+  context.fillStyle = '#ffffff';
+  for (let row = 0; row < 9; row += 1) {
+    const count = row % 2 === 0 ? 6 : 5;
+    const starRowY = stripeHeight * (row + 1) - starRadius * 0.8;
+    for (let column = 0; column < count; column += 1) {
+      const x = 256 / (count + 1) * (column + 1);
+      star(x, starRowY, starRadius);
+      context.fill();
+    }
+  }
+  return canvas;
+}
+
+function canvasLogoDataUrl(draw: () => HTMLCanvasElement | null): string {
+  const canvas = draw();
+  if (!canvas) return '';
+  try {
+    return canvas.toDataURL('image/png');
+  } catch {
+    return '';
+  }
+}
+
+function flashKillstreakLogo(kind: 'palantir' | 'us-flag'): void {
   const el = element<HTMLElement>('#killstreak-logo-flash');
   if (!el) return;
-  el.innerHTML = `<div class="logo ${className}">${symbol}</div>`;
+  const dataUrl = canvasLogoDataUrl(kind === 'palantir' ? drawPalantirLogo : drawUsFlagLogo);
+  el.innerHTML = dataUrl
+    ? `<div class="logo ${kind}"><img src="${dataUrl}" alt="${kind === 'palantir' ? 'Palantir' : 'US flag'}"></div>`
+    : `<div class="logo ${kind}">${kind === 'palantir' ? '◉' : '🇺🇸'}</div>`;
   el.hidden = false;
   el.style.opacity = '1';
   if (killstreakLogoFlashTimeout) clearTimeout(killstreakLogoFlashTimeout);
   killstreakLogoFlashTimeout = setTimeout(() => {
     el.style.opacity = '0';
-    setTimeout(() => { el.hidden = true; el.innerHTML = ''; }, 120);
-  }, 500);
+    setTimeout(() => { el.hidden = true; el.innerHTML = ''; }, 160);
+  }, 1_150);
 }
 
 function beginNuke(now: number, authoritativeDamage = true): void {
-  flashKillstreakLogo('🇺🇸', 'us-flag');
+  flashKillstreakLogo('us-flag');
   nukeShockwave.scale.setScalar(0.1);
   (nukeShockwave.material as THREE.MeshBasicMaterial).opacity = 0;
   nukeShockwave.visible = false;
@@ -19277,7 +19382,7 @@ function activateFieldSupport(id: FieldSupportId): void {
       [ingressFacing.x, 0, ingressFacing.z],
     )) return;
     addFeed('DRONE SWARM · 24 DRONES · 30 SEC', 'gold');
-    flashKillstreakLogo('◉', 'palantir');
+    flashKillstreakLogo('palantir');
   }
   updateFieldSupportHud();
 }
