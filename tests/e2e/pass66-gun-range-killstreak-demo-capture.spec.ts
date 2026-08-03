@@ -856,8 +856,15 @@ test('records one unique real-bay video after every canonical support passes F a
   const pageErrors: string[] = [];
   const executablePath = installedChromePath();
   const encoderVersion = ffmpegVersion();
+  // The Pass 65 presentation contract only runs the game loop for a visible
+  // AND focused window. Headless Chromium on Windows loses OS focus right
+  // after launch, so the canvas freezes mid-clip and the cadence gate fails.
+  // A headed capture (KILLSTREAK_CAPTURE_HEADED=1) keeps the window focused
+  // and presents real frames; CI stays headless because it cannot run this
+  // capture (the spec is captureExplicitlyEnabled-gated anyway).
+  const headed = process.env.KILLSTREAK_CAPTURE_HEADED === '1';
   const browser = await chromium.launch({
-    headless: true,
+    headless: !headed,
     executablePath,
     args: [
       '--enable-gpu',
@@ -867,6 +874,7 @@ test('records one unique real-bay video after every canonical support passes F a
       '--disable-background-timer-throttling',
       '--disable-renderer-backgrounding',
       '--disable-backgrounding-occluded-windows',
+      ...(headed ? ['--window-position=48,48', '--window-size=1080,640'] : []),
     ],
   });
   try {

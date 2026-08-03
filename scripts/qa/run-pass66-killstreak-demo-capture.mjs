@@ -48,6 +48,9 @@ const childEnvironment = {
   QA_PREVIEW_HOST: '127.0.0.1',
   QA_PREVIEW_PORT: previewPort,
   BASE_URL: `http://127.0.0.1:${previewPort}`,
+  // Local captures run headed so the tab owns OS focus and the game loop
+  // presents real frames (the Pass 65 scheduler requires visible + focused).
+  KILLSTREAK_CAPTURE_HEADED: process.env.KILLSTREAK_CAPTURE_HEADED === '0' ? '0' : '1',
 };
 const capture = spawnSync(process.execPath, [
   playwrightCli,
