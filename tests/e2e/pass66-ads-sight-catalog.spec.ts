@@ -260,6 +260,9 @@ test('renders a distinct, live ADS sight for every canonical weapon without free
       catch { clientRuntimeLog = ['invalid-client-runtime-log-json']; }
       return {
         weapon: state.player.weapon,
+        alive: state.player.alive,
+        matchPhase: state.matchPhase,
+        playerDeaths: state.player.deaths,
         adsProgress: state.weaponPresentation.adsProgress,
         presentedGameplayFrame: window.__ATOMIC_ACRES_DEBUG__!.admissionState().presentedGameplayFrame,
         clientRuntimeLog,
@@ -272,7 +275,7 @@ test('renders a distinct, live ADS sight for every canonical weapon without free
     });
     const presentedFrameDelta = stableAds.presentedGameplayFrame - presentedBefore;
     expect(presentedFrameDelta, `${weapon}: rendered frames continue after ADS settles`).toBeGreaterThan(2);
-    expect(stableAds.weapon, `${weapon}: remains equipped through ADS dwell`).toBe(weapon);
+    expect(stableAds.weapon, `${weapon}: remains equipped through ADS dwell (alive=${stableAds.alive} phase=${stableAds.matchPhase} deaths=${stableAds.playerDeaths})`).toBe(weapon);
     expect(stableAds.adsProgress, `${weapon}: remains fully ADS through dwell`).toBeGreaterThan(0.98);
     expect(stableAds.clientRuntimeLog, `${weapon}: no caught frame/runtime errors`).toEqual([]);
     expect(stableAds.runtimeErrorVisible, `${weapon}: runtime error surfaces stay hidden`).toBe(false);

@@ -438,8 +438,10 @@ async function startMultiplayerMatch(
   arena: ArenaId,
   profile: RenderProfile,
 ): Promise<{ hostId: string; guestId: string }> {
-  await host.locator('#player-name').fill(`Prone Host ${arena} ${profile}`);
-  await guest.locator('#player-name').fill(`Prone Guest ${arena} ${profile}`);
+  const hostLabel = `PH-${arena.slice(0, 9)}-${profile.slice(0, 5)}`;
+  const guestLabel = `PG-${arena.slice(0, 9)}-${profile.slice(0, 5)}`;
+  await host.locator('#player-name').fill(hostLabel);
+  await guest.locator('#player-name').fill(guestLabel);
   await host.locator('#team').selectOption('0');
   await guest.locator('#team').selectOption('1');
   await host.locator('#host').click();
@@ -456,9 +458,10 @@ async function startMultiplayerMatch(
     return {
       hostId: members.find((member: any) => member.name === hostName)?.id ?? '',
       guestId: members.find((member: any) => member.name === guestName)?.id ?? '',
+      memberNames: members.map((member: any) => member.name),
     };
-  }, { hostName: `Prone Host ${arena} ${profile}`, guestName: `Prone Guest ${arena} ${profile}` });
-  expect(identities.hostId).toMatch(/^p-/u);
+  }, { hostName: hostLabel, guestName: guestLabel });
+  expect(identities.hostId, `host member found by name (members: ${JSON.stringify(identities.memberNames)})`).toMatch(/^p-/u);
   expect(identities.guestId).toMatch(/^p-/u);
   expect(identities.hostId).not.toBe(identities.guestId);
   await host.locator('#lobby-ready').click();
