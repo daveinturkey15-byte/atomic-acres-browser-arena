@@ -25072,8 +25072,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     debugCaptureCameraActive = [x, y, z, yaw, pitch].every(Number.isFinite);
     debugCaptureCameraUsesQuaternion = false;
     if (!debugCaptureCameraActive) {
-      debugCaptureOrbit = null;
       debugCaptureCameraFov = null;
+      debugCaptureOrbit = null;
       debugCaptureFixedVisualTimeMs = null;
       pass64TslSystems?.clearReviewCamera();
       activeArenaReviewCameraId = null;
