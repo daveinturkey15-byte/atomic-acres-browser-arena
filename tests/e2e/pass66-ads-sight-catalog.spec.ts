@@ -166,6 +166,10 @@ async function captureIsolatedReticle(page: Page, weapon: WeaponId): Promise<Rea
       #crosshair::before, #crosshair::after, #sniper-scope *, #dmr-thermal *, #railgun-thermal * {
         visibility: visible !important;
       }
+      /* The ADS crosshair carries the hidden attribute, which display:nones the
+         element and cannot be overridden by visibility alone. Re-display it so
+         the isolated reticle capture sees the real rendered marker. */
+      #crosshair { display: initial !important; }
       #hud::before, #hud::after { display: none !important; }
     `;
     document.head.append(style);

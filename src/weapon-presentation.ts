@@ -3018,16 +3018,25 @@ export class WeaponPresentation {
     this.centerSightReference(activeModel);
     if (arms && !meleeActive) this.solveArms(arms, activeModel, reloadPose);
     if (!authoredMeleeActive) this.solveRiggedArms(activeModel, reloadPose);
-    // Near-plane safety net: the recoil pitch can swing a viewmodel corner back
-    // toward the camera in a way that depends on arena geometry and camera
-    // pitch, so a fixed retreat floor is not enough. While the fire kick is
-    // active, push the weapon forward just enough that every bounding-box
-    // corner clears the near plane. Bounded to the kick window.
-    if (presentationKick > 0.05 && activeModel?.visible) {
-      const framing = measureCameraFraming(activeModel, this.camera);
-      if (framing && !framing.nearPlaneClear && Number.isFinite(framing.nearestDepth)) {
-        const cameraNear = this.camera instanceof THREE.PerspectiveCamera ? this.camera.near : 0.08;
-        const push = Math.max(0, cameraNear + 0.02 - framing.nearestDepth);
+    // Near-plane safety net: the recoil pitch and reload poses can swing a
+    // viewmodel or arm corner back toward the camera in a way that depends on
+    // arena geometry and camera pitch, so a fixed retreat floor is not enough.
+    // While the fire kick or a reload is active, push the root forward just
+    // enough that every bounding-box corner clears the near plane. Bounded to
+    // the kick/reload windows.
+    if (presentationKick > 0.05 || reloadProgress > 0) {
+      const cameraNear = this.camera instanceof THREE.PerspectiveCamera ? this.camera.near : 0.08;
+      let nearestDepth = Infinity;
+      if (activeModel?.visible) {
+        const framing = measureCameraFraming(activeModel, this.camera);
+        if (framing && Number.isFinite(framing.nearestDepth)) nearestDepth = Math.min(nearestDepth, framing.nearestDepth);
+      }
+      if (arms?.visible) {
+        const framing = measureCameraFraming(arms, this.camera, isAuthoredArmMesh);
+        if (framing && Number.isFinite(framing.nearestDepth)) nearestDepth = Math.min(nearestDepth, framing.nearestDepth);
+      }
+      if (Number.isFinite(nearestDepth)) {
+        const push = Math.max(0, cameraNear + 0.02 - nearestDepth);
         if (push > 0) this.root.position.z -= push;
       }
     }
