@@ -68,7 +68,8 @@ async function equipForEvidence(page: Page, weapon: WeaponId): Promise<number> {
       const staged = api.stageRailgunSpawn(0);
       if (!Array.isArray(staged.pickupPosition)) throw new Error('Railgun evidence spawn did not expose a pickup position.');
       api.teleportPlayer(...staged.pickupPosition);
-      if (!api.interactRailgun()) throw new Error('Railgun evidence pickup was rejected.');
+      const pickupResult = api.interactRailgun();
+      if (pickupResult !== true) throw new Error(`Railgun evidence pickup was rejected: ${String(pickupResult)}`);
     } else {
       api.equipWeapon(weaponId);
     }

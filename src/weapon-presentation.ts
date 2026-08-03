@@ -512,6 +512,25 @@ export class WeaponPresentation {
     'railgun',
   ]);
   readonly root = new THREE.Group();
+  private frameCounter = 0;
+
+  private enforceNearPlaneClearance(activeModel: THREE.Object3D | undefined, arms: THREE.Object3D | null): void {
+    const cameraNear = this.camera instanceof THREE.PerspectiveCamera ? this.camera.near : 0.08;
+    let nearestDepth = Infinity;
+    if (activeModel?.visible) {
+      const framing = measureCameraFraming(activeModel, this.camera);
+      if (framing && Number.isFinite(framing.nearestDepth)) nearestDepth = Math.min(nearestDepth, framing.nearestDepth);
+    }
+    if (arms?.visible) {
+      const framing = measureCameraFraming(arms, this.camera);
+      if (framing && Number.isFinite(framing.nearestDepth)) nearestDepth = Math.min(nearestDepth, framing.nearestDepth);
+    }
+    if (Number.isFinite(nearestDepth)) {
+      const push = Math.max(0, cameraNear + 0.02 - nearestDepth);
+      if (push > 0) this.root.position.z -= push;
+    }
+  }
+
   private readonly browserRuntime: boolean;
   private readonly models = new Map<WeaponId, THREE.Object3D>();
   private readonly modelLastUsed = new Map<WeaponId, number>();
@@ -3025,21 +3044,13 @@ export class WeaponPresentation {
     // enough that every bounding-box corner clears the near plane. Bounded to
     // the kick/reload windows.
     if (presentationKick > 0.05 || reloadProgress > 0) {
-      const cameraNear = this.camera instanceof THREE.PerspectiveCamera ? this.camera.near : 0.08;
-      let nearestDepth = Infinity;
-      if (activeModel?.visible) {
-        const framing = measureCameraFraming(activeModel, this.camera);
-        if (framing && Number.isFinite(framing.nearestDepth)) nearestDepth = Math.min(nearestDepth, framing.nearestDepth);
-      }
-      if (arms?.visible) {
-        const framing = measureCameraFraming(arms, this.camera);
-        if (framing && Number.isFinite(framing.nearestDepth)) nearestDepth = Math.min(nearestDepth, framing.nearestDepth);
-      }
-      if (Number.isFinite(nearestDepth)) {
-        const push = Math.max(0, cameraNear + 0.02 - nearestDepth);
-        if (push > 0) this.root.position.z -= push;
-      }
+      this.enforceNearPlaneClearance(activeModel, arms);
+    } else if ((this.frameCounter & 1) === 0) {
+      // Hip and idle poses can also cross the near plane in some arena and
+      // camera-pitch combinations, so keep a throttled always-on net.
+      this.enforceNearPlaneClearance(activeModel, arms);
     }
+    this.frameCounter += 1;
     return actionEvents;
   }
 }

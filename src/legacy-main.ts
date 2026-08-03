@@ -25777,7 +25777,18 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     broadcastRailgunState();
     return true;
   },
-  interactRailgun: () => interactWithRailgunPickup(),
+  interactRailgun: () => {
+    if (!player.alive) return 'rejected: player-dead';
+    if (matchState.phase !== 'active') return `rejected: phase-${matchState.phase}`;
+    if (!railgunPickupNearby()) return `rejected: pickup-not-nearby status=${railgunState.status}`;
+    const claimed = claimRailgun(railgunState, player.id, railgunState.generation);
+    if (!claimed.accepted) return 'rejected: claim-not-accepted';
+    dropHeldTimedMapWeapons(player.id, player.position.clone().add(new THREE.Vector3(0, 0.3, 0)));
+    applyRailgunState(claimed.state);
+    recordMatchDiagnostic('railgun-pickup', 'accepted', { actorId: player.id, weaponOrEffect: 'railgun', position: player.position.toArray(), reason: 'host-authoritative-pickup' });
+    broadcastRailgunState();
+    return true;
+  },
   degradeStateChannel: () => localMultiplayerQa && network.degradeStateChannelForQa(),
   endMatch: () => {
     endTimedMatchFromAuthority(performance.now());
