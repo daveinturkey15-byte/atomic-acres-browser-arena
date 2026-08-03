@@ -74,6 +74,8 @@ export class MobileTouchControls {
   private root: HTMLElement | null = null;
   private knobs: Record<StickId, HTMLElement | null> = { move: null, look: null };
   private stickPointers: Record<StickId, number | null> = { move: null, look: null };
+  private firePointerId: number | null = null;
+  private adsPointerId: number | null = null;
   private stickOrigins: Record<StickId, { x: number; y: number }> = { move: { x: 0, y: 0 }, look: { x: 0, y: 0 } };
   private enabled = false;
   private inMatch = false;
@@ -157,6 +159,8 @@ export class MobileTouchControls {
     this.state.ads = false;
     this.stickPointers.move = null;
     this.stickPointers.look = null;
+    this.firePointerId = null;
+    this.adsPointerId = null;
     for (const id of ['move', 'look'] as const) {
       if (this.knobs[id]) this.knobs[id]!.style.transform = 'translate(-50%, -50%)';
     }
@@ -189,10 +193,12 @@ export class MobileTouchControls {
         this.stickOrigins.look = { x: event.clientX, y: event.clientY };
         break;
       case 'fire':
+        this.firePointerId = event.pointerId;
         this.state.firing = true;
         this.callbacks.onFireDown();
         break;
       case 'ads':
+        this.adsPointerId = event.pointerId;
         this.state.ads = true;
         this.callbacks.onAdsDown();
         break;
@@ -249,13 +255,12 @@ export class MobileTouchControls {
     } else if (event.pointerId === this.stickPointers.look) {
       this.stickPointers.look = null;
       if (this.knobs.look) this.knobs.look.style.transform = 'translate(-50%, -50%)';
-    }
-    const target = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-mtc]');
-    const control = target?.dataset.mtc;
-    if (control === 'fire' && this.state.firing) {
+    } else if (event.pointerId === this.firePointerId && this.state.firing) {
+      this.firePointerId = null;
       this.state.firing = false;
       this.callbacks.onFireUp();
-    } else if (control === 'ads' && this.state.ads) {
+    } else if (event.pointerId === this.adsPointerId && this.state.ads) {
+      this.adsPointerId = null;
       this.state.ads = false;
       this.callbacks.onAdsUp();
     }

@@ -3,7 +3,7 @@
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
     "label": "THE BIG ONE",
-    "description": "Pass 66: the current live target, promoted only after exact-SHA verification."
+    "description": "Pass 67.1: the current live target, promoted only after exact-SHA verification."
   },
   "experimental": {
     "label": "THE BIG ONE v67.1",
