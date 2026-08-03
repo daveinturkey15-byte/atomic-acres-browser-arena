@@ -514,7 +514,7 @@ export class WeaponPresentation {
   readonly root = new THREE.Group();
   private frameCounter = 0;
 
-  private enforceNearPlaneClearance(activeModel: THREE.Object3D | undefined, arms: THREE.Object3D | null): void {
+  private enforceNearPlaneClearance(activeModel: THREE.Object3D | undefined, arms: THREE.Object3D | undefined): void {
     const cameraNear = this.camera instanceof THREE.PerspectiveCamera ? this.camera.near : 0.08;
     let nearestDepth = Infinity;
     if (activeModel?.visible) {

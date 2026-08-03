@@ -23559,7 +23559,7 @@ const debugWindow = window as Window & {
     };
     replayLastRailgunResult: () => boolean;
     grantRailgunToRemote: (playerId: string) => boolean;
-    interactRailgun: () => boolean;
+    interactRailgun: () => boolean | string;
     degradeStateChannel: () => boolean;
     endMatch: () => void;
     rematch: () => void;
