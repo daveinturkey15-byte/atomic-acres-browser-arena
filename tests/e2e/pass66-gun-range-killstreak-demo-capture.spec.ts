@@ -753,13 +753,14 @@ async function captureSupport(
     // AND the clip carries real cinematic motion from its first frame.
     {
       const stationTarget = { x: station!.position.x, y: 1.1, z: station!.position.z };
-      await page.evaluate((target) => {
+      const orbitRate = id === 'scout-sweep' ? 0.25 : 0.6;
+      await page.evaluate(({ target, rate }) => {
         window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraOrbit({
           centerX: target.x, centerY: target.y, centerZ: target.z,
-          radius: 6, orbitRate: 0.25, yawRate: 0, baseYaw: 0, pitch: 0.06, fov: 60,
+          radius: 6, orbitRate: rate, yawRate: 0, baseYaw: 0, pitch: 0.06, fov: 60,
           lookAtX: target.x, lookAtY: target.y, lookAtZ: target.z,
         });
-      }, stationTarget);
+      }, { target: stationTarget, rate: orbitRate });
     }
     await startCaptureTelemetryProbe(page, id, baseline);
     const clipStartedAt = Date.now();
