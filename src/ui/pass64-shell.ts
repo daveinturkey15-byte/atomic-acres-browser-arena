@@ -258,7 +258,7 @@ function optionsPanelMarkup(): string {
       <div class="settings-grid">
         <label class="setting-check"><input id="mobile-touch-controls-toggle" type="checkbox"> ENABLE MOBILE TOUCH CONTROLS</label>
       </div>
-      <p>Shows a left movement thumbstick, a right drag-to-aim surface, and FIRE / JUMP / ADS / RELOAD / CROUCH / GRENADE / KNIFE buttons. Auto-detected on touch devices; toggle here to force it on or off.</p>
+      <p>Shows a left movement thumbstick, a right look/aim thumbstick, and FIRE / JUMP / ADS / RELOAD / CROUCH / GRENADE / KNIFE buttons. Auto-detected on touch devices; toggle here to force it on or off.</p>
     </section>
     <section id="privacy-settings" class="settings-section" aria-labelledby="privacy-settings-title">
       <header><b id="privacy-settings-title">PRIVACY + ONLINE SHARING</b><span id="global-leaderboard-sharing-state">SHARING OFF</span></header>

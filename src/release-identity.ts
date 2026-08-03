@@ -1,9 +1,9 @@
 export const PASS66_RELEASE_IDENTITY = Object.freeze({
   pass: 'PASS 66',
-  label: 'THE BIG ONE v77.1',
+  label: 'THE BIG ONE v67.1',
   state: 'RELEASE CANDIDATE',
   route: 'channels/the-big-one',
-  runtimeLabel: 'PASS 77.1 · THE BIG ONE',
+  runtimeLabel: 'PASS 67.1 · THE BIG ONE',
 });
 
 export const PASS64_FAILED_REGRESSION_IDENTITY = Object.freeze({

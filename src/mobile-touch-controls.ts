@@ -1,15 +1,20 @@
 import * as THREE from 'three';
 
 /**
- * Mobile touch controls: a left virtual thumbstick for movement, a right
- * drag-to-look surface, and a compact set of action buttons (fire, jump,
- * reload, ADS, crouch, grenade). The module renders its own DOM overlay,
- * tracks multi-touch pointers, and exposes a single mutable state object the
- * game loop reads alongside keyboard and gamepad input.
+ * Mobile touch controls: a left virtual thumbstick for movement, a second
+ * right virtual thumbstick for look/aim (so both thumbs stay on sticks like
+ * other mobile shooters), and a compact set of action buttons (fire, jump,
+ * reload, ADS, crouch, grenade, knife). The module renders its own DOM
+ * overlay, tracks multi-touch pointers, and exposes a single mutable state
+ * object the game loop reads alongside keyboard and gamepad input.
  *
  * It is presentation/input only: it never authors damage, health, or match
  * state. All actions route through the same gameplay functions the keyboard
  * uses, so authority and multiplayer behaviour stay identical.
+ *
+ * The overlay only intercepts input during an active match (`setInMatch`):
+ * outside gameplay it is fully hidden so menus, the lobby, and the options
+ * toggle remain tappable.
  */
 
 export type MobileTouchCallbacks = Readonly<{
@@ -35,8 +40,8 @@ export type MobileTouchState = {
 
 export const MOBILE_CONTROLS_STORAGE_KEY = 'atomic-acres-mobile-controls';
 
-const STICK_RADIUS = 62;
-const LOOK_SENSITIVITY = 0.0044;
+const STICK_RADIUS = 58;
+const LOOK_STICK_SENSITIVITY = 0.035;
 
 export function isTouchCapableDevice(): boolean {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
@@ -62,15 +67,16 @@ export function writeMobileControlsPreference(enabled: boolean): void {
   }
 }
 
+type StickId = 'move' | 'look';
+
 export class MobileTouchControls {
   readonly state: MobileTouchState = { moveX: 0, moveY: 0, lookDeltaX: 0, lookDeltaY: 0, firing: false, ads: false };
   private root: HTMLElement | null = null;
-  private stickKnob: HTMLElement | null = null;
-  private stickPointerId: number | null = null;
-  private stickOrigin = { x: 0, y: 0 };
-  private lookPointerId: number | null = null;
-  private lookLast = { x: 0, y: 0 };
+  private knobs: Record<StickId, HTMLElement | null> = { move: null, look: null };
+  private stickPointers: Record<StickId, number | null> = { move: null, look: null };
+  private stickOrigins: Record<StickId, { x: number; y: number }> = { move: { x: 0, y: 0 }, look: { x: 0, y: 0 } };
   private enabled = false;
+  private inMatch = false;
   private disposed = false;
 
   constructor(private readonly callbacks: MobileTouchCallbacks) {}
@@ -79,9 +85,10 @@ export class MobileTouchControls {
     if (this.root || this.disposed) return;
     const root = document.createElement('div');
     root.id = 'mobile-touch-controls';
+    root.hidden = true;
     root.innerHTML = `
-      <div class="mtc-stick" data-mtc="stick"><div class="mtc-stick-knob" data-mtc="knob"></div></div>
-      <div class="mtc-look" data-mtc="look"></div>
+      <div class="mtc-stick mtc-stick-move" data-mtc="stick-move"><div class="mtc-stick-knob" data-mtc="knob-move"></div></div>
+      <div class="mtc-stick mtc-stick-look" data-mtc="stick-look"><div class="mtc-stick-knob" data-mtc="knob-look"></div></div>
       <div class="mtc-buttons">
         <button type="button" class="mtc-btn mtc-fire" data-mtc="fire">FIRE</button>
         <button type="button" class="mtc-btn mtc-jump" data-mtc="jump">JUMP</button>
@@ -93,15 +100,28 @@ export class MobileTouchControls {
       </div>`;
     host.append(root);
     this.root = root;
-    this.stickKnob = root.querySelector<HTMLElement>('[data-mtc="knob"]');
+    this.knobs.move = root.querySelector<HTMLElement>('[data-mtc="knob-move"]');
+    this.knobs.look = root.querySelector<HTMLElement>('[data-mtc="knob-look"]');
     this.bind();
-    this.setEnabled(this.enabled);
+    this.applyVisibility();
   }
 
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
-    if (this.root) this.root.hidden = !enabled;
     if (!enabled) this.resetInput();
+    this.applyVisibility();
+  }
+
+  /**
+   * Gates the overlay to live gameplay. Outside an active match the overlay
+   * is hidden and intercepts nothing, so menus, lobbies and options remain
+   * fully tappable even when the mobile-controls toggle is on.
+   */
+  setInMatch(inMatch: boolean): void {
+    if (this.inMatch === inMatch) return;
+    this.inMatch = inMatch;
+    if (!inMatch) this.resetInput();
+    this.applyVisibility();
   }
 
   isEnabled(): boolean {
@@ -122,16 +142,24 @@ export class MobileTouchControls {
     this.root = null;
   }
 
+  private applyVisibility(): void {
+    if (this.root) this.root.hidden = !(this.enabled && this.inMatch);
+  }
+
   private resetInput(): void {
     this.state.moveX = 0;
     this.state.moveY = 0;
     this.state.lookDeltaX = 0;
     this.state.lookDeltaY = 0;
+    if (this.state.firing) this.callbacks.onFireUp();
+    if (this.state.ads) this.callbacks.onAdsUp();
     this.state.firing = false;
     this.state.ads = false;
-    this.stickPointerId = null;
-    this.lookPointerId = null;
-    if (this.stickKnob) this.stickKnob.style.transform = 'translate(-50%, -50%)';
+    this.stickPointers.move = null;
+    this.stickPointers.look = null;
+    for (const id of ['move', 'look'] as const) {
+      if (this.knobs[id]) this.knobs[id]!.style.transform = 'translate(-50%, -50%)';
+    }
   }
 
   private bind(): void {
@@ -142,6 +170,7 @@ export class MobileTouchControls {
     const release = (event: PointerEvent) => this.onPointerUp(event);
     root.addEventListener('pointerup', release);
     root.addEventListener('pointercancel', release);
+    root.addEventListener('contextmenu', (event) => event.preventDefault());
   }
 
   private onPointerDown(event: PointerEvent): void {
@@ -151,13 +180,13 @@ export class MobileTouchControls {
     event.preventDefault();
     target.setPointerCapture?.(event.pointerId);
     switch (control) {
-      case 'stick':
-        this.stickPointerId = event.pointerId;
-        this.stickOrigin = { x: event.clientX, y: event.clientY };
+      case 'stick-move':
+        this.stickPointers.move = event.pointerId;
+        this.stickOrigins.move = { x: event.clientX, y: event.clientY };
         break;
-      case 'look':
-        this.lookPointerId = event.pointerId;
-        this.lookLast = { x: event.clientX, y: event.clientY };
+      case 'stick-look':
+        this.stickPointers.look = event.pointerId;
+        this.stickOrigins.look = { x: event.clientX, y: event.clientY };
         break;
       case 'fire':
         this.state.firing = true;
@@ -185,37 +214,41 @@ export class MobileTouchControls {
     }
   }
 
-  private onPointerMove(event: PointerEvent): void {
-    if (event.pointerId === this.stickPointerId) {
-      const dx = event.clientX - this.stickOrigin.x;
-      const dy = event.clientY - this.stickOrigin.y;
-      const magnitude = Math.hypot(dx, dy);
-      const clamped = Math.min(magnitude, STICK_RADIUS);
-      const scale = magnitude > 0 ? clamped / magnitude : 0;
-      const nx = dx * scale / STICK_RADIUS;
-      const ny = dy * scale / STICK_RADIUS;
-      this.state.moveX = THREE.MathUtils.clamp(nx, -1, 1);
-      this.state.moveY = THREE.MathUtils.clamp(ny, -1, 1);
-      if (this.stickKnob) {
-        this.stickKnob.style.transform = `translate(calc(-50% + ${dx * scale}px), calc(-50% + ${dy * scale}px))`;
-      }
-    } else if (event.pointerId === this.lookPointerId) {
-      const dx = event.clientX - this.lookLast.x;
-      const dy = event.clientY - this.lookLast.y;
-      this.lookLast = { x: event.clientX, y: event.clientY };
-      this.state.lookDeltaX += dx * LOOK_SENSITIVITY;
-      this.state.lookDeltaY += dy * LOOK_SENSITIVITY;
+  private applyStick(id: StickId, event: PointerEvent): void {
+    const dx = event.clientX - this.stickOrigins[id].x;
+    const dy = event.clientY - this.stickOrigins[id].y;
+    const magnitude = Math.hypot(dx, dy);
+    const clamped = Math.min(magnitude, STICK_RADIUS);
+    const scale = magnitude > 0 ? clamped / magnitude : 0;
+    const nx = THREE.MathUtils.clamp(dx * scale / STICK_RADIUS, -1, 1);
+    const ny = THREE.MathUtils.clamp(dy * scale / STICK_RADIUS, -1, 1);
+    if (id === 'move') {
+      this.state.moveX = nx;
+      this.state.moveY = ny;
+    } else {
+      // Push-and-hold aiming: sustained deflection turns/pitches the view.
+      this.state.lookDeltaX += nx * LOOK_STICK_SENSITIVITY;
+      this.state.lookDeltaY += ny * LOOK_STICK_SENSITIVITY;
+    }
+    if (this.knobs[id]) {
+      this.knobs[id]!.style.transform = `translate(calc(-50% + ${dx * scale}px), calc(-50% + ${dy * scale}px))`;
     }
   }
 
+  private onPointerMove(event: PointerEvent): void {
+    if (event.pointerId === this.stickPointers.move) this.applyStick('move', event);
+    else if (event.pointerId === this.stickPointers.look) this.applyStick('look', event);
+  }
+
   private onPointerUp(event: PointerEvent): void {
-    if (event.pointerId === this.stickPointerId) {
-      this.stickPointerId = null;
+    if (event.pointerId === this.stickPointers.move) {
+      this.stickPointers.move = null;
       this.state.moveX = 0;
       this.state.moveY = 0;
-      if (this.stickKnob) this.stickKnob.style.transform = 'translate(-50%, -50%)';
-    } else if (event.pointerId === this.lookPointerId) {
-      this.lookPointerId = null;
+      if (this.knobs.move) this.knobs.move.style.transform = 'translate(-50%, -50%)';
+    } else if (event.pointerId === this.stickPointers.look) {
+      this.stickPointers.look = null;
+      if (this.knobs.look) this.knobs.look.style.transform = 'translate(-50%, -50%)';
     }
     const target = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-mtc]');
     const control = target?.dataset.mtc;

@@ -10677,7 +10677,8 @@ function spawnPersistentWindowDebris(window: ArenaMap['breakableWindows'][number
     fallbackSettled: false,
     receivedPhysicsPose: false,
   });
-  syncInteractiveWorldPhysics();
+  // Defer physics sync to avoid frame hitch on debris spawn.
+  scheduleBrowserPreparationIdleTask(() => syncInteractiveWorldPhysics());
 }
 
 function clearPersistentWindowDebris(): void {
@@ -10742,7 +10743,9 @@ function breakHouseWindow(
   spawnPersistentWindowDebris(window, normal);
   window.broken = true;
   window.mesh.visible = projection.paneVisible;
-  syncInteractiveWorldPhysics();
+  // Defer the heavy physics sync to avoid a frame hitch on glass break.
+  // Visual effects (impact flash, shards, audio) happen immediately.
+  scheduleBrowserPreparationIdleTask(() => syncInteractiveWorldPhysics());
   spawnImpactFlash(point, 'glass', normal);
   spawnGlassShards(point, normal);
   audio.impact('glass', point.distanceTo(camera.position));
@@ -20837,7 +20840,12 @@ function setMobileControlsEnabled(enabled: boolean): void {
 
 function pollMobileTouch(): void {
   const touch = mobileTouchControls;
-  if (!touch || !touch.isEnabled()) return;
+  if (!touch) return;
+  // The overlay only ever intercepts input while a match is live and the menu
+  // is closed; otherwise it stays hidden so menus, lobby and options remain
+  // tappable even when the mobile-controls toggle is enabled.
+  touch.setInMatch(gameStarted && matchState.phase === 'active' && menu.classList.contains('hidden'));
+  if (!touch.isEnabled()) return;
   if (touch.state.firing) setLocalTriggerHeld(true);
   if (touch.state.ads) adsHeld = admittedAdsHeld(true);
   const look = touch.consumeLookDelta();

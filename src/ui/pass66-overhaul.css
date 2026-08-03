@@ -328,7 +328,7 @@
   }
   .kit-card.selected {
     border-color: var(--p66-cyan);
-    background: linear-gradient(125deg, var(--p66-cyan-soft), #fff 52%);
+    background: linear-gradient(125deg, rgba(0, 174, 189, 0.18), #eef5f2 58%);
     box-shadow: inset 4px 0 var(--p66-cyan), var(--p66-card-shadow);
   }
   .kit-card > span { color: #587074; font-size: 10px; }
@@ -733,8 +733,8 @@
   }
 }
 
-/* Mobile touch controls overlay. Rendered only when the mobile-controls toggle
-   is enabled; hidden otherwise. Uses pointer events so touch and pen both work. */
+/* Mobile touch controls overlay. Only mounted during live gameplay (the game
+   loop gates visibility via setInMatch), so menus always stay tappable. */
 #mobile-touch-controls {
   position: fixed;
   inset: 0;
@@ -748,7 +748,6 @@
 #mobile-touch-controls[hidden] { display: none; }
 #mobile-touch-controls .mtc-stick {
   position: absolute;
-  left: 22px;
   bottom: 26px;
   width: 132px;
   height: 132px;
@@ -758,6 +757,8 @@
   pointer-events: auto;
   touch-action: none;
 }
+#mobile-touch-controls .mtc-stick-move { left: 22px; }
+#mobile-touch-controls .mtc-stick-look { right: 18px; }
 #mobile-touch-controls .mtc-stick-knob {
   position: absolute;
   left: 50%;
@@ -769,39 +770,30 @@
   background: radial-gradient(circle at 40% 35%, rgba(127, 246, 255, 0.6), rgba(31, 90, 96, 0.75));
   border: 2px solid rgba(127, 246, 255, 0.7);
 }
-#mobile-touch-controls .mtc-look {
-  position: absolute;
-  right: 0;
-  top: 0;
-  width: 55%;
-  height: 100%;
-  pointer-events: auto;
-  touch-action: none;
-}
 #mobile-touch-controls .mtc-buttons {
   position: absolute;
-  right: 18px;
-  bottom: 22px;
+  right: 172px;
+  bottom: 30px;
   display: grid;
-  grid-template-columns: repeat(3, 66px);
-  gap: 10px;
+  grid-template-columns: repeat(2, 62px);
+  gap: 9px;
   pointer-events: auto;
 }
 #mobile-touch-controls .mtc-btn {
-  height: 54px;
+  height: 50px;
   border-radius: 12px;
   border: 2px solid rgba(127, 246, 255, 0.4);
   background: rgba(13, 30, 32, 0.62);
   color: #d9f6f4;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
   touch-action: none;
 }
 #mobile-touch-controls .mtc-btn:active { background: rgba(31, 90, 96, 0.8); }
 #mobile-touch-controls .mtc-fire {
-  grid-column: span 3;
-  height: 62px;
+  grid-column: span 2;
+  height: 58px;
   font-size: 17px;
   border-color: rgba(255, 118, 95, 0.6);
   background: rgba(70, 22, 14, 0.6);
