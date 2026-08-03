@@ -30,7 +30,7 @@ describe('Pass 66 command shell', () => {
     ]);
   });
 
-  it('renders four curated kits, exactly three custom slots, and one explicit manager', () => {
+  it('renders four curated kits, exactly three custom slots with nested EDIT, and one manager', () => {
     const markup = renderPass64Shell(createPass64ShellViewModel('Operator'));
     expect([...markup.matchAll(/data-kit-id="([^"]+)"/g)].map((match) => match[1])).toEqual([
       'balanced', 'runner', 'breacher', 'marksman',
@@ -38,7 +38,11 @@ describe('Pass 66 command shell', () => {
     expect([...markup.matchAll(/data-custom-preset-id="([^"]+)"/g)].map((match) => match[1])).toEqual([
       'custom-1', 'custom-2', 'custom-3',
     ]);
-    expect(markup.match(/id="loadout-manage"/g)).toHaveLength(1);
+    // Owner direction: rename/modify is nested inside each Custom card.
+    expect(markup.match(/id="loadout-manage"/g)).toBeNull();
+    expect([...markup.matchAll(/data-custom-modify="([^"]+)"/g)].map((match) => match[1])).toEqual([
+      'custom-1', 'custom-2', 'custom-3',
+    ]);
     expect(markup).toContain('id="loadout-primary"');
     expect(markup).toContain('id="loadout-secondary"');
     expect(markup).toContain('id="loadout-grenade"');

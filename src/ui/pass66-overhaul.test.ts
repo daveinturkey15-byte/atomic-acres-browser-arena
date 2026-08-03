@@ -25,9 +25,11 @@ describe('Pass 66 tactical UI overhaul', () => {
       'loadout-secondary', 'loadout-grenade', 'loadout-save', 'loadout-inspector',
       'graphics-profile', 'advanced-graphics', 'audio-settings', 'support-block',
     ]) expect(markup).toContain(`id="${id}"`);
-    expect(markup).toContain('class="kit-stat-strip kit-stat-strip-real"');
-    expect(markup).toContain('class="kit-dps"');
-    expect(markup).toContain('IDEAL BODY DPS');
+    // Exactly one canonical stat deck per card: the weapon-menu CATALOG
+    // BALLISTICS deck. The older real-stat strip was removed as a duplicate.
+    expect(markup).not.toContain('class="kit-stat-strip kit-stat-strip-real"');
+    expect(markup).not.toContain('class="kit-dps"');
+    expect(markup).toContain('data-weapon-metric="cyclic-dps"');
     expect(markup).toContain('data-loadout-stat="damage"');
     expect(markup).toContain('data-loadout-grenade-detail');
     expect(css).toContain('.custom-kit-grid .kit-card:not(.manage-kit-card)');

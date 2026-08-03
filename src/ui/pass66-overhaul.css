@@ -398,6 +398,37 @@
     background: linear-gradient(150deg, #16302f, #0d1e20);
     color: #eef6f4;
   }
+  /* Owner direction: rename/modify lives inside each Custom card. */
+  .custom-kit-card .kit-modify-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(120, 200, 195, 0.18);
+  }
+  .custom-kit-card .kit-modify-row small {
+    color: var(--p66-ink);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .custom-kit-card .kit-modify-row b {
+    padding: 7px 16px;
+    border: 1px solid #2f7a76;
+    background: linear-gradient(160deg, #1d5553, #123c3c);
+    color: #d9f6f2;
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .custom-kit-card .kit-modify-row b:hover {
+    background: linear-gradient(160deg, #2a726e, #1a4e4b);
+  }
   .custom-kit-grid .kit-card:not(.manage-kit-card) > span { color: #8fd8d2; }
   .custom-kit-grid .kit-card:not(.manage-kit-card) > strong { color: #fff; }
   .custom-kit-grid .kit-card:not(.manage-kit-card) > b { color: #ffc46b; }

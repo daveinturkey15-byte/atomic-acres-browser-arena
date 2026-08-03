@@ -608,6 +608,8 @@ export class WeaponPresentation {
     orientCurrentWorld: new THREE.Quaternion(),
     orientDesiredWorld: new THREE.Quaternion(),
     orientParentWorld: new THREE.Quaternion(),
+    orientFallbackAxis: new THREE.Vector3(),
+    orientDelta: new THREE.Quaternion(),
   };
   private readonly meleeKnife = new THREE.Group();
   private readonly meleeRig = new THREE.Group();
@@ -2400,7 +2402,21 @@ export class WeaponPresentation {
     const desiredDirection = scratch.orientDesiredDirection.copy(targetWorld).sub(origin).normalize();
     if (currentDirection.lengthSq() < 1e-6 || desiredDirection.lengthSq() < 1e-6) return;
     const currentWorld = bone.getWorldQuaternion(scratch.orientCurrentWorld);
-    const desiredWorld = scratch.orientDesiredWorld.setFromUnitVectors(currentDirection, desiredDirection).multiply(currentWorld);
+    // Shortest-arc rotation degenerates when the current and desired bone
+    // directions are anti-parallel: the axis is undefined and the solver
+    // spins the hand around an arbitrary vector, which reads as a
+    // contorted/inverted wrist at reload and close-reach poses. Rotate 180°
+    // about the bone's own current X axis instead — a deterministic upright
+    // flip that keeps the hand on the correct side of the weapon.
+    const dot = currentDirection.dot(desiredDirection);
+    const desiredWorld = dot > -0.9999
+      ? scratch.orientDelta.setFromUnitVectors(currentDirection, desiredDirection).multiply(currentWorld)
+      : scratch.orientFallbackAxis.set(1, 0, 0)
+          .applyQuaternion(currentWorld)
+          .normalize()
+          .lengthSq() < 1e-6
+        ? scratch.orientDelta.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI).multiply(currentWorld)
+        : scratch.orientDelta.setFromAxisAngle(scratch.orientFallbackAxis, Math.PI).multiply(currentWorld);
     const parentWorld = bone.parent
       ? bone.parent.getWorldQuaternion(scratch.orientParentWorld)
       : scratch.orientParentWorld.identity();

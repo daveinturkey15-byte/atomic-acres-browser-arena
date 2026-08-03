@@ -27,6 +27,43 @@
   transform: translateY(1px);
 }
 
+/* Clickable hard refresh (mobile-friendly Ctrl+Shift+R equivalent). */
+.game-refresh-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+}
+.game-refresh-row p {
+  flex: 1 1 320px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: color-mix(in srgb, var(--ui-ink, #d8f2ef) 78%, transparent);
+}
+#hard-refresh-button {
+  padding: 12px 26px;
+  border: 1px solid #8a4f0b;
+  background: linear-gradient(160deg, #d98a2b, #a35c12);
+  color: #fff;
+  font: 900 13px/1 Inter, system-ui, sans-serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(217, 138, 43, 0.35);
+}
+#hard-refresh-button:hover {
+  background: linear-gradient(160deg, #f0a03a, #c0711c);
+}
+#hard-refresh-button:active {
+  transform: translateY(1px);
+}
+#hard-refresh-button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
 #advanced-graphics .advanced-graphics-category {
   display: grid;
   gap: 8px;

@@ -51,7 +51,6 @@ function fieldKitCardsMarkup(): string {
     <strong>${kit.title}</strong>
     <b>${WEAPONS[kit.weapon].name} · ${WEAPONS[kit.sidearm].name}</b>
     <p>${kit.summary}</p>
-    ${weaponRealStatStripMarkup(kit.weapon)}
     ${weaponMenuPresentationMarkup(kit.weapon)}
     <em>SELECTED</em>
   </button>`).join('');
@@ -64,16 +63,12 @@ function customPresetCardsMarkup(): string {
     <strong data-custom-name>Custom ${index}</strong>
     <b data-custom-equipment>CONFIGURE PRIMARY · SECONDARY · GRENADE</b>
     <p>Persistent operator-defined equipment. Changes queue safely for the next deployment.</p>
-    <div data-custom-stats>${weaponRealStatStripMarkup(defaultPrimaryIds[index - 1]!)}</div>
     <i>1 primary · 1 secondary · 1 grenade</i>
     ${weaponMenuPresentationMarkup(defaultPrimaryIds[index - 1]!)}
     <em>SELECTED</em>
+    <span class="kit-modify-row"><small>RENAME / MODIFY</small><b data-custom-modify="custom-${index}" aria-controls="loadout-manager">EDIT</b></span>
   </button>`).join('');
-  return `${cards}<button id="loadout-manage" type="button" class="kit-card manage-kit-card" aria-controls="loadout-manager" aria-expanded="false">
-    <span>LOADOUT ADMIN</span><strong>Manage/Rename</strong><b>EDIT THE THREE CUSTOM SLOTS</b>
-    <p>Rename a preset and choose its canonical equipment without creating extra slots.</p>
-    <i>Sanitized · migrated · persistent</i>
-  </button>`;
+  return cards;
 }
 
 function weaponOptionsMarkup(slot: 'primary' | 'secondary'): string {
@@ -84,30 +79,10 @@ function weaponOptionsMarkup(slot: 'primary' | 'secondary'): string {
 }
 
 /**
- * Owner request: profile cards must show the weapon's REAL stats and overall
- * DPS (the same figures as the loadout inspector), not abstract 1-5 traits, so
- * each kit's gun can be compared at a glance. Mirrors the inspector's maths.
+ * Owner request: profile cards show the canonical weapon-menu stat deck (the
+ * same CATALOG BALLISTICS figures as the loadout inspector). The older
+ * real-stat strip was removed so each card carries exactly one stat deck.
  */
-export function weaponRealStatStripMarkup(weaponId: string): string {
-  const weapon = WEAPONS[weaponId as keyof typeof WEAPONS];
-  if (!weapon) return '';
-  const pellets = Math.max(1, weapon.pellets);
-  const damage = Math.round(weapon.damage * pellets);
-  const control = Math.round(Math.max(8, Math.min(100, 100 - (weapon.recoilPitch + weapon.recoilYaw) * 760)));
-  const dps = Math.round(weapon.damage * pellets * (weapon.rpm / 60));
-  const stats: Array<[string, string, number]> = [
-    ['DAMAGE', String(damage), Math.min(100, damage)],
-    ['RATE', `${weapon.rpm}`, Math.min(100, weapon.rpm / 12)],
-    ['RANGE', `${weapon.falloffEnd}m`, Math.min(100, weapon.falloffEnd / 1.2)],
-    ['CONTROL', String(control), control],
-    ['WALL', `${weapon.penetration.maxPenetratedSurfaces}`, Math.min(100, weapon.penetration.maxPenetratedSurfaces * 22 + weapon.penetration.penetrationPower * 3)],
-  ];
-  const rows = stats.map(([label, value, percent]) => (
-    `<span><small>${label}</small><i style="--kit-stat:${Math.max(4, Math.min(100, percent))}%"></i><b>${value}</b></span>`
-  )).join('');
-  return `<div class="kit-stat-strip kit-stat-strip-real">${rows}<span class="kit-dps"><small>IDEAL BODY DPS</small><b>${dps}</b></span></div>`;
-}
-
 function grenadeOptionsMarkup(): string {
   return GRENADE_CATALOG
     .filter((grenade) => grenade.availability === 'shipped')
@@ -264,6 +239,13 @@ function optionsPanelMarkup(): string {
         <label class="setting-check"><input id="mobile-touch-controls-toggle" type="checkbox"> ENABLE MOBILE TOUCH CONTROLS</label>
       </div>
       <p>Shows a left movement thumbstick, a right look/aim thumbstick, and FIRE / JUMP / ADS / RELOAD / CROUCH / GRENADE / KNIFE buttons. Auto-detected on touch devices; toggle here to force it on or off.</p>
+    </section>
+    <section id="game-refresh-settings" class="settings-section" aria-labelledby="game-refresh-settings-title">
+      <header><b id="game-refresh-settings-title">GAME REFRESH</b><span>FORCE THE LATEST BUILD</span></header>
+      <div class="game-refresh-row">
+        <button id="hard-refresh-button" type="button">HARD REFRESH NOW</button>
+        <p>Clears cached game files and reloads the newest version from the server. Use this when a new release has not appeared after an update — the clickable equivalent of Ctrl+Shift+R on desktop, built for mobile. Settings and loadouts are kept.</p>
+      </div>
     </section>
     <section id="privacy-settings" class="settings-section" aria-labelledby="privacy-settings-title">
       <header><b id="privacy-settings-title">PRIVACY + ONLINE SHARING</b><span id="global-leaderboard-sharing-state">SHARING OFF</span></header>

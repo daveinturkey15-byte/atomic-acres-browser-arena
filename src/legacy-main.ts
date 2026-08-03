@@ -92,7 +92,7 @@ import { bindProjectMapDialog } from './ui/project-map-dialog';
 import { bindKillstreakLoadoutMenu, type KillstreakMenuBinding } from './ui/killstreak-loadout-menu';
 import { applyWeaponMenuPresentation } from './ui/field-kit-weapon-presentation';
 import { assertUiSurfaceInventory } from './ui/surface-registry';
-import { createPass64ShellViewModel, renderPass64Shell, weaponRealStatStripMarkup } from './ui/pass64-shell';
+import { createPass64ShellViewModel, renderPass64Shell } from './ui/pass64-shell';
 import { bindAdvancedGraphicsControls } from './ui/advanced-graphics-controls';
 import { ADVANCED_GRAPHICS_CONTROLS, GRAPHICS_CAPABILITY_NOTICES, GRAPHICS_PRESET_VALUES } from './graphics-settings-registry';
 import {
@@ -7738,8 +7738,6 @@ function renderFieldKitSelection(): void {
     }
     const presentation = card.querySelector<HTMLElement>('[data-weapon-presentation]');
     if (presentation && preset) applyWeaponMenuPresentation(presentation, preset.primary as WeaponId);
-    const statsContainer = card.querySelector<HTMLElement>('[data-custom-stats]');
-    if (statsContainer && preset) statsContainer.innerHTML = weaponRealStatStripMarkup(preset.primary as WeaponId);
   });
   renderCustomLoadoutEditor();
 }
@@ -7811,12 +7809,18 @@ document.querySelectorAll<HTMLButtonElement>('[data-kit-id]').forEach((button) =
 document.querySelectorAll<HTMLButtonElement>('[data-custom-preset-id]').forEach((button) => {
   button.addEventListener('click', () => chooseCustomPreset(button.dataset.customPresetId as LoadoutPresetId));
 });
-const loadoutManageButton = element<HTMLButtonElement>('#loadout-manage');
-loadoutManageButton.addEventListener('click', () => {
-  const manager = element<HTMLElement>('#loadout-manager');
-  manager.hidden = !manager.hidden;
-  loadoutManageButton.setAttribute('aria-expanded', String(!manager.hidden));
-  if (!manager.hidden) renderCustomLoadoutEditor();
+// Owner direction: rename/modify is nested inside each Custom 1/2/3 card.
+// Clicking a card's EDIT row opens the loadout manager scoped to that exact
+// preset; the standalone Manage/Rename card is retired.
+document.querySelectorAll<HTMLElement>('[data-custom-modify]').forEach((edit) => {
+  edit.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    managedPresetId = (edit.dataset.customModify ?? managedPresetId) as LoadoutPresetId;
+    const manager = element<HTMLElement>('#loadout-manager');
+    manager.hidden = false;
+    renderCustomLoadoutEditor();
+  });
 });
 element<HTMLSelectElement>('#loadout-manage-preset').addEventListener('change', (event) => {
   managedPresetId = (event.currentTarget as HTMLSelectElement).value as LoadoutPresetId;
@@ -21013,6 +21017,31 @@ mobileTouchToggle.addEventListener('change', () => {
   setMobileControlsEnabled(mobileTouchToggle.checked);
 });
 initMobileTouchControls();
+
+/**
+ * Clickable hard refresh for mobile: clears every Cache Storage entry the
+ * game (or any service worker) may hold, then reloads with a fresh cache-bust
+ * query so the newest deployed build is downloaded. Settings and loadouts in
+ * localStorage are intentionally kept. Equivalent to Ctrl+Shift+R on desktop.
+ */
+const hardRefreshButton = element<HTMLButtonElement>('#hard-refresh-button');
+hardRefreshButton.addEventListener('click', () => {
+  hardRefreshButton.disabled = true;
+  hardRefreshButton.textContent = 'REFRESHING…';
+  const reloadFresh = (): void => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('v', String(Date.now()));
+    window.location.replace(url.toString());
+  };
+  if ('caches' in window) {
+    caches.keys()
+      .then((keys) => Promise.all(keys.map((key) => caches.delete(key))))
+      .catch(() => undefined)
+      .finally(reloadFresh);
+  } else {
+    reloadFresh();
+  }
+});
 graphicsProfileInput.addEventListener('change', () => {
   const preset = graphicsProfileInput.value as GraphicsPreset;
   pendingGraphicsPreset = preset;
