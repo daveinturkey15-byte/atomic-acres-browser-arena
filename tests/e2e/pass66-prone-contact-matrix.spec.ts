@@ -438,8 +438,8 @@ async function startMultiplayerMatch(
   arena: ArenaId,
   profile: RenderProfile,
 ): Promise<{ hostId: string; guestId: string }> {
-  const hostLabel = `PH-${arena.slice(0, 9)}-${profile.slice(0, 5)}`;
-  const guestLabel = `PG-${arena.slice(0, 9)}-${profile.slice(0, 5)}`;
+  const hostLabel = `PH-${arena.slice(0, 8)}-${profile.slice(0, 4)}`;
+  const guestLabel = `PG-${arena.slice(0, 8)}-${profile.slice(0, 4)}`;
   await host.locator('#player-name').fill(hostLabel);
   await guest.locator('#player-name').fill(guestLabel);
   await host.locator('#team').selectOption('0');
