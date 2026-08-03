@@ -30,6 +30,19 @@ import {
 import { applyBotEmissiveBrightness } from './operator-model';
 import { applyRemoteHumanReadabilityHighlight, remoteHumanReadabilityTelemetry } from './remote-player-readability';
 import { isSharedMeshGeometry } from './gpu-resource-ownership';
+import {
+  ACTION_LABELS,
+  GAMEPLAY_ACTIONS,
+  actionHeld,
+  actionMatchesCode,
+  clearKeyBindingProfile,
+  isDefaultProfile,
+  rebindAction,
+  resolveKeyBindingProfile,
+  saveKeyBindingProfile,
+  type GameplayAction,
+  type KeyBindingProfile,
+} from './key-bindings';
 import { GUN_RANGE_FIRING_LINE_Z, applyAdditionalMapPresentationProfile, applyRustworksPresentationProfile, buildGunRange, buildRustworks1v1, buildSkylineTerminal, updateGunRangePresentation, updateGunRangeTestBayDoor } from './additional-maps';
 import {
   GUN_RANGE_TEST_BAY_CONTRACT,
@@ -3617,6 +3630,16 @@ const player = {
 };
 
 const keys = new Set<string>();
+let cachedKeyBindingProfile: KeyBindingProfile | null = null;
+function activeKeyBindingProfile(): KeyBindingProfile {
+  // The profile is cached until the options UI rebinds (it invalidates the
+  // cache) so per-keydown profile re-parsing never shows up in frame work.
+  cachedKeyBindingProfile ??= resolveKeyBindingProfile();
+  return cachedKeyBindingProfile;
+}
+function invalidateKeyBindingProfile(): void {
+  cachedKeyBindingProfile = null;
+}
 const remotes = new Map<string, RemotePlayer>();
 const bots = new Map<string, BotPlayer>();
 const dormantBots = new Map<string, BotPlayer>();
@@ -17988,13 +18011,14 @@ function updateKillstreakPossession(now: number): void {
     nextLocalSupportGunReportAt = 0;
   }
   if (now - lastKillstreakControlSentAt < 50) return;
+  const droneKeyProfile = activeKeyBindingProfile();
   const droneAxes = pilotedDroneControlAxes({
-    keyboardForward: keys.has('KeyW'),
-    keyboardBackward: keys.has('KeyS'),
-    keyboardRight: keys.has('KeyD'),
-    keyboardLeft: keys.has('KeyA'),
-    keyboardAscend: keys.has('Space'),
-    keyboardDescend: keys.has('ControlLeft') || keys.has('KeyC'),
+    keyboardForward: actionHeld('move-forward', keys, droneKeyProfile),
+    keyboardBackward: actionHeld('move-backward', keys, droneKeyProfile),
+    keyboardRight: actionHeld('move-right', keys, droneKeyProfile),
+    keyboardLeft: actionHeld('move-left', keys, droneKeyProfile),
+    keyboardAscend: actionHeld('jump', keys, droneKeyProfile),
+    keyboardDescend: actionHeld('crouch', keys, droneKeyProfile) || actionHeld('prone', keys, droneKeyProfile),
     gamepadMoveX: gamepadMove.x,
     gamepadMoveY: gamepadMove.y,
     gamepadVertical: gamepadDroneVertical,
@@ -19542,14 +19566,15 @@ function updatePhysics(dt: number): void {
   if (!playerSimulationEnabled() || !characterPhysics) return;
   const forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
   const right = new THREE.Vector3(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
-  const forwardInput = THREE.MathUtils.clamp(Number(keys.has('KeyW')) - Number(keys.has('KeyS')) - gamepadMove.y - (mobileTouchControls?.state.moveY ?? 0), -1, 1);
-  const strafeInput = THREE.MathUtils.clamp(Number(keys.has('KeyD')) - Number(keys.has('KeyA')) + gamepadMove.x + (mobileTouchControls?.state.moveX ?? 0), -1, 1);
+  const keyProfile = activeKeyBindingProfile();
+  const forwardInput = THREE.MathUtils.clamp(Number(actionHeld('move-forward', keys, keyProfile)) - Number(actionHeld('move-backward', keys, keyProfile)) - gamepadMove.y - (mobileTouchControls?.state.moveY ?? 0), -1, 1);
+  const strafeInput = THREE.MathUtils.clamp(Number(actionHeld('move-right', keys, keyProfile)) - Number(actionHeld('move-left', keys, keyProfile)) + gamepadMove.x + (mobileTouchControls?.state.moveX ?? 0), -1, 1);
   const input = forward.clone().multiplyScalar(forwardInput).addScaledVector(right, strafeInput);
   if (input.lengthSq() > 1) input.normalize();
   const now = performance.now();
   const crouched = player.stance === 'crouch';
   const prone = player.stance === 'prone';
-  const wantsSprint = (keys.has('ShiftLeft') || gamepadSprint) && input.lengthSq() > 0 && playerGrounded;
+  const wantsSprint = (actionHeld('sprint', keys, keyProfile) || gamepadSprint) && input.lengthSq() > 0 && playerGrounded;
   const validSprintDirection = sprintEligible(forwardInput, strafeInput, adsHeld, false, false);
   if (wantsSprint && validSprintDirection && player.stance !== 'stand') requestStance('stand');
   currentSprinting = wantsSprint
@@ -20690,6 +20715,79 @@ weaponMotionScaleInput.value = String(pass65Settings.accessibility.weaponMotionS
 shareGlobalLeaderboardInput.checked = pass65Settings.privacy.shareGlobalLeaderboard;
 element<HTMLElement>('#graphics-effective').textContent = `EFFECTIVE: ${displayedGraphicsPreset.toUpperCase()}${graphicsRuntime.reason ? ` · ${graphicsRuntime.reason.toUpperCase()}` : ''}`;
 
+// ---- Key binding profile UI ----
+let keyBindingCaptureAction: GameplayAction | null = null;
+const KEY_CODE_LABELS: Readonly<Record<string, string>> = Object.freeze({
+  Space: 'SPACE', ShiftLeft: 'L-SHIFT', ShiftRight: 'R-SHIFT', ControlLeft: 'L-CTRL',
+  ControlRight: 'R-CTRL', AltLeft: 'L-ALT', AltRight: 'R-ALT', Tab: 'TAB', Enter: 'ENTER',
+  Escape: 'ESC', Backspace: 'BACKSPACE', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←',
+  ArrowRight: '→', KeyW: 'W', KeyA: 'A', KeyS: 'S', KeyD: 'D', KeyC: 'C', KeyZ: 'Z',
+  KeyR: 'R', KeyV: 'V', KeyG: 'G', KeyF: 'F', Digit1: '1', Digit2: '2', Digit3: '3',
+  Digit4: '4', Digit5: '5', Digit6: '6', Digit7: '7', Digit8: '8', Digit9: '9', Digit0: '0',
+});
+function prettyKeyCode(code: string): string {
+  if (code.startsWith('Key')) return code.slice(3).toUpperCase();
+  if (code.startsWith('Digit')) return code.slice(5);
+  return KEY_CODE_LABELS[code] ?? code;
+}
+function renderKeyBindingRows(): void {
+  const rows = element<HTMLElement>('#key-binding-rows');
+  const profile = activeKeyBindingProfile();
+  rows.innerHTML = GAMEPLAY_ACTIONS.map((action) => {
+    const keysLabel = profile[action].map(prettyKeyCode).join(' / ');
+    const capturing = keyBindingCaptureAction === action;
+    return `<div class="key-binding-row${capturing ? ' capturing' : ''}" data-action="${action}">
+      <span class="binding-action">${ACTION_LABELS[action]}</span>
+      <kbd>${capturing ? 'PRESS A KEY…' : keysLabel}</kbd>
+      <button type="button" data-rebind="${action}">${capturing ? 'CANCEL' : 'REBIND'}</button>
+    </div>`;
+  }).join('');
+  element<HTMLElement>('#key-bindings-status').textContent = isDefaultProfile(profile) ? 'DEFAULT PROFILE' : 'CUSTOM PROFILE';
+}
+function bindKeyBindingRowEvents(): void {
+  element<HTMLElement>('#key-binding-rows').addEventListener('click', (event) => {
+    const button = (event.target as Element | null)?.closest<HTMLButtonElement>('button[data-rebind]');
+    if (!button) return;
+    const action = button.dataset.rebind as GameplayAction | undefined;
+    if (!action || !GAMEPLAY_ACTIONS.includes(action)) return;
+    keyBindingCaptureAction = keyBindingCaptureAction === action ? null : action;
+    renderKeyBindingRows();
+  });
+  element<HTMLElement>('#key-bindings-reset').addEventListener('click', () => {
+    clearKeyBindingProfile();
+    invalidateKeyBindingProfile();
+    keyBindingCaptureAction = null;
+    renderKeyBindingRows();
+  });
+}
+window.addEventListener('keydown', (event) => {
+  if (keyBindingCaptureAction === null) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  if (event.code === 'Escape' || event.code === 'Tab') {
+    keyBindingCaptureAction = null;
+    renderKeyBindingRows();
+    return;
+  }
+  const profile = activeKeyBindingProfile();
+  const next = rebindAction(profile, keyBindingCaptureAction, event.code);
+  if (next) {
+    saveKeyBindingProfile(next);
+    invalidateKeyBindingProfile();
+    keyBindingCaptureAction = null;
+    renderKeyBindingRows();
+  } else {
+    const rows = element<HTMLElement>('#key-binding-rows');
+    const row = rows.querySelector<HTMLElement>(`[data-action="${keyBindingCaptureAction}"]`);
+    if (row) {
+      row.classList.add('conflict-flash');
+      window.setTimeout(() => row.classList.remove('conflict-flash'), 500);
+    }
+  }
+});
+renderKeyBindingRows();
+bindKeyBindingRowEvents();
+
 function persistPass65Settings(next: Pass65Settings): boolean {
   const result = playerProfileStore.update({ settings: next }, { sessionOnFailure: true });
   pass65Settings = result.value.settings;
@@ -21199,23 +21297,25 @@ window.addEventListener('keydown', (event) => {
   }
   if (gameplayInputEnabled()) keys.add(event.code);
   else if (event.code !== 'Tab') return;
+  const keyProfile = activeKeyBindingProfile();
   const supportPossession = localKillstreakActorSnapshot()?.possession ?? null;
   if (!supportPossession) {
-    if (event.code === 'Space' && !event.repeat) {
+    if (actionMatchesCode('jump', event.code, keyProfile) && !event.repeat) {
       if (player.stance !== 'stand') requestStance('stand');
       jumpQueuedAt = performance.now();
     }
-    if (event.code === 'KeyC' && !event.repeat) requestStance('toggle-crouch');
-    if ((event.code === 'KeyZ' || event.code === 'ControlLeft') && !event.repeat) requestStance('toggle-prone');
-    if (event.code === 'Digit1') switchWeapon(0);
-    if (event.code === 'Digit2') switchWeapon(1);
-    if (event.code === 'KeyR') reload();
-    if (event.code === 'KeyV' && !event.repeat) melee();
-    if (event.code === 'KeyG' && !event.repeat) throwGrenade();
+    if (actionMatchesCode('crouch', event.code, keyProfile) && !event.repeat) requestStance('toggle-crouch');
+    if (actionMatchesCode('prone', event.code, keyProfile) && !event.repeat) requestStance('toggle-prone');
+    if (actionMatchesCode('weapon-1', event.code, keyProfile)) switchWeapon(0);
+    if (actionMatchesCode('weapon-2', event.code, keyProfile)) switchWeapon(1);
+    if (actionMatchesCode('reload', event.code, keyProfile)) reload();
+    if (actionMatchesCode('melee', event.code, keyProfile) && !event.repeat) melee();
+    if (actionMatchesCode('grenade', event.code, keyProfile) && !event.repeat) throwGrenade();
   }
-  const supportSlot = ['Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7'].indexOf(event.code);
+  const supportSlot = GAMEPLAY_ACTIONS.findIndex((action) => action.startsWith('support-')
+    && actionMatchesCode(action, event.code, keyProfile));
   if (supportSlot >= 0 && !event.repeat) activateOrToggleFieldSupportSlot(supportSlot);
-  if (event.code === 'KeyF' && !event.repeat) {
+  if (actionMatchesCode('interact', event.code, keyProfile) && !event.repeat) {
     const now = performance.now();
     if (pointSupportTargeting && !tacticalMapOpen) {
       confirmCrosshairSupportTarget(now);
@@ -21223,20 +21323,20 @@ window.addEventListener('keydown', (event) => {
       beginFInteractionPress(now);
     }
   }
-  if (event.code === 'Tab') {
+  if (actionMatchesCode('scoreboard', event.code, activeKeyBindingProfile())) {
     event.preventDefault();
     updateRoster();
     element<HTMLElement>('#roster').hidden = false;
   }
 });
 window.addEventListener('keyup', (event) => {
-  if (event.code === 'KeyF') {
+  if (actionMatchesCode('interact', event.code, activeKeyBindingProfile())) {
     const now = performance.now();
     releaseFInteractionPress(now);
     if (localCareCaptureRequiresHold) releaseCareCapture(now);
   }
   keys.delete(event.code);
-  if (event.code === 'Tab') element<HTMLElement>('#roster').hidden = true;
+  if (actionMatchesCode('scoreboard', event.code, activeKeyBindingProfile())) element<HTMLElement>('#roster').hidden = true;
 });
 window.addEventListener('blur', () => {
   lastWindowBlurAt = performance.now();

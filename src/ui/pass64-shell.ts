@@ -253,6 +253,11 @@ function optionsPanelMarkup(): string {
         <label>WEAPON MOTION<input id="weapon-motion-scale" type="range" min="0" max="1" step="0.05" value="1"></label>
       </div>
     </section>
+    <section id="key-bindings-settings" class="settings-section" aria-labelledby="key-bindings-settings-title">
+      <header><b id="key-bindings-settings-title">KEY BINDINGS</b><span id="key-bindings-status">DEFAULT PROFILE</span><button id="key-bindings-reset" type="button">RESET TO DEFAULTS</button></header>
+      <div class="key-binding-grid" id="key-binding-rows"></div>
+      <p>Click a binding to reassign it (press a key to capture, Escape to cancel). Conflicts are rejected. Bindings apply immediately and persist on this browser; the default profile is always shown and restorable.</p>
+    </section>
     <section id="touch-controls-settings" class="settings-section" aria-labelledby="touch-controls-settings-title">
       <header><b id="touch-controls-settings-title">TOUCH / MOBILE CONTROLS</b><span>ON-SCREEN THUMBSTICKS + BUTTONS</span></header>
       <div class="settings-grid">

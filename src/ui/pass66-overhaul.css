@@ -537,6 +537,73 @@
   #menu-panel-options .privacy-setting-row .setting-check { color: var(--p66-ink); }
   #menu-panel-options .controls { color: #40585d; font-size: 12px; background: #fff; }
 
+  #menu-panel-options #key-bindings-settings {
+    border: 1px solid var(--p66-line);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--p66-ink);
+    box-shadow: var(--p66-card-shadow);
+    padding: 20px;
+  }
+  #menu-panel-options #key-bindings-settings > header { color: var(--p66-ink); font-size: 14px; }
+  #menu-panel-options #key-bindings-settings > header span { color: #27868d; font-size: 11px; }
+  #menu-panel-options #key-bindings-settings > header button {
+    margin-left: 12px;
+    padding: 7px 14px;
+    border: 1px solid var(--p66-line);
+    border-radius: 4px;
+    background: var(--p66-teal);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  #menu-panel-options #key-bindings-settings > p { color: #405b60; font-size: 12px; }
+  #menu-panel-options .key-binding-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(260px, 1fr));
+    gap: 8px;
+    margin-top: 12px;
+  }
+  #menu-panel-options .key-binding-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 42px;
+    padding: 8px 12px;
+    border: 1px solid var(--p66-line);
+    border-radius: 4px;
+    background: var(--p66-paper-2);
+    color: #365156;
+    font-size: 12px;
+  }
+  #menu-panel-options .key-binding-row .binding-action { font-weight: 700; }
+  #menu-panel-options .key-binding-row kbd {
+    padding: 4px 9px;
+    border: 1px solid var(--p66-line);
+    border-radius: 3px;
+    background: #fff;
+    color: var(--p66-ink);
+    font: 700 11px/1 Inter, system-ui, sans-serif;
+  }
+  #menu-panel-options .key-binding-row button {
+    padding: 6px 11px;
+    border: 1px solid var(--p66-line);
+    border-radius: 4px;
+    background: var(--p66-teal);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  #menu-panel-options .key-binding-row.capturing button { background: #d2452f; }
+  #menu-panel-options .key-binding-row.capturing .binding-action { color: #d2452f; }
+  #menu-panel-options .key-binding-row.conflict-flash {
+    border-color: #d2452f;
+    box-shadow: 0 0 0 2px rgba(210, 69, 47, 0.35);
+  }
+
   .menu-modal-backdrop { background: rgba(7, 21, 24, 0.68); backdrop-filter: blur(6px); }
   #project-map-panel,
   #changelog-panel {
