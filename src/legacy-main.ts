@@ -21054,10 +21054,12 @@ graphicsProfileInput.addEventListener('change', () => {
 });
 
 /**
- * Apply the presentation-side effects budget for the saved settings right now,
- * so a graphics change is visible immediately even though the full renderer
- * rebuild (render scale, MSAA, AO, shadows) still happens at the next menu
- * boundary. This is what makes the SAVE button feel like it does something.
+ * Apply the presentation-side effects budget AND every renderer setting that
+ * can be changed without device recreation the moment SAVE is pressed, so a
+ * graphics change is visible immediately mid-match. The full renderer rebuild
+ * (MSAA, antialias, render scale) still happens at the next menu boundary —
+ * that part requires the page reload — but resolution cap, shadows, bloom and
+ * effects density now respond at once instead of looking dead until redeploy.
  */
 function applyLiveGraphicsEffects(): void {
   if (!applyPresentationEffectsBudget) return;
@@ -21065,6 +21067,15 @@ function applyLiveGraphicsEffects(): void {
   applyPresentationEffectsBudget(applyGraphicsPreferenceBudget(
     graphicsEffectsBudget(live.renderProfile, adaptiveQuality.telemetry().pixelRatioCap),
   ));
+  // Re-anchor the adaptive pixel-ratio cap to the saved profile so resolution
+  // scaling responds immediately (the controller re-samples from here).
+  const savedCap = live.renderProfile === 'compat' ? 0.2 : live.renderProfile === 'performance' ? 0.75 : 1;
+  adaptiveQuality.seedPixelRatioCap(savedCap, 'graphics-save-live');
+  // Shadow toggling is backend-safe and applies without a rebuild. Max and
+  // Quality both resolve to the Blender render profile; Performance and
+  // Compatibility run without shadow maps.
+  renderRuntime.setShadowsEnabled(live.renderProfile === 'blender');
+  graphicsRefinement.refreshSelectiveBloom(scene);
 }
 
 graphicsSaveButton.addEventListener('click', () => {
@@ -21076,7 +21087,7 @@ graphicsSaveButton.addEventListener('click', () => {
   }
   applyLiveGraphicsEffects();
   if (gameStarted) {
-    setStatus('GRAPHICS SAVED · effects applied now · full renderer rebuild on your next deployment.');
+    setStatus('GRAPHICS SAVED · resolution, shadows, bloom and effects applied now · full renderer rebuild on menu return.');
   } else {
     setStatus('GRAPHICS SAVED · applying renderer settings.');
   }

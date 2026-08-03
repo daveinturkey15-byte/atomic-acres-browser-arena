@@ -107,10 +107,11 @@ export class ImpactPresentation {
       new THREE.MeshBasicMaterial({
         color: 0xffffff,
         transparent: true,
-        opacity: reducedDetail ? 0.24 : 0.4,
+        opacity: reducedDetail ? 0.36 : 0.4,
         depthWrite: false,
         polygonOffset: true,
         polygonOffsetFactor: -3,
+        polygonOffsetUnits: -1,
         map: proceduralImpactTexture(64, 'mark'),
         alphaTest: 0.035,
       }),
@@ -330,7 +331,9 @@ export class ImpactPresentation {
     const markCapacity = Math.max(8, Math.round(MAX_IMPACT_MARKS * this.decalCapacityScale));
     const markSlot = this.markCursor++ % markCapacity;
     const markNormal = normal.clone().normalize();
-    const markPosition = point.clone().addScaledVector(markNormal, 0.018);
+    // 3.2 cm standoff keeps the decal clear of skin-over-solid z-fighting on
+    // uneven arena geometry while staying glued to the surface visually.
+    const markPosition = point.clone().addScaledVector(markNormal, 0.032);
     const markRotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), markNormal);
     markRotation.premultiply(new THREE.Quaternion().setFromAxisAngle(markNormal, presentationRandom() * Math.PI));
     this.marks.setMatrixAt(markSlot, new THREE.Matrix4().compose(
