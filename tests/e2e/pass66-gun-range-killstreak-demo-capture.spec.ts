@@ -515,9 +515,11 @@ async function startCaptureTelemetryProbe(
       const presented = Number(api.admissionState().presentedGameplayFrame);
       const transition = document.querySelector<HTMLElement>('#deployment-transition');
       const hud = document.querySelector<HTMLElement>('#hud-root, #hud');
+      const review = snap.deterministicReview as Record<string, unknown> | undefined;
+      const rv = (k: string) => String(review?.[k] ?? '?');
       state.lifecycle.push({
         at: Number((performance.now() - startedAt).toFixed(1)),
-        event: `frame=${snap.frameCount} presented=${presented} decision=${JSON.stringify(snap.presentationScheduling?.lastDecision)} focus=${document.hasFocus()} vis=${document.visibilityState} transHidden=${transition?.hidden ?? 'na'} hudHidden=${hud?.hidden ?? 'na'}`,
+        event: `frame=${snap.frameCount} presented=${presented} cam=${rv('captureCameraActive')} orbit=${rv('captureCameraOrbit')} reviewCam=${rv('cameraId')} rsp=${rv('renderSubmissionPaused')} paused=${rv('matchAdmissionPresentationPaused')} glLost=${rv('webglContextLost')} focus=${document.hasFocus()} vis=${document.visibilityState} transHidden=${transition?.hidden ?? 'na'} hudHidden=${hud?.hidden ?? 'na'}`,
         state: document.visibilityState,
         focus: document.hasFocus(),
       });
