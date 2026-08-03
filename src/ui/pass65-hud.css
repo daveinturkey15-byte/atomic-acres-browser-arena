@@ -955,6 +955,30 @@
     text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
   }
 
+  #gunner-cockpit-hud #chopper-thermal {
+    position: absolute;
+    left: 50%;
+    top: 9vh;
+    transform: translateX(-50%);
+    padding: 7px 16px;
+    border: 1px solid rgba(255, 120, 140, 0.55);
+    border-radius: 4px;
+    background: rgba(18, 4, 8, 0.62);
+    box-shadow: 0 0 18px rgba(255, 80, 100, 0.35);
+    color: #ffc9d2;
+  }
+
+  #gunner-cockpit-hud #chopper-thermal[hidden] {
+    display: none;
+  }
+
+  #gunner-cockpit-hud #chopper-thermal span {
+    font: 800 12px/1 Inter, system-ui, sans-serif;
+    letter-spacing: 0.24em;
+    color: #ffb3c0;
+    text-shadow: 0 0 8px rgba(255, 80, 100, 0.6);
+  }
+
   /* Each firearm projects its own canonical sight signature. The marker stays
      on the authoritative centre ray; scoped weapons suppress it in favour of
      their dedicated magnified/thermal overlays. */

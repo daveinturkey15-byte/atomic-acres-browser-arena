@@ -403,6 +403,7 @@ function hudMarkup(): string {
       <div class="gunner-reticle"><i></i><b></b><span class="tl"></span><span class="tr"></span><span class="bl"></span><span class="br"></span></div>
       <div class="gunner-readout"><small>HULL</small><strong id="gunner-hull">100</strong></div>
       <div class="gunner-readout right"><small>AMMO</small><strong id="gunner-ammo">∞</strong></div>
+      <div id="chopper-thermal" hidden aria-hidden="true"><span>THERMAL · THROUGH-WALL AUTOCANNON · HOSTILES</span></div>
     </div>
     <pre id="runtime-error-log" hidden aria-hidden="true"></pre>
     <div id="death-fade" aria-hidden="true"></div>

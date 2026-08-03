@@ -1876,6 +1876,7 @@ export class HostKillstreakRuntime {
         owner.team,
         world,
         CHOPPER_GUN_PROFILE.maximumRangeM,
+        true,
       );
       if (hit) {
         const admittedDamage = supportGunDamageAtDistance(CHOPPER_GUN_PROFILE, hit.distance);
@@ -2328,6 +2329,7 @@ export class HostKillstreakRuntime {
     team: 0 | 1,
     world: KillstreakWorld,
     maximumRange: number,
+    wallbang = false,
   ): SupportRayTargetHit | null {
     const radiusSquared = CHOPPER_GUNNER_RAY_POLICY.targetRadiusM ** 2;
     const hits: SupportRayTargetHit[] = [];
@@ -2346,7 +2348,14 @@ export class HostKillstreakRuntime {
         origin[1] + direction[1] * entryDistance,
         origin[2] + direction[2] * entryDistance,
       ] as const);
-      if (!lineOfSight(world, origin, endpoint)) continue;
+      // Owner direction: the Chopper Gunner's heavy autocannon must hit
+      // reliably from orbit. LOS gating made damage feel random (a low wall
+      // edge or the chopper's own altitude silently blocked the ray) and
+      // previously wallbanged inconsistently. Player-controlled fire now uses
+      // the same through-wall authority as the railgun: full damage through
+      // solid cover. AI gunners keep LOS gating so bots don't shoot through
+      // the whole map.
+      if (!wallbang && !lineOfSight(world, origin, endpoint)) continue;
       hits.push(Object.freeze({ target, endpoint, distance: entryDistance }));
     }
     return hits.sort((left, right) => left.distance - right.distance || left.target.id.localeCompare(right.target.id))[0] ?? null;

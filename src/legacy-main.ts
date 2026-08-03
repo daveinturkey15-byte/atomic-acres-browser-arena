@@ -17947,6 +17947,29 @@ function updateKillstreakPossession(now: number): void {
   killstreakPresentation.alignFirstPersonCockpit(entity.id, camera.quaternion);
   weaponView.setPresentationVisible(false);
   syncGunnerCockpitHud(entity);
+  // Chopper Gunner thermal vision: the heavy autocannon shoots through walls,
+  // so the cockpit reveals living hostiles with the same thermal-ghost overlay
+  // family as the M14 DMR scope.
+  const chopperThermal = possession.kind === 'chopper-gunner';
+  const chopperThermalElement = element<HTMLElement>('#chopper-thermal');
+  if (chopperThermalElement) chopperThermalElement.hidden = !chopperThermal;
+  if (chopperThermal) {
+    const targets: ThermalGhostTarget[] = [];
+    const mode = gameMode === 'solo' ? 'tdm' : privateMatchMode;
+    for (const remote of remotes.values()) {
+      if (remote.snapshot.hp <= 0) continue;
+      const relation = mode === 'tdm' && remote.snapshot.team === player.team ? 'friendly' as const : 'hostile' as const;
+      targets.push({ id: remote.snapshot.id, relation, root: remote.root });
+    }
+    for (const bot of bots.values()) {
+      if (!bot.alive) continue;
+      const relation = mode === 'tdm' && bot.team === player.team ? 'friendly' as const : 'hostile' as const;
+      targets.push({ id: bot.id, relation, root: bot.root });
+    }
+    thermalGhostPresentation.sync(targets, true);
+  } else if (!dmrThermalActive) {
+    thermalGhostPresentation.sync([], false);
+  }
   if (triggerHeld && now >= nextLocalSupportGunReportAt) {
     audio.supportGun(possession.kind === 'chopper-gunner' ? 'chopper' : 'drone');
     // Owner feedback: it was hard to tell the mounted gun was actually firing.
