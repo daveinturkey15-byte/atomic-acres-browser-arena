@@ -44,7 +44,7 @@ export type RailgunAuthorityState = Readonly<{
 export type RailgunAdvanceResult = Readonly<{
   state: RailgunAuthorityState;
   spawned: boolean;
-  announcement: 'RAILGUN SPAWNED' | null;
+  announcement: 'RARE WEAPON SPAWNED' | null;
 }>;
 
 export type RailgunShotResult = Readonly<{
@@ -122,7 +122,7 @@ export function advanceRailgunAuthority(state: RailgunAuthorityState, now: numbe
   return {
     state: { ...state, revision: state.revision + 1, status: 'available', announcementSent: true },
     spawned: true,
-    announcement: announce ? 'RAILGUN SPAWNED' : null,
+    announcement: announce ? 'RARE WEAPON SPAWNED' : null,
   };
 }
 

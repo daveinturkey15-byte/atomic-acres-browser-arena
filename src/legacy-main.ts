@@ -102,6 +102,10 @@ import {
   waitForVisibleBrowserPreparation,
   yieldBrowserPreparationFrame,
 } from './browser-preparation-scheduler';
+import {
+  deploymentLoadingProgress,
+  type DeploymentLoadingStage,
+} from './deployment-loading-progress';
 import { flyingCatPose } from './gun-range-cat-choreography';
 import { KillstreakLoadoutController } from './killstreak-loadout';
 import type { KillstreakLoadoutV1, Pass65KillstreakId } from './killstreak-catalog';
@@ -638,7 +642,10 @@ import {
   type FlareShooterFeedbackCheckpoint,
 } from './flare-authority-checkpoint';
 import { FLAMETHROWER_EFFECT, FLARE_PROJECTILE_EFFECT } from './special-weapon-effects';
-import { FlamethrowerStreamSystem } from './flamethrower-stream-system';
+import {
+  FLAMETHROWER_GROUND_FIRE_DURATION_MS,
+  FlamethrowerStreamSystem,
+} from './flamethrower-stream-system';
 import { DMR_THERMAL_MAGNIFICATION, DMR_THERMAL_MAX_CONTACTS, DmrThermalPresentation, dmrThermalOcclusionBudget, type DmrThermalContact } from './dmr-thermal-presentation';
 import { ThermalGhostPresentation, type ThermalGhostTarget } from './thermal-ghost-presentation';
 import { applySkyBackdrop, waitForSkyBackdropAdmission } from './rendering/sky-backdrop';
@@ -1043,6 +1050,10 @@ const deploymentTransitionPoster = element<HTMLImageElement>('#deployment-transi
 const deploymentTransitionVideo = element<HTMLVideoElement>('#deployment-transition-video');
 const deploymentTransitionTitle = element<HTMLElement>('#deployment-transition-title');
 const deploymentTransitionStatus = element<HTMLElement>('#deployment-transition-status');
+const deploymentTransitionProgress = element<HTMLProgressElement>('#deployment-transition-progress');
+const deploymentTransitionPercent = element<HTMLOutputElement>('#deployment-transition-percent');
+const deploymentTransitionEta = element<HTMLOutputElement>('#deployment-transition-eta');
+const deploymentTransitionStage = element<HTMLElement>('#deployment-transition-stage');
 const matchPauseFrameFallback = element<HTMLCanvasElement>('#match-pause-frame-fallback');
 const matchPauseFrameFallbackContextValue = matchPauseFrameFallback.getContext('2d', { alpha: false });
 if (!matchPauseFrameFallbackContextValue) throw new Error('Canvas2D pause-only fallback is unavailable');
@@ -1471,6 +1482,48 @@ const railgunPresentation = new RailgunPresentation(scene, element<HTMLElement>(
 const timedMapWeaponPresentation = new TimedMapWeaponPresentation(scene, reducedRenderMode);
 const flareProjectileSystem = new FlareProjectileSystem(scene, reducedRenderMode);
 const flamethrowerStreamPresentation = new FlamethrowerStreamSystem(scene, reducedRenderMode);
+const FLAMETHROWER_GROUND_FIRE_RADIUS_M = 1.8;
+const FLAMETHROWER_GROUND_FIRE_PULSE_MS = 500;
+const FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE = 2;
+const FLAMETHROWER_GROUND_FIRE_CAPACITY = 24;
+type FlamethrowerGroundFire = {
+  ownerId: string;
+  ownerTeam: Team;
+  point: THREE.Vector3;
+  actionNonce: number;
+  expiresAt: number;
+  nextPulseAt: number;
+};
+const flamethrowerGroundFires: FlamethrowerGroundFire[] = [];
+
+function updateFlamethrowerGroundFires(now: number): void {
+  for (let i = flamethrowerGroundFires.length - 1; i >= 0; i--) {
+    const fire = flamethrowerGroundFires[i];
+    if (now >= fire.expiresAt) {
+      flamethrowerGroundFires.splice(i, 1);
+      continue;
+    }
+    if (now >= fire.nextPulseAt) {
+      fire.nextPulseAt = now + FLAMETHROWER_GROUND_FIRE_PULSE_MS;
+      // Damage players/bots within the ground fire radius.
+      const r2 = FLAMETHROWER_GROUND_FIRE_RADIUS_M * FLAMETHROWER_GROUND_FIRE_RADIUS_M;
+      if (player.alive && player.position.distanceToSquared(fire.point) < r2
+        && (network.role !== 'host' || areHostile(fire.ownerTeam, player.team))) {
+        applyLocalDamage(FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, 'flamethrower-ground-fire', fire.ownerId);
+      }
+      for (const bot of [...bots.values()]) {
+        if (!bot.alive) continue;
+        const dx = bot.position.x - fire.point.x;
+        const dz = bot.position.z - fire.point.z;
+        if (dx * dx + dz * dz < r2 && areHostile(fire.ownerTeam, bot.team)) {
+          applyBotDamage(bot, FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, 'body', { weaponOrEffect: 'flamethrower-ground-fire' }, fire.ownerId);
+        }
+      }
+      spawnImpactFlash(fire.point, 'fire', new THREE.Vector3(0, 1, 0));
+    }
+  }
+}
+
 const dmrThermalPresentation = new DmrThermalPresentation(scene, element<HTMLElement>('#dmr-thermal'));
 // Through-wall reveals: the M14 DMR shows the actual posed combatant via exact-
 // pose thermal ghosts; the railgun keeps its signature cyan silhouette scope.
@@ -1482,37 +1535,44 @@ camera.layers.enable(VIEWMODEL_RENDER_LAYER);
 let skyMaterial: THREE.ShaderMaterial | null = null;
 
 let riggedOperatorLoadError: string | null = null;
-type BootstrapStage =
-  | 'loading-module-assets'
-  | 'measuring-display'
-  | 'module-ready'
-  | 'menu-video-ready'
-  | 'loading-gameplay-assets'
-  | 'prewarming-weapon-catalog'
-  | 'prewarming-batched-presentations'
-  | 'prewarming-grenade-world-presentations'
-  | 'prewarming-killstreak-presentations'
-  | 'prewarming-bot-world-weapons'
-  | 'prewarming-smoke-presentations'
-  | 'prewarming-combat-tracers'
-  | 'prewarming-combat-impacts'
-  | 'prewarming-explosive-bolts'
-  | 'prewarming-grenade-explosion'
-  | 'prewarming-support-explosion'
-  | 'prewarming-death-drops'
-  | 'prewarming-nuke'
-  | 'binding-world'
-  | 'waiting-for-authored-textures'
-  | 'compiling-scene'
-  | 'batching-static-meshes'
-  | 'prewarming-overdrive'
-  | 'finalizing'
-  | 'verifying-first-presentation'
-  | 'gameplay-assets-ready'
-  | 'ready'
-  | 'failed';
+type BootstrapStage = DeploymentLoadingStage;
 let bootstrapStage: BootstrapStage = 'loading-module-assets';
 let bootstrapError: string | null = null;
+let deploymentLoadingStartedAt = performance.now();
+let deploymentLoadingPercent = 0;
+
+function updateDeploymentLoadingProgress(stage = bootstrapStage): void {
+  const progress = deploymentLoadingProgress(
+    stage,
+    performance.now() - deploymentLoadingStartedAt,
+    deploymentLoadingPercent,
+  );
+  deploymentLoadingPercent = progress.percent;
+  deploymentTransitionProgress.value = progress.percent;
+  deploymentTransitionProgress.textContent = `${progress.percent}%`;
+  deploymentTransitionPercent.value = `${progress.percent}%`;
+  deploymentTransitionEta.value = progress.completed
+    ? '100% · IN GAME'
+    : progress.etaSeconds === null
+      ? 'ETA ESTIMATING…'
+      : `ETA ${progress.etaSeconds}s`;
+  deploymentTransitionStage.textContent = `${progress.label.toUpperCase()} · 100% = IN GAME`;
+  deploymentTransition.dataset.loadingStage = stage;
+  deploymentTransition.dataset.loadingPercent = String(progress.percent);
+  deploymentTransition.dataset.loadingEtaSeconds = progress.etaSeconds === null ? 'estimating' : String(progress.etaSeconds);
+  deploymentTransition.dataset.loadingComplete = String(progress.completed);
+}
+
+function setBootstrapStage(stage: BootstrapStage): void {
+  bootstrapStage = stage;
+  updateDeploymentLoadingProgress(stage);
+}
+
+function resetDeploymentLoadingProgress(): void {
+  deploymentLoadingStartedAt = performance.now();
+  deploymentLoadingPercent = 0;
+  setBootstrapStage('loading-gameplay-assets');
+}
 type MatchAdmissionCadence = Readonly<{
   backend: 'webgpu' | 'webgl2';
   waitedMs: number;
@@ -1550,17 +1610,32 @@ let lastWebGlReadyPrime: WebGlReadyPrime | null = null;
 const displayCadencePromise = new Promise<number>((resolve) => {
   const samples: number[] = [];
   let previous = performance.now();
+  let settled = false;
+  const finish = (frameMs: number): void => {
+    if (settled) return;
+    settled = true;
+    document.removeEventListener('visibilitychange', finishWhenPresentationIsUnavailable);
+    window.removeEventListener('blur', finishWhenPresentationIsUnavailable);
+    resolve(frameMs);
+  };
+  const finishWhenPresentationIsUnavailable = (): void => {
+    if (document.visibilityState !== 'visible' || !document.hasFocus()) finish(1_000 / 60);
+  };
   const sample = (now: number) => {
+    if (settled) return;
     if (samples.length > 0 || now - previous < 100) samples.push(now - previous);
     previous = now;
-    if (samples.length >= 36) resolve(classifyDisplayFrameMs(samples));
+    if (samples.length >= 36) finish(classifyDisplayFrameMs(samples));
     else requestAnimationFrame(sample);
   };
-  requestAnimationFrame(sample);
+  document.addEventListener('visibilitychange', finishWhenPresentationIsUnavailable);
+  window.addEventListener('blur', finishWhenPresentationIsUnavailable);
+  finishWhenPresentationIsUnavailable();
+  if (!settled) requestAnimationFrame(sample);
 });
-bootstrapStage = 'measuring-display';
+setBootstrapStage('measuring-display');
 const detectedDisplayFrameMs = await displayCadencePromise;
-bootstrapStage = 'module-ready';
+setBootstrapStage('module-ready');
 const configuredAdaptiveLevels = configuredAdaptiveQualityLevels(
   renderProfile,
   activeRenderConfig.pixelRatioCap,
@@ -1991,7 +2066,7 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
   const minimumStableWindowMs = 1_000;
   const maximumWaitMs = 5_000;
   const hitchThresholdMs = 50;
-  bootstrapStage = 'verifying-first-presentation';
+  setBootstrapStage('verifying-first-presentation');
   if (renderRuntime.backend === 'webgpu') {
     await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);
   }
@@ -2213,7 +2288,7 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
   // sample was degraded. The exact-SHA cold WebGPU release gate rejects a
   // candidate with admittedDegraded=true; the runtime records it and proceeds
   // so a background peer or transiently occluded window can still recover.
-  bootstrapStage = 'ready';
+  setBootstrapStage('verifying-first-presentation');
 }
 
 function synchronizeFrozenMatchPrimePresentation(): void {
@@ -2262,7 +2337,7 @@ async function primeFinalWebGpuMatchPresentation(): Promise<void> {
 async function primeFinalWebGlMatchPresentation(): Promise<void> {
   if (renderRuntime.backend === 'webgpu') return;
   if (!atomicSignal) throw new Error('Final WebGL2 match prime requires the AtomicSignal pass');
-  bootstrapStage = 'verifying-first-presentation';
+  setBootstrapStage('verifying-first-presentation');
   const startedAt = performance.now();
   const priorRenderSubmissionPaused = renderSubmissionPaused;
   const priorMatchAdmissionPresentationPaused = matchAdmissionPresentationPaused;
@@ -2309,7 +2384,7 @@ async function primeFinalWebGlMatchPresentation(): Promise<void> {
       finalRenderDurationMs: Number((finalRenderedAt - finalRenderStartedAt).toFixed(3)),
       settleDelayMs: Number((settledAt - firstRenderedAt).toFixed(3)),
     });
-    bootstrapStage = 'ready';
+    setBootstrapStage('verifying-first-presentation');
   } finally {
     // The final synchronous WebGL draw can itself be expensive. Never feed its
     // hidden duration into the first live simulation/adaptive-quality sample.
@@ -2640,6 +2715,7 @@ function invalidateActiveWorldCollisionCache(): void {
 
 let gunRangeTestBayDoorColliders: readonly DynamicWorldCollider[] = [];
 let gunRangeTestBayDoorColliderArena: THREE.Object3D | null = null;
+let gunRangeTestBayTimerResetLastEpoch = -1;
 
 function activeGunRangeTestBayDoorColliders(activeArena: ArenaMap = arena): readonly DynamicWorldCollider[] {
   return activeArena === arena && selectedArena.id === 'gun-range'
@@ -4949,7 +5025,7 @@ function requirePlayerName(): string | null {
 
 function showFatalError(error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
-  bootstrapStage = 'failed';
+  setBootstrapStage('failed');
   bootstrapError = message;
   gameStarted = false;
   clearGameplayInput();
@@ -11443,6 +11519,7 @@ function syncMenuLifecyclePresentation(): void {
 }
 
 function prepareDeploymentTransition(): void {
+  resetDeploymentLoadingProgress();
   const preview = menuPreviewVideoDefinition(selectedArena.id);
   delete deploymentTransition.dataset.readyAt;
   delete deploymentTransition.dataset.readyGeneration;
@@ -11837,7 +11914,7 @@ async function startGame(
     clearStoredHostMatchCheckpoint();
     throw new Error('Stored host recovery no longer matches the authoritative room and arena');
   }
-  bootstrapStage = 'prewarming-weapon-catalog';
+  setBootstrapStage('prewarming-weapon-catalog');
   const matchStartWeapon = selectedArena.id === 'gun-range'
     ? gunRangeSidearmForWeaponPrewarm()
     : activeLoadoutSelection().primary;
@@ -12020,6 +12097,7 @@ async function startGame(
   // Hold all simulation in a non-active state while newly staged operators
   // compile behind the transition surface. Official match clocks begin only
   // after the first submitted presentation has completed.
+  setBootstrapStage('finalizing');
   matchState = {
     phase: 'warmup',
     phaseStartedAt: performance.now(),
@@ -12189,6 +12267,7 @@ async function startGame(
   resetWebGpuPresentationEpoch('match admitted', lastFrame);
   assertMatchAdmissionCurrent(token);
   gameStarted = true;
+  setBootstrapStage('ready');
   if (mode === 'host' && matchState.phase === 'active' && privateLobbySnapshot?.phase !== 'active') {
     // A cold admission can finish after the shared active timestamp, creating
     // an already-active match without the normal warmup -> active transition.
@@ -12750,7 +12829,7 @@ function applyRailgunState(next: RailgunAuthorityState, announce = false): void 
   railgunState = next;
   syncRailgunHolderPresentation(previous, next);
   if (next.holderId === player.id) localRailgunPendingUntilHostTimeMs = 0;
-  if (announce || next.announcementSent && !previous.announcementSent) addFeed(`${WEAPONS.railgun.name.toUpperCase()} SPAWNED`, 'gold');
+  if (announce || next.announcementSent && !previous.announcementSent) addFeed('RARE WEAPON SPAWNED', 'gold');
 }
 
 function broadcastRailgunState(reliableCommit = true): void {
@@ -13641,7 +13720,20 @@ function tryFire(now: number): void {
     }));
     if (result.ballisticTrace) applyInteractiveWorldBallisticTrace(result.ballisticTrace, origin, direction, player.weapon);
     const visualStart = weaponView.muzzleWorldPosition(new THREE.Vector3()) ?? origin;
-    if (flamethrowerShot) flamethrowerStreamPresentation.emit(visualStart, authoritativeEnd, now);
+    if (flamethrowerShot) {
+      flamethrowerStreamPresentation.emit(visualStart, authoritativeEnd, now);
+      // Spawn ground fire at impact point (stays 5s like napalm).
+      if (flamethrowerGroundFires.length < FLAMETHROWER_GROUND_FIRE_CAPACITY) {
+        flamethrowerGroundFires.push({
+          ownerId: player.id,
+          ownerTeam: player.team,
+          point: authoritativeEnd.clone(),
+          actionNonce: randomNonce(),
+          expiresAt: now + 5_000,
+          nextPulseAt: now + FLAMETHROWER_GROUND_FIRE_PULSE_MS,
+        });
+      }
+    }
     else spawnTracer(visualStart, authoritativeEnd, spec.color);
     for (const impact of result.ballisticTrace?.impacts ?? []) {
       if (presentedSurfaceIds.has(impact.surface.id)) continue;
@@ -18256,7 +18348,22 @@ function detonateHunterDrone(drone: HunterDroneEntity, point: THREE.Vector3): vo
   if (index >= 0) hunterDrones.splice(index, 1);
 }
 
+let killstreakLogoFlashTimeout: ReturnType<typeof setTimeout> | null = null;
+function flashKillstreakLogo(symbol: string, className: string): void {
+  const el = element<HTMLElement>('#killstreak-logo-flash');
+  if (!el) return;
+  el.innerHTML = `<div class="logo ${className}">${symbol}</div>`;
+  el.hidden = false;
+  el.style.opacity = '1';
+  if (killstreakLogoFlashTimeout) clearTimeout(killstreakLogoFlashTimeout);
+  killstreakLogoFlashTimeout = setTimeout(() => {
+    el.style.opacity = '0';
+    setTimeout(() => { el.hidden = true; el.innerHTML = ''; }, 120);
+  }, 500);
+}
+
 function beginNuke(now: number, authoritativeDamage = true): void {
+  flashKillstreakLogo('🇺🇸', 'us-flag');
   nukeShockwave.scale.setScalar(0.1);
   (nukeShockwave.material as THREE.MeshBasicMaterial).opacity = 0;
   nukeShockwave.visible = false;
@@ -19034,6 +19141,7 @@ function activateFieldSupport(id: FieldSupportId): void {
       [ingressFacing.x, 0, ingressFacing.z],
     )) return;
     addFeed('DRONE SWARM · 24 DRONES · 30 SEC', 'gold');
+    flashKillstreakLogo('◉', 'palantir');
   }
   updateFieldSupportHud();
 }
@@ -20239,7 +20347,22 @@ function updateHud(now: number): void {
   // bounded 60 Hz cadence so uncapped rendering cannot flood Canvas2D work.
   if (now - lastHudAt < 100) return;
   lastHudAt = now;
-  if (gameStarted) updateMatchState(now);
+  if (gameStarted) {
+    // Gun Range: freeze and reset the 2-minute timer each time the player
+    // enters the killstreak test bay area.
+    if (selectedArena.id === 'gun-range' && matchState.phase === 'active' && player.alive) {
+      const bay = GUN_RANGE_TEST_BAY_CONTRACT.bay.bounds;
+      const inBay = player.position.x >= bay.minX && player.position.x <= bay.maxX
+        && player.position.z >= bay.minZ && player.position.z <= bay.maxZ;
+      if (inBay && gunRangeTestBayTimerResetLastEpoch !== interactiveWorldMatchEpoch) {
+        gunRangeTestBayTimerResetLastEpoch = interactiveWorldMatchEpoch;
+        const rules = currentMatchRules();
+        const durationMs = rules.durationMs ?? 120_000;
+        matchState = { phase: 'active', phaseStartedAt: now, endsAt: now + durationMs, winner: null };
+      }
+    }
+    updateMatchState(now);
+  }
   const spec = WEAPONS[player.weapon];
   const speed = Math.hypot(player.velocity.x, player.velocity.z);
   const adsSettled = adsHeld && weaponView.adsProgress() >= 0.9;
@@ -20253,7 +20376,10 @@ function updateHud(now: number): void {
   const crosshairGap = THREE.MathUtils.clamp(5 + spread * 320, 5, 23);
   const crosshair = element<HTMLElement>('#crosshair');
   crosshair.style.setProperty('--spread', `${crosshairGap}px`);
-  crosshair.classList.toggle('ads', adsSettled);
+  // The physical viewmodel sight/full-screen optic is the complete ADS picture.
+  // Never layer the old coloured HUD marker over it once the aim has settled.
+  crosshair.hidden = adsSettled;
+  crosshair.classList.remove('ads');
   if (crosshair.dataset.weapon !== player.weapon) {
     const sight = adsSightProfile(player.weapon);
     crosshair.dataset.weapon = player.weapon;
@@ -20700,6 +20826,9 @@ function reconcilePresentationScheduling(reason: string): PresentationScheduling
     clearGameplayInput();
   }
   if (!ownsBrowserPresentation) {
+    // Presentation ownership stops only audio and the rAF-driven game loop.
+    // Network, GLB/texture decode and CPU preparation remain owned by their
+    // promises/BrowserCpuTaskLane and must never be cancelled from this path.
     audio.suspend();
     accumulator = 0;
     lastFrame = performance.now();
@@ -21345,6 +21474,7 @@ async function performArenaSelection(
   syncArenaSelectionUi();
   setStatus(`Preparing ${nextSelection.displayName} deployment assets…`);
   try {
+    setBootstrapStage('loading-gameplay-assets');
     await prepareMenuDeploymentAssets();
     assertAdmission();
     // A map generation may only replace renderer-visible authority once every
@@ -21354,6 +21484,7 @@ async function performArenaSelection(
     await flushWebGpuFrames();
     assertAdmission();
     arenaTransitionPhase = 'preparing';
+    setBootstrapStage('binding-world');
     profileArenaTransition('arena-construction');
     nextArena = ensureArenaConstructed(nextSelection.id);
     profileArenaTransition('interactive-world-construction');
@@ -21382,6 +21513,7 @@ async function performArenaSelection(
     audio.setArena(selectedArena.id);
     footstepEmitters.reset();
     document.documentElement.dataset.arenaId = selectedArena.id;
+    setBootstrapStage('waiting-for-authored-textures');
     profileArenaTransition('visual-definition');
     await configurePlayableArenaVisuals(selectedArena.id, arena.root, false);
     assertAdmission();
@@ -21399,7 +21531,7 @@ async function performArenaSelection(
     profileArenaTransition('art-texture-settle');
     await waitForPendingArtTextures();
     assertAdmission();
-    bootstrapStage = 'prewarming-weapon-catalog';
+    setBootstrapStage('prewarming-weapon-catalog');
     profileArenaTransition('weapon-catalog-prewarm');
     await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(
       nextSelection.id,
@@ -21407,6 +21539,7 @@ async function performArenaSelection(
     ));
     assertAdmission();
     profileArenaTransition('presentation-batching');
+    setBootstrapStage('batching-static-meshes');
     batchSelectedArenaPresentation();
     setArenaPresentationVisibility();
     profileArenaTransition('match-authority-reset');
@@ -21424,6 +21557,7 @@ async function performArenaSelection(
     await prewarmArenaBoundGameplayPresentations(arenaTransitionGeneration);
     assertAdmission();
     arenaTransitionPhase = 'committing';
+    setBootstrapStage('compiling-scene');
     // Lazy arena roots and their selected TSL definition must be compiled while
     // submissions remain paused. This also compiles the awaited Gun Range rack
     // assets before their first live frame can trip the presentation watchdog.
@@ -21489,7 +21623,7 @@ async function performArenaSelection(
     renderHighScores();
     committed = true;
     gameplayArenaPrepared = true;
-    bootstrapStage = 'ready';
+    setBootstrapStage('gameplay-assets-ready');
     document.documentElement.dataset.gameplayArena = selectedArena.id;
     previousInteractiveWorldRuntime?.dispose();
     try {
@@ -22273,6 +22407,7 @@ function frame(now: number, scheduleNext = true): void {
     updateExplosiveBolts(frameDt, now);
     updateFlareProjectiles(frameDt, now);
     flamethrowerStreamPresentation.update(frameDt);
+    updateFlamethrowerGroundFires(now);
     updateGrenadeExplosionVisuals(now);
     updateFieldSupport(frameDt, now);
     updatePass65KillstreakRuntime(now);
@@ -25455,7 +25590,7 @@ async function yieldDeploymentPrewarmFrame(): Promise<void> {
 
 async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): Promise<void> {
   if (renderRuntime.backend === 'webgpu') {
-    bootstrapStage = 'prewarming-batched-presentations';
+    setBootstrapStage('prewarming-batched-presentations');
     profileArenaTransition('prewarm-batched-effects');
     const startedAt = performance.now();
     const runGroup = async (name: string, operation: () => Promise<unknown>) => {
@@ -25513,41 +25648,41 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
     });
     return;
   }
-  bootstrapStage = 'prewarming-combat-tracers';
+  setBootstrapStage('prewarming-combat-tracers');
   profileArenaTransition('prewarm-tracers');
   await tracerPool.prewarm(renderRuntime, camera, sceneGeneration);
-  bootstrapStage = 'prewarming-combat-impacts';
+  setBootstrapStage('prewarming-combat-impacts');
   profileArenaTransition('prewarm-impacts');
   await impactPresentation.prewarm(renderRuntime, camera, sceneGeneration);
   await dmrThermalPresentation.prewarm(renderRuntime, camera, sceneGeneration);
-  bootstrapStage = 'prewarming-grenade-explosion';
+  setBootstrapStage('prewarming-grenade-explosion');
   profileArenaTransition('prewarm-grenade-explosion');
   await grenadeExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration);
-  bootstrapStage = 'prewarming-support-explosion';
+  setBootstrapStage('prewarming-support-explosion');
   profileArenaTransition('prewarm-support-explosion');
   await supportExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration);
-  bootstrapStage = 'prewarming-death-drops';
+  setBootstrapStage('prewarming-death-drops');
   profileArenaTransition('prewarm-death-drops');
   await deathDropPresentationPool.prewarm(renderRuntime, camera, player.weapon);
-  bootstrapStage = 'prewarming-nuke';
+  setBootstrapStage('prewarming-nuke');
   profileArenaTransition('prewarm-nuke');
   await prewarmNukePresentation();
-  bootstrapStage = 'prewarming-overdrive';
+  setBootstrapStage('prewarming-overdrive');
   profileArenaTransition('prewarm-overdrive');
   await prewarmOverdrivePresentation();
-  bootstrapStage = 'prewarming-grenade-world-presentations';
+  setBootstrapStage('prewarming-grenade-world-presentations');
   profileArenaTransition('prewarm-grenade-world');
   await prewarmGrenadeWorldPresentations(sceneGeneration);
-  bootstrapStage = 'prewarming-killstreak-presentations';
+  setBootstrapStage('prewarming-killstreak-presentations');
   profileArenaTransition('prewarm-killstreaks');
   await killstreakPresentation.prewarm(renderRuntime, camera, sceneGeneration);
-  bootstrapStage = 'prewarming-bot-world-weapons';
+  setBootstrapStage('prewarming-bot-world-weapons');
   profileArenaTransition('prewarm-bot-world-weapons');
   await botWeaponGpuVocabulary.prewarm(renderRuntime, camera, sceneGeneration, yieldDeploymentPrewarmFrame);
-  bootstrapStage = 'prewarming-smoke-presentations';
+  setBootstrapStage('prewarming-smoke-presentations');
   profileArenaTransition('prewarm-smoke');
   await smokeVolumePresentationPool.prewarm(renderRuntime, camera, sceneGeneration);
-  bootstrapStage = 'prewarming-explosive-bolts';
+  setBootstrapStage('prewarming-explosive-bolts');
   profileArenaTransition('prewarm-explosive-bolts');
   await Promise.all([
     prewarmExplosiveBoltPresentation(sceneGeneration),

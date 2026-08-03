@@ -920,11 +920,17 @@ describe('killstreak presentation', () => {
     expect(targetBounds.max[2]! - targetBounds.min[2]!).toBeGreaterThan(5);
     expect(presentation.root.getObjectByName('support-placement-ground-x')?.userData.audience).toBe('all-combatants');
     const corridorFill = presentation.root.getObjectByName('carpet-bomber-flight-corridor') as THREE.Mesh;
+    const corridorCentre = presentation.root.getObjectByName('carpet-bomber-flight-centreline') as THREE.Mesh;
+    const corridorLeft = presentation.root.getObjectByName('carpet-bomber-flight-corridor-left-edge') as THREE.Mesh;
+    const corridorRight = presentation.root.getObjectByName('carpet-bomber-flight-corridor-right-edge') as THREE.Mesh;
     expect((corridorFill.material as THREE.MeshBasicMaterial).opacity).toBe(0.1);
     expect((corridorFill.material as THREE.MeshBasicMaterial).depthTest).toBe(true);
     expect((corridorFill.material as THREE.MeshBasicMaterial).depthWrite).toBe(false);
     expect(presentation.root.getObjectByName('carpet-bomber-flight-corridor-left-edge')).toBeDefined();
     expect(presentation.root.getObjectByName('carpet-bomber-flight-corridor-right-edge')).toBeDefined();
+    expect(corridorCentre.geometry).toBe(corridorFill.geometry);
+    expect(corridorLeft.geometry).toBe(corridorFill.geometry);
+    expect(corridorRight.geometry).toBe(corridorFill.geometry);
     // A stale network snapshot cannot keep a marker alive after its local
     // deadline; no later host snapshot is required for teardown.
     presentation.sync(snapshot(0, [], [{

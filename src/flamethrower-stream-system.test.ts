@@ -16,7 +16,7 @@ describe('flamethrower stream presentation', () => {
       emissions: 1,
       particlesSpawned: 8,
       lastDistanceM: 18,
-      childCount: 2,
+      childCount: 3,
     });
   });
 
@@ -44,5 +44,15 @@ describe('flamethrower stream presentation', () => {
     expect(system.emit(new THREE.Vector3(), new THREE.Vector3(0, 0, -4), 1)).toBe(true);
     system.clear();
     expect(system.telemetry().active).toBe(0);
+  });
+
+  it('keeps bounded ground fire visible for five seconds', () => {
+    const system = new FlamethrowerStreamSystem(new THREE.Scene(), false);
+    expect(system.igniteGround(new THREE.Vector3(1, 0, 2), 100)).toBe(true);
+    expect(system.telemetry().groundFireActive).toBe(1);
+    system.update(0.1, 5_099);
+    expect(system.telemetry().groundFireActive).toBe(1);
+    system.update(0.1, 5_100);
+    expect(system.telemetry().groundFireActive).toBe(0);
   });
 });

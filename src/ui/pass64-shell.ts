@@ -320,8 +320,12 @@ function deploymentTransitionMarkup(): string {
       <small id="deployment-transition-kicker">THE BIG ONE // DEPLOYMENT STREAM</small>
       <strong id="deployment-transition-title">NUKE TOWN</strong>
       <span id="deployment-transition-status">Preparing authoritative arena state…</span>
-      <i aria-hidden="true"><b></b></i>
-      <em>TYPICAL LOAD 5–15 SECONDS · MAP PREPARATION CONTINUES IN THE BACKGROUND · RETURN HERE TO ENTER</em>
+      <progress id="deployment-transition-progress" max="100" value="0" aria-label="Map loading progress">0%</progress>
+      <div class="deployment-transition-progress-meta">
+        <output id="deployment-transition-percent">0%</output>
+        <output id="deployment-transition-eta">ETA ESTIMATING…</output>
+      </div>
+      <em id="deployment-transition-stage">DOWNLOADING GLBS, DECODING TEXTURES, PREPARING AUDIO, SHADERS &amp; PHYSICS · 100% = IN GAME</em>
     </div>
   </section>`;
 }
@@ -413,7 +417,7 @@ export function renderPass64Shell(model: Pass64ShellViewModel): string {
   return `<canvas id="game" aria-label="Nuke Town multiplayer arena"></canvas>
     <div id="match-pause-backdrop" class="match-pause-backdrop" aria-hidden="true" hidden data-frame-provenance="game-canvas-css-compositor" data-capture-status="empty" data-contract="game-canvas-css-compositor-v1" data-periodic-readback-count="0" data-source-capture-attempt-count="0" data-source-capture-count="0" data-presentation-count="0" data-fallback-count="0"></div>
     <div id="color-grade"></div><div id="film-grain"></div>
-    <div id="vignette"></div><div id="low-health-vignette" aria-hidden="true"></div><div id="damage-flash"></div><div id="damage-direction" aria-hidden="true"></div><div id="ordnance-flash" hidden></div>
+    <div id="vignette"></div><div id="low-health-vignette" aria-hidden="true"></div><div id="damage-flash"></div><div id="damage-direction" aria-hidden="true"></div><div id="ordnance-flash" hidden></div><div id="killstreak-logo-flash" hidden></div>
     <div id="nuke-flash" hidden></div>
     <section id="nuke-warning" hidden aria-live="assertive"><small>ATOMIC EVENT</small><strong>NUKE INBOUND</strong><b>5</b><span>SEEK COVER · HOSTILE EVENT</span></section>
     ${menuMarkup(model)}

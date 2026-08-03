@@ -42,7 +42,7 @@ describe('host-authoritative railgun', () => {
     const scheduled = createRailgunAuthorityState('atomic-acres', 1_000, 0, 7);
     expect(advanceRailgunAuthority(scheduled, 1_000 + RAILGUN_SPAWN_DELAY_MS - 1).spawned).toBe(false);
     const spawned = advanceRailgunAuthority(scheduled, 1_000 + RAILGUN_SPAWN_DELAY_MS);
-    expect(spawned).toMatchObject({ spawned: true, announcement: 'RAILGUN SPAWNED' });
+    expect(spawned).toMatchObject({ spawned: true, announcement: 'RARE WEAPON SPAWNED' });
     expect(advanceRailgunAuthority(spawned.state, 999_999)).toMatchObject({ spawned: false, announcement: null });
   });
 

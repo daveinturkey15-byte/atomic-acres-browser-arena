@@ -4,7 +4,7 @@ export type TimedMapWeaponId = (typeof TIMED_MAP_WEAPON_IDS)[number];
 export type TimedMapWeaponDefinition = Readonly<{
   weaponId: TimedMapWeaponId;
   arenaId: 'rustworks-1v1' | 'skyline-terminal';
-  announcement: 'FLAMETHROWER AVAILABLE' | 'FLARE GUN AVAILABLE';
+  announcement: 'RARE WEAPON SPAWNED';
   spawnPosition: readonly [number, number, number];
   totalShots: number;
 }>;
@@ -18,14 +18,14 @@ export const TIMED_MAP_WEAPON_DEFINITIONS: Readonly<Record<TimedMapWeaponId, Tim
   flamethrower: Object.freeze({
     weaponId: 'flamethrower',
     arenaId: 'rustworks-1v1',
-    announcement: 'FLAMETHROWER AVAILABLE',
+    announcement: 'RARE WEAPON SPAWNED',
     spawnPosition: Object.freeze([0.4, 8.64, 0.2] as const),
     totalShots: 200,
   }),
   'flare-gun': Object.freeze({
     weaponId: 'flare-gun',
     arenaId: 'skyline-terminal',
-    announcement: 'FLARE GUN AVAILABLE',
+    announcement: 'RARE WEAPON SPAWNED',
     spawnPosition: Object.freeze([0, 3.08, 2] as const),
     totalShots: 6,
   }),

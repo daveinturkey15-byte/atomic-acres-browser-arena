@@ -4,11 +4,14 @@ import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 
 const PARTICLES_PER_EMISSION = 8;
 const MIN_STREAM_DISTANCE_M = 0.35;
+export const FLAMETHROWER_GROUND_FIRE_DURATION_MS = 5_000;
+const GROUND_FIRE_POOL_CAPACITY = 24;
 
 /** Fixed-capacity first/third-person flame stream with no live mesh creation. */
 export class FlamethrowerStreamSystem {
   readonly root = new THREE.Group();
   private readonly mesh: THREE.InstancedMesh;
+  private readonly groundMesh: THREE.InstancedMesh;
   private readonly light: THREE.PointLight;
   private readonly active = new Uint8Array(FLAMETHROWER_EFFECT.poolCapacity);
   private readonly positions = new Float32Array(FLAMETHROWER_EFFECT.poolCapacity * 3);
@@ -16,12 +19,18 @@ export class FlamethrowerStreamSystem {
   private readonly agesMs = new Float32Array(FLAMETHROWER_EFFECT.poolCapacity);
   private readonly lifetimesMs = new Float32Array(FLAMETHROWER_EFFECT.poolCapacity);
   private readonly dummy = new THREE.Object3D();
+  private readonly groundActive = new Uint8Array(GROUND_FIRE_POOL_CAPACITY);
+  private readonly groundPositions = new Float32Array(GROUND_FIRE_POOL_CAPACITY * 3);
+  private readonly groundSpawnedAt = new Float64Array(GROUND_FIRE_POOL_CAPACITY);
+  private readonly groundExpiresAt = new Float64Array(GROUND_FIRE_POOL_CAPACITY);
+  private readonly groundDummy = new THREE.Object3D();
   private readonly direction = new THREE.Vector3();
   private readonly side = new THREE.Vector3();
   private readonly up = new THREE.Vector3(0, 1, 0);
   private readonly emitterPosition = new THREE.Vector3();
   private readonly colour = new THREE.Color();
   private cursor = 0;
+  private groundCursor = 0;
   private sequence = 0;
   private emissions = 0;
   private particlesSpawned = 0;
@@ -51,13 +60,30 @@ export class FlamethrowerStreamSystem {
     this.mesh.frustumCulled = false;
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.userData.presentationOnly = true;
+    this.groundMesh = new THREE.InstancedMesh(
+      new THREE.CircleGeometry(0.82, 14),
+      new THREE.MeshBasicMaterial({
+        color: 0xff5a1f,
+        transparent: true,
+        opacity: flattenMaterials ? 0.42 : 0.58,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+      }),
+      GROUND_FIRE_POOL_CAPACITY,
+    );
+    this.groundMesh.name = 'flamethrower-ground-fire-pool';
+    this.groundMesh.frustumCulled = false;
+    this.groundMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.groundMesh.userData.presentationOnly = true;
     this.light = new THREE.PointLight(0xff6a22, flattenMaterials ? 0 : 14, 7, 2);
     this.light.name = 'flamethrower-bounded-stream-light';
     this.light.castShadow = false;
     this.light.visible = false;
-    this.root.add(this.mesh, this.light);
+    this.root.add(this.mesh, this.groundMesh, this.light);
     scene.add(this.root);
     this.writeMatrices();
+    this.writeGroundMatrices(0);
   }
 
   emit(start: THREE.Vector3, end: THREE.Vector3, now: number): boolean {
@@ -113,7 +139,37 @@ export class FlamethrowerStreamSystem {
     return emitted > 0;
   }
 
-  update(deltaSeconds: number): void {
+  /** Retained bounded scorch-flame pool used by the authoritative ground-fire lane. */
+  igniteGround(point: THREE.Vector3, now: number): boolean {
+    if (!Number.isFinite(now) || !point.toArray().every(Number.isFinite)) return false;
+    let slot = -1;
+    for (let index = 0; index < this.groundActive.length; index += 1) {
+      if (this.groundActive[index] === 0) continue;
+      const offset = index * 3;
+      const dx = this.groundPositions[offset] - point.x;
+      const dz = this.groundPositions[offset + 2] - point.z;
+      if (dx * dx + dz * dz <= 0.8 * 0.8) {
+        slot = index;
+        break;
+      }
+    }
+    if (slot < 0) {
+      slot = this.groundActive.findIndex((active) => active === 0);
+      if (slot < 0) slot = this.groundCursor;
+      this.groundCursor = (slot + 1) % this.groundActive.length;
+      this.groundSpawnedAt[slot] = now;
+    }
+    const offset = slot * 3;
+    this.groundActive[slot] = 1;
+    this.groundPositions[offset] = point.x;
+    this.groundPositions[offset + 1] = point.y + 0.035;
+    this.groundPositions[offset + 2] = point.z;
+    this.groundExpiresAt[slot] = now + FLAMETHROWER_GROUND_FIRE_DURATION_MS;
+    this.writeGroundMatrices(now);
+    return true;
+  }
+
+  update(deltaSeconds: number, now = performance.now()): void {
     if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0 || deltaSeconds > 0.1) return;
     const deltaMs = deltaSeconds * 1_000;
     let remaining = 0;
@@ -139,14 +195,19 @@ export class FlamethrowerStreamSystem {
       this.light.intensity = 11 + Math.sin(this.sequence * 2.41 + remaining) * 2.2;
     }
     this.writeMatrices();
+    this.writeGroundMatrices(now);
   }
 
   clear(): void {
     this.active.fill(0);
     this.agesMs.fill(0);
     this.lifetimesMs.fill(0);
+    this.groundActive.fill(0);
+    this.groundSpawnedAt.fill(0);
+    this.groundExpiresAt.fill(0);
     this.light.visible = false;
     this.writeMatrices();
+    this.writeGroundMatrices(0);
   }
 
   async prewarm(runtime: PresentationPrewarmRuntime, camera: THREE.Camera, sceneGeneration: number): Promise<void> {
@@ -198,6 +259,7 @@ export class FlamethrowerStreamSystem {
     poolExhaustions: number;
     lastDistanceM: number;
     childCount: number;
+    groundFireActive: number;
     prewarmGeneration: number;
   }> {
     return Object.freeze({
@@ -209,6 +271,7 @@ export class FlamethrowerStreamSystem {
       poolExhaustions: this.poolExhaustions,
       lastDistanceM: this.lastDistanceM,
       childCount: this.root.children.length,
+      groundFireActive: this.groundActive.reduce((count, active) => count + active, 0),
       prewarmGeneration: this.prewarmGeneration,
     });
   }
@@ -246,5 +309,31 @@ export class FlamethrowerStreamSystem {
       this.mesh.setMatrixAt(slot, this.dummy.matrix);
     }
     this.mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  private writeGroundMatrices(now: number): void {
+    for (let slot = 0; slot < this.groundActive.length; slot += 1) {
+      if (this.groundActive[slot] !== 0 && now >= this.groundExpiresAt[slot]) this.groundActive[slot] = 0;
+      if (this.groundActive[slot] === 0) {
+        this.groundDummy.position.set(0, -10_000, 0);
+        this.groundDummy.scale.setScalar(0.0001);
+      } else {
+        const offset = slot * 3;
+        const ageMs = Math.max(0, now - this.groundSpawnedAt[slot]);
+        const remaining = Math.max(0, this.groundExpiresAt[slot] - now);
+        const fade = Math.min(1, ageMs / 180, remaining / 420);
+        const pulse = 0.92 + Math.sin(now * 0.011 + slot * 1.7) * 0.08;
+        this.groundDummy.position.set(
+          this.groundPositions[offset],
+          this.groundPositions[offset + 1],
+          this.groundPositions[offset + 2],
+        );
+        this.groundDummy.scale.setScalar(fade * pulse);
+      }
+      this.groundDummy.rotation.set(-Math.PI / 2, 0, 0);
+      this.groundDummy.updateMatrix();
+      this.groundMesh.setMatrixAt(slot, this.groundDummy.matrix);
+    }
+    this.groundMesh.instanceMatrix.needsUpdate = true;
   }
 }

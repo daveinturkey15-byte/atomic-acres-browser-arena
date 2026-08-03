@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { GPU_SHARED_GEOMETRY_KEY } from './gpu-resource-ownership';
+import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 
 export const WINDOW_GLASS_DEBRIS_VISUAL_CONTRACT = 'fractured-shards-no-intact-pane-v1';
 export const WINDOW_GLASS_DEBRIS_FRAGMENT_COUNT = 6;
@@ -18,10 +20,36 @@ const SHARD_TRIANGLES = Object.freeze([
   Object.freeze([[-0.04, -0.39], [0.76, -0.34], [0.93, -0.88]]),
 ] as const);
 
+function createSharedShardGeometry(): THREE.BufferGeometry {
+  const positions: number[] = [];
+  SHARD_TRIANGLES.forEach((triangle, fragmentIndex) => {
+    const depthLane = (fragmentIndex % 3) - 1;
+    for (const [x, y] of triangle) positions.push(x, y, depthLane);
+  });
+  const geometry = new THREE.BufferGeometry();
+  geometry.name = 'window-debris:shared-fractured-shards';
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  geometry.userData.fragmentCount = WINDOW_GLASS_DEBRIS_FRAGMENT_COUNT;
+  geometry.userData.intactPane = false;
+  geometry.userData[GPU_SHARED_GEOMETRY_KEY] = 'window-glass-debris';
+  return geometry;
+}
+
+// Build normals, bounds and edge topology once during module preparation. A
+// live glass breach only scales these immutable buffers instead of allocating
+// and analysing new geometry on the shot frame.
+const sharedShardGeometry = createSharedShardGeometry();
+const sharedShardEdgesGeometry = new THREE.EdgesGeometry(sharedShardGeometry, 1);
+sharedShardEdgesGeometry.name = 'window-debris:shared-fractured-shard-edges';
+sharedShardEdgesGeometry.userData[GPU_SHARED_GEOMETRY_KEY] = 'window-glass-debris-edges';
+
 /**
  * Shared shard cluster material: MeshPhysicalMaterial with transmission is
- * expensive to compile on first use, so we prewarm one instance and clone it
- * per break. This avoids the first-break frame hitch.
+ * expensive to compile on first use, so deployment prewarm submits this exact
+ * material before a live break and each break only clones its mutable state.
  */
 const sharedShardMaterialTemplate = new THREE.MeshPhysicalMaterial({
   color: 0x8ad9e8,
@@ -69,30 +97,46 @@ export function createFracturedWindowDebrisVisual(options: WindowGlassDebrisVisu
   root.userData.fragmentCount = WINDOW_GLASS_DEBRIS_FRAGMENT_COUNT;
   root.userData.intactPaneMeshCount = 0;
 
-  const positions: number[] = [];
-  SHARD_TRIANGLES.forEach((triangle, fragmentIndex) => {
-    const depth = ((fragmentIndex % 3) - 1) * Math.max(0.006, options.halfExtents.z * 0.32);
-    for (const [x, y] of triangle) {
-      positions.push(x * options.halfExtents.x, y * options.halfExtents.y, depth);
-    }
-  });
-  const geometry = new THREE.BufferGeometry();
-  geometry.name = `${options.id}:fractured-shards`;
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.computeVertexNormals();
-  geometry.computeBoundingBox();
-  geometry.computeBoundingSphere();
-  geometry.userData.fragmentCount = WINDOW_GLASS_DEBRIS_FRAGMENT_COUNT;
-  geometry.userData.intactPane = false;
-
   const shardMaterial = (options.reducedRenderMode ? sharedShardMaterialReduced : sharedShardMaterialTemplate).clone();
-  const shards = new THREE.Mesh(geometry, shardMaterial);
+  const depthScale = Math.max(0.006, options.halfExtents.z * 0.32);
+  const shards = new THREE.Mesh(sharedShardGeometry, shardMaterial);
   shards.name = `${options.id}:shard-cluster`;
+  shards.scale.set(options.halfExtents.x, options.halfExtents.y, depthScale);
   shards.userData.fragmentCount = WINDOW_GLASS_DEBRIS_FRAGMENT_COUNT;
   shards.userData.intactPane = false;
 
-  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geometry, 1), sharedShardEdgesMaterial);
+  const edges = new THREE.LineSegments(sharedShardEdgesGeometry, sharedShardEdgesMaterial);
   edges.name = `${options.id}:shard-edges`;
+  edges.scale.copy(shards.scale);
   root.add(shards, edges);
   return root;
+}
+
+/** Submit the exact glass buffers/material while the deployment surface is up. */
+export async function prewarmFracturedWindowDebrisVisual(
+  runtime: PresentationPrewarmRuntime,
+  camera: THREE.Camera,
+  scene: THREE.Scene,
+  reducedRenderMode: boolean,
+): Promise<void> {
+  camera.updateWorldMatrix(true, false);
+  const root = createFracturedWindowDebrisVisual({
+    id: 'prewarmed-window-debris',
+    halfExtents: { x: 0.7, y: 0.6, z: 0.03 },
+    reducedRenderMode,
+  });
+  root.position.copy(camera.getWorldPosition(new THREE.Vector3()))
+    .addScaledVector(camera.getWorldDirection(new THREE.Vector3()), 4);
+  scene.add(root);
+  try {
+    await runtime.compileAndRender(root, camera, scene);
+  } finally {
+    root.removeFromParent();
+    const shards = root.getObjectByName('prewarmed-window-debris:shard-cluster');
+    if (shards instanceof THREE.Mesh) {
+      const materials = Array.isArray(shards.material) ? shards.material : [shards.material];
+      for (const material of materials) material.dispose();
+    }
+    root.clear();
+  }
 }

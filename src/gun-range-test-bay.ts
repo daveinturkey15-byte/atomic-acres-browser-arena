@@ -74,8 +74,8 @@ export const GUN_RANGE_TEST_BAY_CONTRACT = Object.freeze({
     clearHeightM: 4.8,
   }),
   bay: Object.freeze({
-    bounds: Object.freeze({ minX: 51.5, maxX: 100, minY: 0, maxY: 8.5, minZ: -26, maxZ: 38 }),
-    clearFloorAreaM2: (100 - 51.5) * (38 - -26),
+    bounds: Object.freeze({ minX: 51.5, maxX: 100, minY: 0, maxY: 8.5, minZ: -52, maxZ: 64 }),
+    clearFloorAreaM2: (100 - 51.5) * (64 - -52),
   }),
   door: Object.freeze({
     id: GUN_RANGE_TEST_BAY_DOOR_ID,

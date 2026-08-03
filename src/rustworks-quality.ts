@@ -111,8 +111,8 @@ export function rustworksLightingTint(
     sunIntensity: quality ? 0.95 : 0.75,
     fillIntensity: quality ? 0.28 : 0.34,
     hemisphereIntensity: quality ? 0.45 : 0.58,
-    ambientIntensity: quality ? 0.16 : 0.24,
-    exposure: quality ? 1 : 0.98,
+    ambientIntensity: quality ? 0.20 : 0.30,
+    exposure: quality ? 1.25 : 1.225,
     godRayStrength: 0.04,
     godRayLobes: 2,
   };

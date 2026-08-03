@@ -2125,22 +2125,29 @@ export class WeaponPresentation {
   }
 
   private sightReference(model: THREE.Object3D | undefined): THREE.Object3D | undefined {
-    const sightName = this.active === 'carbine'
-      ? 'optic-reticle'
+    const sightNames = this.active === 'carbine' || this.active === 'm4a1' || this.active === 'ak-47'
+      ? ['optic-reticle']
       : this.active === 'sniper'
-        ? 'sniper-scope'
-      : this.active === 'm14-ebr'
-        ? 'm14-thermal-optic'
-      : this.active === 'lmg'
-        ? 'lmg-aperture'
-      : this.active === 'smg'
-        ? 'smg-aperture'
-        : this.active === 'pistol' || this.active === 'machine-pistol' || this.active === 'magnum'
-          ? 'pistol-rear-sight'
-          : 'ghost-ring';
+        ? ['sniper-scope']
+        : this.active === 'railgun'
+          ? ['railgun-thermal-scope', 'sniper-scope']
+          : this.active === 'm14-ebr'
+            ? ['m14-thermal-optic', 'sniper-scope']
+            : this.active === 'lmg' || this.active === 'minigun' || this.active === 'flamethrower'
+              ? ['lmg-aperture']
+              : this.active === 'smg' || this.active === 'mini-uzi'
+                ? ['smg-aperture']
+                : this.active === 'mp5'
+                  ? ['mp5-diode-sight', 'smg-aperture']
+                  : this.active === 'scattergun' || this.active === 'slug-shotgun'
+                    ? ['ghost-ring']
+                    : this.active === 'flare-gun'
+                      ? ['flare-gun-rear-sight', 'pistol-rear-sight']
+                      : ['pistol-rear-sight'];
     // Pass 65 authored GLBs expose a canonical socket contract. Cosmetic mesh
     // names are retained only as a fallback for the procedural/headless models.
-    return model?.getObjectByName('rear-sight-socket') ?? model?.getObjectByName(sightName);
+    return model?.getObjectByName('rear-sight-socket')
+      ?? sightNames.map((name) => model?.getObjectByName(name)).find((sight) => sight !== undefined);
   }
 
   private centerSightReference(model: THREE.Object3D | undefined): void {

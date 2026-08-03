@@ -11,7 +11,7 @@ export const FLARE_PROJECTILE_EFFECT = Object.freeze({
   gravityMps2: 5.4,
   collisionRadiusM: 0.16,
   maximumFlightMs: 5_500,
-  burnDurationMs: 4_000,
+  burnDurationMs: 5_000,
   directDamage: 42,
   burnRadiusM: 3.4,
   maximumBurnDamage: 20,

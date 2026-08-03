@@ -120,21 +120,37 @@
     font: 700 clamp(12px, 1.6vw, 16px)/1.4 var(--ui-copy);
   }
 
-  .deployment-transition-console i {
-    position: relative;
+  #deployment-transition-progress {
     display: block;
-    height: 3px;
+    width: 100%;
+    height: 8px;
     margin-top: 18px;
+    border: 0;
     overflow: hidden;
+    background: rgba(255, 255, 255, 0.14);
+    accent-color: #54e6d9;
+  }
+
+  #deployment-transition-progress::-webkit-progress-bar {
     background: rgba(255, 255, 255, 0.14);
   }
 
-  .deployment-transition-console i b {
-    position: absolute;
-    inset-block: 0;
-    width: 34%;
-    background: linear-gradient(90deg, transparent, #54e6d9 28%, #e6a84f 76%, transparent);
-    animation: deployment-scan 1.35s ease-in-out infinite;
+  #deployment-transition-progress::-webkit-progress-value {
+    background: linear-gradient(90deg, #54e6d9, #e6a84f);
+  }
+
+  #deployment-transition-progress::-moz-progress-bar {
+    background: linear-gradient(90deg, #54e6d9, #e6a84f);
+  }
+
+  .deployment-transition-progress-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 8px;
+    color: #eefbf7;
+    font: 900 12px/1 var(--ui-copy);
+    letter-spacing: 0.08em;
   }
 
   .deployment-transition-console em {
@@ -145,11 +161,6 @@
     letter-spacing: 0.16em;
   }
 
-  @keyframes deployment-scan {
-    from { transform: translateX(-110%); }
-    to { transform: translateX(310%); }
-  }
-
   @media (max-width: 700px) {
     .deployment-transition-console {
       width: calc(100vw - 32px);
@@ -157,13 +168,6 @@
     }
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .deployment-transition-console i b {
-      width: 72%;
-      animation: none;
-      transform: none;
-    }
-  }
 }
 
 /* The catalog contribution currently appends an unlayered four-column

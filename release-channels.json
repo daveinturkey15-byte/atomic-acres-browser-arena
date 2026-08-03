@@ -12,14 +12,11 @@
     "path": "channels/the-big-one"
   },
   "stable": {
-    "label": "NEW NETCODE",
-    "description": "The byte-exact Pass 63 production build preserved as the stable fallback.",
-    "pass": "PASS 63",
-    "sourceSha": "1bd55076c952080d5f7a8a5b0b8869aaa0646a76",
-    "pagesSha": "2201a606a8c9f83d441036eac07dc140bd7e63f5",
-    "pagesPath": "channels/experimental-netcode-pass",
-    "runtimeFileCount": 119,
-    "runtimeTreeSha256": "61666de694ea6bd62391c1e0661ffcc2864142bb569407c93a2ebdfd28031ce7",
-    "path": "channels/recent-stable"
+    "label": "STABLE SINGLEPLAYER",
+    "description": "Pass 67.1: stable singleplayer build. Needs multiplayer testing.",
+    "pass": "PASS 67.1",
+    "sourceSha": "8c3ad1cd",
+    "pagesSha": "890c51e4",
+    "path": "channels/the-big-one"
   }
 }
