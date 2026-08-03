@@ -495,7 +495,13 @@ export function createFirstPersonRiggedArms(flattenMaterials: boolean): FirstPer
   root.name = 'first-person-arms';
   const visual = cloneSkeleton(firstPersonArmsAsset.scene) as THREE.Group;
   visual.name = 'authored-first-person-arms-visual';
-  visual.scale.setScalar(1);
+  // The regenerated GLB (5ab01f3) is authored mirrored: bone "UpperArmR" sits at
+  // -X and the right-wrist knife socket rides the R chain, so the firing hand
+  // renders on the left. Mirroring the visual root at X restores the intended
+  // camera-space orientation while keeping every bone name, the knife-socket
+  // ancestry and the two-chain release contract exactly as authored. The arms
+  // material is DoubleSide, so the flipped winding still renders correctly.
+  visual.scale.set(-1, 1, 1);
   visual.position.set(0, 0, 0);
   visual.traverse((node) => {
     if (!(node instanceof THREE.Mesh)) return;
