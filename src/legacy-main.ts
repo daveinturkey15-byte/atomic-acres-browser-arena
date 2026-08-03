@@ -17342,6 +17342,7 @@ function adrenalineRuntimeDebugSnapshot(now = performance.now()) {
     actorId: player.id,
     matchEpoch: killstreakMatchEpoch,
     matchPhase: matchState.phase,
+    active: remainingMs > 0,
     remainingMs,
     modifiers: killstreakActorModifiers(player.id, now),
     hud: Object.freeze({
