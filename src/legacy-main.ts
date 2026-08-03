@@ -333,6 +333,8 @@ import {
   FIELD_SUPPORT,
   NUKE_WARNING_MS,
   SCOUT_SWEEP_DURATION_MS,
+  SCOUT_SWEEP_PULSE_INTERVAL_MS,
+  SCOUT_SWEEP_PULSE_VISIBLE_MS,
   TRI_PASS_BLAST_RADIUS,
   TRI_PASS_MAX_DAMAGE,
   assignHunterSwarmTargets,
@@ -20558,6 +20560,37 @@ function updateMinimap(now: number): void {
   context.restore();
   const px = width / 2;
   const py = height / 2;
+  // Scout sweep radar: an expanding pulse ring plus a rotating sweep wedge
+  // while the pulse is visible, so the sweep reads as active radar motion on
+  // the minimap instead of a silent state change (and demo clips of the
+  // sweep carry genuine motion for the cadence gate).
+  if (scoutSweepPulseVisible(now, scoutSweepUntil)) {
+    const pulseStartedAt = scoutSweepUntil - SCOUT_SWEEP_DURATION_MS;
+    const pulseElapsed = Math.max(0, now - pulseStartedAt) % SCOUT_SWEEP_PULSE_INTERVAL_MS;
+    const pulseProgress = Math.min(1, pulseElapsed / SCOUT_SWEEP_PULSE_VISIBLE_MS);
+    const sweepAngle = (pulseElapsed / SCOUT_SWEEP_PULSE_INTERVAL_MS) * Math.PI * 2;
+    const sweepRadius = 26 + pulseProgress * (Math.min(width, height) * 0.42);
+    context.save();
+    context.translate(px, py);
+    context.strokeStyle = 'rgba(88, 227, 220, 0.55)';
+    context.lineWidth = 3;
+    context.beginPath();
+    context.arc(0, 0, sweepRadius, 0, Math.PI * 2);
+    context.stroke();
+    context.fillStyle = 'rgba(88, 227, 220, 0.12)';
+    context.beginPath();
+    context.moveTo(0, 0);
+    context.arc(0, 0, sweepRadius, sweepAngle - 0.45, sweepAngle);
+    context.closePath();
+    context.fill();
+    context.strokeStyle = 'rgba(88, 227, 220, 0.85)';
+    context.lineWidth = 2;
+    context.beginPath();
+    context.moveTo(0, 0);
+    context.lineTo(Math.cos(sweepAngle) * sweepRadius, Math.sin(sweepAngle) * sweepRadius);
+    context.stroke();
+    context.restore();
+  }
   const facing = playerFacingGeometry(px, py, Math.PI);
   context.fillStyle = player.team === 0 ? 'rgba(88, 227, 220, .18)' : 'rgba(255, 118, 95, .18)';
   context.beginPath();
