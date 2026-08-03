@@ -69,13 +69,20 @@
   if (requested === 'experimental') return route('experimental');
 
   const options = document.querySelector('#release-channel-options');
+  // The internal channel pass code (e.g. PASS 66) is not player-facing branding;
+  // show the public version from the label (e.g. v67.1) on the live card.
+  const displayPass = (key, channel) => {
+    if (key !== 'experimental') return channel.pass;
+    const version = String(channel.label || '').match(/v\d+(?:\.\d+)+/);
+    return version ? `PASS ${version[0].slice(1)}` : channel.pass;
+  };
   for (const key of ['experimental', 'stable']) {
     const channel = config[key];
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `release-channel-option ${key}`;
     button.dataset.releaseChoice = key;
-    button.innerHTML = `<small>${channel.pass} · ${key === 'stable' ? 'STABLE' : 'LIVE'}</small><strong>${channel.label}</strong><span>${channel.description}</span>`;
+    button.innerHTML = `<small>${displayPass(key, channel)} · ${key === 'stable' ? 'STABLE' : 'LIVE'}</small><strong>${channel.label}</strong><span>${channel.description}</span>`;
     button.addEventListener('click', () => route(key));
     options.append(button);
   }
