@@ -22842,8 +22842,8 @@ function frame(now: number, scheduleNext = true): void {
         );
         debugCaptureCameraYaw = debugCaptureOrbit.lookAtX !== null
           ? Math.atan2(
-            debugCaptureOrbit.lookAtX - debugCaptureCameraPosition.x,
-            debugCaptureOrbit.lookAtZ! - debugCaptureCameraPosition.z,
+            debugCaptureCameraPosition.x - debugCaptureOrbit.lookAtX,
+            debugCaptureCameraPosition.z - debugCaptureOrbit.lookAtZ!,
           )
           : debugCaptureOrbit.baseYaw + orbitElapsed * debugCaptureOrbit.yawRate;
         if (debugCaptureOrbit.lookAtY !== null && debugCaptureOrbit.lookAtX !== null) {
