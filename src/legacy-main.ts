@@ -10781,7 +10781,10 @@ function spawnPersistentWindowDebrisSynchronously(
   const centre = window.mesh.getWorldPosition(new THREE.Vector3());
   const paneRotation = window.mesh.getWorldQuaternion(new THREE.Quaternion());
   const direction = normal.lengthSq() > 1e-6 ? normal.clone().normalize() : new THREE.Vector3(0, 0.15, 1).normalize();
-  centre.addScaledVector(direction, Math.max(0.06, halfExtents.z * 1.4));
+  // Push the debris body well clear of the wall plane. Spawning at the pane
+  // centre (or a hair outside it) embedded the shards inside the frame, where
+  // they could sleep stuck mid-air instead of falling to the floor.
+  centre.addScaledVector(direction, Math.max(0.45, halfExtents.z * 4 + 0.3));
 
   const root = createFracturedWindowDebrisVisual({ id, halfExtents, reducedRenderMode });
   root.position.copy(centre);
@@ -10796,9 +10799,12 @@ function spawnPersistentWindowDebrisSynchronously(
     rotation: Object.freeze({ x: paneRotation.x, y: paneRotation.y, z: paneRotation.z, w: paneRotation.w }),
     halfExtents,
     linearVelocity: Object.freeze({
-      x: direction.x * (1.8 + deterministicWindowUnit(window.id, 1) * 1.2),
-      y: 1.1 + deterministicWindowUnit(window.id, 2) * 1.4,
-      z: direction.z * (1.8 + deterministicWindowUnit(window.id, 3) * 1.2),
+      // Shards fall to the floor: modest outward toss, no upward launch that
+      // leaves the pane hovering at sill height. Vertical velocity is always
+      // downward so the debris lands even if the host never sends a pose.
+      x: direction.x * (1.2 + deterministicWindowUnit(window.id, 1) * 1.0),
+      y: -(0.9 + deterministicWindowUnit(window.id, 2) * 1.2),
+      z: direction.z * (1.2 + deterministicWindowUnit(window.id, 3) * 1.0),
     }),
     angularVelocity: Object.freeze({
       x: (deterministicWindowUnit(window.id, 4) - 0.5) * 5,

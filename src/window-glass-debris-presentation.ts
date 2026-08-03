@@ -3,7 +3,7 @@ import { GPU_SHARED_GEOMETRY_KEY } from './gpu-resource-ownership';
 import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 
 export const WINDOW_GLASS_DEBRIS_VISUAL_CONTRACT = 'fractured-shards-no-intact-pane-v1';
-export const WINDOW_GLASS_DEBRIS_FRAGMENT_COUNT = 6;
+export const WINDOW_GLASS_DEBRIS_FRAGMENT_COUNT = 24;
 
 type WindowGlassDebrisVisualOptions = Readonly<{
   id: string;
@@ -11,14 +11,45 @@ type WindowGlassDebrisVisualOptions = Readonly<{
   reducedRenderMode: boolean;
 }>;
 
-const SHARD_TRIANGLES = Object.freeze([
-  Object.freeze([[-0.96, 0.90], [-0.20, 0.82], [-0.55, 0.24]]),
-  Object.freeze([[-0.08, 0.84], [0.92, 0.75], [0.27, 0.17]]),
-  Object.freeze([[-0.88, 0.11], [-0.42, 0.18], [-0.12, -0.34]]),
-  Object.freeze([[-0.33, 0.10], [0.24, 0.13], [0.83, -0.27]]),
-  Object.freeze([[-0.82, -0.04], [-0.18, -0.42], [-0.63, -0.91]]),
-  Object.freeze([[-0.04, -0.39], [0.76, -0.34], [0.93, -0.88]]),
-] as const);
+/**
+ * A shattered pane reads as broken when it breaks into many small shards, not
+ * six large slabs. Generate a 4x3 grid of inset triangles (24 shards) with
+ * visible gaps between them so the debris reads as a real break while the
+ * total covered area stays inside the shared-buffer contract.
+ */
+function buildShardTriangles(): ReadonlyArray<ReadonlyArray<readonly [number, number]>> {
+  const triangles: Array<ReadonlyArray<readonly [number, number]>> = [];
+  const columns = 4;
+  const rows = 3;
+  const inset = 0.1;
+  const cellWidth = 2 / columns;
+  const cellHeight = 2 / rows;
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      const x0 = -1 + column * cellWidth;
+      const x1 = x0 + cellWidth;
+      const y0 = 1 - (row + 1) * cellHeight;
+      const y1 = y0 + cellHeight;
+      const left = x0 + inset;
+      const right = x1 - inset;
+      const bottom = y0 + inset;
+      const top = y1 - inset;
+      triangles.push(Object.freeze([
+        Object.freeze([left, bottom] as const),
+        Object.freeze([right, bottom] as const),
+        Object.freeze([left, top] as const),
+      ]));
+      triangles.push(Object.freeze([
+        Object.freeze([right, bottom] as const),
+        Object.freeze([right, top] as const),
+        Object.freeze([left, top] as const),
+      ]));
+    }
+  }
+  return Object.freeze(triangles);
+}
+
+const SHARD_TRIANGLES = buildShardTriangles();
 
 function createSharedShardGeometry(): THREE.BufferGeometry {
   const positions: number[] = [];
