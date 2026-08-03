@@ -396,9 +396,22 @@ export async function prewarmPass65RuntimeWeaponCorpus(
 
 function flattenMaterial(material: THREE.Material): THREE.Material {
   const source = material as THREE.MeshStandardMaterial;
-  return new THREE.MeshBasicMaterial({
+  // Reduced-render mode must not read as a missing asset: preserve the full
+  // authored PBR response (colour, normal, roughness, metalness, emissive
+  // maps). The performance win in this mode comes from batched draw calls and
+  // disabled shadow casting, not from degrading the most-seen surface in the
+  // game to a flat unlit colour.
+  return new THREE.MeshStandardMaterial({
     color: source.color?.clone() ?? new THREE.Color(0x303944),
     map: source.map ?? null,
+    normalMap: source.normalMap ?? null,
+    roughnessMap: source.roughnessMap ?? null,
+    metalnessMap: source.metalnessMap ?? null,
+    emissive: source.emissive?.clone() ?? new THREE.Color(0x000000),
+    emissiveMap: source.emissiveMap ?? null,
+    emissiveIntensity: source.emissiveIntensity ?? 1,
+    roughness: source.roughness ?? 0.5,
+    metalness: source.metalness ?? 0.5,
     transparent: false,
     opacity: 1,
     alphaTest: source.alphaTest,

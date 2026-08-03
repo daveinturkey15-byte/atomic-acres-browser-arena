@@ -1320,9 +1320,12 @@ export function createOperatorWeaponPresentation(
   const authoredWorldWeapon = browserRuntime ? createImportedWeaponModel(weaponId, flattenMaterials) : null;
   if (browserRuntime && !authoredWorldWeapon) return null;
   const weapon = authoredWorldWeapon ?? buildWeaponModel(weaponId, flattenMaterials, false);
+  // Reduced-render mode keeps authored weapon textures/maps ('texture-lit'
+  // preserves mapped materials + UVs while batching), never collapsing to the
+  // flat unlit 'palette-basic' look that reads as a missing asset.
   optimizeAttachedWeapon(
     weapon,
-    flattenMaterials ? 'palette-basic' : weapon.userData.projectOriginalWeapon === true ? 'texture-lit' : 'vertex-lit',
+    flattenMaterials ? 'texture-lit' : weapon.userData.projectOriginalWeapon === true ? 'texture-lit' : 'vertex-lit',
   );
   weapon.name = `operator-${weaponId}`;
   weapon.userData.weaponId = weaponId;

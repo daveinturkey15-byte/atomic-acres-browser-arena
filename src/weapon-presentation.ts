@@ -405,7 +405,13 @@ function prepareFirstPersonWeaponModel(id: WeaponId, model: THREE.Group, flatten
       reticle.renderOrder = 1_000;
     }
   }
-  if (flattenMaterials && id !== 'explosive-crossbow') optimizeAttachedWeapon(model, 'palette-basic');
+  // The first-person weapon is the most-seen surface in the game. Even in
+  // reduced-render mode it must keep its authored texture maps and UVs —
+  // 'palette-basic' collapsed it to a flat unlit white silhouette, which
+  // reads as a missing asset. 'texture-lit' preserves mapped materials and
+  // their UV/normal attributes while still batching static parts into one
+  // draw call, so Performance keeps the authored look at near-zero extra cost.
+  if (flattenMaterials && id !== 'explosive-crossbow') optimizeAttachedWeapon(model, 'texture-lit');
   return model;
 }
 

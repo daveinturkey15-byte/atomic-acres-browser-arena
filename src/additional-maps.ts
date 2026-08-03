@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { buildOperator } from './art-kit';
+import { buildOperator, poseOperator } from './art-kit';
 import { classifyImpactSurface } from './combat-feedback';
 import { createBallisticSurface, type BallisticMaterialId, type BallisticSurface } from './ballistics';
 import type { Box2 } from './collision';
@@ -2142,6 +2142,13 @@ export function updateGunRangePresentation(root: THREE.Object3D, nowMs: number):
       pose.position.z,
     );
     dummy.rotation.y = pose.yawRadians;
+    // Rigged operators (the canonical in-match family) animate through the
+    // shared pose pipeline, exactly like live combatants; the painted robot's
+    // named-limb walk is only for the pre-rig fixture.
+    if (dummy.userData.riggedOperator === true) {
+      poseOperator(dummy, 'stand', definition.speedMps, nowMs * 0.008 + index, Math.min(1, 0.016 * 24), 0, 0.016);
+      return;
+    }
     const arms = [
       dummy.getObjectByName(`gun-range-${definition.id}-arm--1`),
       dummy.getObjectByName(`gun-range-${definition.id}-arm-1`),
