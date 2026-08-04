@@ -5,14 +5,14 @@
   "status": "accepted",
   "preview": {
     "kind": "github-actions-artifact",
-    "ref": "pr-preview-39-d943284d8ba50ab27b99e4c04249c4f35dec7072",
-    "sourceSha": "d943284d8ba50ab27b99e4c04249c4f35dec7072",
-    "createdAt": "2026-08-04T07:45:00Z"
+    "ref": "pr-preview-39-933aecce85c5d8f2d4008a0dd1cc94bf9a5a6fa5",
+    "sourceSha": "933aecce85c5d8f2d4008a0dd1cc94bf9a5a6fa5",
+    "createdAt": "2026-08-04T12:31:00Z"
   },
   "humanAcceptance": {
     "state": "approved",
     "approvedBy": "Dave",
-    "approvedAt": "2026-08-04T12:01:00Z",
+    "approvedAt": "2026-08-04T12:32:00Z",
     "evidence": "Dave instructed: 'Atomic acres pass and publish' on 2026-08-04 (06:51Z), standing up PASS 68 as the HITL-tested build while PASS 69 (Farcrysis map) is prepared as the next lane. Approval recorded against the immutable PR #39 preview (source 1d2565be) per repo contract; original PASS 68 request received 2026-08-03 with the full fix list below. Test-only re-pin 2026-08-04: frozen-timeout source contract updated to 60s deferred admission; runtime tree byte-identical to approved preview (recordImmediateStreak hook reverted). Preview sourceSha re-pinned to fixing head."
   },
   "requirements": [
