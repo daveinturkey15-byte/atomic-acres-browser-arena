@@ -529,9 +529,9 @@
       "license": "Original project work",
       "files": "public/assets/original/menu-previews/*",
       "sourceScript": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
-      "sourceScriptSha256": "cfe96df62efa7a5785030b1e5d9ab0cce8e28648eefa1ada5522189ed5229154",
+      "sourceScriptSha256": "cf9fb254538c9cc36715c5a7155876394f8a7b972268a0850def74e71c698e3e",
       "sourceProvenance": "source-assets/menu/pass65-preview-masters/provenance.json",
-      "sourceProvenanceSha256": "4042801c5fc5dc4e7bbd3d53d1dfdf25bf397e1f295eb56b6c1e4f0df5ef217f",
+      "sourceProvenanceSha256": "2318e7a53f271c72e820de8a8e86360fe1b54e2e903a7494c59e35a547bdb9d9",
       "format": "Four distinct 2560x1440 eight-second 30 FPS selected-map runtime captures, shipped as high-bitrate VP9/Opus WebM, H.264 High Level 5.0/AAC MP4 and full-resolution static WebP posters, plus deterministic five-frame review evidence",
       "modifications": "Captured offline at native 1440p from each actual authoritative production WebGPU arena with deterministic camera and visual time; the reviewed 1280x720 logical overlay is losslessly authored at exact 2x output scale so its fixed-pixel details retain their intended proportions. Three map flyovers bake perspective-aware elliptic rotor arcs with subdued moving spokes, measured mast/hub/header occlusion, two visible structural ties into the side canopy rails, a restrained tail camera and compact green-on-graphite cockpit avionics; Gun Range bakes compact charcoal/silver ears, forelegs and top-facing paws. Runtime loading/menu playback remains one selected metadata-preload decoder with poster-first readiness, reduced motion is poster-only, and no downloaded or sampled assets are used. The former byte-identical Gun Range media gate is explicitly superseded.",
       "attributionRequired": false
@@ -594,9 +594,9 @@
         }
       ],
       "sourceScript": "tests/e2e/pass66-gun-range-killstreak-demo-capture.spec.ts",
-      "sourceScriptSha256": "14b332f52e3d23fbc9836a1cffce223b32d4ce4c912e82cde45b4e4c917952d5",
+      "sourceScriptSha256": "503a0908c9a73ce4bcb024e6b7ceaba08f002f04ffdd1d768a3f8c57b2fe9513",
       "sourceSpec": "scripts/qa/finalize-pass66-killstreak-demo-media.ts",
-      "sourceSpecSha256": "783b49844fbf455527b6171d21320c46a26b45040187966ca2a7b34d78745ceb",
+      "sourceSpecSha256": "1cb7311b1bf7889d590c35a520e9fd5248db995ca3fed3446a6dfbf94d862051",
       "sourceProvenance": "source-assets/killstreak-demo/pass66-real-test-bay-capture-receipt.json",
       "sourceProvenanceSha256": "c03cfa106a1ae7cb81e244b789451a66f74b411a2cde03e210b531cb368e2dc0",
       "format": "Eleven distinct 960x540 JPEG poster frames from the real Gun Range grey test bay, one per canonical support, plus a fail-closed digest and capture-proof manifest",
