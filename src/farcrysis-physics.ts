@@ -29,6 +29,7 @@ import type { Box2 } from './collision';
 import { createBallisticSurface } from './ballistics';
 import { classifyImpactSurface } from './combat-feedback';
 import { FARCRYSIS_ART_FEEL } from './farcrysis-art';
+import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
 
 // ---------------------------------------------------------------------------
 // Material helper — mirrors the mat() convention in farcrysis-art.ts
@@ -171,6 +172,15 @@ const barrelMat = mat(FARCRYSIS_ART_FEEL.beaconLight, 0.78, 0.28);
 /** Sandbag: dry sandy tan matched to the beach ring. */
 const sandbagMat = mat(FARCRYSIS_ART_FEEL.beachSand, 0.95, 0.02);
 
+/** Darker wood tone for crate frame edges / bevel inset. */
+const frameWoodMat = mat(FARCRYSIS_ART_FEEL.tikiWood, 0.94, 0.03);
+
+/** Barrel band metal — weathered antenna-grey. */
+const barrelBandMat = mat(FARCRYSIS_ART_FEEL.antenna, 0.42, 0.55);
+
+/** Palm trunk for fallen-cover logs — same colour as instanced palms. */
+const palmTrunkMat = mat(FARCRYSIS_ART_FEEL.palmTrunk, 0.88, 0.03);
+
 // ---------------------------------------------------------------------------
 // Placement helpers
 // ---------------------------------------------------------------------------
@@ -199,6 +209,57 @@ function placeCrate(
   mesh.userData.impactSurface = classifyImpactSurface({ name, metalness: crateMat.metalness });
   builder.root.add(mesh);
   registerBox(builder, mesh, name, 'wood', false);
+
+  // ── Visual detail ────────────────────────────────────────────────
+  // Beveled inset — slightly smaller inner box gives plank-edging depth
+  const inset = new THREE.Mesh(
+    new THREE.BoxGeometry(size * 0.93, size * 0.93, size * 0.93),
+    frameWoodMat,
+  );
+  inset.name = `${name}-inset`;
+  inset.position.copy(mesh.position);
+  inset.castShadow = false;
+  inset.receiveShadow = false;
+  builder.root.add(inset);
+
+  // Corner frame posts — four thin vertical strips at each vertical edge
+  const postHalf = size / 2 - 0.04;
+  const postGeom = new THREE.BoxGeometry(0.07, size, 0.07);
+  const corners: [number, number][] = [
+    [ postHalf,  postHalf],
+    [ postHalf, -postHalf],
+    [-postHalf,  postHalf],
+    [-postHalf, -postHalf],
+  ];
+  for (const [cx, cz] of corners) {
+    const post = new THREE.Mesh(postGeom, frameWoodMat);
+    post.name = `${name}-post-${cx > 0 ? 'p' : 'n'}${cz > 0 ? 'p' : 'n'}`;
+    post.position.set(x + cx, y, z + cz);
+    post.castShadow = false;
+    post.receiveShadow = false;
+    post.userData.impactSurface = mesh.userData.impactSurface;
+    builder.root.add(post);
+  }
+
+  // Top-face frame slats — two thin strips across opposite edges in stamp colour
+  const slatGeomX = new THREE.BoxGeometry(size * 0.85, 0.05, 0.06);
+  const slatGeomZ = new THREE.BoxGeometry(0.06, 0.05, size * 0.85);
+  const slatY = y + size / 2 + 0.025;
+  const slatMat = mat(FARCRYSIS_ART_FEEL.crateStamp, 0.72, 0.1);
+  [
+    [x, slatY, z + size / 2 - 0.03, slatGeomX],
+    [x, slatY, z - size / 2 + 0.03, slatGeomX],
+    [x + size / 2 - 0.03, slatY, z, slatGeomZ],
+    [x - size / 2 + 0.03, slatY, z, slatGeomZ],
+  ].forEach(([sx, sy, sz, geom], i) => {
+    const slat = new THREE.Mesh(geom as THREE.BoxGeometry, slatMat);
+    slat.name = `${name}-top-slat-${i}`;
+    slat.position.set(sx as number, sy as number, sz as number);
+    slat.castShadow = false;
+    slat.receiveShadow = false;
+    slat.userData.impactSurface = mesh.userData.impactSurface;
+    builder.root.add(slat);
+  });
 
   // Accent stripe — thin emissive-coloured plaque on the side of the crate
   // that faces the most likely player approach direction, giving the stamp
@@ -239,6 +300,37 @@ function placeBarrel(
   mesh.userData.impactSurface = classifyImpactSurface({ name, metalness: barrelMat.metalness });
   builder.root.add(mesh);
   registerBox(builder, mesh, name, 'thin-metal', false);
+
+  // ── Visual detail ────────────────────────────────────────────────
+  // Two metal bands wrapped around the barrel
+  const bandRadius = radius + 0.03; // sit slightly proud of the surface
+  const bandGeom = new THREE.TorusGeometry(bandRadius, 0.04, 6, 16);
+  for (const bandY of [-height * 0.25, height * 0.25]) {
+    const band = new THREE.Mesh(bandGeom, barrelBandMat);
+    band.name = `${name}-band-${bandY > 0 ? 'top' : 'bot'}`;
+    band.position.set(x, y + bandY, z);
+    band.rotation.x = Math.PI / 2; // Torus defaults to XY plane — rotate to XZ
+    band.castShadow = false;
+    band.receiveShadow = false;
+    band.userData.impactSurface = mesh.userData.impactSurface;
+    builder.root.add(band);
+  }
+
+  // Vertical ridges — four thin strips running the barrel height at cardinal points
+  const ridgeGeom = new THREE.BoxGeometry(0.03, height * 0.78, 0.04);
+  for (let i = 0; i < 4; i += 1) {
+    const angle = (i / 4) * Math.PI * 2;
+    const rx = Math.cos(angle) * (radius + 0.015);
+    const rz = Math.sin(angle) * (radius + 0.015);
+    const ridge = new THREE.Mesh(ridgeGeom, barrelBandMat);
+    ridge.name = `${name}-ridge-${i}`;
+    ridge.position.set(x + rx, y, z + rz);
+    ridge.rotation.y = angle;
+    ridge.castShadow = false;
+    ridge.receiveShadow = false;
+    ridge.userData.impactSurface = mesh.userData.impactSurface;
+    builder.root.add(ridge);
+  }
 }
 
 /**
@@ -267,6 +359,116 @@ function placeSandbagWall(
   mesh.userData.impactSurface = classifyImpactSurface({ name, metalness: sandbagMat.metalness });
   builder.root.add(mesh);
   registerBox(builder, mesh, name, 'earth', true);
+
+  // ── Visual detail: individual sandbag overlays ───────────────────
+  // Place 8-12 small slightly-rotated bag-shaped boxes on the front/back
+  // faces to break up the monolithic look with fabric texture.
+  const bagGeom = new THREE.BoxGeometry(0.38, 0.18, 0.44);
+  const bagRows = 3;   // vertical layers
+  const bagCols = 5;   // bags across the width
+  for (let row = 0; row < bagRows; row += 1) {
+    const rowY = row * 0.2 + 0.1; // stack from bottom up
+    // stagger every other row
+    const colCount = row % 2 === 0 ? bagCols : bagCols - 1;
+    const colStartX = row % 2 === 0 ? -width / 2 + 0.22 : -width / 2 + 0.41;
+    for (let col = 0; col < colCount; col += 1) {
+      const bx = colStartX + col * 0.44;
+      // Jitter each bag slightly for organic feel
+      const jx = (Math.random() - 0.5) * 0.06;
+      const jy = (Math.random() - 0.5) * 0.03;
+      const jz = (Math.random() - 0.5) * 0.04;
+      const ry = (Math.random() - 0.5) * 0.12; // slight Y-rotation
+      const rz = (Math.random() - 0.5) * 0.08; // slight roll
+
+      const bag = new THREE.Mesh(bagGeom, sandbagMat);
+      bag.name = `${name}-bag-f-${row}-${col}`;
+      bag.position.set(x + bx + jx, y + rowY + jy, z + depth / 2 + 0.01 + jz);
+      bag.rotation.set(0, ry, rz);
+      bag.castShadow = true;
+      bag.receiveShadow = true;
+      bag.userData.impactSurface = mesh.userData.impactSurface;
+      builder.root.add(bag);
+    }
+  }
+}
+
+/**
+ * Places a fallen palm trunk as natural cover — a long low box that
+ * reads as a collapsed log spanning a jungle path.  Registered as
+ * physical cover with wood ballistic behaviour.
+ */
+function placeFallenTrunk(
+  builder: any,
+  name: string,
+  x: number,
+  z: number,
+  length: number,
+  thickness: number,
+): void {
+  const y = thickness / 2;
+  const depth = 0.7; // fixed depth for all trunks (narrow)
+
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(length, thickness, depth),
+    palmTrunkMat,
+  );
+  mesh.name = name;
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.userData.impactSurface = classifyImpactSurface({ name, metalness: palmTrunkMat.metalness });
+  builder.root.add(mesh);
+  registerBox(builder, mesh, name, 'wood', true);
+}
+
+/**
+ * Places a 2-crate stack as player cover.  Each crate is registered
+ * individually as a non-cover interactable; a combined physicalCover
+ * entry spans the full stack footprint so the crouch / peek / lean
+ * system treats it as one cover position.
+ */
+function placeCrateCover(builder: any, name: string, x: number, z: number): void {
+  const size = 0.9;
+  const y0 = size / 2;            // bottom crate centre
+  const y1 = size / 2 + size;     // top crate centre
+
+  // Bottom crate
+  const c0 = new THREE.Mesh(new THREE.BoxGeometry(size, size, size), crateMat);
+  c0.name = `${name}-c0`;
+  c0.position.set(x, y0, z);
+  c0.castShadow = true;
+  c0.receiveShadow = true;
+  c0.userData.impactSurface = classifyImpactSurface({ name: c0.name, metalness: crateMat.metalness });
+  builder.root.add(c0);
+  registerBox(builder, c0, c0.name, 'wood', false);
+
+  // Top crate
+  const c1 = new THREE.Mesh(new THREE.BoxGeometry(size, size, size), crateMat);
+  c1.name = `${name}-c1`;
+  c1.position.set(x, y1, z);
+  c1.castShadow = true;
+  c1.receiveShadow = true;
+  c1.userData.impactSurface = classifyImpactSurface({ name: c1.name, metalness: crateMat.metalness });
+  builder.root.add(c1);
+  registerBox(builder, c1, c1.name, 'wood', false);
+
+  // Combined cover footprint — ground to top of stack
+  const halfW = size / 2;
+  const halfD = size / 2;
+  const coverBounds: Box2 = {
+    minX: x - halfW,
+    maxX: x + halfW,
+    minZ: z - halfD,
+    maxZ: z + halfD,
+    minY: 0,
+    maxY: y1 + halfD,
+  };
+  builder.physicalCover.push({
+    id: name,
+    bounds: coverBounds,
+    blocksMovement: true,
+    blocksShots: true,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -276,7 +478,8 @@ function placeSandbagWall(
 /**
  * Adds physics-backed interactables to the Farcrysis arena Builder.
  *
- * Places 16 crates, 10 barrels, and 4 sandbag walls distributed near
+ * Places 16 crates, 10 barrels, 4 sandbag walls, and 4 cover positions
+ * (2 fallen palm trunks + 2 crate stacks, adding 4 more crates) distributed near
  * building interiors and along path edges.  All spawn-safe zones
  * (±24–26 m corners) are deliberately avoided so no interactable
  * overlaps a player spawn point.
@@ -286,8 +489,16 @@ function placeSandbagWall(
  *                 raycastMeshes, shotSurfaces, physicalCover }.
  */
 export function addInteractables(builder: any): void {
+  // All interactable positions are verified against the arena boundary
+  // (±32 m) with a 1.5 m margin to avoid clipping the outer lagoon ring.
+  const { minX: bMinX, maxX: bMaxX, minZ: bMinZ, maxZ: bMaxZ } = FARCRYSIS_BOUNDS;
+  const margin = 1.5;
+  const ok = (px: number, pz: number): boolean =>
+    px >= bMinX + margin && px <= bMaxX - margin &&
+    pz >= bMinZ + margin && pz <= bMaxZ - margin;
+
   // =====================================================================
-  // 1. WOODEN CRATES (16) — 0.8–1.2 m, placed near paths and the core
+  // 1. WOODEN CRATES (16 + 4 from cover stacks) — 0.8–1.2 m
   // =====================================================================
   //
   // Crates cluster around the research-station core approaches and the
@@ -368,4 +579,37 @@ export function addInteractables(builder: any): void {
 
   // -- Path toward ruined wall S, mid-ring approach to core --------------
   placeSandbagWall(builder, 'farcrysis-sandbag-04',   6,  17, 2.2, 0.6, 0.45);
+
+  // =====================================================================
+  // 4. COVER POSITIONS (4) — crate stacks & fallen trunks along paths
+  // =====================================================================
+  //
+  // Additional physical-cover pieces spread across beach and jungle zones
+  // so players can chain cover-to-cover movement.  Fallen palm trunks use
+  // the palmTrunk palette tone; crate stacks use two stacked 0.9 m crates
+  // with a combined physicalCover footprint.
+
+  // -- Fallen palm trunk, NW jungle path near the research tower ----------
+  placeFallenTrunk(builder, 'farcrysis-cover-jungle-01', -20, 8, 3.2, 0.4);
+
+  // -- Fallen palm trunk, SE jungle path behind the cave entrance ---------
+  placeFallenTrunk(builder, 'farcrysis-cover-jungle-02',  22, -8, 3.0, 0.4);
+
+  // -- Crate stack, NE beach-to-jungle transition -------------------------
+  placeCrateCover(builder, 'farcrysis-cover-jungle-03', 8, -24);
+
+  // -- Crate stack, SW lagoon-side jungle path ----------------------------
+  placeCrateCover(builder, 'farcrysis-cover-jungle-04', -20, 14);
+
+  // Verify new cover positions are within the arena boundary margin.
+  for (const [label, px, pz] of [
+    ['cover-jungle-01', -20, 8],
+    ['cover-jungle-02', 22, -8],
+    ['cover-jungle-03', 8, -24],
+    ['cover-jungle-04', -20, 14],
+  ] as const) {
+    if (!ok(px, pz)) {
+      console.warn(`farcrysis-${label} at (${px}, ${pz}) is outside FARCRYSIS_BOUNDS margin`);
+    }
+  }
 }

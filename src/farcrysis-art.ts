@@ -14,6 +14,7 @@ import * as THREE from 'three';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
 import { buildVegetation } from './farcrysis-vegetation';
 import { buildTerrain, buildLighting, buildWater } from './farcrysis-terrain';
+import { applyFarcrysisTextures } from './farcrysis-textures';
 
 // ---------------------------------------------------------------------------
 // Material / naming helpers
@@ -471,4 +472,7 @@ export function applyFarcrysisArtwork(root: THREE.Group): void {
   buildTerrain(s);
   buildLighting(s);
   buildWater(s);
+
+  // Pass 69 procedural PBR textures — apply after all geometry is built
+  applyFarcrysisTextures(root);
 }

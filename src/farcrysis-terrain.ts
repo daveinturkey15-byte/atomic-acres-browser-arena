@@ -350,11 +350,13 @@ export function buildLighting(scene: THREE.Scene): {
   updateGodRays: () => void;
 } {
   // ---- 1. Golden-hour DirectionalLight (sun) ----
-  const sunColor = FARCRYSIS_ART_FEEL.goldenHourSunTint; // 0xffd9a0
-  const sunIntensity = FARCRYSIS_ART_FEEL.goldenHourSunIntensity; // 3.1
+  // Warmer low-angle golden-hour tint against the washed-out high sun constant in
+  // FARCRYSIS_ART_FEEL; intensity pulled back ~13 % for a more natural feel.
+  const SUN_COLOR = 0xffcc80;
+  const SUN_INTENSITY = 2.7;
   const sunPosition = new THREE.Vector3(-18, 20, 25); // low angle from NW
 
-  const sun = new THREE.DirectionalLight(sunColor, sunIntensity);
+  const sun = new THREE.DirectionalLight(SUN_COLOR, SUN_INTENSITY);
   sun.name = 'farcrysis-sun';
   sun.position.copy(sunPosition);
   sun.castShadow = true;
@@ -368,7 +370,37 @@ export function buildLighting(scene: THREE.Scene): {
   sun.shadow.camera.bottom = -40;
   sun.shadow.bias = -0.0005;
   sun.shadow.normalBias = 0.03;
+  sun.shadow.radius = 5; // soft golden-hour penumbra
   scene.add(sun);
+
+  // ---- 1a. Sun disc (visible sphere + halo at the directional-light position) ----
+  const sunDiscGroup = new THREE.Group();
+  sunDiscGroup.name = 'farcrysis-sun-disc';
+
+  // Inner bright disc
+  const sunDiscGeom = new THREE.SphereGeometry(0.7, 16, 12);
+  const sunDiscMat = new THREE.MeshBasicMaterial({ color: 0xfffbe0, fog: false });
+  const sunDisc = new THREE.Mesh(sunDiscGeom, sunDiscMat);
+  sunDisc.name = 'farcrysis-sun-disc-core';
+  sunDiscGroup.add(sunDisc);
+
+  // Outer soft halo (additive blend, barely visible but gives a corona feel)
+  const sunHaloGeom = new THREE.SphereGeometry(2.2, 16, 12);
+  const sunHaloMat = new THREE.MeshBasicMaterial({
+    color: 0xffcc80,
+    transparent: true,
+    opacity: 0.18,
+    fog: false,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const sunHalo = new THREE.Mesh(sunHaloGeom, sunHaloMat);
+  sunHalo.name = 'farcrysis-sun-disc-halo';
+  sunDiscGroup.add(sunHalo);
+
+  sunDiscGroup.position.copy(sunPosition);
+  sunDiscGroup.frustumCulled = false;
+  scene.add(sunDiscGroup);
 
   // ---- 2. Ambient light ----
   const ambient = new THREE.AmbientLight(
@@ -386,8 +418,9 @@ export function buildLighting(scene: THREE.Scene): {
   scene.add(hemi);
 
   // ---- 4. Volumetric fog (FogExp2) ----
-  const fogColor = new THREE.Color(0xffe0b0); // warm golden fog
-  const fogDensity = 0.00025;
+  // Warm grey-brown golden-hour haze — atmospheric but doesn't obscure sightlines.
+  const fogColor = new THREE.Color(0xffd9c8);
+  const fogDensity = 0.0022;
   scene.fog = new THREE.FogExp2(fogColor, fogDensity);
 
   // ---- 5. Lightweight god-ray cones ----
@@ -426,6 +459,23 @@ export function buildLighting(scene: THREE.Scene): {
     rays.push(ray);
   }
 
+  // Store base opacities per ray so we can pulse relative to their authored value.
+  const baseRayOpacities = rays.map((ray) => {
+    const mat = ray.material as THREE.MeshBasicMaterial;
+    return mat.opacity;
+  });
+
+  // Self-driving subtle opacity pulse — feels alive without external wiring.
+  godRayGroup.onBeforeRender = () => {
+    const t = performance.now() * 0.001;
+    for (let i = 0; i < rays.length; i++) {
+      const mat = rays[i].material as THREE.MeshBasicMaterial;
+      const phase = i * 0.7;
+      const pulse = 1 + Math.sin(t * 0.8 + phase) * 0.25;
+      mat.opacity = Math.max(0.01, baseRayOpacities[i] * pulse);
+    }
+  };
+
   scene.add(godRayGroup);
 
   // Update god-ray orientations to follow the light direction
@@ -461,12 +511,15 @@ export function buildWater(scene: THREE.Scene): {
 
   const waterMat = new THREE.MeshStandardMaterial({
     color: 0x2d7f8c,
-    roughness: 0.12,
+    roughness: 0.15,
     metalness: 0.4,
     transparent: true,
     opacity: 0.78,
     depthWrite: true,
     envMapIntensity: 0.3,
+    emissive: 0x1a4030,
+    emissiveIntensity: 0.3,
+    fog: false,
   });
 
   const water = new THREE.Mesh(waterGeom, waterMat);
@@ -503,6 +556,24 @@ export function buildWater(scene: THREE.Scene): {
   sparkles.frustumCulled = false;
   water.add(sparkles);
 
+  // ---- Shoreline foam band (narrow white-ish ring at the water-beach boundary) ----
+  const foamRingGeom = new THREE.TorusGeometry(22, 0.32, 8, 72);
+  foamRingGeom.rotateX(-Math.PI / 2); // lay flat
+  const foamRingMat = new THREE.MeshStandardMaterial({
+    color: 0xfaf5ee,
+    roughness: 0.7,
+    metalness: 0.02,
+    transparent: true,
+    opacity: 0.55,
+    depthWrite: true,
+    fog: false,
+  });
+  const foamRing = new THREE.Mesh(foamRingGeom, foamRingMat);
+  foamRing.name = 'farcrysis-terrain-water-foam';
+  foamRing.position.y = 0.02;
+  foamRing.receiveShadow = true;
+  water.add(foamRing);
+
   // ---- Animation updater ----
   const positions = waterGeom.attributes.position as THREE.BufferAttribute;
   const update = (timeSeconds: number): void => {
@@ -526,6 +597,11 @@ export function buildWater(scene: THREE.Scene): {
 
     // Animate sparkle opacity
     sparkleMat.opacity = 0.35 + Math.sin(t * 1.5) * 0.15;
+  };
+
+  // Self-driving wave animation — fires every visible frame without external wiring.
+  water.onBeforeRender = () => {
+    update(performance.now() * 0.001);
   };
 
   return { mesh: water, update };
