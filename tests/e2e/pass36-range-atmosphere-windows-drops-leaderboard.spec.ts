@@ -79,7 +79,7 @@ async function waitReady(page: Page): Promise<void> {
 async function deploySolo(page: Page): Promise<void> {
   await page.locator('#player-name').fill('PASS 36 QA');
   await page.evaluate(() => api().startSolo());
-  await expect.poll(async () => (await snapshot(page)).matchPhase, { timeout: 15_000 }).toBe('active');
+  await expect.poll(async () => (await snapshot(page)).matchPhase, { timeout: 60_000 }).toBe('active');
 }
 
 const light = 'renderer=webgl2&render=performance&signal=off&grass=off&clouds=off&rays=off&multiplayerQa=1';

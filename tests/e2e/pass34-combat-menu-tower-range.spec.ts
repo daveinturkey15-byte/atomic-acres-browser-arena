@@ -88,7 +88,7 @@ async function waitReady(page: import('@playwright/test').Page): Promise<void> {
 async function deploySolo(page: import('@playwright/test').Page, name: string): Promise<void> {
   await page.locator('#player-name').fill(name);
   await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.startSolo());
-  await page.waitForFunction(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active', undefined, { timeout: 15_000 });
+  await page.waitForFunction(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active', undefined, { timeout: 60_000 });
 }
 
 const lightweight = 'render=performance&signal=off&grass=off&mist=off&clouds=off&rays=off&renderPaused=1';

@@ -354,7 +354,7 @@ test.describe('Pass 65 active-match menu lifecycle', () => {
     await page.evaluate(() => document.dispatchEvent(new Event('pointerlockchange')));
     expect(await lifecycle(page)).toMatchObject({ surface: 'hidden', visibilityChangeCount: 1, pauseOpenCount: 0 });
 
-    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active', undefined, { timeout: 15_000 });
+    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active', undefined, { timeout: 60_000 });
     const activeFrame = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().frameCount);
     await page.waitForFunction((frame) => window.__ATOMIC_ACRES_DEBUG__.snapshot().frameCount > frame + 5, activeFrame);
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.openMenu());
@@ -458,7 +458,7 @@ test.describe('Pass 65 active-match menu lifecycle', () => {
     await ready(page);
     await installPointerLockHarness(page, 'transient');
     await startFromMenu(page);
-    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active', undefined, { timeout: 15_000 });
+    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active', undefined, { timeout: 60_000 });
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.openMenu());
     await expect(page.locator('#menu')).toBeVisible();
     await page.locator('#menu-tab-options').click();

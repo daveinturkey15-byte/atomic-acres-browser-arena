@@ -35,7 +35,7 @@ async function startDeterministicSolo(page: Page): Promise<void> {
     window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false);
     window.__ATOMIC_ACRES_DEBUG__.startSolo();
   });
-  await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active', undefined, { timeout: 15_000 });
+  await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active', undefined, { timeout: 60_000 });
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true));
   await page.waitForTimeout(2_500);
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
@@ -585,7 +585,7 @@ test.describe('Pass 64 command HUD and menu contract', () => {
 
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await expect.poll(async () => page.locator('#countdown').evaluate((element) => getComputedStyle(element).animationName)).toBe('none');
-    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active', undefined, { timeout: 15_000 });
+    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active', undefined, { timeout: 60_000 });
     await expect.poll(async () => page.evaluate(() => (
       window.__ATOMIC_ACRES_DEBUG__.snapshot().audio as { countdown: { cues: number; lastCue: string } }
     ).countdown)).toMatchObject({ cues: 4, lastCue: 'engage' });

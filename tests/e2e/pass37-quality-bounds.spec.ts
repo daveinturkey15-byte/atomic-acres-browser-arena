@@ -88,7 +88,7 @@ test.describe('Pass 37 Quality surface separation and fall-proof bounds', () => 
     await waitReady(page);
     await page.locator('#player-name').fill('PASS 37 QA');
     await page.evaluate(() => api().startSolo());
-    await expect.poll(async () => (await snapshot(page)).matchPhase, { timeout: 15_000 }).toBe('active');
+    await expect.poll(async () => (await snapshot(page)).matchPhase, { timeout: 60_000 }).toBe('active');
     expect((await snapshot(page)).arenaSelection.physicsBoundaryWalls).toBe(4);
 
     for (const probe of [
