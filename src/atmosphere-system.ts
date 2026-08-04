@@ -110,6 +110,9 @@ export function atmosphereFogRange(profile: RenderProfile, arenaId: ArenaId): Re
   if (arenaId === 'atomic-acres') return profile === 'blender' ? { near: 52, far: 142 } : { near: 56, far: 148 };
   if (arenaId === 'rustworks-1v1') return profile === 'blender' ? { near: 26, far: 90 } : { near: 30, far: 94 };
   if (arenaId === 'skyline-terminal') return profile === 'blender' ? { near: 40, far: 122 } : { near: 44, far: 130 };
+  // f4rcry515: dense tropical haze keeps engagement short-range (COD feel) —
+  // you can hear the jungle but only see the next clearing.
+  if (arenaId === 'farcrysis') return profile === 'blender' ? { near: 14, far: 46 } : { near: 18, far: 52 };
   return profile === 'blender' ? { near: 38, far: 96 } : { near: 42, far: 105 };
 }
 

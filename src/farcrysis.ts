@@ -258,6 +258,32 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   cover(builder, 'farcrysis-crate-sw', [-10, 0.45, 8], [1.7, 0.9, 1.7], crateMat);
   cover(builder, 'farcrysis-crate-se', [10, 0.45, 8], [1.7, 0.9, 1.7], crateMat);
 
+  // Mid-field canopy columns — collision-backed old-growth trees that break the
+  // long diagonal sightlines (spawn-to-spawn) so the map reads short-range COD,
+  // not a cross-map sniper lane. Placed OFF the patrol/rotation lanes.
+  const canopyPositions: ReadonlyArray<readonly [number, number]> = [
+    [-15, -15], [15, 15], [-15, 15], [15, -15],
+    [-4, -24], [4, 24], [-24, 4], [24, -4],
+    [-20, -12], [20, 12], [-12, 20], [12, -20],
+  ];
+  for (const [x, z] of canopyPositions) {
+    cover(builder, `farcrysis-canopy-trunk-${x}-${z}`, [x, 1.3, z], [1.5, 2.6, 1.5], palmTrunkMat);
+    const crown = new THREE.Mesh(new THREE.BoxGeometry(4.6, 1.6, 4.6), jungleLeafMat);
+    crown.name = `farcrysis-canopy-crown-${x}-${z}`;
+    crown.position.set(x, 3.1, z);
+    crown.rotation.y = (x * 0.7 + z * 0.13) % Math.PI;
+    crown.castShadow = true;
+    root.add(crown);
+  }
+  // Low ferns beneath the canopy columns: dense but non-colliding dressing.
+  for (const [x, z] of canopyPositions) {
+    const bush = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.0, 2.2), jungleLeafMat);
+    bush.name = `farcrysis-canopy-undergrowth-${x}-${z}`;
+    bush.position.set(x, 0.5, z);
+    bush.castShadow = true;
+    root.add(bush);
+  }
+
   // ---- Inner research-station core: two entrances, interior catwalk, raised desk
   const coreMat = stationMetalMat;
   // Core walls (structural, not cover-list — the station is a structure)
