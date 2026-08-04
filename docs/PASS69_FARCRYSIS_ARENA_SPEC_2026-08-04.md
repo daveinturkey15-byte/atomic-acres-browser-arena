@@ -1,10 +1,24 @@
-# Pass 69 — Farcrysis Arena Spec (HITL-testing lane)
+# Pass 69 — f4rcry515 Arena Spec (HITL-testing lane)
 
 Status: implementation spec — Pass 69  \
 Author of record: Jigglyclaw (Nous Portal `deepseek-v4-flash-0731`, max reasoning)  \
 Collaborator: Desky (same route)  \
 Baseline: pass 68 (`contrib/dave-gaming-pc/hermes/v68-bugfixes`); pass 68 stays untouched  \
-Purpose: new-map lane for human-in-the-loop (HITL) testing while pass 68 is refined/published.
+Purpose: new-map lane for human-in-the-loop (HITL) testing while pass 68 is refined/published.  \
+Codename: **f4rcry515** (Dave's original brief spelling) — displayed as **FARCrySIS**.
+
+## 0. Dave's original brief (2026-08-03, authoritative)
+
+> "A new map for pass 69. It should be called **f4rcry515** and inspired by the beach and
+> jungle areas of **both Far Cry and Crysis** games. It should have a **bot mode** and be
+> available for normal and multiplayer. … It should have similar physics and gameplay to
+> the games I mentioned but feel like **COD multiplayer**. It's more about the map and
+> subtle details and throwbacks. And graphics and physics and lighting. It should be so
+> **delightful**. This should all be done with Nous Portal DeepSeek Flash V4 ultra and
+> sub-agents using the same model. Use the new Three.js skills — especially the jungle one."
+
+That brief is the source of truth for the art/feel lane; the mechanical integration contract
+in this document (sections 1–6) translates it into the Atomic Acres engine.
 
 ## 1. Overview
 
@@ -114,6 +128,32 @@ Expose a dev-only `farcrysisHITL` overlay toggled by a URL flag (e.g. `?hitl=1`)
 - Static geometry eligible for the existing presentation batching (like
   `rustworks-presentation-batch-*`).
 
+### R9 — Art/feel lane (Dave's brief: Far Cry + Crysis beach/jungle, COD-feel, delightful)
+- **Throwbacks (subtle, original, non-copying):** recognizable-but-original nods to the
+  Far Cry/Crysis beach+jungle canon — a crashed seaplane half-buried in sand, a
+  derelict research tower with an antenna mast, a flooded cave entrance, warning
+  barrels, tiki-style markers, signal-fire beacon on the beach, overgrown military
+  crates stamped with the f4rcry515 wordmark (original text, not game logos).
+- **Jungle techniques from the `StarKnightt/jungle-trail` skill (MIT, Three.js r170
+  case study, pinned `073e6eb8`):** dense layered foliage via **instancing** (many
+  palms/ferns/bushes sharing one draw call), **generated procedural plants**
+  (branch/palm geometry with slight per-instance variation), effect-specific visual
+  probes, and deterministic capture controls for QA screenshots. Adopt concepts;
+  re-verify every example import against the project's installed Three.js revision
+  and never copy unlicensed code (see `browser-multiplayer-game-development`
+  reference `threejs-web3d-source-verification.md` for the four-source licence gate).
+- **Physics/gameplay feel (COD-multiplayer, not sim):** keep the engine's existing
+  fast arcade controller (sprint/jump/crouch/prone/ADS, hitscan feel) — no
+  simulation-weight or stamina mechanics. The COD feel comes from **map rhythm**:
+  short sightlines, frequent cover, predictable flank routes, no long open fields.
+- **Graphics/lighting delight:** golden-hour beach lighting on the outer ring
+  (warm tint, long shadows), dappled jungle canopy light mid-ring (darker, cooler
+  green shadow), warm interior work-lights in the research core. One tone-map at the
+  output boundary; no stacked post-processing without a measured reason. Palm
+  shadows, water sparkle on the lagoon, and subtle ambient dust motes in the jungle.
+- **Bot mode:** 2 solo bots (spec R1) with the existing bot-AI; bots navigate the
+  three loops without getting stuck (patrol points on all three lanes).
+
 ## 4. Mechanical acceptance checks
 
 - **C1:** `ArenaId` union, `ARENA_SELECTIONS`, map builder, and minimap registry all
@@ -139,6 +179,10 @@ Expose a dev-only `farcrysisHITL` overlay toggled by a URL flag (e.g. `?hitl=1`)
   pass-69 branch), push, and serve the exact verified bytes for Dave's HITL review.
 - **C10:** Pass 68 untouched — no changes to pass-68 branches or production files
   other than additive arena registration.
+- **C11 (art/feel):** at least 3 throwback props (seaplane, tower, beacon, cave, etc.)
+  exist with original names; ≥3 instanced foliage types (palms/ferns/bushes) share
+  draw calls; beach/jungle/core lighting tints differ measurably; `?hitl=1` visual
+  QA captures include the golden-hour beach, dappled jungle, and research core.
 
 ## 5. HITL test script (Dave / harness)
 
