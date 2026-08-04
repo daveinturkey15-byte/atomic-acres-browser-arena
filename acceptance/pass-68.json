@@ -5,15 +5,15 @@
   "status": "accepted",
   "preview": {
     "kind": "github-actions-artifact",
-    "ref": "pr-preview-6963ef953bbc6bd19da4c6e420c461f25493d33a",
-    "sourceSha": "6963ef953bbc6bd19da4c6e420c461f25493d33a",
-    "createdAt": "2026-08-04T07:30:00Z"
+    "ref": "pr-preview-39-1d2565be8d95f27326b30a0f58a783ec8f948402",
+    "sourceSha": "1d2565be8d95f27326b30a0f58a783ec8f948402",
+    "createdAt": "2026-08-04T07:35:00Z"
   },
   "humanAcceptance": {
     "state": "approved",
     "approvedBy": "Dave",
-    "approvedAt": "2026-08-04T06:51:23Z",
-    "evidence": "Dave instructed: 'Atomic acres pass and publish' on 2026-08-04, standing up PASS 68 as the HITL-tested build while PASS 69 (Farcrysis map) is prepared as the next lane. Original PASS 68 request received 2026-08-03 with the full fix list below."
+    "approvedAt": "2026-08-04T07:36:00Z",
+    "evidence": "Dave instructed: 'Atomic acres pass and publish' on 2026-08-04 (06:51Z), standing up PASS 68 as the HITL-tested build while PASS 69 (Farcrysis map) is prepared as the next lane. Approval recorded against the immutable PR #39 preview (source 1d2565be) per repo contract; original PASS 68 request received 2026-08-03 with the full fix list below."
   },
   "requirements": [
     {
