@@ -39,6 +39,10 @@ const DEFINITIONS = Object.freeze({
     frame: 'cat', label: 'CAT-CAM // GUN RANGE', centre: [0, 1.35, -25] as const,
     radius: [0.34, 0.42] as const, altitude: 1.22, phase: 0, durationMs: 7_000, fov: 72,
   }),
+  'farcrysis': Object.freeze({
+    frame: 'helicopter', label: 'HELO FLYOVER // FARCrySIS', centre: [0, 2.2, 0] as const,
+    radius: [36, 34] as const, altitude: 19, phase: 2.1, durationMs: 22_000, fov: 58,
+  }),
 } satisfies Record<ArenaId, OrbitDefinition>);
 
 export function menuPreviewDefinition(arenaId: ArenaId): OrbitDefinition {

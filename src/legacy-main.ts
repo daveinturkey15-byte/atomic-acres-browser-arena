@@ -15,6 +15,7 @@ import { WaterSystem } from './water-system';
 import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon, waitForPendingArtTextures } from './art-kit';
 import { applyBotEmissiveBrightness } from './operator-model';
 import { GUN_RANGE_FIRING_LINE_Z, applyAdditionalMapPresentationProfile, applyRustworksPresentationProfile, buildGunRange, buildRustworks1v1, buildSkylineTerminal, updateGunRangePresentation } from './additional-maps';
+import { buildFarcrysis } from './farcrysis';
 import {
   BOT_REACTION_DELAY,
   BOT_GRENADE_COOLDOWN_MS,
@@ -923,6 +924,7 @@ const arenaFactories: Readonly<Record<ArenaId, (target: THREE.Scene) => ArenaMap
   'rustworks-1v1': buildRustworks1v1,
   'gun-range': buildGunRange,
   'skyline-terminal': buildSkylineTerminal,
+  'farcrysis': buildFarcrysis,
 });
 const arenaCache = new Map<ArenaId, ArenaMap>();
 const arenaConstructionHistory: ArenaId[] = [];
@@ -943,6 +945,8 @@ function prepareArenaPresentation(candidate: ArenaMap): void {
     createRustworksQualityLights(candidate.root, renderProfile);
     if (renderProfile === 'blender') enhanceRustworksQualityMaterials(candidate.root, renderProfile);
   } else if (candidate.id === 'skyline-terminal') {
+    applyAdditionalMapPresentationProfile(candidate.root, renderProfile);
+  } else if (candidate.id === 'farcrysis') {
     applyAdditionalMapPresentationProfile(candidate.root, renderProfile);
   }
 }
