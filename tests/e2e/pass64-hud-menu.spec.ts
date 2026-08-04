@@ -289,11 +289,26 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     await expect(page.locator('#sensitivity')).toHaveValue('1.45');
     await expect(page.locator('#field-of-view')).toHaveValue('97');
     expect(await page.evaluate((key) => localStorage.getItem(key), PLAYER_PROFILE_STORAGE_KEY)).toBe(latestProfile);
-    expect(await page.evaluate(() => ({
-      mouse: localStorage.getItem('atomic-acres-sensitivity'),
-      controller: localStorage.getItem('atomic-acres-controller-sensitivity'),
-      fov: localStorage.getItem('atomic-acres-fov'),
-    }))).toEqual({ mouse: '1.45', controller: '1', fov: '97' });
+    const canonicalControls = await page.evaluate((key) => {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      try {
+        const parsed = JSON.parse(raw) as { controls?: { mouseSensitivity?: number; controllerSensitivity?: number; fieldOfView?: number } };
+        return {
+          mouseSensitivity: parsed.controls?.mouseSensitivity ?? null,
+          controllerSensitivity: parsed.controls?.controllerSensitivity ?? null,
+          fieldOfView: parsed.controls?.fieldOfView ?? null,
+        };
+      } catch {
+        return null;
+      }
+    }, PLAYER_PROFILE_STORAGE_KEY);
+    expect(canonicalControls).toEqual({ mouseSensitivity: 1.45, controllerSensitivity: 1, fieldOfView: 97 });
+    expect(await page.evaluate(() => Object.keys(localStorage).filter((key) => [
+      'atomic-acres-sensitivity',
+      'atomic-acres-controller-sensitivity',
+      'atomic-acres-fov',
+    ].includes(key)))).toEqual([]);
 
     await page.goto('/?release=latest&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&seed=pass65-profile-return&previewTime=0');
     await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 30_000 });
