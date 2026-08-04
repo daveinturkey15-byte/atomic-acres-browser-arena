@@ -25584,9 +25584,6 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     // endurance does not benchmark synthetic snapshot/HUD churn.
     refreshLocalKillstreakSnapshot();
     bestStreakThisMatch = Math.max(bestStreakThisMatch, localFieldSupportProjection().streak);
-    // Persist the immediate streak exactly like a real eligible elimination so
-    // the QA hook exercises the same durable high-score lane as gameplay.
-    recordImmediateStreak();
     broadcastKillstreakState();
     updateFieldSupportHud();
   },
