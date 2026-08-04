@@ -4,6 +4,7 @@ import { classifyImpactSurface } from './combat-feedback';
 import type { Box2 } from './collision';
 import type { ArenaMap, PracticeTarget } from './map';
 import type { Team } from './protocol';
+import { applyFarcrysisArtwork } from './farcrysis-art';
 
 /**
  * Pass 69 — f4rcry515 arena (HITL-testing lane).
@@ -404,6 +405,9 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
     [-26, -26], [-18, -20], [-12, -16], [-4, -12], [0, 0], [12, 16], [18, 20], [26, 26],
     [-20, 18], [20, -18], [-8, -24], [8, 24],
   ].map(([x, z]) => new THREE.Vector3(x, 0, z));
+
+  // --- Pass 69 art/feel lane (presentation only — no colliders, spawns, or gameplay authority) ---
+  applyFarcrysisArtwork(root);
 
   return {
     id: 'farcrysis',
