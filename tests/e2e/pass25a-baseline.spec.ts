@@ -230,7 +230,7 @@ test.describe('Pass 25A baseline and lifecycle', () => {
       await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { endMatch: () => void } }).__ATOMIC_ACRES_DEBUG__.endMatch());
       await expect.poll(async () => (await snapshot(page)).matchPhase).toBe('ended');
       await page.locator('#rematch').click();
-      await expect.poll(async () => (await snapshot(page)).matchPhase, { timeout: 6_000 }).toBe('active');
+      await expect.poll(async () => (await snapshot(page)).matchPhase, { timeout: 60_000 }).toBe('active');
       const reset = await snapshot(page);
       expect(reset.scores, `cycle ${cycle + 1}`).toEqual([0, 0]);
       expect(reset.deathDrops, `cycle ${cycle + 1}`).toHaveLength(0);
@@ -252,13 +252,19 @@ test.describe('Pass 25A baseline and lifecycle', () => {
     }));
     expect(before.state.render.shadowMode).toBe('static');
     expect(before.state.render.shadowAutoUpdate).toBe(false);
-    await page.waitForTimeout(750);
-    const after = await page.evaluate(() => ({
-      now: performance.now(),
-      state: (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => Pass25State } }).__ATOMIC_ACRES_DEBUG__.snapshot(),
-    }));
+    // Pass 68 streams the Blender GLB during deployment admission; the first
+    // static-shadow refresh may arrive well after the fixed 750 ms budget in
+    // the old contract, especially on hosted SwiftShader.  Poll with the
+    // adopted deferred-admission allowance and keep the rate assertion.
+    let after!: { now: number; state: Pass25State };
+    await expect.poll(async () => {
+      after = await page.evaluate(() => ({
+        now: performance.now(),
+        state: (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => Pass25State } }).__ATOMIC_ACRES_DEBUG__.snapshot(),
+      }));
+      return after.state.render.staticShadowDynamicRefreshes - before.state.render.staticShadowDynamicRefreshes;
+    }, { timeout: 60_000 }).toBeGreaterThanOrEqual(1);
     const refreshes = after.state.render.staticShadowDynamicRefreshes - before.state.render.staticShadowDynamicRefreshes;
-    expect(refreshes).toBeGreaterThanOrEqual(1);
     // Keep this a rate assertion rather than assuming waitForTimeout advances the
     // busy Windows renderer by exactly 750 ms. The production gate is 100 ms.
     const elapsedMs = after.now - before.now;
