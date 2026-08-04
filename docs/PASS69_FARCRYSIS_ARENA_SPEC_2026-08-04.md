@@ -21,7 +21,9 @@ without affecting pass 68 production.
 ## 2. Design intent / observed context
 
 - Current arenas: `atomic-acres` (neighbourhood team arena, 68×86), `rustworks-1v1`
-  (industrial tower, 54×58, private lobbies up to 6), `gun-range` (timed solo lane).
+  (industrial tower, 54×58, private lobbies up to 6), `gun-range` (timed solo lane),
+  plus `skyline-terminal` on newer `origin/main` (arena registry grew after the local
+  Pass-51 checkout; Farcrysis integrates additively against the latest upstream registry).
 - Research basis (FPS level-design literature — Hullett & Whitehead 2010; CritPoints
   "Good FPS Map Design"; MAP-Elites FPS-map studies): good arenas overlay **~3 loops**,
   avoid **absolute chokepoints**, control **line of sight** with cover, keep **spawn
