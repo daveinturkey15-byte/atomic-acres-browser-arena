@@ -137,6 +137,7 @@ jobs:
         if: needs.classify-change.outputs.mode != 'none'
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         if: needs.classify-change.outputs.mode != 'none'
         with:
@@ -167,6 +168,7 @@ jobs:
         if: needs.classify-change.outputs.mode != 'none'
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         if: needs.classify-change.outputs.mode != 'none'
         with:
