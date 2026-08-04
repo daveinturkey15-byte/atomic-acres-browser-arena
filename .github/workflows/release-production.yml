@@ -62,6 +62,7 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Stage live Pass 64 and byte-exact stable Pass 63
         run: |
+          test -n "${RELEASE_BUILT_AT:-}"
           git fetch --no-tags origin gh-pages:refs/remotes/origin/gh-pages
           npm run verify:benchmark -- --verify-git
           npm run stage:release-topology
@@ -118,7 +119,9 @@ jobs:
           QA_SCREENSHOT_DIR: artifacts/pipeline/live-smoke
           SOURCE_SHA: ${{ inputs.source_sha }}
           RELEASE_PASS: ${{ inputs.release_pass }}
-        run: node scripts/qa/verify-release-topology-browser.mjs
+        run: |
+          test -n "${RELEASE_BUILT_AT:-}"
+          node scripts/qa/verify-release-topology-browser.mjs
       - name: Write acceptance-bound production receipt and timings
         env:
           SOURCE_SHA: ${{ inputs.source_sha }}
