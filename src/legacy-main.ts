@@ -22,6 +22,7 @@ import { PASS66_RELEASE_IDENTITY } from './release-identity';
 import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon, waitForPendingArtTextures } from './art-kit';
 import { BotWeaponGpuVocabulary } from './bot-weapon-gpu-vocabulary';
 import { buildFarcrysis } from './farcrysis';
+import { mountFarcrysisHitlOverlay } from './farcrysis-hitl';
 import {
   invalidatePass65PresentationTree,
   pass65WeaponCacheTelemetry,
@@ -2972,6 +2973,14 @@ function stepInteractiveWorldAuthority(): void {
 
 let worldIdentityPresentation: WorldIdentityPresentation | null = null;
 let neighbourhoodLifeRoot: THREE.Group | null = null;
+
+// Pass 69 HITL dev overlay — no-op unless ?hitl=1 (see src/farcrysis-hitl.ts).
+// The overlay controller lives for the session; disposal is not required on the
+// dev-only path, so the binding is intentionally retained.
+const farcrysisHitlOverlay = new URLSearchParams(window.location.search).get('hitl') === '1'
+  ? mountFarcrysisHitlOverlay(arena)
+  : null;
+void farcrysisHitlOverlay;
 
 function ensureAtomicWorldPresentation(): void {
   if (!worldIdentityPresentation) {
