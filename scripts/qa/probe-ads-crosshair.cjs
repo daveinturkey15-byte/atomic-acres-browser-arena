@@ -118,6 +118,52 @@ const { execSync } = require('child_process');
     await page.waitForTimeout(500);
     const isolated = await page.screenshot({ path: '/tmp/ads-isolated.png', clip: { x: 640 - 160, y: 360 - 160, width: 320, height: 320 } });
     console.log('isolated screenshot bytes:', isolated.length);
+    const postInjection = await page.evaluate(() => {
+      const el = document.querySelector('#crosshair');
+      if (!el) return { found: false };
+      const cs = getComputedStyle(el);
+      const before = getComputedStyle(el, '::before');
+      const after = getComputedStyle(el, '::after');
+      const rect = el.getBoundingClientRect();
+      return {
+        found: true,
+        hidden: el.hidden,
+        hasHiddenAttr: el.hasAttribute('hidden'),
+        display: cs.display,
+        visibility: cs.visibility,
+        opacity: cs.opacity,
+        position: cs.position,
+        left: cs.left,
+        top: cs.top,
+        zIndex: cs.zIndex,
+        rect: { x: Math.round(rect.x), y: Math.round(rect.y), w: Math.round(rect.width), h: Math.round(rect.height) },
+        before: { content: before.content, display: before.display, visibility: before.visibility, opacity: before.opacity },
+        after: { content: after.content, display: after.display, visibility: after.visibility, opacity: after.opacity },
+      };
+    });
+    console.log('post-injection:', JSON.stringify(postInjection, null, 1));
+    // Try forcing hidden=false to prove the marker itself renders.
+    const forced = await page.evaluate(() => {
+      const el = document.querySelector('#crosshair');
+      el.hidden = false;
+      const rect = el.getBoundingClientRect();
+      const before = getComputedStyle(el, '::before');
+      const after = getComputedStyle(el, '::after');
+      const bRect = before.getBoundingClientRect?.();
+      return {
+        hidden: el.hidden,
+        display: getComputedStyle(el).display,
+        rect: { x: Math.round(rect.x), y: Math.round(rect.y), w: Math.round(rect.width), h: Math.round(rect.height) },
+        beforePos: before.position,
+        beforeLeft: before.left,
+        beforeTop: before.top,
+        beforeSize: before.width + 'x' + before.height,
+      };
+    });
+    console.log('forced hidden=false:', JSON.stringify(forced));
+    await page.waitForTimeout(300);
+    const forcedShot = await page.screenshot({ path: '/tmp/ads-forced.png', clip: { x: 640 - 160, y: 360 - 160, width: 320, height: 320 } });
+    console.log('forced screenshot bytes:', forcedShot.length);
     const img = await page.screenshot({ path: '/tmp/ads-probe.png', clip: { x: 640 - 160, y: 360 - 160, width: 320, height: 320 } });
     console.log('screenshot bytes:', img.length);
     const full = await page.screenshot({ path: '/tmp/ads-probe-full.png' });

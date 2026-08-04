@@ -76,6 +76,7 @@ jobs:
           echo "RELEASE_ROLLBACK_DIST=$(pwd)/artifacts/pass63-rollback-src/dist" >> "$GITHUB_ENV"
       - name: Stage live Pass 68 The Big One, byte-exact stable Pass 67.1 and rebuilt Pass 63 rollback
         run: |
+          test -n "${RELEASE_BUILT_AT:-}"
           git fetch --no-tags origin gh-pages:refs/remotes/origin/gh-pages
           npm run verify:benchmark -- --verify-git
           npm run stage:release-topology
@@ -133,7 +134,9 @@ jobs:
           QA_SCREENSHOT_DIR: artifacts/pipeline/live-smoke
           SOURCE_SHA: ${{ inputs.source_sha }}
           RELEASE_PASS: ${{ inputs.release_pass }}
-        run: node scripts/qa/verify-release-topology-browser.mjs
+        run: |
+          test -n "${RELEASE_BUILT_AT:-}"
+          node scripts/qa/verify-release-topology-browser.mjs
       - name: Write acceptance-bound production receipt and timings
         env:
           SOURCE_SHA: ${{ inputs.source_sha }}

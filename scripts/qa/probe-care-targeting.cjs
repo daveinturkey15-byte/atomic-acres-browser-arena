@@ -81,7 +81,24 @@ async function main() {
     await page.waitForTimeout(300);
     const commit = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().fieldSupport.fInteraction.lastCommit?.candidate?.targetId ?? null);
     console.log('lastCommit:', commit);
-    for (let i = 0; i < 16; i++) {
+    // Screenshot the canvas at ~500ms, ~900ms, ~1400ms after F tap to see
+    // whether the orbit view is what actually renders (vs player view).
+    const shot = async (label, ms) => {
+      await page.waitForTimeout(ms);
+      const p = `C:/Users/david/AppData/Local/Temp/probe-shot-${label}.png`;
+      await page.screenshot({ path: p });
+      const s = await page.evaluate(() => {
+        const d = window.__ATOMIC_ACRES_DEBUG__;
+        const snap = d.snapshot();
+        const r = snap.deterministicReview;
+        return { cam: r.captureCameraActive, orbit: r.captureCameraOrbit, pos: [r.captureCameraX, r.captureCameraY, r.captureCameraZ].map((v) => Number(v).toFixed(1)), yaw: Number(r.captureCameraYaw).toFixed(2), presented: d.admissionState().presentedGameplayFrame };
+      });
+      console.log(label, ms, 'shot:', p, JSON.stringify(s));
+    };
+    await shot('a500', 500);
+    await shot('b900', 400);
+    await shot('c1400', 500);
+    for (let i = 0; i < 8; i++) {
       await page.waitForTimeout(250);
       const s = await page.evaluate(() => {
         const d = window.__ATOMIC_ACRES_DEBUG__;
@@ -94,7 +111,6 @@ async function main() {
           orbit: r.captureCameraOrbit,
           pos: [r.captureCameraX, r.captureCameraY, r.captureCameraZ].map((v) => Number(v).toFixed(1)),
           yaw: Number(r.captureCameraYaw).toFixed(2),
-          pitch: Number(r.captureCameraPitch ?? r.captureCameraYaw).toFixed(2),
           targeting: fs.targetingMode,
           crosshair: fs.crosshairTarget ? fs.crosshairTarget.map((v) => Number(v).toFixed(2)) : null,
         };

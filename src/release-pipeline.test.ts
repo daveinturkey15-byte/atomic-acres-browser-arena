@@ -1,5 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import {
+  expectedLastReleaseLabel,
+  verifyProductionReleaseTimestamp,
+} from '../scripts/release/release-timestamp-contract.mjs';
 
 const workflow = readFileSync('.github/workflows/release-production.yml', 'utf8');
 const verifyWorkflow = readFileSync('.github/workflows/verify.yml', 'utf8');
@@ -17,6 +21,7 @@ const nightlyPropertyRunner = readFileSync('scripts/qa/run-pass25a-nightly-prope
 const mutationRunner = readFileSync('scripts/qa/run-pass25a-mutation.mjs', 'utf8');
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
 const ownerFeedbackGraph = JSON.parse(readFileSync('docs/PASS65_OWNER_FEEDBACK_COMPLETENESS_GRAPH.json', 'utf8'));
+const topologyBrowserVerifier = readFileSync('scripts/qa/verify-release-topology-browser.mjs', 'utf8');
 
 describe('production release workflow', () => {
   it('configures a repository-local bot identity before publishing gh-pages', () => {
@@ -58,8 +63,35 @@ describe('production release workflow', () => {
     expect(buildStep).toBeGreaterThan(timestampStep);
     expect(verifyStep).toBeGreaterThan(buildStep);
     expect(workflow).toContain('VITE_RELEASED_AT=$released_at');
+    expect(workflow.match(/test -n "\$\{RELEASE_BUILT_AT:-\}"/g)).toHaveLength(2);
+    expect(topologyBrowserVerifier).toContain('process.env.RELEASE_BUILT_AT?.trim()');
+    expect(topologyBrowserVerifier).toContain('verifyProductionReleaseTimestamp');
     expect(workflow).toContain('node scripts/release/write-production-receipt.mjs');
     expect(receiptWriter).toContain('releaseBuiltAt: process.env.RELEASE_BUILT_AT');
+  });
+
+  it('requires the published build to expose its exact UK-local day, date, and time instead of the pending sentinel', () => {
+    const releasedAt = '2026-08-03T16:52:00Z';
+    const label = 'LAST RELEASE · 3 AUG 2026 · 17:52 BST';
+    expect(expectedLastReleaseLabel(releasedAt)).toBe(label);
+    expect(verifyProductionReleaseTimestamp({
+      expectedReleasedAt: releasedAt,
+      observedReleasedAt: releasedAt,
+      observedLabel: label,
+      observedState: 'CURRENT LIVE',
+    })).toEqual({ releasedAt, label, state: 'CURRENT LIVE' });
+    expect(() => verifyProductionReleaseTimestamp({
+      expectedReleasedAt: releasedAt,
+      observedReleasedAt: 'PENDING_PRODUCTION',
+      observedLabel: 'LAST RELEASE · PENDING_PRODUCTION',
+      observedState: 'CURRENT BUILD',
+    })).toThrow('Production candidate still exposes PENDING_PRODUCTION');
+    expect(() => verifyProductionReleaseTimestamp({
+      expectedReleasedAt: releasedAt,
+      observedReleasedAt: '2026-08-03T16:53:00Z',
+      observedLabel: label,
+      observedState: 'CURRENT LIVE',
+    })).toThrow('Production release timestamp mismatch');
   });
 
   it('binds production and immutable preview diagnostics to the exact source SHA', () => {

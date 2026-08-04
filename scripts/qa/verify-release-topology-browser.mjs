@@ -3,6 +3,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { chromium } from '@playwright/test';
+import { verifyProductionReleaseTimestamp } from '../release/release-timestamp-contract.mjs';
 
 const channelConfig = JSON.parse(readFileSync(new URL('../../release-channels.json', import.meta.url), 'utf8'));
 const baseUrl = process.env.QA_BASE_URL ?? 'http://127.0.0.1:4180/';
@@ -10,6 +11,8 @@ const releasePass = process.env.RELEASE_PASS ?? null;
 const sourceSha = process.env.SOURCE_SHA ?? null;
 const outputPath = process.env.QA_OUTPUT ?? null;
 const screenshotDirectory = process.env.QA_SCREENSHOT_DIR ?? null;
+const expectedReleasedAt = process.env.RELEASE_BUILT_AT?.trim() || null;
+if (expectedReleasedAt && !releasePass) throw new Error('RELEASE_PASS is required with RELEASE_BUILT_AT');
 const rootUrl = new URL(baseUrl);
 if (sourceSha) rootUrl.searchParams.set('qa', sourceSha);
 // The production runner is intentionally GPU-less. Route/chooser validation
@@ -183,6 +186,15 @@ async function verifyRuntime(page, expectedPath, expectedPass, expectedChangelog
     const releasedAt = await currentRelease.locator('time').getAttribute('datetime');
     if (!releasedAt || releasedAt === 'PENDING_PRODUCTION' || Number.isNaN(Date.parse(releasedAt))) {
       throw new Error(`${expectedPass} Last Release timestamp is not a published instant: ${JSON.stringify(releasedAt)}`);
+    }
+    if (expectedReleasedAt && normalizedPass(expectedPass) === normalizedPass(releasePass)) {
+      const releaseState = (await currentRelease.locator('.changelog-entry-pass b').textContent())?.trim() ?? null;
+      verifyProductionReleaseTimestamp({
+        expectedReleasedAt,
+        observedReleasedAt: releasedAt,
+        observedLabel: lastReleaseLabel,
+        observedState: releaseState,
+      });
     }
     lastRelease = { lastReleaseLabel, changelogId: expectedChangelogId, releasedAt };
   }
