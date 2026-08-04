@@ -36,8 +36,11 @@ describe('allocation-light match admission observation contract', () => {
       '// Browser gameplay tests must never read from or write to the production',
     );
 
+    // Pass 68 defers arena construction to deployment admission. The bounded
+    // browser gate (hosted CI on SwiftShader) needs up to 60s to complete the
+    // deferred arena construction, route markers, and spawn safety commit.
     expect(startSolo).toContain('__ATOMIC_ACRES_DEBUG__.admissionState().matchPhase');
-    expect(startSolo).toContain('{ timeout: 15_000 }');
+    expect(startSolo).toContain('{ timeout: 60_000 }');
     expect(startSolo).not.toContain('.snapshot(');
     expect(startSolo).not.toContain('.render');
     expect(startSolo).not.toContain('telemetry');
