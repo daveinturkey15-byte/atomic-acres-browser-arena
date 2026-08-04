@@ -6,6 +6,10 @@ import type { ArenaMap, PracticeTarget } from './map';
 import type { Team } from './protocol';
 import { applyFarcrysisArtwork } from './farcrysis-art';
 import { addInteractables } from './farcrysis-physics';
+import { FARCRYSIS_BOUNDS, FARCRYSIS_COVER_MIN, FARCRYSIS_MAX_SIGHTLINE } from './farcrysis-constants';
+
+// Re-export for downstream consumers (tests, map registry)
+export { FARCRYSIS_BOUNDS, FARCRYSIS_COVER_MIN, FARCRYSIS_MAX_SIGHTLINE };
 
 /**
  * Pass 69 — f4rcry515 arena (HITL-testing lane).
@@ -20,16 +24,6 @@ import { addInteractables } from './farcrysis-physics';
  * Mechanical contract mirrors the other arenas (ArenaMap); the art/feel lane is
  * specced in docs/PASS69_FARCRYSIS_ARENA_SPEC_2026-08-04.md R9.
  */
-
-export const FARCRYSIS_BOUNDS: Readonly<Box2> = Object.freeze({
-  minX: -32,
-  maxX: 32,
-  minZ: -32,
-  maxZ: 32,
-});
-
-export const FARCRYSIS_MAX_SIGHTLINE = 22;
-export const FARCRYSIS_COVER_MIN = 14;
 
 export type FarcrysisHitlState = Readonly<{
   active: boolean;

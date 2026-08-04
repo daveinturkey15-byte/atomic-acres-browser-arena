@@ -27,7 +27,7 @@ export const WORLD_COLLISION_CONSUMERS = Object.freeze([
 ] as const);
 
 export type WorldCollisionConsumer = typeof WORLD_COLLISION_CONSUMERS[number];
-export type ShedArenaId = 'atomic-acres' | 'skyline-terminal' | 'rustworks-1v1' | 'gun-range';
+export type ShedArenaId = 'atomic-acres' | 'skyline-terminal' | 'rustworks-1v1' | 'gun-range' | 'farcrysis';
 export type DamageableSheetRole = 'wall' | 'roof' | 'door' | 'detached-chunk';
 export type ShedDoorBlockerKind = 'player' | 'major-debris' | 'bullet';
 
@@ -1271,7 +1271,7 @@ export function isShedState(value: unknown): value is ShedState {
   ])) return false;
   if (value.schemaVersion !== 1 || typeof value.shedId !== 'string' || !validId(value.shedId)
     || typeof value.placementId !== 'string' || !validId(value.placementId)
-    || !['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range'].includes(String(value.arenaId))
+    || !['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range', 'farcrysis'].includes(String(value.arenaId))
     || !finiteInteger(Number(value.matchEpoch), 1) || !finiteInteger(Number(value.revision))
     || !finiteInteger(Number(value.nextApertureId), 1) || !finiteInteger(Number(value.nextDentId), 1)
     || !Array.isArray(value.surfaces) || !Array.isArray(value.detachedChunkIds)

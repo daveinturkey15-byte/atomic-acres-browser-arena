@@ -11,8 +11,8 @@
  * the art layer.
  */
 import * as THREE from 'three';
-import { FARCRYSIS_BOUNDS } from './farcrysis';
-import { buildVegetation, FARCRYSIS_VEGE_STATS } from './farcrysis-vegetation';
+import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
+import { buildVegetation } from './farcrysis-vegetation';
 import { buildTerrain, buildLighting, buildWater } from './farcrysis-terrain';
 
 // ---------------------------------------------------------------------------
@@ -227,48 +227,6 @@ function addTikiMarkers(root: THREE.Group): void {
 // 4. Throwback / detail — crate wordmark stamp (original "f4rcry515")
 // ---------------------------------------------------------------------------
 
-// Minimal 5×7 pixel font for the characters used in the wordmark so the
-// stamp works without a DOM canvas (vitest / node env).
-type Glyph = readonly boolean[]; // 7 rows of 5 columns
-
-const GLYPHS: Readonly<Record<string, Glyph>> = Object.freeze({
-  'f': [true, true, true, true, true, true, true,
-        true, false, false, false, false, false, false,
-        true, true, true, true, false, false, false,
-        true, false, false, false, false, false, false,
-        true, false, false, false, false, false, false], // 5x7 bitmap
-  '4': [false, false, false, true, true, false, false,
-        false, false, true, true, true, false, false,
-        false, true, true, false, true, false, false,
-        true, true, true, true, true, true, true,
-        false, false, false, false, true, false, false],
-  'r': [false, false, false, false, false, false, false,
-        true, false, true, true, false, false, false,
-        true, true, false, true, false, false, false,
-        true, true, false, false, false, false, false,
-        true, false, false, false, false, false, false],
-  'c': [false, false, true, true, true, false, false,
-        true, true, false, false, true, false, false,
-        true, true, false, false, false, false, false,
-        true, true, false, false, true, false, false,
-        false, false, true, true, true, false, false],
-  'y': [false, false, false, false, false, false, false,
-        true, false, false, false, true, false, false,
-        false, true, false, true, false, false, false,
-        false, false, true, false, false, false, false,
-        true, true, false, false, false, false, false],
-  '5': [true, true, true, true, true, false, false,
-        true, false, false, false, false, false, false,
-        true, true, true, true, false, false, false,
-        false, false, false, true, true, false, false,
-        true, true, true, true, false, false, false],
-  '1': [false, false, true, true, false, false, false,
-        false, true, true, true, false, false, false,
-        false, false, true, true, false, false, false,
-        false, false, true, true, false, false, false,
-        true, true, true, true, true, true, false],
-});
-
 function createWordmarkTexture(): THREE.Texture | null {
   // Prefer canvas in browser; fall back to a plain emissive colour stamp
   // in test / headless environments.
@@ -356,7 +314,6 @@ function addInstancedPalms(root: THREE.Group): void {
     const cx = Math.max(minX + 1.5, Math.min(maxX - 1.5, px));
     const cz = Math.max(minZ + 1.5, Math.min(maxZ - 1.5, pz));
     const baseY = 0.95;
-    const lean = (i % 3 === 0 ? 0.06 : -0.05) * (Math.sin(angle) * 0.3);
     const frondY = baseY + 1.85;
 
     trunkMatrix.makeRotationY(angle + 0.3);

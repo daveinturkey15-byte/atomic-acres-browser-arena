@@ -254,6 +254,12 @@ export const ARENA_AUDIO_DEFINITIONS: Readonly<Record<ArenaId, ArenaAudioDefinit
     modulationHz: 0.095, modulationDepth: 0.1,
     bedPosition: Object.freeze({ x: -17, y: 5, z: -8 }), airPosition: Object.freeze({ x: 22, y: 4, z: 14 }),
   }),
+  'farcrysis': Object.freeze({
+    arenaId: 'farcrysis', identity: 'golden-hour-jungle-insect-and-breeze', source: 'repository-procedural-original',
+    continuousVoices: 2, bedFrequencyHz: 52, airFrequencyHz: 163, airLowpassHz: 600, airQ: 1.75, airGain: 0.007,
+    modulationHz: 0.11, modulationDepth: 0.08,
+    bedPosition: Object.freeze({ x: -15, y: 3, z: 10 }), airPosition: Object.freeze({ x: 18, y: 6, z: -14 }),
+  }),
 });
 
 export function validateArenaAudioDefinitions(): readonly string[] {

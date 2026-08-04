@@ -58,6 +58,10 @@ export const PASS65_FLIGHT_NAVIGATION: Readonly<Record<ArenaId, ArenaFlightNavig
     { id: 'boarding-portal', xQ: 0, zQ: 0.08, altitudeM: 4.2 },
     { id: 'terminal-overflight', xQ: 0, zQ: 0, altitudeM: 20 },
   ]),
+  'farcrysis': definition('farcrysis', 42, [
+    { id: 'beach-overflight', xQ: -0.7, zQ: 0.6, altitudeM: 15 },
+    { id: 'jungle-air-gap', xQ: 0, zQ: 0, altitudeM: 20 },
+  ]),
 });
 
 export type SupportFlightStepInput = Readonly<{

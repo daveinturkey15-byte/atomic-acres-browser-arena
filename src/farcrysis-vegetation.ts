@@ -14,7 +14,7 @@
  */
 import * as THREE from 'three';
 import { FARCRYSIS_ART_FEEL } from './farcrysis-art';
-import { FARCRYSIS_BOUNDS } from './farcrysis';
+import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
 
 // ---------------------------------------------------------------------------
 // Constants

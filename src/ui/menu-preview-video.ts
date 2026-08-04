@@ -79,6 +79,20 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     width: 2560,
     height: 1440,
   }),
+  'farcrysis': Object.freeze({
+    arenaId: 'farcrysis',
+    frame: 'helicopter',
+    label: 'PRERECORDED HELO // FARCRYSIS',
+    motionLabel: 'AUTHORED COCKPIT FLYOVER',
+    reducedMotionLabel: 'STABILIZED PREVIEW FRAME',
+    presentationId: 'menu-video-runtime-helo-farcrysis-v1',
+    webm: `${ROOT}/farcrysis.webm?v=${CACHE_KEY}`,
+    mp4: `${ROOT}/farcrysis.mp4?v=${CACHE_KEY}`,
+    poster: `${ROOT}/farcrysis.webp?v=${CACHE_KEY}`,
+    durationSeconds: 8,
+    width: 2560,
+    height: 1440,
+  }),
 } satisfies Record<ArenaId, MenuPreviewVideoDefinition>);
 
 export function menuPreviewVideoDefinition(arenaId: ArenaId): MenuPreviewVideoDefinition {

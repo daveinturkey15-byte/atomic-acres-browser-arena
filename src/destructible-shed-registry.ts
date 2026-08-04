@@ -7,6 +7,8 @@ export const PASS65_SHED_ELIGIBILITY = Object.freeze([
   Object.freeze({ arenaId: 'skyline-terminal' as const, zone: 'terminal-apron' as const, minimumSheds: 2 }),
   Object.freeze({ arenaId: 'rustworks-1v1' as const, zone: 'whole-arena' as const, minimumSheds: 2 }),
   Object.freeze({ arenaId: 'gun-range' as const, zone: null, minimumSheds: 0 }),
+  // Farcrysis is an outdoor jungle/beach arena with no destructible sheds.
+  Object.freeze({ arenaId: 'farcrysis' as const, zone: null, minimumSheds: 0 }),
 ]);
 
 /**
