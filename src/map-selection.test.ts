@@ -2,15 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { ARENA_SELECTIONS, activeSoloBotTarget, arenaSelection, decodeArenaId } from './map-selection';
 
 describe('opening arena selection', () => {
-  it('publishes four unique, fully described maps', () => {
-    expect(ARENA_SELECTIONS.map((entry) => entry.id)).toEqual([
+  it('publishes five unique, fully described maps', () => {
+    const ids = [
       'atomic-acres',
       'skyline-terminal',
       'rustworks-1v1',
       'gun-range',
-    ]);
-    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town', 'Terminal', 'RustRig', 'Gun Range']);
-    expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(4);
+      'farcrysis',
+    ];
+    expect(ARENA_SELECTIONS.map((entry) => entry.id)).toEqual(ids);
+    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis']);
+    expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(5);
     for (const entry of ARENA_SELECTIONS) {
       expect(entry.selectorLabel.length).toBeGreaterThan(3);
       expect(entry.summary.length).toBeGreaterThan(12);

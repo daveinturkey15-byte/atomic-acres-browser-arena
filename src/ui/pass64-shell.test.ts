@@ -25,6 +25,7 @@ describe('Pass 64 command shell', () => {
       'terminal',
       'rustrig',
       'gun-range',
+      'farcrysis',
     ]);
   });
 });

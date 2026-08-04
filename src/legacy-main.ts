@@ -16,6 +16,7 @@ import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOpe
 import { applyBotEmissiveBrightness } from './operator-model';
 import { GUN_RANGE_FIRING_LINE_Z, applyAdditionalMapPresentationProfile, applyRustworksPresentationProfile, buildGunRange, buildRustworks1v1, buildSkylineTerminal, updateGunRangePresentation } from './additional-maps';
 import { buildFarcrysis } from './farcrysis';
+import { mountFarcrysisHitlOverlay } from './farcrysis-hitl';
 import {
   BOT_REACTION_DELAY,
   BOT_GRENADE_COOLDOWN_MS,
@@ -1047,6 +1048,14 @@ async function retireAllArenasExcept(arenaId: ArenaId): Promise<void> {
 let arena: ArenaMap = ensureArenaConstructed(selectedArena.id);
 let worldIdentityPresentation: WorldIdentityPresentation | null = null;
 let neighbourhoodLifeRoot: THREE.Group | null = null;
+
+// Pass 69 HITL dev overlay — no-op unless ?hitl=1 (see src/farcrysis-hitl.ts).
+// The overlay controller lives for the session; disposal is not required on the
+// dev-only path, so the binding is intentionally retained.
+const farcrysisHitlOverlay = new URLSearchParams(window.location.search).get('hitl') === '1'
+  ? mountFarcrysisHitlOverlay(arena)
+  : null;
+void farcrysisHitlOverlay;
 
 function ensureAtomicWorldPresentation(): void {
   if (!worldIdentityPresentation) {
