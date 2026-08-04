@@ -36,6 +36,7 @@ const MAP_TRAP_RADIUS: Readonly<Record<ArenaId, number>> = Object.freeze({
   'rustworks-1v1': 7,
   'gun-range': 8,
   'skyline-terminal': 10,
+  'farcrysis': 8,
 });
 
 export const FFA_MINIMUM_SPAWN_SEPARATION = 8;

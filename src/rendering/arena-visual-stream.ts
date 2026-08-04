@@ -11,6 +11,7 @@ export const ARENA_VISUAL_REGISTRY: ArenaVisualRegistry = Object.freeze({
   'rustworks-1v1': () => import('./arenas/rustworks-1v1'),
   'gun-range': () => import('./arenas/gun-range'),
   'skyline-terminal': () => import('./arenas/skyline-terminal'),
+  'farcrysis': () => import('./arenas/farcrysis'),
 });
 
 export async function loadArenaVisualModule(

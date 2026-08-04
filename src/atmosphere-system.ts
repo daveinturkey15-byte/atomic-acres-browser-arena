@@ -73,6 +73,17 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaId, AtmosphereLayout>> = Object.f
       [-18, 16, 2.4, 4.2, 1.1], [18, 16, 2.4, 4.2, 3.5], [0, -22, 2.2, 3.8, 2.1],
     ] as SmokeCard[]),
   }),
+  'farcrysis': Object.freeze({
+    mist: Object.freeze([
+      [-26, -26, 12, 4.0], [26, 26, 12, 4.0], [-18, 18, 11, 3.6],
+      [18, -18, 11, 3.6], [-8, -14, 10, 3.2], [8, 14, 10, 3.2],
+      [-4, 4, 9, 3.0], [4, -4, 9, 3.0], [0, -26, 12, 3.4], [0, 26, 12, 3.4],
+    ] as MistCard[]),
+    smoke: Object.freeze([
+      [-20, -20, 2.2, 4.0, 0.9], [20, 20, 2.2, 4.0, 3.1], [0, -18, 2.4, 4.4, 2.2],
+      [0, 0, 2.6, 5.0, 4.5], [-6, 20, 2.0, 3.6, 1.6],
+    ] as SmokeCard[]),
+  }),
 });
 
 const MAX_MIST_CARDS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.mist.length));

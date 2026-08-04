@@ -21,6 +21,7 @@ import { WaterSystem, rustworksOceanAmplitude } from './water-system';
 import { PASS66_RELEASE_IDENTITY } from './release-identity';
 import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon, waitForPendingArtTextures } from './art-kit';
 import { BotWeaponGpuVocabulary } from './bot-weapon-gpu-vocabulary';
+import { buildFarcrysis } from './farcrysis';
 import {
   invalidatePass65PresentationTree,
   pass65WeaponCacheTelemetry,
@@ -2459,6 +2460,7 @@ const arenaFactories: Readonly<Record<ArenaId, (target: THREE.Scene) => ArenaMap
   'rustworks-1v1': buildRustworks1v1,
   'gun-range': buildGunRange,
   'skyline-terminal': buildSkylineTerminal,
+  'farcrysis': buildFarcrysis,
 });
 const arenaCache = new Map<ArenaId, ArenaMap>();
 const ARENA_CACHE_BOUND = 2;
@@ -2480,6 +2482,8 @@ function prepareArenaPresentation(candidate: ArenaMap): void {
     createRustworksQualityLights(candidate.root, renderProfile);
     if (renderProfile === 'blender') enhanceRustworksQualityMaterials(candidate.root, renderProfile);
   } else if (candidate.id === 'skyline-terminal') {
+    applyAdditionalMapPresentationProfile(candidate.root, renderProfile);
+  } else if (candidate.id === 'farcrysis') {
     applyAdditionalMapPresentationProfile(candidate.root, renderProfile);
   }
 }

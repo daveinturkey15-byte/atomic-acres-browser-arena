@@ -39,7 +39,7 @@ export type PracticeTarget = {
 };
 export type BreakableWindow = { id: string; mesh: THREE.Mesh; broken: boolean; glassState?: GlassState };
 export type ArenaMap = {
-  id: 'atomic-acres' | 'rustworks-1v1' | 'gun-range' | 'skyline-terminal';
+  id: 'atomic-acres' | 'rustworks-1v1' | 'gun-range' | 'skyline-terminal' | 'farcrysis';
   label: string;
   root: THREE.Group;
   colliders: Box2[];

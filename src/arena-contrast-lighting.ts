@@ -35,6 +35,11 @@ const LEGACY_KEY_LIGHTS: Readonly<Partial<Record<ArenaId, readonly ArenaKeyLight
     { position: [-20, 6.7, -30], target: [-8, 0.8, -19], color: 0xbcecff, intensity: 20, distance: 34, angle: 0.62 },
     { position: [20, 6.7, -24], target: [8, 0.8, -17], color: 0xffc68a, intensity: 17, distance: 34, angle: 0.62 },
   ],
+  // Golden-hour beach key light + a cooler dapple key over the jungle core.
+  'farcrysis': [
+    { position: [-26, 9.5, -26], target: [-8, 1.6, -8], color: 0xffc981, intensity: 15, distance: 38, angle: 0.6 },
+    { position: [18, 8.5, 20], target: [6, 1.6, 6], color: 0x9fd8a8, intensity: 12, distance: 30, angle: 0.58 },
+  ],
 };
 
 export type ArenaPracticalLightSample = Readonly<{

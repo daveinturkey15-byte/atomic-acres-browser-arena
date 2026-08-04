@@ -7,11 +7,20 @@
   "fps": 30,
   "durationSeconds": 8,
   "frameCount": 240,
-  "reviewFrames": [1, 60, 120, 180, 240],
+  "reviewFrames": [
+    1,
+    60,
+    120,
+    180,
+    240
+  ],
   "runtimeContract": "prerecorded compressed media only; static poster for reduced motion; zero arena construction or gameplay renderer submissions",
   "media": {
     "cacheKey": "pass66-runtime-preview-v5",
-    "containers": ["webm", "mp4"],
+    "containers": [
+      "webm",
+      "mp4"
+    ],
     "poster": "webp",
     "encodingBudget": {
       "minimumAverageBitrateKbps": 3000,
@@ -66,20 +75,39 @@
       }
     },
     "audioProfiles": {
-      "helicopter": { "id": "quiet-rotor-bed-v1", "minimumPeakDb": -48, "maximumPeakDb": -24 },
-      "cat": { "id": "quiet-range-roomtone-v1", "minimumPeakDb": -52, "maximumPeakDb": -27 }
+      "helicopter": {
+        "id": "quiet-rotor-bed-v1",
+        "minimumPeakDb": -48,
+        "maximumPeakDb": -24
+      },
+      "cat": {
+        "id": "quiet-range-roomtone-v1",
+        "minimumPeakDb": -52,
+        "maximumPeakDb": -27
+      }
     }
   },
   "capture": {
     "source": "authoritative-runtime-arena",
     "backend": "webgpu",
     "rendererRequired": true,
-    "viewport": [2560, 1440],
+    "viewport": [
+      2560,
+      1440
+    ],
     "fixedTimeStartMs": 65000,
     "overlayScale": 0.5,
-    "overlayReferenceViewport": [1280, 720],
+    "overlayReferenceViewport": [
+      1280,
+      720
+    ],
     "overlayOutputScale": 2,
-    "overlayPalette": ["#020507", "#091316", "#33494a", "#a8f7cf"]
+    "overlayPalette": [
+      "#020507",
+      "#091316",
+      "#33494a",
+      "#a8f7cf"
+    ]
   },
   "helicopter": {
     "varianceAlgorithm": "xorshift32-cyclic-quintic-hold-v1",
@@ -137,7 +165,12 @@
       "mainMotionBlurOpacity": 0.12,
       "poseResponsive": true,
       "tailCameraReflection": true,
-      "occlusionLayers": ["mast-hub", "structural-ties", "canopy-header", "tail-boom"]
+      "occlusionLayers": [
+        "mast-hub",
+        "structural-ties",
+        "canopy-header",
+        "tail-boom"
+      ]
     },
     "maximumPitchDegrees": 0.8,
     "maximumYawDegrees": 1.2,
@@ -159,12 +192,36 @@
       "seed": 65011201,
       "fovDegrees": 68,
       "posterFrame": 60,
-      "centre": [0, 2, 0],
-      "radius": [40, 44],
+      "centre": [
+        0,
+        2,
+        0
+      ],
+      "radius": [
+        40,
+        44
+      ],
       "altitudeM": 24,
-      "lookAt": [0, 2, 0],
+      "lookAt": [
+        0,
+        2,
+        0
+      ],
       "phaseRadians": 0.17,
-      "safeVolume": { "x": [-41.5, 41.5], "y": [23, 25], "z": [-45.5, 45.5] },
+      "safeVolume": {
+        "x": [
+          -41.5,
+          41.5
+        ],
+        "y": [
+          23,
+          25
+        ],
+        "z": [
+          -45.5,
+          45.5
+        ]
+      },
       "reviewLabel": "Nuke Town cockpit flyover"
     },
     "skyline-terminal": {
@@ -175,12 +232,36 @@
       "seed": 65011202,
       "fovDegrees": 68,
       "posterFrame": 60,
-      "centre": [0, 3, 12],
-      "radius": [44, 30],
+      "centre": [
+        0,
+        3,
+        12
+      ],
+      "radius": [
+        44,
+        30
+      ],
       "altitudeM": 15,
-      "lookAt": [0, 3, 0],
+      "lookAt": [
+        0,
+        3,
+        0
+      ],
       "phaseRadians": -0.34,
-      "safeVolume": { "x": [-45.5, 45.5], "y": [14, 16], "z": [-19.5, 43.5] },
+      "safeVolume": {
+        "x": [
+          -45.5,
+          45.5
+        ],
+        "y": [
+          14,
+          16
+        ],
+        "z": [
+          -19.5,
+          43.5
+        ]
+      },
       "reviewLabel": "Terminal cockpit flyover"
     },
     "rustworks-1v1": {
@@ -191,12 +272,36 @@
       "seed": 65011203,
       "fovDegrees": 68,
       "posterFrame": 60,
-      "centre": [0, 5, 0],
-      "radius": [39, 37],
+      "centre": [
+        0,
+        5,
+        0
+      ],
+      "radius": [
+        39,
+        37
+      ],
       "altitudeM": 25,
-      "lookAt": [0, 5, 0],
+      "lookAt": [
+        0,
+        5,
+        0
+      ],
       "phaseRadians": 0.48,
-      "safeVolume": { "x": [-40.5, 40.5], "y": [24, 26], "z": [-38.5, 38.5] },
+      "safeVolume": {
+        "x": [
+          -40.5,
+          40.5
+        ],
+        "y": [
+          24,
+          26
+        ],
+        "z": [
+          -38.5,
+          38.5
+        ]
+      },
       "reviewLabel": "RustRig cockpit flyover"
     },
     "gun-range": {
@@ -206,26 +311,103 @@
       "seed": 65011401,
       "fovDegrees": 62,
       "posterFrame": 60,
-      "safeVolume": { "x": [-1.4, 1.4], "y": [0.76, 0.94], "z": [-5.5, 0.8] },
+      "safeVolume": {
+        "x": [
+          -1.4,
+          1.4
+        ],
+        "y": [
+          0.76,
+          0.94
+        ],
+        "z": [
+          -5.5,
+          0.8
+        ]
+      },
       "path": [
-        [0, 0.82, 0.5],
-        [0.8, 0.86, -0.5],
-        [1.1, 0.8, -2],
-        [0.6, 0.9, -4],
-        [0, 0.84, -5.2],
-        [-0.7, 0.88, -4],
-        [-1.1, 0.8, -2],
-        [-0.75, 0.88, -0.4]
+        [
+          0,
+          0.82,
+          0.5
+        ],
+        [
+          0.8,
+          0.86,
+          -0.5
+        ],
+        [
+          1.1,
+          0.8,
+          -2
+        ],
+        [
+          0.6,
+          0.9,
+          -4
+        ],
+        [
+          0,
+          0.84,
+          -5.2
+        ],
+        [
+          -0.7,
+          0.88,
+          -4
+        ],
+        [
+          -1.1,
+          0.8,
+          -2
+        ],
+        [
+          -0.75,
+          0.88,
+          -0.4
+        ]
       ],
       "lookAtPath": [
-        [0, 1.7, -12],
-        [2, 1.8, -22],
-        [2.5, 2.2, -35],
-        [1.5, 1.6, -40],
-        [0, 1.9, -45],
-        [-1.5, 2, -35],
-        [-2.5, 1.8, -22],
-        [-2, 2, -12]
+        [
+          0,
+          1.7,
+          -12
+        ],
+        [
+          2,
+          1.8,
+          -22
+        ],
+        [
+          2.5,
+          2.2,
+          -35
+        ],
+        [
+          1.5,
+          1.6,
+          -40
+        ],
+        [
+          0,
+          1.9,
+          -45
+        ],
+        [
+          -1.5,
+          2,
+          -35
+        ],
+        [
+          -2.5,
+          1.8,
+          -22
+        ],
+        [
+          -2,
+          2,
+          -12
+        ]
       ],
       "momentLabels": [
         "CURIOUS ENTRY",
@@ -248,9 +430,54 @@
         "pawCount": 2,
         "toeCountPerPaw": 4,
         "primitiveSphereCount": 0,
-        "materials": ["cat-fur-charcoal", "cat-fur-silver", "cat-pads-soft-coral", "cat-inner-ear"]
+        "materials": [
+          "cat-fur-charcoal",
+          "cat-fur-silver",
+          "cat-pads-soft-coral",
+          "cat-inner-ear"
+        ]
       },
       "reviewLabel": "Gun Range joyful feline first-person prowl"
+    },
+    "farcrysis": {
+      "kind": "helicopter",
+      "label": "HELO FLYOVER // FARCrySIS",
+      "presentationId": "menu-video-runtime-helo-farcrysis-v1",
+      "cockpitAssetId": "pass66-compact-cockpit-overlay-v1",
+      "seed": 65011901,
+      "fovDegrees": 58,
+      "posterFrame": 60,
+      "centre": [
+        0,
+        2.2,
+        0
+      ],
+      "radius": [
+        36,
+        34
+      ],
+      "altitudeM": 19,
+      "lookAt": [
+        0,
+        2.2,
+        0
+      ],
+      "phaseRadians": 2.1,
+      "safeVolume": {
+        "x": [
+          -37.5,
+          37.5
+        ],
+        "y": [
+          18,
+          20
+        ],
+        "z": [
+          -35.5,
+          35.5
+        ]
+      },
+      "reviewLabel": "Farcrysis cockpit flyover"
     }
   }
 }
