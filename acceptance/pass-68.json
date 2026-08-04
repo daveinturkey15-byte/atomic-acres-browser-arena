@@ -5,14 +5,14 @@
   "status": "accepted",
   "preview": {
     "kind": "github-actions-artifact",
-    "ref": "pr-preview-39-1d2565be8d95f27326b30a0f58a783ec8f948402",
-    "sourceSha": "1d2565be8d95f27326b30a0f58a783ec8f948402",
-    "createdAt": "2026-08-04T07:35:00Z"
+    "ref": "pr-preview-39-bd5ae09aaa152682159b12705d5530ef798bde0a",
+    "sourceSha": "bd5ae09aaa152682159b12705d5530ef798bde0a",
+    "createdAt": "2026-08-04T07:45:00Z"
   },
   "humanAcceptance": {
     "state": "approved",
     "approvedBy": "Dave",
-    "approvedAt": "2026-08-04T07:36:00Z",
+    "approvedAt": "2026-08-04T07:46:00Z",
     "evidence": "Dave instructed: 'Atomic acres pass and publish' on 2026-08-04 (06:51Z), standing up PASS 68 as the HITL-tested build while PASS 69 (Farcrysis map) is prepared as the next lane. Approval recorded against the immutable PR #39 preview (source 1d2565be) per repo contract; original PASS 68 request received 2026-08-03 with the full fix list below."
   },
   "requirements": [
@@ -28,7 +28,7 @@
           "kind": "contract",
           "ref": "release-channels.json",
           "command": "node scripts/qa/verify-release-topology-browser.mjs",
-          "note": "Live channel config served PASS 68 experimental ('THE BIG ONE v68') and PASS 67.1 stable ('STABLE — REQUIRES HOST/GUEST TESTING') at verification time."
+          "note": "Live channel config served PASS 68 experimental ('THE BIG ONE v68') and PASS 67.1 stable ('STABLE \u2014 REQUIRES HOST/GUEST TESTING') at verification time."
         },
         {
           "kind": "unit",
@@ -73,7 +73,7 @@
     {
       "id": "R4",
       "summary": "Hands positioned correctly; ADS clean with iron sights/scopes only",
-      "expected": "Weapon presentation hands align to sights; ADS shows no coloured artificial crosshair — iron sights or scopes only.",
+      "expected": "Weapon presentation hands align to sights; ADS shows no coloured artificial crosshair \u2014 iron sights or scopes only.",
       "falsifier": "Hands misaligned in presentation or a coloured synthetic crosshair renders during ADS.",
       "acceptance": "mechanical",
       "state": "verified",
@@ -94,7 +94,7 @@
     },
     {
       "id": "R5",
-      "summary": "FPS slow when controlling drone/chopper gunner — fix",
+      "summary": "FPS slow when controlling drone/chopper gunner \u2014 fix",
       "expected": "Drone/chopper possession maintains acceptable FPS without the killstreak presentation freeze.",
       "falsifier": "Possession still drops FPS due to extra killstreak presentation meshes.",
       "acceptance": "mechanical",
@@ -110,7 +110,7 @@
     },
     {
       "id": "R6",
-      "summary": "Glass break freeze and carpet bomb slight freeze — fix",
+      "summary": "Glass break freeze and carpet bomb slight freeze \u2014 fix",
       "expected": "Shooting glass and carpet bombing do not freeze the game.",
       "falsifier": "Glass impact or carpet bomb causes a visible hitch/freeze.",
       "acceptance": "mechanical",
