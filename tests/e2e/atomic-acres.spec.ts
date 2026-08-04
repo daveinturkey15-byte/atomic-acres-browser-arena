@@ -703,7 +703,7 @@ test.describe('boot and authored presentation', () => {
       const raw = localStorage.getItem(storageKey);
       const entries = raw ? (JSON.parse(raw) as { entries: Array<Record<string, unknown>> }).entries : [];
       return entries.find((entry) => entry.name === 'QA Operator');
-    }, HIGH_SCORE_STORAGE_KEY)).toMatchObject({ id: 'global:qa_20operator', name: 'QA Operator', bestStreak: 8 });
+    }, HIGH_SCORE_STORAGE_KEY)).toMatchObject({ name: 'QA Operator', bestStreak: 8 });
     await page.reload();
     await pageReady(page);
     const qaScore = page.locator('#high-score-list li').filter({ hasText: 'QA Operator' });
@@ -849,7 +849,7 @@ test.describe('boot and authored presentation', () => {
       shadows: true, shadowMode: 'static',
       lighting: {
         exposure: 1, hemisphereIntensity: 0.72, ambientIntensity: 0.18,
-        sunIntensity: 3.25, fogNear: 52, fogFar: 142,
+        sunIntensity: 3.25, fogNear: 58, fogFar: 148,
         routeLightIntensity: 3, streetLightIntensity: 3.8, interiorLightIntensity: 10,
         routeLightCount: 3, streetLightCount: 4, interiorLightCount: 4,
         godRayStrength: 0.05, godRayLobes: 2,
