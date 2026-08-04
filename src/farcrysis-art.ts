@@ -12,6 +12,8 @@
  */
 import * as THREE from 'three';
 import { FARCRYSIS_BOUNDS } from './farcrysis';
+import { buildVegetation, FARCRYSIS_VEGE_STATS } from './farcrysis-vegetation';
+import { buildTerrain, buildLighting, buildWater } from './farcrysis-terrain';
 
 // ---------------------------------------------------------------------------
 // Material / naming helpers
@@ -503,4 +505,13 @@ export function applyFarcrysisArtwork(root: THREE.Group): void {
 
   // Atmosphere
   addWaterSparkle(root);
+
+  // ---- Pass 69 re-authored art layer (dense vegetation, terrain, lighting, water) ----
+  buildVegetation(root);
+
+  // Terrain, lighting, and water modules expect Scene; cast through Object3D
+  const s = root as unknown as import('three').Scene;
+  buildTerrain(s);
+  buildLighting(s);
+  buildWater(s);
 }

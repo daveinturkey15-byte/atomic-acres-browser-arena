@@ -5,6 +5,7 @@ import type { Box2 } from './collision';
 import type { ArenaMap, PracticeTarget } from './map';
 import type { Team } from './protocol';
 import { applyFarcrysisArtwork } from './farcrysis-art';
+import { addInteractables } from './farcrysis-physics';
 
 /**
  * Pass 69 — f4rcry515 arena (HITL-testing lane).
@@ -347,6 +348,9 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
     barrel.castShadow = true;
     root.add(barrel);
   }
+
+  // ---- Pass 69 interactables (crates, barrels, sandbag walls)
+  addInteractables(builder);
 
   // ---- Jungle bushes (dressing, no collision) + instanced ferns (R9 style)
   const bushPositions: ReadonlyArray<readonly [number, number]> = [
