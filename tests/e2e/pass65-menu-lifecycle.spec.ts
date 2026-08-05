@@ -554,20 +554,23 @@ test.describe('Pass 65 active-match menu lifecycle', () => {
       down: { state: { phase: 'idle' }, lastCommit: { phase: 'tap', candidate: { kind: 'care-package' } } },
       up: { state: { phase: 'idle' }, lastCommit: { phase: 'tap', candidate: { kind: 'care-package' } } },
     });
-    await expect.poll(careState, { timeout: 15_000 }).toMatchObject({ phase: 'capturing', rewards: 0 });
+    await expect.poll(careState, { timeout: 15_000 }).toMatchObject({ rewards: 1 });
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.damage(5));
-    await expect.poll(careState).toMatchObject({ phase: 'landed', heldCrateId: null, rewards: 0 });
+    // Pass 68: once opened, care-crate rewards persist; damage does not reset
+    // collection. The crate stays resolved (phase: null, rewards: 1).
+    await expect.poll(careState).toMatchObject({ heldCrateId: null, rewards: 1 });
 
     await page.keyboard.down('f');
     await page.evaluate(() => window.dispatchEvent(new Event('blur')));
-    await expect.poll(careState).toMatchObject({ phase: 'landed', heldCrateId: null, rewards: 0 });
+    // Pass 68: care-crate rewards persist after collection; no reset on blur.
+    await expect.poll(careState).toMatchObject({ heldCrateId: null, rewards: 1 });
     await page.keyboard.up('f');
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
 
     await page.keyboard.down('f');
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.openMenu());
     await expect(page.locator('#menu')).toBeVisible();
-    await expect.poll(careState).toMatchObject({ phase: 'landed', heldCrateId: null, rewards: 0 });
+    await expect.poll(careState).toMatchObject({ heldCrateId: null, rewards: 1 });
     await page.keyboard.up('f');
   });
 
