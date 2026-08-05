@@ -1,0 +1,19 @@
+{
+  "fixtureOnly": true,
+  "metadata": {
+    "schemaVersion": 3,
+    "kind": "hardware-receipt",
+    "preset": "max",
+    "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "backend": "webgpu",
+    "settingsHash": "4444444444444444444444444444444444444444444444444444444444444444",
+    "sceneIds": [
+      "atomic-acres",
+      "skyline-terminal",
+      "rustworks-1v1",
+      "gun-range",
+      "combined-stress"
+    ]
+  }
+}

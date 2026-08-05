@@ -2,8 +2,8 @@ import { mkdir } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 
 test('fails the default playable WebGPU route closed on the CI adapter without mounting gameplay', async ({ page }) => {
-  const pageError = page.waitForEvent('pageerror');
-  await page.goto('/?render=blender');
+  const pageError = page.waitForEvent('pageerror', { timeout: 45_000 });
+  await page.goto('/channels/the-big-one/?release=latest&renderer=webgpu&render=blender');
   const error = await pageError;
   expect(error.message).toMatch(/WebGPU|TSL/);
   const state = await page.evaluate(() => ({
@@ -17,12 +17,28 @@ test('fails the default playable WebGPU route closed on the CI adapter without m
 });
 
 test('reports the active WebGL adapter and offscreen HDR samples separately', async ({ page }) => {
-  test.setTimeout(90_000);
-  await page.goto('/?renderer=webgl2&render=blender&signal=on&grass=off&mist=off&clouds=off&rays=off&seed=6401&map=skyline-terminal');
+  test.setTimeout(120_000);
+  await page.goto('/channels/the-big-one/?release=latest&renderer=webgl2&render=blender&signal=on&grass=off&mist=off&clouds=off&rays=off&seed=6401&map=skyline-terminal');
+  // Atomic Signal is a gameplay presentation pass. The deployment menu keeps
+  // presentation scheduling paused, so enter the same deterministic solo
+  // match used by the cabin contract before sampling the pass.
+  await page.waitForFunction(() => {
+    const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => any } }).__ATOMIC_ACRES_DEBUG__;
+    return api?.snapshot().weaponReady === true;
+  }, undefined, { timeout: 75_000 });
+  await page.evaluate(() => {
+    const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: any }).__ATOMIC_ACRES_DEBUG__;
+    api.startSolo();
+    api.setBotsFrozen(true);
+    api.setCaptureViewmodelHidden(true);
+  });
+  await page.waitForFunction(() => (
+    window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => any } }
+  ).__ATOMIC_ACRES_DEBUG__.snapshot().gameStarted === true, undefined, { timeout: 60_000 });
   await page.waitForFunction(() => {
     const state = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => any } }).__ATOMIC_ACRES_DEBUG__?.snapshot();
-    return state?.weaponReady === true && state?.render?.atomicSignal?.samples > 0;
-  }, undefined, { timeout: 45_000 });
+    return state?.render?.atomicSignal?.samples > 0;
+  }, undefined, { timeout: 75_000 });
   const render = await page.evaluate(() => (
     window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => any } }
   ).__ATOMIC_ACRES_DEBUG__.snapshot().render);
@@ -42,12 +58,12 @@ test('reports the active WebGL adapter and offscreen HDR samples separately', as
 });
 
 test('renders Terminal cabin ceiling with only shadowed contrast keys and an open boarding route', async ({ page }) => {
-  test.setTimeout(90_000);
-  await page.goto('/?renderer=webgl2&render=blender&signal=on&grass=off&mist=off&clouds=off&rays=off&seed=6401&map=skyline-terminal');
+  test.setTimeout(120_000);
+  await page.goto('/channels/the-big-one/?release=latest&renderer=webgl2&render=blender&signal=on&grass=off&mist=off&clouds=off&rays=off&seed=6401&map=skyline-terminal');
   await page.waitForFunction(() => {
     const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => any } }).__ATOMIC_ACRES_DEBUG__;
     return api?.snapshot().weaponReady === true;
-  }, undefined, { timeout: 45_000 });
+  }, undefined, { timeout: 75_000 });
   await page.evaluate(() => {
     const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: any }).__ATOMIC_ACRES_DEBUG__;
     api.startSolo();
@@ -56,7 +72,7 @@ test('renders Terminal cabin ceiling with only shadowed contrast keys and an ope
   });
   await page.waitForFunction(() => (
     window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => any } }
-  ).__ATOMIC_ACRES_DEBUG__.snapshot().gameStarted === true, undefined, { timeout: 30_000 });
+  ).__ATOMIC_ACRES_DEBUG__.snapshot().gameStarted === true, undefined, { timeout: 60_000 });
   await page.evaluate(() => {
     const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: any }).__ATOMIC_ACRES_DEBUG__;
     api.setCaptureCameraPose(0, 4.25, 2, -Math.PI / 2, -0.38);

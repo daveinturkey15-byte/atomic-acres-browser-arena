@@ -5,9 +5,9 @@ import { WEAPONS } from './gameplay';
 import { GOLDEN_REPLAYS, runGameplayReplay, type ReplayCommand } from './gameplay-replay';
 import { createRandomStreams } from './deterministic-rng';
 
-const baselinePath = resolve(import.meta.dirname, '../baselines/pass25a/golden-replays.json');
+const baselinePath = resolve(import.meta.dirname, '../baselines/pass65-candidate/golden-replays.json');
 
-describe('Pass 25A golden gameplay replays', () => {
+describe('Pass 65 candidate golden gameplay replays', () => {
   it('repeats every checked state hash and final state', async () => {
     const baseline = JSON.parse(await readFile(baselinePath, 'utf8')) as {
       replays: Record<string, {

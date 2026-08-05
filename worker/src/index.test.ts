@@ -4,6 +4,7 @@ import worker, {
   allowedOrigin,
   deleteExpiredMatchDiagnostics,
   leaderboardNameKey,
+  serverErrorTrace,
   validateMatchDiagnosticSubmission,
   validateStreakSubmission,
 } from './index';
@@ -280,7 +281,26 @@ describe('global leaderboard worker policy', () => {
       ALLOWED_ORIGINS: '*', DB: db as unknown as D1Database, RATE_LIMIT_SALT: 'test-salt',
     }, executionContext());
     expect(response.status).toBe(503);
+    const body = await response.json() as Record<string, unknown>;
+    expect(body).toMatchObject({ error: 'service unavailable' });
+    expect(body.incidentId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(body).not.toHaveProperty('stack');
     expect(db.claims.has(valid.idempotencyKey)).toBe(false);
+  });
+
+  it('retains a bounded provider-side stack without request or identity fields', () => {
+    const error = new Error('database exploded');
+    error.stack = `Error: database exploded\n${'at worker-handler (index.ts:1:1)\n'.repeat(300)}`;
+    const trace = serverErrorTrace(error, 'incident-test');
+    expect(trace).toMatchObject({
+      incidentId: 'incident-test',
+      name: 'Error',
+      message: 'database exploded',
+    });
+    expect(trace.stack).toContain('worker-handler');
+    expect(trace.stack.length).toBe(4_096);
+    expect(trace).not.toHaveProperty('request');
+    expect(trace).not.toHaveProperty('playerId');
   });
 
   it('strictly validates the privacy-minimized match envelope', () => {

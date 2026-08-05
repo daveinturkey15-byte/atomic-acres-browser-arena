@@ -7,7 +7,7 @@ describe('field-kit selection', () => {
     expect(new Set(FIELD_KITS.map((kit) => kit.id)).size).toBe(FIELD_KITS.length);
   });
 
-  it('round-trips the marksman kit and deploys its Longline sniper with the full-auto machine pistol', () => {
+  it('round-trips the marksman kit and deploys its M40A5 sniper with the full-auto machine pistol', () => {
     const encoded = serializeFieldKitSelection('marksman');
     expect(parseFieldKitSelection(encoded)).toBe('marksman');
     expect(fieldKitById('marksman').weapon).toBe('sniper');

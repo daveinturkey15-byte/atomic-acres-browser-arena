@@ -5,11 +5,13 @@ import {
   createDeathDrop,
   deathDropAmmoAvailable,
   deathDropAvailable,
+  deathDropWeaponPickupAvailable,
   deathDropWeaponAvailable,
   nearestDeathDrop,
   nearestScavengeDeathDrop,
   pruneDeathDrops,
   scavengeDeathDrop,
+  selectDeathDropWeaponPickup,
 } from './death-drops';
 
 describe('death-drop inventory contract', () => {
@@ -28,9 +30,9 @@ describe('death-drop inventory contract', () => {
 
   it('scavenges carried-weapon ammo and one grenade without selecting the dropped gun', () => {
     const drop = createDeathDrop('death-1', 'sniper', { x: 1, y: 0, z: 1 }, 5, 4, 1_000);
-    const result = scavengeDeathDrop(drop, { weapon: 'carbine', reserve: 116, grenades: 1 }, 120, 2, 1_100);
+    const result = scavengeDeathDrop(drop, { weapon: 'carbine', reserve: 116, grenades: 0 }, 120, 1_100);
     expect(result.scavenged).toBe(true);
-    expect(result.inventory).toEqual({ weapon: 'carbine', reserve: 120, grenades: 2 });
+    expect(result.inventory).toEqual({ weapon: 'carbine', reserve: 120, grenades: 1 });
     expect(result.ammoGranted).toBe(4);
     expect(result.grenadeGranted).toBe(1);
     expect(deathDropAmmoAvailable(result.drop, 1_101)).toBe(false);
@@ -40,20 +42,40 @@ describe('death-drop inventory contract', () => {
 
   it('does not consume the ammo payload when carried ammo and grenades are already full', () => {
     const drop = createDeathDrop('death-full', 'smg', { x: 0, y: 0, z: 0 }, 16, 32, 1_000);
-    const result = scavengeDeathDrop(drop, { weapon: 'carbine', reserve: 120, grenades: 2 }, 120, 2, 1_100);
+    const result = scavengeDeathDrop(drop, { weapon: 'carbine', reserve: 120, grenades: 1 }, 120, 1_100);
     expect(result.scavenged).toBe(false);
     expect(result.drop).toEqual(drop);
     expect(deathDropAmmoAvailable(result.drop, 1_101)).toBe(true);
   });
 
-  it('keeps the dropped weapon independently selectable after walk-over scavenging', () => {
+  it('keeps a bot sidearm corpse drop scavengable without treating it as a primary-slot pickup', () => {
+    const drop = createDeathDrop('death-sidearm', 'pistol', { x: 0, y: 0, z: 0 }, 8, 12, 1_000);
+    expect(deathDropAmmoAvailable(drop, 1_100)).toBe(true);
+    expect(deathDropWeaponAvailable(drop, 1_100)).toBe(false);
+    const scavenged = scavengeDeathDrop(drop, { weapon: 'carbine', reserve: 110, grenades: 0 }, 120, 1_100);
+    expect(scavenged.scavenged).toBe(true);
+    expect(scavenged.inventory).toEqual({ weapon: 'carbine', reserve: 120, grenades: 1 });
+    expect(consumeDeathDropWeapon(drop, { primary: 'carbine', ammo: 30, reserve: 110 }, 120, 1_100).consumed).toBe(false);
+  });
+
+  it('puts your swapped-out gun back into the drop so you can re-swap freely', () => {
     const drop = createDeathDrop('death-2', 'sniper', { x: 0, y: 0, z: 0 }, 5, 6, 1_000);
-    const scavenged = scavengeDeathDrop(drop, { weapon: 'carbine', reserve: 100, grenades: 1 }, 120, 2, 1_100);
+    const scavenged = scavengeDeathDrop(drop, { weapon: 'carbine', reserve: 100, grenades: 0 }, 120, 1_100);
     const picked = consumeDeathDropWeapon(scavenged.drop, { primary: 'carbine', ammo: 30, reserve: 120 }, 25, 1_200);
     expect(picked.consumed).toBe(true);
     expect(picked.mode).toBe('pickup');
     expect(picked.inventory).toEqual({ primary: 'sniper', ammo: 5, reserve: 0 });
-    expect(deathDropAvailable(picked.drop, 1_201)).toBe(false);
+    // The carbine you dropped goes into the drop, selectable again.
+    expect(picked.drop.weapon).toBe('carbine');
+    expect(picked.drop.ammo).toBe(30);
+    expect(picked.drop.reserve).toBe(120);
+    expect(deathDropAvailable(picked.drop, 1_201)).toBe(true);
+    expect(deathDropWeaponPickupAvailable(picked.drop, 'sniper', 1_201)).toBe(true);
+    // Swapping back returns the sniper to the drop.
+    const swappedBack = consumeDeathDropWeapon(picked.drop, picked.inventory, 25, 1_300);
+    expect(swappedBack.consumed).toBe(true);
+    expect(swappedBack.inventory.primary).toBe('carbine');
+    expect(swappedBack.drop.weapon).toBe('sniper');
   });
 
   it('explicitly replenishes a matching gun only when its ammo payload remains', () => {
@@ -64,6 +86,35 @@ describe('death-drop inventory contract', () => {
     expect(result.inventory).toEqual({ primary: 'sniper', ammo: 2, reserve: 25 });
     expect(deathDropAvailable(result.drop, 1_101)).toBe(false);
     expect(consumeDeathDropWeapon(result.drop, result.inventory, 25, 1_200).consumed).toBe(false);
+  });
+
+  it('uses one predicate for same-primary prompts and consumption after ammo scavenging', () => {
+    const samePrimary = createDeathDrop('same-primary', 'carbine', { x: 0.5, y: 0, z: 0 }, 10, 20, 1_000);
+    const scavenged = scavengeDeathDrop(samePrimary, { weapon: 'carbine', reserve: 0, grenades: 0 }, 120, 1_100);
+    expect(scavenged.scavenged).toBe(true);
+    expect(deathDropWeaponAvailable(scavenged.drop, 1_200)).toBe(true);
+    expect(deathDropWeaponPickupAvailable(scavenged.drop, 'carbine', 1_200)).toBe(false);
+    expect(selectDeathDropWeaponPickup([scavenged.drop], { x: 0, y: 0, z: 0 }, 'carbine', 1_200)).toBeNull();
+    expect(consumeDeathDropWeapon(scavenged.drop, { primary: 'carbine', ammo: 30, reserve: 20 }, 120, 1_200).consumed).toBe(false);
+  });
+
+  it('never substitutes nearby drop B when prompted expected drop A becomes invalid', () => {
+    const expectedA = createDeathDrop('expected-a', 'carbine', { x: 0.6, y: 0, z: 0 }, 10, 20, 1_000);
+    const nearbyB = createDeathDrop('nearby-b', 'smg', { x: 0.8, y: 0, z: 0 }, 10, 20, 1_000);
+    const consumedA = { ...expectedA, weaponConsumedAt: 1_100 };
+    expect(selectDeathDropWeaponPickup(
+      [consumedA, nearbyB],
+      { x: 0, y: 0, z: 0 },
+      'sniper',
+      1_200,
+      'expected-a',
+    )).toBeNull();
+    expect(selectDeathDropWeaponPickup(
+      [consumedA, nearbyB],
+      { x: 0, y: 0, z: 0 },
+      'sniper',
+      1_200,
+    )?.id).toBe('nearby-b');
   });
 
   it('uses tight horizontal walk-over range while preserving wider F interaction and expiry pruning', () => {

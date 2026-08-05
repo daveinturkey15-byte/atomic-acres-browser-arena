@@ -56,6 +56,38 @@ describe('selected arena render watchdog', () => {
     expect(new ArenaRenderWatchdog().observe(audit, 10).status).toBe('not-applicable');
   });
 
+  it('audits a quality presentation root without surrendering procedural gameplay authority', () => {
+    const { scene, root } = authoritativeTerminal();
+    root.visible = false;
+    const qualityRoot = new THREE.Group();
+    qualityRoot.name = 'quality-presentation';
+    qualityRoot.add(new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), new THREE.MeshBasicMaterial()));
+    scene.add(qualityRoot);
+    const healthy = auditArenaRenderLiveness(
+      scene,
+      root,
+      'skyline-terminal',
+      { calls: 4, triangles: 12, points: 0, lines: 0 },
+      true,
+      new THREE.PerspectiveCamera(),
+      qualityRoot,
+    );
+    expect(healthy.presentationRootName).toBe('quality-presentation');
+    expect(healthy.definitionMatches).toBe(true);
+    expect(healthy.reasons).toEqual([]);
+    qualityRoot.removeFromParent();
+    const detached = auditArenaRenderLiveness(
+      scene,
+      root,
+      'skyline-terminal',
+      { calls: 4, triangles: 12, points: 0, lines: 0 },
+      true,
+      undefined,
+      qualityRoot,
+    );
+    expect(detached.reasons).toContain('selected-root-detached');
+  });
+
   it('records empty selected geometry as fatal instead of masking it with sky draw calls', () => {
     const scene = new THREE.Scene();
     const root = new THREE.Group();
@@ -81,5 +113,35 @@ describe('selected arena render watchdog', () => {
     const audit = auditArenaRenderLiveness(scene, root, 'skyline-terminal', { calls: 0, triangles: 0, points: 0, lines: 0 }, true, camera);
     expect(audit.reasons).toEqual(['selected-world-out-of-camera-layer', 'renderer-submission-empty']);
     expect(audit.cameraLayerRenderableDescendants).toBe(0);
+  });
+
+  it('keeps structural auditing active while an intentional backpressure skip suppresses the draw assertion', () => {
+    const { scene, root } = authoritativeTerminal();
+    const audit = auditArenaRenderLiveness(
+      scene,
+      root,
+      'skyline-terminal',
+      { calls: 0, triangles: 0, points: 0, lines: 0 },
+      true,
+      undefined,
+      root,
+      false,
+    );
+    expect(audit.submissionExpected).toBe(false);
+    expect(audit.reasons).toEqual([]);
+
+    root.removeFromParent();
+    const detached = auditArenaRenderLiveness(
+      scene,
+      root,
+      'skyline-terminal',
+      { calls: 0, triangles: 0, points: 0, lines: 0 },
+      true,
+      undefined,
+      root,
+      false,
+    );
+    expect(detached.reasons).toContain('selected-root-detached');
+    expect(detached.reasons).not.toContain('renderer-submission-empty');
   });
 });

@@ -16,7 +16,13 @@ import { classifyImpactSurface } from './combat-feedback';
 import { Box2 } from './collision';
 import { createBallisticSurface, type BallisticMaterialId, type BallisticSurface } from './ballistics';
 import { createHouseArchitecture, HouseSurface, solidBounds, type HouseArchitecture } from './house-navigation';
+import {
+  HOUSE_DESTRUCTION_DEFINITION_SET_ID,
+  createAtomicHouseFragmentDefinitions,
+  type HouseFragmentDefinition,
+} from './house-destruction';
 import { Team } from './protocol';
+import type { GlassState } from './glass-authority';
 
 export type PracticeTarget = {
   id: string;
@@ -29,9 +35,9 @@ export type PracticeTarget = {
   maxHealth: number;
   health: number;
   alwaysCritical?: boolean;
-  kind?: 'plate' | 'flying-cat';
+  kind?: 'plate' | 'flying-cat' | 'training-dummy';
 };
-export type BreakableWindow = { id: string; mesh: THREE.Mesh; broken: boolean };
+export type BreakableWindow = { id: string; mesh: THREE.Mesh; broken: boolean; glassState?: GlassState };
 export type ArenaMap = {
   id: 'atomic-acres' | 'rustworks-1v1' | 'gun-range' | 'skyline-terminal';
   label: string;
@@ -45,6 +51,11 @@ export type ArenaMap = {
   patrolPoints: THREE.Vector3[];
   targets: PracticeTarget[];
   houses: readonly HouseArchitecture[];
+  houseDestruction?: Readonly<{
+    definitions: readonly HouseFragmentDefinition[];
+    staticColliders: readonly Box2[];
+    staticBallisticSurfaceIds: readonly string[];
+  }>;
   breakableWindows: BreakableWindow[];
   physicalCover: Array<{
     id: string;
@@ -78,6 +89,9 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   let ballisticSurfaceSequence = 0;
   const targets: PracticeTarget[] = [];
   const houses: HouseArchitecture[] = [];
+  const houseFragmentDefinitions: HouseFragmentDefinition[] = [];
+  const staticHouseFragmentColliders: Box2[] = [];
+  const staticHouseFragmentBallisticSurfaceIds: string[] = [];
   const breakableWindows: BreakableWindow[] = [];
   const physicalCover: ArenaMap['physicalCover'] = [];
   const houseTelemetry = {
@@ -165,6 +179,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
       ballisticSurfaceSequence += 1;
       shotSurfaces.push(surface);
       mesh.userData.ballisticSurfaceId = surface.id;
+      mesh.userData.ballisticMaterial = surface.material;
     }
     if (solid) {
       colliders.push(bounds);
@@ -314,6 +329,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   ballisticSurfaceSequence += 1;
   shotSurfaces.push(groundSurface);
   ground.userData.ballisticSurfaceId = groundSurface.id;
+  ground.userData.ballisticMaterial = groundSurface.material;
 
   const road = new THREE.Mesh(new THREE.PlaneGeometry(19, 88), palette.road);
   road.name = 'aged asphalt road';
@@ -332,6 +348,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   ballisticSurfaceSequence += 1;
   shotSurfaces.push(roadSurface);
   road.userData.ballisticSurfaceId = roadSurface.id;
+  road.userData.ballisticMaterial = roadSurface.material;
   for (const x of [-10.25, 10.25]) box('curb', [x, 0.12, 0], [1.4, 0.24, 88], palette.concrete, false, false);
   for (const x of [-12.6, 12.6]) box('sidewalk', [x, 0.07, 0], [3.2, 0.14, 88], palette.concrete, false, false);
   for (let z = -38; z <= 38; z += 8) box('lane marker', [0, 0.055, z], [0.18, 0.03, 3.6], palette.mustard, false, false);
@@ -341,6 +358,8 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
 
   function addHouse(team: Team, x: number, z: number, facing: 1 | -1): void {
     const architecture = createHouseArchitecture(team, x, z, facing);
+    const destructionDefinitions = createAtomicHouseFragmentDefinitions([architecture]);
+    houseFragmentDefinitions.push(...destructionDefinitions);
     houses.push(architecture);
     houseTelemetry.houses += 1;
     houseTelemetry.groundRooms += architecture.rooms.filter((room) => room.level === 'ground').length;
@@ -398,6 +417,31 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
       light: 'reinforced',
     };
 
+    const bindPreauthoredFragment = (
+      rendered: THREE.Mesh,
+      definition: HouseFragmentDefinition,
+    ): void => {
+      const collider = colliders.at(-1);
+      const physicsCollider = physicsColliders.at(-1);
+      const surface = shotSurfaces.at(-1);
+      if (!collider || physicsCollider !== collider || !surface || rendered.userData.ballisticSurfaceId !== surface.id) {
+        throw new Error(`Atomic house fragment ${definition.id} did not bind one static authority tuple`);
+      }
+      physicsColliders.pop();
+      staticHouseFragmentColliders.push(collider);
+      staticHouseFragmentBallisticSurfaceIds.push(surface.id);
+      shotSurfaces[shotSurfaces.length - 1] = Object.freeze({
+        ...surface,
+        houseFragment: Object.freeze({
+          definitionSetId: HOUSE_DESTRUCTION_DEFINITION_SET_ID,
+          fragmentId: definition.id,
+        }),
+      });
+      rendered.visible = false;
+      rendered.userData.preAuthoredHouseFragmentId = definition.id;
+      rendered.userData.dynamicAuthorityReplacement = true;
+    };
+
     for (const solid of architecture.solids) {
       const solidMaterial = wallMaterial(solid);
       if (solid.kind === 'ramp') {
@@ -407,6 +451,9 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
         continue;
       }
       const isBreakableGlass = solid.kind === 'glass' && solid.breakable;
+      const destructionDefinition = destructionDefinitions.find((definition) => (
+        definition.sourceKind === 'architecture-solid' && definition.sourceId === solid.id
+      ));
       const rendered = box(
         solid.name,
         solid.position,
@@ -419,6 +466,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
         isBreakableGlass ? solid.id : undefined,
       );
       if (solid.rotation) rendered.rotation.set(...solid.rotation);
+      if (destructionDefinition) bindPreauthoredFragment(rendered, destructionDefinition);
       if (isBreakableGlass) {
         rendered.userData.breakableWindowId = solid.id;
         rendered.userData.dynamic = true;
@@ -426,9 +474,19 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
       }
     }
 
-    // One quiet roof cap is the only exterior dressing. Both ground doors and
-    // all three windows come directly from the shared architecture declaration.
-    box('simple-house-roof', [x, 7.35, z], [architecture.dimensions.width + 0.6, 0.42, architecture.dimensions.depth + 0.6], palette.roof, false);
+    for (const definition of destructionDefinitions.filter((candidate) => candidate.role === 'roof')) {
+      const rendered = box(
+        definition.sourceId,
+        [definition.position.x, definition.position.y, definition.position.z],
+        [definition.halfExtents.x * 2, definition.halfExtents.y * 2, definition.halfExtents.z * 2],
+        palette.roof,
+        true,
+        true,
+        true,
+        definition.ballisticMaterial,
+      );
+      bindPreauthoredFragment(rendered, definition);
+    }
   }
 
   for (const house of HOUSE_LAYOUT) addHouse(house.team, house.x, house.z, house.facing);
@@ -731,6 +789,11 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     patrolPoints: PATROL_LAYOUT.map(([x, z]) => new THREE.Vector3(x, 0, z)),
     targets,
     houses,
+    houseDestruction: Object.freeze({
+      definitions: Object.freeze([...houseFragmentDefinitions].sort((left, right) => left.id.localeCompare(right.id))),
+      staticColliders: Object.freeze(staticHouseFragmentColliders),
+      staticBallisticSurfaceIds: Object.freeze(staticHouseFragmentBallisticSurfaceIds),
+    }),
     breakableWindows,
     physicalCover,
     houseTelemetry,

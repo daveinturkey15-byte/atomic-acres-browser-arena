@@ -50,7 +50,7 @@ test('completed-match diagnostics stay off the active match path and beacon one 
   await expect.poll(() => requests.length, { timeout: 10_000 }).toBe(1);
   expect(requests[0].contentType.toLowerCase()).toContain('text/plain');
   const envelope = JSON.parse(requests[0].body);
-  expect(envelope).toMatchObject({ schemaVersion: 1, pass: 'PASS 64', arena: 'atomic-acres', mode: 'solo', role: 'offline' });
+  expect(envelope).toMatchObject({ schemaVersion: 1, pass: 'PASS 65', arena: 'atomic-acres', mode: 'solo', role: 'offline' });
   expect(envelope.final.participantCount).toBeGreaterThan(0);
   expect(envelope.events.some((event: { category: string }) => event.category === 'damage')).toBe(true);
   expect(envelope.events.some((event: { category: string }) => event.category === 'regen')).toBe(true);

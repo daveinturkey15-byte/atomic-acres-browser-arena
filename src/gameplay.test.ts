@@ -13,6 +13,8 @@ import {
   cancelReload,
   completeReload,
   computeDamage,
+  effectiveHitZoneForWeapon,
+  weaponCanCritical,
   computeFallDamage,
   computeRecoilImpulse,
   computeSpread,
@@ -44,18 +46,32 @@ describe('solo bot tuning', () => {
 });
 
 describe('headshot damage contract', () => {
-  it('keeps the DHV X magnum binary: lethal head, zero body or limb', () => {
+  it('keeps the Deagle as a high-damage balanced sidearm: strong head, standard body and limb', () => {
     expect(WEAPONS.magnum.rpm).toBe(90);
-    expect(computeDamage(WEAPONS.magnum, 10, 'head')).toBe(100);
-    expect(computeDamage(WEAPONS.magnum, 10, 'body')).toBe(0);
-    expect(computeDamage(WEAPONS.magnum, 10, 'limb')).toBe(0);
+    expect(computeDamage(WEAPONS.magnum, 10, 'head')).toBe(99);
+    expect(computeDamage(WEAPONS.magnum, 10, 'body')).toBe(52);
+    expect(computeDamage(WEAPONS.magnum, 10, 'limb')).toBe(39);
+    expect(isSingleShotLethalFromFullHp(WEAPONS.magnum, 'head')).toBe(false);
   });
-  it('uses exactly 1.5× head damage for every firearm', () => {
+  it('preserves the legacy 1.5× baseline and pins deliberate specialist exceptions', () => {
     expect(HEADSHOT_DAMAGE_MULTIPLIER).toBe(1.5);
     expect(SNIPER_HEADSHOT_DAMAGE_MULTIPLIER).toBe(3);
-    for (const weapon of Object.values(WEAPONS).filter((entry) => entry.id !== 'sniper' && entry.id !== 'magnum' && entry.id !== 'railgun')) {
-      expect(weapon.headMultiplier).toBe(HEADSHOT_DAMAGE_MULTIPLIER);
+    for (const id of ['carbine', 'smg', 'lmg', 'pistol', 'machine-pistol', 'mp5', 'm4a1', 'ak-47', 'flashlight-pistol'] as const) {
+      expect(WEAPONS[id].headMultiplier).toBe(HEADSHOT_DAMAGE_MULTIPLIER);
     }
+    expect(WEAPONS.scattergun.headMultiplier).toBe(1.35);
+    expect(WEAPONS['mini-uzi'].headMultiplier).toBe(1.45);
+    expect(WEAPONS.minigun.headMultiplier).toBe(1);
+    expect(effectiveHitZoneForWeapon(WEAPONS.minigun, 'head')).toBe('body');
+    expect(effectiveHitZoneForWeapon(WEAPONS.carbine, 'head')).toBe('head');
+    expect(weaponCanCritical(WEAPONS.minigun)).toBe(false);
+    expect(weaponCanCritical(WEAPONS.carbine)).toBe(true);
+    expect(WEAPONS.minigun.damage).toBe(11.25);
+    expect(WEAPONS.minigun.minimumDamage).toBe(8.4375);
+    expect(computeDamage(WEAPONS.minigun, 5, 'head')).toBe(11);
+    expect(WEAPONS['m14-ebr'].headMultiplier).toBe(1.7);
+    expect(WEAPONS['slug-shotgun'].headMultiplier).toBe(1.35);
+    expect(WEAPONS['explosive-crossbow'].headMultiplier).toBe(1);
     expect(WEAPONS.sniper.headMultiplier).toBe(SNIPER_HEADSHOT_DAMAGE_MULTIPLIER);
     expect(computeDamage(WEAPONS.railgun, 220, 'head')).toBe(50);
     expect(computeDamage(WEAPONS.railgun, 220, 'body')).toBe(50);
@@ -236,7 +252,7 @@ describe('weapon tuning', () => {
 
   it('gives the marksman a bounded full-auto G18 sidearm', () => {
     const auto = WEAPONS['machine-pistol'];
-    expect(auto.name).toBe('G18 AUTO');
+    expect(auto.name).toBe('Glock 18');
     expect(auto.automatic).toBe(true);
     expect(auto.rpm).toBeGreaterThan(WEAPONS.smg.rpm);
     expect(auto.damage).toBeLessThan(WEAPONS.pistol.damage);
@@ -245,7 +261,7 @@ describe('weapon tuning', () => {
     expect(Math.hypot(...Object.values(sampleWeaponPellet(auto, 0, auto.maximumSpread, 1, 0.5)))).toBeGreaterThan(0);
   });
 
-  it('gives the Longline sniper an exact one-headshot two-body-shot lethality contract', () => {
+  it('gives the M40A5 sniper an exact one-headshot two-body-shot lethality contract', () => {
     const sniper = WEAPONS.sniper;
     const body = computeDamage(sniper, 90, 'body');
     const head = computeDamage(sniper, 90, 'head');
@@ -264,13 +280,15 @@ describe('weapon tuning', () => {
     );
   });
 
-  it('applies the owner-approved close-range Model 12 damage increase without changing cadence or pellet count', () => {
+  it('uses coherent per-pellet Remington 870 damage at the owner-approved pump cadence', () => {
     const shotgun = WEAPONS.scattergun;
-    expect(shotgun.damage).toBe(17);
-    expect(shotgun.minimumDamage).toBe(7);
+    // Pass 66 owner balance pass: 13 per pellet at 95 rpm so the close-range
+    // specialist is not strictly outclassed by SMGs inside its own bracket.
+    expect(shotgun.damage).toBe(13);
+    expect(shotgun.minimumDamage).toBe(5);
     expect(shotgun.pellets).toBe(9);
-    expect(computeDamage(shotgun, 5, 'body') * shotgun.pellets).toBe(153);
-    expect(shotgun.rpm).toBe(82);
+    expect(computeDamage(shotgun, 5, 'body') * shotgun.pellets).toBe(117);
+    expect(shotgun.rpm).toBe(95);
   });
 
   it('builds bounded directional recoil and recovers it toward rest', () => {

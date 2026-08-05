@@ -16,10 +16,12 @@ describe('canonical corpse presentation contract', () => {
       .toThrow(/Canonical rigged operator asset is unavailable.*primitive operator fallback is prohibited/);
   });
 
-  it('builds corpses through the same canonical operator path as live players and bots', () => {
+  it('prewarms bounded corpses through the canonical rig path and leaves the weapon to its drop presentation', () => {
     const main = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
-    expect(main).toContain("buildOperator(source.team, 'fallen-operator', flattenOperatorMaterials, source.weapon)");
-    expect(main).not.toMatch(/fallen-operator[^\n]*source\.weapon\s*,\s*false/);
+    expect(main).toContain("buildOperator(team, 'prewarmed-fallen-operator', flattenOperatorMaterials, 'carbine')");
+    expect(main).toContain('if (rig?.weapon) rig.weapon.visible = false');
+    expect(main).toContain('pooled.inUse = true');
+    expect(main).not.toContain("buildOperator(source.team, 'fallen-operator'");
   });
 
   it('captures the live weapon before a death drop mutates railgun holder state', () => {

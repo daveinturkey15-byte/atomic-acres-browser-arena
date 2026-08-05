@@ -12,7 +12,10 @@ describe('Pass 64 local-light occlusion policy', () => {
     makeShadowedLocal(leaking);
     expect(auditLocalLightOcclusion(root)).toMatchObject({ activeLocalLights: 1, shadowedLocalLights: 1, violations: [] });
     makeEmissiveOnly(leaking);
+    expect(leaking.visible).toBe(false);
     expect(auditLocalLightOcclusion(root)).toMatchObject({ activeLocalLights: 0, emissiveOnlySources: 1, violations: [] });
+    leaking.visible = true;
+    expect(auditLocalLightOcclusion(root).violations).toEqual(['leaking:emissive-only-render-visible']);
   });
 
   it('can audit only lights visible to the authoritative world layer', () => {

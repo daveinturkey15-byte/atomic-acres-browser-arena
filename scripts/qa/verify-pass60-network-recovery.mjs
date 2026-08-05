@@ -20,6 +20,7 @@ async function openPlayer(name, context = null) {
     if (message.type() === 'error') errors.push(`${name} console: ${message.text()}`);
   });
   const url = new URL(baseUrl);
+  url.searchParams.set('release', 'latest');
   url.searchParams.set('renderer', 'webgl2');
   url.searchParams.set('render', 'performance');
   url.searchParams.set('multiplayerQa', '1');

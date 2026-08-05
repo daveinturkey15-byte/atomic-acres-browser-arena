@@ -1,0 +1,21 @@
+ok the gun images need to be better in the field kit, should match its asset or a still render of it at least?, its good they have stts though, could probably improve their stats bars a little too and ensure custom profiles inherit stats bars on their visual
+
+Also ensure we have a damage per seconds aka "DPS" which does some math of the damage+ fire rate so we can ensure weapons are balanced (and recoil is a factor too, and range and wallbanging), peircing for wallbanging could be a state? layout of the killstreaks menu needs improving its still all bunched up, and when you mouse over the selected killstreak youve locekd in it should play a little demo video to the right as i specced, stop ignoring my specs
+
+just sort the arms and knife out, artwork and implementaiton and scale, it needs to be done tbh. also ensure when i click off browser, the map keeps loading, it doesnt atm?
+
+I tried to launch into nuketown but it just crashes, you need to test better. terminal crashed too? this hasnt been tested properly like previous builds - sort it out, dont regress in your skills!
+
+When glass breaks it should just fall to the floor and stop being physical and stopping me moving, its behaving weird.
+
+hold to enter drone seems buggy still, lets make it you just press the killstreak button again so 4 for drone or 6 for chopper gunner
+
+Remove the odd invisible walls in terminal
+
+Carpet bomb on the green destrucile shed still crashed the game, grr
+
+ADS with snipers still causing freezing, and when i die sometimes? Sor tthat
+
+glass aint breaking on atomic acres when i stab it?
+
+still strange white noise coming in some times, at 1 minute into atomic acres this time?

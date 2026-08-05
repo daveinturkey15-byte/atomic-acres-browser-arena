@@ -1,4 +1,5 @@
 import { WEAPONS } from './gameplay';
+import type { HostTriggerAuthorityState } from './host-trigger-authority';
 import type { CombatantPoseSample } from './lag-compensation';
 import { MULTIPLAYER_PROTOCOL_VERSION, type PlayerSnapshot, type ShotRejectReason, type ShotRequestMessage } from './protocol';
 
@@ -20,6 +21,7 @@ export type AuthoritativeShotAdmissionContext = Readonly<{
   expectedLifeId: number;
   clockUncertaintyMs: number;
   shooterDiedAtHostTimeMs: number | null;
+  hostTriggerState: HostTriggerAuthorityState | null;
 }>;
 
 export type AuthoritativeShotAdmission = Readonly<{
@@ -66,6 +68,7 @@ export function admitAuthoritativeShot(
     expectedLifeId: request.lifeId,
     clockUncertaintyMs: 0,
     shooterDiedAtHostTimeMs: null,
+    hostTriggerState: null,
   },
 ): AuthoritativeShotAdmission {
   const fireAgeMs = receivedAtHostTimeMs - request.fireTimeMs;
@@ -92,6 +95,16 @@ export function admitAuthoritativeShot(
     return reject('sequence-gap');
   }
   if (sender.weapon !== request.weapon) return reject('weapon-mismatch');
+  const spinUpMs = WEAPONS[request.weapon].spinUpMs;
+  if (spinUpMs > 0) {
+    const trigger = context.hostTriggerState;
+    const hostHeldMs = trigger?.pressed && trigger.weapon === request.weapon
+      && trigger.connectionEpoch === request.connectionEpoch && trigger.lifeId === request.lifeId
+      && trigger.pressedAtHostTimeMs !== null
+      ? receivedAtHostTimeMs - trigger.pressedAtHostTimeMs
+      : Number.NEGATIVE_INFINITY;
+    if (hostHeldMs + AUTHORED_CADENCE_TOLERANCE_MS < spinUpMs) return reject('spin-up');
+  }
   if (request.pelletDirections.length !== WEAPONS[request.weapon].pellets) return reject('invalid-pellets');
   if (fireAgeMs > MAX_SHOT_FIRE_AGE_MS + clockUncertaintyAllowanceMs) return reject('stale');
   if (fireAgeMs < -MAX_FUTURE_SHOT_MS - clockUncertaintyAllowanceMs) return reject('future');
@@ -180,6 +193,16 @@ export function freezeAuthoredBulletRecord(request: ShotRequestMessage): ShotReq
     direction: frozenVector(request.direction),
     pelletDirections: Object.freeze(request.pelletDirections.map(frozenVector)) as unknown as [number, number, number][],
   });
+}
+
+export function canonicalShotDirection(
+  weapon: ShotRequestMessage['weapon'],
+  direction: [number, number, number],
+  pelletDirections: readonly [number, number, number][],
+): [number, number, number] {
+  return WEAPONS[weapon].fireKind === 'projectile' && pelletDirections[0]
+    ? pelletDirections[0]
+    : direction;
 }
 
 export function validateShotOrigin(request: ShotRequestMessage, shooterPose: CombatantPoseSample): boolean {

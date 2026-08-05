@@ -1,7 +1,8 @@
 import releaseChannelsJson from '../release-channels.json';
 import './style.css';
 import './ui/tactical-ui.css';
-import { latestChangelogEntry } from './changelog';
+import './ui/pass66-readability.css';
+import './ui/pass66-overhaul.css';
 import {
   releaseChannelDecision,
   stableReleaseUrl,
@@ -9,7 +10,6 @@ import {
 } from './release-channel';
 
 const releaseChannels: ReleaseChannelConfig = releaseChannelsJson;
-const latestRelease = latestChangelogEntry();
 const appElement = document.querySelector<HTMLDivElement>('#app');
 if (!appElement) throw new Error('Missing #app root');
 const app = appElement;
@@ -34,7 +34,7 @@ function showReleaseChooser(): void {
         <p>Load the newest approved build, or keep playing the preserved version people already know.</p>
         <div class="release-channel-options">
           <button type="button" class="release-channel-option primary" data-release-choice="latest">
-            <small>${latestRelease.pass} · LATEST APPROVED</small>
+            <small>${releaseChannels.experimental.pass} · LIVE TARGET</small>
             <strong>${releaseChannels.latest.label}</strong>
             <span>${releaseChannels.latest.description}</span>
           </button>

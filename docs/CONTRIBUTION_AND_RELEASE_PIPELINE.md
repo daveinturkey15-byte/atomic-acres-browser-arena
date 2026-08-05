@@ -39,7 +39,8 @@ The machine name identifies where the bytes originated; the harness identifies w
 3. Run:
 
    ```bash
-   npm ci
+   npx --yes npm@10.9.8 ci --ignore-scripts
+   npm run qa:lockfile
    npm run pipeline:preflight -- --machine <machine> --harness <harness>
    ```
 
@@ -49,6 +50,8 @@ The machine name identifies where the bytes originated; the harness identifies w
 7. Commit intentionally, rerun the preflight, push only the contribution branch, and open a PR with the repository template. CI builds the exact PR head and uploads `pr-preview-<pr>-<head-sha>`.
 8. Dave tests that immutable preview. Record its exact source SHA and timestamp in the manifest, add Dave's approval, and push only the manifest/process update. Any later runtime or release-shell change invalidates approval and requires a new preview.
 9. Stop at handoff. The contributor does not merge or deploy.
+
+Pass 66 has one explicit, narrow authorization exception. Dave has already instructed the release owner to publish Version 66 as **The Big One** when the frozen candidate is genuinely green, without waiting for another subjective HITL feedback round, while keeping byte-exact Pass 63 Stable and never publishing Pass 65. The immutable preview, exact-SHA gates and acceptance manifest are still mandatory. Only after that preview exists may a process-only acceptance update bind the standing instruction to its exact SHA and actual binding time; it must state truthfully that Dave did not perform a new inspection of that preview. Any later runtime or release-shell drift invalidates the binding. This exception does not apply to another pass.
 
 Before implementation, declare one mechanically conservative impact class:
 
@@ -119,23 +122,26 @@ The first successful exact-SHA receipt plus cache-busted live smoke is the termi
 
 ## Player release channels
 
-The canonical root is a chooser, not a gameplay build. Schema 4 presents exactly two explicit choices and can pin a nested historical Pages subtree by exact digest:
+The canonical root is a chooser, not a gameplay build. Pass 66 source stages schema 4 locally with exactly two intended choices, but this source configuration is not evidence that Pass 66 is published or live:
 
-- **Experimental New Netcode** loads the exact green source SHA being promoted as live Pass 64.
-- **New Netcode** loads the immutable stable channel pinned to the released Pass 63 source `1bd55076c952080d5f7a8a5b0b8869aaa0646a76`, Pages SHA `2201a606a8c9f83d441036eac07dc140bd7e63f5`, exact `channels/experimental-netcode-pass` subtree, 119-file runtime set, and tree digest `61666de694ea6bd62391c1e0661ffcc2864142bb569407c93a2ebdfd28031ce7`.
+- **The Big One** is the unpublished Pass 66 live target staged at `channels/the-big-one`. Dave's standing conditional instruction authorizes its promotion without another subjective HITL round only after an immutable preview exists, all blocking mechanical and visual evidence is green, the truthful process-only acceptance binding and exact-main checks pass, and the protected production workflow is dispatched.
+- **New Netcode** remains the immutable Stable channel pinned to the released Pass 63 source `1bd55076c952080d5f7a8a5b0b8869aaa0646a76`, Pages SHA `2201a606a8c9f83d441036eac07dc140bd7e63f5`, exact historical `channels/experimental-netcode-pass` subtree, 119-file runtime set, and tree digest `61666de694ea6bd62391c1e0661ffcc2864142bb569407c93a2ebdfd28031ce7`.
 
-The stable channel is a Git commit identity, not a moving branch or manually copied folder. During promotion, `scripts/release/stage-release-topology.mjs` reconstructs Pass 63 only from the source and Pages commits pinned in `release-channels.json`, builds the Pass 64 live candidate from the exact promoted source, replaces the root with the two-choice chooser, and records provenance plus tree digests. `scripts/qa/verify-release-topology.mjs` byte-compares every archived Pass 63 file to its pinned Git blob before deployment. Room invitations and legacy `latest` or `normal` links bypass the chooser into live Pass 64. The separate Pass 62 benchmark record remains immutable historical evidence.
+Pass 64 remains the currently published failed-regression comparator only until the authorized Pass 66 promotion succeeds; it is never Stable. Its published source `5075a52d80c6db69a97ed53acc2df5368728371a`, Pages SHA `8326c95659a9fb8c5979c13f9b88126c4ffb85f7`, 130-file channel and digest `ffd3e130d005e9321976795fe2d5cadfd9965ebb27dc0bbff0c1609816cff20b` stay separately identified in candidate project-map evidence. Pass 65 is superseded audit evidence and must never be promoted.
+
+The Stable channel is a Git commit identity, not a moving branch or manually copied folder. During an authorized promotion, `scripts/release/stage-release-topology.mjs` reconstructs Pass 63 only from the source and Pages commits pinned in `release-channels.json`, places the exact Pass 66 build under `channels/the-big-one`, replaces the root with the two-choice chooser, and records provenance plus tree digests. `scripts/qa/verify-release-topology.mjs` byte-compares every archived Pass 63 file to its pinned Git blob before deployment. Only after a successful protected promotion do room invitations and legacy `latest` or `normal` links become live Pass 66 routes. The separate Pass 62 benchmark record remains immutable offline/reconstructible historical evidence.
 
 Changing either pinned Pass 63 SHA is a separate reviewed release decision. Verify the candidate was genuinely live, update the config in one PR, and test the root chooser plus both direct channel URLs before promotion. Never infer "stable" from a pass number, branch name, local build, or chat claim.
 
 ## Multi-machine setup
 
-Each machine needs Git, Node 22, npm, and GitHub CLI authenticated for this repository. Contributors need `repo`; release owners who change workflow files also need `workflow`.
+Each machine needs Git, Node 22, npm 10.9.8, and GitHub CLI authenticated for this repository. Contributors need `repo`; release owners who change workflow files also need `workflow`. `package.json#packageManager` is the executable package-manager authority; do not regenerate the lockfile with a newer npm and assume an existing `node_modules` proves that CI can clean-install it.
 
 Run on every machine:
 
 ```bash
-npm ci
+npx --yes npm@10.9.8 ci --ignore-scripts
+npm run qa:lockfile
 npm run pipeline:doctor
 ```
 
@@ -164,3 +170,7 @@ If tasks overlap or a machine disappears:
 ## Permission failure gotcha
 
 **Symptom -> Cause -> Correction -> Verify:** a normal code push works but a workflow-file push is rejected -> the GitHub OAuth token has `repo` but not `workflow` -> authorize `workflow` for the intended GitHub account, without changing remotes or bypassing authentication -> `gh auth status` lists `workflow`, the branch push succeeds, and the PR contains only the reviewed workflow/process diff.
+
+## Lockfile compatibility gotcha
+
+**Symptom -> Cause -> Correction -> Verify:** local tests pass but both CI operating systems fail immediately in `npm ci` with a missing transitive package -> the lockfile was accepted or regenerated by a different npm resolver than the pinned CI package manager -> run `npx --yes npm@10.9.8 install --package-lock-only --ignore-scripts`, retain `packageManager: npm@10.9.8`, and never hand-edit dependency entries -> `npm run qa:lockfile` succeeds before the contribution is pushed.

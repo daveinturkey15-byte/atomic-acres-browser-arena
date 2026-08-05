@@ -14,6 +14,13 @@ export function makeEmissiveOnly(light: THREE.Light): void {
   tagged.userData.occlusionPolicy = 'emissive-only';
   tagged.userData.authoredIntensity = light.intensity;
   light.intensity = 0;
+  // A zero-intensity Light still participates in Three's WebGPU light graph.
+  // Atomic Acres carries thirteen of these metadata-only sources; leaving them
+  // visible makes every PBR material compile against lights that contribute no
+  // pixels and can exhaust D3D12 pipeline-state compilation in constrained
+  // browser processes. The authored emissive meshes remain visible, while the
+  // inert Light nodes stay available for telemetry without entering rendering.
+  light.visible = false;
   light.castShadow = false;
 }
 
@@ -41,6 +48,7 @@ export function auditLocalLightOcclusion(root: THREE.Object3D, layerMask?: numbe
     const tagged = node as OcclusionTaggedLight;
     if (tagged.userData.occlusionPolicy === 'emissive-only') {
       emissiveOnlySources += 1;
+      if (node.visible) violations.push(`${node.name || '(unnamed)'}:emissive-only-render-visible`);
       if (node.intensity !== 0 || node.castShadow) violations.push(`${node.name}:emissive-only-runtime-light`);
       return;
     }

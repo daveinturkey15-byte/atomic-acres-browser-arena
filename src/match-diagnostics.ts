@@ -14,6 +14,12 @@ import {
   type MatchDiagnosticSource,
   type MatchDiagnosticUploadEnvelope,
 } from '../shared/match-diagnostics-schema';
+import {
+  CLIENT_RUNTIME_MESSAGE_LIMIT,
+  CLIENT_RUNTIME_SOURCE_LIMIT,
+  CLIENT_RUNTIME_STACK_LIMIT,
+  sanitizeClientRuntimeText,
+} from './client-runtime-log';
 
 export const MATCH_DIAGNOSTICS_SCHEMA_VERSION = 2;
 export const MAX_DIAGNOSTIC_EVENTS = 2_048;
@@ -127,7 +133,17 @@ function scrubText(value: string): string {
 
 export function sanitizeDiagnosticValue(value: unknown, key = ''): unknown {
   if (SECRET_KEYS.test(key)) return '[redacted]';
-  if (typeof value === 'string') return scrubText(value).slice(0, 160);
+  if (typeof value === 'string') {
+    const stack = /stack/i.test(key);
+    const limit = stack
+      ? CLIENT_RUNTIME_STACK_LIMIT
+      : /source|filename/i.test(key)
+        ? CLIENT_RUNTIME_SOURCE_LIMIT
+        : /message|error/i.test(key)
+          ? CLIENT_RUNTIME_MESSAGE_LIMIT
+          : 160;
+    return sanitizeClientRuntimeText(value, limit, stack);
+  }
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
   if (typeof value === 'boolean' || value === null) return value;
   if (Array.isArray(value)) return value.slice(0, 8_192).map((entry) => sanitizeDiagnosticValue(entry));

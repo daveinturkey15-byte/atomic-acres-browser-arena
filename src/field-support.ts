@@ -1,8 +1,15 @@
 import { GRENADE_RADIUS, type Stance } from './gameplay';
 import type { ExplosiveSource } from './protocol';
+import { explosiveBoltBlastRadiusM } from './combat/ordnance';
+import { PASS65_KILLSTREAK_CATALOG, type KillstreakLoadoutV1, type Pass65KillstreakId } from './killstreak-catalog';
+import { DEFAULT_KILLSTREAK_LOADOUT } from './killstreak-loadout';
 
-export const FIELD_SUPPORT_IDS = ['scout-sweep', 'yardhawk', 'tri-pass', 'hunter-swarm', 'nuke'] as const;
-export type FieldSupportId = typeof FIELD_SUPPORT_IDS[number];
+export const FIELD_SUPPORT_IDS: readonly Pass65KillstreakId[] = Object.freeze(
+  PASS65_KILLSTREAK_CATALOG.definitions
+    .filter((definition) => definition.availability === 'selectable')
+    .map((definition) => definition.id),
+);
+export type FieldSupportId = Pass65KillstreakId;
 
 export type FieldSupportDefinition = {
   id: FieldSupportId;
@@ -11,13 +18,16 @@ export type FieldSupportDefinition = {
   repeatable: boolean;
 };
 
-export const FIELD_SUPPORT: readonly FieldSupportDefinition[] = [
-  { id: 'scout-sweep', name: 'Scout Sweep', eliminations: 3, repeatable: true },
-  { id: 'yardhawk', name: 'Yardhawk', eliminations: 5, repeatable: true },
-  { id: 'tri-pass', name: 'Tri-Pass Strike', eliminations: 7, repeatable: true },
-  { id: 'hunter-swarm', name: 'Hunter Swarm', eliminations: 8, repeatable: true },
-  { id: 'nuke', name: 'Nuke', eliminations: 15, repeatable: true },
-] as const;
+export const FIELD_SUPPORT: readonly FieldSupportDefinition[] = Object.freeze(
+  PASS65_KILLSTREAK_CATALOG.definitions
+    .filter((definition) => definition.availability === 'selectable')
+    .map((definition) => Object.freeze({
+      id: definition.id,
+      name: definition.displayName,
+      eliminations: definition.cost,
+      repeatable: definition.repeatable,
+    })),
+);
 
 export const TRI_PASS_BLAST_RADIUS = 15;
 export const TRI_PASS_MAX_DAMAGE = 450;
@@ -34,8 +44,9 @@ export const SCOUT_SWEEP_PULSE_INTERVAL_MS = 3_000;
 export const SCOUT_SWEEP_PULSE_VISIBLE_MS = 1_500;
 export const REMOTE_EXPLOSIVE_HIT_MARGIN = 1.3;
 
-export function remoteExplosiveHitMaximumDistance(source?: ExplosiveSource): number {
+export function remoteExplosiveHitMaximumDistance(source?: ExplosiveSource, stuck = false): number {
   if (source === 'grenade') return GRENADE_RADIUS + REMOTE_EXPLOSIVE_HIT_MARGIN;
+  if (source === 'explosive-crossbow') return explosiveBoltBlastRadiusM(stuck) + REMOTE_EXPLOSIVE_HIT_MARGIN;
   if (source === 'tri-pass') return TRI_PASS_BLAST_RADIUS + REMOTE_EXPLOSIVE_HIT_MARGIN;
   if (source === 'hunter-swarm') return HUNTER_SWARM_BLAST_RADIUS + REMOTE_EXPLOSIVE_HIT_MARGIN;
   if (source === 'nuke') return Number.POSITIVE_INFINITY;
@@ -49,93 +60,75 @@ export function scoutSweepPulseVisible(now: number, activeUntil: number): boolea
   return elapsed % SCOUT_SWEEP_PULSE_INTERVAL_MS < SCOUT_SWEEP_PULSE_VISIBLE_MS;
 }
 
-export function cycleFieldSupportSelection(current: FieldSupportId, direction: -1 | 1): FieldSupportId {
-  const index = FIELD_SUPPORT_IDS.indexOf(current);
-  return FIELD_SUPPORT_IDS[(index + direction + FIELD_SUPPORT_IDS.length) % FIELD_SUPPORT_IDS.length];
+export function cycleFieldSupportSelection(
+  current: FieldSupportId,
+  direction: -1 | 1,
+  loadout: KillstreakLoadoutV1 = DEFAULT_KILLSTREAK_LOADOUT,
+): FieldSupportId {
+  const index = loadout.slots.indexOf(current);
+  const anchoredIndex = index < 0 ? 0 : index;
+  return loadout.slots[(anchoredIndex + direction + loadout.slots.length) % loadout.slots.length];
 }
-
-const REPEATABLE_REWARD_THRESHOLD = 7;
 
 function supportFlags(value = false): Record<FieldSupportId, boolean> {
-  return {
-    'scout-sweep': value,
-    yardhawk: value,
-    'tri-pass': value,
-    'hunter-swarm': value,
-    nuke: value,
-  };
+  return Object.fromEntries(FIELD_SUPPORT_IDS.map((id) => [id, value])) as Record<FieldSupportId, boolean>;
 }
 
-export type FieldSupportState = {
-  /** Continuous combat streak. Resets only on death or a new match. */
+function supportCounts(): Record<FieldSupportId, number> {
+  return Object.fromEntries(FIELD_SUPPORT_IDS.map((id) => [id, 0])) as Record<FieldSupportId, number>;
+}
+
+/**
+ * Read-only compatibility projection for the legacy HUD and input adapters.
+ * Reward authority lives exclusively in HostKillstreakRuntime; this shape must
+ * never be stored and mutated as gameplay state.
+ */
+export type FieldSupportProjection = Readonly<{
   streak: number;
-  /** Progress through the compact 3/5/7 field-support eligibility cycle. */
   rewardCycle: number;
-  available: Record<FieldSupportId, boolean>;
-  earnedThisStreak: Record<FieldSupportId, boolean>;
-};
+  loadout: KillstreakLoadoutV1;
+  available: Readonly<Record<FieldSupportId, boolean>>;
+  availableCharges: Readonly<Record<FieldSupportId, number>>;
+  revealedCareReward: FieldSupportId | null;
+}>;
 
-export function createFieldSupportState(): FieldSupportState {
-  return {
-    streak: 0,
-    rewardCycle: 0,
-    available: supportFlags(),
-    earnedThisStreak: supportFlags(),
-  };
-}
+export type FieldSupportActorProjectionSource = Readonly<{
+  streak: number;
+  cycleProgress: number;
+  loadout: KillstreakLoadoutV1;
+  available: readonly FieldSupportId[];
+  availableCharges: readonly Readonly<{ id: FieldSupportId; count: number }>[];
+  revealedCareRewards: readonly FieldSupportId[];
+}>;
 
-export function recordSupportElimination(state: FieldSupportState): FieldSupportState {
-  const nextStreak = Math.max(0, Math.floor(state.streak)) + 1;
-  const nextRewardCycle = Math.max(0, Math.floor(state.rewardCycle)) % REPEATABLE_REWARD_THRESHOLD + 1;
-  const available = { ...state.available };
-  const earnedThisStreak = { ...state.earnedThisStreak };
-  for (const reward of FIELD_SUPPORT) {
-    const usesCompactCycle = reward.repeatable && reward.eliminations <= REPEATABLE_REWARD_THRESHOLD;
-    const thresholdReached = !reward.repeatable
-      ? nextStreak === reward.eliminations
-      : usesCompactCycle
-        ? nextRewardCycle === reward.eliminations
-        : nextStreak % reward.eliminations === 0;
-    // High-tier rewards use independent streak multiples (8, 16, 24… and
-    // 15, 30, 45…). They must be earnable again after use without forcing a
-    // death, while an unused copy simply stays banked.
-    const canEarnAgain = reward.repeatable && !usesCompactCycle;
-    if (thresholdReached && (canEarnAgain || !earnedThisStreak[reward.id])) {
-      available[reward.id] = true;
-      earnedThisStreak[reward.id] = true;
-    }
+export function projectFieldSupportActor(
+  actor: FieldSupportActorProjectionSource | null,
+  fallbackLoadout: KillstreakLoadoutV1 = DEFAULT_KILLSTREAK_LOADOUT,
+): FieldSupportProjection {
+  const loadout = actor?.loadout ?? fallbackLoadout;
+  const available = supportFlags();
+  const availableCharges = supportCounts();
+  for (const charge of actor?.availableCharges ?? []) {
+    availableCharges[charge.id] = charge.count;
+    available[charge.id] = charge.count > 0;
   }
-  if (nextRewardCycle === REPEATABLE_REWARD_THRESHOLD) {
-    return {
-      streak: nextStreak,
-      rewardCycle: 0,
-      available,
-      earnedThisStreak: {
-        ...earnedThisStreak,
-        'scout-sweep': false,
-        yardhawk: false,
-        'tri-pass': false,
-      },
-    };
+  const revealedCareReward = actor?.revealedCareRewards[0] ?? null;
+  if (revealedCareReward) {
+    available[revealedCareReward] = true;
+    // A captured Care Package is still selected through slot one. Project its
+    // readiness onto that slot without manufacturing a second reward queue.
+    available[loadout.slots[0]] = true;
   }
-  return { streak: nextStreak, rewardCycle: nextRewardCycle, available, earnedThisStreak };
-}
-
-export function recordSupportDeath(state: FieldSupportState): FieldSupportState {
-  return {
-    streak: 0,
-    rewardCycle: 0,
-    available: { ...state.available, 'hunter-swarm': false, nuke: false },
-    earnedThisStreak: supportFlags(),
-  };
-}
-
-export function consumeFieldSupport(state: FieldSupportState, id: FieldSupportId): { state: FieldSupportState; activated: boolean } {
-  if (!state.available[id]) return { state, activated: false };
-  return {
-    state: { ...state, available: { ...state.available, [id]: false } },
-    activated: true,
-  };
+  const streak = Math.max(0, Math.floor(actor?.streak ?? 0));
+  const cycleProgress = Math.max(0, Math.floor(actor?.cycleProgress ?? 0));
+  return Object.freeze({
+    streak,
+    rewardCycle: cycleProgress,
+    loadout,
+    available: Object.freeze(available),
+    availableCharges: Object.freeze(availableCharges),
+    revealedCareReward,
+  });
 }
 
 export type TriPassPoint = { x: number; z: number };

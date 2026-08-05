@@ -51,14 +51,14 @@ export function projectMapDialogMarkup(bundle: ProjectMapBundle = createProjectM
         </div>
         <button id="project-map-close" type="button" aria-label="Close project map">CLOSE</button>
       </header>
-      <div class="project-map-meta"><span>${escapeHtml(current.pass)}</span><b>${escapeHtml(current.title)}</b><i>${escapeHtml(bundle.current.candidateState.replaceAll('-', ' '))}</i></div>
+      <div class="project-map-meta"><span>${escapeHtml(current.pass)}</span><b>${escapeHtml(current.title)}</b><i>${escapeHtml(bundle.current.releaseState.replaceAll('-', ' '))}</i></div>
       <nav id="project-map-tabs" role="tablist" aria-label="Project map pages">
         ${(['overview', 'structure', 'changes', 'archive'] as const).map((page, index) => `<button type="button" role="tab" data-project-page="${page}" aria-controls="project-map-page-${page}" aria-selected="${index === 0}">${page.toUpperCase()}</button>`).join('')}
       </nav>
       <div class="project-map-pages">
         <section id="project-map-page-overview" role="tabpanel" data-project-map-page="overview">
-          <div class="project-map-intro"><span><small>LOCAL CANDIDATE</small><strong>${escapeHtml(current.pass)}</strong></span><p>${escapeHtml(current.summary)}</p></div>
-          <div class="project-channel-state"><span><small>PUBLISHED LIVE</small><b>${escapeHtml(bundle.publishedChannels.live.pass)}</b></span><span><small>STABLE FALLBACK</small><b>${escapeHtml(bundle.publishedChannels.stable.pass)}</b></span></div>
+          <div class="project-map-intro"><span><small>CURRENT LIVE TARGET</small><strong>${escapeHtml(current.pass)}</strong></span><p>${escapeHtml(current.summary)}</p></div>
+          <div class="project-channel-state"><span><small>LIVE TARGET · ${escapeHtml(bundle.publishedChannels.liveTarget.state.toUpperCase())}</small><b>${escapeHtml(bundle.publishedChannels.liveTarget.pass)}</b></span><span><small>STABLE FALLBACK · BYTE-EXACT</small><b>${escapeHtml(bundle.publishedChannels.stable.pass)}</b></span></div>
           <h3>AUTHORITY BOUNDARIES</h3>
           <ul class="project-boundaries">${bundle.operatingBoundaries.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}</ul>
           <div class="project-downloads">

@@ -111,8 +111,8 @@ export function rustworksLightingTint(
     sunIntensity: quality ? 0.95 : 0.75,
     fillIntensity: quality ? 0.28 : 0.34,
     hemisphereIntensity: quality ? 0.45 : 0.58,
-    ambientIntensity: quality ? 0.16 : 0.24,
-    exposure: quality ? 1 : 0.98,
+    ambientIntensity: quality ? 0.20 : 0.30,
+    exposure: quality ? 1.25 : 1.225,
     godRayStrength: 0.04,
     godRayLobes: 2,
   };
@@ -232,61 +232,12 @@ export function createRustworksQualityLights(parent: THREE.Object3D, profile: Re
   return root;
 }
 
-/** Build / refresh a starfield sphere (shared for Quality + Performance night). */
+/** Retire the legacy point-star overlay; the selected panorama owns the sky. */
 export function ensureRustworksStarfield(scene: THREE.Scene, arenaId: ArenaId): THREE.Points | null {
-  if (arenaId !== 'rustworks-1v1') {
-    if (qualityState.starsRoot) qualityState.starsRoot.visible = false;
-    return qualityState.starsRoot;
-  }
-  if (qualityState.starsRoot) {
-    qualityState.starsRoot.visible = true;
-    return qualityState.starsRoot;
-  }
-  const count = 2200;
-  const positions = new Float32Array(count * 3);
-  const colors = new Float32Array(count * 3);
-  const radius = 180;
-  for (let i = 0; i < count; i += 1) {
-    // Upper hemisphere bias
-    const u = Math.random();
-    const v = Math.random();
-    const theta = u * Math.PI * 2;
-    const phi = Math.acos(1 - v * 0.72); // mostly above horizon
-    const r = radius * (0.92 + Math.random() * 0.08);
-    const x = r * Math.sin(phi) * Math.cos(theta);
-    const y = r * Math.cos(phi);
-    const z = r * Math.sin(phi) * Math.sin(theta);
-    positions[i * 3] = x;
-    positions[i * 3 + 1] = y;
-    positions[i * 3 + 2] = z;
-    const warm = Math.random() > 0.85;
-    const c = warm ? new THREE.Color(0xffe6c0) : new THREE.Color(0xd8e6ff);
-    const b = 0.55 + Math.random() * 0.45;
-    colors[i * 3] = c.r * b;
-    colors[i * 3 + 1] = c.g * b;
-    colors[i * 3 + 2] = c.b * b;
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  const material = new THREE.PointsMaterial({
-    size: 0.55,
-    sizeAttenuation: true,
-    vertexColors: true,
-    transparent: true,
-    opacity: 0.92,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  });
-  const stars = new THREE.Points(geometry, material);
-  stars.name = 'rustworks-starfield';
-  stars.frustumCulled = false;
-  stars.userData.presentationOnly = true;
-  stars.userData.blocksShots = false;
-  stars.raycast = () => undefined;
-  scene.add(stars);
-  qualityState.starsRoot = stars;
-  return stars;
+  void scene;
+  void arenaId;
+  if (qualityState.starsRoot) qualityState.starsRoot.visible = false;
+  return qualityState.starsRoot;
 }
 
 export function setRustworksQualityPresentationActive(active: boolean, profile: RenderProfile): void {
@@ -294,7 +245,7 @@ export function setRustworksQualityPresentationActive(active: boolean, profile: 
     qualityState.lightsRoot.visible = active && (profile === 'blender' || profile === 'performance');
   }
   if (qualityState.starsRoot) {
-    qualityState.starsRoot.visible = active;
+    qualityState.starsRoot.visible = false;
   }
 }
 

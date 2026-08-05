@@ -4,6 +4,7 @@ import type { RenderInfoSnapshot } from './render-runtime';
 
 export type ArenaRenderLivenessAudit = Readonly<{
   arenaId: ArenaId;
+  presentationRootName: string;
   eligible: boolean;
   rootAttached: boolean;
   rootVisible: boolean;
@@ -12,6 +13,7 @@ export type ArenaRenderLivenessAudit = Readonly<{
   renderableDescendants: number;
   visibleRenderableDescendants: number;
   cameraLayerRenderableDescendants: number;
+  submissionExpected: boolean;
   calls: number;
   triangles: number;
   reasons: readonly string[];
@@ -62,21 +64,23 @@ export function auditArenaRenderLiveness(
   renderInfo: RenderInfoSnapshot,
   eligible = true,
   camera?: THREE.Camera,
+  presentationRoot: THREE.Group = root,
+  submissionExpected = true,
 ): ArenaRenderLivenessAudit {
   let renderableDescendants = 0;
   let visibleRenderableDescendants = 0;
   let cameraLayerRenderableDescendants = 0;
-  root.traverse((node) => {
+  presentationRoot.traverse((node) => {
     if (!renderable(node) || !materialVisible(node)) return;
     if (node instanceof THREE.InstancedMesh && node.count <= 0) return;
     renderableDescendants += 1;
-    if (visibleThroughRoot(node, root)) {
+    if (visibleThroughRoot(node, presentationRoot)) {
       visibleRenderableDescendants += 1;
       if (!camera || camera.layers.test(node.layers)) cameraLayerRenderableDescendants += 1;
     }
   });
-  const rootAttached = root.parent === scene;
-  const rootVisible = root.visible;
+  const rootAttached = presentationRoot.parent === scene;
+  const rootVisible = presentationRoot.visible;
   const definitionMatches = root.userData.arenaVisualDefinitionId === arenaId
     && root.userData.authoritativeArenaId === arenaId;
   const activeDefinitionRoots = scene.children.filter((node) => node.userData.arenaVisualDefinitionId !== undefined).length;
@@ -88,10 +92,11 @@ export function auditArenaRenderLiveness(
     if (activeDefinitionRoots !== 1) reasons.push('definition-root-count');
     if (visibleRenderableDescendants === 0) reasons.push('selected-world-empty');
     else if (cameraLayerRenderableDescendants === 0) reasons.push('selected-world-out-of-camera-layer');
-    if (renderInfo.calls === 0) reasons.push('renderer-submission-empty');
+    if (submissionExpected && renderInfo.calls === 0) reasons.push('renderer-submission-empty');
   }
   return {
     arenaId,
+    presentationRootName: presentationRoot.name,
     eligible,
     rootAttached,
     rootVisible,
@@ -100,6 +105,7 @@ export function auditArenaRenderLiveness(
     renderableDescendants,
     visibleRenderableDescendants,
     cameraLayerRenderableDescendants,
+    submissionExpected,
     calls: renderInfo.calls,
     triangles: renderInfo.triangles,
     reasons,

@@ -1,12 +1,17 @@
-import type { GrenadeThrowMessage, PlayerSnapshot } from './protocol';
+import { MULTIPLAYER_PROTOCOL_VERSION, type GrenadeId, type GrenadeThrowMessage, type PlayerSnapshot } from './protocol';
 
 export const REMOTE_GRENADE_MIN_FUSE_MS = 1_800;
 export const REMOTE_GRENADE_MAX_FUSE_MS = 3_400;
+export const REMOTE_SEMTEX_MIN_FUSE_MS = 900;
+export const REMOTE_SEMTEX_MAX_FUSE_MS = 5_200;
 export const REMOTE_GRENADE_MAX_TRAVEL = 36;
 const REMOTE_GRENADE_ORIGIN_TOLERANCE = 2.4;
 const REMOTE_GRENADE_MAX_VELOCITY = 20;
 
 type RemoteGrenadeAction = Readonly<{
+  grenade: GrenadeId;
+  lifeId: number;
+  actionSequence: number;
   origin: readonly [number, number, number];
   thrownAt: number;
   explosionOrigin: readonly [number, number, number] | null;
@@ -15,15 +20,47 @@ type RemoteGrenadeAction = Readonly<{
 
 export type RemoteGrenadeAuthorityState = Readonly<{
   remaining: number;
+  selectedGrenade: GrenadeId | null;
+  lifeId: number | null;
+  highestActionSequence: number;
   actions: Readonly<Record<number, RemoteGrenadeAction>>;
 }>;
 
-export function createRemoteGrenadeAuthorityState(): RemoteGrenadeAuthorityState {
-  return { remaining: 2, actions: {} };
+export function createRemoteGrenadeAuthorityState(selectedGrenade: GrenadeId | null = null): RemoteGrenadeAuthorityState {
+  return { remaining: 1, selectedGrenade, lifeId: null, highestActionSequence: -1, actions: {} };
 }
 
 export function resetRemoteGrenadeAuthorityState(): RemoteGrenadeAuthorityState {
   return createRemoteGrenadeAuthorityState();
+}
+
+/** Stops new throws for a dead life while retaining already-thrown ordnance. */
+export function recordRemoteGrenadeDeath(state: RemoteGrenadeAuthorityState): RemoteGrenadeAuthorityState {
+  return { ...state, remaining: 0 };
+}
+
+function unexpiredRemoteGrenadeActions(
+  state: RemoteGrenadeAuthorityState,
+  now: number,
+): Readonly<Record<number, RemoteGrenadeAction>> {
+  if (!Number.isFinite(now)) return {};
+  return Object.fromEntries(Object.entries(state.actions)
+    .filter(([, action]) => now - action.thrownAt <= REMOTE_SEMTEX_MAX_FUSE_MS));
+}
+
+/** Starts a new life without erasing still-live ordnance thrown by the prior life. */
+export function recordRemoteGrenadeRespawn(
+  state: RemoteGrenadeAuthorityState,
+  selectedGrenade: GrenadeId,
+  now: number,
+): RemoteGrenadeAuthorityState {
+  return {
+    remaining: 1,
+    selectedGrenade,
+    lifeId: null,
+    highestActionSequence: -1,
+    actions: unexpiredRemoteGrenadeActions(state, now),
+  };
 }
 
 export function replenishRemoteGrenadeAuthorityState(
@@ -31,7 +68,7 @@ export function replenishRemoteGrenadeAuthorityState(
   amount = 1,
 ): RemoteGrenadeAuthorityState {
   if (!Number.isFinite(amount) || amount <= 0) return state;
-  return { ...state, remaining: Math.min(2, state.remaining + Math.floor(amount)) };
+  return { ...state, remaining: Math.min(1, state.remaining + Math.floor(amount)) };
 }
 
 export function admitRemoteGrenadeThrow(
@@ -40,7 +77,13 @@ export function admitRemoteGrenadeThrow(
   sender: PlayerSnapshot | undefined,
   now: number,
 ): { accepted: boolean; state: RemoteGrenadeAuthorityState } {
-  if (!sender || sender.id !== message.by || sender.hp <= 0 || state.remaining <= 0 || !Number.isFinite(now)) {
+  if (message.protocolVersion !== MULTIPLAYER_PROTOCOL_VERSION
+    || !sender || sender.id !== message.by || sender.hp <= 0 || state.remaining <= 0 || !Number.isFinite(now)
+    || sender.grenade !== message.grenade
+    || state.selectedGrenade !== null && state.selectedGrenade !== message.grenade
+    || state.lifeId !== null && state.lifeId !== message.lifeId
+    || message.actionSequence <= state.highestActionSequence
+    || state.highestActionSequence >= 0 && message.actionSequence - state.highestActionSequence > 128) {
     return { accepted: false, state };
   }
   if (state.actions[message.actionNonce]) return { accepted: false, state };
@@ -53,15 +96,25 @@ export function admitRemoteGrenadeThrow(
   if (originDistance > REMOTE_GRENADE_ORIGIN_TOLERANCE || velocity <= 0 || velocity > REMOTE_GRENADE_MAX_VELOCITY) {
     return { accepted: false, state };
   }
-  const activeActions = Object.fromEntries(Object.entries(state.actions)
-    .filter(([, action]) => now - action.thrownAt <= REMOTE_GRENADE_MAX_FUSE_MS));
+  const activeActions = unexpiredRemoteGrenadeActions(state, now);
   return {
     accepted: true,
     state: {
       remaining: state.remaining - 1,
+      selectedGrenade: message.grenade,
+      lifeId: message.lifeId,
+      highestActionSequence: message.actionSequence,
       actions: {
         ...activeActions,
-        [message.actionNonce]: { origin: message.origin, thrownAt: now, explosionOrigin: null, targets: [] },
+        [message.actionNonce]: {
+          grenade: message.grenade,
+          lifeId: message.lifeId,
+          actionSequence: message.actionSequence,
+          origin: message.origin,
+          thrownAt: now,
+          explosionOrigin: null,
+          targets: [],
+        },
       },
     },
   };
@@ -78,7 +131,9 @@ export function admitRemoteGrenadeExplosion(
   const action = state.actions[input.actionNonce];
   if (!action || !Number.isFinite(input.now)) return { accepted: false, state };
   const age = input.now - action.thrownAt;
-  if (age < REMOTE_GRENADE_MIN_FUSE_MS || age > REMOTE_GRENADE_MAX_FUSE_MS) return { accepted: false, state };
+  const minimumFuseMs = action.grenade === 'semtex' ? REMOTE_SEMTEX_MIN_FUSE_MS : REMOTE_GRENADE_MIN_FUSE_MS;
+  const maximumFuseMs = action.grenade === 'semtex' ? REMOTE_SEMTEX_MAX_FUSE_MS : REMOTE_GRENADE_MAX_FUSE_MS;
+  if (age < minimumFuseMs || age > maximumFuseMs) return { accepted: false, state };
   if (Math.hypot(
     input.explosionOrigin[0] - action.origin[0],
     input.explosionOrigin[1] - action.origin[1],
@@ -109,7 +164,9 @@ export function admitRemoteGrenadeHit(
   }>,
 ): { accepted: boolean; state: RemoteGrenadeAuthorityState } {
   const action = state.actions[input.actionNonce];
-  if (!action || input.target.length === 0 || action.targets.includes(input.target)) return { accepted: false, state };
+  if (!action || (action.grenade !== 'frag' && action.grenade !== 'semtex') || input.target.length === 0 || action.targets.includes(input.target)) {
+    return { accepted: false, state };
+  }
   const explosion = admitRemoteGrenadeExplosion(state, input);
   if (!explosion.accepted) return { accepted: false, state };
   const admittedAction = explosion.state.actions[input.actionNonce]!;
@@ -121,4 +178,12 @@ export function admitRemoteGrenadeHit(
     accepted: true,
     state: { ...explosion.state, actions: { ...explosion.state.actions, [input.actionNonce]: nextAction } },
   };
+}
+
+export function remoteGrenadeForAction(state: RemoteGrenadeAuthorityState, actionNonce: number): GrenadeId | null {
+  return state.actions[actionNonce]?.grenade ?? null;
+}
+
+export function remoteGrenadeLifeForAction(state: RemoteGrenadeAuthorityState, actionNonce: number): number | null {
+  return state.actions[actionNonce]?.lifeId ?? null;
 }

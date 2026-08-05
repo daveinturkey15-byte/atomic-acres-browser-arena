@@ -29,4 +29,12 @@ export function validateAcceptanceManifest(
 export function classifyPreviewDelta(
   paths: readonly string[],
   manifestPath: string,
+  previewSha?: string | null,
+  options?: Readonly<{ graph?: unknown }>,
 ): Readonly<{ ok: boolean; paths: string[]; reason: string }>;
+
+export function pass66FinalizerOutputPaths(previewSha: string, graph?: unknown): string[];
+
+export function selectCiAcceptanceManifest(impact: string, manifestPaths: readonly string[]): string | null;
+
+export function evaluateAcceptance(values: Readonly<Record<string, string>>): unknown;

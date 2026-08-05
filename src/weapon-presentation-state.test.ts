@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { advanceAdsBlend, advanceWeaponHeat, fireCycleAt, hitReactionAt, magnifiedFovDegrees, viewmodelSurfaceRetreat } from './weapon-presentation-state';
+import {
+  advanceAdsBlend,
+  advanceWeaponHeat,
+  fireCycleAt,
+  hitReactionAt,
+  magnifiedFovDegrees,
+  viewmodelFloorClearance,
+  viewmodelObstructionPose,
+  viewmodelSurfaceRetreat,
+} from './weapon-presentation-state';
 
 describe('weapon presentation state', () => {
   it('accumulates and cools bounded weapon heat', () => {
@@ -42,6 +51,15 @@ describe('weapon presentation state', () => {
     expect(advanceAdsBlend(0, true, 1 / 120, 'carbine')).toBeLessThan(1);
   });
 
+  it('settles ordinary ADS past ninety percent within 120ms and exits within 140ms', () => {
+    let inBlend = 0;
+    for (let frame = 0; frame < 8; frame += 1) inBlend = advanceAdsBlend(inBlend, true, 0.015, 'carbine');
+    expect(inBlend).toBeGreaterThan(0.9);
+    let outBlend = 1;
+    for (let frame = 0; frame < 10; frame += 1) outBlend = advanceAdsBlend(outBlend, false, 0.014, 'carbine');
+    expect(outBlend).toBeLessThan(0.1);
+  });
+
   it('returns bounded presentation-only hit reactions', () => {
     expect(hitReactionAt(0, 'body').envelope).toBe(0);
     expect(hitReactionAt(140, 'head').envelope).toBeGreaterThan(0.5);
@@ -53,7 +71,26 @@ describe('weapon presentation state', () => {
     expect(viewmodelSurfaceRetreat(null, false)).toBe(0);
     expect(viewmodelSurfaceRetreat(2, false)).toBe(0);
     expect(viewmodelSurfaceRetreat(0.5, false)).toBeGreaterThan(0.25);
-    expect(viewmodelSurfaceRetreat(0, true)).toBeLessThanOrEqual(0.56);
-    expect(viewmodelSurfaceRetreat(2, true)).toBeCloseTo(0.045);
+    expect(viewmodelSurfaceRetreat(0, true)).toBeLessThanOrEqual(0.7);
+    expect(viewmodelSurfaceRetreat(2, true)).toBeCloseTo(0.09);
+  });
+
+  it('adds bounded prone and floor clearance without moving gameplay authority', () => {
+    expect(viewmodelObstructionPose(null, false, null)).toEqual({ retreat: 0, lift: 0 });
+    expect(viewmodelObstructionPose(null, true, 0.61)).toEqual({
+      retreat: 0.09,
+      lift: expect.any(Number),
+    });
+    expect(viewmodelObstructionPose(null, true, 0.61).lift).toBeGreaterThanOrEqual(0.13);
+    expect(viewmodelObstructionPose(0.2, true, 0.2).retreat).toBeLessThanOrEqual(0.7);
+    expect(viewmodelObstructionPose(0.2, true, 0.2).lift).toBeLessThanOrEqual(0.2);
+  });
+
+  it('uses grounded stance height when an authored floor is a raycast plane', () => {
+    expect(viewmodelFloorClearance(null, true, 0.61)).toBeCloseTo(0.61, 8);
+    expect(viewmodelFloorClearance(0.42, true, 0.61)).toBeCloseTo(0.42, 8);
+    expect(viewmodelFloorClearance(null, false, 0.61)).toBeNull();
+    expect(viewmodelObstructionPose(null, true, viewmodelFloorClearance(null, true, 0.61)).lift)
+      .toBeGreaterThanOrEqual(0.13);
   });
 });

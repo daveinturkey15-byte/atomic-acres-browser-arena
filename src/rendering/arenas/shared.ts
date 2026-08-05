@@ -1,7 +1,8 @@
 import type { ArenaVisualBudgets, ArenaReviewCamera, ArenaColorPipelineDefinition } from '../arena-visual-definition';
 
 export const SHARED_GAMEPLAY_ASSETS = Object.freeze([
-  './assets/third-party/quaternius/ultimate-modular-males/Swat.gltf',
+  './assets/original/models/operators/pass65-third-person-operator-lod0.glb',
+  './assets/original/models/operators/pass65-third-person-operator-lod1.glb',
   './assets/third-party/quaternius/animated-guns/',
 ]);
 
@@ -22,10 +23,16 @@ export function budgets(overrides: Partial<ArenaVisualBudgets> = {}): ArenaVisua
     maximumDrawCalls: 520,
     maximumTriangles: 1_400_000,
     maximumTextureBytes: 384 * 1024 * 1024,
+    // Includes invisible GPU-prewarmed viewmodels/support assets as well as
+    // the visible arena. This is deliberately tighter than the legacy 768 MiB
+    // global guard while allowing the hitch-free reachable-weapon catalog.
+    maximumResidentTextureBytes: 512 * 1024 * 1024,
     maximumShadowLights: 3,
     maximumShadowMapPixels: 6 * 2048 * 2048,
     maximumPostTextureSamples: 28,
-    maximumTransientBytes: 192 * 1024 * 1024,
+    // A 2560x1440 High frame with 4x principal HDR MSAA, depth, resolved HDR,
+    // and the conservative bloom-chain allowance is 225 MiB.
+    maximumTransientBytes: 256 * 1024 * 1024,
     cpuFrameP95Ms: 16.7,
     gpuFrameP95Ms: 16.7,
     ...overrides,

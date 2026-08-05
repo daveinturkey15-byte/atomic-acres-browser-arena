@@ -1,0 +1,957 @@
+/*
+ * Pass 66 tactical interface overhaul.
+ *
+ * This is deliberately a final cascade layer: it re-composes the existing
+ * typed surfaces without replacing their ids, controls, authority or focus
+ * behavior. Gameplay remains the source of truth; this file is presentation.
+ */
+@layer pass66.overhaul {
+  :root {
+    --p66-bg: #e9eeea;
+    --p66-paper: #f8faf8;
+    --p66-paper-2: #eef3f0;
+    --p66-ink: #142529;
+    --p66-muted: #5d6b6e;
+    --p66-line: #c5d1ce;
+    --p66-teal: #17282b;
+    --p66-teal-2: #20363a;
+    --p66-cyan: #00aebd;
+    --p66-cyan-bright: #52eef3;
+    --p66-cyan-soft: rgba(0, 174, 189, 0.13);
+    --p66-amber: #b96300;
+    --p66-amber-bright: #ff9d24;
+    --p66-danger: #d64c42;
+    --p66-success: #2f9e70;
+    --p66-shadow: 0 16px 42px rgba(15, 34, 36, 0.14);
+    --p66-card-shadow: 0 7px 19px rgba(15, 34, 36, 0.08);
+  }
+
+  .pass64-command-deck.panel {
+    inset: clamp(10px, 1.2vw, 22px);
+    width: auto;
+    height: auto;
+    max-height: none;
+    padding: 0;
+    transform: none;
+    overflow: hidden;
+    clip-path: none;
+    border: 1px solid #b6c3c0;
+    border-radius: 8px;
+    background: var(--p66-paper);
+    box-shadow: 0 24px 80px rgba(10, 28, 30, 0.24);
+  }
+
+  .pass64-command-deck.panel::before { display: none; }
+
+  .command-header {
+    min-height: 58px;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--p66-line);
+    background: rgba(248, 250, 248, 0.98);
+  }
+
+  .command-brand { gap: 12px; }
+  .command-brand small { font-size: 11px; letter-spacing: 0.11em; }
+  .command-brand strong { font-size: 18px; color: var(--p66-ink); }
+  .command-brand span {
+    padding: 5px 8px;
+    border-left: 2px solid var(--p66-cyan);
+    background: var(--p66-cyan-soft);
+    color: #23585e;
+    font-size: 11px;
+  }
+
+  #menu-meta-actions {
+    position: static;
+    max-width: none;
+  }
+
+  #menu-meta-actions > button {
+    min-height: 38px;
+    padding: 0 15px;
+    border: 1px solid var(--p66-line);
+    border-radius: 5px;
+    background: #fff;
+    color: var(--p66-ink);
+    font: 750 12px/1 var(--ui-copy);
+    letter-spacing: 0.04em;
+    box-shadow: none;
+  }
+
+  #menu-meta-actions > button:hover,
+  #menu-meta-actions > button:focus-visible {
+    border-color: var(--p66-cyan);
+    color: var(--p66-ink);
+    background: #fff;
+    box-shadow: 0 6px 16px rgba(20, 37, 41, 0.1);
+  }
+
+  .command-body {
+    min-height: 0;
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+
+  .command-rail {
+    padding: 20px 12px 16px;
+    border-right: 1px solid #b9c6c3;
+    background: linear-gradient(180deg, #17282b, #102023);
+    color: #f4f8f7;
+  }
+
+  .tactical-rail { padding: 0 9px 15px; color: #a9bcba; font-size: 11px; }
+  .tactical-rail b { color: var(--p66-cyan-bright); }
+
+  #menu .command-rail .menu-tabs { gap: 7px; }
+  #menu .command-rail .menu-tabs button {
+    min-height: 72px;
+    grid-template-columns: 30px minmax(0, 1fr);
+    padding: 11px 12px;
+    border: 1px solid transparent;
+    border-left: 3px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    color: #b9c8c6;
+  }
+
+  #menu .command-rail .menu-tabs button i { font-size: 11px; color: #7f9996; }
+  #menu .command-rail .menu-tabs button span { font-size: 18px; color: inherit; letter-spacing: 0.035em; }
+  #menu .command-rail .menu-tabs button small { font-size: 11px; color: #819895; letter-spacing: 0.04em; }
+  #menu .command-rail .menu-tabs button:hover {
+    border-color: rgba(82, 238, 243, 0.18);
+    background: rgba(255, 255, 255, 0.055);
+    color: #fff;
+  }
+  #menu .command-rail .menu-tabs button.active {
+    border-color: rgba(82, 238, 243, 0.34);
+    border-left-color: var(--p66-cyan-bright);
+    background: linear-gradient(90deg, rgba(0, 174, 189, 0.24), rgba(255, 255, 255, 0.07));
+    color: #fff;
+    box-shadow: 0 10px 22px rgba(2, 14, 17, 0.18);
+  }
+  #menu .command-rail .menu-tabs button.active small { color: #bceced; }
+
+  .command-rail footer { padding: 14px 10px 4px; }
+  .command-rail footer span,
+  .command-rail footer small { color: #849c99; font-size: 10px; }
+  .command-rail footer strong { color: #eff9f7; font-size: 13px; }
+
+  .command-workspace {
+    min-width: 0;
+    padding: clamp(18px, 2.4vw, 38px);
+    overflow: auto;
+    background:
+      linear-gradient(rgba(27, 74, 77, 0.028) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(27, 74, 77, 0.028) 1px, transparent 1px),
+      var(--p66-bg);
+    background-size: 32px 32px;
+  }
+
+  .menu-panel { max-width: 1480px; margin: 0 auto; }
+  #menu-panel-deploy { grid-template-columns: minmax(0, 1fr) minmax(310px, 360px); gap: 24px; }
+
+  .arena-command,
+  .deployment-manifest,
+  #menu-panel-kit,
+  #menu-panel-streaks,
+  #menu-panel-options {
+    border: 1px solid var(--p66-line);
+    border-radius: 7px;
+    background: rgba(248, 250, 248, 0.97);
+    box-shadow: var(--p66-card-shadow);
+  }
+
+  .arena-command { padding: clamp(18px, 2vw, 30px); }
+  .arena-brief { min-height: 104px; }
+  .arena-brief .eyebrow { margin-bottom: 7px; color: var(--p66-amber); font-size: 12px; letter-spacing: 0.08em; }
+  .panel .arena-brief h1 {
+    color: var(--p66-ink);
+    font-size: clamp(42px, 4.2vw, 68px);
+    line-height: 0.84;
+    letter-spacing: -0.025em;
+  }
+  .panel .arena-brief h1 span { display: inline; color: var(--p66-cyan); -webkit-text-stroke: 0; }
+  .arena-brief .lede {
+    max-width: 74ch;
+    margin: 12px 0 18px;
+    padding-left: 12px;
+    border-left: 3px solid var(--p66-cyan);
+    color: var(--p66-muted);
+    font-size: 14px;
+    line-height: 1.48;
+  }
+
+  #menu-showcase {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    max-height: none;
+    aspect-ratio: 16 / 9;
+    transform: none;
+    border: 1px solid #8fa29f;
+    border-radius: 6px;
+    background: #17282b;
+    filter: none;
+    box-shadow: 0 15px 32px rgba(16, 37, 39, 0.16);
+  }
+
+  #menu-showcase::before {
+    inset: 0;
+    z-index: 4;
+    pointer-events: none;
+    border: 0;
+    border-radius: inherit;
+    clip-path: none;
+    background: linear-gradient(0deg, rgba(7, 20, 23, 0.35), transparent 30%);
+  }
+
+  .showcase-telemetry {
+    left: 15px;
+    right: auto;
+    bottom: 14px;
+    min-height: 37px;
+    padding: 9px 12px;
+    border: 1px solid rgba(82, 238, 243, 0.38);
+    border-radius: 4px;
+    background: rgba(9, 27, 31, 0.82);
+    color: #e8fbf8;
+    font-size: 11px;
+    backdrop-filter: blur(7px);
+  }
+
+  .map-selector { margin-top: 18px; padding: 14px; }
+  .map-selector-heading { margin-bottom: 10px; }
+  .map-selector-heading span { color: var(--p66-ink); font-size: 13px; }
+  .map-selector-heading small { color: var(--p66-muted); font-size: 11px; }
+  .map-card-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
+  .map-card {
+    min-height: 94px;
+    padding: 12px;
+    border: 1px solid var(--p66-line);
+    border-radius: 5px;
+    background: #fff;
+    color: var(--p66-ink);
+    box-shadow: none;
+  }
+  .map-card span { font-size: 17px; }
+  .map-card strong { color: var(--p66-muted); font-size: 11px; line-height: 1.35; }
+  .map-card small,
+  .map-index { font-size: 10px; }
+  .map-card.selected {
+    border-color: var(--p66-cyan);
+    background: linear-gradient(115deg, var(--p66-cyan-soft), #fff 60%);
+    box-shadow: inset 4px 0 var(--p66-cyan);
+  }
+
+  .deployment-manifest { padding: 22px; }
+  .manifest-heading small { color: var(--p66-amber); font-size: 11px; }
+  .manifest-heading strong { color: var(--p66-ink); font-size: 27px; }
+  .manifest-heading span { color: var(--p66-muted); font-size: 13px; line-height: 1.4; }
+  .setup-grid { margin-top: 17px; gap: 12px; }
+  .setup-grid label,
+  .lobby-settings label { color: #40565a; font-size: 11px; letter-spacing: 0.06em; }
+  .setup-grid input,
+  .setup-grid select,
+  .join-row input,
+  .lobby-settings select {
+    min-height: 43px;
+    padding: 10px 12px;
+    border: 1px solid var(--p66-line);
+    border-radius: 5px;
+    background: #fff;
+    color: var(--p66-ink);
+    font-size: 14px;
+  }
+  .selected-kit-summary { min-height: 62px; padding: 11px 13px; }
+  .selected-kit-summary span { font-size: 10px; }
+  .selected-kit-summary strong { color: var(--p66-ink); font-size: 18px; }
+  .selected-kit-summary b { font-size: 11px; }
+  .menu-actions button,
+  .join-row button,
+  .lobby-actions button,
+  #field-kit-redeploy {
+    min-height: 44px;
+    border-radius: 5px;
+    color: var(--p66-ink);
+    font-size: 14px;
+    letter-spacing: 0.03em;
+  }
+  .menu-actions .primary,
+  .lobby-actions .primary,
+  .menu-actions #resume {
+    border-color: var(--p66-teal);
+    background: var(--p66-teal);
+    color: #fff;
+  }
+  .menu-actions .primary:hover,
+  .lobby-actions .primary:hover { background: var(--p66-teal-2); }
+  #network-status { min-height: 38px; padding: 10px 12px; color: var(--p66-muted); font-size: 12px; }
+
+  #private-lobby { padding: 20px; }
+  .private-lobby-heading strong { color: var(--p66-ink); font-size: 28px; }
+  .lobby-player { min-height: 60px; border-left: 3px solid var(--p66-cyan); }
+  .lobby-player strong { color: var(--p66-ink); font-size: 15px; }
+  .lobby-player small,
+  .lobby-player b,
+  .lobby-player em,
+  #lobby-guidance { font-size: 11px; }
+
+  #menu-panel-kit,
+  #menu-panel-streaks,
+  #menu-panel-options { padding: clamp(20px, 2.2vw, 34px); }
+  .kit-heading,
+  .options-heading { margin-bottom: 20px; align-items: end; }
+  .kit-heading b,
+  .options-heading b { color: var(--p66-ink); font-size: clamp(36px, 3vw, 48px); letter-spacing: 0.015em; }
+  .kit-heading span,
+  .options-heading span { color: var(--p66-muted); font-size: 14px; line-height: 1.45; }
+  .kit-heading small { max-width: 42ch; color: var(--p66-amber); font-size: 11px; line-height: 1.45; }
+
+  .curated-kit-grid,
+  .custom-kit-grid { grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 14px; }
+  .custom-kit-grid { margin-top: 14px; }
+  .kit-card,
+  .custom-kit-grid .kit-card,
+  .curated-kit-grid .kit-card {
+    min-height: 270px;
+    padding: 18px;
+    border: 1px solid var(--p66-line);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--p66-ink);
+    box-shadow: var(--p66-card-shadow);
+    transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+  }
+  .kit-card:hover {
+    transform: translateY(-2px);
+    border-color: #8ca09d;
+    box-shadow: var(--p66-shadow);
+  }
+  .kit-card.selected {
+    border-color: var(--p66-cyan);
+    background: linear-gradient(125deg, rgba(0, 174, 189, 0.18), #eef5f2 58%);
+    box-shadow: inset 4px 0 var(--p66-cyan), var(--p66-card-shadow);
+  }
+  .kit-card > span { color: #587074; font-size: 10px; }
+  .kit-card > strong { margin-top: 7px; color: var(--p66-ink); font-size: 27px; }
+  .kit-card > b { margin-top: 7px; color: var(--p66-amber); font-size: 11px; }
+  .kit-card p { margin: 9px 0; color: var(--p66-muted); font-size: 12px; line-height: 1.42; }
+  .kit-card > i { color: #667a7d; font-size: 10px; }
+  .kit-card em { color: var(--p66-cyan); font-size: 10px; }
+
+  .kit-stat-strip { display: grid; gap: 9px; margin: 12px 0 12px; }
+  .kit-stat-strip span { display: grid; grid-template-columns: 76px 1fr 26px; align-items: center; gap: 10px; }
+  .kit-stat-strip small { color: var(--p66-ink); font-size: 12px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+  .kit-stat-strip i { height: 9px; border-radius: 4px; background: linear-gradient(90deg, var(--p66-cyan) var(--kit-stat), #d8e1de var(--kit-stat)); box-shadow: inset 0 0 0 1px rgba(20, 40, 42, 0.12); }
+  .kit-stat-strip b { color: var(--p66-ink); font-size: 14px; font-weight: 900; text-align: right; }
+
+  /* Real weapon stats on profile cards: the headline DPS row is emphasised so
+     each kit's gun reads at a glance (owner request). */
+  .kit-stat-strip .kit-dps {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 2px;
+    padding: 7px 10px;
+    border: 1px solid var(--p66-amber, #eaa94d);
+    border-radius: 4px;
+    background: rgba(234, 169, 77, 0.12);
+  }
+  .kit-stat-strip .kit-dps small { color: var(--p66-amber, #c98a35); font-size: 11px; font-weight: 800; letter-spacing: 0.08em; }
+  .kit-stat-strip .kit-dps b { color: var(--p66-ink); font-size: 18px; font-weight: 900; }
+
+  /* Scoped to .custom-kit-grid so the dark action styling out-specifies the
+     white `.custom-kit-grid .kit-card` base (owner: manage card must be dark). */
+  .custom-kit-grid .manage-kit-card {
+    display: grid;
+    align-content: center;
+    border-style: solid;
+    border-color: #5fd4cc;
+    background: linear-gradient(150deg, #1d3a3f, #12262a);
+    box-shadow: var(--p66-shadow);
+  }
+  .custom-kit-grid .manage-kit-card span { color: var(--p66-cyan-bright); }
+  .custom-kit-grid .manage-kit-card strong { color: #fff; }
+  .custom-kit-grid .manage-kit-card > b { color: var(--p66-amber-bright); }
+  .custom-kit-grid .manage-kit-card p,
+  .custom-kit-grid .manage-kit-card > i { color: #d0e4e2; }
+  .custom-kit-grid .manage-kit-card:hover,
+  .custom-kit-grid .manage-kit-card:focus-visible,
+  .custom-kit-grid .manage-kit-card[aria-expanded='true'] {
+    border-color: #7ff6ff;
+    background: linear-gradient(150deg, #234549, #163034);
+  }
+
+  /* Owner feedback: the kit cards now use the real stat strip (kit-stat-strip-real)
+     with IDEAL BODY DPS. Hide the older detailed metric deck but retain the
+     weapon still image. */
+  .kit-card .weapon-menu-stat-deck { display: none; }
+  .kit-card .weapon-menu-presentation { display: block; }
+  .kit-card .weapon-menu-still img { width: 100%; height: auto; border-radius: 4px; }
+
+  /* Custom presets are persistent loadouts, not generic white cards. Keep their
+     complete hierarchy readable before hover/focus so the saved gun, grenade
+     and canonical stat projection can be scanned at a glance. */
+  .custom-kit-grid .kit-card:not(.manage-kit-card) {
+    border-color: #3d5f5c;
+    background: linear-gradient(150deg, #16302f, #0d1e20);
+    color: #eef6f4;
+  }
+  /* Owner direction: rename/modify lives inside each Custom card. */
+  .custom-kit-card .kit-modify-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(120, 200, 195, 0.18);
+  }
+  .custom-kit-card .kit-modify-row small {
+    color: var(--p66-ink);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .custom-kit-card .kit-modify-row b {
+    padding: 7px 16px;
+    border: 1px solid #2f7a76;
+    background: linear-gradient(160deg, #1d5553, #123c3c);
+    color: #d9f6f2;
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .custom-kit-card .kit-modify-row b:hover {
+    background: linear-gradient(160deg, #2a726e, #1a4e4b);
+  }
+  .custom-kit-grid .kit-card:not(.manage-kit-card) > span { color: #8fd8d2; }
+  .custom-kit-grid .kit-card:not(.manage-kit-card) > strong { color: #fff; }
+  .custom-kit-grid .kit-card:not(.manage-kit-card) > b { color: #ffc46b; }
+  .custom-kit-grid .kit-card:not(.manage-kit-card) p { color: #c4d8d5; }
+  .custom-kit-grid .kit-card:not(.manage-kit-card) > i { color: #a9bfbc; }
+  .custom-kit-grid .kit-card:not(.manage-kit-card) em { color: #7ff6ff; }
+  .custom-kit-grid .kit-card:not(.manage-kit-card) .kit-stat-strip small { color: #e8f4f2; }
+  .custom-kit-grid .kit-card:not(.manage-kit-card) .kit-stat-strip b { color: #fff; }
+  .custom-kit-grid .kit-card:not(.manage-kit-card) .kit-stat-strip i {
+    background: linear-gradient(90deg, #35e0d6 var(--kit-stat), #24413f var(--kit-stat));
+  }
+  .custom-kit-grid .kit-card:not(.manage-kit-card) .kit-stat-strip .kit-dps {
+    border-color: #ffc46b;
+    background: rgba(255, 196, 107, 0.1);
+  }
+  .custom-kit-grid .kit-card:not(.manage-kit-card) .kit-stat-strip .kit-dps small { color: #ffc46b; }
+  .custom-kit-grid .kit-card:not(.manage-kit-card) .kit-stat-strip .kit-dps b { color: #fff; }
+  .custom-kit-grid .kit-card:not(.manage-kit-card).selected {
+    border-color: #7ff6ff;
+    background: linear-gradient(125deg, #1d4a47, #102826 55%);
+    box-shadow: inset 4px 0 #7ff6ff, var(--p66-shadow);
+  }
+
+  .loadout-manager {
+    margin-top: 18px;
+    padding: 20px;
+    border: 1px solid #75908d;
+    border-radius: 6px;
+    background: var(--p66-teal);
+    color: #f4f8f7;
+    box-shadow: var(--p66-shadow);
+  }
+  .loadout-manager header span { color: var(--p66-cyan-bright); font-size: 11px; }
+  .loadout-manager header strong { color: #fff; font-size: 24px; }
+  .loadout-manager-workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 0.62fr); gap: 22px; }
+  .loadout-manager-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-content: start; }
+  .loadout-manager-grid label { color: #bcd0ce; font-size: 11px; }
+  .loadout-manager-grid input,
+  .loadout-manager-grid select,
+  .loadout-manager-grid button { min-height: 44px; border-radius: 4px; font-size: 14px; }
+  .loadout-manager-grid button { grid-column: 1 / -1; border-color: var(--p66-cyan-bright); background: #006d74; color: #fff; }
+
+  .loadout-inspector {
+    padding: 22px;
+    border: 1px solid rgba(82, 238, 243, 0.32);
+    border-radius: 5px;
+    background: #0e1e21;
+  }
+  .loadout-inspector small { color: #82aaa8; font-size: 12px; letter-spacing: 0.08em; }
+  .loadout-inspector strong { display: block; margin-top: 6px; color: #fff; font: 800 34px/1 var(--ui-display); }
+  .loadout-inspector span { display: block; margin-top: 7px; color: var(--p66-cyan-bright); font-size: 14px; }
+  .loadout-inspector-stats { display: grid; gap: 14px; margin: 20px 0; }
+  .loadout-inspector-stats > div { display: grid; grid-template-columns: 104px 1fr; align-items: center; gap: 12px; }
+  .loadout-inspector-stats dt { color: #b6cbca; font-size: 13px; letter-spacing: 0.04em; }
+  .loadout-inspector-stats dd { display: grid; grid-template-columns: 1fr 84px; align-items: center; gap: 10px; margin: 0; }
+  .loadout-inspector-stats dd i { height: 10px; border-radius: 5px; background: linear-gradient(90deg, var(--p66-cyan-bright) var(--loadout-stat, 50%), #294347 var(--loadout-stat, 50%)); }
+  .loadout-inspector-stats dd b { color: #fff; font-size: 15px; font-weight: 800; text-align: right; }
+  /* The overall damage-per-second summary is the headline number. */
+  .loadout-inspector-dps {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 0 14px;
+    padding: 12px 14px;
+    border: 1px solid var(--p66-amber-bright);
+    border-radius: 4px;
+    background: rgba(255, 157, 36, 0.12);
+  }
+  .loadout-inspector-dps small { color: var(--p66-amber-bright); font-size: 12px; letter-spacing: 0.1em; }
+  .loadout-inspector-dps strong { margin: 0; color: #ffd39a; font: 900 38px/1 var(--ui-display); }
+  .loadout-inspector > p[data-loadout-grenade-detail] { margin: 0; padding-top: 12px; border-top: 1px solid #2b4548; color: #e9bb72; font-size: 12px; line-height: 1.5; }
+
+  #menu-panel-streaks { min-height: 100%; }
+  .killstreak-slot-grid { grid-template-columns: repeat(5, minmax(190px, 1fr)); gap: 13px; }
+  .killstreak-slot-card {
+    min-height: 360px;
+    padding: 16px;
+    gap: 11px;
+    border: 1px solid var(--p66-line);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--p66-ink);
+    box-shadow: var(--p66-card-shadow);
+  }
+  .killstreak-slot-card > span { color: var(--p66-cyan); font-size: 10px; }
+  .killstreak-slot-card > strong { min-height: 42px; color: var(--p66-ink); font-size: 19px; }
+  .killstreak-slot-card select { min-height: 44px; border: 1px solid #8fa29f; border-radius: 4px; background: var(--p66-teal); color: #fff; font-size: 13px; }
+  .killstreak-slot-card > small { color: var(--p66-muted); font-size: 11px; line-height: 1.45; }
+  .killstreak-demo {
+    position: relative;
+    height: 132px;
+    overflow: hidden;
+    border: 1px solid #b9c8c5;
+    border-radius: 4px;
+    background:
+      linear-gradient(rgba(0, 174, 189, 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 174, 189, 0.08) 1px, transparent 1px),
+      radial-gradient(circle at 50% 52%, #e7eeeb, #c9d4d1);
+    background-size: 18px 18px, 18px 18px, auto;
+  }
+  .killstreak-demo::before { content: ''; position: absolute; inset: 50% auto auto 50%; width: 74px; height: 74px; border: 1px solid rgba(0, 109, 116, 0.38); border-radius: 50%; transform: translate(-50%, -50%); }
+  .killstreak-demo i { position: absolute; left: 26%; right: 26%; top: 50%; height: 7px; border-radius: 50%; background: var(--p66-teal); transform: translateY(-50%); }
+  .killstreak-demo b { position: absolute; left: 46%; top: 32%; width: 8%; height: 36%; border-radius: 3px; background: var(--p66-teal); }
+  .killstreak-demo em { position: absolute; left: 50%; top: 50%; width: 7px; height: 7px; border: 2px solid var(--p66-amber); border-radius: 50%; transform: translate(-50%, -50%); }
+  .killstreak-demo small { position: absolute; left: 8px; bottom: 7px; color: #38565a; font-size: 9px; letter-spacing: 0.07em; }
+  .killstreak-demo[data-killstreak='care-package'] i { height: 29px; left: 37%; right: 37%; border-radius: 2px; }
+  .killstreak-demo[data-killstreak='chopper-gunner'] i,
+  .killstreak-demo[data-killstreak='piloted-drone'] i,
+  .killstreak-demo[data-killstreak='drone-swarm'] i { animation: p66DemoRotor 1.7s linear infinite; }
+  .killstreak-demo[data-killstreak='nuke'] { background-color: #ead8cc; }
+  @keyframes p66DemoRotor { to { transform: translateY(-50%) rotate(360deg); } }
+  .killstreak-loadout-status { margin: 15px 0 0; min-height: 42px; padding: 13px 15px; border-left: 3px solid var(--p66-cyan); background: var(--p66-cyan-soft); color: #31585d; font-size: 11px; }
+
+  #menu-panel-options .settings-grid,
+  #menu-panel-options .settings-section {
+    border: 1px solid var(--p66-line);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--p66-ink);
+    box-shadow: var(--p66-card-shadow);
+  }
+  #menu-panel-options > .settings-grid { grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 0; padding: 0; overflow: hidden; }
+  #menu-panel-options > .settings-grid label { min-height: 86px; padding: 17px; border-right: 1px solid var(--p66-line); color: #365156; font-size: 13px; }
+  #menu-panel-options .settings-section { padding: 20px; }
+  #menu-panel-options .settings-section > header { color: var(--p66-ink); font-size: 14px; }
+  #menu-panel-options .settings-section > header span { color: #27868d; font-size: 11px; }
+  #menu-panel-options .graphics-preset-row > label,
+  #menu-panel-options .graphics-preset-row p,
+  #menu-panel-options .privacy-setting-row p,
+  #menu-panel-options .audio-setting-row { color: #405b60; font-size: 12px; }
+  #menu-panel-options .graphics-preset-row select { min-height: 44px; border: 1px solid var(--p66-line); border-radius: 4px; background: var(--p66-teal); color: #fff; }
+  #menu-panel-options .advanced-settings { border-color: var(--p66-line); background: var(--p66-paper-2); }
+  #menu-panel-options .advanced-settings summary { min-height: 48px; color: var(--p66-ink); font-size: 13px; }
+  #menu-panel-options .advanced-settings summary small { color: #34777c; font-size: 10px; }
+  #menu-panel-options .privacy-setting-row { border-color: var(--p66-line); background: var(--p66-paper-2); }
+  #menu-panel-options .privacy-setting-row .setting-check { color: var(--p66-ink); }
+  #menu-panel-options .controls { color: #40585d; font-size: 12px; background: #fff; }
+
+  #menu-panel-options #key-bindings-settings {
+    border: 1px solid var(--p66-line);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--p66-ink);
+    box-shadow: var(--p66-card-shadow);
+    padding: 20px;
+  }
+  #menu-panel-options #key-bindings-settings > header { color: var(--p66-ink); font-size: 14px; }
+  #menu-panel-options #key-bindings-settings > header span { color: #27868d; font-size: 11px; }
+  #menu-panel-options #key-bindings-settings > header button {
+    margin-left: 12px;
+    padding: 7px 14px;
+    border: 1px solid var(--p66-line);
+    border-radius: 4px;
+    background: var(--p66-teal);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  #menu-panel-options #key-bindings-settings > p { color: #405b60; font-size: 12px; }
+  #menu-panel-options .key-binding-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(260px, 1fr));
+    gap: 8px;
+    margin-top: 12px;
+  }
+  #menu-panel-options .key-binding-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 42px;
+    padding: 8px 12px;
+    border: 1px solid var(--p66-line);
+    border-radius: 4px;
+    background: var(--p66-paper-2);
+    color: #365156;
+    font-size: 12px;
+  }
+  #menu-panel-options .key-binding-row .binding-action { font-weight: 700; }
+  #menu-panel-options .key-binding-row kbd {
+    padding: 4px 9px;
+    border: 1px solid var(--p66-line);
+    border-radius: 3px;
+    background: #fff;
+    color: var(--p66-ink);
+    font: 700 11px/1 Inter, system-ui, sans-serif;
+  }
+  #menu-panel-options .key-binding-row button {
+    padding: 6px 11px;
+    border: 1px solid var(--p66-line);
+    border-radius: 4px;
+    background: var(--p66-teal);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  #menu-panel-options .key-binding-row.capturing button { background: #d2452f; }
+  #menu-panel-options .key-binding-row.capturing .binding-action { color: #d2452f; }
+  #menu-panel-options .key-binding-row.conflict-flash {
+    border-color: #d2452f;
+    box-shadow: 0 0 0 2px rgba(210, 69, 47, 0.35);
+  }
+
+  .menu-modal-backdrop { background: rgba(7, 21, 24, 0.68); backdrop-filter: blur(6px); }
+  #project-map-panel,
+  #changelog-panel {
+    width: min(1180px, calc(100vw - 36px));
+    max-height: min(88vh, 900px);
+    padding: clamp(22px, 2vw, 32px);
+    clip-path: none;
+    border: 1px solid #8ba3a0;
+    border-radius: 8px;
+    background: var(--p66-paper);
+    color: var(--p66-ink);
+    box-shadow: 0 28px 90px rgba(4, 15, 17, 0.46);
+  }
+  #project-map-panel::before,
+  #changelog-panel::before { display: none; }
+  .project-map-header strong,
+  #changelog-panel .changelog-header strong { color: var(--p66-ink); font-size: 42px; }
+  .project-map-header small,
+  #changelog-panel .changelog-header small { color: var(--p66-cyan); font-size: 11px; }
+  #project-map-close,
+  #changelog-close { min-height: 42px; border: 1px solid var(--p66-line); border-radius: 4px; background: #fff; color: var(--p66-ink); }
+  .project-map-intro,
+  .project-tree > li,
+  .project-change-list li,
+  .project-archive-list li,
+  #changelog-list > li { border-color: var(--p66-line); background: #fff; color: var(--p66-ink); }
+  .project-map-intro p,
+  .project-page-lede,
+  .project-boundaries li,
+  .project-tree p,
+  .project-tree small,
+  .project-change-list p,
+  .changelog-lede,
+  #changelog-list > li > p,
+  #changelog-list > li > ul > li { color: var(--p66-muted); font-size: 13px; }
+  .project-node-heading strong,
+  .project-change-list strong,
+  .project-archive-list strong,
+  #changelog-list > li > strong { color: var(--p66-ink); font-size: 20px; }
+
+  /* Minimal, glass-mounted helicopter symbology. The prerecorded video remains
+   * the only moving preview; this overlay adds no renderer or simulation. */
+  .preview-cockpit-hud {
+    position: absolute;
+    z-index: 3;
+    inset: 0;
+    pointer-events: none;
+    color: rgba(190, 255, 225, 0.88);
+    font-family: var(--ui-copy);
+    text-shadow: 0 0 8px rgba(56, 255, 207, 0.3), 0 2px 3px rgba(0, 0, 0, 0.72);
+  }
+  #menu-preview-frame[data-frame='cat'] .preview-cockpit-hud,
+  #deployment-transition[data-arena='gun-range'] .preview-cockpit-hud { display: none; }
+  .cockpit-heading { position: absolute; top: 14%; left: 50%; display: flex; align-items: center; gap: 22px; transform: translateX(-50%); font-size: 11px; }
+  .cockpit-heading b { font-size: 13px; }
+  .cockpit-heading::after { content: ''; position: absolute; left: 50%; top: 21px; width: 280px; height: 7px; transform: translateX(-50%); background: repeating-linear-gradient(90deg, currentColor 0 1px, transparent 1px 28px); opacity: 0.72; }
+  .cockpit-pitch { position: absolute; left: 50%; top: 48%; width: 96px; height: 96px; transform: translate(-50%, -50%); }
+  .cockpit-pitch::before,
+  .cockpit-pitch::after { content: ''; position: absolute; left: 50%; top: 50%; background: currentColor; transform: translate(-50%, -50%); }
+  .cockpit-pitch::before { width: 66px; height: 1px; }
+  .cockpit-pitch::after { width: 1px; height: 66px; }
+  .cockpit-pitch b { position: absolute; inset: 33px; border: 1px solid currentColor; border-radius: 50%; }
+  .cockpit-pitch i { position: absolute; width: 26px; height: 1px; background: currentColor; opacity: 0.66; }
+  .cockpit-pitch i:nth-child(1) { left: -22px; top: 22px; }
+  .cockpit-pitch i:nth-child(2) { right: -22px; top: 22px; }
+  .cockpit-pitch i:nth-child(3) { left: -10px; bottom: 19px; }
+  .cockpit-pitch i:nth-child(4) { right: -10px; bottom: 19px; }
+  .cockpit-instruments { position: absolute; left: 50%; bottom: 7%; display: grid; grid-template-columns: repeat(3, minmax(86px, 1fr)); gap: 6px; width: min(430px, 62%); transform: translateX(-50%); }
+  .cockpit-instruments span { padding: 8px 10px; border: 1px solid rgba(190, 255, 225, 0.28); border-bottom-color: currentColor; background: rgba(4, 19, 21, 0.42); backdrop-filter: blur(4px); }
+  .cockpit-instruments small { display: block; font-size: 9px; letter-spacing: 0.11em; opacity: 0.75; }
+  .cockpit-instruments b { display: block; margin-top: 3px; font-size: 12px; letter-spacing: 0.05em; }
+  .deployment-cockpit-hud { z-index: -1; }
+
+  /* Compact combat HUD: dark translucent edge plates, no opaque white frames. */
+  #hud {
+    --hud-panel-strong: rgba(5, 18, 22, 0.88);
+    --hud-panel-soft: rgba(9, 28, 32, 0.7);
+    --hud-panel-quiet: rgba(5, 18, 22, 0.64);
+    --hud-text: #f2fbf8;
+    --hud-muted: #b6cac8;
+    --hud-dim: #839b99;
+    --hud-cyan: #66eee6;
+    --hud-amber: #f2b356;
+    color: var(--hud-text);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.82);
+  }
+  #matchbar,
+  .hud-map-console,
+  .hud-operator-console,
+  #weapon-block,
+  #support-block,
+  #pause-hint {
+    border-color: rgba(102, 238, 230, 0.23);
+    background: linear-gradient(135deg, var(--hud-panel-strong), var(--hud-panel-soft));
+    color: var(--hud-text);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.34);
+    backdrop-filter: blur(7px);
+  }
+  #matchbar { min-height: 68px; border-left: 3px solid var(--hud-cyan); }
+  .tiny { color: var(--hud-muted); font-size: 10px; }
+  #timer { color: var(--hud-text); }
+  #connection-pill,
+  #fps-counter,
+  #network-strip span,
+  #map-heading,
+  #location-label { border-color: rgba(102, 238, 230, 0.18); background: rgba(5, 18, 22, 0.66); color: var(--hud-text); }
+  #objective { color: var(--hud-muted); background: linear-gradient(90deg, var(--hud-panel-strong), transparent); font-size: 10px; }
+  #minimap { border: 1px solid rgba(102, 238, 230, 0.24); background: rgba(5, 18, 22, 0.62); }
+  .hud-operator-console { border-left-color: var(--hud-cyan); }
+  #health-block b,
+  #weapon-name,
+  #weapon-block #ammo,
+  .reserve-stack em,
+  .support-name { color: var(--hud-text); }
+  #health-block span,
+  #equipment-block span,
+  #equipment-block small,
+  #room-hud,
+  #combat-stats,
+  .support-heading span,
+  .support-state,
+  .support-help { color: var(--hud-muted); font-size: 10px; }
+  .health-track { background: rgba(0, 0, 0, 0.46); }
+  #combat-stats,
+  .support-list b,
+  .support-list b.ready { background: rgba(5, 18, 22, 0.58); }
+  #weapon-block { border-bottom-color: var(--hud-cyan); }
+  #support-block { border-right-color: var(--hud-amber); }
+  .support-name { font-size: 13px; }
+  .support-list b.ready { border-left-color: var(--hud-amber); background: linear-gradient(90deg, rgba(242, 179, 86, 0.18), rgba(5, 18, 22, 0.64)); }
+  #support-interaction-prompt,
+  #pickup-prompt {
+    min-height: 52px;
+    padding: 10px 15px;
+    border: 1px solid rgba(102, 238, 230, 0.42);
+    border-left: 3px solid var(--hud-cyan);
+    background: rgba(5, 18, 22, 0.9);
+    color: var(--hud-text);
+    box-shadow: 0 13px 30px rgba(0, 0, 0, 0.38);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .killstreak-demo i { animation: none !important; }
+    .kit-card,
+    #menu .command-rail .menu-tabs button { transition: none; }
+  }
+
+  @media (max-width: 1180px) {
+    .command-body { grid-template-columns: 176px minmax(0, 1fr); }
+    #menu .command-rail .menu-tabs button { min-height: 64px; }
+    #menu-panel-deploy { grid-template-columns: 1fr; }
+    .deployment-manifest { order: -1; }
+    .map-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .killstreak-slot-grid { grid-template-columns: repeat(3, minmax(190px, 1fr)); }
+    .loadout-manager-workspace { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 820px) {
+    .pass64-command-deck.panel { inset: 6px; }
+    .command-header { padding: 0 12px; }
+    .command-brand small,
+    .command-brand span { display: none; }
+    .command-body { grid-template-columns: 1fr; }
+    .command-rail { padding: 8px; border-right: 0; border-bottom: 1px solid #2d484b; }
+    .tactical-rail,
+    .command-rail footer { display: none; }
+    #menu .command-rail .menu-tabs { grid-template-columns: repeat(4, 1fr); }
+    #menu .command-rail .menu-tabs button { min-height: 48px; grid-template-columns: auto 1fr; padding: 7px 8px; }
+    #menu .command-rail .menu-tabs button span { font-size: 14px; }
+    #menu .command-rail .menu-tabs button small { display: none; }
+    .command-workspace { padding: 13px; }
+    .curated-kit-grid,
+    .custom-kit-grid { grid-template-columns: repeat(2, minmax(190px, 1fr)); }
+    .killstreak-slot-grid { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
+    #menu-panel-options > .settings-grid { grid-template-columns: 1fr; }
+    #menu-panel-options > .settings-grid label { border-right: 0; border-bottom: 1px solid var(--p66-line); }
+  }
+
+  @media (max-width: 560px) {
+    .pass64-command-deck.panel { inset: 0; border-radius: 0; }
+    .command-brand strong { font-size: 15px; }
+    .command-brand strong { width: 58px; overflow: hidden; color: transparent; }
+    .command-brand strong::after { content: 'AA // OPS'; color: var(--p66-ink); font-size: 15px; white-space: nowrap; }
+    #menu-meta-actions > button { min-height: 34px; padding: 0 9px; font-size: 10px; }
+    .curated-kit-grid,
+    .custom-kit-grid,
+    .killstreak-slot-grid,
+    .loadout-manager-grid { grid-template-columns: 1fr; }
+    .kit-heading { align-items: start; flex-direction: column; }
+    .kit-heading small { text-align: left; }
+    .map-card-grid { grid-template-columns: 1fr; }
+    .cockpit-instruments { width: 86%; }
+    #support-block { bottom: 142px; }
+  }
+}
+
+/* Mobile touch controls overlay. Only mounted during live gameplay (the game
+   loop gates visibility via setInMatch), so menus always stay tappable. */
+#mobile-touch-controls {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  font-family: 'Barlow Condensed', 'Bahnschrift Condensed', 'Arial Narrow', sans-serif;
+}
+#mobile-touch-controls[hidden] { display: none; }
+#mobile-touch-controls .mtc-stick {
+  position: absolute;
+  bottom: 26px;
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  border: 2px solid rgba(127, 246, 255, 0.35);
+  background: radial-gradient(circle at 50% 45%, rgba(16, 33, 37, 0.55), rgba(7, 18, 24, 0.35));
+  pointer-events: auto;
+  touch-action: none;
+}
+#mobile-touch-controls .mtc-stick-move { left: 22px; }
+#mobile-touch-controls .mtc-stick-look { right: 18px; }
+#mobile-touch-controls .mtc-stick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle at 40% 35%, rgba(127, 246, 255, 0.6), rgba(31, 90, 96, 0.75));
+  border: 2px solid rgba(127, 246, 255, 0.7);
+}
+#mobile-touch-controls .mtc-buttons {
+  position: absolute;
+  right: 172px;
+  bottom: 30px;
+  display: grid;
+  grid-template-columns: repeat(2, 62px);
+  gap: 9px;
+  pointer-events: auto;
+}
+#mobile-touch-controls .mtc-btn {
+  height: 50px;
+  border-radius: 12px;
+  border: 2px solid rgba(127, 246, 255, 0.4);
+  background: rgba(13, 30, 32, 0.62);
+  color: #d9f6f4;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  touch-action: none;
+}
+#mobile-touch-controls .mtc-btn:active { background: rgba(31, 90, 96, 0.8); }
+#mobile-touch-controls .mtc-fire {
+  grid-column: span 2;
+  height: 58px;
+  font-size: 17px;
+  border-color: rgba(255, 118, 95, 0.6);
+  background: rgba(70, 22, 14, 0.6);
+  color: #ffd9cf;
+}
+#mobile-touch-controls .mtc-fire:active { background: rgba(150, 45, 28, 0.8); }
+
+/* Mobile live-play compact HUD. Applied only while the touch overlay is active
+   (body.mtc-live) so desktop and menu layouts are untouched. Lifts the bottom
+   consoles above the thumbsticks and collapses the support list so nothing
+   overlaps the on-screen controls. */
+body.mtc-live #hud {
+  --hud-edge: 8px;
+  --hud-map-width: 128px;
+}
+body.mtc-live .hud-map-console { top: 84px; width: var(--hud-map-width); padding: 6px; }
+body.mtc-live #minimap { width: 100%; height: auto; }
+body.mtc-live .hud-mission-console { right: var(--hud-edge); }
+body.mtc-live #matchbar { min-height: 52px; padding: 7px 8px; }
+body.mtc-live #timer { font-size: 24px; }
+body.mtc-live #scoreline b { font-size: 18px; }
+body.mtc-live #objective, body.mtc-live .hud-performance-row { display: none; }
+
+/* Operator (bottom-left) sits above the move thumbstick. */
+body.mtc-live .hud-operator-console { bottom: 172px; width: min(150px, 40vw); padding: 8px; }
+body.mtc-live #health-block b { font-size: 34px; }
+body.mtc-live #combat-stats { display: none; }
+
+/* Weapon (bottom-right) sits above the look thumbstick. */
+body.mtc-live .hud-weapon-console { bottom: 172px; right: var(--hud-edge); width: min(150px, 42vw); }
+body.mtc-live #weapon-block #ammo { font-size: 40px; }
+body.mtc-live .reserve-stack em { font-size: 20px; }
+
+/* Collapse the killstreak list to a slim top-centre streak pill so it never
+   covers the action buttons. */
+body.mtc-live #support-block { left: 50%; right: auto; transform: translateX(-50%); top: 8px; bottom: auto; width: auto; padding: 6px 10px; }
+body.mtc-live #support-block .support-list, body.mtc-live #support-block .support-help { display: none; }
+body.mtc-live .support-heading { min-height: 0; margin-bottom: 0; }
+
+body.mtc-live #killfeed { top: 132px; width: 160px; }
+body.mtc-live #damage-feeds { top: 160px; width: min(200px, 52vw); }
+body.mtc-live #pause-hint { display: none; }
+
+/* Portrait fallback (iOS has no orientation-lock API): prompt the player to
+   rotate rather than presenting a cramped, overlapping portrait HUD. */
+@media (orientation: portrait) {
+  body.mtc-live::after {
+    content: 'ROTATE DEVICE · LANDSCAPE RECOMMENDED';
+    position: fixed;
+    left: 50%;
+    top: 10px;
+    transform: translateX(-50%);
+    z-index: 120;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: rgba(7, 18, 24, 0.85);
+    border: 1px solid rgba(127, 246, 255, 0.5);
+    color: #d9f6f4;
+    font: 700 12px/1 'Barlow Condensed', 'Bahnschrift Condensed', 'Arial Narrow', sans-serif;
+    letter-spacing: 0.08em;
+    pointer-events: none;
+  }
+}

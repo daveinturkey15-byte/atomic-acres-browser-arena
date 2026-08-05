@@ -5,6 +5,8 @@ Plan owner: Codex release integrator
 Target project: `daveinturkey15-byte/atomic-acres-browser-arena`
 Publication rule: **Pass 65 must stop at an immutable preview for Dave’s explicit HITL approval. It must not publish before that approval.**
 
+Correction authority: Dave's 2026-07-26 local review rejected failed-HITL baseline `ec8a55fa83f194f34abe6708cab727e45057285e`; the normalized 2026-07-27 Desktop `Untitled.txt` feedback adds HF-073+ and supersedes further graphics, killstreak, interaction, preview and ordnance contracts. The complete correction scope, owners, falsifiers and execution waves are frozen in [`PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md`](PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md). Where this original plan conflicts, the newest ledger row, source outcome, supersession and digest-lined decision receipt govern.
+
 ## 0. Executive decision
 
 Pass 65 will be treated as one numbered product release assembled through staged, reviewable integration waves. It will not be treated as one giant commit, a cosmetic reskin, or a set of unrelated experiments.
@@ -13,15 +15,15 @@ The first hard gate is external to Pass 65:
 
 - Pass 64 must be merged, deployed, and independently verified at the public chooser and live channel.
 - Its exact production source SHA, workflow run, Pages SHA, deployed subtree identity, and public behaviour must be recorded.
-- After Pass 64 is live, its exact published bytes are frozen as the future Pass 65 rollback. The public stable route remains Pass 63 throughout Pass 65 development and changes to those frozen Pass 64 bytes only during an approved Pass 65 promotion. The Pass 62 best-netcode benchmark remains an immutable, independently verified oracle under an explicit public-route or offline-reconstruction policy.
+- Pass 63's exact production bytes remain the Stable rollback. Pass 64's published bytes and evidence are frozen separately as a failed-regression/repair comparator after Dave's 2026-07-26 local test found the build freezing and unplayable; Pass 64 must never replace Stable. The Pass 62 best-netcode benchmark remains an immutable, independently verified offline/reconstructible oracle.
 - Only after that evidence exists may any Pass 65 branch or worktree be created from the exact new `origin/main`.
 
 That gate was independently satisfied at 2026-07-25 22:35 BST:
 
 - Final released Pass 64 main and Pass 65 `B0` are `5075a52d80c6db69a97ed53acc2df5368728371a`.
 - Exact-main verification run `30175101338`, protected production run `30175191044`, and Pages run `30175279180` all succeeded; the resulting Pages SHA is `8326c95659a9fb8c5979c13f9b88126c4ffb85f7`.
-- Production receipt artifact `8624038234` binds those identities to a captured Pass 64 topology pointer: channel `channels/experimental-netcode-pass`, `exactRootFileCount=130`, and `treeSha256=ffd3e130d005e9321976795fe2d5cadfd9965ebb27dc0bbff0c1609816cff20b`. This is not yet the complete rollback record; B1 task F00 must materialize its schema, digest scope/exclusions, verifier, and protected no-rebuild restoration policy.
-- A cache-busted chooser rendered Pass 64 Live / Pass 63 Stable; direct Pass 64 entered bot gameplay; fresh stable, normal, and room routes loaded with no unexpected browser logs.
+- Production receipt artifact `8624038234` binds those identities to a captured Pass 64 topology pointer: channel `channels/experimental-netcode-pass`, `exactRootFileCount=130`, and `treeSha256=ffd3e130d005e9321976795fe2d5cadfd9965ebb27dc0bbff0c1609816cff20b`. This is immutable regression evidence, not a stable-rollback designation. B1 task F00 must preserve its digest scope/exclusions beside the independent byte-exact Pass 63 stable record and no-rebuild restoration policy.
+- A cache-busted chooser initially rendered Pass 64 Live / Pass 63 Stable and shallow fresh-route checks succeeded. Dave's later full local play falsified the gameplay-quality assumption by exposing freezing/unplayability; the deeper owner result supersedes the shallow smoke for promotion decisions while retaining the exact release evidence.
 - The isolated P0 worktree was then created from exact `B0`; runtime work still waits for post-P0 `B1`.
 
 Historical preparation snapshot, superseded by the evidence above: at 21:05 BST the chooser still showed Pass 63 Live / Pass 62 Stable and Pass 64 had not deployed. That observation explains why early requirements and architecture work stayed off-repo; it is not current release truth.
@@ -57,7 +59,7 @@ That estimate is not a reason to weaken the pass. It is a reason to structure it
 
 - Pass 64 has an approved immutable preview at source `c30fb9a103aa8051417f2d1d3130f85265ed56aa` and a final released main identity at `5075a52d80c6db69a97ed53acc2df5368728371a`.
 - Final verification `30175101338`, production `30175191044`, Pages `30175279180` / `8326c95659a9fb8c5979c13f9b88126c4ffb85f7`, and production receipt artifact `8624038234` agree.
-- The public chooser says Pass 64 Live / Pass 63 Stable; direct Pass 64 gameplay and fresh stable/normal/room routes were independently rendered without unexpected logs.
+- The public chooser says Pass 64 Live / Pass 63 Stable. Initial direct/fresh-route smoke rendered without unexpected logs, but Dave's later full local play found Pass 64 freezing and unplayable; Pass 63 therefore remains the only Stable rollback and Pass 64 becomes a mandatory regression-repair comparator.
 - The Pass 65 P0 worktree is isolated at exact `B0` on `contrib/dave-gaming-pc/codex/pass65-p0`; no runtime worktree exists before B1.
 - `src/legacy-main.ts` is 12,438 lines and owns substantial gameplay composition, networking, presentation, settings, grenades, and killstreak wiring.
 - The current protocol is version 6 and hard-codes five primary weapons, three sidearms, and one special weapon.
@@ -83,35 +85,34 @@ That estimate is not a reason to weaken the pass. It is a reason to structure it
 - Convincing browser destruction should use authored damage cells and fracture chunks, not unbounded runtime CSG or soft-body simulation.
 - Random-feeling aircraft motion must be smooth and reproducible: menu motion can vary by seeded session, while killstreak motion must be host-seeded shared state rather than client-local randomness.
 
-### 2.3 Recommended assumptions pending product confirmation
+### 2.3 Frozen owner decisions
 
-- Keep the existing four curated kits as the first row; add `Custom 1`, `Custom 2`, `Custom 3`, plus a fourth Manage/Rename tile in the second row. This matches the explicit three names while preserving a four-column UI.
-- Each custom preset chooses one primary, one secondary, and one grenade type.
-- Interpret Adrenaline as +10% weapon damage, +10% movement speed, and 10% shorter reload duration for 15 seconds, non-stacking. A flat +10 per pellet would catastrophically distort shotgun balance.
-- Treat “Chopper Gunner” as an AI-operated attack helicopter unless player-gunner control is explicitly requested.
-- Drone Swarm replaces Nuke in the selectable top-tier slot, while Nuke remains a care-package-only 1% jackpot. This reconciles both statements in the request.
-- A piloted-drone user’s body remains stationary and vulnerable; body death, drone death, fuel expiry, or ammo exhaustion exits possession cleanly.
-- Care packages are single-consume, host-authored objects. Recommended rule: enemies may steal them, with a shorter owner capture time.
-- “Any random killstreak” means every catalog entry whose typed availability is not `retired`, except the care package itself, appears exactly once in the derived weighted reward pool; the care package is excluded to prevent recursion, and care-only Nuke remains exactly 1%.
+- Keep the existing four curated kits as the first row; expose exactly `Custom 1`, `Custom 2`, `Custom 3`, plus a Manage/Rename tile in the second row.
+- Each custom preset chooses one primary, one secondary and exactly one grenade family. The selected grenade spawns at one, carries at most one, replenishes through a valid corpse ammo pickup and never replenishes from a kill.
+- Adrenaline is host-authored for 15 seconds: ×1.10 weapon damage, ×1.10 ground movement, ×0.90 reload duration, non-stacking, with valid reactivation refreshing rather than compounding.
+- Chopper flight is always host-AI. The gun defaults to AI, and the owner may press `F` at any active time to enter or exit gun-only control during the 30-second window; flight authority never transfers.
+- A piloted-drone user's body remains stationary and fully vulnerable; every terminal path exits possession and restores control exactly once.
+- Care packages are single-consume, host-authored and enemy-stealable: owner/team hold is 1.25 seconds and enemy hold is 2.50 seconds under continuous host validation.
+- Killstreak selection uses exact slot families, not free pick-any-five: slot 1 Scout Sweep/Adrenaline/Care Package; slot 2 Yardhawk/Piloted Drone; slots 3 and 4 two distinct choices from Tri-Pass/Carpet Bomber/Hunter Swarm/Chopper Gunner; slot 5 Nuke/Drone Swarm.
+- Nuke and Drone Swarm are both selectable but mutually exclusive in slot 5. Nuke also remains exactly 1% of the care-package pool.
+- The care pool is derived from the canonical catalog on every catalog change. Every present or future eligible nonretired nonrecursive streak appears exactly once, Scout Sweep uses the highest base-weight band, and formula/property tests reject a stale hand-maintained reward list.
+- Terminal's apron is a shed-eligible mixed zone; Nuke Town and RustRig are outdoor, while Gun Range is indoor for this feature.
+- Weapon display names use real-world names across the existing and future arsenal while stable machine IDs preserve storage/protocol compatibility. Models, audio, code, UI and other presentation remain original or licence-compatible rather than copied from a franchise.
 - Public default graphics mode is capability-aware High; the verified RTX 5080 profile selects High by default with Max available. Do not force Max or unsafe settings on weaker public devices.
-- Use original in-game names and original or clearly licensed art/audio. Familiar real-world labels are archetype references, not permission to copy franchise assets, sounds, code, UI, or branding.
-- The eventual approved release names are fixed by Dave: Pass 65 Live is `The Big One`; frozen Pass 64 Stable is `WebGPU Migration`.
+- Pass 62 remains an offline/reconstructible immutable benchmark. Pass 63 remains byte-exact Stable. Pass 64 is failed-regression evidence and must not be promoted to Stable.
+- The eventual approved Live name is `The Big One`, but no publish occurs until Dave approves exact S0 in HITL and then separately confirms publication.
 
-### 2.4 Unknowns to freeze before their implementation wave
+### 2.4 Decision registry status
 
-| Decision | Recommended default | Why it matters |
-|---|---|---|
-| Does the custom row contain three presets or four? | Three presets + Manage/Rename tile | The request explicitly names only Custom 1/2/3. |
-| Grenade carry limits | Two frag; one smoke; one flash initially | Prevents permanent visibility/flash saturation. |
-| Friendly smoke/flash | Smoke affects everyone; flash has reduced friendly effect | Needs deterministic team rules. |
-| Adrenaline modifiers | ×1.10 damage, ×1.10 movement, ×0.90 reload duration; no stack | Avoids shotgun and modifier-order exploits. |
-| Nuke after Drone Swarm | Care-package-only at exactly 1% | Reconciles “Nuke replacement” with requested care-package jackpot. |
-| Chopper control | Host-driven AI | User behaviour description is autonomous despite the name. |
-| Care-package theft | Enemy-stealable; owner capture advantage | Creates counterplay and clear authority rules. |
-| Piloted-drone body | Immobile and vulnerable | Prevents possession from becoming free invulnerability. |
-| Outdoor-map classification | Nuke Town and RustRig; explicitly decide Terminal apron | Shed count depends on this registry. |
-| RTX 5080 review resolution | 2560×1440 primary; 1600×900 deterministic; optional 4K Max | Exact performance targets require a fixed display contract. |
-| Weapon display names | Original equivalents | Avoids confusion with proprietary presentation or endorsement. |
+All `DEC-01` through `DEC-15` receipts are now `FROZEN` in the canonical schema-valid registry. Implementation still must read each structured value rather than prose, prove every dependent contract, and return to owner review if a later request genuinely changes an authoritative value. A catalog addition is not such an exception: the frozen completeness rules automatically include and revalidate future eligible entries.
+
+Decision interpretation record:
+
+- Observed: the existing canonical support catalog uses ID `yardhawk` and display name `Yardhawk`; Dave's slot-2 wording therefore preserves the existing reward rather than inventing a new Hunter Killer ID.
+- Observed: the Pass 65 planned catalog contains one `carpet-bomber` ID and no separate `carpet-bomb` ID.
+- Inferred: Dave's adjacent “carpet bomb” / “carpet bomber” wording refers to that one Carpet Bomber option. A future genuinely distinct effect requires its own explicit stable ID and catalog definition; an alias must not silently duplicate one reward.
+- Assumed for authority safety: while the owner possesses the chopper gun, their operator body remains in-world, immobile and vulnerable, matching the approved piloted-drone risk model. Falsifier: Dave explicitly requests a different body/remote-control policy before S0.
+- Unknowns: none remain in DEC-01…DEC-15; implementation/calibration evidence can still falsify feasibility or quality and force a revised candidate without silently changing product values.
 
 ### 2.5 Plan falsifiers
 
@@ -119,7 +120,7 @@ The plan must stop and be revised if any of these occurs:
 
 - Pass 64 cannot be tied to an exact successful production workflow, Pages SHA, receipt, and public rendered identity.
 - Any Pass 65 preparation mutates the finalizing Pass 64 worktree.
-- Frozen Pass 62 or Pass 64 bytes drift.
+- Frozen Pass 62 benchmark, Pass 63 stable or Pass 64 regression-evidence bytes drift.
 - Mixed protocol versions enter gameplay ambiguously.
 - A guest can author shared damage, ammo, reward, crate result, drone pose, door state, fracture, flash strength, or score.
 - A visual bullet hole still blocks a bullet, or an invisible region permits one through.
@@ -131,7 +132,7 @@ The plan must stop and be revised if any of these occurs:
 - Entity, debris, particle, audio-node, memory, or network caps are exceeded.
 - Menu helicopter or cat motion jitters, clips, loops visibly, causes discomfort, loses map composition, or ships a hollow/blocky cockpit.
 - Killstreak chopper variance diverges between peers or changes collision, targeting, LOS, cover, lifetime, or calibration outside its frozen tolerance.
-- Any final chooser/release surface names Pass 65 Live or Pass 64 Stable differently from `The Big One` / `WebGPU Migration`.
+- Any candidate or final chooser names Pass 65 Live differently from `The Big One`, installs Pass 64 as Stable, drifts from byte-exact Pass 63 Stable, or publishes before both Dave's exact-SHA HITL approval and separate explicit publish confirmation.
 - Any runtime or release-shell byte changes after Dave approves the exact preview.
 
 ## 3. Non-negotiable release invariants
@@ -140,12 +141,12 @@ The plan must stop and be revised if any of these occurs:
 
 No Pass 65 repository branch, worktree, commit, server, build, test, or release mutation begins until Pass 64 is proven live from independent evidence.
 
-### G2 — Dual rollback protection
+### G2 — Stable, benchmark and regression protection
 
-- Pass 62 remains the immutable best-netcode benchmark under a frozen availability policy.
-- Once live, Pass 64 is frozen as the future byte-exact Pass 65 rollback; it does not replace public Pass 63 stable during development.
-- Only the approved Pass 65 promotion installs exact frozen Pass 64 bytes as public stable.
-- Neither fallback is reconstructed through Pass 65 source code; the restoration path is staged and smoke-tested before HITL.
+- Pass 62 remains the immutable best-netcode benchmark under its frozen offline/reconstructible policy.
+- Pass 63 remains the byte-exact Stable rollback before, during and after any approved Pass 65 promotion.
+- Pass 64's exact published bytes, receipts and freeze evidence remain immutable failed-regression evidence and a repair comparator; they are never installed as Stable.
+- Neither Pass 62 nor Pass 63 is reconstructed through Pass 65 source code; the Pass 63 restoration path is staged and smoke-tested before HITL.
 
 ### G3 — One integration authority
 
@@ -347,7 +348,7 @@ Replace the fixed internal list with:
 - `SupportActivation`: stable ID, owner/team/life, seed, earned time, activation time, state, consumed revision.
 - `SupportEntity`: entity ID, activation ID, owner/team, health, pose, velocity, ammo, reload, fuel/lifetime, target, navigation state.
 
-Every provisional product choice is represented in canonical `docs/PASS65_DECISION_RECEIPTS.json`, validated against `docs/PASS65_DECISION_RECEIPTS.schema.json`. P0 contains 15 complete `OPEN` receipts with proposed defaults, null authoritative values, rationale, owner, recorded timestamp, deadline and supersession field. A dependency such as `P04[DEC-13=FROZEN]` is satisfied only by a validated `FROZEN` receipt with non-null value and resolution timestamp; merely listing or recording a default never unlocks implementation.
+Every product choice is represented in canonical `docs/PASS65_DECISION_RECEIPTS.json`, validated against `docs/PASS65_DECISION_RECEIPTS.schema.json`. P0 historically instantiated 15 complete `OPEN` receipts; Dave froze them on 2026-07-26, and the normalized 2026-07-27 Desktop feedback adds frozen DEC-16 while superseding DEC-04/07/08/13 with structured values, rationale, owner, timestamps and digest lineage. A dependency such as `P04[DEC-13=FROZEN]` is satisfied only by the current schema-valid receipt and by code/evidence that binds its canonical digest; copying a prose summary never unlocks implementation.
 
 Host fixed-step simulation authors navigation, targeting, damage, health, reward, crate roll, loot, and lifecycle. Reliable spawn/despawn/state transitions combine with bounded pose snapshots. Targetable support entities use hit proxies with pose history so ordinary host-authored shots can destroy them under latency.
 
@@ -416,7 +417,7 @@ Project-local skills to create only after the repo gate:
 
 ```mermaid
 flowchart TD
-  P64["Pass 64 merged, published, publicly verified"] --> Freeze["Freeze Pass 64 exact rollback evidence"]
+  P64["Pass 64 merged and published; later owner play found freezing"] --> Freeze["Freeze Pass 63 Stable plus Pass 64 regression evidence"]
   Freeze --> P0["P0 process-only spec, topology, ownership, QA scaffolding"]
   P0 --> F1["F1 typed catalogs, schemas, protocol negotiation"]
   F1 --> F2["F2 inventory, projectile, visibility, support, collision authority"]
@@ -463,7 +464,7 @@ Forbidden:
 
 Exit: completed. This plan and requirement matrix were reviewed internally, then Pass 64 was independently proven live before P0 began.
 
-### Wave 1 — Pass 64 production reconciliation and freeze
+### Wave 1 — release reconciliation, Pass 63 stable freeze and Pass 64 regression capture
 
 Begin reconciliation from material release evidence as it appears; do not wait merely for the Pass 64 Codex task to emit a final message. Conversely, task completion or a duplicate HITL request is never proof. If a release-only correction changes `main`, bind the gate to the final exact released main lineage and reapply the repository's impact/check policy before dispatch.
 
@@ -481,7 +482,7 @@ Required evidence:
 10. Public game enters and logs contain no unexpected errors.
 11. Final Pass 64 runtime and complete-subtree file counts/digests come from actual deployed Git blobs.
 
-Exit: a complete off-repo evidence packet and machine-readable field contract exist; no guessed or ignored local artifact identity is used. The repository rollback record remains blocked on B1 task F00.
+Later owner testing found Pass 64 freezing and unplayable. That observation does not erase the exact publication evidence, but it does falsify Pass 64 as a rollback candidate. Exit therefore requires three separately labelled records: byte-exact Pass 63 Stable, immutable Pass 64 failed-regression evidence, and the Pass 62 benchmark oracle. No guessed or ignored artifact identity is used.
 
 ### Wave 2 — process-only preparation PR
 
@@ -493,14 +494,14 @@ Create the sole P0 branch/worktree from exact successfully released Pass 64 base
 - Integration ledger, schema-v1 `OPEN` decision receipts, task P50/P90/concurrency schedule and project-map documentation where classifier-safe.
 - No gameplay, asset, release-shell, or runtime change.
 
-The exact Pass 64 rollback evidence may be captured off-repo in Wave 1, but baseline records, `.agents/skills`, package scripts, QA/release code and release-shell configuration move to the runtime integration PR unless the classifier explicitly and safely permits them.
+The exact Pass 63 stable and Pass 64 regression evidence may be captured off-repo in Wave 1, but baseline records, `.agents/skills`, package scripts, QA/release code and release-shell configuration move to the runtime integration PR unless the classifier explicitly and safely permits them.
 
 Exit: every intended P0 artifact is present, process-only classification is independently verified, all P0 dependencies are complete, and P0 is merged. Record its exact merge SHA as base `B1`.
 
 ### Wave 3 — foundation and behavior-preserving extraction
 
 - Create the integration and specialist worktrees only from `B1`, not pre-P0 `B0`.
-- Persist the exact Pass 64 rollback record/verifier and rehearse protected restoration without rebuilding Pass 64.
+- Persist separate exact Pass 63 stable and Pass 64 regression records, generalize the verifier across both roles, and rehearse protected Pass 63 restoration without rebuilding either release.
 - Add the validated repo-local domain skills, generic release-topology tooling and QA groups that the current classifier treats as runtime/full impact.
 - Add typed catalogs and completeness verifiers.
 - Add versioned loadout/settings schemas and safe migrations.
@@ -591,7 +592,7 @@ Exit: multi-shed stress, network chaos, late join, rematch, and repeated arena s
 - Run two-peer/three-actor network scenarios with loss, delay, duplication, reorder, reconnect, and rematch.
 - Run High/Max RTX 5080 all-arena captures and stress scenarios.
 - Run accessibility, storage migration, resource-disposal, security, and provenance audits.
-- Add and validate the complete release-shell candidate: Pass 65 Live is named exactly `The Big One`; frozen Pass 64 Stable is named exactly `WebGPU Migration`; retain the Pass 62 oracle policy, chooser/changelog/project-map identity, aliases and workflow labels. These exact release-shell trees belong to the preview.
+- Add and validate the complete release-shell candidate: Pass 65 Live is named exactly `The Big One`; Stable remains byte-exact Pass 63 under its existing verified identity; Pass 64 is explicitly regression-only; retain the Pass 62 oracle policy, chooser/changelog/project-map identity, aliases and workflow labels. These exact release-shell trees belong to the preview.
 - After PV01 freezes source S0 and its immutable preview, create manifest-only descendant S0M. Its `acceptance/pass-65.json` uses table-order `R1..R99`, preserves stable planning IDs, policy-allowed evidence kinds, schema-required `status="accepted"`, complete S0-bound pre-HITL evidence and preview fields, and deliberately omits only `humanAcceptance`; post-release R04 fields remain separately phase-tagged future verification.
 
 Exit at manifest head `S0M`: S0 runtime/release-shell trees are unchanged; all four mechanical hosted checks and every Pass 65 functional/evidence verifier are green without threshold weakening; `requirements-acceptance` has exactly one error, missing Dave's `humanAcceptance`. Hosted CI validates the schema/digest of the separately captured RTX 5080 receipt; it does not claim to be that hardware run.
@@ -609,13 +610,14 @@ Exit at manifest head `S0M`: S0 runtime/release-shell trees are unchanged; all f
 9. Prove S0 ancestry and byte-identical runtime/release-shell trees across S0/S0M/S1; any drift invalidates approval and returns to preview.
 10. Require all five checks green on S1.
 
-### Wave 11 — protected promotion
+### Wave 11 — publish-ready lineage and separately confirmed protected promotion
 
 - Merge S1 serially and record exact main SHA `S2`.
 - Require all five checks again on exact main.
-- Dispatch only the protected production workflow for `PASS 65` and exact main SHA.
+- Stop at publish-ready S2 and ask Dave to separately confirm publication after seeing the final exact SHA, checks and channel topology. HITL approval alone is not publish confirmation.
+- Only after that explicit confirmation, dispatch the protected production workflow for `PASS 65` and exact main SHA.
 - Record one release-lineage receipt spanning S0 approved source/artifact/tree digests; S0M SHA, manifest digest and runtime/release-shell tree digests; S1 approval SHA/tree digests; S2 merge SHA/tree digests; four-head ancestry/parity; check runs; production run; Pages SHA; and deployed subtree identity.
-- Independently verify source SHA, controlled production-build differences or exact-artifact promotion, workflow run, Pages SHA, receipt, chooser, Pass 65 Live `The Big One`, Pass 64 Stable `WebGPU Migration`, Pass 62 benchmark policy, aliases, room links, public runtime behaviour, and logs.
+- Independently verify source SHA, controlled production-build differences or exact-artifact promotion, workflow run, Pages SHA, receipt, chooser, Pass 65 Live `The Big One`, byte-exact Pass 63 Stable, Pass 64 regression-only status, Pass 62 benchmark policy, aliases, room links, public runtime behaviour, and logs.
 - Stop after the first exact successful receipt and live smoke; never redeploy blindly.
 
 ## 7. Feature implementation contracts
@@ -787,6 +789,8 @@ Every weapon gate includes:
 
 ## 9. Grenades and explosive bolt
 
+Every loadout selects exactly one grenade family. The host spawns that family at count one, enforces an absolute carry cap of one, and never replenishes it from a kill. The existing validated corpse ammo-pickup transaction also restores a depleted selected grenade to one, without exceeding the cap or duplicating under retry/reconnect.
+
 ### Frag
 
 Retain existing authority and comparator behaviour unless a documented defect requires change. Move it through the typed ordnance adapter without silently rebalance-drifting Pass 64.
@@ -804,16 +808,16 @@ Retain existing authority and comparator behaviour unless a documented defect re
 
 - Host derives intensity/duration from distance, view angle, LOS, and solid occlusion.
 - Non-damaging unless separately approved.
-- Team/friendly rule explicit.
+- Smoke affects both teams equally; friendly flash uses 50% of hostile duration/intensity, while self-flash uses the full host angle/distance/LOS result.
 - Presentation-only accessibility scaling never changes host result.
 - Reduced flash/sensory modes and safe decay.
 
 ### Explosive crossbow
 
 - Host-spawned projectile with stable ID, pose history, owner/life/action sequence.
-- World or actor attachment rules explicit.
-- Canonical beep schedule and fuse.
-- Small blast with LOS/material semantics and exactly-once result.
+- The bolt sticks to eligible world surfaces or the admitted actor life ID and never follows a respawned life.
+- First authoritative impact arms one fixed host detonation tick 1.25 seconds later; no-impact lifetime is capped at five seconds and beeps accelerate against that fixed time.
+- Direct impact deals 45; blast falls from 60 to 15 over 3.5 metres with LOS/material semantics and exactly-once result.
 - Despawn/reconnect/rematch safe.
 - Original model/audio/presentation; familiar franchise behaviour is only a high-level reference.
 
@@ -929,18 +933,19 @@ Before F07, asset authoring or shed coding, capture final live Pass 64 on the sa
 
 ### 11.1 Five-slot selection
 
-- Main menu exposes exactly five legal slots under one frozen roster/cost/alternative/duplication table.
+- Main menu exposes exactly five family-constrained slots: slot 1 is Scout Sweep/Adrenaline/Care Package; slot 2 is Yardhawk/Piloted Drone; slots 3 and 4 are two distinct choices from Tri-Pass/Carpet Bomber/Hunter Swarm/Chopper Gunner; slot 5 is Nuke/Drone Swarm.
 - One unique-ID catalog controls exact kill cost, tier alternatives, typed `selectable | care-only | retired` availability, earning/death/carry/repeatability and complete nonrecursive care-pool weights. `Shippable` means availability is not `retired`; the reward pool is derived from that catalog rather than duplicated as an independently drifting list.
+- A validator rejects every ID outside its slot family, duplicate selections across slots 3/4, and any state that carries both Nuke and Drone Swarm.
 - Selection persists locally and freezes at match start.
 - Keys 3–7 activate the selected slots.
 - Earning, death, repeatability, carry, and consumption rules are explicit.
 
 ### 11.2 Adrenaline Boost
 
-- Replaces Scout Sweep in the low tier.
-- Recommended: damage ×1.10, movement ×1.10, reload duration ×0.90.
+- Is a slot-1 alternative to retained Scout Sweep, not its retirement.
+- Damage ×1.10, movement ×1.10, reload duration ×0.90.
 - Exactly 15 seconds from host-authored activation time.
-- Non-stacking; reactivation policy explicit.
+- Non-stacking; a second valid activation refreshes to 15 seconds and never compounds.
 - Modifier order tested against DHV/Overdrive/pellet damage/minigun movement.
 
 ### 11.3 Care Package
@@ -949,14 +954,16 @@ Before F07, asset authoring or shed coding, capture final live Pass 64 on the sa
 - Parachute crate descends, collides, lands, and expires inside a frozen measurable trajectory/time envelope.
 - `F` loot validates actor/life, range, LOS, crate revision, and exclusive capture.
 - Host deterministic non-negative integer-unit weighted table stores the roll and reward privately until reveal policy allows.
-- Nuke is typed `care-only` and its probability is exactly 1%. Every catalog definition with availability other than `retired`, except the care package itself, has one positive explicit integer weight and appears exactly once in the derived normalized pool; retired definitions and the care package have weight zero. Odds are non-increasing with kill cost unless a reviewed exception says otherwise; selected-five independence is explicit.
-- The existing Nuke stays verifier-green, host-owned and exactly once if retained care-only.
-- Single consume under retries/reconnect; enemy-steal/owner-advantage rule frozen.
+- Nuke remains `selectable` in slot 5 and also has exactly 1% care probability. Every present or future catalog definition with availability other than `retired`, except Care Package itself, is automatically included exactly once when it has a positive base weight; Care Package is excluded to prevent recursion.
+- Weights recompute from the canonical catalog on every add, rename, retire, cost or weight change. Let `S` be all eligible non-Nuke base-weight units: each non-Nuke derived weight is `base × 99`, Nuke is `S`, and total is `100 × S`. Current `S=123`, current total `12,300`, Scout Sweep has a highest-band base weight of 24, and Nuke is therefore exactly `123/12,300`.
+- The existing Nuke stays verifier-green, host-owned, selectable only as Drone Swarm's mutually exclusive alternative, and exactly once in the reward pool.
+- Single consume under retries/reconnect; owner/team captures in 1.25 seconds and enemies in 2.50 seconds under continuous host validation.
 
 ### 11.4 Chopper
 
-- Recommended AI-operated 30-second orbit.
-- Host owns path, target acquisition, LOS, fire, damage, health/lifecycle if targetable.
+- Host-AI owns the entire 30-second flight route at all times.
+- The gun defaults to AI. The owning player may press `F` at any active time to enter or exit gun-only possession; AI resumes gun control on exit and no input can transfer flight authority.
+- Host owns path, gun-control admission, target acquisition, LOS, fire, damage, health/lifecycle and exactly-once restoration. The conservative body policy keeps the operator in-world, immobile and vulnerable while gunning.
 - Cover breaks acquisition/fire.
 - Freeze a reproducible start distance, cover route, armour/health, exposure window, seeds/sample count and required survival/pressure percentile for the 4–5 second escape intent.
 
@@ -969,8 +976,8 @@ Before F07, asset authoring or shed coding, capture final live Pass 64 on the sa
 
 ### 11.6 Drone Swarm
 
-- Selectable top-tier Nuke replacement.
-- Exactly 12 host-simulated drones.
+- Selectable slot-5 alternative to retained selectable Nuke.
+- Exactly 24 host-simulated drones, admitted as a separated deterministic centre-map formation and distributing into divergent individual/small-group routes.
 - 50 HP each; freeze hitbox/core multipliers and per-weapon shot-count bands so “accurate fire” is testable.
 - Up to 60 seconds lifetime.
 - 20-round magazines with reload loops; unlimited reloads within lifetime.
@@ -1004,7 +1011,7 @@ Before F07, asset authoring or shed coding, capture final live Pass 64 on the sa
 - Smoke density/visibility, flash LOS/angle/distance, DMR occlusion.
 - Killstreak cost/earning/selection/consume/reward/state machines.
 - Killstreak roster/cost/alternative/duplication/care-pool decision receipt and identical DroneGunProfileId contract.
-- Weighted care-package table: exact non-negative integer-unit normalized pool, monotonic cost policy, care-only Nuke lifecycle and exactly 1 / 100 by definition plus deterministic sample/property checks.
+- Catalog-derived care-package table: exact non-negative safe-integer units, automatic future-entry inclusion/recomputation, highest-band Scout Sweep, selectable Nuke exactly 1 / 100, and deterministic formula/mutation/sample/property checks.
 - Support health/ammo/reload/fuel/lifetime/nav state.
 - Shed door, aperture union, panel thresholds, debris caps, state parsing/hash/reset.
 - Audio gain/pan/rolloff/voice caps/disposal.
@@ -1174,7 +1181,7 @@ The exhaustive mechanics, every-weapon/action, every-arena multiplayer, chaos, a
 10. Select/earn or use diagnostic grants for Adrenaline, Care Package, Chopper, Carpet Bomber, Drone Swarm, and Piloted Drone; inspect multiple host-seeded chopper motion variants.
 11. Cycle all maps in High and representative Max stress.
 12. Run a private two-peer lifecycle: join, play, respawn, reconnect, rematch.
-13. Review known issues, performance summary, visual contact sheets, exact frozen stable route, and final `The Big One` Live / `WebGPU Migration` Stable labels.
+13. Review known issues, performance summary, visual contact sheets, exact Pass 63 stable route, staged `The Big One` Live identity, Pass 64 regression-only evidence and the separate publish-confirmation stop.
 14. Approve or reject the exact SHA explicitly.
 
 ## 16. Definition of done
@@ -1192,10 +1199,10 @@ Pass 65 is complete only when:
 - The shed vertical slice and outdoor deployments meet visual, authority, physics, network, performance, and disposal gates.
 - All killstreak entities meet counts, health, ammo, duration, control, LOS, cover, and exactly-once contracts.
 - Performance/High/Max preserve the same gameplay authority.
-- Pass 62 benchmark policy and future Pass 64 stable bytes are independently verified, including a protected rollback rehearsal.
+- Pass 62 benchmark policy, byte-exact Pass 63 Stable and immutable Pass 64 regression evidence are independently verified, including a protected Pass 63 rollback rehearsal.
 - All required CI and Pass 65 suites pass without weakened thresholds.
 - The immutable preview is approved by Dave at the exact SHA.
 - The protected production workflow publishes the exact approved runtime/release-shell lineage, with controlled build differences recorded unless the stored preview artifact is promoted byte-for-byte.
-- Public chooser/live/stable/aliases and receipts independently agree, with Pass 65 Live named `The Big One` and Pass 64 Stable named `WebGPU Migration`.
+- After separate explicit publish confirmation, public chooser/live/stable/aliases and receipts independently agree, with Pass 65 Live named `The Big One`, Pass 63 still byte-exact Stable and Pass 64 absent from the Stable role.
 
 Until those are true, the correct status is “Pass 65 in progress,” not “done enough.”

@@ -14,6 +14,8 @@ const PROCESS_ONLY = Object.freeze([
   /^scripts\/release\//,
   /^scripts\/qa\/(?:run-with-preview-server|verify-release-topology-browser)\.mjs$/,
   /^acceptance\/(?:README\.md|example\.json|policy\.json|pass-[1-9][0-9]*\.json)$/,
+  /^artifacts\/pass65-owner-feedback\/(?:t-[a-z0-9]+(?:-[a-z0-9]+)*|hardware-webgl2-admission)-[0-9a-f]{40}\.json$/,
+  /^artifacts\/pass65\/hardware-webgl2-admission\/[0-9a-f]{40}-(?:receipt|dist-manifest)\.json$/,
   /^src\/(?:acceptance-gate|pipeline-metrics|production-receipt)\.test\.ts$/,
   /^src\/release-change-impact\.test\.ts$/,
   /^src\/release-pipeline\.test\.ts$/,
@@ -78,7 +80,7 @@ function changedPaths(base, head) {
   return paths;
 }
 
-function outputsFor(classification) {
+export function outputsFor(classification) {
   if (classification.mode === 'none') {
     return { ...classification, windows_groups: '', linux_groups: '' };
   }
@@ -87,8 +89,8 @@ function outputsFor(classification) {
   }
   return {
     ...classification,
-    windows_groups: 'pass25a-capability-chromium,boot-and-authored,pass64-hud-contracts,pass64-renderer-foundation',
-    linux_groups: 'pass25a-baseline,pass25a-capability-chromium,pass64-hud-contracts,pass64-renderer-foundation',
+    windows_groups: 'release-shell,pass25a-capability-chromium,boot-and-authored,pass64-hud-contracts,pass64-renderer-foundation',
+    linux_groups: 'release-shell,pass25a-baseline,pass25a-capability-chromium,pass64-hud-contracts,pass64-renderer-foundation',
   };
 }
 

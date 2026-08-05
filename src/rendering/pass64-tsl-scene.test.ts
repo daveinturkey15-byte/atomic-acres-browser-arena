@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { RenderPipeline } from 'three/webgpu';
-import { describe, expect, it } from 'vitest';
+import { SkyMesh } from 'three/addons/objects/SkyMesh.js';
+import { describe, expect, it, vi } from 'vitest';
 import { ARENA_VISUAL_REGISTRY } from './arena-visual-stream';
 import {
   assertRuntimeTslTraversal,
@@ -8,6 +9,7 @@ import {
   createPass64TslSceneSystems,
 } from './pass64-tsl-scene';
 import { canonicalTslDescriptor, tslDescriptorSha256, TSL_MIGRATION_INVENTORY } from './tsl-migration-inventory';
+import { OCEAN_WAVES, RUSTWORKS_OCEAN_AMPLITUDE, RUSTWORKS_OCEAN_AUTHORITY_ID } from '../water-system';
 
 describe('Pass 64 authored TSL pipeline set', () => {
   it('has stable unique SHA-256 descriptors for all seven former GLSL owners', async () => {
@@ -39,8 +41,13 @@ describe('Pass 64 authored TSL pipeline set', () => {
     expect(audit.compiledPipelineIds).toHaveLength(7);
     expect(audit.nodeMaterialPipelineIds).toHaveLength(6);
     expect(systems.principalHdrTarget.samples).toBe(4);
+    expect(systems.principalHdrTarget.textures.map(({ name }) => name)).toEqual(['output']);
     expect(systems.bloomSamples).toBe(0);
     expect(systems.depthAwareBloom).toBe(true);
+    expect(systems.ambientOcclusion).toEqual({
+      graphId: 'pass65.webgpu-gtao-depth.v1',
+      quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0,
+    });
     expect(() => assertRuntimeTslTraversal(audit)).not.toThrow();
     const rustDefinition = (await ARENA_VISUAL_REGISTRY['rustworks-1v1']()).definition;
     systems.applyDefinition(rustDefinition);
@@ -49,15 +56,88 @@ describe('Pass 64 authored TSL pipeline set', () => {
     const water = systems.root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh;
     water.geometry.computeBoundingBox();
     expect(water.visible).toBe(true);
-    expect(water.userData).toMatchObject({ waveBands: 3, waveAuthority: 'presentation-only-tsl' });
+    expect(water.userData).toMatchObject({
+      waveBands: OCEAN_WAVES.length,
+      waveAmplitude: RUSTWORKS_OCEAN_AMPLITUDE.blender,
+      waveAuthority: RUSTWORKS_OCEAN_AUTHORITY_ID,
+      waveNormalAuthority: RUSTWORKS_OCEAN_AUTHORITY_ID,
+      surfaceSegments: 256,
+    });
+    expect((water.geometry as THREE.PlaneGeometry).parameters.widthSegments).toBe(256);
+    const waterMaterial = water.material as THREE.Material & { positionNode?: unknown; normalNode?: unknown };
+    expect(waterMaterial.positionNode).toBeTruthy();
+    expect(waterMaterial.normalNode).toBeTruthy();
+    expect(waterMaterial).toMatchObject({ transparent: false, opacity: 1, depthWrite: true });
+    const oceanHorizon = water.getObjectByName('Pass 66 curved RustRig ocean horizon') as THREE.Mesh;
+    expect(oceanHorizon).toBeInstanceOf(THREE.Mesh);
+    expect(oceanHorizon.userData).toMatchObject({
+      horizonRadius: 3_200,
+      radialSegments: 24,
+      curvatureDrop: 90,
+    });
+    expect(oceanHorizon.frustumCulled).toBe(false);
     expect(systems.root.getObjectByName('Pass 64 TSL mist')?.children).toHaveLength(5);
     expect(water.geometry.boundingBox?.getCenter(new THREE.Vector3()).y).toBeCloseTo(-19.5);
     expect(systems.root.getObjectByName('Pass 64 TSL grass')?.visible).toBe(false);
     const dust = systems.root.getObjectByName('Pass 64 TSL deterministic dust') as THREE.Points;
     expect(dust.geometry.drawRange.count).toBe(96);
+    // Each arena's selected scene background is the sole sky owner. Legacy
+    // point stars, galaxy, aurora, atmosphere dome and cloud veil stay out of
+    // live presentation so they cannot add squares, wash or double exposure.
+    expect(systems.root.getObjectByName('Pass 66 night stars')?.visible).toBe(false);
+    expect(systems.root.getObjectByName('Pass 66 galaxy band')?.visible).toBe(false);
+    expect(systems.root.getObjectByName('Pass 66 aurora curtains')?.visible).toBe(false);
+    expect(systems.root.getObjectByName('Pass 66 seamless cloud veil')?.visible).toBe(false);
     systems.applyDefinition(definition);
     expect(water.visible).toBe(false);
     expect(systems.root.getObjectByName('Pass 64 TSL grass')?.visible).toBe(true);
+    expect(systems.root.getObjectByName('Pass 66 night stars')?.visible).toBe(false);
+    const atmosphereSky = systems.root.getObjectByName('Pass 64 TSL atmosphere sky') as SkyMesh;
+    const atmosphereOpacity = atmosphereSky.userData.opacityUniform as { value: number };
+    expect(atmosphereSky.visible).toBe(false);
+    expect(atmosphereSky.material.transparent).toBe(true);
+    expect(atmosphereOpacity.value).toBe(0);
+    const cloudVeil = systems.root.getObjectByName('Pass 66 seamless cloud veil') as THREE.Group;
+    expect(cloudVeil.visible).toBe(false);
+    expect(cloudVeil.children).toHaveLength(2);
+    expect(cloudVeil.children.every((layer) => layer instanceof THREE.Mesh && layer.geometry instanceof THREE.SphereGeometry)).toBe(true);
+    expect((cloudVeil.userData.cloudTexture as THREE.DataTexture).image).toMatchObject({ width: 1_024, height: 512 });
+    const primaryCloudMaterial = cloudVeil.userData.primaryMaterial as THREE.MeshBasicMaterial;
+    const secondaryCloudMaterial = cloudVeil.userData.secondaryMaterial as THREE.MeshBasicMaterial;
+    expect(primaryCloudMaterial.opacity).toBe(0);
+    expect(secondaryCloudMaterial.opacity).toBe(0);
+    expect(systems.root.userData.tslSkyComposition).toEqual({
+      sceneBackgroundDominant: true,
+      atmosphereSkyVisible: false,
+      cloudVeilVisible: false,
+    });
+    const retainedSkyUuid = atmosphereSky.uuid;
+    const retainedSkyMaterialUuid = atmosphereSky.material.uuid;
+    const retainedCloudTexture = cloudVeil.userData.cloudTexture as THREE.DataTexture;
+    const retainedCloudTextureUuid = retainedCloudTexture.uuid;
+    const skyDispose = vi.spyOn(atmosphereSky.material, 'dispose');
+    const cloudTextureDispose = vi.spyOn(retainedCloudTexture, 'dispose');
+    const terminalDefinition = (await ARENA_VISUAL_REGISTRY['skyline-terminal']()).definition;
+    systems.applyDefinition(terminalDefinition);
+    expect(systems.root.getObjectByName('Pass 64 TSL atmosphere sky')?.visible).toBe(false);
+    expect(atmosphereOpacity.value).toBe(0);
+    expect(cloudVeil.visible).toBe(false);
+    expect(primaryCloudMaterial.opacity).toBe(0);
+    expect(secondaryCloudMaterial.opacity).toBe(0);
+    expect(systems.root.userData.tslSkyComposition).toEqual({
+      sceneBackgroundDominant: true,
+      atmosphereSkyVisible: false,
+      cloudVeilVisible: false,
+    });
+    systems.applyDefinition(definition);
+    expect(atmosphereSky.uuid).toBe(retainedSkyUuid);
+    expect(atmosphereSky.material.uuid).toBe(retainedSkyMaterialUuid);
+    expect((cloudVeil.userData.cloudTexture as THREE.DataTexture).uuid).toBe(retainedCloudTextureUuid);
+    expect(atmosphereOpacity.value).toBe(0);
+    expect(primaryCloudMaterial.opacity).toBe(0);
+    expect(secondaryCloudMaterial.opacity).toBe(0);
+    expect(skyDispose).not.toHaveBeenCalled();
+    expect(cloudTextureDispose).not.toHaveBeenCalled();
     const reviewCamera = { ...definition.reviewCameras[0], fixedTimeMs: 63_321, seed: 9_117 };
     systems.setReviewCamera(reviewCamera);
     systems.update(999_999);
@@ -82,5 +162,128 @@ describe('Pass 64 authored TSL pipeline set', () => {
     );
     expect(audit.legacyShaderMaterials).toHaveLength(1);
     expect(() => assertRuntimeTslTraversal(audit)).toThrow(/legacy shader materials remain/);
+  });
+
+  it('precompiles against the exact ScenePass HDR target and MRT before restoring renderer state', async () => {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const previousTarget = new THREE.RenderTarget(2, 2);
+    const previousMrt = { name: 'previous-mrt' };
+    let currentTarget: THREE.RenderTarget | null = previousTarget;
+    let currentMrt: unknown = previousMrt;
+    let systems: ReturnType<typeof createPass64TslSceneSystems>;
+    const renderer = {
+      getRenderTarget: vi.fn(() => currentTarget),
+      getMRT: vi.fn(() => currentMrt),
+      setRenderTarget: vi.fn((target: THREE.RenderTarget | null) => { currentTarget = target; }),
+      setMRT: vi.fn((value: unknown) => { currentMrt = value; }),
+      compileAsync: vi.fn(async (root: THREE.Object3D, activeCamera: THREE.Camera, targetScene: THREE.Scene) => {
+        expect(root.name).toBe('exact-coverage-root');
+        expect(activeCamera).toBe(camera);
+        expect(targetScene).toBe(scene);
+        expect(currentTarget).toBe(systems.principalHdrTarget);
+        expect(currentMrt).not.toBe(previousMrt);
+        expect(currentMrt).not.toBeNull();
+      }),
+    };
+    const renderPipeline = { outputNode: null, renderer } as unknown as RenderPipeline;
+    const definition = (await ARENA_VISUAL_REGISTRY['atomic-acres']()).definition;
+    systems = createPass64TslSceneSystems(scene, camera, renderPipeline, definition, {
+      principalSamples: 2,
+      volumetricScale: 1,
+      ambientOcclusion: {
+        quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52,
+      },
+      post: {
+        bloomStrength: 0.14, exposureScale: 1, toneMapping: 'aces', filmGrainScale: 1, vignetteStrength: 0,
+      },
+    });
+    const root = new THREE.Group();
+    root.name = 'exact-coverage-root';
+    scene.add(root);
+
+    await systems.precompileExactScenePass(root);
+
+    expect(renderer.compileAsync).toHaveBeenCalledTimes(1);
+    expect(renderer.setRenderTarget.mock.calls.map(([target]) => target)).toEqual([
+      systems.principalHdrTarget,
+      previousTarget,
+    ]);
+    expect(renderer.setMRT.mock.calls.at(-1)?.[0]).toBe(previousMrt);
+    expect(currentTarget).toBe(previousTarget);
+    expect(currentMrt).toBe(previousMrt);
+    systems.dispose();
+    previousTarget.dispose();
+  });
+
+  it('restores the prior renderer target and MRT when exact ScenePass compilation fails', async () => {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const previousTarget = new THREE.RenderTarget(2, 2);
+    const previousMrt = { name: 'previous-mrt' };
+    let currentTarget: THREE.RenderTarget | null = previousTarget;
+    let currentMrt: unknown = previousMrt;
+    const renderer = {
+      getRenderTarget: vi.fn(() => currentTarget),
+      getMRT: vi.fn(() => currentMrt),
+      setRenderTarget: vi.fn((target: THREE.RenderTarget | null) => { currentTarget = target; }),
+      setMRT: vi.fn((value: unknown) => { currentMrt = value; }),
+      compileAsync: vi.fn(async () => { throw new Error('synthetic compile failure'); }),
+    };
+    const renderPipeline = { outputNode: null, renderer } as unknown as RenderPipeline;
+    const definition = (await ARENA_VISUAL_REGISTRY['atomic-acres']()).definition;
+    const systems = createPass64TslSceneSystems(scene, camera, renderPipeline, definition);
+    const root = new THREE.Group();
+    scene.add(root);
+
+    await expect(systems.precompileExactScenePass(root)).rejects.toThrow('synthetic compile failure');
+    expect(currentTarget).toBe(previousTarget);
+    expect(currentMrt).toBe(previousMrt);
+    systems.dispose();
+    previousTarget.dispose();
+  });
+
+  it('allocates the selected HDR samples and applies bounded volumetric/post settings', async () => {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const renderPipeline = { outputNode: null } as unknown as RenderPipeline;
+    const definition = (await ARENA_VISUAL_REGISTRY['rustworks-1v1']()).definition;
+    const systems = createPass64TslSceneSystems(scene, camera, renderPipeline, definition, {
+      principalSamples: 2,
+      volumetricScale: 0.5,
+      ambientOcclusion: {
+        quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52,
+      },
+      post: {
+        bloomStrength: 0,
+        exposureScale: 0.9,
+        toneMapping: 'agx',
+        filmGrainScale: 0,
+        vignetteStrength: 0.35,
+      },
+      oceanWaveAmplitude: RUSTWORKS_OCEAN_AMPLITUDE.performance,
+    });
+    expect(systems.principalHdrTarget.samples).toBe(2);
+    expect(systems.principalHdrTarget.textures.map(({ name }) => name)).toEqual(['output', 'normal']);
+    expect(systems.root.userData.pass65AdvancedGraphics).toEqual({
+      principalSamples: 2,
+      volumetricScale: 0.5,
+      bloomStrength: 0,
+      filmGrainScale: 0,
+      vignetteStrength: 0.35,
+      ambientOcclusion: {
+        quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52,
+      },
+    });
+    expect((systems.root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh).userData).toMatchObject({
+      waveBands: OCEAN_WAVES.length,
+      waveAmplitude: RUSTWORKS_OCEAN_AMPLITUDE.performance,
+      waveAuthority: RUSTWORKS_OCEAN_AUTHORITY_ID,
+    });
+    const dust = systems.root.getObjectByName('Pass 64 TSL deterministic dust') as THREE.Points;
+    expect(dust.geometry.drawRange.count).toBe(48);
+    expect(systems.root.getObjectByName('Pass 64 TSL smoke')?.children.filter(({ visible }) => visible)).toHaveLength(2);
+    expect(renderPipeline.outputNode).not.toBeNull();
+    systems.dispose();
   });
 });

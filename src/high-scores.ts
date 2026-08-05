@@ -136,7 +136,6 @@ export function personalBest(entries: readonly HighScoreEntry[], playerName: str
 }
 
 export function immediateStreakEntry(
-  installId: string,
   playerName: string,
   streak: number,
   kills: number,
@@ -145,8 +144,7 @@ export function immediateStreakEntry(
   now = Date.now(),
 ): HighScoreEntry | null {
   const name = normalizeRequiredPlayerName(playerName);
-  const safeInstallId = installId.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 80);
-  if (!name || safeInstallId.length < 8) return null;
+  if (!name) return null;
   const scalars = parseImmediateStreakScalars(streak, kills, deaths, recordedAt, now);
   if (!scalars) return null;
   const nameKey = leaderboardNameKey(name);

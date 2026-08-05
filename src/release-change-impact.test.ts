@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyPaths } from '../scripts/release/change-impact.mjs';
+import { classifyPaths, outputsFor } from '../scripts/release/change-impact.mjs';
 
 describe('release change impact', () => {
   it('skips expensive browser groups for process-only changes', () => {
@@ -12,6 +12,27 @@ describe('release change impact', () => {
     ])).toEqual({ mode: 'none', reason: 'process-only' });
   });
 
+  it('treats only exact-SHA finalizer receipt JSON as process-only evidence', () => {
+    const sha = 'a'.repeat(40);
+    expect(classifyPaths([
+      `artifacts/pass65-owner-feedback/t-owner-gate-${sha}.json`,
+      `artifacts/pass65-owner-feedback/hardware-webgl2-admission-${sha}.json`,
+      `artifacts/pass65/hardware-webgl2-admission/${sha}-receipt.json`,
+      `artifacts/pass65/hardware-webgl2-admission/${sha}-dist-manifest.json`,
+    ])).toEqual({ mode: 'none', reason: 'process-only' });
+
+    for (const path of [
+      `artifacts/pass65-owner-feedback/t-owner-gate-${'a'.repeat(39)}.json`,
+      `artifacts/pass65-owner-feedback/runtime-${sha}.json`,
+      `artifacts/pass65-owner-feedback/t-owner-gate-${sha}.bin`,
+      `artifacts/pass65/hardware-webgl2-admission/${sha}-receipt.json.sha256`,
+      `artifacts/pass65/hardware-webgl2-admission/${sha}-other.json`,
+      `artifacts/pass65/other/${sha}-receipt.json`,
+    ]) {
+      expect(classifyPaths([path]), path).toEqual({ mode: 'full', reason: 'runtime-or-unclassified' });
+    }
+  });
+
   it('uses a focused browser smoke for release-shell changes', () => {
     expect(classifyPaths(['index.html', 'src/release-channel.test.ts']))
       .toEqual({ mode: 'smoke', reason: 'release-shell-only' });
@@ -21,5 +42,11 @@ describe('release change impact', () => {
     expect(classifyPaths(['src/network.ts'])).toEqual({ mode: 'full', reason: 'runtime-or-unclassified' });
     expect(classifyPaths(['mystery/new-surface.bin'])).toEqual({ mode: 'full', reason: 'runtime-or-unclassified' });
     expect(classifyPaths([])).toEqual({ mode: 'full', reason: 'empty-or-unresolvable-diff' });
+  });
+
+  it('keeps the release chooser contract in both full browser matrices', () => {
+    const output = outputsFor(classifyPaths(['src/network.ts']));
+    expect(output.windows_groups.split(',')).toContain('release-shell');
+    expect(output.linux_groups.split(',')).toContain('release-shell');
   });
 });

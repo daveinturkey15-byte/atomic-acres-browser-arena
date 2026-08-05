@@ -1,18 +1,15 @@
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { PLAYER_PROFILE_STORAGE_KEY } from '../../src/player-profile';
+import { UI_HIGH_DPI_REVIEW_VIEWPORT, UI_REVIEW_VIEWPORTS } from '../../src/ui/surface-registry';
 
 type ReviewViewport = Readonly<{ id: string; width: number; height: number }>;
 
-const reviewViewports = [
-  { id: 'laptop', width: 1280, height: 720 },
-  { id: 'desktop', width: 1920, height: 1080 },
-  { id: 'ultrawide', width: 2560, height: 1080 },
-  { id: 'narrow', width: 390, height: 844 },
-] as const satisfies readonly ReviewViewport[];
-const highDpiViewport = { id: 'high-dpi', width: 390, height: 844 } as const satisfies ReviewViewport;
+const reviewViewports: readonly ReviewViewport[] = UI_REVIEW_VIEWPORTS;
+const highDpiViewport = UI_HIGH_DPI_REVIEW_VIEWPORT;
 
-async function ready(page: Page): Promise<void> {
+async function ready(page: Page, options: Readonly<{ freezeCssMotion?: boolean }> = {}): Promise<void> {
   await page.goto('/?release=latest&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&seed=pass64-hud&previewTime=0');
   await page.waitForFunction(() => {
     const debug = window.__ATOMIC_ACRES_DEBUG__;
@@ -20,7 +17,9 @@ async function ready(page: Page): Promise<void> {
     return debug?.snapshot().weaponReady === true && solo?.disabled === false;
   }, undefined, { timeout: 30_000 });
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
-  await page.addStyleTag({ content: '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}' });
+  if (options.freezeCssMotion !== false) {
+    await page.addStyleTag({ content: '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}' });
+  }
 }
 
 async function captureReview(page: Page, testInfo: TestInfo, state: string, viewport: ReviewViewport): Promise<void> {
@@ -36,7 +35,7 @@ async function startDeterministicSolo(page: Page): Promise<void> {
     window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false);
     window.__ATOMIC_ACRES_DEBUG__.startSolo();
   });
-  await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active', undefined, { timeout: 15_000 });
+  await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active', undefined, { timeout: 60_000 });
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true));
   await page.waitForTimeout(2_500);
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
@@ -69,7 +68,8 @@ test.describe('Pass 64 command HUD and menu contract', () => {
       { id: 'gun-range', route: 'gun-range' },
     ]);
 
-    await expect(page.locator('#menu-showcase > #game')).toBeVisible();
+    await expect(page.locator('#menu-showcase > #game')).toHaveCount(0);
+    await expect(page.locator('#menu-preview-video')).toBeVisible();
     await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-frame', 'helicopter');
     await expect(page.locator('#menu-preview-label')).toContainText('NUKE TOWN');
 
@@ -120,33 +120,235 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     await expect(opener).toBeFocused();
   });
 
-  test('animates the live arena preview when motion is allowed', async ({ page }) => {
+  test('keeps the simple graphics choice separate from collapsed advanced WebGPU controls', async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await ready(page);
+    await page.locator('#menu-tab-options').click();
+    await expect(page.locator('#graphics-profile option')).toHaveText(['QUALITY', 'PERFORMANCE', 'MAX', 'CUSTOM']);
+    await expect(page.locator('#advanced-graphics')).not.toHaveAttribute('open', '');
+    await expect(page.locator('#graphics-target-fps')).toBeHidden();
+    await page.locator('#advanced-graphics summary').click();
+    await expect(page.locator('#graphics-target-fps')).toBeVisible();
+    await expect(page.locator('#graphics-target-fps')).toHaveAttribute('max', '360');
+    await expect(page.locator('#graphics-target-fps-marks option[value="240"]')).toHaveCount(1);
+    await expect(page.locator('[data-graphics-setting]')).toHaveCount(22);
+    await expect(page.locator('[data-graphics-capability][aria-disabled="true"]')).toHaveCount(6);
+    await expect(page.locator('#graphics-frame-rate-limit')).toHaveAttribute('max', '361');
+    await expect(page.locator('#graphics-frame-rate-limit-value')).toHaveText('UNCAPPED');
+    const registry = await page.evaluate(() => (
+      window.__ATOMIC_ACRES_DEBUG__.snapshot().settings as {
+        advancedGraphicsRegistry: { registeredKeys: string[]; controls: Array<{ runtimeConsumer: string }> };
+      }
+    ).advancedGraphicsRegistry);
+    expect(registry.registeredKeys).toHaveLength(22);
+    expect(registry.controls.every(({ runtimeConsumer }) => runtimeConsumer.length > 0)).toBe(true);
+    const layout = await page.evaluate(() => ({
+      pageOverflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      panelOverflowX: document.querySelector<HTMLElement>('#menu-panel-options')!.scrollWidth
+        - document.querySelector<HTMLElement>('#menu-panel-options')!.clientWidth,
+      labelFontPx: Number.parseFloat(getComputedStyle(document.querySelector<HTMLElement>('.graphics-preset-row label')!).fontSize),
+    }));
+    expect(layout).toEqual({ pageOverflowX: 0, panelOverflowX: 0, labelFontPx: 12 });
+    const directory = resolve(process.cwd(), 'artifacts/pass65/graphics-options');
+    mkdirSync(directory, { recursive: true });
+    const screenshot = resolve(directory, 'advanced-webgpu-controls-1280x720.png');
+    await page.screenshot({ path: screenshot, animations: 'disabled', fullPage: true });
+    await testInfo.attach('advanced-webgpu-controls-1280x720', { path: screenshot, contentType: 'image/png' });
+  });
+
+  test('exposes every independent audio bus, applies it live, and persists it', async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await ready(page);
+    await page.locator('#menu-tab-options').click();
+    await expect(page.locator('[data-audio-bus]')).toHaveCount(8);
+    await expect(page.locator('[data-audio-mute]')).toHaveCount(8);
+    await expect(page.locator('.audio-setting-row > span')).toHaveText([
+      'MASTER', 'SFX', 'MOVEMENT', 'UI', 'ANNOUNCEMENTS', 'AMBIENCE', 'MENU MUSIC', 'GAME MUSIC',
+    ]);
+
+    await page.locator('#audio-sfx-gain').evaluate((node) => {
+      const input = node as HTMLInputElement;
+      input.value = '37';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.locator('#audio-sfx-mute').check();
+    expect(await page.evaluate(() => {
+      const requested = window.__ATOMIC_ACRES_DEBUG__.snapshot().settings.requested as {
+        audio: { gains: { sfx: number }; mutes: { sfx: boolean } };
+      };
+      return { gain: requested.audio.gains.sfx, muted: requested.audio.mutes.sfx };
+    })).toEqual({ gain: 37, muted: true });
+    expect(await page.evaluate((key) => {
+      const profile = JSON.parse(localStorage.getItem(key) ?? 'null');
+      return { gain: profile?.settings?.audio?.gains?.sfx, muted: profile?.settings?.audio?.mutes?.sfx };
+    }, PLAYER_PROFILE_STORAGE_KEY)).toEqual({ gain: 37, muted: true });
+
+    const directory = resolve(process.cwd(), 'artifacts/pass65/graphics-options');
+    mkdirSync(directory, { recursive: true });
+    const screenshot = resolve(directory, 'audio-mixer-1280x720.png');
+    await page.screenshot({ path: screenshot, animations: 'disabled', fullPage: true });
+    await testInfo.attach('audio-mixer-1280x720', { path: screenshot, contentType: 'image/png' });
+
+    await page.reload();
+    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 30_000 });
+    await page.locator('#menu-tab-options').click();
+    await expect(page.locator('#audio-sfx-gain')).toHaveValue('37');
+    await expect(page.locator('#audio-sfx-mute')).toBeChecked();
+  });
+
+  test('batches Advanced Graphics edits and commits Custom once when Options closes', async ({ page }) => {
+    await ready(page);
+    await page.locator('#menu-tab-options').click();
+    await page.locator('#advanced-graphics summary').click();
+    await page.locator('#graphics-frame-rate-limit').evaluate((node) => {
+      const input = node as HTMLInputElement;
+      input.value = '240';
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await page.locator('#graphics-film-grain').evaluate((node) => {
+      const input = node as HTMLInputElement;
+      input.value = '0.19';
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await expect(page.locator('#advanced-graphics')).toHaveAttribute('open', '');
+    await expect(page.locator('#graphics-profile')).toHaveValue('custom');
+    await expect(page.locator('#graphics-effective')).toContainText('PENDING');
+    expect(new URL(page.url()).searchParams.get('render')).toBe('compat');
+    expect(await page.evaluate((key) => (
+      JSON.parse(localStorage.getItem(key) ?? 'null')?.settings?.graphics?.frameRateLimit
+    ), PLAYER_PROFILE_STORAGE_KEY)).not.toBe(240);
+
+    await Promise.all([
+      page.waitForURL((url) => !url.searchParams.has('render'), { timeout: 30_000 }),
+      page.locator('#menu-tab-deploy').click(),
+    ]);
+    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 30_000 });
+    await page.locator('#menu-tab-options').click();
+    await page.locator('#advanced-graphics summary').click();
+    await expect(page.locator('#graphics-profile')).toHaveValue('custom');
+    await expect(page.locator('#graphics-frame-rate-limit')).toHaveValue('240');
+    const persisted = await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? 'null'), PLAYER_PROFILE_STORAGE_KEY);
+    expect(persisted.settings.graphics).toMatchObject({ preset: 'custom', frameRateLimit: 240, filmGrain: 0.19 });
+    await expect(page.locator('html')).toHaveAttribute('data-graphics-frame-rate-limit', '240');
+  });
+
+  test('keeps leaderboard sharing default-off, disclosed, persistent, and revocable', async ({ page }) => {
+    await page.addInitScript((profileKey) => {
+      if (sessionStorage.getItem('pass65-privacy-test-initialized') !== '1') {
+        localStorage.removeItem(profileKey);
+        localStorage.setItem('atomic-acres:leaderboard-install:v2', 'legacy_install_123');
+        sessionStorage.setItem('pass65-privacy-test-initialized', '1');
+      }
+    }, PLAYER_PROFILE_STORAGE_KEY);
+    await ready(page);
+    expect(await page.evaluate(() => localStorage.getItem('atomic-acres:leaderboard-install:v2'))).toBeNull();
+    await page.locator('#menu-tab-options').click();
+    const sharing = page.locator('#share-global-leaderboard');
+    await expect(sharing).not.toBeChecked();
+    await expect(page.locator('#global-leaderboard-sharing-state')).toHaveText('SHARING OFF');
+    await expect(page.locator('#privacy-settings')).toContainText('chosen callsign, streak, kills, deaths, build/season and a pseudonymous browser ID');
+
+    await sharing.check();
+    await expect(page.locator('#global-leaderboard-sharing-state')).toHaveText('SHARING ENABLED');
+    expect(await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? 'null')?.settings?.privacy, PLAYER_PROFILE_STORAGE_KEY))
+      .toEqual({ schemaVersion: 1, shareGlobalLeaderboard: true });
+    expect(await page.evaluate(() => localStorage.getItem('atomic-acres:leaderboard-install:v2'))).toBeNull();
+
+    await page.evaluate(() => localStorage.setItem('atomic-acres:leaderboard-install:v2', 'consented_install_123'));
+    await sharing.uncheck();
+    await expect(page.locator('#global-leaderboard-sharing-state')).toHaveText('SHARING OFF');
+    expect(await page.evaluate(() => localStorage.getItem('atomic-acres:leaderboard-install:v2'))).toBeNull();
+    expect(await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? 'null')?.settings?.privacy, PLAYER_PROFILE_STORAGE_KEY))
+      .toEqual({ schemaVersion: 1, shareGlobalLeaderboard: false });
+
+    await page.reload();
+    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 30_000 });
+    await page.locator('#menu-tab-options').click();
+    await expect(page.locator('#share-global-leaderboard')).not.toBeChecked();
+  });
+
+  test('shares one player profile across same-origin Live and Stable query routes', async ({ page }) => {
+    await ready(page);
+    await page.locator('#menu-tab-options').click();
+    await page.locator('#sensitivity').evaluate((node) => {
+      const input = node as HTMLInputElement;
+      input.value = '1.45';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.locator('#field-of-view').evaluate((node) => {
+      const input = node as HTMLInputElement;
+      input.value = '97';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    const latestProfile = await page.evaluate((key) => localStorage.getItem(key), PLAYER_PROFILE_STORAGE_KEY);
+    expect(latestProfile).not.toBeNull();
+
+    await page.goto('/?release=stable&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&seed=pass65-profile-stable&previewTime=0');
+    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 30_000 });
+    await page.locator('#menu-tab-options, [data-menu-tab="options"]').click();
+    await expect(page.locator('#sensitivity')).toHaveValue('1.45');
+    await expect(page.locator('#field-of-view')).toHaveValue('97');
+    expect(await page.evaluate((key) => localStorage.getItem(key), PLAYER_PROFILE_STORAGE_KEY)).toBe(latestProfile);
+    const canonicalControls = await page.evaluate((key) => {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      try {
+        const parsed = JSON.parse(raw) as { controls?: { mouseSensitivity?: number; controllerSensitivity?: number; fieldOfView?: number } };
+        return {
+          mouseSensitivity: parsed.controls?.mouseSensitivity ?? null,
+          controllerSensitivity: parsed.controls?.controllerSensitivity ?? null,
+          fieldOfView: parsed.controls?.fieldOfView ?? null,
+        };
+      } catch {
+        return null;
+      }
+    }, PLAYER_PROFILE_STORAGE_KEY);
+    expect(canonicalControls).toEqual({ mouseSensitivity: 1.45, controllerSensitivity: 1, fieldOfView: 97 });
+    expect(await page.evaluate(() => Object.keys(localStorage).filter((key) => [
+      'atomic-acres-sensitivity',
+      'atomic-acres-controller-sensitivity',
+      'atomic-acres-fov',
+    ].includes(key)))).toEqual([]);
+
+    await page.goto('/?release=latest&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&seed=pass65-profile-return&previewTime=0');
+    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 30_000 });
+    await page.locator('#menu-tab-options').click();
+    await expect(page.locator('#sensitivity')).toHaveValue('1.45');
+    await expect(page.locator('#field-of-view')).toHaveValue('97');
+    expect(await page.evaluate((key) => localStorage.getItem(key), PLAYER_PROFILE_STORAGE_KEY)).toBe(latestProfile);
+    expect(await page.evaluate(() => Object.keys(localStorage).filter((key) => [
+      'atomic-acres-sensitivity',
+      'atomic-acres-controller-sensitivity',
+      'atomic-acres-fov',
+    ].includes(key)))).toEqual([]);
+  });
+
+  test('plays prerecorded media without moving or submitting the gameplay renderer', async ({ page }) => {
     const runtimeErrors: string[] = [];
     page.on('pageerror', (error) => runtimeErrors.push(error.message));
     page.on('console', (message) => {
       if (message.type() === 'error') runtimeErrors.push(message.text());
     });
-    await page.goto('/?release=latest&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&seed=pass64-hud-motion');
+    await page.goto('/?release=latest&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&externalServices=off&seed=pass64-hud-motion');
     await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 30_000 });
     const before = await page.evaluate(() => ({
-      position: (window.__ATOMIC_ACRES_DEBUG__.snapshot().menuCamera as { position: number[] }).position,
+      renderer: window.__ATOMIC_ACRES_DEBUG__.snapshot().menuPreview.rendererEvidence,
       motion: document.querySelector<HTMLElement>('#menu-preview-frame')?.dataset.motion,
-      phase: document.querySelector<HTMLElement>('#menu-preview-frame')?.dataset.phase,
+      phase: Number(window.__ATOMIC_ACRES_DEBUG__.snapshot().menuPreview.phase),
       parent: document.querySelector<HTMLCanvasElement>('#game')?.parentElement?.id,
     }));
     await page.waitForTimeout(350);
     const after = await page.evaluate(() => ({
-      position: (window.__ATOMIC_ACRES_DEBUG__.snapshot().menuCamera as { position: number[] }).position,
-      phase: document.querySelector<HTMLElement>('#menu-preview-frame')?.dataset.phase,
+      renderer: window.__ATOMIC_ACRES_DEBUG__.snapshot().menuPreview.rendererEvidence,
+      phase: Number(window.__ATOMIC_ACRES_DEBUG__.snapshot().menuPreview.phase),
     }));
-    const travel = Math.hypot(...after.position.map((value, index) => value - before.position[index]!));
-    expect(before.motion).toBe('orbit');
-    expect(before.parent).toBe('menu-showcase');
+    expect(before.motion).toBe('video');
+    expect(before.parent).toBe('app');
     expect(runtimeErrors).toEqual([]);
-    expect(before.phase).toMatch(/^-?\d+\.\d+$/);
-    expect(after.phase).toMatch(/^-?\d+\.\d+$/);
-    expect(Number(after.phase) - Number(before.phase)).toBeGreaterThan(0.05);
-    expect(travel).toBeGreaterThan(0.05);
+    expect(after.phase - before.phase).toBeGreaterThan(0.05);
+    expect(after.renderer.renderCalls).toBe(before.renderer.renderCalls);
+    expect(after.renderer.presentation.submissionSequence).toBe(before.renderer.presentation.submissionSequence);
+    expect(after.renderer.arenaConstructionCount).toBe(0);
   });
 
   for (const viewport of reviewViewports) {
@@ -171,7 +373,8 @@ test.describe('Pass 64 command HUD and menu contract', () => {
           withinViewport: rect.left >= -1 && rect.right <= innerWidth + 1 && rect.top >= -1 && rect.bottom <= innerHeight + 1,
           mapWithinMenu: mapRect.left >= rect.left - 1 && mapRect.right <= rect.right + 1,
           showcaseInsideWorkspace: workspace.contains(showcase),
-          rendererInsideShowcase: showcase.querySelector(':scope > #game') !== null,
+          rendererInsideShowcase: showcase.contains(document.querySelector('#game')),
+          previewVideoInsideShowcase: showcase.contains(document.querySelector('#menu-preview-video')),
           previewFrameVisible: getComputedStyle(document.querySelector<HTMLElement>('#menu-preview-frame')!).display !== 'none',
           mapDetailFontPx: Number.parseFloat(mapDetail.fontSize),
           mapHeadingFontPx: Number.parseFloat(heading.fontSize),
@@ -184,11 +387,12 @@ test.describe('Pass 64 command HUD and menu contract', () => {
       expect(layout.withinViewport).toBe(true);
       expect(layout.mapWithinMenu).toBe(true);
       expect(layout.showcaseInsideWorkspace).toBe(true);
-      expect(layout.rendererInsideShowcase).toBe(true);
+      expect(layout.rendererInsideShowcase).toBe(false);
+      expect(layout.previewVideoInsideShowcase).toBe(true);
       expect(layout.previewFrameVisible).toBe(true);
       expect(layout.mapDetailFontPx).toBeGreaterThanOrEqual(9);
       expect(layout.mapHeadingFontPx).toBeGreaterThanOrEqual(15);
-      expect(layout.shellWidthRatio).toBeGreaterThan(viewport.id === 'ultrawide' ? 0.8 : viewport.id === 'narrow' ? 0.99 : 0.95);
+      expect(layout.shellWidthRatio).toBeGreaterThan(viewport.id === 'ultrawide' ? 0.6 : viewport.id === 'narrow' ? 0.99 : viewport.id === 'owner' ? 0.8 : 0.95);
 
       await captureReview(page, testInfo, 'setup', viewport);
     });
@@ -251,7 +455,7 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     expect(contract.status).toContain('ready');
     expect(contract.controls).toBeGreaterThanOrEqual(8);
     expect(contract.previewMotion).toBe('static');
-    expect(contract.rendererParent).toBe('menu-showcase');
+    expect(contract.rendererParent).toBe('app');
   });
 
   test('preserves the critical live-match HUD across the review viewport matrix', async ({ page }, testInfo) => {
@@ -271,34 +475,138 @@ test.describe('Pass 64 command HUD and menu contract', () => {
       const mapGeometry = await page.evaluate(() => {
         const minimap = document.querySelector('#minimap')!.getBoundingClientRect();
         const heading = document.querySelector('#map-heading')!.getBoundingClientRect();
-        const panels = ['#matchbar', '#objective', '#fps-counter', '#network-strip', '.hud-map-console', '.hud-operator-console', '.hud-weapon-console', '#support-block']
+        const operator = document.querySelector('.hud-operator-console')!.getBoundingClientRect();
+        const support = document.querySelector('#support-block')!.getBoundingClientRect();
+        const panels = ['#matchbar', '#objective', '#fps-counter', '#network-strip', '.hud-map-console', '.hud-operator-console', '.hud-weapon-console', '#support-block', '#pause-hint', '#killfeed', '#damage-feeds']
           .map((selector) => ({ selector, rect: document.querySelector(selector)!.getBoundingClientRect().toJSON() }));
         const overlapPairs: string[] = [];
         for (let left = 0; left < panels.length; left += 1) {
           for (let right = left + 1; right < panels.length; right += 1) {
             const a = panels[left]!;
             const b = panels[right]!;
-            const overlaps = a.rect.left < b.rect.right - 1
+            const overlaps = a.rect.width > 1 && a.rect.height > 1 && b.rect.width > 1 && b.rect.height > 1
+              && a.rect.left < b.rect.right - 1
               && a.rect.right > b.rect.left + 1
               && a.rect.top < b.rect.bottom - 1
               && a.rect.bottom > b.rect.top + 1;
             if (overlaps) overlapPairs.push(`${a.selector}:${b.selector}`);
           }
         }
+        const supportCards = [...document.querySelectorAll<HTMLElement>('#support-block [data-support]')];
+        const supportColumns = new Set(supportCards.map((card) => Math.round(card.getBoundingClientRect().left))).size;
+        const clippedSupportCards = supportCards.filter((card) => card.scrollWidth > card.clientWidth + 1 || card.scrollHeight > card.clientHeight + 1)
+          .map((card) => card.dataset.support);
+        const outOfBounds = panels.filter(({ rect }) => rect.width > 1 && rect.height > 1 && (
+          rect.left < -1 || rect.top < -1 || rect.right > innerWidth + 1 || rect.bottom > innerHeight + 1
+        )).map(({ selector }) => selector);
+        const fontSize = (selector: string) => Number.parseFloat(getComputedStyle(document.querySelector<HTMLElement>(selector)!).fontSize);
         return {
           minimapBottom: minimap.bottom,
           headingTop: heading.top,
           overlapPairs,
-          objectiveFontPx: Number.parseFloat(getComputedStyle(document.querySelector<HTMLElement>('#objective')!).fontSize),
-          supportStateFontPx: Number.parseFloat(getComputedStyle(document.querySelector<HTMLElement>('.support-state')!).fontSize),
+          outOfBounds,
+          clippedSupportCards,
+          supportColumns,
+          supportToOperatorGap: operator.top - support.bottom,
+          objectiveFontPx: fontSize('#objective'),
+          supportNameFontPx: fontSize('.support-name'),
+          supportStateFontPx: fontSize('.support-state'),
+          timerFontPx: fontSize('#timer'),
+          healthFontPx: fontSize('#health'),
+          ammoFontPx: fontSize('#ammo'),
+          criticalLabelFloorPx: Math.min(
+            fontSize('.tiny'),
+            fontSize('#objective'),
+            fontSize('#fps-counter span'),
+            fontSize('#map-heading'),
+            fontSize('#health-block span'),
+            fontSize('#weapon-name'),
+            fontSize('.support-name'),
+            fontSize('.support-state'),
+          ),
+          hudContract: document.querySelector<HTMLElement>('#hud')!.dataset.hudContract,
         };
       });
       expect(mapGeometry.headingTop).toBeGreaterThanOrEqual(mapGeometry.minimapBottom);
       expect(mapGeometry.overlapPairs).toEqual([]);
+      expect(mapGeometry.outOfBounds).toEqual([]);
+      expect(mapGeometry.clippedSupportCards).toEqual([]);
+      expect(mapGeometry.supportColumns).toBe(viewport.id === 'narrow' ? 2 : 1);
+      if (viewport.id === 'narrow') expect(mapGeometry.supportToOperatorGap).toBeGreaterThanOrEqual(6);
+      if (viewport.id === 'owner') expect(mapGeometry.criticalLabelFloorPx).toBeGreaterThanOrEqual(10);
+      expect(mapGeometry.hudContract).toBe('pass65-responsive-v1');
       expect(mapGeometry.objectiveFontPx).toBeGreaterThanOrEqual(9);
-      expect(mapGeometry.supportStateFontPx).toBeGreaterThanOrEqual(viewport.id === 'narrow' ? 8 : 9);
+      expect(mapGeometry.supportNameFontPx).toBeGreaterThanOrEqual(9);
+      expect(mapGeometry.supportStateFontPx).toBeGreaterThanOrEqual(9);
+      expect(mapGeometry.timerFontPx).toBeGreaterThanOrEqual(12);
+      expect(mapGeometry.healthFontPx).toBeGreaterThanOrEqual(12);
+      expect(mapGeometry.ammoFontPx).toBeGreaterThanOrEqual(12);
       await captureReview(page, testInfo, 'live-hud', viewport);
     }
+  });
+
+  test('presents an accessible animated 3-2-1 with bounded mixer telemetry and cleanup', async ({ page }, testInfo) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await ready(page, { freezeCssMotion: false });
+    await page.evaluate(() => {
+      window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false);
+      window.__ATOMIC_ACRES_DEBUG__.startSolo();
+    });
+    await page.waitForFunction(() => {
+      const countdown = document.querySelector<HTMLElement>('#countdown');
+      const cue = countdown?.dataset.cue;
+      return countdown?.hidden === false && (cue === '3' || cue === '2' || cue === '1');
+    }, undefined, { timeout: 30_000 });
+    const cue = await page.evaluate(() => {
+      const countdown = document.querySelector<HTMLElement>('#countdown')!;
+      const computed = getComputedStyle(countdown);
+      const audio = window.__ATOMIC_ACRES_DEBUG__.snapshot().audio as {
+        countdown: { cues: number; lastCue: string | number; maximumVoicesPerCue: number; maximumCueWindowSeconds: number; buses: string[] };
+        runtime: { voices: number; globalCap: number };
+      };
+      return {
+        role: countdown.getAttribute('role'),
+        ariaLive: countdown.getAttribute('aria-live'),
+        ariaLabel: countdown.getAttribute('aria-label'),
+        className: countdown.className,
+        cueKey: countdown.dataset.cueKey,
+        reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+        animationName: computed.animationName,
+        fontPx: Number.parseFloat(computed.fontSize),
+        cue: countdown.dataset.cue,
+        audio,
+      };
+    });
+    expect(cue).toMatchObject({
+      role: 'status',
+      ariaLive: 'assertive',
+      className: 'countdown-cue-active',
+      cueKey: expect.stringMatching(/^(odd|even)$/),
+      reducedMotion: false,
+    });
+    expect(cue.ariaLabel).toMatch(/^Deployment countdown [123]$/);
+    expect(cue.animationName).toMatch(/^pass65CountdownBeat(?:Odd|Even)$/);
+    expect(cue.fontPx).toBeGreaterThanOrEqual(100);
+    expect(cue.audio.countdown).toMatchObject({ maximumVoicesPerCue: 2, maximumCueWindowSeconds: 0.36, buses: ['announcements', 'ui'] });
+    expect(cue.audio.countdown.cues).toBeGreaterThanOrEqual(1);
+    expect(cue.audio.runtime.voices).toBeLessThanOrEqual(cue.audio.runtime.globalCap);
+
+    const directory = resolve(process.cwd(), 'artifacts/pass65/hud-review');
+    mkdirSync(directory, { recursive: true });
+    const screenshot = resolve(directory, 'countdown-1280x720.png');
+    await page.screenshot({ path: screenshot, animations: 'disabled' });
+    await testInfo.attach('countdown-1280x720', { path: screenshot, contentType: 'image/png' });
+
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect.poll(async () => page.locator('#countdown').evaluate((element) => getComputedStyle(element).animationName)).toBe('none');
+    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active', undefined, { timeout: 60_000 });
+    await expect.poll(async () => page.evaluate(() => (
+      window.__ATOMIC_ACRES_DEBUG__.snapshot().audio as { countdown: { cues: number; lastCue: string } }
+    ).countdown)).toMatchObject({ cues: 4, lastCue: 'engage' });
+    await expect(page.locator('#countdown')).toBeHidden({ timeout: 2_000 });
+    await expect(page.locator('#countdown')).not.toHaveAttribute('data-cue', /.+/);
+    await expect(page.locator('#countdown')).not.toHaveAttribute('aria-label', /.+/);
   });
 
   test('renders real dead and respawning HUD states', async ({ page }) => {

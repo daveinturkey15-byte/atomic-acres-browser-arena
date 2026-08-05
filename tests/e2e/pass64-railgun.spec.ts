@@ -1,8 +1,13 @@
 import { expect, test } from '@playwright/test';
 
-test('railgun exits ADS, enforces the 1.5 second rechamber, and permits a released second ADS shot', async ({ page }) => {
-  test.setTimeout(90_000);
-  await page.goto('/?renderer=webgl2&render=performance&signal=off&grass=off&mist=off&clouds=off&rays=off&seed=6402&map=atomic-acres');
+const renderer = process.env.PASS66_RAILGUN_RENDERER ?? 'webgl2';
+const renderProfile = process.env.PASS66_RAILGUN_RENDER_PROFILE ?? (renderer === 'webgpu' ? 'blender' : 'performance');
+
+test('railgun restores its through-wall thermal scope, exits ADS, and enforces rechamber', async ({ page }, testInfo) => {
+  test.setTimeout(renderer === 'webgpu' ? 150_000 : 90_000);
+  const requireWebGpu = renderer === 'webgpu' ? '&requireWebGPU=1' : '';
+  await page.goto(`/?release=latest&renderer=${renderer}${requireWebGpu}&render=${renderProfile}&signal=off&grass=off&mist=off&clouds=off&rays=off&seed=6402&map=atomic-acres`);
+  expect(new URL(page.url()).pathname).toBe('/channels/the-big-one/');
   await page.waitForFunction(() => {
     const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => any } }).__ATOMIC_ACRES_DEBUG__;
     return api?.snapshot().weaponReady === true;
@@ -18,6 +23,11 @@ test('railgun exits ADS, enforces the 1.5 second rechamber, and permits a releas
     window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => any } }
   ).__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active'
     && (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => any } }).__ATOMIC_ACRES_DEBUG__.snapshot().arenaSelection.id === 'atomic-acres', undefined, { timeout: 15_000 });
+  if (renderer === 'webgpu') {
+    expect(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().render.runtime)).toMatchObject({
+      actualBackend: 'webgpu', deviceLost: false, uncapturedErrors: 0, presentation: { status: 'healthy' },
+    });
+  }
 
   const acquired = await page.evaluate(() => {
     const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: any }).__ATOMIC_ACRES_DEBUG__;
@@ -30,31 +40,88 @@ test('railgun exits ADS, enforces the 1.5 second rechamber, and permits a releas
   expect(acquired.state.player.weapon).toBe('railgun');
   await page.waitForTimeout(500);
 
+  const thermalStage = await page.evaluate(() => {
+    const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: any }).__ATOMIC_ACRES_DEBUG__;
+    // Aim through the solid centre section of the Aqua house front wall. The
+    // first solo bot is hostile and is staged just inside that wall, so this is
+    // a real through-geometry optic gate rather than an unobstructed marker.
+    api.teleportPlayer(-9, 1.7, -12.5, 0, 0);
+    api.placeBotRelative(0, 9);
+    api.setBotsFrozen(true);
+    return {
+      wallBlocked: api.segmentBlocked(-9, -12.5, -9, -21.5),
+      bot: api.snapshot().bots[0],
+    };
+  });
+  expect(thermalStage.wallBlocked).toBe(true);
+  expect(thermalStage.bot).toMatchObject({ alive: true });
+
   await page.evaluate(() => (
     window as unknown as { __ATOMIC_ACRES_DEBUG__: any }
   ).__ATOMIC_ACRES_DEBUG__.setAds(true));
   await page.waitForFunction(() => (
     window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => any } }
   ).__ATOMIC_ACRES_DEBUG__.snapshot().railgun.thermalVisible === true);
-  await page.evaluate(() => (
-    window as unknown as { __ATOMIC_ACRES_DEBUG__: any }
-  ).__ATOMIC_ACRES_DEBUG__.fireOnce());
-
-  const first = await page.evaluate(() => (
+  await page.waitForFunction(() => {
+    const thermal = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => any } })
+      .__ATOMIC_ACRES_DEBUG__.snapshot().railgun.presentation;
+    return thermal.thermalActive === true && thermal.thermalContacts >= 1 && thermal.worldSilhouettes >= 1;
+  });
+  const thermal = await page.evaluate(() => (
     window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => any } }
-  ).__ATOMIC_ACRES_DEBUG__.snapshot());
+  ).__ATOMIC_ACRES_DEBUG__.snapshot().railgun.presentation);
+  expect(thermal).toMatchObject({
+    thermalActive: true,
+    thermalThroughGeometry: true,
+  });
+  expect(thermal.thermalContacts).toBeGreaterThanOrEqual(1);
+  expect(thermal.worldSilhouettes).toBeGreaterThanOrEqual(1);
+  await page.screenshot({ path: testInfo.outputPath(`railgun-through-wall-thermal-${renderer}.png`), animations: 'disabled' });
+  const shotStates = await page.evaluate(() => {
+    const api = (
+      window as unknown as { __ATOMIC_ACRES_DEBUG__: { fireOnce: () => void; snapshot: () => any } }
+    ).__ATOMIC_ACRES_DEBUG__;
+    api.fireOnce();
+    const first = api.snapshot();
+    // Keep this attempted follow-up in the same browser task as the accepted
+    // shot. On a heavily loaded renderer, crossing the Playwright boundary and
+    // inspecting the full presentation can legitimately consume the 1.5 s
+    // rechamber window, turning this into a machine-speed test instead of an
+    // authority test.
+    api.fireOnce();
+    return { first, blocked: api.snapshot() };
+  });
+  const first = shotStates.first;
   expect(first.railgun).toMatchObject({ roundsRemaining: 7, adsResetRequired: true, rechamberPresentationActive: true });
-  expect(first.railgun.presentation).toMatchObject({ beamPresentations: 1, thermalActive: false });
-  expect(first.audio.railgun).toMatchObject({ local: 1, layerCount: 8, pressureDuration: 0.62 });
+  expect(first.railgun.presentation).toMatchObject({
+    beamPresentations: 1,
+    activeBeams: 1,
+    lastBeamLengthM: 180,
+    visibleDurationMs: 1_000,
+    coreRadiusM: 0.32,
+    haloRadiusM: 1,
+    shockRadiusM: 1.6,
+    filamentCount: 3,
+    poolCapacity: 6,
+    throughGeometry: true,
+  });
+  const acceptedBeam = first.railgun.presentation.lastAcceptedBeam;
+  expect(acceptedBeam).toMatchObject({ generation: first.railgun.generation, lengthM: 180 });
+  expect(acceptedBeam.shotId).toMatch(/:rail:\d+$/);
+  expect(Math.hypot(
+    acceptedBeam.end[0] - acceptedBeam.start[0],
+    acceptedBeam.end[1] - acceptedBeam.start[1],
+    acceptedBeam.end[2] - acceptedBeam.start[2],
+  )).toBeCloseTo(180, 5);
+  expect(first.audio.railgun).toMatchObject({ local: 1, layerCount: 10, pressureDuration: 0.62 });
   expect(first.textChat.adsHeld).toBe(false);
-  expect(first.railgun.thermalVisible).toBe(false);
 
-  await page.evaluate(() => (
-    window as unknown as { __ATOMIC_ACRES_DEBUG__: any }
-  ).__ATOMIC_ACRES_DEBUG__.fireOnce());
-  expect(await page.evaluate(() => (
+  const presentationCountBeforeBlockedShot = first.railgun.presentation.beamPresentations;
+  expect(shotStates.blocked.railgun.roundsRemaining).toBe(7);
+  expect(shotStates.blocked.railgun.presentation.beamPresentations).toBe(presentationCountBeforeBlockedShot);
+  await page.waitForFunction(() => (
     window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => any } }
-  ).__ATOMIC_ACRES_DEBUG__.snapshot().railgun.roundsRemaining)).toBe(7);
+  ).__ATOMIC_ACRES_DEBUG__.snapshot().railgun.thermalVisible === false);
 
   await page.evaluate(() => (
     window as unknown as { __ATOMIC_ACRES_DEBUG__: any }
@@ -82,4 +149,9 @@ test('railgun exits ADS, enforces the 1.5 second rechamber, and permits a releas
   expect(second.beforeReload).toBe(6);
   expect(second.afterReload).toBe(6);
   expect(second.state.player.reserve).toBe(0);
+  if (renderer === 'webgpu') {
+    expect(second.state.render.runtime).toMatchObject({
+      actualBackend: 'webgpu', deviceLost: false, uncapturedErrors: 0, presentation: { status: 'healthy' },
+    });
+  }
 });

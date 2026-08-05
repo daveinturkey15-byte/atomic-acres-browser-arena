@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "algorithm": "sha256-ordered-name-size-bytes-v1",
+  "families": [
+    {
+      "cacheKey": "pass65-runtime-preview-v7",
+      "recipeId": "pass65-authoritative-runtime-menu-preview-v4",
+      "finalMediaSetSha256": "352bfbbca5a2ad06b501997c6d34f64fa70a4ae7f7a20ad93b45c757a45c5576",
+      "fileCount": 12,
+      "totalBytes": 6672030,
+      "recordedAt": "2026-07-28"
+    },
+    {
+      "cacheKey": "pass66-runtime-preview-v1",
+      "recipeId": "pass66-authoritative-runtime-menu-preview-v1",
+      "finalMediaSetSha256": "b20c52a5a6787f722b71550011e31954f1bfa6c1a28c5440e4b13da9aa0d2969",
+      "fileCount": 12,
+      "totalBytes": 9982260,
+      "recordedAt": "2026-07-29"
+    },
+    {
+      "cacheKey": "pass66-runtime-preview-v2",
+      "recipeId": "pass66-authoritative-runtime-menu-preview-v1",
+      "finalMediaSetSha256": "e0ccb5e4ab0d24ca784851043d55f5a1faa2568ae679068b2fc7f677fc8a264e",
+      "fileCount": 12,
+      "totalBytes": 10130001,
+      "recordedAt": "2026-07-29"
+    },
+    {
+      "cacheKey": "pass66-runtime-preview-v3",
+      "recipeId": "pass66-authoritative-runtime-menu-preview-v1",
+      "finalMediaSetSha256": "632fcf631f27a43e4815f4e8c920c35a8c16ebf59271449f5a3b7a5d52d0be97",
+      "fileCount": 12,
+      "totalBytes": 10559132,
+      "recordedAt": "2026-07-29"
+    }
+  ]
+}

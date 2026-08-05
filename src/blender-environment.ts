@@ -98,6 +98,13 @@ export function enforceAtomicMaterialDepthContract(material: THREE.Material, tra
   material.opacity = 1;
   material.depthWrite = true;
   material.alphaTest = 0;
+  // The authored Atomic environment contains closed boxes, cylinders, spheres
+  // and tori only. Blender exports materials double-sided unless backface
+  // culling is explicitly enabled, making every opaque arena surface shade
+  // faces that cannot be seen. Restore the closed-volume contract at load time;
+  // semantic glass remains untouched because its two-sided presentation is
+  // intentional and independently breakable.
+  material.side = THREE.FrontSide;
   material.needsUpdate = true;
   return material;
 }

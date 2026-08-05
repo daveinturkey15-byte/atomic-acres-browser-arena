@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import {
   characterActionContract,
@@ -52,6 +52,27 @@ describe('character presentation contracts', () => {
     expect(bounds!.getCenter(new THREE.Vector3()).length()).toBeLessThan(1);
   });
 
+  it('reuses static geometry bounds while honoring live child transforms and explicit invalidation', () => {
+    const weapon = new THREE.Group();
+    const geometry = new THREE.BoxGeometry(0.2, 0.3, 1.2);
+    const computeBoundingBox = vi.spyOn(geometry, 'computeBoundingBox');
+    const receiver = new THREE.Mesh(geometry);
+    receiver.position.z = -0.45;
+    weapon.add(receiver);
+
+    const first = objectLocalGeometryBounds(weapon);
+    receiver.position.z = -0.15;
+    const moved = objectLocalGeometryBounds(weapon);
+
+    expect(computeBoundingBox).toHaveBeenCalledTimes(1);
+    expect(first?.getCenter(new THREE.Vector3()).z).toBeCloseTo(-0.45, 6);
+    expect(moved?.getCenter(new THREE.Vector3()).z).toBeCloseTo(-0.15, 6);
+
+    geometry.boundingBox = null;
+    objectLocalGeometryBounds(weapon);
+    expect(computeBoundingBox).toHaveBeenCalledTimes(2);
+  });
+
   it('reports near-plane and viewport framing deterministically', () => {
     const camera = new THREE.PerspectiveCamera(70, 16 / 9, 0.1, 100);
     const arm = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.2, 0.8));
@@ -60,6 +81,24 @@ describe('character presentation contracts', () => {
     expect(framing).toMatchObject({ finite: true, nearPlaneClear: true, intersectsViewport: true });
     arm.position.z = -0.04;
     expect(measureCameraFraming(arm, camera)?.nearPlaneClear).toBe(false);
+  });
+
+  it('uses the live deformed bounds for skinned arms instead of the stale bind geometry box', () => {
+    const camera = new THREE.PerspectiveCamera(70, 16 / 9, 0.1, 100);
+    const geometry = new THREE.BoxGeometry(4, 4, 4);
+    geometry.computeBoundingBox();
+    const arm = new THREE.SkinnedMesh(geometry);
+    arm.position.z = -1;
+    arm.boundingBox = new THREE.Box3(
+      new THREE.Vector3(-0.1, -0.1, -0.1),
+      new THREE.Vector3(0.1, 0.1, 0.1),
+    );
+    const computeLiveBounds = vi.spyOn(arm, 'computeBoundingBox').mockImplementation(() => undefined);
+
+    expect(measureCameraFraming(arm, camera)).toMatchObject({
+      finite: true, nearPlaneClear: true, intersectsViewport: true,
+    });
+    expect(computeLiveBounds).toHaveBeenCalledOnce();
   });
 
   it('can exclude intentionally off-screen roots from critical action framing', () => {

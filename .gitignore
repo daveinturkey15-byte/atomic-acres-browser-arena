@@ -3,6 +3,7 @@ dist/
 .vite/
 .swarm/
 __pycache__/
+*.blend1
 qwen_swarm.py
 *.log
 .DS_Store
@@ -13,5 +14,8 @@ qwen_swarm.py
 playwright-report/
 test-results/
 artifacts/
+*.tsbuildinfo
+*.blend1
+docs/assets/pass65-weapons/firearms/pass65-weapon-family-preview-contact-sheet.png
 .wrangler/
 .dev.vars*

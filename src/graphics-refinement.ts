@@ -49,6 +49,16 @@ export function arenaShadowVolume(arenaId: ArenaId): ArenaShadowVolume {
   return { ...SHADOW_VOLUMES[arenaId] };
 }
 
+/**
+ * Reflection quality must remain visible on WebGPU even when no environment
+ * map is available. Raising PBR roughness attenuates direct-light specular
+ * response without inventing SSR or changing authored base colour/metalness.
+ */
+export function effectivePbrRoughness(authoredRoughness: number, transparent: boolean, reflectionScale: number): number {
+  const authored = THREE.MathUtils.clamp(authoredRoughness, transparent ? 0.04 : 0.12, 1);
+  return THREE.MathUtils.lerp(1, authored, THREE.MathUtils.clamp(reflectionScale, 0, 1));
+}
+
 export function graphicsEffectsBudget(profile: RenderProfile, pixelRatioCap: number): GraphicsEffectsBudget {
   if (profile === 'compat') {
     return {
@@ -126,6 +136,8 @@ export type GraphicsRefinementTelemetry = Readonly<{
   environmentIntensity: number;
   refinedMaterials: number;
   refinedTextures: number;
+  requestedAnisotropy: number;
+  reflectionScale: number;
   selectiveBloomObjects: number;
   shadowVolume: ArenaShadowVolume;
   budget: GraphicsEffectsBudget;
@@ -150,6 +162,8 @@ export class GraphicsRefinementSystem {
     private readonly profile: RenderProfile,
     softwareRenderer: boolean,
     initialPixelRatioCap: number,
+    private readonly requestedAnisotropy = profile === 'blender' ? 8 : 4,
+    private readonly reflectionScale = 1,
   ) {
     this.budget = graphicsEffectsBudget(profile, initialPixelRatioCap);
     if (!renderer || profile === 'compat' || softwareRenderer) return;
@@ -180,23 +194,24 @@ export class GraphicsRefinementSystem {
 
   private applyEnvironmentIntensity(): void {
     if (!this.scene.environment) return;
-    this.scene.environmentIntensity = this.budget.environmentIntensity * arenaEnvironmentScale(this.arenaId);
+    this.scene.environmentIntensity = this.budget.environmentIntensity * arenaEnvironmentScale(this.arenaId) * this.reflectionScale;
   }
 
   refine(root: THREE.Object3D, maximumAnisotropy: number): void {
-    const anisotropy = Math.max(1, Math.min(maximumAnisotropy, this.profile === 'blender' ? 8 : 4));
+    const anisotropy = Math.max(1, Math.min(maximumAnisotropy, this.requestedAnisotropy));
     root.traverse((node) => {
       for (const material of materialsOf(node)) {
         if (!(material instanceof THREE.MeshStandardMaterial) || this.refined.has(material)) continue;
         this.refined.add(material);
         this.refinedMaterials += 1;
-        material.roughness = THREE.MathUtils.clamp(material.roughness, material.transparent ? 0.04 : 0.12, 1);
+        material.roughness = effectivePbrRoughness(material.roughness, material.transparent, this.reflectionScale);
         material.metalness = THREE.MathUtils.clamp(material.metalness, 0, 1);
-        material.envMapIntensity = material.transparent
+        const authoredEnvironmentIntensity = material.transparent
           ? Math.max(material.envMapIntensity, 0.48)
           : material.metalness >= 0.45
             ? Math.max(material.envMapIntensity, 0.82)
             : Math.max(material.envMapIntensity, 0.3);
+        material.envMapIntensity = authoredEnvironmentIntensity * this.reflectionScale;
         material.dithering = this.profile === 'blender';
         const record = material as THREE.MeshStandardMaterial & Record<string, THREE.Texture | null | unknown>;
         for (const key of TEXTURE_KEYS) {
@@ -266,6 +281,8 @@ export class GraphicsRefinementSystem {
       environmentIntensity: this.scene.environment ? this.scene.environmentIntensity : 0,
       refinedMaterials: this.refinedMaterials,
       refinedTextures: this.refinedTextures,
+      requestedAnisotropy: this.requestedAnisotropy,
+      reflectionScale: this.reflectionScale,
       selectiveBloomObjects: this.selectiveBloomObjects,
       shadowVolume: { ...this.shadowVolume },
       budget: { ...this.budget },

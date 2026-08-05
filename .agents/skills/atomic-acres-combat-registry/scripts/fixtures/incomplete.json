@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "rosterOracleId": "candidate-defined-roster",
+  "weapons": [
+    {
+      "id": "broken-gun",
+      "displayName": "Broken",
+      "slot": "primary",
+      "family": "laser",
+      "fireKind": "pellet",
+      "fireMode": "burst",
+      "rpm": 0,
+      "pellets": 13,
+      "spinUpMs": -1,
+      "movementMultiplier": 0,
+      "damage": {"policy": "head-only", "base": -1, "minimum": 10},
+      "spread": {"hipSpreadDeg": 4},
+      "recoil": {"recoveryMs": 100},
+      "ammo": {"magazine": 0, "reserve": -1, "reloadSeconds": 2},
+      "penetration": {"power": 100001, "retentionPerSurface": 0.8, "maximumSurfaces": 65},
+      "effects": {"tracerColorHex": 16777216, "threeColor": "red"},
+      "optic": {"kind": "thermal-smoke-only", "magnification": 2.5, "solidOcclusion": "none"},
+      "projectileId": "contradiction",
+      "policies": {"loadout": "diagnostic-only", "range": {"kind": "candidate-defined"}, "telemetry": "bounded", "stance": "stand-crouch-prone"},
+      "modelSetId": "",
+      "presentationId": "",
+      "audioId": "",
+      "provenanceId": "",
+      "evidenceIds": []
+    }
+  ],
+  "coverage": [{"weaponId": "broken-gun", "channels": ["gameplay"], "evidenceSha256": "bad"}],
+  "candidateRequiredWeaponIds": ["broken-gun"]
+}

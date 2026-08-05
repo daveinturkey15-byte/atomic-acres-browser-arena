@@ -1,0 +1,12 @@
+{
+  "fixtureOnly": true,
+  "metadata": {
+    "schemaVersion": 3,
+    "kind": "network-matrix-cell",
+    "scenarioId": "host-guest-bot",
+    "profileId": "moderate-chaos",
+    "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "buildId": "pass65-candidate-001",
+    "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  }
+}

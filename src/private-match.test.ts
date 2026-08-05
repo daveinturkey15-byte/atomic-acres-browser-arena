@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_PRIVATE_MATCH_CONFIG,
+  MAX_HOST_START_FUTURE_LEAD_MS,
+  MIN_RECOVERED_HOST_START_TIME_MS,
   balanceLobbyTeams,
   canHostCommitStart,
   canHostStart,
@@ -130,6 +132,15 @@ describe('private match lobby', () => {
     expect(isLobbySnapshot(snapshot({ members: members.map((member) => ({ ...member, dhv: 9 as 10 })) }))).toBe(false);
     expect(isLobbySnapshot(snapshot({ activeAtHostTimeMs: 1_000 }))).toBe(false);
     expect(isLobbySnapshot(snapshot({ activeAtHostTimeMs: 1_000, activeAtEpochMs: 2_000 }))).toBe(true);
+    expect(isLobbySnapshot(snapshot({
+      phase: 'active', activeAtHostTimeMs: -25_000, activeAtEpochMs: 2_000,
+    }))).toBe(true);
+    expect(isLobbySnapshot(snapshot({
+      phase: 'active', activeAtHostTimeMs: MIN_RECOVERED_HOST_START_TIME_MS - 1, activeAtEpochMs: 2_000,
+    }))).toBe(false);
+    expect(isLobbySnapshot(snapshot({
+      phase: 'countdown', activeAtHostTimeMs: 500 + MAX_HOST_START_FUTURE_LEAD_MS + 1, activeAtEpochMs: 2_000,
+    }))).toBe(false);
   });
 
   it('returns host and guests to a valid readyable lobby before a second match', () => {

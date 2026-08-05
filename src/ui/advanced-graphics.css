@@ -1,0 +1,204 @@
+#advanced-graphics .advanced-graphics-catalog {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+/* Owner HITL: an unmissable SAVE control near the top of Graphics that commits
+   whatever settings were just chosen, in the map or in the menu. */
+#graphics-save {
+  margin-left: auto;
+  padding: 9px 22px;
+  border: 1px solid #0b6b78;
+  background: linear-gradient(160deg, #0e8b9b, #0a5f6b);
+  color: #ffffff;
+  font: 900 13px/1 Inter, system-ui, sans-serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(11, 107, 120, 0.4);
+}
+
+#graphics-save:hover {
+  background: linear-gradient(160deg, #12a4b6, #0d7382);
+}
+
+#graphics-save:active {
+  transform: translateY(1px);
+}
+
+/* Clickable hard refresh (mobile-friendly Ctrl+Shift+R equivalent). */
+.game-refresh-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+}
+.game-refresh-row p {
+  flex: 1 1 320px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: color-mix(in srgb, var(--ui-ink, #d8f2ef) 78%, transparent);
+}
+#hard-refresh-button {
+  padding: 12px 26px;
+  border: 1px solid #8a4f0b;
+  background: linear-gradient(160deg, #d98a2b, #a35c12);
+  color: #fff;
+  font: 900 13px/1 Inter, system-ui, sans-serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(217, 138, 43, 0.35);
+}
+#hard-refresh-button:hover {
+  background: linear-gradient(160deg, #f0a03a, #c0711c);
+}
+#hard-refresh-button:active {
+  transform: translateY(1px);
+}
+#hard-refresh-button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+#advanced-graphics .advanced-graphics-category {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--ui-cyan, #54d9ec) 28%, transparent);
+  background: var(--ui-deep, #f5f7f2);
+}
+
+#advanced-graphics .advanced-graphics-category > header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+#advanced-graphics .advanced-graphics-category > header b {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+}
+
+#advanced-graphics .advanced-graphics-category > header small {
+  color: var(--ui-accent-readable, #0b6b78);
+  font-size: 8px;
+  letter-spacing: 0.08em;
+}
+
+#advanced-graphics .advanced-graphics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 8px;
+}
+
+#advanced-graphics .advanced-graphics-control,
+#advanced-graphics .advanced-graphics-unavailable {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "label input"
+    "help input";
+  align-items: center;
+  gap: 3px 10px;
+  min-width: 0;
+  min-height: 58px;
+  padding: 8px 9px;
+  border: 1px solid color-mix(in srgb, var(--ui-line, #b8c8cb) 42%, transparent);
+  background: var(--ui-panel, #ffffff);
+}
+
+#advanced-graphics .advanced-graphics-control > span:first-child,
+#advanced-graphics .advanced-graphics-unavailable > span {
+  grid-area: label;
+  min-width: 0;
+  /* Owner HITL: labels were washing out on the light panel. Force a near-black
+     ink so every control name reads regardless of inherited theme colour. */
+  color: var(--ui-text, #142326);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+#advanced-graphics .advanced-graphics-control > small,
+#advanced-graphics .advanced-graphics-unavailable > small {
+  grid-area: help;
+  max-width: 48ch;
+  /* 70% currentColor mixed to transparent read as faint grey on white; use a
+     solid mid-ink that keeps a 4.5:1+ ratio on the light panel. */
+  color: var(--ui-text-muted, #48585c);
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+#advanced-graphics .advanced-graphics-control > input,
+#advanced-graphics .advanced-graphics-control > select,
+#advanced-graphics .advanced-graphics-range {
+  grid-area: input;
+  justify-self: end;
+  min-width: 88px;
+  max-width: 145px;
+}
+
+#advanced-graphics .advanced-graphics-range {
+  display: grid;
+  gap: 2px;
+  width: 130px;
+}
+
+#advanced-graphics .advanced-graphics-range input {
+  width: 100%;
+}
+
+#advanced-graphics .advanced-graphics-range output {
+  min-height: 12px;
+  /* Bright cyan failed contrast on the white panel; use a deep readable teal. */
+  color: var(--ui-accent-readable, #0b6b78);
+  font-size: 9px;
+  font-weight: 800;
+  text-align: right;
+}
+
+#advanced-graphics .advanced-graphics-toggle input {
+  width: 18px;
+  height: 18px;
+}
+
+#advanced-graphics .advanced-graphics-unavailable {
+  opacity: 0.7;
+  border-style: dashed;
+}
+
+#advanced-graphics .advanced-graphics-unavailable b {
+  grid-area: input;
+  color: var(--ui-amber, #eaa94d);
+  font-size: 8px;
+  letter-spacing: 0.08em;
+}
+
+#advanced-graphics .advanced-graphics-unavailable em {
+  grid-column: 1 / -1;
+  color: color-mix(in srgb, var(--ui-amber, #eaa94d) 78%, transparent);
+  font-size: 7px;
+  font-style: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 760px) {
+  #advanced-graphics .advanced-graphics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #advanced-graphics .advanced-graphics-category > header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+}

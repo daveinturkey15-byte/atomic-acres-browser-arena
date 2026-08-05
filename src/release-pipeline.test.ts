@@ -10,6 +10,17 @@ const verifyWorkflow = readFileSync('.github/workflows/verify.yml', 'utf8');
 const receiptWriter = readFileSync('scripts/release/write-production-receipt.mjs', 'utf8');
 const productionEnv = readFileSync('.env.production', 'utf8');
 const diagnosticsPreviewRunner = readFileSync('scripts/qa/run-pass64-diagnostics-browser.mjs', 'utf8');
+const liveTopologyVerifier = readFileSync('scripts/qa/verify-release-topology-browser.mjs', 'utf8');
+const agentContract = readFileSync('AGENTS.md', 'utf8');
+const contributionGuide = readFileSync('docs/CONTRIBUTION_AND_RELEASE_PIPELINE.md', 'utf8');
+const pass66ExecutionPlan = readFileSync('docs/PASS66_HITL_EXECUTION_PLAN_2026-07-29.md', 'utf8');
+const ownerFeedbackSkill = readFileSync('.agents/skills/atomic-acres-owner-feedback-gate/SKILL.md', 'utf8');
+const playwrightConfig = readFileSync('playwright.config.ts', 'utf8');
+const ownedPlaywrightRunner = readFileSync('scripts/qa/run-playwright-with-topology.mjs', 'utf8');
+const nightlyPropertyRunner = readFileSync('scripts/qa/run-pass25a-nightly-property.mjs', 'utf8');
+const mutationRunner = readFileSync('scripts/qa/run-pass25a-mutation.mjs', 'utf8');
+const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
+const ownerFeedbackGraph = JSON.parse(readFileSync('docs/PASS65_OWNER_FEEDBACK_COMPLETENESS_GRAPH.json', 'utf8'));
 const topologyBrowserVerifier = readFileSync('scripts/qa/verify-release-topology-browser.mjs', 'utf8');
 
 describe('production release workflow', () => {
@@ -24,14 +35,15 @@ describe('production release workflow', () => {
     expect(workflow).not.toContain('git config --global');
   });
 
-  it('stages pinned stable Pass 63 beside live Pass 64 before a complete publish', () => {
+  it('stages pinned stable Pass 67.1, rebuilt rollback Pass 63 and live Pass 68 The Big One before a complete publish', () => {
     expect(workflow).toContain('npm run stage:release-topology');
     expect(workflow).toContain('npm run verify:release-topology');
     expect(workflow).toContain('SOURCE_SHA: ${{ inputs.source_sha }}');
     expect(workflow).toContain('RELEASE_PASS: ${{ inputs.release_pass }}');
+    expect(workflow).toContain('RELEASE_ROLLBACK_DIST: ${{ env.RELEASE_ROLLBACK_DIST }}');
+    expect(workflow).toContain('git worktree add artifacts/pass63-rollback-src ac85e9b8b46cc2370aee903d564ecf3c4682b24c');
     expect(workflow).not.toContain('stage:stable-channel');
-    expect(workflow).toContain('Stage live Pass 64 and byte-exact stable Pass 63');
-    expect(workflow).not.toContain('three-channel');
+    expect(workflow).toContain('Stage live Pass 68 The Big One, byte-exact stable Pass 67.1 and rebuilt Pass 63 rollback');
     expect(readFileSync('package.json', 'utf8')).toContain('"deploy:ci": "gh-pages -d dist"');
     expect(readFileSync('package.json', 'utf8')).not.toContain('"deploy:ci": "gh-pages -d dist --add"');
   });
@@ -94,17 +106,39 @@ describe('production release workflow', () => {
     expect(diagnosticsPreviewRunner).not.toContain("VITE_MATCH_BUILD_ID: 'pass64-browser-candidate'");
   });
 
+  it('checks out the real PR head SHA rather than GitHub synthetic merge bytes', () => {
+    const exactCheckout = 'ref: ${{ github.event.pull_request.head.sha || github.sha }}';
+    expect(verifyWorkflow.match(new RegExp(exactCheckout.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))?.length).toBe(6);
+    expect(verifyWorkflow).toContain('HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}');
+    const staticJob = verifyWorkflow.slice(
+      verifyWorkflow.indexOf('static-and-unit:'),
+      verifyWorkflow.indexOf('requirements-acceptance:'),
+    );
+    expect(staticJob).toContain(exactCheckout);
+    expect(staticJob).toContain('fetch-depth: 0');
+  });
+
   it('blocks production on accepted requirements and verifies the canonical site after Pages builds', () => {
+    const candidateBuildStep = workflow.indexOf('Build exact frozen-evidence candidate bytes');
+    const candidateEvidenceStep = workflow.indexOf('Verify exact Pass 66 evidence catalog and frozen runtime');
+    const previewProvenanceStep = workflow.indexOf('Verify immutable Pass 66 preview provenance and bytes');
     const acceptanceStep = workflow.indexOf('Validate accepted requirement manifest');
     const publishStep = workflow.indexOf('Publish complete exact dist snapshot');
     const pagesStep = workflow.indexOf('Wait for exact Pages build');
     const liveStep = workflow.indexOf('Verify canonical live release');
     const receiptStep = workflow.indexOf('Write acceptance-bound production receipt and timings');
+    expect(candidateBuildStep).toBeGreaterThan(-1);
+    expect(candidateEvidenceStep).toBeGreaterThan(candidateBuildStep);
+    expect(previewProvenanceStep).toBeGreaterThan(candidateEvidenceStep);
+    expect(acceptanceStep).toBeGreaterThan(previewProvenanceStep);
     expect(acceptanceStep).toBeGreaterThan(-1);
     expect(acceptanceStep).toBeLessThan(publishStep);
     expect(liveStep).toBeGreaterThan(pagesStep);
     expect(receiptStep).toBeGreaterThan(liveStep);
     expect(workflow).toContain('QA_OUTPUT: artifacts/pipeline/live-release-smoke.json');
+    expect(workflow).toContain('npm run qa:pass65:owner-feedback:candidate');
+    expect(workflow).toContain('scripts/release/verify-pr-preview-provenance.mjs');
+    expect(workflow).toContain('checks: read');
   });
 
   it('publishes immutable PR previews while requirement acceptance and timing remain explicit jobs', () => {
@@ -112,6 +146,95 @@ describe('production release workflow', () => {
     expect(verifyWorkflow).toContain('pr-preview-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}');
     expect(verifyWorkflow).toContain('pipeline-metrics:');
     expect(verifyWorkflow).toContain('scripts/release/workflow-metrics.mjs');
+  });
+
+  it('owns and closes the local preview lifecycle for every catalogued Playwright gate', () => {
+    expect(packageJson.scripts['qa:playwright-topology']).toBe('node scripts/qa/run-playwright-with-topology.mjs');
+    expect(playwrightConfig).toContain("const externalPreview = process.env.QA_EXTERNAL_PREVIEW === '1'");
+    expect(playwrightConfig).toContain('webServer: externalPreview ? undefined :');
+    expect(ownedPlaywrightRunner).toContain('outDir: temporaryDist');
+    expect(ownedPlaywrightRunner).toContain("['scripts/release/stage-release-topology.mjs']");
+    expect(ownedPlaywrightRunner).toContain('RELEASE_DIST_ROOT: temporaryDist');
+    expect(ownedPlaywrightRunner).toContain("QA_EXTERNAL_PREVIEW: '1'");
+    expect(ownedPlaywrightRunner).toContain('httpServer.closeAllConnections?.()');
+    expect(ownedPlaywrightRunner).toContain('removeTemporaryTopology();');
+    const playwrightTests = ownerFeedbackGraph.testCatalog
+      .filter(({ command }: { command: string }) => command.includes('playwright'));
+    expect(playwrightTests.map(({ id }: { id: string }) => id)).toEqual([
+      'T-MENU-LIFECYCLE-E2E',
+      'T-CARE-LATCH-E2E',
+      'T-HUD-E2E',
+      'T-SUPPORT-VISUAL-E2E',
+      'T-FOCUS-RECOVERY-E2E',
+      'T-PROFILE-AUTHORITY-E2E',
+      'T-PRIVACY-E2E',
+      'T-FLASH-E2E',
+      'T-SCOPED-ADS',
+      'T-GUN-RANGE-TEST-BAY',
+      'T-TIMED-MAP-WEAPONS',
+      'T-FIELD-KIT-MENU',
+      'T-RUSTRIG-PHYSICS',
+      'T-PICKUP-REPICK',
+    ]);
+    const playwrightCommands = playwrightTests.map(({ command }: { command: string }) => command);
+    expect(playwrightCommands.every((command: string) => command.startsWith('npm run qa:playwright-topology -- '))).toBe(true);
+    const catalogScripts = new Set<string>();
+    const queue = ownerFeedbackGraph.testCatalog
+      .map(({ command }: { command: string }) => /^npm run ([^\s]+)/u.exec(command)?.[1])
+      .filter((script: string | undefined): script is string => Boolean(script));
+    while (queue.length > 0) {
+      const script = queue.shift()!;
+      if (catalogScripts.has(script)) continue;
+      catalogScripts.add(script);
+      const command = packageJson.scripts[script] ?? '';
+      for (const match of command.matchAll(/npm run ([A-Za-z0-9:._-]+)/gu)) queue.push(match[1]);
+    }
+    expect([...catalogScripts]
+      .filter((script) => /(?:^|&&\s*)playwright test/u.test(packageJson.scripts[script] ?? '')))
+      .toEqual([]);
+  });
+
+  it('runs the exact 100000-sequence nightly property gate without POSIX-only environment syntax', () => {
+    const command = packageJson.scripts['test:property:nightly'];
+    expect(command).toBe('node scripts/qa/run-pass25a-nightly-property.mjs');
+    expect(command).not.toMatch(/(?:^|\s)[A-Z_][A-Z0-9_]*=[^\s]+\s/u);
+    expect(nightlyPropertyRunner).toContain('const NIGHTLY_PROPERTY_RUNS = 100_000;');
+    expect(nightlyPropertyRunner).toContain('PASS25_PROPERTY_RUNS: String(NIGHTLY_PROPERTY_RUNS)');
+    expect(nightlyPropertyRunner).toContain("[vitestCli, 'run', 'src/gameplay-state-property.test.ts']");
+    expect(nightlyPropertyRunner).toContain('spawnSync(process.execPath');
+  });
+
+  it('runs the exact 50-sequence mutation gate without POSIX-only environment syntax', () => {
+    const command = packageJson.scripts['test:mutation'];
+    expect(command).toBe('node scripts/qa/run-pass25a-mutation.mjs');
+    expect(command).not.toMatch(/(?:^|\s)[A-Z_][A-Z0-9_]*=[^\s]+\s/u);
+    expect(mutationRunner).toContain('const MUTATION_PROPERTY_RUNS = 50;');
+    expect(mutationRunner).toContain('PASS25_PROPERTY_RUNS: String(MUTATION_PROPERTY_RUNS)');
+    expect(mutationRunner).toContain("[strykerCli, 'run', ...process.argv.slice(2)]");
+    expect(mutationRunner).toContain("../../node_modules/@stryker-mutator/core/bin/stryker.js");
+    expect(mutationRunner).toContain('spawnSync(process.execPath');
+  });
+
+  it('makes exact Pass 66 evidence and real preview provenance mandatory in the required acceptance job', () => {
+    const acceptanceJob = verifyWorkflow.indexOf('requirements-acceptance:');
+    const metricsJob = verifyWorkflow.indexOf('pipeline-metrics:');
+    const section = verifyWorkflow.slice(acceptanceJob, metricsJob);
+    const installStep = section.indexOf('npm ci --ignore-scripts');
+    const buildStep = section.indexOf('Build exact frozen-evidence candidate bytes');
+    const candidateStep = section.indexOf('Verify exact Pass 66 evidence catalog and frozen runtime');
+    const provenanceStep = section.indexOf('Verify immutable Pass 66 preview provenance and bytes');
+    const acceptanceStep = section.indexOf('Verify complete requirement-to-evidence coverage and exact preview approval');
+
+    expect(section).toContain('needs: [classify-change, static-and-unit]');
+    expect(installStep).toBeGreaterThan(-1);
+    expect(buildStep).toBeGreaterThan(installStep);
+    expect(candidateStep).toBeGreaterThan(buildStep);
+    expect(provenanceStep).toBeGreaterThan(candidateStep);
+    expect(acceptanceStep).toBeGreaterThan(provenanceStep);
+    expect(section).toContain('npm run qa:pass65:owner-feedback:candidate');
+    expect(section).toContain('scripts/release/verify-pr-preview-provenance.mjs');
+    expect(section).toContain('GITHUB_TOKEN: ${{ github.token }}');
+    expect(section).toContain('artifacts/pipeline/pr-preview-provenance.json');
   });
 
   it('records the schema 3 two-channel topology in the production receipt', () => {
@@ -123,5 +246,35 @@ describe('production release workflow', () => {
 
   it('does not use a blocking GitHub Actions watcher inside the workflow', () => {
     expect(workflow).not.toContain('gh run watch');
+  });
+
+  it('binds the live browser proof to Pass 68, Pass 67.1 stable, Pass 63 rollback, aliases, and Last Release', () => {
+    expect(liveTopologyVerifier).toContain("verifyChoice('experimental', 'channels/the-big-one', 'PASS 68', 'pass68')");
+    expect(liveTopologyVerifier).toContain("verifyChoice('stable', 'channels/recent-stable', 'PASS 67.1', 'pass671')");
+    expect(liveTopologyVerifier).toContain("verifyChoice('rollback', 'channels/pass63-rollback', 'PASS 63', 'pass63')");
+    expect(liveTopologyVerifier).toContain('pinned-channel-provenance.json');
+    expect(liveTopologyVerifier).toContain('Stable embedded runtime digest');
+    expect(liveTopologyVerifier).toContain("verifyLegacyRoute('latest'");
+    expect(liveTopologyVerifier).toContain("verifyLegacyRoute('normal'");
+    expect(liveTopologyVerifier).toContain("verifyLegacyRoute('room'");
+    expect(liveTopologyVerifier).toContain('Last Release timestamp is not a published instant');
+    expect(liveTopologyVerifier).not.toContain("'channels/the-big-one', 'PASS 65'");
+  });
+
+  it('records the narrow standing Pass 66 authorization without fabricating preview HITL', () => {
+    for (const source of [agentContract, contributionGuide, pass66ExecutionPlan, ownerFeedbackSkill]) {
+      expect(source).toContain('standing conditional');
+      expect(source).toMatch(/does not claim|not evidence|must explicitly avoid claiming|Dave did not/u);
+    }
+    expect(agentContract).toContain('Pass 65 must never be promoted');
+    expect(contributionGuide).toContain('Pass 65 is superseded audit evidence and must never be promoted');
+    expect(pass66ExecutionPlan).not.toContain('Stop. Do not publish Version 66.');
+  });
+
+  it('permits only one fenced retained-asset menu compile after first-frame media readiness', () => {
+    expect(agentContract).toContain("Only after the selected video's first frame is visible");
+    expect(agentContract).toContain('one fenced, isolated submission');
+    expect(agentContract).toContain('construct zero gameplay arenas');
+    expect(agentContract).toContain('run zero live preview rendering or physics');
   });
 });

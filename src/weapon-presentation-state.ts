@@ -15,8 +15,31 @@ export type HitReactionState = {
   roll: number;
 };
 
+export type ViewmodelObstructionPose = Readonly<{
+  retreat: number;
+  lift: number;
+}>;
+
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
 const finite = (value: number, fallback = 0): number => Number.isFinite(value) ? value : fallback;
+export const ADS_IN_RESPONSE_PER_SECOND = 22;
+export const ADS_OUT_RESPONSE_PER_SECOND = 18;
+
+/**
+ * A number of authored floors are raycast planes rather than movement boxes.
+ * When the player is grounded, stance eye height is the exact presentation
+ * clearance even if the downward box probe has no hit. Airborne poses retain
+ * null so a jump/fall cannot invent a floor underneath the camera.
+ */
+export function viewmodelFloorClearance(
+  probedMeters: number | null,
+  grounded: boolean,
+  stanceEyeHeightMeters: number,
+): number | null {
+  if (probedMeters !== null && Number.isFinite(probedMeters)) return Math.max(0, probedMeters);
+  if (!grounded || !Number.isFinite(stanceEyeHeightMeters) || stanceEyeHeightMeters <= 0) return null;
+  return stanceEyeHeightMeters;
+}
 
 /** Converts a base vertical field of view into a true angular magnification. */
 export function magnifiedFovDegrees(baseFovDegrees: number, magnification: number): number {
@@ -31,7 +54,7 @@ export function advanceAdsBlend(current: number, ads: boolean, dt: number, weapo
   if (weapon === 'sniper') return ads ? 1 : 0;
   const safeCurrent = clamp01(finite(current));
   const safeDt = Math.max(0, finite(dt));
-  const blend = 1 - Math.exp(-(ads ? 18 : 15) * safeDt);
+  const blend = 1 - Math.exp(-(ads ? ADS_IN_RESPONSE_PER_SECOND : ADS_OUT_RESPONSE_PER_SECOND) * safeDt);
   return clamp01(safeCurrent + ((ads ? 1 : 0) - safeCurrent) * blend);
 }
 
@@ -44,13 +67,33 @@ export function advanceWeaponHeat(current: number, fired: boolean, dt: number, w
   return clamp01(cooled + (fired ? perShot : 0));
 }
 
-/** Pulls camera-attached arms behind nearby world geometry without changing aim rays. */
-export function viewmodelSurfaceRetreat(nearestSurfaceMeters: number | null, prone: boolean): number {
-  const distance = nearestSurfaceMeters === null || !Number.isFinite(nearestSurfaceMeters)
+/**
+ * Keeps camera-attached geometry inside the player's free-space envelope.
+ * This is presentation-only: it never changes the camera, gameplay ray, or
+ * authoritative character capsule.
+ */
+export function viewmodelObstructionPose(
+  nearestForwardSurfaceMeters: number | null,
+  prone: boolean,
+  floorClearanceMeters: number | null = null,
+): ViewmodelObstructionPose {
+  const distance = nearestForwardSurfaceMeters === null || !Number.isFinite(nearestForwardSurfaceMeters)
     ? Number.POSITIVE_INFINITY
-    : Math.max(0, nearestSurfaceMeters);
-  const obstruction = distance >= 1.2 ? 0 : (1 - distance / 1.2) * 0.52;
-  return Math.min(0.56, Math.max(0, obstruction + (prone ? 0.045 : 0)));
+    : Math.max(0, nearestForwardSurfaceMeters);
+  const obstruction = distance >= 1.45 ? 0 : (1 - distance / 1.45) * 0.62;
+  const floorClearance = floorClearanceMeters === null || !Number.isFinite(floorClearanceMeters)
+    ? Number.POSITIVE_INFINITY
+    : Math.max(0, floorClearanceMeters);
+  const floorPressure = floorClearance >= 0.82 ? 0 : (1 - floorClearance / 0.82);
+  return {
+    retreat: Math.min(0.7, Math.max(0, obstruction + (prone ? 0.09 : 0))),
+    lift: Math.min(0.2, Math.max(0, (prone ? 0.115 : 0) + floorPressure * (prone ? 0.075 : 0.04))),
+  };
+}
+
+/** Backwards-compatible scalar used by non-runtime presentation tests/tools. */
+export function viewmodelSurfaceRetreat(nearestSurfaceMeters: number | null, prone: boolean): number {
+  return viewmodelObstructionPose(nearestSurfaceMeters, prone).retreat;
 }
 
 /** Deterministic visual fire-cycle envelope. Gameplay recoil and hit rays remain authoritative elsewhere. */

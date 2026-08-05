@@ -2,6 +2,11 @@ import type { HighScoreEntry, ScoreStorage } from './high-scores';
 import { LEADERBOARD_SEASON } from '../shared/leaderboard-season';
 
 export const LEADERBOARD_INSTALL_STORAGE_KEY = 'atomic-acres:leaderboard-install:v2';
+
+export function leaderboardNetworkEnabled(search: string): boolean {
+  const params = new URLSearchParams(search);
+  return params.get('externalServices') !== 'off' && params.get('multiplayerQa') !== '1';
+}
 export const GLOBAL_LEADERBOARD_ENDPOINT = (import.meta.env.VITE_GLOBAL_LEADERBOARD_URL ?? '').trim().replace(/\/$/, '');
 export const GLOBAL_LEADERBOARD_TIMEOUT_MS = 4_000;
 
@@ -20,8 +25,10 @@ type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Respo
 
 export function leaderboardInstallId(
   storage: ScoreStorage,
+  sharingConsent: boolean,
   randomId: () => string = () => globalThis.crypto.randomUUID(),
-): string {
+): string | null {
+  if (!sharingConsent) return null;
   try {
     const current = storage.getItem(LEADERBOARD_INSTALL_STORAGE_KEY);
     if (current && /^[a-zA-Z0-9_-]{8,80}$/.test(current)) return current;
@@ -31,6 +38,17 @@ export function leaderboardInstallId(
     return created;
   } catch {
     return `volatile_${randomId().replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64)}`;
+  }
+}
+
+export function forgetLeaderboardInstallId(
+  storage: Pick<Storage, 'removeItem'>,
+): boolean {
+  try {
+    storage.removeItem(LEADERBOARD_INSTALL_STORAGE_KEY);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -63,11 +81,12 @@ export async function fetchGlobalLeaderboard(
 
 export async function submitGlobalStreak(
   submission: GlobalStreakSubmission,
+  sharingConsent: boolean,
   endpoint = GLOBAL_LEADERBOARD_ENDPOINT,
   fetcher: FetchLike = fetch,
   timeoutMs = GLOBAL_LEADERBOARD_TIMEOUT_MS,
 ): Promise<boolean> {
-  if (!endpoint) return false;
+  if (!sharingConsent || !endpoint) return false;
   const { signal, cancel } = requestSignal(timeoutMs);
   try {
     const response = await fetcher(`${endpoint}/v1/streak`, {

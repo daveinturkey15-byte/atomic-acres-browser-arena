@@ -3,14 +3,17 @@ type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 export type RoomRejoinIdentity = Readonly<{
   playerId: string;
   token: string;
+  /** Last life identity admitted from a host-authored authority snapshot. */
+  authoritativeLifeId?: number;
 }>;
 
 type StoredRoomRejoinIdentity = Readonly<{
-  schemaVersion: 1 | 2;
+  schemaVersion: 1 | 2 | 3;
   playerId: string;
   token: string;
   expiresAtEpochMs: number;
   ownerTabId?: string;
+  authoritativeLifeId?: number;
 }>;
 
 type StoredRoomIdentityLease = Readonly<{
@@ -29,17 +32,42 @@ function roomIdentityLeaseKey(roomCode: string): string {
   return `atomic-acres:room-identity-owner:${roomCode}`;
 }
 
+const LAST_ROOM_KEY = 'atomic-acres:last-room';
+
+/** Remember the most recently joined room so a crashed player can be offered a
+    one-click rejoin on reload instead of re-pasting the code. */
+export function saveLastRoomCode(roomCode: string, persistentStorage: StorageLike): void {
+  try { persistentStorage.setItem(LAST_ROOM_KEY, roomCode); } catch { /* Rejoin affordance is best effort. */ }
+}
+
+export function loadLastRoomCode(persistentStorage: StorageLike): string | null {
+  try {
+    const value = persistentStorage.getItem(LAST_ROOM_KEY);
+    return typeof value === 'string' && value.length > 0 ? value : null;
+  } catch { return null; }
+}
+
 function validIdentity(value: unknown): value is RoomRejoinIdentity {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<RoomRejoinIdentity>;
   return typeof candidate.playerId === 'string' && candidate.playerId.length > 0 && candidate.playerId.length <= 80
-    && typeof candidate.token === 'string' && candidate.token.length >= 24 && candidate.token.length <= 128;
+    && typeof candidate.token === 'string' && candidate.token.length >= 24 && candidate.token.length <= 128
+    && (candidate.authoritativeLifeId === undefined
+      || Number.isSafeInteger(candidate.authoritativeLifeId) && Number(candidate.authoritativeLifeId) >= 0);
+}
+
+function restoredIdentity(value: RoomRejoinIdentity): RoomRejoinIdentity {
+  return {
+    playerId: value.playerId,
+    token: value.token,
+    ...(value.authoritativeLifeId === undefined ? {} : { authoritativeLifeId: value.authoritativeLifeId }),
+  };
 }
 
 function readTransientIdentity(storage: StorageLike, key: string): RoomRejoinIdentity | null {
   try {
     const parsed = JSON.parse(storage.getItem(key) ?? 'null') as unknown;
-    return validIdentity(parsed) ? { playerId: parsed.playerId, token: parsed.token } : null;
+    return validIdentity(parsed) ? restoredIdentity(parsed) : null;
   } catch {
     return null;
   }
@@ -74,7 +102,7 @@ function readPersistentIdentity(
 ): RoomRejoinIdentity | null {
   try {
     const parsed = JSON.parse(storage.getItem(key) ?? 'null') as Partial<StoredRoomRejoinIdentity> | null;
-    if (!parsed || (parsed.schemaVersion !== 1 && parsed.schemaVersion !== 2) || !Number.isFinite(parsed.expiresAtEpochMs)
+    if (!parsed || (parsed.schemaVersion !== 1 && parsed.schemaVersion !== 2 && parsed.schemaVersion !== 3) || !Number.isFinite(parsed.expiresAtEpochMs)
       || Number(parsed.expiresAtEpochMs) <= nowEpochMs || !validIdentity(parsed)) {
       storage.removeItem(key);
       return null;
@@ -82,7 +110,7 @@ function readPersistentIdentity(
     // localStorage is shared by every tab on this origin. Do not let a second
     // concurrently open guest clone the first guest's resume credential.
     if (activeOtherOwner(storage, roomCode, ownerTabId, nowEpochMs)) return null;
-    return { playerId: parsed.playerId, token: parsed.token };
+    return restoredIdentity(parsed);
   } catch {
     return null;
   }
@@ -114,7 +142,7 @@ export function saveRoomRejoinIdentity(
   if (!validIdentity(identity) || !Number.isFinite(rejoinGraceMs) || rejoinGraceMs <= 0) return;
   const key = roomIdentityKey(roomCode);
   const document: StoredRoomRejoinIdentity = {
-    schemaVersion: ownerTabId ? 2 : 1,
+    schemaVersion: 3,
     ...identity,
     expiresAtEpochMs: nowEpochMs + rejoinGraceMs,
     ...(ownerTabId ? { ownerTabId } : {}),

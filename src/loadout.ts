@@ -1,4 +1,4 @@
-import type { PrimaryWeaponId, SidearmWeaponId } from './protocol';
+import type { GrenadeId, PrimaryWeaponId, SidearmWeaponId } from './protocol';
 
 export type FieldKitId = 'balanced' | 'runner' | 'breacher' | 'marksman';
 
@@ -7,6 +7,7 @@ export type FieldKit = {
   title: string;
   weapon: PrimaryWeaponId;
   sidearm: SidearmWeaponId;
+  grenade: GrenadeId;
   role: string;
   summary: string;
   traits: [string, string, string];
@@ -18,6 +19,7 @@ export const FIELD_KITS: readonly FieldKit[] = [
     title: 'Linekeeper',
     weapon: 'carbine',
     sidearm: 'pistol',
+    grenade: 'frag',
     role: 'CONTROL / MID RANGE',
     summary: 'Stable automatic pressure with the cleanest sight picture.',
     traits: ['Range 4', 'Control 4', 'Mobility 3'],
@@ -27,6 +29,7 @@ export const FIELD_KITS: readonly FieldKit[] = [
     title: 'Circuit Runner',
     weapon: 'smg',
     sidearm: 'pistol',
+    grenade: 'flash',
     role: 'MOBILITY / CLOSE RANGE',
     summary: 'Fast handling and dense close-range fire for side routes.',
     traits: ['Range 2', 'Control 3', 'Mobility 5'],
@@ -36,17 +39,19 @@ export const FIELD_KITS: readonly FieldKit[] = [
     title: 'Doorbreaker',
     weapon: 'scattergun',
     sidearm: 'pistol',
+    grenade: 'frag',
     role: 'BURST / VERY CLOSE',
     summary: 'Heavy short-range impact with a deliberate pump cycle.',
     traits: ['Range 1', 'Control 2', 'Mobility 3'],
   },
   {
     id: 'marksman',
-    title: 'Longline Marksman',
+    title: 'M40A5 Marksman',
     weapon: 'sniper',
     sidearm: 'machine-pistol',
+    grenade: 'smoke',
     role: 'PRECISION / LONG RANGE',
-    summary: 'One-headshot Longline precision backed by a compact full-auto G18-style sidearm.',
+    summary: 'One-headshot M40A5 precision backed by a compact full-auto Glock 18 sidearm.',
     traits: ['Range 5', 'Control 2', 'Mobility 2'],
   },
 ] as const;
@@ -60,8 +65,11 @@ export function sidearmForPrimary(primary: PrimaryWeaponId): SidearmWeaponId {
   return primary === 'sniper' ? MARKSMAN_AUTO_PISTOL : SERVICE_PISTOL;
 }
 
-export function deployedWeapons(primary: PrimaryWeaponId): readonly [PrimaryWeaponId, SidearmWeaponId] {
-  return [primary, sidearmForPrimary(primary)];
+export function deployedWeapons(
+  primary: PrimaryWeaponId,
+  secondary: SidearmWeaponId = sidearmForPrimary(primary),
+): readonly [PrimaryWeaponId, SidearmWeaponId] {
+  return [primary, secondary];
 }
 
 export function fieldKitById(value: unknown): FieldKit {

@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { markMeshGeometriesShared } from './gpu-resource-ownership';
 import type { Team } from './protocol';
 import { objectLocalGeometryBounds } from './character-presentation-contract';
 import { solveTwoBoneElbow } from './ik';
+import { yieldBrowserCpuTask } from './browser-preparation-scheduler';
 
 export const BOT_EMISSIVE_BRIGHTNESS_SCALE = 0.5;
 
@@ -32,16 +34,50 @@ export function applyBotEmissiveBrightness(root: THREE.Object3D): number {
   return adjusted;
 }
 
-const OPERATOR_URL = './assets/third-party/quaternius/ultimate-modular-males/Swat.gltf';
-const FIRST_PERSON_ARMS_URL = './assets/third-party/quaternius/ultimate-modular-males/Swat_FirstPersonArms.glb';
+const OPERATOR_QUALITY_URL = './assets/original/models/operators/pass65-third-person-operator-lod0.glb';
+const OPERATOR_PERFORMANCE_URL = './assets/original/models/operators/pass65-third-person-operator-lod1.glb';
+const FIRST_PERSON_ARMS_URL = './assets/original/models/operators/pass65-first-person-arms-lod0.glb';
 
 type RiggedOperatorAsset = {
   scene: THREE.Group;
   clips: THREE.AnimationClip[];
+  lod: 0 | 1;
+  source: string;
+  skinnedMeshes: number;
+  pbrMaterials: number;
 };
+
+type FirstPersonArmsAsset = {
+  scene: THREE.Group;
+  clips: THREE.AnimationClip[];
+};
+
+type FirstPersonArmsRuntime = {
+  mixer: THREE.AnimationMixer;
+  actions: Map<string, THREE.AnimationAction>;
+  activeAction: string | null;
+};
+
+const FIRST_PERSON_RUNTIME_FINGER_TRACK = /(?:Index|Middle|Ring|Pinky|Thumb)[123][LR](?:\.|$)/;
+
+/**
+ * The authored Blender clips retain complete arm-chain motion for offline
+ * contact review. In the live viewmodel only digit tracks are admitted: the
+ * shoulder, elbow and wrist are solved after animation by weapon socket IK (or
+ * the dedicated melee solve), so a clip can never pull a hand off its socket.
+ */
+export function firstPersonArmRuntimeClip(clip: THREE.AnimationClip): THREE.AnimationClip {
+  return new THREE.AnimationClip(
+    clip.name,
+    clip.duration,
+    clip.tracks.filter((track) => FIRST_PERSON_RUNTIME_FINGER_TRACK.test(track.name)).map((track) => track.clone()),
+    clip.blendMode,
+  );
+}
 
 type RiggedOperatorRuntime = {
   mixer: THREE.AnimationMixer;
+  clips: Map<string, THREE.AnimationClip>;
   actions: Map<string, THREE.AnimationAction>;
   currentBase: string;
   lastUpdatedAt: number;
@@ -72,6 +108,37 @@ type RiggedOperatorRuntime = {
   }>;
 };
 
+/**
+ * Only clips reachable from the live operator controller belong in the runtime
+ * mixer. The source GLB deliberately retains the complete authored animation
+ * library for offline review, but binding every track of every unused clip at
+ * spawn time creates a multi-hundred-millisecond main-thread task.
+ */
+export const RIGGED_OPERATOR_RUNTIME_ACTION_NAMES = Object.freeze([
+  'Idle_Gun_Pointing',
+  'Idle_Gun',
+  'Idle_Gun_Shoot',
+  'Walk',
+  'Run_Shoot',
+  'Run',
+  'Gun_Shoot',
+  'HitRecieve_2',
+  'HitRecieve',
+  'Death',
+  'Punch_Right',
+  'Kick_Right',
+] as const);
+
+export const RIGGED_OPERATOR_CORPSE_ACTION_NAMES = Object.freeze(['Death'] as const);
+
+export function riggedOperatorRuntimeClips(clips: readonly THREE.AnimationClip[]): THREE.AnimationClip[] {
+  const clipsByName = new Map(clips.map((clip) => [clip.name, clip]));
+  return RIGGED_OPERATOR_RUNTIME_ACTION_NAMES.flatMap((name) => {
+    const clip = clipsByName.get(name);
+    return clip ? [clip] : [];
+  });
+}
+
 export type RiggedOperatorInstance = {
   root: THREE.Group;
   weaponSocket: THREE.Group;
@@ -79,9 +146,10 @@ export type RiggedOperatorInstance = {
 
 export type OperatorAppearance = 'team' | 'neon-purple';
 
-let operatorAsset: RiggedOperatorAsset | null = null;
-let firstPersonArmsAsset: THREE.Group | null = null;
+const operatorAssets: Partial<Record<'quality' | 'performance', RiggedOperatorAsset>> = {};
+let firstPersonArmsAsset: FirstPersonArmsAsset | null = null;
 let operatorAssetPromise: Promise<void> | null = null;
+let firstPersonArmsAssetPromise: Promise<void> | null = null;
 
 const STANCE_PIVOT_HEIGHT = 0.84;
 const EMBEDDED_WEAPON_NAME = /(^|[\s_.-])(pistol|rifle|shotgun|smg|gun|weapon)([\s_.-]|$)/i;
@@ -275,104 +343,127 @@ function materialForTeam(
   return result;
 }
 
-function flattenOperatorMaterialGroups(
-  mesh: THREE.Mesh,
-  materials: THREE.Material[],
-  appearance: OperatorAppearance,
-): void {
-  const cloned = mesh.geometry.clone();
-  const geometry = cloned.index ? cloned.toNonIndexed() : cloned;
-  if (geometry !== cloned) cloned.dispose();
-  const vertexCount = geometry.getAttribute('position')?.count ?? 0;
-  const colors = new Float32Array(vertexCount * 3);
-  const groups = geometry.groups.length > 0
-    ? [...geometry.groups]
-    : [{ start: 0, count: vertexCount, materialIndex: 0 }];
-  for (const group of groups) {
-    const source = materials[group.materialIndex ?? 0] ?? materials[0];
-    const candidate = source as THREE.MeshStandardMaterial;
-    const color = candidate.color?.clone() ?? new THREE.Color(0xffffff);
-    if (candidate.emissive && candidate.emissiveIntensity > 0) {
-      color.lerp(candidate.emissive, Math.min(0.34, candidate.emissiveIntensity * 0.3));
-    }
-    const end = Math.min(vertexCount, group.start + group.count);
-    for (let vertex = group.start; vertex < end; vertex += 1) color.toArray(colors, vertex * 3);
-  }
-  geometry.clearGroups();
-  if (vertexCount > 0) geometry.addGroup(0, vertexCount, 0);
-  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  mesh.geometry = geometry;
-  mesh.material = new THREE.MeshStandardMaterial({
-    color: 0xffffff,
-    vertexColors: true,
-    roughness: appearance === 'neon-purple' ? 0.46 : 1,
-    metalness: appearance === 'neon-purple' ? 0.06 : 0,
-    emissive: appearance === 'neon-purple' ? 0x4f078d : 0x000000,
-    emissiveIntensity: appearance === 'neon-purple' ? 0.92 : 0,
-  });
+/**
+ * One operator owns one mutable material set, but meshes inside that operator
+ * which referenced the same authored source material should continue sharing a
+ * single clone. Cloning per mesh multiplied material objects during every bot
+ * and corpse build, while sharing across operators would make independent
+ * fenced retirement unsafe.
+ */
+export function createOperatorInstanceMaterialResolver(
+  team: Team,
+  flattenMaterials: boolean,
+  appearance: OperatorAppearance = 'team',
+): (material: THREE.Material) => THREE.Material {
+  const instanceMaterials = new Map<THREE.Material, THREE.Material>();
+  return (material: THREE.Material): THREE.Material => {
+    const existing = instanceMaterials.get(material);
+    if (existing) return existing;
+    const result = materialForTeam(material, team, flattenMaterials, appearance);
+    result.transparent = false;
+    result.opacity = 1;
+    result.depthWrite = true;
+    result.depthTest = true;
+    result.alphaTest = 0;
+    instanceMaterials.set(material, result);
+    return result;
+  };
 }
 
-function mergeFlattenedOperatorMeshes(visual: THREE.Group): void {
-  const meshes: THREE.SkinnedMesh[] = [];
-  visual.traverse((node) => {
-    if (node instanceof THREE.SkinnedMesh && node.visible) meshes.push(node);
-  });
-  if (meshes.length < 2) return;
-  const first = meshes[0];
-  if (!meshes.every((mesh) => mesh.skeleton.bones.length === first.skeleton.bones.length)) return;
-  const allowedAttributes = new Set(['position', 'normal', 'color', 'skinIndex', 'skinWeight']);
-  const geometries = meshes.map((mesh) => {
-    const geometry = mesh.geometry.clone();
-    for (const attribute of Object.keys(geometry.attributes)) {
-      if (!allowedAttributes.has(attribute)) geometry.deleteAttribute(attribute);
-    }
-    return geometry;
-  });
-  const geometry = mergeGeometries(geometries, false);
-  geometries.forEach((candidate) => candidate.dispose());
-  if (!geometry) return;
-  const merged = new THREE.SkinnedMesh(geometry, first.material);
-  merged.name = 'Swat_Merged_Vertex_LOD';
-  merged.castShadow = false;
-  merged.receiveShadow = false;
-  merged.userData.presentationOnly = true;
-  merged.raycast = () => undefined;
-  merged.bindMode = first.bindMode;
-  merged.bind(first.skeleton, first.bindMatrix);
-  meshes.forEach((mesh) => { mesh.visible = false; });
-  visual.add(merged);
+export const FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY = 0.7;
+
+export function firstPersonArmMaterialReadabilityProfile(materialName: string): Readonly<{
+  emissive: number;
+  emissiveIntensity: number;
+  color?: number;
+}> | null {
+  const normalized = materialName.toLowerCase();
+  if (normalized === 'skin') return Object.freeze({ emissive: 0x0a1416, emissiveIntensity: 0.18, color: 0x324249 });
+  if (normalized.includes('arms_glove') || normalized.includes('arms_fingerglove')) {
+    return Object.freeze({ emissive: 0x2f6b78, emissiveIntensity: 0.68 });
+  }
+  if (normalized.includes('arms_sleeve')) return Object.freeze({ emissive: 0x285c68, emissiveIntensity: 0.62 });
+  if (normalized.includes('arms_armorpad')) {
+    return Object.freeze({ emissive: 0x2d6570, emissiveIntensity: 0.66, color: 0x41656f });
+  }
+  return null;
 }
 
 function materialForFirstPerson(material: THREE.Material, flattenMaterials: boolean): THREE.Material {
   const result = materialForTeam(material, 0, flattenMaterials);
+  const profile = firstPersonArmMaterialReadabilityProfile(material.name);
+  if (result instanceof THREE.MeshStandardMaterial && profile) {
+    // Preserve the licensed base-color, normal, roughness and metallic maps.
+    // A bounded cool emissive lift keeps fingers and sleeves readable in the
+    // darkest arenas without turning them into flat self-lit plastic.
+    result.emissive.setHex(profile.emissive);
+    result.emissiveIntensity = Math.min(profile.emissiveIntensity, FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY);
+    if (profile.color !== undefined) result.color.setHex(profile.color);
+  }
   if (result instanceof THREE.MeshStandardMaterial && material.name.toLowerCase() === 'skin') {
-    // Dark tactical gloves read more cleanly than bare low-poly fingertips
-    // when the articulated hand wraps around compact weapon geometry.
-    result.color.setHex(0x243238);
     result.roughness = 0.92;
     result.metalness = 0;
-    result.emissive.setHex(0x05090a);
-    result.emissiveIntensity = flattenMaterials ? 0.24 : 0.08;
   }
   return result;
 }
 
+const loadRiggedGltf = (url: string) => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url);
+
+function describeOperatorAsset(
+  operator: Awaited<ReturnType<typeof loadRiggedGltf>>,
+  lod: 0 | 1,
+  source: string,
+): RiggedOperatorAsset {
+  let skinnedMeshes = 0;
+  const pbrMaterials = new Set<THREE.MeshStandardMaterial>();
+  operator.scene.traverse((node) => {
+    if (node instanceof THREE.SkinnedMesh) skinnedMeshes += 1;
+    if (!(node instanceof THREE.Mesh)) return;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    for (const material of materials) {
+      if (material instanceof THREE.MeshStandardMaterial
+        && material.map && material.normalMap && material.roughnessMap && material.metalnessMap) {
+        pbrMaterials.add(material);
+      }
+    }
+  });
+  return {
+    scene: operator.scene,
+    clips: operator.animations,
+    lod,
+    source,
+    skinnedMeshes,
+    pbrMaterials: pbrMaterials.size,
+  };
+}
+
+export function loadFirstPersonArmsAsset(): Promise<void> {
+  if (firstPersonArmsAsset) return Promise.resolve();
+  firstPersonArmsAssetPromise ??= loadRiggedGltf(FIRST_PERSON_ARMS_URL).then((arms) => {
+    firstPersonArmsAsset = { scene: arms.scene, clips: arms.animations };
+  });
+  return firstPersonArmsAssetPromise;
+}
+
 export function loadRiggedOperatorAsset(): Promise<void> {
-  if (operatorAsset && firstPersonArmsAsset) return Promise.resolve();
+  if (operatorAssets.quality && operatorAssets.performance && firstPersonArmsAsset) return Promise.resolve();
   if (operatorAssetPromise) return operatorAssetPromise;
-  const loader = new GLTFLoader();
-  const load = (url: string) => new Promise<Awaited<ReturnType<GLTFLoader['loadAsync']>>>((resolve, reject) => {
-    loader.load(url, resolve, undefined, reject);
-  });
-  operatorAssetPromise = Promise.all([load(OPERATOR_URL), load(FIRST_PERSON_ARMS_URL)]).then(([operator, arms]) => {
-    operatorAsset = { scene: operator.scene, clips: operator.animations };
-    firstPersonArmsAsset = arms.scene;
-  });
+  operatorAssetPromise = Promise.all([
+    operatorAssets.quality ? Promise.resolve() : loadRiggedGltf(OPERATOR_QUALITY_URL).then((operator) => {
+      operatorAssets.quality = describeOperatorAsset(operator, 0, OPERATOR_QUALITY_URL);
+    }),
+    operatorAssets.performance ? Promise.resolve() : loadRiggedGltf(OPERATOR_PERFORMANCE_URL).then((operator) => {
+      operatorAssets.performance = describeOperatorAsset(operator, 1, OPERATOR_PERFORMANCE_URL);
+    }),
+    loadFirstPersonArmsAsset(),
+  ]).then(() => undefined);
   return operatorAssetPromise;
 }
 
 export function riggedOperatorAssetReady(): boolean {
-  return operatorAsset !== null && firstPersonArmsAsset !== null;
+  return operatorAssets.quality !== undefined
+    && operatorAssets.performance !== undefined
+    && firstPersonArmsAsset !== null;
 }
 
 export type FirstPersonArmChain = {
@@ -383,26 +474,56 @@ export type FirstPersonArmChain = {
   side: 'left' | 'right';
 };
 
+export type FirstPersonFingerBone = {
+  bone: THREE.Bone;
+  bindQuaternion: THREE.Quaternion;
+  side: 'left' | 'right';
+  digit: 'index' | 'middle' | 'ring' | 'pinky' | 'thumb';
+  joint: 1 | 2 | 3;
+};
+
 export type FirstPersonRiggedArms = {
   root: THREE.Group;
   chains: FirstPersonArmChain[];
+  fingers: FirstPersonFingerBone[];
+  knifeSocket: THREE.Object3D;
 };
 
 export function createFirstPersonRiggedArms(flattenMaterials: boolean): FirstPersonRiggedArms | null {
   if (!firstPersonArmsAsset) return null;
   const root = new THREE.Group();
   root.name = 'first-person-arms';
-  const visual = cloneSkeleton(firstPersonArmsAsset) as THREE.Group;
-  visual.name = 'licensed-first-person-arms-visual';
-  visual.rotation.y = Math.PI;
-  visual.scale.setScalar(1.6);
-  visual.position.set(-0.28, -2.02, 1.05);
+  const visual = cloneSkeleton(firstPersonArmsAsset.scene) as THREE.Group;
+  visual.name = 'authored-first-person-arms-visual';
+  // The regenerated GLB (5ab01f3) is authored mirrored: bone "UpperArmR" sits at
+  // -X and the right-wrist knife socket rides the R chain, so the firing hand
+  // renders on the left. Mirroring the visual root at X restores the intended
+  // camera-space orientation while keeping every bone name, the knife-socket
+  // ancestry and the two-chain release contract exactly as authored. The arms
+  // material is DoubleSide, so the flipped winding still renders correctly.
+  visual.scale.set(-1, 1, 1);
+  visual.position.set(0, 0, 0);
   visual.traverse((node) => {
     if (!(node instanceof THREE.Mesh)) return;
     node.castShadow = false;
     node.receiveShadow = false;
-    if (Array.isArray(node.material)) node.material = node.material.map((material) => materialForFirstPerson(material, flattenMaterials));
-    else node.material = materialForFirstPerson(node.material, flattenMaterials);
+    // Camera-space viewmodels must never frustum-cull: the repartitioned
+    // four-skin delivery keeps rest-pose bounds that do not track the posed
+    // IK chains, which silently dropped whole arms from the render list.
+    node.frustumCulled = false;
+    const prepare = (material: THREE.Material) => {
+      const result = materialForFirstPerson(material, flattenMaterials);
+      result.transparent = false;
+      result.opacity = 1;
+      result.depthWrite = true;
+      // The thicker authored sleeves can legitimately intersect the near
+      // plane in tight stances; render interiors so a clipped sleeve reads
+      // as solid cloth instead of vanishing through backface culling.
+      result.side = THREE.DoubleSide;
+      return result;
+    };
+    if (Array.isArray(node.material)) node.material = node.material.map(prepare);
+    else node.material = prepare(node.material);
   });
   root.add(visual);
   const chain = (side: 'left' | 'right'): FirstPersonArmChain | null => {
@@ -416,26 +537,105 @@ export function createFirstPersonRiggedArms(flattenMaterials: boolean): FirstPer
       : null;
   };
   const chains = [chain('right'), chain('left')].filter((value): value is FirstPersonArmChain => value !== null);
-  // The source third-person proportions are slightly short for a camera-space
-  // two-hand stance. Extend bone offsets without inflating sleeve thickness.
-  for (const arm of chains) {
-    const reachScale = arm.side === 'left' ? 1.5 : 1.3;
-    arm.elbow.position.multiplyScalar(reachScale);
-    arm.wrist.position.multiplyScalar(reachScale);
-  }
-  for (const suffix of ['L', 'R']) {
-    for (const fingerName of ['Index', 'Middle', 'Ring', 'Pinky']) {
-      for (let joint = 1; joint <= 3; joint += 1) {
-        const bone = visual.getObjectByName(`${fingerName}${joint}${suffix}`);
-        if (bone instanceof THREE.Bone) bone.rotation.x += joint === 1 ? 0.72 : joint === 2 ? 0.95 : 0.78;
+  const fingers: FirstPersonFingerBone[] = [];
+  const digitNames = ['Index', 'Middle', 'Ring', 'Pinky', 'Thumb'] as const;
+  for (const [suffix, side] of [['L', 'left'], ['R', 'right']] as const) {
+    for (const digitName of digitNames) {
+      for (const joint of [1, 2, 3] as const) {
+        const bone = visual.getObjectByName(`${digitName}${joint}${suffix}`);
+        if (bone instanceof THREE.Bone) {
+          fingers.push({
+            bone,
+            bindQuaternion: bone.quaternion.clone(),
+            side,
+            digit: digitName.toLowerCase() as FirstPersonFingerBone['digit'],
+            joint,
+          });
+        }
       }
     }
-    const thumb = visual.getObjectByName(`Thumb2${suffix}`);
-    if (thumb instanceof THREE.Bone) thumb.rotation.x += 0.58;
   }
-  root.userData.importedFirstPersonArms = true;
+  const knifeSocket = visual.getObjectByName('right-wrist-knife-socket');
+  const rightWrist = visual.getObjectByName('WristR');
+  let knifeAncestor: THREE.Object3D | null = knifeSocket?.parent ?? null;
+  while (knifeAncestor && knifeAncestor !== rightWrist) knifeAncestor = knifeAncestor.parent;
+  if (!knifeSocket || !(rightWrist instanceof THREE.Bone) || knifeAncestor !== rightWrist || fingers.length !== 30) return null;
+  const mixer = new THREE.AnimationMixer(visual);
+  const runtimeClips = firstPersonArmsAsset.clips.map(firstPersonArmRuntimeClip);
+  const authoredTrackCount = firstPersonArmsAsset.clips.reduce((count, clip) => count + clip.tracks.length, 0);
+  const runtimeTrackCount = runtimeClips.reduce((count, clip) => count + clip.tracks.length, 0);
+  const actions = new Map(runtimeClips.map((clip) => [clip.name, mixer.clipAction(clip)]));
+  root.userData.firstPersonArmsRuntime = { mixer, actions, activeAction: null } satisfies FirstPersonArmsRuntime;
+  root.userData.importedFirstPersonArms = false;
+  root.userData.authoredFirstPersonArms = true;
+  root.userData.firstPersonArmsSource = FIRST_PERSON_ARMS_URL;
+  root.userData.materialContract = 'opaque-depth-writing';
   root.userData.importedFirstPersonArmChains = chains.length;
-  return { root, chains };
+  root.userData.authoredAnimationClipCount = actions.size;
+  root.userData.authoredAnimationBlendPolicy = 'finger-tracks-first-runtime-ik-last';
+  root.userData.authoredAnimationTrackPolicy = 'finger-bones-only';
+  root.userData.authoredAnimationTrackCount = runtimeTrackCount;
+  root.userData.authoredUpperChainTracksExcluded = authoredTrackCount - runtimeTrackCount;
+  root.userData.authoredKnifeSocket = knifeSocket.name;
+  return { root, chains, fingers, knifeSocket };
+}
+
+function firstPersonArmsRuntime(root: THREE.Object3D): FirstPersonArmsRuntime | null {
+  return (root.userData.firstPersonArmsRuntime as FirstPersonArmsRuntime | undefined) ?? null;
+}
+
+export function resetFirstPersonArmFingers(fingers: readonly FirstPersonFingerBone[]): void {
+  for (const finger of fingers) finger.bone.quaternion.copy(finger.bindQuaternion);
+}
+
+export function playFirstPersonArmAction(root: THREE.Object3D, actionName: string): boolean {
+  const runtime = firstPersonArmsRuntime(root);
+  const action = runtime?.actions.get(actionName);
+  if (!runtime || !action) return false;
+  runtime.mixer.stopAllAction();
+  action.reset().setLoop(THREE.LoopOnce, 1);
+  action.clampWhenFinished = false;
+  action.play();
+  runtime.activeAction = actionName;
+  return true;
+}
+
+export function updateFirstPersonArmAnimations(root: THREE.Object3D, dt: number): void {
+  const runtime = firstPersonArmsRuntime(root);
+  if (!runtime) return;
+  runtime.mixer.update(Math.min(0.05, Math.max(0, dt)));
+  if (runtime.activeAction && runtime.actions.get(runtime.activeAction)?.isRunning() !== true) runtime.activeAction = null;
+}
+
+/** Clears a retained first-person action without advancing its mixer clock. */
+export function resetFirstPersonArmAnimations(root: THREE.Object3D): void {
+  const runtime = firstPersonArmsRuntime(root);
+  if (!runtime) return;
+  runtime.mixer.stopAllAction();
+  for (const action of runtime.actions.values()) action.stop();
+  runtime.mixer.setTime(0);
+  runtime.activeAction = null;
+}
+
+export function firstPersonArmAnimationState(root: THREE.Object3D | undefined): Readonly<{
+  clips: number;
+  activeAction: string | null;
+  blendPolicy: string;
+  trackPolicy: string;
+  runtimeTracks: number;
+  upperChainTracksExcluded: number;
+}> | null {
+  if (!root) return null;
+  const runtime = firstPersonArmsRuntime(root);
+  if (!runtime) return null;
+  return Object.freeze({
+    clips: runtime.actions.size,
+    activeAction: runtime.activeAction,
+    blendPolicy: String(root.userData.authoredAnimationBlendPolicy ?? 'unknown'),
+    trackPolicy: String(root.userData.authoredAnimationTrackPolicy ?? 'unknown'),
+    runtimeTracks: Number(root.userData.authoredAnimationTrackCount ?? 0),
+    upperChainTracksExcluded: Number(root.userData.authoredUpperChainTracksExcluded ?? 0),
+  });
 }
 
 function runtime(root: THREE.Object3D): RiggedOperatorRuntime | undefined {
@@ -443,7 +643,43 @@ function runtime(root: THREE.Object3D): RiggedOperatorRuntime | undefined {
 }
 
 function actionFor(runtimeState: RiggedOperatorRuntime, name: string): THREE.AnimationAction | undefined {
-  return runtimeState.actions.get(name);
+  const existing = runtimeState.actions.get(name);
+  if (existing) return existing;
+  const clip = runtimeState.clips.get(name);
+  if (!clip) return undefined;
+  const action = runtimeState.mixer.clipAction(clip);
+  runtimeState.actions.set(name, action);
+  return action;
+}
+
+const RIGGED_OPERATOR_ACTIONS_PER_TASK = 2;
+
+async function performRiggedOperatorActionPrewarm(
+  runtimeState: RiggedOperatorRuntime,
+  actionNames: readonly string[],
+): Promise<number> {
+  let bound = 0;
+  for (let index = 0; index < actionNames.length; index += 1) {
+    const name = actionNames[index]!;
+    const existed = runtimeState.actions.has(name);
+    if (actionFor(runtimeState, name) && !existed) bound += 1;
+    if (typeof document !== 'undefined'
+      && (index + 1) % RIGGED_OPERATOR_ACTIONS_PER_TASK === 0
+      && index + 1 < actionNames.length) {
+      await yieldBrowserCpuTask();
+    }
+  }
+  return bound;
+}
+
+/** Binds requested live animation actions in short CPU tasks before admission. */
+export function prewarmRiggedOperatorActions(
+  root: THREE.Object3D,
+  actionNames: readonly string[] = RIGGED_OPERATOR_RUNTIME_ACTION_NAMES,
+): Promise<number> {
+  const runtimeState = runtime(root);
+  if (!runtimeState) return Promise.resolve(0);
+  return performRiggedOperatorActionPrewarm(runtimeState, actionNames);
 }
 
 function switchBaseAction(runtimeState: RiggedOperatorRuntime, name: string): void {
@@ -474,6 +710,7 @@ export function createRiggedOperator(
   flattenMaterials: boolean,
   appearance: OperatorAppearance = 'team',
 ): RiggedOperatorInstance | null {
+  const operatorAsset = flattenMaterials ? operatorAssets.performance : operatorAssets.quality;
   if (!operatorAsset) return null;
   const root = new THREE.Group();
   root.name = name;
@@ -486,22 +723,21 @@ export function createRiggedOperator(
   // network yaw and authoritative hit proxies keep their established axes.
   visual.rotation.y = Math.PI;
   const embeddedWeaponsSuppressed = suppressEmbeddedWeaponObjects(visual);
+  const prepareMaterial = createOperatorInstanceMaterialResolver(team, flattenMaterials, appearance);
   visual.traverse((node) => {
     if (!(node instanceof THREE.Mesh)) return;
     node.castShadow = !flattenMaterials;
     node.receiveShadow = !flattenMaterials;
     node.userData.presentationOnly = true;
     node.raycast = () => undefined;
-    if (Array.isArray(node.material)) {
-      const materials = node.material.map((material) => materialForTeam(material, team, flattenMaterials, appearance));
-      if (flattenMaterials) {
-        flattenOperatorMaterialGroups(node, materials, appearance);
-      } else {
-        node.material = materials;
-      }
-    } else node.material = materialForTeam(node.material, team, flattenMaterials, appearance);
+    if (Array.isArray(node.material)) node.material = node.material.map(prepareMaterial);
+    else node.material = prepareMaterial(node.material);
   });
-  if (flattenMaterials) mergeFlattenedOperatorMeshes(visual);
+  // SkeletonUtils already creates independent bones and SkinnedMesh objects.
+  // Their immutable vertex/index buffers can remain shared with the retained
+  // operator source; selective fenced retirement disposes per-instance team
+  // materials without copying or invalidating these multi-megabyte buffers.
+  markMeshGeometriesShared(visual, 'rigged-operator-source');
   const stancePivot = new THREE.Group();
   stancePivot.name = 'operator-stance-pivot';
   stancePivot.position.y = STANCE_PIVOT_HEIGHT;
@@ -515,10 +751,15 @@ export function createRiggedOperator(
   root.add(weaponSocket);
 
   const mixer = new THREE.AnimationMixer(visual);
+  const clips = new Map(riggedOperatorRuntimeClips(operatorAsset.clips).map((clip) => [clip.name, clip]));
   const actions = new Map<string, THREE.AnimationAction>();
-  for (const clip of operatorAsset.clips) actions.set(clip.name, mixer.clipAction(clip));
-  const base = actions.has('Idle_Gun_Pointing') ? 'Idle_Gun_Pointing' : actions.has('Idle_Gun') ? 'Idle_Gun' : 'Idle_Gun_Shoot';
-  actions.get(base)?.setLoop(THREE.LoopRepeat, Infinity).play();
+  const base = clips.has('Idle_Gun_Pointing') ? 'Idle_Gun_Pointing' : clips.has('Idle_Gun') ? 'Idle_Gun' : 'Idle_Gun_Shoot';
+  const baseClip = clips.get(base);
+  if (baseClip) {
+    const baseAction = mixer.clipAction(baseClip);
+    actions.set(base, baseAction);
+    baseAction.setLoop(THREE.LoopRepeat, Infinity).play();
+  }
   const poseBone = (...names: string[]): THREE.Bone | undefined => {
     for (const candidate of names) {
       const node = visual.getObjectByName(candidate);
@@ -528,6 +769,7 @@ export function createRiggedOperator(
   };
   root.userData.riggedOperatorRuntime = {
     mixer,
+    clips,
     actions,
     currentBase: base,
     lastUpdatedAt: performance.now(),
@@ -553,9 +795,13 @@ export function createRiggedOperator(
     },
   } satisfies RiggedOperatorRuntime;
   root.userData.operatorAsset = {
-    source: 'Quaternius Ultimate Modular Males / Swat.gltf',
+    source: 'Atomic Acres Pass 65 operator / Quaternius CC0 derivative',
+    assetUrl: operatorAsset.source,
     license: 'CC0-1.0',
-    skinnedMeshes: 5,
+    lod: operatorAsset.lod,
+    skinnedMeshes: operatorAsset.skinnedMeshes,
+    pbrMaterials: operatorAsset.pbrMaterials,
+    materialContract: 'opaque-embedded-pbr-depth-writing',
     clips: operatorAsset.clips.length,
     embeddedWeaponsSuppressed,
   };
@@ -582,7 +828,7 @@ export function updateRiggedOperator(root: THREE.Object3D, speed: number, stance
   const next = stance !== 'stand'
     ? 'Idle_Gun_Pointing'
     : speed > 3.2 ? 'Run_Shoot' : speed > 0.18 ? 'Walk' : 'Idle_Gun_Pointing';
-  switchBaseAction(runtimeState, runtimeState.actions.has(next) ? next : speed > 0.18 ? 'Run' : 'Idle_Gun');
+  switchBaseAction(runtimeState, runtimeState.clips.has(next) ? next : speed > 0.18 ? 'Run' : 'Idle_Gun');
   runtimeState.mixer.update(dt);
   runtimeState.poseBeforeStance = Object.values(runtimeState.poseBones)
     .filter((bone): bone is THREE.Bone => bone instanceof THREE.Bone)
@@ -598,20 +844,20 @@ export function updateRiggedOperator(root: THREE.Object3D, speed: number, stance
 export function fireRiggedOperator(root: THREE.Object3D): boolean {
   const runtimeState = runtime(root);
   if (!runtimeState) return false;
-  playOneShot(runtimeState, runtimeState.actions.has('Gun_Shoot') ? 'Gun_Shoot' : 'Idle_Gun_Shoot', 1.35);
+  playOneShot(runtimeState, runtimeState.clips.has('Gun_Shoot') ? 'Gun_Shoot' : 'Idle_Gun_Shoot', 1.35);
   return true;
 }
 
 export function reactRiggedOperator(root: THREE.Object3D, alternate = false): boolean {
   const runtimeState = runtime(root);
   if (!runtimeState) return false;
-  playOneShot(runtimeState, alternate && runtimeState.actions.has('HitRecieve_2') ? 'HitRecieve_2' : 'HitRecieve', 1.15);
+  playOneShot(runtimeState, alternate && runtimeState.clips.has('HitRecieve_2') ? 'HitRecieve_2' : 'HitRecieve', 1.15);
   return true;
 }
 
 export function deathRiggedOperator(root: THREE.Object3D): boolean {
   const runtimeState = runtime(root);
-  if (!runtimeState || !runtimeState.actions.has('Death')) return false;
+  if (!runtimeState || !runtimeState.clips.has('Death')) return false;
   for (const action of runtimeState.actions.values()) action.fadeOut(0.04);
   playOneShot(runtimeState, 'Death', 1.08);
   runtimeState.currentBase = 'Death';
@@ -622,10 +868,10 @@ export function resetRiggedOperator(root: THREE.Object3D): boolean {
   const runtimeState = runtime(root);
   if (!runtimeState) return false;
   for (const action of runtimeState.actions.values()) action.stop();
-  const base = runtimeState.actions.has('Idle_Gun_Pointing')
+  const base = runtimeState.clips.has('Idle_Gun_Pointing')
     ? 'Idle_Gun_Pointing'
-    : runtimeState.actions.has('Idle_Gun') ? 'Idle_Gun' : 'Idle_Gun_Shoot';
-  runtimeState.actions.get(base)?.reset().setLoop(THREE.LoopRepeat, Infinity).play();
+    : runtimeState.clips.has('Idle_Gun') ? 'Idle_Gun' : 'Idle_Gun_Shoot';
+  actionFor(runtimeState, base)?.reset().setLoop(THREE.LoopRepeat, Infinity).play();
   runtimeState.currentBase = base;
   runtimeState.stance = 'stand';
   runtimeState.crouchBlend = 0;
@@ -642,7 +888,7 @@ export function resetRiggedOperator(root: THREE.Object3D): boolean {
 export function meleeRiggedOperator(root: THREE.Object3D): boolean {
   const runtimeState = runtime(root);
   if (!runtimeState) return false;
-  playOneShot(runtimeState, runtimeState.actions.has('Punch_Right') ? 'Punch_Right' : 'Kick_Right', 1.4);
+  playOneShot(runtimeState, runtimeState.clips.has('Punch_Right') ? 'Punch_Right' : 'Kick_Right', 1.4);
   return true;
 }
 
@@ -695,10 +941,16 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
   const hitProxyHeadWorld = headProxy?.getWorldPosition(new THREE.Vector3()) ?? null;
   return {
     source: root.userData.operatorAsset?.source,
+    assetUrl: root.userData.operatorAsset?.assetUrl,
     appearance: root.userData.operatorAppearance,
     license: root.userData.operatorAsset?.license,
+    lod: root.userData.operatorAsset?.lod,
     skinnedMeshes: root.userData.operatorAsset?.skinnedMeshes,
+    pbrMaterials: root.userData.operatorAsset?.pbrMaterials,
+    materialContract: root.userData.operatorAsset?.materialContract,
     clips: root.userData.operatorAsset?.clips,
+    runtimeClips: runtimeState.clips.size,
+    runtimeActionsBound: runtimeState.actions.size,
     embeddedWeaponsSuppressed: root.userData.operatorAsset?.embeddedWeaponsSuppressed,
     visibleEmbeddedWeapons,
     activeClip: runtimeState.currentBase,
@@ -741,5 +993,6 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
       } : null,
     } : null,
     supportGrip: root.userData.operatorGripTelemetry ?? null,
+    minigunSpool: root.userData.operatorMinigunSpoolTelemetry ?? null,
   };
 }

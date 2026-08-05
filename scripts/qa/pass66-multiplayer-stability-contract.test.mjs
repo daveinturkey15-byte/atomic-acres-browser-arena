@@ -1,0 +1,209 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import test from 'node:test';
+import { resolve } from 'node:path';
+import {
+  PASS66_MULTIPLAYER_SPECS,
+  PASS66_MULTIPLAYER_TEST_COUNT,
+  multiplayerPlaywrightReportFailures,
+  multiplayerServedCandidateFailures,
+  multiplayerStabilityEnvironmentFailures,
+  multiplayerStabilityReceiptFailures,
+  summarizeMultiplayerPlaywrightReport,
+} from './pass66-multiplayer-stability-contract.mjs';
+
+const sourceSha = 'a'.repeat(40);
+const treeSha256 = 'b'.repeat(64);
+const exactRootFileCount = 12;
+const candidate = {
+  schemaVersion: 4,
+  channel: 'the-big-one',
+  releasePass: 'PASS 66',
+  path: 'channels/the-big-one',
+  sourceSha,
+  treeSha256,
+  exactRootFileCount,
+};
+
+function validEnvironment() {
+  return {
+    PASS66_OWNED_GATE: 'multiplayer-stability',
+    QA_BASE_URL: 'http://127.0.0.1:4530/channels/the-big-one/',
+    BASE_URL: 'http://127.0.0.1:4530/channels/the-big-one/',
+    PASS66_OWNED_SOURCE_SHA: sourceSha,
+    PASS66_OWNED_TREE_SHA256: treeSha256,
+    PASS66_OWNED_FILE_COUNT: String(exactRootFileCount),
+    PASS66_OWNED_RECEIPT_PATH: resolve('artifacts/pass66/multiplayer-stability/receipt.json'),
+  };
+}
+
+function makeSpec(title) {
+  return {
+    title,
+    ok: true,
+    tests: [{
+      projectName: 'chromium',
+      expectedStatus: 'passed',
+      results: [{ status: 'passed', duration: 25 }],
+    }],
+  };
+}
+
+function validReport() {
+  return {
+    errors: [],
+    stats: {
+      expected: PASS66_MULTIPLAYER_TEST_COUNT,
+      skipped: 0,
+      unexpected: 0,
+      flaky: 0,
+      duration: 800,
+    },
+    suites: PASS66_MULTIPLAYER_SPECS.map(({ path, expectedTests, titles }) => ({
+      file: path,
+      specs: Array.from({ length: expectedTests }, (_, index) => makeSpec(titles[index])),
+    })),
+  };
+}
+
+test('owned multiplayer verifier environment fails closed on route or source ambiguity', () => {
+  const environment = validEnvironment();
+  assert.deepEqual(multiplayerStabilityEnvironmentFailures(environment), []);
+  assert.match(multiplayerStabilityEnvironmentFailures({
+    ...environment,
+    QA_BASE_URL: 'http://127.0.0.1:4530/',
+  }).join('\n'), /candidate channel route/u);
+  assert.match(multiplayerStabilityEnvironmentFailures({
+    ...environment,
+    BASE_URL: 'http://127.0.0.1:4530/channels/stable/',
+  }).join('\n'), /exactly match/u);
+  assert.match(multiplayerStabilityEnvironmentFailures({
+    ...environment,
+    PASS66_OWNED_SOURCE_SHA: 'stale',
+  }).join('\n'), /source SHA/u);
+  assert.match(multiplayerStabilityEnvironmentFailures({
+    ...environment,
+    PASS66_OWNED_RECEIPT_PATH: 'relative/receipt.json',
+  }).join('\n'), /absolute/u);
+});
+
+test('served provenance requires the exact Pass 66 candidate identity', () => {
+  const expected = { sourceSha, treeSha256, exactRootFileCount };
+  assert.deepEqual(multiplayerServedCandidateFailures(candidate, expected), []);
+  assert.match(multiplayerServedCandidateFailures({
+    ...candidate,
+    sourceSha: 'c'.repeat(40),
+  }, expected).join('\n'), /source SHA mismatch/u);
+  assert.match(multiplayerServedCandidateFailures({
+    ...candidate,
+    exactRootFileCount: exactRootFileCount + 1,
+  }, expected).join('\n'), /file count mismatch/u);
+});
+
+test('Playwright JSON must prove the exact five-spec nine-test serial Chromium matrix', () => {
+  const report = validReport();
+  assert.deepEqual(multiplayerPlaywrightReportFailures(report), []);
+  const summary = summarizeMultiplayerPlaywrightReport(report);
+  assert.equal(summary.totalTests, 9);
+  assert.equal(summary.passedTests, 9);
+  assert.deepEqual(summary.specs.map(({ testCount }) => testCount), [1, 1, 3, 3, 1]);
+
+  const missing = validReport();
+  missing.suites.pop();
+  assert.match(multiplayerPlaywrightReportFailures(missing).join('\n'), /adrenaline.*exactly 1 tests/iu);
+
+  const skipped = validReport();
+  skipped.stats.skipped = 1;
+  skipped.stats.expected = 7;
+  assert.match(multiplayerPlaywrightReportFailures(skipped).join('\n'), /skipped count must be zero/u);
+
+  const retried = validReport();
+  retried.suites[0].specs[0].tests[0].results.push({ status: 'passed', duration: 10 });
+  assert.match(multiplayerPlaywrightReportFailures(retried).join('\n'), /exactly once/u);
+
+  const wrongProject = validReport();
+  wrongProject.suites[0].specs[0].tests[0].projectName = 'firefox';
+  assert.match(multiplayerPlaywrightReportFailures(wrongProject).join('\n'), /non-Chromium/u);
+});
+
+test('all five runtime specs bind their navigated page through the shared exact-candidate guard', () => {
+  const support = readFileSync('tests/e2e/pass66-e2e-support.ts', 'utf8');
+  assert.match(support, /export async function assertPass66OwnedCandidatePage/u);
+  assert.match(support, /route\.pathname !== '\/channels\/the-big-one\/'/u);
+  assert.match(support, /new URL\('channel-provenance\.json', route\)/u);
+  assert.match(support, /provenance\.sourceSha !== ownedIdentity\.sourceSha/u);
+
+  for (const { path } of PASS66_MULTIPLAYER_SPECS) {
+    const source = readFileSync(path, 'utf8');
+    assert.match(source, /assertPass66OwnedCandidatePage/u, `${path} must import the shared candidate guard`);
+    assert.match(source, /await assertPass66OwnedCandidatePage\(page\)/u, `${path} must bind the navigated page`);
+    assert.doesNotMatch(source, /new URL\('\/', test\.info\(\)\.project\.use\.baseURL/u, `${path} must not escape to chooser root`);
+    assert.match(source, /startOwnedPeerServer\(peerPort, process\.env\.PASS66_[A-Z_]+_PEER_PATH\)/u,
+      `${path} must consume the wrapper-owned tokenized PeerJS path`);
+  }
+});
+
+test('final receipt binds exact runtime, test matrix and five physical peer identities', () => {
+  const baseUrl = 'http://127.0.0.1:4530/channels/the-big-one/';
+  const receipt = {
+    schemaVersion: 1,
+    status: 'PASS',
+    gate: 'multiplayer-stability',
+    schema: 'atomic-acres/pass66-multiplayer-stability@1',
+    sourceSha,
+    servedCandidate: candidate,
+    servedCandidateAfter: candidate,
+    runner: {
+      browser: 'chromium', workers: 1, retries: 0, externalPreview: true, baseUrl,
+      args: [
+        'test',
+        ...PASS66_MULTIPLAYER_SPECS.map(({ path }) => path),
+        '--project=chromium', '--workers=1', '--retries=0', '--reporter=json',
+      ],
+    },
+    pageBinding: {
+      helper: 'assertPass66OwnedCandidatePage',
+      exactCandidateRoute: '/channels/the-big-one/',
+      guardedSpecs: PASS66_MULTIPLAYER_SPECS.map(({ path }) => path),
+    },
+    ownedPeerServers: [
+      'hostCrashRejoin', 'ownerFeedbackMultiplayerUi',
+      'timedMapWeaponsMultiplayerRejoin', 'qoderMultiplayerAuthority',
+      'adrenalineMatchLifecycle',
+    ].map((owner, index) => ({
+      owner, host: '127.0.0.1', port: 10_000 + index,
+      path: `/peerjs-${String(index + 1).repeat(24)}`, localOnly: true,
+    })),
+    playwright: summarizeMultiplayerPlaywrightReport(validReport()),
+    errors: [],
+  };
+  const expected = { sourceSha, treeSha256, exactRootFileCount, baseUrl };
+  assert.deepEqual(multiplayerStabilityReceiptFailures(receipt, expected), []);
+  assert.match(multiplayerStabilityReceiptFailures({
+    ...receipt,
+    ownedPeerServers: receipt.ownedPeerServers.map((peer, index) => index === 0
+      ? { ...peer, path: '/peerjs' }
+      : peer),
+  }, expected).join('\n'), /PeerJS identity mismatch/u);
+  assert.match(multiplayerStabilityReceiptFailures({
+    ...receipt,
+    playwright: {
+      ...receipt.playwright,
+      specs: receipt.playwright.specs.map((spec, index) => index === 3
+        ? { ...spec, passedCount: 2 }
+        : spec),
+    },
+  }, expected).join('\n'), /qoder.*summary mismatch/iu);
+});
+
+test('verifier pins the external serial Chromium command and writes only a parsed PASS receipt', () => {
+  const source = readFileSync('scripts/qa/verify-pass66-multiplayer-stability.mjs', 'utf8');
+  for (const { path } of PASS66_MULTIPLAYER_SPECS) assert.match(source, /PASS66_MULTIPLAYER_SPECS/u, path);
+  assert.match(source, /'--project=chromium'/u);
+  assert.match(source, /'--workers=1'/u);
+  assert.match(source, /'--retries=0'/u);
+  assert.match(source, /'--reporter=json'/u);
+  assert.match(source, /QA_EXTERNAL_PREVIEW: '1'/u);
+  assert.match(source, /multiplayerPlaywrightReportFailures\(result\.report\)/u);
+  assert.ok(source.indexOf("status: 'PASS'") < source.indexOf('writeFileSync(temporaryReceiptPath'));
+});

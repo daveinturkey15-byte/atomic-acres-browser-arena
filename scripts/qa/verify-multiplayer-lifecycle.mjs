@@ -15,6 +15,9 @@ const browser = await chromium.launch({ headless: !headed, args: chromiumArgs })
 const results = [];
 const errors = [];
 const diagnosticTransportStatuses = [];
+const vectorsEqual = (left, right, epsilon = 1e-5) => Array.isArray(left) && Array.isArray(right)
+  && left.length === 3 && right.length === 3
+  && left.every((value, index) => Math.abs(value - right[index]) <= epsilon);
 async function keepPageAnimating(context, page) {
   if (headed) return;
   const cdp = await context.newCDPSession(page);
@@ -246,8 +249,43 @@ try {
     await guest.waitForTimeout(500);
     await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setAds(true));
     await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.thermalVisible === true, undefined, { timeout: 5_000 });
+    const railgunBeamBaselines = await Promise.all(labelledPages.map(async ([label, page]) => ({
+      label,
+      beamPresentations: (await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.presentation.beamPresentations)),
+    })));
     await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.fireOnce());
-    await Promise.all(peers.map((page) => page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.roundsRemaining === 7, undefined, { timeout: 15_000 })));
+    await Promise.all(peers.map((page) => page.waitForFunction(() => {
+      const railgun = window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun;
+      return railgun.roundsRemaining === 7 && railgun.presentation.activeBeams === 1
+        && railgun.presentation.lastAcceptedBeam !== null;
+    }, undefined, { timeout: 15_000 })));
+    joined.railgunPeerBoltEvidence = await Promise.all(labelledPages.map(async ([label, page], index) => ({
+      label,
+      baselineBeamPresentations: railgunBeamBaselines[index].beamPresentations,
+      presentation: (await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.presentation)),
+    })));
+    const authoritativeBeam = joined.railgunPeerBoltEvidence[0]?.presentation.lastAcceptedBeam;
+    joined.railgunPeerBoltReplicated = Boolean(authoritativeBeam) && joined.railgunPeerBoltEvidence.every(({ baselineBeamPresentations, presentation }) => {
+      const beam = presentation.lastAcceptedBeam;
+      return presentation.beamPresentations === baselineBeamPresentations + 1
+      && presentation.activeBeams === 1
+      && beam !== null
+      && beam.generation === authoritativeBeam.generation
+      && beam.shotId === authoritativeBeam.shotId
+      && vectorsEqual(beam.start, authoritativeBeam.start)
+      && vectorsEqual(beam.end, authoritativeBeam.end)
+      && Math.abs(beam.lengthM - 180) <= 1e-4
+      && presentation.lastBeamLengthM === beam.lengthM
+      && presentation.visibleDurationMs >= 900
+      && presentation.coreRadiusM >= 0.14
+      && presentation.haloRadiusM >= 0.62
+      && presentation.poolCapacity === 6
+      && presentation.throughGeometry === true;
+    });
+    joined.railgunUninvolvedObserverCount = Math.max(0, labelledPages.length - 2);
+    joined.railgunUninvolvedObserversReplicated = guestCount < 2
+      ? null
+      : joined.railgunPeerBoltEvidence.slice(2).every(({ presentation }) => presentation.lastAcceptedBeam?.shotId === authoritativeBeam?.shotId);
     await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.fireOnce());
     joined.railgunImmediateRepeatBlocked = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.roundsRemaining === 7);
     await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setAds(false));
@@ -264,7 +302,7 @@ try {
     const beforeRedeploy = await Promise.all([host, guest].map((page) => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot())));
     await guest.evaluate(() => {
       if (document.pointerLockElement) void document.exitPointerLock();
-      document.querySelector('#menu')?.classList.remove('hidden');
+      window.__ATOMIC_ACRES_DEBUG__.openMenu();
     });
     await guest.click('[data-menu-tab="kit"]');
     await guest.click('[data-kit-id="runner"]');
@@ -307,7 +345,9 @@ try {
   if (errors.length || results.length !== cycles || results.some((result) => result.hostMode !== 'host' || result.guestMode !== 'client'
     || !result.hostStartReadinessCommitted || !result.rematchReset || !result.secondReady || !result.secondMatchStarted || !result.regenSmallDamageSurvived || !result.guestRedeployNoCombatEffects
     || !result.sanitizedDiagnosticRetained || !result.automaticDiagnosticsCompleted || !result.railgunGuestClaimed || !result.railgunImmediateRepeatBlocked
-    || !result.railgunReplicatedTwoShots || !result.railgunDroppedOnRedeploy || result.railgunReliableStateMirrors < 1
+    || !result.railgunReplicatedTwoShots || !result.railgunPeerBoltReplicated
+    || result.guestCount >= 2 && !result.railgunUninvolvedObserversReplicated
+    || !result.railgunDroppedOnRedeploy || result.railgunReliableStateMirrors < 1
     || !result.leaveObserved || !result.rejoinGraceObserved
     || result.hostNetwork.stateChannels < 1 || result.guestNetwork.stateChannels < 1
     || result.hostNetwork.stateChannelReliable !== false || result.hostNetwork.stateChannelOrdered !== false

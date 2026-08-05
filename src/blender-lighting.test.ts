@@ -85,6 +85,15 @@ describe('Pass 30 stormfront early-morning arena lighting', () => {
     });
     expect(atomic.sunIntensity / atomic.hemisphereIntensity).toBeGreaterThan(4);
     expect(atomic.ambientIntensity).toBeLessThan(0.25);
-    expect(otherMap).toEqual(arenaLightingProfile('blender'));
+    // RustRig gets the owner-specced +25% brightness lift so its darkest
+    // corridors read; it must not fall back to the plain blender profile.
+    const plain = arenaLightingProfile('blender');
+    expect(otherMap).not.toEqual(plain);
+    expect(otherMap.exposure).toBeCloseTo(plain.exposure * 1.25, 5);
+    expect(otherMap.ambientIntensity).toBeCloseTo(plain.ambientIntensity * 1.25, 5);
+    expect(otherMap.hemisphereIntensity).toBeCloseTo(plain.hemisphereIntensity * 1.25, 5);
+    expect(otherMap.sunIntensity).toBeCloseTo(plain.sunIntensity * 1.25, 5);
+    expect(otherMap.fillIntensity).toBeCloseTo(plain.fillIntensity * 1.25, 5);
+    expect(otherMap.interiorLightIntensity).toBeCloseTo(plain.interiorLightIntensity * 1.25, 5);
   });
 });

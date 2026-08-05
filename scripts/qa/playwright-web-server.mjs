@@ -1,9 +1,18 @@
+import { execFileSync } from 'node:child_process';
 import { build, preview } from 'vite';
 
 const host = process.env.QA_PREVIEW_HOST ?? '127.0.0.1';
 const port = Number(process.env.QA_PREVIEW_PORT ?? '4173');
 
 await build();
+// Browser QA must exercise the same chooser + candidate + byte-exact stable
+// topology that production publishes. Serving the raw Vite root makes
+// `?release=stable` fall through to candidate HTML and masks broken channel
+// assets behind the SPA fallback.
+execFileSync(process.execPath, ['scripts/release/stage-release-topology.mjs'], {
+  cwd: process.cwd(),
+  stdio: 'inherit',
+});
 const server = await preview({
   preview: { host, port, strictPort: true },
 });

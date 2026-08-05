@@ -1,0 +1,68 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+
+const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+
+describe('persistent physical house-window debris integration', () => {
+  it('keeps one bounded major pane per broken window in the shared Rapier budget', () => {
+    expect(source).toContain('const persistentWindowDebris = new Map<string, PersistentWindowDebris>()');
+    expect(source).toContain('MAX_MAJOR_DEBRIS_BODIES - runtimeBodies.length');
+    expect(source).toContain('Math.min(capacity, SHARED_MAJOR_DEBRIS_BUDGET.window)');
+    expect(source).toContain("canAdmitMajorDebris(counts, 'window')");
+    expect(source).toContain('characterPhysics.syncMajorDebrisBodies(activeMajorDebrisPhysicsBodies(), authoritativeResync)');
+    expect(source).toContain('spawnPersistentWindowDebris(window, normal)');
+  });
+
+  it('updates the visible fragment while falling, then retires only its movement body when settled', () => {
+    const start = source.indexOf('function spawnPersistentWindowDebris(');
+    const end = source.indexOf('\nfunction clearPersistentWindowDebris(', start);
+    const block = source.slice(start, end);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    expect(block).toContain('persistentWindowDebris.set(id, {');
+    expect(block).toContain('physicsActive: true,');
+    // Owner requirement: shards always reach the ground, so the record carries a
+    // presentation-only fall used when Rapier publishes no pose for the body.
+    expect(block).toContain('fallbackSettled: false,');
+    expect(block).toContain('receivedPhysicsPose: false,');
+    expect(block).not.toContain('setTimeout');
+    expect(block).not.toContain('expiresAt');
+    expect(block).toContain('root.userData.persistentMajorDebris = true');
+    expect(block).toContain('scene.add(root)');
+    expect(block).not.toContain('if (reducedRenderMode)');
+    expect(block).not.toContain('root.visible = false');
+    expect(source).toContain('entry.root.position.set(snapshot.position.x, snapshot.position.y, snapshot.position.z)');
+    expect(source).toContain('entry.root.quaternion.set(snapshot.rotation.x, snapshot.rotation.y, snapshot.rotation.z, snapshot.rotation.w)');
+    expect(source).toContain('.filter((entry) => entry.physicsActive)');
+    expect(source).toContain('if (snapshot.sleeping) {');
+    expect(source).toContain('entry.physicsActive = false;');
+    expect(source).toContain('if (retireSettledPhysics) syncInteractiveWorldPhysics();');
+  });
+
+  it('clears the persistent major pane only at the explicit window reset boundary', () => {
+    const resetStart = source.indexOf('function resetBreakableWindows()');
+    const resetEnd = source.indexOf('\nconst CORPSE_LIFETIME_MS', resetStart);
+    const resetBlock = source.slice(resetStart, resetEnd);
+    expect(resetBlock).toContain('clearPersistentWindowDebris()');
+    expect(source.match(/clearPersistentWindowDebris\(\)/g)).toHaveLength(2);
+  });
+
+  it('keeps short-lived glass flecks cosmetic without mistaking them for the persistent major pane', () => {
+    const shardStart = source.indexOf('function spawnGlassShards(');
+    const shardEnd = source.indexOf('\nfunction deterministicWindowUnit(', shardStart);
+    const shardBlock = source.slice(shardStart, shardEnd);
+    expect(shardBlock).toContain("root.name = 'breaking-window-shards'");
+    expect(shardBlock).toContain('if (age >= 0.9)');
+    expect(shardBlock).not.toContain('persistentMajorDebris');
+    expect(source).toContain('spawnPersistentWindowDebris(window, normal)');
+  });
+
+  it('lets later explosions re-impulse only still-active shed and falling window bodies', () => {
+    const start = source.indexOf('function applyInteractiveWorldExplosion(');
+    const end = source.indexOf('\ndocument.documentElement.dataset.arenaId', start);
+    const block = source.slice(start, end);
+    expect(block).toContain('for (const body of activeMajorDebrisPhysicsBodies())');
+    expect(block).toContain('characterPhysics.applyMajorDebrisImpulse(');
+    expect(block).toContain('mutations <= 0 && debrisImpulses <= 0');
+  });
+});

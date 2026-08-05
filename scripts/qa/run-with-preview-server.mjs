@@ -22,6 +22,7 @@ const viteBin = resolve('node_modules/vite/bin/vite.js');
 const server = spawn(process.execPath, [viteBin, 'preview', '--host', '127.0.0.1', '--port', port, '--strictPort'], {
   cwd: process.cwd(),
   stdio: 'inherit',
+  windowsHide: true,
 });
 
 function ready() {
@@ -51,15 +52,26 @@ async function waitForServer(timeoutMs = 30_000) {
 async function stopServer() {
   if (server.exitCode !== null) return;
   if (isWindows) {
-    spawnSync('taskkill.exe', ['/PID', String(server.pid), '/T', '/F'], { stdio: 'ignore' });
+    const stopped = spawnSync('taskkill.exe', ['/PID', String(server.pid), '/T', '/F'], {
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    if (stopped.status !== 0 && server.exitCode === null) server.kill('SIGKILL');
   } else {
     server.kill('SIGTERM');
   }
-  await Promise.race([
-    new Promise((resolveExit) => server.once('exit', resolveExit)),
-    new Promise((resolveTimeout) => setTimeout(resolveTimeout, 5_000)),
-  ]);
-  if (!isWindows && server.exitCode === null) server.kill('SIGKILL');
+  const waitForExit = async (timeoutMs) => {
+    const deadline = Date.now() + timeoutMs;
+    while (server.exitCode === null && Date.now() < deadline) {
+      await new Promise((resolveWait) => setTimeout(resolveWait, 50));
+    }
+  };
+  await waitForExit(5_000);
+  if (server.exitCode === null) {
+    server.kill('SIGKILL');
+    await waitForExit(2_000);
+  }
+  if (server.exitCode === null) throw new Error(`Preview server PID ${server.pid} did not terminate`);
 }
 
 let exitCode = 1;
@@ -70,6 +82,7 @@ try {
     cwd: process.cwd(),
     env: { ...process.env, QA_BASE_URL: baseUrl },
     stdio: 'inherit',
+    windowsHide: true,
   });
   if (result.error) throw result.error;
   if (result.signal) throw new Error(`${executable} terminated by ${result.signal}`);

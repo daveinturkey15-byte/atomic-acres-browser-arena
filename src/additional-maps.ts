@@ -1,12 +1,23 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { buildWeaponModel } from './art-kit';
+import { buildOperator, poseOperator } from './art-kit';
 import { classifyImpactSurface } from './combat-feedback';
 import { createBallisticSurface, type BallisticMaterialId, type BallisticSurface } from './ballistics';
 import type { Box2 } from './collision';
 import { WEAPONS } from './gameplay';
 import { GUN_RANGE_WEAPON_STATIONS } from './gun-range-armory';
+import {
+  GUN_RANGE_TEST_BAY_CONTRACT,
+  advanceGunRangeTestBayDoor,
+  createGunRangeTestBayDoorState,
+  gunRangeTestBayDoorDynamicColliders,
+  gunRangeTestBayDoorLeafBounds,
+  gunRangeTestBayDummyPose,
+  type GunRangeTestBayDoorState,
+  type GunRangeTestBayDummyDefinition,
+} from './gun-range-test-bay';
 import type { ArenaMap, BreakableWindow, PracticeTarget } from './map';
+import type { DynamicWorldCollider } from './physics';
 import type { Team } from './protocol';
 import { createRustworksWelshFlag } from './rustworks-flag';
 import { makeEmissiveOnly } from './rendering/light-occlusion';
@@ -129,6 +140,7 @@ function box(
     builder.ballisticSurfaceSequence += 1;
     builder.shotSurfaces.push(surface);
     mesh.userData.ballisticSurfaceId = surface.id;
+    mesh.userData.ballisticMaterial = surface.material;
   }
   if (solid) {
     builder.colliders.push(bounds);
@@ -209,7 +221,8 @@ function skylineOpeningParityAudit(
   builder.root.updateMatrixWorld(true);
   const sourceMeshes: THREE.Mesh[] = [];
   builder.root.traverse((node) => {
-    if (!(node instanceof THREE.Mesh) || node.name.startsWith('rustworks-presentation-batch-')) return;
+    if (!(node instanceof THREE.Mesh)
+      || (node.userData.staticBatchRendered === true && typeof node.userData.sourceMeshes === 'number')) return;
     sourceMeshes.push(node);
   });
 
@@ -270,7 +283,7 @@ function skylineOpeningParityAudit(
  * are deliberately excluded: only non-solid, non-raycast presentation detail
  * enters these static batches.
  */
-function batchPresentationOnlyBoxes(root: THREE.Group): PresentationBatchTelemetry {
+function batchPresentationOnlyBoxes(root: THREE.Group, batchPrefix = 'presentation'): PresentationBatchTelemetry {
   const groups = new Map<string, {
     material: THREE.Material;
     castShadow: boolean;
@@ -315,7 +328,7 @@ function batchPresentationOnlyBoxes(root: THREE.Group): PresentationBatchTelemet
     transformed.forEach((entry) => entry.dispose());
     if (!geometry) continue;
     const batch = new THREE.Mesh(geometry, group.material);
-    batch.name = `rustworks-presentation-batch-${batches}`;
+    batch.name = `${batchPrefix}-presentation-batch-${batches}`;
     batch.castShadow = group.castShadow;
     batch.receiveShadow = group.receiveShadow;
     batch.userData.presentationOnly = true;
@@ -378,7 +391,7 @@ export const RUSTWORKS_TOWER = Object.freeze({
 });
 
 /**
- * Authored fixture locations shared by the RustRig presentation and its one
+ * Authored fixture locations shared by the RustRig presentation and its
  * budgeted shadowed-local work lights. Both heads remain visible/emissive and
  * own bounded, opposed shadowed volumes so the playable deck is readable from
  * both ends without reintroducing unoccluded point-light leakage.
@@ -405,6 +418,63 @@ export const RUSTWORKS_WORK_LIGHTS = Object.freeze([
     distance: 34,
     angle: 0.82,
     shadowed: true,
+  }),
+]);
+
+/**
+ * One bounded shadowed practical per freight cluster. The eight visible
+ * red/orange/yellow strips remain cheap emissive navigation cues; these four
+ * ceiling-mounted volumes add real occluded colour and slow deterministic
+ * intensity motion in Quality/Custom without changing container collision.
+ */
+export const RUSTWORKS_CONTAINER_LIGHTS = Object.freeze([
+  Object.freeze({
+    id: 'north-west',
+    position: [-8, 2.32, -13] as const,
+    target: [-8, 0.28, -13] as const,
+    volume: { minimum: [-10.76, 0.04, -14.18] as const, maximum: [-5.24, 2.48, -11.82] as const },
+    color: 0xff4d2e,
+    intensity: 18,
+    distance: 4.2,
+    angle: 0.86,
+    frequencyHz: 0.18,
+    phaseRadians: 0.35,
+  }),
+  Object.freeze({
+    id: 'north-east',
+    position: [8, 2.32, -13] as const,
+    target: [8, 0.28, -13] as const,
+    volume: { minimum: [5.24, 0.04, -14.18] as const, maximum: [10.76, 2.48, -11.82] as const },
+    color: 0xffd25a,
+    intensity: 17,
+    distance: 4.2,
+    angle: 0.86,
+    frequencyHz: 0.23,
+    phaseRadians: 1.7,
+  }),
+  Object.freeze({
+    id: 'south-west',
+    position: [-18, 2.32, 8] as const,
+    target: [-18, 0.28, 8] as const,
+    volume: { minimum: [-19.18, 0.04, 5.24] as const, maximum: [-16.82, 2.48, 10.76] as const },
+    color: 0xff9a3d,
+    intensity: 16,
+    distance: 4.2,
+    angle: 0.86,
+    frequencyHz: 0.29,
+    phaseRadians: 3.05,
+  }),
+  Object.freeze({
+    id: 'south-east',
+    position: [18, 2.32, 8] as const,
+    target: [18, 0.28, 8] as const,
+    volume: { minimum: [16.82, 0.04, 5.24] as const, maximum: [19.18, 2.48, 10.76] as const },
+    color: 0xff4d2e,
+    intensity: 17,
+    distance: 4.2,
+    angle: 0.86,
+    frequencyHz: 0.31,
+    phaseRadians: 4.4,
   }),
 ]);
 
@@ -463,6 +533,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   builder.ballisticSurfaceSequence += 1;
   builder.shotSurfaces.push(groundSurface);
   ground.userData.ballisticSurfaceId = groundSurface.id;
+  ground.userData.ballisticMaterial = groundSurface.material;
   // Thick deck plate + edge lip so the drop to water reads when looking over.
   box(builder, 'rustworks-rig-deck-slab', [0, -0.85, 0], [54.5, 1.6, 58.5], rustDark, { solid: false, cast: true, shots: false });
   const deckEdgeSpecs = [
@@ -708,8 +779,15 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
       emissiveOnlyLens: true,
       shadowedLocalVolume: fixture.shadowed,
     })),
-    shadowedLocalVolumes: RUSTWORKS_WORK_LIGHTS.filter((fixture) => fixture.shadowed).length,
-    maximumShadowCastersIncludingMoon: 3,
+    containerFixtures: RUSTWORKS_CONTAINER_LIGHTS.map((fixture) => ({
+      id: fixture.id,
+      position: [...fixture.position],
+      target: [...fixture.target],
+      color: fixture.color,
+      shadowedLocalVolume: true,
+    })),
+    shadowedLocalVolumes: RUSTWORKS_WORK_LIGHTS.filter((fixture) => fixture.shadowed).length + RUSTWORKS_CONTAINER_LIGHTS.length,
+    maximumShadowCastersIncludingMoon: 7,
   };
 
   // Ground → lower deck ramp on -Z with explicit foot/top landings (≤50°).
@@ -937,7 +1015,23 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     { cluster: 'south-east', side: 'east', slot: 3, axis: 'z', x: 7, z: 19, opening: 'open-one' },
   ] as const;
   const containerPalette = [hazardDark, rustDark, tarp] as const;
+  const containerPracticalPalette = [0xff4d2e, 0xff9a3d, 0xffd25a] as const;
+  const containerPracticalMaterials = containerPracticalPalette.map((color, index) => {
+    const material = new THREE.MeshStandardMaterial({
+      color,
+      emissive: color,
+      // Keep the hue saturated through the HDR/ACES path; the former 3.2+
+      // values clipped all three cues toward white at RustRig exposure.
+      emissiveIntensity: 1.55 + index * 0.1,
+      roughness: 0.24,
+      metalness: 0.28,
+    });
+    material.name = `RustRig_Container_Practical_${index}`;
+    return material;
+  });
   const openContainerRoutes: Array<{ id: string; side: string; axis: 'x' | 'z'; anchors: [number, number, number][] }> = [];
+  const containerPracticalIds: string[] = [];
+  let openPracticalSequence = 0;
   for (const [index, placement] of containerRows.entries()) {
     const alongX = placement.axis === 'x';
     const containerSize: [number, number, number] = alongX ? [5.8, 2.6, 2.5] : [2.5, 2.6, 5.8];
@@ -981,6 +1075,24 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
         cast: false,
         detail: 'performance',
       });
+      const practicalId = `rustworks-container-practical-${placement.cluster}-${placement.slot}`;
+      const practicalPaletteIndex = openPracticalSequence % containerPracticalMaterials.length;
+      const practicalMaterial = containerPracticalMaterials[practicalPaletteIndex]!;
+      openPracticalSequence += 1;
+      const practical = box(
+        builder,
+        practicalId,
+        [placement.x, 2.36, placement.z],
+        alongX ? [2.1, 0.08, 0.16] : [0.16, 0.08, 2.1],
+        practicalMaterial,
+        { solid: false, shots: false, cast: false, detail: 'performance' },
+      );
+      practical.userData.occlusionPolicy = 'emissive-only';
+      practical.userData.practicalPolicyId = 'container-interior-warm-practicals';
+      practical.userData.containerInterior = true;
+      practical.userData.containerCluster = placement.cluster;
+      practical.userData.paletteIndex = practicalPaletteIndex;
+      containerPracticalIds.push(practicalId);
       if (placement.opening === 'open-one') {
         const endThickness = 0.16;
         const closesPositiveEnd = (placement.side === 'north' || placement.side === 'west');
@@ -1045,6 +1157,15 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     minimumTowerDistance: Math.min(...containerRows.map((placement) => Math.hypot(placement.x, placement.z))),
     onlyShippingContainers: true,
   };
+  root.userData.rustworksContainerPracticalAudit = {
+    ids: containerPracticalIds,
+    count: containerPracticalIds.length,
+    palette: [...containerPracticalPalette],
+    fixtureOcclusionPolicy: 'emissive-only',
+    dynamicOcclusionPolicy: 'shadowed-local',
+    shadowedDynamicFill: 'four-cluster-container-practical-pulse',
+    dynamicPracticalIds: RUSTWORKS_CONTAINER_LIGHTS.map((fixture) => `container-dynamic-${fixture.id}`),
+  };
   root.userData.rustworksOpenContainerRoutes = openContainerRoutes;
   root.userData.rustworksUndercroft = {
     passageWidth: RUSTWORKS_TOWER.undercroftPassageWidth,
@@ -1065,7 +1186,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   root.add(welshFlag);
   root.userData.rustworksFlagAudit = welshFlag.userData.rustworksFlagAudit;
 
-  root.userData.rustworksPresentationBatches = batchPresentationOnlyBoxes(root);
+  root.userData.rustworksPresentationBatches = batchPresentationOnlyBoxes(root, 'rustworks');
   // Default to full presentation for tests/tools; runtime re-applies the active render profile.
   applyRustworksPresentationProfile(root, 'blender');
 
@@ -1168,7 +1289,8 @@ export function applyAdditionalMapPresentationProfile(
   const allowQuality = profile === 'blender';
   root.traverse((node) => {
     // Source meshes collapsed into static presentation batches must stay hidden.
-    if (node.userData.staticBatchRendered === true && !String(node.name).startsWith('rustworks-presentation-batch-')) {
+    if (node.userData.staticBatchRendered === true
+      && (root.userData.pass65StaticBatchReady === true || !String(node.name).startsWith('rustworks-presentation-batch-'))) {
       if (node.visible) {
         node.visible = false;
         hidden += 1;
@@ -1194,15 +1316,31 @@ export function applyAdditionalMapPresentationProfile(
   });
   root.traverse((node) => {
     if (!(node instanceof THREE.Mesh) || node.userData.skylineQualityPlaceholder !== true) return;
-    const replaced = allowQuality;
-    node.castShadow = !replaced;
-    node.receiveShadow = !replaced;
+    const authorityId = node.userData.skylineCollisionAuthorityId as string | undefined;
+    let visiblePresentation = false;
+    if (authorityId) {
+      root.traverse((candidate) => {
+        if (candidate === node
+          || candidate.userData.skylineCollisionAuthorityId !== authorityId
+          || !candidate.visible
+          || candidate.userData.skylineQualityPlaceholder === true
+          || !(candidate instanceof THREE.Mesh)) return;
+        const candidateMaterials = Array.isArray(candidate.material) ? candidate.material : [candidate.material];
+        if (candidateMaterials.some((material) => material.visible && material.colorWrite)) visiblePresentation = true;
+      });
+    }
+    // HF-188: collision authority may be hidden only while an explicitly
+    // bound authored presentation is visible in the active profile. Missing
+    // ownership fails visible instead of leaving a mystery blocker.
+    node.castShadow = false;
+    node.receiveShadow = false;
     const materials = Array.isArray(node.material) ? node.material : [node.material];
     for (const material of materials) {
-      material.colorWrite = !replaced;
-      material.depthWrite = !replaced;
+      material.colorWrite = !visiblePresentation;
+      material.depthWrite = !visiblePresentation;
       material.needsUpdate = true;
     }
+    node.userData.skylineCollisionPresentationVisible = visiblePresentation;
   });
   return { hidden, shown };
 }
@@ -1236,31 +1374,6 @@ export function fitCanvasText(
     context.font = `900 ${fontSize}px ${family}`;
   }
   return { fontSize, measuredWidth: context.measureText(text).width, availableWidth };
-}
-
-function scoreTexture(value: number): THREE.CanvasTexture | null {
-  if (typeof document === 'undefined') return null;
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 256;
-  const context = canvas.getContext('2d');
-  if (!context) return null;
-  const text = `${value} PTS`;
-  context.fillStyle = '#10171b';
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  context.strokeStyle = '#f4c44f';
-  context.lineWidth = 18;
-  context.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
-  context.fillStyle = '#f8f0d2';
-  const layout = fitCanvasText(context, text, 118, canvas.width - 88, 54);
-  context.textAlign = 'center';
-  context.textBaseline = 'middle';
-  context.fillText(text, canvas.width / 2, canvas.height / 2 + 6);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.needsUpdate = true;
-  texture.userData.textLayout = { ...layout, canvasWidth: canvas.width, canvasHeight: canvas.height };
-  return texture;
 }
 
 function rangeSign(text: string, accent: number, name: string, scale: [number, number]): THREE.Mesh | null {
@@ -1331,40 +1444,49 @@ function rangeTarget(
   bullseye.userData.hitZone = 'head';
   bullseye.position.set(0, 1.65, 0.01);
   bullseye.rotation.x = Math.PI / 2;
-  const movingLight = new THREE.Mesh(
-    new THREE.RingGeometry(0.12, 0.17, 18),
-    new THREE.MeshBasicMaterial({
-      color: distanceBand === 'near' ? 0x7afff6 : distanceBand === 'mid' ? 0xffdb67 : 0xff8a78,
-      transparent: true,
-      opacity: 0.82,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      toneMapped: false,
-      side: THREE.DoubleSide,
-    }),
-  );
-  movingLight.name = 'gun-range-moving-target-light';
-  movingLight.position.set(0, 1.65, 0.085);
-  movingLight.userData.presentationOnly = true;
-  movingLight.userData.targetLightPhase = targets.length * 0.83;
-  movingLight.raycast = () => undefined;
-  root.add(stand, plate, bullseye, movingLight);
-  const movingLights = (builder.root.userData.gunRangeMovingTargetLights ??= []) as THREE.Mesh[];
-  movingLights.push(movingLight);
-  const texture = scoreTexture(scoreValue);
-  if (texture) {
-    const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: false, depthTest: true, toneMapped: false }));
-    label.name = `${scoreValue}-point-label`;
-    label.position.set(0, 2.75, 0);
-    label.scale.set(2.4, 1.2, 1);
-    root.add(label);
-  }
+  root.add(stand, plate, bullseye);
   root.traverse((child) => {
     child.userData.targetRoot = root;
     child.userData.impactSurface = 'metal';
   });
   builder.root.add(root);
   targets.push({ id, root, active: true, respawnAt: 0, scoreValue, distanceBand, maxHealth: 500, health: 500, kind: 'plate' });
+}
+
+function lateralRangeTarget(
+  builder: Builder,
+  targets: PracticeTarget[],
+  id: string,
+  originX: number,
+  z: number,
+  phase: number,
+  color: number,
+): void {
+  const root = new THREE.Group();
+  root.name = 'gun-range-lateral-illuminated-target';
+  root.userData.targetId = id;
+  root.userData.scoreValue = 250;
+  root.userData.lateralOriginX = originX;
+  root.userData.lateralAmplitudeM = 3.6;
+  root.userData.lateralFrequencyHz = 0.065;
+  root.userData.lateralPhaseRadians = phase;
+  root.position.set(originX, 0, z);
+  const plate = new THREE.Mesh(
+    new THREE.BoxGeometry(0.92, 1.45, 0.16),
+    new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 2.8, roughness: 0.34, metalness: 0.4 }),
+  );
+  plate.name = 'gun-range-lateral-target-plate';
+  plate.position.y = 1.72;
+  plate.userData.hitZone = 'body';
+  root.add(plate);
+  root.traverse((child) => {
+    child.userData.targetRoot = root;
+    child.userData.impactSurface = 'metal';
+  });
+  builder.root.add(root);
+  const lateralTargets = (builder.root.userData.gunRangeLateralTargets ??= []) as THREE.Group[];
+  lateralTargets.push(root);
+  targets.push({ id, root, active: true, respawnAt: 0, scoreValue: 250, distanceBand: 'mid', maxHealth: 500, health: 500, kind: 'plate' });
 }
 
 function fivePointStarGeometry(outerRadius = 0.16, innerRadius = 0.065): THREE.ShapeGeometry {
@@ -1450,6 +1572,159 @@ function flyingBlackCat(targets: PracticeTarget[], root: THREE.Group): void {
   });
 }
 
+type GunRangeTestDummyPresentation = Readonly<{
+  root: THREE.Group;
+  definition: GunRangeTestBayDummyDefinition;
+}>;
+
+export type GunRangeTestBayDoorFrame = Readonly<{
+  state: GunRangeTestBayDoorState;
+  audioIntent: 'secure-door-opening-thump' | null;
+  collisionChanged: boolean;
+  dynamicColliders: readonly DynamicWorldCollider[];
+}>;
+
+function gunRangeTrainingDummy(
+  builder: Builder,
+  targets: PracticeTarget[],
+  definition: GunRangeTestBayDummyDefinition,
+  index: number,
+): GunRangeTestDummyPresentation {
+  const root = new THREE.Group();
+  root.name = `gun-range-${definition.id}`;
+  root.userData.targetId = definition.id;
+  root.userData.targetKind = 'training-dummy';
+  root.userData.armed = false;
+  root.userData.walkSpeedMps = definition.speedMps;
+  root.userData.scoreValue = 250;
+  root.userData.maxHealth = 300;
+  // Owner direction: the killstreak-room training bots must look like the
+  // combatants in real matches. Use the canonical rigged operator family when
+  // its authored GLB has loaded; the painted training robot remains only as a
+  // pre-load fixture and is replaced as soon as the shared rig is ready.
+  const rigged = (() => {
+    try {
+      return buildOperator(index % 2 === 0 ? 1 : 0, `gun-range-${definition.id}`, false, 'carbine', 'team');
+    } catch {
+      // Canonical rig not loaded yet (e.g. headless/unit environments): fall
+      // back to the painted training robot below. Live deployment always loads
+      // the rig before arena construction, so gameplay uses the rigged model.
+      return null;
+    }
+  })();
+  if (rigged) {
+    rigged.position.set(0, 0, 0);
+    rigged.userData.targetRoot = root;
+    rigged.userData.targetId = definition.id;
+    rigged.traverse((node) => {
+      node.userData.targetRoot = root;
+      node.userData.targetId = definition.id;
+      if (node instanceof THREE.Mesh) node.userData.impactSurface = 'metal';
+    });
+    root.add(rigged);
+    const parts: THREE.Mesh[] = [];
+    rigged.traverse((node) => {
+      if (!(node instanceof THREE.Mesh) || node.userData.authoritativeProxy === true) return;
+      parts.push(node);
+      builder.raycastMeshes.push(node);
+    });
+    root.userData.targetMeshes = parts;
+    root.userData.riggedOperator = true;
+    root.position.set(definition.start.x, definition.start.y, definition.start.z);
+    builder.root.add(root);
+    targets.push({
+      id: definition.id,
+      root,
+      active: true,
+      respawnAt: 0,
+      respawnDelayMs: 2_500,
+      scoreValue: 250,
+      distanceBand: 'mid',
+      maxHealth: 300,
+      health: 300,
+      kind: 'training-dummy',
+    });
+    return Object.freeze({ root, definition });
+  }
+  // Review capture and compatibility renderers must not turn the slow targets
+  // into black silhouettes when authored practical lights are culled. These
+  // are painted training robots, so an unlit albedo is also semantically apt.
+  const shell = new THREE.MeshBasicMaterial({ color: index % 2 === 0 ? 0xb9c8ca : 0x9aabad, toneMapped: false });
+  const armour = new THREE.MeshBasicMaterial({ color: index % 2 === 0 ? 0x279aa0 : 0xb87832, toneMapped: false });
+  const joint = new THREE.MeshBasicMaterial({ color: 0x263337, toneMapped: false });
+  const parts: THREE.Mesh[] = [];
+  const part = (
+    name: string,
+    geometry: THREE.BufferGeometry,
+    material: THREE.Material,
+    position: [number, number, number],
+    hitZone: 'head' | 'body' | 'limb',
+  ): THREE.Mesh => {
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = `gun-range-${definition.id}-${name}`;
+    mesh.position.set(...position);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.userData.targetRoot = root;
+    mesh.userData.targetId = definition.id;
+    mesh.userData.hitZone = hitZone;
+    mesh.userData.impactSurface = 'metal';
+    root.add(mesh);
+    builder.raycastMeshes.push(mesh);
+    parts.push(mesh);
+    return mesh;
+  };
+  part('torso', new THREE.BoxGeometry(0.72, 0.94, 0.38), armour, [0, 1.32, 0], 'body');
+  part('pelvis', new THREE.BoxGeometry(0.55, 0.34, 0.34), shell, [0, 0.72, 0], 'body');
+  part('head', new THREE.SphereGeometry(0.27, 14, 10), shell, [0, 2.08, 0], 'head');
+  for (const side of [-1, 1] as const) {
+    part(`arm-${side}`, new THREE.CapsuleGeometry(0.105, 0.62, 4, 8), shell, [side * 0.52, 1.28, 0], 'limb').rotation.z = side * 0.13;
+    part(`leg-${side}`, new THREE.CapsuleGeometry(0.13, 0.72, 4, 8), joint, [side * 0.2, 0.24, 0], 'limb');
+  }
+  root.userData.targetMeshes = parts;
+  root.position.set(definition.start.x, definition.start.y, definition.start.z);
+  builder.root.add(root);
+  targets.push({
+    id: definition.id,
+    root,
+    active: true,
+    respawnAt: 0,
+    respawnDelayMs: 2_500,
+    scoreValue: 250,
+    distanceBand: 'mid',
+    maxHealth: 300,
+    health: 300,
+    kind: 'training-dummy',
+  });
+  return Object.freeze({ root, definition });
+}
+
+function syncGunRangeTestBayDoorLeaf(root: THREE.Object3D, state: GunRangeTestBayDoorState): void {
+  const leaf = root.getObjectByName('gun-range-test-bay-secure-door-leaf');
+  if (!leaf) return;
+  const bounds = gunRangeTestBayDoorLeafBounds(state);
+  leaf.position.y = ((bounds.minY ?? 0) + (bounds.maxY ?? 0)) / 2;
+  leaf.userData.phase = state.phase;
+  leaf.userData.openness = state.openness;
+}
+
+/**
+ * Narrow frame API for the main runtime. The caller owns audio delivery and
+ * must merge dynamicColliders into the existing Rapier reconciliation set.
+ */
+export function updateGunRangeTestBayDoor(
+  root: THREE.Object3D,
+  nowMs: number,
+  observerPosition: Readonly<{ x: number; y: number; z: number }>,
+): GunRangeTestBayDoorFrame {
+  const prior = (root.userData.gunRangeTestBayDoorState as GunRangeTestBayDoorState | undefined)
+    ?? createGunRangeTestBayDoorState(nowMs);
+  const step = advanceGunRangeTestBayDoor(prior, nowMs, observerPosition);
+  root.userData.gunRangeTestBayDoorState = step.state;
+  syncGunRangeTestBayDoorLeaf(root, step.state);
+  return Object.freeze({ ...step, dynamicColliders: gunRangeTestBayDoorDynamicColliders(step.state) });
+}
+
 export function buildGunRange(scene: THREE.Scene): ArenaMap {
   const root = new THREE.Group();
   root.name = 'Acres Indoor Gun Range arena';
@@ -1457,7 +1732,7 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   const builder: Builder = {
     root, colliders: [], physicsColliders: [], raycastMeshes: [], shotSurfaces: [], ballisticSurfaceSequence: 0,
   };
-  const concrete = standard(0x444b4e, 0.98, 0.02);
+  const concrete = standard(0x626a6d, 0.98, 0.02);
   const wall = terminalSurfaceMaterial('panel', 0xb8c1c4, '#69777d', 0.5, 0.38, [7, 4]);
   wall.name = 'GunRange_SilverWall_PanelTexture';
   wall.userData.gunRangeShell = 'white-silver-wall';
@@ -1469,7 +1744,7 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   const timber = standard(0x765136, 0.91, 0.04);
   const safety = new THREE.MeshStandardMaterial({ color: 0xe0aa37, emissive: 0x4b2b00, emissiveIntensity: 0.5, roughness: 0.62, metalness: 0.28 });
   const redSafety = new THREE.MeshStandardMaterial({ color: 0xc74235, emissive: 0x4a0804, emissiveIntensity: 0.72, roughness: 0.54, metalness: 0.2 });
-  const lamp = new THREE.MeshStandardMaterial({ color: 0xd9eff2, emissive: 0x9edfe9, emissiveIntensity: 2.5, roughness: 0.22, metalness: 0.08 });
+  const lamp = new THREE.MeshStandardMaterial({ color: 0xf1ffff, emissive: 0xa8f5ff, emissiveIntensity: 4.2, roughness: 0.18, metalness: 0.08 });
   const targets: PracticeTarget[] = [];
   root.userData.gunRangeBayLightMaterial = lamp;
 
@@ -1490,14 +1765,155 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   builder.ballisticSurfaceSequence += 1;
   builder.shotSurfaces.push(floorSurface);
   floor.userData.ballisticSurfaceId = floorSurface.id;
+  floor.userData.ballisticMaterial = floorSurface.material;
 
   // A pale textured shell keeps player and target silhouettes readable. Dark
   // acoustic/ballistic inserts preserve contrast without turning the room black.
   box(builder, 'gun-range-backstop', [0, 3.6, -49], [42, 7.2, 1.2], dark);
   box(builder, 'gun-range-left-wall', [-20.5, 3.6, -14.5], [1, 7.2, 70], wall);
-  box(builder, 'gun-range-right-wall', [20.5, 3.6, -14.5], [1, 7.2, 70], wall);
+  // Split the east wall around the 8 m test-bay portal. The two solids retain
+  // the original shell identity while leaving movement and shots genuinely
+  // clear through z=8..16; no opaque/collider plane masks the new opening.
+  box(builder, 'gun-range-right-wall', [20.5, 3.6, -20.5], [1, 7.2, 57], wall);
+  box(builder, 'gun-range-right-wall', [20.5, 3.6, 18], [1, 7.2, 4], wall);
   box(builder, 'gun-range-rear-wall', [0, 3.6, 20], [42, 7.2, 1], wall);
   box(builder, 'gun-range-ceiling', [0, 7.1, -14.5], [42, 0.45, 70], ceiling, { solid: false, shots: true });
+
+  // Pass 66 grey-room annex. Ordinary forward walk is 6.15 m/s, so the
+  // 30.75 m entry-to-door approach is exactly five seconds without sprinting.
+  const testBayWall = terminalSurfaceMaterial('panel', 0x9aa3a6, '#4e5a5e', 0.62, 0.48, [6, 4]);
+  testBayWall.name = 'GunRange_TestBay_GreyWall_PanelTexture';
+  testBayWall.emissive.setHex(0x465155);
+  testBayWall.emissiveIntensity = 0.52;
+  const testBayFloor = terminalSurfaceMaterial('concrete', 0x596164, '#a5afb2', 0.88, 0.16, [12, 16]);
+  testBayFloor.name = 'GunRange_TestBay_GreyFloor_Texture';
+  testBayFloor.emissive.setHex(0x293235);
+  testBayFloor.emissiveIntensity = 0.42;
+  const testBayCeiling = terminalSurfaceMaterial('panel', 0x525d61, '#192225', 0.7, 0.5, [10, 8]);
+  testBayCeiling.name = 'GunRange_TestBay_GreyCeiling_PanelTexture';
+  testBayCeiling.emissive.setHex(0x252f32);
+  testBayCeiling.emissiveIntensity = 0.4;
+  const testBayCyan = new THREE.MeshBasicMaterial({ color: 0x35b9b6, toneMapped: false });
+  const testBayAmber = new THREE.MeshBasicMaterial({ color: 0xd49742, toneMapped: false });
+  const testBayVisibleFloor = new THREE.MeshBasicMaterial({ color: 0x303c40, toneMapped: false });
+  const testBayVisibleWall = new THREE.MeshBasicMaterial({ color: 0x465358, toneMapped: false });
+  const testBayVisibleCeiling = new THREE.MeshBasicMaterial({ color: 0x263237, toneMapped: false });
+  const secureDoorMaterial = new THREE.MeshStandardMaterial({ color: 0x283236, emissive: 0x14262a, emissiveIntensity: 0.48, roughness: 0.5, metalness: 0.78 });
+  const secureDoorPanelMaterial = terminalSurfaceMaterial('panel', 0x283236, '#4a5a5e', 0.52, 0.74, [2, 3]);
+
+  box(builder, 'gun-range-test-bay-corridor-floor', [35.75, -0.08, 12], [30.5, 0.16, 8], testBayFloor, { solid: false, shots: true });
+  box(builder, 'gun-range-test-bay-corridor-north-wall', [35.75, 2.6, 7.75], [30.5, 5.2, 0.5], testBayWall, { ballisticMaterial: 'structural-metal' });
+  box(builder, 'gun-range-test-bay-corridor-south-wall', [35.75, 2.6, 16.25], [30.5, 5.2, 0.5], testBayWall, { ballisticMaterial: 'structural-metal' });
+  box(builder, 'gun-range-test-bay-corridor-ceiling', [35.75, 5.15, 12], [30.5, 0.35, 8.5], testBayCeiling, { solid: false, shots: true });
+  // Thin unlit interior skins guarantee a readable grey-room silhouette in
+  // deterministic captures without becoming collision or shot authority.
+  for (const skin of [
+    box(builder, 'gun-range-test-bay-corridor-floor-skin', [35.75, 0.012, 12], [30.25, 0.024, 7.55], testBayVisibleFloor, { solid: false, shots: false, cast: false }),
+    box(builder, 'gun-range-test-bay-corridor-north-skin', [35.75, 2.55, 8.015], [30.25, 4.9, 0.03], testBayVisibleWall, { solid: false, shots: false, cast: false }),
+    box(builder, 'gun-range-test-bay-corridor-south-skin', [35.75, 2.55, 15.985], [30.25, 4.9, 0.03], testBayVisibleWall, { solid: false, shots: false, cast: false }),
+    box(builder, 'gun-range-test-bay-corridor-ceiling-skin', [35.75, 4.955, 12], [30.25, 0.03, 7.55], testBayVisibleCeiling, { solid: false, shots: false, cast: false }),
+  ]) skin.userData.presentationBatchCandidate = false;
+  for (const x of [24, 29, 34, 39, 44, 49]) {
+    const ceilingRib = box(builder, 'gun-range-test-bay-corridor-light-rib', [x, 4.88, 12], [0.18, 0.12, 7.2], x % 2 === 0 ? testBayCyan : testBayAmber, { solid: false, shots: false, cast: false });
+    ceilingRib.userData.presentationBatchCandidate = false;
+    for (const [sideIndex, z] of [8.03, 15.97].entries()) {
+      const wallRib = box(builder, 'gun-range-test-bay-corridor-wall-rib', [x, 2.45, z], [0.16, 4.55, 0.08], sideIndex === 0 ? testBayCyan : testBayAmber, { solid: false, shots: false, cast: false });
+      wallRib.userData.presentationBatchCandidate = false;
+    }
+  }
+  for (const guide of [
+    box(builder, 'gun-range-test-bay-corridor-guide-cyan', [35.75, 0.025, 9.15], [30.5, 0.05, 0.18], testBayCyan, { solid: false, shots: false, cast: false }),
+    box(builder, 'gun-range-test-bay-corridor-guide-amber', [35.75, 0.026, 14.85], [30.5, 0.052, 0.18], testBayAmber, { solid: false, shots: false, cast: false }),
+    box(builder, 'gun-range-test-bay-corridor-wall-guide-cyan', [35.75, 1.12, 8.03], [30.5, 0.15, 0.08], testBayCyan, { solid: false, shots: false, cast: false }),
+    box(builder, 'gun-range-test-bay-corridor-wall-guide-amber', [35.75, 1.12, 15.97], [30.5, 0.15, 0.08], testBayAmber, { solid: false, shots: false, cast: false }),
+  ]) guide.userData.presentationBatchCandidate = false;
+
+  // Large 48.5 x 64 m bay: west wall is split around the secure door aperture.
+  // Owner direction: the killstreak-testing room roof is three times taller so
+  // chopper/drone altitudes read realistically; the bay clears 25.5 m.
+  box(builder, 'gun-range-test-bay-floor', [75.75, -0.08, 6], [48.5, 0.16, 64], testBayFloor, { solid: false, shots: true });
+  box(builder, 'gun-range-test-bay-ceiling', [75.75, 25.35, 6], [48.5, 0.35, 64], testBayCeiling, { solid: false, shots: true });
+  box(builder, 'gun-range-test-bay-east-wall', [100.25, 13.25, 6], [0.5, 25.5, 64.5], testBayWall, { ballisticMaterial: 'structural-metal' });
+  box(builder, 'gun-range-test-bay-north-wall', [75.75, 13.25, -26.25], [49, 25.5, 0.5], testBayWall, { ballisticMaterial: 'structural-metal' });
+  box(builder, 'gun-range-test-bay-south-wall', [75.75, 13.25, 38.25], [49, 25.5, 0.5], testBayWall, { ballisticMaterial: 'structural-metal' });
+  box(builder, 'gun-range-test-bay-west-wall-north', [51.75, 13.25, -9], [0.5, 25.5, 34], testBayWall, { ballisticMaterial: 'structural-metal' });
+  box(builder, 'gun-range-test-bay-west-wall-south', [51.75, 13.25, 27], [0.5, 25.5, 22], testBayWall, { ballisticMaterial: 'structural-metal' });
+  for (const skin of [
+    box(builder, 'gun-range-test-bay-floor-skin', [75.75, 0.012, 6], [48, 0.024, 63.5], testBayVisibleFloor, { solid: false, shots: false, cast: false }),
+    box(builder, 'gun-range-test-bay-ceiling-skin', [75.75, 25.155, 6], [48, 0.03, 63.5], testBayVisibleCeiling, { solid: false, shots: false, cast: false }),
+    box(builder, 'gun-range-test-bay-east-wall-skin', [99.985, 13.15, 6], [0.03, 24.5, 63.5], testBayVisibleWall, { solid: false, shots: false, cast: false }),
+    box(builder, 'gun-range-test-bay-north-wall-skin', [75.75, 13.15, -25.985], [48, 24.5, 0.03], testBayVisibleWall, { solid: false, shots: false, cast: false }),
+    box(builder, 'gun-range-test-bay-south-wall-skin', [75.75, 13.15, 37.985], [48, 24.5, 0.03], testBayVisibleWall, { solid: false, shots: false, cast: false }),
+  ]) skin.userData.presentationBatchCandidate = false;
+  box(builder, 'gun-range-test-bay-door-frame-top', [51.75, 7.45, 12], [1.05, 1.9, 8.5], secureDoorMaterial, { ballisticMaterial: 'structural-metal' });
+  box(builder, 'gun-range-test-bay-door-rail-north', [51.6, 3.3, 8.05], [0.3, 6.6, 0.3], secureDoorMaterial, { solid: false, shots: false });
+  box(builder, 'gun-range-test-bay-door-rail-south', [51.6, 3.3, 15.95], [0.3, 6.6, 0.3], secureDoorMaterial, { solid: false, shots: false });
+  // Secure door leaf: textured armour panels with amber/cyan status edge
+  // lights so the door reads as the room's gameplay entrance from both faces.
+  const secureDoor = box(builder, 'gun-range-test-bay-secure-door-leaf', [51.5, 10.25, 12], [0.7, 6.5, 7.6], secureDoorPanelMaterial, { solid: false, shots: false });
+  secureDoor.userData.presentationBatchCandidate = false;
+  secureDoor.userData.dynamic = true;
+  secureDoor.userData.authorityId = GUN_RANGE_TEST_BAY_CONTRACT.door.id;
+  secureDoor.userData.portalCollisionStatus = 'runtime-helper-required';
+  secureDoor.userData.defaultFailsOpen = true;
+  for (const [z, side] of [[7.1, 'north'], [16.9, 'south']] as const) {
+    const edge = box(builder, `gun-range-test-bay-door-edge-${side}`, [51.5, 10.25, z], [0.71, 6.5, 0.09], z < 12 ? testBayAmber : testBayCyan, { solid: false, shots: false, cast: false });
+    edge.userData.presentationBatchCandidate = false;
+    edge.userData.dynamic = true;
+  }
+  for (const z of [-19, -7, 5, 17, 29]) {
+    box(builder, 'gun-range-test-bay-ceiling-light', [75.5, 25.02, z], [35, 0.12, 0.3], z % 2 === 0 ? testBayAmber : testBayCyan, { solid: false, shots: false, cast: false });
+  }
+  for (const x of [59, 67, 75, 83, 91, 99]) {
+    const grid = box(builder, 'gun-range-test-bay-floor-grid-x', [x, 0.023, 6], [0.11, 0.046, 62], x % 2 === 0 ? testBayAmber : testBayCyan, { solid: false, shots: false, cast: false });
+    grid.userData.presentationBatchCandidate = false;
+  }
+  for (const z of [-20, -10, 0, 10, 20, 30]) {
+    const grid = box(builder, 'gun-range-test-bay-floor-grid-z', [75.75, 0.024, z], [47, 0.048, 0.11], z % 20 === 0 ? testBayAmber : testBayCyan, { solid: false, shots: false, cast: false });
+    grid.userData.presentationBatchCandidate = false;
+  }
+
+  const testBaySign = rangeSign('SECURE SYSTEMS TEST BAY', 0x53ded8, 'gun-range-test-bay-sign', [13.5, 0.95]);
+  if (testBaySign) {
+    testBaySign.position.set(52.15, 6.65, 12);
+    testBaySign.rotation.y = -Math.PI / 2;
+    if (!Array.isArray(testBaySign.material)) testBaySign.material.side = THREE.FrontSide;
+    root.add(testBaySign);
+  }
+  const supportSign = rangeSign('ALL SUPPORT SYSTEMS', 0xf0b24b, 'gun-range-test-bay-support-sign', [11.5, 0.82]);
+  if (supportSign) {
+    supportSign.position.set(99.85, 6.6, 6);
+    supportSign.rotation.y = -Math.PI / 2;
+    if (!Array.isArray(supportSign.material)) supportSign.material.side = THREE.FrontSide;
+    root.add(supportSign);
+  }
+
+  // These pads are honest structural stations. Their canonical IDs are
+  // projected from the killstreak catalog; the main runtime consumes the IDs
+  // through the normal host-authoritative support and weapon admission paths.
+  for (const [index, station] of GUN_RANGE_TEST_BAY_CONTRACT.supportStations.entries()) {
+    const pad = box(builder, `gun-range-test-bay-support-pad-${station.id}`, [station.position.x, 0.06, station.position.z], [5.6, 0.12, 5.6], index % 2 === 0 ? testBayAmber : testBayCyan, { solid: false, shots: false, cast: false });
+    pad.userData.supportId = station.id;
+    pad.userData.runtimeStatus = station.runtimeStatus;
+  }
+  for (const [index, station] of GUN_RANGE_TEST_BAY_CONTRACT.weaponStations.entries()) {
+    const marker = box(builder, `gun-range-test-bay-weapon-marker-${station.id}`, [station.position.x, 0.055, station.position.z], [4.8, 0.11, 0.5], index % 2 === 0 ? testBayCyan : testBayAmber, { solid: false, shots: false, cast: false });
+    marker.userData.weaponId = station.id;
+    marker.userData.runtimeStatus = station.runtimeStatus;
+  }
+
+  const testDummyPresentations = GUN_RANGE_TEST_BAY_CONTRACT.dummies.map(
+    (definition, index) => gunRangeTrainingDummy(builder, targets, definition, index),
+  );
+  root.userData.gunRangeTestDummies = testDummyPresentations;
+  root.userData.gunRangeTestBayContract = GUN_RANGE_TEST_BAY_CONTRACT;
+  root.userData.gunRangeTestBayRuntime = Object.freeze({
+    structure: 'implemented',
+    slowUnarmedTargets: 'implemented',
+    doorHelper: 'integrated-by-main-runtime',
+    supportActivation: 'host-authoritative-training-integration',
+    weaponInteraction: 'canonical-training-integration',
+  });
 
   // Suspended acoustic baffles and side ventilation sell the large industrial
   // interior while leaving the floor plan broad and readable.
@@ -1521,7 +1937,7 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     makeEmissiveOnly(light);
     root.add(light);
   }
-  const ambient = new THREE.HemisphereLight(0xe8f5f5, 0x253137, 0.68);
+  const ambient = new THREE.HemisphereLight(0xf2ffff, 0x4f626a, 1.24);
   ambient.name = 'gun-range-moderate-ambient';
   ambient.userData.presentationOnly = true;
   root.add(ambient);
@@ -1548,6 +1964,14 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     makeEmissiveOnly(light);
     neonLights.push(light);
     root.add(light);
+  }
+  const perimeterNeon = neonMaterials[1]!;
+  for (const side of [-1, 1] as const) {
+    box(builder, 'gun-range-floor-neon-strip', [side * 19.55, 0.12, -14], [0.34, 0.14, 60], perimeterNeon, { solid: false, shots: false, cast: false });
+    box(builder, 'gun-range-ceiling-neon-strip', [side * 19.55, 6.68, -14], [0.34, 0.14, 60], perimeterNeon, { solid: false, shots: false, cast: false });
+  }
+  for (const [index, z] of [-37, -21, -5, 11].entries()) {
+    box(builder, 'gun-range-ceiling-neon-rib', [0, 6.69, z], [29, 0.1, 0.22], neonMaterials[index]!, { solid: false, shots: false, cast: false });
   }
   root.userData.gunRangeNeonMaterials = neonMaterials;
   root.userData.gunRangeNeonLights = neonLights;
@@ -1577,6 +2001,14 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   ] as const) {
     for (const x of [-7, 0, 7]) rangeTarget(builder, targets, `${band}-${x}`, x, z, score, band);
   }
+  const movingTargetSign = rangeSign('MOVING 250 PTS', 0xf4c44f, 'gun-range-moving-score-sign', [4.2, 0.72]);
+  if (movingTargetSign) {
+    movingTargetSign.position.set(16.2, 2.75, -29);
+    root.add(movingTargetSign);
+  }
+  box(builder, 'gun-range-lateral-target-rail', [0, 3.02, -29], [25, 0.12, 0.16], dark, { solid: false, shots: false, cast: false });
+  lateralRangeTarget(builder, targets, 'lateral-cyan', -6.2, -29, 0, 0x56e7df);
+  lateralRangeTarget(builder, targets, 'lateral-amber', 6.2, -29, Math.PI, 0xffb347);
 
   // Subtle live wall-penetration lab: four isolated lanes use explicit material
   // and thickness contracts, with a scored plate behind every panel.
@@ -1624,15 +2056,9 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     stationRoot.userData.stationId = station.id;
     stationRoot.userData.weapon = station.weapon;
     stationRoot.userData.label = `${station.label} / ${WEAPONS[station.weapon].name}`;
-    const weapon = buildWeaponModel(station.weapon, true, false);
-    weapon.name = `gun-range-rack-weapon-${station.weapon}`;
-    weapon.rotation.set(0.08, Math.PI / 2, -0.08);
-    weapon.scale.setScalar(station.weapon === 'lmg' ? 0.52 : 0.58);
-    weapon.traverse((node) => {
-      node.userData.presentationOnly = true;
-      if (node instanceof THREE.Mesh) node.raycast = () => undefined;
-    });
-    stationRoot.add(weapon);
+    // Rack presentation fails closed until the selected-arena deployment gate
+    // atomically attaches the already-authored world-LOD firearm family.
+    stationRoot.userData.rackPresentationSource = 'fail-closed-unloaded';
     const label = rangeSign(`${station.label} · ${WEAPONS[station.weapon].name.toUpperCase()}`, WEAPONS[station.weapon].color, `gun-range-station-label-${station.weapon}`, [4.15, 0.62]);
     if (label) {
       label.position.set(0, 0.78, 0.65);
@@ -1646,6 +2072,14 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     stationRoot.add(stationLight);
     root.add(stationRoot);
   }
+
+  root.userData.gunRangeRackPresentation = Object.freeze({
+    status: 'unloaded',
+    required: GUN_RANGE_WEAPON_STATIONS.length,
+    ready: 0,
+    source: 'fail-closed',
+    error: null,
+  });
 
   box(builder, 'gun-range-armory-header', [0, 3.8, 9.45], [32, 1.15, 0.25], dark, { solid: false, shots: false });
   box(builder, 'gun-range-live-fire-sign', [0, 4.45, 1.0], [12, 0.75, 0.22], redSafety, { solid: false, shots: false });
@@ -1662,6 +2096,8 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     liveFireSign.position.set(0, 4.45, 1.13);
     root.add(liveFireSign);
   }
+
+  root.userData.gunRangePresentationBatches = batchPresentationOnlyBoxes(root, 'gun-range');
 
   return {
     id: 'gun-range',
@@ -1680,7 +2116,7 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     houses: [],
     breakableWindows: [],
     physicalCover: [],
-    bounds: { minX: -20, maxX: 20, minZ: -48, maxZ: 19.5 },
+    bounds: { minX: -20, maxX: 100, minZ: -48, maxZ: 38 },
     houseTelemetry: emptyTelemetry(),
   };
 }
@@ -1699,13 +2135,41 @@ export function updateGunRangePresentation(root: THREE.Object3D, nowMs: number):
     light.color.copy(materials[index % materials.length].color);
   });
   const bayMaterial = root.userData.gunRangeBayLightMaterial as THREE.MeshStandardMaterial | undefined;
-  if (bayMaterial) bayMaterial.emissiveIntensity = 2.25 + (Math.sin(nowMs * 0.00062) * 0.5 + 0.5) * 0.55;
-  const targetLights = root.userData.gunRangeMovingTargetLights as THREE.Mesh[] | undefined;
-  targetLights?.forEach((light, index) => {
-    const phase = nowMs * 0.00135 + Number(light.userData.targetLightPhase ?? index);
-    light.position.x = Math.sin(phase) * 0.28;
-    light.position.y = 1.65 + Math.cos(phase * 0.73) * 0.12;
-    (light.material as THREE.MeshBasicMaterial).opacity = 0.58 + (Math.sin(phase * 1.4) * 0.5 + 0.5) * 0.34;
+  if (bayMaterial) bayMaterial.emissiveIntensity = 3.7 + (Math.sin(nowMs * 0.00062) * 0.5 + 0.5) * 0.9;
+  const lateralTargets = root.userData.gunRangeLateralTargets as THREE.Group[] | undefined;
+  lateralTargets?.forEach((target) => {
+    const phase = nowMs / 1_000 * Math.PI * 2 * Number(target.userData.lateralFrequencyHz)
+      + Number(target.userData.lateralPhaseRadians);
+    target.position.x = Number(target.userData.lateralOriginX)
+      + Math.sin(phase) * Number(target.userData.lateralAmplitudeM);
+  });
+  const testDummies = root.userData.gunRangeTestDummies as GunRangeTestDummyPresentation[] | undefined;
+  testDummies?.forEach(({ root: dummy, definition }, index) => {
+    const pose = gunRangeTestBayDummyPose(definition, nowMs);
+    dummy.position.set(
+      pose.position.x,
+      pose.position.y + Math.abs(Math.sin(nowMs * 0.004 + index)) * 0.025,
+      pose.position.z,
+    );
+    dummy.rotation.y = pose.yawRadians;
+    // Rigged operators (the canonical in-match family) animate through the
+    // shared pose pipeline, exactly like live combatants; the painted robot's
+    // named-limb walk is only for the pre-rig fixture.
+    if (dummy.userData.riggedOperator === true) {
+      poseOperator(dummy, 'stand', definition.speedMps, nowMs * 0.008 + index, Math.min(1, 0.016 * 24), 0, 0.016);
+      return;
+    }
+    const arms = [
+      dummy.getObjectByName(`gun-range-${definition.id}-arm--1`),
+      dummy.getObjectByName(`gun-range-${definition.id}-arm-1`),
+    ];
+    const legs = [
+      dummy.getObjectByName(`gun-range-${definition.id}-leg--1`),
+      dummy.getObjectByName(`gun-range-${definition.id}-leg-1`),
+    ];
+    const stride = Math.sin(nowMs * 0.0045 + index * 0.8) * 0.26;
+    arms.forEach((limb, limbIndex) => { if (limb) limb.rotation.x = limbIndex === 0 ? stride : -stride; });
+    legs.forEach((limb, limbIndex) => { if (limb) limb.rotation.x = limbIndex === 0 ? -stride : stride; });
   });
 }
 
@@ -1870,9 +2334,22 @@ function terminalSurfaceMaterial(
 function prismGeometryXZ(points: Array<[number, number]>, thickness: number): THREE.BufferGeometry {
   const half = thickness / 2;
   const positions: number[] = [];
+  const uvs: number[] = [];
+  const minimumX = Math.min(...points.map(([x]) => x));
+  const maximumX = Math.max(...points.map(([x]) => x));
+  const minimumZ = Math.min(...points.map(([, z]) => z));
+  const maximumZ = Math.max(...points.map(([, z]) => z));
+  const extentX = Math.max(Number.EPSILON, maximumX - minimumX);
+  const extentZ = Math.max(Number.EPSILON, maximumZ - minimumZ);
   const indices: number[] = [];
   for (const y of [-half, half]) {
-    for (const [x, z] of points) positions.push(x, y, z);
+    for (const [x, z] of points) {
+      positions.push(x, y, z);
+      // The shared top/side vertices use a stable planar wing projection. The
+      // thin edge may stretch slightly, but every textured vertex now has a
+      // finite UV and WebGPU never has to synthesize a missing attribute.
+      uvs.push((x - minimumX) / extentX, (z - minimumZ) / extentZ);
+    }
   }
   const count = points.length;
   for (let index = 1; index < count - 1; index += 1) {
@@ -1885,6 +2362,7 @@ function prismGeometryXZ(points: Array<[number, number]>, thickness: number): TH
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
@@ -2046,9 +2524,11 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     position: [number, number, number],
     size: [number, number, number],
     material: THREE.MeshStandardMaterial,
+    collisionAuthorityId: string,
   ): THREE.Mesh => {
     const mesh = box(builder, name, position, size, material.clone());
     mesh.userData.skylineQualityPlaceholder = true;
+    mesh.userData.skylineCollisionAuthorityId = collisionAuthorityId;
     return mesh;
   };
   type SkylineWalkablePlatform = Readonly<{
@@ -2069,7 +2549,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     options: Readonly<{ qualityPlaceholder?: boolean; qualityPresentationName?: string }> = {},
   ): THREE.Mesh => {
     const mesh = options.qualityPlaceholder
-      ? qualityPlaceholderBox(presentationName, position, size, material)
+      ? qualityPlaceholderBox(presentationName, position, size, material, options.qualityPresentationName ?? id)
       : box(builder, presentationName, position, size, material);
     const bounds = builder.physicsColliders[builder.physicsColliders.length - 1];
     walkablePlatforms.push({
@@ -2114,6 +2594,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   builder.ballisticSurfaceSequence += 1;
   builder.shotSurfaces.push(tarmacSurface);
   tarmac.userData.ballisticSurfaceId = tarmacSurface.id;
+  tarmac.userData.ballisticMaterial = tarmacSurface.material;
 
   const addPalletStack = (id: string, x: number, z: number, alongX: boolean): void => {
     for (let level = 0; level < 4; level += 1) {
@@ -2508,7 +2989,13 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   // leaf, frame, header, threshold or sign may make this route read as an
   // opaque portal.
 
-  qualityPlaceholderBox('skyline-jetliner-fuselage-top', [0, 5.8, 2.0], [36.0, 1.2, 4.2], planeHullMat);
+  qualityPlaceholderBox(
+    'skyline-jetliner-fuselage-top',
+    [0, 5.8, 2.0],
+    [36.0, 1.2, 4.2],
+    planeHullMat,
+    'jetliner-fuselage-roof',
+  );
   addWalkablePlatform('jetliner-cabin', 'skyline-jetliner-cabin-floor', [0, 2.4, 2.0], [35.0, 0.3, 3.8], floorMat);
   // Split the north fuselage wall around the jetbridge doorway. A single solid
   // wall made the authored bridge-to-cabin route stop outside the aircraft.
@@ -2539,7 +3026,11 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     [x, 4.3, 2],
     [0, 0, Math.PI / 2],
   ));
-  for (const shell of fuselageShells) shell.userData.assetOwner = 'skyline-terminal';
+  for (const shell of fuselageShells) {
+    shell.userData.assetOwner = 'skyline-terminal';
+    shell.userData.rustworksDetail = 'core';
+    shell.userData.skylineCollisionAuthorityId = 'jetliner-fuselage-roof';
+  }
   // The exterior half-cylinder is intentionally FrontSide. From the cabin its
   // backfaces disappear, which made the aircraft roof look absent in Quality.
   // A slightly inset, separately split BackSide shell restores the interior
@@ -2557,8 +3048,10 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   ));
   for (const shell of cabinCeilingShells) {
     shell.userData.assetOwner = 'skyline-terminal';
+    shell.userData.rustworksDetail = 'core';
     shell.userData.interiorFaceOrientation = 'back-side';
     shell.userData.boardingAperturePreserved = true;
+    shell.userData.skylineCollisionAuthorityId = 'jetliner-fuselage-roof';
   }
   detailBox('quality-aircraft', 'skyline-quality-fuselage-door-crown', [0, 6.08, 2], [3.8, 0.58, 4.15], planeHullMat, 'quality');
   const qualityNose = detailMesh(
@@ -2572,6 +3065,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   );
   qualityNose.scale.set(2.45, 2.1, 2.1);
   qualityNose.userData.assetOwner = 'skyline-terminal';
+  qualityNose.userData.rustworksDetail = 'core';
   const tailShape = new THREE.Shape();
   tailShape.moveTo(0, 0);
   tailShape.lineTo(3.1, 0);
@@ -2673,8 +3167,8 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   };
   addWingAuthority('port', 3.6, 16.8, 'skyline-quality-wing-port');
   addWingAuthority('starboard', 0.4, -16.8, 'skyline-quality-wing-starboard');
-  qualityPlaceholderBox('skyline-jetliner-engine-1', [0, 1.6, 12.0], [2.2, 2.2, 4.5], engineMat);
-  qualityPlaceholderBox('skyline-jetliner-engine-2', [0, 1.6, -8.0], [2.2, 2.2, 4.5], engineMat);
+  qualityPlaceholderBox('skyline-jetliner-engine-1', [0, 1.6, 12.0], [1.9, 1.9, 4.1], engineMat, 'jetliner-engine-nacelles');
+  qualityPlaceholderBox('skyline-jetliner-engine-2', [0, 1.6, -8.0], [1.9, 1.9, 4.1], engineMat, 'jetliner-engine-nacelles');
   const portWing = detailMesh(
     'quality-aircraft',
     'skyline-quality-wing-port',
@@ -2683,6 +3177,8 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     [0, 2.82, 3.6],
   );
   portWing.userData.assetOwner = 'skyline-terminal';
+  portWing.userData.rustworksDetail = 'core';
+  portWing.userData.skylineCollisionAuthorityId = 'skyline-quality-wing-port';
   const starboardWing = detailMesh(
     'quality-aircraft',
     'skyline-quality-wing-starboard',
@@ -2691,6 +3187,8 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     [0, 2.82, 0.4],
   );
   starboardWing.userData.assetOwner = 'skyline-terminal';
+  starboardWing.userData.rustworksDetail = 'core';
+  starboardWing.userData.skylineCollisionAuthorityId = 'skyline-quality-wing-starboard';
   detailBox('aircraft-skin', 'skyline-wingtip-port', [0, 2.99, 18.42], [5.1, 0.08, 0.14], planeStripeMat);
   detailBox('aircraft-skin', 'skyline-wingtip-starboard', [0, 2.99, -14.42], [5.1, 0.08, 0.14], planeStripeMat);
   detailBox('aircraft-skin', 'skyline-wing-navigation-port', [-2.35, 3.06, 18.48], [0.42, 0.16, 0.16], practicalMat);
@@ -2700,8 +3198,9 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   engineNacelles.castShadow = true;
   engineNacelles.receiveShadow = true;
   engineNacelles.userData.presentationOnly = true;
-  engineNacelles.userData.rustworksDetail = 'quality';
+  engineNacelles.userData.rustworksDetail = 'core';
   engineNacelles.userData.skylineCluster = 'aircraft-skin';
+  engineNacelles.userData.skylineCollisionAuthorityId = 'jetliner-engine-nacelles';
   const nacelleMatrix = new THREE.Matrix4();
   const nacelleRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, Math.PI / 2));
   for (const [index, z] of [12, -8].entries()) {
@@ -2730,7 +3229,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   detailBox('floor-language', 'skyline-airstair-comb-foot', [21.35, 0.08, 2], [0.5, 0.04, 2.15], hazardMat);
   detailBox('floor-language', 'skyline-airstair-comb-top', [17.45, 2.7, 2], [0.5, 0.04, 2.15], hazardMat);
 
-  qualityPlaceholderBox('skyline-fuel-trailer', [-10, 1.2, 18], [5.8, 2.4, 2.6], hazardMat);
+  qualityPlaceholderBox('skyline-fuel-trailer', [-10, 1.5, 18], [5.2, 2.2, 2.2], hazardMat, 'fuel-trailer');
   const fuelTank = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 5.2, 14), cargoMat);
   fuelTank.name = 'skyline-fuel-trailer-tank';
   fuelTank.rotation.z = Math.PI / 2;
@@ -2739,9 +3238,10 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   fuelTank.receiveShadow = true;
   fuelTank.userData.presentationOnly = true;
   fuelTank.userData.impactSurface = 'metal';
-  fuelTank.userData.rustworksDetail = 'quality';
+  fuelTank.userData.rustworksDetail = 'core';
   fuelTank.userData.skylineCluster = 'service-equipment';
   fuelTank.userData.assetOwner = 'skyline-terminal';
+  fuelTank.userData.skylineCollisionAuthorityId = 'fuel-trailer';
   fuelTank.raycast = () => undefined;
   root.add(fuelTank);
   detailBox('service-equipment', 'skyline-fuel-trailer-chassis', [-10, 0.38, 18], [6.1, 0.28, 2.3], structureMat, 'performance');
@@ -2767,7 +3267,9 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     [12, 26, cargoMat],
     [0, 28, trimMat],
   ] as const) {
-    qualityPlaceholderBox(`skyline-tarmac-cargo-${x}-${z}`, [x, 1.3, z], [4.5, 2.6, 2.6], col);
+    const cargoAuthorityId = `tarmac-cargo-${x}-${z}`;
+    qualityPlaceholderBox(`skyline-tarmac-cargo-${x}-${z}-lower`, [x, 0.975, z], [4.5, 1.95, 2.6], col, cargoAuthorityId);
+    qualityPlaceholderBox(`skyline-tarmac-cargo-${x}-${z}-upper`, [x + 0.15, 2.275, z], [3.74, 0.65, 2.6], col, cargoAuthorityId);
     const shell = detailMesh(
       'service-equipment',
       `skyline-quality-uld-${x}-${z}`,
@@ -2776,6 +3278,8 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
       [x, 0, z - 1.3],
     );
     shell.userData.assetOwner = 'skyline-terminal';
+    shell.userData.rustworksDetail = 'core';
+    shell.userData.skylineCollisionAuthorityId = cargoAuthorityId;
     detailBox('service-equipment', `skyline-uld-rail-${x}-${z}`, [x, 1.42, z + 1.34], [4.15, 0.12, 0.08], hazardMat, 'quality');
   }
 
@@ -2817,7 +3321,40 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     { id: 'wood-pallet-stack-east', bounds: { minX: 22.7, maxX: 25.3, minZ: 19.4, maxZ: 24.6 }, blocksMovement: true, blocksShots: true },
   ];
 
-  root.userData.skylinePresentationBatches = batchPresentationOnlyBoxes(root);
+  root.userData.skylinePresentationBatches = batchPresentationOnlyBoxes(root, 'skyline');
+  const collisionPresentationAudit: Array<Readonly<{
+    placeholder: string;
+    authorityId: string | null;
+    presentationNames: readonly string[];
+  }>> = [];
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh) || node.userData.skylineQualityPlaceholder !== true) return;
+    const authorityId = node.userData.skylineCollisionAuthorityId as string | undefined;
+    const presentationNames: string[] = [];
+    if (authorityId) {
+      root.traverse((candidate) => {
+        if (candidate !== node
+          && candidate instanceof THREE.Mesh
+          && candidate.userData.skylineQualityPlaceholder !== true
+          && candidate.userData.skylineCollisionAuthorityId === authorityId) {
+          presentationNames.push(candidate.name);
+        }
+      });
+    }
+    collisionPresentationAudit.push(Object.freeze({
+      placeholder: node.name,
+      authorityId: authorityId ?? null,
+      presentationNames: Object.freeze(presentationNames.sort()),
+    }));
+  });
+  root.userData.skylineCollisionPresentationAudit = Object.freeze({
+    version: 'hf-188-profile-authority-v1',
+    entries: Object.freeze(collisionPresentationAudit.sort((left, right) => left.placeholder.localeCompare(right.placeholder))),
+    unownedPlaceholders: Object.freeze(collisionPresentationAudit
+      .filter((entry) => !entry.authorityId || entry.presentationNames.length === 0)
+      .map((entry) => entry.placeholder)
+      .sort()),
+  });
   root.userData.skylineOpeningAudit = skylineOpeningParityAudit(builder, [
     {
       id: 'terminal-gate',

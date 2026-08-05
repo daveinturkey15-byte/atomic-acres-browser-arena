@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
 import { execFileSync, spawn } from 'node:child_process';
 import { inflateSync } from 'node:zlib';
 import { chromium } from '@playwright/test';
@@ -21,8 +21,12 @@ if (trackedWorktreeDirty) throw new Error('Pass 64 hardware WebGPU QA requires a
 const cases = process.env.PASS64_ARENAS
   ? process.env.PASS64_ARENAS.split(',').map((value) => value.trim()).filter(Boolean)
   : ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range'];
-const artifactRoot = 'artifacts/pass64/playable-webgpu';
+const publishedArtifactRoot = 'artifacts/pass64/playable-webgpu';
+const artifactRunId = `${sourceRevision.slice(0, 12)}-${Date.now()}-${process.pid}`;
+const artifactRoot = `artifacts/pass64/.playable-webgpu-run-${artifactRunId}`;
+const artifactBackupRoot = `artifacts/pass64/.playable-webgpu-backup-${artifactRunId}`;
 await mkdir(artifactRoot, { recursive: true });
+let artifactsPromoted = false;
 
 function pngLuminance(png) {
   if (png.toString('ascii', 1, 4) !== 'PNG') throw new Error('ROI capture is not PNG');
@@ -103,6 +107,141 @@ function pngLuminance(png) {
   };
 }
 
+const PRESENTATION_FRESHNESS_TIMEOUT_MS = 15_000;
+
+function concisePresentationState(state) {
+  const presentation = state?.render?.runtime?.presentation;
+  const playableScene = state?.render?.playableScene;
+  return {
+    frameCount: state?.frameCount ?? null,
+    cameraId: playableScene?.deterministicReview?.cameraId ?? null,
+    cameraPosition: playableScene?.cameraComposition?.position ?? null,
+    cameraInsideCollider: playableScene?.cameraComposition?.insideHorizontalCollider ?? null,
+    status: presentation?.status ?? null,
+    submissionSequence: presentation?.submissionSequence ?? null,
+    completedSequence: presentation?.completedSequence ?? null,
+    pendingForMs: presentation?.pendingForMs ?? null,
+    completionFailures: presentation?.completionFailures ?? null,
+    lastFailure: presentation?.lastFailure ?? null,
+    backpressureActive: presentation?.backpressureActive ?? null,
+    skippedSubmissions: presentation?.skippedSubmissions ?? null,
+    deviceLost: state?.render?.runtime?.deviceLost ?? null,
+    uncapturedErrors: state?.render?.runtime?.uncapturedErrors ?? null,
+  };
+}
+
+async function freshPresentationDiagnostics(page) {
+  return page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot() ?? null)
+    .then(concisePresentationState)
+    .catch((error) => ({ snapshotError: error instanceof Error ? error.message : String(error) }));
+}
+
+async function applyAndAwaitFreshPresentation(page, action, label) {
+  const started = await page.evaluate((requestedAction) => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    const before = api.snapshot();
+    let applied = true;
+    if (requestedAction.kind === 'review-camera') {
+      applied = api.setArenaReviewCamera(requestedAction.cameraId);
+    } else {
+      api.setCaptureCameraPose(...requestedAction.pose);
+    }
+    const afterMutation = api.snapshot();
+    const summarize = (state) => ({
+      frameCount: state.frameCount,
+      cameraId: state.render.playableScene.deterministicReview.cameraId,
+      cameraPosition: state.render.playableScene.cameraComposition.position,
+      cameraInsideCollider: state.render.playableScene.cameraComposition.insideHorizontalCollider,
+      status: state.render.runtime.presentation.status,
+      submissionSequence: state.render.runtime.presentation.submissionSequence,
+      completedSequence: state.render.runtime.presentation.completedSequence,
+      completionFailures: state.render.runtime.presentation.completionFailures,
+      lastFailure: state.render.runtime.presentation.lastFailure,
+      deviceLost: state.render.runtime.deviceLost,
+      uncapturedErrors: state.render.runtime.uncapturedErrors,
+    });
+    return { applied, before: summarize(before), afterMutation: summarize(afterMutation) };
+  }, action);
+  if (!started.applied) throw new Error(`${label} could not apply presentation action ${JSON.stringify(action)}`);
+
+  const expectedCameraId = action.kind === 'review-camera' ? action.cameraId : null;
+  try {
+    await page.waitForFunction(({ beforeFrame, beforeSubmission, expectedCameraId }) => {
+      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+      const presentation = state?.render?.runtime?.presentation;
+      return state?.render?.playableScene?.deterministicReview?.cameraId === expectedCameraId
+        && state?.frameCount > beforeFrame
+        && presentation?.submissionSequence > beforeSubmission;
+    }, {
+      beforeFrame: started.before.frameCount,
+      beforeSubmission: started.before.submissionSequence,
+      expectedCameraId,
+    }, { timeout: PRESENTATION_FRESHNESS_TIMEOUT_MS });
+  } catch (error) {
+    const stalled = await freshPresentationDiagnostics(page);
+    throw new Error(`${label} timed out before a post-mutation WebGPU submission was admitted: ${JSON.stringify({ action, started, stalled })}`, { cause: error });
+  }
+
+  const admitted = concisePresentationState(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot()));
+  try {
+    await page.waitForFunction(({ targetSequence, expectedCameraId }) => {
+      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+      const presentation = state?.render?.runtime?.presentation;
+      return state?.render?.playableScene?.deterministicReview?.cameraId === expectedCameraId
+        && state?.render?.playableScene?.cameraComposition?.insideHorizontalCollider === false
+        && presentation?.completedSequence >= targetSequence
+        && presentation?.status === 'healthy'
+        && presentation?.completionFailures === 0
+        && state?.render?.runtime?.deviceLost === false
+        && state?.render?.runtime?.uncapturedErrors === 0;
+    }, {
+      targetSequence: admitted.submissionSequence,
+      expectedCameraId,
+    }, { timeout: PRESENTATION_FRESHNESS_TIMEOUT_MS });
+  } catch (error) {
+    const stalled = await freshPresentationDiagnostics(page);
+    throw new Error(`${label} timed out before admitted WebGPU submission ${admitted.submissionSequence} completed cleanly: ${JSON.stringify({ action, started, admitted, stalled })}`, { cause: error });
+  }
+
+  const completed = concisePresentationState(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot()));
+  return {
+    action,
+    before: started.before,
+    afterMutation: started.afterMutation,
+    admitted,
+    completed,
+    admittedSubmissionDelta: admitted.submissionSequence - started.before.submissionSequence,
+    completedSubmissionDelta: completed.completedSequence - started.before.completedSequence,
+  };
+}
+
+async function promoteArtifactDirectory() {
+  let previousCorpusMoved = false;
+  try {
+    if (existsSync(publishedArtifactRoot)) {
+      await rename(publishedArtifactRoot, artifactBackupRoot);
+      previousCorpusMoved = true;
+    }
+    await rename(artifactRoot, publishedArtifactRoot);
+    artifactsPromoted = true;
+  } catch (error) {
+    let rollbackFailure = null;
+    if (previousCorpusMoved && !existsSync(publishedArtifactRoot) && existsSync(artifactBackupRoot)) {
+      try {
+        await rename(artifactBackupRoot, publishedArtifactRoot);
+      } catch (rollbackError) {
+        rollbackFailure = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
+      }
+    }
+    throw new Error(`WebGPU evidence promotion failed without publishing a mixed corpus: ${JSON.stringify({ artifactRunId, rollbackFailure })}`, { cause: error });
+  }
+  if (previousCorpusMoved) {
+    await rm(artifactBackupRoot, { recursive: true, force: true }).catch((error) => {
+      console.warn(`[Pass 64 WebGPU evidence backup retained at ${artifactBackupRoot}]`, error);
+    });
+  }
+}
+
 const server = await createServer({
   server: { host: '127.0.0.1', port, strictPort: true },
   logLevel: 'error',
@@ -141,7 +280,7 @@ try {
     page.on('pageerror', (error) => errors.push(error.message));
     page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
     page.on('request', (request) => { if (request.resourceType() === 'script') scripts.push(request.url()); });
-    await page.goto(`http://127.0.0.1:${port}/?release=latest&renderer=webgpu&map=${arenaId}&render=blender&grass=on&mist=on&seed=6401`);
+    await page.goto(`http://127.0.0.1:${port}/?release=latest&renderer=webgpu&externalServices=off&map=${arenaId}&render=blender&grass=on&mist=on&seed=6401`);
     await page.waitForFunction(() => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
       const state = api?.snapshot();
@@ -156,20 +295,50 @@ try {
     });
     await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().gameStarted === true, undefined, { timeout: 30_000 });
     await page.waitForTimeout(500);
-    const overview = await page.evaluate(() => {
+    const overviewCameraId = await page.evaluate(() => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
-      const cameraId = api.snapshot().render.playableScene.appliedArenaVisualPolicy.reviewCameraIds
-        .find((id) => id.includes('overview'));
-      return { cameraId, selected: typeof cameraId === 'string' && api.setArenaReviewCamera(cameraId) };
+      return api.snapshot().render.playableScene.appliedArenaVisualPolicy.reviewCameraIds
+        .find((id) => id.includes('overview')) ?? null;
     });
-    if (!overview.selected) throw new Error(`${arenaId} deterministic overview camera is missing`);
-    await page.waitForTimeout(350);
-    const performanceBudget = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.sampleArenaPerformanceBudget());
+    if (!overviewCameraId) throw new Error(`${arenaId} deterministic overview camera is missing`);
+    const overviewPresentation = await applyAndAwaitFreshPresentation(
+      page,
+      { kind: 'review-camera', cameraId: overviewCameraId },
+      `${arenaId} deterministic overview`,
+    );
+    const overview = { cameraId: overviewCameraId, selected: true, presentation: overviewPresentation };
+    let performanceBudget;
+    try {
+      performanceBudget = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.sampleArenaPerformanceBudget());
+    } catch (error) {
+      const failureState = await page.evaluate(() => {
+        const api = window.__ATOMIC_ACRES_DEBUG__;
+        const state = api?.snapshot();
+        return {
+          bootstrap: state?.bootstrap,
+          gameStarted: state?.gameStarted,
+          matchPhase: state?.matchPhase,
+          menuLifecycle: state?.menuLifecycle,
+          frameCount: state?.frameCount,
+          framePacing: state?.render?.framePacing,
+          adaptiveQuality: state?.render?.adaptiveQuality,
+          runtime: state?.render?.runtime,
+          playableScene: state?.render?.playableScene,
+          residency: api?.sampleRendererResidency(),
+        };
+      }).catch((snapshotError) => ({ snapshotError: String(snapshotError) }));
+      throw new Error(`${arenaId} hardware performance sampler failed: ${String(error)}; state=${JSON.stringify(failureState)}`);
+    }
     const evidence = await page.evaluate(async () => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
       const state = api.snapshot();
       return {
         runtime: state.render.runtime,
+        shadowScheduling: {
+          autoUpdate: state.render.shadowAutoUpdate,
+          needsUpdate: state.render.shadowNeedsUpdate,
+          boundedDynamicRefreshes: state.render.staticShadowDynamicRefreshes,
+        },
         post: state.render.atomicSignal,
         playableScene: state.render.playableScene,
         arenaStreaming: state.arenaSelection.streaming,
@@ -184,8 +353,13 @@ try {
     });
     const uniqueErrors = [...new Set(errors)];
     if (uniqueErrors.length > 0) throw new Error(`${arenaId} emitted browser/GPU errors: ${uniqueErrors[0]}`);
-    if (evidence.runtime.actualBackend !== 'webgpu' || evidence.runtime.softwareAdapter || evidence.runtime.deviceLost) {
+    if (evidence.runtime.actualBackend !== 'webgpu' || evidence.runtime.softwareAdapter || evidence.runtime.deviceLost
+      || evidence.runtime.canvasAlphaMode !== 'opaque'
+      || evidence.runtime.presentation.status !== 'healthy') {
       throw new Error(`${arenaId} did not retain healthy hardware WebGPU`);
+    }
+    if (evidence.shadowScheduling.autoUpdate || evidence.shadowScheduling.needsUpdate) {
+      throw new Error(`${arenaId} did not retain bounded per-light static shadow scheduling: ${JSON.stringify(evidence.shadowScheduling)}`);
     }
     if (evidence.playableScene.route !== 'complete-playable-game'
       || evidence.playableScene.authoritativeArenaRoots !== 1
@@ -241,6 +415,10 @@ try {
     }
     if (performanceBudget.steadyStateFps < 55) {
       throw new Error(`${arenaId} steady-state hardware WebGPU frame rate is below 55 FPS: ${JSON.stringify(performanceBudget)}`);
+    }
+    if (performanceBudget.presentationFrameP95Ms > evidence.playableScene.budgetAudit.limits.gpuFrameP95Ms * 2
+      || performanceBudget.queueSubmissionP95Ms > performanceBudget.frameHitchThresholdMs) {
+      throw new Error(`${arenaId} exceeded the player-visible frame or queue-freshness bound: ${JSON.stringify(performanceBudget)}`);
     }
     const requiredPerformanceNumbers = [
       performanceBudget.cpuFrameP50Ms,
@@ -312,20 +490,30 @@ try {
       const cameraIds = arenaId === 'skyline-terminal'
         ? ['terminal-concourse-wall-closed', 'terminal-boarding-open']
         : ['nuke-town-aqua-wall-closed', 'nuke-town-aqua-door-open'];
-      const closedSelected = await page.evaluate((id) => window.__ATOMIC_ACRES_DEBUG__.setArenaReviewCamera(id), cameraIds[0]);
-      if (!closedSelected) throw new Error(`${arenaId} solid-wall review camera missing`);
-      await page.waitForTimeout(350);
+      const closedPresentation = await applyAndAwaitFreshPresentation(
+        page,
+        { kind: 'review-camera', cameraId: cameraIds[0] },
+        `${arenaId} solid-wall review`,
+      );
       const closedPng = await page.screenshot({ path: `${artifactRoot}/${arenaId}-solid-wall-roi.png`, clip, animations: 'disabled' });
-      const openSelected = await page.evaluate((id) => window.__ATOMIC_ACRES_DEBUG__.setArenaReviewCamera(id), cameraIds[1]);
-      if (!openSelected) throw new Error(`${arenaId} open-door review camera missing`);
-      await page.waitForTimeout(350);
+      const openPresentation = await applyAndAwaitFreshPresentation(
+        page,
+        { kind: 'review-camera', cameraId: cameraIds[1] },
+        `${arenaId} open-door review`,
+      );
       const openPng = await page.screenshot({ path: `${artifactRoot}/${arenaId}-open-door-roi.png`, clip, animations: 'disabled' });
-      roi = { solidWall: pngLuminance(closedPng), openDoor: pngLuminance(openPng) };
+      roi = {
+        solidWall: { ...pngLuminance(closedPng), presentation: closedPresentation },
+        openDoor: { ...pngLuminance(openPng), presentation: openPresentation },
+      };
     }
     receipts.push({ arenaId, scripts: arenaChunks, errors: uniqueErrors, overview, composition, performanceBudget, ...evidence, roi });
     await page.close();
   }
-  const switchPage = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
+  // The Pass 64 UAF reproduced reliably at Dave's 2560-class owner-play load,
+  // not at the old low-resolution switch smoke. Keep this lifecycle stress at
+  // the frozen primary HITL resolution so memory/transient pressure is real.
+  const switchPage = await browser.newPage({ viewport: { width: 2560, height: 1440 }, deviceScaleFactor: 1 });
   const switchScripts = [];
   const switchErrors = [];
   switchPage.on('pageerror', (error) => switchErrors.push(error.message));
@@ -333,43 +521,120 @@ try {
   switchPage.on('request', (request) => {
     if (request.resourceType() === 'script' && /\/rendering\/arenas\//.test(request.url())) switchScripts.push(request.url());
   });
-  await switchPage.goto(`http://127.0.0.1:${port}/?renderer=webgpu&map=atomic-acres&render=blender&seed=6401`);
+  await switchPage.goto(`http://127.0.0.1:${port}/?renderer=webgpu&externalServices=off&map=atomic-acres&render=blender&seed=6401`);
   await switchPage.waitForFunction(() => {
-    const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
-    return state?.weaponReady === true && state?.bootstrap?.stage === 'ready';
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    const state = api?.snapshot();
+    const catalog = api?.sampleWeaponCatalogReadiness();
+    const preparation = state?.bootstrap?.menuDeploymentAssetsProfile;
+    return state?.weaponReady === true
+      && state?.bootstrap?.stage === 'ready'
+      && preparation?.completed === true
+      && preparation?.error === null
+      && catalog?.prewarming === false
+      && catalog?.loaded === catalog?.available
+      && catalog?.gpuReady === catalog?.available
+      && catalog?.retainedCount === catalog?.available;
   }, undefined, { timeout: 60_000 });
+  const deferredMenuState = await switchPage.evaluate(() => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    const state = api.snapshot();
+    const presentation = state.render.runtime.presentation;
+    return {
+      constructionCount: state.arenaSelection.streaming.constructionCount,
+      residentArenaRoots: state.arenaSelection.streaming.residentArenaRoots,
+      submissionSequence: presentation.submissionSequence,
+      completedSequence: presentation.completedSequence,
+      presentationStatus: presentation.status,
+      completionFailures: presentation.completionFailures,
+      deviceLost: state.render.runtime.deviceLost,
+      uncapturedErrors: state.render.runtime.uncapturedErrors,
+      gameplayArena: document.documentElement.dataset.gameplayArena,
+      previewMode: document.documentElement.dataset.menuPreview,
+      menuVisible: document.querySelector('#menu')?.classList.contains('hidden') === false,
+      gameStarted: state.gameStarted,
+      preparation: state.bootstrap.menuDeploymentAssetsProfile,
+      weaponCatalog: api.sampleWeaponCatalogReadiness(),
+    };
+  });
+  if (deferredMenuState.constructionCount !== 0
+    || deferredMenuState.residentArenaRoots !== 0
+    // A single fenced TSL/HDR submission compiles the isolated retained-asset
+    // vocabulary after the prerecorded video is visible. It is not a gameplay
+    // frame: no arena root exists, the menu remains visible, and the exact
+    // completion frontier must already be drained before this evidence sample.
+    || deferredMenuState.submissionSequence !== 1
+    || deferredMenuState.completedSequence !== deferredMenuState.submissionSequence
+    || deferredMenuState.presentationStatus !== 'healthy'
+    || deferredMenuState.completionFailures !== 0
+    || deferredMenuState.deviceLost !== false
+    || deferredMenuState.uncapturedErrors !== 0
+    || deferredMenuState.gameplayArena !== 'deferred-until-deployment'
+    || deferredMenuState.previewMode !== 'prerecorded-video'
+    || deferredMenuState.menuVisible !== true
+    || deferredMenuState.gameStarted !== false
+    || deferredMenuState.preparation?.completed !== true
+    || deferredMenuState.preparation?.error !== null
+    || deferredMenuState.weaponCatalog?.prewarming !== false
+    || deferredMenuState.weaponCatalog?.loaded !== deferredMenuState.weaponCatalog?.available
+    || deferredMenuState.weaponCatalog?.gpuReady !== deferredMenuState.weaponCatalog?.available
+    || deferredMenuState.weaponCatalog?.retainedCount !== deferredMenuState.weaponCatalog?.available) {
+    throw new Error(`Prerecorded menu violated deferred-gameplay or bounded retained-asset preparation: ${JSON.stringify(deferredMenuState)}`);
+  }
   const switchReceipts = [];
-  for (const arenaId of ['skyline-terminal', 'rustworks-1v1', 'gun-range', 'atomic-acres']) {
+  const maximumResidentTextureBytes = 768 * 1024 * 1024;
+  const maximumResidentGeometryBytes = 256 * 1024 * 1024;
+  const switchSequence = ['skyline-terminal', 'rustworks-1v1', 'gun-range', 'atomic-acres'];
+  for (const [switchIndex, arenaId] of switchSequence.entries()) {
     await switchPage.evaluate((id) => window.__ATOMIC_ACRES_DEBUG__.selectArena(id), arenaId);
     await switchPage.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.sampleArenaPerformanceBudget());
     const switchState = await switchPage.evaluate(() => {
       const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-      return { arenaId: state.arenaSelection.id, streaming: state.arenaSelection.streaming, playableScene: state.render.playableScene };
+      return {
+        arenaId: state.arenaSelection.id,
+        streaming: state.arenaSelection.streaming,
+        playableScene: state.render.playableScene,
+        runtime: state.render.runtime,
+        residency: window.__ATOMIC_ACRES_DEBUG__.sampleRendererResidency(),
+      };
     });
     if (switchState.arenaId !== arenaId || switchState.playableScene.arena.arenaId !== arenaId
       || switchState.playableScene.authoritativeArenaRoots !== 1) {
       throw new Error(`${arenaId} gameplay switch failed: ${JSON.stringify({ switchState, switchErrors })}`);
     }
     const receipt = switchState.playableScene;
-    if (receipt.arena.retiredPresentationInventory.geometries <= 0
-      || receipt.arena.retiredPresentationInventory.materials <= 0
-      || receipt.appliedTslArenaDefinitions < 2) {
+    const expectedAppliedDefinitions = switchIndex + 1;
+    const retirementInventoryRequired = switchIndex > 0;
+    if ((retirementInventoryRequired && receipt.arena.retiredPresentationInventory.geometries <= 0)
+      || (retirementInventoryRequired && receipt.arena.retiredPresentationInventory.materials <= 0)
+      || receipt.appliedTslArenaDefinitions < expectedAppliedDefinitions) {
       throw new Error(`${arenaId} switch did not detach the prior presentation and apply the selected TSL definition`);
     }
     if (receipt.traversal.legacyShaderMaterials.length !== 0 || receipt.duplicateArenaRoots) {
       throw new Error(`${arenaId} switch introduced a duplicate arena or legacy shader material`);
     }
-    if (!switchState.streaming.selectedOnlyResident || switchState.streaming.residentArenaRoots !== 1
-      || switchState.streaming.residentArenaIds[0] !== arenaId
+    const expectedResidentRoots = Math.min(switchIndex + 1, 2);
+    if (switchState.streaming.cachePolicy !== 'fenced-two-arena-lru'
+      || switchState.streaming.canonicalCacheBound !== 2
+      || switchState.streaming.residentArenaRoots !== expectedResidentRoots
+      || !switchState.streaming.residentArenaIds.includes(arenaId)
+      || switchState.streaming.transition.phase !== 'idle'
+      || switchState.streaming.transition.failure !== null
+      || switchState.streaming.transition.renderSubmissionPaused
+      || switchState.runtime.presentation.status !== 'healthy'
       || receipt.appliedArenaVisualPolicy.definitionId !== arenaId
       || receipt.actualArenaVisualPolicy.definitionId !== arenaId
       || receipt.actualArenaVisualPolicy.atmosphereDefinitionId !== arenaId
       || JSON.stringify(receipt.actualArenaVisualPolicy.atmosphere) !== JSON.stringify(receipt.appliedArenaVisualPolicy.atmosphere)
       || receipt.actualArenaVisualPolicy.practicals.definitionId !== arenaId
+      || switchState.residency.totalTextureBytes > maximumResidentTextureBytes
+      || switchState.residency.totalGeometryBytes > maximumResidentGeometryBytes
+      || switchState.residency.totalTextureBytes !== switchState.residency.activeTextureBytes + switchState.residency.cachedTextureBytes
+      || switchState.residency.totalGeometryBytes !== switchState.residency.activeGeometryBytes + switchState.residency.cachedGeometryBytes
       || !receipt.budgetAudit.pass) {
-      throw new Error(`${arenaId} switch retained an arena or failed definition policy/budget gates: ${JSON.stringify(switchState)}`);
+      throw new Error(`${arenaId} switch violated the bounded-cache, presentation-freshness, definition, or budget gates: ${JSON.stringify(switchState)}`);
     }
-    switchReceipts.push({ ...receipt, streaming: switchState.streaming });
+    switchReceipts.push({ ...receipt, streaming: switchState.streaming, residency: switchState.residency });
   }
   const requestedArenaModules = [...new Set(switchScripts
     .map((url) => /\/arenas\/(atomic-acres|skyline-terminal|rustworks-1v1|gun-range)(?:\.|\?)/.exec(url)?.[1])
@@ -378,6 +643,168 @@ try {
     throw new Error(`Gameplay arena switch did not lazily request all four definition modules: ${JSON.stringify(requestedArenaModules)}`);
   }
   if (switchErrors.length > 0) throw new Error(`Gameplay arena switches emitted browser/GPU errors: ${[...new Set(switchErrors)][0]}`);
+  const menuResidencyEnvelope = {
+    totalTextureBytes: Math.max(...switchReceipts.map((receipt) => receipt.residency.totalTextureBytes)),
+    totalGeometryBytes: Math.max(...switchReceipts.map((receipt) => receipt.residency.totalGeometryBytes)),
+  };
+  const gameplayResidencyBaselines = new Map();
+  const gameplayResidencyVisits = new Map();
+  const presentationSoak = [];
+  // Start from the warmed gun-range/atomic-acres pair above, then traverse the
+  // same four two-arena LRU pairs twice. Residency must be compared against an
+  // identical in-match pair: menu-only residency excludes players, weapons,
+  // bots, and support geometry and is therefore not a valid gameplay baseline.
+  const gameplayCycle = ['skyline-terminal', 'rustworks-1v1', 'gun-range', 'atomic-acres'];
+  for (const [visitIndex, arenaId] of [...gameplayCycle, ...gameplayCycle].entries()) {
+    const deploymentStartedAt = Date.now();
+    console.log(`[pass64-webgpu] gameplay-soak visit=${visitIndex + 1}/8 arena=${arenaId}`);
+    await switchPage.evaluate((id) => window.__ATOMIC_ACRES_DEBUG__.selectArena(id), arenaId);
+    await switchPage.evaluate(() => {
+      window.__ATOMIC_ACRES_DEBUG__.startSolo();
+      window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true);
+    });
+    try {
+      // Poll only cheap, user-visible lifecycle state. Repeated full debug
+      // snapshots traverse both resident arena roots and can themselves stall
+      // a warmed LRU cycle enough to falsify this deployment deadline.
+      await switchPage.waitForFunction((expectedArena) => (
+        document.documentElement.dataset.gameplayArena === expectedArena
+          && document.querySelector('#menu')?.classList.contains('hidden') === true
+      ), arenaId, { timeout: 15_000 });
+    } catch (error) {
+      const stalled = await switchPage.evaluate(() => {
+        const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+        return {
+          gameStarted: state?.gameStarted ?? null,
+          bootstrap: state?.bootstrap ?? null,
+          arenaSelection: state?.arenaSelection ?? null,
+          menuLifecycle: state?.menuLifecycle ?? null,
+          runtime: state?.render?.runtime ?? null,
+          qualityAssetStreaming: state?.render?.qualityAssetStreaming ?? null,
+          status: document.querySelector('#status')?.textContent ?? null,
+        };
+      }).catch((snapshotError) => ({ snapshotError: String(snapshotError) }));
+      throw new Error(`${arenaId} gameplay-soak deployment ${visitIndex + 1}/8 exceeded 15 seconds after ${Date.now() - deploymentStartedAt}ms: ${JSON.stringify(stalled)}`, { cause: error });
+    }
+    await switchPage.waitForTimeout(arenaId === 'rustworks-1v1' ? 2_500 : 1_250);
+    const beforePose = await switchPage.evaluate(() => {
+      const [x, y, z] = window.__ATOMIC_ACRES_DEBUG__.snapshot().player.position;
+      return [x, y, z, 0, 0];
+    });
+    const beforePresentation = await applyAndAwaitFreshPresentation(
+      switchPage,
+      { kind: 'capture-pose', pose: beforePose },
+      `${arenaId} presentation-soak before pose`,
+    );
+    const before = await switchPage.evaluate(async () => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      return {
+        state: api.snapshot(),
+        menuHidden: document.querySelector('#menu')?.classList.contains('hidden') === true,
+        readback: await api.readbackWebGpuFrame(),
+      };
+    });
+    const afterPose = await switchPage.evaluate(() => {
+      const [x, y, z] = window.__ATOMIC_ACRES_DEBUG__.snapshot().player.position;
+      return [x, y, z, 1.2, 0];
+    });
+    const afterPresentation = await applyAndAwaitFreshPresentation(
+      switchPage,
+      { kind: 'capture-pose', pose: afterPose },
+      `${arenaId} presentation-soak after pose`,
+    );
+    const after = await switchPage.evaluate(async () => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      return {
+        state: api.snapshot(),
+        menuHidden: document.querySelector('#menu')?.classList.contains('hidden') === true,
+        readback: await api.readbackWebGpuFrame(),
+        residency: api.sampleRendererResidency(),
+      };
+    });
+    await switchPage.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(null));
+    const residentArenaIds = [...after.state.arenaSelection.streaming.residentArenaIds].sort();
+    const residencyPairKey = residentArenaIds.join('+');
+    const baselineResidency = gameplayResidencyBaselines.get(residencyPairKey) ?? null;
+    const textureGrowthAllowance = baselineResidency
+      ? Math.max(8 * 1024 * 1024, baselineResidency.totalTextureBytes * 0.04)
+      : null;
+    const geometryGrowthAllowance = baselineResidency
+      ? Math.max(4 * 1024 * 1024, baselineResidency.totalGeometryBytes * 0.04)
+      : null;
+    const freshnessFailures = [
+      ['game-started', after.state.gameStarted === true],
+      ['menu-hidden', after.menuHidden === true],
+      ['before-presentation-healthy', before.state.render.runtime.presentation.status === 'healthy'],
+      ['after-presentation-healthy', after.state.render.runtime.presentation.status === 'healthy'],
+      ['completion-advanced', after.state.render.runtime.presentation.completedSequence > before.state.render.runtime.presentation.completedSequence],
+      ['frame-advanced', after.state.frameCount > before.state.frameCount],
+      ['two-resident-arena-roots', residentArenaIds.length === 2],
+      ['texture-hard-bound', after.residency.totalTextureBytes <= maximumResidentTextureBytes],
+      ['geometry-hard-bound', after.residency.totalGeometryBytes <= maximumResidentGeometryBytes],
+      ['texture-repeated-pair-envelope', !baselineResidency
+        || after.residency.totalTextureBytes <= baselineResidency.totalTextureBytes + textureGrowthAllowance],
+      ['geometry-repeated-pair-envelope', !baselineResidency
+        || after.residency.totalGeometryBytes <= baselineResidency.totalGeometryBytes + geometryGrowthAllowance],
+      ['readback-changed', after.readback.hash !== before.readback.hash],
+    ].filter(([, passed]) => !passed).map(([name]) => name);
+    if (freshnessFailures.length > 0) {
+      throw new Error(`${arenaId} gameplay presentation did not remain fresh: ${JSON.stringify({
+        freshnessFailures,
+        before: {
+          frameCount: before.state.frameCount,
+          completedSequence: before.state.render.runtime.presentation.completedSequence,
+          status: before.state.render.runtime.presentation.status,
+          readback: before.readback,
+        },
+        after: {
+          frameCount: after.state.frameCount,
+          completedSequence: after.state.render.runtime.presentation.completedSequence,
+          status: after.state.render.runtime.presentation.status,
+          readback: after.readback,
+          residency: after.residency,
+        },
+        menuResidencyEnvelope,
+        residentArenaIds,
+        residencyPairKey,
+        baselineResidency,
+        textureGrowthAllowance,
+        geometryGrowthAllowance,
+      })}`);
+    }
+    if (!baselineResidency) gameplayResidencyBaselines.set(residencyPairKey, after.residency);
+    gameplayResidencyVisits.set(residencyPairKey, (gameplayResidencyVisits.get(residencyPairKey) ?? 0) + 1);
+    presentationSoak.push({
+      arenaId,
+      residentArenaIds,
+      residencyPairKey,
+      residencyVisit: gameplayResidencyVisits.get(residencyPairKey),
+      frameDelta: after.state.frameCount - before.state.frameCount,
+      completionDelta: after.state.render.runtime.presentation.completedSequence
+        - before.state.render.runtime.presentation.completedSequence,
+      beforeHash: before.readback.hash,
+      afterHash: after.readback.hash,
+      beforePresentation,
+      afterPresentation,
+      presentationStatus: after.state.render.runtime.presentation.status,
+      residency: after.residency,
+    });
+    await switchPage.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.returnToMainMenu());
+    await switchPage.waitForFunction(() => (
+      document.querySelector('#menu')?.classList.contains('hidden') === false
+    ), undefined, { timeout: 15_000 });
+  }
+  if (gameplayResidencyBaselines.size !== gameplayCycle.length
+    || [...gameplayResidencyVisits.values()].some((visits) => visits !== 2)) {
+    throw new Error(`Gameplay residency pair coverage was incomplete: ${JSON.stringify({
+      expectedPairs: gameplayCycle.length,
+      baselines: Object.fromEntries(gameplayResidencyBaselines),
+      visits: Object.fromEntries(gameplayResidencyVisits),
+    })}`);
+  }
+  if (switchErrors.length > 0) {
+    throw new Error(`Repeated gameplay presentation soak emitted browser/GPU errors: ${[...new Set(switchErrors)][0]}`);
+  }
   await switchPage.close();
   const multiplayerPages = await Promise.all(['host', 'guest'].map(async (role) => {
     const page = await browser.newPage({ viewport: { width: 960, height: 540 }, deviceScaleFactor: 1 });
@@ -464,18 +891,36 @@ try {
     schemaVersion: 2,
     generatedAt: new Date().toISOString(),
     source: { revision: sourceRevision, trackedWorktreeDirty },
+    artifactTransaction: {
+      mode: 'run-scoped-directory-atomic-promote',
+      runId: artifactRunId,
+      publishedRoot: publishedArtifactRoot,
+    },
     browserExecutable: executablePath,
     rendererPolicy: 'webgpu-default-fail-closed-webgl-explicit-compatibility',
     arenaRetirementPolicy: 'single-authoritative-gameplay-root',
+    deferredMenuState,
+    menuResidencyEnvelope,
+    gameplayResidencyBaselines: Object.fromEntries(gameplayResidencyBaselines),
+    gameplayResidencyVisits: Object.fromEntries(gameplayResidencyVisits),
     switchReceipts,
+    presentationSoak,
     requestedArenaModules,
     twoPeerWebGpu,
     receipts,
   };
   await writeFile(`${artifactRoot}/hardware-webgpu-playable-receipt.json`, `${JSON.stringify(output, null, 2)}\n`, 'utf8');
+  await promoteArtifactDirectory();
   console.log(JSON.stringify(output, null, 2));
 } finally {
-  await browser?.close();
-  peerServer?.kill();
-  await server.close();
+  try {
+    await browser?.close();
+  } finally {
+    peerServer?.kill();
+    try {
+      await server.close();
+    } finally {
+      if (!artifactsPromoted) await rm(artifactRoot, { recursive: true, force: true });
+    }
+  }
 }

@@ -1,5 +1,6 @@
+import { GRENADE_CARRY_CAP } from './combat/ordnance';
 import { WEAPONS } from './gameplay';
-import type { PrimaryWeaponId, WeaponId } from './protocol';
+import { PRIMARY_WEAPON_IDS, type PrimaryWeaponId, type WeaponId } from './protocol';
 
 export const DEATH_DROP_LIFETIME_MS = 30_000;
 export const DEATH_DROP_INTERACTION_RANGE = 2.35;
@@ -12,7 +13,7 @@ export type DropPoint = { x: number; y: number; z: number };
 
 export type DeathDrop = {
   id: string;
-  weapon: PrimaryWeaponId;
+  weapon: WeaponId;
   position: DropPoint;
   ammo: number;
   reserve: number;
@@ -40,7 +41,7 @@ function finiteRound(value: number): number {
 
 export function createDeathDrop(
   id: string,
-  weapon: PrimaryWeaponId,
+  weapon: WeaponId,
   position: DropPoint,
   ammo: number,
   reserve: number,
@@ -69,11 +70,27 @@ export function deathDropAmmoAvailable(drop: DeathDrop, now: number): boolean {
 }
 
 export function deathDropWeaponAvailable(drop: DeathDrop, now: number): boolean {
-  return drop.weaponConsumedAt === null && now < drop.expiresAt;
+  return isPrimaryWeaponId(drop.weapon) && drop.weaponConsumedAt === null && now < drop.expiresAt;
+}
+
+/** The single eligibility predicate shared by weapon prompts and consumption. */
+export function deathDropWeaponPickupAvailable(
+  drop: DeathDrop,
+  equippedPrimary: PrimaryWeaponId,
+  now: number,
+): boolean {
+  return deathDropWeaponAvailable(drop, now)
+    && (drop.weapon !== equippedPrimary || deathDropAmmoAvailable(drop, now));
 }
 
 export function deathDropAvailable(drop: DeathDrop, now: number): boolean {
-  return now < drop.expiresAt && (drop.ammoConsumedAt === null || drop.weaponConsumedAt === null);
+  return now < drop.expiresAt && (drop.ammoConsumedAt === null || deathDropWeaponAvailable(drop, now));
+}
+
+const PRIMARY_WEAPON_ID_SET = new Set<WeaponId>(PRIMARY_WEAPON_IDS);
+
+export function isPrimaryWeaponId(weapon: WeaponId): weapon is PrimaryWeaponId {
+  return PRIMARY_WEAPON_ID_SET.has(weapon);
 }
 
 export function nearestDeathDrop(
@@ -101,6 +118,22 @@ export function nearestDeathDrop(
   return nearest;
 }
 
+export function selectDeathDropWeaponPickup(
+  drops: readonly DeathDrop[],
+  position: DropPoint,
+  equippedPrimary: PrimaryWeaponId,
+  now = performance.now(),
+  expectedTargetId?: string,
+  range = DEATH_DROP_INTERACTION_RANGE,
+): DeathDrop | null {
+  const eligible = drops.filter((drop) => deathDropWeaponPickupAvailable(drop, equippedPrimary, now));
+  if (expectedTargetId !== undefined) {
+    const expected = eligible.find((drop) => drop.id === expectedTargetId);
+    return expected ? nearestDeathDrop([expected], position, range, now, 'weapon') : null;
+  }
+  return nearestDeathDrop(eligible, position, range, now, 'weapon');
+}
+
 export function nearestScavengeDeathDrop(
   drops: readonly DeathDrop[],
   position: DropPoint,
@@ -125,7 +158,6 @@ export function scavengeDeathDrop(
   drop: DeathDrop,
   inventory: ScavengeInventory,
   maximumReserve: number,
-  grenadeCap: number,
   now: number,
 ): {
   scavenged: boolean;
@@ -140,7 +172,7 @@ export function scavengeDeathDrop(
   const reserveCap = Math.min(WEAPONS[inventory.weapon].reserve, finiteRound(maximumReserve));
   const ammunitionAvailable = finiteRound(drop.ammo) + finiteRound(drop.reserve);
   const reserve = Math.min(reserveCap, finiteRound(inventory.reserve) + ammunitionAvailable);
-  const grenades = Math.min(finiteRound(grenadeCap), finiteRound(inventory.grenades) + 1);
+  const grenades = Math.min(GRENADE_CARRY_CAP, finiteRound(inventory.grenades) + 1);
   const ammoGranted = Math.max(0, reserve - finiteRound(inventory.reserve));
   const grenadeGranted = Math.max(0, grenades - finiteRound(inventory.grenades));
   if (ammoGranted === 0 && grenadeGranted === 0) {
@@ -166,7 +198,9 @@ export function consumeDeathDropWeapon(
   inventory: DeathDropInventory;
   drop: DeathDrop;
 } {
-  if (!deathDropWeaponAvailable(drop, now)) return { consumed: false, mode: null, inventory, drop };
+  if (!deathDropWeaponAvailable(drop, now) || !isPrimaryWeaponId(drop.weapon)) {
+    return { consumed: false, mode: null, inventory, drop };
+  }
   const spec = WEAPONS[drop.weapon];
   const reserveCap = Math.min(spec.reserve, finiteRound(maximumReserve));
   if (inventory.primary === drop.weapon) {
@@ -188,7 +222,17 @@ export function consumeDeathDropWeapon(
       ammo: Math.min(spec.mag, Math.max(1, finiteRound(drop.ammo))),
       reserve: 0,
     },
-    drop: { ...drop, weaponConsumedAt: now },
+    // Owner requirement: the gun you swapped out (with its magazine and reserve)
+    // goes INTO this drop instead of being deleted, and the consumed flags are
+    // cleared, so you can immediately pick it back up and re-swap freely.
+    drop: {
+      ...drop,
+      weapon: inventory.primary,
+      ammo: finiteRound(inventory.ammo),
+      reserve: finiteRound(inventory.reserve),
+      weaponConsumedAt: null,
+      ammoConsumedAt: null,
+    },
   };
 }
 

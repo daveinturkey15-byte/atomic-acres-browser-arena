@@ -18,4 +18,15 @@ describe('room chat presentation', () => {
     expect(roomChatPresentation(0, false, true, 0)).toEqual({ visible: false, fadeAfterMs: null });
     expect(roomChatPresentation(0, true, false, null)).toEqual({ visible: false, fadeAfterMs: null });
   });
+
+  it('keeps the lobby affordance visible while still respecting availability', () => {
+    expect(roomChatPresentation(60_000, true, false, null, true)).toEqual({
+      visible: true,
+      fadeAfterMs: null,
+    });
+    expect(roomChatPresentation(60_000, false, false, 0, true)).toEqual({
+      visible: false,
+      fadeAfterMs: null,
+    });
+  });
 });

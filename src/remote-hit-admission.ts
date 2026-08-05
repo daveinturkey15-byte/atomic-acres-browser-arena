@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { computeDamage, grenadeDamage, WEAPONS, type HitZone, type Stance } from './gameplay';
+import { computeDamage, effectiveHitZoneForWeapon, grenadeDamage, WEAPONS, type HitZone, type Stance } from './gameplay';
 import {
   HUNTER_SWARM_BLAST_RADIUS,
   TRI_PASS_BLAST_RADIUS,
@@ -7,8 +7,10 @@ import {
   hunterSwarmDamage,
 } from './field-support';
 import { AUTHORITATIVE_HIT_PROXIES, hitProxyRootTransform } from './hit-proxies';
-import type { ExplosiveSource, WeaponId } from './protocol';
+import type { ExplosiveSource, GrenadeId, WeaponId } from './protocol';
 import { applyPenetrationDamage } from './ballistics';
+import { explosiveBoltBlastDamage } from './combat/ordnance';
+import { semtexBlastDamage } from './combat/pass65-ordnance-contract';
 
 type ShotTarget = Readonly<{
   x: number;
@@ -95,12 +97,13 @@ export function deriveAuthoritativeShotOutcomes(
     const prior = outcomes.get(nearest.target.id) ?? {
       damage: 0, rawDamage: 0, pelletHits: 0, hitZone: 'limb' as HitZone, wallbang: false, penetrationMultiplier: 1,
     };
-    const rawDamage = prior.rawDamage + applyPenetrationDamage(computeDamage(spec, nearest.distance, nearest.zone), multiplier);
+    const effectiveZone = effectiveHitZoneForWeapon(spec, nearest.zone);
+    const rawDamage = prior.rawDamage + applyPenetrationDamage(computeDamage(spec, nearest.distance, effectiveZone), multiplier);
     outcomes.set(nearest.target.id, {
       damage: Math.min(100, rawDamage),
       rawDamage,
       pelletHits: prior.pelletHits + 1,
-      hitZone: nearest.zone === 'head' || nearest.zone === 'body' && prior.hitZone === 'limb' ? nearest.zone : prior.hitZone,
+      hitZone: effectiveZone === 'head' || effectiveZone === 'body' && prior.hitZone === 'limb' ? effectiveZone : prior.hitZone,
       wallbang: prior.wallbang || multiplier < 0.999,
       penetrationMultiplier: Math.min(prior.penetrationMultiplier, multiplier),
     });
@@ -130,9 +133,10 @@ export function deriveRemoteShotOutcome(
     const multiplier = typeof result === 'boolean' ? (result ? 0 : 1) : Math.max(0, Math.min(1, result));
     if (multiplier <= 0) continue;
     pelletHits += 1;
-    if (hit.zone === 'head' || hit.zone === 'body' && hitZone === 'limb') hitZone = hit.zone;
+    const effectiveZone = effectiveHitZoneForWeapon(spec, hit.zone);
+    if (effectiveZone === 'head' || effectiveZone === 'body' && hitZone === 'limb') hitZone = effectiveZone;
     penetrationMultiplier = Math.min(penetrationMultiplier, multiplier);
-    damage += applyPenetrationDamage(computeDamage(spec, hit.distance, hit.zone), multiplier);
+    damage += applyPenetrationDamage(computeDamage(spec, hit.distance, effectiveZone), multiplier);
   }
   return {
     damage: Math.min(100, damage),
@@ -150,9 +154,10 @@ export function maximumRemoteShotBaseDamage(weapon: WeaponId): number {
   return Math.min(100, computeDamage(spec, 0, 'head') * spec.pellets);
 }
 
-export function maximumRemoteExplosiveBaseDamage(source: ExplosiveSource, distance: number, stance: Stance): number {
+export function maximumRemoteExplosiveBaseDamage(source: ExplosiveSource, distance: number, stance: Stance, grenade: GrenadeId | null = null, stuck = false): number {
   if (!Number.isFinite(distance) || distance < 0) return 0;
-  if (source === 'grenade') return Math.min(100, grenadeDamage(distance));
+  if (source === 'grenade') return Math.min(100, grenade === 'semtex' ? semtexBlastDamage(distance, stance === 'prone', stuck) : grenadeDamage(distance));
+  if (source === 'explosive-crossbow') return Math.min(100, explosiveBoltBlastDamage(distance, stuck));
   if (source === 'yardhawk') {
     if (distance > 3.2) return 0;
     return Math.min(100, Math.max(1, Math.round(200 * (1 - distance / 3.2))));

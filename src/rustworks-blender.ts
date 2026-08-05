@@ -81,9 +81,13 @@ export function setRustworksProceduralPresentationVisible(arenaRoot: THREE.Objec
     node.visible = visible;
   });
   // Re-hide static-batch source meshes if we just re-showed them incorrectly.
+  // Before the runtime whole-arena batch exists, rustworks-presentation-batch-*
+  // meshes are the visible outputs of the map builder's smaller decorative
+  // batch. Afterwards those meshes are themselves retired sources.
   if (visible) {
     arenaRoot.traverse((node) => {
-      if (node.userData.staticBatchRendered === true && !String(node.name).startsWith('rustworks-presentation-batch-')) {
+      if (node.userData.staticBatchRendered === true
+        && (arenaRoot.userData.pass65StaticBatchReady === true || !String(node.name).startsWith('rustworks-presentation-batch-'))) {
         node.visible = false;
       }
     });

@@ -10,10 +10,10 @@ import {
 } from './changelog';
 
 describe('changelog', () => {
-  it('keeps the pending Pass 64 release first until production injects its timestamp', () => {
+  it('keeps the pending Pass 68 release first until production injects its timestamp', () => {
     expect(CHANGELOG.length).toBeGreaterThan(0);
     const latest = latestChangelogEntry();
-    expect(latest.id).toBe('pass64');
+    expect(latest.id).toBe('pass68');
     expect(latest.id).toBe(CHANGELOG[0]?.id);
     expect(formatChangelogTimestamp('2026-07-22T15:43:16+01:00')).toBe('22 JUL 2026 · 15:43 BST');
     expect(formatChangelogTimestampDetail('2026-07-22T15:43:16+01:00')).toBe(
@@ -27,6 +27,7 @@ describe('changelog', () => {
   });
 
   it('uses the successful production promotion rather than implementation time', () => {
+    const pass64 = CHANGELOG.find((entry) => entry.id === 'pass64');
     const pass63 = CHANGELOG.find((entry) => entry.id === 'pass63');
     const pass62 = CHANGELOG.find((entry) => entry.id === 'pass62');
     const pass60 = CHANGELOG.find((entry) => entry.id === 'pass60');
@@ -37,6 +38,9 @@ describe('changelog', () => {
     const pass55 = CHANGELOG.find((entry) => entry.id === 'pass55');
     const pass51 = CHANGELOG.find((entry) => entry.id === 'pass51');
     const pass49 = CHANGELOG.find((entry) => entry.id === 'pass49');
+    // Pass 64's frozen timestamp is its actual Pages publication of pagesSha
+    // 8326c956 (failed-regression evidence channel), not implementation time.
+    expect(pass64?.releasedAt).toBe('2026-07-25T21:15:25Z');
     expect(pass63?.releasedAt).toBe('2026-07-25T02:50:32Z');
     expect(pass62?.releasedAt).toBe('2026-07-24T16:36:32Z');
     expect(pass60?.releasedAt).toBe('2026-07-23T23:15:05Z');

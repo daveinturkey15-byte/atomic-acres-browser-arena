@@ -69,7 +69,7 @@ export function objectLocalGeometryBounds(root: THREE.Object3D): THREE.Box3 | nu
   const bounds = new THREE.Box3().makeEmpty();
   root.traverse((child) => {
     if (!(child instanceof THREE.Mesh) || !child.geometry || !child.visible) return;
-    child.geometry.computeBoundingBox();
+    if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
     if (!child.geometry.boundingBox) return;
     const meshToRoot = inverseRoot.clone().multiply(child.matrixWorld);
     bounds.union(child.geometry.boundingBox.clone().applyMatrix4(meshToRoot));
@@ -98,6 +98,15 @@ export function measureCameraFraming(
   const bounds = new THREE.Box3().makeEmpty();
   object.traverse((child) => {
     if (!(child instanceof THREE.Mesh) || !child.visible || !includeMesh(child)) return;
+    if (child instanceof THREE.SkinnedMesh) {
+      // Geometry bounds describe the undeformed bind mesh. First-person arm IK
+      // can move that stale box through the camera even while every rendered
+      // vertex is safely in front of the near plane, producing a false clipping
+      // failure. SkinnedMesh computes the current CPU-deformed bounds.
+      child.computeBoundingBox();
+      if (child.boundingBox) bounds.union(child.boundingBox.clone().applyMatrix4(child.matrixWorld));
+      return;
+    }
     child.geometry.computeBoundingBox();
     if (child.geometry.boundingBox) bounds.union(child.geometry.boundingBox.clone().applyMatrix4(child.matrixWorld));
   });

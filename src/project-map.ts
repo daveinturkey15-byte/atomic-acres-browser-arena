@@ -5,6 +5,7 @@ import {
   type ChangelogEntry,
 } from './changelog';
 import releaseChannelsJson from '../release-channels.json';
+import { PASS64_FAILED_REGRESSION_IDENTITY, PASS66_RELEASE_IDENTITY } from './release-identity';
 
 export type ProjectMapNode = Readonly<{
   id: string;
@@ -21,15 +22,25 @@ export type ProjectMapBundle = Readonly<{
   current: Readonly<{
     product: 'Nuke Town';
     generatedAt: string;
-    architectureRevision: 'pass64-webgpu-hud-v1';
-    candidateState: 'hitl-candidate' | 'released';
+    architectureRevision: 'pass66-big-one-v1';
+    releaseState: 'release-candidate' | 'released';
     release: ChangelogEntry;
     previousRelease: string | null;
   }>;
   publishedChannels: Readonly<{
     schemaVersion: number;
-    live: Readonly<{ pass: string; label: string; path: string }>;
-    stable: Readonly<{ pass: string; label: string; path: string; sourceSha: string; pagesSha: string }>;
+    liveTarget: Readonly<{ pass: string; label: string; path: string; state: 'release-candidate' | 'released' }>;
+    failedRegressionEvidence: Readonly<{
+      pass: string;
+      label: string;
+      path: string;
+      role: 'published-failed-regression-evidence';
+      sourceSha: string;
+      pagesSha: string;
+      runtimeFileCount: number;
+      runtimeTreeSha256: string;
+    }>;
+    stable: Readonly<{ pass: string; label: string; path: string; sourceSha: string; pagesSha: string; role: 'stable' }>;
   }>;
   operatingBoundaries: readonly string[];
   architecture: readonly ProjectMapNode[];
@@ -42,20 +53,22 @@ export type ProjectMapBundle = Readonly<{
  * production-only release ledger. Keeping the candidate separate prevents an
  * unpublished pass from appearing as live release history.
  */
-export const PROJECT_MAP_CANDIDATE: ChangelogEntry = Object.freeze({
-  id: 'pass64-candidate',
-  pass: 'PASS 64',
-  title: 'Playable WebGPU, Command UI & Multiplayer Hardening',
+export const PROJECT_MAP_RELEASE: ChangelogEntry = Object.freeze({
+  id: 'pass68',
+  pass: PASS66_RELEASE_IDENTITY.pass,
+  title: 'The Big One',
   releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
-  areas: Object.freeze(['WEBGPU', 'TSL', 'HUD', 'MULTIPLAYER', 'MAPS', 'DIAGNOSTICS']),
-  summary: 'HITL candidate for the complete playable WebGPU/TSL route, redesigned command HUD and menus, rematch and health reconciliation repairs, lightweight post-match diagnostics, Railgun, and arena visual-quality gates.',
+  areas: Object.freeze(['WEBGPU', 'COMBAT', 'KILLSTREAKS', 'DESTRUCTION', 'AUDIO', 'MAPS', 'HITL']),
+  summary: 'Pass 68: stability, loading, gun range and combat corrections. Pass 67.1 is pinned as the stable singleplayer release; Pass 64 remains failed-regression evidence only.',
   highlights: Object.freeze([
-    'The normal gameplay route is fail-closed hardware WebGPU with TSL-owned atmosphere and HDR presentation; WebGL2 remains an explicit rollback-compatible route',
-    'Nuke Town, Terminal, RustRig and Gun Range each own a streamed ArenaVisualDefinition with deterministic review cameras and budgets',
-    'The HUD, lobby, map selection, loadout and match overlays use the new command interface without dropping gameplay controls',
-    'Private-match rematches, authoritative health regeneration and duplicate result handling have dedicated regression coverage',
-    'The Railgun spawns during Nuke Town matches with finite ammunition, rechamber cadence, wall penetration and hostile thermal identification',
-    'Pass 63 is retained byte-exact as the stable rollback while the immutable Pass 62 benchmark record remains available for regression comparison',
+    'Maps keep loading in the background when the tab loses focus; the deployment surface shows a real percentage/ETA progress bar up to 100% = IN GAME',
+    'Flamethrower and flare fire stays on the floor for five seconds like napalm and damages anyone standing in it; flamethrower damage is tripled',
+    'M14 EBR wall penetration is reduced 75% and its fire rate halved; Adrenaline instantly restarts health regen and adds passive +1 HP/s',
+    'Gun Range test bay is three times larger with the two-minute timer freezing and resetting on killstreak-area entry; training bots use the canonical rigged operators',
+    'Piloted Drone and Chopper Gunner views render at reduced internal resolution so altitude combat stays smooth',
+    'A Palantir-style logo flashes on every HUD when Drone Swarm deploys and the US flag flashes when a Nuke is called',
+    'RustRig darkness is lifted roughly 25% in the darkest corners; scoped ADS uses aligned iron sights and optics only',
+    'Pass 67.1 is pinned as the Stable Singleplayer build, flagged as needing multiplayer testing; Pass 64 is never promoted to Stable and remains failed-regression evidence only',
   ]),
 });
 
@@ -88,6 +101,12 @@ export const PROJECT_MAP_TREE: readonly ProjectMapNode[] = Object.freeze([
           'src/ballistics.ts',
           'src/hit-proxies.ts',
           'src/map.ts',
+          'src/destructible-world.ts',
+          'src/destructible-shed-definition.ts',
+          'src/destructible-shed-registry.ts',
+          'src/interactive-world-runtime.ts',
+          'src/house-destruction.ts',
+          'src/major-debris-budget.ts',
         ]),
       }),
       Object.freeze({
@@ -119,6 +138,8 @@ export const PROJECT_MAP_TREE: readonly ProjectMapNode[] = Object.freeze([
           'src/atomic-signal.ts',
           'src/weapon-presentation.ts',
           'src/render-profile.ts',
+          'src/destructible-shed-presentation.ts',
+          'src/house-destruction-presentation.ts',
         ]),
       }),
       Object.freeze({
@@ -142,18 +163,20 @@ export const PROJECT_MAP_TREE: readonly ProjectMapNode[] = Object.freeze([
   Object.freeze({
     id: 'services',
     title: 'Optional services',
-    summary: 'The season-aware global leaderboard Worker and browser-local fallback policy.',
-    authority: 'Leaderboard availability never blocks local play or private matches.',
+    summary: 'The season-aware public leaderboard, browser-local fallback and explicit result-sharing consent policy.',
+    authority: 'Public records are readable without creating an identifier. Result submission is default-off, disclosed, revocable and never blocks play.',
     status: 'active',
     children: Object.freeze([
       Object.freeze({
         id: 'leaderboard-service',
         title: 'Leaderboard Worker',
-        summary: 'Cloudflare Worker/D1 submission and retrieval with shared validation policy.',
-        authority: 'Authoritative only for the optional global board; local cache remains a fallback.',
+        summary: 'Cloudflare Worker/D1 retrieval plus explicitly consented submission with shared validation policy.',
+        authority: 'Authoritative only for the optional global board; local cache remains a fallback and no browser ID is created or retained while sharing is off.',
         status: 'active',
         paths: Object.freeze([
           'src/global-leaderboard.ts',
+          'src/pass65-settings.ts',
+          'src/ui/pass64-shell.ts',
           'shared/leaderboard-policy.ts',
           'shared/leaderboard-season.ts',
           'worker/src/index.ts',
@@ -227,23 +250,34 @@ export function createProjectMapBundle(
   entries: readonly ChangelogEntry[] = CHANGELOG,
 ): ProjectMapBundle {
   if (Number.isNaN(Date.parse(generatedAt))) throw new Error(`Invalid project-map timestamp: ${generatedAt}`);
-  const release = PROJECT_MAP_CANDIDATE;
+  const release = PROJECT_MAP_RELEASE;
   return {
     schemaVersion: 1,
     current: {
       product: 'Nuke Town',
       generatedAt,
-      architectureRevision: 'pass64-webgpu-hud-v1',
-      candidateState: release.releasedAt === PENDING_PRODUCTION_RELEASE ? 'hitl-candidate' : 'released',
+      architectureRevision: 'pass66-big-one-v1',
+      releaseState: release.releasedAt === PENDING_PRODUCTION_RELEASE ? 'release-candidate' : 'released',
       release,
-      previousRelease: entries.find((entry) => entry.pass !== release.pass)?.pass ?? null,
+      previousRelease: entries.find((entry) => entry.id !== release.id)?.pass ?? null,
     },
     publishedChannels: {
       schemaVersion: releaseChannelsJson.schemaVersion,
-      live: {
+      liveTarget: {
         pass: releaseChannelsJson.experimental.pass,
         label: releaseChannelsJson.experimental.label,
         path: releaseChannelsJson.experimental.path,
+        state: release.releasedAt === PENDING_PRODUCTION_RELEASE ? 'release-candidate' : 'released',
+      },
+      failedRegressionEvidence: {
+        pass: PASS64_FAILED_REGRESSION_IDENTITY.pass,
+        label: PASS64_FAILED_REGRESSION_IDENTITY.publishedLabel,
+        path: PASS64_FAILED_REGRESSION_IDENTITY.route,
+        role: PASS64_FAILED_REGRESSION_IDENTITY.role,
+        sourceSha: PASS64_FAILED_REGRESSION_IDENTITY.sourceSha,
+        pagesSha: PASS64_FAILED_REGRESSION_IDENTITY.pagesSha,
+        runtimeFileCount: PASS64_FAILED_REGRESSION_IDENTITY.runtimeFileCount,
+        runtimeTreeSha256: PASS64_FAILED_REGRESSION_IDENTITY.runtimeTreeSha256,
       },
       stable: {
         pass: releaseChannelsJson.stable.pass,
@@ -251,11 +285,12 @@ export function createProjectMapBundle(
         path: releaseChannelsJson.stable.path,
         sourceSha: releaseChannelsJson.stable.sourceSha,
         pagesSha: releaseChannelsJson.stable.pagesSha,
+        role: 'stable',
       },
     },
     operatingBoundaries: PROJECT_OPERATING_BOUNDARIES,
     architecture: PROJECT_MAP_TREE,
-    changes: Object.freeze([release, ...entries.filter((entry) => entry.pass !== release.pass)]),
+    changes: Object.freeze([release, ...entries.filter((entry) => entry.id !== release.id)]),
     archive: entries,
   };
 }
@@ -288,7 +323,7 @@ export function projectMapMarkdown(bundle: ProjectMapBundle = createProjectMapBu
     '',
     `Generated: ${bundle.current.generatedAt}`,
     `Architecture revision: ${bundle.current.architectureRevision}`,
-    `Candidate state: ${bundle.current.candidateState}`,
+    `Release state: ${bundle.current.releaseState}`,
     '',
     '## Current release snapshot',
     '',
@@ -296,7 +331,8 @@ export function projectMapMarkdown(bundle: ProjectMapBundle = createProjectMapBu
     `- Release timestamp: ${current.releasedAt}`,
     `- Areas: ${current.areas.join(', ')}`,
     `- Summary: ${current.summary}`,
-    `- Published live channel: ${bundle.publishedChannels.live.pass} (${bundle.publishedChannels.live.label})`,
+    `- Live target: ${bundle.publishedChannels.liveTarget.pass} (${bundle.publishedChannels.liveTarget.label}); ${bundle.publishedChannels.liveTarget.state}`,
+    `- Failed-regression evidence: ${bundle.publishedChannels.failedRegressionEvidence.pass} (${bundle.publishedChannels.failedRegressionEvidence.label}); not selectable`,
     `- Published stable channel: ${bundle.publishedChannels.stable.pass} (${bundle.publishedChannels.stable.label})`,
     '',
     'Current changes:',

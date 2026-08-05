@@ -1,5 +1,5 @@
 import type { WeaponId } from './protocol';
-import type { WeaponPenetrationProfile } from './ballistics';
+import { LEGACY_WEAPONS, type LegacyWeaponSpec } from './combat/legacy-weapon-adapter';
 
 export type HitZone = 'head' | 'body' | 'limb';
 export type Stance = 'stand' | 'crouch' | 'prone';
@@ -32,182 +32,15 @@ export const SNIPER_HEADSHOT_DAMAGE_MULTIPLIER = 3;
 export const FALL_DAMAGE_SAFE_SPEED = 9.5;
 export const FALL_DAMAGE_LETHAL_SPEED = 22;
 
-export type WeaponSpec = {
-  id: WeaponId;
-  name: string;
-  damage: number;
-  minimumDamage: number;
-  falloffStart: number;
-  falloffEnd: number;
-  headMultiplier: number;
-  limbMultiplier: number;
-  rpm: number;
-  mag: number;
-  reserve: number;
-  reload: number;
-  hipSpread: number;
-  adsSpreadMultiplier: number;
-  movementSpreadMultiplier: number;
-  crouchSpreadMultiplier: number;
-  sustainedSpreadPerShot: number;
-  maximumSpread: number;
-  pellets: number;
-  recoilPitch: number;
-  recoilYaw: number;
-  recoilRecovery: number;
-  adsRecoilMultiplier: number;
-  crouchRecoilMultiplier: number;
-  proneRecoilMultiplier: number;
-  switchSeconds: number;
-  automatic: boolean;
-  color: number;
-  penetration: WeaponPenetrationProfile;
-};
-
-export const WEAPONS: Record<WeaponId, WeaponSpec> = {
-  carbine: {
-    id: 'carbine', name: 'M86 Carbine', damage: 31, minimumDamage: 20,
-    falloffStart: 24, falloffEnd: 72, headMultiplier: HEADSHOT_DAMAGE_MULTIPLIER, limbMultiplier: 0.82,
-    rpm: 650, mag: 30, reserve: 120, reload: 1.8,
-    hipSpread: 0.012, adsSpreadMultiplier: 0.28, movementSpreadMultiplier: 1.65,
-    crouchSpreadMultiplier: 0.78, sustainedSpreadPerShot: 0.0016, maximumSpread: 0.045,
-    pellets: 1, recoilPitch: 0.016, recoilYaw: 0.006, recoilRecovery: 12,
-    adsRecoilMultiplier: 0.72, crouchRecoilMultiplier: 0.84, proneRecoilMultiplier: 0.65,
-    switchSeconds: 0.48, automatic: true, color: 0xffd166,
-    penetration: {
-      caliber: '5.56 mm', penetrationPower: 5.8, fmjMultiplier: 1.12,
-      energyFalloffStart: 20, energyFalloffEnd: 76, minimumEnergyRetention: 0.48,
-      minimumWallDamageMultiplier: 0.34, maxPenetratedSurfaces: 2,
-    },
-  },
-  smg: {
-    id: 'smg', name: 'Vectorline SMG', damage: 23, minimumDamage: 14,
-    falloffStart: 15, falloffEnd: 52, headMultiplier: HEADSHOT_DAMAGE_MULTIPLIER, limbMultiplier: 0.8,
-    rpm: 860, mag: 32, reserve: 128, reload: 1.5,
-    hipSpread: 0.018, adsSpreadMultiplier: 0.42, movementSpreadMultiplier: 1.45,
-    crouchSpreadMultiplier: 0.82, sustainedSpreadPerShot: 0.0021, maximumSpread: 0.058,
-    pellets: 1, recoilPitch: 0.011, recoilYaw: 0.009, recoilRecovery: 15,
-    adsRecoilMultiplier: 0.78, crouchRecoilMultiplier: 0.88, proneRecoilMultiplier: 0.72,
-    switchSeconds: 0.4, automatic: true, color: 0x65e7ff,
-    penetration: {
-      caliber: '9 mm', penetrationPower: 3.05, fmjMultiplier: 1.08,
-      energyFalloffStart: 8, energyFalloffEnd: 38, minimumEnergyRetention: 0.22,
-      minimumWallDamageMultiplier: 0.22, maxPenetratedSurfaces: 1,
-    },
-  },
-  lmg: {
-    id: 'lmg', name: 'Mastiff 63 LMG', damage: 27, minimumDamage: 18,
-    falloffStart: 30, falloffEnd: 82, headMultiplier: HEADSHOT_DAMAGE_MULTIPLIER, limbMultiplier: 0.82,
-    rpm: 720, mag: 62, reserve: 186, reload: 3.25,
-    hipSpread: 0.022, adsSpreadMultiplier: 0.34, movementSpreadMultiplier: 1.78,
-    crouchSpreadMultiplier: 0.7, sustainedSpreadPerShot: 0.0025, maximumSpread: 0.064,
-    pellets: 1, recoilPitch: 0.019, recoilYaw: 0.01, recoilRecovery: 10,
-    adsRecoilMultiplier: 0.76, crouchRecoilMultiplier: 0.8, proneRecoilMultiplier: 0.6,
-    switchSeconds: 0.78, automatic: true, color: 0x9fda72,
-    penetration: {
-      caliber: '7.62 mm', penetrationPower: 6.9, fmjMultiplier: 1.14,
-      energyFalloffStart: 30, energyFalloffEnd: 90, minimumEnergyRetention: 0.58,
-      minimumWallDamageMultiplier: 0.4, maxPenetratedSurfaces: 2,
-    },
-  },
-  scattergun: {
-    id: 'scattergun', name: 'Model 12 Scattergun', damage: 17, minimumDamage: 7,
-    falloffStart: 8, falloffEnd: 30, headMultiplier: HEADSHOT_DAMAGE_MULTIPLIER, limbMultiplier: 0.88,
-    rpm: 82, mag: 8, reserve: 40, reload: 2.35,
-    hipSpread: 0.068, adsSpreadMultiplier: 0.72, movementSpreadMultiplier: 1.22,
-    crouchSpreadMultiplier: 0.88, sustainedSpreadPerShot: 0.002, maximumSpread: 0.09,
-    pellets: 9, recoilPitch: 0.052, recoilYaw: 0.012, recoilRecovery: 8,
-    adsRecoilMultiplier: 0.84, crouchRecoilMultiplier: 0.9, proneRecoilMultiplier: 0.8,
-    switchSeconds: 0.62, automatic: false, color: 0xff8a5b,
-    penetration: {
-      caliber: '12 ga pellet', penetrationPower: 2.15, fmjMultiplier: 1,
-      energyFalloffStart: 4, energyFalloffEnd: 20, minimumEnergyRetention: 0.16,
-      minimumWallDamageMultiplier: 0.18, maxPenetratedSurfaces: 1,
-    },
-  },
-  sniper: {
-    id: 'sniper', name: 'Longline 86', damage: 67, minimumDamage: 67,
-    falloffStart: 96, falloffEnd: 120, headMultiplier: SNIPER_HEADSHOT_DAMAGE_MULTIPLIER, limbMultiplier: 0.9,
-    rpm: 55, mag: 5, reserve: 25, reload: 2.6,
-    hipSpread: 0.052, adsSpreadMultiplier: 0.05, movementSpreadMultiplier: 1.8,
-    crouchSpreadMultiplier: 0.72, sustainedSpreadPerShot: 0.004, maximumSpread: 0.07,
-    pellets: 1, recoilPitch: 0.072, recoilYaw: 0.016, recoilRecovery: 6.5,
-    adsRecoilMultiplier: 0.6, crouchRecoilMultiplier: 0.76, proneRecoilMultiplier: 0.52,
-    switchSeconds: 0.68, automatic: false, color: 0xa9e7ff,
-    penetration: {
-      caliber: '7.62 mm', penetrationPower: 9.4, fmjMultiplier: 1.16,
-      energyFalloffStart: 58, energyFalloffEnd: 120, minimumEnergyRetention: 0.7,
-      minimumWallDamageMultiplier: 0.48, maxPenetratedSurfaces: 3,
-    },
-  },
-  railgun: {
-    id: 'railgun', name: 'VX-8 Railgun', damage: 50, minimumDamage: 50,
-    falloffStart: 512, falloffEnd: 512, headMultiplier: 1, limbMultiplier: 1,
-    rpm: 40, mag: 8, reserve: 0, reload: 1.5,
-    hipSpread: 0.035, adsSpreadMultiplier: 0, movementSpreadMultiplier: 1,
-    crouchSpreadMultiplier: 1, sustainedSpreadPerShot: 0, maximumSpread: 0.035,
-    pellets: 1, recoilPitch: 0.085, recoilYaw: 0, recoilRecovery: 5.8,
-    adsRecoilMultiplier: 1, crouchRecoilMultiplier: 1, proneRecoilMultiplier: 1,
-    switchSeconds: 0.72, automatic: false, color: 0x7df8ff,
-    penetration: {
-      caliber: 'electromagnetic sabot', penetrationPower: 100_000, fmjMultiplier: 1,
-      energyFalloffStart: 512, energyFalloffEnd: 513, minimumEnergyRetention: 1,
-      minimumWallDamageMultiplier: 1, maxPenetratedSurfaces: 64,
-    },
-  },
-  pistol: {
-    id: 'pistol', name: 'Aster 9 Service Pistol', damage: 36, minimumDamage: 22,
-    falloffStart: 20, falloffEnd: 58, headMultiplier: HEADSHOT_DAMAGE_MULTIPLIER, limbMultiplier: 0.84,
-    rpm: 420, mag: 15, reserve: 60, reload: 1.35,
-    hipSpread: 0.02, adsSpreadMultiplier: 0.34, movementSpreadMultiplier: 1.42,
-    crouchSpreadMultiplier: 0.8, sustainedSpreadPerShot: 0.0024, maximumSpread: 0.052,
-    pellets: 1, recoilPitch: 0.021, recoilYaw: 0.008, recoilRecovery: 14,
-    adsRecoilMultiplier: 0.74, crouchRecoilMultiplier: 0.86, proneRecoilMultiplier: 0.7,
-    switchSeconds: 0.28, automatic: false, color: 0xe8c77b,
-    penetration: {
-      caliber: '9 mm', penetrationPower: 3.65, fmjMultiplier: 1.08,
-      energyFalloffStart: 12, energyFalloffEnd: 48, minimumEnergyRetention: 0.3,
-      minimumWallDamageMultiplier: 0.26, maxPenetratedSurfaces: 1,
-    },
-  },
-  magnum: {
-    id: 'magnum', name: 'DHV X Verdict Magnum', damage: 100, minimumDamage: 100,
-    falloffStart: 120, falloffEnd: 120, headMultiplier: 1, limbMultiplier: 0,
-    rpm: 90, mag: 6, reserve: 30, reload: 1.75,
-    hipSpread: 0.026, adsSpreadMultiplier: 0.3, movementSpreadMultiplier: 1.5,
-    crouchSpreadMultiplier: 0.8, sustainedSpreadPerShot: 0.006, maximumSpread: 0.06,
-    pellets: 1, recoilPitch: 0.05, recoilYaw: 0.012, recoilRecovery: 8,
-    adsRecoilMultiplier: 0.74, crouchRecoilMultiplier: 0.84, proneRecoilMultiplier: 0.68,
-    switchSeconds: 0.34, automatic: false, color: 0xffd36a,
-    penetration: {
-      caliber: '.44 magnum', penetrationPower: 4.7, fmjMultiplier: 1.08,
-      energyFalloffStart: 30, energyFalloffEnd: 82, minimumEnergyRetention: 0.4,
-      minimumWallDamageMultiplier: 0.3, maxPenetratedSurfaces: 1,
-    },
-  },
-  'machine-pistol': {
-    id: 'machine-pistol', name: 'G18 AUTO', damage: 18, minimumDamage: 11,
-    falloffStart: 11, falloffEnd: 34, headMultiplier: HEADSHOT_DAMAGE_MULTIPLIER, limbMultiplier: 0.8,
-    rpm: 900, mag: 20, reserve: 80, reload: 1.55,
-    hipSpread: 0.026, adsSpreadMultiplier: 0.46, movementSpreadMultiplier: 1.55,
-    crouchSpreadMultiplier: 0.82, sustainedSpreadPerShot: 0.0032, maximumSpread: 0.072,
-    pellets: 1, recoilPitch: 0.014, recoilYaw: 0.012, recoilRecovery: 13,
-    adsRecoilMultiplier: 0.82, crouchRecoilMultiplier: 0.9, proneRecoilMultiplier: 0.78,
-    switchSeconds: 0.3, automatic: true, color: 0xff9f43,
-    penetration: {
-      caliber: '9 mm', penetrationPower: 2.75, fmjMultiplier: 1.06,
-      energyFalloffStart: 6, energyFalloffEnd: 30, minimumEnergyRetention: 0.18,
-      minimumWallDamageMultiplier: 0.2, maxPenetratedSurfaces: 1,
-    },
-  },
-};
-
+export type WeaponSpec = LegacyWeaponSpec;
+export const WEAPONS = LEGACY_WEAPONS;
 export type MovementContext = {
   crouched: boolean;
   prone?: boolean;
   ads: boolean;
   sprinting: boolean;
   grounded: boolean;
+  equippedMovementMultiplier?: number;
 };
 
 export type MovementProfile = {
@@ -221,7 +54,11 @@ export type MovementProfile = {
 
 export function movementProfile(context: MovementContext): MovementProfile {
   const prone = context.prone === true;
-  const maxSpeed = prone ? 1.55 : context.crouched ? 3.15 : context.ads ? 4.05 : context.sprinting ? 8.7 : 6.15;
+  const authoredMultiplier = Number.isFinite(context.equippedMovementMultiplier)
+    ? Math.max(0.1, Math.min(1.5, context.equippedMovementMultiplier!))
+    : 1;
+  const maxSpeed = (prone ? 1.55 : context.crouched ? 3.15 : context.ads ? 4.05 : context.sprinting ? 8.7 : 6.15)
+    * authoredMultiplier;
   const groundAcceleration = prone ? 17 : context.crouched ? 36 : context.sprinting ? 54 : context.ads ? 40 : 48;
   return {
     maxSpeed,
@@ -364,7 +201,6 @@ export function sampleWeaponPellet(
 }
 
 export function computeDamage(weapon: WeaponSpec, distance: number, zone: HitZone): number {
-  if (weapon.id === 'magnum') return zone === 'head' ? 100 : 0;
   const clampedDistance = Math.max(0, distance);
   const falloff = clampedDistance <= weapon.falloffStart
     ? 0
@@ -372,6 +208,15 @@ export function computeDamage(weapon: WeaponSpec, distance: number, zone: HitZon
   const base = weapon.damage + (weapon.minimumDamage - weapon.damage) * falloff;
   const multiplier = zone === 'head' ? weapon.headMultiplier : zone === 'limb' ? weapon.limbMultiplier : 1;
   return Math.max(1, Math.round(base * multiplier));
+}
+
+/** Minigun impacts retain proxy geometry but never enter the critical-hit semantic/UI path. */
+export function effectiveHitZoneForWeapon(weapon: WeaponSpec, zone: HitZone): HitZone {
+  return weapon.id === 'minigun' && zone === 'head' ? 'body' : zone;
+}
+
+export function weaponCanCritical(weapon: WeaponSpec): boolean {
+  return weapon.id !== 'minigun' && weapon.headMultiplier > 1;
 }
 
 /** BO2-like bounded landing damage: normal jumps are safe; severe drops become lethal. */

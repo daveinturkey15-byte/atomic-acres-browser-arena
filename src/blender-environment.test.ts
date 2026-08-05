@@ -40,14 +40,31 @@ describe('Quality Graphics environment asset', () => {
     expect(procedural.children).toHaveLength(3);
   });
 
-  it('forces opaque Atomic materials to remain opaque and depth-writing without changing glass', () => {
-    const opaque = new THREE.MeshStandardMaterial({ transparent: true, opacity: 0.2, depthWrite: false, alphaTest: 0.5 });
+  it('forces opaque closed-volume materials to cull hidden backfaces without changing glass', () => {
+    const opaque = new THREE.MeshStandardMaterial({
+      transparent: true,
+      opacity: 0.2,
+      depthWrite: false,
+      alphaTest: 0.5,
+      side: THREE.DoubleSide,
+    });
     enforceAtomicMaterialDepthContract(opaque, false);
-    expect(opaque).toMatchObject({ transparent: false, opacity: 1, depthWrite: true, alphaTest: 0 });
+    expect(opaque).toMatchObject({
+      transparent: false,
+      opacity: 1,
+      depthWrite: true,
+      alphaTest: 0,
+      side: THREE.FrontSide,
+    });
 
-    const glass = new THREE.MeshStandardMaterial({ transparent: true, opacity: 0.2, depthWrite: false });
+    const glass = new THREE.MeshStandardMaterial({
+      transparent: true,
+      opacity: 0.2,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
     enforceAtomicMaterialDepthContract(glass, true);
-    expect(glass).toMatchObject({ transparent: true, opacity: 0.2, depthWrite: false });
+    expect(glass).toMatchObject({ transparent: true, opacity: 0.2, depthWrite: false, side: THREE.DoubleSide });
   });
   it('ships a self-contained, bounded original arena GLB with semantic windows', () => {
     const buffer = readFileSync(assetPath);

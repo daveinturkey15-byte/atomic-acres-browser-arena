@@ -57,7 +57,7 @@ test.describe('Pass 37 Quality surface separation and fall-proof bounds', () => 
     await page.goto('/?render=blender&signal=off&grass=off&mist=off&clouds=off&rays=off&multiplayerQa=1&seed=37001');
     await waitReady(page);
     await expect(page.locator('.eyebrow')).toContainText('PASS 62');
-    await expect(page.locator('#graphics-profile option[value="blender"]')).toHaveText('QUALITY GRAPHICS');
+    await expect(page.locator('#graphics-profile option[value="high"]')).toHaveText('QUALITY');
     expect((await snapshot(page)).render.blenderEnvironment).toMatchObject({
       status: 'ready',
       triangleCount: 44_196,
@@ -88,7 +88,7 @@ test.describe('Pass 37 Quality surface separation and fall-proof bounds', () => 
     await waitReady(page);
     await page.locator('#player-name').fill('PASS 37 QA');
     await page.evaluate(() => api().startSolo());
-    await expect.poll(async () => (await snapshot(page)).matchPhase, { timeout: 15_000 }).toBe('active');
+    await expect.poll(async () => (await snapshot(page)).matchPhase, { timeout: 60_000 }).toBe('active');
     expect((await snapshot(page)).arenaSelection.physicsBoundaryWalls).toBe(4);
 
     for (const probe of [

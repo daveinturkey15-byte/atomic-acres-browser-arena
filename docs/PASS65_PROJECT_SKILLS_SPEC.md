@@ -1,7 +1,7 @@
 # Pass 65 Project-Skill Package Specification
 
-State: design only; no skill has been installed or added to the game repository.
-Activation gate: Pass 64 live/frozen, classifier-safe P0 merged, then skill creation/validation inside the runtime integration PR because `.agents/skills/**` is currently full-impact rather than process-only.
+State: project-local skill package is present on the Pass 65 integration lineage; each skill remains usable only to the extent that its current validator and forward-test evidence pass.
+Activation gate: skills and their validators are full-impact Pass 65 work. They must travel with the exact candidate and cannot be cited from an unrelated branch or older SHA.
 Design rule: each skill stays narrow, concise, executable, and tied to project-local validators. Shared release controls remain in the existing release/arena/HUD skills.
 
 ## 1. Package layout
@@ -40,6 +40,14 @@ Proposed project-local package:
     agents/openai.yaml
     references/chaos-matrix.md
     scripts/run-pass65-combat-matrix.mjs
+  atomic-acres-webgpu-frame-pacing/
+    SKILL.md
+    agents/openai.yaml
+    scripts/verify-webgpu-frame-pacing-policy.mjs
+  atomic-acres-owner-feedback-gate/
+    SKILL.md
+    agents/openai.yaml
+    scripts/verify-owner-feedback-ledger.mjs
 ```
 
 Only create a resource when it is executable or prevents repeated rediscovery. Do not add README, changelog, or duplicated prose.
@@ -69,6 +77,9 @@ Author, extend, rebalance, or verify Atomic Acres weapons, sidearms, grenades, p
 - Do not use an incomplete/generic release fallback.
 - Do not rebalance existing content accidentally during adapter migration.
 - Do not copy proprietary franchise assets, audio, code, animations, or branded presentation.
+- Per DEC-11, every current/future weapon uses its approved real-world display name while stable machine IDs remain protocol/storage/replay/telemetry authority; a display rename must not fork identity.
+- Per DEC-07, loadouts expose exactly one selected grenade family with spawn/carry cap one; kills never replenish it and the validated corpse-ammo-pickup transaction restores it exactly once.
+- Adding any weapon, grenade or projectile ID must automatically enter every catalog-derived completeness set; validators must mutate the catalog with synthetic future IDs and reject every downstream registry that fails to update.
 
 ### Validator responsibilities
 
@@ -121,7 +132,7 @@ Add, change, select, balance, network, simulate, or verify Atomic Acres killstre
 
 1. Read catalog/schema, protocol, remote-support admission, canonical combat-result path, arena nav metadata, and acceptance rows.
 2. Define cost/tier/selection/activation/entity/authority/presentation policy in the typed catalog.
-3. Freeze five-slot selection at match start and validate unique legal slots.
+3. Freeze exact family-constrained slots at match start: Scout/Adrenaline/Care; Yardhawk/Piloted Drone; two distinct Tri-Pass/Carpet Bomber/Hunter Swarm/Chopper choices; Nuke/Drone Swarm.
 4. Model activation as host-owned stable ID/seed/time/life/revision with exactly-once consume.
 5. For stateful effects, use host fixed-step entities; reliable lifecycle plus bounded lossy pose snapshots.
 6. Derive targeting, navigation, reward, hit, health, ammo, reload, fuel, expiry and damage on the host.
@@ -133,13 +144,15 @@ Add, change, select, balance, network, simulate, or verify Atomic Acres killstre
 
 - Never accept client-authored reward, path, target, ammo, health, hit, damage, or score.
 - Shared RNG uses canonical seed/time, never ambient `Math.random()`.
-- Nuke care-package probability is explicit and exactly 1% if the approved decision retains it.
+- Nuke and Drone Swarm are selectable mutually exclusive slot-5 alternatives; Nuke is also exactly 1% of the derived care pool.
+- The reward pool is a projection of the canonical catalog, never a second authored list. Every present/future eligible nonretired nonrecursive streak appears exactly once; Scout Sweep has a highest-band base weight; every catalog add/rename/retire/cost/weight change recomputes the set and exact safe-integer formula automatically.
+- Chopper flight is always host-AI. The owner may toggle gun-only possession with `F` throughout the 30-second active window; no gun input may enter flight state.
 - Chopper/drone targeting respects hard cover and semantic smoke.
 - Support entities/audio/lights/projectiles are pooled, prewarmed, capped and disposed.
 
 ### Validator responsibilities
 
-`verify-killstreak-catalog.mjs` should check catalog completeness, five-slot legality, exact weights/counts/HP/ammo/durations, authority policy, nav requirements, entity/effect budgets, and required unit/network/visual evidence IDs.
+`verify-killstreak-catalog.mjs` should check catalog completeness, exact slot-family legality, Nuke/Drone exclusion, exact weights/counts/HP/ammo/durations, chopper gun/flight isolation, authority policy, nav requirements, entity/effect budgets, and required unit/network/visual evidence IDs. Its adversarial suite must add at least two synthetic future streaks and mutate rename/retire/cost/base-weight fields, proving automatic care-pool inclusion/recomputation and rejecting stale mirrors.
 
 ## 5. `atomic-acres-destructible-world`
 
@@ -233,12 +246,51 @@ Verify or red-team Atomic Acres multiplayer combat, inventory, weapons, grenades
 
 `run-pass65-combat-matrix.mjs` should provide bounded named groups, exact source/build identity, timeout/cleanup, state-hash summaries, requirement/falsifier IDs, artifact paths and a nonzero exit on missing evidence or threshold failure.
 
-## 8. Skill validation and forward testing
+## 8. `atomic-acres-owner-feedback-gate`
+
+### Trigger description
+
+Reconcile any Atomic Acres owner correction, HITL observation, regression, missing specification item or durable future-facing rule. Use before implementing new feedback and again after integration so no chat statement is treated as implicitly covered.
+
+### Core workflow
+
+1. Atomize each statement without dropping corrections, negations, `all`/future scope or `still`/regression evidence.
+2. Add stable `HF-###` rows with priority, one accountable lane, map/mode scope, falsifier/evidence and lifecycle state.
+3. Map every feedback ID exactly once to the planning matrix and record explicit supersessions.
+4. Update canonical catalogs/contracts before downstream mirrors.
+5. Keep `OPEN`, `IMPLEMENTED`, `VERIFIED` and `HITL` distinct.
+6. Run the ledger verifier, negative self-test and affected domain/runtime evidence.
+7. Hand off exact source identity, evidence, assumptions, unknowns and remaining falsifiers; never infer publish authority.
+
+### Validator responsibilities
+
+`verify-owner-feedback-ledger.mjs` fails duplicate, skipped, malformed, unowned, unscoped or unmapped feedback IDs, unknown planning references, stale latest-ID metadata and missing repository routing rules. Its self-test deliberately mutates a known-good ledger and must prove those defects are rejected.
+
+## 9. `atomic-acres-webgpu-frame-pacing`
+
+### Trigger description
+
+Prevent or diagnose Atomic Acres native-WebGPU freezes, frame-tail regressions, active-frame canvas readbacks, pause-backdrop capture, GPU queue/device errors, or Atomic Acres versus Terminal performance drift. Use for renderer-loop, menu lifecycle, arena streaming, performance and exact-SHA owner-hardware QA work.
+
+### Core workflow
+
+1. Prohibit presented game-canvas readback/copy during active native-WebGPU gameplay.
+2. Use CSS compositor blur for WebGPU pauses; permit only one pause-open 2D copy on the explicit WebGL2 compatibility route.
+3. Run the fail-closed policy mutation verifier and both menu/multiplayer lifecycle gates.
+4. Run installed Chrome at native WebGPU, Quality, 2560x1440 on a clean exact SHA with alternating fresh-context Atomic Acres and Terminal trials.
+5. Gate p50/p95/p99/max, counts over 20/33/50/100 ms, Long Tasks, queue completion, device loss, uncaptured errors and browser/page/request errors.
+6. Preserve the receipt/digest and require Dave's headed HITL on the unchanged candidate before publish.
+
+### Validator responsibilities
+
+`verify-webgpu-frame-pacing-policy.mjs` validates the exact evidence contract and repository source wiring, and its self-test mutates readback, compositor, source identity, browser/backend, viewport, comparator, metric, Long Task, lifecycle, HITL and package/index controls. It must fail closed when any mutation escapes.
+
+## 10. Skill validation and forward testing
 
 When the repo gate opens:
 
 1. Confirm the project-local skill location and repo conventions.
-2. Initialize each real skill with the canonical `skill-creator` script; do not copy this document verbatim into six oversized files.
+2. Initialize each real skill with the canonical `skill-creator` script; do not copy this document verbatim into oversized skill files.
 3. Generate matching `agents/openai.yaml` metadata from the final skill text.
 4. Implement only reusable references/scripts that the repo actually needs.
 5. Run `quick_validate.py` on every folder.

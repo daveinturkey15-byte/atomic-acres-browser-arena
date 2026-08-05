@@ -1,0 +1,349 @@
+import { pngDimensions, readGlb } from './hunter-drone-glb.mjs';
+
+export { pngDimensions, readGlb };
+
+export const SUPPORT_VEHICLE_SPECS = Object.freeze({
+  chopper: Object.freeze({
+    assetId: 'chopper-gunner-vehicle-v1',
+    root: (lod) => `Pass65Chopper_LOD${lod}`,
+    variant: null,
+    material: 'MAT_Pass65Chopper_Armor_PBR',
+    nodes: Object.freeze([
+      'chopper-fuselage', 'chopper-rear-fuselage', 'chopper-tail-boom', 'chopper-tail-fin',
+      'chopper-sleek-cockpit-canopy', 'chopper-first-person-cockpit', 'chopper-gunner-sightline',
+      'chopper-gunner-weapon-view',
+      'chopper-cockpit-dashboard-3d', 'chopper-cockpit-display-cyan', 'chopper-cockpit-display-green',
+      'chopper-cockpit-hud-glass', 'chopper-cockpit-hud-target-ring',
+      'chopper-first-person-camera-socket', 'chopper-main-rotor', 'chopper-tail-rotor',
+      'chopper-player-gun', 'chopper-gun-muzzle-socket',
+      'chopper-forward-socket', 'chopper-muzzle-flash', 'chopper-tracer-action', 'chopper-impact-action',
+    ]),
+    sockets: Object.freeze(['chopper-first-person-camera-socket', 'chopper-gun-muzzle-socket', 'chopper-forward-socket']),
+    forwardSockets: Object.freeze(['chopper-gun-muzzle-socket', 'chopper-forward-socket']),
+    actions: Object.freeze([
+      'Chopper_Main_Rotor_Loop', 'Chopper_Tail_Rotor_Loop',
+      'Chopper_Gun_Recoil', 'Chopper_Gun_Fire', 'Chopper_Muzzle_Flash',
+      'Chopper_Tracer_Pulse', 'Chopper_Impact_Pulse', 'Chopper_Quiet_Loop',
+    ]),
+    minimumAnimationChannels: Object.freeze({
+      Chopper_Main_Rotor_Loop: 1,
+      Chopper_Tail_Rotor_Loop: 1,
+    }),
+    minimumMeshNodes: Object.freeze({
+      'chopper-fuselage': 5,
+      'chopper-rear-fuselage': 5,
+      'chopper-first-person-cockpit': 18,
+      'chopper-gunner-sightline': 8,
+      'chopper-gunner-weapon-view': 3,
+      'chopper-player-gun': 5,
+    }),
+  }),
+  care: Object.freeze({
+    assetId: 'support-aircraft-family-v1',
+    root: (lod) => `Pass65CareAircraft_LOD${lod}`,
+    variant: 'care',
+    material: 'MAT_Pass65SupportAircraft_Armor_PBR',
+    nodes: Object.freeze([
+      'care-aircraft-fuselage', 'care-aircraft-nose', 'care-aircraft-main-wing',
+      'care-aircraft-cargo-bay', 'care-aircraft-cargo-door', 'care-aircraft-cargo-socket',
+      'care-aircraft-forward-socket', 'care-aircraft-propeller-0', 'care-aircraft-propeller-1',
+      'care-aircraft-propeller-2', 'care-aircraft-propeller-3',
+    ]),
+    sockets: Object.freeze(['care-aircraft-cargo-socket', 'care-aircraft-forward-socket']),
+    forwardSockets: Object.freeze(['care-aircraft-forward-socket']),
+    actions: Object.freeze(['Care_Aircraft_Propellers_Loop', 'Care_Cargo_Door_Open', 'Care_Cargo_Drop_Pulse', 'Care_Aircraft_Quiet_Loop']),
+    minimumAnimationChannels: Object.freeze({ Care_Aircraft_Propellers_Loop: 4 }),
+    minimumMeshNodes: Object.freeze({ 'care-aircraft-fuselage': 1, 'care-aircraft-main-wing': 2 }),
+  }),
+  carpet: Object.freeze({
+    assetId: 'support-aircraft-family-v1',
+    root: (lod) => `Pass65CarpetAircraft_LOD${lod}`,
+    variant: 'carpet',
+    material: 'MAT_Pass65SupportAircraft_Carpet_PBR',
+    nodes: Object.freeze([
+      'carpet-aircraft-fuselage', 'carpet-aircraft-nose', 'carpet-aircraft-main-wing',
+      'carpet-aircraft-bomb-bay', 'carpet-aircraft-bomb-door-left', 'carpet-aircraft-bomb-door-right',
+      'carpet-aircraft-bomb-rack', 'carpet-aircraft-bomb-socket', 'carpet-aircraft-forward-socket',
+      'carpet-aircraft-fan-0', 'carpet-aircraft-fan-1', 'carpet-aircraft-fan-2', 'carpet-aircraft-fan-3',
+    ]),
+    sockets: Object.freeze(['carpet-aircraft-bomb-socket', 'carpet-aircraft-forward-socket']),
+    forwardSockets: Object.freeze(['carpet-aircraft-forward-socket']),
+    actions: Object.freeze(['Carpet_Aircraft_Engine_Loop', 'Carpet_Bomb_Bay_Open', 'Carpet_Bomb_Rack_Pulse', 'Carpet_Aircraft_Quiet_Loop']),
+    minimumAnimationChannels: Object.freeze({ Carpet_Aircraft_Engine_Loop: 4, Carpet_Bomb_Bay_Open: 2 }),
+    minimumMeshNodes: Object.freeze({ 'carpet-aircraft-fuselage': 1, 'carpet-aircraft-main-wing': 2 }),
+  }),
+  crate: Object.freeze({
+    assetId: 'support-aircraft-family-v1',
+    root: (lod) => `Pass65CareCrate_LOD${lod}`,
+    variant: 'parachute-crate',
+    material: 'MAT_Pass65SupportAircraft_Crate_PBR',
+    nodes: Object.freeze([
+      'care-package-crate', 'care-package-straps', 'care-package-parachute',
+      'care-parachute-lines', 'care-crate-landing-socket',
+    ]),
+    sockets: Object.freeze(['care-crate-landing-socket']),
+    forwardSockets: Object.freeze([]),
+    actions: Object.freeze(['Care_Parachute_Sway_Loop', 'Care_Parachute_Lines_Loop', 'Care_Parachute_Collapse']),
+    minimumAnimationChannels: Object.freeze({}),
+    minimumMeshNodes: Object.freeze({ 'care-package-crate': 1, 'care-package-parachute': 1, 'care-parachute-lines': 8 }),
+  }),
+});
+
+function descendantMeshCount(json, rootIndex) {
+  const visited = new Set();
+  const visit = (index) => {
+    if (visited.has(index)) return 0;
+    visited.add(index);
+    const node = json.nodes?.[index];
+    if (!node) return 0;
+    return (typeof node.mesh === 'number' ? 1 : 0) + (node.children ?? []).reduce((sum, child) => sum + visit(child), 0);
+  };
+  return visit(rootIndex);
+}
+
+function primitiveTriangles(json) {
+  const instances = new Map();
+  for (const node of json.nodes ?? []) {
+    if (typeof node.mesh === 'number') instances.set(node.mesh, (instances.get(node.mesh) ?? 0) + 1);
+  }
+  let triangles = 0;
+  for (const [meshIndex, mesh] of (json.meshes ?? []).entries()) {
+    for (const primitive of mesh.primitives ?? []) {
+      if ((primitive.mode ?? 4) !== 4) continue;
+      const accessorIndex = primitive.indices ?? primitive.attributes?.POSITION;
+      triangles += ((json.accessors?.[accessorIndex]?.count ?? 0) / 3) * (instances.get(meshIndex) ?? 0);
+    }
+  }
+  return triangles;
+}
+
+function multiplyQuaternion(a, b) {
+  return [
+    a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
+    a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
+    a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
+    a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2],
+  ];
+}
+
+function rotateVector(q, vector) {
+  return multiplyQuaternion(multiplyQuaternion(q, [...vector, 0]), [-q[0], -q[1], -q[2], q[3]]).slice(0, 3);
+}
+
+function nodeWorldTranslation(json, index) {
+  const parents = new Map();
+  for (const [parentIndex, node] of (json.nodes ?? []).entries()) {
+    for (const child of node.children ?? []) parents.set(child, parentIndex);
+  }
+  const resolve = (nodeIndex) => {
+    const node = json.nodes?.[nodeIndex] ?? {};
+    if (node.matrix) throw new Error(`matrix-authored node ${node.name ?? nodeIndex} is unsupported by the axis audit`);
+    const position = node.translation ?? [0, 0, 0];
+    const rotation = node.rotation ?? [0, 0, 0, 1];
+    const scale = node.scale ?? [1, 1, 1];
+    const parentIndex = parents.get(nodeIndex);
+    if (parentIndex === undefined) return { position, rotation, scale };
+    const parent = resolve(parentIndex);
+    const rotated = rotateVector(parent.rotation, position.map((value, axis) => value * parent.scale[axis]));
+    return {
+      position: parent.position.map((value, axis) => value + rotated[axis]),
+      rotation: multiplyQuaternion(parent.rotation, rotation),
+      scale: parent.scale.map((value, axis) => value * scale[axis]),
+    };
+  };
+  return resolve(index).position;
+}
+
+function animationDuration(json, animation) {
+  return Math.max(0, ...(animation.samplers ?? []).map((sampler) => json.accessors?.[sampler.input]?.max?.[0] ?? 0));
+}
+
+export function auditSupportVehicleGlb(json, bytes, family, lod) {
+  const spec = SUPPORT_VEHICLE_SPECS[family];
+  if (!spec) throw new Error(`unknown support vehicle family ${family}`);
+  const failures = [];
+  const nodes = json.nodes ?? [];
+  const nodeIndex = new Map(nodes.map((node, index) => [node.name, index]));
+  for (const name of spec.nodes) if (!nodeIndex.has(name)) failures.push(`${family} LOD${lod}: missing authored node ${name}`);
+  const root = nodes.find((node) => node.name === spec.root(lod));
+  if (!root) failures.push(`${family} LOD${lod}: missing canonical root ${spec.root(lod)}`);
+  if (root?.extras?.asset_id !== spec.assetId) failures.push(`${family} LOD${lod}: wrong asset id`);
+  if (root?.extras?.runtime_forward_axis !== '-Z') failures.push(`${family} LOD${lod}: root does not declare runtime -Z forward`);
+  if (root?.extras?.presentation_only !== true) failures.push(`${family} LOD${lod}: presentation-only boundary missing`);
+  if (spec.variant && root?.extras?.presentation_variant !== spec.variant) failures.push(`${family} LOD${lod}: wrong presentation variant`);
+  const detailCounts = {};
+  if (family === 'chopper') {
+    if (root?.extras?.visual_revision !== 'close-range-tandem-armored-airframe-v4'
+      || root?.extras?.detail_contract !== 'layered-armour-framed-canopy-fasteners-sensors-ordnance-mechanics-v4') {
+      failures.push(`chopper LOD${lod}: authored airframe refinement contract missing`);
+    }
+    const requiredDetail = [
+      ['Chopper_ArmoredNose_', 1],
+      ['Chopper_CheekArmor_', 2],
+      ['Chopper_TandemPilotCanopy_', 1],
+      ['Chopper_TandemGunnerCanopy_', 1],
+      ['Chopper_TandemDivider_', 2],
+      ['Chopper_CanopyCrossBrace_', 3],
+      ['Chopper_EngineIntake_', 2],
+      ['Chopper_EngineExhaust_', 2],
+      ['Chopper_RocketPod_', 2],
+      ['Chopper_RocketPodMuzzleCollar_', 2],
+      ['Chopper_RocketTube_', lod === 0 ? 14 : lod === 1 ? 8 : 2],
+      ['Chopper_Missile_', lod === 0 ? 4 : 2],
+      ['Chopper_SensorLens_', 2],
+      ['Chopper_RotorYoke_', 2],
+      ['Chopper_MainBladeGrip_', 4],
+      ['Chopper_TailBladeGrip_', 4],
+      ['Chopper_TailGearbox_', 1],
+      ['Chopper_GunBarrelCollar_', 3],
+      ['Chopper_GunArmourShroud_', 2],
+      ['Chopper_SkidDamper_', 4],
+    ];
+    if (lod === 0) requiredDetail.push(
+      ['Chopper_OverlappingArmorPlate_', 8], ['Chopper_ArmorFastener_', 16],
+      ['Chopper_DorsalArmorPanel_', 1], ['Chopper_NoseArmorCap_', 1],
+      ['Chopper_EngineDeckLouver_', 4], ['Chopper_CanopyArmourBrow_', 2],
+      ['Chopper_CanopyRoofArmor_', 1], ['Chopper_CanopyArmorBolt_', 4],
+      ['Chopper_FuselagePanelSeam_', 6], ['Chopper_GunFeedLink_', 5],
+      ['Chopper_SkidWearShoe_', 4],
+    );
+    else if (lod === 1) requiredDetail.push(
+      ['Chopper_OverlappingArmorPlate_', 4], ['Chopper_DorsalArmorPanel_', 1],
+      ['Chopper_CanopyArmourBrow_', 2],
+    );
+    for (const [prefix, minimum] of requiredDetail) {
+      const count = nodes.filter((node) => node.name?.startsWith(prefix)).length;
+      detailCounts[prefix] = count;
+      if (count < minimum) failures.push(`chopper LOD${lod}: ${prefix} detail count ${count} is below ${minimum}`);
+    }
+  } else if (family === 'care') {
+    if (root?.extras?.visual_revision !== 'close-range-heavy-cargo-aircraft-v4'
+      || root?.extras?.detail_contract !== 'framed-flightdeck-panelled-hull-ramp-bogie-turbofans-v4') {
+      failures.push(`care LOD${lod}: heavy cargo-aircraft refinement contract missing`);
+    }
+    const requiredDetail = [
+      ['Care_FlightDeckOuterFrame_', 2], ['Care_TurbofanIntakeRing_', 4],
+      ['Care_TurbofanExhaustRing_', 4], ['Care_PropBlade_', lod === 0 ? 40 : lod === 1 ? 28 : 16],
+      ['Care_FuselagePanel_', 10], ['Care_MainGearSponson_', 2],
+      ['Care_RearCargoRamp_', 1], ['Care_RearCargoAperture_', 1],
+      ['Care_NoseWheel_', 2], ['Care_MainWheel_', lod < 2 ? 6 : 4],
+    ];
+    if (lod < 2) requiredDetail.push(
+      ['Care_WingPanelBreak_', 6], ['Care_RampTrack_', 3],
+      ['Care_RampCrossRib_', 3], ['Care_RampHinge_', 2],
+      ['Care_RampLockHousing_', 2], ['Care_MainGearBogieBeam_', 2],
+    );
+    if (lod === 0) requiredDetail.push(
+      ['Care_FlightDeckArmourBrow_', 1], ['Care_FlightDeckCheekArmor_', 2],
+      ['Care_FlightDeckFastener_', 6], ['Care_FlightDeckFrontPane_', 4],
+      ['Care_FlightDeckFrontMullion_', 3], ['Care_RearApertureHeader_', 1],
+      ['Care_RearApertureFrame_', 2], ['Care_FuselageLongitudinalBreak_', 4],
+      ['Care_FuselageServiceHatch_', 6], ['Care_FuselageServiceLatch_', 6],
+      ['Care_NoseWheelHub_', 2], ['Care_MainGearDragBrace_', 2], ['Care_MainWheelHub_', 6],
+    );
+    for (const [prefix, minimum] of requiredDetail) {
+      const count = nodes.filter((node) => node.name?.startsWith(prefix)).length;
+      detailCounts[prefix] = count;
+      if (count < minimum) failures.push(`care LOD${lod}: ${prefix} detail count ${count} is below ${minimum}`);
+    }
+  } else if (family === 'carpet') {
+    if (root?.extras?.visual_revision !== 'close-range-stealth-flying-wing-v4'
+      || root?.extras?.detail_contract !== 'framed-intakes-service-panels-bay-structure-tailless-v4') {
+      failures.push(`carpet LOD${lod}: stealth flying-wing refinement contract missing`);
+    }
+    const requiredDetail = [
+      ['Carpet_BlendedCentreBody_', 1], ['Carpet_SweptWing_', 2],
+      ['Carpet_TrailingControl_', 6], ['Carpet_BuriedIntake_', 4],
+      ['Carpet_IntakeLip_', 4], ['Carpet_FanBlade_', lod === 0 ? 32 : lod === 1 ? 24 : 12],
+      ['Carpet_ExhaustSlot_', 4], ['Carpet_BombBayCavity_', 1], ['Carpet_BombBayRail_', 3],
+    ];
+    if (lod < 2) requiredDetail.push(
+      ['Carpet_WingPanelSeam_', 8], ['Carpet_BombBayCrossFrame_', 4],
+      ['Carpet_BombBaySideFrame_', 2], ['Carpet_BombDoorHinge_', 4],
+    );
+    if (lod === 0) requiredDetail.push(
+      ['Carpet_WingServicePanel_', 6], ['Carpet_WingServiceLatch_', 6],
+      ['Carpet_IntakeSplitter_', 4], ['Carpet_IntakeFrame_', 8],
+    );
+    for (const [prefix, minimum] of requiredDetail) {
+      const count = nodes.filter((node) => node.name?.startsWith(prefix)).length;
+      detailCounts[prefix] = count;
+      if (count < minimum) failures.push(`carpet LOD${lod}: ${prefix} detail count ${count} is below ${minimum}`);
+    }
+    if (nodes.some((node) => /^Carpet_(?:TailFin|TailPlane)_/u.test(node.name ?? ''))) {
+      failures.push(`carpet LOD${lod}: conventional tail surfaces violate the flying-wing silhouette contract`);
+    }
+  } else if (family === 'crate') {
+    if (root?.extras?.visual_revision !== 'close-range-rigged-pallet-drop-v4'
+      || root?.extras?.detail_contract !== 'corner-guards-buckles-latches-crossweb-ribbed-canopy-v4') {
+      failures.push(`crate LOD${lod}: parachute/crate refinement contract missing`);
+    }
+    const requiredDetail = [
+      ['Care_CrateLid_', 1], ['Care_CratePallet_', 1], ['Care_CratePalletSlat_', 3],
+      ['Care_CrateCornerGuard_', 4], ['Care_CrateBuckle_', 2],
+      ['Care_ParachuteRib_', lod === 0 ? 12 : 8], ['Care_ParachuteSkirt_', 1], ['Care_ParachuteVent_', 1],
+    ];
+    if (lod === 0) requiredDetail.push(
+      ['Care_CrateLatch_', 4], ['Care_CrateLatchPin_', 4], ['Care_PalletTieDownCleat_', 4],
+    );
+    for (const [prefix, minimum] of requiredDetail) {
+      const count = nodes.filter((node) => node.name?.startsWith(prefix)).length;
+      detailCounts[prefix] = count;
+      if (count < minimum) failures.push(`crate LOD${lod}: ${prefix} detail count ${count} is below ${minimum}`);
+    }
+  }
+
+  for (const socket of spec.sockets) {
+    const index = nodeIndex.get(socket);
+    if (index === undefined || typeof nodes[index]?.mesh === 'number') failures.push(`${family} LOD${lod}: ${socket} must be an authored empty socket`);
+  }
+  for (const socket of spec.forwardSockets) {
+    const index = nodeIndex.get(socket);
+    if (index !== undefined && nodeWorldTranslation(json, index)[2] >= -0.4) failures.push(`${family} LOD${lod}: ${socket} is not forward on local -Z`);
+  }
+  for (const [name, minimum] of Object.entries(spec.minimumMeshNodes)) {
+    const index = nodeIndex.get(name);
+    if (index === undefined || descendantMeshCount(json, index) < minimum) failures.push(`${family} LOD${lod}: ${name} lacks authored silhouette depth`);
+  }
+
+  const animations = new Map((json.animations ?? []).map((animation) => [animation.name, animation]));
+  for (const name of spec.actions) {
+    const animation = animations.get(name);
+    if (!animation) failures.push(`${family} LOD${lod}: missing animation ${name}`);
+    else if ((animation.channels?.length ?? 0) < (spec.minimumAnimationChannels[name] ?? 1)) failures.push(`${family} LOD${lod}: ${name} has insufficient channels`);
+    else if (animationDuration(json, animation) <= 0.03) failures.push(`${family} LOD${lod}: ${name} has no useful duration`);
+  }
+
+  const material = (json.materials ?? []).find((candidate) => candidate.name === spec.material);
+  if (!material?.pbrMetallicRoughness?.baseColorTexture) failures.push(`${family} LOD${lod}: albedo binding missing`);
+  if (!material?.normalTexture) failures.push(`${family} LOD${lod}: normal binding missing`);
+  if (!material?.pbrMetallicRoughness?.metallicRoughnessTexture) failures.push(`${family} LOD${lod}: ORM metallic/roughness binding missing`);
+  if (!material?.occlusionTexture) failures.push(`${family} LOD${lod}: ORM occlusion binding missing`);
+  if (!material?.emissiveTexture) failures.push(`${family} LOD${lod}: emissive binding missing`);
+  if ((json.images ?? []).length < 4) failures.push(`${family} LOD${lod}: complete embedded PBR image set missing`);
+  if ((json.images ?? []).some((image) => image.uri) || (json.buffers ?? []).some((buffer) => buffer.uri)) failures.push(`${family} LOD${lod}: external URI is forbidden`);
+  const primitives = (json.meshes ?? []).flatMap((mesh) => mesh.primitives ?? []);
+  if (!primitives.some((primitive) => primitive.attributes?.TEXCOORD_0 !== undefined && primitive.attributes?.TANGENT !== undefined)) failures.push(`${family} LOD${lod}: no UV+tangent primitive`);
+  for (const extension of ['EXT_meshopt_compression', 'KHR_mesh_quantization', 'EXT_texture_webp']) {
+    if (!(json.extensionsUsed ?? []).includes(extension)) failures.push(`${family} LOD${lod}: optimized extension ${extension} missing`);
+  }
+  const triangles = primitiveTriangles(json);
+  const triangleRanges = {
+    chopper: [[45_000, 60_000], [36_000, 50_000], [20_000, 32_000]],
+    care: [[16_000, 18_000], [13_000, 16_000], [10_000, 13_000]],
+    carpet: [[10_500, 12_000], [8_500, 9_800], [4_800, 5_800]],
+    crate: [[5_500, 7_000], [4_000, 5_000]],
+  };
+  const [minimum, maximum] = triangleRanges[family]?.[lod] ?? [Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY];
+  if (triangles < minimum || triangles > maximum) {
+    failures.push(`${family} LOD${lod}: ${triangles} triangles outside authored ${minimum}-${maximum} budget`);
+  }
+  if (bytes < 70_000 || bytes > 3_000_000) failures.push(`${family} LOD${lod}: ${bytes} bytes outside optimized budget`);
+  return Object.freeze({
+    failures: Object.freeze(failures), triangles, bytes,
+    meshNodes: nodes.filter((node) => typeof node.mesh === 'number').length,
+    materials: (json.materials ?? []).length, images: (json.images ?? []).length,
+    animations: Object.freeze([...animations.keys()]), externalUris: (json.images ?? []).filter((image) => image.uri).length + (json.buffers ?? []).filter((buffer) => buffer.uri).length,
+    detailCounts: Object.freeze(detailCounts),
+  });
+}

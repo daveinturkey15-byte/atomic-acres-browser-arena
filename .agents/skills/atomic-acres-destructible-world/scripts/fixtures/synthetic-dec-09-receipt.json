@@ -1,0 +1,19 @@
+{
+  "receiptVersion": 1,
+  "id": "DEC-09",
+  "status": "FROZEN",
+  "syntheticFixtureOnly": true,
+  "sourceDecisionStatus": "OPEN",
+  "value": {
+    "arenaClassifications": [
+      {"arenaId": "atomic-acres", "displayName": "Nuke Town", "classification": "outdoor", "shedEligibleZones": ["whole-arena"], "minimumSheds": 2},
+      {"arenaId": "skyline-terminal", "displayName": "Terminal", "classification": "mixed", "shedEligibleZones": ["terminal-apron"], "minimumSheds": 2},
+      {"arenaId": "rustworks-1v1", "displayName": "RustRig", "classification": "outdoor", "shedEligibleZones": ["whole-arena"], "minimumSheds": 2},
+      {"arenaId": "gun-range", "displayName": "Gun Range", "classification": "indoor", "shedEligibleZones": [], "minimumSheds": 0}
+    ]
+  },
+  "rationale": "Synthetic forward-test authority mirrors the Pass 65 DEC-09 recommended value and is not Dave approval.",
+  "owner": "synthetic-fixture-not-owner-approval",
+  "recordedAt": "2026-07-26T00:00:00Z",
+  "resolvedAt": "2026-07-26T00:00:00Z"
+}

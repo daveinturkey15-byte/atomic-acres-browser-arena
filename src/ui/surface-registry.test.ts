@@ -1,10 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { UI_REVIEW_VIEWPORTS, UI_STATE_INVENTORY, UI_SURFACE_INVENTORY } from './surface-registry';
+import {
+  UI_HIGH_DPI_REVIEW_VIEWPORT,
+  UI_REVIEW_VIEWPORTS,
+  UI_STATE_INVENTORY,
+  UI_SURFACE_INVENTORY,
+} from './surface-registry';
 
 const mainSource = readFileSync(new URL('../legacy-main.ts', import.meta.url), 'utf8');
 const generatedDialogSources = [
   readFileSync(new URL('./pass64-shell.ts', import.meta.url), 'utf8'),
+  readFileSync(new URL('./killstreak-loadout-menu.ts', import.meta.url), 'utf8'),
   readFileSync(new URL('./project-map-dialog.ts', import.meta.url), 'utf8'),
   readFileSync(new URL('./release-history-dialog.ts', import.meta.url), 'utf8'),
 ].join('\n');
@@ -47,9 +53,18 @@ describe('Pass 64 typed UI surface contract', () => {
     expect(UI_STATE_INVENTORY).toEqual(expect.arrayContaining([
       'host', 'guest', 'reconnecting', 'syncing', 'ready', 'live', 'dead',
       'respawning', 'match-ended', 'returned-lobby', 'modal-open', 'chat-typing',
-      'error', 'reduced-motion', 'high-dpi',
+      'error', 'reduced-motion', 'pointer-lock-requesting', 'pointer-lock-denied',
+      'focus-suspended', 'paused-match', 'high-dpi',
     ]));
-    expect(UI_REVIEW_VIEWPORTS.map(({ id }) => id)).toEqual(['laptop', 'desktop', 'ultrawide', 'narrow']);
+    expect(UI_REVIEW_VIEWPORTS.map(({ id }) => id)).toEqual([
+      'laptop', 'review', 'desktop', 'owner', 'ultrawide', 'narrow',
+    ]);
+    expect(UI_REVIEW_VIEWPORTS.map(({ width, height }) => `${width}x${height}`)).toEqual([
+      '1280x720', '1600x900', '1920x1080', '2560x1440', '3440x1440', '390x844',
+    ]);
+    expect(UI_HIGH_DPI_REVIEW_VIEWPORT).toEqual({
+      id: 'high-dpi', width: 1280, height: 720, deviceScaleFactor: 2,
+    });
   });
 
   it('registers the railgun thermal scope as a critical rendered and styled HUD surface', () => {
@@ -61,6 +76,32 @@ describe('Pass 64 typed UI surface contract', () => {
     });
     expect(mainSource).toContain("element<HTMLElement>('#railgun-thermal')");
     expect(tacticalCssSource).toContain('#railgun-thermal');
+  });
+
+  it('registers the M14 smoke-only thermal scope as a critical rendered and styled HUD surface', () => {
+    expect(UI_SURFACE_INVENTORY.find(({ id }) => id === 'dmr-thermal')).toEqual({
+      id: 'dmr-thermal',
+      rootElementId: 'dmr-thermal',
+      renderer: 'match-hud',
+      critical: true,
+    });
+    expect(mainSource).toContain("element<HTMLElement>('#dmr-thermal')");
+    expect(tacticalCssSource).toContain('#dmr-thermal');
+  });
+
+  it('registers one zero-readback compositor active-match pause backdrop', () => {
+    expect(UI_SURFACE_INVENTORY.find(({ id }) => id === 'match-pause-backdrop')).toEqual({
+      id: 'match-pause-backdrop',
+      rootElementId: 'match-pause-backdrop',
+      renderer: 'main-shell',
+      critical: true,
+    });
+    expect(generatedDialogSources).toContain('data-frame-provenance="game-canvas-css-compositor"');
+    expect(generatedDialogSources).toContain('data-periodic-readback-count="0"');
+    expect(generatedDialogSources).not.toContain('<canvas id="match-pause-backdrop"');
+    expect(generatedDialogSources).not.toContain('atomic-acres-menu-squad-joke.jpg');
+    expect(tacticalCssSource).toContain('#match-pause-backdrop');
+    expect(mainSource).not.toContain('retainLatestGameplayBackdrop');
   });
 
   it('keeps canonical text and status colours above AA contrast on the primary panel', () => {

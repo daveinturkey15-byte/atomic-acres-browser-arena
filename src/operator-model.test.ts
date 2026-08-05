@@ -1,14 +1,36 @@
 import * as THREE from 'three';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   BOT_EMISSIVE_BRIGHTNESS_SCALE,
+  FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY,
+  RIGGED_OPERATOR_RUNTIME_ACTION_NAMES,
   applyBotEmissiveBrightness,
+  createOperatorInstanceMaterialResolver,
+  firstPersonArmMaterialReadabilityProfile,
   isEmbeddedWeaponObjectName,
   riggedStanceTarget,
+  riggedOperatorRuntimeClips,
   suppressEmbeddedWeaponObjects,
 } from './operator-model';
 
 describe('rigged operator presentation contract', () => {
+  it('bounds first-person readability fill without flattening PBR into self-lit plastic', () => {
+    const profiles = [
+      firstPersonArmMaterialReadabilityProfile('Skin'),
+      firstPersonArmMaterialReadabilityProfile('Arms_Glove_PBR'),
+      firstPersonArmMaterialReadabilityProfile('Arms_FingerGlove_PBR'),
+      firstPersonArmMaterialReadabilityProfile('Arms_Sleeve_PBR'),
+      firstPersonArmMaterialReadabilityProfile('Arms_ArmorPad_PBR'),
+    ];
+    expect(profiles.every((profile) => profile !== null)).toBe(true);
+    for (const profile of profiles) {
+      expect(profile!.emissiveIntensity).toBeGreaterThan(0);
+      expect(profile!.emissiveIntensity).toBeLessThanOrEqual(FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY);
+    }
+    expect(firstPersonArmMaterialReadabilityProfile('Arms_Glove_PBR')?.emissiveIntensity).toBeGreaterThan(0.6);
+    expect(firstPersonArmMaterialReadabilityProfile('unrelated-world-operator')).toBeNull();
+  });
+
   it('halves bot emissive brightness idempotently without changing base colour', () => {
     const root = new THREE.Group();
     const material = new THREE.MeshStandardMaterial({ color: 0xd85cff, emissive: 0x7d16bd, emissiveIntensity: 1.2 });
@@ -48,5 +70,42 @@ describe('rigged operator presentation contract', () => {
     expect(prone.pivotPitch).toBeGreaterThan(-Math.PI / 2);
     expect(prone.pivotPitch).toBeLessThan(-1.3);
     expect(prone).toMatchObject({ crouch: 0, prone: 1 });
+  });
+
+  it('reuses one material clone inside an operator without sharing mutable ownership across operators', () => {
+    const source = new THREE.MeshStandardMaterial({ color: 0x507080, roughness: 0.61, metalness: 0.17 });
+    source.name = 'Swat';
+    const resolveFirstOwner = createOperatorInstanceMaterialResolver(0, false, 'team');
+    const resolveSecondOwner = createOperatorInstanceMaterialResolver(0, false, 'team');
+
+    const firstMeshMaterial = resolveFirstOwner(source);
+    const siblingMeshMaterial = resolveFirstOwner(source);
+    const secondOwnerMaterial = resolveSecondOwner(source);
+
+    expect(firstMeshMaterial).toBe(siblingMeshMaterial);
+    expect(firstMeshMaterial).not.toBe(source);
+    expect(secondOwnerMaterial).not.toBe(firstMeshMaterial);
+    expect((firstMeshMaterial as THREE.MeshStandardMaterial).color.getHex()).toBe(0x2d7882);
+    expect((secondOwnerMaterial as THREE.MeshStandardMaterial).color.getHex()).toBe(0x2d7882);
+
+    const secondOwnerDisposed = vi.fn();
+    secondOwnerMaterial.addEventListener('dispose', secondOwnerDisposed);
+    firstMeshMaterial.dispose();
+    expect(secondOwnerDisposed).not.toHaveBeenCalled();
+  });
+
+  it('admits only controller-reachable authored clips in deterministic prewarm order', () => {
+    const authored = [
+      new THREE.AnimationClip('Wave', 1, []),
+      ...[...RIGGED_OPERATOR_RUNTIME_ACTION_NAMES].reverse().map((name) => new THREE.AnimationClip(name, 1, [])),
+      new THREE.AnimationClip('Roll', 1, []),
+    ];
+
+    const runtimeClips = riggedOperatorRuntimeClips(authored);
+    expect(runtimeClips.map((clip) => clip.name)).toEqual(RIGGED_OPERATOR_RUNTIME_ACTION_NAMES);
+    expect(runtimeClips).toHaveLength(12);
+    expect(runtimeClips).not.toContain(authored[0]);
+    expect(runtimeClips).not.toContain(authored.at(-1));
+    expect(runtimeClips.every((clip) => authored.includes(clip))).toBe(true);
   });
 });

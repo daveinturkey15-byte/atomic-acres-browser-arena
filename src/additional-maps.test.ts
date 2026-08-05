@@ -7,6 +7,7 @@ import {
   GUN_RANGE_FIRING_LINE_BARRIER,
   GUN_RANGE_FIRING_LINE_Z,
   RUSTWORKS_TOWER,
+  RUSTWORKS_CONTAINER_LIGHTS,
   RUSTWORKS_WORK_LIGHTS,
   applyAdditionalMapPresentationProfile,
   applyRustworksPresentationProfile,
@@ -16,11 +17,18 @@ import {
   fitCanvasText,
   rustworksDeckTopY,
   updateGunRangePresentation,
+  updateGunRangeTestBayDoor,
 } from './additional-maps';
+import {
+  GUN_RANGE_TEST_BAY_CONTRACT,
+  createGunRangeTestBayDoorState,
+  gunRangeTestBayDoorDynamicColliders,
+} from './gun-range-test-bay';
 import type { ArenaMap } from './map';
 import type { Stance } from './gameplay';
 import { CharacterPhysics, STANCE_SHAPES } from './physics';
 import { definition as rustworksVisualDefinition } from './rendering/arenas/rustworks-1v1';
+import { definition as gunRangeVisualDefinition } from './rendering/arenas/gun-range';
 import { definition as terminalVisualDefinition } from './rendering/arenas/skyline-terminal';
 
 type RouteAnchor = { id: string; position: [number, number, number] };
@@ -190,14 +198,18 @@ describe('additional authored maps', () => {
     const map = buildRustworks1v1(new THREE.Scene());
     const lightAudit = map.root.userData.rustworksWorkLightAudit as {
       fixtures: Array<{ id: string; position: number[]; target: number[]; emissiveOnlyLens: boolean; shadowedLocalVolume: boolean }>;
+      containerFixtures: Array<{ id: string; position: number[]; target: number[]; color: number; shadowedLocalVolume: boolean }>;
       shadowedLocalVolumes: number;
       maximumShadowCastersIncludingMoon: number;
     };
     expect(lightAudit).toMatchObject({
-      shadowedLocalVolumes: 2,
-      maximumShadowCastersIncludingMoon: 3,
+      shadowedLocalVolumes: 6,
+      maximumShadowCastersIncludingMoon: 7,
     });
     expect(lightAudit.fixtures).toHaveLength(2);
+    expect(lightAudit.containerFixtures).toHaveLength(4);
+    expect(lightAudit.containerFixtures.map(({ id }) => id)).toEqual(RUSTWORKS_CONTAINER_LIGHTS.map(({ id }) => id));
+    expect(lightAudit.containerFixtures.map(({ color }) => color)).toEqual(RUSTWORKS_CONTAINER_LIGHTS.map(({ color }) => color));
     expect(lightAudit.fixtures.map((fixture) => fixture.id)).toEqual(RUSTWORKS_WORK_LIGHTS.map((fixture) => fixture.id));
     for (const fixture of RUSTWORKS_WORK_LIGHTS) {
       const lens = map.root.getObjectByName(`rustworks-work-light-lens-${fixture.id}`) as THREE.Mesh;
@@ -368,6 +380,50 @@ describe('additional authored maps', () => {
       onlyShippingContainers: true,
     });
     expect(layout.minimumTowerDistance).toBeGreaterThan(15);
+    const practicalAudit = map.root.userData.rustworksContainerPracticalAudit as {
+      ids: string[];
+      count: number;
+      palette: number[];
+      fixtureOcclusionPolicy: string;
+      dynamicOcclusionPolicy: string;
+      shadowedDynamicFill: string;
+      dynamicPracticalIds: string[];
+    };
+    expect(practicalAudit).toMatchObject({
+      count: 8,
+      palette: [0xff4d2e, 0xff9a3d, 0xffd25a],
+      fixtureOcclusionPolicy: 'emissive-only',
+      dynamicOcclusionPolicy: 'shadowed-local',
+      shadowedDynamicFill: 'four-cluster-container-practical-pulse',
+    });
+    expect(practicalAudit.dynamicPracticalIds).toEqual(
+      RUSTWORKS_CONTAINER_LIGHTS.map(({ id }) => `container-dynamic-${id}`),
+    );
+    expect(practicalAudit.ids).toHaveLength(8);
+    const practicalColours = new Set<number>();
+    const practicalPaletteIndexes = new Set<number>();
+    for (const id of practicalAudit.ids) {
+      const practical = map.root.getObjectByName(id) as THREE.Mesh;
+      expect(practical).toBeInstanceOf(THREE.Mesh);
+      expect(practical.userData).toMatchObject({
+        occlusionPolicy: 'emissive-only',
+        practicalPolicyId: 'container-interior-warm-practicals',
+        containerInterior: true,
+      });
+      const material = practical.material as THREE.MeshStandardMaterial;
+      expect(material.emissiveIntensity).toBeGreaterThanOrEqual(1.55);
+      practicalColours.add(material.emissive.getHex());
+      practicalPaletteIndexes.add(Number(practical.userData.paletteIndex));
+    }
+    expect([...practicalColours].sort((a, b) => a - b)).toEqual([0xff4d2e, 0xff9a3d, 0xffd25a].sort((a, b) => a - b));
+    expect([...practicalPaletteIndexes].sort()).toEqual([0, 1, 2]);
+    for (const fixture of RUSTWORKS_CONTAINER_LIGHTS) {
+      const visibleFixture = practicalAudit.ids
+        .map((id) => map.root.getObjectByName(id) as THREE.Mesh)
+        .find((mesh) => mesh.position.distanceTo(new THREE.Vector3(...fixture.position)) < 0.1);
+      expect(visibleFixture, `${fixture.id}:visible-fixture`).toBeInstanceOf(THREE.Mesh);
+      expect((visibleFixture!.material as THREE.MeshStandardMaterial).emissive.getHex()).toBe(fixture.color);
+    }
     expect(RUSTWORKS_TOWER.openContainerClearWidth).toBeGreaterThan(0.38 * 2 + 1.4);
     expect(RUSTWORKS_TOWER.openContainerClearHeight).toBeGreaterThan(1.82 + 0.5);
     const openRoutes = map.root.userData.rustworksOpenContainerRoutes as Array<{
@@ -581,17 +637,19 @@ describe('additional authored maps', () => {
     const map = buildGunRange(new THREE.Scene());
     expect(map.id).toBe('gun-range');
     expect(map.label).toBe('Indoor Gun Range');
-    expect(map.targets).toHaveLength(14);
-    expect(map.targets.filter((target) => target.distanceBand === 'near')).toHaveLength(7);
-    expect(map.targets.filter((target) => target.distanceBand === 'mid')).toHaveLength(4);
-    expect(map.targets.filter((target) => target.distanceBand === 'far')).toHaveLength(3);
-    expect(map.targets.map((target) => target.scoreValue).sort((a, b) => a - b)).toEqual([
-      50, 50, 50, 50, 100, 100, 100, 200, 200, 200, 300, 300, 300, 500,
+    const scoreRangeTargets = map.targets.filter((target) => target.kind !== 'training-dummy');
+    expect(scoreRangeTargets).toHaveLength(16);
+    expect(scoreRangeTargets.filter((target) => target.distanceBand === 'near')).toHaveLength(7);
+    expect(scoreRangeTargets.filter((target) => target.distanceBand === 'mid')).toHaveLength(6);
+    expect(scoreRangeTargets.filter((target) => target.distanceBand === 'far')).toHaveLength(3);
+    expect(scoreRangeTargets.map((target) => target.scoreValue).sort((a, b) => a - b)).toEqual([
+      50, 50, 50, 50, 100, 100, 100, 200, 200, 200, 250, 250, 300, 300, 300, 500,
     ]);
     expect(map.targets.every((target) => target.root.userData.scoreValue === target.scoreValue)).toBe(true);
     expect(map.targets.filter((target) => target.kind === 'plate').every((target) => target.maxHealth === 500 && target.health === 500)).toBe(true);
-    expect(map.targets.filter((target) => target.kind === 'plate').every((target) => target.root.getObjectByName('range-bullseye')?.userData.hitZone === 'head')).toBe(true);
-    expect(map.targets.filter((target) => target.kind === 'plate').every((target) => target.root.children.some((child) => /point-range-plate/.test(child.name) && child.userData.hitZone === 'body'))).toBe(true);
+    const staticPlates = map.targets.filter((target) => target.kind === 'plate' && !target.id.startsWith('lateral-'));
+    expect(staticPlates.every((target) => target.root.getObjectByName('range-bullseye')?.userData.hitZone === 'head')).toBe(true);
+    expect(staticPlates.every((target) => target.root.children.some((child) => /point-range-plate/.test(child.name) && child.userData.hitZone === 'body'))).toBe(true);
     const cat = map.targets.find((target) => target.id === 'flying-black-cat');
     expect(cat).toMatchObject({ kind: 'flying-cat', maxHealth: 100, health: 100, scoreValue: 500, respawnDelayMs: 30_000, alwaysCritical: true });
     expect(map.root.getObjectByName('gun-range-flying-black-cat')).toBeTruthy();
@@ -615,6 +673,19 @@ describe('additional authored maps', () => {
     expect(map.root.children.filter((child) => child.name === 'gun-range-interior-light')).toHaveLength(7);
     expect(map.root.children.filter((child) => child.name === 'gun-range-cycling-neon-light')).toHaveLength(4);
     expect(map.root.children.filter((child) => child.name === 'gun-range-cycling-neon-strip')).toHaveLength(8);
+    expect(map.root.children.filter((child) => child.name === 'gun-range-floor-neon-strip')).toHaveLength(2);
+    expect(map.root.children.filter((child) => child.name === 'gun-range-ceiling-neon-strip')).toHaveLength(2);
+    expect(map.root.children.filter((child) => child.name === 'gun-range-ceiling-neon-rib')).toHaveLength(4);
+    const presentationBatches = map.root.userData.gunRangePresentationBatches as {
+      sourceMeshes: number;
+      batches: number;
+      savedDrawCalls: number;
+    };
+    expect(presentationBatches.sourceMeshes).toBeGreaterThanOrEqual(30);
+    expect(presentationBatches.batches).toBeGreaterThan(0);
+    expect(presentationBatches.savedDrawCalls).toBeGreaterThanOrEqual(24);
+    expect(map.root.children.some((node) => node.name.startsWith('gun-range-presentation-batch-') && node.visible)).toBe(true);
+    expect(visibleMeshDrawUpperBound(map.root)).toBeLessThanOrEqual(gunRangeVisualDefinition.budgets.maximumDrawCalls);
     expect(auditLocalLightOcclusion(map.root)).toMatchObject({
       activeLocalLights: 0,
       emissiveOnlySources: 16,
@@ -629,15 +700,17 @@ describe('additional authored maps', () => {
     expect(ceilingMaterial.color.getHex()).toBe(0xd7dbdc);
     const neon = map.root.children.find((child) => child.name === 'gun-range-cycling-neon-light') as THREE.PointLight;
     const before = neon.color.getHex();
-    const movingTargetLight = map.root.getObjectByName('gun-range-moving-target-light') as THREE.Mesh;
-    const movingTargetStart = movingTargetLight.position.clone();
+    const lateralTarget = map.root.getObjectByName('gun-range-lateral-illuminated-target') as THREE.Group;
+    const lateralTargetStart = lateralTarget.position.clone();
     const bayMaterial = map.root.userData.gunRangeBayLightMaterial as THREE.MeshStandardMaterial;
     const bayIntensity = bayMaterial.emissiveIntensity;
     updateGunRangePresentation(map.root, 9_000);
     expect(neon.color.getHex()).not.toBe(before);
-    expect(movingTargetLight.position.equals(movingTargetStart)).toBe(false);
-    expect(movingTargetLight.userData.presentationOnly).toBe(true);
-    expect(map.raycastMeshes).not.toContain(movingTargetLight);
+    expect(lateralTarget.position.equals(lateralTargetStart)).toBe(false);
+    expect(lateralTarget.userData.lateralAmplitudeM).toBeGreaterThanOrEqual(3);
+    const lateralPlate = lateralTarget.getObjectByName('gun-range-lateral-target-plate') as THREE.Mesh;
+    expect(lateralPlate).toBeInstanceOf(THREE.Mesh);
+    expect((lateralPlate.material as THREE.MeshStandardMaterial).emissiveIntensity).toBe(2.8);
     expect(bayMaterial.emissiveIntensity).not.toBe(bayIntensity);
     const boothDividers = map.root.children.filter((child) => child.name === 'gun-range-booth-divider');
     expect(boothDividers.map((divider) => divider.position.x)).toEqual([-15, -9, -3, 3, 9, 15]);
@@ -645,9 +718,69 @@ describe('additional authored maps', () => {
     const stations = map.root.children.filter((child) => child.name.startsWith('gun-range-weapon-station-'));
     expect(stations).toHaveLength(5);
     expect(stations.map((station) => station.userData.weapon)).toEqual(['carbine', 'smg', 'lmg', 'scattergun', 'sniper']);
+    const testDummies = map.targets.filter((target) => target.kind === 'training-dummy');
+    expect(testDummies).toHaveLength(4);
+    expect(testDummies.every((target) => target.maxHealth === 300 && target.root.userData.armed === false)).toBe(true);
     expect(map.bounds.maxX - map.bounds.minX).toBeGreaterThanOrEqual(40);
     expect(map.bounds.maxZ - map.bounds.minZ).toBeGreaterThanOrEqual(67);
     expectGunRangeSpawnContract(map);
+  });
+
+  it('builds a collision-backed five-second tunnel and a fail-closed canonical test-bay plan', async () => {
+    const map = buildGunRange(new THREE.Scene());
+    const requiredGeometry = [
+      'gun-range-test-bay-corridor-floor',
+      'gun-range-test-bay-corridor-north-wall',
+      'gun-range-test-bay-corridor-south-wall',
+      'gun-range-test-bay-corridor-ceiling',
+      'gun-range-test-bay-secure-door-leaf',
+      'gun-range-test-bay-floor',
+      'gun-range-test-bay-ceiling',
+      'gun-range-test-bay-east-wall',
+      'gun-range-test-bay-north-wall',
+      'gun-range-test-bay-south-wall',
+    ];
+    for (const name of requiredGeometry) expect(map.root.getObjectByName(name), name).toBeTruthy();
+    expect(map.root.userData.gunRangeTestBayContract).toBe(GUN_RANGE_TEST_BAY_CONTRACT);
+    expect(map.root.userData.gunRangeTestBayRuntime).toEqual({
+      structure: 'implemented',
+      slowUnarmedTargets: 'implemented',
+      doorHelper: 'integrated-by-main-runtime',
+      supportActivation: 'host-authoritative-training-integration',
+      weaponInteraction: 'canonical-training-integration',
+    });
+    expect(namedPrefixCount(map.root, 'gun-range-test-bay-support-pad-')).toBe(
+      GUN_RANGE_TEST_BAY_CONTRACT.supportStations.length,
+    );
+    expect(namedPrefixCount(map.root, 'gun-range-test-bay-weapon-marker-')).toBe(
+      GUN_RANGE_TEST_BAY_CONTRACT.weaponStations.length,
+    );
+
+    // The east wall really is split: movement and ballistics have no static
+    // blocker through the corridor aperture, while both jamb regions remain solid.
+    const portalProbe = { x: 20.5, y: 1.7, z: 12 };
+    expect(isBlocked(portalProbe, map.colliders, 0.38)).toBe(false);
+    expect(isBlocked({ x: 20.5, y: 1.7, z: 5 }, map.colliders, 0.38)).toBe(true);
+    expect(map.shotSurfaces.some((surface) => (
+      surface.bounds.minX <= portalProbe.x && surface.bounds.maxX >= portalProbe.x
+      && surface.bounds.minZ <= portalProbe.z && surface.bounds.maxZ >= portalProbe.z
+      && (surface.bounds.minY ?? -Infinity) <= portalProbe.y && (surface.bounds.maxY ?? Infinity) >= portalProbe.y
+    ))).toBe(false);
+
+    await traverseRoute(map, [
+      { id: 'range-entry', position: [18, 1.7, 12] },
+      { id: 'corridor-entry', position: [22, 1.7, 12] },
+      { id: 'secure-door', position: [51, 1.7, 12] },
+      { id: 'test-bay-centre', position: [72, 1.7, 6] },
+    ]);
+
+    const closed = createGunRangeTestBayDoorState(0);
+    expect(gunRangeTestBayDoorDynamicColliders(closed)).toHaveLength(1);
+    const frame = updateGunRangeTestBayDoor(map.root, 0, GUN_RANGE_TEST_BAY_CONTRACT.door.trigger);
+    expect(frame).toMatchObject({ audioIntent: 'secure-door-opening-thump' });
+    expect(frame.dynamicColliders).toHaveLength(1);
+    const leaf = map.root.getObjectByName('gun-range-test-bay-secure-door-leaf');
+    expect(leaf?.userData.phase).toBe('opening');
   });
 
   it('physically contains the Gun Range player at all four map edges', async () => {
@@ -780,6 +913,34 @@ describe('additional authored maps', () => {
     expect((magenta.material as THREE.MeshStandardMaterial).emissiveIntensity).toBeGreaterThan(1);
   });
 
+  it('provides UVs for every textured Terminal mesh, including both authored wing prisms', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const missingUv: string[] = [];
+    const texturedProperties = [
+      'map', 'alphaMap', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'lightMap', 'emissiveMap',
+    ] as const;
+    map.root.traverse((node) => {
+      if (!(node instanceof THREE.Mesh)) return;
+      const materials = Array.isArray(node.material) ? node.material : [node.material];
+      const textured = materials.some((material) => texturedProperties.some(
+        (property) => (material as THREE.Material & Record<string, unknown>)[property] instanceof THREE.Texture,
+      ));
+      if (textured && !node.geometry.getAttribute('uv')) missingUv.push(node.name || node.uuid);
+    });
+    expect(missingUv).toEqual([]);
+
+    for (const name of ['skyline-quality-wing-port', 'skyline-quality-wing-starboard']) {
+      const wing = map.root.getObjectByName(name) as THREE.Mesh;
+      const position = wing.geometry.getAttribute('position');
+      const uv = wing.geometry.getAttribute('uv');
+      expect(uv.itemSize, name).toBe(2);
+      expect(uv.count, name).toBe(position.count);
+      expect(Array.from(uv.array), name).toSatisfy((values: number[]) => (
+        values.every((value) => Number.isFinite(value) && value >= 0 && value <= 1)
+      ));
+    }
+  });
+
   it('keeps six breakable facade panes independent from the added mullion frames', () => {
     const map = buildSkylineTerminal(new THREE.Scene());
     expect(map.breakableWindows.map((window) => window.id)).toEqual([
@@ -816,7 +977,7 @@ describe('additional authored maps', () => {
     }
   });
 
-  it('applies the Performance/Quality split to Skyline instead of rendering Quality props on low-spec profiles', () => {
+  it('keeps primary Skyline silhouettes visible while reserving secondary detail for Quality', () => {
     const map = buildSkylineTerminal(new THREE.Scene());
     const performanceSign = map.root.getObjectByName('skyline-terminal-main-sign');
     const qualityBoard = map.root.getObjectByName('skyline-flight-display-board');
@@ -837,9 +998,9 @@ describe('additional authored maps', () => {
     applyAdditionalMapPresentationProfile(map.root, 'performance');
     expect(performanceSign?.visible).toBe(true);
     expect(qualityBoard?.visible).toBe(false);
-    expect(qualityNacelles?.visible).toBe(false);
-    expect(qualityShells.every((shell) => shell?.visible === false)).toBe(true);
-    expect((fuselagePlaceholder.material as THREE.Material).colorWrite).toBe(true);
+    expect(qualityNacelles?.visible).toBe(true);
+    expect(qualityShells.every((shell) => shell?.visible === true)).toBe(true);
+    expect((fuselagePlaceholder.material as THREE.Material).colorWrite).toBe(false);
     expect(coreFloor?.visible).not.toBe(false);
     applyAdditionalMapPresentationProfile(map.root, 'blender');
     expect(performanceSign?.visible).toBe(true);
@@ -847,6 +1008,53 @@ describe('additional authored maps', () => {
     expect(qualityNacelles?.visible).toBe(true);
     expect(qualityShells.every((shell) => shell?.visible === true)).toBe(true);
     expect((fuselagePlaceholder.material as THREE.Material).colorWrite).toBe(false);
+    applyAdditionalMapPresentationProfile(map.root, 'compat');
+    expect(qualityBoard?.visible).toBe(false);
+    expect(qualityNacelles?.visible).toBe(true);
+    expect(qualityShells.every((shell) => shell?.visible === true)).toBe(true);
+    expect((fuselagePlaceholder.material as THREE.Material).colorWrite).toBe(false);
+  });
+
+  it('HF-188 binds every retained Terminal placeholder collider to visible authored presentation in every profile', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const audit = map.root.userData.skylineCollisionPresentationAudit as {
+      version: string;
+      entries: Array<{ placeholder: string; authorityId: string | null; presentationNames: string[] }>;
+      unownedPlaceholders: string[];
+    };
+    expect(audit.version).toBe('hf-188-profile-authority-v1');
+    expect(audit.entries.length).toBeGreaterThan(0);
+    expect(audit.unownedPlaceholders).toEqual([]);
+    expect(audit.entries.every((entry) => entry.authorityId && entry.presentationNames.length > 0)).toBe(true);
+
+    for (const profile of ['performance', 'blender', 'compat'] as const) {
+      applyAdditionalMapPresentationProfile(map.root, profile);
+      for (const entry of audit.entries) {
+        const placeholder = map.root.getObjectByName(entry.placeholder) as THREE.Mesh;
+        const materials = Array.isArray(placeholder.material) ? placeholder.material : [placeholder.material];
+        expect(placeholder.userData.skylineCollisionPresentationVisible, `${profile}:${entry.placeholder}:binding`).toBe(true);
+        expect(materials.every((material) => !material.colorWrite && !material.depthWrite), `${profile}:${entry.placeholder}:hidden-proxy`).toBe(true);
+        expect(entry.presentationNames.some((name) => map.root.getObjectByName(name)?.visible), `${profile}:${entry.placeholder}:presentation`).toBe(true);
+      }
+    }
+
+    const engine = map.root.getObjectByName('skyline-jetliner-engine-1') as THREE.Mesh<THREE.BoxGeometry>;
+    const fuel = map.root.getObjectByName('skyline-fuel-trailer') as THREE.Mesh<THREE.BoxGeometry>;
+    expect(engine.geometry.parameters).toMatchObject({ width: 1.9, height: 1.9, depth: 4.1 });
+    expect(fuel.geometry.parameters).toMatchObject({ width: 5.2, height: 2.2, depth: 2.2 });
+    expect(audit.entries.filter((entry) => entry.placeholder.includes('skyline-tarmac-cargo-'))).toHaveLength(10);
+
+    for (const name of new Set(audit.entries.flatMap((entry) => entry.presentationNames))) {
+      const presentation = map.root.getObjectByName(name);
+      if (presentation) presentation.visible = false;
+    }
+    applyAdditionalMapPresentationProfile(map.root, 'performance');
+    for (const entry of audit.entries) {
+      const placeholder = map.root.getObjectByName(entry.placeholder) as THREE.Mesh;
+      const materials = Array.isArray(placeholder.material) ? placeholder.material : [placeholder.material];
+      expect(placeholder.userData.skylineCollisionPresentationVisible, entry.placeholder).toBe(false);
+      expect(materials.every((material) => material.colorWrite && material.depthWrite), entry.placeholder).toBe(true);
+    }
   });
 
   it('gives the Quality aircraft a separate BackSide cabin roof without closing the boarding aperture', () => {

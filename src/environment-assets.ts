@@ -594,45 +594,77 @@ export function addSemanticHouseInteriors(root: THREE.Group): void {
   };
 
   HOUSE_LAYOUT.forEach((house, houseIndex) => {
-    const safeSide = house.team === 0 ? -1 : 1;
-    const safeX = safeSide * 5.8;
-    const diningTable = addPiece(houseIndex, house, 'dining-table', [safeX, 0.86, 3.9], [2.7, 0.18, 1.25], timber, 'timber');
+    // These local centres are the presentation half of map.ts's substantial
+    // furnishing collider contract. Performance may simplify materials and
+    // piece count, but must not substitute a sofa for the kitchen collider or
+    // move solid furniture away from the authority players collide with.
+    const diningX = -3;
+    const diningZ = -2.7;
+    const sofaX = 3.7;
+    const sofaZ = 2.7;
+    const kitchenX = -3.75;
+    const kitchenZ = -5.25;
+    const diningTable = addPiece(houseIndex, house, 'dining-table', [diningX, 0.86, diningZ], [2.7, 0.18, 1.25], timber, 'timber');
+    diningTable.userData.authoritativeCollider = `authored-house-${houseIndex}-dining-collider`;
     diningTable.userData.supportedBy = [];
     for (const legX of [-0.95, 0.95]) for (const legZ of [-0.4, 0.4]) {
-      const leg = addPiece(houseIndex, house, 'dining-table-leg-' + legX + '-' + legZ, [safeX + legX, 0.385, 3.9 + legZ], [0.14, 0.77, 0.14], timber, 'timber');
+      const leg = addPiece(houseIndex, house, 'dining-table-leg-' + legX + '-' + legZ, [diningX + legX, 0.385, diningZ + legZ], [0.14, 0.77, 0.14], timber, 'timber');
       leg.userData.groundedAtY = 0;
       diningTable.userData.supportedBy.push(leg.name);
     }
-    for (const side of [-1, 1]) {
-      addPiece(houseIndex, house, `dining-chair-${side}`, [safeX + side * 1.65, 0.52, 3.9], [0.62, 1.04, 0.62], timber, 'timber');
+    for (const [chairIndex, [x, z]] of [
+      [diningX - 1.72, diningZ], [diningX + 1.72, diningZ],
+      [diningX, diningZ - house.facing * 1.05], [diningX, diningZ + house.facing * 1.05],
+    ].entries()) {
+      const chair = addPiece(houseIndex, house, `dining-chair-${chairIndex}`, [x, 0.6, z], [0.72, 1.2, 0.72], timber, 'timber');
+      chair.userData.authoritativeCollider = `authored-house-${houseIndex}-chair-collider-${chairIndex}`;
     }
 
-    addPiece(houseIndex, house, 'sofa-seat', [safeX, 0.48, -3.8], [3.1, 0.56, 1.28], fabric, 'fabric');
-    addPiece(houseIndex, house, 'sofa-back', [safeX, 1.08, -4.3], [3.1, 1.25, 0.3], fabric, 'fabric');
+    const sofaSeat = addPiece(houseIndex, house, 'sofa-seat', [sofaX, 0.48, sofaZ], [3.1, 0.56, 1.28], fabric, 'fabric');
+    sofaSeat.userData.authoritativeCollider = `authored-house-${houseIndex}-sofa-collider`;
+    addPiece(houseIndex, house, 'sofa-back', [sofaX, 1.08, sofaZ + 0.5], [3.1, 1.25, 0.3], fabric, 'fabric');
     for (const side of [-1, 1]) {
-      addPiece(houseIndex, house, `sofa-arm-${side}`, [safeX + side * 1.45, 0.78, -3.8], [0.24, 0.76, 1.3], fabric, 'fabric');
+      addPiece(houseIndex, house, `sofa-arm-${side}`, [sofaX + side * 1.45, 0.78, sofaZ], [0.24, 0.76, 1.3], fabric, 'fabric');
     }
-    addPiece(houseIndex, house, 'media-console', [-safeX, 0.52, -4.45], [2.5, 0.88, 0.56], darkEquipment, 'dark-equipment');
-    addPiece(houseIndex, house, 'media-screen', [-safeX, 1.55, -4.65], [2.15, 1.25, 0.14], darkEquipment, 'dark-equipment');
+    const coffeeTable = addPiece(houseIndex, house, 'coffee-table', [sofaX - 0.3, 0.36, sofaZ - 1.5], [1.9, 0.72, 0.9], timber, 'timber');
+    coffeeTable.userData.authoritativeCollider = `authored-house-${houseIndex}-coffee-table-collider`;
+    const mediaConsole = addPiece(houseIndex, house, 'media-console', [sofaX, 0.52, -3.1], [2.5, 0.88, 0.56], darkEquipment, 'dark-equipment');
+    mediaConsole.userData.authoritativeCollider = `authored-house-${houseIndex}-media-collider`;
+    addPiece(houseIndex, house, 'media-screen', [sofaX, 1.55, -3.22], [2.15, 1.25, 0.14], darkEquipment, 'dark-equipment');
 
-    const bedFrame = addPiece(houseIndex, house, 'bed-frame', [safeX, 3.78, 3.7], [3.25, 0.28, 2.3], timber, 'timber');
+    const cabinetWidth = 1.25;
+    for (const [cabinetIndex, offset] of [-2.5, -1.25, 0, 1.25, 2.5].entries()) {
+      addPiece(houseIndex, house, `kitchen-base-${cabinetIndex}`, [kitchenX + offset, 0.52, kitchenZ], [cabinetWidth, 0.95, 0.72], metal, 'metal');
+    }
+    const kitchenCounter = addPiece(houseIndex, house, 'kitchen-counter', [kitchenX, 1.05, kitchenZ], [6.5, 0.12, 0.85], timber, 'timber');
+    kitchenCounter.userData.authoritativeCollider = `authored-house-${houseIndex}-kitchen-collider`;
+    addPiece(houseIndex, house, 'kitchen-upper', [kitchenX + 0.62, 1.83, kitchenZ], [5.25, 0.82, 0.62], metal, 'metal');
+    addPiece(houseIndex, house, 'kitchen-fridge', [kitchenX - 2.72, 1.15, kitchenZ], [1.05, 2.3, 0.82], darkEquipment, 'dark-equipment');
+
+    const bedX = 6.1;
+    const bedZ = -2.5;
+    const bedFrame = addPiece(houseIndex, house, 'bed-frame', [bedX, 3.78, bedZ], [3.2, 0.28, 2.2], timber, 'timber');
+    bedFrame.userData.authoritativeCollider = `authored-house-${houseIndex}-upper-bed-collider`;
     bedFrame.userData.supportedBy = [];
     for (const legX of [-1.35, 1.35]) for (const legZ of [-0.92, 0.92]) {
-      const leg = addPiece(houseIndex, house, 'bed-leg-' + legX + '-' + legZ, [safeX + legX, 3.56, 3.7 + legZ], [0.14, 0.16, 0.14], timber, 'timber');
+      const leg = addPiece(houseIndex, house, 'bed-leg-' + legX + '-' + legZ, [bedX + legX, 3.56, bedZ + legZ], [0.14, 0.16, 0.14], timber, 'timber');
       leg.userData.groundedAtY = 3.48;
       bedFrame.userData.supportedBy.push(leg.name);
     }
-    addPiece(houseIndex, house, 'bed-mattress', [safeX, 4.08, 3.7], [3.05, 0.4, 2.1], fabric, 'fabric');
-    addPiece(houseIndex, house, 'bed-pillow', [safeX, 4.42, 4.35], [1.55, 0.24, 0.62], fabric, 'fabric');
+    addPiece(houseIndex, house, 'bed-mattress', [bedX, 4.08, bedZ], [3.05, 0.4, 2.1], fabric, 'fabric');
+    addPiece(houseIndex, house, 'bed-pillow', [bedX, 4.42, bedZ + 0.65], [1.55, 0.24, 0.62], fabric, 'fabric');
 
-    addPiece(houseIndex, house, 'shelving-body', [safeX * 1.42, 4.72, -4.5], [1.3, 2.45, 0.42], timber, 'timber');
+    addPiece(houseIndex, house, 'shelving-body', [-5.4, 4.72, -4.5], [1.3, 2.45, 0.42], timber, 'timber');
     for (const shelfY of [3.85, 4.65, 5.45]) {
-      addPiece(houseIndex, house, `shelf-${shelfY}`, [safeX * 1.42, shelfY, -4.23], [1.2, 0.11, 0.48], timber, 'timber');
+      addPiece(houseIndex, house, `shelf-${shelfY}`, [-5.4, shelfY, -4.23], [1.2, 0.11, 0.48], timber, 'timber');
     }
-    addPiece(houseIndex, house, 'workstation-desk', [safeX, 3.95, -3.55], [2.5, 0.18, 1.05], timber, 'timber');
-    addPiece(houseIndex, house, 'workstation-monitor', [safeX, 4.75, -3.98], [1.35, 0.88, 0.12], darkEquipment, 'dark-equipment');
-    addPiece(houseIndex, house, 'workstation-leg-left', [safeX - 0.95, 3.55, -3.55], [0.13, 0.82, 0.72], metal, 'metal');
-    addPiece(houseIndex, house, 'workstation-leg-right', [safeX + 0.95, 3.55, -3.55], [0.13, 0.82, 0.72], metal, 'metal');
+    const deskX = -3.2;
+    const deskZ = 2.8;
+    const desk = addPiece(houseIndex, house, 'workstation-desk', [deskX, 3.95, deskZ], [2.7, 0.18, 0.92], timber, 'timber');
+    desk.userData.authoritativeCollider = `authored-house-${houseIndex}-upper-desk-collider`;
+    addPiece(houseIndex, house, 'workstation-monitor', [deskX, 4.75, deskZ - 0.38], [1.35, 0.88, 0.12], darkEquipment, 'dark-equipment');
+    addPiece(houseIndex, house, 'workstation-leg-left', [deskX - 0.95, 3.55, deskZ], [0.13, 0.82, 0.72], metal, 'metal');
+    addPiece(houseIndex, house, 'workstation-leg-right', [deskX + 0.95, 3.55, deskZ], [0.13, 0.82, 0.72], metal, 'metal');
   });
 
   root.add(interiors);
@@ -683,13 +715,20 @@ function addNarrativeDressing(root: THREE.Group, reduced: boolean): void {
   }
 }
 
-/** Updates only explicitly presentation-only arena nodes. */
+const arenaFlightMatrix = new THREE.Matrix4();
+const arenaFlightPosition = new THREE.Vector3();
+const arenaFlightRotation = new THREE.Quaternion();
+const arenaFlightEuler = new THREE.Euler();
+const arenaFlightScale = new THREE.Vector3();
+
+/** Updates only explicitly presentation-only arena nodes without per-instance frame allocations. */
 export function updateArenaArt(root: THREE.Group, now: number): void {
   const state = arenaAnimationAt(now);
   const rings = (root.userData.animationRings as THREE.Mesh[] | undefined) ?? [];
-  rings.forEach((ring, index) => {
+  for (let index = 0; index < rings.length; index += 1) {
+    const ring = rings[index];
     ring.rotation.y = state.landmarkYaw * (index % 2 === 0 ? 1 : -1) + index * Math.PI / 3;
-  });
+  }
   const nucleus = root.userData.animationNucleus as THREE.Object3D | undefined;
   if (nucleus) nucleus.scale.setScalar(0.96 + state.beaconPulse * 0.08);
   const beacon = root.userData.animationBeacon as THREE.Mesh | undefined;
@@ -698,30 +737,32 @@ export function updateArenaArt(root: THREE.Group, now: number): void {
     const material = beacon.material;
     if (material instanceof THREE.MeshStandardMaterial) material.emissiveIntensity = 1.7 + state.beaconPulse * 2;
   }
-  const updateFlights = (mesh: THREE.InstancedMesh | undefined, flights: FaunaFlight[], flutter: boolean): void => {
-    if (!mesh) return;
+  const updateFlights = (mesh: THREE.InstancedMesh | undefined, flights: FaunaFlight[] | undefined, flutter: boolean): void => {
+    if (!mesh || !flights) return;
     const seconds = now * 0.001;
-    const matrix = new THREE.Matrix4();
-    for (const [index, flight] of flights.entries()) {
+    for (let index = 0; index < flights.length; index += 1) {
+      const flight = flights[index];
       const angle = flight.phase + seconds * flight.speed;
-      const position = new THREE.Vector3(
+      arenaFlightPosition.set(
         flight.x + Math.cos(angle) * flight.radius,
         flight.height + Math.sin(angle * (flutter ? 3.7 : 1.9)) * (flutter ? 0.18 : 0.6),
         flight.z + Math.sin(angle) * flight.radius,
       );
-      const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+      arenaFlightEuler.set(
         flutter ? Math.sin(angle * 8) * 0.25 : 0,
         -angle + Math.PI / 2,
         flutter ? Math.sin(angle * 12) * 0.45 : Math.sin(angle * 2) * 0.12,
-      ));
+      );
+      arenaFlightRotation.setFromEuler(arenaFlightEuler);
       const pulse = flutter ? 0.72 + Math.abs(Math.sin(angle * 11)) * 0.55 : 1;
-      matrix.compose(position, rotation, new THREE.Vector3(pulse, 1, pulse));
-      mesh.setMatrixAt(index, matrix);
+      arenaFlightScale.set(pulse, 1, pulse);
+      arenaFlightMatrix.compose(arenaFlightPosition, arenaFlightRotation, arenaFlightScale);
+      mesh.setMatrixAt(index, arenaFlightMatrix);
     }
     mesh.instanceMatrix.needsUpdate = true;
   };
-  updateFlights(root.userData.animationButterflies as THREE.InstancedMesh | undefined, (root.userData.butterflyFlights as FaunaFlight[] | undefined) ?? [], true);
-  updateFlights(root.userData.animationBirds as THREE.InstancedMesh | undefined, (root.userData.birdFlights as FaunaFlight[] | undefined) ?? [], false);
+  updateFlights(root.userData.animationButterflies as THREE.InstancedMesh | undefined, root.userData.butterflyFlights as FaunaFlight[] | undefined, true);
+  updateFlights(root.userData.animationBirds as THREE.InstancedMesh | undefined, root.userData.birdFlights as FaunaFlight[] | undefined, false);
 }
 
 /** Builds original Atomic Acres hero vehicles and environmental props. */

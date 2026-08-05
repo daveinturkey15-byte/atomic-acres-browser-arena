@@ -5,7 +5,7 @@ import type { MeleeMessage, PlayerSnapshot } from './protocol';
 const sender: PlayerSnapshot = {
   id: 'remote', name: 'Remote', team: 1,
   x: 0, y: 1.7, z: 0, yaw: 0, pitch: 0,
-  hp: 100, kills: 0, deaths: 0, primary: 'carbine', weapon: 'pistol', seq: 1,
+  hp: 100, kills: 0, deaths: 0, primary: 'carbine', secondary: 'pistol', grenade: 'frag', weapon: 'pistol', seq: 1,
 };
 const action: MeleeMessage = {
   type: 'melee', by: 'remote', origin: [0, 1.7, 0], direction: [0, 0, -1], nonce: 10,

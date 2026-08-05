@@ -34,7 +34,8 @@ export class SupportExplosionPresentation {
   private cursor = 0;
   private emitted = 0;
   private overflowReuses = 0;
-  private wasPrewarmed = false;
+  private gpuPrewarmGeneration: number | null = null;
+  private gpuPrewarmPromise: Promise<void> | null = null;
 
   constructor(scene: THREE.Scene, reducedDetail: boolean) {
     this.root.name = 'support-explosion-pool';
@@ -68,21 +69,94 @@ export class SupportExplosionPresentation {
     }
   }
 
-  async prewarm(runtime: PresentationPrewarmRuntime, camera: THREE.Camera): Promise<void> {
-    if (this.wasPrewarmed) return;
+  async prewarm(
+    runtime: PresentationPrewarmRuntime,
+    camera: THREE.Camera,
+    sceneGeneration = 0,
+  ): Promise<void> {
+    if (this.gpuPrewarmGeneration === sceneGeneration) return;
+    while (this.gpuPrewarmPromise) {
+      const pending = this.gpuPrewarmPromise;
+      try {
+        await pending;
+      } catch {
+        if (this.gpuPrewarmPromise === pending) this.gpuPrewarmPromise = null;
+      }
+      if (this.gpuPrewarmGeneration === sceneGeneration) return;
+    }
+    const operation = this.performGpuPrewarm(runtime, camera, sceneGeneration);
+    this.gpuPrewarmPromise = operation;
+    try {
+      await operation;
+    } finally {
+      if (this.gpuPrewarmPromise === operation) this.gpuPrewarmPromise = null;
+    }
+  }
+
+  private async performGpuPrewarm(
+    runtime: PresentationPrewarmRuntime,
+    camera: THREE.Camera,
+    sceneGeneration: number,
+  ): Promise<void> {
     const parentScene = this.root.parent;
     if (!(parentScene instanceof THREE.Scene)) throw new Error('Support explosion presentation must be attached to a scene before prewarm');
-    for (const slot of this.slots) {
+
+    const objectStates = new Map<THREE.Object3D, Readonly<{
+      visible: boolean;
+      position: THREE.Vector3;
+      quaternion: THREE.Quaternion;
+      scale: THREE.Vector3;
+      frustumCulled: boolean;
+    }>>();
+    const materialOpacities = new Map<THREE.Material, number>();
+    this.root.traverse((node) => {
+      objectStates.set(node, Object.freeze({
+        visible: node.visible,
+        position: node.position.clone(),
+        quaternion: node.quaternion.clone(),
+        scale: node.scale.clone(),
+        frustumCulled: node.frustumCulled,
+      }));
+      node.frustumCulled = false;
+    });
+
+    camera.updateWorldMatrix(true, false);
+    this.root.updateWorldMatrix(true, true);
+    const cameraPosition = camera.getWorldPosition(new THREE.Vector3());
+    const forward = camera.getWorldDirection(new THREE.Vector3());
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0).normalize();
+    const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1).normalize();
+    const columns = 4;
+    const rows = Math.ceil(this.slots.length / columns);
+    const representativeRadius = 4;
+    const representativeProgress = 0.5;
+    this.root.visible = true;
+    for (let index = 0; index < this.slots.length; index += 1) {
+      const slot = this.slots[index]!;
+      materialOpacities.set(slot.flash.material, slot.flash.material.opacity);
+      const column = index % columns;
+      const row = Math.floor(index / columns);
+      const target = cameraPosition.clone()
+        .addScaledVector(forward, 24)
+        .addScaledVector(right, (column - (columns - 1) / 2) * 5.2)
+        .addScaledVector(up, ((rows - 1) / 2 - row) * 5.2);
+      slot.root.position.copy(this.root.worldToLocal(target));
+      slot.root.scale.setScalar(0.25 + representativeProgress * representativeRadius);
       slot.root.visible = true;
-      slot.root.scale.setScalar(0.0001);
+      slot.flash.visible = true;
+      slot.flash.material.opacity = 0.76 * (1 - representativeProgress);
     }
     try {
       await runtime.compileAndRender(this.root, camera, parentScene);
-      this.wasPrewarmed = true;
+      this.gpuPrewarmGeneration = sceneGeneration;
     } finally {
-      for (const slot of this.slots) {
-        slot.root.visible = false;
-        slot.root.scale.setScalar(1);
+      for (const [material, opacity] of materialOpacities) material.opacity = opacity;
+      for (const [node, state] of objectStates) {
+        node.visible = state.visible;
+        node.position.copy(state.position);
+        node.quaternion.copy(state.quaternion);
+        node.scale.copy(state.scale);
+        node.frustumCulled = state.frustumCulled;
       }
     }
   }
@@ -133,7 +207,7 @@ export class SupportExplosionPresentation {
       emitted: this.emitted,
       overflowReuses: this.overflowReuses,
       dynamicLights: 0,
-      prewarmed: this.wasPrewarmed,
+      prewarmed: this.gpuPrewarmGeneration !== null,
     };
   }
 }

@@ -13,7 +13,7 @@ describe('immutable best-build benchmark', () => {
       ok: true,
       releasePass: 'PASS 62',
       sourceSha: '249a7ee77dce761eb237f3eb0e0d0ea1d0356317',
-      currentStablePass: 'PASS 63',
+      currentStablePass: 'PASS 67.1',
       benchmarkIsCurrentStable: false,
     });
   });

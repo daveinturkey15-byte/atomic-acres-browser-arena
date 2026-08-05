@@ -2,7 +2,21 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRiggedOperator, deathRiggedOperator, fireRiggedOperator, meleeRiggedOperator, reactRiggedOperator, resetRiggedOperator, updateRiggedOperator, type OperatorAppearance } from './operator-model';
-import { createImportedWeaponModel } from './weapon-model';
+import { advanceMinigunSpool, createMinigunSpoolState, type MinigunSpoolState } from './minigun-spool';
+import {
+  capturePass65PresentationGeneration,
+  createImportedWeaponModel,
+  createPass65FieldKnifeModel,
+  createPass65CrossbowModel,
+  disposePass65WeaponModel,
+  fireImportedWeapon,
+  isPass65PresentationGenerationCurrent,
+  loadPass65FieldKnifeAsset,
+  loadPass65WeaponPresentation,
+  meleeImportedWeapon,
+  releasePass65WeaponModel,
+  updateImportedWeapon,
+} from './weapon-model';
 import { weaponFinishProfile } from './weapon-finish';
 import { solveTwoBoneElbow } from './ik';
 import { objectLocalGeometryBounds, resolveSocketWorld } from './character-presentation-contract';
@@ -215,7 +229,10 @@ export function optimizeAttachedWeapon(
   materialMode: StaticBatchMaterialMode,
 ): StaticBatchStats {
   if (weapon.userData.attachedWeaponBatchStats) return weapon.userData.attachedWeaponBatchStats as StaticBatchStats;
-  const articulatedNames = new Set(['bolt-or-slide', 'pump', 'curved-magazine', 'lmg-box-magazine', 'straight-magazine', 'pistol-magazine', 'optic-reticle']);
+  const articulatedNames = new Set([
+    'bolt-or-slide', 'pump', 'curved-magazine', 'lmg-box-magazine', 'straight-magazine', 'pistol-magazine', 'optic-reticle',
+    'weapon-action', 'weapon-magazine', 'm134-barrel-cluster',
+  ]);
   const compoundArticulatedNames = ['curved-magazine', 'lmg-box-magazine', 'straight-magazine', 'pistol-magazine'];
   for (const name of compoundArticulatedNames) {
     const articulated = weapon.getObjectByName(name);
@@ -363,9 +380,119 @@ function finalizeWeaponGeometryLod(root: THREE.Group, flattenMaterials: boolean)
   return root;
 }
 
+const PROCEDURAL_WEAPON_BASE: Partial<Record<WeaponId, WeaponId>> = {
+  'mini-uzi': 'smg',
+  mp5: 'smg',
+  m4a1: 'carbine',
+  'ak-47': 'carbine',
+  minigun: 'lmg',
+  'm14-ebr': 'sniper',
+  'slug-shotgun': 'scattergun',
+  'flashlight-pistol': 'pistol',
+  'explosive-crossbow': 'pistol',
+  flamethrower: 'lmg',
+  'flare-gun': 'pistol',
+};
+
+function buildProceduralWeaponVariant(id: WeaponId, baseId: WeaponId, flattenMaterials: boolean): THREE.Group {
+  const root = buildWeaponModel(baseId, flattenMaterials, false);
+  root.name = `${id}-procedural-family-weapon`;
+  root.userData.weaponModelId = `${id}-procedural-family-v1`;
+  root.userData.weaponFinishId = weaponFinishProfile(id).id;
+  root.userData.assetPolicy = 'family-derived-procedural-no-bespoke-claim';
+  const metal = MAT.gunmetal(id);
+  const dark = MAT.dark();
+  const accent = flattenMaterials
+    ? new THREE.MeshBasicMaterial({ color: 0xb8d9dc })
+    : new THREE.MeshStandardMaterial({ color: 0xb8d9dc, roughness: 0.34, metalness: 0.62 });
+
+  if (id === 'mini-uzi') {
+    part(root, roundedBox('mini-uzi-compact-stock', [0.16, 0.17, 0.22], dark, 0.025, 2), [0, 0.01, 0.36]);
+  } else if (id === 'mp5') {
+    part(root, roundedBox('mp5-diode-sight', [0.08, 0.075, 0.1], accent, 0.018, 2), [0, 0.22, -0.12]);
+  } else if (id === 'm4a1') {
+    part(root, roundedBox('m4a1-handguard', [0.22, 0.16, 0.58], dark, 0.028, 3), [0, 0, -0.62]);
+  } else if (id === 'ak-47') {
+    part(root, roundedBox('ak-gas-tube', [0.14, 0.11, 0.72], metal, 0.025, 3), [0, 0.13, -0.68]);
+  } else if (id === 'minigun') {
+    const inheritedBarrel = root.getObjectByName('lmg-long-barrel');
+    if (inheritedBarrel) inheritedBarrel.visible = false;
+    const cluster = new THREE.Group();
+    cluster.name = 'minigun-barrel-cluster';
+    cluster.position.set(0, 0.005, -1.35);
+    root.add(cluster);
+    for (let index = 0; index < 6; index += 1) {
+      const angle = index / 6 * Math.PI * 2;
+      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.024, 1.18, 10), dark);
+      barrel.name = `minigun-barrel-${index}`;
+      barrel.rotation.x = Math.PI / 2;
+      barrel.position.set(Math.cos(angle) * 0.085, Math.sin(angle) * 0.085, -0.1);
+      cluster.add(barrel);
+    }
+    part(root, roundedBox('minigun-ammo-drum', [0.48, 0.48, 0.44], dark, 0.12, 5), [0, -0.3, -0.22]);
+    part(root, roundedBox('minigun-carry-frame', [0.52, 0.08, 0.9], metal, 0.025, 2), [0, 0.25, -0.55]);
+  } else if (id === 'm14-ebr') {
+    part(root, roundedBox('m14-thermal-optic', [0.14, 0.12, 0.36], accent, 0.025, 3), [0, 0.29, -0.18]);
+  } else if (id === 'slug-shotgun') {
+    part(root, roundedBox('slug-saddle', [0.05, 0.16, 0.36], accent, 0.012, 2), [-0.15, 0.02, -0.03]);
+  } else if (id === 'flashlight-pistol') {
+    const lamp = new THREE.Group();
+    lamp.name = 'always-on-flashlight';
+    lamp.position.set(0, -0.12, -0.34);
+    root.add(lamp);
+    const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.052, 0.26, 14), dark);
+    tube.rotation.x = Math.PI / 2;
+    lamp.add(tube);
+    const lens = new THREE.Mesh(new THREE.CircleGeometry(0.045, 16), new THREE.MeshBasicMaterial({ color: 0xeaffff, toneMapped: false }));
+    lens.position.z = -0.135;
+    lamp.add(lens);
+  } else if (id === 'explosive-crossbow') {
+    const inheritedFlash = root.getObjectByName('world-muzzle-flash');
+    if (inheritedFlash) inheritedFlash.visible = false;
+    part(root, roundedBox('bolt-rail', [0.08, 0.07, 0.9], dark, 0.018, 2), [0, 0.09, -0.48]);
+    for (const side of [-1, 1]) {
+      part(root, roundedBox(side < 0 ? 'crossbow-limb-left' : 'crossbow-limb-right', [0.62, 0.055, 0.06], metal, 0.018, 3), [side * 0.31, 0.09, -0.72], [0, side * 0.18, 0]);
+    }
+    const string = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 1.22, 6), accent);
+    string.name = 'crossbow-string';
+    string.rotation.z = Math.PI / 2;
+    string.position.set(0, 0.09, -0.66);
+    root.add(string);
+  } else if (id === 'flamethrower') {
+    const inheritedMagazine = root.getObjectByName('magazine');
+    if (inheritedMagazine) inheritedMagazine.visible = false;
+    for (const side of [-1, 1]) {
+      const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.54, 14), metal);
+      tank.name = side < 0 ? 'flamethrower-fuel-tank-left' : 'flamethrower-fuel-tank-right';
+      tank.position.set(side * 0.16, -0.18, 0.04);
+      root.add(tank);
+    }
+    const hose = new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.018, 8, 22, Math.PI * 1.4), dark);
+    hose.name = 'flamethrower-hose';
+    hose.rotation.set(Math.PI / 2, 0, -0.3);
+    hose.position.set(-0.1, -0.22, -0.36);
+    root.add(hose);
+    part(root, roundedBox('flamethrower-heat-shield', [0.22, 0.18, 0.68], dark, 0.035, 3), [0, 0.02, -0.66]);
+    part(root, roundedBox('flamethrower-igniter', [0.09, 0.1, 0.16], accent, 0.02, 2), [0.09, 0.04, -1.04]);
+  } else if (id === 'flare-gun') {
+    part(root, roundedBox('flare-gun-break-barrel', [0.22, 0.2, 0.58], metal, 0.05, 4), [0, 0.08, -0.46]);
+    part(root, roundedBox('flare-gun-latch', [0.14, 0.07, 0.11], accent, 0.018, 2), [0, 0.21, -0.12]);
+    part(root, roundedBox('flare-gun-front-sight', [0.035, 0.075, 0.05], accent, 0.008, 2), [0, 0.24, -0.7]);
+    part(root, roundedBox('flare-gun-rear-sight', [0.12, 0.06, 0.05], dark, 0.008, 2), [0, 0.24, -0.18]);
+    part(root, roundedBox('flare-gun-trigger-guard', [0.2, 0.05, 0.2], dark, 0.02, 2), [0, -0.14, -0.1]);
+  }
+  return root;
+}
+
 export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferImported = true): THREE.Group {
+  if (id === 'explosive-crossbow') {
+    const authoredCrossbow = createPass65CrossbowModel(flattenMaterials, 'world');
+    if (authoredCrossbow) return authoredCrossbow;
+  }
   const imported = preferImported && id !== 'lmg' ? createImportedWeaponModel(id, flattenMaterials) : null;
   if (imported) return imported;
+  const proceduralBase = PROCEDURAL_WEAPON_BASE[id];
+  if (proceduralBase) return buildProceduralWeaponVariant(id, proceduralBase, flattenMaterials);
   if (id === 'lmg') {
     const root = buildWeaponModel('carbine', flattenMaterials, false);
     root.name = 'lmg-original-weapon';
@@ -383,7 +510,7 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     const rubber = MAT.rubber();
     const accent = new THREE.MeshStandardMaterial({ color: 0x789f54, roughness: 0.5, metalness: 0.32 });
 
-    // The Mastiff is an original belt-fed support weapon, not a stretched
+    // The M249 is an original belt-fed support-weapon treatment, not a stretched
     // rifle. Suppress the inherited magazine and optic silhouette, then add a
     // heavier receiver, box feed, heat shield, carry handle and folded bipod.
     const inheritedDetails = new Set([
@@ -612,7 +739,7 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
   };
 
   if (id === 'carbine') {
-    // Original M86 vertical-slice silhouette: compact receiver, ventilated fore-end,
+    // Original HK416 vertical-slice silhouette: compact receiver, ventilated fore-end,
     // skeleton stock and a physically aligned low reflex optic.
     part(root, roundedBox('receiver', [0.235, 0.22, 0.62], metal, 0.035), [0, 0, -0.12]);
     part(root, roundedBox('upper-receiver', [0.205, 0.095, 0.57], dark, 0.025), [0, 0.115, -0.13]);
@@ -706,7 +833,7 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     addSocket('grip-socket-r', [0.035, -0.135, 0.045]);
     addSocket('support-socket-l', [-0.035, -0.17, -0.57]);
   } else if (id === 'smg') {
-    // Original Vectorline SMG: vertically layered receiver, forward heat cage,
+    // Original FN P90 treatment: vertically layered receiver, forward heat cage,
     // compact aperture sights and an exposed side charging tab.
     part(root, roundedBox('receiver', [0.22, 0.225, 0.45], metal, 0.04), [0, 0, -0.12]);
     part(root, roundedBox('tall-rear-housing', [0.205, 0.25, 0.2], dark, 0.035), [0, 0.075, 0.09]);
@@ -754,7 +881,7 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     addSocket('grip-socket-r', [0.03, -0.13, 0.02]);
     addSocket('support-socket-l', [-0.03, -0.16, -0.47]);
   } else if (pistolFamily) {
-    // Original Aster/G18-style pistol family: compact stepped slide, open-frame
+    // Original Glock 17/Glock 18 treatment: compact stepped slide, open-frame
     // trigger guard and a high-contrast sight channel. The full-auto marksman
     // derivative uses an extended magazine and selector without a new asset.
     const frame = roundedBox('pistol-frame', [0.21, 0.16, 0.5], metal, 0.035, 3);
@@ -819,7 +946,7 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     addSocket('grip-socket-r', [0.03, -0.2, 0.08]);
     addSocket('support-socket-l', [-0.09, -0.1, -0.12]);
   } else {
-    // Original Model 12: warm laminated furniture, perforated heat shield,
+    // Original Remington 870 treatment: warm laminated furniture, perforated heat shield,
     // shell saddle and a physically aligned ghost-ring sight.
     const wood = new THREE.MeshStandardMaterial({ color: 0xb98a57, roughness: 0.78, metalness: 0.04 });
     part(root, roundedBox('rounded-receiver', [0.225, 0.225, 0.5], metal, 0.055), [0, 0, -0.05]);
@@ -1025,6 +1152,17 @@ const RIGGED_SUPPORT_GRIP_POSITION: Record<WeaponId, [number, number, number]> =
   pistol: [-0.06, -0.15, 0.03],
   magnum: [-0.06, -0.15, 0.03],
   'machine-pistol': [-0.06, -0.15, 0.03],
+  'mini-uzi': [-0.03, -0.16, -0.16],
+  mp5: [-0.03, -0.16, -0.16],
+  m4a1: [-0.035, -0.17, -0.21],
+  'ak-47': [-0.035, -0.17, -0.21],
+  minigun: [-0.06, -0.13, -0.3],
+  'm14-ebr': [-0.035, -0.095, -0.21],
+  'slug-shotgun': [-0.03, -0.025, 0.29],
+  'flashlight-pistol': [-0.06, -0.15, 0.03],
+  'explosive-crossbow': [-0.06, -0.12, -0.25],
+  flamethrower: [-0.06, -0.13, -0.3],
+  'flare-gun': [-0.06, -0.15, 0.03],
 };
 
 /** Rotate one animated bone toward a world-space target without rewriting bind offsets. */
@@ -1163,15 +1301,32 @@ function applyRiggedWeaponGrip(rig: Extract<OperatorRig, { rigged: true }>, weap
   };
 }
 
-export function setOperatorWeapon(root: THREE.Group, weaponId: WeaponId, flattenMaterials = false): void {
-  const rig = operatorRig(root);
-  if (!rig || rig.weaponId === weaponId && rig.weapon) return;
-  if (rig.weapon) rig.weaponSocket.remove(rig.weapon);
+/**
+ * Builds the exact third-person weapon presentation mounted by operators.
+ *
+ * Browser callers deliberately receive `null` until the authored world asset
+ * has loaded; mounting a procedural stand-in would make retained GPU
+ * vocabulary readiness differ from the model a bot actually equips. Node-side
+ * contract tests retain the deterministic procedural presentation.
+ */
+export function createOperatorWeaponPresentation(
+  weaponId: WeaponId,
+  flattenMaterials = false,
+): THREE.Group | null {
+  const browserRuntime = typeof document !== 'undefined';
   // Third-person mounting must use the socket-native authored model. Pass 16's
   // imported scene could place visible bounds metres away from WristR even
   // while the root socket itself was correct.
-  const weapon = buildWeaponModel(weaponId, flattenMaterials, false);
-  optimizeAttachedWeapon(weapon, flattenMaterials ? 'palette-basic' : 'vertex-lit');
+  const authoredWorldWeapon = browserRuntime ? createImportedWeaponModel(weaponId, flattenMaterials) : null;
+  if (browserRuntime && !authoredWorldWeapon) return null;
+  const weapon = authoredWorldWeapon ?? buildWeaponModel(weaponId, flattenMaterials, false);
+  // Reduced-render mode keeps authored weapon textures/maps ('texture-lit'
+  // preserves mapped materials + UVs while batching), never collapsing to the
+  // flat unlit 'palette-basic' look that reads as a missing asset.
+  optimizeAttachedWeapon(
+    weapon,
+    flattenMaterials ? 'texture-lit' : weapon.userData.projectOriginalWeapon === true ? 'texture-lit' : 'vertex-lit',
+  );
   weapon.name = `operator-${weaponId}`;
   weapon.userData.weaponId = weaponId;
   weapon.scale.setScalar(THIRD_PERSON_WEAPON_SCALE[weaponId]);
@@ -1190,9 +1345,67 @@ export function setOperatorWeapon(root: THREE.Group, weaponId: WeaponId, flatten
       node.raycast = () => undefined;
     }
   });
+  return weapon;
+}
+
+export function setOperatorWeapon(
+  root: THREE.Group,
+  weaponId: WeaponId,
+  flattenMaterials = false,
+  retirePrevious?: (root: THREE.Object3D, afterFence?: () => void) => void,
+): void {
+  const rig = operatorRig(root);
+  if (!rig || rig.weaponId === weaponId && rig.weapon) return;
+  const browserRuntime = typeof document !== 'undefined';
+  const presentationGeneration = capturePass65PresentationGeneration(root);
+  if (browserRuntime && root.userData.pass65PendingWorldWeapon === weaponId) return;
+  const weapon = createOperatorWeaponPresentation(weaponId, flattenMaterials);
+  if (!weapon) {
+    root.userData.pass65PendingWorldWeapon = weaponId;
+    const request = Number(root.userData.pass65WorldWeaponRequest ?? 0) + 1;
+    root.userData.pass65WorldWeaponRequest = request;
+    void loadPass65WeaponPresentation(weaponId, 'world').then(() => {
+      const currentRig = operatorRig(root);
+      if (!currentRig || !isPass65PresentationGenerationCurrent(root, presentationGeneration)
+        || root.userData.pass65PendingWorldWeapon !== weaponId
+        || root.userData.pass65WorldWeaponRequest !== request) return;
+      delete root.userData.pass65PendingWorldWeapon;
+      setOperatorWeapon(root, weaponId, flattenMaterials, retirePrevious);
+    }).catch((error: unknown) => {
+      if (root.userData.pass65PendingWorldWeapon !== weaponId
+        || root.userData.pass65WorldWeaponRequest !== request) return;
+      delete root.userData.pass65PendingWorldWeapon;
+      root.userData.pass65WorldWeaponLoadError = error instanceof Error ? error.message : String(error);
+      console.error(`Pass 65 authored world weapon load failed for ${weaponId}`, error);
+    });
+    return;
+  }
+  if (rig.weapon) {
+    const previous = rig.weapon;
+    rig.weaponSocket.remove(previous);
+    if (retirePrevious) retirePrevious(previous, () => releasePass65WeaponModel(previous));
+    else disposePass65WeaponModel(previous);
+  }
   rig.weaponSocket.add(weapon);
   rig.weapon = weapon;
   rig.weaponId = weaponId;
+  delete root.userData.pass65PendingWorldWeapon;
+  if (weaponId === 'minigun') {
+    root.userData.operatorMinigunSpool = createMinigunSpoolState();
+    root.userData.operatorMinigunSpoolUpdatedAt = performance.now();
+    root.userData.operatorMinigunDriveUntil = 0;
+    root.userData.operatorMinigunSpoolTelemetry = {
+      fraction: 0,
+      phase: 'idle',
+      angleRadians: 0,
+      source: 'replicated-shot-window',
+    };
+  } else {
+    delete root.userData.operatorMinigunSpool;
+    delete root.userData.operatorMinigunSpoolUpdatedAt;
+    delete root.userData.operatorMinigunDriveUntil;
+    delete root.userData.operatorMinigunSpoolTelemetry;
+  }
 
   // A rigged swap is solved on the next presentation frame, after the mixer
   // restores the base animation. Solving here would use the previous weapon's
@@ -1201,12 +1414,15 @@ export function setOperatorWeapon(root: THREE.Group, weaponId: WeaponId, flatten
 }
 
 export function fireOperator(root: THREE.Group): void {
-  root.userData.operatorShotAt = performance.now();
+  const now = performance.now();
+  root.userData.operatorShotAt = now;
   fireRiggedOperator(root);
   const rig = operatorRig(root);
   if (rig?.weapon) {
+    fireImportedWeapon(rig.weapon);
     const flash = rig.weapon.getObjectByName('world-muzzle-flash');
     if (flash) flash.visible = true;
+    if (rig.weaponId === 'minigun') root.userData.operatorMinigunDriveUntil = now + 140;
   }
 }
 
@@ -1231,7 +1447,10 @@ export function meleeOperator(root: THREE.Group): void {
   root.userData.operatorMeleeAt = performance.now();
   meleeRiggedOperator(root);
   const rig = operatorRig(root);
-  if (rig?.meleeKnife) rig.meleeKnife.visible = true;
+  if (rig?.meleeKnife) {
+    rig.meleeKnife.visible = true;
+    meleeImportedWeapon(rig.meleeKnife);
+  }
 }
 
 export function poseOperator(
@@ -1241,9 +1460,20 @@ export function poseOperator(
   _phase: number,
   _blend = 1,
   _aimPitch = 0,
+  explicitDeltaSeconds?: number,
 ): void {
   const rig = operatorRig(root);
   if (!rig) return;
+  const now = performance.now();
+  const previousAnimationAt = Number(root.userData.pass65WeaponAnimationUpdatedAt ?? now);
+  const measuredDeltaSeconds = Math.max(0, (now - previousAnimationAt) / 1_000);
+  const animationDeltaSeconds = THREE.MathUtils.clamp(
+    Number.isFinite(explicitDeltaSeconds) ? Number(explicitDeltaSeconds) : measuredDeltaSeconds,
+    0,
+    0.05,
+  );
+  root.userData.pass65WeaponAnimationUpdatedAt = now;
+  if (rig.meleeKnife) updateImportedWeapon(rig.meleeKnife, animationDeltaSeconds);
   root.userData.operatorStance = stance;
   const proxyTransform = hitProxyRootTransform(stance);
   rig.hitProxyRoot.position.set(...proxyTransform.position);
@@ -1258,6 +1488,38 @@ export function poseOperator(
     entry.bone.quaternion.copy(entry.quaternion);
   }
   updateRiggedOperator(root, speed, stance);
+  if (rig.weapon) updateImportedWeapon(rig.weapon, animationDeltaSeconds);
+  if (rig.weaponId === 'minigun' && rig.weapon) {
+    const now = performance.now();
+    const state = (root.userData.operatorMinigunSpool as MinigunSpoolState | undefined)
+      ?? createMinigunSpoolState();
+    const lastUpdatedAt = Number(root.userData.operatorMinigunSpoolUpdatedAt ?? now);
+    advanceMinigunSpool(state, {
+      dt: Math.max(0, (now - lastUpdatedAt) / 1_000),
+      triggerHeld: now < Number(root.userData.operatorMinigunDriveUntil ?? 0),
+      equipped: true,
+    });
+    root.userData.operatorMinigunSpool = state;
+    root.userData.operatorMinigunSpoolUpdatedAt = now;
+    const barrels = rig.weapon.getObjectByName('m134-barrel-cluster')
+      ?? rig.weapon.getObjectByName('minigun-barrel-cluster');
+    if (barrels) barrels.rotation.z = state.angleRadians;
+    const telemetry = (root.userData.operatorMinigunSpoolTelemetry ?? {
+      fraction: 0,
+      phase: 'idle',
+      angleRadians: 0,
+      source: 'replicated-shot-window',
+    }) as {
+      fraction: number;
+      phase: string;
+      angleRadians: number;
+      source: 'replicated-shot-window';
+    };
+    root.userData.operatorMinigunSpoolTelemetry = telemetry;
+    telemetry.fraction = state.fraction;
+    telemetry.phase = state.phase;
+    telemetry.angleRadians = state.angleRadians;
+  }
   const armBones = [
     rig.leftShoulderBone, rig.leftElbowBone, rig.leftWristBone,
     rig.rightShoulderBone, rig.rightElbowBone, rig.rightWristBone,
@@ -1323,16 +1585,30 @@ export function buildOperator(
       const knife = new THREE.Group();
       knife.name = 'operator-melee-knife';
       knife.visible = false;
-      const handle = roundedBox('operator-knife-handle', [0.09, 0.25, 0.09], MAT.rubber(), 0.025, 2);
-      handle.position.y = -0.1;
-      const blade = new THREE.Mesh(
-        new THREE.ConeGeometry(0.085, 0.48, 4),
-        new THREE.MeshStandardMaterial({ color: 0xc6d0d2, roughness: 0.22, metalness: 0.82 }),
-      );
-      blade.name = 'operator-knife-blade';
-      blade.position.y = -0.46;
-      blade.rotation.y = Math.PI / 4;
-      knife.add(handle, blade);
+      if (typeof document === 'undefined') {
+        const handle = roundedBox('operator-knife-handle', [0.09, 0.25, 0.09], MAT.rubber(), 0.025, 2);
+        handle.position.y = -0.1;
+        const blade = new THREE.Mesh(
+          new THREE.ConeGeometry(0.085, 0.48, 4),
+          new THREE.MeshStandardMaterial({ color: 0xc6d0d2, roughness: 0.22, metalness: 0.82 }),
+        );
+        blade.name = 'operator-knife-blade';
+        blade.position.y = -0.46;
+        blade.rotation.y = Math.PI / 4;
+        knife.add(handle, blade);
+      } else {
+        const presentationGeneration = capturePass65PresentationGeneration(root);
+        void loadPass65FieldKnifeAsset('world').then(() => {
+          if (!isPass65PresentationGenerationCurrent(root, presentationGeneration)) return;
+          const authoredKnife = createPass65FieldKnifeModel(flattenMaterials, 'world');
+          if (!authoredKnife) throw new Error('Pass 65 authored operator field knife unavailable after load');
+          knife.add(authoredKnife);
+          knife.userData.projectOriginalMeleeWeapon = true;
+        }).catch((error: unknown) => {
+          root.userData.pass65FieldKnifeWorldLoadError = error instanceof Error ? error.message : String(error);
+          console.error('Pass 65 authored operator field knife load failed', error);
+        });
+      }
       knife.position.set(0.04, -0.08, -0.02);
       knife.rotation.set(0.14, 0, -0.16);
       wristR.add(knife);

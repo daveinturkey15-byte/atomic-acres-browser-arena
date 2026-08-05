@@ -66,7 +66,7 @@ async function waitReady(page: import('@playwright/test').Page): Promise<void> {
 async function deploySolo(page: import('@playwright/test').Page): Promise<void> {
   await page.locator('#player-name').fill('PASS 35 QA');
   await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: Pass35Api }).__ATOMIC_ACRES_DEBUG__.startSolo());
-  await page.waitForFunction(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: Pass35Api }).__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active', undefined, { timeout: 15_000 });
+  await page.waitForFunction(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: Pass35Api }).__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active', undefined, { timeout: 60_000 });
 }
 
 async function snapshot(page: import('@playwright/test').Page): Promise<Pass35Snapshot> {

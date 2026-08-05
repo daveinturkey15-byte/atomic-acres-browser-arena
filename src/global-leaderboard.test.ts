@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   LEADERBOARD_INSTALL_STORAGE_KEY,
   fetchGlobalLeaderboard,
+  forgetLeaderboardInstallId,
+  leaderboardNetworkEnabled,
   leaderboardInstallId,
   submitGlobalStreak,
 } from './global-leaderboard';
@@ -12,15 +14,33 @@ class MemoryStorage implements ScoreStorage {
   private readonly data = new Map<string, string>();
   getItem(key: string): string | null { return this.data.get(key) ?? null; }
   setItem(key: string, value: string): void { this.data.set(key, value); }
+  removeItem(key: string): void { this.data.delete(key); }
 }
 
 describe('global leaderboard client', () => {
+  it('supports an explicit deterministic offline-services route for browser and hardware QA', () => {
+    expect(leaderboardNetworkEnabled('?externalServices=off')).toBe(false);
+    expect(leaderboardNetworkEnabled('?multiplayerQa=1')).toBe(false);
+    expect(leaderboardNetworkEnabled('?release=latest')).toBe(true);
+  });
+
   it('creates and reuses a stable non-secret installation identifier', () => {
     const storage = new MemoryStorage();
-    const created = leaderboardInstallId(storage, () => 'install_123456789');
+    const created = leaderboardInstallId(storage, true, () => 'install_123456789');
     expect(created).toBe('install_123456789');
     expect(storage.getItem(LEADERBOARD_INSTALL_STORAGE_KEY)).toBe(created);
-    expect(leaderboardInstallId(storage, () => 'different_123456')).toBe(created);
+    expect(leaderboardInstallId(storage, true, () => 'different_123456')).toBe(created);
+  });
+
+  it('does not create or retain an identifier without explicit sharing consent', () => {
+    const storage = new MemoryStorage();
+    const randomId = vi.fn(() => 'install_123456789');
+    expect(leaderboardInstallId(storage, false, randomId)).toBeNull();
+    expect(randomId).not.toHaveBeenCalled();
+    expect(storage.getItem(LEADERBOARD_INSTALL_STORAGE_KEY)).toBeNull();
+    expect(leaderboardInstallId(storage, true, randomId)).toBe('install_123456789');
+    expect(forgetLeaderboardInstallId(storage)).toBe(true);
+    expect(storage.getItem(LEADERBOARD_INSTALL_STORAGE_KEY)).toBeNull();
   });
 
   it('returns an empty global list when no backend endpoint is configured', async () => {
@@ -48,10 +68,20 @@ describe('global leaderboard client', () => {
       name: 'Dave', streak: 8, kills: 9, deaths: 2,
       installId: 'install_123456789', buildId: 'pass30', idempotencyKey: 'install_123456789:8', season: LEADERBOARD_SEASON,
     } as const;
-    await expect(submitGlobalStreak(submission, 'https://leaderboard.example', fetcher)).resolves.toBe(true);
+    await expect(submitGlobalStreak(submission, true, 'https://leaderboard.example', fetcher)).resolves.toBe(true);
     const [, init] = fetcher.mock.calls[0];
     expect(init).toEqual(expect.objectContaining({ method: 'POST', keepalive: true }));
     expect(JSON.parse(String(init?.body))).toEqual(submission);
     expect(String(init?.body)).not.toMatch(/secret|token|password/i);
+  });
+
+  it('does not POST a streak when sharing consent is off', async () => {
+    const fetcher = vi.fn();
+    const submission = {
+      name: 'Dave', streak: 8, kills: 9, deaths: 2,
+      installId: 'install_123456789', buildId: 'pass65', idempotencyKey: 'install_123456789:8', season: LEADERBOARD_SEASON,
+    } as const;
+    await expect(submitGlobalStreak(submission, false, 'https://leaderboard.example', fetcher)).resolves.toBe(false);
+    expect(fetcher).not.toHaveBeenCalled();
   });
 });
