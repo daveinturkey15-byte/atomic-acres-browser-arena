@@ -15,6 +15,9 @@ import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
 import { buildVegetation, animateVegetationWind, setVegetationLOD } from './farcrysis-vegetation';
 import { buildTerrain, buildLighting, buildWater, animateWater } from './farcrysis-terrain';
 import { applyFarcrysisTextures } from './farcrysis-textures';
+import { applyVista, animateVista } from './farcrysis-vista';
+import { buildEnhancedPalms } from './farcrysis-palms-enhanced';
+import { applyGroundTextures } from './farcrysis-ground-textures';
 
 // ---------------------------------------------------------------------------
 // Material / naming helpers
@@ -281,58 +284,6 @@ function addCrateWordmarks(root: THREE.Group): void {
 }
 
 // ---------------------------------------------------------------------------
-// 5. Instanced foliage — palms (beach lagoon ring)
-// ---------------------------------------------------------------------------
-
-function addInstancedPalms(root: THREE.Group): void {
-  const count = 14;
-  const trunkGeom = new THREE.BoxGeometry(0.4, 1.9, 0.4);
-  // Fronds as and additional instanced layer (thin wide box)
-  const frondGeom = new THREE.BoxGeometry(3.2, 0.16, 3.2);
-
-  const trunkInstances = new THREE.InstancedMesh(trunkGeom, mat(FARCRYSIS_ART_FEEL.palmTrunk, 0.88, 0.03), count);
-  trunkInstances.name = 'farcrysis-art-instanced-palm-trunks';
-  trunkInstances.castShadow = true;
-  trunkInstances.receiveShadow = true;
-
-  const frondInstances = new THREE.InstancedMesh(frondGeom, mat(FARCRYSIS_ART_FEEL.palmFrond, 0.85, 0.02), count);
-  frondInstances.name = 'farcrysis-art-instanced-palm-fronds';
-  frondInstances.castShadow = true;
-  frondInstances.receiveShadow = true;
-
-  const trunkMatrix = new THREE.Matrix4();
-  const frondMatrix = new THREE.Matrix4();
-  const { minX, maxX, minZ, maxZ } = FARCRYSIS_BOUNDS;
-
-  for (let i = 0; i < count; i += 1) {
-    // Scatter palms near the outer beach ring (~22-30m from centre), leaning slightly
-    const angle = (i / count) * Math.PI * 2 + (i % 3) * 0.35;
-    const radius = 22 + (i % 4) * 2.7;
-    const px = Math.cos(angle) * radius;
-    const pz = Math.sin(angle) * radius * 0.9;
-
-    // Clamp inside bounds with a 1.5 m margin
-    const cx = Math.max(minX + 1.5, Math.min(maxX - 1.5, px));
-    const cz = Math.max(minZ + 1.5, Math.min(maxZ - 1.5, pz));
-    const baseY = 0.95;
-    const frondY = baseY + 1.85;
-
-    trunkMatrix.makeRotationY(angle + 0.3);
-    trunkMatrix.setPosition(cx, baseY, cz);
-    trunkInstances.setMatrixAt(i, trunkMatrix);
-
-    frondMatrix.makeRotationY(angle * 1.3 + i * 0.15);
-    frondMatrix.setPosition(cx, frondY, cz);
-    frondInstances.setMatrixAt(i, frondMatrix);
-  }
-
-  trunkInstances.instanceMatrix.needsUpdate = true;
-  frondInstances.instanceMatrix.needsUpdate = true;
-  root.add(trunkInstances);
-  root.add(frondInstances);
-}
-
-// ---------------------------------------------------------------------------
 // 6. Instanced foliage — bushes (jungle undergrowth, mid ring)
 // ---------------------------------------------------------------------------
 
@@ -456,8 +407,8 @@ export function applyFarcrysisArtwork(root: THREE.Group): void {
   addTikiMarkers(root);
   addCrateWordmarks(root);
 
-  // Instanced foliage — ≥3 types (palms, bushes, fern clusters)
-  addInstancedPalms(root);
+  // Instanced foliage — ≥3 types (enhanced palms, bushes, fern clusters)
+  buildEnhancedPalms(root);
   addInstancedBushes(root);
   addInstancedFernClusters(root);
 
@@ -473,8 +424,14 @@ export function applyFarcrysisArtwork(root: THREE.Group): void {
   buildLighting(s);
   buildWater(s);
 
+  // Distant vista — ocean horizon, island silhouettes, seabirds (additive, no colliders)
+  applyVista(s);
+
   // Pass 69 procedural PBR textures — apply after all geometry is built
   applyFarcrysisTextures(root);
+
+  // Procedural ground textures (canvas sand/earth — baseline; async PBR images may override)
+  applyGroundTextures(s);
 
   // Per-frame animation driver (wind sway, water/foam, vegetation LOD).
   // Uses the codebase's proven onBeforeRender self-drive pattern; safe no-op
@@ -483,6 +440,7 @@ export function applyFarcrysisArtwork(root: THREE.Group): void {
     const t = performance.now() * 0.001;
     animateVegetationWind(t);
     animateWater(t);
+    animateVista(t);
     if (camera) {
       const dist = camera.position.distanceTo(root.position);
       setVegetationLOD(dist);
