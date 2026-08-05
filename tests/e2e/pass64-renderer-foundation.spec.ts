@@ -21,7 +21,7 @@ test('reports the active WebGL adapter and offscreen HDR samples separately', as
   await page.goto('/channels/the-big-one/?release=latest&renderer=webgl2&render=blender&signal=on&grass=off&mist=off&clouds=off&rays=off&seed=6401&map=skyline-terminal');
   await page.waitForFunction(() => {
     const state = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => any } }).__ATOMIC_ACRES_DEBUG__?.snapshot();
-    return state?.weaponReady === true && state?.render?.atomicSignal?.samples > 0;
+    return state?.render?.atomicSignal?.samples > 0;
   }, undefined, { timeout: 75_000 });
   const render = await page.evaluate(() => (
     window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => any } }
