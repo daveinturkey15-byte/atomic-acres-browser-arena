@@ -557,7 +557,7 @@ test.describe('Pass 64 command HUD and menu contract', () => {
       const countdown = document.querySelector<HTMLElement>('#countdown');
       const cue = countdown?.dataset.cue;
       return countdown?.hidden === false && (cue === '3' || cue === '2' || cue === '1');
-    }, undefined, { timeout: 45_000 });
+    }, undefined, { timeout: 30_000 });
     const cue = await page.evaluate(() => {
       const countdown = document.querySelector<HTMLElement>('#countdown')!;
       const computed = getComputedStyle(countdown);
