@@ -471,6 +471,163 @@ function placeCrateCover(builder: any, name: string, x: number, z: number): void
   });
 }
 
+/**
+ * Adds splinter-shard detail on top of a crate — small thin planks at slight
+ * angles, purely visual, not registered for collision/physics. Gives the
+ * crate a "broken open" supply-drop look.
+ */
+function addCrateShards(builder: any, name: string, x: number, z: number, size: number): void {
+  const yTop = size + 0.025; // just above the crate top
+  const shardGeom = new THREE.BoxGeometry(size * 0.45, 0.03, 0.08);
+  const shardMat = mat(FARCRYSIS_ART_FEEL.tikiWood, 0.94, 0.03);
+  const seed = (x * 17 + z * 31) % 100;
+  for (let i = 0; i < 4; i += 1) {
+    const angle = (i / 4) * Math.PI * 2 + ((seed + i * 7) % 31) * 0.04;
+    const offsetR = size * 0.26;
+    const sx = x + Math.cos(angle) * offsetR;
+    const sz = z + Math.sin(angle) * offsetR;
+    const shard = new THREE.Mesh(shardGeom, shardMat);
+    shard.name = `${name}-shard-${i}`;
+    shard.position.set(sx, yTop, sz);
+    shard.rotation.y = angle + ((seed + i * 13) % 17 - 8) * 0.07;
+    shard.castShadow = false;
+    shard.receiveShadow = false;
+    builder.root.add(shard);
+  }
+  // One or two thin splinters poking upward
+  const splinterGeom = new THREE.BoxGeometry(0.04, size * 0.35, 0.04);
+  for (let i = 0; i < 2; i += 1) {
+    const angle = ((seed + i * 11) % 37) * 0.17;
+    const offsetR = size * 0.18;
+    const sx = x + Math.cos(angle) * offsetR;
+    const sz = z + Math.sin(angle) * offsetR;
+    const splinter = new THREE.Mesh(splinterGeom, shardMat);
+    splinter.name = `${name}-splinter-${i}`;
+    splinter.position.set(sx, yTop + size * 0.12, sz);
+    splinter.rotation.z = ((seed + i * 19) % 13 - 6) * 0.055;
+    splinter.rotation.x = ((seed + i * 23) % 11 - 5) * 0.05;
+    splinter.castShadow = false;
+    splinter.receiveShadow = false;
+    builder.root.add(splinter);
+  }
+}
+
+/**
+ * Adds hazard-yellow stripe bands to a barrel (purely visual).
+ * Two thin torus rings in a contrasting safety-yellow tone, placed
+ * near the top and bottom thirds.
+ */
+function addHazardStripesToBarrel(
+  builder: any,
+  name: string,
+  x: number,
+  z: number,
+  radius: number,
+  height: number,
+): void {
+  const hazardYellow = mat(0xe6c23a, 0.55, 0.12);
+  const stripeRadius = radius + 0.045;
+  const stripeGeom = new THREE.TorusGeometry(stripeRadius, 0.05, 6, 16);
+  const y = height / 2;
+  for (const bandY of [-height * 0.18, height * 0.18]) {
+    const stripe = new THREE.Mesh(stripeGeom, hazardYellow);
+    stripe.name = `${name}-hazard-${bandY > 0 ? 'top' : 'bot'}`;
+    stripe.position.set(x, y + bandY, z);
+    stripe.rotation.x = Math.PI / 2;
+    stripe.castShadow = false;
+    stripe.receiveShadow = false;
+    builder.root.add(stripe);
+  }
+}
+
+/**
+ * Places a rock outcrop as natural cover — a wide low boulder-like box
+ * with a grey-brown rock tone.  Registered as physical cover with
+ * earth ballistic behaviour, placed near the beach ring.
+ */
+function placeRockOutcrop(
+  builder: any,
+  name: string,
+  x: number,
+  z: number,
+  width: number,
+  height: number,
+  depth: number,
+): void {
+  const y = height / 2;
+  const rockOutcropMat = mat(0x7a7a73, 0.93, 0.08);
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), rockOutcropMat);
+  mesh.name = name;
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.userData.impactSurface = classifyImpactSurface({ name, metalness: 0.08 });
+  builder.root.add(mesh);
+  registerBox(builder, mesh, name, 'earth', true);
+}
+
+/**
+ * Places a raised vantage platform — a 2×2 crate stack (~1.5 m tall) that
+ * gives a height advantage and doubles as cover.  Each base crate is
+ * registered individually; the plank top and a combined physicalCover
+ * footprint complete the position.  Small footprint keeps it out of
+ * patrol lanes.
+ */
+function placeVantagePlatform(builder: any, name: string, x: number, z: number): void {
+  const cSize = 0.82;
+  const half = cSize / 2;
+  const yBase = cSize / 2;
+
+  // 2×2 grid of crates at the base
+  const offsets: [number, number][] = [
+    [-half, -half], [half, -half],
+    [-half,  half], [half,  half],
+  ];
+  for (let i = 0; i < offsets.length; i += 1) {
+    const [ox, oz] = offsets[i];
+    const c = new THREE.Mesh(new THREE.BoxGeometry(cSize, cSize, cSize), crateMat);
+    c.name = `${name}-base-${i}`;
+    c.position.set(x + ox, yBase, z + oz);
+    c.castShadow = true;
+    c.receiveShadow = true;
+    c.userData.impactSurface = classifyImpactSurface({ name: c.name, metalness: crateMat.metalness });
+    builder.root.add(c);
+    registerBox(builder, c, c.name, 'wood', false);
+  }
+
+  // Plank top — wider than the crate stack so a player can stand on it
+  const platGeomHalf = cSize * 1.05;
+  const platThick = 0.08;
+  const platY = cSize + platThick / 2;
+  const plat = new THREE.Mesh(
+    new THREE.BoxGeometry(platGeomHalf * 2, platThick, platGeomHalf * 2),
+    mat(FARCRYSIS_ART_FEEL.tikiWood, 0.84, 0.04),
+  );
+  plat.name = `${name}-plank`;
+  plat.position.set(x, platY, z);
+  plat.castShadow = true;
+  plat.receiveShadow = true;
+  plat.userData.impactSurface = classifyImpactSurface({ name: plat.name, metalness: 0.04 });
+  builder.root.add(plat);
+  registerBox(builder, plat, plat.name, 'wood', false);
+
+  // Combined cover footprint: ground to top of plank
+  const coverBounds: Box2 = {
+    minX: x - platGeomHalf,
+    maxX: x + platGeomHalf,
+    minZ: z - platGeomHalf,
+    maxZ: z + platGeomHalf,
+    minY: 0,
+    maxY: platY + platThick,
+  };
+  builder.physicalCover.push({
+    id: name,
+    bounds: coverBounds,
+    blocksMovement: true,
+    blocksShots: true,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Main entry point — called once from buildFarcrysis()
 // ---------------------------------------------------------------------------
@@ -601,12 +758,101 @@ export function addInteractables(builder: any): void {
   // -- Crate stack, SW lagoon-side jungle path ----------------------------
   placeCrateCover(builder, 'farcrysis-cover-jungle-04', -20, 14);
 
+  // =====================================================================
+  // 5. ADDITIONAL CRATES (6) — jungle mid-ring and beach fringe
+  // =====================================================================
+  //
+  // Six more breakable wooden crates placed in the jungle mid-ring and
+  // along the beach approach.  Every position avoids spawn points, core
+  // entrances, mid-ring cardinal corridor, and patrol waypoints.
+
+  // -- Jungle mid-ring diagonals (radius ~19 m) --------------------------
+  placeCrate(builder, 'farcrysis-crate-17', -14, -13, 0.95);
+  placeCrate(builder, 'farcrysis-crate-18',  14,  13, 0.95);
+  placeCrate(builder, 'farcrysis-crate-19', -13,  14, 0.9);
+  placeCrate(builder, 'farcrysis-crate-20',  13, -14, 0.9);
+
+  // -- Beach / jungle transition (radius ~24 m) --------------------------
+  placeCrate(builder, 'farcrysis-crate-21', -14, -20, 0.95);
+  placeCrate(builder, 'farcrysis-crate-22',  14,  20, 0.95);
+
+  // ── Crate shard detail on the two beach crates ───────────────────────
+  addCrateShards(builder, 'farcrysis-crate-21-shards', -14, -20, 0.95);
+  addCrateShards(builder, 'farcrysis-crate-22-shards',  14,  20, 0.95);
+
+  // =====================================================================
+  // 6. ADDITIONAL BARRELS (4) — beach fringe
+  // =====================================================================
+  //
+  // Four additional rusty steel barrels along the lagoon-side beach edge,
+  // clear of spawn and patrol routes.
+
+  // -- West / east beach fringe ------------------------------------------
+  placeBarrel(builder, 'farcrysis-barrel-11', -28,  -6, 0.55, 0.95);
+  placeBarrel(builder, 'farcrysis-barrel-12',  28,   6, 0.55, 0.95);
+
+  // -- North / south beach fringe ----------------------------------------
+  placeBarrel(builder, 'farcrysis-barrel-13',  -6,  24, 0.55, 0.95);
+  placeBarrel(builder, 'farcrysis-barrel-14',   6, -24, 0.55, 0.95);
+
+  // ── Hazard stripes on the new barrels ─────────────────────────────────
+  addHazardStripesToBarrel(builder, 'farcrysis-barrel-11', -28,  -6, 0.55, 0.95);
+  addHazardStripesToBarrel(builder, 'farcrysis-barrel-12',  28,   6, 0.55, 0.95);
+  addHazardStripesToBarrel(builder, 'farcrysis-barrel-13',  -6,  24, 0.55, 0.95);
+  addHazardStripesToBarrel(builder, 'farcrysis-barrel-14',   6, -24, 0.55, 0.95);
+
+  // =====================================================================
+  // 7. FALLEN-LOG COVER (2) — jungle mid-ring
+  // =====================================================================
+  //
+  // Two additional fallen palm trunks spanning jungle paths, placed off
+  // the cardinal lanes and clear of patrol waypoints.
+
+  // -- West jungle mid-ring -----------------------------------------------
+  placeFallenTrunk(builder, 'farcrysis-cover-jungle-05', -16, -4, 3.0, 0.4);
+
+  // -- East jungle mid-ring -----------------------------------------------
+  placeFallenTrunk(builder, 'farcrysis-cover-jungle-06',  16,  4, 3.0, 0.4);
+
+  // =====================================================================
+  // 8. ROCK-OUTCROP COVER (2) — beach fringe
+  // =====================================================================
+  //
+  // Two weathered limestone boulders near the lagoon edge that provide
+  // natural crouch cover with earth ballistic behaviour.
+
+  // -- West beach outcrop -------------------------------------------------
+  placeRockOutcrop(builder, 'farcrysis-cover-rock-01', -25, -8, 1.8, 1.2, 1.6);
+
+  // -- East beach outcrop -------------------------------------------------
+  placeRockOutcrop(builder, 'farcrysis-cover-rock-02',  25,  8, 1.8, 1.2, 1.6);
+
+  // =====================================================================
+  // 9. RAISED VANTAGE PLATFORMS (2) — jungle mid-ring
+  // =====================================================================
+  //
+  // Two 2×2 crate-stack platforms (~1.5 m tall) that give a height
+  // advantage over the surrounding ground.  Small footprint, reachable
+  // by walking movement, placed clear of patrol lanes and core entrances.
+
+  // -- West vantage platform (jungle mid-ring) ----------------------------
+  placeVantagePlatform(builder, 'farcrysis-vantage-01', -18, -6);
+
+  // -- East vantage platform (jungle mid-ring) ----------------------------
+  placeVantagePlatform(builder, 'farcrysis-vantage-02',  18,  6);
+
   // Verify new cover positions are within the arena boundary margin.
   for (const [label, px, pz] of [
     ['cover-jungle-01', -20, 8],
     ['cover-jungle-02', 22, -8],
     ['cover-jungle-03', 8, -24],
     ['cover-jungle-04', -20, 14],
+    ['cover-jungle-05', -16, -4],
+    ['cover-jungle-06', 16, 4],
+    ['cover-rock-01', -25, -8],
+    ['cover-rock-02', 25, 8],
+    ['vantage-01', -18, -6],
+    ['vantage-02', 18, 6],
   ] as const) {
     if (!ok(px, pz)) {
       console.warn(`farcrysis-${label} at (${px}, ${pz}) is outside FARCRYSIS_BOUNDS margin`);
