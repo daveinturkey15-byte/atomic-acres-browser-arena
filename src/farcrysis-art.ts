@@ -408,7 +408,6 @@ function addWaterSparkle(root: THREE.Group): void {
 // ---------------------------------------------------------------------------
 
 function terrainHeight(x: number, z: number): number {
-  const rad = Math.hypot(x, z);
   const dist = FARCRYSIS_BOUNDS.maxX - Math.max(Math.abs(x), Math.abs(z));
   // Beach shelf: flat near edges, rising toward center
   if (dist < 10) return Math.max(0, dist * 0.03 - 0.1);

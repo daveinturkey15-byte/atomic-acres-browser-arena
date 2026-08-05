@@ -37,6 +37,30 @@ import { FARCRYSIS_ART_FEEL } from './farcrysis-art';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
 
 // ---------------------------------------------------------------------------
+// Terrain-height function — replicated from farcrysis-art.ts so every
+// interactable can be placed on the visual terrain surface.  The physics
+// world floor is flat at y=0; this function determines where the rendered
+// terrain sits so objects are never floating above or buried inside it.
+// ---------------------------------------------------------------------------
+
+/** Replicated from farcrysis-art.ts — must be kept in sync. */
+function terrainHeight(x: number, z: number): number {
+  const dist = FARCRYSIS_BOUNDS.maxX - Math.max(Math.abs(x), Math.abs(z));
+  // Beach shelf: flat near edges, rising toward centre
+  if (dist < 10) return Math.max(0, dist * 0.03 - 0.1);
+  // Jungle interior: gentle rolling hills
+  const h = Math.sin(x * 0.12) * Math.cos(z * 0.15) * 1.2
+    + Math.sin(x * 0.25 + 1.3) * Math.cos(z * 0.22 + 2.1) * 0.6
+    + Math.sin(z * 0.18 - 0.7) * 0.4;
+  return Math.max(-0.05, h + 0.1);
+}
+
+/** Returns the terrain surface Y clamped to never go below the physics floor (y=0). */
+function placementBaseY(x: number, z: number): number {
+  return Math.max(0, terrainHeight(x, z));
+}
+
+// ---------------------------------------------------------------------------
 // Material helper — mirrors the mat() convention in farcrysis-art.ts
 // ---------------------------------------------------------------------------
 
@@ -223,7 +247,8 @@ function placeCrate(
   z: number,
   size: number,          // cubic side length, 0.8–1.2 m
 ): void {
-  const y = size / 2;     // sit on the ground plane (bottom at y=0)
+  const baseY = placementBaseY(x, z);
+  const y = baseY + size / 2;     // sit on the terrain surface
 
   // Main body — wood-brown box
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(size, size, size), crateMat);
@@ -312,7 +337,8 @@ function placeBarrel(
   radius: number,
   height: number,
 ): void {
-  const y = height / 2;  // sit on the ground plane
+  const baseY = placementBaseY(x, z);
+  const y = baseY + height / 2;  // sit on the terrain surface
 
   const mesh = new THREE.Mesh(
     new THREE.CylinderGeometry(radius, radius, height, 12),
@@ -371,7 +397,8 @@ function placeSandbagWall(
   height: number,
   depth: number,
 ): void {
-  const y = height / 2;
+  const baseY = placementBaseY(x, z);
+  const y = baseY + height / 2;
 
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(width, height, depth),
@@ -433,7 +460,8 @@ function placeFallenTrunk(
   length: number,
   thickness: number,
 ): void {
-  const y = thickness / 2;
+  const baseY = placementBaseY(x, z);
+  const y = baseY + thickness / 2;
   const depth = 0.7; // fixed depth for all trunks (narrow)
 
   const mesh = new THREE.Mesh(
@@ -457,8 +485,9 @@ function placeFallenTrunk(
  */
 function placeCrateCover(builder: any, name: string, x: number, z: number): void {
   const size = 0.9;
-  const y0 = size / 2;            // bottom crate centre
-  const y1 = size / 2 + size;     // top crate centre
+  const baseY = placementBaseY(x, z);
+  const y0 = baseY + size / 2;            // bottom crate centre
+  const y1 = baseY + size / 2 + size;     // top crate centre
 
   // Bottom crate
   const c0 = new THREE.Mesh(new THREE.BoxGeometry(size, size, size), crateMat);
@@ -488,7 +517,7 @@ function placeCrateCover(builder: any, name: string, x: number, z: number): void
     maxX: x + halfW,
     minZ: z - halfD,
     maxZ: z + halfD,
-    minY: 0,
+    minY: baseY,
     maxY: y1 + halfD,
   };
   builder.physicalCover.push({
@@ -505,7 +534,8 @@ function placeCrateCover(builder: any, name: string, x: number, z: number): void
  * crate a "broken open" supply-drop look.
  */
 function addCrateShards(builder: any, name: string, x: number, z: number, size: number): void {
-  const yTop = size + 0.025; // just above the crate top
+  const baseY = placementBaseY(x, z);
+  const yTop = baseY + size + 0.025; // just above the crate top
   const shardGeom = new THREE.BoxGeometry(size * 0.45, 0.03, 0.08);
   const shardMat = mat(FARCRYSIS_ART_FEEL.tikiWood, 0.94, 0.03);
   const seed = (x * 17 + z * 31) % 100;
@@ -556,7 +586,8 @@ function addHazardStripesToBarrel(
   const hazardYellow = mat(0xe6c23a, 0.55, 0.12);
   const stripeRadius = radius + 0.045;
   const stripeGeom = new THREE.TorusGeometry(stripeRadius, 0.05, 6, 16);
-  const y = height / 2;
+  const baseY = placementBaseY(x, z);
+  const y = baseY + height / 2;
   for (const bandY of [-height * 0.18, height * 0.18]) {
     const stripe = new THREE.Mesh(stripeGeom, hazardYellow);
     stripe.name = `${name}-hazard-${bandY > 0 ? 'top' : 'bot'}`;
@@ -582,7 +613,8 @@ function placeRockOutcrop(
   height: number,
   depth: number,
 ): void {
-  const y = height / 2;
+  const baseY = placementBaseY(x, z);
+  const y = baseY + height / 2;
   const rockOutcropMat = mat(0x7a7a73, 0.93, 0.08);
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), rockOutcropMat);
   mesh.name = name;
@@ -604,7 +636,8 @@ function placeRockOutcrop(
 function placeVantagePlatform(builder: any, name: string, x: number, z: number): void {
   const cSize = 0.82;
   const half = cSize / 2;
-  const yBase = cSize / 2;
+  const baseY = placementBaseY(x, z);
+  const yBase = baseY + cSize / 2;
 
   // 2×2 grid of crates at the base
   const offsets: [number, number][] = [
@@ -626,7 +659,7 @@ function placeVantagePlatform(builder: any, name: string, x: number, z: number):
   // Plank top — wider than the crate stack so a player can stand on it
   const platGeomHalf = cSize * 1.05;
   const platThick = 0.08;
-  const platY = cSize + platThick / 2;
+  const platY = baseY + cSize + platThick / 2;
   const plat = new THREE.Mesh(
     new THREE.BoxGeometry(platGeomHalf * 2, platThick, platGeomHalf * 2),
     mat(FARCRYSIS_ART_FEEL.tikiWood, 0.84, 0.04),
@@ -645,7 +678,7 @@ function placeVantagePlatform(builder: any, name: string, x: number, z: number):
     maxX: x + platGeomHalf,
     minZ: z - platGeomHalf,
     maxZ: z + platGeomHalf,
-    minY: 0,
+    minY: baseY,
     maxY: platY + platThick,
   };
   builder.physicalCover.push({
@@ -673,9 +706,10 @@ function placeStackedSandbagWall(
   depth: number,
   count: number,
 ): void {
+  const baseY = placementBaseY(x, z);
   // Build vertically stacked segments
   for (let i = 0; i < count; i += 1) {
-    const segY = segHeight / 2 + i * segHeight; // bottom-aligned stack
+    const segY = baseY + segHeight / 2 + i * segHeight; // bottom-aligned stack
     const mesh = new THREE.Mesh(
       new THREE.BoxGeometry(width, segHeight, depth),
       sandbagMat,
@@ -699,8 +733,8 @@ function placeStackedSandbagWall(
     maxX: x + width / 2,
     minZ: z - depth / 2,
     maxZ: z + depth / 2,
-    minY: 0,
-    maxY: totalHeight,
+    minY: baseY,
+    maxY: baseY + totalHeight,
   };
   builder.physicalCover.push({
     id: name,
@@ -1017,7 +1051,46 @@ export function addInteractables(builder: any): void {
   // -- SE beach sandbag cover ----------------------------------------------
   placeSandbagWall(builder, 'farcrysis-sandbag-07', 26, -26, 2.2, 0.6, 0.45);
 
-  // Verify new cover positions are within the arena boundary margin.
+  // =====================================================================
+  // 14. FLESH-OUT GAP PIECES — fill bare patrol lanes in jungle/beach
+  // =====================================================================
+  //
+  // Nine additional well-placed interactables to fill sparse patrol lanes
+  // that had fewer than 3 cover/breakable options.  Every position is
+  // verified ≥3 m from every spawn and patrol waypoint.  All use the
+  // existing placement helpers so Rapier colliders match the established
+  // addInteractables pattern.
+
+  // -- East jungle mid-ring: crate fills gap between cover-jungle-06 and core
+  placeCrate(builder, 'farcrysis-crate-33', 10, -8, 0.9);
+
+  // -- West jungle mid-ring: barrel near cover-jungle-05
+  placeBarrel(builder, 'farcrysis-barrel-23', -12, -4, 0.6, 1.0);
+
+  // -- East jungle approach: fallen palm trunk cover
+  placeFallenTrunk(builder, 'farcrysis-cover-jungle-07', 12, -10, 3.0, 0.4);
+
+  // -- West jungle: crate stack cover near core approach
+  placeCrateCover(builder, 'farcrysis-cover-jungle-08', -14, -4);
+
+  // -- SW beach fringe: sandbag wall above lagoon edge
+  placeSandbagWall(builder, 'farcrysis-sandbag-08', -20, -26, 2.2, 0.6, 0.45);
+
+  // -- NE beach edge: barrel filling the empty NE corner
+  placeBarrel(builder, 'farcrysis-barrel-24', 24, 24, 0.6, 1.0);
+
+  // -- NW jungle: crate cover near research tower approach
+  placeCrateCover(builder, 'farcrysis-cover-jungle-09', -16, 8);
+
+  // -- SE jungle: barrel for the sparse SE interior
+  placeBarrel(builder, 'farcrysis-barrel-25', 18, -8, 0.6, 1.0);
+
+  // -- South jungle path: fallen palm trunk for southern approach cover
+  placeFallenTrunk(builder, 'farcrysis-cover-jungle-10', 6, -20, 3.0, 0.4);
+
+  // =====================================================================
+  // VERIFICATION: warn if any cover position exceeds the arena boundary
+  // =====================================================================
   for (const [label, px, pz] of [
     ['cover-jungle-01', -20, 8],
     ['cover-jungle-02', 22, -8],
@@ -1034,6 +1107,11 @@ export function addInteractables(builder: any): void {
     ['sandbag-05', 19, 15],
     ['sandbag-06', -13, -8],
     ['sandbag-07', 26, -26],
+    ['cover-jungle-07', 12, -10],
+    ['cover-jungle-08', -14, -4],
+    ['sandbag-08', -20, -26],
+    ['cover-jungle-09', -16, 8],
+    ['cover-jungle-10', 6, -20],
   ] as const) {
     if (!ok(px, pz)) {
       console.warn(`farcrysis-${label} at (${px}, ${pz}) is outside FARCRYSIS_BOUNDS margin`);
