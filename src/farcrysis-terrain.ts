@@ -388,6 +388,247 @@ function makeVolumetricShaft(
 }
 
 // ---------------------------------------------------------------------------
+// Volumetric cloud cluster helpers (ShaderMaterial + layered noise)
+// ---------------------------------------------------------------------------
+
+/** Create a single volumetric cloud puff — large sphere with noise-based transparency. */
+function makeVolumetricCloud(
+  radius: number,
+  position: THREE.Vector3,
+  color: THREE.Color,
+  opacity: number,
+  noiseScale: number,
+  detailLevel: number,
+): THREE.Mesh {
+  const geom = new THREE.SphereGeometry(radius, 16, 12);
+
+  // Flatten the bottom slightly for more natural cloud shape
+  const pos = geom.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i);
+    if (y < 0) {
+      const flatFactor = 1 + y / radius * 0.5; // flatten bottom 50%
+      pos.setY(i, y * (1 + flatFactor * 0.6));
+    }
+  }
+  geom.computeVertexNormals();
+
+  const mat = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uColor: { value: color },
+      uOpacity: { value: opacity },
+      uNoiseScale: { value: noiseScale },
+      uDetail: { value: detailLevel },
+    },
+    vertexShader: /* glsl */ `
+      varying vec3 vWorldPos;
+      varying vec3 vLocalPos;
+      varying vec3 vNormal;
+      void main() {
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vWorldPos = wp.xyz;
+        vLocalPos = position;
+        vNormal = normalize(mat3(modelMatrix) * normal);
+        gl_Position = projectionMatrix * viewMatrix * wp;
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform float uTime;
+      uniform vec3 uColor;
+      uniform float uOpacity;
+      uniform float uNoiseScale;
+      uniform float uDetail;
+      varying vec3 vWorldPos;
+      varying vec3 vLocalPos;
+      varying vec3 vNormal;
+      ${GLSL_NOISE}
+      void main() {
+        float r = length(vLocalPos) / (${radius.toFixed(1)} * 0.98);
+        // Multi-octave noise for billowy cloud shape
+        float n1 = fbm3(vWorldPos * uNoiseScale + vec3(uTime * 0.015, 0.0, uTime * 0.01));
+        float n2 = fbm3(vWorldPos * uNoiseScale * 2.5 + vec3(uTime * 0.02, uTime * 0.01, uTime * 0.015));
+        float n = n1 * 0.7 + n2 * 0.3;
+        n += 0.15 * fbm3(vWorldPos * uNoiseScale * 5.0 + vec3(uTime * 0.03, 0.0, 0.0)) * uDetail;
+        n = clamp(n, 0.0, 1.0);
+        // Soft radial falloff — cloud fades at edges
+        float edge = 1.0 - smoothstep(0.25, 0.95, r);
+        float shape = n * edge;
+        // Sharpen the cloud silhouette
+        shape = smoothstep(0.24, 0.68, shape);
+        float a = shape * uOpacity;
+        // Rim lighting from above
+        float rim = max(0.0, dot(vNormal, vec3(0.0, 1.0, 0.0)));
+        vec3 litColor = uColor * (0.75 + 0.25 * rim);
+        if (a < 0.02) discard;
+        gl_FragColor = vec4(litColor, a);
+      }
+    `,
+    blending: THREE.NormalBlending,
+    depthWrite: false,
+    transparent: true,
+    side: THREE.FrontSide,
+    fog: false,
+  });
+
+  const mesh = new THREE.Mesh(geom, mat);
+  mesh.name = 'farcrysis-vol-cloud';
+  mesh.position.copy(position);
+  mesh.renderOrder = 2;
+  mesh.frustumCulled = false;
+  mesh.userData.farcrysisArt = true;
+  return mesh;
+}
+
+/** Build a group of volumetric cloud clusters scattered across the sky dome. */
+function buildCloudGroup(sunPosition: THREE.Vector3): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'farcrysis-clouds';
+
+  const cloudRng = mulberry32(0xca11_7c2e);
+  const baseColor = new THREE.Color(0xfff5e8); // warm white
+  const shadowColor = new THREE.Color(0xffe0c0); // peach shadow
+
+  // High-altitude billowy cloud clusters at varying radii (30-80m)
+  // Clusters weighted toward the horizon and sun direction for dramatic golden-hour look
+  const skyRadius = 100;
+  const cloudCount = 28;
+
+  for (let i = 0; i < cloudCount; i++) {
+    // Position clouds on a large spherical shell, biased toward horizon
+    const theta = (cloudRng() - 0.5) * Math.PI * 0.8; // ±72° from horizon
+    const phi = cloudRng() * Math.PI * 2;
+    const dist = skyRadius * (0.7 + cloudRng() * 0.3);
+
+    // Bias some clouds toward the sun side
+    const sunPhi = Math.atan2(sunPosition.x, sunPosition.z);
+    let cloudPhi = phi;
+    if (cloudRng() < 0.4) {
+      cloudPhi = sunPhi + (cloudRng() - 0.5) * 1.5;
+    }
+
+    const cx = Math.cos(theta) * Math.sin(cloudPhi) * dist;
+    const cy = Math.sin(theta) * dist + 15; // elevate above horizon
+    const cz = Math.cos(theta) * Math.cos(cloudPhi) * dist;
+
+    const cloudRadius = 12 + cloudRng() * 32;
+    const cloudOpacity = 0.28 + cloudRng() * 0.35;
+    const noiseScale = 0.08 + cloudRng() * 0.06;
+    const detail = cloudRng() < 0.5 ? 1.0 : 0.5;
+
+    // Mix base and shadow colors based on position relative to sun
+    const colorMix = cloudRng() * 0.6;
+    const cloudColor = baseColor.clone().lerp(shadowColor, colorMix);
+
+    const cloud = makeVolumetricCloud(
+      cloudRadius,
+      new THREE.Vector3(cx, cy, cz),
+      cloudColor,
+      cloudOpacity,
+      noiseScale,
+      detail,
+    );
+    cloud.name = `farcrysis-cloud-${i}`;
+    // Render order: larger/background clouds first
+    cloud.renderOrder = 3 + Math.floor(cloudRadius / 15);
+    group.add(cloud);
+  }
+
+  // Add a few low-horizon cloud wisps (flattened)
+  const wispCount = 8;
+  for (let i = 0; i < wispCount; i++) {
+    const phi = cloudRng() * Math.PI * 2;
+    const theta = 0.35 + cloudRng() * 0.2; // near horizon
+    const dist = skyRadius * 0.85;
+    const wx = Math.cos(theta) * Math.sin(phi) * dist;
+    const wy = Math.sin(theta) * dist;
+    const wz = Math.cos(theta) * Math.cos(phi) * dist;
+
+    const wisp = makeVolumetricCloud(
+      18 + cloudRng() * 25,
+      new THREE.Vector3(wx, wy, wz),
+      new THREE.Color(0xffedd0),
+      0.18 + cloudRng() * 0.22,
+      0.05 + cloudRng() * 0.04,
+      0.3,
+    );
+    wisp.name = `farcrysis-cloud-wisp-${i}`;
+    wisp.renderOrder = 2;
+    // Squash horizontally for wispy horizon clouds
+    wisp.scale.set(1.5, 0.4, 1.0);
+    group.add(wisp);
+  }
+
+  // Self-driving time update
+  group.onBeforeRender = () => {
+    const t = performance.now() * 0.001;
+    group.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.name.includes('farcrysis-vol-cloud')) {
+        const m = child.material as THREE.ShaderMaterial;
+        if (m.uniforms?.uTime) m.uniforms.uTime.value = t;
+      }
+    });
+  };
+
+  return group;
+}
+
+/** Build a low-lying ground fog layer — thin semi-transparent plane with noise-based opacity. */
+function buildGroundFogLayer(): THREE.Mesh {
+  const geom = new THREE.PlaneGeometry(100, 100, 32, 32);
+  geom.rotateX(-Math.PI / 2);
+
+  const mat = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uColor: { value: new THREE.Color(0xffe0c0) },
+    },
+    vertexShader: /* glsl */ `
+      varying vec3 vWorldPos;
+      varying vec2 vUv;
+      void main() {
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vWorldPos = wp.xyz;
+        vUv = wp.xz * 0.04;
+        gl_Position = projectionMatrix * viewMatrix * wp;
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform float uTime;
+      uniform vec3 uColor;
+      varying vec3 vWorldPos;
+      varying vec2 vUv;
+      ${GLSL_NOISE}
+      void main() {
+        // Ground-level haze thicker near water perimeter, thinner in center
+        float dist = max(abs(vWorldPos.x), abs(vWorldPos.z));
+        float edgeFactor = smoothstep(10.0, 32.0, dist);
+        // Animated fog noise
+        float n = fbm3(vWorldPos * 0.05 + vec3(uTime * 0.03, 0.0, uTime * 0.02));
+        float a = edgeFactor * 0.14 * (0.6 + 0.4 * n);
+        a += 0.03 * edgeFactor;
+        a = clamp(a, 0.0, 1.0);
+        if (a < 0.005) discard;
+        gl_FragColor = vec4(uColor, a);
+      }
+    `,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    transparent: true,
+    side: THREE.DoubleSide,
+    fog: false,
+  });
+
+  const plane = new THREE.Mesh(geom, mat);
+  plane.name = 'farcrysis-ground-fog';
+  plane.position.y = 0.4;
+  plane.renderOrder = 5;
+  plane.frustumCulled = false;
+  plane.userData.farcrysisArt = true;
+  return plane;
+}
+
+// ---------------------------------------------------------------------------
 // Atmospheric particle helpers (shader-driven Points — zero CPU update)
 // ---------------------------------------------------------------------------
 
@@ -932,6 +1173,13 @@ export function buildLighting(scene: THREE.Scene): {
     skyDome.userData.farcrysisArt = true;
     scene.add(skyDome);
   }
+
+  // ---- 5a. Volumetric clouds + ground haze (golden-hour sky layer) ----
+  // Cloud group self-drives its uTime via onBeforeRender; ground fog is static noise.
+  const cloudGroup = buildCloudGroup(sunPosition);
+  scene.add(cloudGroup);
+  const groundFog = buildGroundFogLayer();
+  scene.add(groundFog);
 
   // ---- 6. Lightweight god-ray cones (subtle atmospheric layer — kept for near-ground rays) ----
   const godRayGroup = new THREE.Group();
