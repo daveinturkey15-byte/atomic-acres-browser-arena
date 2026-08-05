@@ -1,12 +1,17 @@
 /**
  * farcrysis-physics.ts — Rapier-aligned physics interactables for the Farcrysis arena.
  *
- * Exports addInteractables(builder) which places breakable crates, barrels, and
- * sandbag cover walls into the arena.  Every object follows the existing box()
- * pattern from farcrysis.ts: create THREE.Mesh, push to builder.physicsColliders,
- * builder.raycastMeshes, builder.shotSurfaces (plus builder.colliders and
- * builder.physicalCover where appropriate).  The Rapier physics world and the
- * ballistic-authority system pick up every entry without any extra wiring.
+ * Exports addInteractables(builder) which places breakable crates, barrels,
+ * stacked sandbag cover walls, fallen trunks, rock outcrops, and vantage
+ * platforms into the arena.  Every object follows the existing box() pattern
+ * from farcrysis.ts: create THREE.Mesh, push matching pairs into
+ * builder.colliders AND builder.physicsColliders (keeping their lengths equal),
+ * builder.raycastMeshes, builder.shotSurfaces, and builder.physicalCover where
+ * appropriate.  The Rapier physics world and the ballistic-authority system
+ * pick up every entry without any extra wiring.
+ *
+ * All placement is seeded deterministic (mulberry32 PRNG — no Math.random)
+ * so every prop position is reproducible across reloads and test runs.
  *
  * ## How to wire into buildFarcrysis()
  *
@@ -180,6 +185,26 @@ const barrelBandMat = mat(FARCRYSIS_ART_FEEL.antenna, 0.42, 0.55);
 
 /** Palm trunk for fallen-cover logs — same colour as instanced palms. */
 const palmTrunkMat = mat(FARCRYSIS_ART_FEEL.palmTrunk, 0.88, 0.03);
+
+// ---------------------------------------------------------------------------
+// Deterministic seeded PRNG (mulberry32) — replaces Math.random for
+// reproducible placement in all interactable helpers.
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns a mulberry32 PRNG function seeded with a 32-bit integer.
+ * Used throughout the module for deterministic jitter so that every
+ * prop position is reproducible across reloads and test runs.
+ */
+function mulberry32(seed: number): () => number {
+  let s = seed | 0;
+  return () => {
+    s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Placement helpers
@@ -373,12 +398,15 @@ function placeSandbagWall(
     const colStartX = row % 2 === 0 ? -width / 2 + 0.22 : -width / 2 + 0.41;
     for (let col = 0; col < colCount; col += 1) {
       const bx = colStartX + col * 0.44;
-      // Jitter each bag slightly for organic feel
-      const jx = (Math.random() - 0.5) * 0.06;
-      const jy = (Math.random() - 0.5) * 0.03;
-      const jz = (Math.random() - 0.5) * 0.04;
-      const ry = (Math.random() - 0.5) * 0.12; // slight Y-rotation
-      const rz = (Math.random() - 0.5) * 0.08; // slight roll
+      // Jitter each bag slightly for organic feel (deterministic via mulberry32)
+      const bagRng = mulberry32(
+        ((x * 1000) | 0) + ((z * 100) | 0) + row * 10 + col + 1,
+      );
+      const jx = (bagRng() - 0.5) * 0.06;
+      const jy = (bagRng() - 0.5) * 0.03;
+      const jz = (bagRng() - 0.5) * 0.04;
+      const ry = (bagRng() - 0.5) * 0.12; // slight Y-rotation
+      const rz = (bagRng() - 0.5) * 0.08; // slight roll
 
       const bag = new THREE.Mesh(bagGeom, sandbagMat);
       bag.name = `${name}-bag-f-${row}-${col}`;
@@ -628,6 +656,60 @@ function placeVantagePlatform(builder: any, name: string, x: number, z: number):
   });
 }
 
+/**
+ * Places a stacked sandbag wall built from small box segments near a
+ * core door entrance.  Each segment is individually registered as a
+ * 'concrete' ballistic surface with colliders + physics colliders;
+ * a single physicalCover entry spans the whole wall so the crouch /
+ * peek / lean system treats it as one cover position.
+ */
+function placeStackedSandbagWall(
+  builder: any,
+  name: string,
+  x: number,
+  z: number,
+  width: number,
+  segHeight: number,
+  depth: number,
+  count: number,
+): void {
+  // Build vertically stacked segments
+  for (let i = 0; i < count; i += 1) {
+    const segY = segHeight / 2 + i * segHeight; // bottom-aligned stack
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(width, segHeight, depth),
+      sandbagMat,
+    );
+    mesh.name = `${name}-seg-${i}`;
+    mesh.position.set(x, segY, z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.userData.impactSurface = classifyImpactSurface({
+      name: mesh.name,
+      metalness: sandbagMat.metalness,
+    });
+    builder.root.add(mesh);
+    registerBox(builder, mesh, mesh.name, 'concrete', false);
+  }
+
+  // Single physicalCover for the full wall stack
+  const totalHeight = segHeight * count;
+  const wallBounds: Box2 = {
+    minX: x - width / 2,
+    maxX: x + width / 2,
+    minZ: z - depth / 2,
+    maxZ: z + depth / 2,
+    minY: 0,
+    maxY: totalHeight,
+  };
+  builder.physicalCover.push({
+    id: name,
+    bounds: wallBounds,
+    blocksMovement: true,
+    blocksShots: true,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Main entry point — called once from buildFarcrysis()
 // ---------------------------------------------------------------------------
@@ -635,11 +717,11 @@ function placeVantagePlatform(builder: any, name: string, x: number, z: number):
 /**
  * Adds physics-backed interactables to the Farcrysis arena Builder.
  *
- * Places 16 crates, 10 barrels, 4 sandbag walls, and 4 cover positions
- * (2 fallen palm trunks + 2 crate stacks, adding 4 more crates) distributed near
- * building interiors and along path edges.  All spawn-safe zones
- * (±24–26 m corners) are deliberately avoided so no interactable
- * overlaps a player spawn point.
+ * Places 28 crates, 18 barrels, 6 sandbag walls (4 flat + 2 stacked near
+ * core doors), 6 fallen palm trunks, 2 rock outcrops, 2 crate stacks
+ * (adding 4 more crates), and 2 vantage platforms (8 more crates).
+ * Every position is seed-deterministic (mulberry32 — no Math.random)
+ * and verified ≥3 m from every spawn and patrol waypoint.
  *
  * @param builder  The ArenaMap Builder object from farcrysis.ts — a
  *                 plain object with { root, colliders, physicsColliders,
@@ -841,6 +923,68 @@ export function addInteractables(builder: any): void {
   // -- East vantage platform (jungle mid-ring) ----------------------------
   placeVantagePlatform(builder, 'farcrysis-vantage-02',  18,  6);
 
+  // =====================================================================
+  // 10. SIX MORE WOODEN CRATES (6) — core door flanks + jungle pockets
+  // =====================================================================
+  //
+  // Four crates flank the two core door approaches, and two sit in
+  // mid-jungle pockets SW and NE of the core.  All positions verified
+  // ≥3 m from every spawn and patrol waypoint.
+
+  // -- Core door south: west + east flanks ---------------------------------
+  placeCrate(builder, 'farcrysis-crate-23',  -6, -4.0, 0.9);
+  placeCrate(builder, 'farcrysis-crate-24',   6, -4.0, 0.9);
+
+  // -- Core door north: west + east flanks ---------------------------------
+  placeCrate(builder, 'farcrysis-crate-25',  -6,  4.0, 0.9);
+  placeCrate(builder, 'farcrysis-crate-26',   6,  4.0, 0.9);
+
+  // -- Mid-jungle SW + NE pockets (radius ~17 m) --------------------------
+  placeCrate(builder, 'farcrysis-crate-27', -16, -10, 0.95);
+  placeCrate(builder, 'farcrysis-crate-28',  16,  10, 0.95);
+
+  // =====================================================================
+  // 11. FOUR FUEL BARRELS (4) — hazard-striped, corner pockets
+  // =====================================================================
+  //
+  // Four explosive-looking barrels with hazard-yellow stripe bands,
+  // placed in arena corner pockets away from spawns and patrol paths.
+  // Each carries a small emissive band for visibility at range.
+
+  // -- NW / SE diagonal corner pockets ------------------------------------
+  placeBarrel(builder, 'farcrysis-barrel-15', -16,  16, 0.6, 1.0);
+  placeBarrel(builder, 'farcrysis-barrel-16',  16, -16, 0.6, 1.0);
+
+  // -- SW / NE beach fringe corner pockets --------------------------------
+  placeBarrel(builder, 'farcrysis-barrel-17', -12, -28, 0.55, 0.95);
+  placeBarrel(builder, 'farcrysis-barrel-18',  12,  28, 0.55, 0.95);
+
+  // ── Hazard stripes on all four new barrels ────────────────────────────
+  addHazardStripesToBarrel(builder, 'farcrysis-barrel-15', -16,  16, 0.6, 1.0);
+  addHazardStripesToBarrel(builder, 'farcrysis-barrel-16',  16, -16, 0.6, 1.0);
+  addHazardStripesToBarrel(builder, 'farcrysis-barrel-17', -12, -28, 0.55, 0.95);
+  addHazardStripesToBarrel(builder, 'farcrysis-barrel-18',  12,  28, 0.55, 0.95);
+
+  // =====================================================================
+  // 12. TWO STACKED SANDBAG WALLS (2) — core door approach cover
+  // =====================================================================
+  //
+  // Each wall is built from 4 stacked box segments (1.6 m wide × 0.45 m
+  // tall × 0.6 m deep per segment → 1.8 m total height).  Every segment
+  // gets its own collider + physicsCollider + 'concrete' shot surface;
+  // a single physicalCover spans the full stack so the peek / lean
+  // system treats it as one low-cover position.
+
+  // -- South core door approach cover -------------------------------------
+  placeStackedSandbagWall(
+    builder, 'farcrysis-core-door-sandbag-s', 0, -3.6, 1.6, 0.45, 0.6, 4,
+  );
+
+  // -- North core door approach cover -------------------------------------
+  placeStackedSandbagWall(
+    builder, 'farcrysis-core-door-sandbag-n', 0, 3.6, 1.6, 0.45, 0.6, 4,
+  );
+
   // Verify new cover positions are within the arena boundary margin.
   for (const [label, px, pz] of [
     ['cover-jungle-01', -20, 8],
@@ -853,6 +997,8 @@ export function addInteractables(builder: any): void {
     ['cover-rock-02', 25, 8],
     ['vantage-01', -18, -6],
     ['vantage-02', 18, 6],
+    ['core-door-sandbag-s', 0, -3.6],
+    ['core-door-sandbag-n', 0, 3.6],
   ] as const) {
     if (!ok(px, pz)) {
       console.warn(`farcrysis-${label} at (${px}, ${pz}) is outside FARCRYSIS_BOUNDS margin`);

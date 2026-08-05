@@ -12,8 +12,8 @@
  */
 import * as THREE from 'three';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
-import { buildVegetation } from './farcrysis-vegetation';
-import { buildTerrain, buildLighting, buildWater } from './farcrysis-terrain';
+import { buildVegetation, animateVegetationWind, setVegetationLOD } from './farcrysis-vegetation';
+import { buildTerrain, buildLighting, buildWater, animateWater } from './farcrysis-terrain';
 import { applyFarcrysisTextures } from './farcrysis-textures';
 
 // ---------------------------------------------------------------------------
@@ -475,4 +475,17 @@ export function applyFarcrysisArtwork(root: THREE.Group): void {
 
   // Pass 69 procedural PBR textures — apply after all geometry is built
   applyFarcrysisTextures(root);
+
+  // Per-frame animation driver (wind sway, water/foam, vegetation LOD).
+  // Uses the codebase's proven onBeforeRender self-drive pattern; safe no-op
+  // before build runs, idempotent every frame.
+  root.onBeforeRender = (_renderer, _scene, camera) => {
+    const t = performance.now() * 0.001;
+    animateVegetationWind(t);
+    animateWater(t);
+    if (camera) {
+      const dist = camera.position.distanceTo(root.position);
+      setVegetationLOD(dist);
+    }
+  };
 }

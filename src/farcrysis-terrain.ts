@@ -27,6 +27,17 @@
  *   - Caustic light pattern projector on lagoon floor ring.
  *   - Warm exponential-squared fog, cool-blue fill light, tuned golden-hour exposure.
  *   - PCFSoftShadowMap-ready directional-light shadow config (radius-based soft penumbra).
+ *   - Animated shoreline foam band (dedicated ShaderMaterial ring hugging the
+ *     square shoreline; time-driven wash, drifting noise, sunlit sparkle).
+ *   - Natural rock formations (5 seeded displaced-icosahedron clusters, 2–4 m)
+ *     at the lagoon perimeter and beside the flooded cave entrance — hand-placed
+ *     clear of spawns (±18–26 diagonal corners) and patrol routes, presentation only.
+ *   - Water reflection upgrade: sun-tinted sky gradient (warm orange → deep teal)
+ *     mixed by fresnel, plus shoreline caustic sparkle — no render targets.
+ *   - Sand/dirt path ribbons (3 winding strips) from the beach to the research
+ *     tower core — visual flow dressing, no navigation authority.
+ *   - Exported animateWater(timeSeconds) — drives every water/foam uniform from
+ *     one call (safe per frame; systems also self-drive via onBeforeRender).
  */
 
 import * as THREE from 'three';
@@ -238,6 +249,173 @@ function makeBoulder(
   mat.flatShading = true;
   const mesh = new THREE.Mesh(geom, mat);
   mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.userData.farcrysisArt = true;
+  return mesh;
+}
+
+/**
+ * Formation rock — displaced IcosahedronGeometry with two-octave seeded radial
+ * noise, slight base flattening, and per-vertex tonal colouring (dry rock,
+ * sandy base, faint lichen band). Deterministic (seeded mulberry32 only).
+ */
+function makeFormationRock(
+  radius: number,
+  detail: number,
+  seed: number,
+  material: THREE.Material,
+): THREE.Mesh {
+  const localRng = mulberry32(seed);
+  const geom = new THREE.IcosahedronGeometry(radius, detail);
+  const pos = geom.attributes.position as THREE.BufferAttribute;
+
+  const colors = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    const vx = pos.getX(i);
+    const vy = pos.getY(i);
+    const vz = pos.getZ(i);
+    const len = Math.sqrt(vx * vx + vy * vy + vz * vz) || 1;
+    // Two-octave seeded radial displacement — rugged, natural silhouette
+    const n1 = localRng();
+    const n2 = localRng();
+    const noise = 1 + (n1 - 0.5) * 0.5 + (n2 - 0.5) * 0.22;
+    // Slight base flattening so the rock settles into the sand
+    const flat = vy < 0 ? 1 - Math.min(0.16, (-vy / radius) * 0.5) : 1;
+    const r = radius * noise * flat;
+    pos.setXYZ(i, (vx / len) * r, (vy / len) * r, (vz / len) * r);
+
+    // Tonal variation: dry grey-brown rock, sandy base, faint lichen band
+    const up = vy / (radius * 1.25); // approx -1..1 after displacement
+    const t = up * 0.5 + 0.5;        // 0 bottom → 1 top
+    let cr = 0.44; let cg = 0.41; let cb = 0.37;
+    const v = localRng();
+    cr += (v - 0.5) * 0.12;
+    cg += (v - 0.5) * 0.10;
+    cb += (v - 0.5) * 0.08;
+    const lichen = smoothstep(0.25, 0.55, t) * (1 - smoothstep(0.55, 0.9, t));
+    cg += lichen * 0.10;
+    cr -= lichen * 0.04;
+    const baseSand = 1 - smoothstep(0.05, 0.45, t);
+    cr += baseSand * 0.10;
+    cg += baseSand * 0.09;
+    cb += baseSand * 0.06;
+    colors[i * 3 + 0] = Math.max(0, Math.min(1, cr));
+    colors[i * 3 + 1] = Math.max(0, Math.min(1, cg));
+    colors[i * 3 + 2] = Math.max(0, Math.min(1, cb));
+  }
+  geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geom.computeVertexNormals();
+
+  const mesh = new THREE.Mesh(geom, material);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.userData.farcrysisArt = true;
+  return mesh;
+}
+
+type RockFormationSite = { x: number; z: number; seed: number; scale: number };
+
+/**
+ * Build one natural rock formation: a large primary rock flanked by two smaller
+ * satellites. Site footprint is fixed (seeded jitter affects shape/size/
+ * orientation only, never the safe clearance from spawns/patrol routes).
+ */
+function buildRockFormation(
+  site: RockFormationSite,
+  material: THREE.Material,
+): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'farcrysis-terrain-rock-formation';
+  const localRng = mulberry32(site.seed);
+
+  const primaryRadius = Math.min((1.35 + localRng() * 0.45) * site.scale, 1.95);
+  const primary = makeFormationRock(primaryRadius, 2, site.seed + 1, material);
+  primary.name = 'farcrysis-terrain-rock-formation-primary';
+  primary.position.set(
+    site.x,
+    terrainHeight(site.x, site.z) + primaryRadius * 0.42,
+    site.z,
+  );
+  primary.rotation.set(localRng() * Math.PI, localRng() * Math.PI, localRng() * Math.PI);
+  group.add(primary);
+
+  const satelliteCount = 2;
+  for (let j = 0; j < satelliteCount; j++) {
+    const angle = (j / satelliteCount) * Math.PI * 2 + localRng() * 0.6;
+    const offset = 1.1 + localRng() * 1.1; // ≤ 2.2 m — preserves the ≥4 m spawn/patrol clearance
+    const sx = site.x + Math.cos(angle) * offset;
+    const sz = site.z + Math.sin(angle) * offset;
+    const satRadius = (0.55 + localRng() * 0.4) * site.scale;
+    const sat = makeFormationRock(satRadius, 1, site.seed + 10 + j * 7, material);
+    sat.name = `farcrysis-terrain-rock-formation-sat-${j}`;
+    sat.position.set(sx, terrainHeight(sx, sz) + satRadius * 0.4, sz);
+    sat.rotation.set(localRng() * Math.PI, localRng() * Math.PI, localRng() * Math.PI);
+    group.add(sat);
+  }
+  return group;
+}
+
+/**
+ * Build a winding sand/dirt path ribbon from a centreline of waypoints.
+ * The strip follows terrainHeight (+0.06 m) with seeded edge wobble and
+ * tonal mottling. Visual only — no colliders, no navigation authority.
+ */
+function makePathRibbon(
+  waypoints: Array<[number, number]>,
+  width: number,
+  seed: number,
+  color: THREE.Color,
+): THREE.Mesh {
+  const localRng = mulberry32(seed);
+  const pts = waypoints.map(([x, z]) => new THREE.Vector3(x, 0, z));
+  const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.5);
+
+  const SEG = 26;
+  const positions: number[] = [];
+  const colorsArr: number[] = [];
+  const indices: number[] = [];
+  for (let i = 0; i <= SEG; i++) {
+    const p = curve.getPoint(i / SEG);
+    const tang = curve.getTangent(i / SEG);
+    // Perpendicular offset in the XZ plane
+    const perpX = -tang.z;
+    const perpZ = tang.x;
+    const perpLen = Math.sqrt(perpX * perpX + perpZ * perpZ) || 1;
+    const wob = 1 + (localRng() - 0.5) * 0.35; // natural edge wobble
+    const halfW = (width / 2) * wob;
+    const ax = p.x + (perpX / perpLen) * halfW;
+    const az = p.z + (perpZ / perpLen) * halfW;
+    const bx = p.x - (perpX / perpLen) * halfW;
+    const bz = p.z - (perpZ / perpLen) * halfW;
+    positions.push(
+      ax, terrainHeight(ax, az) + 0.06, az,
+      bx, terrainHeight(bx, bz) + 0.06, bz,
+    );
+    const mottle = 1 + (localRng() - 0.5) * 0.22;
+    const cr = Math.min(1, color.r * mottle);
+    const cg = Math.min(1, color.g * mottle);
+    const cb = Math.min(1, color.b * mottle);
+    colorsArr.push(cr, cg, cb, cr, cg, cb);
+    if (i > 0) {
+      const base = i * 2;
+      indices.push(base - 2, base - 1, base, base - 1, base + 1, base);
+    }
+  }
+
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geom.setAttribute('color', new THREE.Float32BufferAttribute(colorsArr, 3));
+  geom.setIndex(indices);
+  geom.computeVertexNormals();
+
+  const mat = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.95,
+    metalness: 0.0,
+    side: THREE.DoubleSide,
+  });
+  const mesh = new THREE.Mesh(geom, mat);
+  mesh.castShadow = false;
   mesh.receiveShadow = true;
   mesh.userData.farcrysisArt = true;
   return mesh;
@@ -1025,6 +1203,30 @@ export function buildTerrain(scene: THREE.Scene): THREE.Group {
     }
   }
 
+  // ---- 4b. Natural rock formations (seeded displaced-icosahedron clusters) ----
+  // Sites are hand-picked on the beach/cliff edge, clear of spawns (±18–26
+  // diagonal corners) and patrol routes by ≥4 m, incl. beside the flooded cave
+  // entrance (26, 16). Presentation only — never colliders.
+  const formationMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    vertexColors: true,
+    roughness: 0.9,
+    metalness: 0.05,
+    flatShading: true,
+  });
+  const formationSites: RockFormationSite[] = [
+    { x: 23.0, z: 12.5, seed: 0x9101, scale: 1.15 },  // beside the flooded cave entrance
+    { x: 29.5, z: 11.5, seed: 0x9102, scale: 0.95 },  // lagoon perimeter, SE of cave
+    { x: -28.5, z: -14.5, seed: 0x9103, scale: 1.05 }, // NW beach/cliff edge
+    { x: -22.0, z: 27.0, seed: 0x9104, scale: 1.0 },   // W beach
+    { x: 27.0, z: -11.0, seed: 0x9105, scale: 1.1 },   // E beach
+  ];
+  for (let i = 0; i < formationSites.length; i++) {
+    const formation = buildRockFormation(formationSites[i], formationMat);
+    formation.name = `farcrysis-terrain-rock-formation-${i}`;
+    group.add(formation);
+  }
+
   // ---- 5. Sand flat ring mesh (decorative overlay, subtle white-sand colour) ----
   const sandRingOuter = ARENA_HALF;
   const sandRingInner = sandRingOuter - SAND_INSET;
@@ -1056,6 +1258,49 @@ export function buildTerrain(scene: THREE.Scene): THREE.Group {
   sandRing.receiveShadow = true;
   sandRing.userData.farcrysisArt = true;
   group.add(sandRing);
+
+  // ---- 5b. Jungle path ribbons (visual flow dressing, beach → research tower) ----
+  // Three winding sand/dirt strips marking the intended flow routes from the
+  // beach ring to the research-station core (-8.5, -8.5). Visual only — no
+  // colliders, no navigation changes.
+  const pathRibbons: Array<{
+    waypoints: Array<[number, number]>;
+    width: number;
+    seed: number;
+    color: number;
+  }> = [
+    {
+      waypoints: [
+        [-4, -31.5], [-9, -27.5], [-15, -23], [-18.5, -19.5],
+        [-16.5, -15], [-12.5, -11.5], [-8.5, -9], [-7.5, -8.5],
+      ],
+      width: 2.0, seed: 0x81a0, color: 0xcbb07a, // sand trail, NW beach → tower
+    },
+    {
+      waypoints: [
+        [31.5, -14], [27, -15.5], [22.5, -15], [18, -12],
+        [13.5, -9], [9, -6.5], [4, -6], [-1.5, -7], [-6, -8],
+      ],
+      width: 1.8, seed: 0x81a1, color: 0xa98a60, // dirt trail, E beach → tower
+    },
+    {
+      waypoints: [
+        [-31.5, 8], [-27.5, 10.5], [-22.5, 11], [-17.5, 9],
+        [-13, 6], [-9.5, 2.5], [-8.5, -2], [-8, -6.5],
+      ],
+      width: 1.9, seed: 0x81a2, color: 0xbfa26e, // packed-earth trail, W beach → tower
+    },
+  ];
+  for (let i = 0; i < pathRibbons.length; i++) {
+    const ribbon = makePathRibbon(
+      pathRibbons[i].waypoints,
+      pathRibbons[i].width,
+      pathRibbons[i].seed,
+      new THREE.Color(pathRibbons[i].color),
+    );
+    ribbon.name = `farcrysis-terrain-path-ribbon-${i}`;
+    group.add(ribbon);
+  }
 
   scene.add(group);
   return group;
@@ -1505,9 +1750,28 @@ export function buildLighting(scene: THREE.Scene): {
 }
 
 // ---------------------------------------------------------------------------
+// Shared water animation driver
+// ---------------------------------------------------------------------------
+
+type WaterAnimator = (timeSeconds: number) => void;
+const _waterAnimators: WaterAnimator[] = [];
+
+/**
+ * Drive every animated water/foam uniform from one call. Safe to invoke every
+ * frame (idempotent — systems also self-drive via onBeforeRender when the host
+ * render loop does not call this). No-op when buildWater has not run.
+ */
+export function animateWater(timeSeconds: number): void {
+  for (let i = 0; i < _waterAnimators.length; i++) {
+    _waterAnimators[i](timeSeconds);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // buildWater — custom-shader animated tropical water
 //   Features: wave-displaced vertices, computed normals, specular glints,
-//   fresnel reflection + env map, transparency near shore, procedural foam
+//   fresnel reflection + env map + sun-tinted sky gradient, transparency near
+//   shore, procedural foam, animated shoreline foam band, shoreline sparkle
 // ---------------------------------------------------------------------------
 
 export function buildWater(scene: THREE.Scene): {
@@ -1546,6 +1810,8 @@ export function buildWater(scene: THREE.Scene): {
     uCameraPos: { value: new THREE.Vector3(0, 5, 25) },
     uFresnelPow: { value: 3.2 },
     uFoamColor: { value: new THREE.Color(1.0, 1.0, 0.98) },
+    uSkyGradTop: { value: new THREE.Color(0xffb469) }, // sun-tinted warm zenith
+    uSkyGradBot: { value: new THREE.Color(0x0b4a5a) }, // deep teal horizon/water
     uEnvMap: { value: envCube },
     uEnvTexPresent: { value: envTexPresent },
   };
@@ -1596,6 +1862,8 @@ export function buildWater(scene: THREE.Scene): {
     uniform vec3 uCameraPos;
     uniform float uFresnelPow;
     uniform vec3 uFoamColor;
+    uniform vec3 uSkyGradTop;
+    uniform vec3 uSkyGradBot;
     uniform float uTime;
     uniform float uEnvTexPresent;
     uniform samplerCube uEnvMap;
@@ -1632,6 +1900,14 @@ export function buildWater(scene: THREE.Scene): {
       // Fresnel darkens edges + reflects sky
       vec3 color = base;
       color += envCol * fresnel * 0.55;
+      // Sun-tinted sky gradient reflection (warm zenith → deep teal horizon),
+      // mixed by fresnel — one cheap mix, no render targets
+      float skyMix = clamp(R.y * 0.55 + 0.5, 0.0, 1.0);
+      color += mix(uSkyGradBot, uSkyGradTop, pow(skyMix, 1.6)) * fresnel * 0.5;
+      // Shoreline caustic sparkle — sunlit glints where waves break near the beach
+      float caust = pow(fbm3(vWorldPos * 2.6 + vec3(uTime * 0.45, 0.0, uTime * 0.3)), 7.0);
+      float shoreGlint = vShore * caust * (0.55 + 0.45 * sin(uTime * 2.0 + vWorldPos.x * 2.4));
+      color += uSunColor * shoreGlint * 0.8;
       color += uSunColor * (spec + specWide);
       color += uFoamColor * foam * 0.7;
 
@@ -1811,6 +2087,96 @@ export function buildWater(scene: THREE.Scene): {
   causticPlane.userData.farcrysisArt = true;
   water.add(causticPlane);
 
+  // ---- Animated shoreline foam band (ShaderMaterial ring, time-driven wash) ----
+  // A thin ring straddling the square shoreline (33.2 → 29.0): over water on the
+  // outside, lapping up onto the sand lip inside. Vertex heights hug the
+  // shoreline contour so the band reads as waves breaking on the beach.
+  const foamBandOuter = ARENA_HALF + 1.2;
+  const foamBandInner = ARENA_HALF - 3.0;
+  const foamBandShape = new THREE.Shape();
+  foamBandShape.moveTo(-foamBandOuter, -foamBandOuter);
+  foamBandShape.lineTo(foamBandOuter, -foamBandOuter);
+  foamBandShape.lineTo(foamBandOuter, foamBandOuter);
+  foamBandShape.lineTo(-foamBandOuter, foamBandOuter);
+  foamBandShape.closePath();
+  const foamBandHole = new THREE.Path();
+  foamBandHole.moveTo(-foamBandInner, -foamBandInner);
+  foamBandHole.lineTo(foamBandInner, -foamBandInner);
+  foamBandHole.lineTo(foamBandInner, foamBandInner);
+  foamBandHole.lineTo(-foamBandInner, foamBandInner);
+  foamBandHole.closePath();
+  foamBandShape.holes.push(foamBandHole);
+
+  const foamBandGeom = new THREE.ShapeGeometry(foamBandShape);
+  foamBandGeom.rotateX(-Math.PI / 2);
+  {
+    // Hug the shoreline contour: sand-side just above the beach, water-side at
+    // wave level. Geometry is parented to `water` (y = -0.3), so add +0.3.
+    const fbPos = foamBandGeom.attributes.position as THREE.BufferAttribute;
+    for (let i = 0; i < fbPos.count; i++) {
+      const x = fbPos.getX(i);
+      const z = fbPos.getZ(i);
+      const edgeDist = ARENA_HALF - Math.max(Math.abs(x), Math.abs(z));
+      const sandY = terrainHeight(x, z) + 0.05;
+      const waterY = -0.16;
+      const blend = smoothstep(-0.8, 0.8, edgeDist);
+      fbPos.setY(i, waterY + (sandY - waterY) * blend + 0.3);
+    }
+  }
+
+  const foamBandUniforms = {
+    uTime: { value: 0 },
+    uColor: { value: new THREE.Color(0xfaf6ee) },
+    uOpacity: { value: 0.55 },
+  };
+
+  const foamBandMat = new THREE.ShaderMaterial({
+    uniforms: foamBandUniforms,
+    vertexShader: /* glsl */ `
+      varying vec3 vWorldPos;
+      void main() {
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vWorldPos = wp.xyz;
+        gl_Position = projectionMatrix * viewMatrix * wp;
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform float uTime;
+      uniform vec3 uColor;
+      uniform float uOpacity;
+      varying vec3 vWorldPos;
+      ${GLSL_NOISE}
+      void main() {
+        // Distance from the square shoreline (negative = over water, positive = onto sand)
+        float edgeDist = 32.0 - max(abs(vWorldPos.x), abs(vWorldPos.z));
+        float band = smoothstep(-1.6, 0.1, edgeDist) * (1.0 - smoothstep(0.3, 3.4, edgeDist));
+        // Slow drifting foam noise + advancing/retreating wash line
+        float n = fbm3(vWorldPos * 0.9 + vec3(0.0, uTime * 0.22, uTime * 0.13));
+        float wash = 0.5 + 0.5 * sin(edgeDist * 2.6 - uTime * 1.15 + n * 5.0);
+        float foamDetail = fbm3(vWorldPos * 2.4 + vec3(uTime * 0.4, 0.0, uTime * 0.3));
+        float alpha = uOpacity * band * (0.30 + 0.70 * wash) * (0.55 + 0.45 * foamDetail);
+        // Sunlit sparkle concentrated along the wash front
+        float sp = pow(fbm3(vWorldPos * 3.2 + vec3(0.0, uTime * 0.55, 0.0)), 9.0);
+        alpha += sp * band * 0.35 * (0.5 + 0.5 * wash);
+        alpha = clamp(alpha, 0.0, 0.85);
+        if (alpha < 0.02) discard;
+        gl_FragColor = vec4(uColor, alpha);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+    side: THREE.DoubleSide,
+    blending: THREE.NormalBlending,
+    fog: false,
+  });
+
+  const foamBand = new THREE.Mesh(foamBandGeom, foamBandMat);
+  foamBand.name = 'farcrysis-terrain-foam-band';
+  foamBand.renderOrder = 2;
+  foamBand.userData.farcrysisArt = true;
+  water.add(foamBand);
+
   // ---- Animation updater (alloc-free) ----
   const update = (timeSeconds: number): void => {
     const t = timeSeconds;
@@ -1824,6 +2190,9 @@ export function buildWater(scene: THREE.Scene): {
 
     // Animate caustics
     causticMat.uniforms.uTime.value = t;
+
+    // Animate shoreline foam band wash
+    foamBandMat.uniforms.uTime.value = t;
 
     // Animate foam particles
     for (const child of water.children) {
@@ -1839,6 +2208,11 @@ export function buildWater(scene: THREE.Scene): {
     const t = performance.now() * 0.001;
     update(t);
   };
+
+  // Register with the shared animateWater() driver (idempotent with update())
+  _waterAnimators.push((t) => { waterMat.uniforms.uTime.value = t; });
+  _waterAnimators.push((t) => { causticMat.uniforms.uTime.value = t; });
+  _waterAnimators.push((t) => { foamBandMat.uniforms.uTime.value = t; });
 
   return { mesh: water, causticPlane, update };
 }

@@ -4,17 +4,109 @@
  * Exports:
  *   buildVegetation(scene: THREE.Group): void
  *   FARCRYSIS_VEGE_STATS(): { totalInstances: number; treeTypes: number; totalTriangles: number; textureCount: number }
+ *   animateVegetationWind(time: number): void   — frame wind-sway update (call each frame)
+ *   setVegetationLOD(dist: number): void        — distance LOD toggle for large tree layers
  *
- * Target: 500+ vegetation instances via InstancedMesh, 8+ distinct tree/palm types,
- * ground cover (grass + leaf litter), multi-layer undergrowth, hanging vines —
- * all via InstancedMesh / merged-geometry for 60fps. Deterministic seeded placement.
- * All procedural — no copied IP. Presentation only — never adds colliders.
+ * Target: 600+ vegetation instances via InstancedMesh, 8+ distinct tree/palm types,
+ * ground cover (grass + leaf litter + fallen fronds + flower patches + beach pebbles),
+ * multi-layer undergrowth, hanging vines — all via InstancedMesh / merged-geometry
+ * for 60fps. Deterministic seeded placement. All procedural — no copied IP.
+ * Presentation only — never adds colliders.
  * Mount from farcrysis.ts buildFarcrysis to add dense jungle dressing over the arena.
+ *
+ * Wind: lightweight GPU vertex displacement via onBeforeCompile shader injection
+ * on select wind-enabled materials. Subtle (~0.15m max displacement), no collision impact.
+ * LOD: far-distance impostor meshes (simple cross/cone) for palm + mangrove layers.
+ * Ground: 3 new deterministic layers — fallen fronds (60), flower patches (5×8),
+ * beach pebbles (40).
  */
 import * as THREE from 'three';
 import { FARCRYSIS_ART_FEEL } from './farcrysis-art';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+// ---------------------------------------------------------------------------
+// Wind-sway animation (module-level shared state)
+// ---------------------------------------------------------------------------
+
+/** Per-material wind uniform references pushed by onBeforeCompile. */
+const _windUniforms: Array<Record<string, { value: unknown }>> = [];
+
+/**
+ * Wrap a MeshStandardMaterial with onBeforeCompile wind-displacement injection.
+ * The shader gets uWindTime / uWindStrength / uWindDir uniforms, and gentle
+ * position-based vertex sway (local-space, ~0.15m max displacement).
+ * Safe to call multiple times on the same material (idempotent guard).
+ */
+function makeWindMaterial(base: THREE.MeshStandardMaterial): THREE.MeshStandardMaterial {
+  if ((base as any).__farcrysisWind) return base;
+  (base as any).__farcrysisWind = true;
+
+  base.onBeforeCompile = (shader: any) => {
+    shader.uniforms.uWindTime = { value: 0 };
+    shader.uniforms.uWindStrength = { value: 0.12 };
+    shader.uniforms.uWindDir = { value: new THREE.Vector2(0.3, 0.7) };
+    _windUniforms.push(shader.uniforms);
+
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <begin_vertex>',
+      `#include <begin_vertex>
+
+      // Wind sway — gentle vertex displacement in local space.
+      // position.y acts as height factor: more sway near the top of geometry.
+      float _windH = clamp(position.y / 3.2, 0.0, 1.0);
+      float _windN = sin(position.x * 2.5 + position.y * 1.3 + uWindTime * 4.0) * 0.5
+                   + cos(position.z * 3.1 - position.y * 0.7 + uWindTime * 2.7) * 0.3;
+      transformed.x += _windN * uWindDir.x * uWindStrength * _windH;
+      transformed.z += _windN * uWindDir.y * uWindStrength * _windH;`,
+    );
+  };
+
+  return base;
+}
+
+/**
+ * Call once per frame to advance wind animation on all wind-enabled materials.
+ * @param time Seconds elapsed (e.g. performance.now() / 1000 or a clock delta accumulator).
+ */
+export function animateVegetationWind(time: number): void {
+  for (let i = 0; i < _windUniforms.length; i++) {
+    const u = _windUniforms[i];
+    if (u.uWindTime) u.uWindTime.value = time;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Distance-LOD for large tree layers (module-level registry)
+// ---------------------------------------------------------------------------
+
+interface LODPair {
+  near: THREE.InstancedMesh[];
+  far: THREE.InstancedMesh[];
+}
+
+const _lodPairs: LODPair[] = [];
+
+function registerLODPair(near: THREE.InstancedMesh[], far: THREE.InstancedMesh[]): void {
+  far.forEach((m) => { m.visible = false; });
+  _lodPairs.push({ near, far });
+}
+
+/**
+ * Call when camera distance changes to toggle near/far LOD impostors.
+ * Threshold: dist < 35m → near (full detail); dist >= 35m → far (impostor).
+ * Non-breaking: if no LOD pairs registered (e.g. buildVegetation not called yet),
+ * this is a safe no-op.
+ *
+ * @param dist Camera-to-arena-centre distance in metres.
+ */
+export function setVegetationLOD(dist: number): void {
+  const useNear = dist < 35;
+  for (const pair of _lodPairs) {
+    pair.near.forEach((m) => { m.visible = useNear; });
+    pair.far.forEach((m) => { m.visible = !useNear; });
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -420,6 +512,35 @@ function addPalms(root: THREE.Group): void {
 
   root.add(register(trunks, 'palm'));
   root.add(register(fronds, 'palm'));
+
+  // --- Palm LOD impostor: simple cone (half triangle count) ---
+  const lodCount = count;
+  const lodGeom = new THREE.ConeGeometry(0.4, 5.0, 6, 1);
+  const lodMat = vegeMat(FARCRYSIS_ART_FEEL.palmFrond, 0.86, 0.02);
+  const lodMesh = new THREE.InstancedMesh(lodGeom, lodMat, lodCount);
+  lodMesh.name = 'farcrysis-vege-palm-lod';
+  lodMesh.castShadow = false;
+  lodMesh.receiveShadow = true;
+  lodMesh.userData.farcrysisArt = true;
+
+  const lodM = new THREE.Matrix4();
+  for (let i = 0; i < lodCount; i++) {
+    const [x, z, angle] = positions[i];
+    const frondY = 1.4 + 2.7; // match original frond centre height
+    lodM.compose(
+      new THREE.Vector3(x, frondY - 0.5, z),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(0, angle * 1.3 + i * 0.15, 0)),
+      new THREE.Vector3(1, 1, 1),
+    );
+    lodMesh.setMatrixAt(i, lodM);
+  }
+  lodMesh.instanceMatrix.needsUpdate = true;
+
+  // Wind-enable fronds for gentle sway
+  makeWindMaterial(fronds.material as THREE.MeshStandardMaterial);
+
+  registerLODPair([trunks, fronds], [lodMesh]);
+  root.add(lodMesh);
 }
 
 // ---------------------------------------------------------------------------
@@ -1336,6 +1457,32 @@ function addMangroveTrees(root: THREE.Group): void {
 
   root.add(register(trunks, 'mangrove', { castShadow: true, receiveShadow: true }));
   root.add(register(canopies, 'mangrove', { castShadow: false, receiveShadow: true }));
+
+  // --- Mangrove LOD impostor: simple cone (half triangle count) ---
+  const lodCount = count;
+  const lodGeom = new THREE.ConeGeometry(0.35, 4.5, 6, 1);
+  const lodMat = vegeMat(0x2a4a28, 0.88, 0.02);
+  const lodMesh = new THREE.InstancedMesh(lodGeom, lodMat, lodCount);
+  lodMesh.name = 'farcrysis-vege-mangrove-lod';
+  lodMesh.castShadow = false;
+  lodMesh.receiveShadow = true;
+  lodMesh.userData.farcrysisArt = true;
+
+  const lodM = new THREE.Matrix4();
+  for (let i = 0; i < positions.length; i++) {
+    const [x, z, groundY, angle] = positions[i];
+    const canopyY = groundY + 2.3;
+    lodM.compose(
+      new THREE.Vector3(x, canopyY - 0.3, z),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(0, angle, 0)),
+      new THREE.Vector3(1, 1, 1),
+    );
+    lodMesh.setMatrixAt(i, lodM);
+  }
+  lodMesh.instanceMatrix.needsUpdate = true;
+
+  registerLODPair([trunks, canopies], [lodMesh]);
+  root.add(lodMesh);
 }
 
 // ---------------------------------------------------------------------------
@@ -1650,6 +1797,172 @@ function addLargeFerns(root: THREE.Group): void {
 }
 
 // ---------------------------------------------------------------------------
+// 25. Fallen palm fronds — scattered brown leaf-litter on sand + grass rings
+//     60 flat box instances, deterministic seeded placement, near-zero height.
+// ---------------------------------------------------------------------------
+
+function addFallenFronds(root: THREE.Group): void {
+  const count = 60;
+  const SEED = 0xfa11_3eaf;
+
+  const frondGeom = new THREE.BoxGeometry(1.2, 0.03, 0.25);
+
+  const fronds = new THREE.InstancedMesh(frondGeom, vegeMat(0x8b6b3a, 0.9, 0.01), count);
+  fronds.name = 'farcrysis-vege-fallen-fronds';
+
+  const matrix = new THREE.Matrix4();
+  const positions = layerPositions(count, 3, 30, 0.8, SEED);
+  const rng = mulberry32(SEED + 1);
+
+  for (let i = 0; i < positions.length; i++) {
+    const [x, z, groundY, angle] = positions[i];
+    const frondY = groundY + 0.02;
+    const scaleXZ = 0.7 + rng() * 0.8;
+
+    matrix.compose(
+      new THREE.Vector3(x, frondY, z),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(
+        -Math.PI / 2 + (rng() - 0.5) * 0.4,
+        angle + rng() * 2.0,
+        (rng() - 0.5) * 0.3,
+      )),
+      new THREE.Vector3(scaleXZ, 1, scaleXZ * 0.38),
+    );
+    fronds.setMatrixAt(i, matrix);
+  }
+
+  fronds.instanceMatrix.needsUpdate = true;
+  root.add(register(fronds, undefined, { castShadow: false, receiveShadow: false }));
+}
+
+// ---------------------------------------------------------------------------
+// 26. Flower patches — 5 clusters × 8 tiny emissive-tinted sphere flowers
+//     Scattered across jungle interior, deterministically placed.
+// ---------------------------------------------------------------------------
+
+function addFlowerPatches(root: THREE.Group): void {
+  const patches = 5;
+  const flowersPerPatch = 8;
+  const count = patches * flowersPerPatch;
+  const SEED = 0xbea0_7101;
+
+  const flowerGeom = new THREE.IcosahedronGeometry(0.08, 1);
+  const flowerMat = new THREE.MeshStandardMaterial({
+    color: 0xff6090,
+    roughness: 0.55,
+    metalness: 0.03,
+    emissive: 0xff3060,
+    emissiveIntensity: 0.5,
+  });
+
+  const flowers = new THREE.InstancedMesh(flowerGeom, flowerMat, count);
+  flowers.name = 'farcrysis-vege-flower-patches';
+
+  const matrix = new THREE.Matrix4();
+  // Generate 5 patch centres with Poisson separation
+  const patchCenters = poissonLayerPositions(patches, 5, 26, 2.5, SEED, 5.0);
+
+  for (let p = 0; p < patchCenters.length; p++) {
+    const [cx, cz, groundY] = patchCenters[p];
+    const patchRng = mulberry32(SEED + p + 1);
+
+    for (let f = 0; f < flowersPerPatch; f++) {
+      const fa = patchRng() * Math.PI * 2;
+      const fr = patchRng() * 1.5;
+      const fx = cx + Math.cos(fa) * fr;
+      const fz = cz + Math.sin(fa) * fr;
+      const fy = groundY + 0.05 + patchRng() * 0.15;
+      const s = 0.7 + patchRng() * 0.6;
+      const idx = p * flowersPerPatch + f;
+
+      matrix.compose(
+        new THREE.Vector3(fx, fy, fz),
+        new THREE.Quaternion(),
+        new THREE.Vector3(s, s * (0.8 + patchRng() * 0.3), s),
+      );
+      flowers.setMatrixAt(idx, matrix);
+    }
+  }
+
+  flowers.instanceMatrix.needsUpdate = true;
+  root.add(register(flowers, undefined, { castShadow: false, receiveShadow: false }));
+}
+
+// ---------------------------------------------------------------------------
+// 27. Beach pebbles — ~40 tiny icosahedron stones scattered on the outer sand
+//     Non-shadow-casting for performance, deterministically placed.
+// ---------------------------------------------------------------------------
+
+function addBeachPebbles(root: THREE.Group): void {
+  const count = 40;
+  const SEED = 0x5eab_1100;
+
+  const pebbleGeom = new THREE.IcosahedronGeometry(0.12, 0);
+
+  const pebbles = new THREE.InstancedMesh(pebbleGeom, vegeMat(0xb8a890, 0.78, 0.08), count);
+  pebbles.name = 'farcrysis-vege-beach-pebbles';
+
+  const matrix = new THREE.Matrix4();
+  const positions = layerPositions(count, 26, 31.5, 0.3, SEED);
+  const rng = mulberry32(SEED + 1);
+
+  for (let i = 0; i < positions.length; i++) {
+    const [x, z, groundY] = positions[i];
+    const pebbleY = groundY + 0.02;
+    const s = 0.5 + rng() * 0.7;
+
+    matrix.compose(
+      new THREE.Vector3(x, pebbleY, z),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(
+        rng() * Math.PI,
+        rng() * Math.PI,
+        rng() * Math.PI,
+      )),
+      new THREE.Vector3(s, s * (0.4 + rng() * 0.5), s),
+    );
+    pebbles.setMatrixAt(i, matrix);
+  }
+
+  pebbles.instanceMatrix.needsUpdate = true;
+  root.add(register(pebbles, undefined, { castShadow: false, receiveShadow: false }));
+}
+
+// ---------------------------------------------------------------------------
+// Wind-enable helper — walks the scene's direct children (InstancedMesh only)
+// and applies makeWindMaterial to layers that should sway.
+// Trunks, dead trees, pebbles, leaf litter, and LOD impostors are excluded.
+// ---------------------------------------------------------------------------
+
+function _windEnableAll(scene: THREE.Group): void {
+  const windNames: string[] = [
+    'farcrysis-vege-palm-fronds',        // already done in addPalms, but idempotent
+    'farcrysis-vege-banana-leaves',
+    'farcrysis-vege-bamboo-stems',
+    'farcrysis-vege-ferns',
+    'farcrysis-vege-grass-tufts',
+    'farcrysis-vege-vines',
+    'farcrysis-vege-coconut-fronds',
+    'farcrysis-vege-canopy-vines',
+    'farcrysis-vege-dense-grass',
+    'farcrysis-vege-flowering-accents',
+    'farcrysis-vege-understory-ferns',
+    'farcrysis-vege-bamboo-grove-stems',
+    'farcrysis-vege-flowering-blooms',
+    'farcrysis-vege-jungle-vine-clusters',
+    'farcrysis-vege-beach-grass',
+    'farcrysis-vege-large-ferns',
+  ];
+
+  for (let i = 0; i < scene.children.length; i++) {
+    const child = scene.children[i];
+    if (!(child instanceof THREE.InstancedMesh)) continue;
+    if (windNames.includes(child.name)) {
+      makeWindMaterial(child.material as THREE.MeshStandardMaterial);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main entry: add every vegetation layer to the arena group.
 // ---------------------------------------------------------------------------
 
@@ -1657,7 +1970,7 @@ export function buildVegetation(scene: THREE.Group): void {
   resetStats();
 
   // Trees — 6 distinct types (existing)
-  addPalms(scene);
+  addPalms(scene);              // LOD pair registered + fronds wind-enabled inside
   addBroadleafTrees(scene);
   addConifers(scene);
   addBananaPlants(scene);
@@ -1681,12 +1994,20 @@ export function buildVegetation(scene: THREE.Group): void {
   addUnderstoryFerns(scene);     // 90 varied-height understory fern clusters
 
   // ---- Pass 69 vegetation enrichment (6 new families, Poisson-disc, groves) ----
-  addMangroveTrees(scene);       // tree family #9 — 18 twisted mangroves (trunk + canopy)
+  addMangroveTrees(scene);       // tree family #9 — 18 mangroves (LOD pair registered inside)
   addBambooGroves(scene);        // 196 stems in 14 dense groves along path edges
   addFloweringBushes(scene);     // 36 bushes + 72 emissive magenta blooms
   addJungleVineClusters(scene);  // 30 multi-strand hanging vine bundles
   addBeachGrass(scene);          // 140 golden beach grass tufts
   addLargeFerns(scene);          // 50 broad-blade large understory ferns
+
+  // ---- Pass 69 wind + LOD + ground detail (3 new layers) ----
+  addFallenFronds(scene);        // #25 — 60 fallen palm-frond patches
+  addFlowerPatches(scene);       // #26 — 5×8=40 emissive flower blooms in clusters
+  addBeachPebbles(scene);        // #27 — 40 tiny beach pebbles
+
+  // ---- Wind-enable remaining flexible vegetation (non-LOD-managed) ----
+  _windEnableAll(scene);
 }
 
 // ---------------------------------------------------------------------------
