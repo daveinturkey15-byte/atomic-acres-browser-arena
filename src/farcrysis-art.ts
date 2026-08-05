@@ -18,6 +18,9 @@ import { applyFarcrysisTextures } from './farcrysis-textures';
 import { applyVista, animateVista } from './farcrysis-vista';
 import { buildEnhancedPalms } from './farcrysis-palms-enhanced';
 import { applyGroundTextures } from './farcrysis-ground-textures';
+import { buildWaterFX, animateWaterFX } from './farcrysis-water-fx';
+import { buildDetail, animateDetail } from './farcrysis-detail';
+import { buildAtmosphere, animateAtmosphere } from './farcrysis-atmosphere';
 
 // ---------------------------------------------------------------------------
 // Material / naming helpers
@@ -433,6 +436,15 @@ export function applyFarcrysisArtwork(root: THREE.Group): void {
   // Procedural ground textures (canvas sand/earth — baseline; async PBR images may override)
   applyGroundTextures(s);
 
+  // Pass 69 atmospheric polish (god rays, dust motes, fireflies, ground haze)
+  buildAtmosphere(s);
+
+  // Environmental detail polish: vines, moss, rocks, floor litter, reeds
+  buildDetail(s);
+
+  // Enhanced water FX — shoreline foam, wave surface, caustics, edge ripples
+  buildWaterFX(s);
+
   // Per-frame animation driver (wind sway, water/foam, vegetation LOD).
   // Uses the codebase's proven onBeforeRender self-drive pattern; safe no-op
   // before build runs, idempotent every frame.
@@ -441,6 +453,9 @@ export function applyFarcrysisArtwork(root: THREE.Group): void {
     animateVegetationWind(t);
     animateWater(t);
     animateVista(t);
+    animateAtmosphere(t);
+    animateDetail(t);
+    animateWaterFX(t);
     if (camera) {
       const dist = camera.position.distanceTo(root.position);
       setVegetationLOD(dist);
