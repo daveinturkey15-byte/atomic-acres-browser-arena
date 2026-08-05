@@ -23,6 +23,15 @@ import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
 const ATMOS_SUN = new THREE.Vector3(35, 25, -10);
 const ATMOS_SUN_DIR = ATMOS_SUN.clone().normalize();
 
+/**
+ * Sky-dome sun disk placement — matches the live golden-hour directional light
+ * (farcrysis-art.ts sun at (-18, 22, 25)) so the disk sits in the sky where the
+ * light actually comes from. Parked inside the 180–200 m sky dome.
+ */
+const ATMOS_SUN_DISK_DIR = new THREE.Vector3(-18, 22, 25).normalize();
+const ATMOS_SUN_DISK_DIST = 165;
+const ATMOS_SHAFT_COUNT = 7;
+
 // ---------------------------------------------------------------------------
 // Module-level state for per-frame animation
 // ---------------------------------------------------------------------------
@@ -37,6 +46,151 @@ let _fireflyPoints: THREE.Points | null = null;
 let _fireflyPhases: Float32Array | null = null;
 let _fireflyDriftAngles: Float32Array | null = null;
 let _fireflyBase: Float32Array | null = null;
+let _sunDiskGroup: THREE.Group | null = null;
+let _sunHaloMesh: THREE.Mesh | null = null;
+let _shaftGroup: THREE.Group | null = null;
+const _shaftMeshes: THREE.Mesh[] = [];
+const _shaftBaseOpacities: number[] = [];
+const _shaftPhases: number[] = [];
+const _shaftSpeeds: number[] = [];
+const _shaftOrigins: THREE.Vector3[] = [];
+
+// ---------------------------------------------------------------------------
+// 5. Sun disk in the sky dome — bright core + additive halo/glow facing the arena
+// ---------------------------------------------------------------------------
+
+function buildSunDisk(): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'farcrysis-atmos-sun-disk';
+  group.userData.farcrysisArt = true;
+  group.frustumCulled = false;
+
+  const center = ATMOS_SUN_DISK_DIR.clone().multiplyScalar(ATMOS_SUN_DISK_DIST);
+
+  // Core disk — bright warm-white face visible against the sky gradient
+  const core = new THREE.Mesh(
+    new THREE.CircleGeometry(3.2, 32),
+    new THREE.MeshBasicMaterial({
+      color: 0xfff8e0,
+      fog: false,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    }),
+  );
+  core.name = 'farcrysis-atmos-sun-disk-core';
+  core.userData.farcrysisArt = true;
+
+  // Inner halo — soft additive glow hugging the disk
+  const halo = new THREE.Mesh(
+    new THREE.CircleGeometry(6.8, 32),
+    new THREE.MeshBasicMaterial({
+      color: 0xffcc80,
+      transparent: true,
+      opacity: 0.35,
+      blending: THREE.AdditiveBlending,
+      fog: false,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    }),
+  );
+  halo.name = 'farcrysis-atmos-sun-disk-halo';
+  halo.userData.farcrysisArt = true;
+
+  // Outer glow — wide warm bloom behind the disk
+  const glow = new THREE.Mesh(
+    new THREE.CircleGeometry(14, 40),
+    new THREE.MeshBasicMaterial({
+      color: 0xff9a4a,
+      transparent: true,
+      opacity: 0.14,
+      blending: THREE.AdditiveBlending,
+      fog: false,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    }),
+  );
+  glow.name = 'farcrysis-atmos-sun-disk-glow';
+  glow.userData.farcrysisArt = true;
+
+  for (const part of [core, halo, glow]) {
+    part.position.copy(center);
+    part.lookAt(0, 0, 0); // face the arena centre (CircleGeometry front is +Z)
+  }
+
+  group.add(core, halo, glow);
+  _sunHaloMesh = halo;
+  return group;
+}
+
+// ---------------------------------------------------------------------------
+// 6. God-ray shafts — additive quads (MeshBasicMaterial, no ShaderMaterial)
+// ---------------------------------------------------------------------------
+
+function buildGodRayShafts(): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'farcrysis-atmos-god-ray-shafts';
+  group.userData.farcrysisArt = true;
+
+  _shaftMeshes.length = 0;
+  _shaftBaseOpacities.length = 0;
+  _shaftPhases.length = 0;
+  _shaftSpeeds.length = 0;
+  _shaftOrigins.length = 0;
+
+  const up = new THREE.Vector3(0, 1, 0);
+  const sunDir = ATMOS_SUN_DISK_DIR.clone();
+
+  for (let i = 0; i < ATMOS_SHAFT_COUNT; i++) {
+    // Scatter shaft origins across the arena, clamped inside the bounds
+    const ox = (Math.random() - 0.5) * 36;
+    const oz = (Math.random() - 0.5) * 36;
+    const origin = new THREE.Vector3(
+      Math.max(FARCRYSIS_BOUNDS.minX + 2, Math.min(FARCRYSIS_BOUNDS.maxX - 2, ox)),
+      3 + Math.random() * 9,
+      Math.max(FARCRYSIS_BOUNDS.minZ + 2, Math.min(FARCRYSIS_BOUNDS.maxZ - 2, oz)),
+    );
+
+    const length = 26 + Math.random() * 16;
+    const width = 1.6 + Math.random() * 1.6;
+
+    // Slight per-shaft tilt off the pure sun axis so quads stay visible
+    // from many camera angles (a pure axis-aligned quad is edge-on head-on).
+    const axis = sunDir
+      .clone()
+      .add(new THREE.Vector3((Math.random() - 0.5) * 0.1, (Math.random() - 0.5) * 0.1, (Math.random() - 0.5) * 0.1))
+      .normalize();
+
+    const quad = new THREE.Mesh(
+      new THREE.PlaneGeometry(width, length, 1, 6),
+      new THREE.MeshBasicMaterial({
+        color: 0xffecc0,
+        transparent: true,
+        opacity: 0.04 + Math.random() * 0.03,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        depthTest: true,
+        side: THREE.DoubleSide,
+        fog: false,
+      }),
+    );
+    quad.name = `farcrysis-atmos-god-ray-shaft-${i}`;
+    quad.position.copy(origin);
+    quad.setRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(up, axis));
+    quad.rotateY(Math.random() * Math.PI * 2); // random roll around the sun axis
+    quad.renderOrder = 997;
+    quad.frustumCulled = false;
+    quad.userData.farcrysisArt = true;
+    group.add(quad);
+
+    _shaftMeshes.push(quad);
+    _shaftBaseOpacities.push((quad.material as THREE.MeshBasicMaterial).opacity);
+    _shaftPhases.push(Math.random() * Math.PI * 2);
+    _shaftSpeeds.push(0.5 + Math.random() * 0.7);
+    _shaftOrigins.push(origin.clone());
+  }
+
+  return group;
+}
 
 // ---------------------------------------------------------------------------
 // 1. God rays — 10 semi-transparent cone geometries radiating from sun dir
@@ -277,6 +431,12 @@ export function buildAtmosphere(scene: THREE.Scene): void {
   scene.add(buildFireflies());
 
   scene.add(buildFogLayer());
+
+  _sunDiskGroup = buildSunDisk();
+  scene.add(_sunDiskGroup);
+
+  _shaftGroup = buildGodRayShafts();
+  scene.add(_shaftGroup);
 }
 
 /**
@@ -331,5 +491,27 @@ export function animateAtmosphere(time: number): void {
     // Global opacity pulse — averages out individual phases into a nice shimmer
     const mat = _fireflyPoints.material as THREE.PointsMaterial;
     mat.opacity = 0.35 + 0.35 * (0.5 + 0.5 * Math.sin(time * 2.3 + 0.7));
+  }
+
+  // --- Sun disk: breathing halo + gentle opacity shimmer ---
+  if (_sunHaloMesh) {
+    _sunHaloMesh.scale.setScalar(1 + Math.sin(time * 0.5) * 0.06);
+    const haloMat = _sunHaloMesh.material as THREE.MeshBasicMaterial;
+    haloMat.opacity = 0.30 + Math.sin(time * 0.7 + 1.2) * 0.08;
+  }
+
+  // --- God-ray shafts: slow group sway + per-shaft flicker + drift along sun axis ---
+  if (_shaftGroup) {
+    _shaftGroup.rotation.y = Math.sin(time * 0.03 + 1.3) * 0.07;
+    _shaftGroup.rotation.x = Math.cos(time * 0.025 + 0.6) * 0.035;
+  }
+  for (let i = 0; i < _shaftMeshes.length; i++) {
+    const quad = _shaftMeshes[i];
+    const shaftMat = quad.material as THREE.MeshBasicMaterial;
+    const pulse = 0.72 + 0.28 * Math.sin(time * _shaftSpeeds[i] + _shaftPhases[i]);
+    shaftMat.opacity = Math.max(0.01, _shaftBaseOpacities[i] * pulse);
+    quad.position
+      .copy(_shaftOrigins[i])
+      .addScaledVector(ATMOS_SUN_DISK_DIR, Math.sin(time * 0.12 + _shaftPhases[i] * 2.0) * 1.4);
   }
 }

@@ -1392,6 +1392,18 @@ export function buildLighting(scene: THREE.Scene): {
   fillLight.castShadow = false; // secondary; no extra shadow pass
   scene.add(fillLight);
 
+  // ---- 3b. Warm rim bounce light — low-angle warm wrap opposite the sun ----
+  // Paints amber onto the shadow-side silhouettes (cliff rims, boulder edges,
+  // palm trunks) for the classic golden-hour rim-lit look. No shadows by
+  // design — a bounce/rim helper, never a second shadow caster.
+  const rimPosition = sunPosition.clone().multiplyScalar(-0.6);
+  rimPosition.y = 7;
+  const rimLight = new THREE.DirectionalLight(0xffa066, 0.24);
+  rimLight.name = 'farcrysis-rim-bounce';
+  rimLight.position.copy(rimPosition);
+  rimLight.castShadow = false;
+  scene.add(rimLight);
+
   // ---- 4. Volumetric fog (FogExp2) — warm golden-hour haze ----
   // Walk parent chain to find the real THREE.Scene so the renderer picks up fog.
   const fogColor = new THREE.Color(0xffd4b3);
@@ -2134,6 +2146,66 @@ export function buildWater(scene: THREE.Scene): {
   foamBand.renderOrder = 2;
   foamBand.userData.farcrysisArt = true;
   water.add(foamBand);
+
+  // ---- Shoreline wet-sand transition band (square frame hugging the beach lip) ----
+  // Damp chocolate sand where the waves lap up, blending to dry sand inland.
+  // Conformed to the terrain so the band tracks the beach slope exactly.
+  const wetOuter = ARENA_HALF + 0.4; // 0.4 m into the water
+  const wetInner = ARENA_HALF - 3.4; // 3.4 m band onto the beach
+  const wetShape = new THREE.Shape();
+  wetShape.moveTo(-wetOuter, -wetOuter);
+  wetShape.lineTo(wetOuter, -wetOuter);
+  wetShape.lineTo(wetOuter, wetOuter);
+  wetShape.lineTo(-wetOuter, wetOuter);
+  wetShape.closePath();
+  const wetHole = new THREE.Path();
+  wetHole.moveTo(-wetInner, -wetInner);
+  wetHole.lineTo(wetInner, -wetInner);
+  wetHole.lineTo(wetInner, wetInner);
+  wetHole.lineTo(-wetInner, wetInner);
+  wetHole.closePath();
+  wetShape.holes.push(wetHole);
+
+  const wetGeom = new THREE.ShapeGeometry(wetShape);
+  wetGeom.rotateX(-Math.PI / 2);
+
+  const wetPosAttr = wetGeom.attributes.position as THREE.BufferAttribute;
+  const wetColors = new Float32Array(wetPosAttr.count * 3);
+  for (let i = 0; i < wetPosAttr.count; i++) {
+    const wx = wetPosAttr.getX(i);
+    const wz = wetPosAttr.getZ(i);
+    const edgeDist = ARENA_HALF - Math.max(Math.abs(wx), Math.abs(wz));
+    const sandY = terrainHeight(wx, wz) + 0.02;
+    const waterY = -0.18;
+    const blend = smoothstep(-0.3, 1.2, edgeDist);
+    wetPosAttr.setY(i, waterY + (sandY - waterY) * blend);
+
+    // Wet → dry vertex-colour gradient: damp sand at the water lip, dry inland
+    const wetness = 1 - smoothstep(0.2, 3.2, edgeDist);
+    const dryR = 0.85;
+    const dryG = 0.73;
+    const dryB = 0.55;
+    const wetR = 0.50;
+    const wetG = 0.42;
+    const wetB = 0.33;
+    wetColors[i * 3 + 0] = dryR + (wetR - dryR) * wetness;
+    wetColors[i * 3 + 1] = dryG + (wetG - dryG) * wetness;
+    wetColors[i * 3 + 2] = dryB + (wetB - dryB) * wetness;
+  }
+  wetGeom.setAttribute('color', new THREE.BufferAttribute(wetColors, 3));
+  wetGeom.computeVertexNormals();
+
+  const wetMat = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.98,
+    metalness: 0.0,
+    side: THREE.DoubleSide,
+  });
+  const wetBand = new THREE.Mesh(wetGeom, wetMat);
+  wetBand.name = 'farcrysis-terrain-wet-sand-band';
+  wetBand.receiveShadow = true;
+  wetBand.userData.farcrysisArt = true;
+  scene.add(wetBand);
 
   // ---- Animation updater (alloc-free) ----
   const update = (timeSeconds: number): void => {

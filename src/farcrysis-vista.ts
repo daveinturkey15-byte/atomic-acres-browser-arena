@@ -35,9 +35,14 @@ import * as THREE from 'three';
 const OCEAN_Y = -0.62;
 const OCEAN_SIZE = 512;
 
-const OCEAN_COLOR = 0x1a7a9f; // tropical open-ocean blue
+const OCEAN_COLOR = 0x1f7086; // tropical open-ocean teal, warmed for sunset
 const OCEAN_ROUGHNESS = 0.3; // low roughness → golden-hour sun glitter path
 const OCEAN_METALNESS = 0.05;
+const OCEAN_EMISSIVE = 0x55260f; // faint warm glow — sunset colour grading on the water
+const OCEAN_EMISSIVE_INTENSITY = 0.22;
+
+/** Horizontal sun azimuth — matches the golden-hour light at (-18, 22, 25). */
+const SUN_AZIMUTH = new THREE.Vector3(-18, 0, 25).normalize();
 
 /** Distant hazy green — sits inside the warm FogExp2 (0xffd4b3) haze. */
 const ISLAND_HAZE_COLOR = 0x4a6a5a;
@@ -93,6 +98,7 @@ interface VistaBirds {
 
 let birds: VistaBirds | null = null;
 let vistaApplied = false;
+let _glitterPath: THREE.Mesh | null = null;
 
 // ---------------------------------------------------------------------------
 // Ocean plane
@@ -106,6 +112,8 @@ function buildOcean(scene: THREE.Scene): void {
     color: OCEAN_COLOR,
     roughness: OCEAN_ROUGHNESS,
     metalness: OCEAN_METALNESS,
+    emissive: OCEAN_EMISSIVE,
+    emissiveIntensity: OCEAN_EMISSIVE_INTENSITY,
   });
 
   const ocean = new THREE.Mesh(geometry, material);
@@ -115,6 +123,140 @@ function buildOcean(scene: THREE.Scene): void {
   ocean.receiveShadow = true;
   ocean.userData.farcrysisArt = true;
   scene.add(ocean);
+}
+
+// ---------------------------------------------------------------------------
+// Sunset horizon grading — warm glow bands + sun glitter path on the ocean
+// ---------------------------------------------------------------------------
+
+/**
+ * Two additive warm glow rings straddling the horizon circle (the sky dome is
+ * ~180 m out) so the sunset colour sits right where the ocean meets the sky.
+ */
+function buildSunsetHorizonGlow(scene: THREE.Scene): void {
+  // Wide soft halo below the horizon line
+  const wideGeom = new THREE.RingGeometry(168, 194, 96);
+  wideGeom.rotateX(-Math.PI / 2);
+  const wide = new THREE.Mesh(
+    wideGeom,
+    new THREE.MeshBasicMaterial({
+      color: 0xff8f3f,
+      transparent: true,
+      opacity: 0.16,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      fog: false,
+      side: THREE.DoubleSide,
+    }),
+  );
+  wide.name = 'farcrysis-vista-horizon-glow-wide';
+  wide.position.y = -0.5;
+  wide.renderOrder = 2;
+  wide.userData.farcrysisArt = true;
+  scene.add(wide);
+
+  // Bright band right on the horizon line
+  const bandGeom = new THREE.RingGeometry(178, 186, 96);
+  bandGeom.rotateX(-Math.PI / 2);
+  const band = new THREE.Mesh(
+    bandGeom,
+    new THREE.MeshBasicMaterial({
+      color: 0xffb469,
+      transparent: true,
+      opacity: 0.30,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      fog: false,
+      side: THREE.DoubleSide,
+    }),
+  );
+  band.name = 'farcrysis-vista-horizon-glow-band';
+  band.position.y = -0.55;
+  band.renderOrder = 2;
+  band.userData.farcrysisArt = true;
+  scene.add(band);
+}
+
+/**
+ * Canvas streak texture for the sun glitter path — bright and wide at the
+ * horizon end, tapering to a faint point toward the viewer.
+ */
+function createGlitterCanvas(): HTMLCanvasElement | null {
+  try {
+    if (typeof document === 'undefined') return null;
+    const w = 128;
+    const h = 512;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    const rng = mulberry32(0x9e11_7d3);
+
+    ctx.clearRect(0, 0, w, h);
+    for (let py = 0; py < h; py++) {
+      const t = py / (h - 1); // 0 = horizon end (bright), 1 = viewer end (faint)
+      const intensity = Math.exp(-((t * 5.5) ** 2)) * 0.85 + Math.exp(-((t * 12) ** 2)) * 0.25;
+      if (intensity <= 0.01) continue;
+      const halfW = Math.max(1, w * 0.5 * (1 - 0.88 * t)); // taper toward viewer
+      ctx.fillStyle = `rgba(255, 205, 140, ${intensity})`;
+      ctx.fillRect(w * 0.5 - halfW, py, halfW * 2, 1);
+    }
+
+    // Glitter sparkles concentrated near the horizon end
+    for (let i = 0; i < 260; i++) {
+      const sx = rng() * w;
+      const sy = rng() * h * 0.5;
+      ctx.fillStyle = `rgba(255, 236, 200, ${0.10 + rng() * 0.35})`;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 0.6 + rng() * 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return canvas;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Sun glitter path — a long additive quad lying on the open ocean, aimed at
+ * the sun azimuth, from just beyond the lagoon out to the horizon.
+ */
+function buildSunGlitterPath(scene: THREE.Scene): void {
+  const canvas = createGlitterCanvas();
+  if (!canvas) return;
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+
+  const geom = new THREE.PlaneGeometry(18, 260, 1, 12);
+  geom.rotateX(-Math.PI / 2);
+
+  const path = new THREE.Mesh(
+    geom,
+    new THREE.MeshBasicMaterial({
+      map: tex,
+      transparent: true,
+      opacity: 0.5,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      depthTest: true,
+      side: THREE.DoubleSide,
+      fog: false,
+    }),
+  );
+  path.name = 'farcrysis-vista-sun-glitter-path';
+  path.position.copy(SUN_AZIMUTH.clone().multiplyScalar(115));
+  path.position.y = OCEAN_Y + 0.02;
+  // Rotate so the plane's far end (-Z after flattening) points at the sun azimuth
+  path.rotation.y = Math.atan2(-SUN_AZIMUTH.x, -SUN_AZIMUTH.z);
+  path.renderOrder = 3;
+  path.frustumCulled = false;
+  path.userData.farcrysisArt = true;
+  scene.add(path);
+
+  _glitterPath = path;
 }
 
 // ---------------------------------------------------------------------------
@@ -294,9 +436,15 @@ export function applyVista(scene: THREE.Scene): void {
   buildOcean(scene);
   buildIslands(scene);
   buildBirds(scene);
+  buildSunsetHorizonGlow(scene);
+  buildSunGlitterPath(scene);
 }
 
 /** Per-frame driver: orbit the seabirds. Safe no-op before applyVista. */
 export function animateVista(timeSeconds: number): void {
   updateBirdPositions(timeSeconds);
+  if (_glitterPath) {
+    const mat = _glitterPath.material as THREE.MeshBasicMaterial;
+    mat.opacity = 0.42 + Math.sin(timeSeconds * 0.55) * 0.10;
+  }
 }

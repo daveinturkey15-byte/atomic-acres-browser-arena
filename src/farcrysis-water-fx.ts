@@ -24,6 +24,140 @@ let _causticPlane: THREE.Mesh | null = null;
 let _rippleGroup: THREE.Group | null = null;
 const _rippleMeshes: THREE.Mesh[] = [];
 const _ripplePhases: number[] = [];
+let _crestMesh: THREE.Mesh | null = null;
+let _crestBasePositions: Float32Array | null = null;
+let _crestGeom: THREE.PlaneGeometry | null = null;
+let _sandGradient: THREE.Mesh | null = null;
+
+// ---------------------------------------------------------------------------
+// 5. Wave crest highlights — additive brightness riding the wave peaks
+// ---------------------------------------------------------------------------
+
+/**
+ * A second 76×76 plane matching the wave surface geometry exactly, but driven
+ * as a brightness field instead of a colour wash: crests glow warm-white
+ * (additive), troughs contribute nothing. Vertex-coloured MeshBasicMaterial —
+ * no ShaderMaterial.
+ */
+function buildWaveCrestHighlights(scene: THREE.Scene): void {
+  const size = 76;
+  const segments = 72;
+
+  const geom = new THREE.PlaneGeometry(size, size, segments, segments);
+  geom.rotateX(-Math.PI / 2);
+
+  const posAttr = geom.attributes.position as THREE.BufferAttribute;
+  const base = new Float32Array(posAttr.count * 3);
+  for (let i = 0; i < posAttr.count; i++) {
+    base[i * 3 + 0] = posAttr.getX(i);
+    base[i * 3 + 1] = posAttr.getY(i); // always 0
+    base[i * 3 + 2] = posAttr.getZ(i);
+  }
+
+  // All-zero colours → invisible until the first animate pass brightens crests
+  const colors = new Float32Array(posAttr.count * 3);
+  geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xffe9c4, // warm sunlit white — multiplied by vertex brightness
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.5,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    depthTest: true,
+    side: THREE.DoubleSide,
+    fog: false,
+  });
+
+  const mesh = new THREE.Mesh(geom, mat);
+  mesh.name = 'farcrysis-water-fx-crest-highlights';
+  mesh.position.y = -0.22;
+  mesh.renderOrder = 3;
+  mesh.frustumCulled = false;
+  mesh.userData.farcrysisArt = true;
+
+  scene.add(mesh);
+
+  _crestMesh = mesh;
+  _crestBasePositions = base;
+  _crestGeom = geom;
+}
+
+// ---------------------------------------------------------------------------
+// 6. Underwater sand depth gradient — golden shallows → deep teal lagoon floor
+// ---------------------------------------------------------------------------
+
+function createSandGradientCanvas(): HTMLCanvasElement | null {
+  try {
+    if (typeof document === 'undefined') return null;
+    const size = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    // Vertical gradient; ring UV v=0 (inner edge, near shore) maps to the
+    // bottom of the canvas. Canvas bottom = golden shallow sand.
+    const grad = ctx.createLinearGradient(0, 0, 0, size);
+    grad.addColorStop(0.0, '#143c50'); // outer edge → deep lagoon floor
+    grad.addColorStop(0.4, '#4a8a92'); // mid depth
+    grad.addColorStop(0.7, '#9fb89a'); // sandy shallows
+    grad.addColorStop(1.0, '#d8bf8c'); // inner edge → sunlit shallow sand
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+
+    // Sand speckle so the floor reads as sand, not a flat colour wash
+    for (let i = 0; i < 1500; i++) {
+      const sx = Math.random() * size;
+      const sy = Math.random() * size;
+      ctx.fillStyle = `rgba(232, 216, 178, ${0.03 + Math.random() * 0.08})`;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 0.5 + Math.random() * 1.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return canvas;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Annulus under the water surface (r 31.5–61) covering the visible water ring
+ * around the beach shelf. Golden near the shore fading to deep teal offshore —
+ * the shallow→deep sand depth gradient seen through the translucent water.
+ */
+function buildSandDepthGradient(scene: THREE.Scene): void {
+  const canvas = createSandGradientCanvas();
+  if (!canvas) return;
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+
+  const geom = new THREE.RingGeometry(31.5, 61, 96);
+  geom.rotateX(-Math.PI / 2);
+
+  const mat = new THREE.MeshBasicMaterial({
+    map: tex,
+    transparent: true,
+    opacity: 0.5,
+    depthWrite: false,
+    depthTest: true,
+    side: THREE.DoubleSide,
+  });
+
+  const mesh = new THREE.Mesh(geom, mat);
+  mesh.name = 'farcrysis-water-fx-sand-depth-gradient';
+  mesh.position.y = -0.26;
+  mesh.renderOrder = 2;
+  mesh.userData.farcrysisArt = true;
+  scene.add(mesh);
+
+  _sandGradient = mesh;
+}
 
 // ---------------------------------------------------------------------------
 // 1. Shoreline foam ring
@@ -321,6 +455,8 @@ export function buildWaterFX(scene: THREE.Scene): void {
   buildWaveSurface(scene);
   buildCausticProjection(scene);
   buildEdgeRipples(scene);
+  buildWaveCrestHighlights(scene);
+  buildSandDepthGradient(scene);
 }
 
 export function animateWaterFX(time: number): void {
@@ -395,5 +531,45 @@ export function animateWaterFX(time: number): void {
       const s = 0.7 + pulse * 0.45;
       ripple.scale.setScalar(s);
     }
+  }
+
+  // --- 5. Wave crest highlights — brightness rides the animated wave peaks ---
+  if (_crestMesh && _crestBasePositions && _crestGeom) {
+    const posAttr = _crestGeom.attributes.position as THREE.BufferAttribute;
+    const colAttr = _crestGeom.attributes.color as THREE.BufferAttribute;
+    const base = _crestBasePositions;
+
+    for (let i = 0; i < posAttr.count; i++) {
+      const bx = base[i * 3 + 0];
+      const bz = base[i * 3 + 2];
+      const dist = Math.sqrt(bx * bx + bz * bz);
+
+      // Mirror the wave-surface displacement so highlights ride the crests
+      const wave1 = Math.sin(dist * 0.55 - time * 1.4) * 0.08;
+      const wave2 = Math.cos(dist * 0.75 + time * 1.1) * 0.05;
+      const wave3 = Math.sin(dist * 1.05 - time * 1.8) * 0.04;
+      const ripple = Math.sin(dist * 0.40 - time * 2.0) * 0.06;
+      const y = wave1 + wave2 + wave3 + ripple + 0.02;
+
+      posAttr.setY(i, y + 0.015); // just above the wave surface — no z-fight
+
+      // Bright on crests, plus travelling sparkle bands
+      const crest = Math.max(0, Math.min(1, (y - 0.06) / 0.12));
+      const sparkle = Math.pow(Math.max(0, Math.sin(dist * 1.6 - time * 2.4)), 10.0);
+      const bright = Math.min(1, crest * 0.9 + sparkle * 0.55);
+      colAttr.setXYZ(i, bright, bright * 0.96, bright * 0.86);
+    }
+
+    posAttr.needsUpdate = true;
+    colAttr.needsUpdate = true;
+
+    const crestMat = _crestMesh.material as THREE.MeshBasicMaterial;
+    crestMat.opacity = 0.42 + Math.sin(time * 0.9) * 0.12;
+  }
+
+  // --- 6. Sand depth gradient — gentle opacity breathing ---
+  if (_sandGradient) {
+    const sandMat = _sandGradient.material as THREE.MeshBasicMaterial;
+    sandMat.opacity = 0.46 + Math.sin(time * 0.4) * 0.06;
   }
 }

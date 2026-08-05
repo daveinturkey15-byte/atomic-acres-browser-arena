@@ -12,7 +12,7 @@
  */
 import * as THREE from 'three';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
-import { buildVegetation, animateVegetationWind, setVegetationLOD } from './farcrysis-vegetation';
+import { buildVegetation, buildAdditionalVegetation, animateVegetationWind, setVegetationLOD } from './farcrysis-vegetation';
 // terrain.ts ShaderMaterial effects disabled for TSL review compatibility.
 // Terrain + water provided inline; lighting simplified to standard lights.
 import { applyFarcrysisTextures } from './farcrysis-textures';
@@ -830,6 +830,7 @@ export function applyFarcrysisArtwork(root: THREE.Group): void {
 
   // ---- Pass 69 re-authored art layer (dense vegetation, terrain, lighting, water) ----
   buildVegetation(root);
+  buildAdditionalVegetation(root);
 
   // Terrain, lighting, and water modules expect Scene; cast through Object3D
   const s = root as unknown as import('three').Scene;

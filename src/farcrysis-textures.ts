@@ -134,10 +134,13 @@ const T = 512;
 
 let _sandColor: THREE.Texture | null = null;
 let _sandRoughness: THREE.Texture | null = null;
+let _sandNormal: THREE.Texture | null = null;
 let _rockColor: THREE.Texture | null = null;
 let _rockRoughness: THREE.Texture | null = null;
+let _rockNormal: THREE.Texture | null = null;
 let _barkColor: THREE.Texture | null = null;
 let _barkRoughness: THREE.Texture | null = null;
+let _barkNormal: THREE.Texture | null = null;
 let _barkBump: THREE.Texture | null = null;
 let _frondAlpha: THREE.Texture | null = null;
 let _waterColor: THREE.Texture | null = null;
@@ -333,6 +336,86 @@ function genPalmBark(): void {
 }
 
 // ---------------------------------------------------------------------------
+// 3b. Tangent-space normal maps (procedural PBR polish — sand / rock / bark)
+//     Gradient of a tileable height field → tangent-space normal, encoded as
+//     RGB (X/Y/Z) with NoColorSpace. Toroidal neighbour sampling keeps the
+//     map perfectly seamless, matching the tiling color/roughness maps.
+// ---------------------------------------------------------------------------
+
+function genNormalMap(
+  height: (nx: number, ny: number) => number,
+  strength: number,
+): THREE.Texture | null {
+  const ctx = makeCanvas(T, T);
+  if (!ctx) return null;
+
+  const field = new Float32Array(T * T);
+  for (let y = 0; y < T; y++) {
+    for (let x = 0; x < T; x++) {
+      field[y * T + x] = height(x / T, y / T);
+    }
+  }
+
+  const img = ctx.createImageData(T, T);
+  const data = img.data;
+  for (let y = 0; y < T; y++) {
+    for (let x = 0; x < T; x++) {
+      const i = (y * T + x) * 4;
+      // Toroidal wrap so gradients are seamless across tile edges
+      const xL = field[y * T + ((x + T - 1) % T)];
+      const xR = field[y * T + ((x + 1) % T)];
+      const yD = field[((y + T - 1) % T) * T + x];
+      const yU = field[((y + 1) % T) * T + x];
+      const gradX = (xR - xL) * strength;
+      const gradY = (yU - yD) * strength;
+      const len = Math.sqrt(gradX * gradX + gradY * gradY + 1);
+      data[i] = Math.round((-gradX / len) * 127.5 + 127.5);
+      data[i + 1] = Math.round((-gradY / len) * 127.5 + 127.5);
+      data[i + 2] = Math.round((1 / len) * 127.5 + 127.5);
+      data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return wrapTexture(ctx.canvas, THREE.NoColorSpace);
+}
+
+/** Sand normal: fine grain + faint wind-ripple bands (matches genBeachSand). */
+function genSandNormal(): void {
+  const tex = genNormalMap((nx, ny) => {
+    const n = fbmNoise(nx * 18, ny * 18, 3, 0x51a7);
+    const ripple = Math.sin(ny * 26 + Math.sin(nx * 4.2 + ny * 5) * 1.4) * 0.12;
+    return n * 0.7 + ripple * 0.5;
+  }, 1.4);
+  if (!tex) return;
+  _sandNormal = tex;
+  _textureCount += 1;
+}
+
+/** Rock normal: broad crag relief + fine pitting (matches genJungleRock). */
+function genRockNormal(): void {
+  const tex = genNormalMap((nx, ny) => {
+    const n1 = fbmNoise(nx * 16, ny * 16, 4, 0x7abc);
+    const n2 = fbmNoise(nx * 32, ny * 32, 3, 0xdef1);
+    return n1 * 0.7 + n2 * 0.3;
+  }, 2.2);
+  if (!tex) return;
+  _rockNormal = tex;
+  _textureCount += 1;
+}
+
+/** Bark normal: vertical striation ridges + knots (matches genPalmBark). */
+function genBarkNormal(): void {
+  const tex = genNormalMap((nx, ny) => {
+    const stripe = Math.sin(nx * 28 + fbmNoise(ny * 4, 0, 2, 0xb0b) * 6) * 0.5 + 0.5;
+    const n = fbmNoise(nx * 12, ny * 8, 3, 0xabcd);
+    return stripe * 0.7 + n * 0.3;
+  }, 2.6);
+  if (!tex) return;
+  _barkNormal = tex;
+  _textureCount += 1;
+}
+
+// ---------------------------------------------------------------------------
 // 4. Frond alpha (procedural fallback)
 // ---------------------------------------------------------------------------
 
@@ -509,6 +592,9 @@ function ensureTextures(): void {
   genBeachSand();
   genJungleRock();
   genPalmBark();
+  genSandNormal();
+  genRockNormal();
+  genBarkNormal();
   genFrondAlpha();
   genWater();
   genWoodCrate();
@@ -587,10 +673,18 @@ function upgradeRegistered(category: TextureCategory, set: ImageTextureSet): voi
     switch (category) {
       case 'sand':
         if (set.color) mat.map = set.color;
+        if (set.normal) {
+          mat.normalMap = set.normal;
+          mat.normalScale = new THREE.Vector2(0.7, 0.7);
+        }
         if (set.roughness) mat.roughnessMap = set.roughness;
         break;
       case 'rock':
         if (set.color) mat.map = set.color;
+        if (set.normal) {
+          mat.normalMap = set.normal;
+          mat.normalScale = new THREE.Vector2(0.8, 0.8);
+        }
         if (set.roughness) mat.roughnessMap = set.roughness;
         break;
       case 'palm-bark':
@@ -698,16 +792,30 @@ function augmentProcedural(mat: THREE.Material, category: TextureCategory): void
   switch (category) {
     case 'sand':
       if (!mat.map && _sandColor) mat.map = _sandColor;
+      if (!mat.normalMap && _sandNormal) {
+        mat.normalMap = _sandNormal;
+        mat.normalScale = new THREE.Vector2(0.7, 0.7);
+      }
       if (!mat.roughnessMap && _sandRoughness) mat.roughnessMap = _sandRoughness;
       break;
     case 'rock':
       if (!mat.map && _rockColor) mat.map = _rockColor;
+      if (!mat.normalMap && _rockNormal) {
+        mat.normalMap = _rockNormal;
+        mat.normalScale = new THREE.Vector2(0.8, 0.8);
+      }
       if (!mat.roughnessMap && _rockRoughness) mat.roughnessMap = _rockRoughness;
       break;
     case 'palm-bark':
       if (!mat.map && _barkColor) mat.map = _barkColor;
       if (!mat.roughnessMap && _barkRoughness) mat.roughnessMap = _barkRoughness;
-      if (!mat.bumpMap && !mat.normalMap && _barkBump) {
+      // Prefer the procedural tangent-space normal over the legacy bump map
+      if (!mat.normalMap && _barkNormal) {
+        mat.normalMap = _barkNormal;
+        mat.normalScale = new THREE.Vector2(0.5, 0.5);
+        mat.bumpMap = null;
+        mat.bumpScale = 1;
+      } else if (!mat.normalMap && !mat.bumpMap && _barkBump) {
         mat.bumpMap = _barkBump;
         mat.bumpScale = 0.04;
       }
@@ -766,4 +874,17 @@ export function applyFarcrysisTextures(root: THREE.Group): void {
 
   // 2. Kick off async loading of high-resolution image textures
   loadAllImageTextures();
+}
+
+// ---------------------------------------------------------------------------
+// PBR map stats — counts of canvas-generated normal/roughness maps available.
+// Call after applyFarcrysisTextures (or any time; generation is cached).
+// ---------------------------------------------------------------------------
+
+export function buildProceduralPBRMaps(): { normalMaps: number; roughnessMaps: number } {
+  ensureTextures();
+  return {
+    normalMaps: [_sandNormal, _rockNormal, _barkNormal, _waterNormal].filter((t) => t !== null).length,
+    roughnessMaps: [_sandRoughness, _rockRoughness, _barkRoughness, _crateRoughness].filter((t) => t !== null).length,
+  };
 }

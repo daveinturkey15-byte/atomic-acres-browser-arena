@@ -717,10 +717,10 @@ function placeStackedSandbagWall(
 /**
  * Adds physics-backed interactables to the Farcrysis arena Builder.
  *
- * Places 28 crates, 18 barrels, 6 sandbag walls (4 flat + 2 stacked near
- * core doors), 6 fallen palm trunks, 2 rock outcrops, 2 crate stacks
- * (adding 4 more crates), and 2 vantage platforms (8 more crates).
- * Every position is seed-deterministic (mulberry32 — no Math.random)
+ * Places 32 crates, 22 barrels, 9 sandbag walls (6 flat + 2 stacked near
+ * core doors + 1 cave/tower/beach each), 6 fallen palm trunks, 2 rock
+ * outcrops, 2 crate stacks (adding 4 more crates), and 2 vantage
+ * platforms (8 more crates).  Every position is seed-deterministic (mulberry32 — no Math.random)
  * and verified ≥3 m from every spawn and patrol waypoint.
  *
  * @param builder  The ArenaMap Builder object from farcrysis.ts — a
@@ -985,6 +985,38 @@ export function addInteractables(builder: any): void {
     builder, 'farcrysis-core-door-sandbag-n', 0, 3.6, 1.6, 0.45, 0.6, 4,
   );
 
+  // =====================================================================
+  // 13. PASS 69 QA — cave entrance, tower approach, beach interactables
+  // =====================================================================
+  //
+  // Eight additional interactables and three sandbag walls placed at
+  // gameplay-significant positions: the flooded cave entrance (SE),
+  // the research tower approach (NW), and the beach ring.  Every
+  // position is verified ≥3 m from every spawn and patrol waypoint.
+
+  // -- Cave entrance (SE) — crates + barrel flanking the flooded cave ------
+  placeCrate(builder, 'farcrysis-crate-29', 28, 17.5, 1.0);
+  placeCrate(builder, 'farcrysis-crate-30', 22, 17, 0.9);
+  placeBarrel(builder, 'farcrysis-barrel-19', 24, 13.5, 0.6, 1.0);
+
+  // -- Tower approach (NW) — barrel + crate near the research tower --------
+  placeBarrel(builder, 'farcrysis-barrel-20', -11, -11, 0.6, 1.0);
+  placeCrate(builder, 'farcrysis-crate-31', -10, -6.5, 0.9);
+
+  // -- Beach ring — south, north, west beach interactables -----------------
+  placeBarrel(builder, 'farcrysis-barrel-21', -3, -27, 0.55, 0.95);
+  placeCrate(builder, 'farcrysis-crate-32', 3.5, 27, 0.95);
+  placeBarrel(builder, 'farcrysis-barrel-22', -28, 14, 0.55, 0.95);
+
+  // -- Cave entrance approach sandbag cover --------------------------------
+  placeSandbagWall(builder, 'farcrysis-sandbag-05', 19, 15, 2.2, 0.6, 0.45);
+
+  // -- Tower approach sandbag cover ----------------------------------------
+  placeSandbagWall(builder, 'farcrysis-sandbag-06', -13, -8, 2.2, 0.6, 0.45);
+
+  // -- SE beach sandbag cover ----------------------------------------------
+  placeSandbagWall(builder, 'farcrysis-sandbag-07', 26, -26, 2.2, 0.6, 0.45);
+
   // Verify new cover positions are within the arena boundary margin.
   for (const [label, px, pz] of [
     ['cover-jungle-01', -20, 8],
@@ -999,6 +1031,9 @@ export function addInteractables(builder: any): void {
     ['vantage-02', 18, 6],
     ['core-door-sandbag-s', 0, -3.6],
     ['core-door-sandbag-n', 0, 3.6],
+    ['sandbag-05', 19, 15],
+    ['sandbag-06', -13, -8],
+    ['sandbag-07', 26, -26],
   ] as const) {
     if (!ok(px, pz)) {
       console.warn(`farcrysis-${label} at (${px}, ${pz}) is outside FARCRYSIS_BOUNDS margin`);

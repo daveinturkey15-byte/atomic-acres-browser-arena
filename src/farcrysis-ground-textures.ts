@@ -131,6 +131,8 @@ export interface FarcrysisGroundTextures {
   wetSandTex: THREE.CanvasTexture | null;
   earthTex: THREE.CanvasTexture | null;
   roughnessTex: THREE.CanvasTexture | null;
+  sandNormalTex: THREE.CanvasTexture | null;
+  earthNormalTex: THREE.CanvasTexture | null;
 }
 
 /** Per-pixel filler for a tiling color map. */
@@ -228,6 +230,77 @@ function roughnessPixel(nx: number, ny: number, rng: () => number): [number, num
   return [c, c, c];
 }
 
+/**
+ * Tangent-space normal map from a tileable height field (PBR micro-relief).
+ * Toroidal neighbour sampling keeps gradients seamless across tile edges,
+ * matching the color/roughness maps' RepeatWrapping.
+ */
+function fillNormalMap(
+  width: number,
+  height: number,
+  seed: number,
+  heightFn: (nx: number, ny: number, rng: () => number) => number,
+  strength: number,
+  repeat: number,
+): THREE.CanvasTexture | null {
+  const canvas = makeCanvas(width, height);
+  if (!canvas) return null;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  const rng = mulberry32(seed);
+  const field = new Float32Array(width * height);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      field[y * width + x] = heightFn(x / width, y / height, rng);
+    }
+  }
+
+  const img = ctx.createImageData(width, height);
+  const data = img.data;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      const xL = field[y * width + ((x + width - 1) % width)];
+      const xR = field[y * width + ((x + 1) % width)];
+      const yD = field[((y + height - 1) % height) * width + x];
+      const yU = field[((y + 1) % height) * width + x];
+      const gradX = (xR - xL) * strength;
+      const gradY = (yU - yD) * strength;
+      const len = Math.sqrt(gradX * gradX + gradY * gradY + 1);
+      data[i] = clamp255((-gradX / len) * 127.5 + 127.5);
+      data[i + 1] = clamp255((-gradY / len) * 127.5 + 127.5);
+      data[i + 2] = clamp255((1 / len) * 127.5 + 127.5);
+      data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.repeat.set(repeat, repeat);
+  tex.needsUpdate = true;
+  return tex;
+}
+
+/** Sand height field: fine grain + faint wind-ripple bands (mirrors sandPixel). */
+function sandHeight(nx: number, ny: number, rng: () => number): number {
+  const drift = fbmNoise(nx * 3, ny * 3, 3, SAND_SEED + 17) - 0.5;
+  const ripple = Math.sin(ny * 26 + Math.sin(nx * 4.2 + ny * 5) * 1.4) * 0.12;
+  const grain = (rng() - 0.5) * 0.12;
+  return 0.5 + drift * 0.3 + ripple + grain;
+}
+
+/** Earth height field: broad mottling + pebble bumps (mirrors earthPixel). */
+function earthHeight(nx: number, ny: number, rng: () => number): number {
+  const n = fbmNoise(nx * 8, ny * 8, 4, EARTH_SEED + 31) - 0.5;
+  const pebble = fbmNoise(nx * 42, ny * 42, 2, EARTH_SEED + 43) > 0.62 ? 0.35 : 0;
+  const grain = (rng() - 0.5) * 0.1;
+  return 0.5 + n * 0.5 + pebble + grain;
+}
+
 let _cached: FarcrysisGroundTextures | null = null;
 let _generated = false;
 
@@ -248,7 +321,9 @@ export function generateSandTextures(): FarcrysisGroundTextures {
   );
   const earthTex = fillColorMap(SAND_SIZE, SAND_SIZE, EARTH_SEED, earthPixel, THREE.SRGBColorSpace, 4);
   const roughnessTex = fillColorMap(ROUGHNESS_SIZE, ROUGHNESS_SIZE, ROUGH_SEED, roughnessPixel, THREE.NoColorSpace, 4);
-  _cached = { sandTex, wetSandTex, earthTex, roughnessTex };
+  const sandNormalTex = fillNormalMap(ROUGHNESS_SIZE, ROUGHNESS_SIZE, SAND_SEED + 91, sandHeight, 1.6, 4);
+  const earthNormalTex = fillNormalMap(ROUGHNESS_SIZE, ROUGHNESS_SIZE, EARTH_SEED + 71, earthHeight, 1.2, 4);
+  _cached = { sandTex, wetSandTex, earthTex, roughnessTex, sandNormalTex, earthNormalTex };
   _generated = Boolean(sandTex || wetSandTex || earthTex);
   return _cached;
 }
@@ -256,7 +331,14 @@ export function generateSandTextures(): FarcrysisGroundTextures {
 export function FARCRYSIS_GROUND_TEXTURE_STATS(): { generated: boolean; textureCount: number } {
   const set = _cached;
   const count = set
-    ? [set.sandTex, set.wetSandTex, set.earthTex, set.roughnessTex].filter((t) => t !== null).length
+    ? [
+        set.sandTex,
+        set.wetSandTex,
+        set.earthTex,
+        set.roughnessTex,
+        set.sandNormalTex,
+        set.earthNormalTex,
+      ].filter((t) => t !== null).length
     : 0;
   return { generated: _generated, textureCount: count };
 }
@@ -268,17 +350,19 @@ export function FARCRYSIS_GROUND_TEXTURE_STATS(): { generated: boolean; textureC
 interface GroundTextureSpec {
   tex: THREE.CanvasTexture | null;
   roughness: number;
+  normalTex: THREE.CanvasTexture | null;
+  normalScale: number;
 }
 
 /** Map a ground mesh name to its texture + roughness contract. */
 function groundSpec(name: string, set: FarcrysisGroundTextures): GroundTextureSpec | null {
   switch (name) {
     case GROUND_PLATE:
-      return { tex: set.sandTex, roughness: 0.85 };
+      return { tex: set.sandTex, roughness: 0.85, normalTex: set.sandNormalTex, normalScale: 0.7 };
     case BEACH_RING:
-      return { tex: set.wetSandTex, roughness: 0.6 };
+      return { tex: set.wetSandTex, roughness: 0.6, normalTex: set.sandNormalTex, normalScale: 0.6 };
     case JUNGLE_FLOOR:
-      return { tex: set.earthTex, roughness: 0.9 };
+      return { tex: set.earthTex, roughness: 0.9, normalTex: set.earthNormalTex, normalScale: 0.5 };
     default:
       return null;
   }
@@ -307,6 +391,10 @@ export function applyGroundTextures(scene: THREE.Scene): void {
       }
       mat.roughness = spec.roughness;
       if (set.roughnessTex) mat.roughnessMap = set.roughnessTex;
+      if (spec.normalTex) {
+        mat.normalMap = spec.normalTex;
+        mat.normalScale = new THREE.Vector2(spec.normalScale, spec.normalScale);
+      }
       mat.needsUpdate = true;
     }
   });
