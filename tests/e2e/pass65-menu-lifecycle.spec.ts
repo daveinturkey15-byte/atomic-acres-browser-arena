@@ -167,7 +167,7 @@ async function startFromMenu(page: Page): Promise<void> {
   await expect(transition).toHaveAttribute('data-active', 'true');
   await expect(page.locator('#deployment-transition-video')).toBeHidden();
   // Wait for deployment loading to complete before the transition hides.
-  await expect.poll(async () => (await lifecycle(page)).matchReadyCount, { timeout: 45_000 }).toBe(1);
+  await expect.poll(async () => (await lifecycle(page)).matchReadyCount, { timeout: 30_000 }).toBe(1);
   // Post-deployment: menu stays in layout but is inert/aria-hidden during
   // deployment; transition hides once deploying phase ends.
   await expect(page.locator('#menu')).toBeHidden();
