@@ -1,23 +1,21 @@
 /**
- * farcrysis-textures.ts — Procedural PBR Canvas-based texture generation
- * for the Farcrysis jungle arena (Pass 69).
+ * farcrysis-textures.ts — PBR texture application for the Farcrysis jungle/beach arena.
  *
- * Generates 6 texture families at runtime via HTML Canvas:
- *   1. Beach sand  (color + roughness)
- *   2. Jungle rock (color + roughness)
- *   3. Palm bark   (color + roughness + bump)
- *   4. Frond alpha (alpha map + green-gold tint)
- *   5. Water       (normal map + tropical colour)
- *   6. Wood crate  (colour + roughness)
+ * Uses high-quality AI-generated 1024×1024 PBR image textures (color, normal, roughness)
+ * loaded asynchronously from public/assets/original/textures/farcrysis-*.png.
+ *
+ * Immediate synchronous presentation via procedural Canvas textures (the legacy
+ * noise-based generators) provides a seamless fallback in headless environments,
+ * during network delays, and while images load.  When the image set for a material
+ * family finishes loading, registered materials are upgraded in-place.
  *
  * Exports:
  *   applyFarcrysisTextures(root: THREE.Group): void
  *   FARCRYSIS_TEXTURE_STATS(): { textureCount: number }
  *
  * Presentation only — never adds colliders, spawns, or gameplay authority.
- * Canvas textures are generated once and cached. Headless / test-safe:
- * canvas creation is gated; when unavailable stats report 0 and apply is a no-op.
  */
+
 import * as THREE from 'three';
 import { FARCRYSIS_ART_FEEL } from './farcrysis-art';
 
@@ -90,20 +88,18 @@ function mulberry32(seed: number): () => number {
 // Noise generators (value noise + fractal)
 // ---------------------------------------------------------------------------
 
-/** Simple gradient-noise-like value at integer lattice. */
 function valueNoise(x: number, y: number, seed: number): number {
   const s = x * 374761393 + y * 668265263 + seed * 15485863;
   const n = Math.sin(s) * 10000;
   return n - Math.floor(n);
 }
 
-/** Smooth interpolation between lattice points. */
 function smoothNoise(x: number, y: number, seed: number): number {
   const ix = Math.floor(x);
   const iy = Math.floor(y);
   const fx = x - ix;
   const fy = y - iy;
-  const sx = fx * fx * (3 - 2 * fx); // smoothstep
+  const sx = fx * fx * (3 - 2 * fx);
   const sy = fy * fy * (3 - 2 * fy);
 
   const v00 = valueNoise(ix, iy, seed);
@@ -116,7 +112,6 @@ function smoothNoise(x: number, y: number, seed: number): number {
   return a + sy * (b - a);
 }
 
-/** Fractal / octave noise. */
 function fbmNoise(x: number, y: number, octaves: number, seed: number): number {
   let value = 0;
   let amplitude = 1;
@@ -132,10 +127,10 @@ function fbmNoise(x: number, y: number, octaves: number, seed: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// Texture caches
+// Procedural texture caches (fallback)
 // ---------------------------------------------------------------------------
 
-const T = 512; // base texture resolution
+const T = 512;
 
 let _sandColor: THREE.Texture | null = null;
 let _sandRoughness: THREE.Texture | null = null;
@@ -151,7 +146,7 @@ let _crateColor: THREE.Texture | null = null;
 let _crateRoughness: THREE.Texture | null = null;
 
 // ---------------------------------------------------------------------------
-// 1. Beach sand — warm golden-white noise
+// 1. Beach sand (procedural fallback)
 // ---------------------------------------------------------------------------
 
 function genBeachSand(): void {
@@ -167,21 +162,14 @@ function genBeachSand(): void {
       const i = (y * T + x) * 4;
       const nx = x / T;
       const ny = y / T;
-
-      // Fractal noise for grain
       const n = fbmNoise(nx * 24, ny * 24, 4, 0x5bea);
-
-      // Warm beige palette: mix tan, cream, light brown
       const baseR = 0.78 + n * 0.12;
       const baseG = 0.65 + n * 0.14;
       const baseB = 0.42 + n * 0.12;
-
-      // Fine grain: high-frequency variation
       const grain = (rng() - 0.5) * 0.06;
       const r = Math.min(1, Math.max(0, baseR + grain));
       const g = Math.min(1, Math.max(0, baseG + grain));
       const b = Math.min(1, Math.max(0, baseB + grain));
-
       data[i] = Math.round(r * 255);
       data[i + 1] = Math.round(g * 255);
       data[i + 2] = Math.round(b * 255);
@@ -191,7 +179,6 @@ function genBeachSand(): void {
   ctx.putImageData(img, 0, 0);
   _sandColor = wrapTexture(ctx.canvas);
 
-  // Roughness map: sand is generally rough (light grey) with subtle variation
   const rCtx = makeCanvas(T, T);
   if (!rCtx) return;
   const rImg = rCtx.createImageData(T, T);
@@ -214,7 +201,7 @@ function genBeachSand(): void {
 }
 
 // ---------------------------------------------------------------------------
-// 2. Jungle rock/cliff — dark grey-brown with micro-detail
+// 2. Jungle rock (procedural fallback)
 // ---------------------------------------------------------------------------
 
 function genJungleRock(): void {
@@ -229,33 +216,21 @@ function genJungleRock(): void {
       const i = (y * T + x) * 4;
       const nx = x / T;
       const ny = y / T;
-
-      // Base rock tone — dark grey-brown
       const n1 = fbmNoise(nx * 16, ny * 16, 4, 0x7abc);
       const n2 = fbmNoise(nx * 32, ny * 32, 3, 0xdef1);
-
-      // Darker base with lighter cracks / highlights
       const base = 0.28 + n1 * 0.18 + n2 * 0.06;
-
-      // Slight colour variation: grey → brown
       const rTint = base * 0.96;
       const gTint = base * 0.94;
       const bTint = base * 0.90;
-
-      const r = Math.min(1, Math.max(0, rTint));
-      const g = Math.min(1, Math.max(0, gTint));
-      const b = Math.min(1, Math.max(0, bTint));
-
-      data[i] = Math.round(r * 255);
-      data[i + 1] = Math.round(g * 255);
-      data[i + 2] = Math.round(b * 255);
+      data[i] = Math.round(Math.min(1, Math.max(0, rTint)) * 255);
+      data[i + 1] = Math.round(Math.min(1, Math.max(0, gTint)) * 255);
+      data[i + 2] = Math.round(Math.min(1, Math.max(0, bTint)) * 255);
       data[i + 3] = 255;
     }
   }
   ctx.putImageData(img, 0, 0);
   _rockColor = wrapTexture(ctx.canvas);
 
-  // Roughness: high roughness with variation (cracks are smoother)
   const rCtx = makeCanvas(T, T);
   if (!rCtx) return;
   const rImg = rCtx.createImageData(T, T);
@@ -278,7 +253,7 @@ function genJungleRock(): void {
 }
 
 // ---------------------------------------------------------------------------
-// 3. Palm bark — vertical striations, brown tones
+// 3. Palm bark (procedural fallback)
 // ---------------------------------------------------------------------------
 
 function genPalmBark(): void {
@@ -294,35 +269,23 @@ function genPalmBark(): void {
       const i = (y * T + x) * 4;
       const nx = x / T;
       const ny = y / T;
-
-      // Vertical striations — sine waves along X
       const stripe = Math.sin(nx * 28 + fbmNoise(ny * 4, 0, 2, 0xb0b) * 6) * 0.5 + 0.5;
-
-      // Additional irregular horizontal banding and knots
       const band = fbmNoise(ny * 8, nx * 3, 3, 0xd0d) * 0.15;
       const knot = smoothNoise(nx * 18, ny * 22, 0xe0e) > 0.55 ? 0.08 : 0;
-
-      // Base bark brown
       const baseLum = 0.35 + stripe * 0.22 + band + knot;
-      const rTint = baseLum * 1.10; // slightly redder
+      const rTint = baseLum * 1.10;
       const gTint = baseLum * 0.92;
       const bTint = baseLum * 0.72;
-
       const grain = (rng() - 0.5) * 0.04;
-      const r = Math.min(1, Math.max(0, rTint + grain));
-      const g = Math.min(1, Math.max(0, gTint + grain));
-      const b = Math.min(1, Math.max(0, bTint + grain));
-
-      data[i] = Math.round(r * 255);
-      data[i + 1] = Math.round(g * 255);
-      data[i + 2] = Math.round(b * 255);
+      data[i] = Math.round(Math.min(1, Math.max(0, rTint + grain)) * 255);
+      data[i + 1] = Math.round(Math.min(1, Math.max(0, gTint + grain)) * 255);
+      data[i + 2] = Math.round(Math.min(1, Math.max(0, bTint + grain)) * 255);
       data[i + 3] = 255;
     }
   }
   ctx.putImageData(img, 0, 0);
   _barkColor = wrapTexture(ctx.canvas);
 
-  // Roughness: variable, stripe ridges are slightly smoother
   const rCtx = makeCanvas(T, T);
   if (!rCtx) return;
   const rImg = rCtx.createImageData(T, T);
@@ -334,18 +297,16 @@ function genPalmBark(): void {
       const ny = y / T;
       const stripe = Math.sin(nx * 32) * 0.5 + 0.5;
       const n = fbmNoise(nx * 14 + ny * 3, ny * 12, 3, 0xf00d);
-      const rough = 0.78 + n * 0.16 - stripe * 0.08; // ridges smoother
-      const val = Math.round(Math.min(1, Math.max(0, rough)) * 255);
-      rData[i] = val;
-      rData[i + 1] = val;
-      rData[i + 2] = val;
+      const rough = 0.78 + n * 0.16 - stripe * 0.08;
+      rData[i] = Math.round(Math.min(1, Math.max(0, rough)) * 255);
+      rData[i + 1] = rData[i];
+      rData[i + 2] = rData[i];
       rData[i + 3] = 255;
     }
   }
   rCtx.putImageData(rImg, 0, 0);
   _barkRoughness = wrapTexture(rCtx.canvas, THREE.NoColorSpace);
 
-  // Bump map: height field from stripe + noise
   const bCtx = makeCanvas(T, T);
   if (!bCtx) return;
   const bImg = bCtx.createImageData(T, T);
@@ -372,7 +333,7 @@ function genPalmBark(): void {
 }
 
 // ---------------------------------------------------------------------------
-// 4. Frond alpha — leaf silhouette, green-yellow gradient
+// 4. Frond alpha (procedural fallback)
 // ---------------------------------------------------------------------------
 
 function genFrondAlpha(): void {
@@ -381,66 +342,45 @@ function genFrondAlpha(): void {
 
   const img = ctx.createImageData(T, T);
   const data = img.data;
-
-  // Create a radial dappled-leaf pattern: tile a 4x4 grid of palm-frond-like
-  // shapes (elongated ellipses) with transparency at the tips.
   const tilesU = 4;
   const tilesV = 4;
 
   for (let y = 0; y < T; y++) {
     for (let x = 0; x < T; x++) {
       const i = (y * T + x) * 4;
-
-      // Map to tile local coordinates [-1, 1]
       const tileW = T / tilesU;
       const tileH = T / tilesV;
-      const u = ((x % tileW) / tileW) * 2 - 1; // -1..1
-      const v = ((y % tileH) / tileH) * 2 - 1; // -1..1
-
-      // Palm frond: elongated along U, wider at base (v=1), narrow at tip (v=-1)
-      const frondWidth = 0.35 + (v + 1) * 0.4; // wider at bottom, narrow at top
+      const u = ((x % tileW) / tileW) * 2 - 1;
+      const v = ((y % tileH) / tileH) * 2 - 1;
+      const frondWidth = 0.35 + (v + 1) * 0.4;
       const inFrond = Math.abs(u) < frondWidth;
       const edgeFade = inFrond ? (1 - Math.abs(u) / (frondWidth + 0.02)) : 0;
-
-      // Soft edges
       const alpha = Math.min(1, Math.max(0, edgeFade * 1.5));
-
-      // Green with golden-yellow gradient tip (at v = -1)
       const greenR = 0.15;
       const greenG = 0.55 + (1 - Math.abs(v)) * 0.25;
       const greenB = 0.18;
-
       const goldR = 0.72;
       const goldG = 0.68;
       const goldB = 0.22;
-
-      const t = Math.max(0, (-v + 1) / 2); // 0 at bottom, 1 at tip
-      const r = greenR + (goldR - greenR) * t;
-      const g = greenG + (goldG - greenG) * t;
-      const b = greenB + (goldB - greenB) * t;
-
-      data[i] = Math.round(r * 255);
-      data[i + 1] = Math.round(g * 255);
-      data[i + 2] = Math.round(b * 255);
+      const t = Math.max(0, (-v + 1) / 2);
+      data[i] = Math.round((greenR + (goldR - greenR) * t) * 255);
+      data[i + 1] = Math.round((greenG + (goldG - greenG) * t) * 255);
+      data[i + 2] = Math.round((greenB + (goldB - greenB) * t) * 255);
       data[i + 3] = Math.round(alpha * 255);
     }
   }
   ctx.putImageData(img, 0, 0);
-
   _frondAlpha = wrapTexture(ctx.canvas, THREE.SRGBColorSpace);
-  // Reset wrap mode for alpha so leaf pattern is distinct per face
   _frondAlpha.wrapS = THREE.RepeatWrapping;
   _frondAlpha.wrapT = THREE.RepeatWrapping;
-
   _textureCount += 1;
 }
 
 // ---------------------------------------------------------------------------
-// 5. Water — gentle wave normal map + tropical tint
+// 5. Water (procedural fallback)
 // ---------------------------------------------------------------------------
 
 function genWater(): void {
-  // Colour map: tropical blue-turquoise with caustic-like noise
   const ctx = makeCanvas(T, T);
   if (!ctx) return;
 
@@ -452,64 +392,41 @@ function genWater(): void {
       const i = (y * T + x) * 4;
       const nx = x / T;
       const ny = y / T;
-
-      // Soft wave noise
       const wave = fbmNoise(nx * 8, ny * 8, 3, 0x04ef) * 0.12;
       const caustic = fbmNoise(nx * 22, ny * 22, 2, 0x04e0) * 0.06;
-
-      const r = Math.max(0, Math.min(1, 0.18 + wave * 0.5 + caustic));
-      const g = Math.max(0, Math.min(1, 0.50 + wave * 0.6 + caustic));
-      const b = Math.max(0, Math.min(1, 0.55 + wave * 0.7 + caustic));
-
-      data[i] = Math.round(r * 255);
-      data[i + 1] = Math.round(g * 255);
-      data[i + 2] = Math.round(b * 255);
+      data[i] = Math.round(Math.min(1, Math.max(0, 0.18 + wave * 0.5 + caustic)) * 255);
+      data[i + 1] = Math.round(Math.min(1, Math.max(0, 0.50 + wave * 0.6 + caustic)) * 255);
+      data[i + 2] = Math.round(Math.min(1, Math.max(0, 0.55 + wave * 0.7 + caustic)) * 255);
       data[i + 3] = 255;
     }
   }
   ctx.putImageData(img, 0, 0);
   _waterColor = wrapTexture(ctx.canvas);
 
-  // Normal map: derive from heightfield
   const normalCtx = makeCanvas(T, T);
   if (!normalCtx) return;
-
-  // Compute height field first
   const heightField = new Float32Array(T * T);
-  const STRENGTH = 2.5; // normal intensity
+  const STRENGTH = 2.5;
   for (let y = 0; y < T; y++) {
     for (let x = 0; x < T; x++) {
-      const nx = x / T;
-      const ny = y / T;
-      heightField[y * T + x] = fbmNoise(nx * 10, ny * 10, 4, 0x1337);
+      heightField[y * T + x] = fbmNoise((x / T) * 10, (y / T) * 10, 4, 0x1337);
     }
   }
-
   const nImg = normalCtx.createImageData(T, T);
   const nData = nImg.data;
-
   for (let y = 0; y < T; y++) {
     for (let x = 0; x < T; x++) {
       const i = (y * T + x) * 4;
-
-      // Central difference to compute gradient
       const xL = x > 0 ? heightField[y * T + (x - 1)] : heightField[y * T + x];
       const xR = x < T - 1 ? heightField[y * T + (x + 1)] : heightField[y * T + x];
       const yD = y > 0 ? heightField[(y - 1) * T + x] : heightField[y * T + x];
       const yU = y < T - 1 ? heightField[(y + 1) * T + x] : heightField[y * T + x];
-
       const gradX = (xR - xL) * STRENGTH;
       const gradY = (yU - yD) * STRENGTH;
-
-      // Normal map encoding: N = (-gradX, -gradY, 1) normalized → RGB
       const len = Math.sqrt(gradX * gradX + gradY * gradY + 1);
-      const nx = (-gradX / len) * 0.5 + 0.5;
-      const ny = (-gradY / len) * 0.5 + 0.5;
-      const nz = (1 / len) * 0.5 + 0.5;
-
-      nData[i] = Math.round(nx * 255);
-      nData[i + 1] = Math.round(ny * 255);
-      nData[i + 2] = Math.round(nz * 255);
+      nData[i] = Math.round((-gradX / len) * 0.5 * 255 + 127.5);
+      nData[i + 1] = Math.round((-gradY / len) * 0.5 * 255 + 127.5);
+      nData[i + 2] = Math.round((1 / len) * 0.5 * 255 + 127.5);
       nData[i + 3] = 255;
     }
   }
@@ -520,7 +437,7 @@ function genWater(): void {
 }
 
 // ---------------------------------------------------------------------------
-// 6. Wood crate — rough wood grain, brown/orange tint
+// 6. Wood crate (procedural fallback)
 // ---------------------------------------------------------------------------
 
 function genWoodCrate(): void {
@@ -536,39 +453,26 @@ function genWoodCrate(): void {
       const i = (y * T + x) * 4;
       const nx = x / T;
       const ny = y / T;
-
-      // Wood grain: horizontal growth rings
       const ring = Math.sin(ny * 42 + fbmNoise(nx * 6, ny * 3, 3, 0xc0ff) * 8) * 0.5 + 0.5;
       const fine = fbmNoise(nx * 18, ny * 24, 3, 0x1337) * 0.08;
-
-      // Knots: darker spots
       const knotX = (nx * T - T * 0.3) / 60;
       const knotY = (ny * T - T * 0.55) / 60;
       const knotDist = Math.sqrt(knotX * knotX + knotY * knotY);
       const knot = knotDist < 1 ? (1 - knotDist) * 0.2 : 0;
-
       const baseLum = 0.42 + ring * 0.20 + fine - knot;
-
-      // Brown/orange tint
       const rTint = baseLum * 1.05 + 0.06;
       const gTint = baseLum * 0.85;
       const bTint = baseLum * 0.55;
-
       const grain = (rng() - 0.5) * 0.05;
-      const r = Math.min(1, Math.max(0, rTint + grain));
-      const g = Math.min(1, Math.max(0, gTint + grain));
-      const b = Math.min(1, Math.max(0, bTint + grain));
-
-      data[i] = Math.round(r * 255);
-      data[i + 1] = Math.round(g * 255);
-      data[i + 2] = Math.round(b * 255);
+      data[i] = Math.round(Math.min(1, Math.max(0, rTint + grain)) * 255);
+      data[i + 1] = Math.round(Math.min(1, Math.max(0, gTint + grain)) * 255);
+      data[i + 2] = Math.round(Math.min(1, Math.max(0, bTint + grain)) * 255);
       data[i + 3] = 255;
     }
   }
   ctx.putImageData(img, 0, 0);
   _crateColor = wrapTexture(ctx.canvas);
 
-  // Roughness: rough with grain (ridges rougher)
   const rCtx = makeCanvas(T, T);
   if (!rCtx) return;
   const rImg = rCtx.createImageData(T, T);
@@ -594,7 +498,7 @@ function genWoodCrate(): void {
 }
 
 // ---------------------------------------------------------------------------
-// One-time generation
+// One-time generation of procedural fallbacks
 // ---------------------------------------------------------------------------
 
 function ensureTextures(): void {
@@ -622,29 +526,16 @@ type TextureCategory =
   | 'water'
   | 'crate';
 
-/** Classify a mesh into a texture category based on name, userData, and material colour. */
 function classifyMesh(mesh: THREE.Mesh): TextureCategory | null {
   const name = mesh.name.toLowerCase();
-
-  // 1. Water — names containing 'water' or 'lagoon'
   if (name.includes('water') || name.includes('lagoon')) return 'water';
-
-  // 2. Crate — names containing 'crate'
   if (name.includes('crate')) return 'crate';
-
-  // 3. Rock / cliff / cave
   if (name.includes('rock') || name.includes('cliff') || name.includes('cave')) return 'rock';
-
-  // 4. Palm bark — trunk of palm or canopy
   if (name.includes('trunk') && (name.includes('palm') || name.includes('canopy'))) return 'palm-bark';
-
-  // 5. Frond — palm leaves / fronds
   if (name.includes('frond')) return 'frond';
-
-  // 6. Sand / beach
   if (name.includes('beach') || name.includes('sand')) return 'sand';
 
-  // Fallback: check material colour against FARCRYSIS_ART_FEEL for art-layer meshes
+  // Fallback: check material colour against FARCRYSIS_ART_FEEL
   if (mesh.userData.farcrysisArt) {
     const mat = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material) as THREE.MeshStandardMaterial | null;
     if (mat && mat instanceof THREE.MeshStandardMaterial && 'color' in mat) {
@@ -660,36 +551,167 @@ function classifyMesh(mesh: THREE.Mesh): TextureCategory | null {
 }
 
 // ---------------------------------------------------------------------------
-// Material augmentation (in-place, no new materials)
+// Material augmentation registry (for async image-texture upgrade)
 // ---------------------------------------------------------------------------
 
-function augmentMaterial(
-  mat: THREE.Material,
-  category: TextureCategory,
-): void {
+interface ImageTextureSet {
+  color?: THREE.Texture;
+  normal?: THREE.Texture;
+  roughness?: THREE.Texture;
+  alpha?: THREE.Texture;
+}
+
+const REGISTRY = new Map<THREE.MeshStandardMaterial, TextureCategory>();
+const _imageSets: Partial<Record<TextureCategory, ImageTextureSet>> = {};
+let _imageLoaderInitiated = false;
+
+const TEXTURE_PATH = './assets/original/textures/farcrysis';
+
+/** Wrap a loaded texture for tiled PBR use. */
+function configurePBRTexture(
+  tex: THREE.Texture,
+  colorSpace: THREE.ColorSpace,
+): THREE.Texture {
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = colorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+/** Apply loaded image textures to all registered materials of a given category. */
+function upgradeRegistered(category: TextureCategory, set: ImageTextureSet): void {
+  REGISTRY.forEach((cat, mat) => {
+    if (cat !== category) return;
+
+    switch (category) {
+      case 'sand':
+        if (set.color) mat.map = set.color;
+        if (set.roughness) mat.roughnessMap = set.roughness;
+        break;
+      case 'rock':
+        if (set.color) mat.map = set.color;
+        if (set.roughness) mat.roughnessMap = set.roughness;
+        break;
+      case 'palm-bark':
+        if (set.color) mat.map = set.color;
+        if (set.roughness) mat.roughnessMap = set.roughness;
+        if (set.normal) {
+          mat.normalMap = set.normal;
+          mat.normalScale = new THREE.Vector2(0.55, 0.55);
+          // Clear procedural bump if present
+          mat.bumpMap = null;
+          mat.bumpScale = 1;
+        }
+        break;
+      case 'frond':
+        if (set.color) {
+          mat.map = set.color;
+          mat.transparent = true;
+          mat.alphaTest = 0.05;
+          // Frond image has embedded alpha channel
+          mat.alphaMap = set.color;
+        }
+        break;
+      case 'water':
+        if (set.color) mat.map = set.color;
+        if (set.normal) {
+          mat.normalMap = set.normal;
+          mat.normalScale = new THREE.Vector2(0.8, 0.8);
+        }
+        if (set.roughness) mat.roughnessMap = set.roughness;
+        if (mat.roughness > 0.3) mat.roughness = 0.22;
+        break;
+      case 'crate':
+        if (set.color) mat.map = set.color;
+        if (set.roughness) mat.roughnessMap = set.roughness;
+        break;
+    }
+
+    mat.needsUpdate = true;
+  });
+}
+
+/** Load a single texture family's image set via THREE.TextureLoader. */
+function loadImageSet(stem: string, category: TextureCategory): void {
+  if (!hasCanvas()) return; // no document → TextureLoader will fail
+
+  const loader = new THREE.TextureLoader();
+  const basePath = `${TEXTURE_PATH}-${stem}`;
+  const set: ImageTextureSet = {};
+
+  let pending = 3;
+  function onDone(): void {
+    pending--;
+    if (pending === 0) {
+      _imageSets[category] = set;
+      upgradeRegistered(category, set);
+    }
+  }
+
+  // Color map (sRGB color space)
+  loader.load(
+    `${basePath}.png`,
+    (tex) => { set.color = configurePBRTexture(tex, THREE.SRGBColorSpace); onDone(); },
+    undefined,
+    () => onDone(),
+  );
+
+  // Normal map (linear)
+  loader.load(
+    `${basePath}-normal.png`,
+    (tex) => { set.normal = configurePBRTexture(tex, THREE.NoColorSpace); onDone(); },
+    undefined,
+    () => onDone(),
+  );
+
+  // Roughness map (linear)
+  loader.load(
+    `${basePath}-roughness.png`,
+    (tex) => { set.roughness = configurePBRTexture(tex, THREE.NoColorSpace); onDone(); },
+    undefined,
+    () => onDone(),
+  );
+}
+
+/** Initiate async loading of all 6 image texture sets. */
+function loadAllImageTextures(): void {
+  if (_imageLoaderInitiated) return;
+  _imageLoaderInitiated = true;
+  if (!hasCanvas()) return;
+
+  loadImageSet('sand', 'sand');
+  loadImageSet('rock', 'rock');
+  loadImageSet('bark', 'palm-bark');
+  loadImageSet('frond', 'frond');
+  loadImageSet('water', 'water');
+  loadImageSet('crate', 'crate');
+}
+
+// ---------------------------------------------------------------------------
+// Procedural augmentation (immediate, synchronous)
+// ---------------------------------------------------------------------------
+
+function augmentProcedural(mat: THREE.Material, category: TextureCategory): void {
   if (!(mat instanceof THREE.MeshStandardMaterial)) return;
 
-  // Respect existing textures — don't overwrite
   switch (category) {
     case 'sand':
       if (!mat.map && _sandColor) mat.map = _sandColor;
       if (!mat.roughnessMap && _sandRoughness) mat.roughnessMap = _sandRoughness;
       break;
-
     case 'rock':
       if (!mat.map && _rockColor) mat.map = _rockColor;
       if (!mat.roughnessMap && _rockRoughness) mat.roughnessMap = _rockRoughness;
       break;
-
     case 'palm-bark':
       if (!mat.map && _barkColor) mat.map = _barkColor;
       if (!mat.roughnessMap && _barkRoughness) mat.roughnessMap = _barkRoughness;
-      if (!mat.bumpMap && _barkBump) {
+      if (!mat.bumpMap && !mat.normalMap && _barkBump) {
         mat.bumpMap = _barkBump;
         mat.bumpScale = 0.04;
       }
       break;
-
     case 'frond':
       if (_frondAlpha) {
         mat.alphaMap = _frondAlpha;
@@ -698,17 +720,14 @@ function augmentMaterial(
         mat.needsUpdate = true;
       }
       break;
-
     case 'water':
       if (!mat.map && _waterColor) mat.map = _waterColor;
       if (!mat.normalMap && _waterNormal) {
         mat.normalMap = _waterNormal;
         mat.normalScale = new THREE.Vector2(0.8, 0.8);
-        // Water surfaces benefit from lower roughness for reflectivity
         if (mat.roughness > 0.3) mat.roughness = 0.22;
       }
       break;
-
     case 'crate':
       if (!mat.map && _crateColor) mat.map = _crateColor;
       if (!mat.roughnessMap && _crateRoughness) mat.roughnessMap = _crateRoughness;
@@ -719,15 +738,15 @@ function augmentMaterial(
 }
 
 // ---------------------------------------------------------------------------
-// Main entry: walk the scene and apply textures
+// Main entry: walk the scene, apply procedural textures, register for images
 // ---------------------------------------------------------------------------
 
 export function applyFarcrysisTextures(root: THREE.Group): void {
   ensureTextures();
   if (_textureCount === 0) return; // canvas not available (test / headless)
 
+  // 1. Walk scene: apply procedural textures immediately + register for image upgrade
   root.traverse((obj) => {
-    // InstancedMesh is a subclass of Mesh, so check it first for clarity
     if (!(obj instanceof THREE.Mesh)) return;
 
     const mesh = obj;
@@ -736,7 +755,15 @@ export function applyFarcrysisTextures(root: THREE.Group): void {
 
     const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     for (const mat of materials) {
-      augmentMaterial(mat, category);
+      // Apply immediate procedural textures
+      augmentProcedural(mat, category);
+      // Register for async image-texture upgrade
+      if (mat instanceof THREE.MeshStandardMaterial) {
+        REGISTRY.set(mat, category);
+      }
     }
   });
+
+  // 2. Kick off async loading of high-resolution image textures
+  loadAllImageTextures();
 }

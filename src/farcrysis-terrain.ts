@@ -1,11 +1,16 @@
 /**
  * farcrysis-terrain.ts — Procedural golden-hour tropical beach/cliff terrain,
- * atmospheric lighting, and animated water for the Farcrysis arena.
+ * atmospheric lighting, volumetric god-rays, atmospheric particles, and
+ * custom-shader animated water for the Farcrysis arena.
  *
  * Exports:
  *   buildTerrain(scene)  — custom BufferGeometry elevation, cliffs, rocks, paths
- *   buildLighting(scene) — golden-hour sun, ambient/hemisphere, FogExp2, god rays
- *   buildWater(scene)    — animated tropical water plane with wave animation
+ *   buildLighting(scene) — golden-hour sun (PCFSoft-ready shadows), ambient/hemisphere,
+ *                           FogExp2 warm golden haze, volumetric light shafts, fill light,
+ *                           atmospheric particles (pollen, fireflies, dust)
+ *   buildWater(scene)    — custom-shader water (wave-displaced vertices, specular, fresnel,
+ *                           env reflection, shore transparency, procedural foam),
+ *                           shoreline foam ring, sparkles, caustic floor projector
  *
  * All procedural — no copied IP. Presentation only (no colliders/gameplay authority).
  * Uses FARCRYSIS_ART_FEEL palette constants from farcrysis-art.ts.
@@ -15,9 +20,13 @@
  *     clear lanes, elevation range 0–1.3 m).
  *   - White-sand beach with subtle dune banding in vertex colours.
  *   - Beach boulder clusters (dodecahedron, flat-shaded) near cliff edge.
- *   - Animated lagoon waves with alloc-free vertex update; shoreline foam ring.
- *   - Glossy water reflection hint (canvas CubeTexture envMap when available).
- *   - Extended god rays (halo layer + tower shafts), warmer golden fog, sky dome.
+ *   - Volumetric god-ray shafts (ShaderMaterial; noise-dithered, time-animated).
+ *   - Atmospheric particles: pollen motes, lagoon fireflies, sunbeam dust (shader-driven Points).
+ *   - Custom water shader: animated normal + wave displacement, specular glints,
+ *     fresnel edge-darkening + reflection, shore transparency, procedural foam.
+ *   - Caustic light pattern projector on lagoon floor ring.
+ *   - Warm exponential-squared fog, cool-blue fill light, tuned golden-hour exposure.
+ *   - PCFSoftShadowMap-ready directional-light shadow config (radius-based soft penumbra).
  */
 
 import * as THREE from 'three';
@@ -276,7 +285,195 @@ function makeGodRayCone(
 }
 
 // ---------------------------------------------------------------------------
-// Canvas availability guard (for textures created at build time)
+// GLSL noise snippet — shared by volumetric shafts, water, caustic shaders
+// ---------------------------------------------------------------------------
+
+const GLSL_NOISE = /* glsl */ `
+float hash13(vec3 p) {
+  p = fract(p * 0.3183099 + vec3(0.1, 0.2, 0.3));
+  p *= 17.0;
+  return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+}
+float vnoise(vec3 p) {
+  vec3 i = floor(p); vec3 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(
+    mix(mix(hash13(i), hash13(i + vec3(1.0,0.0,0.0)), f.x),
+        mix(hash13(i + vec3(0.0,1.0,0.0)), hash13(i + vec3(1.0,1.0,0.0)), f.x), f.y),
+    mix(mix(hash13(i + vec3(0.0,0.0,1.0)), hash13(i + vec3(1.0,0.0,1.0)), f.x),
+        mix(hash13(i + vec3(0.0,1.0,1.0)), hash13(i + vec3(1.0,1.0,1.0)), f.x), f.y),
+    f.z);
+}
+float fbm3(vec3 p) {
+  float v = 0.0; float a = 0.5; vec3 shift = vec3(0.0);
+  for (int i = 0; i < 4; i++) { v += a * vnoise(p + shift); p *= 2.0; a *= 0.5; }
+  return v;
+}
+`;
+
+// ---------------------------------------------------------------------------
+// Volumetric light-shaft cylinder (ShaderMaterial with noise/dither)
+// ---------------------------------------------------------------------------
+
+function makeVolumetricShaft(
+  radius: number,
+  length: number,
+  axisDir: THREE.Vector3,
+  center: THREE.Vector3,
+  color: THREE.Color,
+  alpha: number,
+  density: number,
+  falloffExp: number,
+): THREE.Mesh {
+  const geom = new THREE.CylinderGeometry(radius, radius, length, 24, 1, true); // open-ended
+
+  const mat = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uColor: { value: color },
+      uAlpha: { value: alpha },
+      uDensity: { value: density },
+      uFalloff: { value: falloffExp },
+    },
+    vertexShader: /* glsl */ `
+      varying vec3 vLocal;
+      varying vec3 vWorld;
+      void main() {
+        vLocal = position;
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vWorld = wp.xyz;
+        gl_Position = projectionMatrix * viewMatrix * wp;
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform float uTime;
+      uniform vec3 uColor;
+      uniform float uAlpha;
+      uniform float uDensity;
+      uniform float uFalloff;
+      varying vec3 vLocal;
+      varying vec3 vWorld;
+      ${GLSL_NOISE}
+      void main() {
+        float r = length(vLocal.xz);
+        float rim = exp(-r * r * uFalloff);
+        float band = fbm3(vLocal * 0.055 + vec3(0.0, -uTime * 0.12, 0.0));
+        // Animated dither for subtle flicker / heat shimmer
+        float dith = hash13(vec3(gl_FragCoord.xy, uTime * 0.45));
+        float noiseRim = rim * (0.65 + 0.35 * band);
+        float a = noiseRim * uDensity * uAlpha;
+        a += dith * rim * 0.08;
+        a = clamp(a, 0.0, 1.0);
+        if (a < 0.015) discard;
+        gl_FragColor = vec4(uColor, a);
+      }
+    `,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    transparent: true,
+    side: THREE.DoubleSide,
+    fog: false,
+  });
+
+  const shaft = new THREE.Mesh(geom, mat);
+  shaft.name = 'farcrysis-volumetric-shaft';
+  shaft.position.copy(center);
+  const up = new THREE.Vector3(0, 1, 0);
+  const quat = new THREE.Quaternion().setFromUnitVectors(up, axisDir.clone().normalize());
+  shaft.setRotationFromQuaternion(quat);
+  shaft.renderOrder = 998;
+  shaft.frustumCulled = false;
+  shaft.userData.farcrysisArt = true;
+  return shaft;
+}
+
+// ---------------------------------------------------------------------------
+// Atmospheric particle helpers (shader-driven Points — zero CPU update)
+// ---------------------------------------------------------------------------
+
+type ParticleConfig = {
+  name: string;
+  count: number;
+  positions: Float32Array;
+  phases: Float32Array;
+  speeds: Float32Array;
+  amps: Float32Array;
+  sizes: Float32Array;
+  twinkles: Float32Array;
+  color: [number, number, number];
+  opacity: number;
+  sizeScale: number;
+  blinkSharp: number; // 1 = soft, 6 = firefly flash
+  driftVert: number; // vertical drift multiplier
+};
+
+function makeParticleSystem(cfg: ParticleConfig): THREE.Points {
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.BufferAttribute(cfg.positions, 3));
+  geom.setAttribute('aPhase', new THREE.BufferAttribute(cfg.phases, 1));
+  geom.setAttribute('aSpeed', new THREE.BufferAttribute(cfg.speeds, 1));
+  geom.setAttribute('aAmp', new THREE.BufferAttribute(cfg.amps, 1));
+  geom.setAttribute('aSize', new THREE.BufferAttribute(cfg.sizes, 1));
+  geom.setAttribute('aTwinkle', new THREE.BufferAttribute(cfg.twinkles, 1));
+
+  const mat = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uColor: { value: new THREE.Color(...cfg.color) },
+      uOpacity: { value: cfg.opacity },
+      uSharp: { value: cfg.blinkSharp },
+      uDriftVert: { value: cfg.driftVert },
+    },
+    vertexShader: /* glsl */ `
+      attribute float aPhase;
+      attribute float aSpeed;
+      attribute float aAmp;
+      attribute float aSize;
+      attribute float aTwinkle;
+      varying float vBlink;
+      uniform float uTime;
+      uniform float uDriftVert;
+      void main() {
+        vec3 p = position;
+        float t = uTime;
+        p.x += sin(t * aSpeed * 0.65 + aPhase) * aAmp;
+        p.z += cos(t * aSpeed * 0.52 + aPhase * 1.4) * aAmp;
+        p.y += sin(t * aSpeed * 0.38 + aPhase * 2.1) * aAmp * uDriftVert;
+        vBlink = 0.5 + 0.5 * sin(t * aTwinkle * 1.5 + aPhase * 3.0);
+        vec4 mv = modelViewMatrix * vec4(p, 1.0);
+        gl_PointSize = aSize * (180.0 / -mv.z);
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform vec3 uColor;
+      uniform float uOpacity;
+      uniform float uSharp;
+      varying float vBlink;
+      void main() {
+        vec2 c = gl_PointCoord - 0.5;
+        float d = length(c);
+        float mask = 1.0 - smoothstep(0.3, 0.5, d);
+        if (mask < 0.01) discard;
+        float blink = pow(max(vBlink, 0.0), uSharp);
+        gl_FragColor = vec4(uColor, uOpacity * mask * blink);
+      }
+    `,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    transparent: true,
+    fog: false,
+  });
+
+  const points = new THREE.Points(geom, mat);
+  points.name = cfg.name;
+  points.userData.farcrysisArt = true;
+  points.frustumCulled = false;
+  return points;
+}
+
+// ---------------------------------------------------------------------------
+// Canvas availability guard
 // ---------------------------------------------------------------------------
 
 function hasCanvas(): boolean {
@@ -329,25 +526,21 @@ function ensureSkyDomeTexture(): THREE.Texture | null {
       let r: number, g: number, b: number;
 
       if (t < 0.35) {
-        // Zenith: warm golden-blue
         const s = t / 0.35;
         r = 0.55 + s * 0.30;
         g = 0.40 + s * 0.30;
-        b = 0.55 - s * 0.25; // slightly less blue at top
+        b = 0.55 - s * 0.25;
       } else if (t < 0.65) {
-        // Mid sky: golden-orange
         const s = (t - 0.35) / 0.30;
         r = 0.85 + s * 0.12;
         g = 0.70 + s * 0.10;
         b = 0.30 - s * 0.10;
       } else if (t < 0.88) {
-        // Lower sky: warm horizon glow
         const s = (t - 0.65) / 0.23;
         r = 0.97 - s * 0.07;
         g = 0.80 - s * 0.30;
         b = 0.20 - s * 0.08;
       } else {
-        // Horizon to water: fade to pale teal
         const s = (t - 0.88) / 0.12;
         r = 0.90 - s * 0.50;
         g = 0.50 - s * 0.20;
@@ -355,7 +548,7 @@ function ensureSkyDomeTexture(): THREE.Texture | null {
       }
 
       // Soft sun glow spot (top-centre-rightish)
-      const hx = (px / 512 - 0.65) * 2; // -1..1 centred at ~0.65
+      const hx = (px / 512 - 0.65) * 2;
       const hy = (t - 0.15) * 3;
       const sunDist = Math.sqrt(hx * hx + hy * hy);
       const sunGlow = sunDist < 1 ? Math.exp(-sunDist * 3.5) * 0.25 : 0;
@@ -375,16 +568,14 @@ function ensureSkyDomeTexture(): THREE.Texture | null {
 }
 
 // ---------------------------------------------------------------------------
-// Water env-map cube faces (simple sky gradient for reflection hint)
+// Water env-map cube faces
 // ---------------------------------------------------------------------------
 
 function makeEnvCubeTexture(): THREE.CubeTexture | null {
   if (!hasCanvas()) return null;
   const SIZE = 64;
 
-  // Warm golden sky color for upward faces; pale turquoise for downward
   const faceSky = (_x: number, y: number): [number, number, number] => {
-    // y goes 0 (top) → 1 (bottom); gradient warm gold → pale horizon
     const t = y;
     const r = 0.75 - t * 0.4;
     const gB = 0.55 - t * 0.3;
@@ -393,12 +584,10 @@ function makeEnvCubeTexture(): THREE.CubeTexture | null {
   };
   const faceHorizon = (): [number, number, number] => [0.85, 0.72, 0.55];
   const faceWater = (_x: number, y: number): [number, number, number] => {
-    const t = y; // darker turquoise at bottom
+    const t = y;
     return [0.12 + t * 0.1, 0.35 + t * 0.1, 0.40 + t * 0.05];
   };
 
-  // Orientation: +Y up, -Y down, +X right, -X left, +Z front, -Z back
-  // For PMREM/cube gen we need PX, NX, PY, NY, PZ, NZ
   const faces: Array<HTMLCanvasElement> = [];
 
   const makeFace = (fn: (x: number, y: number) => [number, number, number]): HTMLCanvasElement => {
@@ -420,18 +609,12 @@ function makeEnvCubeTexture(): THREE.CubeTexture | null {
     return c;
   };
 
-  // +X (right): horizon
-  faces.push(makeFace(faceHorizon));
-  // -X (left): horizon
-  faces.push(makeFace(faceHorizon));
-  // +Y (up): sky
-  faces.push(makeFace(faceSky));
-  // -Y (down): water
-  faces.push(makeFace((_px, py) => faceWater(_px, py)));
-  // +Z (front): lowerslight sky
-  faces.push(makeFace((_px, _py) => faceSky(_px, 0.6)));
-  // -Z (back): horizon
-  faces.push(makeFace(faceHorizon));
+  faces.push(makeFace(faceHorizon));                  // +X
+  faces.push(makeFace(faceHorizon));                  // -X
+  faces.push(makeFace(faceSky));                      // +Y (up)
+  faces.push(makeFace((_px, py) => faceWater(_px, py))); // -Y (down)
+  faces.push(makeFace((_px, _py) => faceSky(_px, 0.6))); // +Z
+  faces.push(makeFace(faceHorizon));                  // -Z
 
   const cubeTex = new THREE.CubeTexture(faces);
   cubeTex.needsUpdate = true;
@@ -468,14 +651,11 @@ export function buildTerrain(scene: THREE.Scene): THREE.Group {
 
     if (edgeDist < 12 && h < 0.8) {
       // ---- White-sand beach with dune banding ----
-      // Subtle stripe bands parallel to shoreline
       const band = Math.sin(edgeDist * 1.9 + fbm(x * 0.2, z * 0.2, 2, 101) * 2.5) * 0.04;
-      // Wet sand near water edge (darker, more saturated)
       const wetness = edgeDist < 1.8 ? (1 - edgeDist / 1.8) * 0.09 : 0;
       r = 0.93 + band - wetness;
       g = 0.86 + band * 0.6 - wetness * 0.6;
       b = 0.72 + band * 0.3 - wetness * 0.4;
-      // Dune highlights — brighter on crests
       const duneHighlight = (h > 0.15 ? Math.min(0.08, (h - 0.15) * 0.3) : 0);
       r += duneHighlight;
       g += duneHighlight * 0.8;
@@ -493,11 +673,9 @@ export function buildTerrain(scene: THREE.Scene): THREE.Group {
       g = 0.44 + noise * 0.08;
       b = 0.20 + noise * 0.04;
     } else {
-      // Fallback — warm dirt
       r = 0.55; g = 0.45; b = 0.32;
     }
 
-    // Clamp and assign
     colors[i * 3 + 0] = Math.max(0, Math.min(1, r));
     colors[i * 3 + 1] = Math.max(0, Math.min(1, g));
     colors[i * 3 + 2] = Math.max(0, Math.min(1, b));
@@ -515,7 +693,6 @@ export function buildTerrain(scene: THREE.Scene): THREE.Group {
   terrainMesh.receiveShadow = true;
   terrainMesh.castShadow = true;
   terrainMesh.userData.farcrysisArt = true;
-  // Slight offset above game-world ground plates to prevent z-fighting
   terrainMesh.position.y = 0.04;
   group.add(terrainMesh);
 
@@ -559,7 +736,6 @@ export function buildTerrain(scene: THREE.Scene): THREE.Group {
     let rz = Math.sin(angle) * placeDist;
     rx = Math.max(minX + 3, Math.min(maxX - 3, rx));
     rz = Math.max(minZ + 3, Math.min(maxZ - 3, rz));
-    // Skip path corridors
     const onPath = (
       Math.abs(Math.abs(rx) - 20) < 6 ||
       Math.abs(Math.abs(rz) - 20) < 6
@@ -592,7 +768,7 @@ export function buildTerrain(scene: THREE.Scene): THREE.Group {
     const localRng = mulberry32(cluster.seed);
     for (let j = 0; j < cluster.count; j++) {
       const angle = j * ((Math.PI * 2) / cluster.count) + localRng() * 0.4;
-      const offset = 1.5 + localRng() * 3; // cluster radius
+      const offset = 1.5 + localRng() * 3;
       const bx = cluster.cx + Math.cos(angle) * offset;
       const bz = cluster.cz + Math.sin(angle) * offset;
       const clampedX = Math.max(minX + 2, Math.min(maxX - 2, bx));
@@ -635,7 +811,7 @@ export function buildTerrain(scene: THREE.Scene): THREE.Group {
   });
   const sandRing = new THREE.Mesh(sandRingGeom, sandRingMat);
   sandRing.name = 'farcrysis-terrain-sand-ring';
-  sandRing.position.y = 0.025; // slightly above terrain base to avoid z-fighting
+  sandRing.position.y = 0.025;
   sandRing.receiveShadow = true;
   sandRing.userData.farcrysisArt = true;
   group.add(sandRing);
@@ -645,17 +821,20 @@ export function buildTerrain(scene: THREE.Scene): THREE.Group {
 }
 
 // ---------------------------------------------------------------------------
-// buildLighting — golden-hour sun, ambient, hemisphere, FogExp2, god rays, sky dome
+// buildLighting — golden-hour sun, ambient, hemisphere, FogExp2,
+//                volumetric shafts, fill light, atmospheric particles, sky dome
 // ---------------------------------------------------------------------------
 
 export function buildLighting(scene: THREE.Scene): {
   sun: THREE.DirectionalLight;
   godRays: THREE.Group;
+  atmosphere: THREE.Group;
   updateGodRays: () => void;
+  updateAtmosphere: (timeSeconds: number) => void;
 } {
-  // ---- 1. Golden-hour DirectionalLight (sun) ----
-  const SUN_COLOR = 0xffcc80;
-  const SUN_INTENSITY = 2.7;
+  // ---- 1. Golden-hour DirectionalLight (sun) — PCFSoftShadowMap-ready config ----
+  const SUN_COLOR = 0xffc880;
+  const SUN_INTENSITY = 2.45; // tuned to avoid washout; fill + hemi carry the rest
   const sunPosition = new THREE.Vector3(-18, 20, 25); // low angle from NW
 
   const sun = new THREE.DirectionalLight(SUN_COLOR, SUN_INTENSITY);
@@ -670,23 +849,21 @@ export function buildLighting(scene: THREE.Scene): {
   sun.shadow.camera.right = 40;
   sun.shadow.camera.top = 40;
   sun.shadow.camera.bottom = -40;
-  sun.shadow.bias = -0.0005;
-  sun.shadow.normalBias = 0.03;
-  sun.shadow.radius = 5; // soft golden-hour penumbra
+  sun.shadow.bias = -0.0003;
+  sun.shadow.normalBias = 0.02;
+  sun.shadow.radius = 7; // soft penumbra — effective when host renderer uses PCFSoftShadowMap
   scene.add(sun);
 
   // ---- 1a. Sun disc (visible sphere + halo at the directional-light position) ----
   const sunDiscGroup = new THREE.Group();
   sunDiscGroup.name = 'farcrysis-sun-disc';
 
-  // Inner bright disc
   const sunDiscGeom = new THREE.SphereGeometry(0.7, 16, 12);
   const sunDiscMat = new THREE.MeshBasicMaterial({ color: 0xfffbe0, fog: false });
   const sunDisc = new THREE.Mesh(sunDiscGeom, sunDiscMat);
   sunDisc.name = 'farcrysis-sun-disc-core';
   sunDiscGroup.add(sunDisc);
 
-  // Outer soft halo (additive blend)
   const sunHaloGeom = new THREE.SphereGeometry(2.2, 16, 12);
   const sunHaloMat = new THREE.MeshBasicMaterial({
     color: 0xffcc80,
@@ -706,24 +883,37 @@ export function buildLighting(scene: THREE.Scene): {
 
   // ---- 2. Ambient light ----
   const ambient = new THREE.AmbientLight(
-    FARCRYSIS_ART_FEEL.ambientColor, // 0x9fbfa8
-    FARCRYSIS_ART_FEEL.ambientIntensity, // 0.42
+    FARCRYSIS_ART_FEEL.ambientColor,
+    FARCRYSIS_ART_FEEL.ambientIntensity,
   );
   ambient.name = 'farcrysis-ambient';
   scene.add(ambient);
 
   // ---- 3. Hemisphere light (sky + ground bounce) ----
-  const hemiSky = new THREE.Color(0xffe8cc); // warm sky
-  const hemiGround = new THREE.Color(0x4a6b3a); // green ground bounce
-  const hemi = new THREE.HemisphereLight(hemiSky, hemiGround, 0.55);
+  const hemiSky = new THREE.Color(0xffe8cc);
+  const hemiGround = new THREE.Color(0x4a6b3a);
+  const hemi = new THREE.HemisphereLight(hemiSky, hemiGround, 0.50);
   hemi.name = 'farcrysis-hemisphere';
   scene.add(hemi);
 
+  // ---- 3a. Cool-blue secondary fill light — shadow-side illumination ----
+  const FILL_COLOR = 0x7d9cc9;
+  const FILL_INTENSITY = 0.28;
+  const fillPosition = new THREE.Vector3(6, 10, -20); // roughly opposite the sun
+  const fillLight = new THREE.DirectionalLight(FILL_COLOR, FILL_INTENSITY);
+  fillLight.name = 'farcrysis-fill';
+  fillLight.position.copy(fillPosition);
+  fillLight.castShadow = false; // secondary; no extra shadow pass
+  scene.add(fillLight);
+
   // ---- 4. Volumetric fog (FogExp2) — warm golden-hour haze ----
-  // Warmer, slightly denser than original for richer atmosphere
-  const fogColor = new THREE.Color(0xffd2b0);
-  const fogDensity = 0.0030; // subtle haze, visible at mid-long range
-  scene.fog = new THREE.FogExp2(fogColor, fogDensity);
+  // Walk parent chain to find the real THREE.Scene so the renderer picks up fog.
+  const fogColor = new THREE.Color(0xffd4b3);
+  const fogDensity = 0.0028;
+  let fogOwner: THREE.Object3D = scene as unknown as THREE.Object3D;
+  while (fogOwner && !(fogOwner instanceof THREE.Scene)) fogOwner = fogOwner.parent as THREE.Object3D;
+  const fogTarget = (fogOwner instanceof THREE.Scene ? fogOwner : scene) as THREE.Scene;
+  fogTarget.fog = new THREE.FogExp2(fogColor, fogDensity);
 
   // ---- 5. Sky dome (large BackSide sphere with gradient texture) ----
   const skyTex = ensureSkyDomeTexture();
@@ -743,34 +933,30 @@ export function buildLighting(scene: THREE.Scene): {
     scene.add(skyDome);
   }
 
-  // ---- 6. Lightweight god-ray cones (main layer + halo layer + tower shafts) ----
+  // ---- 6. Lightweight god-ray cones (subtle atmospheric layer — kept for near-ground rays) ----
   const godRayGroup = new THREE.Group();
   godRayGroup.name = 'farcrysis-god-rays';
 
   const sunDir = sunPosition.clone().normalize();
   const rays: THREE.Mesh[] = [];
 
-  // --- Main ray layer (scattered origins across the arena) ---
+  // --- Main ray layer (scattered origins across the arena) — reduced opacity to let volumetric shafts dominate ---
   {
-    const rayCount = 14;
+    const rayCount = 12;
     for (let i = 0; i < rayCount; i++) {
       const originAngle = (i / rayCount) * Math.PI * 2;
-      const originDist = 7 + (i % 5) * 5;
+      const originDist = 7 + (i % 4) * 5;
       const ox = Math.cos(originAngle) * originDist;
       const oz = Math.sin(originAngle) * originDist;
-      const oy = 2 + (i % 4) * 4;
+      const oy = 2 + (i % 3) * 4;
 
-      const coneLength = 28 + (i % 3) * 14;
-      const coneAngle = 0.035 + (i % 5) * 0.018;
-      const coneOpacity = 0.05 + (i % 4) * 0.025;
+      const coneLength = 26 + (i % 3) * 12;
+      const coneAngle = 0.032 + (i % 4) * 0.015;
+      const coneOpacity = 0.03 + (i % 3) * 0.015;
 
       const ray = makeGodRayCone(
         new THREE.Vector3(ox, oy, oz),
-        sunDir,
-        coneLength,
-        coneAngle,
-        0xfff5e0,
-        coneOpacity,
+        sunDir, coneLength, coneAngle, 0xfff5e0, coneOpacity,
       );
       ray.name = `farcrysis-god-ray-${i}`;
       godRayGroup.add(ray);
@@ -778,27 +964,23 @@ export function buildLighting(scene: THREE.Scene): {
     }
   }
 
-  // --- Halo layer (wider, fainter cones — soft atmospheric glow) ---
+  // --- Halo layer (wider, fainter) ---
   {
-    const haloCount = 8;
+    const haloCount = 6;
     for (let i = 0; i < haloCount; i++) {
       const originAngle = (i / haloCount) * Math.PI * 2 + 0.3;
-      const originDist = 10 + (i % 3) * 7;
+      const originDist = 10 + (i % 2) * 7;
       const ox = Math.cos(originAngle) * originDist;
       const oz = Math.sin(originAngle) * originDist;
-      const oy = 3 + (i % 3) * 6;
+      const oy = 3 + (i % 2) * 6;
 
-      const coneLength = 35 + (i % 2) * 18;
-      const coneAngle = 0.07 + (i % 3) * 0.03;
-      const coneOpacity = 0.025 + (i % 3) * 0.012;
+      const coneLength = 32 + (i % 2) * 16;
+      const coneAngle = 0.06 + (i % 2) * 0.03;
+      const coneOpacity = 0.018 + (i % 2) * 0.01;
 
       const halo = makeGodRayCone(
         new THREE.Vector3(ox, oy, oz),
-        sunDir,
-        coneLength,
-        coneAngle,
-        0xfff8ed,
-        coneOpacity,
+        sunDir, coneLength, coneAngle, 0xfff8ed, coneOpacity,
       );
       halo.name = `farcrysis-god-ray-halo-${i}`;
       godRayGroup.add(halo);
@@ -806,30 +988,22 @@ export function buildLighting(scene: THREE.Scene): {
     }
   }
 
-  // --- Tower light shafts (vertical beams near the derelict research tower at NW core) ---
+  // --- Tower light shafts (near research tower) ---
   {
     const towerOrigins: Array<[number, number, number]> = [
-      [-8, 4.5, -8],
-      [-7.5, 3.8, -7],
-      [-8.5, 5.2, -8.5],
-      [-7, 4.0, -9],
+      [-8, 4.5, -8], [-7.5, 3.8, -7], [-8.5, 5.2, -8.5], [-7, 4.0, -9],
     ];
     for (let i = 0; i < towerOrigins.length; i++) {
       const [ox, oy, oz] = towerOrigins[i];
-      // Shafts point slightly upward, converging with the sun direction
       const shaftDir = new THREE.Vector3(ox, oy + 2, oz)
         .normalize().lerp(sunDir, 0.7).normalize();
-      const coneLength = 22 + i * 4;
-      const coneAngle = 0.03 + i * 0.01;
-      const coneOpacity = 0.04 + i * 0.015;
+      const coneLength = 20 + i * 4;
+      const coneAngle = 0.025 + i * 0.008;
+      const coneOpacity = 0.03 + i * 0.012;
 
       const shaft = makeGodRayCone(
         new THREE.Vector3(ox, oy, oz),
-        shaftDir,
-        coneLength,
-        coneAngle,
-        0xfffbe5,
-        coneOpacity,
+        shaftDir, coneLength, coneAngle, 0xfffbe5, coneOpacity,
       );
       shaft.name = `farcrysis-god-ray-tower-${i}`;
       godRayGroup.add(shaft);
@@ -837,18 +1011,17 @@ export function buildLighting(scene: THREE.Scene): {
     }
   }
 
-  // Store base opacities per ray so we can pulse relative to authored value.
+  // Base opacities for pulse animation
   const baseRayOpacities = rays.map((ray) => {
     const mat = ray.material as THREE.MeshBasicMaterial;
     return mat.opacity;
   });
 
-  // Self-driving subtle opacity pulse — feels alive without external wiring.
   const pulsePhases: number[] = [];
   const pulseSpeeds: number[] = [];
   for (let i = 0; i < rays.length; i++) {
     pulsePhases.push((i * 0.7) % (Math.PI * 2));
-    pulseSpeeds.push(0.6 + (i % 5) * 0.15); // varied speeds
+    pulseSpeeds.push(0.6 + (i % 5) * 0.15);
   }
 
   godRayGroup.onBeforeRender = () => {
@@ -862,56 +1035,374 @@ export function buildLighting(scene: THREE.Scene): {
 
   scene.add(godRayGroup);
 
-  // Update god-ray orientations to follow the light direction
-  const updateGodRays = (): void => {
-    const dir = sun.position.clone().normalize();
-    for (const ray of rays) {
-      const up = new THREE.Vector3(0, 1, 0);
-      const quat = new THREE.Quaternion().setFromUnitVectors(up, dir);
-      ray.setRotationFromQuaternion(quat);
+  // ---- 7. Volumetric light shafts (noise-dithered cylinders along sun direction) ----
+  const shaftGroup = new THREE.Group();
+  shaftGroup.name = 'farcrysis-volumetric-shafts';
+
+  // Wide atmospheric shaft
+  const shaftCenter1 = sunPosition.clone().addScaledVector(sunDir, -27);
+  const wideShaft = makeVolumetricShaft(
+    19, 58, sunDir, shaftCenter1,
+    new THREE.Color(0xfff5e0), 0.48, 0.55, 0.018,
+  );
+  wideShaft.name = 'farcrysis-vol-shaft-wide';
+  shaftGroup.add(wideShaft);
+
+  // Narrow bright core shaft
+  const shaftCenter2 = sunPosition.clone().addScaledVector(sunDir, -25);
+  const coreShaft = makeVolumetricShaft(
+    11, 54, sunDir, shaftCenter2,
+    new THREE.Color(0xfffbe6), 0.60, 0.65, 0.032,
+  );
+  coreShaft.name = 'farcrysis-vol-shaft-core';
+  shaftGroup.add(coreShaft);
+
+  // Faint secondary shaft at slight offset for broken-cloud look
+  const shaftDir2 = sunDir.clone().add(
+    new THREE.Vector3(0.08, -0.03, -0.04),
+  ).normalize();
+  const shaftCenter3 = sunPosition.clone().addScaledVector(shaftDir2, -29);
+  const offsetShaft = makeVolumetricShaft(
+    14, 60, shaftDir2, shaftCenter3,
+    new THREE.Color(0xffeed5), 0.28, 0.35, 0.022,
+  );
+  offsetShaft.name = 'farcrysis-vol-shaft-offset';
+  shaftGroup.add(offsetShaft);
+
+  scene.add(shaftGroup);
+
+  // Time update for volumetric shafts and cones
+  const updateShafts = (): void => {
+    const t = performance.now() * 0.001;
+    for (const child of shaftGroup.children) {
+      const m = (child as THREE.Mesh).material as THREE.ShaderMaterial;
+      if (m.uniforms && m.uniforms.uTime) m.uniforms.uTime.value = t;
     }
   };
 
-  return { sun, godRays: godRayGroup, updateGodRays };
+  // ---- 8. Atmospheric particle systems ----
+  const atmosphereGroup = new THREE.Group();
+  atmosphereGroup.name = 'farcrysis-atmosphere';
+
+  // --- 8a. Pollen motes — floating warm motes across the arena ---
+  {
+    const PC = 140;
+    const pos = new Float32Array(PC * 3);
+    const ph = new Float32Array(PC);
+    const sp = new Float32Array(PC);
+    const amp = new Float32Array(PC);
+    const sz = new Float32Array(PC);
+    const twk = new Float32Array(PC);
+    for (let i = 0; i < PC; i++) {
+      pos[i * 3 + 0] = (Math.random() - 0.5) * 52;
+      pos[i * 3 + 1] = 0.5 + Math.random() * 5.5;
+      pos[i * 3 + 2] = (Math.random() - 0.5) * 52;
+      ph[i] = Math.random() * Math.PI * 2;
+      sp[i] = 0.3 + Math.random() * 1.5;
+      amp[i] = 0.4 + Math.random() * 2.2;
+      sz[i] = 0.6 + Math.random() * 1.8;
+      twk[i] = 0.3 + Math.random() * 1.2;
+    }
+    const cfg: ParticleConfig = {
+      name: 'farcrysis-atmosphere-pollen',
+      count: PC,
+      positions: pos,
+      phases: ph,
+      speeds: sp,
+      amps: amp,
+      sizes: sz,
+      twinkles: twk,
+      color: [1.0, 0.92, 0.68],
+      opacity: 0.38,
+      sizeScale: 1.0,
+      blinkSharp: 1.4,
+      driftVert: 0.45,
+    };
+    const pollen = makeParticleSystem(cfg);
+    pollen.renderOrder = 1001;
+    atmosphereGroup.add(pollen);
+  }
+
+  // --- 8b. Fireflies along lagoon edges — emissive blinking, larger ---
+  {
+    const FC = 55;
+    const pos = new Float32Array(FC * 3);
+    const ph = new Float32Array(FC);
+    const sp = new Float32Array(FC);
+    const amp = new Float32Array(FC);
+    const sz = new Float32Array(FC);
+    const twk = new Float32Array(FC);
+    for (let i = 0; i < FC; i++) {
+      const angle = (i / FC) * Math.PI * 2 + Math.random() * 0.6;
+      const radius = 30 + Math.random() * 7;
+      pos[i * 3 + 0] = Math.cos(angle) * radius;
+      pos[i * 3 + 1] = 0.2 + Math.random() * 1.3;
+      pos[i * 3 + 2] = Math.sin(angle) * radius;
+      ph[i] = Math.random() * Math.PI * 2;
+      sp[i] = 2.5 + Math.random() * 6.0;
+      amp[i] = 0.15 + Math.random() * 0.5;
+      sz[i] = 2.5 + Math.random() * 4.5;
+      twk[i] = 1.8 + Math.random() * 4.5;
+    }
+    const cfg: ParticleConfig = {
+      name: 'farcrysis-atmosphere-fireflies',
+      count: FC,
+      positions: pos,
+      phases: ph,
+      speeds: sp,
+      amps: amp,
+      sizes: sz,
+      twinkles: twk,
+      color: [0.84, 0.98, 0.42],
+      opacity: 0.7,
+      sizeScale: 1.0,
+      blinkSharp: 7.0, // sharp on/off flash
+      driftVert: 0.12,
+    };
+    const fireflies = makeParticleSystem(cfg);
+    fireflies.renderOrder = 1002;
+    atmosphereGroup.add(fireflies);
+  }
+
+  // --- 8c. Dust motes in sunbeams — concentrated along sun axis ---
+  {
+    const DC = 90;
+    const pos = new Float32Array(DC * 3);
+    const ph = new Float32Array(DC);
+    const sp = new Float32Array(DC);
+    const amp = new Float32Array(DC);
+    const sz = new Float32Array(DC);
+    const twk = new Float32Array(DC);
+    // Sample points in a cylinder along the sun direction within the arena bounds
+    const sunAxis = sunDir.clone();
+    const sunPerp1 = new THREE.Vector3(-sunAxis.z, 0, sunAxis.x).normalize();
+    if (sunPerp1.lengthSq() < 0.1) sunPerp1.set(0, 0, 1);
+    const sunPerp2 = new THREE.Vector3().crossVectors(sunAxis, sunPerp1).normalize();
+    const shaftRadius = 16;
+    const shaftHalfLen = 30;
+    const midpoint = new THREE.Vector3(0, 6, 0);
+    for (let i = 0; i < DC; i++) {
+      const r = Math.random() * shaftRadius;
+      const angle = Math.random() * Math.PI * 2;
+      const along = (Math.random() - 0.5) * shaftHalfLen * 2;
+      const px = midpoint.x + sunPerp1.x * Math.cos(angle) * r + sunPerp2.x * Math.sin(angle) * r + sunAxis.x * along;
+      const py = midpoint.y + sunPerp1.y * Math.cos(angle) * r + sunPerp2.y * Math.sin(angle) * r + sunAxis.y * along;
+      const pz = midpoint.z + sunPerp1.z * Math.cos(angle) * r + sunPerp2.z * Math.sin(angle) * r + sunAxis.z * along;
+      pos[i * 3 + 0] = px;
+      pos[i * 3 + 1] = Math.max(0.2, Math.min(18, py));
+      pos[i * 3 + 2] = pz;
+      ph[i] = Math.random() * Math.PI * 2;
+      sp[i] = 0.4 + Math.random() * 1.8;
+      amp[i] = 0.2 + Math.random() * 1.1;
+      sz[i] = 0.4 + Math.random() * 1.4;
+      twk[i] = 0.5 + Math.random() * 2.5;
+    }
+    const cfg: ParticleConfig = {
+      name: 'farcrysis-atmosphere-dust',
+      count: DC,
+      positions: pos,
+      phases: ph,
+      speeds: sp,
+      amps: amp,
+      sizes: sz,
+      twinkles: twk,
+      color: [1.0, 0.90, 0.65],
+      opacity: 0.30,
+      sizeScale: 1.0,
+      blinkSharp: 1.2,
+      driftVert: 0.35,
+    };
+    const dust = makeParticleSystem(cfg);
+    dust.renderOrder = 1003;
+    atmosphereGroup.add(dust);
+  }
+
+  scene.add(atmosphereGroup);
+
+  // Time update for atmosphere particles
+  const updateAtmosphere = (timeSeconds: number): void => {
+    atmosphereGroup.traverse((child) => {
+      if (child instanceof THREE.Points) {
+        const m = (child as THREE.Points).material as THREE.ShaderMaterial;
+        if (m.uniforms && m.uniforms.uTime) {
+          m.uniforms.uTime.value = timeSeconds;
+        }
+      }
+    });
+  };
+
+  // Also drive atmosphere by onBeforeRender for self-driving
+  atmosphereGroup.onBeforeRender = () => {
+    updateAtmosphere(performance.now() * 0.001);
+    updateShafts();
+  };
+
+  // Update god-ray orientations to follow the light direction
+  const updateGodRays = (): void => {
+    const dir = sun.position.clone().normalize();
+    const up = new THREE.Vector3(0, 1, 0);
+    for (const ray of rays) {
+      const quat = new THREE.Quaternion().setFromUnitVectors(up, dir);
+      ray.setRotationFromQuaternion(quat);
+    }
+    // Also re-aim volumetric shafts
+    for (const child of shaftGroup.children) {
+      const quat2 = new THREE.Quaternion().setFromUnitVectors(up, dir);
+      child.setRotationFromQuaternion(quat2);
+    }
+    updateShafts();
+  };
+
+  return { sun, godRays: godRayGroup, atmosphere: atmosphereGroup, updateGodRays, updateAtmosphere };
 }
 
 // ---------------------------------------------------------------------------
-// buildWater — animated tropical water plane with wave simulation and foam
+// buildWater — custom-shader animated tropical water
+//   Features: wave-displaced vertices, computed normals, specular glints,
+//   fresnel reflection + env map, transparency near shore, procedural foam
 // ---------------------------------------------------------------------------
 
 export function buildWater(scene: THREE.Scene): {
   mesh: THREE.Mesh;
+  causticPlane: THREE.Mesh;
   update: (timeSeconds: number) => void;
 } {
   const waterSize = 76;
-  const waterSegments = 64;
+  const waterSegments = 72;
   const waterGeom = new THREE.PlaneGeometry(waterSize, waterSize, waterSegments, waterSegments);
   waterGeom.rotateX(-Math.PI / 2);
 
-  // Store original positions for animation
-  const basePositions = new Float32Array(
-    (waterGeom.attributes.position as THREE.BufferAttribute).array,
-  );
+  // Precomputed shore factor per vertex (attribute to avoid per-fragment shore calc)
+  const positions = waterGeom.attributes.position as THREE.BufferAttribute;
+  const shoreFactors = new Float32Array(positions.count);
+  for (let i = 0; i < positions.count; i++) {
+    const x = positions.getX(i);
+    const z = positions.getZ(i);
+    const m = Math.max(Math.abs(x), Math.abs(z));
+    // 0 = deep ocean (m→0), 1 = shore (m→32+)
+    shoreFactors[i] = Math.max(0, Math.min(1, (m - 15) / 22));
+  }
+  waterGeom.setAttribute('aShore', new THREE.BufferAttribute(shoreFactors, 1));
 
-  // Glossy reflection-hint material — high metalness, low roughness gives sun glints
-  const waterMat = new THREE.MeshStandardMaterial({
-    color: 0x2d7f8c,
-    roughness: 0.14,
-    metalness: 0.52,
+  // Env map (optional)
+  const envCube = makeEnvCubeTexture();
+  const envTexPresent = envCube ? 1.0 : 0.0;
+
+  const waterUniforms = {
+    uTime: { value: 0 },
+    uDeepColor: { value: new THREE.Color(0x0d4a5c) },
+    uShallowColor: { value: new THREE.Color(0x19a3a8) },
+    uSkyColor: { value: new THREE.Color(0xffe0b0) },
+    uSunColor: { value: new THREE.Color(0xffd9a0) },
+    uSunDir: { value: sunDirFromLightPosition().clone() },
+    uCameraPos: { value: new THREE.Vector3(0, 5, 25) },
+    uFresnelPow: { value: 3.2 },
+    uFoamColor: { value: new THREE.Color(1.0, 1.0, 0.98) },
+    uEnvMap: { value: envCube },
+    uEnvTexPresent: { value: envTexPresent },
+  };
+
+  // Wave height function also used by caustic plane + normal computation
+  // Replicated in GLSL; kept in sync with the JS terrainHeight for the water shader only.
+  const waterVertShader = /* glsl */ `
+    attribute float aShore;
+    varying vec3 vWorldPos;
+    varying vec3 vNormalW;
+    varying float vShore;
+
+    uniform float uTime;
+
+    float waveHeight(vec2 xz, float t) {
+      float dist = length(xz);
+      float w1 = sin(xz.x * 0.35 + t * 0.55) * cos(xz.y * 0.30 + t * 0.45) * 0.11;
+      float w2 = sin(xz.x * 0.65 - t * 0.45) * 0.06;
+      float w3 = cos(xz.y * 0.55 + t * 0.55) * 0.07;
+      float ri = sin(dist * 0.80 - t * 1.0) * 0.05;
+      return w1 + w2 + w3 + ri;
+    }
+
+    void main() {
+      vec3 pos = (modelMatrix * vec4(position, 1.0)).xyz;
+      float h = waveHeight(pos.xz, uTime);
+      float eps = 0.45;
+      float hx = waveHeight(pos.xz + vec2(eps, 0.0), uTime);
+      float hz = waveHeight(pos.xz + vec2(0.0, eps), uTime);
+      vec3 n = normalize(vec3(-(hx - h) / eps, 1.0, -(hz - h) / eps));
+      vNormalW = normalize(mat3(modelMatrix) * n);
+      vWorldPos = pos + vec3(0.0, h, 0.0);
+      vShore = aShore;
+      gl_Position = projectionMatrix * viewMatrix * vec4(vWorldPos, 1.0);
+    }
+  `;
+
+  const waterFragShader = /* glsl */ `
+    varying vec3 vWorldPos;
+    varying vec3 vNormalW;
+    varying float vShore;
+
+    uniform vec3 uDeepColor;
+    uniform vec3 uShallowColor;
+    uniform vec3 uSkyColor;
+    uniform vec3 uSunColor;
+    uniform vec3 uSunDir;
+    uniform vec3 uCameraPos;
+    uniform float uFresnelPow;
+    uniform vec3 uFoamColor;
+    uniform float uTime;
+    uniform float uEnvTexPresent;
+    uniform samplerCube uEnvMap;
+
+    ${GLSL_NOISE}
+
+    void main() {
+      vec3 N = normalize(vNormalW);
+      vec3 viewDir = normalize(uCameraPos - vWorldPos);
+      float NdotV = max(dot(N, viewDir), 0.0);
+
+      // Fresnel
+      float fresnel = pow(1.0 - NdotV, uFresnelPow);
+
+      // Specular highlights from sun
+      vec3 H = normalize(viewDir + uSunDir);
+      float spec = pow(max(dot(N, H), 0.0), 90.0) * 2.5;
+      float specWide = pow(max(dot(N, H), 0.0), 14.0) * 0.35;
+
+      // Reflection
+      vec3 R = reflect(-viewDir, N);
+      vec3 envCol = uEnvTexPresent > 0.5 ? textureCube(uEnvMap, R).rgb : uSkyColor;
+
+      // Base colour: deep lagoon → bright aqua near shore
+      float shoreMix = clamp(vShore * 0.85 + fresnel * 0.15, 0.0, 1.0);
+      vec3 base = mix(uDeepColor, uShallowColor, shoreMix);
+
+      // Procedural shoreline foam
+      float foamNoise = fbm3(vWorldPos * 1.2 + vec3(0.0, uTime * 0.25, 0.0));
+      float waveCrest = abs(sin(vWorldPos.x * 0.55 + vWorldPos.z * 0.45 - uTime * 0.9));
+      float shoreBand = smoothstep(0.28, 0.55, vShore) * (1.0 - smoothstep(0.58, 0.75, vShore));
+      float foam = shoreBand * waveCrest * (0.55 + 0.45 * foamNoise) * 1.1;
+
+      // Fresnel darkens edges + reflects sky
+      vec3 color = base;
+      color += envCol * fresnel * 0.55;
+      color += uSunColor * (spec + specWide);
+      color += uFoamColor * foam * 0.7;
+
+      // Alpha: transparent near shore (sand visible), opaque in deeper water
+      float alpha = mix(0.55, 0.84, smoothstep(0.05, 0.45, vShore));
+
+      gl_FragColor = vec4(color, alpha);
+    }
+  `;
+
+  const waterMat = new THREE.ShaderMaterial({
+    uniforms: waterUniforms,
+    vertexShader: waterVertShader,
+    fragmentShader: waterFragShader,
     transparent: true,
-    opacity: 0.76,
     depthWrite: true,
-    envMapIntensity: 0.85,
-    emissive: 0x103025,
-    emissiveIntensity: 0.35,
+    blending: THREE.NormalBlending,
     fog: false,
   });
-
-  // Apply sky-coloured envMap for reflection hint (canvas CubeTexture — fallback-safe)
-  const envCube = makeEnvCubeTexture();
-  if (envCube) {
-    waterMat.envMap = envCube;
-  }
 
   const water = new THREE.Mesh(waterGeom, waterMat);
   water.name = 'farcrysis-terrain-water';
@@ -922,19 +1413,20 @@ export function buildWater(scene: THREE.Scene): {
   scene.add(water);
 
   // ---- Sparkle points (additive blending dots on water surface) ----
-  const sparkleCount = 80;
+  const sparkleCount = 100;
   const sparklePositions = new Float32Array(sparkleCount * 3);
+  // Concentrate sparkles in the visible ring (just beyond terrain edge)
   for (let i = 0; i < sparkleCount; i++) {
     const angle = (i / sparkleCount) * Math.PI * 2 + Math.random() * 0.5;
-    const radius = 18 + Math.random() * 16;
+    const radius = 33 + Math.random() * 5;
     sparklePositions[i * 3 + 0] = Math.cos(angle) * radius;
-    sparklePositions[i * 3 + 1] = -0.29; // just above water surface
+    sparklePositions[i * 3 + 1] = -0.28;
     sparklePositions[i * 3 + 2] = Math.sin(angle) * radius;
   }
   const sparkleGeom = new THREE.BufferGeometry();
   sparkleGeom.setAttribute('position', new THREE.BufferAttribute(sparklePositions, 3));
   const sparkleMat = new THREE.PointsMaterial({
-    color: FARCRYSIS_ART_FEEL.waterSparkleColor, // 0xd4f0ff
+    color: FARCRYSIS_ART_FEEL.waterSparkleColor,
     size: 0.18,
     transparent: true,
     opacity: 0.5,
@@ -947,7 +1439,7 @@ export function buildWater(scene: THREE.Scene): {
   sparkles.frustumCulled = false;
   water.add(sparkles);
 
-  // ---- Shoreline foam band (square annular ring at the water–beach lip) ----
+  // ---- Shoreline foam ring mesh (animated alpha) ----
   const foamRingOuter = ARENA_HALF + 0.2;
   const foamRingInner = ARENA_HALF - 1.6;
   const foamRingShape = new THREE.Shape();
@@ -971,56 +1463,139 @@ export function buildWater(scene: THREE.Scene): {
     roughness: 0.62,
     metalness: 0.02,
     transparent: true,
-    opacity: 0.50,
+    opacity: 0.45,
     depthWrite: true,
     fog: false,
   });
   const foamRing = new THREE.Mesh(foamGeom, foamMat);
   foamRing.name = 'farcrysis-terrain-foam-ring';
-  foamRing.position.y = -0.22; // near the water surface
+  foamRing.position.y = -0.22;
   foamRing.receiveShadow = true;
   foamRing.renderOrder = 2;
   foamRing.userData.farcrysisArt = true;
   water.add(foamRing);
 
-  // ---- Animation updater (alloc-free: no per-frame allocations) ----
-  const positions = waterGeom.attributes.position as THREE.BufferAttribute;
+  // ---- Foam particle ring (additive Points along shoreline) ----
+  {
+    const FPC = 160;
+    const fpos = new Float32Array(FPC * 3);
+    for (let i = 0; i < FPC; i++) {
+      const angle = (i / FPC) * Math.PI * 2 + Math.random() * 0.3;
+      // Distribute along a ~1.5m-wide band at the shore lip
+      const dist = ARENA_HALF + (Math.random() - 0.5) * 2.0;
+      fpos[i * 3 + 0] = Math.cos(angle) * dist;
+      fpos[i * 3 + 1] = -0.21;
+      fpos[i * 3 + 2] = Math.sin(angle) * dist;
+    }
+    const fg = new THREE.BufferGeometry();
+    fg.setAttribute('position', new THREE.BufferAttribute(fpos, 3));
+    const fm = new THREE.PointsMaterial({
+      color: 0xfaf5ee,
+      size: 0.22,
+      transparent: true,
+      opacity: 0.35,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      depthTest: true,
+    });
+    const fps = new THREE.Points(fg, fm);
+    fps.name = 'farcrysis-terrain-foam-particles';
+    fps.renderOrder = 3;
+    fps.frustumCulled = false;
+    fps.userData.farcrysisArt = true;
+    water.add(fps);
+  }
+
+  // ---- Caustic floor projector (RingGeometry at lagoon floor, additive shader) ----
+  const causticGeom = new THREE.RingGeometry(31.5, 38.5, 80);
+  causticGeom.rotateX(-Math.PI / 2);
+
+  const causticUniforms = {
+    uTime: { value: 0 },
+    uColor: { value: new THREE.Color(0x80e8d0) },
+    uOpacity: { value: 0.30 },
+  };
+
+  const causticMat = new THREE.ShaderMaterial({
+    uniforms: causticUniforms,
+    vertexShader: /* glsl */ `
+      varying vec3 vLocal;
+      varying vec2 vUv;
+      void main() {
+        vLocal = position;
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vUv = wp.xz * 0.065;
+        gl_Position = projectionMatrix * viewMatrix * wp;
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform float uTime;
+      uniform vec3 uColor;
+      uniform float uOpacity;
+      varying vec2 vUv;
+      ${GLSL_NOISE}
+      void main() {
+        // Animated caustic pattern (two-layer fbm with time distortion)
+        vec2 uv1 = vUv * 3.5 + vec2(uTime * 0.18, uTime * 0.22);
+        vec2 uv2 = vUv * 5.2 - vec2(uTime * 0.14, uTime * 0.26);
+        float caust1 = fbm3(vec3(uv1, 0.0));
+        float caust2 = fbm3(vec3(uv2, 0.5));
+        float caust = caust1 * 0.7 + caust2 * 0.3;
+        // Sharpen peaks
+        caust = smoothstep(0.35, 0.72, caust);
+        // Fade toward the center so caustics are only visible in the outer ring
+        float ring = 1.0 - smoothstep(0.15, 0.55, abs(vUv.x) + abs(vUv.y) * 0.25);
+        float a = caust * uOpacity * ring;
+        if (a < 0.02) discard;
+        gl_FragColor = vec4(uColor, a * 0.9);
+      }
+    `,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    transparent: true,
+    fog: false,
+  });
+
+  const causticPlane = new THREE.Mesh(causticGeom, causticMat);
+  causticPlane.name = 'farcrysis-terrain-caustics';
+  causticPlane.position.y = 0.03;
+  causticPlane.renderOrder = 4;
+  causticPlane.userData.farcrysisArt = true;
+  water.add(causticPlane);
+
+  // ---- Animation updater (alloc-free) ----
   const update = (timeSeconds: number): void => {
     const t = timeSeconds;
-
-    // Gentle multi-octave wave — vertex displacement only (normals stay as-built;
-    // surface detail comes from the normal map applied by the textures module.)
-    for (let i = 0; i < positions.count; i++) {
-      const bx = basePositions[i * 3 + 0];
-      const bz = basePositions[i * 3 + 2];
-      const dist = Math.sqrt(bx * bx + bz * bz);
-
-      // Lapping shore waves — stronger near the edges, gentler inland
-      const edgeDist = ARENA_HALF + 6 - Math.max(Math.abs(bx), Math.abs(bz));
-      const shoreFactor = Math.max(0, Math.min(1, edgeDist / 8)); // ramp near shore
-
-      const wave1 = Math.sin(bx * 0.35 + t * 0.55) * Math.cos(bz * 0.30 + t * 0.45) * 0.10;
-      const wave2 = Math.sin(bx * 0.65 - t * 0.45) * 0.05;
-      const wave3 = Math.cos(bz * 0.55 + t * 0.55) * 0.06;
-      const ripple = Math.sin(dist * 0.8 - t * 1.0) * 0.04 * shoreFactor;
-
-      // Waves are gentler further from shore
-      const height = (wave1 + wave2 + wave3) * (0.3 + shoreFactor * 0.7) + ripple;
-      positions.setY(i, height);
-    }
-    positions.needsUpdate = true;
+    waterMat.uniforms.uTime.value = t;
 
     // Animate sparkle opacity
     sparkleMat.opacity = 0.35 + Math.sin(t * 1.2) * 0.12;
 
-    // Animate foam opacity — gentle pulse like advancing/retreating wash
-    foamMat.opacity = 0.40 + Math.sin(t * 0.7) * 0.12;
+    // Animate foam ring opacity — gentle pulse like advancing/retreating wash
+    foamMat.opacity = 0.38 + Math.sin(t * 0.7) * 0.14;
+
+    // Animate caustics
+    causticMat.uniforms.uTime.value = t;
+
+    // Animate foam particles
+    for (const child of water.children) {
+      if (child instanceof THREE.Points && child.name.includes('foam-particles')) {
+        const fm2 = child.material as THREE.PointsMaterial;
+        fm2.opacity = 0.28 + Math.sin(t * 0.85) * 0.10;
+      }
+    }
   };
 
   // Self-driving wave animation — fires every visible frame
   water.onBeforeRender = () => {
-    update(performance.now() * 0.001);
+    const t = performance.now() * 0.001;
+    update(t);
   };
 
-  return { mesh: water, update };
+  return { mesh: water, causticPlane, update };
+}
+
+// ---- Helper: extract sun direction from the light position used in buildLighting ----
+function sunDirFromLightPosition(): THREE.Vector3 {
+  return new THREE.Vector3(-18, 20, 25).normalize();
 }

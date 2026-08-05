@@ -298,6 +298,84 @@ function mergeTransformed(geomParts: Array<{ geom: THREE.BufferGeometry; matrix:
   return merged;
 }
 
+/**
+ * Poisson-disc-based layer positions (seeded dart-throwing rejection).
+ * Same signature as layerPositions but enforces minimum separation between
+ * placed points for a more natural, non-overlapping scatter.
+ */
+function poissonLayerPositions(
+  count: number,
+  minRadius: number,
+  maxRadius: number,
+  clearanceMargin: number,
+  seed: number,
+  minSeparation: number,
+): Array<[number, number, number, number]> {
+  const rng = mulberry32(seed);
+  const result: Array<[number, number, number, number]> = [];
+  let attempts = 0;
+  const maxAttempts = count * 60;
+
+  while (result.length < count && attempts < maxAttempts) {
+    const radius = minRadius + rng() * (maxRadius - minRadius);
+    const angle = rng() * Math.PI * 2;
+    let x = Math.cos(angle) * radius;
+    let z = Math.sin(angle) * radius;
+    x = Math.max(BOUNDS.minX + MARGIN, Math.min(BOUNDS.maxX - MARGIN, x));
+    z = Math.max(BOUNDS.minZ + MARGIN, Math.min(BOUNDS.maxZ - MARGIN, z));
+
+    if (clearOfGameplay(x, z, clearanceMargin)) {
+      let tooClose = false;
+      for (let j = 0; j < result.length; j++) {
+        if (Math.hypot(x - result[j][0], z - result[j][1]) < minSeparation) {
+          tooClose = true;
+          break;
+        }
+      }
+      if (!tooClose) {
+        const groundY = terrainHeightAt(x, z);
+        result.push([x, z, groundY, angle]);
+      }
+    }
+
+    attempts += 1;
+  }
+
+  return result;
+}
+
+/**
+ * Generate grove-like clustered positions: pick N grove centres, then scatter
+ * `splay` stems around each centre with a small in-grove radius.
+ */
+function grovePositions(
+  groves: number,
+  stemsPerGrove: number,
+  splay: number,
+  minRadius: number,
+  maxRadius: number,
+  clearanceMargin: number,
+  seed: number,
+): Array<[number, number, number, number, number, number]> {
+  const rng = mulberry32(seed);
+  const result: Array<[number, number, number, number, number, number]> = [];
+  const centres = poissonLayerPositions(groves, minRadius, maxRadius, clearanceMargin, seed, splay * 3);
+
+  for (let g = 0; g < centres.length; g++) {
+    const [cx, cz, _groundC, _angleC] = centres[g];
+    for (let s = 0; s < stemsPerGrove; s++) {
+      const sa = rng() * Math.PI * 2;
+      const sr = rng() * splay;
+      const sx = cx + Math.cos(sa) * sr;
+      const sz = cz + Math.sin(sa) * sr;
+      const sy = terrainHeightAt(sx, sz);
+      result.push([sx, sz, sy, sa, sr, g + s * 0.01]);
+    }
+  }
+
+  return result;
+}
+
 // ---------------------------------------------------------------------------
 // 1. Palm trees — tall tropical palms (beach / outer ring)
 // ---------------------------------------------------------------------------
@@ -932,7 +1010,7 @@ function addCanopyVines(root: THREE.Group): void {
 // ---------------------------------------------------------------------------
 
 function addLeafLitter(root: THREE.Group): void {
-  const count = 90;
+  const count = 120;
   const SEED = 0x11af_0455;
 
   const litterGeom = new THREE.BoxGeometry(0.7, 0.025, 0.55);
@@ -967,7 +1045,7 @@ function addLeafLitter(root: THREE.Group): void {
 // ---------------------------------------------------------------------------
 
 function addDenseGrass(root: THREE.Group): void {
-  const count = 260;
+  const count = 340;
   const SEED = 0x600d_a55e;
 
   const grassGeom = new THREE.ConeGeometry(0.08, 0.42, 5, 1);
@@ -1123,7 +1201,7 @@ function addUndergrowthShrubs(root: THREE.Group): void {
 // ---------------------------------------------------------------------------
 
 function addUnderstoryFerns(root: THREE.Group): void {
-  const count = 60;
+  const count = 90;
   const SEED = 0x6e2d_f45e;
 
   // Merged: 3 crossed flat blades (thin boxes) forming a fern cluster
@@ -1170,6 +1248,408 @@ function addUnderstoryFerns(root: THREE.Group): void {
 }
 
 // ---------------------------------------------------------------------------
+// 19. Mangrove trees — twisted multi-trunk, small dark leaves (lagoon edges)
+//     Placed in the outer sand/beach ring near the water transition.
+//     Trunk: 3 leaning thin cylinders (merged). Canopy: 4 small dark spheres (merged).
+// ---------------------------------------------------------------------------
+
+function addMangroveTrees(root: THREE.Group): void {
+  const count = 18;
+  const SEED = 0x9a46_0e11;
+
+  // --- Build merged mangrove trunk (3 leaning cylinders) ---
+  const trunkCyl = new THREE.CylinderGeometry(0.1, 0.16, 2.4, 7);
+  const trunkParts: Array<{ geom: THREE.BufferGeometry; matrix: THREE.Matrix4 }> = [];
+  for (let t = 0; t < 3; t++) {
+    const leanAngle = (t - 1) * 0.22;
+    const leanDir = (t / 3) * Math.PI * 2;
+    const tiltQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(leanAngle, leanDir, 0));
+    trunkParts.push({
+      geom: trunkCyl,
+      matrix: new THREE.Matrix4().compose(
+        new THREE.Vector3(Math.cos(leanDir) * 0.18, 1.2, Math.sin(leanDir) * 0.18),
+        tiltQ,
+        new THREE.Vector3(0.75 + (t % 2) * 0.15, 0.85 + t * 0.08, 0.75 + (t % 2) * 0.15),
+      ),
+    });
+  }
+  const mangroveTrunkGeom = mergeTransformed(trunkParts);
+
+  // --- Build merged mangrove canopy (4 small dark spheres) ---
+  const leafBlob = new THREE.IcosahedronGeometry(0.55, 1);
+  const canopyParts: Array<{ geom: THREE.BufferGeometry; matrix: THREE.Matrix4 }> = [];
+  for (let l = 0; l < 4; l++) {
+    const la = (l / 4) * Math.PI * 2;
+    canopyParts.push({
+      geom: leafBlob,
+      matrix: new THREE.Matrix4().compose(
+        new THREE.Vector3(Math.cos(la) * 0.55, 2.3 + (l % 3) * 0.22, Math.sin(la) * 0.55),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler((l % 2) * 0.3, la, 0)),
+        new THREE.Vector3(0.65 + (l % 2) * 0.2, 0.6 + (l % 3) * 0.12, 0.6 + (l % 3) * 0.15),
+      ),
+    });
+  }
+  canopyParts.push({
+    geom: leafBlob,
+    matrix: new THREE.Matrix4().compose(
+      new THREE.Vector3(0, 2.55, 0),
+      new THREE.Quaternion(),
+      new THREE.Vector3(0.7, 0.55, 0.65),
+    ),
+  });
+  const mangroveCanopyGeom = mergeTransformed(canopyParts);
+
+  const trunks = new THREE.InstancedMesh(mangroveTrunkGeom, vegeMat(0x5a4232, 0.9, 0.04), count);
+  trunks.name = 'farcrysis-vege-mangrove-trunks';
+  const canopies = new THREE.InstancedMesh(mangroveCanopyGeom, vegeMat(0x2a4a28, 0.88, 0.02), count);
+  canopies.name = 'farcrysis-vege-mangrove-canopies';
+
+  const tMat = new THREE.Matrix4();
+  const cMat = new THREE.Matrix4();
+  const positions = poissonLayerPositions(count, 23, 30.5, 2.5, SEED, 3.5);
+  const rng = mulberry32(SEED + 1);
+
+  for (let i = 0; i < positions.length; i++) {
+    const [x, z, groundY, angle] = positions[i];
+    const trunkBaseY = groundY;
+    const trunkCenterY = trunkBaseY + 1.2;
+    const canopyY = trunkBaseY + 2.3;
+
+    const s = 0.8 + rng() * 0.35;
+    tMat.compose(
+      new THREE.Vector3(x, trunkCenterY, z),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler((rng() - 0.5) * 0.08, angle + rng() * 0.6, 0)),
+      new THREE.Vector3(s, 0.85 + rng() * 0.2, s),
+    );
+    trunks.setMatrixAt(i, tMat);
+
+    cMat.compose(
+      new THREE.Vector3(x, canopyY, z),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(rng() * 0.25, angle + rng() * 1.2, 0)),
+      new THREE.Vector3(0.8 + rng() * 0.3, 0.65 + rng() * 0.2, 0.8 + rng() * 0.3),
+    );
+    canopies.setMatrixAt(i, cMat);
+  }
+
+  trunks.instanceMatrix.needsUpdate = true;
+  canopies.instanceMatrix.needsUpdate = true;
+
+  root.add(register(trunks, 'mangrove', { castShadow: true, receiveShadow: true }));
+  root.add(register(canopies, 'mangrove', { castShadow: false, receiveShadow: true }));
+}
+
+// ---------------------------------------------------------------------------
+// 20. Dense bamboo groves — tall thin cylinders, green-yellow, clustered
+//     Placed along path corridor edges (not on paths) in the jungle interior.
+// ---------------------------------------------------------------------------
+
+function addBambooGroves(root: THREE.Group): void {
+  const groves = 14;
+  const stemsPerGrove = 14;
+  const count = groves * stemsPerGrove; // 196
+
+  const stemGeom = new THREE.CylinderGeometry(0.04, 0.06, 3.2, 6);
+
+  const stems = new THREE.InstancedMesh(stemGeom, vegeMat(0x8a9a3a, 0.82, 0.03), count);
+  stems.name = 'farcrysis-vege-bamboo-grove-stems';
+
+  const matrix = new THREE.Matrix4();
+  const SEED = 0xa860_0091;
+  const rng = mulberry32(SEED);
+
+  const positions = grovePositions(groves, stemsPerGrove, 2.2, 5, 24, 3.5, SEED);
+
+  for (let i = 0; i < positions.length; i++) {
+    const [x, z, groundY, angle, _sr, _gi] = positions[i];
+    const heightScale = 0.8 + rng() * 0.4;
+    const lean = (rng() - 0.5) * 0.06;
+
+    matrix.compose(
+      new THREE.Vector3(x, groundY + 1.55 * heightScale, z),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(lean, angle + rng() * 0.6, lean * 0.5)),
+      new THREE.Vector3(0.7 + rng() * 0.3, heightScale, 0.7 + rng() * 0.3),
+    );
+    stems.setMatrixAt(i, matrix);
+  }
+
+  stems.instanceMatrix.needsUpdate = true;
+  root.add(register(stems, 'bamboo-grove', { castShadow: true, receiveShadow: true }));
+}
+
+// ---------------------------------------------------------------------------
+// 21. Flowering bushes — icosahedron bush bodies + small emissive blooms
+//     Scattered accents across the jungle interior and cliff ring.
+// ---------------------------------------------------------------------------
+
+function addFloweringBushes(root: THREE.Group): void {
+  const count = 36;
+  const bloomsPerBush = 2;
+  const bloomCount = count * bloomsPerBush;
+  const SEED = 0x710a_a5a5;
+
+  // Bush body: 2 overlapping icosahedrons
+  const blobGeom = new THREE.IcosahedronGeometry(0.7, 1);
+  const bushParts: Array<{ geom: THREE.BufferGeometry; matrix: THREE.Matrix4 }> = [
+    {
+      geom: blobGeom,
+      matrix: new THREE.Matrix4().compose(
+        new THREE.Vector3(0, 0, 0), new THREE.Quaternion(),
+        new THREE.Vector3(1, 0.65, 0.9),
+      ),
+    },
+    {
+      geom: blobGeom,
+      matrix: new THREE.Matrix4().compose(
+        new THREE.Vector3(0.3, 0.05, -0.1),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(0.2, 0.4, 0)),
+        new THREE.Vector3(0.8, 0.55, 0.8),
+      ),
+    },
+  ];
+  const bushGeom = mergeTransformed(bushParts);
+
+  // Bloom head: small emissive sphere
+  const bloomGeom = new THREE.IcosahedronGeometry(0.1, 1);
+
+  const bushes = new THREE.InstancedMesh(bushGeom, vegeMat(FARCRYSIS_ART_FEEL.bushGreen, 0.88, 0.01), count);
+  bushes.name = 'farcrysis-vege-flowering-bushes';
+
+  // Emissive bloom material — warm magenta-pink glow
+  const bloomMat = new THREE.MeshStandardMaterial({
+    color: 0xff5a9e,
+    roughness: 0.5,
+    metalness: 0.05,
+    emissive: 0xff3070,
+    emissiveIntensity: 0.6,
+  });
+  const blooms = new THREE.InstancedMesh(bloomGeom, bloomMat, bloomCount);
+  blooms.name = 'farcrysis-vege-flowering-blooms';
+
+  const bMat = new THREE.Matrix4();
+  const lMat = new THREE.Matrix4();
+  const positions = poissonLayerPositions(count, 6, 24, 3.0, SEED, 2.8);
+  const rng = mulberry32(SEED + 1);
+
+  for (let i = 0; i < positions.length; i++) {
+    const [x, z, groundY, angle] = positions[i];
+    const baseY = groundY + 0.15 * rng();
+    const s = 0.7 + rng() * 0.45;
+
+    bMat.compose(
+      new THREE.Vector3(x, baseY, z),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(rng() * 0.2, angle + rng() * 1.5, rng() * 0.2)),
+      new THREE.Vector3(s, 0.65 + rng() * 0.3, s * 0.9),
+    );
+    bushes.setMatrixAt(i, bMat);
+
+    // Blooms offset to top/sides of bush
+    for (let b = 0; b < bloomsPerBush; b++) {
+      const bloomAngle = angle + ((b + i * 0.5) / bloomsPerBush) * Math.PI * 2;
+      const bx = x + Math.cos(bloomAngle) * 0.35 * s;
+      const bz = z + Math.sin(bloomAngle) * 0.35 * s * 0.85;
+      const by = baseY + 0.55 + rng() * 0.35;
+      const bidx = i * bloomsPerBush + b;
+
+      lMat.compose(
+        new THREE.Vector3(bx, by, bz),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(rng() * 0.5, bloomAngle, 0)),
+        new THREE.Vector3(0.7 + rng() * 0.4, 0.7 + rng() * 0.4, 0.7 + rng() * 0.4),
+      );
+      blooms.setMatrixAt(bidx, lMat);
+    }
+  }
+
+  bushes.instanceMatrix.needsUpdate = true;
+  blooms.instanceMatrix.needsUpdate = true;
+
+  root.add(register(bushes, undefined, { castShadow: false, receiveShadow: true }));
+  root.add(register(blooms, undefined, { castShadow: false, receiveShadow: false }));
+}
+
+// ---------------------------------------------------------------------------
+// 22. Jungle vine clusters — procedural multi-strand hanging vine bundles
+//     Placed near kapok and coconut tree positions in the canopy zone.
+// ---------------------------------------------------------------------------
+
+function addJungleVineClusters(root: THREE.Group): void {
+  const count = 30;
+  const SEED = 0x6659_1e11;
+
+  // Each vine cluster: 5 strands, each strand = 2-3 thin cylinder segments
+  // with slight alternating bends for a natural hanging look.
+  const strandSeg = new THREE.CylinderGeometry(0.02, 0.025, 0.55, 5);
+  const clusterParts: Array<{ geom: THREE.BufferGeometry; matrix: THREE.Matrix4 }> = [];
+
+  for (let s = 0; s < 5; s++) {
+    const baseAngle = (s / 5) * Math.PI * 2;
+    const offsetR = 0.08 + (s % 3) * 0.05;
+    const ox = Math.cos(baseAngle) * offsetR;
+    const oz = Math.sin(baseAngle) * offsetR;
+
+    // 3 segments per strand, descending vertically
+    for (let seg = 0; seg < 3; seg++) {
+      const segY = 3.2 - seg * 0.9;
+      const bendX = ox + (seg % 2 === 0 ? 0.06 : -0.04);
+      const bendZ = oz + (seg % 3 === 0 ? -0.05 : 0.04);
+      clusterParts.push({
+        geom: strandSeg,
+        matrix: new THREE.Matrix4().compose(
+          new THREE.Vector3(bendX, segY, bendZ),
+          new THREE.Quaternion().setFromEuler(new THREE.Euler(0.12, baseAngle + s * 0.3, 0.08)),
+          new THREE.Vector3(0.7 + (seg % 2) * 0.15, 0.8 + (seg % 3) * 0.1, 0.7 + (seg % 2) * 0.15),
+        ),
+      });
+    }
+  }
+  const vineClusterGeom = mergeTransformed(clusterParts);
+
+  const clusters = new THREE.InstancedMesh(vineClusterGeom, vegeMat(0x3d6e30, 0.8, 0.02), count);
+  clusters.name = 'farcrysis-vege-jungle-vine-clusters';
+
+  const matrix = new THREE.Matrix4();
+  const positions = poissonLayerPositions(count, 5, 24, 2.5, SEED, 2.0);
+  const rng = mulberry32(SEED + 2);
+
+  for (let i = 0; i < positions.length; i++) {
+    const [x, z, groundY, angle] = positions[i];
+    // Hang from high canopy (~3.5-5m above ground)
+    const hangTop = groundY + 3.5 + rng() * 1.8;
+    const scale = 0.75 + rng() * 0.45;
+
+    matrix.compose(
+      new THREE.Vector3(x, hangTop - 1.6 * scale, z),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler((rng() - 0.5) * 0.25, angle + rng() * 1.0, (rng() - 0.5) * 0.2)),
+      new THREE.Vector3(scale, 0.9 + rng() * 0.2, scale),
+    );
+    clusters.setMatrixAt(i, matrix);
+  }
+
+  clusters.instanceMatrix.needsUpdate = true;
+  root.add(register(clusters, undefined, { castShadow: false, receiveShadow: false }));
+}
+
+// ---------------------------------------------------------------------------
+// 23. Beach grass tufts — taller, golden-tinged cones along the sand/shore rim
+//     Dense scatter in the outer sand ring (beach-to-water transition).
+// ---------------------------------------------------------------------------
+
+function addBeachGrass(root: THREE.Group): void {
+  const count = 140;
+  const SEED = 0xdea4_c055;
+
+  const grassGeom = new THREE.ConeGeometry(0.06, 0.72, 5, 1);
+
+  const grass = new THREE.InstancedMesh(grassGeom, vegeMat(0xb8a04a, 0.86, 0.02), count);
+  grass.name = 'farcrysis-vege-beach-grass';
+
+  const matrix = new THREE.Matrix4();
+  const positions = layerPositions(count, 24, 31.5, 0.5, SEED);
+  const rng = mulberry32(SEED + 1);
+
+  for (let i = 0; i < positions.length; i++) {
+    const [x, z, groundY, angle] = positions[i];
+    const grassY = groundY + 0.36;
+    const s = 0.6 + rng() * 0.55;
+    const leanAngle = (rng() - 0.5) * 0.18;
+    const leanDir = angle + rng() * 0.8;
+
+    matrix.compose(
+      new THREE.Vector3(x, grassY, z),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(leanAngle, leanDir, 0)),
+      new THREE.Vector3(s, 0.7 + rng() * 0.55, s),
+    );
+    grass.setMatrixAt(i, matrix);
+  }
+
+  grass.instanceMatrix.needsUpdate = true;
+  root.add(register(grass, undefined, { castShadow: false, receiveShadow: false }));
+}
+
+// ---------------------------------------------------------------------------
+// 24. Large ferns — broader fronds (5-7 blades) forming dense understory
+//     Placed in the cliff ring and near rocky areas (cave entrance).
+// ---------------------------------------------------------------------------
+
+function addLargeFerns(root: THREE.Group): void {
+  const count = 50;
+  const SEED = 0x3e29_f0ae;
+
+  // Merged: 6 broad flat blades arranged radially with upward arch
+  const bladeGeom = new THREE.BoxGeometry(0.6, 1.6, 0.1);
+  const fernParts: Array<{ geom: THREE.BufferGeometry; matrix: THREE.Matrix4 }> = [];
+  for (let b = 0; b < 6; b++) {
+    const bladeAngle = (b / 6) * Math.PI * 2;
+    const tilt = -0.3 + (b % 3) * 0.18; // gentle outward arch
+    fernParts.push({
+      geom: bladeGeom,
+      matrix: new THREE.Matrix4().compose(
+        new THREE.Vector3(0, 0.8, 0),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(tilt, bladeAngle + (b % 2) * 0.15, 0)),
+        new THREE.Vector3(0.8 + (b % 3) * 0.12, 1, 0.6 + (b % 3) * 0.25),
+      ),
+    });
+  }
+  // Extra 7th blade for fullness
+  fernParts.push({
+    geom: bladeGeom,
+    matrix: new THREE.Matrix4().compose(
+      new THREE.Vector3(0, 0.75, 0),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.15, Math.PI / 3, 0)),
+      new THREE.Vector3(0.7, 0.9, 0.65),
+    ),
+  });
+  const largeFernGeom = mergeTransformed(fernParts);
+
+  const ferns = new THREE.InstancedMesh(largeFernGeom, vegeMat(FARCRYSIS_ART_FEEL.fernGreen, 0.84, 0.02), count);
+  ferns.name = 'farcrysis-vege-large-ferns';
+
+  const matrix = new THREE.Matrix4();
+  // Place majority in cliff ring (radius 14-24), a handful near the cave at (26,16)
+  const cliffCount = Math.floor(count * 0.85);
+  const cliffPositions = poissonLayerPositions(cliffCount, 14, 24, 2.0, SEED, 1.8);
+  const rng = mulberry32(SEED + 1);
+
+  for (let i = 0; i < cliffPositions.length; i++) {
+    const [x, z, groundY, angle] = cliffPositions[i];
+    const baseY = groundY + 0.08 * rng();
+    const s = 0.65 + rng() * 0.5;
+    const hScale = 0.65 + rng() * 0.6;
+
+    matrix.compose(
+      new THREE.Vector3(x, baseY, z),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(0, angle + rng() * 2.0, 0)),
+      new THREE.Vector3(s, hScale, s),
+    );
+    ferns.setMatrixAt(i, matrix);
+  }
+
+  // Cave-adjacent ferns: scatter a few near (26, 16) with local jitter
+  const caveCount = count - cliffPositions.length;
+  const caveRng = mulberry32(SEED + 99);
+  for (let i = 0; i < caveCount; i++) {
+    const cx = 26 + (caveRng() - 0.5) * 6;
+    const cz = 16 + (caveRng() - 0.5) * 5;
+    const dx = Math.max(BOUNDS.minX + MARGIN, Math.min(BOUNDS.maxX - MARGIN, cx));
+    const dz = Math.max(BOUNDS.minZ + MARGIN, Math.min(BOUNDS.maxZ - MARGIN, cz));
+    const groundY = terrainHeightAt(dx, dz);
+    const angle = caveRng() * Math.PI * 2;
+    const s = 0.65 + caveRng() * 0.45;
+    const hScale = 0.65 + caveRng() * 0.55;
+    const idx = cliffPositions.length + i;
+
+    matrix.compose(
+      new THREE.Vector3(dx, groundY + 0.08, dz),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(0, angle, 0)),
+      new THREE.Vector3(s, hScale, s),
+    );
+    ferns.setMatrixAt(idx, matrix);
+  }
+
+  ferns.instanceMatrix.needsUpdate = true;
+  root.add(register(ferns, undefined, { castShadow: false, receiveShadow: true }));
+}
+
+// ---------------------------------------------------------------------------
 // Main entry: add every vegetation layer to the arena group.
 // ---------------------------------------------------------------------------
 
@@ -1194,11 +1674,19 @@ export function buildVegetation(scene: THREE.Group): void {
   addKapokTrees(scene);          // tree family #7 — 16 kapok trunks + 16 canopies
   addCoconutPalms(scene);        // tree family #8 — 14 coconut trunks + 14 fronds
   addCanopyVines(scene);         // 26 hanging vine strands from canopy height
-  addLeafLitter(scene);          // 90 ground leaf-litter patches
-  addDenseGrass(scene);          // 260 dense grass tufts
+  addLeafLitter(scene);          // 120 ground leaf-litter patches
+  addDenseGrass(scene);          // 340 dense grass tufts
   addFloweringAccents(scene);    // 40 flowering accent clusters
   addUndergrowthShrubs(scene);   // 40 multi-lobe undergrowth shrubs
-  addUnderstoryFerns(scene);     // 60 varied-height understory fern clusters
+  addUnderstoryFerns(scene);     // 90 varied-height understory fern clusters
+
+  // ---- Pass 69 vegetation enrichment (6 new families, Poisson-disc, groves) ----
+  addMangroveTrees(scene);       // tree family #9 — 18 twisted mangroves (trunk + canopy)
+  addBambooGroves(scene);        // 196 stems in 14 dense groves along path edges
+  addFloweringBushes(scene);     // 36 bushes + 72 emissive magenta blooms
+  addJungleVineClusters(scene);  // 30 multi-strand hanging vine bundles
+  addBeachGrass(scene);          // 140 golden beach grass tufts
+  addLargeFerns(scene);          // 50 broad-blade large understory ferns
 }
 
 // ---------------------------------------------------------------------------
