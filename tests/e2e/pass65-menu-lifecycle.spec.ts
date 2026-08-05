@@ -167,7 +167,7 @@ async function startFromMenu(page: Page): Promise<void> {
   await expect(transition).toHaveAttribute('data-active', 'true');
   await expect(page.locator('#deployment-transition-video')).toBeHidden();
   // Wait for deployment loading to complete before the transition hides.
-  await expect.poll(async () => (await lifecycle(page)).matchReadyCount, { timeout: 30_000 }).toBe(1);
+  await expect.poll(async () => (await lifecycle(page)).matchReadyCount, { timeout: 15_000 }).toBe(1);
   // Post-deployment: menu stays in layout but is inert/aria-hidden during
   // deployment; transition hides once deploying phase ends.
   await expect(page.locator('#menu')).toBeHidden();
@@ -554,7 +554,7 @@ test.describe('Pass 65 active-match menu lifecycle', () => {
       down: { state: { phase: 'idle' }, lastCommit: { phase: 'tap', candidate: { kind: 'care-package' } } },
       up: { state: { phase: 'idle' }, lastCommit: { phase: 'tap', candidate: { kind: 'care-package' } } },
     });
-    await expect.poll(careState, { timeout: 15_000 }).toMatchObject({ rewards: 1 });
+    await expect.poll(careState, { timeout: 10_000 }).toMatchObject({ rewards: 1 });
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.damage(5));
     // Pass 68: once opened, care-crate rewards persist; damage does not reset
     // collection. The crate stays resolved (phase: null, rewards: 1).
