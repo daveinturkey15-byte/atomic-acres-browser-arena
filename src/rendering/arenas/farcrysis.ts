@@ -1,12 +1,13 @@
 import { buildFarcrysis } from '../../farcrysis';
 import { createProceduralArenaVisualDefinition } from '../arena-visual-definition';
+import { ATOMIC_ACRES_GENERATED_SKY_ASSET_URL } from '../sky-backdrop';
 import { budgets, camera, colorPipeline, SHARED_GAMEPLAY_ASSETS } from './shared';
 
 export const definition = createProceduralArenaVisualDefinition({
   id: 'farcrysis',
   displayLabel: 'Farcrysis',
   moduleId: 'arena.visual.farcrysis.v1',
-  assetDependencies: [],
+  assetDependencies: [ATOMIC_ACRES_GENERATED_SKY_ASSET_URL],
   sharedAssetDependencies: SHARED_GAMEPLAY_ASSETS,
   lighting: {
     sunColor: 0xffd9a0, sunIntensity: 3.1, ambientColor: 0x9fbfa8, ambientIntensity: 0.42,
@@ -18,7 +19,7 @@ export const definition = createProceduralArenaVisualDefinition({
   },
   fog: { color: 0xcfe0c8, near: 40, far: 96 },
   shadows: { enabled: true, mapSize: 2048, maximumDistance: 120, normalBias: 0.03 },
-  atmosphere: { preset: 'golden-hour-jungle', mist: 0.24, dust: 0.1, clouds: true },
+  atmosphere: { preset: 'sunset-farmland', mist: 0.24, dust: 0.1, clouds: true },
   colorPipeline: colorPipeline('pass69.farcrysis.hdr.v1', 1.08),
   budgets: budgets({ maximumDrawCalls: 460, maximumTriangles: 1_100_000 }),
   reviewCameras: [

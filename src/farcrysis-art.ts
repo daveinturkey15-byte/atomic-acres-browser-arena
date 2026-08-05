@@ -13,7 +13,8 @@
 import * as THREE from 'three';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
 import { buildVegetation, animateVegetationWind, setVegetationLOD } from './farcrysis-vegetation';
-import { buildTerrain, buildLighting, buildWater, animateWater } from './farcrysis-terrain';
+// terrain.ts ShaderMaterial effects disabled for TSL review compatibility.
+// Terrain + water provided inline; lighting simplified to standard lights.
 import { applyFarcrysisTextures } from './farcrysis-textures';
 import { applyVista, animateVista } from './farcrysis-vista';
 import { buildEnhancedPalms } from './farcrysis-palms-enhanced';
@@ -21,6 +22,9 @@ import { applyGroundTextures } from './farcrysis-ground-textures';
 import { buildWaterFX, animateWaterFX } from './farcrysis-water-fx';
 import { buildDetail, animateDetail } from './farcrysis-detail';
 import { buildAtmosphere, animateAtmosphere } from './farcrysis-atmosphere';
+
+// TSL-compatible inline replacements for terrain.ts ShaderMaterial effects.
+// All use standard Three.js materials (MeshStandardMaterial, MeshBasicMaterial).
 
 // ---------------------------------------------------------------------------
 // Material / naming helpers
@@ -400,6 +404,135 @@ function addWaterSparkle(root: THREE.Group): void {
 }
 
 // ---------------------------------------------------------------------------
+// TSL-compatible inline terrain, lighting, and water (replaces terrain.ts)
+// ---------------------------------------------------------------------------
+
+function terrainHeight(x: number, z: number): number {
+  const rad = Math.hypot(x, z);
+  const dist = FARCRYSIS_BOUNDS.maxX - Math.max(Math.abs(x), Math.abs(z));
+  // Beach shelf: flat near edges, rising toward center
+  if (dist < 10) return Math.max(0, dist * 0.03 - 0.1);
+  // Jungle interior: gentle rolling hills
+  const h = Math.sin(x * 0.12) * Math.cos(z * 0.15) * 1.2
+    + Math.sin(x * 0.25 + 1.3) * Math.cos(z * 0.22 + 2.1) * 0.6
+    + Math.sin(z * 0.18 - 0.7) * 0.4;
+  return Math.max(-0.05, h + 0.1);
+}
+
+// ARENA_HALF based on FARCRYSIS_BOUNDS
+const ARENA_HALF = FARCRYSIS_BOUNDS.maxX;
+
+function buildInlineTerrain(scene: THREE.Scene): void {
+  const group = new THREE.Group();
+  group.name = 'farcrysis-terrain-inline';
+
+  const w = ARENA_HALF * 2;
+  const segs = 96;
+  const geom = new THREE.PlaneGeometry(w, w, segs, segs);
+  geom.rotateX(-Math.PI / 2);
+
+  const pos = geom.attributes.position as THREE.BufferAttribute;
+  const colors = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const z = pos.getZ(i);
+    const h = terrainHeight(x, z);
+    pos.setY(i, h);
+
+    const edgeDist = ARENA_HALF - Math.max(Math.abs(x), Math.abs(z));
+    if (edgeDist < 8) {
+      colors[i * 3 + 0] = 0.85; colors[i * 3 + 1] = 0.75; colors[i * 3 + 2] = 0.60; // sand
+    } else if (edgeDist < 14) {
+      colors[i * 3 + 0] = 0.40; colors[i * 3 + 1] = 0.42; colors[i * 3 + 2] = 0.26; // transition
+    } else {
+      colors[i * 3 + 0] = 0.28; colors[i * 3 + 1] = 0.38; colors[i * 3 + 2] = 0.18; // jungle floor
+    }
+  }
+  geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geom.computeVertexNormals();
+
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88, metalness: 0.03 });
+  const mesh = new THREE.Mesh(geom, mat);
+  mesh.name = 'farcrysis-terrain-elevation';
+  mesh.receiveShadow = true;
+  mesh.castShadow = true;
+  group.add(mesh);
+
+  // Simple rock formation scatter
+  const rockMat = new THREE.MeshStandardMaterial({ color: 0x6a6058, roughness: 0.85, metalness: 0.08 });
+  for (let i = 0; i < 32; i++) {
+    const angle = (i / 32) * Math.PI * 2 + Math.random() * 0.4;
+    const rockDist = 10 + Math.random() * 18;
+    const rx = Math.cos(angle) * rockDist;
+    const rz = Math.sin(angle) * rockDist;
+    const baseY = terrainHeight(rx, rz);
+    const detail = Math.random() < 0.5 ? 2 : 1;
+    const geom2 = new THREE.IcosahedronGeometry(0.4 + Math.random() * 0.7, detail);
+    const rock = new THREE.Mesh(geom2, rockMat);
+    rock.name = `farcrysis-inline-cliff-rock-${i}`;
+    rock.position.set(rx, baseY + 0.3, rz);
+    rock.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+    rock.castShadow = true;
+    rock.receiveShadow = true;
+    group.add(rock);
+  }
+
+  scene.add(group);
+}
+
+function buildInlineLighting(scene: THREE.Scene): void {
+  const ambient = new THREE.AmbientLight(0xffe8cc, 0.45);
+  ambient.name = 'farcrysis-ambient';
+  scene.add(ambient);
+
+  const hemi = new THREE.HemisphereLight(0xffe8cc, 0x4a6b3a, 0.50);
+  hemi.name = 'farcrysis-hemi';
+  scene.add(hemi);
+
+  const sun = new THREE.DirectionalLight(0xffd9a0, 3.1);
+  sun.name = 'farcrysis-sun';
+  sun.position.set(-18, 22, 25);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.near = 0.5;
+  sun.shadow.camera.far = 150;
+  sun.shadow.camera.left = -38;
+  sun.shadow.camera.right = 38;
+  sun.shadow.camera.top = 38;
+  sun.shadow.camera.bottom = -38;
+  sun.shadow.normalBias = 0.03;
+  scene.add(sun);
+
+  const fill = new THREE.DirectionalLight(0x7d9cc9, 0.28);
+  fill.name = 'farcrysis-fill';
+  fill.position.set(6, 10, -20);
+  scene.add(fill);
+
+  const fogColor = new THREE.Color(0xffd4b3);
+  scene.fog = new THREE.FogExp2(fogColor, 0.0028);
+}
+
+function buildInlineWater(scene: THREE.Scene): void {
+  const waterSize = 78;
+  const waterGeom = new THREE.PlaneGeometry(waterSize, waterSize);
+  waterGeom.rotateX(-Math.PI / 2);
+
+  const waterMat = new THREE.MeshStandardMaterial({
+    color: 0x19a3a8,
+    roughness: 0.15,
+    metalness: 0.35,
+    transparent: true,
+    opacity: 0.78,
+  });
+  
+  const water = new THREE.Mesh(waterGeom, waterMat);
+  water.name = 'farcrysis-water-inline';
+  water.position.y = -0.28;
+  water.receiveShadow = true;
+  scene.add(water);
+}
+
+// ---------------------------------------------------------------------------
 // Main entry: apply every art/feel lane addition to the arena root group.
 // ---------------------------------------------------------------------------
 
@@ -423,9 +556,9 @@ export function applyFarcrysisArtwork(root: THREE.Group): void {
 
   // Terrain, lighting, and water modules expect Scene; cast through Object3D
   const s = root as unknown as import('three').Scene;
-  buildTerrain(s);
-  buildLighting(s);
-  buildWater(s);
+  buildInlineTerrain(s);
+  buildInlineLighting(s);
+  buildInlineWater(s);
 
   // Distant vista — ocean horizon, island silhouettes, seabirds (additive, no colliders)
   applyVista(s);
@@ -451,7 +584,7 @@ export function applyFarcrysisArtwork(root: THREE.Group): void {
   root.onBeforeRender = (_renderer, _scene, camera) => {
     const t = performance.now() * 0.001;
     animateVegetationWind(t);
-    animateWater(t);
+    // animateWater removed — ShaderMaterial-based water replaced with standard materials
     animateVista(t);
     animateAtmosphere(t);
     animateDetail(t);

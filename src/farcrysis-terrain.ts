@@ -1419,12 +1419,9 @@ export function buildLighting(scene: THREE.Scene): {
     scene.add(skyDome);
   }
 
-  // ---- 5a. Volumetric clouds + ground haze (golden-hour sky layer) ----
-  // Cloud group self-drives its uTime via onBeforeRender; ground fog is static noise.
-  const cloudGroup = buildCloudGroup(sunPosition);
-  scene.add(cloudGroup);
-  const groundFog = buildGroundFogLayer();
-  scene.add(groundFog);
+  // ---- 5a. Volumetric clouds + ground haze REMOVED (TSL review: ShaderMaterial) ----
+  // Cloud group and ground fog used legacy ShaderMaterial; removed for WebGPU TSL compatibility.
+  // Sky backdrop provides clouds; scene fog provides atmospheric haze.
 
   // ---- 6. Lightweight god-ray cones (subtle atmospheric layer — kept for near-ground rays) ----
   const godRayGroup = new THREE.Group();
@@ -1528,50 +1525,11 @@ export function buildLighting(scene: THREE.Scene): {
 
   scene.add(godRayGroup);
 
-  // ---- 7. Volumetric light shafts (noise-dithered cylinders along sun direction) ----
+  // ---- 7. Volumetric light shafts REMOVED (TSL review: ShaderMaterial) ----
+  // Replaced by atmosphere.ts god-ray cones which use standard MeshBasicMaterial.
   const shaftGroup = new THREE.Group();
-  shaftGroup.name = 'farcrysis-volumetric-shafts';
-
-  // Wide atmospheric shaft
-  const shaftCenter1 = sunPosition.clone().addScaledVector(sunDir, -27);
-  const wideShaft = makeVolumetricShaft(
-    19, 58, sunDir, shaftCenter1,
-    new THREE.Color(0xfff5e0), 0.48, 0.55, 0.018,
-  );
-  wideShaft.name = 'farcrysis-vol-shaft-wide';
-  shaftGroup.add(wideShaft);
-
-  // Narrow bright core shaft
-  const shaftCenter2 = sunPosition.clone().addScaledVector(sunDir, -25);
-  const coreShaft = makeVolumetricShaft(
-    11, 54, sunDir, shaftCenter2,
-    new THREE.Color(0xfffbe6), 0.60, 0.65, 0.032,
-  );
-  coreShaft.name = 'farcrysis-vol-shaft-core';
-  shaftGroup.add(coreShaft);
-
-  // Faint secondary shaft at slight offset for broken-cloud look
-  const shaftDir2 = sunDir.clone().add(
-    new THREE.Vector3(0.08, -0.03, -0.04),
-  ).normalize();
-  const shaftCenter3 = sunPosition.clone().addScaledVector(shaftDir2, -29);
-  const offsetShaft = makeVolumetricShaft(
-    14, 60, shaftDir2, shaftCenter3,
-    new THREE.Color(0xffeed5), 0.28, 0.35, 0.022,
-  );
-  offsetShaft.name = 'farcrysis-vol-shaft-offset';
-  shaftGroup.add(offsetShaft);
-
-  scene.add(shaftGroup);
-
-  // Time update for volumetric shafts and cones
-  const updateShafts = (): void => {
-    const t = performance.now() * 0.001;
-    for (const child of shaftGroup.children) {
-      const m = (child as THREE.Mesh).material as THREE.ShaderMaterial;
-      if (m.uniforms && m.uniforms.uTime) m.uniforms.uTime.value = t;
-    }
-  };
+  shaftGroup.name = 'farcrysis-volumetric-shafts-removed';
+  // shaftGroup is empty — kept as placeholder to avoid downstream reference errors
 
   // ---- 8. Atmospheric particle systems ----
   const atmosphereGroup = new THREE.Group();
