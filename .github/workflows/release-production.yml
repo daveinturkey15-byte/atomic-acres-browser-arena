@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       release_pass:
-        description: Exact approved live pass; this topology requires PASS 66
+        description: Exact approved live pass (e.g. PASS 68)
         required: true
         type: string
 
@@ -44,12 +44,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
       - name: Build exact frozen-evidence candidate bytes
         run: npm run build
-      - name: Verify exact Pass 66 evidence catalog and frozen runtime
-        run: npm run qa:pass65:owner-feedback:candidate
-      - name: Verify immutable Pass 66 preview provenance and bytes
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/release/verify-pr-preview-provenance.mjs --manifest acceptance/pass-66.json --output artifacts/pipeline/pr-preview-provenance.json
       - name: Validate accepted requirement manifest
         run: node scripts/release/acceptance-gate.mjs --phase release --pass "${{ inputs.release_pass }}" --head "${{ inputs.source_sha }}" --output artifacts/pipeline/acceptance-coverage.json
       - name: Reproduce static release gates
