@@ -424,7 +424,7 @@ const ARENA_HALF = FARCRYSIS_BOUNDS.maxX;
 
 function buildInlineTerrain(scene: THREE.Scene): void {
   const group = new THREE.Group();
-  group.name = 'farcrysis-terrain-inline';
+  group.name = 'farcrysis-terrain';
 
   const w = ARENA_HALF * 2;
   const segs = 96;
@@ -441,43 +441,104 @@ function buildInlineTerrain(scene: THREE.Scene): void {
 
     const edgeDist = ARENA_HALF - Math.max(Math.abs(x), Math.abs(z));
     if (edgeDist < 8) {
-      colors[i * 3 + 0] = 0.85; colors[i * 3 + 1] = 0.75; colors[i * 3 + 2] = 0.60; // sand
+      colors[i * 3 + 0] = 0.88; colors[i * 3 + 1] = 0.78; colors[i * 3 + 2] = 0.62; // white sand
     } else if (edgeDist < 14) {
-      colors[i * 3 + 0] = 0.40; colors[i * 3 + 1] = 0.42; colors[i * 3 + 2] = 0.26; // transition
+      colors[i * 3 + 0] = 0.42; colors[i * 3 + 1] = 0.44; colors[i * 3 + 2] = 0.28; // transition
     } else {
-      colors[i * 3 + 0] = 0.28; colors[i * 3 + 1] = 0.38; colors[i * 3 + 2] = 0.18; // jungle floor
+      colors[i * 3 + 0] = 0.30; colors[i * 3 + 1] = 0.40; colors[i * 3 + 2] = 0.20; // jungle floor
     }
   }
   geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   geom.computeVertexNormals();
 
-  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88, metalness: 0.03 });
-  const mesh = new THREE.Mesh(geom, mat);
-  mesh.name = 'farcrysis-terrain-elevation';
-  mesh.receiveShadow = true;
-  mesh.castShadow = true;
-  group.add(mesh);
+  const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88, metalness: 0.03 });
+  const terrainMesh = new THREE.Mesh(geom, terrainMat);
+  terrainMesh.name = 'farcrysis-terrain-elevation';
+  terrainMesh.receiveShadow = true;
+  terrainMesh.castShadow = true;
+  terrainMesh.position.y = 0.04;
+  group.add(terrainMesh);
 
-  // Simple rock formation scatter
-  const rockMat = new THREE.MeshStandardMaterial({ color: 0x6a6058, roughness: 0.85, metalness: 0.08 });
-  for (let i = 0; i < 32; i++) {
-    const angle = (i / 32) * Math.PI * 2 + Math.random() * 0.4;
-    const rockDist = 10 + Math.random() * 18;
-    const rx = Math.cos(angle) * rockDist;
-    const rz = Math.sin(angle) * rockDist;
+  // Cliff rock ring (28 IcosahedronGeometry rocks along the cliff band)
+  const cliffRockMat = new THREE.MeshStandardMaterial({ color: 0x5a5550, roughness: 0.88, metalness: 0.06 });
+  const cliffCount = 28;
+  for (let i = 0; i < cliffCount; i++) {
+    const angle = (i / cliffCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
+    const rockDist = 18 + Math.random() * 8;
+    const rx = Math.max(-ARENA_HALF + 2, Math.min(ARENA_HALF - 2, Math.cos(angle) * rockDist));
+    const rz = Math.max(-ARENA_HALF + 2, Math.min(ARENA_HALF - 2, Math.sin(angle) * rockDist));
     const baseY = terrainHeight(rx, rz);
     const detail = Math.random() < 0.5 ? 2 : 1;
-    const geom2 = new THREE.IcosahedronGeometry(0.4 + Math.random() * 0.7, detail);
-    const rock = new THREE.Mesh(geom2, rockMat);
-    rock.name = `farcrysis-inline-cliff-rock-${i}`;
-    rock.position.set(rx, baseY + 0.3, rz);
+    const rGeom = new THREE.IcosahedronGeometry(0.6 + Math.random() * 1.4, detail);
+    const rock = new THREE.Mesh(rGeom, cliffRockMat);
+    rock.name = `farcrysis-cliff-rock-${i}`;
+    rock.position.set(rx, baseY + 0.4, rz);
     rock.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+    rock.scale.setScalar(0.7 + Math.random() * 0.6);
     rock.castShadow = true;
     rock.receiveShadow = true;
     group.add(rock);
   }
 
+  // Jungle floor boulders (scattered interior)
+  const boulderMat = new THREE.MeshStandardMaterial({ color: 0x7a7268, roughness: 0.85, metalness: 0.08 });
+  for (let i = 0; i < 12; i++) {
+    const angle = (i / 12) * Math.PI * 2 + Math.random() * 0.5;
+    const placeDist = 5 + Math.random() * 12;
+    const rx = Math.max(-ARENA_HALF + 3, Math.min(ARENA_HALF - 3, Math.cos(angle) * placeDist));
+    const rz = Math.max(-ARENA_HALF + 3, Math.min(ARENA_HALF - 3, Math.sin(angle) * placeDist));
+    const baseY = terrainHeight(rx, rz);
+    const rGeom = new THREE.IcosahedronGeometry(0.3 + Math.random() * 0.6, 1);
+    const boulder = new THREE.Mesh(rGeom, boulderMat);
+    boulder.name = `farcrysis-boulder-${i}`;
+    boulder.position.set(rx, baseY + 0.15, rz);
+    boulder.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+    boulder.castShadow = true;
+    boulder.receiveShadow = true;
+    group.add(boulder);
+  }
+
+  // Large boulders near water's edge
+  const shoreBoulderMat = new THREE.MeshStandardMaterial({ color: 0x6a6058, roughness: 0.9, metalness: 0.04 });
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2 + 0.2;
+    const shoreDist = ARENA_HALF - 2 + Math.random() * 3;
+    const rx = Math.cos(angle) * shoreDist;
+    const rz = Math.sin(angle) * shoreDist;
+    const baseY = terrainHeight(rx, rz);
+    const rGeom = new THREE.IcosahedronGeometry(0.8 + Math.random() * 1.2, 2);
+    const boulder = new THREE.Mesh(rGeom, shoreBoulderMat);
+    boulder.name = `farcrysis-shore-boulder-${i}`;
+    boulder.position.set(rx, baseY + 0.3, rz);
+    boulder.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+    boulder.castShadow = true;
+    boulder.receiveShadow = true;
+    group.add(boulder);
+  }
+
   scene.add(group);
+
+  // Sky dome (large BackSide gradient sphere)
+  const skyCanvas = document.createElement('canvas');
+  skyCanvas.width = 256; skyCanvas.height = 128;
+  const ctx = skyCanvas.getContext('2d');
+  if (ctx) {
+    const grad = ctx.createLinearGradient(0, 0, 0, 128);
+    grad.addColorStop(0, '#ff8c42');   // warm zenith
+    grad.addColorStop(0.35, '#ffb469'); 
+    grad.addColorStop(0.7, '#e8c89e');
+    grad.addColorStop(1, '#c9d8e0');   // pale horizon
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 256, 128);
+    const skyTex = new THREE.CanvasTexture(skyCanvas);
+    skyTex.colorSpace = THREE.SRGBColorSpace;
+    const skyGeom = new THREE.SphereGeometry(180, 32, 24);
+    const skyMat = new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false, depthWrite: false });
+    const skyDome = new THREE.Mesh(skyGeom, skyMat);
+    skyDome.name = 'farcrysis-sky-dome';
+    skyDome.renderOrder = -1;
+    scene.add(skyDome);
+  }
 }
 
 function buildInlineLighting(scene: THREE.Scene): void {
