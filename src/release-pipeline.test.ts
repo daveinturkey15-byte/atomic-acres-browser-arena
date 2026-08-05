@@ -120,24 +120,20 @@ describe('production release workflow', () => {
 
   it('blocks production on accepted requirements and verifies the canonical site after Pages builds', () => {
     const candidateBuildStep = workflow.indexOf('Build exact frozen-evidence candidate bytes');
-    const candidateEvidenceStep = workflow.indexOf('Verify exact Pass 66 evidence catalog and frozen runtime');
-    const previewProvenanceStep = workflow.indexOf('Verify immutable Pass 66 preview provenance and bytes');
     const acceptanceStep = workflow.indexOf('Validate accepted requirement manifest');
     const publishStep = workflow.indexOf('Publish complete exact dist snapshot');
     const pagesStep = workflow.indexOf('Wait for exact Pages build');
     const liveStep = workflow.indexOf('Verify canonical live release');
     const receiptStep = workflow.indexOf('Write acceptance-bound production receipt and timings');
     expect(candidateBuildStep).toBeGreaterThan(-1);
-    expect(candidateEvidenceStep).toBeGreaterThan(candidateBuildStep);
-    expect(previewProvenanceStep).toBeGreaterThan(candidateEvidenceStep);
-    expect(acceptanceStep).toBeGreaterThan(previewProvenanceStep);
+    // Pass 68+ uses the dynamic acceptance-gate; stale Pass 65/66 evidence
+    // catalog and preview-provenance steps were removed from production.
+    expect(acceptanceStep).toBeGreaterThan(candidateBuildStep);
     expect(acceptanceStep).toBeGreaterThan(-1);
     expect(acceptanceStep).toBeLessThan(publishStep);
     expect(liveStep).toBeGreaterThan(pagesStep);
     expect(receiptStep).toBeGreaterThan(liveStep);
     expect(workflow).toContain('QA_OUTPUT: artifacts/pipeline/live-release-smoke.json');
-    expect(workflow).toContain('npm run qa:pass65:owner-feedback:candidate');
-    expect(workflow).toContain('scripts/release/verify-pr-preview-provenance.mjs');
     expect(workflow).toContain('checks: read');
   });
 
