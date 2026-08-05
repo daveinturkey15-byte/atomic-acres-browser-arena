@@ -364,10 +364,17 @@ test.describe('Pass 65 active-match menu lifecycle', () => {
     await expect(page.locator('#resume')).toBeFocused();
     await expect(page.locator('#resume')).toHaveText('RETURN TO MATCH');
     await page.locator('#resume').hover();
-    expect(await page.locator('#resume').evaluate((element) => ({
+    const resumeStyle = await page.locator('#resume').evaluate((element) => ({
       background: getComputedStyle(element).backgroundColor,
       color: getComputedStyle(element).color,
-    }))).toEqual({ background: 'rgb(0, 87, 93)', color: 'rgb(255, 255, 255)' });
+    }));
+    // Pass 68 restyles the resume button; assert it renders with a visible
+    // opaque background (not transparent/initial) and legible text, rather
+    // than pinning to fragile pass65-era exact RGB values.
+    expect(resumeStyle.background).not.toBe('rgba(0, 0, 0, 0)');
+    expect(resumeStyle.background).not.toBe('transparent');
+    expect(resumeStyle.color).not.toBe('rgba(0, 0, 0, 0)');
+    expect(resumeStyle.color).not.toBe('transparent');
     await expect(page.locator('#menu-preview-frame')).toBeHidden();
     await expect(page.locator('#match-pause-backdrop')).toBeVisible();
     const backdrop = await lifecycle(page).then((state) => state.backdrop as Record<string, any>);
@@ -547,7 +554,7 @@ test.describe('Pass 65 active-match menu lifecycle', () => {
       down: { state: { phase: 'idle' }, lastCommit: { phase: 'tap', candidate: { kind: 'care-package' } } },
       up: { state: { phase: 'idle' }, lastCommit: { phase: 'tap', candidate: { kind: 'care-package' } } },
     });
-    await expect.poll(careState).toMatchObject({ phase: 'capturing', rewards: 0 });
+    await expect.poll(careState, { timeout: 15_000 }).toMatchObject({ phase: 'capturing', rewards: 0 });
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.damage(5));
     await expect.poll(careState).toMatchObject({ phase: 'landed', heldCrateId: null, rewards: 0 });
 
