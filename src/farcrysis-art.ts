@@ -516,6 +516,11 @@ function buildInlineTerrain(scene: THREE.Scene): void {
     group.add(boulder);
   }
 
+  // ---- Pass 69 density polish: beach litter, driftwood, interior undergrowth ----
+  addBeachLitter(group);
+  addDriftwoodLogs(group);
+  addJungleUndergrowth(group);
+
   scene.add(group);
 
   // Sky dome (large BackSide gradient sphere)
@@ -542,7 +547,7 @@ function buildInlineTerrain(scene: THREE.Scene): void {
 }
 
 function buildInlineLighting(scene: THREE.Scene): void {
-  const ambient = new THREE.AmbientLight(0xffe8cc, 0.45);
+  const ambient = new THREE.AmbientLight(0xffe8cc, 0.55);
   ambient.name = 'farcrysis-ambient';
   scene.add(ambient);
 
@@ -550,19 +555,26 @@ function buildInlineLighting(scene: THREE.Scene): void {
   hemi.name = 'farcrysis-hemi';
   scene.add(hemi);
 
-  const sun = new THREE.DirectionalLight(0xffd9a0, 3.1);
+  const sun = new THREE.DirectionalLight(0xffd9a0, 2.8);
   sun.name = 'farcrysis-sun';
   sun.position.set(-18, 22, 25);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(4096, 4096);
   sun.shadow.camera.near = 0.5;
   sun.shadow.camera.far = 150;
-  sun.shadow.camera.left = -38;
-  sun.shadow.camera.right = 38;
-  sun.shadow.camera.top = 38;
-  sun.shadow.camera.bottom = -38;
+  sun.shadow.camera.left = -36;
+  sun.shadow.camera.right = 36;
+  sun.shadow.camera.top = 36;
+  sun.shadow.camera.bottom = -36;
   sun.shadow.normalBias = 0.03;
   scene.add(sun);
+
+  // Low-intensity warm fill from below to soften underside shadows on rocks/boulders.
+  // Deliberately does NOT castShadow so it cannot create secondary shadows.
+  const bounce = new THREE.DirectionalLight(0xffe0c0, 0.15);
+  bounce.name = 'farcrysis-bounce';
+  bounce.position.set(0, -2, 0);
+  scene.add(bounce);
 
   const fill = new THREE.DirectionalLight(0x7d9cc9, 0.28);
   fill.name = 'farcrysis-fill';
@@ -574,23 +586,226 @@ function buildInlineLighting(scene: THREE.Scene): void {
 }
 
 function buildInlineWater(scene: THREE.Scene): void {
-  const waterSize = 78;
-  const waterGeom = new THREE.PlaneGeometry(waterSize, waterSize);
-  waterGeom.rotateX(-Math.PI / 2);
+  // (a) Deep open water — extended to the visible horizon (120×120 m),
+  //     richer tropical blue-green. At y = -0.28 it sits below the lowest
+  //     terrain rim (y ≈ 0.0) and beneath every additive water-FX layer.
+  const deepSize = 120;
+  const deepGeom = new THREE.PlaneGeometry(deepSize, deepSize);
+  deepGeom.rotateX(-Math.PI / 2);
 
-  const waterMat = new THREE.MeshStandardMaterial({
-    color: 0x19a3a8,
+  const deepMat = new THREE.MeshStandardMaterial({
+    color: 0x0b6a7a,
     roughness: 0.15,
     metalness: 0.35,
     transparent: true,
-    opacity: 0.78,
+    opacity: 0.82,
   });
-  
-  const water = new THREE.Mesh(waterGeom, waterMat);
-  water.name = 'farcrysis-water-inline';
-  water.position.y = -0.28;
-  water.receiveShadow = true;
-  scene.add(water);
+
+  const deep = new THREE.Mesh(deepGeom, deepMat);
+  deep.name = 'farcrysis-water-inline';
+  deep.position.y = -0.28;
+  deep.receiveShadow = true;
+  scene.add(deep);
+
+  // (c) Shallow near-shore water — a lighter translucent lens (40×40 m)
+  //     over the beach shelf so the sand reads through the water near the
+  //     shoreline. y = -0.24 keeps it just below the additive wave surface
+  //     at -0.22 (no z-fighting) while still above the deep plane.
+  const shallowSize = 40;
+  const shallowGeom = new THREE.PlaneGeometry(shallowSize, shallowSize);
+  shallowGeom.rotateX(-Math.PI / 2);
+
+  const shallowMat = new THREE.MeshStandardMaterial({
+    color: 0x2f9aa0,
+    roughness: 0.35,
+    metalness: 0.1,
+    transparent: true,
+    opacity: 0.45,
+    depthWrite: false,
+  });
+
+  const shallow = new THREE.Mesh(shallowGeom, shallowMat);
+  shallow.name = 'farcrysis-water-shallow';
+  shallow.position.y = -0.24;
+  shallow.renderOrder = 2;
+  scene.add(shallow);
+
+  // (d) Wet-sand shoreline transition — a square-frame plane (64×64 outer,
+  //     48×48 inner hole → 8-unit band at the beach rim) conformed to the
+  //     terrain height so it hugs the sand slope naturally.
+  const outer = ARENA_HALF;          // 32 — matches terrain edge
+  const inner = outer - 8;           // 24 — inner edge of the sand band
+  const shape = new THREE.Shape();
+  shape.moveTo(-outer, -outer);
+  shape.lineTo(outer, -outer);
+  shape.lineTo(outer, outer);
+  shape.lineTo(-outer, outer);
+  shape.closePath();
+
+  const hole = new THREE.Path();
+  hole.moveTo(-inner, -inner);
+  hole.lineTo(inner, -inner);
+  hole.lineTo(inner, inner);
+  hole.lineTo(-inner, inner);
+  hole.closePath();
+  shape.holes.push(hole);
+
+  const wetGeom = new THREE.ShapeGeometry(shape);
+  wetGeom.rotateX(-Math.PI / 2);
+
+  // Conform to the terrain slope so the band tracks the beach shelf exactly.
+  const wetPos = wetGeom.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i < wetPos.count; i++) {
+    const h = terrainHeight(wetPos.getX(i), wetPos.getZ(i));
+    wetPos.setY(i, h + 0.02);       // just above the terrain — no depth-fight
+  }
+  wetGeom.computeVertexNormals();
+
+  const wetMat = new THREE.MeshStandardMaterial({
+    color: 0x8a7a58,               // darker than dry sand — damp/wet shore
+    roughness: 0.95,
+    metalness: 0.0,
+  });
+
+  const wet = new THREE.Mesh(wetGeom, wetMat);
+  wet.name = 'farcrysis-water-wetsand';
+  wet.receiveShadow = true;
+  scene.add(wet);
+}
+
+// ---------------------------------------------------------------------------
+// Pass 69 density polish — beach litter, driftwood, fallen coconuts, and
+// interior undergrowth. All standard MeshStandardMaterial (no ShaderMaterial,
+// no PointsMaterial); presentation-only dressing, no colliders.
+// ---------------------------------------------------------------------------
+
+/** Sand-matched vertex colors so small beach litter blends into the sand. */
+function tintBeachGeometry(geo: THREE.BufferGeometry, base: THREE.Color, spread: number): THREE.BufferGeometry {
+  const posAttr = geo.attributes.position as THREE.BufferAttribute;
+  const count = posAttr.count;
+  const colors = new Float32Array(count * 3);
+  for (let i = 0; i < count; i += 1) {
+    const v = 1 - spread + Math.random() * spread * 2;
+    colors[i * 3 + 0] = base.r * v;
+    colors[i * 3 + 1] = base.g * v;
+    colors[i * 3 + 2] = base.b * v;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  return geo;
+}
+
+/** Scattered small rocks + shells on the beach ring (edgeDist < 8). */
+function addBeachLitter(group: THREE.Group): void {
+  const sand = new THREE.Color(FARCRYSIS_ART_FEEL.beachSand);
+  const litterMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0.03 });
+  const litterCount = 36;
+
+  for (let i = 0; i < litterCount; i += 1) {
+    const angle = (i / litterCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.9;
+    const dist = ARENA_HALF - 1.5 - Math.random() * 6.5; // edgeDist ≈ 1.5-8 (sand)
+    const rx = Math.max(-ARENA_HALF + 0.8, Math.min(ARENA_HALF - 0.8, Math.cos(angle) * dist));
+    const rz = Math.max(-ARENA_HALF + 0.8, Math.min(ARENA_HALF - 0.8, Math.sin(angle) * dist * 0.96));
+    const baseY = terrainHeight(rx, rz);
+
+    // Every third item is a flattened shell; the rest are small lumpy rocks.
+    const size = 0.06 + Math.random() * 0.12;
+    const isShell = i % 3 === 0;
+    const geo = isShell
+      ? tintBeachGeometry(new THREE.SphereGeometry(size, 6, 4), sand, 0.16)
+      : tintBeachGeometry(new THREE.BoxGeometry(size * 2.2, size * 0.7, size * 1.6), sand, 0.22);
+
+    group.add(makeMesh(geo, litterMat, `farcrysis-beach-litter-${i}`, [rx, baseY + size * 0.3, rz], {
+      rotation: [Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI],
+      castShadow: false,
+    }));
+  }
+}
+
+/** Driftwood logs washed up on the beach (edgeDist < 8). */
+function addDriftwoodLogs(group: THREE.Group): void {
+  const logMat = mat(0x8a7355, 0.92, 0.04);
+  const logCount = 6;
+
+  for (let i = 0; i < logCount; i += 1) {
+    const angle = (i / logCount) * Math.PI * 2 + (Math.random() - 0.5) * 1.1;
+    const dist = ARENA_HALF - 2 - Math.random() * 5; // edgeDist ≈ 2-7 (sand)
+    const rx = Math.max(-ARENA_HALF + 0.8, Math.min(ARENA_HALF - 0.8, Math.cos(angle) * dist));
+    const rz = Math.max(-ARENA_HALF + 0.8, Math.min(ARENA_HALF - 0.8, Math.sin(angle) * dist * 0.96));
+    const baseY = terrainHeight(rx, rz);
+    const length = 1.2 + Math.random() * 1.6;
+
+    group.add(makeMesh(
+      new THREE.CylinderGeometry(0.09, 0.14, length, 6),
+      logMat,
+      `farcrysis-driftwood-${i}`,
+      [rx, baseY + 0.1, rz],
+      // Rz(π/2) lays the cylinder horizontal; Ry spins it; Rx gives a slight tilt.
+      { rotation: [(Math.random() - 0.5) * 0.25, Math.random() * Math.PI, Math.PI / 2], castShadow: true },
+    ));
+  }
+}
+
+/** Low flat undergrowth bushes inside the jungle interior (edgeDist ≥ 14). */
+function addJungleUndergrowth(group: THREE.Group): void {
+  const undergrowthMat = mat(0x35682f, 0.9, 0.02);
+  const bushCount = 18;
+
+  for (let i = 0; i < bushCount; i += 1) {
+    const angle = (i / bushCount) * Math.PI * 2 + (Math.random() - 0.5) * 1.2;
+    const dist = 7 + Math.random() * 9; // 7-16 → jungle interior
+    const rx = Math.max(-ARENA_HALF + 4, Math.min(ARENA_HALF - 4, Math.cos(angle) * dist));
+    const rz = Math.max(-ARENA_HALF + 4, Math.min(ARENA_HALF - 4, Math.sin(angle) * dist * 0.9));
+    const edgeDist = ARENA_HALF - Math.max(Math.abs(rx), Math.abs(rz));
+    if (edgeDist < 14) continue; // keep strictly inside the jungle interior
+    const baseY = terrainHeight(rx, rz);
+    const sx = 0.7 + Math.random() * 0.8;
+    const sz = 0.7 + Math.random() * 0.8;
+
+    group.add(makeMesh(
+      new THREE.BoxGeometry(1.2, 1.0, 1.2),
+      undergrowthMat,
+      `farcrysis-undergrowth-bush-${i}`,
+      [rx, baseY + 0.21, rz],
+      { rotation: [0, Math.random() * Math.PI, 0], scale: [sx, 0.42, sz], castShadow: true },
+    ));
+  }
+}
+
+/**
+ * Fallen coconuts scattered around the bases of the enhanced palms.
+ * Reads exact palm trunk positions from the InstancedMesh matrices so every
+ * coconut lands near a real trunk.
+ */
+export function addFallenCoconuts(root: THREE.Group, trunkInstances: THREE.InstancedMesh): void {
+  const coconutMat = mat(0x6b4a2b, 0.75, 0.06);
+  const matrix = new THREE.Matrix4();
+  const pos = new THREE.Vector3();
+  const target = 20;
+  let added = 0;
+
+  for (let i = 0; i < trunkInstances.count && added < target; i += 1) {
+    trunkInstances.getMatrixAt(i, matrix);
+    pos.setFromMatrixPosition(matrix);
+    // Drop 1-2 coconuts a short tumble from each trunk base
+    const perPalm = i % 2 === 0 ? 2 : 1;
+    for (let c = 0; c < perPalm && added < target; c += 1) {
+      const offset = 0.35 + Math.random() * 0.55;
+      const ang = Math.random() * Math.PI * 2;
+      const cx = Math.max(-ARENA_HALF + 0.5, Math.min(ARENA_HALF - 0.5, pos.x + Math.cos(ang) * offset));
+      const cz = Math.max(-ARENA_HALF + 0.5, Math.min(ARENA_HALF - 0.5, pos.z + Math.sin(ang) * offset));
+      const baseY = terrainHeight(cx, cz);
+      const size = 0.11 + Math.random() * 0.07;
+
+      root.add(makeMesh(
+        new THREE.SphereGeometry(size, 8, 6),
+        coconutMat,
+        `farcrysis-fallen-coconut-${added}`,
+        [cx, baseY + size * 0.7, cz],
+        { rotation: [Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI], castShadow: false },
+      ));
+      added += 1;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -605,7 +820,8 @@ export function applyFarcrysisArtwork(root: THREE.Group): void {
   addCrateWordmarks(root);
 
   // Instanced foliage — ≥3 types (enhanced palms, bushes, fern clusters)
-  buildEnhancedPalms(root);
+  const palms = buildEnhancedPalms(root);
+  addFallenCoconuts(root, palms.trunkInstances);
   addInstancedBushes(root);
   addInstancedFernClusters(root);
 
