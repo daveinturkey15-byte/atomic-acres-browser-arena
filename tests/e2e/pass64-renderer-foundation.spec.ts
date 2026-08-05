@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 
 test('fails the default playable WebGPU route closed on the CI adapter without mounting gameplay', async ({ page }) => {
   const pageError = page.waitForEvent('pageerror', { timeout: 45_000 });
-  await page.goto('/?render=blender');
+  await page.goto('/channels/the-big-one/?release=latest&renderer=webgpu&render=blender');
   const error = await pageError;
   expect(error.message).toMatch(/WebGPU|TSL/);
   const state = await page.evaluate(() => ({
@@ -18,7 +18,7 @@ test('fails the default playable WebGPU route closed on the CI adapter without m
 
 test('reports the active WebGL adapter and offscreen HDR samples separately', async ({ page }) => {
   test.setTimeout(120_000);
-  await page.goto('/?renderer=webgl2&render=blender&signal=on&grass=off&mist=off&clouds=off&rays=off&seed=6401&map=skyline-terminal');
+  await page.goto('/channels/the-big-one/?release=latest&renderer=webgl2&render=blender&signal=on&grass=off&mist=off&clouds=off&rays=off&seed=6401&map=skyline-terminal');
   await page.waitForFunction(() => {
     const state = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => any } }).__ATOMIC_ACRES_DEBUG__?.snapshot();
     return state?.weaponReady === true && state?.render?.atomicSignal?.samples > 0;
@@ -43,7 +43,7 @@ test('reports the active WebGL adapter and offscreen HDR samples separately', as
 
 test('renders Terminal cabin ceiling with only shadowed contrast keys and an open boarding route', async ({ page }) => {
   test.setTimeout(120_000);
-  await page.goto('/?renderer=webgl2&render=blender&signal=on&grass=off&mist=off&clouds=off&rays=off&seed=6401&map=skyline-terminal');
+  await page.goto('/channels/the-big-one/?release=latest&renderer=webgl2&render=blender&signal=on&grass=off&mist=off&clouds=off&rays=off&seed=6401&map=skyline-terminal');
   await page.waitForFunction(() => {
     const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => any } }).__ATOMIC_ACRES_DEBUG__;
     return api?.snapshot().weaponReady === true;
