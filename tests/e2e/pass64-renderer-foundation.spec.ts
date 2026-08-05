@@ -19,6 +19,22 @@ test('fails the default playable WebGPU route closed on the CI adapter without m
 test('reports the active WebGL adapter and offscreen HDR samples separately', async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto('/channels/the-big-one/?release=latest&renderer=webgl2&render=blender&signal=on&grass=off&mist=off&clouds=off&rays=off&seed=6401&map=skyline-terminal');
+  // Atomic Signal is a gameplay presentation pass. The deployment menu keeps
+  // presentation scheduling paused, so enter the same deterministic solo
+  // match used by the cabin contract before sampling the pass.
+  await page.waitForFunction(() => {
+    const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => any } }).__ATOMIC_ACRES_DEBUG__;
+    return api?.snapshot().weaponReady === true;
+  }, undefined, { timeout: 75_000 });
+  await page.evaluate(() => {
+    const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: any }).__ATOMIC_ACRES_DEBUG__;
+    api.startSolo();
+    api.setBotsFrozen(true);
+    api.setCaptureViewmodelHidden(true);
+  });
+  await page.waitForFunction(() => (
+    window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => any } }
+  ).__ATOMIC_ACRES_DEBUG__.snapshot().gameStarted === true, undefined, { timeout: 60_000 });
   await page.waitForFunction(() => {
     const state = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => any } }).__ATOMIC_ACRES_DEBUG__?.snapshot();
     return state?.render?.atomicSignal?.samples > 0;
