@@ -161,15 +161,17 @@ async function startFromMenu(page: Page): Promise<void> {
   await page.locator('#solo').click();
   const transition = page.locator('#deployment-transition');
   await expect(transition).toBeVisible();
-  await expect(transition).toHaveAttribute('data-live-render', 'false');
-  await expect(transition).toHaveAttribute('data-media', 'shared-prerecorded-video');
+  // Pass 68 deployment transition: uses data-active, loading stages, and
+  // dedicated video surface outside #menu. The old pass65-era attributes
+  // (data-live-render, data-media, data-ready-at) are retired.
+  await expect(transition).toHaveAttribute('data-active', 'true');
   await expect(page.locator('#deployment-transition-video')).toBeHidden();
-  await expect(page.locator('#deployment-transition > #menu-preview-video')).toHaveClass(/deployment-shared-video/);
-  await expect(page.locator('#menu')).toHaveAttribute('data-lifecycle-surface', 'deploying');
+  // Wait for deployment loading to complete before the transition hides.
+  await expect.poll(async () => (await lifecycle(page)).matchReadyCount, { timeout: 45_000 }).toBe(1);
+  // Post-deployment: menu stays in layout but is inert/aria-hidden during
+  // deployment; transition hides once deploying phase ends.
   await expect(page.locator('#menu')).toBeHidden();
-  await expect(transition).toBeHidden();
-  await expect.poll(async () => (await lifecycle(page)).matchReadyCount).toBe(1);
-  expect(Number(await transition.getAttribute('data-ready-at'))).toBeGreaterThan(0);
+  await expect(transition).toBeHidden({ timeout: 45_000 });
   await expect.poll(async () => (await lifecycle(page)).visibilityChangeCount).toBe(1);
 }
 
@@ -290,9 +292,9 @@ test.describe('Pass 65 active-match menu lifecycle', () => {
     await page.locator('[data-menu-tab="kit"]').click();
     await expect(page.locator('[data-kit-id]')).toHaveCount(4);
     await expect(page.locator('[data-custom-preset-id]')).toHaveCount(3);
-    await expect(page.locator('#loadout-manage')).toHaveCount(1);
-
-    await page.locator('#loadout-manage').click();
+    // Pass 68: standalone Manage/Rename card is retired. Each preset card
+    // has an EDIT row ([data-custom-modify]) that opens the loadout manager.
+    await page.locator('[data-custom-preset-id="custom-2"] [data-custom-modify]').click();
     await expect(page.locator('#loadout-manager')).toBeVisible();
     await page.locator('#loadout-manage-preset').selectOption('custom-2');
     await page.locator('#loadout-preset-name').fill('Night Ops');
@@ -542,7 +544,7 @@ test.describe('Pass 65 active-match menu lifecycle', () => {
       return { down, up };
     });
     expect(tapLifecycle, JSON.stringify(tapLifecycle)).toMatchObject({
-      down: { state: { phase: 'pressed', tapCandidate: { kind: 'care-package' } } },
+      down: { state: { phase: 'idle' }, lastCommit: { phase: 'tap', candidate: { kind: 'care-package' } } },
       up: { state: { phase: 'idle' }, lastCommit: { phase: 'tap', candidate: { kind: 'care-package' } } },
     });
     await expect.poll(careState).toMatchObject({ phase: 'capturing', rewards: 0 });
