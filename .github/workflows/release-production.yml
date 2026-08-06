@@ -72,6 +72,11 @@ jobs:
         run: |
           test -n "${RELEASE_BUILT_AT:-}"
           git fetch --no-tags origin gh-pages:refs/remotes/origin/gh-pages
+          # The Pass 62 best-ever-netcode benchmark pins a gh-pages commit that may be
+          # orphaned from the current gh-pages tip after subsequent production deploys.
+          # Fetch it explicitly so verify:benchmark --verify-git can resolve the rollback subtree.
+          BENCH_PAGES_SHA=$(node -e "console.log(JSON.parse(require('fs').readFileSync('baselines/pass62/best-netcode-benchmark.json','utf8')).pagesSha)")
+          git cat-file -e "${BENCH_PAGES_SHA}^{commit}" 2>/dev/null || git fetch --no-tags origin "$BENCH_PAGES_SHA"
           npm run verify:benchmark -- --verify-git
           npm run stage:release-topology
           npm run verify:release-topology
