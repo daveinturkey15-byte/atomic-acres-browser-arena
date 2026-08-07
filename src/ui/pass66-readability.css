@@ -261,7 +261,7 @@
 
 .weapon-menu-presentation {
   display: grid;
-  grid-template-columns: minmax(150px, 0.78fr) minmax(210px, 1.22fr);
+  grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
   gap: 14px;
   margin-top: 18px;
   padding: 14px;
