@@ -91,10 +91,10 @@ export function computePreviewTree(files) {
 export function parsePreviewManifest(manifest) {
   invariant(isObject(manifest), 'acceptance manifest must be an object');
   invariant(manifest.schemaVersion === 1, 'acceptance manifest schemaVersion must be 1');
-  invariant(manifest.releasePass === 'PASS 69', 'preview provenance verifier only accepts PASS 69');
+  invariant(/^PASS [1-9][0-9]*$/.test(manifest.releasePass ?? ''), 'preview provenance manifest releasePass must look like PASS <number>');
   invariant(manifest.status === 'accepted', 'acceptance manifest status must be accepted');
   invariant(isObject(manifest.preview), 'acceptance manifest preview must be an object');
-  invariant(manifest.preview.kind === 'github-actions-artifact', 'PASS 69 preview must be a GitHub Actions artifact');
+  invariant(manifest.preview.kind === 'github-actions-artifact', 'preview must be a GitHub Actions artifact');
   const match = PREVIEW_REF.exec(manifest.preview.ref ?? '');
   invariant(match, 'preview.ref must be exactly pr-preview-<positive-pr>-<40-lowercase-sha>');
   const pullRequest = Number(match[1]);
