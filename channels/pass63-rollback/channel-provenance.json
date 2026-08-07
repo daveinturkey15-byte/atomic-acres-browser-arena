@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 4,
+  "channel": "rollback",
+  "releasePass": "PASS 63",
+  "sourceSha": "ac85e9b8b46cc2370aee903d564ecf3c4682b24c",
+  "path": "channels/pass63-rollback",
+  "exactRootFileCount": 119,
+  "treeSha256": "ad08fa895b7ca146678b2cee599e703e8a0094b1a81c36b6860b0c002affd7f8",
+  "rebuiltFromSource": true,
+  "passEvidenceFiles": [
+    "assets/preload-helper-89feXvFF.js"
+  ]
+}

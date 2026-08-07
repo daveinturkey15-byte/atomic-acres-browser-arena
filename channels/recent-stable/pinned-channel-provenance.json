@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 4,
+  "channel": "recent-stable",
+  "releasePass": "PASS 67.1",
+  "pagesSha": "271cea28299570af8def30e879701ddbd3c4bc12",
+  "pagesPath": "channels/recent-stable",
+  "sourceSha": "8c3ad1cd4d819aba79f07c01c16c8c4294fd14c1",
+  "sourceSubject": "deploy(stable): pin PASS 67.1 singleplayer from 8c3ad1cd4d819aba79f07c01c16c8c4294fd14c1",
+  "path": "channels/recent-stable",
+  "exactRootFileCount": 509,
+  "passEvidenceFiles": [
+    "assets/legacy-main-C1ceiQ3O.js",
+    "assets/release-identity-CywxsJ6f.js"
+  ],
+  "treeSha256": "10e408e5663dda8fef820aae89bbcda174699bd2661b9d94387d060fdb55914a",
+  "pinnedRuntime": {
+    "schemaVersion": 4,
+    "channel": "recent-stable",
+    "releasePass": "PASS 67.1",
+    "sourceSha": "8c3ad1cd4d819aba79f07c01c16c8c4294fd14c1",
+    "path": "channels/recent-stable",
+    "exactRootFileCount": 508,
+    "treeSha256": "d8d444578e83a408c2e4d63ca4d1c2c5b705521f565fee6a58daffeb1e205ce9"
+  }
+}

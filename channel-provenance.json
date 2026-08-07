@@ -1,9 +1,0 @@
-{
-  "schemaVersion": 4,
-  "channel": "recent-stable",
-  "releasePass": "PASS 67.1",
-  "sourceSha": "8c3ad1cd4d819aba79f07c01c16c8c4294fd14c1",
-  "path": "channels/recent-stable",
-  "exactRootFileCount": 508,
-  "treeSha256": "d8d444578e83a408c2e4d63ca4d1c2c5b705521f565fee6a58daffeb1e205ce9"
-}
