@@ -23,11 +23,29 @@ test.describe('Pass 66 Field Kit and killstreak menu correction', () => {
     expect(await presentations.evaluateAll((roots) => roots.every((root) => (
       root.querySelectorAll('[data-weapon-metric]').length === 9
     )))).toBe(true);
+    expect(await presentations.evaluateAll((roots) => roots.every((root) => {
+      const deck = root.querySelector<HTMLElement>('.weapon-menu-stat-deck');
+      const card = root.closest<HTMLElement>('.kit-card');
+      if (!deck || !card) return false;
+      const presentationStyle = getComputedStyle(root);
+      const deckStyle = getComputedStyle(deck);
+      const presentationBounds = root.getBoundingClientRect();
+      const deckBounds = deck.getBoundingClientRect();
+      const cardBounds = card.getBoundingClientRect();
+      return presentationStyle.display === 'grid'
+        && deckStyle.display === 'grid'
+        && deckBounds.height > 0
+        && presentationBounds.left >= cardBounds.left
+        && presentationBounds.right <= cardBounds.right + 1
+        && deckBounds.left >= presentationBounds.left
+        && deckBounds.right <= presentationBounds.right + 1
+        && root.scrollWidth <= root.clientWidth + 1;
+    }))).toBe(true);
     await expect.poll(async () => page.locator('#menu-panel-kit [data-weapon-still]').evaluateAll((images) => (
       images.every((image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0)
     ))).toBe(true);
 
-    await page.locator('#loadout-manage').click();
+    await page.locator('[data-custom-modify="custom-1"]').click();
     await page.locator('#loadout-manage-preset').selectOption('custom-1');
     await page.locator('#loadout-primary').selectOption('ak-47');
     await page.locator('#loadout-save').click();

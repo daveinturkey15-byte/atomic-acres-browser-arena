@@ -86,13 +86,24 @@ const SUPPORT_VEHICLE_REQUIRED_NODES: Readonly<Record<SupportVehicleAssetFamily,
     'chopper-fuselage', 'chopper-rear-fuselage', 'chopper-tail-boom', 'chopper-tail-fin',
     'chopper-sleek-cockpit-canopy', 'chopper-first-person-cockpit',
     'chopper-gunner-sightline', 'chopper-gunner-weapon-view',
-    'chopper-cockpit-dashboard-3d', 'chopper-cockpit-hud-glass', 'chopper-cockpit-hud-target-ring',
+    'chopper-cockpit-dashboard-3d', 'chopper-cockpit-display-cyan', 'chopper-cockpit-display-green',
+    'chopper-cockpit-hud-glass', 'chopper-cockpit-hud-target-ring',
     'chopper-first-person-camera-socket', 'chopper-main-rotor', 'chopper-tail-rotor',
-    'chopper-player-gun', 'chopper-gun-muzzle-socket',
+    'chopper-player-gun', 'chopper-gun-muzzle-socket', 'chopper-forward-socket',
+    'chopper-muzzle-flash', 'chopper-tracer-action', 'chopper-impact-action',
   ]),
   care: Object.freeze(['care-aircraft-fuselage', 'care-aircraft-main-wing', 'care-aircraft-cargo-socket', 'care-aircraft-forward-socket']),
   carpet: Object.freeze(['carpet-aircraft-fuselage', 'carpet-aircraft-main-wing', 'carpet-aircraft-bomb-socket', 'carpet-aircraft-forward-socket']),
   crate: Object.freeze(['care-package-crate', 'care-package-parachute', 'care-parachute-lines', 'care-crate-landing-socket']),
+});
+const SUPPORT_VEHICLE_REQUIRED_ACTIONS: Readonly<Record<SupportVehicleAssetFamily, readonly string[]>> = Object.freeze({
+  chopper: Object.freeze([
+    'Chopper_Main_Rotor_Loop', 'Chopper_Tail_Rotor_Loop', 'Chopper_Gun_Recoil', 'Chopper_Gun_Fire',
+    'Chopper_Muzzle_Flash', 'Chopper_Tracer_Pulse', 'Chopper_Impact_Pulse', 'Chopper_Quiet_Loop',
+  ]),
+  care: Object.freeze([]),
+  carpet: Object.freeze([]),
+  crate: Object.freeze([]),
 });
 const SUPPORT_VEHICLE_LOOP_ACTIONS: Readonly<Record<SupportVehicleAssetFamily, readonly string[]>> = Object.freeze({
   chopper: Object.freeze(['Chopper_Main_Rotor_Loop', 'Chopper_Tail_Rotor_Loop', 'Chopper_Quiet_Loop']),
@@ -556,6 +567,12 @@ export function loadSupportVehiclePresentations(): Promise<void> {
       }
       const missing = SUPPORT_VEHICLE_REQUIRED_NODES[family].filter((name) => lods[0]?.scene.getObjectByName(name) === undefined);
       if (missing.length > 0) throw new Error(`${family}: authored LOD0 missing ${missing.join(', ')}`);
+      for (const [lodIndex, lod] of lods.entries()) {
+        const missingActions = SUPPORT_VEHICLE_REQUIRED_ACTIONS[family].filter((name) => (
+          lod.animations.some((clip) => clip.name === name) !== true
+        ));
+        if (missingActions.length > 0) throw new Error(`${family} LOD${lodIndex}: authored actions missing ${missingActions.join(', ')}`);
+      }
       if (new Set(lods.map((lod) => lod.asset)).size !== SUPPORT_VEHICLE_ASSETS[family].length) {
         throw new Error(`${family}: runtime asset set is not exact`);
       }
@@ -1122,6 +1139,10 @@ function buildProceduralChopperFallback(): PresentedEntity {
   gun.rotation.x = Math.PI / 2;
   gun.position.set(0, -0.58, -0.72);
   const gunMuzzle = presentationSocket('chopper-gun-muzzle-socket', [0, -0.58, -1.24]);
+  const forwardSocket = presentationSocket('chopper-forward-socket', [0, 0, -1.9]);
+  const muzzleFlashAction = presentationSocket('chopper-muzzle-flash', [0, -0.58, -1.24]);
+  const tracerAction = presentationSocket('chopper-tracer-action', [0, -0.58, -1.24]);
+  const impactAction = presentationSocket('chopper-impact-action', [0, -0.58, -1.24]);
   const cameraSocket = presentationSocket('chopper-first-person-camera-socket', [0, 0.18, -1.22]);
   const cockpit = new THREE.Group();
   cockpit.name = 'chopper-first-person-cockpit';
@@ -1206,7 +1227,8 @@ function buildProceduralChopperFallback(): PresentedEntity {
   root.add(
     fuselage, rearFuselage, canopy, glareshield, belly, noseArmour, tail, fin, stabilizer,
     ...stubWings, ...enginePods, ...rocketPods,
-    gun, gunMuzzle, cameraSocket, cockpit, rotor, tailRotor, ...skids,
+    gun, gunMuzzle, forwardSocket, muzzleFlashAction, tracerAction, impactAction,
+    cameraSocket, cockpit, rotor, tailRotor, ...skids,
   );
   root.userData.forwardAxis = [0, 0, -1];
   root.userData.audioSemanticIds = ['chopper-low-loop', 'chopper-gun-report'];

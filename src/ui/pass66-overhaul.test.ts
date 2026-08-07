@@ -32,6 +32,10 @@ describe('Pass 66 tactical UI overhaul', () => {
     expect(markup).toContain('data-weapon-metric="cyclic-dps"');
     expect(markup).toContain('data-loadout-stat="damage"');
     expect(markup).toContain('data-loadout-grenade-detail');
+    // The shell no longer emits the retired kit-stat-strip. The final cascade
+    // must therefore leave the canonical asset + metric deck visible.
+    expect(css).not.toContain('.kit-card .weapon-menu-stat-deck { display: none; }');
+    expect(css).not.toContain('.kit-card .weapon-menu-presentation { display: block; }');
     expect(css).toContain('.custom-kit-grid .kit-card:not(.manage-kit-card)');
     expect(css).toContain('background: linear-gradient(150deg, #16302f, #0d1e20)');
     expect(css).toContain('.custom-kit-grid .kit-card:not(.manage-kit-card) .kit-stat-strip small { color: #e8f4f2; }');

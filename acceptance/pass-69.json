@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "releasePass": "PASS 69",
+  "feedbackReceivedAt": "2026-08-07T19:01:49.302Z",
+  "status": "accepted",
+  "preview": {
+    "kind": "github-actions-artifact",
+    "ref": "pr-preview-49-9885908752a2c26c5dc7233d242bbbaf7a1aa5ef",
+    "sourceSha": "9885908752a2c26c5dc7233d242bbbaf7a1aa5ef",
+    "createdAt": "2026-08-07T19:01:49.302Z"
+  },
+  "humanAcceptance": {
+    "state": "approved",
+    "approvedBy": "Dave",
+    "approvedAt": "2026-08-07T19:39:02.000Z",
+    "evidence": "Dave instructed: get Pass 69 sorted and live so he can play with friends. Approval is bound to the immutable PR #49 preview artifact at source SHA 9885908752a2c26c5dc7233d242bbbaf7a1aa5ef. Farcrysis remains excluded and deferred to Pass 78; killstreak videos remain out of scope. The known stale prerecorded Chopper menu-preview provenance is explicitly deferred and is not represented as new video evidence."
+  },
+  "requirements": [
+    {
+      "id": "R1",
+      "summary": "Field Kit metric decks remain visible and readable",
+      "expected": "Asset-backed Field Kit weapon cards display independently labelled real catalog metrics inside their card bounds without clipping or hidden stat decks.",
+      "falsifier": "A served Field Kit card hides its metric deck, clips it outside the card, or loses the asset-backed weapon still and metric labels.",
+      "acceptance": "visual",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/pass66-field-kit-killstreak-menu.spec.ts",
+          "command": "npx playwright test tests/e2e/pass66-field-kit-killstreak-menu.spec.ts --grep asset-backed --project chromium --workers=1",
+          "note": "The exact candidate's Chromium browser contract passed and checks visible metric decks, asset-backed cards, computed layout, and card-contained bounds."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifact://pass69/field-kit-preview-49-9885908752a2c26c5dc7233d242bbbaf7a1aa5ef",
+          "note": "The immutable PR #49 preview artifact is the review target for the Field Kit presentation."
+        }
+      ]
+    },
+    {
+      "id": "R2",
+      "summary": "First-person arms use the corrected mirrored parent-space solve",
+      "expected": "The two-chain authored first-person arms solve their wrist and palm targets in parent space while preserving ADS, prone, reload, recoil, knife, and near-plane contracts.",
+      "falsifier": "Arm reach/contact errors, mirrored drift, ADS framing regression, prone clipping, or knife/socket misalignment appears in the affected contracts or served browser groups.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/weapon-presentation-anatomy.test.ts",
+          "command": "npx vitest run src/weapon-presentation-anatomy.test.ts src/viewmodel-framing.test.ts src/character-presentation-contract.test.ts src/pass65-weapon-runtime-behavior.test.ts",
+          "note": "Focused anatomy, viewmodel, character presentation, and runtime contracts pass on the exact candidate."
+        },
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/pass66-viewmodel-framing.spec.ts",
+          "command": "npm run test:e2e:bounded",
+          "note": "The exact candidate's required Linux and Windows bounded browser groups passed; clean headed owner-HITL framing remains a residual unknown."
+        }
+      ]
+    },
+    {
+      "id": "R3",
+      "summary": "Chopper Gunner runtime presentation matches authored semantic contracts",
+      "expected": "The loader validates the authored Chopper Gunner nodes and eight actions across LODs, and the procedural fallback exposes matching semantic sockets without changing gameplay authority.",
+      "falsifier": "A required authored node/action is missing, LOD parity breaks, forward alignment is absent, or the fallback omits a required presentation socket.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/killstreak-presentation.test.ts",
+          "command": "npx vitest run src/killstreak-presentation.test.ts src/support-vehicle-presentation-contract.test.ts src/chopper-gunner-fire-ray.test.ts",
+          "note": "Focused Chopper Gunner authored node/action, LOD, fallback, alignment, and fire-ray contracts pass."
+        },
+        {
+          "kind": "contract",
+          "ref": "source-assets/blender/pass65-chopper-gunner.provenance.json",
+          "command": "node scripts/qa/pass65-support-vehicle-glb.mjs",
+          "note": "Direct authored GLB structural validation passes for the shipped Chopper Gunner LODs."
+        }
+      ]
+    },
+    {
+      "id": "R4",
+      "summary": "Farcrysis remains absent and deferred to Pass 78",
+      "expected": "No Farcrysis runtime source, public asset, map registry entry, chooser card, route, or release-topology channel is present in this candidate.",
+      "falsifier": "Farcrysis appears in the candidate source, release topology, chooser, build output, or public artifact.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "contract",
+          "ref": "release-channels.json",
+          "command": "git grep -in farcrysis HEAD -- ':!docs/**' ':!*.md'",
+          "note": "The exact candidate has no Farcrysis runtime/public reference; the only historical mention is in the Pass 68 acceptance narrative."
+        }
+      ]
+    },
+    {
+      "id": "R5",
+      "summary": "Killstreak videos remain out of scope",
+      "expected": "This candidate does not change killstreak demo video capture, published video media, or video provenance.",
+      "falsifier": "The candidate diff modifies video/media/capture files or claims new video evidence.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "contract",
+          "ref": "src/release-topology.test.ts",
+          "command": "git diff --name-only 2df960ed062c42588ba3a80bec56b2240a9ce5fd 9885908752a2c26c5dc7233d242bbbaf7a1aa5ef",
+          "note": "The exact candidate diff contains no video/media/capture paths."
+        }
+      ]
+    }
+  ]
+}
