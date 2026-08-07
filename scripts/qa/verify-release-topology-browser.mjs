@@ -255,7 +255,7 @@ try {
   }
 
   await verifyChoice('experimental', 'channels/the-big-one', 'PASS 68', 'pass68');
-  await verifyChoice('stable', 'channels/recent-stable', 'PASS 67.1', 'pass671');
+  await verifyChoice('stable', 'channels/recent-stable', 'PASS 67.1', 'pass66');
   await verifyChoice('rollback', 'channels/pass63-rollback', 'PASS 63', 'pass63');
   if (releasePass && !normalizedPass(routes.experimental.eyebrow).includes(normalizedPass(releasePass))) {
     throw new Error(`Experimental runtime ${routes.experimental.eyebrow} does not match ${releasePass}`);
