@@ -23,11 +23,20 @@ test.describe('Pass 66 Field Kit and killstreak menu correction', () => {
     expect(await presentations.evaluateAll((roots) => roots.every((root) => (
       root.querySelectorAll('[data-weapon-metric]').length === 9
     )))).toBe(true);
+    expect(await presentations.evaluateAll((roots) => roots.every((root) => {
+      const deck = root.querySelector<HTMLElement>('.weapon-menu-stat-deck');
+      if (!deck) return false;
+      const presentationStyle = getComputedStyle(root);
+      const deckStyle = getComputedStyle(deck);
+      return presentationStyle.display === 'grid'
+        && deckStyle.display === 'grid'
+        && deck.getBoundingClientRect().height > 0;
+    }))).toBe(true);
     await expect.poll(async () => page.locator('#menu-panel-kit [data-weapon-still]').evaluateAll((images) => (
       images.every((image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0)
     ))).toBe(true);
 
-    await page.locator('#loadout-manage').click();
+    await page.locator('[data-custom-modify="custom-1"]').click();
     await page.locator('#loadout-manage-preset').selectOption('custom-1');
     await page.locator('#loadout-primary').selectOption('ak-47');
     await page.locator('#loadout-save').click();

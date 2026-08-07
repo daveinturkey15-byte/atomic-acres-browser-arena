@@ -383,13 +383,6 @@
     background: linear-gradient(150deg, #234549, #163034);
   }
 
-  /* Owner feedback: the kit cards now use the real stat strip (kit-stat-strip-real)
-     with IDEAL BODY DPS. Hide the older detailed metric deck but retain the
-     weapon still image. */
-  .kit-card .weapon-menu-stat-deck { display: none; }
-  .kit-card .weapon-menu-presentation { display: block; }
-  .kit-card .weapon-menu-still img { width: 100%; height: auto; border-radius: 4px; }
-
   /* Custom presets are persistent loadouts, not generic white cards. Keep their
      complete hierarchy readable before hover/focus so the saved gun, grenade
      and canonical stat projection can be scanned at a glance. */
