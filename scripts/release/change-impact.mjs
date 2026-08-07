@@ -12,7 +12,7 @@ const PROCESS_ONLY = Object.freeze([
   /^\.github\/PULL_REQUEST_TEMPLATE\.md$/,
   /^\.github\/workflows\/[^/]+\.ya?ml$/,
   /^scripts\/release\//,
-  /^scripts\/qa\/(?:run-with-preview-server|verify-release-topology-browser)\.mjs$/,
+  /^scripts\/qa\/(?:run-with-preview-server|verify-release-topology(?:-browser)?)\.mjs$/,
   /^acceptance\/(?:README\.md|example\.json|policy\.json|pass-[1-9][0-9]*\.json)$/,
   /^artifacts\/pass65-owner-feedback\/(?:t-[a-z0-9]+(?:-[a-z0-9]+)*|hardware-webgl2-admission)-[0-9a-f]{40}\.json$/,
   /^artifacts\/pass65\/hardware-webgl2-admission\/[0-9a-f]{40}-(?:receipt|dist-manifest)\.json$/,

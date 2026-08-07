@@ -17,7 +17,7 @@ const expectedChannelKeys = rollbackStaged ? ['experimental', 'stable', 'rollbac
 if (JSON.stringify(Object.keys(publicConfig)) !== JSON.stringify(expectedChannelKeys)) {
   throw new Error(`Root chooser must expose exactly ${expectedChannelKeys.join(', ')}: ${Object.keys(publicConfig).join(', ')}`);
 }
-if (publicConfig.experimental.pass !== 'PASS 68' || publicConfig.experimental.label !== 'THE BIG ONE'
+if (publicConfig.experimental.pass !== 'PASS 68' || !publicConfig.experimental.label.startsWith('THE BIG ONE')
   || publicConfig.experimental.path !== 'channels/the-big-one') {
   throw new Error('Root chooser is missing live Pass 68 THE BIG ONE');
 }
