@@ -9,8 +9,8 @@ import { validateAcceptanceManifest } from './acceptance-gate.mjs';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const REPOSITORY_ROOT = resolve(dirname(SCRIPT_PATH), '..', '..');
-const DEFAULT_MANIFEST_PATH = 'acceptance/pass-66.json';
-const DEFAULT_OUTPUT_PATH = 'artifacts/pipeline/pass66-preview-provenance.json';
+const DEFAULT_MANIFEST_PATH = 'acceptance/pass-69.json';
+const DEFAULT_OUTPUT_PATH = 'artifacts/pipeline/pass69-preview-provenance.json';
 const DEFAULT_API_BASE = 'https://api.github.com';
 const DEFAULT_MAX_ARCHIVE_BYTES = 1024 * 1024 * 1024;
 const DEFAULT_MAX_UNCOMPRESSED_BYTES = 2 * 1024 * 1024 * 1024;
@@ -91,10 +91,10 @@ export function computePreviewTree(files) {
 export function parsePreviewManifest(manifest) {
   invariant(isObject(manifest), 'acceptance manifest must be an object');
   invariant(manifest.schemaVersion === 1, 'acceptance manifest schemaVersion must be 1');
-  invariant(manifest.releasePass === 'PASS 66', 'preview provenance verifier only accepts PASS 66');
+  invariant(manifest.releasePass === 'PASS 69', 'preview provenance verifier only accepts PASS 69');
   invariant(manifest.status === 'accepted', 'acceptance manifest status must be accepted');
   invariant(isObject(manifest.preview), 'acceptance manifest preview must be an object');
-  invariant(manifest.preview.kind === 'github-actions-artifact', 'PASS 66 preview must be a GitHub Actions artifact');
+  invariant(manifest.preview.kind === 'github-actions-artifact', 'PASS 69 preview must be a GitHub Actions artifact');
   const match = PREVIEW_REF.exec(manifest.preview.ref ?? '');
   invariant(match, 'preview.ref must be exactly pr-preview-<positive-pr>-<40-lowercase-sha>');
   const pullRequest = Number(match[1]);

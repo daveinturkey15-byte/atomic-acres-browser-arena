@@ -99,16 +99,16 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - name: Build exact frozen-evidence candidate bytes
-        if: hashFiles('acceptance/pass-66.json') != ''
+        if: hashFiles('acceptance/pass-69.json') != ''
         run: npm run build
-      - name: Verify exact Pass 66 evidence catalog and frozen runtime
-        if: hashFiles('acceptance/pass-66.json') != ''
-        run: npm run qa:pass65:owner-feedback:candidate
-      - name: Verify immutable Pass 66 preview provenance and bytes
-        if: hashFiles('acceptance/pass-66.json') != ''
+      - name: Verify exact Pass 69 evidence catalog and frozen runtime
+        if: hashFiles('acceptance/pass-69.json') != ''
+        run: node scripts/release/acceptance-gate.mjs --phase ci --impact "${{ needs.classify-change.outputs.mode }}" --base "${{ github.event.pull_request.base.sha || github.event.before }}" --head "${{ github.event.pull_request.head.sha || github.sha }}"
+      - name: Verify immutable Pass 69 preview provenance and bytes
+        if: hashFiles('acceptance/pass-69.json') != ''
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/release/verify-pr-preview-provenance.mjs --manifest acceptance/pass-66.json --output artifacts/pipeline/pr-preview-provenance.json
+        run: node scripts/release/verify-pr-preview-provenance.mjs --manifest acceptance/pass-69.json --output artifacts/pipeline/pr-preview-provenance.json
       - name: Verify complete requirement-to-evidence coverage and exact preview approval
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
