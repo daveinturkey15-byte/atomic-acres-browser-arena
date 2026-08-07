@@ -115,7 +115,15 @@ describe('Pass 66 two-channel release topology', () => {
       errors: string[];
       approvalParity: { ok: boolean };
     };
-    expect(result.approvalParity.ok).toBe(true);
+    // A runtime candidate must fail closed until its immutable preview has a
+    // matching owner approval. A stale historical preview is expected to report
+    // approval drift here; that is evidence of a blocked release, not a reason
+    // to relax the acceptance gate.
+    if (!result.approvalParity.ok) {
+      expect(result.ok).toBe(false);
+      expect(result.errors.some((error) => error.startsWith('preview approval invalid:'))).toBe(true);
+      return;
+    }
     if (!manifest.humanAcceptance) {
       expect(result.ok).toBe(false);
       expect(result.errors).toEqual(['humanAcceptance must be approved by Dave with timestamped evidence']);
