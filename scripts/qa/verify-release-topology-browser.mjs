@@ -232,7 +232,7 @@ async function verifyLegacyRoute(name, configure) {
     const url = new URL(rootUrl);
     configure(url.searchParams);
     await page.goto(url.toString(), { waitUntil: 'domcontentloaded' });
-    const runtime = await verifyRuntime(page, 'channels/the-big-one', 'PASS 66');
+    const runtime = await verifyRuntime(page, 'channels/the-big-one', 'PASS 68');
     routes[name] = { url: page.url(), eyebrow: runtime.runtimeIdentity };
   } finally {
     await observed.close();
