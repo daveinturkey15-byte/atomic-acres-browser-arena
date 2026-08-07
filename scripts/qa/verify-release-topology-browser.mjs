@@ -145,10 +145,11 @@ async function openChooser(page) {
   await page.waitForSelector('#release-channel-options [data-release-choice="experimental"]');
   const buttons = page.locator('#release-channel-options button');
   const labels = await buttons.allTextContents();
-  if (await buttons.count() !== 2
-    || !labels.some((text) => text.includes('PASS 66') && text.includes('LIVE') && text.includes('THE BIG ONE'))
-    || !labels.some((text) => text.includes('PASS 63') && text.includes('STABLE') && text.includes('NEW NETCODE'))
-    || labels.some((text) => text.includes('PASS 65') || text.includes('PASS 64') || text.includes('PASS 59'))) {
+  if (await buttons.count() !== 3
+    || !labels.some((text) => text.includes('PASS 68') && text.includes('LIVE') && text.includes('THE BIG ONE'))
+    || !labels.some((text) => text.includes('PASS 67.1') && text.includes('STABLE') && text.includes('SINGLEPLAYER'))
+    || !labels.some((text) => text.includes('PASS 63') && text.includes('ROLLBACK'))
+    || labels.some((text) => text.includes('PASS 66') || text.includes('PASS 65') || text.includes('PASS 64') || text.includes('PASS 59'))) {
     throw new Error(`Unexpected chooser labels: ${JSON.stringify(labels)}`);
   }
   if (await page.locator('[data-release-choice="normal"]').count()) throw new Error('Removed normal channel is still selectable');
