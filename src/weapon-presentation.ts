@@ -628,13 +628,8 @@ export class WeaponPresentation {
       perpendicular: new THREE.Vector3(),
       projection: new THREE.Vector3(),
     } satisfies TwoBoneElbowScratch,
-    orientOrigin: new THREE.Vector3(),
     orientCurrentDirection: new THREE.Vector3(),
     orientDesiredDirection: new THREE.Vector3(),
-    orientCurrentWorld: new THREE.Quaternion(),
-    orientDesiredWorld: new THREE.Quaternion(),
-    orientParentWorld: new THREE.Quaternion(),
-    orientFallbackAxis: new THREE.Vector3(),
     orientDelta: new THREE.Quaternion(),
   };
   private readonly meleeKnife = new THREE.Group();
@@ -2425,31 +2420,25 @@ export class WeaponPresentation {
 
   private orientRiggedBone(bone: THREE.Bone, child: THREE.Bone, targetWorld: THREE.Vector3): void {
     const scratch = this.riggedArmSolveScratch;
-    bone.updateWorldMatrix(true, true);
-    const origin = bone.getWorldPosition(scratch.orientOrigin);
-    const currentDirection = child.getWorldPosition(scratch.orientCurrentDirection).sub(origin).normalize();
-    const desiredDirection = scratch.orientDesiredDirection.copy(targetWorld).sub(origin).normalize();
-    if (currentDirection.lengthSq() < 1e-6 || desiredDirection.lengthSq() < 1e-6) return;
-    const currentWorld = bone.getWorldQuaternion(scratch.orientCurrentWorld);
-    // Shortest-arc rotation degenerates when the current and desired bone
-    // directions are anti-parallel: the axis is undefined and the solver
-    // spins the hand around an arbitrary vector, which reads as a
-    // contorted/inverted wrist at reload and close-reach poses. Rotate 180°
-    // about the bone's own current X axis instead — a deterministic upright
-    // flip that keeps the hand on the correct side of the weapon.
-    const dot = currentDirection.dot(desiredDirection);
-    const desiredWorld = dot > -0.9999
-      ? scratch.orientDelta.setFromUnitVectors(currentDirection, desiredDirection).multiply(currentWorld)
-      : scratch.orientFallbackAxis.set(1, 0, 0)
-          .applyQuaternion(currentWorld)
-          .normalize()
-          .lengthSq() < 1e-6
-        ? scratch.orientDelta.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI).multiply(currentWorld)
-        : scratch.orientDelta.setFromAxisAngle(scratch.orientFallbackAxis, Math.PI).multiply(currentWorld);
-    const parentWorld = bone.parent
-      ? bone.parent.getWorldQuaternion(scratch.orientParentWorld)
-      : scratch.orientParentWorld.identity();
-    bone.quaternion.copy(parentWorld.invert().multiply(desiredWorld));
+    // The licensed arms visual is mirrored on X so the authored R chain reads
+    // on the camera's right. A negative parent scale is a reflection, not a
+    // quaternion rotation: deriving a world quaternion and converting it back
+    // through that parent makes the wrist miss its socket by the length of the
+    // forearm. Solve the shortest arc in the bone parent's local space instead;
+    // worldToLocal preserves the reflection while the quaternion only owns the
+    // bone's local rotation.
+    bone.updateWorldMatrix(true, false);
+    const parent = bone.parent;
+    const desiredParent = scratch.orientDesiredDirection.copy(targetWorld);
+    if (parent) parent.worldToLocal(desiredParent);
+    desiredParent.sub(bone.position).normalize();
+    const currentParent = scratch.orientCurrentDirection
+      .copy(child.position)
+      .applyQuaternion(bone.quaternion)
+      .normalize();
+    if (currentParent.lengthSq() < 1e-6 || desiredParent.lengthSq() < 1e-6) return;
+    scratch.orientDelta.setFromUnitVectors(currentParent, desiredParent);
+    bone.quaternion.premultiply(scratch.orientDelta).normalize();
     bone.updateWorldMatrix(false, true);
   }
 

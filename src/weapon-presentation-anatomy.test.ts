@@ -28,6 +28,28 @@ describe('first-person anatomical presentation', () => {
     ]);
   });
 
+  it('solves mirrored authored arm bones in parent space without missing the weapon socket', () => {
+    const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
+    const presentation = new WeaponPresentation(camera, false);
+    const mirroredVisual = new THREE.Group();
+    mirroredVisual.scale.x = -1;
+    const shoulder = new THREE.Bone();
+    const elbow = new THREE.Bone();
+    shoulder.add(elbow);
+    elbow.position.set(0, -1, 0);
+    mirroredVisual.add(shoulder);
+    mirroredVisual.updateWorldMatrix(true, true);
+
+    const target = new THREE.Vector3(0.5, -0.5, -Math.sqrt(0.5));
+    const orient = (presentation as unknown as {
+      orientRiggedBone: (bone: THREE.Bone, child: THREE.Bone, targetWorld: THREE.Vector3) => void;
+    }).orientRiggedBone;
+    orient.call(presentation, shoulder, elbow, target);
+
+    const solved = elbow.getWorldPosition(new THREE.Vector3());
+    expect(solved.distanceTo(target)).toBeLessThan(1e-6);
+  });
+
   it('applies the authored floor-clearance lift while prone instead of reporting a no-op', () => {
     const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
     const baseline = new WeaponPresentation(camera, false);
