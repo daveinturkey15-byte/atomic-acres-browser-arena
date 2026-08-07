@@ -5,15 +5,15 @@
   "status": "accepted",
   "preview": {
     "kind": "github-actions-artifact",
-    "ref": "pr-preview-50-693fc77dc0c29e64446224ea15b1086117eff4fb",
-    "sourceSha": "693fc77dc0c29e64446224ea15b1086117eff4fb",
-    "createdAt": "2026-08-07T20:54:17.083Z"
+    "ref": "pr-preview-50-95a64776e341e7893d161be29a2fdfc1036ff6a6",
+    "sourceSha": "95a64776e341e7893d161be29a2fdfc1036ff6a6",
+    "createdAt": "2026-08-07T22:02:59Z"
   },
   "humanAcceptance": {
     "state": "approved",
     "approvedBy": "Dave",
-    "approvedAt": "2026-08-07T20:56:33.000Z",
-    "evidence": "Dave's current instruction is to get Pass 69 sorted, published on GitHub Pages, and playable online with friends. This is conditional publication authorization bound to immutable PR #50 preview artifact 9009196703 at source SHA 693fc77dc0c29e64446224ea15b1086117eff4fb; Dave has not claimed to have inspected or tested this preview artifact. Farcrysis remains excluded and deferred to Pass 78; killstreak videos remain out of scope. The known stale prerecorded Chopper menu-preview provenance is explicitly deferred and is not represented as new video evidence."
+    "approvedAt": "2026-08-07T22:05:54.480Z",
+    "evidence": "Dave's current instruction is to get Pass 69 sorted, published on GitHub Pages, and playable online with friends. This is conditional publication authorization rebound to immutable PR #50 preview artifact 9010840625 at source SHA 95a64776e341e7893d161be29a2fdfc1036ff6a6; Dave has not claimed to have inspected or tested this preview artifact. Farcrysis remains excluded and deferred to Pass 78; killstreak videos remain out of scope. The known stale prerecorded Chopper menu-preview provenance is explicitly deferred and is not represented as new video evidence."
   },
   "requirements": [
     {
@@ -32,7 +32,7 @@
         },
         {
           "kind": "visual",
-          "ref": "artifact://pass69/field-kit-preview-50-693fc77dc0c29e64446224ea15b1086117eff4fb",
+          "ref": "artifact://pass69/field-kit-preview-50-95a64776e341e7893d161be29a2fdfc1036ff6a6",
           "note": "The immutable PR #50 preview artifact is the byte-bound visual target for the Field Kit presentation; no claim is made that Dave inspected it in a browser."
         }
       ]
@@ -108,7 +108,7 @@
         {
           "kind": "contract",
           "ref": "src/release-topology.test.ts",
-          "command": "git diff --name-only cf3539cd1018efd7c6572e70ccbf4cb17dfca0bf 693fc77dc0c29e64446224ea15b1086117eff4fb",
+          "command": "git diff --name-only cf3539cd1018efd7c6572e70ccbf4cb17dfca0bf 95a64776e341e7893d161be29a2fdfc1036ff6a6",
           "note": "The exact Pass 69 runtime candidate diff contains no video/media/capture paths."
         }
       ]
