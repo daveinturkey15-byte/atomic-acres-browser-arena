@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   SUPPORT_FORWARD_AXIS,
@@ -36,6 +37,35 @@ describe('support vehicle authored orientation contract', () => {
       requiredVisibleNodes: ['chopper-cockpit-hud-glass', 'chopper-cockpit-hud-target-ring', 'chopper-gunner-weapon-view'],
       forbiddenVisibleNodes: ['chopper-fuselage', 'chopper-rear-fuselage', 'chopper-main-rotor', 'chopper-tail-rotor'],
     });
+    expect(SUPPORT_VEHICLE_PRESENTATION_CONTRACT.chopper.requiredNodes).toEqual([
+      'chopper-fuselage', 'chopper-rear-fuselage', 'chopper-tail-boom', 'chopper-tail-fin',
+      'chopper-sleek-cockpit-canopy', 'chopper-main-rotor', 'chopper-tail-rotor',
+      'chopper-player-gun', 'chopper-gun-muzzle-socket', 'chopper-forward-socket',
+      'chopper-first-person-camera-socket', 'chopper-first-person-cockpit',
+      'chopper-gunner-sightline', 'chopper-gunner-weapon-view',
+      'chopper-cockpit-dashboard-3d', 'chopper-cockpit-display-cyan', 'chopper-cockpit-display-green',
+      'chopper-cockpit-hud-glass', 'chopper-cockpit-hud-target-ring',
+      'chopper-muzzle-flash', 'chopper-tracer-action', 'chopper-impact-action',
+    ]);
+    expect(SUPPORT_VEHICLE_PRESENTATION_CONTRACT.chopper.requiredActions).toEqual([
+      'Chopper_Main_Rotor_Loop', 'Chopper_Tail_Rotor_Loop', 'Chopper_Gun_Recoil', 'Chopper_Gun_Fire',
+      'Chopper_Muzzle_Flash', 'Chopper_Tracer_Pulse', 'Chopper_Impact_Pulse', 'Chopper_Quiet_Loop',
+    ]);
+    const productionManifest = JSON.parse(readFileSync(new URL('../source-assets/blender/pass65-weapon-production.manifest.json', import.meta.url), 'utf8')) as {
+      supportVehicles: readonly {
+        id: string;
+        semanticNodes?: readonly string[];
+        actions?: readonly string[];
+      }[];
+    };
+    const chopperManifest = productionManifest.supportVehicles.find((entry) => entry.id === 'chopper-gunner-vehicle-v1');
+    expect(chopperManifest).toBeDefined();
+    expect(chopperManifest?.semanticNodes?.every((name) => (
+      SUPPORT_VEHICLE_PRESENTATION_CONTRACT.chopper.requiredNodes.includes(name)
+    ))).toBe(true);
+    expect(chopperManifest?.actions?.every((name) => (
+      SUPPORT_VEHICLE_PRESENTATION_CONTRACT.chopper.requiredActions.includes(name)
+    ))).toBe(true);
     expect(missingSupportNodes(new THREE.Group(), SUPPORT_VEHICLE_PRESENTATION_CONTRACT.drone.requiredNodes))
       .toEqual(SUPPORT_VEHICLE_PRESENTATION_CONTRACT.drone.requiredNodes);
   });

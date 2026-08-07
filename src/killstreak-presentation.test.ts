@@ -554,6 +554,7 @@ describe('killstreak presentation', () => {
     expect(missingSupportNodes(drone, SUPPORT_VEHICLE_PRESENTATION_CONTRACT.drone.requiredNodes)).toEqual([]);
     expect(missingSupportNodes(aircraft, SUPPORT_VEHICLE_PRESENTATION_CONTRACT.aircraft.requiredNodes)).toEqual([]);
     expect(supportForwardAlignment(chopper, 'chopper-player-gun', 'chopper-gun-muzzle-socket')).toBeCloseTo(1, 6);
+    expect(supportForwardAlignment(chopper, 'chopper-fuselage', 'chopper-forward-socket')).toBeCloseTo(1, 6);
     expect(supportForwardAlignment(drone, 'drone-gun-receiver', 'drone-gun-muzzle-socket')).toBeCloseTo(1, 6);
     expect(supportForwardAlignment(aircraft, 'care-aircraft-fuselage', 'care-aircraft-forward-socket')).toBeCloseTo(1, 6);
     expect(presentation.firstPersonCameraAnchor('ks-1-chopper-1')).not.toBeNull();

@@ -30,11 +30,17 @@ export const SUPPORT_VEHICLE_PRESENTATION_CONTRACT = Object.freeze({
   chopper: Object.freeze({
     requiredNodes: Object.freeze([
       'chopper-fuselage', 'chopper-rear-fuselage', 'chopper-tail-boom', 'chopper-tail-fin',
-      'chopper-main-rotor', 'chopper-tail-rotor', 'chopper-player-gun', 'chopper-gun-muzzle-socket',
+      'chopper-sleek-cockpit-canopy', 'chopper-main-rotor', 'chopper-tail-rotor',
+      'chopper-player-gun', 'chopper-gun-muzzle-socket', 'chopper-forward-socket',
       'chopper-first-person-camera-socket', 'chopper-first-person-cockpit',
       'chopper-gunner-sightline', 'chopper-gunner-weapon-view',
       'chopper-cockpit-dashboard-3d', 'chopper-cockpit-display-cyan', 'chopper-cockpit-display-green',
       'chopper-cockpit-hud-glass', 'chopper-cockpit-hud-target-ring',
+      'chopper-muzzle-flash', 'chopper-tracer-action', 'chopper-impact-action',
+    ]),
+    requiredActions: Object.freeze([
+      'Chopper_Main_Rotor_Loop', 'Chopper_Tail_Rotor_Loop', 'Chopper_Gun_Recoil', 'Chopper_Gun_Fire',
+      'Chopper_Muzzle_Flash', 'Chopper_Tracer_Pulse', 'Chopper_Impact_Pulse', 'Chopper_Quiet_Loop',
     ]),
     possessedView: Object.freeze({
       visibleOnlyBelow: 'chopper-gunner-sightline',
