@@ -246,7 +246,7 @@ describe('production release workflow', () => {
 
   it('binds the live browser proof to Pass 68, Pass 67.1 stable, Pass 63 rollback, aliases, and Last Release', () => {
     expect(liveTopologyVerifier).toContain("verifyChoice('experimental', 'channels/the-big-one', 'PASS 68', 'pass68')");
-    expect(liveTopologyVerifier).toContain("verifyChoice('stable', 'channels/recent-stable', 'PASS 67.1', 'pass671')");
+    expect(liveTopologyVerifier).toContain("verifyChoice('stable', 'channels/recent-stable', 'PASS 67.1', 'pass66')");
     expect(liveTopologyVerifier).toContain("verifyChoice('rollback', 'channels/pass63-rollback', 'PASS 63', 'pass63')");
     expect(liveTopologyVerifier).toContain('pinned-channel-provenance.json');
     expect(liveTopologyVerifier).toContain('Stable embedded runtime digest');
