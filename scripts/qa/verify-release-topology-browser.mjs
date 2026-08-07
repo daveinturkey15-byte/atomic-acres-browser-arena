@@ -173,7 +173,9 @@ async function verifyRuntime(page, expectedPath, expectedPass, expectedChangelog
   if (expectedChangelogId) {
     await page.waitForSelector('#last-updated-btn', { timeout: 60_000 });
     const lastReleaseLabel = (await page.locator('#last-updated-btn').textContent())?.trim() ?? '';
-    if (!lastReleaseLabel.includes('LAST RELEASE') || lastReleaseLabel.includes('PENDING_PRODUCTION')) {
+    const requiresPublishedTimestamp = !releasePass || normalizedPass(expectedPass) === normalizedPass(releasePass);
+    if (!lastReleaseLabel.includes('LAST RELEASE')
+      || (requiresPublishedTimestamp && lastReleaseLabel.includes('PENDING_PRODUCTION'))) {
       throw new Error(`Invalid Last Release label for ${expectedPass}: ${JSON.stringify(lastReleaseLabel)}`);
     }
     await page.locator('#last-updated-btn').click();
@@ -185,7 +187,9 @@ async function verifyRuntime(page, expectedPath, expectedPass, expectedChangelog
       throw new Error(`${expectedPass} Last Release details do not identify the current pass: ${JSON.stringify(currentReleaseText)}`);
     }
     const releasedAt = await currentRelease.locator('time').getAttribute('datetime');
-    if (!releasedAt || releasedAt === 'PENDING_PRODUCTION' || Number.isNaN(Date.parse(releasedAt))) {
+    if (!releasedAt
+      || (requiresPublishedTimestamp && releasedAt === 'PENDING_PRODUCTION')
+      || (releasedAt !== 'PENDING_PRODUCTION' && Number.isNaN(Date.parse(releasedAt)))) {
       throw new Error(`${expectedPass} Last Release timestamp is not a published instant: ${JSON.stringify(releasedAt)}`);
     }
     if (expectedReleasedAt && normalizedPass(expectedPass) === normalizedPass(releasePass)) {
