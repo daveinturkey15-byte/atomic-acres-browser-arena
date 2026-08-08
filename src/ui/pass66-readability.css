@@ -272,6 +272,9 @@
   text-align: left;
 }
 
+.weapon-menu-presentation,
+.weapon-menu-presentation * { min-width: 0; }
+
 .weapon-menu-still {
   position: relative;
   min-width: 0;
@@ -368,6 +371,8 @@
   color: #8ba5a7;
   font: 800 var(--pass66-micro)/1 var(--ui-copy, Inter, sans-serif);
   letter-spacing: 0.08em;
+  text-overflow: clip;
+  font-size: clamp(8px, 0.62vw, 10px);
 }
 .weapon-menu-metric strong {
   color: #eff8f7;
