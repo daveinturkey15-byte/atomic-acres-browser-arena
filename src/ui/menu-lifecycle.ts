@@ -19,6 +19,7 @@ export type MenuLifecycleReason =
   | 'tactical-map'
   | 'resume'
   | 'debug-pause'
+  | 'mobile-pause'
   | 'return-pre-match'
   | 'fatal-error';
 
@@ -51,7 +52,7 @@ export type MenuLifecycleEvent =
     }>
   | Readonly<{ type: 'focus-lost' }>
   | Readonly<{ type: 'focus-gained' }>
-  | Readonly<{ type: 'pause-requested'; reason: 'escape' | 'debug-pause' }>
+  | Readonly<{ type: 'pause-requested'; reason: 'escape' | 'debug-pause' | 'mobile-pause' }>
   | Readonly<{ type: 'resume' }>
   | Readonly<{ type: 'return-pre-match' }>
   | Readonly<{ type: 'fatal-error' }>;

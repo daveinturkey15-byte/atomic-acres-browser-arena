@@ -5,10 +5,10 @@ import { expect, test, type Page } from '@playwright/test';
 const MOBILE_STORAGE_KEY = 'atomic-acres-mobile-controls';
 test.use({ hasTouch: true, isMobile: true });
 
-async function ready(page: Page, width: number, height: number): Promise<void> {
+async function ready(page: Page, width: number, height: number, arena = 'atomic-acres'): Promise<void> {
   await page.setViewportSize({ width, height });
   await page.addInitScript((storageKey) => localStorage.setItem(storageKey, 'on'), MOBILE_STORAGE_KEY);
-  await page.goto('/?release=latest&renderer=webgl2&render=performance&grass=off&mist=off&clouds=off&rays=off&externalServices=off&seed=pass69-mobile-touch&previewTime=0');
+  await page.goto(`/?release=latest&map=${arena}&renderer=webgl2&render=performance&grass=off&mist=off&clouds=off&rays=off&externalServices=off&seed=pass69-mobile-touch&previewTime=0`);
   await page.waitForFunction(() => {
     const solo = document.querySelector<HTMLButtonElement>('#solo');
     const debug = window.__ATOMIC_ACRES_DEBUG__;
@@ -107,4 +107,83 @@ test('fires a semi-automatic weapon from touch without pointer lock', async ({ p
   if (!fireBounds) throw new Error('FIRE control has no touch target');
   await page.touchscreen.tap(fireBounds.x + fireBounds.width / 2, fireBounds.y + fireBounds.height / 2);
   await expect.poll(async () => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.ammo)).toBe(before.ammo - 1);
+});
+
+test('sustains and releases automatic fire from the mobile overlay without pointer lock', async ({ page }) => {
+  await ready(page, 844, 390);
+  const before = await page.evaluate(() => {
+    window.__ATOMIC_ACRES_DEBUG__.equipWeapon('carbine');
+    const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+    return {
+      ammo: snapshot.player.ammo,
+      pointerLocked: document.pointerLockElement !== null,
+    };
+  });
+  expect(before.pointerLocked).toBe(false);
+  const fire = page.locator('[data-mtc="fire"]');
+  const fireBounds = await fire.boundingBox();
+  if (!fireBounds) throw new Error('FIRE control has no held-input target');
+  await page.mouse.move(fireBounds.x + fireBounds.width / 2, fireBounds.y + fireBounds.height / 2);
+  await page.mouse.down();
+  try {
+    await expect.poll(async () => page.evaluate(() => {
+      const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+      return {
+        ammo: snapshot.player.ammo,
+        triggerHeld: snapshot.textChat.triggerHeld,
+        pointerLocked: document.pointerLockElement !== null,
+      };
+    }), { timeout: 5_000 }).toMatchObject({
+      ammo: expect.any(Number),
+      triggerHeld: true,
+      pointerLocked: false,
+    });
+    await expect.poll(async () => page.evaluate(() => (
+      window.__ATOMIC_ACRES_DEBUG__.snapshot().player.ammo
+    )), { timeout: 5_000 }).toBeLessThanOrEqual(before.ammo - 3);
+  } finally {
+    await page.mouse.up();
+  }
+  const releasedAmmo = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.ammo);
+  await page.waitForTimeout(350);
+  expect(await page.evaluate(() => ({
+    ammo: window.__ATOMIC_ACRES_DEBUG__.snapshot().player.ammo,
+    triggerHeld: window.__ATOMIC_ACRES_DEBUG__.snapshot().textChat.triggerHeld,
+  }))).toEqual({ ammo: releasedAmmo, triggerHeld: false });
+});
+
+test('routes mobile USE and PAUSE through the live interaction and menu lifecycles', async ({ page }) => {
+  await ready(page, 390, 844, 'gun-range');
+  const staged = await page.evaluate(() => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    const station = debug.snapshot().rangePractice.stations.find((candidate: any) => candidate.visible);
+    if (!station) throw new Error('Gun range has no visible mobile interaction station');
+    debug.teleportPlayer(station.position[0], station.position[1] + 1.7, station.position[2]);
+    return {
+      targetId: `station:${station.weapon}`,
+    };
+  });
+  await expect.poll(async () => page.evaluate((targetId) => (
+    window.__ATOMIC_ACRES_DEBUG__.snapshot().fieldSupport.fInteraction.candidates
+      .some((candidate: any) => candidate.targetId === targetId)
+  ), staged.targetId)).toBe(true);
+
+  const use = page.locator('[data-mtc="interact"]');
+  await expect(use).toBeVisible();
+  const useBounds = await use.boundingBox();
+  if (!useBounds) throw new Error('USE control has no touch target');
+  await page.touchscreen.tap(useBounds.x + useBounds.width / 2, useBounds.y + useBounds.height / 2);
+  await expect.poll(async () => page.evaluate(() => (
+    window.__ATOMIC_ACRES_DEBUG__.snapshot().fieldSupport.fInteraction.lastCommit?.candidate.targetId ?? null
+  ))).toBe(staged.targetId);
+
+  const pause = page.locator('[data-mtc="pause"]');
+  await expect(pause).toBeVisible();
+  const pauseBounds = await pause.boundingBox();
+  if (!pauseBounds) throw new Error('PAUSE control has no touch target');
+  await page.touchscreen.tap(pauseBounds.x + pauseBounds.width / 2, pauseBounds.y + pauseBounds.height / 2);
+  await expect.poll(async () => page.evaluate(() => (
+    window.__ATOMIC_ACRES_DEBUG__.snapshot().menuLifecycle.surface
+  ))).toBe('paused-match');
+  await expect(page.locator('#mobile-touch-controls')).toBeHidden();
 });

@@ -27,6 +27,9 @@ export type MobileTouchCallbacks = Readonly<{
   onCrouch: () => void;
   onGrenade: () => void;
   onMelee: () => void;
+  onInteractDown: () => void;
+  onInteractUp: () => void;
+  onPause: () => void;
 }>;
 
 export type MobileTouchState = {
@@ -36,6 +39,7 @@ export type MobileTouchState = {
   lookDeltaY: number;
   firing: boolean;
   ads: boolean;
+  interacting: boolean;
 };
 
 export const MOBILE_CONTROLS_STORAGE_KEY = 'atomic-acres-mobile-controls';
@@ -81,12 +85,15 @@ export function writeMobileControlsPreference(enabled: boolean): void {
 type StickId = 'move' | 'look';
 
 export class MobileTouchControls {
-  readonly state: MobileTouchState = { moveX: 0, moveY: 0, lookDeltaX: 0, lookDeltaY: 0, firing: false, ads: false };
+  readonly state: MobileTouchState = {
+    moveX: 0, moveY: 0, lookDeltaX: 0, lookDeltaY: 0, firing: false, ads: false, interacting: false,
+  };
   private root: HTMLElement | null = null;
   private knobs: Record<StickId, HTMLElement | null> = { move: null, look: null };
   private stickPointers: Record<StickId, number | null> = { move: null, look: null };
   private firePointerId: number | null = null;
   private adsPointerId: number | null = null;
+  private interactPointerId: number | null = null;
   private lookAxis = { x: 0, y: 0 };
   private stickOrigins: Record<StickId, { x: number; y: number }> = { move: { x: 0, y: 0 }, look: { x: 0, y: 0 } };
   private enabled = false;
@@ -111,6 +118,8 @@ export class MobileTouchControls {
         <button type="button" class="mtc-btn mtc-crouch" data-mtc="crouch">CRCH</button>
         <button type="button" class="mtc-btn mtc-grenade" data-mtc="grenade">GRND</button>
         <button type="button" class="mtc-btn mtc-melee" data-mtc="melee">KNIFE</button>
+        <button type="button" class="mtc-btn mtc-interact" data-mtc="interact">USE</button>
+        <button type="button" class="mtc-btn mtc-pause" data-mtc="pause">PAUSE</button>
       </div>`;
     host.append(root);
     this.root = root;
@@ -168,14 +177,17 @@ export class MobileTouchControls {
     this.state.lookDeltaY = 0;
     if (this.state.firing) this.callbacks.onFireUp();
     if (this.state.ads) this.callbacks.onAdsUp();
+    if (this.state.interacting) this.callbacks.onInteractUp();
     this.state.firing = false;
     this.state.ads = false;
+    this.state.interacting = false;
     this.lookAxis.x = 0;
     this.lookAxis.y = 0;
     this.stickPointers.move = null;
     this.stickPointers.look = null;
     this.firePointerId = null;
     this.adsPointerId = null;
+    this.interactPointerId = null;
     for (const id of ['move', 'look'] as const) {
       if (this.knobs[id]) this.knobs[id]!.style.transform = 'translate(-50%, -50%)';
     }
@@ -232,6 +244,14 @@ export class MobileTouchControls {
       case 'melee':
         this.callbacks.onMelee();
         break;
+      case 'interact':
+        this.interactPointerId = event.pointerId;
+        this.state.interacting = true;
+        this.callbacks.onInteractDown();
+        break;
+      case 'pause':
+        this.callbacks.onPause();
+        break;
     }
   }
 
@@ -280,6 +300,10 @@ export class MobileTouchControls {
       this.adsPointerId = null;
       this.state.ads = false;
       this.callbacks.onAdsUp();
+    } else if (event.pointerId === this.interactPointerId && this.state.interacting) {
+      this.interactPointerId = null;
+      this.state.interacting = false;
+      this.callbacks.onInteractUp();
     }
   }
 }

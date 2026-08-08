@@ -115,6 +115,9 @@ for (const testCase of cases) {
     });
 
     let baselineFrameProbe: { frames: number; maxGapMs: number } | null = null;
+    let baselinePresentedGameplayFrame: number | null = null;
+    let baselineFlareRegion: Buffer | null = null;
+    let flareRegion: { x: number; y: number; width: number; height: number } | null = null;
     if (testCase.weaponId === 'flare-gun') {
       await page.evaluate(() => {
         const checkpointKey = 'atomic-acres:host-match-checkpoint:v3';
@@ -163,6 +166,18 @@ for (const testCase of cases) {
         probe.active = false;
         return { frames: probe.frames, maxGapMs: probe.maxGapMs };
       });
+      baselinePresentedGameplayFrame = await page.evaluate(() => (
+        window.__ATOMIC_ACRES_DEBUG__.admissionState().presentedGameplayFrame
+      ));
+      const canvasBounds = await page.locator('#game').boundingBox();
+      if (!canvasBounds) throw new Error('Flare compositor probe has no game canvas bounds');
+      flareRegion = {
+        x: canvasBounds.x + canvasBounds.width * 0.35,
+        y: canvasBounds.y + canvasBounds.height * 0.25,
+        width: canvasBounds.width * 0.3,
+        height: canvasBounds.height * 0.5,
+      };
+      baselineFlareRegion = await page.screenshot({ clip: flareRegion, animations: 'allow' });
     } else {
       await page.waitForTimeout(500);
     }
@@ -223,6 +238,17 @@ for (const testCase of cases) {
         }
       });
     }
+    if (testCase.weaponId === 'flare-gun') {
+      await page.waitForFunction((baselineFrame) => {
+        const debug = window.__ATOMIC_ACRES_DEBUG__;
+        const snapshot = debug.snapshot();
+        return debug.admissionState().presentedGameplayFrame > baselineFrame
+          && snapshot.timedMapWeapons.flareProjectiles.active > 0;
+      }, baselinePresentedGameplayFrame, { polling: 'raf', timeout: 5_000 });
+      if (!baselineFlareRegion || !flareRegion) throw new Error('Flare compositor baseline was not captured');
+      const presentedFlareRegion = await page.screenshot({ clip: flareRegion, animations: 'allow' });
+      expect(Buffer.compare(baselineFlareRegion, presentedFlareRegion)).not.toBe(0);
+    }
     const fired = await page.evaluate(({ weaponId, effect }) => {
       const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
       return {
@@ -250,6 +276,11 @@ for (const testCase of cases) {
       expect(frameProbe).not.toBeNull();
       expect(frameProbe!.frames).toBeGreaterThan(8);
       expect(baselineFrameProbe).not.toBeNull();
+      const presentedGameplayFrame = await page.evaluate(() => (
+        window.__ATOMIC_ACRES_DEBUG__.admissionState().presentedGameplayFrame
+      ));
+      expect(baselinePresentedGameplayFrame).not.toBeNull();
+      expect(presentedGameplayFrame - baselinePresentedGameplayFrame!).toBeGreaterThan(8);
       const checkpointProbe = await page.evaluate(() => (
         window as any
       ).__PASS69_FLARE_CHECKPOINT_PROBE__ as {

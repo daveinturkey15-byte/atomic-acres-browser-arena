@@ -115,10 +115,52 @@ test('loads and prewarms the exact authored support-vehicle family before deploy
     'Chopper_Muzzle_Flash',
     'Chopper_Tracer_Pulse',
   ] });
+  const canvasBounds = await page.locator('#game').boundingBox();
+  if (!canvasBounds) throw new Error('Game canvas has no rendered bounds');
+  const actionRegion = {
+    x: canvasBounds.x + canvasBounds.width * 0.3,
+    y: canvasBounds.y + canvasBounds.height * 0.3,
+    width: canvasBounds.width * 0.4,
+    height: canvasBounds.height * 0.55,
+  };
+  const beforeWeaponAction = await page.screenshot({ clip: actionRegion, animations: 'allow' });
+  const beforeWeaponCanvas = await page.locator<HTMLCanvasElement>('#game').evaluate((canvas) => canvas.toDataURL('image/png'));
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setTriggerHeld(true));
-  await page.waitForFunction(() => (
-    (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).killstreakPresentation.chopperWeaponActionsPresented > 0
-  ));
+  const expectedWeaponActions = [
+    'Chopper_Gun_Recoil',
+    'Chopper_Gun_Fire',
+    'Chopper_Muzzle_Flash',
+    'Chopper_Tracer_Pulse',
+  ];
+  const actionEvidence = await page.evaluate(async (names) => new Promise<{
+    playback: any[];
+    canvasFrame: string;
+  }>((resolveEvidence, rejectEvidence) => {
+    const deadline = performance.now() + 5_000;
+    const inspect = () => {
+      const presentation = (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).killstreakPresentation;
+      const playback = presentation.chopperActionPlayback.filter((action: any) => (
+        action.visible && action.running && action.timeSeconds > 0 && action.effectiveWeight > 0
+      ));
+      if (presentation.chopperWeaponActionsPresented > 0 && names.every((name) => (
+        playback.some((action: any) => action.name === name)
+      ))) {
+        const canvas = document.querySelector<HTMLCanvasElement>('#game');
+        if (!canvas) return rejectEvidence(new Error('Game canvas disappeared during Chopper action'));
+        return resolveEvidence({ playback, canvasFrame: canvas.toDataURL('image/png') });
+      }
+      if (performance.now() >= deadline) return rejectEvidence(new Error('Visible authored Chopper actions did not enter playback'));
+      requestAnimationFrame(inspect);
+    };
+    requestAnimationFrame(inspect);
+  }), expectedWeaponActions);
+  const actionPlayback = actionEvidence.playback;
+  expect([...new Set(actionPlayback.map((action: any) => action.name))].sort()).toEqual([...expectedWeaponActions].sort());
+  expect(actionPlayback.every((action: any) => action.clipDurationSeconds > action.timeSeconds)).toBe(true);
+  expect(actionPlayback.every((action: any) => /authored-lod\d+$/u.test(action.lodRootName))).toBe(true);
+  expect(actionEvidence.canvasFrame).not.toBe(beforeWeaponCanvas);
+  const duringWeaponAction = await page.screenshot({ clip: actionRegion, animations: 'allow' });
+  expect(Buffer.compare(beforeWeaponAction, duringWeaponAction)).not.toBe(0);
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setTriggerHeld(false));
   const weaponActions = await page.evaluate(() => (
     window.__ATOMIC_ACRES_DEBUG__.snapshot() as any

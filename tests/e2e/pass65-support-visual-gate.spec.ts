@@ -476,8 +476,9 @@ test.describe('Pass 65 support visual fail-closed gate', () => {
   test('projects chopper and drone damage over the authoritative remote victim and suppresses hidden hits', async ({ browser }) => {
     test.setTimeout(150_000);
     const pair = await startPair(browser, 'SUPPORT DAMAGE');
-    const { context, host, errors } = pair;
+    const { context, host, guest, errors } = pair;
     try {
+      const guestChopperImpactsBefore = (await state(guest)).killstreakPresentation.chopperImpactActionsPresented;
       await host.bringToFront();
       await host.locator('#game').click({ position: { x: 100, y: 100 }, force: true });
       await host.evaluate(() => {
@@ -485,9 +486,14 @@ test.describe('Pass 65 support visual fail-closed gate', () => {
         api.earnSupport(15);
         api.aimAtRemoteWithOffset(0.18, 0);
       });
-      await host.keyboard.press('4');
-      await host.keyboard.press('6');
-      await host.keyboard.press('7');
+      expect(await host.evaluate(() => {
+        const api = window.__ATOMIC_ACRES_DEBUG__;
+        return [
+          api.activateKillstreak('chopper'),
+          api.activateKillstreak('piloted-drone'),
+          api.activateKillstreak('drone-swarm'),
+        ];
+      })).toEqual([true, true, true]);
       await expect.poll(async () => {
         const entities = (await state(host)).killstreak.entities;
         return {
@@ -499,6 +505,9 @@ test.describe('Pass 65 support visual fail-closed gate', () => {
       await expect.poll(async () => (await state(host)).supportDamageFeedback.visible, { timeout: 20_000 }).toBeGreaterThan(0);
       await expect.poll(async () => [...new Set((await state(host)).supportDamageFeedback.recent
         .map((sample: any) => sample.source))].sort(), { timeout: 35_000 }).toEqual(['chopper', 'drone-swarm', 'piloted-drone']);
+      await expect.poll(async () => (
+        (await state(guest)).killstreakPresentation.chopperImpactActionsPresented
+      ), { timeout: 35_000 }).toBeGreaterThan(guestChopperImpactsBefore);
 
       const visibleState = await state(host);
       const remote = visibleState.remotePlayers[0];

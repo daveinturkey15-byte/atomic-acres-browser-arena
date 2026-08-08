@@ -534,6 +534,7 @@ describe('killstreak presentation', () => {
       activeChopperActionNames: [],
       pooledChopperActionNames: [],
       lastChopperWeaponActions: [],
+      chopperActionPlayback: [],
       firstPersonSightline: null,
       markerDetails: [],
       bounded: true,

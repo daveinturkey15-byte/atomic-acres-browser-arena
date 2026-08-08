@@ -926,7 +926,9 @@ body.mtc-live .reserve-stack em { font-size: 18px; }
   body.mtc-live #mobile-touch-controls .mtc-buttons {
     right: calc(max(10px, env(safe-area-inset-right)) + 142px);
     bottom: max(10px, env(safe-area-inset-bottom));
+    grid-template-columns: repeat(3, 54px);
   }
+  body.mtc-live #mobile-touch-controls .mtc-fire { grid-column: 1 / -1; }
 }
 
 /* Portrait is a supported playable layout. A narrow centre action rail leaves

@@ -940,6 +940,16 @@ export type KillstreakPresentationTelemetry = Readonly<{
   activeChopperActionNames: readonly string[];
   pooledChopperActionNames: readonly string[];
   lastChopperWeaponActions: readonly string[];
+  chopperActionPlayback: readonly Readonly<{
+    entityId: string;
+    name: string;
+    lodRootName: string;
+    visible: boolean;
+    running: boolean;
+    timeSeconds: number;
+    clipDurationSeconds: number;
+    effectiveWeight: number;
+  }>[];
   firstPersonSightline: Readonly<{
     entityId: string;
     presentationSource: string;
@@ -2617,12 +2627,38 @@ export class KillstreakPresentation {
   }
 
   telemetry(): KillstreakPresentationTelemetry {
+    const effectivelyVisible = (node: THREE.Object3D, root: THREE.Object3D): boolean => {
+      let cursor: THREE.Object3D | null = node;
+      while (cursor) {
+        if (!cursor.visible) return false;
+        if (cursor === root) return true;
+        cursor = cursor.parent;
+      }
+      return false;
+    };
     const activeChopperActionNames = Object.freeze([...new Set(
       [...this.entities.values()].flatMap((entry) => [...entry.oneShotActions.keys()]),
     )].sort());
     const pooledChopperActionNames = Object.freeze([...new Set(
       (this.entityPools.get('chopper') ?? []).flatMap((entry) => [...entry.oneShotActions.keys()]),
     )].sort());
+    const chopperActionPlayback = Object.freeze([...this.entities.entries()].flatMap(([entityId, entry]) => (
+      [...entry.oneShotActions.entries()].flatMap(([name, actions]) => actions.map((action) => {
+        const mixerRoot = action.getMixer().getRoot();
+        const lodRoot = mixerRoot instanceof THREE.Object3D ? mixerRoot : null;
+        return Object.freeze({
+          entityId,
+          name,
+          lodRootName: lodRoot?.name ?? 'animation-object-group',
+          visible: lodRoot ? effectivelyVisible(lodRoot, entry.root) : false,
+          running: action.isRunning(),
+          timeSeconds: Number(action.time.toFixed(4)),
+          clipDurationSeconds: Number(action.getClip().duration.toFixed(4)),
+          effectiveWeight: Number(action.getEffectiveWeight().toFixed(4)),
+        });
+      }))
+    )).sort((left, right) => `${left.entityId}:${left.name}:${left.lodRootName}`
+      .localeCompare(`${right.entityId}:${right.name}:${right.lodRootName}`)));
     const markerDetails = [...this.placementMarkers.values()]
       .sort((left, right) => left.snapshot.id.localeCompare(right.snapshot.id))
       .map(({ root, snapshot }): KillstreakPlacementMarkerTelemetry => {
@@ -2682,15 +2718,6 @@ export class KillstreakPresentation {
     const visibleSwarmBatches = this.swarmInstanceBatches.filter((batch) => batch.root.visible && batch.root.count > 0);
     const visibleSwarmCounts = visibleSwarmBatches.map((batch) => batch.root.count);
     const firstPersonRoot = this.firstPersonEntityId ? this.entities.get(this.firstPersonEntityId)?.root ?? null : null;
-    const effectivelyVisible = (node: THREE.Object3D, root: THREE.Object3D): boolean => {
-      let cursor: THREE.Object3D | null = node;
-      while (cursor) {
-        if (!cursor.visible) return false;
-        if (cursor === root) return true;
-        cursor = cursor.parent;
-      }
-      return false;
-    };
     const firstPersonSightline = firstPersonRoot && this.firstPersonEntityId
       && firstPersonRoot.getObjectByName('chopper-gunner-sightline')
       ? (() => {
@@ -2743,6 +2770,7 @@ export class KillstreakPresentation {
       activeChopperActionNames,
       pooledChopperActionNames,
       lastChopperWeaponActions: this.lastChopperWeaponActions,
+      chopperActionPlayback,
       firstPersonSightline,
       markerDetails: Object.freeze(markerDetails),
       bounded: this.entities.size <= MAX_PRESENTED_ENTITIES

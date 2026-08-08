@@ -8538,6 +8538,10 @@ function onNetworkMessage(message: GameMessage): void {
     for (const event of message.events) {
       if (event.ownerId === player.id) recordOwnerSupportDamage(event);
       if (event.targetId === player.id) applyKillstreakDamageEvent(event);
+      if (event.source === 'chopper') {
+        const presented = killstreakSnapshot.entities.find((entity) => entity.activationId === event.activationId);
+        if (presented) killstreakPresentation.presentChopperImpactAction(presented.id);
+      }
     }
     const presentedAt = performance.now();
     for (const impact of message.impacts) {
@@ -11684,7 +11688,7 @@ function pauseBackdropCompositorSupported(): boolean {
   }
 }
 
-function presentPauseOnlyWebGlBackdrop(reason: 'escape' | 'debug-pause'): boolean {
+function presentPauseOnlyWebGlBackdrop(reason: 'escape' | 'debug-pause' | 'mobile-pause'): boolean {
   if (renderRuntime.backend !== 'webgl2' || !atomicSignal
     || document.visibilityState !== 'visible' || !document.hasFocus()) return false;
   const sourceWidth = Math.max(1, canvas.width);
@@ -11732,7 +11736,7 @@ function presentPauseOnlyWebGlBackdrop(reason: 'escape' | 'debug-pause'): boolea
   return true;
 }
 
-function renderSafePauseBackdropFallback(reason: 'escape' | 'debug-pause', failure: unknown): void {
+function renderSafePauseBackdropFallback(reason: 'escape' | 'debug-pause' | 'mobile-pause', failure: unknown): void {
   const heldAt = performance.now();
   matchPauseBackdropFallbackCount += 1;
   matchPauseFrameFallback.hidden = true;
@@ -11760,7 +11764,7 @@ function renderSafePauseBackdropFallback(reason: 'escape' | 'debug-pause', failu
   console.warn('[Pass 65 menu backdrop used safe fallback]', failure);
 }
 
-function presentActiveMatchBackdrop(reason: 'escape' | 'debug-pause'): boolean {
+function presentActiveMatchBackdrop(reason: 'escape' | 'debug-pause' | 'mobile-pause'): boolean {
   let pauseOnlyCaptureFailure: unknown = null;
   try {
     if (lastGameplayPresentedFrame <= 0) throw new Error('No presented gameplay frame is available');
@@ -11801,10 +11805,14 @@ function presentActiveMatchBackdrop(reason: 'escape' | 'debug-pause'): boolean {
   }
 }
 
-function openActiveMatchPause(reason: 'escape' | 'debug-pause'): void {
+function openActiveMatchPause(reason: 'escape' | 'debug-pause' | 'mobile-pause'): void {
   if (!gameStarted || !player.alive || matchFinished || menuLifecycle.surface === 'paused-match') return;
   cancelFInteractionPress('pause');
   clearGameplayInput();
+  mobileTouchControls?.setInMatch(false);
+  mobilePresentationActive = false;
+  document.body.classList.remove('mtc-live');
+  releaseMobileLandscapePresentation();
   presentActiveMatchBackdrop(reason);
   applyMenuLifecycle({ type: 'pause-requested', reason });
   if (document.pointerLockElement === canvas) void document.exitPointerLock();
@@ -21383,6 +21391,9 @@ function initMobileTouchControls(): void {
     onCrouch: () => { if (gameplayInputEnabled()) requestStance('toggle-crouch'); },
     onGrenade: () => { if (gameplayInputEnabled()) throwGrenade(); },
     onMelee: () => { if (gameplayInputEnabled()) melee(); },
+    onInteractDown: () => { if (gameplayInputEnabled()) beginFInteractionPress(performance.now()); },
+    onInteractUp: () => releaseFInteractionPress(performance.now()),
+    onPause: () => openActiveMatchPause('mobile-pause'),
   });
   mobileTouchControls.mount(document.body);
   mobileTouchControls.setEnabled(readMobileControlsPreference());
