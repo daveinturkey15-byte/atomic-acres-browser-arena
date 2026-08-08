@@ -76,7 +76,7 @@
           "kind": "browser",
           "ref": "tests/e2e/pass69-mobile-touch-layout.spec.ts",
           "command": "npm run qa:playwright-topology -- tests/e2e/pass69-mobile-touch-layout.spec.ts --project=chromium --workers=1 --retries=0",
-          "note": "One active match rotates in both directions while FIRE is held; each orientation recovers active phase, clears triggerHeld, retains controls and emits zero page errors."
+          "note": "One active match rotates in both directions while movement, aim and FIRE pointers are held in turn; each orientation recovers active phase, centres held sticks, clears triggerHeld, advances frames, retains controls and emits zero page errors."
         },
         {
           "kind": "contract",

@@ -137,6 +137,41 @@ test('survives bidirectional mid-match rotation and clears held touch ownership'
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
   await ready(page, 390, 844);
+
+  const move = page.locator('[data-mtc="stick-move"]');
+  const moveKnob = move.locator('.mtc-stick-knob');
+  const moveBounds = await move.boundingBox();
+  if (!moveBounds) throw new Error('MOVE control has no touch target');
+  const portraitFrame = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().frameCount);
+  await page.mouse.move(moveBounds.x + moveBounds.width / 2, moveBounds.y + moveBounds.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(moveBounds.x + moveBounds.width * 0.78, moveBounds.y + moveBounds.height / 2);
+  await expect.poll(async () => moveKnob.evaluate((element) => (element as HTMLElement).style.transform))
+    .not.toBe('translate(-50%, -50%)');
+  await page.setViewportSize({ width: 844, height: 390 });
+  await expect.poll(async () => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.admissionState().matchPhase)).toBe('active');
+  await expect.poll(async () => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().frameCount)).toBeGreaterThan(portraitFrame);
+  await expect.poll(async () => moveKnob.evaluate((element) => (element as HTMLElement).style.transform))
+    .toBe('translate(-50%, -50%)');
+  await page.mouse.up();
+
+  const look = page.locator('[data-mtc="stick-look"]');
+  const lookKnob = look.locator('.mtc-stick-knob');
+  const lookBounds = await look.boundingBox();
+  if (!lookBounds) throw new Error('AIM control has no touch target');
+  const landscapeFrame = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().frameCount);
+  await page.mouse.move(lookBounds.x + lookBounds.width / 2, lookBounds.y + lookBounds.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(lookBounds.x + lookBounds.width * 0.78, lookBounds.y + lookBounds.height / 2);
+  await expect.poll(async () => lookKnob.evaluate((element) => (element as HTMLElement).style.transform))
+    .not.toBe('translate(-50%, -50%)');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(async () => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.admissionState().matchPhase)).toBe('active');
+  await expect.poll(async () => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().frameCount)).toBeGreaterThan(landscapeFrame);
+  await expect.poll(async () => lookKnob.evaluate((element) => (element as HTMLElement).style.transform))
+    .toBe('translate(-50%, -50%)');
+  await page.mouse.up();
+
   const fire = page.locator('[data-mtc="fire"]');
   const fireBounds = await fire.boundingBox();
   if (!fireBounds) throw new Error('FIRE control has no touch target');
@@ -144,24 +179,6 @@ test('survives bidirectional mid-match rotation and clears held touch ownership'
   await page.mouse.down();
   await expect.poll(async () => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().textChat.triggerHeld)).toBe(true);
   await page.setViewportSize({ width: 844, height: 390 });
-  await expect.poll(async () => page.evaluate(() => ({
-    phase: window.__ATOMIC_ACRES_DEBUG__.admissionState().matchPhase,
-    triggerHeld: window.__ATOMIC_ACRES_DEBUG__.snapshot().textChat.triggerHeld,
-    frameCount: window.__ATOMIC_ACRES_DEBUG__.snapshot().frameCount,
-  }))).toMatchObject({ phase: 'active', triggerHeld: false, frameCount: expect.any(Number) });
-  await expect(page.locator('#mobile-touch-controls')).toBeVisible();
-  await expect(page.locator('body')).toHaveClass(/mtc-live/u);
-  await page.mouse.up();
-
-  const landscapeFireBounds = await page.locator('[data-mtc="fire"]').boundingBox();
-  if (!landscapeFireBounds) throw new Error('Landscape FIRE control has no touch target');
-  await page.mouse.move(
-    landscapeFireBounds.x + landscapeFireBounds.width / 2,
-    landscapeFireBounds.y + landscapeFireBounds.height / 2,
-  );
-  await page.mouse.down();
-  await expect.poll(async () => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().textChat.triggerHeld)).toBe(true);
-  await page.setViewportSize({ width: 390, height: 844 });
   await expect.poll(async () => page.evaluate(() => ({
     phase: window.__ATOMIC_ACRES_DEBUG__.admissionState().matchPhase,
     triggerHeld: window.__ATOMIC_ACRES_DEBUG__.snapshot().textChat.triggerHeld,

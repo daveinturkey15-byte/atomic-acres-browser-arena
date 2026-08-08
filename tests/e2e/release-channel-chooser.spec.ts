@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const releaseChannels = JSON.parse(readFileSync(resolve(process.cwd(), 'release-channels.json'), 'utf8')) as {
-  experimental: { pass: string };
+  latest: { label: string };
+  experimental: { label: string; pass: string };
 };
 
 test('offers live Pass 69 The Big One, stable Pass 67.1 and rollback Pass 63 before the menu loads', async ({ page }, testInfo) => {
@@ -14,8 +15,10 @@ test('offers live Pass 69 The Big One, stable Pass 67.1 and rollback Pass 63 bef
   await expect(page.locator('#menu')).toHaveCount(0);
   const hasRollback = await page.evaluate(() => Boolean(window.__ATOMIC_ACRES_RELEASE_CHANNELS__?.rollback));
   await expect(page.locator('.release-channel-option')).toHaveCount(hasRollback ? 3 : 2);
+  expect(releaseChannels.latest.label).toBe('THE BIG ONE v69.1');
+  expect(releaseChannels.experimental.label).toBe('THE BIG ONE v69.1');
   await expect(page.locator('[data-release-choice="experimental"]')).toContainText(releaseChannels.experimental.pass);
-  await expect(page.locator('[data-release-choice="experimental"]')).toContainText('THE BIG ONE');
+  await expect(page.locator('[data-release-choice="experimental"]')).toContainText(releaseChannels.experimental.label);
   await expect(page.locator('[data-release-choice="experimental"]')).toContainText('LIVE');
   await expect(page.locator('[data-release-choice="stable"]')).toContainText('PASS 67.1');
   await expect(page.locator('[data-release-choice="stable"]')).toContainText('STABLE');
