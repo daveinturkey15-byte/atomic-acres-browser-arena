@@ -36,13 +36,32 @@ const expectedSourceSha = process.env.PASS66_PRONE_CONTACT_SOURCE_SHA ?? '';
 const renderer = process.env.PASS66_PRONE_CONTACT_RENDERER === 'webgpu' ? 'webgpu' : 'webgl2';
 const peerPort = Number(process.env.PASS66_PRONE_CONTACT_PEER_PORT ?? 9_071);
 const CLIENT_RUNTIME_LOG_KEY = 'atomic-acres:client-runtime-log:v1';
-const ARENAS: readonly ArenaId[] = Object.freeze([
+const ALL_ARENAS: readonly ArenaId[] = Object.freeze([
   'atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range',
 ]);
-const PROFILES: readonly RenderProfile[] = Object.freeze(['performance', 'blender', 'compat']);
+const requestedArena = process.env.PASS66_PRONE_CONTACT_ARENA ?? '';
+if (requestedArena && !ALL_ARENAS.includes(requestedArena as ArenaId)) {
+  throw new Error(`PASS66_PRONE_CONTACT_ARENA must be a canonical arena; received ${requestedArena}`);
+}
+const ARENAS: readonly ArenaId[] = requestedArena
+  ? Object.freeze([requestedArena as ArenaId])
+  : ALL_ARENAS;
+const ALL_PROFILES: readonly RenderProfile[] = Object.freeze(['performance', 'blender', 'compat']);
+const requestedProfile = process.env.PASS66_PRONE_CONTACT_PROFILE ?? '';
+if (requestedProfile && !ALL_PROFILES.includes(requestedProfile as RenderProfile)) {
+  throw new Error(`PASS66_PRONE_CONTACT_PROFILE must be performance, blender, or compat; received ${requestedProfile}`);
+}
+const PROFILES: readonly RenderProfile[] = requestedProfile
+  ? Object.freeze([requestedProfile as RenderProfile])
+  : ALL_PROFILES;
+const requestedPhase = process.env.PASS66_PRONE_CONTACT_PHASE ?? '';
+if (requestedPhase && requestedPhase !== 'solo' && requestedPhase !== 'multiplayer') {
+  throw new Error(`PASS66_PRONE_CONTACT_PHASE must be solo or multiplayer; received ${requestedPhase}`);
+}
 const EXPECTED_CELLS = ARENAS.length * PROFILES.length;
 const artifactRoot = resolve('artifacts/pass66/prone-contact-matrix');
-const receiptPath = resolve(artifactRoot, 'receipt.json');
+const receiptSuffix = [requestedProfile, requestedPhase, requestedArena].filter(Boolean).join('-');
+const receiptPath = resolve(artifactRoot, receiptSuffix ? `receipt-${receiptSuffix}.json` : 'receipt.json');
 const receiptTempPath = `${receiptPath}.tmp`;
 let peerServer: OwnedPeerServer | null = null;
 let sourceSha = '';
@@ -88,8 +107,10 @@ test.afterAll(async () => {
   const ownedServer = peerServer;
   peerServer = null;
   await ownedServer?.stop();
-  if (!soloComplete || !multiplayerComplete
-    || soloRows.length !== EXPECTED_CELLS || multiplayerRows.length !== EXPECTED_CELLS) return;
+  const expectedSoloCells = requestedPhase === 'multiplayer' ? 0 : EXPECTED_CELLS;
+  const expectedMultiplayerCells = requestedPhase === 'solo' ? 0 : EXPECTED_CELLS;
+  if ((expectedSoloCells > 0 && !soloComplete) || (expectedMultiplayerCells > 0 && !multiplayerComplete)
+    || soloRows.length !== expectedSoloCells || multiplayerRows.length !== expectedMultiplayerCells) return;
   const finalDirty = execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { encoding: 'utf8' }).trim();
   if (finalDirty) throw new Error('Pass 66 prone contact matrix source drifted during execution');
   const finalSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
@@ -103,6 +124,11 @@ test.afterAll(async () => {
     contract: {
       arenas: ARENAS,
       renderProfiles: PROFILES,
+      browserProcessIsolation: requestedProfile && requestedPhase && requestedArena
+        ? 'single-render-profile-phase-and-arena'
+        : requestedProfile && requestedPhase
+          ? 'single-render-profile-and-phase'
+        : requestedProfile ? 'single-render-profile' : 'combined-process',
       soloCells: soloRows.length,
       twoPeerCells: multiplayerRows.length,
       fixtureDiscovery: 'live arena bounds plus collisionProbeAt; no authored contact coordinates',
@@ -397,13 +423,18 @@ async function proveSoloActions(page: Page, label: string): Promise<Record<strin
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setReloadCaptureProgress(null));
   await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.reloading === false, undefined, { timeout: 6_000 });
   before = await presentedFrame(page);
-  const accepted = await page.evaluate(() => {
+  const meleeAttempt = await page.evaluate(() => {
     const api = window.__ATOMIC_ACRES_DEBUG__;
+    const before = api.snapshot().player.lastMeleeAt;
+    const now = performance.now();
     const outcome = api.melee();
     api.setMeleeCaptureProgress(0.42);
-    return outcome.accepted;
+    return { before, now, outcome };
   });
-  expect(accepted, `${label}/melee: accepted`).toBe(true);
+  expect(
+    meleeAttempt.outcome.accepted,
+    `${label}/melee: accepted ${JSON.stringify(meleeAttempt)}`,
+  ).toBe(true);
   await page.waitForFunction(() => {
     const presentation = window.__ATOMIC_ACRES_DEBUG__.snapshot().weaponPresentation;
     return presentation.actionContract.state === 'melee'
@@ -567,6 +598,7 @@ function remoteProneSummary(remote: any, expectedId: string, label: string): Rec
 
 test('keeps prone hip, ADS, fire, reload and melee viewmodels clear at live contact on every arena and render profile', async ({ browser, browserName }) => {
   test.skip(!enabled, 'Run the explicit clean-SHA Pass 66 prone contact matrix command.');
+  test.skip(requestedPhase === 'multiplayer', 'The isolated process owns only the multiplayer phase.');
   test.skip(browserName !== 'chromium', 'The release matrix runs in the installed Chromium-family browser.');
   test.setTimeout(renderer === 'webgpu' ? 2_400_000 : 1_500_000);
   for (const profile of PROFILES) for (const arena of ARENAS) {
@@ -607,6 +639,7 @@ test('keeps prone hip, ADS, fire, reload and melee viewmodels clear at live cont
 
 test('replicates both peers canonical prone stance and finite authored operator mounts on every multiplayer arena/profile cell', async ({ browser, browserName }) => {
   test.skip(!enabled, 'Run the explicit clean-SHA Pass 66 prone contact matrix command.');
+  test.skip(requestedPhase === 'solo', 'The isolated process owns only the solo phase.');
   test.skip(browserName !== 'chromium', 'The release matrix runs in the installed Chromium-family browser.');
   test.setTimeout(renderer === 'webgpu' ? 3_000_000 : 2_100_000);
   if (!peerServer) throw new Error('Owned PeerJS server is not ready');
