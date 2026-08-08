@@ -61,6 +61,19 @@ jobs:
           VITE_MATCH_DIAGNOSTICS_URL: https://atomic-acres-leaderboard.atomic-acres.workers.dev
       - name: Verify exact production bytes
         run: npm run verify:release-tree
+      - name: Rebuild Pass 67.1 stable with its original Pages publication timestamp
+        shell: bash
+        run: |
+          set -euo pipefail
+          stable_source_sha="$(node -e "console.log(JSON.parse(require('fs').readFileSync('release-channels.json','utf8')).stable.sourceSha)")"
+          stable_pages_sha="$(node -e "console.log(JSON.parse(require('fs').readFileSync('release-channels.json','utf8')).stable.pagesSha)")"
+          git cat-file -e "${stable_source_sha}^{commit}" 2>/dev/null || git fetch --no-tags origin "$stable_source_sha"
+          git cat-file -e "${stable_pages_sha}^{commit}" 2>/dev/null || git fetch --no-tags origin "$stable_pages_sha"
+          stable_released_at="$(date -u -d "$(git show -s --format=%cI "$stable_pages_sha")" +'%Y-%m-%dT%H:%M:%SZ')"
+          git worktree add artifacts/pass67-stable-src "$stable_source_sha"
+          (cd artifacts/pass67-stable-src && npm ci --ignore-scripts && VITE_MATCH_BUILD_ID="$stable_source_sha" VITE_RELEASED_AT="$stable_released_at" npm run build)
+          echo "RELEASE_STABLE_DIST=$(pwd)/artifacts/pass67-stable-src/dist" >> "$GITHUB_ENV"
+          echo "STABLE_RELEASED_AT=$stable_released_at" >> "$GITHUB_ENV"
       - name: Install topology browser
         run: npx playwright install --with-deps chromium
       - name: Rebuild Pass 63 rollback from approved source
@@ -68,7 +81,7 @@ jobs:
           git worktree add artifacts/pass63-rollback-src ac85e9b8b46cc2370aee903d564ecf3c4682b24c
           (cd artifacts/pass63-rollback-src && npm ci --ignore-scripts && VITE_MATCH_BUILD_ID=ac85e9b8b46cc2370aee903d564ecf3c4682b24c VITE_RELEASED_AT="$RELEASE_BUILT_AT" npm run build)
           echo "RELEASE_ROLLBACK_DIST=$(pwd)/artifacts/pass63-rollback-src/dist" >> "$GITHUB_ENV"
-      - name: Stage live approved The Big One, byte-exact stable Pass 67.1 and rebuilt Pass 63 rollback
+      - name: Stage live approved The Big One, timestamped rebuilt Pass 67.1 stable and rebuilt Pass 63 rollback
         run: |
           test -n "${RELEASE_BUILT_AT:-}"
           git fetch --no-tags origin gh-pages:refs/remotes/origin/gh-pages
@@ -84,6 +97,9 @@ jobs:
         env:
           SOURCE_SHA: ${{ inputs.source_sha }}
           RELEASE_PASS: ${{ inputs.release_pass }}
+          RELEASE_STABLE_DIST: ${{ env.RELEASE_STABLE_DIST }}
+          STABLE_RELEASED_AT: ${{ env.STABLE_RELEASED_AT }}
+          REQUIRE_STABLE_RELEASE_TIMESTAMP: '1'
           RELEASE_ROLLBACK_DIST: ${{ env.RELEASE_ROLLBACK_DIST }}
       - name: Configure release commit identity
         run: |

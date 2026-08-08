@@ -67,28 +67,41 @@ async function verifyPublishedProvenance() {
   if (sourceSha) assertEqual(live.sourceSha, sourceSha, 'Live provenance sourceSha');
   if (releasePass) assertEqual(live.releasePass, releasePass, 'Live provenance releasePass');
 
-  const stableOriginal = await fetchJson(`${channelConfig.stable.path}/channel-provenance.json`);
-  assertEqual(stableOriginal.schemaVersion, 4, 'Stable embedded provenance schema');
-  assertEqual(stableOriginal.releasePass, channelConfig.stable.pass, 'Stable embedded provenance pass');
-  assertEqual(stableOriginal.sourceSha, channelConfig.stable.sourceSha, 'Stable embedded sourceSha');
-  assertEqual(stableOriginal.path, channelConfig.stable.pagesPath, 'Stable embedded source path');
-  assertEqual(stableOriginal.exactRootFileCount, channelConfig.stable.runtimeFileCount, 'Stable embedded runtime file count');
-  assertEqual(stableOriginal.treeSha256, channelConfig.stable.runtimeTreeSha256, 'Stable embedded runtime digest');
-
-  const stableWrapper = await fetchJson(`${channelConfig.stable.path}/pinned-channel-provenance.json`);
-  assertEqual(stableWrapper.schemaVersion, 4, 'Stable wrapper provenance schema');
-  assertEqual(stableWrapper.channel, 'recent-stable', 'Stable wrapper channel');
-  assertEqual(stableWrapper.releasePass, channelConfig.stable.pass, 'Stable wrapper pass');
-  assertEqual(stableWrapper.sourceSha, channelConfig.stable.sourceSha, 'Stable wrapper sourceSha');
-  assertEqual(stableWrapper.pagesSha, channelConfig.stable.pagesSha, 'Stable wrapper pagesSha');
-  assertEqual(stableWrapper.pagesPath, channelConfig.stable.pagesPath, 'Stable wrapper Pages path');
-  assertEqual(stableWrapper.path, channelConfig.stable.path, 'Stable wrapper route');
-  assertEqual(stableWrapper.pinnedRuntime?.sourceSha, stableOriginal.sourceSha, 'Stable wrapper embedded sourceSha');
-  assertEqual(stableWrapper.pinnedRuntime?.exactRootFileCount, stableOriginal.exactRootFileCount, 'Stable wrapper embedded file count');
-  assertEqual(stableWrapper.pinnedRuntime?.treeSha256, stableOriginal.treeSha256, 'Stable wrapper embedded digest');
-
   provenance.live = live;
-  provenance.stable = { wrapper: stableWrapper, embedded: stableOriginal };
+  const stableOriginal = await fetchJson(`${channelConfig.stable.path}/channel-provenance.json`);
+  if (stableOriginal.rebuiltFromSource === true) {
+    assertEqual(stableOriginal.schemaVersion, 4, 'Stable rebuilt provenance schema');
+    assertEqual(stableOriginal.channel, 'recent-stable', 'Stable rebuilt channel');
+    assertEqual(stableOriginal.releasePass, channelConfig.stable.pass, 'Stable rebuilt pass');
+    assertEqual(stableOriginal.sourceSha, channelConfig.stable.sourceSha, 'Stable rebuilt sourceSha');
+    assertEqual(stableOriginal.path, channelConfig.stable.path, 'Stable rebuilt route');
+    assertEqual(stableOriginal.originalPagesSha, channelConfig.stable.pagesSha, 'Stable original Pages SHA');
+    assertEqual(stableOriginal.originalPagesPath, channelConfig.stable.pagesPath, 'Stable original Pages path');
+    if (!stableOriginal.releasedAt || Number.isNaN(Date.parse(stableOriginal.releasedAt))) {
+      throw new Error(`Stable rebuilt timestamp is invalid: ${JSON.stringify(stableOriginal.releasedAt)}`);
+    }
+    provenance.stable = { rebuilt: stableOriginal };
+  } else {
+    assertEqual(stableOriginal.schemaVersion, 4, 'Stable embedded provenance schema');
+    assertEqual(stableOriginal.releasePass, channelConfig.stable.pass, 'Stable embedded provenance pass');
+    assertEqual(stableOriginal.sourceSha, channelConfig.stable.sourceSha, 'Stable embedded sourceSha');
+    assertEqual(stableOriginal.path, channelConfig.stable.pagesPath, 'Stable embedded source path');
+    assertEqual(stableOriginal.exactRootFileCount, channelConfig.stable.runtimeFileCount, 'Stable embedded runtime file count');
+    assertEqual(stableOriginal.treeSha256, channelConfig.stable.runtimeTreeSha256, 'Stable embedded runtime digest');
+
+    const stableWrapper = await fetchJson(`${channelConfig.stable.path}/pinned-channel-provenance.json`);
+    assertEqual(stableWrapper.schemaVersion, 4, 'Stable wrapper provenance schema');
+    assertEqual(stableWrapper.channel, 'recent-stable', 'Stable wrapper channel');
+    assertEqual(stableWrapper.releasePass, channelConfig.stable.pass, 'Stable wrapper pass');
+    assertEqual(stableWrapper.sourceSha, channelConfig.stable.sourceSha, 'Stable wrapper sourceSha');
+    assertEqual(stableWrapper.pagesSha, channelConfig.stable.pagesSha, 'Stable wrapper pagesSha');
+    assertEqual(stableWrapper.pagesPath, channelConfig.stable.pagesPath, 'Stable wrapper Pages path');
+    assertEqual(stableWrapper.path, channelConfig.stable.path, 'Stable wrapper route');
+    assertEqual(stableWrapper.pinnedRuntime?.sourceSha, stableOriginal.sourceSha, 'Stable wrapper embedded sourceSha');
+    assertEqual(stableWrapper.pinnedRuntime?.exactRootFileCount, stableOriginal.exactRootFileCount, 'Stable wrapper embedded file count');
+    assertEqual(stableWrapper.pinnedRuntime?.treeSha256, stableOriginal.treeSha256, 'Stable wrapper embedded digest');
+    provenance.stable = { wrapper: stableWrapper, embedded: stableOriginal };
+  }
 }
 
 async function observedPage() {
@@ -173,7 +186,9 @@ async function verifyRuntime(page, expectedPath, expectedPass, expectedChangelog
   if (expectedChangelogId) {
     await page.waitForSelector('#last-updated-btn', { timeout: 60_000 });
     const lastReleaseLabel = (await page.locator('#last-updated-btn').textContent())?.trim() ?? '';
-    const requiresPublishedTimestamp = !releasePass || normalizedPass(expectedPass) === normalizedPass(releasePass);
+    const requiresPublishedTimestamp = Boolean(expectedReleasedAt)
+      || !releasePass
+      || normalizedPass(expectedPass) === normalizedPass(releasePass);
     if (!lastReleaseLabel.includes('LAST RELEASE')
       || (requiresPublishedTimestamp && lastReleaseLabel.includes('PENDING_PRODUCTION'))) {
       throw new Error(`Invalid Last Release label for ${expectedPass}: ${JSON.stringify(lastReleaseLabel)}`);

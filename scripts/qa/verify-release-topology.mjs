@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join, resolve, sep } from 'node:path';
+import { join, relative, resolve, sep } from 'node:path';
 
 const root = resolve('.');
 const dist = join(root, 'dist');
@@ -33,6 +34,20 @@ if (JSON.stringify(stagedChannelDirectories) !== JSON.stringify(expectedDirector
   throw new Error(`Unexpected staged channels: ${stagedChannelDirectories.join(', ')}`);
 }
 
+const walkFiles = (directory) => readdirSync(directory, { withFileTypes: true })
+  .flatMap((entry) => entry.isDirectory() ? walkFiles(join(directory, entry.name)) : [join(directory, entry.name)])
+  .sort();
+const treeDigest = (rootPath, paths) => {
+  const hash = createHash('sha256');
+  for (const path of paths) {
+    hash.update(relative(rootPath, path).replaceAll('\\', '/'));
+    hash.update('\0');
+    hash.update(readFileSync(path));
+    hash.update('\0');
+  }
+  return hash.digest('hex');
+};
+
 function verifyPinned(channel) {
   const targetRoot = resolve(dist, channel.path);
   if (!targetRoot.startsWith(`${dist}${sep}`)) throw new Error('Unsafe staged channel');
@@ -52,17 +67,45 @@ function verifyPinned(channel) {
   }
   return paths.length;
 }
-const stableFiles = verifyPinned(config.stable);
-const stableProvenanceFile = config.stable.pagesPath ? 'pinned-channel-provenance.json' : 'channel-provenance.json';
-const stableProvenance = JSON.parse(readFileSync(join(dist, config.stable.path, stableProvenanceFile), 'utf8'));
-if (stableProvenance.schemaVersion !== 4
-  || stableProvenance.releasePass !== config.stable.pass
-  || stableProvenance.sourceSha !== config.stable.sourceSha
-  || stableProvenance.pagesSha !== config.stable.pagesSha
-  || stableProvenance.pagesPath !== config.stable.pagesPath
-  || stableProvenance.pinnedRuntime?.exactRootFileCount !== config.stable.runtimeFileCount
-  || stableProvenance.pinnedRuntime?.treeSha256 !== config.stable.runtimeTreeSha256) {
-  throw new Error('Stable Pass 67.1 provenance does not match the exact configured source and Pages SHAs');
+const stableRoot = resolve(dist, config.stable.path);
+const rebuiltStableProvenancePath = join(stableRoot, 'channel-provenance.json');
+const rebuiltStable = existsSync(rebuiltStableProvenancePath)
+  ? JSON.parse(readFileSync(rebuiltStableProvenancePath, 'utf8'))
+  : null;
+let stableFiles;
+if (rebuiltStable?.rebuiltFromSource === true) {
+  const files = walkFiles(stableRoot).filter((path) => path !== rebuiltStableProvenancePath);
+  const passEvidence = files.some((path) => path.endsWith('.js') && readFileSync(path).includes(Buffer.from(config.stable.pass)));
+  const sourceEvidence = files.some((path) => path.endsWith('.js') && readFileSync(path).includes(Buffer.from(config.stable.sourceSha)));
+  if (rebuiltStable.schemaVersion !== 4
+    || rebuiltStable.channel !== 'recent-stable'
+    || rebuiltStable.releasePass !== config.stable.pass
+    || rebuiltStable.sourceSha !== config.stable.sourceSha
+    || rebuiltStable.path !== config.stable.path
+    || rebuiltStable.originalPagesSha !== config.stable.pagesSha
+    || rebuiltStable.originalPagesPath !== config.stable.pagesPath
+    || rebuiltStable.exactRootFileCount !== files.length
+    || rebuiltStable.treeSha256 !== treeDigest(stableRoot, files)
+    || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(rebuiltStable.releasedAt ?? '')
+    || Number.isNaN(Date.parse(rebuiltStable.releasedAt))
+    || !passEvidence
+    || !sourceEvidence) {
+    throw new Error('Stable Pass 67.1 rebuilt provenance does not match its configured source, timestamp, and staged bytes');
+  }
+  stableFiles = files.length;
+} else {
+  stableFiles = verifyPinned(config.stable);
+  const stableProvenanceFile = config.stable.pagesPath ? 'pinned-channel-provenance.json' : 'channel-provenance.json';
+  const stableProvenance = JSON.parse(readFileSync(join(stableRoot, stableProvenanceFile), 'utf8'));
+  if (stableProvenance.schemaVersion !== 4
+    || stableProvenance.releasePass !== config.stable.pass
+    || stableProvenance.sourceSha !== config.stable.sourceSha
+    || stableProvenance.pagesSha !== config.stable.pagesSha
+    || stableProvenance.pagesPath !== config.stable.pagesPath
+    || stableProvenance.pinnedRuntime?.exactRootFileCount !== config.stable.runtimeFileCount
+    || stableProvenance.pinnedRuntime?.treeSha256 !== config.stable.runtimeTreeSha256) {
+    throw new Error('Stable Pass 67.1 provenance does not match the exact configured source and Pages SHAs');
+  }
 }
 const experimentalRoot = resolve(dist, config.experimental.path);
 if (!existsSync(join(experimentalRoot, 'index.html')) || !existsSync(join(experimentalRoot, 'assets'))) throw new Error('Experimental channel is incomplete');

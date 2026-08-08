@@ -9,6 +9,7 @@ describe('release change impact', () => {
       '.github/workflows/verify.yml',
       'scripts/release/change-impact.mjs',
       'scripts/qa/run-with-preview-server.mjs',
+      'src/release-topology.test.ts',
     ])).toEqual({ mode: 'none', reason: 'process-only' });
   });
 
