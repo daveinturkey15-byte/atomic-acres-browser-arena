@@ -21406,15 +21406,15 @@ function pollMobileTouch(): void {
 let mobilePresentationActive = false;
 
 /**
- * Mobile play is authored for landscape: enter fullscreen (a prerequisite for
- * orientation lock on Android) and lock to landscape. Best-effort - iOS Safari
- * has no orientation-lock API, so the CSS portrait hint covers that case.
+ * Mobile play uses the available viewport in either orientation. Fullscreen
+ * and orientation lock remain best-effort enhancements, never a prerequisite
+ * for the touch controls or portrait HUD.
  */
 function requestMobileLandscapePresentation(): void {
   const docEl = document.documentElement as HTMLElement & { requestFullscreen?: () => Promise<void> };
   const lock = (): void => {
     const orientation = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
-    orientation.lock?.('landscape').catch(() => {});
+    orientation.lock?.(window.matchMedia('(orientation: portrait)').matches ? 'portrait' : 'landscape').catch(() => {});
   };
   if (!document.fullscreenElement && typeof docEl.requestFullscreen === 'function') {
     docEl.requestFullscreen().then(lock).catch(() => {});
