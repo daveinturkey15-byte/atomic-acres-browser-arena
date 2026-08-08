@@ -474,14 +474,39 @@ async function startMultiplayerMatch(
   await guest.locator('#lobby-ready').click();
   await expect(host.locator('#lobby-start')).toBeEnabled();
   await host.locator('#lobby-start').click();
-  await Promise.all([host, guest].map((page) => page.waitForFunction(({ expectedArena, expectedProfile }) => {
+  const activeMatchPredicate = ({ expectedArena, expectedProfile }: { expectedArena: ArenaId; expectedProfile: RenderProfile }) => {
     const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
     return state.gameStarted && state.matchPhase === 'active'
       && state.arenaSelection.id === expectedArena
       && state.render.profile === expectedProfile
       && state.remotePlayers.length === 1
       && state.remotePlayers[0].operatorModel !== null;
-  }, { expectedArena: arena, expectedProfile: profile }, { timeout: renderer === 'webgpu' ? 150_000 : 75_000 })));
+  };
+  try {
+    await Promise.all([host, guest].map((page) => page.waitForFunction(
+      activeMatchPredicate,
+      { expectedArena: arena, expectedProfile: profile },
+      { timeout: renderer === 'webgpu' ? 150_000 : 75_000 },
+    )));
+  } catch (error) {
+    const peerStates = await Promise.all([host, guest].map((page) => page.evaluate(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+      return {
+        playerId: state.player.id,
+        gameStarted: state.gameStarted,
+        matchPhase: state.matchPhase,
+        arenaId: state.arenaSelection.id,
+        renderProfile: state.render.profile,
+        actualBackend: state.render.runtime.actualBackend,
+        remotePlayers: state.remotePlayers.map((remote: any) => ({
+          id: remote.id,
+          stance: remote.stance,
+          operatorModel: remote.operatorModel,
+        })),
+      };
+    })));
+    throw new Error(`Two-peer active-match gate failed for ${caseLabel(arena, profile)}: ${JSON.stringify(peerStates)}`, { cause: error });
+  }
   return identities;
 }
 
