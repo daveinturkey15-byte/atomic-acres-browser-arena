@@ -160,7 +160,11 @@ async function captureIsolatedReticle(page: Page, weapon: WeaponId): Promise<Rea
 }>> {
   const name = `${String(WEAPON_IDS.indexOf(weapon) + 1).padStart(2, '0')}-${weapon}-${renderer}-isolated-reticle.png`;
   const path = resolve(output, name);
-  await page.evaluate(() => {
+  const wasHidden = await page.evaluate(() => {
+    window.__ATOMIC_ACRES_DEBUG__!.setRenderPaused(true);
+    const crosshair = document.querySelector<HTMLElement>('#crosshair')!;
+    const hidden = crosshair.hidden;
+    crosshair.hidden = false;
     const style = document.createElement('style');
     style.id = 'pass66-ads-isolated-reticle';
     style.textContent = `
@@ -177,7 +181,9 @@ async function captureIsolatedReticle(page: Page, weapon: WeaponId): Promise<Rea
       #hud::before, #hud::after { display: none !important; }
     `;
     document.head.append(style);
+    return hidden;
   });
+  expect(wasHidden, `${weapon}: physical sight owns the live ADS picture`).toBe(true);
   let bytes: Buffer;
   try {
     bytes = await page.screenshot({
@@ -187,7 +193,11 @@ async function captureIsolatedReticle(page: Page, weapon: WeaponId): Promise<Rea
       timeout: 60_000,
     });
   } finally {
-    await page.evaluate(() => document.querySelector('#pass66-ads-isolated-reticle')?.remove());
+    await page.evaluate((hidden) => {
+      document.querySelector('#pass66-ads-isolated-reticle')?.remove();
+      document.querySelector<HTMLElement>('#crosshair')!.hidden = hidden;
+      window.__ATOMIC_ACRES_DEBUG__!.setRenderPaused(false);
+    }, wasHidden);
   }
   const { data, info } = await sharp(bytes).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   expect(info, `${weapon}: isolated reticle dimensions`).toMatchObject({ width: 320, height: 320, channels: 3 });
