@@ -25,7 +25,7 @@ test.describe('Pass 66 Field Kit and killstreak menu correction', () => {
     }));
   });
 
-  test('shows asset-backed stills, exact metric parity and live custom-primary projection', async ({ page }, testInfo) => {
+  test('shows weapon-specific previews, exact metric parity and live custom-primary projection', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 1600, height: 900 });
     await ready(page);
     await page.locator('#menu-tab-kit').click();
@@ -57,6 +57,7 @@ test.describe('Pass 66 Field Kit and killstreak menu correction', () => {
     await expect.poll(async () => page.locator('#menu-panel-kit [data-weapon-still]').evaluateAll((images) => (
       images.every((image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0)
     ))).toBe(true);
+    await expect(page.locator('#menu-panel-kit')).not.toContainText('ASSET-BACKED STILL');
 
     await page.locator('[data-custom-modify="custom-1"]').click();
     await page.locator('#loadout-manage-preset').selectOption('custom-1');
@@ -67,8 +68,9 @@ test.describe('Pass 66 Field Kit and killstreak menu correction', () => {
     await expect(page.locator('[data-custom-preset-id="custom-1"] [data-weapon-stat-name]')).toHaveText('AK-47');
     await expect(page.locator('[data-custom-preset-id="custom-1"] [data-weapon-metric="fire-rate"] [data-weapon-metric-value]'))
       .toHaveText('600 RPM');
-    await expect(page.locator('#loadout-inspector [data-loadout-stat]')).toHaveCount(4);
-    await expect(page.locator('#loadout-inspector .loadout-inspector-dps')).toHaveCount(0);
+    await expect(page.locator('#loadout-inspector [data-loadout-stat]')).toHaveCount(5);
+    await expect(page.locator('#loadout-inspector .loadout-inspector-dps')).toBeVisible();
+    await expect(page.locator('#loadout-inspector [data-loadout-value="dps"]')).toHaveText('350');
 
     const idleCustomCardStyle = await page.locator('[data-custom-preset-id="custom-2"]').evaluate((card) => {
       const title = card.querySelector('strong')!;

@@ -150,7 +150,7 @@ export const WEAPON_MENU_PRESENTATIONS: Readonly<Record<WeaponId, WeaponMenuPres
     weaponId: weapon.id as WeaponId,
     displayName: weapon.displayName,
     stillPath: stillPathFor(weapon),
-    stillAlt: `${weapon.displayName} project-original asset-backed weapon render`,
+    stillAlt: `${weapon.displayName} weapon preview`,
     metrics: metricsFor(weapon),
   })])) as Record<WeaponId, WeaponMenuPresentation>,
 );

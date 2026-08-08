@@ -13,7 +13,7 @@ const expectedMetricIds = [
 ];
 
 describe('HF-182/HF-183 Field Kit weapon presentation', () => {
-  it('covers the complete canonical weapon catalog with shipped asset-backed WebP stills', () => {
+  it('covers the complete canonical weapon catalog with weapon-specific WebP previews', () => {
     expect(Object.keys(WEAPON_MENU_PRESENTATIONS).sort()).toEqual(WEAPON_CATALOG.map(({ id }) => id).sort());
     for (const weapon of WEAPON_CATALOG) {
       const presentation = WEAPON_MENU_PRESENTATIONS[weapon.id as WeaponId];

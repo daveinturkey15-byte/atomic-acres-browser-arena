@@ -175,6 +175,7 @@ describe('production release workflow', () => {
       'T-FIELD-KIT-MENU',
       'T-RUSTRIG-PHYSICS',
       'T-PICKUP-REPICK',
+      'T-MOBILE-TOUCH-69-1',
     ]);
     const playwrightCommands = playwrightTests.map(({ command }: { command: string }) => command);
     expect(playwrightCommands.every((command: string) => command.startsWith('npm run qa:playwright-topology -- '))).toBe(true);

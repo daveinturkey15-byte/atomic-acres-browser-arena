@@ -2,12 +2,12 @@
   "schemaVersion": 4,
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
-    "label": "THE BIG ONE v69",
-    "description": "Pass 69: responsive Field Kit metrics, corrected first-person arms, reconciled Chopper presentation, and multiplayer-ready release candidate."
+    "label": "THE BIG ONE v69.1",
+    "description": "Pass 69.1: gamepad-shaped mobile sticks, rotation recovery, restored Field Kit DPS, and front-page refresh controls."
   },
   "experimental": {
-    "label": "THE BIG ONE v69",
-    "description": "Pass 69 live release; Pass 67.1 preserved as the stable singleplayer fallback and Pass 63 remains the rollback.",
+    "label": "THE BIG ONE v69.1",
+    "description": "Pass 69.1 live release; Pass 67.1 preserved as the stable singleplayer fallback and Pass 63 remains the rollback.",
     "pass": "PASS 69",
     "path": "channels/the-big-one"
   },

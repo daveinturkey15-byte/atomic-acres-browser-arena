@@ -61,6 +61,12 @@ function overlaps(a: RectRecord, b: RectRecord): boolean {
     && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1;
 }
 
+function edgeGap(a: RectRecord, b: RectRecord): number {
+  const horizontal = Math.max(0, Math.max(a.left, b.left) - Math.min(a.right, b.right));
+  const vertical = Math.max(0, Math.max(a.top, b.top) - Math.min(a.bottom, b.bottom));
+  return Math.hypot(horizontal, vertical);
+}
+
 for (const viewport of [
   { name: 'narrow portrait', width: 320, height: 667 },
   { name: 'portrait', width: 390, height: 844 },
@@ -83,6 +89,11 @@ for (const viewport of [
       }
     }
     expect(collisions).toEqual([]);
+    const lookStick = rects.find(({ label }) => label === 'stick-look');
+    const fire = rects.find(({ label }) => label === 'fire');
+    expect(lookStick).toBeDefined();
+    expect(fire).toBeDefined();
+    expect(edgeGap(lookStick!, fire!), 'FIRE stays within one thumb gap of the aim stick').toBeLessThanOrEqual(24);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
     const evidenceDir = resolve(process.cwd(), 'artifacts/pass69/mobile-touch-layout');
     mkdirSync(evidenceDir, { recursive: true });
@@ -91,6 +102,93 @@ for (const viewport of [
     await testInfo.attach(`${viewport.name}-layout`, { path: screenshot, contentType: 'image/png' });
   });
 }
+
+test('acquires each stick through its centre knob and emits gamepad-shaped axes', async ({ page }) => {
+  await ready(page, 844, 390);
+  const move = page.locator('[data-mtc="stick-move"]');
+  const moveKnob = move.locator('.mtc-stick-knob');
+  await expect(moveKnob).not.toHaveAttribute('data-mtc', /.+/u);
+  const moveBounds = await move.boundingBox();
+  if (!moveBounds) throw new Error('Move stick has no touch target');
+  const before = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.position as number[]);
+  await page.mouse.move(moveBounds.x + moveBounds.width / 2, moveBounds.y + moveBounds.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(moveBounds.x + moveBounds.width * 0.78, moveBounds.y + moveBounds.height / 2);
+  await expect.poll(async () => page.evaluate((start) => {
+    const current = window.__ATOMIC_ACRES_DEBUG__.snapshot().player.position as number[];
+    return Math.hypot(current[0] - start[0], current[2] - start[2]);
+  }, before)).toBeGreaterThan(0.2);
+  await page.mouse.up();
+
+  const look = page.locator('[data-mtc="stick-look"]');
+  const lookBounds = await look.boundingBox();
+  if (!lookBounds) throw new Error('Look stick has no touch target');
+  const yawBefore = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().deterministicReview.captureCameraYaw as number);
+  await page.mouse.move(lookBounds.x + lookBounds.width / 2, lookBounds.y + lookBounds.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(lookBounds.x + lookBounds.width * 0.78, lookBounds.y + lookBounds.height / 2);
+  await expect.poll(async () => page.evaluate((start) => (
+    Math.abs((window.__ATOMIC_ACRES_DEBUG__.snapshot().deterministicReview.captureCameraYaw as number) - start)
+  ), yawBefore)).toBeGreaterThan(0.02);
+  await page.mouse.up();
+});
+
+test('survives bidirectional mid-match rotation and clears held touch ownership', async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await ready(page, 390, 844);
+
+  const move = page.locator('[data-mtc="stick-move"]');
+  const moveKnob = move.locator('.mtc-stick-knob');
+  const moveBounds = await move.boundingBox();
+  if (!moveBounds) throw new Error('MOVE control has no touch target');
+  const portraitFrame = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().frameCount);
+  await page.mouse.move(moveBounds.x + moveBounds.width / 2, moveBounds.y + moveBounds.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(moveBounds.x + moveBounds.width * 0.78, moveBounds.y + moveBounds.height / 2);
+  await expect.poll(async () => moveKnob.evaluate((element) => (element as HTMLElement).style.transform))
+    .not.toBe('translate(-50%, -50%)');
+  await page.setViewportSize({ width: 844, height: 390 });
+  await expect.poll(async () => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.admissionState().matchPhase)).toBe('active');
+  await expect.poll(async () => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().frameCount)).toBeGreaterThan(portraitFrame);
+  await expect.poll(async () => moveKnob.evaluate((element) => (element as HTMLElement).style.transform))
+    .toBe('translate(-50%, -50%)');
+  await page.mouse.up();
+
+  const look = page.locator('[data-mtc="stick-look"]');
+  const lookKnob = look.locator('.mtc-stick-knob');
+  const lookBounds = await look.boundingBox();
+  if (!lookBounds) throw new Error('AIM control has no touch target');
+  const landscapeFrame = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().frameCount);
+  await page.mouse.move(lookBounds.x + lookBounds.width / 2, lookBounds.y + lookBounds.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(lookBounds.x + lookBounds.width * 0.78, lookBounds.y + lookBounds.height / 2);
+  await expect.poll(async () => lookKnob.evaluate((element) => (element as HTMLElement).style.transform))
+    .not.toBe('translate(-50%, -50%)');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(async () => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.admissionState().matchPhase)).toBe('active');
+  await expect.poll(async () => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().frameCount)).toBeGreaterThan(landscapeFrame);
+  await expect.poll(async () => lookKnob.evaluate((element) => (element as HTMLElement).style.transform))
+    .toBe('translate(-50%, -50%)');
+  await page.mouse.up();
+
+  const fire = page.locator('[data-mtc="fire"]');
+  const fireBounds = await fire.boundingBox();
+  if (!fireBounds) throw new Error('FIRE control has no touch target');
+  await page.mouse.move(fireBounds.x + fireBounds.width / 2, fireBounds.y + fireBounds.height / 2);
+  await page.mouse.down();
+  await expect.poll(async () => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().textChat.triggerHeld)).toBe(true);
+  await page.setViewportSize({ width: 844, height: 390 });
+  await expect.poll(async () => page.evaluate(() => ({
+    phase: window.__ATOMIC_ACRES_DEBUG__.admissionState().matchPhase,
+    triggerHeld: window.__ATOMIC_ACRES_DEBUG__.snapshot().textChat.triggerHeld,
+    frameCount: window.__ATOMIC_ACRES_DEBUG__.snapshot().frameCount,
+  }))).toMatchObject({ phase: 'active', triggerHeld: false, frameCount: expect.any(Number) });
+  await expect(page.locator('#mobile-touch-controls')).toBeVisible();
+  await expect(page.locator('body')).toHaveClass(/mtc-live/u);
+  await page.mouse.up();
+  expect(pageErrors).toEqual([]);
+});
 
 test('fires a semi-automatic weapon from touch without pointer lock', async ({ page }) => {
   await ready(page, 390, 844);

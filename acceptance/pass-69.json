@@ -1,171 +1,249 @@
 {
   "schemaVersion": 1,
   "releasePass": "PASS 69",
-  "feedbackReceivedAt": "2026-08-07T19:01:49.302Z",
+  "feedbackReceivedAt": "2026-08-08T14:07:11Z",
   "status": "accepted",
   "preview": {
     "kind": "github-actions-artifact",
-    "ref": "pr-preview-51-df330132ee34b36e30f6a5b85c20ab6a8171bd40",
-    "sourceSha": "df330132ee34b36e30f6a5b85c20ab6a8171bd40",
-    "createdAt": "2026-08-08T11:06:47.056Z"
+    "ref": "pr-preview-53-139a753dd11658a3855832d73b1222308f1b0e24",
+    "sourceSha": "139a753dd11658a3855832d73b1222308f1b0e24",
+    "createdAt": "2026-08-08T14:28:38.949Z"
   },
   "humanAcceptance": {
     "state": "approved",
     "approvedBy": "Dave",
-    "approvedAt": "2026-08-08T11:16:29Z",
-    "evidence": "Dave's current instruction after immutable PR #51 preview artifact 9020910443 became available at source SHA df330132ee34b36e30f6a5b85c20ab6a8171bd40 is: 'Just get it live on GitHub pages ... Then I can preview it that way.' This is explicit publication authorization for that exact artifact; Dave has not claimed a pre-publication manual browser inspection. Farcrysis remains excluded and deferred to Pass 78; killstreak videos remain out of scope. The known stale prerecorded Chopper menu-preview provenance is explicitly deferred and is not represented as new video evidence."
+    "approvedAt": "2026-08-08T14:31:31Z",
+    "evidence": "Dave approved through the current authorized owner Telegram channel after immutable artifact 9023055533 became available. His selected response was: 'Approve this exact preview and publish Pass 69.1'. This binds publication authorization to preview pr-preview-53-139a753dd11658a3855832d73b1222308f1b0e24 at source SHA 139a753dd11658a3855832d73b1222308f1b0e24. Dave had stated that he would test the mobile feel more properly later, so this records exact publication approval and does not claim hands-on preview inspection."
   },
   "requirements": [
     {
       "id": "R1",
-      "summary": "Field Kit cards and the selected-primary inspector remain readable at four core metrics",
-      "expected": "Asset-backed Field Kit weapon cards and the selected-primary inspector display Damage, Range, Fire Rate, and Magazine inside their bounds without duplicate DPS, wallbang, or expandable extra-ballistics density.",
-      "falsifier": "A served Field Kit card hides or clips its four-metric deck, loses the asset-backed weapon still, duplicates DPS/wallbang, or restores the expandable extra-ballistics block.",
-      "acceptance": "visual",
+      "summary": "Mobile thumbsticks acquire through their complete visible discs and emulate normalized gamepad axes",
+      "expected": "Move and aim engage from the centre knob, inner disc, edge and diagonals; the visible fixed-origin disc maps to circular -1..1 axes and uses the same applyRadialDeadzone curve as physical gamepad sticks.",
+      "falsifier": "A centre-knob press is ignored, an inner press only works near the edge, diagonal magnitude exceeds one, or touch and physical-gamepad radial shaping diverge.",
+      "acceptance": "mixed",
       "state": "verified",
       "evidence": [
         {
+          "kind": "unit",
+          "ref": "src/mobile-touch-controls.test.ts",
+          "command": "npx vitest run src/mobile-touch-controls.test.ts",
+          "note": "Pure centre, inner, edge and diagonal projections use the physical-gamepad radial deadzone helper and remain circularly bounded."
+        },
+        {
           "kind": "browser",
-          "ref": "tests/e2e/pass66-field-kit-killstreak-menu.spec.ts",
-          "command": "npx playwright test tests/e2e/pass66-field-kit-killstreak-menu.spec.ts --project chromium --workers=1 --retries=0",
-          "note": "The exact candidate Chromium contract passed all six Field Kit/menu tests and checks four metrics per card, four selected-primary stats, asset-backed stills, computed layout, and bounded desktop/mobile surfaces."
+          "ref": "tests/e2e/pass69-mobile-touch-layout.spec.ts",
+          "command": "npm run qa:playwright-topology -- tests/e2e/pass69-mobile-touch-layout.spec.ts --project=chromium --workers=1 --retries=0",
+          "note": "A real captured pointer acquires through each centre knob, then drives live player movement and camera yaw before clean release."
         },
         {
           "kind": "visual",
-          "ref": "artifact://pass69/field-kit-preview-51-df330132ee34b36e30f6a5b85c20ab6a8171bd40",
-          "note": "The immutable PR #51 preview artifact is the byte-bound visual target for the Field Kit presentation; no claim is made that Dave inspected it in a browser."
+          "ref": "artifact://pr-preview-53-139a753dd11658a3855832d73b1222308f1b0e24/mobile-touch-layout",
+          "note": "The approved immutable preview contains the fixed visible stick discs exercised at 320x667, 390x844 and 844x390."
         }
       ]
     },
     {
       "id": "R2",
-      "summary": "First-person arms use a stable parent-space shortest-arc solve",
-      "expected": "The authored mirrored arm rig solves wrist and palm targets in parent space with a deterministic anti-parallel axis while preserving hip, ADS, prone, reload, recoil, melee, wall-clearance, firearm contact, and knife contact contracts.",
-      "falsifier": "An anti-parallel bone direction produces a non-finite or arbitrary flip, or arm reach/contact, ADS framing, prone clearance, reload, melee, or knife/socket alignment regresses in the served matrix.",
-      "acceptance": "mechanical",
+      "summary": "FIRE is beside the right aim stick without overlapping other mobile controls",
+      "expected": "FIRE is the final visual and focus-order control and remains within one practical thumb gap of the right aim stick in narrow portrait, portrait and landscape while every hit region remains distinct.",
+      "falsifier": "FIRE is farther than the bounded thumb gap, overlaps the aim stick or another button, steals another pointer, leaves the viewport, or has focus order inconsistent with its visual order.",
+      "acceptance": "mixed",
       "state": "verified",
       "evidence": [
         {
-          "kind": "unit",
-          "ref": "src/weapon-presentation-anatomy.test.ts",
-          "command": "npx vitest run src/stable-bone-orientation.test.ts src/weapon-presentation-anatomy.test.ts src/viewmodel-framing.test.ts src/character-presentation-contract.test.ts src/pass65-weapon-runtime-behavior.test.ts",
-          "note": "Focused orientation, anatomy, viewmodel, character presentation, and runtime contracts pass on the exact candidate."
+          "kind": "browser",
+          "ref": "tests/e2e/pass69-mobile-touch-layout.spec.ts",
+          "command": "npm run qa:playwright-topology -- tests/e2e/pass69-mobile-touch-layout.spec.ts --project=chromium --workers=1 --retries=0",
+          "note": "The retained three-viewport collision matrix reports zero intersections and a FIRE-to-aim edge gap no greater than 24 CSS pixels."
         },
         {
-          "kind": "browser",
-          "ref": "tests/e2e/pass66-viewmodel-framing.spec.ts",
-          "command": "npx playwright test tests/e2e/pass66-viewmodel-framing.spec.ts --project chromium --workers=1 --retries=0",
-          "note": "The exact candidate browser matrix passed authored arms, firearm, reload, melee, prone/wall-clearance, both hand contacts, and knife contact at 1440p, 4K, and ultrawide."
+          "kind": "visual",
+          "ref": "artifact://pr-preview-53-139a753dd11658a3855832d73b1222308f1b0e24/fire-near-aim-stick",
+          "note": "Immutable-preview screenshots show FIRE immediately above the portrait aim stick and immediately left of it in landscape."
         }
       ]
     },
     {
       "id": "R3",
-      "summary": "Chopper Gunner authored firing and impact actions run from real possession and authority paths",
-      "expected": "The loader validates all authored Chopper nodes and eight actions across LODs; possession fire plays recoil, gun-fire, muzzle-flash, and tracer actions, while an applied authoritative hit plays the authored impact action without changing gameplay authority.",
-      "falsifier": "A required authored node/action is absent, active/pooled action maps are empty, the real trigger path does not present all four firing actions, impact plays without an applied authoritative hit, or first-person sightline/alignment fails.",
-      "acceptance": "mechanical",
-      "state": "verified",
-      "evidence": [
-        {
-          "kind": "unit",
-          "ref": "src/killstreak-presentation.test.ts",
-          "command": "npx vitest run src/killstreak-presentation.test.ts src/killstreak-main-integration.test.ts src/support-vehicle-presentation-contract.test.ts src/chopper-gunner-fire-ray.test.ts",
-          "note": "Focused authored node/action, LOD, fallback, possession, impact-authority, alignment, and fire-ray contracts pass."
-        },
-        {
-          "kind": "browser",
-          "ref": "tests/e2e/pass65-support-vehicle-assets.spec.ts",
-          "command": "npx playwright test tests/e2e/pass65-support-vehicle-assets.spec.ts --project chromium --workers=1 --retries=0",
-          "note": "The exact candidate browser test loads all authored support assets, possesses an orbiting Chopper, proves active and pooled action names, drives the real trigger intent, observes all four actions running on the visible authored LOD, and binds that live action state to changed canvas pixels and the first-person sightline."
-        },
-        {
-          "kind": "browser",
-          "ref": "tests/e2e/pass65-support-visual-gate.spec.ts",
-          "command": "npx playwright test tests/e2e/pass65-support-visual-gate.spec.ts --project chromium --workers=1 --retries=0 --grep 'projects chopper and drone damage'",
-          "note": "The authoritative multiplayer browser path proves a remote guest receives Chopper damage and presents the authored impact action rather than leaving impact playback host-only."
-        },
-        {
-          "kind": "contract",
-          "ref": "source-assets/blender/pass65-chopper-gunner.provenance.json",
-          "command": "node scripts/qa/pass65-support-vehicle-glb.mjs",
-          "note": "Direct authored GLB structural validation passes for all shipped Chopper Gunner LODs."
-        }
-      ]
-    },
-    {
-      "id": "R4",
-      "summary": "Farcrysis remains absent and deferred to Pass 78",
-      "expected": "No Farcrysis runtime source, public asset, map registry entry, chooser card, route, or release-topology channel is present in this candidate.",
-      "falsifier": "Farcrysis appears in the candidate source, release topology, chooser, build output, or public artifact.",
-      "acceptance": "mechanical",
-      "state": "verified",
-      "evidence": [
-        {
-          "kind": "contract",
-          "ref": "release-channels.json",
-          "command": "git grep -in farcrysis HEAD -- ':!docs/**' ':!*.md'",
-          "note": "The exact candidate has no Farcrysis runtime/public reference; the only historical mention is in the Pass 68 acceptance narrative."
-        }
-      ]
-    },
-    {
-      "id": "R5",
-      "summary": "Killstreak videos remain out of scope",
-      "expected": "This candidate does not change killstreak demo video capture, published video media, or video provenance.",
-      "falsifier": "The candidate diff modifies video/media/capture files or claims new video evidence.",
-      "acceptance": "mechanical",
-      "state": "verified",
-      "evidence": [
-        {
-          "kind": "contract",
-          "ref": "src/release-topology.test.ts",
-          "command": "git diff --name-only 59b3dc1106ac12459194e449cd4db50b9dd4f8fd df330132ee34b36e30f6a5b85c20ab6a8171bd40",
-          "note": "The exact Pass 69 runtime candidate changes no published video/media/capture asset or provenance path; browser decoder tests use an existing local fixture and retain the explicit poster fallback."
-        }
-      ]
-    },
-    {
-      "id": "R6",
-      "summary": "Mobile portrait and landscape controls remain usable without pointer-lock coupling",
-      "expected": "The game admits portrait and landscape touch play without a rotate blocker; movement, look, FIRE, reload, jump, crouch, grenade, melee, interact, pause, and compact HUD regions remain inside the viewport without rectangle intersections, and touch FIRE admits a semi-automatic shot without desktop pointer lock.",
-      "falsifier": "A retained mobile viewport shows the rotate blocker, a control leaves the viewport or intersects another control/HUD region, sustained look stops before release, or touch FIRE requires pointer lock or fails to consume ammunition.",
+      "summary": "Bidirectional mid-match rotation recovers without crash and releases held touch ownership",
+      "expected": "Portrait-to-landscape and landscape-to-portrait changes keep the current match active, coalesce renderer/camera sizing, clear held FIRE and stick state, preserve advancing frames and leave controls usable; ordinary internal renderer resizing does not clear touch input.",
+      "falsifier": "Rotation emits a page error, strands or duplicates the match, leaves held input latched, loses controls, stops frame advancement, or adaptive pixel-ratio/support-camera resizing incorrectly releases touch input.",
       "acceptance": "mechanical",
       "state": "verified",
       "evidence": [
         {
           "kind": "browser",
           "ref": "tests/e2e/pass69-mobile-touch-layout.spec.ts",
-          "command": "npx playwright test tests/e2e/pass69-mobile-touch-layout.spec.ts --project chromium --workers=1 --retries=0",
-          "note": "The exact candidate passed narrow portrait 320x667, portrait 390x844, landscape 844x390, rectangle-intersection, compact-HUD, pointer-lock-independent semi-auto FIRE, held automatic FIRE, live USE interaction, and PAUSE lifecycle checks."
+          "command": "npm run qa:playwright-topology -- tests/e2e/pass69-mobile-touch-layout.spec.ts --project=chromium --workers=1 --retries=0",
+          "note": "One active match rotates in both directions while movement, aim and FIRE pointers are held in turn; each orientation recovers active phase, centres held sticks, clears triggerHeld, advances frames, retains controls and emits zero page errors."
         },
         {
+          "kind": "contract",
+          "ref": "src/legacy-main.ts",
+          "command": "npx tsc --noEmit",
+          "note": "Viewport events call recoverViewport while established internal resize callers retain the geometry-only coalesced resize path."
+        }
+      ]
+    },
+    {
+      "id": "R4",
+      "summary": "Gun Field Kit restores canonical DPS without duplicating stale balance UI",
+      "expected": "The selected-primary inspector contains one DPS row calculated as base damage times pellets times RPM divided by 60, followed by Damage, Fire Rate, Range and Control; AK-47 displays 350.",
+      "falsifier": "DPS is absent, duplicated, hard-coded independently of the weapon registry, uses a non-canonical formula, clips, or AK-47 projects a value other than 350.",
+      "acceptance": "mixed",
+      "state": "verified",
+      "evidence": [
+        {
           "kind": "unit",
-          "ref": "src/mobile-touch-controls.test.ts",
-          "command": "npx vitest run src/mobile-touch-controls.test.ts src/ui/pass66-overhaul.test.ts src/ui/pass66-readability.test.ts",
-          "note": "Touch callback state and retained responsive CSS contracts pass."
+          "ref": "src/ui/pass66-overhaul.test.ts",
+          "command": "npx vitest run src/ui/pass66-overhaul.test.ts src/ui/field-kit-weapon-presentation.test.ts",
+          "note": "The shell retains one five-stat inspector including DPS while the weapon-card cyclic-DPS catalog projection remains canonical."
+        },
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/pass66-field-kit-killstreak-menu.spec.ts",
+          "command": "npm run qa:playwright-topology -- tests/e2e/pass66-field-kit-killstreak-menu.spec.ts --project=chromium --workers=1 --retries=0",
+          "note": "The served custom AK-47 inspector displays one visible DPS row with value 350 and remains bounded across retained desktop widths."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifact://pr-preview-53-139a753dd11658a3855832d73b1222308f1b0e24/field-kit-dps",
+          "note": "The immutable preview screenshot visibly shows DPS 350 in the selected AK-47 panel."
+        }
+      ]
+    },
+    {
+      "id": "R5",
+      "summary": "The player-facing static or asset-backed image note is removed",
+      "expected": "Weapon previews remain accessible and weapon-specific without rendering the ASSET-BACKED STILL badge or equivalent implementation-note copy.",
+      "falsifier": "ASSET-BACKED STILL, STATIC-BACKED IMAGE or equivalent player-facing copy remains in source, built bytes or the Field Kit DOM, or preview alt text becomes inaccessible.",
+      "acceptance": "mixed",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/pass66-field-kit-killstreak-menu.spec.ts",
+          "command": "npm run qa:playwright-topology -- tests/e2e/pass66-field-kit-killstreak-menu.spec.ts --project=chromium --workers=1 --retries=0",
+          "note": "The served Field Kit rejects the retired badge text while every weapon-specific preview image loads."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifact://pr-preview-53-139a753dd11658a3855832d73b1222308f1b0e24/field-kit-no-asset-badge",
+          "note": "Visual inspection of the immutable preview shows no asset/static-backed badge."
+        }
+      ]
+    },
+    {
+      "id": "R6",
+      "summary": "The corrected live route is player-facing version 69.1",
+      "expected": "The live chooser, runtime identity and changelog show The Big One v69.1 while the protected internal acceptance lane remains PASS 69 and Stable Pass 67.1 plus Rollback Pass 63 retain their pinned source topology.",
+      "falsifier": "The live card/runtime still presents v69, channel labels disagree, Stable or Rollback provenance changes, or the release infrastructure is weakened merely to admit a decimal internal pass number.",
+      "acceptance": "mixed",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/release-channel-chooser.spec.ts",
+          "command": "npm run qa:playwright-topology -- tests/e2e/release-channel-chooser.spec.ts --project=chromium --workers=1 --retries=0",
+          "note": "The staged production chooser presents PASS 69.1 / THE BIG ONE v69.1 and retains byte-pinned Stable and Rollback routes."
+        },
+        {
+          "kind": "contract",
+          "ref": "release-channels.json",
+          "command": "npx vitest run src/release-channel.test.ts src/release-topology.test.ts src/changelog.test.ts src/project-map.test.ts",
+          "note": "Public version copy is v69.1; internal PASS 69 acceptance and prior-channel topology remain intact."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifact://pr-preview-53-139a753dd11658a3855832d73b1222308f1b0e24/release-chooser-69.1",
+          "note": "The immutable preview chooser visibly presents PASS 69.1 and THE BIG ONE v69.1."
         }
       ]
     },
     {
       "id": "R7",
-      "summary": "The first WebGL flare shot stays responsive and does not serialize a host checkpoint on the shot frame",
-      "expected": "The compatibility renderer prewarms the exact retained flare fire presentation without a live dynamic point-light shader-key change, the first real shot remains within the preserved frame-gap bound, and non-forced checkpoint creation/storage occurs only in the deferred idle task.",
-      "falsifier": "The real first shot exceeds the relative/fixed frame-gap ceiling, performs a synchronous host-checkpoint storage write, spends 250 ms or more inside the fire call, or restores a live WebGL flare PointLight topology change.",
+      "summary": "Farcrysis is absent from player-facing release notes and project information",
+      "expected": "No Farcrysis deferral note or runtime/map/asset reference appears in the candidate source, built browser bytes, Last Release dialog, Project Map or release chooser.",
+      "falsifier": "Farcrysis appears in player-facing source, build output, chooser, changelog, project map or any selectable runtime route.",
       "acceptance": "mechanical",
       "state": "verified",
       "evidence": [
         {
+          "kind": "contract",
+          "ref": "src/changelog.ts",
+          "command": "npx vitest run src/changelog.test.ts src/project-map.test.ts src/release-channel.test.ts",
+          "note": "Public release/project surfaces retain their other notes while omitting Farcrysis. Independent extraction of the immutable artifact found zero Farcrysis strings."
+        }
+      ]
+    },
+    {
+      "id": "R8",
+      "summary": "Ctrl+Shift+R recovery guidance is visible before selecting a game version",
+      "expected": "Candidate and staged production version choosers visibly tell the player to press Ctrl+Shift+R when the selected version did not update, at desktop and narrow widths.",
+      "falsifier": "The guidance exists only inside Options, loads after channel selection, clips at a retained width, or is absent from staged production-shell bytes.",
+      "acceptance": "mixed",
+      "state": "verified",
+      "evidence": [
+        {
           "kind": "browser",
-          "ref": "tests/e2e/pass66-timed-map-weapons.spec.ts",
-          "command": "npx playwright test tests/e2e/pass66-timed-map-weapons.spec.ts --project chromium --workers=1 --retries=0",
-          "note": "The exact candidate passed the real first-shot frame-gap probe, synchronous Storage.setItem falsifier, bounded fire-call assertion, finite-ammo admission, active projectile check, game-owned presented-frame advance, and changed compositor-region pixels without replacing timing with a fixed-delay claim."
+          "ref": "tests/e2e/release-channel-chooser.spec.ts",
+          "command": "npm run qa:playwright-topology -- tests/e2e/release-channel-chooser.spec.ts --project=chromium --workers=1 --retries=0",
+          "note": "The front chooser requires visible Ctrl+Shift+R guidance before navigating to a channel."
         },
         {
+          "kind": "visual",
+          "ref": "artifact://pr-preview-53-139a753dd11658a3855832d73b1222308f1b0e24/release-chooser-refresh-guidance",
+          "note": "The immutable preview screenshot shows the guidance directly below the version cards."
+        }
+      ]
+    },
+    {
+      "id": "R9",
+      "summary": "The Options hard game refresh is available on the front version chooser",
+      "expected": "HARD RESET / REFRESH clears every CacheStorage entry and reloads the current chooser with a fresh cachebust parameter before a version is selected.",
+      "falsifier": "The button is decorative, performs an ordinary reload, leaves seeded cache entries, navigates to a channel, loses the chooser, or is absent from the staged production shell.",
+      "acceptance": "mixed",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/release-channel-chooser.spec.ts",
+          "command": "npm run qa:playwright-topology -- tests/e2e/release-channel-chooser.spec.ts --project=chromium --workers=1 --retries=0",
+          "note": "The test seeds a cache, activates the front button, observes a changed cachebust URL, proves the cache was deleted and confirms the chooser remains visible."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifact://pr-preview-53-139a753dd11658a3855832d73b1222308f1b0e24/release-chooser-hard-refresh",
+          "note": "The immutable preview visibly exposes HARD RESET / REFRESH beside the Ctrl+Shift+R note."
+        }
+      ]
+    },
+    {
+      "id": "R10",
+      "summary": "Retained Pass 69 gameplay and protected release topology do not regress",
+      "expected": "Existing FIRE, held automatic FIRE, USE, PAUSE, pointer cancellation, portrait/landscape layout, gameplay properties, build/provenance contracts and pinned Stable/Rollback channels remain intact outside the explicit correction surfaces.",
+      "falsifier": "A retained Pass 69 unit/property/browser contract fails, an unrelated release channel changes source, touch FIRE regains pointer-lock coupling, USE or PAUSE breaks, or exact-head build/provenance validation fails.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
           "kind": "unit",
-          "ref": "src/host-match-recovery-main-integration.test.ts",
-          "command": "npx vitest run src/host-match-recovery-main-integration.test.ts src/flare-projectile-system.test.ts src/presentation-prewarm-contract.test.ts src/timed-map-weapon-main-integration.test.ts",
-          "note": "The exact candidate proves deferred gameplay checkpoint serialization, forced lifecycle persistence, WebGL no-dynamic-light topology, and bounded first-shot presentation prewarm."
+          "ref": "package.json",
+          "command": "npm test",
+          "note": "The exact source passed 2,179 tests with two explicit published-media policy skips, including deterministic gameplay property replay."
+        },
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/pass69-mobile-touch-layout.spec.ts",
+          "command": "npm run qa:playwright-topology -- tests/e2e/pass69-mobile-touch-layout.spec.ts tests/e2e/pass66-field-kit-killstreak-menu.spec.ts tests/e2e/release-channel-chooser.spec.ts --project=chromium --workers=1 --retries=0",
+          "note": "All 18 affected real-browser tests passed on the exact source, including held FIRE, USE, PAUSE, collision-free responsive layouts and release routing."
+        },
+        {
+          "kind": "contract",
+          "ref": "scripts/release/write-preview-receipt.mjs",
+          "command": "node scripts/release/write-preview-receipt.mjs --head 139a753dd11658a3855832d73b1222308f1b0e24 --pr 53",
+          "note": "GitHub Linux and Windows static/unit jobs passed and artifact 9023055533 attests source SHA 139a753d with 507 files and tree hash ee1c082490200ee6e02e0b64913f901c0dcb36ae2dc5559c0c9767337aee97be."
         }
       ]
     }

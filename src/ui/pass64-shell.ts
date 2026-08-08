@@ -174,6 +174,7 @@ function fieldKitPanelMarkup(): string {
       <aside id="loadout-inspector" class="loadout-inspector" aria-live="polite">
         <div><small>PRIMARY WEAPON</small><strong data-loadout-inspector-name>HK416</strong><span data-loadout-inspector-meta>AUTOMATIC / 650 RPM</span></div>
         <dl class="loadout-inspector-stats">
+          <div class="loadout-inspector-dps"><dt>DPS</dt><dd><i data-loadout-stat="dps"></i><b data-loadout-value="dps">336</b></dd></div>
           <div><dt>DAMAGE</dt><dd><i data-loadout-stat="damage"></i><b data-loadout-value="damage">31</b></dd></div>
           <div><dt>FIRE RATE</dt><dd><i data-loadout-stat="fire-rate"></i><b data-loadout-value="fire-rate">650</b></dd></div>
           <div><dt>RANGE</dt><dd><i data-loadout-stat="range"></i><b data-loadout-value="range">72m</b></dd></div>

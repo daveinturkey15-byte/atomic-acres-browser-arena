@@ -7677,7 +7677,9 @@ function renderLoadoutInspector(): void {
   if (name) name.textContent = weapon.displayName.toUpperCase();
   if (meta) meta.textContent = `${weapon.fireMode.toUpperCase()} / ${weapon.rpm} RPM / ${weapon.penetration.calibreLabel.toUpperCase()}`;
   const control = Math.round(Math.max(8, Math.min(100, 100 - (weapon.recoil.pitchRadians + weapon.recoil.yawRadians) * 760)));
+  const cyclicDps = weapon.damage.base * weapon.pellets * weapon.rpm / 60;
   const stats = {
+    dps: { value: String(Math.round(cyclicDps)), percent: Math.min(100, cyclicDps / 12) },
     damage: { value: String(Math.round(weapon.damage.base * weapon.pellets)), percent: Math.min(100, weapon.damage.base * weapon.pellets) },
     'fire-rate': { value: String(weapon.rpm), percent: Math.min(100, weapon.rpm / 12) },
     range: { value: `${weapon.damage.falloffEndM}m`, percent: Math.min(100, weapon.damage.falloffEndM / 1.2) },
@@ -20843,16 +20845,32 @@ function escapeHtml(value: string): string {
   return value.replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]!);
 }
 
-function resize(): void {
+function applyViewportSize(): void {
   const width = window.innerWidth;
   const height = window.innerHeight;
+  if (width < 2 || height < 2) return;
   renderRuntime.setSize(width, height, false);
   atomicSignal?.resize();
   camera.aspect = width / Math.max(1, height);
   camera.updateProjectionMatrix();
 }
-window.addEventListener('resize', resize);
-resize();
+
+let viewportResizeFrame: number | null = null;
+function resize(): void {
+  if (viewportResizeFrame !== null) return;
+  viewportResizeFrame = window.requestAnimationFrame(() => {
+    viewportResizeFrame = null;
+    applyViewportSize();
+  });
+}
+function recoverViewport(): void {
+  mobileTouchControls?.resetForViewportChange();
+  resize();
+}
+window.addEventListener('resize', recoverViewport);
+window.visualViewport?.addEventListener('resize', recoverViewport);
+screen.orientation?.addEventListener?.('change', recoverViewport);
+applyViewportSize();
 
 const launchParams = new URLSearchParams(window.location.search);
 const invitedRoom = launchParams.get('room')?.trim() ?? '';

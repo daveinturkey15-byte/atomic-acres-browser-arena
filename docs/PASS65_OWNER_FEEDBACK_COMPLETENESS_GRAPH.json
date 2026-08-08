@@ -242,13 +242,30 @@
       "outcomeProjectionSha256": "3ca8c67de52624a300963e11eb301f21ba0194220d2d6c1321f580b9037d90cc"
     },
     {
+      "id": "SRC-TELEGRAM-P69-AUG08-001",
+      "kind": "telegram-owner-feedback",
+      "externalLocator": "telegram:owner-channel/2026-08-08/pass69.1-mobile-corrections",
+      "rawByteLength": 748,
+      "rawSha256": "1eb2d0b1218d3b0dff3bb265b47ca8e192d02c3857e0e283f5adff8e733fb878",
+      "rawEndsWithCrLf": false,
+      "normalizedRepositoryPath": "docs/pass69-sources/telegram-owner-feedback-2026-08-08.txt",
+      "normalization": "UTF-8; CRLF converted to LF; one final LF added; text semantics unchanged",
+      "normalizedByteLength": 743,
+      "normalizedSha256": "df1c93c2558f5f15754ec68eaff4f8030d84a27e7864debc5cbe69aea9051bb8",
+      "outcomeCollection": "telegramPass69August08Outcomes",
+      "outcomeIdPrefix": "P69AUG08",
+      "outcomeCount": 12,
+      "lineAtomCounts": {"1": 5, "3": 2, "5": 3, "7": 2},
+      "outcomeProjectionSha256": "d5057149d4adaa44260a9668a5d8b5feea7dc824e79364a9440fcdb3a1920079"
+    },
+    {
       "id": "SRC-CORRECTION-LEDGER-001",
       "kind": "canonical-correction-ledger",
       "repositoryPath": "docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md",
       "ledgerVersion": 1,
-      "latestFeedbackId": "HF-207",
-      "outcomeCount": 207,
-      "stateIndependentOutcomeSha256": "924b9cd77d5d6dd4d7113ac0d941fa34c405ef97bc8147ffa8b766166d30e4b1"
+      "latestFeedbackId": "HF-216",
+      "outcomeCount": 216,
+      "stateIndependentOutcomeSha256": "d9474df7aa3d4b51d6fe0fe5681264bde21943cd771ec4f7300fd3e2fec83a4b"
     },
     {
       "id": "SRC-PLANNING-MATRIX-001",
@@ -932,7 +949,7 @@
     "outcomeIdTemplate": "CORR-{feedbackId}",
     "sourceLocatorTemplate": "{feedbackId}.observation",
     "feedbackIdStart": "HF-001",
-    "feedbackIdEnd": "HF-207"
+    "feedbackIdEnd": "HF-216"
   },
   "supersessions": [
     {
@@ -2247,6 +2264,13 @@
       "visualArtifactPaths": [
         "artifacts/pass66/release-shell"
       ]
+    },
+    {
+      "id": "T-MOBILE-TOUCH-69-1",
+      "command": "npm run qa:playwright-topology -- tests/e2e/pass69-mobile-touch-layout.spec.ts --project=chromium --workers=1 --retries=0",
+      "paths": ["src/mobile-touch-controls.ts", "src/mobile-touch-controls.test.ts", "src/ui/pass66-overhaul.css", "src/legacy-main.ts", "tests/e2e/pass69-mobile-touch-layout.spec.ts"],
+      "evidenceKinds": ["browser", "visual"],
+      "visualArtifactPaths": ["artifacts/pass69/mobile-touch-layout"]
     }
   ],
   "artifactCatalog": [],
@@ -7026,7 +7050,16 @@
       "canonicalOwner": "Prerecorded media forge/lifecycle",
       "ownerSource": "SRC-CORRECTION-LEDGER-001",
       "verification": {"coverage": "partial", "testRefs": ["T-PREVIEW-GATE", "T-KILLSTREAK-DEMO-VIDEOS", "T-FIELD-KIT-MENU", "T-MENU-LIFECYCLE-E2E"], "artifactRefs": []}
-    }
+    },
+    {"id":"HF-208","sourceOutcomeIds":["CORR-HF-208","P69AUG08-002","P69AUG08-004"],"planningRequirementIds":["R108","R307","R600","R608","R609","R610"],"canonicalOwner":"Mobile input/gamepad projection","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-MOBILE-TOUCH-69-1"],"artifactRefs":[]}},
+    {"id":"HF-209","sourceOutcomeIds":["CORR-HF-209","P69AUG08-003"],"planningRequirementIds":["R600","R608","R609"],"canonicalOwner":"Mobile control layout","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-MOBILE-TOUCH-69-1"],"artifactRefs":[]}},
+    {"id":"HF-210","sourceOutcomeIds":["CORR-HF-210","P69AUG08-005"],"planningRequirementIds":["R307","R608","R610"],"canonicalOwner":"Runtime viewport/input lifecycle","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-MOBILE-TOUCH-69-1"],"artifactRefs":[]}},
+    {"id":"HF-211","sourceOutcomeIds":["CORR-HF-211","P69AUG08-006"],"planningRequirementIds":["R108","R232","R600","R608","R609"],"canonicalOwner":"Loadout UI/combat-registry projection","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-FIELD-KIT-MENU"],"artifactRefs":[]}},
+    {"id":"HF-212","sourceOutcomeIds":["CORR-HF-212","P69AUG08-007"],"planningRequirementIds":["R108","R600","R609"],"canonicalOwner":"Loadout UI copy","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-FIELD-KIT-MENU"],"artifactRefs":[]}},
+    {"id":"HF-213","sourceOutcomeIds":["CORR-HF-213","P69AUG08-009"],"planningRequirementIds":["R001","R303","R600","R608","R611","R613"],"canonicalOwner":"Release identity/topology","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-RELEASE-SHELL"],"artifactRefs":[]}},
+    {"id":"HF-214","sourceOutcomeIds":["CORR-HF-214","P69AUG08-010"],"planningRequirementIds":["R303","R600","R609"],"canonicalOwner":"Release notes/project-map copy","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-RELEASE-SHELL"],"artifactRefs":[]}},
+    {"id":"HF-215","sourceOutcomeIds":["CORR-HF-215","P69AUG08-011"],"planningRequirementIds":["R303","R600","R608","R609"],"canonicalOwner":"Release chooser recovery UX","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-RELEASE-SHELL"],"artifactRefs":[]}},
+    {"id":"HF-216","sourceOutcomeIds":["CORR-HF-216","P69AUG08-012"],"planningRequirementIds":["R303","R307","R600","R608","R609","R610"],"canonicalOwner":"Release chooser recovery UX","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-RELEASE-SHELL"],"artifactRefs":[]}}
   ],
   "desktopUntitledOutcomes": [
     {
@@ -8669,5 +8702,19 @@
     {"id":"V66AUG01-045","sourceLocator":"L75#1","normalizedOutcome":"Restore Railgun's distinctive ADS scope that reveals valid hostile silhouettes through walls.","feedbackIds":["HF-191"],"planningRequirementIds":["R105","R108","R307","R510","R608","R610"]},
     {"id":"V66AUG01-046","sourceLocator":"L77#1","normalizedOutcome":"Allow the player to pick up the gun just swapped onto the ground and swap back exactly once.","feedbackIds":["HF-206"],"planningRequirementIds":["R400","R401","R402","R403","R404","R405","R406","R407","R408","R409","R410","R411","R412","R413","R502","R505","R510","R609"]},
     {"id":"V66AUG01-047","sourceLocator":"L77#2","normalizedOutcome":"Re-audit the full Atomic Acres owner-request history so prior asks cannot disappear behind completion claims.","feedbackIds":["HF-069"],"planningRequirementIds":["R001","R005","R101","R102","R103","R111","R303","R600","R608","R611","R613"]}
+  ],
+  "telegramPass69August08Outcomes": [
+    {"id":"P69AUG08-001","sourceLocator":"L1#1","normalizedOutcome":"Record the owner plan to test the improved-but-still-clunky mobile controls more fully later as session context only.","feedbackIds":[],"planningRequirementIds":[],"disposition":"excluded-nonproduct","exclusionReason":"Testing timing and the qualitative progress observation are session context; the independently falsifiable control corrections are projected separately."},
+    {"id":"P69AUG08-002","sourceLocator":"L1#2","normalizedOutcome":"Both mobile sticks respond through the full visible disc, including the centre, rather than only around the edges.","feedbackIds":["HF-208"],"planningRequirementIds":["R108","R307","R600","R608","R609","R610"]},
+    {"id":"P69AUG08-003","sourceLocator":"L1#3","normalizedOutcome":"Move FIRE closer to the right thumb stick without overlapping its touch ownership.","feedbackIds":["HF-209"],"planningRequirementIds":["R600","R608","R609"]},
+    {"id":"P69AUG08-004","sourceLocator":"L1#4","normalizedOutcome":"Apply established mobile-game gamepad-emulation conventions and keep touch axes aligned with physical gamepad behavior.","feedbackIds":["HF-208"],"planningRequirementIds":["R108","R307","R600","R608","R609","R610"]},
+    {"id":"P69AUG08-005","sourceLocator":"L1#5","normalizedOutcome":"Rotating a device mid-match must not crash the active match.","feedbackIds":["HF-210"],"planningRequirementIds":["R307","R608","R610"]},
+    {"id":"P69AUG08-006","sourceLocator":"L3#1","normalizedOutcome":"Restore the DPS statistic to the Gun Field Kit.","feedbackIds":["HF-211"],"planningRequirementIds":["R108","R232","R600","R608","R609"]},
+    {"id":"P69AUG08-007","sourceLocator":"L3#2","normalizedOutcome":"Remove the player-facing static-backed-image note from the Gun Field Kit.","feedbackIds":["HF-212"],"planningRequirementIds":["R108","R600","R609"]},
+    {"id":"P69AUG08-008","sourceLocator":"L5#1","normalizedOutcome":"Complete this bounded correction wave quickly.","feedbackIds":[],"planningRequirementIds":[],"disposition":"excluded-nonproduct","exclusionReason":"Requested speed is a scheduling priority rather than an independently testable product behavior."},
+    {"id":"P69AUG08-009","sourceLocator":"L5#2","normalizedOutcome":"Publish the focused correction release with player-facing version 69.1.","feedbackIds":["HF-213"],"planningRequirementIds":["R001","R303","R600","R608","R611","R613"]},
+    {"id":"P69AUG08-010","sourceLocator":"L5#3","normalizedOutcome":"Remove the Farcrysis note from player-facing release information.","feedbackIds":["HF-214"],"planningRequirementIds":["R303","R600","R609"]},
+    {"id":"P69AUG08-011","sourceLocator":"L7#1","normalizedOutcome":"Show Ctrl+Shift+R refresh guidance on the front version-selection screen.","feedbackIds":["HF-215"],"planningRequirementIds":["R303","R600","R608","R609"]},
+    {"id":"P69AUG08-012","sourceLocator":"L7#2","normalizedOutcome":"Expose the Options hard-reset game refresh on the front version-selection screen too.","feedbackIds":["HF-216"],"planningRequirementIds":["R303","R307","R600","R608","R609","R610"]}
   ]
 }

@@ -252,7 +252,7 @@
 #advanced-graphics .advanced-graphics-unavailable > small,
 #advanced-graphics .advanced-graphics-range output { font-size: var(--pass66-micro); }
 
-/* HF-182/HF-183: asset-backed Field Kit inspection with catalog-derived,
+/* HF-182/HF-183: weapon-specific Field Kit inspection with catalog-derived,
  * independently labelled combat facts. The bars visualize each stated value;
  * there is deliberately no synthetic balance/quality score. */
 #menu-panel-kit .kit-card:not(.manage-kit-card) {
@@ -284,17 +284,6 @@
   background: #0b141a;
 }
 
-.weapon-menu-still::after {
-  content: 'ASSET-BACKED STILL';
-  position: absolute;
-  left: 8px;
-  bottom: 7px;
-  padding: 4px 6px;
-  background: rgba(4, 10, 14, 0.82);
-  color: #84eee4;
-  font: 800 var(--pass66-micro)/1 var(--ui-copy, Inter, sans-serif);
-  letter-spacing: 0.1em;
-}
 
 .weapon-menu-still img {
   display: block;
