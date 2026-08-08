@@ -453,16 +453,22 @@ async function startMultiplayerMatch(
   await Promise.all([host, guest].map((page) => page.waitForFunction(() => (
     window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch?.members.length === 2
   ), undefined, { timeout: 30_000 })));
-  const identities = await host.evaluate(({ hostName, guestName }) => {
-    const members = window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.members;
-    return {
-      hostId: members.find((member: any) => member.name === hostName)?.id ?? '',
-      guestId: members.find((member: any) => member.name === guestName)?.id ?? '',
-      memberNames: members.map((member: any) => member.name),
-    };
-  }, { hostName: hostLabel, guestName: guestLabel });
-  expect(identities.hostId, `host member found by name (members: ${JSON.stringify(identities.memberNames)})`).toMatch(/^p-/u);
-  expect(identities.guestId).toMatch(/^p-/u);
+  const [identities, hostLocalId, guestLocalId] = await Promise.all([
+    host.evaluate(({ hostName, guestName }) => {
+      const members = window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.members;
+      return {
+        hostId: members.find((member: any) => member.name === hostName)?.id ?? '',
+        guestId: members.find((member: any) => member.name === guestName)?.id ?? '',
+        memberNames: members.map((member: any) => member.name),
+      };
+    }, { hostName: hostLabel, guestName: guestLabel }),
+    host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.id),
+    guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.id),
+  ]);
+  expect(identities.hostId, `host member found by name (members: ${JSON.stringify(identities.memberNames)})`).toBe(hostLocalId);
+  expect(identities.guestId, `guest member found by name (members: ${JSON.stringify(identities.memberNames)})`).toBe(guestLocalId);
+  expect(identities.hostId).not.toBe('');
+  expect(identities.guestId).not.toBe('');
   expect(identities.hostId).not.toBe(identities.guestId);
   await host.locator('#lobby-ready').click();
   await guest.locator('#lobby-ready').click();
