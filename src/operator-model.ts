@@ -154,7 +154,7 @@ let firstPersonArmsAssetPromise: Promise<void> | null = null;
 const STANCE_PIVOT_HEIGHT = 0.84;
 const EMBEDDED_WEAPON_NAME = /(^|[\s_.-])(pistol|rifle|shotgun|smg|gun|weapon)([\s_.-]|$)/i;
 const PRONE_WEAPON_MOUNT: Record<string, { x: number; y: number; z: number }> = {
-  carbine: { x: 0.1, y: 0.425, z: -0.14 },
+  carbine: { x: 0.1, y: 0.425, z: -0.42 },
   smg: { x: 0.09, y: 0.425, z: -0.14 },
   lmg: { x: 0.1, y: 0.435, z: -0.11 },
   scattergun: { x: 0.09, y: 0.425, z: -0.14 },
