@@ -170,6 +170,7 @@ describe('production release workflow', () => {
       'T-PRIVACY-E2E',
       'T-FLASH-E2E',
       'T-SCOPED-ADS',
+      'T-PASS69-2-SUPPORT-INPUT',
       'T-GUN-RANGE-TEST-BAY',
       'T-TIMED-MAP-WEAPONS',
       'T-FIELD-KIT-MENU',
