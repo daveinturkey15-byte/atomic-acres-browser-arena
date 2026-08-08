@@ -515,6 +515,14 @@ function remoteProneSummary(remote: any, expectedId: string, label: string): Rec
   expect(remote.stance, `${label}: network stance`).toBe('prone');
   const operator = remote.operatorModel;
   expect(operator, `${label}: authored operator`).not.toBeNull();
+  expect(
+    operator.supportGrip?.torsoClear,
+    `${label}: support elbow must remain outboard ${JSON.stringify(operator.supportGrip)}`,
+  ).toBe(true);
+  expect(
+    operator.supportGrip?.bothHandsConnected,
+    `${label}: both hands must remain on authored sockets ${JSON.stringify(operator.supportGrip)}`,
+  ).toBe(true);
   expect(operator, `${label}: canonical rig`).toMatchObject({
     source: 'Atomic Acres Pass 65 operator / Quaternius CC0 derivative',
     materialContract: 'opaque-embedded-pbr-depth-writing',
