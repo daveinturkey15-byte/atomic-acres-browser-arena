@@ -4,6 +4,7 @@ const previewPort = Number(process.env.QA_PREVIEW_PORT ?? '4173');
 const externalPreview = process.env.QA_EXTERNAL_PREVIEW === '1';
 const requireOwnedFreshPreview = process.env.QA_REQUIRE_OWNED_FRESH_PREVIEW === '1';
 const installedEdgeChannel = process.env.QA_INSTALLED_EDGE === '1' ? 'msedge' as const : undefined;
+const installedEdgeHeaded = process.env.QA_HEADED_EDGE === '1';
 
 if (externalPreview && requireOwnedFreshPreview) {
   throw new Error('QA_REQUIRE_OWNED_FRESH_PREVIEW cannot be combined with QA_EXTERNAL_PREVIEW');
@@ -35,7 +36,7 @@ export default defineConfig({
       name: 'chromium',
       // Opt into the machine-installed Edge binary without widening CI's
       // default browser requirement or maintaining a second Chromium project.
-      use: { ...devices['Desktop Chrome'], channel: installedEdgeChannel, viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 },
+      use: { ...devices['Desktop Chrome'], channel: installedEdgeChannel, headless: installedEdgeHeaded ? false : undefined, viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 },
     },
     {
       name: 'firefox',
