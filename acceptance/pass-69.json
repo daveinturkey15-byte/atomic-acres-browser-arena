@@ -5,15 +5,15 @@
   "status": "accepted",
   "preview": {
     "kind": "github-actions-artifact",
-    "ref": "pr-preview-51-8c501ab1b05e2b2a48803f53e1d070ee466bf6ee",
-    "sourceSha": "8c501ab1b05e2b2a48803f53e1d070ee466bf6ee",
-    "createdAt": "2026-08-08T10:02:32.214Z"
+    "ref": "pr-preview-51-df330132ee34b36e30f6a5b85c20ab6a8171bd40",
+    "sourceSha": "df330132ee34b36e30f6a5b85c20ab6a8171bd40",
+    "createdAt": "2026-08-08T11:06:47.056Z"
   },
   "humanAcceptance": {
     "state": "approved",
     "approvedBy": "Dave",
-    "approvedAt": "2026-08-08T10:03:03.345Z",
-    "evidence": "Dave's current instruction is to 'get all the work done properly and get Pass 69 live.' This is conditional publication authorization rebound to immutable PR #51 preview artifact 9020248526 at source SHA 8c501ab1b05e2b2a48803f53e1d070ee466bf6ee; Dave has not claimed to have inspected or tested this preview artifact. Farcrysis remains excluded and deferred to Pass 78; killstreak videos remain out of scope. The known stale prerecorded Chopper menu-preview provenance is explicitly deferred and is not represented as new video evidence."
+    "approvedAt": "2026-08-08T11:16:29Z",
+    "evidence": "Dave's current instruction after immutable PR #51 preview artifact 9020910443 became available at source SHA df330132ee34b36e30f6a5b85c20ab6a8171bd40 is: 'Just get it live on GitHub pages ... Then I can preview it that way.' This is explicit publication authorization for that exact artifact; Dave has not claimed a pre-publication manual browser inspection. Farcrysis remains excluded and deferred to Pass 78; killstreak videos remain out of scope. The known stale prerecorded Chopper menu-preview provenance is explicitly deferred and is not represented as new video evidence."
   },
   "requirements": [
     {
@@ -32,7 +32,7 @@
         },
         {
           "kind": "visual",
-          "ref": "artifact://pass69/field-kit-preview-51-8c501ab1b05e2b2a48803f53e1d070ee466bf6ee",
+          "ref": "artifact://pass69/field-kit-preview-51-df330132ee34b36e30f6a5b85c20ab6a8171bd40",
           "note": "The immutable PR #51 preview artifact is the byte-bound visual target for the Field Kit presentation; no claim is made that Dave inspected it in a browser."
         }
       ]
@@ -77,7 +77,13 @@
           "kind": "browser",
           "ref": "tests/e2e/pass65-support-vehicle-assets.spec.ts",
           "command": "npx playwright test tests/e2e/pass65-support-vehicle-assets.spec.ts --project chromium --workers=1 --retries=0",
-          "note": "The exact candidate browser test loads all authored support assets, possesses an orbiting Chopper, proves active and pooled action names, drives the real trigger intent, observes all four firing actions, and records the first-person sightline."
+          "note": "The exact candidate browser test loads all authored support assets, possesses an orbiting Chopper, proves active and pooled action names, drives the real trigger intent, observes all four actions running on the visible authored LOD, and binds that live action state to changed canvas pixels and the first-person sightline."
+        },
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/pass65-support-visual-gate.spec.ts",
+          "command": "npx playwright test tests/e2e/pass65-support-visual-gate.spec.ts --project chromium --workers=1 --retries=0 --grep 'projects chopper and drone damage'",
+          "note": "The authoritative multiplayer browser path proves a remote guest receives Chopper damage and presents the authored impact action rather than leaving impact playback host-only."
         },
         {
           "kind": "contract",
@@ -114,7 +120,7 @@
         {
           "kind": "contract",
           "ref": "src/release-topology.test.ts",
-          "command": "git diff --name-only 59b3dc1106ac12459194e449cd4db50b9dd4f8fd 8c501ab1b05e2b2a48803f53e1d070ee466bf6ee",
+          "command": "git diff --name-only 59b3dc1106ac12459194e449cd4db50b9dd4f8fd df330132ee34b36e30f6a5b85c20ab6a8171bd40",
           "note": "The exact Pass 69 runtime candidate changes no published video/media/capture asset or provenance path; browser decoder tests use an existing local fixture and retain the explicit poster fallback."
         }
       ]
@@ -131,7 +137,7 @@
           "kind": "browser",
           "ref": "tests/e2e/pass69-mobile-touch-layout.spec.ts",
           "command": "npx playwright test tests/e2e/pass69-mobile-touch-layout.spec.ts --project chromium --workers=1 --retries=0",
-          "note": "The exact candidate passed narrow portrait 320x667, portrait 390x844, landscape 844x390, rectangle-intersection, sustained-look, compact-HUD, and pointer-lock-independent semi-auto FIRE checks."
+          "note": "The exact candidate passed narrow portrait 320x667, portrait 390x844, landscape 844x390, rectangle-intersection, compact-HUD, pointer-lock-independent semi-auto FIRE, held automatic FIRE, live USE interaction, and PAUSE lifecycle checks."
         },
         {
           "kind": "unit",
@@ -153,7 +159,7 @@
           "kind": "browser",
           "ref": "tests/e2e/pass66-timed-map-weapons.spec.ts",
           "command": "npx playwright test tests/e2e/pass66-timed-map-weapons.spec.ts --project chromium --workers=1 --retries=0",
-          "note": "The exact candidate passed the real first-shot frame-gap probe, synchronous Storage.setItem falsifier, bounded fire-call assertion, finite-ammo admission, and active projectile check without replacing timing with a fixed-delay claim."
+          "note": "The exact candidate passed the real first-shot frame-gap probe, synchronous Storage.setItem falsifier, bounded fire-call assertion, finite-ammo admission, active projectile check, game-owned presented-frame advance, and changed compositor-region pixels without replacing timing with a fixed-delay claim."
         },
         {
           "kind": "unit",
