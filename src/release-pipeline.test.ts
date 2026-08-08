@@ -35,7 +35,7 @@ describe('production release workflow', () => {
     expect(workflow).not.toContain('git config --global');
   });
 
-  it('stages pinned stable Pass 67.1, rebuilt rollback Pass 63 and live Pass 68 The Big One before a complete publish', () => {
+  it('stages pinned stable Pass 67.1, rebuilt rollback Pass 63 and live Pass 69 The Big One before a complete publish', () => {
     expect(workflow).toContain('npm run stage:release-topology');
     expect(workflow).toContain('npm run verify:release-topology');
     expect(workflow).toContain('SOURCE_SHA: ${{ inputs.source_sha }}');
@@ -43,7 +43,7 @@ describe('production release workflow', () => {
     expect(workflow).toContain('RELEASE_ROLLBACK_DIST: ${{ env.RELEASE_ROLLBACK_DIST }}');
     expect(workflow).toContain('git worktree add artifacts/pass63-rollback-src ac85e9b8b46cc2370aee903d564ecf3c4682b24c');
     expect(workflow).not.toContain('stage:stable-channel');
-    expect(workflow).toContain('Stage live Pass 68 The Big One, byte-exact stable Pass 67.1 and rebuilt Pass 63 rollback');
+    expect(workflow).toContain('Stage live approved The Big One, byte-exact stable Pass 67.1 and rebuilt Pass 63 rollback');
     expect(readFileSync('package.json', 'utf8')).toContain('"deploy:ci": "gh-pages -d dist"');
     expect(readFileSync('package.json', 'utf8')).not.toContain('"deploy:ci": "gh-pages -d dist --add"');
   });
@@ -211,14 +211,14 @@ describe('production release workflow', () => {
     expect(mutationRunner).toContain('spawnSync(process.execPath');
   });
 
-  it('makes exact Pass 66 evidence and real preview provenance mandatory in the required acceptance job', () => {
+  it('makes exact Pass 69 evidence and real preview provenance mandatory in the required acceptance job', () => {
     const acceptanceJob = verifyWorkflow.indexOf('requirements-acceptance:');
     const metricsJob = verifyWorkflow.indexOf('pipeline-metrics:');
     const section = verifyWorkflow.slice(acceptanceJob, metricsJob);
     const installStep = section.indexOf('npm ci --ignore-scripts');
     const buildStep = section.indexOf('Build exact frozen-evidence candidate bytes');
-    const candidateStep = section.indexOf('Verify exact Pass 66 evidence catalog and frozen runtime');
-    const provenanceStep = section.indexOf('Verify immutable Pass 66 preview provenance and bytes');
+    const candidateStep = section.indexOf('Verify exact Pass 69 evidence catalog and frozen runtime');
+    const provenanceStep = section.indexOf('Verify immutable Pass 69 preview provenance and bytes');
     const acceptanceStep = section.indexOf('Verify complete requirement-to-evidence coverage and exact preview approval');
 
     expect(section).toContain('needs: [classify-change, static-and-unit]');
@@ -227,7 +227,7 @@ describe('production release workflow', () => {
     expect(candidateStep).toBeGreaterThan(buildStep);
     expect(provenanceStep).toBeGreaterThan(candidateStep);
     expect(acceptanceStep).toBeGreaterThan(provenanceStep);
-    expect(section).toContain('npm run qa:pass65:owner-feedback:candidate');
+    expect(section).toContain('scripts/release/acceptance-gate.mjs --phase ci');
     expect(section).toContain('scripts/release/verify-pr-preview-provenance.mjs');
     expect(section).toContain('GITHUB_TOKEN: ${{ github.token }}');
     expect(section).toContain('artifacts/pipeline/pr-preview-provenance.json');
@@ -244,8 +244,8 @@ describe('production release workflow', () => {
     expect(workflow).not.toContain('gh run watch');
   });
 
-  it('binds the live browser proof to Pass 68, Pass 67.1 stable, Pass 63 rollback, aliases, and Last Release', () => {
-    expect(liveTopologyVerifier).toContain("verifyChoice('experimental', 'channels/the-big-one', 'PASS 68', 'pass68')");
+  it('binds the live browser proof to Pass 69, Pass 67.1 stable, Pass 63 rollback, aliases, and Last Release', () => {
+    expect(liveTopologyVerifier).toContain("verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass69')");
     expect(liveTopologyVerifier).toContain("verifyChoice('stable', 'channels/recent-stable', 'PASS 67.1', 'pass66')");
     expect(liveTopologyVerifier).toContain("verifyChoice('rollback', 'channels/pass63-rollback', 'PASS 63', 'pass63')");
     expect(liveTopologyVerifier).toContain('pinned-channel-provenance.json');

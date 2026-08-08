@@ -54,21 +54,19 @@ export type ProjectMapBundle = Readonly<{
  * unpublished pass from appearing as live release history.
  */
 export const PROJECT_MAP_RELEASE: ChangelogEntry = Object.freeze({
-  id: 'pass68',
+  id: 'pass69',
   pass: PASS66_RELEASE_IDENTITY.pass,
   title: 'The Big One',
   releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
-  areas: Object.freeze(['WEBGPU', 'COMBAT', 'KILLSTREAKS', 'DESTRUCTION', 'AUDIO', 'MAPS', 'HITL']),
-  summary: 'Pass 68: stability, loading, gun range and combat corrections. Pass 67.1 is pinned as the stable singleplayer release; Pass 64 remains failed-regression evidence only.',
+  areas: Object.freeze(['MULTIPLAYER', 'FIELD KIT', 'FIRST-PERSON', 'CHOPPER GUNNER', 'HITL']),
+  summary: 'Pass 69 delivers the current playable candidate for friend testing while preserving Pass 67.1 stable singleplayer and Pass 63 rollback evidence.',
   highlights: Object.freeze([
-    'Maps keep loading in the background when the tab loses focus; the deployment surface shows a real percentage/ETA progress bar up to 100% = IN GAME',
-    'Flamethrower and flare fire stays on the floor for five seconds like napalm and damages anyone standing in it; flamethrower damage is tripled',
-    'M14 EBR wall penetration is reduced 75% and its fire rate halved; Adrenaline instantly restarts health regen and adds passive +1 HP/s',
-    'Gun Range test bay is three times larger with the two-minute timer freezing and resetting on killstreak-area entry; training bots use the canonical rigged operators',
-    'Piloted Drone and Chopper Gunner views render at reduced internal resolution so altitude combat stays smooth',
-    'A Palantir-style logo flashes on every HUD when Drone Swarm deploys and the US flag flashes when a Nuke is called',
-    'RustRig darkness is lifted roughly 25% in the darkest corners; scoped ADS uses aligned iron sights and optics only',
-    'Pass 67.1 is pinned as the Stable Singleplayer build, flagged as needing multiplayer testing; Pass 64 is never promoted to Stable and remains failed-regression evidence only',
+    'Field Kit metric decks stay visible and readable inside responsive weapon cards',
+    'First-person arms use the corrected mirrored parent-space solve without replacing the canonical authored rig',
+    'Chopper Gunner authored presentation contracts match required LOD nodes, actions and fallback sockets',
+    'Private host/guest lobby state remains host-authoritative across the current release topology',
+    'Farcrysis remains absent and deferred to Pass 78; killstreak videos remain untouched',
+    'Pass 67.1 stays frozen as stable singleplayer and Pass 63 remains the rollback',
   ]),
 });
 

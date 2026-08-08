@@ -10,7 +10,7 @@ const shellHtml = readFileSync('release-shell/index.html', 'utf8');
 const staging = readFileSync('scripts/release/stage-release-topology.mjs', 'utf8');
 const playwrightServer = readFileSync('scripts/qa/playwright-web-server.mjs', 'utf8');
 
-describe('Pass 66 two-channel release topology', () => {
+describe('Pass 69 release topology', () => {
   it('retains the immutable best-ever Pass 62 benchmark record independently', () => {
     expect(pass62Benchmark).toMatchObject({
       designation: 'user-approved-best-ever-netcode',
@@ -40,7 +40,7 @@ describe('Pass 66 two-channel release topology', () => {
     });
   });
 
-  it('stages Pass 66 The Big One at its own live path and removes old live channels', () => {
+  it('stages Pass 69 The Big One at its own live path and removes old live channels', () => {
     expect(config.experimental).toEqual({
       pass: PASS66_RELEASE_IDENTITY.pass,
       label: PASS66_RELEASE_IDENTITY.label,
@@ -53,13 +53,13 @@ describe('Pass 66 two-channel release topology', () => {
     expect(JSON.stringify(config)).not.toContain('channels/new-netcode');
   });
 
-  it('renders exactly live Pass 68 The Big One, stable Pass 67.1 and rollback Pass 63 choices', () => {
+  it('renders exactly live Pass 69 The Big One, stable Pass 67.1 and rollback Pass 63 choices', () => {
     expect(shell).toContain("['experimental', 'stable', 'rollback']");
     expect(shell).not.toContain("['normal', 'stable', 'experimental']");
     expect(shell).toContain("key === 'stable' ? 'STABLE' : key === 'rollback' ? 'ROLLBACK' : 'LIVE'");
     expect(shell).toContain("requested === 'rollback') return route('rollback')");
     expect(shell).toContain("if (!channel) continue");
-    expect(shellHtml).toContain('Pass 68');
+    expect(shellHtml).toContain('Pass 69');
     expect(shellHtml).toContain('The Big One');
     expect(shellHtml).toContain('stable singleplayer');
     expect(shellHtml).toContain('Nuke Town');
@@ -102,7 +102,7 @@ describe('Pass 66 two-channel release topology', () => {
   });
 
   it('tracks the current release acceptance lifecycle without allowing premature publication', () => {
-    const manifestPath = 'acceptance/pass-68.json';
+    const manifestPath = 'acceptance/pass-69.json';
     if (!existsSync(manifestPath)) {
       expect(() => evaluateAcceptance({ phase: 'release', pass: PASS66_RELEASE_IDENTITY.pass }))
         .toThrow(`acceptance manifest does not exist: ${manifestPath}`);

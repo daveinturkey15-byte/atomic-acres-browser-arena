@@ -14,14 +14,14 @@ describe('release channel entry routing', () => {
     expect(releaseChannelDecision('?release=choose', 'localhost', canonical)).toBe('choose');
   });
 
-  it('routes latest, normal and experimental aliases to live Pass 66', () => {
+  it('routes latest, normal and experimental aliases to live Pass 69', () => {
     expect(releaseChannelDecision('?release=latest', canonical, canonical)).toBe('latest');
     expect(releaseChannelDecision('?release=normal', canonical, canonical)).toBe('latest');
     expect(releaseChannelDecision('?release=experimental', canonical, canonical)).toBe('latest');
     expect(releaseChannelDecision('?release=stable', canonical, canonical)).toBe('stable');
   });
 
-  it('keeps room invitations on the live Pass 66 multiplayer client', () => {
+  it('keeps room invitations on the live Pass 69 multiplayer client', () => {
     expect(releaseChannelDecision('?room=abc&autojoin=1&release=choose', canonical, canonical)).toBe('latest');
   });
 

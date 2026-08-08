@@ -281,7 +281,7 @@ function menuMarkup(model: Pass64ShellViewModel): string {
           <button id="menu-tab-streaks" type="button" role="tab" data-menu-tab="streaks" aria-controls="menu-panel-streaks" aria-selected="false" tabindex="-1"><i>03</i><span>STREAKS</span><small>FIVE SLOTS</small></button>
           <button id="menu-tab-options" type="button" role="tab" data-menu-tab="options" aria-controls="menu-panel-options" aria-selected="false" tabindex="-1"><i>04</i><span>OPTIONS</span><small>INPUT + VIDEO</small></button>
         </nav>
-        <footer><span>SESSION</span><strong>SECURE / LOCAL</strong><small>THE BIG ONE · PASS 68</small></footer>
+        <footer><span>SESSION</span><strong>SECURE / LOCAL</strong><small>THE BIG ONE · ${PASS66_RELEASE_IDENTITY.pass}</small></footer>
       </aside>
       <main class="command-workspace">
         ${deploymentPanelMarkup(model)}

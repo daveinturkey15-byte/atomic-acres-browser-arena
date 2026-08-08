@@ -32,7 +32,7 @@ export const PASS67_STABLE_BUNDLE_CAPABILITY_EVIDENCE = Object.freeze({
     'PASS 67.1',
   ]),
   absent: Object.freeze([
-    'PASS 68',
+    'PASS 69',
   ]),
 });
 
