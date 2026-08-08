@@ -35,7 +35,7 @@ describe('production release workflow', () => {
     expect(workflow).not.toContain('git config --global');
   });
 
-  it('stages pinned stable Pass 67.1, rebuilt rollback Pass 63 and live Pass 69 The Big One before a complete publish', () => {
+  it('stages timestamped stable Pass 67.1, rebuilt rollback Pass 63 and live Pass 69 The Big One before a complete publish', () => {
     expect(workflow).toContain('npm run stage:release-topology');
     expect(workflow).toContain('npm run verify:release-topology');
     expect(workflow).toContain('SOURCE_SHA: ${{ inputs.source_sha }}');
@@ -43,7 +43,7 @@ describe('production release workflow', () => {
     expect(workflow).toContain('RELEASE_ROLLBACK_DIST: ${{ env.RELEASE_ROLLBACK_DIST }}');
     expect(workflow).toContain('git worktree add artifacts/pass63-rollback-src ac85e9b8b46cc2370aee903d564ecf3c4682b24c');
     expect(workflow).not.toContain('stage:stable-channel');
-    expect(workflow).toContain('Stage live approved The Big One, byte-exact stable Pass 67.1 and rebuilt Pass 63 rollback');
+    expect(workflow).toContain('Stage live approved The Big One, timestamped rebuilt Pass 67.1 stable and rebuilt Pass 63 rollback');
     expect(readFileSync('package.json', 'utf8')).toContain('"deploy:ci": "gh-pages -d dist"');
     expect(readFileSync('package.json', 'utf8')).not.toContain('"deploy:ci": "gh-pages -d dist --add"');
   });
@@ -63,6 +63,10 @@ describe('production release workflow', () => {
     expect(buildStep).toBeGreaterThan(timestampStep);
     expect(verifyStep).toBeGreaterThan(buildStep);
     expect(workflow).toContain('VITE_RELEASED_AT=$released_at');
+    expect(workflow).toContain('Rebuild Pass 67.1 stable with its original Pages publication timestamp');
+    expect(workflow).toContain('VITE_RELEASED_AT="$stable_released_at"');
+    expect(workflow).toContain('REQUIRE_STABLE_RELEASE_TIMESTAMP: \'1\'');
+    expect(topologyBrowserVerifier).toContain('Boolean(expectedReleasedAt)');
     expect(workflow.match(/test -n "\$\{RELEASE_BUILT_AT:-\}"/g)).toHaveLength(2);
     expect(topologyBrowserVerifier).toContain('process.env.RELEASE_BUILT_AT?.trim()');
     expect(topologyBrowserVerifier).toContain('verifyProductionReleaseTimestamp');

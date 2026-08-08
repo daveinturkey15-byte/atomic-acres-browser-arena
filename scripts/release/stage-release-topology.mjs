@@ -38,7 +38,7 @@ if (!/^PASS [1-9][0-9]*$/.test(config.experimental.pass) || !config.experimental
   throw new Error('Experimental production topology must stage THE BIG ONE at channels/the-big-one');
 }
 if (config.stable.pass !== 'PASS 67.1' || config.stable.label !== 'STABLE SINGLEPLAYER') {
-  throw new Error('Pass 67.1 must remain the byte-exact stable singleplayer channel');
+  throw new Error('Pass 67.1 must remain the approved-source stable singleplayer channel');
 }
 if (config.rollback && (config.rollback.pass !== 'PASS 63' || config.rollback.path !== 'channels/pass63-rollback')) {
   throw new Error('Rollback must be the Pass 63 rebuild at channels/pass63-rollback');
@@ -146,7 +146,63 @@ function stagePinned(channelName, channel) {
   return { ...provenance, provenanceFile };
 }
 
-const stable = stagePinned('recent-stable', config.stable);
+function stageRebuilt(channelName, channel, configuredDist, releasedAt) {
+  if (!configuredDist || !isAbsolute(configuredDist)) {
+    throw new Error(`RELEASE_STABLE_DIST must be an absolute path to the ${channel.pass} rebuilt dist`);
+  }
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(releasedAt ?? '')
+    || Number.isNaN(Date.parse(releasedAt))) {
+    throw new Error('STABLE_RELEASED_AT must be one strict UTC ISO-8601 instant');
+  }
+  const rebuiltDist = resolve(configuredDist);
+  const rebuiltSourceSha = exactSha(channel.sourceSha, `${channelName}.sourceSha`);
+  const rebuiltFiles = walkFiles(rebuiltDist)
+    .filter((path) => path.endsWith('index.html') || path.includes(`${sep}assets${sep}`));
+  if (!rebuiltFiles.some((path) => path.endsWith('index.html'))
+    || !rebuiltFiles.some((path) => path.includes(`${sep}assets${sep}`))) {
+    throw new Error(`${channel.pass} rebuilt stable dist is incomplete`);
+  }
+  const targetRoot = channelRoot(channel.path);
+  mkdirSync(targetRoot, { recursive: true });
+  for (const path of rebuiltFiles) {
+    const target = resolve(targetRoot, relative(rebuiltDist, path));
+    if (!target.startsWith(`${targetRoot}${sep}`)) throw new Error(`Unsafe rebuilt stable path: ${path}`);
+    mkdirSync(dirname(target), { recursive: true });
+    copyFileSync(path, target);
+  }
+  const passEvidenceFiles = rebuiltFiles
+    .filter((path) => path.endsWith('.js') && readFileSync(path).includes(Buffer.from(channel.pass)));
+  const sourceEvidenceFiles = rebuiltFiles
+    .filter((path) => path.endsWith('.js') && readFileSync(path).includes(Buffer.from(rebuiltSourceSha)));
+  if (passEvidenceFiles.length === 0) throw new Error(`${channel.pass} rebuilt stable dist does not contain its pass identity`);
+  if (sourceEvidenceFiles.length === 0) throw new Error(`${channel.pass} rebuilt stable dist does not contain its source SHA`);
+  const provenance = {
+    schemaVersion: 4,
+    channel: channelName,
+    releasePass: channel.pass,
+    sourceSha: rebuiltSourceSha,
+    path: channel.path,
+    exactRootFileCount: rebuiltFiles.length,
+    treeSha256: treeDigest(targetRoot, rebuiltFiles.map((path) => resolve(targetRoot, relative(rebuiltDist, path)))),
+    rebuiltFromSource: true,
+    releasedAt,
+    originalPagesSha: exactSha(channel.pagesSha, `${channelName}.pagesSha`),
+    originalPagesPath: channel.pagesPath,
+    passEvidenceFiles: passEvidenceFiles.map((path) => relative(rebuiltDist, path).replaceAll('\\', '/')),
+    sourceEvidenceFiles: sourceEvidenceFiles.map((path) => relative(rebuiltDist, path).replaceAll('\\', '/')),
+  };
+  writeFileSync(join(targetRoot, 'channel-provenance.json'), `${JSON.stringify(provenance, null, 2)}\n`);
+  return { ...provenance, provenanceFile: 'channel-provenance.json' };
+}
+
+const configuredStableDist = process.env.RELEASE_STABLE_DIST;
+const stableRebuildRequired = process.env.REQUIRE_STABLE_RELEASE_TIMESTAMP === '1';
+if (stableRebuildRequired && (!configuredStableDist || !isAbsolute(configuredStableDist))) {
+  throw new Error('Production topology requires RELEASE_STABLE_DIST');
+}
+const stable = configuredStableDist
+  ? stageRebuilt('recent-stable', config.stable, configuredStableDist, process.env.STABLE_RELEASED_AT)
+  : stagePinned('recent-stable', config.stable);
 const experimentalFiles = walkFiles(experimentalRoot);
 const experimental = {
   schemaVersion: 4, channel: liveChannelId, releasePass,
@@ -167,7 +223,7 @@ if (config.rollback) {
   if (!configuredRollbackDist || !isAbsolute(configuredRollbackDist)) {
     if (!rollbackRequired) {
       // Browser-QA previews (killstreak capture, HUD e2e) exercise the live
-      // candidate + byte-exact stable topology; the Pass 63 rebuild subtree is
+      // candidate + approved-source stable topology; the Pass 63 rebuild subtree is
       // only staged by the production workflow that builds it.
       console.log(`[stage-release-topology] skipping ${config.rollback.pass} rollback (RELEASE_ROLLBACK_DIST unset; preview topology)`);
     } else {

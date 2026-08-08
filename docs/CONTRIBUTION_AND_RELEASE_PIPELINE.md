@@ -89,7 +89,7 @@ One integrator owns the queue at a time.
 Only the `release-production` GitHub Actions workflow may publish production.
 
 1. Wait for the merge commit's five required checks to succeed, including `requirements-acceptance`.
-2. Confirm the player-facing changelog is truthful. A new top entry may use `PENDING_PRODUCTION` through `resolveProductionReleasedAt`; the protected workflow injects one immutable production-build timestamp and records the same value in its receipt. At the start of the next substantive pass, freeze the previous entry from that receipt. Do not create a post-release metadata PR or second deployment solely to learn a timestamp.
+2. Confirm the player-facing changelog is truthful. A new top entry may use `PENDING_PRODUCTION` through `resolveProductionReleasedAt`; the protected workflow injects one immutable production-build timestamp and records the same value in its receipt. A publicly selectable fallback may never retain that sentinel: if its pinned historical Pages bytes predate timestamp injection, rebuild its exact approved source with the immutable timestamp of the pinned Pages publication, record `rebuiltFromSource: true`, and verify every live channel shows a real UK-local day/date/time. At the start of the next substantive pass, freeze the previous entry from that receipt. Do not create a post-release metadata PR or second deployment solely to learn a timestamp.
 
    ```ts
    releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE)

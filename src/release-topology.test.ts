@@ -81,11 +81,15 @@ describe('Pass 69 release topology', () => {
     expect(shell).toContain('localStorage.removeItem(key)');
   });
 
-  it('moves the candidate under experimental and reconstructs only stable Pass 67.1 from Git blobs', () => {
+  it('moves the candidate under experimental and requires a timestamped stable rebuild in production', () => {
     expect(staging).toContain('process.env.RELEASE_DIST_ROOT');
     expect(staging).toContain('process.env.RELEASE_TOPOLOGY_RECEIPT_PATH');
     expect(staging).toContain("renameSync(join(distRoot, 'index.html'), join(experimentalRoot, 'index.html'))");
-    expect(staging).toContain("const stable = stagePinned('recent-stable', config.stable)");
+    expect(staging).toContain('process.env.RELEASE_STABLE_DIST');
+    expect(staging).toContain('process.env.REQUIRE_STABLE_RELEASE_TIMESTAMP');
+    expect(staging).toContain("stageRebuilt('recent-stable', config.stable");
+    expect(staging).toContain("stagePinned('recent-stable', config.stable)");
+    expect(staging).toContain('STABLE_RELEASED_AT must be one strict UTC ISO-8601 instant');
     expect(staging).toContain("channel: liveChannelId");
     expect(staging).toContain('channel.pagesPath');
     expect(staging).toContain("'pinned-channel-provenance.json'");
