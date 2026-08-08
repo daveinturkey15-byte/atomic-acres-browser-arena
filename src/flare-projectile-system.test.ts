@@ -33,6 +33,26 @@ describe('flare projectile system', () => {
     )).toBeNull();
   });
 
+  it('keeps WebGL compatibility flares emissive without changing the live point-light shader topology', async () => {
+    const scene = new THREE.Scene();
+    const system = new FlareProjectileSystem(scene, false, false);
+    const lights: THREE.PointLight[] = [];
+    scene.traverse((node) => {
+      if (node instanceof THREE.PointLight && node.name === 'signal-flare-bounded-light') lights.push(node);
+    });
+    expect(lights).toHaveLength(FLARE_PROJECTILE_EFFECT.poolCapacity);
+    expect(lights.every((light) => !light.visible)).toBe(true);
+    expect(system.spawn({
+      ownerId: 'player-webgl', ownerTeam: 0, origin: new THREE.Vector3(), direction: new THREE.Vector3(1, 0, 0),
+      authority: true, actionNonce: 1, now: 0,
+    })).toBe(true);
+    expect(lights.every((light) => !light.visible)).toBe(true);
+    const staged = vi.fn(async () => undefined);
+    await system.withStagedFirstShotLight(staged);
+    expect(staged).toHaveBeenCalledTimes(1);
+    expect(lights.every((light) => !light.visible)).toBe(true);
+  });
+
   it('flies, impacts a target once, and emits finite host-owned burn pulses without explosion semantics', () => {
     const scene = new THREE.Scene();
     const system = new FlareProjectileSystem(scene, false);

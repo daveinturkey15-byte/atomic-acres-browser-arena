@@ -97,6 +97,7 @@ import { bindAdvancedGraphicsControls } from './ui/advanced-graphics-controls';
 import { ADVANCED_GRAPHICS_CONTROLS, GRAPHICS_CAPABILITY_NOTICES, GRAPHICS_PRESET_VALUES } from './graphics-settings-registry';
 import {
   MobileTouchControls,
+  mobileTouchFireBypassesPointerLock,
   readMobileControlsPreference,
   writeMobileControlsPreference,
 } from './mobile-touch-controls';
@@ -1495,7 +1496,11 @@ camera.rotation.order = 'YXZ';
 scene.add(camera);
 const railgunPresentation = new RailgunPresentation(scene, element<HTMLElement>('#railgun-thermal'), reducedRenderMode);
 const timedMapWeaponPresentation = new TimedMapWeaponPresentation(scene, reducedRenderMode);
-const flareProjectileSystem = new FlareProjectileSystem(scene, reducedRenderMode);
+const flareProjectileSystem = new FlareProjectileSystem(
+  scene,
+  reducedRenderMode,
+  renderRuntime.backend !== 'webgl2',
+);
 const flamethrowerStreamPresentation = new FlamethrowerStreamSystem(scene, reducedRenderMode);
 const FLAMETHROWER_GROUND_FIRE_RADIUS_M = 1.8;
 const FLAMETHROWER_GROUND_FIRE_PULSE_MS = 500;
@@ -5755,22 +5760,24 @@ let hostCheckpointPersistScheduled = false;
 function persistActiveHostMatchCheckpoint(force = false): boolean {
   const storage = clientPersistentStorage();
   if (!storage) return false;
-  const nowEpochMs = Date.now();
-  if (!force && nowEpochMs - lastHostCheckpointPersistAtEpochMs < 2_000) {
-    if (!hostCheckpointPersistScheduled) {
-      hostCheckpointPersistScheduled = true;
-      scheduleBrowserPreparationIdleTask(() => {
-        hostCheckpointPersistScheduled = false;
-        lastHostCheckpointPersistAtEpochMs = Date.now();
-        const checkpoint = createHostMatchCheckpoint();
-        if (checkpoint) saveHostMatchCheckpoint(storage, checkpoint);
-      });
-    }
-    return true;
+  if (force) {
+    lastHostCheckpointPersistAtEpochMs = Date.now();
+    const checkpoint = createHostMatchCheckpoint();
+    return checkpoint ? saveHostMatchCheckpoint(storage, checkpoint) : false;
   }
-  lastHostCheckpointPersistAtEpochMs = nowEpochMs;
-  const checkpoint = createHostMatchCheckpoint();
-  return checkpoint ? saveHostMatchCheckpoint(storage, checkpoint) : false;
+  if (hostCheckpointPersistScheduled) return true;
+  hostCheckpointPersistScheduled = true;
+  scheduleBrowserPreparationIdleTask(() => {
+    hostCheckpointPersistScheduled = false;
+    const deferredStorage = clientPersistentStorage();
+    if (!deferredStorage) return;
+    const nowEpochMs = Date.now();
+    if (nowEpochMs - lastHostCheckpointPersistAtEpochMs < 2_000) return;
+    lastHostCheckpointPersistAtEpochMs = nowEpochMs;
+    const checkpoint = createHostMatchCheckpoint();
+    if (checkpoint) saveHostMatchCheckpoint(deferredStorage, checkpoint);
+  });
+  return true;
 }
 
 function clearStoredHostMatchCheckpoint(): void {
@@ -7670,17 +7677,11 @@ function renderLoadoutInspector(): void {
   if (name) name.textContent = weapon.displayName.toUpperCase();
   if (meta) meta.textContent = `${weapon.fireMode.toUpperCase()} / ${weapon.rpm} RPM / ${weapon.penetration.calibreLabel.toUpperCase()}`;
   const control = Math.round(Math.max(8, Math.min(100, 100 - (weapon.recoil.pitchRadians + weapon.recoil.yawRadians) * 760)));
-  // Ideal cyclic body DPS from canonical damage x pellets x rounds-per-second.
-  const idealDps = Math.round(weapon.damage.base * weapon.pellets * (weapon.rpm / 60));
   const stats = {
     damage: { value: String(Math.round(weapon.damage.base * weapon.pellets)), percent: Math.min(100, weapon.damage.base * weapon.pellets) },
     'fire-rate': { value: String(weapon.rpm), percent: Math.min(100, weapon.rpm / 12) },
     range: { value: `${weapon.damage.falloffEndM}m`, percent: Math.min(100, weapon.damage.falloffEndM / 1.2) },
     control: { value: String(control), percent: control },
-    wallbang: {
-      value: `${weapon.penetration.maximumSurfaces} surface${weapon.penetration.maximumSurfaces === 1 ? '' : 's'}`,
-      percent: Math.min(100, weapon.penetration.maximumSurfaces * 22 + weapon.penetration.power * 3),
-    },
   } as const;
   for (const [id, stat] of Object.entries(stats)) {
     const bar = inspector.querySelector<HTMLElement>(`[data-loadout-stat="${id}"]`);
@@ -7688,8 +7689,7 @@ function renderLoadoutInspector(): void {
     bar?.style.setProperty('--loadout-stat', `${stat.percent}%`);
     if (value) value.textContent = stat.value;
   }
-  const dpsValue = inspector.querySelector<HTMLElement>('[data-loadout-value="dps"]');
-  if (dpsValue) dpsValue.textContent = String(idealDps);
+
   const grenadeDetail = inspector.querySelector<HTMLElement>('[data-loadout-grenade-detail]');
   if (grenadeDetail) {
     const profiles: Record<string, string> = {
@@ -8538,6 +8538,10 @@ function onNetworkMessage(message: GameMessage): void {
     for (const event of message.events) {
       if (event.ownerId === player.id) recordOwnerSupportDamage(event);
       if (event.targetId === player.id) applyKillstreakDamageEvent(event);
+      if (event.source === 'chopper') {
+        const presented = killstreakSnapshot.entities.find((entity) => entity.activationId === event.activationId);
+        if (presented) killstreakPresentation.presentChopperImpactAction(presented.id);
+      }
     }
     const presentedAt = performance.now();
     for (const impact of message.impacts) {
@@ -11684,7 +11688,7 @@ function pauseBackdropCompositorSupported(): boolean {
   }
 }
 
-function presentPauseOnlyWebGlBackdrop(reason: 'escape' | 'debug-pause'): boolean {
+function presentPauseOnlyWebGlBackdrop(reason: 'escape' | 'debug-pause' | 'mobile-pause'): boolean {
   if (renderRuntime.backend !== 'webgl2' || !atomicSignal
     || document.visibilityState !== 'visible' || !document.hasFocus()) return false;
   const sourceWidth = Math.max(1, canvas.width);
@@ -11732,7 +11736,7 @@ function presentPauseOnlyWebGlBackdrop(reason: 'escape' | 'debug-pause'): boolea
   return true;
 }
 
-function renderSafePauseBackdropFallback(reason: 'escape' | 'debug-pause', failure: unknown): void {
+function renderSafePauseBackdropFallback(reason: 'escape' | 'debug-pause' | 'mobile-pause', failure: unknown): void {
   const heldAt = performance.now();
   matchPauseBackdropFallbackCount += 1;
   matchPauseFrameFallback.hidden = true;
@@ -11760,7 +11764,7 @@ function renderSafePauseBackdropFallback(reason: 'escape' | 'debug-pause', failu
   console.warn('[Pass 65 menu backdrop used safe fallback]', failure);
 }
 
-function presentActiveMatchBackdrop(reason: 'escape' | 'debug-pause'): boolean {
+function presentActiveMatchBackdrop(reason: 'escape' | 'debug-pause' | 'mobile-pause'): boolean {
   let pauseOnlyCaptureFailure: unknown = null;
   try {
     if (lastGameplayPresentedFrame <= 0) throw new Error('No presented gameplay frame is available');
@@ -11801,10 +11805,14 @@ function presentActiveMatchBackdrop(reason: 'escape' | 'debug-pause'): boolean {
   }
 }
 
-function openActiveMatchPause(reason: 'escape' | 'debug-pause'): void {
+function openActiveMatchPause(reason: 'escape' | 'debug-pause' | 'mobile-pause'): void {
   if (!gameStarted || !player.alive || matchFinished || menuLifecycle.surface === 'paused-match') return;
   cancelFInteractionPress('pause');
   clearGameplayInput();
+  mobileTouchControls?.setInMatch(false);
+  mobilePresentationActive = false;
+  document.body.classList.remove('mtc-live');
+  releaseMobileLandscapePresentation();
   presentActiveMatchBackdrop(reason);
   applyMenuLifecycle({ type: 'pause-requested', reason });
   if (document.pointerLockElement === canvas) void document.exitPointerLock();
@@ -13643,7 +13651,13 @@ function finishReload(now: number): void {
 }
 
 function tryFire(now: number): void {
-  if (!player.alive || !gameStarted || (!debugInputUnlocked && document.pointerLockElement !== canvas) || matchState.phase !== 'active') return;
+  const touchFireActive = mobileTouchFireBypassesPointerLock(
+    mobilePresentationActive,
+    mobileTouchControls?.state.firing === true,
+  );
+  if (!player.alive || !gameStarted
+    || (!debugInputUnlocked && document.pointerLockElement !== canvas && !touchFireActive)
+    || matchState.phase !== 'active') return;
   if (pointSupportTargeting && !tacticalMapOpen) return;
   // While piloting a drone or manning the chopper gun the trigger belongs to
   // that platform's host-admitted weapon. Rapid clicking previously discharged
@@ -18024,6 +18038,7 @@ function updateKillstreakPossession(now: number): void {
     // Stream a bright tracer down the aim line on every admitted shot so the
     // trigger is unmistakable (presentation-only; the host owns real hits).
     if (possession.kind === 'chopper-gunner') {
+      killstreakPresentation.presentChopperWeaponAction(entity.id);
       const muzzle = camera.getWorldPosition(new THREE.Vector3());
       const aim = camera.getWorldDirection(new THREE.Vector3());
       muzzle.addScaledVector(aim, 1.4).y -= 0.18;
@@ -18073,7 +18088,13 @@ function updatePass65KillstreakRuntime(now: number): void {
   if (network.role !== 'client' && matchState.phase === 'active') {
     const result = killstreakRuntime.advance(now, killstreakWorldState());
     const applied = result.damageEvents.map(applyKillstreakDamageEvent).filter((event): event is KillstreakDamageEvent => event !== null && event.damage > 0);
-    for (const event of applied) recordOwnerSupportDamage(event);
+    for (const event of applied) {
+      recordOwnerSupportDamage(event);
+      if (event.source === 'chopper') {
+        const presented = killstreakSnapshot.entities.find((entity) => entity.activationId === event.activationId);
+        if (presented) killstreakPresentation.presentChopperImpactAction(presented.id);
+      }
+    }
     const carpetWorldImpacts: Array<{
       point: THREE.Vector3;
       radius: number;
@@ -21354,7 +21375,10 @@ function pollGamepad(dt: number): void {
 function initMobileTouchControls(): void {
   if (mobileTouchControls) return;
   mobileTouchControls = new MobileTouchControls({
-    onFireDown: () => setLocalTriggerHeld(true),
+    onFireDown: () => {
+      setLocalTriggerHeld(true);
+      tryFire(performance.now());
+    },
     onFireUp: () => setLocalTriggerHeld(false),
     onJump: () => {
       if (!gameplayInputEnabled()) return;
@@ -21367,6 +21391,9 @@ function initMobileTouchControls(): void {
     onCrouch: () => { if (gameplayInputEnabled()) requestStance('toggle-crouch'); },
     onGrenade: () => { if (gameplayInputEnabled()) throwGrenade(); },
     onMelee: () => { if (gameplayInputEnabled()) melee(); },
+    onInteractDown: () => { if (gameplayInputEnabled()) beginFInteractionPress(performance.now()); },
+    onInteractUp: () => releaseFInteractionPress(performance.now()),
+    onPause: () => openActiveMatchPause('mobile-pause'),
   });
   mobileTouchControls.mount(document.body);
   mobileTouchControls.setEnabled(readMobileControlsPreference());
@@ -21406,15 +21433,15 @@ function pollMobileTouch(): void {
 let mobilePresentationActive = false;
 
 /**
- * Mobile play is authored for landscape: enter fullscreen (a prerequisite for
- * orientation lock on Android) and lock to landscape. Best-effort - iOS Safari
- * has no orientation-lock API, so the CSS portrait hint covers that case.
+ * Mobile play uses the available viewport in either orientation. Fullscreen
+ * and orientation lock remain best-effort enhancements, never a prerequisite
+ * for the touch controls or portrait HUD.
  */
 function requestMobileLandscapePresentation(): void {
   const docEl = document.documentElement as HTMLElement & { requestFullscreen?: () => Promise<void> };
   const lock = (): void => {
     const orientation = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
-    orientation.lock?.('landscape').catch(() => {});
+    orientation.lock?.(window.matchMedia('(orientation: portrait)').matches ? 'portrait' : 'landscape').catch(() => {});
   };
   if (!document.fullscreenElement && typeof docEl.requestFullscreen === 'function') {
     docEl.requestFullscreen().then(lock).catch(() => {});
@@ -22494,15 +22521,15 @@ window.setInterval(() => {
   persistActiveHostMatchCheckpoint();
 }, 2_000);
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') persistActiveHostMatchCheckpoint();
+  if (document.visibilityState === 'hidden') persistActiveHostMatchCheckpoint(true);
 });
 window.addEventListener('pagehide', () => {
-  persistActiveHostMatchCheckpoint();
+  persistActiveHostMatchCheckpoint(true);
   persistRoomIdentityForCloseTabRejoin();
   matchDiagnosticUploader.flushForPageLifecycle();
 });
 window.addEventListener('beforeunload', () => {
-  persistActiveHostMatchCheckpoint();
+  persistActiveHostMatchCheckpoint(true);
   persistRoomIdentityForCloseTabRejoin();
   matchDiagnosticUploader.flushForPageLifecycle();
   network.close();
@@ -23540,6 +23567,7 @@ const debugWindow = window as Window & {
     replayLastKillstreakActivation: () => boolean;
     forceRemoteDeathForReconnect: (playerId?: string) => { targetId: string; nextLifeId: number } | null;
     togglePilotedDroneControl: (entityId?: string) => boolean;
+    toggleChopperGunnerControl: (entityId?: string) => boolean;
     forceBotGrenade: (fuseMs?: number, grenade?: GrenadeId) => boolean;
     activateSupport: (id: FieldSupportId) => void;
     setOverdrive: (mode: 'charging' | 'available' | 'active' | 'expired') => void;
@@ -25652,6 +25680,15 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     ));
     return entity ? requestKillstreakControl(entity.id, 'toggle-piloted-drone') : false;
   },
+  toggleChopperGunnerControl: (entityId) => {
+    const entity = killstreakSnapshot.entities.find((candidate) => (
+      candidate.kind === 'chopper'
+      && candidate.ownerId === player.id
+      && candidate.expiresInMs > 0
+      && (!entityId || candidate.id === entityId)
+    ));
+    return entity ? requestKillstreakControl(entity.id, 'toggle-chopper-gunner') : false;
+  },
   forceBotGrenade: (fuseMs = 1_100, grenade: GrenadeId = 'frag') => {
     const bot = bots.values().next().value as BotPlayer | undefined;
     return bot ? throwBotGrenade(bot, performance.now(), fuseMs, player.position, player.stance, grenade) : false;
@@ -26210,6 +26247,14 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
     flareProjectileSystem.prewarm(renderRuntime, camera, sceneGeneration),
     flamethrowerStreamPresentation.prewarm(renderRuntime, camera, sceneGeneration),
   ]);
+  setBootstrapStage('prewarming-flare-first-shot');
+  profileArenaTransition('prewarm-flare-first-shot');
+  await flareProjectileSystem.withStagedFirstShotLight(() => (
+    weaponView.prewarmBrowserWeaponFirePresentation(
+      'flare-gun',
+      () => renderRuntime.compileAndRender(scene, camera, scene),
+    )
+  ));
 }
 
 function bootstrapMenuPreview(): void {

@@ -30,7 +30,10 @@ describe('Pass 66 tactical UI overhaul', () => {
     expect(markup).not.toContain('class="kit-stat-strip kit-stat-strip-real"');
     expect(markup).not.toContain('class="kit-dps"');
     expect(markup).toContain('data-weapon-metric="cyclic-dps"');
+    expect(markup.match(/data-loadout-stat=/gu)).toHaveLength(4);
     expect(markup).toContain('data-loadout-stat="damage"');
+    expect(markup).not.toContain('data-loadout-stat="wallbang"');
+    expect(markup).not.toContain('loadout-inspector-dps');
     expect(markup).toContain('data-loadout-grenade-detail');
     // The shell no longer emits the retired kit-stat-strip. The final cascade
     // must therefore leave the canonical asset + metric deck visible.
@@ -59,5 +62,10 @@ describe('Pass 66 tactical UI overhaul', () => {
     expect(css).toContain('@media (max-width: 560px)');
     expect(css).toContain('.pass64-command-deck.panel { inset: 0; border-radius: 0; }');
     expect(css).toContain('#support-block { bottom: 142px; }');
+    expect(css).toContain('@media (orientation: portrait)');
+    expect(css).toContain('@media (orientation: landscape) and (max-height: 500px)');
+    expect(css).toContain('env(safe-area-inset-bottom)');
+    expect(css).toContain('body.mtc-live #support-block,');
+    expect(css).not.toContain('ROTATE DEVICE · LANDSCAPE RECOMMENDED');
   });
 });

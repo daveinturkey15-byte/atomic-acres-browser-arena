@@ -157,7 +157,11 @@ export class FlareProjectileSystem {
   private replicaReleases = 0;
   private replicaRejectedSnapshots = 0;
 
-  constructor(scene: THREE.Scene, flattenMaterials: boolean) {
+  constructor(
+    scene: THREE.Scene,
+    flattenMaterials: boolean,
+    private readonly dynamicLightsEnabled = true,
+  ) {
     this.root.name = 'signal-flare-projectile-pool';
     this.root.userData.presentationOnly = true;
     scene.add(this.root);
@@ -182,6 +186,7 @@ export class FlareProjectileSystem {
       }));
       const light = new THREE.PointLight(0xff4a24, flattenMaterials ? 0 : 18, 9, 2);
       light.castShadow = false;
+      light.visible = dynamicLightsEnabled;
       light.userData.baseIntensity = flattenMaterials ? 0 : 18;
       halo.userData.baseOpacity = flattenMaterials ? 0.34 : 0.5;
       core.name = 'signal-flare-core';
@@ -498,33 +503,56 @@ export class FlareProjectileSystem {
     const entity = this.entities[0];
     if (!entity) return;
     camera.updateWorldMatrix(true, false);
-    // Activate every pooled flare light at once while compiling so the worst-case
-    // dynamic light count is pre-compiled. A single first-shot flare otherwise
-    // changed the effective light count on the live frame and forced a WebGPU
-    // material rebuild (the reported flare micro-freeze).
-    const priorStates = this.entities.map((entry) => ({
+    // WebGL shader keys encode the exact point-light count. Compile the real
+    // first-shot topology (one flare) against the complete arena; compiling
+    // eight pooled lights or only the flare root does not warm the one-light
+    // programs used by live world materials. WebGPU retains the bounded
+    // worst-case pooled topology because its TSL pipeline owns that vocabulary.
+    const stagedEntities = runtime.backend === 'webgl2' ? [entity] : this.entities;
+    const priorStates = stagedEntities.map((entry) => ({
       visible: entry.root.visible,
       position: entry.root.position.clone(),
       intensity: entry.light.intensity,
     }));
     const cameraPosition = camera.getWorldPosition(new THREE.Vector3());
     const cameraDirection = camera.getWorldDirection(new THREE.Vector3());
-    this.entities.forEach((entry, index) => {
+    stagedEntities.forEach((entry, index) => {
       entry.root.position.copy(cameraPosition)
         .addScaledVector(cameraDirection, 4 + index * 0.35);
       entry.root.visible = true;
       entry.light.intensity = Number(entry.light.userData.baseIntensity ?? 0);
     });
     try {
-      await runtime.compileAndRender(this.root, camera, this.root.parent as THREE.Scene);
+      const scene = this.root.parent as THREE.Scene;
+      await runtime.compileAndRender(
+        runtime.backend === 'webgl2' && this.dynamicLightsEnabled ? scene : this.root,
+        camera,
+        scene,
+      );
       this.prewarmGeneration = sceneGeneration;
     } finally {
-      this.entities.forEach((entry, index) => {
+      stagedEntities.forEach((entry, index) => {
         const prior = priorStates[index]!;
         entry.root.visible = prior.visible;
         entry.root.position.copy(prior.position);
         entry.light.intensity = prior.intensity;
       });
+    }
+  }
+
+  async withStagedFirstShotLight(action: () => Promise<void>): Promise<void> {
+    if (!this.dynamicLightsEnabled) return action();
+    const entity = this.entities[0];
+    if (!entity) return action();
+    const priorVisible = entity.root.visible;
+    const priorIntensity = entity.light.intensity;
+    entity.root.visible = true;
+    entity.light.intensity = Number(entity.light.userData.baseIntensity ?? 0);
+    try {
+      await action();
+    } finally {
+      entity.root.visible = priorVisible;
+      entity.light.intensity = priorIntensity;
     }
   }
 

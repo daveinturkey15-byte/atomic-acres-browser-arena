@@ -256,7 +256,7 @@
  * independently labelled combat facts. The bars visualize each stated value;
  * there is deliberately no synthetic balance/quality score. */
 #menu-panel-kit .kit-card:not(.manage-kit-card) {
-  min-height: 430px;
+  min-height: 0;
 }
 
 .weapon-menu-presentation {
@@ -271,6 +271,9 @@
     linear-gradient(145deg, #0b171d, #071116);
   text-align: left;
 }
+
+.weapon-menu-presentation,
+.weapon-menu-presentation * { min-width: 0; }
 
 .weapon-menu-still {
   position: relative;
@@ -332,6 +335,7 @@
   gap: 8px 11px;
 }
 
+
 .weapon-menu-metric { min-width: 0; gap: 4px; }
 .weapon-menu-metric > span {
   grid-template-columns: minmax(0, 1fr) auto;
@@ -348,6 +352,8 @@
   color: #8ba5a7;
   font: 800 var(--pass66-micro)/1 var(--ui-copy, Inter, sans-serif);
   letter-spacing: 0.08em;
+  text-overflow: clip;
+  font-size: clamp(8px, 0.62vw, 10px);
 }
 .weapon-menu-metric strong {
   color: #eff8f7;
@@ -661,6 +667,8 @@ html[data-reduced-motion='true'] .killstreak-demo-choreography::after,
   #menu-panel-kit .kit-card:not(.manage-kit-card) { min-height: 0; }
   .weapon-menu-presentation { grid-template-columns: 1fr; }
   .weapon-menu-metrics { grid-template-columns: 1fr; }
+  .weapon-menu-still { min-height: 130px; max-height: 170px; }
+
   .killstreak-slot-grid { grid-template-columns: 1fr; }
   .killstreak-slot-card:nth-child(5) { grid-column: auto; }
   .killstreak-demo-rail > footer { display: grid; }

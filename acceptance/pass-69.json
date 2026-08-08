@@ -5,79 +5,91 @@
   "status": "accepted",
   "preview": {
     "kind": "github-actions-artifact",
-    "ref": "pr-preview-50-95a64776e341e7893d161be29a2fdfc1036ff6a6",
-    "sourceSha": "95a64776e341e7893d161be29a2fdfc1036ff6a6",
-    "createdAt": "2026-08-07T22:02:54.677Z"
+    "ref": "pr-preview-51-df330132ee34b36e30f6a5b85c20ab6a8171bd40",
+    "sourceSha": "df330132ee34b36e30f6a5b85c20ab6a8171bd40",
+    "createdAt": "2026-08-08T11:06:47.056Z"
   },
   "humanAcceptance": {
     "state": "approved",
     "approvedBy": "Dave",
-    "approvedAt": "2026-08-07T22:05:54.480Z",
-    "evidence": "Dave's current instruction is to get Pass 69 sorted, published on GitHub Pages, and playable online with friends. This is conditional publication authorization rebound to immutable PR #50 preview artifact 9010840625 at source SHA 95a64776e341e7893d161be29a2fdfc1036ff6a6; Dave has not claimed to have inspected or tested this preview artifact. Farcrysis remains excluded and deferred to Pass 78; killstreak videos remain out of scope. The known stale prerecorded Chopper menu-preview provenance is explicitly deferred and is not represented as new video evidence."
+    "approvedAt": "2026-08-08T11:16:29Z",
+    "evidence": "Dave's current instruction after immutable PR #51 preview artifact 9020910443 became available at source SHA df330132ee34b36e30f6a5b85c20ab6a8171bd40 is: 'Just get it live on GitHub pages ... Then I can preview it that way.' This is explicit publication authorization for that exact artifact; Dave has not claimed a pre-publication manual browser inspection. Farcrysis remains excluded and deferred to Pass 78; killstreak videos remain out of scope. The known stale prerecorded Chopper menu-preview provenance is explicitly deferred and is not represented as new video evidence."
   },
   "requirements": [
     {
       "id": "R1",
-      "summary": "Field Kit metric decks remain visible and readable",
-      "expected": "Asset-backed Field Kit weapon cards display independently labelled real catalog metrics inside their card bounds without clipping or hidden stat decks.",
-      "falsifier": "A served Field Kit card hides its metric deck, clips it outside the card, or loses the asset-backed weapon still and metric labels.",
+      "summary": "Field Kit cards and the selected-primary inspector remain readable at four core metrics",
+      "expected": "Asset-backed Field Kit weapon cards and the selected-primary inspector display Damage, Range, Fire Rate, and Magazine inside their bounds without duplicate DPS, wallbang, or expandable extra-ballistics density.",
+      "falsifier": "A served Field Kit card hides or clips its four-metric deck, loses the asset-backed weapon still, duplicates DPS/wallbang, or restores the expandable extra-ballistics block.",
       "acceptance": "visual",
       "state": "verified",
       "evidence": [
         {
           "kind": "browser",
           "ref": "tests/e2e/pass66-field-kit-killstreak-menu.spec.ts",
-          "command": "npx playwright test tests/e2e/pass66-field-kit-killstreak-menu.spec.ts --grep asset-backed --project chromium --workers=1",
-          "note": "The exact candidate's Chromium browser contract passed and checks visible metric decks, asset-backed cards, computed layout, and card-contained bounds."
+          "command": "npx playwright test tests/e2e/pass66-field-kit-killstreak-menu.spec.ts --project chromium --workers=1 --retries=0",
+          "note": "The exact candidate Chromium contract passed all six Field Kit/menu tests and checks four metrics per card, four selected-primary stats, asset-backed stills, computed layout, and bounded desktop/mobile surfaces."
         },
         {
           "kind": "visual",
-          "ref": "artifact://pass69/field-kit-preview-50-95a64776e341e7893d161be29a2fdfc1036ff6a6",
-          "note": "The immutable PR #50 preview artifact is the byte-bound visual target for the Field Kit presentation; no claim is made that Dave inspected it in a browser."
+          "ref": "artifact://pass69/field-kit-preview-51-df330132ee34b36e30f6a5b85c20ab6a8171bd40",
+          "note": "The immutable PR #51 preview artifact is the byte-bound visual target for the Field Kit presentation; no claim is made that Dave inspected it in a browser."
         }
       ]
     },
     {
       "id": "R2",
-      "summary": "First-person arms use the corrected mirrored parent-space solve",
-      "expected": "The two-chain authored first-person arms solve their wrist and palm targets in parent space while preserving ADS, prone, reload, recoil, knife, and near-plane contracts.",
-      "falsifier": "Arm reach/contact errors, mirrored drift, ADS framing regression, prone clipping, or knife/socket misalignment appears in the affected contracts or served browser groups.",
+      "summary": "First-person arms use a stable parent-space shortest-arc solve",
+      "expected": "The authored mirrored arm rig solves wrist and palm targets in parent space with a deterministic anti-parallel axis while preserving hip, ADS, prone, reload, recoil, melee, wall-clearance, firearm contact, and knife contact contracts.",
+      "falsifier": "An anti-parallel bone direction produces a non-finite or arbitrary flip, or arm reach/contact, ADS framing, prone clearance, reload, melee, or knife/socket alignment regresses in the served matrix.",
       "acceptance": "mechanical",
       "state": "verified",
       "evidence": [
         {
           "kind": "unit",
           "ref": "src/weapon-presentation-anatomy.test.ts",
-          "command": "npx vitest run src/weapon-presentation-anatomy.test.ts src/viewmodel-framing.test.ts src/character-presentation-contract.test.ts src/pass65-weapon-runtime-behavior.test.ts",
-          "note": "Focused anatomy, viewmodel, character presentation, and runtime contracts pass on the exact candidate."
+          "command": "npx vitest run src/stable-bone-orientation.test.ts src/weapon-presentation-anatomy.test.ts src/viewmodel-framing.test.ts src/character-presentation-contract.test.ts src/pass65-weapon-runtime-behavior.test.ts",
+          "note": "Focused orientation, anatomy, viewmodel, character presentation, and runtime contracts pass on the exact candidate."
         },
         {
           "kind": "browser",
           "ref": "tests/e2e/pass66-viewmodel-framing.spec.ts",
-          "command": "npm run test:e2e:bounded",
-          "note": "The exact candidate's required Linux and Windows bounded browser groups are the release gate for this preview; clean headed owner-HITL framing remains a residual unknown and is not claimed as completed here."
+          "command": "npx playwright test tests/e2e/pass66-viewmodel-framing.spec.ts --project chromium --workers=1 --retries=0",
+          "note": "The exact candidate browser matrix passed authored arms, firearm, reload, melee, prone/wall-clearance, both hand contacts, and knife contact at 1440p, 4K, and ultrawide."
         }
       ]
     },
     {
       "id": "R3",
-      "summary": "Chopper Gunner runtime presentation matches authored semantic contracts",
-      "expected": "The loader validates the authored Chopper Gunner nodes and eight actions across LODs, and the procedural fallback exposes matching semantic sockets without changing gameplay authority.",
-      "falsifier": "A required authored node/action is missing, LOD parity breaks, forward alignment is absent, or the fallback omits a required presentation socket.",
+      "summary": "Chopper Gunner authored firing and impact actions run from real possession and authority paths",
+      "expected": "The loader validates all authored Chopper nodes and eight actions across LODs; possession fire plays recoil, gun-fire, muzzle-flash, and tracer actions, while an applied authoritative hit plays the authored impact action without changing gameplay authority.",
+      "falsifier": "A required authored node/action is absent, active/pooled action maps are empty, the real trigger path does not present all four firing actions, impact plays without an applied authoritative hit, or first-person sightline/alignment fails.",
       "acceptance": "mechanical",
       "state": "verified",
       "evidence": [
         {
           "kind": "unit",
           "ref": "src/killstreak-presentation.test.ts",
-          "command": "npx vitest run src/killstreak-presentation.test.ts src/support-vehicle-presentation-contract.test.ts src/chopper-gunner-fire-ray.test.ts",
-          "note": "Focused Chopper Gunner authored node/action, LOD, fallback, alignment, and fire-ray contracts pass."
+          "command": "npx vitest run src/killstreak-presentation.test.ts src/killstreak-main-integration.test.ts src/support-vehicle-presentation-contract.test.ts src/chopper-gunner-fire-ray.test.ts",
+          "note": "Focused authored node/action, LOD, fallback, possession, impact-authority, alignment, and fire-ray contracts pass."
+        },
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/pass65-support-vehicle-assets.spec.ts",
+          "command": "npx playwright test tests/e2e/pass65-support-vehicle-assets.spec.ts --project chromium --workers=1 --retries=0",
+          "note": "The exact candidate browser test loads all authored support assets, possesses an orbiting Chopper, proves active and pooled action names, drives the real trigger intent, observes all four actions running on the visible authored LOD, and binds that live action state to changed canvas pixels and the first-person sightline."
+        },
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/pass65-support-visual-gate.spec.ts",
+          "command": "npx playwright test tests/e2e/pass65-support-visual-gate.spec.ts --project chromium --workers=1 --retries=0 --grep 'projects chopper and drone damage'",
+          "note": "The authoritative multiplayer browser path proves a remote guest receives Chopper damage and presents the authored impact action rather than leaving impact playback host-only."
         },
         {
           "kind": "contract",
           "ref": "source-assets/blender/pass65-chopper-gunner.provenance.json",
           "command": "node scripts/qa/pass65-support-vehicle-glb.mjs",
-          "note": "Direct authored GLB structural validation passes for the shipped Chopper Gunner LODs."
+          "note": "Direct authored GLB structural validation passes for all shipped Chopper Gunner LODs."
         }
       ]
     },
@@ -108,8 +120,52 @@
         {
           "kind": "contract",
           "ref": "src/release-topology.test.ts",
-          "command": "git diff --name-only cf3539cd1018efd7c6572e70ccbf4cb17dfca0bf 95a64776e341e7893d161be29a2fdfc1036ff6a6",
-          "note": "The exact Pass 69 runtime candidate diff contains no video/media/capture paths."
+          "command": "git diff --name-only 59b3dc1106ac12459194e449cd4db50b9dd4f8fd df330132ee34b36e30f6a5b85c20ab6a8171bd40",
+          "note": "The exact Pass 69 runtime candidate changes no published video/media/capture asset or provenance path; browser decoder tests use an existing local fixture and retain the explicit poster fallback."
+        }
+      ]
+    },
+    {
+      "id": "R6",
+      "summary": "Mobile portrait and landscape controls remain usable without pointer-lock coupling",
+      "expected": "The game admits portrait and landscape touch play without a rotate blocker; movement, look, FIRE, reload, jump, crouch, grenade, melee, interact, pause, and compact HUD regions remain inside the viewport without rectangle intersections, and touch FIRE admits a semi-automatic shot without desktop pointer lock.",
+      "falsifier": "A retained mobile viewport shows the rotate blocker, a control leaves the viewport or intersects another control/HUD region, sustained look stops before release, or touch FIRE requires pointer lock or fails to consume ammunition.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/pass69-mobile-touch-layout.spec.ts",
+          "command": "npx playwright test tests/e2e/pass69-mobile-touch-layout.spec.ts --project chromium --workers=1 --retries=0",
+          "note": "The exact candidate passed narrow portrait 320x667, portrait 390x844, landscape 844x390, rectangle-intersection, compact-HUD, pointer-lock-independent semi-auto FIRE, held automatic FIRE, live USE interaction, and PAUSE lifecycle checks."
+        },
+        {
+          "kind": "unit",
+          "ref": "src/mobile-touch-controls.test.ts",
+          "command": "npx vitest run src/mobile-touch-controls.test.ts src/ui/pass66-overhaul.test.ts src/ui/pass66-readability.test.ts",
+          "note": "Touch callback state and retained responsive CSS contracts pass."
+        }
+      ]
+    },
+    {
+      "id": "R7",
+      "summary": "The first WebGL flare shot stays responsive and does not serialize a host checkpoint on the shot frame",
+      "expected": "The compatibility renderer prewarms the exact retained flare fire presentation without a live dynamic point-light shader-key change, the first real shot remains within the preserved frame-gap bound, and non-forced checkpoint creation/storage occurs only in the deferred idle task.",
+      "falsifier": "The real first shot exceeds the relative/fixed frame-gap ceiling, performs a synchronous host-checkpoint storage write, spends 250 ms or more inside the fire call, or restores a live WebGL flare PointLight topology change.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/pass66-timed-map-weapons.spec.ts",
+          "command": "npx playwright test tests/e2e/pass66-timed-map-weapons.spec.ts --project chromium --workers=1 --retries=0",
+          "note": "The exact candidate passed the real first-shot frame-gap probe, synchronous Storage.setItem falsifier, bounded fire-call assertion, finite-ammo admission, active projectile check, game-owned presented-frame advance, and changed compositor-region pixels without replacing timing with a fixed-delay claim."
+        },
+        {
+          "kind": "unit",
+          "ref": "src/host-match-recovery-main-integration.test.ts",
+          "command": "npx vitest run src/host-match-recovery-main-integration.test.ts src/flare-projectile-system.test.ts src/presentation-prewarm-contract.test.ts src/timed-map-weapon-main-integration.test.ts",
+          "note": "The exact candidate proves deferred gameplay checkpoint serialization, forced lifecycle persistence, WebGL no-dynamic-light topology, and bounded first-shot presentation prewarm."
         }
       ]
     }

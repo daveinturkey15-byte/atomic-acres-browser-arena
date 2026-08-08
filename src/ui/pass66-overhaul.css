@@ -479,20 +479,6 @@
   .loadout-inspector-stats dd { display: grid; grid-template-columns: 1fr 84px; align-items: center; gap: 10px; margin: 0; }
   .loadout-inspector-stats dd i { height: 10px; border-radius: 5px; background: linear-gradient(90deg, var(--p66-cyan-bright) var(--loadout-stat, 50%), #294347 var(--loadout-stat, 50%)); }
   .loadout-inspector-stats dd b { color: #fff; font-size: 15px; font-weight: 800; text-align: right; }
-  /* The overall damage-per-second summary is the headline number. */
-  .loadout-inspector-dps {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 12px;
-    margin: 0 0 14px;
-    padding: 12px 14px;
-    border: 1px solid var(--p66-amber-bright);
-    border-radius: 4px;
-    background: rgba(255, 157, 36, 0.12);
-  }
-  .loadout-inspector-dps small { color: var(--p66-amber-bright); font-size: 12px; letter-spacing: 0.1em; }
-  .loadout-inspector-dps strong { margin: 0; color: #ffd39a; font: 900 38px/1 var(--ui-display); }
   .loadout-inspector > p[data-loadout-grenade-detail] { margin: 0; padding-top: 12px; border-top: 1px solid #2b4548; color: #e9bb72; font-size: 12px; line-height: 1.5; }
 
   #menu-panel-streaks { min-height: 100%; }
@@ -896,55 +882,83 @@
    (body.mtc-live) so desktop and menu layouts are untouched. Lifts the bottom
    consoles above the thumbsticks and collapses the support list so nothing
    overlaps the on-screen controls. */
-body.mtc-live #hud {
-  --hud-edge: 8px;
-  --hud-map-width: 128px;
+body.mtc-live #hud { --hud-edge: max(8px, env(safe-area-inset-left)); }
+body.mtc-live .hud-mission-console {
+  top: max(6px, env(safe-area-inset-top));
+  left: max(8px, env(safe-area-inset-left));
+  right: max(8px, env(safe-area-inset-right));
+  width: auto;
 }
-body.mtc-live .hud-map-console { top: 84px; width: var(--hud-map-width); padding: 6px; }
-body.mtc-live #minimap { width: 100%; height: auto; }
-body.mtc-live .hud-mission-console { right: var(--hud-edge); }
-body.mtc-live #matchbar { min-height: 52px; padding: 7px 8px; }
-body.mtc-live #timer { font-size: 24px; }
-body.mtc-live #scoreline b { font-size: 18px; }
-body.mtc-live #objective, body.mtc-live .hud-performance-row { display: none; }
-
-/* Operator (bottom-left) sits above the move thumbstick. */
-body.mtc-live .hud-operator-console { bottom: 172px; width: min(150px, 40vw); padding: 8px; }
-body.mtc-live #health-block b { font-size: 34px; }
-body.mtc-live #combat-stats { display: none; }
-
-/* Weapon (bottom-right) sits above the look thumbstick. */
-body.mtc-live .hud-weapon-console { bottom: 172px; right: var(--hud-edge); width: min(150px, 42vw); }
-body.mtc-live #weapon-block #ammo { font-size: 40px; }
-body.mtc-live .reserve-stack em { font-size: 20px; }
-
-/* Collapse the killstreak list to a slim top-centre streak pill so it never
-   covers the action buttons. */
-body.mtc-live #support-block { left: 50%; right: auto; transform: translateX(-50%); top: 8px; bottom: auto; width: auto; padding: 6px 10px; }
-body.mtc-live #support-block .support-list, body.mtc-live #support-block .support-help { display: none; }
-body.mtc-live .support-heading { min-height: 0; margin-bottom: 0; }
-
-body.mtc-live #killfeed { top: 132px; width: 160px; }
-body.mtc-live #damage-feeds { top: 160px; width: min(200px, 52vw); }
+body.mtc-live #matchbar { min-height: 48px; padding: 6px 8px; }
+body.mtc-live #timer { font-size: 22px; }
+body.mtc-live #scoreline b { font-size: 17px; }
+body.mtc-live #objective,
+body.mtc-live .hud-performance-row,
+body.mtc-live .hud-map-console,
+body.mtc-live #support-block,
+body.mtc-live #killfeed,
+body.mtc-live #damage-feeds,
 body.mtc-live #pause-hint { display: none; }
+body.mtc-live .hud-operator-console,
+body.mtc-live .hud-weapon-console {
+  top: calc(max(6px, env(safe-area-inset-top)) + 58px);
+  bottom: auto;
+  width: min(140px, calc(50vw - 24px));
+  padding: 7px;
+}
+body.mtc-live .hud-operator-console { left: max(8px, env(safe-area-inset-left)); }
+body.mtc-live .hud-weapon-console { right: max(8px, env(safe-area-inset-right)); }
+body.mtc-live #health-block b { font-size: 30px; }
+body.mtc-live #combat-stats { display: none; }
+body.mtc-live #weapon-block { padding: 7px; }
+body.mtc-live #weapon-block #ammo { font-size: 34px; }
+body.mtc-live .reserve-stack em { font-size: 18px; }
 
-/* Portrait fallback (iOS has no orientation-lock API): prompt the player to
-   rotate rather than presenting a cramped, overlapping portrait HUD. */
+/* Compact landscape puts the action rail between the right HUD and look stick. */
+@media (orientation: landscape) and (max-height: 500px) {
+  body.mtc-live #mobile-touch-controls .mtc-stick {
+    bottom: max(10px, env(safe-area-inset-bottom));
+    width: 124px;
+    height: 124px;
+  }
+  body.mtc-live #mobile-touch-controls .mtc-stick-move { left: max(10px, env(safe-area-inset-left)); }
+  body.mtc-live #mobile-touch-controls .mtc-stick-look { right: max(10px, env(safe-area-inset-right)); }
+  body.mtc-live #mobile-touch-controls .mtc-buttons {
+    right: calc(max(10px, env(safe-area-inset-right)) + 142px);
+    bottom: max(10px, env(safe-area-inset-bottom));
+    grid-template-columns: repeat(3, 54px);
+  }
+  body.mtc-live #mobile-touch-controls .mtc-fire { grid-column: 1 / -1; }
+}
+
+/* Portrait is a supported playable layout. A narrow centre action rail leaves
+   the two thumb zones and compact top HUD clear at 320px and wider. */
 @media (orientation: portrait) {
-  body.mtc-live::after {
-    content: 'ROTATE DEVICE · LANDSCAPE RECOMMENDED';
-    position: fixed;
-    left: 50%;
-    top: 10px;
-    transform: translateX(-50%);
-    z-index: 120;
-    padding: 8px 14px;
-    border-radius: 999px;
-    background: rgba(7, 18, 24, 0.85);
-    border: 1px solid rgba(127, 246, 255, 0.5);
-    color: #d9f6f4;
-    font: 700 12px/1 'Barlow Condensed', 'Bahnschrift Condensed', 'Arial Narrow', sans-serif;
-    letter-spacing: 0.08em;
-    pointer-events: none;
+  body.mtc-live .hud-operator-console,
+  body.mtc-live .hud-weapon-console {
+    width: min(128px, calc(50vw - 46px));
+  }
+  body.mtc-live #mobile-touch-controls .mtc-stick {
+    bottom: max(10px, env(safe-area-inset-bottom));
+    width: clamp(104px, 30vw, 116px);
+    height: clamp(104px, 30vw, 116px);
+  }
+  body.mtc-live #mobile-touch-controls .mtc-stick-move { left: max(8px, env(safe-area-inset-left)); }
+  body.mtc-live #mobile-touch-controls .mtc-stick-look { right: max(8px, env(safe-area-inset-right)); }
+  body.mtc-live #mobile-touch-controls .mtc-buttons {
+    left: auto;
+    right: max(8px, env(safe-area-inset-right));
+    bottom: calc(max(10px, env(safe-area-inset-bottom)) + clamp(104px, 30vw, 116px) + 10px);
+    width: clamp(100px, 32vw, 124px);
+    transform: none;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px;
+  }
+  body.mtc-live #mobile-touch-controls .mtc-btn { height: 44px; padding: 0 3px; font-size: 10px; }
+  body.mtc-live #mobile-touch-controls .mtc-fire {
+    grid-column: 1 / -1;
+    height: 58px;
+    min-height: 58px;
+    font-size: 15px;
   }
 }

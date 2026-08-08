@@ -47,6 +47,7 @@ import {
   type MinigunSpoolPhase,
 } from './minigun-spool';
 import { RUNTIME_WEAPON_RETENTION_LIMIT } from './weapon-prewarm-catalog';
+import { stableDirectionDelta } from './stable-bone-orientation';
 
 export type WeaponPose = {
   dt: number;
@@ -630,6 +631,7 @@ export class WeaponPresentation {
     } satisfies TwoBoneElbowScratch,
     orientCurrentDirection: new THREE.Vector3(),
     orientDesiredDirection: new THREE.Vector3(),
+    orientPreferredAxis: new THREE.Vector3(),
     orientDelta: new THREE.Quaternion(),
   };
   private readonly meleeKnife = new THREE.Group();
@@ -1350,6 +1352,51 @@ export class WeaponPresentation {
     await this.prewarmBrowserModel(id, model, this.browserWeaponRequest);
     if (!this.modelIsGpuReady(model)) {
       throw new Error(`Pass 65 match-start viewmodel did not reach GPU readiness: ${id}`);
+    }
+  }
+
+  /**
+   * Exercises the exact retained first-person fire pose behind the deployment
+   * surface. WebGL2 does not use the streamed WebGPU hook, so an idle-model
+   * compile alone leaves the authored fire clip and bounded muzzle-light
+   * topology to compile on the first live shot.
+   */
+  async prewarmBrowserWeaponFirePresentation(
+    id: WeaponId,
+    submit: (root: THREE.Object3D) => Promise<void>,
+  ): Promise<void> {
+    await this.prepareBrowserWeapon(id);
+    const model = this.models.get(id);
+    if (!model) throw new Error(`Pass 65 fire presentation unavailable after load: ${id}`);
+    const priorActive = this.active;
+    const priorRootVisible = this.root.visible;
+    const priorModelVisibility = new Map([...this.models].map(([weaponId, entry]) => [weaponId, entry.visible]));
+    const priorFlashVisible = this.muzzleFlash.visible;
+    const priorLightVisible = this.muzzleLight.visible;
+    const priorLightIntensity = this.muzzleLight.intensity;
+    try {
+      this.active = id;
+      this.root.visible = true;
+      for (const entry of this.models.values()) entry.visible = entry === model;
+      this.updateActiveSockets(id);
+      fireImportedWeapon(model);
+      updateImportedWeapon(model, 1 / 60);
+      this.muzzleFlash.visible = true;
+      this.muzzleLight.visible = true;
+      this.muzzleLight.intensity = 1;
+      await submit(this.root);
+    } finally {
+      resetImportedWeaponAnimations(model);
+      this.active = priorActive;
+      this.root.visible = priorRootVisible;
+      for (const [weaponId, visible] of priorModelVisibility) {
+        const entry = this.models.get(weaponId);
+        if (entry) entry.visible = visible;
+      }
+      this.muzzleFlash.visible = priorFlashVisible;
+      this.muzzleLight.visible = priorLightVisible;
+      this.muzzleLight.intensity = priorLightIntensity;
+      this.updateActiveSockets(priorActive);
     }
   }
 
@@ -2437,7 +2484,8 @@ export class WeaponPresentation {
       .applyQuaternion(bone.quaternion)
       .normalize();
     if (currentParent.lengthSq() < 1e-6 || desiredParent.lengthSq() < 1e-6) return;
-    scratch.orientDelta.setFromUnitVectors(currentParent, desiredParent);
+    const preferredAxis = scratch.orientPreferredAxis.set(1, 0, 0).applyQuaternion(bone.quaternion);
+    stableDirectionDelta(currentParent, desiredParent, preferredAxis, scratch.orientDelta);
     bone.quaternion.premultiply(scratch.orientDelta).normalize();
     bone.updateWorldMatrix(false, true);
   }

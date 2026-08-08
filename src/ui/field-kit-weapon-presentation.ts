@@ -172,11 +172,13 @@ function metricMarkup(metric: WeaponMenuMetric): string {
 
 export function weaponMenuPresentationMarkup(weaponId: WeaponId): string {
   const presentation = WEAPON_MENU_PRESENTATIONS[weaponId];
+  const summaryMetricIds = new Set<WeaponMenuMetricId>(['damage', 'cyclic-dps', 'fire-rate', 'effective-range']);
+  const summaryMetrics = presentation.metrics.filter((metric) => summaryMetricIds.has(metric.id));
   return `<span class="weapon-menu-presentation" data-weapon-presentation data-weapon-id="${weaponId}">
     <span class="weapon-menu-still"><img data-weapon-still src="${presentation.stillPath}" alt="${escapeHtml(presentation.stillAlt)}" width="480" height="360" loading="lazy" decoding="async"></span>
     <span class="weapon-menu-stat-deck">
       <span class="weapon-menu-stat-heading"><b data-weapon-stat-name>${escapeHtml(presentation.displayName)}</b><small>CATALOG BALLISTICS · NO BALANCE SCORE</small></span>
-      <span class="weapon-menu-metrics">${presentation.metrics.map(metricMarkup).join('')}</span>
+      <span class="weapon-menu-metrics weapon-menu-summary-metrics">${summaryMetrics.map(metricMarkup).join('')}</span>
     </span>
   </span>`;
 }

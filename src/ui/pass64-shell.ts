@@ -178,9 +178,7 @@ function fieldKitPanelMarkup(): string {
           <div><dt>FIRE RATE</dt><dd><i data-loadout-stat="fire-rate"></i><b data-loadout-value="fire-rate">650</b></dd></div>
           <div><dt>RANGE</dt><dd><i data-loadout-stat="range"></i><b data-loadout-value="range">72m</b></dd></div>
           <div><dt>CONTROL</dt><dd><i data-loadout-stat="control"></i><b data-loadout-value="control">72</b></dd></div>
-          <div><dt>WALLBANG</dt><dd><i data-loadout-stat="wallbang"></i><b data-loadout-value="wallbang">2</b></dd></div>
         </dl>
-        <p class="loadout-inspector-dps"><small>IDEAL BODY DPS</small><strong data-loadout-value="dps">336</strong></p>
         <p data-loadout-grenade-detail>FRAG / TIMED EXPLOSIVE / ONE CARRIED</p>
       </aside>
       </div>
