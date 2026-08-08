@@ -2072,6 +2072,22 @@
       ]
     },
     {
+      "id": "T-PASS69-2-SUPPORT-INPUT",
+      "command": "npm run qa:playwright-topology -- tests/e2e/pass69-2-support-slot-input.spec.ts --project=chromium --workers=1 --retries=0",
+      "paths": [
+        "src/key-bindings.ts",
+        "src/key-bindings.test.ts",
+        "src/interaction-arbitration.ts",
+        "src/interaction-arbitration.test.ts",
+        "src/interaction-press-lifecycle.test.ts",
+        "tests/e2e/pass69-2-support-slot-input.spec.ts"
+      ],
+      "evidenceKinds": [
+        "unit",
+        "browser"
+      ]
+    },
+    {
       "id": "T-SKY-WEBGPU",
       "command": "npm run qa:pass66:sky-webgpu",
       "paths": [
@@ -7156,7 +7172,8 @@
         "coverage": "partial",
         "testRefs": [
           "T-SUPPORT-RUNTIME",
-          "T-INTERACTION"
+          "T-INTERACTION",
+          "T-PASS69-2-SUPPORT-INPUT"
         ],
         "artifactRefs": []
       }
@@ -7276,7 +7293,8 @@
         "coverage": "partial",
         "testRefs": [
           "T-GUN-RANGE-TEST-BAY",
-          "T-WEAPON-CATALOG"
+          "T-WEAPON-CATALOG",
+          "T-PASS69-2-SUPPORT-INPUT"
         ],
         "artifactRefs": []
       }
@@ -7311,7 +7329,8 @@
         "coverage": "partial",
         "testRefs": [
           "T-PICKUP-REPICK",
-          "T-INTERACTION"
+          "T-INTERACTION",
+          "T-PASS69-2-SUPPORT-INPUT"
         ],
         "artifactRefs": []
       }
@@ -7336,7 +7355,8 @@
         "testRefs": [
           "T-GUN-RANGE-TEST-BAY",
           "T-INTERACTION",
-          "T-SUPPORT-RUNTIME"
+          "T-SUPPORT-RUNTIME",
+          "T-PASS69-2-SUPPORT-INPUT"
         ],
         "artifactRefs": []
       }
