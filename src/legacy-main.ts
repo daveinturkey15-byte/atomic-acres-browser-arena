@@ -13523,6 +13523,13 @@ function updateThermalGhosts(): void {
   thermalGhostPresentation.sync(targets, true);
 }
 
+function railgunThermalOpticActive(): boolean {
+  return localHoldsRailgun()
+    && player.weapon === 'railgun'
+    && adsHeld
+    && weaponView.adsProgress() >= 0.45;
+}
+
 function updateRailgun(now: number): void {
   if (network.role !== 'client') {
     const chambered = advanceRailgunChamber(railgunState, now);
@@ -13548,8 +13555,7 @@ function updateRailgun(now: number): void {
   // and must stay live for the whole aim hold - gating it on the per-shot re-ADS
   // flag turned see-through-walls off the instant the player fired, which read
   // as the railgun scope having lost the feature entirely.
-  const thermalActive = localHoldsRailgun() && player.weapon === 'railgun' && adsHeld
-    && weaponView.adsProgress() >= 0.45;
+  const thermalActive = railgunThermalOpticActive();
   // The railgun's signature see-through-walls reveal: cyan thermal silhouettes
   // of hostile combatants drawn with depth testing disabled so they read through
   // geometry. This is the weapon's unique selling point and must always work.
@@ -19733,6 +19739,7 @@ function shouldShowWeaponViewmodel(): boolean {
     && !localKillstreakActorSnapshot()?.possession
     && !sniperScopeActive
     && !dmrThermalActive
+    && !railgunThermalOpticActive()
     && !debugCaptureViewmodelHidden;
 }
 

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
+import { measureCameraFraming } from './character-presentation-contract';
 import { HIP_VIEWMODEL_POSITION, HIP_VIEWMODEL_SCALE, WeaponPresentation } from './weapon-presentation';
 
 const REST_POSE = {
@@ -60,6 +61,27 @@ describe('first-person anatomical presentation', () => {
     }
     expect(cleared.presentationState().surfaceLift).toBeCloseTo(0.34, 8);
     expect(cleared.root.position.y - baseline.root.position.y).toBeCloseTo(0.34, 3);
+  });
+
+  it('pushes a visible melee knife clear of the camera near plane by itself', () => {
+    const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.1, 250);
+    const presentation = new WeaponPresentation(camera, false);
+    const knife = new THREE.Mesh(
+      new THREE.BoxGeometry(0.02, 0.02, 0.02),
+      new THREE.MeshBasicMaterial(),
+    );
+    presentation.root.add(knife);
+    presentation.root.position.set(0, 0, -0.05);
+    const before = presentation.root.position.z;
+    const enforce = (presentation as unknown as {
+      enforceNearPlaneClearance: (...roots: Array<THREE.Object3D | undefined>) => boolean;
+    }).enforceNearPlaneClearance;
+
+    const corrected = enforce.call(presentation, undefined, undefined, knife);
+
+    expect(corrected).toBe(true);
+    expect(presentation.root.position.z).toBeLessThan(before);
+    expect(measureCameraFraming(knife, camera)?.nearPlaneClear).toBe(true);
   });
 
   it('returns to the resolution-stable dynamically centred sight picture in ADS', async () => {

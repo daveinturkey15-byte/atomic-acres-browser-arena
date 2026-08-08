@@ -515,21 +515,22 @@ export class WeaponPresentation {
   readonly root = new THREE.Group();
   private frameCounter = 0;
 
-  private enforceNearPlaneClearance(activeModel: THREE.Object3D | undefined, arms: THREE.Object3D | undefined): void {
+  private enforceNearPlaneClearance(...visibleRoots: Array<THREE.Object3D | undefined>): boolean {
     const cameraNear = this.camera instanceof THREE.PerspectiveCamera ? this.camera.near : 0.08;
     let nearestDepth = Infinity;
-    if (activeModel?.visible) {
-      const framing = measureCameraFraming(activeModel, this.camera);
-      if (framing && Number.isFinite(framing.nearestDepth)) nearestDepth = Math.min(nearestDepth, framing.nearestDepth);
-    }
-    if (arms?.visible) {
-      const framing = measureCameraFraming(arms, this.camera);
+    for (const root of visibleRoots) {
+      if (!root?.visible) continue;
+      const framing = measureCameraFraming(root, this.camera);
       if (framing && Number.isFinite(framing.nearestDepth)) nearestDepth = Math.min(nearestDepth, framing.nearestDepth);
     }
     if (Number.isFinite(nearestDepth)) {
       const push = Math.max(0, cameraNear + 0.02 - nearestDepth);
-      if (push > 0) this.root.position.z -= push;
+      if (push > 0) {
+        this.root.position.z -= push;
+        return true;
+      }
     }
+    return false;
   }
 
   private readonly browserRuntime: boolean;
@@ -3080,13 +3081,18 @@ export class WeaponPresentation {
     // While the fire kick or a reload is active, push the root forward just
     // enough that every bounding-box corner clears the near plane. Bounded to
     // the kick/reload windows.
+    let nearPlaneCorrected = false;
     if (presentationKick > 0.05 || reloadProgress > 0) {
-      this.enforceNearPlaneClearance(activeModel, arms);
+      nearPlaneCorrected = this.enforceNearPlaneClearance(activeModel, arms, this.meleeKnife);
     } else if ((this.frameCounter & 1) === 0) {
       // Hip and idle poses can also cross the near plane in some arena and
       // camera-pitch combinations, so keep a throttled always-on net.
-      this.enforceNearPlaneClearance(activeModel, arms);
+      nearPlaneCorrected = this.enforceNearPlaneClearance(activeModel, arms, this.meleeKnife);
     }
+    // Near-plane correction changes root Z after the first physical-sight solve.
+    // Recenter once against the corrected transform so safety cannot leave an
+    // off-axis settled ADS picture. centerSightReference only adjusts X/Y.
+    if (nearPlaneCorrected) this.centerSightReference(activeModel);
     this.frameCounter += 1;
     return actionEvents;
   }
