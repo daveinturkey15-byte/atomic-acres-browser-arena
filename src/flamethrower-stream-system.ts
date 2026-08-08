@@ -217,6 +217,9 @@ export class FlamethrowerStreamSystem {
       active: this.active.slice(), positions: this.positions.slice(), velocities: this.velocities.slice(),
       agesMs: this.agesMs.slice(), lifetimesMs: this.lifetimesMs.slice(),
       cursor: this.cursor, sequence: this.sequence, emissions: this.emissions,
+      groundActive: this.groundActive.slice(), groundPositions: this.groundPositions.slice(),
+      groundSpawnedAt: this.groundSpawnedAt.slice(), groundExpiresAt: this.groundExpiresAt.slice(),
+      groundCursor: this.groundCursor,
       particlesSpawned: this.particlesSpawned, poolExhaustions: this.poolExhaustions,
       maximumActive: this.maximumActive, lastDistanceM: this.lastDistanceM,
       lightVisible: this.light.visible, lightIntensity: this.light.intensity,
@@ -242,6 +245,11 @@ export class FlamethrowerStreamSystem {
       this.agesMs.set(state.agesMs);
       this.lifetimesMs.set(state.lifetimesMs);
       this.cursor = state.cursor;
+      this.groundActive.set(state.groundActive);
+      this.groundPositions.set(state.groundPositions);
+      this.groundSpawnedAt.set(state.groundSpawnedAt);
+      this.groundExpiresAt.set(state.groundExpiresAt);
+      this.groundCursor = state.groundCursor;
       this.sequence = state.sequence;
       this.emissions = state.emissions;
       this.particlesSpawned = state.particlesSpawned;
@@ -251,9 +259,8 @@ export class FlamethrowerStreamSystem {
       this.light.visible = state.lightVisible;
       this.light.intensity = state.lightIntensity;
       this.light.position.copy(state.lightPosition);
-      this.groundActive.fill(0);
       this.writeMatrices();
-      this.writeGroundMatrices(0);
+      this.writeGroundMatrices(performance.now());
     }
   }
 
