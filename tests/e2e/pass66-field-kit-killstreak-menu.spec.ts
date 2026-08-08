@@ -12,6 +12,19 @@ async function ready(page: Page): Promise<void> {
 }
 
 test.describe('Pass 66 Field Kit and killstreak menu correction', () => {
+  test.beforeEach(async ({ page }) => {
+    // The repository retains poster-backed production fallbacks. Exercise the
+    // decoder/selection lifecycle against one real local MP4 while preserving
+    // each requested demo URL; the dedicated 415 test below still proves the
+    // production fallback path.
+    const knownGoodVideo = readFileSync(resolve(process.cwd(), 'public/assets/original/menu-previews/gun-range.mp4'));
+    await page.route('**/assets/original/killstreak-demo/*.mp4', (route) => route.fulfill({
+      status: 200,
+      contentType: 'video/mp4',
+      body: knownGoodVideo,
+    }));
+  });
+
   test('shows asset-backed stills, exact metric parity and live custom-primary projection', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 1600, height: 900 });
     await ready(page);
@@ -19,9 +32,9 @@ test.describe('Pass 66 Field Kit and killstreak menu correction', () => {
 
     const presentations = page.locator('#menu-panel-kit [data-weapon-presentation]');
     await expect(presentations).toHaveCount(7);
-    await expect(page.locator('#menu-panel-kit [data-weapon-metric]')).toHaveCount(63);
+    await expect(page.locator('#menu-panel-kit [data-weapon-metric]')).toHaveCount(28);
     expect(await presentations.evaluateAll((roots) => roots.every((root) => (
-      root.querySelectorAll('[data-weapon-metric]').length === 9
+      root.querySelectorAll('[data-weapon-metric]').length === 4
     )))).toBe(true);
     expect(await presentations.evaluateAll((roots) => roots.every((root) => {
       const deck = root.querySelector<HTMLElement>('.weapon-menu-stat-deck');
@@ -54,6 +67,8 @@ test.describe('Pass 66 Field Kit and killstreak menu correction', () => {
     await expect(page.locator('[data-custom-preset-id="custom-1"] [data-weapon-stat-name]')).toHaveText('AK-47');
     await expect(page.locator('[data-custom-preset-id="custom-1"] [data-weapon-metric="fire-rate"] [data-weapon-metric-value]'))
       .toHaveText('600 RPM');
+    await expect(page.locator('#loadout-inspector [data-loadout-stat]')).toHaveCount(4);
+    await expect(page.locator('#loadout-inspector .loadout-inspector-dps')).toHaveCount(0);
 
     const idleCustomCardStyle = await page.locator('[data-custom-preset-id="custom-2"]').evaluate((card) => {
       const title = card.querySelector('strong')!;
@@ -161,12 +176,6 @@ test.describe('Pass 66 Field Kit and killstreak menu correction', () => {
   });
 
   test('reuses one decoder through rapid selection races and releases it off-surface', async ({ page }) => {
-    const knownGoodVideo = readFileSync(resolve(process.cwd(), 'public/assets/original/menu-previews/gun-range.mp4'));
-    await page.route('**/assets/original/killstreak-demo/*.mp4', (route) => route.fulfill({
-      status: 200,
-      contentType: 'video/mp4',
-      body: knownGoodVideo,
-    }));
     await page.setViewportSize({ width: 1280, height: 720 });
     await ready(page);
     const constructionBefore = await page.evaluate(() => (

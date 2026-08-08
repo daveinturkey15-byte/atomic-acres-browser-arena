@@ -347,6 +347,7 @@ export function configureSceneLightShadowSchedule(
 }
 
 export type PresentationPrewarmRuntime = Readonly<{
+  backend?: RenderBackendId;
   compileAndRender(root: THREE.Object3D, camera: THREE.Camera, scene: THREE.Scene): Promise<void>;
 }>;
 

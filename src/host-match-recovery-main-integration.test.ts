@@ -99,7 +99,25 @@ describe('same-browser hosted active-match recovery integration', () => {
     expect(restoreAt).toBeGreaterThan(start);
     expect(admittedAt).toBeGreaterThan(restoreAt);
     const unload = main.slice(main.lastIndexOf("window.addEventListener('beforeunload'"));
-    expect(unload.indexOf('persistActiveHostMatchCheckpoint()')).toBeLessThan(unload.indexOf('network.close()'));
+    expect(unload.indexOf('persistActiveHostMatchCheckpoint(true)')).toBeLessThan(unload.indexOf('network.close()'));
+  });
+
+  it('keeps gameplay-triggered checkpoint serialization off the live shot frame', () => {
+    const persist = functionBody('persistActiveHostMatchCheckpoint', 'clearStoredHostMatchCheckpoint');
+    const forcedBranch = persist.slice(persist.indexOf('if (force) {'), persist.indexOf('if (hostCheckpointPersistScheduled)'));
+    const deferredBranch = persist.slice(persist.indexOf('scheduleBrowserPreparationIdleTask'));
+    expect(forcedBranch).toContain('createHostMatchCheckpoint()');
+    expect(forcedBranch).toContain('saveHostMatchCheckpoint(storage, checkpoint)');
+    expect(deferredBranch).toContain('createHostMatchCheckpoint()');
+    expect(deferredBranch).toContain('saveHostMatchCheckpoint(deferredStorage, checkpoint)');
+    const nonForcedPrelude = persist.slice(
+      persist.indexOf('if (hostCheckpointPersistScheduled)'),
+      persist.indexOf('scheduleBrowserPreparationIdleTask'),
+    );
+    expect(nonForcedPrelude).not.toContain('createHostMatchCheckpoint()');
+    expect(main).toContain("if (document.visibilityState === 'hidden') persistActiveHostMatchCheckpoint(true)");
+    expect(main).toContain("window.addEventListener('pagehide', () => {\n  persistActiveHostMatchCheckpoint(true);");
+    expect(main).toContain("window.addEventListener('beforeunload', () => {\n  persistActiveHostMatchCheckpoint(true);");
   });
 
   it('checkpoints and restores guest health/loadout/pose/inventory plus finite railgun authority before reconnect repair', () => {

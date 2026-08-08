@@ -13,6 +13,7 @@ export type DeploymentLoadingStage =
   | 'prewarming-combat-tracers'
   | 'prewarming-combat-impacts'
   | 'prewarming-explosive-bolts'
+  | 'prewarming-flare-first-shot'
   | 'prewarming-grenade-explosion'
   | 'prewarming-support-explosion'
   | 'prewarming-death-drops'
@@ -57,6 +58,7 @@ const STAGE_PROGRESS: Readonly<Record<DeploymentLoadingStage, Readonly<{ percent
   'prewarming-bot-world-weapons': { percent: 87, label: 'Preparing bot weapons' },
   'prewarming-smoke-presentations': { percent: 89, label: 'Compiling smoke shaders' },
   'prewarming-explosive-bolts': { percent: 91, label: 'Compiling projectile shaders' },
+  'prewarming-flare-first-shot': { percent: 92, label: 'Preparing flare first-shot presentation' },
   'compiling-scene': { percent: 93, label: 'Compiling arena shaders' },
   'batching-static-meshes': { percent: 95, label: 'Batching arena geometry' },
   'gameplay-assets-ready': { percent: 97, label: 'Gameplay assets ready' },

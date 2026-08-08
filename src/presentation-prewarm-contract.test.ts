@@ -146,6 +146,9 @@ describe('presentation prewarm startup contract', () => {
     expect(arenaPresentationPrewarm).toContain('prewarmExplosiveBoltPresentation(sceneGeneration),');
     expect(arenaPresentationPrewarm).toContain('timedMapWeaponPresentation.prewarm(renderRuntime, camera, sceneGeneration),');
     expect(arenaPresentationPrewarm).toContain('flareProjectileSystem.prewarm(renderRuntime, camera, sceneGeneration),');
+    expect(arenaPresentationPrewarm).toContain('flareProjectileSystem.withStagedFirstShotLight');
+    expect(arenaPresentationPrewarm).toContain("weaponView.prewarmBrowserWeaponFirePresentation(\n      'flare-gun'");
+    expect(arenaPresentationPrewarm).toContain('() => renderRuntime.compileAndRender(scene, camera, scene)');
     expect(arenaPresentationPrewarm).toContain('flamethrowerStreamPresentation.prewarm(renderRuntime, camera, sceneGeneration),');
     expect(arenaPresentationPrewarm).toContain('await prewarmGrenadeWorldPresentations(sceneGeneration);');
     expect(arenaPresentationPrewarm).toContain('await tracerPool.prewarm(renderRuntime, camera, sceneGeneration);');

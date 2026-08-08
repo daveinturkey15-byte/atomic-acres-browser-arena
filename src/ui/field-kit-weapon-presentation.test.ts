@@ -46,11 +46,8 @@ describe('HF-182/HF-183 Field Kit weapon presentation', () => {
     const markup = weaponMenuPresentationMarkup('m4a1');
     expect(markup).toContain('data-weapon-id="m4a1"');
     expect(markup).toContain('<img data-weapon-still');
-    expect(markup.match(/data-weapon-metric="/gu)).toHaveLength(expectedMetricIds.length);
-    expect(markup.match(/data-weapon-metric-tier="summary"/gu)).toHaveLength(4);
-    expect(markup.match(/data-weapon-metric-tier="detail"/gu)).toHaveLength(5);
-    expect(markup).toContain('<details class="weapon-menu-details">');
-    expect(markup).toContain('MORE BALLISTICS');
+    expect(markup.match(/data-weapon-metric="/gu)).toHaveLength(4);
+    expect(markup).not.toContain('<details');
     expect(markup).toContain('CATALOG BALLISTICS · NO BALANCE SCORE');
     expect(markup).not.toContain('<canvas');
   });

@@ -163,8 +163,8 @@ function escapeHtml(value: string): string {
     .replaceAll('"', '&quot;');
 }
 
-function metricMarkup(metric: WeaponMenuMetric, tier: 'summary' | 'detail'): string {
-  return `<span class="weapon-menu-metric" data-weapon-metric-tier="${tier}" data-weapon-metric="${metric.id}" title="${escapeHtml(metric.note)}">
+function metricMarkup(metric: WeaponMenuMetric): string {
+  return `<span class="weapon-menu-metric" data-weapon-metric="${metric.id}" title="${escapeHtml(metric.note)}">
     <span><b>${metric.label}</b><strong data-weapon-metric-value>${escapeHtml(metric.value)}</strong></span>
     <i aria-hidden="true"><i data-weapon-metric-fill style="--weapon-metric-fill:${metric.fillPercent}%"></i></i>
   </span>`;
@@ -174,16 +174,11 @@ export function weaponMenuPresentationMarkup(weaponId: WeaponId): string {
   const presentation = WEAPON_MENU_PRESENTATIONS[weaponId];
   const summaryMetricIds = new Set<WeaponMenuMetricId>(['damage', 'cyclic-dps', 'fire-rate', 'effective-range']);
   const summaryMetrics = presentation.metrics.filter((metric) => summaryMetricIds.has(metric.id));
-  const detailMetrics = presentation.metrics.filter((metric) => !summaryMetricIds.has(metric.id));
   return `<span class="weapon-menu-presentation" data-weapon-presentation data-weapon-id="${weaponId}">
     <span class="weapon-menu-still"><img data-weapon-still src="${presentation.stillPath}" alt="${escapeHtml(presentation.stillAlt)}" width="480" height="360" loading="lazy" decoding="async"></span>
     <span class="weapon-menu-stat-deck">
       <span class="weapon-menu-stat-heading"><b data-weapon-stat-name>${escapeHtml(presentation.displayName)}</b><small>CATALOG BALLISTICS · NO BALANCE SCORE</small></span>
-      <span class="weapon-menu-metrics weapon-menu-summary-metrics">${summaryMetrics.map((metric) => metricMarkup(metric, 'summary')).join('')}</span>
-      <details class="weapon-menu-details">
-        <summary>MORE BALLISTICS <span>${detailMetrics.length} DETAILS</span></summary>
-        <span class="weapon-menu-metrics weapon-menu-detail-metrics">${detailMetrics.map((metric) => metricMarkup(metric, 'detail')).join('')}</span>
-      </details>
+      <span class="weapon-menu-metrics weapon-menu-summary-metrics">${summaryMetrics.map(metricMarkup).join('')}</span>
     </span>
   </span>`;
 }

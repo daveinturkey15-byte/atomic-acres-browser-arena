@@ -105,6 +105,33 @@ test('keeps authored arms and knife readable at 1440p, 4K and ultrawide', async 
     await page.evaluate(() => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
       api.setAds(false);
+      api.fireOnce();
+    });
+    await page.locator('#game').click({ position: { x: 640, y: 360 } });
+    await page.waitForFunction(() => document.pointerLockElement === document.querySelector('#game'));
+    await page.keyboard.press('r');
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setReloadCaptureProgress(0.46));
+    await page.waitForFunction(() => {
+      const presentation = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation;
+      return presentation?.adsProgress < 0.02
+        && presentation?.authoredArmAnimation?.activeAction === 'reload';
+    });
+    const reload = (await snapshot(page)).weaponPresentation;
+    expect(reload.authoredArmAnimation).toMatchObject({
+      activeAction: 'reload',
+      blendPolicy: 'finger-tracks-first-runtime-ik-last',
+    });
+    for (const side of ['right', 'left'] as const) {
+      const arm = reload.riggedArms.find((candidate: { side: string }) => candidate.side === side);
+      expect(arm, `${viewport.name}: ${side} reload arm`).toMatchObject({ finite: true, withinStableReach: true });
+      expect(arm.contactError, `${viewport.name}: ${side} reload hand contact`).toBeLessThanOrEqual(0.02);
+    }
+    await capture(page, testInfo, viewport, 'reload-0_46');
+
+    await page.evaluate(() => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      api.setReloadCaptureProgress(null);
+      api.setAds(false);
       api.melee();
       api.setMeleeCaptureProgress(0.42);
     });
@@ -122,6 +149,7 @@ test('keeps authored arms and knife readable at 1440p, 4K and ultrawide', async 
       authoredMeleeKnifeParent: 'right-wrist-knife-socket',
     });
     expect(melee.authoredMeleeGripError, `${viewport.name}: grip-to-socket contact`).toBeLessThanOrEqual(0.001);
+    expect(melee.authoredMeleeHandContactError, `${viewport.name}: knife remains in the posed firing hand`).toBeLessThanOrEqual(0.015);
     await capture(page, testInfo, viewport, 'melee-0_42');
 
     await page.evaluate(() => {

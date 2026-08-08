@@ -624,6 +624,7 @@ type PresentedEntity = Readonly<{
   attitudeTarget: THREE.Quaternion;
   attitudeEuler: THREE.Euler;
   mixers: readonly THREE.AnimationMixer[];
+  oneShotActions: ReadonlyMap<string, readonly THREE.AnimationAction[]>;
   authored: boolean;
   cameraSocket: THREE.Object3D | null;
   cockpit: THREE.Object3D | null;
@@ -634,6 +635,7 @@ function presentedEntity(
   rotor: THREE.Object3D | null,
   mixers: readonly THREE.AnimationMixer[],
   authored: boolean,
+  oneShotActions: ReadonlyMap<string, readonly THREE.AnimationAction[]> = new Map(),
 ): PresentedEntity {
   return Object.freeze({
     root,
@@ -642,6 +644,7 @@ function presentedEntity(
     attitudeTarget: new THREE.Quaternion(),
     attitudeEuler: new THREE.Euler(0, 0, 0, 'YXZ'),
     mixers: Object.freeze([...mixers]),
+    oneShotActions,
     authored,
     cameraSocket: root.getObjectByName('drone-first-person-camera-socket')
       ?? root.getObjectByName('chopper-first-person-camera-socket')
@@ -932,6 +935,11 @@ export type KillstreakPresentationTelemetry = Readonly<{
   swarmMinimumRenderedInstances: number;
   swarmMaximumRenderedInstances: number;
   prewarmedAuthoredSupportFamilies: readonly string[];
+  chopperWeaponActionsPresented: number;
+  chopperImpactActionsPresented: number;
+  activeChopperActionNames: readonly string[];
+  pooledChopperActionNames: readonly string[];
+  lastChopperWeaponActions: readonly string[];
   firstPersonSightline: Readonly<{
     entityId: string;
     presentationSource: string;
@@ -1040,6 +1048,7 @@ function buildAuthoredSupportVehicle(family: SupportVehicleAssetFamily): Present
   const lod = new THREE.LOD();
   lod.name = `${runtimeName}-authored-lods`;
   const mixers: THREE.AnimationMixer[] = [];
+  const oneShotActions = new Map<string, THREE.AnimationAction[]>();
   for (const [index, source] of template.lods.entries()) {
     const level = source.scene.clone(true);
     level.name = `${runtimeName}-authored-lod${index}`;
@@ -1067,6 +1076,24 @@ function buildAuthoredSupportVehicle(family: SupportVehicleAssetFamily): Present
       const clip = source.animations.find((candidate) => candidate.name === clipName);
       if (clip) mixer.clipAction(clip).setLoop(THREE.LoopRepeat, Infinity).play();
     }
+    if (family === 'chopper') {
+      for (const clipName of [
+        'Chopper_Gun_Recoil',
+        'Chopper_Gun_Fire',
+        'Chopper_Muzzle_Flash',
+        'Chopper_Tracer_Pulse',
+        'Chopper_Impact_Pulse',
+      ]) {
+        const clip = source.animations.find((candidate) => candidate.name === clipName);
+        if (!clip) continue;
+        const action = mixer.clipAction(clip);
+        action.setLoop(THREE.LoopOnce, 1);
+        action.clampWhenFinished = false;
+        const actions = oneShotActions.get(clipName) ?? [];
+        actions.push(action);
+        oneShotActions.set(clipName, actions);
+      }
+    }
     mixers.push(mixer);
   }
   root.add(lod);
@@ -1085,7 +1112,7 @@ function buildAuthoredSupportVehicle(family: SupportVehicleAssetFamily): Present
     }
   }
   markSharedPresentationAsset(root);
-  return presentedEntity(root, null, mixers, true);
+  return presentedEntity(root, null, mixers, true, oneShotActions);
 }
 
 function buildProceduralChopperFallback(): PresentedEntity {
@@ -1604,6 +1631,9 @@ export class KillstreakPresentation {
   private readonly sensorRoot = new THREE.Group();
   private readonly sensorSilhouettes: THREE.Group[];
   private visibleSensorContacts = 0;
+  private chopperWeaponActionsPresented = 0;
+  private chopperImpactActionsPresented = 0;
+  private lastChopperWeaponActions: readonly string[] = Object.freeze([]);
   private firstPersonEntityId: string | null = null;
   private disposed = false;
   private readonly placementMarkers = new Map<string, PresentedPlacementMarker>();
@@ -2515,6 +2545,41 @@ export class KillstreakPresentation {
     return this.entities.get(id)?.root ?? null;
   }
 
+  private playChopperActions(entityId: string, names: readonly string[]): readonly string[] {
+    const presented = this.entities.get(entityId);
+    if (!presented || presented.oneShotActions.size === 0) return Object.freeze([]);
+    const played: string[] = [];
+    for (const name of names) {
+      const actions = presented.oneShotActions.get(name) ?? [];
+      if (actions.length === 0) continue;
+      for (const action of actions) {
+        const mixerTime = action.getMixer().time;
+        action.reset().startAt(mixerTime).play();
+      }
+      played.push(name);
+    }
+    return Object.freeze(played);
+  }
+
+  presentChopperWeaponAction(entityId: string): boolean {
+    const played = this.playChopperActions(entityId, [
+      'Chopper_Gun_Recoil',
+      'Chopper_Gun_Fire',
+      'Chopper_Muzzle_Flash',
+      'Chopper_Tracer_Pulse',
+    ]);
+    if (played.length === 0) return false;
+    this.chopperWeaponActionsPresented += 1;
+    this.lastChopperWeaponActions = played;
+    return true;
+  }
+
+  presentChopperImpactAction(entityId: string): boolean {
+    if (this.playChopperActions(entityId, ['Chopper_Impact_Pulse']).length === 0) return false;
+    this.chopperImpactActionsPresented += 1;
+    return true;
+  }
+
   setFirstPersonEntity(id: string | null): void {
     if (id === this.firstPersonEntityId) return;
     this.firstPersonEntityId = id;
@@ -2552,6 +2617,12 @@ export class KillstreakPresentation {
   }
 
   telemetry(): KillstreakPresentationTelemetry {
+    const activeChopperActionNames = Object.freeze([...new Set(
+      [...this.entities.values()].flatMap((entry) => [...entry.oneShotActions.keys()]),
+    )].sort());
+    const pooledChopperActionNames = Object.freeze([...new Set(
+      (this.entityPools.get('chopper') ?? []).flatMap((entry) => [...entry.oneShotActions.keys()]),
+    )].sort());
     const markerDetails = [...this.placementMarkers.values()]
       .sort((left, right) => left.snapshot.id.localeCompare(right.snapshot.id))
       .map(({ root, snapshot }): KillstreakPlacementMarkerTelemetry => {
@@ -2667,6 +2738,11 @@ export class KillstreakPresentation {
       prewarmedAuthoredSupportFamilies: Object.freeze([...new Set(this.prewarmed
         .filter((entry) => entry.root.userData.presentationSource === 'project-original-blender-glb')
         .map((entry) => String(entry.root.userData.presentationFamily)))].sort()),
+      chopperWeaponActionsPresented: this.chopperWeaponActionsPresented,
+      chopperImpactActionsPresented: this.chopperImpactActionsPresented,
+      activeChopperActionNames,
+      pooledChopperActionNames,
+      lastChopperWeaponActions: this.lastChopperWeaponActions,
       firstPersonSightline,
       markerDetails: Object.freeze(markerDetails),
       bounded: this.entities.size <= MAX_PRESENTED_ENTITIES
@@ -2694,6 +2770,9 @@ export class KillstreakPresentation {
     for (const shell of this.bombShellPool) if (shell.active) this.deactivateBombShell(shell);
     for (const ember of this.emberPool) if (ember.active) this.deactivateEmber(ember);
     this.visibleSensorContacts = 0;
+    this.chopperWeaponActionsPresented = 0;
+    this.chopperImpactActionsPresented = 0;
+    this.lastChopperWeaponActions = Object.freeze([]);
     for (const silhouette of this.sensorSilhouettes) silhouette.visible = false;
     for (const presented of this.placementMarkers.values()) this.retireRoot(presented.root);
     this.placementMarkers.clear();

@@ -114,7 +114,73 @@ for (const testCase of cases) {
       visible: false,
     });
 
-    await page.waitForTimeout(500);
+    let baselineFrameProbe: { frames: number; maxGapMs: number } | null = null;
+    if (testCase.weaponId === 'flare-gun') {
+      await page.evaluate(() => {
+        const checkpointKey = 'atomic-acres:host-match-checkpoint:v3';
+        const checkpointProbe = {
+          fireCallActive: false,
+          syncCheckpointWrites: 0,
+          checkpointWrites: 0,
+          fireCallDurationMs: 0,
+          fireStartedAtMs: 0,
+          checkpointWriteStartedAtMs: 0,
+          checkpointWriteDurationMs: 0,
+        };
+        (window as any).__PASS69_FLARE_CHECKPOINT_PROBE__ = checkpointProbe;
+        const originalSetItem = Storage.prototype.setItem;
+        Storage.prototype.setItem = function pass69CheckpointProbe(key: string, value: string): void {
+          if (key === checkpointKey) {
+            checkpointProbe.checkpointWrites += 1;
+            if (checkpointProbe.fireCallActive) checkpointProbe.syncCheckpointWrites += 1;
+            checkpointProbe.checkpointWriteStartedAtMs = performance.now();
+          }
+          const startedAt = performance.now();
+          originalSetItem.call(this, key, value);
+          if (key === checkpointKey) {
+            checkpointProbe.checkpointWriteDurationMs = Math.max(
+              checkpointProbe.checkpointWriteDurationMs,
+              performance.now() - startedAt,
+            );
+          }
+        };
+        const probe = { active: true, frames: 0, maxGapMs: 0, lastAtMs: performance.now() };
+        (window as Window & { __PASS69_FLARE_FRAME_PROBE__?: typeof probe }).__PASS69_FLARE_FRAME_PROBE__ = probe;
+        const tick = (now: number) => {
+          if (!probe.active) return;
+          probe.frames += 1;
+          probe.maxGapMs = Math.max(probe.maxGapMs, now - probe.lastAtMs);
+          probe.lastAtMs = now;
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+      await page.waitForTimeout(1_000);
+      baselineFrameProbe = await page.evaluate(() => {
+        const probe = (window as Window & {
+          __PASS69_FLARE_FRAME_PROBE__?: { active: boolean; frames: number; maxGapMs: number };
+        }).__PASS69_FLARE_FRAME_PROBE__!;
+        probe.active = false;
+        return { frames: probe.frames, maxGapMs: probe.maxGapMs };
+      });
+    } else {
+      await page.waitForTimeout(500);
+    }
+    if (testCase.weaponId === 'flare-gun') {
+      await page.evaluate(() => {
+        const probe = { active: true, frames: 0, maxGapMs: 0, lastAtMs: performance.now() };
+        (window as Window & { __PASS69_FLARE_FRAME_PROBE__?: typeof probe }).__PASS69_FLARE_FRAME_PROBE__ = probe;
+        const tick = (now: number) => {
+          if (!probe.active) return;
+          probe.frames += 1;
+          probe.maxGapMs = Math.max(probe.maxGapMs, now - probe.lastAtMs);
+          probe.lastAtMs = now;
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+    }
+
     if (testCase.weaponId === 'flamethrower') {
       // The authored flamethrower has a real 180 ms spin-up. `fireOnce()` is an
       // instantaneous semi-auto QA tap and intentionally releases before that
@@ -140,7 +206,22 @@ for (const testCase of cases) {
         await page.mouse.up();
       }
     } else {
-      await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.fireOnce());
+      await page.evaluate(() => {
+        const checkpointProbe = (window as any).__PASS69_FLARE_CHECKPOINT_PROBE__ as {
+          fireCallActive: boolean;
+          fireCallDurationMs: number;
+          fireStartedAtMs: number;
+        };
+        checkpointProbe.fireCallActive = true;
+        const startedAt = performance.now();
+        checkpointProbe.fireStartedAtMs = startedAt;
+        try {
+          window.__ATOMIC_ACRES_DEBUG__.fireOnce();
+        } finally {
+          checkpointProbe.fireCallDurationMs = performance.now() - startedAt;
+          checkpointProbe.fireCallActive = false;
+        }
+      });
     }
     const fired = await page.evaluate(({ weaponId, effect }) => {
       const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
@@ -155,7 +236,37 @@ for (const testCase of cases) {
     expect(consumed).toBeGreaterThan(0);
     expect(fired.effectCount).toBe(consumed);
     if (testCase.weaponId === 'flare-gun') expect(consumed).toBe(1);
-    await page.waitForTimeout(250);
+    await page.waitForTimeout(testCase.weaponId === 'flare-gun' ? 1_000 : 250);
+
+    if (testCase.weaponId === 'flare-gun') {
+      const frameProbe = await page.evaluate(() => {
+        const probe = (window as Window & {
+          __PASS69_FLARE_FRAME_PROBE__?: { active: boolean; frames: number; maxGapMs: number };
+        }).__PASS69_FLARE_FRAME_PROBE__;
+        if (!probe) return null;
+        probe.active = false;
+        return { frames: probe.frames, maxGapMs: probe.maxGapMs };
+      });
+      expect(frameProbe).not.toBeNull();
+      expect(frameProbe!.frames).toBeGreaterThan(8);
+      expect(baselineFrameProbe).not.toBeNull();
+      const checkpointProbe = await page.evaluate(() => (
+        window as any
+      ).__PASS69_FLARE_CHECKPOINT_PROBE__ as {
+        syncCheckpointWrites: number;
+        checkpointWrites: number;
+        fireCallDurationMs: number;
+        fireStartedAtMs: number;
+        checkpointWriteStartedAtMs: number;
+        checkpointWriteDurationMs: number;
+      });
+      expect(
+        frameProbe!.maxGapMs,
+        `flare timing ${JSON.stringify({ baselineFrameProbe, frameProbe, checkpointProbe })}`,
+      ).toBeLessThan(Math.max(500, baselineFrameProbe!.maxGapMs + 250));
+      expect(checkpointProbe.syncCheckpointWrites).toBe(0);
+      expect(checkpointProbe.fireCallDurationMs).toBeLessThan(250);
+    }
     expect(await page.evaluate(({ weaponId, effect }) => {
       const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
       return {

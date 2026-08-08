@@ -43,6 +43,17 @@ export const MOBILE_CONTROLS_STORAGE_KEY = 'atomic-acres-mobile-controls';
 const STICK_RADIUS = 58;
 const LOOK_STICK_SENSITIVITY = 0.035;
 
+export function mobileTouchFireBypassesPointerLock(presentationActive: boolean, firing: boolean): boolean {
+  return presentationActive && firing;
+}
+
+export function sustainedMobileLookDelta(x: number, y: number): Readonly<{ x: number; y: number }> {
+  return Object.freeze({
+    x: THREE.MathUtils.clamp(x, -1, 1) * LOOK_STICK_SENSITIVITY,
+    y: THREE.MathUtils.clamp(y, -1, 1) * LOOK_STICK_SENSITIVITY,
+  });
+}
+
 export function isTouchCapableDevice(): boolean {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
   return ('ontouchstart' in window) || (navigator.maxTouchPoints ?? 0) > 0;
@@ -76,6 +87,7 @@ export class MobileTouchControls {
   private stickPointers: Record<StickId, number | null> = { move: null, look: null };
   private firePointerId: number | null = null;
   private adsPointerId: number | null = null;
+  private lookAxis = { x: 0, y: 0 };
   private stickOrigins: Record<StickId, { x: number; y: number }> = { move: { x: 0, y: 0 }, look: { x: 0, y: 0 } };
   private enabled = false;
   private inMatch = false;
@@ -132,7 +144,8 @@ export class MobileTouchControls {
 
   /** Drains the accumulated look delta; call once per frame. */
   consumeLookDelta(): { x: number; y: number } {
-    const delta = { x: this.state.lookDeltaX, y: this.state.lookDeltaY };
+    const held = sustainedMobileLookDelta(this.lookAxis.x, this.lookAxis.y);
+    const delta = { x: this.state.lookDeltaX + held.x, y: this.state.lookDeltaY + held.y };
     this.state.lookDeltaX = 0;
     this.state.lookDeltaY = 0;
     return delta;
@@ -157,6 +170,8 @@ export class MobileTouchControls {
     if (this.state.ads) this.callbacks.onAdsUp();
     this.state.firing = false;
     this.state.ads = false;
+    this.lookAxis.x = 0;
+    this.lookAxis.y = 0;
     this.stickPointers.move = null;
     this.stickPointers.look = null;
     this.firePointerId = null;
@@ -233,8 +248,8 @@ export class MobileTouchControls {
       this.state.moveY = ny;
     } else {
       // Push-and-hold aiming: sustained deflection turns/pitches the view.
-      this.state.lookDeltaX += nx * LOOK_STICK_SENSITIVITY;
-      this.state.lookDeltaY += ny * LOOK_STICK_SENSITIVITY;
+      this.lookAxis.x = nx;
+      this.lookAxis.y = ny;
     }
     if (this.knobs[id]) {
       this.knobs[id]!.style.transform = `translate(calc(-50% + ${dx * scale}px), calc(-50% + ${dy * scale}px))`;
@@ -254,6 +269,8 @@ export class MobileTouchControls {
       if (this.knobs.move) this.knobs.move.style.transform = 'translate(-50%, -50%)';
     } else if (event.pointerId === this.stickPointers.look) {
       this.stickPointers.look = null;
+      this.lookAxis.x = 0;
+      this.lookAxis.y = 0;
       if (this.knobs.look) this.knobs.look.style.transform = 'translate(-50%, -50%)';
     } else if (event.pointerId === this.firePointerId && this.state.firing) {
       this.firePointerId = null;
