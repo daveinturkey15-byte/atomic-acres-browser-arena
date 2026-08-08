@@ -40,16 +40,19 @@ export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
   Object.freeze({
     id: 'pass69',
     pass: 'PASS 69',
-    title: 'Playable Multiplayer & Presentation Corrections',
+    title: 'Pass 69.1 · Mobile Controls & Field Kit Corrections',
     releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
     areas: Object.freeze(['MULTIPLAYER', 'FIELD KIT', 'FIRST-PERSON', 'CHOPPER GUNNER', 'STABILITY']),
-    summary: 'Pass 69 makes the current playable candidate easier to test with friends while preserving the stable Pass 67.1 and rollback Pass 63 channels.',
+    summary: 'Pass 69.1 makes touch controls behave like shaped gamepad axes, survives mid-match rotation and restores practical Field Kit and release-selection information.',
     highlights: Object.freeze([
-      'Field Kit metric decks remain visible, readable and contained inside responsive weapon cards',
+      'Touching anywhere on either visible stick acquires it, including the centre knob, with physical-gamepad radial shaping',
+      'FIRE sits beside the aim stick and mid-match rotation safely releases held touch ownership before one resized frame',
+      'Field Kit weapon inspection restores truthful cyclic DPS alongside damage, rate, range and control',
+      'The version chooser shows Ctrl+Shift+R guidance and the same hard cache-reset refresh available in Options',
       'First-person arms use the corrected mirrored parent-space solve while retaining ADS, prone, reload, recoil and knife contracts',
       'Chopper Gunner authored nodes and actions are reconciled across LODs with matching procedural fallback sockets',
       'Host and guest private-lobby state uses the current authoritative transport and release topology',
-      'Farcrysis is intentionally absent and deferred to Pass 78; killstreak videos are unchanged',
+
       'Pass 67.1 remains the frozen stable singleplayer channel and Pass 63 remains the rollback',
     ]),
   }),

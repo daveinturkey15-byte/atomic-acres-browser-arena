@@ -30,10 +30,11 @@ describe('Pass 66 tactical UI overhaul', () => {
     expect(markup).not.toContain('class="kit-stat-strip kit-stat-strip-real"');
     expect(markup).not.toContain('class="kit-dps"');
     expect(markup).toContain('data-weapon-metric="cyclic-dps"');
-    expect(markup.match(/data-loadout-stat=/gu)).toHaveLength(4);
+    expect(markup.match(/data-loadout-stat=/gu)).toHaveLength(5);
     expect(markup).toContain('data-loadout-stat="damage"');
+    expect(markup).toContain('data-loadout-stat="dps"');
     expect(markup).not.toContain('data-loadout-stat="wallbang"');
-    expect(markup).not.toContain('loadout-inspector-dps');
+    expect(markup).toContain('loadout-inspector-dps');
     expect(markup).toContain('data-loadout-grenade-detail');
     // The shell no longer emits the retired kit-stat-strip. The final cascade
     // must therefore leave the canonical asset + metric deck visible.

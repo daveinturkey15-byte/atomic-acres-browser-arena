@@ -44,6 +44,10 @@ function showReleaseChooser(): void {
             <span>${releaseChannels.stable.description}</span>
           </button>
         </div>
+        <section class="release-channel-refresh" aria-label="Refresh this version chooser">
+          <div><strong>VERSION NOT UPDATED?</strong><span>Press Ctrl+Shift+R, or use the same hard game refresh available in Options.</span></div>
+          <button id="release-channel-hard-refresh" type="button">HARD RESET / REFRESH</button>
+        </section>
         <footer>The stable copy stays frozen while new releases move forward. You can use your browser's Back button to switch again.</footer>
       </section>
     </main>
@@ -56,6 +60,20 @@ function showReleaseChooser(): void {
     void loadLatestBuild();
   });
   app.querySelector<HTMLButtonElement>('[data-release-choice="stable"]')?.addEventListener('click', openStableBuild);
+  app.querySelector<HTMLButtonElement>('#release-channel-hard-refresh')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget as HTMLButtonElement;
+    button.disabled = true;
+    try {
+      if ('caches' in window) {
+        const keys = await window.caches.keys();
+        await Promise.all(keys.map((key) => window.caches.delete(key)));
+      }
+    } finally {
+      const url = new URL(window.location.href);
+      url.searchParams.set('cachebust', String(Date.now()));
+      window.location.replace(url.toString());
+    }
+  });
 }
 
 const decision = releaseChannelDecision(

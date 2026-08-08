@@ -70,6 +70,22 @@
   if (requested === 'experimental') return route('experimental');
 
   const options = document.querySelector('#release-channel-options');
+  const hardRefreshButton = document.querySelector('#release-hard-refresh');
+  const status = document.querySelector('#release-status');
+  hardRefreshButton?.addEventListener('click', async () => {
+    hardRefreshButton.disabled = true;
+    if (status) status.textContent = 'Clearing cached game files…';
+    try {
+      if ('caches' in window) {
+        const keys = await window.caches.keys();
+        await Promise.all(keys.map((key) => window.caches.delete(key)));
+      }
+    } finally {
+      const url = new URL(window.location.href);
+      url.searchParams.set('cachebust', String(Date.now()));
+      window.location.replace(url.toString());
+    }
+  });
   // The internal channel pass code (e.g. PASS 66) is not player-facing branding;
   // show the public version from the label (e.g. v67.1) on the live card.
   const displayPass = (key, channel) => {

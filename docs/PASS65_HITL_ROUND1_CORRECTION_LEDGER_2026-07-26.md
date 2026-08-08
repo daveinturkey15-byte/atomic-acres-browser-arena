@@ -1,6 +1,6 @@
 # Pass 65 HITL Round 1 Correction Ledger
 
-<!-- owner-feedback-ledger-version: 1; latest-id: HF-207 -->
+<!-- owner-feedback-ledger-version: 1; latest-id: HF-216 -->
 
 Status: **BLOCKING CORRECTION WAVE — NOT APPROVED, NOT PUBLISHABLE**
 
@@ -236,6 +236,15 @@ This ledger is the authoritative translation of Dave's first local Pass 65 revie
 | HF-205 | P0 | Hosted-session behavior and UI converge for every peer: bots use the solo-skirmish AI/damage path and remain visible to guests, host map changes propagate safely, Adrenaline cannot leak through lobby/rematch, killstreak descriptions remain truthful, remote humans receive a slight non-wallhacking orange highlight, and lobby/in-match chat is discoverable and non-overlapping. | Hosted-session authority/UI integration | Clean exact-SHA two-browser map-cycle, bot parity/presentation, Adrenaline round-boundary, loadout-description, team/FFA highlight occlusion and chat viewport/focus matrices under reconnect assert one authoritative state and no host-only result, stale buff, through-wall reveal, clipped surface or disabled guest readiness. | Hosted lobby and match across desktop, narrow, ultrawide and high-DPI viewports | IMPLEMENTED |
 | HF-206 | P1 | Picking up a weapon leaves the just-swapped-out gun and its ammo as an eligible independent pickup at the player's feet so a second valid F tap swaps back exactly once rather than deleting or selecting another nearby drop. | World-pickup/interaction authority | Unit transaction tests and served all-map/profile host/guest overlap matrices bind prompt eligibility, range/LOS, inventory and pinned-F priority to two reversible swaps with conserved ammo; deletion, duplicate award, wrong-drop selection, dead prompt or peer divergence fails. | Ground/corpse weapon pickups in solo and hosted play | IMPLEMENTED |
 | HF-207 | P1 | Final locally hosted prerecorded media is complete and truthful: every arena selection uses its distinct actual-map 2560x1440 preview with required codec/colour/provenance/fallback contracts, and every selectable killstreak uses a unique real Gun Range test-bay demo video/poster suitable for hover/focus thumbnails without live menu rendering. | Prerecorded media forge/lifecycle | Production verifiers enforce canonical arena/killstreak set equality, exact source/provenance/cache digests, 1440p codec/bitrate/BT.709 delivery, unique real-runtime landmarks/actions, poster/reduced-motion fallback, bounded decoder races and zero menu arena roots/submissions; stale 720p media, poster-only streaks, fake footage or live preview rendering fails. | Arena-selection and killstreak-selection media | OPEN |
+| HF-208 | P1 | Both mobile thumbsticks acquire through their complete visible disc, including the centre knob, and project position to the same normalized radial-deadzone shape used by physical gamepad axes without stealing other touch pointers. | Mobile input/gamepad projection | Pure centre/inner/edge/diagonal axis tests plus served centre-knob pointer acquisition, move/look response, release, cancel and independent-pointer coverage fail on a dead centre, edge-only response, square clamping or gamepad-shape drift. | Mobile move/look sticks in portrait and landscape | IMPLEMENTED |
+| HF-209 | P1 | Mobile FIRE sits within one practical thumb gap of the right aim stick while retaining distinct non-overlapping FIRE, USE, PAUSE and stick hit regions. | Mobile control layout | Portrait, narrow portrait and landscape bounding-box/collision matrices require FIRE-to-aim edge separation at most one thumb gap with no overlap or pointer theft; distant FIRE, overlap or viewport overflow fails. | Mobile combat overlay | IMPLEMENTED |
+| HF-210 | P0 | Rotating a phone mid-match must preserve the active match, coalesce renderer/camera resize, release every held touch action and recover controls without crash, freeze, device loss or duplicate game lifecycle. | Runtime viewport/input lifecycle | Served portrait-to-landscape and landscape-to-portrait active-match rotation holds FIRE/sticks across resize, asserts exactly one recovered geometry generation, advancing frames, cleared ownership, visible controls and zero page/device errors. | Active mobile matches | IMPLEMENTED |
+| HF-211 | P1 | The Gun Field Kit inspector restores truthful ideal cyclic body DPS derived from canonical damage, pellets and cadence alongside its retained damage, rate, range and control fields. | Loadout UI/combat-registry projection | Canonical formula/unit coverage and served custom-primary projection require one labelled DPS row with deterministic value and no stale mirror; missing, duplicate or non-canonical DPS fails. | Field Kit and custom loadout inspector | IMPLEMENTED |
+| HF-212 | P1 | Player-facing Gun Field Kit copy no longer describes weapon previews as a static-backed or asset-backed image. | Loadout UI copy | Source/DOM copy assertions reject static-backed, asset-backed or equivalent implementation-note text while preserving an accessible weapon-specific preview label. | Field Kit weapon previews | IMPLEMENTED |
+| HF-213 | P1 | The focused correction release is player-facing version 69.1 while retaining the protected internal Pass 69 acceptance lane and frozen Stable/Rollback channels. | Release identity/topology | Release-identity, chooser, changelog and staged-topology tests require v69.1 on the live route and unchanged Stable/Rollback provenance; mixed 69/69.1 branding or channel drift fails. | Live release chooser and runtime identity | IMPLEMENTED |
+| HF-214 | P1 | Player-facing release notes and project information contain no Farcrysis deferral note. | Release notes/project-map copy | Changelog/project-map source and served-dialog assertions reject Farcrysis text while preserving the remaining Pass 69.1 highlights and frozen channel notes. | Last Release and Project Map surfaces | IMPLEMENTED |
+| HF-215 | P1 | The front version-selection screen visibly tells players to use Ctrl+Shift+R when a newly selected game version has not updated. | Release chooser recovery UX | Candidate and staged production chooser DOM/visual tests require readable Ctrl+Shift+R guidance before selecting a channel at desktop and narrow widths. | Root version chooser | IMPLEMENTED |
+| HF-216 | P1 | The Options hard game-refresh/cache-reset action is also available on the front version-selection screen and clears CacheStorage before reloading the chooser with a fresh cache-busting URL. | Release chooser recovery UX | Candidate and staged chooser browser tests seed CacheStorage, activate HARD RESET / REFRESH, verify cache deletion, changed cache-bust URL and restored chooser; a decorative or ordinary reload button fails. | Root version chooser | IMPLEMENTED |
 
 ### 3A. Implemented boundaries awaiting independent candidate evidence
 
@@ -414,6 +423,15 @@ The feedback IDs remain the correction source; these ranges bind each row back t
 | HF-205 | R005, R009, R114, R304, R305, R506-R510, R600, R608, R609, R610, R613 |
 | HF-206 | R400-R413, R502, R505, R510, R609 |
 | HF-207 | R112, R114, R307, R600, R608, R609, R610 |
+| HF-208 | R108, R307, R600, R608, R609, R610 |
+| HF-209 | R600, R608, R609 |
+| HF-210 | R307, R608, R610 |
+| HF-211 | R108, R232, R600, R608, R609 |
+| HF-212 | R108, R600, R609 |
+| HF-213 | R001, R303, R600, R608, R611, R613 |
+| HF-214 | R303, R600, R609 |
+| HF-215 | R303, R600, R608, R609 |
+| HF-216 | R303, R307, R600, R608, R609, R610 |
 
 ## 4. Canonical contract supersessions
 

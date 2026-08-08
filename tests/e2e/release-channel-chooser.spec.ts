@@ -25,6 +25,8 @@ test('offers live Pass 69 The Big One, stable Pass 67.1 and rollback Pass 63 bef
   }
   await expect(page.locator('#release-channel-gate')).not.toContainText('PASS 65');
   await expect(page.locator('#release-channel-gate')).not.toContainText('PASS 59');
+  await expect(page.getByText('Ctrl+Shift+R')).toBeVisible();
+  await expect(page.locator('[id$="hard-refresh"]')).toHaveText('HARD RESET / REFRESH');
 
   const artifactRoot = resolve(process.cwd(), 'artifacts/pass69/release-shell');
   mkdirSync(artifactRoot, { recursive: true });
@@ -36,6 +38,15 @@ test('offers live Pass 69 The Big One, stable Pass 67.1 and rollback Pass 63 bef
   await expect(page).toHaveURL(/\/channels\/the-big-one\/.*release=latest/);
   await expect(page.locator('#release-channel-gate')).toHaveCount(0);
   await expect(page.locator('#menu')).toBeVisible();
+});
+
+test('front-page hard reset clears CacheStorage and reloads the chooser', async ({ page }) => {
+  await page.goto('/?release=choose');
+  await page.evaluate(async () => { await caches.open('pass69-1-stale-test'); });
+  await page.locator('[id$="hard-refresh"]').click();
+  await page.waitForURL(/cachebust=\d+/u);
+  await expect(page.locator('#release-channel-gate')).toBeVisible();
+  expect(await page.evaluate(async () => (await caches.keys()).includes('pass69-1-stale-test'))).toBe(false);
 });
 
 test('routes the stable choice to byte-exact Pass 67.1', async ({ page }) => {

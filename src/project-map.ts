@@ -59,13 +59,15 @@ export const PROJECT_MAP_RELEASE: ChangelogEntry = Object.freeze({
   title: 'The Big One',
   releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
   areas: Object.freeze(['MULTIPLAYER', 'FIELD KIT', 'FIRST-PERSON', 'CHOPPER GUNNER', 'HITL']),
-  summary: 'Pass 69 delivers the current playable candidate for friend testing while preserving Pass 67.1 stable singleplayer and Pass 63 rollback evidence.',
+  summary: 'Pass 69.1 delivers corrected mobile gamepad controls, safe rotation, restored Field Kit DPS and front-page refresh recovery while preserving Pass 67.1 stable singleplayer and Pass 63 rollback evidence.',
   highlights: Object.freeze([
-    'Field Kit metric decks stay visible and readable inside responsive weapon cards',
+    'Mobile sticks acquire through their full visible area with gamepad-shaped axes, FIRE beside aim and safe rotation recovery',
+    'Field Kit metric decks stay visible with truthful DPS and readable responsive weapon cards',
+    'The version chooser exposes Ctrl+Shift+R guidance and a hard cache-reset refresh control',
     'First-person arms use the corrected mirrored parent-space solve without replacing the canonical authored rig',
     'Chopper Gunner authored presentation contracts match required LOD nodes, actions and fallback sockets',
     'Private host/guest lobby state remains host-authoritative across the current release topology',
-    'Farcrysis remains absent and deferred to Pass 78; killstreak videos remain untouched',
+
     'Pass 67.1 stays frozen as stable singleplayer and Pass 63 remains the rollback',
   ]),
 });
