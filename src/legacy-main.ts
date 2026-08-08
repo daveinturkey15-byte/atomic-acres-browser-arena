@@ -24131,7 +24131,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       snapshotAgeMs: Math.max(0, performance.now() - remote.lastSeen),
       interpolationError: remote.root.position.distanceTo(remote.target),
       screenPosition: remote.root.localToWorld(new THREE.Vector3(0, 1.2, 0)).project(camera).toArray(),
-      operatorModel: riggedOperatorTelemetry(remote.root),
+      operatorModel: riggedOperatorTelemetry(remote.root.userData.operator as THREE.Object3D),
       readability: remoteHumanReadabilityTelemetry(remote.root.userData.operator as THREE.Object3D),
     })),
     retainedRemotePlayers: [...retainedRemoteAuthorities.values()].map((retained) => ({
