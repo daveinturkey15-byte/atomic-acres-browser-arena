@@ -1,0 +1,13 @@
+Fix catalog-wide opaque or obstructive ADS weapon assets.
+Correct first-person gun, knife, hand, and arm alignment.
+Activate every ready selected killstreak with 3, 4, 5, and every configured or rebound support key.
+Eliminate sniper ADS renderer freezes.
+Prevent first-person weapon, hand, and arm clipping into walls and floors.
+Improve the Gun Range killstreak-room secure-door lighting and texture.
+Eliminate Flamethrower and Flare Gun freezes or GPU stalls.
+Give every gun and support station a useful canonical label or rotating 3D preview.
+Show the accurate canonical nearby weapon name in every F pickup prompt.
+In the killstreak test zone only, require hold-F to use streaks not selected in the loadout.
+Make killstreak-room bots roam naturally rather than following a rail-like path.
+Use animated canonical operators for killstreak-room bots rather than primitive or T-pose bodies.
+Present Chopper Gunner, Carpet Bomber, Care Package aircraft, crate, and parachute from the retained authored assets in the served runtime.

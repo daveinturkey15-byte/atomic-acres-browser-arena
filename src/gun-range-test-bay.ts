@@ -23,6 +23,7 @@ export type GunRangeTestBayDummyDefinition = Readonly<{
   start: Readonly<Point3>;
   end: Readonly<Point3>;
   speedMps: number;
+  roamHalfWidthM: number;
   phase: number;
   armed: false;
 }>;
@@ -74,8 +75,8 @@ export const GUN_RANGE_TEST_BAY_CONTRACT = Object.freeze({
     clearHeightM: 4.8,
   }),
   bay: Object.freeze({
-    bounds: Object.freeze({ minX: 51.5, maxX: 100, minY: 0, maxY: 25.5, minZ: -52, maxZ: 64 }),
-    clearFloorAreaM2: (100 - 51.5) * (64 - -52),
+    bounds: Object.freeze({ minX: 51.5, maxX: 100, minY: 0, maxY: 25.5, minZ: -26, maxZ: 38 }),
+    clearFloorAreaM2: (100 - 51.5) * (38 - -26),
   }),
   door: Object.freeze({
     id: GUN_RANGE_TEST_BAY_DOOR_ID,
@@ -86,10 +87,10 @@ export const GUN_RANGE_TEST_BAY_CONTRACT = Object.freeze({
     thumpIntent: 'secure-door-opening-thump' as const,
   }),
   dummies: Object.freeze([
-    Object.freeze({ id: 'test-dummy-alpha', start: Object.freeze({ x: 63, y: 0, z: -16 }), end: Object.freeze({ x: 77, y: 0, z: -16 }), speedMps: 0.72, phase: 0, armed: false as const }),
-    Object.freeze({ id: 'test-dummy-bravo', start: Object.freeze({ x: 62, y: 0, z: -6 }), end: Object.freeze({ x: 78, y: 0, z: -6 }), speedMps: 0.68, phase: 0.33, armed: false as const }),
-    Object.freeze({ id: 'test-dummy-charlie', start: Object.freeze({ x: 63, y: 0, z: 4 }), end: Object.freeze({ x: 77, y: 0, z: 4 }), speedMps: 0.76, phase: 0.66, armed: false as const }),
-    Object.freeze({ id: 'test-dummy-delta', start: Object.freeze({ x: 62, y: 0, z: 14 }), end: Object.freeze({ x: 78, y: 0, z: 14 }), speedMps: 0.7, phase: 0.91, armed: false as const }),
+    Object.freeze({ id: 'test-dummy-alpha', start: Object.freeze({ x: 63, y: 0, z: -16 }), end: Object.freeze({ x: 77, y: 0, z: -16 }), speedMps: 0.72, roamHalfWidthM: 2.2, phase: 0, armed: false as const }),
+    Object.freeze({ id: 'test-dummy-bravo', start: Object.freeze({ x: 62, y: 0, z: -6 }), end: Object.freeze({ x: 78, y: 0, z: -6 }), speedMps: 0.68, roamHalfWidthM: 2.8, phase: 0.33, armed: false as const }),
+    Object.freeze({ id: 'test-dummy-charlie', start: Object.freeze({ x: 63, y: 0, z: 4 }), end: Object.freeze({ x: 77, y: 0, z: 4 }), speedMps: 0.76, roamHalfWidthM: 3.1, phase: 0.66, armed: false as const }),
+    Object.freeze({ id: 'test-dummy-delta', start: Object.freeze({ x: 62, y: 0, z: 14 }), end: Object.freeze({ x: 78, y: 0, z: 14 }), speedMps: 0.7, roamHalfWidthM: 2.5, phase: 0.91, armed: false as const }),
   ] as const satisfies readonly GunRangeTestBayDummyDefinition[]),
   supportStations,
   weaponStations,
@@ -214,7 +215,7 @@ export function nearestGunRangeTestBaySupportStation(
   return nearestTrainingStation(GUN_RANGE_TEST_BAY_CONTRACT.supportStations, position, maximumDistance);
 }
 
-/** Deterministic unarmed walking-target pose. The triangle wave has no teleport at either turn. */
+/** Deterministic unarmed walking-target pose on a smooth bounded roaming loop. */
 export function gunRangeTestBayDummyPose(
   definition: GunRangeTestBayDummyDefinition,
   nowMs: number,
@@ -224,16 +225,30 @@ export function gunRangeTestBayDummyPose(
   const dy = definition.end.y - definition.start.y;
   const dz = definition.end.z - definition.start.z;
   const distance = Math.hypot(dx, dy, dz);
-  const oneWaySeconds = distance / definition.speedMps;
-  const cycle = (((nowMs / 1_000) / (oneWaySeconds * 2) + definition.phase) % 1 + 1) % 1;
-  const forward = cycle < 0.5;
-  const alpha = forward ? cycle * 2 : (1 - cycle) * 2;
+  const majorRadius = distance / 2;
+  if (!(majorRadius > 0) || !(definition.speedMps > 0) || !(definition.roamHalfWidthM > 0)) {
+    throw new TypeError('dummy roaming definition must have positive dimensions and speed');
+  }
+  const horizontalDistance = Math.hypot(dx, dz);
+  const perpendicularX = horizontalDistance > 0 ? -dz / horizontalDistance : 0;
+  const perpendicularZ = horizontalDistance > 0 ? dx / horizontalDistance : 1;
+  const minorRadius = Math.min(definition.roamHalfWidthM, majorRadius);
+  const angle = nowMs / 1_000 * (definition.speedMps / majorRadius) + definition.phase * Math.PI * 2;
+  const along = Math.cos(angle);
+  const across = Math.sin(angle);
+  const midpoint = {
+    x: (definition.start.x + definition.end.x) / 2,
+    y: (definition.start.y + definition.end.y) / 2,
+    z: (definition.start.z + definition.end.z) / 2,
+  };
+  const velocityX = (-dx / 2 * across - perpendicularX * minorRadius * along) * (definition.speedMps / majorRadius);
+  const velocityZ = (-dz / 2 * across - perpendicularZ * minorRadius * along) * (definition.speedMps / majorRadius);
   return Object.freeze({
     position: Object.freeze({
-      x: definition.start.x + dx * alpha,
-      y: definition.start.y + dy * alpha,
-      z: definition.start.z + dz * alpha,
+      x: midpoint.x + dx / 2 * along + perpendicularX * minorRadius * across,
+      y: midpoint.y + dy / 2 * along,
+      z: midpoint.z + dz / 2 * along + perpendicularZ * minorRadius * across,
     }),
-    yawRadians: Math.atan2(forward ? dx : -dx, forward ? dz : -dz),
+    yawRadians: Math.atan2(velocityX, velocityZ),
   });
 }

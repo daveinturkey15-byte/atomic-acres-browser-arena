@@ -169,6 +169,12 @@ export function supportSlotAction(slot: number): GameplayAction | null {
   return SUPPORT_SLOT_ACTIONS[slot] ?? null;
 }
 
+/** Resolve a configured support key to the compact runtime slot range 0..4. */
+export function supportSlotForCode(code: string, profile: KeyBindingProfile): number | null {
+  const slot = SUPPORT_SLOT_ACTIONS.findIndex((action) => profile[action].includes(code));
+  return slot >= 0 ? slot : null;
+}
+
 export function actionMatchesCode(action: GameplayAction, code: string, profile: KeyBindingProfile): boolean {
   return profile[action].includes(code);
 }

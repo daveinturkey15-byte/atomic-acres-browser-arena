@@ -9,6 +9,7 @@ import {
   rebindAction,
   resolveKeyBindingProfile,
   saveKeyBindingProfile,
+  supportSlotForCode,
 } from './key-bindings';
 
 class FakeStorage implements Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> {
@@ -72,6 +73,18 @@ describe('key-bindings', () => {
     expect(actionMatchesCode('sprint', 'ShiftLeft', profile)).toBe(true);
     expect(actionHeld('sprint', new Set(['ShiftLeft']), profile)).toBe(true);
     expect(actionHeld('sprint', new Set(['KeyW']), profile)).toBe(false);
+  });
+
+  it('maps support keys to compact slots for defaults and custom bindings', () => {
+    expect(['Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7'].map((code) => (
+      supportSlotForCode(code, DEFAULT_KEY_BINDINGS)
+    ))).toEqual([0, 1, 2, 3, 4]);
+    expect(supportSlotForCode('Digit2', DEFAULT_KEY_BINDINGS)).toBeNull();
+
+    const rebound = rebindAction(DEFAULT_KEY_BINDINGS, 'support-3', 'KeyH');
+    expect(rebound).not.toBeNull();
+    expect(supportSlotForCode('KeyH', rebound!)).toBe(2);
+    expect(supportSlotForCode('Digit5', rebound!)).toBeNull();
   });
 
   it('covers every gameplay action with a label and default binding', () => {

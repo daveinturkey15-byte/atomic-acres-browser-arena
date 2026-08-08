@@ -5,6 +5,7 @@ import { classifyImpactSurface } from './combat-feedback';
 import { createBallisticSurface, type BallisticMaterialId, type BallisticSurface } from './ballistics';
 import type { Box2 } from './collision';
 import { WEAPONS } from './gameplay';
+import { PASS65_KILLSTREAK_CATALOG } from './killstreak-catalog';
 import { GUN_RANGE_WEAPON_STATIONS } from './gun-range-armory';
 import {
   GUN_RANGE_TEST_BAY_CONTRACT,
@@ -1598,17 +1599,14 @@ function gunRangeTrainingDummy(
   root.userData.walkSpeedMps = definition.speedMps;
   root.userData.scoreValue = 250;
   root.userData.maxHealth = 300;
-  // Owner direction: the killstreak-room training bots must look like the
-  // combatants in real matches. Use the canonical rigged operator family when
-  // its authored GLB has loaded; the painted training robot remains only as a
-  // pre-load fixture and is replaced as soon as the shared rig is ready.
+  // Combatants in the support-testing room use the canonical rigged operator
+  // family. Production fails closed if that shared asset was not prewarmed;
+  // only Vitest may construct the primitive target fixture below.
   const rigged = (() => {
     try {
       return buildOperator(index % 2 === 0 ? 1 : 0, `gun-range-${definition.id}`, false, 'carbine', 'team');
-    } catch {
-      // Canonical rig not loaded yet (e.g. headless/unit environments): fall
-      // back to the painted training robot below. Live deployment always loads
-      // the rig before arena construction, so gameplay uses the rigged model.
+    } catch (error) {
+      if (import.meta.env.MODE !== 'test') throw error;
       return null;
     }
   })();
@@ -1646,9 +1644,9 @@ function gunRangeTrainingDummy(
     });
     return Object.freeze({ root, definition });
   }
-  // Review capture and compatibility renderers must not turn the slow targets
-  // into black silhouettes when authored practical lights are culled. These
-  // are painted training robots, so an unlit albedo is also semantically apt.
+  root.userData.testFixtureOperator = true;
+  // Unit tests exercise arena geometry before authored assets are prewarmed.
+  // This painted robot is tree-shaken from production and never a live fallback.
   const shell = new THREE.MeshBasicMaterial({ color: index % 2 === 0 ? 0xb9c8ca : 0x9aabad, toneMapped: false });
   const armour = new THREE.MeshBasicMaterial({ color: index % 2 === 0 ? 0x279aa0 : 0xb87832, toneMapped: false });
   const joint = new THREE.MeshBasicMaterial({ color: 0x263337, toneMapped: false });
@@ -1800,6 +1798,7 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   const testBayVisibleCeiling = new THREE.MeshBasicMaterial({ color: 0x263237, toneMapped: false });
   const secureDoorMaterial = new THREE.MeshStandardMaterial({ color: 0x283236, emissive: 0x14262a, emissiveIntensity: 0.48, roughness: 0.5, metalness: 0.78 });
   const secureDoorPanelMaterial = terminalSurfaceMaterial('panel', 0x283236, '#4a5a5e', 0.52, 0.74, [2, 3]);
+  secureDoorPanelMaterial.name = 'GunRange_TestBay_SecureDoor_PanelTexture';
 
   box(builder, 'gun-range-test-bay-corridor-floor', [35.75, -0.08, 12], [30.5, 0.16, 8], testBayFloor, { solid: false, shots: true });
   box(builder, 'gun-range-test-bay-corridor-north-wall', [35.75, 2.6, 7.75], [30.5, 5.2, 0.5], testBayWall, { ballisticMaterial: 'structural-metal' });
@@ -1860,6 +1859,16 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     const edge = box(builder, `gun-range-test-bay-door-edge-${side}`, [51.5, 10.25, z], [0.71, 6.5, 0.09], z < 12 ? testBayAmber : testBayCyan, { solid: false, shots: false, cast: false });
     edge.userData.presentationBatchCandidate = false;
     edge.userData.dynamic = true;
+    root.remove(edge);
+    edge.position.set(0, 0, z - secureDoor.position.z);
+    secureDoor.add(edge);
+  }
+  for (const [face, x] of [['range', 49.9], ['bay', 53.1]] as const) {
+    for (const [tone, z, material] of [['amber', 10.1, testBayAmber], ['cyan', 13.9, testBayCyan]] as const) {
+      const fixture = box(builder, `gun-range-test-bay-door-fixture-${face}-${tone}`, [x, 3.2, z], [0.08, 0.9, 0.35], material, { solid: false, shots: false, cast: false });
+      fixture.userData.presentationBatchCandidate = false;
+      fixture.userData.presentationOnly = true;
+    }
   }
   for (const z of [-19, -7, 5, 17, 29]) {
     box(builder, 'gun-range-test-bay-ceiling-light', [75.5, 25.02, z], [35, 0.12, 0.3], z % 2 === 0 ? testBayAmber : testBayCyan, { solid: false, shots: false, cast: false });
@@ -1891,10 +1900,24 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   // These pads are honest structural stations. Their canonical IDs are
   // projected from the killstreak catalog; the main runtime consumes the IDs
   // through the normal host-authoritative support and weapon admission paths.
+  const supportLabels = PASS65_KILLSTREAK_CATALOG.definitions.map((definition) => Object.freeze({
+    id: definition.id,
+    displayName: definition.displayName,
+    meshName: `gun-range-test-bay-support-label-${definition.id}`,
+  }));
+  root.userData.gunRangeTestBaySupportLabels = Object.freeze(supportLabels);
   for (const [index, station] of GUN_RANGE_TEST_BAY_CONTRACT.supportStations.entries()) {
     const pad = box(builder, `gun-range-test-bay-support-pad-${station.id}`, [station.position.x, 0.06, station.position.z], [5.6, 0.12, 5.6], index % 2 === 0 ? testBayAmber : testBayCyan, { solid: false, shots: false, cast: false });
     pad.userData.supportId = station.id;
     pad.userData.runtimeStatus = station.runtimeStatus;
+    const label = supportLabels.find((candidate) => candidate.id === station.id)!;
+    const sign = rangeSign(label.displayName.toUpperCase(), index % 2 === 0 ? 0xf0b24b : 0x53ded8, label.meshName, [4.8, 0.72]);
+    if (sign) {
+      sign.position.set(station.position.x - 2.72, 1.28, station.position.z);
+      sign.rotation.y = -Math.PI / 2;
+      if (!Array.isArray(sign.material)) sign.material.side = THREE.FrontSide;
+      root.add(sign);
+    }
   }
   for (const [index, station] of GUN_RANGE_TEST_BAY_CONTRACT.weaponStations.entries()) {
     const marker = box(builder, `gun-range-test-bay-weapon-marker-${station.id}`, [station.position.x, 0.055, station.position.z], [4.8, 0.11, 0.5], index % 2 === 0 ? testBayCyan : testBayAmber, { solid: false, shots: false, cast: false });

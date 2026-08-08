@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { auditLocalLightOcclusion } from './rendering/light-occlusion';
 import { describe, expect, it } from 'vitest';
@@ -25,11 +26,14 @@ import {
   gunRangeTestBayDoorDynamicColliders,
 } from './gun-range-test-bay';
 import type { ArenaMap } from './map';
+import { PASS65_KILLSTREAK_CATALOG } from './killstreak-catalog';
 import type { Stance } from './gameplay';
 import { CharacterPhysics, STANCE_SHAPES } from './physics';
 import { definition as rustworksVisualDefinition } from './rendering/arenas/rustworks-1v1';
 import { definition as gunRangeVisualDefinition } from './rendering/arenas/gun-range';
 import { definition as terminalVisualDefinition } from './rendering/arenas/skyline-terminal';
+
+const additionalMapsSource = readFileSync(new URL('./additional-maps.ts', import.meta.url), 'utf8');
 
 type RouteAnchor = { id: string; position: [number, number, number] };
 
@@ -724,6 +728,37 @@ describe('additional authored maps', () => {
     expect(map.bounds.maxX - map.bounds.minX).toBeGreaterThanOrEqual(40);
     expect(map.bounds.maxZ - map.bounds.minZ).toBeGreaterThanOrEqual(67);
     expectGunRangeSpawnContract(map);
+  });
+
+  it('fails closed on a missing canonical training operator outside the unit-test fixture', () => {
+    expect(additionalMapsSource).toContain("if (import.meta.env.MODE !== 'test') throw error;");
+    expect(additionalMapsSource).toContain('root.userData.testFixtureOperator = true;');
+    expect(additionalMapsSource).toContain("poseOperator(dummy, 'stand'");
+  });
+
+  it('authors a textured two-sided secure door with attached edge strips and practical face lights', () => {
+    const map = buildGunRange(new THREE.Scene());
+    const door = map.root.getObjectByName('gun-range-test-bay-secure-door-leaf') as THREE.Mesh;
+    const material = door.material as THREE.MeshStandardMaterial;
+    expect(material.name).toBe('GunRange_TestBay_SecureDoor_PanelTexture');
+    expect(material.userData.surfacePattern).toBe('panel');
+    for (const side of ['north', 'south']) {
+      expect(door.getObjectByName(`gun-range-test-bay-door-edge-${side}`)?.parent).toBe(door);
+    }
+    for (const face of ['range', 'bay']) {
+      expect(map.root.getObjectByName(`gun-range-test-bay-door-fixture-${face}-amber`)).toBeInstanceOf(THREE.Mesh);
+      expect(map.root.getObjectByName(`gun-range-test-bay-door-fixture-${face}-cyan`)).toBeInstanceOf(THREE.Mesh);
+    }
+  });
+
+  it('projects every canonical support name onto its own visible test-bay station', () => {
+    const map = buildGunRange(new THREE.Scene());
+    const labels = map.root.userData.gunRangeTestBaySupportLabels as Array<{ id: string; displayName: string; meshName: string }>;
+    expect(labels).toEqual(PASS65_KILLSTREAK_CATALOG.definitions.map((definition) => ({
+      id: definition.id,
+      displayName: definition.displayName,
+      meshName: `gun-range-test-bay-support-label-${definition.id}`,
+    })));
   });
 
   it('builds a collision-backed five-second tunnel and a fail-closed canonical test-bay plan', async () => {

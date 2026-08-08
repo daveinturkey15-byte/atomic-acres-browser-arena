@@ -259,13 +259,44 @@
       "outcomeProjectionSha256": "d5057149d4adaa44260a9668a5d8b5feea7dc824e79364a9440fcdb3a1920079"
     },
     {
+      "id": "SRC-HERMES-P69-2-AUG08-001",
+      "kind": "hermes-authorized-owner-feedback",
+      "externalLocator": "hermes:desktop/default/2026-08-08/pass69.2-retained-outcomes",
+      "rawByteLength": 1042,
+      "rawSha256": "76035f973677bdfa3f0a5dbb597ebb64286c7456d6f64176644943d71edc8701",
+      "rawEndsWithCrLf": false,
+      "normalizedRepositoryPath": "docs/pass69-sources/hermes-owner-outcomes-2026-08-08-pass69-2.txt",
+      "normalization": "UTF-8; CRLF converted to LF; one final LF added; text semantics unchanged",
+      "normalizedByteLength": 1031,
+      "normalizedSha256": "d54296406b3ce86f2233ce66cefd25bac73b432bbfc01f4f9b8672310e64f57c",
+      "outcomeCollection": "hermesPass692August08Outcomes",
+      "outcomeIdPrefix": "P692AUG08",
+      "outcomeCount": 13,
+      "lineAtomCounts": {
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1
+      },
+      "outcomeProjectionSha256": "23030ad0176e37a615f0bf8fbff9afa5ecc8a9b9f1a88b621c6be7ed11fcf3d9"
+    },
+    {
       "id": "SRC-CORRECTION-LEDGER-001",
       "kind": "canonical-correction-ledger",
       "repositoryPath": "docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md",
       "ledgerVersion": 1,
-      "latestFeedbackId": "HF-216",
-      "outcomeCount": 216,
-      "stateIndependentOutcomeSha256": "d9474df7aa3d4b51d6fe0fe5681264bde21943cd771ec4f7300fd3e2fec83a4b"
+      "latestFeedbackId": "HF-229",
+      "outcomeCount": 229,
+      "stateIndependentOutcomeSha256": "21443d96cae7c2eefb9c26b73f79c8a41b6690a86f7b256f46e6b8f16913cf93"
     },
     {
       "id": "SRC-PLANNING-MATRIX-001",
@@ -949,7 +980,7 @@
     "outcomeIdTemplate": "CORR-{feedbackId}",
     "sourceLocatorTemplate": "{feedbackId}.observation",
     "feedbackIdStart": "HF-001",
-    "feedbackIdEnd": "HF-216"
+    "feedbackIdEnd": "HF-229"
   },
   "supersessions": [
     {
@@ -7059,7 +7090,327 @@
     {"id":"HF-213","sourceOutcomeIds":["CORR-HF-213","P69AUG08-009"],"planningRequirementIds":["R001","R303","R600","R608","R611","R613"],"canonicalOwner":"Release identity/topology","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-RELEASE-SHELL"],"artifactRefs":[]}},
     {"id":"HF-214","sourceOutcomeIds":["CORR-HF-214","P69AUG08-010"],"planningRequirementIds":["R303","R600","R609"],"canonicalOwner":"Release notes/project-map copy","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-RELEASE-SHELL"],"artifactRefs":[]}},
     {"id":"HF-215","sourceOutcomeIds":["CORR-HF-215","P69AUG08-011"],"planningRequirementIds":["R303","R600","R608","R609"],"canonicalOwner":"Release chooser recovery UX","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-RELEASE-SHELL"],"artifactRefs":[]}},
-    {"id":"HF-216","sourceOutcomeIds":["CORR-HF-216","P69AUG08-012"],"planningRequirementIds":["R303","R307","R600","R608","R609","R610"],"canonicalOwner":"Release chooser recovery UX","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-RELEASE-SHELL"],"artifactRefs":[]}}
+    {"id":"HF-216","sourceOutcomeIds":["CORR-HF-216","P69AUG08-012"],"planningRequirementIds":["R303","R307","R600","R608","R609","R610"],"canonicalOwner":"Release chooser recovery UX","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-RELEASE-SHELL"],"artifactRefs":[]}},
+    {
+      "id": "HF-217",
+      "sourceOutcomeIds": [
+        "CORR-HF-217",
+        "P692AUG08-001"
+      ],
+      "planningRequirementIds": [
+        "R108",
+        "R307",
+        "R608",
+        "R610"
+      ],
+      "canonicalOwner": "ADS/viewmodel/rendering integration",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-ADS-SIGHT-CATALOG",
+          "T-SCOPED-ADS"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-218",
+      "sourceOutcomeIds": [
+        "CORR-HF-218",
+        "P692AUG08-002"
+      ],
+      "planningRequirementIds": [
+        "R108",
+        "R307",
+        "R608",
+        "R610"
+      ],
+      "canonicalOwner": "Operator rig/viewmodel forge",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-VIEWMODEL-FRAMING",
+          "T-OPERATOR-GATE"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-219",
+      "sourceOutcomeIds": [
+        "CORR-HF-219",
+        "P692AUG08-003"
+      ],
+      "planningRequirementIds": [
+        "R504",
+        "R600",
+        "R608",
+        "R609",
+        "R610"
+      ],
+      "canonicalOwner": "Support targeting/input lifecycle",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-SUPPORT-RUNTIME",
+          "T-INTERACTION"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-220",
+      "sourceOutcomeIds": [
+        "CORR-HF-220",
+        "P692AUG08-004"
+      ],
+      "planningRequirementIds": [
+        "R006",
+        "R108",
+        "R307",
+        "R606",
+        "R610",
+        "R613"
+      ],
+      "canonicalOwner": "Sniper viewmodel/frame pacing",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-SCOPED-ADS",
+          "T-NATIVE-FRAME-PACING"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-221",
+      "sourceOutcomeIds": [
+        "CORR-HF-221",
+        "P692AUG08-005"
+      ],
+      "planningRequirementIds": [
+        "R108",
+        "R236",
+        "R307",
+        "R608",
+        "R610"
+      ],
+      "canonicalOwner": "ADS/viewmodel/rendering integration",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-VIEWMODEL-FRAMING",
+          "T-PRONE-CONTACT-MATRIX"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-222",
+      "sourceOutcomeIds": [
+        "CORR-HF-222",
+        "P692AUG08-006"
+      ],
+      "planningRequirementIds": [
+        "R112",
+        "R307",
+        "R608",
+        "R609"
+      ],
+      "canonicalOwner": "Gun Range world/gameplay integration",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-ADDITIONAL-MAPS",
+          "T-GUN-RANGE-TEST-BAY"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-223",
+      "sourceOutcomeIds": [
+        "CORR-HF-223",
+        "P692AUG08-007"
+      ],
+      "planningRequirementIds": [
+        "R006",
+        "R109",
+        "R307",
+        "R606",
+        "R610",
+        "R613"
+      ],
+      "canonicalOwner": "Timed weapon/content integration",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-TIMED-MAP-WEAPONS",
+          "T-NATIVE-FRAME-PACING"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-224",
+      "sourceOutcomeIds": [
+        "CORR-HF-224",
+        "P692AUG08-008"
+      ],
+      "planningRequirementIds": [
+        "R108",
+        "R500",
+        "R600",
+        "R609"
+      ],
+      "canonicalOwner": "Loadout UI/weapon asset projection",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-GUN-RANGE-TEST-BAY",
+          "T-WEAPON-CATALOG"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-225",
+      "sourceOutcomeIds": [
+        "CORR-HF-225",
+        "P692AUG08-009"
+      ],
+      "planningRequirementIds": [
+        "R108",
+        "R400",
+        "R401",
+        "R402",
+        "R403",
+        "R404",
+        "R405",
+        "R406",
+        "R407",
+        "R408",
+        "R409",
+        "R410",
+        "R411",
+        "R412",
+        "R413",
+        "R609"
+      ],
+      "canonicalOwner": "World-pickup/interaction authority",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-PICKUP-REPICK",
+          "T-INTERACTION"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-226",
+      "sourceOutcomeIds": [
+        "CORR-HF-226",
+        "P692AUG08-010"
+      ],
+      "planningRequirementIds": [
+        "R500",
+        "R502",
+        "R504",
+        "R510",
+        "R609"
+      ],
+      "canonicalOwner": "Support authority/HUD integration",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-GUN-RANGE-TEST-BAY",
+          "T-INTERACTION",
+          "T-SUPPORT-RUNTIME"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-227",
+      "sourceOutcomeIds": [
+        "CORR-HF-227",
+        "P692AUG08-011"
+      ],
+      "planningRequirementIds": [
+        "R111",
+        "R509",
+        "R510",
+        "R608"
+      ],
+      "canonicalOwner": "Gun Range world/gameplay integration",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-GUN-RANGE-TEST-BAY"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-228",
+      "sourceOutcomeIds": [
+        "CORR-HF-228",
+        "P692AUG08-012"
+      ],
+      "planningRequirementIds": [
+        "R108",
+        "R307",
+        "R608",
+        "R610"
+      ],
+      "canonicalOwner": "Operator rig/viewmodel forge",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-OPERATOR-GATE",
+          "T-GUN-RANGE-TEST-BAY"
+        ],
+        "artifactRefs": []
+      }
+    },
+    {
+      "id": "HF-229",
+      "sourceOutcomeIds": [
+        "CORR-HF-229",
+        "P692AUG08-013"
+      ],
+      "planningRequirementIds": [
+        "R112",
+        "R114",
+        "R307",
+        "R608",
+        "R610",
+        "R613"
+      ],
+      "canonicalOwner": "Support vehicle asset forge",
+      "ownerSource": "SRC-CORRECTION-LEDGER-001",
+      "verification": {
+        "coverage": "partial",
+        "testRefs": [
+          "T-SUPPORT-VEHICLE-GATE",
+          "T-SUPPORT-VISUAL-E2E"
+        ],
+        "artifactRefs": []
+      }
+    }
   ],
   "desktopUntitledOutcomes": [
     {
@@ -8716,5 +9067,210 @@
     {"id":"P69AUG08-010","sourceLocator":"L5#3","normalizedOutcome":"Remove the Farcrysis note from player-facing release information.","feedbackIds":["HF-214"],"planningRequirementIds":["R303","R600","R609"]},
     {"id":"P69AUG08-011","sourceLocator":"L7#1","normalizedOutcome":"Show Ctrl+Shift+R refresh guidance on the front version-selection screen.","feedbackIds":["HF-215"],"planningRequirementIds":["R303","R600","R608","R609"]},
     {"id":"P69AUG08-012","sourceLocator":"L7#2","normalizedOutcome":"Expose the Options hard-reset game refresh on the front version-selection screen too.","feedbackIds":["HF-216"],"planningRequirementIds":["R303","R307","R600","R608","R609","R610"]}
+  ],
+  "hermesPass692August08Outcomes": [
+    {
+      "id": "P692AUG08-001",
+      "sourceLocator": "L1#1",
+      "normalizedOutcome": "Fix catalog-wide opaque or obstructive ADS weapon assets.",
+      "feedbackIds": [
+        "HF-217"
+      ],
+      "planningRequirementIds": [
+        "R108",
+        "R307",
+        "R608",
+        "R610"
+      ]
+    },
+    {
+      "id": "P692AUG08-002",
+      "sourceLocator": "L2#1",
+      "normalizedOutcome": "Correct first-person gun, knife, hand, and arm alignment.",
+      "feedbackIds": [
+        "HF-218"
+      ],
+      "planningRequirementIds": [
+        "R108",
+        "R307",
+        "R608",
+        "R610"
+      ]
+    },
+    {
+      "id": "P692AUG08-003",
+      "sourceLocator": "L3#1",
+      "normalizedOutcome": "Activate every ready selected killstreak with 3, 4, 5, and every configured or rebound support key.",
+      "feedbackIds": [
+        "HF-219"
+      ],
+      "planningRequirementIds": [
+        "R504",
+        "R600",
+        "R608",
+        "R609",
+        "R610"
+      ]
+    },
+    {
+      "id": "P692AUG08-004",
+      "sourceLocator": "L4#1",
+      "normalizedOutcome": "Eliminate sniper ADS renderer freezes.",
+      "feedbackIds": [
+        "HF-220"
+      ],
+      "planningRequirementIds": [
+        "R006",
+        "R108",
+        "R307",
+        "R606",
+        "R610",
+        "R613"
+      ]
+    },
+    {
+      "id": "P692AUG08-005",
+      "sourceLocator": "L5#1",
+      "normalizedOutcome": "Prevent first-person weapon, hand, and arm clipping into walls and floors.",
+      "feedbackIds": [
+        "HF-221"
+      ],
+      "planningRequirementIds": [
+        "R108",
+        "R236",
+        "R307",
+        "R608",
+        "R610"
+      ]
+    },
+    {
+      "id": "P692AUG08-006",
+      "sourceLocator": "L6#1",
+      "normalizedOutcome": "Improve the Gun Range killstreak-room secure-door lighting and texture.",
+      "feedbackIds": [
+        "HF-222"
+      ],
+      "planningRequirementIds": [
+        "R112",
+        "R307",
+        "R608",
+        "R609"
+      ]
+    },
+    {
+      "id": "P692AUG08-007",
+      "sourceLocator": "L7#1",
+      "normalizedOutcome": "Eliminate Flamethrower and Flare Gun freezes or GPU stalls.",
+      "feedbackIds": [
+        "HF-223"
+      ],
+      "planningRequirementIds": [
+        "R006",
+        "R109",
+        "R307",
+        "R606",
+        "R610",
+        "R613"
+      ]
+    },
+    {
+      "id": "P692AUG08-008",
+      "sourceLocator": "L8#1",
+      "normalizedOutcome": "Give every gun and support station a useful canonical label or rotating 3D preview.",
+      "feedbackIds": [
+        "HF-224"
+      ],
+      "planningRequirementIds": [
+        "R108",
+        "R500",
+        "R600",
+        "R609"
+      ]
+    },
+    {
+      "id": "P692AUG08-009",
+      "sourceLocator": "L9#1",
+      "normalizedOutcome": "Show the accurate canonical nearby weapon name in every F pickup prompt.",
+      "feedbackIds": [
+        "HF-225"
+      ],
+      "planningRequirementIds": [
+        "R108",
+        "R400",
+        "R401",
+        "R402",
+        "R403",
+        "R404",
+        "R405",
+        "R406",
+        "R407",
+        "R408",
+        "R409",
+        "R410",
+        "R411",
+        "R412",
+        "R413",
+        "R609"
+      ]
+    },
+    {
+      "id": "P692AUG08-010",
+      "sourceLocator": "L10#1",
+      "normalizedOutcome": "In the killstreak test zone only, require hold-F to use streaks not selected in the loadout.",
+      "feedbackIds": [
+        "HF-226"
+      ],
+      "planningRequirementIds": [
+        "R500",
+        "R502",
+        "R504",
+        "R510",
+        "R609"
+      ]
+    },
+    {
+      "id": "P692AUG08-011",
+      "sourceLocator": "L11#1",
+      "normalizedOutcome": "Make killstreak-room bots roam naturally rather than following a rail-like path.",
+      "feedbackIds": [
+        "HF-227"
+      ],
+      "planningRequirementIds": [
+        "R111",
+        "R509",
+        "R510",
+        "R608"
+      ]
+    },
+    {
+      "id": "P692AUG08-012",
+      "sourceLocator": "L12#1",
+      "normalizedOutcome": "Use animated canonical operators for killstreak-room bots rather than primitive or T-pose bodies.",
+      "feedbackIds": [
+        "HF-228"
+      ],
+      "planningRequirementIds": [
+        "R108",
+        "R307",
+        "R608",
+        "R610"
+      ]
+    },
+    {
+      "id": "P692AUG08-013",
+      "sourceLocator": "L13#1",
+      "normalizedOutcome": "Present Chopper Gunner, Carpet Bomber, Care Package aircraft, crate, and parachute from the retained authored assets in the served runtime.",
+      "feedbackIds": [
+        "HF-229"
+      ],
+      "planningRequirementIds": [
+        "R112",
+        "R114",
+        "R307",
+        "R608",
+        "R610",
+        "R613"
+      ]
+    }
   ]
 }
