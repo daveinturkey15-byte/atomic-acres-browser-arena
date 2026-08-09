@@ -49,6 +49,14 @@
       "fileCount": 12,
       "totalBytes": 55328640,
       "recordedAt": "2026-08-02"
+    },
+    {
+      "cacheKey": "pass66-runtime-preview-v7",
+      "recipeId": "pass66-authoritative-runtime-menu-preview-v2",
+      "finalMediaSetSha256": "fd5fdbf82475a5c4424f14048ed3e83affa98e4a7d77d77963efc104c448ac8f",
+      "fileCount": 12,
+      "totalBytes": 55328861,
+      "recordedAt": "2026-08-02"
     }
   ]
 }

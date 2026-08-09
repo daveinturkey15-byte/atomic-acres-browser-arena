@@ -3,7 +3,7 @@
   "captureId": "pass66-authoritative-runtime-menu-preview-capture-v2",
   "generatedAt": "2026-08-02",
   "recipeId": "pass66-authoritative-runtime-menu-preview-v2",
-  "recipeDigest": "e84ca8214eb7260064f65dc22eba26a0da6ad6de82f90864904e74996395b5bd",
+  "recipeDigest": "bb1e8eb5dee4f1277e7bdc607dadd4534d2c8e8c3d149033119915f00eca1a82",
   "source": "authoritative-runtime-arena",
   "backendRequired": "webgpu",
   "viewport": [
@@ -272,7 +272,7 @@
     "captureTools": [
       {
         "path": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
-        "sha256": "90763a46515d3a785ce36fb2480b2e3ee3838abb28d38503196d000269c47d0e"
+        "sha256": "10feeffd3de7305961f418d70492eb06c5d08b28be3df37e7d29bb42f5782a84"
       },
       {
         "path": "scripts/assets/pass65-menu-preview-integrity.mjs",
@@ -408,8 +408,8 @@
         "public/assets/third-party/quaternius/animated-guns"
       ],
       "fileCount": 1031,
-      "totalBytes": 111114383,
-      "treeSha256": "54e78f32ac52d67e19f3d48f8531df4367df15be3fa2eff018acd97dd4c6b070",
+      "totalBytes": 111115112,
+      "treeSha256": "32b7f02af6e009b8f11d3d4b1d75b885d235b297ea9b9e1ef5b8b27e130f1e63",
       "files": [
         {
           "path": "public/assets/original/models/atomic-acres-blender-arena.glb",
@@ -4453,8 +4453,8 @@
         },
         {
           "path": "src/pass69-2-native-r4-r9-runner-integration.test.ts",
-          "sizeBytes": 3805,
-          "sha256": "093cec92436af7634ff25482d9542487e3cb17e9e66249923c720b77e21db241"
+          "sizeBytes": 4534,
+          "sha256": "492917c78b992f44419fd6642c18909e942a9ed3553a8978d32b4ee93b43359c"
         },
         {
           "path": "src/persistent-window-debris-integration.test.ts",
@@ -5304,12 +5304,12 @@
         {
           "path": "src/ui/menu-preview-video.test.ts",
           "sizeBytes": 5611,
-          "sha256": "3e97d6453553d69dcb8c4467265739112c26de8d5b455bb1f12fa2e24eb6157c"
+          "sha256": "6ca39ab27b00d7f580f95deaa3efaa1dad3d0e4c93d5011cdd998d29df7dae06"
         },
         {
           "path": "src/ui/menu-preview-video.ts",
           "sizeBytes": 14105,
-          "sha256": "1b8c556a11561c64ba6b326053d6d9c818c1f879775873a5723abab0f4a7f637"
+          "sha256": "cd3eeaed123a09411f94f7025e3583e52155528a7e6711d6e353f2e20badcd73"
         },
         {
           "path": "src/ui/pass64-shell.test.ts",
@@ -5591,8 +5591,8 @@
         "algorithm": "sha256-ordered-name-size-bytes-v1",
         "domain": "menu-preview-frames:atomic-acres",
         "fileCount": 240,
-        "totalBytes": 991529576,
-        "sha256": "e0ff09cc7a9f5281cff00f4036baff876c6376e59b036e9dc5bce7a188c43fc6",
+        "totalBytes": 991378878,
+        "sha256": "d9517273390f134624592dde36d70b96fd8f3147e24eb63d8f59b0593e5d03ba",
         "frameRoster": [
           1,
           2,
@@ -5918,7 +5918,7 @@
           "fixedVisualTimeMs": 66974.89539748954,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "947337209c946424976abe30900a54adace5fb80e99a8ab6433d129520a86c71",
+          "pngSha256": "97fcd8728999be180d87ec8252e475b04b9249093b4e00ae10fe461a2ed3cded",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.020440171824561225,
@@ -6046,7 +6046,7 @@
           "fixedVisualTimeMs": 70991.63179916318,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "420b16ed307095e9668af8a80a395039b3397c7aa9ae2003d695501c161639d6",
+          "pngSha256": "5447c0fa4a2bdf5236d1f098c80f289975610b95117330548c2714dc3864a9c5",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.037695002555847165,
@@ -6181,8 +6181,8 @@
         "algorithm": "sha256-ordered-name-size-bytes-v1",
         "domain": "menu-preview-frames:skyline-terminal",
         "fileCount": 240,
-        "totalBytes": 556172114,
-        "sha256": "ec7f464b3c0db535cc96ae051c0770621f78758d0ef7d2396b780517596b5414",
+        "totalBytes": 556160943,
+        "sha256": "1da4e0f0d6c5212f4995a524f0a26b6a5ce56477bc093a1d20e2d8ec5183925f",
         "frameRoster": [
           1,
           2,
@@ -6771,8 +6771,8 @@
         "algorithm": "sha256-ordered-name-size-bytes-v1",
         "domain": "menu-preview-frames:rustworks-1v1",
         "fileCount": 240,
-        "totalBytes": 658825377,
-        "sha256": "cfb5d0334c568445b2d2076244ce2f6b33e7c44e400391d90a6fcbf6cba5295d",
+        "totalBytes": 658839122,
+        "sha256": "5fd0b39fba68fb870f93464b9d4abdcceda0cd48f3da11336ab3f22e5c91f6fa",
         "frameRoster": [
           1,
           2,
@@ -7361,8 +7361,8 @@
         "algorithm": "sha256-ordered-name-size-bytes-v1",
         "domain": "menu-preview-frames:gun-range",
         "fileCount": 240,
-        "totalBytes": 410710491,
-        "sha256": "189cbfebb26840290479a5a8905e7e3b098e87362b1877a38d7244b879aeb877",
+        "totalBytes": 410707858,
+        "sha256": "7801f86fc7176c431f2eb93a57db1cbfb793a63eb794faf6be1097dd6265af92",
         "frameRoster": [
           1,
           2,
@@ -7681,7 +7681,7 @@
           "fixedVisualTimeMs": 70991.63179916318,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "8180998a62af1b02f0f28450dcaa10db2c5dbe0a14bbda2b969004fe1da604f8"
+          "pngSha256": "b9d3fd6b3c87c106b5ce3decaed5cd3c4cba4e77aa9eb3a30d4cefd96583f395"
         },
         {
           "frame": 240,
