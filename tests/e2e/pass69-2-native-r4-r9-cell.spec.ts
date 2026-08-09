@@ -159,12 +159,26 @@ async function stageTimedWeapon(page: Page, timedWeapon: TimedMapWeaponId): Prom
   ), timedWeapon);
   expect(staged.status).toBe('available');
   const [x, y, z] = TIMED_MAP_WEAPON_DEFINITIONS[timedWeapon].spawnPosition;
-  const pitch = timedWeapon === 'flare-gun' ? -0.9 : 0.9;
-  await page.evaluate(([px, py, pz, aimPitch]) => (
+  await page.evaluate(([px, py, pz]) => (
     window.__ATOMIC_ACRES_DEBUG__ as any
-  ).teleportPlayer(px, py, pz, 0, aimPitch), [x, y, z, pitch]);
+  ).teleportPlayer(px, py, pz, 0, 0.9), [x, y, z]);
   expect(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.interactDrop())).toBe(true);
   await page.waitForFunction((weaponId) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.weapon === weaponId, timedWeapon);
+  if (timedWeapon === 'flare-gun') {
+    await page.evaluate(() => {
+      const api = window.__ATOMIC_ACRES_DEBUG__ as any;
+      api.placeBotAhead(2.5);
+      api.aimAtBot('body');
+    });
+    await page.waitForFunction(() => {
+      const snapshot = window.__ATOMIC_ACRES_DEBUG__!.snapshot() as any;
+      const target = snapshot.bots[0];
+      if (!target?.alive || target.team === snapshot.player.team) return false;
+      const [px, , pz] = snapshot.player.position;
+      const [tx, , tz] = target.position;
+      return Math.hypot(tx - px, tz - pz) <= 3;
+    }, undefined, { polling: 'raf', timeout: 5_000 });
+  }
 }
 
 async function runTimedCycle(page: Page, timedWeapon: TimedMapWeaponId, cycle: 'cold' | 'warm') {

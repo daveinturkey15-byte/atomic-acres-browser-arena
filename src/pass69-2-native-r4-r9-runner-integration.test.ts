@@ -49,8 +49,9 @@ describe('Pass 69.2 strict native R4/R9 runner contract', () => {
     expect(spec).toContain("state.sniperScope.active === true");
     expect(spec).toContain("state.dmrThermal.active === true");
     expect(spec).toContain("state.railgun.thermalVisible === true");
-    expect(spec).toContain("const pitch = timedWeapon === 'flare-gun' ? -0.9 : 0.9");
-    expect(spec).toContain('teleportPlayer(px, py, pz, 0, aimPitch)');
+    expect(spec).toContain('teleportPlayer(px, py, pz, 0, 0.9)');
+    expect(spec).toContain('api.placeBotAhead(2.5)');
+    expect(spec).toContain("api.aimAtBot('body')");
     expect(spec).toContain('grantRailgunToLocal()');
     expect(spec).toContain('telemetry.groundFireActive > 0');
     expect(spec).toContain('telemetry.impactCount > 0 && telemetry.burnPulseCount > 0');
