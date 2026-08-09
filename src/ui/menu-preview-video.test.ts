@@ -25,9 +25,9 @@ describe('prerecorded map-selection previews', () => {
       expect(definition.width / definition.height).toBeCloseTo(16 / 9, 5);
       expect(definition.width).toBe(2560);
       expect(definition.height).toBe(1440);
-      expect(definition.webm).toMatch(new RegExp(`${id}\\.webm\\?v=pass66-runtime-preview-v7$`));
-      expect(definition.mp4).toMatch(new RegExp(`${id}\\.mp4\\?v=pass66-runtime-preview-v7$`));
-      expect(definition.poster).toMatch(new RegExp(`${id}\\.webp\\?v=pass66-runtime-preview-v7$`));
+      expect(definition.webm).toMatch(new RegExp(`${id}\\.webm\\?v=pass66-runtime-preview-v8$`));
+      expect(definition.mp4).toMatch(new RegExp(`${id}\\.mp4\\?v=pass66-runtime-preview-v8$`));
+      expect(definition.poster).toMatch(new RegExp(`${id}\\.webp\\?v=pass66-runtime-preview-v8$`));
       return [definition.webm, definition.mp4, definition.poster];
     });
     expect(new Set(assets).size).toBe(assets.length);
@@ -74,7 +74,7 @@ describe('prerecorded map-selection previews', () => {
         overlayOutputScale: 2,
       },
       media: {
-        cacheKey: 'pass66-runtime-preview-v7',
+        cacheKey: 'pass66-runtime-preview-v8',
         encodingBudget: {
           minimumAverageBitrateKbps: 3000,
           maximumAverageBitrateKbps: 9000,
@@ -122,11 +122,11 @@ describe('prerecorded map-selection previews', () => {
       fileCount: 12,
       totalBytes: 55328027,
     })]);
-    const v7Families = cacheFamilyLock.families.filter((family) => family.cacheKey === 'pass66-runtime-preview-v7');
-    expect(v7Families).toEqual([expect.objectContaining({
-      finalMediaSetSha256: 'fd5fdbf82475a5c4424f14048ed3e83affa98e4a7d77d77963efc104c448ac8f',
+    const v8Families = cacheFamilyLock.families.filter((family) => family.cacheKey === 'pass66-runtime-preview-v8');
+    expect(v8Families).toEqual([expect.objectContaining({
+      finalMediaSetSha256: '0ce00506d739e3c679e717207638c16fdc0fa4007c3ffd764093478c3966375b',
       fileCount: 12,
-      totalBytes: 55328861,
+      totalBytes: 55334618,
     })]);
   });
 });

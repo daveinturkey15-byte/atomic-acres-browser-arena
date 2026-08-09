@@ -599,7 +599,7 @@ if (choreography.schemaVersion !== 4
   || choreography.recipeId !== 'pass66-authoritative-runtime-menu-preview-v2'
   || choreography.captureId !== 'pass66-authoritative-runtime-menu-preview-capture-v2'
   || choreography.generatedAt !== requiredGenerationDate) failures.push('canonical runtime choreography schema/recipe/capture identity drifted');
-if (choreography.media?.cacheKey !== 'pass66-runtime-preview-v7') failures.push('canonical runtime preview cache family is not the unused Pass 66 v7 family');
+if (choreography.media?.cacheKey !== 'pass66-runtime-preview-v8') failures.push('canonical runtime preview cache family is not the unused Pass 66 v8 family');
 if (choreography.capture?.source !== 'authoritative-runtime-arena'
   || choreography.capture?.backend !== 'webgpu'
   || choreography.capture?.overlayScale !== 0.5

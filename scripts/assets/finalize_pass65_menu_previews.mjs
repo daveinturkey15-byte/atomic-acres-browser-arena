@@ -114,7 +114,7 @@ function validateRecipe() {
     || choreography.reviewFrames.at(-1) !== choreography.frameCount) {
     throw new Error('reviewFrames must be unique and include the exact loop endpoints');
   }
-  if (choreography.media.cacheKey !== 'pass66-runtime-preview-v7') throw new Error('runtime preview cache key is stale');
+  if (choreography.media.cacheKey !== 'pass66-runtime-preview-v8') throw new Error('runtime preview cache key is stale');
   const budget = choreography.media.encodingBudget;
   if (budget?.minimumAverageBitrateKbps !== 3000
     || budget?.maximumAverageBitrateKbps !== 9000
