@@ -176,6 +176,9 @@ describe('production release workflow', () => {
       'T-RUSTRIG-PHYSICS',
       'T-PICKUP-REPICK',
       'T-MOBILE-TOUCH-69-1',
+      'T-PASS69-3-ADS-PHYSICAL',
+      'T-PASS69-3-GLASS-M14-HITCH',
+      'T-PASS69-3-FLAME-FLARE-HITCH',
     ]);
     const playwrightCommands = playwrightTests.map(({ command }: { command: string }) => command);
     expect(playwrightCommands.every((command: string) => command.startsWith('npm run qa:playwright-topology -- '))).toBe(true);

@@ -20,6 +20,7 @@ const config = JSON.parse(readFileSync(join(repositoryRoot, 'release-channels.js
 const sourceSha = process.env.SOURCE_SHA ?? execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repositoryRoot, encoding: 'utf8' }).trim();
 const releasePass = process.env.RELEASE_PASS ?? config.experimental.pass;
 const liveChannelId = config.experimental.path.split('/').at(-1);
+const deploymentState = process.env.RELEASE_BUILT_AT?.trim() ? 'live' : 'candidate';
 
 const safePath = (value, label) => {
   if (typeof value !== 'string' || !value || value.split('/').some((part) => !part || part === '.' || part === '..')) {
@@ -262,6 +263,7 @@ for (const file of ['index.html', 'release-shell.css', 'release-shell.js']) {
 }
 const publicConfig = Object.fromEntries(['experimental', 'stable', 'rollback'].filter((key) => config[key] && (key !== 'rollback' || rollback)).map((key) => [key, {
   label: config[key].label, description: config[key].description, pass: config[key].pass, path: config[key].path,
+  ...(key === 'experimental' ? { deploymentState } : {}),
 }]));
 writeFileSync(join(distRoot, 'release-channel-config.js'), `window.__ATOMIC_ACRES_RELEASE_CHANNELS__=${JSON.stringify(publicConfig)};\n`);
 

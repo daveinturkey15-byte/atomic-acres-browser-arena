@@ -85,8 +85,8 @@ export type KillstreakWorld = Readonly<{
   /** Resolves against arena static/dynamic solids, ceilings, portals and no-fly data. */
   resolveFlightPosition?: (from: SupportVec3, desired: SupportVec3, radius: number) => SupportVec3;
   isFlightPositionValid?: (position: SupportVec3) => boolean;
-  /** Optional arena-authored centre volume; the host derives a bounded fallback when absent. */
-  droneCentreSpawnVolume?: Readonly<{ centre: SupportVec3; halfExtents: SupportVec3 }>;
+  /** Optional arena-authored support-flight centre; the host derives a bounded fallback when absent. */
+  supportFlightCentreVolume?: Readonly<{ centre: SupportVec3; halfExtents: SupportVec3 }>;
 }>;
 
 export type DroneSensorContact = Readonly<{
@@ -679,10 +679,18 @@ function chopperPositionAt(
   const directionVariance = Math.sin(seconds * 0.61 + phase(11)) * 0.09
     + Math.sin(seconds * 0.23 + phase(12)) * 0.045;
   const angle = progress * Math.PI * 2 * 1.35 + phase(10) + directionVariance;
-  const radiusX = Math.max(2, (bounds.maxX - bounds.minX) * 0.36)
-    * (1 + Math.sin(seconds * 0.31 + phase(13)) * CHOPPER_MOTION_VARIANCE.maximumRadiusScaleDelta);
-  const radiusZ = Math.max(2, (bounds.maxZ - bounds.minZ) * 0.36)
-    * (1 + Math.sin(seconds * 0.27 + phase(14)) * CHOPPER_MOTION_VARIANCE.maximumRadiusScaleDelta);
+  const radiusX = Math.max(2, Math.min(
+    (bounds.maxX - bounds.minX) * 0.36
+      * (1 + Math.sin(seconds * 0.31 + phase(13)) * CHOPPER_MOTION_VARIANCE.maximumRadiusScaleDelta),
+    routeCentre[0] - bounds.minX - 1,
+    bounds.maxX - routeCentre[0] - 1,
+  ));
+  const radiusZ = Math.max(2, Math.min(
+    (bounds.maxZ - bounds.minZ) * 0.36
+      * (1 + Math.sin(seconds * 0.27 + phase(14)) * CHOPPER_MOTION_VARIANCE.maximumRadiusScaleDelta),
+    routeCentre[2] - bounds.minZ - 1,
+    bounds.maxZ - routeCentre[2] - 1,
+  ));
   const altitudeVariance = Math.sin(seconds * 0.47 + phase(15)) * 0.8
     + Math.sin(seconds * 0.19 + phase(16)) * 0.45;
   return [
@@ -752,7 +760,7 @@ export type DroneCentreSpawnPlan = Readonly<{
   positions: readonly SupportVec3[];
 }>;
 
-function droneCentreVolume(world: KillstreakWorld): Readonly<{ centre: SupportVec3; halfExtents: SupportVec3 }> {
+function supportFlightCentreVolume(world: KillstreakWorld): Readonly<{ centre: SupportVec3; halfExtents: SupportVec3 }> {
   const width = Math.max(1, world.bounds.maxX - world.bounds.minX);
   const depth = Math.max(1, world.bounds.maxZ - world.bounds.minZ);
   const height = Math.max(1, world.bounds.ceilingY - world.bounds.floorY);
@@ -761,7 +769,7 @@ function droneCentreVolume(world: KillstreakWorld): Readonly<{ centre: SupportVe
     clamp(world.bounds.floorY + height * 0.45, world.bounds.floorY + 1, world.bounds.ceilingY - 0.5),
     (world.bounds.minZ + world.bounds.maxZ) / 2,
   ] as const);
-  const requested = world.droneCentreSpawnVolume;
+  const requested = world.supportFlightCentreVolume;
   const centre = finiteTuple(requested?.centre)
     ? clampFlightPosition(requested!.centre, world, 0.35)
     : fallbackCentre;
@@ -783,7 +791,7 @@ export function planDroneCentreSpawns(world: KillstreakWorld, count: number, see
   if (!Number.isSafeInteger(count) || count < 1 || count > DRONE_SWARM_COUNT) {
     throw new Error('drone centre spawn count must be between 1 and 24');
   }
-  const volume = droneCentreVolume(world);
+  const volume = supportFlightCentreVolume(world);
   const columns = count === 1 ? 1 : 6;
   const rows = Math.ceil(count / columns);
   const positions: SupportVec3[] = [];
@@ -1279,11 +1287,8 @@ export class HostKillstreakRuntime {
       entityIds.push(aircraftId);
     } else if (actualId === 'chopper') {
       const id = this.nextEntityId('chopper');
-      const centre: [number, number, number] = [
-        (world.bounds.minX + world.bounds.maxX) / 2,
-        Math.min(world.bounds.ceilingY - 2, world.bounds.floorY + 18),
-        (world.bounds.minZ + world.bounds.maxZ) / 2,
-      ];
+      const authoredCentre = supportFlightCentreVolume(world).centre;
+      const centre: [number, number, number] = [...authoredCentre];
       const chopper: ChopperEntity = {
         id, activationId, ownerId: actor.actorId, team: actor.team,
         createdAtMs: nowMs, expiresAtMs: nowMs + CHOPPER_DURATION_MS,

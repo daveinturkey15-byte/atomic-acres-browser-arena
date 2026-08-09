@@ -11,6 +11,7 @@
     "author:blender-operator-body": "node scripts/blender/run-authoring.mjs operator-body",
     "author:blender-pass65-weapon-tranche": "node scripts/blender/run-authoring.mjs pass65-weapon-tranche",
     "author:blender-support-vehicles": "node scripts/blender/run-authoring.mjs support-vehicles",
+    "author:blender-support-aircraft-visibility": "node scripts/blender/run-authoring.mjs support-aircraft-visibility",
     "author:blender-weapon-families": "node scripts/blender/run-authoring.mjs weapon-families",
     "author:blender-field-knife": "node scripts/blender/run-authoring.mjs field-knife",
     "author:pass65:menu-previews": "tsx scripts/assets/generate-pass65-runtime-menu-previews.ts",

@@ -7,6 +7,7 @@ import {
   PROJECT_MAP_TREE,
   createProjectMapBundle,
   flattenProjectMap,
+  projectMapReleaseCopy,
   projectMapJson,
   projectMapMarkdown,
 } from './project-map';
@@ -40,6 +41,18 @@ describe('project map', () => {
       pass: 'PASS 64', role: 'published-failed-regression-evidence',
     });
     expect(bundle.publishedChannels.stable.pass).toBe('PASS 67.1');
+  });
+
+  it('keeps candidate and timestamped-production release copy mutually truthful', () => {
+    expect(projectMapReleaseCopy('PENDING_PRODUCTION')).toMatchObject({
+      summary: expect.stringContaining('Live remains 69.1 pending exact-preview approval'),
+      approvalHighlight: expect.stringContaining('Owner approval remains pending'),
+    });
+    const released = projectMapReleaseCopy('2026-08-09T20:00:00Z');
+    expect(released.summary).toContain('current released correction');
+    expect(released.summary).not.toContain('Live remains 69.1');
+    expect(released.approvalHighlight).toContain('was promoted only after approval');
+    expect(released.approvalHighlight).not.toContain('remains pending');
   });
 
   it('serializes agent JSON and human Markdown from the same bundle', () => {

@@ -4,10 +4,10 @@ import { applyRadialDeadzone } from './gameplay';
 /**
  * Mobile touch controls: a left virtual thumbstick for movement, a second
  * right virtual thumbstick for look/aim (so both thumbs stay on sticks like
- * other mobile shooters), and a compact set of action buttons (fire, jump,
- * reload, ADS, crouch, grenade, knife). The module renders its own DOM
- * overlay, tracks multi-touch pointers, and exposes a single mutable state
- * object the game loop reads alongside keyboard and gamepad input.
+ * other mobile shooters), and safe-area-aware semantic action clusters for
+ * weapons, stance, sprint, interaction, support, and pause. The module renders
+ * its own DOM overlay, tracks multi-touch pointers, and exposes a single
+ * mutable state object the game loop reads alongside keyboard and gamepad input.
  *
  * It is presentation/input only: it never authors damage, health, or match
  * state. All actions route through the same gameplay functions the keyboard
@@ -26,8 +26,12 @@ export type MobileTouchCallbacks = Readonly<{
   onAdsDown: () => void;
   onAdsUp: () => void;
   onCrouch: () => void;
+  onProne: () => void;
   onGrenade: () => void;
   onMelee: () => void;
+  onSwitchWeapon: () => void;
+  onSupportCycle: () => void;
+  onSupportActivate: () => void;
   onInteractDown: () => void;
   onInteractUp: () => void;
   onPause: () => void;
@@ -40,8 +44,50 @@ export type MobileTouchState = {
   lookDeltaY: number;
   firing: boolean;
   ads: boolean;
+  sprinting: boolean;
   interacting: boolean;
 };
+
+export const MOBILE_TOUCH_ACTION_GROUPS = Object.freeze([
+  Object.freeze({
+    className: 'mtc-primary-actions',
+    label: 'Aim and weapon actions',
+    buttons: Object.freeze([
+      Object.freeze({ id: 'fire', text: 'FIRE', ariaLabel: 'Fire weapon' }),
+      Object.freeze({ id: 'ads', text: 'ADS', ariaLabel: 'Aim down sights' }),
+      Object.freeze({ id: 'reload', text: 'RLD', ariaLabel: 'Reload weapon' }),
+      Object.freeze({ id: 'switch-weapon', text: 'SWAP', ariaLabel: 'Switch weapon' }),
+    ]),
+  }),
+  Object.freeze({
+    className: 'mtc-combat-actions',
+    label: 'Movement and combat actions',
+    buttons: Object.freeze([
+      Object.freeze({ id: 'jump', text: 'JUMP', ariaLabel: 'Jump' }),
+      Object.freeze({ id: 'crouch', text: 'CRCH', ariaLabel: 'Toggle crouch' }),
+      Object.freeze({ id: 'prone', text: 'PRONE', ariaLabel: 'Toggle prone' }),
+      Object.freeze({ id: 'grenade', text: 'GRND', ariaLabel: 'Throw grenade' }),
+      Object.freeze({ id: 'melee', text: 'KNIFE', ariaLabel: 'Melee attack' }),
+    ]),
+  }),
+  Object.freeze({
+    className: 'mtc-context-actions',
+    label: 'Movement and field support actions',
+    buttons: Object.freeze([
+      Object.freeze({ id: 'sprint', text: 'RUN', ariaLabel: 'Hold to sprint' }),
+      Object.freeze({ id: 'interact', text: 'USE', ariaLabel: 'Use or interact' }),
+      Object.freeze({ id: 'support-cycle', text: 'SUP+', ariaLabel: 'Select next field support' }),
+      Object.freeze({ id: 'support-activate', text: 'CALL', ariaLabel: 'Activate selected field support' }),
+    ]),
+  }),
+  Object.freeze({
+    className: 'mtc-system-actions',
+    label: 'Match controls',
+    buttons: Object.freeze([
+      Object.freeze({ id: 'pause', text: 'PAUSE', ariaLabel: 'Pause match' }),
+    ]),
+  }),
+] as const);
 
 export const MOBILE_CONTROLS_STORAGE_KEY = 'atomic-acres-mobile-controls';
 
@@ -72,6 +118,10 @@ export function touchStickAxis(
 
 export function mobileTouchFireBypassesPointerLock(presentationActive: boolean, firing: boolean): boolean {
   return presentationActive && firing;
+}
+
+export function shouldSuppressMobileBrowserSelection(presentationActive: boolean, editableTarget: boolean): boolean {
+  return presentationActive && !editableTarget;
 }
 
 export function sustainedMobileLookDelta(x: number, y: number): Readonly<{ x: number; y: number }> {
@@ -109,13 +159,15 @@ type StickId = 'move' | 'look';
 
 export class MobileTouchControls {
   readonly state: MobileTouchState = {
-    moveX: 0, moveY: 0, lookDeltaX: 0, lookDeltaY: 0, firing: false, ads: false, interacting: false,
+    moveX: 0, moveY: 0, lookDeltaX: 0, lookDeltaY: 0,
+    firing: false, ads: false, sprinting: false, interacting: false,
   };
   private root: HTMLElement | null = null;
   private knobs: Record<StickId, HTMLElement | null> = { move: null, look: null };
   private stickPointers: Record<StickId, number | null> = { move: null, look: null };
   private firePointerId: number | null = null;
   private adsPointerId: number | null = null;
+  private sprintPointerId: number | null = null;
   private interactPointerId: number | null = null;
   private lookAxis = { x: 0, y: 0 };
 
@@ -130,20 +182,14 @@ export class MobileTouchControls {
     const root = document.createElement('div');
     root.id = 'mobile-touch-controls';
     root.hidden = true;
+    const actionGroups = MOBILE_TOUCH_ACTION_GROUPS.map((group) => `
+      <div class="mtc-action-group ${group.className}" role="group" aria-label="${group.label}">
+        ${group.buttons.map((button) => `<button type="button" class="mtc-btn mtc-${button.id}" data-mtc="${button.id}" aria-label="${button.ariaLabel}">${button.text}</button>`).join('')}
+      </div>`).join('');
     root.innerHTML = `
       <div class="mtc-stick mtc-stick-move" data-mtc="stick-move"><div class="mtc-stick-knob" aria-hidden="true"></div></div>
       <div class="mtc-stick mtc-stick-look" data-mtc="stick-look"><div class="mtc-stick-knob" aria-hidden="true"></div></div>
-      <div class="mtc-buttons">
-        <button type="button" class="mtc-btn mtc-jump" data-mtc="jump">JUMP</button>
-        <button type="button" class="mtc-btn mtc-ads" data-mtc="ads">ADS</button>
-        <button type="button" class="mtc-btn mtc-reload" data-mtc="reload">RLD</button>
-        <button type="button" class="mtc-btn mtc-crouch" data-mtc="crouch">CRCH</button>
-        <button type="button" class="mtc-btn mtc-grenade" data-mtc="grenade">GRND</button>
-        <button type="button" class="mtc-btn mtc-melee" data-mtc="melee">KNIFE</button>
-        <button type="button" class="mtc-btn mtc-interact" data-mtc="interact">USE</button>
-        <button type="button" class="mtc-btn mtc-pause" data-mtc="pause">PAUSE</button>
-        <button type="button" class="mtc-btn mtc-fire" data-mtc="fire">FIRE</button>
-      </div>`;
+      ${actionGroups}`;
     host.append(root);
     this.root = root;
     this.knobs.move = root.querySelector<HTMLElement>('.mtc-stick-move .mtc-stick-knob');
@@ -209,6 +255,7 @@ export class MobileTouchControls {
     if (this.state.interacting) this.callbacks.onInteractUp();
     this.state.firing = false;
     this.state.ads = false;
+    this.state.sprinting = false;
     this.state.interacting = false;
     this.lookAxis.x = 0;
     this.lookAxis.y = 0;
@@ -216,6 +263,7 @@ export class MobileTouchControls {
     this.stickPointers.look = null;
     this.firePointerId = null;
     this.adsPointerId = null;
+    this.sprintPointerId = null;
     this.interactPointerId = null;
     for (const id of ['move', 'look'] as const) {
       if (this.knobs[id]) this.knobs[id]!.style.transform = 'translate(-50%, -50%)';
@@ -274,11 +322,29 @@ export class MobileTouchControls {
       case 'crouch':
         this.callbacks.onCrouch();
         break;
+      case 'prone':
+        this.callbacks.onProne();
+        break;
       case 'grenade':
         this.callbacks.onGrenade();
         break;
       case 'melee':
         this.callbacks.onMelee();
+        break;
+      case 'switch-weapon':
+        this.callbacks.onSwitchWeapon();
+        break;
+      case 'support-cycle':
+        this.callbacks.onSupportCycle();
+        break;
+      case 'support-activate':
+        this.callbacks.onSupportActivate();
+        break;
+      case 'sprint':
+        if (this.sprintPointerId !== null) return;
+        target.setPointerCapture?.(event.pointerId);
+        this.sprintPointerId = event.pointerId;
+        this.state.sprinting = true;
         break;
       case 'interact':
         if (this.interactPointerId !== null) return;
@@ -339,6 +405,9 @@ export class MobileTouchControls {
       this.adsPointerId = null;
       this.state.ads = false;
       this.callbacks.onAdsUp();
+    } else if (event.pointerId === this.sprintPointerId && this.state.sprinting) {
+      this.sprintPointerId = null;
+      this.state.sprinting = false;
     } else if (event.pointerId === this.interactPointerId && this.state.interacting) {
       this.interactPointerId = null;
       this.state.interacting = false;

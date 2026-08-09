@@ -70,6 +70,15 @@ type LoadedSupportVehicleLod = Readonly<{
   asset: string;
 }>;
 type SupportVehicleTemplate = Readonly<{ family: SupportVehicleAssetFamily; lods: readonly LoadedSupportVehicleLod[] }>;
+export type SupportAircraftWingVisibility = Readonly<{
+  contract: 'visible-rendered-wing-span-v1';
+  family: SupportAircraftVariant;
+  visibleMeshCount: number;
+  span: readonly [number, number, number];
+  aircraftSpan: readonly [number, number, number];
+  lateralSpanRatio: number;
+  passed: boolean;
+}>;
 const SUPPORT_VEHICLE_LOAD_TIMEOUT_MS = 20_000;
 const SUPPORT_VEHICLE_MAX_CONCURRENT_DECODES = 2;
 const SUPPORT_VEHICLE_TARGET_DIMENSIONS: Readonly<Record<SupportVehicleAssetFamily, number>> = Object.freeze({
@@ -565,13 +574,20 @@ export function loadSupportVehiclePresentations(): Promise<void> {
         lods.push(await loadSupportVehicleLod(asset, family));
         await yieldPresentationPreparation();
       }
-      const missing = SUPPORT_VEHICLE_REQUIRED_NODES[family].filter((name) => lods[0]?.scene.getObjectByName(name) === undefined);
-      if (missing.length > 0) throw new Error(`${family}: authored LOD0 missing ${missing.join(', ')}`);
       for (const [lodIndex, lod] of lods.entries()) {
+        const missing = SUPPORT_VEHICLE_REQUIRED_NODES[family].filter((name) => lod.scene.getObjectByName(name) === undefined);
+        if (missing.length > 0) throw new Error(`${family} LOD${lodIndex}: authored nodes missing ${missing.join(', ')}`);
         const missingActions = SUPPORT_VEHICLE_REQUIRED_ACTIONS[family].filter((name) => (
           lod.animations.some((clip) => clip.name === name) !== true
         ));
         if (missingActions.length > 0) throw new Error(`${family} LOD${lodIndex}: authored actions missing ${missingActions.join(', ')}`);
+        if (family === 'care' || family === 'carpet') {
+          const wing = supportAircraftWingVisibility(lod.scene, family);
+          lod.scene.userData.aircraftWingVisibility = wing;
+          if (!wing.passed) {
+            throw new Error(`${family} LOD${lodIndex}: no visible rendered main-wing span (${JSON.stringify(wing)})`);
+          }
+        }
       }
       if (new Set(lods.map((lod) => lod.asset)).size !== SUPPORT_VEHICLE_ASSETS[family].length) {
         throw new Error(`${family}: runtime asset set is not exact`);
@@ -585,7 +601,7 @@ export function loadSupportVehiclePresentations(): Promise<void> {
     }
     supportVehicleLoadState = supportVehicleTemplates.size === Object.keys(SUPPORT_VEHICLE_ASSETS).length ? 'ready' : 'fallback';
     if (supportVehicleLoadState === 'fallback') {
-      console.warn('[Arena] One or more authored support vehicles are unavailable; explicit non-release fallbacks remain active.', Object.fromEntries(supportVehicleLoadFailures));
+      throw new Error(`Authored support-vehicle release contract failed: ${JSON.stringify(Object.fromEntries(supportVehicleLoadFailures))}`);
     }
   })();
   return supportVehicleLoadPromise;
@@ -599,6 +615,7 @@ export function supportVehiclePresentationTelemetry(): Readonly<{
   maxConcurrentDecodes: number;
   failures: Readonly<Record<string, string>>;
   textureDedup: SupportVehicleTextureDedupTelemetry;
+  aircraftWings: Readonly<Record<string, readonly SupportAircraftWingVisibility[]>>;
 }> {
   return Object.freeze({
     state: supportVehicleLoadState,
@@ -608,6 +625,13 @@ export function supportVehiclePresentationTelemetry(): Readonly<{
     maxConcurrentDecodes: SUPPORT_VEHICLE_MAX_CONCURRENT_DECODES,
     failures: Object.freeze(Object.fromEntries(supportVehicleLoadFailures)),
     textureDedup: supportVehicleTextureCanonicalizer.telemetry(),
+    aircraftWings: Object.freeze(Object.fromEntries(
+      [...supportVehicleTemplates.entries()]
+        .filter(([family]) => family === 'care' || family === 'carpet')
+        .map(([family, template]) => [family, Object.freeze(template.lods.map((lod) => (
+          lod.scene.userData.aircraftWingVisibility as SupportAircraftWingVisibility
+        )))])
+    )),
   });
 }
 
@@ -789,6 +813,57 @@ async function batchAuthoredSupportStaticMeshes(
   return Object.freeze({ sourceMeshes, batches });
 }
 
+function visibleThroughAncestor(root: THREE.Object3D, node: THREE.Object3D): boolean {
+  let cursor: THREE.Object3D | null = node;
+  while (cursor) {
+    if (!cursor.visible) return false;
+    if (cursor === root) return true;
+    cursor = cursor.parent;
+  }
+  return false;
+}
+
+export function supportAircraftWingVisibility(
+  root: THREE.Object3D,
+  family: SupportAircraftVariant,
+): SupportAircraftWingVisibility {
+  const wing = root.getObjectByName(`${family}-aircraft-main-wing`);
+  const bounds = new THREE.Box3();
+  const aircraftBounds = new THREE.Box3();
+  const meshBounds = new THREE.Box3();
+  let visibleMeshCount = 0;
+  root.updateWorldMatrix(true, true);
+  wing?.traverse((node) => {
+    if (!(node instanceof THREE.Mesh) || !visibleThroughAncestor(wing, node)) return;
+    node.geometry.computeBoundingBox();
+    if (!node.geometry.boundingBox || node.geometry.boundingBox.isEmpty()) return;
+    meshBounds.copy(node.geometry.boundingBox).applyMatrix4(node.matrixWorld);
+    bounds.union(meshBounds);
+    visibleMeshCount += 1;
+  });
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh) || !visibleThroughAncestor(root, node)) return;
+    node.geometry.computeBoundingBox();
+    if (!node.geometry.boundingBox || node.geometry.boundingBox.isEmpty()) return;
+    meshBounds.copy(node.geometry.boundingBox).applyMatrix4(node.matrixWorld);
+    aircraftBounds.union(meshBounds);
+  });
+  const size = bounds.isEmpty() ? new THREE.Vector3() : bounds.getSize(new THREE.Vector3());
+  const aircraftSize = aircraftBounds.isEmpty() ? new THREE.Vector3() : aircraftBounds.getSize(new THREE.Vector3());
+  const span = Object.freeze(size.toArray() as [number, number, number]);
+  const aircraftSpan = Object.freeze(aircraftSize.toArray() as [number, number, number]);
+  const lateralSpanRatio = size.x / Math.max(0.01, aircraftSize.x);
+  return Object.freeze({
+    contract: 'visible-rendered-wing-span-v1',
+    family,
+    visibleMeshCount,
+    span,
+    aircraftSpan,
+    lateralSpanRatio,
+    passed: visibleMeshCount > 0 && lateralSpanRatio >= 0.65 && size.x > Math.max(0.01, size.z) * 0.8,
+  });
+}
+
 async function optimizeAuthoredSupportLevel(
   level: THREE.Group,
   family: SupportVehicleAssetFamily,
@@ -829,14 +904,28 @@ async function optimizeAuthoredSupportLevel(
     : Object.freeze({ sourceMeshes: 0, batches: 0 });
   if (cockpit) cockpit.userData.supportStaticBatchBoundary = true;
   await yieldPresentationCpuTask();
+  const aircraftFamily = family === 'care' || family === 'carpet' ? family : null;
+  const mainWing = aircraftFamily ? level.getObjectByName(`${aircraftFamily}-aircraft-main-wing`) : null;
+  // Keep the small bounded wing subtree authored and visible. Merging its
+  // already-scaled left/right panels collapsed their evaluated span in the
+  // retained template; the semantic node survived but the in-game craft read
+  // as a fuselage-only slab. One aircraft is active at a time, so preserving
+  // these few drawables is the correct quality/performance tradeoff.
+  const wingStats = Object.freeze({ sourceMeshes: 0, batches: 0 });
+  if (mainWing) mainWing.userData.supportStaticBatchBoundary = true;
+  await yieldPresentationCpuTask();
   const exteriorStats = await batchAuthoredSupportStaticMeshes(level, family, 'exterior');
   level.userData.supportStaticBatchStats = Object.freeze({
-    sourceMeshes: gunnerWeaponStats.sourceMeshes + gunnerSightlineStats.sourceMeshes + cockpitStats.sourceMeshes + exteriorStats.sourceMeshes
+    sourceMeshes: gunnerWeaponStats.sourceMeshes + gunnerSightlineStats.sourceMeshes + cockpitStats.sourceMeshes
+      + wingStats.sourceMeshes + exteriorStats.sourceMeshes
       + animatedStats.reduce((total, stats) => total + stats.sourceMeshes, 0),
-    batches: gunnerWeaponStats.batches + gunnerSightlineStats.batches + cockpitStats.batches + exteriorStats.batches
+    batches: gunnerWeaponStats.batches + gunnerSightlineStats.batches + cockpitStats.batches
+      + wingStats.batches + exteriorStats.batches
       + animatedStats.reduce((total, stats) => total + stats.batches, 0),
     animatedTargets: animatedTargets.length,
+    wingBatches: wingStats.batches,
   });
+  if (aircraftFamily) level.userData.aircraftWingVisibility = supportAircraftWingVisibility(level, aircraftFamily);
   level.userData.supportStaticBatchOptimized = true;
   await yieldPresentationCpuTask();
 }
@@ -851,10 +940,18 @@ function presentedEntityPoolKey(entity: KillstreakEntitySnapshot): PresentedEnti
 }
 
 function buildPresentedEntityForPool(key: PresentedEntityPoolKey): PresentedEntity {
-  if (key === 'chopper') return buildAuthoredSupportVehicle('chopper') ?? buildProceduralChopperFallback();
-  if (key === 'care-aircraft') return buildAuthoredSupportVehicle('care') ?? buildProceduralAircraftFallback('care');
-  if (key === 'carpet-aircraft') return buildAuthoredSupportVehicle('carpet') ?? buildProceduralAircraftFallback('carpet');
-  if (key === 'care-crate') return buildAuthoredSupportVehicle('crate') ?? buildProceduralCareCrateFallback();
+  const requiredAuthored = (family: SupportVehicleAssetFamily, fallback: () => PresentedEntity): PresentedEntity => {
+    const authored = buildAuthoredSupportVehicle(family);
+    if (authored) return authored;
+    if (typeof document !== 'undefined' && supportVehicleLoadState === 'ready') {
+      throw new Error(`${family}: authored support presentation disappeared after the release load barrier`);
+    }
+    return fallback();
+  };
+  if (key === 'chopper') return requiredAuthored('chopper', buildProceduralChopperFallback);
+  if (key === 'care-aircraft') return requiredAuthored('care', () => buildProceduralAircraftFallback('care'));
+  if (key === 'carpet-aircraft') return requiredAuthored('carpet', () => buildProceduralAircraftFallback('carpet'));
+  if (key === 'care-crate') return requiredAuthored('crate', buildProceduralCareCrateFallback);
   return buildDrone(key === 'piloted-drone' ? 'piloted' : 'swarm');
 }
 
@@ -935,6 +1032,16 @@ export type KillstreakPresentationTelemetry = Readonly<{
   swarmMinimumRenderedInstances: number;
   swarmMaximumRenderedInstances: number;
   prewarmedAuthoredSupportFamilies: readonly string[];
+  entityDetails: readonly Readonly<{
+    entityId: string;
+    rootName: string;
+    poolKey: string;
+    presentationSource: string;
+    worldPosition: readonly number[];
+    visible: boolean;
+    visibleMeshCount: number;
+    visibleBounds: Readonly<{ min: readonly number[]; max: readonly number[] }> | null;
+  }>[];
   chopperWeaponActionsPresented: number;
   chopperImpactActionsPresented: number;
   activeChopperActionNames: readonly string[];
@@ -2659,6 +2766,33 @@ export class KillstreakPresentation {
       }))
     )).sort((left, right) => `${left.entityId}:${left.name}:${left.lodRootName}`
       .localeCompare(`${right.entityId}:${right.name}:${right.lodRootName}`)));
+    const entityDetails = Object.freeze([...this.entities.entries()].map(([entityId, entry]) => {
+      entry.root.updateWorldMatrix(true, true);
+      const bounds = new THREE.Box3();
+      const meshBounds = new THREE.Box3();
+      let visibleMeshCount = 0;
+      entry.root.traverse((node) => {
+        if (!(node instanceof THREE.Mesh) || !effectivelyVisible(node, entry.root)) return;
+        node.geometry.computeBoundingBox();
+        if (!node.geometry.boundingBox || node.geometry.boundingBox.isEmpty()) return;
+        meshBounds.copy(node.geometry.boundingBox).applyMatrix4(node.matrixWorld);
+        bounds.union(meshBounds);
+        visibleMeshCount += 1;
+      });
+      return Object.freeze({
+        entityId,
+        rootName: entry.root.name,
+        poolKey: String(entry.root.userData.presentationPoolKey ?? 'unpooled'),
+        presentationSource: String(entry.root.userData.presentationSource ?? 'unknown'),
+        worldPosition: Object.freeze(entry.root.getWorldPosition(new THREE.Vector3()).toArray()),
+        visible: entry.root.visible,
+        visibleMeshCount,
+        visibleBounds: bounds.isEmpty() ? null : Object.freeze({
+          min: Object.freeze(bounds.min.toArray()),
+          max: Object.freeze(bounds.max.toArray()),
+        }),
+      });
+    }).sort((left, right) => left.entityId.localeCompare(right.entityId)));
     const markerDetails = [...this.placementMarkers.values()]
       .sort((left, right) => left.snapshot.id.localeCompare(right.snapshot.id))
       .map(({ root, snapshot }): KillstreakPlacementMarkerTelemetry => {
@@ -2765,6 +2899,7 @@ export class KillstreakPresentation {
       prewarmedAuthoredSupportFamilies: Object.freeze([...new Set(this.prewarmed
         .filter((entry) => entry.root.userData.presentationSource === 'project-original-blender-glb')
         .map((entry) => String(entry.root.userData.presentationFamily)))].sort()),
+      entityDetails,
       chopperWeaponActionsPresented: this.chopperWeaponActionsPresented,
       chopperImpactActionsPresented: this.chopperImpactActionsPresented,
       activeChopperActionNames,

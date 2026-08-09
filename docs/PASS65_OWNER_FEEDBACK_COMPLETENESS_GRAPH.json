@@ -259,13 +259,30 @@
       "outcomeProjectionSha256": "d5057149d4adaa44260a9668a5d8b5feea7dc824e79364a9440fcdb3a1920079"
     },
     {
+      "id": "SRC-CODEX-P69-AUG09-001",
+      "kind": "codex-owner-feedback",
+      "externalLocator": "codex-task:pass69.3-reconciliation-2026-08-09#game-feedback-excerpt",
+      "rawByteLength": 1081,
+      "rawSha256": "44449666dcd7bf51b9a7a5746ecfc0fb3fb67d2e6e170fe4d394b05045c17a87",
+      "rawEndsWithCrLf": false,
+      "normalizedRepositoryPath": "docs/pass69-sources/codex-owner-feedback-2026-08-09.txt",
+      "normalization": "UTF-8; CRLF converted to LF; one final LF added; text semantics unchanged",
+      "normalizedByteLength": 1065,
+      "normalizedSha256": "0aa69539c0cd652a3234795889e86807a6128fca01799eaf21087ebc609df204",
+      "outcomeCollection": "codexPass69August09Outcomes",
+      "outcomeIdPrefix": "P69AUG09",
+      "outcomeCount": 19,
+      "lineAtomCounts": {"1":1,"3":1,"5":1,"7":1,"9":1,"10":2,"11":1,"12":3,"13":1,"14":1,"15":2,"16":1,"17":2,"18":1},
+      "outcomeProjectionSha256": "2b14289a6129be698b301746dc4ecea5ee15c9bf005e985b9b47a6ecc5e6484e"
+    },
+    {
       "id": "SRC-CORRECTION-LEDGER-001",
       "kind": "canonical-correction-ledger",
       "repositoryPath": "docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md",
       "ledgerVersion": 1,
-      "latestFeedbackId": "HF-216",
-      "outcomeCount": 216,
-      "stateIndependentOutcomeSha256": "d9474df7aa3d4b51d6fe0fe5681264bde21943cd771ec4f7300fd3e2fec83a4b"
+      "latestFeedbackId": "HF-232",
+      "outcomeCount": 232,
+      "stateIndependentOutcomeSha256": "fb16b210c398d469461eacacfa673da2391266c830d03fe5c2d08f6f30433e16"
     },
     {
       "id": "SRC-PLANNING-MATRIX-001",
@@ -949,7 +966,7 @@
     "outcomeIdTemplate": "CORR-{feedbackId}",
     "sourceLocatorTemplate": "{feedbackId}.observation",
     "feedbackIdStart": "HF-001",
-    "feedbackIdEnd": "HF-216"
+    "feedbackIdEnd": "HF-232"
   },
   "supersessions": [
     {
@@ -1379,6 +1396,19 @@
         "HF-187"
       ],
       "canonicalText": "Support possession no longer uses hold-`F`. After activation, pressing the same currently bound killstreak slot key again toggles Piloted Drone or Chopper Gunner entry/exit exactly once; in the inspected binding these are slots `4` and `6`. `F` remains the tap-only world interaction coordinator. This supersedes the support-hold portion of supersession 22 and the support-toggle clauses in R504, R507 and R609 without weakening world-interaction priority."
+    },
+    {
+      "id": "SUP-030",
+      "ledgerOrdinal": 30,
+      "sourceOutcomeIds": [
+        "P69AUG09-001",
+        "CORR-HF-232"
+      ],
+      "feedbackIds": [
+        "HF-213",
+        "HF-232"
+      ],
+      "canonicalText": "The next player-facing correction candidate is `69.3`; Live remains `69.1` until that exact immutable preview is approved, and the rejected `69.2` candidate remains regression evidence only. This supersedes HF-213's `69.1` correction target without changing the internal `PASS 69` acceptance lane or the protected Stable/Rollback source pins."
     }
   ],
   "testCatalog": [
@@ -2271,6 +2301,68 @@
       "paths": ["src/mobile-touch-controls.ts", "src/mobile-touch-controls.test.ts", "src/ui/pass66-overhaul.css", "src/legacy-main.ts", "tests/e2e/pass69-mobile-touch-layout.spec.ts"],
       "evidenceKinds": ["browser", "visual"],
       "visualArtifactPaths": ["artifacts/pass69/mobile-touch-layout"]
+    },
+    {
+      "id": "T-PASS69-3-ADS-PHYSICAL",
+      "command": "npm run qa:playwright-topology -- tests/e2e/pass69-3-ads-physical-clearance.spec.ts --project=chromium --workers=1 --retries=0",
+      "paths": [
+        "src/weapon-presentation.ts",
+        "src/ads-physical-aperture.test.ts",
+        "tests/e2e/pass69-3-ads-physical-clearance.spec.ts"
+      ],
+      "evidenceKinds": ["browser", "visual"],
+      "visualArtifactPaths": ["artifacts/pass69-3/ads-physical-clearance"]
+    },
+    {
+      "id": "T-PASS69-3-GLASS-M14-HITCH",
+      "command": "npm run qa:playwright-topology -- tests/e2e/pass69-3-glass-m14-frame-hitch.spec.ts --project=chromium --workers=1 --retries=0",
+      "paths": [
+        "package.json",
+        "src/legacy-main.ts",
+        "src/window-glass-debris-presentation.ts",
+        "src/window-glass-debris-presentation.test.ts",
+        "src/weapon-presentation.ts",
+        "src/thermal-ghost-presentation.test.ts",
+        "tests/e2e/pass69-3-glass-m14-frame-hitch.spec.ts"
+      ],
+      "evidenceKinds": ["browser"]
+    },
+    {
+      "id": "T-PASS69-3-FLAME-FLARE-HITCH",
+      "command": "npm run qa:playwright-topology -- tests/e2e/pass69-3-special-weapon-frame-hitch.spec.ts --project=chromium --workers=1 --retries=0",
+      "paths": [
+        "package.json",
+        "src/arena-transition-profile.ts",
+        "src/flamethrower-stream-system.ts",
+        "src/flamethrower-stream-system.test.ts",
+        "src/flare-projectile-system.ts",
+        "src/flare-projectile-system.test.ts",
+        "src/legacy-main.ts",
+        "src/weapon-presentation.ts",
+        "tests/e2e/pass69-3-special-weapon-frame-hitch.spec.ts"
+      ],
+      "evidenceKinds": ["browser"]
+    },
+    {
+      "id": "T-PASS69-3-RIGGED-DUMMY",
+      "command": "npx vitest run src/additional-maps-rigged-dummy.test.ts",
+      "paths": [
+        "src/additional-maps.ts",
+        "src/additional-maps.test.ts",
+        "src/additional-maps-rigged-dummy.test.ts"
+      ],
+      "evidenceKinds": ["unit"]
+    },
+    {
+      "id": "T-PASS69-3-FLAME-FLARE-POOL",
+      "command": "npx vitest run src/flamethrower-stream-system.test.ts src/flare-projectile-system.test.ts",
+      "paths": [
+        "src/flamethrower-stream-system.ts",
+        "src/flamethrower-stream-system.test.ts",
+        "src/flare-projectile-system.ts",
+        "src/flare-projectile-system.test.ts"
+      ],
+      "evidenceKinds": ["unit"]
     }
   ],
   "artifactCatalog": [],
@@ -7059,7 +7151,23 @@
     {"id":"HF-213","sourceOutcomeIds":["CORR-HF-213","P69AUG08-009"],"planningRequirementIds":["R001","R303","R600","R608","R611","R613"],"canonicalOwner":"Release identity/topology","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-RELEASE-SHELL"],"artifactRefs":[]}},
     {"id":"HF-214","sourceOutcomeIds":["CORR-HF-214","P69AUG08-010"],"planningRequirementIds":["R303","R600","R609"],"canonicalOwner":"Release notes/project-map copy","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-RELEASE-SHELL"],"artifactRefs":[]}},
     {"id":"HF-215","sourceOutcomeIds":["CORR-HF-215","P69AUG08-011"],"planningRequirementIds":["R303","R600","R608","R609"],"canonicalOwner":"Release chooser recovery UX","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-RELEASE-SHELL"],"artifactRefs":[]}},
-    {"id":"HF-216","sourceOutcomeIds":["CORR-HF-216","P69AUG08-012"],"planningRequirementIds":["R303","R307","R600","R608","R609","R610"],"canonicalOwner":"Release chooser recovery UX","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-RELEASE-SHELL"],"artifactRefs":[]}}
+    {"id":"HF-216","sourceOutcomeIds":["CORR-HF-216","P69AUG08-012"],"planningRequirementIds":["R303","R307","R600","R608","R609","R610"],"canonicalOwner":"Release chooser recovery UX","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-RELEASE-SHELL"],"artifactRefs":[]}},
+    {"id":"HF-217","sourceOutcomeIds":["CORR-HF-217","P69AUG09-002"],"planningRequirementIds":["R307","R600","R608","R609","R610"],"canonicalOwner":"Mobile browser gesture/input lifecycle","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-MOBILE-TOUCH-69-1","T-HUD-UNIT"],"artifactRefs":[]}},
+    {"id":"HF-218","sourceOutcomeIds":["CORR-HF-218","P69AUG09-003"],"planningRequirementIds":["R307","R600","R608","R609","R610"],"canonicalOwner":"Mobile HUD/layout","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-MOBILE-TOUCH-69-1","T-HUD-E2E","T-HUD-UNIT"],"artifactRefs":[]}},
+    {"id":"HF-219","sourceOutcomeIds":["CORR-HF-219","P69AUG09-004"],"planningRequirementIds":["R600","R608","R609"],"canonicalOwner":"Mobile control mapping","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-MOBILE-TOUCH-69-1","T-HUD-UNIT"],"artifactRefs":[]}},
+    {"id":"HF-220","sourceOutcomeIds":["CORR-HF-220","P69AUG09-005"],"planningRequirementIds":["R105","R108","R109","R608","R609"],"canonicalOwner":"Operator rig/viewmodel forge","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-OPERATOR-GATE","T-WEAPON-PRESENTATION","T-VIEWMODEL-FRAMING"],"artifactRefs":[]}},
+    {"id":"HF-221","sourceOutcomeIds":["CORR-HF-221","P69AUG09-006","P69AUG09-007"],"planningRequirementIds":["R105","R108","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R307","R608","R610"],"canonicalOwner":"ADS/viewmodel presentation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-WEAPON-PRESENTATION","T-ADS-SIGHT-CATALOG","T-SCOPED-ADS","T-PASS69-3-ADS-PHYSICAL"],"artifactRefs":[]}},
+    {"id":"HF-222","sourceOutcomeIds":["CORR-HF-222","P69AUG09-008"],"planningRequirementIds":["R111","R307","R400","R401","R402","R403","R404","R405","R406","R407","R408","R409","R410","R411","R412","R413","R606","R610"],"canonicalOwner":"Destructible glass/frame pacing","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-DESTRUCTIBLE","T-PASS69-3-GLASS-M14-HITCH","T-COLD-WEBGPU-ADMISSION","T-WEBGPU-ENDURANCE","T-NATIVE-FRAME-PACING"],"artifactRefs":[]}},
+    {"id":"HF-223","sourceOutcomeIds":["CORR-HF-223","P69AUG09-009","P69AUG09-010","P69AUG09-011"],"planningRequirementIds":["R108","R112","R113","R304","R502","R505","R511","R608","R609"],"canonicalOwner":"Support vehicle asset/presentation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-SUPPORT-VEHICLE-GATE","T-SUPPORT-VISUAL-E2E","T-PROVENANCE"],"artifactRefs":[]}},
+    {"id":"HF-224","sourceOutcomeIds":["CORR-HF-224","P69AUG09-012"],"planningRequirementIds":["R111","R400","R401","R402","R403","R404","R405","R406","R407","R408","R409","R410","R411","R412","R413","R608","R610"],"canonicalOwner":"Glass debris presentation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-DESTRUCTIBLE","T-PASS69-3-GLASS-M14-HITCH"],"artifactRefs":[]}},
+    {"id":"HF-225","sourceOutcomeIds":["CORR-HF-225","P69AUG09-013"],"planningRequirementIds":["R105","R108","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R307","R606","R610"],"canonicalOwner":"M14 EBR viewmodel/frame pacing","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-WEAPON-PRESENTATION","T-PASS69-3-GLASS-M14-HITCH","T-ADS-SIGHT-CATALOG","T-COLD-WEBGPU-ADMISSION","T-WEBGPU-ENDURANCE","T-NATIVE-FRAME-PACING"],"artifactRefs":[]}},
+    {"id":"HF-226","sourceOutcomeIds":["CORR-HF-226","P69AUG09-014"],"planningRequirementIds":["R108","R236","R304","R500","R501","R502","R503","R504","R505","R506","R507","R508","R509","R510","R511","R512","R600","R608","R609"],"canonicalOwner":"Gun Range test-bay UI/catalog","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-GUN-RANGE-TEST-BAY","T-WEAPON-CATALOG","T-ADDITIONAL-MAPS"],"artifactRefs":[]}},
+    {"id":"HF-227","sourceOutcomeIds":["CORR-HF-227","P69AUG09-015"],"planningRequirementIds":["R110","R304","R608","R609"],"canonicalOwner":"Gun Range environment/lighting forge","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-GUN-RANGE-TEST-BAY","T-ADDITIONAL-MAPS"],"artifactRefs":[]}},
+    {"id":"HF-228","sourceOutcomeIds":["CORR-HF-228","P69AUG09-016"],"planningRequirementIds":["R105","R108","R232","R600","R608"],"canonicalOwner":"Operator/bot rig presentation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-PASS69-3-RIGGED-DUMMY","T-OPERATOR-GATE","T-BOTS"],"artifactRefs":[]}},
+    {"id":"HF-229","sourceOutcomeIds":["CORR-HF-229","P69AUG09-017"],"planningRequirementIds":["R109","R236","R304","R307","R510","R511","R606","R610","R613"],"canonicalOwner":"Timed weapon/frame pacing","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-PASS69-3-FLAME-FLARE-POOL","T-PASS69-3-FLAME-FLARE-HITCH","T-TIMED-MAP-WEAPONS","T-COLD-WEBGPU-ADMISSION","T-WEBGPU-ENDURANCE","T-NATIVE-FRAME-PACING"],"artifactRefs":[]}},
+    {"id":"HF-230","sourceOutcomeIds":["CORR-HF-230","P69AUG09-018"],"planningRequirementIds":["R109","R236","R304","R307","R510","R511","R606","R610","R613"],"canonicalOwner":"Timed weapon/frame pacing","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-PASS69-3-FLAME-FLARE-POOL","T-PASS69-3-FLAME-FLARE-HITCH","T-TIMED-MAP-WEAPONS","T-COLD-WEBGPU-ADMISSION","T-WEBGPU-ENDURANCE","T-NATIVE-FRAME-PACING"],"artifactRefs":[]}},
+    {"id":"HF-231","sourceOutcomeIds":["CORR-HF-231","P69AUG09-019"],"planningRequirementIds":["R108","R236","R304","R400","R401","R402","R403","R404","R405","R406","R407","R408","R409","R410","R411","R412","R413","R500","R501","R502","R503","R504","R505","R506","R507","R508","R509","R510","R511","R512","R600","R609"],"canonicalOwner":"Gun Range pickup-prompt projection","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-GUN-RANGE-TEST-BAY","T-INTERACTION","T-WEAPON-CATALOG"],"artifactRefs":[]}},
+    {"id":"HF-232","sourceOutcomeIds":["CORR-HF-232","P69AUG09-001"],"planningRequirementIds":["R001","R002","R003","R005","R006","R010","R303","R600","R608","R611","R612","R613"],"canonicalOwner":"Release identity/lineage","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-RELEASE-SHELL","T-OWNER-GATE"],"artifactRefs":[]}}
   ],
   "desktopUntitledOutcomes": [
     {
@@ -8716,5 +8824,26 @@
     {"id":"P69AUG08-010","sourceLocator":"L5#3","normalizedOutcome":"Remove the Farcrysis note from player-facing release information.","feedbackIds":["HF-214"],"planningRequirementIds":["R303","R600","R609"]},
     {"id":"P69AUG08-011","sourceLocator":"L7#1","normalizedOutcome":"Show Ctrl+Shift+R refresh guidance on the front version-selection screen.","feedbackIds":["HF-215"],"planningRequirementIds":["R303","R600","R608","R609"]},
     {"id":"P69AUG08-012","sourceLocator":"L7#2","normalizedOutcome":"Expose the Options hard-reset game refresh on the front version-selection screen too.","feedbackIds":["HF-216"],"planningRequirementIds":["R303","R307","R600","R608","R609","R610"]}
+  ],
+  "codexPass69August09Outcomes": [
+    {"id":"P69AUG09-001","sourceLocator":"L1#1","normalizedOutcome":"Retain rejected 69.2 as regression evidence and make the next player-facing correction candidate 69.3.","feedbackIds":["HF-232"],"planningRequirementIds":["R001","R002","R003","R005","R006","R010","R303","R600","R608","R611","R612","R613"]},
+    {"id":"P69AUG09-002","sourceLocator":"L3#1","normalizedOutcome":"Suppress whole-game browser selection and copy/paste gestures during mobile play.","feedbackIds":["HF-217"],"planningRequirementIds":["R307","R600","R608","R609","R610"]},
+    {"id":"P69AUG09-003","sourceLocator":"L5#1","normalizedOutcome":"Keep the mobile HUD usable in landscape and portrait without regressing the already-good portrait composition.","feedbackIds":["HF-218"],"planningRequirementIds":["R307","R600","R608","R609","R610"]},
+    {"id":"P69AUG09-004","sourceLocator":"L7#1","normalizedOutcome":"Remap the mobile button layout for practical mobile use.","feedbackIds":["HF-219"],"planningRequirementIds":["R600","R608","R609"]},
+    {"id":"P69AUG09-005","sourceLocator":"L9#1","normalizedOutcome":"Correct the remaining first-person arms and hands presentation defects.","feedbackIds":["HF-220"],"planningRequirementIds":["R105","R108","R109","R608","R609"]},
+    {"id":"P69AUG09-006","sourceLocator":"L10#1","normalizedOutcome":"Remove the opaque assault-rifle hard asset that blocks the ADS sightline.","feedbackIds":["HF-221"],"planningRequirementIds":["R105","R108","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R307","R608","R610"]},
+    {"id":"P69AUG09-007","sourceLocator":"L10#2","normalizedOutcome":"Remove the equivalent opaque Uzi hard asset that blocks the ADS sightline.","feedbackIds":["HF-221"],"planningRequirementIds":["R105","R108","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R307","R608","R610"]},
+    {"id":"P69AUG09-008","sourceLocator":"L11#1","normalizedOutcome":"Eliminate the freeze when a shot breaks glass.","feedbackIds":["HF-222"],"planningRequirementIds":["R111","R307","R400","R401","R402","R403","R404","R405","R406","R407","R408","R409","R410","R411","R412","R413","R606","R610"]},
+    {"id":"P69AUG09-009","sourceLocator":"L12#1","normalizedOutcome":"Care Package flyover aircraft retain visible authored wings.","feedbackIds":["HF-223"],"planningRequirementIds":["R108","R112","R113","R304","R502","R505","R511","R608","R609"]},
+    {"id":"P69AUG09-010","sourceLocator":"L12#2","normalizedOutcome":"Carpet Bomber flyover aircraft retain visible authored wings.","feedbackIds":["HF-223"],"planningRequirementIds":["R108","R112","R113","R304","R502","R505","R511","R608","R609"]},
+    {"id":"P69AUG09-011","sourceLocator":"L12#3","normalizedOutcome":"Both support flyovers read as proper complete aircraft rather than slab or block silhouettes.","feedbackIds":["HF-223"],"planningRequirementIds":["R108","R112","R113","R304","R502","R505","R511","R608","R609"]},
+    {"id":"P69AUG09-012","sourceLocator":"L13#1","normalizedOutcome":"Replace square grid-like glass shatter pieces with realistic irregular independently moving shards.","feedbackIds":["HF-224"],"planningRequirementIds":["R111","R400","R401","R402","R403","R404","R405","R406","R407","R408","R409","R410","R411","R412","R413","R608","R610"]},
+    {"id":"P69AUG09-013","sourceLocator":"L14#1","normalizedOutcome":"Eliminate the freeze on the canonical M14 EBR corresponding to Dave's MBR report.","feedbackIds":["HF-225"],"planningRequirementIds":["R105","R108","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R307","R606","R610"]},
+    {"id":"P69AUG09-014","sourceLocator":"L15#1","normalizedOutcome":"Label every weapon station in the Gun Range test bay, not only killstreak stations.","feedbackIds":["HF-226"],"planningRequirementIds":["R108","R236","R304","R500","R501","R502","R503","R504","R505","R506","R507","R508","R509","R510","R511","R512","R600","R608","R609"]},
+    {"id":"P69AUG09-015","sourceLocator":"L15#2","normalizedOutcome":"Give the test-bay door coherent lighting, texture and attached geometry instead of floating blocks.","feedbackIds":["HF-227"],"planningRequirementIds":["R110","R304","R608","R609"]},
+    {"id":"P69AUG09-016","sourceLocator":"L16#1","normalizedOutcome":"Remove the source T pose from every bot and moving dummy hand presentation.","feedbackIds":["HF-228"],"planningRequirementIds":["R105","R108","R232","R600","R608"]},
+    {"id":"P69AUG09-017","sourceLocator":"L17#1","normalizedOutcome":"Eliminate the massive freeze during cold and sustained Flamethrower use.","feedbackIds":["HF-229"],"planningRequirementIds":["R109","R236","R304","R307","R510","R511","R606","R610","R613"]},
+    {"id":"P69AUG09-018","sourceLocator":"L17#2","normalizedOutcome":"Eliminate the massive freeze during cold and sustained Flare Gun use.","feedbackIds":["HF-230"],"planningRequirementIds":["R109","R236","R304","R307","R510","R511","R606","R610","R613"]},
+    {"id":"P69AUG09-019","sourceLocator":"L18#1","normalizedOutcome":"Show the correct weapon pickup action and weapon name while walking between test-bay guns.","feedbackIds":["HF-231"],"planningRequirementIds":["R108","R236","R304","R400","R401","R402","R403","R404","R405","R406","R407","R408","R409","R410","R411","R412","R413","R500","R501","R502","R503","R504","R505","R506","R507","R508","R509","R510","R511","R512","R600","R609"]}
   ]
 }

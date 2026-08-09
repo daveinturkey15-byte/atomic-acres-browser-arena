@@ -28,7 +28,7 @@ describe('first-person anatomical presentation', () => {
     ]);
   });
 
-  it('solves mirrored authored arm bones in parent space without missing the weapon socket', () => {
+  it('solves arm bones in parent space without missing the weapon socket under a reflected ancestor', () => {
     const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
     const presentation = new WeaponPresentation(camera, false);
     const mirroredVisual = new THREE.Group();
@@ -70,6 +70,8 @@ describe('first-person anatomical presentation', () => {
     const state = presentation.presentationState();
     expect(state.adsProgress).toBeGreaterThan(0.999);
     expect(presentation.root.scale.x).toBeCloseTo(0.76, 3);
+    expect(state.adsMaterialClearance.sightPictureRetreat).toBeCloseTo(0.26, 3);
+    expect(state.viewmodelViewport.rootPosition[2]).toBeLessThan(-1.25);
     expect(state.sightOffset?.[0]).toBeCloseTo(0, 3);
     expect(state.sightOffset?.[1]).toBeCloseTo(0, 3);
   });

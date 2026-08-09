@@ -59,6 +59,15 @@ test('loads and prewarms the exact authored support-vehicle family before deploy
         readyFamilies: string[];
         maxConcurrentDecodes: number;
         failures: Record<string, string>;
+        aircraftWings: Record<string, Array<{
+          contract: string;
+          family: string;
+          visibleMeshCount: number;
+          span: [number, number, number];
+          aircraftSpan: [number, number, number];
+          lateralSpanRatio: number;
+          passed: boolean;
+        }>>;
       };
       killstreakPresentation: {
         prewarmed: number;
@@ -83,8 +92,55 @@ test('loads and prewarms the exact authored support-vehicle family before deploy
   expect(telemetry.loadedAssets.map((asset) => asset.split('/').at(-1)).sort()).toEqual(REQUIRED_ASSETS);
   expect([...assetResponses.keys()].sort()).toEqual(REQUIRED_ASSETS);
   expect([...assetResponses.values()].every((status) => status === 200)).toBe(true);
+  expect(Object.keys(telemetry.aircraftWings).sort()).toEqual(['care', 'carpet']);
+  for (const family of ['care', 'carpet']) {
+    const lods = telemetry.aircraftWings[family]!;
+    expect(lods).toHaveLength(3);
+    for (const wing of lods) {
+      expect(wing).toMatchObject({
+        contract: 'visible-rendered-wing-span-v1',
+        family,
+        passed: true,
+      });
+      expect(wing.visibleMeshCount).toBeGreaterThan(0);
+      expect(wing.span[0]).toBeGreaterThan(wing.span[2] * 0.8);
+      expect(wing.lateralSpanRatio).toBeGreaterThanOrEqual(0.65);
+    }
+  }
+  const aircraftActivations = await page.evaluate(() => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    debug.earnSupport(15);
+    const position = (debug.snapshot() as any).player.position as number[];
+    const target: [number, number, number] = [position[0] + 12, 0, position[2] + 12];
+    return {
+      care: debug.activateKillstreak('care-package', target),
+      carpet: debug.activateKillstreak('carpet-bomber', target, [1, 0, 0]),
+    };
+  });
+  expect(aircraftActivations).toEqual({ care: true, carpet: true });
+  await page.waitForFunction(() => {
+    const details = (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).killstreakPresentation.entityDetails as any[];
+    return ['care-aircraft', 'carpet-aircraft'].every((poolKey) => details.some((entry) => (
+      entry.poolKey === poolKey
+      && entry.presentationSource === 'project-original-blender-glb'
+      && entry.visible === true
+      && entry.visibleMeshCount > 0
+      && entry.visibleBounds !== null
+    )));
+  }, undefined, { timeout: 10_000 });
+  const activeAircraft = await page.evaluate(() => (
+    (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).killstreakPresentation.entityDetails as any[]
+  ).filter((entry) => entry.poolKey === 'care-aircraft' || entry.poolKey === 'carpet-aircraft'));
+  expect(new Set(activeAircraft.map((entry: any) => entry.poolKey))).toEqual(new Set(['care-aircraft', 'carpet-aircraft']));
+  for (const aircraft of activeAircraft) {
+    expect(aircraft).toMatchObject({
+      presentationSource: 'project-original-blender-glb',
+      visible: true,
+    });
+    expect(aircraft.visibleMeshCount).toBeGreaterThan(0);
+    expect(aircraft.visibleBounds).not.toBeNull();
+  }
   expect(await page.evaluate(() => {
-    window.__ATOMIC_ACRES_DEBUG__.earnSupport(15);
     return window.__ATOMIC_ACRES_DEBUG__.activateKillstreak('chopper');
   })).toBe(true);
   await page.waitForFunction(() => (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).killstreak.entities

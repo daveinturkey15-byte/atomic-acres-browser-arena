@@ -70,6 +70,8 @@ export type FlareProjectileCallbacks = Readonly<{
   onExpire: (expiry: FlareProjectileExpiry) => void;
 }>;
 
+const EMPTY_FLARE_PROJECTILE_TARGETS: readonly FlareProjectileTarget[] = Object.freeze([]);
+
 type FlareEntity = {
   root: THREE.Group;
   core: THREE.Mesh;
@@ -118,10 +120,12 @@ export function flareSegmentSphereFraction(
   radiusM: number,
 ): number | null {
   if (!Number.isFinite(radiusM) || radiusM <= 0 || delta.lengthSq() <= 1e-12) return null;
-  const offset = start.clone().sub(centre);
+  const offsetX = start.x - centre.x;
+  const offsetY = start.y - centre.y;
+  const offsetZ = start.z - centre.z;
   const a = delta.lengthSq();
-  const b = 2 * offset.dot(delta);
-  const c = offset.lengthSq() - radiusM * radiusM;
+  const b = 2 * (offsetX * delta.x + offsetY * delta.y + offsetZ * delta.z);
+  const c = offsetX * offsetX + offsetY * offsetY + offsetZ * offsetZ - radiusM * radiusM;
   if (c <= 0) return 0;
   const discriminant = b * b - 4 * a * c;
   if (discriminant < 0) return null;
@@ -145,8 +149,14 @@ export class FlareProjectileSystem {
   private poolExhaustions = 0;
   private readonly start = new THREE.Vector3();
   private readonly delta = new THREE.Vector3();
+  private readonly next = new THREE.Vector3();
   private readonly flightDirection = new THREE.Vector3();
   private readonly projectileForward = new THREE.Vector3(0, 0, -1);
+  private readonly targetCacheOwnerIds = new Array<string>(FLARE_PROJECTILE_EFFECT.poolCapacity);
+  private readonly targetCacheOwnerTeams = new Uint8Array(FLARE_PROJECTILE_EFFECT.poolCapacity);
+  private readonly targetCacheValues = new Array<readonly FlareProjectileTarget[]>(FLARE_PROJECTILE_EFFECT.poolCapacity);
+  private targetCacheCount = 0;
+  private lifecycleRevision = 0;
   private prewarmGeneration = -1;
   private authoritySnapshotSeq = 0;
   private lastReplicaSnapshotSeq = -1;
@@ -214,20 +224,24 @@ export class FlareProjectileSystem {
     const key = flarePresentationReplicaKey(input);
     if (!input.ownerId || input.ownerId.length > 80 || this.admittedKeys.has(key) || this.activeByKey.has(key)
       || !Number.isSafeInteger(input.actionNonce) || input.actionNonce < 0
-      || !Number.isFinite(input.now) || !input.origin.toArray().every(Number.isFinite)
-      || !input.direction.toArray().every(Number.isFinite) || input.direction.lengthSq() < 0.999 ** 2) return false;
-    const available = this.entities.find((entity) => entity.phase === 'idle');
+      || !Number.isFinite(input.now) || !finiteVector3(input.origin)
+      || !finiteVector3(input.direction) || input.direction.lengthSq() < 0.999 ** 2) return false;
+    let available: FlareEntity | null = null;
+    for (const entity of this.entities) {
+      if (entity.phase !== 'idle') continue;
+      available = entity;
+      break;
+    }
     if (!available) {
       this.poolExhaustions += 1;
       return false;
     }
     this.admittedKeys.add(key);
     while (this.admittedKeys.size > 128) this.admittedKeys.delete(this.admittedKeys.values().next().value!);
-    const direction = input.direction.clone().normalize();
     available.root.position.copy(input.origin);
     available.root.visible = true;
     available.root.scale.setScalar(1);
-    available.velocity.copy(direction).multiplyScalar(FLARE_PROJECTILE_EFFECT.speedMps);
+    available.velocity.copy(input.direction).normalize().multiplyScalar(FLARE_PROJECTILE_EFFECT.speedMps);
     available.ownerId = input.ownerId;
     available.ownerTeam = input.ownerTeam;
     available.authority = input.authority;
@@ -246,16 +260,48 @@ export class FlareProjectileSystem {
     available.light.intensity = Number(available.light.userData.baseIntensity ?? 0);
     this.activeByKey.set(key, available);
     this.spawnCount += 1;
+    this.lifecycleRevision += 1;
     return true;
   }
 
   update(deltaSeconds: number, now: number, callbacks: FlareProjectileCallbacks): void {
     if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0 || deltaSeconds > 0.1 || !Number.isFinite(now)) return;
+    this.targetCacheCount = 0;
     for (const entity of this.entities) {
       if (entity.phase === 'idle') continue;
-      if (entity.phase === 'flight') this.updateFlight(entity, deltaSeconds, now, callbacks);
-      if (entity.phase === 'burn') this.updateBurn(entity, now, callbacks);
+      const needsTargets = entity.phase === 'flight'
+        || (entity.authority && entity.nextBurnPulseAt <= now && entity.nextBurnPulseAt <= entity.expiresAt);
+      const targets = needsTargets
+        ? this.targetsForUpdate(entity.ownerId, entity.ownerTeam, callbacks)
+        : EMPTY_FLARE_PROJECTILE_TARGETS;
+      if (entity.phase === 'flight') this.updateFlight(entity, deltaSeconds, now, targets, callbacks);
+      if (entity.phase === 'burn') this.updateBurn(entity, now, targets, callbacks);
     }
+  }
+
+  hasActiveProjectiles(): boolean {
+    for (const entity of this.entities) {
+      if (entity.phase !== 'idle') return true;
+    }
+    return false;
+  }
+
+  requiresWorldSnapshot(now: number): boolean {
+    if (!Number.isFinite(now)) return false;
+    for (const entity of this.entities) {
+      if (entity.phase === 'flight') return true;
+      if (entity.phase === 'burn' && entity.authority
+        && entity.nextBurnPulseAt <= now && entity.nextBurnPulseAt <= entity.expiresAt) return true;
+    }
+    return false;
+  }
+
+  lifecycleRevisionValue(): number {
+    return this.lifecycleRevision;
+  }
+
+  burnPulseRevisionValue(): number {
+    return this.burnPulseCount;
   }
 
   clear(): void {
@@ -621,6 +667,7 @@ export class FlareProjectileSystem {
     remainingMs: number,
     now: number,
   ): void {
+    const previousPhase = entity.phase;
     this.resetVisibleAppearance(entity);
     entity.root.position.copy(position);
     entity.ownerId = snapshot.ownerId;
@@ -628,6 +675,7 @@ export class FlareProjectileSystem {
     entity.authority = false;
     entity.actionNonce = snapshot.actionNonce;
     entity.phase = snapshot.phase;
+    if (previousPhase !== entity.phase) this.lifecycleRevision += 1;
     entity.expiresAt = now + remainingMs;
     if (snapshot.phase === 'flight' && velocity) {
       entity.velocity.copy(velocity);
@@ -654,6 +702,7 @@ export class FlareProjectileSystem {
     effect: FlareAuthorityContinuationEntity,
     now: number,
   ): void {
+    const previousPhase = entity.phase;
     this.resetVisibleAppearance(entity);
     entity.root.position.set(...effect.position);
     entity.ownerId = effect.ownerId;
@@ -661,6 +710,7 @@ export class FlareProjectileSystem {
     entity.authority = true;
     entity.actionNonce = effect.actionNonce;
     entity.phase = effect.phase;
+    if (previousPhase !== entity.phase) this.lifecycleRevision += 1;
     entity.expiresAt = now + effect.remainingMs;
     entity.burnPulseIndex = effect.burnPulseIndex;
     if (effect.phase === 'flight') {
@@ -680,7 +730,13 @@ export class FlareProjectileSystem {
     this.applyBurnAppearance(entity, (now - entity.impactedAt) / FLARE_PROJECTILE_EFFECT.burnDurationMs);
   }
 
-  private updateFlight(entity: FlareEntity, deltaSeconds: number, now: number, callbacks: FlareProjectileCallbacks): void {
+  private updateFlight(
+    entity: FlareEntity,
+    deltaSeconds: number,
+    now: number,
+    targets: readonly FlareProjectileTarget[],
+    callbacks: FlareProjectileCallbacks,
+  ): void {
     this.start.copy(entity.root.position);
     entity.velocity.y -= FLARE_PROJECTILE_EFFECT.gravityMps2 * deltaSeconds;
     this.delta.copy(entity.velocity).multiplyScalar(deltaSeconds);
@@ -690,7 +746,7 @@ export class FlareProjectileSystem {
     }
     let target: FlareProjectileTarget | null = null;
     let targetFraction = Number.POSITIVE_INFINITY;
-    for (const candidate of callbacks.hostileTargets(entity.ownerId, entity.ownerTeam)) {
+    for (const candidate of targets) {
       const fraction = flareSegmentSphereFraction(
         this.start,
         this.delta,
@@ -709,15 +765,15 @@ export class FlareProjectileSystem {
       this.beginBurn(entity, now, targetFraction <= worldFraction ? target : null, callbacks);
       return;
     }
-    const next = this.start.clone().add(this.delta);
-    if (now >= entity.expiresAt || !callbacks.withinBounds(next)) {
-      entity.root.position.copy(next);
+    this.next.copy(this.start).add(this.delta);
+    if (now >= entity.expiresAt || !callbacks.withinBounds(this.next)) {
+      entity.root.position.copy(this.next);
       callbacks.onExpire(Object.freeze({
         ownerId: entity.ownerId,
         ownerTeam: entity.ownerTeam,
         actionNonce: entity.actionNonce,
         authority: entity.authority,
-        point: next.clone(),
+        point: this.next.clone(),
       }));
       this.release(entity);
       return;
@@ -741,6 +797,7 @@ export class FlareProjectileSystem {
     entity.velocity.set(0, 0, 0);
     entity.halo.scale.setScalar(1.8);
     this.impactCount += 1;
+    this.lifecycleRevision += 1;
     callbacks.onImpact(Object.freeze({
       ownerId: entity.ownerId,
       ownerTeam: entity.ownerTeam,
@@ -752,7 +809,12 @@ export class FlareProjectileSystem {
     }));
   }
 
-  private updateBurn(entity: FlareEntity, now: number, callbacks: FlareProjectileCallbacks): void {
+  private updateBurn(
+    entity: FlareEntity,
+    now: number,
+    targets: readonly FlareProjectileTarget[],
+    callbacks: FlareProjectileCallbacks,
+  ): void {
     const progress = Math.max(0, Math.min(1, (now - entity.impactedAt) / FLARE_PROJECTILE_EFFECT.burnDurationMs));
     entity.halo.scale.setScalar(1.8 + progress * 1.6);
     const haloMaterial = entity.halo.material;
@@ -760,7 +822,7 @@ export class FlareProjectileSystem {
     entity.light.intensity = Number(entity.light.userData.baseIntensity ?? 18) * (1 - progress);
     while (entity.authority && entity.nextBurnPulseAt <= now && entity.nextBurnPulseAt <= entity.expiresAt) {
       entity.burnPulseIndex += 1;
-      for (const target of callbacks.hostileTargets(entity.ownerId, entity.ownerTeam)) {
+      for (const target of targets) {
         const distance = entity.root.position.distanceTo(target.position);
         const totalDamage = flareBurnDamage(distance);
         if (totalDamage <= 0 || !callbacks.burnLineOfSight(entity.root.position, target)) continue;
@@ -781,6 +843,7 @@ export class FlareProjectileSystem {
   }
 
   private release(entity: FlareEntity): void {
+    const wasActive = entity.phase !== 'idle';
     if (entity.ownerId) this.activeByKey.delete(flarePresentationReplicaKey(entity));
     entity.phase = 'idle';
     entity.root.visible = false;
@@ -798,5 +861,29 @@ export class FlareProjectileSystem {
     entity.burnPulseIndex = 0;
     entity.velocity.set(0, 0, 0);
     entity.light.intensity = 0;
+    if (wasActive) this.lifecycleRevision += 1;
   }
+
+  private targetsForUpdate(
+    ownerId: string,
+    ownerTeam: Team,
+    callbacks: FlareProjectileCallbacks,
+  ): readonly FlareProjectileTarget[] {
+    for (let index = 0; index < this.targetCacheCount; index += 1) {
+      if (this.targetCacheOwnerIds[index] === ownerId && this.targetCacheOwnerTeams[index] === ownerTeam) {
+        return this.targetCacheValues[index]!;
+      }
+    }
+    const targets = callbacks.hostileTargets(ownerId, ownerTeam);
+    const slot = this.targetCacheCount;
+    this.targetCacheOwnerIds[slot] = ownerId;
+    this.targetCacheOwnerTeams[slot] = ownerTeam;
+    this.targetCacheValues[slot] = targets;
+    this.targetCacheCount += 1;
+    return targets;
+  }
+}
+
+function finiteVector3(value: THREE.Vector3): boolean {
+  return Number.isFinite(value.x) && Number.isFinite(value.y) && Number.isFinite(value.z);
 }

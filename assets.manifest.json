@@ -228,45 +228,45 @@
       "files": [
         {
           "path": "public/assets/original/models/support/pass65-care-aircraft-lod0.glb",
-          "sha256": "940846bb8646dba5b0847fc788e54ed0a5f64e644a1442cdf374f69cb3c904ac",
+          "sha256": "fa69a075d70f5c45d954abe19b7fff31d1662d158a4f130412f333fc593c20d2",
           "lod": 0,
           "triangles": 17192,
-          "bytes": 323116
+          "bytes": 320760
         },
         {
           "path": "public/assets/original/models/support/pass65-care-aircraft-lod1.glb",
-          "sha256": "22d043547b22c67c053d8381684769e877e34eb9274953bfe8ed5aebb3310d3b",
+          "sha256": "0442f594b3cff65b1ff042e8dac8c1871bf6e267836c21f2598da287c6f4b687",
           "lod": 1,
           "triangles": 13500,
-          "bytes": 288840
+          "bytes": 280228
         },
         {
           "path": "public/assets/original/models/support/pass65-care-aircraft-lod2.glb",
-          "sha256": "84eb02c184b143462dc64362868964a3f28528dd30bafcb0b9f3f46c7c011f42",
+          "sha256": "0fd23651634da95f03af9d92cc6ee6ec367dfdc49a93c0cf63bf19d17532245c",
           "lod": 2,
           "triangles": 11016,
-          "bytes": 245568
+          "bytes": 240432
         },
         {
           "path": "public/assets/original/models/support/pass65-carpet-aircraft-lod0.glb",
-          "sha256": "7ab3c037a1847ce5e53af49a39706ed8722d1766d0b9ee8b19644e3c903b62b7",
+          "sha256": "29563df5d972a347a8c4a94a6b1b20afe75ce29220ccb9b9a969854a7a5277d5",
           "lod": 0,
           "triangles": 11658,
-          "bytes": 248400
+          "bytes": 246164
         },
         {
           "path": "public/assets/original/models/support/pass65-carpet-aircraft-lod1.glb",
-          "sha256": "c18785d9782d6195fbe464808b6b4965fff7a540de3569832defc228c483da7e",
+          "sha256": "344a3965871534fc36a88f8121ad68f601f0e103d26e20684cab186b423df7ee",
           "lod": 1,
           "triangles": 9128,
-          "bytes": 229188
+          "bytes": 223016
         },
         {
           "path": "public/assets/original/models/support/pass65-carpet-aircraft-lod2.glb",
-          "sha256": "54928c0da8b02dc5d93741b910b9141184304b1a2fd355e93fb968461e539c4e",
+          "sha256": "93cc0cfa360d1bf76ec0319927e7c40df0b738869a03efcce287fdef0b68ea0c",
           "lod": 2,
           "triangles": 5112,
-          "bytes": 179408
+          "bytes": 181544
         },
         {
           "path": "public/assets/original/models/support/pass65-care-crate-lod0.glb",
@@ -281,6 +281,54 @@
           "lod": 1,
           "triangles": 4416,
           "bytes": 149448
+        },
+        {
+          "path": "public/assets/original/textures/support/pass65-care-aircraft-albedo.png",
+          "sha256": "e38c3126030f9fd39f442750c4e38aa0528814e816eb4a2becc5e2323e2b13fb",
+          "width": 512,
+          "height": 512
+        },
+        {
+          "path": "public/assets/original/textures/support/pass65-care-aircraft-normal.png",
+          "sha256": "8ea8fba6ea9b7cddcde40feaadf1418b18e485a8479174bff737e08626a93ae4",
+          "width": 512,
+          "height": 512
+        },
+        {
+          "path": "public/assets/original/textures/support/pass65-care-aircraft-orm.png",
+          "sha256": "f7a6b6bb064146a7eb03e01e5cf7434d7224b287648c45d0ef59fbe86fa32495",
+          "width": 512,
+          "height": 512
+        },
+        {
+          "path": "public/assets/original/textures/support/pass65-care-aircraft-emissive.png",
+          "sha256": "55aea7bfe6f9c90c71df2379611c12eada3014444ccbce4f3352d3303077a44f",
+          "width": 512,
+          "height": 512
+        },
+        {
+          "path": "public/assets/original/textures/support/pass65-carpet-aircraft-albedo.png",
+          "sha256": "1462ab032956fe4ce92d0b15b80ac418c10576a06b56be997da97db2552accb5",
+          "width": 512,
+          "height": 512
+        },
+        {
+          "path": "public/assets/original/textures/support/pass65-carpet-aircraft-normal.png",
+          "sha256": "8ea8fba6ea9b7cddcde40feaadf1418b18e485a8479174bff737e08626a93ae4",
+          "width": 512,
+          "height": 512
+        },
+        {
+          "path": "public/assets/original/textures/support/pass65-carpet-aircraft-orm.png",
+          "sha256": "0006d9c8024b77e5c46be66f999b48aa0523ab7b59d9ade4f996f06f3b452649",
+          "width": 512,
+          "height": 512
+        },
+        {
+          "path": "public/assets/original/textures/support/pass65-carpet-aircraft-emissive.png",
+          "sha256": "55aea7bfe6f9c90c71df2379611c12eada3014444ccbce4f3352d3303077a44f",
+          "width": 512,
+          "height": 512
         },
         {
           "path": "public/assets/original/textures/support/pass65-support-aircraft-albedo.png",
@@ -308,14 +356,14 @@
         }
       ],
       "sourceBlend": "source-assets/blender/pass65-support-aircraft-family.blend",
-      "sourceBlendSha256": "eeb894a2411b3d3f1b596341759d2dd4a5479586c8ab92df265960764b426593",
+      "sourceBlendSha256": "d604ee311755cfe89caefe297c826b64274c51f4f010cc8f53af619111ea1292",
       "sourceScript": "scripts/blender/create-pass65-support-vehicles.py",
-      "sourceScriptSha256": "d0bdf98635e25b38348149d02cc990157aac367108468fdd177437c7d256e8f4",
+      "sourceScriptSha256": "4ac7c18f2e2bd11b21b78a1dae0a9ed8d19500904fec6316cd402daedcec9366",
       "sourceProvenance": "source-assets/blender/pass65-support-aircraft-family.provenance.json",
-      "sourceProvenanceSha256": "1ce72d5a6f2cd0c4f40b36762ea288e8a159a9e49ca669034083d6bc6ae70a4a",
+      "sourceProvenanceSha256": "8d275c17f1c9de7aea65b2e048d62eca0b0522503c31db4dc18ece02d35a2a3b",
       "preview": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-contact-sheet.png",
-      "format": "Distinct heavy four-turbofan Care transport and tailless flying-wing Carpet bomber three-LOD GLBs plus two-LOD rigged parachute crate, embedded WebP PBR maps, semantic cargo/bomb sockets and authored actions",
-      "modifications": "Project-original close-range v4 support family: Care adds raised hull breaks, service hatches/latches, framed flight-deck armour, four high-bypass turbofans, hubbed landing-gear bogies and a ribbed hinged rear ramp; Carpet adds framed split buried intakes, service panels and a cross-braced animated bomb bay while remaining a tailless blended flying wing; the drop asset adds visible latches and pallet tie-down hardware to its cross webbing and ribbed scalloped canopy. The local -Z runtime-forward contract and all gameplay-owned sockets remain unchanged.",
+      "format": "Distinct heavy four-turbofan Care transport and tailless flying-wing Carpet bomber three-LOD GLBs plus two-LOD rigged parachute crate, variant-specific embedded WebP PBR maps, semantic cargo/bomb sockets and authored actions",
+      "modifications": "Project-original close-range v4 support family with daylight-readable material revision v1: Care and Carpet now use independent brighter low-metallic, high-roughness PBR sets, with authored underside and leading-edge value breaks; Care also separates its tail and engine-nacelle values. Existing hull, flight-deck, turbofan, gear, ramp, intake, service-panel, bomb-bay, drop-rig and gameplay-owned socket contracts remain unchanged.",
       "attributionRequired": false
     },
     {
@@ -375,9 +423,9 @@
       "sourceBlend": "source-assets/blender/pass65-chopper-gunner.blend",
       "sourceBlendSha256": "6d645dc3bdf6ce6990f3c5b292cee4296d4be60ba755c4b6d163fa5f5ed1a8e0",
       "sourceScript": "scripts/blender/create-pass65-support-vehicles.py",
-      "sourceScriptSha256": "d0bdf98635e25b38348149d02cc990157aac367108468fdd177437c7d256e8f4",
+      "sourceScriptSha256": "4ac7c18f2e2bd11b21b78a1dae0a9ed8d19500904fec6316cd402daedcec9366",
       "sourceProvenance": "source-assets/blender/pass65-chopper-gunner.provenance.json",
-      "sourceProvenanceSha256": "b53903b9140ee1d56c6bb1ff439b556c5b7e5dc29052b34a3004991fa2a3df89",
+      "sourceProvenanceSha256": "260b8073aac4fef02dbef45ad14f3faa1b68d4958579020714d772eb4263b88f",
       "preview": "docs/assets/pass65-vehicles/chopper/pass65-chopper-contact-sheet.png",
       "format": "Three strict decreasing optimized self-contained glTF 2.0 binary LODs with embedded WebP PBR maps, complete armoured tandem attack-helicopter silhouette, authored unobstructed gunner sightline/HUD/weapon view, detailed exterior rotors/gun/sockets and eight animation clips",
       "modifications": "Project-original close-range v4 tandem attack-helicopter refinement with overlapping side and dorsal armour, raised fasteners and louvers, faceted framed pilot/gunner glazing, armoured nose and cheeks, restrained olive PBR, separated dual-aperture nose sensor, braced pylons, forward-aligned finned missiles, collared seven-tube rocket pods, mechanical rotor yokes/pitch links, tail gearbox, gun armour/feed chute and damped skid gear. Possessed view still excludes exterior shell and rotors; runtime gameplay authority remains TypeScript-owned.",
@@ -525,13 +573,13 @@
       "kind": "original-project-prerecorded-authoritative-runtime-menu-video-family",
       "creator": "Atomic Acres project",
       "source": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
-      "generatedAsOf": "2026-07-29",
+      "generatedAsOf": "2026-08-02",
       "license": "Original project work",
       "files": "public/assets/original/menu-previews/*",
       "sourceScript": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
-      "sourceScriptSha256": "cf9fb254538c9cc36715c5a7155876394f8a7b972268a0850def74e71c698e3e",
+      "sourceScriptSha256": "73c9b7ca78b73b5a7e1a24323afbddca4a176594367c5fe1d95a56e5c04cafb9",
       "sourceProvenance": "source-assets/menu/pass65-preview-masters/provenance.json",
-      "sourceProvenanceSha256": "2318e7a53f271c72e820de8a8e86360fe1b54e2e903a7494c59e35a547bdb9d9",
+      "sourceProvenanceSha256": "18026901f18965fcdc38b7adce10709919c46fa6fbd3eda6166dd3b60ebffa7b",
       "format": "Four distinct 2560x1440 eight-second 30 FPS selected-map runtime captures, shipped as high-bitrate VP9/Opus WebM, H.264 High Level 5.0/AAC MP4 and full-resolution static WebP posters, plus deterministic five-frame review evidence",
       "modifications": "Captured offline at native 1440p from each actual authoritative production WebGPU arena with deterministic camera and visual time; the reviewed 1280x720 logical overlay is losslessly authored at exact 2x output scale so its fixed-pixel details retain their intended proportions. Three map flyovers bake perspective-aware elliptic rotor arcs with subdued moving spokes, measured mast/hub/header occlusion, two visible structural ties into the side canopy rails, a restrained tail camera and compact green-on-graphite cockpit avionics; Gun Range bakes compact charcoal/silver ears, forelegs and top-facing paws. Runtime loading/menu playback remains one selected metadata-preload decoder with poster-first readiness, reduced motion is poster-only, and no downloaded or sampled assets are used. The former byte-identical Gun Range media gate is explicitly superseded.",
       "attributionRequired": false

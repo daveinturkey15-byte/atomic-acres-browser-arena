@@ -6,6 +6,7 @@ import {
   RIGGED_OPERATOR_RUNTIME_ACTION_NAMES,
   applyBotEmissiveBrightness,
   createOperatorInstanceMaterialResolver,
+  firstPersonArmHandedness,
   firstPersonArmMaterialReadabilityProfile,
   isEmbeddedWeaponObjectName,
   riggedStanceTarget,
@@ -27,8 +28,31 @@ describe('rigged operator presentation contract', () => {
       expect(profile!.emissiveIntensity).toBeGreaterThan(0);
       expect(profile!.emissiveIntensity).toBeLessThanOrEqual(FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY);
     }
-    expect(firstPersonArmMaterialReadabilityProfile('Arms_Glove_PBR')?.emissiveIntensity).toBeGreaterThan(0.6);
+    expect(firstPersonArmMaterialReadabilityProfile('Arms_Glove_PBR')?.emissiveIntensity).toBeLessThanOrEqual(0.14);
     expect(firstPersonArmMaterialReadabilityProfile('unrelated-world-operator')).toBeNull();
+  });
+
+  it('accepts the authored right-on-positive-X armature without a negative-determinant mirror', () => {
+    const visual = new THREE.Group();
+    const right = new THREE.Bone(); right.name = 'UpperArmR'; right.position.x = 0.24;
+    const left = new THREE.Bone(); left.name = 'UpperArmL'; left.position.x = -0.24;
+    visual.add(right, left);
+
+    const authored = firstPersonArmHandedness(visual);
+    expect(authored).toMatchObject({
+      contract: 'authored-positive-determinant-right-on-positive-x-v1',
+      valid: true,
+      rightShoulderX: 0.24,
+      leftShoulderX: -0.24,
+    });
+    expect(authored.shoulderSeparation).toBeCloseTo(0.48);
+    expect(authored.visualDeterminant).toBeGreaterThan(0);
+
+    visual.scale.x = -1;
+    const reflected = firstPersonArmHandedness(visual);
+    expect(reflected.valid).toBe(false);
+    expect(reflected.rightShoulderX).toBeLessThan(reflected.leftShoulderX);
+    expect(reflected.visualDeterminant).toBeLessThan(0);
   });
 
   it('halves bot emissive brightness idempotently without changing base colour', () => {

@@ -33,6 +33,22 @@
       "fileCount": 12,
       "totalBytes": 10559132,
       "recordedAt": "2026-07-29"
+    },
+    {
+      "cacheKey": "pass66-runtime-preview-v12",
+      "recipeId": "pass66-authoritative-runtime-menu-preview-v2",
+      "finalMediaSetSha256": "4f2fcde9ccb39ee5cd2dd516ab1f93ef76a0ec326639ea59113a7729612456aa",
+      "fileCount": 12,
+      "totalBytes": 55320394,
+      "recordedAt": "2026-08-02"
+    },
+    {
+      "cacheKey": "pass66-runtime-preview-v13",
+      "recipeId": "pass66-authoritative-runtime-menu-preview-v2",
+      "finalMediaSetSha256": "2f7ee59e7d499f34da0c8d7c29e978114243c2dbaacd73bc684cadd99b0734fe",
+      "fileCount": 12,
+      "totalBytes": 55332502,
+      "recordedAt": "2026-08-02"
     }
   ]
 }

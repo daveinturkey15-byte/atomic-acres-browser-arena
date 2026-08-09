@@ -100,6 +100,10 @@ const REQUIRED_NATIVE_TESTS_BY_FEEDBACK = new Map([
   ['HF-198', ['T-NATIVE-FRAME-PACING']],
   ['HF-199', ['T-WEBGPU-ENDURANCE']],
   ['HF-200', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE', 'T-NATIVE-FRAME-PACING']],
+  ['HF-222', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE', 'T-NATIVE-FRAME-PACING']],
+  ['HF-225', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE', 'T-NATIVE-FRAME-PACING']],
+  ['HF-229', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE', 'T-NATIVE-FRAME-PACING']],
+  ['HF-230', ['T-COLD-WEBGPU-ADMISSION', 'T-WEBGPU-ENDURANCE', 'T-NATIVE-FRAME-PACING']],
 ]);
 for (const feedbackId of HARDWARE_WEBGL2_FEEDBACK_IDS) {
   const required = REQUIRED_NATIVE_TESTS_BY_FEEDBACK.get(feedbackId) ?? [];
@@ -1411,6 +1415,17 @@ function runSelfTest(ledger, matrix, agents, packageJson, graph) {
     'T-WEBGPU-ENDURANCE',
   ];
   expectRejected('missing required native gate', 'E_GRAPH_NATIVE_GATE_REQUIRED', { graph: missingNativeGate });
+  for (const feedbackId of ['HF-222', 'HF-225', 'HF-229', 'HF-230']) {
+    const missingPass69NativeGate = structuredClone(graph);
+    const feedback = missingPass69NativeGate.feedbackNodes.find((node) => node.id === feedbackId);
+    feedback.verification.testRefs = feedback.verification.testRefs
+      .filter((testRef) => testRef !== 'T-NATIVE-FRAME-PACING');
+    expectRejected(
+      `${feedbackId} missing Pass 69.3 native frame-pacing gate`,
+      'E_GRAPH_NATIVE_GATE_REQUIRED',
+      { graph: missingPass69NativeGate },
+    );
+  }
   const missingHardwareWebGl2Gate = structuredClone(graph);
   missingHardwareWebGl2Gate.feedbackNodes.find((node) => node.id === 'HF-001').verification.testRefs =
     missingHardwareWebGl2Gate.feedbackNodes.find((node) => node.id === 'HF-001').verification.testRefs

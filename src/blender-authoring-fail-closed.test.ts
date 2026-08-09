@@ -16,6 +16,7 @@ const AUTHORING_TARGETS = Object.freeze([
   'field-knife',
   'pass65-weapon-tranche',
   'support-vehicles',
+  'support-aircraft-visibility',
 ]);
 
 describe('Blender authoring process contract', () => {

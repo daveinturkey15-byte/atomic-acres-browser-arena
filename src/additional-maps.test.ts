@@ -25,13 +25,43 @@ import {
   gunRangeTestBayDoorDynamicColliders,
 } from './gun-range-test-bay';
 import type { ArenaMap } from './map';
-import type { Stance } from './gameplay';
+import { WEAPONS, type Stance } from './gameplay';
 import { CharacterPhysics, STANCE_SHAPES } from './physics';
 import { definition as rustworksVisualDefinition } from './rendering/arenas/rustworks-1v1';
 import { definition as gunRangeVisualDefinition } from './rendering/arenas/gun-range';
 import { definition as terminalVisualDefinition } from './rendering/arenas/skyline-terminal';
 
 type RouteAnchor = { id: string; position: [number, number, number] };
+
+function installCanvasDocument(): () => void {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  const contextState: Record<PropertyKey, unknown> = { font: '900 30px sans-serif' };
+  const context = new Proxy(contextState, {
+    get(target, property) {
+      if (property === 'measureText') {
+        return (text: string) => ({ width: text.length * Number.parseInt(String(target.font).match(/(\d+)px/)?.[1] ?? '30', 10) * 0.58 });
+      }
+      if (property === 'createLinearGradient') return () => ({ addColorStop: () => undefined });
+      if (property in target) return target[property];
+      return () => undefined;
+    },
+    set(target, property, value) {
+      target[property] = value;
+      return true;
+    },
+  }) as unknown as CanvasRenderingContext2D;
+  const fakeDocument = {
+    createElement(tagName: string) {
+      if (tagName !== 'canvas') throw new Error(`Unexpected test element ${tagName}`);
+      return { width: 0, height: 0, getContext: () => context } as unknown as HTMLCanvasElement;
+    },
+  } as unknown as Document;
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: fakeDocument });
+  return () => {
+    if (previous) Object.defineProperty(globalThis, 'document', previous);
+    else Reflect.deleteProperty(globalThis, 'document');
+  };
+}
 
 function expectRustworksSpawnContract(map: ReturnType<typeof buildRustworks1v1>): void {
   for (const team of [0, 1] as const) {
@@ -781,6 +811,67 @@ describe('additional authored maps', () => {
     expect(frame.dynamicColliders).toHaveLength(1);
     const leaf = map.root.getObjectByName('gun-range-test-bay-secure-door-leaf');
     expect(leaf?.userData.phase).toBe('opening');
+  });
+
+  it('attaches a textured two-face door assembly and labels every canonical test-bay weapon', () => {
+    const restoreDocument = installCanvasDocument();
+    try {
+      const map = buildGunRange(new THREE.Scene());
+      const labels = GUN_RANGE_TEST_BAY_CONTRACT.weaponStations.map((station) => {
+        const label = map.root.getObjectByName(`gun-range-test-bay-weapon-label-${station.id}`) as THREE.Mesh;
+        expect(label, station.id).toBeInstanceOf(THREE.Mesh);
+        expect(label.parent?.name).toBe(`gun-range-test-bay-weapon-marker-${station.id}`);
+        expect(label.userData).toMatchObject({
+          weaponId: station.id,
+          canonicalWeaponName: WEAPONS[station.id].name,
+          text: WEAPONS[station.id].name.toUpperCase(),
+        });
+        expect((label.material as THREE.MeshBasicMaterial).side).toBe(THREE.DoubleSide);
+        return label;
+      });
+      expect(labels).toHaveLength(GUN_RANGE_TEST_BAY_CONTRACT.weaponStations.length);
+      expect(map.root.userData.gunRangeTestBayWeaponLabels).toEqual(
+        GUN_RANGE_TEST_BAY_CONTRACT.weaponStations.map((station) => ({
+          id: station.id,
+          name: WEAPONS[station.id].name,
+          objectName: `gun-range-test-bay-weapon-label-${station.id}`,
+        })),
+      );
+
+      const leaf = map.root.getObjectByName('gun-range-test-bay-secure-door-leaf') as THREE.Mesh;
+      expect(leaf.position.y).toBe(3.25);
+      const panel = leaf.material as THREE.MeshStandardMaterial;
+      expect(panel.name).toBe('GunRange_TestBay_SecureDoor_PanelTexture');
+      expect(panel.userData.surfacePattern).toBe('panel');
+      expect(panel.map).toBeInstanceOf(THREE.CanvasTexture);
+      const fixtureNames = [
+        'gun-range-test-bay-door-edge-north',
+        'gun-range-test-bay-door-edge-south',
+        'gun-range-test-bay-door-status-range-face',
+        'gun-range-test-bay-door-status-bay-face',
+      ];
+      const fixtures = fixtureNames.map((name) => map.root.getObjectByName(name) as THREE.Mesh);
+      expect(fixtures.every((fixture) => fixture.parent === leaf && fixture.userData.dynamic === true)).toBe(true);
+      expect(map.root.children.some((child) => fixtureNames.includes(child.name))).toBe(false);
+      expect(fixtures.slice(0, 2).map((fixture) => Math.abs(fixture.position.z))).toEqual([3.74, 3.74]);
+      expect(fixtures.slice(2).map((fixture) => Math.sign(fixture.position.x))).toEqual([-1, 1]);
+      expect(fixtures.slice(2).every((fixture) => (
+        fixture.userData.doorAssemblyRole === 'status-light'
+        && (fixture.material as THREE.MeshStandardMaterial).emissiveIntensity > 3
+      ))).toBe(true);
+
+      map.root.updateMatrixWorld(true);
+      const before = fixtures[2].getWorldPosition(new THREE.Vector3());
+      updateGunRangeTestBayDoor(map.root, 0, GUN_RANGE_TEST_BAY_CONTRACT.door.trigger);
+      updateGunRangeTestBayDoor(map.root, GUN_RANGE_TEST_BAY_CONTRACT.door.openDurationMs, GUN_RANGE_TEST_BAY_CONTRACT.door.trigger);
+      map.root.updateMatrixWorld(true);
+      const after = fixtures[2].getWorldPosition(new THREE.Vector3());
+      expect(after.y - before.y).toBeCloseTo(GUN_RANGE_TEST_BAY_CONTRACT.door.travelM, 6);
+      expect(after.x).toBeCloseTo(before.x, 6);
+      expect(after.z).toBeCloseTo(before.z, 6);
+    } finally {
+      restoreDocument();
+    }
   });
 
   it('physically contains the Gun Range player at all four map edges', async () => {

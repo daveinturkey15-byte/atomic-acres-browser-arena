@@ -28,6 +28,7 @@ export type ArenaTransitionProfilePhase =
   | 'prewarm-smoke'
   | 'prewarm-explosive-bolts'
   | 'prewarm-flare-first-shot'
+  | 'prewarm-flamethrower-first-shot'
   | 'coverage-submit-fence'
   | 'retire-previous-arenas'
   | 'commit-bookkeeping'

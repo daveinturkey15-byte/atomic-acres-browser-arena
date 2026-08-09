@@ -13,7 +13,9 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).not.toContain('recordSupportElimination(');
     expect(source).not.toContain('recordSupportDeath(');
     expect(source).not.toContain('consumeFieldSupport(');
-    expect(source).toContain('GAMEPLAY_ACTIONS.findIndex((action) => action.startsWith(\'support-\')');
+    expect(source).toContain('supportSlotAction(candidateSlot)');
+    expect(source).toContain('supportSlot = candidateSlot;');
+    expect(source).not.toContain('GAMEPLAY_ACTIONS.findIndex((action) => action.startsWith(\'support-\')');
     expect(source).toContain('activateOrToggleFieldSupportSlot(supportSlot)');
     expect(source).toContain('selectControllableSupportEntity(id, player.id, killstreakSnapshot.entities)');
     expect(source).not.toContain("activateFieldSupport('hunter-swarm');");
@@ -289,6 +291,37 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(damage).toContain('{ weaponOrEffect: event.source }');
   });
 
+  it('atomically replaces both pickup-prompt fields from the selected F candidate', () => {
+    const deathDropStart = source.indexOf('function updateDeathDrops(');
+    const deathDropEnd = source.indexOf('\nfunction acceptRemotePickup(', deathDropStart);
+    const deathDropUpdate = source.slice(deathDropStart, deathDropEnd);
+    expect(deathDropUpdate).not.toContain("'#pickup-prompt'");
+    expect(deathDropUpdate).not.toContain("querySelector<HTMLElement>('strong')");
+    const clearStart = source.indexOf('function clearDeathDrops(');
+    const clearEnd = source.indexOf('\nfunction deathDropVictim(', clearStart);
+    const clear = source.slice(clearStart, clearEnd);
+    expect(clear).toContain("renderPickupInteractionPrompt(element<HTMLElement>('#pickup-prompt'), null);");
+    expect(clear).not.toContain('.hidden = true');
+
+    const rendererStart = source.indexOf('function renderPickupInteractionPrompt(');
+    const rendererEnd = source.indexOf('\nfunction updateFInteractionPrompt(', rendererStart);
+    const renderer = source.slice(rendererStart, rendererEnd);
+    expect(renderer).toContain("prompt.querySelector<HTMLElement>('span')");
+    expect(renderer).toContain("prompt.querySelector<HTMLElement>('strong')");
+    expect(renderer).toContain("actionElement.textContent = visible ? `TAP \\u00b7 ${action}` : ''");
+    expect(renderer).toContain("subjectElement.textContent = visible ? subject : ''");
+    expect(renderer).toContain('delete prompt.dataset.interactionKind;');
+    expect(renderer).toContain('delete prompt.dataset.targetId;');
+    expect(renderer).toContain('prompt.dataset.targetId = weaponCandidate.targetId;');
+
+    const updateStart = source.indexOf('function updateFInteractionPrompt(');
+    const updateEnd = source.indexOf('\nfunction recordOwnerSupportDamage(', updateStart);
+    const update = source.slice(updateStart, updateEnd);
+    expect(update.match(/renderPickupInteractionPrompt\(pickupPrompt,/g)).toHaveLength(3);
+    expect(update).not.toContain('pickupPrompt.hidden =');
+    expect(update).not.toContain("pickupPrompt.querySelector<HTMLElement>('strong')");
+  });
+
   it('supersedes and exits possession with the equipped support slot key, never F', () => {
     const start = source.indexOf('function activateOrToggleFieldSupportSlot(');
     const end = source.indexOf('\nfunction interactWithSelectedKillstreakSupport(', start);
@@ -297,7 +330,12 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(block).toContain('requestKillstreakControl(entity.id, action, {}, now)');
     expect(block).toContain('localKillstreakActorSnapshot()?.possession?.entityId !== entity.id');
     expect(block).toContain('if (!localKillstreakActorSnapshot()?.possession) activateFieldSupport(id)');
-    expect(source).toContain('GAMEPLAY_ACTIONS.findIndex((action) => action.startsWith(\'support-\')');
+    const inputStart = source.indexOf('let supportSlot = -1;');
+    const inputEnd = source.indexOf("if (actionMatchesCode('interact'", inputStart);
+    const inputBlock = source.slice(inputStart, inputEnd);
+    expect(inputBlock).toContain('supportSlotAction(candidateSlot)');
+    expect(inputBlock).toContain('supportSlot = candidateSlot;');
+    expect(inputBlock).not.toContain('GAMEPLAY_ACTIONS.findIndex');
     expect(source).toContain('if (supportSlot >= 0 && !event.repeat) activateOrToggleFieldSupportSlot(supportSlot)');
   });
 

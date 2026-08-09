@@ -29,6 +29,9 @@ REVIEW_SIZE = 512
 REVIEW_TARGET = os.environ.get("PASS65_SUPPORT_REVIEW_TARGET", "")
 FOCUSED_FP_REVIEW = REVIEW_TARGET == "chopper-fp"
 FP_DIAGNOSTIC_REVIEW = REVIEW_TARGET == "chopper-fp-diagnostic"
+AUTHORING_SCOPE = os.environ.get("PASS65_SUPPORT_AUTHORING_SCOPE", "all")
+if AUTHORING_SCOPE not in {"all", "aircraft"}:
+    raise RuntimeError(f"unsupported PASS65_SUPPORT_AUTHORING_SCOPE={AUTHORING_SCOPE!r}")
 
 for directory in (
     CHOPPER_BLEND.parent,
@@ -64,6 +67,9 @@ def make_texture(
     kind: str,
     palette: tuple[float, float, float],
     emissive_panel_seams: bool = True,
+    roughness_range: tuple[float, float] = (0.28, 0.52),
+    metallic: float = 0.86,
+    warning_metallic: float = 0.44,
 ) -> bpy.types.Image:
     image = bpy.data.images.new(f"{prefix}_{kind.title()}", width=TEXTURE_SIZE, height=TEXTURE_SIZE, alpha=True)
     pixels: list[float] = [0.0] * (TEXTURE_SIZE * TEXTURE_SIZE * 4)
@@ -88,7 +94,8 @@ def make_texture(
                 if seam:
                     value = [0.42 if panel_x < 4 else 0.58, 0.42 if panel_y < 4 else 0.58, 0.986]
             elif kind == "orm":
-                value = [0.72 if seam else 0.96, 0.28 + micro * 0.24, 0.86 if not warning else 0.44]
+                roughness = roughness_range[0] + micro * (roughness_range[1] - roughness_range[0])
+                value = [0.72 if seam else 0.96, roughness, metallic if not warning else warning_metallic]
             else:
                 cyan = emissive_panel_seams and seam and ((x // 128 + y // 128) % 2 == 0)
                 green = emissive_panel_seams and abs(u - 0.5) < 0.018 and 0.35 < v < 0.68
@@ -298,7 +305,10 @@ def loft(name, sections, material, parent, segments=16):
     return obj
 
 
-def wing_panel(name, side, root_y, root_chord, span, sweep, tip_chord, z, thickness, material, parent):
+def wing_panel(
+    name, side, root_y, root_chord, span, sweep, tip_chord, z, thickness,
+    material, parent, underside_material=None, edge_material=None,
+):
     root_lead = root_y + root_chord * 0.5
     root_trail = root_y - root_chord * 0.5
     tip_y = root_y - sweep
@@ -318,7 +328,16 @@ def wing_panel(name, side, root_y, root_chord, span, sweep, tip_chord, z, thickn
     data.update()
     obj = bpy.data.objects.new(name, data)
     bpy.context.collection.objects.link(obj)
-    finish_mesh(obj, material, parent, bevel=min(0.045, thickness * 0.22))
+    obj.data.materials.append(material)
+    if underside_material is not None:
+        obj.data.materials.append(underside_material)
+        obj.data.polygons[0].material_index = 1
+    if edge_material is not None:
+        obj.data.materials.append(edge_material)
+        edge_index = len(obj.data.materials) - 1
+        for polygon in obj.data.polygons[2:]:
+            polygon.material_index = edge_index
+    finish_mesh(obj, None, parent, bevel=min(0.045, thickness * 0.22))
     obj["canonical_node_name"] = name
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
@@ -330,7 +349,10 @@ def wing_panel(name, side, root_y, root_chord, span, sweep, tip_chord, z, thickn
     return obj
 
 
-def extruded_panel(name, outline, z, thickness, material, parent, bevel=0.025):
+def extruded_panel(
+    name, outline, z, thickness, material, parent, bevel=0.025,
+    underside_material=None, edge_material=None,
+):
     """Build an authored shallow prism from an XY planform outline.
 
     This keeps stealth planforms and armour cheek plates as real silhouette
@@ -348,7 +370,16 @@ def extruded_panel(name, outline, z, thickness, material, parent, bevel=0.025):
     data.update()
     obj = bpy.data.objects.new(name, data)
     bpy.context.collection.objects.link(obj)
-    finish_mesh(obj, material, parent, bevel=bevel)
+    obj.data.materials.append(material)
+    if underside_material is not None:
+        obj.data.materials.append(underside_material)
+        obj.data.polygons[0].material_index = 1
+    if edge_material is not None:
+        obj.data.materials.append(edge_material)
+        edge_index = len(obj.data.materials) - 1
+        for polygon in obj.data.polygons[2:]:
+            polygon.material_index = edge_index
+    finish_mesh(obj, None, parent, bevel=bevel)
     obj["canonical_node_name"] = name
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
@@ -1013,6 +1044,7 @@ def build_care_aircraft(lod: int, materials):
     root = root_metadata(f"Pass65CareAircraft_LOD{lod}", "support-aircraft-family-v1", lod, "care")
     root["visual_revision"] = "close-range-heavy-cargo-aircraft-v4"
     root["detail_contract"] = "framed-flightdeck-panelled-hull-ramp-bogie-turbofans-v4"
+    root["material_revision"] = "separated-daylight-readable-pbr-v1"
     segments = (36, 26, 18)[lod]
     rings = (20, 14, 10)[lod]
     fuselage = empty("care-aircraft-fuselage", (0, 0, 0), root, "care-fuselage")
@@ -1100,8 +1132,16 @@ def build_care_aircraft(lod: int, materials):
                 )
     wing = empty("care-aircraft-main-wing", (0, 0, 0), root, "main-wing")
     for side in (-1, 1):
-        wing_panel(f"Care_MainWing_{side}_LOD{lod}", side, -0.02, 3.05, 7.25, 1.05, 0.82, 1.02, 0.28, materials["armor"], wing)
-        wing_panel(f"Care_TailPlane_{side}_LOD{lod}", side, -4.28, 1.30, 2.55, 0.32, 0.42, 2.05, 0.15, materials["armor"], root)
+        wing_panel(
+            f"Care_MainWing_{side}_LOD{lod}", side, -0.02, 3.05, 7.25, 1.05,
+            0.82, 1.02, 0.28, materials["armor"], wing,
+            underside_material=materials["care_underside"], edge_material=materials["care_edge"],
+        )
+        wing_panel(
+            f"Care_TailPlane_{side}_LOD{lod}", side, -4.28, 1.30, 2.55, 0.32,
+            0.42, 2.05, 0.15, materials["armor"], root,
+            underside_material=materials["care_underside"], edge_material=materials["care_edge"],
+        )
         if lod < 2:
             for panel, span_fraction in enumerate((0.23, 0.48, 0.73)):
                 x = side * 7.25 * span_fraction
@@ -1111,7 +1151,7 @@ def build_care_aircraft(lod: int, materials):
                     (0.030, 1.20 - panel * 0.18, 0.012), materials["panel_seam"], wing,
                     rotation=(0, 0, side * math.radians(7)), bevel=0.002,
                 )
-    wedge(f"Care_TailFin_LOD{lod}", (0, -4.42, 2.15), (0.34, 1.70, 2.82), materials["armor"], root, rotation=(math.radians(-8), 0, 0))
+    wedge(f"Care_TailFin_LOD{lod}", (0, -4.42, 2.15), (0.34, 1.70, 2.82), materials["care_tail"], root, rotation=(math.radians(-8), 0, 0))
     cube(f"Care_TailFinTip_LOD{lod}", (0, -4.83, 3.30), (0.38, 0.50, 0.10), materials["accent"], root, rotation=(math.radians(-8), 0, 0), bevel=0.025)
     for index, x in enumerate((-4.30, -2.35, 2.35, 4.30)):
         side = -1 if x < 0 else 1
@@ -1120,7 +1160,7 @@ def build_care_aircraft(lod: int, materials):
             f"Care_EngineNacelle_{index}_LOD{lod}",
             [(-1.05, 0.10, 0.38, 0.38), (-0.55, 0.08, 0.52, 0.50),
              (0.45, 0.10, 0.56, 0.54), (1.18, 0.12, 0.50, 0.48)],
-            materials["dark"], engine, max(10, segments // 2),
+            materials["care_engine"], engine, max(10, segments // 2),
         ).location.x = x
         torus(
             f"Care_TurbofanIntakeRing_{index}_LOD{lod}", (x, 1.18, 0.12),
@@ -1252,6 +1292,7 @@ def build_carpet_aircraft(lod: int, materials):
     root = root_metadata(f"Pass65CarpetAircraft_LOD{lod}", "support-aircraft-family-v1", lod, "carpet")
     root["visual_revision"] = "close-range-stealth-flying-wing-v4"
     root["detail_contract"] = "framed-intakes-service-panels-bay-structure-tailless-v4"
+    root["material_revision"] = "separated-daylight-readable-pbr-v1"
     segments = (34, 24, 16)[lod]
     rings = (18, 12, 8)[lod]
     fuselage = empty("carpet-aircraft-fuselage", (0, 0, 0), root, "carpet-fuselage")
@@ -1259,6 +1300,7 @@ def build_carpet_aircraft(lod: int, materials):
         f"Carpet_BlendedCentreBody_LOD{lod}",
         [(-1.55, -3.95), (1.55, -3.95), (2.22, 3.35), (0.0, 5.42), (-2.22, 3.35)],
         0.16, 0.54, materials["carpet"], fuselage, bevel=0.095,
+        underside_material=materials["carpet_underside"], edge_material=materials["carpet_edge"],
     )
     loft(
         f"Carpet_CentreSpine_LOD{lod}",
@@ -1285,6 +1327,7 @@ def build_carpet_aircraft(lod: int, materials):
         extruded_panel(
             f"Carpet_SweptWing_{side}_LOD{lod}", outline, 0.08, 0.34,
             materials["carpet"], wing, bevel=0.075,
+            underside_material=materials["carpet_underside"], edge_material=materials["carpet_edge"],
         )
         # Distinct sawtooth control surfaces preserve the low-observable flying-
         # wing outline without decorative vertical tails.
@@ -1862,54 +1905,83 @@ def render_aircraft_reviews(care_roots, carpet_roots, crate_roots) -> None:
     contact_sheet(paths, AIRCRAFT_REVIEW / "pass65-aircraft-contact-sheet.png")
 
 
+if AUTHORING_SCOPE != "aircraft":
+    reset()
+    chopper_images = {
+        kind: make_texture(
+            "pass65-chopper", kind, (0.17, 0.20, 0.16),
+            emissive_panel_seams=False,
+        )
+        for kind in ("albedo", "normal", "orm", "emissive")
+    }
+    chopper_materials = {
+        "armor": textured_material("MAT_Pass65Chopper_Armor_PBR", chopper_images),
+        "dark": simple_material("MAT_Pass65Chopper_DarkArmor", (0.055, 0.085, 0.095), 0.84, 0.31),
+        "metal": simple_material("MAT_Pass65Chopper_Gunmetal", (0.095, 0.120, 0.128), 0.92, 0.22),
+        "frame": simple_material("MAT_Pass65Chopper_CockpitFrame", (0.075, 0.135, 0.145), 0.78, 0.29),
+        "cockpit": simple_material("MAT_Pass65Chopper_CockpitInterior", (0.060, 0.095, 0.105), 0.50, 0.42),
+        "panel_wear": simple_material("MAT_Pass65Chopper_PanelWear", (0.28, 0.32, 0.29), 0.86, 0.34),
+        "panel_seam": simple_material("MAT_Pass65Chopper_PanelSeam", (0.055, 0.070, 0.067), 0.66, 0.58),
+        "seat": simple_material("MAT_Pass65Chopper_Seat", (0.10, 0.15, 0.16), 0.08, 0.62),
+        "glass": simple_material("MAT_Pass65Chopper_CanopyGlass", (0.025, 0.040, 0.035), 0.18, 0.24, (0.08, 0.035, 0.010), 0.10, 0.62),
+        "hudglass": simple_material("MAT_Pass65Chopper_HUDGlass", (0.02, 0.20, 0.24), 0.08, 0.10, (0.01, 0.46, 0.60), 0.42, 0.12),
+        "hud_cyan": simple_material("MAT_Pass65Chopper_HUDCyan", (0.01, 0.12, 0.15), 0.12, 0.22, (0.01, 0.62, 0.82), 1.8),
+        "hud_green": simple_material("MAT_Pass65Chopper_HUDGreen", (0.01, 0.15, 0.055), 0.10, 0.22, (0.06, 0.80, 0.26), 1.7),
+        "cyan": simple_material("MAT_Pass65Chopper_CyanInstrument", (0.01, 0.18, 0.24), 0.22, 0.18, (0.01, 0.82, 1.0), 5.2),
+        "green": simple_material("MAT_Pass65Chopper_GreenInstrument", (0.01, 0.20, 0.08), 0.20, 0.18, (0.08, 1.0, 0.38), 5.0),
+        "screen_cyan": simple_material("MAT_Pass65Chopper_CyanDisplay", (0.01, 0.12, 0.17), 0.10, 0.28, (0.01, 0.45, 0.72), 1.35),
+        "screen_green": simple_material("MAT_Pass65Chopper_GreenDisplay", (0.01, 0.13, 0.045), 0.10, 0.28, (0.03, 0.62, 0.20), 1.25),
+        "accent": simple_material("MAT_Pass65Chopper_RescueAccent", (0.78, 0.24, 0.035), 0.58, 0.34),
+        "blade": simple_material("MAT_Pass65Chopper_RotorBlade", (0.015, 0.022, 0.025), 0.72, 0.35),
+        "rotorblur": simple_material("MAT_Pass65Chopper_RotorBlur", (0.025, 0.045, 0.052), 0.08, 0.34, (0.01, 0.08, 0.09), 0.18, 0.065),
+        "rotortip": simple_material("MAT_Pass65Chopper_RotorTipBlur", (0.42, 0.12, 0.012), 0.05, 0.38, (1.0, 0.11, 0.01), 0.75, 0.24),
+        "muzzle": simple_material("MAT_Pass65Chopper_Muzzle", (1.0, 0.22, 0.025), 0.0, 0.15, (1.0, 0.07, 0.0), 8.0),
+    }
+    chopper_roots = [build_chopper(lod, chopper_materials) for lod in range(3)]
+    for lod, chopper_root in enumerate(chopper_roots):
+        export_root(chopper_root, CHOPPER_RAW / f"pass65-chopper-gunner-lod{lod}.glb")
+    render_chopper_reviews(chopper_roots)
+    bpy.ops.wm.save_as_mainfile(filepath=str(CHOPPER_BLEND))
+
+    if FOCUSED_FP_REVIEW or FP_DIAGNOSTIC_REVIEW:
+        print(f"CHOPPER_BLEND={CHOPPER_BLEND}")
+        print(f"CHOPPER_FP_REVIEW={CHOPPER_REVIEW / 'pass65-chopper-first-person-instruments.png'}")
+        print(f"CHOPPER_REVIEW={CHOPPER_REVIEW / 'pass65-chopper-contact-sheet.png'}")
+        raise SystemExit(0)
+
 reset()
-chopper_images = {
+care_images = {
     kind: make_texture(
-        "pass65-chopper", kind, (0.17, 0.20, 0.16),
+        "pass65-care-aircraft", kind, (0.58, 0.64, 0.59),
+        emissive_panel_seams=False, roughness_range=(0.68, 0.82),
+        metallic=0.08, warning_metallic=0.06,
+    )
+    for kind in ("albedo", "normal", "orm", "emissive")
+}
+carpet_images = {
+    kind: make_texture(
+        "pass65-carpet-aircraft", kind, (0.52, 0.57, 0.62),
+        emissive_panel_seams=False, roughness_range=(0.72, 0.88),
+        metallic=0.04, warning_metallic=0.03,
+    )
+    for kind in ("albedo", "normal", "orm", "emissive")
+}
+crate_images = {
+    kind: make_texture(
+        "pass65-support-aircraft", kind, (0.12, 0.15, 0.14),
         emissive_panel_seams=False,
     )
     for kind in ("albedo", "normal", "orm", "emissive")
 }
-chopper_materials = {
-    "armor": textured_material("MAT_Pass65Chopper_Armor_PBR", chopper_images),
-    "dark": simple_material("MAT_Pass65Chopper_DarkArmor", (0.055, 0.085, 0.095), 0.84, 0.31),
-    "metal": simple_material("MAT_Pass65Chopper_Gunmetal", (0.095, 0.120, 0.128), 0.92, 0.22),
-    "frame": simple_material("MAT_Pass65Chopper_CockpitFrame", (0.075, 0.135, 0.145), 0.78, 0.29),
-    "cockpit": simple_material("MAT_Pass65Chopper_CockpitInterior", (0.060, 0.095, 0.105), 0.50, 0.42),
-    "panel_wear": simple_material("MAT_Pass65Chopper_PanelWear", (0.28, 0.32, 0.29), 0.86, 0.34),
-    "panel_seam": simple_material("MAT_Pass65Chopper_PanelSeam", (0.055, 0.070, 0.067), 0.66, 0.58),
-    "seat": simple_material("MAT_Pass65Chopper_Seat", (0.10, 0.15, 0.16), 0.08, 0.62),
-    "glass": simple_material("MAT_Pass65Chopper_CanopyGlass", (0.025, 0.040, 0.035), 0.18, 0.24, (0.08, 0.035, 0.010), 0.10, 0.62),
-    "hudglass": simple_material("MAT_Pass65Chopper_HUDGlass", (0.02, 0.20, 0.24), 0.08, 0.10, (0.01, 0.46, 0.60), 0.42, 0.12),
-    "hud_cyan": simple_material("MAT_Pass65Chopper_HUDCyan", (0.01, 0.12, 0.15), 0.12, 0.22, (0.01, 0.62, 0.82), 1.8),
-    "hud_green": simple_material("MAT_Pass65Chopper_HUDGreen", (0.01, 0.15, 0.055), 0.10, 0.22, (0.06, 0.80, 0.26), 1.7),
-    "cyan": simple_material("MAT_Pass65Chopper_CyanInstrument", (0.01, 0.18, 0.24), 0.22, 0.18, (0.01, 0.82, 1.0), 5.2),
-    "green": simple_material("MAT_Pass65Chopper_GreenInstrument", (0.01, 0.20, 0.08), 0.20, 0.18, (0.08, 1.0, 0.38), 5.0),
-    "screen_cyan": simple_material("MAT_Pass65Chopper_CyanDisplay", (0.01, 0.12, 0.17), 0.10, 0.28, (0.01, 0.45, 0.72), 1.35),
-    "screen_green": simple_material("MAT_Pass65Chopper_GreenDisplay", (0.01, 0.13, 0.045), 0.10, 0.28, (0.03, 0.62, 0.20), 1.25),
-    "accent": simple_material("MAT_Pass65Chopper_RescueAccent", (0.78, 0.24, 0.035), 0.58, 0.34),
-    "blade": simple_material("MAT_Pass65Chopper_RotorBlade", (0.015, 0.022, 0.025), 0.72, 0.35),
-    "rotorblur": simple_material("MAT_Pass65Chopper_RotorBlur", (0.025, 0.045, 0.052), 0.08, 0.34, (0.01, 0.08, 0.09), 0.18, 0.065),
-    "rotortip": simple_material("MAT_Pass65Chopper_RotorTipBlur", (0.42, 0.12, 0.012), 0.05, 0.38, (1.0, 0.11, 0.01), 0.75, 0.24),
-    "muzzle": simple_material("MAT_Pass65Chopper_Muzzle", (1.0, 0.22, 0.025), 0.0, 0.15, (1.0, 0.07, 0.0), 8.0),
-}
-chopper_roots = [build_chopper(lod, chopper_materials) for lod in range(3)]
-for lod, chopper_root in enumerate(chopper_roots):
-    export_root(chopper_root, CHOPPER_RAW / f"pass65-chopper-gunner-lod{lod}.glb")
-render_chopper_reviews(chopper_roots)
-bpy.ops.wm.save_as_mainfile(filepath=str(CHOPPER_BLEND))
-
-if FOCUSED_FP_REVIEW or FP_DIAGNOSTIC_REVIEW:
-    print(f"CHOPPER_BLEND={CHOPPER_BLEND}")
-    print(f"CHOPPER_FP_REVIEW={CHOPPER_REVIEW / 'pass65-chopper-first-person-instruments.png'}")
-    print(f"CHOPPER_REVIEW={CHOPPER_REVIEW / 'pass65-chopper-contact-sheet.png'}")
-    raise SystemExit(0)
-
-reset()
-aircraft_images = {kind: make_texture("pass65-support-aircraft", kind, (0.12, 0.15, 0.14), emissive_panel_seams=False) for kind in ("albedo", "normal", "orm", "emissive")}
 aircraft_materials = {
-    "armor": textured_material("MAT_Pass65SupportAircraft_Armor_PBR", aircraft_images),
-    "carpet": textured_material("MAT_Pass65SupportAircraft_Carpet_PBR", aircraft_images, tint=(0.62, 0.68, 0.72, 1.0), emission=1.2),
+    "armor": textured_material("MAT_Pass65SupportAircraft_Armor_PBR", care_images),
+    "carpet": textured_material("MAT_Pass65SupportAircraft_Carpet_PBR", carpet_images, emission=1.2),
+    "care_underside": simple_material("MAT_Pass65CareAircraft_Underside", (0.40, 0.44, 0.42), 0.08, 0.78),
+    "care_edge": simple_material("MAT_Pass65CareAircraft_LeadingEdge", (0.66, 0.70, 0.65), 0.06, 0.72),
+    "care_tail": simple_material("MAT_Pass65CareAircraft_Tail", (0.52, 0.57, 0.52), 0.08, 0.74),
+    "care_engine": simple_material("MAT_Pass65CareAircraft_EngineNacelle", (0.46, 0.50, 0.52), 0.10, 0.70),
+    "carpet_underside": simple_material("MAT_Pass65CarpetAircraft_Underside", (0.34, 0.38, 0.42), 0.04, 0.82),
+    "carpet_edge": simple_material("MAT_Pass65CarpetAircraft_LeadingEdge", (0.60, 0.65, 0.68), 0.04, 0.76),
     "dark": simple_material("MAT_Pass65SupportAircraft_Dark", (0.065, 0.090, 0.100), 0.84, 0.34),
     "metal": simple_material("MAT_Pass65SupportAircraft_Metal", (0.105, 0.120, 0.128), 0.92, 0.23),
     "panel_wear": simple_material("MAT_Pass65SupportAircraft_PanelWear", (0.28, 0.30, 0.28), 0.84, 0.38),
@@ -1923,7 +1995,7 @@ aircraft_materials = {
     "blade": simple_material("MAT_Pass65SupportAircraft_Blade", (0.016, 0.023, 0.026), 0.76, 0.34),
     "bomb": simple_material("MAT_Pass65SupportAircraft_Bomb", (0.11, 0.15, 0.11), 0.72, 0.43),
     "cyan": simple_material("MAT_Pass65SupportAircraft_CargoLight", (0.02, 0.18, 0.22), 0.22, 0.18, (0.02, 0.90, 1.0), 5.0),
-    "crate": textured_material("MAT_Pass65SupportAircraft_Crate_PBR", aircraft_images, tint=(0.72, 0.84, 0.70, 1.0), emission=0.6),
+    "crate": textured_material("MAT_Pass65SupportAircraft_Crate_PBR", crate_images, emission=0.6),
     "pallet": simple_material("MAT_Pass65SupportAircraft_CratePallet", (0.16, 0.11, 0.065), 0.18, 0.70),
     "cloth": simple_material("MAT_Pass65SupportAircraft_Parachute", (0.025, 0.030, 0.027), 0.02, 0.94),
     "parachute_rib": simple_material("MAT_Pass65SupportAircraft_ParachuteRib", (0.34, 0.36, 0.32), 0.18, 0.70),
@@ -1936,12 +2008,15 @@ for lod, care_root in enumerate(care_roots):
     export_root(care_root, AIRCRAFT_RAW / f"pass65-care-aircraft-lod{lod}.glb")
 for lod, carpet_root in enumerate(carpet_roots):
     export_root(carpet_root, AIRCRAFT_RAW / f"pass65-carpet-aircraft-lod{lod}.glb")
-for lod, crate_root in enumerate(crate_roots):
-    export_root(crate_root, AIRCRAFT_RAW / f"pass65-care-crate-lod{lod}.glb")
+if AUTHORING_SCOPE != "aircraft":
+    for lod, crate_root in enumerate(crate_roots):
+        export_root(crate_root, AIRCRAFT_RAW / f"pass65-care-crate-lod{lod}.glb")
 render_aircraft_reviews(care_roots, carpet_roots, crate_roots)
 bpy.ops.wm.save_as_mainfile(filepath=str(AIRCRAFT_BLEND))
 
-print(f"CHOPPER_BLEND={CHOPPER_BLEND}")
+if AUTHORING_SCOPE != "aircraft":
+    print(f"CHOPPER_BLEND={CHOPPER_BLEND}")
 print(f"AIRCRAFT_BLEND={AIRCRAFT_BLEND}")
-print(f"CHOPPER_REVIEW={CHOPPER_REVIEW / 'pass65-chopper-contact-sheet.png'}")
+if AUTHORING_SCOPE != "aircraft":
+    print(f"CHOPPER_REVIEW={CHOPPER_REVIEW / 'pass65-chopper-contact-sheet.png'}")
 print(f"AIRCRAFT_REVIEW={AIRCRAFT_REVIEW / 'pass65-aircraft-contact-sheet.png'}")

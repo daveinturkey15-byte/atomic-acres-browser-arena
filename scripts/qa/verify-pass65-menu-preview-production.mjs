@@ -31,7 +31,7 @@ const runtimeSourcePath = path.join(root, 'src/ui/menu-preview-video.ts');
 const runtimeEntryPath = path.join(root, 'src/legacy-main.ts');
 const cameraEvaluatorPath = path.join(root, 'src/ui/menu-preview-camera.ts');
 const acceptedCockpitEvidence = 'docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png';
-const acceptedCockpitDigest = 'b75d0ca8dc8b8be61c93e06a737029ad679f480d27eea56edc66dadcd00fba9e';
+const acceptedCockpitDigest = '680a235168bfa0021232aa1e7cfe6332b91616f60bd5369b9fea60e110f9b4be';
 const requiredGenerationDate = '2026-08-02';
 const arenas = ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range'];
 const helicopterArenas = arenas.slice(0, 3);
@@ -599,7 +599,7 @@ if (choreography.schemaVersion !== 4
   || choreography.recipeId !== 'pass66-authoritative-runtime-menu-preview-v2'
   || choreography.captureId !== 'pass66-authoritative-runtime-menu-preview-capture-v2'
   || choreography.generatedAt !== requiredGenerationDate) failures.push('canonical runtime choreography schema/recipe/capture identity drifted');
-if (choreography.media?.cacheKey !== 'pass66-runtime-preview-v5') failures.push('canonical runtime preview cache family is not the unused Pass 66 v5 family');
+if (choreography.media?.cacheKey !== 'pass66-runtime-preview-v13') failures.push('canonical runtime preview cache family is not the fresh Pass 66 v13 family');
 if (choreography.capture?.source !== 'authoritative-runtime-arena'
   || choreography.capture?.backend !== 'webgpu'
   || choreography.capture?.overlayScale !== 0.5
@@ -644,7 +644,7 @@ if (webmEncoding?.encoder !== 'libvpx-vp9'
   || webmEncoding?.minimumVideoBitrateKbps !== 4500
   || webmEncoding?.maximumVideoBitrateKbps !== 7500
   || webmEncoding?.bufferSizeKbps !== 15000
-  || webmEncoding?.crf !== 28
+  || webmEncoding?.crf !== 20
   || webmEncoding?.cpuUsed !== 2
   || webmEncoding?.audioBitrateKbps !== 48
   || webmEncoding?.mimeType !== 'video/webm; codecs="vp9,opus"') failures.push('canonical VP9 1440p profile drifted');

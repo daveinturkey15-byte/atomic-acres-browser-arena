@@ -100,7 +100,11 @@
     button.type = 'button';
     button.className = `release-channel-option ${key}`;
     button.dataset.releaseChoice = key;
-    const badge = key === 'stable' ? 'STABLE' : key === 'rollback' ? 'ROLLBACK' : 'LIVE';
+    const badge = key === 'stable'
+      ? 'STABLE'
+      : key === 'rollback'
+        ? 'ROLLBACK'
+        : channel.deploymentState === 'live' ? 'LIVE' : 'RELEASE CANDIDATE';
     button.innerHTML = `<small>${displayPass(key, channel)} · ${badge}</small><strong>${channel.label}</strong><span>${channel.description}</span>`;
     button.addEventListener('click', () => route(key));
     options.append(button);

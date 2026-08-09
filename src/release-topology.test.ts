@@ -11,6 +11,19 @@ const staging = readFileSync('scripts/release/stage-release-topology.mjs', 'utf8
 const playwrightServer = readFileSync('scripts/qa/playwright-web-server.mjs', 'utf8');
 
 describe('Pass 69 release topology', () => {
+  it('identifies this source as the 69.3 candidate without moving protected fallback pins', () => {
+    expect(PASS66_RELEASE_IDENTITY).toMatchObject({
+      pass: 'PASS 69',
+      label: 'THE BIG ONE v69.3',
+      state: 'RELEASE CANDIDATE',
+      route: 'channels/the-big-one',
+      runtimeLabel: 'PASS 69 · THE BIG ONE v69.3',
+    });
+    expect(config.latest.label).toBe('THE BIG ONE v69.3');
+    expect(config.stable.sourceSha).toBe('8c3ad1cd4d819aba79f07c01c16c8c4294fd14c1');
+    expect(config.rollback.sourceSha).toBe('ac85e9b8b46cc2370aee903d564ecf3c4682b24c');
+  });
+
   it('retains the immutable best-ever Pass 62 benchmark record independently', () => {
     expect(pass62Benchmark).toMatchObject({
       designation: 'user-approved-best-ever-netcode',
@@ -40,7 +53,7 @@ describe('Pass 69 release topology', () => {
     });
   });
 
-  it('stages Pass 69 The Big One at its own live path and removes old live channels', () => {
+  it('stages the Pass 69 candidate at the promotable path and removes old channels', () => {
     expect(config.experimental).toEqual({
       pass: PASS66_RELEASE_IDENTITY.pass,
       label: PASS66_RELEASE_IDENTITY.label,
@@ -53,10 +66,10 @@ describe('Pass 69 release topology', () => {
     expect(JSON.stringify(config)).not.toContain('channels/new-netcode');
   });
 
-  it('renders exactly live Pass 69 The Big One, stable Pass 67.1 and rollback Pass 63 choices', () => {
+  it('keeps the Pass 69 badge candidate-aware beside stable Pass 67.1 and rollback Pass 63', () => {
     expect(shell).toContain("['experimental', 'stable', 'rollback']");
     expect(shell).not.toContain("['normal', 'stable', 'experimental']");
-    expect(shell).toContain("key === 'stable' ? 'STABLE' : key === 'rollback' ? 'ROLLBACK' : 'LIVE'");
+    expect(shell).toContain("channel.deploymentState === 'live' ? 'LIVE' : 'RELEASE CANDIDATE'");
     expect(shell).toContain("requested === 'rollback') return route('rollback')");
     expect(shell).toContain("if (!channel) continue");
     expect(shellHtml).toContain('Pass 69');
@@ -67,7 +80,7 @@ describe('Pass 69 release topology', () => {
     expect(shellHtml).not.toContain('Pass 59');
   });
 
-  it('routes root rooms and legacy latest or normal aliases to Pass 66', () => {
+  it('routes root rooms and legacy latest or normal aliases to The Big One', () => {
     expect(shell).toContain("requested === 'latest' || requested === 'normal') return route('experimental')");
     expect(shell).toContain("requested === 'experimental'");
     expect(shell).toContain("requested === 'stable'");
@@ -97,6 +110,8 @@ describe('Pass 69 release topology', () => {
     expect(staging).toContain("channels: Object.fromEntries(Object.entries({ experimental, stable, rollback })");
     expect(staging).toContain("RELEASE_ROLLBACK_DIST");
     expect(staging).toContain("schemaVersion: 4");
+    expect(staging).toContain("process.env.RELEASE_BUILT_AT?.trim() ? 'live' : 'candidate'");
+    expect(staging).toContain("key === 'experimental' ? { deploymentState } : {}");
   });
 
   it('stages the production channel topology before browser regression tests', () => {

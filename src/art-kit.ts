@@ -1119,7 +1119,7 @@ type OperatorRig = {
   weaponSocket: THREE.Group;
   hitProxyRoot: THREE.Group;
   weapon?: THREE.Group;
-  weaponId: WeaponId;
+  weaponId: WeaponId | null;
   /** Rigged operator skeletal bones for two-hand weapon grip IK. */
   leftShoulderBone?: THREE.Bone;
   leftElbowBone?: THREE.Bone;
@@ -1543,7 +1543,7 @@ export function buildOperator(
   team: Team,
   name = 'operator',
   flattenMaterials = false,
-  weaponId: WeaponId = 'carbine',
+  weaponId: WeaponId | null = 'carbine',
   appearance: OperatorAppearance = 'team',
 ): THREE.Group {
   const rigged = createRiggedOperator(team, name, flattenMaterials, appearance);
@@ -1614,7 +1614,7 @@ export function buildOperator(
       wristR.add(knife);
       runtimeRig.meleeKnife = knife;
     }
-    setOperatorWeapon(root, weaponId, flattenMaterials);
+    if (weaponId) setOperatorWeapon(root, weaponId, flattenMaterials);
     root.traverse((node) => {
       node.userData.targetRoot = root;
       // Combat rays use authoritative proxies only — presentation mesh never defines zones/damage.

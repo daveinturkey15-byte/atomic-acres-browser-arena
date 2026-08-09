@@ -18,7 +18,7 @@ export type MenuPreviewVideoDefinition = Readonly<{
 }>;
 
 const ROOT = './assets/original/menu-previews';
-const CACHE_KEY = 'pass66-runtime-preview-v5';
+const CACHE_KEY = 'pass66-runtime-preview-v13';
 const WEBM_MIME_TYPE = 'video/webm; codecs="vp9,opus"';
 const MP4_MIME_TYPE = 'video/mp4; codecs="avc1.640032,mp4a.40.2"';
 

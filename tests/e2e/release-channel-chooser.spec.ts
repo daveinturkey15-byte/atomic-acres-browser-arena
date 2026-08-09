@@ -8,18 +8,19 @@ const releaseChannels = JSON.parse(readFileSync(resolve(process.cwd(), 'release-
   experimental: { label: string; pass: string };
 };
 
-test('offers live Pass 69 The Big One, stable Pass 67.1 and rollback Pass 63 before the menu loads', async ({ page }, testInfo) => {
+test('offers the Pass 69.3 candidate without claiming it is live, plus stable Pass 67.1 and rollback Pass 63', async ({ page }, testInfo) => {
   await page.goto('/?release=choose&renderer=webgl2');
 
   await expect(page.locator('#release-channel-gate')).toBeVisible();
   await expect(page.locator('#menu')).toHaveCount(0);
   const hasRollback = await page.evaluate(() => Boolean(window.__ATOMIC_ACRES_RELEASE_CHANNELS__?.rollback));
   await expect(page.locator('.release-channel-option')).toHaveCount(hasRollback ? 3 : 2);
-  expect(releaseChannels.latest.label).toBe('THE BIG ONE v69.1');
-  expect(releaseChannels.experimental.label).toBe('THE BIG ONE v69.1');
+  expect(releaseChannels.latest.label).toBe('THE BIG ONE v69.3');
+  expect(releaseChannels.experimental.label).toBe('THE BIG ONE v69.3');
   await expect(page.locator('[data-release-choice="experimental"]')).toContainText(releaseChannels.experimental.pass);
   await expect(page.locator('[data-release-choice="experimental"]')).toContainText(releaseChannels.experimental.label);
-  await expect(page.locator('[data-release-choice="experimental"]')).toContainText('LIVE');
+  await expect(page.locator('[data-release-choice="experimental"]')).toContainText('RELEASE CANDIDATE');
+  await expect(page.locator('[data-release-choice="experimental"]')).not.toContainText(/\bLIVE\b/u);
   await expect(page.locator('[data-release-choice="stable"]')).toContainText('PASS 67.1');
   await expect(page.locator('[data-release-choice="stable"]')).toContainText('STABLE');
   if (hasRollback) {
@@ -33,9 +34,9 @@ test('offers live Pass 69 The Big One, stable Pass 67.1 and rollback Pass 63 bef
 
   const artifactRoot = resolve(process.cwd(), 'artifacts/pass69/release-shell');
   mkdirSync(artifactRoot, { recursive: true });
-  const screenshot = resolve(artifactRoot, 'the-big-one-live-pass671-stable.png');
+  const screenshot = resolve(artifactRoot, 'the-big-one-candidate-pass671-stable.png');
   await page.screenshot({ path: screenshot, animations: 'disabled', fullPage: true });
-  await testInfo.attach('the-big-one-live-pass671-stable', { path: screenshot, contentType: 'image/png' });
+  await testInfo.attach('the-big-one-candidate-pass671-stable', { path: screenshot, contentType: 'image/png' });
 
   await page.locator('[data-release-choice="experimental"]').click();
   await expect(page).toHaveURL(/\/channels\/the-big-one\/.*release=latest/);

@@ -58,6 +58,23 @@ function fakeWeaponGltf(id: Pass65AuthoredFirearmId, animated = false): FakeGltf
   identity.userData.design_id = `${id}-behavior-test`;
   identity.userData.display_name = id;
   identity.userData.silhouette_family = 'behavior-test';
+  if (id === 'carbine' || id === 'mini-uzi') {
+    const rear = new THREE.Object3D();
+    rear.name = 'rear-sight-socket';
+    rear.position.z = 0;
+    const front = new THREE.Object3D();
+    front.name = 'front-sight-socket';
+    front.position.z = 0.4;
+    const apertureFixture = new THREE.BufferGeometry();
+    apertureFixture.setAttribute('position', new THREE.Float32BufferAttribute([
+      -0.1, -0.1, -0.2, 0.1, -0.1, -0.2, 0.1, 0.1, -0.2, -0.1, 0.1, -0.2,
+      -0.1, -0.1, 0.2, 0.1, -0.1, 0.2, 0.1, 0.1, 0.2, -0.1, 0.1, 0.2,
+    ], 3));
+    apertureFixture.setIndex([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7]);
+    const rendered = new THREE.Mesh(apertureFixture, new THREE.MeshStandardMaterial());
+    rendered.name = `${id}_FP_LOD0_Runtime_static_MAT_behavior-test`;
+    identity.add(rear, front, rendered);
+  }
   scene.add(identity);
   const animations = animated
     ? [new THREE.AnimationClip('reload', 1, [
@@ -71,6 +88,7 @@ function fakeArmsGltf(): FakeGltf {
   const scene = new THREE.Group();
   for (const suffix of ['R', 'L']) {
     const shoulder = new THREE.Bone(); shoulder.name = `UpperArm${suffix}`;
+    shoulder.position.x = suffix === 'R' ? 0.24 : -0.24;
     const elbow = new THREE.Bone(); elbow.name = `LowerArm${suffix}`;
     const wrist = new THREE.Bone(); wrist.name = `Wrist${suffix}`;
     elbow.position.set(0, -0.36, 0);

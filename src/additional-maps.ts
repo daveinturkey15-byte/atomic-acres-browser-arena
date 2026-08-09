@@ -1575,6 +1575,8 @@ function flyingBlackCat(targets: PracticeTarget[], root: THREE.Group): void {
 type GunRangeTestDummyPresentation = Readonly<{
   root: THREE.Group;
   definition: GunRangeTestBayDummyDefinition;
+  /** The actual canonical operator child; poseOperator cannot animate its wrapper. */
+  riggedOperator: THREE.Group | null;
 }>;
 
 export type GunRangeTestBayDoorFrame = Readonly<{
@@ -1604,7 +1606,7 @@ function gunRangeTrainingDummy(
   // pre-load fixture and is replaced as soon as the shared rig is ready.
   const rigged = (() => {
     try {
-      return buildOperator(index % 2 === 0 ? 1 : 0, `gun-range-${definition.id}`, false, 'carbine', 'team');
+      return buildOperator(index % 2 === 0 ? 1 : 0, `gun-range-${definition.id}`, false, null, 'team');
     } catch {
       // Canonical rig not loaded yet (e.g. headless/unit environments): fall
       // back to the painted training robot below. Live deployment always loads
@@ -1644,7 +1646,7 @@ function gunRangeTrainingDummy(
       health: 300,
       kind: 'training-dummy',
     });
-    return Object.freeze({ root, definition });
+    return Object.freeze({ root, definition, riggedOperator: rigged });
   }
   // Review capture and compatibility renderers must not turn the slow targets
   // into black silhouettes when authored practical lights are culled. These
@@ -1696,7 +1698,7 @@ function gunRangeTrainingDummy(
     health: 300,
     kind: 'training-dummy',
   });
-  return Object.freeze({ root, definition });
+  return Object.freeze({ root, definition, riggedOperator: null });
 }
 
 function syncGunRangeTestBayDoorLeaf(root: THREE.Object3D, state: GunRangeTestBayDoorState): void {
@@ -1800,6 +1802,7 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   const testBayVisibleCeiling = new THREE.MeshBasicMaterial({ color: 0x263237, toneMapped: false });
   const secureDoorMaterial = new THREE.MeshStandardMaterial({ color: 0x283236, emissive: 0x14262a, emissiveIntensity: 0.48, roughness: 0.5, metalness: 0.78 });
   const secureDoorPanelMaterial = terminalSurfaceMaterial('panel', 0x283236, '#4a5a5e', 0.52, 0.74, [2, 3]);
+  secureDoorPanelMaterial.name = 'GunRange_TestBay_SecureDoor_PanelTexture';
 
   box(builder, 'gun-range-test-bay-corridor-floor', [35.75, -0.08, 12], [30.5, 0.16, 8], testBayFloor, { solid: false, shots: true });
   box(builder, 'gun-range-test-bay-corridor-north-wall', [35.75, 2.6, 7.75], [30.5, 5.2, 0.5], testBayWall, { ballisticMaterial: 'structural-metal' });
@@ -1850,17 +1853,55 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   box(builder, 'gun-range-test-bay-door-rail-south', [51.6, 3.3, 15.95], [0.3, 6.6, 0.3], secureDoorMaterial, { solid: false, shots: false });
   // Secure door leaf: textured armour panels with amber/cyan status edge
   // lights so the door reads as the room's gameplay entrance from both faces.
-  const secureDoor = box(builder, 'gun-range-test-bay-secure-door-leaf', [51.5, 10.25, 12], [0.7, 6.5, 7.6], secureDoorPanelMaterial, { solid: false, shots: false });
+  const secureDoor = box(builder, 'gun-range-test-bay-secure-door-leaf', [51.5, 3.25, 12], [0.7, 6.5, 7.6], secureDoorPanelMaterial, { solid: false, shots: false });
   secureDoor.userData.presentationBatchCandidate = false;
   secureDoor.userData.dynamic = true;
   secureDoor.userData.authorityId = GUN_RANGE_TEST_BAY_CONTRACT.door.id;
   secureDoor.userData.portalCollisionStatus = 'runtime-helper-required';
   secureDoor.userData.defaultFailsOpen = true;
-  for (const [z, side] of [[7.1, 'north'], [16.9, 'south']] as const) {
-    const edge = box(builder, `gun-range-test-bay-door-edge-${side}`, [51.5, 10.25, z], [0.71, 6.5, 0.09], z < 12 ? testBayAmber : testBayCyan, { solid: false, shots: false, cast: false });
-    edge.userData.presentationBatchCandidate = false;
-    edge.userData.dynamic = true;
-  }
+  const doorStatusRangeMaterial = new THREE.MeshStandardMaterial({
+    color: 0xf0b24b,
+    emissive: 0xf0b24b,
+    emissiveIntensity: 3.1,
+    roughness: 0.28,
+    metalness: 0.18,
+    toneMapped: false,
+  });
+  doorStatusRangeMaterial.name = 'GunRange_TestBay_DoorStatus_Amber';
+  const doorStatusBayMaterial = new THREE.MeshStandardMaterial({
+    color: 0x53ded8,
+    emissive: 0x53ded8,
+    emissiveIntensity: 3.1,
+    roughness: 0.28,
+    metalness: 0.18,
+    toneMapped: false,
+  });
+  doorStatusBayMaterial.name = 'GunRange_TestBay_DoorStatus_Cyan';
+  const attachDoorFixture = (
+    name: string,
+    position: [number, number, number],
+    size: [number, number, number],
+    material: THREE.Material,
+    role: 'edge' | 'status-light',
+  ): THREE.Mesh => {
+    const fixture = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+    fixture.name = name;
+    fixture.position.set(...position);
+    fixture.castShadow = false;
+    fixture.receiveShadow = false;
+    fixture.userData.presentationOnly = true;
+    fixture.userData.presentationBatchCandidate = false;
+    fixture.userData.dynamic = true;
+    fixture.userData.doorAssemblyRole = role;
+    secureDoor.add(fixture);
+    return fixture;
+  };
+  attachDoorFixture('gun-range-test-bay-door-edge-north', [0, 0, -3.74], [0.7, 6.5, 0.12], doorStatusRangeMaterial, 'edge');
+  attachDoorFixture('gun-range-test-bay-door-edge-south', [0, 0, 3.74], [0.7, 6.5, 0.12], doorStatusBayMaterial, 'edge');
+  // One flush emissive indicator per face keeps the moving entrance readable
+  // from the range and bay without introducing an unoccluded runtime light.
+  attachDoorFixture('gun-range-test-bay-door-status-range-face', [-0.335, -2.3, 0], [0.04, 0.82, 1.45], doorStatusRangeMaterial, 'status-light');
+  attachDoorFixture('gun-range-test-bay-door-status-bay-face', [0.335, -2.3, 0], [0.04, 0.82, 1.45], doorStatusBayMaterial, 'status-light');
   for (const z of [-19, -7, 5, 17, 29]) {
     box(builder, 'gun-range-test-bay-ceiling-light', [75.5, 25.02, z], [35, 0.12, 0.3], z % 2 === 0 ? testBayAmber : testBayCyan, { solid: false, shots: false, cast: false });
   }
@@ -1900,12 +1941,26 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     const marker = box(builder, `gun-range-test-bay-weapon-marker-${station.id}`, [station.position.x, 0.055, station.position.z], [4.8, 0.11, 0.5], index % 2 === 0 ? testBayCyan : testBayAmber, { solid: false, shots: false, cast: false });
     marker.userData.weaponId = station.id;
     marker.userData.runtimeStatus = station.runtimeStatus;
+    const weapon = WEAPONS[station.id];
+    const label = rangeSign(weapon.name.toUpperCase(), weapon.color, `gun-range-test-bay-weapon-label-${station.id}`, [5.2, 0.7]);
+    if (label) {
+      label.position.set(0, 0.72, -1.05);
+      label.rotation.x = -Math.PI * 0.08;
+      label.userData.weaponId = station.id;
+      label.userData.canonicalWeaponName = weapon.name;
+      marker.add(label);
+    }
   }
 
   const testDummyPresentations = GUN_RANGE_TEST_BAY_CONTRACT.dummies.map(
     (definition, index) => gunRangeTrainingDummy(builder, targets, definition, index),
   );
   root.userData.gunRangeTestDummies = testDummyPresentations;
+  root.userData.gunRangeTestBayWeaponLabels = Object.freeze(GUN_RANGE_TEST_BAY_CONTRACT.weaponStations.map((station) => Object.freeze({
+    id: station.id,
+    name: WEAPONS[station.id].name,
+    objectName: `gun-range-test-bay-weapon-label-${station.id}`,
+  })));
   root.userData.gunRangeTestBayContract = GUN_RANGE_TEST_BAY_CONTRACT;
   root.userData.gunRangeTestBayRuntime = Object.freeze({
     structure: 'implemented',
@@ -2144,7 +2199,7 @@ export function updateGunRangePresentation(root: THREE.Object3D, nowMs: number):
       + Math.sin(phase) * Number(target.userData.lateralAmplitudeM);
   });
   const testDummies = root.userData.gunRangeTestDummies as GunRangeTestDummyPresentation[] | undefined;
-  testDummies?.forEach(({ root: dummy, definition }, index) => {
+  testDummies?.forEach(({ root: dummy, definition, riggedOperator }, index) => {
     const pose = gunRangeTestBayDummyPose(definition, nowMs);
     dummy.position.set(
       pose.position.x,
@@ -2155,8 +2210,8 @@ export function updateGunRangePresentation(root: THREE.Object3D, nowMs: number):
     // Rigged operators (the canonical in-match family) animate through the
     // shared pose pipeline, exactly like live combatants; the painted robot's
     // named-limb walk is only for the pre-rig fixture.
-    if (dummy.userData.riggedOperator === true) {
-      poseOperator(dummy, 'stand', definition.speedMps, nowMs * 0.008 + index, Math.min(1, 0.016 * 24), 0, 0.016);
+    if (riggedOperator) {
+      poseOperator(riggedOperator, 'stand', definition.speedMps, nowMs * 0.008 + index, Math.min(1, 0.016 * 24), 0, 0.016);
       return;
     }
     const arms = [

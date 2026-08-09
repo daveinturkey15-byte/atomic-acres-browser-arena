@@ -41,10 +41,12 @@ const expectedRefinementContracts = Object.freeze({
   care: Object.freeze({
     visualRevision: 'close-range-heavy-cargo-aircraft-v4',
     detailContract: 'framed-flightdeck-panelled-hull-ramp-bogie-turbofans-v4',
+    materialRevision: 'separated-daylight-readable-pbr-v1',
   }),
   carpet: Object.freeze({
     visualRevision: 'close-range-stealth-flying-wing-v4',
     detailContract: 'framed-intakes-service-panels-bay-structure-tailless-v4',
+    materialRevision: 'separated-daylight-readable-pbr-v1',
   }),
   parachuteCrate: Object.freeze({
     visualRevision: 'close-range-rigged-pallet-drop-v4',
@@ -66,7 +68,8 @@ if (chopperEntry.visualRevision !== expectedRefinementContracts.chopper.visualRe
 for (const [variant, expected] of Object.entries(expectedRefinementContracts)) {
   if (variant === 'chopper') continue;
   const entry = aircraftEntry.variants?.[variant];
-  if (entry?.visualRevision !== expected.visualRevision || entry?.detailContract !== expected.detailContract) {
+  if (entry?.visualRevision !== expected.visualRevision || entry?.detailContract !== expected.detailContract
+    || (expected.materialRevision && entry?.materialRevision !== expected.materialRevision)) {
     failures.push(`${variant}: production manifest does not pin the expected v4 close-range refinement`);
   }
   if (!entry?.triangleRange || Object.keys(entry.triangleRange).length !== entry?.worldGlbs?.length) {
@@ -121,8 +124,8 @@ else {
     "carpet=[o for o in roots if o.get('presentation_variant')=='carpet']",
     "crate=[o for o in roots if o.get('presentation_variant')=='parachute-crate']",
     'assert len(roots)==8 and len(care)==3 and len(carpet)==3 and len(crate)==2',
-    "assert all(r.get('visual_revision')=='close-range-heavy-cargo-aircraft-v4' and r.get('detail_contract')=='framed-flightdeck-panelled-hull-ramp-bogie-turbofans-v4' for r in care)",
-    "assert all(r.get('visual_revision')=='close-range-stealth-flying-wing-v4' and r.get('detail_contract')=='framed-intakes-service-panels-bay-structure-tailless-v4' for r in carpet)",
+    "assert all(r.get('visual_revision')=='close-range-heavy-cargo-aircraft-v4' and r.get('detail_contract')=='framed-flightdeck-panelled-hull-ramp-bogie-turbofans-v4' and r.get('material_revision')=='separated-daylight-readable-pbr-v1' for r in care)",
+    "assert all(r.get('visual_revision')=='close-range-stealth-flying-wing-v4' and r.get('detail_contract')=='framed-intakes-service-panels-bay-structure-tailless-v4' and r.get('material_revision')=='separated-daylight-readable-pbr-v1' for r in carpet)",
     "assert all(r.get('visual_revision')=='close-range-rigged-pallet-drop-v4' and r.get('detail_contract')=='corner-guards-buckles-latches-crossweb-ribbed-canopy-v4' for r in crate)",
     "names=lambda r:[str(c.get('canonical_node_name','')) for c in r.children_recursive]",
     "count=lambda r,prefix:sum(n.startswith(prefix) for n in names(r))",
@@ -133,8 +136,19 @@ else {
     "assert count(carpet0,'Carpet_WingServicePanel_')>=6 and count(carpet0,'Carpet_IntakeFrame_')>=8 and count(carpet0,'Carpet_BombBayCrossFrame_')>=4",
     "assert count(crate0,'Care_CrateLatch_')>=4 and count(crate0,'Care_PalletTieDownCleat_')>=4",
     "assert all(not any(n.startswith(('Carpet_TailFin_','Carpet_TailPlane_')) for n in names(r)) for r in carpet)",
+    "required_materials={'MAT_Pass65CareAircraft_Underside','MAT_Pass65CareAircraft_LeadingEdge','MAT_Pass65CareAircraft_Tail','MAT_Pass65CareAircraft_EngineNacelle','MAT_Pass65CarpetAircraft_Underside','MAT_Pass65CarpetAircraft_LeadingEdge'}",
+    "assert required_materials.issubset(set(bpy.data.materials.keys()))",
+    "image=lambda name:bpy.data.images.get(name)",
+    "mean=lambda img,channel:sum(img.pixels[channel::4])/(len(img.pixels)//4)",
+    "care_albedo=image('pass65-care-aircraft_Albedo')",
+    "carpet_albedo=image('pass65-carpet-aircraft_Albedo')",
+    "care_orm=image('pass65-care-aircraft_Orm')",
+    "carpet_orm=image('pass65-carpet-aircraft_Orm')",
+    "assert all((care_albedo,carpet_albedo,care_orm,carpet_orm))",
+    "assert mean(care_albedo,0)>0.43 and mean(carpet_albedo,0)>0.38 and mean(care_albedo,0)>mean(carpet_albedo,0)+0.03",
+    "assert mean(care_orm,1)>0.64 and mean(carpet_orm,1)>0.68 and mean(care_orm,2)<0.12 and mean(carpet_orm,2)<0.08",
     'assert len(bpy.data.actions)>=32',
-    'assert len([i for i in bpy.data.images if i.packed_file])>=4',
+    'assert len([i for i in bpy.data.images if i.packed_file])>=12',
   ].join('; ');
   const blendAudits = [
     [chopperEntry.sourceBlend.path, chopperBlendExpression],
@@ -210,7 +224,13 @@ async function verifyPbrMaps(label, maps) {
   }
 }
 await verifyPbrMaps('chopper', chopperEntry.pbrMaps);
-await verifyPbrMaps('aircraft', aircraftEntry.pbrMaps);
+await verifyPbrMaps('care aircraft', aircraftEntry.pbrMaps?.care);
+await verifyPbrMaps('carpet aircraft', aircraftEntry.pbrMaps?.carpet);
+await verifyPbrMaps('parachute crate', aircraftEntry.pbrMaps?.parachuteCrate);
+if (aircraftEntry.pbrMaps?.care?.baseColor?.sha256 === aircraftEntry.pbrMaps?.carpet?.baseColor?.sha256
+  || aircraftEntry.pbrMaps?.care?.orm?.sha256 === aircraftEntry.pbrMaps?.carpet?.orm?.sha256) {
+  failures.push('care/carpet aircraft must not share albedo or ORM texture digests');
+}
 
 async function verifyReview(label, review, expectedRenderCount, sheetWidth, sheetHeight, requiresAcceptedFrame = false) {
   if (!Array.isArray(review?.renders) || review.renders.length !== expectedRenderCount) failures.push(`${label}: review render set is incomplete`);
@@ -263,7 +283,8 @@ if (aircraftProvenanceBytes) {
   for (const [variant, expected] of Object.entries(expectedRefinementContracts)) {
     if (variant === 'chopper') continue;
     if (provenance.variants?.[variant]?.visualRevision !== expected.visualRevision
-      || provenance.variants?.[variant]?.detailContract !== expected.detailContract) {
+      || provenance.variants?.[variant]?.detailContract !== expected.detailContract
+      || (expected.materialRevision && provenance.variants?.[variant]?.materialRevision !== expected.materialRevision)) {
       failures.push(`${variant}: aircraft provenance refinement contract drift`);
     }
   }

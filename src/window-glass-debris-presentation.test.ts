@@ -6,6 +6,7 @@ import {
   WINDOW_GLASS_DEBRIS_VISUAL_CONTRACT,
   createFracturedWindowDebrisVisual,
   prewarmFracturedWindowDebrisVisual,
+  updateFracturedWindowDebrisVisual,
 } from './window-glass-debris-presentation';
 
 describe('persistent window glass debris presentation', () => {
@@ -22,28 +23,48 @@ describe('persistent window glass debris presentation', () => {
       fragmentCount: WINDOW_GLASS_DEBRIS_FRAGMENT_COUNT,
       intactPaneMeshCount: 0,
     });
-    expect(shards).toBeInstanceOf(THREE.Mesh);
-    const geometry = (shards as THREE.Mesh).geometry;
+    expect(shards).toBeInstanceOf(THREE.InstancedMesh);
+    const instancedShards = shards as THREE.InstancedMesh;
+    const geometry = instancedShards.geometry;
     expect(geometry).toBeInstanceOf(THREE.BufferGeometry);
     expect(geometry).not.toBeInstanceOf(THREE.BoxGeometry);
-    expect(geometry.getAttribute('position').count).toBe(WINDOW_GLASS_DEBRIS_FRAGMENT_COUNT * 3);
+    expect(geometry.getAttribute('position').count).toBe(3);
+    expect(instancedShards.count).toBe(WINDOW_GLASS_DEBRIS_FRAGMENT_COUNT);
     expect(geometry.userData).toMatchObject({
       fragmentCount: WINDOW_GLASS_DEBRIS_FRAGMENT_COUNT,
       intactPane: false,
     });
 
-    const positions = geometry.getAttribute('position') as THREE.BufferAttribute;
-    const shardScale = (shards as THREE.Mesh).scale;
     let shardArea = 0;
-    for (let offset = 0; offset < positions.count; offset += 3) {
-      const a = new THREE.Vector2(positions.getX(offset) * shardScale.x, positions.getY(offset) * shardScale.y);
-      const b = new THREE.Vector2(positions.getX(offset + 1) * shardScale.x, positions.getY(offset + 1) * shardScale.y);
-      const c = new THREE.Vector2(positions.getX(offset + 2) * shardScale.x, positions.getY(offset + 2) * shardScale.y);
-      shardArea += Math.abs(b.clone().sub(a).cross(c.clone().sub(a))) / 2;
+    const shardAreas: number[] = [];
+    const sideLengths: number[] = [];
+    const matrix = new THREE.Matrix4();
+    for (let index = 0; index < instancedShards.count; index += 1) {
+      instancedShards.getMatrixAt(index, matrix);
+      const a = new THREE.Vector3(0, 0, 0).applyMatrix4(matrix);
+      const b = new THREE.Vector3(1, 0, 0).applyMatrix4(matrix);
+      const c = new THREE.Vector3(0, 1, 0).applyMatrix4(matrix);
+      const area = b.clone().sub(a).cross(c.clone().sub(a)).length() / 2;
+      shardAreas.push(area);
+      shardArea += area;
+      sideLengths.push(a.distanceTo(b), b.distanceTo(c), c.distanceTo(a));
     }
     const intactPaneArea = halfExtents.x * halfExtents.y * 4;
     expect(shardArea).toBeGreaterThan(intactPaneArea * 0.2);
     expect(shardArea).toBeLessThan(intactPaneArea * 0.6);
+    expect(Math.min(...shardAreas)).toBeGreaterThan(1e-4);
+    expect(Math.max(...sideLengths) - Math.min(...sideLengths)).toBeGreaterThan(0.25);
+    expect(root.userData).toMatchObject({ independentShardTransforms: true, radialFracture: true });
+
+    const before = new THREE.Matrix4();
+    const after = new THREE.Matrix4();
+    instancedShards.getMatrixAt(0, before);
+    expect(updateFracturedWindowDebrisVisual(root, 0.4)).toBe(true);
+    instancedShards.getMatrixAt(0, after);
+    expect(after.equals(before)).toBe(false);
+    const second = new THREE.Matrix4();
+    instancedShards.getMatrixAt(1, second);
+    expect(second.equals(after)).toBe(false);
   });
 
   it('reuses analysed shard buffers and submits them during deployment prewarm', async () => {
@@ -53,8 +74,8 @@ describe('persistent window glass debris presentation', () => {
     const second = createFracturedWindowDebrisVisual({
       id: 'window-debris:second', halfExtents: { x: 0.5, y: 0.4, z: 0.02 }, reducedRenderMode: false,
     });
-    expect((first.getObjectByName('window-debris:first:shard-cluster') as THREE.Mesh).geometry)
-      .toBe((second.getObjectByName('window-debris:second:shard-cluster') as THREE.Mesh).geometry);
+    expect((first.getObjectByName('window-debris:first:shard-cluster') as THREE.InstancedMesh).geometry)
+      .toBe((second.getObjectByName('window-debris:second:shard-cluster') as THREE.InstancedMesh).geometry);
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera();
@@ -72,14 +93,45 @@ describe('persistent window glass debris presentation', () => {
     expect(submittedRoot!.parent).toBeNull();
   });
 
-  it('wires the authoritative window breach to the fractured visual helper', () => {
+  it('retains the exact prewarmed instance and never allocates shard geometry on the breach frame', () => {
     const source = readFileSync('src/legacy-main.ts', 'utf8');
+    const prewarmStart = source.indexOf('async function prewarmWindowGlassDebrisPool');
     const start = source.indexOf('function spawnPersistentWindowDebris');
     const end = source.indexOf('function clearPersistentWindowDebris', start);
+    expect(prewarmStart).toBeGreaterThanOrEqual(0);
     expect(start).toBeGreaterThanOrEqual(0);
     expect(end).toBeGreaterThan(start);
+    const prewarm = source.slice(prewarmStart, start);
     const block = source.slice(start, end);
-    expect(block).toContain('createFracturedWindowDebrisVisual({');
+    expect(prewarm).toContain('createFracturedWindowDebrisVisual({');
+    expect(prewarm).toContain('await renderRuntime.compileAndRender(stage, camera, scene);');
+    expect(block).toContain('pooledWindowDebris.get(windowDebrisPoolKey(arena.id, window.id))');
+    expect(block).not.toContain('createFracturedWindowDebrisVisual({');
     expect(block).not.toContain('new THREE.BoxGeometry');
+  });
+
+  it('prewarms zero-light world glass and impact programs before staging the flare PointLight', () => {
+    const source = readFileSync('src/legacy-main.ts', 'utf8');
+    const start = source.indexOf('async function prewarmArenaBoundGameplayPresentations');
+    const end = source.indexOf('function bootstrapMenuPreview', start);
+    const prewarm = source.slice(start, end);
+    const disableViewmodelFill = prewarm.indexOf('camera.layers.disable(VIEWMODEL_RENDER_LAYER);');
+    const tracer = prewarm.indexOf('await tracerPool.prewarm(renderRuntime, camera, sceneGeneration);', disableViewmodelFill);
+    const impact = prewarm.indexOf('await impactPresentation.prewarm(renderRuntime, camera, sceneGeneration);', disableViewmodelFill);
+    const glass = prewarm.indexOf('prewarmWindowGlassDebrisPool(sceneGeneration),', disableViewmodelFill);
+    const flarePointLight = prewarm.lastIndexOf('await flareProjectileSystem.prewarm(renderRuntime, camera, sceneGeneration);');
+    const restoreViewmodelFill = prewarm.indexOf('camera.layers.mask = priorWorldPrewarmCameraLayerMask;');
+    const flareFirstShot = prewarm.indexOf("setBootstrapStage('prewarming-flare-first-shot');");
+
+    expect(disableViewmodelFill).toBeGreaterThanOrEqual(0);
+    for (const zeroLightPresentation of [tracer, impact, glass]) {
+      expect(zeroLightPresentation).toBeGreaterThan(disableViewmodelFill);
+      expect(zeroLightPresentation).toBeLessThan(flarePointLight);
+    }
+    expect(flarePointLight).toBeGreaterThan(glass);
+    expect(restoreViewmodelFill).toBeGreaterThan(flarePointLight);
+    expect(flareFirstShot).toBeGreaterThan(restoreViewmodelFill);
+    const preFlareWorldWave = prewarm.slice(disableViewmodelFill, flarePointLight);
+    expect(preFlareWorldWave).not.toContain('flareProjectileSystem.prewarm(');
   });
 });

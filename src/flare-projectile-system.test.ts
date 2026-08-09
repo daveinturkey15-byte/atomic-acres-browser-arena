@@ -109,6 +109,51 @@ describe('flare projectile system', () => {
     });
   });
 
+  it('samples hostile targets once per owner/team per update for concurrent flares', () => {
+    const system = new FlareProjectileSystem(new THREE.Scene(), true);
+    for (const actionNonce of [1, 2]) {
+      expect(system.spawn({
+        ownerId: 'shared-owner', ownerTeam: 0, origin: new THREE.Vector3(),
+        direction: new THREE.Vector3(1, 0, 0), authority: true, actionNonce, now: 0,
+      })).toBe(true);
+    }
+    const hostileTargets = vi.fn(() => []);
+    system.update(0.01, 10, callbacks({ hostileTargets }));
+    expect(hostileTargets).toHaveBeenCalledTimes(1);
+  });
+
+  it('exposes allocation-free lifecycle counters for the frame loop', () => {
+    const system = new FlareProjectileSystem(new THREE.Scene(), true);
+    const initialRevision = system.lifecycleRevisionValue();
+    expect(system.hasActiveProjectiles()).toBe(false);
+    expect(system.spawn({
+      ownerId: 'owner-a', ownerTeam: 0, origin: new THREE.Vector3(),
+      direction: new THREE.Vector3(1, 0, 0), authority: true, actionNonce: 10, now: 0,
+    })).toBe(true);
+    expect(system.hasActiveProjectiles()).toBe(true);
+    expect(system.lifecycleRevisionValue()).toBeGreaterThan(initialRevision);
+    const flightRevision = system.lifecycleRevisionValue();
+    system.update(0.01, 10, callbacks({ worldCollisionFraction: () => 0.5 }));
+    expect(system.lifecycleRevisionValue()).toBeGreaterThan(flightRevision);
+    expect(system.burnPulseRevisionValue()).toBe(0);
+  });
+
+  it('does not rebuild target or world snapshots between authority burn pulses', () => {
+    const system = new FlareProjectileSystem(new THREE.Scene(), true);
+    const hostileTargets = vi.fn(() => []);
+    expect(system.spawn({
+      ownerId: 'owner-a', ownerTeam: 0, origin: new THREE.Vector3(),
+      direction: new THREE.Vector3(1, 0, 0), authority: true, actionNonce: 11, now: 0,
+    })).toBe(true);
+    expect(system.requiresWorldSnapshot(10)).toBe(true);
+    system.update(0.01, 10, callbacks({ hostileTargets, worldCollisionFraction: () => 0.5 }));
+    hostileTargets.mockClear();
+    expect(system.requiresWorldSnapshot(20)).toBe(false);
+    system.update(0.01, 20, callbacks({ hostileTargets }));
+    expect(hostileTargets).not.toHaveBeenCalled();
+    expect(system.requiresWorldSnapshot(510)).toBe(true);
+  });
+
   it('exports only authoritative entities in canonical snapshots while exposing read-only authority inspection', () => {
     const system = new FlareProjectileSystem(new THREE.Scene(), true);
     expect(system.spawn({

@@ -370,7 +370,7 @@ export function createOperatorInstanceMaterialResolver(
   };
 }
 
-export const FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY = 0.7;
+export const FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY = 0.18;
 
 export function firstPersonArmMaterialReadabilityProfile(materialName: string): Readonly<{
   emissive: number;
@@ -378,13 +378,13 @@ export function firstPersonArmMaterialReadabilityProfile(materialName: string): 
   color?: number;
 }> | null {
   const normalized = materialName.toLowerCase();
-  if (normalized === 'skin') return Object.freeze({ emissive: 0x0a1416, emissiveIntensity: 0.18, color: 0x324249 });
+  if (normalized === 'skin') return Object.freeze({ emissive: 0x24160f, emissiveIntensity: 0.08 });
   if (normalized.includes('arms_glove') || normalized.includes('arms_fingerglove')) {
-    return Object.freeze({ emissive: 0x2f6b78, emissiveIntensity: 0.68 });
+    return Object.freeze({ emissive: 0x183238, emissiveIntensity: 0.14 });
   }
-  if (normalized.includes('arms_sleeve')) return Object.freeze({ emissive: 0x285c68, emissiveIntensity: 0.62 });
+  if (normalized.includes('arms_sleeve')) return Object.freeze({ emissive: 0x142b30, emissiveIntensity: 0.12 });
   if (normalized.includes('arms_armorpad')) {
-    return Object.freeze({ emissive: 0x2d6570, emissiveIntensity: 0.66, color: 0x41656f });
+    return Object.freeze({ emissive: 0x172f34, emissiveIntensity: 0.1 });
   }
   return null;
 }
@@ -394,8 +394,9 @@ function materialForFirstPerson(material: THREE.Material, flattenMaterials: bool
   const profile = firstPersonArmMaterialReadabilityProfile(material.name);
   if (result instanceof THREE.MeshStandardMaterial && profile) {
     // Preserve the licensed base-color, normal, roughness and metallic maps.
-    // A bounded cool emissive lift keeps fingers and sleeves readable in the
-    // darkest arenas without turning them into flat self-lit plastic.
+    // Retain only a low fill contribution for the darkest arenas. The authored
+    // base-colour, normal and ORM maps must remain the dominant surface signal;
+    // the previous near-0.7 emissive lift flattened gloves into teal plastic.
     result.emissive.setHex(profile.emissive);
     result.emissiveIntensity = Math.min(profile.emissiveIntensity, FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY);
     if (profile.color !== undefined) result.color.setHex(profile.color);
@@ -489,20 +490,55 @@ export type FirstPersonRiggedArms = {
   knifeSocket: THREE.Object3D;
 };
 
+export type FirstPersonArmHandedness = Readonly<{
+  contract: 'authored-positive-determinant-right-on-positive-x-v1';
+  valid: boolean;
+  rightShoulderX: number;
+  leftShoulderX: number;
+  shoulderSeparation: number;
+  visualDeterminant: number;
+}>;
+
+/**
+ * Audits the exported scene in world space. Local bone translations are not a
+ * handedness signal because the GLB owns parent rotations and scale. The Pass
+ * 65 delivery already resolves its right chain to camera-positive X; reflecting
+ * the runtime root a second time crossed both shoulders and inverted tangents.
+ */
+export function firstPersonArmHandedness(visual: THREE.Object3D): FirstPersonArmHandedness {
+  visual.updateWorldMatrix(true, true);
+  const right = visual.getObjectByName('UpperArmR');
+  const left = visual.getObjectByName('UpperArmL');
+  const rightShoulderX = right?.getWorldPosition(new THREE.Vector3()).x ?? Number.NaN;
+  const leftShoulderX = left?.getWorldPosition(new THREE.Vector3()).x ?? Number.NaN;
+  const shoulderSeparation = rightShoulderX - leftShoulderX;
+  const visualDeterminant = visual.matrixWorld.determinant();
+  return Object.freeze({
+    contract: 'authored-positive-determinant-right-on-positive-x-v1',
+    valid: Number.isFinite(rightShoulderX)
+      && Number.isFinite(leftShoulderX)
+      && shoulderSeparation > 0.05
+      && visualDeterminant > 0,
+    rightShoulderX,
+    leftShoulderX,
+    shoulderSeparation,
+    visualDeterminant,
+  });
+}
+
 export function createFirstPersonRiggedArms(flattenMaterials: boolean): FirstPersonRiggedArms | null {
   if (!firstPersonArmsAsset) return null;
   const root = new THREE.Group();
   root.name = 'first-person-arms';
   const visual = cloneSkeleton(firstPersonArmsAsset.scene) as THREE.Group;
   visual.name = 'authored-first-person-arms-visual';
-  // The regenerated GLB (5ab01f3) is authored mirrored: bone "UpperArmR" sits at
-  // -X and the right-wrist knife socket rides the R chain, so the firing hand
-  // renders on the left. Mirroring the visual root at X restores the intended
-  // camera-space orientation while keeping every bone name, the knife-socket
-  // ancestry and the two-chain release contract exactly as authored. The arms
-  // material is DoubleSide, so the flipped winding still renders correctly.
-  visual.scale.set(-1, 1, 1);
+  // The exported parent transforms already resolve UpperArmR to positive world
+  // X. Preserve that positive-determinant delivery: a second runtime reflection
+  // crossed the shoulders and reversed the normal-map tangent basis.
+  visual.scale.set(1, 1, 1);
   visual.position.set(0, 0, 0);
+  const handedness = firstPersonArmHandedness(visual);
+  if (!handedness.valid) return null;
   visual.traverse((node) => {
     if (!(node instanceof THREE.Mesh)) return;
     node.castShadow = false;
@@ -516,10 +552,10 @@ export function createFirstPersonRiggedArms(flattenMaterials: boolean): FirstPer
       result.transparent = false;
       result.opacity = 1;
       result.depthWrite = true;
-      // The thicker authored sleeves can legitimately intersect the near
-      // plane in tight stances; render interiors so a clipped sleeve reads
-      // as solid cloth instead of vanishing through backface culling.
-      result.side = THREE.DoubleSide;
+      // Positive-handed authored winding lets normal-mapped cloth use its real
+      // front face. Near-plane clearance is owned by the viewmodel framing
+      // pass; drawing backfaces here made cuffs and fingers look inside-out.
+      result.side = THREE.FrontSide;
       return result;
     };
     if (Array.isArray(node.material)) node.material = node.material.map(prepare);
@@ -570,6 +606,8 @@ export function createFirstPersonRiggedArms(flattenMaterials: boolean): FirstPer
   root.userData.authoredFirstPersonArms = true;
   root.userData.firstPersonArmsSource = FIRST_PERSON_ARMS_URL;
   root.userData.materialContract = 'opaque-depth-writing';
+  root.userData.firstPersonArmSurfaceContract = 'front-face-authored-pbr-v1';
+  root.userData.firstPersonArmHandedness = handedness;
   root.userData.importedFirstPersonArmChains = chains.length;
   root.userData.authoredAnimationClipCount = actions.size;
   root.userData.authoredAnimationBlendPolicy = 'finger-tracks-first-runtime-ik-last';

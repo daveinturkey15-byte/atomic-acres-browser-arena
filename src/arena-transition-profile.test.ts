@@ -29,4 +29,15 @@ describe('ArenaTransitionProfiler', () => {
     expect(receipt?.phases).toHaveLength(1);
     expect(profiler.snapshot(100)).toBe(receipt);
   });
+
+  it('records the exact flare and flamethrower first-shot prewarm phases', () => {
+    const profiler = new ArenaTransitionProfiler();
+    profiler.begin(2, 'gun-range', 10, 'prewarm-flare-first-shot');
+    profiler.enter('prewarm-flamethrower-first-shot', 20);
+    const receipt = profiler.finish(35, 'committed');
+    expect(receipt?.phases.map(({ phase }) => phase)).toEqual([
+      'prewarm-flare-first-shot',
+      'prewarm-flamethrower-first-shot',
+    ]);
+  });
 });

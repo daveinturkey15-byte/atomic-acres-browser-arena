@@ -40,6 +40,7 @@ import {
   rebindAction,
   resolveKeyBindingProfile,
   saveKeyBindingProfile,
+  supportSlotAction,
   type GameplayAction,
   type KeyBindingProfile,
 } from './key-bindings';
@@ -99,6 +100,7 @@ import {
   MobileTouchControls,
   mobileTouchFireBypassesPointerLock,
   readMobileControlsPreference,
+  shouldSuppressMobileBrowserSelection,
   writeMobileControlsPreference,
 } from './mobile-touch-controls';
 import {
@@ -380,10 +382,8 @@ import {
   createDeathDrop,
   deathDropAmmoAvailable,
   deathDropAvailable,
-  deathDropWeaponPickupAvailable,
   deathDropWeaponAvailable,
   isPrimaryWeaponId,
-  nearestDeathDrop,
   nearestScavengeDeathDrop,
   pruneDeathDrops,
   scavengeDeathDrop,
@@ -596,7 +596,10 @@ import { InteractiveWorldRuntime } from './interactive-world-runtime';
 import { shedPlacementsForArena } from './destructible-shed-registry';
 import { FIELD_SHED_EXPLOSION_DAMAGE_MULTIPLIER } from './destructible-shed-definition';
 import { canAdmitMajorDebris, SHARED_MAJOR_DEBRIS_BUDGET } from './major-debris-budget';
-import { createFracturedWindowDebrisVisual } from './window-glass-debris-presentation';
+import {
+  createFracturedWindowDebrisVisual,
+  updateFracturedWindowDebrisVisual,
+} from './window-glass-debris-presentation';
 import {
   INTERACTIVE_WORLD_SCHEMA_VERSION,
   type InteractiveWorldSnapshotMessage,
@@ -648,6 +651,7 @@ import {
   FlareProjectileSystem,
   type FlarePresentationReconcileResult,
   type FlareBurnPulse,
+  type FlareProjectileCallbacks,
   type FlareProjectileImpact,
   type FlareProjectileTarget,
 } from './flare-projectile-system';
@@ -660,7 +664,9 @@ import {
 import { FLAMETHROWER_EFFECT, FLARE_PROJECTILE_EFFECT } from './special-weapon-effects';
 import {
   FLAMETHROWER_GROUND_FIRE_DURATION_MS,
+  FlamethrowerGroundFirePool,
   FlamethrowerStreamSystem,
+  flamethrowerPulseImpactPresentationEnabled,
 } from './flamethrower-stream-system';
 import { DMR_THERMAL_MAGNIFICATION, DMR_THERMAL_MAX_CONTACTS, DmrThermalPresentation, dmrThermalOcclusionBudget, type DmrThermalContact } from './dmr-thermal-presentation';
 import { ThermalGhostPresentation, type ThermalGhostTarget } from './thermal-ghost-presentation';
@@ -1501,47 +1507,50 @@ const flareProjectileSystem = new FlareProjectileSystem(
   reducedRenderMode,
   renderRuntime.backend !== 'webgl2',
 );
-const flamethrowerStreamPresentation = new FlamethrowerStreamSystem(scene, reducedRenderMode);
+const flamethrowerStreamPresentation = new FlamethrowerStreamSystem(
+  scene,
+  reducedRenderMode,
+  softwareRenderer,
+);
 const FLAMETHROWER_GROUND_FIRE_RADIUS_M = 1.8;
 const FLAMETHROWER_GROUND_FIRE_PULSE_MS = 500;
 const FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE = 6;
 const FLAMETHROWER_GROUND_FIRE_CAPACITY = 24;
-type FlamethrowerGroundFire = {
-  ownerId: string;
-  ownerTeam: Team;
-  point: THREE.Vector3;
-  actionNonce: number;
-  expiresAt: number;
-  nextPulseAt: number;
-};
-const flamethrowerGroundFires: FlamethrowerGroundFire[] = [];
+const flamethrowerGroundFires = new FlamethrowerGroundFirePool(FLAMETHROWER_GROUND_FIRE_CAPACITY);
+const flamethrowerGroundFireBotSnapshot: BotPlayer[] = [];
+const flamethrowerGroundFireUp = new THREE.Vector3(0, 1, 0);
+const presentFlamethrowerPulseImpact = flamethrowerPulseImpactPresentationEnabled(softwareRenderer);
+let flamethrowerGroundFireBotSnapshotReady = false;
 
-function updateFlamethrowerGroundFires(now: number): void {
-  for (let i = flamethrowerGroundFires.length - 1; i >= 0; i--) {
-    const fire = flamethrowerGroundFires[i];
-    if (now >= fire.expiresAt) {
-      flamethrowerGroundFires.splice(i, 1);
-      continue;
-    }
-    if (now >= fire.nextPulseAt) {
-      fire.nextPulseAt = now + FLAMETHROWER_GROUND_FIRE_PULSE_MS;
-      // Napalm burns EVERYONE who stands in it - self, friends and enemies
-      // alike (same friendly-fire rule as the Carpet Bomber).
-      const r2 = FLAMETHROWER_GROUND_FIRE_RADIUS_M * FLAMETHROWER_GROUND_FIRE_RADIUS_M;
-      if (player.alive && player.position.distanceToSquared(fire.point) < r2) {
-        applyDamage(FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, fire.ownerId, 1, false, { kind: 'killstreak', effect: 'carpet-bomber' });
-      }
-      for (const bot of [...bots.values()]) {
-        if (!bot.alive) continue;
-        const dx = bot.position.x - fire.point.x;
-        const dz = bot.position.z - fire.point.z;
-        if (dx * dx + dz * dz < r2) {
-          applyBotDamage(bot, FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, 'body', { kind: 'killstreak', effect: 'carpet-bomber' }, fire.ownerId);
-        }
-      }
-      spawnImpactFlash(fire.point, 'concrete', new THREE.Vector3(0, 1, 0));
+function applyFlamethrowerGroundFirePulse(fire: Readonly<{
+  ownerId: string;
+  point: THREE.Vector3;
+}>): void {
+  // Napalm burns EVERYONE who stands in it - self, friends and enemies alike
+  // (same friendly-fire rule as the Carpet Bomber).
+  const r2 = FLAMETHROWER_GROUND_FIRE_RADIUS_M * FLAMETHROWER_GROUND_FIRE_RADIUS_M;
+  if (player.alive && player.position.distanceToSquared(fire.point) < r2) {
+    applyDamage(FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, fire.ownerId, 1, false, { kind: 'killstreak', effect: 'carpet-bomber' });
+  }
+  if (!flamethrowerGroundFireBotSnapshotReady) {
+    flamethrowerGroundFireBotSnapshot.length = 0;
+    for (const bot of bots.values()) flamethrowerGroundFireBotSnapshot.push(bot);
+    flamethrowerGroundFireBotSnapshotReady = true;
+  }
+  for (const bot of flamethrowerGroundFireBotSnapshot) {
+    if (!bot.alive) continue;
+    const dx = bot.position.x - fire.point.x;
+    const dz = bot.position.z - fire.point.z;
+    if (dx * dx + dz * dz < r2) {
+      applyBotDamage(bot, FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, 'body', { kind: 'killstreak', effect: 'carpet-bomber' }, fire.ownerId);
     }
   }
+  if (presentFlamethrowerPulseImpact) spawnImpactFlash(fire.point, 'concrete', flamethrowerGroundFireUp);
+}
+
+function updateFlamethrowerGroundFires(now: number): void {
+  flamethrowerGroundFireBotSnapshotReady = false;
+  flamethrowerGroundFires.update(now, FLAMETHROWER_GROUND_FIRE_PULSE_MS, applyFlamethrowerGroundFirePulse);
 }
 
 const dmrThermalPresentation = new DmrThermalPresentation(scene, element<HTMLElement>('#dmr-thermal'));
@@ -2703,8 +2712,20 @@ type PersistentWindowDebris = {
   fallbackRestY: number;
   fallbackSettled: boolean;
   receivedPhysicsPose: boolean;
+  spawnedAt: number;
 };
+type PooledWindowDebris = Readonly<{
+  key: string;
+  arenaId: ArenaId;
+  windowId: string;
+  root: THREE.Group;
+  halfExtents: Readonly<{ x: number; y: number; z: number }>;
+}>;
 const persistentWindowDebris = new Map<string, PersistentWindowDebris>();
+// Retain the exact InstancedMesh objects that were submitted behind the
+// deployment surface. Compiling one throwaway lookalike still left each live
+// pane's instance buffer/render object to initialize on the shot frame.
+const pooledWindowDebris = new Map<string, PooledWindowDebris>();
 
 function createInteractiveWorldRuntime(
   activeArena: ArenaMap,
@@ -2845,7 +2866,9 @@ function updatePersistentWindowDebrisPhysics(dt = 1 / SIMULATION_HZ): void {
     : new Map<string, MajorDebrisBodySnapshot>();
   const fallbackDt = Math.min(0.05, Math.max(0, dt));
   let retireSettledPhysics = false;
+  const now = performance.now();
   for (const entry of persistentWindowDebris.values()) {
+    updateFracturedWindowDebrisVisual(entry.root, Math.max(0, (now - entry.spawnedAt) / 1_000));
     const snapshot = snapshots.get(entry.id);
     if (snapshot) {
       entry.receivedPhysicsPose = true;
@@ -10250,7 +10273,7 @@ function clearDeathDrops(): void {
   for (const entity of deathDrops) disposeDeathDrop(entity);
   deathDrops.length = 0;
   authorizedRemotePickups.clear();
-  element<HTMLElement>('#pickup-prompt').hidden = true;
+  renderPickupInteractionPrompt(element<HTMLElement>('#pickup-prompt'), null);
 }
 
 function deathDropVictim(message: DeathMessage): { weapon: WeaponId; position: THREE.Vector3 } | null {
@@ -10599,32 +10622,6 @@ function updateDeathDrops(now: number): void {
     entity.root.rotation.y = age * 0.00065;
     entity.root.position.y = entity.drop.position.y + Math.sin(age * 0.004) * 0.08;
   }
-  const candidates = deathDrops
-    .map((entity) => entity.drop)
-    .filter((drop) => deathDropWeaponPickupAvailable(drop, player.primaryWeapon, now));
-  const nearbyStation = nearbyGunRangeWeaponStation();
-  const nearbyTimedWeapon = player.alive ? nearbyTimedMapWeaponPickup() : null;
-  const nearbyRailgun = player.alive && railgunPickupNearby();
-  const nearby = player.alive && !nearbyTimedWeapon && !nearbyRailgun && !nearbyStation
-    ? nearestDeathDrop(candidates, player.position, DEATH_DROP_INTERACTION_RANGE, now, 'weapon')
-    : null;
-  const prompt = element<HTMLElement>('#pickup-prompt');
-  prompt.hidden = !nearbyTimedWeapon && !nearbyRailgun && !nearby && !nearbyStation;
-  if (nearbyTimedWeapon) {
-    prompt.querySelector<HTMLElement>('span')!.textContent = 'TAP · PICK UP';
-    prompt.querySelector<HTMLElement>('strong')!.textContent = WEAPONS[nearbyTimedWeapon].name.toUpperCase();
-  } else if (nearbyRailgun) {
-    prompt.querySelector<HTMLElement>('span')!.textContent = 'TAP · PICK UP';
-    prompt.querySelector<HTMLElement>('strong')!.textContent = WEAPONS.railgun.name.toUpperCase();
-  } else if (nearbyStation) {
-    const replenish = rangePrimaryUnlocked && nearbyStation.weapon === player.primaryWeapon;
-    prompt.querySelector<HTMLElement>('span')!.textContent = replenish ? 'TAP · REFILL' : 'TAP · EQUIP';
-    prompt.querySelector<HTMLElement>('strong')!.textContent = WEAPONS[nearbyStation.weapon].name.toUpperCase();
-  } else if (nearby) {
-    const replenish = nearby.weapon === player.primaryWeapon;
-    prompt.querySelector<HTMLElement>('span')!.textContent = replenish ? 'TAP · REPLENISH' : 'TAP · PICK UP';
-    prompt.querySelector<HTMLElement>('strong')!.textContent = WEAPONS[nearby.weapon].name.toUpperCase();
-  }
 }
 
 function acceptRemotePickup(message: PickupMessage, now = performance.now()): void {
@@ -10706,50 +10703,6 @@ function acceptRemotePickup(message: PickupMessage, now = performance.now()): vo
   trimNonceSet();
 }
 
-const sharedGlassShardGeometry = new THREE.PlaneGeometry(1, 1);
-const sharedGlassShardMaterial = new THREE.MeshBasicMaterial({ color: 0xa9e8f5, transparent: true, opacity: 0.74, side: THREE.DoubleSide, depthWrite: false, toneMapped: false });
-function spawnGlassShards(point: THREE.Vector3, normal: THREE.Vector3): void {
-  const root = new THREE.Group();
-  root.name = 'breaking-window-shards';
-  root.position.copy(point);
-  const shards: Array<{ mesh: THREE.Mesh; velocity: THREE.Vector3; spin: THREE.Vector3; baseOpacity: number }> = [];
-  for (let index = 0; index < 10; index += 1) {
-    // Reuse one shared unit plane and material across all shards: per-break
-    // geometry/material allocation was a measurable first-break hitch.
-    const material = sharedGlassShardMaterial.clone();
-    const mesh = new THREE.Mesh(sharedGlassShardGeometry, material);
-    mesh.scale.set(0.14 + presentationRandom() * 0.16, 0.18 + presentationRandom() * 0.22, 1);
-    mesh.position.set((presentationRandom() - 0.5) * 0.55, (presentationRandom() - 0.5) * 0.45, (presentationRandom() - 0.5) * 0.08);
-    root.add(mesh);
-    shards.push({
-      mesh,
-      baseOpacity: 0.74,
-      velocity: normal.clone().multiplyScalar(1.1 + presentationRandom() * 1.5).add(new THREE.Vector3((presentationRandom() - 0.5) * 1.7, 0.8 + presentationRandom() * 1.3, (presentationRandom() - 0.5) * 1.7)),
-      spin: new THREE.Vector3(presentationRandom() * 8, presentationRandom() * 8, presentationRandom() * 8),
-    });
-  }
-  scene.add(root);
-  const startedAt = performance.now();
-  const animate = (now: number) => {
-    const age = (now - startedAt) / 1000;
-    if (age >= 0.9) {
-      for (const shard of shards) (shard.mesh.material as THREE.MeshBasicMaterial).dispose();
-      disposeSupportRoot(root);
-      return;
-    }
-    for (const shard of shards) {
-      shard.velocity.y -= 7.5 / 60;
-      shard.mesh.position.addScaledVector(shard.velocity, 1 / 60);
-      shard.mesh.rotation.x += shard.spin.x / 60;
-      shard.mesh.rotation.y += shard.spin.y / 60;
-      shard.mesh.rotation.z += shard.spin.z / 60;
-      (shard.mesh.material as THREE.MeshBasicMaterial).opacity = shard.baseOpacity * (1 - age / 0.9);
-    }
-    requestAnimationFrame(animate);
-  };
-  requestAnimationFrame(animate);
-}
-
 function deterministicWindowUnit(windowId: string, salt: number): number {
   let hash = 0x811c9dc5 ^ salt;
   for (let index = 0; index < windowId.length; index += 1) {
@@ -10765,27 +10718,84 @@ function persistentWindowDebrisId(windowId: string): string {
   return `window-debris:${canonical}`;
 }
 
-const pendingWindowDebrisSpawns = new Set<string>();
+function windowDebrisPoolKey(arenaId: ArenaId, windowId: string): string {
+  return `${arenaId}:${persistentWindowDebrisId(windowId)}`;
+}
+
+function windowDebrisHalfExtents(
+  window: ArenaMap['breakableWindows'][number],
+): Readonly<{ x: number; y: number; z: number }> {
+  window.mesh.updateWorldMatrix(true, false);
+  if (!window.mesh.geometry.boundingBox) window.mesh.geometry.computeBoundingBox();
+  const localSize = window.mesh.geometry.boundingBox?.getSize(new THREE.Vector3()) ?? new THREE.Vector3(1.4, 1.2, 0.04);
+  const worldScale = window.mesh.getWorldScale(new THREE.Vector3());
+  return Object.freeze({
+    x: Math.max(0.12, localSize.x * Math.abs(worldScale.x) * 0.34),
+    y: Math.max(0.12, localSize.y * Math.abs(worldScale.y) * 0.32),
+    z: Math.max(0.025, localSize.z * Math.abs(worldScale.z) * 0.55),
+  });
+}
+
+async function prewarmWindowGlassDebrisPool(sceneGeneration: number): Promise<void> {
+  if (arena.breakableWindows.length === 0) return;
+  const stage = new THREE.Group();
+  stage.name = `prewarmed-window-debris-pool-${sceneGeneration}`;
+  stage.position.copy(camera.getWorldPosition(new THREE.Vector3()))
+    .addScaledVector(camera.getWorldDirection(new THREE.Vector3()), 4);
+  stage.quaternion.copy(camera.getWorldQuaternion(new THREE.Quaternion()));
+  const staged: PooledWindowDebris[] = [];
+  for (const [index, window] of arena.breakableWindows.entries()) {
+    const key = windowDebrisPoolKey(arena.id, window.id);
+    let pooled = pooledWindowDebris.get(key);
+    if (!pooled) {
+      const halfExtents = windowDebrisHalfExtents(window);
+      const root = createFracturedWindowDebrisVisual({
+        id: persistentWindowDebrisId(window.id),
+        halfExtents,
+        reducedRenderMode,
+      });
+      root.userData.windowGlassDebrisPoolKey = key;
+      root.userData.prewarmedSceneGeneration = sceneGeneration;
+      pooled = Object.freeze({ key, arenaId: arena.id, windowId: window.id, root, halfExtents });
+      pooledWindowDebris.set(key, pooled);
+    }
+    if ([...persistentWindowDebris.values()].some((entry) => entry.root === pooled.root)) {
+      throw new Error(`${key}: cannot prewarm an active window-debris instance`);
+    }
+    updateFracturedWindowDebrisVisual(pooled.root, 0);
+    pooled.root.visible = true;
+    pooled.root.position.set(((index % 3) - 1) * 1.6, Math.floor(index / 3) * 1.4 - 0.7, 0);
+    pooled.root.quaternion.identity();
+    stage.add(pooled.root);
+    staged.push(pooled);
+  }
+  scene.add(stage);
+  try {
+    await renderRuntime.compileAndRender(stage, camera, scene);
+  } finally {
+    stage.removeFromParent();
+    for (const pooled of staged) {
+      pooled.root.removeFromParent();
+      pooled.root.visible = false;
+      scene.add(pooled.root);
+    }
+    stage.clear();
+  }
+}
+
 function spawnPersistentWindowDebris(window: ArenaMap['breakableWindows'][number], normal: THREE.Vector3): void {
   const id = persistentWindowDebrisId(window.id);
-  if (persistentWindowDebris.has(id) || pendingWindowDebrisSpawns.has(id)) return;
+  if (persistentWindowDebris.has(id)) return;
   const counts = Object.freeze({
     shed: interactiveWorldRuntime?.shedMajorBodyCount() ?? 0,
     house: interactiveWorldRuntime?.houseMajorBodyCount() ?? 0,
     window: persistentWindowDebris.size,
   });
   if (!canAdmitMajorDebris(counts, 'window')) return;
-  pendingWindowDebrisSpawns.add(id);
-  // The pane transform, bounding-box analysis and the fractured-shard material
-  // clone all trigger real work (and a WebGPU shader compile for the cloned
-  // material) on the shot frame. Defer the whole spawn to the idle lane so a
-  // glass break never hitches; the pane visibility/authority is already
-  // committed and nothing gameplay-critical reads this debris synchronously.
-  scheduleBrowserPreparationIdleTask(() => {
-    pendingWindowDebrisSpawns.delete(id);
-    if (persistentWindowDebris.has(id)) return;
-    spawnPersistentWindowDebrisSynchronously(window, normal, id);
-  });
+  // The exact instanced topology/material is compiled during deployment. Add
+  // the already-analysed shard draw immediately so impact feedback cannot lag
+  // behind authority; only the Rapier reconciliation remains deferred.
+  spawnPersistentWindowDebrisSynchronously(window, normal, id);
 }
 
 function spawnPersistentWindowDebrisSynchronously(
@@ -10793,15 +10803,11 @@ function spawnPersistentWindowDebrisSynchronously(
   normal: THREE.Vector3,
   id: string,
 ): void {
-  window.mesh.updateWorldMatrix(true, false);
-  window.mesh.geometry.computeBoundingBox();
-  const localSize = window.mesh.geometry.boundingBox?.getSize(new THREE.Vector3()) ?? new THREE.Vector3(1.4, 1.2, 0.04);
-  const worldScale = window.mesh.getWorldScale(new THREE.Vector3());
-  const halfExtents = Object.freeze({
-    x: Math.max(0.12, localSize.x * Math.abs(worldScale.x) * 0.34),
-    y: Math.max(0.12, localSize.y * Math.abs(worldScale.y) * 0.32),
-    z: Math.max(0.025, localSize.z * Math.abs(worldScale.z) * 0.55),
-  });
+  const pooled = pooledWindowDebris.get(windowDebrisPoolKey(arena.id, window.id));
+  if (!pooled) {
+    throw new Error(`${arena.id}:${window.id}: retained glass-debris prewarm instance is missing`);
+  }
+  const { halfExtents, root } = pooled;
   const centre = window.mesh.getWorldPosition(new THREE.Vector3());
   const paneRotation = window.mesh.getWorldQuaternion(new THREE.Quaternion());
   const direction = normal.lengthSq() > 1e-6 ? normal.clone().normalize() : new THREE.Vector3(0, 0.15, 1).normalize();
@@ -10810,9 +10816,10 @@ function spawnPersistentWindowDebrisSynchronously(
   // they could sleep stuck mid-air instead of falling to the floor.
   centre.addScaledVector(direction, Math.max(0.45, halfExtents.z * 4 + 0.3));
 
-  const root = createFracturedWindowDebrisVisual({ id, halfExtents, reducedRenderMode });
+  updateFracturedWindowDebrisVisual(root, 0);
   root.position.copy(centre);
   root.quaternion.copy(paneRotation);
+  root.visible = true;
   root.userData.persistentMajorDebris = true;
   root.userData.windowId = window.id;
   scene.add(root);
@@ -10857,13 +10864,17 @@ function spawnPersistentWindowDebrisSynchronously(
     fallbackRestY: halfExtents.y,
     fallbackSettled: false,
     receivedPhysicsPose: false,
+    spawnedAt: performance.now(),
   });
   // Defer physics sync to avoid frame hitch on debris spawn.
   scheduleBrowserPreparationIdleTask(() => syncInteractiveWorldPhysics());
 }
 
 function clearPersistentWindowDebris(): void {
-  for (const entry of persistentWindowDebris.values()) scheduleDeferredGpuRetirement(entry.root);
+  for (const entry of persistentWindowDebris.values()) {
+    updateFracturedWindowDebrisVisual(entry.root, 0);
+    entry.root.visible = false;
+  }
   persistentWindowDebris.clear();
   syncInteractiveWorldPhysics();
 }
@@ -10928,7 +10939,6 @@ function breakHouseWindow(
   // Visual effects (impact flash, shards, audio) happen immediately.
   scheduleBrowserPreparationIdleTask(() => syncInteractiveWorldPhysics());
   spawnImpactFlash(point, 'glass', normal);
-  spawnGlassShards(point, normal);
   audio.impact('glass', point.distanceTo(camera.position));
   return true;
 }
@@ -11175,6 +11185,7 @@ async function prewarmExactWebGlMatchComposition(): Promise<void> {
     throw new Error('Exact WebGL2 match composition prewarm requires the WebGL2 AtomicSignal pass');
   }
   const priorCameraLayerMask = camera.layers.mask;
+  prewarmThermalGhostPipelines();
   try {
     await withArenaFrustumCullingDisabled(scene, async () => {
       // Keep this identical to the live WebGL2 frame path: world-only first,
@@ -11183,6 +11194,7 @@ async function prewarmExactWebGlMatchComposition(): Promise<void> {
       atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);
     });
   } finally {
+    thermalGhostPresentation.sync([], false);
     camera.layers.mask = priorCameraLayerMask;
   }
 }
@@ -11814,7 +11826,7 @@ function openActiveMatchPause(reason: 'escape' | 'debug-pause' | 'mobile-pause')
   mobileTouchControls?.setInMatch(false);
   mobilePresentationActive = false;
   document.body.classList.remove('mtc-live');
-  releaseMobileLandscapePresentation();
+  releaseMobilePresentation();
   presentActiveMatchBackdrop(reason);
   applyMenuLifecycle({ type: 'pause-requested', reason });
   if (document.pointerLockElement === canvas) void document.exitPointerLock();
@@ -12169,7 +12181,9 @@ async function startGame(
   railgunPresentation.resetBeams();
   timedMapWeaponPresentation.reset();
   flareProjectileSystem.clear();
+  clearFlareTargetSnapshots();
   flamethrowerStreamPresentation.clear();
+  flamethrowerGroundFires.clear();
   timedMapWeaponAudit = createTimedMapWeaponAudit();
   pendingFlareShotRequests.clear();
   flareShotResultContexts.clear();
@@ -12730,7 +12744,9 @@ function initializeTimedMapWeaponsForMatch(
   lastFlarePresentationBroadcastAt = Number.NEGATIVE_INFINITY;
   lastFlarePresentationAdmission = null;
   flareProjectileSystem.clear();
+  clearFlareTargetSnapshots();
   flamethrowerStreamPresentation.clear();
+  flamethrowerGroundFires.clear();
   if (recovery) restoreRecoveredFlareRuntime(recovery, performance.now());
   if (network.role === 'host') broadcastTimedMapWeaponState();
 }
@@ -13469,15 +13485,26 @@ function updateDmrThermal(): void {
  */
 function prewarmThermalGhostPipelines(): void {
   const targets: ThermalGhostTarget[] = [];
-  for (const bot of bots.values()) {
-    if (!bot.alive) continue;
-    targets.push({ id: `prewarm-bot-${bot.id}`, relation: 'hostile', root: bot.root });
-    break;
-  }
+  const mode = gameMode === 'solo' ? 'tdm' : privateMatchMode;
   for (const remote of remotes.values()) {
     if (remote.snapshot.hp <= 0) continue;
-    targets.push({ id: `prewarm-remote-${remote.snapshot.id}`, relation: 'friendly', root: remote.root });
-    break;
+    const relation = mode === 'tdm' && remote.snapshot.team === player.team ? 'friendly' as const : 'hostile' as const;
+    targets.push({ id: remote.snapshot.id, relation, root: remote.root });
+  }
+  for (const bot of bots.values()) {
+    if (!bot.alive) continue;
+    const relation = mode === 'tdm' && bot.team === player.team ? 'friendly' as const : 'hostile' as const;
+    targets.push({ id: bot.id, relation, root: bot.root });
+  }
+  // Retain records under the exact live IDs so first ADS reuses them. If the
+  // current roster has only one relation, add one bounded alias solely to
+  // submit the other shared material pipeline during admission.
+  const first = targets[0];
+  if (first && !targets.some((target) => target.relation === 'friendly')) {
+    targets.push({ id: `pipeline-friendly:${first.id}`, relation: 'friendly', root: first.root });
+  }
+  if (first && !targets.some((target) => target.relation === 'hostile')) {
+    targets.push({ id: `pipeline-hostile:${first.id}`, relation: 'hostile', root: first.root });
   }
   if (targets.length > 0) thermalGhostPresentation.sync(targets, true);
 }
@@ -13840,14 +13867,15 @@ function tryFire(now: number): void {
       // Spawn visible napalm ground fire at impact point (stays 5s like
       // napalm) plus the damage lane.
       const ignited = flamethrowerStreamPresentation.igniteGround(authoritativeEnd, now);
-      if (ignited && flamethrowerGroundFires.length < FLAMETHROWER_GROUND_FIRE_CAPACITY) {
-        flamethrowerGroundFires.push({
+      if (ignited) {
+        flamethrowerGroundFires.ignite({
           ownerId: player.id,
           ownerTeam: player.team,
-          point: authoritativeEnd.clone(),
+          point: authoritativeEnd,
           actionNonce: randomNonce(),
-          expiresAt: now + FLAMETHROWER_GROUND_FIRE_DURATION_MS,
-          nextPulseAt: now + FLAMETHROWER_GROUND_FIRE_PULSE_MS,
+          now,
+          durationMs: FLAMETHROWER_GROUND_FIRE_DURATION_MS,
+          pulseIntervalMs: FLAMETHROWER_GROUND_FIRE_PULSE_MS,
         });
       }
     }
@@ -15724,13 +15752,16 @@ function detonateExplosiveBoltEntity(bolt: ExplosiveBoltEntity, now: number): vo
 }
 
 const crossbowGlassRay = new THREE.Raycaster();
+const crossbowGlassDirection = new THREE.Vector3();
+const crossbowGlassHits: THREE.Intersection[] = [];
+const crossbowGlassResult = { time: 0, windowId: '' };
 function crossbowGlassCollision(
   start: THREE.Vector3,
   delta: THREE.Vector3,
 ): Readonly<{ time: number; windowId: string }> | null {
   const distance = delta.length();
   if (distance <= 1e-8) return null;
-  crossbowGlassRay.set(start, delta.clone().divideScalar(distance));
+  crossbowGlassRay.set(start, crossbowGlassDirection.copy(delta).multiplyScalar(1 / distance));
   crossbowGlassRay.near = 0;
   crossbowGlassRay.far = distance;
   let nearest: Readonly<{ time: number; windowId: string }> | null = null;
@@ -15746,49 +15777,144 @@ function crossbowGlassCollision(
     });
     if (admission.passes) continue;
     pane.mesh.updateWorldMatrix(true, false);
-    const hit = crossbowGlassRay.intersectObject(pane.mesh, false)[0];
+    crossbowGlassHits.length = 0;
+    const hit = crossbowGlassRay.intersectObject(pane.mesh, false, crossbowGlassHits)[0];
     if (!hit) continue;
-    const candidate = Object.freeze({ time: hit.distance / distance, windowId: pane.id });
-    if (!nearest || candidate.time < nearest.time) nearest = candidate;
+    const candidateTime = hit.distance / distance;
+    if (!nearest || candidateTime < nearest.time) {
+      crossbowGlassResult.time = candidateTime;
+      crossbowGlassResult.windowId = pane.id;
+      nearest = crossbowGlassResult;
+    }
   }
   return nearest;
 }
 
-function flareHostileTargets(ownerId: string, ownerTeam: Team): readonly FlareProjectileTarget[] {
-  const targets: FlareProjectileTarget[] = [];
-  if (player.alive && ownerId !== player.id
-    && areCombatantsHostile(ownerId, ownerTeam, player.id, player.team)) {
-    targets.push(Object.freeze({
-      id: player.id, lifeId: localContinuity, kind: 'player' as const,
-      position: player.position.clone().add(new THREE.Vector3(0, -0.7, 0)), radiusM: 0.62,
-    }));
+type MutableFlareTargetSnapshot = {
+  id: string;
+  lifeId: number;
+  kind: FlareProjectileTarget['kind'];
+  position: THREE.Vector3;
+  radiusM: number;
+};
+type FlareTargetSnapshotEntry = {
+  target: MutableFlareTargetSnapshot;
+  team: Team;
+  practiceOnly: boolean;
+  active: boolean;
+};
+type FlareHostileTargetView = {
+  generation: number;
+  targets: FlareProjectileTarget[];
+};
+const FLARE_TARGET_SNAPSHOT_CAPACITY = 128;
+const FLARE_OWNER_VIEW_CAPACITY = FLARE_PROJECTILE_EFFECT.poolCapacity;
+const flareTargetSnapshots = new Map<string, FlareTargetSnapshotEntry>();
+const flareHostileTargetViews = new Map<string, [FlareHostileTargetView | null, FlareHostileTargetView | null]>();
+let flareTargetSnapshotGeneration = 0;
+
+function upsertFlareTargetSnapshot(
+  id: string,
+  lifeId: number,
+  kind: FlareProjectileTarget['kind'],
+  team: Team,
+  practiceOnly: boolean,
+  radiusM: number,
+  x: number,
+  y: number,
+  z: number,
+): void {
+  let entry = flareTargetSnapshots.get(id);
+  if (!entry) {
+    if (flareTargetSnapshots.size >= FLARE_TARGET_SNAPSHOT_CAPACITY) {
+      for (const [cachedId, cached] of flareTargetSnapshots) {
+        if (cached.active) continue;
+        flareTargetSnapshots.delete(cachedId);
+        break;
+      }
+    }
+    if (flareTargetSnapshots.size >= FLARE_TARGET_SNAPSHOT_CAPACITY) return;
+    entry = {
+      target: { id, lifeId, kind, position: new THREE.Vector3(), radiusM },
+      team,
+      practiceOnly,
+      active: true,
+    };
+    flareTargetSnapshots.set(id, entry);
+  }
+  entry.target.lifeId = lifeId;
+  entry.target.kind = kind;
+  entry.target.radiusM = radiusM;
+  entry.target.position.set(x, y, z);
+  entry.team = team;
+  entry.practiceOnly = practiceOnly;
+  entry.active = true;
+}
+
+function prepareFlareTargetSnapshots(): void {
+  flareTargetSnapshotGeneration += 1;
+  for (const entry of flareTargetSnapshots.values()) entry.active = false;
+  if (player.alive) {
+    upsertFlareTargetSnapshot(
+      player.id, localContinuity, 'player', player.team, false, 0.62,
+      player.position.x, player.position.y - 0.7, player.position.z,
+    );
   }
   for (const [id, remote] of remotes) {
-    if (id === ownerId || remote.snapshot.hp <= 0
-      || !areCombatantsHostile(ownerId, ownerTeam, id, remote.snapshot.team)) continue;
-    targets.push(Object.freeze({
-      id, lifeId: remote.continuity, kind: 'player' as const,
-      position: new THREE.Vector3(remote.snapshot.x, remote.snapshot.y - 0.7, remote.snapshot.z), radiusM: 0.62,
-    }));
+    if (remote.snapshot.hp <= 0) continue;
+    upsertFlareTargetSnapshot(
+      id, remote.continuity, 'player', remote.snapshot.team, false, 0.62,
+      remote.snapshot.x, remote.snapshot.y - 0.7, remote.snapshot.z,
+    );
   }
   for (const bot of bots.values()) {
-    if (!bot.alive || bot.id === ownerId
-      || !areCombatantsHostile(ownerId, ownerTeam, bot.id, bot.team)) continue;
-    targets.push(Object.freeze({
-      id: bot.id, lifeId: bot.continuity, kind: 'bot' as const,
-      position: bot.position.clone().add(new THREE.Vector3(0, 1, 0)), radiusM: 0.64,
-    }));
+    if (!bot.alive) continue;
+    upsertFlareTargetSnapshot(
+      bot.id, bot.continuity, 'bot', bot.team, false, 0.64,
+      bot.position.x, bot.position.y + 1, bot.position.z,
+    );
   }
-  if (ownerId === player.id && selectedArena.id === 'gun-range') {
+  if (selectedArena.id === 'gun-range') {
     for (const target of arena.targets) {
       if (!target.active) continue;
-      targets.push(Object.freeze({
-        id: target.id, lifeId: 1, kind: 'practice-target' as const,
-        position: target.root.getWorldPosition(new THREE.Vector3()), radiusM: 0.58,
-      }));
+      upsertFlareTargetSnapshot(target.id, 1, 'practice-target', player.team, true, 0.58, 0, 0, 0);
+      const entry = flareTargetSnapshots.get(target.id);
+      if (!entry) continue;
+      target.root.getWorldPosition(entry.target.position);
     }
   }
-  return targets;
+}
+
+function flareHostileTargets(ownerId: string, ownerTeam: Team): readonly FlareProjectileTarget[] {
+  let views = flareHostileTargetViews.get(ownerId);
+  if (!views) {
+    if (flareHostileTargetViews.size >= FLARE_OWNER_VIEW_CAPACITY) flareHostileTargetViews.clear();
+    views = [null, null];
+    flareHostileTargetViews.set(ownerId, views);
+  }
+  let view = views[ownerTeam];
+  if (!view) {
+    view = { generation: -1, targets: [] };
+    views[ownerTeam] = view;
+  }
+  if (view.generation === flareTargetSnapshotGeneration) return view.targets;
+  view.generation = flareTargetSnapshotGeneration;
+  view.targets.length = 0;
+  for (const entry of flareTargetSnapshots.values()) {
+    if (!entry.active || entry.target.id === ownerId) continue;
+    if (entry.practiceOnly) {
+      if (ownerId === player.id && selectedArena.id === 'gun-range') view.targets.push(entry.target);
+      continue;
+    }
+    if (areCombatantsHostile(ownerId, ownerTeam, entry.target.id, entry.team)) view.targets.push(entry.target);
+  }
+  return view.targets;
+}
+
+function clearFlareTargetSnapshots(): void {
+  flareTargetSnapshots.clear();
+  flareHostileTargetViews.clear();
+  flareTargetSnapshotGeneration = 0;
 }
 
 function flareTargetStillCurrent(target: FlareProjectileTarget): boolean {
@@ -15977,39 +16103,50 @@ function handleFlareBurnPulse(pulse: FlareBurnPulse): void {
   }
 }
 
+let flareFrameColliders: ArenaMap['colliders'] = [];
+const flareBurnLineOfSightPoint = new THREE.Vector3();
+const flareProjectileCallbacks: FlareProjectileCallbacks = Object.freeze({
+  worldCollisionFraction: (start: THREE.Vector3, delta: THREE.Vector3, radiusM: number) => {
+    const world = sweepSphereAgainstBoxes(start, delta, flareFrameColliders, radiusM)?.time ?? null;
+    const glass = crossbowGlassCollision(start, delta)?.time ?? null;
+    if (world === null) return glass;
+    if (glass === null) return world;
+    return Math.min(world, glass);
+  },
+  withinBounds: (point: THREE.Vector3) => (
+    pointInsideBounds(point, arena.bounds, 0.1) && point.y >= -25 && point.y <= 250
+  ),
+  hostileTargets: flareHostileTargets,
+  burnLineOfSight: (point: THREE.Vector3, target: FlareProjectileTarget) => {
+    flareBurnLineOfSightPoint.copy(point).y += 0.12;
+    for (const box of flareFrameColliders) {
+      if (segmentIntersectsBox(flareBurnLineOfSightPoint, target.position, box)) return false;
+    }
+    return true;
+  },
+  onImpact: handleFlareImpact,
+  onBurnPulse: handleFlareBurnPulse,
+  onExpire: (expiry) => {
+    if (expiry.authority) finishPendingFlareShot(expiry.ownerId, expiry.actionNonce, null);
+  },
+});
+
 function updateFlareProjectiles(dt: number, now: number): void {
   for (const [key, context] of flareShotResultContexts) {
     if (now >= context.expiresAt) flareShotResultContexts.delete(key);
   }
-  const before = flareProjectileSystem.telemetry();
-  flareProjectileSystem.update(dt, now, {
-    worldCollisionFraction: (start, delta, radiusM) => {
-      const world = sweepSphereAgainstBoxes(start, delta, activeWorldColliders(), radiusM)?.time ?? null;
-      const glass = crossbowGlassCollision(start, delta)?.time ?? null;
-      if (world === null) return glass;
-      if (glass === null) return world;
-      return Math.min(world, glass);
-    },
-    withinBounds: (point) => pointInsideBounds(point, arena.bounds, 0.1) && point.y >= -25 && point.y <= 250,
-    hostileTargets: flareHostileTargets,
-    burnLineOfSight: (point, target) => {
-      const elevatedPoint = point.clone().add(new THREE.Vector3(0, 0.12, 0));
-      return !activeWorldColliders().some((box) => segmentIntersectsBox(elevatedPoint, target.position, box));
-    },
-    onImpact: handleFlareImpact,
-    onBurnPulse: handleFlareBurnPulse,
-    onExpire: (expiry) => {
-      if (expiry.authority) finishPendingFlareShot(expiry.ownerId, expiry.actionNonce, null);
-    },
-  });
+  if (!flareProjectileSystem.hasActiveProjectiles()) return;
+  if (flareProjectileSystem.requiresWorldSnapshot(now)) {
+    prepareFlareTargetSnapshots();
+    flareFrameColliders = activeWorldColliders();
+  }
+  const lifecycleBefore = flareProjectileSystem.lifecycleRevisionValue();
+  const burnPulsesBefore = flareProjectileSystem.burnPulseRevisionValue();
+  flareProjectileSystem.update(dt, now, flareProjectileCallbacks);
   if (network.role === 'host') {
-    const after = flareProjectileSystem.telemetry();
-    const lifecycleChanged = after.active !== before.active
-      || after.flying !== before.flying
-      || after.burning !== before.burning
-      || after.impactCount !== before.impactCount;
+    const lifecycleChanged = flareProjectileSystem.lifecycleRevisionValue() !== lifecycleBefore;
     if (lifecycleChanged) broadcastFlarePresentationState();
-    if (lifecycleChanged || after.burnPulseCount !== before.burnPulseCount) {
+    if (lifecycleChanged || flareProjectileSystem.burnPulseRevisionValue() !== burnPulsesBefore) {
       persistActiveHostMatchCheckpoint();
     }
   }
@@ -17248,13 +17385,45 @@ function cancelFInteractionPress(reason: FInteractionCancelReason, now = perform
   applyFInteractionTransition(reduceFInteractionPress(fInteractionPressState, { type: 'cancel', nowMs: now, reason }));
 }
 
+const PICKUP_PROMPT_ACTIONS = Object.freeze(['EQUIP / REFILL', 'REPLENISH', 'PICK UP', 'REFILL', 'EQUIP'] as const);
+
+function renderPickupInteractionPrompt(
+  prompt: HTMLElement,
+  candidate: InteractionCandidate | null,
+): void {
+  const actionElement = prompt.querySelector<HTMLElement>('span');
+  const subjectElement = prompt.querySelector<HTMLElement>('strong');
+  const weaponCandidate = candidate?.kind === 'weapon-pickup' || candidate?.kind === 'test-bay-weapon'
+    ? candidate
+    : null;
+  const action = weaponCandidate
+    ? PICKUP_PROMPT_ACTIONS.find((prefix) => weaponCandidate.prompt.startsWith(`${prefix} `)) ?? null
+    : null;
+  const subject = action && weaponCandidate
+    ? weaponCandidate.prompt.slice(action.length + 1).trim()
+    : '';
+  const visible = Boolean(action && subject);
+
+  // One synchronous writer owns visibility, identity, action and subject. A
+  // station change can therefore never expose the previous strong label.
+  prompt.hidden = !visible;
+  delete prompt.dataset.interactionKind;
+  delete prompt.dataset.targetId;
+  if (actionElement) actionElement.textContent = visible ? `TAP \u00b7 ${action}` : '';
+  if (subjectElement) subjectElement.textContent = visible ? subject : '';
+  if (visible && weaponCandidate) {
+    prompt.dataset.interactionKind = weaponCandidate.kind;
+    prompt.dataset.targetId = weaponCandidate.targetId;
+  }
+}
+
 function updateFInteractionPrompt(now = performance.now()): void {
   const supportPrompt = element<HTMLElement>('#support-interaction-prompt');
   const pickupPrompt = element<HTMLElement>('#pickup-prompt');
   if (pointSupportTargeting && !tacticalMapOpen) {
     cancelFInteractionPress('manual-reset', now);
     supportPrompt.hidden = false;
-    pickupPrompt.hidden = true;
+    renderPickupInteractionPrompt(pickupPrompt, null);
     delete supportPrompt.dataset.interactionKind;
     delete supportPrompt.dataset.targetId;
     const label = supportPrompt.querySelector<HTMLElement>('span');
@@ -17268,7 +17437,7 @@ function updateFInteractionPrompt(now = performance.now()): void {
     : null;
   if (localCareCaptureRequiresHold && activeCareCrate) {
     supportPrompt.hidden = false;
-    pickupPrompt.hidden = true;
+    renderPickupInteractionPrompt(pickupPrompt, null);
     supportPrompt.dataset.interactionKind = 'care-package';
     supportPrompt.dataset.targetId = activeCareCrate.id;
     supportPrompt.dataset.holdActive = 'true';
@@ -17285,18 +17454,15 @@ function updateFInteractionPrompt(now = performance.now()): void {
     : pressedCandidate ?? selectedFInteraction(now);
   const weaponPrompt = selected?.kind === 'weapon-pickup' || selected?.kind === 'test-bay-weapon';
   supportPrompt.hidden = !selected || weaponPrompt;
-  pickupPrompt.hidden = !selected || !weaponPrompt;
+  renderPickupInteractionPrompt(pickupPrompt, weaponPrompt ? selected : null);
   delete supportPrompt.dataset.interactionKind;
   delete supportPrompt.dataset.targetId;
-  delete pickupPrompt.dataset.interactionKind;
-  delete pickupPrompt.dataset.targetId;
   delete supportPrompt.dataset.holdActive;
   supportPrompt.style.setProperty('--f-hold-progress', '0%');
   if (!selected) return;
-  const prompt = weaponPrompt ? pickupPrompt : supportPrompt;
-  prompt.dataset.interactionKind = selected.kind;
-  prompt.dataset.targetId = selected.targetId;
   if (!weaponPrompt) {
+    supportPrompt.dataset.interactionKind = selected.kind;
+    supportPrompt.dataset.targetId = selected.targetId;
     const label = supportPrompt.querySelector<HTMLElement>('span');
     const holdInteraction = isHoldInteraction(selected.kind) || selected.requiresSustainedHold === true;
     const pinnedTap = fInteractionPressState.phase === 'pressed' ? fInteractionPressState.tapCandidate : null;
@@ -17477,7 +17643,7 @@ function killstreakWorldState(): KillstreakWorld {
       return pointInsideBounds(point, arena.bounds, 0.35)
         && !flightSolids.some((solid) => sphereIntersectsBox(point, 0.35, solid));
     },
-    droneCentreSpawnVolume: {
+    supportFlightCentreVolume: {
       centre: centreSpawn,
       halfExtents: [
         Math.min(7.5, (arena.bounds.maxX - arena.bounds.minX) * 0.12),
@@ -18109,15 +18275,15 @@ function updatePass65KillstreakRuntime(now: number): void {
       if (impact.source === 'carpet-bomber') {
         carpetWorldImpacts.push({ point, radius: 4.5, maximumDamage: 240, shedBlastClass: 'carpet-bomber-obliteration' });
         // Carpet bombs leave burning napalm on the ground too.
-        if (flamethrowerGroundFires.length < FLAMETHROWER_GROUND_FIRE_CAPACITY) {
-          flamethrowerStreamPresentation.igniteGround(point, now);
-          flamethrowerGroundFires.push({
+        if (flamethrowerStreamPresentation.igniteGround(point, now)) {
+          flamethrowerGroundFires.ignite({
             ownerId: player.id,
             ownerTeam: player.team,
-            point: point.clone(),
+            point,
             actionNonce: randomNonce(),
-            expiresAt: now + FLAMETHROWER_GROUND_FIRE_DURATION_MS,
-            nextPulseAt: now + FLAMETHROWER_GROUND_FIRE_PULSE_MS,
+            now,
+            durationMs: FLAMETHROWER_GROUND_FIRE_DURATION_MS,
+            pulseIntervalMs: FLAMETHROWER_GROUND_FIRE_PULSE_MS,
           });
         }
         audio.explosion(now);
@@ -19727,7 +19893,11 @@ function updatePhysics(dt: number): void {
   const now = performance.now();
   const crouched = player.stance === 'crouch';
   const prone = player.stance === 'prone';
-  const wantsSprint = (actionHeld('sprint', keys, keyProfile) || gamepadSprint) && input.lengthSq() > 0 && playerGrounded;
+  const wantsSprint = (
+    actionHeld('sprint', keys, keyProfile)
+    || gamepadSprint
+    || mobileTouchControls?.state.sprinting === true
+  ) && input.lengthSq() > 0 && playerGrounded;
   const validSprintDirection = sprintEligible(forwardInput, strafeInput, adsHeld, false, false);
   if (wantsSprint && validSprintDirection && player.stance !== 'stand') requestStance('stand');
   currentSprinting = wantsSprint
@@ -21310,9 +21480,9 @@ const GAMEPAD_SUPPORT_LABELS: Record<FieldSupportId, string> = {
   nuke: 'NUKE',
 };
 
-function selectGamepadSupport(direction: -1 | 1): void {
+function selectFieldSupport(direction: -1 | 1, source: 'PAD' | 'TOUCH'): void {
   gamepadSupportSelection = cycleFieldSupportSelection(gamepadSupportSelection, direction, localFieldSupportProjection().loadout);
-  addFeed(`PAD SUPPORT · ${GAMEPAD_SUPPORT_LABELS[gamepadSupportSelection]}`, 'gold');
+  addFeed(`${source} SUPPORT · ${GAMEPAD_SUPPORT_LABELS[gamepadSupportSelection]}`, 'gold');
   updateFieldSupportHud();
 }
 
@@ -21382,8 +21552,8 @@ function pollGamepad(dt: number): void {
       if (pressed(3)) switchWeapon(player.weapon === (localHoldsRailgun() ? 'railgun' : player.primaryWeapon) ? 1 : 0);
       if (pressed(4)) throwGrenade();
       if (pressed(5)) melee();
-      if (pressed(14)) selectGamepadSupport(-1);
-      if (pressed(15)) selectGamepadSupport(1);
+      if (pressed(14)) selectFieldSupport(-1, 'PAD');
+      if (pressed(15)) selectFieldSupport(1, 'PAD');
       if (pressed(12)) activateFieldSupport(gamepadSupportSelection);
     }
   }
@@ -21407,8 +21577,19 @@ function initMobileTouchControls(): void {
     onAdsDown: () => { adsHeld = admittedAdsHeld(true); },
     onAdsUp: () => { adsHeld = admittedAdsHeld(false); },
     onCrouch: () => { if (gameplayInputEnabled()) requestStance('toggle-crouch'); },
+    onProne: () => { if (gameplayInputEnabled()) requestStance('toggle-prone'); },
     onGrenade: () => { if (gameplayInputEnabled()) throwGrenade(); },
     onMelee: () => { if (gameplayInputEnabled()) melee(); },
+    onSwitchWeapon: () => {
+      if (!gameplayInputEnabled()) return;
+      switchWeapon(player.weapon === (localHoldsRailgun() ? 'railgun' : player.primaryWeapon) ? 1 : 0);
+    },
+    onSupportCycle: () => { if (gameplayInputEnabled()) selectFieldSupport(1, 'TOUCH'); },
+    onSupportActivate: () => {
+      if (!gameplayInputEnabled()) return;
+      const slotIndex = localFieldSupportProjection().loadout.slots.indexOf(gamepadSupportSelection);
+      if (slotIndex >= 0) activateOrToggleFieldSupportSlot(slotIndex);
+    },
     onInteractDown: () => { if (gameplayInputEnabled()) beginFInteractionPress(performance.now()); },
     onInteractUp: () => releaseFInteractionPress(performance.now()),
     onPause: () => openActiveMatchPause('mobile-pause'),
@@ -21435,8 +21616,8 @@ function pollMobileTouch(): void {
   if (live !== mobilePresentationActive) {
     mobilePresentationActive = live;
     document.body.classList.toggle('mtc-live', live);
-    if (live) requestMobileLandscapePresentation();
-    else releaseMobileLandscapePresentation();
+    if (live) requestMobilePresentation();
+    else releaseMobilePresentation();
   }
   if (!touch.isEnabled()) return;
   if (touch.state.firing) setLocalTriggerHeld(true);
@@ -21452,29 +21633,37 @@ let mobilePresentationActive = false;
 
 /**
  * Mobile play uses the available viewport in either orientation. Fullscreen
- * and orientation lock remain best-effort enhancements, never a prerequisite
- * for the touch controls or portrait HUD.
+ * remains best-effort, but the runtime never locks orientation: a real device
+ * rotation must always reach the resize/orientation recovery path above.
  */
-function requestMobileLandscapePresentation(): void {
+function requestMobilePresentation(): void {
   const docEl = document.documentElement as HTMLElement & { requestFullscreen?: () => Promise<void> };
-  const lock = (): void => {
-    const orientation = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
-    orientation.lock?.(window.matchMedia('(orientation: portrait)').matches ? 'portrait' : 'landscape').catch(() => {});
-  };
   if (!document.fullscreenElement && typeof docEl.requestFullscreen === 'function') {
-    docEl.requestFullscreen().then(lock).catch(() => {});
-  } else {
-    lock();
+    docEl.requestFullscreen().catch(() => {});
   }
 }
 
-function releaseMobileLandscapePresentation(): void {
+function releaseMobilePresentation(): void {
   const orientation = screen.orientation as ScreenOrientation & { unlock?: () => void };
   orientation.unlock?.();
   if (document.fullscreenElement && typeof document.exitFullscreen === 'function') {
     document.exitFullscreen().catch(() => {});
   }
 }
+
+const MOBILE_EDITABLE_SELECTOR = 'input, textarea, select, [contenteditable]:not([contenteditable="false"])';
+
+function mobileTargetAllowsSelection(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest(MOBILE_EDITABLE_SELECTOR) !== null;
+}
+
+function suppressMobileBrowserSelection(event: Event): void {
+  if (!shouldSuppressMobileBrowserSelection(mobilePresentationActive, mobileTargetAllowsSelection(event.target))) return;
+  event.preventDefault();
+}
+
+document.addEventListener('selectstart', suppressMobileBrowserSelection, { capture: true });
+document.addEventListener('contextmenu', suppressMobileBrowserSelection, { capture: true });
 
 textChatForm.addEventListener('submit', (event) => {
   event.preventDefault();
@@ -21557,8 +21746,13 @@ window.addEventListener('keydown', (event) => {
     if (actionMatchesCode('melee', event.code, keyProfile) && !event.repeat) melee();
     if (actionMatchesCode('grenade', event.code, keyProfile) && !event.repeat) throwGrenade();
   }
-  const supportSlot = GAMEPLAY_ACTIONS.findIndex((action) => action.startsWith('support-')
-    && actionMatchesCode(action, event.code, keyProfile));
+  let supportSlot = -1;
+  for (let candidateSlot = 0; candidateSlot < 5; candidateSlot += 1) {
+    const action = supportSlotAction(candidateSlot);
+    if (!action || !actionMatchesCode(action, event.code, keyProfile)) continue;
+    supportSlot = candidateSlot;
+    break;
+  }
   if (supportSlot >= 0 && !event.repeat) activateOrToggleFieldSupportSlot(supportSlot);
   if (actionMatchesCode('interact', event.code, keyProfile) && !event.repeat) {
     const now = performance.now();
@@ -24309,7 +24503,16 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       visible: window.mesh.visible,
       position: window.mesh.getWorldPosition(new THREE.Vector3()).toArray(),
       persistentDebrisId: [...persistentWindowDebris.values()].find((entry) => entry.windowId === window.id)?.id ?? null,
+      retainedDebrisPrewarmed: pooledWindowDebris.has(windowDebrisPoolKey(arena.id, window.id)),
     })),
+    windowGlassDebrisPool: {
+      contract: 'retained-exact-instanced-render-object-v1',
+      retained: pooledWindowDebris.size,
+      currentArenaRetained: arena.breakableWindows.filter((window) => (
+        pooledWindowDebris.has(windowDebrisPoolKey(arena.id, window.id))
+      )).length,
+      active: persistentWindowDebris.size,
+    },
     persistentWindowDebris: [...persistentWindowDebris.values()].map((entry) => ({
       id: entry.id,
       windowId: entry.windowId,
@@ -26189,7 +26392,10 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
         grenadeExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration),
         supportExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration),
       ])],
-      ['death-drops', () => deathDropPresentationPool.prewarm(renderRuntime, camera, player.weapon)],
+      ['death-drops-glass', () => Promise.all([
+        deathDropPresentationPool.prewarm(renderRuntime, camera, player.weapon),
+        prewarmWindowGlassDebrisPool(sceneGeneration),
+      ])],
       ['world-ordnance', () => prewarmGrenadeWorldPresentations(sceneGeneration)],
       ['nuke-overdrive-bolts', () => Promise.all([
         prewarmNukePresentation(),
@@ -26216,6 +26422,22 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
     // Promise.all preserves the eight-name evidence order regardless of which
     // family completes first.
     const groups = await Promise.all(groupDefinitions.map(([name, operation]) => runGroup(name, operation)));
+    groups.push(await runGroup('flare-first-shot', () => (
+      flareProjectileSystem.withStagedFirstShotLight(() => (
+        weaponView.prewarmBrowserWeaponFirePresentation(
+          'flare-gun',
+          () => renderRuntime.compileAndRender(scene, camera, scene),
+        )
+      ))
+    )));
+    groups.push(await runGroup('flamethrower-first-shot', () => (
+      flamethrowerStreamPresentation.withStagedFirstShotLight(() => (
+        weaponView.prewarmBrowserWeaponFirePresentation(
+          'flamethrower',
+          () => renderRuntime.compileAndRender(scene, camera, scene),
+        )
+      ))
+    )));
     lastArenaEffectPrewarmProfile = Object.freeze({
       sceneGeneration,
       durationMs: Number((performance.now() - startedAt).toFixed(3)),
@@ -26223,54 +26445,81 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
     });
     return;
   }
-  setBootstrapStage('prewarming-combat-tracers');
-  profileArenaTransition('prewarm-tracers');
-  await tracerPool.prewarm(renderRuntime, camera, sceneGeneration);
-  setBootstrapStage('prewarming-combat-impacts');
-  profileArenaTransition('prewarm-impacts');
-  await impactPresentation.prewarm(renderRuntime, camera, sceneGeneration);
-  await dmrThermalPresentation.prewarm(renderRuntime, camera, sceneGeneration);
-  setBootstrapStage('prewarming-grenade-explosion');
-  profileArenaTransition('prewarm-grenade-explosion');
-  await grenadeExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration);
-  setBootstrapStage('prewarming-support-explosion');
-  profileArenaTransition('prewarm-support-explosion');
-  await supportExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration);
-  setBootstrapStage('prewarming-death-drops');
-  profileArenaTransition('prewarm-death-drops');
-  await deathDropPresentationPool.prewarm(renderRuntime, camera, player.weapon);
-  setBootstrapStage('prewarming-nuke');
-  profileArenaTransition('prewarm-nuke');
-  await prewarmNukePresentation();
-  setBootstrapStage('prewarming-overdrive');
-  profileArenaTransition('prewarm-overdrive');
-  await prewarmOverdrivePresentation();
-  setBootstrapStage('prewarming-grenade-world-presentations');
-  profileArenaTransition('prewarm-grenade-world');
-  await prewarmGrenadeWorldPresentations(sceneGeneration);
-  setBootstrapStage('prewarming-killstreak-presentations');
-  profileArenaTransition('prewarm-killstreaks');
-  await killstreakPresentation.prewarm(renderRuntime, camera, sceneGeneration);
-  setBootstrapStage('prewarming-bot-world-weapons');
-  profileArenaTransition('prewarm-bot-world-weapons');
-  await botWeaponGpuVocabulary.prewarm(renderRuntime, camera, sceneGeneration, yieldDeploymentPrewarmFrame);
-  setBootstrapStage('prewarming-smoke-presentations');
-  profileArenaTransition('prewarm-smoke');
-  await smokeVolumePresentationPool.prewarm(renderRuntime, camera, sceneGeneration);
-  setBootstrapStage('prewarming-explosive-bolts');
-  profileArenaTransition('prewarm-explosive-bolts');
-  await Promise.all([
-    prewarmExplosiveBoltPresentation(sceneGeneration),
-    timedMapWeaponPresentation.prewarm(renderRuntime, camera, sceneGeneration),
-    flareProjectileSystem.prewarm(renderRuntime, camera, sceneGeneration),
-    flamethrowerStreamPresentation.prewarm(renderRuntime, camera, sceneGeneration),
-  ]);
+  // AtomicSignal renders WebGL gameplay in two exact passes: a world-only pass
+  // with no camera-attached viewmodel fill, then layer 2 after clearDepth. The
+  // generic prewarm renderer uses the camera's current combined layer mask, so
+  // leaving layer 2 enabled compiled hidden world effects with one PointLight
+  // even though their first live frame has zero. Keep every zero-light world
+  // vocabulary exact, then stage the flare's real world PointLight only after
+  // those programs have settled. Restore the viewmodel mask before its own
+  // first-shot prewarm below.
+  const priorWorldPrewarmCameraLayerMask = camera.layers.mask;
+  camera.layers.disable(VIEWMODEL_RENDER_LAYER);
+  try {
+    setBootstrapStage('prewarming-combat-tracers');
+    profileArenaTransition('prewarm-tracers');
+    await tracerPool.prewarm(renderRuntime, camera, sceneGeneration);
+    setBootstrapStage('prewarming-combat-impacts');
+    profileArenaTransition('prewarm-impacts');
+    await impactPresentation.prewarm(renderRuntime, camera, sceneGeneration);
+    await dmrThermalPresentation.prewarm(renderRuntime, camera, sceneGeneration);
+    setBootstrapStage('prewarming-grenade-explosion');
+    profileArenaTransition('prewarm-grenade-explosion');
+    await grenadeExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration);
+    setBootstrapStage('prewarming-support-explosion');
+    profileArenaTransition('prewarm-support-explosion');
+    await supportExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration);
+    setBootstrapStage('prewarming-death-drops');
+    profileArenaTransition('prewarm-death-drops');
+    await Promise.all([
+      deathDropPresentationPool.prewarm(renderRuntime, camera, player.weapon),
+      prewarmWindowGlassDebrisPool(sceneGeneration),
+    ]);
+    setBootstrapStage('prewarming-nuke');
+    profileArenaTransition('prewarm-nuke');
+    await prewarmNukePresentation();
+    setBootstrapStage('prewarming-overdrive');
+    profileArenaTransition('prewarm-overdrive');
+    await prewarmOverdrivePresentation();
+    setBootstrapStage('prewarming-grenade-world-presentations');
+    profileArenaTransition('prewarm-grenade-world');
+    await prewarmGrenadeWorldPresentations(sceneGeneration);
+    setBootstrapStage('prewarming-killstreak-presentations');
+    profileArenaTransition('prewarm-killstreaks');
+    await killstreakPresentation.prewarm(renderRuntime, camera, sceneGeneration);
+    setBootstrapStage('prewarming-bot-world-weapons');
+    profileArenaTransition('prewarm-bot-world-weapons');
+    await botWeaponGpuVocabulary.prewarm(renderRuntime, camera, sceneGeneration, yieldDeploymentPrewarmFrame);
+    setBootstrapStage('prewarming-smoke-presentations');
+    profileArenaTransition('prewarm-smoke');
+    await smokeVolumePresentationPool.prewarm(renderRuntime, camera, sceneGeneration);
+    setBootstrapStage('prewarming-explosive-bolts');
+    profileArenaTransition('prewarm-explosive-bolts');
+    await Promise.all([
+      prewarmExplosiveBoltPresentation(sceneGeneration),
+      timedMapWeaponPresentation.prewarm(renderRuntime, camera, sceneGeneration),
+      flamethrowerStreamPresentation.prewarm(renderRuntime, camera, sceneGeneration),
+    ]);
+    await flareProjectileSystem.prewarm(renderRuntime, camera, sceneGeneration);
+  } finally {
+    camera.layers.mask = priorWorldPrewarmCameraLayerMask;
+  }
   setBootstrapStage('prewarming-flare-first-shot');
   profileArenaTransition('prewarm-flare-first-shot');
   await flareProjectileSystem.withStagedFirstShotLight(() => (
     weaponView.prewarmBrowserWeaponFirePresentation(
       'flare-gun',
       () => renderRuntime.compileAndRender(scene, camera, scene),
+    )
+  ));
+  profileArenaTransition('prewarm-flamethrower-first-shot');
+  await flamethrowerStreamPresentation.withStagedFirstShotLight(() => (
+    weaponView.prewarmBrowserWeaponFirePresentation(
+      'flamethrower',
+      // The live WebGL renderer splits world and viewmodel layers. A generic
+      // combined-layer compile sees both PointLights together and misses the
+      // one-world-light program created when the flame becomes visible.
+      () => prewarmExactWebGlMatchComposition(),
     )
   ));
 }

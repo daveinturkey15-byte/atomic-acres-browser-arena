@@ -148,7 +148,10 @@ describe('presentation prewarm startup contract', () => {
     expect(arenaPresentationPrewarm).toContain('flareProjectileSystem.prewarm(renderRuntime, camera, sceneGeneration),');
     expect(arenaPresentationPrewarm).toContain('flareProjectileSystem.withStagedFirstShotLight');
     expect(arenaPresentationPrewarm).toContain("weaponView.prewarmBrowserWeaponFirePresentation(\n      'flare-gun'");
+    expect(arenaPresentationPrewarm).toContain('flamethrowerStreamPresentation.withStagedFirstShotLight');
+    expect(arenaPresentationPrewarm).toContain("weaponView.prewarmBrowserWeaponFirePresentation(\n          'flamethrower'");
     expect(arenaPresentationPrewarm).toContain('() => renderRuntime.compileAndRender(scene, camera, scene)');
+    expect(arenaPresentationPrewarm).toContain('() => prewarmExactWebGlMatchComposition()');
     expect(arenaPresentationPrewarm).toContain('flamethrowerStreamPresentation.prewarm(renderRuntime, camera, sceneGeneration),');
     expect(arenaPresentationPrewarm).toContain('await prewarmGrenadeWorldPresentations(sceneGeneration);');
     expect(arenaPresentationPrewarm).toContain('await tracerPool.prewarm(renderRuntime, camera, sceneGeneration);');
@@ -157,7 +160,8 @@ describe('presentation prewarm startup contract', () => {
     expect(sharedAssets).not.toContain('impactPresentation.prewarm(');
     expect(arenaPresentationPrewarm).toContain('await grenadeExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration);');
     expect(arenaPresentationPrewarm).toContain('await supportExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration);');
-    expect(arenaPresentationPrewarm).toContain('await deathDropPresentationPool.prewarm(renderRuntime, camera, player.weapon);');
+    expect(arenaPresentationPrewarm).toContain('deathDropPresentationPool.prewarm(renderRuntime, camera, player.weapon),');
+    expect(arenaPresentationPrewarm).toContain('prewarmWindowGlassDebrisPool(sceneGeneration),');
     expect(arenaPresentationPrewarm).toContain('await prewarmNukePresentation();');
     expect(arenaPresentationPrewarm).toContain('await prewarmOverdrivePresentation();');
     expect(sharedAssets).not.toContain('grenadeExplosionPresentation.prewarm(');
@@ -225,7 +229,7 @@ describe('presentation prewarm startup contract', () => {
     expect(sharedAssets).toContain('await Promise.all([sharedAssets, worldDropCorpus, firstPersonCatalog, botWeaponVocabulary]);');
     expect(source).toContain('menuDeploymentAssetsProfile: lastMenuDeploymentAssetsProfile');
     expect(arenaPresentationPrewarm).toContain("['tracers-impacts', () => Promise.all([");
-    expect(arenaPresentationPrewarm).toContain("['death-drops', () => deathDropPresentationPool.prewarm(");
+    expect(arenaPresentationPrewarm).toContain("['death-drops-glass', () => Promise.all([");
     expect(arenaPresentationPrewarm).toContain("['world-ordnance', () => prewarmGrenadeWorldPresentations(sceneGeneration)]");
     expect(arenaPresentationPrewarm).not.toContain("['world-drops-ordnance'");
     expect(arenaPresentationPrewarm).toContain("['bot-world-weapons', () => botWeaponGpuVocabulary.prewarm(");

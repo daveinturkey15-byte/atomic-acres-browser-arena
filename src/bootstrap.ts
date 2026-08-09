@@ -1,4 +1,5 @@
 import releaseChannelsJson from '../release-channels.json';
+import { CHANGELOG, PENDING_PRODUCTION_RELEASE } from './changelog';
 import './style.css';
 import './ui/tactical-ui.css';
 import './ui/pass66-readability.css';
@@ -10,6 +11,7 @@ import {
 } from './release-channel';
 
 const releaseChannels: ReleaseChannelConfig = releaseChannelsJson;
+const newestBuildIsPublished = CHANGELOG[0]?.releasedAt !== PENDING_PRODUCTION_RELEASE;
 const appElement = document.querySelector<HTMLDivElement>('#app');
 if (!appElement) throw new Error('Missing #app root');
 const app = appElement;
@@ -31,10 +33,10 @@ function showReleaseChooser(): void {
       <section class="release-channel-card">
         <div class="release-channel-eyebrow">NUKE TOWN · BUILD SELECT</div>
         <h1 id="release-channel-title">CHOOSE YOUR <span>DEPLOYMENT</span></h1>
-        <p>Load the newest approved build, or keep playing the preserved version people already know.</p>
+        <p>${newestBuildIsPublished ? 'Load the newest approved build' : 'Review the current release candidate'}, or keep playing the preserved version people already know.</p>
         <div class="release-channel-options">
           <button type="button" class="release-channel-option primary" data-release-choice="latest">
-            <small>${releaseChannels.experimental.pass} · LIVE TARGET</small>
+            <small>${releaseChannels.experimental.pass} · ${newestBuildIsPublished ? 'LIVE' : 'RELEASE CANDIDATE'}</small>
             <strong>${releaseChannels.latest.label}</strong>
             <span>${releaseChannels.latest.description}</span>
           </button>

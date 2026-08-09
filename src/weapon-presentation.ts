@@ -78,6 +78,14 @@ type RiggedViewArm = FirstPersonArmChain & {
   bindShoulderPosition: THREE.Vector3;
   bindShoulderScale: THREE.Vector3;
 };
+type AdsClearanceMaterial = Readonly<{
+  material: THREE.Material;
+  originalOpacity: number;
+  originalTransparent: boolean;
+  originalDepthWrite: boolean;
+  targetOpacity: number;
+  surface: 'lens' | 'primary' | 'gunmetal' | 'polymer' | 'rubber' | 'accent' | 'other-static';
+}>;
 
 type ViewArmRig = {
   side: 'left' | 'right';
@@ -320,6 +328,217 @@ function viewmodelMeleeScreenOffset(camera: THREE.Camera): number {
   return viewmodelMeleeLateralOffset(camera instanceof THREE.PerspectiveCamera ? camera.aspect : VIEWMODEL_REFERENCE_ASPECT);
 }
 
+const FIRST_PERSON_ADS_BORE_RADIUS: Readonly<Partial<Record<WeaponId, number>>> = Object.freeze({
+  carbine: 0.032,
+  'mini-uzi': 0.024,
+});
+const FIRST_PERSON_ADS_SIGHT_PICTURE_RETREAT: Readonly<Partial<Record<WeaponId, number>>> = Object.freeze({
+  // The authored muzzle/front-sight geometry extends close to the camera when
+  // its rear socket is centred. A bounded ADS-only retreat keeps the complete
+  // ghosted silhouette and opaque arms below the sight window without changing
+  // the hip silhouette, source model scale, sockets or authoritative aim ray.
+  carbine: 0.26,
+  'mini-uzi': 0.3,
+});
+
+type AdsSightBoreTelemetry = Readonly<{
+  applied: boolean;
+  contract: 'physical-aperture-spatial-degenerate-v1';
+  radius: number;
+  rayCount: number;
+  suppressedElements: number;
+  batches: ReadonlyArray<Readonly<{ mesh: string; submittedElements: number; suppressedElements: number }>>;
+}>;
+
+/**
+ * Punches a small, real aperture through only the cloned first-person render
+ * batches intersecting the authored rear-to-front sight axis. Pass 65 merged
+ * the HK416 lens and Mini Uzi sight plates into material batches, leaving the
+ * semantic optic nodes empty; toggling those nodes therefore hid no pixels.
+ * Degenerating intersected cloned indices keeps sockets, materials and source
+ * topology stable while guaranteeing that the centre sight ray is unobstructed.
+ */
+export function carveFirstPersonAdsSightBore(id: WeaponId, model: THREE.Object3D): AdsSightBoreTelemetry | null {
+  const radius = FIRST_PERSON_ADS_BORE_RADIUS[id];
+  if (!radius) return null;
+  const rearSocket = model.getObjectByName('rear-sight-socket');
+  const frontSocket = model.getObjectByName('front-sight-socket');
+  if (!rearSocket || !frontSocket) return null;
+
+  model.updateMatrixWorld(true);
+  const rear = model.worldToLocal(rearSocket.getWorldPosition(new THREE.Vector3()));
+  const front = model.worldToLocal(frontSocket.getWorldPosition(new THREE.Vector3()));
+  const axis = front.clone().sub(rear).normalize();
+  if (![...rear.toArray(), ...front.toArray(), ...axis.toArray()].every(Number.isFinite) || axis.lengthSq() < 0.99) return null;
+
+  const lateral = new THREE.Vector3(1, 0, 0);
+  if (Math.abs(lateral.dot(axis)) > 0.9) lateral.set(0, 1, 0);
+  lateral.addScaledVector(axis, -lateral.dot(axis)).normalize();
+  const vertical = new THREE.Vector3().crossVectors(axis, lateral).normalize();
+  const start = rear.clone().addScaledVector(axis, -0.12);
+  const end = front.clone().addScaledVector(axis, 0.08);
+  const maximumDistance = start.distanceTo(end);
+  const rayOffsets = Object.freeze([
+    [0, 0],
+    [-0.55, 0], [0.55, 0], [0, -0.55], [0, 0.55],
+    [-0.42, -0.42], [-0.42, 0.42], [0.42, -0.42], [0.42, 0.42],
+  ] as const);
+  const rays = rayOffsets.map(([x, y]) => new THREE.Ray(
+    start.clone().addScaledVector(lateral, x * radius).addScaledVector(vertical, y * radius),
+    axis,
+  ));
+  const inverseModelWorld = model.matrixWorld.clone().invert();
+  const meshToModel = new THREE.Matrix4();
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  const hit = new THREE.Vector3();
+  const batches: Array<Readonly<{ mesh: string; submittedElements: number; suppressedElements: number }>> = [];
+  let suppressedElements = 0;
+
+  model.traverse((node) => {
+    if (!(node instanceof THREE.Mesh) || !node.name.includes('Runtime_static')) return;
+    const geometry = node.geometry;
+    const position = geometry.getAttribute('position');
+    const index = geometry.index;
+    const elementCount = index?.count ?? 0;
+    if (!position || position.itemSize < 3 || !index || elementCount < 3 || elementCount % 3 !== 0) return;
+    meshToModel.multiplyMatrices(inverseModelWorld, node.matrixWorld);
+    let batchSuppressed = 0;
+    for (let element = 0; element < elementCount; element += 3) {
+      const ia = index.getX(element);
+      const ib = index.getX(element + 1);
+      const ic = index.getX(element + 2);
+      if (ia === ib && ib === ic) continue;
+      a.fromBufferAttribute(position, ia).applyMatrix4(meshToModel);
+      b.fromBufferAttribute(position, ib).applyMatrix4(meshToModel);
+      c.fromBufferAttribute(position, ic).applyMatrix4(meshToModel);
+      const blocksAperture = rays.some((ray) => {
+        const intersection = ray.intersectTriangle(a, b, c, false, hit);
+        return intersection !== null && ray.origin.distanceTo(intersection) <= maximumDistance;
+      });
+      if (!blocksAperture) continue;
+      index.setX(element + 1, ia);
+      index.setX(element + 2, ia);
+      batchSuppressed += 3;
+    }
+    if (batchSuppressed === 0) return;
+    index.needsUpdate = true;
+    node.userData.firstPersonAdsSightBore = Object.freeze({
+      submittedElements: elementCount,
+      suppressedElements: batchSuppressed,
+      radius,
+    });
+    batches.push(Object.freeze({ mesh: node.name, submittedElements: elementCount, suppressedElements: batchSuppressed }));
+    suppressedElements += batchSuppressed;
+  });
+
+  const telemetry: AdsSightBoreTelemetry = Object.freeze({
+    applied: suppressedElements > 0,
+    contract: 'physical-aperture-spatial-degenerate-v1',
+    radius,
+    rayCount: rays.length,
+    suppressedElements,
+    batches: Object.freeze(batches),
+  });
+  model.userData.firstPersonAdsSightBore = telemetry;
+  return telemetry;
+}
+
+type RearOccluderTrimTelemetry = Readonly<{
+  applied: boolean;
+  contract: 'rear-sight-axis-spatial-degenerate-v1';
+  radius: number;
+  rayCount: number;
+  submittedElements: number;
+  suppressedElements: number;
+  suppressionRatio: number;
+  batches: ReadonlyArray<Readonly<{ mesh: string; submittedElements: number; suppressedElements: number }>>;
+}>;
+
+/** Removes only merged butt/stock triangles intersecting the rear sight corridor. */
+export function trimFirstPersonRearOccluder(id: WeaponId, model: THREE.Object3D): RearOccluderTrimTelemetry | null {
+  if (id !== 'carbine' && id !== 'mini-uzi') return null;
+  const rearSocket = model.getObjectByName('rear-sight-socket');
+  const frontSocket = model.getObjectByName('front-sight-socket');
+  if (!rearSocket || !frontSocket) return null;
+  model.updateMatrixWorld(true);
+  const rear = model.worldToLocal(rearSocket.getWorldPosition(new THREE.Vector3()));
+  const front = model.worldToLocal(frontSocket.getWorldPosition(new THREE.Vector3()));
+  const axis = front.clone().sub(rear).normalize();
+  if (axis.lengthSq() < 0.99) return null;
+  const radius = id === 'carbine' ? 0.065 : 0.05;
+  const lateral = new THREE.Vector3(1, 0, 0);
+  if (Math.abs(lateral.dot(axis)) > 0.9) lateral.set(0, 1, 0);
+  lateral.addScaledVector(axis, -lateral.dot(axis)).normalize();
+  const vertical = new THREE.Vector3().crossVectors(axis, lateral).normalize();
+  const start = rear.clone().addScaledVector(axis, -0.38);
+  const end = rear.clone().addScaledVector(axis, 0.015);
+  const maximumDistance = start.distanceTo(end);
+  const rayOffsets = Object.freeze([
+    [0, 0],
+    [-0.55, 0], [0.55, 0], [0, -0.55], [0, 0.55],
+    [-0.42, -0.42], [-0.42, 0.42], [0.42, -0.42], [0.42, 0.42],
+  ] as const);
+  const rays = rayOffsets.map(([x, y]) => new THREE.Ray(
+    start.clone().addScaledVector(lateral, x * radius).addScaledVector(vertical, y * radius),
+    axis,
+  ));
+  const inverseModelWorld = model.matrixWorld.clone().invert();
+  const meshToModel = new THREE.Matrix4();
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  const hit = new THREE.Vector3();
+  const batches: Array<Readonly<{ mesh: string; submittedElements: number; suppressedElements: number }>> = [];
+  let submittedElements = 0;
+  let suppressedElements = 0;
+  model.traverse((node) => {
+    if (!(node instanceof THREE.Mesh) || !node.name.includes('Runtime_static')) return;
+    const geometry = node.geometry;
+    const position = geometry.getAttribute('position');
+    const index = geometry.index;
+    const elementCount = index?.count ?? 0;
+    if (!position || position.itemSize < 3 || !index || elementCount < 3 || elementCount % 3 !== 0) return;
+    submittedElements += elementCount;
+    meshToModel.multiplyMatrices(inverseModelWorld, node.matrixWorld);
+    let batchSuppressed = 0;
+    for (let element = 0; element < elementCount; element += 3) {
+      const ia = index.getX(element);
+      const ib = index.getX(element + 1);
+      const ic = index.getX(element + 2);
+      if (ia === ib && ib === ic) continue;
+      a.fromBufferAttribute(position, ia).applyMatrix4(meshToModel);
+      b.fromBufferAttribute(position, ib).applyMatrix4(meshToModel);
+      c.fromBufferAttribute(position, ic).applyMatrix4(meshToModel);
+      const blocksCorridor = rays.some((ray) => {
+        const intersection = ray.intersectTriangle(a, b, c, false, hit);
+        return intersection !== null && ray.origin.distanceTo(intersection) <= maximumDistance;
+      });
+      if (!blocksCorridor) continue;
+      index.setX(element + 1, ia);
+      index.setX(element + 2, ia);
+      batchSuppressed += 3;
+    }
+    if (batchSuppressed === 0) return;
+    index.needsUpdate = true;
+    batches.push(Object.freeze({ mesh: node.name, submittedElements: elementCount, suppressedElements: batchSuppressed }));
+    suppressedElements += batchSuppressed;
+  });
+  const telemetry: RearOccluderTrimTelemetry = Object.freeze({
+    applied: suppressedElements > 0,
+    contract: 'rear-sight-axis-spatial-degenerate-v1',
+    radius,
+    rayCount: rays.length,
+    submittedElements,
+    suppressedElements,
+    suppressionRatio: submittedElements > 0 ? suppressedElements / submittedElements : 0,
+    batches: Object.freeze(batches),
+  });
+  model.userData.firstPersonRearOccluderTrim = telemetry;
+  return telemetry;
+}
+
 /**
  * The release GLB keeps semantic stock nodes, but its renderable material
  * batches have already been merged beneath `weapon-frame`; hiding the empty
@@ -399,11 +618,24 @@ const FIRST_PERSON_HIDDEN_NODES: Readonly<Record<WeaponId, ReadonlySet<string>>>
   'flare-gun': new Set<string>(),
 });
 
-function prepareFirstPersonWeaponModel(id: WeaponId, model: THREE.Group, flattenMaterials: boolean): THREE.Group {
+function prepareFirstPersonWeaponModel(
+  id: WeaponId,
+  model: THREE.Group,
+  flattenMaterials: boolean,
+  requirePhysicalAdsAperture: boolean,
+): THREE.Group {
   model.traverse((node) => {
     if (FIRST_PERSON_HIDDEN_NODES[id].has(node.name)) node.visible = false;
   });
   if (id === 'm4a1') trimM4a1FirstPersonRearStock(model);
+  const rearOccluderTrim = trimFirstPersonRearOccluder(id, model);
+  if (requirePhysicalAdsAperture && FIRST_PERSON_ADS_BORE_RADIUS[id] && !rearOccluderTrim?.applied) {
+    throw new Error(`${id} first-person rear occluder trim is missing or did not intersect rendered geometry`);
+  }
+  const adsSightBore = carveFirstPersonAdsSightBore(id, model);
+  if (requirePhysicalAdsAperture && FIRST_PERSON_ADS_BORE_RADIUS[id] && !adsSightBore?.applied) {
+    throw new Error(`${id} first-person ADS sight bore is missing or did not intersect rendered geometry`);
+  }
   if (id === 'carbine') {
     const reticle = model.getObjectByName('optic-reticle');
     if (reticle instanceof THREE.Mesh && reticle.material instanceof THREE.MeshBasicMaterial) {
@@ -659,6 +891,11 @@ export class WeaponPresentation {
   private sprintBlend = 0;
   private weaponHeat = 0;
   private shotsPresented = 0;
+  private flamethrowerHeldFireClearanceFastPathActive = false;
+  private flamethrowerHeldFireClearanceEntryChecks = 0;
+  private flamethrowerHeldFireClearanceExitChecks = 0;
+  private flamethrowerHeldFireClearanceSkippedFrames = 0;
+  private flamethrowerHeldFireClearancePrewarmChecks = 0;
   private surfaceRetreat = 0;
   private surfaceLift = 0;
   private readonly minigunSpool = createMinigunSpoolState();
@@ -1238,7 +1475,7 @@ export class WeaponPresentation {
           : createPass65WeaponModel(id, this.flattenMaterials, 'first-person')
         : buildWeaponModel(id, this.flattenMaterials, false);
       if (!unpreparedModel) throw new Error(`Pass 65 first-person asset unavailable: ${id}`);
-      const model = prepareFirstPersonWeaponModel(id, unpreparedModel, this.flattenMaterials);
+      const model = prepareFirstPersonWeaponModel(id, unpreparedModel, this.flattenMaterials, browserRuntime);
       if (!browserRuntime && id !== 'explosive-crossbow') model.userData.firstPersonSource = 'test-only-procedural-fallback';
       model.visible = false;
       this.models.set(id, model);
@@ -1374,6 +1611,7 @@ export class WeaponPresentation {
     const priorFlashVisible = this.muzzleFlash.visible;
     const priorLightVisible = this.muzzleLight.visible;
     const priorLightIntensity = this.muzzleLight.intensity;
+    const priorRootPosition = this.root.position.clone();
     try {
       this.active = id;
       this.root.visible = true;
@@ -1384,6 +1622,10 @@ export class WeaponPresentation {
       this.muzzleFlash.visible = true;
       this.muzzleLight.visible = true;
       this.muzzleLight.intensity = 1;
+      if (id === 'flamethrower') {
+        this.enforceNearPlaneClearance(model, this.root.getObjectByName('first-person-arms'));
+        this.flamethrowerHeldFireClearancePrewarmChecks += 1;
+      }
       await submit(this.root);
     } finally {
       resetImportedWeaponAnimations(model);
@@ -1396,6 +1638,7 @@ export class WeaponPresentation {
       this.muzzleFlash.visible = priorFlashVisible;
       this.muzzleLight.visible = priorLightVisible;
       this.muzzleLight.intensity = priorLightIntensity;
+      this.root.position.copy(priorRootPosition);
       this.updateActiveSockets(priorActive);
     }
   }
@@ -1635,7 +1878,7 @@ export class WeaponPresentation {
     const model = id === 'explosive-crossbow'
       ? createPass65CrossbowModel(this.flattenMaterials, 'first-person')
       : createPass65WeaponModel(id, this.flattenMaterials, 'first-person');
-    return model ? prepareFirstPersonWeaponModel(id, model, this.flattenMaterials) : null;
+    return model ? prepareFirstPersonWeaponModel(id, model, this.flattenMaterials, this.browserRuntime) : null;
   }
 
   private trimBrowserWeaponModels(): void {
@@ -2246,30 +2489,92 @@ export class WeaponPresentation {
     this.root.updateWorldMatrix(true, true);
   }
 
-  private adsOpticHidden = false;
-  private adsOpticHiddenWeapon: WeaponId | null = null;
+  private readonly adsClearanceMaterials = new WeakMap<THREE.Object3D, ReadonlyArray<AdsClearanceMaterial>>();
+  private adsClearanceWeapon: WeaponId | null = null;
+  private adsClearanceBlend = 0;
 
   /**
-   * Keeps the authored holo-optic housing out of the ADS sightline. The
-   * carbine/M4A1/AK-47 first-person GLBs centre their ADS camera on the iron
-   * rear-sight socket while the taller optic shell sits above it; leaving the
-   * shell visible during ADS blocks the centred sight picture. Hidden at
-   * 85%+ aim blend and restored as the weapon lowers.
+   * Ghosts the complete static HK416/Mini Uzi silhouette only while ADS is
+   * settled. These release GLBs merge the receiver, optic frame, polymer and
+   * stock surfaces into material batches; treating only Primary_PBR/Lens left
+   * the other batches as a large opaque wall around the physical sight bore.
+   * Action and magazine batches stay solid, and every per-viewmodel material
+   * clone is restored exactly on ADS release or weapon switch.
    */
   private applyAdsOpticClearance(adsBlend: number): void {
-    const hideOptic = adsBlend >= 0.85;
-    if (hideOptic === this.adsOpticHidden && this.adsOpticHiddenWeapon === this.active) return;
-    const model = this.mountedModel();
-    const opticNames = ['hk416-holographic-optic', 'weapon-optic'];
-    if (model) {
-      for (const name of opticNames) {
-        const optic = model.getObjectByName(name);
-        if (!optic) continue;
-        optic.visible = !hideOptic;
+    const restore = (weapon: WeaponId | null) => {
+      if (!weapon) return;
+      const previous = this.models.get(weapon);
+      if (!previous) return;
+      for (const entry of this.adsClearanceMaterials.get(previous) ?? []) {
+        const transparentChanged = entry.material.transparent !== entry.originalTransparent;
+        const depthWriteChanged = entry.material.depthWrite !== entry.originalDepthWrite;
+        entry.material.opacity = entry.originalOpacity;
+        entry.material.transparent = entry.originalTransparent;
+        entry.material.depthWrite = entry.originalDepthWrite;
+        if (transparentChanged || depthWriteChanged) entry.material.needsUpdate = true;
       }
+    };
+    if (this.adsClearanceWeapon !== this.active) restore(this.adsClearanceWeapon);
+    this.adsClearanceWeapon = this.active;
+    const model = this.mountedModel();
+    if (!model || (this.active !== 'carbine' && this.active !== 'mini-uzi')) {
+      this.adsClearanceBlend = 0;
+      return;
     }
-    this.adsOpticHidden = hideOptic;
-    this.adsOpticHiddenWeapon = this.active;
+    let materials = this.adsClearanceMaterials.get(model);
+    if (!materials) {
+      const collected: AdsClearanceMaterial[] = [];
+      const seen = new Set<THREE.Material>();
+      model.traverse((node) => {
+        if (!(node instanceof THREE.Mesh) || !node.name.includes('Runtime_static')) return;
+        const surface: AdsClearanceMaterial['surface'] = node.name.includes('_Lens')
+          ? 'lens'
+          : node.name.includes('_Primary_PBR')
+            ? 'primary'
+            : node.name.includes('_Gunmetal')
+              ? 'gunmetal'
+              : node.name.includes('_Polymer_PBR')
+                ? 'polymer'
+                : node.name.includes('_Rubber')
+                  ? 'rubber'
+                  : node.name.includes('_Accent') ? 'accent' : 'other-static';
+        const targetOpacity = surface === 'lens'
+          ? 0.025
+          : surface === 'accent'
+            ? 0.14
+            : surface === 'polymer' || surface === 'rubber'
+              ? 0.1
+              : surface === 'gunmetal' ? 0.09 : 0.07;
+        const candidates = Array.isArray(node.material) ? node.material : [node.material];
+        for (const material of candidates) {
+          if (seen.has(material)) continue;
+          seen.add(material);
+          collected.push(Object.freeze({
+            material,
+            originalOpacity: material.opacity,
+            originalTransparent: material.transparent,
+            originalDepthWrite: material.depthWrite,
+            targetOpacity,
+            surface,
+          }));
+        }
+      });
+      materials = Object.freeze(collected);
+      this.adsClearanceMaterials.set(model, materials);
+    }
+    const clearance = THREE.MathUtils.smoothstep(adsBlend, 0.58, 0.94);
+    this.adsClearanceBlend = clearance;
+    for (const entry of materials) {
+      const transparent = clearance > 0.01 ? true : entry.originalTransparent;
+      const depthWrite = clearance > 0.08 ? false : entry.originalDepthWrite;
+      if (entry.material.transparent !== transparent || entry.material.depthWrite !== depthWrite) {
+        entry.material.transparent = transparent;
+        entry.material.depthWrite = depthWrite;
+        entry.material.needsUpdate = true;
+      }
+      entry.material.opacity = THREE.MathUtils.lerp(entry.originalOpacity, entry.targetOpacity, clearance);
+    }
   }
 
   presentationState() {
@@ -2320,6 +2625,59 @@ export class WeaponPresentation {
         && (importedModel.sightForwardDot ?? -1) > 0.995
         && (importedModel.muzzleForwardDot ?? -1) > 0.85
       : requiredDetails.every((name) => model?.getObjectByName(name) !== undefined);
+    const adsClearanceCatalog = (['carbine', 'mini-uzi'] as const).map((weapon) => {
+      const weaponModel = this.models.get(weapon);
+      const entries = weaponModel ? (this.adsClearanceMaterials.get(weaponModel) ?? []) : [];
+      return {
+        weapon,
+        materialCount: entries.length,
+        transparentCount: entries.filter((entry) => entry.material.transparent).length,
+        nonOpaqueCount: entries.filter((entry) => entry.material.opacity < 1).length,
+        depthWriteDisabledCount: entries.filter((entry) => !entry.material.depthWrite).length,
+        restoredCount: entries.filter((entry) => entry.material.opacity === entry.originalOpacity
+          && entry.material.transparent === entry.originalTransparent
+          && entry.material.depthWrite === entry.originalDepthWrite).length,
+        maximumOpacity: entries.reduce((maximum, entry) => Math.max(maximum, entry.material.opacity), 0),
+        maximumTargetOpacity: entries.reduce((maximum, entry) => Math.max(maximum, entry.targetOpacity), 0),
+        surfaces: [...new Set(entries.map((entry) => entry.surface))].sort(),
+      };
+    });
+    const opaqueSightWindowHits = (() => {
+      if (!model || (this.active !== 'carbine' && this.active !== 'mini-uzi')) {
+        return {
+          contract: 'camera-ndc-sight-window-opaque-weapon-rays-v1',
+          rayCount: 9,
+          blockedRays: 0,
+          maximumHits: 0,
+          meshes: [] as string[],
+        };
+      }
+      model.updateWorldMatrix(true, true);
+      const offsets = [
+        [0, 0],
+        [-0.05, 0], [0.05, 0], [0, -0.05], [0, 0.05],
+        [-0.035, -0.035], [-0.035, 0.035], [0.035, -0.035], [0.035, 0.035],
+      ] as const;
+      const raycaster = new THREE.Raycaster();
+      raycaster.layers.mask = this.camera.layers.mask;
+      const samples = offsets.map(([x, y]) => {
+        raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
+        const hits = raycaster.intersectObject(model, true).filter((hit) => {
+          if (!(hit.object instanceof THREE.Mesh) || !hit.object.visible) return false;
+          const materials = Array.isArray(hit.object.material) ? hit.object.material : [hit.object.material];
+          const material = materials[hit.face?.materialIndex ?? 0] ?? materials[0];
+          return material?.visible === true && material.colorWrite !== false && material.opacity >= 0.35;
+        });
+        return { count: hits.length, meshes: hits.map((hit) => hit.object.name) };
+      });
+      return {
+        contract: 'camera-ndc-sight-window-opaque-weapon-rays-v1',
+        rayCount: samples.length,
+        blockedRays: samples.filter((sample) => sample.count > 0).length,
+        maximumHits: samples.reduce((maximum, sample) => Math.max(maximum, sample.count), 0),
+        meshes: [...new Set(samples.flatMap((sample) => sample.meshes))],
+      };
+    })();
     return {
       weapon: this.active,
       heat: this.weaponHeat,
@@ -2340,6 +2698,24 @@ export class WeaponPresentation {
       weaponModelId: model?.userData.weaponModelId ?? null,
       weaponFinishId: model?.userData.weaponFinishId ?? null,
       firstPersonRearStockTrim: model?.userData.firstPersonRearStockTrim ?? null,
+      firstPersonRearOccluderTrim: model?.userData.firstPersonRearOccluderTrim ?? null,
+      firstPersonAdsSightBore: model?.userData.firstPersonAdsSightBore ?? null,
+      adsMaterialClearance: {
+        contract: 'static-silhouette-ads-translucency-v2',
+        active: this.active === 'carbine' || this.active === 'mini-uzi',
+        blend: this.adsClearanceBlend,
+        sightPictureRetreat: this.adsBlend * (FIRST_PERSON_ADS_SIGHT_PICTURE_RETREAT[this.active] ?? 0),
+        materialCount: model ? (this.adsClearanceMaterials.get(model)?.length ?? 0) : 0,
+        catalog: adsClearanceCatalog,
+      },
+      adsOpaqueSightWindow: opaqueSightWindowHits,
+      flamethrowerHeldFireClearance: {
+        fastPathActive: this.flamethrowerHeldFireClearanceFastPathActive,
+        entryChecks: this.flamethrowerHeldFireClearanceEntryChecks,
+        exitChecks: this.flamethrowerHeldFireClearanceExitChecks,
+        skippedFrames: this.flamethrowerHeldFireClearanceSkippedFrames,
+        prewarmChecks: this.flamethrowerHeldFireClearancePrewarmChecks,
+      },
       modelVisibleMeshCount,
       attachedWeaponBatchStats: model?.userData.attachedWeaponBatchStats ?? null,
       adsProgress: this.adsBlend,
@@ -2467,13 +2843,10 @@ export class WeaponPresentation {
 
   private orientRiggedBone(bone: THREE.Bone, child: THREE.Bone, targetWorld: THREE.Vector3): void {
     const scratch = this.riggedArmSolveScratch;
-    // The licensed arms visual is mirrored on X so the authored R chain reads
-    // on the camera's right. A negative parent scale is a reflection, not a
-    // quaternion rotation: deriving a world quaternion and converting it back
-    // through that parent makes the wrist miss its socket by the length of the
-    // forearm. Solve the shortest arc in the bone parent's local space instead;
-    // worldToLocal preserves the reflection while the quaternion only owns the
-    // bone's local rotation.
+    // Solve the shortest arc in the bone parent's local space. This preserves
+    // the authored positive-handed armature and also keeps diagnostic fixtures
+    // with a reflected ancestor mathematically stable; a quaternion must never
+    // be asked to encode scale handedness.
     bone.updateWorldMatrix(true, false);
     const parent = bone.parent;
     const desiredParent = scratch.orientDesiredDirection.copy(targetWorld);
@@ -3046,18 +3419,19 @@ export class WeaponPresentation {
     // crosshair with a clear, unobstructed picture instead of drifting around it.
     const aimSteady = 1 - this.adsBlend * 0.86;
     const surfaceRetreatClamped = Math.min(pose.surfaceRetreat ?? 0, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT);
+    const adsSightPictureRetreat = this.adsBlend * (FIRST_PERSON_ADS_SIGHT_PICTURE_RETREAT[this.active] ?? 0);
     // The fire kick plus a full surface retreat can push the viewmodel behind
     // the near plane while prone against a wall; the weapon must stay at least
     // as far from the camera as its near-plane-clear hip position, and the
     // recoil pitch swings the stock back toward the camera, so the floor
     // carries an extra stock-swing allowance during the fire kick.
-    const fireNearPlaneFloorZ = viewmodelBaseZ + surfaceRetreatClamped
+    const fireNearPlaneFloorZ = viewmodelBaseZ + surfaceRetreatClamped - adsSightPictureRetreat
       - (presentationKick > 0.05 ? 0.1 : 0);
     const targetPosition = this.frameTargetPosition.set(
       viewmodelBaseX + adsX + (bobX + this.swayX) * aimSteady - pose.lateralSpeed * 0.012 * aimSteady + meleeArc * viewmodelMeleeScreenOffset(this.camera) + grenadeArc * 0.18 + reloadStage.lateral,
       viewmodelBaseY + adsY + (bobY + breath) * aimSteady + sprintDrop + crouchLift + proneLift + switchDrop + reloadStage.lift - presentationKick * 0.095 - pose.landingImpulse * 0.075 * aimSteady + meleeArc * 0.26,
       Math.max(
-        viewmodelBaseZ + adsZ + surfaceRetreatClamped - VIEWMODEL_NEAR_PLANE_CLEARANCE + presentationKick * profile.recoilTranslation * 1.12 + grenadeArc * 0.24,
+        viewmodelBaseZ + adsZ + surfaceRetreatClamped - adsSightPictureRetreat - VIEWMODEL_NEAR_PLANE_CLEARANCE + presentationKick * profile.recoilTranslation * 1.12 + grenadeArc * 0.24,
         fireNearPlaneFloorZ,
       ),
     );
@@ -3080,13 +3454,28 @@ export class WeaponPresentation {
     // While the fire kick or a reload is active, push the root forward just
     // enough that every bounding-box corner clears the near plane. Bounded to
     // the kick/reload windows.
-    if (presentationKick > 0.05 || reloadProgress > 0) {
+    const flamethrowerHeldFireFastPath = this.active === 'flamethrower' && pose.triggerHeld === true;
+    const enteringFlamethrowerHeldFireFastPath = flamethrowerHeldFireFastPath
+      && !this.flamethrowerHeldFireClearanceFastPathActive;
+    const exitingFlamethrowerHeldFireFastPath = !flamethrowerHeldFireFastPath
+      && this.flamethrowerHeldFireClearanceFastPathActive;
+    if (enteringFlamethrowerHeldFireFastPath || exitingFlamethrowerHeldFireFastPath) {
+      // The authored fire floor above remains active on every frame. Compute
+      // exact skinned bounds once at each state edge, not ten times per second
+      // throughout an automatic flame stream.
+      this.enforceNearPlaneClearance(activeModel, arms);
+      if (enteringFlamethrowerHeldFireFastPath) this.flamethrowerHeldFireClearanceEntryChecks += 1;
+      else this.flamethrowerHeldFireClearanceExitChecks += 1;
+    } else if (flamethrowerHeldFireFastPath) {
+      this.flamethrowerHeldFireClearanceSkippedFrames += 1;
+    } else if (presentationKick > 0.05 || reloadProgress > 0) {
       this.enforceNearPlaneClearance(activeModel, arms);
     } else if ((this.frameCounter & 1) === 0) {
       // Hip and idle poses can also cross the near plane in some arena and
       // camera-pitch combinations, so keep a throttled always-on net.
       this.enforceNearPlaneClearance(activeModel, arms);
     }
+    this.flamethrowerHeldFireClearanceFastPathActive = flamethrowerHeldFireFastPath;
     this.frameCounter += 1;
     return actionEvents;
   }
