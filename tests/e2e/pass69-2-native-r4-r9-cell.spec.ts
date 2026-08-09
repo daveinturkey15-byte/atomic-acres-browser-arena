@@ -159,7 +159,10 @@ async function stageTimedWeapon(page: Page, timedWeapon: TimedMapWeaponId): Prom
   ), timedWeapon);
   expect(staged.status).toBe('available');
   const [x, y, z] = TIMED_MAP_WEAPON_DEFINITIONS[timedWeapon].spawnPosition;
-  await page.evaluate(([px, py, pz]) => (window.__ATOMIC_ACRES_DEBUG__ as any).teleportPlayer(px, py, pz, 0, 0.9), [x, y, z]);
+  const pitch = timedWeapon === 'flare-gun' ? -0.9 : 0.9;
+  await page.evaluate(([px, py, pz, aimPitch]) => (
+    window.__ATOMIC_ACRES_DEBUG__ as any
+  ).teleportPlayer(px, py, pz, 0, aimPitch), [x, y, z, pitch]);
   expect(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.interactDrop())).toBe(true);
   await page.waitForFunction((weaponId) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.weapon === weaponId, timedWeapon);
 }
