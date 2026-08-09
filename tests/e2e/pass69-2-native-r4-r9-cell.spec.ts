@@ -154,6 +154,9 @@ async function runSniperCycle(page: Page, sniper: WeaponId, cycle: 'cold' | 'war
 }
 
 async function stageTimedWeapon(page: Page, timedWeapon: TimedMapWeaponId): Promise<void> {
+  const returnPosition = timedWeapon === 'flare-gun'
+    ? await page.evaluate(() => [...(window.__ATOMIC_ACRES_DEBUG__!.snapshot() as any).player.position] as [number, number, number])
+    : null;
   const staged = await page.evaluate((weaponId) => (
     (window.__ATOMIC_ACRES_DEBUG__ as any).stageTimedMapWeaponMidpoint(weaponId, 'exact')
   ), timedWeapon);
@@ -165,19 +168,23 @@ async function stageTimedWeapon(page: Page, timedWeapon: TimedMapWeaponId): Prom
   expect(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.interactDrop())).toBe(true);
   await page.waitForFunction((weaponId) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.weapon === weaponId, timedWeapon);
   if (timedWeapon === 'flare-gun') {
-    await page.evaluate(() => {
+    const target = await page.evaluate(([px, py, pz]) => {
       const api = window.__ATOMIC_ACRES_DEBUG__ as any;
+      api.teleportPlayer(px, py, pz, 0, 0);
       api.placeBotAhead(2.5);
       api.aimAtBot('body');
-    });
-    await page.waitForFunction(() => {
-      const snapshot = window.__ATOMIC_ACRES_DEBUG__!.snapshot() as any;
-      const target = snapshot.bots[0];
-      if (!target?.alive || target.team === snapshot.player.team) return false;
-      const [px, , pz] = snapshot.player.position;
-      const [tx, , tz] = target.position;
-      return Math.hypot(tx - px, tz - pz) <= 3;
-    }, undefined, { polling: 'raf', timeout: 5_000 });
+      const snapshot = api.snapshot() as any;
+      const bot = snapshot.bots[0];
+      const [tx, , tz] = bot?.position ?? [Number.POSITIVE_INFINITY, 0, Number.POSITIVE_INFINITY];
+      return {
+        alive: bot?.alive === true,
+        hostile: bot?.team !== snapshot.player.team,
+        distance: Math.hypot(tx - snapshot.player.position[0], tz - snapshot.player.position[2]),
+      };
+    }, returnPosition!);
+    expect(target.alive).toBe(true);
+    expect(target.hostile).toBe(true);
+    expect(target.distance).toBeLessThanOrEqual(3);
   }
 }
 
