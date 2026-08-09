@@ -136,6 +136,7 @@ describe('Pass 69.3 real-authored near-plane evidence boundary', () => {
       'timerAfterSeconds, `${afterWeapon}: production bay entry advances the visible deadline`).toBeGreaterThan(timerBeforeSeconds)',
       'roundContinuity.push(await refreshGunRangeRoundAndRestoreContact(page, weapon, nextWeapon))',
       'refreshCount: roundContinuity.length',
+      "api.setStance('stand');\n    api.setStance('prone');",
     ]) expect(spec).toContain(token);
     expect(runner).toContain('function roundContinuityValid(continuity)');
     expect(runner).toContain('continuity.refreshCount !== expectedWeapons.length - 1');

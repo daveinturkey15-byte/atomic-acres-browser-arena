@@ -390,7 +390,6 @@ async function refreshGunRangeRoundAndRestoreContact(
     api.setFireCaptureAgeMs(null);
     api.setReloadCaptureProgress(null);
     api.setMeleeCaptureProgress(null);
-    api.setStance('stand');
     api.teleportPlayer(...continuity.bayEntryPosition, 0, 0);
   }, ROUND_CONTINUITY);
   await page.waitForFunction(({ continuity, timerBefore }) => {
@@ -425,8 +424,26 @@ async function refreshGunRangeRoundAndRestoreContact(
   await page.evaluate((fixture) => {
     const api = window.__ATOMIC_ACRES_DEBUG__;
     api.teleportPlayer(...fixture.teleportPosition, fixture.yaw, fixture.pitch);
-    api.setStance('prone');
   }, CONTACT_FIXTURE);
+  // A QA teleport preserves the current capsule but deliberately does not
+  // claim ground contact. Let the retained prone capsule land, then exercise
+  // the normal stance authority once so the exact calibrated eye height is
+  // restored instead of measuring a transient post-teleport height.
+  await page.waitForFunction((fixture) => {
+    const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
+    const position = state.player.position;
+    return state.matchPhase === 'active'
+      && Array.isArray(position)
+      && position.length === 3
+      && Math.abs(position[0] - fixture.settledPosition[0]) <= fixture.maximumPositionAxisError
+      && position[1] <= 0.75
+      && Math.abs(position[2] - fixture.settledPosition[2]) <= fixture.maximumPositionAxisError;
+  }, CONTACT_FIXTURE, { timeout: 10_000 });
+  await page.evaluate(() => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    api.setStance('stand');
+    api.setStance('prone');
+  });
   try {
     await page.waitForFunction((fixture) => {
       const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
