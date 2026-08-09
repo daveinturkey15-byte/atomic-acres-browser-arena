@@ -193,6 +193,12 @@ async function stageTimedWeapon(page: Page, timedWeapon: TimedMapWeaponId): Prom
 }
 
 async function runTimedCycle(page: Page, timedWeapon: TimedMapWeaponId, cycle: 'cold' | 'warm') {
+  if (timedWeapon === 'flare-gun') {
+    await page.waitForFunction(() => {
+      const player = (window.__ATOMIC_ACRES_DEBUG__!.snapshot() as any).player;
+      return player.ammo > 0 && player.reloading === false;
+    }, undefined, { polling: 'raf', timeout: 5_000 });
+  }
   const before = await sampleHealth(page);
   assertHealthy(before);
   const beforeEffects = await page.evaluate(() => (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).timedMapWeapons);
