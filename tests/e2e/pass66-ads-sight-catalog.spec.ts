@@ -412,7 +412,7 @@ test('renders a distinct, live ADS sight for every canonical weapon without free
 
   const contactSheet = await buildContactSheet(receipts);
   const isolatedReticleContactSheet = await buildIsolatedReticleContactSheet(receipts);
-  writeFileSync(resolve(output, `receipt-${renderer}-${renderProfile}.json`), `${JSON.stringify({
+  writeFileSync(resolve(output, `receipt-${renderer}.json`), `${JSON.stringify({
     schemaVersion: 2,
     status: 'PASS',
     sourceSha,

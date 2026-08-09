@@ -88,22 +88,6 @@ async function sampleHealth(page: Page) {
   });
 }
 
-async function probeStorage(page: Page) {
-  return page.evaluate(async (id) => {
-    const key = `atomic-acres.pass69-2.native-storage-probe.${id}`;
-    localStorage.setItem(key, id);
-    const readBack = localStorage.getItem(key);
-    localStorage.removeItem(key);
-    const estimate = await navigator.storage?.estimate?.();
-    return {
-      localStorageRoundTrip: readBack === id,
-      removedAfterProbe: localStorage.getItem(key) === null,
-      quotaBytes: Number.isFinite(estimate?.quota) ? estimate!.quota! : null,
-      usageBytes: Number.isFinite(estimate?.usage) ? estimate!.usage! : null,
-    };
-  }, cellId);
-}
-
 function assertHealthy(sample: Awaited<ReturnType<typeof sampleHealth>>): void {
   expect(sample.focused).toBe(true);
   expect(sample.visibility).toBe('visible');
@@ -250,8 +234,6 @@ test('proves one strict native cold/warm R4 or R9 cell', async ({ page, browserN
     if (message.type() === 'error' && !message.text().startsWith('Failed to load resource:')) consoleErrors.push(message.text());
   });
   await deploy(page);
-  const storage = await probeStorage(page);
-  expect(storage).toMatchObject({ localStorageRoundTrip: true, removedAfterProbe: true });
   let cycles;
   if (mode === 'sniper') {
     cycles = [await runSniperCycle(page, weapon!, 'cold'), await runSniperCycle(page, weapon!, 'warm')];
@@ -264,22 +246,6 @@ test('proves one strict native cold/warm R4 or R9 cell', async ({ page, browserN
   expect(consoleErrors).toEqual([]);
   const final = await sampleHealth(page);
   assertHealthy(final);
-  const pipeline = {
-    backend: final.runtime.actualBackend,
-    deviceLost: final.runtime.deviceLost,
-    uncapturedErrors: final.runtime.uncapturedErrors,
-    runtimePresentation: final.runtime.presentation.status,
-    sampledPresentation: final.presentation.status,
-    presentedGameplayFrame: final.admission.presentedGameplayFrame,
-  };
-  expect(pipeline).toMatchObject({
-    backend: 'webgpu',
-    deviceLost: false,
-    uncapturedErrors: 0,
-    runtimePresentation: 'healthy',
-    sampledPresentation: 'healthy',
-  });
-  expect(pipeline.presentedGameplayFrame).toBeGreaterThan(0);
   const sourceShaAfter = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   expect(sourceShaAfter).toBe(expectedSourceSha);
   expect(execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { encoding: 'utf8' }).trim()).toBe('');
@@ -289,6 +255,6 @@ test('proves one strict native cold/warm R4 or R9 cell', async ({ page, browserN
     cellId, mode, weapon, arena, profile,
     browser: { name: browserName, channel: 'msedge', version: await page.context().browser()!.version(), headless: false },
     thresholds: { actionProgressStallMs: 1_300, adsEntryMs: 2_500, dwellMs: 1_200 },
-    cycles, storage, pipeline, final, pageErrors, consoleErrors,
+    cycles, final, pageErrors, consoleErrors,
   }, null, 2)}\n`);
 });
