@@ -1,17 +1,22 @@
 {
   "schemaVersion": 4,
-  "captureId": "pass66-authoritative-runtime-menu-preview-capture-v1",
-  "generatedAt": "2026-07-30",
-  "recipeId": "pass66-authoritative-runtime-menu-preview-v1",
-  "recipeDigest": "e613221a11fde02a706d7065647b1f5ded0fd20ee2d2d3492d66b7721f00dac4",
+  "captureId": "pass66-authoritative-runtime-menu-preview-capture-v2",
+  "generatedAt": "2026-08-02",
+  "recipeId": "pass66-authoritative-runtime-menu-preview-v2",
+  "recipeDigest": "9e91cfeb2e026f9bca38ceb2cc40dfef878fa8dd19b337bc5b85843917b35205",
   "source": "authoritative-runtime-arena",
   "backendRequired": "webgpu",
   "viewport": [
-    1280,
-    720
+    2560,
+    1440
   ],
   "overlay": {
     "scale": 0.5,
+    "referenceViewport": [
+      1280,
+      720
+    ],
+    "outputScale": 2,
     "palette": [
       "#020507",
       "#091316",
@@ -267,11 +272,11 @@
     "captureTools": [
       {
         "path": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
-        "sha256": "cfe96df62efa7a5785030b1e5d9ab0cce8e28648eefa1ada5522189ed5229154"
+        "sha256": "f15a16a1e849dbb2fc3a3686356b4f23b1d08cf8500822f7da0efe83430a4899"
       },
       {
         "path": "scripts/assets/pass65-menu-preview-integrity.mjs",
-        "sha256": "b670816627237fcf4103f111beb731b7762c54726fb6230a8f934e8635f6a864"
+        "sha256": "dfe3286f6003f810e1abefa875d39c661453b54d39f2c0e8d6724c0b65590da1"
       },
       {
         "path": "scripts/assets/pass65-menu-preview-integrity.d.mts",
@@ -296,7 +301,8 @@
           "arenaId": "atomic-acres",
           "moduleId": "arena.visual.atomic-acres.v1",
           "assetDependencies": [
-            "./assets/original/models/atomic-acres-blender-arena.glb?v=pass63-20260724-apertures1"
+            "./assets/original/models/atomic-acres-blender-arena.glb?v=pass63-20260724-apertures1",
+            "./assets/original/skies/atomic-acres-sunset.webp"
           ],
           "sharedAssetDependencies": [
             "./assets/original/models/operators/pass65-third-person-operator-lod0.glb",
@@ -307,13 +313,16 @@
             "public/assets/original/models/atomic-acres-blender-arena.glb",
             "public/assets/original/models/operators/pass65-third-person-operator-lod0.glb",
             "public/assets/original/models/operators/pass65-third-person-operator-lod1.glb",
+            "public/assets/original/skies/atomic-acres-sunset.webp",
             "public/assets/third-party/quaternius/animated-guns/"
           ]
         },
         {
           "arenaId": "skyline-terminal",
           "moduleId": "arena.visual.skyline-terminal.v1",
-          "assetDependencies": [],
+          "assetDependencies": [
+            "./assets/original/skies/terminal-airport-dawn.webp"
+          ],
           "sharedAssetDependencies": [
             "./assets/original/models/operators/pass65-third-person-operator-lod0.glb",
             "./assets/original/models/operators/pass65-third-person-operator-lod1.glb",
@@ -322,13 +331,16 @@
           "localAssetPaths": [
             "public/assets/original/models/operators/pass65-third-person-operator-lod0.glb",
             "public/assets/original/models/operators/pass65-third-person-operator-lod1.glb",
+            "public/assets/original/skies/terminal-airport-dawn.webp",
             "public/assets/third-party/quaternius/animated-guns/"
           ]
         },
         {
           "arenaId": "rustworks-1v1",
           "moduleId": "arena.visual.rustworks-1v1.v1",
-          "assetDependencies": [],
+          "assetDependencies": [
+            "./assets/original/skies/rustworks-industrial-night.webp"
+          ],
           "sharedAssetDependencies": [
             "./assets/original/models/operators/pass65-third-person-operator-lod0.glb",
             "./assets/original/models/operators/pass65-third-person-operator-lod1.glb",
@@ -337,6 +349,7 @@
           "localAssetPaths": [
             "public/assets/original/models/operators/pass65-third-person-operator-lod0.glb",
             "public/assets/original/models/operators/pass65-third-person-operator-lod1.glb",
+            "public/assets/original/skies/rustworks-industrial-night.webp",
             "public/assets/third-party/quaternius/animated-guns/"
           ]
         },
@@ -367,7 +380,7 @@
           ]
         }
       ],
-      "manifestSha256": "ec6698a85dde7c769a0b383eff2e18f815e5083caedc135cdee8804b211f6dc7"
+      "manifestSha256": "1ace28a048ab06bd4c3c64ed7f59f2ee3fa3d75c28561150502dce3cf7c25b7b"
     },
     "dependencyClosure": {
       "schemaVersion": 1,
@@ -377,7 +390,8 @@
         "public/assets/original"
       ],
       "excludes": [
-        "public/assets/original/menu-previews/"
+        "public/assets/original/menu-previews/",
+        "public/assets/original/killstreak-demo/"
       ],
       "extraPaths": [
         "public/assets/original/models/atomic-acres-blender-arena.glb",
@@ -388,11 +402,14 @@
         "public/assets/original/models/weapons/pass65-firearms/scattergun/scattergun-world-lod0.glb",
         "public/assets/original/models/weapons/pass65-firearms/smg/smg-world-lod0.glb",
         "public/assets/original/models/weapons/pass65-firearms/sniper/sniper-world-lod0.glb",
+        "public/assets/original/skies/atomic-acres-sunset.webp",
+        "public/assets/original/skies/rustworks-industrial-night.webp",
+        "public/assets/original/skies/terminal-airport-dawn.webp",
         "public/assets/third-party/quaternius/animated-guns"
       ],
-      "fileCount": 914,
-      "totalBytes": 100592584,
-      "treeSha256": "4d6d9969edb83d147eeb57b8ce186b4b62a220626e6b9c6d9230a7ca194365ff",
+      "fileCount": 1031,
+      "totalBytes": 111113403,
+      "treeSha256": "68678228ac56cc6d105ec2d3017a626be0fae4ea6aee0fbcf1e3ad3aa6b52cd9",
       "files": [
         {
           "path": "public/assets/original/models/atomic-acres-blender-arena.glb",
@@ -406,13 +423,13 @@
         },
         {
           "path": "public/assets/original/models/operators/pass65-first-person-arms-lod0.glb",
-          "sizeBytes": 404912,
-          "sha256": "11dce2412b82d09bdfe0aa8170c2705eebe3fba823eac8e6b1b477cc7803959b"
+          "sizeBytes": 406008,
+          "sha256": "953a113e4cfd1f79f0394a7e8b1c601590edc85be52906eb5397e7291ab5a707"
         },
         {
           "path": "public/assets/original/models/operators/pass65-first-person-arms-lod1.glb",
-          "sizeBytes": 386628,
-          "sha256": "436bde2f13a155bb53caa4ee2e4df0ef50e9fcb2969a026a31972d38f673b8c5"
+          "sizeBytes": 387520,
+          "sha256": "addd8e4da4dc4659a6b84ece3a084360c495cfd1876b6f68dcccc058346bfaa0"
         },
         {
           "path": "public/assets/original/models/operators/pass65-third-person-operator-lod0.glb",
@@ -466,58 +483,58 @@
         },
         {
           "path": "public/assets/original/models/support/pass65-care-aircraft-lod0.glb",
-          "sizeBytes": 156360,
-          "sha256": "cf87311ad07bb8fb02e0413365364fc8e36e736c0b7890e87a77334d6210d274"
+          "sizeBytes": 323116,
+          "sha256": "940846bb8646dba5b0847fc788e54ed0a5f64e644a1442cdf374f69cb3c904ac"
         },
         {
           "path": "public/assets/original/models/support/pass65-care-aircraft-lod1.glb",
-          "sizeBytes": 147892,
-          "sha256": "2da31ce77deb071cd00ab868bf0a0929eed67c3c214b01b9827f9ab2ae82a654"
+          "sizeBytes": 288840,
+          "sha256": "22d043547b22c67c053d8381684769e877e34eb9274953bfe8ed5aebb3310d3b"
         },
         {
           "path": "public/assets/original/models/support/pass65-care-aircraft-lod2.glb",
-          "sizeBytes": 153852,
-          "sha256": "745833de7e6feff2489b9e0b2bdafbd7cbe29d77d75dd5648dd3fd7bec10dcc3"
+          "sizeBytes": 245568,
+          "sha256": "84eb02c184b143462dc64362868964a3f28528dd30bafcb0b9f3f46c7c011f42"
         },
         {
           "path": "public/assets/original/models/support/pass65-care-crate-lod0.glb",
-          "sizeBytes": 107980,
-          "sha256": "7eb35d28741d9effe8c6e5869767bb4c86235bbf573e60ea7eb8f5b6a774bb12"
+          "sizeBytes": 170292,
+          "sha256": "c2fc77b2d9dac12a972530a71670b08c4c19d27ee27946cc66b8be7e0dc0b812"
         },
         {
           "path": "public/assets/original/models/support/pass65-care-crate-lod1.glb",
-          "sizeBytes": 103724,
-          "sha256": "ca0a8bd4d811f5c39725a3a9d7710f31ceb037680f08fc49edbf5ff013b9daf4"
+          "sizeBytes": 149448,
+          "sha256": "fbd3e5d6a32ccb2376a3673334c599b94a451b60f2d60d9fc2536e80d1dc9e86"
         },
         {
           "path": "public/assets/original/models/support/pass65-carpet-aircraft-lod0.glb",
-          "sizeBytes": 159476,
-          "sha256": "ce927de84b6cc2108aa04b2e93ae0ffaf265e8b4a4083439bb0f0c7dab5b735e"
+          "sizeBytes": 248400,
+          "sha256": "7ab3c037a1847ce5e53af49a39706ed8722d1766d0b9ee8b19644e3c903b62b7"
         },
         {
           "path": "public/assets/original/models/support/pass65-carpet-aircraft-lod1.glb",
-          "sizeBytes": 158800,
-          "sha256": "cb8cd16905abf0dcaefa6560ee177ef120e8b555a8684058c5b548bf32b60177"
+          "sizeBytes": 229188,
+          "sha256": "c18785d9782d6195fbe464808b6b4965fff7a540de3569832defc228c483da7e"
         },
         {
           "path": "public/assets/original/models/support/pass65-carpet-aircraft-lod2.glb",
-          "sizeBytes": 148748,
-          "sha256": "74b5dc4c51f5acd161f1a650145338c6c3bdcc1f1b585230ecf62973af314100"
+          "sizeBytes": 179408,
+          "sha256": "54928c0da8b02dc5d93741b910b9141184304b1a2fd355e93fb968461e539c4e"
         },
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod0.glb",
-          "sizeBytes": 840660,
-          "sha256": "9d5936ce16ae4aeccf3291c7f2d9aa041f823cf96d2fddf80d35fee5bb284c73"
+          "sizeBytes": 951740,
+          "sha256": "fba45762d0fb0cb7cc68a58e791b50fc8243a03489ca528d3273e2fba5e1afcb"
         },
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod1.glb",
-          "sizeBytes": 578756,
-          "sha256": "044b33914aa1ee79485ebe761d425e321a578b251e7050c46d4273baf718c90f"
+          "sizeBytes": 844688,
+          "sha256": "c737b8b6c332ecf414890a170c07852197b6223178947ff17c1b0ec01ae8237d"
         },
         {
           "path": "public/assets/original/models/support/pass65-chopper-gunner-lod2.glb",
-          "sizeBytes": 435660,
-          "sha256": "339110af1ca885f8ba2a47a62a26cd0f1ed5ac8a6bfb534705158fbb23e9e4d9"
+          "sizeBytes": 562896,
+          "sha256": "a96352c773caf04c8649253d22fa2420a14963d7344b94b9a928aa1b867c5115"
         },
         {
           "path": "public/assets/original/models/weapons/pass65-crossbow/pass65-crossbow-drop-lod0.glb",
@@ -551,28 +568,28 @@
         },
         {
           "path": "public/assets/original/models/weapons/pass65-field-knife/pass65-field-knife-drop-lod0.glb",
-          "sizeBytes": 107452,
-          "sha256": "c20d7d9dc0673af67f2784691f97b7cb7d057c3073aebf2b4b84e6500a46ebda"
+          "sizeBytes": 142464,
+          "sha256": "943a06c17a899b4f4c081362a580d23569d039649884a1c42f459504b8f36745"
         },
         {
           "path": "public/assets/original/models/weapons/pass65-field-knife/pass65-field-knife-fp-lod0.glb",
-          "sizeBytes": 125912,
-          "sha256": "5b12c5a94a00bbbc255c2b9ef8d446b321710e998f6eea74ecc5bd8d0e1c02a3"
+          "sizeBytes": 156980,
+          "sha256": "982e51c5eba6c9fc30897b23fbc4886263c9e27242a107cff80e55952334bf85"
         },
         {
           "path": "public/assets/original/models/weapons/pass65-field-knife/pass65-field-knife-fp-lod1.glb",
-          "sizeBytes": 117756,
-          "sha256": "cf3934b96b5139251f6f1ce313baf8edd6280ffaba906c1919dfc5d4f69e7b28"
+          "sizeBytes": 154416,
+          "sha256": "0e5ef7882927d1a39eaa763777b8a89ddae22bba6f1b9c77114849f6c4361e10"
         },
         {
           "path": "public/assets/original/models/weapons/pass65-field-knife/pass65-field-knife-world-lod0.glb",
-          "sizeBytes": 124732,
-          "sha256": "ee65853903955df86d2799f8f88d2825c4c95bc499c8ea687474d463200d91b2"
+          "sizeBytes": 154280,
+          "sha256": "bec9122488dcf13d5a5da2bb8d1ef818e290191fa868adfb6fc31222f2c1e21d"
         },
         {
           "path": "public/assets/original/models/weapons/pass65-field-knife/pass65-field-knife-world-lod1.glb",
-          "sizeBytes": 110060,
-          "sha256": "2f5cc4f3fa80e2c1c9f0065306af204c559286438ffb6ab9c8e61a15e8d86f64"
+          "sizeBytes": 139748,
+          "sha256": "9b2aa2e683524194d39348f23683e453d1c9fed1fc59f1eb70e298a01869605b"
         },
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/ak-47/ak-47-drop-lod0.glb",
@@ -633,6 +650,66 @@
           "path": "public/assets/original/models/weapons/pass65-firearms/carbine/carbine-world-lod2.glb",
           "sizeBytes": 249008,
           "sha256": "6e6e4dcf960ea8eb1744b04bd6e16a1fc6ab85bf8816c045e597d3c52dbac135"
+        },
+        {
+          "path": "public/assets/original/models/weapons/pass65-firearms/flamethrower/flamethrower-drop-lod0.glb",
+          "sizeBytes": 235888,
+          "sha256": "4d2ab7e0de8b7caf3fcd1e6aa11d40bfa340f1ff4770f32beedc1041015cb3d7"
+        },
+        {
+          "path": "public/assets/original/models/weapons/pass65-firearms/flamethrower/flamethrower-fp-lod0.glb",
+          "sizeBytes": 281016,
+          "sha256": "38a0dcb260763de46575cb92c7091b0f199613b99df6cbc94ac5e5fd4150fd0c"
+        },
+        {
+          "path": "public/assets/original/models/weapons/pass65-firearms/flamethrower/flamethrower-fp-lod1.glb",
+          "sizeBytes": 240104,
+          "sha256": "84d7f12c11b2d4fc8d83c9622eacc0000bfe2ee76cbe94c7d5abb047524bcb3d"
+        },
+        {
+          "path": "public/assets/original/models/weapons/pass65-firearms/flamethrower/flamethrower-world-lod0.glb",
+          "sizeBytes": 262420,
+          "sha256": "c0e9280dd9c4ad5a518ee84ebb48aef70088445d9d64cdab358be7e4b6c04679"
+        },
+        {
+          "path": "public/assets/original/models/weapons/pass65-firearms/flamethrower/flamethrower-world-lod1.glb",
+          "sizeBytes": 235900,
+          "sha256": "d8ce9ea39eb58a2b2146c5e3dbc3a92d86d66ca290a3c5c2642ef952ff7a231e"
+        },
+        {
+          "path": "public/assets/original/models/weapons/pass65-firearms/flamethrower/flamethrower-world-lod2.glb",
+          "sizeBytes": 207872,
+          "sha256": "c4f38f75e4b7262c9764a0b8c8ae291f8b74e8f08e656c3790537c78153967ff"
+        },
+        {
+          "path": "public/assets/original/models/weapons/pass65-firearms/flare-gun/flare-gun-drop-lod0.glb",
+          "sizeBytes": 218952,
+          "sha256": "d11f4608da0dd75692e9f994c9ff072df8315a9ca62fbd9c2b7440d1629e222d"
+        },
+        {
+          "path": "public/assets/original/models/weapons/pass65-firearms/flare-gun/flare-gun-fp-lod0.glb",
+          "sizeBytes": 223900,
+          "sha256": "d1610e21e095c60bb7c61c295fe4bed83286f3f25cf39ff70edbdf5a85d8d869"
+        },
+        {
+          "path": "public/assets/original/models/weapons/pass65-firearms/flare-gun/flare-gun-fp-lod1.glb",
+          "sizeBytes": 206892,
+          "sha256": "5f6b74d84ba8f7ce937efa8f8f1d775eebe4de88e63a445dfbee3a91dfe57dda"
+        },
+        {
+          "path": "public/assets/original/models/weapons/pass65-firearms/flare-gun/flare-gun-world-lod0.glb",
+          "sizeBytes": 225028,
+          "sha256": "7df598157c9143367c3e223f767996aec7e33d01b548b16f024fabeaf0627d27"
+        },
+        {
+          "path": "public/assets/original/models/weapons/pass65-firearms/flare-gun/flare-gun-world-lod1.glb",
+          "sizeBytes": 218968,
+          "sha256": "a4125cdfb7e3760f534aa6233992c8d9c5bbce7a470eebdd5f27a54530147801"
+        },
+        {
+          "path": "public/assets/original/models/weapons/pass65-firearms/flare-gun/flare-gun-world-lod2.glb",
+          "sizeBytes": 194692,
+          "sha256": "d1b2a9dfeb0f7fd8a6a78f2bbcd0863507185c2ac590ec7175e791e3d5848dfb"
         },
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/flashlight-pistol/flashlight-pistol-drop-lod0.glb",
@@ -1085,6 +1162,21 @@
           "sha256": "d1bf6cf6e1d46af165f39c80e11ec75609d61e1257f65dc4202054249bf69e11"
         },
         {
+          "path": "public/assets/original/skies/atomic-acres-sunset.webp",
+          "sizeBytes": 1120742,
+          "sha256": "7a1ad1c445af528afb461d0e3bc5ad5607618dd87df078529fdc41e7d071396b"
+        },
+        {
+          "path": "public/assets/original/skies/rustworks-industrial-night.webp",
+          "sizeBytes": 825088,
+          "sha256": "d5a0fc1d1f60678fa78f22a8b89fd1df2a9aab14998e5a75576bb92393b08450"
+        },
+        {
+          "path": "public/assets/original/skies/terminal-airport-dawn.webp",
+          "sizeBytes": 985934,
+          "sha256": "e36b73cfe0c291d25815e04a67c36921a6a1259049531371d35d96a04b307600"
+        },
+        {
           "path": "public/assets/original/textures/asphalt-aged-normal.png",
           "sizeBytes": 106538,
           "sha256": "7b2464dcae91e048e4d8c3e4524c13b5a5e582d601701142a35f8c380b313ff8"
@@ -1166,8 +1258,8 @@
         },
         {
           "path": "public/assets/original/textures/operators/pass65-first-person-arms/pass65-first-person-arms-baseColor.png",
-          "sizeBytes": 1065859,
-          "sha256": "d222dee1c8a169e5f4667b91ef327752e49c21c00c18af23adc49034e68ba38b"
+          "sizeBytes": 1098631,
+          "sha256": "31525a7731899098f1142756cb503f14e7af6930165c3035ba812ab25b5680ea"
         },
         {
           "path": "public/assets/original/textures/operators/pass65-first-person-arms/pass65-first-person-arms-metallic.png",
@@ -1546,13 +1638,13 @@
         },
         {
           "path": "public/assets/original/textures/support/pass65-chopper-albedo.png",
-          "sizeBytes": 245400,
-          "sha256": "bc729d8572e00ce6fbf712543071556a15e7ed970fea279c9582cf8f2199c6a3"
+          "sizeBytes": 216502,
+          "sha256": "3e99137cf87a5968a68cf675fc7ade2598341f8871ecd32bf51a0e54683dfef2"
         },
         {
           "path": "public/assets/original/textures/support/pass65-chopper-emissive.png",
-          "sizeBytes": 7756,
-          "sha256": "ed9974eee6effb11d2b86bc2d58405054dc1ffdc1202458759221419a4bf0c71"
+          "sizeBytes": 5807,
+          "sha256": "55aea7bfe6f9c90c71df2379611c12eada3014444ccbce4f3352d3303077a44f"
         },
         {
           "path": "public/assets/original/textures/support/pass65-chopper-normal.png",
@@ -1566,13 +1658,13 @@
         },
         {
           "path": "public/assets/original/textures/support/pass65-support-aircraft-albedo.png",
-          "sizeBytes": 249878,
-          "sha256": "5146c85eacb76e3c1cf55a50d3efe3a2bafa01b36298652437b41ba75fcc29b9"
+          "sizeBytes": 213081,
+          "sha256": "b2a1c5cc389787ad1a2e5b699260682f5598838aee0e74e58e8815bed1dbd7eb"
         },
         {
           "path": "public/assets/original/textures/support/pass65-support-aircraft-emissive.png",
-          "sizeBytes": 7756,
-          "sha256": "ed9974eee6effb11d2b86bc2d58405054dc1ffdc1202458759221419a4bf0c71"
+          "sizeBytes": 5807,
+          "sha256": "55aea7bfe6f9c90c71df2379611c12eada3014444ccbce4f3352d3303077a44f"
         },
         {
           "path": "public/assets/original/textures/support/pass65-support-aircraft-normal.png",
@@ -1838,6 +1930,76 @@
           "path": "public/assets/original/textures/weapons/pass65-firearms/carbine/carbine-roughness.png",
           "sizeBytes": 177996,
           "sha256": "51684f6a808e88a68392a2ce2511f721c2683554f47ae60b914e158958f5e5e9"
+        },
+        {
+          "path": "public/assets/original/textures/weapons/pass65-firearms/flamethrower/flamethrower-baseColor.png",
+          "sizeBytes": 208951,
+          "sha256": "a7c4a8dac2576b81d1e6e778e5a194964f8afb1436dbe780f6310543fb163455"
+        },
+        {
+          "path": "public/assets/original/textures/weapons/pass65-firearms/flamethrower/flamethrower-metallic.png",
+          "sizeBytes": 144553,
+          "sha256": "380be6cc4a6d2b1b53cfc54f5d4f01d5f80329f40ea248642c4d7577ce5fdd68"
+        },
+        {
+          "path": "public/assets/original/textures/weapons/pass65-firearms/flamethrower/flamethrower-normal.png",
+          "sizeBytes": 185557,
+          "sha256": "838f67f58ce095747787f37830372f4607d75cf2f85a44fb10593cbce627653c"
+        },
+        {
+          "path": "public/assets/original/textures/weapons/pass65-firearms/flamethrower/flamethrower-polymerBaseColor.png",
+          "sizeBytes": 115745,
+          "sha256": "9731000d45db8315faf8f73b4aa3f9ffaf0bfcaa6de15e27fc4876dbdd55fcc2"
+        },
+        {
+          "path": "public/assets/original/textures/weapons/pass65-firearms/flamethrower/flamethrower-polymerMetallic.png",
+          "sizeBytes": 120218,
+          "sha256": "d56854a9d6e56807148b1c907c9f6d0536d91631046ee76c66d577e67c13d49c"
+        },
+        {
+          "path": "public/assets/original/textures/weapons/pass65-firearms/flamethrower/flamethrower-polymerRoughness.png",
+          "sizeBytes": 158118,
+          "sha256": "563b31d4a761899163ffa23bce5d264d5d449408073681de75b809789023cf19"
+        },
+        {
+          "path": "public/assets/original/textures/weapons/pass65-firearms/flamethrower/flamethrower-roughness.png",
+          "sizeBytes": 170575,
+          "sha256": "08f7b058a1f582401a7e7c5187e74a4cc032352fa60eb395ce0d73eb387b4c1a"
+        },
+        {
+          "path": "public/assets/original/textures/weapons/pass65-firearms/flare-gun/flare-gun-baseColor.png",
+          "sizeBytes": 247809,
+          "sha256": "5f610c4b528e0f7820ece89982f94e56c45ede55cf88ebc5f58ef3c1edb42c59"
+        },
+        {
+          "path": "public/assets/original/textures/weapons/pass65-firearms/flare-gun/flare-gun-metallic.png",
+          "sizeBytes": 168814,
+          "sha256": "1ecdf9c0996754e0964b0ca6ee31a3a74993cd78b72f7ea64ff37e52041d838a"
+        },
+        {
+          "path": "public/assets/original/textures/weapons/pass65-firearms/flare-gun/flare-gun-normal.png",
+          "sizeBytes": 175373,
+          "sha256": "db032fa83811015023fd405aadc25742673c52ade520d57218e4a7ff65b0152d"
+        },
+        {
+          "path": "public/assets/original/textures/weapons/pass65-firearms/flare-gun/flare-gun-polymerBaseColor.png",
+          "sizeBytes": 181186,
+          "sha256": "c221ff7c51f7b54671e92597c5c4cd0bf1d67f25eec94f13a17e7897d84813eb"
+        },
+        {
+          "path": "public/assets/original/textures/weapons/pass65-firearms/flare-gun/flare-gun-polymerMetallic.png",
+          "sizeBytes": 143483,
+          "sha256": "bf6ad618915e57e8f5563bd1e009691b4e5b8d9b6d181f1d2fd60c88a5bcd25e"
+        },
+        {
+          "path": "public/assets/original/textures/weapons/pass65-firearms/flare-gun/flare-gun-polymerRoughness.png",
+          "sizeBytes": 173853,
+          "sha256": "d07af7b1b63e24cab6363db61263a6070a3b9a7883633cca4776e459b0213e20"
+        },
+        {
+          "path": "public/assets/original/textures/weapons/pass65-firearms/flare-gun/flare-gun-roughness.png",
+          "sizeBytes": 186408,
+          "sha256": "a7d449a3a932e15c52e5d157125e16f749133b84bc6bebaf1b6d7bca1f2877a6"
         },
         {
           "path": "public/assets/original/textures/weapons/pass65-firearms/flashlight-pistol/flashlight-pistol-baseColor.png",
@@ -2395,6 +2557,16 @@
           "sha256": "304d775b7ec3a85d0f74becb182cfbab77bf232e704e6640ff47ee7c6880c2ce"
         },
         {
+          "path": "public/assets/original/ui/pass65-firearms/flamethrower-hero-quarter.webp",
+          "sizeBytes": 9556,
+          "sha256": "94cbd8362edc79ab369e300a2bb3ca03f3c1d9ff341d4e5d7dd1284dccef50c8"
+        },
+        {
+          "path": "public/assets/original/ui/pass65-firearms/flare-gun-hero-quarter.webp",
+          "sizeBytes": 7696,
+          "sha256": "ca1982aa4df7b3a5d4c2bba0465ce56f2602a145a9db4132bf1012c1dd309c83"
+        },
+        {
           "path": "public/assets/original/ui/pass65-firearms/flashlight-pistol-hero-quarter.webp",
           "sizeBytes": 10350,
           "sha256": "7de6356e9f3ef135b2a6bb07294cf849edfc272894cb1476791ef164d12a95de"
@@ -2516,28 +2688,48 @@
         },
         {
           "path": "src/additional-maps.test.ts",
-          "sizeBytes": 69034,
-          "sha256": "417cc10ae5c31bf256a9c789a97e6e92a2dc50e3185d3884d660ffe1f0227b76"
+          "sizeBytes": 74661,
+          "sha256": "555e6103899693554adf9066e1e9fbda6269cbbb905156121c555954a3ebc3e2"
         },
         {
           "path": "src/additional-maps.ts",
-          "sizeBytes": 154102,
-          "sha256": "07f083836d104b1bef46864a4125b05d2e83e8c533ec168834e239e0bb14a2fe"
+          "sizeBytes": 174692,
+          "sha256": "f93a2de49d11d9d60e3bd0e6a89838bcd30ce646b749ed36908d56f347bb9350"
         },
         {
           "path": "src/admission-debug-contract.test.ts",
-          "sizeBytes": 6969,
-          "sha256": "17286779eb61eb80c404a5832bd2a47efdb3820e8faa03a73c77e8d4c7ad09cd"
+          "sizeBytes": 7202,
+          "sha256": "a84cca23d245b1f51a368ef93a9cc072bc38a296ce7e4351852ac7e1a77d584c"
+        },
+        {
+          "path": "src/ads-sight-profile.test.ts",
+          "sizeBytes": 1040,
+          "sha256": "83544a7908ac69c52e865a04a6411edddaab8da981d2efbe6d41d7bc5c60b534"
+        },
+        {
+          "path": "src/ads-sight-profile.ts",
+          "sizeBytes": 3590,
+          "sha256": "cb2cce0155bc525ad583998daa9b5296a2e67e0c0dd3beb6251fe27364f7a261"
         },
         {
           "path": "src/arena-contrast-lighting.test.ts",
-          "sizeBytes": 13247,
-          "sha256": "58f2220604e412c9ba1acf6d8a178cdfd28c122603bb45472bb173e2eee74852"
+          "sizeBytes": 13472,
+          "sha256": "04112bd0264dc4dd3f1526d565fcd40d6702bb22336e11ef2fb6d2c6ef0b41a0"
         },
         {
           "path": "src/arena-contrast-lighting.ts",
           "sizeBytes": 10665,
           "sha256": "a0a8e313aba358806c11efa5e064df300590cf6c65a76aa0b22d54effff9655c"
+        },
+        {
+          "path": "src/arena-generation-cache.test.ts",
+          "sizeBytes": 1356,
+          "sha256": "a24b3360cfa2eca66627d6470f154a186035c87db884afa7adca1874052c52d7"
+        },
+        {
+          "path": "src/arena-generation-cache.ts",
+          "sizeBytes": 478,
+          "sha256": "ac00100323c941f9443c5b2ee470876231af062de5187ad64113cd6472fff600"
         },
         {
           "path": "src/arena-layout.test.ts",
@@ -2566,8 +2758,8 @@
         },
         {
           "path": "src/arena-transition-profile.ts",
-          "sizeBytes": 4141,
-          "sha256": "d9c9a798fdea3e8cb4d8906fd43c0288f3daebb43c50a3198ca842e75e91df7e"
+          "sizeBytes": 4172,
+          "sha256": "cc0a09ddc22c632e6316b68fe14190c0b8f1971bbc709a09010df66b99c8f3f4"
         },
         {
           "path": "src/art-kit.test.ts",
@@ -2576,8 +2768,8 @@
         },
         {
           "path": "src/art-kit.ts",
-          "sizeBytes": 80106,
-          "sha256": "6fed959de5558a4527cb9dfaa456bfa20f50f6413a1662f8a241e0e90f16a944"
+          "sizeBytes": 81942,
+          "sha256": "4e8f0b3dc7b53e18cfe7cbc7f826f518bc33b5aa52b43902b0cf5833265a1079"
         },
         {
           "path": "src/assets-manifest.test.ts",
@@ -2616,13 +2808,18 @@
         },
         {
           "path": "src/atomic-signal.test.ts",
-          "sizeBytes": 4281,
-          "sha256": "c2aa153457f3153094dbc9a50d526ef436dbc81c7744088c7688f4fc64bbe185"
+          "sizeBytes": 11098,
+          "sha256": "e05281a4f1814e05da948d13b0152284113b3a96a512550d9d063e4870ce4f35"
         },
         {
           "path": "src/atomic-signal.ts",
-          "sizeBytes": 25059,
-          "sha256": "baef8050394f8051d22e7b910f6dba74838b474605275f764190139e4f214fb9"
+          "sizeBytes": 27860,
+          "sha256": "e011e2d5bd39c444fd64e3d53082de71e802b56579b8e767d033855d1ad81ece"
+        },
+        {
+          "path": "src/audio-browser-compatibility.test.ts",
+          "sizeBytes": 4469,
+          "sha256": "d3ac6450d2808d6494154467e73a820d006dd0f9f37e574abc91a1eb8ef6c536"
         },
         {
           "path": "src/audio-buses.ts",
@@ -2645,14 +2842,24 @@
           "sha256": "002584cdfd627cc000b252b63381a89c65f79704ecc0c9c5c22db43ae03d90e9"
         },
         {
+          "path": "src/audio-output-probe.test.ts",
+          "sizeBytes": 2035,
+          "sha256": "414f6ab8ae82970e6485e1fd28d0061ad17d865ae5ce3d56df86ac9181fc42d4"
+        },
+        {
           "path": "src/audio-railgun.test.ts",
           "sizeBytes": 8414,
           "sha256": "d36f73acaf16d6994ae62450bce424770c68b709e78eb0fd2b1bcf6c3e7935a3"
         },
         {
+          "path": "src/audio-test-bay-door.test.ts",
+          "sizeBytes": 2967,
+          "sha256": "166425494156196d9ae275de64e2420efc0f5060f2cef828e2ad2f44c28a7ca8"
+        },
+        {
           "path": "src/audio.ts",
-          "sizeBytes": 65471,
-          "sha256": "0b63fbc6b0e84f6c441dcd9121ee38b066ed47d7f7edc3910453b2935ac909d1"
+          "sizeBytes": 75560,
+          "sha256": "4ee5058e7e45435123188d4c267aa8386ac447e083de4fbe7a2573a4dae8ddbc"
         },
         {
           "path": "src/authored-shot-resolution.test.ts",
@@ -2671,8 +2878,8 @@
         },
         {
           "path": "src/ballistics.test.ts",
-          "sizeBytes": 8338,
-          "sha256": "e8f7aa41dbadb35a54b21b92996f92ceff8ac33cb899c1bf1b1e209b7193501e"
+          "sizeBytes": 9157,
+          "sha256": "9012b3a8aeb609aeee4dd62d0992225b57c918602c59c9177fe937f77f013ab5"
         },
         {
           "path": "src/ballistics.ts",
@@ -2696,13 +2903,13 @@
         },
         {
           "path": "src/blender-lighting.test.ts",
-          "sizeBytes": 3478,
-          "sha256": "2ac5ca07eb6dcca5f6d92663f2160bd1cc521e79a851fc4f8a0c11d6653477f8"
+          "sizeBytes": 4154,
+          "sha256": "da5c4dc92d478912e7587cc2e67c9968fb64d4d71616b67966cbd8b08617abff"
         },
         {
           "path": "src/blender-lighting.ts",
-          "sizeBytes": 5187,
-          "sha256": "f027ef0c42c0c37c64bd4acdc12b03e6251c6713b152fcda3a3b1d66c4feec97"
+          "sizeBytes": 5945,
+          "sha256": "4bca9199b3161a336e4ce57c4605a9c95831056d614da23fb687a9fcebec5637"
         },
         {
           "path": "src/bootstrap-preload-contract.test.ts",
@@ -2711,8 +2918,8 @@
         },
         {
           "path": "src/bootstrap.ts",
-          "sizeBytes": 2838,
-          "sha256": "8c9f3a92af280b094d24b81765c0dcc2bec6d1059e5098b0b5a78b9bfbe4165e"
+          "sizeBytes": 3756,
+          "sha256": "449f08ddb312420c16978652a5e85057b9428fc58ae59812cf764fb7ba127473"
         },
         {
           "path": "src/bot-ai.test.ts",
@@ -2721,18 +2928,18 @@
         },
         {
           "path": "src/bot-ai.ts",
-          "sizeBytes": 9128,
-          "sha256": "3a06d325ca00c921d63c75fff9ecaeb9647a2201d71add0a53f960b201877040"
+          "sizeBytes": 9210,
+          "sha256": "5cd4415be5803dea7277833617b1c3cea2d7c7d1d35619c14133667ff0db8e4d"
         },
         {
           "path": "src/bot-arsenal.test.ts",
-          "sizeBytes": 6490,
-          "sha256": "ad4cc57cb5d9d0c43951c4a4ab3fd23a8cbda8257297363e02dfdb7fe3e8ccd5"
+          "sizeBytes": 8498,
+          "sha256": "f3f47c9c340d18db4cdb6863d18a07916e76465cdd87f2208cd841a781afef97"
         },
         {
           "path": "src/bot-arsenal.ts",
-          "sizeBytes": 7245,
-          "sha256": "825fe0505a0693cf1815132adfa198d7d9f8c58e1dc5745a69adce11d50d378f"
+          "sizeBytes": 9647,
+          "sha256": "01ceed833fe5a9ee3750af61e609fc1cb0eaf7819820dbb08abad9f80b4e642c"
         },
         {
           "path": "src/bot-perception-authority.test.ts",
@@ -2755,14 +2962,24 @@
           "sha256": "a157e5251541a50e706b84e2ac67b71201ba93c1a02c826a07636adc3b147d15"
         },
         {
+          "path": "src/bot-weapon-presentation.test.ts",
+          "sizeBytes": 4390,
+          "sha256": "b8f6d8602b7f556d8242839df0339c6d06a420a1ad9d7df5e1d71211b23465d7"
+        },
+        {
+          "path": "src/bot-weapon-presentation.ts",
+          "sizeBytes": 6370,
+          "sha256": "815d2679f138d8f0a3fbbc227deb6d6a46ea47f51a98fd5bace2ff32838a3e12"
+        },
+        {
           "path": "src/browser-preparation-scheduler.test.ts",
-          "sizeBytes": 11408,
-          "sha256": "cfa363984e76b151ca648bb7305c8e1b0457ec2f039a2a902b8cb78d5ed62db9"
+          "sizeBytes": 18020,
+          "sha256": "4e5dd002dff65a32f9fd8e3d778921d6d4639513282f7387c8c6c0eec4748ebf"
         },
         {
           "path": "src/browser-preparation-scheduler.ts",
-          "sizeBytes": 10439,
-          "sha256": "b477986802b7d503ec716ab47ac319b37b78b0656352169b6bed622cc2337bfb"
+          "sizeBytes": 13059,
+          "sha256": "240987e49fc567fbe3bf199b558085d7430632ae45bd32a1b179d2598f996685"
         },
         {
           "path": "src/canonical-sha256.test.ts",
@@ -2786,38 +3003,38 @@
         },
         {
           "path": "src/changelog.test.ts",
-          "sizeBytes": 4880,
-          "sha256": "337e67bc951162b37b464096d1a338ae58dbc13ecb04f34e0f2ab4e7b033f8d4"
+          "sizeBytes": 4989,
+          "sha256": "edc5e7fcb34ab77d762f9052a6d20e97cf894a12a70021f67dc46d2d4dce8ae9"
         },
         {
           "path": "src/changelog.ts",
-          "sizeBytes": 28280,
-          "sha256": "6c0264a3b0eeb500b501955a8cde8fd385ffe64ca3124cf3ceb345d51a0027fd"
+          "sizeBytes": 31529,
+          "sha256": "20602e75cf8f2bb7e2c16fe37f08c62601653f75a9be2de06eaeff88a7fb16b1"
         },
         {
           "path": "src/character-presentation-contract.test.ts",
-          "sizeBytes": 5110,
-          "sha256": "6dfa18839a3baa073ddb6f99d2cf3987c0233a8cf98f7462b2a7ac8677cb0e87"
+          "sizeBytes": 5875,
+          "sha256": "bab0b1d8f38d1868f93097e8fdeb0e2156d4884ac6af0446b603b2550d3f259d"
         },
         {
           "path": "src/character-presentation-contract.ts",
-          "sizeBytes": 5072,
-          "sha256": "4aeec648644ebcf33cfaf4bda6da4a0e53431bfa85f33701ad2c1ab7e99edc0c"
+          "sizeBytes": 5585,
+          "sha256": "e1f822a557711728b9ebebb41ca5d1274272df6887f51c82997eb88765e2d15e"
         },
         {
           "path": "src/chopper-gunner-fire-ray.test.ts",
-          "sizeBytes": 11490,
-          "sha256": "8e2bba061011cb156a83245ca4cddfd6141456acd03f0703f42b79e76d5269e6"
+          "sizeBytes": 12711,
+          "sha256": "561794c324bbf134332fee631b12be227de8a1b70a6a4cdf1e126f1efb469485"
         },
         {
           "path": "src/client-runtime-log.test.ts",
-          "sizeBytes": 1172,
-          "sha256": "17eb52246d6695c613670ba941f2c517edd7d6ebe255afe9c86c0045252738f9"
+          "sizeBytes": 4682,
+          "sha256": "2d98d25d06e501080c4b1cadfbbb1dd50bd85e8acec0f5f34d63fe08ead3b211"
         },
         {
           "path": "src/client-runtime-log.ts",
-          "sizeBytes": 1960,
-          "sha256": "5464dce25f3abc08a88f7c477c440de4d6579a2d78a68659deb171181d1ef70a"
+          "sizeBytes": 6649,
+          "sha256": "918244b08d967e1de9ea9f8623f128846b614bdc4a715dcdcbeccff66052e7a0"
         },
         {
           "path": "src/clipboard.test.ts",
@@ -2881,8 +3098,8 @@
         },
         {
           "path": "src/combat/legacy-weapon-adapter.test.ts",
-          "sizeBytes": 5969,
-          "sha256": "64ee7cbbf3f5b09851d249c7e75d0f6ed9fff40a0cc3956402674cf6c06f2193"
+          "sizeBytes": 6391,
+          "sha256": "4f88f03e809b71a8b041526bbe5867ad79fcbaf32a372e2fd30eb8b53b19f881"
         },
         {
           "path": "src/combat/legacy-weapon-adapter.ts",
@@ -2911,13 +3128,13 @@
         },
         {
           "path": "src/combat/weapon-catalog.test.ts",
-          "sizeBytes": 6451,
-          "sha256": "a02b048d476b7f8a2394b716eb90a18cc457439a5010a1b87cf57d4460f483c1"
+          "sizeBytes": 7571,
+          "sha256": "3bbefd7ae80570c4088cd253da552d69dcc832bafcad4d3f140c4ee0712c4827"
         },
         {
           "path": "src/combat/weapon-catalog.ts",
-          "sizeBytes": 33966,
-          "sha256": "fa6b4e2e79b2d4aba96bb6b74a19038326fe3f3f2a2748d6fa15cd4751df5381"
+          "sizeBytes": 37499,
+          "sha256": "94c166e855c0f8a35b606e2cb44c5f6ee47802e25f2e8f084d878cc2ac9eb591"
         },
         {
           "path": "src/combat/weapon-role-distance.test.ts",
@@ -2980,6 +3197,16 @@
           "sha256": "c93303e69482c307cdb51e8d578bd9b49d74895618f3b6d07086c533d4cd50ed"
         },
         {
+          "path": "src/deployment-loading-progress.test.ts",
+          "sizeBytes": 1545,
+          "sha256": "31f41be04b32e353ed86f59f3ac02625bf8dd385fb544c5c6c855e41178e5f44"
+        },
+        {
+          "path": "src/deployment-loading-progress.ts",
+          "sizeBytes": 4105,
+          "sha256": "28153a7ff0000d8bf98c5daa374cdbdbce160f84283a6321a01d82e397c58a25"
+        },
+        {
           "path": "src/destructible-shed-definition.ts",
           "sizeBytes": 4560,
           "sha256": "27576954a2b7ad2f6759da8a53c2b354942ec2aa92c6e4b0ef2382d8f5ae8909"
@@ -3011,13 +3238,13 @@
         },
         {
           "path": "src/destructible-world.test.ts",
-          "sizeBytes": 20929,
-          "sha256": "bdc6adf327d64c424edae3a69285cd4c5f883f3032bb6bbdc220b39671b9e761"
+          "sizeBytes": 21007,
+          "sha256": "c79a7a00150233f4c8edc2fd4a94e3f6371c474a1fc70e6bbc1bad3dd67fd555"
         },
         {
           "path": "src/destructible-world.ts",
-          "sizeBytes": 54256,
-          "sha256": "00f56379930dea303670f78700874e26b02aafa7bf242590028cb6f2aedab714"
+          "sizeBytes": 56292,
+          "sha256": "0d3c005ed8fc36a9efc922f4ca5aa60c1865514cdd1ebc4163b45c9091fe08e8"
         },
         {
           "path": "src/deterministic-rng.test.ts",
@@ -3073,6 +3300,46 @@
           "path": "src/field-support.ts",
           "sizeBytes": 8639,
           "sha256": "7661450e8442648bad04e3128e8402ed16bd3b48eab06ce4efe29a0068f01831"
+        },
+        {
+          "path": "src/flamethrower-stream-system.test.ts",
+          "sizeBytes": 4239,
+          "sha256": "16a63bfd59fa31440c151197455445844e05a61bff3b4ca4e7727dcac70c4daa"
+        },
+        {
+          "path": "src/flamethrower-stream-system.ts",
+          "sizeBytes": 15171,
+          "sha256": "b19cb0293faee463c29a3ba6e10294e0d45ba8cf92ba47db7f27245efa7a00db"
+        },
+        {
+          "path": "src/flare-authority-checkpoint.test.ts",
+          "sizeBytes": 5360,
+          "sha256": "ebe90478847bba0821fa0b7848f3a242b598e81f68812e7cf36bd23f884fba0b"
+        },
+        {
+          "path": "src/flare-authority-checkpoint.ts",
+          "sizeBytes": 13055,
+          "sha256": "10936f34d6e4d577375889a0d4990d5c5088515339a9e73bd66917c10532d061"
+        },
+        {
+          "path": "src/flare-presentation-protocol.test.ts",
+          "sizeBytes": 4379,
+          "sha256": "d53e8634be24ace8f3375889ad2aa704a3d28b4aa48e727ad5421c770efc980d"
+        },
+        {
+          "path": "src/flare-presentation-protocol.ts",
+          "sizeBytes": 6613,
+          "sha256": "dcc66bb40a94aa17ae2218569ad0c723cbdf15360654750eeee240eecfffc65a"
+        },
+        {
+          "path": "src/flare-projectile-system.test.ts",
+          "sizeBytes": 11323,
+          "sha256": "c98875650b15b54995fdc1e31e400def1e55d539d710aa10a53a536782b8fd63"
+        },
+        {
+          "path": "src/flare-projectile-system.ts",
+          "sizeBytes": 31489,
+          "sha256": "58a918fffac0ffd19785bfae6d28f5f3332632c5335b9863deff403351af957a"
         },
         {
           "path": "src/flash-authority.integration.test.ts",
@@ -3131,8 +3398,8 @@
         },
         {
           "path": "src/gameplay-contract.ts",
-          "sizeBytes": 7006,
-          "sha256": "080768bfdb94d1baaddeba0ef61e595b6c71cd0c07bded0b30f51b671a75bce3"
+          "sizeBytes": 7406,
+          "sha256": "f54fd436af6abd44e3ff517cfb3cc3ece3323e333ed971f11054d09a8ad364b8"
         },
         {
           "path": "src/gameplay-replay.test.ts",
@@ -3151,13 +3418,13 @@
         },
         {
           "path": "src/gameplay.test.ts",
-          "sizeBytes": 20178,
-          "sha256": "1af89111cb45925b42ef856b45c29dd1010d1b9c818aa1c07ef2a07d21828c33"
+          "sizeBytes": 20283,
+          "sha256": "08ca8026fb2e8ef3a109643f3c6baa9892e1156cd18c24021e9832342d8cce55"
         },
         {
           "path": "src/gameplay.ts",
-          "sizeBytes": 16385,
-          "sha256": "6e4e0d10e8a2e4e173e923664832c37d7493a01ed343b73d108bffa75429c5ec"
+          "sizeBytes": 16321,
+          "sha256": "de9f1f3680be5cef098b395866874694da03da598cef552b5876d30d233411d4"
         },
         {
           "path": "src/glass-authority.test.ts",
@@ -3255,6 +3522,46 @@
           "sha256": "2a0019906c0be38fe3e32ce0f8e578ded4207ef24aa7ab4d21551b0538acd8d6"
         },
         {
+          "path": "src/guest-combat-inventory-authority.test.ts",
+          "sizeBytes": 8306,
+          "sha256": "10033d218428315c68e315814ff6814f7aaef081d65e19ff5a5fcdba170a63d8"
+        },
+        {
+          "path": "src/guest-combat-inventory-authority.ts",
+          "sizeBytes": 8410,
+          "sha256": "19ef5b035ea326d2540b932ebc30839c3219745ac2a7b846c5e97ec66b6e067e"
+        },
+        {
+          "path": "src/guest-rejoin-affordance.test.ts",
+          "sizeBytes": 800,
+          "sha256": "a84f75c93958327d39ae11c50191beeb83264a00aac48e4e2bb76a83fe32814b"
+        },
+        {
+          "path": "src/guest-rejoin-affordance.ts",
+          "sizeBytes": 996,
+          "sha256": "ca4363d836e6f18bdf38798a41e48fed0e38ff3c537f612c7f70c59cc1300809"
+        },
+        {
+          "path": "src/guest-reload-authority.test.ts",
+          "sizeBytes": 4537,
+          "sha256": "3faeeffb51531d56c0be3fb2d43e7fbd06a177273ccd17a82b537cc7a7203bc0"
+        },
+        {
+          "path": "src/guest-reload-authority.ts",
+          "sizeBytes": 5963,
+          "sha256": "7da7957f22e118fd9341cf4a42302c01d5dacf8fc8f7be658187a0969b0e2dfd"
+        },
+        {
+          "path": "src/guest-resume-authority.test.ts",
+          "sizeBytes": 6626,
+          "sha256": "1355709ead208edf46c70d2d1b1024a363f438ed65e8b6f6b0eb42cd3752b1d2"
+        },
+        {
+          "path": "src/guest-resume-authority.ts",
+          "sizeBytes": 5623,
+          "sha256": "cc8c76b8f1c36aac8630534084c6eb194661032f419c2a5939ce5d2ba0acc9d2"
+        },
+        {
           "path": "src/gun-range-armory.test.ts",
           "sizeBytes": 1301,
           "sha256": "b204f2e2ed0ce7d3d5b6b7dc5a1b53ceede8c564a963fbede60a5252e24e3573"
@@ -3305,6 +3612,16 @@
           "sha256": "22dcf1d2b4c5016e8f9b95616fa518b9b1c348360b15d866c29ef2e2508569be"
         },
         {
+          "path": "src/gun-range-test-bay.test.ts",
+          "sizeBytes": 6293,
+          "sha256": "5812bdbade9e1387fb0a17a8eb44ac45b68c896cd273ccb38e9d2abefa33d803"
+        },
+        {
+          "path": "src/gun-range-test-bay.ts",
+          "sizeBytes": 10673,
+          "sha256": "54430196952096bd560a66d03a0517c26e4062bac73a398cfd12138cb70c3e0b"
+        },
+        {
           "path": "src/handicap.test.ts",
           "sizeBytes": 1733,
           "sha256": "266ec69e68f60bdf4186429ba241d82cc2119168e42a6e0ea5249102d476a17f"
@@ -3350,6 +3667,31 @@
           "sha256": "2d9bdfc2f88091f6390acd19ec4b6d398858f343eaaf400972938294b0a9d477"
         },
         {
+          "path": "src/host-lobby-admission-generation.test.ts",
+          "sizeBytes": 1658,
+          "sha256": "0653afb4b3bba0e0af49bf684c3135f7c67a15b60bfbfdcd0a392ece5d7b9d89"
+        },
+        {
+          "path": "src/host-lobby-admission-generation.ts",
+          "sizeBytes": 1002,
+          "sha256": "cb99f8bc1d94a14bae1d47197645197fc8e06d7f107522e3b64c2616fed9c443"
+        },
+        {
+          "path": "src/host-match-checkpoint.test.ts",
+          "sizeBytes": 20413,
+          "sha256": "3b71886bf9280081ecb84e4efa48e3fbc5f280dab80c577e1e90e1cf232878dc"
+        },
+        {
+          "path": "src/host-match-checkpoint.ts",
+          "sizeBytes": 36583,
+          "sha256": "4d3f1ba94b26663e9fad21bbaefbc2cac30dcb0b571669975f18eb0a048386a1"
+        },
+        {
+          "path": "src/host-match-recovery-main-integration.test.ts",
+          "sizeBytes": 16083,
+          "sha256": "5b748ba2037a18f9d832b11447da25710b80655ee00ea69c8baca910ce629385"
+        },
+        {
           "path": "src/host-time.test.ts",
           "sizeBytes": 4070,
           "sha256": "d6e24f4338969b54f73d8ac644affb28129742d117451561a8373b0a039a89d4"
@@ -3370,14 +3712,29 @@
           "sha256": "a1cb7d4e307488bcf63117677b60f3859b174cefbf9e20d3ebcf1f82762b703f"
         },
         {
+          "path": "src/hosted-bot-damage-admission.test.ts",
+          "sizeBytes": 1411,
+          "sha256": "f4cb8214bbb903afa3ef0837e0416f198545b0c321027cfd0f3f648e85a2f76f"
+        },
+        {
+          "path": "src/hosted-bot-damage-admission.ts",
+          "sizeBytes": 1043,
+          "sha256": "e072538a2011d97fb9a22c40e92c134f93c9e7f3e7125cca70c55fdd4d86d62a"
+        },
+        {
+          "path": "src/hosted-bot-main-integration.test.ts",
+          "sizeBytes": 8235,
+          "sha256": "e391f14e4159cbad135973b08bec713c0fe244fdf6fe51861f0c5dc5251aa4ce"
+        },
+        {
           "path": "src/hosted-bots.test.ts",
-          "sizeBytes": 1349,
-          "sha256": "d328717f6607f5d26dd9924b076fe01c3a8863502ece0d985990341970d426de"
+          "sizeBytes": 3054,
+          "sha256": "5b57dfa2a4bcbb7aaa5e975dcd40b5c6a5cdc53d7aabba9d55d433a60cc59e8c"
         },
         {
           "path": "src/hosted-bots.ts",
-          "sizeBytes": 1566,
-          "sha256": "d018a40b2dd8cadeb08c0835cdb8bbf66f4484045b6d856ab351afe4d61e218f"
+          "sizeBytes": 3129,
+          "sha256": "249b3e1c584d5c49137f6336f3c2dce33234dfada5aa867cc71ef27808e05ad1"
         },
         {
           "path": "src/house-destruction-live-integration.test.ts",
@@ -3456,23 +3813,23 @@
         },
         {
           "path": "src/impact-presentation.ts",
-          "sizeBytes": 19532,
-          "sha256": "81bd439d03f724188c52d03ca4bf51b543eb9c2c97b702a7f733baa12a42a442"
+          "sizeBytes": 19716,
+          "sha256": "0a2ee813cf35b36d14dbe5e4cbe81d22731df1394a34f29c6726ed6803bec103"
         },
         {
           "path": "src/interaction-arbitration.test.ts",
-          "sizeBytes": 3247,
-          "sha256": "e46444bcd664ab2b2b8c678b69b3cd17a3698a453f04e05925f94c1f0dc0a967"
+          "sizeBytes": 4012,
+          "sha256": "7ffcb24e4748d15b82cc94f388e26daf60bc10c0e831073b7819e377b5c7eebf"
         },
         {
           "path": "src/interaction-arbitration.ts",
-          "sizeBytes": 2677,
-          "sha256": "b84b68d90780e1efb482b0d529036262978ba5ba443f5bd34520f8835fb36d30"
+          "sizeBytes": 2939,
+          "sha256": "1abbc2e78da8a313ac9536f93385ba200ee6f2a00a4d73ad0aa2b34f299d29b3"
         },
         {
           "path": "src/interaction-press-lifecycle.test.ts",
-          "sizeBytes": 5566,
-          "sha256": "ded3dfa975f88b7385b6e39a7e7726460ce543d637f2919baf38a4e9b5895097"
+          "sizeBytes": 6361,
+          "sha256": "53406dc645adabcb7350a183da349841fbbd8a48e9856f4b84cbedc2b65c0e30"
         },
         {
           "path": "src/interaction-press-lifecycle.ts",
@@ -3500,6 +3857,16 @@
           "sha256": "87d29a2facfe351a483d45cc08f09cff86ed4646079eac0c04f860be382b3ffc"
         },
         {
+          "path": "src/key-bindings.test.ts",
+          "sizeBytes": 3862,
+          "sha256": "abe5b7fc069833f51d565d84d95c466ee525cfebaef86c454d1a964af31db34e"
+        },
+        {
+          "path": "src/key-bindings.ts",
+          "sizeBytes": 6273,
+          "sha256": "2e1846c45e080d6c6e7909d9453889d2abf987be2edff928c13d1944c5f1205f"
+        },
+        {
           "path": "src/kill-provenance.test.ts",
           "sizeBytes": 1152,
           "sha256": "5a6f72f77a1a10b507d29612bfe64d633eba845b8e205a41119d452e762dcf61"
@@ -3516,13 +3883,38 @@
         },
         {
           "path": "src/killstreak-catalog.test.ts",
-          "sizeBytes": 12187,
-          "sha256": "f796bef5f0b16a66a86424dc3cdf95505280d9fe09e7b7302ca1fcb849f40ff6"
+          "sizeBytes": 12539,
+          "sha256": "d4874a1b4c65909570bb5b995eec9c1b42c798fa8d673166536cd2ba6bf075a0"
         },
         {
           "path": "src/killstreak-catalog.ts",
-          "sizeBytes": 16272,
-          "sha256": "b451b78236501948e70aca71a9c6a18a08cbcbfb67a5a7b6c76ef3cfbcf8fe32"
+          "sizeBytes": 16402,
+          "sha256": "be014c63a1318907e21a82a36ecb384021887c34c11478c924bcd142c6180f56"
+        },
+        {
+          "path": "src/killstreak-demo-capture-contract.test.ts",
+          "sizeBytes": 13549,
+          "sha256": "55bc2dec7cc64e066d58af2c823c4ff9e755213e878b23ef14af98a1e7176bd6"
+        },
+        {
+          "path": "src/killstreak-demo-capture-contract.ts",
+          "sizeBytes": 45877,
+          "sha256": "76bf7221e4fda0bde1a6b0113f73b2966f4d2779c980a0bad81747e63dc805a3"
+        },
+        {
+          "path": "src/killstreak-demo-capture-runner.test.ts",
+          "sizeBytes": 4271,
+          "sha256": "74af0129b8290c10ec314f37c86c06b59ee4066acd2f52b9915777fe5b4665af"
+        },
+        {
+          "path": "src/killstreak-demo-media-finalizer.test.ts",
+          "sizeBytes": 13783,
+          "sha256": "cb147a3f63edba7287fd09b7c395124946844192b6cd2db789e1c7c1ef666ef5"
+        },
+        {
+          "path": "src/killstreak-demo-published-media.test.ts",
+          "sizeBytes": 1516,
+          "sha256": "38a7997de160036a883983ab83a19260daf4eb7d898e0d72f50e96a34acc3602"
         },
         {
           "path": "src/killstreak-drone-deployment.test.ts",
@@ -3556,33 +3948,38 @@
         },
         {
           "path": "src/killstreak-flight-navigation.ts",
-          "sizeBytes": 7562,
-          "sha256": "35b673bb2a5fca67032d7bcfd52fe2da32f8080d0911209dfbe1cebf4c7b0f1d"
+          "sizeBytes": 7807,
+          "sha256": "21515864d5f8d396c05f6562768297d232de06dcc359d9e328cf22e26745c51f"
+        },
+        {
+          "path": "src/killstreak-host-checkpoint-integration.test.ts",
+          "sizeBytes": 3952,
+          "sha256": "4fc801216a804f734f05142b98820a8c49f329233e6194a3b8399f3121b035af"
         },
         {
           "path": "src/killstreak-loadout.test.ts",
-          "sizeBytes": 3433,
-          "sha256": "48a41e75baf700b1a7f38d27824ce3d8c2bba54c2183f44812e118de5fd8a1b8"
+          "sizeBytes": 4278,
+          "sha256": "30f8d3cef704b64bb687649ba88c60af1201229f1a61187e623e61c605c0ac27"
         },
         {
           "path": "src/killstreak-loadout.ts",
-          "sizeBytes": 4704,
-          "sha256": "c858663f28427908fd05c6f6d92460da847538ae4f66a7ef758319bf2e2b2767"
+          "sizeBytes": 5177,
+          "sha256": "96d93423cb220b8c611d12050e7c0627aeba85029771ef32709435441b500956"
         },
         {
           "path": "src/killstreak-main-integration.test.ts",
-          "sizeBytes": 20788,
-          "sha256": "e32b180f8b54aed6ee76d40c3e0a2198447c475e1cb606250b53d2cafeb04965"
+          "sizeBytes": 26052,
+          "sha256": "521665d17f19049122e99ea8fe36f4d5d575f89d31a74bdff4ce647ba442e529"
         },
         {
           "path": "src/killstreak-presentation.test.ts",
-          "sizeBytes": 48979,
-          "sha256": "d1cee5fa0cfaa6e19ee1dd426b27120e3a8cbe2368069605889757637d844368"
+          "sizeBytes": 49849,
+          "sha256": "cd06b7bffb639139d6f00937044b959017fe3e4ce1dff86e11703265e82b174e"
         },
         {
           "path": "src/killstreak-presentation.ts",
-          "sizeBytes": 121841,
-          "sha256": "76e0da1897292c3c7d1d5dc607052e0a36e1020659875244e178a5c02df3f88b"
+          "sizeBytes": 128777,
+          "sha256": "822a17548e57d7b389fb028cc15a9fb2d436205f0a815fffbb6a7f7810461c03"
         },
         {
           "path": "src/killstreak-protocol.test.ts",
@@ -3595,14 +3992,24 @@
           "sha256": "747bf7db6fb8b8959c58d4066b0440c1c2ae877076247592a2d9d269459f90bf"
         },
         {
+          "path": "src/killstreak-reconnect-checkpoint.test.ts",
+          "sizeBytes": 5246,
+          "sha256": "fddfc99ba6ed39ccc3dee0aa1e6471892b16fb020f4760517b5f3c14cf91a8bd"
+        },
+        {
+          "path": "src/killstreak-replacement-authority-main-integration.test.ts",
+          "sizeBytes": 3929,
+          "sha256": "380f9612de1127114281542d8e5ae388ff6af3a8cc8f06484b0568fbed59cf9e"
+        },
+        {
           "path": "src/killstreak-runtime.test.ts",
-          "sizeBytes": 53435,
-          "sha256": "00ea6eb1e83ab1716112a43f2ce4804ef07386a1e857d810e0930670b102052e"
+          "sizeBytes": 55926,
+          "sha256": "6359b234daef68ad5c2c26820731d4118fcfbe9e8af600a2b9390bb868cc4de4"
         },
         {
           "path": "src/killstreak-runtime.ts",
-          "sizeBytes": 102724,
-          "sha256": "c0e686b3edebd68cd43312029bc95987715227c963c5d2d6850680acc8e11b84"
+          "sizeBytes": 116282,
+          "sha256": "50451f4268313292d219a4ea7075f1528cb7eaa45a8f15ec94d951d62f2a91a3"
         },
         {
           "path": "src/killstreak-slot-possession.test.ts",
@@ -3616,13 +4023,13 @@
         },
         {
           "path": "src/killstreak-support-catalog.test.ts",
-          "sizeBytes": 4360,
-          "sha256": "c15f7ac8584ac11c8c7b70ac5f43be360756e1a487d795d7dcd27fb006799abd"
+          "sizeBytes": 4758,
+          "sha256": "b9886603c70ce3ce18e6ef8fac8049e271f7a92f17ed130994a65dbc3e67ef49"
         },
         {
           "path": "src/killstreak-support-catalog.ts",
-          "sizeBytes": 7490,
-          "sha256": "8c5de778aec9d903b4c90e361f385158f66afa37309ba1ed9d13a572fe393cfb"
+          "sizeBytes": 7803,
+          "sha256": "f00ea3a5803bbd2c6d4c2e7738414d706ad1466be96dbd9fb2065ee0d994fbf9"
         },
         {
           "path": "src/lag-compensation.test.ts",
@@ -3646,8 +4053,8 @@
         },
         {
           "path": "src/legacy-main.ts",
-          "sizeBytes": 957564,
-          "sha256": "5f3e957041126e101bd58d0df78a1c7266d637cb9ef4cb12e68ffa1dbc6f9367"
+          "sizeBytes": 1185372,
+          "sha256": "749c0a442add97f9e3d34021758b89f6ec009bc2b695ecf0b6f375e64cc556cf"
         },
         {
           "path": "src/loadout-preset-schema.test.ts",
@@ -3686,13 +4093,13 @@
         },
         {
           "path": "src/map-selection.test.ts",
-          "sizeBytes": 4027,
-          "sha256": "dfca0e7426a6ff28c08cbcaa5a2f166e9527b1217c7a5d5e83aa032ed2e8ba87"
+          "sizeBytes": 4047,
+          "sha256": "987c3f2952fc5d4e2340793b8cdd2516ef130ad9f8b2da6172815920419f3779"
         },
         {
           "path": "src/map-selection.ts",
-          "sizeBytes": 5098,
-          "sha256": "9dd5ad4539e9bdc8a06966accb6c92dc7ccd86de56e06899e8cfff8021da0290"
+          "sizeBytes": 5241,
+          "sha256": "b512da6670c38afe28d2b2cc99bdc32bb71d49ecc08e068b1505da411a360a2c"
         },
         {
           "path": "src/map.test.ts",
@@ -3701,8 +4108,23 @@
         },
         {
           "path": "src/map.ts",
-          "sizeBytes": 37667,
-          "sha256": "8fccab4de87b0ce5587c48c4d8d9eb388074510086b7240fb9517a0ae68df4bd"
+          "sizeBytes": 37686,
+          "sha256": "4103f285fc10d9e853d5a257352c431447b0785cfb50775369563c8fad0409bb"
+        },
+        {
+          "path": "src/match-admission-main-integration.test.ts",
+          "sizeBytes": 7704,
+          "sha256": "eee2a58eb778ec620ae7de999d30afd09764cfc39af01ff500f408f1108d374d"
+        },
+        {
+          "path": "src/match-admission-transaction.test.ts",
+          "sizeBytes": 8160,
+          "sha256": "23d70b4bc4e97076dfb9a53c91e21097fd123346014b1c286c174e63c64906b9"
+        },
+        {
+          "path": "src/match-admission-transaction.ts",
+          "sizeBytes": 6137,
+          "sha256": "be54a1df49db4048f63f8d7eab94e5174eb59b1eb03bdb8e46c8a7f3a272fb77"
         },
         {
           "path": "src/match-countdown-audio.test.ts",
@@ -3741,13 +4163,13 @@
         },
         {
           "path": "src/match-diagnostics.test.ts",
-          "sizeBytes": 13264,
-          "sha256": "17cfb1c047612c33b0d010f486e8a293cf82d8b487b444523b30ad2f237fc076"
+          "sizeBytes": 15281,
+          "sha256": "c24d32e7ae2af42b47a9a0901588d5dcc91018ba03db8e9f7e3f3d1b98946a20"
         },
         {
           "path": "src/match-diagnostics.ts",
-          "sizeBytes": 18483,
-          "sha256": "fafb42158007fdcfe6ce11d5f472112fa164a8bcefdf3172488a0993cd56c7f7"
+          "sizeBytes": 18938,
+          "sha256": "a06a83de19d68b5b028b7eb2179547311475a363446db230299fdc3ef39a99d3"
         },
         {
           "path": "src/match-presentation.test.ts",
@@ -3805,6 +4227,16 @@
           "sha256": "ede407b5b0fff77e9035f39ff83d264a5720940e0ebcb8707c8b19b9b9a5916b"
         },
         {
+          "path": "src/mobile-touch-controls.test.ts",
+          "sizeBytes": 1442,
+          "sha256": "eab0c1a697785bcb13e78eec86eb637693986c0785b573a478d57016362ad68a"
+        },
+        {
+          "path": "src/mobile-touch-controls.ts",
+          "sizeBytes": 12794,
+          "sha256": "2e519f4b67498e594d386b82972da3a9d57d797de109d23b4522eb7f9ee1ace4"
+        },
+        {
           "path": "src/multiplayer-damage-matrix.test.ts",
           "sizeBytes": 3261,
           "sha256": "353cb2246907349011e7a13fbd5b371bed700060c09807726cadbc162bc068f0"
@@ -3820,6 +4252,11 @@
           "sha256": "62590992f6de40016d7bc028711e277ed1afc9b343c2e6a5b586e2b3fa8cab19"
         },
         {
+          "path": "src/network-connection-attempt.test.ts",
+          "sizeBytes": 8665,
+          "sha256": "91d246dd8bebfc9dd1078741d7f5e98f650c0ff8f6a2be1597ccf984b7a7ba84"
+        },
+        {
           "path": "src/network-fairness.test.ts",
           "sizeBytes": 1728,
           "sha256": "84f5bb31870c1a6a841c7a5fcd8ad93f4cb03ae7a8d0afbb88c4c7d3a9ee31cd"
@@ -3831,8 +4268,8 @@
         },
         {
           "path": "src/network-lifecycle.test.ts",
-          "sizeBytes": 3854,
-          "sha256": "cf72ea9bf6022ad2f84172903871b0cbd1e52d959fa8ef437fefda8f43df4c0f"
+          "sizeBytes": 32994,
+          "sha256": "bd45d82c9607e30fc3882ea28a4508b051216c703593d041bac6d151fb766923"
         },
         {
           "path": "src/network-sync.test.ts",
@@ -3846,18 +4283,18 @@
         },
         {
           "path": "src/network.ts",
-          "sizeBytes": 32198,
-          "sha256": "dfaa956f2f57022f53458efa9ea229ae32fbe0c7bfc49ae903654e3fd71bc6e6"
+          "sizeBytes": 62087,
+          "sha256": "806974f8de84fca8fe755c5b57f3d2e3783dd6a9a37892640a8fd80e89f513c3"
         },
         {
           "path": "src/operator-model.test.ts",
-          "sizeBytes": 4649,
-          "sha256": "9b0a74413f34256774f31633f006e1548ddee3c82ea828dd24b537e45815db65"
+          "sizeBytes": 5684,
+          "sha256": "dd892ac3c2ced11cc3a9c6b8013fa723cf981e6bce2dc61fd637135a793ed630"
         },
         {
           "path": "src/operator-model.ts",
-          "sizeBytes": 42684,
-          "sha256": "eef3bae7db559f7fa8e2d168b134c3014c9999059a5cec6cede9c7b05c31b3a0"
+          "sizeBytes": 43358,
+          "sha256": "8e0224b318f89e41e7dfa031d993f8234eccaf599fe0463d9db26c85fd800495"
         },
         {
           "path": "src/overdrive.test.ts",
@@ -3980,6 +4417,46 @@
           "sha256": "32817e302e288e2fde47c64ec7317db1a2ded009d3fd7165494cb843d45ee540"
         },
         {
+          "path": "src/pass66-audio-long-run-runner.test.ts",
+          "sizeBytes": 1739,
+          "sha256": "222fa1b0bcfe82d554f75a929752a0880eb23544f1a2d90438b98063dad9c7e5"
+        },
+        {
+          "path": "src/pass66-owned-browser-verifier-runner.test.ts",
+          "sizeBytes": 6527,
+          "sha256": "c105af8ebc4104d7cc8e87c019b7fcf8d390856cdee4f1dee7eca2346a93e36f"
+        },
+        {
+          "path": "src/pass66-pass63-multiplayer-comparator-contract.test.ts",
+          "sizeBytes": 2468,
+          "sha256": "8c70ae397c8aef93ce84c272ba45febf946c9417c80fe94bca653ce061e29784"
+        },
+        {
+          "path": "src/pass66-pass63-multiplayer-comparator-contract.ts",
+          "sizeBytes": 1436,
+          "sha256": "323dd6a82501894518c011c6569d0042405e09f59c1f710ab8c76546e96409a2"
+        },
+        {
+          "path": "src/pass66-standalone-browser-source-binding.test.ts",
+          "sizeBytes": 2650,
+          "sha256": "984a24fdd484eab3415aba524c24b67abb884389a65d052e812ff7f34c68b693"
+        },
+        {
+          "path": "src/pass69-2-chopper-cockpit-review-integration.test.ts",
+          "sizeBytes": 2207,
+          "sha256": "6f6dbc3cd419cca60354b93011adbb8c77fe5a640a0bbf71c50f305307b7265b"
+        },
+        {
+          "path": "src/pass69-2-menu-preview-authoring-integration.test.ts",
+          "sizeBytes": 1212,
+          "sha256": "9851ecaae90d6257567c3612c0af55c64ef4cd83fadde4e5184e668a50604a76"
+        },
+        {
+          "path": "src/pass69-2-native-r4-r9-runner-integration.test.ts",
+          "sizeBytes": 3752,
+          "sha256": "3259118587752bd860f9a0628897dcc7046b776598567f067c8162eb19535db2"
+        },
+        {
           "path": "src/persistent-window-debris-integration.test.ts",
           "sizeBytes": 4159,
           "sha256": "a2c35e9a6909606cc24bdcb01172a3bdcf084951720cb21ee8cdd55729835c7a"
@@ -4001,13 +4478,13 @@
         },
         {
           "path": "src/player-feedback.test.ts",
-          "sizeBytes": 1823,
-          "sha256": "fcde9b36a83b9c5eee98fadddad0e825c24c3dbfcb3ccb122966375c9d50e8c6"
+          "sizeBytes": 1884,
+          "sha256": "d0f33592bc6a60f41f6df69d82de0e2f58eac04250904127226fe6d7be882ed1"
         },
         {
           "path": "src/player-feedback.ts",
-          "sizeBytes": 2377,
-          "sha256": "b54c0eb8383d5c1a36ce3d1a40d0805071d0c22f2a24c91eea8bb715058c3808"
+          "sizeBytes": 2420,
+          "sha256": "14d2d97baf62d357b5b969aaeb6fb35061d2ee304449f72364923dfa94e189dc"
         },
         {
           "path": "src/player-profile-main-integration.test.ts",
@@ -4036,8 +4513,8 @@
         },
         {
           "path": "src/presentation-prewarm-contract.test.ts",
-          "sizeBytes": 61398,
-          "sha256": "683314115bea4d66ac22577a9acd693000be29e8671ea2424880e939b2b83f0c"
+          "sizeBytes": 62730,
+          "sha256": "598c6870e35e49b4f85959de4c5162947069d403ff8746ae92d59ed935993bbd"
         },
         {
           "path": "src/presentation-scheduling-lifecycle.test.ts",
@@ -4061,13 +4538,13 @@
         },
         {
           "path": "src/private-match.test.ts",
-          "sizeBytes": 8673,
-          "sha256": "d83f4e7d0eb553c7977fe29259d1757540b6c95cb7d68d25c31cfd3de2ea455d"
+          "sizeBytes": 9213,
+          "sha256": "eb569bee6d9febfee7f6c86991c1a01e6386a5e57565722047d5d98e5ccd8f7a"
         },
         {
           "path": "src/private-match.ts",
-          "sizeBytes": 10630,
-          "sha256": "0f305116f1063a91d11fc19be84d94cf36bc65de1111758e598208cd0a771415"
+          "sizeBytes": 11228,
+          "sha256": "18797455e8fe9f58093fe26de39ed1b8e04e05b825568d9c0004fc7c94e5a0b0"
         },
         {
           "path": "src/production-receipt.test.ts",
@@ -4076,43 +4553,48 @@
         },
         {
           "path": "src/project-map.test.ts",
-          "sizeBytes": 2857,
-          "sha256": "76b31fe332d6ff7478c34712f232a026acb2966d9d3b0f3fd94c6fcc11dd6421"
+          "sizeBytes": 2896,
+          "sha256": "35c7fd357b841b1253f1ead079956ec3f8c4f723274fb161ca8705f90a1d1123"
         },
         {
           "path": "src/project-map.ts",
           "sizeBytes": 15291,
-          "sha256": "1d6c51064af8f445fd070c71b39d003cbe8ac862f70162bb41683ca28edbb96a"
+          "sha256": "bca24361bcd50a783f25bc41d827c016f1c9b62e83677959f6be03e86664f83f"
+        },
+        {
+          "path": "src/prone-contact-runner-integration.test.ts",
+          "sizeBytes": 1801,
+          "sha256": "7e3f97198c1bf4beaca6fc0bf55ecc22ffea1dd2866403e9bfbbb2ee3659dd1b"
         },
         {
           "path": "src/protocol.test.ts",
-          "sizeBytes": 26228,
-          "sha256": "9469db038f60dd0371ace4f43f454bd67564f67c263e6410ede1b3ef787d0b7f"
+          "sizeBytes": 33503,
+          "sha256": "38b26ed81d36079377d836dab28ce8068f9fae6ecf61809482ad271941d335d0"
         },
         {
           "path": "src/protocol.ts",
-          "sizeBytes": 45334,
-          "sha256": "6f7ad473bdbbf9b6eb55e1fcee7f30ebf55c02bc260b45e20247d2b3a3780e57"
+          "sizeBytes": 64406,
+          "sha256": "b42da5c2ce3404ce15e662088c379d20dfb9f1e445b5021bcb71e0ed04b11761"
         },
         {
           "path": "src/railgun-authority.test.ts",
-          "sizeBytes": 15689,
-          "sha256": "bedef94cd9d6a136ecd38546e582d07ab43b6024137e6c36937ee9fb07d4bb5a"
+          "sizeBytes": 16749,
+          "sha256": "245a9cc0a2a16d5f347473380b5172037cb3f57cd63c53c8932830c8fe3ad67f"
         },
         {
           "path": "src/railgun-authority.ts",
-          "sizeBytes": 23156,
-          "sha256": "57e2b058030f9dd51a485a5811dfcd52fb617fa7de1d356372570a93f16d9222"
+          "sizeBytes": 24302,
+          "sha256": "b7bcd1d2fbcd575f7541308ae2bfeace7d98db1e0f3e2481a8deafb7b461086c"
         },
         {
           "path": "src/railgun-presentation.test.ts",
-          "sizeBytes": 12404,
-          "sha256": "2ef09a7dd8b0a63be948bf465322a370fdd20db712bdccf3f08b0ad06c5ac58d"
+          "sizeBytes": 12663,
+          "sha256": "22ffad0e873b809bf10c5789120df801a6a2eb68eca849adc212d4e714556e34"
         },
         {
           "path": "src/railgun-presentation.ts",
-          "sizeBytes": 28462,
-          "sha256": "c3f4c1a18aa28ca622e32fc85aefc18077891617ac49ceb82a45a8cf8c8c6ae2"
+          "sizeBytes": 29026,
+          "sha256": "5b2e8739e90025a3ca3c84de45ec29c333ae1a7136454d0837000b93959cdb6c"
         },
         {
           "path": "src/railgun-result-delivery-contract.test.ts",
@@ -4121,18 +4603,18 @@
         },
         {
           "path": "src/release-benchmark.test.ts",
-          "sizeBytes": 1434,
-          "sha256": "51b22c9eb6783833430aa3d3e75a1ee00aab1ed23e0b4448727affe7c7718c90"
+          "sizeBytes": 1436,
+          "sha256": "4165aa6e7e22dd635a2fc94e8cefbc7c352ffc2910f4683423a345a1da375ada"
         },
         {
           "path": "src/release-change-impact.test.ts",
-          "sizeBytes": 2520,
-          "sha256": "a531df7457f24add8fd8135403fa97f03d43c2d05fee86b622ab9b8cacbc03e6"
+          "sizeBytes": 2558,
+          "sha256": "c1df72010a976da981a1e3b28fe3d16325d2832aa826b3f543706cee4aab9657"
         },
         {
           "path": "src/release-channel.test.ts",
           "sizeBytes": 2607,
-          "sha256": "d758c02dfb0af988c9ac6b0a61ec614628345dfab18c4b5e38969b9bfabf4577"
+          "sha256": "fa78915c1950e13db9d8c39220a7fa9f5cc3ac6195dbe41cd82c229815a999a4"
         },
         {
           "path": "src/release-channel.ts",
@@ -4141,23 +4623,23 @@
         },
         {
           "path": "src/release-identity.ts",
-          "sizeBytes": 664,
-          "sha256": "d9c6f43751a408cb569281709acb86d42d3a57eff85d105df33328f5eba495aa"
+          "sizeBytes": 676,
+          "sha256": "07b3b3aa38cb10db4cfc32f8a0f183eafa79cc7ed552a806932189afacba0611"
         },
         {
           "path": "src/release-pipeline.test.ts",
-          "sizeBytes": 15143,
-          "sha256": "00d7af1430d2e49aecd2252322e970c5e146464d2ff4ffc3e4ebf358994787e9"
+          "sizeBytes": 17617,
+          "sha256": "37318aab750ca564d1f11f4b47b4f9b78cadc208ec7ab3ef3e10e2a73d94582a"
         },
         {
           "path": "src/release-topology.test.ts",
-          "sizeBytes": 6099,
-          "sha256": "061d85cb489f0f7673d4103b8ae478f268a7083e920f20893dbf04fae037592b"
+          "sizeBytes": 7111,
+          "sha256": "3848e9bc2a3ed29f7a9193b13e2e8fee808886dd9447dc88a8a38c015f8726ec"
         },
         {
           "path": "src/remote-grenade-admission.test.ts",
-          "sizeBytes": 7997,
-          "sha256": "0f41a6eae223442ecaae022a92cbf54d4395f6278aa57fb17b8ff0e0719aaa8d"
+          "sizeBytes": 8040,
+          "sha256": "ef039497c589f24804526de84ae1cd8b9c6f8ce026dace5b6d3e56f4220c9f51"
         },
         {
           "path": "src/remote-grenade-admission.ts",
@@ -4205,6 +4687,21 @@
           "sha256": "c2ad0c75bc6d40359cb2c466e6d81b89dc49090f3a24c443aab1071b18f21d2f"
         },
         {
+          "path": "src/remote-operator-main-integration.test.ts",
+          "sizeBytes": 667,
+          "sha256": "77959b70cb2004e6df5f477925934e5f5d25ac8ea9d0ed22388da3a085cdb02f"
+        },
+        {
+          "path": "src/remote-player-readability.test.ts",
+          "sizeBytes": 3620,
+          "sha256": "b4203aefd88e0d899a316e01276b4c859c7f1b7d0cac5acc18512b9a21b10d8e"
+        },
+        {
+          "path": "src/remote-player-readability.ts",
+          "sizeBytes": 3742,
+          "sha256": "790470d509ff35d657e730b38f65dec61b838b59a813df652a8d40d96e188a73"
+        },
+        {
           "path": "src/remote-shot-admission.test.ts",
           "sizeBytes": 2295,
           "sha256": "5627091c0f0b097ccc23d5470e74346aa04a179cdccfe586017e6dce80b876f8"
@@ -4226,8 +4723,8 @@
         },
         {
           "path": "src/remote-sticky-main-integration.test.ts",
-          "sizeBytes": 4967,
-          "sha256": "cc36e7f8727c8677ab8d5341fd44dea41357178313f35c0c3dff18f523f49531"
+          "sizeBytes": 5355,
+          "sha256": "8a5258e868c52e180325d2734a52868fb97ba84d0331adfb380a9e430adae329"
         },
         {
           "path": "src/remote-support-authority.test.ts",
@@ -4271,8 +4768,8 @@
         },
         {
           "path": "src/rendering/arena-visual-definition.test.ts",
-          "sizeBytes": 15673,
-          "sha256": "cfb939499473312701ef766327abd9de4fa8d86de33564cc53ced5fe7270d5b4"
+          "sizeBytes": 22840,
+          "sha256": "1244130cbf22420739f609477f0fef738ab69c62332bef60a8a80cd7fc8363d6"
         },
         {
           "path": "src/rendering/arena-visual-definition.ts",
@@ -4281,23 +4778,23 @@
         },
         {
           "path": "src/rendering/arena-visual-stream.ts",
-          "sizeBytes": 9838,
-          "sha256": "bfaa3823475bd24c4976d1f17138e3888d39b32342070617284604b8d5056f43"
+          "sizeBytes": 14145,
+          "sha256": "373606050e392bd6addf692caf82347089b97a73ac0c84237dae035551783d25"
         },
         {
           "path": "src/rendering/arenas/atomic-acres.ts",
-          "sizeBytes": 2193,
-          "sha256": "b76e30143b5e9dca1e87f43ed00fee7f919eae2e453278aabb5fdc520e33690d"
+          "sizeBytes": 2316,
+          "sha256": "3aac6bda7a4564d85f2ec1e7a8e1ba7d563dd6e44118479b5266debf52517df4"
         },
         {
           "path": "src/rendering/arenas/gun-range.ts",
-          "sizeBytes": 4942,
-          "sha256": "5a1d51652386186ae107726daefac30960a2c7931a146231e0246808551159a6"
+          "sizeBytes": 6787,
+          "sha256": "08658fe8a97c68b811f3c54bb33f2bdca518d12ed7cbfca7d8c709280ce9a06e"
         },
         {
           "path": "src/rendering/arenas/rustworks-1v1.ts",
-          "sizeBytes": 4475,
-          "sha256": "a58ed3c39a790227a26f7af3803385f5c5e376b14432194bce3eb193988fe5ac"
+          "sizeBytes": 4577,
+          "sha256": "2fb476331543878ab833afc5dc3cf842e8e60ff8b6d3b21e6e2a104cf346d470"
         },
         {
           "path": "src/rendering/arenas/shared.ts",
@@ -4306,8 +4803,8 @@
         },
         {
           "path": "src/rendering/arenas/skyline-terminal.ts",
-          "sizeBytes": 2206,
-          "sha256": "d2c4efeb9293e38ee345eadc1753185d09ceef866cc368cd72b28f069ad29c4a"
+          "sizeBytes": 2306,
+          "sha256": "c552013e2101cefea3285aca75ac83080d18e9dba4a3c629165686842b287e3b"
         },
         {
           "path": "src/rendering/light-occlusion.test.ts",
@@ -4321,23 +4818,23 @@
         },
         {
           "path": "src/rendering/pass64-tsl-scene.test.ts",
-          "sizeBytes": 11624,
-          "sha256": "bbef1fae211ce8269bb9c2339fcdd728c1b3d79bd6cdb36449f9d7a97dad7345"
+          "sizeBytes": 15546,
+          "sha256": "473abee9d1852936d0a86363dffcdfbf4206712397cbce0da0ecdbcee6c32fa1"
         },
         {
           "path": "src/rendering/pass64-tsl-scene.ts",
-          "sizeBytes": 34753,
-          "sha256": "ff40281883c8ceb144ed4346001084ff6a3b530a4654b17c7e22ba96911757bb"
+          "sizeBytes": 42260,
+          "sha256": "56760af5447a5f9887004575ec85ee6123e6e9b940886aa9b8072957c3f7c3be"
         },
         {
           "path": "src/rendering/render-runtime.test.ts",
-          "sizeBytes": 42470,
-          "sha256": "9f2df37607050dd7745c051c4a0f2dfe1523f0837d39902670832795cde6a464"
+          "sizeBytes": 44589,
+          "sha256": "2921d27aa2c9edcc5389fdacb84bed2cf31ea85e6c65cb6a31405bd0120751b5"
         },
         {
           "path": "src/rendering/render-runtime.ts",
-          "sizeBytes": 54607,
-          "sha256": "5e768c92b37fe8c3384a92be41a437ffc7c1bc03e99fae5ac2a06ec557b2745b"
+          "sizeBytes": 55285,
+          "sha256": "34a55cf125951ab78981d2e005f69aa7c05f383b8ce22dbf12e3af342200b490"
         },
         {
           "path": "src/rendering/resident-memory.test.ts",
@@ -4360,9 +4857,14 @@
           "sha256": "8588caed5342d17c2ece7761e06349fc17220f98c51c9aec621918009f762aa3"
         },
         {
+          "path": "src/rendering/sky-backdrop.test.ts",
+          "sizeBytes": 20878,
+          "sha256": "8bd38ff1b90b887fec54431306b3abe672f4ad6aee607b4ec58c01d2e3a4bb4a"
+        },
+        {
           "path": "src/rendering/sky-backdrop.ts",
-          "sizeBytes": 8847,
-          "sha256": "b059ffc462f3747823249f1c3a94b7b02304ed809df7bbcf79f314e8d47df31a"
+          "sizeBytes": 19248,
+          "sha256": "ba1f2e9bee5d78d499f2ccd9cb3db8ee4bbab98b96621980f55149554744a759"
         },
         {
           "path": "src/rendering/tsl-migration-inventory.ts",
@@ -4371,23 +4873,23 @@
         },
         {
           "path": "src/room-chat-presentation.test.ts",
-          "sizeBytes": 963,
-          "sha256": "d33bb9994b7769a7a12fcf601d5795c56b025fff997834d8ef4556b8edfba659"
+          "sizeBytes": 1316,
+          "sha256": "f7c921fa22eb10ccad7d885e9facda7fd786df436707b2565829419d1db3a8d4"
         },
         {
           "path": "src/room-chat-presentation.ts",
-          "sizeBytes": 724,
-          "sha256": "51b66f0b1256ea03756aed290222324ac767b3466e182b20f56af271eaa37871"
+          "sizeBytes": 776,
+          "sha256": "0ee76e0a6871e1c61eb454ff0a1de771e269617f50456bdcbf50c0eed01a3d63"
         },
         {
           "path": "src/room-rejoin-identity.test.ts",
-          "sizeBytes": 2701,
-          "sha256": "163ae312a8c3d296fa76e5f10ffbe35171e390ea9d79504949b324c163c8dde5"
+          "sizeBytes": 3824,
+          "sha256": "90e0951bcd33a4dd2f096f8bb895822074277e66faaa89b7db53fa2cf98a2dde"
         },
         {
           "path": "src/room-rejoin-identity.ts",
-          "sizeBytes": 5863,
-          "sha256": "0f8e9c42b35bd35ee364594e99df540d0ecd3345491571f21e21b46bd6c26c1a"
+          "sizeBytes": 6386,
+          "sha256": "db96328e03169d782d6d989e8ae3920c405e525c2a31e4839b97274cb1df9fba"
         },
         {
           "path": "src/runtime-random.ts",
@@ -4416,13 +4918,18 @@
         },
         {
           "path": "src/rustworks-quality.test.ts",
-          "sizeBytes": 5078,
-          "sha256": "77c499d4030d89f9b1fd7c95f2f1635be0de6102d7d4d8cb9d57294ea7501219"
+          "sizeBytes": 5050,
+          "sha256": "d3ea5abf0601da901c1edd5fc79a883475bf756414306834d5f8e88198d31427"
         },
         {
           "path": "src/rustworks-quality.ts",
-          "sizeBytes": 12991,
-          "sha256": "f8fe2456f8eb1b4dd6b4900f0059f2d7d41d1816fe381ae1c07796efd188476b"
+          "sizeBytes": 11238,
+          "sha256": "d4eb71e1590e528b516cd8983bfda56c7d8fd8864af1474db2d800b13b49f488"
+        },
+        {
+          "path": "src/scoped-optic-main-integration.test.ts",
+          "sizeBytes": 1972,
+          "sha256": "e355f76236bd1b56216652db431f3c6cfdf39cc845ce7297f3fab41ba0a4a33f"
         },
         {
           "path": "src/semtex-main-integration.test.ts",
@@ -4517,12 +5024,12 @@
         {
           "path": "src/sound-event-inventory.test.ts",
           "sizeBytes": 14192,
-          "sha256": "2d8e0c49078cd02edeb90eda821a32d6fd19bfa7f5d914416caed53adf90bc9f"
+          "sha256": "54c4b3345d8a9c4ebb35bc65fd72ce9bbed068223a94bc78d9cc081507a0e71d"
         },
         {
           "path": "src/sound-event-inventory.ts",
-          "sizeBytes": 65660,
-          "sha256": "e5a7e314766e872e6065d43fcfa1774aa6b2b5829a1f32df88255c0cacc633e6"
+          "sizeBytes": 66721,
+          "sha256": "55535f38c4c2f5b929e9dad6607c51ee21590562f2a0595c1de357232ddabc3e"
         },
         {
           "path": "src/spatial-audio.test.ts",
@@ -4545,9 +5052,49 @@
           "sha256": "d9d01bbe7386ae45bcf83beef8214eabde678e54cd9c61413eb6408d56df736e"
         },
         {
+          "path": "src/special-weapon-effects.test.ts",
+          "sizeBytes": 2190,
+          "sha256": "5e76b1a7db32f2fc0c17158cf2fcea89fb90935c4a46b6f0bab550bdbae5c7bb"
+        },
+        {
+          "path": "src/special-weapon-effects.ts",
+          "sizeBytes": 3366,
+          "sha256": "cbede964520459fcbfce7cb67c07e185cd9bcf109708df37f9a4175b6d319cf3"
+        },
+        {
+          "path": "src/stable-bone-orientation.test.ts",
+          "sizeBytes": 1960,
+          "sha256": "92d13a22879a6b2a07bde3bce093829b5f31135b2dff6b05d22f095666f6588b"
+        },
+        {
+          "path": "src/stable-bone-orientation.ts",
+          "sizeBytes": 1900,
+          "sha256": "3ac119aa1442a4cce59f02c83674debbd93f00471c93ae4229a4fa68b6a3ac06"
+        },
+        {
+          "path": "src/sticky-victim-feedback.test.ts",
+          "sizeBytes": 2013,
+          "sha256": "182c774002fc520d061860d7c5c4e940da88d5069d74d07a1ea2497315575729"
+        },
+        {
+          "path": "src/sticky-victim-feedback.ts",
+          "sizeBytes": 1547,
+          "sha256": "d72a99eb445d3eb1943f25d2cbf01b3fccbb4658471cf7cef85bf349f440f804"
+        },
+        {
+          "path": "src/sticky-victim-receipts.test.ts",
+          "sizeBytes": 2578,
+          "sha256": "60e7c0d614779756b302ebf922bf43c0c1353b433dc0e180dec3b2c583b2fc42"
+        },
+        {
+          "path": "src/sticky-victim-receipts.ts",
+          "sizeBytes": 5121,
+          "sha256": "cf545a3e1c902c20dda6dbe65735c6c3a40f097be026adba13d6f8b134854ae5"
+        },
+        {
           "path": "src/style.css",
-          "sizeBytes": 71715,
-          "sha256": "6e58b5f9cbf94a7e1d118fa00d9b9d2a87fca24d3930c05011f8c28e5c249c8d"
+          "sizeBytes": 73126,
+          "sha256": "766ce008a6e6b90dbdab7330ee49e9cac09d55e2b133fe6cc9be23e54c4ed8e3"
         },
         {
           "path": "src/support-damage-feedback.test.ts",
@@ -4596,13 +5143,13 @@
         },
         {
           "path": "src/support-vehicle-presentation-contract.test.ts",
-          "sizeBytes": 2200,
-          "sha256": "4e599bb7806d27deb90c53a68c2228720eaf816691df40559274279fed45993d"
+          "sizeBytes": 4073,
+          "sha256": "0955fbae488d57ac906dba72551b3cbcd1233020542b1756fe9f5b2baeb520a6"
         },
         {
           "path": "src/support-vehicle-presentation-contract.ts",
-          "sizeBytes": 3740,
-          "sha256": "30d953ce2d7ca62fc88ca5ab952834082c8ec781d319d667ab08518bc6781d6e"
+          "sizeBytes": 4131,
+          "sha256": "c5bf354a1f28d801035f92c55a6dd1a595f4e9119ea52f644da6e0534bad2d09"
         },
         {
           "path": "src/surface-impact-registry.test.ts",
@@ -4613,6 +5160,11 @@
           "path": "src/surface-impact-registry.ts",
           "sizeBytes": 3944,
           "sha256": "5921aaff2b2e7feebc977d45d11d0beaadc51ef9904b56bfd4a9e14ecfe27009"
+        },
+        {
+          "path": "src/test-bay-teleport-killstreak-main-integration.test.ts",
+          "sizeBytes": 2818,
+          "sha256": "88bedc20eaffdbe9cf663b3819c1d740c70532938e09f157d42246318a8a2896"
         },
         {
           "path": "src/text-chat-ui.test.ts",
@@ -4631,8 +5183,43 @@
         },
         {
           "path": "src/thermal-ghost-presentation.ts",
-          "sizeBytes": 5833,
-          "sha256": "43b688f0aef6019b859432fa45c8754eb36a2be78e757982a15abec54c04af95"
+          "sizeBytes": 5668,
+          "sha256": "6bd38975da6876be1c90ee6c317454e3f42282f594b70f2f6eb07629772da48e"
+        },
+        {
+          "path": "src/timed-map-weapon-authority.test.ts",
+          "sizeBytes": 7120,
+          "sha256": "51fd678a7897df199c06c40ceab7c3abd040409b647d3fa1d8d0af2d80cad69c"
+        },
+        {
+          "path": "src/timed-map-weapon-authority.ts",
+          "sizeBytes": 12278,
+          "sha256": "743684dcf67ba2b7fc1451dd52a30c16c3cb40b313e1beb824dcd4bad58dcb6e"
+        },
+        {
+          "path": "src/timed-map-weapon-main-integration.test.ts",
+          "sizeBytes": 9947,
+          "sha256": "31c4a591162dd77499edc5126755ab0b0103b200c63511574845a37c0fd14c77"
+        },
+        {
+          "path": "src/timed-map-weapon-presentation.test.ts",
+          "sizeBytes": 1715,
+          "sha256": "5fd55bcf20578a2f526c180f5391d7b5ee397600b4373c75c170795312bb582e"
+        },
+        {
+          "path": "src/timed-map-weapon-presentation.ts",
+          "sizeBytes": 7905,
+          "sha256": "7ce20ec3a00f5686fef589ff2c97d440e69695df5403a9280f7eaff4e7ea1d67"
+        },
+        {
+          "path": "src/timed-map-weapon-protocol.test.ts",
+          "sizeBytes": 4176,
+          "sha256": "ae2c3cf48fb465761582aacd1375ee58a6ccb4b0848f5951d1bdb9dcfee98050"
+        },
+        {
+          "path": "src/timed-map-weapon-protocol.ts",
+          "sizeBytes": 3767,
+          "sha256": "9ebe72bd50fa7ce2684a412f1fc7faea4f4e349c477c7383ff96a86aa4fac0b9"
         },
         {
           "path": "src/tracer-pool.test.ts",
@@ -4656,8 +5243,8 @@
         },
         {
           "path": "src/ui/advanced-graphics.css",
-          "sizeBytes": 4278,
-          "sha256": "d55a847fbec5dccbe9d891dcbb04b2573dbbf74aee37e8373191c87e75912c1e"
+          "sizeBytes": 5168,
+          "sha256": "fee7b9c8cd02561e7dd670a9f90be4d789ae2407aa83d2f24745dc3a77ee3747"
         },
         {
           "path": "src/ui/dialog-controller.ts",
@@ -4666,33 +5253,33 @@
         },
         {
           "path": "src/ui/field-kit-weapon-presentation.test.ts",
-          "sizeBytes": 3050,
-          "sha256": "1f496ee5fd6761d2d1d953c65462c526930edd0d5f55024f197bb46e871aa2c5"
+          "sizeBytes": 3070,
+          "sha256": "547a7a4e9a15499aa84203314ba7e79b4c3458f7ecb489bfe7ae993f1e981e3d"
         },
         {
           "path": "src/ui/field-kit-weapon-presentation.ts",
-          "sizeBytes": 8946,
-          "sha256": "44a33e48f5d896185b4af23c2a4fecff7f8ff10642ed349cb61612a28ea3b643"
+          "sizeBytes": 9152,
+          "sha256": "b9b5faf7784cff2e75b34eae47d3b3093fe73876edc5945e34cc73916820a524"
         },
         {
           "path": "src/ui/killstreak-demo-presentation.test.ts",
-          "sizeBytes": 2027,
-          "sha256": "dcc779007dcdf4d395faa521546d338dfecf85f19927f575ea8081a352c1f021"
+          "sizeBytes": 3357,
+          "sha256": "60c6079f4b13dfba665761a425a8848a28dba39c980c71d54a4a6de75516f3c3"
         },
         {
           "path": "src/ui/killstreak-demo-presentation.ts",
-          "sizeBytes": 10283,
-          "sha256": "ab1a87b83138e5878b97236531fa645b909ee0888c201ca63c5627a4c1dfbe91"
+          "sizeBytes": 14799,
+          "sha256": "2deae060ef89c32c37cdcc1a2de6699de6e78ba6499be274a41dabada942b505"
         },
         {
           "path": "src/ui/killstreak-loadout-menu.test.ts",
-          "sizeBytes": 921,
-          "sha256": "99f7ffdbe155cd3892ebf0e5f4c0c605cbf7a8c2febbccaa9a58e2e13ec141b2"
+          "sizeBytes": 2781,
+          "sha256": "180aefa8cf1531714e3fb1db852ad19af2c3902fc0522364f270034d99bcf149"
         },
         {
           "path": "src/ui/killstreak-loadout-menu.ts",
-          "sizeBytes": 7159,
-          "sha256": "3fdae42b48deb417414b299b4ab283d948603e62984c737d2643a27db04c3613"
+          "sizeBytes": 8215,
+          "sha256": "e96689c2ca048981fde797adf015676f049f81865cfef2cc51d7fe19e0958422"
         },
         {
           "path": "src/ui/menu-lifecycle.test.ts",
@@ -4701,13 +5288,13 @@
         },
         {
           "path": "src/ui/menu-lifecycle.ts",
-          "sizeBytes": 8079,
-          "sha256": "b078e41e70ff27d660e0e846802c394eb565234d5c09c719de56c08cafad532f"
+          "sizeBytes": 8115,
+          "sha256": "29146ed1ab02c183ed42b5625e886b308517a78522184778ddfce3e3f36de191"
         },
         {
           "path": "src/ui/menu-preview-camera.test.ts",
           "sizeBytes": 7122,
-          "sha256": "15f5a2a7a005d68df2e3ef5ffee30e0ac600e6663698b288b062184d09847721"
+          "sha256": "f8ab7979ed8934400a5c78a24328b375c92ab95b401641d47b8ed7de4461c032"
         },
         {
           "path": "src/ui/menu-preview-camera.ts",
@@ -4716,48 +5303,48 @@
         },
         {
           "path": "src/ui/menu-preview-video.test.ts",
-          "sizeBytes": 2832,
-          "sha256": "2db0bf3d08884bb7ffdf92a720a3213baae9622f678dd2ba74ef7cbd4ff0a178"
+          "sizeBytes": 5574,
+          "sha256": "f44e68d33f92d672dfdc2695356adf8128ccdebb906dfafa7bf06cd909ceb3bb"
         },
         {
           "path": "src/ui/menu-preview-video.ts",
-          "sizeBytes": 13114,
-          "sha256": "77c99b3f05743ceccfdb4cd85cd7bb14c7f8a6f64b6fc5be61e973a0189ce021"
+          "sizeBytes": 14105,
+          "sha256": "f3961161237017bf9717bf33d98fd9d41adcbfe539f167fe8dcf2d062c250d95"
         },
         {
           "path": "src/ui/pass64-shell.test.ts",
-          "sizeBytes": 6127,
-          "sha256": "40dd21a44e2f121517980b44fb6ca2708a9236b6d913c9b2f96554942e90ebbe"
+          "sizeBytes": 6426,
+          "sha256": "0b83f519c3b3584724b66620e52ab74decbaaa2913ec0aa073a872eb51475ab8"
         },
         {
           "path": "src/ui/pass64-shell.ts",
-          "sizeBytes": 31741,
-          "sha256": "d39971f97ea09a80870e8f2af37b49375143dc5daf99947d0af225d110476c63"
+          "sizeBytes": 32355,
+          "sha256": "dd3efa851547c9b36bb17ce0dd3027d32a84b32cc5558770e7a0749f0a5a954f"
         },
         {
           "path": "src/ui/pass65-hud-layout.test.ts",
-          "sizeBytes": 2946,
-          "sha256": "e02e42d91b903541481537c92512a98b0abd9fae97e19f29d40ec3383045fb39"
+          "sizeBytes": 3463,
+          "sha256": "3c5d42fc1f2d4e10874842eb8e5baa7a238135010b40a304344617bb36c5764f"
         },
         {
           "path": "src/ui/pass65-hud.css",
-          "sizeBytes": 21624,
-          "sha256": "d3450c51db4b9be71fb8e01394e586262e4150705ada57b363d461df36fa7a9d"
+          "sizeBytes": 27119,
+          "sha256": "8609c41e8053b3eea65acfcf252c24b93d693d95e5820b9d958d9709fc28d836"
         },
         {
           "path": "src/ui/pass66-overhaul.css",
-          "sizeBytes": 29484,
-          "sha256": "1c2b27d0c96a0e0ce19521af9af1c299b9537e98a75eabc4bf7a88268a5c9444"
+          "sizeBytes": 39499,
+          "sha256": "efff83c351469b85052a60d0f0ec0515252629929bac53eaf93a0868d09e1251"
         },
         {
           "path": "src/ui/pass66-overhaul.test.ts",
-          "sizeBytes": 2886,
-          "sha256": "0a5cc2027c3a7803f8bf318ee5e00b64a7a77b433f29ccbd10374b6f9b605da3"
+          "sizeBytes": 4254,
+          "sha256": "c1adf3edae95b62f39c716efad029836dacb2215308d04ff6663290922dc8478"
         },
         {
           "path": "src/ui/pass66-readability.css",
-          "sizeBytes": 21524,
-          "sha256": "e5780d1ac6e097c82b15f683bc15bd000f4d5282adf006dff92f8687612d996f"
+          "sizeBytes": 22489,
+          "sha256": "415b43833712f243dbdbe36f0a51c6fb9249572bfb023da043942b90dee59bcb"
         },
         {
           "path": "src/ui/pass66-readability.test.ts",
@@ -4796,8 +5383,8 @@
         },
         {
           "path": "src/ui/tactical-ui.css",
-          "sizeBytes": 84781,
-          "sha256": "5f543deed2b6c58873b6d4fad5bb99c34faa4a65d0f076a6649399b5a6e70dd8"
+          "sizeBytes": 84851,
+          "sha256": "b50a22556dd87c5135e19c0af0af8f02067a1e26fcb824868be7a72b310ec8cc"
         },
         {
           "path": "src/vertical-navigation.test.ts",
@@ -4810,19 +5397,24 @@
           "sha256": "a3023fce0f168d4aee22fa9dd857379f8eb4e5fddbdcddb39ba0776f4e21aab2"
         },
         {
+          "path": "src/viewmodel-framing.test.ts",
+          "sizeBytes": 2167,
+          "sha256": "7127b3ed624e36757c4d0d16e44cb6c7b759c7f67972299467849d994d1233c4"
+        },
+        {
           "path": "src/vite-env.d.ts",
           "sizeBytes": 38,
           "sha256": "65996936fbb042915f7b74a200fcdde7e410f32a669b1ab9597cfaa4b0faddb5"
         },
         {
           "path": "src/water-system.test.ts",
-          "sizeBytes": 2506,
-          "sha256": "ecbe5e54a1f788e41cd54f4d462e600598ea20fc6af696cb086a09e35f636d51"
+          "sizeBytes": 3555,
+          "sha256": "d7bb30cdf7c12455f117eec948ad94a1341a0c71d2e7fa21d19d5bf1fc21cbf0"
         },
         {
           "path": "src/water-system.ts",
-          "sizeBytes": 14584,
-          "sha256": "4258475956eebb960a53e263b203834f8cdc6b776b9aa9fbcb2c7f874e1e6a45"
+          "sizeBytes": 15284,
+          "sha256": "37b1a2c3d3da674aa170afa24bdd10a415893225d5d853be09d942ac60bcc15e"
         },
         {
           "path": "src/weapon-actions.test.ts",
@@ -4836,8 +5428,8 @@
         },
         {
           "path": "src/weapon-asset-production-contract.test.ts",
-          "sizeBytes": 10362,
-          "sha256": "8a6c333a4b062b062d32affd4d023fe664f2838b22869af4cbbbf82356a91f0c"
+          "sizeBytes": 10368,
+          "sha256": "b59b53f29c62cc45f17e71515c0fe739f2c4510e9816fbb06be63cd805080a71"
         },
         {
           "path": "src/weapon-audio-profiles.test.ts",
@@ -4846,8 +5438,8 @@
         },
         {
           "path": "src/weapon-audio-profiles.ts",
-          "sizeBytes": 8189,
-          "sha256": "3ba3b7322df21ad9aefd5fe397da99c0c6f2394d6ce1a967c63c03114d93ccaf"
+          "sizeBytes": 8803,
+          "sha256": "b860ed2951dd7d42048b9f71bc09a3c917c0fde8098a7b394ed74780887df3a8"
         },
         {
           "path": "src/weapon-display-name-contract.test.ts",
@@ -4861,58 +5453,68 @@
         },
         {
           "path": "src/weapon-family-presentation.ts",
-          "sizeBytes": 5833,
-          "sha256": "852477b6566353537ca9cdcbd343ab10e7aca25aa78e3255e71ce63161876c39"
+          "sizeBytes": 6488,
+          "sha256": "273be1083c3c193fd75fc9cf2a0e28b1195f5366999e2ceb31d038424e00f925"
         },
         {
           "path": "src/weapon-finish.test.ts",
           "sizeBytes": 2607,
-          "sha256": "90905fb4e8ac331bb30120eeb9db7e9737287acfc62164fda8649683820b0ab9"
+          "sha256": "49e828afad089798afa96ba8979544b23ded1ef2ccaac53bb59e4dcbd995deae"
         },
         {
           "path": "src/weapon-finish.ts",
-          "sizeBytes": 4225,
-          "sha256": "a6193d621c26a076c082acc0c2d02ac24f89a7559631be0f3e7b8b1af1e80101"
+          "sizeBytes": 4617,
+          "sha256": "8d0b545c541ce9713a1a636ddc85610c6b345043899fb2cf6f76f718f20c5081"
         },
         {
           "path": "src/weapon-model.ts",
-          "sizeBytes": 32158,
-          "sha256": "7caeb6dfd5ce363a6d6aa260ccfc418ea7f7749a9fe85d7d7d89be51b05a2a80"
+          "sizeBytes": 32918,
+          "sha256": "8279ba2a2ff627eb8aff742d62a819d543d64bfbd9e631bd4326f4e71cbe8589"
         },
         {
           "path": "src/weapon-presentation-anatomy.test.ts",
-          "sizeBytes": 11101,
-          "sha256": "4aeeb5762a82d6ff3977d000c29443ac405e6eec782459f56505cd3a233675f2"
+          "sizeBytes": 13717,
+          "sha256": "d6db218162f02f91367d2cb01f273ea28fca3b1c4ae0e00b8a87cad61a0cc60b"
         },
         {
           "path": "src/weapon-presentation-state.test.ts",
-          "sizeBytes": 3961,
-          "sha256": "6cfb0de80066404990a2c00c6e1421c351936abc11769dd189830e25d4a1b54b"
+          "sizeBytes": 4449,
+          "sha256": "90388b36a731956c360ed9d7c3975c6d37b63e19f7f6340ebf1279113437d4d9"
         },
         {
           "path": "src/weapon-presentation-state.ts",
-          "sizeBytes": 5857,
-          "sha256": "10ca0500724ef5142629e2185e2ef2b1dcd32f925fa25d160d5b7a6754942d7c"
+          "sizeBytes": 6544,
+          "sha256": "f86664c8a703751066c5e92d7d79ca926d6e819714f9ba63359e83e47cf2dfaa"
         },
         {
           "path": "src/weapon-presentation.ts",
-          "sizeBytes": 126831,
-          "sha256": "7f62a61022d6598ab6f8566cbffdfa0166e3921e16559053c71ddafd2baa7f54"
+          "sizeBytes": 151963,
+          "sha256": "15b3b6fd523ae6c6f5d5251a5949f20f3fbe9b2c5da7ad6c8bc684aae37293d2"
         },
         {
           "path": "src/weapon-prewarm-catalog.test.ts",
-          "sizeBytes": 1418,
-          "sha256": "c9935153f0084692b639b0573113bcede0ede142e3ff254ad6cd1ee4d46f3e35"
+          "sizeBytes": 1404,
+          "sha256": "ddb52c6cad62694846d0315719388c030d0a96ff8a15e45cc4c05ba2e62e6ada"
         },
         {
           "path": "src/weapon-prewarm-catalog.ts",
-          "sizeBytes": 1593,
-          "sha256": "79d770becb5c5bb253f75fb022c8f5b36ef2a69eaa08812cb6f641f970cdb4e8"
+          "sizeBytes": 1634,
+          "sha256": "d969af387aca1a2eb541925c1e0310561678650d6a0c8239692115e85c7883ce"
         },
         {
           "path": "src/weapon-runtime-corpus.test.ts",
-          "sizeBytes": 9333,
-          "sha256": "10a8f74f520e45aa654b061c0377a43184dcac87da6ab863ed26478b8b266610"
+          "sizeBytes": 9435,
+          "sha256": "9633cad8fc5b1602cf5d863200a0acbd6c1e7b7257316c8221a549a45d0cf4a9"
+        },
+        {
+          "path": "src/webgl-shadow-compatibility.test.ts",
+          "sizeBytes": 1218,
+          "sha256": "c3ce80ef567a4a68aa12a23664628e48c1ea19876a70e43526989797e2b8c962"
+        },
+        {
+          "path": "src/webgl-shadow-compatibility.ts",
+          "sizeBytes": 679,
+          "sha256": "7715a394d3eb3bddbd4c7bebb91ed8e1334cba1c793c4c06849e19e30a0904ab"
         },
         {
           "path": "src/webgpu-adaptive-epoch.integration.test.ts",
@@ -4931,13 +5533,13 @@
         },
         {
           "path": "src/window-glass-debris-presentation.test.ts",
-          "sizeBytes": 2655,
-          "sha256": "e9f50d4c587357934312a50a49ab8a4069b11adec139dfb43e658bbc8c3ae52c"
+          "sizeBytes": 4036,
+          "sha256": "73533e5277b217faedadf52468d90d160e74d2dca91d017f88621dfaf4540c3f"
         },
         {
           "path": "src/window-glass-debris-presentation.ts",
-          "sizeBytes": 3023,
-          "sha256": "b4949441dbbf1dc24f32ad0a1f569fa8e8db7725a1306f03e611b6a72342a490"
+          "sizeBytes": 6728,
+          "sha256": "2dfad66a0bc2461c52ff74a479f8a2d1c79ec7940c253c7f89516d1cb1424cb5"
         },
         {
           "path": "src/world-identity-presentation.test.ts",
@@ -4961,8 +5563,8 @@
         },
         {
           "path": "src/world-perception-main-integration.test.ts",
-          "sizeBytes": 3536,
-          "sha256": "c2d6b525b5e37030c62580768a1bb237b208183345744b28964bd9e86d81b41e"
+          "sizeBytes": 3767,
+          "sha256": "f746a95b53a323d88bdb0036c527541e7cd4ae2d61e78de98d83ab2bcf841740"
         }
       ]
     }
@@ -4989,8 +5591,8 @@
         "algorithm": "sha256-ordered-name-size-bytes-v1",
         "domain": "menu-preview-frames:atomic-acres",
         "fileCount": 240,
-        "totalBytes": 208269802,
-        "sha256": "5d1b9be419ce76dfc7fa11fc99f473e2c0223de90cb9b3bebc18f239a18cb821",
+        "totalBytes": 991490786,
+        "sha256": "f28578d7442c88988ebb7434a248f84c71bb7b4ace5620942a5456ddf3cd47d2",
         "frameRoster": [
           1,
           2,
@@ -5252,7 +5854,7 @@
           "fixedVisualTimeMs": 65000,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "b668300a299eefd09c68822d1bbb9bb3448ef5dd4261139ae667a63ff763dd66",
+          "pngSha256": "feaad067d8937ca780357dc009ad16805d6290db103055848ad5b9993f8005e2",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.021080999904208714,
@@ -5264,23 +5866,23 @@
             "arcCount": 3,
             "temporalTrailCount": 2,
             "legibleBladeSweeps": 2,
-            "projectedBladeThresholdPixels": 300,
-            "shortestProjectedBladeLengthPixels": 57.668025970458984,
-            "projectedSweepSpanPixels": 1049.826171875,
-            "projectedArcSpanPixels": 966.5175170898438,
+            "projectedBladeThresholdPixels": 600,
+            "shortestProjectedBladeLengthPixels": 115.33605194091797,
+            "projectedSweepSpanPixels": 2099.65234375,
+            "projectedArcSpanPixels": 1933.0350341796875,
             "authoredBladeThicknessPixels": 3,
             "bladeOpacity": 0.32,
             "contrastMode": "graphite-low-contrast-motion-v1",
             "filledDiscDetected": false,
-            "hubDiameterPixels": 20.197101593017578,
-            "hubCanopyOverlapPixels": 4.605491638183594,
+            "hubDiameterPixels": 40.394203186035156,
+            "hubCanopyOverlapPixels": 9.210983276367188,
             "hubCanopyOcclusionFraction": 0.22802735417124292,
-            "mastCanopyOverlapPixels": 16.108325958251953,
+            "mastCanopyOverlapPixels": 32.216651916503906,
             "structuralTieCount": 2,
-            "leftTieHeaderOverlapAreaPixels": 1556.1121446958277,
-            "rightTieHeaderOverlapAreaPixels": 1585.8924204530194,
-            "leftTieCanopyOverlapAreaPixels": 2007.7658143683802,
-            "rightTieCanopyOverlapAreaPixels": 2042.0053235581145,
+            "leftTieHeaderOverlapAreaPixels": 6224.448578783311,
+            "rightTieHeaderOverlapAreaPixels": 6343.569681812078,
+            "leftTieCanopyOverlapAreaPixels": 8031.063257473521,
+            "rightTieCanopyOverlapAreaPixels": 8168.021294232458,
             "leftTieHeaderOcclusionSampled": true,
             "rightTieHeaderOcclusionSampled": true,
             "leftTieCanopyOcclusionSampled": true,
@@ -5316,7 +5918,7 @@
           "fixedVisualTimeMs": 66974.89539748954,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "b8230530905b1d09a8bde47b75827ff29b02ffdae2b4bd3b5db807c450997da6",
+          "pngSha256": "947337209c946424976abe30900a54adace5fb80e99a8ab6433d129520a86c71",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.020440171824561225,
@@ -5328,23 +5930,23 @@
             "arcCount": 3,
             "temporalTrailCount": 2,
             "legibleBladeSweeps": 3,
-            "projectedBladeThresholdPixels": 300,
-            "shortestProjectedBladeLengthPixels": 181.34671020507812,
-            "projectedSweepSpanPixels": 950.9351959228516,
-            "projectedArcSpanPixels": 966.3007202148438,
+            "projectedBladeThresholdPixels": 600,
+            "shortestProjectedBladeLengthPixels": 362.69342041015625,
+            "projectedSweepSpanPixels": 1901.8703918457031,
+            "projectedArcSpanPixels": 1932.6014404296875,
             "authoredBladeThicknessPixels": 3,
             "bladeOpacity": 0.32,
             "contrastMode": "graphite-low-contrast-motion-v1",
             "filledDiscDetected": false,
-            "hubDiameterPixels": 20.34033966064453,
-            "hubCanopyOverlapPixels": 5.6356201171875,
+            "hubDiameterPixels": 40.68067932128906,
+            "hubCanopyOverlapPixels": 11.271240234375,
             "hubCanopyOcclusionFraction": 0.27706617545288925,
-            "mastCanopyOverlapPixels": 17.093210220336914,
+            "mastCanopyOverlapPixels": 34.18642044067383,
             "structuralTieCount": 2,
-            "leftTieHeaderOverlapAreaPixels": 1508.9073245075997,
-            "rightTieHeaderOverlapAreaPixels": 1643.9076140522957,
-            "leftTieCanopyOverlapAreaPixels": 2057.2403071972076,
-            "rightTieCanopyOverlapAreaPixels": 2138.4443528950214,
+            "leftTieHeaderOverlapAreaPixels": 6035.629298030399,
+            "rightTieHeaderOverlapAreaPixels": 6575.630456209183,
+            "leftTieCanopyOverlapAreaPixels": 8228.96122878883,
+            "rightTieCanopyOverlapAreaPixels": 8553.777411580086,
             "leftTieHeaderOcclusionSampled": true,
             "rightTieHeaderOcclusionSampled": true,
             "leftTieCanopyOcclusionSampled": true,
@@ -5380,7 +5982,7 @@
           "fixedVisualTimeMs": 68983.26359832636,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "cc91f96a5966d05eb3a8641ea59648c0db167f316f807dff87a334a6e118aa63",
+          "pngSha256": "451fea8e46d0b1bd51fbf919270f1bde8705809636d8ba9a2dd38146601531e3",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.01937614017062717,
@@ -5392,23 +5994,23 @@
             "arcCount": 3,
             "temporalTrailCount": 2,
             "legibleBladeSweeps": 2,
-            "projectedBladeThresholdPixels": 300,
-            "shortestProjectedBladeLengthPixels": 122.7464599609375,
-            "projectedSweepSpanPixels": 999.8948135375977,
-            "projectedArcSpanPixels": 966.6071166992188,
+            "projectedBladeThresholdPixels": 600,
+            "shortestProjectedBladeLengthPixels": 245.492919921875,
+            "projectedSweepSpanPixels": 1999.7896270751953,
+            "projectedArcSpanPixels": 1933.2142333984375,
             "authoredBladeThicknessPixels": 3,
             "bladeOpacity": 0.32,
             "contrastMode": "graphite-low-contrast-motion-v1",
             "filledDiscDetected": false,
-            "hubDiameterPixels": 20.18173599243164,
-            "hubCanopyOverlapPixels": 4.495262145996094,
+            "hubDiameterPixels": 40.36347198486328,
+            "hubCanopyOverlapPixels": 8.990524291992188,
             "hubCanopyOcclusionFraction": 0.22273912153453318,
-            "mastCanopyOverlapPixels": 16.00291633605957,
+            "mastCanopyOverlapPixels": 32.00583267211914,
             "structuralTieCount": 2,
-            "leftTieHeaderOverlapAreaPixels": 1579.6882012272254,
-            "rightTieHeaderOverlapAreaPixels": 1561.1253728508018,
-            "leftTieCanopyOverlapAreaPixels": 2078.125101218233,
-            "rightTieCanopyOverlapAreaPixels": 2074.551221251022,
+            "leftTieHeaderOverlapAreaPixels": 6318.752804908901,
+            "rightTieHeaderOverlapAreaPixels": 6244.501491403207,
+            "leftTieCanopyOverlapAreaPixels": 8312.500404872932,
+            "rightTieCanopyOverlapAreaPixels": 8298.204885004088,
             "leftTieHeaderOcclusionSampled": true,
             "rightTieHeaderOcclusionSampled": true,
             "leftTieCanopyOcclusionSampled": true,
@@ -5444,7 +6046,7 @@
           "fixedVisualTimeMs": 70991.63179916318,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "aabaab9a06c0764f4f0419d49a90dfa5024cddc147833bab60c4bb09fda24d00",
+          "pngSha256": "07d978ef0019b4ec7e6085f10b6237831f455e706db2c059298cde52793f618f",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.037695002555847165,
@@ -5456,23 +6058,23 @@
             "arcCount": 3,
             "temporalTrailCount": 2,
             "legibleBladeSweeps": 2,
-            "projectedBladeThresholdPixels": 300,
-            "shortestProjectedBladeLengthPixels": 63.87255859375,
-            "projectedSweepSpanPixels": 1044.429443359375,
-            "projectedArcSpanPixels": 966.9749755859375,
+            "projectedBladeThresholdPixels": 600,
+            "shortestProjectedBladeLengthPixels": 127.7451171875,
+            "projectedSweepSpanPixels": 2088.85888671875,
+            "projectedArcSpanPixels": 1933.949951171875,
             "authoredBladeThicknessPixels": 3,
             "bladeOpacity": 0.32,
             "contrastMode": "graphite-low-contrast-motion-v1",
             "filledDiscDetected": false,
-            "hubDiameterPixels": 20.538536071777344,
-            "hubCanopyOverlapPixels": 7.0691375732421875,
+            "hubDiameterPixels": 41.07707214355469,
+            "hubCanopyOverlapPixels": 14.138275146484375,
             "hubCanopyOcclusionFraction": 0.3441889698728876,
-            "mastCanopyOverlapPixels": 18.46316146850586,
+            "mastCanopyOverlapPixels": 36.92632293701172,
             "structuralTieCount": 2,
-            "leftTieHeaderOverlapAreaPixels": 1724.7772814724594,
-            "rightTieHeaderOverlapAreaPixels": 1442.0927474573255,
-            "leftTieCanopyOverlapAreaPixels": 1911.5958964470774,
-            "rightTieCanopyOverlapAreaPixels": 1547.2474867557175,
+            "leftTieHeaderOverlapAreaPixels": 6899.109125889838,
+            "rightTieHeaderOverlapAreaPixels": 5768.370989829302,
+            "leftTieCanopyOverlapAreaPixels": 7646.38358578831,
+            "rightTieCanopyOverlapAreaPixels": 6188.98994702287,
             "leftTieHeaderOcclusionSampled": true,
             "rightTieHeaderOcclusionSampled": true,
             "leftTieCanopyOcclusionSampled": true,
@@ -5508,7 +6110,7 @@
           "fixedVisualTimeMs": 65000,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "b668300a299eefd09c68822d1bbb9bb3448ef5dd4261139ae667a63ff763dd66",
+          "pngSha256": "feaad067d8937ca780357dc009ad16805d6290db103055848ad5b9993f8005e2",
           "seamSourceFrame": 1,
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
@@ -5521,23 +6123,23 @@
             "arcCount": 3,
             "temporalTrailCount": 2,
             "legibleBladeSweeps": 2,
-            "projectedBladeThresholdPixels": 300,
-            "shortestProjectedBladeLengthPixels": 57.668025970458984,
-            "projectedSweepSpanPixels": 1049.826171875,
-            "projectedArcSpanPixels": 966.5175170898438,
+            "projectedBladeThresholdPixels": 600,
+            "shortestProjectedBladeLengthPixels": 115.33605194091797,
+            "projectedSweepSpanPixels": 2099.65234375,
+            "projectedArcSpanPixels": 1933.0350341796875,
             "authoredBladeThicknessPixels": 3,
             "bladeOpacity": 0.32,
             "contrastMode": "graphite-low-contrast-motion-v1",
             "filledDiscDetected": false,
-            "hubDiameterPixels": 20.197101593017578,
-            "hubCanopyOverlapPixels": 4.605491638183594,
+            "hubDiameterPixels": 40.394203186035156,
+            "hubCanopyOverlapPixels": 9.210983276367188,
             "hubCanopyOcclusionFraction": 0.22802735417124292,
-            "mastCanopyOverlapPixels": 16.108325958251953,
+            "mastCanopyOverlapPixels": 32.216651916503906,
             "structuralTieCount": 2,
-            "leftTieHeaderOverlapAreaPixels": 1556.1121446958277,
-            "rightTieHeaderOverlapAreaPixels": 1585.8924204530194,
-            "leftTieCanopyOverlapAreaPixels": 2007.7658143683802,
-            "rightTieCanopyOverlapAreaPixels": 2042.0053235581145,
+            "leftTieHeaderOverlapAreaPixels": 6224.448578783311,
+            "rightTieHeaderOverlapAreaPixels": 6343.569681812078,
+            "leftTieCanopyOverlapAreaPixels": 8031.063257473521,
+            "rightTieCanopyOverlapAreaPixels": 8168.021294232458,
             "leftTieHeaderOcclusionSampled": true,
             "rightTieHeaderOcclusionSampled": true,
             "leftTieCanopyOcclusionSampled": true,
@@ -5579,8 +6181,8 @@
         "algorithm": "sha256-ordered-name-size-bytes-v1",
         "domain": "menu-preview-frames:skyline-terminal",
         "fileCount": 240,
-        "totalBytes": 110813076,
-        "sha256": "6b2d87400e49bcbc7fbfd8723f87ce38e6c42b4aa43cc0eefb3e65a8c5d62c03",
+        "totalBytes": 556163204,
+        "sha256": "0f0f9c9a85332ca36abfb8cfab5cd28f0c361ef621136524bd30beb367a0cba6",
         "frameRoster": [
           1,
           2,
@@ -5842,7 +6444,7 @@
           "fixedVisualTimeMs": 65000,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "55f696d67b3c264c3ed08723cf46c45d3a7b6e8a795926dc1e6b307955614419",
+          "pngSha256": "8c27ea0d3c7476b9097f69375c2eaf4a1ed27d44669444744a6a3ae466038506",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.019423282146453856,
@@ -5854,23 +6456,23 @@
             "arcCount": 3,
             "temporalTrailCount": 2,
             "legibleBladeSweeps": 2,
-            "projectedBladeThresholdPixels": 300,
-            "shortestProjectedBladeLengthPixels": 57.334312438964844,
-            "projectedSweepSpanPixels": 1049.6590576171875,
-            "projectedArcSpanPixels": 966.588623046875,
+            "projectedBladeThresholdPixels": 600,
+            "shortestProjectedBladeLengthPixels": 114.66862487792969,
+            "projectedSweepSpanPixels": 2099.318115234375,
+            "projectedArcSpanPixels": 1933.17724609375,
             "authoredBladeThicknessPixels": 3,
             "bladeOpacity": 0.32,
             "contrastMode": "graphite-low-contrast-motion-v1",
             "filledDiscDetected": false,
-            "hubDiameterPixels": 20.167678833007812,
-            "hubCanopyOverlapPixels": 4.394432067871094,
+            "hubDiameterPixels": 40.335357666015625,
+            "hubCanopyOverlapPixels": 8.788864135742188,
             "hubCanopyOcclusionFraction": 0.2178947862199622,
-            "mastCanopyOverlapPixels": 15.906478881835938,
+            "mastCanopyOverlapPixels": 31.812957763671875,
             "structuralTieCount": 2,
-            "leftTieHeaderOverlapAreaPixels": 1574.0170783293433,
-            "rightTieHeaderOverlapAreaPixels": 1565.6994633916765,
-            "leftTieCanopyOverlapAreaPixels": 2058.1832984741777,
-            "rightTieCanopyOverlapAreaPixels": 2057.7450206154026,
+            "leftTieHeaderOverlapAreaPixels": 6296.068313317373,
+            "rightTieHeaderOverlapAreaPixels": 6262.797853566706,
+            "leftTieCanopyOverlapAreaPixels": 8232.73319389671,
+            "rightTieCanopyOverlapAreaPixels": 8230.98008246161,
             "leftTieHeaderOcclusionSampled": true,
             "rightTieHeaderOcclusionSampled": true,
             "leftTieCanopyOcclusionSampled": true,
@@ -5906,7 +6508,7 @@
           "fixedVisualTimeMs": 66974.89539748954,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "e1d0ceb15fe19a681ab8fa439ff55e64f6d6b563d99277759bfc7c7bed47c8d7",
+          "pngSha256": "87b98386aa1fad2a5543cda7834475f8b88f0bc534a75b91f781c427dd9efcd0",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.02505436208513048,
@@ -5918,23 +6520,23 @@
             "arcCount": 3,
             "temporalTrailCount": 2,
             "legibleBladeSweeps": 3,
-            "projectedBladeThresholdPixels": 300,
-            "shortestProjectedBladeLengthPixels": 181.98089599609375,
-            "projectedSweepSpanPixels": 950.4661560058594,
-            "projectedArcSpanPixels": 966.6893310546875,
+            "projectedBladeThresholdPixels": 600,
+            "shortestProjectedBladeLengthPixels": 363.9617919921875,
+            "projectedSweepSpanPixels": 1900.9323120117188,
+            "projectedArcSpanPixels": 1933.378662109375,
             "authoredBladeThicknessPixels": 3,
             "bladeOpacity": 0.32,
             "contrastMode": "graphite-low-contrast-motion-v1",
             "filledDiscDetected": false,
-            "hubDiameterPixels": 20.24755096435547,
-            "hubCanopyOverlapPixels": 4.967903137207031,
+            "hubDiameterPixels": 40.49510192871094,
+            "hubCanopyOverlapPixels": 9.935806274414062,
             "hubCanopyOcclusionFraction": 0.24535822361690607,
-            "mastCanopyOverlapPixels": 16.45486831665039,
+            "mastCanopyOverlapPixels": 32.90973663330078,
             "structuralTieCount": 2,
-            "leftTieHeaderOverlapAreaPixels": 1606.2839106302708,
-            "rightTieHeaderOverlapAreaPixels": 1539.5907660014927,
-            "leftTieCanopyOverlapAreaPixels": 1998.1625289663207,
-            "rightTieCanopyOverlapAreaPixels": 1847.3337807226926,
+            "leftTieHeaderOverlapAreaPixels": 6425.135642521083,
+            "rightTieHeaderOverlapAreaPixels": 6158.363064005971,
+            "leftTieCanopyOverlapAreaPixels": 7992.650115865283,
+            "rightTieCanopyOverlapAreaPixels": 7389.33512289077,
             "leftTieHeaderOcclusionSampled": true,
             "rightTieHeaderOcclusionSampled": true,
             "leftTieCanopyOcclusionSampled": true,
@@ -5970,7 +6572,7 @@
           "fixedVisualTimeMs": 68983.26359832636,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "8b3df0ea377bac805fde2f0c4bee704f2114ea937018e637430995a0074d5b97",
+          "pngSha256": "5f3342395c76c53337eb1fdfcde3c496e8e701fe8ea7ac51572239422fc244c0",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.020275488164689805,
@@ -5982,23 +6584,23 @@
             "arcCount": 3,
             "temporalTrailCount": 2,
             "legibleBladeSweeps": 2,
-            "projectedBladeThresholdPixels": 300,
-            "shortestProjectedBladeLengthPixels": 122.64007568359375,
-            "projectedSweepSpanPixels": 999.9452362060547,
-            "projectedArcSpanPixels": 966.5406494140625,
+            "projectedBladeThresholdPixels": 600,
+            "shortestProjectedBladeLengthPixels": 245.2801513671875,
+            "projectedSweepSpanPixels": 1999.8904724121094,
+            "projectedArcSpanPixels": 1933.081298828125,
             "authoredBladeThicknessPixels": 3,
             "bladeOpacity": 0.32,
             "contrastMode": "graphite-low-contrast-motion-v1",
             "filledDiscDetected": false,
-            "hubDiameterPixels": 20.180419921875,
-            "hubCanopyOverlapPixels": 4.48577880859375,
+            "hubDiameterPixels": 40.36083984375,
+            "hubCanopyOverlapPixels": 8.9715576171875,
             "hubCanopyOcclusionFraction": 0.22228371986111614,
-            "mastCanopyOverlapPixels": 15.99383544921875,
+            "mastCanopyOverlapPixels": 31.9876708984375,
             "structuralTieCount": 2,
-            "leftTieHeaderOverlapAreaPixels": 1561.5523545630276,
-            "rightTieHeaderOverlapAreaPixels": 1579.1580517650582,
-            "leftTieCanopyOverlapAreaPixels": 2026.2928455972578,
-            "rightTieCanopyOverlapAreaPixels": 2050.1434474484995,
+            "leftTieHeaderOverlapAreaPixels": 6246.2094182521105,
+            "rightTieHeaderOverlapAreaPixels": 6316.632207060233,
+            "leftTieCanopyOverlapAreaPixels": 8105.171382389031,
+            "rightTieCanopyOverlapAreaPixels": 8200.573789793998,
             "leftTieHeaderOcclusionSampled": true,
             "rightTieHeaderOcclusionSampled": true,
             "leftTieCanopyOcclusionSampled": true,
@@ -6034,7 +6636,7 @@
           "fixedVisualTimeMs": 70991.63179916318,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "a950203fd146d8bcc8f9e45215a9f0016da75f46fd2ea3d4a0b8608b13f2b4b1",
+          "pngSha256": "28a6ad933b442907c5da10ffac066ac3eeb752c7848704961d9dca41de9abed5",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.02142097420162625,
@@ -6046,23 +6648,23 @@
             "arcCount": 3,
             "temporalTrailCount": 2,
             "legibleBladeSweeps": 2,
-            "projectedBladeThresholdPixels": 300,
-            "shortestProjectedBladeLengthPixels": 63.07080078125,
-            "projectedSweepSpanPixels": 1043.7348022460938,
-            "projectedArcSpanPixels": 966.6473388671875,
+            "projectedBladeThresholdPixels": 600,
+            "shortestProjectedBladeLengthPixels": 126.1416015625,
+            "projectedSweepSpanPixels": 2087.4696044921875,
+            "projectedArcSpanPixels": 1933.294677734375,
             "authoredBladeThicknessPixels": 3,
             "bladeOpacity": 0.32,
             "contrastMode": "graphite-low-contrast-motion-v1",
             "filledDiscDetected": false,
-            "hubDiameterPixels": 20.213348388671875,
-            "hubCanopyOverlapPixels": 4.722137451171875,
+            "hubDiameterPixels": 40.42669677734375,
+            "hubCanopyOverlapPixels": 9.44427490234375,
             "hubCanopyOcclusionFraction": 0.23361480544303548,
-            "mastCanopyOverlapPixels": 16.219865798950195,
+            "mastCanopyOverlapPixels": 32.43973159790039,
             "structuralTieCount": 2,
-            "leftTieHeaderOverlapAreaPixels": 1592.4505214870442,
-            "rightTieHeaderOverlapAreaPixels": 1550.8054450824857,
-            "leftTieCanopyOverlapAreaPixels": 2045.1968093635514,
-            "rightTieCanopyOverlapAreaPixels": 2014.331493685022,
+            "leftTieHeaderOverlapAreaPixels": 6369.802085948177,
+            "rightTieHeaderOverlapAreaPixels": 6203.221780329943,
+            "leftTieCanopyOverlapAreaPixels": 8180.787237454206,
+            "rightTieCanopyOverlapAreaPixels": 8057.325974740088,
             "leftTieHeaderOcclusionSampled": true,
             "rightTieHeaderOcclusionSampled": true,
             "leftTieCanopyOcclusionSampled": true,
@@ -6098,7 +6700,7 @@
           "fixedVisualTimeMs": 65000,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "55f696d67b3c264c3ed08723cf46c45d3a7b6e8a795926dc1e6b307955614419",
+          "pngSha256": "8c27ea0d3c7476b9097f69375c2eaf4a1ed27d44669444744a6a3ae466038506",
           "seamSourceFrame": 1,
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
@@ -6111,23 +6713,23 @@
             "arcCount": 3,
             "temporalTrailCount": 2,
             "legibleBladeSweeps": 2,
-            "projectedBladeThresholdPixels": 300,
-            "shortestProjectedBladeLengthPixels": 57.334312438964844,
-            "projectedSweepSpanPixels": 1049.6590576171875,
-            "projectedArcSpanPixels": 966.588623046875,
+            "projectedBladeThresholdPixels": 600,
+            "shortestProjectedBladeLengthPixels": 114.66862487792969,
+            "projectedSweepSpanPixels": 2099.318115234375,
+            "projectedArcSpanPixels": 1933.17724609375,
             "authoredBladeThicknessPixels": 3,
             "bladeOpacity": 0.32,
             "contrastMode": "graphite-low-contrast-motion-v1",
             "filledDiscDetected": false,
-            "hubDiameterPixels": 20.167678833007812,
-            "hubCanopyOverlapPixels": 4.394432067871094,
+            "hubDiameterPixels": 40.335357666015625,
+            "hubCanopyOverlapPixels": 8.788864135742188,
             "hubCanopyOcclusionFraction": 0.2178947862199622,
-            "mastCanopyOverlapPixels": 15.906478881835938,
+            "mastCanopyOverlapPixels": 31.812957763671875,
             "structuralTieCount": 2,
-            "leftTieHeaderOverlapAreaPixels": 1574.0170783293433,
-            "rightTieHeaderOverlapAreaPixels": 1565.6994633916765,
-            "leftTieCanopyOverlapAreaPixels": 2058.1832984741777,
-            "rightTieCanopyOverlapAreaPixels": 2057.7450206154026,
+            "leftTieHeaderOverlapAreaPixels": 6296.068313317373,
+            "rightTieHeaderOverlapAreaPixels": 6262.797853566706,
+            "leftTieCanopyOverlapAreaPixels": 8232.73319389671,
+            "rightTieCanopyOverlapAreaPixels": 8230.98008246161,
             "leftTieHeaderOcclusionSampled": true,
             "rightTieHeaderOcclusionSampled": true,
             "leftTieCanopyOcclusionSampled": true,
@@ -6169,8 +6771,8 @@
         "algorithm": "sha256-ordered-name-size-bytes-v1",
         "domain": "menu-preview-frames:rustworks-1v1",
         "fileCount": 240,
-        "totalBytes": 186272765,
-        "sha256": "1537f9033109da1dd523be42b88046c98a1fca84b07b8a2b1ef43227c5bcc9c6",
+        "totalBytes": 658822034,
+        "sha256": "0028b7748e0c91cb7dca4b29ab65557f3ffc4573fc52bd0d8fb902c17ed07f4c",
         "frameRoster": [
           1,
           2,
@@ -6432,7 +7034,7 @@
           "fixedVisualTimeMs": 65000,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "7992cdf6da217d962397d9a6817894561a57cbcde1b83ae13422fa795a73f8c8",
+          "pngSha256": "fd494a7d03aff612a36c6ec806f0a31ee42b647f8c7c3da5cf827b00a8802242",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.020263327492607966,
@@ -6444,23 +7046,23 @@
             "arcCount": 3,
             "temporalTrailCount": 2,
             "legibleBladeSweeps": 2,
-            "projectedBladeThresholdPixels": 300,
-            "shortestProjectedBladeLengthPixels": 57.391639709472656,
-            "projectedSweepSpanPixels": 1049.7987060546875,
-            "projectedArcSpanPixels": 966.5242309570312,
+            "projectedBladeThresholdPixels": 600,
+            "shortestProjectedBladeLengthPixels": 114.78327941894531,
+            "projectedSweepSpanPixels": 2099.597412109375,
+            "projectedArcSpanPixels": 1933.0484619140625,
             "authoredBladeThicknessPixels": 3,
             "bladeOpacity": 0.32,
             "contrastMode": "graphite-low-contrast-motion-v1",
             "filledDiscDetected": false,
-            "hubDiameterPixels": 20.192279815673828,
-            "hubCanopyOverlapPixels": 4.5708465576171875,
+            "hubDiameterPixels": 40.384559631347656,
+            "hubCanopyOverlapPixels": 9.141693115234375,
             "hubCanopyOcclusionFraction": 0.22636604679324843,
-            "mastCanopyOverlapPixels": 16.0751895904541,
+            "mastCanopyOverlapPixels": 32.1503791809082,
             "structuralTieCount": 2,
-            "leftTieHeaderOverlapAreaPixels": 1557.687013988616,
-            "rightTieHeaderOverlapAreaPixels": 1583.944320956245,
-            "leftTieCanopyOverlapAreaPixels": 2035.0204650254454,
-            "rightTieCanopyOverlapAreaPixels": 2070.226822757628,
+            "leftTieHeaderOverlapAreaPixels": 6230.748055954464,
+            "rightTieHeaderOverlapAreaPixels": 6335.77728382498,
+            "leftTieCanopyOverlapAreaPixels": 8140.081860101782,
+            "rightTieCanopyOverlapAreaPixels": 8280.907291030511,
             "leftTieHeaderOcclusionSampled": true,
             "rightTieHeaderOcclusionSampled": true,
             "leftTieCanopyOcclusionSampled": true,
@@ -6496,7 +7098,7 @@
           "fixedVisualTimeMs": 66974.89539748954,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "39e42846cf030a94f9643282df775fbb70906a3ba1d2acadfb5da14e971a5324",
+          "pngSha256": "e30fe8003a05a579ec99ef340682fb1a0001a9e0cd3edfe19ab2aa89c299b5b6",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.021996829244825575,
@@ -6508,23 +7110,23 @@
             "arcCount": 3,
             "temporalTrailCount": 2,
             "legibleBladeSweeps": 3,
-            "projectedBladeThresholdPixels": 300,
-            "shortestProjectedBladeLengthPixels": 181.98910522460938,
-            "projectedSweepSpanPixels": 950.4210815429688,
-            "projectedArcSpanPixels": 966.7049560546875,
+            "projectedBladeThresholdPixels": 600,
+            "shortestProjectedBladeLengthPixels": 363.97821044921875,
+            "projectedSweepSpanPixels": 1900.8421630859375,
+            "projectedArcSpanPixels": 1933.409912109375,
             "authoredBladeThicknessPixels": 3,
             "bladeOpacity": 0.32,
             "contrastMode": "graphite-low-contrast-motion-v1",
             "filledDiscDetected": false,
-            "hubDiameterPixels": 20.260704040527344,
-            "hubCanopyOverlapPixels": 5.062431335449219,
+            "hubDiameterPixels": 40.52140808105469,
+            "hubCanopyOverlapPixels": 10.124862670898438,
             "hubCanopyOcclusionFraction": 0.24986453211709095,
-            "mastCanopyOverlapPixels": 16.545244216918945,
+            "mastCanopyOverlapPixels": 33.09048843383789,
             "structuralTieCount": 2,
-            "leftTieHeaderOverlapAreaPixels": 1611.6056672937702,
-            "rightTieHeaderOverlapAreaPixels": 1535.2649393049069,
-            "leftTieCanopyOverlapAreaPixels": 2062.4698380741756,
-            "rightTieCanopyOverlapAreaPixels": 2056.745618842542,
+            "leftTieHeaderOverlapAreaPixels": 6446.422669175081,
+            "rightTieHeaderOverlapAreaPixels": 6141.0597572196275,
+            "leftTieCanopyOverlapAreaPixels": 8249.879352296703,
+            "rightTieCanopyOverlapAreaPixels": 8226.982475370169,
             "leftTieHeaderOcclusionSampled": true,
             "rightTieHeaderOcclusionSampled": true,
             "leftTieCanopyOcclusionSampled": true,
@@ -6560,7 +7162,7 @@
           "fixedVisualTimeMs": 68983.26359832636,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "36bad35b3e29cc8a944b44064f02c2c9cc7df096ffb10bd8f1724f54eeab7c3d",
+          "pngSha256": "f61521b23bc1d3f7f1773eefc409d8c699fcbcb12c7b04bfef0c91ac704ea317",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.020378171073065863,
@@ -6572,23 +7174,23 @@
             "arcCount": 3,
             "temporalTrailCount": 2,
             "legibleBladeSweeps": 2,
-            "projectedBladeThresholdPixels": 300,
-            "shortestProjectedBladeLengthPixels": 122.6737060546875,
-            "projectedSweepSpanPixels": 999.8990097045898,
-            "projectedArcSpanPixels": 966.5598754882812,
+            "projectedBladeThresholdPixels": 600,
+            "shortestProjectedBladeLengthPixels": 245.347412109375,
+            "projectedSweepSpanPixels": 1999.7980194091797,
+            "projectedArcSpanPixels": 1933.1197509765625,
             "authoredBladeThicknessPixels": 3,
             "bladeOpacity": 0.32,
             "contrastMode": "graphite-low-contrast-motion-v1",
             "filledDiscDetected": false,
-            "hubDiameterPixels": 20.166358947753906,
-            "hubCanopyOverlapPixels": 4.3849639892578125,
+            "hubDiameterPixels": 40.33271789550781,
+            "hubCanopyOverlapPixels": 8.769927978515625,
             "hubCanopyOcclusionFraction": 0.21743954873649624,
-            "mastCanopyOverlapPixels": 15.89742660522461,
+            "mastCanopyOverlapPixels": 31.79485321044922,
             "structuralTieCount": 2,
-            "leftTieHeaderOverlapAreaPixels": 1566.1247795270756,
-            "rightTieHeaderOverlapAreaPixels": 1573.4856475060806,
-            "leftTieCanopyOverlapAreaPixels": 2014.9894974902272,
-            "rightTieCanopyOverlapAreaPixels": 2019.9780299700797,
+            "leftTieHeaderOverlapAreaPixels": 6264.499118108302,
+            "rightTieHeaderOverlapAreaPixels": 6293.942590024322,
+            "leftTieCanopyOverlapAreaPixels": 8059.957989960909,
+            "rightTieCanopyOverlapAreaPixels": 8079.912119880319,
             "leftTieHeaderOcclusionSampled": true,
             "rightTieHeaderOcclusionSampled": true,
             "leftTieCanopyOcclusionSampled": true,
@@ -6624,7 +7226,7 @@
           "fixedVisualTimeMs": 70991.63179916318,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "2e9c335d4b5be8a95bfc7d3f62fe3b41265735f47612687f4568691ac16d9780",
+          "pngSha256": "8de680b6ab269ea1e1ba28650b5497e373ec446c54127cfe83d5d2ef70b93377",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.02128285434510973,
@@ -6636,23 +7238,23 @@
             "arcCount": 3,
             "temporalTrailCount": 2,
             "legibleBladeSweeps": 2,
-            "projectedBladeThresholdPixels": 300,
-            "shortestProjectedBladeLengthPixels": 63.01837158203125,
-            "projectedSweepSpanPixels": 1043.6889953613281,
-            "projectedArcSpanPixels": 966.6172485351562,
+            "projectedBladeThresholdPixels": 600,
+            "shortestProjectedBladeLengthPixels": 126.0367431640625,
+            "projectedSweepSpanPixels": 2087.3779907226562,
+            "projectedArcSpanPixels": 1933.2344970703125,
             "authoredBladeThicknessPixels": 3,
             "bladeOpacity": 0.32,
             "contrastMode": "graphite-low-contrast-motion-v1",
             "filledDiscDetected": false,
-            "hubDiameterPixels": 20.18964385986328,
-            "hubCanopyOverlapPixels": 4.5519866943359375,
+            "hubDiameterPixels": 40.37928771972656,
+            "hubCanopyOverlapPixels": 9.103973388671875,
             "hubCanopyOcclusionFraction": 0.22546146558757388,
-            "mastCanopyOverlapPixels": 16.057147979736328,
+            "mastCanopyOverlapPixels": 32.114295959472656,
             "structuralTieCount": 2,
-            "leftTieHeaderOverlapAreaPixels": 1582.879208771512,
-            "rightTieHeaderOverlapAreaPixels": 1558.5473416233435,
-            "leftTieCanopyOverlapAreaPixels": 2021.277214883361,
-            "rightTieCanopyOverlapAreaPixels": 1994.5531110931188,
+            "leftTieHeaderOverlapAreaPixels": 6331.516835086048,
+            "rightTieHeaderOverlapAreaPixels": 6234.189366493374,
+            "leftTieCanopyOverlapAreaPixels": 8085.108859533444,
+            "rightTieCanopyOverlapAreaPixels": 7978.212444372475,
             "leftTieHeaderOcclusionSampled": true,
             "rightTieHeaderOcclusionSampled": true,
             "leftTieCanopyOcclusionSampled": true,
@@ -6688,7 +7290,7 @@
           "fixedVisualTimeMs": 65000,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "7992cdf6da217d962397d9a6817894561a57cbcde1b83ae13422fa795a73f8c8",
+          "pngSha256": "fd494a7d03aff612a36c6ec806f0a31ee42b647f8c7c3da5cf827b00a8802242",
           "seamSourceFrame": 1,
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
@@ -6701,23 +7303,23 @@
             "arcCount": 3,
             "temporalTrailCount": 2,
             "legibleBladeSweeps": 2,
-            "projectedBladeThresholdPixels": 300,
-            "shortestProjectedBladeLengthPixels": 57.391639709472656,
-            "projectedSweepSpanPixels": 1049.7987060546875,
-            "projectedArcSpanPixels": 966.5242309570312,
+            "projectedBladeThresholdPixels": 600,
+            "shortestProjectedBladeLengthPixels": 114.78327941894531,
+            "projectedSweepSpanPixels": 2099.597412109375,
+            "projectedArcSpanPixels": 1933.0484619140625,
             "authoredBladeThicknessPixels": 3,
             "bladeOpacity": 0.32,
             "contrastMode": "graphite-low-contrast-motion-v1",
             "filledDiscDetected": false,
-            "hubDiameterPixels": 20.192279815673828,
-            "hubCanopyOverlapPixels": 4.5708465576171875,
+            "hubDiameterPixels": 40.384559631347656,
+            "hubCanopyOverlapPixels": 9.141693115234375,
             "hubCanopyOcclusionFraction": 0.22636604679324843,
-            "mastCanopyOverlapPixels": 16.0751895904541,
+            "mastCanopyOverlapPixels": 32.1503791809082,
             "structuralTieCount": 2,
-            "leftTieHeaderOverlapAreaPixels": 1557.687013988616,
-            "rightTieHeaderOverlapAreaPixels": 1583.944320956245,
-            "leftTieCanopyOverlapAreaPixels": 2035.0204650254454,
-            "rightTieCanopyOverlapAreaPixels": 2070.226822757628,
+            "leftTieHeaderOverlapAreaPixels": 6230.748055954464,
+            "rightTieHeaderOverlapAreaPixels": 6335.77728382498,
+            "leftTieCanopyOverlapAreaPixels": 8140.081860101782,
+            "rightTieCanopyOverlapAreaPixels": 8280.907291030511,
             "leftTieHeaderOcclusionSampled": true,
             "rightTieHeaderOcclusionSampled": true,
             "leftTieCanopyOcclusionSampled": true,
@@ -6748,9 +7350,9 @@
         "gun-range"
       ],
       "residentArenaRoots": 1,
-      "colliders": 20,
-      "raycastMeshes": 26,
-      "targets": 16,
+      "colliders": 30,
+      "raycastMeshes": 123,
+      "targets": 20,
       "viewmodelHidden": true,
       "firstFrame": 1,
       "lastFrame": 240,
@@ -6759,8 +7361,8 @@
         "algorithm": "sha256-ordered-name-size-bytes-v1",
         "domain": "menu-preview-frames:gun-range",
         "fileCount": 240,
-        "totalBytes": 113700777,
-        "sha256": "8a0cb95fef3e031e1c44840ef00135c0feae790a9ddc2e0548465a6c9d1896a5",
+        "totalBytes": 410707858,
+        "sha256": "7801f86fc7176c431f2eb93a57db1cbfb793a63eb794faf6be1097dd6265af92",
         "frameRoster": [
           1,
           2,
@@ -7022,7 +7624,7 @@
           "fixedVisualTimeMs": 65000,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "209fee277728d582fb4e8cd8d2d6c92c281a9044b6baa441c8d67e96571d96e0"
+          "pngSha256": "2f18df5bd08aa91a4d1987731fff718a81e4468130f9d73eb52be13914d6e48e"
         },
         {
           "frame": 60,
@@ -7041,7 +7643,7 @@
           "fixedVisualTimeMs": 66974.89539748954,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "f8413b06affeec3a2a07dd3c8af503c30ab14f376f83949a8cba08319f21c99b"
+          "pngSha256": "52a4344ade6c15814baac23549ab24c77ae3819598f8bd5f41dbda4ae89a409f"
         },
         {
           "frame": 120,
@@ -7060,7 +7662,7 @@
           "fixedVisualTimeMs": 68983.26359832636,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "4b24647e666d9aef388539d154af24674c679f5c4489383d010e6711957808e3"
+          "pngSha256": "a29b6f538489d554cac03a4e00470d3ddb2967a74aba7f29c6a64262994e5b74"
         },
         {
           "frame": 180,
@@ -7079,7 +7681,7 @@
           "fixedVisualTimeMs": 70991.63179916318,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "3fa1d9b2c9711bc189a071d646c6e517a5c4afdf2af1570c8c0c2aabe43e3510"
+          "pngSha256": "b9d3fd6b3c87c106b5ce3decaed5cd3c4cba4e77aa9eb3a30d4cefd96583f395"
         },
         {
           "frame": 240,
@@ -7098,7 +7700,7 @@
           "fixedVisualTimeMs": 65000,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "209fee277728d582fb4e8cd8d2d6c92c281a9044b6baa441c8d67e96571d96e0",
+          "pngSha256": "2f18df5bd08aa91a4d1987731fff718a81e4468130f9d73eb52be13914d6e48e",
           "seamSourceFrame": 1
         }
       ]
