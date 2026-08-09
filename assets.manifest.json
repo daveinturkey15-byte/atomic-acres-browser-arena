@@ -529,9 +529,9 @@
       "license": "Original project work",
       "files": "public/assets/original/menu-previews/*",
       "sourceScript": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
-      "sourceScriptSha256": "f15a16a1e849dbb2fc3a3686356b4f23b1d08cf8500822f7da0efe83430a4899",
+      "sourceScriptSha256": "90763a46515d3a785ce36fb2480b2e3ee3838abb28d38503196d000269c47d0e",
       "sourceProvenance": "source-assets/menu/pass65-preview-masters/provenance.json",
-      "sourceProvenanceSha256": "c9c9bd626221cc185cf0930f819470ac6d0410f38dcf3d338b26e8be590f2fb6",
+      "sourceProvenanceSha256": "7218877be90fb271e315d4925557864b73bf0c93566d37a6e5f12b23d698cdb7",
       "format": "Four distinct 2560x1440 eight-second 30 FPS selected-map runtime captures, shipped as high-bitrate VP9/Opus WebM, H.264 High Level 5.0/AAC MP4 and full-resolution static WebP posters, plus deterministic five-frame review evidence",
       "modifications": "Captured offline at native 1440p from each actual authoritative production WebGPU arena with deterministic camera and visual time; the reviewed 1280x720 logical overlay is losslessly authored at exact 2x output scale so its fixed-pixel details retain their intended proportions. Three map flyovers bake perspective-aware elliptic rotor arcs with subdued moving spokes, measured mast/hub/header occlusion, two visible structural ties into the side canopy rails, a restrained tail camera and compact green-on-graphite cockpit avionics; Gun Range bakes compact charcoal/silver ears, forelegs and top-facing paws. Runtime loading/menu playback remains one selected metadata-preload decoder with poster-first readiness, reduced motion is poster-only, and no downloaded or sampled assets are used. The former byte-identical Gun Range media gate is explicitly superseded.",
       "attributionRequired": false
