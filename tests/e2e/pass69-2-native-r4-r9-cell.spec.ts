@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+import { WEAPONS } from '../../src/gameplay';
 import { TIMED_MAP_WEAPON_DEFINITIONS, type TimedMapWeaponId } from '../../src/timed-map-weapon-authority';
 import type { WeaponId } from '../../src/protocol';
 
@@ -18,6 +19,8 @@ const SNIPERS = new Set<WeaponId>(['sniper', 'm14-ebr', 'railgun']);
 const TIMED = new Set<TimedMapWeaponId>(['flamethrower', 'flare-gun']);
 const PROFILES = new Set(['performance', 'blender', 'compat']);
 const ARENAS = new Set(['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range']);
+const FLARE_SHOT_INTERVAL_MS = 60_000 / WEAPONS['flare-gun'].rpm;
+let previousFlareActionCompletedAtMs: number | null = null;
 
 async function deploy(page: Page): Promise<void> {
   await page.setViewportSize({ width: 1280, height: 720 });
@@ -198,6 +201,13 @@ async function runTimedCycle(page: Page, timedWeapon: TimedMapWeaponId, cycle: '
       const player = (window.__ATOMIC_ACRES_DEBUG__!.snapshot() as any).player;
       return player.ammo > 0 && player.reloading === false;
     }, undefined, { polling: 'raf', timeout: 5_000 });
+    if (previousFlareActionCompletedAtMs !== null) {
+      await page.waitForFunction(
+        ({ firedAtMs, shotIntervalMs }) => performance.now() >= firedAtMs + shotIntervalMs,
+        { firedAtMs: previousFlareActionCompletedAtMs, shotIntervalMs: FLARE_SHOT_INTERVAL_MS },
+        { polling: 'raf', timeout: 5_000 },
+      );
+    }
   }
   const before = await sampleHealth(page);
   assertHealthy(before);
@@ -229,6 +239,7 @@ async function runTimedCycle(page: Page, timedWeapon: TimedMapWeaponId, cycle: '
   } else {
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.fireOnce());
     actionCompletedAt = await page.evaluate(() => performance.now());
+    previousFlareActionCompletedAtMs = actionCompletedAt;
     for (const metric of ['spawnCount', 'impactCount', 'burnPulseCount'] as const) {
       await expect.poll(async () => page.evaluate((name) => {
         const telemetry = (window.__ATOMIC_ACRES_DEBUG__!.snapshot() as any).timedMapWeapons.flareProjectiles;
