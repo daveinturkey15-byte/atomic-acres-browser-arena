@@ -20,7 +20,7 @@ export type InteractionCandidate = Readonly<{
 }>;
 
 export type TapInteractionKind = Extract<InteractionKind,
-  'care-package' | 'shed-door' | 'timed-map-weapon' | 'test-bay-weapon' | 'test-bay-support' | 'weapon-pickup'>;
+  'care-package' | 'shed-door' | 'timed-map-weapon' | 'test-bay-weapon' | 'weapon-pickup'>;
 export type HoldInteractionKind = Exclude<InteractionKind, TapInteractionKind>;
 
 const INTERACTION_PRIORITY: Readonly<Record<InteractionKind, number>> = Object.freeze({
@@ -53,7 +53,7 @@ export function primaryInteraction(candidates: readonly InteractionCandidate[]):
 
 export function isTapInteraction(kind: InteractionKind): kind is TapInteractionKind {
   return kind === 'care-package' || kind === 'shed-door' || kind === 'timed-map-weapon' || kind === 'test-bay-weapon'
-    || kind === 'test-bay-support' || kind === 'weapon-pickup';
+    || kind === 'weapon-pickup';
 }
 
 export function isHoldInteraction(kind: InteractionKind): kind is HoldInteractionKind {

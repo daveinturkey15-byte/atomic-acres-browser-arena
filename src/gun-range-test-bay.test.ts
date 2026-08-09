@@ -28,7 +28,10 @@ describe('Gun Range grey test-bay authority', () => {
     expect(GUN_RANGE_TEST_BAY_CONTRACT.corridor.nominalTraversalSeconds).toBeCloseTo(5, 8);
     expect(GUN_RANGE_TEST_BAY_CONTRACT.corridor.clearWidthM).toBeGreaterThanOrEqual(7);
     expect(GUN_RANGE_TEST_BAY_CONTRACT.corridor.clearHeightM).toBeGreaterThanOrEqual(4.5);
-    expect(GUN_RANGE_TEST_BAY_CONTRACT.bay.clearFloorAreaM2).toBeGreaterThan(3_000);
+    expect(GUN_RANGE_TEST_BAY_CONTRACT.bay.bounds).toEqual({
+      minX: 51.5, maxX: 100, minY: 0, maxY: 25.5, minZ: -26, maxZ: 38,
+    });
+    expect(GUN_RANGE_TEST_BAY_CONTRACT.bay.clearFloorAreaM2).toBeCloseTo(48.5 * 64, 8);
   });
 
   it('projects every canonical weapon and killstreak into one deterministic station plan', () => {
@@ -93,23 +96,27 @@ describe('Gun Range grey test-bay authority', () => {
     expect(closing.audioIntent).toBeNull();
   });
 
-  it('keeps slow unarmed dummies continuous, bounded, and below walking speed', () => {
+  it('keeps slow unarmed dummies on smooth bounded two-axis roaming loops below walking speed', () => {
     const walkSpeed = GUN_RANGE_TEST_BAY_CONTRACT.corridor.canonicalWalkSpeedMps;
     for (const dummy of GUN_RANGE_TEST_BAY_CONTRACT.dummies) {
       expect(dummy.armed).toBe(false);
       expect(dummy.speedMps).toBeGreaterThan(0.5);
       expect(dummy.speedMps).toBeLessThan(walkSpeed * 0.15);
+      expect(dummy.roamHalfWidthM).toBeGreaterThan(1.5);
       const start = gunRangeTestBayDummyPose(dummy, 0);
       const next = gunRangeTestBayDummyPose(dummy, 16);
       expect(Math.hypot(
         next.position.x - start.position.x,
         next.position.y - start.position.y,
         next.position.z - start.position.z,
-      )).toBeLessThanOrEqual(dummy.speedMps * 0.016 + 1e-9);
-      for (const now of [0, 1_000, 5_000, 15_000, 30_000]) {
-        const pose = gunRangeTestBayDummyPose(dummy, now);
+      )).toBeLessThanOrEqual(dummy.speedMps * 0.016 + 1e-6);
+      const samples = [0, 1_000, 5_000, 15_000, 30_000].map((now) => gunRangeTestBayDummyPose(dummy, now));
+      expect(new Set(samples.map((pose) => pose.position.z.toFixed(3))).size).toBeGreaterThan(2);
+      for (const pose of samples) {
         expect(pose.position.x).toBeGreaterThanOrEqual(Math.min(dummy.start.x, dummy.end.x));
         expect(pose.position.x).toBeLessThanOrEqual(Math.max(dummy.start.x, dummy.end.x));
+        expect(pose.position.z).toBeGreaterThanOrEqual(GUN_RANGE_TEST_BAY_CONTRACT.bay.bounds.minZ);
+        expect(pose.position.z).toBeLessThanOrEqual(GUN_RANGE_TEST_BAY_CONTRACT.bay.bounds.maxZ);
         expect(Number.isFinite(pose.yawRadians)).toBe(true);
       }
     }

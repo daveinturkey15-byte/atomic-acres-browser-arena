@@ -1739,18 +1739,25 @@ def render_chopper_reviews(roots) -> None:
         print(f"CHOPPER_FP_DIAGNOSTIC={diagnostic}")
         return
     def render_accepted_first_person() -> Path:
-        sightline = next((
+        cockpit = next((
             obj for obj in hierarchy(lod0)
+            if obj.name == "chopper-first-person-cockpit"
+            or obj.get("canonical_node_name") == "chopper-first-person-cockpit"
+        ), None)
+        if cockpit is None:
+            raise RuntimeError("authored complete chopper first-person cockpit missing from focused review")
+        cockpit_nodes = set(hierarchy(cockpit))
+        sightline = next((
+            obj for obj in cockpit_nodes
             if obj.name == "chopper-gunner-sightline"
             or obj.get("canonical_node_name") == "chopper-gunner-sightline"
         ), None)
         if sightline is None:
             raise RuntimeError("authored unobstructed chopper gunner sightline missing from focused review")
-        sightline_nodes = set(hierarchy(sightline))
         for obj in hierarchy(lod0):
             if obj.type == "MESH":
-                obj.hide_render = obj not in sightline_nodes
-                obj.hide_viewport = obj not in sightline_nodes
+                obj.hide_render = obj not in cockpit_nodes
+                obj.hide_viewport = obj not in cockpit_nodes
         for obj in hierarchy(fp_world):
             obj.hide_render = False
             obj.hide_viewport = False

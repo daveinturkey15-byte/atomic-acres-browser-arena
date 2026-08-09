@@ -78,11 +78,12 @@ describe('shared F interaction arbitration', () => {
     expect(primaryHoldInteraction(candidates)).toMatchObject({ kind: 'support-enter-chopper', targetId: 'chopper-a' });
   });
 
-  it('prefers a test-bay weapon over overlapping support pads while keeping both tap interactions', () => {
-    const winner = primaryTapInteraction([
+  it('keeps test-bay weapons on tap while reserving test-bay support for hold', () => {
+    const candidates = [
       candidate('test-bay-support', 'chopper', 0.1),
       candidate('test-bay-weapon', 'm14-ebr', 1.9),
-    ]);
-    expect(winner).toMatchObject({ kind: 'test-bay-weapon', targetId: 'm14-ebr' });
+    ];
+    expect(primaryTapInteraction(candidates)).toMatchObject({ kind: 'test-bay-weapon', targetId: 'm14-ebr' });
+    expect(primaryHoldInteraction(candidates)).toMatchObject({ kind: 'test-bay-support', targetId: 'chopper' });
   });
 });

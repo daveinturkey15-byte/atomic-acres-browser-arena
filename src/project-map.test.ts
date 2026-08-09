@@ -24,10 +24,10 @@ describe('project map', () => {
   it('keeps the current snapshot first and the complete older history in the archive', () => {
     const bundle = createProjectMapBundle('2026-07-24T17:00:00Z');
     expect(bundle.current.release).toEqual(PROJECT_MAP_RELEASE);
-    expect(bundle.current.previousRelease).toBe('PASS 67.1');
+    expect(bundle.current.previousRelease).toBe('PASS 69');
     expect(bundle.archive).toEqual(CHANGELOG);
-    // The current snapshot replaces the pending PASS 69 ledger entry at the
-    // front of the combined changes list instead of duplicating the pass.
+    // The current snapshot replaces the pending PASS 69.2 ledger entry at the
+    // front of the combined changes list while retaining the frozen 69.1 entry.
     expect(bundle.changes).toEqual([
       PROJECT_MAP_RELEASE,
       ...CHANGELOG.filter((entry) => entry.id !== PROJECT_MAP_RELEASE.id),

@@ -13,7 +13,7 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).not.toContain('recordSupportElimination(');
     expect(source).not.toContain('recordSupportDeath(');
     expect(source).not.toContain('consumeFieldSupport(');
-    expect(source).toContain('GAMEPLAY_ACTIONS.findIndex((action) => action.startsWith(\'support-\')');
+    expect(source).toContain('supportSlotForCode(event.code, keyProfile)');
     expect(source).toContain('activateOrToggleFieldSupportSlot(supportSlot)');
     expect(source).toContain('selectControllableSupportEntity(id, player.id, killstreakSnapshot.entities)');
     expect(source).not.toContain("activateFieldSupport('hunter-swarm');");
@@ -177,6 +177,7 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain("? 'CLICK ONE LOCATION TO CONFIRM · <kbd>RMB</kbd> CANCELS AND REFUNDS'");
     expect(source).not.toContain("LEFT CLICK or [F] to confirm target  [ESC] to cancel");
     expect(source).toContain('cancelSupportTargeting(true)');
+    expect(source).toMatch(/if \(pointSupportTargeting && !tacticalMapOpen && event\.code === 'Escape' && !event\.repeat\) \{\s+event\.preventDefault\(\);\s+cancelSupportTargeting\(true\);\s+return;/);
     expect(source).toContain('let groundSampler: SupportPlacementGroundSampler | null = null;');
     expect(source).toContain('groundSampler ??= new SupportPlacementGroundSampler({');
     expect(source).toContain('colliders: flightSolids');
@@ -274,6 +275,7 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(candidates).toContain("kind: 'test-bay-support'");
     expect(source).toContain('grantTrainingRailgun(railgunState, player.id');
     expect(source).toContain('killstreakRuntime.grantTrainingReward(player.id, localContinuity, id');
+    expect(source).toContain('activateFieldSupport(id, gunRangeTestBayKillstreakWorld());');
     expect(source).toContain("if (network.role === 'client') {");
     expect(source).toContain('activateFieldSupport(id);');
     const worldStart = source.indexOf('function killstreakWorldState()');
@@ -297,8 +299,16 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(block).toContain('requestKillstreakControl(entity.id, action, {}, now)');
     expect(block).toContain('localKillstreakActorSnapshot()?.possession?.entityId !== entity.id');
     expect(block).toContain('if (!localKillstreakActorSnapshot()?.possession) activateFieldSupport(id)');
-    expect(source).toContain('GAMEPLAY_ACTIONS.findIndex((action) => action.startsWith(\'support-\')');
-    expect(source).toContain('if (supportSlot >= 0 && !event.repeat) activateOrToggleFieldSupportSlot(supportSlot)');
+    expect(source).toContain('supportSlotForCode(event.code, keyProfile)');
+    expect(source).toContain('if (supportSlot != null && !event.repeat) activateOrToggleFieldSupportSlot(supportSlot)');
+  });
+
+  it('projects the selected canonical weapon prompt into the visible pickup surface', () => {
+    const start = source.indexOf('function updateFInteractionPrompt(');
+    const end = source.indexOf('\nfunction recordOwnerSupportDamage(', start);
+    const block = source.slice(start, end);
+    expect(block).toContain("const pickupLabel = pickupPrompt.querySelector<HTMLElement>('span');");
+    expect(block).toContain('pickupLabel.textContent = `TAP F · ${selected.prompt}`');
   });
 
   it('offers only claimable landed crates and correlates pending, acknowledged, released and rejected capture state', () => {

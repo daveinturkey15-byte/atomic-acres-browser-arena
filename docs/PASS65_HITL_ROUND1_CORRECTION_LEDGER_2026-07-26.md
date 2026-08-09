@@ -1,6 +1,6 @@
 # Pass 65 HITL Round 1 Correction Ledger
 
-<!-- owner-feedback-ledger-version: 1; latest-id: HF-216 -->
+<!-- owner-feedback-ledger-version: 1; latest-id: HF-229 -->
 
 Status: **BLOCKING CORRECTION WAVE — NOT APPROVED, NOT PUBLISHABLE**
 
@@ -245,6 +245,19 @@ This ledger is the authoritative translation of Dave's first local Pass 65 revie
 | HF-214 | P1 | Player-facing release notes and project information contain no Farcrysis deferral note. | Release notes/project-map copy | Changelog/project-map source and served-dialog assertions reject Farcrysis text while preserving the remaining Pass 69.1 highlights and frozen channel notes. | Last Release and Project Map surfaces | IMPLEMENTED |
 | HF-215 | P1 | The front version-selection screen visibly tells players to use Ctrl+Shift+R when a newly selected game version has not updated. | Release chooser recovery UX | Candidate and staged production chooser DOM/visual tests require readable Ctrl+Shift+R guidance before selecting a channel at desktop and narrow widths. | Root version chooser | IMPLEMENTED |
 | HF-216 | P1 | The Options hard game-refresh/cache-reset action is also available on the front version-selection screen and clears CacheStorage before reloading the chooser with a fresh cache-busting URL. | Release chooser recovery UX | Candidate and staged chooser browser tests seed CacheStorage, activate HARD RESET / REFRESH, verify cache deletion, changed cache-bust URL and restored chooser; a decorative or ordinary reload button fails. | Root version chooser | IMPLEMENTED |
+| HF-217 | P0 | Every canonical weapon remains visibly usable in ADS; opaque receivers, attachments or authored assets may not cover the sight picture or obstruct the centre aiming corridor. | ADS/viewmodel/rendering integration | Catalog-wide Performance and Quality browser sweeps capture every weapon at settled ADS and reject centre-corridor occlusion, opaque overlays, fallback geometry or missing entries. | Every canonical weapon in ADS | OPEN |
+| HF-218 | P1 | First-person guns, knives, hands and arms maintain authored connected alignment in hip, ADS, fire, reload, melee and stance transitions. | Operator rig/viewmodel forge | Catalog/action/resolution matrices and visual review reject detached grips, floating knives, malformed wrists, undersized anatomy or action-specific alignment drift. | Every first-person weapon and action | OPEN |
+| HF-219 | P0 | Ready selected killstreaks activate through default keys 3, 4 and 5 and through every currently configured or rebound support-slot key using compact slot identity rather than global action-list position. | Support targeting/input lifecycle | Unit and trusted-input browser tests exercise all five compact support slots, defaults and rebounds, reject non-support keys and prove exactly one admitted activation or possession toggle. | Selected ready killstreak input | IMPLEMENTED |
+| HF-220 | P0 | Entering and repeatedly using sniper ADS never freezes renderer submission, device progress or the active match. | Sniper viewmodel/frame pacing | Native-Windows-GPU cold/warm repeated ADS cycles capture frame/GPU progress, pending submissions, device errors and first-fault stacks; a 1,300 ms progress stall or frozen input fails. | Every sniper-family weapon in ADS | OPEN |
+| HF-221 | P1 | First-person weapon, hand, arm and knife presentation retreats from nearby walls and remains above valid floors in every stance without changing authoritative collision. | ADS/viewmodel/rendering integration | All-map/profile stance/contact matrices exercise hip, ADS, fire, reload and melee at floors, slopes, walls, doors and corners and reject visible penetration or authority drift. | First-person contact presentation | OPEN |
+| HF-222 | P1 | The Gun Range support-room secure door has readable authored panel texture and lighting from both faces, and all attached strips move with the leaf. | Gun Range world/gameplay integration | Structural material/attachment/light-occlusion tests plus served Performance and Quality captures reject untextured slabs, detached strips, black faces, unoccluded local lights or unreadable entrance state. | Gun Range support-room secure door | IMPLEMENTED |
+| HF-223 | P0 | Flamethrower and Flare Gun spawn, pickup, fire and repeated-use lifecycles never freeze or stall GPU progress. | Timed weapon/content integration | Native-Windows-GPU cold/warm spawn/pickup/fire/depletion repeats capture frame/GPU progress, pending submissions, resource counts and first-fault stacks; any watchdog stall or unbounded resource growth fails. | Flamethrower and Flare Gun lifecycle | OPEN |
+| HF-224 | P1 | Every gun and support test station projects a useful canonical name or a truthful rotating authored preview rather than anonymous or stale presentation. | Loadout UI/weapon asset projection | Canonical set-equality and served-room visual checks reject missing, wrong, duplicate, stale or unreadable station identity in Performance and Quality. | Gun Range weapon and support stations | IMPLEMENTED |
+| HF-225 | P1 | The nearby F pickup prompt always displays the canonical name of the exact currently selected eligible weapon drop. | World-pickup/interaction authority | Unit and served overlapping-drop/range/LOS tests bind the visible prompt and committed pickup to one pinned candidate and reject stale, generic or wrong names. | Ground and corpse weapon pickups | IMPLEMENTED |
+| HF-226 | P1 | Only inside the Gun Range support test zone, holding F for the full threshold grants and uses a station streak even when that streak is absent from the selected loadout. | Support authority/HUD integration | Press-lifecycle, catalog-set and served-room tests require a full pinned hold, cancel early/range/LOS-invalid presses, admit every station ID and prove ordinary matches retain selected-loadout authority. | Gun Range support test stations | IMPLEMENTED |
+| HF-227 | P1 | Support-room training bots roam naturally on smooth bounded two-axis paths at below-walking speed rather than reversing on a rail-like line. | Gun Range world/gameplay integration | Deterministic trajectory tests and served temporal captures reject line-only triangle waves, discontinuous reversals, overlap, out-of-bounds motion or walking-speed excess. | Gun Range support-room bots | IMPLEMENTED |
+| HF-228 | P1 | Support-room bots use animated canonical operator rigs in production; primitive or T-pose bodies are test-only and cannot become a runtime fallback. | Operator rig/viewmodel forge | Production fail-closed asset admission, rig/socket/action tests and served temporal captures reject primitive/T-pose fallback, missing animation or noncanonical bodies. | Gun Range support-room bot presentation | IMPLEMENTED |
+| HF-229 | P0 | Served Chopper Gunner, Carpet Bomber, Care Package aircraft, crate and parachute presentation uses the retained authored asset families with correct identity, scale, framing, visibility and lifecycle. | Support vehicle asset forge | Production asset/provenance gates and served cold/warm activation captures in Performance and Quality reject stale previews, proxy/block silhouettes, wrong family, missing crate/parachute, load races or fallback geometry. | Chopper, bomber and care-package presentation | OPEN |
 
 ### 3A. Implemented boundaries awaiting independent candidate evidence
 
@@ -432,6 +445,19 @@ The feedback IDs remain the correction source; these ranges bind each row back t
 | HF-214 | R303, R600, R609 |
 | HF-215 | R303, R600, R608, R609 |
 | HF-216 | R303, R307, R600, R608, R609, R610 |
+| HF-217 | R108, R307, R608, R610 |
+| HF-218 | R108, R307, R608, R610 |
+| HF-219 | R504, R600, R608, R609, R610 |
+| HF-220 | R006, R108, R307, R606, R610, R613 |
+| HF-221 | R108, R236, R307, R608, R610 |
+| HF-222 | R112, R307, R608, R609 |
+| HF-223 | R006, R109, R307, R606, R610, R613 |
+| HF-224 | R108, R500, R600, R609 |
+| HF-225 | R108, R400-R413, R609 |
+| HF-226 | R500, R502, R504, R510, R609 |
+| HF-227 | R111, R509, R510, R608 |
+| HF-228 | R108, R307, R608, R610 |
+| HF-229 | R112, R114, R307, R608, R610, R613 |
 
 ## 4. Canonical contract supersessions
 

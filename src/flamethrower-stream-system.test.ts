@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { FLAMETHROWER_EFFECT } from './special-weapon-effects';
 import { FlamethrowerStreamSystem } from './flamethrower-stream-system';
 
@@ -54,5 +54,38 @@ describe('flamethrower stream presentation', () => {
     expect(system.telemetry().groundFireActive).toBe(1);
     system.update(0.1, 5_100);
     expect(system.telemetry().groundFireActive).toBe(0);
+  });
+
+  it('restores active ground-fire state and slot selection after GPU prewarm', async () => {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const system = new FlamethrowerStreamSystem(scene, false);
+    const now = performance.now();
+    expect(system.igniteGround(new THREE.Vector3(1, 0, 2), now)).toBe(true);
+    const internals = system as unknown as {
+      groundActive: Uint8Array;
+      groundPositions: Float32Array;
+      groundSpawnedAt: Float64Array;
+      groundExpiresAt: Float64Array;
+      groundCursor: number;
+    };
+    const before = {
+      active: [...internals.groundActive],
+      positions: [...internals.groundPositions],
+      spawnedAt: [...internals.groundSpawnedAt],
+      expiresAt: [...internals.groundExpiresAt],
+      cursor: internals.groundCursor,
+    };
+    const compileAndRender = vi.fn(async () => undefined);
+
+    await system.prewarm({ compileAndRender } as never, camera, 7);
+
+    expect(compileAndRender).toHaveBeenCalledTimes(1);
+    expect([...internals.groundActive]).toEqual(before.active);
+    expect([...internals.groundPositions]).toEqual(before.positions);
+    expect([...internals.groundSpawnedAt]).toEqual(before.spawnedAt);
+    expect([...internals.groundExpiresAt]).toEqual(before.expiresAt);
+    expect(internals.groundCursor).toBe(before.cursor);
+    expect(system.telemetry()).toMatchObject({ groundFireActive: 1, prewarmGeneration: 7 });
   });
 });

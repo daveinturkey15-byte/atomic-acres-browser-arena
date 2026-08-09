@@ -52,6 +52,21 @@ describe('pinned F press lifecycle', () => {
     expect(released).toMatchObject({ state: { phase: 'idle' }, commit: null });
   });
 
+  it('requires the full hold threshold for a test-bay support grant', () => {
+    const station = candidate('test-bay-support', 'test-bay-support:chopper', 0.4);
+    const pressed = reduceFInteractionPress(createFInteractionPressState(), {
+      type: 'press', pressId: 20, ...sample(10_000, [station]),
+    });
+    expect(pressed.commit).toBeNull();
+    expect(pressed.state).toMatchObject({ phase: 'pressed', tapCandidate: null, holdCandidate: station });
+    expect(reduceFInteractionPress(pressed.state, {
+      type: 'release', ...sample(10_999, [station]),
+    }).commit).toBeNull();
+    expect(reduceFInteractionPress(pressed.state, {
+      type: 'advance', ...sample(10_000 + F_INTERACTION_HOLD_MS, [station]),
+    }).commit).toMatchObject({ phase: 'hold', candidate: station });
+  });
+
   it('pins separate tap and hold winners so a nearby door never overwrites support hold', () => {
     const door = candidate('shed-door', 'door-a', 0.4);
     const chopper = candidate('support-enter-chopper', 'chopper-a', 40);

@@ -40,6 +40,7 @@ import {
   rebindAction,
   resolveKeyBindingProfile,
   saveKeyBindingProfile,
+  supportSlotForCode,
   type GameplayAction,
   type KeyBindingProfile,
 } from './key-bindings';
@@ -10417,8 +10418,24 @@ function interactWithGunRangeTestBaySupport(expectedId?: Pass65KillstreakId): bo
   }
   refreshLocalKillstreakSnapshot(performance.now());
   addFeed(`${GAMEPAD_SUPPORT_LABELS[id]} TRAINING AUTHORITY GRANTED`, 'gold');
-  activateFieldSupport(id);
+  activateFieldSupport(id, gunRangeTestBayKillstreakWorld());
   return true;
+}
+
+function gunRangeTestBayKillstreakWorld(): KillstreakWorld {
+  const world = killstreakWorldState();
+  const bay = GUN_RANGE_TEST_BAY_CONTRACT.bay.bounds;
+  return Object.freeze({
+    ...world,
+    bounds: Object.freeze({
+      minX: bay.minX + 2,
+      maxX: bay.maxX - 2,
+      minZ: bay.minZ + 2,
+      maxZ: bay.maxZ - 2,
+      floorY: bay.minY,
+      ceilingY: bay.maxY,
+    }),
+  });
 }
 
 function interactWithWeaponPickup(now = performance.now(), expectedTargetId?: string): boolean {
@@ -13506,6 +13523,13 @@ function updateThermalGhosts(): void {
   thermalGhostPresentation.sync(targets, true);
 }
 
+function railgunThermalOpticActive(): boolean {
+  return localHoldsRailgun()
+    && player.weapon === 'railgun'
+    && adsHeld
+    && weaponView.adsProgress() >= 0.45;
+}
+
 function updateRailgun(now: number): void {
   if (network.role !== 'client') {
     const chambered = advanceRailgunChamber(railgunState, now);
@@ -13531,8 +13555,7 @@ function updateRailgun(now: number): void {
   // and must stay live for the whole aim hold - gating it on the per-shot re-ADS
   // flag turned see-through-walls off the instant the player fired, which read
   // as the railgun scope having lost the feature entirely.
-  const thermalActive = localHoldsRailgun() && player.weapon === 'railgun' && adsHeld
-    && weaponView.adsProgress() >= 0.45;
+  const thermalActive = railgunThermalOpticActive();
   // The railgun's signature see-through-walls reveal: cyan thermal silhouettes
   // of hostile combatants drawn with depth testing disabled so they read through
   // geometry. This is the weapon's unique selling point and must always work.
@@ -17296,7 +17319,10 @@ function updateFInteractionPrompt(now = performance.now()): void {
   const prompt = weaponPrompt ? pickupPrompt : supportPrompt;
   prompt.dataset.interactionKind = selected.kind;
   prompt.dataset.targetId = selected.targetId;
-  if (!weaponPrompt) {
+  if (weaponPrompt) {
+    const pickupLabel = pickupPrompt.querySelector<HTMLElement>('span');
+    if (pickupLabel) pickupLabel.textContent = `TAP F · ${selected.prompt}`;
+  } else {
     const label = supportPrompt.querySelector<HTMLElement>('span');
     const holdInteraction = isHoldInteraction(selected.kind) || selected.requiresSustainedHold === true;
     const pinnedTap = fInteractionPressState.phase === 'pressed' ? fInteractionPressState.tapCandidate : null;
@@ -17615,6 +17641,7 @@ function requestKillstreakActivation(
   now: number,
   anchor?: [number, number, number],
   facing?: [number, number, number],
+  worldOverride?: KillstreakWorld,
 ): string | null {
   const slot = killstreakSlotFor(id);
   if (!slot) return null;
@@ -17642,7 +17669,7 @@ function requestKillstreakActivation(
     network.send(message);
     return activationRequestId;
   }
-  const admission = killstreakRuntime.activate(message, now, killstreakWorldState());
+  const admission = killstreakRuntime.activate(message, now, worldOverride ?? killstreakWorldState());
   if (!admission.accepted) {
     addFeed(`${GAMEPAD_SUPPORT_LABELS[id]} REJECTED · ${admission.reason.toUpperCase()}`, 'coral');
     return null;
@@ -19340,7 +19367,7 @@ function authorizeLocalOffensiveSupport(
   return activationNonce;
 }
 
-function activateFieldSupport(id: FieldSupportId): void {
+function activateFieldSupport(id: FieldSupportId, worldOverride?: KillstreakWorld): void {
   if ((!selectedArena.fieldSupport && selectedArena.id !== 'gun-range')
     || !player.alive || matchState.phase !== 'active' || tacticalMapOpen) return;
   const fieldSupport = localFieldSupportProjection();
@@ -19413,7 +19440,7 @@ function activateFieldSupport(id: FieldSupportId): void {
     if (!requestKillstreakActivation(activatedId, now, [player.position.x, player.position.y, player.position.z])) return;
     addFeed('PILOTED DRONE · 20 ROUNDS + TWO SPARE CLIPS · PRESS SLOT KEY AGAIN TO ENTER', 'gold');
   } else if (activatedId === 'chopper') {
-    if (!requestKillstreakActivation(activatedId, now)) return;
+    if (!requestKillstreakActivation(activatedId, now, undefined, undefined, worldOverride)) return;
     addFeed('CHOPPER GUNNER · AI ONLINE · PRESS SLOT KEY AGAIN TO TAKE / RELEASE GUN · 30 SEC', 'gold');
   } else if (activatedId === 'drone-swarm') {
     const ingressFacing = camera.getWorldDirection(new THREE.Vector3());
@@ -19712,6 +19739,7 @@ function shouldShowWeaponViewmodel(): boolean {
     && !localKillstreakActorSnapshot()?.possession
     && !sniperScopeActive
     && !dmrThermalActive
+    && !railgunThermalOpticActive()
     && !debugCaptureViewmodelHidden;
 }
 
@@ -21527,6 +21555,11 @@ window.addEventListener('keydown', (event) => {
     cancelSupportTargeting(true);
     return;
   }
+  if (pointSupportTargeting && !tacticalMapOpen && event.code === 'Escape' && !event.repeat) {
+    event.preventDefault();
+    cancelSupportTargeting(true);
+    return;
+  }
   if (
     event.code === 'Escape'
     && !event.repeat
@@ -21557,9 +21590,8 @@ window.addEventListener('keydown', (event) => {
     if (actionMatchesCode('melee', event.code, keyProfile) && !event.repeat) melee();
     if (actionMatchesCode('grenade', event.code, keyProfile) && !event.repeat) throwGrenade();
   }
-  const supportSlot = GAMEPLAY_ACTIONS.findIndex((action) => action.startsWith('support-')
-    && actionMatchesCode(action, event.code, keyProfile));
-  if (supportSlot >= 0 && !event.repeat) activateOrToggleFieldSupportSlot(supportSlot);
+  const supportSlot = supportSlotForCode(event.code, keyProfile);
+  if (supportSlot != null && !event.repeat) activateOrToggleFieldSupportSlot(supportSlot);
   if (actionMatchesCode('interact', event.code, keyProfile) && !event.repeat) {
     const now = performance.now();
     if (pointSupportTargeting && !tacticalMapOpen) {
@@ -23550,8 +23582,9 @@ const debugWindow = window as Window & {
     switchWeapon: (index: number) => void;
     equipKit: (id: FieldKitId) => void;
     equipWeapon: (weapon: WeaponId) => void;
-    interactDrop: () => void;
+    interactDrop: () => boolean;
     interactTestBayStation: () => boolean;
+    grantTestBaySupport: (id: Pass65KillstreakId) => boolean;
     setAmmo: (weapon: WeaponId, ammo: number, reserve: number) => void;
     setGrenades: (count: number) => void;
     reload: () => void;
@@ -23604,6 +23637,7 @@ const debugWindow = window as Window & {
       positions: number[][];
     };
     replayLastRailgunResult: () => boolean;
+    grantRailgunToLocal: () => boolean;
     grantRailgunToRemote: (playerId: string) => boolean;
     interactRailgun: () => boolean | string;
     degradeStateChannel: () => boolean;
@@ -24105,7 +24139,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       snapshotAgeMs: Math.max(0, performance.now() - remote.lastSeen),
       interpolationError: remote.root.position.distanceTo(remote.target),
       screenPosition: remote.root.localToWorld(new THREE.Vector3(0, 1.2, 0)).project(camera).toArray(),
-      operatorModel: riggedOperatorTelemetry(remote.root),
+      operatorModel: riggedOperatorTelemetry(remote.root.userData.operator as THREE.Object3D),
       readability: remoteHumanReadabilityTelemetry(remote.root.userData.operator as THREE.Object3D),
     })),
     retainedRemotePlayers: [...retainedRemoteAuthorities.values()].map((retained) => ({
@@ -25506,6 +25540,16 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       && (interaction.kind === 'test-bay-weapon' || interaction.kind === 'test-bay-support')
       && executePinnedFInteraction(interaction, performance.now());
   },
+  grantTestBaySupport: (id) => {
+    if (selectedArena.id !== 'gun-range' || network.role === 'client') return false;
+    const grant = killstreakRuntime.grantTrainingReward(player.id, localContinuity, id, {
+      arenaId: 'gun-range', stationKind: 'secure-test-bay', authorityRole: network.role,
+    });
+    if (!grant.accepted) return false;
+    refreshLocalKillstreakSnapshot(performance.now());
+    updateFieldSupportHud();
+    return true;
+  },
   setAmmo: (weapon: WeaponId, ammo: number, reserve: number) => {
     player.ammo[weapon] = Math.max(0, Math.min(WEAPONS[weapon].mag, Math.floor(ammo)));
     player.reserve[weapon] = Math.max(0, Math.min(WEAPONS[weapon].reserve, Math.floor(reserve)));
@@ -25836,6 +25880,26 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     applyRailgunState(claimed.state);
     broadcastRailgunState();
     return true;
+  },
+  grantRailgunToLocal: () => {
+    if (!localMultiplayerQa || !gameStarted || network.role === 'client' || !player.alive) return false;
+    let claimable = railgunState;
+    if (claimable.status !== 'available') {
+      const scheduled = createRailgunAuthorityState(
+        'atomic-acres',
+        0,
+        0.01 / RAILGUN_UPPER_ROOM_SPAWN_SITES.length,
+        railgunState.generation + 1,
+      );
+      claimable = advanceRailgunAuthority(scheduled, RAILGUN_SPAWN_DELAY_MS).state;
+      applyRailgunState(claimable);
+    }
+    const claimed = claimRailgun(claimable, player.id, claimable.generation);
+    if (!claimed.accepted) return false;
+    dropHeldTimedMapWeapons(player.id, player.position.clone().add(new THREE.Vector3(0, 0.3, 0)));
+    applyRailgunState(claimed.state);
+    broadcastRailgunState();
+    return localHoldsRailgun();
   },
   interactRailgun: () => {
     if (!player.alive) return 'rejected: player-dead';

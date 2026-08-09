@@ -52,6 +52,54 @@ export const RETAINED_CACHE_FAMILY_BASELINE = Object.freeze({
       totalBytes: 10559132,
       recordedAt: '2026-07-29',
     }),
+    Object.freeze({
+      cacheKey: 'pass66-runtime-preview-v5',
+      recipeId: 'pass66-authoritative-runtime-menu-preview-v2',
+      finalMediaSetSha256: 'b4c9ea1b7898b433dddbec780df9fa03e0f05cf7e23bc5e05fd4fea66bd6ac20',
+      fileCount: 12,
+      totalBytes: 55328027,
+      recordedAt: '2026-08-02',
+    }),
+    Object.freeze({
+      cacheKey: 'pass66-runtime-preview-v6',
+      recipeId: 'pass66-authoritative-runtime-menu-preview-v2',
+      finalMediaSetSha256: 'a4f560c676e9ec1d78a104a42ab03bd7a0a419a4143528c34dcca6609ed8bae0',
+      fileCount: 12,
+      totalBytes: 55328640,
+      recordedAt: '2026-08-02',
+    }),
+    Object.freeze({
+      cacheKey: 'pass66-runtime-preview-v7',
+      recipeId: 'pass66-authoritative-runtime-menu-preview-v2',
+      finalMediaSetSha256: 'fd5fdbf82475a5c4424f14048ed3e83affa98e4a7d77d77963efc104c448ac8f',
+      fileCount: 12,
+      totalBytes: 55328861,
+      recordedAt: '2026-08-02',
+    }),
+    Object.freeze({
+      cacheKey: 'pass66-runtime-preview-v8',
+      recipeId: 'pass66-authoritative-runtime-menu-preview-v2',
+      finalMediaSetSha256: '0ce00506d739e3c679e717207638c16fdc0fa4007c3ffd764093478c3966375b',
+      fileCount: 12,
+      totalBytes: 55334618,
+      recordedAt: '2026-08-02',
+    }),
+    Object.freeze({
+      cacheKey: 'pass66-runtime-preview-v9',
+      recipeId: 'pass66-authoritative-runtime-menu-preview-v2',
+      finalMediaSetSha256: '6d1116b475d8e69962decad861cceeab9be72f939871729d968688f3436cff33',
+      fileCount: 12,
+      totalBytes: 55329971,
+      recordedAt: '2026-08-02',
+    }),
+    Object.freeze({
+      cacheKey: 'pass66-runtime-preview-v10',
+      recipeId: 'pass66-authoritative-runtime-menu-preview-v2',
+      finalMediaSetSha256: '902bddf1eb5f40ece6579fd6050c5426e8714f3368e22f9b2f29a92ad5576c21',
+      fileCount: 12,
+      totalBytes: 55333887,
+      recordedAt: '2026-08-02',
+    }),
   ]),
 });
 
@@ -293,7 +341,7 @@ export async function runIntegrityMutationSelfTest() {
       throw new Error('cache-family self-test missed retained-entry rewriting');
     }
     const appendedEntry = {
-      cacheKey: 'pass66-runtime-preview-v5',
+      cacheKey: 'pass66-runtime-preview-v6',
       recipeId: 'fixture-v2',
       finalMediaSetSha256: '3'.repeat(64),
       fileCount: 12,

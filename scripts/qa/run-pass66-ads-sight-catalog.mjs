@@ -12,6 +12,10 @@ const target = targets[targetName];
 if (!target) {
   throw new Error(`Pass 66 ADS catalog target must be one of ${Object.keys(targets).join(', ')}; received ${targetName || '(missing)'}`);
 }
+const renderProfile = process.argv[3] ?? process.env.PASS66_ADS_CATALOG_RENDER_PROFILE ?? 'blender';
+if (!['blender', 'performance'].includes(renderProfile)) {
+  throw new Error(`Pass 66 ADS catalog render profile must be blender or performance; received ${renderProfile}`);
+}
 
 const artifactDirectory = resolve('artifacts/pass66/ads-sight-catalog');
 const receiptPath = resolve(artifactDirectory, `receipt-${target.renderer}.json`);
@@ -39,7 +43,7 @@ const result = spawnSync(process.execPath, [
     QA_INSTALLED_EDGE: '1',
     QA_PREVIEW_PORT: process.env.QA_PREVIEW_PORT ?? target.port,
     PASS66_ADS_CATALOG_RENDERER: target.renderer,
-    PASS66_ADS_CATALOG_RENDER_PROFILE: 'blender',
+    PASS66_ADS_CATALOG_RENDER_PROFILE: renderProfile,
     PASS66_ADS_CATALOG_SOURCE_SHA: sourceSha,
   },
   stdio: 'inherit',
@@ -52,12 +56,12 @@ if ((result.status ?? 1) !== 0) {
 } else {
   const receipt = JSON.parse(readFileSync(receiptPath, 'utf8'));
   if (receipt.schemaVersion !== 2 || receipt.status !== 'PASS' || receipt.sourceSha !== sourceSha
-    || receipt.renderer !== target.renderer || receipt.renderProfile !== 'blender'
+    || receipt.renderer !== target.renderer || receipt.renderProfile !== renderProfile
     || receipt.canonicalWeaponCount < 1
     || receipt.uniqueProfileSignatures !== receipt.canonicalWeaponCount
     || receipt.uniqueIsolatedReticles !== receipt.canonicalWeaponCount) {
     rmSync(receiptPath, { force: true });
     throw new Error(`Pass 66 ${targetName} ADS catalog emitted an invalid or stale receipt`);
   }
-  console.log(JSON.stringify({ pass66AdsCatalog: 'PASS', target: targetName, sourceSha, receiptPath }));
+  console.log(JSON.stringify({ pass66AdsCatalog: 'PASS', target: targetName, renderProfile, sourceSha, receiptPath }));
 }
