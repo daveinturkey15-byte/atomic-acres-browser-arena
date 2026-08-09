@@ -193,6 +193,16 @@ async function stageTimedWeapon(page: Page, timedWeapon: TimedMapWeaponId): Prom
     expect(target.hostile).toBe(true);
     expect(target.distance).toBeLessThanOrEqual(3);
   }
+  // The first canvas press is consumed solely by requestPointerLock() and the
+  // runtime returns before trigger admission. Keeping the native page locked
+  // prevents Chromium background RAF throttling during the longer Flare pulse
+  // and reload windows without consuming a timed-weapon round.
+  await page.locator('#game').click({ position: { x: 640, y: 360 } });
+  await page.waitForFunction(
+    () => document.pointerLockElement === document.querySelector('#game'),
+    undefined,
+    { timeout: 5_000 },
+  );
 }
 
 async function runTimedCycle(page: Page, timedWeapon: TimedMapWeaponId, cycle: 'cold' | 'warm') {
@@ -216,16 +226,8 @@ async function runTimedCycle(page: Page, timedWeapon: TimedMapWeaponId, cycle: '
   const startedAt = await page.evaluate(() => performance.now());
   let actionCompletedAt = startedAt;
   if (timedWeapon === 'flamethrower') {
-    // The authored flamethrower has a real 180 ms spin-up and the runtime
-    // deliberately ignores primary fire until the gameplay canvas owns pointer
-    // lock. Acquire the same trusted input state used by the canonical Pass 66
-    // timed-weapon gate before holding the real trigger.
-    await page.locator('#game').click({ position: { x: 640, y: 360 } });
-    await page.waitForFunction(
-      () => document.pointerLockElement === document.querySelector('#game'),
-      undefined,
-      { timeout: 5_000 },
-    );
+    // The authored flamethrower has a real 180 ms spin-up, so hold the trusted
+    // primary trigger until both stream emission and ground fire are visible.
     await page.mouse.down();
     try {
       await page.waitForFunction((emissions) => {
