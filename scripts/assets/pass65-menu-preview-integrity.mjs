@@ -52,6 +52,14 @@ export const RETAINED_CACHE_FAMILY_BASELINE = Object.freeze({
       totalBytes: 10559132,
       recordedAt: '2026-07-29',
     }),
+    Object.freeze({
+      cacheKey: 'pass66-runtime-preview-v5',
+      recipeId: 'pass66-authoritative-runtime-menu-preview-v2',
+      finalMediaSetSha256: 'b4c9ea1b7898b433dddbec780df9fa03e0f05cf7e23bc5e05fd4fea66bd6ac20',
+      fileCount: 12,
+      totalBytes: 55328027,
+      recordedAt: '2026-08-02',
+    }),
   ]),
 });
 
@@ -293,7 +301,7 @@ export async function runIntegrityMutationSelfTest() {
       throw new Error('cache-family self-test missed retained-entry rewriting');
     }
     const appendedEntry = {
-      cacheKey: 'pass66-runtime-preview-v5',
+      cacheKey: 'pass66-runtime-preview-v6',
       recipeId: 'fixture-v2',
       finalMediaSetSha256: '3'.repeat(64),
       fileCount: 12,
