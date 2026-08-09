@@ -198,6 +198,7 @@ async function runTimedCycle(page: Page, timedWeapon: TimedMapWeaponId, cycle: '
   const beforeEffects = await page.evaluate(() => (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).timedMapWeapons);
   await startTimingProbe(page);
   const startedAt = await page.evaluate(() => performance.now());
+  let actionCompletedAt = startedAt;
   if (timedWeapon === 'flamethrower') {
     // The authored flamethrower has a real 180 ms spin-up and the runtime
     // deliberately ignores primary fire until the gameplay canvas owns pointer
@@ -218,8 +219,10 @@ async function runTimedCycle(page: Page, timedWeapon: TimedMapWeaponId, cycle: '
     } finally {
       await page.mouse.up();
     }
+    actionCompletedAt = await page.evaluate(() => performance.now());
   } else {
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.fireOnce());
+    actionCompletedAt = await page.evaluate(() => performance.now());
     for (const metric of ['spawnCount', 'impactCount', 'burnPulseCount'] as const) {
       await expect.poll(async () => page.evaluate((name) => {
         const telemetry = (window.__ATOMIC_ACRES_DEBUG__!.snapshot() as any).timedMapWeapons.flareProjectiles;
@@ -230,12 +233,11 @@ async function runTimedCycle(page: Page, timedWeapon: TimedMapWeaponId, cycle: '
       }).toBeGreaterThan(beforeEffects.flareProjectiles[metric]);
     }
   }
-  const completedAt = await page.evaluate(() => performance.now());
   await page.waitForTimeout(1_200);
   const timing = await stopTimingProbe(page);
   const after = await sampleHealth(page);
   const afterEffects = await page.evaluate(() => (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).timedMapWeapons);
-  const actionDurationMs = completedAt - startedAt;
+  const actionDurationMs = actionCompletedAt - startedAt;
   expect(timing.frames).toBeGreaterThan(8);
   expect(timing.maxGapMs, `${timedWeapon}/${profile}/${cycle}: presentation progress fence`).toBeLessThan(1_300);
   expect(after.admission.presentedGameplayFrame - before.admission.presentedGameplayFrame).toBeGreaterThan(8);
