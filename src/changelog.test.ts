@@ -10,10 +10,10 @@ import {
 } from './changelog';
 
 describe('changelog', () => {
-  it('keeps the pending Pass 69 release first until production injects its timestamp', () => {
+  it('keeps the pending Pass 69.2 release first until production injects its timestamp', () => {
     expect(CHANGELOG.length).toBeGreaterThan(0);
     const latest = latestChangelogEntry();
-    expect(latest.id).toBe('pass69');
+    expect(latest.id).toBe('pass69-2');
     expect(latest.id).toBe(CHANGELOG[0]?.id);
     expect(formatChangelogTimestamp('2026-07-22T15:43:16+01:00')).toBe('22 JUL 2026 · 15:43 BST');
     expect(formatChangelogTimestampDetail('2026-07-22T15:43:16+01:00')).toBe(
@@ -24,6 +24,7 @@ describe('changelog', () => {
       '23 JUL 2026 · 23:51 BST · UTC+1 · 23:51:43',
     );
     expect(lastUpdatedButtonLabel(latest)).toContain(PENDING_PRODUCTION_RELEASE);
+    expect(CHANGELOG.find((entry) => entry.id === 'pass69-1')?.releasedAt).toBe('2026-08-08T16:14:57Z');
   });
 
   it('uses the successful production promotion rather than implementation time', () => {

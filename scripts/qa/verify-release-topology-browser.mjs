@@ -269,7 +269,7 @@ try {
     await chooser.close();
   }
 
-  await verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass69');
+  await verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass69-2');
   await verifyChoice('stable', 'channels/recent-stable', 'PASS 67.1', 'pass66');
   await verifyChoice('rollback', 'channels/pass63-rollback', 'PASS 63', 'pass63');
   if (releasePass && !normalizedPass(routes.experimental.eyebrow).includes(normalizedPass(releasePass))) {

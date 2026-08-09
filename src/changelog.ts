@@ -38,10 +38,29 @@ export function resolveProductionReleasedAt(
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
   Object.freeze({
-    id: 'pass69',
+    id: 'pass69-2',
+    pass: 'PASS 69',
+    title: 'Pass 69.2 · First-Person & Gun Range Reliability',
+    releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
+    areas: Object.freeze(['FIRST-PERSON', 'WEAPONS', 'GUN RANGE', 'SUPPORT', 'STABILITY', 'ASSETS']),
+    summary: 'Pass 69.2 keeps every canonical weapon readable in first person, removes scoped and timed-weapon stalls, and completes the Gun Range support-room interaction and presentation pass.',
+    highlights: Object.freeze([
+      'Every canonical weapon retains a clear sight picture in settled ADS across Performance and Quality',
+      'Guns, knives, hands and arms stay connected through hip, ADS, fire, reload, melee, stance and nearby-surface transitions',
+      'Ready selected streaks activate through default and rebound compact support-slot keys without global-action index drift',
+      'Sniper-family ADS plus Flamethrower and Flare Gun cold and warm use retain advancing native hardware-WebGPU presentation',
+      'Gun Range door lighting, station identity, exact pickup prompts and hold-to-use support training now share authoritative interaction state',
+      'Support-room bots use smooth bounded two-axis routes and canonical animated operator rigs without primitive production fallback',
+      'Chopper Gunner, Carpet Bomber and Care Package presentation uses the retained authored aircraft, crate and parachute families',
+      'Prerecorded arena previews are recaptured from the final authoritative runtime and rebound to exact source provenance',
+      'Pass 67.1 remains the frozen stable singleplayer channel and Pass 63 remains the rollback',
+    ]),
+  }),
+  Object.freeze({
+    id: 'pass69-1',
     pass: 'PASS 69',
     title: 'Pass 69.1 · Mobile Controls & Field Kit Corrections',
-    releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
+    releasedAt: '2026-08-08T16:14:57Z',
     areas: Object.freeze(['MULTIPLAYER', 'FIELD KIT', 'FIRST-PERSON', 'CHOPPER GUNNER', 'STABILITY']),
     summary: 'Pass 69.1 makes touch controls behave like shaped gamepad axes, survives mid-match rotation and restores practical Field Kit and release-selection information.',
     highlights: Object.freeze([

@@ -54,20 +54,19 @@ export type ProjectMapBundle = Readonly<{
  * unpublished pass from appearing as live release history.
  */
 export const PROJECT_MAP_RELEASE: ChangelogEntry = Object.freeze({
-  id: 'pass69',
+  id: 'pass69-2',
   pass: PASS66_RELEASE_IDENTITY.pass,
   title: 'The Big One',
   releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
-  areas: Object.freeze(['MULTIPLAYER', 'FIELD KIT', 'FIRST-PERSON', 'CHOPPER GUNNER', 'HITL']),
-  summary: 'Pass 69.1 delivers corrected mobile gamepad controls, safe rotation, restored Field Kit DPS and front-page refresh recovery while preserving Pass 67.1 stable singleplayer and Pass 63 rollback evidence.',
+  areas: Object.freeze(['FIRST-PERSON', 'WEAPONS', 'GUN RANGE', 'SUPPORT', 'STABILITY', 'ASSETS']),
+  summary: 'Pass 69.2 delivers clear catalog-wide ADS, connected first-person rigs, reliable scoped and timed weapons, and completed Gun Range support presentation while preserving Pass 67.1 stable singleplayer and Pass 63 rollback evidence.',
   highlights: Object.freeze([
-    'Mobile sticks acquire through their full visible area with gamepad-shaped axes, FIRE beside aim and safe rotation recovery',
-    'Field Kit metric decks stay visible with truthful DPS and readable responsive weapon cards',
-    'The version chooser exposes Ctrl+Shift+R guidance and a hard cache-reset refresh control',
-    'First-person arms use the corrected mirrored parent-space solve without replacing the canonical authored rig',
-    'Chopper Gunner authored presentation contracts match required LOD nodes, actions and fallback sockets',
-    'Private host/guest lobby state remains host-authoritative across the current release topology',
-
+    'Every canonical weapon preserves a clear settled-ADS sight corridor across Performance and Quality',
+    'First-person weapons, hands, arms and knives remain connected and retreat from nearby world surfaces',
+    'Default and rebound support keys use compact slot identity, and Gun Range support stations use one authoritative hold lifecycle',
+    'Sniper ADS, Flamethrower and Flare Gun cold and warm paths retain native hardware-WebGPU frame and device progress',
+    'Gun Range door, station, pickup-prompt and training-bot presentation now matches canonical runtime authority',
+    'Support aircraft, crate, parachute and prerecorded arena media are rebound to final authored source provenance',
     'Pass 67.1 stays frozen as stable singleplayer and Pass 63 remains the rollback',
   ]),
 });
