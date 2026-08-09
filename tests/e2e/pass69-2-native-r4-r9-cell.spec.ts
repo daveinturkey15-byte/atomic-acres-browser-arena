@@ -31,6 +31,7 @@ async function deploy(page: Page): Promise<void> {
   // The gameplay canvas is deliberately hidden while the deployment menu is
   // active. Use the visible player-facing launch control so focus acquisition
   // remains trusted and the native gate cannot stall on a hidden surface.
+  await page.locator('#player-name').fill(`PASS69 ${cellId}`);
   await page.locator('#solo').click();
   await page.waitForFunction(() => document.visibilityState === 'visible' && document.hasFocus(), undefined, { timeout: 5_000 });
   await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().matchPhase === 'active', undefined, { timeout: 60_000 });
