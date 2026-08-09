@@ -167,6 +167,10 @@ async function stageTimedWeapon(page: Page, timedWeapon: TimedMapWeaponId): Prom
   ).teleportPlayer(px, py, pz, 0, 0.9), [x, y, z]);
   expect(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.interactDrop())).toBe(true);
   await page.waitForFunction((weaponId) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.weapon === weaponId, timedWeapon);
+  // Timed-weapon pickup uses the same 280 ms first-person switch transition as
+  // an ordinary player equip. Let that authored transition finish before the
+  // measured cold/warm trigger cycles begin.
+  await page.waitForTimeout(350);
   if (timedWeapon === 'flare-gun') {
     const target = await page.evaluate(([px, py, pz]) => {
       const api = window.__ATOMIC_ACRES_DEBUG__ as any;
