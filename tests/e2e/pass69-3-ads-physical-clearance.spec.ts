@@ -1,13 +1,70 @@
 import { expect, test, type Page } from '@playwright/test';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { relative, resolve } from 'node:path';
 
 const ADS_WEAPONS = ['carbine', 'mini-uzi'] as const;
-const artifactRoot = resolve(process.cwd(), 'artifacts/pass69-3/ads-physical-clearance');
+type Renderer = 'webgl2' | 'webgpu';
+
+const requestedRenderer = process.env.PASS69_3_ADS_PHYSICAL_RENDERER ?? 'webgl2';
+if (requestedRenderer !== 'webgl2' && requestedRenderer !== 'webgpu') {
+  throw new Error(`Pass 69.3 physical ADS renderer must be webgl2 or webgpu; received ${requestedRenderer}`);
+}
+const renderer: Renderer = requestedRenderer;
+const renderProfile = process.env.PASS69_3_ADS_PHYSICAL_RENDER_PROFILE ?? 'blender';
+if (renderProfile !== 'blender') {
+  throw new Error(`Pass 69.3 physical ADS evidence requires the Blender profile; received ${renderProfile}`);
+}
+const expectedSourceSha = process.env.PASS69_3_ADS_PHYSICAL_SOURCE_SHA ?? '';
+const expectedTarget = process.env.PASS69_3_ADS_PHYSICAL_TARGET ?? '';
+const officialEvidence = expectedSourceSha !== '' || expectedTarget !== '';
+const targetForRenderer = `edge-${renderer}`;
+if (officialEvidence && (!/^[a-f0-9]{40}$/u.test(expectedSourceSha) || expectedTarget !== targetForRenderer)) {
+  throw new Error(`Pass 69.3 physical ADS evidence has incomplete target provenance for ${targetForRenderer}`);
+}
+const repositoryRoot = process.cwd();
+const sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repositoryRoot, encoding: 'utf8' }).trim();
+const sourceStatus = execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], {
+  cwd: repositoryRoot,
+  encoding: 'utf8',
+}).trim();
+const artifactBase = resolve(repositoryRoot, 'artifacts/pass69-3/ads-physical-clearance');
+const artifactRoot = resolve(artifactBase, renderer);
+const receiptPath = resolve(artifactBase, `receipt-${renderer}.json`);
+
+function sha256(value: Buffer): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function repositoryRelative(path: string): string {
+  return relative(repositoryRoot, path).replaceAll('\\', '/');
+}
+
+function expectRendererProvenance(runtime: any, label: string): void {
+  expect(runtime, `${label}: requested renderer reaches the actual renderer`).toMatchObject({
+    requestedBackend: renderer,
+    actualBackend: renderer,
+    initialized: true,
+    failClosed: false,
+    deviceLost: false,
+    uncapturedErrors: 0,
+  });
+  if (officialEvidence) expect(runtime.softwareAdapter, `${label}: hardware renderer provenance`).toBe(false);
+  if (renderer === 'webgpu') {
+    expect(runtime.adapterClass, `${label}: native WebGPU adapter`).toBe('GPUAdapter');
+    expect(runtime.deviceClass, `${label}: native WebGPU device`).toBe('GPUDevice');
+    expect(runtime.presentation, `${label}: native WebGPU presentation remains healthy`).toMatchObject({ status: 'healthy' });
+  } else {
+    expect(runtime.adapterClass, `${label}: WebGL2 context provenance`).toBe('WebGL2RenderingContext');
+    expect(runtime.presentation, `${label}: WebGL2 stays on synchronous presentation`).toMatchObject({ status: 'synchronous' });
+  }
+}
 
 async function deploy(page: Page): Promise<void> {
+  const requireWebGpu = renderer === 'webgpu' ? '&requireWebGPU=1' : '';
   await page.setViewportSize({ width: 1_600, height: 900 });
-  await page.goto('/?release=latest&map=atomic-acres&renderer=webgl2&render=blender&grass=off&mist=off&rays=off&externalServices=off&seed=pass69-3-ads-physical-clearance');
+  await page.goto(`/?release=latest&map=atomic-acres&renderer=${renderer}${requireWebGpu}&render=${renderProfile}&grass=off&mist=off&rays=off&externalServices=off&seed=pass69-3-ads-physical-clearance-${renderer}`);
   await page.waitForFunction(() => {
     const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
     return state?.bootstrap?.stage === 'ready' && state.weaponReady === true;
@@ -25,13 +82,36 @@ function clearanceFor(state: any, weapon: typeof ADS_WEAPONS[number]) {
     .find((entry: { weapon: string }) => entry.weapon === weapon);
 }
 
-test('carbine and Mini Uzi expose a physical ADS corridor and restore every material on exit and switch', async ({ page }, testInfo) => {
-  test.setTimeout(120_000);
+test('carbine and Mini Uzi expose a live physical ADS corridor and restore every material on exit and switch', async ({ browser, page }, testInfo) => {
+  test.setTimeout(renderer === 'webgpu' ? 180_000 : 120_000);
+  rmSync(artifactRoot, { recursive: true, force: true });
+  rmSync(receiptPath, { force: true });
+  if (officialEvidence) {
+    expect(sourceSha, 'official physical ADS evidence starts at the requested exact HEAD').toBe(expectedSourceSha);
+    expect(sourceStatus, 'official physical ADS evidence starts from a clean worktree').toBe('');
+  }
   const browserErrors: string[] = [];
   page.on('pageerror', (error) => browserErrors.push(error.stack ?? error.message));
   page.on('console', (message) => { if (message.type() === 'error') browserErrors.push(message.text()); });
   mkdirSync(artifactRoot, { recursive: true });
   await deploy(page);
+  const servedCandidate = await page.evaluate(async () => {
+    const response = await fetch('/channels/the-big-one/channel-provenance.json', { cache: 'no-store' });
+    if (!response.ok) throw new Error(`Physical ADS candidate provenance returned HTTP ${response.status}`);
+    return response.json() as Promise<Record<string, unknown>>;
+  });
+  expect(servedCandidate, 'physical ADS page is bound to the staged candidate').toMatchObject({
+    schemaVersion: 4,
+    channel: 'the-big-one',
+    releasePass: 'PASS 69',
+    path: 'channels/the-big-one',
+    sourceSha,
+  });
+  expect(servedCandidate.treeSha256).toMatch(/^[a-f0-9]{64}$/u);
+  expect(servedCandidate.exactRootFileCount).toEqual(expect.any(Number));
+  expect(servedCandidate.exactRootFileCount as number).toBeGreaterThanOrEqual(2);
+  const runtimeBefore = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().render.runtime as any);
+  expectRendererProvenance(runtimeBefore, 'initial physical ADS runtime');
   const evidence: Array<Record<string, unknown>> = [];
 
   for (const [index, weapon] of ADS_WEAPONS.entries()) {
@@ -58,8 +138,9 @@ test('carbine and Mini Uzi expose a physical ADS corridor and restore every mate
       'gunmetal', 'polymer', 'primary', 'rubber',
     ]));
     expect(hipMaterials.restoredCount, `${weapon}: hip materials start at authored state`).toBe(hipMaterials.materialCount);
+    const hipScreenshotPath = resolve(artifactRoot, `${index + 1}-${weapon}-hip-retention.png`);
     const hipScreenshot = await page.screenshot({
-      path: resolve(artifactRoot, `${index + 1}-${weapon}-hip-retention.png`),
+      path: hipScreenshotPath,
       animations: 'disabled',
       clip: { x: 640, y: 290, width: 320, height: 320 },
     });
@@ -100,8 +181,9 @@ test('carbine and Mini Uzi expose a physical ADS corridor and restore every mate
       meshes: [],
     });
 
+    const adsScreenshotPath = resolve(artifactRoot, `${index + 1}-${weapon}-physical-ads-corridor.png`);
     const screenshot = await page.screenshot({
-      path: resolve(artifactRoot, `${index + 1}-${weapon}-physical-ads-corridor.png`),
+      path: adsScreenshotPath,
       animations: 'disabled',
       clip: { x: 640, y: 290, width: 320, height: 320 },
     });
@@ -122,6 +204,7 @@ test('carbine and Mini Uzi expose a physical ADS corridor and restore every mate
       hip: {
         materials: hipMaterials,
         visibleMeshes: hip.weaponPresentation.modelVisibleMeshCount,
+        screenshot: { path: repositoryRelative(hipScreenshotPath), sha256: sha256(hipScreenshot) },
       },
       ads: {
         materials: adsMaterials,
@@ -130,6 +213,7 @@ test('carbine and Mini Uzi expose a physical ADS corridor and restore every mate
         rearOccluderTrim: ads.weaponPresentation.firstPersonRearOccluderTrim,
         sightBore: ads.weaponPresentation.firstPersonAdsSightBore,
         opaqueSightWindow: ads.weaponPresentation.adsOpaqueSightWindow,
+        screenshot: { path: repositoryRelative(adsScreenshotPath), sha256: sha256(screenshot) },
       },
       restored: restoredMaterials,
     });
@@ -145,12 +229,41 @@ test('carbine and Mini Uzi expose a physical ADS corridor and restore every mate
     const restored = clearanceFor(afterSwitch, weapon);
     expect(restored.restoredCount, `${weapon}: remains restored after switching away`).toBe(restored.materialCount);
   }
+  const runtimeAfter = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().render.runtime as any);
+  expectRendererProvenance(runtimeAfter, 'final physical ADS runtime');
+  const userAgent = await page.evaluate(() => navigator.userAgent);
+  if (officialEvidence) expect(userAgent, 'official physical ADS evidence uses installed Edge').toMatch(/Edg\//u);
   expect(browserErrors).toEqual([]);
-  writeFileSync(resolve(artifactRoot, 'ads-physical-clearance-telemetry.json'), `${JSON.stringify({
-    contract: 'pass69-3-ads-physical-clearance-v2',
-    renderer: 'webgl2',
-    renderProfile: 'blender',
+  const endingSourceSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repositoryRoot, encoding: 'utf8' }).trim();
+  const endingSourceStatus = execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], {
+    cwd: repositoryRoot,
+    encoding: 'utf8',
+  }).trim();
+  if (officialEvidence) {
+    expect(endingSourceSha, 'official physical ADS evidence ends at the same exact HEAD').toBe(sourceSha);
+    expect(endingSourceStatus, 'official physical ADS evidence ends with a clean worktree').toBe('');
+  }
+  writeFileSync(receiptPath, `${JSON.stringify({
+    schemaVersion: 1,
+    status: 'PASS',
+    contract: 'atomic-acres/pass69-3-ads-physical-clearance@1',
+    evidenceScope: 'live-physical-viewmodel-clearance',
+    target: officialEvidence ? expectedTarget : `development-${renderer}`,
+    sourceSha,
+    endingSourceSha,
+    cleanSource: sourceStatus === '' && endingSourceStatus === '',
+    renderer,
+    renderProfile,
     viewport: [1_600, 900],
+    servedCandidate,
+    browser: {
+      project: testInfo.project.name,
+      channel: officialEvidence ? 'msedge' : 'configured-chromium',
+      version: browser.version(),
+      userAgent,
+    },
+    runtimeBefore,
+    runtimeAfter,
     weapons: evidence,
     browserErrors,
   }, null, 2)}\n`, 'utf8');

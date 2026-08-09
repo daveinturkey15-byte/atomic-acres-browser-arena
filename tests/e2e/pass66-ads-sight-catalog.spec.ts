@@ -158,9 +158,22 @@ async function captureIsolatedReticle(page: Page, weapon: WeaponId): Promise<Rea
   bytes: Buffer;
   pixels: Buffer;
 }>> {
+  // This isolates the authored HUD/profile vocabulary only. It deliberately
+  // hides the 3D scene and therefore cannot attest physical viewmodel clearance;
+  // Pass 69.3 owns that proof in its separate two-renderer physical ADS matrix.
   const name = `${String(WEAPON_IDS.indexOf(weapon) + 1).padStart(2, '0')}-${weapon}-${renderer}-isolated-reticle.png`;
   const path = resolve(output, name);
-  await page.evaluate(() => {
+  const isolation = await page.evaluate(async () => {
+    const crosshair = document.querySelector<HTMLElement>('#crosshair');
+    if (!crosshair) throw new Error('ADS sight isolation could not find #crosshair.');
+    const hiddenObserver = new MutationObserver(() => {
+      // The live HUD loop deliberately reapplies the HTML hidden attribute on
+      // every ADS frame. Chromium's user-agent [hidden] rule outranks authored
+      // CSS, so keep the real element unhidden until the screenshot is painted.
+      if (crosshair.hasAttribute('hidden')) crosshair.removeAttribute('hidden');
+    });
+    hiddenObserver.observe(crosshair, { attributes: true, attributeFilter: ['hidden'] });
+    crosshair.removeAttribute('hidden');
     const style = document.createElement('style');
     style.id = 'pass66-ads-isolated-reticle';
     style.textContent = `
@@ -170,14 +183,43 @@ async function captureIsolatedReticle(page: Page, weapon: WeaponId): Promise<Rea
       #crosshair::before, #crosshair::after, #sniper-scope *, #dmr-thermal *, #railgun-thermal * {
         visibility: visible !important;
       }
-      /* The ADS crosshair carries the hidden attribute, which display:nones the
-         element and cannot be overridden by visibility alone. Re-display it so
-         the isolated reticle capture sees the real rendered marker. */
+      /* The scoped observer removes the ADS hidden attribute; display is kept
+         explicit so the capture remains independent of normal HUD layout. */
       #crosshair { display: block !important; }
       #hud::before, #hud::after { display: none !important; }
     `;
     document.head.append(style);
+    (window as Window & { __PASS66_ADS_ISOLATION_CLEANUP__?: () => void }).__PASS66_ADS_ISOLATION_CLEANUP__ = () => {
+      hiddenObserver.disconnect();
+      crosshair.hidden = true;
+      style.remove();
+      delete (window as Window & { __PASS66_ADS_ISOLATION_CLEANUP__?: () => void }).__PASS66_ADS_ISOLATION_CLEANUP__;
+    };
+    await new Promise<void>((resolveFrame) => requestAnimationFrame(() => resolveFrame()));
+    const crosshairStyle = getComputedStyle(crosshair);
+    const beforeStyle = getComputedStyle(crosshair, '::before');
+    const afterStyle = getComputedStyle(crosshair, '::after');
+    return {
+      hidden: crosshair.hidden,
+      display: crosshairStyle.display,
+      visibility: crosshairStyle.visibility,
+      opacity: Number(crosshairStyle.opacity),
+      beforeVisibility: beforeStyle.visibility,
+      beforeContent: beforeStyle.content,
+      afterVisibility: afterStyle.visibility,
+      afterContent: afterStyle.content,
+    };
   });
+  expect(isolation.hidden, `${weapon}: isolated real crosshair is not HTML-hidden`).toBe(false);
+  expect(isolation.display, `${weapon}: isolated real crosshair participates in layout`).toBe('block');
+  expect(isolation.visibility, `${weapon}: isolated real crosshair is visible`).toBe('visible');
+  if (!['sniper', 'm14-ebr', 'railgun'].includes(weapon)) {
+    expect(isolation.opacity, `${weapon}: isolated authored marker remains opaque`).toBeGreaterThan(0.9);
+    expect(isolation.beforeVisibility, `${weapon}: isolated sight body is visible`).toBe('visible');
+    expect(isolation.beforeContent, `${weapon}: isolated sight body is generated`).not.toBe('none');
+    expect(isolation.afterVisibility, `${weapon}: isolated sight dot is visible`).toBe('visible');
+    expect(isolation.afterContent, `${weapon}: isolated sight dot is generated`).not.toBe('none');
+  }
   let bytes: Buffer;
   try {
     bytes = await page.screenshot({
@@ -187,7 +229,11 @@ async function captureIsolatedReticle(page: Page, weapon: WeaponId): Promise<Rea
       timeout: 60_000,
     });
   } finally {
-    await page.evaluate(() => document.querySelector('#pass66-ads-isolated-reticle')?.remove());
+    await page.evaluate(() => {
+      const isolatedWindow = window as Window & { __PASS66_ADS_ISOLATION_CLEANUP__?: () => void };
+      isolatedWindow.__PASS66_ADS_ISOLATION_CLEANUP__?.();
+      document.querySelector('#pass66-ads-isolated-reticle')?.remove();
+    });
   }
   const { data, info } = await sharp(bytes).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   expect(info, `${weapon}: isolated reticle dimensions`).toMatchObject({ width: 320, height: 320, channels: 3 });
@@ -216,7 +262,7 @@ function isolatedPixelDifference(left: Buffer, right: Buffer): Readonly<{
   });
 }
 
-test('renders a distinct, live ADS sight for every canonical weapon without freezing', async ({ page }) => {
+test('renders a distinct live HUD sight profile for every canonical weapon without freezing', async ({ page }) => {
   test.setTimeout(renderer === 'webgpu' ? 480_000 : 360_000);
   mkdirSync(output, { recursive: true });
   for (const staleEvidence of [
@@ -397,6 +443,9 @@ test('renders a distinct, live ADS sight for every canonical weapon without free
   writeFileSync(resolve(output, `receipt-${renderer}.json`), `${JSON.stringify({
     schemaVersion: 2,
     status: 'PASS',
+    evidenceScope: 'hud-sight-profile-catalog-only',
+    excludedClaims: ['physical-viewmodel-clearance', 'physical-ads-sight-picture'],
+    physicalEvidenceCommand: 'npm run qa:pass69-3:ads-physical',
     sourceSha,
     renderer,
     renderProfile,
