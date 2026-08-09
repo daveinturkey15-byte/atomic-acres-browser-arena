@@ -36,6 +36,8 @@ describe('Pass 69.2 strict native R4/R9 runner contract', () => {
     expect(spec).toContain('toBeLessThan(2_500)');
     expect(spec).toContain("actualBackend: 'webgpu', softwareAdapter: false, deviceLost: false, uncapturedErrors: 0");
     expect(spec).toContain("presentation: { status: 'healthy', completionFailures: 0 }");
+    expect(spec).toContain("await page.locator('#solo').click()");
+    expect(spec).not.toContain("page.locator('#game').click");
     expect(spec).toContain("document.visibilityState === 'visible' && document.hasFocus()");
     expect(runner).toContain("schema: 'atomic-acres/pass69-2-native-edge-webgpu-r4-r9@1'");
     expect(runner).toContain("verdict: 'pass'");
