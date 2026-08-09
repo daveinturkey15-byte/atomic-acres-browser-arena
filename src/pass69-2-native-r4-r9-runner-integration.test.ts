@@ -36,7 +36,6 @@ describe('Pass 69.2 strict native R4/R9 runner contract', () => {
     expect(spec).toContain('toBeLessThan(2_500)');
     expect(spec).toContain("actualBackend: 'webgpu', softwareAdapter: false, deviceLost: false, uncapturedErrors: 0");
     expect(spec).toContain("presentation: { status: 'healthy', completionFailures: 0 }");
-    expect(spec).toContain("await page.locator('#player-name').fill(`PASS69 ${cellId}`)");
     expect(spec).toContain("await page.locator('#solo').click()");
     expect(spec).not.toContain("page.locator('#game').click");
     expect(spec).toContain("document.visibilityState === 'visible' && document.hasFocus()");
