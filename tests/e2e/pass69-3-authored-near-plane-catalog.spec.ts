@@ -92,6 +92,15 @@ const CONTACT_FIXTURE = Object.freeze({
   maximumPositionAxisError: 0.02,
   maximumAngularError: 0.000001,
 });
+const ROUND_CONTINUITY = Object.freeze({
+  contract: 'gun-range-test-bay-entry-round-refresh-v1',
+  // This is an empty systems-bay floor cell, away from the moving dummies and
+  // station interaction radii. Entering the production bay resets the normal
+  // two-minute Gun Range round; the gate then returns to the west-wall fixture.
+  bayEntryPosition: Object.freeze([54, 1.7, 0] as const),
+  bayBounds: Object.freeze({ minX: 51.5, maxX: 100, minZ: -52, maxZ: 64 }),
+  minimumResetTimerSeconds: 119,
+});
 
 type FirearmSpec = Readonly<{ id: WeaponId; designId: string }>;
 const firearmSpecs = (JSON.parse(readFileSync(
@@ -107,6 +116,13 @@ function sha256(value: Buffer): string {
 
 function repositoryRelative(path: string): string {
   return relative(repositoryRoot, path).replaceAll('\\', '/');
+}
+
+function matchTimerSeconds(value: string | null): number {
+  const match = /^(\d{2}):(\d{2})$/u.exec(value ?? '');
+  if (!match) return Number.NaN;
+  const seconds = Number(match[2]);
+  return seconds < 60 ? Number(match[1]) * 60 + seconds : Number.NaN;
 }
 
 function expectedAssetSource(weapon: WeaponId): string {
@@ -356,6 +372,98 @@ async function deploy(page: Page): Promise<void> {
   }, CONTACT_FIXTURE, { timeout: 10_000 });
   const before = await presentedFrame(page);
   await waitForPresentedFrames(page, before, 4);
+}
+
+async function refreshGunRangeRoundAndRestoreContact(
+  page: Page,
+  afterWeapon: WeaponId,
+  nextWeapon: WeaponId,
+): Promise<Record<string, unknown>> {
+  const timerBeforeText = await page.locator('#timer').textContent();
+  const timerBeforeSeconds = matchTimerSeconds(timerBeforeText);
+  expect(Number.isFinite(timerBeforeSeconds), `${afterWeapon}: readable pre-refresh Gun Range timer`).toBe(true);
+  expect(timerBeforeSeconds, `${afterWeapon}: round is still active before refresh`).toBeGreaterThan(0);
+
+  await page.evaluate((continuity) => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    api.setAds(false);
+    api.setFireCaptureAgeMs(null);
+    api.setReloadCaptureProgress(null);
+    api.setMeleeCaptureProgress(null);
+    api.setStance('stand');
+    api.teleportPlayer(...continuity.bayEntryPosition, 0, 0);
+  }, ROUND_CONTINUITY);
+  await page.waitForFunction(({ continuity, timerBefore }) => {
+    const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
+    const position = state.player.position;
+    const text = document.querySelector<HTMLElement>('#timer')?.textContent ?? '';
+    const match = /^(\d{2}):(\d{2})$/u.exec(text);
+    const secondsField = match ? Number(match[2]) : Number.NaN;
+    const seconds = match && secondsField < 60 ? Number(match[1]) * 60 + secondsField : Number.NaN;
+    return state.matchPhase === 'active'
+      && Array.isArray(position)
+      && position.length === 3
+      && position[0] >= continuity.bayBounds.minX
+      && position[0] <= continuity.bayBounds.maxX
+      && position[2] >= continuity.bayBounds.minZ
+      && position[2] <= continuity.bayBounds.maxZ
+      && seconds >= continuity.minimumResetTimerSeconds
+      && seconds > timerBefore;
+  }, { continuity: ROUND_CONTINUITY, timerBefore: timerBeforeSeconds }, { timeout: 5_000 });
+  const bayObservation = await page.evaluate(() => ({
+    matchPhase: window.__ATOMIC_ACRES_DEBUG__!.snapshot().matchPhase,
+    playerPosition: window.__ATOMIC_ACRES_DEBUG__!.snapshot().player.position,
+    timerText: document.querySelector<HTMLElement>('#timer')?.textContent ?? '',
+  }));
+  const timerAfterSeconds = matchTimerSeconds(bayObservation.timerText);
+  expect(bayObservation.matchPhase, `${afterWeapon}: production bay refresh keeps the round active`).toBe('active');
+  expect(timerAfterSeconds, `${afterWeapon}: production bay entry restores the two-minute clock`).toBeGreaterThanOrEqual(
+    ROUND_CONTINUITY.minimumResetTimerSeconds,
+  );
+  expect(timerAfterSeconds, `${afterWeapon}: production bay entry advances the visible deadline`).toBeGreaterThan(timerBeforeSeconds);
+
+  await page.evaluate((fixture) => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    api.teleportPlayer(...fixture.teleportPosition, fixture.yaw, fixture.pitch);
+    api.setStance('prone');
+  }, CONTACT_FIXTURE);
+  await page.waitForFunction((fixture) => {
+    const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
+    const position = state.player.position;
+    if (!Array.isArray(position) || position.length !== 3) return false;
+    const positionError = Math.max(...position.map((value: number, index: number) => (
+      Math.abs(value - fixture.settledPosition[index]!)
+    )));
+    const yawError = Math.abs(Math.atan2(
+      Math.sin(state.player.yaw - fixture.yaw),
+      Math.cos(state.player.yaw - fixture.yaw),
+    ));
+    const pitchError = Math.abs(state.player.pitch - fixture.pitch);
+    return state.matchPhase === 'active'
+      && state.player.stance === fixture.stance
+      && positionError <= fixture.maximumPositionAxisError
+      && yawError <= fixture.maximumAngularError
+      && pitchError <= fixture.maximumAngularError
+      && state.weaponPresentation.surfaceRetreat >= state.weaponPresentation.nearPlaneClearance.maximumSurfaceRetreat;
+  }, CONTACT_FIXTURE, { timeout: 10_000 });
+  const before = await presentedFrame(page);
+  await waitForPresentedFrames(page, before, 4);
+  const returnedState = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot());
+  return {
+    contract: ROUND_CONTINUITY.contract,
+    afterWeapon,
+    nextWeapon,
+    timerBefore: { text: timerBeforeText, seconds: timerBeforeSeconds },
+    bayEntry: {
+      commandPosition: ROUND_CONTINUITY.bayEntryPosition,
+      observedPosition: bayObservation.playerPosition,
+      bounds: ROUND_CONTINUITY.bayBounds,
+      matchPhase: bayObservation.matchPhase,
+    },
+    timerAfter: { text: bayObservation.timerText, seconds: timerAfterSeconds },
+    minimumResetTimerSeconds: ROUND_CONTINUITY.minimumResetTimerSeconds,
+    returnedFixture: assertFixturePose(returnedState, `${afterWeapon}: restored contact for ${nextWeapon}`),
+  };
 }
 
 function assertIdentity(state: any, weapon: WeaponId, label: string): Record<string, unknown> {
@@ -732,6 +840,7 @@ test('proves canonical authored first-person weapons satisfy the scoped maximum-
   expect(contactFixture.surfaceLift).toBeGreaterThanOrEqual(0.13);
 
   const weaponEvidence: Array<Record<string, unknown>> = [];
+  const roundContinuity: Array<Record<string, unknown>> = [];
   for (const [index, weapon] of WEAPON_IDS.entries()) {
     const equipped = await equipAtContact(page, weapon);
     const identityState = equipped.state;
@@ -846,6 +955,10 @@ test('proves canonical authored first-person weapons satisfy the scoped maximum-
       ...perWeaponEvidence,
       artifact: { path: repositoryRelative(artifactPath), sha256: sha256(artifactBytes) },
     });
+    const nextWeapon = WEAPON_IDS[index + 1];
+    if (nextWeapon) {
+      roundContinuity.push(await refreshGunRangeRoundAndRestoreContact(page, weapon, nextWeapon));
+    }
   }
 
   const runtimeAfter = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot().render.runtime as any);
@@ -866,9 +979,9 @@ test('proves canonical authored first-person weapons satisfy the scoped maximum-
   }
 
   writeFileSync(receiptPath, `${JSON.stringify({
-    schemaVersion: 1,
+    schemaVersion: 2,
     status: 'PASS',
-    contract: 'atomic-acres/pass69-3-authored-near-plane-catalog@1',
+    contract: 'atomic-acres/pass69-3-authored-near-plane-catalog@2',
     evidenceScope: 'maximum-contact-hip-settled-ads-fire-kick-reload-near-plane-clearance',
     target: officialEvidence ? expectedTarget : `development-${renderer}`,
     sourceSha,
@@ -887,6 +1000,11 @@ test('proves canonical authored first-person weapons satisfy the scoped maximum-
     runtimeBefore,
     runtimeAfter,
     contactFixture,
+    roundContinuity: {
+      contract: ROUND_CONTINUITY.contract,
+      refreshCount: roundContinuity.length,
+      entries: roundContinuity,
+    },
     catalog: {
       weapons: WEAPON_IDS,
       weaponCount: WEAPON_IDS.length,

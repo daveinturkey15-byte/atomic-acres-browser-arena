@@ -126,4 +126,22 @@ describe('Pass 69.3 real-authored near-plane evidence boundary', () => {
     expect(runner).toContain('pitchError <= expectedContactFixture.maximumAngularError');
     expect(runner).toContain('!contactFixtureValid(receipt.contactFixture)');
   });
+
+  it('keeps the long catalog inside the production Gun Range round lifecycle without weakening convergence', () => {
+    const spec = readFileSync('tests/e2e/pass69-3-authored-near-plane-catalog.spec.ts', 'utf8');
+    const runner = readFileSync('scripts/qa/run-pass69-3-authored-near-plane-catalog.mjs', 'utf8');
+    for (const token of [
+      "contract: 'gun-range-test-bay-entry-round-refresh-v1'",
+      'bayEntryPosition: Object.freeze([54, 1.7, 0] as const)',
+      'timerAfterSeconds, `${afterWeapon}: production bay entry advances the visible deadline`).toBeGreaterThan(timerBeforeSeconds)',
+      'roundContinuity.push(await refreshGunRangeRoundAndRestoreContact(page, weapon, nextWeapon))',
+      'refreshCount: roundContinuity.length',
+    ]) expect(spec).toContain(token);
+    expect(runner).toContain('function roundContinuityValid(continuity)');
+    expect(runner).toContain('continuity.refreshCount !== expectedWeapons.length - 1');
+    expect(runner).toContain('entry.timerAfter.seconds > entry.timerBefore.seconds');
+    expect(runner).toContain('!roundContinuityValid(receipt.roundContinuity)');
+    expect(spec).toContain('requiredStableTransitions: 8');
+    expect(spec).toContain('maximumDepthDelta: 0.0005');
+  });
 });

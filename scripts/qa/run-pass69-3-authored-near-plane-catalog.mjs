@@ -64,6 +64,12 @@ const expectedContactFixture = Object.freeze({
   maximumPositionAxisError: 0.02,
   maximumAngularError: 0.000001,
 });
+const expectedRoundContinuity = Object.freeze({
+  contract: 'gun-range-test-bay-entry-round-refresh-v1',
+  bayEntryPosition: Object.freeze([54, 1.7, 0]),
+  bayBounds: Object.freeze({ minX: 51.5, maxX: 100, minZ: -52, maxZ: 64 }),
+  minimumResetTimerSeconds: 119,
+});
 
 function sourceStatus() {
   return execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], {
@@ -87,6 +93,13 @@ function sameArray(actual, expected) {
   return Array.isArray(actual)
     && actual.length === expected.length
     && actual.every((value, index) => value === expected[index]);
+}
+
+function matchTimerSeconds(value) {
+  const match = /^(\d{2}):(\d{2})$/u.exec(value ?? '');
+  if (!match) return Number.NaN;
+  const seconds = Number(match[2]);
+  return seconds < 60 ? Number(match[1]) * 60 + seconds : Number.NaN;
 }
 
 function contactFixtureValid(contact) {
@@ -168,6 +181,39 @@ function fixturePoseValid(pose) {
     && Math.abs(pose.maximumPositionAxisError - maximumPositionAxisError) <= 1e-12
     && Math.abs(pose.yawError - yawError) <= 1e-12
     && Math.abs(pose.pitchError - pitchError) <= 1e-12;
+}
+
+function roundContinuityValid(continuity) {
+  if (continuity?.contract !== expectedRoundContinuity.contract
+    || continuity.refreshCount !== expectedWeapons.length - 1
+    || !Array.isArray(continuity.entries)
+    || continuity.entries.length !== expectedWeapons.length - 1) return false;
+  return continuity.entries.every((entry, index) => {
+    const observed = entry.bayEntry?.observedPosition;
+    const inBay = Array.isArray(observed)
+      && observed.length === 3
+      && observed.every(Number.isFinite)
+      && observed[0] >= expectedRoundContinuity.bayBounds.minX
+      && observed[0] <= expectedRoundContinuity.bayBounds.maxX
+      && observed[2] >= expectedRoundContinuity.bayBounds.minZ
+      && observed[2] <= expectedRoundContinuity.bayBounds.maxZ;
+    return entry.contract === expectedRoundContinuity.contract
+      && entry.afterWeapon === expectedWeapons[index]
+      && entry.nextWeapon === expectedWeapons[index + 1]
+      && Number.isInteger(entry.timerBefore?.seconds)
+      && entry.timerBefore.seconds > 0
+      && matchTimerSeconds(entry.timerBefore?.text) === entry.timerBefore.seconds
+      && Number.isInteger(entry.timerAfter?.seconds)
+      && entry.timerAfter.seconds >= expectedRoundContinuity.minimumResetTimerSeconds
+      && entry.timerAfter.seconds > entry.timerBefore.seconds
+      && matchTimerSeconds(entry.timerAfter?.text) === entry.timerAfter.seconds
+      && entry.minimumResetTimerSeconds === expectedRoundContinuity.minimumResetTimerSeconds
+      && sameArray(entry.bayEntry?.commandPosition, expectedRoundContinuity.bayEntryPosition)
+      && JSON.stringify(entry.bayEntry?.bounds) === JSON.stringify(expectedRoundContinuity.bayBounds)
+      && entry.bayEntry?.matchPhase === 'active'
+      && inBay
+      && fixturePoseValid(entry.returnedFixture);
+  });
 }
 
 function runtimeValid(runtime) {
@@ -434,9 +480,9 @@ const weaponsValid = Array.isArray(receipt.weapons)
       && sha256(screenshotFile) === entry.screenshot.sha256;
   });
 
-if (receipt.schemaVersion !== 1
+if (receipt.schemaVersion !== 2
   || receipt.status !== 'PASS'
-  || receipt.contract !== 'atomic-acres/pass69-3-authored-near-plane-catalog@1'
+  || receipt.contract !== 'atomic-acres/pass69-3-authored-near-plane-catalog@2'
   || receipt.evidenceScope !== 'maximum-contact-hip-settled-ads-fire-kick-reload-near-plane-clearance'
   || receipt.target !== targetName
   || receipt.sourceSha !== sourceSha
@@ -458,6 +504,7 @@ if (receipt.schemaVersion !== 1
   || !runtimeValid(receipt.runtimeBefore)
   || !runtimeValid(receipt.runtimeAfter)
   || !contactFixtureValid(receipt.contactFixture)
+  || !roundContinuityValid(receipt.roundContinuity)
   || !sameArray(receipt.catalog?.weapons, expectedWeapons)
   || receipt.catalog?.weaponCount !== expectedWeapons.length
   || JSON.stringify(receipt.catalog?.contactRetreatTable) !== JSON.stringify(expectedRetreats)
