@@ -46,7 +46,7 @@ if (choreography.schemaVersion !== 4
   || choreography.recipeId !== 'pass66-authoritative-runtime-menu-preview-v2'
   || choreography.captureId !== 'pass66-authoritative-runtime-menu-preview-capture-v2'
   || choreography.generatedAt !== '2026-08-02'
-  || choreography.media.cacheKey !== 'pass66-runtime-preview-v8'
+  || choreography.media.cacheKey !== 'pass66-runtime-preview-v10'
   || choreography.fps !== 30
   || choreography.durationSeconds !== 8
   || choreography.frameCount !== 240

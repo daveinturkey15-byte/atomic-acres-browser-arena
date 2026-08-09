@@ -3,7 +3,7 @@
   "captureId": "pass66-authoritative-runtime-menu-preview-capture-v2",
   "generatedAt": "2026-08-02",
   "recipeId": "pass66-authoritative-runtime-menu-preview-v2",
-  "recipeDigest": "0ae4904d0848dbfecd717e6967eea9466d79c9ef51060473ccb7b11fa4bc485e",
+  "recipeDigest": "918da3381cd69d28d55d5c0519100b831753a0b6e9369bc23757c063e463b28d",
   "source": "authoritative-runtime-arena",
   "backendRequired": "webgpu",
   "viewport": [
@@ -272,7 +272,7 @@
     "captureTools": [
       {
         "path": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
-        "sha256": "8a833568327be11176c44cba7cb97a4ce721a81140f33ddf47a6e69eadf70392"
+        "sha256": "d0f25b6f0dacb00571ca75a6434e9e1c4772ac6bb70deb89d694a10d0c2431e6"
       },
       {
         "path": "scripts/assets/pass65-menu-preview-integrity.mjs",
@@ -408,8 +408,8 @@
         "public/assets/third-party/quaternius/animated-guns"
       ],
       "fileCount": 1031,
-      "totalBytes": 111115319,
-      "treeSha256": "a9d6e2ababdff08743d715f452a0a4d74b125420dab04b154c7aaa833be17e82",
+      "totalBytes": 111115424,
+      "treeSha256": "a99d974632e081fa5051fbc391aedf0cf0e40df3bc09269d76baea0c3059143b",
       "files": [
         {
           "path": "public/assets/original/models/atomic-acres-blender-arena.glb",
@@ -5303,13 +5303,13 @@
         },
         {
           "path": "src/ui/menu-preview-video.test.ts",
-          "sizeBytes": 5818,
-          "sha256": "b414110fc64961992c805ff768623fae45db810d3a75ce961d06fed3c993f880"
+          "sizeBytes": 5922,
+          "sha256": "b21737e9a5ad93022bf2b8b8924be56ee7b4467b64397d6234ee222c1608d92e"
         },
         {
           "path": "src/ui/menu-preview-video.ts",
-          "sizeBytes": 14105,
-          "sha256": "5d99e636d65cc265619b83fd8418db1686498a8511196f079e2cfb90a8588610"
+          "sizeBytes": 14106,
+          "sha256": "cb3592690c952d4c4d1a5c0a94de169fca073c16e6757f2b1892fb5587b3538f"
         },
         {
           "path": "src/ui/pass64-shell.test.ts",
@@ -5591,8 +5591,8 @@
         "algorithm": "sha256-ordered-name-size-bytes-v1",
         "domain": "menu-preview-frames:atomic-acres",
         "fileCount": 240,
-        "totalBytes": 991390058,
-        "sha256": "9c474a0797f2854c883c232def2e9f99ac58d412508e964c189342dbb0768701",
+        "totalBytes": 991396976,
+        "sha256": "4a93ead27a32289e1d2255438f8f8cb2d21ecdf21617a46afd6299af926acc13",
         "frameRoster": [
           1,
           2,
@@ -5982,7 +5982,7 @@
           "fixedVisualTimeMs": 68983.26359832636,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "451fea8e46d0b1bd51fbf919270f1bde8705809636d8ba9a2dd38146601531e3",
+          "pngSha256": "64752d8c0f3597cd462c0a03348b56c8dfdee5bc4d077204813a3dc66a1955c6",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.01937614017062717,
@@ -6046,7 +6046,7 @@
           "fixedVisualTimeMs": 70991.63179916318,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "af86abbdd26f1cbcd62bc3487c55c6d44d0346777e9d00e7bfc315ea0a00e00a",
+          "pngSha256": "ac51cc51fccb69ef101dd9737a9afc284fde52471453b32201c7d8886386e8d5",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.037695002555847165,
@@ -6181,8 +6181,8 @@
         "algorithm": "sha256-ordered-name-size-bytes-v1",
         "domain": "menu-preview-frames:skyline-terminal",
         "fileCount": 240,
-        "totalBytes": 556160949,
-        "sha256": "06d5a48bb7551eb90c5eec085f42d0dc767596d98b4dd582ab40feef7464a89a",
+        "totalBytes": 556160947,
+        "sha256": "33be0d2897326dadb60c00f701d9124dd909a5e595e44c75ff89b3b3cf673d25",
         "frameRoster": [
           1,
           2,
@@ -6771,8 +6771,8 @@
         "algorithm": "sha256-ordered-name-size-bytes-v1",
         "domain": "menu-preview-frames:rustworks-1v1",
         "fileCount": 240,
-        "totalBytes": 658838090,
-        "sha256": "1dc79de4121688846e131caa1333f2a3ef80695fdbcf10e77fe31d1b3940108d",
+        "totalBytes": 658836923,
+        "sha256": "b09a8beea27e5083f10a7b9842338c65141a1ef35f7847ec0b8698cf9386a8e0",
         "frameRoster": [
           1,
           2,
