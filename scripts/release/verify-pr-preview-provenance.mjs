@@ -91,7 +91,7 @@ export function computePreviewTree(files) {
 export function parsePreviewManifest(manifest) {
   invariant(isObject(manifest), 'acceptance manifest must be an object');
   invariant(manifest.schemaVersion === 1, 'acceptance manifest schemaVersion must be 1');
-  invariant(/^PASS [1-9][0-9]*$/.test(manifest.releasePass ?? ''), 'preview provenance manifest releasePass must look like PASS <number>');
+  invariant(/^PASS [1-9][0-9]*(?:\.[1-9][0-9]*)?$/.test(manifest.releasePass ?? ''), 'preview provenance manifest releasePass must look like PASS <number> or PASS <number.minor>');
   invariant(manifest.status === 'accepted', 'acceptance manifest status must be accepted');
   invariant(isObject(manifest.preview), 'acceptance manifest preview must be an object');
   invariant(manifest.preview.kind === 'github-actions-artifact', 'preview must be a GitHub Actions artifact');
@@ -320,7 +320,7 @@ export function inspectPreviewArtifactZip(zipBytes, identity, options = {}) {
       distFiles.push({ path, bytes: entry.bytes });
       continue;
     }
-    if (/^acceptance\/pass-[1-9][0-9]*\.json$/.test(entry.name)) continue;
+    if (/^acceptance\/pass-[1-9][0-9]*(?:\.[1-9][0-9]*)?\.json$/.test(entry.name)) continue;
     throw new ProvenanceError(`unexpected file in preview artifact: ${entry.name}`);
   }
   invariant(receiptBytes !== null, 'preview artifact is missing artifacts/pipeline/pr-preview.json');

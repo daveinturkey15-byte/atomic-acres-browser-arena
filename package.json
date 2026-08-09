@@ -71,7 +71,7 @@
     "qa:pass66:audio-long-run": "node scripts/qa/run-pass66-audio-long-run.mjs",
     "qa:pass66:ads-catalog:edge-webgl2": "node scripts/qa/run-pass66-ads-sight-catalog.mjs edge-webgl2",
     "qa:pass66:ads-catalog:edge-webgpu": "node scripts/qa/run-pass66-ads-sight-catalog.mjs edge-webgpu",
-    "qa:pass66:ads-catalog": "npm run qa:pass66:ads-catalog:edge-webgl2 && npm run qa:pass66:ads-catalog:edge-webgpu",
+    "qa:pass66:ads-catalog": "npm run qa:pass66:ads-catalog:edge-webgl2 -- blender && npm run qa:pass66:ads-catalog:edge-webgl2 -- performance && npm run qa:pass66:ads-catalog:edge-webgpu -- blender && npm run qa:pass66:ads-catalog:edge-webgpu -- performance",
     "qa:pass69-2:native-r4-r9": "node scripts/qa/run-pass69-2-native-r4-r9.mjs",
     "qa:pass66:sky-webgpu": "node scripts/qa/verify-pass66-atomic-sky-webgpu.mjs",
     "qa:pass64:webgpu": "node scripts/qa/verify-pass64-webgpu.mjs",

@@ -42,15 +42,15 @@ function git(...args) {
   return execFileSync('git', ['-C', REPOSITORY_ROOT, ...args], { encoding: 'utf8' }).trim();
 }
 
-function passNumber(value) {
-  const match = /^PASS ([1-9][0-9]*)$/.exec(value ?? '');
+export function passNumber(value) {
+  const match = /^PASS ([1-9][0-9]*(?:\.[1-9][0-9]*)?)$/.exec(value ?? '');
   return match ? Number(match[1]) : null;
 }
 
-function manifestPathForPass(releasePass, policy) {
-  const number = passNumber(releasePass);
-  if (number === null) throw new Error('releasePass must look like "PASS 62"');
-  return `${policy.manifestDirectory}/pass-${number}.json`;
+export function manifestPathForPass(releasePass, policy) {
+  const match = /^PASS ([1-9][0-9]*(?:\.[1-9][0-9]*)?)$/.exec(releasePass ?? '');
+  if (!match) throw new Error('releasePass must look like "PASS 62" or "PASS 69.2"');
+  return `${policy.manifestDirectory}/pass-${match[1]}.json`;
 }
 
 function isIsoDate(value) {
@@ -81,7 +81,7 @@ function changedPaths(base, head) {
 }
 
 function changedManifestPaths(base, head, policy) {
-  const pattern = new RegExp(`^${policy.manifestDirectory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\/pass-([1-9][0-9]*)\\.json$`);
+  const pattern = new RegExp(`^${policy.manifestDirectory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\/pass-([1-9][0-9]*(?:\\.[1-9][0-9]*)?)\\.json$`);
   return changedPaths(base, head).filter((path) => {
     const match = pattern.exec(path);
     return match && Number(match[1]) >= policy.enforceFromPass;
@@ -135,7 +135,7 @@ export function validateAcceptanceManifest(manifest, options = {}) {
   if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) return { ok: false, errors: ['manifest must be an object'] };
   if (manifest.schemaVersion !== 1) errors.push('schemaVersion must be 1');
   const number = passNumber(manifest.releasePass);
-  if (number === null) errors.push('releasePass must look like "PASS 62"');
+  if (number === null) errors.push('releasePass must look like "PASS 62" or "PASS 69.2"');
   if (!isIsoDate(manifest.feedbackReceivedAt)) errors.push('feedbackReceivedAt must be an ISO UTC timestamp');
   if (manifest.status !== 'accepted') errors.push('status must be accepted');
   if (!Array.isArray(manifest.requirements) || manifest.requirements.length === 0) {
@@ -373,7 +373,7 @@ export function evaluateAcceptance(values) {
     }
   } else {
     const number = passNumber(releasePass);
-    if (number === null) throw new Error('--pass must look like "PASS 62"');
+    if (number === null) throw new Error('--pass must look like "PASS 62" or "PASS 69.2"');
     if (number < policy.enforceFromPass) {
       return {
         schemaVersion: 1,

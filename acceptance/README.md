@@ -1,7 +1,9 @@
 # Release acceptance manifests
 
 Every `runtime` or `release-shell` contribution for Pass 62 or later must add or
-update exactly one `acceptance/pass-<number>.json` manifest. The manifest is the
+update exactly one `acceptance/pass-<release>.json` manifest. Dotted player releases
+retain the exact label: `PASS 69.2` maps to `acceptance/pass-69.2.json` and never
+reuses `pass-69.json`. The manifest is the
 release-blocking map from Dave's feedback to evidence; a green test suite is not
 a substitute for it.
 
@@ -28,7 +30,7 @@ The gate is run directly so it also works before package scripts change:
 
 ```text
 node scripts/release/acceptance-gate.mjs --phase ci --impact full --base <base-sha> --head <head-sha>
-node scripts/release/acceptance-gate.mjs --phase release --pass "PASS 62"
+node scripts/release/acceptance-gate.mjs --phase release --pass "PASS 69.2"
 ```
 
 Passes below the policy's `enforceFromPass` remain reproducible for rollback,

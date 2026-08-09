@@ -33,7 +33,7 @@ const exactSha = (value, label) => {
 };
 exactSha(sourceSha, 'SOURCE_SHA');
 if (config.schemaVersion !== 4) throw new Error('release-channels.json schemaVersion must be 4');
-if (!/^PASS [1-9][0-9]*$/.test(config.experimental.pass) || !config.experimental.label.startsWith('THE BIG ONE')
+if (!/^PASS [1-9][0-9]*(?:\.[1-9][0-9]*)?$/.test(config.experimental.pass) || !config.experimental.label.startsWith('THE BIG ONE')
   || config.experimental.path !== 'channels/the-big-one') {
   throw new Error('Experimental production topology must stage THE BIG ONE at channels/the-big-one');
 }

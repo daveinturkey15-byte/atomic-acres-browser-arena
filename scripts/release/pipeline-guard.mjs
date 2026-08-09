@@ -158,8 +158,8 @@ if (mode === 'release') {
   if (!/^[0-9a-f]{40}$/.test(sourceSha ?? '')) {
     throw new Error('--source-sha must be a full 40-character Git SHA');
   }
-  if (!/^PASS [1-9][0-9]*$/.test(releasePass ?? '')) {
-    throw new Error('--pass must look like "PASS 58"');
+  if (!/^PASS [1-9][0-9]*(?:\.[1-9][0-9]*)?$/.test(releasePass ?? '')) {
+    throw new Error('--pass must look like "PASS 58" or "PASS 69.2"');
   }
   if (branch !== 'main') throw new Error(`Release must run from branch main; current branch is ${branch}`);
   if (sourceSha !== headSha || sourceSha !== receipt.originMainSha) {

@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       release_pass:
-        description: Exact approved live pass (e.g. PASS 69)
+        description: Exact approved live pass (e.g. PASS 69.2)
         required: true
         type: string
 

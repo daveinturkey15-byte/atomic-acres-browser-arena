@@ -18,7 +18,7 @@ if (!['blender', 'performance'].includes(renderProfile)) {
 }
 
 const artifactDirectory = resolve('artifacts/pass66/ads-sight-catalog');
-const receiptPath = resolve(artifactDirectory, `receipt-${target.renderer}.json`);
+const receiptPath = resolve(artifactDirectory, `receipt-${target.renderer}-${renderProfile}.json`);
 mkdirSync(artifactDirectory, { recursive: true });
 rmSync(receiptPath, { force: true });
 const status = execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { encoding: 'utf8' }).trim();
