@@ -644,7 +644,7 @@ if (webmEncoding?.encoder !== 'libvpx-vp9'
   || webmEncoding?.minimumVideoBitrateKbps !== 4500
   || webmEncoding?.maximumVideoBitrateKbps !== 7500
   || webmEncoding?.bufferSizeKbps !== 15000
-  || webmEncoding?.crf !== 28
+  || webmEncoding?.crf !== 20
   || webmEncoding?.cpuUsed !== 2
   || webmEncoding?.audioBitrateKbps !== 48
   || webmEncoding?.mimeType !== 'video/webm; codecs="vp9,opus"') failures.push('canonical VP9 1440p profile drifted');

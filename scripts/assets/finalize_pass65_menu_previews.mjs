@@ -64,6 +64,12 @@ function run(command, args) {
   return result;
 }
 
+function ffmpegSupportsEncoder(encoder) {
+  const result = run('ffmpeg', ['-hide_banner', '-encoders']);
+  const escaped = encoder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`^\\s*A\\S*\\s+${escaped}\\s`, 'm').test(result.stdout);
+}
+
 function canonicalArenaDependencies() {
   const result = run(process.execPath, ['--import', 'tsx', dependencyPrinterPath]);
   let manifest;
@@ -145,7 +151,7 @@ function validateRecipe() {
     || webm?.minimumVideoBitrateKbps !== 4500
     || webm?.maximumVideoBitrateKbps !== 7500
     || webm?.bufferSizeKbps !== 15000
-    || webm?.crf !== 28
+    || webm?.crf !== 20
     || webm?.cpuUsed !== 2
     || webm?.audioBitrateKbps !== 48
     || webm?.mimeType !== 'video/webm; codecs="vp9,opus"') {
@@ -491,7 +497,7 @@ function assertStagedVideo(file, profile) {
     || video?.color_transfer !== colour.transfer
     || video?.color_space !== colour.space
     || video?.color_range !== colour.range) {
-    throw new Error(`${relative(file)} does not satisfy the canonical 2560x1440/30 FPS/BT.709 stream contract`);
+    throw new Error(`${relative(file)} does not satisfy the canonical 2560x1440/30 FPS/BT.709 stream contract: ${JSON.stringify({ format: probe.format, video, audio })}`);
   }
   if (profile.videoCodec === 'h264'
     && (String(video?.profile ?? '').toLowerCase() !== profile.profile
@@ -546,6 +552,10 @@ function transcode(arena, outputRoot = runtimeRoot) {
   const poster = path.join(outputRoot, `${arena}.webp`);
   const mp4Profile = choreography.media.encodingProfiles.mp4;
   const webmProfile = choreography.media.encodingProfiles.webm;
+  const webmAudioEncoder = webmProfile.audioCodec === 'opus' && ffmpegSupportsEncoder('libopus')
+    ? 'libopus'
+    : webmProfile.audioCodec;
+  const webmAudioCompatibility = webmAudioEncoder === 'opus' ? ['-strict', '-2'] : [];
   const images = choreography.media.encodingProfiles.images;
   const colour = choreography.media.encodingProfiles.colour;
   const common = [
@@ -574,7 +584,7 @@ function transcode(arena, outputRoot = runtimeRoot) {
     '-bufsize', rate(mp4Profile.bufferSizeKbps),
     '-g', '60', '-keyint_min', '60', '-sc_threshold', '0',
     '-threads:v', '1',
-    '-x264-params', 'threads=1:lookahead_threads=1:sliced_threads=0:nal-hrd=vbr:force-cfr=1',
+    '-x264-params', 'threads=1:lookahead_threads=1:sliced_threads=0:nal-hrd=vbr:force-cfr=1:colorprim=bt709:transfer=bt709:colormatrix=bt709:range=limited',
     '-flags:v', '+bitexact',
     ...colourArgs,
     '-movflags', '+faststart',
@@ -586,6 +596,7 @@ function transcode(arena, outputRoot = runtimeRoot) {
   ]);
   run('ffmpeg', [
     ...common,
+    '-vf', 'setparams=range=limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709',
     '-c:v', webmProfile.encoder,
     '-profile:v', String(webmProfile.profile),
     '-crf', String(webmProfile.crf),
@@ -596,7 +607,8 @@ function transcode(arena, outputRoot = runtimeRoot) {
     '-g', '60', '-row-mt', '1', '-deadline', 'good', '-cpu-used', String(webmProfile.cpuUsed),
     '-flags:v', '+bitexact',
     ...colourArgs,
-    '-c:a', webmProfile.audioCodec,
+    '-c:a', webmAudioEncoder,
+    ...webmAudioCompatibility,
     '-flags:a', '+bitexact',
     '-b:a', rate(webmProfile.audioBitrateKbps),
     webm,
