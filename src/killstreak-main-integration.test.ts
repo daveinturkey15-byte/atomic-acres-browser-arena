@@ -95,6 +95,36 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(clearBlock).toContain('weaponView.setPresentationVisible(player.alive);');
   });
 
+  it('keeps the WebGPU viewmodel light vocabulary resident through support possession', () => {
+    const possessionStart = source.indexOf('function updateKillstreakPossession(');
+    const possessionEnd = source.indexOf('\nfunction overdriveStateMessage(', possessionStart);
+    const possessionBlock = source.slice(possessionStart, possessionEnd);
+    expect(possessionBlock).not.toContain('weaponView.setPresentationVisible(false);');
+    expect(possessionBlock).not.toContain('applyAdaptiveRenderBudget(');
+    expect(possessionBlock).not.toContain('resize();');
+    expect(source).not.toContain('possessionRenderPixelRatioScale');
+
+    const visibilityStart = source.indexOf('function synchronizeWeaponViewmodelPresentation(');
+    const visibilityEnd = source.indexOf('\nfunction updatePhysics(', visibilityStart);
+    const visibilityBlock = source.slice(visibilityStart, visibilityEnd);
+    expect(visibilityBlock).toContain("localKillstreakActorSnapshot()?.possession");
+    expect(visibilityBlock).toContain('sniperScopeActive || dmrThermalActive');
+    expect(visibilityBlock).toContain('weaponView.suppressForFullscreenPresentation(true);');
+    expect(source).toContain('viewmodelVisible: shouldShowWeaponViewmodel(),');
+    expect(source.match(/synchronizeWeaponViewmodelPresentation\(\);/g)).toHaveLength(2);
+  });
+
+  it('types and exposes the exact canonical player yaw and pitch for viewmodel fixture provenance', () => {
+    expect(source).toContain('type DebugPlayerPose = Readonly<{ yaw: number; pitch: number }>;');
+    expect(source).toContain('snapshot: () => Record<string, unknown> & { player: DebugPlayerPose };');
+    const playerSnapshot = source.slice(
+      source.indexOf('    player: {', source.indexOf('snapshot: () => ({')),
+      source.indexOf('    spawnSelection:', source.indexOf('snapshot: () => ({')),
+    );
+    expect(playerSnapshot).toContain('yaw: player.yaw,');
+    expect(playerSnapshot).toContain('pitch: player.pitch,');
+  });
+
   it('keeps legacy offensive effects as admitted presentation adapters, never a second reward queue', () => {
     const activationStart = source.indexOf('function activateFieldSupport(');
     const activationEnd = source.indexOf('\nfunction detonateYardhawk(', activationStart);

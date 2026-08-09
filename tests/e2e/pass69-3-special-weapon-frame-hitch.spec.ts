@@ -500,7 +500,7 @@ test('cold and held flamethrower fire remain inside the presented-frame freeze b
   await page.waitForFunction(() => {
     const clearance = (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any)
       .weaponPresentation.flamethrowerHeldFireClearance;
-    return clearance.fastPathActive === false && clearance.exitChecks >= 1;
+    return clearance.fastPathActive === false && clearance.exitTransitions >= 1;
   }, undefined, { timeout: 5_000 });
   const clearance = await page.evaluate(() => {
     const presentation = (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).weaponPresentation;
@@ -561,8 +561,8 @@ test('cold and held flamethrower fire remain inside the presented-frame freeze b
     weaponNearPlaneClear: true,
   });
   expect(clearance.prewarmChecks).toBeGreaterThanOrEqual(1);
-  expect(clearance.entryChecks).toBeGreaterThanOrEqual(1);
-  expect(clearance.exitChecks).toBeGreaterThanOrEqual(1);
+  expect(clearance.entryTransitions).toBeGreaterThanOrEqual(1);
+  expect(clearance.exitTransitions).toBeGreaterThanOrEqual(1);
   expect(clearance.skippedFrames).toBeGreaterThanOrEqual(20);
   expectBoundedFrameWindow(baseline, 20);
   expectBoundedFrameWindow(probe.frameWindow, 50);

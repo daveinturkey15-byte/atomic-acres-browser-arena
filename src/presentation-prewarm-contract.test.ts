@@ -233,7 +233,26 @@ describe('presentation prewarm startup contract', () => {
     expect(arenaPresentationPrewarm).toContain("['world-ordnance', () => prewarmGrenadeWorldPresentations(sceneGeneration)]");
     expect(arenaPresentationPrewarm).not.toContain("['world-drops-ordnance'");
     expect(arenaPresentationPrewarm).toContain("['bot-world-weapons', () => botWeaponGpuVocabulary.prewarm(");
-    expect(arenaPresentationPrewarm).toContain("['killstreak-vocabulary', () => killstreakPresentation.prewarm(");
+    const concurrentEffectDefinitions = arenaPresentationPrewarm.slice(
+      arenaPresentationPrewarm.indexOf('const groupDefinitions = ['),
+      arenaPresentationPrewarm.indexOf('const groups = await Promise.all(groupDefinitions.map('),
+    );
+    expect(concurrentEffectDefinitions).not.toContain('killstreakPresentation.prewarm(');
+    const flareFirstShotIndex = arenaPresentationPrewarm.indexOf("runGroup('flare-first-shot'");
+    const flameFirstShotIndex = arenaPresentationPrewarm.indexOf("runGroup('flamethrower-first-shot'");
+    const killstreakVocabularyIndex = arenaPresentationPrewarm.indexOf("'killstreak-vocabulary'");
+    expect(flareFirstShotIndex).toBeGreaterThan(0);
+    expect(flameFirstShotIndex).toBeGreaterThan(flareFirstShotIndex);
+    expect(killstreakVocabularyIndex).toBeGreaterThan(flameFirstShotIndex);
+    const killstreakVocabularyPrewarm = arenaPresentationPrewarm.slice(
+      killstreakVocabularyIndex,
+      arenaPresentationPrewarm.indexOf('lastArenaEffectPrewarmProfile = Object.freeze({'),
+    );
+    expect(killstreakVocabularyPrewarm).toContain('weaponView.setPresentationVisible(true);');
+    expect(killstreakVocabularyPrewarm).toContain(
+      'await killstreakPresentation.prewarm(renderRuntime, camera, sceneGeneration);',
+    );
+    expect(killstreakVocabularyPrewarm).toContain('finally {\n        weaponView.setPresentationVisible(false);');
     expect(arenaPresentationPrewarm).toContain('const groups = await Promise.all(groupDefinitions.map(');
     expect(arenaPresentationPrewarm).not.toContain('await yieldDeploymentPrewarmFrame();');
     expect(source).toContain('botWeaponVocabulary: botWeaponGpuVocabulary.telemetry()');
@@ -326,6 +345,27 @@ describe('presentation prewarm startup contract', () => {
     expect(matchStartSnap).toContain('resetFirstPersonArmAnimations(this.authoredArmsRoot);');
     expect(matchStartSnap.indexOf('resetFirstPersonArmAnimations(this.authoredArmsRoot);'))
       .toBeLessThan(matchStartSnap.indexOf('resetFirstPersonArmFingers(this.riggedFingerBones);'));
+    const liveWeaponUpdate = weaponPresentationSource.slice(
+      weaponPresentationSource.indexOf('  update(pose: WeaponPose)'),
+      weaponPresentationSource.lastIndexOf('\n}'),
+    );
+    const flameAdmissionProof = weaponPresentationSource.slice(
+      weaponPresentationSource.indexOf('  async prewarmBrowserWeaponFirePresentation('),
+      weaponPresentationSource.indexOf('  private async performBrowserWeaponCatalogPrewarm('),
+    );
+    expect(liveWeaponUpdate).not.toContain('this.enforceNearPlaneClearance(');
+    expect(liveWeaponUpdate).not.toContain('measureCameraFraming(');
+    expect(liveWeaponUpdate).toContain('const authoredContactRetreat = authoredNearPlaneContactRetreat(');
+    expect(liveWeaponUpdate).toContain('const fireNearPlaneCapZ =');
+    expect(liveWeaponUpdate).toContain('Math.min(\n        viewmodelBaseZ');
+    expect(liveWeaponUpdate).toContain(') - authoredContactRetreat');
+    expect(liveWeaponUpdate).toContain('flamethrowerHeldFireClearanceEntryTransitions += 1');
+    expect(liveWeaponUpdate).toContain('flamethrowerHeldFireClearanceExitTransitions += 1');
+    expect(liveWeaponUpdate).not.toContain('ClearanceEntryChecks');
+    expect(liveWeaponUpdate).not.toContain('ClearanceExitChecks');
+    expect(flameAdmissionProof).toContain("if (id === 'flamethrower') {");
+    expect(flameAdmissionProof).toContain('this.enforceNearPlaneClearance(model,');
+    expect(weaponPresentationSource.match(/this\.enforceNearPlaneClearance\(/g)).toHaveLength(1);
     expect(source).toContain('const minimumStableWindowMs = 1_000;');
     expect(source).toContain('const hitchThresholdMs = 50;');
     const cadenceAdmission = source.slice(
@@ -429,6 +469,20 @@ describe('presentation prewarm startup contract', () => {
     expect(preparedSwitchExercise).toContain('sniperScopeOverlay.hidden = false;');
     expect(preparedSwitchExercise).toContain('weaponView.suppressForSniperScope(true);');
     expect(preparedSwitchExercise).toContain('sniperScopeOverlay.hidden = true;');
+    const dmrThermalExerciseStart = preparedSwitchExercise.indexOf('} else if (exercisesDmrThermal) {');
+    const dmrThermalExercise = preparedSwitchExercise.slice(
+      dmrThermalExerciseStart,
+      preparedSwitchExercise.indexOf('camera.updateMatrixWorld(true);', dmrThermalExerciseStart),
+    );
+    expect(dmrThermalExercise).toContain('weaponView.suppressForFullscreenPresentation(true);');
+    const dmrThermalRestoreStart = preparedSwitchExercise.lastIndexOf('} else if (exercisesDmrThermal) {');
+    const dmrThermalRestore = preparedSwitchExercise.slice(
+      dmrThermalRestoreStart,
+      preparedSwitchExercise.indexOf('const presentation = renderRuntime.presentationTelemetry();', dmrThermalRestoreStart),
+    );
+    expect(dmrThermalRestore).toContain('weaponView.suppressForFullscreenPresentation(false);');
+    expect(dmrThermalRestore).toContain("hudRoot.classList.remove('dmr-thermal-active');");
+    expect(dmrThermalRestore).toContain('thermalGhostPresentation.sync([], false);');
     expect(source).toContain('streamedWeaponGpuPrewarmer,');
     expect(source).toContain('streamedWeaponCatalogGpuPrewarmer,');
     expect(menuLoadoutApply).toContain('const retainedCatalog = menuDeploymentAssetsPromise');
@@ -577,6 +631,8 @@ describe('presentation prewarm startup contract', () => {
     expect(verifierSource).toContain("slots: ['scout-sweep', 'piloted-drone', 'carpet-bomber', 'chopper', 'drone-swarm']");
     expect(pilotWorkflow).toContain("api.activateSupport('piloted-drone')");
     expect(pilotWorkflow).toContain("api.togglePilotedDroneControl(activated.id)");
+    expect(pilotWorkflow).toContain("const sampleWorkflow = () => api.sampleEnduranceHealth('piloted-workflow');");
+    expect(pilotWorkflow).not.toContain('api.snapshot()');
     for (const [code, axis] of [
       ['KeyW', 'forward'], ['KeyS', 'backward'], ['KeyD', 'right'],
       ['KeyA', 'left'], ['Space', 'up'], ['ControlLeft', 'down'],
@@ -588,11 +644,26 @@ describe('presentation prewarm startup contract', () => {
     expect(pilotWorkflow).toContain('result.autonomousDisplacementM <= 0.02');
 
     expect(carpetWorkflow).toContain("api.activateSupport('carpet-bomber')");
+    expect(carpetWorkflow).toContain("const sampleWorkflow = () => api.sampleEnduranceHealth('carpet-workflow');");
+    expect(carpetWorkflow).not.toContain('api.snapshot()');
     expect(carpetWorkflow).toContain("new KeyboardEvent('keydown', { code: 'KeyF'");
     expect(carpetWorkflow).toContain("marker.shape === 'ground-x'");
     expect(carpetWorkflow).toContain("marker.shape === 'corridor'");
-    expect(carpetWorkflow).toContain("entity.kind === 'aircraft'");
-    expect(carpetWorkflow).toContain("entity.id.includes('carpet-aircraft')");
+    const enduranceSampler = runtimeSource.slice(
+      runtimeSource.indexOf('function sampleEnduranceHealth('),
+      runtimeSource.indexOf('function sampleAdmissionState()'),
+    );
+    expect(enduranceSampler).toContain("detail === 'carpet-workflow'");
+    expect(enduranceSampler).toContain("entity.kind === 'aircraft'");
+    expect(enduranceSampler).toContain("entity.id.includes('carpet-aircraft')");
+    expect(enduranceSampler).toContain('killstreakPresentation.carpetWorkflowTelemetry()');
+    expect(enduranceSampler).not.toContain('killstreakPresentation.telemetry()');
+    const captureCameraUpdate = runtimeSource.slice(
+      runtimeSource.lastIndexOf('if (debugCaptureCameraActive) {', runtimeSource.indexOf('updateCrosshairSupportPreview();')),
+      runtimeSource.indexOf('updateCrosshairSupportPreview();'),
+    );
+    expect(captureCameraUpdate).toContain('camera.updateWorldMatrix(true, false);');
+    expect(captureCameraUpdate).not.toContain('camera.updateMatrixWorld(true);');
     expect(carpetWorkflow).toContain('result.aircraft.displacementM <= 0.1');
     expect(carpetWorkflow).toContain("}, 'authored shell drop');");
     expect(carpetWorkflow).toContain("}, 'flight and first impact');");
@@ -600,10 +671,24 @@ describe('presentation prewarm startup contract', () => {
     expect(carpetWorkflow).toContain('result.impactPresentation.impactFlashes <= result.impactPresentation.baselineImpactFlashes');
 
     expect(verifierSource).toContain('const requiredLifecycleRecoveryCyclesPerVisit = 2;');
+    expect(lifecycleWorkflow).toContain('api.sampleEnduranceHealth()');
+    expect(lifecycleWorkflow).not.toContain('api.snapshot()');
     expect(lifecycleWorkflow).toContain('await coverPage.bringToFront();');
+    expect(lifecycleWorkflow).toContain('if (!nativeLifecycleEventsComplete)');
+    expect(lifecycleWorkflow.indexOf('await coverPage.bringToFront();')).toBeLessThan(
+      lifecycleWorkflow.indexOf('if (!nativeLifecycleEventsComplete)'),
+    );
+    expect(lifecycleWorkflow).toContain("visibilityState = 'hidden';");
+    expect(lifecycleWorkflow).toContain("document.dispatchEvent(new Event('visibilitychange'));");
+    expect(lifecycleWorkflow).toContain("window.dispatchEvent(new Event('blur'));");
+    expect(lifecycleWorkflow).toContain("window.dispatchEvent(new Event('focus'));");
+    expect(lifecycleWorkflow).toContain("lifecycleStimulus: nativeLifecycleEventsComplete ? 'native-page-focus' : 'headless-event-fallback'");
     expect(lifecycleWorkflow).toContain("entry.type === 'visibilitychange' && entry.visibilityState === 'hidden'");
     expect(lifecycleWorkflow).toContain("entry.type === 'visibilitychange' && entry.visibilityState === 'visible'");
-    expect(lifecycleWorkflow).toContain("['tab visibility regained', 'window focus regained']");
+    expect(lifecycleWorkflow).toContain(
+      '/^(?:tab visibility regained|window focus regained) · recovery [1-9]\\d*$/',
+    );
+    expect(lifecycleWorkflow).toContain("lifecycleResetReasonPattern.test(receipt.framePacing.lastResetReason ?? '')");
 
     expect(doorProbe).toContain("api.detonateGrenadeAtShed(shed.placementId, 'door-south')");
     expect(doorProbe).not.toContain('api.damageShed(');
@@ -659,7 +744,9 @@ describe('presentation prewarm startup contract', () => {
       source.indexOf('async function pauseAndDrainPresentation'),
       source.indexOf('async function requireCaptureRecoveryCompletions'),
     );
-    expect(drainIsolation).toContain('Resolve with the same snapshot that first proves equality');
+    expect(drainIsolation).toContain('Resolve with the same allocation-light health sample that first');
+    expect(drainIsolation).toContain('api.sampleEnduranceHealth()');
+    expect(drainIsolation).not.toContain('api.snapshot()');
     expect(drainIsolation).not.toContain('page.waitForFunction');
 
     const liveTourGateIndex = source.indexOf('if (arenaReceipts.length !== arenaSequence.length');
@@ -703,7 +790,7 @@ describe('presentation prewarm startup contract', () => {
   it('keeps continuous endurance telemetry allocation-light and isolates full audits behind pauses', () => {
     const runtimeSource = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
     const enduranceHealth = runtimeSource.slice(
-      runtimeSource.indexOf('function sampleEnduranceHealth()'),
+      runtimeSource.indexOf('function sampleEnduranceHealth('),
       runtimeSource.indexOf('const debugWindow = window'),
     );
     expect(enduranceHealth).toContain('renderRuntime.healthTelemetry()');
@@ -712,7 +799,10 @@ describe('presentation prewarm startup contract', () => {
     expect(enduranceHealth).not.toContain('estimateRendererResidency');
     expect(enduranceHealth).not.toContain('presentationState()');
     expect(enduranceHealth).not.toContain('.traverse(');
-    expect(runtimeSource).toContain('sampleEnduranceHealth: () => ReturnType<typeof sampleEnduranceHealth>;');
+    expect(enduranceHealth).not.toContain('killstreakPresentation.telemetry()');
+    expect(runtimeSource).toContain(
+      'sampleEnduranceHealth: (detail?: EnduranceHealthDetail) => ReturnType<typeof sampleEnduranceHealth>;',
+    );
     expect(runtimeSource).toContain('sampleWeaponCatalogReadiness: () => weaponView.browserCatalogReadiness()');
 
     const verifierSource = readFileSync(new URL('../scripts/qa/verify-pass65-webgpu-endurance.mjs', import.meta.url), 'utf8');
@@ -727,6 +817,51 @@ describe('presentation prewarm startup contract', () => {
     expect(liveLoop).not.toContain('.snapshot()');
     expect(liveLoop).not.toContain('sampleRendererResidency');
     expect(verifierSource).toContain('api.setRenderPaused(true);\n      return {\n        state: api.snapshot(),\n        residency: api.sampleRendererResidency(),');
+  });
+
+  it('quarantines the paused admission-audit tail before measured live endurance', () => {
+    const source = readFileSync(new URL('../scripts/qa/verify-pass65-webgpu-endurance.mjs', import.meta.url), 'utf8');
+    const drain = source.slice(
+      source.indexOf('async function pauseAndDrainPresentation('),
+      source.indexOf('async function requireCaptureRecoveryCompletions('),
+    );
+    const recovery = source.slice(
+      source.indexOf('async function requireCaptureRecoveryCompletions('),
+      source.indexOf('async function captureCanvasOnly('),
+    );
+    expect(drain).toContain('const health = api.sampleEnduranceHealth();');
+    expect(drain).not.toContain('api.snapshot()');
+    expect(recovery).toContain('api.sampleEnduranceHealth()?.runtime?.presentation');
+    expect(recovery).not.toContain('api.snapshot()');
+    expect(recovery).toContain('maximumInFlightSubmissions === 2');
+    expect(recovery).toContain('advancedBy <= maximumInFlightSubmissions');
+    expect(recovery).toContain('completionLatencyMs <= maximumCompletionMs');
+    expect(recovery).toContain('completionProgressGapMs <= maximumCompletionMs');
+    expect(recovery).toContain('qualifyingCompletionCount >= requiredCompletions');
+    expect(recovery).toContain('recoveryWindowMs >= minimumWindowMs');
+    expect(recovery).toContain('api.setRenderPaused(true);\n            resolve({');
+    expect(source).toContain('const requiredCaptureRecoveryCompletions = 12;');
+    expect(source).toContain('const minimumCaptureRecoveryWindowMs = 250;');
+    expect(source).toContain('const maximumCaptureRecoveryCompletionMs = 50;');
+
+    const auditIndex = source.indexOf('const arenaAdmissionAudit = await page.evaluate');
+    const baselineIndex = source.indexOf('const auditTailBaseline = await page.evaluate', auditIndex);
+    const unpauseIndex = source.indexOf('api.setRenderPaused(false);', baselineIndex);
+    const recoveryIndex = source.indexOf('const auditTailRecovery = await requireCaptureRecoveryCompletions', baselineIndex);
+    const heldIndex = source.indexOf('const auditTailHeldFrontier = await pauseAndDrainPresentation(page);', recoveryIndex);
+    const liveIndex = source.indexOf('while (measuredLiveDurationMs < durationMs) {', heldIndex);
+    expect(auditIndex).toBeGreaterThan(0);
+    expect(baselineIndex).toBeGreaterThan(auditIndex);
+    expect(unpauseIndex).toBeGreaterThan(baselineIndex);
+    expect(recoveryIndex).toBeGreaterThan(unpauseIndex);
+    expect(heldIndex).toBeGreaterThan(recoveryIndex);
+    expect(liveIndex).toBeGreaterThan(heldIndex);
+    const boundary = source.slice(baselineIndex, liveIndex);
+    expect(boundary).toContain('presentation.submissionSequence !== presentation.completedSequence');
+    expect(boundary).toContain('baseline: summarizeHeldFrontier(auditTailBaseline)');
+    expect(boundary).toContain('recovery: summarizeCaptureRecovery(auditTailRecovery)');
+    expect(boundary).toContain('heldFrontier: summarizeHeldFrontier(auditTailHeldFrontier)');
+    expect(source).toContain('activeStressBudget,\n      arenaAdmissionRecovery,');
   });
 
   it('samples presentation progress without a full scene snapshot at frame-window boundaries', () => {

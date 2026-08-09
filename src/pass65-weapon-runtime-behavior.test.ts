@@ -2,7 +2,17 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { poseOperator, setOperatorWeapon } from './art-kit';
-import { WeaponPresentation, HIP_VIEWMODEL_SCALE, type WeaponViewmodelCatalogGpuPrewarmEntry } from './weapon-presentation';
+import {
+  FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT,
+  FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT_CONTRACT,
+  FULLSCREEN_PRESENTATION_SUPPRESSED_SCALE,
+  FULLSCREEN_PRESENTATION_SUPPRESSION_CONTRACT,
+  HIP_VIEWMODEL_SCALE,
+  VIEWMODEL_NEAR_PLANE_SAFE_RETREAT,
+  WeaponPresentation,
+  authoredNearPlaneContactRetreat,
+  type WeaponViewmodelCatalogGpuPrewarmEntry,
+} from './weapon-presentation';
 import { WEAPON_IDS, type WeaponId } from './protocol';
 import { RUNTIME_WEAPON_RETENTION_LIMIT } from './weapon-prewarm-catalog';
 import {
@@ -220,6 +230,108 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     presentation.suppressForSniperScope(false);
     expect(presentation.root.visible).toBe(true);
     expect(presentation.root.scale.toArray()).toEqual([HIP_VIEWMODEL_SCALE, HIP_VIEWMODEL_SCALE, HIP_VIEWMODEL_SCALE]);
+  });
+
+  it('keeps the authored max-contact near-plane retreat complete, bounded and allocation-free', () => {
+    expect(FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT_CONTRACT)
+      .toBe('authored-glb-contact-retreat-2026-08-09-v1');
+    expect(Object.keys(FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT).sort()).toEqual([...WEAPON_IDS].sort());
+    expect(FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT).toMatchObject({
+      sniper: 0.14,
+      railgun: 0.1,
+      lmg: 0.1,
+      'm14-ebr': 0.05,
+    });
+    for (const weapon of WEAPON_IDS) {
+      const cached = FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT[weapon];
+      expect(cached).toBeGreaterThanOrEqual(0);
+      expect(cached).toBeLessThanOrEqual(0.14);
+      expect(authoredNearPlaneContactRetreat(weapon, 0)).toBe(0);
+      expect(authoredNearPlaneContactRetreat(weapon, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT / 2))
+        .toBeCloseTo(cached / 2, 8);
+      expect(authoredNearPlaneContactRetreat(weapon, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT * 2))
+        .toBe(cached);
+    }
+    const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(76, 1, 0.08, 180), false);
+    presentation.setWeapon('sniper', true);
+    presentation.update({
+      dt: 1, moving: false, sprinting: false, crouched: false, prone: true,
+      ads: false, phase: 0, landingImpulse: 0, lateralSpeed: 0, reloadProgress: null,
+      surfaceRetreat: VIEWMODEL_NEAR_PLANE_SAFE_RETREAT,
+    });
+    expect(presentation.presentationState().nearPlaneClearance).toEqual({
+      contract: FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT_CONTRACT,
+      cameraNear: 0.08,
+      requiredMargin: 0.02,
+      baseRetreat: 0.06,
+      maximumSurfaceRetreat: VIEWMODEL_NEAR_PLANE_SAFE_RETREAT,
+      cachedRetreat: 0.14,
+      blendedRetreat: 0.14,
+    });
+  });
+
+  it('retains and exactly restores the M14 structural viewmodel vocabulary through fullscreen suppression', () => {
+    const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250), false);
+    presentation.setWeapon('m14-ebr', true);
+    presentation.setPresentationVisible(true);
+    presentation.update({
+      dt: 1 / 60, moving: false, sprinting: false, crouched: false, prone: false,
+      ads: true, phase: 0, landingImpulse: 0, lateralSpeed: 0, reloadProgress: null,
+    });
+    const restoredScale = presentation.root.scale.clone();
+    const restoredPosition = presentation.root.position.clone();
+    const restoredRotation = presentation.root.rotation.clone();
+    const structuralLights = presentation.root.children.filter((child) => child instanceof THREE.PointLight);
+    const fillLight = structuralLights.find((light) => light.name === 'first-person-viewmodel-fill');
+    const muzzleLight = structuralLights.find((light) => light.name === 'first-person-muzzle-light');
+
+    expect(structuralLights).toHaveLength(2);
+    expect(fillLight?.intensity).toBeGreaterThan(0);
+    presentation.fire(0.02);
+    expect(muzzleLight?.intensity).toBeGreaterThan(0);
+    presentation.suppressForFullscreenPresentation(true);
+    expect(presentation.root.visible).toBe(true);
+    expect(structuralLights.every((light) => light.visible)).toBe(true);
+    expect(presentation.root.scale.toArray()).toEqual([
+      FULLSCREEN_PRESENTATION_SUPPRESSED_SCALE,
+      FULLSCREEN_PRESENTATION_SUPPRESSED_SCALE,
+      FULLSCREEN_PRESENTATION_SUPPRESSED_SCALE,
+    ]);
+    expect(presentation.root.position.toArray()).toEqual(restoredPosition.toArray());
+    expect(presentation.root.rotation.toArray()).toEqual(restoredRotation.toArray());
+    expect(presentation.presentationState().fullscreenSuppression).toEqual({
+      contract: FULLSCREEN_PRESENTATION_SUPPRESSION_CONTRACT,
+      active: true,
+      suppressedScale: FULLSCREEN_PRESENTATION_SUPPRESSED_SCALE,
+      rootVisible: true,
+      rootScale: FULLSCREEN_PRESENTATION_SUPPRESSED_SCALE,
+      structuralLightCount: 2,
+      structuralLights: [
+        {
+          name: 'first-person-viewmodel-fill',
+          intensityContract: 'zero-when-suppressed',
+          attachedToRoot: true,
+          visible: true,
+          intensity: 0,
+        },
+        {
+          name: 'first-person-muzzle-light',
+          intensityContract: 'transient-fire-decay',
+          attachedToRoot: true,
+          visible: true,
+          intensity: 0,
+        },
+      ],
+    });
+
+    presentation.suppressForFullscreenPresentation(false);
+    expect(presentation.root.visible).toBe(true);
+    expect(presentation.root.scale.toArray()).toEqual(restoredScale.toArray());
+    expect(presentation.root.position.toArray()).toEqual(restoredPosition.toArray());
+    expect(presentation.root.rotation.toArray()).toEqual(restoredRotation.toArray());
+    expect(fillLight?.intensity).toBeGreaterThan(0);
+    expect(muzzleLight?.intensity).toBe(0);
+    expect(presentation.presentationState().fullscreenSuppression.active).toBe(false);
   });
 
   it('keeps a rapid loadout switch atomic while initial browser assets are delayed', async () => {

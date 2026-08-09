@@ -1016,6 +1016,15 @@ export type KillstreakPlacementMarkerTelemetry = Readonly<{
   visible: boolean;
 }>;
 
+export type KillstreakCarpetWorkflowTelemetry = Readonly<{
+  impactFlashes: number;
+  bombShells: number;
+  emberParticles: number;
+  markers: readonly Readonly<Pick<KillstreakPlacementMarkerTelemetry,
+    'id' | 'source' | 'shape' | 'audience' | 'corridorLengthM' | 'colourHexes'
+    | 'depthTest' | 'writesDepth' | 'raycastDisabled' | 'visible'>>[];
+}>;
+
 export type KillstreakPresentationTelemetry = Readonly<{
   entities: number;
   impactFlashes: number;
@@ -2731,6 +2740,44 @@ export class KillstreakPresentation {
     root.updateWorldMatrix(true, false);
     const inverseParent = root.getWorldQuaternion(this.firstPersonRootQuaternionScratch).invert();
     cockpit.quaternion.copy(inverseParent.multiply(cameraWorldQuaternion));
+  }
+
+  carpetWorkflowTelemetry(): KillstreakCarpetWorkflowTelemetry {
+    const markers = [...this.placementMarkers.values()]
+      .filter(({ snapshot }) => snapshot.source === 'carpet-bomber')
+      .sort((left, right) => left.snapshot.id.localeCompare(right.snapshot.id))
+      .map(({ root, snapshot }) => {
+        const meshes = root.children.filter((child): child is THREE.Mesh => child instanceof THREE.Mesh);
+        const materials = meshes.flatMap((mesh) => (
+          Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+        ));
+        return Object.freeze({
+          id: snapshot.id,
+          source: snapshot.source,
+          shape: snapshot.shape,
+          audience: snapshot.audience,
+          corridorLengthM: snapshot.pathStart && snapshot.pathEnd
+            ? Math.hypot(
+              snapshot.pathEnd[0] - snapshot.pathStart[0],
+              snapshot.pathEnd[2] - snapshot.pathStart[2],
+            )
+            : null,
+          colourHexes: Object.freeze([...new Set(materials.flatMap((entry) => (
+            'color' in entry && entry.color instanceof THREE.Color ? [`#${entry.color.getHexString()}`] : []
+          )))].sort()),
+          depthTest: materials.every((entry) => entry.depthTest),
+          writesDepth: materials.some((entry) => entry.depthWrite),
+          raycastDisabled: root.raycast === disabledPlacementMarkerRaycast
+            && meshes.every((mesh) => mesh.raycast === disabledPlacementMarkerRaycast),
+          visible: root.visible && root.parent !== null,
+        });
+      });
+    return Object.freeze({
+      impactFlashes: countActive(this.impactFlashPool),
+      bombShells: countActive(this.bombShellPool),
+      emberParticles: countActive(this.emberPool),
+      markers: Object.freeze(markers),
+    });
   }
 
   telemetry(): KillstreakPresentationTelemetry {

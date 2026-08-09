@@ -1719,10 +1719,8 @@ let matchWebGpuQualityFrozen = false;
 renderRuntime.setPixelRatio(Math.min(window.devicePixelRatio, adaptiveQuality.telemetry().pixelRatioCap));
 let activeArenaVisualDefinition: ArenaVisualDefinition | null = null;
 
-let possessionRenderPixelRatioScale = 1;
-
 function applyAdaptiveRenderBudget(pixelRatioCap: number): void {
-  renderRuntime.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatioCap * possessionRenderPixelRatioScale));
+  renderRuntime.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatioCap));
   const effectsBudget = applyGraphicsPreferenceBudget(graphicsEffectsBudget(renderProfile, pixelRatioCap));
   graphicsRefinement.setBudget(effectsBudget);
   atomicSignal?.setEffectsBudget(effectsBudget);
@@ -2049,6 +2047,7 @@ async function exercisePreparedWebGpuWeaponSwitches(): Promise<void> {
         // sniper scope. Exercise the thermal composition state here too.
         camera.fov = magnifiedFovDegrees(preferredFov, DMR_THERMAL_MAGNIFICATION);
         camera.updateProjectionMatrix();
+        weaponView.suppressForFullscreenPresentation(true);
         hudRoot.classList.add('dmr-thermal-active');
         // First ADS otherwise compiled the through-wall ghost pipelines on the
         // live frame and froze the optic. Build ghosts for one live combatant of
@@ -2067,6 +2066,7 @@ async function exercisePreparedWebGpuWeaponSwitches(): Promise<void> {
           camera.fov = preferredFov;
           camera.updateProjectionMatrix();
         } else if (exercisesDmrThermal) {
+          weaponView.suppressForFullscreenPresentation(false);
           hudRoot.classList.remove('dmr-thermal-active');
           thermalGhostPresentation.sync([], false);
           camera.fov = preferredFov;
@@ -18134,15 +18134,6 @@ function hideGunnerCockpitHud(): void {
 
 function updateKillstreakPossession(now: number): void {
   const possession = localKillstreakActorSnapshot()?.possession;
-  // Piloted Drone / Chopper Gunner views render the full arena from altitude;
-  // drop the internal render resolution ~25% while possessed so frame time
-  // stays smooth (restored on exit).
-  const desiredScale = possession ? 0.75 : 1;
-  if (possessionRenderPixelRatioScale !== desiredScale) {
-    possessionRenderPixelRatioScale = desiredScale;
-    applyAdaptiveRenderBudget(adaptiveQuality.telemetry().pixelRatioCap);
-    resize();
-  }
   if (!possession) {
     killstreakPresentation.setFirstPersonEntity(null);
     hideGunnerCockpitHud();
@@ -18175,7 +18166,6 @@ function updateKillstreakPossession(now: number): void {
   camera.rotation.y = player.yaw;
   camera.rotation.x = player.pitch;
   killstreakPresentation.alignFirstPersonCockpit(entity.id, camera.quaternion);
-  weaponView.setPresentationVisible(false);
   syncGunnerCockpitHud(entity);
   // Chopper Gunner thermal vision: the heavy autocannon shoots through walls,
   // so the cockpit reveals living hostiles with the same thermal-ghost overlay
@@ -18313,8 +18303,7 @@ function updatePass65KillstreakRuntime(now: number): void {
   refreshSupportStatusHud(now);
   const possession = localKillstreakActorSnapshot()?.possession;
   document.documentElement.dataset.killstreakPossession = possession?.kind ?? 'none';
-  if (sniperScopeActive) weaponView.suppressForSniperScope(true);
-  else weaponView.setPresentationVisible(shouldShowWeaponViewmodel());
+  synchronizeWeaponViewmodelPresentation();
   updateKillstreakPossession(now);
 }
 
@@ -19881,6 +19870,14 @@ function shouldShowWeaponViewmodel(): boolean {
     && !debugCaptureViewmodelHidden;
 }
 
+function synchronizeWeaponViewmodelPresentation(): void {
+  if (sniperScopeActive || dmrThermalActive || localKillstreakActorSnapshot()?.possession) {
+    weaponView.suppressForFullscreenPresentation(true);
+    return;
+  }
+  weaponView.setPresentationVisible(shouldShowWeaponViewmodel());
+}
+
 function updatePhysics(dt: number): void {
   if (!playerSimulationEnabled() || !characterPhysics) return;
   const forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
@@ -20072,8 +20069,7 @@ function updatePhysics(dt: number): void {
     && weaponView.adsProgress() >= 0.9
     && Math.abs(camera.fov - aimingFov) < 0.35;
   hudRoot.classList.toggle('dmr-thermal-active', dmrThermalActive);
-  if (sniperScopeActive) weaponView.suppressForSniperScope(true);
-  else weaponView.setPresentationVisible(shouldShowWeaponViewmodel());
+  synchronizeWeaponViewmodelPresentation();
   camera.position.copy(player.position);
   camera.position.y += cameraHeightOffset - landingImpulse * 0.035 * accessibilityRuntime.weaponMotionScale;
   camera.rotation.y = player.yaw + recoilCamera.yaw;
@@ -23107,7 +23103,9 @@ function frame(now: number, scheduleNext = true): void {
         camera.fov = debugCaptureCameraFov;
         camera.updateProjectionMatrix();
       }
-      camera.updateMatrixWorld(true);
+      // Update only the camera/ancestor chain here. The renderer owns the one
+      // descendant propagation for the retained viewmodel hierarchy.
+      camera.updateWorldMatrix(true, false);
     }
     updateCrosshairSupportPreview();
     updateCorpsePresentations(now);
@@ -23565,18 +23563,35 @@ function playableSceneProof(): Record<string, unknown> {
   };
 }
 
-function sampleEnduranceHealth() {
+type EnduranceHealthDetail = 'base' | 'piloted-workflow' | 'carpet-workflow';
+
+function sampleEnduranceHealth(detail: EnduranceHealthDetail = 'base') {
   let choppers = 0;
   let swarmDrones = 0;
   for (const entity of killstreakSnapshot.entities) {
     if (entity.kind === 'chopper') choppers += 1;
     else if (entity.kind === 'drone' && entity.mode === 'swarm') swarmDrones += 1;
   }
+  const localActor = detail === 'piloted-workflow' ? localKillstreakActorSnapshot() : null;
+  const ownedPilotedDrone = detail === 'piloted-workflow'
+    ? killstreakSnapshot.entities.find((entity) => (
+      entity.kind === 'drone' && entity.mode === 'piloted' && entity.ownerId === player.id
+    ))
+    : undefined;
+  const carpetAircraft = detail === 'carpet-workflow'
+    ? killstreakSnapshot.entities.find((entity) => (
+      entity.kind === 'aircraft' && entity.id.includes('carpet-aircraft')
+    ))
+    : undefined;
+  const carpetPresentationHealth = detail === 'carpet-workflow'
+    ? killstreakPresentation.carpetWorkflowTelemetry()
+    : null;
   const grenadeWorldPool = grenadeWorldPresentationPool.telemetry();
   const smokePresentation = smokeVolumePresentationPool.telemetry();
   return {
     frameCount,
     gameStarted,
+    matchPhase: matchState.phase,
     playerPosition: [player.position.x, player.position.y, player.position.z] as [number, number, number],
     arenaId: selectedArena.id,
     transition: {
@@ -23592,6 +23607,35 @@ function sampleEnduranceHealth() {
       entities: killstreakSnapshot.entities.length,
       choppers,
       swarmDrones,
+      pilotedWorkflow: detail === 'piloted-workflow' ? {
+        actor: localActor ? {
+          actorId: localActor.actorId,
+          possession: localActor.possession ? {
+            kind: localActor.possession.kind,
+            entityId: localActor.possession.entityId,
+          } : null,
+        } : null,
+        drone: ownedPilotedDrone ? {
+          id: ownedPilotedDrone.id,
+          ownerId: ownedPilotedDrone.ownerId,
+          position: [...ownedPilotedDrone.position] as [number, number, number],
+          attitude: [...ownedPilotedDrone.attitude] as [number, number, number],
+          revision: ownedPilotedDrone.revision,
+          magazine: ownedPilotedDrone.magazine,
+        } : null,
+      } : null,
+      carpetWorkflow: detail === 'carpet-workflow' && carpetPresentationHealth ? {
+        targetingMode: pointSupportTargeting?.id ?? (triPassTargeting ? 'tri-pass' : null),
+        crosshairTarget: crosshairPreviewLastPoint?.toArray() ?? null,
+        markers: carpetPresentationHealth.markers,
+        aircraft: carpetAircraft ? {
+          id: carpetAircraft.id,
+          position: [...carpetAircraft.position] as [number, number, number],
+        } : null,
+        impactFlashes: carpetPresentationHealth.impactFlashes,
+        bombShells: carpetPresentationHealth.bombShells,
+        emberParticles: carpetPresentationHealth.emberParticles,
+      } : null,
     },
     grenadeWorldPool: {
       exhaustions: grenadeWorldPool.exhaustions,
@@ -23617,12 +23661,14 @@ function sampleAdmissionState() {
   };
 }
 
+type DebugPlayerPose = Readonly<{ yaw: number; pitch: number }>;
+
 const debugWindow = window as Window & {
   __ATOMIC_ACRES_DEBUG__?: {
-    snapshot: () => Record<string, unknown>;
+    snapshot: () => Record<string, unknown> & { player: DebugPlayerPose };
     admissionState: () => ReturnType<typeof sampleAdmissionState>;
     samplePresentationTelemetry: () => ReturnType<typeof renderRuntime.presentationTelemetry>;
-    sampleEnduranceHealth: () => ReturnType<typeof sampleEnduranceHealth>;
+    sampleEnduranceHealth: (detail?: EnduranceHealthDetail) => ReturnType<typeof sampleEnduranceHealth>;
     sampleWeaponCatalogReadiness: () => ReturnType<typeof weaponView.browserCatalogReadiness>;
     sampleWeaponAssetCache: () => ReturnType<typeof pass65WeaponCacheTelemetry>;
     traceBallistics: (
@@ -24156,6 +24202,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       stance: player.stance,
       crouched: player.stance === 'crouch',
       prone: player.stance === 'prone',
+      yaw: player.yaw,
+      pitch: player.pitch,
       sprinting: currentSprinting,
       grenades: player.grenades,
       combatInventory: localGuestCombatInventory(),
@@ -24661,7 +24709,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       // The scoped presentation remains resident at imperceptible scale so the
       // WebGPU render vocabulary stays warm. Expose the player-visible state,
       // not the implementation detail used to avoid a first-ADS pipeline stall.
-      viewmodelVisible: weaponView.root.visible && !sniperScopeActive,
+      viewmodelVisible: shouldShowWeaponViewmodel(),
     },
     weaponActionHistory: [...weaponActionHistory],
     menuVisible: !menu.classList.contains('hidden'),
@@ -26412,10 +26460,6 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
         sceneGeneration,
         yieldDeploymentPrewarmFrame,
       )],
-      // This retains the complete vehicle/effect vocabulary, three authored LOD
-      // bands, 24-drone formation and possessed-cockpit submissions. Its
-      // internal CPU yields naturally place later exact draws in bounded waves.
-      ['killstreak-vocabulary', () => killstreakPresentation.prewarm(renderRuntime, camera, sceneGeneration)],
     ] as const;
     // Start every compatible family in one call stack. RenderRuntime coalesces
     // their first exact roots into one masked TSL/HDR submission, while
@@ -26438,6 +26482,20 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
         )
       ))
     )));
+    // Three r185 includes the complete visible light graph in each render
+    // object's dynamic node cache key. Run support prewarm only after transient
+    // flare/flame lights have restored, then stage the ordinary live viewmodel
+    // fill plus zero-intensity muzzle light that coexist with world support in
+    // gameplay. Its internal CPU yields still bound the exact LOD, 24-drone
+    // formation and possessed-cockpit submissions.
+    groups.push(await runGroup('killstreak-vocabulary', async () => {
+      weaponView.setPresentationVisible(true);
+      try {
+        await killstreakPresentation.prewarm(renderRuntime, camera, sceneGeneration);
+      } finally {
+        weaponView.setPresentationVisible(false);
+      }
+    }));
     lastArenaEffectPrewarmProfile = Object.freeze({
       sceneGeneration,
       durationMs: Number((performance.now() - startedAt).toFixed(3)),

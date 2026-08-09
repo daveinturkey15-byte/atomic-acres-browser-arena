@@ -277,6 +277,48 @@ export const VIEWMODEL_NEAR_PLANE_CLEARANCE = 0.06;
 export const VIEWMODEL_NEAR_PLANE_SAFE_RETREAT = 0.28;
 const ADS_VIEWMODEL_BASE_POSITION = Object.freeze({ x: 0.28, y: -0.38, z: -1.04 });
 const ADS_VIEWMODEL_SCALE = 0.76;
+export const FULLSCREEN_PRESENTATION_SUPPRESSED_SCALE = 0.0001;
+export const FULLSCREEN_PRESENTATION_SUPPRESSION_CONTRACT = 'retained-structural-lights-fullscreen-suppression-v1';
+
+/**
+ * Extra max-contact retreat for authored first-person assets whose retained
+ * receiver/stock envelope is deeper than the M4A1 calibration weapon. These
+ * conservative upper bounds come from the 2026-08-09 real-GLB wall-contact
+ * sweep at camera.near + 0.02 m; the release verifier must be rerun whenever a
+ * source model or the gameplay camera near plane changes.
+ */
+export const FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT_CONTRACT = 'authored-glb-contact-retreat-2026-08-09-v1';
+export const FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT: Readonly<Record<WeaponId, number>> = Object.freeze({
+  carbine: 0,
+  smg: 0,
+  lmg: 0.1,
+  scattergun: 0.03,
+  sniper: 0.14,
+  'mini-uzi': 0,
+  mp5: 0,
+  m4a1: 0,
+  'ak-47': 0.03,
+  minigun: 0,
+  'm14-ebr': 0.05,
+  'slug-shotgun': 0.03,
+  pistol: 0,
+  'machine-pistol': 0,
+  magnum: 0,
+  'flashlight-pistol': 0,
+  'explosive-crossbow': 0,
+  railgun: 0.1,
+  flamethrower: 0,
+  'flare-gun': 0,
+});
+
+export function authoredNearPlaneContactRetreat(weapon: WeaponId, surfaceRetreat: number): number {
+  const contactBlend = THREE.MathUtils.clamp(
+    surfaceRetreat / VIEWMODEL_NEAR_PLANE_SAFE_RETREAT,
+    0,
+    1,
+  );
+  return FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT[weapon] * contactBlend;
+}
 
 /**
  * The viewmodel is framed for a 16:9 viewport at the default field of view.
@@ -745,7 +787,6 @@ export class WeaponPresentation {
     'railgun',
   ]);
   readonly root = new THREE.Group();
-  private frameCounter = 0;
 
   private enforceNearPlaneClearance(activeModel: THREE.Object3D | undefined, arms: THREE.Object3D | undefined): void {
     const cameraNear = this.camera instanceof THREE.PerspectiveCamera ? this.camera.near : 0.08;
@@ -892,12 +933,13 @@ export class WeaponPresentation {
   private weaponHeat = 0;
   private shotsPresented = 0;
   private flamethrowerHeldFireClearanceFastPathActive = false;
-  private flamethrowerHeldFireClearanceEntryChecks = 0;
-  private flamethrowerHeldFireClearanceExitChecks = 0;
+  private flamethrowerHeldFireClearanceEntryTransitions = 0;
+  private flamethrowerHeldFireClearanceExitTransitions = 0;
   private flamethrowerHeldFireClearanceSkippedFrames = 0;
   private flamethrowerHeldFireClearancePrewarmChecks = 0;
   private surfaceRetreat = 0;
   private surfaceLift = 0;
+  private fullscreenPresentationSuppressed = false;
   private readonly minigunSpool = createMinigunSpoolState();
   private actionContract: CharacterActionContract = characterActionContract({
     weapon: 'carbine', aimBlend: 0, sprintBlend: 0, reloadProgress: null, meleeProgress: null,
@@ -1230,6 +1272,7 @@ export class WeaponPresentation {
     this.passiveKnife.visible = false;
     this.root.add(this.passiveKnife);
     this.muzzleLight = new THREE.PointLight(0xffc36a, 0, 4.5, 2);
+    this.muzzleLight.name = 'first-person-muzzle-light';
     this.muzzleLight.position.set(0, 0.08, -1.15);
     if (!flattenMaterials) this.root.add(this.muzzleLight);
 
@@ -2118,6 +2161,13 @@ export class WeaponPresentation {
   }
 
   setPresentationVisible(visible: boolean): void {
+    if (this.fullscreenPresentationSuppressed) {
+      this.fullscreenPresentationSuppressed = false;
+      this.root.scale.setScalar(
+        THREE.MathUtils.lerp(HIP_VIEWMODEL_SCALE, ADS_VIEWMODEL_SCALE, this.adsBlend)
+          * viewmodelScreenScale(this.camera),
+      );
+    }
     this.root.visible = visible;
     this.viewmodelFill.intensity = visible
       ? Number(this.viewmodelFill.userData.authoredIntensity ?? 0)
@@ -2125,20 +2175,26 @@ export class WeaponPresentation {
   }
 
   /**
-   * Keep the prepared viewmodel render objects resident while the full-screen
-   * sniper optic owns the sight picture. Removing the root from the render list
-   * forced Three's WebGPU ScenePass node graph to rebuild on the first scoped
-   * frame; a near-zero exact-scale draw suppresses the model without changing
-   * the retained render vocabulary.
+   * Keep the prepared viewmodel render objects and structural lights resident
+   * while a full-screen optic or support cockpit owns the sight picture.
+   * Removing the root from the render list changes Three's WebGPU light/node
+   * graph and forces every active world-support object to rebuild. A near-zero
+   * exact-scale draw suppresses the model without changing that vocabulary.
    */
-  suppressForSniperScope(suppressed: boolean): void {
+  suppressForFullscreenPresentation(suppressed: boolean): void {
+    this.fullscreenPresentationSuppressed = suppressed;
     this.root.visible = true;
     this.root.scale.setScalar(suppressed
-      ? 0.0001
+      ? FULLSCREEN_PRESENTATION_SUPPRESSED_SCALE
       : THREE.MathUtils.lerp(HIP_VIEWMODEL_SCALE, ADS_VIEWMODEL_SCALE, this.adsBlend) * viewmodelScreenScale(this.camera));
     this.viewmodelFill.intensity = suppressed
       ? 0
       : Number(this.viewmodelFill.userData.authoredIntensity ?? 0);
+    if (suppressed) this.muzzleLight.intensity = 0;
+  }
+
+  suppressForSniperScope(suppressed: boolean): void {
+    this.suppressForFullscreenPresentation(suppressed);
   }
 
   /**
@@ -2193,13 +2249,15 @@ export class WeaponPresentation {
     (this.smokePoints.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
     (this.smokePoints.geometry.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
 
+    const surfaceRetreatClamped = Math.min(surfaceRetreat, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT);
     this.root.position.set(
       HIP_VIEWMODEL_POSITION.x,
       HIP_VIEWMODEL_POSITION.y,
       // The wall retreat is capped at the near-plane-safe distance: pushing
       // the weapon further back would drive the arms/stock through the near
       // plane and fail the prone framing contract.
-      HIP_VIEWMODEL_POSITION.z + Math.min(surfaceRetreat, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT),
+      HIP_VIEWMODEL_POSITION.z + surfaceRetreatClamped - VIEWMODEL_NEAR_PLANE_CLEARANCE
+        - authoredNearPlaneContactRetreat(this.active, surfaceRetreatClamped),
     );
     this.root.rotation.set(0, weaponHipYaw(this.active), 0);
     this.root.scale.setScalar(HIP_VIEWMODEL_SCALE);
@@ -2711,10 +2769,47 @@ export class WeaponPresentation {
       adsOpaqueSightWindow: opaqueSightWindowHits,
       flamethrowerHeldFireClearance: {
         fastPathActive: this.flamethrowerHeldFireClearanceFastPathActive,
-        entryChecks: this.flamethrowerHeldFireClearanceEntryChecks,
-        exitChecks: this.flamethrowerHeldFireClearanceExitChecks,
+        entryTransitions: this.flamethrowerHeldFireClearanceEntryTransitions,
+        exitTransitions: this.flamethrowerHeldFireClearanceExitTransitions,
         skippedFrames: this.flamethrowerHeldFireClearanceSkippedFrames,
         prewarmChecks: this.flamethrowerHeldFireClearancePrewarmChecks,
+      },
+      nearPlaneClearance: {
+        contract: FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT_CONTRACT,
+        cameraNear: this.camera instanceof THREE.PerspectiveCamera ? this.camera.near : 0.08,
+        requiredMargin: 0.02,
+        baseRetreat: VIEWMODEL_NEAR_PLANE_CLEARANCE,
+        maximumSurfaceRetreat: VIEWMODEL_NEAR_PLANE_SAFE_RETREAT,
+        cachedRetreat: FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT[this.active],
+        blendedRetreat: authoredNearPlaneContactRetreat(
+          this.active,
+          Math.min(this.surfaceRetreat, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT),
+        ),
+      },
+      fullscreenSuppression: {
+        contract: FULLSCREEN_PRESENTATION_SUPPRESSION_CONTRACT,
+        active: this.fullscreenPresentationSuppressed,
+        suppressedScale: FULLSCREEN_PRESENTATION_SUPPRESSED_SCALE,
+        rootVisible: this.root.visible,
+        rootScale: this.root.scale.x,
+        structuralLightCount: [this.viewmodelFill, this.muzzleLight]
+          .filter((light) => light.parent === this.root).length,
+        structuralLights: [
+          {
+            name: this.viewmodelFill.name,
+            intensityContract: 'zero-when-suppressed',
+            attachedToRoot: this.viewmodelFill.parent === this.root,
+            visible: this.viewmodelFill.visible,
+            intensity: this.viewmodelFill.intensity,
+          },
+          {
+            name: this.muzzleLight.name,
+            intensityContract: 'transient-fire-decay',
+            attachedToRoot: this.muzzleLight.parent === this.root,
+            visible: this.muzzleLight.visible,
+            intensity: this.muzzleLight.intensity,
+          },
+        ],
       },
       modelVisibleMeshCount,
       attachedWeaponBatchStats: model?.userData.attachedWeaponBatchStats ?? null,
@@ -2745,6 +2840,7 @@ export class WeaponPresentation {
         scaleMultiplier: viewmodelScreenScale(this.camera),
         rootScale: this.root.scale.x,
         rootPosition: this.root.position.toArray(),
+        rootRotation: [this.root.rotation.x, this.root.rotation.y, this.root.rotation.z],
       },
       actionContract: this.actionContract,
       surfaceRetreat: this.surfaceRetreat,
@@ -3419,21 +3515,22 @@ export class WeaponPresentation {
     // crosshair with a clear, unobstructed picture instead of drifting around it.
     const aimSteady = 1 - this.adsBlend * 0.86;
     const surfaceRetreatClamped = Math.min(pose.surfaceRetreat ?? 0, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT);
+    const authoredContactRetreat = authoredNearPlaneContactRetreat(this.active, surfaceRetreatClamped);
     const adsSightPictureRetreat = this.adsBlend * (FIRST_PERSON_ADS_SIGHT_PICTURE_RETREAT[this.active] ?? 0);
     // The fire kick plus a full surface retreat can push the viewmodel behind
     // the near plane while prone against a wall; the weapon must stay at least
     // as far from the camera as its near-plane-clear hip position, and the
-    // recoil pitch swings the stock back toward the camera, so the floor
-    // carries an extra stock-swing allowance during the fire kick.
-    const fireNearPlaneFloorZ = viewmodelBaseZ + surfaceRetreatClamped - adsSightPictureRetreat
+    // recoil pitch swings the stock back toward the camera, so the cap carries
+    // an extra stock-swing allowance during the fire kick.
+    const fireNearPlaneCapZ = viewmodelBaseZ + surfaceRetreatClamped - adsSightPictureRetreat
       - (presentationKick > 0.05 ? 0.1 : 0);
     const targetPosition = this.frameTargetPosition.set(
       viewmodelBaseX + adsX + (bobX + this.swayX) * aimSteady - pose.lateralSpeed * 0.012 * aimSteady + meleeArc * viewmodelMeleeScreenOffset(this.camera) + grenadeArc * 0.18 + reloadStage.lateral,
       viewmodelBaseY + adsY + (bobY + breath) * aimSteady + sprintDrop + crouchLift + proneLift + switchDrop + reloadStage.lift - presentationKick * 0.095 - pose.landingImpulse * 0.075 * aimSteady + meleeArc * 0.26,
-      Math.max(
+      Math.min(
         viewmodelBaseZ + adsZ + surfaceRetreatClamped - adsSightPictureRetreat - VIEWMODEL_NEAR_PLANE_CLEARANCE + presentationKick * profile.recoilTranslation * 1.12 + grenadeArc * 0.24,
-        fireNearPlaneFloorZ,
-      ),
+        fireNearPlaneCapZ,
+      ) - authoredContactRetreat,
     );
     this.surfaceRetreat = pose.surfaceRetreat ?? 0;
     this.surfaceLift = pose.surfaceLift ?? 0;
@@ -3448,35 +3545,21 @@ export class WeaponPresentation {
     this.centerSightReference(activeModel);
     if (arms && !meleeActive) this.solveArms(arms, activeModel, reloadPose);
     if (!authoredMeleeActive) this.solveRiggedArms(activeModel, reloadPose);
-    // Near-plane safety net: the recoil pitch and reload poses can swing a
-    // viewmodel or arm corner back toward the camera in a way that depends on
-    // arena geometry and camera pitch, so a fixed retreat floor is not enough.
-    // While the fire kick or a reload is active, push the root forward just
-    // enough that every bounding-box corner clears the near plane. Bounded to
-    // the kick/reload windows.
+    // The conservative position cap and authored contact retreat above are the
+    // live near-plane contract.
+    // Exact skinned bounds remain available to admission/diagnostic probes, but
+    // never traverse and deform the complete weapon/arm mesh during gameplay.
     const flamethrowerHeldFireFastPath = this.active === 'flamethrower' && pose.triggerHeld === true;
     const enteringFlamethrowerHeldFireFastPath = flamethrowerHeldFireFastPath
       && !this.flamethrowerHeldFireClearanceFastPathActive;
     const exitingFlamethrowerHeldFireFastPath = !flamethrowerHeldFireFastPath
       && this.flamethrowerHeldFireClearanceFastPathActive;
-    if (enteringFlamethrowerHeldFireFastPath || exitingFlamethrowerHeldFireFastPath) {
-      // The authored fire floor above remains active on every frame. Compute
-      // exact skinned bounds once at each state edge, not ten times per second
-      // throughout an automatic flame stream.
-      this.enforceNearPlaneClearance(activeModel, arms);
-      if (enteringFlamethrowerHeldFireFastPath) this.flamethrowerHeldFireClearanceEntryChecks += 1;
-      else this.flamethrowerHeldFireClearanceExitChecks += 1;
-    } else if (flamethrowerHeldFireFastPath) {
+    if (enteringFlamethrowerHeldFireFastPath) this.flamethrowerHeldFireClearanceEntryTransitions += 1;
+    if (exitingFlamethrowerHeldFireFastPath) this.flamethrowerHeldFireClearanceExitTransitions += 1;
+    if (flamethrowerHeldFireFastPath && !enteringFlamethrowerHeldFireFastPath) {
       this.flamethrowerHeldFireClearanceSkippedFrames += 1;
-    } else if (presentationKick > 0.05 || reloadProgress > 0) {
-      this.enforceNearPlaneClearance(activeModel, arms);
-    } else if ((this.frameCounter & 1) === 0) {
-      // Hip and idle poses can also cross the near plane in some arena and
-      // camera-pitch combinations, so keep a throttled always-on net.
-      this.enforceNearPlaneClearance(activeModel, arms);
     }
     this.flamethrowerHeldFireClearanceFastPathActive = flamethrowerHeldFireFastPath;
-    this.frameCounter += 1;
     return actionEvents;
   }
 }

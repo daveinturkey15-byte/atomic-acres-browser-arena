@@ -150,15 +150,15 @@ async function pauseAndDrainPresentation(page) {
     let lastPresentation = null;
     api.setRenderPaused(true);
     const inspect = () => {
-      const state = api.snapshot();
-      lastPresentation = state.render.runtime.presentation;
+      const health = api.sampleEnduranceHealth();
+      lastPresentation = health.runtime.presentation;
       if (lastPresentation.completedSequence >= lastPresentation.submissionSequence) {
-        // Resolve with the same snapshot that first proves equality. A second
-        // Node/browser round trip while intentionally paused would inflate the
-        // time-decaying gap telemetry with verifier time.
+        // Resolve with the same allocation-light health sample that first
+        // proves equality. A full graph snapshot here can itself schedule the
+        // verifier allocation/GC tail this held frontier is meant to isolate.
         resolve({
           atMs: performance.now(),
-          frameCount: state.frameCount,
+          frameCount: health.frameCount,
           presentation: lastPresentation,
         });
         return;
@@ -206,7 +206,7 @@ async function requireCaptureRecoveryCompletions(page, captureCompletionSequence
         })}`));
       };
       const inspect = () => {
-        const presentation = api.snapshot()?.render?.runtime?.presentation;
+        const presentation = api.sampleEnduranceHealth()?.runtime?.presentation;
         if (!presentation) {
           holdAndReject('Capture recovery lost presentation telemetry');
           return;
@@ -370,10 +370,12 @@ async function runPilotedDroneWorkflow(page, arenaId) {
       const inspect = () => performance.now() >= endsAt ? resolve() : requestAnimationFrame(inspect);
       requestAnimationFrame(inspect);
     });
-    const localActor = (state) => state.killstreak.actors[0] ?? null;
-    const ownedDrone = (state) => state.killstreak.entities.find((entity) => (
-      entity.kind === 'drone' && entity.mode === 'piloted' && entity.ownerId === localActor(state)?.actorId
-    ));
+    // Full debug snapshots traverse render diagnostics and authored geometry.
+    // Keep the measured cockpit workflow on the allocation-light endurance
+    // sampler so verifier observation cannot manufacture a gameplay long task.
+    const sampleWorkflow = () => api.sampleEnduranceHealth('piloted-workflow');
+    const localActor = (state) => state.killstreak.pilotedWorkflow.actor;
+    const ownedDrone = (state) => state.killstreak.pilotedWorkflow.drone;
     const longTasks = [];
     const observer = typeof PerformanceObserver === 'function'
       ? new PerformanceObserver((list) => {
@@ -383,7 +385,7 @@ async function runPilotedDroneWorkflow(page, arenaId) {
     observer?.observe({ type: 'longtask', buffered: false });
     api.setMovement(false);
     api.resetPresentationProgressWindow();
-    const before = api.snapshot();
+    const before = sampleWorkflow();
     const keyName = {
       KeyW: 'w', KeyS: 's', KeyD: 'd', KeyA: 'a', Space: ' ', ControlLeft: 'Control',
     };
@@ -397,13 +399,13 @@ async function runPilotedDroneWorkflow(page, arenaId) {
     try {
       api.activateSupport('piloted-drone');
       const activatedState = await waitFor(() => {
-        const state = api.snapshot();
+        const state = sampleWorkflow();
         return ownedDrone(state) ? state : null;
       }, 'activation');
       const activated = ownedDrone(activatedState);
       const possessionAccepted = api.togglePilotedDroneControl(activated.id);
       const possessedState = await waitFor(() => {
-        const state = api.snapshot();
+        const state = sampleWorkflow();
         const actor = localActor(state);
         return actor?.possession?.kind === 'piloted-drone' && actor.possession.entityId === activated.id
           && document.documentElement.dataset.killstreakPossession === 'piloted-drone'
@@ -415,7 +417,7 @@ async function runPilotedDroneWorkflow(page, arenaId) {
         hudVisible: document.querySelector('#support-combat-feedback')?.hidden === false,
       };
       const phase = async (code, expectedAxis, fire = false) => {
-        const phaseBeforeState = api.snapshot();
+        const phaseBeforeState = sampleWorkflow();
         const phaseBefore = ownedDrone(phaseBeforeState);
         if (fire) api.setTriggerHeld(true);
         dispatchKey('keydown', code);
@@ -423,7 +425,7 @@ async function runPilotedDroneWorkflow(page, arenaId) {
         dispatchKey('keyup', code);
         if (fire) api.setTriggerHeld(false);
         await waitDuration(80);
-        const phaseAfterState = api.snapshot();
+        const phaseAfterState = sampleWorkflow();
         const phaseAfter = ownedDrone(phaseAfterState);
         const displacement = phaseAfter.position.map((value, index) => value - phaseBefore.position[index]);
         const yaw = phaseBefore.attitude[1];
@@ -454,17 +456,17 @@ async function runPilotedDroneWorkflow(page, arenaId) {
       controls.push(await phase('Space', 'up'));
       controls.push(await phase('ControlLeft', 'down'));
       releaseAll();
-      const beforeExitState = api.snapshot();
+      const beforeExitState = sampleWorkflow();
       const beforeExit = ownedDrone(beforeExitState);
       const exitAccepted = api.togglePilotedDroneControl(activated.id);
       const exitedState = await waitFor(() => {
-        const state = api.snapshot();
+        const state = sampleWorkflow();
         const actor = localActor(state);
         return actor?.possession === null && document.documentElement.dataset.killstreakPossession === 'none'
           ? state : null;
       }, 'exit');
       await waitDuration(450);
-      const after = api.snapshot();
+      const after = sampleWorkflow();
       const afterExit = ownedDrone(after);
       const autonomousDisplacementM = Math.hypot(...afterExit.position.map((value, index) => value - beforeExit.position[index]));
       for (const entry of observer?.takeRecords() ?? []) {
@@ -484,12 +486,12 @@ async function runPilotedDroneWorkflow(page, arenaId) {
         autonomousDisplacementM,
         afterExitPosition: afterExit.position,
         frameDelta: after.frameCount - before.frameCount,
-        submissionDelta: after.render.runtime.presentation.submissionSequence - before.render.runtime.presentation.submissionSequence,
-        completionDelta: after.render.runtime.presentation.completedSequence - before.render.runtime.presentation.completedSequence,
+        submissionDelta: after.runtime.presentation.submissionSequence - before.runtime.presentation.submissionSequence,
+        completionDelta: after.runtime.presentation.completedSequence - before.runtime.presentation.completedSequence,
         longTasks,
-        presentation: after.render.runtime.presentation,
-        deviceLost: after.render.runtime.deviceLost,
-        uncapturedErrors: after.render.runtime.uncapturedErrors,
+        presentation: after.runtime.presentation,
+        deviceLost: after.runtime.deviceLost,
+        uncapturedErrors: after.runtime.uncapturedErrors,
         exited: localActor(exitedState)?.possession === null,
         thresholds: { submissionLimitMs, completionLimitMs, pendingLimitMs },
       };
@@ -543,36 +545,38 @@ async function runCarpetBomberWorkflow(page, arenaId) {
     observer?.observe({ type: 'longtask', buffered: false });
     api.setMovement(false);
     api.resetPresentationProgressWindow();
-    const before = api.snapshot();
-    const [x, y, z] = before.player.position;
+    const sampleWorkflow = () => api.sampleEnduranceHealth('carpet-workflow');
+    const carpet = (state) => state.killstreak.carpetWorkflow;
+    const before = sampleWorkflow();
+    const [x, y, z] = before.playerPosition;
     api.setCaptureCameraPose(x, y + 8, z, 0, -1.18);
     try {
       api.activateSupport('carpet-bomber');
       const targeting = await waitFor(() => {
-        const state = api.snapshot();
-        return state.fieldSupport.targetingMode === 'carpet-bomber' && state.fieldSupport.crosshairTarget
+        const state = sampleWorkflow();
+        return carpet(state).targetingMode === 'carpet-bomber' && carpet(state).crosshairTarget
           ? state : null;
       }, 'target preview');
-      const previewTarget = targeting.fieldSupport.crosshairTarget;
+      const previewTarget = carpet(targeting).crosshairTarget;
       window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyF', key: 'f', bubbles: true, cancelable: true }));
       window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyF', key: 'f', bubbles: true, cancelable: true }));
       const staged = await waitFor(() => {
-        const state = api.snapshot();
-        const markers = state.killstreakPresentation.markerDetails.filter((marker) => marker.source === 'carpet-bomber');
-        const aircraft = state.killstreak.entities.find((entity) => entity.kind === 'aircraft' && entity.id.includes('carpet-aircraft'));
-        return state.fieldSupport.targetingMode === null && markers.length === 2 && aircraft
+        const state = sampleWorkflow();
+        const markers = carpet(state).markers;
+        const aircraft = carpet(state).aircraft;
+        return carpet(state).targetingMode === null && markers.length === 2 && aircraft
           ? { state, markers, aircraft } : null;
       }, 'marker and aircraft projection');
       const dropped = await waitFor(() => {
-        const state = api.snapshot();
-        return state.killstreakPresentation.bombShells > before.killstreakPresentation.bombShells
+        const state = sampleWorkflow();
+        return carpet(state).bombShells > carpet(before).bombShells
           ? state : null;
       }, 'authored shell drop');
       const impact = await waitFor(() => {
-        const state = api.snapshot();
-        const aircraft = state.killstreak.entities.find((entity) => entity.id === staged.aircraft.id);
-        const presented = state.killstreakPresentation.impactFlashes > before.killstreakPresentation.impactFlashes
-          || state.killstreakPresentation.emberParticles > before.killstreakPresentation.emberParticles;
+        const state = sampleWorkflow();
+        const aircraft = carpet(state).aircraft?.id === staged.aircraft.id ? carpet(state).aircraft : null;
+        const presented = carpet(state).impactFlashes > carpet(before).impactFlashes
+          || carpet(state).emberParticles > carpet(before).emberParticles;
         return presented && aircraft ? { state, aircraft } : null;
       }, 'flight and first impact');
       for (const entry of observer?.takeRecords() ?? []) {
@@ -584,7 +588,7 @@ async function runCarpetBomberWorkflow(page, arenaId) {
       return {
         skipped: false,
         preview: {
-          targetingMode: targeting.fieldSupport.targetingMode,
+          targetingMode: carpet(targeting).targetingMode,
           crosshairTarget: previewTarget,
         },
         markers: staged.markers,
@@ -595,21 +599,21 @@ async function runCarpetBomberWorkflow(page, arenaId) {
           displacementM: aircraftDisplacementM,
         },
         impactPresentation: {
-          baselineImpactFlashes: before.killstreakPresentation.impactFlashes,
-          baselineBombShells: before.killstreakPresentation.bombShells,
-          baselineEmberParticles: before.killstreakPresentation.emberParticles,
-          droppedBombShells: dropped.killstreakPresentation.bombShells,
-          impactFlashes: after.killstreakPresentation.impactFlashes,
-          bombShells: after.killstreakPresentation.bombShells,
-          emberParticles: after.killstreakPresentation.emberParticles,
+          baselineImpactFlashes: carpet(before).impactFlashes,
+          baselineBombShells: carpet(before).bombShells,
+          baselineEmberParticles: carpet(before).emberParticles,
+          droppedBombShells: carpet(dropped).bombShells,
+          impactFlashes: carpet(after).impactFlashes,
+          bombShells: carpet(after).bombShells,
+          emberParticles: carpet(after).emberParticles,
         },
         frameDelta: after.frameCount - before.frameCount,
-        submissionDelta: after.render.runtime.presentation.submissionSequence - before.render.runtime.presentation.submissionSequence,
-        completionDelta: after.render.runtime.presentation.completedSequence - before.render.runtime.presentation.completedSequence,
+        submissionDelta: after.runtime.presentation.submissionSequence - before.runtime.presentation.submissionSequence,
+        completionDelta: after.runtime.presentation.completedSequence - before.runtime.presentation.completedSequence,
         longTasks,
-        presentation: after.render.runtime.presentation,
-        deviceLost: after.render.runtime.deviceLost,
-        uncapturedErrors: after.render.runtime.uncapturedErrors,
+        presentation: after.runtime.presentation,
+        deviceLost: after.runtime.deviceLost,
+        uncapturedErrors: after.runtime.uncapturedErrors,
       };
     } finally {
       api.setCaptureCameraPose(null);
@@ -642,29 +646,74 @@ async function runCarpetBomberWorkflow(page, arenaId) {
 
 async function runLifecycleRecoveryProbe(page, coverPage, arenaId) {
   const cycles = [];
+  const lifecycleResetReasonPattern = /^(?:tab visibility regained|window focus regained) · recovery [1-9]\d*$/;
   for (let cycle = 0; cycle < requiredLifecycleRecoveryCyclesPerVisit; cycle += 1) {
     await page.bringToFront();
     const before = await page.evaluate(() => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
       window.__PASS65_LIFECYCLE_EVENTS__.length = 0;
       api.resetPresentationProgressWindow();
-      const state = api.snapshot();
+      const state = api.sampleEnduranceHealth();
       return {
         frameCount: state.frameCount,
-        completedSequence: state.render.runtime.presentation.completedSequence,
+        completedSequence: state.runtime.presentation.completedSequence,
       };
     });
     await coverPage.bringToFront();
     await coverPage.waitForTimeout(150);
     await page.bringToFront();
+    const nativeLifecycleEventsComplete = await page.evaluate(() => {
+      const events = window.__PASS65_LIFECYCLE_EVENTS__ ?? [];
+      return events.some((entry) => entry.type === 'blur')
+        && events.some((entry) => entry.type === 'focus')
+        && events.some((entry) => entry.type === 'visibilitychange' && entry.visibilityState === 'hidden')
+        && events.some((entry) => entry.type === 'visibilitychange' && entry.visibilityState === 'visible');
+    });
+    if (!nativeLifecycleEventsComplete) {
+      // Headless Chromium does not guarantee lifecycle events when Playwright
+      // changes the foreground page. Exercise the same production listeners
+      // deterministically, but only after the native page transition failed to
+      // provide a complete hidden -> visible cycle.
+      await page.evaluate(async () => {
+        const previousVisibilityState = Object.getOwnPropertyDescriptor(document, 'visibilityState');
+        const previousHidden = Object.getOwnPropertyDescriptor(document, 'hidden');
+        const previousHasFocus = Object.getOwnPropertyDescriptor(document, 'hasFocus');
+        let visibilityState = 'hidden';
+        let hidden = true;
+        let focused = false;
+        Object.defineProperties(document, {
+          visibilityState: { configurable: true, get: () => visibilityState },
+          hidden: { configurable: true, get: () => hidden },
+          hasFocus: { configurable: true, value: () => focused },
+        });
+        const restore = (property, descriptor) => {
+          if (descriptor) Object.defineProperty(document, property, descriptor);
+          else delete document[property];
+        };
+        try {
+          window.dispatchEvent(new Event('blur'));
+          document.dispatchEvent(new Event('visibilitychange'));
+          await new Promise((resolve) => setTimeout(resolve, 150));
+          visibilityState = 'visible';
+          hidden = false;
+          document.dispatchEvent(new Event('visibilitychange'));
+          focused = true;
+          window.dispatchEvent(new Event('focus'));
+        } finally {
+          restore('visibilityState', previousVisibilityState);
+          restore('hidden', previousHidden);
+          restore('hasFocus', previousHasFocus);
+        }
+      });
+    }
     await page.waitForFunction(({ minimumFrameCount, minimumCompletionSequence }) => {
-      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+      const state = window.__ATOMIC_ACRES_DEBUG__?.sampleEnduranceHealth();
       const events = window.__PASS65_LIFECYCLE_EVENTS__ ?? [];
       return state?.gameStarted === true
         && state.matchPhase === 'active'
-        && state.render.runtime.presentation.status === 'healthy'
-        && state.render.runtime.deviceLost === false
-        && state.render.runtime.uncapturedErrors === 0
+        && state.runtime.presentation.status === 'healthy'
+        && state.runtime.deviceLost === false
+        && state.runtime.uncapturedErrors === 0
         && document.visibilityState === 'visible'
         && document.hasFocus()
         && events.some((entry) => entry.type === 'blur')
@@ -672,7 +721,7 @@ async function runLifecycleRecoveryProbe(page, coverPage, arenaId) {
         && events.some((entry) => entry.type === 'visibilitychange' && entry.visibilityState === 'hidden')
         && events.some((entry) => entry.type === 'visibilitychange' && entry.visibilityState === 'visible')
         && state.frameCount >= minimumFrameCount
-        && state.render.runtime.presentation.completedSequence >= minimumCompletionSequence;
+        && state.runtime.presentation.completedSequence >= minimumCompletionSequence;
     }, {
       minimumFrameCount: before.frameCount + 8,
       minimumCompletionSequence: before.completedSequence + 1,
@@ -680,13 +729,13 @@ async function runLifecycleRecoveryProbe(page, coverPage, arenaId) {
     const after = await page.evaluate(() => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
       api.setMovement(true, true);
-      const state = api.snapshot();
+      const state = api.sampleEnduranceHealth();
       return {
         frameCount: state.frameCount,
-        presentation: state.render.runtime.presentation,
-        deviceLost: state.render.runtime.deviceLost,
-        uncapturedErrors: state.render.runtime.uncapturedErrors,
-        framePacing: state.render.framePacing,
+        presentation: state.runtime.presentation,
+        deviceLost: state.runtime.deviceLost,
+        uncapturedErrors: state.runtime.uncapturedErrors,
+        framePacing: state.runtime.presentation.progress.submissionPacing,
         visibilityState: document.visibilityState,
         focused: document.hasFocus(),
         events: [...window.__PASS65_LIFECYCLE_EVENTS__],
@@ -694,13 +743,14 @@ async function runLifecycleRecoveryProbe(page, coverPage, arenaId) {
     });
     const receipt = {
       cycle,
+      lifecycleStimulus: nativeLifecycleEventsComplete ? 'native-page-focus' : 'headless-event-fallback',
       frameDelta: after.frameCount - before.frameCount,
       completionDelta: after.presentation.completedSequence - before.completedSequence,
       ...after,
     };
     if (receipt.presentation.status !== 'healthy' || receipt.deviceLost || receipt.uncapturedErrors !== 0
       || receipt.frameDelta < 8 || receipt.completionDelta < 1 || !receipt.focused || receipt.visibilityState !== 'visible'
-      || !['tab visibility regained', 'window focus regained'].includes(receipt.framePacing.lastResetReason)
+      || !lifecycleResetReasonPattern.test(receipt.framePacing.lastResetReason ?? '')
       || receipt.presentation.progress.maximumSubmissionGapMs > maximumLiveSubmissionGapMs
       || receipt.presentation.progress.maximumCompletionGapMs > maximumLiveCompletionGapMs
       || receipt.presentation.progress.maximumPendingForMs > maximumLivePendingMs) {
@@ -1090,6 +1140,37 @@ try {
     if (activeStressBudget && activeStressBudget.budgetAudit.pass !== true) {
       throw new Error(`${arenaId} exceeded its live chopper, drone and carpet-bomber support budget: ${JSON.stringify(activeStressBudget)}`);
     }
+    // The admission audit intentionally walks the complete scene graph and
+    // renderer residency while presentation is held. Chrome can defer that
+    // verifier-owned allocation/GC or driver tail until the next live task.
+    // Unpause outside measurement, require a sustained strict completion
+    // frontier, then hold and drain again before opening the live observer.
+    activeContext = { visit, arenaId, phase: 'arena-admission-recovery', sampleIndex: null };
+    const auditTailBaseline = await page.evaluate(() => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      const health = api.sampleEnduranceHealth();
+      const presentation = health.runtime.presentation;
+      if (presentation.submissionSequence !== presentation.completedSequence) {
+        throw new Error(`Arena admission audit did not leave a drained frontier: ${JSON.stringify(presentation)}`);
+      }
+      const baseline = {
+        atMs: performance.now(),
+        frameCount: health.frameCount,
+        presentation,
+      };
+      api.setRenderPaused(false);
+      return baseline;
+    });
+    const auditTailRecovery = await requireCaptureRecoveryCompletions(
+      page,
+      auditTailBaseline.presentation.completedSequence,
+    );
+    const auditTailHeldFrontier = await pauseAndDrainPresentation(page);
+    const arenaAdmissionRecovery = {
+      baseline: summarizeHeldFrontier(auditTailBaseline),
+      recovery: summarizeCaptureRecovery(auditTailRecovery),
+      heldFrontier: summarizeHeldFrontier(auditTailHeldFrontier),
+    };
     const durationMs = arenaId === 'rustworks-1v1' ? rustworksDurationMs : otherArenaDurationMs;
     const samples = [];
     let sampleIndex = 0;
@@ -1517,6 +1598,7 @@ try {
       carpetBomberProbe,
       lifecycleRecoveryProbe,
       activeStressBudget,
+      arenaAdmissionRecovery,
       admissionRuntimeIdentity: arenaAdmissionAudit.runtimeIdentity,
       doorResetProbe,
       live: {
