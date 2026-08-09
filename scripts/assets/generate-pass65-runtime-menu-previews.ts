@@ -329,6 +329,11 @@ async function captureArena(page: Page, arenaId: ArenaId): Promise<CaptureEviden
     await page.evaluate(({ pose, yaw, pitch, fixedTimeMs, seed, frame, mainRotorTurns, tailRotorTurns, altitude, rotorPose }) => {
       const debug = (window as unknown as { __ATOMIC_ACRES_DEBUG__: any }).__ATOMIC_ACRES_DEBUG__;
       debug.setCaptureCameraPose(pose.position[0], pose.position[1], pose.position[2], yaw, pitch, pose.fov, fixedTimeMs, seed);
+      // Respawn, weapon-switch, and match lifecycle events may directly reveal
+      // the viewmodel after the capture starts. Reassert the existing
+      // synchronous authoring hide for every requested frame so late gameplay
+      // presentation cannot leak into an otherwise healthy offline master.
+      debug.setCaptureViewmodelHidden(true);
       debug.setGrassTime(fixedTimeMs / 1_000);
       const overlay = document.querySelector<HTMLElement>('#offline-menu-preview-overlay');
       if (overlay) {
