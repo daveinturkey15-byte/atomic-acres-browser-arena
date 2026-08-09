@@ -427,25 +427,44 @@ async function refreshGunRangeRoundAndRestoreContact(
     api.teleportPlayer(...fixture.teleportPosition, fixture.yaw, fixture.pitch);
     api.setStance('prone');
   }, CONTACT_FIXTURE);
-  await page.waitForFunction((fixture) => {
-    const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
-    const position = state.player.position;
-    if (!Array.isArray(position) || position.length !== 3) return false;
-    const positionError = Math.max(...position.map((value: number, index: number) => (
-      Math.abs(value - fixture.settledPosition[index]!)
-    )));
-    const yawError = Math.abs(Math.atan2(
-      Math.sin(state.player.yaw - fixture.yaw),
-      Math.cos(state.player.yaw - fixture.yaw),
-    ));
-    const pitchError = Math.abs(state.player.pitch - fixture.pitch);
-    return state.matchPhase === 'active'
-      && state.player.stance === fixture.stance
-      && positionError <= fixture.maximumPositionAxisError
-      && yawError <= fixture.maximumAngularError
-      && pitchError <= fixture.maximumAngularError
-      && state.weaponPresentation.surfaceRetreat >= state.weaponPresentation.nearPlaneClearance.maximumSurfaceRetreat;
-  }, CONTACT_FIXTURE, { timeout: 10_000 });
+  try {
+    await page.waitForFunction((fixture) => {
+      const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
+      const position = state.player.position;
+      if (!Array.isArray(position) || position.length !== 3) return false;
+      const positionError = Math.max(...position.map((value: number, index: number) => (
+        Math.abs(value - fixture.settledPosition[index]!)
+      )));
+      const yawError = Math.abs(Math.atan2(
+        Math.sin(state.player.yaw - fixture.yaw),
+        Math.cos(state.player.yaw - fixture.yaw),
+      ));
+      const pitchError = Math.abs(state.player.pitch - fixture.pitch);
+      return state.matchPhase === 'active'
+        && state.player.stance === fixture.stance
+        && positionError <= fixture.maximumPositionAxisError
+        && yawError <= fixture.maximumAngularError
+        && pitchError <= fixture.maximumAngularError
+        && state.weaponPresentation.surfaceRetreat >= state.weaponPresentation.nearPlaneClearance.maximumSurfaceRetreat;
+    }, CONTACT_FIXTURE, { timeout: 10_000 });
+  } catch (error) {
+    const diagnostic = await page.evaluate((fixture) => {
+      const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
+      const position = state.player.position as number[];
+      return {
+        matchPhase: state.matchPhase,
+        stance: state.player.stance,
+        position,
+        positionAxisError: position.map((value, index) => Math.abs(value - fixture.settledPosition[index]!)),
+        yaw: state.player.yaw,
+        pitch: state.player.pitch,
+        surfaceRetreat: state.weaponPresentation.surfaceRetreat,
+        maximumSurfaceRetreat: state.weaponPresentation.nearPlaneClearance.maximumSurfaceRetreat,
+        surfaceLift: state.weaponPresentation.surfaceLift,
+      };
+    }, CONTACT_FIXTURE);
+    throw new Error(`Contact restoration failed after ${afterWeapon}: ${JSON.stringify(diagnostic)}`, { cause: error });
+  }
   const before = await presentedFrame(page);
   await waitForPresentedFrames(page, before, 4);
   const returnedState = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot());
