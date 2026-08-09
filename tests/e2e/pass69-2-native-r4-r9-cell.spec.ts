@@ -216,10 +216,15 @@ async function runTimedCycle(page: Page, timedWeapon: TimedMapWeaponId, cycle: '
     }
   } else {
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.fireOnce());
-    await page.waitForFunction((spawnCount) => {
-      const telemetry = (window.__ATOMIC_ACRES_DEBUG__!.snapshot() as any).timedMapWeapons.flareProjectiles;
-      return telemetry.spawnCount > spawnCount && telemetry.impactCount > 0 && telemetry.burnPulseCount > 0;
-    }, beforeEffects.flareProjectiles.spawnCount, { polling: 'raf', timeout: 5_000 });
+    for (const metric of ['spawnCount', 'impactCount', 'burnPulseCount'] as const) {
+      await expect.poll(async () => page.evaluate((name) => {
+        const telemetry = (window.__ATOMIC_ACRES_DEBUG__!.snapshot() as any).timedMapWeapons.flareProjectiles;
+        return telemetry[name] as number;
+      }, metric), {
+        message: `flare ${metric} must advance during ${cycle}`,
+        timeout: 5_000,
+      }).toBeGreaterThan(beforeEffects.flareProjectiles[metric]);
+    }
   }
   const completedAt = await page.evaluate(() => performance.now());
   await page.waitForTimeout(1_200);

@@ -54,7 +54,8 @@ describe('Pass 69.2 strict native R4/R9 runner contract', () => {
     expect(spec).toContain("api.aimAtBot('body')");
     expect(spec).toContain('grantRailgunToLocal()');
     expect(spec).toContain('telemetry.groundFireActive > 0');
-    expect(spec).toContain('telemetry.impactCount > 0 && telemetry.burnPulseCount > 0');
+    expect(spec).toContain("['spawnCount', 'impactCount', 'burnPulseCount']");
+    expect(spec).toContain('toBeGreaterThan(beforeEffects.flareProjectiles[metric])');
     expect(spec).toContain("await runTimedCycle(page, timedWeapon, 'cold')");
     expect(spec).toContain("await runTimedCycle(page, timedWeapon, 'warm')");
   });
