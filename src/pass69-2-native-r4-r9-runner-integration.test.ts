@@ -49,6 +49,7 @@ describe('Pass 69.2 strict native R4/R9 runner contract', () => {
     expect(spec).toContain("state.dmrThermal.active === true");
     expect(spec).toContain("state.railgun.thermalVisible === true");
     expect(spec).toContain('teleportPlayer(px, py, pz, 0, 0.9)');
+    expect(spec).toContain('grantRailgunToLocal()');
     expect(spec).toContain('telemetry.groundFireActive > 0');
     expect(spec).toContain('telemetry.impactCount > 0 && telemetry.burnPulseCount > 0');
     expect(spec).toContain("await runTimedCycle(page, timedWeapon, 'cold')");

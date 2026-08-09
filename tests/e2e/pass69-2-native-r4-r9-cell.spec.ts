@@ -112,7 +112,7 @@ async function equipSniper(page: Page, sniper: WeaponId): Promise<void> {
       } else {
         // Railgun world spawns are deliberately Atomic-Acres-only. Other
         // arenas still need the real scoped renderer exercised by this matrix.
-        api.equipWeapon(weaponId);
+        if (api.grantRailgunToLocal() !== true) throw new Error('QA railgun authority grant was rejected');
       }
     } else {
       api.equipWeapon(weaponId);

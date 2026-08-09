@@ -23637,6 +23637,7 @@ const debugWindow = window as Window & {
       positions: number[][];
     };
     replayLastRailgunResult: () => boolean;
+    grantRailgunToLocal: () => boolean;
     grantRailgunToRemote: (playerId: string) => boolean;
     interactRailgun: () => boolean | string;
     degradeStateChannel: () => boolean;
@@ -25879,6 +25880,26 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     applyRailgunState(claimed.state);
     broadcastRailgunState();
     return true;
+  },
+  grantRailgunToLocal: () => {
+    if (!localMultiplayerQa || !gameStarted || network.role === 'client' || !player.alive) return false;
+    let claimable = railgunState;
+    if (claimable.status !== 'available') {
+      const scheduled = createRailgunAuthorityState(
+        'atomic-acres',
+        0,
+        0.01 / RAILGUN_UPPER_ROOM_SPAWN_SITES.length,
+        railgunState.generation + 1,
+      );
+      claimable = advanceRailgunAuthority(scheduled, RAILGUN_SPAWN_DELAY_MS).state;
+      applyRailgunState(claimable);
+    }
+    const claimed = claimRailgun(claimable, player.id, claimable.generation);
+    if (!claimed.accepted) return false;
+    dropHeldTimedMapWeapons(player.id, player.position.clone().add(new THREE.Vector3(0, 0.3, 0)));
+    applyRailgunState(claimed.state);
+    broadcastRailgunState();
+    return localHoldsRailgun();
   },
   interactRailgun: () => {
     if (!player.alive) return 'rejected: player-dead';
