@@ -3,7 +3,7 @@
   "captureId": "pass66-authoritative-runtime-menu-preview-capture-v2",
   "generatedAt": "2026-08-02",
   "recipeId": "pass66-authoritative-runtime-menu-preview-v2",
-  "recipeDigest": "918da3381cd69d28d55d5c0519100b831753a0b6e9369bc23757c063e463b28d",
+  "recipeDigest": "2d3af55e6bd8cd3b247567337d4c469ea51c41daeb05e504e17a33659fd4b602",
   "source": "authoritative-runtime-arena",
   "backendRequired": "webgpu",
   "viewport": [
@@ -272,11 +272,11 @@
     "captureTools": [
       {
         "path": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
-        "sha256": "d0f25b6f0dacb00571ca75a6434e9e1c4772ac6bb70deb89d694a10d0c2431e6"
+        "sha256": "5b27240bafe6528591a6e4327b52e027eed7c81cd19d3b4277b1567f5f4c05b1"
       },
       {
         "path": "scripts/assets/pass65-menu-preview-integrity.mjs",
-        "sha256": "dd2df1c602ecd40ce4d15caae63461ce7b8d06c4d352172005c3a6b7b1c734ff"
+        "sha256": "3b694b344adf2763f79e4bcf1de8cb72df3e6425b5c63df699dd1b2c8fcb2725"
       },
       {
         "path": "scripts/assets/pass65-menu-preview-integrity.d.mts",
@@ -409,7 +409,7 @@
       ],
       "fileCount": 1031,
       "totalBytes": 111115424,
-      "treeSha256": "a99d974632e081fa5051fbc391aedf0cf0e40df3bc09269d76baea0c3059143b",
+      "treeSha256": "30f984d3b3ab84a31614bc32b367e3bec0d4e529a670289287082f1c34f72f98",
       "files": [
         {
           "path": "public/assets/original/models/atomic-acres-blender-arena.glb",
@@ -5304,12 +5304,12 @@
         {
           "path": "src/ui/menu-preview-video.test.ts",
           "sizeBytes": 5922,
-          "sha256": "b21737e9a5ad93022bf2b8b8924be56ee7b4467b64397d6234ee222c1608d92e"
+          "sha256": "ffce88ac7c15f37c287d857857cb59135fb520d5ff32bfb18bcec2fd1718fd99"
         },
         {
           "path": "src/ui/menu-preview-video.ts",
           "sizeBytes": 14106,
-          "sha256": "cb3592690c952d4c4d1a5c0a94de169fca073c16e6757f2b1892fb5587b3538f"
+          "sha256": "de5b1415eb321a8e7fa478c4313d231d87d8168e3d100fea1c17a150c356ceb9"
         },
         {
           "path": "src/ui/pass64-shell.test.ts",
@@ -5591,8 +5591,8 @@
         "algorithm": "sha256-ordered-name-size-bytes-v1",
         "domain": "menu-preview-frames:atomic-acres",
         "fileCount": 240,
-        "totalBytes": 991396976,
-        "sha256": "4a93ead27a32289e1d2255438f8f8cb2d21ecdf21617a46afd6299af926acc13",
+        "totalBytes": 991386553,
+        "sha256": "b5faa59480919bd064cf50bd307c2f0df0fbaae4c98ab7070bed6fc89664b4cb",
         "frameRoster": [
           1,
           2,
@@ -5982,7 +5982,7 @@
           "fixedVisualTimeMs": 68983.26359832636,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "64752d8c0f3597cd462c0a03348b56c8dfdee5bc4d077204813a3dc66a1955c6",
+          "pngSha256": "451fea8e46d0b1bd51fbf919270f1bde8705809636d8ba9a2dd38146601531e3",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.01937614017062717,
@@ -6046,7 +6046,7 @@
           "fixedVisualTimeMs": 70991.63179916318,
           "aboveArenaFloor": true,
           "insideHorizontalCollider": false,
-          "pngSha256": "ac51cc51fccb69ef101dd9737a9afc284fde52471453b32201c7d8886386e8d5",
+          "pngSha256": "9a112f3f5c899c3dfba9f233e83c253a7905c9db548fd418f4380e2f70909996",
           "rotorProjection": {
             "mode": "perspective-elliptic-motion-arcs",
             "stageTopFraction": -0.037695002555847165,
@@ -6181,8 +6181,8 @@
         "algorithm": "sha256-ordered-name-size-bytes-v1",
         "domain": "menu-preview-frames:skyline-terminal",
         "fileCount": 240,
-        "totalBytes": 556160947,
-        "sha256": "33be0d2897326dadb60c00f701d9124dd909a5e595e44c75ff89b3b3cf673d25",
+        "totalBytes": 556160946,
+        "sha256": "d584fbe0d9770b1ac68d1f83ad40e5be5b15e57151f57eaed38bfbc0f90f0754",
         "frameRoster": [
           1,
           2,
@@ -6771,8 +6771,8 @@
         "algorithm": "sha256-ordered-name-size-bytes-v1",
         "domain": "menu-preview-frames:rustworks-1v1",
         "fileCount": 240,
-        "totalBytes": 658836923,
-        "sha256": "b09a8beea27e5083f10a7b9842338c65141a1ef35f7847ec0b8698cf9386a8e0",
+        "totalBytes": 658837417,
+        "sha256": "5197582f38b231b5bdb1ad43f3c5c7871d5d06425975c14789e369fa8fa3efb4",
         "frameRoster": [
           1,
           2,

@@ -25,9 +25,9 @@ describe('prerecorded map-selection previews', () => {
       expect(definition.width / definition.height).toBeCloseTo(16 / 9, 5);
       expect(definition.width).toBe(2560);
       expect(definition.height).toBe(1440);
-      expect(definition.webm).toMatch(new RegExp(`${id}\\.webm\\?v=pass66-runtime-preview-v10$`));
-      expect(definition.mp4).toMatch(new RegExp(`${id}\\.mp4\\?v=pass66-runtime-preview-v10$`));
-      expect(definition.poster).toMatch(new RegExp(`${id}\\.webp\\?v=pass66-runtime-preview-v10$`));
+      expect(definition.webm).toMatch(new RegExp(`${id}\\.webm\\?v=pass66-runtime-preview-v11$`));
+      expect(definition.mp4).toMatch(new RegExp(`${id}\\.mp4\\?v=pass66-runtime-preview-v11$`));
+      expect(definition.poster).toMatch(new RegExp(`${id}\\.webp\\?v=pass66-runtime-preview-v11$`));
       return [definition.webm, definition.mp4, definition.poster];
     });
     expect(new Set(assets).size).toBe(assets.length);
@@ -74,7 +74,7 @@ describe('prerecorded map-selection previews', () => {
         overlayOutputScale: 2,
       },
       media: {
-        cacheKey: 'pass66-runtime-preview-v10',
+        cacheKey: 'pass66-runtime-preview-v11',
         encodingBudget: {
           minimumAverageBitrateKbps: 3000,
           maximumAverageBitrateKbps: 9000,
@@ -122,10 +122,10 @@ describe('prerecorded map-selection previews', () => {
       fileCount: 12,
       totalBytes: 55328027,
     })]);
-    const v10Families = cacheFamilyLock.families.filter((family) => family.cacheKey === 'pass66-runtime-preview-v10');
+    const v10Families = cacheFamilyLock.families.filter((family) => family.cacheKey === 'pass66-runtime-preview-v11');
     expect(v10Families).toHaveLength(1);
     expect(v10Families[0]).toEqual(expect.objectContaining({
-      cacheKey: 'pass66-runtime-preview-v10',
+      cacheKey: 'pass66-runtime-preview-v11',
       fileCount: 12,
     }));
     expect(v10Families[0].finalMediaSetSha256).toMatch(/^[0-9a-f]{64}$/);
