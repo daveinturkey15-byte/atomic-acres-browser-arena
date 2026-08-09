@@ -5,14 +5,14 @@
   "status": "accepted",
   "preview": {
     "kind": "github-actions-artifact",
-    "ref": "pr-preview-54-638c63a8fa879e83aa38604b6e15add9519bfa5c",
-    "sourceSha": "638c63a8fa879e83aa38604b6e15add9519bfa5c",
-    "createdAt": "2026-08-09T10:25:37.000Z"
+    "ref": "pr-preview-54-d1bb492ba76a8229b28874d0e8c4ad608a3ebec2",
+    "sourceSha": "d1bb492ba76a8229b28874d0e8c4ad608a3ebec2",
+    "createdAt": "2026-08-09T10:29:32.825Z"
   },
   "humanAcceptance": {
     "state": "approved",
     "approvedBy": "Dave",
-    "approvedAt": "2026-08-09T10:25:37.000Z",
+    "approvedAt": "2026-08-09T10:29:32.825Z",
     "evidence": "Dave's current authorized owner instruction in the Telegram channel requests autonomous continuation until Pass 69.2 is reviewed, published through the required contribution and protected-release pipeline, and live-verified on GitHub Pages. This authorizes publication only when every exact-SHA gate is genuinely green; it does not claim that Dave inspected or tested this immutable preview."
   },
   "requirements": [
