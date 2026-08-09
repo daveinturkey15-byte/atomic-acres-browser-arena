@@ -171,6 +171,16 @@ async function runTimedCycle(page: Page, timedWeapon: TimedMapWeaponId, cycle: '
   await startTimingProbe(page);
   const startedAt = await page.evaluate(() => performance.now());
   if (timedWeapon === 'flamethrower') {
+    // The authored flamethrower has a real 180 ms spin-up and the runtime
+    // deliberately ignores primary fire until the gameplay canvas owns pointer
+    // lock. Acquire the same trusted input state used by the canonical Pass 66
+    // timed-weapon gate before holding the real trigger.
+    await page.locator('#game').click({ position: { x: 640, y: 360 } });
+    await page.waitForFunction(
+      () => document.pointerLockElement === document.querySelector('#game'),
+      undefined,
+      { timeout: 5_000 },
+    );
     await page.mouse.down();
     try {
       await page.waitForFunction((emissions) => {
