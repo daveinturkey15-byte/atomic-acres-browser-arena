@@ -718,6 +718,7 @@ const server = await createServer({
 });
 
 let browser;
+let browserContext;
 let page;
 let activeContext = null;
 let lastCompletedLiveSample = null;
@@ -739,7 +740,8 @@ try {
       '--disable-backgrounding-occluded-windows',
     ],
   });
-  page = await browser.newPage({ viewport: { width: 2560, height: 1440 }, deviceScaleFactor: 1 });
+  browserContext = await browser.newContext({ viewport: { width: 2560, height: 1440 }, deviceScaleFactor: 1 });
+  page = await browserContext.newPage();
   await page.addInitScript(() => {
     localStorage.setItem('atomic-acres:killstreak-loadout:v1', JSON.stringify({
       schemaVersion: 1,
@@ -1873,6 +1875,7 @@ try {
   }
   throw error;
 } finally {
+  await browserContext?.close();
   await browser?.close();
   await server.close();
 }
