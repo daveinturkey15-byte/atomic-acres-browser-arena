@@ -106,9 +106,14 @@ async function equipSniper(page: Page, sniper: WeaponId): Promise<void> {
     if (api.snapshot().player.weapon === weaponId) return;
     if (weaponId === 'railgun') {
       const staged = api.stageRailgunSpawn(0);
-      if (!Array.isArray(staged.pickupPosition)) throw new Error('Railgun spawn did not expose a pickup position');
-      api.teleportPlayer(...staged.pickupPosition);
-      if (api.interactRailgun() !== true) throw new Error('Railgun pickup was rejected');
+      if (Array.isArray(staged.pickupPosition)) {
+        api.teleportPlayer(...staged.pickupPosition);
+        if (api.interactRailgun() !== true) throw new Error('Railgun pickup was rejected');
+      } else {
+        // Railgun world spawns are deliberately Atomic-Acres-only. Other
+        // arenas still need the real scoped renderer exercised by this matrix.
+        api.equipWeapon(weaponId);
+      }
     } else {
       api.equipWeapon(weaponId);
     }

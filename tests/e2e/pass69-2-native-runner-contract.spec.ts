@@ -12,4 +12,6 @@ test('Pass 69.2 native gate completes required player launch input before truste
 
   expect(callsign).toBeGreaterThanOrEqual(0);
   expect(launch).toBeGreaterThan(callsign);
+  expect(source).toContain("if (Array.isArray(staged.pickupPosition))");
+  expect(source).toContain("api.equipWeapon(weaponId);");
 });
