@@ -93,12 +93,7 @@ const CONTACT_FIXTURE = Object.freeze({
   maximumAngularError: 0.000001,
 });
 const ROUND_CONTINUITY = Object.freeze({
-  contract: 'gun-range-test-bay-entry-round-refresh-v1',
-  // This is an empty systems-bay floor cell, away from the moving dummies and
-  // station interaction radii. Entering the production bay resets the normal
-  // two-minute Gun Range round; the gate then returns to the west-wall fixture.
-  bayEntryPosition: Object.freeze([54, 1.7, 0] as const),
-  bayBounds: Object.freeze({ minX: 51.5, maxX: 100, minZ: -52, maxZ: 64 }),
+  contract: 'gun-range-production-rematch-round-refresh-v1',
   minimumResetTimerSeconds: 119,
 });
 
@@ -374,7 +369,7 @@ async function deploy(page: Page): Promise<void> {
   await waitForPresentedFrames(page, before, 4);
 }
 
-async function refreshGunRangeRoundAndRestoreContact(
+async function rematchGunRangeRoundAndRestoreContact(
   page: Page,
   afterWeapon: WeaponId,
   nextWeapon: WeaponId,
@@ -383,67 +378,58 @@ async function refreshGunRangeRoundAndRestoreContact(
   const timerBeforeSeconds = matchTimerSeconds(timerBeforeText);
   expect(Number.isFinite(timerBeforeSeconds), `${afterWeapon}: readable pre-refresh Gun Range timer`).toBe(true);
   expect(timerBeforeSeconds, `${afterWeapon}: round is still active before refresh`).toBeGreaterThan(0);
+  const roundBefore = await page.evaluate(() => {
+    const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
+    return {
+      matchPhase: state.matchPhase,
+      matchEpoch: state.killstreak.matchEpoch,
+      playerContinuity: state.player.continuity,
+    };
+  });
 
-  await page.evaluate((continuity) => {
+  await page.evaluate(() => {
     const api = window.__ATOMIC_ACRES_DEBUG__;
     api.setAds(false);
     api.setFireCaptureAgeMs(null);
     api.setReloadCaptureProgress(null);
     api.setMeleeCaptureProgress(null);
-    api.teleportPlayer(...continuity.bayEntryPosition, 0, 0);
-  }, ROUND_CONTINUITY);
-  await page.waitForFunction(({ continuity, timerBefore }) => {
+    api.rematch();
+  });
+  await page.waitForFunction(({ continuity, previous, timerBefore }) => {
     const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
-    const position = state.player.position;
     const text = document.querySelector<HTMLElement>('#timer')?.textContent ?? '';
     const match = /^(\d{2}):(\d{2})$/u.exec(text);
     const secondsField = match ? Number(match[2]) : Number.NaN;
     const seconds = match && secondsField < 60 ? Number(match[1]) * 60 + secondsField : Number.NaN;
     return state.matchPhase === 'active'
-      && Array.isArray(position)
-      && position.length === 3
-      && position[0] >= continuity.bayBounds.minX
-      && position[0] <= continuity.bayBounds.maxX
-      && position[2] >= continuity.bayBounds.minZ
-      && position[2] <= continuity.bayBounds.maxZ
+      && state.killstreak.matchEpoch > previous.matchEpoch
+      && state.player.continuity > previous.playerContinuity
       && seconds >= continuity.minimumResetTimerSeconds
       && seconds > timerBefore;
-  }, { continuity: ROUND_CONTINUITY, timerBefore: timerBeforeSeconds }, { timeout: 5_000 });
-  const bayObservation = await page.evaluate(() => ({
-    matchPhase: window.__ATOMIC_ACRES_DEBUG__!.snapshot().matchPhase,
-    playerPosition: window.__ATOMIC_ACRES_DEBUG__!.snapshot().player.position,
-    timerText: document.querySelector<HTMLElement>('#timer')?.textContent ?? '',
-  }));
-  const timerAfterSeconds = matchTimerSeconds(bayObservation.timerText);
-  expect(bayObservation.matchPhase, `${afterWeapon}: production bay refresh keeps the round active`).toBe('active');
-  expect(timerAfterSeconds, `${afterWeapon}: production bay entry restores the two-minute clock`).toBeGreaterThanOrEqual(
+  }, { continuity: ROUND_CONTINUITY, previous: roundBefore, timerBefore: timerBeforeSeconds }, { timeout: 30_000 });
+  const rematchObservation = await page.evaluate(() => {
+    const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
+    return {
+      matchPhase: state.matchPhase,
+      matchEpoch: state.killstreak.matchEpoch,
+      playerContinuity: state.player.continuity,
+      timerText: document.querySelector<HTMLElement>('#timer')?.textContent ?? '',
+    };
+  });
+  const timerAfterSeconds = matchTimerSeconds(rematchObservation.timerText);
+  expect(rematchObservation.matchPhase, `${afterWeapon}: production rematch returns to an active round`).toBe('active');
+  expect(rematchObservation.matchEpoch, `${afterWeapon}: production rematch advances match authority`).toBeGreaterThan(roundBefore.matchEpoch);
+  expect(rematchObservation.playerContinuity, `${afterWeapon}: production rematch advances player life`).toBeGreaterThan(roundBefore.playerContinuity);
+  expect(timerAfterSeconds, `${afterWeapon}: production rematch restores the two-minute clock`).toBeGreaterThanOrEqual(
     ROUND_CONTINUITY.minimumResetTimerSeconds,
   );
-  expect(timerAfterSeconds, `${afterWeapon}: production bay entry advances the visible deadline`).toBeGreaterThan(timerBeforeSeconds);
+  expect(timerAfterSeconds, `${afterWeapon}: production rematch advances the visible deadline`).toBeGreaterThan(timerBeforeSeconds);
 
   await page.evaluate((fixture) => {
     const api = window.__ATOMIC_ACRES_DEBUG__;
     api.teleportPlayer(...fixture.teleportPosition, fixture.yaw, fixture.pitch);
-  }, CONTACT_FIXTURE);
-  // A QA teleport preserves the current capsule but deliberately does not
-  // claim ground contact. Let the retained prone capsule land, then exercise
-  // the normal stance authority once so the exact calibrated eye height is
-  // restored instead of measuring a transient post-teleport height.
-  await page.waitForFunction((fixture) => {
-    const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
-    const position = state.player.position;
-    return state.matchPhase === 'active'
-      && Array.isArray(position)
-      && position.length === 3
-      && Math.abs(position[0] - fixture.settledPosition[0]) <= fixture.maximumPositionAxisError
-      && position[1] <= 0.75
-      && Math.abs(position[2] - fixture.settledPosition[2]) <= fixture.maximumPositionAxisError;
-  }, CONTACT_FIXTURE, { timeout: 10_000 });
-  await page.evaluate(() => {
-    const api = window.__ATOMIC_ACRES_DEBUG__;
-    api.setStance('stand');
     api.setStance('prone');
-  });
+  }, CONTACT_FIXTURE);
   try {
     await page.waitForFunction((fixture) => {
       const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
@@ -482,21 +468,23 @@ async function refreshGunRangeRoundAndRestoreContact(
     }, CONTACT_FIXTURE);
     throw new Error(`Contact restoration failed after ${afterWeapon}: ${JSON.stringify(diagnostic)}`, { cause: error });
   }
-  const before = await presentedFrame(page);
-  await waitForPresentedFrames(page, before, 4);
+  const frameBefore = await presentedFrame(page);
+  await waitForPresentedFrames(page, frameBefore, 4);
   const returnedState = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot());
   return {
     contract: ROUND_CONTINUITY.contract,
     afterWeapon,
     nextWeapon,
     timerBefore: { text: timerBeforeText, seconds: timerBeforeSeconds },
-    bayEntry: {
-      commandPosition: ROUND_CONTINUITY.bayEntryPosition,
-      observedPosition: bayObservation.playerPosition,
-      bounds: ROUND_CONTINUITY.bayBounds,
-      matchPhase: bayObservation.matchPhase,
+    rematch: {
+      before: roundBefore,
+      after: {
+        matchPhase: rematchObservation.matchPhase,
+        matchEpoch: rematchObservation.matchEpoch,
+        playerContinuity: rematchObservation.playerContinuity,
+      },
     },
-    timerAfter: { text: bayObservation.timerText, seconds: timerAfterSeconds },
+    timerAfter: { text: rematchObservation.timerText, seconds: timerAfterSeconds },
     minimumResetTimerSeconds: ROUND_CONTINUITY.minimumResetTimerSeconds,
     returnedFixture: assertFixturePose(returnedState, `${afterWeapon}: restored contact for ${nextWeapon}`),
   };
@@ -993,7 +981,7 @@ test('proves canonical authored first-person weapons satisfy the scoped maximum-
     });
     const nextWeapon = WEAPON_IDS[index + 1];
     if (nextWeapon) {
-      roundContinuity.push(await refreshGunRangeRoundAndRestoreContact(page, weapon, nextWeapon));
+      roundContinuity.push(await rematchGunRangeRoundAndRestoreContact(page, weapon, nextWeapon));
     }
   }
 

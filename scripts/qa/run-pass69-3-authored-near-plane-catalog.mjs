@@ -65,9 +65,7 @@ const expectedContactFixture = Object.freeze({
   maximumAngularError: 0.000001,
 });
 const expectedRoundContinuity = Object.freeze({
-  contract: 'gun-range-test-bay-entry-round-refresh-v1',
-  bayEntryPosition: Object.freeze([54, 1.7, 0]),
-  bayBounds: Object.freeze({ minX: 51.5, maxX: 100, minZ: -52, maxZ: 64 }),
+  contract: 'gun-range-production-rematch-round-refresh-v1',
   minimumResetTimerSeconds: 119,
 });
 
@@ -189,14 +187,8 @@ function roundContinuityValid(continuity) {
     || !Array.isArray(continuity.entries)
     || continuity.entries.length !== expectedWeapons.length - 1) return false;
   return continuity.entries.every((entry, index) => {
-    const observed = entry.bayEntry?.observedPosition;
-    const inBay = Array.isArray(observed)
-      && observed.length === 3
-      && observed.every(Number.isFinite)
-      && observed[0] >= expectedRoundContinuity.bayBounds.minX
-      && observed[0] <= expectedRoundContinuity.bayBounds.maxX
-      && observed[2] >= expectedRoundContinuity.bayBounds.minZ
-      && observed[2] <= expectedRoundContinuity.bayBounds.maxZ;
+    const before = entry.rematch?.before;
+    const after = entry.rematch?.after;
     return entry.contract === expectedRoundContinuity.contract
       && entry.afterWeapon === expectedWeapons[index]
       && entry.nextWeapon === expectedWeapons[index + 1]
@@ -208,10 +200,14 @@ function roundContinuityValid(continuity) {
       && entry.timerAfter.seconds > entry.timerBefore.seconds
       && matchTimerSeconds(entry.timerAfter?.text) === entry.timerAfter.seconds
       && entry.minimumResetTimerSeconds === expectedRoundContinuity.minimumResetTimerSeconds
-      && sameArray(entry.bayEntry?.commandPosition, expectedRoundContinuity.bayEntryPosition)
-      && JSON.stringify(entry.bayEntry?.bounds) === JSON.stringify(expectedRoundContinuity.bayBounds)
-      && entry.bayEntry?.matchPhase === 'active'
-      && inBay
+      && before?.matchPhase === 'active'
+      && Number.isSafeInteger(before?.matchEpoch)
+      && Number.isSafeInteger(before?.playerContinuity)
+      && after?.matchPhase === 'active'
+      && Number.isSafeInteger(after?.matchEpoch)
+      && Number.isSafeInteger(after?.playerContinuity)
+      && after.matchEpoch > before.matchEpoch
+      && after.playerContinuity > before.playerContinuity
       && fixturePoseValid(entry.returnedFixture);
   });
 }
