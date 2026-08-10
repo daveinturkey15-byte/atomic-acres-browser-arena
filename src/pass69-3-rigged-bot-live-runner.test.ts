@@ -10,6 +10,7 @@ const graph = JSON.parse(readFileSync('docs/PASS65_OWNER_FEEDBACK_COMPLETENESS_G
 const runner = readFileSync('scripts/qa/run-pass69-3-rigged-bot-live.mjs', 'utf8');
 const spec = readFileSync('tests/e2e/pass69-3-rigged-bot-live.spec.ts', 'utf8');
 const operator = readFileSync('src/operator-model.ts', 'utf8');
+const operatorUnit = readFileSync('src/operator-model.test.ts', 'utf8');
 const artKit = readFileSync('src/art-kit.ts', 'utf8');
 const artKitTest = readFileSync('src/art-kit.test.ts', 'utf8');
 const legacy = readFileSync('src/legacy-main.ts', 'utf8');
@@ -130,6 +131,15 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     expect(artKit).toContain('pinky: -0.76');
     expect(artKit).toContain('right: Object.freeze({ thumb: -0.34, index: -0.46, middle: -0.7, ring: -0.76, pinky: -0.78 })');
     expect(artKit).toContain('applyRiggedCarbineFingerCurlToBone(bone, curlRadians)');
+    expect(artKit).toContain('RIGGED_CARBINE_RIGHT_PINKY_BIND_DELTA_FLOOR_RADIANS = 0.38');
+    expect(artKit).toContain('enforceRiggedOperatorHandBindDeltaFloor(');
+    expect(operator).toContain("contract: 'post-mixer-authored-bind-relative-hand-floor-v1'");
+    expect(operator).toContain('floorTargetRelativeAngleRadians');
+    expect(operator).toContain('reportedBindDeltaCorrectionRadians');
+    expect(operatorUnit).toContain('0.2701489666915341');
+    expect(operatorUnit).toContain('0.36981904581827996');
+    expect(operatorUnit).toContain('honors the 0.379999/0.38 boundary');
+    expect(operatorUnit).toContain('other nine joints');
     expect(artKitTest).toContain('0.2593672251552949');
     expect(artKitTest).toContain('0.3746668889113999');
     expect(artKit).toContain("root.userData.operatorUnarmedHandPose = rig.weaponId === null");
@@ -192,6 +202,7 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       'src/art-kit.test.ts',
       'src/art-kit.ts',
       'src/operator-model.ts',
+      'src/operator-model.test.ts',
       'src/legacy-main.ts',
       'src/pass69-3-rigged-bot-live-runner.test.ts',
       'tests/e2e/pass69-3-rigged-bot-live.spec.ts',
@@ -214,6 +225,9 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       '0.300 rad elbow flex must pass',
       '0.349 rad pinky bind delta must fail',
       '0.350 rad pinky bind delta must pass',
+      '0.379999 rad post-mixer pinky floor must fail',
+      '0.380000 rad post-mixer pinky floor must pass',
+      'floor telemetry must match rendered Pinky2R hand pose',
       'corrected wrist rotation over 0.20 rad must fail',
       'post-overwrite socket cannot impersonate imported authored source',
       'cropped/off-ROI shoulder must fail',

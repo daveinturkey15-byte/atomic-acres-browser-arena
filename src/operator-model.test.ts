@@ -6,6 +6,7 @@ import {
   RIGGED_OPERATOR_RUNTIME_ACTION_NAMES,
   applyBotEmissiveBrightness,
   createOperatorInstanceMaterialResolver,
+  enforceRiggedOperatorHandBindDeltaFloor,
   firstPersonArmHandedness,
   firstPersonArmMaterialReadabilityProfile,
   isEmbeddedWeaponObjectName,
@@ -13,6 +14,68 @@ import {
   riggedOperatorRuntimeClips,
   suppressEmbeddedWeaponObjects,
 } from './operator-model';
+
+const RIGHT_PINKY_BIND = new THREE.Quaternion(
+  0.03783833980560303,
+  -0.1764165163040161,
+  0.06506768614053726,
+  0.9814335107803345,
+);
+const HAND_SENTINELS = (['left', 'right'] as const).flatMap((side) =>
+  (['thumb', 'index', 'middle', 'ring', 'pinky'] as const).map((digit) => ({ side, digit })));
+
+function handBoneName(side: 'left' | 'right', digit: string): string {
+  return `${digit[0].toUpperCase()}${digit.slice(1)}2${side === 'left' ? 'L' : 'R'}`;
+}
+
+function handSourceBoneName(side: 'left' | 'right', digit: string): string {
+  return `${digit[0].toUpperCase()}${digit.slice(1)}2.${side === 'left' ? 'L' : 'R'}`;
+}
+
+function makeHandFloorRig(pinkyLocalQuaternion: THREE.Quaternion) {
+  const root = new THREE.Group();
+  const entries = HAND_SENTINELS.map(({ side, digit }, index) => {
+    const bone = new THREE.Bone();
+    bone.name = handBoneName(side, digit);
+    const bindQuaternion = side === 'right' && digit === 'pinky'
+      ? RIGHT_PINKY_BIND.clone()
+      : new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(index + 1, index % 3 + 1, index % 5 + 1).normalize(),
+        0.01 * (index + 1),
+      );
+    bone.quaternion.copy(side === 'right' && digit === 'pinky'
+      ? pinkyLocalQuaternion
+      : bindQuaternion.clone().multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.02)));
+    root.add(bone);
+    return {
+      side,
+      digit,
+      joint: 2,
+      sourceBone: handSourceBoneName(side, digit),
+      bone,
+      quaternion: bindQuaternion,
+    };
+  });
+  root.userData.riggedOperatorRuntime = { handBindPose: entries };
+  const pinky = entries.find(({ side, digit }) => side === 'right' && digit === 'pinky')!;
+  return { root, entries, pinky };
+}
+
+function shortestBindRelativeAxis(bind: THREE.Quaternion, local: THREE.Quaternion): THREE.Vector3 | null {
+  const relative = bind.clone().invert().multiply(local).normalize();
+  if (relative.w < 0) relative.set(-relative.x, -relative.y, -relative.z, -relative.w);
+  const length = Math.hypot(relative.x, relative.y, relative.z);
+  return length > 1e-8 ? new THREE.Vector3(relative.x, relative.y, relative.z).divideScalar(length) : null;
+}
+
+function localAtReportedBindDelta(bind: THREE.Quaternion, axis: THREE.Vector3, reportedRadians: number): THREE.Quaternion {
+  const relativeRadians = 2 * Math.acos(Math.cos(reportedRadians / 2) / bind.length());
+  return bind.clone().normalize().multiply(new THREE.Quaternion().setFromAxisAngle(axis, relativeRadians));
+}
+
+function enforceRightPinkyFloor(root: THREE.Object3D) {
+  return enforceRiggedOperatorHandBindDeltaFloor(root, 'right', 'pinky', 0.38, [-1, 0, 0])!;
+}
 
 describe('rigged operator presentation contract', () => {
   it('bounds first-person readability fill without flattening PBR into self-lit plastic', () => {
@@ -131,5 +194,138 @@ describe('rigged operator presentation contract', () => {
     expect(runtimeClips).not.toContain(authored[0]);
     expect(runtimeClips).not.toContain(authored.at(-1));
     expect(runtimeClips.every((clip) => authored.includes(clip))).toBe(true);
+  });
+});
+
+describe('post-mixer authored-bind hand floor', () => {
+  it('minimally clamps both independently observed cancellation phases and preserves their shortest axes', () => {
+    const traces = [
+      {
+        label: 'second official cancellation phase',
+        local: [-0.06157356889928739, 0.14493789798255466, -0.19362636538984757, -0.9683724807055973],
+        before: 0.2701489666915341,
+        correction: 0.1098510333084659,
+      },
+      {
+        label: 'first official near-floor phase',
+        local: [-0.14530507857983138, 0.1276035513223795, -0.20546410230402973, -0.9593867832703411],
+        before: 0.36981904581827996,
+        correction: 0.01018095418172004,
+      },
+    ] as const;
+
+    for (const trace of traces) {
+      const before = new THREE.Quaternion(...trace.local);
+      const expectedAxis = shortestBindRelativeAxis(RIGHT_PINKY_BIND, before)!;
+      const { root, pinky } = makeHandFloorRig(before);
+      const receipt = enforceRightPinkyFloor(root);
+      const afterAxis = shortestBindRelativeAxis(RIGHT_PINKY_BIND, pinky.bone.quaternion)!;
+
+      expect(receipt.beforeBindDeltaRadians, trace.label).toBeCloseTo(trace.before, 12);
+      expect(receipt.afterBindDeltaRadians, trace.label).toBeCloseTo(0.38, 12);
+      expect(receipt.intervened, trace.label).toBe(true);
+      expect(receipt.reportedBindDeltaCorrectionRadians, trace.label).toBeCloseTo(trace.correction, 12);
+      expect(receipt.renderedOrientationCorrectionRadians, trace.label).toBeGreaterThan(0);
+      expect(receipt.renderedOrientationCorrectionRadians, trace.label).toBeLessThanOrEqual(trace.correction + 0.001);
+      expect(Math.abs(afterAxis.dot(expectedAxis)), trace.label).toBeCloseTo(1, 12);
+      expect(receipt).toMatchObject({
+        axisSource: 'shortest-bind-relative',
+        preservedShortestRelativeAxis: true,
+        appliedToRenderedBone: true,
+        allFinite: true,
+      });
+    }
+  });
+
+  it('leaves a high Walk phase unchanged and honors the 0.379999/0.38 boundary', () => {
+    const highPhase = new THREE.Quaternion(
+      -0.5417796855187491,
+      -0.23911234215831756,
+      0.0792161689019715,
+      0.801899553957991,
+    );
+    const highRig = makeHandFloorRig(highPhase);
+    const highReceipt = enforceRightPinkyFloor(highRig.root);
+    expect(highReceipt.beforeBindDeltaRadians).toBeCloseTo(1.2401019755382803, 12);
+    expect(highReceipt.intervened).toBe(false);
+    expect(highRig.pinky.bone.quaternion.toArray()).toEqual(highPhase.toArray());
+
+    const axis = new THREE.Vector3(0.2, -0.9, 0.38).normalize();
+    const localAt = (angle: number) => localAtReportedBindDelta(RIGHT_PINKY_BIND, axis, angle);
+    const belowRig = makeHandFloorRig(localAt(0.379999));
+    const belowReceipt = enforceRightPinkyFloor(belowRig.root);
+    expect(belowReceipt.beforeBindDeltaRadians).toBeCloseTo(0.379999, 12);
+    expect(belowReceipt.intervened).toBe(true);
+    expect(belowRig.pinky.bone.quaternion.angleTo(RIGHT_PINKY_BIND)).toBeCloseTo(0.38, 12);
+
+    const boundary = localAt(0.38);
+    const boundaryRig = makeHandFloorRig(boundary);
+    const boundaryReceipt = enforceRightPinkyFloor(boundaryRig.root);
+    expect(boundaryReceipt.beforeBindDeltaRadians).toBeCloseTo(0.38, 12);
+    expect(boundaryReceipt.intervened).toBe(false);
+    expect(boundaryRig.pinky.bone.quaternion.toArray()).toEqual(boundary.toArray());
+  });
+
+  it('is hemisphere-invariant, finite at exact bind, and idempotent', () => {
+    const input = new THREE.Quaternion(
+      -0.06157356889928739,
+      0.14493789798255466,
+      -0.19362636538984757,
+      -0.9683724807055973,
+    );
+    const positiveRig = makeHandFloorRig(input);
+    const negativeRig = makeHandFloorRig(new THREE.Quaternion(-input.x, -input.y, -input.z, -input.w));
+    const positive = enforceRightPinkyFloor(positiveRig.root);
+    const negative = enforceRightPinkyFloor(negativeRig.root);
+    expect(positive.beforeBindDeltaRadians).toBeCloseTo(negative.beforeBindDeltaRadians as number, 12);
+    expect(positiveRig.pinky.bone.quaternion.angleTo(negativeRig.pinky.bone.quaternion)).toBeLessThan(1e-7);
+
+    const bindRig = makeHandFloorRig(RIGHT_PINKY_BIND.clone());
+    const first = enforceRightPinkyFloor(bindRig.root);
+    const firstQuaternion = bindRig.pinky.bone.quaternion.clone();
+    expect(first).toMatchObject({
+      intervened: true,
+      axisSource: 'authored-curl-fallback',
+      usedFallbackAxis: true,
+      observedShortestRelativeAxis: null,
+      preservedShortestRelativeAxis: null,
+      allFinite: true,
+    });
+    expect(first.afterBindDeltaRadians).toBeCloseTo(0.38, 12);
+    const second = enforceRightPinkyFloor(bindRig.root);
+    expect(second.intervened).toBe(false);
+    expect(bindRig.pinky.bone.quaternion.toArray()).toEqual(firstQuaternion.toArray());
+    expect(second.afterBindDeltaRadians).toBeCloseTo(0.38, 12);
+  });
+
+  it('stays finite over dense cancellation poses while retaining immutable bind data and the other nine joints', () => {
+    for (let sample = 0; sample <= 80; sample += 1) {
+      const angle = sample * 0.01;
+      const axis = new THREE.Vector3(
+        Math.sin(0.37 + sample * 0.11),
+        Math.cos(0.19 + sample * 0.07),
+        Math.sin(0.61 + sample * 0.05),
+      ).normalize();
+      const local = localAtReportedBindDelta(RIGHT_PINKY_BIND, axis, angle);
+      const rig = makeHandFloorRig(local);
+      const bindSnapshot = rig.entries.map((entry) => entry.quaternion.toArray());
+      const otherBoneSnapshot = rig.entries.map((entry) => entry.bone.quaternion.toArray());
+      const receipt = enforceRightPinkyFloor(rig.root);
+
+      expect(receipt.allFinite, `dense phase ${sample}`).toBe(true);
+      expect(rig.pinky.bone.quaternion.angleTo(RIGHT_PINKY_BIND), `dense phase ${sample}`).toBeGreaterThanOrEqual(0.38 - 1e-9);
+      if (angle > 1e-8 && angle < 0.38 - 1e-9) {
+        const afterAxis = shortestBindRelativeAxis(RIGHT_PINKY_BIND, rig.pinky.bone.quaternion)!;
+        expect(Math.abs(afterAxis.dot(axis)), `dense phase ${sample}`).toBeCloseTo(1, 10);
+      } else if (angle >= 0.38 - 1e-9) {
+        expect(rig.pinky.bone.quaternion.angleTo(local), `dense phase ${sample}`).toBeLessThan(1e-7);
+      }
+      expect(rig.entries.map((entry) => entry.quaternion.toArray()), `immutable bind phase ${sample}`).toEqual(bindSnapshot);
+      rig.entries.forEach((entry, index) => {
+        if (entry !== rig.pinky) {
+          expect(entry.bone.quaternion.toArray(), `${entry.bone.name} phase ${sample}`).toEqual(otherBoneSnapshot[index]);
+        }
+      });
+    }
   });
 });

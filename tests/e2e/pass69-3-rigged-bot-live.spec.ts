@@ -70,6 +70,7 @@ const RENDERED_INFLUENCE_THRESHOLDS = Object.freeze({
   minimumMaximumNormalizedWeight: 0.2,
 });
 const GRIP_THRESHOLDS = Object.freeze({ maximumPositionErrorM: 0.015, maximumQuaternionErrorRadians: 0.2 });
+const RIGHT_PINKY_BIND_DELTA_FLOOR_RADIANS = 0.38;
 const CARBINE_SOCKET_REFERENCES = Object.freeze({
   'support-socket-l': Object.freeze({
     authoredLocalPosition: Object.freeze([-0.10000000149011612, -0.03999999910593033, 0.47999998927116394]),
@@ -116,6 +117,12 @@ function route(map: 'atomic-acres' | 'gun-range', seed: string): string {
 
 function quaternionDelta(left: number[], right: number[]): number {
   const dot = Math.abs(left.reduce((sum, value, index) => sum + value * right[index], 0));
+  return 2 * Math.acos(Math.min(1, Math.max(-1, dot)));
+}
+
+function normalizedQuaternionDelta(left: number[], right: number[]): number {
+  const denominator = Math.hypot(...left) * Math.hypot(...right);
+  const dot = Math.abs(left.reduce((sum, value, index) => sum + value * right[index], 0) / denominator);
   return 2 * Math.acos(Math.min(1, Math.max(-1, dot)));
 }
 
@@ -305,10 +312,11 @@ function expectArmPose(model: any, label: string, armed: boolean): void {
         wristOrientation: { referenceAvailable: true, wristSourceAsset: OPERATOR_ASSET },
       },
       fingerCurl: {
-        contract: 'pass65-evaluated-per-digit-grip-curl-v1',
+        contract: 'pass65-evaluated-per-digit-grip-curl-v2',
         sourceReferenceAvailable: true,
         expectedBoneCount: 10,
         bothHands: true,
+        allAtOrAboveRequiredBindFloor: true,
         allApplied: true,
       },
     });
@@ -336,6 +344,57 @@ function expectArmPose(model: any, label: string, armed: boolean): void {
     }
     expect(model.supportGrip.fingerCurl.bones).toHaveLength(10);
     expect(model.supportGrip.fingerCurl.bones.every(({ applied, curlRadians }: any) => applied === true && Math.abs(curlRadians) >= 0.18)).toBe(true);
+    const rightPinky = model.handPose.bones.find(({ side, digit }: any) => side === 'right' && digit === 'pinky');
+    const rightPinkyFloor = model.supportGrip.fingerCurl.rightPinkyBindFloor;
+    expect(rightPinkyFloor, `${label}: firing pinky floor receipts the rendered joint`).toMatchObject({
+      contract: 'post-mixer-authored-bind-relative-hand-floor-v1',
+      reference: 'immutable-authored-handBindPose-before-animation',
+      side: 'right',
+      digit: 'pinky',
+      sourceBone: 'Pinky2.R',
+      bone: 'Pinky2R',
+      minimumBindDeltaRadians: RIGHT_PINKY_BIND_DELTA_FLOOR_RADIANS,
+      preservedShortestRelativeAxis: true,
+      appliedToRenderedBone: true,
+      allFinite: true,
+    });
+    expect(rightPinkyFloor.afterBindDeltaRadians, `${label}: firing pinky post-mixer floor`)
+      .toBeGreaterThanOrEqual(RIGHT_PINKY_BIND_DELTA_FLOOR_RADIANS - 1e-9);
+    const bindNorm = Math.hypot(...rightPinkyFloor.bindLocalQuaternion);
+    const expectedAppliedRelativeAngle = 2 * Math.acos(
+      Math.cos(RIGHT_PINKY_BIND_DELTA_FLOOR_RADIANS / 2) / bindNorm,
+    );
+    expect(rightPinkyFloor.bindQuaternionNorm, `${label}: receipts immutable float32 bind norm`).toBeCloseTo(bindNorm, 12);
+    expect(rightPinkyFloor.floorTargetRelativeAngleRadians, `${label}: compensates authored float32 bind norm`).toBeCloseTo(expectedAppliedRelativeAngle, 12);
+    expect(rightPinkyFloor.bindNormCompensationRadians, `${label}: receipts bind-norm compensation`).toBeCloseTo(
+      expectedAppliedRelativeAngle - RIGHT_PINKY_BIND_DELTA_FLOOR_RADIANS,
+      12,
+    );
+    expect(rightPinkyFloor.beforeBindDeltaRadians, `${label}: independently recomputed pre-floor delta`).toBeCloseTo(
+      quaternionDelta(rightPinkyFloor.beforeLocalQuaternion, rightPinkyFloor.bindLocalQuaternion),
+      9,
+    );
+    expect(rightPinkyFloor.afterBindDeltaRadians, `${label}: independently recomputed post-floor delta`).toBeCloseTo(
+      quaternionDelta(rightPinkyFloor.afterLocalQuaternion, rightPinkyFloor.bindLocalQuaternion),
+      9,
+    );
+    expect(rightPinkyFloor.reportedBindDeltaCorrectionRadians, `${label}: receipts the bounded reported correction`).toBeCloseTo(
+      rightPinkyFloor.intervened
+        ? RIGHT_PINKY_BIND_DELTA_FLOOR_RADIANS - rightPinkyFloor.beforeBindDeltaRadians : 0,
+      9,
+    );
+    expect(rightPinkyFloor.renderedOrientationCorrectionRadians, `${label}: receipts the actual rendered correction`).toBeCloseTo(
+      normalizedQuaternionDelta(rightPinkyFloor.beforeLocalQuaternion, rightPinkyFloor.afterLocalQuaternion),
+      9,
+    );
+    expect(rightPinkyFloor.afterBindDeltaRadians, `${label}: telemetry equals actual rendered Pinky2R delta`).toBeCloseTo(
+      rightPinky.bindQuaternionDeltaRadians,
+      9,
+    );
+    expect(quaternionDelta(rightPinkyFloor.afterLocalQuaternion, rightPinky.localQuaternion), `${label}: telemetry is the actual rendered Pinky2R quaternion`)
+      .toBeLessThanOrEqual(1e-9);
+    expect(quaternionDelta(rightPinkyFloor.bindLocalQuaternion, rightPinky.bindLocalQuaternion), `${label}: floor uses immutable authored Pinky2R bind`)
+      .toBeLessThanOrEqual(1e-9);
   } else {
     expect(model.weaponChildren, `${label}: unarmed socket remains empty`).toBe(0);
     expect(model.weaponMount, `${label}: no mounted weapon`).toBeNull();

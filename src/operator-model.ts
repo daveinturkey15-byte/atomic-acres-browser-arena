@@ -1000,10 +1000,125 @@ export function updateRiggedOperator(root: THREE.Object3D, speed: number, stance
 
 const UNARMED_WRIST_BIND_DELTA_FLOOR_RADIANS = 0.075;
 const UNARMED_WRIST_AXIS_EPSILON = 1e-6;
+const HAND_BIND_FLOOR_COMPARISON_EPSILON = 1e-9;
+const HAND_BIND_FLOOR_AXIS_EPSILON = 1e-8;
 const UNARMED_WRIST_FALLBACK_AXIS = Object.freeze({
   left: Object.freeze([1, -0.45, -0.6] as const),
   right: Object.freeze([1, 0.45, 0.6] as const),
 });
+
+/**
+ * Enforce a post-mixer angular floor on one rendered hand joint relative to
+ * its immutable authored GLB bind quaternion. Nonzero poses retain the
+ * shortest bind-relative rotation axis; exact cancellation reuses the last
+ * observed axis before falling back to the caller's authored curl axis.
+ */
+export function enforceRiggedOperatorHandBindDeltaFloor(
+  root: THREE.Object3D,
+  side: 'left' | 'right',
+  digit: 'thumb' | 'index' | 'middle' | 'ring' | 'pinky',
+  minimumBindDeltaRadians: number,
+  fallbackAxis: readonly [number, number, number],
+): Record<string, unknown> | null {
+  const runtimeState = runtime(root);
+  const entry = runtimeState?.handBindPose.find((candidate) => candidate.side === side && candidate.digit === digit);
+  if (!entry || !Number.isFinite(minimumBindDeltaRadians)
+    || minimumBindDeltaRadians <= 0 || minimumBindDeltaRadians >= Math.PI) return null;
+  const bindLocalQuaternion = entry.quaternion;
+  const bindQuaternionNorm = bindLocalQuaternion.length();
+  const normalizedBindDotTarget = Math.cos(minimumBindDeltaRadians / 2) / bindQuaternionNorm;
+  if (!Number.isFinite(bindQuaternionNorm) || bindQuaternionNorm <= HAND_BIND_FLOOR_AXIS_EPSILON
+    || !Number.isFinite(normalizedBindDotTarget) || normalizedBindDotTarget > 1) return null;
+  // GLB quaternion components are float32 and can differ from unit length by a
+  // few e-8. Three's Quaternion.angleTo intentionally uses the stored values,
+  // so solve the unit output angle that makes that immutable authored value
+  // report the requested floor instead of silently missing it by float error.
+  const floorTargetRelativeAngleRadians = 2 * Math.acos(THREE.MathUtils.clamp(normalizedBindDotTarget, -1, 1));
+  const beforeLocalQuaternion = entry.bone.quaternion.clone();
+  const beforeBindDeltaRadians = beforeLocalQuaternion.angleTo(bindLocalQuaternion);
+  const relative = bindLocalQuaternion.clone().invert().multiply(beforeLocalQuaternion).normalize();
+  if (relative.w < 0) relative.set(-relative.x, -relative.y, -relative.z, -relative.w);
+  const relativeAxisLength = Math.hypot(relative.x, relative.y, relative.z);
+  const observedAxis = relativeAxisLength > HAND_BIND_FLOOR_AXIS_EPSILON
+    ? new THREE.Vector3(relative.x, relative.y, relative.z).divideScalar(relativeAxisLength)
+    : null;
+  const cacheKey = `riggedHandBindFloorAxis:${side}:${digit}`;
+  const cachedAxisValue = entry.bone.userData[cacheKey];
+  const cachedAxisCandidate = Array.isArray(cachedAxisValue) && cachedAxisValue.length === 3
+    && cachedAxisValue.every((value) => typeof value === 'number' && Number.isFinite(value))
+    ? new THREE.Vector3().fromArray(cachedAxisValue as [number, number, number])
+    : null;
+  const cachedAxis = cachedAxisCandidate
+    && cachedAxisCandidate.lengthSq() > HAND_BIND_FLOOR_AXIS_EPSILON ** 2
+    ? cachedAxisCandidate.normalize()
+    : null;
+  const authoredFallbackAxis = new THREE.Vector3(...fallbackAxis);
+  if (authoredFallbackAxis.lengthSq() <= HAND_BIND_FLOOR_AXIS_EPSILON ** 2) return null;
+  authoredFallbackAxis.normalize();
+  const appliedAxis = observedAxis ?? cachedAxis ?? authoredFallbackAxis;
+  const axisSource = observedAxis
+    ? 'shortest-bind-relative'
+    : cachedAxis ? 'previous-shortest-bind-relative' : 'authored-curl-fallback';
+  const intervened = beforeBindDeltaRadians
+    < minimumBindDeltaRadians - HAND_BIND_FLOOR_COMPARISON_EPSILON;
+  if (intervened) {
+    entry.bone.quaternion.copy(bindLocalQuaternion).multiply(
+      new THREE.Quaternion().setFromAxisAngle(appliedAxis, floorTargetRelativeAngleRadians),
+    ).normalize();
+  }
+  if (observedAxis) entry.bone.userData[cacheKey] = observedAxis.toArray();
+  else if (!cachedAxis) entry.bone.userData[cacheKey] = appliedAxis.toArray();
+  entry.bone.updateWorldMatrix(false, true);
+  const afterBindDeltaRadians = entry.bone.quaternion.angleTo(bindLocalQuaternion);
+  const reportedBindDeltaCorrectionRadians = intervened
+    ? Math.max(0, minimumBindDeltaRadians - beforeBindDeltaRadians)
+    : 0;
+  const renderedOrientationCorrectionRadians = beforeLocalQuaternion.clone().normalize()
+    .angleTo(entry.bone.quaternion.clone().normalize());
+  return {
+    contract: 'post-mixer-authored-bind-relative-hand-floor-v1',
+    reference: 'immutable-authored-handBindPose-before-animation',
+    side,
+    digit,
+    sourceBone: entry.sourceBone,
+    bone: entry.bone.name,
+    minimumBindDeltaRadians,
+    bindQuaternionNorm,
+    floorTargetRelativeAngleRadians,
+    bindNormCompensationRadians: floorTargetRelativeAngleRadians - minimumBindDeltaRadians,
+    beforeBindDeltaRadians,
+    afterBindDeltaRadians,
+    reportedBindDeltaCorrectionRadians,
+    renderedOrientationCorrectionRadians,
+    bindLocalQuaternion: bindLocalQuaternion.toArray(),
+    beforeLocalQuaternion: beforeLocalQuaternion.toArray(),
+    afterLocalQuaternion: entry.bone.quaternion.toArray(),
+    observedShortestRelativeAxis: observedAxis?.toArray() ?? null,
+    appliedAxis: appliedAxis.toArray(),
+    axisSource,
+    intervened,
+    preservedShortestRelativeAxis: observedAxis !== null
+      ? Math.abs(observedAxis.dot(appliedAxis)) >= 1 - 1e-9
+      : intervened ? null : true,
+    usedPreviousAxis: observedAxis === null && cachedAxis !== null,
+    usedFallbackAxis: observedAxis === null && cachedAxis === null,
+    appliedToRenderedBone: true,
+    allFinite: [
+      minimumBindDeltaRadians,
+      bindQuaternionNorm,
+      floorTargetRelativeAngleRadians,
+      floorTargetRelativeAngleRadians - minimumBindDeltaRadians,
+      beforeBindDeltaRadians,
+      afterBindDeltaRadians,
+      reportedBindDeltaCorrectionRadians,
+      renderedOrientationCorrectionRadians,
+      ...bindLocalQuaternion.toArray(),
+      ...beforeLocalQuaternion.toArray(),
+      ...entry.bone.quaternion.toArray(),
+      ...appliedAxis.toArray(),
+    ].every(Number.isFinite),
+  };
+}
 
 /**
  * Keep an unarmed operator's rendered hands in a natural, deterministic rest

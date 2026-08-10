@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { createRiggedOperator, deathRiggedOperator, fireRiggedOperator, meleeRiggedOperator, poseUnarmedRiggedOperatorHands, reactRiggedOperator, resetRiggedOperator, updateRiggedOperator, type OperatorAppearance } from './operator-model';
+import { createRiggedOperator, deathRiggedOperator, enforceRiggedOperatorHandBindDeltaFloor, fireRiggedOperator, meleeRiggedOperator, poseUnarmedRiggedOperatorHands, reactRiggedOperator, resetRiggedOperator, updateRiggedOperator, type OperatorAppearance } from './operator-model';
 import { advanceMinigunSpool, createMinigunSpoolState, type MinigunSpoolState } from './minigun-spool';
 import {
   capturePass65PresentationGeneration,
@@ -1210,6 +1210,8 @@ const RIGGED_CARBINE_SECOND_PHALANX_CURL = Object.freeze({
   left: Object.freeze({ thumb: -0.18, index: -0.24, middle: -0.3, ring: -0.36, pinky: -0.76 }),
   right: Object.freeze({ thumb: -0.34, index: -0.46, middle: -0.7, ring: -0.76, pinky: -0.78 }),
 });
+const RIGGED_CARBINE_RIGHT_PINKY_BIND_DELTA_FLOOR_RADIANS = 0.38;
+const RIGGED_CARBINE_RIGHT_PINKY_FALLBACK_AXIS = Object.freeze([-1, 0, 0] as const);
 
 const RIGGED_GRIP_POSITION_ERROR_MAX_M = 0.015;
 const RIGGED_GRIP_QUATERNION_ERROR_MAX_RADIANS = 0.2;
@@ -1448,16 +1450,19 @@ function applyRiggedArmGrip(
 }
 
 function applyRiggedCarbineFingerCurl(
+  root: THREE.Group,
   rig: Extract<OperatorRig, { rigged: true }>,
   weapon: THREE.Group,
 ): Record<string, unknown> {
   const bones: Array<Record<string, unknown>> = [];
   if (weapon.userData.weaponId !== 'carbine') {
     return {
-      contract: 'pass65-evaluated-per-digit-grip-curl-v1',
+      contract: 'pass65-evaluated-per-digit-grip-curl-v2',
       sourceReferenceAvailable: false,
       expectedBoneCount: 10,
       bones,
+      rightPinkyBindFloor: null,
+      allAtOrAboveRequiredBindFloor: false,
       allApplied: false,
     };
   }
@@ -1474,20 +1479,42 @@ function applyRiggedCarbineFingerCurl(
         continue;
       }
       applyRiggedCarbineFingerCurlToBone(bone, curlRadians);
-      bones.push({ side, digit, bone: runtimeName, curlRadians, applied: true });
+      const bindRelativeFloor = side === 'right' && digit === 'pinky'
+        ? enforceRiggedOperatorHandBindDeltaFloor(
+          root,
+          side,
+          digit,
+          RIGGED_CARBINE_RIGHT_PINKY_BIND_DELTA_FLOOR_RADIANS,
+          RIGGED_CARBINE_RIGHT_PINKY_FALLBACK_AXIS,
+        )
+        : null;
+      bones.push({ side, digit, bone: runtimeName, curlRadians, bindRelativeFloor, applied: true });
     }
   }
+  const rightPinkyBindFloor = (bones.find(({ side, digit }) => side === 'right' && digit === 'pinky')
+    ?.bindRelativeFloor ?? null) as Record<string, unknown> | null;
+  const allAtOrAboveRequiredBindFloor = rightPinkyBindFloor?.appliedToRenderedBone === true
+    && rightPinkyBindFloor.allFinite === true
+    && Number(rightPinkyBindFloor.afterBindDeltaRadians)
+      >= RIGGED_CARBINE_RIGHT_PINKY_BIND_DELTA_FLOOR_RADIANS - 1e-9;
   return {
-    contract: 'pass65-evaluated-per-digit-grip-curl-v1',
+    contract: 'pass65-evaluated-per-digit-grip-curl-v2',
     sourceReferenceAvailable: true,
     expectedBoneCount: 10,
     bones,
     bothHands: new Set(bones.filter(({ applied }) => applied === true).map(({ side }) => side)).size === 2,
-    allApplied: bones.length === 10 && bones.every(({ applied }) => applied === true),
+    rightPinkyBindFloor,
+    allAtOrAboveRequiredBindFloor,
+    allApplied: bones.length === 10 && bones.every(({ applied }) => applied === true)
+      && allAtOrAboveRequiredBindFloor,
   };
 }
 
-function applyRiggedWeaponGrip(rig: Extract<OperatorRig, { rigged: true }>, weapon: THREE.Group): Record<string, unknown> | null {
+function applyRiggedWeaponGrip(
+  root: THREE.Group,
+  rig: Extract<OperatorRig, { rigged: true }>,
+  weapon: THREE.Group,
+): Record<string, unknown> | null {
   if (!rig.leftShoulderBone || !rig.leftElbowBone || !rig.leftWristBone
     || !rig.rightShoulderBone || !rig.rightElbowBone || !rig.rightWristBone) return null;
   const support = applyRiggedArmGrip(
@@ -1497,7 +1524,7 @@ function applyRiggedWeaponGrip(rig: Extract<OperatorRig, { rigged: true }>, weap
     rig.rightShoulderBone, rig.rightElbowBone, rig.rightWristBone, weapon, 'grip-socket-r', -1,
   );
   if (!support) return dominant;
-  const fingerCurl = applyRiggedCarbineFingerCurl(rig, weapon);
+  const fingerCurl = applyRiggedCarbineFingerCurl(root, rig, weapon);
   const supportOrientationError = Number((support.wristOrientation as { errorRadians?: number } | undefined)?.errorRadians);
   const dominantOrientationError = Number((dominant?.wristOrientation as { errorRadians?: number } | undefined)?.errorRadians);
   const supportSocketReferenceValid = (support.socketReference as { valid?: boolean } | undefined)?.valid === true;
@@ -1803,7 +1830,7 @@ export function poseOperator(
     rig.weapon.visible = !meleeActive;
     // The mixer writes animated bones first; two-arm IK is the final
     // presentation layer so locomotion/fire clips cannot steer the muzzle.
-    root.userData.operatorGripTelemetry = meleeActive ? null : applyRiggedWeaponGrip(rig, rig.weapon);
+    root.userData.operatorGripTelemetry = meleeActive ? null : applyRiggedWeaponGrip(root, rig, rig.weapon);
   }
   if (rig.meleeKnife) rig.meleeKnife.visible = meleeActive;
 }
