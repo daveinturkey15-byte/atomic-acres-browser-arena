@@ -475,6 +475,18 @@ async function startSolo(page: Page): Promise<void> {
   await expect(page.locator('#hud')).toBeVisible();
 }
 
+async function startSoloWithExtendedFallbackAdmission(page: Page): Promise<void> {
+  await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { startSolo: () => void } }).__ATOMIC_ACRES_DEBUG__.startSolo());
+  await page.waitForFunction(
+    () => (window as unknown as {
+      __ATOMIC_ACRES_DEBUG__: { admissionState: () => { matchPhase: DebugState['matchPhase'] } };
+    }).__ATOMIC_ACRES_DEBUG__.admissionState().matchPhase === 'active',
+    undefined,
+    { timeout: 120_000 },
+  );
+  await expect(page.locator('#hud')).toBeVisible();
+}
+
 async function startSoloForStateOnlySupportLadder(page: Page): Promise<void> {
   await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { startSolo: () => void } }).__ATOMIC_ACRES_DEBUG__.startSolo());
   await page.waitForFunction(
@@ -824,7 +836,7 @@ test.describe('boot and authored presentation', () => {
     // at menu preview. Exercise the real fallback path by starting a solo match
     // with the asset blocked, then assert the authored procedural arena owns
     // the presentation.
-    await startSolo(page);
+    await startSoloWithExtendedFallbackAdmission(page);
     await expect.poll(async () => (await debug(page)).render.blenderEnvironment.status, { timeout: 60_000 }).toBe('fallback');
     const state = await debug(page);
     expect(state.render.profile).toBe('blender');
