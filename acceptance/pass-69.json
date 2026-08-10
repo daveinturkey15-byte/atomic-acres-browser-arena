@@ -4,16 +4,16 @@
   "feedbackReceivedAt": "2026-08-10T14:00:00Z",
   "status": "accepted",
   "preview": {
-    "kind": "immutable-url",
-    "ref": "http://127.0.0.1:4175/?release=choose&renderer=webgpu&requireWebGPU=1&source=95788909eab9727ed1dc82d7ef9a9d64d519830e",
-    "sourceSha": "95788909eab9727ed1dc82d7ef9a9d64d519830e",
-    "createdAt": "2026-08-10T14:18:30Z"
+    "kind": "github-actions-artifact",
+    "ref": "pr-preview-55-e1b22b7c2450f2eb818980d6889123133db2d5f7",
+    "sourceSha": "e1b22b7c2450f2eb818980d6889123133db2d5f7",
+    "createdAt": "2026-08-10T14:46:07.627Z"
   },
   "humanAcceptance": {
     "state": "approved",
     "approvedBy": "Dave",
-    "approvedAt": "2026-08-10T14:25:05Z",
-    "evidence": "Dave tested the SHA-keyed local staged preview and explicitly replied: 'ok its good, get it published'. This approval binds Pass 69 publication to source SHA 95788909eab9727ed1dc82d7ef9a9d64d519830e and its two-choice Pass 69 / Pass 63 Stable WebGL release shell."
+    "approvedAt": "2026-08-10T14:50:46Z",
+    "evidence": "Dave tested the SHA-keyed local staged preview at 95788909eab9727ed1dc82d7ef9a9d64d519830e and repeatedly instructed Codex to publish Pass 69. The immutable GitHub Actions preview at e1b22b7c2450f2eb818980d6889123133db2d5f7 contains the same approved runtime and release-shell bytes; intervening changes are restricted to acceptance, test, and process files and are checked by approval parity."
   },
   "requirements": [
     {
