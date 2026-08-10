@@ -12,7 +12,7 @@ function sourceSlice(source: string, start: string, end: string, fromIndex = 0):
 describe('allocation-light match admission observation contract', () => {
   it('exposes only authoritative scalar admission state without scene or render telemetry', () => {
     const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
-    const sampler = sourceSlice(source, 'function sampleAdmissionState()', 'const debugWindow');
+    const sampler = sourceSlice(source, 'function sampleAdmissionState()', 'function sampleDmrThermalReadiness()');
 
     expect(sampler).toContain('bootstrapStage,');
     expect(sampler).toContain('gameStarted,');
