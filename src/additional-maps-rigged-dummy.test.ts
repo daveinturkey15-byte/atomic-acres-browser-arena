@@ -109,10 +109,16 @@ vi.mock('./art-kit', async (importOriginal) => {
     ]);
     const walk = new THREE.AnimationClip('Walk', 1, [
       new THREE.QuaternionKeyframeTrack('Hips.quaternion', [0, 1], [0, 0, 0, 1, 0, 0.3826834, 0, 0.9238795]),
-      ...armBones.map(({ bone }, index) => {
+      ...armBones.map(({ bone, role }, index) => {
         const sign = index < 3 ? 1 : -1;
-        const first = new THREE.Quaternion().setFromEuler(new THREE.Euler(sign * (0.18 + index * 0.01), 0.08, sign * 0.12));
-        const second = new THREE.Quaternion().setFromEuler(new THREE.Euler(-sign * (0.14 + index * 0.01), -0.06, -sign * 0.09));
+        // Reproduce the hardware gate failure: the real Walk clip can leave an
+        // unarmed wrist animated, but only 0.0378 rad away from bind pose.
+        const first = role === 'wrist-hand'
+          ? new THREE.Quaternion().setFromEuler(new THREE.Euler(0.032, 0, 0))
+          : new THREE.Quaternion().setFromEuler(new THREE.Euler(sign * (0.18 + index * 0.01), 0.08, sign * 0.12));
+        const second = role === 'wrist-hand'
+          ? new THREE.Quaternion().setFromEuler(new THREE.Euler(0.038, 0, 0))
+          : new THREE.Quaternion().setFromEuler(new THREE.Euler(-sign * (0.14 + index * 0.01), -0.06, -sign * 0.09));
         return new THREE.QuaternionKeyframeTrack(
           `${bone.name}.quaternion`,
           [0, 1],
@@ -167,7 +173,7 @@ vi.mock('./art-kit', async (importOriginal) => {
 });
 
 import { buildGunRange, updateGunRangePresentation } from './additional-maps';
-import { riggedOperatorTelemetry } from './operator-model';
+import { poseUnarmedRiggedOperatorHands, riggedOperatorTelemetry } from './operator-model';
 
 describe('Gun Range rigged training-dummy presentation', () => {
   it('poses the retained operator child and advances its runtime bone instead of posing the wrapper', () => {
@@ -196,6 +202,71 @@ describe('Gun Range rigged training-dummy presentation', () => {
     expect(operator?.userData.operatorStance).toBe('stand');
     expect(presentation.root.userData.operatorStance).toBeUndefined();
     armBones.forEach((bone, index) => expect(bone.quaternion.angleTo(before[index])).toBeGreaterThan(0));
+    const unarmedHandPose = operator?.userData.operatorUnarmedHandPose as {
+      contract: string;
+      entries: Array<{
+        bone: string;
+        beforeBindDeltaRadians: number;
+        afterBindDeltaRadians: number;
+        intervened: boolean;
+        preservedAnimatedAxis: boolean;
+        usedMirroredFallbackAxis: boolean;
+        appliedToRenderedBone: boolean;
+      }>;
+      allApplied: boolean;
+      allAtOrAboveFloor: boolean;
+    };
+    expect(unarmedHandPose).toMatchObject({
+      contract: 'post-mixer-unarmed-wrist-rest-v1',
+      allApplied: true,
+      allAtOrAboveFloor: true,
+    });
+    expect(unarmedHandPose.entries).toHaveLength(2);
+    expect(unarmedHandPose.entries.every(({ beforeBindDeltaRadians }) => beforeBindDeltaRadians < 0.05)).toBe(true);
+    expect(unarmedHandPose.entries.every(({ afterBindDeltaRadians }) => afterBindDeltaRadians >= 0.075 - 1e-9)).toBe(true);
+    // This is the rendered bone itself, not a telemetry-only replacement.
+    expect(armBones[2].quaternion.angleTo(before[2])).toBeGreaterThanOrEqual(0.075 - 1e-9);
+    expect(armBones[5].quaternion.angleTo(before[5])).toBeGreaterThanOrEqual(0.075 - 1e-9);
+
+    const aboveFloorAxis = new THREE.Vector3(0.3, 0.8, -0.2).normalize();
+    armBones[2].quaternion.copy(before[2]).multiply(
+      new THREE.Quaternion().setFromAxisAngle(aboveFloorAxis, 0.12),
+    );
+    const aboveFloorQuaternion = armBones[2].quaternion.clone();
+    const aboveFloorPose = poseUnarmedRiggedOperatorHands(operator!) as typeof unarmedHandPose;
+    const aboveFloorLeft = aboveFloorPose.entries.find(({ bone }) => bone === 'WristL')!;
+    expect(aboveFloorLeft).toMatchObject({ intervened: false, usedMirroredFallbackAxis: false });
+    expect(armBones[2].quaternion.angleTo(aboveFloorQuaternion)).toBeLessThan(1e-9);
+
+    const belowFloorAxis = new THREE.Vector3(-0.25, 0.4, 0.7).normalize();
+    armBones[2].quaternion.copy(before[2]).multiply(
+      new THREE.Quaternion().setFromAxisAngle(belowFloorAxis, 0.04),
+    );
+    const belowFloorPose = poseUnarmedRiggedOperatorHands(operator!) as typeof unarmedHandPose;
+    const belowFloorLeft = belowFloorPose.entries.find(({ bone }) => bone === 'WristL')!;
+    expect(belowFloorLeft).toMatchObject({ intervened: true, preservedAnimatedAxis: true, usedMirroredFallbackAxis: false });
+    expect(armBones[2].quaternion.angleTo(before[2])).toBeCloseTo(0.075, 9);
+    const enforcedRelative = before[2].clone().invert().multiply(armBones[2].quaternion).normalize();
+    const enforcedAxis = new THREE.Vector3(enforcedRelative.x, enforcedRelative.y, enforcedRelative.z).normalize();
+    expect(Math.abs(enforcedAxis.dot(belowFloorAxis))).toBeGreaterThan(0.999999);
+
+    armBones[2].quaternion.copy(before[2]);
+    armBones[5].quaternion.copy(before[5]);
+    const exactBindPose = poseUnarmedRiggedOperatorHands(operator!) as typeof unarmedHandPose;
+    const exactBindLeft = exactBindPose.entries.find(({ bone }) => bone === 'WristL')!;
+    const exactBindRight = exactBindPose.entries.find(({ bone }) => bone === 'WristR')!;
+    expect(exactBindLeft).toMatchObject({ intervened: true, preservedAnimatedAxis: false, usedMirroredFallbackAxis: true });
+    expect(exactBindRight).toMatchObject({ intervened: true, preservedAnimatedAxis: false, usedMirroredFallbackAxis: true });
+    expect(exactBindLeft.afterBindDeltaRadians).toBeCloseTo(0.075, 9);
+    expect(exactBindRight.afterBindDeltaRadians).toBeCloseTo(0.075, 9);
+    const fallbackLeft = before[2].clone().invert().multiply(armBones[2].quaternion).normalize();
+    const fallbackRight = before[5].clone().invert().multiply(armBones[5].quaternion).normalize();
+    const fallbackLeftAxis = new THREE.Vector3(fallbackLeft.x, fallbackLeft.y, fallbackLeft.z).normalize();
+    const fallbackRightAxis = new THREE.Vector3(fallbackRight.x, fallbackRight.y, fallbackRight.z).normalize();
+    expect(fallbackLeftAxis.x).toBeCloseTo(fallbackRightAxis.x, 9);
+    expect(fallbackLeftAxis.y).toBeCloseTo(-fallbackRightAxis.y, 9);
+    expect(fallbackLeftAxis.z).toBeCloseTo(-fallbackRightAxis.z, 9);
+    expect([...armBones[2].quaternion.toArray(), ...armBones[5].quaternion.toArray()].every(Number.isFinite)).toBe(true);
     const telemetry = riggedOperatorTelemetry(operator!);
     expect(telemetry?.activeClip).toBe('Walk');
     expect(telemetry?.armPose).toMatchObject({

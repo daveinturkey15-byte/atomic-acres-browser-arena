@@ -998,6 +998,71 @@ export function updateRiggedOperator(root: THREE.Object3D, speed: number, stance
   return true;
 }
 
+const UNARMED_WRIST_BIND_DELTA_FLOOR_RADIANS = 0.075;
+const UNARMED_WRIST_AXIS_EPSILON = 1e-6;
+const UNARMED_WRIST_FALLBACK_AXIS = Object.freeze({
+  left: Object.freeze([1, -0.45, -0.6] as const),
+  right: Object.freeze([1, 0.45, 0.6] as const),
+});
+
+/**
+ * Keep an unarmed operator's rendered hands in a natural, deterministic rest
+ * pose after the locomotion mixer. Shoulder, elbow and finger animation stays
+ * live. A wrist already beyond the floor is untouched; a near-bind wrist keeps
+ * its animated relative-rotation axis and only gains enough angle to reach the
+ * floor. Exact bind pose uses a mirrored natural fallback axis. Armed operators
+ * never call this path because their final wrist pose is owned by weapon grip IK.
+ */
+export function poseUnarmedRiggedOperatorHands(root: THREE.Object3D): Record<string, unknown> | null {
+  const runtimeState = runtime(root);
+  if (!runtimeState) return null;
+  const entries = runtimeState.armBindPose
+    .filter(({ role }) => role === 'wrist-hand')
+    .map((entry) => {
+      const beforeBindDeltaRadians = entry.bone.quaternion.angleTo(entry.quaternion);
+      let intervened = false;
+      let usedMirroredFallbackAxis = false;
+      if (beforeBindDeltaRadians < UNARMED_WRIST_BIND_DELTA_FLOOR_RADIANS) {
+        const relative = entry.quaternion.clone().invert().multiply(entry.bone.quaternion).normalize();
+        if (relative.w < 0) relative.set(-relative.x, -relative.y, -relative.z, -relative.w);
+        const relativeAxisLength = Math.hypot(relative.x, relative.y, relative.z);
+        const axis = beforeBindDeltaRadians > UNARMED_WRIST_AXIS_EPSILON
+          && relativeAxisLength > UNARMED_WRIST_AXIS_EPSILON
+          ? new THREE.Vector3(relative.x, relative.y, relative.z).divideScalar(relativeAxisLength)
+          : new THREE.Vector3(...UNARMED_WRIST_FALLBACK_AXIS[entry.side]).normalize();
+        usedMirroredFallbackAxis = beforeBindDeltaRadians <= UNARMED_WRIST_AXIS_EPSILON;
+        const enforcedDelta = new THREE.Quaternion().setFromAxisAngle(
+          axis,
+          UNARMED_WRIST_BIND_DELTA_FLOOR_RADIANS,
+        );
+        entry.bone.quaternion.copy(entry.quaternion).multiply(enforcedDelta).normalize();
+        intervened = true;
+      }
+      entry.bone.updateWorldMatrix(false, true);
+      return {
+        side: entry.side,
+        sourceBone: entry.sourceBone,
+        bone: entry.bone.name,
+        minimumBindDeltaRadians: UNARMED_WRIST_BIND_DELTA_FLOOR_RADIANS,
+        beforeBindDeltaRadians,
+        afterBindDeltaRadians: entry.bone.quaternion.angleTo(entry.quaternion),
+        intervened,
+        preservedAnimatedAxis: intervened && !usedMirroredFallbackAxis,
+        usedMirroredFallbackAxis,
+        appliedToRenderedBone: true,
+      };
+    });
+  return {
+    contract: 'post-mixer-unarmed-wrist-rest-v1',
+    expectedBoneCount: 2,
+    entries,
+    allApplied: entries.length === 2 && entries.every(({ appliedToRenderedBone }) => appliedToRenderedBone),
+    allAtOrAboveFloor: entries.length === 2 && entries.every(({ afterBindDeltaRadians }) => (
+      afterBindDeltaRadians >= UNARMED_WRIST_BIND_DELTA_FLOOR_RADIANS - 1e-9
+    )),
+  };
+}
+
 export function fireRiggedOperator(root: THREE.Object3D): boolean {
   const runtimeState = runtime(root);
   if (!runtimeState) return false;

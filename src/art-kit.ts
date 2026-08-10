@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { createRiggedOperator, deathRiggedOperator, fireRiggedOperator, meleeRiggedOperator, reactRiggedOperator, resetRiggedOperator, updateRiggedOperator, type OperatorAppearance } from './operator-model';
+import { createRiggedOperator, deathRiggedOperator, fireRiggedOperator, meleeRiggedOperator, poseUnarmedRiggedOperatorHands, reactRiggedOperator, resetRiggedOperator, updateRiggedOperator, type OperatorAppearance } from './operator-model';
 import { advanceMinigunSpool, createMinigunSpoolState, type MinigunSpoolState } from './minigun-spool';
 import {
   capturePass65PresentationGeneration,
@@ -1786,6 +1786,9 @@ export function poseOperator(
     position: bone.position.clone(),
     quaternion: bone.quaternion.clone(),
   }));
+  root.userData.operatorUnarmedHandPose = rig.weaponId === null
+    ? poseUnarmedRiggedOperatorHands(root)
+    : null;
   root.updateWorldMatrix(true, true);
   if (rig.weapon) {
     rig.weapon.visible = !meleeActive;

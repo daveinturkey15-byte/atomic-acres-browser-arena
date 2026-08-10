@@ -82,6 +82,9 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     expect(operator).toContain('minimumInfluencedVertices: 4');
     expect(operator).toContain('minimumMaximumNormalizedWeight: 0.2');
     expect(operator).toContain('minimumElbowFlexRadians: 0.3');
+    expect(operator).toContain('UNARMED_WRIST_BIND_DELTA_FLOOR_RADIANS = 0.075');
+    expect(operator).toContain('if (beforeBindDeltaRadians < UNARMED_WRIST_BIND_DELTA_FLOOR_RADIANS)');
+    expect(operator).toContain('preservedAnimatedAxis: intervened && !usedMirroredFallbackAxis');
     expect(operator).toContain("contract: 'static-rendered-influence-cache-v1'");
     expect(operator).toContain('bufferAttributeVersion(weights)');
     expect(operator).toContain("reference: 'authored-glb-local-transform-before-animation'");
@@ -94,6 +97,9 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     expect(dummyUnit).toContain("['UpperArmL', 'LowerArmL', 'WristL', 'UpperArmR', 'LowerArmR', 'WristR']");
     expect(dummyUnit).toContain('expect(posedBones).toHaveLength(6)');
     expect(dummyUnit).toContain("'Thumb2L', 'Index2L', 'Middle2L', 'Ring2L', 'Pinky2L'");
+    expect(dummyUnit).toContain('setFromAxisAngle(aboveFloorAxis, 0.12)');
+    expect(dummyUnit).toContain('angleTo(aboveFloorQuaternion)).toBeLessThan(1e-9)');
+    expect(dummyUnit).toContain('usedMirroredFallbackAxis: true');
     expect(dummyUnit).toContain('zeroing every UpperArmL WEIGHTS_0 contribution');
     expect(dummyUnit).toContain('skinWeight.setXYZW');
     expect(dummyUnit).toContain('allHaveRenderedVertexInfluence).toBe(false)');
@@ -120,6 +126,7 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     expect(artKit).toContain('authoredLocalPosition: Object.freeze([-0.10000000149011612, -0.03999999910593033, 0.47999998927116394]');
     expect(artKit).toContain("liveTargetContract: 'runtime-calibrated-from-authored-source-v1'");
     expect(artKit).toContain("calibrationReason: 'third-person-swat-chain-reach-without-unsafe-stretch'");
+    expect(artKit).toContain("root.userData.operatorUnarmedHandPose = rig.weaponId === null");
     expect(artKit.indexOf('const observedImportedSourceLocalPosition = socket.position.toArray()'))
       .toBeLessThan(artKit.indexOf("supportGrip.position.set(...RIGGED_SUPPORT_GRIP_POSITION[weaponId])"));
     expect(spec).not.toContain('weaponLocalBounds');
