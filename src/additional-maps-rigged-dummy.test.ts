@@ -41,12 +41,17 @@ vi.mock('./art-kit', async (importOriginal) => {
       { side: 'right' as const, role: 'elbow' as const, sourceBone: 'LowerArm.R', bone: rightElbow },
       { side: 'right' as const, role: 'wrist-hand' as const, sourceBone: 'Wrist.R', bone: rightWrist },
     ].map((entry) => ({ ...entry, position: entry.bone.position.clone(), quaternion: entry.bone.quaternion.clone() }));
+    const digitOffsets = [
+      ['thumb', -0.05], ['index', -0.025], ['middle', 0], ['ring', 0.025], ['pinky', 0.05],
+    ] as const;
     const handBones = ([
-      ['left', 'middle', 'Middle1L', 'Middle2L', 'Middle2.L', leftWrist, -0.025],
-      ['left', 'ring', 'Ring1L', 'Ring2L', 'Ring2.L', leftWrist, 0.025],
-      ['right', 'middle', 'Middle1R', 'Middle2R', 'Middle2.R', rightWrist, 0.025],
-      ['right', 'ring', 'Ring1R', 'Ring2R', 'Ring2.R', rightWrist, -0.025],
-    ] as const).map(([side, digit, parentName, boneName, sourceBone, wrist, offsetX]) => {
+      ['left', leftWrist, 'L'], ['right', rightWrist, 'R'],
+    ] as const).flatMap(([side, wrist, suffix]) => digitOffsets.map(([digit, baseOffsetX]) => {
+      const capitalized = `${digit[0].toUpperCase()}${digit.slice(1)}`;
+      const parentName = `${capitalized}1${suffix}`;
+      const boneName = `${capitalized}2${suffix}`;
+      const sourceBone = `${capitalized}2.${suffix}`;
+      const offsetX = side === 'left' ? baseOffsetX : -baseOffsetX;
       const first = bone(parentName, new THREE.Vector3(offsetX, -0.035, -0.045), wrist);
       const second = bone(boneName, new THREE.Vector3(0, -0.05, 0), first);
       return {
@@ -59,20 +64,33 @@ vi.mock('./art-kit', async (importOriginal) => {
         quaternion: second.quaternion.clone(),
         first,
       };
-    });
-    const geometry = new THREE.BoxGeometry(0.5, 1, 0.3);
+    }));
+    const skeletonBones = [
+      hips, torso, ...armBones.map((entry) => entry.bone),
+      ...handBones.flatMap((entry) => [entry.first, entry.bone]),
+    ];
+    const geometry = new THREE.BoxGeometry(0.5, 1, 0.3, 4, 4, 4);
     const vertexCount = geometry.getAttribute('position').count;
-    geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(new Uint16Array(vertexCount * 4), 4));
+    const indices = new Uint16Array(vertexCount * 4);
     const weights = new Float32Array(vertexCount * 4);
-    for (let index = 0; index < vertexCount; index += 1) weights[index * 4] = 1;
+    const trackedBones = [...armBones.map((entry) => entry.bone), ...handBones.map((entry) => entry.bone)];
+    for (let index = 0; index < vertexCount; index += 1) {
+      const primary = trackedBones[Math.floor(index / 4) % trackedBones.length];
+      indices[index * 4] = skeletonBones.indexOf(primary);
+      indices[index * 4 + 1] = skeletonBones.indexOf(primary.parent as THREE.Bone);
+      indices[index * 4 + 2] = skeletonBones.indexOf(torso);
+      indices[index * 4 + 3] = skeletonBones.indexOf(hips);
+      weights[index * 4] = 0.7;
+      weights[index * 4 + 1] = 0.15;
+      weights[index * 4 + 2] = 0.1;
+      weights[index * 4 + 3] = 0.05;
+    }
+    geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(indices, 4));
     geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(weights, 4));
     const body = new THREE.SkinnedMesh(geometry, new THREE.MeshBasicMaterial());
     body.name = 'Swat_Body';
     body.add(hips);
-    body.bind(new THREE.Skeleton([
-      hips, torso, ...armBones.map((entry) => entry.bone),
-      ...handBones.flatMap((entry) => [entry.first, entry.bone]),
-    ]));
+    body.bind(new THREE.Skeleton(skeletonBones));
     visual.add(body);
     const weaponSocket = new THREE.Group();
     weaponSocket.name = 'weapon-socket';
@@ -187,39 +205,107 @@ describe('Gun Range rigged training-dummy presentation', () => {
       allFinite: true,
       allHierarchyValid: true,
       allInEffectivelyVisibleSkinnedMesh: true,
+      allHaveRenderedVertexInfluence: true,
       allAntiTPoseGeometry: true,
     });
     expect(telemetry?.handPose).toMatchObject({
-      contract: 'source-glb-animated-middle-ring-finger-descendants-v1',
-      expectedBoneCount: 4,
+      contract: 'source-glb-weighted-five-digit-sentinels-v2',
+      expectedBoneCount: 10,
       allPresent: true,
       allDescendantOfWrist: true,
       allInEffectivelyVisibleSkinnedMesh: true,
+      allHaveRenderedVertexInfluence: true,
       allFinite: true,
     });
     const armPose = telemetry?.armPose as {
-      bones: Array<{ bindQuaternionDeltaRadians: number; inEffectivelyVisibleSkinnedMesh: boolean }>;
+      bones: Array<{
+        bindQuaternionDeltaRadians: number;
+        inEffectivelyVisibleSkinnedMesh: boolean;
+        vertexInfluence: { influencedVertexCount: number; maximumNormalizedWeight: number; passes: boolean };
+      }>;
       chains: Array<{ hierarchyPath: string[]; antiTPoseGeometry: boolean; shoulderToWristVerticalDrop: number; elbowFlexRadians: number }>;
       commonEffectiveSkinnedMeshes: string[];
+      renderedInfluenceCache: { generation: number; computedBones: number; reusedBones: number; cachedBones: number };
     };
     const posedBones = armPose.bones;
     expect(posedBones).toHaveLength(6);
     expect(posedBones.every(({ bindQuaternionDeltaRadians }) => bindQuaternionDeltaRadians > 0.05)).toBe(true);
     expect(posedBones.every(({ inEffectivelyVisibleSkinnedMesh }) => inEffectivelyVisibleSkinnedMesh)).toBe(true);
+    expect(posedBones.every(({ vertexInfluence }) => vertexInfluence.passes
+      && vertexInfluence.influencedVertexCount >= 4 && vertexInfluence.maximumNormalizedWeight >= 0.2)).toBe(true);
     expect(armPose.commonEffectiveSkinnedMeshes).toContain('Swat_Body');
     expect(armPose.chains.map(({ hierarchyPath }) => hierarchyPath)).toEqual([
       ['UpperArmL', 'LowerArmL', 'WristL'],
       ['UpperArmR', 'LowerArmR', 'WristR'],
     ]);
     expect(armPose.chains.every(({ antiTPoseGeometry, shoulderToWristVerticalDrop, elbowFlexRadians }) => (
-      antiTPoseGeometry && shoulderToWristVerticalDrop >= 0.08 && elbowFlexRadians >= 0.12
+      antiTPoseGeometry && shoulderToWristVerticalDrop >= 0.08 && elbowFlexRadians >= 0.3
     ))).toBe(true);
     const handPose = telemetry?.handPose as {
-      bones: Array<{ bone: string; wristDescendantPath: string[]; bindQuaternionDeltaRadians: number }>;
+      bones: Array<{
+        bone: string;
+        wristDescendantPath: string[];
+        bindQuaternionDeltaRadians: number;
+        vertexInfluence: { influencedVertexCount: number; maximumNormalizedWeight: number; passes: boolean };
+      }>;
     };
-    expect(handPose.bones.map(({ bone }) => bone)).toEqual(['Middle2L', 'Ring2L', 'Middle2R', 'Ring2R']);
+    expect(handPose.bones.map(({ bone }) => bone)).toEqual([
+      'Thumb2L', 'Index2L', 'Middle2L', 'Ring2L', 'Pinky2L',
+      'Thumb2R', 'Index2R', 'Middle2R', 'Ring2R', 'Pinky2R',
+    ]);
     expect(handPose.bones.every(({ wristDescendantPath, bindQuaternionDeltaRadians }) => (
       wristDescendantPath.length === 3 && bindQuaternionDeltaRadians >= 0.12
     ))).toBe(true);
+    expect(handPose.bones.every(({ vertexInfluence }) => vertexInfluence.passes
+      && vertexInfluence.influencedVertexCount >= 4 && vertexInfluence.maximumNormalizedWeight >= 0.2)).toBe(true);
+    expect(armPose.renderedInfluenceCache).toMatchObject({
+      generation: 1,
+      computedBones: 16,
+      reusedBones: 0,
+      cachedBones: 16,
+    });
+    const repeatedTelemetry = riggedOperatorTelemetry(operator!);
+    expect((repeatedTelemetry?.armPose as { renderedInfluenceCache: Record<string, number> }).renderedInfluenceCache)
+      .toMatchObject({ generation: 1, computedBones: 0, reusedBones: 16, cachedBones: 16 });
+
+    // A skeleton palette and JOINTS_0 entry are not rendered influence. Retain
+    // both while zeroing every UpperArmL WEIGHTS_0 contribution, then assert
+    // the telemetry fails closed.
+    const body = operator?.getObjectByName('Swat_Body') as THREE.SkinnedMesh;
+    const targetJoint = body.skeleton.bones.indexOf(armBones[0]);
+    const skinIndex = body.geometry.getAttribute('skinIndex') as THREE.BufferAttribute;
+    const skinWeight = body.geometry.getAttribute('skinWeight') as THREE.BufferAttribute;
+    for (let vertex = 0; vertex < skinIndex.count; vertex += 1) {
+      const joints = [skinIndex.getX(vertex), skinIndex.getY(vertex), skinIndex.getZ(vertex), skinIndex.getW(vertex)];
+      const weights = [skinWeight.getX(vertex), skinWeight.getY(vertex), skinWeight.getZ(vertex), skinWeight.getW(vertex)];
+      let displacedWeight = 0;
+      for (let slot = 0; slot < 4; slot += 1) {
+        if (joints[slot] !== targetJoint) continue;
+        displacedWeight += weights[slot];
+        weights[slot] = 0;
+      }
+      weights[3] += displacedWeight;
+      skinWeight.setXYZW(vertex, weights[0], weights[1], weights[2], weights[3]);
+    }
+    skinWeight.needsUpdate = true;
+    expect(Array.from({ length: skinIndex.count }, (_, vertex) => (
+      [skinIndex.getX(vertex), skinIndex.getY(vertex), skinIndex.getZ(vertex), skinIndex.getW(vertex)]
+        .includes(targetJoint)
+    )).some(Boolean)).toBe(true);
+    const zeroWeightTelemetry = riggedOperatorTelemetry(operator!);
+    const zeroWeightArm = (zeroWeightTelemetry?.armPose as {
+      allHaveRenderedVertexInfluence: boolean;
+      bones: Array<{ bone: string; vertexInfluence: { influencedVertexCount: number; passes: boolean } }>;
+      renderedInfluenceCache: { generation: number; computedBones: number; reusedBones: number; cachedBones: number };
+    });
+    expect(zeroWeightArm.allHaveRenderedVertexInfluence).toBe(false);
+    expect(zeroWeightArm.renderedInfluenceCache).toMatchObject({
+      generation: 2,
+      computedBones: 16,
+      reusedBones: 0,
+      cachedBones: 16,
+    });
+    expect(zeroWeightArm.bones.find(({ bone }) => bone === 'UpperArmL')?.vertexInfluence)
+      .toMatchObject({ influencedVertexCount: 0, passes: false });
   });
 });

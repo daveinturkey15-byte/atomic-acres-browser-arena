@@ -113,19 +113,38 @@ type RiggedOperatorRuntime = {
   /** Authored finger joints animated by Walk, captured before mixer evaluation. */
   handBindPose: Array<{
     side: 'left' | 'right';
-    digit: 'middle' | 'ring';
+    digit: 'thumb' | 'index' | 'middle' | 'ring' | 'pinky';
     joint: 2;
     sourceBone: string;
     bone: THREE.Bone;
     position: THREE.Vector3;
     quaternion: THREE.Quaternion;
   }>;
+  /** Static skin influence scan, invalidated when a geometry attribute version changes. */
+  renderedInfluenceCache?: {
+    signature: string;
+    generation: number;
+    byBone: Map<THREE.Bone, RenderedVertexInfluenceTelemetry>;
+  };
   poseBeforeStance?: Array<{
     bone: THREE.Bone;
     position: THREE.Vector3;
     quaternion: THREE.Quaternion;
   }>;
 };
+
+type RenderedVertexInfluenceTelemetry = Readonly<{
+  contract: 'rendered-joints0-weights0-influence-v1';
+  thresholds: Readonly<{
+    minimumNormalizedWeight: number;
+    minimumInfluencedVertices: number;
+    minimumMaximumNormalizedWeight: number;
+  }>;
+  influencedVertexCount: number;
+  maximumNormalizedWeight: number;
+  meshes: Array<{ mesh: string; influencedVertexCount: number; maximumNormalizedWeight: number }>;
+  passes: boolean;
+}>;
 
 const RIGGED_OPERATOR_ARM_BONES = Object.freeze([
   Object.freeze({ side: 'left' as const, role: 'shoulder' as const, sourceBone: 'UpperArm.L', names: Object.freeze(['UpperArmL', 'UpperArm.L']) }),
@@ -136,22 +155,34 @@ const RIGGED_OPERATOR_ARM_BONES = Object.freeze([
   Object.freeze({ side: 'right' as const, role: 'wrist-hand' as const, sourceBone: 'Wrist.R', names: Object.freeze(['WristR', 'Wrist.R']) }),
 ]);
 
-// These are real animated second phalanges in the shipped operator GLB. They
-// prove that each tracked wrist terminates in an authored hand, not a named arm
-// transform with no skinned finger descendants.
+// All ten second phalanges are real, animated joints in the shipped operator
+// GLB. They are both projection sentinels and rendered-weight sentinels: a
+// named skeleton node without JOINTS_0/WEIGHTS_0 influence is not hand proof.
 const RIGGED_OPERATOR_HAND_BONES = Object.freeze([
+  Object.freeze({ side: 'left' as const, digit: 'thumb' as const, joint: 2 as const, sourceBone: 'Thumb2.L', names: Object.freeze(['Thumb2L', 'Thumb2.L']) }),
+  Object.freeze({ side: 'left' as const, digit: 'index' as const, joint: 2 as const, sourceBone: 'Index2.L', names: Object.freeze(['Index2L', 'Index2.L']) }),
   Object.freeze({ side: 'left' as const, digit: 'middle' as const, joint: 2 as const, sourceBone: 'Middle2.L', names: Object.freeze(['Middle2L', 'Middle2.L']) }),
   Object.freeze({ side: 'left' as const, digit: 'ring' as const, joint: 2 as const, sourceBone: 'Ring2.L', names: Object.freeze(['Ring2L', 'Ring2.L']) }),
+  Object.freeze({ side: 'left' as const, digit: 'pinky' as const, joint: 2 as const, sourceBone: 'Pinky2.L', names: Object.freeze(['Pinky2L', 'Pinky2.L']) }),
+  Object.freeze({ side: 'right' as const, digit: 'thumb' as const, joint: 2 as const, sourceBone: 'Thumb2.R', names: Object.freeze(['Thumb2R', 'Thumb2.R']) }),
+  Object.freeze({ side: 'right' as const, digit: 'index' as const, joint: 2 as const, sourceBone: 'Index2.R', names: Object.freeze(['Index2R', 'Index2.R']) }),
   Object.freeze({ side: 'right' as const, digit: 'middle' as const, joint: 2 as const, sourceBone: 'Middle2.R', names: Object.freeze(['Middle2R', 'Middle2.R']) }),
   Object.freeze({ side: 'right' as const, digit: 'ring' as const, joint: 2 as const, sourceBone: 'Ring2.R', names: Object.freeze(['Ring2R', 'Ring2.R']) }),
+  Object.freeze({ side: 'right' as const, digit: 'pinky' as const, joint: 2 as const, sourceBone: 'Pinky2.R', names: Object.freeze(['Pinky2R', 'Pinky2.R']) }),
 ]);
+
+const RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS = Object.freeze({
+  minimumNormalizedWeight: 0.05,
+  minimumInfluencedVertices: 4,
+  minimumMaximumNormalizedWeight: 0.2,
+});
 
 const RIGGED_OPERATOR_ANTI_T_THRESHOLDS = Object.freeze({
   minimumVerticalDropM: 0.08,
   minimumVerticalDropRatio: 0.18,
   maximumHorizontalReachRatio: 0.9,
   maximumOutwardReachRatio: 0.82,
-  minimumElbowFlexRadians: 0.12,
+  minimumElbowFlexRadians: 0.3,
 });
 
 /**
@@ -874,6 +905,23 @@ export function createRiggedOperator(
       quaternion: bone.quaternion.clone(),
     }] : [];
   });
+  root.updateWorldMatrix(true, true);
+  const operatorRootWorld = root.getWorldQuaternion(new THREE.Quaternion());
+  for (const entry of armBindPose.filter(({ role }) => role === 'wrist-hand')) {
+    // Convert the authored third-person wrist basis into Atomic Acres operator
+    // root space. The weapon solve can then apply the existing weapon-specific
+    // hand rotation without pretending the GLB bone axes equal socket axes.
+    const wristWorld = entry.bone.getWorldQuaternion(new THREE.Quaternion());
+    entry.bone.userData.riggedGripBasisCorrection = wristWorld.invert()
+      .multiply(operatorRootWorld)
+      .normalize()
+      .toArray();
+    entry.bone.userData.riggedGripBasisReference = {
+      contract: 'authored-wrist-bind-to-operator-root-v1',
+      sourceAsset: operatorAsset.source,
+      sourceBone: entry.sourceBone,
+    };
+  }
   root.userData.riggedOperatorRuntime = {
     mixer,
     clips,
@@ -1071,6 +1119,112 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
   const skinMembership = (bone: THREE.Bone): string[] => effectiveSkinnedMeshes
     .filter((mesh) => mesh.skeleton.bones.includes(bone))
     .map((mesh) => mesh.name);
+  const attributeComponent = (
+    attribute: THREE.BufferAttribute | THREE.InterleavedBufferAttribute,
+    vertex: number,
+    slot: number,
+  ): number => {
+    if (slot === 0) return attribute.getX(vertex);
+    if (slot === 1) return attribute.getY(vertex);
+    if (slot === 2) return attribute.getZ(vertex);
+    return attribute.getW(vertex);
+  };
+  const bufferAttributeVersion = (
+    attribute: THREE.BufferAttribute | THREE.InterleavedBufferAttribute | undefined,
+  ): number => {
+    if (!attribute) return -1;
+    return attribute instanceof THREE.InterleavedBufferAttribute ? attribute.data.version : attribute.version;
+  };
+  const renderedInfluenceSignature = effectiveSkinnedMeshes.map((mesh) => {
+    const joints = mesh.geometry.getAttribute('skinIndex');
+    const weights = mesh.geometry.getAttribute('skinWeight');
+    const positions = mesh.geometry.getAttribute('position');
+    return [
+      mesh.uuid,
+      mesh.geometry.uuid,
+      positions?.count ?? -1,
+      bufferAttributeVersion(joints),
+      bufferAttributeVersion(weights),
+      mesh.geometry.index?.version ?? -1,
+      mesh.geometry.drawRange.start,
+      mesh.geometry.drawRange.count,
+    ].join(':');
+  }).join('|');
+  let renderedInfluenceCache = runtimeState.renderedInfluenceCache;
+  if (!renderedInfluenceCache || renderedInfluenceCache.signature !== renderedInfluenceSignature) {
+    renderedInfluenceCache = {
+      signature: renderedInfluenceSignature,
+      generation: (renderedInfluenceCache?.generation ?? 0) + 1,
+      byBone: new Map(),
+    };
+    runtimeState.renderedInfluenceCache = renderedInfluenceCache;
+  }
+  let renderedInfluenceComputedBones = 0;
+  let renderedInfluenceReusedBones = 0;
+  const renderedVertexInfluence = (bone: THREE.Bone): RenderedVertexInfluenceTelemetry => {
+    const cached = renderedInfluenceCache.byBone.get(bone);
+    if (cached) {
+      renderedInfluenceReusedBones += 1;
+      return cached;
+    }
+    let influencedVertexCount = 0;
+    let maximumNormalizedWeight = 0;
+    const meshes: Array<{ mesh: string; influencedVertexCount: number; maximumNormalizedWeight: number }> = [];
+    for (const mesh of effectiveSkinnedMeshes) {
+      const jointIndex = mesh.skeleton.bones.indexOf(bone);
+      const joints = mesh.geometry.getAttribute('skinIndex');
+      const weights = mesh.geometry.getAttribute('skinWeight');
+      const positions = mesh.geometry.getAttribute('position');
+      if (jointIndex < 0 || !joints || !weights || !positions || joints.itemSize < 4 || weights.itemSize < 4) continue;
+      const renderedVertices = new Set<number>();
+      const index = mesh.geometry.index;
+      const drawStart = Math.max(0, mesh.geometry.drawRange.start);
+      const available = index?.count ?? positions.count;
+      const drawCount = Number.isFinite(mesh.geometry.drawRange.count)
+        ? Math.min(mesh.geometry.drawRange.count, available - drawStart)
+        : available - drawStart;
+      for (let drawIndex = drawStart; drawIndex < drawStart + Math.max(0, drawCount); drawIndex += 1) {
+        renderedVertices.add(index ? index.getX(drawIndex) : drawIndex);
+      }
+      let meshInfluencedVertexCount = 0;
+      let meshMaximumNormalizedWeight = 0;
+      for (const vertex of renderedVertices) {
+        let totalWeight = 0;
+        let boneWeight = 0;
+        for (let slot = 0; slot < 4; slot += 1) {
+          const weight = attributeComponent(weights, vertex, slot);
+          totalWeight += weight;
+          if (Math.round(attributeComponent(joints, vertex, slot)) === jointIndex) boneWeight += weight;
+        }
+        const normalizedWeight = totalWeight > 1e-8 ? boneWeight / totalWeight : 0;
+        if (normalizedWeight >= RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS.minimumNormalizedWeight) {
+          meshInfluencedVertexCount += 1;
+        }
+        meshMaximumNormalizedWeight = Math.max(meshMaximumNormalizedWeight, normalizedWeight);
+      }
+      if (meshInfluencedVertexCount > 0 || meshMaximumNormalizedWeight > 0) {
+        meshes.push({
+          mesh: mesh.name,
+          influencedVertexCount: meshInfluencedVertexCount,
+          maximumNormalizedWeight: meshMaximumNormalizedWeight,
+        });
+      }
+      influencedVertexCount += meshInfluencedVertexCount;
+      maximumNormalizedWeight = Math.max(maximumNormalizedWeight, meshMaximumNormalizedWeight);
+    }
+    const telemetry: RenderedVertexInfluenceTelemetry = {
+      contract: 'rendered-joints0-weights0-influence-v1',
+      thresholds: RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS,
+      influencedVertexCount,
+      maximumNormalizedWeight,
+      meshes,
+      passes: influencedVertexCount >= RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS.minimumInfluencedVertices
+        && maximumNormalizedWeight >= RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS.minimumMaximumNormalizedWeight,
+    };
+    renderedInfluenceCache.byBone.set(bone, telemetry);
+    renderedInfluenceComputedBones += 1;
+    return telemetry;
+  };
   const descendantPath = (descendant: THREE.Object3D, ancestor: THREE.Object3D): string[] | null => {
     const path = [descendant.name];
     let cursor = descendant.parent;
@@ -1088,6 +1242,7 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
     const worldQuaternion = entry.bone.getWorldQuaternion(new THREE.Quaternion()).toArray();
     const bindPositionDelta = entry.bone.position.distanceTo(entry.position);
     const bindQuaternionDeltaRadians = entry.bone.quaternion.angleTo(entry.quaternion);
+    const vertexInfluence = renderedVertexInfluence(entry.bone);
     return {
       side: entry.side,
       role: entry.role,
@@ -1104,6 +1259,7 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
       bindPositionDelta,
       bindQuaternionDeltaRadians,
       inEffectivelyVisibleSkinnedMesh: skinMembership(entry.bone).length > 0,
+      vertexInfluence,
       finite: [
         ...localPosition,
         ...localQuaternion,
@@ -1125,6 +1281,7 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
     const bindQuaternionDeltaRadians = entry.bone.quaternion.angleTo(entry.quaternion);
     const effectiveSkinMembership = skinMembership(entry.bone);
     const wristDescendantPath = wrist ? descendantPath(entry.bone, wrist) : null;
+    const vertexInfluence = renderedVertexInfluence(entry.bone);
     return {
       side: entry.side,
       digit: entry.digit,
@@ -1137,6 +1294,7 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
       descendantOfWrist: wristDescendantPath !== null,
       effectiveSkinnedMeshes: effectiveSkinMembership,
       inEffectivelyVisibleSkinnedMesh: effectiveSkinMembership.length > 0,
+      vertexInfluence,
       localPosition,
       localQuaternion,
       worldPosition,
@@ -1266,6 +1424,14 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
       allHierarchyValid: armChains.every((chain) => chain.complete && chain.directHierarchy === true),
       allInEffectivelyVisibleSkinnedMesh: armPoseBones.every((bone) => bone.inEffectivelyVisibleSkinnedMesh)
         && commonEffectiveSkinMeshes.length > 0,
+      allHaveRenderedVertexInfluence: armPoseBones.every((bone) => bone.vertexInfluence.passes),
+      renderedInfluenceCache: {
+        contract: 'static-rendered-influence-cache-v1',
+        generation: renderedInfluenceCache.generation,
+        computedBones: renderedInfluenceComputedBones,
+        reusedBones: renderedInfluenceReusedBones,
+        cachedBones: renderedInfluenceCache.byBone.size,
+      },
       allAntiTPoseGeometry: armChains.every((chain) => chain.complete && chain.antiTPoseGeometry === true),
       allFinite: armPoseBones.every((bone) => bone.finite)
         && armChains.every((chain) => !chain.complete || ('armLength' in chain
@@ -1282,7 +1448,7 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
           ].every(Number.isFinite))),
     },
     handPose: {
-      contract: 'source-glb-animated-middle-ring-finger-descendants-v1',
+      contract: 'source-glb-weighted-five-digit-sentinels-v2',
       reference: 'shipped-lod0-walk-animated-second-phalanges',
       expectedBoneCount: RIGGED_OPERATOR_HAND_BONES.length,
       bones: handPoseBones,
@@ -1290,6 +1456,7 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
       allDescendantOfWrist: handPoseBones.every((bone) => bone.descendantOfWrist),
       allInEffectivelyVisibleSkinnedMesh: handPoseBones.every((bone) => bone.inEffectivelyVisibleSkinnedMesh)
         && commonEffectiveSkinMeshes.length > 0,
+      allHaveRenderedVertexInfluence: handPoseBones.every((bone) => bone.vertexInfluence.passes),
       allFinite: handPoseBones.every((bone) => bone.finite),
     },
     meleeKnifeVisible: root.getObjectByName('operator-melee-knife')?.visible === true,

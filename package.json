@@ -85,6 +85,7 @@
     "qa:pass69-3:support-aircraft:edge-webgl2": "node scripts/qa/run-pass69-3-support-aircraft-live.mjs edge-webgl2",
     "qa:pass69-3:support-aircraft:edge-webgpu": "node scripts/qa/run-pass69-3-support-aircraft-live.mjs edge-webgpu",
     "qa:pass69-3:support-aircraft": "npm run qa:pass69-3:support-aircraft:edge-webgl2 && npm run qa:pass69-3:support-aircraft:edge-webgpu",
+    "qa:pass69-3:rigged-bot-contract": "node scripts/qa/run-pass69-3-rigged-bot-live.mjs --self-test",
     "qa:pass69-3:rigged-bot-live:edge-webgl2": "node scripts/qa/run-pass69-3-rigged-bot-live.mjs edge-webgl2",
     "qa:pass69-3:rigged-bot-live:edge-webgpu": "node scripts/qa/run-pass69-3-rigged-bot-live.mjs edge-webgpu",
     "qa:pass69-3:rigged-bot-live": "npm run qa:pass69-3:rigged-bot-live:edge-webgl2 && npm run qa:pass69-3:rigged-bot-live:edge-webgpu",

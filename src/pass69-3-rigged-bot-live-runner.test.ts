@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> };
@@ -9,6 +10,7 @@ const graph = JSON.parse(readFileSync('docs/PASS65_OWNER_FEEDBACK_COMPLETENESS_G
 const runner = readFileSync('scripts/qa/run-pass69-3-rigged-bot-live.mjs', 'utf8');
 const spec = readFileSync('tests/e2e/pass69-3-rigged-bot-live.spec.ts', 'utf8');
 const operator = readFileSync('src/operator-model.ts', 'utf8');
+const artKit = readFileSync('src/art-kit.ts', 'utf8');
 const legacy = readFileSync('src/legacy-main.ts', 'utf8');
 const dummyUnit = readFileSync('src/additional-maps-rigged-dummy.test.ts', 'utf8');
 
@@ -20,6 +22,8 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       .toBe('node scripts/qa/run-pass69-3-rigged-bot-live.mjs edge-webgpu');
     expect(packageJson.scripts['qa:pass69-3:rigged-bot-live'])
       .toBe('npm run qa:pass69-3:rigged-bot-live:edge-webgl2 && npm run qa:pass69-3:rigged-bot-live:edge-webgpu');
+    expect(packageJson.scripts['qa:pass69-3:rigged-bot-contract'])
+      .toBe('node scripts/qa/run-pass69-3-rigged-bot-live.mjs --self-test');
     for (const token of [
       "'edge-webgl2': Object.freeze({ renderer: 'webgl2', port: '4561' })",
       "'edge-webgpu': Object.freeze({ renderer: 'webgpu', port: '4562' })",
@@ -50,10 +54,16 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       "sourceBone: 'UpperArm.R', bone: 'UpperArmR', minimumBindRadians: 0.5",
       "sourceBone: 'LowerArm.R', bone: 'LowerArmR', minimumBindRadians: 0.15",
       "sourceBone: 'Wrist.R', bone: 'WristR', minimumBindRadians: 0.05",
+      "sourceBone: 'Thumb2.L', bone: 'Thumb2L'",
+      "sourceBone: 'Index2.L', bone: 'Index2L'",
       "sourceBone: 'Middle2.L', bone: 'Middle2L'",
       "sourceBone: 'Ring2.L', bone: 'Ring2L'",
+      "sourceBone: 'Pinky2.L', bone: 'Pinky2L'",
+      "sourceBone: 'Thumb2.R', bone: 'Thumb2R'",
+      "sourceBone: 'Index2.R', bone: 'Index2R'",
       "sourceBone: 'Middle2.R', bone: 'Middle2R'",
       "sourceBone: 'Ring2.R', bone: 'Ring2R'",
+      "sourceBone: 'Pinky2.R', bone: 'Pinky2R'",
       "activeClip: 'Walk'",
       'bone.bindQuaternionDeltaRadians',
       'model.armPose.bones',
@@ -67,7 +77,13 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     expect(spec).not.toContain('0.005');
     expect(runner).not.toContain('0.005');
     expect(operator).toContain("contract: 'source-glb-skinned-anti-t-arm-chain-v2'");
-    expect(operator).toContain("contract: 'source-glb-animated-middle-ring-finger-descendants-v1'");
+    expect(operator).toContain("contract: 'source-glb-weighted-five-digit-sentinels-v2'");
+    expect(operator).toContain("contract: 'rendered-joints0-weights0-influence-v1'");
+    expect(operator).toContain('minimumInfluencedVertices: 4');
+    expect(operator).toContain('minimumMaximumNormalizedWeight: 0.2');
+    expect(operator).toContain('minimumElbowFlexRadians: 0.3');
+    expect(operator).toContain("contract: 'static-rendered-influence-cache-v1'");
+    expect(operator).toContain('bufferAttributeVersion(weights)');
     expect(operator).toContain("reference: 'authored-glb-local-transform-before-animation'");
     expect(operator).toContain('mesh.skeleton.bones.includes(bone)');
     expect(operator).toContain('descendantPath(entry.bone, wrist)');
@@ -77,7 +93,10 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     expect(operator).toContain('handBindPose');
     expect(dummyUnit).toContain("['UpperArmL', 'LowerArmL', 'WristL', 'UpperArmR', 'LowerArmR', 'WristR']");
     expect(dummyUnit).toContain('expect(posedBones).toHaveLength(6)');
-    expect(dummyUnit).toContain("expect(handPose.bones.map(({ bone }) => bone)).toEqual(['Middle2L', 'Ring2L', 'Middle2R', 'Ring2R'])");
+    expect(dummyUnit).toContain("'Thumb2L', 'Index2L', 'Middle2L', 'Ring2L', 'Pinky2L'");
+    expect(dummyUnit).toContain('zeroing every UpperArmL WEIGHTS_0 contribution');
+    expect(dummyUnit).toContain('skinWeight.setXYZW');
+    expect(dummyUnit).toContain('allHaveRenderedVertexInfluence).toBe(false)');
   });
 
   it('covers an armed live combat bot and all four explicitly unarmed moving test-bay dummies', () => {
@@ -86,7 +105,9 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       'grip?.bothHandsConnected === true',
       'grip.elbowTorsoOutward >= grip.minimumOutwardClearance',
       'grip.dominantGrip.elbowTorsoOutward >= grip.dominantGrip.minimumOutwardClearance',
-      'weaponLocalBounds: { containsTarget: true }',
+      'sourceTransformValid: true',
+      "liveTargetContract: 'runtime-calibrated-from-authored-source-v1'",
+      'wristOrientation: { referenceAvailable: true',
       "weapon: armedFirst.weapon",
       'actor.armed === false',
       'model.weaponChildren === 0',
@@ -95,6 +116,14 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       "expect(model.supportGrip, `${label}: no fabricated grip telemetry`).toBeNull()",
       "expect(motion.positionM, `${label}: target moves in world`).toBeGreaterThan(0.12)",
     ]) expect(spec).toContain(token);
+    expect(artKit).toContain('pass65-carbine-authored-source-plus-runtime-target-v2');
+    expect(artKit).toContain('authoredLocalPosition: Object.freeze([-0.10000000149011612, -0.03999999910593033, 0.47999998927116394]');
+    expect(artKit).toContain("liveTargetContract: 'runtime-calibrated-from-authored-source-v1'");
+    expect(artKit).toContain("calibrationReason: 'third-person-swat-chain-reach-without-unsafe-stretch'");
+    expect(artKit.indexOf('const observedImportedSourceLocalPosition = socket.position.toArray()'))
+      .toBeLessThan(artKit.indexOf("supportGrip.position.set(...RIGGED_SUPPORT_GRIP_POSITION[weaponId])"));
+    expect(spec).not.toContain('weaponLocalBounds');
+    expect(runner).not.toContain('weaponLocalBounds');
     expect(runner).toContain('expectedDummyIds = Object.freeze([');
     for (const id of ['test-dummy-alpha', 'test-dummy-bravo', 'test-dummy-charlie', 'test-dummy-delta']) {
       expect(runner).toContain(`'${id}'`);
@@ -118,13 +147,18 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       'withinRoi',
       'onScreen',
       'captureFraming(',
+      'expectedSentinelCount: 16',
+      'minimumArmChainPixels: 80',
+      'minimumWristFingerPixels: 12',
+      "status: 'AUTOMATION_PASS_OWNER_PENDING'",
       "status: 'PENDING_OWNER_INSPECTION'",
       'automatedFramingIsNotVisualAcceptance: true',
       "fetch('/channels/the-big-one/channel-provenance.json'",
-      "evidenceScope: 'real-glb-skinned-hierarchy-anti-t-hands-grip-and-live-framing'",
+      "evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-and-joint-framing'",
     ]) expect(spec).toContain(token);
     expect(runner).toContain('sha256(path) === record.sha256');
-    expect(runner).toContain('framingValid(record.framing, actor, expectedRoi)');
+    expect(runner).toContain('framingValid(record.framing, actor, expectedRoi, requireJointDetail)');
+    expect(runner).toContain('closeJointFramingValid(framing, expectedRoi)');
     expect(runner).toContain("receipt.visualReview.status !== 'PENDING_OWNER_INSPECTION'");
     const catalog = graph.testCatalog.find(({ id }) => id === 'T-PASS69-3-RIGGED-DUMMY');
     expect(catalog).toMatchObject({
@@ -134,6 +168,7 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     });
     expect(catalog?.paths).toEqual(expect.arrayContaining([
       'scripts/qa/run-pass69-3-rigged-bot-live.mjs',
+      'src/art-kit.ts',
       'src/operator-model.ts',
       'src/legacy-main.ts',
       'src/pass69-3-rigged-bot-live-runner.test.ts',
@@ -143,5 +178,24 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     expect(hf228?.verification.testRefs).toContain('T-PASS69-3-RIGGED-DUMMY');
     expect(hf228?.verification.coverage).toBe('partial');
     expect(hf228?.verification.artifactRefs).toEqual([]);
+  });
+
+  it('executes adversarial zero-weight, elbow-boundary, rotated-grip and cropped-joint mutations', () => {
+    const output = execFileSync(process.execPath, ['scripts/qa/run-pass69-3-rigged-bot-live.mjs', '--self-test'], {
+      encoding: 'utf8',
+      windowsHide: true,
+    });
+    expect(output).toContain('"pass69_3RiggedBotContractSelfTest":"PASS"');
+    for (const token of [
+      'zero-weight skeleton membership must fail',
+      '0.299 rad elbow flex must fail',
+      '0.300 rad elbow flex must pass',
+      'corrected wrist rotation over 0.20 rad must fail',
+      'post-overwrite socket cannot impersonate imported authored source',
+      'cropped/off-ROI shoulder must fail',
+      'offscreen shoulder must fail',
+      'sub-80px arm chain must fail',
+      'sub-12px wrist-finger detail must fail',
+    ]) expect(runner).toContain(token);
   });
 });

@@ -36,12 +36,13 @@ const artifactRoot = resolve(artifactBase, renderer);
 const receiptPath = resolve(artifactBase, `receipt-${renderer}.json`);
 const OPERATOR_SOURCE = 'Atomic Acres Pass 65 operator / Quaternius CC0 derivative';
 const OPERATOR_ASSET = './assets/original/models/operators/pass65-third-person-operator-lod0.glb';
+const CARBINE_WORLD_ASSET = './assets/original/models/weapons/pass65-firearms/carbine/carbine-world-lod0.glb';
 const ANTI_T_THRESHOLDS = Object.freeze({
   minimumVerticalDropM: 0.08,
   minimumVerticalDropRatio: 0.18,
   maximumHorizontalReachRatio: 0.9,
   maximumOutwardReachRatio: 0.82,
-  minimumElbowFlexRadians: 0.12,
+  minimumElbowFlexRadians: 0.3,
 });
 const ARM_BONES = Object.freeze([
   Object.freeze({ side: 'left', role: 'shoulder', sourceBone: 'UpperArm.L', bone: 'UpperArmL', minimumBindRadians: 0.5 }),
@@ -52,12 +53,40 @@ const ARM_BONES = Object.freeze([
   Object.freeze({ side: 'right', role: 'wrist-hand', sourceBone: 'Wrist.R', bone: 'WristR', minimumBindRadians: 0.05 }),
 ]);
 const HAND_BONES = Object.freeze([
-  Object.freeze({ side: 'left', digit: 'middle', joint: 2, sourceBone: 'Middle2.L', bone: 'Middle2L' }),
-  Object.freeze({ side: 'left', digit: 'ring', joint: 2, sourceBone: 'Ring2.L', bone: 'Ring2L' }),
-  Object.freeze({ side: 'right', digit: 'middle', joint: 2, sourceBone: 'Middle2.R', bone: 'Middle2R' }),
-  Object.freeze({ side: 'right', digit: 'ring', joint: 2, sourceBone: 'Ring2.R', bone: 'Ring2R' }),
+  Object.freeze({ side: 'left', digit: 'thumb', joint: 2, sourceBone: 'Thumb2.L', bone: 'Thumb2L', minimumBindRadians: 0.008 }),
+  Object.freeze({ side: 'left', digit: 'index', joint: 2, sourceBone: 'Index2.L', bone: 'Index2L', minimumBindRadians: 0.2 }),
+  Object.freeze({ side: 'left', digit: 'middle', joint: 2, sourceBone: 'Middle2.L', bone: 'Middle2L', minimumBindRadians: 0.18 }),
+  Object.freeze({ side: 'left', digit: 'ring', joint: 2, sourceBone: 'Ring2.L', bone: 'Ring2L', minimumBindRadians: 0.22 }),
+  Object.freeze({ side: 'left', digit: 'pinky', joint: 2, sourceBone: 'Pinky2.L', bone: 'Pinky2L', minimumBindRadians: 0.35 }),
+  Object.freeze({ side: 'right', digit: 'thumb', joint: 2, sourceBone: 'Thumb2.R', bone: 'Thumb2R', minimumBindRadians: 0.008 }),
+  Object.freeze({ side: 'right', digit: 'index', joint: 2, sourceBone: 'Index2.R', bone: 'Index2R', minimumBindRadians: 0.2 }),
+  Object.freeze({ side: 'right', digit: 'middle', joint: 2, sourceBone: 'Middle2.R', bone: 'Middle2R', minimumBindRadians: 0.18 }),
+  Object.freeze({ side: 'right', digit: 'ring', joint: 2, sourceBone: 'Ring2.R', bone: 'Ring2R', minimumBindRadians: 0.22 }),
+  Object.freeze({ side: 'right', digit: 'pinky', joint: 2, sourceBone: 'Pinky2.R', bone: 'Pinky2R', minimumBindRadians: 0.35 }),
 ]);
-const MINIMUM_FINGER_BIND_RADIANS = 0.12;
+const RENDERED_INFLUENCE_THRESHOLDS = Object.freeze({
+  minimumNormalizedWeight: 0.05,
+  minimumInfluencedVertices: 4,
+  minimumMaximumNormalizedWeight: 0.2,
+});
+const GRIP_THRESHOLDS = Object.freeze({ maximumPositionErrorM: 0.015, maximumQuaternionErrorRadians: 0.2 });
+const CARBINE_SOCKET_REFERENCES = Object.freeze({
+  'support-socket-l': Object.freeze({
+    authoredLocalPosition: Object.freeze([-0.10000000149011612, -0.03999999910593033, 0.47999998927116394]),
+    evaluatedTargetLocalPosition: Object.freeze([-0.035, -0.17, -0.21]),
+    liveTargetContract: 'runtime-calibrated-from-authored-source-v1',
+    calibrationApplied: true,
+    calibrationReason: 'third-person-swat-chain-reach-without-unsafe-stretch',
+  }),
+  'grip-socket-r': Object.freeze({
+    authoredLocalPosition: Object.freeze([0, -0.3400000035762787, -0.12999999523162842]),
+    evaluatedTargetLocalPosition: Object.freeze([0, -0.3400000035762787, -0.12999999523162842]),
+    liveTargetContract: 'authored-source-socket-retained-v1',
+    calibrationApplied: false,
+    calibrationReason: 'authored-firing-grip-retained',
+  }),
+});
+const CLOSE_JOINT_THRESHOLDS = Object.freeze({ minimumArmChainPixels: 80, minimumWristFingerPixels: 12 });
 const CLOSE_ROI_NDC = Object.freeze({ minX: -0.46, maxX: 0.46, minY: -0.7, maxY: 0.7 });
 const MEDIUM_ROI_NDC = Object.freeze({ minX: -0.68, maxX: 0.68, minY: -0.82, maxY: 0.82 });
 const OVERVIEW_ROI_NDC = Object.freeze({ minX: -0.97, maxX: 0.97, minY: -0.95, maxY: 0.95 });
@@ -146,16 +175,18 @@ function expectArmPose(model: any, label: string, armed: boolean): void {
       allFinite: true,
       allHierarchyValid: true,
       allInEffectivelyVisibleSkinnedMesh: true,
+      allHaveRenderedVertexInfluence: true,
       allAntiTPoseGeometry: true,
       thresholds: ANTI_T_THRESHOLDS,
     },
     handPose: {
-      contract: 'source-glb-animated-middle-ring-finger-descendants-v1',
+      contract: 'source-glb-weighted-five-digit-sentinels-v2',
       reference: 'shipped-lod0-walk-animated-second-phalanges',
-      expectedBoneCount: 4,
+      expectedBoneCount: 10,
       allPresent: true,
       allDescendantOfWrist: true,
       allInEffectivelyVisibleSkinnedMesh: true,
+      allHaveRenderedVertexInfluence: true,
       allFinite: true,
     },
   });
@@ -172,19 +203,34 @@ function expectArmPose(model: any, label: string, armed: boolean): void {
     expect(bone.inEffectivelyVisibleSkinnedMesh, `${label}: ${bone.bone} drives a visible skin`).toBe(true);
     expect(bone.effectiveSkinnedMeshes, `${label}: ${bone.bone} shares a rendered skeleton`)
       .toEqual(expect.arrayContaining(model.armPose.commonEffectiveSkinnedMeshes));
+    expect(bone.vertexInfluence, `${label}: ${bone.bone} has real rendered JOINTS_0/WEIGHTS_0 influence`).toMatchObject({
+      contract: 'rendered-joints0-weights0-influence-v1',
+      thresholds: RENDERED_INFLUENCE_THRESHOLDS,
+      passes: true,
+    });
+    expect(bone.vertexInfluence.influencedVertexCount).toBeGreaterThanOrEqual(RENDERED_INFLUENCE_THRESHOLDS.minimumInfluencedVertices);
+    expect(bone.vertexInfluence.maximumNormalizedWeight).toBeGreaterThanOrEqual(RENDERED_INFLUENCE_THRESHOLDS.minimumMaximumNormalizedWeight);
     expect(bone.bindQuaternionDeltaRadians, `${label}: ${bone.bone} leaves authored T/bind pose`)
       .toBeGreaterThanOrEqual(expected.minimumBindRadians);
   }
-  expect(model.handPose.bones.map(({ side, digit, joint, sourceBone, bone }: any) => ({ side, digit, joint, sourceBone, bone })), `${label}: shipped animated finger joints`)
-    .toEqual(HAND_BONES);
-  for (const finger of model.handPose.bones) {
+  expect(model.handPose.bones.map(({ side, digit, joint, sourceBone, bone }: any) => ({ side, digit, joint, sourceBone, bone })), `${label}: all ten shipped finger sentinels`)
+    .toEqual(HAND_BONES.map(({ minimumBindRadians: _minimum, ...bone }) => bone));
+  for (const [index, finger] of model.handPose.bones.entries()) {
+    const expected = HAND_BONES[index];
     expect(finger.descendantOfWrist, `${label}: ${finger.bone} descends from ${finger.wristBone}`).toBe(true);
     expect(finger.wristDescendantPath, `${label}: ${finger.bone} has a real phalanx chain`).toHaveLength(3);
     expect(finger.wristDescendantPath[0]).toBe(finger.wristBone);
     expect(finger.wristDescendantPath.at(-1)).toBe(finger.bone);
     expect(finger.inEffectivelyVisibleSkinnedMesh, `${label}: ${finger.bone} drives the rendered hand`).toBe(true);
+    expect(finger.vertexInfluence, `${label}: ${finger.bone} deforms rendered glove vertices`).toMatchObject({
+      contract: 'rendered-joints0-weights0-influence-v1',
+      thresholds: RENDERED_INFLUENCE_THRESHOLDS,
+      passes: true,
+    });
+    expect(finger.vertexInfluence.influencedVertexCount).toBeGreaterThanOrEqual(RENDERED_INFLUENCE_THRESHOLDS.minimumInfluencedVertices);
+    expect(finger.vertexInfluence.maximumNormalizedWeight).toBeGreaterThanOrEqual(RENDERED_INFLUENCE_THRESHOLDS.minimumMaximumNormalizedWeight);
     expect(finger.bindQuaternionDeltaRadians, `${label}: ${finger.bone} has a nontrivial authored pose`)
-      .toBeGreaterThanOrEqual(MINIMUM_FINGER_BIND_RADIANS);
+      .toBeGreaterThanOrEqual(expected.minimumBindRadians);
   }
   expect(model.armPose.chains).toHaveLength(2);
   for (const chain of model.armPose.chains) {
@@ -223,22 +269,64 @@ function expectArmPose(model: any, label: string, armed: boolean): void {
       torsoClear: true,
       torsoRelativeBendHint: true,
       socketName: 'support-socket-l',
-      weaponLocalBounds: { containsTarget: true },
+      socketReference: {
+        available: true,
+        valid: true,
+        sourceAsset: CARBINE_WORLD_ASSET,
+        atomicSocket: 'leftGrip',
+        sourceTransformValid: true,
+        liveTargetContract: 'runtime-calibrated-from-authored-source-v1',
+        calibrationApplied: true,
+      },
+      wristOrientation: { referenceAvailable: true, wristSourceAsset: OPERATOR_ASSET },
       dominantGrip: {
         finite: true,
         torsoClear: true,
         torsoRelativeBendHint: true,
         socketName: 'grip-socket-r',
-        weaponLocalBounds: { containsTarget: true },
+        socketReference: {
+          available: true,
+          valid: true,
+          sourceAsset: CARBINE_WORLD_ASSET,
+          atomicSocket: 'rightGrip',
+          sourceTransformValid: true,
+          liveTargetContract: 'authored-source-socket-retained-v1',
+          calibrationApplied: false,
+        },
+        wristOrientation: { referenceAvailable: true, wristSourceAsset: OPERATOR_ASSET },
+      },
+      fingerCurl: {
+        contract: 'pass65-evaluated-per-digit-grip-curl-v1',
+        sourceReferenceAvailable: true,
+        expectedBoneCount: 10,
+        bothHands: true,
+        allApplied: true,
       },
     });
     for (const grip of [model.supportGrip, model.supportGrip.dominantGrip]) {
-      expect(grip.supportError, `${label}: grip reaches authored socket`).toBeLessThanOrEqual(0.025);
+      const socketReference = CARBINE_SOCKET_REFERENCES[grip.socketName as keyof typeof CARBINE_SOCKET_REFERENCES];
+      const delta = (actual: number[], expected: readonly number[]) => (
+        Math.hypot(...actual.map((value, index) => value - expected[index]))
+      );
+      expect(grip.supportError, `${label}: grip reaches evaluated weapon-specific socket`).toBeLessThanOrEqual(GRIP_THRESHOLDS.maximumPositionErrorM);
       expect(grip.minimumOutwardClearance, `${label}: nonzero torso clearance floor`).toBeGreaterThan(0);
       expect(grip.elbowTorsoOutward, `${label}: elbow remains outward of torso floor`)
         .toBeGreaterThanOrEqual(grip.minimumOutwardClearance);
-      expect(grip.weaponLocalBounds.distanceToTarget, `${label}: grip socket lies inside weapon bounds`).toBe(0);
+      expect(delta(grip.socketReference.authoredSourceLocalPosition, socketReference.authoredLocalPosition), `${label}: immutable imported socket position matches shipped GLB`).toBeLessThanOrEqual(1e-9);
+      expect(delta(grip.socketReference.observedImportedSourceLocalPosition, socketReference.authoredLocalPosition), `${label}: source transform was observed before calibration`).toBeLessThanOrEqual(1e-6);
+      expect(grip.socketReference.sourcePositionErrorM, `${label}: imported source position validation`).toBeLessThanOrEqual(1e-6);
+      expect(grip.socketReference.sourceQuaternionErrorRadians, `${label}: imported source rotation validation`).toBeLessThanOrEqual(1e-6);
+      expect(grip.socketReference.liveTargetContract).toBe(socketReference.liveTargetContract);
+      expect(grip.socketReference.calibrationApplied).toBe(socketReference.calibrationApplied);
+      expect(grip.socketReference.calibrationReason).toBe(socketReference.calibrationReason);
+      expect(delta(grip.socketReference.evaluatedTargetLocalPosition, socketReference.evaluatedTargetLocalPosition), `${label}: evaluated live target is versioned independently`).toBeLessThanOrEqual(1e-9);
+      expect(grip.socketReference.liveTargetPositionErrorM, `${label}: live socket position stays on evaluated target`).toBeLessThanOrEqual(1e-6);
+      expect(grip.socketReference.liveTargetQuaternionErrorRadians, `${label}: live socket rotation stays on evaluated target`).toBeLessThanOrEqual(1e-6);
+      expect(grip.wristOrientation.errorRadians, `${label}: corrected wrist aligns to evaluated socket orientation`)
+        .toBeLessThanOrEqual(GRIP_THRESHOLDS.maximumQuaternionErrorRadians);
     }
+    expect(model.supportGrip.fingerCurl.bones).toHaveLength(10);
+    expect(model.supportGrip.fingerCurl.bones.every(({ applied, curlRadians }: any) => applied === true && Math.abs(curlRadians) >= 0.18)).toBe(true);
   } else {
     expect(model.weaponChildren, `${label}: unarmed socket remains empty`).toBe(0);
     expect(model.weaponMount, `${label}: no mounted weapon`).toBeNull();
@@ -369,29 +457,91 @@ async function screenshotWithHash(page: Page, testInfo: TestInfo, name: string):
 type CaptureActor = Readonly<{ kind: 'bot' | 'training-dummy'; id: string }>;
 type CaptureRoi = Readonly<{ minX: number; maxX: number; minY: number; maxY: number }>;
 
-async function captureFraming(page: Page, actors: readonly CaptureActor[], roiNdc: CaptureRoi): Promise<any[]> {
-  const evidence = await page.evaluate(({ requestedActors, roi }) => {
+async function captureFraming(
+  page: Page,
+  actors: readonly CaptureActor[],
+  roiNdc: CaptureRoi,
+  requireJointDetail = false,
+): Promise<any[]> {
+  const expectedJoints = [
+    ...ARM_BONES.map(({ side, role, bone }) => ({ kind: 'arm', side, role, digit: null, bone })),
+    ...HAND_BONES.map(({ side, digit, bone }) => ({ kind: 'finger', side, role: null, digit, bone })),
+  ];
+  const evidence = await page.evaluate(({ requestedActors, roi, strictJoints, expected, jointThresholds }) => {
     const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
     const canvasBounds = document.querySelector<HTMLCanvasElement>('#game')!.getBoundingClientRect();
     const viewport = { width: window.innerWidth, height: window.innerHeight };
+    const pointToPixel = ([x, y]: number[]) => ({
+      x: canvasBounds.left + (x + 1) * 0.5 * canvasBounds.width,
+      y: canvasBounds.top + (1 - y) * 0.5 * canvasBounds.height,
+    });
+    const pointInside = ([x, y, z]: number[]) => Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)
+      && x >= roi.minX && x <= roi.maxX && y >= roi.minY && y <= roi.maxY && z >= -1 && z <= 1;
+    const pixelDistance = (left: { x: number; y: number }, right: { x: number; y: number }) => (
+      Math.hypot(left.x - right.x, left.y - right.y)
+    );
     return requestedActors.map((actor) => {
       const target = actor.kind === 'bot'
         ? snapshot.bots.find((candidate: any) => candidate.id === actor.id)
         : snapshot.rangePractice.targets.find((candidate: any) => candidate.id === actor.id);
       if (!target) return { actor, missing: true };
       const [x, y, z] = target.screenPosition;
-      const withinRoi = Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)
-        && x >= roi.minX && x <= roi.maxX && y >= roi.minY && y <= roi.maxY
-        && z >= -1 && z <= 1;
-      const projectedPixel = {
-        x: canvasBounds.left + (x + 1) * 0.5 * canvasBounds.width,
-        y: canvasBounds.top + (1 - y) * 0.5 * canvasBounds.height,
-      };
+      const withinRoi = pointInside([x, y, z]);
+      const projectedPixel = pointToPixel([x, y, z]);
       const onScreen = withinRoi && canvasBounds.width > 0 && canvasBounds.height > 0
         && projectedPixel.x >= Math.max(0, canvasBounds.left)
         && projectedPixel.x <= Math.min(viewport.width, canvasBounds.right)
         && projectedPixel.y >= Math.max(0, canvasBounds.top)
         && projectedPixel.y <= Math.min(viewport.height, canvasBounds.bottom);
+      const jointPoints = strictJoints ? (target.jointScreenPositions ?? []).map((joint: any) => {
+        const pixel = pointToPixel(joint.ndc);
+        const jointWithinRoi = pointInside(joint.ndc);
+        const jointOnScreen = jointWithinRoi
+          && pixel.x >= Math.max(0, canvasBounds.left)
+          && pixel.x <= Math.min(viewport.width, canvasBounds.right)
+          && pixel.y >= Math.max(0, canvasBounds.top)
+          && pixel.y <= Math.min(viewport.height, canvasBounds.bottom);
+        return { ...joint, pixel, withinRoi: jointWithinRoi, onScreen: jointOnScreen };
+      }) : [];
+      const orderValid = strictJoints && jointPoints.length === expected.length
+        && jointPoints.every((joint: any, index: number) => {
+          const wanted = expected[index];
+          return joint.kind === wanted.kind && joint.side === wanted.side && joint.role === wanted.role
+            && joint.digit === wanted.digit && joint.bone === wanted.bone;
+        });
+      const armChainPixels = strictJoints ? (['left', 'right'] as const).map((side) => {
+        const shoulder = jointPoints.find((joint: any) => joint.side === side && joint.role === 'shoulder');
+        const elbow = jointPoints.find((joint: any) => joint.side === side && joint.role === 'elbow');
+        const wrist = jointPoints.find((joint: any) => joint.side === side && joint.role === 'wrist-hand');
+        return {
+          side,
+          pixels: shoulder && elbow && wrist
+            ? pixelDistance(shoulder.pixel, elbow.pixel) + pixelDistance(elbow.pixel, wrist.pixel)
+            : 0,
+        };
+      }) : [];
+      const wristFingerPixels = strictJoints ? (['left', 'right'] as const).map((side) => {
+        const wrist = jointPoints.find((joint: any) => joint.side === side && joint.role === 'wrist-hand');
+        const fingers = jointPoints.filter((joint: any) => joint.side === side && joint.kind === 'finger');
+        return {
+          side,
+          fingerCount: fingers.length,
+          minimumPixels: wrist && fingers.length === 5
+            ? Math.min(...fingers.map((finger: any) => pixelDistance(wrist.pixel, finger.pixel)))
+            : 0,
+        };
+      }) : [];
+      const jointDetail = strictJoints ? {
+        required: true,
+        expectedSentinelCount: expected.length,
+        sentinels: jointPoints,
+        orderValid,
+        allInsideRoi: jointPoints.length === expected.length
+          && jointPoints.every((joint: any) => joint.withinRoi && joint.onScreen),
+        armChainPixels,
+        wristFingerPixels,
+        thresholds: jointThresholds,
+      } : null;
       return {
         actor,
         missing: false,
@@ -413,9 +563,16 @@ async function captureFraming(page: Page, actors: readonly CaptureActor[], roiNd
         },
         viewport,
         projectedPixel,
+        jointDetail,
       };
     });
-  }, { requestedActors: actors, roi: roiNdc });
+  }, {
+    requestedActors: actors,
+    roi: roiNdc,
+    strictJoints: requireJointDetail,
+    expected: expectedJoints,
+    jointThresholds: CLOSE_JOINT_THRESHOLDS,
+  });
   for (const framing of evidence) {
     const label = `${framing.actor.kind}:${framing.actor.id}`;
     expect(framing.missing, `${label}: capture actor exists`).toBe(false);
@@ -428,6 +585,25 @@ async function captureFraming(page: Page, actors: readonly CaptureActor[], roiNd
     expect(framing.screenPosition.every(Number.isFinite), `${label}: finite projection`).toBe(true);
     expect(framing.withinRoi, `${label}: bounded live screenshot ROI ${JSON.stringify(framing)}`).toBe(true);
     expect(framing.onScreen, `${label}: projected actor point is inside the visible canvas and viewport`).toBe(true);
+    if (requireJointDetail) {
+      expect(framing.jointDetail, `${label}: close capture has joint-level evidence`).toMatchObject({
+        required: true,
+        expectedSentinelCount: 16,
+        orderValid: true,
+        allInsideRoi: true,
+        thresholds: CLOSE_JOINT_THRESHOLDS,
+      });
+      expect(framing.jointDetail.sentinels).toHaveLength(16);
+      expect(framing.jointDetail.armChainPixels).toHaveLength(2);
+      expect(framing.jointDetail.wristFingerPixels).toHaveLength(2);
+      for (const chain of framing.jointDetail.armChainPixels) {
+        expect(chain.pixels, `${label}: ${chain.side} projected arm chain`).toBeGreaterThanOrEqual(CLOSE_JOINT_THRESHOLDS.minimumArmChainPixels);
+      }
+      for (const hand of framing.jointDetail.wristFingerPixels) {
+        expect(hand.fingerCount, `${label}: ${hand.side} has five projected digit sentinels`).toBe(5);
+        expect(hand.minimumPixels, `${label}: ${hand.side} wrist-to-finger detail`).toBeGreaterThanOrEqual(CLOSE_JOINT_THRESHOLDS.minimumWristFingerPixels);
+      }
+    }
   }
   return evidence;
 }
@@ -453,6 +629,7 @@ async function captureAtPose(
   name: string,
   actor: CaptureActor,
   roiNdc: CaptureRoi,
+  requireJointDetail = false,
 ) {
   const pose = cameraPose(target, distance);
   await page.evaluate(({ x, y, z, yaw, pitch }) => {
@@ -462,7 +639,7 @@ async function captureAtPose(
   }, pose);
   await waitForPresentedFrame(page);
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
-  const [framing] = await captureFraming(page, [actor], roiNdc);
+  const [framing] = await captureFraming(page, [actor], roiNdc, requireJointDetail);
   const screenshot = await screenshotWithHash(page, testInfo, name);
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false));
   return { ...screenshot, framing };
@@ -473,7 +650,7 @@ async function waitForStrictPose(
   kind: 'armed-bot' | 'unarmed-dummies',
   expectedIds: readonly string[] = [],
 ): Promise<void> {
-  await expect.poll(async () => page.evaluate(({ actorKind, ids, armBones, fingerBones, fingerMinimum }) => {
+  await expect.poll(async () => page.evaluate(({ actorKind, ids, armBones, fingerBones, influence, gripThresholds }) => {
     const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
     const actors = actorKind === 'armed-bot'
       ? snapshot.bots.slice(0, 1)
@@ -487,22 +664,37 @@ async function waitForStrictPose(
       return model?.activeClip === 'Walk'
         && model.armPose?.allHierarchyValid === true
         && model.armPose?.allInEffectivelyVisibleSkinnedMesh === true
+        && model.armPose?.allHaveRenderedVertexInfluence === true
         && model.armPose?.allAntiTPoseGeometry === true
         && model.armPose.bones?.length === armBones.length
         && model.armPose.bones.every((bone: any, index: number) => (
           bone.bindQuaternionDeltaRadians >= armBones[index].minimumBindRadians
+            && bone.vertexInfluence?.influencedVertexCount >= influence.minimumInfluencedVertices
+            && bone.vertexInfluence?.maximumNormalizedWeight >= influence.minimumMaximumNormalizedWeight
         ))
         && model.handPose?.allDescendantOfWrist === true
         && model.handPose?.allInEffectivelyVisibleSkinnedMesh === true
+        && model.handPose?.allHaveRenderedVertexInfluence === true
         && model.handPose.bones?.length === fingerBones.length
-        && model.handPose.bones.every((bone: any) => bone.bindQuaternionDeltaRadians >= fingerMinimum)
+        && model.handPose.bones.every((bone: any, index: number) => (
+          bone.bindQuaternionDeltaRadians >= fingerBones[index].minimumBindRadians
+            && bone.vertexInfluence?.influencedVertexCount >= influence.minimumInfluencedVertices
+            && bone.vertexInfluence?.maximumNormalizedWeight >= influence.minimumMaximumNormalizedWeight
+        ))
         && (actorKind === 'armed-bot'
           ? model.weaponChildren === 1
             && grip?.bothHandsConnected === true
+            && grip.supportError <= gripThresholds.maximumPositionErrorM
+            && grip.socketReference?.valid === true
+            && grip.wristOrientation?.errorRadians <= gripThresholds.maximumQuaternionErrorRadians
             && grip.torsoClear === true
             && grip.elbowTorsoOutward >= grip.minimumOutwardClearance
             && grip.dominantGrip?.torsoClear === true
+            && grip.dominantGrip.supportError <= gripThresholds.maximumPositionErrorM
+            && grip.dominantGrip.socketReference?.valid === true
+            && grip.dominantGrip.wristOrientation?.errorRadians <= gripThresholds.maximumQuaternionErrorRadians
             && grip.dominantGrip.elbowTorsoOutward >= grip.dominantGrip.minimumOutwardClearance
+            && grip.fingerCurl?.allApplied === true
           : actor.armed === false && model.weaponChildren === 0 && model.weaponMount === null);
     });
   }, {
@@ -510,7 +702,8 @@ async function waitForStrictPose(
     ids: expectedIds,
     armBones: ARM_BONES,
     fingerBones: HAND_BONES,
-    fingerMinimum: MINIMUM_FINGER_BIND_RADIANS,
+    influence: RENDERED_INFLUENCE_THRESHOLDS,
+    gripThresholds: GRIP_THRESHOLDS,
   }), { timeout: 12_000 }).toBe(true);
 }
 
@@ -548,7 +741,7 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
   const armedActor = { kind: 'bot' as const, id: armedSecond.id };
   const armedScreenshots = {
     medium: await captureAtPose(page, testInfo, armedSecond.position, 4.4, 'armed-live-bot-medium', armedActor, MEDIUM_ROI_NDC),
-    close: await captureAtPose(page, testInfo, armedSecond.position, 2.15, 'armed-live-bot-close', armedActor, CLOSE_ROI_NDC),
+    close: await captureAtPose(page, testInfo, armedSecond.position, 2.15, 'armed-live-bot-close', armedActor, CLOSE_ROI_NDC, true),
   };
   const armedRuntime = await captureSurfaceEvidence(page, testInfo, 'atomic-acres');
 
@@ -606,6 +799,7 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
       `${dummy.id}-close`,
       { kind: 'training-dummy', id: dummy.id },
       CLOSE_ROI_NDC,
+      true,
     );
     dummyEvidence.push({ ...dummy, closeScreenshot });
   }
@@ -624,10 +818,10 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
     expect(endingSourceStatus, 'official rigged-bot evidence ends with a clean worktree').toBe('');
   }
   writeFileSync(receiptPath, `${JSON.stringify({
-    schemaVersion: 2,
-    status: 'PASS',
-    contract: 'atomic-acres/pass69-3-rigged-bot-live@2',
-    evidenceScope: 'real-glb-skinned-hierarchy-anti-t-hands-grip-and-live-framing',
+    schemaVersion: 3,
+    status: 'AUTOMATION_PASS_OWNER_PENDING',
+    contract: 'atomic-acres/pass69-3-rigged-bot-live@3',
+    evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-and-joint-framing',
     target: officialEvidence ? expectedTarget : `development-${renderer}`,
     sourceSha,
     endingSourceSha,
@@ -638,8 +832,11 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
     armBindThresholds: ARM_BONES.map(({ side, role, sourceBone, bone, minimumBindRadians }) => (
       { side, role, sourceBone, bone, minimumBindRadians }
     )),
-    minimumFingerBindRadians: MINIMUM_FINGER_BIND_RADIANS,
+    handBindThresholds: HAND_BONES,
+    renderedInfluenceThresholds: RENDERED_INFLUENCE_THRESHOLDS,
     antiTThresholds: ANTI_T_THRESHOLDS,
+    gripThresholds: GRIP_THRESHOLDS,
+    closeJointThresholds: CLOSE_JOINT_THRESHOLDS,
     captureRoisNdc: { close: CLOSE_ROI_NDC, medium: MEDIUM_ROI_NDC, overview: OVERVIEW_ROI_NDC },
     visualReview: {
       required: true,

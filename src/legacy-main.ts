@@ -24096,6 +24096,40 @@ function debugEffectivelyVisibleRenderableCount(root: THREE.Object3D): number {
   return count;
 }
 
+function debugRiggedOperatorJointScreenPositions(
+  telemetry: Record<string, unknown> | null,
+): Array<Record<string, unknown>> {
+  if (!telemetry) return [];
+  const armBones = (telemetry.armPose as { bones?: Array<Record<string, unknown>> } | undefined)?.bones ?? [];
+  const handBones = (telemetry.handPose as { bones?: Array<Record<string, unknown>> } | undefined)?.bones ?? [];
+  const project = (bone: Record<string, unknown>, kind: 'arm' | 'finger') => {
+    const worldPosition = bone.worldPosition;
+    if (!Array.isArray(worldPosition) || worldPosition.length !== 3
+      || !worldPosition.every((value) => typeof value === 'number' && Number.isFinite(value))) return null;
+    const ndc = new THREE.Vector3().fromArray(worldPosition as [number, number, number]).project(camera).toArray();
+    return {
+      kind,
+      side: bone.side ?? null,
+      role: bone.role ?? null,
+      digit: bone.digit ?? null,
+      joint: bone.joint ?? null,
+      bone: bone.bone ?? null,
+      worldPosition,
+      ndc,
+    };
+  };
+  const projected: Array<Record<string, unknown>> = [];
+  for (const bone of armBones) {
+    const entry = project(bone, 'arm');
+    if (entry) projected.push(entry);
+  }
+  for (const bone of handBones) {
+    const entry = project(bone, 'finger');
+    if (entry) projected.push(entry);
+  }
+  return projected;
+}
+
 debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   admissionState: sampleAdmissionState,
   samplePresentationTelemetry: () => renderRuntime.presentationTelemetry(),
@@ -24361,6 +24395,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         const operator = target.kind === 'training-dummy'
           ? target.root.children.find((child) => child.userData.riggedOperatorRuntime !== undefined)
           : undefined;
+        const operatorModel = operator ? riggedOperatorTelemetry(operator) : null;
         return {
           id: target.id,
           kind: target.kind ?? 'plate',
@@ -24377,7 +24412,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
           yaw: target.root.rotation.y,
           screenPosition: target.root.localToWorld(new THREE.Vector3(0, 1.65, 0)).project(camera).toArray(),
           armed: target.root.userData.armed ?? null,
-          operatorModel: operator ? riggedOperatorTelemetry(operator) : null,
+          operatorModel,
+          jointScreenPositions: debugRiggedOperatorJointScreenPositions(operatorModel),
         };
       }),
     },
@@ -24499,6 +24535,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         })(),
         effectivelyVisibleMeshCount: debugEffectivelyVisibleRenderableCount(bot.root),
         operatorModel,
+        jointScreenPositions: debugRiggedOperatorJointScreenPositions(operatorModel),
         neonHaze: bot.root.userData.neonBotHaze === true
           && bot.root.getObjectByName('neon-purple-bot-haze') instanceof THREE.Sprite,
         presentationReady: operatorModel !== null || ['presentation-reaction-gear', 'field-radio-pack', 'asymmetric-shoulder-plate', 'team-radio-antenna']
