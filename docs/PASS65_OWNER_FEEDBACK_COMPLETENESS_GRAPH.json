@@ -282,7 +282,7 @@
       "ledgerVersion": 1,
       "latestFeedbackId": "HF-232",
       "outcomeCount": 232,
-      "stateIndependentOutcomeSha256": "fb16b210c398d469461eacacfa673da2391266c830d03fe5c2d08f6f30433e16"
+      "stateIndependentOutcomeSha256": "cb69306d9aef376e585eb0044cf4c3982e15b7ebe9c0e1e593412fcf4e448ce3"
     },
     {
       "id": "SRC-PLANNING-MATRIX-001",
@@ -1409,6 +1409,18 @@
         "HF-232"
       ],
       "canonicalText": "The next player-facing correction candidate is `69.3`; Live remains `69.1` until that exact immutable preview is approved, and the rejected `69.2` candidate remains regression evidence only. This supersedes HF-213's `69.1` correction target without changing the internal `PASS 69` acceptance lane or the protected Stable/Rollback source pins."
+    },
+    {
+      "id": "SUP-031",
+      "ledgerOrdinal": 31,
+      "sourceOutcomeIds": [
+        "P69AUG09-005",
+        "CORR-HF-220"
+      ],
+      "feedbackIds": [
+        "HF-220"
+      ],
+      "canonicalText": "`HF-220` is reopened and remains blocked on the manual first-person arms reauthoring and exact-preview owner HITL defined in `docs/PASS69_3_FIRST_PERSON_ARMS_REAUTHORING_PLAN_2026-08-10.md`; prior handedness, material, framing and socket-distance work does not establish acceptable anatomy, deformation or grips."
     }
   ],
   "testCatalog": [
