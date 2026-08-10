@@ -155,18 +155,31 @@ describe('fixed rigged actor visual evidence fixtures', () => {
 
   it('requires committed camera frames, compositor boundaries, and all six LOS sentinels', () => {
     expect(RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT).toMatchObject({
-      schemaVersion: 7,
-      contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v7',
+      schemaVersion: 8,
+      contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v8',
     });
     expect(RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation).toEqual({
       contract: 'capture-camera-committed-frame-v2',
       order: 'pause-final-submission-await-completion-then-compositor-v1',
       compositorBoundariesAfterCommit: 2,
       mainCameraDraw: {
-        contract: 'rigged-main-camera-draw-stamp-v1',
+        contract: 'rigged-main-camera-draw-stamp-v2',
         pixelProof: false,
         expectedSkinnedMeshCount: 9,
         expectedSkinnedMeshNames: RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES,
+      },
+      handDrawAdmission: {
+        contract: 'rigged-hand-main-camera-draw-admission-v1',
+        pixelProof: false,
+        scope: 'hand',
+        influenceContract: 'rendered-joints0-weights0-influence-v2',
+        thresholds: {
+          minimumNormalizedWeight: 0.05,
+          minimumInfluencedVertices: 4,
+          minimumMaximumNormalizedWeight: 0.2,
+        },
+        expectedBoneCount: 6,
+        terminalSurfaceRequired: true,
       },
       productionRgbRasterProof: {
         contract: 'gun-range-dummy-production-rgb-raster-proof-v1',
@@ -197,7 +210,7 @@ describe('fixed rigged actor visual evidence fixtures', () => {
     ]);
     expect(new Set(RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES).size).toBe(9);
     expect(RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.handSelfOcclusion).toEqual({
-      contract: 'submitted-frame-hand-self-occlusion-v2',
+      contract: 'submitted-frame-hand-self-occlusion-v3',
       actorSelfOcclusionIncluded: true,
       actorAttachmentsIncluded: true,
       heldWeaponTerminalHitAccepted: false,

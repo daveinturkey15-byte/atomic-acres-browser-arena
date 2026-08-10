@@ -31,6 +31,7 @@ import { applyBotEmissiveBrightness } from './operator-model';
 import { applyRemoteHumanReadabilityHighlight, remoteHumanReadabilityTelemetry } from './remote-player-readability';
 import {
   classifyRiggedHandSelfOcclusionHit,
+  buildRiggedEvidenceHandDrawAdmission,
   collectRiggedEvidenceOccluders,
   collectRiggedEvidenceSelfOccluders,
   firstRiggedEvidenceOccluder,
@@ -24351,6 +24352,13 @@ function debugRiggedHandSelfOcclusionForFrame(
   };
   if (!actorRoot || !operatorRoot || !weaponRoot || !canonicalOperator) return Object.freeze({
     ...base,
+    drawAdmission: buildRiggedEvidenceHandDrawAdmission(
+      frameActor.mainCameraDraw,
+      canonicalOperator?.manifest ?? null,
+      side,
+      frameActor.jointScreenPositions,
+      [],
+    ),
     heldWeaponIncluded: false,
     renderOccluderCount: 0,
     actorOccluderCount: 0,
@@ -24399,6 +24407,13 @@ function debugRiggedHandSelfOcclusionForFrame(
   const expectedNames = RIGGED_HAND_SELF_OCCLUSION_CONTRACT.sentinelNames;
   const orderValid = sentinels.length === expectedNames.length
     && sentinels.every((sentinel, index) => sentinel.name === expectedNames[index]);
+  const drawAdmission = buildRiggedEvidenceHandDrawAdmission(
+    frameActor.mainCameraDraw,
+    canonicalOperator.manifest,
+    side,
+    frameActor.jointScreenPositions,
+    sentinels,
+  );
   return Object.freeze({
     ...base,
     heldWeaponIncluded: true,
@@ -24407,6 +24422,7 @@ function debugRiggedHandSelfOcclusionForFrame(
     heldWeaponOccluderCount: occluders.filter((node) => riggedEvidenceObjectDescendsFrom(node, weaponRoot)).length,
     orderValid,
     allClear: orderValid && sentinels.every((sentinel) => sentinel.present && sentinel.clear),
+    drawAdmission,
     sentinels: Object.freeze(sentinels),
   });
 }
@@ -24710,6 +24726,7 @@ function debugRiggedOperatorJointScreenPositions(
       digit: bone.digit ?? null,
       joint: bone.joint ?? null,
       bone: bone.bone ?? null,
+      vertexInfluence: bone.vertexInfluence ?? null,
       worldPosition,
       ndc,
     };

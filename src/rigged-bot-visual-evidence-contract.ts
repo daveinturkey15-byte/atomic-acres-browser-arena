@@ -1,5 +1,10 @@
 import { GUN_RANGE_TEST_BAY_CONTRACT, gunRangeTestBayRenderedDummyPose } from './gun-range-test-bay';
-import { RIGGED_HAND_SELF_OCCLUSION_CONTRACT } from './rigged-evidence-occlusion';
+import {
+  RIGGED_EVIDENCE_HAND_DRAW_ADMISSION_CONTRACT,
+  RIGGED_EVIDENCE_MAIN_CAMERA_DRAW_CONTRACT,
+  RIGGED_HAND_SELF_OCCLUSION_CONTRACT,
+} from './rigged-evidence-occlusion';
+import { RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS } from './operator-model';
 
 export type RiggedEvidenceCamera = Readonly<{
   id: string;
@@ -469,8 +474,8 @@ export const RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES = Object.freeze([
 ] as const);
 
 export const RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT = Object.freeze({
-  schemaVersion: 7,
-  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v7',
+  schemaVersion: 8,
+  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v8',
   los: Object.freeze({
     contract: 'actual-render-world-layout-occluder-multi-sentinel-los-v2',
     actorSelfOcclusionExcluded: true,
@@ -482,10 +487,19 @@ export const RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT = Object.freeze({
     order: 'pause-final-submission-await-completion-then-compositor-v1',
     compositorBoundariesAfterCommit: 2,
     mainCameraDraw: Object.freeze({
-      contract: 'rigged-main-camera-draw-stamp-v1',
+      contract: RIGGED_EVIDENCE_MAIN_CAMERA_DRAW_CONTRACT,
       pixelProof: false,
       expectedSkinnedMeshCount: RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES.length,
       expectedSkinnedMeshNames: RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES,
+    }),
+    handDrawAdmission: Object.freeze({
+      contract: RIGGED_EVIDENCE_HAND_DRAW_ADMISSION_CONTRACT,
+      pixelProof: false,
+      scope: 'hand',
+      influenceContract: 'rendered-joints0-weights0-influence-v2',
+      thresholds: RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS,
+      expectedBoneCount: 6,
+      terminalSurfaceRequired: true,
     }),
     productionRgbRasterProof: Object.freeze({
       contract: 'gun-range-dummy-production-rgb-raster-proof-v1',

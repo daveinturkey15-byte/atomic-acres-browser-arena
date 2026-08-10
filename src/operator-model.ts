@@ -182,8 +182,18 @@ export type RiggedOperatorHandEvidenceIdentity = Readonly<{
   manifest: RiggedOperatorCanonicalEvidenceManifest;
 }>;
 
-type RenderedVertexInfluenceTelemetry = Readonly<{
-  contract: 'rendered-joints0-weights0-influence-v1';
+export type RenderedVertexInfluenceMeshTelemetry = Readonly<{
+  mesh: string;
+  meshUuid: string;
+  geometryUuid: string;
+  influencedVertexCount: number;
+  maximumNormalizedWeight: number;
+}>;
+
+export type RenderedVertexInfluenceTelemetry = Readonly<{
+  contract: 'rendered-joints0-weights0-influence-v2';
+  bone: string;
+  boneUuid: string;
   thresholds: Readonly<{
     minimumNormalizedWeight: number;
     minimumInfluencedVertices: number;
@@ -191,7 +201,7 @@ type RenderedVertexInfluenceTelemetry = Readonly<{
   }>;
   influencedVertexCount: number;
   maximumNormalizedWeight: number;
-  meshes: Array<{ mesh: string; influencedVertexCount: number; maximumNormalizedWeight: number }>;
+  meshes: readonly RenderedVertexInfluenceMeshTelemetry[];
   passes: boolean;
 }>;
 
@@ -220,7 +230,7 @@ const RIGGED_OPERATOR_HAND_BONES = Object.freeze([
   Object.freeze({ side: 'right' as const, digit: 'pinky' as const, joint: 2 as const, sourceBone: 'Pinky2.R', names: Object.freeze(['Pinky2R', 'Pinky2.R']) }),
 ]);
 
-const RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS = Object.freeze({
+export const RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS = Object.freeze({
   minimumNormalizedWeight: 0.05,
   minimumInfluencedVertices: 4,
   minimumMaximumNormalizedWeight: 0.2,
@@ -1580,7 +1590,7 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
     }
     let influencedVertexCount = 0;
     let maximumNormalizedWeight = 0;
-    const meshes: Array<{ mesh: string; influencedVertexCount: number; maximumNormalizedWeight: number }> = [];
+    const meshes: RenderedVertexInfluenceMeshTelemetry[] = [];
     for (const mesh of effectiveSkinnedMeshes) {
       const jointIndex = mesh.skeleton.bones.indexOf(bone);
       const joints = mesh.geometry.getAttribute('skinIndex');
@@ -1616,6 +1626,8 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
       if (meshInfluencedVertexCount > 0 || meshMaximumNormalizedWeight > 0) {
         meshes.push({
           mesh: mesh.name,
+          meshUuid: mesh.uuid,
+          geometryUuid: mesh.geometry.uuid,
           influencedVertexCount: meshInfluencedVertexCount,
           maximumNormalizedWeight: meshMaximumNormalizedWeight,
         });
@@ -1624,7 +1636,9 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
       maximumNormalizedWeight = Math.max(maximumNormalizedWeight, meshMaximumNormalizedWeight);
     }
     const telemetry: RenderedVertexInfluenceTelemetry = {
-      contract: 'rendered-joints0-weights0-influence-v1',
+      contract: 'rendered-joints0-weights0-influence-v2',
+      bone: bone.name,
+      boneUuid: bone.uuid,
       thresholds: RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS,
       influencedVertexCount,
       maximumNormalizedWeight,

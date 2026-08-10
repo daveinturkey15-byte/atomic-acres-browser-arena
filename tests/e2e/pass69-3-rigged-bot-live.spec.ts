@@ -303,8 +303,10 @@ function expectExactMainCameraDrawReceipt(
     [...RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.mainCameraDraw.expectedSkinnedMeshNames].sort(),
     `${label}: contract matches the independently pinned shipped manifest`,
   ).toEqual(EXPECTED_MAIN_CAMERA_DRAW_MESH_NAMES);
-  expect(actorFrame.rootUuid, `${label}: current actor-root UUID`).toMatch(/^[0-9a-f-]{36}$/iu);
-  expect(actorFrame.operatorRootUuid, `${label}: current operator-root UUID`).toMatch(/^[0-9a-f-]{36}$/iu);
+  expect(actorFrame.rootUuid, `${label}: current actor-root UUID`).toMatch(THREE_UUID_PATTERN);
+  expect(actorFrame.operatorRootUuid, `${label}: current operator-root UUID`).toMatch(THREE_UUID_PATTERN);
+  const manifest = actorFrame.canonicalOperatorSkinManifest;
+  expect(canonicalOperatorSkinManifestValid(manifest), `${label}: canonical operator skin manifest`).toBe(true);
   expect(draw, `${label}: exact main-camera draw receipt`).toMatchObject({
     contract: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.mainCameraDraw.contract,
     pixelProof: false,
@@ -320,8 +322,8 @@ function expectExactMainCameraDrawReceipt(
     exactExpectedMeshUuids: true,
     complete: true,
   });
-  expect(draw.gameplaySceneUuid, `${label}: gameplay scene UUID`).toMatch(/^[0-9a-f-]{36}$/iu);
-  expect(draw.gameplayCameraUuid, `${label}: gameplay camera UUID`).toMatch(/^[0-9a-f-]{36}$/iu);
+  expect(draw.gameplaySceneUuid, `${label}: gameplay scene UUID`).toMatch(THREE_UUID_PATTERN);
+  expect(draw.gameplayCameraUuid, `${label}: gameplay camera UUID`).toMatch(THREE_UUID_PATTERN);
   expect(draw.expectedMeshNames, `${label}: no duplicate expected mesh names`).toHaveLength(
     new Set(draw.expectedMeshNames).size,
   );
@@ -331,6 +333,9 @@ function expectExactMainCameraDrawReceipt(
   expect(new Set(draw.expectedMeshUuids).size, `${label}: unique expected mesh UUIDs`).toBe(
     RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.mainCameraDraw.expectedSkinnedMeshCount,
   );
+  expect(draw.expectedMeshUuids.every((uuid: unknown) => (
+    typeof uuid === 'string' && THREE_UUID_PATTERN.test(uuid)
+  )), `${label}: expected mesh UUID shapes`).toBe(true);
   expect(draw.meshes, `${label}: exact shipped SkinnedMesh cardinality`).toHaveLength(
     RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.mainCameraDraw.expectedSkinnedMeshCount,
   );
@@ -340,7 +345,13 @@ function expectExactMainCameraDrawReceipt(
     .toEqual([...draw.expectedMeshUuids].sort());
   for (const mesh of draw.meshes) {
     const meshLabel = `${label}:${mesh.meshName}`;
-    expect(mesh.meshUuid, `${meshLabel}: mesh UUID`).toMatch(/^[0-9a-f-]{36}$/iu);
+    expect(mesh.meshUuid, `${meshLabel}: mesh UUID`).toMatch(THREE_UUID_PATTERN);
+    expect(mesh.geometryUuid, `${meshLabel}: geometry UUID`).toMatch(THREE_UUID_PATTERN);
+    expect(manifest.skinnedMeshes.filter((candidate: any) => (
+      candidate.name === mesh.meshName
+        && candidate.uuid === mesh.meshUuid
+        && candidate.geometryUuid === mesh.geometryUuid
+    )), `${meshLabel}: canonical mesh and geometry identity`).toHaveLength(1);
     expect(mesh.beforeCount, `${meshLabel}: admitted before callbacks`).toBeGreaterThan(0);
     expect(mesh.afterCount, `${meshLabel}: balanced before/after callbacks`).toBe(mesh.beforeCount);
     expect(mesh.beforeStamps, `${meshLabel}: all before stamps`).toHaveLength(mesh.beforeCount);
@@ -349,13 +360,20 @@ function expectExactMainCameraDrawReceipt(
     expect(mesh.after, `${meshLabel}: final after stamp`).toEqual(mesh.afterStamps.at(-1));
     expect(mesh.complete, `${meshLabel}: complete callback pair`).toBe(true);
     expect(mesh.materialSlotUuids.length, `${meshLabel}: nonempty ordered material slots`).toBeGreaterThan(0);
-    expect(mesh.materialSlotUuids.every((uuid: unknown) => typeof uuid === 'string' && /^[0-9a-f-]{36}$/iu.test(uuid)),
+    expect(mesh.materialSlotUuids.every((uuid: unknown) => (
+      typeof uuid === 'string' && THREE_UUID_PATTERN.test(uuid)
+    )),
       `${meshLabel}: material-slot UUID shape`).toBe(true);
     expect(mesh.materialUuidSet, `${meshLabel}: independently derived unique material UUID set`).toEqual(
       [...new Set(mesh.materialSlotUuids)].sort(),
     );
     const invocationKey = (stamp: any) => JSON.stringify([
       stamp.material.uuid,
+      stamp.drawRange.start,
+      stamp.drawRange.count,
+      stamp.drawRange.effectiveCount,
+      stamp.drawRange.positionCount,
+      stamp.drawRange.indexCount,
       stamp.drawRange.group?.start ?? null,
       stamp.drawRange.group?.count ?? null,
       stamp.drawRange.group?.materialIndex ?? null,
@@ -372,6 +390,7 @@ function expectExactMainCameraDrawReceipt(
         frame,
         captureRevision,
         meshUuid: mesh.meshUuid,
+        geometryUuid: mesh.geometryUuid,
         meshName: mesh.meshName,
         actorRootUuid: draw.actorRootUuid,
         operatorRootUuid: draw.operatorRootUuid,
@@ -394,10 +413,17 @@ function expectExactMainCameraDrawReceipt(
           boundingSphere: { finite: true },
         },
       });
+      expect(stamp.material.uuid, `${meshLabel}: ${phase} material UUID`).toMatch(THREE_UUID_PATTERN);
       expect(stamp.meshLayerMask & stamp.cameraLayerMask, `${meshLabel}: ${phase} layer intersection`).not.toBe(0);
       expect(stamp.cameraLayerMask & 1, `${meshLabel}: ${phase} world-layer camera pass`).toBe(1);
       expect(stamp.drawRange.effectiveCount, `${meshLabel}: ${phase} nonzero draw range`).toBeGreaterThan(0);
       expect(stamp.drawRange.positionCount, `${meshLabel}: ${phase} positions`).toBeGreaterThan(0);
+      expect(stamp.drawRange.positionCount, `${meshLabel}: ${phase} canonical position count`)
+        .toBe(manifest.skinnedMeshes.find((candidate: any) => (
+          candidate.name === mesh.meshName
+            && candidate.uuid === mesh.meshUuid
+            && candidate.geometryUuid === mesh.geometryUuid
+        )).positionCount);
       if (stamp.drawRange.group !== null) {
         expect(stamp.drawRange.group, `${meshLabel}: ${phase} valid material group`).toMatchObject({
           start: expect.any(Number), count: expect.any(Number), materialIndex: expect.any(Number),
@@ -429,6 +455,467 @@ function expectExactMainCameraDrawReceipt(
       expect(stamp.frustum.boundingSphere.radius, `${meshLabel}: ${phase} finite bound radius`).toBeGreaterThanOrEqual(0);
       }
     }
+  }
+}
+
+function mainCameraStampValidForEvidence(
+  stamp: any,
+  mesh: any,
+  draw: any,
+  frame: number,
+  captureRevision: number,
+  canonicalPositionCount: number,
+): boolean {
+  const group = stamp?.drawRange?.group ?? null;
+  const availableCount = stamp?.drawRange?.indexCount ?? stamp?.drawRange?.positionCount;
+  const rangeCount = stamp?.drawRange?.count === 'infinity'
+    ? Math.max(0, availableCount - stamp.drawRange.start) : stamp?.drawRange?.count;
+  const rangeEnd = Number.isSafeInteger(availableCount) && Number.isSafeInteger(stamp?.drawRange?.start)
+    && Number.isSafeInteger(rangeCount)
+    ? Math.min(availableCount, stamp.drawRange.start + rangeCount) : Number.NaN;
+  const groupStart = group?.start ?? 0;
+  const groupEnd = Number.isSafeInteger(availableCount) && Number.isSafeInteger(groupStart)
+    && Number.isSafeInteger(group?.count ?? availableCount)
+    ? Math.min(availableCount, groupStart + (group?.count ?? availableCount)) : Number.NaN;
+  const expectedEffectiveCount = Math.max(
+    0,
+    Math.min(rangeEnd, groupEnd) - Math.max(stamp?.drawRange?.start, groupStart),
+  );
+  const materialIndex = group?.materialIndex ?? 0;
+  const materialSlotValid = Number.isSafeInteger(materialIndex) && materialIndex >= 0
+    && materialIndex < mesh.materialSlotUuids.length
+    && stamp.material?.uuid === mesh.materialSlotUuids[materialIndex]
+    && (group !== null || mesh.materialSlotUuids.length === 1);
+  const drawCount = stamp?.drawRange?.count;
+  const drawRangeValid = Number.isSafeInteger(stamp?.drawRange?.start) && stamp.drawRange.start >= 0
+    && (drawCount === 'infinity' || (Number.isSafeInteger(drawCount) && drawCount >= 0))
+    && Number.isSafeInteger(stamp.drawRange.effectiveCount) && stamp.drawRange.effectiveCount > 0
+    && stamp.drawRange.effectiveCount === expectedEffectiveCount
+    && Number.isSafeInteger(stamp.drawRange.positionCount) && stamp.drawRange.positionCount > 0
+    && stamp.drawRange.positionCount === canonicalPositionCount
+    && (stamp.drawRange.indexCount === null
+      || (Number.isSafeInteger(stamp.drawRange.indexCount) && stamp.drawRange.indexCount > 0))
+    && (group === null || (Number.isSafeInteger(group.start) && group.start >= 0
+      && Number.isSafeInteger(group.count) && group.count >= 0
+      && Number.isSafeInteger(group.materialIndex) && group.materialIndex >= 0));
+  return stamp?.frame === frame
+    && stamp.captureRevision === captureRevision
+    && stamp.meshName === mesh.meshName
+    && stamp.meshUuid === mesh.meshUuid
+    && stamp.geometryUuid === mesh.geometryUuid
+    && stamp.actorRootUuid === draw.actorRootUuid
+    && stamp.operatorRootUuid === draw.operatorRootUuid
+    && stamp.descendsFromActorRoot === true
+    && stamp.descendsFromOperatorRoot === true
+    && stamp.meshLayerMask === mesh.meshLayerMask
+    && Number.isSafeInteger(stamp.meshLayerMask)
+    && Number.isSafeInteger(stamp.cameraLayerMask)
+    && (stamp.meshLayerMask & stamp.cameraLayerMask) !== 0
+    && (stamp.cameraLayerMask & 1) === 1
+    && stamp.sceneUuid === draw.gameplaySceneUuid
+    && stamp.cameraUuid === draw.gameplayCameraUuid
+    && stamp.sceneOverrideMaterialUuid === null
+    && stamp.materialMatchesMeshSlot === true
+    && materialSlotValid
+    && drawRangeValid
+    && stamp.world?.attachedToGameplayScene === true
+    && stamp.world.effectivelyVisible === true
+    && stamp.world.matrixFinite === true
+    && Number.isFinite(stamp.world.determinant)
+    && Math.abs(stamp.world.determinant) > 1e-12
+    && Array.isArray(stamp.world.position) && stamp.world.position.length === 3
+    && stamp.world.position.every(Number.isFinite)
+    && Array.isArray(stamp.world.scale) && stamp.world.scale.length === 3
+    && stamp.world.scale.every(Number.isFinite)
+    && stamp.frustum?.intersectsMainCameraFrustum === true
+    && stamp.frustum.boundingSphere?.finite === true
+    && Array.isArray(stamp.frustum.boundingSphere.center)
+    && stamp.frustum.boundingSphere.center.length === 3
+    && stamp.frustum.boundingSphere.center.every(Number.isFinite)
+    && Number.isFinite(stamp.frustum.boundingSphere.radius)
+    && stamp.frustum.boundingSphere.radius >= 0
+    && stamp.material?.visible === true
+    && stamp.material.colorWrite === true
+    && typeof stamp.material.depthWrite === 'boolean'
+    && typeof stamp.material.stencilWrite === 'boolean'
+    && typeof stamp.material.transparent === 'boolean'
+    && Number.isFinite(stamp.material.opacity)
+    && (!stamp.material.transparent || stamp.material.opacity > 0)
+    && stamp.stateValid === true;
+}
+
+function mainCameraMeshEnvelopeValidForEvidence(mesh: any): boolean {
+  const expectedMaterialUuidSet = Array.isArray(mesh?.materialSlotUuids)
+    ? [...new Set(mesh.materialSlotUuids)].sort() : [];
+  return THREE_UUID_PATTERN.test(mesh?.meshUuid ?? '')
+    && THREE_UUID_PATTERN.test(mesh?.geometryUuid ?? '')
+    && typeof mesh?.meshName === 'string' && mesh.meshName.length > 0
+    && Array.isArray(mesh.materialSlotUuids) && mesh.materialSlotUuids.length > 0
+    && mesh.materialSlotUuids.every((uuid: unknown) => typeof uuid === 'string' && THREE_UUID_PATTERN.test(uuid))
+    && JSON.stringify(mesh.materialUuidSet) === JSON.stringify(expectedMaterialUuidSet)
+    && Number.isSafeInteger(mesh.meshLayerMask) && mesh.meshLayerMask > 0;
+}
+
+function mainCameraMeshDrawCompleteForEvidence(
+  mesh: any,
+  draw: any,
+  frame: number,
+  captureRevision: number,
+  canonicalPositionCount: number,
+): boolean {
+  const invocationKey = (stamp: any) => JSON.stringify([
+    stamp.material?.uuid ?? null,
+    stamp.drawRange?.start ?? null,
+    stamp.drawRange?.count ?? null,
+    stamp.drawRange?.effectiveCount ?? null,
+    stamp.drawRange?.positionCount ?? null,
+    stamp.drawRange?.indexCount ?? null,
+    stamp.drawRange?.group?.start ?? null,
+    stamp.drawRange?.group?.count ?? null,
+    stamp.drawRange?.group?.materialIndex ?? null,
+  ]);
+  const sameStrings = (left: unknown, right: unknown) => Array.isArray(left) && Array.isArray(right)
+    && JSON.stringify([...left].sort()) === JSON.stringify([...right].sort());
+  if (!mainCameraMeshEnvelopeValidForEvidence(mesh)
+    || !Number.isSafeInteger(mesh.beforeCount) || mesh.beforeCount <= 0
+    || mesh.afterCount !== mesh.beforeCount
+    || !Array.isArray(mesh.beforeStamps) || mesh.beforeStamps.length !== mesh.beforeCount
+    || !Array.isArray(mesh.afterStamps) || mesh.afterStamps.length !== mesh.afterCount
+    || JSON.stringify(mesh.before) !== JSON.stringify(mesh.beforeStamps.at(-1))
+    || JSON.stringify(mesh.after) !== JSON.stringify(mesh.afterStamps.at(-1))
+    || !Array.isArray(mesh.materialSlotUuids) || mesh.materialSlotUuids.length < 1
+    || !sameStrings(mesh.materialUuidSet, [...new Set(mesh.materialSlotUuids)])) return false;
+  const stamps = [...mesh.beforeStamps, ...mesh.afterStamps];
+  const expectedMaterialUuidSet = [...new Set(mesh.materialSlotUuids)].sort();
+  if (!sameStrings(mesh.materialUuidSet, expectedMaterialUuidSet)
+    || JSON.stringify(mesh.materialUuidSet) !== JSON.stringify(expectedMaterialUuidSet)
+    || !stamps.every((stamp) => mainCameraStampValidForEvidence(
+      stamp, mesh, draw, frame, captureRevision, canonicalPositionCount,
+    )
+      && JSON.stringify(stamp.materialSlotUuids) === JSON.stringify(mesh.materialSlotUuids)
+      && JSON.stringify(stamp.materialUuidSet) === JSON.stringify(mesh.materialUuidSet))) return false;
+  const beforeKeys = mesh.beforeStamps.map(invocationKey).sort();
+  const afterKeys = mesh.afterStamps.map(invocationKey).sort();
+  return JSON.stringify(beforeKeys) === JSON.stringify(afterKeys)
+    && new Set(beforeKeys).size === beforeKeys.length
+    && new Set(afterKeys).size === afterKeys.length
+    && mesh.complete === true;
+}
+
+function exactZeroMainCameraMeshDrawForEvidence(mesh: any): boolean {
+  return mainCameraMeshEnvelopeValidForEvidence(mesh)
+    && mesh.beforeCount === 0 && mesh.afterCount === 0
+    && Array.isArray(mesh.beforeStamps) && mesh.beforeStamps.length === 0
+    && Array.isArray(mesh.afterStamps) && mesh.afterStamps.length === 0
+    && mesh.before === null && mesh.after === null && mesh.complete === false;
+}
+
+function mainCameraStampCoversTerminalFaceForEvidence(stamp: any, blocker: any): boolean {
+  if (!Number.isSafeInteger(blocker?.faceIndex) || blocker.faceIndex < 0
+    || !Number.isSafeInteger(blocker.materialIndex) || blocker.materialIndex < 0) return false;
+  const faceElementStart = blocker.faceIndex * 3;
+  if (!Number.isSafeInteger(faceElementStart)) return false;
+  const available = stamp.drawRange.indexCount ?? stamp.drawRange.positionCount;
+  const drawCount = stamp.drawRange.count === 'infinity'
+    ? available - stamp.drawRange.start : stamp.drawRange.count;
+  const drawEnd = Math.min(available, stamp.drawRange.start + drawCount);
+  const groupStart = stamp.drawRange.group?.start ?? 0;
+  const groupCount = stamp.drawRange.group?.count ?? available;
+  const groupEnd = Math.min(available, groupStart + groupCount);
+  const materialIndex = stamp.drawRange.group?.materialIndex ?? 0;
+  return materialIndex === blocker.materialIndex
+    && faceElementStart >= Math.max(stamp.drawRange.start, groupStart)
+    && faceElementStart + 3 <= Math.min(drawEnd, groupEnd)
+    && stamp.material.uuid === stamp.materialSlotUuids[blocker.materialIndex];
+}
+
+function expectHandMainCameraDrawReceipt(
+  actorFrame: any,
+  expectedActor: Readonly<{ kind: 'bot' | 'training-dummy'; id: string }>,
+  frame: number,
+  captureRevision: number,
+  side: 'left' | 'right',
+  handSelfOcclusion: readonly any[],
+  label: string,
+): void {
+  const draw = actorFrame?.mainCameraDraw;
+  const manifest = actorFrame?.canonicalOperatorSkinManifest;
+  expect(canonicalOperatorSkinManifestValid(manifest), `${label}: canonical manifest`).toBe(true);
+  expect(actorFrame.rootUuid, `${label}: actor root UUID`).toMatch(THREE_UUID_PATTERN);
+  expect(actorFrame.operatorRootUuid, `${label}: operator root UUID`).toMatch(THREE_UUID_PATTERN);
+  expect(draw, `${label}: raw exact-nine receipt retained`).toMatchObject({
+    contract: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.mainCameraDraw.contract,
+    pixelProof: false,
+    actor: expectedActor,
+    frame,
+    captureRevision,
+    actorRootUuid: actorFrame.rootUuid,
+    operatorRootUuid: actorFrame.operatorRootUuid,
+    expectedMeshNames: EXPECTED_MAIN_CAMERA_DRAW_MESH_NAMES,
+  });
+  expect(draw.gameplaySceneUuid, `${label}: gameplay scene UUID`).toMatch(THREE_UUID_PATTERN);
+  expect(draw.gameplayCameraUuid, `${label}: gameplay camera UUID`).toMatch(THREE_UUID_PATTERN);
+  expect(draw.meshes, `${label}: raw exact-nine mesh cardinality`).toHaveLength(
+    RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.mainCameraDraw.expectedSkinnedMeshCount,
+  );
+  expect(draw.meshes.map(({ meshName }: any) => meshName).sort(), `${label}: raw exact-nine names`)
+    .toEqual(EXPECTED_MAIN_CAMERA_DRAW_MESH_NAMES);
+  expect(draw.meshes.map(({ meshUuid }: any) => meshUuid).sort(), `${label}: raw exact-nine UUIDs`)
+    .toEqual([...draw.expectedMeshUuids].sort());
+  for (const mesh of draw.meshes) {
+    const canonicalMatches = manifest.skinnedMeshes.filter((candidate: any) => (
+      candidate.name === mesh.meshName
+      && candidate.uuid === mesh.meshUuid
+      && candidate.geometryUuid === mesh.geometryUuid
+    ));
+    expect(canonicalMatches, `${label}:${mesh.meshName}: canonical mesh/geometry identity`).toHaveLength(1);
+    expect(
+      mainCameraMeshDrawCompleteForEvidence(
+        mesh, draw, frame, captureRevision, canonicalMatches[0].positionCount,
+      )
+        || exactZeroMainCameraMeshDrawForEvidence(mesh),
+      `${label}:${mesh.meshName}: complete balanced draw or exact zero`,
+    ).toBe(true);
+  }
+  const drawnMeshes = draw.meshes.filter((mesh: any) => (
+    mainCameraMeshDrawCompleteForEvidence(
+      mesh,
+      draw,
+      frame,
+      captureRevision,
+      manifest.skinnedMeshes.find((candidate: any) => (
+        candidate.name === mesh.meshName
+          && candidate.uuid === mesh.meshUuid
+          && candidate.geometryUuid === mesh.geometryUuid
+      ))?.positionCount,
+    )
+  ));
+  const beforeNames = draw.meshes.filter(({ beforeCount }: any) => beforeCount > 0)
+    .map(({ meshName }: any) => meshName).sort();
+  const afterNames = draw.meshes.filter(({ afterCount }: any) => afterCount > 0)
+    .map(({ meshName }: any) => meshName).sort();
+  expect(draw.beforeMeshNames, `${label}: truthful before-name summary`).toEqual(beforeNames);
+  expect(draw.afterMeshNames, `${label}: truthful after-name summary`).toEqual(afterNames);
+  expect(draw.exactExpectedMeshNames, `${label}: truthful exact-name flag`).toBe(
+    JSON.stringify(beforeNames) === JSON.stringify(EXPECTED_MAIN_CAMERA_DRAW_MESH_NAMES)
+      && JSON.stringify(afterNames) === JSON.stringify(EXPECTED_MAIN_CAMERA_DRAW_MESH_NAMES),
+  );
+  expect(draw.exactExpectedMeshUuids, `${label}: truthful exact-UUID flag`).toBe(drawnMeshes.length === draw.meshes.length);
+  expect(draw.complete, `${label}: strict actor completeness remains all-nine`).toBe(drawnMeshes.length === draw.meshes.length);
+  expect(drawnMeshes.length, `${label}: at least one admitted canonical mesh`).toBeGreaterThan(0);
+  expect(Object.keys(draw.ignoredCallbacks ?? {}).sort(), `${label}: exact ignored callback summary keys`).toEqual(
+    ['nonWorldCameraLayer', 'wrongCamera', 'wrongScene'],
+  );
+  for (const value of Object.values(draw.ignoredCallbacks ?? {})) {
+    expect(Number.isSafeInteger(value) && (value as number) >= 0, `${label}: ignored callback count`).toBe(true);
+  }
+
+  const selfMatches = handSelfOcclusion.filter((candidate: any) => (
+    candidate?.actor?.kind === expectedActor.kind && candidate.actor.id === expectedActor.id
+    && candidate.side === side && candidate.captureFrame === frame && candidate.captureRevision === captureRevision
+  ));
+  expect(selfMatches, `${label}: one same-frame hand receipt`).toHaveLength(1);
+  const self = selfMatches[0];
+  const admission = self.drawAdmission;
+  expect(admission, `${label}: hand draw admission`).toMatchObject({
+    contract: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.handDrawAdmission.contract,
+    pixelProof: false,
+    scope: 'hand',
+    influenceContract: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.handDrawAdmission.influenceContract,
+    thresholds: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.handDrawAdmission.thresholds,
+    actor: expectedActor,
+    side,
+    frame,
+    captureRevision,
+    gameplaySceneUuid: draw.gameplaySceneUuid,
+    gameplayCameraUuid: draw.gameplayCameraUuid,
+    actorRootUuid: draw.actorRootUuid,
+    operatorRootUuid: draw.operatorRootUuid,
+    canonicalManifestContract: manifest.contract,
+    mainCameraDrawContract: draw.contract,
+    expectedBoneCount: 6,
+    admittedMeshCount: drawnMeshes.length,
+    rawExactCanonicalMeshIdentity: true,
+    rawCallbacksAreCompleteOrExactZero: true,
+    allRequiredBonesAdmitted: true,
+    allTerminalSurfacesBound: true,
+    complete: true,
+  });
+  expect(admission.bones, `${label}: wrist plus five digit admissions`).toHaveLength(6);
+  const expectedSentinels = ['wrist-hand', 'thumb', 'index', 'middle', 'ring', 'pinky'];
+  expect(admission.bones.map(({ sentinel }: any) => sentinel), `${label}: exact six bone identities`)
+    .toEqual(expectedSentinels);
+  for (const bone of admission.bones) {
+    const expectedBone = bone.sentinel === 'wrist-hand'
+      ? `Wrist${side === 'left' ? 'L' : 'R'}`
+      : `${bone.sentinel[0].toUpperCase()}${bone.sentinel.slice(1)}2${side === 'left' ? 'L' : 'R'}`;
+    const expectedIdentity = bone.sentinel === 'wrist-hand'
+      ? { kind: 'arm', side, role: 'wrist-hand', digit: null, bone: expectedBone }
+      : { kind: 'finger', side, role: null, digit: bone.sentinel, bone: expectedBone };
+    expect({
+      kind: bone.kind, side: bone.side, role: bone.role, digit: bone.digit, bone: bone.bone,
+    }, `${label}:${bone.sentinel}: exact bone identity`).toEqual(expectedIdentity);
+    const jointMatches = actorFrame.jointScreenPositions.filter((joint: any) => (
+      joint.kind === expectedIdentity.kind && joint.side === expectedIdentity.side
+      && joint.role === expectedIdentity.role && joint.digit === expectedIdentity.digit
+      && joint.bone === expectedIdentity.bone
+    ));
+    expect(jointMatches, `${label}:${bone.sentinel}: exactly one actor-frame joint`).toHaveLength(1);
+    const influence = bone.vertexInfluence;
+    expect(influence, `${label}:${bone.sentinel}: binds actor-frame vertex influence`)
+      .toEqual(jointMatches[0].vertexInfluence);
+    expect(influence?.bone, `${label}:${bone.sentinel}: influence bone identity`).toBe(expectedBone);
+    expect(influence?.boneUuid, `${label}:${bone.sentinel}: influence bone UUID`).toMatch(THREE_UUID_PATTERN);
+    const expectedWristName = `Wrist${side === 'left' ? 'L' : 'R'}`;
+    const expectedWrists = manifest.wrists.filter((wrist: any) => (
+      wrist.side === side && wrist.name === expectedWristName
+    ));
+    expect(expectedWrists, `${label}:${bone.sentinel}: exactly one requested-side wrist`).toHaveLength(1);
+    if (bone.sentinel === 'wrist-hand') {
+      expect(manifest.wrists.filter((wrist: any) => wrist.side === side && wrist.name === expectedBone
+        && wrist.uuid === influence.boneUuid), `${label}:${bone.sentinel}: canonical wrist UUID`).toHaveLength(1);
+    }
+    expect(influence?.contract, `${label}:${bone.sentinel}: vertex influence contract`)
+      .toBe(RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.handDrawAdmission.influenceContract);
+    expect(influence?.thresholds, `${label}:${bone.sentinel}: exact thresholds`)
+      .toEqual(RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.handDrawAdmission.thresholds);
+    expect(new Set(influence.meshes.map(({ meshUuid, geometryUuid }: any) => `${meshUuid}:${geometryUuid}`)).size,
+      `${label}:${bone.sentinel}: unique influence mesh identities`).toBe(influence.meshes.length);
+    for (const entry of influence.meshes) {
+      const canonicalMatches = manifest.skinnedMeshes.filter((mesh: any) => {
+        const expectedBoneIndices = mesh.skeletonBones.flatMap(({ name, uuid }: any, boneIndex: number) => (
+          name === expectedBone && uuid === influence.boneUuid ? [boneIndex] : []
+        ));
+        return mesh.name === entry.mesh
+          && mesh.uuid === entry.meshUuid && mesh.geometryUuid === entry.geometryUuid
+          && expectedBoneIndices.length === 1
+          && canonicalBoneDescendsFromWrist(
+            mesh.skeletonBones, expectedBoneIndices[0], expectedWrists[0].uuid,
+          );
+      });
+      expect(typeof entry.mesh === 'string' && entry.mesh.length > 0,
+        `${label}:${bone.sentinel}: influence mesh name`).toBe(true);
+      expect(Number.isSafeInteger(entry.influencedVertexCount) && entry.influencedVertexCount >= 0,
+        `${label}:${bone.sentinel}: influence vertex count`).toBe(true);
+      expect(Number.isFinite(entry.maximumNormalizedWeight)
+        && entry.maximumNormalizedWeight >= 0 && entry.maximumNormalizedWeight <= 1,
+      `${label}:${bone.sentinel}: normalized influence maximum`).toBe(true);
+      expect(entry.influencedVertexCount > 0 || entry.maximumNormalizedWeight > 0,
+        `${label}:${bone.sentinel}: emitted influence entry is nonzero`).toBe(true);
+      expect(entry.influencedVertexCount > 0, `${label}:${bone.sentinel}: count/maximum threshold coherence`).toBe(
+        entry.maximumNormalizedWeight >= influence.thresholds.minimumNormalizedWeight,
+      );
+      expect(canonicalMatches, `${label}:${bone.sentinel}: canonical influence mesh`).toHaveLength(1);
+      expect(entry.influencedVertexCount, `${label}:${bone.sentinel}: count bounded by canonical positions`)
+        .toBeLessThanOrEqual(canonicalMatches[0].positionCount);
+    }
+    const recomputedCount = influence.meshes.reduce((sum: number, entry: any) => sum + entry.influencedVertexCount, 0);
+    const recomputedMaximum = influence.meshes.length > 0
+      ? Math.max(...influence.meshes.map(({ maximumNormalizedWeight }: any) => maximumNormalizedWeight)) : 0;
+    expect(influence.influencedVertexCount, `${label}:${bone.sentinel}: recomputed raw vertex count`).toBe(recomputedCount);
+    expect(Number.isSafeInteger(recomputedCount), `${label}:${bone.sentinel}: safe raw vertex count`).toBe(true);
+    expect(influence.maximumNormalizedWeight, `${label}:${bone.sentinel}: recomputed raw maximum weight`).toBe(recomputedMaximum);
+    expect(influence.passes, `${label}:${bone.sentinel}: recomputed raw pass`).toBe(
+      recomputedCount >= influence.thresholds.minimumInfluencedVertices
+        && recomputedMaximum >= influence.thresholds.minimumMaximumNormalizedWeight,
+    );
+    const expectedAdmitted = influence.meshes.filter((entry: any) => drawnMeshes.some((mesh: any) => (
+      mesh.meshName === entry.mesh && mesh.meshUuid === entry.meshUuid && mesh.geometryUuid === entry.geometryUuid
+    )));
+    expect(bone.admittedMeshes.map((entry: any) => ({
+      mesh: entry.mesh,
+      meshUuid: entry.meshUuid,
+      geometryUuid: entry.geometryUuid,
+      influencedVertexCount: entry.influencedVertexCount,
+      maximumNormalizedWeight: entry.maximumNormalizedWeight,
+    })), `${label}:${bone.sentinel}: only current admitted canonical meshes`).toEqual(expectedAdmitted);
+    for (const admitted of bone.admittedMeshes) {
+      expect(admitted.currentFrameBalancedStateValidDraw,
+        `${label}:${bone.sentinel}:${admitted.mesh}: current balanced draw flag`).toBe(true);
+      expect(admitted.meetsThresholds,
+        `${label}:${bone.sentinel}:${admitted.mesh}: per-mesh threshold diagnostic`).toBe(
+        admitted.influencedVertexCount >= influence.thresholds.minimumInfluencedVertices
+          && admitted.maximumNormalizedWeight >= influence.thresholds.minimumMaximumNormalizedWeight,
+      );
+    }
+    const admittedCount = expectedAdmitted.reduce((sum: number, entry: any) => sum + entry.influencedVertexCount, 0);
+    const admittedMaximum = expectedAdmitted.length > 0
+      ? Math.max(...expectedAdmitted.map(({ maximumNormalizedWeight }: any) => maximumNormalizedWeight)) : 0;
+    expect(bone.admittedInfluencedVertexCount, `${label}:${bone.sentinel}: admitted aggregate count`).toBe(admittedCount);
+    expect(Number.isSafeInteger(admittedCount), `${label}:${bone.sentinel}: safe admitted vertex count`).toBe(true);
+    expect(bone.admittedMaximumNormalizedWeight, `${label}:${bone.sentinel}: admitted aggregate maximum`).toBe(admittedMaximum);
+    expect(bone.complete, `${label}:${bone.sentinel}: admitted threshold proof`).toBe(
+      expectedAdmitted.length > 0
+        && admittedCount >= influence.thresholds.minimumInfluencedVertices
+        && admittedMaximum >= influence.thresholds.minimumMaximumNormalizedWeight,
+    );
+    expect(bone.complete, `${label}:${bone.sentinel}: required bone admitted`).toBe(true);
+  }
+  expect(admission.allRequiredBonesAdmitted, `${label}: recomputed all-six admission`).toBe(
+    admission.bones.length === 6 && admission.bones.every(({ complete }: any) => complete === true),
+  );
+
+  const terminalSentinels = self.sentinels.filter(({ blocker }: any) => blocker?.reason === 'terminal-hand-surface');
+  expect(terminalSentinels.length, `${label}: at least one terminal hand face`).toBeGreaterThan(0);
+  expect(admission.terminalSurfaceCount, `${label}: terminal count`).toBe(terminalSentinels.length);
+  expect(admission.terminalDrawBindings, `${label}: one binding per terminal hit`).toHaveLength(terminalSentinels.length);
+  for (let index = 0; index < terminalSentinels.length; index += 1) {
+    const blocker = terminalSentinels[index].blocker;
+    const binding = admission.terminalDrawBindings[index];
+    expect(binding, `${label}:${terminalSentinels[index].name}: exact terminal identity`).toMatchObject({
+      sentinel: terminalSentinels[index].name,
+      bone: terminalSentinels[index].bone,
+      mesh: blocker.mesh,
+      meshUuid: blocker.meshUuid,
+      geometryUuid: blocker.geometryUuid,
+      faceIndex: blocker.faceIndex,
+      faceElementStart: blocker.faceIndex * 3,
+      face: blocker.face,
+      materialIndex: blocker.materialIndex,
+      complete: true,
+      failure: null,
+    });
+    const mesh = drawnMeshes.find((candidate: any) => candidate.meshUuid === blocker.meshUuid
+      && candidate.geometryUuid === blocker.geometryUuid && candidate.meshName === blocker.mesh);
+    expect(mesh, `${label}:${terminalSentinels[index].name}: bound admitted mesh`).toBeTruthy();
+    const canonicalMesh = manifest.skinnedMeshes.find((candidate: any) => candidate.name === blocker.mesh
+      && candidate.uuid === blocker.meshUuid && candidate.geometryUuid === blocker.geometryUuid);
+    expect(canonicalMesh, `${label}:${terminalSentinels[index].name}: bound canonical mesh`).toBeTruthy();
+    expect([blocker.face?.a, blocker.face?.b, blocker.face?.c].every((vertex: unknown) => (
+      Number.isSafeInteger(vertex) && (vertex as number) >= 0 && (vertex as number) < canonicalMesh.positionCount
+    )), `${label}:${terminalSentinels[index].name}: face within canonical geometry`).toBe(true);
+    const beforeCovering = mesh.beforeStamps.filter((stamp: any) => (
+      mainCameraStampCoversTerminalFaceForEvidence(stamp, blocker)
+    ));
+    const afterCovering = mesh.afterStamps.filter((stamp: any) => (
+      mainCameraStampCoversTerminalFaceForEvidence(stamp, blocker)
+    ));
+    expect(beforeCovering, `${label}:${terminalSentinels[index].name}: exact before drawRange/group coverage`).toHaveLength(1);
+    expect(afterCovering, `${label}:${terminalSentinels[index].name}: exact after drawRange/group coverage`).toHaveLength(1);
+    const invocationKey = (stamp: any) => JSON.stringify([
+      stamp.material.uuid,
+      stamp.drawRange.start,
+      stamp.drawRange.count,
+      stamp.drawRange.effectiveCount,
+      stamp.drawRange.positionCount,
+      stamp.drawRange.indexCount,
+      stamp.drawRange.group?.start ?? null,
+      stamp.drawRange.group?.count ?? null,
+      stamp.drawRange.group?.materialIndex ?? null,
+    ]);
+    const beforeInvocationKey = invocationKey(beforeCovering[0]);
+    const afterInvocationKey = invocationKey(afterCovering[0]);
+    expect(binding.materialUuid, `${label}:${terminalSentinels[index].name}: callback material`)
+      .toBe(beforeCovering[0].material.uuid);
+    expect(binding.beforeInvocationKey, `${label}:${terminalSentinels[index].name}: exact before invocation`)
+      .toBe(beforeInvocationKey);
+    expect(binding.afterInvocationKey, `${label}:${terminalSentinels[index].name}: exact after invocation`)
+      .toBe(afterInvocationKey);
+    expect(binding.drawRange, `${label}:${terminalSentinels[index].name}: exact callback draw range`)
+      .toEqual(beforeCovering[0].drawRange);
+    expect(binding.drawRange, `${label}:${terminalSentinels[index].name}: same after callback draw range`)
+      .toEqual(afterCovering[0].drawRange);
+    expect(beforeInvocationKey, `${label}:${terminalSentinels[index].name}: balanced invocation`).toBe(afterInvocationKey);
   }
 }
 
@@ -754,7 +1241,7 @@ function expectArmPose(model: any, label: string, armed: boolean): void {
     expect(bone.effectiveSkinnedMeshes, `${label}: ${bone.bone} shares a rendered skeleton`)
       .toEqual(expect.arrayContaining(model.armPose.commonEffectiveSkinnedMeshes));
     expect(bone.vertexInfluence, `${label}: ${bone.bone} has real rendered JOINTS_0/WEIGHTS_0 influence`).toMatchObject({
-      contract: 'rendered-joints0-weights0-influence-v1',
+      contract: 'rendered-joints0-weights0-influence-v2',
       thresholds: RENDERED_INFLUENCE_THRESHOLDS,
       passes: true,
     });
@@ -773,7 +1260,7 @@ function expectArmPose(model: any, label: string, armed: boolean): void {
     expect(finger.wristDescendantPath.at(-1)).toBe(finger.bone);
     expect(finger.inEffectivelyVisibleSkinnedMesh, `${label}: ${finger.bone} drives the rendered hand`).toBe(true);
     expect(finger.vertexInfluence, `${label}: ${finger.bone} deforms rendered glove vertices`).toMatchObject({
-      contract: 'rendered-joints0-weights0-influence-v1',
+      contract: 'rendered-joints0-weights0-influence-v2',
       thresholds: RENDERED_INFLUENCE_THRESHOLDS,
       passes: true,
     });
@@ -1143,6 +1630,7 @@ type PrincipalWriteCaptureOptions = Readonly<{
 
 type CommitCaptureCameraOptions = Readonly<{
   principalWrite?: PrincipalWriteCaptureOptions;
+  drawScope?: 'full-actor' | 'hand';
   handSide?: 'left' | 'right';
 }>;
 
@@ -1154,7 +1642,11 @@ async function commitCaptureCamera(
   options: CommitCaptureCameraOptions = {},
 ): Promise<any> {
   const principalWrite = options.principalWrite ?? null;
+  const drawScope = options.drawScope ?? 'full-actor';
   const handSide = options.handSide ?? null;
+  if ((drawScope === 'hand') !== (handSide !== null)) {
+    throw new Error('Rigged evidence hand draw scope requires one explicit hand side, and full-actor scope requires none');
+  }
   if (principalWrite !== null && handSide !== null) {
     throw new Error('Rigged evidence capture cannot combine hand self-occlusion and principal-write control');
   }
@@ -1207,34 +1699,177 @@ async function commitCaptureCamera(
   expect(requestedRevision, `${camera.id}: capture revision advances from the sampled prior camera state`).toBeGreaterThan(
     before.captureRevision,
   );
-  await page.waitForFunction(({ revision, beforeFrame, expected, targets, expectedPrincipalMode, requestedHandSide }) => {
-    const review = (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).deterministicReview;
-    const committed = review.presentedCapture;
-    const close = (left: number, right: number) => Math.abs(left - right) <= 1e-8;
-    return committed?.contract === 'capture-camera-committed-frame-v2'
-      && committed.frame > beforeFrame
-      && committed.captureRevision === revision
-      && JSON.stringify(committed.captureTargets) === JSON.stringify(targets)
-      && committed.actors?.length === targets.length
-      && committed.actors.every((actor: any) => actor.mainCameraDraw?.complete === true)
-      && (expectedPrincipalMode === null || committed.actors.every((actor: any) => (
-        actor.principalWriteControl?.complete === true
-        && actor.principalWriteControl.mode === expectedPrincipalMode
-        && actor.rasterRoi?.anchorAndSixteenJointsInside === true
-      )))
-      && (requestedHandSide === null || committed.handSelfOcclusion?.length === targets.length)
-      && committed.position.every((value: number, index: number) => close(value, expected.position[index]))
-      && close(committed.yaw, expected.yaw)
-      && close(committed.pitch, expected.pitch)
-      && close(committed.fov, expected.fov);
-  }, {
-    revision: requestedRevision,
-    beforeFrame: before.captureFrame,
-    expected: camera,
-    targets: captureTargets,
-    expectedPrincipalMode: principalWrite?.mode ?? null,
-    requestedHandSide: handSide,
-  }, { timeout: 5_000 });
+  try {
+    await page.waitForFunction(({
+      revision, beforeFrame, expected, targets, expectedPrincipalMode, expectedDrawScope, requestedHandSide,
+    }) => {
+      const review = (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).deterministicReview;
+      const committed = review.presentedCapture;
+      const close = (left: number, right: number) => Math.abs(left - right) <= 1e-8;
+      const drawScopeReady = committed?.actors?.length === targets.length && (
+        expectedDrawScope === 'full-actor'
+          ? committed.actors.every((actor: any) => actor.mainCameraDraw?.complete === true)
+          : requestedHandSide !== null
+            && committed.handSelfOcclusion?.length === targets.length
+            && targets.every((target: any) => committed.handSelfOcclusion.filter((receipt: any) => (
+              receipt?.actor?.kind === target.kind && receipt.actor.id === target.id
+              && receipt.side === requestedHandSide
+              && receipt.captureFrame === committed.frame
+              && receipt.captureRevision === revision
+              && receipt.drawAdmission?.scope === 'hand'
+              && receipt.drawAdmission.complete === true
+            )).length === 1)
+      );
+      return committed?.contract === 'capture-camera-committed-frame-v2'
+        && committed.frame > beforeFrame
+        && committed.captureRevision === revision
+        && JSON.stringify(committed.captureTargets) === JSON.stringify(targets)
+        && committed.actors?.length === targets.length
+        && drawScopeReady
+        && (expectedPrincipalMode === null || committed.actors.every((actor: any) => (
+          actor.principalWriteControl?.complete === true
+          && actor.principalWriteControl.mode === expectedPrincipalMode
+          && actor.rasterRoi?.anchorAndSixteenJointsInside === true
+        )))
+        && committed.position.every((value: number, index: number) => close(value, expected.position[index]))
+        && close(committed.yaw, expected.yaw)
+        && close(committed.pitch, expected.pitch)
+        && close(committed.fov, expected.fov);
+    }, {
+      revision: requestedRevision,
+      beforeFrame: before.captureFrame,
+      expected: camera,
+      targets: captureTargets,
+      expectedPrincipalMode: principalWrite?.mode ?? null,
+      expectedDrawScope: drawScope,
+      requestedHandSide: handSide,
+    }, { timeout: 5_000 });
+  } catch (error) {
+    const diagnostic = await page.evaluate(({
+      revision, beforeFrame, expected, targets, expectedPrincipalMode, expectedDrawScope, requestedHandSide,
+    }) => {
+      const committed = (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).deterministicReview.presentedCapture;
+      const close = (left: number, right: number) => Math.abs(left - right) <= 1e-8;
+      const actorDiagnostics = targets.map((target: any) => {
+        const actor = committed?.actors?.find((candidate: any) => (
+          candidate?.actor?.kind === target.kind && candidate.actor.id === target.id
+        ));
+        const draw = actor?.mainCameraDraw;
+        const handReceipts = committed?.handSelfOcclusion?.filter((receipt: any) => (
+          receipt?.actor?.kind === target.kind && receipt.actor.id === target.id
+          && receipt.side === requestedHandSide
+        )) ?? [];
+        return {
+          target,
+          actorPresent: actor !== undefined,
+          draw: draw ? {
+            contract: draw.contract,
+            frame: draw.frame,
+            captureRevision: draw.captureRevision,
+            complete: draw.complete,
+            exactExpectedMeshNames: draw.exactExpectedMeshNames,
+            exactExpectedMeshUuids: draw.exactExpectedMeshUuids,
+            expectedMeshNames: draw.expectedMeshNames,
+            beforeMeshNames: draw.beforeMeshNames,
+            afterMeshNames: draw.afterMeshNames,
+            ignoredCallbacks: draw.ignoredCallbacks,
+            meshes: draw.meshes?.map((mesh: any) => ({
+              meshName: mesh.meshName,
+              meshUuid: mesh.meshUuid,
+              geometryUuid: mesh.geometryUuid,
+              beforeCount: mesh.beforeCount,
+              afterCount: mesh.afterCount,
+              complete: mesh.complete,
+              beforeStateValid: mesh.beforeStamps?.map((stamp: any) => stamp.stateValid),
+              afterStateValid: mesh.afterStamps?.map((stamp: any) => stamp.stateValid),
+            })),
+          } : null,
+          handReceipts: handReceipts.map((receipt: any) => ({
+            frame: receipt.captureFrame,
+            captureRevision: receipt.captureRevision,
+            side: receipt.side,
+            allClear: receipt.allClear,
+            drawAdmission: receipt.drawAdmission ? {
+              complete: receipt.drawAdmission.complete,
+              rawExactCanonicalMeshIdentity: receipt.drawAdmission.rawExactCanonicalMeshIdentity,
+              rawCallbacksAreCompleteOrExactZero: receipt.drawAdmission.rawCallbacksAreCompleteOrExactZero,
+              admittedMeshCount: receipt.drawAdmission.admittedMeshCount,
+              allRequiredBonesAdmitted: receipt.drawAdmission.allRequiredBonesAdmitted,
+              terminalSurfaceCount: receipt.drawAdmission.terminalSurfaceCount,
+              allTerminalSurfacesBound: receipt.drawAdmission.allTerminalSurfacesBound,
+              bones: receipt.drawAdmission.bones?.map((bone: any) => ({
+                sentinel: bone.sentinel,
+                complete: bone.complete,
+                admittedInfluencedVertexCount: bone.admittedInfluencedVertexCount,
+                admittedMaximumNormalizedWeight: bone.admittedMaximumNormalizedWeight,
+                admittedMeshes: bone.admittedMeshes,
+              })),
+              terminalDrawBindings: receipt.drawAdmission.terminalDrawBindings,
+            } : null,
+          })),
+        };
+      });
+      return {
+        contract: 'rigged-capture-commit-timeout-diagnostic-v1',
+        expected: {
+          revision,
+          afterFrame: beforeFrame,
+          camera: expected,
+          targets,
+          principalMode: expectedPrincipalMode,
+          drawScope: expectedDrawScope,
+          handSide: requestedHandSide,
+        },
+        observed: committed ? {
+          contract: committed.contract,
+          frame: committed.frame,
+          captureRevision: committed.captureRevision,
+          captureTargets: committed.captureTargets,
+          actorCount: committed.actors?.length ?? null,
+          handReceiptCount: committed.handSelfOcclusion?.length ?? null,
+          position: committed.position,
+          yaw: committed.yaw,
+          pitch: committed.pitch,
+          fov: committed.fov,
+        } : null,
+        conjuncts: {
+          committedContract: committed?.contract === 'capture-camera-committed-frame-v2',
+          frameAdvanced: committed?.frame > beforeFrame,
+          revisionMatches: committed?.captureRevision === revision,
+          targetsMatch: JSON.stringify(committed?.captureTargets) === JSON.stringify(targets),
+          actorCountMatches: committed?.actors?.length === targets.length,
+          fullActorDrawComplete: committed?.actors?.every((actor: any) => actor.mainCameraDraw?.complete === true) ?? false,
+          handReceiptCountMatches: committed?.handSelfOcclusion?.length === targets.length,
+          handAdmissionsComplete: requestedHandSide !== null && targets.every((target: any) => (
+            committed?.handSelfOcclusion?.filter((receipt: any) => (
+              receipt?.actor?.kind === target.kind && receipt.actor.id === target.id
+              && receipt.side === requestedHandSide && receipt.captureFrame === committed.frame
+              && receipt.captureRevision === revision && receipt.drawAdmission?.complete === true
+            )).length === 1
+          )),
+          principalComplete: expectedPrincipalMode === null || committed?.actors?.every((actor: any) => (
+            actor.principalWriteControl?.complete === true
+            && actor.principalWriteControl.mode === expectedPrincipalMode
+            && actor.rasterRoi?.anchorAndSixteenJointsInside === true
+          )),
+          positionMatches: committed?.position?.every((value: number, index: number) => close(value, expected.position[index])) ?? false,
+          yawMatches: close(committed?.yaw, expected.yaw),
+          pitchMatches: close(committed?.pitch, expected.pitch),
+          fovMatches: close(committed?.fov, expected.fov),
+        },
+        actors: actorDiagnostics,
+      };
+    }, {
+      revision: requestedRevision,
+      beforeFrame: before.captureFrame,
+      expected: camera,
+      targets: captureTargets,
+      expectedPrincipalMode: principalWrite?.mode ?? null,
+      expectedDrawScope: drawScope,
+      requestedHandSide: handSide,
+    });
+    throw new Error(`${camera.id}: renderer commit timeout\n${JSON.stringify(diagnostic, null, 2)}\n${String(error)}`);
+  }
   const committed = await page.evaluate(() => (
     (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).deterministicReview.presentedCapture
   ));
@@ -1246,13 +1881,16 @@ async function commitCaptureCamera(
   });
   expect(committed.captureTargets, `${camera.id}: exact ordered registered actors`).toEqual(captureTargets);
   expect(committed.actors.map(({ actor }: any) => actor), `${camera.id}: exact submitted-frame actor evidence`).toEqual(captureTargets);
-  committed.actors.forEach((actorFrame: any, index: number) => expectExactMainCameraDrawReceipt(
-    actorFrame,
-    captureTargets[index],
-    committed.frame,
-    requestedRevision,
-    `${camera.id}:committed:${captureTargets[index].kind}:${captureTargets[index].id}`,
-  ));
+  committed.actors.forEach((actorFrame: any, index: number) => {
+    const label = `${camera.id}:committed:${captureTargets[index].kind}:${captureTargets[index].id}`;
+    if (drawScope === 'hand') {
+      expectHandMainCameraDrawReceipt(
+        actorFrame, captureTargets[index], committed.frame, requestedRevision, handSide!, committed.handSelfOcclusion, label,
+      );
+    } else {
+      expectExactMainCameraDrawReceipt(actorFrame, captureTargets[index], committed.frame, requestedRevision, label);
+    }
+  });
   expectPresentationDrawIdentity(committed.actors, `${camera.id}:committed`);
   expect(normalizedQuaternionDelta(committed.quaternion, yxzCameraQuaternion(camera.yaw, camera.pitch)), `${camera.id}: rendered camera quaternion matches fixed yaw/pitch`).toBeLessThanOrEqual(1e-9);
   if (renderer === 'webgl2') {
@@ -1294,13 +1932,22 @@ async function commitCaptureCamera(
   });
   expect(paused.debugRenderPaused, `${camera.id}: renderer paused only after committed frame`).toBe(true);
   expect(paused.presentedCapture.captureRevision, `${camera.id}: paused frame retains requested camera`).toBe(requestedRevision);
-  paused.presentedCapture.actors.forEach((actorFrame: any, index: number) => expectExactMainCameraDrawReceipt(
-    actorFrame,
-    captureTargets[index],
-    paused.presentedCapture.frame,
-    requestedRevision,
-    `${camera.id}:paused:${captureTargets[index].kind}:${captureTargets[index].id}`,
-  ));
+  paused.presentedCapture.actors.forEach((actorFrame: any, index: number) => {
+    const label = `${camera.id}:paused:${captureTargets[index].kind}:${captureTargets[index].id}`;
+    if (drawScope === 'hand') {
+      expectHandMainCameraDrawReceipt(
+        actorFrame,
+        captureTargets[index],
+        paused.presentedCapture.frame,
+        requestedRevision,
+        handSide!,
+        paused.presentedCapture.handSelfOcclusion,
+        label,
+      );
+    } else {
+      expectExactMainCameraDrawReceipt(actorFrame, captureTargets[index], paused.presentedCapture.frame, requestedRevision, label);
+    }
+  });
   if (principalWrite) {
     const actorFrame = paused.presentedCapture.actors[0];
     expect(actorFrame.principalWriteControl, `${camera.id}: exact principal-write control receipt`).toMatchObject({
@@ -1567,6 +2214,14 @@ async function sampleRequiredLineOfSight(
     captureFrame: presentation.pausedPresentedCapture.frame,
     captureRevision: presentation.requestedRevision,
     captureSubmissionSequence: presentation.pausedPresentedCapture.submissionSequence,
+    drawAdmission: {
+      contract: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.handDrawAdmission.contract,
+      scope: 'hand',
+      side,
+      complete: true,
+      allRequiredBonesAdmitted: true,
+      allTerminalSurfacesBound: true,
+    },
     cameraPresentation: {
       contract: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.contract,
       captureRevision: presentation.requestedRevision,
@@ -1701,6 +2356,8 @@ async function sampleRequiredHandSelfOcclusion(
     expect([blocker.face?.a, blocker.face?.b, blocker.face?.c].every((vertex) => (
       Number.isSafeInteger(vertex) && vertex >= 0
     )), `${label}:${sentinel.name}: exact nonnegative integer triangle`).toBe(true);
+    expect(Number.isSafeInteger(blocker.faceIndex), `${label}:${sentinel.name}: face index`).toBe(true);
+    expect(blocker.faceIndex, `${label}:${sentinel.name}: nonnegative face index`).toBeGreaterThanOrEqual(0);
     expect(Number.isSafeInteger(blocker.materialIndex), `${label}:${sentinel.name}: material index`).toBe(true);
     expect(blocker.materialIndex, `${label}:${sentinel.name}: nonnegative material index`).toBeGreaterThanOrEqual(0);
     expect(blocker.hitPointWorld, `${label}:${sentinel.name}: hit point`).toHaveLength(3);
@@ -2513,7 +3170,14 @@ async function captureHandAtFixedOutsidePose(
     handSentinels: sourceSentinels,
   });
   const { targetWorld, positionWorld, outsideDirectionWorld } = derived;
-  expect(Math.sign(derived.lateralDot), `${label}: camera is on the requested lateral hemisphere`).toBe(derived.sideSign);
+  expect(derived.gripHemisphereSign, `${label}: crossed grip selects the camera hemisphere`).toBe(
+    HAND_CAMERA_CONTRACT.expectedGripHemisphereSigns[side],
+  );
+  expect(Math.sign(derived.lateralDot), `${label}: camera follows the submitted grip hemisphere`).toBe(
+    derived.gripHemisphereSign,
+  );
+  expect(Math.abs(derived.gripHemisphereLateralOffsetM), `${label}: grip hemisphere is non-degenerate`)
+    .toBeGreaterThanOrEqual(HAND_CAMERA_CONTRACT.minimumGripHemisphereLateralOffsetM);
   expect(Math.abs(derived.lateralDot), `${label}: shoulder-lateral contribution`).toBeGreaterThanOrEqual(
     HAND_CAMERA_CONTRACT.minimumAbsoluteLateralDot,
   );
@@ -2548,7 +3212,7 @@ async function captureHandAtFixedOutsidePose(
     ...HAND_CAMERA_CONTRACT,
     actor,
     side,
-    source: 'armed-close-submitted-frame-shoulder-lateral-weapon-front-and-rigged-hand-world-transforms',
+    source: 'armed-close-submitted-frame-shoulder-grip-hemisphere-weapon-front-and-rigged-hand-world-transforms',
     sourceFrameBinding: {
       contract: 'armed-close-submitted-actor-source-v1',
       cameraId: sourceCapture.camera.id,
@@ -2564,13 +3228,16 @@ async function captureHandAtFixedOutsidePose(
     rightShoulderWorld: derived.rightShoulderWorld,
     shoulderMidWorld: derived.shoulderMidWorld,
     horizontalShoulderSpanM: derived.horizontalShoulderSpanM,
+    gripCentroidWorld: derived.gripCentroidWorld,
+    gripHemisphereLateralOffsetM: derived.gripHemisphereLateralOffsetM,
+    gripHemisphereSign: derived.gripHemisphereSign,
+    expectedGripHemisphereSign: derived.expectedGripHemisphereSign,
     lateralWorld: derived.lateralWorld,
     rawFrontWorld: derived.rawFrontWorld,
     weaponCenterDistanceM: derived.weaponCenterDistanceM,
     orthogonalFrontWorld: derived.orthogonalFrontWorld,
     orthogonalFrontLengthM: derived.orthogonalFrontLengthM,
     frontWorld: derived.frontWorld,
-    sideSign: derived.sideSign,
     outsideDirectionWorld: derived.outsideDirectionWorld,
     peerOutsideDirectionWorld: derived.peerOutsideDirectionWorld,
     lateralDot: derived.lateralDot,
@@ -2583,7 +3250,10 @@ async function captureHandAtFixedOutsidePose(
     pitch: pose.pitch,
     fixtureCamera,
   };
-  const presentation = await commitCaptureCamera(page, fixtureCamera, [actor], null, { handSide: side });
+  const presentation = await commitCaptureCamera(page, fixtureCamera, [actor], null, {
+    drawScope: 'hand',
+    handSide: side,
+  });
   const framing = await captureHandFraming(page, actor, side, camera, presentation);
   const lineOfSight = await sampleRequiredLineOfSight(page, actor, presentation, framing);
   const selfOcclusion = await sampleRequiredHandSelfOcclusion(page, actor, side, presentation, framing);
@@ -3005,10 +3675,10 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
     expect(endingSourceStatus, 'official rigged-bot evidence ends with a clean worktree').toBe('');
   }
   writeFileSync(receiptPath, `${JSON.stringify({
-    schemaVersion: 11,
+    schemaVersion: 12,
     status: 'AUTOMATION_PASS_OWNER_PENDING',
-    contract: 'atomic-acres/pass69-3-rigged-bot-live@11',
-    evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-shoulder-oblique-hand-detail-self-occlusion-main-camera-draw-stamps-and-production-rgb-raster-proof',
+    contract: 'atomic-acres/pass69-3-rigged-bot-live@12',
+    evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-shoulder-grip-hemisphere-hand-detail-self-occlusion-hand-draw-admission-main-camera-draw-stamps-and-production-rgb-raster-proof',
     target: officialEvidence ? expectedTarget : `development-${renderer}`,
     sourceSha,
     endingSourceSha,

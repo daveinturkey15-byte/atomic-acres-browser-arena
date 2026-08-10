@@ -5,13 +5,15 @@ export type RiggedHandSourceSentinel = Readonly<{
 }>;
 
 export const RIGGED_HAND_CAMERA_CONTRACT = Object.freeze({
-  contract: 'fixed-shoulder-lateral-front-oblique-hand-v2',
+  contract: 'fixed-shoulder-grip-hemisphere-front-oblique-hand-v3',
   outsideOffsetM: 0.7,
   upwardOffsetM: 0.12,
   fovDegrees: 48,
   maximumSourceJointDriftM: 0.03,
   frontObliqueDegrees: 20,
   minimumHorizontalShoulderSpanM: 0.15,
+  minimumGripHemisphereLateralOffsetM: 0.08,
+  expectedGripHemisphereSigns: Object.freeze({ left: 1 as const, right: -1 as const }),
   minimumOrthogonalFrontLengthM: 0.08,
   minimumWeaponCenterDistanceM: 0.08,
   maximumWeaponCenterDistanceM: 0.65,
@@ -62,6 +64,20 @@ export function deriveRiggedHandCamera(input: DeriveRiggedHandCameraInput) {
   const shoulderMidWorld = [0, 1, 2].map((axis) => (
     (leftShoulderWorld[axis] + rightShoulderWorld[axis]) / 2
   ));
+  const gripCentroidWorld = [0, 1, 2].map((axis) => (
+    handSentinels.reduce((sum, sentinel) => sum + sentinel.worldPosition[axis], 0)
+      / handSentinels.length
+  ));
+  const gripHemisphereLateralOffsetM = [0, 2].reduce((sum, axis) => (
+    sum + (gripCentroidWorld[axis] - shoulderMidWorld[axis]) * lateralWorld[axis]
+  ), 0);
+  if (!(Math.abs(gripHemisphereLateralOffsetM)
+      >= RIGGED_HAND_CAMERA_CONTRACT.minimumGripHemisphereLateralOffsetM)) {
+    fail('grip-hemisphere-lateral-offset');
+  }
+  const gripHemisphereSign = Math.sign(gripHemisphereLateralOffsetM);
+  const expectedGripHemisphereSign = RIGGED_HAND_CAMERA_CONTRACT.expectedGripHemisphereSigns[side];
+  if (gripHemisphereSign !== expectedGripHemisphereSign) fail('grip-hemisphere-side');
   const rawFrontWorld = [
     weaponCenterWorld[0] - shoulderMidWorld[0],
     0,
@@ -82,14 +98,13 @@ export function deriveRiggedHandCamera(input: DeriveRiggedHandCameraInput) {
     fail('orthogonal-front-length');
   }
   const frontWorld = orthogonalFrontWorld.map((value) => value / orthogonalFrontLengthM);
-  const sideSign = side === 'left' ? -1 : 1;
   const obliqueRadians = RIGGED_HAND_CAMERA_CONTRACT.frontObliqueDegrees * Math.PI / 180;
   const outsideDirectionWorld = [0, 1, 2].map((axis) => (
-    Math.cos(obliqueRadians) * sideSign * lateralWorld[axis]
+    Math.cos(obliqueRadians) * gripHemisphereSign * lateralWorld[axis]
       + Math.sin(obliqueRadians) * frontWorld[axis]
   ));
   const peerOutsideDirectionWorld = [0, 1, 2].map((axis) => (
-    -Math.cos(obliqueRadians) * sideSign * lateralWorld[axis]
+    -Math.cos(obliqueRadians) * gripHemisphereSign * lateralWorld[axis]
       + Math.sin(obliqueRadians) * frontWorld[axis]
   ));
   const lateralDot = outsideDirectionWorld[0] * lateralWorld[0]
@@ -100,24 +115,24 @@ export function deriveRiggedHandCamera(input: DeriveRiggedHandCameraInput) {
     sum + value * peerOutsideDirectionWorld[axis]
   ), 0);
   if (!(Math.abs(lateralDot) >= RIGGED_HAND_CAMERA_CONTRACT.minimumAbsoluteLateralDot
-    && Math.sign(lateralDot) === sideSign
+    && Math.sign(lateralDot) === gripHemisphereSign
     && frontDot >= RIGGED_HAND_CAMERA_CONTRACT.minimumFrontDot
     && frontDot <= RIGGED_HAND_CAMERA_CONTRACT.maximumFrontDot
     && peerDirectionDot <= RIGGED_HAND_CAMERA_CONTRACT.maximumPeerDirectionDot)) {
     fail('derived-direction-invariant');
   }
 
-  const targetWorld = [0, 1, 2].map((axis) => (
-    handSentinels.reduce((sum, sentinel) => sum + sentinel.worldPosition[axis], 0)
-      / handSentinels.length
-  ));
+  const targetWorld = gripCentroidWorld;
   const positionWorld = targetWorld.map((value, axis) => (
     value + outsideDirectionWorld[axis] * RIGGED_HAND_CAMERA_CONTRACT.outsideOffsetM
       + (axis === 1 ? RIGGED_HAND_CAMERA_CONTRACT.upwardOffsetM : 0)
   ));
 
   return Object.freeze({
-    sideSign,
+    gripCentroidWorld: Object.freeze(gripCentroidWorld),
+    gripHemisphereLateralOffsetM,
+    gripHemisphereSign,
+    expectedGripHemisphereSign,
     leftShoulderWorld: Object.freeze([...leftShoulderWorld]),
     rightShoulderWorld: Object.freeze([...rightShoulderWorld]),
     shoulderMidWorld: Object.freeze(shoulderMidWorld),
@@ -137,6 +152,7 @@ export function deriveRiggedHandCamera(input: DeriveRiggedHandCameraInput) {
     positionWorld: Object.freeze(positionWorld),
     degeneracyPolicy: Object.freeze({
       minimumHorizontalShoulderSpanM: RIGGED_HAND_CAMERA_CONTRACT.minimumHorizontalShoulderSpanM,
+      minimumGripHemisphereLateralOffsetM: RIGGED_HAND_CAMERA_CONTRACT.minimumGripHemisphereLateralOffsetM,
       minimumOrthogonalFrontLengthM: RIGGED_HAND_CAMERA_CONTRACT.minimumOrthogonalFrontLengthM,
       minimumWeaponCenterDistanceM: RIGGED_HAND_CAMERA_CONTRACT.minimumWeaponCenterDistanceM,
       maximumWeaponCenterDistanceM: RIGGED_HAND_CAMERA_CONTRACT.maximumWeaponCenterDistanceM,

@@ -4,7 +4,9 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 import { describe, expect, it } from 'vitest';
+import { RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS } from './operator-model';
 import {
+  buildRiggedEvidenceHandDrawAdmission,
   classifyRiggedHandSelfOcclusionHit,
   collectRiggedEvidenceOccluders,
   collectRiggedEvidenceSelfOccluders,
@@ -23,6 +25,7 @@ function fakeHit(mesh: THREE.Mesh, distance: number, materialIndex: number): THR
     distance,
     point: new THREE.Vector3(distance, 0, 0),
     object: mesh,
+    faceIndex: 0,
     face: { a: 0, b: 1, c: 2, normal: new THREE.Vector3(1, 0, 0), materialIndex },
   };
 }
@@ -105,6 +108,135 @@ function riggedDrawFixture() {
     setFrame: (value: number) => { frame = value; },
     setCaptureRevision: (value: number) => { captureRevision = value; },
   };
+}
+
+function handDrawAdmissionFixture(drawnMeshCount = 2) {
+  const fixture = riggedDrawFixture();
+  fixture.invoke('before');
+  fixture.invoke('after');
+  const baseDraw = fixture.session.actorReceipt(
+    fixture.actor, fixture.root, fixture.root, 41, 7,
+  )!;
+  fixture.session.dispose();
+
+  const bones = [
+    { index: 0, name: 'WristL', uuid: THREE.MathUtils.generateUUID(), parentIndex: -1 },
+    { index: 1, name: 'Thumb2L', uuid: THREE.MathUtils.generateUUID(), parentIndex: 0 },
+    { index: 2, name: 'Index2L', uuid: THREE.MathUtils.generateUUID(), parentIndex: 0 },
+    { index: 3, name: 'Middle2L', uuid: THREE.MathUtils.generateUUID(), parentIndex: 0 },
+    { index: 4, name: 'Ring2L', uuid: THREE.MathUtils.generateUUID(), parentIndex: 0 },
+    { index: 5, name: 'Pinky2L', uuid: THREE.MathUtils.generateUUID(), parentIndex: 0 },
+    { index: 6, name: 'WristR', uuid: THREE.MathUtils.generateUUID(), parentIndex: -1 },
+  ];
+  const meshes = Array.from({ length: 9 }, (_, index) => {
+    const mesh = structuredClone(baseDraw.meshes[0]) as any;
+    mesh.meshName = `fixture-skin-${index}`;
+    mesh.meshUuid = THREE.MathUtils.generateUUID();
+    mesh.geometryUuid = THREE.MathUtils.generateUUID();
+    for (const stamp of [...mesh.beforeStamps, ...mesh.afterStamps]) {
+      stamp.meshName = mesh.meshName;
+      stamp.meshUuid = mesh.meshUuid;
+      stamp.geometryUuid = mesh.geometryUuid;
+    }
+    if (index < drawnMeshCount) {
+      mesh.before = mesh.beforeStamps.at(-1);
+      mesh.after = mesh.afterStamps.at(-1);
+      mesh.complete = true;
+    } else {
+      Object.assign(mesh, {
+        beforeCount: 0,
+        afterCount: 0,
+        beforeStamps: [],
+        afterStamps: [],
+        before: null,
+        after: null,
+        complete: false,
+      });
+    }
+    return mesh;
+  });
+  const allDrawn = drawnMeshCount === meshes.length;
+  const draw = structuredClone(baseDraw) as any;
+  Object.assign(draw, {
+    expectedMeshNames: meshes.map(({ meshName }: any) => meshName).sort(),
+    expectedMeshUuids: meshes.map(({ meshUuid }: any) => meshUuid).sort(),
+    beforeMeshNames: meshes.filter(({ beforeCount }: any) => beforeCount > 0)
+      .map(({ meshName }: any) => meshName).sort(),
+    afterMeshNames: meshes.filter(({ afterCount }: any) => afterCount > 0)
+      .map(({ meshName }: any) => meshName).sort(),
+    meshes,
+    exactExpectedMeshNames: allDrawn,
+    exactExpectedMeshUuids: allDrawn,
+    complete: allDrawn,
+  });
+  const manifest = {
+    contract: 'runtime-canonical-operator-skin-manifest-v1' as const,
+    assetUrl: './fixture-operator.glb',
+    lod: 0 as const,
+    visual: { name: 'rigged-operator-visual', uuid: THREE.MathUtils.generateUUID() },
+    skinnedMeshes: meshes.map((mesh: any) => ({
+      name: mesh.meshName,
+      uuid: mesh.meshUuid,
+      geometryUuid: mesh.geometryUuid,
+      positionCount: 3,
+      skinIndexCount: 3,
+      skinIndexItemSize: 4,
+      skinIndexNormalized: false,
+      skinWeightCount: 3,
+      skinWeightItemSize: 4,
+      skinWeightNormalized: false,
+      skeletonBones: structuredClone(bones),
+    })),
+    wrists: [
+      { side: 'left' as const, name: 'WristL', uuid: bones[0].uuid },
+      { side: 'right' as const, name: 'WristR', uuid: bones[6].uuid },
+    ],
+  };
+  const expectedBones = [
+    { sentinel: 'wrist-hand', kind: 'arm', role: 'wrist-hand', digit: null, bone: 'WristL', boneIndex: 0 },
+    { sentinel: 'thumb', kind: 'finger', role: null, digit: 'thumb', bone: 'Thumb2L', boneIndex: 1 },
+    { sentinel: 'index', kind: 'finger', role: null, digit: 'index', bone: 'Index2L', boneIndex: 2 },
+    { sentinel: 'middle', kind: 'finger', role: null, digit: 'middle', bone: 'Middle2L', boneIndex: 3 },
+    { sentinel: 'ring', kind: 'finger', role: null, digit: 'ring', bone: 'Ring2L', boneIndex: 4 },
+    { sentinel: 'pinky', kind: 'finger', role: null, digit: 'pinky', bone: 'Pinky2L', boneIndex: 5 },
+  ] as const;
+  const joints = expectedBones.map((expected) => ({
+    kind: expected.kind,
+    side: 'left',
+    role: expected.role,
+    digit: expected.digit,
+    bone: expected.bone,
+    vertexInfluence: {
+      contract: 'rendered-joints0-weights0-influence-v2',
+      bone: expected.bone,
+      boneUuid: bones[expected.boneIndex].uuid,
+      thresholds: structuredClone(RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS),
+      influencedVertexCount: 4,
+      maximumNormalizedWeight: 0.25,
+      passes: true,
+      meshes: meshes.slice(0, 2).map((mesh: any, index: number) => ({
+        mesh: mesh.meshName,
+        meshUuid: mesh.meshUuid,
+        geometryUuid: mesh.geometryUuid,
+        influencedVertexCount: 2,
+        maximumNormalizedWeight: index === 0 ? 0.25 : 0.1,
+      })),
+    },
+  }));
+  const sentinels = expectedBones.map((expected, index) => ({
+    name: expected.sentinel,
+    bone: expected.bone,
+    blocker: index === 0 ? {
+      reason: 'terminal-hand-surface',
+      mesh: meshes[0].meshName,
+      meshUuid: meshes[0].meshUuid,
+      geometryUuid: meshes[0].geometryUuid,
+      faceIndex: 0,
+      face: { a: 0, b: 1, c: 2 },
+      materialIndex: 0,
+    } : null,
+  }));
+  return { draw, manifest, joints, sentinels, bones };
 }
 
 function handOwnershipFixture() {
@@ -205,6 +337,7 @@ function provenanceHit(
     distance,
     point: new THREE.Vector3(0, 0, distance),
     object,
+    faceIndex: face ? 0 : null,
     face: face ? {
       a: face[0], b: face[1], c: face[2], normal: new THREE.Vector3(0, 0, 1), materialIndex: 0,
     } : null,
@@ -556,6 +689,171 @@ describe('rigged evidence per-intersection occluder qualification', () => {
     expect(fixture.session.actorReceipt(fixture.actor, fixture.root, fixture.root, 42, 8)?.complete).toBe(true);
     expect(fixture.session.actorReceipt(fixture.actor, fixture.root, fixture.root, 41, 7)?.complete).toBe(false);
     fixture.session.dispose();
+  });
+
+  it('admits a genuine partial nine-mesh hand draw while preserving strict full-actor completeness', () => {
+    const partial = handDrawAdmissionFixture();
+    const admission = buildRiggedEvidenceHandDrawAdmission(
+      partial.draw, partial.manifest, 'left', partial.joints, partial.sentinels,
+    );
+    expect(partial.draw.meshes).toHaveLength(9);
+    expect(partial.draw.meshes.filter(({ complete }: any) => complete)).toHaveLength(2);
+    expect(partial.draw.meshes.filter(({ beforeCount }: any) => beforeCount === 0)).toHaveLength(7);
+    expect(riggedEvidenceMainCameraActorDrawComplete(partial.draw)).toBe(false);
+    expect(admission).toMatchObject({
+      rawExactCanonicalMeshIdentity: true,
+      rawCallbacksAreCompleteOrExactZero: true,
+      admittedMeshCount: 2,
+      terminalSurfaceCount: 1,
+      allRequiredBonesAdmitted: true,
+      allTerminalSurfacesBound: true,
+      complete: true,
+    });
+    expect(admission.bones).toHaveLength(6);
+    expect(admission.bones.every((bone) => (
+      bone.admittedMeshes.length === 2
+        && bone.admittedInfluencedVertexCount === 4
+        && bone.admittedMaximumNormalizedWeight === 0.25
+        && bone.admittedMeshes.every(({ meetsThresholds }) => !meetsThresholds)
+        && bone.complete
+    ))).toBe(true);
+
+    const full = handDrawAdmissionFixture(9);
+    expect(riggedEvidenceMainCameraActorDrawComplete(full.draw)).toBe(true);
+    const missing = full.draw.meshes[8];
+    Object.assign(missing, {
+      beforeCount: 0, afterCount: 0, beforeStamps: [], afterStamps: [],
+      before: null, after: null, complete: false,
+    });
+    full.draw.beforeMeshNames = full.draw.meshes.filter(({ beforeCount }: any) => beforeCount > 0)
+      .map(({ meshName }: any) => meshName).sort();
+    full.draw.afterMeshNames = full.draw.meshes.filter(({ afterCount }: any) => afterCount > 0)
+      .map(({ meshName }: any) => meshName).sort();
+    full.draw.exactExpectedMeshNames = false;
+    full.draw.exactExpectedMeshUuids = false;
+    full.draw.complete = false;
+    expect(riggedEvidenceMainCameraActorDrawComplete(full.draw)).toBe(false);
+  });
+
+  it('aggregates only admitted hand draws and fails closed on malformed influence provenance', () => {
+    const culled = handDrawAdmissionFixture();
+    Object.assign(culled.draw.meshes[1], {
+      beforeCount: 0, afterCount: 0, beforeStamps: [], afterStamps: [],
+      before: null, after: null, complete: false,
+    });
+    culled.draw.beforeMeshNames = [culled.draw.meshes[0].meshName];
+    culled.draw.afterMeshNames = [culled.draw.meshes[0].meshName];
+    const culledAdmission = buildRiggedEvidenceHandDrawAdmission(
+      culled.draw, culled.manifest, 'left', culled.joints, culled.sentinels,
+    );
+    expect(culledAdmission.rawCallbacksAreCompleteOrExactZero).toBe(true);
+    expect(culledAdmission.bones.every((bone) => (
+      bone.admittedInfluencedVertexCount === 2 && !bone.complete
+    ))).toBe(true);
+    expect(culledAdmission.complete).toBe(false);
+
+    const adversaries: Array<[string, (fixture: ReturnType<typeof handDrawAdmissionFixture>) => void]> = [
+      ['missing thresholds', ({ joints }) => { delete (joints[0].vertexInfluence as any).thresholds; }],
+      ['missing meshes', ({ joints }) => { delete (joints[0].vertexInfluence as any).meshes; }],
+      ['wrong stamp actor identity', ({ draw }) => {
+        for (const stamp of [...draw.meshes[0].beforeStamps, ...draw.meshes[0].afterStamps]) {
+          stamp.actorRootUuid = THREE.MathUtils.generateUUID();
+        }
+      }],
+      ['forged canonical position count', ({ draw }) => {
+        for (const stamp of [...draw.meshes[0].beforeStamps, ...draw.meshes[0].afterStamps]) {
+          stamp.drawRange.positionCount = 600;
+        }
+      }],
+      ['phantom influence mesh', ({ joints }) => {
+        const influence = joints[0].vertexInfluence as any;
+        influence.meshes.push({
+          mesh: 'phantom',
+          meshUuid: THREE.MathUtils.generateUUID(),
+          geometryUuid: THREE.MathUtils.generateUUID(),
+          influencedVertexCount: 1,
+          maximumNormalizedWeight: 0.1,
+        });
+        influence.influencedVertexCount = 5;
+      }],
+      ['incoherent per-mesh count and maximum', ({ joints }) => {
+        const influence = joints[1].vertexInfluence as any;
+        influence.meshes[0].influencedVertexCount = 0;
+        influence.meshes[1].influencedVertexCount = 4;
+      }],
+      ['wrong expected-bone UUID', ({ joints }) => {
+        (joints[1].vertexInfluence as any).boneUuid = THREE.MathUtils.generateUUID();
+      }],
+      ['digit parented under opposite wrist', ({ manifest }) => {
+        for (const mesh of manifest.skinnedMeshes) mesh.skeletonBones[1].parentIndex = 6;
+      }],
+      ['same digit name with inconsistent cross-mesh UUID', ({ manifest }) => {
+        manifest.skinnedMeshes[1].skeletonBones[1].uuid = THREE.MathUtils.generateUUID();
+      }],
+    ];
+    for (const [label, mutate] of adversaries) {
+      const fixture = handDrawAdmissionFixture();
+      mutate(fixture);
+      expect(() => buildRiggedEvidenceHandDrawAdmission(
+        fixture.draw, fixture.manifest, 'left', fixture.joints, fixture.sentinels,
+      ), label).not.toThrow();
+      expect(buildRiggedEvidenceHandDrawAdmission(
+        fixture.draw, fixture.manifest, 'left', fixture.joints, fixture.sentinels,
+      ).complete, label).toBe(false);
+    }
+  });
+
+  it('binds every terminal hand triangle to an exact balanced geometry/material/range invocation', () => {
+    const valid = handDrawAdmissionFixture();
+    const validAdmission = buildRiggedEvidenceHandDrawAdmission(
+      valid.draw, valid.manifest, 'left', valid.joints, valid.sentinels,
+    );
+    expect(validAdmission.terminalDrawBindings).toHaveLength(1);
+    expect(validAdmission.terminalDrawBindings[0]).toMatchObject({
+      faceIndex: 0,
+      faceElementStart: 0,
+      materialIndex: 0,
+      complete: true,
+      failure: null,
+    });
+
+    const terminalAdversaries: Array<[
+      string,
+      (fixture: ReturnType<typeof handDrawAdmissionFixture>) => void,
+    ]> = [
+      ['zero terminal surfaces', ({ sentinels }) => { sentinels[0].blocker = null; }],
+      ['null face index', ({ sentinels }) => { sentinels[0].blocker!.faceIndex = null as any; }],
+      ['fractional face index', ({ sentinels }) => { sentinels[0].blocker!.faceIndex = 0.5; }],
+      ['negative face index', ({ sentinels }) => { sentinels[0].blocker!.faceIndex = -1; }],
+      ['face outside draw range', ({ sentinels }) => { sentinels[0].blocker!.faceIndex = 1; }],
+      ['face vertex outside canonical geometry', ({ sentinels }) => { sentinels[0].blocker!.face.c = 3; }],
+      ['geometry UUID mismatch', ({ sentinels }) => {
+        sentinels[0].blocker!.geometryUuid = THREE.MathUtils.generateUUID();
+      }],
+      ['material slot mismatch', ({ sentinels }) => { sentinels[0].blocker!.materialIndex = 1; }],
+      ['callback group mismatch', ({ draw }) => {
+        for (const stamp of [...draw.meshes[0].beforeStamps, ...draw.meshes[0].afterStamps]) {
+          stamp.drawRange.group = { start: 0, count: 3, materialIndex: 1 };
+        }
+      }],
+      ['before/after outer range drift', ({ draw }) => {
+        draw.meshes[0].afterStamps[0].drawRange.count = 0;
+        draw.meshes[0].afterStamps[0].drawRange.effectiveCount = 0;
+      }],
+    ];
+    for (const [label, mutate] of terminalAdversaries) {
+      const fixture = handDrawAdmissionFixture();
+      mutate(fixture);
+      const admission = buildRiggedEvidenceHandDrawAdmission(
+        fixture.draw, fixture.manifest, 'left', fixture.joints, fixture.sentinels,
+      );
+      expect(admission.complete, label).toBe(false);
+      if (label === 'zero terminal surfaces') {
+        expect(admission.allTerminalSurfacesBound, label).toBe(false);
+      } else {
+        expect(admission.terminalDrawBindings[0].complete, label).toBe(false);
+      }
+    }
   });
 
   it('rejects missing, extra, duplicate, or hidden visible-mesh manifests before installing callbacks', () => {

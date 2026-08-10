@@ -104,7 +104,11 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     expect(runner).not.toContain('0.005');
     expect(operator).toContain("contract: 'source-glb-skinned-anti-t-arm-chain-v2'");
     expect(operator).toContain("contract: 'source-glb-weighted-five-digit-sentinels-v2'");
-    expect(operator).toContain("contract: 'rendered-joints0-weights0-influence-v1'");
+    expect(operator).toContain("contract: 'rendered-joints0-weights0-influence-v2'");
+    expect(operator).toContain('bone: bone.name');
+    expect(operator).toContain('boneUuid: bone.uuid');
+    expect(operator).toContain('meshUuid: mesh.uuid');
+    expect(operator).toContain('geometryUuid: mesh.geometry.uuid');
     expect(operator).toContain('minimumInfluencedVertices: 4');
     expect(operator).toContain('minimumMaximumNormalizedWeight: 0.2');
     expect(operator).toContain('minimumElbowFlexRadians: 0.3');
@@ -242,7 +246,7 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       'handSelfOcclusionRayDoesNotReplaceVisualAcceptance: true',
       'screenshotPresentedFrameWithHash(',
       "contract: 'paused-presented-frame-screenshot-v1'",
-      "source: 'armed-close-submitted-frame-shoulder-lateral-weapon-front-and-rigged-hand-world-transforms'",
+      "source: 'armed-close-submitted-frame-shoulder-grip-hemisphere-weapon-front-and-rigged-hand-world-transforms'",
       "contract: 'armed-close-submitted-actor-source-v1'",
       'api.setRiggedEvidenceCaptureTargets(targets)',
       'api.setRiggedEvidenceHandCaptureSide(requestedHandSide)',
@@ -260,16 +264,18 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       "contract: 'paused-render-live-pose-advance-v1'",
       'capture revision advances from the sampled prior camera state',
       "fetch('/channels/the-big-one/channel-provenance.json'",
-      "evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-shoulder-oblique-hand-detail-self-occlusion-main-camera-draw-stamps-and-production-rgb-raster-proof'",
+      "evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-shoulder-grip-hemisphere-hand-detail-self-occlusion-hand-draw-admission-main-camera-draw-stamps-and-production-rgb-raster-proof'",
       'api.admissionState().presentedGameplayFrame',
       'waitForAtomicPlayerConvergence(',
       'presentedGameplayFrame: stagedAtomic.presentedGameplayFrame',
     ]) expect(spec).toContain(token);
     for (const token of [
-      "contract: 'fixed-shoulder-lateral-front-oblique-hand-v2'",
+      "contract: 'fixed-shoulder-grip-hemisphere-front-oblique-hand-v3'",
       'outsideOffsetM: 0.7',
       'upwardOffsetM: 0.12',
       'fovDegrees: 48',
+      'minimumGripHemisphereLateralOffsetM: 0.08',
+      'expectedGripHemisphereSigns: Object.freeze({ left: 1 as const, right: -1 as const })',
       'maximumSourceJointDriftM: 0.03',
       'frontObliqueDegrees: 20',
       'noFallback: true',
@@ -283,7 +289,17 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     expect(runner).toContain('non-principal capture with stray ${field} must fail');
     expect(runner).toContain('lineOfSightValid(');
     expect(runner).toContain('handSelfOcclusionValid(');
-    expect(runner).toContain("contract: 'fixed-shoulder-lateral-front-oblique-hand-v2'");
+    expect(runner).toContain("contract: 'fixed-shoulder-grip-hemisphere-front-oblique-hand-v3'");
+    expect(runner).toContain("contract: 'rigged-main-camera-draw-stamp-v2'");
+    expect(runner).toContain("const handDrawAdmissionContract = 'rigged-hand-main-camera-draw-admission-v1'");
+    expect(runner).toContain("influenceContract: 'rendered-joints0-weights0-influence-v2'");
+    expect(runner).toContain('schemaVersion: 8');
+    expect(runner).toContain("contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v8'");
+    expect(runner).toContain("receipt.contract === 'atomic-acres/pass69-3-rigged-bot-live@12'");
+    expect(spec).toContain('schemaVersion: 12');
+    expect(spec).toContain("contract: 'atomic-acres/pass69-3-rigged-bot-live@12'");
+    expect(spec).toContain("contract: 'rigged-capture-commit-timeout-diagnostic-v1'");
+    expect(spec).toContain("drawScope?: 'full-actor' | 'hand'");
     expect(runner).toContain('deriveExpectedHandCamera(');
     expect(runner).toContain('swapped shoulder basis must fail');
     expect(runner).toContain('weapon front collinear with shoulder lateral must fail without fallback');
@@ -318,7 +334,11 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     expect(runner).toContain("const validateReceiptMode = process.argv[2] === '--validate-receipt'");
     expect(runner).toContain('failed predicates: ${failedPredicates.join(\', \')}');
     expect(runner).toContain("failedPredicates: ['receipt.readable']");
-    expect(handOcclusion).toContain("contract: 'submitted-frame-hand-self-occlusion-v2'");
+    expect(handOcclusion).toContain("contract: 'submitted-frame-hand-self-occlusion-v3'");
+    expect(handOcclusion).toContain("RIGGED_EVIDENCE_MAIN_CAMERA_DRAW_CONTRACT = 'rigged-main-camera-draw-stamp-v2'");
+    expect(handOcclusion).toContain("RIGGED_EVIDENCE_HAND_DRAW_ADMISSION_CONTRACT = 'rigged-hand-main-camera-draw-admission-v1'");
+    expect(handOcclusion).toContain('buildRiggedEvidenceHandDrawAdmission(');
+    expect(handOcclusion).toContain('handDrawBoneDescendsFromWrist(');
     expect(handOcclusion).toContain("Reflect.set(candidate, 'boundingSphere', null)");
     expect(handOcclusion).toContain('THREE.InstancedMesh.prototype.raycast.call(candidate, raycaster, intersections)');
     expect(handOcclusion).toContain("Reflect.set(candidate, 'boundingSphere', previousBoundingSphere)");
@@ -426,7 +446,7 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       'later bot root mismatch must fail',
       'later bot yaw mismatch must fail',
       'old placement-less fixture fails closed without throwing',
-      'receipt schema 8 is explicitly rejected without throwing',
+      'receipt schema 11 is explicitly rejected without throwing',
       'previous-axis hemisphere-aligned receipt must pass',
       'forged Y-axis receipt cannot impersonate the canonical X-axis pre-floor pose',
       'exact-bind authored fallback axis must pass',
@@ -457,11 +477,14 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       'main-camera layer mismatch must fail',
       'offscreen main-camera frustum state must fail',
       'zero main-camera draw range must fail',
+      'callback position count must equal canonical geometry',
       'invisible main-camera material must fail',
       'same-scene same-camera override-material pass must fail',
+      'malformed Three.js gameplay-scene UUID must fail',
       'zero-count callback group must fail',
       'callback material/group slot mismatch must fail',
       'unpaired callback material/group multiset must fail',
+      'before/after outer draw-range drift must fail',
       'duplicate principal material/group invocation must fail',
       'forged padded/shifted/out-of-frame raster ROI must fail',
       'excluded telemetry cache-path counters may differ without changing render-causal state',
@@ -499,6 +522,18 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       'sub-12px fixed hand span must fail',
       'non-fixed hand camera distance must fail',
       'hand camera source must bind to the armed close submitted frame',
+      'partial hand scope must retain the WebGPU completion frontier gate',
+      'partial hand scope must reject a stale WebGPU completion fence',
+      'hand fixture must retain two draws and seven exact-zero canonical meshes',
+      'partial hand receipt must pass only trusted hand scope',
+      '2+2 vertices across two admitted draws must satisfy every aggregate hand-bone threshold',
+      '2 drawn vertices plus 2 culled vertices must fail the admitted-only hand threshold',
+      'zero terminal hand faces cannot vacuously pass draw admission',
+      'terminal before/after outer draw-range drift must fail',
+      'aggregate thresholds cannot launder a per-mesh count/maximum incoherence',
+      'influence bone UUID must bind to the expected canonical skeleton bone',
+      'all contributing canonical meshes must resolve the expected bone to one UUID',
+      'digit influence must descend from the trusted requested-side wrist',
     ]) expect(runner).toContain(token);
   });
 });

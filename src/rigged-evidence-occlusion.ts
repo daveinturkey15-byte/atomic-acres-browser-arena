@@ -1,10 +1,15 @@
 import * as THREE from 'three';
-import type { RiggedOperatorHandEvidenceIdentity } from './operator-model';
+import {
+  RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS,
+  type RenderedVertexInfluenceTelemetry,
+  type RiggedOperatorCanonicalEvidenceManifest,
+  type RiggedOperatorHandEvidenceIdentity,
+} from './operator-model';
 
 export const RIGGED_EVIDENCE_OCCLUDER_MINIMUM_OPACITY = 0.75;
 
 export const RIGGED_HAND_SELF_OCCLUSION_CONTRACT = Object.freeze({
-  contract: 'submitted-frame-hand-self-occlusion-v2',
+  contract: 'submitted-frame-hand-self-occlusion-v3',
   actorSelfOcclusionIncluded: true,
   actorAttachmentsIncluded: true,
   heldWeaponTerminalHitAccepted: false,
@@ -18,7 +23,8 @@ export type RiggedEvidenceCaptureTarget = Readonly<{
   id: string;
 }>;
 
-export const RIGGED_EVIDENCE_MAIN_CAMERA_DRAW_CONTRACT = 'rigged-main-camera-draw-stamp-v1';
+export const RIGGED_EVIDENCE_MAIN_CAMERA_DRAW_CONTRACT = 'rigged-main-camera-draw-stamp-v2';
+export const RIGGED_EVIDENCE_HAND_DRAW_ADMISSION_CONTRACT = 'rigged-hand-main-camera-draw-admission-v1';
 export const RIGGED_EVIDENCE_PRINCIPAL_WRITE_CONTROL_CONTRACT = 'rigged-principal-write-control-v1';
 export const RIGGED_EVIDENCE_RASTER_ROI_CONTRACT = 'rigged-live-deformed-raster-roi-v1';
 
@@ -71,6 +77,7 @@ export type RiggedEvidenceMainCameraDrawStamp = Readonly<{
   frame: number;
   captureRevision: number;
   meshUuid: string;
+  geometryUuid: string;
   meshName: string;
   actorRootUuid: string;
   operatorRootUuid: string;
@@ -93,6 +100,7 @@ export type RiggedEvidenceMainCameraDrawStamp = Readonly<{
 
 export type RiggedEvidenceMainCameraMeshDrawReceipt = Readonly<{
   meshUuid: string;
+  geometryUuid: string;
   meshName: string;
   materialSlotUuids: readonly string[];
   materialUuidSet: readonly string[];
@@ -103,6 +111,74 @@ export type RiggedEvidenceMainCameraMeshDrawReceipt = Readonly<{
   afterStamps: readonly RiggedEvidenceMainCameraDrawStamp[];
   before: RiggedEvidenceMainCameraDrawStamp | null;
   after: RiggedEvidenceMainCameraDrawStamp | null;
+  complete: boolean;
+}>;
+
+export type RiggedEvidenceHandDrawBoneReceipt = Readonly<{
+  sentinel: 'wrist-hand' | 'thumb' | 'index' | 'middle' | 'ring' | 'pinky';
+  kind: 'arm' | 'finger';
+  side: 'left' | 'right';
+  role: 'wrist-hand' | null;
+  digit: 'thumb' | 'index' | 'middle' | 'ring' | 'pinky' | null;
+  bone: string;
+  vertexInfluence: RenderedVertexInfluenceTelemetry | null;
+  admittedMeshes: readonly Readonly<{
+    mesh: string;
+    meshUuid: string;
+    geometryUuid: string;
+    influencedVertexCount: number;
+    maximumNormalizedWeight: number;
+    currentFrameBalancedStateValidDraw: boolean;
+    meetsThresholds: boolean;
+  }>[];
+  admittedInfluencedVertexCount: number;
+  admittedMaximumNormalizedWeight: number;
+  complete: boolean;
+}>;
+
+export type RiggedEvidenceTerminalDrawBinding = Readonly<{
+  sentinel: string;
+  bone: string;
+  mesh: string;
+  meshUuid: string;
+  geometryUuid: string;
+  faceIndex: number | null;
+  faceElementStart: number | null;
+  face: Readonly<{ a: number; b: number; c: number }> | null;
+  materialIndex: number | null;
+  materialUuid: string | null;
+  beforeInvocationKey: string | null;
+  afterInvocationKey: string | null;
+  drawRange: RiggedEvidenceDrawRange | null;
+  complete: boolean;
+  failure: string | null;
+}>;
+
+export type RiggedEvidenceHandDrawAdmissionReceipt = Readonly<{
+  contract: typeof RIGGED_EVIDENCE_HAND_DRAW_ADMISSION_CONTRACT;
+  pixelProof: false;
+  scope: 'hand';
+  actor: RiggedEvidenceCaptureTarget;
+  side: 'left' | 'right';
+  frame: number;
+  captureRevision: number;
+  gameplaySceneUuid: string;
+  gameplayCameraUuid: string;
+  actorRootUuid: string;
+  operatorRootUuid: string;
+  canonicalManifestContract: 'runtime-canonical-operator-skin-manifest-v1' | null;
+  mainCameraDrawContract: typeof RIGGED_EVIDENCE_MAIN_CAMERA_DRAW_CONTRACT;
+  influenceContract: 'rendered-joints0-weights0-influence-v2';
+  thresholds: typeof RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS;
+  expectedBoneCount: 6;
+  bones: readonly RiggedEvidenceHandDrawBoneReceipt[];
+  admittedMeshCount: number;
+  rawExactCanonicalMeshIdentity: boolean;
+  rawCallbacksAreCompleteOrExactZero: boolean;
+  terminalSurfaceCount: number;
+  terminalDrawBindings: readonly RiggedEvidenceTerminalDrawBinding[];
+  allRequiredBonesAdmitted: boolean;
+  allTerminalSurfacesBound: boolean;
   complete: boolean;
 }>;
 
@@ -484,6 +560,7 @@ function mainCameraDrawStamp(
     frame,
     captureRevision,
     meshUuid: mesh.uuid,
+    geometryUuid: mesh.geometry.uuid,
     meshName: mesh.name,
     actorRootUuid: actorRoot.uuid,
     operatorRootUuid: operatorRoot.uuid,
@@ -530,6 +607,11 @@ export function riggedEvidenceMainCameraMeshDrawComplete(
 ): boolean {
   const invocationKey = (stamp: RiggedEvidenceMainCameraDrawStamp): string => JSON.stringify([
     stamp.material.uuid,
+    stamp.drawRange.start,
+    stamp.drawRange.count,
+    stamp.drawRange.effectiveCount,
+    stamp.drawRange.positionCount,
+    stamp.drawRange.indexCount,
     stamp.drawRange.group?.start ?? null,
     stamp.drawRange.group?.count ?? null,
     stamp.drawRange.group?.materialIndex ?? null,
@@ -549,6 +631,8 @@ export function riggedEvidenceMainCameraMeshDrawComplete(
     && receipt.after.captureRevision === captureRevision
     && receipt.before.meshUuid === receipt.meshUuid
     && receipt.after.meshUuid === receipt.meshUuid
+    && receipt.before.geometryUuid === receipt.geometryUuid
+    && receipt.after.geometryUuid === receipt.geometryUuid
     && receipt.before.meshName === receipt.meshName
     && receipt.after.meshName === receipt.meshName
     && receipt.materialSlotUuids.length > 0
@@ -560,6 +644,7 @@ export function riggedEvidenceMainCameraMeshDrawComplete(
     && receipt.beforeStamps.every((stamp) => stamp.frame === frame
       && stamp.captureRevision === captureRevision
       && stamp.meshUuid === receipt.meshUuid
+      && stamp.geometryUuid === receipt.geometryUuid
       && stamp.meshName === receipt.meshName
       && sameStrings(stamp.materialSlotUuids, receipt.materialSlotUuids)
       && sameStrings(stamp.materialUuidSet, receipt.materialUuidSet)
@@ -567,6 +652,7 @@ export function riggedEvidenceMainCameraMeshDrawComplete(
     && receipt.afterStamps.every((stamp) => stamp.frame === frame
       && stamp.captureRevision === captureRevision
       && stamp.meshUuid === receipt.meshUuid
+      && stamp.geometryUuid === receipt.geometryUuid
       && stamp.meshName === receipt.meshName
       && sameStrings(stamp.materialSlotUuids, receipt.materialSlotUuids)
       && sameStrings(stamp.materialUuidSet, receipt.materialUuidSet)
@@ -609,6 +695,412 @@ export function riggedEvidenceMainCameraActorDrawComplete(
       ))
         && riggedEvidenceMainCameraMeshDrawComplete(mesh, receipt.frame, receipt.captureRevision)
     ));
+}
+
+const RIGGED_EVIDENCE_HAND_DRAW_BONES = Object.freeze([
+  Object.freeze({ sentinel: 'wrist-hand' as const, kind: 'arm' as const, role: 'wrist-hand' as const, digit: null }),
+  Object.freeze({ sentinel: 'thumb' as const, kind: 'finger' as const, role: null, digit: 'thumb' as const }),
+  Object.freeze({ sentinel: 'index' as const, kind: 'finger' as const, role: null, digit: 'index' as const }),
+  Object.freeze({ sentinel: 'middle' as const, kind: 'finger' as const, role: null, digit: 'middle' as const }),
+  Object.freeze({ sentinel: 'ring' as const, kind: 'finger' as const, role: null, digit: 'ring' as const }),
+  Object.freeze({ sentinel: 'pinky' as const, kind: 'finger' as const, role: null, digit: 'pinky' as const }),
+] as const);
+
+function exactZeroMainCameraMeshDraw(receipt: RiggedEvidenceMainCameraMeshDrawReceipt): boolean {
+  return receipt.beforeCount === 0
+    && receipt.afterCount === 0
+    && receipt.beforeStamps.length === 0
+    && receipt.afterStamps.length === 0
+    && receipt.before === null
+    && receipt.after === null
+    && receipt.complete === false;
+}
+
+function handDrawInvocationKey(stamp: RiggedEvidenceMainCameraDrawStamp): string {
+  return JSON.stringify([
+    stamp.material.uuid,
+    stamp.drawRange.start,
+    stamp.drawRange.count,
+    stamp.drawRange.effectiveCount,
+    stamp.drawRange.positionCount,
+    stamp.drawRange.indexCount,
+    stamp.drawRange.group?.start ?? null,
+    stamp.drawRange.group?.count ?? null,
+    stamp.drawRange.group?.materialIndex ?? null,
+  ]);
+}
+
+function handDrawStampCoversFace(
+  stamp: RiggedEvidenceMainCameraDrawStamp,
+  faceIndex: number,
+  materialIndex: number,
+): boolean {
+  if (!Number.isSafeInteger(faceIndex) || faceIndex < 0
+    || !Number.isSafeInteger(materialIndex) || materialIndex < 0) return false;
+  const faceElementStart = faceIndex * 3;
+  if (!Number.isSafeInteger(faceElementStart)) return false;
+  const { drawRange } = stamp;
+  const availableCount = drawRange.indexCount ?? drawRange.positionCount;
+  if (!Number.isSafeInteger(availableCount) || availableCount < 1
+    || !Number.isSafeInteger(drawRange.start) || drawRange.start < 0) return false;
+  const drawCount = drawRange.count === 'infinity'
+    ? Math.max(0, availableCount - drawRange.start)
+    : drawRange.count;
+  if (!Number.isSafeInteger(drawCount) || drawCount < 0) return false;
+  const drawEnd = Math.min(availableCount, drawRange.start + drawCount);
+  const group = drawRange.group;
+  const groupStart = group?.start ?? 0;
+  const groupCount = group?.count ?? availableCount;
+  const groupMaterialIndex = group?.materialIndex ?? 0;
+  if (!Number.isSafeInteger(groupStart) || groupStart < 0
+    || !Number.isSafeInteger(groupCount) || groupCount < 0
+    || groupMaterialIndex !== materialIndex) return false;
+  const groupEnd = Math.min(availableCount, groupStart + groupCount);
+  const admittedStart = Math.max(drawRange.start, groupStart);
+  const admittedEnd = Math.min(drawEnd, groupEnd);
+  return faceElementStart >= admittedStart
+    && faceElementStart + 3 <= admittedEnd
+    && stamp.materialSlotUuids[materialIndex] === stamp.material.uuid;
+}
+
+function handDrawExpectedBoneName(
+  side: 'left' | 'right',
+  sentinel: typeof RIGGED_EVIDENCE_HAND_DRAW_BONES[number]['sentinel'],
+): string {
+  const suffix = side === 'left' ? 'L' : 'R';
+  if (sentinel === 'wrist-hand') return `Wrist${suffix}`;
+  return `${sentinel[0].toUpperCase()}${sentinel.slice(1)}2${suffix}`;
+}
+
+function handDrawBoneDescendsFromWrist(
+  skeletonBones: RiggedOperatorCanonicalEvidenceManifest['skinnedMeshes'][number]['skeletonBones'],
+  boneName: string,
+  boneUuid: string,
+  wristUuid: string,
+): boolean {
+  const matchingIndices = skeletonBones.flatMap((bone, index) => (
+    bone.name === boneName && bone.uuid === boneUuid && bone.index === index ? [index] : []
+  ));
+  if (matchingIndices.length !== 1) return false;
+  const visited = new Set<number>();
+  let cursor = matchingIndices[0];
+  while (Number.isSafeInteger(cursor) && cursor >= 0 && cursor < skeletonBones.length
+    && !visited.has(cursor)) {
+    visited.add(cursor);
+    const bone = skeletonBones[cursor];
+    if (bone.uuid === wristUuid) return true;
+    cursor = bone.parentIndex;
+  }
+  return false;
+}
+
+export function buildRiggedEvidenceHandDrawAdmission(
+  draw: RiggedEvidenceMainCameraActorDrawReceipt | null,
+  manifest: RiggedOperatorCanonicalEvidenceManifest | null,
+  side: 'left' | 'right',
+  joints: readonly Readonly<Record<string, unknown>>[],
+  selfOcclusionSentinels: readonly Readonly<Record<string, unknown>>[],
+): RiggedEvidenceHandDrawAdmissionReceipt {
+  const manifestNames = manifest ? sortedStrings(manifest.skinnedMeshes.map(({ name }) => name)) : [];
+  const manifestUuids = manifest ? sortedStrings(manifest.skinnedMeshes.map(({ uuid }) => uuid)) : [];
+  const rawExactCanonicalMeshIdentity = draw !== null && manifest !== null
+    && draw.contract === RIGGED_EVIDENCE_MAIN_CAMERA_DRAW_CONTRACT
+    && draw.meshes.length === manifest.skinnedMeshes.length
+    && sameStrings(draw.expectedMeshNames, manifestNames)
+    && sameStrings(draw.expectedMeshUuids, manifestUuids)
+    && new Set(draw.meshes.map(({ meshName }) => meshName)).size === draw.meshes.length
+    && new Set(draw.meshes.map(({ meshUuid }) => meshUuid)).size === draw.meshes.length
+    && draw.meshes.every((mesh) => manifest.skinnedMeshes.some((candidate) => (
+      candidate.name === mesh.meshName
+        && candidate.uuid === mesh.meshUuid
+        && candidate.geometryUuid === mesh.geometryUuid
+    )));
+  const stampBindsRawDraw = (stamp: RiggedEvidenceMainCameraDrawStamp): boolean => draw !== null
+    && stamp.actorRootUuid === draw.actorRootUuid
+    && stamp.operatorRootUuid === draw.operatorRootUuid
+    && stamp.descendsFromActorRoot
+    && stamp.descendsFromOperatorRoot
+    && stamp.sceneUuid === draw.gameplaySceneUuid
+    && stamp.cameraUuid === draw.gameplayCameraUuid
+    && stamp.sceneOverrideMaterialUuid === null;
+  const rawCallbacksAreCompleteOrExactZero = draw !== null && draw.meshes.every((mesh) => {
+    const recomputedComplete = riggedEvidenceMainCameraMeshDrawComplete(mesh, draw.frame, draw.captureRevision);
+    const canonicalMatches = manifest?.skinnedMeshes.filter((candidate) => (
+      candidate.name === mesh.meshName
+        && candidate.uuid === mesh.meshUuid
+        && candidate.geometryUuid === mesh.geometryUuid
+    )) ?? [];
+    return canonicalMatches.length === 1
+      && [...mesh.beforeStamps, ...mesh.afterStamps].every((stamp) => (
+        stamp.drawRange.positionCount === canonicalMatches[0].positionCount
+      ))
+      && mesh.complete === recomputedComplete
+      && [...mesh.beforeStamps, ...mesh.afterStamps].every(stampBindsRawDraw)
+      && (recomputedComplete || exactZeroMainCameraMeshDraw(mesh));
+  }) && sameStrings(
+    draw.beforeMeshNames,
+    sortedStrings(draw.meshes.filter(({ beforeCount }) => beforeCount > 0).map(({ meshName }) => meshName)),
+  ) && sameStrings(
+    draw.afterMeshNames,
+    sortedStrings(draw.meshes.filter(({ afterCount }) => afterCount > 0).map(({ meshName }) => meshName)),
+  ) && draw.exactExpectedMeshNames === (
+    sameStrings(draw.expectedMeshNames, draw.beforeMeshNames)
+      && sameStrings(draw.expectedMeshNames, draw.afterMeshNames)
+  ) && draw.exactExpectedMeshUuids === draw.meshes.every((mesh) => (
+    riggedEvidenceMainCameraMeshDrawComplete(mesh, draw.frame, draw.captureRevision)
+  )) && draw.complete === riggedEvidenceMainCameraActorDrawComplete(draw)
+    && Number.isSafeInteger(draw.ignoredCallbacks.wrongScene) && draw.ignoredCallbacks.wrongScene >= 0
+    && Number.isSafeInteger(draw.ignoredCallbacks.wrongCamera) && draw.ignoredCallbacks.wrongCamera >= 0
+    && Number.isSafeInteger(draw.ignoredCallbacks.nonWorldCameraLayer)
+    && draw.ignoredCallbacks.nonWorldCameraLayer >= 0;
+  const admittedMeshCount = draw?.meshes.filter((mesh) => (
+    riggedEvidenceMainCameraMeshDrawComplete(mesh, draw.frame, draw.captureRevision)
+  )).length ?? 0;
+
+  const bones = Object.freeze(RIGGED_EVIDENCE_HAND_DRAW_BONES.map((expected): RiggedEvidenceHandDrawBoneReceipt => {
+    const expectedBone = handDrawExpectedBoneName(side, expected.sentinel);
+    const expectedWristName = `Wrist${side === 'left' ? 'L' : 'R'}`;
+    const expectedWristUuids = manifest?.wrists.filter((wrist) => (
+      wrist.side === side && wrist.name === expectedWristName
+    )).map(({ uuid }) => uuid) ?? [];
+    const matches = joints.filter((joint) => joint.side === side
+      && joint.kind === expected.kind
+      && joint.role === expected.role
+      && joint.digit === expected.digit
+      && joint.bone === expectedBone);
+    const influence = matches.length === 1
+      ? matches[0].vertexInfluence as RenderedVertexInfluenceTelemetry | null | undefined
+      : null;
+    const thresholdsMatch = influence?.thresholds?.minimumNormalizedWeight
+        === RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS.minimumNormalizedWeight
+      && influence?.thresholds?.minimumInfluencedVertices
+        === RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS.minimumInfluencedVertices
+      && influence?.thresholds?.minimumMaximumNormalizedWeight
+        === RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS.minimumMaximumNormalizedWeight;
+    const influenceEntriesValid = Array.isArray(influence?.meshes)
+      && influence.meshes.every((entry) => typeof entry.mesh === 'string' && entry.mesh.length > 0
+        && typeof entry.meshUuid === 'string' && entry.meshUuid.length > 0
+        && typeof entry.geometryUuid === 'string' && entry.geometryUuid.length > 0
+        && Number.isSafeInteger(entry.influencedVertexCount) && entry.influencedVertexCount >= 0
+        && Number.isFinite(entry.maximumNormalizedWeight) && entry.maximumNormalizedWeight >= 0
+        && entry.maximumNormalizedWeight <= 1
+        && (entry.influencedVertexCount > 0 || entry.maximumNormalizedWeight > 0)
+        && (entry.influencedVertexCount > 0) === (
+          entry.maximumNormalizedWeight
+            >= RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS.minimumNormalizedWeight
+        )
+        && expectedWristUuids.length === 1
+        && manifest?.skinnedMeshes.filter((candidate) => candidate.name === entry.mesh
+          && candidate.uuid === entry.meshUuid
+          && candidate.geometryUuid === entry.geometryUuid
+          && handDrawBoneDescendsFromWrist(
+            candidate.skeletonBones,
+            expectedBone,
+            influence?.boneUuid ?? '',
+            expectedWristUuids[0],
+          )
+          && entry.influencedVertexCount <= candidate.positionCount).length === 1);
+    const recomputedInfluencedVertexCount = influenceEntriesValid
+      ? influence!.meshes.reduce((sum, entry) => sum + entry.influencedVertexCount, 0)
+      : -1;
+    const recomputedMaximumNormalizedWeight = influenceEntriesValid && influence!.meshes.length > 0
+      ? Math.max(...influence!.meshes.map(({ maximumNormalizedWeight }) => maximumNormalizedWeight))
+      : 0;
+    const recomputedPasses = recomputedInfluencedVertexCount
+        >= RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS.minimumInfluencedVertices
+      && recomputedMaximumNormalizedWeight
+        >= RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS.minimumMaximumNormalizedWeight;
+    const influenceShapeValid = influence?.contract === 'rendered-joints0-weights0-influence-v2'
+      && influence.bone === expectedBone
+      && typeof influence.boneUuid === 'string' && influence.boneUuid.length > 0
+      && expectedWristUuids.length === 1
+      && (expected.sentinel !== 'wrist-hand' || expectedWristUuids[0] === influence.boneUuid)
+      && thresholdsMatch
+      && influenceEntriesValid
+      && Number.isSafeInteger(recomputedInfluencedVertexCount)
+      && influence.passes === recomputedPasses
+      && Number.isSafeInteger(influence.influencedVertexCount)
+      && influence.influencedVertexCount === recomputedInfluencedVertexCount
+      && Number.isFinite(influence.maximumNormalizedWeight)
+      && influence.maximumNormalizedWeight === recomputedMaximumNormalizedWeight
+      && new Set(influence.meshes.map(({ meshUuid, geometryUuid }) => `${meshUuid}:${geometryUuid}`)).size
+        === influence.meshes.length;
+    const admittedMeshes = Object.freeze((influenceShapeValid ? influence!.meshes : []).flatMap((entry) => {
+      const canonicalMatches = manifest?.skinnedMeshes.filter((candidate) => (
+        candidate.name === entry.mesh
+          && candidate.uuid === entry.meshUuid
+          && candidate.geometryUuid === entry.geometryUuid
+      )) ?? [];
+      const drawMatches = draw?.meshes.filter((candidate) => (
+        candidate.meshName === entry.mesh
+          && candidate.meshUuid === entry.meshUuid
+          && candidate.geometryUuid === entry.geometryUuid
+      )) ?? [];
+      const currentFrameBalancedStateValidDraw = canonicalMatches.length === 1
+        && drawMatches.length === 1
+        && draw !== null
+        && riggedEvidenceMainCameraMeshDrawComplete(drawMatches[0], draw.frame, draw.captureRevision);
+      if (!currentFrameBalancedStateValidDraw) return [];
+      const meetsThresholds = Number.isSafeInteger(entry.influencedVertexCount)
+        && entry.influencedVertexCount >= RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS.minimumInfluencedVertices
+        && Number.isFinite(entry.maximumNormalizedWeight)
+        && entry.maximumNormalizedWeight
+          >= RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS.minimumMaximumNormalizedWeight;
+      return [Object.freeze({
+        ...entry,
+        currentFrameBalancedStateValidDraw,
+        meetsThresholds,
+      })];
+    }));
+    const admittedInfluencedVertexCount = admittedMeshes.reduce((sum, entry) => (
+      sum + entry.influencedVertexCount
+    ), 0);
+    const admittedMaximumNormalizedWeight = admittedMeshes.length > 0
+      ? Math.max(...admittedMeshes.map(({ maximumNormalizedWeight }) => maximumNormalizedWeight))
+      : 0;
+    return Object.freeze({
+      sentinel: expected.sentinel,
+      kind: expected.kind,
+      side,
+      role: expected.role,
+      digit: expected.digit,
+      bone: expectedBone,
+      vertexInfluence: influenceShapeValid ? influence! : null,
+      admittedMeshes,
+      admittedInfluencedVertexCount,
+      admittedMaximumNormalizedWeight,
+      complete: matches.length === 1
+        && influenceShapeValid
+        && admittedMeshes.length > 0
+        && Number.isSafeInteger(admittedInfluencedVertexCount)
+        && admittedInfluencedVertexCount
+          >= RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS.minimumInfluencedVertices
+        && admittedMaximumNormalizedWeight
+          >= RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS.minimumMaximumNormalizedWeight,
+    });
+  }));
+
+  const terminalSentinels = selfOcclusionSentinels.filter((sentinel) => {
+    const blocker = sentinel.blocker as Readonly<Record<string, unknown>> | null | undefined;
+    return blocker?.reason === 'terminal-hand-surface';
+  });
+  const terminalDrawBindings = Object.freeze(terminalSentinels.map((sentinel): RiggedEvidenceTerminalDrawBinding => {
+    const blocker = sentinel.blocker as Readonly<Record<string, unknown>>;
+    const meshName = typeof blocker.mesh === 'string' ? blocker.mesh : '';
+    const meshUuid = typeof blocker.meshUuid === 'string' ? blocker.meshUuid : '';
+    const geometryUuid = typeof blocker.geometryUuid === 'string' ? blocker.geometryUuid : '';
+    const faceIndex = Number.isSafeInteger(blocker.faceIndex) ? blocker.faceIndex as number : null;
+    const materialIndex = Number.isSafeInteger(blocker.materialIndex) ? blocker.materialIndex as number : null;
+    const faceValue = blocker.face as Readonly<Record<string, unknown>> | null | undefined;
+    const face = faceValue && [faceValue.a, faceValue.b, faceValue.c].every((value) => (
+      Number.isSafeInteger(value) && (value as number) >= 0
+    )) ? Object.freeze({
+        a: faceValue.a as number,
+        b: faceValue.b as number,
+        c: faceValue.c as number,
+      }) : null;
+    const faceElementStart = faceIndex === null ? null : faceIndex * 3;
+    const canonicalMatches = manifest?.skinnedMeshes.filter((candidate) => (
+      candidate.name === meshName && candidate.uuid === meshUuid && candidate.geometryUuid === geometryUuid
+    )) ?? [];
+    const drawMatches = draw?.meshes.filter((candidate) => (
+      candidate.meshName === meshName
+        && candidate.meshUuid === meshUuid
+        && candidate.geometryUuid === geometryUuid
+    )) ?? [];
+    const meshDraw = drawMatches.length === 1 ? drawMatches[0] : null;
+    const meshComplete = meshDraw !== null && draw !== null
+      && riggedEvidenceMainCameraMeshDrawComplete(meshDraw, draw.frame, draw.captureRevision);
+    const beforeMatches = meshComplete && faceIndex !== null && materialIndex !== null
+      ? meshDraw.beforeStamps.filter((stamp) => handDrawStampCoversFace(stamp, faceIndex, materialIndex))
+      : [];
+    const afterMatches = meshComplete && faceIndex !== null && materialIndex !== null
+      ? meshDraw.afterStamps.filter((stamp) => handDrawStampCoversFace(stamp, faceIndex, materialIndex))
+      : [];
+    const before = beforeMatches.length === 1 ? beforeMatches[0] : null;
+    const after = afterMatches.length === 1 ? afterMatches[0] : null;
+    const beforeInvocationKey = before ? handDrawInvocationKey(before) : null;
+    const afterInvocationKey = after ? handDrawInvocationKey(after) : null;
+    const beforeAfterDrawRangeMatches = before !== null && after !== null
+      && JSON.stringify(before.drawRange) === JSON.stringify(after.drawRange);
+    const faceWithinCanonicalPositions = face !== null && canonicalMatches.length === 1
+      && [face.a, face.b, face.c].every((vertex) => vertex < canonicalMatches[0].positionCount);
+    const complete = canonicalMatches.length === 1
+      && meshComplete
+      && faceIndex !== null && faceIndex >= 0 && Number.isSafeInteger(faceElementStart)
+      && faceWithinCanonicalPositions
+      && materialIndex !== null && materialIndex >= 0
+      && before !== null && after !== null
+      && beforeAfterDrawRangeMatches
+      && beforeInvocationKey === afterInvocationKey;
+    const failure = complete ? null
+      : canonicalMatches.length !== 1 ? 'terminal-mesh-not-canonical'
+        : !meshComplete ? 'terminal-mesh-not-current-frame-balanced-draw'
+          : faceIndex === null || faceIndex < 0 ? 'terminal-face-index-invalid'
+            : face === null ? 'terminal-face-invalid'
+              : !faceWithinCanonicalPositions ? 'terminal-face-outside-canonical-geometry'
+              : materialIndex === null || materialIndex < 0 ? 'terminal-material-index-invalid'
+                : beforeMatches.length !== 1 || afterMatches.length !== 1
+                  ? 'terminal-face-not-in-exact-draw-range-group'
+                  : !beforeAfterDrawRangeMatches ? 'terminal-before-after-draw-range-mismatch'
+                  : 'terminal-before-after-invocation-mismatch';
+    return Object.freeze({
+      sentinel: typeof sentinel.name === 'string' ? sentinel.name : '',
+      bone: typeof sentinel.bone === 'string' ? sentinel.bone : '',
+      mesh: meshName,
+      meshUuid,
+      geometryUuid,
+      faceIndex,
+      faceElementStart: Number.isSafeInteger(faceElementStart) ? faceElementStart : null,
+      face,
+      materialIndex,
+      materialUuid: before?.material.uuid ?? null,
+      beforeInvocationKey,
+      afterInvocationKey,
+      drawRange: before?.drawRange ?? null,
+      complete,
+      failure,
+    });
+  }));
+  const allRequiredBonesAdmitted = bones.length === 6 && bones.every(({ complete }) => complete);
+  const allTerminalSurfacesBound = terminalDrawBindings.length === terminalSentinels.length
+    && terminalSentinels.length > 0
+    && terminalDrawBindings.every(({ complete }) => complete);
+  const complete = draw !== null
+    && manifest !== null
+    && draw.actor.kind.length > 0 && draw.actor.id.length > 0
+    && rawExactCanonicalMeshIdentity
+    && rawCallbacksAreCompleteOrExactZero
+    && admittedMeshCount > 0
+    && allRequiredBonesAdmitted
+    && allTerminalSurfacesBound;
+  return Object.freeze({
+    contract: RIGGED_EVIDENCE_HAND_DRAW_ADMISSION_CONTRACT,
+    pixelProof: false,
+    scope: 'hand',
+    actor: Object.freeze({ ...(draw?.actor ?? { kind: 'bot' as const, id: '' }) }),
+    side,
+    frame: draw?.frame ?? -1,
+    captureRevision: draw?.captureRevision ?? -1,
+    gameplaySceneUuid: draw?.gameplaySceneUuid ?? '',
+    gameplayCameraUuid: draw?.gameplayCameraUuid ?? '',
+    actorRootUuid: draw?.actorRootUuid ?? '',
+    operatorRootUuid: draw?.operatorRootUuid ?? '',
+    canonicalManifestContract: manifest?.contract ?? null,
+    mainCameraDrawContract: RIGGED_EVIDENCE_MAIN_CAMERA_DRAW_CONTRACT,
+    influenceContract: 'rendered-joints0-weights0-influence-v2',
+    thresholds: RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS,
+    expectedBoneCount: 6,
+    bones,
+    admittedMeshCount,
+    rawExactCanonicalMeshIdentity,
+    rawCallbacksAreCompleteOrExactZero,
+    terminalSurfaceCount: terminalSentinels.length,
+    terminalDrawBindings,
+    allRequiredBonesAdmitted,
+    allTerminalSurfacesBound,
+    complete,
+  });
 }
 
 export function projectRiggedEvidenceLiveDeformedRasterRoi(
@@ -1121,6 +1613,7 @@ export function installRiggedEvidenceMainCameraDrawSession(
         const after = afterStamps.at(-1) ?? null;
         const meshReceipt: RiggedEvidenceMainCameraMeshDrawReceipt = Object.freeze({
           meshUuid: record.mesh.uuid,
+          geometryUuid: record.mesh.geometry.uuid,
           meshName: record.mesh.name,
           materialSlotUuids: Object.freeze(meshMaterialSlotUuids(record.mesh)),
           materialUuidSet: Object.freeze(meshMaterialUuidSet(record.mesh)),
@@ -1640,6 +2133,7 @@ export function classifyRiggedHandSelfOcclusionHit(
     mesh: intersection.object.name || intersection.object.type,
     meshUuid: intersection.object.uuid,
     geometryUuid: mesh instanceof THREE.Mesh ? mesh.geometry.uuid : null,
+    faceIndex: Number.isSafeInteger(intersection.faceIndex) ? intersection.faceIndex : null,
     face: face ? Object.freeze({ a: face.a, b: face.b, c: face.c }) : null,
     materialIndex: face?.materialIndex ?? null,
     hitPointWorld: Object.freeze(intersection.point.toArray()),
