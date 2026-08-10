@@ -4,13 +4,26 @@ import { WEAPON_IDS } from './protocol';
 import {
   GUN_RANGE_FIELD_TEST_WEAPONS,
   RUNTIME_WEAPON_RETENTION_LIMIT,
+  WEBGL_MATCH_BOUND_WEAPON_HOTSET,
   menuWeaponPrewarmCatalog,
+  webGlMatchBoundWeaponPrewarmCatalog,
   weaponPrewarmCatalogForArena,
 } from './weapon-prewarm-catalog';
 
 describe('Pass 65 first-person weapon prewarm authority', () => {
   it('keeps menu editing bounded to the selected loadout', () => {
     expect(menuWeaponPrewarmCatalog('carbine', 'pistol')).toEqual(['carbine', 'pistol']);
+  });
+
+  it('retains the exact bounded WebGL2 match-bound hitch vocabulary', () => {
+    expect(WEBGL_MATCH_BOUND_WEAPON_HOTSET).toEqual(['m14-ebr', 'flare-gun', 'flamethrower']);
+    expect(webGlMatchBoundWeaponPrewarmCatalog('carbine'))
+      .toEqual(['carbine', 'm14-ebr', 'flare-gun', 'flamethrower']);
+    expect(webGlMatchBoundWeaponPrewarmCatalog('m14-ebr'))
+      .toEqual(['m14-ebr', 'flare-gun', 'flamethrower']);
+    expect(webGlMatchBoundWeaponPrewarmCatalog('flare-gun'))
+      .toEqual(['flare-gun', 'm14-ebr', 'flamethrower']);
+    expect(webGlMatchBoundWeaponPrewarmCatalog('carbine')).toHaveLength(4);
   });
 
   it('automatically retains every canonical weapon in normal matches', () => {

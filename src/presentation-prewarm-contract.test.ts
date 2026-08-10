@@ -179,6 +179,21 @@ describe('presentation prewarm startup contract', () => {
     expect(matchDeployment).toContain('did not commit before match start${arenaTransitionDetail}');
     expect(matchDeployment).not.toContain('throw new Error(`Selected arena ${requestedArenaId} did not commit before match start`);');
     expect(source).toContain("return localDhv === 'X' ? 'magnum' : 'pistol';");
+    const webGlMatchBoundHotset = matchDeployment.indexOf(
+      'const webGlMatchBoundCatalog = webGlMatchBoundWeaponPrewarmCatalog(matchStartWeapon);',
+    );
+    const webGlMatchBoundAssetLoad = matchDeployment.indexOf(
+      'await weaponView.prepareBrowserWeaponCatalogAssets(',
+      webGlMatchBoundHotset,
+    );
+    const fullCatalogPrewarm = matchDeployment.indexOf(
+      'await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(',
+    );
+    expect(webGlMatchBoundHotset).toBeGreaterThan(-1);
+    expect(webGlMatchBoundAssetLoad).toBeGreaterThan(webGlMatchBoundHotset);
+    expect(fullCatalogPrewarm).toBeGreaterThan(webGlMatchBoundAssetLoad);
+    expect(matchDeployment.slice(webGlMatchBoundHotset, fullCatalogPrewarm))
+      .toContain('webGlCatalogReadiness.retained.includes(weaponId)');
     expect(matchDeployment.indexOf('prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena('))
       .toBeLessThan(matchDeployment.indexOf('weaponView.setWeapon(player.weapon, true);'));
     expect(arenaDeployment).toContain('await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(');
@@ -260,8 +275,40 @@ describe('presentation prewarm startup contract', () => {
     expect(matchDeployment).not.toContain('await smokeVolumePresentationPool.prewarm(renderRuntime, camera, -killstreakMatchEpoch);');
     expect(matchDeployment).not.toContain('await prewarmExplosiveBoltPresentation(-killstreakMatchEpoch);');
     expect(matchDeployment).toContain("await settleWebGpuPresentation('Initial match')");
+    const dmrThermalAdsPrewarm = source.slice(
+      source.indexOf('async function prewarmMatchBoundDmrThermalAdsPresentation('),
+      source.indexOf('async function prewarmMatchBoundFirstShotPresentations('),
+    );
+    expect(dmrThermalAdsPrewarm).toContain("await weaponView.prepareBrowserWeapon('m14-ebr');");
+    expect(dmrThermalAdsPrewarm).toContain("deploymentTransition.hidden || menuLifecycle.surface !== 'deploying'");
+    expect(dmrThermalAdsPrewarm).toContain("weaponView.setWeapon('m14-ebr', true);");
+    expect(dmrThermalAdsPrewarm).toContain('weaponView.snapToMatchStartRestPose(currentViewmodelSurfaceRetreat());');
+    expect(dmrThermalAdsPrewarm).toContain(
+      'camera.fov = magnifiedFovDegrees(preferredFov, DMR_THERMAL_MAGNIFICATION);',
+    );
+    expect(dmrThermalAdsPrewarm).toContain('weaponView.suppressForFullscreenPresentation(true);');
+    expect(dmrThermalAdsPrewarm).toContain('dmrThermalPresentation.update(camera, dmrThermalContacts(), true);');
+    expect(dmrThermalAdsPrewarm).toContain('dmrThermalPresentation.worldRoot.visible = false;');
+    expect(dmrThermalAdsPrewarm).toContain('prewarmThermalGhostPipelines();');
+    expect(dmrThermalAdsPrewarm).toContain('await runStagedDmrThermalPrewarm({');
+    expect(dmrThermalAdsPrewarm.match(/yieldVisibleBrowserPresentationFrame\(token\.signal\)/g)).toHaveLength(2);
+    expect(dmrThermalAdsPrewarm).not.toContain('yieldVisibleBrowserPresentationFrame();');
+    const dmrThrowRestore = dmrThermalAdsPrewarm.slice(
+      dmrThermalAdsPrewarm.indexOf('restore: (restoreState) => {'),
+    );
+    for (const restore of [
+      'dmrThermalPresentation.update(camera, [], false);',
+      'thermalGhostPresentation.sync([], false);',
+      "hudRoot.classList.toggle('dmr-thermal-active', restoreState.hudThermalClass);",
+      'weaponView.suppressForFullscreenPresentation(false);',
+      'weaponView.setWeapon(restoreState.weapon, true);',
+      'camera.position.copy(restoreState.cameraPosition);',
+      'camera.quaternion.copy(restoreState.cameraQuaternion);',
+      'camera.fov = restoreState.cameraFov;',
+      'camera.updateProjectionMatrix();',
+    ]) expect(dmrThrowRestore).toContain(restore);
     const matchBoundFirstShots = source.slice(
-      source.indexOf('async function prewarmMatchBoundFirstShotPresentations()'),
+      source.indexOf('async function prewarmMatchBoundFirstShotPresentations('),
       source.indexOf('function disposeCorpsePresentation('),
     );
     expect(matchBoundFirstShots).toContain('weaponView.prewarmBrowserWeaponFirePresentation(player.weapon,');
@@ -270,7 +317,9 @@ describe('presentation prewarm startup contract', () => {
     expect(matchBoundFirstShots).toContain('flamethrowerStreamPresentation.withStagedFirstShotPresentation(camera,');
     expect(matchBoundFirstShots).toContain("weaponView.prewarmBrowserWeaponFirePresentation('flamethrower',");
     expect(matchBoundFirstShots).toContain('renderRuntime.compileAndRender(scene, camera, scene)');
-    expect(matchBoundFirstShots).toContain('prewarmExactWebGlMatchComposition()');
+    expect(matchBoundFirstShots).toContain('prewarmExactWebGlMatchComposition(token.signal)');
+    expect(matchBoundFirstShots).toContain("weaponView.prewarmBrowserWeaponFirePresentation('m14-ebr',");
+    expect(matchBoundFirstShots).toContain('prewarmMatchBoundDmrThermalAdsPresentation(submitExactMatchComposition, token);');
     const glassImpactStage = matchBoundFirstShots.indexOf(
       'await impactPresentation.withStagedVocabulary(camera,',
     );
@@ -292,12 +341,14 @@ describe('presentation prewarm startup contract', () => {
     expect(matchBoundFirstShots.slice(glassImpactStage, ordinaryFireStage))
       .toContain('arenaTransitionGeneration');
     expect(matchBoundFirstShots.indexOf('player.weapon'))
+      .toBeLessThan(matchBoundFirstShots.indexOf("'m14-ebr'"));
+    expect(matchBoundFirstShots.indexOf("'m14-ebr'"))
       .toBeLessThan(matchBoundFirstShots.indexOf("'flare-gun'"));
     expect(matchBoundFirstShots.indexOf("'flare-gun'"))
       .toBeLessThan(matchBoundFirstShots.indexOf("'flamethrower'"));
-    const firstMatchBoundCall = matchDeployment.indexOf('await prewarmMatchBoundFirstShotPresentations();');
+    const firstMatchBoundCall = matchDeployment.indexOf('await prewarmMatchBoundFirstShotPresentations(token);');
     expect(firstMatchBoundCall).toBeGreaterThan(matchDeployment.indexOf('await prewarmBotPresentations();'));
-    expect(matchDeployment.match(/await prewarmMatchBoundFirstShotPresentations\(\);/g)).toHaveLength(2);
+    expect(matchDeployment.match(/await prewarmMatchBoundFirstShotPresentations\(token\);/g)).toHaveLength(2);
     expect(firstMatchBoundCall).toBeLessThan(matchDeployment.indexOf("await settleWebGpuPresentation('Initial match')"));
     expect(arenaDeployment.indexOf('await prewarmArenaBoundGameplayPresentations(arenaTransitionGeneration);'))
       .toBeLessThan(source.indexOf('async function startGame('));
@@ -320,7 +371,7 @@ describe('presentation prewarm startup contract', () => {
     expect(matchDeployment).toContain('await prewarmExactWebGlMatchComposition();');
     expect(matchDeployment).not.toContain('await renderRuntime.compileAndRender(scene, camera, scene);');
     const webGlMatchPrewarm = source.slice(
-      source.indexOf('async function prewarmExactWebGlMatchComposition()'),
+      source.indexOf('async function prewarmExactWebGlMatchComposition('),
       source.indexOf('function disposeCorpsePresentation('),
     );
     expect(webGlMatchPrewarm).toContain("renderRuntime.backend !== 'webgl2' || !atomicSignal");

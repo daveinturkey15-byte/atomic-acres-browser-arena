@@ -1550,8 +1550,8 @@ export class WeaponPresentation {
    * deployment surface. WebGPU compilation can synchronously occupy the browser
    * main thread even though compileAsync returns a Promise, so a live lazy
    * switch is not a safe presentation boundary. Deployment therefore pins the
-   * complete arena-reachable set; WebGL/no-hook callers retain the existing
-   * bounded two-model lazy cache.
+   * complete arena-reachable set. WebGL/no-hook callers use the asset-only
+   * preparation path for a caller-defined bounded retained hotset.
    */
   async prewarmBrowserWeaponCatalog(
     requestedIds: readonly WeaponId[],
@@ -1954,6 +1954,45 @@ export class WeaponPresentation {
 
   isReady(): boolean {
     return typeof document !== 'undefined' ? this.models.has(this.active) : this.models.size === Object.keys(WEAPONS).length;
+  }
+
+  /**
+   * Allocation-light imported-model readiness for frame-transition gates. This
+   * deliberately avoids presentationState(), whose framing telemetry traverses
+   * every mesh and would itself contaminate a per-animation-frame hitch probe.
+   */
+  activeWeaponReadiness(): Readonly<{
+    requestedWeapon: WeaponId;
+    ready: boolean;
+    modelLoaded: boolean;
+    gpuReady: boolean;
+    resident: boolean;
+    catalogPrewarming: boolean;
+    importedWeapon: WeaponId | null;
+    mountedIsRequested: boolean;
+  }> {
+    const requestedModel = this.models.get(this.active);
+    const mountedModel = this.mountedModel();
+    const importedRuntime = mountedModel?.userData.importedWeaponRuntime as { weapon?: unknown } | undefined;
+    const importedWeapon = typeof importedRuntime?.weapon === 'string'
+      && Object.prototype.hasOwnProperty.call(WEAPONS, importedRuntime.weapon)
+      ? importedRuntime.weapon as WeaponId
+      : null;
+    const modelLoaded = requestedModel !== undefined;
+    const gpuReady = requestedModel !== undefined && this.modelIsGpuReady(requestedModel);
+    const mountedIsRequested = requestedModel !== undefined
+      && mountedModel === requestedModel
+      && requestedModel.visible;
+    return Object.freeze({
+      requestedWeapon: this.active,
+      ready: modelLoaded && gpuReady && mountedIsRequested && importedWeapon === this.active,
+      modelLoaded,
+      gpuReady,
+      resident: this.browserResidentWeaponIds.has(this.active),
+      catalogPrewarming: this.browserCatalogOperationPromise !== null,
+      importedWeapon,
+      mountedIsRequested,
+    });
   }
 
   /** Narrow live-gate health; unlike presentationState(), this never traverses models or measures framing. */

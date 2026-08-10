@@ -14,7 +14,10 @@ import {
   type WeaponViewmodelCatalogGpuPrewarmEntry,
 } from './weapon-presentation';
 import { WEAPON_IDS, type WeaponId } from './protocol';
-import { RUNTIME_WEAPON_RETENTION_LIMIT } from './weapon-prewarm-catalog';
+import {
+  RUNTIME_WEAPON_RETENTION_LIMIT,
+  webGlMatchBoundWeaponPrewarmCatalog,
+} from './weapon-prewarm-catalog';
 import {
   PASS65_AUTHORED_FIREARM_IDS,
   createPass65WeaponModel,
@@ -217,6 +220,53 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(pistol?.visible).toBe(true);
     expect(carbine?.visible).toBe(false);
     expect(releasePass65WeaponModelsIn(presentation.root)).toBe(2);
+  });
+
+  it('keeps the bounded WebGL M14 hotset through retained-model eviction pressure', async () => {
+    stubBrowserTextureLoading();
+    vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (
+      Promise.resolve(fakeGltfForUrl(String(url)))
+    )) as GLTFLoader['loadAsync']);
+    const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(), false);
+    await presentation.load();
+    const hotset = webGlMatchBoundWeaponPrewarmCatalog('carbine');
+    await presentation.prepareBrowserWeaponCatalogAssets(hotset);
+    const retainedModels = new Map(hotset.map((weaponId) => [
+      weaponId,
+      presentation.root.getObjectByName(`${weaponId}-pass65-first-person-model`),
+    ]));
+
+    for (const transient of ['pistol', 'mp5', 'ak-47'] as const) {
+      presentation.setWeapon(transient, true);
+      await flushPromises();
+    }
+    presentation.setWeapon('m14-ebr', true);
+    await flushPromises();
+
+    expect(presentation.browserCatalogReadiness()).toMatchObject({
+      retained: hotset,
+      retainedCount: hotset.length,
+      loaded: hotset.length,
+      gpuReady: hotset.length,
+      prewarming: false,
+      unpreparedSwitches: 3,
+    });
+    expect(presentation.activeWeaponReadiness()).toEqual({
+      requestedWeapon: 'm14-ebr',
+      ready: true,
+      modelLoaded: true,
+      gpuReady: true,
+      resident: true,
+      catalogPrewarming: false,
+      importedWeapon: 'm14-ebr',
+      mountedIsRequested: true,
+    });
+    for (const [weaponId, model] of retainedModels) {
+      expect(model, `${weaponId}: initially retained`).toBeDefined();
+      expect(presentation.root.getObjectByName(`${weaponId}-pass65-first-person-model`))
+        .toBe(model);
+    }
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(hotset.length);
   });
 
   it('suppresses the sniper viewmodel without removing its prepared WebGPU render vocabulary', () => {

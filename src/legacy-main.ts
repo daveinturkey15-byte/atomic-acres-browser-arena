@@ -117,6 +117,7 @@ import {
   scheduleBrowserPreparationIdleTask,
   waitForVisibleBrowserPreparation,
   yieldBrowserPreparationFrame,
+  yieldVisibleBrowserPresentationFrame,
 } from './browser-preparation-scheduler';
 import {
   deploymentLoadingProgress,
@@ -174,7 +175,11 @@ import {
 import { DHV_VALUES, applyDhvIncomingDamage, applyDhvWeaponOutgoingDamage, dhvLabel, isDhv, reportedDhvRawDamage, type Dhv } from './handicap';
 import { GUN_RANGE_WEAPON_STATIONS, nearestGunRangeWeaponStation, type GunRangeWeaponStation } from './gun-range-armory';
 import { loadGunRangeRackPresentation } from './gun-range-rack-presentation';
-import { menuWeaponPrewarmCatalog, weaponPrewarmCatalogForArena } from './weapon-prewarm-catalog';
+import {
+  menuWeaponPrewarmCatalog,
+  webGlMatchBoundWeaponPrewarmCatalog,
+  weaponPrewarmCatalogForArena,
+} from './weapon-prewarm-catalog';
 import { ArenaAudio, GRENADE_FUSE_BEEP_START_MS, crossbowFuseBeepIntervalMs, grenadeFuseBeepIntervalMs } from './audio';
 import { clampPointToBounds, damp, firstSegmentBoxHit, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes } from './collision';
 import {
@@ -669,6 +674,7 @@ import {
   flamethrowerPulseImpactPresentationEnabled,
 } from './flamethrower-stream-system';
 import { DMR_THERMAL_MAGNIFICATION, DMR_THERMAL_MAX_CONTACTS, DmrThermalPresentation, dmrThermalOcclusionBudget, type DmrThermalContact } from './dmr-thermal-presentation';
+import { runStagedDmrThermalPrewarm } from './dmr-thermal-prewarm-lifecycle';
 import { ThermalGhostPresentation, type ThermalGhostTarget } from './thermal-ghost-presentation';
 import { applySkyBackdrop, waitForSkyBackdropAdmission } from './rendering/sky-backdrop';
 import {
@@ -11217,7 +11223,7 @@ function stageCorpsePresentationPoolForPrewarm(): () => void {
   };
 }
 
-async function prewarmExactWebGlMatchComposition(): Promise<void> {
+async function prewarmExactWebGlMatchComposition(signal?: AbortSignal): Promise<void> {
   if (renderRuntime.backend !== 'webgl2' || !atomicSignal) {
     throw new Error('Exact WebGL2 match composition prewarm requires the WebGL2 AtomicSignal pass');
   }
@@ -11227,7 +11233,8 @@ async function prewarmExactWebGlMatchComposition(): Promise<void> {
     await withArenaFrustumCullingDisabled(scene, async () => {
       // Keep this identical to the live WebGL2 frame path: world-only first,
       // then the viewmodel layer after clearDepth through AtomicSignalPass.
-      await waitForVisibleBrowserPreparation();
+      await waitForVisibleBrowserPreparation(signal);
+      if (signal?.aborted) throw signal.reason;
       atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);
     });
   } finally {
@@ -11237,14 +11244,77 @@ async function prewarmExactWebGlMatchComposition(): Promise<void> {
 }
 
 /**
+ * Stage the exact live M14 thermal sight picture after match-bound operators
+ * exist. The two compositor boundaries make the DOM optic/contacts paint while
+ * the retained imported model, suppressed viewmodel light graph and exact-pose
+ * thermal ghosts are submitted behind the opaque deployment surface.
+ */
+async function prewarmMatchBoundDmrThermalAdsPresentation(
+  submitExactMatchComposition: () => Promise<void>,
+  token: MatchAdmissionToken,
+): Promise<void> {
+  await weaponView.prepareBrowserWeapon('m14-ebr');
+  assertMatchAdmissionCurrent(token);
+  if (deploymentTransition.hidden || menuLifecycle.surface !== 'deploying') {
+    throw new Error('M14 thermal prewarm requires the owned opaque deployment surface');
+  }
+  await runStagedDmrThermalPrewarm({
+    capture: () => ({
+      weapon: weaponView.activeWeaponReadiness().requestedWeapon,
+      cameraFov: camera.fov,
+      cameraPosition: camera.position.clone(),
+      cameraQuaternion: camera.quaternion.clone(),
+      hudThermalClass: hudRoot.classList.contains('dmr-thermal-active'),
+    }),
+    stage: () => {
+      weaponView.setWeapon('m14-ebr', true);
+      weaponView.snapToMatchStartRestPose(currentViewmodelSurfaceRetreat());
+      camera.position.copy(player.position);
+      camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+      camera.fov = magnifiedFovDegrees(preferredFov, DMR_THERMAL_MAGNIFICATION);
+      camera.updateProjectionMatrix();
+      camera.updateMatrixWorld(true);
+      weaponView.suppressForFullscreenPresentation(true);
+      hudRoot.classList.add('dmr-thermal-active');
+      dmrThermalPresentation.update(camera, dmrThermalContacts(), true);
+      // Live gameplay replaces the generic billboard layer with the same
+      // skinned exact-pose ghosts staged below.
+      dmrThermalPresentation.worldRoot.visible = false;
+      prewarmThermalGhostPipelines();
+    },
+    present: async () => {
+      await yieldVisibleBrowserPresentationFrame(token.signal);
+      assertMatchAdmissionCurrent(token);
+      await submitExactMatchComposition();
+      assertMatchAdmissionCurrent(token);
+      await yieldVisibleBrowserPresentationFrame(token.signal);
+      assertMatchAdmissionCurrent(token);
+    },
+    restore: (restoreState) => {
+      dmrThermalPresentation.update(camera, [], false);
+      thermalGhostPresentation.sync([], false);
+      hudRoot.classList.toggle('dmr-thermal-active', restoreState.hudThermalClass);
+      weaponView.suppressForFullscreenPresentation(false);
+      weaponView.setWeapon(restoreState.weapon, true);
+      weaponView.snapToMatchStartRestPose(currentViewmodelSurfaceRetreat());
+      camera.position.copy(restoreState.cameraPosition);
+      camera.quaternion.copy(restoreState.cameraQuaternion);
+      camera.fov = restoreState.cameraFov;
+      camera.updateProjectionMatrix();
+      camera.updateMatrixWorld(true);
+    },
+  });
+}
+
+/**
  * Rehearse complete first-shot compositions only after match-bound operators,
  * bots and the dormant corpse pool exist. Earlier arena prewarm owns asset and
  * root residency, but cannot compile the final skinned/material scene graph.
  */
-async function prewarmMatchBoundFirstShotPresentations(): Promise<void> {
+async function prewarmMatchBoundFirstShotPresentations(token: MatchAdmissionToken): Promise<void> {
   const submitExactMatchComposition = renderRuntime.backend === 'webgpu'
     ? () => renderRuntime.compileAndRender(scene, camera, scene)
-    : () => prewarmExactWebGlMatchComposition();
+    : () => prewarmExactWebGlMatchComposition(token.signal);
 
   // The arena-bound WebGL pool compile targets the default sRGB framebuffer,
   // while live AtomicSignal gameplay targets its linear HDR buffer. Stage both
@@ -11261,6 +11331,10 @@ async function prewarmMatchBoundFirstShotPresentations(): Promise<void> {
   // transient world light. Special weapons then add their complete retained
   // visual state sequentially so each exact live object/light graph is fenced.
   await weaponView.prewarmBrowserWeaponFirePresentation(player.weapon, submitExactMatchComposition);
+  if (player.weapon !== 'm14-ebr') {
+    await weaponView.prewarmBrowserWeaponFirePresentation('m14-ebr', submitExactMatchComposition);
+  }
+  await prewarmMatchBoundDmrThermalAdsPresentation(submitExactMatchComposition, token);
   await flareProjectileSystem.withStagedFirstShotPresentation(camera, () => (
     weaponView.prewarmBrowserWeaponFirePresentation('flare-gun', submitExactMatchComposition)
   ));
@@ -12109,6 +12183,20 @@ async function startGame(
   const matchStartWeapon = selectedArena.id === 'gun-range'
     ? gunRangeSidearmForWeaponPrewarm()
     : activeLoadoutSelection().primary;
+  if (renderRuntime.backend === 'webgl2') {
+    const webGlMatchBoundCatalog = webGlMatchBoundWeaponPrewarmCatalog(matchStartWeapon);
+    await weaponView.prepareBrowserWeaponCatalogAssets(
+      webGlMatchBoundCatalog,
+      undefined,
+      yieldDeploymentPrewarmFrame,
+    );
+    const webGlCatalogReadiness = weaponView.browserCatalogReadiness();
+    if (webGlCatalogReadiness.prewarming
+      || !webGlMatchBoundCatalog.every((weaponId) => webGlCatalogReadiness.retained.includes(weaponId))) {
+      throw new Error(`WebGL2 match-bound weapon hotset was not retained: ${JSON.stringify(webGlCatalogReadiness)}`);
+    }
+    assertMatchAdmissionCurrent(token);
+  }
   await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(
     selectedArena.id,
     gunRangeSidearmForWeaponPrewarm(),
@@ -12335,7 +12423,7 @@ async function startGame(
     if (renderRuntime.backend === 'webgpu') {
       await exercisePreparedWebGpuWeaponSwitches();
       assertMatchAdmissionCurrent(token);
-      await prewarmMatchBoundFirstShotPresentations();
+      await prewarmMatchBoundFirstShotPresentations(token);
       assertMatchAdmissionCurrent(token);
       await settleWebGpuPresentation('Initial match');
       assertMatchAdmissionCurrent(token);
@@ -12348,7 +12436,7 @@ async function startGame(
       await waitForStableMatchAdmissionCadence();
       assertMatchAdmissionCurrent(token);
     } else {
-      await prewarmMatchBoundFirstShotPresentations();
+      await prewarmMatchBoundFirstShotPresentations(token);
       assertMatchAdmissionCurrent(token);
       // Restore and compile the ordinary rest frame after the staged fire
       // compositions so the first controllable frame starts from exact state.
@@ -23737,6 +23825,18 @@ function sampleAdmissionState() {
   };
 }
 
+function sampleDmrThermalReadiness() {
+  const thermal = dmrThermalPresentation.telemetry();
+  return Object.freeze({
+    active: thermal.active,
+    contacts: thermal.contacts,
+    weapon: player.weapon,
+    adsProgress: weaponView.adsProgress(),
+    cameraFov: camera.fov,
+    expectedFov: magnifiedFovDegrees(preferredFov, DMR_THERMAL_MAGNIFICATION),
+  });
+}
+
 type DebugPlayerPose = Readonly<{ yaw: number; pitch: number }>;
 
 const debugWindow = window as Window & {
@@ -23746,7 +23846,9 @@ const debugWindow = window as Window & {
     samplePresentationTelemetry: () => ReturnType<typeof renderRuntime.presentationTelemetry>;
     sampleEnduranceHealth: (detail?: EnduranceHealthDetail) => ReturnType<typeof sampleEnduranceHealth>;
     sampleWeaponCatalogReadiness: () => ReturnType<typeof weaponView.browserCatalogReadiness>;
+    sampleActiveWeaponReadiness: () => ReturnType<typeof weaponView.activeWeaponReadiness>;
     sampleWeaponAssetCache: () => ReturnType<typeof pass65WeaponCacheTelemetry>;
+    sampleDmrThermalReadiness: () => ReturnType<typeof sampleDmrThermalReadiness>;
     traceBallistics: (
       weapon: WeaponId,
       origin: [number, number, number],
@@ -23954,7 +24056,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   samplePresentationTelemetry: () => renderRuntime.presentationTelemetry(),
   sampleEnduranceHealth,
   sampleWeaponCatalogReadiness: () => weaponView.browserCatalogReadiness(),
+  sampleActiveWeaponReadiness: () => weaponView.activeWeaponReadiness(),
   sampleWeaponAssetCache: () => pass65WeaponCacheTelemetry(),
+  sampleDmrThermalReadiness,
   snapshot: () => ({
     bootstrap: {
       stage: bootstrapStage,

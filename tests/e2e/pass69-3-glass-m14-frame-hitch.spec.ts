@@ -16,8 +16,32 @@ type FrameProbe = Readonly<{
   presentedFrameDelta: number;
 }>;
 
+type M14TransitionReadiness = Readonly<{
+  requestedWeapon: string;
+  ready: boolean;
+  modelLoaded: boolean;
+  gpuReady: boolean;
+  resident: boolean;
+  catalogPrewarming: boolean;
+  importedWeapon: string | null;
+  mountedIsRequested: boolean;
+  assetCacheLoading: number;
+  dmrThermalActive: boolean;
+  dmrThermalContacts: number;
+  adsProgress: number;
+  cameraFov: number;
+  expectedFov: number;
+}>;
+
+type M14TransitionProbe = FrameProbe & Readonly<{
+  readyMs: number;
+  maximumAnimationFrameGapMs: number;
+  readiness: M14TransitionReadiness;
+}>;
+
 const MAX_EVENT_TO_PRESENTED_FRAME_MS = 120;
 const MAX_SYNCHRONOUS_ACTION_MS = 50;
+const MAX_M14_TRANSITION_READY_MS = 5_000;
 
 async function deploy(page: Page): Promise<void> {
   await page.goto(frameHitchRoute('atomic-acres', 'pass69-3-glass-m14-hitch-gate'));
@@ -69,6 +93,93 @@ async function eventToNextPresentedFrame(page: Page, label: string, action: Prob
   }), { selectedLabel: label, selectedAction: action });
 }
 
+async function m14TransitionToReady(
+  page: Page,
+  label: string,
+  action: 'equip-m14' | 'ads-on',
+  requiredState: 'equipped' | 'thermal-active',
+): Promise<M14TransitionProbe> {
+  return page.evaluate(({ selectedLabel, selectedAction, selectedRequiredState, maximumReadyMs }) => (
+    new Promise<M14TransitionProbe>((resolve, reject) => {
+      const debug = window.__ATOMIC_ACRES_DEBUG__;
+      if (!debug) return reject(new Error('Atomic Acres debug surface is unavailable'));
+      requestAnimationFrame(() => {
+        const startedAt = performance.now();
+        const presentedBefore = debug.admissionState().presentedGameplayFrame;
+        if (selectedAction === 'equip-m14') debug.equipWeapon('m14-ebr');
+        else debug.setAds(true);
+        const synchronousMs = performance.now() - startedAt;
+        const deadline = startedAt + maximumReadyMs;
+        let previousAnimationFrameAt = startedAt;
+        let maximumAnimationFrameGapMs = 0;
+        let firstPresentedAtMs: number | null = null;
+        let firstPresentedFrameDelta = 0;
+        let lastReadiness: M14TransitionReadiness | null = null;
+        const inspect = () => {
+          const now = performance.now();
+          maximumAnimationFrameGapMs = Math.max(maximumAnimationFrameGapMs, now - previousAnimationFrameAt);
+          previousAnimationFrameAt = now;
+          const presentedAfter = debug.admissionState().presentedGameplayFrame;
+          if (firstPresentedAtMs === null && presentedAfter > presentedBefore) {
+            firstPresentedAtMs = now - startedAt;
+            firstPresentedFrameDelta = presentedAfter - presentedBefore;
+          }
+          const weapon = debug.sampleActiveWeaponReadiness();
+          const importedM14Ready = weapon.requestedWeapon === 'm14-ebr'
+            && weapon.ready
+            && weapon.modelLoaded
+            && weapon.gpuReady
+            && weapon.resident
+            && !weapon.catalogPrewarming
+            && weapon.importedWeapon === 'm14-ebr'
+            && weapon.mountedIsRequested;
+          const assetCacheLoading = importedM14Ready ? debug.sampleWeaponAssetCache().loading : -1;
+          const thermal = debug.sampleDmrThermalReadiness();
+          lastReadiness = {
+            ...weapon,
+            assetCacheLoading,
+            dmrThermalActive: thermal.active,
+            dmrThermalContacts: thermal.contacts,
+            adsProgress: thermal.adsProgress,
+            cameraFov: thermal.cameraFov,
+            expectedFov: thermal.expectedFov,
+          };
+          const requiredPresentationReady = selectedRequiredState === 'equipped' || thermal.active;
+          if (firstPresentedAtMs !== null
+            && importedM14Ready
+            && assetCacheLoading === 0
+            && requiredPresentationReady) {
+            resolve({
+              label: selectedLabel,
+              action: selectedAction,
+              synchronousMs: Number(synchronousMs.toFixed(3)),
+              eventToPresentedFrameMs: Number(firstPresentedAtMs.toFixed(3)),
+              presentedFrameDelta: firstPresentedFrameDelta,
+              readyMs: Number((now - startedAt).toFixed(3)),
+              maximumAnimationFrameGapMs: Number(maximumAnimationFrameGapMs.toFixed(3)),
+              readiness: lastReadiness,
+            });
+            return;
+          }
+          if (now >= deadline) {
+            reject(new Error(
+              `${selectedAction} did not reach ${selectedRequiredState} within ${maximumReadyMs}ms: ${JSON.stringify(lastReadiness)}`,
+            ));
+            return;
+          }
+          requestAnimationFrame(inspect);
+        };
+        requestAnimationFrame(inspect);
+      });
+    })
+  ), {
+    selectedLabel: label,
+    selectedAction: action,
+    selectedRequiredState: requiredState,
+    maximumReadyMs: MAX_M14_TRANSITION_READY_MS,
+  });
+}
+
 function expectBoundedProbe(probe: FrameProbe): void {
   const evidence = `${probe.label}/${probe.action} ${JSON.stringify(probe)}`;
   expect(probe.presentedFrameDelta, `${evidence}: presentation must advance`).toBeGreaterThan(0);
@@ -77,7 +188,35 @@ function expectBoundedProbe(probe: FrameProbe): void {
     .toBeLessThan(MAX_EVENT_TO_PRESENTED_FRAME_MS);
 }
 
-test('cold carbine control, glass breach and first M14 EBR use reach the next presented frame without a freeze', async ({ page }, testInfo) => {
+function expectM14TransitionReady(probe: M14TransitionProbe, thermalActive: boolean): void {
+  const evidence = `${probe.label}/${probe.action} ${JSON.stringify(probe)}`;
+  expectBoundedProbe(probe);
+  expect(probe.readyMs, `${evidence}: bounded readiness deadline`).toBeLessThan(MAX_M14_TRANSITION_READY_MS);
+  expect(probe.maximumAnimationFrameGapMs, `${evidence}: no hidden transition freeze`)
+    .toBeLessThan(MAX_EVENT_TO_PRESENTED_FRAME_MS);
+  expect(probe.readiness, `${evidence}: exact retained imported M14`).toMatchObject({
+    requestedWeapon: 'm14-ebr',
+    ready: true,
+    modelLoaded: true,
+    gpuReady: true,
+    resident: true,
+    catalogPrewarming: false,
+    importedWeapon: 'm14-ebr',
+    mountedIsRequested: true,
+    assetCacheLoading: 0,
+    dmrThermalActive: thermalActive,
+  });
+  if (!thermalActive) return;
+  expect(probe.readiness.adsProgress, `${evidence}: settled physical ADS pose`).toBeGreaterThanOrEqual(0.9);
+  expect(probe.readiness.dmrThermalContacts, `${evidence}: real thermal contact presentation`)
+    .toBeGreaterThan(0);
+  expect(
+    Math.abs(probe.readiness.cameraFov - probe.readiness.expectedFov),
+    `${evidence}: exact 2.5x DMR projection`,
+  ).toBeLessThan(0.35);
+}
+
+test('cold carbine control, isolated first M14 EBR use and glass breach reach the next presented frame without a freeze', async ({ page }, testInfo) => {
   test.setTimeout(90_000);
   const browserErrors: string[] = [];
   page.on('pageerror', (error) => browserErrors.push(error.message));
@@ -119,6 +258,33 @@ test('cold carbine control, glass breach and first M14 EBR use reach the next pr
   await page.waitForTimeout(250);
   await page.evaluate(() => {
     const debug = window.__ATOMIC_ACRES_DEBUG__;
+    debug.placeBotAhead(6);
+    debug.aimAtBot('body');
+  });
+  const m14Equip = await m14TransitionToReady(page, 'm14-cold-equip', 'equip-m14', 'equipped');
+  const m14Ads = await m14TransitionToReady(page, 'm14-cold-ads-on', 'ads-on', 'thermal-active');
+  const m14Shot = await eventToNextPresentedFrame(page, 'm14-cold-fire', 'fire');
+  const m14AdsRelease = await eventToNextPresentedFrame(page, 'm14-ads-off', 'ads-off');
+  await expect.poll(async () => page.evaluate(() => (
+    window.__ATOMIC_ACRES_DEBUG__.sampleDmrThermalReadiness().active
+  ))).toBe(false);
+  await page.evaluate(() => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    debug.equipWeapon('carbine');
+  });
+  await expect.poll(async () => page.evaluate(() => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    const weapon = debug.sampleActiveWeaponReadiness();
+    return weapon.requestedWeapon === 'carbine'
+      && weapon.ready
+      && weapon.importedWeapon === 'carbine'
+      && weapon.mountedIsRequested
+      && debug.sampleWeaponAssetCache().loading === 0;
+  })).toBe(true);
+
+  await page.waitForTimeout(250);
+  await page.evaluate(() => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
     debug.stageWindow(0, 4);
   });
   const coldGlass = await eventToNextPresentedFrame(page, 'cold-glass-breach', 'fire');
@@ -133,19 +299,6 @@ test('cold carbine control, glass breach and first M14 EBR use reach the next pr
     window.__ATOMIC_ACRES_DEBUG__.snapshot() as any
   ).breakableWindows[1].broken)).toBe(true);
 
-  await page.evaluate(() => {
-    const debug = window.__ATOMIC_ACRES_DEBUG__;
-    debug.placeBotAhead(6);
-    debug.aimAtBot('body');
-  });
-  const m14Equip = await eventToNextPresentedFrame(page, 'm14-cold-equip', 'equip-m14');
-  const m14Ads = await eventToNextPresentedFrame(page, 'm14-cold-ads-on', 'ads-on');
-  const m14Shot = await eventToNextPresentedFrame(page, 'm14-cold-fire', 'fire');
-  const m14AdsRelease = await eventToNextPresentedFrame(page, 'm14-ads-off', 'ads-off');
-  await expect.poll(async () => page.evaluate(() => (
-    window.__ATOMIC_ACRES_DEBUG__.snapshot() as any
-  ).dmrThermal.active)).toBe(false);
-
   const glassAfter = await page.evaluate(() => {
     const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
     return {
@@ -158,12 +311,13 @@ test('cold carbine control, glass breach and first M14 EBR use reach the next pr
   const runtimeAfter = await captureFrameHitchRendererEvidence(page, testInfo);
   expectFrameHitchRendererEvidence(runtimeAfter, 'atomic-acres', 'glass/M14 final runtime');
 
-  const probes = [baseline, coldCarbine, coldGlass, warmGlass, m14Equip, m14Ads, m14Shot, m14AdsRelease];
+  const probes = [baseline, coldCarbine, m14Equip, m14Ads, m14Shot, m14AdsRelease, coldGlass, warmGlass];
   await testInfo.attach('event-to-presented-frame-receipt', {
     body: Buffer.from(JSON.stringify({
       renderer: runtimeAfter.runtime.actualBackend,
       maximumEventToPresentedFrameMs: MAX_EVENT_TO_PRESENTED_FRAME_MS,
       maximumSynchronousActionMs: MAX_SYNCHRONOUS_ACTION_MS,
+      maximumM14TransitionReadyMs: MAX_M14_TRANSITION_READY_MS,
       runtimeBefore,
       runtimeAfter,
       retainedGlassBefore,
@@ -173,7 +327,15 @@ test('cold carbine control, glass breach and first M14 EBR use reach the next pr
     contentType: 'application/json',
   });
   for (const probe of probes) expectBoundedProbe(probe);
-  for (const probe of [coldCarbine, coldGlass, warmGlass, m14Equip, m14Ads, m14Shot, m14AdsRelease]) {
+  expectM14TransitionReady(m14Equip, false);
+  expectM14TransitionReady(m14Ads, true);
+  for (const transition of [m14Equip, m14Ads]) {
+    expect(
+      transition.maximumAnimationFrameGapMs,
+      `${transition.action}: transition gaps must remain within 4x the no-op frame plus 40ms`,
+    ).toBeLessThan(baseline.eventToPresentedFrameMs * 4 + 40);
+  }
+  for (const probe of [coldCarbine, m14Equip, m14Ads, m14Shot, m14AdsRelease, coldGlass, warmGlass]) {
     expect(
       probe.eventToPresentedFrameMs,
       `${probe.action}: regression must remain within 4x the no-op frame plus 40ms`,
@@ -187,6 +349,7 @@ test('cold carbine control, glass breach and first M14 EBR use reach the next pr
     {
       maximumEventToPresentedFrameMs: MAX_EVENT_TO_PRESENTED_FRAME_MS,
       maximumSynchronousActionMs: MAX_SYNCHRONOUS_ACTION_MS,
+      maximumM14TransitionReadyMs: MAX_M14_TRANSITION_READY_MS,
       maximumRelativeMultiplier: 4,
       maximumRelativeAllowanceMs: 40,
     },

@@ -81,6 +81,8 @@ describe('Pass 69.3 clean exact-SHA frame-hitch matrix', () => {
       expect(spec).toContain('const MAX_SYNCHRONOUS_ACTION_MS = 50;');
     }
     expect(glassSpec).toContain('baseline.eventToPresentedFrameMs * 4 + 40');
+    expect(glassSpec).toContain('const MAX_M14_TRANSITION_READY_MS = 5_000;');
+    expect(glassSpec).toContain('transition.maximumAnimationFrameGapMs');
     expect(specialSpec).toContain('baseline.p95Ms * 4 + 40');
     expect(specialSpec).toContain('const MAX_SUSTAINED_PRESENTED_FRAME_GAP_MS = 120;');
     expect(specialSpec).toContain('const MAX_SUSTAINED_P95_MS = 50;');
@@ -91,7 +93,10 @@ describe('Pass 69.3 clean exact-SHA frame-hitch matrix', () => {
       'thresholds.maximumSustainedP95Ms === 50',
       'thresholds.maximumRelativeMultiplier === 4',
       'thresholds.maximumRelativeAllowanceMs === 40',
+      'receipt.thresholds.maximumM14TransitionReadyMs !== 5_000',
+      'probe.maximumAnimationFrameGapMs < 120',
       'probe.eventToPresentedFrameMs < baseline.eventToPresentedFrameMs * 4 + 40',
+      'probe.maximumAnimationFrameGapMs < baseline.eventToPresentedFrameMs * 4 + 40',
       'probe.frameWindow.maximumMs < baseline.p95Ms * 4 + 40',
       'evidence.sustained.maximumMs < evidence.baseline.p95Ms * 4 + 40',
       'rounded(percentile(sorted, 0.95))',
@@ -110,9 +115,21 @@ describe('Pass 69.3 clean exact-SHA frame-hitch matrix', () => {
       "['fire', 'cold-glass-breach']",
       "['fire', 'warm-glass-breach']",
       "['equip-m14', 'm14-cold-equip']",
+      "['ads-on', 'm14-cold-ads-on']",
+      'debug.sampleActiveWeaponReadiness()',
+      'weapon.ready',
+      'debug.sampleWeaponAssetCache().loading',
+      'debug.sampleDmrThermalReadiness()',
+      'thermal.active',
+      'assetCacheLoading === 0',
+      'readiness.dmrThermalActive === thermalActive',
       'coldWindowBroken !== true',
       'warmWindowBroken !== true',
     ]) expect(`${glassSpec}\n${runner}`).toContain(token);
+    expect(glassSpec.indexOf("m14TransitionToReady(page, 'm14-cold-equip'"))
+      .toBeLessThan(glassSpec.indexOf("eventToNextPresentedFrame(page, 'cold-glass-breach'"));
+    expect(runner.indexOf("['equip-m14', 'm14-cold-equip']"))
+      .toBeLessThan(runner.indexOf("['fire', 'cold-glass-breach']"));
     for (const token of [
       "label: 'flamethrower-held-fire'",
       "await page.mouse.down({ button: 'left' })",

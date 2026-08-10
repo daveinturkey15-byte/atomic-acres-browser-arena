@@ -149,6 +149,33 @@ function actionProbeValid(probe, action, label) {
     && Number.isSafeInteger(probe.presentedFrameDelta) && probe.presentedFrameDelta > 0;
 }
 
+function m14TransitionProbeValid(probe, action, label, thermalActive) {
+  const readiness = probe?.readiness;
+  return actionProbeValid(probe, action, label)
+    && finite(probe.readyMs) && probe.readyMs >= probe.eventToPresentedFrameMs && probe.readyMs < 5_000
+    && finite(probe.maximumAnimationFrameGapMs) && probe.maximumAnimationFrameGapMs >= 0
+    && probe.maximumAnimationFrameGapMs < 120
+    && readiness?.requestedWeapon === 'm14-ebr'
+    && readiness.ready === true
+    && readiness.modelLoaded === true
+    && readiness.gpuReady === true
+    && readiness.resident === true
+    && readiness.catalogPrewarming === false
+    && readiness.importedWeapon === 'm14-ebr'
+    && readiness.mountedIsRequested === true
+    && readiness.assetCacheLoading === 0
+    && readiness.dmrThermalActive === thermalActive
+    && finite(readiness.adsProgress) && readiness.adsProgress >= 0
+    && Number.isSafeInteger(readiness.dmrThermalContacts) && readiness.dmrThermalContacts >= 0
+    && finite(readiness.cameraFov)
+    && finite(readiness.expectedFov)
+    && (!thermalActive || (
+      readiness.adsProgress >= 0.9
+      && readiness.dmrThermalContacts > 0
+      && Math.abs(readiness.cameraFov - readiness.expectedFov) < 0.35
+    ));
+}
+
 function coldFireProbeValid(probe, label) {
   return probe?.label === label
     && finite(probe.synchronousMs) && probe.synchronousMs >= 0 && probe.synchronousMs < 50
@@ -186,14 +213,15 @@ function glassM14EvidenceValid(receipt) {
   const expectedProbes = [
     ['noop', 'baseline-noop'],
     ['fire', 'cold-carbine-empty-sky'],
-    ['fire', 'cold-glass-breach'],
-    ['fire', 'warm-glass-breach'],
     ['equip-m14', 'm14-cold-equip'],
     ['ads-on', 'm14-cold-ads-on'],
     ['fire', 'm14-cold-fire'],
     ['ads-off', 'm14-ads-off'],
+    ['fire', 'cold-glass-breach'],
+    ['fire', 'warm-glass-breach'],
   ];
   if (!thresholdsValid(receipt.thresholds, false)
+    || receipt.thresholds.maximumM14TransitionReadyMs !== 5_000
     || evidence?.retainedGlassBefore?.pool?.contract !== 'retained-exact-instanced-render-object-v1'
     || evidence.retainedGlassBefore.pool.retained !== 6
     || evidence.retainedGlassBefore.pool.currentArenaRetained !== 6
@@ -202,10 +230,14 @@ function glassM14EvidenceValid(receipt) {
     || evidence?.glassAfter?.coldWindowBroken !== true
     || evidence.glassAfter.warmWindowBroken !== true
     || !Array.isArray(probes) || probes.length !== expectedProbes.length
-    || !probes.every((probe, index) => actionProbeValid(probe, ...expectedProbes[index]))) return false;
+    || !probes.every((probe, index) => actionProbeValid(probe, ...expectedProbes[index]))
+    || !m14TransitionProbeValid(probes[2], 'equip-m14', 'm14-cold-equip', false)
+    || !m14TransitionProbeValid(probes[3], 'ads-on', 'm14-cold-ads-on', true)) return false;
   const baseline = probes[0];
   return probes.slice(1).every((probe) => (
     probe.eventToPresentedFrameMs < baseline.eventToPresentedFrameMs * 4 + 40
+  )) && [probes[2], probes[3]].every((probe) => (
+    probe.maximumAnimationFrameGapMs < baseline.eventToPresentedFrameMs * 4 + 40
   ));
 }
 
