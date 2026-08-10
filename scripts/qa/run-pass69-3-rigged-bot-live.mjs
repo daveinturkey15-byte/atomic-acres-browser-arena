@@ -120,7 +120,7 @@ const handCameraContract = Object.freeze({
   noFallback: true,
 });
 const handSelfOcclusionContract = Object.freeze({
-  contract: 'submitted-frame-hand-self-occlusion-v1',
+  contract: 'submitted-frame-hand-self-occlusion-v2',
   actorSelfOcclusionIncluded: true,
   actorAttachmentsIncluded: true,
   heldWeaponTerminalHitAccepted: false,
@@ -1400,11 +1400,22 @@ function lineOfSightValid(lineOfSight, actor, expectedArena, presentation, frami
 
 function handSelfOcclusionValid(selfOcclusion, actor, side, presentation, framing) {
   const paused = presentation?.pausedPresentedCapture;
-  const cachedMatches = paused?.handSelfOcclusion?.filter((candidate) => (
-    sameObject(candidate.actor, actor) && candidate.side === side
-  )) ?? [];
+  const cachedMatches = Array.isArray(paused?.handSelfOcclusion)
+    ? paused.handSelfOcclusion.filter((candidate) => (
+      sameObject(candidate?.actor, actor) && candidate?.side === side
+    ))
+    : [];
   const { cameraPresentation: _cameraPresentation, ...sampledCachedFields } = selfOcclusion ?? {};
   if (cachedMatches.length !== 1 || !sameObject(sampledCachedFields, cachedMatches[0])) return false;
+  const renderCount = selfOcclusion?.renderOccluderCount;
+  const actorCount = selfOcclusion?.actorOccluderCount;
+  const heldWeaponCount = selfOcclusion?.heldWeaponOccluderCount;
+  const expectedCamera = {
+    position: paused?.position,
+    quaternion: paused?.quaternion,
+    fov: paused?.fov,
+    captureRevision: paused?.captureRevision,
+  };
   if (Object.entries(handSelfOcclusionContract).some(([key, value]) => !sameObject(selfOcclusion?.[key], value))
     || !sameObject(selfOcclusion.actor, actor)
     || selfOcclusion.side !== side
@@ -1415,33 +1426,147 @@ function handSelfOcclusionValid(selfOcclusion, actor, side, presentation, framin
     || selfOcclusion.captureFrame !== paused?.frame
     || selfOcclusion.captureRevision !== paused?.captureRevision
     || selfOcclusion.captureSubmissionSequence !== paused?.submissionSequence
-    || selfOcclusion.actorOccluderCount < 1
-    || selfOcclusion.heldWeaponOccluderCount < 1
-    || selfOcclusion.renderOccluderCount < selfOcclusion.actorOccluderCount
+    || !Number.isSafeInteger(renderCount) || !Number.isSafeInteger(actorCount)
+    || !Number.isSafeInteger(heldWeaponCount)
+    || !(heldWeaponCount > 0 && heldWeaponCount <= actorCount && actorCount <= renderCount)
+    || !sameObject(selfOcclusion.camera, expectedCamera)
     || !sameObject(selfOcclusion.cameraPresentation, paused)
     || !Array.isArray(selfOcclusion.sentinels)
     || selfOcclusion.sentinels.length !== handSelfOcclusionContract.sentinelNames.length) return false;
   return selfOcclusion.sentinels.every((sentinel, index) => {
+    if (sentinel === null || typeof sentinel !== 'object') return false;
     const framed = framing?.handDetail?.sentinels?.[index];
     const blocker = sentinel.blocker;
-    const validTerminal = blocker === null || (blocker.clear === true
-      && blocker.reason === 'terminal-hand-surface'
-      && blocker.sameActor === true
-      && blocker.heldWeapon === false
-      && blocker.cameraInsideOpaqueGeometry === false
-      && Number.isFinite(blocker.terminalDeltaM) && blocker.terminalDeltaM >= 0
-      && blocker.terminalDeltaM <= handSelfOcclusionContract.terminalHandToleranceM
-      && Number.isFinite(blocker.hitPointToSentinelM)
-      && blocker.hitPointToSentinelM <= handSelfOcclusionContract.terminalHandToleranceM);
+    const sentinelWorldValid = finiteVector(sentinel.worldPosition);
+    const expectedTargetDistanceM = sentinelWorldValid
+      ? positionDelta(selfOcclusion.camera.position, sentinel.worldPosition)
+      : Number.NaN;
+    let validTerminal = blocker === null && sentinel.reason === 'no-hit-before-hand-sentinel';
+    if (blocker !== null && typeof blocker === 'object') {
+      const rawTerminalDeltaM = blocker.targetDistanceM - blocker.distanceM;
+      const boundaryDistanceM = blocker.targetDistanceM - handSelfOcclusionContract.terminalHandToleranceM;
+      const terminalDistanceWithinTolerance = blocker.distanceM >= boundaryDistanceM
+        && blocker.distanceM <= blocker.targetDistanceM;
+      const expectedTerminalBoundaryComparisonM = terminalDistanceWithinTolerance
+        && rawTerminalDeltaM > handSelfOcclusionContract.terminalHandToleranceM
+        ? handSelfOcclusionContract.terminalHandToleranceM
+        : rawTerminalDeltaM;
+      const hitPointWorldValid = finiteVector(blocker.hitPointWorld);
+      const rawHitPointDistanceM = hitPointWorldValid && sentinelWorldValid
+        ? positionDelta(blocker.hitPointWorld, sentinel.worldPosition)
+        : Number.NaN;
+      const representationScale = Math.max(
+        1,
+        blocker.targetDistanceM,
+        blocker.distanceM,
+        ...(hitPointWorldValid ? blocker.hitPointWorld.map(Math.abs) : []),
+        ...(finiteVector(sentinel.worldPosition) ? sentinel.worldPosition.map(Math.abs) : []),
+      );
+      const representationTolerance = Number.EPSILON * 16 * representationScale;
+      const hitPointWithinTolerance = rawHitPointDistanceM <= handSelfOcclusionContract.terminalHandToleranceM
+        || (terminalDistanceWithinTolerance
+          && Math.abs(rawHitPointDistanceM - rawTerminalDeltaM) <= representationTolerance
+          && rawTerminalDeltaM - handSelfOcclusionContract.terminalHandToleranceM
+            <= representationTolerance);
+      const expectedHitPointBoundaryComparisonM = hitPointWithinTolerance
+        && rawHitPointDistanceM > handSelfOcclusionContract.terminalHandToleranceM
+        ? handSelfOcclusionContract.terminalHandToleranceM
+        : rawHitPointDistanceM;
+      const faceVertices = [blocker.face?.a, blocker.face?.b, blocker.face?.c];
+      const dominantBonesValid = Array.isArray(blocker.dominantBones)
+        && blocker.dominantBones.length === 3
+        && blocker.dominantBones.every((dominant, vertex) => (
+          Number.isSafeInteger(dominant?.vertexIndex) && dominant.vertexIndex === faceVertices[vertex]
+          && Number.isSafeInteger(dominant.slot) && dominant.slot >= 0 && dominant.slot <= 3
+          && Number.isSafeInteger(dominant.skinIndex) && dominant.skinIndex >= 0
+          && Number.isFinite(dominant.normalizedWeight)
+          && dominant.normalizedWeight >= 0 && dominant.normalizedWeight <= 1
+          && typeof dominant.bone === 'string' && dominant.bone.length > 0
+          && typeof dominant.handOwned === 'boolean'
+        ));
+      const ownedCount = dominantBonesValid
+        ? blocker.dominantBones.filter((dominant) => dominant.handOwned).length
+        : -1;
+      validTerminal = blocker.clear === true
+        && blocker.reason === 'terminal-hand-surface'
+        && blocker.sameActor === true
+        && blocker.heldWeapon === false
+        && blocker.canonicalOperatorSkinnedMesh === true
+        && blocker.requestedSide === side
+        && blocker.requestedWrist === (side === 'left' ? 'WristL' : 'WristR')
+        && blocker.requestedWristMatchesSide === true
+        && typeof blocker.mesh === 'string' && blocker.mesh.length > 0
+        && blocker.name === blocker.mesh
+        && faceVertices.every((value) => Number.isSafeInteger(value) && value >= 0)
+        && Number.isSafeInteger(blocker.materialIndex) && blocker.materialIndex >= 0
+        && hitPointWorldValid
+        && Number.isFinite(blocker.distanceM) && blocker.distanceM >= 0
+        && Number.isFinite(blocker.targetDistanceM) && blocker.targetDistanceM > 0
+        && scaleAwareEqual(
+          blocker.targetDistanceM,
+          expectedTargetDistanceM,
+          [blocker.targetDistanceM, expectedTargetDistanceM],
+        )
+        && terminalDistanceWithinTolerance
+        && Number.isFinite(blocker.terminalDeltaM) && blocker.terminalDeltaM >= 0
+        && scaleAwareEqual(
+          blocker.terminalDeltaM,
+          rawTerminalDeltaM,
+          [blocker.terminalDeltaM, rawTerminalDeltaM, blocker.targetDistanceM],
+        )
+        && Number.isFinite(blocker.terminalBoundaryComparisonM)
+        && blocker.terminalBoundaryComparisonM >= 0
+        && blocker.terminalBoundaryComparisonM <= handSelfOcclusionContract.terminalHandToleranceM
+        && scaleAwareEqual(
+          blocker.terminalBoundaryComparisonM,
+          expectedTerminalBoundaryComparisonM,
+          [blocker.terminalBoundaryComparisonM, expectedTerminalBoundaryComparisonM, blocker.targetDistanceM],
+        )
+        && hitPointWithinTolerance
+        && Number.isFinite(blocker.hitPointToSentinelM) && blocker.hitPointToSentinelM >= 0
+        && scaleAwareEqual(
+          blocker.hitPointToSentinelM,
+          rawHitPointDistanceM,
+          [blocker.hitPointToSentinelM, rawHitPointDistanceM, representationScale],
+        )
+        && Number.isFinite(blocker.hitPointBoundaryComparisonM)
+        && blocker.hitPointBoundaryComparisonM >= 0
+        && blocker.hitPointBoundaryComparisonM <= handSelfOcclusionContract.terminalHandToleranceM
+        && scaleAwareEqual(
+          blocker.hitPointBoundaryComparisonM,
+          expectedHitPointBoundaryComparisonM,
+          [blocker.hitPointBoundaryComparisonM, expectedHitPointBoundaryComparisonM, representationScale],
+        )
+        && Number.isFinite(blocker.boundaryUlpAllowanceM) && blocker.boundaryUlpAllowanceM >= 0
+        && scaleAwareEqual(
+          blocker.boundaryUlpAllowanceM,
+          representationTolerance,
+          [blocker.boundaryUlpAllowanceM, representationTolerance, representationScale],
+        )
+        && blocker.cameraInsideOpaqueGeometry === (
+          blocker.distanceM <= handSelfOcclusionContract.cameraInsideOpaqueDistanceM
+        )
+        && blocker.cameraInsideOpaqueGeometry === false
+        && dominantBonesValid
+        && Number.isSafeInteger(blocker.handOwnedDominantBoneCount)
+        && blocker.handOwnedDominantBoneCount === ownedCount
+        && ownedCount >= 2
+        && blocker.faceHandOwned === true;
+    }
     return sentinel.name === handSelfOcclusionContract.sentinelNames[index]
       && sentinel.name === (framed?.role === 'wrist-hand' ? 'wrist-hand' : framed?.digit)
       && sentinel.bone === framed?.bone
       && sentinel.present === true
       && sentinel.clear === true
-      && finiteVector(sentinel.worldPosition)
+      && sentinelWorldValid
       && sameObject(sentinel.worldPosition, framed?.worldPosition)
       && Number.isFinite(sentinel.targetDistanceM)
       && sentinel.targetDistanceM > 0
+      && scaleAwareEqual(
+        sentinel.targetDistanceM,
+        expectedTargetDistanceM,
+        [...selfOcclusion.camera.position, ...sentinel.worldPosition],
+      )
       && validTerminal;
   });
 }
@@ -2244,6 +2369,12 @@ function vectorLength(vector) {
 
 function close(left, right, tolerance = 1e-7) {
   return Number.isFinite(left) && Number.isFinite(right) && Math.abs(left - right) <= tolerance;
+}
+
+function scaleAwareEqual(left, right, scaleValues) {
+  return Number.isFinite(left) && Number.isFinite(right) && Array.isArray(scaleValues)
+    && scaleValues.every(Number.isFinite)
+    && Math.abs(left - right) <= Number.EPSILON * 16 * Math.max(1, ...scaleValues.map(Math.abs));
 }
 
 function renderedInfluenceValid(bone) {
@@ -4087,16 +4218,68 @@ async function runContractSelfTest() {
     allClear: true,
     sentinels: frameActor.jointScreenPositions
       .filter((joint) => joint.side === side && (joint.role === 'wrist-hand' || joint.kind === 'finger'))
-      .map((joint) => ({
-        name: joint.role === 'wrist-hand' ? 'wrist-hand' : joint.digit,
-        bone: joint.bone,
-        present: true,
-        clear: true,
-        worldPosition: joint.worldPosition,
-        targetDistanceM: positionDelta(cameraEvidence.position, joint.worldPosition),
-        blocker: null,
-        reason: 'no-hit-before-hand-sentinel',
-      })),
+      .map((joint, index) => {
+        const targetDistanceM = positionDelta(cameraEvidence.position, joint.worldPosition);
+        if (index !== 0) return {
+          name: joint.role === 'wrist-hand' ? 'wrist-hand' : joint.digit,
+          bone: joint.bone,
+          present: true,
+          clear: true,
+          worldPosition: joint.worldPosition,
+          targetDistanceM,
+          blocker: null,
+          reason: 'no-hit-before-hand-sentinel',
+        };
+        const distanceM = targetDistanceM - 0.05;
+        const ray = joint.worldPosition.map((value, axis) => value - cameraEvidence.position[axis]);
+        const hitPointWorld = cameraEvidence.position.map((value, axis) => (
+          value + ray[axis] * distanceM / targetDistanceM
+        ));
+        const terminalDeltaM = targetDistanceM - distanceM;
+        const hitPointToSentinelM = positionDelta(hitPointWorld, joint.worldPosition);
+        const representationScale = Math.max(
+          1, targetDistanceM, distanceM, ...hitPointWorld.map(Math.abs), ...joint.worldPosition.map(Math.abs),
+        );
+        return {
+          name: 'wrist-hand',
+          bone: joint.bone,
+          present: true,
+          clear: true,
+          worldPosition: joint.worldPosition,
+          targetDistanceM,
+          blocker: {
+            name: 'Swat_Body',
+            mesh: 'Swat_Body',
+            face: { a: 0, b: 1, c: 2 },
+            materialIndex: 0,
+            hitPointWorld,
+            distanceM,
+            targetDistanceM,
+            terminalDeltaM,
+            hitPointToSentinelM,
+            terminalBoundaryComparisonM: terminalDeltaM,
+            hitPointBoundaryComparisonM: hitPointToSentinelM,
+            boundaryUlpAllowanceM: Number.EPSILON * 16 * representationScale,
+            sameActor: true,
+            heldWeapon: false,
+            canonicalOperatorSkinnedMesh: true,
+            requestedSide: side,
+            requestedWrist: side === 'left' ? 'WristL' : 'WristR',
+            requestedWristMatchesSide: true,
+            dominantBones: [
+              { vertexIndex: 0, slot: 0, skinIndex: 0, normalizedWeight: 0.8, bone: side === 'left' ? 'WristL' : 'WristR', handOwned: true },
+              { vertexIndex: 1, slot: 0, skinIndex: 1, normalizedWeight: 0.7, bone: side === 'left' ? 'Index2L' : 'Index2R', handOwned: true },
+              { vertexIndex: 2, slot: 0, skinIndex: 2, normalizedWeight: 0.9, bone: 'Torso', handOwned: false },
+            ],
+            handOwnedDominantBoneCount: 2,
+            faceHandOwned: true,
+            cameraInsideOpaqueGeometry: false,
+            clear: true,
+            reason: 'terminal-hand-surface',
+          },
+          reason: 'terminal-hand-surface',
+        };
+      }),
   });
   const makePresentation = (
     cameraEvidence, frameActor, rendererName = 'webgl2', arenaId = 'atomic-acres', handSide = null,
@@ -4845,6 +5028,91 @@ async function runContractSelfTest() {
   const staleSelfReceipt = structuredClone(leftHand);
   staleSelfReceipt.selfOcclusion.captureFrame -= 1;
   assert(!validateHandSelf(staleSelfReceipt, 'left'), 'stale sampled self-occlusion frame must fail cached binding');
+  const stringCount = mutateSelfReceipt(leftHand, (receipt) => { receipt.renderOccluderCount = '8'; });
+  assert(!validateHandSelf(stringCount, 'left'), 'string occluder count must fail');
+  const fractionalCount = mutateSelfReceipt(leftHand, (receipt) => { receipt.actorOccluderCount = 2.5; });
+  assert(!validateHandSelf(fractionalCount, 'left'), 'fractional occluder count must fail');
+  const invalidSubsetCounts = mutateSelfReceipt(leftHand, (receipt) => {
+    receipt.heldWeaponOccluderCount = receipt.actorOccluderCount + 1;
+  });
+  assert(!validateHandSelf(invalidSubsetCounts, 'left'), 'held weapon count outside actor subset must fail');
+  const zeroHeldWeaponCount = mutateSelfReceipt(leftHand, (receipt) => { receipt.heldWeaponOccluderCount = 0; });
+  assert(!validateHandSelf(zeroHeldWeaponCount, 'left'), 'zero held weapon occluder count must fail');
+  const actorOutsideRenderSubset = mutateSelfReceipt(leftHand, (receipt) => {
+    receipt.actorOccluderCount = receipt.renderOccluderCount + 1;
+  });
+  assert(!validateHandSelf(actorOutsideRenderSubset, 'left'), 'actor count outside render subset must fail');
+  const staleSelfCamera = mutateSelfReceipt(leftHand, (receipt) => { receipt.camera.position[0] += 0.001; });
+  assert(!validateHandSelf(staleSelfCamera, 'left'), 'self-occlusion camera must equal paused capture camera');
+  const wrongSentinelDistance = mutateSelfReceipt(leftHand, (receipt) => { receipt.sentinels[0].targetDistanceM += 0.01; });
+  assert(!validateHandSelf(wrongSentinelDistance, 'left'), 'forged sentinel target distance must fail');
+  const stringBlockerDistance = mutateSelfReceipt(leftHand, (receipt) => {
+    receipt.sentinels[0].blocker.distanceM = String(receipt.sentinels[0].blocker.distanceM);
+  });
+  assert(!validateHandSelf(stringBlockerDistance, 'left'), 'string blocker distance must fail closed');
+  const malformedHitPoint = mutateSelfReceipt(leftHand, (receipt) => {
+    receipt.sentinels[0].blocker.hitPointWorld = 'not-a-vector';
+  });
+  assert(!validateHandSelf(malformedHitPoint, 'left'), 'malformed hit-point vector must fail closed');
+  const wrongBlockerDistance = mutateSelfReceipt(leftHand, (receipt) => { receipt.sentinels[0].blocker.distanceM += 0.01; });
+  assert(!validateHandSelf(wrongBlockerDistance, 'left'), 'forged blocker distance must fail');
+  const wrongBlockerTargetDistance = mutateSelfReceipt(leftHand, (receipt) => {
+    receipt.sentinels[0].blocker.targetDistanceM += 0.01;
+  });
+  assert(!validateHandSelf(wrongBlockerTargetDistance, 'left'), 'forged blocker target distance must fail');
+  const wrongTerminalDelta = mutateSelfReceipt(leftHand, (receipt) => { receipt.sentinels[0].blocker.terminalDeltaM += 0.001; });
+  assert(!validateHandSelf(wrongTerminalDelta, 'left'), 'forged raw terminal delta must fail');
+  const negativeHitPointDistance = mutateSelfReceipt(leftHand, (receipt) => {
+    receipt.sentinels[0].blocker.hitPointToSentinelM = -0.001;
+  });
+  assert(!validateHandSelf(negativeHitPointDistance, 'left'), 'negative raw hit-point distance must fail');
+  const noncanonicalTerminal = mutateSelfReceipt(leftHand, (receipt) => {
+    receipt.sentinels[0].blocker.canonicalOperatorSkinnedMesh = false;
+  });
+  assert(!validateHandSelf(noncanonicalTerminal, 'left'), 'noncanonical attachment terminal hit must fail');
+  const minorityOwnedTerminal = mutateSelfReceipt(leftHand, (receipt) => {
+    receipt.sentinels[0].blocker.dominantBones[1].handOwned = false;
+  });
+  assert(!validateHandSelf(minorityOwnedTerminal, 'left'),
+    'forged declared majority with one-of-three hand-owned face must fail');
+  const sideWristMismatch = mutateSelfReceipt(leftHand, (receipt) => {
+    receipt.sentinels[0].blocker.requestedWrist = 'WristR';
+  });
+  assert(!validateHandSelf(sideWristMismatch, 'left'),
+    'requested side and wrist mismatch must fail despite forged true binding claim');
+  const setTerminalGap = (receipt, gapM) => {
+    const sentinel = receipt.sentinels[0];
+    const blocker = sentinel.blocker;
+    const targetDistanceM = positionDelta(receipt.camera.position, sentinel.worldPosition);
+    const distanceM = targetDistanceM - gapM;
+    const ray = sentinel.worldPosition.map((value, axis) => value - receipt.camera.position[axis]);
+    const hitPointWorld = receipt.camera.position.map((value, axis) => (
+      value + ray[axis] * distanceM / targetDistanceM
+    ));
+    const terminalDeltaM = targetDistanceM - distanceM;
+    const hitPointToSentinelM = positionDelta(hitPointWorld, sentinel.worldPosition);
+    const representationScale = Math.max(
+      1, targetDistanceM, distanceM, ...hitPointWorld.map(Math.abs), ...sentinel.worldPosition.map(Math.abs),
+    );
+    blocker.distanceM = distanceM;
+    blocker.targetDistanceM = targetDistanceM;
+    blocker.terminalDeltaM = terminalDeltaM;
+    blocker.hitPointWorld = hitPointWorld;
+    blocker.hitPointToSentinelM = hitPointToSentinelM;
+    blocker.terminalBoundaryComparisonM = gapM === handSelfOcclusionContract.terminalHandToleranceM
+      ? handSelfOcclusionContract.terminalHandToleranceM : terminalDeltaM;
+    blocker.hitPointBoundaryComparisonM = gapM === handSelfOcclusionContract.terminalHandToleranceM
+      ? handSelfOcclusionContract.terminalHandToleranceM : hitPointToSentinelM;
+    blocker.boundaryUlpAllowanceM = Number.EPSILON * 16 * representationScale;
+  };
+  const exactTerminalBoundary = mutateSelfReceipt(leftHand, (receipt) => {
+    setTerminalGap(receipt, handSelfOcclusionContract.terminalHandToleranceM);
+  });
+  assert(validateHandSelf(exactTerminalBoundary, 'left'), 'exact 0.06m comparison boundary must pass with raw evidence retained');
+  const beyondTerminalBoundary = mutateSelfReceipt(leftHand, (receipt) => {
+    setTerminalGap(receipt, handSelfOcclusionContract.terminalHandToleranceM + 0.0000001);
+  });
+  assert(!validateHandSelf(beyondTerminalBoundary, 'left'), 'meaningful epsilon beyond 0.06m must fail');
 }
 
 if (selfTestMode) {

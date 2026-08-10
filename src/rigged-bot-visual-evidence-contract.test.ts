@@ -197,7 +197,7 @@ describe('fixed rigged actor visual evidence fixtures', () => {
     ]);
     expect(new Set(RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES).size).toBe(9);
     expect(RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.handSelfOcclusion).toEqual({
-      contract: 'submitted-frame-hand-self-occlusion-v1',
+      contract: 'submitted-frame-hand-self-occlusion-v2',
       actorSelfOcclusionIncluded: true,
       actorAttachmentsIncluded: true,
       heldWeaponTerminalHitAccepted: false,

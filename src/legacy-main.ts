@@ -24326,6 +24326,8 @@ function debugRiggedHandSelfOcclusionForFrame(
   const actorRoot = debugRiggedEvidenceActorRoot(actorKind, actorId);
   const operatorRoot = actorRoot ? resolveRiggedOperatorRuntimeRoot(actorRoot) : null;
   const weaponRoot = (operatorRoot?.userData.operatorRig as { weapon?: THREE.Object3D } | undefined)?.weapon ?? null;
+  const requestedWristCandidate = operatorRoot?.getObjectByName(side === 'left' ? 'WristL' : 'WristR') ?? null;
+  const requestedWrist = requestedWristCandidate instanceof THREE.Bone ? requestedWristCandidate : null;
   const cameraWorld = camera.getWorldPosition(new THREE.Vector3());
   const base = {
     ...RIGGED_HAND_SELF_OCCLUSION_CONTRACT,
@@ -24342,7 +24344,7 @@ function debugRiggedHandSelfOcclusionForFrame(
       captureRevision: debugCaptureCameraRevision,
     }),
   };
-  if (!actorRoot || !operatorRoot || !weaponRoot) return Object.freeze({
+  if (!actorRoot || !operatorRoot || !weaponRoot || !requestedWrist) return Object.freeze({
     ...base,
     heldWeaponIncluded: false,
     renderOccluderCount: 0,
@@ -24351,7 +24353,8 @@ function debugRiggedHandSelfOcclusionForFrame(
     allClear: false,
     reason: !actorRoot ? 'missing-actor-at-submitted-frame'
       : !operatorRoot ? 'missing-operator-root-at-submitted-frame'
-        : 'missing-held-weapon-at-submitted-frame',
+        : !weaponRoot ? 'missing-held-weapon-at-submitted-frame'
+          : 'missing-requested-wrist-at-submitted-frame',
     sentinels: Object.freeze([]),
   });
   scene.updateMatrixWorld(true);
@@ -24373,7 +24376,10 @@ function debugRiggedHandSelfOcclusionForFrame(
       cameraWorld,
       worldPosition,
       actorRoot,
+      operatorRoot,
       weaponRoot,
+      side,
+      requestedWrist,
     );
     return Object.freeze({
       name,

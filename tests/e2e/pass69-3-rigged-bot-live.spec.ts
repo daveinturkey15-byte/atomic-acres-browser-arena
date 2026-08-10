@@ -527,6 +527,11 @@ function positionDelta(left: number[], right: number[]): number {
   return Math.hypot(...left.map((value, index) => value - right[index]));
 }
 
+function scaleAwareEqual(left: number, right: number, scaleValues: readonly number[]): boolean {
+  return Number.isFinite(left) && Number.isFinite(right) && scaleValues.every(Number.isFinite)
+    && Math.abs(left - right) <= Number.EPSILON * 16 * Math.max(1, ...scaleValues.map(Math.abs));
+}
+
 function subtract(left: number[], right: number[]): number[] {
   return left.map((value, index) => value - right[index]);
 }
@@ -1470,8 +1475,34 @@ async function sampleRequiredHandSelfOcclusion(
       submissionSequence: presentation.pausedPresentedCapture.submissionSequence,
     },
   });
+  const { cameraPresentation, ...sampledCachedFields } = selfOcclusion;
+  const cachedMatches = presentation.pausedPresentedCapture.handSelfOcclusion.filter((candidate: any) => (
+    candidate.actor.kind === actor.kind && candidate.actor.id === actor.id && candidate.side === side
+  ));
+  expect(cachedMatches, `${label}: one cached same-frame receipt`).toHaveLength(1);
+  expect(sampledCachedFields, `${label}: sampled receipt is the cached submitted record`).toEqual(cachedMatches[0]);
+  expect(cameraPresentation, `${label}: exact cached camera presentation`).toEqual(
+    presentation.pausedPresentedCapture,
+  );
   expect(selfOcclusion.actorOccluderCount, `${label}: actor render geometry included`).toBeGreaterThan(0);
   expect(selfOcclusion.heldWeaponOccluderCount, `${label}: held weapon render geometry included`).toBeGreaterThan(0);
+  for (const [field, value] of [
+    ['renderOccluderCount', selfOcclusion.renderOccluderCount],
+    ['actorOccluderCount', selfOcclusion.actorOccluderCount],
+    ['heldWeaponOccluderCount', selfOcclusion.heldWeaponOccluderCount],
+  ] as const) {
+    expect(Number.isSafeInteger(value), `${label}: ${field} safe integer`).toBe(true);
+  }
+  expect(selfOcclusion.heldWeaponOccluderCount, `${label}: held weapon subset of actor geometry`)
+    .toBeLessThanOrEqual(selfOcclusion.actorOccluderCount);
+  expect(selfOcclusion.actorOccluderCount, `${label}: actor subset of render geometry`)
+    .toBeLessThanOrEqual(selfOcclusion.renderOccluderCount);
+  expect(selfOcclusion.camera, `${label}: exact submitted camera telemetry`).toEqual({
+    position: presentation.pausedPresentedCapture.position,
+    quaternion: presentation.pausedPresentedCapture.quaternion,
+    fov: presentation.pausedPresentedCapture.fov,
+    captureRevision: presentation.pausedPresentedCapture.captureRevision,
+  });
   expect(selfOcclusion.sentinels.map(({ name }: any) => name), `${label}: exact hand sentinel order`).toEqual(
     contract.sentinelNames,
   );
@@ -1479,8 +1510,130 @@ async function sampleRequiredHandSelfOcclusion(
   expect(framing.captureRevision, `${label}: framing shares camera revision`).toBe(selfOcclusion.captureRevision);
   for (const sentinel of selfOcclusion.sentinels) {
     expect(sentinel, `${label}:${sentinel.name}`).toMatchObject({ present: true, clear: true });
-    expect(sentinel.blocker?.heldWeapon ?? false, `${label}:${sentinel.name}: no held-weapon terminal acceptance`).toBe(false);
-    expect(sentinel.blocker?.cameraInsideOpaqueGeometry ?? false, `${label}:${sentinel.name}: camera outside opaque geometry`).toBe(false);
+    const expectedTargetDistanceM = positionDelta(selfOcclusion.camera.position, sentinel.worldPosition);
+    expect(scaleAwareEqual(
+      sentinel.targetDistanceM,
+      expectedTargetDistanceM,
+      [...selfOcclusion.camera.position, ...sentinel.worldPosition],
+    ), `${label}:${sentinel.name}: independently recomputed target distance`).toBe(true);
+    if (sentinel.blocker === null) {
+      expect(sentinel.reason, `${label}:${sentinel.name}: explicit clear-ray reason`).toBe(
+        'no-hit-before-hand-sentinel',
+      );
+      continue;
+    }
+    const blocker = sentinel.blocker;
+    expect(blocker, `${label}:${sentinel.name}: terminal provenance`).toMatchObject({
+      clear: true,
+      reason: 'terminal-hand-surface',
+      sameActor: true,
+      heldWeapon: false,
+      canonicalOperatorSkinnedMesh: true,
+      requestedSide: side,
+      requestedWrist: side === 'left' ? 'WristL' : 'WristR',
+      requestedWristMatchesSide: true,
+      faceHandOwned: true,
+      cameraInsideOpaqueGeometry: false,
+    });
+    expect(typeof blocker.mesh, `${label}:${sentinel.name}: canonical mesh name`).toBe('string');
+    expect((blocker.mesh as string).length, `${label}:${sentinel.name}: nonempty mesh name`).toBeGreaterThan(0);
+    expect(blocker.name, `${label}:${sentinel.name}: mesh identity`).toBe(blocker.mesh);
+    expect([blocker.face?.a, blocker.face?.b, blocker.face?.c].every((vertex) => (
+      Number.isSafeInteger(vertex) && vertex >= 0
+    )), `${label}:${sentinel.name}: exact nonnegative integer triangle`).toBe(true);
+    expect(Number.isSafeInteger(blocker.materialIndex), `${label}:${sentinel.name}: material index`).toBe(true);
+    expect(blocker.materialIndex, `${label}:${sentinel.name}: nonnegative material index`).toBeGreaterThanOrEqual(0);
+    expect(blocker.hitPointWorld, `${label}:${sentinel.name}: hit point`).toHaveLength(3);
+    expect(blocker.hitPointWorld.every(Number.isFinite), `${label}:${sentinel.name}: finite hit point`).toBe(true);
+    expect(Number.isFinite(blocker.distanceM) && blocker.distanceM >= 0, `${label}:${sentinel.name}: hit distance`).toBe(true);
+    expect(scaleAwareEqual(
+      blocker.targetDistanceM,
+      expectedTargetDistanceM,
+      [blocker.targetDistanceM, expectedTargetDistanceM],
+    ), `${label}:${sentinel.name}: blocker target distance`).toBe(true);
+    const rawTerminalDeltaM = blocker.targetDistanceM - blocker.distanceM;
+    const terminalBoundaryDistanceM = blocker.targetDistanceM - contract.terminalHandToleranceM;
+    const terminalWithinTolerance = blocker.distanceM >= terminalBoundaryDistanceM
+      && blocker.distanceM <= blocker.targetDistanceM;
+    const expectedTerminalBoundaryComparisonM = terminalWithinTolerance
+      && rawTerminalDeltaM > contract.terminalHandToleranceM
+      ? contract.terminalHandToleranceM
+      : rawTerminalDeltaM;
+    expect(terminalWithinTolerance, `${label}:${sentinel.name}: exact terminal distance boundary`).toBe(true);
+    expect(scaleAwareEqual(
+      blocker.terminalDeltaM,
+      rawTerminalDeltaM,
+      [blocker.distanceM, blocker.terminalDeltaM, blocker.targetDistanceM],
+    ), `${label}:${sentinel.name}: raw terminal delta arithmetic`).toBe(true);
+    expect(blocker.terminalDeltaM, `${label}:${sentinel.name}: nonnegative raw terminal delta`).toBeGreaterThanOrEqual(0);
+    expect(scaleAwareEqual(
+      blocker.terminalBoundaryComparisonM,
+      expectedTerminalBoundaryComparisonM,
+      [blocker.terminalBoundaryComparisonM, expectedTerminalBoundaryComparisonM, blocker.targetDistanceM],
+    ), `${label}:${sentinel.name}: comparison-normalized terminal delta`).toBe(true);
+    expect(blocker.terminalBoundaryComparisonM, `${label}:${sentinel.name}: exact terminal tolerance`).toBeLessThanOrEqual(
+      contract.terminalHandToleranceM,
+    );
+    const hitPointDistanceM = positionDelta(blocker.hitPointWorld, sentinel.worldPosition);
+    const representationScale = Math.max(
+      1,
+      blocker.targetDistanceM,
+      blocker.distanceM,
+      ...blocker.hitPointWorld.map(Math.abs),
+      ...sentinel.worldPosition.map(Math.abs),
+    );
+    const representationTolerance = Number.EPSILON * 16 * representationScale;
+    const hitPointWithinTolerance = hitPointDistanceM <= contract.terminalHandToleranceM
+      || (terminalWithinTolerance
+        && Math.abs(hitPointDistanceM - rawTerminalDeltaM) <= representationTolerance
+        && rawTerminalDeltaM - contract.terminalHandToleranceM <= representationTolerance);
+    const expectedHitPointBoundaryComparisonM = hitPointWithinTolerance
+      && hitPointDistanceM > contract.terminalHandToleranceM
+      ? contract.terminalHandToleranceM
+      : hitPointDistanceM;
+    expect(hitPointWithinTolerance, `${label}:${sentinel.name}: exact hit-point boundary`).toBe(true);
+    expect(scaleAwareEqual(
+      blocker.hitPointToSentinelM,
+      hitPointDistanceM,
+      [...blocker.hitPointWorld, ...sentinel.worldPosition],
+    ), `${label}:${sentinel.name}: hit-point distance`).toBe(true);
+    expect(blocker.hitPointToSentinelM, `${label}:${sentinel.name}: nonnegative raw hit-point distance`)
+      .toBeGreaterThanOrEqual(0);
+    expect(scaleAwareEqual(
+      blocker.hitPointBoundaryComparisonM,
+      expectedHitPointBoundaryComparisonM,
+      [blocker.hitPointBoundaryComparisonM, expectedHitPointBoundaryComparisonM, representationScale],
+    ), `${label}:${sentinel.name}: comparison-normalized hit-point distance`).toBe(true);
+    expect(blocker.hitPointBoundaryComparisonM, `${label}:${sentinel.name}: hit-point terminal tolerance`)
+      .toBeLessThanOrEqual(contract.terminalHandToleranceM);
+    expect(scaleAwareEqual(
+      blocker.boundaryUlpAllowanceM,
+      representationTolerance,
+      [blocker.boundaryUlpAllowanceM, representationTolerance, representationScale],
+    ), `${label}:${sentinel.name}: exact scale-aware ULP allowance`).toBe(true);
+    expect(blocker.cameraInsideOpaqueGeometry, `${label}:${sentinel.name}: independent camera-inside classification`)
+      .toBe(blocker.distanceM <= contract.cameraInsideOpaqueDistanceM);
+    expect(blocker.dominantBones, `${label}:${sentinel.name}: three dominant face bones`).toHaveLength(3);
+    const ownedCount = blocker.dominantBones.filter(({ handOwned }: any) => handOwned === true).length;
+    expect(blocker.dominantBones.every(({ handOwned }: any) => typeof handOwned === 'boolean'),
+      `${label}:${sentinel.name}: explicit per-vertex ownership booleans`).toBe(true);
+    expect(blocker.handOwnedDominantBoneCount, `${label}:${sentinel.name}: majority count`).toBe(ownedCount);
+    expect(ownedCount, `${label}:${sentinel.name}: hand-owned face majority`).toBeGreaterThanOrEqual(2);
+    for (let vertex = 0; vertex < blocker.dominantBones.length; vertex += 1) {
+      const dominant = blocker.dominantBones[vertex];
+      expect(dominant.vertexIndex, `${label}:${sentinel.name}: face vertex binding`).toBe(
+        [blocker.face.a, blocker.face.b, blocker.face.c][vertex],
+      );
+      expect(Number.isSafeInteger(dominant.slot) && dominant.slot >= 0 && dominant.slot <= 3,
+        `${label}:${sentinel.name}: dominant slot`).toBe(true);
+      expect(Number.isSafeInteger(dominant.skinIndex) && dominant.skinIndex >= 0,
+        `${label}:${sentinel.name}: dominant skin index`).toBe(true);
+      expect(Number.isFinite(dominant.normalizedWeight)
+        && dominant.normalizedWeight >= 0 && dominant.normalizedWeight <= 1,
+      `${label}:${sentinel.name}: normalized dominant weight`).toBe(true);
+      expect(typeof dominant.bone === 'string' && dominant.bone.length > 0,
+        `${label}:${sentinel.name}: dominant bone identity`).toBe(true);
+    }
   }
   return selfOcclusion;
 }

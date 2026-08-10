@@ -103,6 +103,69 @@ function riggedDrawFixture() {
   };
 }
 
+function handOwnershipFixture() {
+  const actor = new THREE.Group();
+  const operator = new THREE.Group();
+  actor.add(operator);
+  const leftWrist = new THREE.Bone();
+  leftWrist.name = 'WristL';
+  const leftFinger = new THREE.Bone();
+  leftFinger.name = 'Index2L';
+  leftWrist.add(leftFinger);
+  const torso = new THREE.Bone();
+  torso.name = 'Torso';
+  const rightWrist = new THREE.Bone();
+  rightWrist.name = 'WristR';
+  const rightFinger = new THREE.Bone();
+  rightFinger.name = 'Index2R';
+  rightWrist.add(rightFinger);
+  operator.add(leftWrist, torso, rightWrist);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+    -1, -1, 0, 1, -1, 0, 0, 1, 0,
+    -1, -1, -1, 1, -1, -1, 0, 1, -1,
+  ], 3));
+  geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute([
+    0, 2, 0, 0,
+    1, 2, 0, 0,
+    2, 0, 0, 0,
+    2, 0, 0, 0,
+    2, 0, 0, 0,
+    2, 0, 0, 0,
+  ], 4));
+  geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute([
+    0.5, 0.5, 0, 0,
+    0.7, 0.3, 0, 0,
+    1, 0, 0, 0,
+    1, 0, 0, 0,
+    1, 0, 0, 0,
+    1, 0, 0, 0,
+  ], 4));
+  const mesh = new THREE.SkinnedMesh(geometry, new THREE.MeshBasicMaterial());
+  mesh.name = 'canonical-operator-skin';
+  mesh.bind(new THREE.Skeleton([leftWrist, leftFinger, torso, rightWrist, rightFinger]));
+  operator.add(mesh);
+  const weapon = new THREE.Group();
+  weapon.name = 'held-weapon';
+  operator.add(weapon);
+  return { actor, operator, mesh, weapon, leftWrist, rightWrist };
+}
+
+function provenanceHit(
+  object: THREE.Object3D,
+  distance: number,
+  face: [number, number, number] | null = [0, 1, 2],
+): THREE.Intersection {
+  return {
+    distance,
+    point: new THREE.Vector3(0, 0, distance),
+    object,
+    face: face ? {
+      a: face[0], b: face[1], c: face[2], normal: new THREE.Vector3(0, 0, 1), materialIndex: 0,
+    } : null,
+  };
+}
+
 describe('rigged evidence per-intersection occluder qualification', () => {
   it('fails closed on null, malformed, duplicate, missing, or oversized capture targets', () => {
     const actorExists = (_kind: 'bot' | 'training-dummy', id: string) => id === 'present';
@@ -842,38 +905,201 @@ describe('rigged evidence per-intersection occluder qualification', () => {
     geometry.dispose();
   });
 
-  it('accepts only terminal actor skin and rejects torso, weapon, world, and camera-inside hits', () => {
-    const actor = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
-    body.name = 'body';
-    const weapon = body.clone();
-    weapon.name = 'weapon';
-    actor.add(body, weapon);
-    const world = body.clone();
-    world.name = 'world';
+  it('recomputes a stale moved-instance sphere while preserving every live override and bound', () => {
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const material = new THREE.MeshBasicMaterial();
+    const presentation = new THREE.InstancedMesh(geometry, material, 1);
+    presentation.setMatrixAt(0, new THREE.Matrix4().makeTranslation(0, 0, -2));
+    presentation.instanceMatrix.needsUpdate = true;
+    presentation.updateMatrixWorld(true);
+    const cachedBox = new THREE.Box3(new THREE.Vector3(90, 90, 90), new THREE.Vector3(91, 91, 91));
+    const cachedBoxContent = cachedBox.clone();
+    const cachedSphere = new THREE.Sphere(new THREE.Vector3(100, 100, 100), 0.1);
+    const cachedSphereContent = cachedSphere.clone();
+    presentation.boundingBox = cachedBox;
+    presentation.boundingSphere = cachedSphere;
+    const combatRaycast = () => undefined;
+    presentation.raycast = combatRaycast;
+    const raycaster = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, 0, -1), 0, 4);
+
+    const evidenceHits = intersectRiggedEvidencePresentationObjects(raycaster, [presentation]);
+
+    expect(evidenceHits.length).toBeGreaterThan(0);
+    expect(evidenceHits[0]).toMatchObject({ object: presentation, instanceId: 0 });
+    expect(presentation.raycast).toBe(combatRaycast);
+    expect(presentation.boundingSphere).toBe(cachedSphere);
+    expect(presentation.boundingSphere).toEqual(cachedSphereContent);
+    expect(presentation.boundingBox).toBe(cachedBox);
+    expect(presentation.boundingBox).toEqual(cachedBoxContent);
+    geometry.dispose();
+    material.dispose();
+  });
+
+  it('restores the exact instanced sphere, box, and override when native evidence raycasting throws', () => {
+    const presentation = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshBasicMaterial(),
+      1,
+    );
+    const cachedBox = new THREE.Box3(new THREE.Vector3(1, 2, 3), new THREE.Vector3(4, 5, 6));
+    const cachedSphere = new THREE.Sphere(new THREE.Vector3(7, 8, 9), 10);
+    presentation.boundingBox = cachedBox;
+    presentation.boundingSphere = cachedSphere;
+    const combatRaycast = () => undefined;
+    presentation.raycast = combatRaycast;
+    presentation.computeBoundingSphere = () => {
+      presentation.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 999);
+      throw new Error('synthetic instance bounds failure');
+    };
+    const raycaster = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, 0, -1));
+
+    expect(() => intersectRiggedEvidencePresentationObjects(raycaster, [presentation]))
+      .toThrow('synthetic instance bounds failure');
+    expect(presentation.raycast).toBe(combatRaycast);
+    expect(presentation.boundingSphere).toBe(cachedSphere);
+    expect(presentation.boundingBox).toBe(cachedBox);
+    presentation.geometry.dispose();
+    (presentation.material as THREE.Material).dispose();
+  });
+
+  it('uses native batched geometry while preserving its combat override and bound objects', () => {
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const material = new THREE.MeshBasicMaterial();
+    const presentation = new THREE.BatchedMesh(
+      1,
+      geometry.getAttribute('position').count,
+      geometry.index?.count ?? 0,
+      material,
+    );
+    const geometryId = presentation.addGeometry(geometry);
+    const batchId = presentation.addInstance(geometryId);
+    presentation.setMatrixAt(batchId, new THREE.Matrix4().makeTranslation(0, 0, -2));
+    presentation.updateMatrixWorld(true);
+    const cachedBox = new THREE.Box3(new THREE.Vector3(10, 10, 10), new THREE.Vector3(11, 11, 11));
+    const cachedSphere = new THREE.Sphere(new THREE.Vector3(12, 12, 12), 0.5);
+    const cachedBoxContent = cachedBox.clone();
+    const cachedSphereContent = cachedSphere.clone();
+    presentation.boundingBox = cachedBox;
+    presentation.boundingSphere = cachedSphere;
+    const combatRaycast = () => undefined;
+    presentation.raycast = combatRaycast;
+    const raycaster = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, 0, -1), 0, 4);
+
+    const evidenceHits = intersectRiggedEvidencePresentationObjects(raycaster, [presentation]);
+
+    expect(evidenceHits.length).toBeGreaterThan(0);
+    expect(evidenceHits[0]).toMatchObject({ object: presentation, batchId });
+    expect(presentation.raycast).toBe(combatRaycast);
+    expect(presentation.boundingSphere).toBe(cachedSphere);
+    expect(presentation.boundingSphere).toEqual(cachedSphereContent);
+    expect(presentation.boundingBox).toBe(cachedBox);
+    expect(presentation.boundingBox).toEqual(cachedBoxContent);
+    presentation.geometry.dispose();
+    geometry.dispose();
+    material.dispose();
+  });
+
+  it('accepts only majority hand-owned canonical skin and records deterministic face provenance', () => {
+    const { actor, operator, mesh, weapon, leftWrist, rightWrist } = handOwnershipFixture();
     const origin = new THREE.Vector3(0, 0, 0);
     const target = new THREE.Vector3(0, 0, 0.7);
-    const hit = (object: THREE.Object3D, distance: number): THREE.Intersection => ({
-      distance,
-      point: new THREE.Vector3(0, 0, distance),
-      object,
-    });
+    const terminal = classifyRiggedHandSelfOcclusionHit(
+      provenanceHit(mesh, 0.65), origin, target, actor, operator, weapon, 'left', leftWrist,
+    );
 
-    const terminal = classifyRiggedHandSelfOcclusionHit(hit(body, 0.65), origin, target, actor, weapon);
-    expect(terminal).toMatchObject({ clear: true, reason: 'terminal-hand-surface' });
+    expect(terminal).toMatchObject({
+      clear: true,
+      reason: 'terminal-hand-surface',
+      mesh: 'canonical-operator-skin',
+      face: { a: 0, b: 1, c: 2 },
+      materialIndex: 0,
+      hitPointWorld: [0, 0, 0.65],
+      canonicalOperatorSkinnedMesh: true,
+      requestedSide: 'left',
+      requestedWrist: 'WristL',
+      handOwnedDominantBoneCount: 2,
+      faceHandOwned: true,
+    });
+    expect(terminal?.dominantBones).toMatchObject([
+      { vertexIndex: 0, slot: 0, skinIndex: 0, bone: 'WristL', handOwned: true },
+      { vertexIndex: 1, slot: 0, skinIndex: 1, bone: 'Index2L', handOwned: true },
+      { vertexIndex: 2, slot: 0, skinIndex: 2, bone: 'Torso', handOwned: false },
+    ]);
+    expect((terminal?.dominantBones as Array<{ normalizedWeight: number }>)[0].normalizedWeight).toBeCloseTo(0.5);
+    expect((terminal?.dominantBones as Array<{ normalizedWeight: number }>)[1].normalizedWeight).toBeCloseTo(0.7);
+    expect((terminal?.dominantBones as Array<{ normalizedWeight: number }>)[2].normalizedWeight).toBe(1);
     expect(terminal?.terminalDeltaM).toBeCloseTo(0.05);
-    expect(classifyRiggedHandSelfOcclusionHit(hit(body, 0.4), origin, target, actor, weapon))
-      .toMatchObject({ clear: false, reason: 'actor-self-occlusion-before-hand-sentinel' });
-    expect(classifyRiggedHandSelfOcclusionHit(hit(weapon, 0.65), origin, target, actor, weapon))
-      .toMatchObject({ clear: false, heldWeapon: true, reason: 'held-weapon-before-hand-sentinel' });
-    expect(classifyRiggedHandSelfOcclusionHit(hit(world, 0.65), origin, target, actor, weapon))
-      .toMatchObject({ clear: false, reason: 'world-occlusion-before-hand-sentinel' });
     expect(classifyRiggedHandSelfOcclusionHit(
-      hit(body, RIGGED_HAND_SELF_OCCLUSION_CONTRACT.cameraInsideOpaqueDistanceM),
-      origin,
-      target,
-      actor,
-      weapon,
-    )).toMatchObject({ clear: false, reason: 'camera-inside-opaque-geometry' });
+      provenanceHit(mesh, 0.65, [3, 4, 5]), origin, target, actor, operator, weapon, 'left', leftWrist,
+    )).toMatchObject({ clear: false, canonicalOperatorSkinnedMesh: true, faceHandOwned: false });
+    expect(classifyRiggedHandSelfOcclusionHit(
+      provenanceHit(mesh, 0.65), origin, target, actor, operator, weapon, 'right', rightWrist,
+    )).toMatchObject({ clear: false, requestedWrist: 'WristR', handOwnedDominantBoneCount: 0 });
+    expect(classifyRiggedHandSelfOcclusionHit(
+      provenanceHit(mesh, 0.65), origin, target, actor, operator, weapon, 'left', rightWrist,
+    )).toMatchObject({
+      clear: false,
+      requestedSide: 'left',
+      requestedWrist: 'WristR',
+      requestedWristMatchesSide: false,
+      canonicalOperatorSkinnedMesh: false,
+    });
+  });
+
+  it('rejects attachment, weapon, world, missing-face, camera-inside, and over-tolerance hits', () => {
+    const { actor, operator, mesh, weapon, leftWrist } = handOwnershipFixture();
+    const backpack = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+    backpack.name = 'backpack-attachment';
+    operator.add(backpack);
+    const weaponMesh = backpack.clone();
+    weapon.add(weaponMesh);
+    const world = backpack.clone();
+    const origin = new THREE.Vector3();
+    const target = new THREE.Vector3(0, 0, 0.7);
+    const classify = (hit: THREE.Intersection) => classifyRiggedHandSelfOcclusionHit(
+      hit, origin, target, actor, operator, weapon, 'left', leftWrist,
+    );
+
+    expect(classify(provenanceHit(backpack, 0.65))).toMatchObject({
+      clear: false, sameActor: true, canonicalOperatorSkinnedMesh: false,
+      reason: 'actor-self-occlusion-before-hand-sentinel',
+    });
+    expect(classify(provenanceHit(weaponMesh, 0.65))).toMatchObject({
+      clear: false, heldWeapon: true, reason: 'held-weapon-before-hand-sentinel',
+    });
+    expect(classify(provenanceHit(world, 0.65))).toMatchObject({
+      clear: false, sameActor: false, reason: 'world-occlusion-before-hand-sentinel',
+    });
+    expect(classify(provenanceHit(mesh, 0.65, null))).toMatchObject({
+      clear: false, canonicalOperatorSkinnedMesh: true, faceHandOwned: false,
+    });
+    expect(classify(provenanceHit(
+      mesh, RIGGED_HAND_SELF_OCCLUSION_CONTRACT.cameraInsideOpaqueDistanceM,
+    ))).toMatchObject({ clear: false, reason: 'camera-inside-opaque-geometry' });
+    expect(classify(provenanceHit(mesh, target.z - 0.0600001))).toMatchObject({ clear: false });
+  });
+
+  it('accepts the exact 0.06m terminal boundary without accepting the next farther hit', () => {
+    const { actor, operator, mesh, weapon, leftWrist } = handOwnershipFixture();
+    const origin = new THREE.Vector3();
+    const target = new THREE.Vector3(0, 0, 0.7);
+    const classify = (distance: number) => classifyRiggedHandSelfOcclusionHit(
+      provenanceHit(mesh, distance), origin, target, actor, operator, weapon, 'left', leftWrist,
+    );
+    const boundaryDistance = target.z - RIGGED_HAND_SELF_OCCLUSION_CONTRACT.terminalHandToleranceM;
+    const exactBoundary = classify(boundaryDistance);
+    expect(exactBoundary).toMatchObject({
+      clear: true,
+      terminalBoundaryComparisonM: RIGGED_HAND_SELF_OCCLUSION_CONTRACT.terminalHandToleranceM,
+      hitPointBoundaryComparisonM: RIGGED_HAND_SELF_OCCLUSION_CONTRACT.terminalHandToleranceM,
+    });
+    expect(exactBoundary?.terminalDeltaM).toBeGreaterThan(
+      RIGGED_HAND_SELF_OCCLUSION_CONTRACT.terminalHandToleranceM,
+    );
+    expect(exactBoundary?.hitPointToSentinelM).toBeGreaterThan(
+      RIGGED_HAND_SELF_OCCLUSION_CONTRACT.terminalHandToleranceM,
+    );
+    expect(exactBoundary?.boundaryUlpAllowanceM).toBeGreaterThan(0);
+    expect(classify(boundaryDistance - Number.EPSILON)).toMatchObject({ clear: false });
   });
 });

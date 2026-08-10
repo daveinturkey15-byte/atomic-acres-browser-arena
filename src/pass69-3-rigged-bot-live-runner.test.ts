@@ -23,6 +23,7 @@ const artKitTest = readFileSync('src/art-kit.test.ts', 'utf8');
 const legacy = readFileSync('src/legacy-main.ts', 'utf8');
 const dummyUnit = readFileSync('src/additional-maps-rigged-dummy.test.ts', 'utf8');
 const handEvidence = readFileSync('src/rigged-hand-evidence.ts', 'utf8');
+const handOcclusion = readFileSync('src/rigged-evidence-occlusion.ts', 'utf8');
 const gitignore = readFileSync('.gitignore', 'utf8');
 
 describe('Pass 69.3 real rigged-bot evidence boundary', () => {
@@ -281,6 +282,23 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     expect(runner).toContain('held-weapon terminal hit must never be accepted');
     expect(runner).toContain('camera-inside opaque geometry must fail');
     expect(runner).toContain('stale sampled self-occlusion frame must fail cached binding');
+    expect(runner).toContain('string occluder count must fail');
+    expect(runner).toContain('fractional occluder count must fail');
+    expect(runner).toContain('held weapon count outside actor subset must fail');
+    expect(runner).toContain('zero held weapon occluder count must fail');
+    expect(runner).toContain('actor count outside render subset must fail');
+    expect(runner).toContain('malformed hit-point vector must fail closed');
+    expect(runner).toContain('forged blocker distance must fail');
+    expect(runner).toContain('forged blocker target distance must fail');
+    expect(runner).toContain('forged raw terminal delta must fail');
+    expect(runner).toContain('negative raw hit-point distance must fail');
+    expect(runner).toContain('noncanonical attachment terminal hit must fail');
+    expect(runner).toContain('requested side and wrist mismatch must fail despite forged true binding claim');
+    expect(runner).toContain('exact 0.06m comparison boundary must pass with raw evidence retained');
+    expect(runner).toContain('meaningful epsilon beyond 0.06m must fail');
+    expect(runner).toContain('terminalBoundaryComparisonM');
+    expect(runner).toContain('hitPointBoundaryComparisonM');
+    expect(runner).toContain('boundaryUlpAllowanceM');
     expect(runner).toContain('cachedMatches.length !== 1');
     expect(runner).toContain('completion.finalPausedSubmissionSequence !== paused.submissionSequence');
     expect(runner).toContain('completion.observedCompletedSequence >= paused.submissionSequence');
@@ -292,6 +310,13 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     expect(runner).toContain("const validateReceiptMode = process.argv[2] === '--validate-receipt'");
     expect(runner).toContain('failed predicates: ${failedPredicates.join(\', \')}');
     expect(runner).toContain("failedPredicates: ['receipt.readable']");
+    expect(handOcclusion).toContain("contract: 'submitted-frame-hand-self-occlusion-v2'");
+    expect(handOcclusion).toContain("Reflect.set(candidate, 'boundingSphere', null)");
+    expect(handOcclusion).toContain('THREE.InstancedMesh.prototype.raycast.call(candidate, raycaster, intersections)');
+    expect(handOcclusion).toContain("Reflect.set(candidate, 'boundingSphere', previousBoundingSphere)");
+    expect(handOcclusion).toContain('THREE.BatchedMesh.prototype.raycast.call(candidate, raycaster, intersections)');
+    expect(handOcclusion).toContain("operatorRoot.getObjectByName(expectedWristName) === requestedWrist");
+    expect(handOcclusion).toContain('handOwnedDominantBoneCount >= 2');
     const catalog = graph.testCatalog.find(({ id }) => id === 'T-PASS69-3-RIGGED-DUMMY');
     expect(catalog).toMatchObject({
       command: 'npm run qa:pass69-3:rigged-bot-live',

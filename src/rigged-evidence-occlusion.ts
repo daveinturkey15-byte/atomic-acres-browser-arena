@@ -3,7 +3,7 @@ import * as THREE from 'three';
 export const RIGGED_EVIDENCE_OCCLUDER_MINIMUM_OPACITY = 0.75;
 
 export const RIGGED_HAND_SELF_OCCLUSION_CONTRACT = Object.freeze({
-  contract: 'submitted-frame-hand-self-occlusion-v1',
+  contract: 'submitted-frame-hand-self-occlusion-v2',
   actorSelfOcclusionIncluded: true,
   actorAttachmentsIncluded: true,
   heldWeaponTerminalHitAccepted: false,
@@ -1385,9 +1385,22 @@ export function intersectRiggedEvidencePresentationObjects(
         Reflect.set(candidate, 'boundingSphere', previousBoundingSphere);
       }
     } else if (candidate instanceof THREE.InstancedMesh) {
-      THREE.InstancedMesh.prototype.raycast.call(candidate, raycaster, intersections);
+      const previousBoundingSphere = candidate.boundingSphere;
+      Reflect.set(candidate, 'boundingSphere', null);
+      try {
+        THREE.InstancedMesh.prototype.raycast.call(candidate, raycaster, intersections);
+      } finally {
+        Reflect.set(candidate, 'boundingSphere', previousBoundingSphere);
+      }
     } else if (candidate instanceof THREE.BatchedMesh) {
-      THREE.BatchedMesh.prototype.raycast.call(candidate, raycaster, intersections);
+      const previousBoundingBox = candidate.boundingBox;
+      const previousBoundingSphere = candidate.boundingSphere;
+      try {
+        THREE.BatchedMesh.prototype.raycast.call(candidate, raycaster, intersections);
+      } finally {
+        Reflect.set(candidate, 'boundingBox', previousBoundingBox);
+        Reflect.set(candidate, 'boundingSphere', previousBoundingSphere);
+      }
     } else {
       THREE.Mesh.prototype.raycast.call(candidate, raycaster, intersections);
     }
@@ -1441,29 +1454,136 @@ export function classifyRiggedHandSelfOcclusionHit(
   origin: THREE.Vector3,
   target: THREE.Vector3,
   actorRoot: THREE.Object3D,
+  operatorRoot: THREE.Object3D,
   weaponRoot: THREE.Object3D | null,
+  requestedSide: 'left' | 'right',
+  requestedWrist: THREE.Bone,
 ): Readonly<Record<string, unknown>> | null {
   if (!intersection) return null;
   const targetDistanceM = origin.distanceTo(target);
-  const terminalDeltaM = targetDistanceM - intersection.distance;
-  const hitPointToSentinelM = intersection.point.distanceTo(target);
+  const rawTerminalDeltaM = targetDistanceM - intersection.distance;
+  const rawHitPointToSentinelM = intersection.point.distanceTo(target);
+  const terminalBoundaryDistanceM = targetDistanceM
+    - RIGGED_HAND_SELF_OCCLUSION_CONTRACT.terminalHandToleranceM;
+  const terminalDistanceWithinTolerance = intersection.distance >= terminalBoundaryDistanceM
+    && intersection.distance <= targetDistanceM;
+  const representationScale = Math.max(
+    1,
+    targetDistanceM,
+    intersection.distance,
+    ...origin.toArray().map(Math.abs),
+    ...target.toArray().map(Math.abs),
+    ...intersection.point.toArray().map(Math.abs),
+  );
+  const representationTolerance = Number.EPSILON * 16 * representationScale;
+  const hitPointWithinTolerance = rawHitPointToSentinelM
+      <= RIGGED_HAND_SELF_OCCLUSION_CONTRACT.terminalHandToleranceM
+    || (terminalDistanceWithinTolerance
+      && Math.abs(rawHitPointToSentinelM - rawTerminalDeltaM) <= representationTolerance
+      && rawTerminalDeltaM - RIGGED_HAND_SELF_OCCLUSION_CONTRACT.terminalHandToleranceM
+        <= representationTolerance);
+  const terminalBoundaryComparisonM = terminalDistanceWithinTolerance
+      && rawTerminalDeltaM > RIGGED_HAND_SELF_OCCLUSION_CONTRACT.terminalHandToleranceM
+    ? RIGGED_HAND_SELF_OCCLUSION_CONTRACT.terminalHandToleranceM
+    : rawTerminalDeltaM;
+  const hitPointBoundaryComparisonM = hitPointWithinTolerance
+      && rawHitPointToSentinelM > RIGGED_HAND_SELF_OCCLUSION_CONTRACT.terminalHandToleranceM
+    ? RIGGED_HAND_SELF_OCCLUSION_CONTRACT.terminalHandToleranceM
+    : rawHitPointToSentinelM;
   const sameActor = riggedEvidenceObjectDescendsFrom(intersection.object, actorRoot);
   const heldWeapon = weaponRoot !== null
     && riggedEvidenceObjectDescendsFrom(intersection.object, weaponRoot);
+  const mesh = intersection.object;
+  const expectedWristName = requestedSide === 'left' ? 'WristL' : 'WristR';
+  const requestedWristMatchesSide = requestedWrist.name === expectedWristName
+    && operatorRoot.getObjectByName(expectedWristName) === requestedWrist;
+  const canonicalOperatorSkinnedMesh = requestedWristMatchesSide && mesh instanceof THREE.SkinnedMesh
+    && riggedEvidenceObjectDescendsFrom(mesh, operatorRoot)
+    && mesh.skeleton.bones.includes(requestedWrist)
+    && riggedEvidenceObjectDescendsFrom(requestedWrist, operatorRoot);
+  const face = intersection.face;
+  const dominantBones = canonicalOperatorSkinnedMesh && face
+    ? [face.a, face.b, face.c].map((vertexIndex) => {
+      const skinIndex = mesh.geometry.getAttribute('skinIndex');
+      const skinWeight = mesh.geometry.getAttribute('skinWeight');
+      const component = (attribute: THREE.BufferAttribute | THREE.InterleavedBufferAttribute, slot: number) => {
+        if (slot === 0) return attribute.getX(vertexIndex);
+        if (slot === 1) return attribute.getY(vertexIndex);
+        if (slot === 2) return attribute.getZ(vertexIndex);
+        return attribute.getW(vertexIndex);
+      };
+      if (!skinIndex || !skinWeight || skinIndex.itemSize < 4 || skinWeight.itemSize < 4
+        || !Number.isSafeInteger(vertexIndex) || vertexIndex < 0
+        || vertexIndex >= skinIndex.count || vertexIndex >= skinWeight.count) return Object.freeze({
+        vertexIndex,
+        slot: null,
+        skinIndex: null,
+        normalizedWeight: null,
+        bone: null,
+        handOwned: false,
+      });
+      const weights = [0, 1, 2, 3].map((slot) => component(skinWeight, slot));
+      const weightSum = weights.reduce((sum, weight) => sum + weight, 0);
+      if (!weights.every((weight) => Number.isFinite(weight) && weight >= 0) || !(weightSum > 0)) {
+        return Object.freeze({
+          vertexIndex,
+          slot: null,
+          skinIndex: null,
+          normalizedWeight: null,
+          bone: null,
+          handOwned: false,
+        });
+      }
+      let dominantSlot = 0;
+      for (let slot = 1; slot < 4; slot += 1) {
+        if (weights[slot] > weights[dominantSlot]) dominantSlot = slot;
+      }
+      const dominantSkinIndex = component(skinIndex, dominantSlot);
+      const dominantBone = Number.isSafeInteger(dominantSkinIndex) && dominantSkinIndex >= 0
+        ? mesh.skeleton.bones[dominantSkinIndex] ?? null
+        : null;
+      const handOwned = dominantBone !== null
+        && (dominantBone === requestedWrist || riggedEvidenceObjectDescendsFrom(dominantBone, requestedWrist));
+      return Object.freeze({
+        vertexIndex,
+        slot: dominantSlot,
+        skinIndex: dominantSkinIndex,
+        normalizedWeight: weights[dominantSlot] / weightSum,
+        bone: dominantBone?.name ?? null,
+        handOwned,
+      });
+    })
+    : [];
+  const handOwnedDominantBoneCount = dominantBones.filter(({ handOwned }) => handOwned).length;
+  const faceHandOwned = dominantBones.length === 3 && handOwnedDominantBoneCount >= 2;
   const cameraInsideOpaqueGeometry = intersection.distance
     <= RIGGED_HAND_SELF_OCCLUSION_CONTRACT.cameraInsideOpaqueDistanceM;
-  const terminalHandSurface = sameActor && !heldWeapon && !cameraInsideOpaqueGeometry
-    && terminalDeltaM >= 0
-    && terminalDeltaM <= RIGGED_HAND_SELF_OCCLUSION_CONTRACT.terminalHandToleranceM
-    && hitPointToSentinelM <= RIGGED_HAND_SELF_OCCLUSION_CONTRACT.terminalHandToleranceM;
+  const terminalHandSurface = sameActor && canonicalOperatorSkinnedMesh && faceHandOwned
+    && !heldWeapon && !cameraInsideOpaqueGeometry
+    && terminalDistanceWithinTolerance
+    && hitPointWithinTolerance;
   return Object.freeze({
     name: intersection.object.name || intersection.object.type,
+    mesh: intersection.object.name || intersection.object.type,
+    face: face ? Object.freeze({ a: face.a, b: face.b, c: face.c }) : null,
+    materialIndex: face?.materialIndex ?? null,
+    hitPointWorld: Object.freeze(intersection.point.toArray()),
     distanceM: intersection.distance,
     targetDistanceM,
-    terminalDeltaM,
-    hitPointToSentinelM,
+    terminalDeltaM: rawTerminalDeltaM,
+    hitPointToSentinelM: rawHitPointToSentinelM,
+    terminalBoundaryComparisonM,
+    hitPointBoundaryComparisonM,
+    boundaryUlpAllowanceM: representationTolerance,
     sameActor,
     heldWeapon,
+    canonicalOperatorSkinnedMesh,
+    requestedSide,
+    requestedWrist: requestedWrist.name,
+    requestedWristMatchesSide,
+    dominantBones: Object.freeze(dominantBones),
+    handOwnedDominantBoneCount,
+    faceHandOwned,
     cameraInsideOpaqueGeometry,
     clear: terminalHandSurface,
     reason: cameraInsideOpaqueGeometry
