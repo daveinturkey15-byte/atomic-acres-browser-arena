@@ -1203,12 +1203,22 @@ const RIGGED_CARBINE_GRIP_REFERENCE = Object.freeze({
 });
 
 const RIGGED_CARBINE_SECOND_PHALANX_CURL = Object.freeze({
-  left: Object.freeze({ thumb: -0.18, index: -0.24, middle: -0.3, ring: -0.36, pinky: -0.42 }),
+  // Exact hardware-trace replay: the old -0.42 left pinky produced only
+  // 0.259367 rad from bind on the second pose. -0.76 produces 0.374667 rad,
+  // clears the retained 0.35 gate with margin, and remains shy of the firing
+  // hand's natural -0.82 wrap.
+  left: Object.freeze({ thumb: -0.18, index: -0.24, middle: -0.3, ring: -0.36, pinky: -0.76 }),
   right: Object.freeze({ thumb: -0.34, index: -0.46, middle: -0.7, ring: -0.76, pinky: -0.82 }),
 });
 
 const RIGGED_GRIP_POSITION_ERROR_MAX_M = 0.015;
 const RIGGED_GRIP_QUATERNION_ERROR_MAX_RADIANS = 0.2;
+
+/** Apply the evaluated curl to the rendered skeletal joint used by skinning. */
+export function applyRiggedCarbineFingerCurlToBone(bone: THREE.Bone, curlRadians: number): void {
+  bone.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(curlRadians, 0, 0, 'XYZ')));
+  bone.updateWorldMatrix(false, true);
+}
 
 /** Rotate one animated bone toward a world-space target without rewriting bind offsets. */
 function orientBoneToward(bone: THREE.Bone, child: THREE.Bone, targetWorld: THREE.Vector3): void {
@@ -1463,8 +1473,7 @@ function applyRiggedCarbineFingerCurl(
         bones.push({ side, digit, bone: runtimeName, curlRadians, applied: false });
         continue;
       }
-      bone.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(curlRadians, 0, 0, 'XYZ')));
-      bone.updateWorldMatrix(false, true);
+      applyRiggedCarbineFingerCurlToBone(bone, curlRadians);
       bones.push({ side, digit, bone: runtimeName, curlRadians, applied: true });
     }
   }

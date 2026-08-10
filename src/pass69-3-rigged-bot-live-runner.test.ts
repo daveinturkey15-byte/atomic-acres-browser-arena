@@ -11,6 +11,7 @@ const runner = readFileSync('scripts/qa/run-pass69-3-rigged-bot-live.mjs', 'utf8
 const spec = readFileSync('tests/e2e/pass69-3-rigged-bot-live.spec.ts', 'utf8');
 const operator = readFileSync('src/operator-model.ts', 'utf8');
 const artKit = readFileSync('src/art-kit.ts', 'utf8');
+const artKitTest = readFileSync('src/art-kit.test.ts', 'utf8');
 const legacy = readFileSync('src/legacy-main.ts', 'utf8');
 const dummyUnit = readFileSync('src/additional-maps-rigged-dummy.test.ts', 'utf8');
 
@@ -126,6 +127,10 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     expect(artKit).toContain('authoredLocalPosition: Object.freeze([-0.10000000149011612, -0.03999999910593033, 0.47999998927116394]');
     expect(artKit).toContain("liveTargetContract: 'runtime-calibrated-from-authored-source-v1'");
     expect(artKit).toContain("calibrationReason: 'third-person-swat-chain-reach-without-unsafe-stretch'");
+    expect(artKit).toContain('pinky: -0.76');
+    expect(artKit).toContain('applyRiggedCarbineFingerCurlToBone(bone, curlRadians)');
+    expect(artKitTest).toContain('0.2593672251552949');
+    expect(artKitTest).toContain('0.3746668889113999');
     expect(artKit).toContain("root.userData.operatorUnarmedHandPose = rig.weaponId === null");
     expect(artKit.indexOf('const observedImportedSourceLocalPosition = socket.position.toArray()'))
       .toBeLessThan(artKit.indexOf("supportGrip.position.set(...RIGGED_SUPPORT_GRIP_POSITION[weaponId])"));
@@ -175,6 +180,7 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     });
     expect(catalog?.paths).toEqual(expect.arrayContaining([
       'scripts/qa/run-pass69-3-rigged-bot-live.mjs',
+      'src/art-kit.test.ts',
       'src/art-kit.ts',
       'src/operator-model.ts',
       'src/legacy-main.ts',
@@ -197,6 +203,8 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       'zero-weight skeleton membership must fail',
       '0.299 rad elbow flex must fail',
       '0.300 rad elbow flex must pass',
+      '0.349 rad pinky bind delta must fail',
+      '0.350 rad pinky bind delta must pass',
       'corrected wrist rotation over 0.20 rad must fail',
       'post-overwrite socket cannot impersonate imported authored source',
       'cropped/off-ROI shoulder must fail',

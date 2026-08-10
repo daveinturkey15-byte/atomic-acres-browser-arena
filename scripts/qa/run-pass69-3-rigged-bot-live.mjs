@@ -317,6 +317,10 @@ function elbowFlexValid(value) {
   return Number.isFinite(value) && value >= antiTThresholds.minimumElbowFlexRadians;
 }
 
+function bindDeltaValid(value, minimumRadians) {
+  return Number.isFinite(value) && value >= minimumRadians;
+}
+
 function chainGeometryValid(model, chain, side) {
   const expectedChain = expectedBones.filter((bone) => bone.side === side);
   const shoulder = model.armPose.bones.find((bone) => bone.side === side && bone.role === 'shoulder');
@@ -485,7 +489,7 @@ function armPoseValid(model, armed) {
       && Array.isArray(bone.effectiveSkinnedMeshes)
       && model.armPose.commonEffectiveSkinnedMeshes.every((name) => bone.effectiveSkinnedMeshes.includes(name))
       && Number.isFinite(bone.bindQuaternionDeltaRadians)
-      && bone.bindQuaternionDeltaRadians >= expected.minimumBindRadians
+      && bindDeltaValid(bone.bindQuaternionDeltaRadians, expected.minimumBindRadians)
       && Array.isArray(bone.localQuaternion)
       && bone.localQuaternion.length === 4
       && bone.localQuaternion.every(Number.isFinite)
@@ -512,7 +516,7 @@ function armPoseValid(model, armed) {
       && Array.isArray(bone.effectiveSkinnedMeshes)
       && model.armPose.commonEffectiveSkinnedMeshes.every((name) => bone.effectiveSkinnedMeshes.includes(name))
       && bone.finite === true
-      && bone.bindQuaternionDeltaRadians >= expected.minimumBindRadians;
+      && bindDeltaValid(bone.bindQuaternionDeltaRadians, expected.minimumBindRadians);
   })) return false;
   if (!model.armPose.chains.every((chain) => chainGeometryValid(model, chain, chain.side))) return false;
   return armed
@@ -586,6 +590,8 @@ function runContractSelfTest() {
   assert(!renderedInfluenceValid(zeroWeight), 'zero-weight skeleton membership must fail');
   assert(!elbowFlexValid(0.299), '0.299 rad elbow flex must fail');
   assert(elbowFlexValid(0.3), '0.300 rad elbow flex must pass');
+  assert(!bindDeltaValid(0.349, 0.35), '0.349 rad pinky bind delta must fail');
+  assert(bindDeltaValid(0.35, 0.35), '0.350 rad pinky bind delta must pass');
 
   const grip = {
     finite: true,

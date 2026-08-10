@@ -1,6 +1,39 @@
 import * as THREE from 'three';
 import { describe, expect, it, vi } from 'vitest';
-import { batchStaticMeshes, buildWeaponModel, optimizeAttachedWeapon, texturedMaterial, waitForPendingArtTextures } from './art-kit';
+import { applyRiggedCarbineFingerCurlToBone, batchStaticMeshes, buildWeaponModel, optimizeAttachedWeapon, texturedMaterial, waitForPendingArtTextures } from './art-kit';
+
+describe('rigged carbine finger wrap', () => {
+  it('replays both hardware poses on the rendered Pinky2L bone and clears the retained bind threshold', () => {
+    const bind = new THREE.Quaternion(
+      0.03783821687102318,
+      0.17641645669937134,
+      -0.06506747752428055,
+      0.9814335107803345,
+    );
+    const tracedAfterOldCurl = [
+      new THREE.Quaternion(-0.35393805909048315, 0.21481179440852435, -0.12095894931648729, 0.9022068113105155),
+      new THREE.Quaternion(0.04416943606473711, 0.14839248963520346, -0.19099170836858365, 0.9693222512109313),
+    ];
+    const oldCurlInverse = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.42, 0, 0, 'XYZ'));
+    const replay = (trace: THREE.Quaternion, curlRadians: number) => {
+      const bone = new THREE.Bone();
+      bone.name = 'Pinky2L';
+      bone.quaternion.copy(trace).multiply(oldCurlInverse);
+      applyRiggedCarbineFingerCurlToBone(bone, curlRadians);
+      return { bone, bindDeltaRadians: bone.quaternion.angleTo(bind) };
+    };
+
+    const oldSecond = replay(tracedAfterOldCurl[1], -0.42);
+    expect(oldSecond.bindDeltaRadians).toBeCloseTo(0.2593672251552949, 12);
+    expect(oldSecond.bindDeltaRadians >= 0.35).toBe(false);
+
+    const corrected = tracedAfterOldCurl.map((trace) => replay(trace, -0.76));
+    expect(corrected[0].bindDeltaRadians).toBeCloseTo(1.1422203698059192, 12);
+    expect(corrected[1].bindDeltaRadians).toBeCloseTo(0.3746668889113999, 12);
+    expect(corrected.every(({ bindDeltaRadians }) => bindDeltaRadians >= 0.35)).toBe(true);
+    expect(corrected[1].bone.quaternion.angleTo(oldSecond.bone.quaternion)).toBeCloseTo(0.339595123444383, 12);
+  });
+});
 
 describe('authored texture readiness', () => {
   it('waits for null-image TextureLoader placeholders before WebGPU scene compilation', async () => {

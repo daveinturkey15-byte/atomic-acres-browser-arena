@@ -2400,6 +2400,7 @@
         "scripts/qa/run-pass69-3-rigged-bot-live.mjs",
         "src/additional-maps.ts",
         "src/additional-maps-rigged-dummy.test.ts",
+        "src/art-kit.test.ts",
         "src/art-kit.ts",
         "src/legacy-main.ts",
         "src/operator-model.ts",
