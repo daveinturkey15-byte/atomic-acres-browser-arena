@@ -741,7 +741,7 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
   const armedActor = { kind: 'bot' as const, id: armedSecond.id };
   const armedScreenshots = {
     medium: await captureAtPose(page, testInfo, armedSecond.position, 4.4, 'armed-live-bot-medium', armedActor, MEDIUM_ROI_NDC),
-    close: await captureAtPose(page, testInfo, armedSecond.position, 2.05, 'armed-live-bot-close', armedActor, CLOSE_ROI_NDC, true),
+    close: await captureAtPose(page, testInfo, armedSecond.position, 2.00, 'armed-live-bot-close', armedActor, CLOSE_ROI_NDC, true),
   };
   const armedRuntime = await captureSurfaceEvidence(page, testInfo, 'atomic-acres');
 
