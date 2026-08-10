@@ -12,6 +12,9 @@ describe('menu documentation dialogs', () => {
     expect(markup).toContain('DOWNLOAD HUMAN DOCS · MD');
     expect(markup).toContain('DOWNLOAD FULL DATA · JSON');
     expect(markup).toContain('src/authoritative-shot.ts');
+    expect(markup).toContain('RELEASE CANDIDATE');
+    expect(markup).toContain('PROMOTION TARGET · RELEASE-CANDIDATE');
+    expect(markup).not.toContain('CURRENT LIVE');
   });
 
   it('renders release history from the shared changelog without inline event wiring', () => {

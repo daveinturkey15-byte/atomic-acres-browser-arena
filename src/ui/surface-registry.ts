@@ -70,7 +70,8 @@ export const UI_STATE_INVENTORY = Object.freeze([
   'modal-open', 'chat-typing', 'loading', 'error', 'reduced-motion', 'reduced-sensory',
   'pointer-lock-requesting', 'pointer-lock-denied', 'focus-suspended', 'paused-match',
   'killstreak-possession', 'chopper-gunner', 'adrenaline-active', 'care-package-nearby',
-  'narrow-height', 'narrow-width', 'ultrawide', 'high-dpi',
+  'narrow-height', 'narrow-width', 'ultrawide', 'high-dpi', 'mobile-touch',
+  'mobile-portrait', 'mobile-landscape', 'safe-area',
 ] as const);
 
 export const UI_REVIEW_VIEWPORTS = Object.freeze([
@@ -88,6 +89,16 @@ export const UI_HIGH_DPI_REVIEW_VIEWPORT = Object.freeze({
   height: 720,
   deviceScaleFactor: 2,
 } as const);
+
+export const UI_MOBILE_REVIEW_VIEWPORTS = Object.freeze([
+  { id: 'mobile-compact-portrait', width: 320, height: 568, deviceScaleFactor: 2 },
+  { id: 'mobile-portrait', width: 390, height: 844, deviceScaleFactor: 3 },
+  { id: 'mobile-compact-landscape', width: 568, height: 320, deviceScaleFactor: 2 },
+  { id: 'mobile-small-landscape', width: 667, height: 375, deviceScaleFactor: 2 },
+  { id: 'mobile-landscape', width: 844, height: 390, deviceScaleFactor: 3 },
+  { id: 'mobile-wide-landscape', width: 932, height: 430, deviceScaleFactor: 3 },
+  { id: 'mobile-tablet-landscape', width: 1024, height: 768, deviceScaleFactor: 2 },
+] as const);
 
 export function assertUiSurfaceInventory(root: ParentNode): void {
   for (const surface of UI_SURFACE_INVENTORY) {

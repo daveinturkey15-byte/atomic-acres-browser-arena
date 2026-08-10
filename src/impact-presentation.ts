@@ -170,6 +170,18 @@ export class ImpactPresentation {
     camera: THREE.Camera,
     sceneGeneration: number,
   ): Promise<void> {
+    await this.withStagedVocabulary(camera, (root) => runtime.compileAndRender(root, camera, this.scene));
+    this.gpuPrewarmGeneration = sceneGeneration;
+  }
+
+  /**
+   * Stages the exact retained points and mark vocabulary for a caller-owned
+   * renderer composition, then restores every live cursor and buffer.
+   */
+  async withStagedVocabulary(
+    camera: THREE.Camera,
+    submit: (root: THREE.Object3D) => Promise<void>,
+  ): Promise<void> {
     if (this.root.parent !== this.scene || this.points.parent !== this.root || this.marks.parent !== this.root) {
       throw new Error('Impact presentation pool must be attached to its scene before prewarm');
     }
@@ -270,8 +282,7 @@ export class ImpactPresentation {
     instanceColor.needsUpdate = true;
 
     try {
-      await runtime.compileAndRender(this.root, camera, this.scene);
-      this.gpuPrewarmGeneration = sceneGeneration;
+      await submit(this.root);
     } finally {
       this.positions.set(positionState);
       this.colors.set(colorState);

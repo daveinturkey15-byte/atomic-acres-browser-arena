@@ -10,6 +10,7 @@ import {
   authoredSupportMaterialCastsShadow,
   hunterDronePresentationTelemetry,
   supportAircraftPresentationVariant,
+  supportAircraftWingVisibility,
   supportVehiclePresentationTelemetry,
 } from './killstreak-presentation';
 import type { KillstreakImpactEvent, KillstreakRecipientSnapshot } from './killstreak-runtime';
@@ -44,6 +45,25 @@ describe('authored support preparation scheduling', () => {
     expect(buildVehicle).toContain('const level = source.scene.clone(true);');
     expect(buildVehicle).not.toContain('optimizeAuthoredSupportLevel(');
     expect(source).toContain('level.userData.supportStaticBatchOptimized = true;');
+    expect(source).not.toContain("batchAuthoredSupportStaticMeshes(mainWing, family, 'main-wing')");
+    expect(source).toContain('mainWing.userData.supportStaticBatchBoundary = true;');
+  });
+
+  it('requires a visible rendered aircraft wing span, not merely an empty semantic node', () => {
+    const aircraft = new THREE.Group();
+    const wing = new THREE.Group();
+    wing.name = 'care-aircraft-main-wing';
+    const wingMesh = new THREE.Mesh(new THREE.BoxGeometry(8, 0.3, 2), new THREE.MeshBasicMaterial());
+    wingMesh.name = 'care-main-wing-visible-batch';
+    wing.add(wingMesh);
+    aircraft.add(wing);
+    expect(supportAircraftWingVisibility(aircraft, 'care')).toMatchObject({
+      passed: true,
+      visibleMeshCount: 1,
+      contract: 'visible-rendered-wing-span-v1',
+    });
+    wingMesh.visible = false;
+    expect(supportAircraftWingVisibility(aircraft, 'care')).toMatchObject({ passed: false, visibleMeshCount: 0 });
   });
 
   it('finishes cooperative pool preparation when hidden-tab animation frames are suspended', async () => {
@@ -515,6 +535,12 @@ describe('killstreak presentation', () => {
     presentation.sync(snapshot(4), 1_000);
     expect(presentation.telemetry()).toEqual({
       entities: 4,
+      entityDetails: expect.arrayContaining([
+        expect.objectContaining({ entityId: 'ks-1-chopper-1', poolKey: 'chopper', presentationSource: 'procedural-non-release-fallback', visible: true }),
+        expect.objectContaining({ entityId: 'ks-1-care-aircraft-2', poolKey: 'care-aircraft', presentationSource: 'procedural-non-release-fallback', visible: true }),
+        expect.objectContaining({ entityId: 'ks-1-care-3', poolKey: 'care-crate', presentationSource: 'procedural-non-release-fallback', visible: true }),
+        expect.objectContaining({ entityId: 'ks-1-swarm-drone-4', poolKey: 'swarm-drone', presentationSource: 'procedural-non-release-fallback', visible: false }),
+      ]),
       impactFlashes: 0,
       bombShells: 0,
       emberParticles: 0,

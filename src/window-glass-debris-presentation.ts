@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GPU_SHARED_GEOMETRY_KEY } from './gpu-resource-ownership';
 import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 
-export const WINDOW_GLASS_DEBRIS_VISUAL_CONTRACT = 'fractured-shards-no-intact-pane-v1';
+export const WINDOW_GLASS_DEBRIS_VISUAL_CONTRACT = 'irregular-independent-radial-shards-v2';
 export const WINDOW_GLASS_DEBRIS_FRAGMENT_COUNT = 24;
 
 type WindowGlassDebrisVisualOptions = Readonly<{
@@ -11,40 +11,31 @@ type WindowGlassDebrisVisualOptions = Readonly<{
   reducedRenderMode: boolean;
 }>;
 
-/**
- * A shattered pane reads as broken when it breaks into many small shards, not
- * six large slabs. Generate a 4x3 grid of inset triangles (24 shards) with
- * visible gaps between them so the debris reads as a real break while the
- * total covered area stays inside the shared-buffer contract.
- */
+/** Build an irregular radial fracture with a small impact void and visible gaps. */
 function buildShardTriangles(): ReadonlyArray<ReadonlyArray<readonly [number, number]>> {
   const triangles: Array<ReadonlyArray<readonly [number, number]>> = [];
-  const columns = 4;
-  const rows = 3;
-  const inset = 0.1;
-  const cellWidth = 2 / columns;
-  const cellHeight = 2 / rows;
-  for (let row = 0; row < rows; row += 1) {
-    for (let column = 0; column < columns; column += 1) {
-      const x0 = -1 + column * cellWidth;
-      const x1 = x0 + cellWidth;
-      const y0 = 1 - (row + 1) * cellHeight;
-      const y1 = y0 + cellHeight;
-      const left = x0 + inset;
-      const right = x1 - inset;
-      const bottom = y0 + inset;
-      const top = y1 - inset;
-      triangles.push(Object.freeze([
-        Object.freeze([left, bottom] as const),
-        Object.freeze([right, bottom] as const),
-        Object.freeze([left, top] as const),
-      ]));
-      triangles.push(Object.freeze([
-        Object.freeze([right, bottom] as const),
-        Object.freeze([right, top] as const),
-        Object.freeze([left, top] as const),
-      ]));
-    }
+  const outer = Object.freeze([
+    [-0.86, -0.82], [-0.28, -0.88], [0.34, -0.84], [0.84, -0.66],
+    [0.88, -0.12], [0.82, 0.48], [0.58, 0.86], [0.02, 0.89],
+    [-0.5, 0.84], [-0.86, 0.56], [-0.9, 0.02], [-0.84, -0.48],
+  ] as const);
+  const inner = Object.freeze([
+    [-0.16, -0.12], [-0.06, -0.2], [0.1, -0.18], [0.2, -0.08],
+    [0.22, 0.06], [0.14, 0.18], [0.01, 0.22], [-0.13, 0.18],
+    [-0.22, 0.08], [-0.2, -0.03], [-0.25, -0.09], [-0.28, -0.17],
+  ] as const);
+  const shrinkTriangle = (points: readonly (readonly [number, number])[]) => {
+    const centreX = points.reduce((sum, point) => sum + point[0], 0) / points.length;
+    const centreY = points.reduce((sum, point) => sum + point[1], 0) / points.length;
+    return Object.freeze(points.map(([x, y]) => Object.freeze([
+      centreX + (x - centreX) * 0.84,
+      centreY + (y - centreY) * 0.84,
+    ] as const)));
+  };
+  for (let index = 0; index < outer.length; index += 1) {
+    const next = (index + 1) % outer.length;
+    triangles.push(shrinkTriangle([inner[index], outer[index], outer[next]]));
+    triangles.push(shrinkTriangle([inner[index], outer[next], inner[next]]));
   }
   return Object.freeze(triangles);
 }
@@ -52,14 +43,13 @@ function buildShardTriangles(): ReadonlyArray<ReadonlyArray<readonly [number, nu
 const SHARD_TRIANGLES = buildShardTriangles();
 
 function createSharedShardGeometry(): THREE.BufferGeometry {
-  const positions: number[] = [];
-  SHARD_TRIANGLES.forEach((triangle, fragmentIndex) => {
-    const depthLane = (fragmentIndex % 3) - 1;
-    for (const [x, y] of triangle) positions.push(x, y, depthLane);
-  });
   const geometry = new THREE.BufferGeometry();
-  geometry.name = 'window-debris:shared-fractured-shards';
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.name = 'window-debris:shared-unit-triangle';
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+    0, 0, 0,
+    1, 0, 0,
+    0, 1, 0,
+  ], 3));
   geometry.computeVertexNormals();
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
@@ -73,9 +63,6 @@ function createSharedShardGeometry(): THREE.BufferGeometry {
 // live glass breach only scales these immutable buffers instead of allocating
 // and analysing new geometry on the shot frame.
 const sharedShardGeometry = createSharedShardGeometry();
-const sharedShardEdgesGeometry = new THREE.EdgesGeometry(sharedShardGeometry, 1);
-sharedShardEdgesGeometry.name = 'window-debris:shared-fractured-shard-edges';
-sharedShardEdgesGeometry.userData[GPU_SHARED_GEOMETRY_KEY] = 'window-glass-debris-edges';
 
 /**
  * Shared shard cluster material: MeshPhysicalMaterial with transmission is
@@ -114,12 +101,43 @@ const sharedShardMaterialReduced = new THREE.MeshPhysicalMaterial({
   depthWrite: true,
 });
 
-const sharedShardEdgesMaterial = new THREE.LineBasicMaterial({ color: 0xbaf5ff, transparent: true, opacity: 0.72, toneMapped: false });
+type ShardMotion = Readonly<{
+  base: THREE.Matrix4;
+  pivot: THREE.Vector3;
+  velocity: THREE.Vector3;
+  axis: THREE.Vector3;
+  angularSpeed: number;
+}>;
+
+const shardMotionByRoot = new WeakMap<THREE.Group, Readonly<{
+  mesh: THREE.InstancedMesh;
+  shards: readonly ShardMotion[];
+}>>();
+const shardOffsetScratch = new THREE.Vector3();
+const shardRotationScratch = new THREE.Quaternion();
+const shardMatrixScratch = new THREE.Matrix4();
+const shardTransformScratch = new THREE.Matrix4();
+const shardPivotScratch = new THREE.Matrix4();
+const shardUnpivotScratch = new THREE.Matrix4();
+const shardRotationMatrixScratch = new THREE.Matrix4();
+
+function shardBaseMatrix(
+  triangle: ReadonlyArray<readonly [number, number]>,
+  halfExtents: Readonly<{ x: number; y: number; z: number }>,
+  depth: number,
+): THREE.Matrix4 {
+  const [a, b, c] = triangle;
+  return new THREE.Matrix4().set(
+    (b[0] - a[0]) * halfExtents.x, (c[0] - a[0]) * halfExtents.x, 0, a[0] * halfExtents.x,
+    (b[1] - a[1]) * halfExtents.y, (c[1] - a[1]) * halfExtents.y, 0, a[1] * halfExtents.y,
+    0, 0, Math.max(0.006, halfExtents.z * 0.32), depth,
+    0, 0, 0, 1,
+  );
+}
 
 /**
- * One bounded physics body can carry several visibly separated glass shards.
- * The old presentation used a single rectangular box, which read as an intact
- * pane falling out of its frame even though the authority had breached it.
+ * One prewarmed instanced draw carries independently transformed triangular
+ * shards. This avoids both the old rectangular grid and per-shard materials.
  */
 export function createFracturedWindowDebrisVisual(options: WindowGlassDebrisVisualOptions): THREE.Group {
   const root = new THREE.Group();
@@ -127,23 +145,66 @@ export function createFracturedWindowDebrisVisual(options: WindowGlassDebrisVisu
   root.userData.windowGlassDebrisContract = WINDOW_GLASS_DEBRIS_VISUAL_CONTRACT;
   root.userData.fragmentCount = WINDOW_GLASS_DEBRIS_FRAGMENT_COUNT;
   root.userData.intactPaneMeshCount = 0;
+  root.userData.independentShardTransforms = true;
+  root.userData.radialFracture = true;
 
   // Reuse the single prewarmed material instance for every break. Cloning per
   // break creates a new RenderObject whose first draw triggers a WebGPU shader
   // pipeline compile on the shot frame (the reported glass-break freeze).
   const shardMaterial = options.reducedRenderMode ? sharedShardMaterialReduced : sharedShardMaterialTemplate;
-  const depthScale = Math.max(0.006, options.halfExtents.z * 0.32);
-  const shards = new THREE.Mesh(sharedShardGeometry, shardMaterial);
+  const shards = new THREE.InstancedMesh(sharedShardGeometry, shardMaterial, WINDOW_GLASS_DEBRIS_FRAGMENT_COUNT);
   shards.name = `${options.id}:shard-cluster`;
-  shards.scale.set(options.halfExtents.x, options.halfExtents.y, depthScale);
   shards.userData.fragmentCount = WINDOW_GLASS_DEBRIS_FRAGMENT_COUNT;
   shards.userData.intactPane = false;
-
-  const edges = new THREE.LineSegments(sharedShardEdgesGeometry, sharedShardEdgesMaterial);
-  edges.name = `${options.id}:shard-edges`;
-  edges.scale.copy(shards.scale);
-  root.add(shards, edges);
+  shards.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  const motion = SHARD_TRIANGLES.map((triangle, index): ShardMotion => {
+    const depth = ((index % 5) - 2) * Math.max(0.004, options.halfExtents.z * 0.08);
+    const base = shardBaseMatrix(triangle, options.halfExtents, depth);
+    shards.setMatrixAt(index, base);
+    const centroid = new THREE.Vector3(
+      triangle.reduce((sum, point) => sum + point[0], 0) / 3 * options.halfExtents.x,
+      triangle.reduce((sum, point) => sum + point[1], 0) / 3 * options.halfExtents.y,
+      depth,
+    );
+    const radial = centroid.clone().setZ(0).normalize();
+    const jitter = ((index * 37) % 11 - 5) * 0.018;
+    return Object.freeze({
+      base,
+      pivot: centroid,
+      velocity: radial.multiplyScalar(0.18 + (index % 4) * 0.035).add(new THREE.Vector3(jitter, 0.06 + (index % 3) * 0.025, ((index % 5) - 2) * 0.035)),
+      axis: new THREE.Vector3(0.35 + (index % 3) * 0.2, 0.5 + (index % 5) * 0.08, 0.9).normalize(),
+      angularSpeed: 0.8 + (index % 7) * 0.21,
+    });
+  });
+  shards.instanceMatrix.needsUpdate = true;
+  root.add(shards);
+  shardMotionByRoot.set(root, Object.freeze({ mesh: shards, shards: Object.freeze(motion) }));
   return root;
+}
+
+/** Spread and rotate every shard independently during the first break beat. */
+export function updateFracturedWindowDebrisVisual(root: THREE.Group, ageSeconds: number): boolean {
+  const state = shardMotionByRoot.get(root);
+  if (!state || !Number.isFinite(ageSeconds)) return false;
+  const elapsed = THREE.MathUtils.clamp(ageSeconds, 0, 0.72);
+  const eased = 1 - Math.pow(1 - elapsed / 0.72, 3);
+  state.shards.forEach((shard, index) => {
+    shardOffsetScratch.copy(shard.velocity).multiplyScalar(eased);
+    shardOffsetScratch.y -= 0.08 * eased * eased;
+    shardRotationScratch.setFromAxisAngle(shard.axis, shard.angularSpeed * eased);
+    shardTransformScratch.makeTranslation(shardOffsetScratch.x, shardOffsetScratch.y, shardOffsetScratch.z);
+    shardPivotScratch.makeTranslation(shard.pivot.x, shard.pivot.y, shard.pivot.z);
+    shardUnpivotScratch.makeTranslation(-shard.pivot.x, -shard.pivot.y, -shard.pivot.z);
+    shardRotationMatrixScratch.makeRotationFromQuaternion(shardRotationScratch);
+    shardMatrixScratch.copy(shardTransformScratch)
+      .multiply(shardPivotScratch)
+      .multiply(shardRotationMatrixScratch)
+      .multiply(shardUnpivotScratch)
+      .multiply(shard.base);
+    state.mesh.setMatrixAt(index, shardMatrixScratch);
+  });
+  state.mesh.instanceMatrix.needsUpdate = true;
+  return true;
 }
 
 /** Submit the exact glass buffers/material while the deployment surface is up. */

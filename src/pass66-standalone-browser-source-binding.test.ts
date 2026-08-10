@@ -27,6 +27,9 @@ describe('Pass 66 standalone browser evidence source binding', () => {
       expect(source).toContain('cleanAfter: endingStatus.length === 0');
       expect(source).toContain('exactSource: !allowDirty');
       expect(source).toContain('dirtyDevelopmentCapture: allowDirty');
+      expect(source).toContain("if (snapshot.player?.stance !== 'stand') api.setStance('stand')");
+      expect(source).toContain('{ timeout: 5_000, polling: 50 }');
+      expect(source).not.toContain('await page.waitForTimeout(180)');
     } else {
       expect(source).toContain('cleanBefore: true');
       expect(source).toContain('cleanAfter: true');

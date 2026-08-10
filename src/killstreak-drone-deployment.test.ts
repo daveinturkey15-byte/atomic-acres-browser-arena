@@ -113,7 +113,7 @@ describe('drone centre-map deployment and movement', () => {
           return pointInsideBounds(point, map.bounds, 0.35)
             && !map.colliders.some((solid) => sphereIntersectsBox(point, 0.35, solid));
         },
-        droneCentreSpawnVolume: {
+        supportFlightCentreVolume: {
           centre: [
             (map.bounds.minX + map.bounds.maxX) / 2 + centrePortal.xQ * (map.bounds.maxX - map.bounds.minX) / 2,
             centrePortal.altitudeM,

@@ -962,3 +962,325 @@ body.mtc-live .reserve-stack em { font-size: 18px; }
     font-size: 15px;
   }
 }
+
+/* Pass 69.3 mobile reconciliation. Safe-area tokens are declared on the live
+   body so tests and embedded shells can supply deterministic insets. */
+body.mtc-live {
+    --mtc-safe-top: max(8px, env(safe-area-inset-top));
+    --mtc-safe-right: max(8px, env(safe-area-inset-right));
+    --mtc-safe-bottom: max(8px, env(safe-area-inset-bottom));
+    --mtc-safe-left: max(8px, env(safe-area-inset-left));
+    --mtc-button-size: 44px;
+    --mtc-button-gap: 4px;
+    --mtc-action-width: 94px;
+    --mtc-stick-size: 104px;
+  }
+
+  body.mtc-live #mobile-touch-controls {
+    --mtc-panel: rgba(5, 18, 22, 0.72);
+    --mtc-panel-active: rgba(25, 78, 84, 0.88);
+  }
+
+  body.mtc-live #mobile-touch-controls .mtc-stick {
+    bottom: var(--mtc-safe-bottom);
+    width: var(--mtc-stick-size);
+    height: var(--mtc-stick-size);
+  }
+
+  body.mtc-live #mobile-touch-controls .mtc-stick-move { left: var(--mtc-safe-left); }
+  body.mtc-live #mobile-touch-controls .mtc-stick-look { right: var(--mtc-safe-right); }
+
+  body.mtc-live #mobile-touch-controls .mtc-action-group {
+    position: absolute;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(var(--mtc-button-size), 1fr));
+    gap: var(--mtc-button-gap);
+    width: var(--mtc-action-width);
+    pointer-events: auto;
+  }
+
+  body.mtc-live #mobile-touch-controls .mtc-btn {
+    width: 100%;
+    min-width: var(--mtc-button-size);
+    height: var(--mtc-button-size);
+    min-height: var(--mtc-button-size);
+    padding: 0 2px;
+    border-radius: 10px;
+    background: var(--mtc-panel);
+    font-size: 10px;
+    line-height: 1;
+  }
+
+  body.mtc-live #mobile-touch-controls .mtc-btn:active { background: var(--mtc-panel-active); }
+  body.mtc-live #mobile-touch-controls .mtc-fire {
+    grid-column: auto;
+    height: var(--mtc-button-size);
+    min-height: var(--mtc-button-size);
+    font-size: 13px;
+  }
+  body.mtc-live #mobile-touch-controls .mtc-primary-actions .mtc-reload { grid-area: 1 / 1; }
+  body.mtc-live #mobile-touch-controls .mtc-primary-actions .mtc-switch-weapon { grid-area: 1 / 2; }
+  body.mtc-live #mobile-touch-controls .mtc-primary-actions .mtc-ads { grid-area: 2 / 1; }
+  body.mtc-live #mobile-touch-controls .mtc-primary-actions .mtc-fire { grid-area: 2 / 2; }
+
+  body.mtc-live #mobile-touch-controls .mtc-system-actions {
+    top: var(--mtc-safe-top);
+    right: var(--mtc-safe-right);
+    grid-template-columns: 52px;
+    width: 52px;
+  }
+
+  /* Keep every critical HUD root present on touch layouts. Dense surfaces are
+     compacted, and support rows remain reachable by cycling the selected row. */
+  body.mtc-live #objective { display: block; }
+  body.mtc-live .hud-performance-row { display: flex; margin-top: 2px; }
+  body.mtc-live #fps-counter { display: none; }
+  body.mtc-live .hud-map-console { display: block; }
+  body.mtc-live #support-block:not([hidden]) { display: block; }
+  body.mtc-live #killfeed { display: flex; }
+  body.mtc-live #damage-feeds { display: grid; }
+  body.mtc-live #pause-hint { display: none; }
+  body.mtc-live #combat-stats { display: flex; }
+
+  body.mtc-live .hud-mission-console {
+    top: var(--mtc-safe-top);
+    width: auto;
+  }
+
+  body.mtc-live #matchbar {
+    min-height: 48px;
+    padding: 5px 7px;
+    grid-template-columns: minmax(58px, 0.8fr) minmax(112px, 1.35fr) auto;
+    gap: 4px;
+  }
+
+  body.mtc-live .tiny { font-size: 7px; }
+  body.mtc-live #timer { margin-top: 2px; font-size: 21px; }
+  body.mtc-live #scoreline { gap: 3px; font-size: 10px; }
+  body.mtc-live #scoreline b { font-size: 17px; }
+  body.mtc-live #scoreline i { padding: 3px 4px; font-size: 7px; }
+  body.mtc-live #connection-pill { min-width: 46px; padding: 4px; font-size: 7px; }
+  body.mtc-live #objective {
+    min-height: 16px;
+    margin-top: 2px;
+    padding: 3px 6px;
+    overflow: hidden;
+    font-size: 7px;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  body.mtc-live #network-strip { gap: 2px; overflow: hidden; }
+  body.mtc-live #network-strip span {
+    min-height: 14px;
+    padding: 2px 4px;
+    font-size: 7px;
+  }
+
+  body.mtc-live .hud-map-console { padding: 4px; }
+  body.mtc-live #map-heading,
+  body.mtc-live #location-label {
+    min-height: 14px;
+    padding: 3px;
+    overflow: hidden;
+    font-size: 7px;
+    line-height: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  body.mtc-live .hud-operator-console,
+  body.mtc-live .hud-weapon-console {
+    bottom: auto;
+    padding: 5px 6px;
+  }
+
+  body.mtc-live .hud-operator-console {
+    grid-template-columns: 1fr;
+    gap: 2px;
+    overflow: hidden;
+  }
+
+  body.mtc-live #health-block { grid-column: 1; }
+  body.mtc-live #health-block b { font-size: 28px; }
+  body.mtc-live #health-block span,
+  body.mtc-live #equipment-block span,
+  body.mtc-live #equipment-block small,
+  body.mtc-live #combat-stats,
+  body.mtc-live #room-hud { font-size: 7px; }
+  body.mtc-live #combat-stats { gap: 3px; padding: 3px 4px; }
+  body.mtc-live #equipment-block {
+    grid-column: 1;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 3px;
+    overflow: hidden;
+  }
+  body.mtc-live #equipment-block b { font-size: 9px; white-space: nowrap; }
+  body.mtc-live #equipment-block small { display: none; }
+  body.mtc-live #weapon-block { padding: 6px; }
+  body.mtc-live #weapon-name { font-size: 8px; }
+  body.mtc-live #weapon-block #ammo { font-size: 32px; }
+  body.mtc-live .reserve-stack em { font-size: 17px; }
+  body.mtc-live .reserve-stack > small,
+  body.mtc-live #reload-state { font-size: 7px; }
+
+  body.mtc-live #support-block {
+    right: auto;
+    bottom: auto;
+    padding: 5px;
+  }
+  body.mtc-live #support-block .support-heading { min-height: 18px; margin-bottom: 3px; }
+  body.mtc-live #support-block .support-heading span { font-size: 7px; }
+  body.mtc-live #support-block .support-heading strong { font-size: 10px; }
+  body.mtc-live #support-block .support-list { grid-template-columns: 1fr; gap: 0; }
+  body.mtc-live #support-block .support-list b { display: none; min-height: 34px; padding: 3px; }
+  body.mtc-live #support-block .support-list b.controller-selected { display: grid; }
+  body.mtc-live #support-block .support-list kbd { width: 20px; height: 20px; font-size: 10px; }
+  body.mtc-live #support-block .support-name { font-size: 9px; }
+  body.mtc-live #support-block .support-meta small,
+  body.mtc-live #support-block .support-state { font-size: 6px; }
+  body.mtc-live #support-block .support-help { display: none; }
+
+  body.mtc-live #killfeed { width: min(160px, 38vw); }
+  body.mtc-live #killfeed div { padding: 3px 5px; font-size: 9px; }
+  body.mtc-live #damage-feeds { width: min(160px, 38vw); gap: 3px; }
+  body.mtc-live .damage-feed > div div { min-width: 0; padding: 3px 5px; font-size: 9px; }
+
+  body.mtc-live #support-interaction-prompt,
+  body.mtc-live #pickup-prompt {
+    top: 54%;
+    bottom: auto;
+    min-width: min(220px, calc(100vw - var(--mtc-safe-left) - var(--mtc-safe-right) - 16px));
+    min-height: 44px;
+    padding: 7px 10px;
+  }
+
+  body.mtc-live #text-chat[data-open="true"] {
+    z-index: 95;
+    left: var(--mtc-safe-left);
+    right: var(--mtc-safe-right);
+    bottom: var(--mtc-safe-bottom);
+    width: auto;
+  }
+
+  @media (orientation: portrait) {
+    body.mtc-live {
+      --mtc-stick-size: clamp(96px, 28vw, 112px);
+      --mtc-action-width: clamp(94px, 26vw, 106px);
+    }
+
+    body.mtc-live #mobile-touch-controls .mtc-primary-actions,
+    body.mtc-live #mobile-touch-controls .mtc-context-actions {
+      bottom: calc(var(--mtc-safe-bottom) + var(--mtc-stick-size) + 8px);
+    }
+    body.mtc-live #mobile-touch-controls .mtc-primary-actions { right: var(--mtc-safe-right); }
+    body.mtc-live #mobile-touch-controls .mtc-context-actions { left: var(--mtc-safe-left); }
+    body.mtc-live #mobile-touch-controls .mtc-combat-actions {
+      left: calc(var(--mtc-safe-left) + var(--mtc-stick-size) + 6px);
+      bottom: var(--mtc-safe-bottom);
+    }
+
+    body.mtc-live .hud-mission-console {
+      left: var(--mtc-safe-left);
+      right: calc(var(--mtc-safe-right) + 60px);
+    }
+    body.mtc-live .hud-map-console {
+      top: calc(var(--mtc-safe-top) + 92px);
+      left: var(--mtc-safe-left);
+      right: auto;
+      width: clamp(76px, 22vw, 96px);
+    }
+    body.mtc-live .hud-operator-console {
+      top: calc(var(--mtc-safe-top) + 92px);
+      left: calc(var(--mtc-safe-left) + clamp(76px, 22vw, 96px) + 8px);
+      width: clamp(104px, 30vw, 120px);
+    }
+    body.mtc-live .hud-weapon-console {
+      top: calc(var(--mtc-safe-top) + 92px);
+      right: var(--mtc-safe-right);
+      width: clamp(104px, 30vw, 120px);
+    }
+    body.mtc-live #support-block {
+      top: calc(var(--mtc-safe-top) + 220px);
+      left: var(--mtc-safe-left);
+      width: clamp(104px, 29vw, 128px);
+    }
+    body.mtc-live #killfeed {
+      top: calc(var(--mtc-safe-top) + 220px);
+      right: var(--mtc-safe-right);
+    }
+    body.mtc-live #damage-feeds {
+      top: calc(var(--mtc-safe-top) + 270px);
+      right: var(--mtc-safe-right);
+    }
+  }
+
+  @media (orientation: portrait) and (max-width: 360px) and (max-height: 650px) {
+    body.mtc-live .hud-map-console,
+    body.mtc-live #support-block { width: 70px; }
+    body.mtc-live #support-block .support-heading {
+      min-height: 12px;
+    }
+    body.mtc-live #support-block .support-heading span { display: none; }
+  }
+
+  @media (orientation: landscape) {
+    body.mtc-live {
+      --mtc-stick-size: clamp(88px, 30vh, 104px);
+      --mtc-action-width: 94px;
+    }
+
+    body.mtc-live #mobile-touch-controls .mtc-primary-actions {
+      right: calc(var(--mtc-safe-right) + var(--mtc-stick-size) + 6px);
+      bottom: var(--mtc-safe-bottom);
+    }
+    body.mtc-live #mobile-touch-controls .mtc-combat-actions {
+      left: calc(var(--mtc-safe-left) + var(--mtc-stick-size) + 6px);
+      bottom: var(--mtc-safe-bottom);
+    }
+    body.mtc-live #mobile-touch-controls .mtc-context-actions {
+      left: var(--mtc-safe-left);
+      bottom: calc(var(--mtc-safe-bottom) + var(--mtc-stick-size) + 4px);
+    }
+
+    body.mtc-live .hud-mission-console {
+      left: 50%;
+      right: auto;
+      width: min(320px, calc(100vw - var(--mtc-safe-left) - var(--mtc-safe-right) - 128px));
+      transform: translateX(-50%);
+    }
+    body.mtc-live .hud-map-console {
+      top: var(--mtc-safe-top);
+      left: var(--mtc-safe-left);
+      right: auto;
+      width: clamp(72px, 12vw, 104px);
+    }
+    body.mtc-live .hud-operator-console {
+      top: calc(var(--mtc-safe-top) + 84px);
+      left: calc(var(--mtc-safe-left) + var(--mtc-stick-size) + 6px);
+      width: var(--mtc-action-width);
+    }
+    body.mtc-live .hud-weapon-console {
+      top: calc(var(--mtc-safe-top) + 92px);
+      right: calc(var(--mtc-safe-right) + var(--mtc-stick-size) + 6px);
+      width: var(--mtc-action-width);
+    }
+    body.mtc-live #support-block {
+      top: calc(var(--mtc-safe-top) + 92px);
+      right: var(--mtc-safe-right);
+      left: auto;
+      width: var(--mtc-stick-size);
+      transform: none;
+    }
+    body.mtc-live #killfeed {
+      top: calc(var(--mtc-safe-top) + 160px);
+      right: var(--mtc-safe-right);
+    }
+    body.mtc-live #damage-feeds {
+      top: calc(var(--mtc-safe-top) + 198px);
+      right: var(--mtc-safe-right);
+    }
+  }

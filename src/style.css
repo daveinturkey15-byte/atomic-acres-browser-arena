@@ -311,3 +311,29 @@ html[data-reduced-motion=true] *,html[data-reduced-motion=true] *::before,html[d
 .killstreak-loadout-status{margin:12px 0 0;padding:9px 11px;border-left:3px solid var(--gold);background:rgba(244,196,79,.07);font:800 9px/1 Inter,sans-serif;letter-spacing:.1em;color:var(--gold)}
 @media(max-width:900px){.killstreak-slot-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.killstreak-slot-card{min-height:140px}}
 @media(max-width:700px){.menu-tabs{grid-template-columns:1fr 1fr}.killstreak-slot-grid{grid-template-columns:1fr}.killstreak-slot-card{min-height:0}}
+
+/* Live touch play owns gestures across the whole game surface, including the
+   transparent gaps between controls. Editable chat fields explicitly opt back
+   into native selection/caret behavior. */
+body.mtc-live,
+body.mtc-live #app,
+body.mtc-live #game,
+body.mtc-live #hud,
+body.mtc-live #mobile-touch-controls {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  overscroll-behavior: none;
+}
+body.mtc-live input,
+body.mtc-live textarea,
+body.mtc-live select,
+body.mtc-live [contenteditable]:not([contenteditable="false"]) {
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-touch-callout: default;
+  -webkit-tap-highlight-color: rgba(88, 227, 220, 0.28);
+  touch-action: manipulation;
+}

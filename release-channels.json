@@ -2,12 +2,12 @@
   "schemaVersion": 4,
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
-    "label": "THE BIG ONE v69.1",
-    "description": "Pass 69.1: gamepad-shaped mobile sticks, rotation recovery, restored Field Kit DPS, and front-page refresh controls."
+    "label": "PASS 69",
+    "description": "Pass 69: the current locally approved gameplay, weapons, support, mobile and visual build."
   },
   "experimental": {
-    "label": "THE BIG ONE v69.1",
-    "description": "Pass 69.1 live release; Pass 67.1 preserved as the stable singleplayer fallback and Pass 63 remains the rollback.",
+    "label": "PASS 69",
+    "description": "The current locally approved Pass 69 build.",
     "pass": "PASS 69",
     "path": "channels/the-big-one"
   },
@@ -23,8 +23,8 @@
     "path": "channels/recent-stable"
   },
   "rollback": {
-    "label": "PASS 63 ROLLBACK",
-    "description": "Pass 63: the older multiplayer-known build, rebuilt deterministically from its approved source SHA.",
+    "label": "PASS 63 · STABLE WEBGL",
+    "description": "The retained stable WebGL build, rebuilt deterministically from its approved Pass 63 source SHA.",
     "pass": "PASS 63",
     "sourceSha": "ac85e9b8b46cc2370aee903d564ecf3c4682b24c",
     "path": "channels/pass63-rollback",

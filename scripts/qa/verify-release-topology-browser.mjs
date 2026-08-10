@@ -158,12 +158,16 @@ async function openChooser(page) {
   await page.waitForSelector('#release-channel-options [data-release-choice="experimental"]');
   const buttons = page.locator('#release-channel-options button');
   const labels = await buttons.allTextContents();
+  const expectedBadge = expectedReleasedAt ? 'LIVE' : 'RELEASE CANDIDATE';
   if (await buttons.count() !== 3
-    || !labels.some((text) => text.includes(channelConfig.experimental.pass) && text.includes('LIVE') && text.includes('THE BIG ONE'))
+    || !labels.some((text) => text.includes(channelConfig.experimental.pass) && text.includes(expectedBadge) && text.includes('THE BIG ONE'))
     || !labels.some((text) => text.includes('PASS 67.1') && text.includes('STABLE') && text.includes('SINGLEPLAYER'))
     || !labels.some((text) => text.includes('PASS 63') && text.includes('ROLLBACK'))
     || labels.some((text) => text.includes('PASS 66') || text.includes('PASS 65') || text.includes('PASS 64') || text.includes('PASS 59'))) {
     throw new Error(`Unexpected chooser labels: ${JSON.stringify(labels)}`);
+  }
+  if (expectedReleasedAt && labels.some((text) => /candidate/iu.test(text))) {
+    throw new Error(`Production chooser still exposes candidate copy: ${JSON.stringify(labels)}`);
   }
   if (await page.locator('[data-release-choice="normal"]').count()) throw new Error('Removed normal channel is still selectable');
   if (await page.locator('#menu').count()) throw new Error('Root chooser loaded a game runtime');

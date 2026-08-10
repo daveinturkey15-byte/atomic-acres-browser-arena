@@ -1,49 +1,49 @@
 {
   "schemaVersion": 4,
   "assetId": "atomic-acres-pass65-prerecorded-menu-previews-2026-07-26",
-  "generatedAt": "2026-07-29",
+  "generatedAt": "2026-08-02",
   "creator": "Atomic Acres project",
   "license": "Original project work",
   "releaseState": "HITL candidate only",
   "choreography": {
     "path": "source-assets/menu/pass65-preview-masters/choreography.json",
-    "sha256": "a7fa039deab629688d9e992d67760071d8901d077de076c09bbfe4a69a077e63",
-    "recipeId": "pass66-authoritative-runtime-menu-preview-v1"
+    "sha256": "400f2aaaa142cce4b222450e20fc713a782a6b74f2f2c56afbeda4b913d65232",
+    "recipeId": "pass66-authoritative-runtime-menu-preview-v2"
   },
   "documentation": {
     "path": "source-assets/menu/pass65-preview-masters/README.md",
-    "sha256": "ee99086f6a778a04a14d8696fda2c0e77d39526be89569ecb6af131cc2459bae"
+    "sha256": "6b567db3b91464e57acc50fd8a6699431dac8aa9608ece05df46ffdabbb4ceed"
   },
   "generator": {
     "path": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
-    "sha256": "44123c993085db075a92fb4421d895a5884f0ab5dcb3417b6ad0ae7f1e7b7b1e",
+    "sha256": "73c9b7ca78b73b5a7e1a24323afbddca4a176594367c5fe1d95a56e5c04cafb9",
     "engine": "Playwright installed Chrome hardware WebGPU",
     "deterministicCapture": true
   },
   "finalizer": {
     "path": "scripts/assets/finalize_pass65_menu_previews.mjs",
-    "sha256": "abd20463bb7e975640b93ca9dfd1a282ed6508cbc7fce027dae74ff32cb47e97",
+    "sha256": "4ea98288d21c37d04c139b0b5db2faf083df0c893f82919a444503b8241ef979",
     "ffmpeg": "required"
   },
   "verification": {
     "path": "scripts/qa/verify-pass65-menu-preview-production.mjs",
-    "sha256": "232d984afb3a6cd26438eab22fa2e69138002c7df895915a31ae620bd69732f4",
+    "sha256": "0aab653422adcd73f1724dcedd50229c7e7528653c75a49c3de7c61b9368789b",
     "failClosed": true
   },
   "captureReceipt": {
     "path": "source-assets/menu/pass65-preview-masters/runtime-capture-receipt.json",
-    "sha256": "c7c1b05b02f7507d5530b6e18b07cb9f49d57a1083694e0b406dbab71c8b67e1",
-    "captureId": "pass66-authoritative-runtime-menu-preview-capture-v1",
+    "sha256": "cbde7b354a2d864c62c9cdd587199889ed92cd5b5a1cb558a464aacc57b833e7",
+    "captureId": "pass66-authoritative-runtime-menu-preview-capture-v2",
     "backend": "webgpu"
   },
   "captureTools": [
     {
       "path": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
-      "sha256": "44123c993085db075a92fb4421d895a5884f0ab5dcb3417b6ad0ae7f1e7b7b1e"
+      "sha256": "73c9b7ca78b73b5a7e1a24323afbddca4a176594367c5fe1d95a56e5c04cafb9"
     },
     {
       "path": "scripts/assets/pass65-menu-preview-integrity.mjs",
-      "sha256": "d4e0805ec1882c1d0285892ae00e2d84a2973334f239e3eb2535ce600b975e2b"
+      "sha256": "dfe3286f6003f810e1abefa875d39c661453b54d39f2c0e8d6724c0b65590da1"
     },
     {
       "path": "scripts/assets/pass65-menu-preview-integrity.d.mts",
@@ -68,7 +68,8 @@
         "arenaId": "atomic-acres",
         "moduleId": "arena.visual.atomic-acres.v1",
         "assetDependencies": [
-          "./assets/original/models/atomic-acres-blender-arena.glb?v=pass63-20260724-apertures1"
+          "./assets/original/models/atomic-acres-blender-arena.glb?v=pass63-20260724-apertures1",
+          "./assets/original/skies/atomic-acres-sunset.webp"
         ],
         "sharedAssetDependencies": [
           "./assets/original/models/operators/pass65-third-person-operator-lod0.glb",
@@ -79,13 +80,16 @@
           "public/assets/original/models/atomic-acres-blender-arena.glb",
           "public/assets/original/models/operators/pass65-third-person-operator-lod0.glb",
           "public/assets/original/models/operators/pass65-third-person-operator-lod1.glb",
+          "public/assets/original/skies/atomic-acres-sunset.webp",
           "public/assets/third-party/quaternius/animated-guns/"
         ]
       },
       {
         "arenaId": "skyline-terminal",
         "moduleId": "arena.visual.skyline-terminal.v1",
-        "assetDependencies": [],
+        "assetDependencies": [
+          "./assets/original/skies/terminal-airport-dawn.webp"
+        ],
         "sharedAssetDependencies": [
           "./assets/original/models/operators/pass65-third-person-operator-lod0.glb",
           "./assets/original/models/operators/pass65-third-person-operator-lod1.glb",
@@ -94,13 +98,16 @@
         "localAssetPaths": [
           "public/assets/original/models/operators/pass65-third-person-operator-lod0.glb",
           "public/assets/original/models/operators/pass65-third-person-operator-lod1.glb",
+          "public/assets/original/skies/terminal-airport-dawn.webp",
           "public/assets/third-party/quaternius/animated-guns/"
         ]
       },
       {
         "arenaId": "rustworks-1v1",
         "moduleId": "arena.visual.rustworks-1v1.v1",
-        "assetDependencies": [],
+        "assetDependencies": [
+          "./assets/original/skies/rustworks-industrial-night.webp"
+        ],
         "sharedAssetDependencies": [
           "./assets/original/models/operators/pass65-third-person-operator-lod0.glb",
           "./assets/original/models/operators/pass65-third-person-operator-lod1.glb",
@@ -109,6 +116,7 @@
         "localAssetPaths": [
           "public/assets/original/models/operators/pass65-third-person-operator-lod0.glb",
           "public/assets/original/models/operators/pass65-third-person-operator-lod1.glb",
+          "public/assets/original/skies/rustworks-industrial-night.webp",
           "public/assets/third-party/quaternius/animated-guns/"
         ]
       },
@@ -139,7 +147,7 @@
         ]
       }
     ],
-    "manifestSha256": "ec6698a85dde7c769a0b383eff2e18f815e5083caedc135cdee8804b211f6dc7"
+    "manifestSha256": "1ace28a048ab06bd4c3c64ed7f59f2ee3fa3d75c28561150502dce3cf7c25b7b"
   },
   "dependencyClosure": {
     "schemaVersion": 1,
@@ -149,7 +157,8 @@
       "public/assets/original"
     ],
     "excludes": [
-      "public/assets/original/menu-previews/"
+      "public/assets/original/menu-previews/",
+      "public/assets/original/killstreak-demo/"
     ],
     "extraPaths": [
       "public/assets/original/models/atomic-acres-blender-arena.glb",
@@ -160,26 +169,29 @@
       "public/assets/original/models/weapons/pass65-firearms/scattergun/scattergun-world-lod0.glb",
       "public/assets/original/models/weapons/pass65-firearms/smg/smg-world-lod0.glb",
       "public/assets/original/models/weapons/pass65-firearms/sniper/sniper-world-lod0.glb",
+      "public/assets/original/skies/atomic-acres-sunset.webp",
+      "public/assets/original/skies/rustworks-industrial-night.webp",
+      "public/assets/original/skies/terminal-airport-dawn.webp",
       "public/assets/third-party/quaternius/animated-guns"
     ],
-    "fileCount": 878,
-    "totalBytes": 99963822,
-    "treeSha256": "94a0f9d326b1db86bd8aec59e208eab0257851b6b8e7459b4f04a2e586e0b58d"
+    "fileCount": 1037,
+    "totalBytes": 112418971,
+    "treeSha256": "bf97e55dfb3857a04a26f7fca568f6cbec8bfaeda84e6aff05bf62d47d69dac3"
   },
   "cacheFamilyLock": {
     "path": "source-assets/menu/pass65-preview-masters/cache-family-lock.json",
-    "sha256": "7ec024c584dfc0ce7465976c9b130c01049ac958bc9f8527223b7b824f69d8b5",
-    "cacheKey": "pass66-runtime-preview-v3",
-    "finalMediaSetSha256": "632fcf631f27a43e4815f4e8c920c35a8c16ebf59271449f5a3b7a5d52d0be97"
+    "sha256": "a946eadcdc9476b00df206ec2402b9426a1dc1256e8075f6210207679c562e0d",
+    "cacheKey": "pass66-runtime-preview-v13",
+    "finalMediaSetSha256": "2f7ee59e7d499f34da0c8d7c29e978114243c2dbaacd73bc684cadd99b0734fe"
   },
   "authoredCockpit": {
     "assetId": "chopper-gunner-vehicle-v1",
     "path": "source-assets/blender/pass65-chopper-gunner.blend",
-    "sha256": "81a84cd3e9d265cddb305ad54926f11e71a6ff705d1f07e3bb0e78b88fdf77b9",
+    "sha256": "6d645dc3bdf6ce6990f3c5b292cee4296d4be60ba755c4b6d163fa5f5ed1a8e0",
     "qualityTier": "LOD0",
     "role": "visual design reference; compact black-grey treatment is baked offline over runtime footage",
     "evidence": "docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png",
-    "evidenceSha256": "581c448b7d998a220ea69fb0c024d9553f40d9aea767b3d88b503780a64921d1"
+    "evidenceSha256": "680a235168bfa0021232aa1e7cfe6332b91616f60bd5369b9fea60e110f9b4be"
   },
   "sources": [
     {
@@ -193,7 +205,8 @@
         "arenaId": "atomic-acres",
         "moduleId": "arena.visual.atomic-acres.v1",
         "assetDependencies": [
-          "./assets/original/models/atomic-acres-blender-arena.glb?v=pass63-20260724-apertures1"
+          "./assets/original/models/atomic-acres-blender-arena.glb?v=pass63-20260724-apertures1",
+          "./assets/original/skies/atomic-acres-sunset.webp"
         ],
         "sharedAssetDependencies": [
           "./assets/original/models/operators/pass65-third-person-operator-lod0.glb",
@@ -204,10 +217,11 @@
           "public/assets/original/models/atomic-acres-blender-arena.glb",
           "public/assets/original/models/operators/pass65-third-person-operator-lod0.glb",
           "public/assets/original/models/operators/pass65-third-person-operator-lod1.glb",
+          "public/assets/original/skies/atomic-acres-sunset.webp",
           "public/assets/third-party/quaternius/animated-guns/"
         ]
       },
-      "dependencyClosureTreeSha256": "94a0f9d326b1db86bd8aec59e208eab0257851b6b8e7459b4f04a2e586e0b58d"
+      "dependencyClosureTreeSha256": "bf97e55dfb3857a04a26f7fca568f6cbec8bfaeda84e6aff05bf62d47d69dac3"
     },
     {
       "arenaId": "skyline-terminal",
@@ -219,7 +233,9 @@
       "canonicalVisualModule": {
         "arenaId": "skyline-terminal",
         "moduleId": "arena.visual.skyline-terminal.v1",
-        "assetDependencies": [],
+        "assetDependencies": [
+          "./assets/original/skies/terminal-airport-dawn.webp"
+        ],
         "sharedAssetDependencies": [
           "./assets/original/models/operators/pass65-third-person-operator-lod0.glb",
           "./assets/original/models/operators/pass65-third-person-operator-lod1.glb",
@@ -228,10 +244,11 @@
         "localAssetPaths": [
           "public/assets/original/models/operators/pass65-third-person-operator-lod0.glb",
           "public/assets/original/models/operators/pass65-third-person-operator-lod1.glb",
+          "public/assets/original/skies/terminal-airport-dawn.webp",
           "public/assets/third-party/quaternius/animated-guns/"
         ]
       },
-      "dependencyClosureTreeSha256": "94a0f9d326b1db86bd8aec59e208eab0257851b6b8e7459b4f04a2e586e0b58d"
+      "dependencyClosureTreeSha256": "bf97e55dfb3857a04a26f7fca568f6cbec8bfaeda84e6aff05bf62d47d69dac3"
     },
     {
       "arenaId": "rustworks-1v1",
@@ -243,7 +260,9 @@
       "canonicalVisualModule": {
         "arenaId": "rustworks-1v1",
         "moduleId": "arena.visual.rustworks-1v1.v1",
-        "assetDependencies": [],
+        "assetDependencies": [
+          "./assets/original/skies/rustworks-industrial-night.webp"
+        ],
         "sharedAssetDependencies": [
           "./assets/original/models/operators/pass65-third-person-operator-lod0.glb",
           "./assets/original/models/operators/pass65-third-person-operator-lod1.glb",
@@ -252,10 +271,11 @@
         "localAssetPaths": [
           "public/assets/original/models/operators/pass65-third-person-operator-lod0.glb",
           "public/assets/original/models/operators/pass65-third-person-operator-lod1.glb",
+          "public/assets/original/skies/rustworks-industrial-night.webp",
           "public/assets/third-party/quaternius/animated-guns/"
         ]
       },
-      "dependencyClosureTreeSha256": "94a0f9d326b1db86bd8aec59e208eab0257851b6b8e7459b4f04a2e586e0b58d"
+      "dependencyClosureTreeSha256": "bf97e55dfb3857a04a26f7fca568f6cbec8bfaeda84e6aff05bf62d47d69dac3"
     },
     {
       "arenaId": "gun-range",
@@ -290,12 +310,12 @@
           "public/assets/third-party/quaternius/animated-guns/"
         ]
       },
-      "dependencyClosureTreeSha256": "94a0f9d326b1db86bd8aec59e208eab0257851b6b8e7459b4f04a2e586e0b58d"
+      "dependencyClosureTreeSha256": "bf97e55dfb3857a04a26f7fca568f6cbec8bfaeda84e6aff05bf62d47d69dac3"
     }
   ],
   "render": {
     "masterFrames": "240 PNG frames per arena (intermediate frames excluded from git)",
-    "dimensions": "1280x720",
+    "dimensions": "2560x1440",
     "frameRate": 30,
     "durationSeconds": 8,
     "mapSource": "Selected authoritative production runtime arena under hardware WebGPU",
@@ -303,6 +323,11 @@
     "helicopter": "Perspective-aware elliptic rotor arcs with subdued moving spokes, measured hub/mast/header occlusion, visible structural ties into both side canopy rails, and a compact graphite cockpit with restrained green avionics and an unobstructed sightline baked offline",
     "cat": "Compact charcoal/silver feline crown, articulated ears, forelegs and top-facing paws baked offline over the authoritative Gun Range moving-target scene",
     "overlayScale": 0.5,
+    "overlayReferenceViewport": [
+      1280,
+      720
+    ],
+    "overlayOutputScale": 2,
     "audio": {
       "helicopter": {
         "id": "quiet-rotor-bed-v1",
@@ -314,79 +339,131 @@
         "minimumPeakDb": -52,
         "maximumPeakDb": -27
       }
+    },
+    "encodingProfiles": {
+      "mp4": {
+        "encoder": "libx264",
+        "videoCodec": "h264",
+        "profile": "high",
+        "level": "5.0",
+        "codecTag": "avc1",
+        "rfc6381": "avc1.640032",
+        "audioCodec": "aac",
+        "audioRfc6381": "mp4a.40.2",
+        "targetVideoBitrateKbps": 7500,
+        "minimumVideoBitrateKbps": 6000,
+        "maximumVideoBitrateKbps": 8500,
+        "bufferSizeKbps": 17000,
+        "audioBitrateKbps": 64,
+        "mimeType": "video/mp4; codecs=\"avc1.640032,mp4a.40.2\""
+      },
+      "webm": {
+        "encoder": "libvpx-vp9",
+        "videoCodec": "vp9",
+        "profile": 0,
+        "audioCodec": "opus",
+        "targetVideoBitrateKbps": 6000,
+        "minimumVideoBitrateKbps": 4500,
+        "maximumVideoBitrateKbps": 7500,
+        "bufferSizeKbps": 15000,
+        "crf": 20,
+        "cpuUsed": 2,
+        "audioBitrateKbps": 48,
+        "mimeType": "video/webm; codecs=\"vp9,opus\""
+      },
+      "images": {
+        "posterQuality": 88,
+        "reviewFrameWidth": 640,
+        "reviewFrameHeight": 360,
+        "reviewQuality": 88
+      },
+      "colour": {
+        "pixelFormat": "yuv420p",
+        "primaries": "bt709",
+        "transfer": "bt709",
+        "space": "bt709",
+        "range": "tv"
+      }
+    },
+    "encodingBudget": {
+      "minimumAverageBitrateKbps": 3000,
+      "maximumAverageBitrateKbps": 9000,
+      "maximumBytesPerVideo": 9500000,
+      "maximumPosterBytes": 1500000,
+      "maximumReviewSheetBytes": 1200000
     }
   },
   "runtimeContract": "prerecorded compressed media only; static poster for reduced motion; zero arena construction or gameplay renderer submissions",
   "runtimeFiles": [
     {
       "path": "public/assets/original/menu-previews/atomic-acres.mp4",
-      "sha256": "4e5b234c9ba67e3d0def450727a31d3f46bcf76445478d3be221d9d23393d34b",
+      "sha256": "95ac22e41817acec26f14e0506b29fe32b9b3010c22ced22b2af36af84d3bbea",
       "arenaId": "atomic-acres",
       "extension": "mp4"
     },
     {
       "path": "public/assets/original/menu-previews/atomic-acres.webm",
-      "sha256": "ab5c6b297875ce39e4289c7e1cc147b0873a65a9b44be46752ec44f06ec4fb53",
+      "sha256": "04c4531b92abbd165ff23e9c464ef99015ebe22a411bda58ab0cf2ddd5e89547",
       "arenaId": "atomic-acres",
       "extension": "webm"
     },
     {
       "path": "public/assets/original/menu-previews/atomic-acres.webp",
-      "sha256": "56506895da9a7717574507b72e03090c4de5870ae432fdf12c88e0c55fb47eff",
+      "sha256": "1f7ab1a21c95901baac8f613454d4e6b39f1102b6c0f7c9203db7cc26d2ed630",
       "arenaId": "atomic-acres",
       "extension": "webp"
     },
     {
       "path": "public/assets/original/menu-previews/skyline-terminal.mp4",
-      "sha256": "117951aad0c2d5a2538fff88475caab0590fb384ac48c9d82a48a8d149fb71f2",
+      "sha256": "9f3e00921806d95cf1f234cae0688c777952ff5c1edbd602afde099a19c96733",
       "arenaId": "skyline-terminal",
       "extension": "mp4"
     },
     {
       "path": "public/assets/original/menu-previews/skyline-terminal.webm",
-      "sha256": "496535899334a670ad847af771aa3a000eebc7286ea781a3c1d3ca14ed485288",
+      "sha256": "9d586897a28dba0199d6dedaef0f63c40a6a1ddf05b4e9585d2b5ee6ee100366",
       "arenaId": "skyline-terminal",
       "extension": "webm"
     },
     {
       "path": "public/assets/original/menu-previews/skyline-terminal.webp",
-      "sha256": "2600504ff4f7117760f9ecf8999eb2f5efcbc9ed953b6bffa6ecceea9df8be8c",
+      "sha256": "269040879c9430b6681919f7e2315508711e9e780ead0d6f6c9e4a7c1c8ba51f",
       "arenaId": "skyline-terminal",
       "extension": "webp"
     },
     {
       "path": "public/assets/original/menu-previews/rustworks-1v1.mp4",
-      "sha256": "950b73a2aacf8de63938402da80e0a059ff640f2553e4ee102fcbe6ca8cb2525",
+      "sha256": "e7702b1cea606ffc0cebbd08e17f50033708f9e7014e80a65b4a389008c15744",
       "arenaId": "rustworks-1v1",
       "extension": "mp4"
     },
     {
       "path": "public/assets/original/menu-previews/rustworks-1v1.webm",
-      "sha256": "1c4d370dbf8d0a73b32b862cf5dba69c619fcfeb5a19c2f2aa793e0fd9c31662",
+      "sha256": "2f770eb10749728c9ff337b30f527bacb464ce642f4f465926bb7fde09aa80c7",
       "arenaId": "rustworks-1v1",
       "extension": "webm"
     },
     {
       "path": "public/assets/original/menu-previews/rustworks-1v1.webp",
-      "sha256": "a43e41b89bfa2af30c4ce4a694971953a0e6d1ea0d48b66b234658e89b5e168b",
+      "sha256": "b4e2825cc6b50843d02164b5836331a39b108f3615f0a9d0ae342f3876e41505",
       "arenaId": "rustworks-1v1",
       "extension": "webp"
     },
     {
       "path": "public/assets/original/menu-previews/gun-range.mp4",
-      "sha256": "da40b2ee6de07ee6ce61744302e8df4dbe2f8e529cec9d74081f701417550ee4",
+      "sha256": "28c9d908aa66cd2a136d88d7fba937d7b3a7530d044ea8d96e747e9996a6dfe4",
       "arenaId": "gun-range",
       "extension": "mp4"
     },
     {
       "path": "public/assets/original/menu-previews/gun-range.webm",
-      "sha256": "69b81275a8984e5804485971b4d7761a374c8ba9ccd0f918cafd7984f641517c",
+      "sha256": "e21f10cca5d641ae32ee98eaec661851036343560f7bb30be932b39c9fbda4a3",
       "arenaId": "gun-range",
       "extension": "webm"
     },
     {
       "path": "public/assets/original/menu-previews/gun-range.webp",
-      "sha256": "25f0c8888e38b262c4a5cd8137ab51280ba1cbb8863f6db521fd01dfbb1c2dc4",
+      "sha256": "a2eddd02ddee15e95486d04f765a326ff5fdea3a868f7f7e0a12cfd7bafed401",
       "arenaId": "gun-range",
       "extension": "webp"
     }
@@ -394,7 +471,7 @@
   "reviewEvidence": [
     {
       "path": "docs/assets/pass65-menu-previews/atomic-acres-review-frames.webp",
-      "sha256": "3743c802d11226fed9a97cf2bdeb9206fc2e28456239c1d2fae33fcb3eb2c58c",
+      "sha256": "2cb05bdf5ca25db808b4b371b8df6262b8a05bcf6cabd1f9394eb85771c69b34",
       "arenaId": "atomic-acres",
       "frames": [
         1,
@@ -406,7 +483,7 @@
     },
     {
       "path": "docs/assets/pass65-menu-previews/skyline-terminal-review-frames.webp",
-      "sha256": "c846931aac4b87b177c0d021158f002b4e320f730e88860cc659c369747c5751",
+      "sha256": "c7d8527bd69436b1d57d0c44af4ea902f3f2768701427b54bd1df83ebefd076e",
       "arenaId": "skyline-terminal",
       "frames": [
         1,
@@ -418,7 +495,7 @@
     },
     {
       "path": "docs/assets/pass65-menu-previews/rustworks-1v1-review-frames.webp",
-      "sha256": "38f8410599a336243bc407818946ea00f90743588054607ea7ca7073d9af56fc",
+      "sha256": "e6c419dff4666f7e29552d0506a6d4220eca493d4a42bd94edbf0c7fd7a5a09f",
       "arenaId": "rustworks-1v1",
       "frames": [
         1,
@@ -430,7 +507,7 @@
     },
     {
       "path": "docs/assets/pass65-menu-previews/gun-range-review-frames.webp",
-      "sha256": "253c89efaff703b5175bcf651c2231f9dad167e12f8b03dde7d0bef702568ccf",
+      "sha256": "e252fa6c4235cae34a5c17f83a08ac2cfe31748092d2e96d7c944b88dd822b0b",
       "arenaId": "gun-range",
       "frames": [
         1,

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { createRiggedOperator, deathRiggedOperator, fireRiggedOperator, meleeRiggedOperator, reactRiggedOperator, resetRiggedOperator, updateRiggedOperator, type OperatorAppearance } from './operator-model';
+import { createRiggedOperator, deathRiggedOperator, enforceRiggedOperatorHandBindDeltaFloor, fireRiggedOperator, meleeRiggedOperator, poseUnarmedRiggedOperatorHands, reactRiggedOperator, resetRiggedOperator, updateRiggedOperator, type OperatorAppearance } from './operator-model';
 import { advanceMinigunSpool, createMinigunSpoolState, type MinigunSpoolState } from './minigun-spool';
 import {
   capturePass65PresentationGeneration,
@@ -15,11 +15,12 @@ import {
   loadPass65WeaponPresentation,
   meleeImportedWeapon,
   releasePass65WeaponModel,
+  PASS65_AUTHORED_WEAPON_URLS,
   updateImportedWeapon,
 } from './weapon-model';
 import { weaponFinishProfile } from './weapon-finish';
 import { solveTwoBoneElbow } from './ik';
-import { objectLocalGeometryBounds, resolveSocketWorld } from './character-presentation-contract';
+import { resolveSocketWorld } from './character-presentation-contract';
 import type { Team, WeaponId } from './protocol';
 import { AUTHORITATIVE_HIT_PROXIES, hitProxyRootTransform } from './hit-proxies';
 import { THIRD_PERSON_WEAPON_SCALE } from './player-feedback';
@@ -1119,7 +1120,7 @@ type OperatorRig = {
   weaponSocket: THREE.Group;
   hitProxyRoot: THREE.Group;
   weapon?: THREE.Group;
-  weaponId: WeaponId;
+  weaponId: WeaponId | null;
   /** Rigged operator skeletal bones for two-hand weapon grip IK. */
   leftShoulderBone?: THREE.Bone;
   leftElbowBone?: THREE.Bone;
@@ -1165,6 +1166,68 @@ const RIGGED_SUPPORT_GRIP_POSITION: Record<WeaponId, [number, number, number]> =
   'flare-gun': [-0.06, -0.15, 0.03],
 };
 
+const RIGGED_CARBINE_GRIP_REFERENCE = Object.freeze({
+  weaponId: 'carbine' as const,
+  sourceAsset: PASS65_AUTHORED_WEAPON_URLS.carbine.world,
+  contract: 'pass65-carbine-authored-source-plus-runtime-target-v2',
+  sockets: Object.freeze({
+    'support-socket-l': Object.freeze({
+      atomicSocket: 'leftGrip',
+      // Parsed from the immutable shipped GLB, before the evaluated operator
+      // reach calibration below mutates this node's live local position.
+      authoredLocalPosition: Object.freeze([-0.10000000149011612, -0.03999999910593033, 0.47999998927116394] as const),
+      authoredLocalQuaternion: Object.freeze([0, 0, 0, 1] as const),
+      evaluatedTargetLocalPosition: Object.freeze(RIGGED_SUPPORT_GRIP_POSITION.carbine),
+      evaluatedTargetLocalQuaternion: Object.freeze([0, 0, 0, 1] as const),
+      liveTargetContract: 'runtime-calibrated-from-authored-source-v1',
+      calibrationApplied: true,
+      calibrationReason: 'third-person-swat-chain-reach-without-unsafe-stretch',
+      // Existing evaluated Pass 65 carbine support-hand rotation.
+      handEuler: Object.freeze([-0.32, 0.12, -0.22] as const),
+      side: 'left' as const,
+    }),
+    'grip-socket-r': Object.freeze({
+      atomicSocket: 'rightGrip',
+      authoredLocalPosition: Object.freeze([0, -0.3400000035762787, -0.12999999523162842] as const),
+      authoredLocalQuaternion: Object.freeze([0, 0, 0, 1] as const),
+      evaluatedTargetLocalPosition: Object.freeze([0, -0.3400000035762787, -0.12999999523162842] as const),
+      evaluatedTargetLocalQuaternion: Object.freeze([0, 0, 0, 1] as const),
+      liveTargetContract: 'authored-source-socket-retained-v1',
+      calibrationApplied: false,
+      calibrationReason: 'authored-firing-grip-retained',
+      // Existing evaluated Pass 65 carbine firing-hand rotation.
+      handEuler: Object.freeze([-0.22, -0.06, 0.26] as const),
+      side: 'right' as const,
+    }),
+  }),
+});
+
+const RIGGED_CARBINE_SECOND_PHALANX_CURL = Object.freeze({
+  // Exact hardware-trace replay: -0.76 clears the support pinky at 0.374667
+  // rad; -0.78 clears the firing pinky at 0.369819 rad. The latter avoids the
+  // phase-dependent cancellation seen at -0.82 while retaining a natural
+  // progression beyond the firing-hand ring's -0.76 wrap.
+  left: Object.freeze({ thumb: -0.18, index: -0.24, middle: -0.3, ring: -0.36, pinky: -0.76 }),
+  right: Object.freeze({ thumb: -0.34, index: -0.46, middle: -0.7, ring: -0.76, pinky: -0.78 }),
+});
+const RIGGED_CARBINE_SECOND_PHALANX_BIND_DELTA_FLOOR_RADIANS = Object.freeze({
+  thumb: 0.04,
+  index: 0.23,
+  middle: 0.21,
+  ring: 0.25,
+  pinky: 0.38,
+});
+const RIGGED_CARBINE_SECOND_PHALANX_FALLBACK_AXIS = Object.freeze([-1, 0, 0] as const);
+
+const RIGGED_GRIP_POSITION_ERROR_MAX_M = 0.015;
+const RIGGED_GRIP_QUATERNION_ERROR_MAX_RADIANS = 0.2;
+
+/** Apply the evaluated curl to the rendered skeletal joint used by skinning. */
+export function applyRiggedCarbineFingerCurlToBone(bone: THREE.Bone, curlRadians: number): void {
+  bone.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(curlRadians, 0, 0, 'XYZ')));
+  bone.updateWorldMatrix(false, true);
+}
+
 /** Rotate one animated bone toward a world-space target without rewriting bind offsets. */
 function orientBoneToward(bone: THREE.Bone, child: THREE.Bone, targetWorld: THREE.Vector3): void {
   bone.updateWorldMatrix(true, true);
@@ -1190,6 +1253,55 @@ function applyRiggedArmGrip(
 ): Record<string, unknown> | null {
   const grip = weapon.getObjectByName(socketName);
   if (!grip) return null;
+  const reference = grip.userData.riggedGripSocketReference as {
+    available?: boolean;
+    referenceId?: string;
+    weaponId?: string;
+    sourceAsset?: string;
+    atomicSocket?: string;
+    sourceTransformValid?: boolean;
+    authoredSourceLocalPosition?: number[];
+    authoredSourceLocalQuaternion?: number[];
+    observedImportedSourceLocalPosition?: number[];
+    observedImportedSourceLocalQuaternion?: number[];
+    sourcePositionErrorM?: number;
+    sourceQuaternionErrorRadians?: number;
+    liveTargetContract?: string;
+    calibrationApplied?: boolean;
+    calibrationReason?: string;
+    evaluatedTargetLocalPosition?: number[];
+    evaluatedTargetLocalQuaternion?: number[];
+    expectedHandEuler?: number[];
+    wristBasisContract?: string;
+  } | undefined;
+  const evaluatedTargetLocalPosition = Array.isArray(reference?.evaluatedTargetLocalPosition)
+    && reference.evaluatedTargetLocalPosition.length === 3
+    ? new THREE.Vector3().fromArray(reference.evaluatedTargetLocalPosition)
+    : null;
+  const evaluatedTargetLocalQuaternion = Array.isArray(reference?.evaluatedTargetLocalQuaternion)
+    && reference.evaluatedTargetLocalQuaternion.length === 4
+    ? new THREE.Quaternion().fromArray(reference.evaluatedTargetLocalQuaternion)
+    : null;
+  const expectedHandEuler = Array.isArray(reference?.expectedHandEuler)
+    && reference.expectedHandEuler.length === 3
+    ? new THREE.Euler(reference.expectedHandEuler[0], reference.expectedHandEuler[1], reference.expectedHandEuler[2], 'XYZ')
+    : null;
+  const liveTargetPositionErrorM = evaluatedTargetLocalPosition
+    ? grip.position.distanceTo(evaluatedTargetLocalPosition)
+    : Number.NaN;
+  const liveTargetQuaternionErrorRadians = evaluatedTargetLocalQuaternion
+    ? grip.quaternion.angleTo(evaluatedTargetLocalQuaternion)
+    : Number.NaN;
+  const socketReferenceValid = reference?.available === true
+    && reference.sourceTransformValid === true
+    && reference.weaponId === weapon.userData.weaponId
+    && reference.atomicSocket === grip.userData.atomic_socket
+    && typeof reference.liveTargetContract === 'string'
+    && reference.liveTargetContract.length > 0
+    && Number.isFinite(liveTargetPositionErrorM)
+    && liveTargetPositionErrorM <= 1e-6
+    && Number.isFinite(liveTargetQuaternionErrorRadians)
+    && liveTargetQuaternionErrorRadians <= 1e-6;
   // The scattergun grip is parented to its animated pump. Resolve the complete
   // current hierarchy after the mixer/action part moved it; treating every
   // socket as a direct weapon child was the stale/far-target Pass 17 bug.
@@ -1235,11 +1347,45 @@ function applyRiggedArmGrip(
   );
   orientBoneToward(shoulder, elbow, elbowTarget);
   orientBoneToward(elbow, wrist, target);
+  const wristCorrectionValues = wrist.userData.riggedGripBasisCorrection;
+  const wristReference = wrist.userData.riggedGripBasisReference as {
+    contract?: string;
+    sourceAsset?: string;
+    sourceBone?: string;
+  } | undefined;
+  const orientationReferenceAvailable = socketReferenceValid
+    && expectedHandEuler !== null
+    && Array.isArray(wristCorrectionValues)
+    && wristCorrectionValues.length === 4
+    && wristCorrectionValues.every(Number.isFinite)
+    && wristReference?.contract === reference?.wristBasisContract
+    && typeof wristReference?.sourceAsset === 'string'
+    && wristReference.sourceAsset.length > 0;
+  const desiredCorrectedWristWorld = orientationReferenceAvailable
+    ? grip.getWorldQuaternion(new THREE.Quaternion())
+      .multiply(new THREE.Quaternion().setFromEuler(expectedHandEuler!))
+      .normalize()
+    : null;
+  const wristBasisCorrection = orientationReferenceAvailable
+    ? new THREE.Quaternion().fromArray(wristCorrectionValues).normalize()
+    : null;
+  if (desiredCorrectedWristWorld && wristBasisCorrection) {
+    const desiredWristWorld = desiredCorrectedWristWorld.clone()
+      .multiply(wristBasisCorrection.clone().invert())
+      .normalize();
+    const parentWorld = wrist.parent?.getWorldQuaternion(new THREE.Quaternion()) ?? new THREE.Quaternion();
+    wrist.quaternion.copy(parentWorld.invert().multiply(desiredWristWorld)).normalize();
+  }
   wrist.updateWorldMatrix(true, true);
   const solvedElbow = elbow.getWorldPosition(new THREE.Vector3());
   const solvedWrist = wrist.getWorldPosition(new THREE.Vector3());
-  const bounds = objectLocalGeometryBounds(weapon);
   const targetInWeapon = weapon.worldToLocal(target.clone());
+  const correctedWristWorld = wristBasisCorrection
+    ? wrist.getWorldQuaternion(new THREE.Quaternion()).multiply(wristBasisCorrection).normalize()
+    : null;
+  const correctedWristToSocketQuaternionErrorRadians = correctedWristWorld && desiredCorrectedWristWorld
+    ? correctedWristWorld.angleTo(desiredCorrectedWristWorld)
+    : Number.NaN;
   const elbowAngle = shoulderPos.clone().sub(solvedElbow).angleTo(solvedWrist.clone().sub(solvedElbow));
   const elbowTorsoDistance = solvedElbow.distanceTo(torsoPosition);
   const shoulderFromTorso = shoulderPos.clone().sub(torsoPosition);
@@ -1262,6 +1408,40 @@ function applyRiggedArmGrip(
     socketName,
     socketParent: grip.parent?.name ?? null,
     nestedSocket: grip.parent !== weapon,
+    socketReference: {
+      available: reference?.available === true,
+      valid: socketReferenceValid,
+      referenceId: reference?.referenceId ?? null,
+      weaponId: reference?.weaponId ?? null,
+      sourceAsset: reference?.sourceAsset ?? null,
+      atomicSocket: reference?.atomicSocket ?? null,
+      sourceTransformValid: reference?.sourceTransformValid === true,
+      authoredSourceLocalPosition: reference?.authoredSourceLocalPosition ?? null,
+      authoredSourceLocalQuaternion: reference?.authoredSourceLocalQuaternion ?? null,
+      observedImportedSourceLocalPosition: reference?.observedImportedSourceLocalPosition ?? null,
+      observedImportedSourceLocalQuaternion: reference?.observedImportedSourceLocalQuaternion ?? null,
+      sourcePositionErrorM: reference?.sourcePositionErrorM ?? Number.NaN,
+      sourceQuaternionErrorRadians: reference?.sourceQuaternionErrorRadians ?? Number.NaN,
+      liveTargetContract: reference?.liveTargetContract ?? null,
+      calibrationApplied: reference?.calibrationApplied ?? null,
+      calibrationReason: reference?.calibrationReason ?? null,
+      evaluatedTargetLocalPosition: reference?.evaluatedTargetLocalPosition ?? null,
+      observedLiveTargetLocalPosition: grip.position.toArray(),
+      liveTargetPositionErrorM,
+      evaluatedTargetLocalQuaternion: reference?.evaluatedTargetLocalQuaternion ?? null,
+      observedLiveTargetLocalQuaternion: grip.quaternion.toArray(),
+      liveTargetQuaternionErrorRadians,
+    },
+    wristOrientation: {
+      referenceAvailable: orientationReferenceAvailable,
+      wristBasisContract: wristReference?.contract ?? null,
+      wristSourceAsset: wristReference?.sourceAsset ?? null,
+      wristSourceBone: wristReference?.sourceBone ?? null,
+      weaponHandEuler: reference?.expectedHandEuler ?? null,
+      correctedWristQuaternion: correctedWristWorld?.toArray() ?? null,
+      targetSocketQuaternion: desiredCorrectedWristWorld?.toArray() ?? null,
+      errorRadians: correctedWristToSocketQuaternionErrorRadians,
+    },
     elbowAngle,
     elbowTorsoDistance,
     shoulderTorsoDistance,
@@ -1271,17 +1451,96 @@ function applyRiggedArmGrip(
     torsoRelativeBendHint: true,
     bindOffsetsPreserved: reachStretch === 1
       && shoulderOffset.equals(elbow.position) && elbowOffset.equals(wrist.position),
-    weaponLocalBounds: bounds ? {
-      center: bounds.getCenter(new THREE.Vector3()).toArray(),
-      size: bounds.getSize(new THREE.Vector3()).toArray(),
-      containsTarget: bounds.containsPoint(targetInWeapon),
-      distanceToTarget: bounds.distanceToPoint(targetInWeapon),
-    } : null,
-    finite: [...target.toArray(), ...solvedWrist.toArray()].every(Number.isFinite),
+    finite: [...target.toArray(), ...targetInWeapon.toArray(), ...solvedWrist.toArray()].every(Number.isFinite),
   };
 }
 
-function applyRiggedWeaponGrip(rig: Extract<OperatorRig, { rigged: true }>, weapon: THREE.Group): Record<string, unknown> | null {
+function applyRiggedCarbineFingerCurl(
+  root: THREE.Group,
+  rig: Extract<OperatorRig, { rigged: true }>,
+  weapon: THREE.Group,
+): Record<string, unknown> {
+  const bones: Array<{
+    side: 'left' | 'right';
+    digit: keyof typeof RIGGED_CARBINE_SECOND_PHALANX_BIND_DELTA_FLOOR_RADIANS;
+    bone: string;
+    curlRadians: number;
+    bindRelativeFloor: Record<string, unknown> | null;
+    applied: boolean;
+  }> = [];
+  const bindFloors: Array<Record<string, unknown>> = [];
+  let rightPinkyBindFloor: Record<string, unknown> | null = null;
+  let leftHandApplied = false;
+  let rightHandApplied = false;
+  if (weapon.userData.weaponId !== 'carbine') {
+    return {
+      contract: 'pass65-evaluated-per-digit-grip-curl-v3',
+      sourceReferenceAvailable: false,
+      expectedBoneCount: 10,
+      bones,
+      bindFloors,
+      rightPinkyBindFloor: null,
+      allAtOrAboveRequiredBindFloor: false,
+      allApplied: false,
+    };
+  }
+  for (const [side, wrist, suffix] of [
+    ['left', rig.leftWristBone, 'L'],
+    ['right', rig.rightWristBone, 'R'],
+  ] as const) {
+    for (const digit of ['thumb', 'index', 'middle', 'ring', 'pinky'] as const) {
+      const runtimeName = `${digit[0].toUpperCase()}${digit.slice(1)}2${suffix}`;
+      const bone = wrist?.getObjectByName(runtimeName);
+      const curlRadians = RIGGED_CARBINE_SECOND_PHALANX_CURL[side][digit];
+      if (!(bone instanceof THREE.Bone)) {
+        bones.push({ side, digit, bone: runtimeName, curlRadians, bindRelativeFloor: null, applied: false });
+        continue;
+      }
+      applyRiggedCarbineFingerCurlToBone(bone, curlRadians);
+      const bindRelativeFloor = enforceRiggedOperatorHandBindDeltaFloor(
+        root,
+        side,
+        digit,
+        RIGGED_CARBINE_SECOND_PHALANX_BIND_DELTA_FLOOR_RADIANS[digit],
+        RIGGED_CARBINE_SECOND_PHALANX_FALLBACK_AXIS,
+      );
+      if (bindRelativeFloor !== null) bindFloors.push(bindRelativeFloor);
+      if (side === 'right' && digit === 'pinky') rightPinkyBindFloor = bindRelativeFloor;
+      if (side === 'left') leftHandApplied = true;
+      else rightHandApplied = true;
+      bones.push({ side, digit, bone: runtimeName, curlRadians, bindRelativeFloor, applied: true });
+    }
+  }
+  let allAtOrAboveRequiredBindFloor = bindFloors.length === 10 && bones.length === 10;
+  for (const { digit, bindRelativeFloor, applied } of bones) {
+    if (!applied || bindRelativeFloor?.appliedToRenderedBone !== true
+      || bindRelativeFloor.allFinite !== true
+      || bindRelativeFloor.minimumBindDeltaRadians
+        !== RIGGED_CARBINE_SECOND_PHALANX_BIND_DELTA_FLOOR_RADIANS[digit]
+      || Number(bindRelativeFloor.afterBindDeltaRadians)
+        < RIGGED_CARBINE_SECOND_PHALANX_BIND_DELTA_FLOOR_RADIANS[digit] - 1e-9) {
+      allAtOrAboveRequiredBindFloor = false;
+      break;
+    }
+  }
+  return {
+    contract: 'pass65-evaluated-per-digit-grip-curl-v3',
+    sourceReferenceAvailable: true,
+    expectedBoneCount: 10,
+    bones,
+    bothHands: leftHandApplied && rightHandApplied,
+    bindFloors,
+    rightPinkyBindFloor,
+    allAtOrAboveRequiredBindFloor,
+    allApplied: allAtOrAboveRequiredBindFloor,
+  };
+}
+
+function applyRiggedWeaponGrip(
+  root: THREE.Group,
+  rig: Extract<OperatorRig, { rigged: true }>,
+  weapon: THREE.Group,
+): Record<string, unknown> | null {
   if (!rig.leftShoulderBone || !rig.leftElbowBone || !rig.leftWristBone
     || !rig.rightShoulderBone || !rig.rightElbowBone || !rig.rightWristBone) return null;
   const support = applyRiggedArmGrip(
@@ -1291,13 +1550,26 @@ function applyRiggedWeaponGrip(rig: Extract<OperatorRig, { rigged: true }>, weap
     rig.rightShoulderBone, rig.rightElbowBone, rig.rightWristBone, weapon, 'grip-socket-r', -1,
   );
   if (!support) return dominant;
+  const fingerCurl = applyRiggedCarbineFingerCurl(root, rig, weapon);
+  const supportOrientationError = Number((support.wristOrientation as { errorRadians?: number } | undefined)?.errorRadians);
+  const dominantOrientationError = Number((dominant?.wristOrientation as { errorRadians?: number } | undefined)?.errorRadians);
+  const supportSocketReferenceValid = (support.socketReference as { valid?: boolean } | undefined)?.valid === true;
+  const dominantSocketReferenceValid = (dominant?.socketReference as { valid?: boolean } | undefined)?.valid === true;
   return {
     ...support,
     dominantGrip: dominant,
+    fingerCurl,
     bothHandsConnected: support.supportError !== undefined
-      && Number(support.supportError) <= 0.055
+      && Number(support.supportError) <= RIGGED_GRIP_POSITION_ERROR_MAX_M
       && dominant?.supportError !== undefined
-      && Number(dominant.supportError) <= 0.055,
+      && Number(dominant.supportError) <= RIGGED_GRIP_POSITION_ERROR_MAX_M
+      && Number.isFinite(supportOrientationError)
+      && supportOrientationError <= RIGGED_GRIP_QUATERNION_ERROR_MAX_RADIANS
+      && Number.isFinite(dominantOrientationError)
+      && dominantOrientationError <= RIGGED_GRIP_QUATERNION_ERROR_MAX_RADIANS
+      && supportSocketReferenceValid
+      && dominantSocketReferenceValid
+      && fingerCurl.allApplied === true,
   };
 }
 
@@ -1333,10 +1605,57 @@ export function createOperatorWeaponPresentation(
   weapon.position.set(0, 0, 0);
   weapon.quaternion.identity();
   weapon.userData.riggedForwardCorrection = 'stable-body-mount-minus-z';
+  if (weaponId === RIGGED_CARBINE_GRIP_REFERENCE.weaponId) {
+    for (const socketName of ['support-socket-l', 'grip-socket-r'] as const) {
+      const socket = weapon.getObjectByName(socketName);
+      if (!socket) continue;
+      const reference = RIGGED_CARBINE_GRIP_REFERENCE.sockets[socketName];
+      const observedImportedSourceLocalPosition = socket.position.toArray();
+      const observedImportedSourceLocalQuaternion = socket.quaternion.toArray();
+      const sourcePositionErrorM = socket.position.distanceTo(
+        new THREE.Vector3(...reference.authoredLocalPosition),
+      );
+      const sourceQuaternionErrorRadians = socket.quaternion.angleTo(
+        new THREE.Quaternion(...reference.authoredLocalQuaternion),
+      );
+      const sourceTransformValid = Number.isFinite(sourcePositionErrorM)
+        && sourcePositionErrorM <= 1e-6
+        && Number.isFinite(sourceQuaternionErrorRadians)
+        && sourceQuaternionErrorRadians <= 1e-6;
+      socket.userData.riggedGripSocketReference = {
+        available: browserRuntime
+          && weapon.userData.projectOriginalWeapon === true
+          && weapon.userData.importedWeaponSource === RIGGED_CARBINE_GRIP_REFERENCE.sourceAsset
+          && socket.userData.atomic_socket === reference.atomicSocket
+          && sourceTransformValid,
+        referenceId: `${RIGGED_CARBINE_GRIP_REFERENCE.contract}:${socketName}`,
+        weaponId,
+        sourceAsset: RIGGED_CARBINE_GRIP_REFERENCE.sourceAsset,
+        atomicSocket: reference.atomicSocket,
+        sourceTransformValid,
+        authoredSourceLocalPosition: [...reference.authoredLocalPosition],
+        authoredSourceLocalQuaternion: [...reference.authoredLocalQuaternion],
+        observedImportedSourceLocalPosition,
+        observedImportedSourceLocalQuaternion,
+        sourcePositionErrorM,
+        sourceQuaternionErrorRadians,
+        liveTargetContract: reference.liveTargetContract,
+        calibrationApplied: reference.calibrationApplied,
+        calibrationReason: reference.calibrationReason,
+        evaluatedTargetLocalPosition: [...reference.evaluatedTargetLocalPosition],
+        evaluatedTargetLocalQuaternion: [...reference.evaluatedTargetLocalQuaternion],
+        expectedHandEuler: [...reference.handEuler],
+        wristBasisContract: 'authored-wrist-bind-to-operator-root-v1',
+      };
+    }
+  }
   const supportGrip = weapon.getObjectByName('support-socket-l');
   if (supportGrip) {
     supportGrip.position.set(...RIGGED_SUPPORT_GRIP_POSITION[weaponId]);
     supportGrip.userData.riggedReachCalibrated = true;
+    supportGrip.userData.riggedReachCalibrationContract = weaponId === 'carbine'
+      ? RIGGED_CARBINE_GRIP_REFERENCE.sockets['support-socket-l'].liveTargetContract
+      : 'legacy-third-person-support-grip-calibration';
   }
   // World weapons are presentation only: visual recoil must never move an authoritative hit proxy.
   weapon.traverse((node) => {
@@ -1529,12 +1848,15 @@ export function poseOperator(
     position: bone.position.clone(),
     quaternion: bone.quaternion.clone(),
   }));
+  root.userData.operatorUnarmedHandPose = rig.weaponId === null
+    ? poseUnarmedRiggedOperatorHands(root)
+    : null;
   root.updateWorldMatrix(true, true);
   if (rig.weapon) {
     rig.weapon.visible = !meleeActive;
     // The mixer writes animated bones first; two-arm IK is the final
     // presentation layer so locomotion/fire clips cannot steer the muzzle.
-    root.userData.operatorGripTelemetry = meleeActive ? null : applyRiggedWeaponGrip(rig, rig.weapon);
+    root.userData.operatorGripTelemetry = meleeActive ? null : applyRiggedWeaponGrip(root, rig, rig.weapon);
   }
   if (rig.meleeKnife) rig.meleeKnife.visible = meleeActive;
 }
@@ -1543,7 +1865,7 @@ export function buildOperator(
   team: Team,
   name = 'operator',
   flattenMaterials = false,
-  weaponId: WeaponId = 'carbine',
+  weaponId: WeaponId | null = 'carbine',
   appearance: OperatorAppearance = 'team',
 ): THREE.Group {
   const rigged = createRiggedOperator(team, name, flattenMaterials, appearance);
@@ -1614,7 +1936,7 @@ export function buildOperator(
       wristR.add(knife);
       runtimeRig.meleeKnife = knife;
     }
-    setOperatorWeapon(root, weaponId, flattenMaterials);
+    if (weaponId) setOperatorWeapon(root, weaponId, flattenMaterials);
     root.traverse((node) => {
       node.userData.targetRoot = root;
       // Combat rays use authoritative proxies only — presentation mesh never defines zones/damage.

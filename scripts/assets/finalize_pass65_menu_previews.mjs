@@ -35,7 +35,7 @@ const verifierPath = path.join(root, 'scripts/qa/verify-pass65-menu-preview-prod
 const chopperSourcePath = path.join(root, 'source-assets/blender/pass65-chopper-gunner.blend');
 const acceptedCockpitEvidence = 'docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png';
 const acceptedCockpitEvidencePath = path.join(root, acceptedCockpitEvidence);
-const acceptedCockpitDigest = 'b75d0ca8dc8b8be61c93e06a737029ad679f480d27eea56edc66dadcd00fba9e';
+const acceptedCockpitDigest = '680a235168bfa0021232aa1e7cfe6332b91616f60bd5369b9fea60e110f9b4be';
 const choreography = JSON.parse(await readFile(choreographyPath, 'utf8'));
 const generatedAt = choreography.generatedAt;
 const arenas = Object.keys(choreography.arenas);
@@ -62,6 +62,12 @@ function run(command, args) {
   });
   if (result.status !== 0) throw new Error(`${command} ${args.join(' ')} failed\n${result.stdout}\n${result.stderr}`);
   return result;
+}
+
+function ffmpegSupportsEncoder(encoder) {
+  const result = run('ffmpeg', ['-hide_banner', '-encoders']);
+  const escaped = encoder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`^\\s*A\\S*\\s+${escaped}\\s`, 'm').test(result.stdout);
 }
 
 function canonicalArenaDependencies() {
@@ -108,7 +114,7 @@ function validateRecipe() {
     || choreography.reviewFrames.at(-1) !== choreography.frameCount) {
     throw new Error('reviewFrames must be unique and include the exact loop endpoints');
   }
-  if (choreography.media.cacheKey !== 'pass66-runtime-preview-v5') throw new Error('runtime preview cache key is stale');
+  if (choreography.media.cacheKey !== 'pass66-runtime-preview-v13') throw new Error('runtime preview cache key is stale');
   const budget = choreography.media.encodingBudget;
   if (budget?.minimumAverageBitrateKbps !== 3000
     || budget?.maximumAverageBitrateKbps !== 9000
@@ -145,7 +151,7 @@ function validateRecipe() {
     || webm?.minimumVideoBitrateKbps !== 4500
     || webm?.maximumVideoBitrateKbps !== 7500
     || webm?.bufferSizeKbps !== 15000
-    || webm?.crf !== 28
+    || webm?.crf !== 20
     || webm?.cpuUsed !== 2
     || webm?.audioBitrateKbps !== 48
     || webm?.mimeType !== 'video/webm; codecs="vp9,opus"') {
@@ -546,6 +552,10 @@ function transcode(arena, outputRoot = runtimeRoot) {
   const poster = path.join(outputRoot, `${arena}.webp`);
   const mp4Profile = choreography.media.encodingProfiles.mp4;
   const webmProfile = choreography.media.encodingProfiles.webm;
+  const webmAudioEncoder = webmProfile.audioCodec === 'opus' && ffmpegSupportsEncoder('libopus')
+    ? 'libopus'
+    : webmProfile.audioCodec;
+  const webmAudioCompatibility = webmAudioEncoder === 'opus' ? ['-strict', '-2'] : [];
   const images = choreography.media.encodingProfiles.images;
   const colour = choreography.media.encodingProfiles.colour;
   const common = [
@@ -574,7 +584,7 @@ function transcode(arena, outputRoot = runtimeRoot) {
     '-bufsize', rate(mp4Profile.bufferSizeKbps),
     '-g', '60', '-keyint_min', '60', '-sc_threshold', '0',
     '-threads:v', '1',
-    '-x264-params', 'threads=1:lookahead_threads=1:sliced_threads=0:nal-hrd=vbr:force-cfr=1',
+    '-x264-params', 'threads=1:lookahead_threads=1:sliced_threads=0:nal-hrd=vbr:force-cfr=1:colorprim=bt709:transfer=bt709:colormatrix=bt709:range=limited',
     '-flags:v', '+bitexact',
     ...colourArgs,
     '-movflags', '+faststart',
@@ -586,6 +596,7 @@ function transcode(arena, outputRoot = runtimeRoot) {
   ]);
   run('ffmpeg', [
     ...common,
+    '-vf', 'setparams=range=limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709',
     '-c:v', webmProfile.encoder,
     '-profile:v', String(webmProfile.profile),
     '-crf', String(webmProfile.crf),
@@ -596,7 +607,8 @@ function transcode(arena, outputRoot = runtimeRoot) {
     '-g', '60', '-row-mt', '1', '-deadline', 'good', '-cpu-used', String(webmProfile.cpuUsed),
     '-flags:v', '+bitexact',
     ...colourArgs,
-    '-c:a', webmProfile.audioCodec,
+    '-c:a', webmAudioEncoder,
+    ...webmAudioCompatibility,
     '-flags:a', '+bitexact',
     '-b:a', rate(webmProfile.audioBitrateKbps),
     webm,

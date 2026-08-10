@@ -136,4 +136,40 @@ describe('timed map weapon legacy-main integration', () => {
     expect(main).toContain('flareProjectiles: flareProjectileSystem.telemetry()');
     expect(main).toContain('flameStream: flamethrowerStreamPresentation.telemetry()');
   });
+
+  it('keeps idle railgun action ownership at hip and enters reload only while rechambering', () => {
+    const update = between('function updatePhysics(dt: number)', '\nfunction interpolationSourceSnapshotRateHz(');
+    const progressStart = update.indexOf("const railgunReloadProgress = player.weapon === 'railgun' && railgunRechamberPresentationActive");
+    const progressEnd = update.indexOf('\n  const viewmodelObstruction', progressStart);
+    expect(progressStart).toBeGreaterThanOrEqual(0);
+    expect(progressEnd).toBeGreaterThan(progressStart);
+    const progress = update.slice(progressStart, progressEnd);
+    expect(progress).toContain('THREE.MathUtils.clamp(');
+    expect(progress).toContain(': null;');
+    expect(progress).not.toContain(': 0;');
+    expect(update).toContain("player.weapon === 'railgun' ? railgunReloadProgress : gameplayReloadProgress(");
+  });
+
+  it('keeps flame and flare frame loops on retained pools and cached snapshots', () => {
+    const groundFireUpdate = between(
+      'function updateFlamethrowerGroundFires(now: number)',
+      '\nconst dmrThermalPresentation',
+    );
+    expect(groundFireUpdate).toContain('flamethrowerGroundFires.update(');
+    expect(groundFireUpdate).not.toContain('[...bots.values()]');
+    expect(groundFireUpdate).not.toContain('.splice(');
+
+    const flareUpdate = between('function updateFlareProjectiles(', '\nfunction updateExplosiveBolts(');
+    expect(flareUpdate).toContain('if (!flareProjectileSystem.hasActiveProjectiles()) return');
+    expect(flareUpdate).toContain('if (flareProjectileSystem.requiresWorldSnapshot(now))');
+    expect(flareUpdate).toContain('prepareFlareTargetSnapshots()');
+    expect(flareUpdate).toContain('flareFrameColliders = activeWorldColliders()');
+    expect(flareUpdate).toContain('flareProjectileSystem.update(dt, now, flareProjectileCallbacks)');
+    expect(flareUpdate).not.toContain('flareProjectileSystem.telemetry()');
+    expect(flareUpdate).not.toContain('point.clone()');
+
+    const targetSnapshots = between('function prepareFlareTargetSnapshots(', '\nfunction flareHostileTargets(');
+    expect(targetSnapshots).toContain('target.root.getWorldPosition(entry.target.position)');
+    expect(targetSnapshots).not.toContain('position.clone()');
+  });
 });

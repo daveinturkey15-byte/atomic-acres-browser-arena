@@ -43,6 +43,11 @@ export const SUPPORT_VEHICLE_SPECS = Object.freeze({
     root: (lod) => `Pass65CareAircraft_LOD${lod}`,
     variant: 'care',
     material: 'MAT_Pass65SupportAircraft_Armor_PBR',
+    materialRevision: 'separated-daylight-readable-pbr-v1',
+    valueBreakMaterials: Object.freeze([
+      'MAT_Pass65CareAircraft_Underside', 'MAT_Pass65CareAircraft_LeadingEdge',
+      'MAT_Pass65CareAircraft_Tail', 'MAT_Pass65CareAircraft_EngineNacelle',
+    ]),
     nodes: Object.freeze([
       'care-aircraft-fuselage', 'care-aircraft-nose', 'care-aircraft-main-wing',
       'care-aircraft-cargo-bay', 'care-aircraft-cargo-door', 'care-aircraft-cargo-socket',
@@ -60,6 +65,10 @@ export const SUPPORT_VEHICLE_SPECS = Object.freeze({
     root: (lod) => `Pass65CarpetAircraft_LOD${lod}`,
     variant: 'carpet',
     material: 'MAT_Pass65SupportAircraft_Carpet_PBR',
+    materialRevision: 'separated-daylight-readable-pbr-v1',
+    valueBreakMaterials: Object.freeze([
+      'MAT_Pass65CarpetAircraft_Underside', 'MAT_Pass65CarpetAircraft_LeadingEdge',
+    ]),
     nodes: Object.freeze([
       'carpet-aircraft-fuselage', 'carpet-aircraft-nose', 'carpet-aircraft-main-wing',
       'carpet-aircraft-bomb-bay', 'carpet-aircraft-bomb-door-left', 'carpet-aircraft-bomb-door-right',
@@ -171,6 +180,14 @@ export function auditSupportVehicleGlb(json, bytes, family, lod) {
   if (root?.extras?.runtime_forward_axis !== '-Z') failures.push(`${family} LOD${lod}: root does not declare runtime -Z forward`);
   if (root?.extras?.presentation_only !== true) failures.push(`${family} LOD${lod}: presentation-only boundary missing`);
   if (spec.variant && root?.extras?.presentation_variant !== spec.variant) failures.push(`${family} LOD${lod}: wrong presentation variant`);
+  if (spec.materialRevision && root?.extras?.material_revision !== spec.materialRevision) {
+    failures.push(`${family} LOD${lod}: daylight-readable material revision missing`);
+  }
+  for (const name of spec.valueBreakMaterials ?? []) {
+    if (!(json.materials ?? []).some((material) => material.name === name)) {
+      failures.push(`${family} LOD${lod}: authored value-break material ${name} missing`);
+    }
+  }
   const detailCounts = {};
   if (family === 'chopper') {
     if (root?.extras?.visual_revision !== 'close-range-tandem-armored-airframe-v4'

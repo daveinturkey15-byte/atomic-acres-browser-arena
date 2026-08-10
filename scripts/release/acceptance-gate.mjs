@@ -314,7 +314,9 @@ export function classifyPreviewDelta(paths, manifestPath, previewSha = null, opt
   // as full CI impact in change-impact.mjs so the edited gate is exercised,
   // but correcting a non-shipping assertion must not invalidate approval of
   // byte-identical runtime output.
-  const relevantPaths = normalizedPaths.filter((path) => path !== manifestPath && !/^tests\//.test(path));
+  const relevantPaths = normalizedPaths.filter((path) => path !== manifestPath
+    && !/^tests\//.test(path)
+    && !/^src\/.*\.test\.ts$/.test(path));
   const classification = relevantPaths.length === 0 ? { mode: 'none' } : classifyPaths(relevantPaths);
   return classification.mode === 'none'
     ? { ok: true, paths: relevantPaths, reason: 'only process/acceptance paths changed after preview' }

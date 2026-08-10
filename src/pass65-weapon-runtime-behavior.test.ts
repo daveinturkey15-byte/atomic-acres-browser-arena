@@ -2,9 +2,22 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { poseOperator, setOperatorWeapon } from './art-kit';
-import { WeaponPresentation, HIP_VIEWMODEL_SCALE, type WeaponViewmodelCatalogGpuPrewarmEntry } from './weapon-presentation';
+import {
+  FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT,
+  FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT_CONTRACT,
+  FULLSCREEN_PRESENTATION_SUPPRESSED_SCALE,
+  FULLSCREEN_PRESENTATION_SUPPRESSION_CONTRACT,
+  HIP_VIEWMODEL_SCALE,
+  VIEWMODEL_NEAR_PLANE_SAFE_RETREAT,
+  WeaponPresentation,
+  authoredNearPlaneContactRetreat,
+  type WeaponViewmodelCatalogGpuPrewarmEntry,
+} from './weapon-presentation';
 import { WEAPON_IDS, type WeaponId } from './protocol';
-import { RUNTIME_WEAPON_RETENTION_LIMIT } from './weapon-prewarm-catalog';
+import {
+  RUNTIME_WEAPON_RETENTION_LIMIT,
+  webGlMatchBoundWeaponPrewarmCatalog,
+} from './weapon-prewarm-catalog';
 import {
   PASS65_AUTHORED_FIREARM_IDS,
   createPass65WeaponModel,
@@ -58,6 +71,23 @@ function fakeWeaponGltf(id: Pass65AuthoredFirearmId, animated = false): FakeGltf
   identity.userData.design_id = `${id}-behavior-test`;
   identity.userData.display_name = id;
   identity.userData.silhouette_family = 'behavior-test';
+  if (id === 'carbine' || id === 'mini-uzi') {
+    const rear = new THREE.Object3D();
+    rear.name = 'rear-sight-socket';
+    rear.position.z = 0;
+    const front = new THREE.Object3D();
+    front.name = 'front-sight-socket';
+    front.position.z = 0.4;
+    const apertureFixture = new THREE.BufferGeometry();
+    apertureFixture.setAttribute('position', new THREE.Float32BufferAttribute([
+      -0.1, -0.1, -0.2, 0.1, -0.1, -0.2, 0.1, 0.1, -0.2, -0.1, 0.1, -0.2,
+      -0.1, -0.1, 0.2, 0.1, -0.1, 0.2, 0.1, 0.1, 0.2, -0.1, 0.1, 0.2,
+    ], 3));
+    apertureFixture.setIndex([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7]);
+    const rendered = new THREE.Mesh(apertureFixture, new THREE.MeshStandardMaterial());
+    rendered.name = `${id}_FP_LOD0_Runtime_static_MAT_behavior-test`;
+    identity.add(rear, front, rendered);
+  }
   scene.add(identity);
   const animations = animated
     ? [new THREE.AnimationClip('reload', 1, [
@@ -71,6 +101,7 @@ function fakeArmsGltf(): FakeGltf {
   const scene = new THREE.Group();
   for (const suffix of ['R', 'L']) {
     const shoulder = new THREE.Bone(); shoulder.name = `UpperArm${suffix}`;
+    shoulder.position.x = suffix === 'R' ? 0.24 : -0.24;
     const elbow = new THREE.Bone(); elbow.name = `LowerArm${suffix}`;
     const wrist = new THREE.Bone(); wrist.name = `Wrist${suffix}`;
     elbow.position.set(0, -0.36, 0);
@@ -191,6 +222,53 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(releasePass65WeaponModelsIn(presentation.root)).toBe(2);
   });
 
+  it('keeps the bounded WebGL M14 hotset through retained-model eviction pressure', async () => {
+    stubBrowserTextureLoading();
+    vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (
+      Promise.resolve(fakeGltfForUrl(String(url)))
+    )) as GLTFLoader['loadAsync']);
+    const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(), false);
+    await presentation.load();
+    const hotset = webGlMatchBoundWeaponPrewarmCatalog('carbine');
+    await presentation.prepareBrowserWeaponCatalogAssets(hotset);
+    const retainedModels = new Map(hotset.map((weaponId) => [
+      weaponId,
+      presentation.root.getObjectByName(`${weaponId}-pass65-first-person-model`),
+    ]));
+
+    for (const transient of ['pistol', 'mp5', 'ak-47'] as const) {
+      presentation.setWeapon(transient, true);
+      await flushPromises();
+    }
+    presentation.setWeapon('m14-ebr', true);
+    await flushPromises();
+
+    expect(presentation.browserCatalogReadiness()).toMatchObject({
+      retained: hotset,
+      retainedCount: hotset.length,
+      loaded: hotset.length,
+      gpuReady: hotset.length,
+      prewarming: false,
+      unpreparedSwitches: 3,
+    });
+    expect(presentation.activeWeaponReadiness()).toEqual({
+      requestedWeapon: 'm14-ebr',
+      ready: true,
+      modelLoaded: true,
+      gpuReady: true,
+      resident: true,
+      catalogPrewarming: false,
+      importedWeapon: 'm14-ebr',
+      mountedIsRequested: true,
+    });
+    for (const [weaponId, model] of retainedModels) {
+      expect(model, `${weaponId}: initially retained`).toBeDefined();
+      expect(presentation.root.getObjectByName(`${weaponId}-pass65-first-person-model`))
+        .toBe(model);
+    }
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(hotset.length);
+  });
+
   it('suppresses the sniper viewmodel without removing its prepared WebGPU render vocabulary', () => {
     // Canonical 75deg/16:9 framing: the viewmodel screen-scale compensation is
     // exactly 1 here, so the unsuppressed scale is the authored hip scale.
@@ -202,6 +280,108 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     presentation.suppressForSniperScope(false);
     expect(presentation.root.visible).toBe(true);
     expect(presentation.root.scale.toArray()).toEqual([HIP_VIEWMODEL_SCALE, HIP_VIEWMODEL_SCALE, HIP_VIEWMODEL_SCALE]);
+  });
+
+  it('keeps the authored max-contact near-plane retreat complete, bounded and allocation-free', () => {
+    expect(FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT_CONTRACT)
+      .toBe('authored-glb-contact-retreat-2026-08-09-v1');
+    expect(Object.keys(FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT).sort()).toEqual([...WEAPON_IDS].sort());
+    expect(FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT).toMatchObject({
+      sniper: 0.14,
+      railgun: 0.1,
+      lmg: 0.1,
+      'm14-ebr': 0.05,
+    });
+    for (const weapon of WEAPON_IDS) {
+      const cached = FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT[weapon];
+      expect(cached).toBeGreaterThanOrEqual(0);
+      expect(cached).toBeLessThanOrEqual(0.14);
+      expect(authoredNearPlaneContactRetreat(weapon, 0)).toBe(0);
+      expect(authoredNearPlaneContactRetreat(weapon, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT / 2))
+        .toBeCloseTo(cached / 2, 8);
+      expect(authoredNearPlaneContactRetreat(weapon, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT * 2))
+        .toBe(cached);
+    }
+    const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(76, 1, 0.08, 180), false);
+    presentation.setWeapon('sniper', true);
+    presentation.update({
+      dt: 1, moving: false, sprinting: false, crouched: false, prone: true,
+      ads: false, phase: 0, landingImpulse: 0, lateralSpeed: 0, reloadProgress: null,
+      surfaceRetreat: VIEWMODEL_NEAR_PLANE_SAFE_RETREAT,
+    });
+    expect(presentation.presentationState().nearPlaneClearance).toEqual({
+      contract: FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT_CONTRACT,
+      cameraNear: 0.08,
+      requiredMargin: 0.02,
+      baseRetreat: 0.06,
+      maximumSurfaceRetreat: VIEWMODEL_NEAR_PLANE_SAFE_RETREAT,
+      cachedRetreat: 0.14,
+      blendedRetreat: 0.14,
+    });
+  });
+
+  it('retains and exactly restores the M14 structural viewmodel vocabulary through fullscreen suppression', () => {
+    const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250), false);
+    presentation.setWeapon('m14-ebr', true);
+    presentation.setPresentationVisible(true);
+    presentation.update({
+      dt: 1 / 60, moving: false, sprinting: false, crouched: false, prone: false,
+      ads: true, phase: 0, landingImpulse: 0, lateralSpeed: 0, reloadProgress: null,
+    });
+    const restoredScale = presentation.root.scale.clone();
+    const restoredPosition = presentation.root.position.clone();
+    const restoredRotation = presentation.root.rotation.clone();
+    const structuralLights = presentation.root.children.filter((child) => child instanceof THREE.PointLight);
+    const fillLight = structuralLights.find((light) => light.name === 'first-person-viewmodel-fill');
+    const muzzleLight = structuralLights.find((light) => light.name === 'first-person-muzzle-light');
+
+    expect(structuralLights).toHaveLength(2);
+    expect(fillLight?.intensity).toBeGreaterThan(0);
+    presentation.fire(0.02);
+    expect(muzzleLight?.intensity).toBeGreaterThan(0);
+    presentation.suppressForFullscreenPresentation(true);
+    expect(presentation.root.visible).toBe(true);
+    expect(structuralLights.every((light) => light.visible)).toBe(true);
+    expect(presentation.root.scale.toArray()).toEqual([
+      FULLSCREEN_PRESENTATION_SUPPRESSED_SCALE,
+      FULLSCREEN_PRESENTATION_SUPPRESSED_SCALE,
+      FULLSCREEN_PRESENTATION_SUPPRESSED_SCALE,
+    ]);
+    expect(presentation.root.position.toArray()).toEqual(restoredPosition.toArray());
+    expect(presentation.root.rotation.toArray()).toEqual(restoredRotation.toArray());
+    expect(presentation.presentationState().fullscreenSuppression).toEqual({
+      contract: FULLSCREEN_PRESENTATION_SUPPRESSION_CONTRACT,
+      active: true,
+      suppressedScale: FULLSCREEN_PRESENTATION_SUPPRESSED_SCALE,
+      rootVisible: true,
+      rootScale: FULLSCREEN_PRESENTATION_SUPPRESSED_SCALE,
+      structuralLightCount: 2,
+      structuralLights: [
+        {
+          name: 'first-person-viewmodel-fill',
+          intensityContract: 'zero-when-suppressed',
+          attachedToRoot: true,
+          visible: true,
+          intensity: 0,
+        },
+        {
+          name: 'first-person-muzzle-light',
+          intensityContract: 'transient-fire-decay',
+          attachedToRoot: true,
+          visible: true,
+          intensity: 0,
+        },
+      ],
+    });
+
+    presentation.suppressForFullscreenPresentation(false);
+    expect(presentation.root.visible).toBe(true);
+    expect(presentation.root.scale.toArray()).toEqual(restoredScale.toArray());
+    expect(presentation.root.position.toArray()).toEqual(restoredPosition.toArray());
+    expect(presentation.root.rotation.toArray()).toEqual(restoredRotation.toArray());
+    expect(fillLight?.intensity).toBeGreaterThan(0);
+    expect(muzzleLight?.intensity).toBe(0);
+    expect(presentation.presentationState().fullscreenSuppression.active).toBe(false);
   });
 
   it('keeps a rapid loadout switch atomic while initial browser assets are delayed', async () => {

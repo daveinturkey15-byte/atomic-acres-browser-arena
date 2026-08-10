@@ -83,6 +83,28 @@ describe('character presentation contracts', () => {
     expect(measureCameraFraming(arm, camera)?.nearPlaneClear).toBe(false);
   });
 
+  it('excludes meshes hidden by an ancestor from local bounds and camera framing', () => {
+    const camera = new THREE.PerspectiveCamera(70, 16 / 9, 0.1, 100);
+    const assembly = new THREE.Group();
+    const visible = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2));
+    visible.position.z = -1;
+    const hiddenStock = new THREE.Group();
+    hiddenStock.visible = false;
+    const hiddenMesh = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4));
+    hiddenMesh.position.z = 1;
+    hiddenStock.add(hiddenMesh);
+    assembly.add(visible, hiddenStock);
+
+    const localBounds = objectLocalGeometryBounds(assembly);
+    const framing = measureCameraFraming(assembly, camera);
+
+    expect(localBounds?.getSize(new THREE.Vector3()).toArray()).toEqual([
+      expect.closeTo(0.2, 5), expect.closeTo(0.2, 5), expect.closeTo(0.2, 5),
+    ]);
+    expect(framing).toMatchObject({ finite: true, nearPlaneClear: true, intersectsViewport: true });
+    expect(framing!.nearestDepth).toBeGreaterThan(0.8);
+  });
+
   it('uses the live deformed bounds for skinned arms instead of the stale bind geometry box', () => {
     const camera = new THREE.PerspectiveCamera(70, 16 / 9, 0.1, 100);
     const geometry = new THREE.BoxGeometry(4, 4, 4);

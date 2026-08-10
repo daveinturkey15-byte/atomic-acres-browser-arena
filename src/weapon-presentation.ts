@@ -78,6 +78,14 @@ type RiggedViewArm = FirstPersonArmChain & {
   bindShoulderPosition: THREE.Vector3;
   bindShoulderScale: THREE.Vector3;
 };
+type AdsClearanceMaterial = Readonly<{
+  material: THREE.Material;
+  originalOpacity: number;
+  originalTransparent: boolean;
+  originalDepthWrite: boolean;
+  targetOpacity: number;
+  surface: 'lens' | 'primary' | 'gunmetal' | 'polymer' | 'rubber' | 'accent' | 'other-static';
+}>;
 
 type ViewArmRig = {
   side: 'left' | 'right';
@@ -269,6 +277,48 @@ export const VIEWMODEL_NEAR_PLANE_CLEARANCE = 0.06;
 export const VIEWMODEL_NEAR_PLANE_SAFE_RETREAT = 0.28;
 const ADS_VIEWMODEL_BASE_POSITION = Object.freeze({ x: 0.28, y: -0.38, z: -1.04 });
 const ADS_VIEWMODEL_SCALE = 0.76;
+export const FULLSCREEN_PRESENTATION_SUPPRESSED_SCALE = 0.0001;
+export const FULLSCREEN_PRESENTATION_SUPPRESSION_CONTRACT = 'retained-structural-lights-fullscreen-suppression-v1';
+
+/**
+ * Extra max-contact retreat for authored first-person assets whose retained
+ * receiver/stock envelope is deeper than the M4A1 calibration weapon. These
+ * conservative upper bounds come from the 2026-08-09 real-GLB wall-contact
+ * sweep at camera.near + 0.02 m; the release verifier must be rerun whenever a
+ * source model or the gameplay camera near plane changes.
+ */
+export const FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT_CONTRACT = 'authored-glb-contact-retreat-2026-08-09-v1';
+export const FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT: Readonly<Record<WeaponId, number>> = Object.freeze({
+  carbine: 0,
+  smg: 0,
+  lmg: 0.1,
+  scattergun: 0.03,
+  sniper: 0.14,
+  'mini-uzi': 0,
+  mp5: 0,
+  m4a1: 0,
+  'ak-47': 0.03,
+  minigun: 0,
+  'm14-ebr': 0.05,
+  'slug-shotgun': 0.03,
+  pistol: 0,
+  'machine-pistol': 0,
+  magnum: 0,
+  'flashlight-pistol': 0,
+  'explosive-crossbow': 0,
+  railgun: 0.1,
+  flamethrower: 0,
+  'flare-gun': 0,
+});
+
+export function authoredNearPlaneContactRetreat(weapon: WeaponId, surfaceRetreat: number): number {
+  const contactBlend = THREE.MathUtils.clamp(
+    surfaceRetreat / VIEWMODEL_NEAR_PLANE_SAFE_RETREAT,
+    0,
+    1,
+  );
+  return FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT[weapon] * contactBlend;
+}
 
 /**
  * The viewmodel is framed for a 16:9 viewport at the default field of view.
@@ -318,6 +368,217 @@ function viewmodelScreenDrop(camera: THREE.Camera): number {
 
 function viewmodelMeleeScreenOffset(camera: THREE.Camera): number {
   return viewmodelMeleeLateralOffset(camera instanceof THREE.PerspectiveCamera ? camera.aspect : VIEWMODEL_REFERENCE_ASPECT);
+}
+
+const FIRST_PERSON_ADS_BORE_RADIUS: Readonly<Partial<Record<WeaponId, number>>> = Object.freeze({
+  carbine: 0.032,
+  'mini-uzi': 0.024,
+});
+const FIRST_PERSON_ADS_SIGHT_PICTURE_RETREAT: Readonly<Partial<Record<WeaponId, number>>> = Object.freeze({
+  // The authored muzzle/front-sight geometry extends close to the camera when
+  // its rear socket is centred. A bounded ADS-only retreat keeps the complete
+  // ghosted silhouette and opaque arms below the sight window without changing
+  // the hip silhouette, source model scale, sockets or authoritative aim ray.
+  carbine: 0.26,
+  'mini-uzi': 0.3,
+});
+
+type AdsSightBoreTelemetry = Readonly<{
+  applied: boolean;
+  contract: 'physical-aperture-spatial-degenerate-v1';
+  radius: number;
+  rayCount: number;
+  suppressedElements: number;
+  batches: ReadonlyArray<Readonly<{ mesh: string; submittedElements: number; suppressedElements: number }>>;
+}>;
+
+/**
+ * Punches a small, real aperture through only the cloned first-person render
+ * batches intersecting the authored rear-to-front sight axis. Pass 65 merged
+ * the HK416 lens and Mini Uzi sight plates into material batches, leaving the
+ * semantic optic nodes empty; toggling those nodes therefore hid no pixels.
+ * Degenerating intersected cloned indices keeps sockets, materials and source
+ * topology stable while guaranteeing that the centre sight ray is unobstructed.
+ */
+export function carveFirstPersonAdsSightBore(id: WeaponId, model: THREE.Object3D): AdsSightBoreTelemetry | null {
+  const radius = FIRST_PERSON_ADS_BORE_RADIUS[id];
+  if (!radius) return null;
+  const rearSocket = model.getObjectByName('rear-sight-socket');
+  const frontSocket = model.getObjectByName('front-sight-socket');
+  if (!rearSocket || !frontSocket) return null;
+
+  model.updateMatrixWorld(true);
+  const rear = model.worldToLocal(rearSocket.getWorldPosition(new THREE.Vector3()));
+  const front = model.worldToLocal(frontSocket.getWorldPosition(new THREE.Vector3()));
+  const axis = front.clone().sub(rear).normalize();
+  if (![...rear.toArray(), ...front.toArray(), ...axis.toArray()].every(Number.isFinite) || axis.lengthSq() < 0.99) return null;
+
+  const lateral = new THREE.Vector3(1, 0, 0);
+  if (Math.abs(lateral.dot(axis)) > 0.9) lateral.set(0, 1, 0);
+  lateral.addScaledVector(axis, -lateral.dot(axis)).normalize();
+  const vertical = new THREE.Vector3().crossVectors(axis, lateral).normalize();
+  const start = rear.clone().addScaledVector(axis, -0.12);
+  const end = front.clone().addScaledVector(axis, 0.08);
+  const maximumDistance = start.distanceTo(end);
+  const rayOffsets = Object.freeze([
+    [0, 0],
+    [-0.55, 0], [0.55, 0], [0, -0.55], [0, 0.55],
+    [-0.42, -0.42], [-0.42, 0.42], [0.42, -0.42], [0.42, 0.42],
+  ] as const);
+  const rays = rayOffsets.map(([x, y]) => new THREE.Ray(
+    start.clone().addScaledVector(lateral, x * radius).addScaledVector(vertical, y * radius),
+    axis,
+  ));
+  const inverseModelWorld = model.matrixWorld.clone().invert();
+  const meshToModel = new THREE.Matrix4();
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  const hit = new THREE.Vector3();
+  const batches: Array<Readonly<{ mesh: string; submittedElements: number; suppressedElements: number }>> = [];
+  let suppressedElements = 0;
+
+  model.traverse((node) => {
+    if (!(node instanceof THREE.Mesh) || !node.name.includes('Runtime_static')) return;
+    const geometry = node.geometry;
+    const position = geometry.getAttribute('position');
+    const index = geometry.index;
+    const elementCount = index?.count ?? 0;
+    if (!position || position.itemSize < 3 || !index || elementCount < 3 || elementCount % 3 !== 0) return;
+    meshToModel.multiplyMatrices(inverseModelWorld, node.matrixWorld);
+    let batchSuppressed = 0;
+    for (let element = 0; element < elementCount; element += 3) {
+      const ia = index.getX(element);
+      const ib = index.getX(element + 1);
+      const ic = index.getX(element + 2);
+      if (ia === ib && ib === ic) continue;
+      a.fromBufferAttribute(position, ia).applyMatrix4(meshToModel);
+      b.fromBufferAttribute(position, ib).applyMatrix4(meshToModel);
+      c.fromBufferAttribute(position, ic).applyMatrix4(meshToModel);
+      const blocksAperture = rays.some((ray) => {
+        const intersection = ray.intersectTriangle(a, b, c, false, hit);
+        return intersection !== null && ray.origin.distanceTo(intersection) <= maximumDistance;
+      });
+      if (!blocksAperture) continue;
+      index.setX(element + 1, ia);
+      index.setX(element + 2, ia);
+      batchSuppressed += 3;
+    }
+    if (batchSuppressed === 0) return;
+    index.needsUpdate = true;
+    node.userData.firstPersonAdsSightBore = Object.freeze({
+      submittedElements: elementCount,
+      suppressedElements: batchSuppressed,
+      radius,
+    });
+    batches.push(Object.freeze({ mesh: node.name, submittedElements: elementCount, suppressedElements: batchSuppressed }));
+    suppressedElements += batchSuppressed;
+  });
+
+  const telemetry: AdsSightBoreTelemetry = Object.freeze({
+    applied: suppressedElements > 0,
+    contract: 'physical-aperture-spatial-degenerate-v1',
+    radius,
+    rayCount: rays.length,
+    suppressedElements,
+    batches: Object.freeze(batches),
+  });
+  model.userData.firstPersonAdsSightBore = telemetry;
+  return telemetry;
+}
+
+type RearOccluderTrimTelemetry = Readonly<{
+  applied: boolean;
+  contract: 'rear-sight-axis-spatial-degenerate-v1';
+  radius: number;
+  rayCount: number;
+  submittedElements: number;
+  suppressedElements: number;
+  suppressionRatio: number;
+  batches: ReadonlyArray<Readonly<{ mesh: string; submittedElements: number; suppressedElements: number }>>;
+}>;
+
+/** Removes only merged butt/stock triangles intersecting the rear sight corridor. */
+export function trimFirstPersonRearOccluder(id: WeaponId, model: THREE.Object3D): RearOccluderTrimTelemetry | null {
+  if (id !== 'carbine' && id !== 'mini-uzi') return null;
+  const rearSocket = model.getObjectByName('rear-sight-socket');
+  const frontSocket = model.getObjectByName('front-sight-socket');
+  if (!rearSocket || !frontSocket) return null;
+  model.updateMatrixWorld(true);
+  const rear = model.worldToLocal(rearSocket.getWorldPosition(new THREE.Vector3()));
+  const front = model.worldToLocal(frontSocket.getWorldPosition(new THREE.Vector3()));
+  const axis = front.clone().sub(rear).normalize();
+  if (axis.lengthSq() < 0.99) return null;
+  const radius = id === 'carbine' ? 0.065 : 0.05;
+  const lateral = new THREE.Vector3(1, 0, 0);
+  if (Math.abs(lateral.dot(axis)) > 0.9) lateral.set(0, 1, 0);
+  lateral.addScaledVector(axis, -lateral.dot(axis)).normalize();
+  const vertical = new THREE.Vector3().crossVectors(axis, lateral).normalize();
+  const start = rear.clone().addScaledVector(axis, -0.38);
+  const end = rear.clone().addScaledVector(axis, 0.015);
+  const maximumDistance = start.distanceTo(end);
+  const rayOffsets = Object.freeze([
+    [0, 0],
+    [-0.55, 0], [0.55, 0], [0, -0.55], [0, 0.55],
+    [-0.42, -0.42], [-0.42, 0.42], [0.42, -0.42], [0.42, 0.42],
+  ] as const);
+  const rays = rayOffsets.map(([x, y]) => new THREE.Ray(
+    start.clone().addScaledVector(lateral, x * radius).addScaledVector(vertical, y * radius),
+    axis,
+  ));
+  const inverseModelWorld = model.matrixWorld.clone().invert();
+  const meshToModel = new THREE.Matrix4();
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  const hit = new THREE.Vector3();
+  const batches: Array<Readonly<{ mesh: string; submittedElements: number; suppressedElements: number }>> = [];
+  let submittedElements = 0;
+  let suppressedElements = 0;
+  model.traverse((node) => {
+    if (!(node instanceof THREE.Mesh) || !node.name.includes('Runtime_static')) return;
+    const geometry = node.geometry;
+    const position = geometry.getAttribute('position');
+    const index = geometry.index;
+    const elementCount = index?.count ?? 0;
+    if (!position || position.itemSize < 3 || !index || elementCount < 3 || elementCount % 3 !== 0) return;
+    submittedElements += elementCount;
+    meshToModel.multiplyMatrices(inverseModelWorld, node.matrixWorld);
+    let batchSuppressed = 0;
+    for (let element = 0; element < elementCount; element += 3) {
+      const ia = index.getX(element);
+      const ib = index.getX(element + 1);
+      const ic = index.getX(element + 2);
+      if (ia === ib && ib === ic) continue;
+      a.fromBufferAttribute(position, ia).applyMatrix4(meshToModel);
+      b.fromBufferAttribute(position, ib).applyMatrix4(meshToModel);
+      c.fromBufferAttribute(position, ic).applyMatrix4(meshToModel);
+      const blocksCorridor = rays.some((ray) => {
+        const intersection = ray.intersectTriangle(a, b, c, false, hit);
+        return intersection !== null && ray.origin.distanceTo(intersection) <= maximumDistance;
+      });
+      if (!blocksCorridor) continue;
+      index.setX(element + 1, ia);
+      index.setX(element + 2, ia);
+      batchSuppressed += 3;
+    }
+    if (batchSuppressed === 0) return;
+    index.needsUpdate = true;
+    batches.push(Object.freeze({ mesh: node.name, submittedElements: elementCount, suppressedElements: batchSuppressed }));
+    suppressedElements += batchSuppressed;
+  });
+  const telemetry: RearOccluderTrimTelemetry = Object.freeze({
+    applied: suppressedElements > 0,
+    contract: 'rear-sight-axis-spatial-degenerate-v1',
+    radius,
+    rayCount: rays.length,
+    submittedElements,
+    suppressedElements,
+    suppressionRatio: submittedElements > 0 ? suppressedElements / submittedElements : 0,
+    batches: Object.freeze(batches),
+  });
+  model.userData.firstPersonRearOccluderTrim = telemetry;
+  return telemetry;
 }
 
 /**
@@ -399,11 +660,24 @@ const FIRST_PERSON_HIDDEN_NODES: Readonly<Record<WeaponId, ReadonlySet<string>>>
   'flare-gun': new Set<string>(),
 });
 
-function prepareFirstPersonWeaponModel(id: WeaponId, model: THREE.Group, flattenMaterials: boolean): THREE.Group {
+function prepareFirstPersonWeaponModel(
+  id: WeaponId,
+  model: THREE.Group,
+  flattenMaterials: boolean,
+  requirePhysicalAdsAperture: boolean,
+): THREE.Group {
   model.traverse((node) => {
     if (FIRST_PERSON_HIDDEN_NODES[id].has(node.name)) node.visible = false;
   });
   if (id === 'm4a1') trimM4a1FirstPersonRearStock(model);
+  const rearOccluderTrim = trimFirstPersonRearOccluder(id, model);
+  if (requirePhysicalAdsAperture && FIRST_PERSON_ADS_BORE_RADIUS[id] && !rearOccluderTrim?.applied) {
+    throw new Error(`${id} first-person rear occluder trim is missing or did not intersect rendered geometry`);
+  }
+  const adsSightBore = carveFirstPersonAdsSightBore(id, model);
+  if (requirePhysicalAdsAperture && FIRST_PERSON_ADS_BORE_RADIUS[id] && !adsSightBore?.applied) {
+    throw new Error(`${id} first-person ADS sight bore is missing or did not intersect rendered geometry`);
+  }
   if (id === 'carbine') {
     const reticle = model.getObjectByName('optic-reticle');
     if (reticle instanceof THREE.Mesh && reticle.material instanceof THREE.MeshBasicMaterial) {
@@ -513,7 +787,6 @@ export class WeaponPresentation {
     'railgun',
   ]);
   readonly root = new THREE.Group();
-  private frameCounter = 0;
 
   private enforceNearPlaneClearance(activeModel: THREE.Object3D | undefined, arms: THREE.Object3D | undefined): void {
     const cameraNear = this.camera instanceof THREE.PerspectiveCamera ? this.camera.near : 0.08;
@@ -659,8 +932,14 @@ export class WeaponPresentation {
   private sprintBlend = 0;
   private weaponHeat = 0;
   private shotsPresented = 0;
+  private flamethrowerHeldFireClearanceFastPathActive = false;
+  private flamethrowerHeldFireClearanceEntryTransitions = 0;
+  private flamethrowerHeldFireClearanceExitTransitions = 0;
+  private flamethrowerHeldFireClearanceSkippedFrames = 0;
+  private flamethrowerHeldFireClearancePrewarmChecks = 0;
   private surfaceRetreat = 0;
   private surfaceLift = 0;
+  private fullscreenPresentationSuppressed = false;
   private readonly minigunSpool = createMinigunSpoolState();
   private actionContract: CharacterActionContract = characterActionContract({
     weapon: 'carbine', aimBlend: 0, sprintBlend: 0, reloadProgress: null, meleeProgress: null,
@@ -993,6 +1272,7 @@ export class WeaponPresentation {
     this.passiveKnife.visible = false;
     this.root.add(this.passiveKnife);
     this.muzzleLight = new THREE.PointLight(0xffc36a, 0, 4.5, 2);
+    this.muzzleLight.name = 'first-person-muzzle-light';
     this.muzzleLight.position.set(0, 0.08, -1.15);
     if (!flattenMaterials) this.root.add(this.muzzleLight);
 
@@ -1238,7 +1518,7 @@ export class WeaponPresentation {
           : createPass65WeaponModel(id, this.flattenMaterials, 'first-person')
         : buildWeaponModel(id, this.flattenMaterials, false);
       if (!unpreparedModel) throw new Error(`Pass 65 first-person asset unavailable: ${id}`);
-      const model = prepareFirstPersonWeaponModel(id, unpreparedModel, this.flattenMaterials);
+      const model = prepareFirstPersonWeaponModel(id, unpreparedModel, this.flattenMaterials, browserRuntime);
       if (!browserRuntime && id !== 'explosive-crossbow') model.userData.firstPersonSource = 'test-only-procedural-fallback';
       model.visible = false;
       this.models.set(id, model);
@@ -1270,8 +1550,8 @@ export class WeaponPresentation {
    * deployment surface. WebGPU compilation can synchronously occupy the browser
    * main thread even though compileAsync returns a Promise, so a live lazy
    * switch is not a safe presentation boundary. Deployment therefore pins the
-   * complete arena-reachable set; WebGL/no-hook callers retain the existing
-   * bounded two-model lazy cache.
+   * complete arena-reachable set. WebGL/no-hook callers use the asset-only
+   * preparation path for a caller-defined bounded retained hotset.
    */
   async prewarmBrowserWeaponCatalog(
     requestedIds: readonly WeaponId[],
@@ -1374,6 +1654,31 @@ export class WeaponPresentation {
     const priorFlashVisible = this.muzzleFlash.visible;
     const priorLightVisible = this.muzzleLight.visible;
     const priorLightIntensity = this.muzzleLight.intensity;
+    const priorRootPosition = this.root.position.clone();
+    const priorCasingCursor = this.casingCursor;
+    const priorSmokeCursor = this.smokeCursor;
+    const priorSmokeVisible = this.smokePoints.visible;
+    const priorSmokePositions = this.smokePositions.slice();
+    const priorSmokeColors = this.smokeColors.slice();
+    const priorSmokes = this.smokes.map((smoke) => ({
+      velocity: smoke.velocity.clone(),
+      life: smoke.life,
+      maxLife: smoke.maxLife,
+      active: smoke.active,
+    }));
+    const stagedCasing = this.casings[this.casingCursor % this.casings.length];
+    const priorCasing = stagedCasing ? {
+      geometry: stagedCasing.mesh.geometry,
+      material: stagedCasing.mesh.material,
+      position: stagedCasing.mesh.position.clone(),
+      quaternion: stagedCasing.mesh.quaternion.clone(),
+      scale: stagedCasing.mesh.scale.clone(),
+      visible: stagedCasing.mesh.visible,
+      velocity: stagedCasing.velocity.clone(),
+      life: stagedCasing.life,
+      frames: stagedCasing.frames,
+      active: stagedCasing.active,
+    } : null;
     try {
       this.active = id;
       this.root.visible = true;
@@ -1384,6 +1689,46 @@ export class WeaponPresentation {
       this.muzzleFlash.visible = true;
       this.muzzleLight.visible = true;
       this.muzzleLight.intensity = 1;
+      if (id === 'flamethrower') {
+        this.enforceNearPlaneClearance(model, this.root.getObjectByName('first-person-arms'));
+        this.flamethrowerHeldFireClearancePrewarmChecks += 1;
+      }
+      // Submit the exact retained Points and brass Mesh used by a legal shot,
+      // without calling fire() or advancing gameplay/presentation cursors. An
+      // idle viewmodel compile cannot create these material programs because
+      // both pooled objects are normally hidden until the accepted shot.
+      const muzzle = this.socketLocalPosition(model, 'muzzle-socket')
+        ?? new THREE.Vector3(0, 0.08, -1.15);
+      const smokeCount = Math.min(this.smokes.length, Math.ceil(weaponFamilyPresentation(id).smokeBase));
+      for (let index = 0; index < smokeCount; index += 1) {
+        const slot = (this.smokeCursor + index) % this.smokes.length;
+        const smoke = this.smokes[slot];
+        const offset = slot * 3;
+        this.smokePositions[offset] = muzzle.x + (index - smokeCount / 2) * 0.012;
+        this.smokePositions[offset + 1] = muzzle.y + index * 0.008;
+        this.smokePositions[offset + 2] = muzzle.z - 0.05 - index * 0.035;
+        smoke.velocity.set(0, 0.12, -0.14);
+        smoke.maxLife = 0.2;
+        smoke.life = smoke.maxLife;
+        smoke.active = true;
+        this.smokeColors[offset] = this.smokeColors[offset + 1] = this.smokeColors[offset + 2] = 0.62;
+      }
+      this.smokePoints.visible = smokeCount > 0;
+      (this.smokePoints.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+      (this.smokePoints.geometry.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
+      if (stagedCasing) {
+        stagedCasing.mesh.geometry = this.brassGeometry;
+        stagedCasing.mesh.material = this.brassMaterial;
+        stagedCasing.mesh.position.copy(
+          this.socketLocalPosition(model, 'eject-socket') ?? new THREE.Vector3(0.12, 0.04, -0.48),
+        );
+        stagedCasing.mesh.rotation.set(0.2, 0, Math.PI / 2);
+        stagedCasing.mesh.visible = true;
+        stagedCasing.velocity.set(1.05, 0.85, 0.1);
+        stagedCasing.life = 0.42;
+        stagedCasing.frames = 0;
+        stagedCasing.active = true;
+      }
       await submit(this.root);
     } finally {
       resetImportedWeaponAnimations(model);
@@ -1396,7 +1741,113 @@ export class WeaponPresentation {
       this.muzzleFlash.visible = priorFlashVisible;
       this.muzzleLight.visible = priorLightVisible;
       this.muzzleLight.intensity = priorLightIntensity;
+      this.root.position.copy(priorRootPosition);
+      this.casingCursor = priorCasingCursor;
+      this.smokeCursor = priorSmokeCursor;
+      this.smokePositions.set(priorSmokePositions);
+      this.smokeColors.set(priorSmokeColors);
+      this.smokePoints.visible = priorSmokeVisible;
+      (this.smokePoints.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+      (this.smokePoints.geometry.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
+      for (let index = 0; index < this.smokes.length; index += 1) {
+        const smoke = this.smokes[index];
+        const prior = priorSmokes[index];
+        if (!prior) continue;
+        smoke.velocity.copy(prior.velocity);
+        smoke.life = prior.life;
+        smoke.maxLife = prior.maxLife;
+        smoke.active = prior.active;
+      }
+      if (stagedCasing && priorCasing) {
+        stagedCasing.mesh.geometry = priorCasing.geometry;
+        stagedCasing.mesh.material = priorCasing.material;
+        stagedCasing.mesh.position.copy(priorCasing.position);
+        stagedCasing.mesh.quaternion.copy(priorCasing.quaternion);
+        stagedCasing.mesh.scale.copy(priorCasing.scale);
+        stagedCasing.mesh.visible = priorCasing.visible;
+        stagedCasing.velocity.copy(priorCasing.velocity);
+        stagedCasing.life = priorCasing.life;
+        stagedCasing.frames = priorCasing.frames;
+        stagedCasing.active = priorCasing.active;
+      }
       this.updateActiveSockets(priorActive);
+    }
+  }
+
+  /** Rehearse the exact retained reload pose without advancing live reload authority. */
+  async prewarmBrowserWeaponReloadPresentation(
+    id: WeaponId,
+    submit: (root: THREE.Object3D) => Promise<void>,
+  ): Promise<void> {
+    await this.prepareBrowserWeapon(id);
+    const model = this.models.get(id);
+    if (!model) throw new Error(`Pass 65 reload presentation unavailable after load: ${id}`);
+    const priorActive = this.active;
+    const priorReloadLastProgress = this.reloadLastProgress;
+    const priorNodes: Array<Readonly<{
+      node: THREE.Object3D;
+      visible: boolean;
+      position: THREE.Vector3;
+      quaternion: THREE.Quaternion;
+      scale: THREE.Vector3;
+    }>> = [];
+    this.root.traverse((node) => priorNodes.push({
+      node,
+      visible: node.visible,
+      position: node.position.clone(),
+      quaternion: node.quaternion.clone(),
+      scale: node.scale.clone(),
+    }));
+    try {
+      this.active = id;
+      this.root.visible = true;
+      for (const entry of this.models.values()) entry.visible = entry === model;
+      this.updateActiveSockets(id);
+      reloadImportedWeapon(model);
+      updateImportedWeapon(model, 0.16);
+      if (this.authoredArmsRoot) {
+        playFirstPersonArmAction(this.authoredArmsRoot, 'reload');
+        updateFirstPersonArmAnimations(this.authoredArmsRoot, 0.16);
+      }
+      const reloadPose = reloadPoseAt(id, 0.5);
+      const magazineName = id === 'carbine'
+        ? 'curved-magazine'
+        : id === 'lmg'
+          ? 'lmg-box-magazine'
+          : id === 'pistol' || id === 'machine-pistol' || id === 'magnum'
+            ? 'pistol-magazine'
+            : 'straight-magazine';
+      const magazine = model.getObjectByName(magazineName);
+      if (magazine) {
+        const restX = Number(magazine.userData.restX ?? magazine.position.x);
+        const restY = Number(magazine.userData.restY ?? magazine.position.y);
+        const restZ = Number(magazine.userData.restZ ?? magazine.position.z);
+        const restRotationZ = Number(magazine.userData.restRotationZ ?? magazine.rotation.z);
+        magazine.position.set(
+          restX + reloadPose.magazineLateral,
+          restY - reloadPose.magazineDrop,
+          restZ + reloadPose.magazineForward,
+        );
+        magazine.rotation.z = restRotationZ + reloadPose.magazineTwist;
+      }
+      const reloadShell = model.getObjectByName('reload-shell');
+      if (reloadShell) {
+        reloadShell.visible = reloadPose.shellVisible;
+        reloadShell.position.set(-0.16 + reloadPose.shellTravel * 0.13, -0.13 + reloadPose.shellTravel * 0.035, -0.02);
+      }
+      this.reloadLastProgress = 0.5;
+      await submit(this.root);
+    } finally {
+      resetImportedWeaponAnimations(model);
+      if (this.authoredArmsRoot) resetFirstPersonArmAnimations(this.authoredArmsRoot);
+      this.active = priorActive;
+      this.reloadLastProgress = priorReloadLastProgress;
+      for (const prior of priorNodes) {
+        prior.node.visible = prior.visible;
+        prior.node.position.copy(prior.position);
+        prior.node.quaternion.copy(prior.quaternion);
+        prior.node.scale.copy(prior.scale);
+      }
     }
   }
 
@@ -1582,6 +2033,45 @@ export class WeaponPresentation {
     return typeof document !== 'undefined' ? this.models.has(this.active) : this.models.size === Object.keys(WEAPONS).length;
   }
 
+  /**
+   * Allocation-light imported-model readiness for frame-transition gates. This
+   * deliberately avoids presentationState(), whose framing telemetry traverses
+   * every mesh and would itself contaminate a per-animation-frame hitch probe.
+   */
+  activeWeaponReadiness(): Readonly<{
+    requestedWeapon: WeaponId;
+    ready: boolean;
+    modelLoaded: boolean;
+    gpuReady: boolean;
+    resident: boolean;
+    catalogPrewarming: boolean;
+    importedWeapon: WeaponId | null;
+    mountedIsRequested: boolean;
+  }> {
+    const requestedModel = this.models.get(this.active);
+    const mountedModel = this.mountedModel();
+    const importedRuntime = mountedModel?.userData.importedWeaponRuntime as { weapon?: unknown } | undefined;
+    const importedWeapon = typeof importedRuntime?.weapon === 'string'
+      && Object.prototype.hasOwnProperty.call(WEAPONS, importedRuntime.weapon)
+      ? importedRuntime.weapon as WeaponId
+      : null;
+    const modelLoaded = requestedModel !== undefined;
+    const gpuReady = requestedModel !== undefined && this.modelIsGpuReady(requestedModel);
+    const mountedIsRequested = requestedModel !== undefined
+      && mountedModel === requestedModel
+      && requestedModel.visible;
+    return Object.freeze({
+      requestedWeapon: this.active,
+      ready: modelLoaded && gpuReady && mountedIsRequested && importedWeapon === this.active,
+      modelLoaded,
+      gpuReady,
+      resident: this.browserResidentWeaponIds.has(this.active),
+      catalogPrewarming: this.browserCatalogOperationPromise !== null,
+      importedWeapon,
+      mountedIsRequested,
+    });
+  }
+
   /** Narrow live-gate health; unlike presentationState(), this never traverses models or measures framing. */
   browserCatalogHealth(): Readonly<{
     retainedCount: number;
@@ -1635,7 +2125,7 @@ export class WeaponPresentation {
     const model = id === 'explosive-crossbow'
       ? createPass65CrossbowModel(this.flattenMaterials, 'first-person')
       : createPass65WeaponModel(id, this.flattenMaterials, 'first-person');
-    return model ? prepareFirstPersonWeaponModel(id, model, this.flattenMaterials) : null;
+    return model ? prepareFirstPersonWeaponModel(id, model, this.flattenMaterials, this.browserRuntime) : null;
   }
 
   private trimBrowserWeaponModels(): void {
@@ -1875,6 +2365,13 @@ export class WeaponPresentation {
   }
 
   setPresentationVisible(visible: boolean): void {
+    if (this.fullscreenPresentationSuppressed) {
+      this.fullscreenPresentationSuppressed = false;
+      this.root.scale.setScalar(
+        THREE.MathUtils.lerp(HIP_VIEWMODEL_SCALE, ADS_VIEWMODEL_SCALE, this.adsBlend)
+          * viewmodelScreenScale(this.camera),
+      );
+    }
     this.root.visible = visible;
     this.viewmodelFill.intensity = visible
       ? Number(this.viewmodelFill.userData.authoredIntensity ?? 0)
@@ -1882,20 +2379,26 @@ export class WeaponPresentation {
   }
 
   /**
-   * Keep the prepared viewmodel render objects resident while the full-screen
-   * sniper optic owns the sight picture. Removing the root from the render list
-   * forced Three's WebGPU ScenePass node graph to rebuild on the first scoped
-   * frame; a near-zero exact-scale draw suppresses the model without changing
-   * the retained render vocabulary.
+   * Keep the prepared viewmodel render objects and structural lights resident
+   * while a full-screen optic or support cockpit owns the sight picture.
+   * Removing the root from the render list changes Three's WebGPU light/node
+   * graph and forces every active world-support object to rebuild. A near-zero
+   * exact-scale draw suppresses the model without changing that vocabulary.
    */
-  suppressForSniperScope(suppressed: boolean): void {
+  suppressForFullscreenPresentation(suppressed: boolean): void {
+    this.fullscreenPresentationSuppressed = suppressed;
     this.root.visible = true;
     this.root.scale.setScalar(suppressed
-      ? 0.0001
+      ? FULLSCREEN_PRESENTATION_SUPPRESSED_SCALE
       : THREE.MathUtils.lerp(HIP_VIEWMODEL_SCALE, ADS_VIEWMODEL_SCALE, this.adsBlend) * viewmodelScreenScale(this.camera));
     this.viewmodelFill.intensity = suppressed
       ? 0
       : Number(this.viewmodelFill.userData.authoredIntensity ?? 0);
+    if (suppressed) this.muzzleLight.intensity = 0;
+  }
+
+  suppressForSniperScope(suppressed: boolean): void {
+    this.suppressForFullscreenPresentation(suppressed);
   }
 
   /**
@@ -1950,13 +2453,15 @@ export class WeaponPresentation {
     (this.smokePoints.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
     (this.smokePoints.geometry.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
 
+    const surfaceRetreatClamped = Math.min(surfaceRetreat, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT);
     this.root.position.set(
       HIP_VIEWMODEL_POSITION.x,
       HIP_VIEWMODEL_POSITION.y,
       // The wall retreat is capped at the near-plane-safe distance: pushing
       // the weapon further back would drive the arms/stock through the near
       // plane and fail the prone framing contract.
-      HIP_VIEWMODEL_POSITION.z + Math.min(surfaceRetreat, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT),
+      HIP_VIEWMODEL_POSITION.z + surfaceRetreatClamped - VIEWMODEL_NEAR_PLANE_CLEARANCE
+        - authoredNearPlaneContactRetreat(this.active, surfaceRetreatClamped),
     );
     this.root.rotation.set(0, weaponHipYaw(this.active), 0);
     this.root.scale.setScalar(HIP_VIEWMODEL_SCALE);
@@ -2246,30 +2751,92 @@ export class WeaponPresentation {
     this.root.updateWorldMatrix(true, true);
   }
 
-  private adsOpticHidden = false;
-  private adsOpticHiddenWeapon: WeaponId | null = null;
+  private readonly adsClearanceMaterials = new WeakMap<THREE.Object3D, ReadonlyArray<AdsClearanceMaterial>>();
+  private adsClearanceWeapon: WeaponId | null = null;
+  private adsClearanceBlend = 0;
 
   /**
-   * Keeps the authored holo-optic housing out of the ADS sightline. The
-   * carbine/M4A1/AK-47 first-person GLBs centre their ADS camera on the iron
-   * rear-sight socket while the taller optic shell sits above it; leaving the
-   * shell visible during ADS blocks the centred sight picture. Hidden at
-   * 85%+ aim blend and restored as the weapon lowers.
+   * Ghosts the complete static HK416/Mini Uzi silhouette only while ADS is
+   * settled. These release GLBs merge the receiver, optic frame, polymer and
+   * stock surfaces into material batches; treating only Primary_PBR/Lens left
+   * the other batches as a large opaque wall around the physical sight bore.
+   * Action and magazine batches stay solid, and every per-viewmodel material
+   * clone is restored exactly on ADS release or weapon switch.
    */
   private applyAdsOpticClearance(adsBlend: number): void {
-    const hideOptic = adsBlend >= 0.85;
-    if (hideOptic === this.adsOpticHidden && this.adsOpticHiddenWeapon === this.active) return;
-    const model = this.mountedModel();
-    const opticNames = ['hk416-holographic-optic', 'weapon-optic'];
-    if (model) {
-      for (const name of opticNames) {
-        const optic = model.getObjectByName(name);
-        if (!optic) continue;
-        optic.visible = !hideOptic;
+    const restore = (weapon: WeaponId | null) => {
+      if (!weapon) return;
+      const previous = this.models.get(weapon);
+      if (!previous) return;
+      for (const entry of this.adsClearanceMaterials.get(previous) ?? []) {
+        const transparentChanged = entry.material.transparent !== entry.originalTransparent;
+        const depthWriteChanged = entry.material.depthWrite !== entry.originalDepthWrite;
+        entry.material.opacity = entry.originalOpacity;
+        entry.material.transparent = entry.originalTransparent;
+        entry.material.depthWrite = entry.originalDepthWrite;
+        if (transparentChanged || depthWriteChanged) entry.material.needsUpdate = true;
       }
+    };
+    if (this.adsClearanceWeapon !== this.active) restore(this.adsClearanceWeapon);
+    this.adsClearanceWeapon = this.active;
+    const model = this.mountedModel();
+    if (!model || (this.active !== 'carbine' && this.active !== 'mini-uzi')) {
+      this.adsClearanceBlend = 0;
+      return;
     }
-    this.adsOpticHidden = hideOptic;
-    this.adsOpticHiddenWeapon = this.active;
+    let materials = this.adsClearanceMaterials.get(model);
+    if (!materials) {
+      const collected: AdsClearanceMaterial[] = [];
+      const seen = new Set<THREE.Material>();
+      model.traverse((node) => {
+        if (!(node instanceof THREE.Mesh) || !node.name.includes('Runtime_static')) return;
+        const surface: AdsClearanceMaterial['surface'] = node.name.includes('_Lens')
+          ? 'lens'
+          : node.name.includes('_Primary_PBR')
+            ? 'primary'
+            : node.name.includes('_Gunmetal')
+              ? 'gunmetal'
+              : node.name.includes('_Polymer_PBR')
+                ? 'polymer'
+                : node.name.includes('_Rubber')
+                  ? 'rubber'
+                  : node.name.includes('_Accent') ? 'accent' : 'other-static';
+        const targetOpacity = surface === 'lens'
+          ? 0.025
+          : surface === 'accent'
+            ? 0.14
+            : surface === 'polymer' || surface === 'rubber'
+              ? 0.1
+              : surface === 'gunmetal' ? 0.09 : 0.07;
+        const candidates = Array.isArray(node.material) ? node.material : [node.material];
+        for (const material of candidates) {
+          if (seen.has(material)) continue;
+          seen.add(material);
+          collected.push(Object.freeze({
+            material,
+            originalOpacity: material.opacity,
+            originalTransparent: material.transparent,
+            originalDepthWrite: material.depthWrite,
+            targetOpacity,
+            surface,
+          }));
+        }
+      });
+      materials = Object.freeze(collected);
+      this.adsClearanceMaterials.set(model, materials);
+    }
+    const clearance = THREE.MathUtils.smoothstep(adsBlend, 0.58, 0.94);
+    this.adsClearanceBlend = clearance;
+    for (const entry of materials) {
+      const transparent = clearance > 0.01 ? true : entry.originalTransparent;
+      const depthWrite = clearance > 0.08 ? false : entry.originalDepthWrite;
+      if (entry.material.transparent !== transparent || entry.material.depthWrite !== depthWrite) {
+        entry.material.transparent = transparent;
+        entry.material.depthWrite = depthWrite;
+        entry.material.needsUpdate = true;
+      }
+      entry.material.opacity = THREE.MathUtils.lerp(entry.originalOpacity, entry.targetOpacity, clearance);
+    }
   }
 
   presentationState() {
@@ -2320,6 +2887,59 @@ export class WeaponPresentation {
         && (importedModel.sightForwardDot ?? -1) > 0.995
         && (importedModel.muzzleForwardDot ?? -1) > 0.85
       : requiredDetails.every((name) => model?.getObjectByName(name) !== undefined);
+    const adsClearanceCatalog = (['carbine', 'mini-uzi'] as const).map((weapon) => {
+      const weaponModel = this.models.get(weapon);
+      const entries = weaponModel ? (this.adsClearanceMaterials.get(weaponModel) ?? []) : [];
+      return {
+        weapon,
+        materialCount: entries.length,
+        transparentCount: entries.filter((entry) => entry.material.transparent).length,
+        nonOpaqueCount: entries.filter((entry) => entry.material.opacity < 1).length,
+        depthWriteDisabledCount: entries.filter((entry) => !entry.material.depthWrite).length,
+        restoredCount: entries.filter((entry) => entry.material.opacity === entry.originalOpacity
+          && entry.material.transparent === entry.originalTransparent
+          && entry.material.depthWrite === entry.originalDepthWrite).length,
+        maximumOpacity: entries.reduce((maximum, entry) => Math.max(maximum, entry.material.opacity), 0),
+        maximumTargetOpacity: entries.reduce((maximum, entry) => Math.max(maximum, entry.targetOpacity), 0),
+        surfaces: [...new Set(entries.map((entry) => entry.surface))].sort(),
+      };
+    });
+    const opaqueSightWindowHits = (() => {
+      if (!model || (this.active !== 'carbine' && this.active !== 'mini-uzi')) {
+        return {
+          contract: 'camera-ndc-sight-window-opaque-weapon-rays-v1',
+          rayCount: 9,
+          blockedRays: 0,
+          maximumHits: 0,
+          meshes: [] as string[],
+        };
+      }
+      model.updateWorldMatrix(true, true);
+      const offsets = [
+        [0, 0],
+        [-0.05, 0], [0.05, 0], [0, -0.05], [0, 0.05],
+        [-0.035, -0.035], [-0.035, 0.035], [0.035, -0.035], [0.035, 0.035],
+      ] as const;
+      const raycaster = new THREE.Raycaster();
+      raycaster.layers.mask = this.camera.layers.mask;
+      const samples = offsets.map(([x, y]) => {
+        raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
+        const hits = raycaster.intersectObject(model, true).filter((hit) => {
+          if (!(hit.object instanceof THREE.Mesh) || !hit.object.visible) return false;
+          const materials = Array.isArray(hit.object.material) ? hit.object.material : [hit.object.material];
+          const material = materials[hit.face?.materialIndex ?? 0] ?? materials[0];
+          return material?.visible === true && material.colorWrite !== false && material.opacity >= 0.35;
+        });
+        return { count: hits.length, meshes: hits.map((hit) => hit.object.name) };
+      });
+      return {
+        contract: 'camera-ndc-sight-window-opaque-weapon-rays-v1',
+        rayCount: samples.length,
+        blockedRays: samples.filter((sample) => sample.count > 0).length,
+        maximumHits: samples.reduce((maximum, sample) => Math.max(maximum, sample.count), 0),
+        meshes: [...new Set(samples.flatMap((sample) => sample.meshes))],
+      };
+    })();
     return {
       weapon: this.active,
       heat: this.weaponHeat,
@@ -2340,6 +2960,61 @@ export class WeaponPresentation {
       weaponModelId: model?.userData.weaponModelId ?? null,
       weaponFinishId: model?.userData.weaponFinishId ?? null,
       firstPersonRearStockTrim: model?.userData.firstPersonRearStockTrim ?? null,
+      firstPersonRearOccluderTrim: model?.userData.firstPersonRearOccluderTrim ?? null,
+      firstPersonAdsSightBore: model?.userData.firstPersonAdsSightBore ?? null,
+      adsMaterialClearance: {
+        contract: 'static-silhouette-ads-translucency-v2',
+        active: this.active === 'carbine' || this.active === 'mini-uzi',
+        blend: this.adsClearanceBlend,
+        sightPictureRetreat: this.adsBlend * (FIRST_PERSON_ADS_SIGHT_PICTURE_RETREAT[this.active] ?? 0),
+        materialCount: model ? (this.adsClearanceMaterials.get(model)?.length ?? 0) : 0,
+        catalog: adsClearanceCatalog,
+      },
+      adsOpaqueSightWindow: opaqueSightWindowHits,
+      flamethrowerHeldFireClearance: {
+        fastPathActive: this.flamethrowerHeldFireClearanceFastPathActive,
+        entryTransitions: this.flamethrowerHeldFireClearanceEntryTransitions,
+        exitTransitions: this.flamethrowerHeldFireClearanceExitTransitions,
+        skippedFrames: this.flamethrowerHeldFireClearanceSkippedFrames,
+        prewarmChecks: this.flamethrowerHeldFireClearancePrewarmChecks,
+      },
+      nearPlaneClearance: {
+        contract: FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT_CONTRACT,
+        cameraNear: this.camera instanceof THREE.PerspectiveCamera ? this.camera.near : 0.08,
+        requiredMargin: 0.02,
+        baseRetreat: VIEWMODEL_NEAR_PLANE_CLEARANCE,
+        maximumSurfaceRetreat: VIEWMODEL_NEAR_PLANE_SAFE_RETREAT,
+        cachedRetreat: FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT[this.active],
+        blendedRetreat: authoredNearPlaneContactRetreat(
+          this.active,
+          Math.min(this.surfaceRetreat, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT),
+        ),
+      },
+      fullscreenSuppression: {
+        contract: FULLSCREEN_PRESENTATION_SUPPRESSION_CONTRACT,
+        active: this.fullscreenPresentationSuppressed,
+        suppressedScale: FULLSCREEN_PRESENTATION_SUPPRESSED_SCALE,
+        rootVisible: this.root.visible,
+        rootScale: this.root.scale.x,
+        structuralLightCount: [this.viewmodelFill, this.muzzleLight]
+          .filter((light) => light.parent === this.root).length,
+        structuralLights: [
+          {
+            name: this.viewmodelFill.name,
+            intensityContract: 'zero-when-suppressed',
+            attachedToRoot: this.viewmodelFill.parent === this.root,
+            visible: this.viewmodelFill.visible,
+            intensity: this.viewmodelFill.intensity,
+          },
+          {
+            name: this.muzzleLight.name,
+            intensityContract: 'transient-fire-decay',
+            attachedToRoot: this.muzzleLight.parent === this.root,
+            visible: this.muzzleLight.visible,
+            intensity: this.muzzleLight.intensity,
+          },
+        ],
+      },
       modelVisibleMeshCount,
       attachedWeaponBatchStats: model?.userData.attachedWeaponBatchStats ?? null,
       adsProgress: this.adsBlend,
@@ -2369,6 +3044,7 @@ export class WeaponPresentation {
         scaleMultiplier: viewmodelScreenScale(this.camera),
         rootScale: this.root.scale.x,
         rootPosition: this.root.position.toArray(),
+        rootRotation: [this.root.rotation.x, this.root.rotation.y, this.root.rotation.z],
       },
       actionContract: this.actionContract,
       surfaceRetreat: this.surfaceRetreat,
@@ -2467,13 +3143,10 @@ export class WeaponPresentation {
 
   private orientRiggedBone(bone: THREE.Bone, child: THREE.Bone, targetWorld: THREE.Vector3): void {
     const scratch = this.riggedArmSolveScratch;
-    // The licensed arms visual is mirrored on X so the authored R chain reads
-    // on the camera's right. A negative parent scale is a reflection, not a
-    // quaternion rotation: deriving a world quaternion and converting it back
-    // through that parent makes the wrist miss its socket by the length of the
-    // forearm. Solve the shortest arc in the bone parent's local space instead;
-    // worldToLocal preserves the reflection while the quaternion only owns the
-    // bone's local rotation.
+    // Solve the shortest arc in the bone parent's local space. This preserves
+    // the authored positive-handed armature and also keeps diagnostic fixtures
+    // with a reflected ancestor mathematically stable; a quaternion must never
+    // be asked to encode scale handedness.
     bone.updateWorldMatrix(true, false);
     const parent = bone.parent;
     const desiredParent = scratch.orientDesiredDirection.copy(targetWorld);
@@ -3046,20 +3719,22 @@ export class WeaponPresentation {
     // crosshair with a clear, unobstructed picture instead of drifting around it.
     const aimSteady = 1 - this.adsBlend * 0.86;
     const surfaceRetreatClamped = Math.min(pose.surfaceRetreat ?? 0, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT);
+    const authoredContactRetreat = authoredNearPlaneContactRetreat(this.active, surfaceRetreatClamped);
+    const adsSightPictureRetreat = this.adsBlend * (FIRST_PERSON_ADS_SIGHT_PICTURE_RETREAT[this.active] ?? 0);
     // The fire kick plus a full surface retreat can push the viewmodel behind
     // the near plane while prone against a wall; the weapon must stay at least
     // as far from the camera as its near-plane-clear hip position, and the
-    // recoil pitch swings the stock back toward the camera, so the floor
-    // carries an extra stock-swing allowance during the fire kick.
-    const fireNearPlaneFloorZ = viewmodelBaseZ + surfaceRetreatClamped
+    // recoil pitch swings the stock back toward the camera, so the cap carries
+    // an extra stock-swing allowance during the fire kick.
+    const fireNearPlaneCapZ = viewmodelBaseZ + surfaceRetreatClamped - adsSightPictureRetreat
       - (presentationKick > 0.05 ? 0.1 : 0);
     const targetPosition = this.frameTargetPosition.set(
       viewmodelBaseX + adsX + (bobX + this.swayX) * aimSteady - pose.lateralSpeed * 0.012 * aimSteady + meleeArc * viewmodelMeleeScreenOffset(this.camera) + grenadeArc * 0.18 + reloadStage.lateral,
       viewmodelBaseY + adsY + (bobY + breath) * aimSteady + sprintDrop + crouchLift + proneLift + switchDrop + reloadStage.lift - presentationKick * 0.095 - pose.landingImpulse * 0.075 * aimSteady + meleeArc * 0.26,
-      Math.max(
-        viewmodelBaseZ + adsZ + surfaceRetreatClamped - VIEWMODEL_NEAR_PLANE_CLEARANCE + presentationKick * profile.recoilTranslation * 1.12 + grenadeArc * 0.24,
-        fireNearPlaneFloorZ,
-      ),
+      Math.min(
+        viewmodelBaseZ + adsZ + surfaceRetreatClamped - adsSightPictureRetreat - VIEWMODEL_NEAR_PLANE_CLEARANCE + presentationKick * profile.recoilTranslation * 1.12 + grenadeArc * 0.24,
+        fireNearPlaneCapZ,
+      ) - authoredContactRetreat,
     );
     this.surfaceRetreat = pose.surfaceRetreat ?? 0;
     this.surfaceLift = pose.surfaceLift ?? 0;
@@ -3074,20 +3749,21 @@ export class WeaponPresentation {
     this.centerSightReference(activeModel);
     if (arms && !meleeActive) this.solveArms(arms, activeModel, reloadPose);
     if (!authoredMeleeActive) this.solveRiggedArms(activeModel, reloadPose);
-    // Near-plane safety net: the recoil pitch and reload poses can swing a
-    // viewmodel or arm corner back toward the camera in a way that depends on
-    // arena geometry and camera pitch, so a fixed retreat floor is not enough.
-    // While the fire kick or a reload is active, push the root forward just
-    // enough that every bounding-box corner clears the near plane. Bounded to
-    // the kick/reload windows.
-    if (presentationKick > 0.05 || reloadProgress > 0) {
-      this.enforceNearPlaneClearance(activeModel, arms);
-    } else if ((this.frameCounter & 1) === 0) {
-      // Hip and idle poses can also cross the near plane in some arena and
-      // camera-pitch combinations, so keep a throttled always-on net.
-      this.enforceNearPlaneClearance(activeModel, arms);
+    // The conservative position cap and authored contact retreat above are the
+    // live near-plane contract.
+    // Exact skinned bounds remain available to admission/diagnostic probes, but
+    // never traverse and deform the complete weapon/arm mesh during gameplay.
+    const flamethrowerHeldFireFastPath = this.active === 'flamethrower' && pose.triggerHeld === true;
+    const enteringFlamethrowerHeldFireFastPath = flamethrowerHeldFireFastPath
+      && !this.flamethrowerHeldFireClearanceFastPathActive;
+    const exitingFlamethrowerHeldFireFastPath = !flamethrowerHeldFireFastPath
+      && this.flamethrowerHeldFireClearanceFastPathActive;
+    if (enteringFlamethrowerHeldFireFastPath) this.flamethrowerHeldFireClearanceEntryTransitions += 1;
+    if (exitingFlamethrowerHeldFireFastPath) this.flamethrowerHeldFireClearanceExitTransitions += 1;
+    if (flamethrowerHeldFireFastPath && !enteringFlamethrowerHeldFireFastPath) {
+      this.flamethrowerHeldFireClearanceSkippedFrames += 1;
     }
-    this.frameCounter += 1;
+    this.flamethrowerHeldFireClearanceFastPathActive = flamethrowerHeldFireFastPath;
     return actionEvents;
   }
 }

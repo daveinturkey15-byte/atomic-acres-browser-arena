@@ -61,7 +61,12 @@ const care = await auditedLods('care', [0, 1, 2].map((lod) => `public/assets/ori
 const carpet = await auditedLods('carpet', [0, 1, 2].map((lod) => `public/assets/original/models/support/pass65-carpet-aircraft-lod${lod}.glb`));
 const crate = await auditedLods('crate', [0, 1].map((lod) => `public/assets/original/models/support/pass65-care-crate-lod${lod}.glb`));
 const chopperPbrMaps = await pbrSet('pass65-chopper');
-const aircraftPbrMaps = await pbrSet('pass65-support-aircraft');
+const aircraftPbrMaps = Object.freeze({
+  care: await pbrSet('pass65-care-aircraft'),
+  carpet: await pbrSet('pass65-carpet-aircraft'),
+  parachuteCrate: await pbrSet('pass65-support-aircraft'),
+});
+const aircraftPbrRecords = Object.values(aircraftPbrMaps).flatMap((maps) => Object.values(maps));
 
 const chopperRenders = await Promise.all([
   reviewRecord('docs/assets/pass65-vehicles/chopper/pass65-chopper-exterior-front-quarter.png', 'exterior-front-quarter', 512, 512),
@@ -157,6 +162,7 @@ const aircraftProvenance = {
     care: {
       visualRevision: 'close-range-heavy-cargo-aircraft-v4',
       detailContract: 'framed-flightdeck-panelled-hull-ramp-bogie-turbofans-v4',
+      materialRevision: 'separated-daylight-readable-pbr-v1',
       triangleRange: { lod0: [16_000, 18_000], lod1: [13_000, 16_000], lod2: [10_000, 13_000] },
       worldGlbs: care.records,
       requiredNodes: SUPPORT_VEHICLE_SPECS.care.nodes,
@@ -166,6 +172,7 @@ const aircraftProvenance = {
     carpet: {
       visualRevision: 'close-range-stealth-flying-wing-v4',
       detailContract: 'framed-intakes-service-panels-bay-structure-tailless-v4',
+      materialRevision: 'separated-daylight-readable-pbr-v1',
       triangleRange: { lod0: [10_500, 12_000], lod1: [8_500, 9_800], lod2: [4_800, 5_800] },
       worldGlbs: carpet.records,
       requiredNodes: SUPPORT_VEHICLE_SPECS.carpet.nodes,
@@ -193,7 +200,7 @@ const aircraftProvenance = {
     externalUris: 0,
   },
   authorityBoundary: 'Presentation only. Target markers, corridor ownership, flight, drops, impacts, damage, collision, interaction and replication remain TypeScript authoritative.',
-  determinism: { command: 'npm run author:blender-support-vehicles', cleanFactoryStartup: true, pythonHashSeed: 0 },
+  determinism: { command: 'npm run author:blender-support-aircraft-visibility', cleanFactoryStartup: true, pythonHashSeed: 0 },
   reproducibility: reproducibilityBoundary,
 };
 await writeFile(absolute(aircraftProvenancePath), `${JSON.stringify(aircraftProvenance, null, 2)}\n`, 'utf8');
@@ -221,7 +228,7 @@ replaceSupport('chopper-gunner-vehicle-v1', {
 replaceSupport('support-aircraft-family-v1', {
   id: 'support-aircraft-family-v1', releaseState: 'release-ready', sourceKind: 'project-original-blender', owner: 'Atomic Acres project',
   qualityTier: 'hero-support-aircraft-family', materialFamily: 'distinct-care-and-carpet-tactical-pbr',
-  textureDensity: '512px shared project-owned PBR map set', placeholderStatus: 'forbidden-and-not-present', runtimeForwardAxis: '-Z',
+  textureDensity: '512px variant-specific care/carpet PBR map sets plus retained crate set', placeholderStatus: 'forbidden-and-not-present', runtimeForwardAxis: '-Z',
   sourceBlend: aircraftSourceBlend, sourceScript, pbrMaps: aircraftPbrMaps, provenance: aircraftProvenanceRecord,
   variants: aircraftProvenance.variants, review: { renders: aircraftRenders, contactSheet: aircraftContactSheet },
   technicalAudit: { careLods: compactAudit(care.audits), carpetLods: compactAudit(carpet.audits), crateLods: compactAudit(crate.audits) },
@@ -249,12 +256,12 @@ upsertAsset({
 upsertAsset({
   id: 'atomic-acres-pass65-support-aircraft-family-2026-07-26', kind: 'original-project-blender-support-aircraft-family', creator: 'Atomic Acres project',
   source: sourceScript.path, generatedAsOf: '2026-07-26', license: 'Original project work',
-  files: [...care.records, ...carpet.records, ...crate.records, ...Object.values(aircraftPbrMaps)], sourceBlend: aircraftSourceBlend.path, sourceBlendSha256: aircraftSourceBlend.sha256,
+  files: [...care.records, ...carpet.records, ...crate.records, ...aircraftPbrRecords], sourceBlend: aircraftSourceBlend.path, sourceBlendSha256: aircraftSourceBlend.sha256,
   sourceScript: sourceScript.path, sourceScriptSha256: sourceScript.sha256,
   sourceProvenance: aircraftProvenanceRecord.path, sourceProvenanceSha256: aircraftProvenanceRecord.sha256,
   preview: aircraftContactSheet.path,
-  format: 'Distinct heavy four-turbofan Care transport and tailless flying-wing Carpet bomber three-LOD GLBs plus two-LOD rigged parachute crate, embedded WebP PBR maps, semantic cargo/bomb sockets and authored actions',
-  modifications: 'Project-original close-range v4 support family: Care adds raised hull breaks, service hatches/latches, framed flight-deck armour, four high-bypass turbofans, hubbed landing-gear bogies and a ribbed hinged rear ramp; Carpet adds framed split buried intakes, service panels and a cross-braced animated bomb bay while remaining a tailless blended flying wing; the drop asset adds visible latches and pallet tie-down hardware to its cross webbing and ribbed scalloped canopy. The local -Z runtime-forward contract and all gameplay-owned sockets remain unchanged.',
+  format: 'Distinct heavy four-turbofan Care transport and tailless flying-wing Carpet bomber three-LOD GLBs plus two-LOD rigged parachute crate, variant-specific embedded WebP PBR maps, semantic cargo/bomb sockets and authored actions',
+  modifications: 'Project-original close-range v4 support family with daylight-readable material revision v1: Care and Carpet now use independent brighter low-metallic, high-roughness PBR sets, with authored underside and leading-edge value breaks; Care also separates its tail and engine-nacelle values. Existing hull, flight-deck, turbofan, gear, ramp, intake, service-panel, bomb-bay, drop-rig and gameplay-owned socket contracts remain unchanged.',
   attributionRequired: false,
 });
 await writeFile(assetManifestPath, `${JSON.stringify(assetManifest, null, 2)}\n`, 'utf8');

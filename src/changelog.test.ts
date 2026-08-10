@@ -15,6 +15,8 @@ describe('changelog', () => {
     const latest = latestChangelogEntry();
     expect(latest.id).toBe('pass69');
     expect(latest.id).toBe(CHANGELOG[0]?.id);
+    expect(latest.title).toContain('Pass 69.3');
+    expect(latest.summary).toContain('Pass 69.3');
     expect(formatChangelogTimestamp('2026-07-22T15:43:16+01:00')).toBe('22 JUL 2026 · 15:43 BST');
     expect(formatChangelogTimestampDetail('2026-07-22T15:43:16+01:00')).toBe(
       '22 JUL 2026 · 15:43 BST · UTC+1 · 15:43:16',

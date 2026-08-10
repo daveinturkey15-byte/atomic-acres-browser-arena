@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
+import { WEAPONS } from '../../src/gameplay';
 import { GUN_RANGE_TEST_BAY_CONTRACT } from '../../src/gun-range-test-bay';
 
 test('renders the five-second Gun Range tunnel, grey test bay, and slow unarmed targets', async ({ page }) => {
@@ -116,6 +117,22 @@ test('renders the five-second Gun Range tunnel, grey test bay, and slow unarmed 
 
   await page.locator('#game').click({ position: { x: 64, y: 64 }, force: true });
   await page.waitForFunction(() => document.pointerLockElement === document.querySelector('#game'), undefined, { timeout: 5_000 });
+  expect(await page.evaluate(() => {
+    const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+    return {
+      pointerLocked: document.pointerLockElement === document.querySelector('#game'),
+      inputEligible: snapshot.fieldSupport.fInteraction.inputEligible,
+      menuVisible: snapshot.menuVisible,
+      matchPhase: snapshot.matchPhase,
+      activeElement: document.activeElement?.id || document.activeElement?.tagName || null,
+    };
+  })).toEqual({
+    pointerLocked: true,
+    inputEligible: true,
+    menuVisible: false,
+    matchPhase: 'active',
+    activeElement: expect.any(String),
+  });
   await page.keyboard.press(chopperControl.inputKey!);
   await expect.poll(async () => page.evaluate((entityId) => {
     const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
@@ -317,5 +334,54 @@ test('renders the five-second Gun Range tunnel, grey test bay, and slow unarmed 
     await page.screenshot({ path: resolve(output, `${cameraId}-2560x1440.png`), animations: 'disabled' });
   }
   await page.screenshot({ path: resolve(output, 'gun-range-test-bay-live-chopper-2560x1440.png'), animations: 'disabled' });
+  expect(errors).toEqual([]);
+});
+
+test('atomically refreshes adjacent test-bay weapon prompts', async ({ page }) => {
+  test.setTimeout(90_000);
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.stack ?? error.message));
+  await page.goto('/?release=latest&map=gun-range&renderer=webgl2&render=blender&signal=off&grass=off&mist=off&rays=off&externalServices=off&seed=pass69-3-prompt');
+  await page.waitForFunction(() => {
+    const snapshot = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+    return snapshot?.bootstrap?.stage === 'ready'
+      && !(document.querySelector<HTMLButtonElement>('#solo')?.disabled ?? true);
+  }, undefined, { timeout: 60_000 });
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.startSolo());
+  await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().matchPhase === 'active', undefined, { timeout: 60_000 });
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true));
+
+  // Traverse adjacent stations without interacting. Both fields and the
+  // candidate identity must change together on each rendered frame.
+  for (const station of GUN_RANGE_TEST_BAY_CONTRACT.weaponStations.slice(0, 2)) {
+    await page.evaluate(({ x, z }) => window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(x, 1.7, z), station.position);
+    await expect.poll(async () => page.evaluate(() => {
+      const prompt = document.querySelector<HTMLElement>('#pickup-prompt');
+      return {
+        hidden: prompt?.hidden ?? true,
+        kind: prompt?.dataset.interactionKind ?? null,
+        targetId: prompt?.dataset.targetId ?? null,
+        action: prompt?.querySelector<HTMLElement>('span')?.textContent ?? '',
+        subject: prompt?.querySelector<HTMLElement>('strong')?.textContent ?? '',
+      };
+    })).toEqual({
+      hidden: false,
+      kind: 'test-bay-weapon',
+      targetId: `test-bay-weapon:${station.id}`,
+      action: 'TAP \u00b7 EQUIP / REFILL',
+      subject: WEAPONS[station.id].name.toUpperCase(),
+    });
+  }
+
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(54, 1.7, 0));
+  await expect.poll(async () => page.evaluate(() => {
+    const prompt = document.querySelector<HTMLElement>('#pickup-prompt');
+    return {
+      hidden: prompt?.hidden ?? false,
+      targetId: prompt?.dataset.targetId ?? null,
+      action: prompt?.querySelector<HTMLElement>('span')?.textContent ?? '',
+      subject: prompt?.querySelector<HTMLElement>('strong')?.textContent ?? '',
+    };
+  })).toEqual({ hidden: true, targetId: null, action: '', subject: '' });
   expect(errors).toEqual([]);
 });

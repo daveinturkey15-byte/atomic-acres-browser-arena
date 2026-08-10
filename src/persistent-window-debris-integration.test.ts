@@ -47,14 +47,38 @@ describe('persistent physical house-window debris integration', () => {
     expect(source.match(/clearPersistentWindowDebris\(\)/g)).toHaveLength(2);
   });
 
-  it('keeps short-lived glass flecks cosmetic without mistaking them for the persistent major pane', () => {
-    const shardStart = source.indexOf('function spawnGlassShards(');
-    const shardEnd = source.indexOf('\nfunction deterministicWindowUnit(', shardStart);
-    const shardBlock = source.slice(shardStart, shardEnd);
-    expect(shardBlock).toContain("root.name = 'breaking-window-shards'");
-    expect(shardBlock).toContain('if (age >= 0.9)');
-    expect(shardBlock).not.toContain('persistentMajorDebris');
+  it('uses one prewarmed instanced shard presentation instead of a second cosmetic RAF path', () => {
+    const poolStart = source.indexOf('async function withStagedWindowGlassDebrisPool(');
+    const poolEnd = source.indexOf('\nfunction clearPersistentWindowDebris(', poolStart);
+    const poolBlock = source.slice(poolStart, poolEnd);
+    expect(poolStart).toBeGreaterThan(-1);
+    expect(poolEnd).toBeGreaterThan(poolStart);
+    expect(source).not.toContain('function spawnGlassShards(');
+    expect(source).not.toContain("root.name = 'breaking-window-shards'");
+    expect(poolBlock).toContain('const pooled = pooledWindowDebris.get(windowDebrisPoolKey(arena.id, window.id))');
+    expect(poolBlock).toContain('updateFracturedWindowDebrisVisual(pooled.root, 0)');
+    expect(poolBlock).toContain('root.userData.persistentMajorDebris = true');
+    expect(poolBlock).not.toContain('requestAnimationFrame');
+    expect(poolBlock).not.toContain('.material.clone()');
     expect(source).toContain('spawnPersistentWindowDebris(window, normal)');
+  });
+
+  it('schedules exactly one deferred physics reconciliation for each admitted breach', () => {
+    const spawnStart = source.indexOf('function spawnPersistentWindowDebris(');
+    const breachEnd = source.indexOf('\nfunction breakWindowsAlongBallisticTrace(', spawnStart);
+    const block = source.slice(spawnStart, breachEnd);
+    const breakStart = block.indexOf('function breakHouseWindow(');
+    const breakBlock = block.slice(breakStart);
+    const deferredSync = 'scheduleBrowserPreparationIdleTask(() => syncInteractiveWorldPhysics());';
+
+    expect(spawnStart).toBeGreaterThan(-1);
+    expect(breachEnd).toBeGreaterThan(spawnStart);
+    expect(block.match(/scheduleBrowserPreparationIdleTask\(\(\) => syncInteractiveWorldPhysics\(\)\);/g))
+      .toHaveLength(1);
+    expect(breakBlock).toContain('spawnPersistentWindowDebris(window, normal);');
+    expect(breakBlock).toContain(deferredSync);
+    expect(breakBlock.indexOf('spawnPersistentWindowDebris(window, normal);'))
+      .toBeLessThan(breakBlock.indexOf(deferredSync));
   });
 
   it('lets later explosions re-impulse only still-active shed and falling window bodies', () => {

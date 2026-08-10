@@ -14,6 +14,16 @@ import {
 export const RUNTIME_WEAPON_RETENTION_LIMIT = WEAPON_IDS.length;
 /** Secure test-bay stations expose the entire canonical runtime catalog. */
 export const GUN_RANGE_FIELD_TEST_WEAPONS: readonly WeaponId[] = WEAPON_IDS;
+/**
+ * WebGL2 has no catalog GPU prewarmer. Retain the exact hitch-critical imported
+ * viewmodels that match admission rehearses instead of falling back to the
+ * two-model lazy cache after the deployment surface releases.
+ */
+export const WEBGL_MATCH_BOUND_WEAPON_HOTSET: readonly WeaponId[] = Object.freeze([
+  'm14-ebr',
+  'flare-gun',
+  'flamethrower',
+]);
 
 function uniqueWeaponIds(ids: readonly WeaponId[]): readonly WeaponId[] {
   return Object.freeze([...new Set(ids)]);
@@ -25,6 +35,13 @@ export function menuWeaponPrewarmCatalog(
   secondary: SidearmWeaponId,
 ): readonly WeaponId[] {
   return uniqueWeaponIds([primary, secondary]);
+}
+
+/** Bounded decoded-model residency for the WebGL2 match-admission rehearsals. */
+export function webGlMatchBoundWeaponPrewarmCatalog(
+  matchStartWeapon: WeaponId,
+): readonly WeaponId[] {
+  return uniqueWeaponIds([matchStartWeapon, ...WEBGL_MATCH_BOUND_WEAPON_HOTSET]);
 }
 
 /**

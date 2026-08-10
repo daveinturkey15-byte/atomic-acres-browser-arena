@@ -84,6 +84,7 @@ type RiggedOperatorRuntime = {
   stancePivot: THREE.Group;
   visual: THREE.Group;
   weaponSocket: THREE.Group;
+  canonicalEvidence: RiggedOperatorCanonicalEvidence;
   stance: 'stand' | 'crouch' | 'prone';
   crouchBlend: number;
   proneBlend: number;
@@ -101,12 +102,147 @@ type RiggedOperatorRuntime = {
     footLeft?: THREE.Bone;
     footRight?: THREE.Bone;
   };
+  /** Immutable local transforms captured from the authored GLB before animation. */
+  armBindPose: Array<{
+    side: 'left' | 'right';
+    role: 'shoulder' | 'elbow' | 'wrist-hand';
+    sourceBone: string;
+    bone: THREE.Bone;
+    position: THREE.Vector3;
+    quaternion: THREE.Quaternion;
+  }>;
+  /** Authored finger joints animated by Walk, captured before mixer evaluation. */
+  handBindPose: Array<{
+    side: 'left' | 'right';
+    digit: 'thumb' | 'index' | 'middle' | 'ring' | 'pinky';
+    joint: 2;
+    sourceBone: string;
+    bone: THREE.Bone;
+    position: THREE.Vector3;
+    quaternion: THREE.Quaternion;
+  }>;
+  /** Static skin influence scan, invalidated when a geometry attribute version changes. */
+  renderedInfluenceCache?: {
+    signature: string;
+    generation: number;
+    byBone: Map<THREE.Bone, RenderedVertexInfluenceTelemetry>;
+  };
   poseBeforeStance?: Array<{
     bone: THREE.Bone;
     position: THREE.Vector3;
     quaternion: THREE.Quaternion;
   }>;
 };
+
+export type RiggedOperatorCanonicalBoneIdentity = Readonly<{
+  index: number;
+  name: string;
+  uuid: string;
+  parentIndex: number;
+}>;
+
+export type RiggedOperatorCanonicalSkinIdentity = Readonly<{
+  name: string;
+  uuid: string;
+  geometryUuid: string;
+  positionCount: number;
+  skinIndexCount: number;
+  skinIndexItemSize: number;
+  skinIndexNormalized: boolean;
+  skinWeightCount: number;
+  skinWeightItemSize: number;
+  skinWeightNormalized: boolean;
+  skeletonBones: readonly RiggedOperatorCanonicalBoneIdentity[];
+}>;
+
+export type RiggedOperatorCanonicalEvidenceManifest = Readonly<{
+  contract: 'runtime-canonical-operator-skin-manifest-v1';
+  assetUrl: string;
+  lod: 0 | 1;
+  visual: Readonly<{ name: string; uuid: string }>;
+  skinnedMeshes: readonly RiggedOperatorCanonicalSkinIdentity[];
+  wrists: readonly Readonly<{ side: 'left' | 'right'; name: string; uuid: string }>[];
+}>;
+
+type RiggedOperatorCanonicalEvidence = {
+  visual: THREE.Group;
+  skinnedMeshes: readonly THREE.SkinnedMesh[];
+  wrists: Readonly<Partial<Record<'left' | 'right', THREE.Bone>>>;
+  assetUrl: string;
+  lod: 0 | 1;
+  manifest?: RiggedOperatorCanonicalEvidenceManifest;
+};
+
+export type RiggedOperatorHandEvidenceIdentity = Readonly<{
+  operatorRoot: THREE.Object3D;
+  visual: THREE.Group;
+  side: 'left' | 'right';
+  wrist: THREE.Bone;
+  skinnedMeshes: readonly THREE.SkinnedMesh[];
+  manifest: RiggedOperatorCanonicalEvidenceManifest;
+}>;
+
+export type RenderedVertexInfluenceMeshTelemetry = Readonly<{
+  mesh: string;
+  meshUuid: string;
+  geometryUuid: string;
+  influencedVertexCount: number;
+  maximumNormalizedWeight: number;
+}>;
+
+export type RenderedVertexInfluenceTelemetry = Readonly<{
+  contract: 'rendered-joints0-weights0-influence-v2';
+  bone: string;
+  boneUuid: string;
+  thresholds: Readonly<{
+    minimumNormalizedWeight: number;
+    minimumInfluencedVertices: number;
+    minimumMaximumNormalizedWeight: number;
+  }>;
+  influencedVertexCount: number;
+  maximumNormalizedWeight: number;
+  meshes: readonly RenderedVertexInfluenceMeshTelemetry[];
+  passes: boolean;
+}>;
+
+const RIGGED_OPERATOR_ARM_BONES = Object.freeze([
+  Object.freeze({ side: 'left' as const, role: 'shoulder' as const, sourceBone: 'UpperArm.L', names: Object.freeze(['UpperArmL', 'UpperArm.L']) }),
+  Object.freeze({ side: 'left' as const, role: 'elbow' as const, sourceBone: 'LowerArm.L', names: Object.freeze(['LowerArmL', 'LowerArm.L']) }),
+  Object.freeze({ side: 'left' as const, role: 'wrist-hand' as const, sourceBone: 'Wrist.L', names: Object.freeze(['WristL', 'Wrist.L']) }),
+  Object.freeze({ side: 'right' as const, role: 'shoulder' as const, sourceBone: 'UpperArm.R', names: Object.freeze(['UpperArmR', 'UpperArm.R']) }),
+  Object.freeze({ side: 'right' as const, role: 'elbow' as const, sourceBone: 'LowerArm.R', names: Object.freeze(['LowerArmR', 'LowerArm.R']) }),
+  Object.freeze({ side: 'right' as const, role: 'wrist-hand' as const, sourceBone: 'Wrist.R', names: Object.freeze(['WristR', 'Wrist.R']) }),
+]);
+
+// All ten second phalanges are real, animated joints in the shipped operator
+// GLB. They are both projection sentinels and rendered-weight sentinels: a
+// named skeleton node without JOINTS_0/WEIGHTS_0 influence is not hand proof.
+const RIGGED_OPERATOR_HAND_BONES = Object.freeze([
+  Object.freeze({ side: 'left' as const, digit: 'thumb' as const, joint: 2 as const, sourceBone: 'Thumb2.L', names: Object.freeze(['Thumb2L', 'Thumb2.L']) }),
+  Object.freeze({ side: 'left' as const, digit: 'index' as const, joint: 2 as const, sourceBone: 'Index2.L', names: Object.freeze(['Index2L', 'Index2.L']) }),
+  Object.freeze({ side: 'left' as const, digit: 'middle' as const, joint: 2 as const, sourceBone: 'Middle2.L', names: Object.freeze(['Middle2L', 'Middle2.L']) }),
+  Object.freeze({ side: 'left' as const, digit: 'ring' as const, joint: 2 as const, sourceBone: 'Ring2.L', names: Object.freeze(['Ring2L', 'Ring2.L']) }),
+  Object.freeze({ side: 'left' as const, digit: 'pinky' as const, joint: 2 as const, sourceBone: 'Pinky2.L', names: Object.freeze(['Pinky2L', 'Pinky2.L']) }),
+  Object.freeze({ side: 'right' as const, digit: 'thumb' as const, joint: 2 as const, sourceBone: 'Thumb2.R', names: Object.freeze(['Thumb2R', 'Thumb2.R']) }),
+  Object.freeze({ side: 'right' as const, digit: 'index' as const, joint: 2 as const, sourceBone: 'Index2.R', names: Object.freeze(['Index2R', 'Index2.R']) }),
+  Object.freeze({ side: 'right' as const, digit: 'middle' as const, joint: 2 as const, sourceBone: 'Middle2.R', names: Object.freeze(['Middle2R', 'Middle2.R']) }),
+  Object.freeze({ side: 'right' as const, digit: 'ring' as const, joint: 2 as const, sourceBone: 'Ring2.R', names: Object.freeze(['Ring2R', 'Ring2.R']) }),
+  Object.freeze({ side: 'right' as const, digit: 'pinky' as const, joint: 2 as const, sourceBone: 'Pinky2.R', names: Object.freeze(['Pinky2R', 'Pinky2.R']) }),
+]);
+
+export const RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS = Object.freeze({
+  minimumNormalizedWeight: 0.05,
+  minimumInfluencedVertices: 4,
+  minimumMaximumNormalizedWeight: 0.2,
+});
+
+const RIGGED_OPERATOR_ANTI_T_THRESHOLDS = Object.freeze({
+  minimumVerticalDropM: 0.08,
+  minimumVerticalDropRatio: 0.18,
+  maximumHorizontalReachRatio: 0.9,
+  maximumOutwardReachRatio: 0.82,
+  minimumElbowFlexRadians: 0.3,
+});
 
 /**
  * Only clips reachable from the live operator controller belong in the runtime
@@ -370,7 +506,7 @@ export function createOperatorInstanceMaterialResolver(
   };
 }
 
-export const FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY = 0.7;
+export const FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY = 0.18;
 
 export function firstPersonArmMaterialReadabilityProfile(materialName: string): Readonly<{
   emissive: number;
@@ -378,13 +514,13 @@ export function firstPersonArmMaterialReadabilityProfile(materialName: string): 
   color?: number;
 }> | null {
   const normalized = materialName.toLowerCase();
-  if (normalized === 'skin') return Object.freeze({ emissive: 0x0a1416, emissiveIntensity: 0.18, color: 0x324249 });
+  if (normalized === 'skin') return Object.freeze({ emissive: 0x24160f, emissiveIntensity: 0.08 });
   if (normalized.includes('arms_glove') || normalized.includes('arms_fingerglove')) {
-    return Object.freeze({ emissive: 0x2f6b78, emissiveIntensity: 0.68 });
+    return Object.freeze({ emissive: 0x183238, emissiveIntensity: 0.14 });
   }
-  if (normalized.includes('arms_sleeve')) return Object.freeze({ emissive: 0x285c68, emissiveIntensity: 0.62 });
+  if (normalized.includes('arms_sleeve')) return Object.freeze({ emissive: 0x142b30, emissiveIntensity: 0.12 });
   if (normalized.includes('arms_armorpad')) {
-    return Object.freeze({ emissive: 0x2d6570, emissiveIntensity: 0.66, color: 0x41656f });
+    return Object.freeze({ emissive: 0x172f34, emissiveIntensity: 0.1 });
   }
   return null;
 }
@@ -394,8 +530,9 @@ function materialForFirstPerson(material: THREE.Material, flattenMaterials: bool
   const profile = firstPersonArmMaterialReadabilityProfile(material.name);
   if (result instanceof THREE.MeshStandardMaterial && profile) {
     // Preserve the licensed base-color, normal, roughness and metallic maps.
-    // A bounded cool emissive lift keeps fingers and sleeves readable in the
-    // darkest arenas without turning them into flat self-lit plastic.
+    // Retain only a low fill contribution for the darkest arenas. The authored
+    // base-colour, normal and ORM maps must remain the dominant surface signal;
+    // the previous near-0.7 emissive lift flattened gloves into teal plastic.
     result.emissive.setHex(profile.emissive);
     result.emissiveIntensity = Math.min(profile.emissiveIntensity, FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY);
     if (profile.color !== undefined) result.color.setHex(profile.color);
@@ -489,20 +626,55 @@ export type FirstPersonRiggedArms = {
   knifeSocket: THREE.Object3D;
 };
 
+export type FirstPersonArmHandedness = Readonly<{
+  contract: 'authored-positive-determinant-right-on-positive-x-v1';
+  valid: boolean;
+  rightShoulderX: number;
+  leftShoulderX: number;
+  shoulderSeparation: number;
+  visualDeterminant: number;
+}>;
+
+/**
+ * Audits the exported scene in world space. Local bone translations are not a
+ * handedness signal because the GLB owns parent rotations and scale. The Pass
+ * 65 delivery already resolves its right chain to camera-positive X; reflecting
+ * the runtime root a second time crossed both shoulders and inverted tangents.
+ */
+export function firstPersonArmHandedness(visual: THREE.Object3D): FirstPersonArmHandedness {
+  visual.updateWorldMatrix(true, true);
+  const right = visual.getObjectByName('UpperArmR');
+  const left = visual.getObjectByName('UpperArmL');
+  const rightShoulderX = right?.getWorldPosition(new THREE.Vector3()).x ?? Number.NaN;
+  const leftShoulderX = left?.getWorldPosition(new THREE.Vector3()).x ?? Number.NaN;
+  const shoulderSeparation = rightShoulderX - leftShoulderX;
+  const visualDeterminant = visual.matrixWorld.determinant();
+  return Object.freeze({
+    contract: 'authored-positive-determinant-right-on-positive-x-v1',
+    valid: Number.isFinite(rightShoulderX)
+      && Number.isFinite(leftShoulderX)
+      && shoulderSeparation > 0.05
+      && visualDeterminant > 0,
+    rightShoulderX,
+    leftShoulderX,
+    shoulderSeparation,
+    visualDeterminant,
+  });
+}
+
 export function createFirstPersonRiggedArms(flattenMaterials: boolean): FirstPersonRiggedArms | null {
   if (!firstPersonArmsAsset) return null;
   const root = new THREE.Group();
   root.name = 'first-person-arms';
   const visual = cloneSkeleton(firstPersonArmsAsset.scene) as THREE.Group;
   visual.name = 'authored-first-person-arms-visual';
-  // The regenerated GLB (5ab01f3) is authored mirrored: bone "UpperArmR" sits at
-  // -X and the right-wrist knife socket rides the R chain, so the firing hand
-  // renders on the left. Mirroring the visual root at X restores the intended
-  // camera-space orientation while keeping every bone name, the knife-socket
-  // ancestry and the two-chain release contract exactly as authored. The arms
-  // material is DoubleSide, so the flipped winding still renders correctly.
-  visual.scale.set(-1, 1, 1);
+  // The exported parent transforms already resolve UpperArmR to positive world
+  // X. Preserve that positive-determinant delivery: a second runtime reflection
+  // crossed the shoulders and reversed the normal-map tangent basis.
+  visual.scale.set(1, 1, 1);
   visual.position.set(0, 0, 0);
+  const handedness = firstPersonArmHandedness(visual);
+  if (!handedness.valid) return null;
   visual.traverse((node) => {
     if (!(node instanceof THREE.Mesh)) return;
     node.castShadow = false;
@@ -516,10 +688,10 @@ export function createFirstPersonRiggedArms(flattenMaterials: boolean): FirstPer
       result.transparent = false;
       result.opacity = 1;
       result.depthWrite = true;
-      // The thicker authored sleeves can legitimately intersect the near
-      // plane in tight stances; render interiors so a clipped sleeve reads
-      // as solid cloth instead of vanishing through backface culling.
-      result.side = THREE.DoubleSide;
+      // Positive-handed authored winding lets normal-mapped cloth use its real
+      // front face. Near-plane clearance is owned by the viewmodel framing
+      // pass; drawing backfaces here made cuffs and fingers look inside-out.
+      result.side = THREE.FrontSide;
       return result;
     };
     if (Array.isArray(node.material)) node.material = node.material.map(prepare);
@@ -570,6 +742,8 @@ export function createFirstPersonRiggedArms(flattenMaterials: boolean): FirstPer
   root.userData.authoredFirstPersonArms = true;
   root.userData.firstPersonArmsSource = FIRST_PERSON_ARMS_URL;
   root.userData.materialContract = 'opaque-depth-writing';
+  root.userData.firstPersonArmSurfaceContract = 'front-face-authored-pbr-v1';
+  root.userData.firstPersonArmHandedness = handedness;
   root.userData.importedFirstPersonArmChains = chains.length;
   root.userData.authoredAnimationClipCount = actions.size;
   root.userData.authoredAnimationBlendPolicy = 'finger-tracks-first-runtime-ik-last';
@@ -640,6 +814,79 @@ export function firstPersonArmAnimationState(root: THREE.Object3D | undefined): 
 
 function runtime(root: THREE.Object3D): RiggedOperatorRuntime | undefined {
   return root.userData.riggedOperatorRuntime as RiggedOperatorRuntime | undefined;
+}
+
+function canonicalEvidenceManifest(
+  evidence: RiggedOperatorCanonicalEvidence,
+): RiggedOperatorCanonicalEvidenceManifest {
+  if (evidence.manifest) return evidence.manifest;
+  const skinnedMeshes = Object.freeze(evidence.skinnedMeshes.map((mesh) => {
+    const boneIndices = new Map(mesh.skeleton.bones.map((bone, index) => [bone, index]));
+    const position = mesh.geometry.getAttribute('position');
+    const skinIndex = mesh.geometry.getAttribute('skinIndex');
+    const skinWeight = mesh.geometry.getAttribute('skinWeight');
+    return Object.freeze({
+      name: mesh.name,
+      uuid: mesh.uuid,
+      geometryUuid: mesh.geometry.uuid,
+      positionCount: position?.count ?? -1,
+      skinIndexCount: skinIndex?.count ?? -1,
+      skinIndexItemSize: skinIndex?.itemSize ?? -1,
+      skinIndexNormalized: skinIndex?.normalized ?? false,
+      skinWeightCount: skinWeight?.count ?? -1,
+      skinWeightItemSize: skinWeight?.itemSize ?? -1,
+      skinWeightNormalized: skinWeight?.normalized ?? false,
+      skeletonBones: Object.freeze(mesh.skeleton.bones.map((bone, index) => Object.freeze({
+        index,
+        name: bone.name,
+        uuid: bone.uuid,
+        parentIndex: bone.parent instanceof THREE.Bone ? (boneIndices.get(bone.parent) ?? -1) : -1,
+      }))),
+    });
+  }));
+  evidence.manifest = Object.freeze({
+    contract: 'runtime-canonical-operator-skin-manifest-v1',
+    assetUrl: evidence.assetUrl,
+    lod: evidence.lod,
+    visual: Object.freeze({ name: evidence.visual.name, uuid: evidence.visual.uuid }),
+    skinnedMeshes,
+    wrists: Object.freeze((['left', 'right'] as const).flatMap((side) => {
+      const wrist = evidence.wrists[side];
+      return wrist ? [Object.freeze({ side, name: wrist.name, uuid: wrist.uuid })] : [];
+    })),
+  });
+  return evidence.manifest;
+}
+
+export function riggedOperatorCanonicalEvidenceManifest(
+  root: THREE.Object3D,
+): RiggedOperatorCanonicalEvidenceManifest | null {
+  const evidence = runtime(root)?.canonicalEvidence;
+  return evidence ? canonicalEvidenceManifest(evidence) : null;
+}
+
+export function riggedOperatorHandEvidenceIdentity(
+  root: THREE.Object3D,
+  side: 'left' | 'right',
+): RiggedOperatorHandEvidenceIdentity | null {
+  const runtimeState = runtime(root);
+  const wrist = runtimeState?.canonicalEvidence.wrists[side];
+  if (!runtimeState || !wrist || runtimeState.canonicalEvidence.skinnedMeshes.length === 0) return null;
+  const manifest = canonicalEvidenceManifest(runtimeState.canonicalEvidence);
+  return Object.freeze({
+    operatorRoot: root,
+    visual: runtimeState.canonicalEvidence.visual,
+    side,
+    wrist,
+    skinnedMeshes: runtimeState.canonicalEvidence.skinnedMeshes,
+    manifest,
+  });
+}
+
+export function resolveRiggedOperatorRuntimeRoot(root: THREE.Object3D): THREE.Object3D | null {
+  if (runtime(root)) return root;
+  const candidates = root.children.filter((child) => runtime(child) !== undefined);
+  return candidates.length === 1 ? candidates[0] : null;
 }
 
 function actionFor(runtimeState: RiggedOperatorRuntime, name: string): THREE.AnimationAction | undefined {
@@ -724,8 +971,10 @@ export function createRiggedOperator(
   visual.rotation.y = Math.PI;
   const embeddedWeaponsSuppressed = suppressEmbeddedWeaponObjects(visual);
   const prepareMaterial = createOperatorInstanceMaterialResolver(team, flattenMaterials, appearance);
+  const canonicalSkinnedMeshes: THREE.SkinnedMesh[] = [];
   visual.traverse((node) => {
     if (!(node instanceof THREE.Mesh)) return;
+    if (node instanceof THREE.SkinnedMesh) canonicalSkinnedMeshes.push(node);
     node.castShadow = !flattenMaterials;
     node.receiveShadow = !flattenMaterials;
     node.userData.presentationOnly = true;
@@ -767,6 +1016,57 @@ export function createRiggedOperator(
     }
     return undefined;
   };
+  const armBindPose = RIGGED_OPERATOR_ARM_BONES.flatMap(({ side, role, sourceBone, names }) => {
+    const bone = poseBone(...names);
+    return bone ? [{
+      side,
+      role,
+      sourceBone,
+      bone,
+      position: bone.position.clone(),
+      quaternion: bone.quaternion.clone(),
+    }] : [];
+  });
+  const handBindPose = RIGGED_OPERATOR_HAND_BONES.flatMap(({ side, digit, joint, sourceBone, names }) => {
+    const bone = poseBone(...names);
+    return bone ? [{
+      side,
+      digit,
+      joint,
+      sourceBone,
+      bone,
+      position: bone.position.clone(),
+      quaternion: bone.quaternion.clone(),
+    }] : [];
+  });
+  const canonicalWrists = Object.freeze({
+    left: armBindPose.find((entry) => entry.side === 'left' && entry.role === 'wrist-hand')?.bone,
+    right: armBindPose.find((entry) => entry.side === 'right' && entry.role === 'wrist-hand')?.bone,
+  });
+  const canonicalEvidence: RiggedOperatorCanonicalEvidence = {
+    visual,
+    skinnedMeshes: Object.freeze([...canonicalSkinnedMeshes]),
+    wrists: canonicalWrists,
+    assetUrl: operatorAsset.source,
+    lod: operatorAsset.lod,
+  };
+  root.updateWorldMatrix(true, true);
+  const operatorRootWorld = root.getWorldQuaternion(new THREE.Quaternion());
+  for (const entry of armBindPose.filter(({ role }) => role === 'wrist-hand')) {
+    // Convert the authored third-person wrist basis into Atomic Acres operator
+    // root space. The weapon solve can then apply the existing weapon-specific
+    // hand rotation without pretending the GLB bone axes equal socket axes.
+    const wristWorld = entry.bone.getWorldQuaternion(new THREE.Quaternion());
+    entry.bone.userData.riggedGripBasisCorrection = wristWorld.invert()
+      .multiply(operatorRootWorld)
+      .normalize()
+      .toArray();
+    entry.bone.userData.riggedGripBasisReference = {
+      contract: 'authored-wrist-bind-to-operator-root-v1',
+      sourceAsset: operatorAsset.source,
+      sourceBone: entry.sourceBone,
+    };
+  }
   root.userData.riggedOperatorRuntime = {
     mixer,
     clips,
@@ -776,6 +1076,7 @@ export function createRiggedOperator(
     stancePivot,
     visual,
     weaponSocket,
+    canonicalEvidence,
     stance: 'stand',
     crouchBlend: 0,
     proneBlend: 0,
@@ -793,6 +1094,8 @@ export function createRiggedOperator(
       footLeft: poseBone('FootL', 'Foot.L'),
       footRight: poseBone('FootR', 'Foot.R'),
     },
+    armBindPose,
+    handBindPose,
   } satisfies RiggedOperatorRuntime;
   root.userData.operatorAsset = {
     source: 'Atomic Acres Pass 65 operator / Quaternius CC0 derivative',
@@ -839,6 +1142,281 @@ export function updateRiggedOperator(root: THREE.Object3D, speed: number, stance
     }));
   applyStancePose(runtimeState, dt);
   return true;
+}
+
+const UNARMED_WRIST_BIND_DELTA_FLOOR_RADIANS = 0.075;
+const UNARMED_WRIST_AXIS_EPSILON = 1e-6;
+const HAND_BIND_FLOOR_COMPARISON_EPSILON = 1e-9;
+const HAND_BIND_FLOOR_AXIS_EPSILON = 1e-8;
+const HAND_BIND_FLOOR_AXIS_CACHE_KEY = 'riggedHandBindFloorAxis';
+const HAND_BIND_FLOOR_TELEMETRY_KEY = 'riggedHandBindFloorTelemetry';
+const HAND_BIND_FLOOR_OBSERVED_AXIS_STORAGE_KEY = 'riggedHandBindFloorObservedAxisStorage';
+type RiggedHandSide = 'left' | 'right';
+type RiggedHandDigit = 'thumb' | 'index' | 'middle' | 'ring' | 'pinky';
+type RiggedHandBindFloorTelemetry = Record<string, unknown> & {
+  contract: 'post-mixer-authored-bind-relative-hand-floor-v1';
+  allocationContract: 'persistent-per-rendered-hand-bone-v1';
+  generation: number;
+  bindLocalQuaternion: number[];
+  beforeLocalQuaternion: number[];
+  afterLocalQuaternion: number[];
+  observedShortestRelativeAxis: number[] | null;
+  appliedAxis: number[];
+};
+const HAND_BIND_FLOOR_SCRATCH = {
+  before: new THREE.Quaternion(),
+  relative: new THREE.Quaternion(),
+  observedAxis: new THREE.Vector3(),
+  cachedAxis: new THREE.Vector3(),
+  fallbackAxis: new THREE.Vector3(),
+  appliedAxis: new THREE.Vector3(),
+  targetDelta: new THREE.Quaternion(),
+  normalizedBefore: new THREE.Quaternion(),
+  normalizedAfter: new THREE.Quaternion(),
+};
+const UNARMED_WRIST_FALLBACK_AXIS = Object.freeze({
+  left: Object.freeze([1, -0.45, -0.6] as const),
+  right: Object.freeze([1, 0.45, 0.6] as const),
+});
+
+function writeQuaternionArray(target: number[], value: THREE.Quaternion): void {
+  target[0] = value.x;
+  target[1] = value.y;
+  target[2] = value.z;
+  target[3] = value.w;
+}
+
+function writeVectorArray(target: number[], value: THREE.Vector3): void {
+  target[0] = value.x;
+  target[1] = value.y;
+  target[2] = value.z;
+}
+
+/**
+ * Enforce a post-mixer angular floor on one rendered hand joint relative to
+ * its immutable authored GLB bind quaternion. Nonzero poses retain the
+ * shortest bind-relative rotation axis; exact cancellation reuses the last
+ * observed axis before falling back to the caller's authored curl axis.
+ */
+export function enforceRiggedOperatorHandBindDeltaFloor(
+  root: THREE.Object3D,
+  side: RiggedHandSide,
+  digit: RiggedHandDigit,
+  minimumBindDeltaRadians: number,
+  fallbackAxis: readonly [number, number, number],
+): Record<string, unknown> | null {
+  const runtimeState = runtime(root);
+  if (!runtimeState) return null;
+  let entry: RiggedOperatorRuntime['handBindPose'][number] | undefined;
+  for (const candidate of runtimeState.handBindPose) {
+    if (candidate.side === side && candidate.digit === digit) {
+      entry = candidate;
+      break;
+    }
+  }
+  if (!entry || !Number.isFinite(minimumBindDeltaRadians)
+    || minimumBindDeltaRadians <= 0 || minimumBindDeltaRadians >= Math.PI) return null;
+  const bindLocalQuaternion = entry.quaternion;
+  const bindQuaternionNorm = bindLocalQuaternion.length();
+  const normalizedBindDotTarget = Math.cos(minimumBindDeltaRadians / 2) / bindQuaternionNorm;
+  if (!Number.isFinite(bindQuaternionNorm) || bindQuaternionNorm <= HAND_BIND_FLOOR_AXIS_EPSILON
+    || !Number.isFinite(normalizedBindDotTarget) || normalizedBindDotTarget > 1) return null;
+  // GLB quaternion components are float32 and can differ from unit length by a
+  // few e-8. Three's Quaternion.angleTo intentionally uses the stored values,
+  // so solve the unit output angle that makes that immutable authored value
+  // report the requested floor instead of silently missing it by float error.
+  const floorTargetRelativeAngleRadians = 2 * Math.acos(THREE.MathUtils.clamp(normalizedBindDotTarget, -1, 1));
+  const beforeLocalQuaternion = HAND_BIND_FLOOR_SCRATCH.before.copy(entry.bone.quaternion);
+  const beforeBindDeltaRadians = beforeLocalQuaternion.angleTo(bindLocalQuaternion);
+  const relative = HAND_BIND_FLOOR_SCRATCH.relative.copy(bindLocalQuaternion)
+    .invert().multiply(beforeLocalQuaternion).normalize();
+  if (relative.w < 0) relative.set(-relative.x, -relative.y, -relative.z, -relative.w);
+  const relativeAxisLength = Math.hypot(relative.x, relative.y, relative.z);
+  const observedAxisAvailable = relativeAxisLength > HAND_BIND_FLOOR_AXIS_EPSILON;
+  if (observedAxisAvailable) {
+    HAND_BIND_FLOOR_SCRATCH.observedAxis.set(relative.x, relative.y, relative.z).divideScalar(relativeAxisLength);
+  }
+  const cachedAxisValue = entry.bone.userData[HAND_BIND_FLOOR_AXIS_CACHE_KEY];
+  const cachedAxisAvailable = Array.isArray(cachedAxisValue) && cachedAxisValue.length === 3
+    && typeof cachedAxisValue[0] === 'number' && Number.isFinite(cachedAxisValue[0])
+    && typeof cachedAxisValue[1] === 'number' && Number.isFinite(cachedAxisValue[1])
+    && typeof cachedAxisValue[2] === 'number' && Number.isFinite(cachedAxisValue[2])
+    && HAND_BIND_FLOOR_SCRATCH.cachedAxis.fromArray(cachedAxisValue as [number, number, number]).lengthSq()
+      > HAND_BIND_FLOOR_AXIS_EPSILON ** 2;
+  if (cachedAxisAvailable) HAND_BIND_FLOOR_SCRATCH.cachedAxis.normalize();
+  const authoredFallbackAxis = HAND_BIND_FLOOR_SCRATCH.fallbackAxis.set(...fallbackAxis);
+  if (authoredFallbackAxis.lengthSq() <= HAND_BIND_FLOOR_AXIS_EPSILON ** 2) return null;
+  authoredFallbackAxis.normalize();
+  const intervened = beforeBindDeltaRadians
+    < minimumBindDeltaRadians - HAND_BIND_FLOOR_COMPARISON_EPSILON;
+  const continuityReferenceAxis = cachedAxisAvailable
+    ? HAND_BIND_FLOOR_SCRATCH.cachedAxis
+    : authoredFallbackAxis;
+  const appliedAxis = HAND_BIND_FLOOR_SCRATCH.appliedAxis.copy(observedAxisAvailable
+    ? HAND_BIND_FLOOR_SCRATCH.observedAxis
+    : continuityReferenceAxis);
+  // A real observed axis seeds the persistent hemisphere without being
+  // rewritten. Subsequent sub-floor cancellation samples align to that prior
+  // observation; exact bind uses the authored fallback only when no observed
+  // direction has ever existed.
+  const alignedObservedAxisHemisphere = intervened && observedAxisAvailable && cachedAxisAvailable
+    && appliedAxis.dot(continuityReferenceAxis) < 0;
+  if (alignedObservedAxisHemisphere) appliedAxis.negate();
+  const axisSource = observedAxisAvailable
+    ? alignedObservedAxisHemisphere
+      ? 'shortest-bind-relative-aligned-to-previous'
+      : 'shortest-bind-relative'
+    : cachedAxisAvailable ? 'previous-shortest-bind-relative' : 'authored-curl-fallback';
+  if (intervened) {
+    entry.bone.quaternion.copy(bindLocalQuaternion).multiply(
+      HAND_BIND_FLOOR_SCRATCH.targetDelta.setFromAxisAngle(appliedAxis, floorTargetRelativeAngleRadians),
+    ).normalize();
+  }
+  let persistentAxisCache = cachedAxisValue as number[] | undefined;
+  if (!Array.isArray(persistentAxisCache) || persistentAxisCache.length !== 3) {
+    persistentAxisCache = [0, 0, 0];
+    entry.bone.userData[HAND_BIND_FLOOR_AXIS_CACHE_KEY] = persistentAxisCache;
+  }
+  // While the source pose is inside the prohibited bind neighbourhood, keep
+  // the cached axis hemisphere continuous across +0/-0 cancellation. Once a
+  // real animation phase clears the floor it owns the cache again unchanged.
+  if (observedAxisAvailable) writeVectorArray(
+    persistentAxisCache,
+    intervened ? appliedAxis : HAND_BIND_FLOOR_SCRATCH.observedAxis,
+  );
+  else if (!cachedAxisAvailable) writeVectorArray(persistentAxisCache, appliedAxis);
+  entry.bone.updateWorldMatrix(false, true);
+  const afterBindDeltaRadians = entry.bone.quaternion.angleTo(bindLocalQuaternion);
+  const reportedBindDeltaCorrectionRadians = intervened
+    ? Math.max(0, minimumBindDeltaRadians - beforeBindDeltaRadians)
+    : 0;
+  const renderedOrientationCorrectionRadians = intervened
+    ? HAND_BIND_FLOOR_SCRATCH.normalizedBefore.copy(beforeLocalQuaternion).normalize()
+      .angleTo(HAND_BIND_FLOOR_SCRATCH.normalizedAfter.copy(entry.bone.quaternion).normalize())
+    : 0;
+  let telemetry = entry.bone.userData[HAND_BIND_FLOOR_TELEMETRY_KEY] as RiggedHandBindFloorTelemetry | undefined;
+  if (telemetry?.allocationContract !== 'persistent-per-rendered-hand-bone-v1') {
+    telemetry = {
+      contract: 'post-mixer-authored-bind-relative-hand-floor-v1',
+      allocationContract: 'persistent-per-rendered-hand-bone-v1',
+      generation: 0,
+      bindLocalQuaternion: [0, 0, 0, 1],
+      beforeLocalQuaternion: [0, 0, 0, 1],
+      afterLocalQuaternion: [0, 0, 0, 1],
+      observedShortestRelativeAxis: null,
+      appliedAxis: [0, 0, 0],
+    };
+    entry.bone.userData[HAND_BIND_FLOOR_TELEMETRY_KEY] = telemetry;
+  }
+  let observedAxisStorage = entry.bone.userData[HAND_BIND_FLOOR_OBSERVED_AXIS_STORAGE_KEY] as number[] | undefined;
+  if (!Array.isArray(observedAxisStorage) || observedAxisStorage.length !== 3) {
+    observedAxisStorage = [0, 0, 0];
+    entry.bone.userData[HAND_BIND_FLOOR_OBSERVED_AXIS_STORAGE_KEY] = observedAxisStorage;
+  }
+  if (observedAxisAvailable) writeVectorArray(observedAxisStorage, HAND_BIND_FLOOR_SCRATCH.observedAxis);
+  writeQuaternionArray(telemetry.bindLocalQuaternion, bindLocalQuaternion);
+  writeQuaternionArray(telemetry.beforeLocalQuaternion, beforeLocalQuaternion);
+  writeQuaternionArray(telemetry.afterLocalQuaternion, entry.bone.quaternion);
+  writeVectorArray(telemetry.appliedAxis, appliedAxis);
+  telemetry.generation += 1;
+  telemetry.reference = 'immutable-authored-handBindPose-before-animation';
+  telemetry.side = side;
+  telemetry.digit = digit;
+  telemetry.sourceBone = entry.sourceBone;
+  telemetry.bone = entry.bone.name;
+  telemetry.minimumBindDeltaRadians = minimumBindDeltaRadians;
+  telemetry.bindQuaternionNorm = bindQuaternionNorm;
+  telemetry.floorTargetRelativeAngleRadians = floorTargetRelativeAngleRadians;
+  telemetry.bindNormCompensationRadians = floorTargetRelativeAngleRadians - minimumBindDeltaRadians;
+  telemetry.beforeBindDeltaRadians = beforeBindDeltaRadians;
+  telemetry.afterBindDeltaRadians = afterBindDeltaRadians;
+  telemetry.reportedBindDeltaCorrectionRadians = reportedBindDeltaCorrectionRadians;
+  telemetry.renderedOrientationCorrectionRadians = renderedOrientationCorrectionRadians;
+  telemetry.observedShortestRelativeAxis = observedAxisAvailable ? observedAxisStorage : null;
+  telemetry.axisSource = axisSource;
+  telemetry.alignedObservedAxisHemisphere = alignedObservedAxisHemisphere;
+  telemetry.continuityReference = intervened
+    ? cachedAxisAvailable
+      ? 'previous-shortest-bind-relative'
+      : observedAxisAvailable ? null : 'authored-curl-fallback'
+    : null;
+  telemetry.intervened = intervened;
+  telemetry.preservedShortestRelativeAxis = observedAxisAvailable
+    ? Math.abs(HAND_BIND_FLOOR_SCRATCH.observedAxis.dot(appliedAxis)) >= 1 - 1e-9
+    : intervened ? null : true;
+  telemetry.usedPreviousAxis = !observedAxisAvailable && cachedAxisAvailable;
+  telemetry.usedFallbackAxis = !observedAxisAvailable && !cachedAxisAvailable;
+  telemetry.appliedToRenderedBone = true;
+  telemetry.allFinite = Number.isFinite(minimumBindDeltaRadians)
+    && Number.isFinite(bindQuaternionNorm)
+    && Number.isFinite(floorTargetRelativeAngleRadians)
+    && Number.isFinite(beforeBindDeltaRadians)
+    && Number.isFinite(afterBindDeltaRadians)
+    && Number.isFinite(reportedBindDeltaCorrectionRadians)
+    && Number.isFinite(renderedOrientationCorrectionRadians)
+    && telemetry.bindLocalQuaternion.every(Number.isFinite)
+    && telemetry.beforeLocalQuaternion.every(Number.isFinite)
+    && telemetry.afterLocalQuaternion.every(Number.isFinite)
+    && telemetry.appliedAxis.every(Number.isFinite);
+  return telemetry;
+}
+
+/**
+ * Keep an unarmed operator's rendered hands in a natural, deterministic rest
+ * pose after the locomotion mixer. Shoulder, elbow and finger animation stays
+ * live. A wrist already beyond the floor is untouched; a near-bind wrist keeps
+ * its animated relative-rotation axis and only gains enough angle to reach the
+ * floor. Exact bind pose uses a mirrored natural fallback axis. Armed operators
+ * never call this path because their final wrist pose is owned by weapon grip IK.
+ */
+export function poseUnarmedRiggedOperatorHands(root: THREE.Object3D): Record<string, unknown> | null {
+  const runtimeState = runtime(root);
+  if (!runtimeState) return null;
+  const entries = runtimeState.armBindPose
+    .filter(({ role }) => role === 'wrist-hand')
+    .map((entry) => {
+      const beforeBindDeltaRadians = entry.bone.quaternion.angleTo(entry.quaternion);
+      let intervened = false;
+      let usedMirroredFallbackAxis = false;
+      if (beforeBindDeltaRadians < UNARMED_WRIST_BIND_DELTA_FLOOR_RADIANS) {
+        const relative = entry.quaternion.clone().invert().multiply(entry.bone.quaternion).normalize();
+        if (relative.w < 0) relative.set(-relative.x, -relative.y, -relative.z, -relative.w);
+        const relativeAxisLength = Math.hypot(relative.x, relative.y, relative.z);
+        const axis = beforeBindDeltaRadians > UNARMED_WRIST_AXIS_EPSILON
+          && relativeAxisLength > UNARMED_WRIST_AXIS_EPSILON
+          ? new THREE.Vector3(relative.x, relative.y, relative.z).divideScalar(relativeAxisLength)
+          : new THREE.Vector3(...UNARMED_WRIST_FALLBACK_AXIS[entry.side]).normalize();
+        usedMirroredFallbackAxis = beforeBindDeltaRadians <= UNARMED_WRIST_AXIS_EPSILON;
+        const enforcedDelta = new THREE.Quaternion().setFromAxisAngle(
+          axis,
+          UNARMED_WRIST_BIND_DELTA_FLOOR_RADIANS,
+        );
+        entry.bone.quaternion.copy(entry.quaternion).multiply(enforcedDelta).normalize();
+        intervened = true;
+      }
+      entry.bone.updateWorldMatrix(false, true);
+      return {
+        side: entry.side,
+        sourceBone: entry.sourceBone,
+        bone: entry.bone.name,
+        minimumBindDeltaRadians: UNARMED_WRIST_BIND_DELTA_FLOOR_RADIANS,
+        beforeBindDeltaRadians,
+        afterBindDeltaRadians: entry.bone.quaternion.angleTo(entry.quaternion),
+        intervened,
+        preservedAnimatedAxis: intervened && !usedMirroredFallbackAxis,
+        usedMirroredFallbackAxis,
+        appliedToRenderedBone: true,
+      };
+    });
+  return {
+    contract: 'post-mixer-unarmed-wrist-rest-v1',
+    expectedBoneCount: 2,
+    entries,
+    allApplied: entries.length === 2 && entries.every(({ appliedToRenderedBone }) => appliedToRenderedBone),
+    allAtOrAboveFloor: entries.length === 2 && entries.every(({ afterBindDeltaRadians }) => (
+      afterBindDeltaRadians >= UNARMED_WRIST_BIND_DELTA_FLOOR_RADIANS - 1e-9
+    )),
+  };
 }
 
 export function fireRiggedOperator(root: THREE.Object3D): boolean {
@@ -928,10 +1506,29 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
       if (aim.lengthSq() > 1e-8) muzzleForwardDot = aim.normalize().dot(operatorForward.normalize());
     }
   }
+  const effectivelyVisible = (node: THREE.Object3D): boolean => {
+    let cursor: THREE.Object3D | null = node;
+    while (cursor) {
+      if (!cursor.visible) return false;
+      cursor = cursor.parent;
+    }
+    return true;
+  };
+  const skinnedMeshIsRenderable = (mesh: THREE.SkinnedMesh): boolean => {
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    return effectivelyVisible(mesh)
+      && materials.some((material) => material.visible && material.colorWrite
+        && (!material.transparent || material.opacity > 0))
+      && (mesh.geometry.getAttribute('position')?.count ?? 0) > 0;
+  };
+  const effectiveSkinnedMeshes: THREE.SkinnedMesh[] = [];
   let visibleSkinnedMeshes = 0;
   let visibleEmbeddedWeapons = 0;
   runtimeState.visual.traverse((node) => {
-    if (node instanceof THREE.SkinnedMesh && node.visible) visibleSkinnedMeshes += 1;
+    if (node instanceof THREE.SkinnedMesh && node.visible) {
+      visibleSkinnedMeshes += 1;
+      if (skinnedMeshIsRenderable(node)) effectiveSkinnedMeshes.push(node);
+    }
     if (node.userData.embeddedWeaponSuppressed === true && node.visible) visibleEmbeddedWeapons += 1;
   });
   const headBoneWorld = runtimeState.poseBones.head?.getWorldPosition(new THREE.Vector3()) ?? null;
@@ -939,6 +1536,274 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
     (node) => node.userData.authoritativeProxy === true && node.userData.hitZone === 'head',
   );
   const hitProxyHeadWorld = headProxy?.getWorldPosition(new THREE.Vector3()) ?? null;
+  root.updateWorldMatrix(true, true);
+  const skinMembership = (bone: THREE.Bone): string[] => effectiveSkinnedMeshes
+    .filter((mesh) => mesh.skeleton.bones.includes(bone))
+    .map((mesh) => mesh.name);
+  const attributeComponent = (
+    attribute: THREE.BufferAttribute | THREE.InterleavedBufferAttribute,
+    vertex: number,
+    slot: number,
+  ): number => {
+    if (slot === 0) return attribute.getX(vertex);
+    if (slot === 1) return attribute.getY(vertex);
+    if (slot === 2) return attribute.getZ(vertex);
+    return attribute.getW(vertex);
+  };
+  const bufferAttributeVersion = (
+    attribute: THREE.BufferAttribute | THREE.InterleavedBufferAttribute | undefined,
+  ): number => {
+    if (!attribute) return -1;
+    return attribute instanceof THREE.InterleavedBufferAttribute ? attribute.data.version : attribute.version;
+  };
+  const renderedInfluenceSignature = effectiveSkinnedMeshes.map((mesh) => {
+    const joints = mesh.geometry.getAttribute('skinIndex');
+    const weights = mesh.geometry.getAttribute('skinWeight');
+    const positions = mesh.geometry.getAttribute('position');
+    return [
+      mesh.uuid,
+      mesh.geometry.uuid,
+      positions?.count ?? -1,
+      bufferAttributeVersion(joints),
+      bufferAttributeVersion(weights),
+      mesh.geometry.index?.version ?? -1,
+      mesh.geometry.drawRange.start,
+      mesh.geometry.drawRange.count,
+    ].join(':');
+  }).join('|');
+  let renderedInfluenceCache = runtimeState.renderedInfluenceCache;
+  if (!renderedInfluenceCache || renderedInfluenceCache.signature !== renderedInfluenceSignature) {
+    renderedInfluenceCache = {
+      signature: renderedInfluenceSignature,
+      generation: (renderedInfluenceCache?.generation ?? 0) + 1,
+      byBone: new Map(),
+    };
+    runtimeState.renderedInfluenceCache = renderedInfluenceCache;
+  }
+  let renderedInfluenceComputedBones = 0;
+  let renderedInfluenceReusedBones = 0;
+  const renderedVertexInfluence = (bone: THREE.Bone): RenderedVertexInfluenceTelemetry => {
+    const cached = renderedInfluenceCache.byBone.get(bone);
+    if (cached) {
+      renderedInfluenceReusedBones += 1;
+      return cached;
+    }
+    let influencedVertexCount = 0;
+    let maximumNormalizedWeight = 0;
+    const meshes: RenderedVertexInfluenceMeshTelemetry[] = [];
+    for (const mesh of effectiveSkinnedMeshes) {
+      const jointIndex = mesh.skeleton.bones.indexOf(bone);
+      const joints = mesh.geometry.getAttribute('skinIndex');
+      const weights = mesh.geometry.getAttribute('skinWeight');
+      const positions = mesh.geometry.getAttribute('position');
+      if (jointIndex < 0 || !joints || !weights || !positions || joints.itemSize < 4 || weights.itemSize < 4) continue;
+      const renderedVertices = new Set<number>();
+      const index = mesh.geometry.index;
+      const drawStart = Math.max(0, mesh.geometry.drawRange.start);
+      const available = index?.count ?? positions.count;
+      const drawCount = Number.isFinite(mesh.geometry.drawRange.count)
+        ? Math.min(mesh.geometry.drawRange.count, available - drawStart)
+        : available - drawStart;
+      for (let drawIndex = drawStart; drawIndex < drawStart + Math.max(0, drawCount); drawIndex += 1) {
+        renderedVertices.add(index ? index.getX(drawIndex) : drawIndex);
+      }
+      let meshInfluencedVertexCount = 0;
+      let meshMaximumNormalizedWeight = 0;
+      for (const vertex of renderedVertices) {
+        let totalWeight = 0;
+        let boneWeight = 0;
+        for (let slot = 0; slot < 4; slot += 1) {
+          const weight = attributeComponent(weights, vertex, slot);
+          totalWeight += weight;
+          if (Math.round(attributeComponent(joints, vertex, slot)) === jointIndex) boneWeight += weight;
+        }
+        const normalizedWeight = totalWeight > 1e-8 ? boneWeight / totalWeight : 0;
+        if (normalizedWeight >= RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS.minimumNormalizedWeight) {
+          meshInfluencedVertexCount += 1;
+        }
+        meshMaximumNormalizedWeight = Math.max(meshMaximumNormalizedWeight, normalizedWeight);
+      }
+      if (meshInfluencedVertexCount > 0 || meshMaximumNormalizedWeight > 0) {
+        meshes.push({
+          mesh: mesh.name,
+          meshUuid: mesh.uuid,
+          geometryUuid: mesh.geometry.uuid,
+          influencedVertexCount: meshInfluencedVertexCount,
+          maximumNormalizedWeight: meshMaximumNormalizedWeight,
+        });
+      }
+      influencedVertexCount += meshInfluencedVertexCount;
+      maximumNormalizedWeight = Math.max(maximumNormalizedWeight, meshMaximumNormalizedWeight);
+    }
+    const telemetry: RenderedVertexInfluenceTelemetry = {
+      contract: 'rendered-joints0-weights0-influence-v2',
+      bone: bone.name,
+      boneUuid: bone.uuid,
+      thresholds: RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS,
+      influencedVertexCount,
+      maximumNormalizedWeight,
+      meshes,
+      passes: influencedVertexCount >= RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS.minimumInfluencedVertices
+        && maximumNormalizedWeight >= RIGGED_OPERATOR_RENDERED_INFLUENCE_THRESHOLDS.minimumMaximumNormalizedWeight,
+    };
+    renderedInfluenceCache.byBone.set(bone, telemetry);
+    renderedInfluenceComputedBones += 1;
+    return telemetry;
+  };
+  const descendantPath = (descendant: THREE.Object3D, ancestor: THREE.Object3D): string[] | null => {
+    const path = [descendant.name];
+    let cursor = descendant.parent;
+    while (cursor) {
+      path.unshift(cursor.name);
+      if (cursor === ancestor) return path;
+      cursor = cursor.parent;
+    }
+    return null;
+  };
+  const armPoseBones = (runtimeState.armBindPose ?? []).map((entry) => {
+    const localPosition = entry.bone.position.toArray();
+    const localQuaternion = entry.bone.quaternion.toArray();
+    const worldPosition = entry.bone.getWorldPosition(new THREE.Vector3()).toArray();
+    const worldQuaternion = entry.bone.getWorldQuaternion(new THREE.Quaternion()).toArray();
+    const bindPositionDelta = entry.bone.position.distanceTo(entry.position);
+    const bindQuaternionDeltaRadians = entry.bone.quaternion.angleTo(entry.quaternion);
+    const vertexInfluence = renderedVertexInfluence(entry.bone);
+    return {
+      side: entry.side,
+      role: entry.role,
+      sourceBone: entry.sourceBone,
+      bone: entry.bone.name,
+      parentBone: entry.bone.parent?.name ?? null,
+      effectiveSkinnedMeshes: skinMembership(entry.bone),
+      localPosition,
+      localQuaternion,
+      worldPosition,
+      worldQuaternion,
+      bindLocalPosition: entry.position.toArray(),
+      bindLocalQuaternion: entry.quaternion.toArray(),
+      bindPositionDelta,
+      bindQuaternionDeltaRadians,
+      inEffectivelyVisibleSkinnedMesh: skinMembership(entry.bone).length > 0,
+      vertexInfluence,
+      finite: [
+        ...localPosition,
+        ...localQuaternion,
+        ...worldPosition,
+        ...worldQuaternion,
+        bindPositionDelta,
+        bindQuaternionDeltaRadians,
+      ].every(Number.isFinite),
+    };
+  });
+  const handPoseBones = (runtimeState.handBindPose ?? []).map((entry) => {
+    const wrist = runtimeState.armBindPose.find((candidate) => (
+      candidate.side === entry.side && candidate.role === 'wrist-hand'
+    ))?.bone;
+    const localPosition = entry.bone.position.toArray();
+    const localQuaternion = entry.bone.quaternion.toArray();
+    const worldPosition = entry.bone.getWorldPosition(new THREE.Vector3()).toArray();
+    const worldQuaternion = entry.bone.getWorldQuaternion(new THREE.Quaternion()).toArray();
+    const bindQuaternionDeltaRadians = entry.bone.quaternion.angleTo(entry.quaternion);
+    const effectiveSkinMembership = skinMembership(entry.bone);
+    const wristDescendantPath = wrist ? descendantPath(entry.bone, wrist) : null;
+    const vertexInfluence = renderedVertexInfluence(entry.bone);
+    return {
+      side: entry.side,
+      digit: entry.digit,
+      joint: entry.joint,
+      sourceBone: entry.sourceBone,
+      bone: entry.bone.name,
+      parentBone: entry.bone.parent?.name ?? null,
+      wristBone: wrist?.name ?? null,
+      wristDescendantPath,
+      descendantOfWrist: wristDescendantPath !== null,
+      effectiveSkinnedMeshes: effectiveSkinMembership,
+      inEffectivelyVisibleSkinnedMesh: effectiveSkinMembership.length > 0,
+      vertexInfluence,
+      localPosition,
+      localQuaternion,
+      worldPosition,
+      worldQuaternion,
+      bindLocalPosition: entry.position.toArray(),
+      bindLocalQuaternion: entry.quaternion.toArray(),
+      bindQuaternionDeltaRadians,
+      finite: [
+        ...localPosition,
+        ...localQuaternion,
+        ...worldPosition,
+        ...worldQuaternion,
+        bindQuaternionDeltaRadians,
+      ].every(Number.isFinite),
+    };
+  });
+  const commonEffectiveSkinMeshes = effectiveSkinnedMeshes
+    .filter((mesh) => [...(runtimeState.armBindPose ?? []), ...(runtimeState.handBindPose ?? [])]
+      .every((entry) => mesh.skeleton.bones.includes(entry.bone)))
+    .map((mesh) => mesh.name);
+  const armChains = (['left', 'right'] as const).map((side) => {
+    const shoulder = armPoseBones.find((bone) => bone.side === side && bone.role === 'shoulder');
+    const elbow = armPoseBones.find((bone) => bone.side === side && bone.role === 'elbow');
+    const wrist = armPoseBones.find((bone) => bone.side === side && bone.role === 'wrist-hand');
+    if (!shoulder || !elbow || !wrist) return { side, complete: false };
+    const shoulderWorld = new THREE.Vector3().fromArray(shoulder.worldPosition);
+    const elbowWorld = new THREE.Vector3().fromArray(elbow.worldPosition);
+    const wristWorld = new THREE.Vector3().fromArray(wrist.worldPosition);
+    const shoulderToElbow = elbowWorld.clone().sub(shoulderWorld);
+    const elbowToWrist = wristWorld.clone().sub(elbowWorld);
+    const shoulderToWrist = wristWorld.clone().sub(shoulderWorld);
+    const upperArmLength = shoulderToElbow.length();
+    const forearmLength = elbowToWrist.length();
+    const armLength = upperArmLength + forearmLength;
+    const elbowBendRadians = shoulderWorld.clone().sub(elbowWorld).angleTo(elbowToWrist);
+    const elbowFlexRadians = Math.PI - elbowBendRadians;
+    const shoulderToWristVerticalDrop = shoulderWorld.y - wristWorld.y;
+    const shoulderToWristHorizontalReach = Math.hypot(shoulderToWrist.x, shoulderToWrist.z);
+    const torsoWorld = runtimeState.poseBones.torso?.getWorldPosition(new THREE.Vector3()) ?? null;
+    const outwardAxis = torsoWorld ? shoulderWorld.clone().sub(torsoWorld).setY(0) : new THREE.Vector3();
+    const shoulderToWristOutwardReach = outwardAxis.lengthSq() > 1e-8
+      ? shoulderToWrist.dot(outwardAxis.normalize())
+      : Number.NaN;
+    const hierarchyPath = descendantPath(
+      runtimeState.armBindPose.find((entry) => entry.side === side && entry.role === 'wrist-hand')!.bone,
+      runtimeState.armBindPose.find((entry) => entry.side === side && entry.role === 'shoulder')!.bone,
+    );
+    const directHierarchy = hierarchyPath?.length === 3
+      && runtimeState.armBindPose.find((entry) => entry.side === side && entry.role === 'elbow')?.bone.parent
+        === runtimeState.armBindPose.find((entry) => entry.side === side && entry.role === 'shoulder')?.bone
+      && runtimeState.armBindPose.find((entry) => entry.side === side && entry.role === 'wrist-hand')?.bone.parent
+        === runtimeState.armBindPose.find((entry) => entry.side === side && entry.role === 'elbow')?.bone;
+    const shoulderToWristVerticalDropRatio = shoulderToWristVerticalDrop / Math.max(armLength, 1e-6);
+    const shoulderToWristHorizontalReachRatio = shoulderToWristHorizontalReach / Math.max(armLength, 1e-6);
+    const shoulderToWristOutwardReachRatio = Math.abs(shoulderToWristOutwardReach) / Math.max(armLength, 1e-6);
+    return {
+      side,
+      complete: true,
+      hierarchyPath,
+      directHierarchy,
+      upperArmLength,
+      forearmLength,
+      armLength,
+      elbowBendRadians,
+      elbowFlexRadians,
+      upperArmVerticalDrop: shoulderWorld.y - elbowWorld.y,
+      forearmVerticalDrop: elbowWorld.y - wristWorld.y,
+      shoulderToWristVerticalDrop,
+      shoulderToWristVerticalDropRatio,
+      shoulderToWristHorizontalReach,
+      shoulderToWristHorizontalReachRatio,
+      shoulderOutwardAxis: outwardAxis.toArray(),
+      shoulderToWristOutwardReach,
+      shoulderToWristOutwardReachRatio,
+      verticalDropToOutwardReachRatio: shoulderToWristVerticalDrop
+        / Math.max(Math.abs(shoulderToWristOutwardReach), 1e-6),
+      antiTPoseGeometry: directHierarchy === true
+        && shoulderToWristVerticalDrop >= RIGGED_OPERATOR_ANTI_T_THRESHOLDS.minimumVerticalDropM
+        && shoulderToWristVerticalDropRatio >= RIGGED_OPERATOR_ANTI_T_THRESHOLDS.minimumVerticalDropRatio
+        && shoulderToWristHorizontalReachRatio <= RIGGED_OPERATOR_ANTI_T_THRESHOLDS.maximumHorizontalReachRatio
+        && shoulderToWristOutwardReachRatio <= RIGGED_OPERATOR_ANTI_T_THRESHOLDS.maximumOutwardReachRatio
+        && elbowFlexRadians >= RIGGED_OPERATOR_ANTI_T_THRESHOLDS.minimumElbowFlexRadians,
+    };
+  });
   return {
     source: root.userData.operatorAsset?.source,
     assetUrl: root.userData.operatorAsset?.assetUrl,
@@ -966,11 +1831,59 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
     },
     skeletons: runtimeState.visual.getObjectsByProperty('isSkinnedMesh', true).length,
     visibleSkinnedMeshes,
+    effectivelyVisibleSkinnedMeshes: effectiveSkinnedMeshes.map((mesh) => mesh.name),
     headBoneWorld: headBoneWorld?.toArray() ?? null,
     hitProxyHeadWorld: hitProxyHeadWorld?.toArray() ?? null,
     hitProxyHeadDelta: headBoneWorld && hitProxyHeadWorld ? headBoneWorld.distanceTo(hitProxyHeadWorld) : null,
-    armBonesPresent: ['UpperArmL', 'LowerArmL', 'WristL', 'UpperArmR', 'LowerArmR', 'WristR']
-      .filter((name) => runtimeState.visual.getObjectByName(name) instanceof THREE.Bone).length,
+    armBonesPresent: (runtimeState.armBindPose ?? []).length,
+    armPose: {
+      contract: 'source-glb-skinned-anti-t-arm-chain-v2',
+      reference: 'authored-glb-local-transform-before-animation',
+      thresholds: RIGGED_OPERATOR_ANTI_T_THRESHOLDS,
+      expectedBoneCount: RIGGED_OPERATOR_ARM_BONES.length,
+      bones: armPoseBones,
+      chains: armChains,
+      commonEffectiveSkinnedMeshes: commonEffectiveSkinMeshes,
+      allPresent: armPoseBones.length === RIGGED_OPERATOR_ARM_BONES.length
+        && armChains.every((chain) => chain.complete),
+      allHierarchyValid: armChains.every((chain) => chain.complete && chain.directHierarchy === true),
+      allInEffectivelyVisibleSkinnedMesh: armPoseBones.every((bone) => bone.inEffectivelyVisibleSkinnedMesh)
+        && commonEffectiveSkinMeshes.length > 0,
+      allHaveRenderedVertexInfluence: armPoseBones.every((bone) => bone.vertexInfluence.passes),
+      renderedInfluenceCache: {
+        contract: 'static-rendered-influence-cache-v1',
+        generation: renderedInfluenceCache.generation,
+        computedBones: renderedInfluenceComputedBones,
+        reusedBones: renderedInfluenceReusedBones,
+        cachedBones: renderedInfluenceCache.byBone.size,
+      },
+      allAntiTPoseGeometry: armChains.every((chain) => chain.complete && chain.antiTPoseGeometry === true),
+      allFinite: armPoseBones.every((bone) => bone.finite)
+        && armChains.every((chain) => !chain.complete || ('armLength' in chain
+          && chain.shoulderOutwardAxis?.length === 3
+          && chain.shoulderOutwardAxis.every(Number.isFinite)
+          && [
+            chain.upperArmLength, chain.forearmLength, chain.armLength,
+            chain.elbowBendRadians, chain.elbowFlexRadians,
+            chain.upperArmVerticalDrop, chain.forearmVerticalDrop,
+            chain.shoulderToWristVerticalDrop, chain.shoulderToWristVerticalDropRatio,
+            chain.shoulderToWristHorizontalReach, chain.shoulderToWristHorizontalReachRatio,
+            chain.shoulderToWristOutwardReach, chain.shoulderToWristOutwardReachRatio,
+            chain.verticalDropToOutwardReachRatio,
+          ].every(Number.isFinite))),
+    },
+    handPose: {
+      contract: 'source-glb-weighted-five-digit-sentinels-v2',
+      reference: 'shipped-lod0-walk-animated-second-phalanges',
+      expectedBoneCount: RIGGED_OPERATOR_HAND_BONES.length,
+      bones: handPoseBones,
+      allPresent: handPoseBones.length === RIGGED_OPERATOR_HAND_BONES.length,
+      allDescendantOfWrist: handPoseBones.every((bone) => bone.descendantOfWrist),
+      allInEffectivelyVisibleSkinnedMesh: handPoseBones.every((bone) => bone.inEffectivelyVisibleSkinnedMesh)
+        && commonEffectiveSkinMeshes.length > 0,
+      allHaveRenderedVertexInfluence: handPoseBones.every((bone) => bone.vertexInfluence.passes),
+      allFinite: handPoseBones.every((bone) => bone.finite),
+    },
     meleeKnifeVisible: root.getObjectByName('operator-melee-knife')?.visible === true,
     mergedVertexLod: runtimeState.visual.getObjectByName('Swat_Merged_Vertex_LOD')?.visible === true,
     weaponChildren: runtimeState.weaponSocket.children.length,

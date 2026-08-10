@@ -41,12 +41,14 @@ export function projectMapButtonMarkup(): string {
 
 export function projectMapDialogMarkup(bundle: ProjectMapBundle = createProjectMapBundle()): string {
   const current = bundle.current.release;
+  const currentTargetLabel = bundle.current.releaseState === 'released' ? 'CURRENT LIVE' : 'RELEASE CANDIDATE';
+  const channelTargetLabel = bundle.publishedChannels.liveTarget.state === 'released' ? 'LIVE TARGET' : 'PROMOTION TARGET';
   return `
     <div id="project-map-backdrop" class="menu-modal-backdrop" hidden></div>
     <section id="project-map-panel" class="panel menu-modal-panel" hidden role="dialog" aria-modal="true" aria-labelledby="project-map-title">
       <header class="menu-modal-header project-map-header">
         <div>
-          <small>LIVE PROJECT DOCUMENTATION</small>
+          <small>PROJECT DOCUMENTATION</small>
           <strong id="project-map-title">PROJECT MAP</strong>
         </div>
         <button id="project-map-close" type="button" aria-label="Close project map">CLOSE</button>
@@ -57,8 +59,8 @@ export function projectMapDialogMarkup(bundle: ProjectMapBundle = createProjectM
       </nav>
       <div class="project-map-pages">
         <section id="project-map-page-overview" role="tabpanel" data-project-map-page="overview">
-          <div class="project-map-intro"><span><small>CURRENT LIVE TARGET</small><strong>${escapeHtml(current.pass)}</strong></span><p>${escapeHtml(current.summary)}</p></div>
-          <div class="project-channel-state"><span><small>LIVE TARGET · ${escapeHtml(bundle.publishedChannels.liveTarget.state.toUpperCase())}</small><b>${escapeHtml(bundle.publishedChannels.liveTarget.pass)}</b></span><span><small>STABLE FALLBACK · BYTE-EXACT</small><b>${escapeHtml(bundle.publishedChannels.stable.pass)}</b></span></div>
+          <div class="project-map-intro"><span><small>${currentTargetLabel}</small><strong>${escapeHtml(current.pass)}</strong></span><p>${escapeHtml(current.summary)}</p></div>
+          <div class="project-channel-state"><span><small>${channelTargetLabel} · ${escapeHtml(bundle.publishedChannels.liveTarget.state.toUpperCase())}</small><b>${escapeHtml(bundle.publishedChannels.liveTarget.pass)}</b></span><span><small>STABLE FALLBACK · BYTE-EXACT</small><b>${escapeHtml(bundle.publishedChannels.stable.pass)}</b></span></div>
           <h3>AUTHORITY BOUNDARIES</h3>
           <ul class="project-boundaries">${bundle.operatingBoundaries.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}</ul>
           <div class="project-downloads">

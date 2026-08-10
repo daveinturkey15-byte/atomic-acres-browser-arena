@@ -10,6 +10,7 @@ import {
   gunRangeTestBayDoorDynamicColliders,
   gunRangeTestBayDoorLeafBounds,
   gunRangeTestBayDummyPose,
+  gunRangeTestBayRenderedDummyPose,
   nearestGunRangeTestBaySupportStation,
   nearestGunRangeTestBayWeaponStation,
 } from './gun-range-test-bay';
@@ -95,11 +96,14 @@ describe('Gun Range grey test-bay authority', () => {
 
   it('keeps slow unarmed dummies continuous, bounded, and below walking speed', () => {
     const walkSpeed = GUN_RANGE_TEST_BAY_CONTRACT.corridor.canonicalWalkSpeedMps;
-    for (const dummy of GUN_RANGE_TEST_BAY_CONTRACT.dummies) {
+    for (let index = 0; index < GUN_RANGE_TEST_BAY_CONTRACT.dummies.length; index += 1) {
+      const dummy = GUN_RANGE_TEST_BAY_CONTRACT.dummies[index];
       expect(dummy.armed).toBe(false);
       expect(dummy.speedMps).toBeGreaterThan(0.5);
       expect(dummy.speedMps).toBeLessThan(walkSpeed * 0.15);
       const start = gunRangeTestBayDummyPose(dummy, 0);
+      const renderedStart = gunRangeTestBayRenderedDummyPose(dummy, index, 0);
+      expect(renderedStart.position.y).toBeCloseTo(start.position.y + Math.abs(Math.sin(index)) * 0.025, 12);
       const next = gunRangeTestBayDummyPose(dummy, 16);
       expect(Math.hypot(
         next.position.x - start.position.x,

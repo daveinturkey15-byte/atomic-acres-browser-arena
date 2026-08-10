@@ -49,26 +49,44 @@ export type ProjectMapBundle = Readonly<{
 }>;
 
 /**
- * The project map describes the active review candidate, while CHANGELOG is a
- * production-only release ledger. Keeping the candidate separate prevents an
- * unpublished pass from appearing as live release history.
+ * The project map describes the active review candidate or the same bytes after
+ * protected timestamp injection. Keeping this copy state-aware prevents either
+ * an unpublished pass claiming to be live or a promoted build claiming approval
+ * is still pending.
  */
+export function projectMapReleaseCopy(releasedAt: string): Readonly<{
+  summary: string;
+  approvalHighlight: string;
+}> {
+  const released = releasedAt !== PENDING_PRODUCTION_RELEASE;
+  return Object.freeze({
+    summary: released
+      ? 'Pass 69 is the current released build for mobile control, ADS, authored aircraft, glass and weapon-effect improvements; the stable Pass 63 WebGL fallback stays frozen.'
+      : 'Pass 69 is the current release candidate for mobile control, ADS, authored aircraft, glass and weapon-effect improvements; the stable Pass 63 WebGL fallback stays frozen.',
+    approvalHighlight: released
+      ? 'Pass 69 was promoted only after approval of its immutable preview'
+      : 'Owner approval remains pending on the immutable Pass 69 preview',
+  });
+}
+
+const projectMapReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+const projectMapCopy = projectMapReleaseCopy(projectMapReleasedAt);
+
 export const PROJECT_MAP_RELEASE: ChangelogEntry = Object.freeze({
   id: 'pass69',
   pass: PASS66_RELEASE_IDENTITY.pass,
-  title: 'The Big One',
-  releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
-  areas: Object.freeze(['MULTIPLAYER', 'FIELD KIT', 'FIRST-PERSON', 'CHOPPER GUNNER', 'HITL']),
-  summary: 'Pass 69.1 delivers corrected mobile gamepad controls, safe rotation, restored Field Kit DPS and front-page refresh recovery while preserving Pass 67.1 stable singleplayer and Pass 63 rollback evidence.',
+  title: 'Pass 69',
+  releasedAt: projectMapReleasedAt,
+  areas: Object.freeze(['MOBILE', 'FIRST-PERSON', 'SUPPORT', 'DESTRUCTION', 'HITL']),
+  summary: projectMapCopy.summary,
   highlights: Object.freeze([
-    'Mobile sticks acquire through their full visible area with gamepad-shaped axes, FIRE beside aim and safe rotation recovery',
-    'Field Kit metric decks stay visible with truthful DPS and readable responsive weapon cards',
-    'The version chooser exposes Ctrl+Shift+R guidance and a hard cache-reset refresh control',
-    'First-person arms use the corrected mirrored parent-space solve without replacing the canonical authored rig',
-    'Chopper Gunner authored presentation contracts match required LOD nodes, actions and fallback sockets',
-    'Private host/guest lobby state remains host-authoritative across the current release topology',
-
-    'Pass 67.1 stays frozen as stable singleplayer and Pass 63 remains the rollback',
+    'Responsive touch clusters suppress accidental selection, preserve chat editing and keep both HUD and controls clear of the aim cone',
+    'Authored arm handedness and physical HK416 / Mini Uzi sight apertures replace the failed reflection and empty-node ADS fixes',
+    'Care-package and Carpet Bomber LOD contracts require visible authored wing meshes and reject generic release fallback aircraft',
+    'Irregular retained glass shards, live-ID M14 thermal ghosts and bounded Flamethrower / Flare work remove known cold allocation and shader gaps',
+    'The secure test bay presents canonical weapon labels, one coherent door assembly, posed rigged dummies and atomic pickup text',
+    projectMapCopy.approvalHighlight,
+    'Pass 63 stays frozen as the selectable stable WebGL fallback',
   ]),
 });
 

@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+import { UI_MOBILE_REVIEW_VIEWPORTS } from '../../src/ui/surface-registry';
 
 const MOBILE_STORAGE_KEY = 'atomic-acres-mobile-controls';
 test.use({ hasTouch: true, isMobile: true });
@@ -28,14 +29,11 @@ async function ready(page: Page, width: number, height: number, arena = 'atomic-
 
 type RectRecord = Readonly<{ label: string; left: number; top: number; right: number; bottom: number }>;
 
-async function visibleGameplayRects(page: Page): Promise<RectRecord[]> {
+async function visibleControlRects(page: Page): Promise<RectRecord[]> {
   return page.evaluate(() => {
     const selectors = [
       '#mobile-touch-controls .mtc-stick',
       '#mobile-touch-controls .mtc-btn',
-      '.hud-mission-console',
-      '.hud-operator-console',
-      '.hud-weapon-console',
     ];
     return selectors.flatMap((selector) => [...document.querySelectorAll<HTMLElement>(selector)])
       .filter((element) => {
@@ -56,6 +54,25 @@ async function visibleGameplayRects(page: Page): Promise<RectRecord[]> {
   });
 }
 
+async function visibleHudPanelRects(page: Page): Promise<RectRecord[]> {
+  return page.evaluate(() => [
+    '.hud-mission-console', '.hud-map-console', '.hud-operator-console',
+    '.hud-weapon-console', '#support-block',
+  ].flatMap((selector) => {
+    const element = document.querySelector<HTMLElement>(selector);
+    if (!element || element.hidden || getComputedStyle(element).display === 'none') return [];
+    const rect = element.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return [];
+    return [{
+      label: selector,
+      left: rect.left,
+      top: rect.top,
+      right: rect.right,
+      bottom: rect.bottom,
+    }];
+  }));
+}
+
 function overlaps(a: RectRecord, b: RectRecord): boolean {
   return Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1
     && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1;
@@ -67,14 +84,17 @@ function edgeGap(a: RectRecord, b: RectRecord): number {
   return Math.hypot(horizontal, vertical);
 }
 
-for (const viewport of [
-  { name: 'narrow portrait', width: 320, height: 667 },
-  { name: 'portrait', width: 390, height: 844 },
-  { name: 'landscape', width: 844, height: 390 },
-]) {
-  test(`keeps touch controls and compact HUD usable in ${viewport.name}`, async ({ page }, testInfo) => {
+function centreDistance(a: RectRecord, b: RectRecord): number {
+  return Math.hypot(
+    (a.left + a.right - b.left - b.right) / 2,
+    (a.top + a.bottom - b.top - b.bottom) / 2,
+  );
+}
+
+for (const viewport of UI_MOBILE_REVIEW_VIEWPORTS) {
+  test(`keeps touch controls and critical HUD usable in ${viewport.id}`, async ({ page }, testInfo) => {
     await ready(page, viewport.width, viewport.height);
-    const rects = await visibleGameplayRects(page);
+    const rects = await visibleControlRects(page);
     const viewportBounds = { left: 0, top: 0, right: viewport.width, bottom: viewport.height };
     for (const rect of rects) {
       expect(rect.left, `${rect.label} left`).toBeGreaterThanOrEqual(viewportBounds.left - 1);
@@ -89,19 +109,188 @@ for (const viewport of [
       }
     }
     expect(collisions).toEqual([]);
+    const hudRects = await visibleHudPanelRects(page);
+    const hudCollisions = hudRects.flatMap((hudRect) => (
+      rects.filter((controlRect) => overlaps(hudRect, controlRect))
+        .map((controlRect) => `${hudRect.label}↔${controlRect.label}`)
+    ));
+    expect(hudCollisions).toEqual([]);
+    for (const rect of rects) {
+      expect(rect.right - rect.left, `${rect.label} width`).toBeGreaterThanOrEqual(44);
+      expect(rect.bottom - rect.top, `${rect.label} height`).toBeGreaterThanOrEqual(44);
+    }
+
+    const aimRoi: RectRecord = {
+      label: 'central aim ROI',
+      left: viewport.width / 2 - 80,
+      right: viewport.width / 2 + 80,
+      top: viewport.height / 2 - 80,
+      bottom: viewport.height / 2 + 80,
+    };
+    expect([...rects, ...hudRects]
+      .filter((rect) => overlaps(rect, aimRoi))
+      .map(({ label }) => label)).toEqual([]);
+
     const lookStick = rects.find(({ label }) => label === 'stick-look');
     const fire = rects.find(({ label }) => label === 'fire');
     expect(lookStick).toBeDefined();
     expect(fire).toBeDefined();
-    expect(edgeGap(lookStick!, fire!), 'FIRE stays within one thumb gap of the aim stick').toBeLessThanOrEqual(24);
+    expect(fire!.right - fire!.left, 'FIRE remains a bounded thumb target').toBeLessThanOrEqual(72);
+    expect(edgeGap(lookStick!, fire!), 'FIRE stays within one thumb gap of the aim stick').toBeLessThanOrEqual(16);
+    expect(centreDistance(lookStick!, fire!), 'FIRE centre remains reachable from the aim stick').toBeLessThanOrEqual(128);
+
+    const actionOrder = await page.locator('#mobile-touch-controls .mtc-btn').evaluateAll((buttons) => (
+      buttons.map((button) => (button as HTMLElement).dataset.mtc)
+    ));
+    expect(actionOrder).toEqual([
+      'fire', 'ads', 'reload', 'switch-weapon',
+      'jump', 'crouch', 'prone', 'grenade', 'melee',
+      'sprint', 'interact', 'support-cycle', 'support-activate',
+      'pause',
+    ]);
+
+    const criticalHud = await page.evaluate(() => Object.fromEntries([
+      '.hud-mission-console', '#objective', '#network-strip', '.hud-map-console', '#minimap',
+      '.hud-operator-console', '#health-block', '#combat-stats', '#equipment-block',
+      '.hud-weapon-console', '#weapon-block', '#support-block', '#killfeed', '#damage-feeds',
+    ].map((selector) => {
+      const element = document.querySelector<HTMLElement>(selector);
+      return [selector, element ? {
+        hidden: element.hidden,
+        display: getComputedStyle(element).display,
+        visibility: getComputedStyle(element).visibility,
+      } : null];
+    })));
+    const stateHiddenWhenOffline = new Set(['#network-strip']);
+    for (const [selector, state] of Object.entries(criticalHud)) {
+      expect(state, `${selector} exists`).not.toBeNull();
+      if (state!.hidden && stateHiddenWhenOffline.has(selector)) continue;
+      expect(state!.hidden, `${selector} is not state-hidden`).toBe(false);
+      expect(state!.display, `${selector} is not CSS-hidden`).not.toBe('none');
+      expect(state!.visibility, `${selector} is visible`).not.toBe('hidden');
+    }
+
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
     const evidenceDir = resolve(process.cwd(), 'artifacts/pass69/mobile-touch-layout');
     mkdirSync(evidenceDir, { recursive: true });
     const screenshot = resolve(evidenceDir, `${viewport.width}x${viewport.height}.png`);
     await page.screenshot({ path: screenshot, animations: 'disabled' });
-    await testInfo.attach(`${viewport.name}-layout`, { path: screenshot, contentType: 'image/png' });
+    await testInfo.attach(`${viewport.id}-layout`, { path: screenshot, contentType: 'image/png' });
   });
 }
+
+test('honours asymmetric safe-area insets for every touch target', async ({ page }) => {
+  await ready(page, 932, 430);
+  const safeArea = { top: 18, right: 20, bottom: 22, left: 34 };
+  await page.evaluate((insets) => {
+    const body = document.body;
+    body.style.setProperty('--mtc-safe-top', `${insets.top}px`);
+    body.style.setProperty('--mtc-safe-right', `${insets.right}px`);
+    body.style.setProperty('--mtc-safe-bottom', `${insets.bottom}px`);
+    body.style.setProperty('--mtc-safe-left', `${insets.left}px`);
+  }, safeArea);
+  await page.evaluate(() => new Promise<void>((resolveFrame) => requestAnimationFrame(() => resolveFrame())));
+  for (const rect of await visibleControlRects(page)) {
+    expect(rect.left, `${rect.label} clears left safe area`).toBeGreaterThanOrEqual(safeArea.left - 1);
+    expect(rect.top, `${rect.label} clears top safe area`).toBeGreaterThanOrEqual(safeArea.top - 1);
+    expect(rect.right, `${rect.label} clears right safe area`).toBeLessThanOrEqual(932 - safeArea.right + 1);
+    expect(rect.bottom, `${rect.label} clears bottom safe area`).toBeLessThanOrEqual(430 - safeArea.bottom + 1);
+  }
+});
+
+test('blocks selection and callout events on live gameplay while preserving editable chat selection', async ({ page }) => {
+  await ready(page, 390, 844);
+  const gameplayEvents = await page.evaluate(() => {
+    const game = document.querySelector<HTMLElement>('#game');
+    const objective = document.querySelector<HTMLElement>('#objective');
+    if (!game || !objective) throw new Error('Missing gameplay selection targets');
+    const dispatch = (target: HTMLElement, type: string) => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      const dispatched = target.dispatchEvent(event);
+      return { defaultPrevented: event.defaultPrevented, dispatched };
+    };
+    return {
+      canvasSelect: dispatch(game, 'selectstart'),
+      canvasMenu: dispatch(game, 'contextmenu'),
+      hudSelect: dispatch(objective, 'selectstart'),
+      gameUserSelect: getComputedStyle(game).userSelect,
+    };
+  });
+  expect(gameplayEvents.canvasSelect).toEqual({ defaultPrevented: true, dispatched: false });
+  expect(gameplayEvents.canvasMenu).toEqual({ defaultPrevented: true, dispatched: false });
+  expect(gameplayEvents.hudSelect).toEqual({ defaultPrevented: true, dispatched: false });
+  expect(gameplayEvents.gameUserSelect).toBe('none');
+
+  const editableEvents = await page.evaluate(() => {
+    const chat = document.querySelector<HTMLElement>('#text-chat');
+    const input = document.querySelector<HTMLInputElement>('#text-chat-input');
+    if (!chat || !input) throw new Error('Missing chat editable target');
+    chat.hidden = false;
+    chat.dataset.open = 'true';
+    const dispatch = (type: string) => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      const dispatched = input.dispatchEvent(event);
+      return { defaultPrevented: event.defaultPrevented, dispatched };
+    };
+    return {
+      select: dispatch('selectstart'),
+      menu: dispatch('contextmenu'),
+      userSelect: getComputedStyle(input).userSelect,
+      touchAction: getComputedStyle(input).touchAction,
+    };
+  });
+  expect(editableEvents.select).toEqual({ defaultPrevented: false, dispatched: true });
+  expect(editableEvents.menu).toEqual({ defaultPrevented: false, dispatched: true });
+  expect(editableEvents.userSelect).toBe('text');
+  expect(editableEvents.touchAction).toBe('manipulation');
+});
+
+test('routes switch, prone, sprint, and field support through live semantic paths', async ({ page }) => {
+  await ready(page, 844, 390);
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.equipWeapon('carbine'));
+  const weaponBefore = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.weapon);
+  await page.locator('[data-mtc="switch-weapon"]').click();
+  await expect.poll(async () => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.weapon))
+    .not.toBe(weaponBefore);
+
+  await page.locator('[data-mtc="prone"]').click();
+  await expect.poll(async () => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.prone)).toBe(true);
+
+  await page.keyboard.down('KeyW');
+  const sprint = page.locator('[data-mtc="sprint"]');
+  const sprintBounds = await sprint.boundingBox();
+  if (!sprintBounds) throw new Error('SPRINT control has no held-input target');
+  await page.mouse.move(sprintBounds.x + sprintBounds.width / 2, sprintBounds.y + sprintBounds.height / 2);
+  await page.mouse.down();
+  try {
+    await expect.poll(async () => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.sprinting)).toBe(true);
+  } finally {
+    await page.mouse.up();
+    await page.keyboard.up('KeyW');
+  }
+  await expect.poll(async () => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.sprinting)).toBe(false);
+
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.earnSupport(15));
+  const supportBefore = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().fieldSupport.gamepadSelection);
+  await page.locator('[data-mtc="support-cycle"]').click();
+  await expect.poll(async () => page.evaluate(() => (
+    window.__ATOMIC_ACRES_DEBUG__.snapshot().fieldSupport.gamepadSelection
+  ))).not.toBe(supportBefore);
+  const activationBefore = await page.evaluate(() => {
+    const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot().fieldSupport;
+    return {
+      id: snapshot.gamepadSelection,
+      charges: snapshot.availableCharges[snapshot.gamepadSelection],
+    };
+  });
+  await page.locator('[data-mtc="support-activate"]').click();
+  await expect.poll(async () => page.evaluate((before) => {
+    const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot().fieldSupport;
+    return snapshot.availableCharges[before.id] < before.charges
+      || snapshot.targetingMode !== null
+      || snapshot.tacticalMapOpen === true;
+  }, activationBefore)).toBe(true);
+});
 
 test('acquires each stick through its centre knob and emits gamepad-shaped axes', async ({ page }) => {
   await ready(page, 844, 390);

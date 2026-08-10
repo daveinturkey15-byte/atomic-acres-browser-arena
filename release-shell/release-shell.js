@@ -65,8 +65,7 @@
   const params = new URLSearchParams(window.location.search);
   const requested = params.get('release')?.trim().toLowerCase();
   if (params.get('room')?.trim() || requested === 'latest' || requested === 'normal') return route('experimental');
-  if (requested === 'stable') return route('stable');
-  if (requested === 'rollback') return route('rollback');
+  if (requested === 'stable' || requested === 'rollback') return route('stable');
   if (requested === 'experimental') return route('experimental');
 
   const options = document.querySelector('#release-channel-options');
@@ -93,14 +92,16 @@
     const version = String(channel.label || '').match(/v\d+(?:\.\d+)+/);
     return version ? `PASS ${version[0].slice(1)}` : channel.pass;
   };
-  for (const key of ['experimental', 'stable', 'rollback']) {
+  for (const key of ['experimental', 'stable']) {
     const channel = config[key];
     if (!channel) continue;
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `release-channel-option ${key}`;
     button.dataset.releaseChoice = key;
-    const badge = key === 'stable' ? 'STABLE' : key === 'rollback' ? 'ROLLBACK' : 'LIVE';
+    const badge = key === 'stable'
+      ? 'STABLE WEBGL'
+      : channel.deploymentState === 'live' ? 'LIVE' : 'RELEASE CANDIDATE';
     button.innerHTML = `<small>${displayPass(key, channel)} · ${badge}</small><strong>${channel.label}</strong><span>${channel.description}</span>`;
     button.addEventListener('click', () => route(key));
     options.append(button);

@@ -59,6 +59,16 @@ export function resolveSocketWorld(socket: THREE.Object3D, target = new THREE.Ve
   return socket.getWorldPosition(target);
 }
 
+function effectivelyVisibleWithin(child: THREE.Object3D, root: THREE.Object3D): boolean {
+  let current: THREE.Object3D | null = child;
+  while (current) {
+    if (!current.visible) return false;
+    if (current === root) return true;
+    current = current.parent;
+  }
+  return false;
+}
+
 /**
  * Geometry bounds expressed in the object's own space. This avoids the
  * misleading world Box3 produced by animated/skinned wrist ancestry.
@@ -68,7 +78,7 @@ export function objectLocalGeometryBounds(root: THREE.Object3D): THREE.Box3 | nu
   const inverseRoot = root.matrixWorld.clone().invert();
   const bounds = new THREE.Box3().makeEmpty();
   root.traverse((child) => {
-    if (!(child instanceof THREE.Mesh) || !child.geometry || !child.visible) return;
+    if (!(child instanceof THREE.Mesh) || !child.geometry || !effectivelyVisibleWithin(child, root)) return;
     if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
     if (!child.geometry.boundingBox) return;
     const meshToRoot = inverseRoot.clone().multiply(child.matrixWorld);
@@ -97,7 +107,7 @@ export function measureCameraFraming(
   camera.updateWorldMatrix(true, false);
   const bounds = new THREE.Box3().makeEmpty();
   object.traverse((child) => {
-    if (!(child instanceof THREE.Mesh) || !child.visible || !includeMesh(child)) return;
+    if (!(child instanceof THREE.Mesh) || !effectivelyVisibleWithin(child, object) || !includeMesh(child)) return;
     if (child instanceof THREE.SkinnedMesh) {
       // Geometry bounds describe the undeformed bind mesh. First-person arm IK
       // can move that stale box through the camera even while every rendered

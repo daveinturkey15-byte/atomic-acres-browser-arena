@@ -1,6 +1,14 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { HIP_VIEWMODEL_POSITION, HIP_VIEWMODEL_SCALE, WeaponPresentation } from './weapon-presentation';
+import {
+  FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT,
+  FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT_CONTRACT,
+  HIP_VIEWMODEL_POSITION,
+  HIP_VIEWMODEL_SCALE,
+  VIEWMODEL_NEAR_PLANE_CLEARANCE,
+  WeaponPresentation,
+  authoredNearPlaneContactRetreat,
+} from './weapon-presentation';
 
 const REST_POSE = {
   dt: 1 / 60,
@@ -28,7 +36,7 @@ describe('first-person anatomical presentation', () => {
     ]);
   });
 
-  it('solves mirrored authored arm bones in parent space without missing the weapon socket', () => {
+  it('solves arm bones in parent space without missing the weapon socket under a reflected ancestor', () => {
     const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
     const presentation = new WeaponPresentation(camera, false);
     const mirroredVisual = new THREE.Group();
@@ -70,6 +78,8 @@ describe('first-person anatomical presentation', () => {
     const state = presentation.presentationState();
     expect(state.adsProgress).toBeGreaterThan(0.999);
     expect(presentation.root.scale.x).toBeCloseTo(0.76, 3);
+    expect(state.adsMaterialClearance.sightPictureRetreat).toBeCloseTo(0.26, 3);
+    expect(state.viewmodelViewport.rootPosition[2]).toBeLessThan(-1.25);
     expect(state.sightOffset?.[0]).toBeCloseTo(0, 3);
     expect(state.sightOffset?.[1]).toBeCloseTo(0, 3);
   });
@@ -187,6 +197,7 @@ describe('first-person anatomical presentation', () => {
   it('snaps retained match-start presentation state without advancing an action frame', () => {
     const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
     const presentation = new WeaponPresentation(camera, false);
+    const surfaceRetreat = 0.12;
     presentation.setWeapon('minigun', true);
     for (let frame = 0; frame < 20; frame += 1) {
       presentation.update({ ...REST_POSE, moving: true, sprinting: true, ads: true, triggerHeld: true });
@@ -194,13 +205,14 @@ describe('first-person anatomical presentation', () => {
     presentation.fire(0.02);
     presentation.melee();
 
-    presentation.snapToMatchStartRestPose(0.12);
+    presentation.snapToMatchStartRestPose(surfaceRetreat);
 
     const state = presentation.presentationState();
     expect(presentation.root.position.toArray()).toEqual([
       HIP_VIEWMODEL_POSITION.x,
       HIP_VIEWMODEL_POSITION.y,
-      HIP_VIEWMODEL_POSITION.z + 0.12,
+      HIP_VIEWMODEL_POSITION.z + surfaceRetreat - VIEWMODEL_NEAR_PLANE_CLEARANCE
+        - authoredNearPlaneContactRetreat('minigun', surfaceRetreat),
     ]);
     expect(presentation.root.scale.toArray()).toEqual([
       HIP_VIEWMODEL_SCALE,
@@ -214,9 +226,16 @@ describe('first-person anatomical presentation', () => {
       shotsPresented: 0,
       knifeVisible: false,
       passiveKnifeVisible: false,
-      surfaceRetreat: 0.12,
+      surfaceRetreat,
       meleeArmSource: 'inactive',
       minigunSpool: { fraction: 0, phase: 'idle' },
+      nearPlaneClearance: {
+        contract: FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT_CONTRACT,
+        cameraNear: camera.near,
+        baseRetreat: VIEWMODEL_NEAR_PLANE_CLEARANCE,
+        cachedRetreat: FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT.minigun,
+        blendedRetreat: authoredNearPlaneContactRetreat('minigun', surfaceRetreat),
+      },
       actionContract: {
         state: 'hip',
         weapon: 'minigun',

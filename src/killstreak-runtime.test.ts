@@ -84,6 +84,33 @@ describe('host killstreak runtime', () => {
     }
   });
 
+  it('keeps an off-centre Gun Range chopper route inside the authored support-flight bay', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
+    earn(runtime, 8);
+    const gunRangeWorld: KillstreakWorld = {
+      ...DEFAULT_WORLD,
+      bounds: { minX: -20, maxX: 100, minZ: -48, maxZ: 38, floorY: 0, ceilingY: 18 },
+      supportFlightCentreVolume: {
+        centre: [76, 4.5, 6],
+        halfExtents: [7.5, 1, 7.5],
+      },
+      resolveFlightPosition: (_from, desired) => desired,
+    };
+    const activation = runtime.activate(intent('chopper', 4), 1_000, gunRangeWorld);
+    expect(activation.accepted).toBe(true);
+    for (let elapsed = 0; elapsed < CHOPPER_DURATION_MS; elapsed += 500) {
+      const now = 1_000 + elapsed;
+      runtime.advance(now, gunRangeWorld);
+      const chopper = runtime.snapshotFor('owner', now).entities.find((entity) => entity.kind === 'chopper');
+      expect(chopper, `missing chopper at ${elapsed}ms`).toBeDefined();
+      expect(chopper!.position[0], `x at ${elapsed}ms`).toBeGreaterThanOrEqual(51.5);
+      expect(chopper!.position[0], `x at ${elapsed}ms`).toBeLessThanOrEqual(100);
+      expect(chopper!.position[2], `z at ${elapsed}ms`).toBeGreaterThanOrEqual(-26);
+      expect(chopper!.position[2], `z at ${elapsed}ms`).toBeLessThanOrEqual(38);
+    }
+  });
+
   it('fails closed for spoofed test-bay context, stale lives and missing actors', () => {
     const runtime = new HostKillstreakRuntime(7);
     runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));

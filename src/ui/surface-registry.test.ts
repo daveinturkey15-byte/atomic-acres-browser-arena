@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   UI_HIGH_DPI_REVIEW_VIEWPORT,
+  UI_MOBILE_REVIEW_VIEWPORTS,
   UI_REVIEW_VIEWPORTS,
   UI_STATE_INVENTORY,
   UI_SURFACE_INVENTORY,
@@ -54,7 +55,8 @@ describe('Pass 64 typed UI surface contract', () => {
       'host', 'guest', 'reconnecting', 'syncing', 'ready', 'live', 'dead',
       'respawning', 'match-ended', 'returned-lobby', 'modal-open', 'chat-typing',
       'error', 'reduced-motion', 'pointer-lock-requesting', 'pointer-lock-denied',
-      'focus-suspended', 'paused-match', 'high-dpi',
+      'focus-suspended', 'paused-match', 'high-dpi', 'mobile-touch',
+      'mobile-portrait', 'mobile-landscape', 'safe-area',
     ]));
     expect(UI_REVIEW_VIEWPORTS.map(({ id }) => id)).toEqual([
       'laptop', 'review', 'desktop', 'owner', 'ultrawide', 'narrow',
@@ -65,6 +67,9 @@ describe('Pass 64 typed UI surface contract', () => {
     expect(UI_HIGH_DPI_REVIEW_VIEWPORT).toEqual({
       id: 'high-dpi', width: 1280, height: 720, deviceScaleFactor: 2,
     });
+    expect(UI_MOBILE_REVIEW_VIEWPORTS.map(({ width, height }) => `${width}x${height}`)).toEqual([
+      '320x568', '390x844', '568x320', '667x375', '844x390', '932x430', '1024x768',
+    ]);
   });
 
   it('registers the railgun thermal scope as a critical rendered and styled HUD surface', () => {
@@ -102,6 +107,12 @@ describe('Pass 64 typed UI surface contract', () => {
     expect(generatedDialogSources).not.toContain('atomic-acres-menu-squad-joke.jpg');
     expect(tacticalCssSource).toContain('#match-pause-backdrop');
     expect(mainSource).not.toContain('retainLatestGameplayBackdrop');
+  });
+
+  it('keeps mobile orientation recoverable without locking the current device orientation', () => {
+    expect(mainSource).toContain("screen.orientation?.addEventListener?.('change', recoverViewport)");
+    expect(mainSource).not.toContain('orientation.lock?.(');
+    expect(mainSource).not.toContain('requestMobileLandscapePresentation');
   });
 
   it('keeps canonical text and status colours above AA contrast on the primary panel', () => {
