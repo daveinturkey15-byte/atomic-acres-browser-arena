@@ -14,16 +14,18 @@ if (!rootIndex.includes('release-shell.js') || rootIndex.includes('type="module"
 const publicConfigSource = readFileSync(join(dist, 'release-channel-config.js'), 'utf8');
 const publicConfig = JSON.parse(publicConfigSource.slice(publicConfigSource.indexOf('=') + 1).replace(/;\s*$/, ''));
 const rollbackStaged = Boolean(config.rollback && existsSync(join(dist, config.rollback.path)));
-const expectedChannelKeys = rollbackStaged ? ['experimental', 'stable', 'rollback'] : ['experimental', 'stable'];
+const expectedChannelKeys = rollbackStaged ? ['experimental', 'stable'] : ['experimental'];
 if (JSON.stringify(Object.keys(publicConfig)) !== JSON.stringify(expectedChannelKeys)) {
   throw new Error(`Root chooser must expose exactly ${expectedChannelKeys.join(', ')}: ${Object.keys(publicConfig).join(', ')}`);
 }
-if (publicConfig.experimental.pass !== config.experimental.pass || !publicConfig.experimental.label.startsWith('THE BIG ONE')
+if (publicConfig.experimental.pass !== config.experimental.pass || publicConfig.experimental.label !== config.experimental.label
   || publicConfig.experimental.path !== 'channels/the-big-one') {
-  throw new Error(`Root chooser is missing live ${config.experimental.pass} THE BIG ONE`);
+  throw new Error(`Root chooser is missing live ${config.experimental.pass}`);
 }
-if (publicConfig.stable.pass !== 'PASS 67.1' || publicConfig.stable.label !== 'STABLE SINGLEPLAYER') {
-  throw new Error('Root chooser is missing stable Pass 67.1 singleplayer');
+if (rollbackStaged && (publicConfig.stable.pass !== config.rollback.pass
+  || publicConfig.stable.label !== config.rollback.label
+  || publicConfig.stable.path !== config.rollback.path)) {
+  throw new Error(`Root chooser is missing stable ${config.rollback.pass} WebGL`);
 }
 const stagedChannelDirectories = readdirSync(join(dist, 'channels'), { withFileTypes: true })
   .filter((entry) => entry.isDirectory())

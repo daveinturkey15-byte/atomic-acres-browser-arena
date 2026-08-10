@@ -11,6 +11,7 @@ const receiptWriter = readFileSync('scripts/release/write-production-receipt.mjs
 const productionEnv = readFileSync('.env.production', 'utf8');
 const diagnosticsPreviewRunner = readFileSync('scripts/qa/run-pass64-diagnostics-browser.mjs', 'utf8');
 const liveTopologyVerifier = readFileSync('scripts/qa/verify-release-topology-browser.mjs', 'utf8');
+const staticTopologyVerifier = readFileSync('scripts/qa/verify-release-topology.mjs', 'utf8');
 const agentContract = readFileSync('AGENTS.md', 'utf8');
 const contributionGuide = readFileSync('docs/CONTRIBUTION_AND_RELEASE_PIPELINE.md', 'utf8');
 const pass66ExecutionPlan = readFileSync('docs/PASS66_HITL_EXECUTION_PLAN_2026-07-29.md', 'utf8');
@@ -51,6 +52,15 @@ describe('production release workflow', () => {
     expect(workflow).toContain('Stage live approved The Big One, timestamped rebuilt Pass 67.1 stable and rebuilt Pass 63 rollback');
     expect(readFileSync('package.json', 'utf8')).toContain('"deploy:ci": "gh-pages -d dist"');
     expect(readFileSync('package.json', 'utf8')).not.toContain('"deploy:ci": "gh-pages -d dist --add"');
+  });
+
+  it('verifies exactly the public Pass 69 and Pass 63 choices while retaining internal stable provenance', () => {
+    expect(staticTopologyVerifier).toContain("const expectedChannelKeys = rollbackStaged ? ['experimental', 'stable'] : ['experimental'];");
+    expect(staticTopologyVerifier).toContain('publicConfig.stable.pass !== config.rollback.pass');
+    expect(liveTopologyVerifier).toContain('await buttons.count() !== 2');
+    expect(liveTopologyVerifier).toContain("for (const choice of ['experimental', 'stable'])");
+    expect(liveTopologyVerifier).toContain("await verifyChoice('stable', 'channels/pass63-rollback', 'PASS 63', 'pass63');");
+    expect(liveTopologyVerifier).not.toContain("await verifyChoice('rollback'");
   });
 
   it('allows the external Pages deployment queue to drain without weakening exact-SHA verification', () => {
@@ -286,10 +296,10 @@ describe('production release workflow', () => {
     expect(workflow).not.toContain('gh run watch');
   });
 
-  it('binds the live browser proof to Pass 69, Pass 67.1 stable, Pass 63 rollback, aliases, and Last Release', () => {
+  it('binds the live browser proof to public Pass 69 and Pass 63 choices, internal stable provenance, aliases, and Last Release', () => {
     expect(liveTopologyVerifier).toContain("verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass69')");
-    expect(liveTopologyVerifier).toContain("verifyChoice('stable', 'channels/recent-stable', 'PASS 67.1', 'pass66')");
-    expect(liveTopologyVerifier).toContain("verifyChoice('rollback', 'channels/pass63-rollback', 'PASS 63', 'pass63')");
+    expect(liveTopologyVerifier).toContain("verifyChoice('stable', 'channels/pass63-rollback', 'PASS 63', 'pass63')");
+    expect(liveTopologyVerifier).not.toContain("verifyChoice('rollback'");
     expect(liveTopologyVerifier).toContain('pinned-channel-provenance.json');
     expect(liveTopologyVerifier).toContain('Stable embedded runtime digest');
     expect(liveTopologyVerifier).toContain("verifyLegacyRoute('latest'");

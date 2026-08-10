@@ -139,6 +139,12 @@
           "ref": "tests/e2e/atomic-acres.spec.ts",
           "command": "npx playwright test tests/e2e/atomic-acres.spec.ts --project=chromium --workers=1 --retries=0 --grep \"falls back to the authored procedural arena\"",
           "note": "The forced Blender-load failure keeps the normal 60-second admission contract and uses a dedicated 120-second hosted-SwiftShader allowance; the focused Windows test passes without changing shipped runtime bytes."
+        },
+        {
+          "kind": "contract",
+          "ref": "scripts/qa/verify-release-topology.mjs",
+          "command": "npm run verify:release-topology && node scripts/qa/run-with-preview-server.mjs node scripts/qa/verify-release-topology-browser.mjs",
+          "note": "The static and served-browser topology verifiers require exactly the public Pass 69 and Pass 63 Stable WebGL choices while continuing to validate the retained internal Pass 67.1 subtree provenance."
         }
       ]
     }
