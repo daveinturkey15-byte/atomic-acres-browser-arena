@@ -250,6 +250,8 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       'options.handSide ?? null',
       'principalWrite !== null && handSide !== null',
       'capture cannot combine hand self-occlusion and principal-write control',
+      'const rasterState = principalWrite === null ? null : {',
+      'rasterStateDigests: rasterState === null ? null : rasterStateDigests(',
       'sampleRiggedEvidenceHandSelfOcclusion(',
       'setRiggedEvidenceCaptureTargets([])',
       'awaitRiggedEvidenceCaptureCompletion()',
@@ -277,6 +279,8 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     expect(runner).toContain('framingActorFrameBindingValid(');
     expect(runner).toContain('screenshotFrameBindingValid(');
     expect(runner).toContain('capturePresentationValid(');
+    expect(runner).toContain('nonPrincipalRasterStateAbsent(record.presentation)');
+    expect(runner).toContain('non-principal capture with stray ${field} must fail');
     expect(runner).toContain('lineOfSightValid(');
     expect(runner).toContain('handSelfOcclusionValid(');
     expect(runner).toContain("contract: 'fixed-shoulder-lateral-front-oblique-hand-v2'");

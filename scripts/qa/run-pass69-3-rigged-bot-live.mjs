@@ -1055,6 +1055,12 @@ function capturePresentationValid(
       && completion.observedCompletedSequence >= paused.submissionSequence);
 }
 
+function nonPrincipalRasterStateAbsent(presentation) {
+  return presentation?.principalWriteSession === null
+    && presentation?.rasterState === null
+    && presentation?.rasterStateDigests === null;
+}
+
 function normalizedPrincipalManifest(manifest) {
   if (!Array.isArray(manifest)) return null;
   const normalized = manifest.map((entry) => ({
@@ -1836,6 +1842,7 @@ function screenshotValid(
       : record.pausedLivePoseAdvance === null)
     && evidenceCameraValid(record.camera, expectedCamera)
     && capturePresentationValid(record.presentation, expectedCamera, expectedArena, expectedActors)
+    && (actor.kind === 'bot' ? nonPrincipalRasterStateAbsent(record.presentation) : true)
     && lineOfSightValid(record.lineOfSight, actor, expectedArena, record.presentation, record.framing)
     && framingValid(
       record.framing,
@@ -2356,6 +2363,7 @@ function handScreenshotValid(record, expectedPath, actor, side, sourceScreenshot
     && record.fixtureContract === expectedVisualEvidenceContract.contract
     && evidenceCameraValid(record.camera, expectedCamera)
     && capturePresentationValid(record.presentation, expectedCamera, 'atomic-acres', [actor])
+    && nonPrincipalRasterStateAbsent(record.presentation)
     && lineOfSightValid(record.lineOfSight, actor, 'atomic-acres', record.presentation, record.framing)
     && handSelfOcclusionValid(record.selfOcclusion, actor, side, record.presentation, record.framing)
     && handFramingValid(
@@ -2390,6 +2398,7 @@ function overviewScreenshotValid(record, expectedPath) {
       'gun-range',
       expectedActors,
     )
+    && nonPrincipalRasterStateAbsent(record.presentation)
     && Array.isArray(record.lineOfSight)
     && record.lineOfSight.length === expectedDummyIds.length
     && record.lineOfSight.every((lineOfSight, index) => lineOfSightValid(
@@ -3298,6 +3307,23 @@ async function runContractSelfTest() {
   assert(strictlyIncreasingCaptureRevisions(revisionFixtures), 'strictly increasing capture revisions must pass');
   revisionFixtures[2].presentation.requestedRevision = 2;
   assert(!strictlyIncreasingCaptureRevisions(revisionFixtures), 'reused camera revision in a capture sequence must fail');
+  const nonPrincipalRasterFixture = {
+    principalWriteSession: null,
+    rasterState: null,
+    rasterStateDigests: null,
+  };
+  assert(nonPrincipalRasterStateAbsent(nonPrincipalRasterFixture),
+    'non-principal capture with an exact null raster-state triple must pass');
+  for (const [field, strayValue] of [
+    ['principalWriteSession', { contract: 'stray-principal-write-session' }],
+    ['rasterState', { camera: 'stray-raster-state' }],
+    ['rasterStateDigests', { contract: 'stray-raster-state-digests' }],
+  ]) {
+    const adversary = structuredClone(nonPrincipalRasterFixture);
+    adversary[field] = strayValue;
+    assert(!nonPrincipalRasterStateAbsent(adversary),
+      `non-principal capture with stray ${field} must fail`);
+  }
   const rasterRoiFixture = {
     contract: 'rigged-live-deformed-raster-roi-v1',
     viewport: {

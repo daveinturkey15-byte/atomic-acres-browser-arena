@@ -1493,7 +1493,7 @@ async function commitCaptureCamera(
       before.completedSequence,
     );
   }
-  const rasterState = {
+  const rasterState = principalWrite === null ? null : {
     camera: {
       position: paused.presentedCapture.position,
       quaternion: paused.presentedCapture.quaternion,
@@ -1545,7 +1545,7 @@ async function commitCaptureCamera(
     compositorBoundariesAfterCommit: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.compositorBoundariesAfterCommit,
     pausedAtFrameCount: afterBoundaries.frameCount,
     rasterState,
-    rasterStateDigests: principalWrite ? rasterStateDigests(rasterState, captureTargets[0].id) : null,
+    rasterStateDigests: rasterState === null ? null : rasterStateDigests(rasterState, captureTargets[0].id),
   };
 }
 
