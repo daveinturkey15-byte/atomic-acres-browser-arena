@@ -97,19 +97,33 @@ describe('flamethrower stream presentation', () => {
     expect(system.telemetry()).toMatchObject({ groundFireActive: 1, groundFireMerges: 1 });
   });
 
-  it('stages and restores the exact first-shot PointLight topology', async () => {
-    const system = new FlamethrowerStreamSystem(new THREE.Scene(), false);
+  it('stages and restores the complete first-shot stream, ground patch and light', async () => {
+    const scene = new THREE.Scene();
+    const system = new FlamethrowerStreamSystem(scene, false);
     const light = system.root.getObjectByName('flamethrower-bounded-stream-light') as THREE.PointLight;
+    const stream = system.root.getObjectByName('flamethrower-stream-instanced-flame') as THREE.InstancedMesh;
+    const ground = system.root.getObjectByName('flamethrower-ground-fire-pool') as THREE.InstancedMesh;
     expect(light.visible).toBe(false);
     expect(light.intensity).toBe(14);
+    const before = system.telemetry();
+    const streamMatrixVersionBefore = stream.instanceMatrix.version;
+    const groundMatrixVersionBefore = ground.instanceMatrix.version;
+    const camera = new THREE.PerspectiveCamera();
+    camera.position.set(1, 2, 3);
+    camera.lookAt(1, 2, -3);
+    camera.updateWorldMatrix(true, false);
     const staged = vi.fn(async () => {
       expect(light.visible).toBe(true);
       expect(light.intensity).toBe(14);
+      expect(system.telemetry()).toMatchObject({ active: 4, groundFireActive: 1, emissions: 1 });
+      expect(stream.instanceMatrix.version).toBeGreaterThan(streamMatrixVersionBefore);
+      expect(ground.instanceMatrix.version).toBeGreaterThan(groundMatrixVersionBefore);
     });
-    await system.withStagedFirstShotLight(staged);
+    await system.withStagedFirstShotPresentation(camera, staged);
     expect(staged).toHaveBeenCalledTimes(1);
     expect(light.visible).toBe(false);
     expect(light.intensity).toBe(14);
+    expect(system.telemetry()).toEqual(before);
   });
 
   it('pools authority patches without changing independent pulse timing and fails closed at capacity', () => {

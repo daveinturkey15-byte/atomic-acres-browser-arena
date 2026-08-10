@@ -11199,6 +11199,28 @@ async function prewarmExactWebGlMatchComposition(): Promise<void> {
   }
 }
 
+/**
+ * Rehearse complete first-shot compositions only after match-bound operators,
+ * bots and the dormant corpse pool exist. Earlier arena prewarm owns asset and
+ * root residency, but cannot compile the final skinned/material scene graph.
+ */
+async function prewarmMatchBoundFirstShotPresentations(): Promise<void> {
+  const submitExactMatchComposition = renderRuntime.backend === 'webgpu'
+    ? () => renderRuntime.compileAndRender(scene, camera, scene)
+    : () => prewarmExactWebGlMatchComposition();
+
+  // Ordinary fire owns shared muzzle-smoke and casing programs without a
+  // transient world light. Special weapons then add their complete retained
+  // visual state sequentially so each exact live object/light graph is fenced.
+  await weaponView.prewarmBrowserWeaponFirePresentation(player.weapon, submitExactMatchComposition);
+  await flareProjectileSystem.withStagedFirstShotPresentation(camera, () => (
+    weaponView.prewarmBrowserWeaponFirePresentation('flare-gun', submitExactMatchComposition)
+  ));
+  await flamethrowerStreamPresentation.withStagedFirstShotPresentation(camera, () => (
+    weaponView.prewarmBrowserWeaponFirePresentation('flamethrower', submitExactMatchComposition)
+  ));
+}
+
 function disposeCorpsePresentation(root: THREE.Group): void {
   const pooled = corpsePresentationPool.find((entry) => entry.root === root);
   if (!pooled) {
@@ -12265,6 +12287,8 @@ async function startGame(
     if (renderRuntime.backend === 'webgpu') {
       await exercisePreparedWebGpuWeaponSwitches();
       assertMatchAdmissionCurrent(token);
+      await prewarmMatchBoundFirstShotPresentations();
+      assertMatchAdmissionCurrent(token);
       await settleWebGpuPresentation('Initial match');
       assertMatchAdmissionCurrent(token);
       restoreCorpsePoolPrewarm();
@@ -12276,6 +12300,10 @@ async function startGame(
       await waitForStableMatchAdmissionCadence();
       assertMatchAdmissionCurrent(token);
     } else {
+      await prewarmMatchBoundFirstShotPresentations();
+      assertMatchAdmissionCurrent(token);
+      // Restore and compile the ordinary rest frame after the staged fire
+      // compositions so the first controllable frame starts from exact state.
       await prewarmExactWebGlMatchComposition();
       assertMatchAdmissionCurrent(token);
       restoreCorpsePoolPrewarm();
@@ -26472,7 +26500,7 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
     // family completes first.
     const groups = await Promise.all(groupDefinitions.map(([name, operation]) => runGroup(name, operation)));
     groups.push(await runGroup('flare-first-shot', () => (
-      flareProjectileSystem.withStagedFirstShotLight(() => (
+      flareProjectileSystem.withStagedFirstShotPresentation(camera, () => (
         weaponView.prewarmBrowserWeaponFirePresentation(
           'flare-gun',
           () => renderRuntime.compileAndRender(scene, camera, scene),
@@ -26480,7 +26508,7 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
       ))
     )));
     groups.push(await runGroup('flamethrower-first-shot', () => (
-      flamethrowerStreamPresentation.withStagedFirstShotLight(() => (
+      flamethrowerStreamPresentation.withStagedFirstShotPresentation(camera, () => (
         weaponView.prewarmBrowserWeaponFirePresentation(
           'flamethrower',
           () => renderRuntime.compileAndRender(scene, camera, scene),
@@ -26569,14 +26597,14 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
   }
   setBootstrapStage('prewarming-flare-first-shot');
   profileArenaTransition('prewarm-flare-first-shot');
-  await flareProjectileSystem.withStagedFirstShotLight(() => (
+  await flareProjectileSystem.withStagedFirstShotPresentation(camera, () => (
     weaponView.prewarmBrowserWeaponFirePresentation(
       'flare-gun',
       () => renderRuntime.compileAndRender(scene, camera, scene),
     )
   ));
   profileArenaTransition('prewarm-flamethrower-first-shot');
-  await flamethrowerStreamPresentation.withStagedFirstShotLight(() => (
+  await flamethrowerStreamPresentation.withStagedFirstShotPresentation(camera, () => (
     weaponView.prewarmBrowserWeaponFirePresentation(
       'flamethrower',
       // The live WebGL renderer splits world and viewmodel layers. A generic

@@ -153,6 +153,37 @@ function finiteVector3(value: THREE.Vector3): boolean {
   return Number.isFinite(value.x) && Number.isFinite(value.y) && Number.isFinite(value.z);
 }
 
+type FlamethrowerPresentationState = Readonly<{
+  active: Uint8Array;
+  positions: Float32Array;
+  velocities: Float32Array;
+  agesMs: Float32Array;
+  lifetimesMs: Float32Array;
+  cursor: number;
+  sequence: number;
+  emissions: number;
+  particlesSpawned: number;
+  poolExhaustions: number;
+  maximumActive: number;
+  lastDistanceM: number;
+  activeParticles: number;
+  activeGroundFires: number;
+  groundActive: Uint8Array;
+  groundPositions: Float32Array;
+  groundSpawnedAt: Float64Array;
+  groundExpiresAt: Float64Array;
+  groundCursor: number;
+  groundFireMerges: number;
+  particleMatrixWrites: number;
+  groundMatrixWrites: number;
+  direction: THREE.Vector3;
+  side: THREE.Vector3;
+  emitterPosition: THREE.Vector3;
+  lightVisible: boolean;
+  lightIntensity: number;
+  lightPosition: THREE.Vector3;
+}>;
+
 /** Fixed-capacity first/third-person flame stream with no live mesh creation. */
 export class FlamethrowerStreamSystem {
   readonly root = new THREE.Group();
@@ -384,10 +415,8 @@ export class FlamethrowerStreamSystem {
     this.writeGroundMatrices(0);
   }
 
-  async prewarm(runtime: PresentationPrewarmRuntime, camera: THREE.Camera, sceneGeneration: number): Promise<void> {
-    if (this.prewarmGeneration === sceneGeneration) return;
-    camera.updateWorldMatrix(true, false);
-    const state = {
+  private capturePresentationState(): FlamethrowerPresentationState {
+    return {
       active: this.active.slice(), positions: this.positions.slice(), velocities: this.velocities.slice(),
       agesMs: this.agesMs.slice(), lifetimesMs: this.lifetimesMs.slice(),
       cursor: this.cursor, sequence: this.sequence, emissions: this.emissions,
@@ -397,62 +426,82 @@ export class FlamethrowerStreamSystem {
       groundActive: this.groundActive.slice(), groundPositions: this.groundPositions.slice(),
       groundSpawnedAt: this.groundSpawnedAt.slice(), groundExpiresAt: this.groundExpiresAt.slice(),
       groundCursor: this.groundCursor, groundFireMerges: this.groundFireMerges,
+      particleMatrixWrites: this.particleMatrixWrites, groundMatrixWrites: this.groundMatrixWrites,
+      direction: this.direction.clone(), side: this.side.clone(), emitterPosition: this.emitterPosition.clone(),
       lightVisible: this.light.visible, lightIntensity: this.light.intensity,
       lightPosition: this.light.position.clone(),
     };
+  }
+
+  private stageFirstShotPresentation(camera: THREE.Camera): void {
+    camera.updateWorldMatrix(true, false);
     const start = camera.getWorldPosition(new THREE.Vector3());
-    const end = start.clone().addScaledVector(camera.getWorldDirection(new THREE.Vector3()), 8);
-    this.emit(start, end, performance.now());
-    // Ignite a ground patch so the ground-fire InstancedMesh pipeline is
-    // compiled during deployment. Without this, the first live flare/flame
-    // ground hit draws a never-compiled material and hitches the shot frame
-    // (the reported flare-gun freeze).
-    this.igniteGround(start.clone().addScaledVector(camera.getWorldDirection(new THREE.Vector3()), 2.4), performance.now());
+    const direction = camera.getWorldDirection(new THREE.Vector3());
+    const now = performance.now();
+    this.emit(start, start.clone().addScaledVector(direction, 8), now);
+    this.igniteGround(start.clone().addScaledVector(direction, 2.4), now);
     this.light.visible = true;
     this.light.intensity = Number(this.light.userData.baseIntensity ?? 14);
+  }
+
+  private restorePresentationState(state: FlamethrowerPresentationState): void {
+    this.active.set(state.active);
+    this.positions.set(state.positions);
+    this.velocities.set(state.velocities);
+    this.agesMs.set(state.agesMs);
+    this.lifetimesMs.set(state.lifetimesMs);
+    this.cursor = state.cursor;
+    this.sequence = state.sequence;
+    this.emissions = state.emissions;
+    this.particlesSpawned = state.particlesSpawned;
+    this.poolExhaustions = state.poolExhaustions;
+    this.maximumActive = state.maximumActive;
+    this.lastDistanceM = state.lastDistanceM;
+    this.activeParticles = state.activeParticles;
+    this.activeGroundFires = state.activeGroundFires;
+    this.groundActive.set(state.groundActive);
+    this.groundPositions.set(state.groundPositions);
+    this.groundSpawnedAt.set(state.groundSpawnedAt);
+    this.groundExpiresAt.set(state.groundExpiresAt);
+    this.groundCursor = state.groundCursor;
+    this.groundFireMerges = state.groundFireMerges;
+    this.direction.copy(state.direction);
+    this.side.copy(state.side);
+    this.emitterPosition.copy(state.emitterPosition);
+    this.light.visible = state.lightVisible;
+    this.light.intensity = state.lightIntensity;
+    this.light.position.copy(state.lightPosition);
+    this.writeMatrices();
+    this.writeGroundMatrices(0);
+    // Matrix restoration is presentation housekeeping, not live effect work.
+    // Preserve the externally receipted counters exactly across prewarm.
+    this.particleMatrixWrites = state.particleMatrixWrites;
+    this.groundMatrixWrites = state.groundMatrixWrites;
+  }
+
+  async prewarm(runtime: PresentationPrewarmRuntime, camera: THREE.Camera, sceneGeneration: number): Promise<void> {
+    if (this.prewarmGeneration === sceneGeneration) return;
+    const state = this.capturePresentationState();
+    this.stageFirstShotPresentation(camera);
     try {
       await runtime.compileAndRender(this.root, camera, this.root.parent as THREE.Scene);
       this.prewarmGeneration = sceneGeneration;
     } finally {
-      this.active.set(state.active);
-      this.positions.set(state.positions);
-      this.velocities.set(state.velocities);
-      this.agesMs.set(state.agesMs);
-      this.lifetimesMs.set(state.lifetimesMs);
-      this.cursor = state.cursor;
-      this.sequence = state.sequence;
-      this.emissions = state.emissions;
-      this.particlesSpawned = state.particlesSpawned;
-      this.poolExhaustions = state.poolExhaustions;
-      this.maximumActive = state.maximumActive;
-      this.lastDistanceM = state.lastDistanceM;
-      this.activeParticles = state.activeParticles;
-      this.activeGroundFires = state.activeGroundFires;
-      this.light.visible = state.lightVisible;
-      this.light.intensity = state.lightIntensity;
-      this.light.position.copy(state.lightPosition);
-      this.groundActive.set(state.groundActive);
-      this.groundPositions.set(state.groundPositions);
-      this.groundSpawnedAt.set(state.groundSpawnedAt);
-      this.groundExpiresAt.set(state.groundExpiresAt);
-      this.groundCursor = state.groundCursor;
-      this.groundFireMerges = state.groundFireMerges;
-      this.writeMatrices();
-      this.writeGroundMatrices(0);
+      this.restorePresentationState(state);
     }
   }
 
-  /** Stage the live stream PointLight while the exact weapon fire pose draws. */
-  async withStagedFirstShotLight(action: () => Promise<void>): Promise<void> {
-    const priorVisible = this.light.visible;
-    const priorIntensity = this.light.intensity;
-    this.light.visible = true;
-    this.light.intensity = 14;
+  /** Stage one complete retained stream, ground patch and light without authority side effects. */
+  async withStagedFirstShotPresentation(
+    camera: THREE.Camera,
+    action: () => Promise<void>,
+  ): Promise<void> {
+    const state = this.capturePresentationState();
+    this.stageFirstShotPresentation(camera);
     try {
       await action();
     } finally {
-      this.light.visible = priorVisible;
-      this.light.intensity = priorIntensity;
+      this.restorePresentationState(state);
     }
   }
 

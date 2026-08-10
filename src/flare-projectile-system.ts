@@ -586,18 +586,40 @@ export class FlareProjectileSystem {
     }
   }
 
-  async withStagedFirstShotLight(action: () => Promise<void>): Promise<void> {
-    if (!this.dynamicLightsEnabled) return action();
+  /**
+   * Stage the complete retained first-shot visual without admitting authority.
+   * WebGL compatibility deliberately keeps the PointLight out of its shader
+   * graph, but the emissive core and halo must still be submitted against the
+   * final match scene before the first live flare.
+   */
+  async withStagedFirstShotPresentation(
+    camera: THREE.Camera,
+    action: () => Promise<void>,
+  ): Promise<void> {
     const entity = this.entities[0];
     if (!entity) return action();
     const priorVisible = entity.root.visible;
+    const priorPosition = entity.root.position.clone();
+    const priorCoreVisible = entity.core.visible;
+    const priorHaloVisible = entity.halo.visible;
+    const priorLightVisible = entity.light.visible;
     const priorIntensity = entity.light.intensity;
+    const cameraPosition = camera.getWorldPosition(new THREE.Vector3());
+    const cameraDirection = camera.getWorldDirection(new THREE.Vector3());
+    entity.root.position.copy(cameraPosition).addScaledVector(cameraDirection, 4);
     entity.root.visible = true;
+    entity.core.visible = true;
+    entity.halo.visible = true;
+    entity.light.visible = this.dynamicLightsEnabled;
     entity.light.intensity = Number(entity.light.userData.baseIntensity ?? 0);
     try {
       await action();
     } finally {
       entity.root.visible = priorVisible;
+      entity.root.position.copy(priorPosition);
+      entity.core.visible = priorCoreVisible;
+      entity.halo.visible = priorHaloVisible;
+      entity.light.visible = priorLightVisible;
       entity.light.intensity = priorIntensity;
     }
   }

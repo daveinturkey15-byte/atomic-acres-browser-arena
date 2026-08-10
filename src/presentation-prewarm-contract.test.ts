@@ -146,9 +146,9 @@ describe('presentation prewarm startup contract', () => {
     expect(arenaPresentationPrewarm).toContain('prewarmExplosiveBoltPresentation(sceneGeneration),');
     expect(arenaPresentationPrewarm).toContain('timedMapWeaponPresentation.prewarm(renderRuntime, camera, sceneGeneration),');
     expect(arenaPresentationPrewarm).toContain('flareProjectileSystem.prewarm(renderRuntime, camera, sceneGeneration),');
-    expect(arenaPresentationPrewarm).toContain('flareProjectileSystem.withStagedFirstShotLight');
+    expect(arenaPresentationPrewarm).toContain('flareProjectileSystem.withStagedFirstShotPresentation(camera,');
     expect(arenaPresentationPrewarm).toContain("weaponView.prewarmBrowserWeaponFirePresentation(\n      'flare-gun'");
-    expect(arenaPresentationPrewarm).toContain('flamethrowerStreamPresentation.withStagedFirstShotLight');
+    expect(arenaPresentationPrewarm).toContain('flamethrowerStreamPresentation.withStagedFirstShotPresentation(camera,');
     expect(arenaPresentationPrewarm).toContain("weaponView.prewarmBrowserWeaponFirePresentation(\n          'flamethrower'");
     expect(arenaPresentationPrewarm).toContain('() => renderRuntime.compileAndRender(scene, camera, scene)');
     expect(arenaPresentationPrewarm).toContain('() => prewarmExactWebGlMatchComposition()');
@@ -260,6 +260,25 @@ describe('presentation prewarm startup contract', () => {
     expect(matchDeployment).not.toContain('await smokeVolumePresentationPool.prewarm(renderRuntime, camera, -killstreakMatchEpoch);');
     expect(matchDeployment).not.toContain('await prewarmExplosiveBoltPresentation(-killstreakMatchEpoch);');
     expect(matchDeployment).toContain("await settleWebGpuPresentation('Initial match')");
+    const matchBoundFirstShots = source.slice(
+      source.indexOf('async function prewarmMatchBoundFirstShotPresentations()'),
+      source.indexOf('function disposeCorpsePresentation('),
+    );
+    expect(matchBoundFirstShots).toContain('weaponView.prewarmBrowserWeaponFirePresentation(player.weapon,');
+    expect(matchBoundFirstShots).toContain('flareProjectileSystem.withStagedFirstShotPresentation(camera,');
+    expect(matchBoundFirstShots).toContain("weaponView.prewarmBrowserWeaponFirePresentation('flare-gun',");
+    expect(matchBoundFirstShots).toContain('flamethrowerStreamPresentation.withStagedFirstShotPresentation(camera,');
+    expect(matchBoundFirstShots).toContain("weaponView.prewarmBrowserWeaponFirePresentation('flamethrower',");
+    expect(matchBoundFirstShots).toContain('renderRuntime.compileAndRender(scene, camera, scene)');
+    expect(matchBoundFirstShots).toContain('prewarmExactWebGlMatchComposition()');
+    expect(matchBoundFirstShots.indexOf('player.weapon'))
+      .toBeLessThan(matchBoundFirstShots.indexOf("'flare-gun'"));
+    expect(matchBoundFirstShots.indexOf("'flare-gun'"))
+      .toBeLessThan(matchBoundFirstShots.indexOf("'flamethrower'"));
+    const firstMatchBoundCall = matchDeployment.indexOf('await prewarmMatchBoundFirstShotPresentations();');
+    expect(firstMatchBoundCall).toBeGreaterThan(matchDeployment.indexOf('await prewarmBotPresentations();'));
+    expect(matchDeployment.match(/await prewarmMatchBoundFirstShotPresentations\(\);/g)).toHaveLength(2);
+    expect(firstMatchBoundCall).toBeLessThan(matchDeployment.indexOf("await settleWebGpuPresentation('Initial match')"));
     expect(arenaDeployment.indexOf('await prewarmArenaBoundGameplayPresentations(arenaTransitionGeneration);'))
       .toBeLessThan(source.indexOf('async function startGame('));
     expect(matchDeployment).toContain('await waitForStableMatchAdmissionCadence();');

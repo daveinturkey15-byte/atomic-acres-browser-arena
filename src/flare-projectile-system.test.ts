@@ -47,10 +47,23 @@ describe('flare projectile system', () => {
       authority: true, actionNonce: 1, now: 0,
     })).toBe(true);
     expect(lights.every((light) => !light.visible)).toBe(true);
-    const staged = vi.fn(async () => undefined);
-    await system.withStagedFirstShotLight(staged);
+    const camera = new THREE.PerspectiveCamera();
+    camera.position.set(2, 3, 4);
+    camera.lookAt(2, 3, 0);
+    camera.updateWorldMatrix(true, false);
+    const staged = vi.fn(async () => {
+      const root = system.root.getObjectByName('signal-flare-1') as THREE.Group;
+      expect(root.visible).toBe(true);
+      expect(root.getObjectByName('signal-flare-core')?.visible).toBe(true);
+      expect(root.getObjectByName('signal-flare-halo')?.visible).toBe(true);
+      expect(root.position.distanceTo(new THREE.Vector3(2, 3, 0))).toBeLessThan(1e-6);
+      expect(lights.every((light) => !light.visible)).toBe(true);
+    });
+    await system.withStagedFirstShotPresentation(camera, staged);
     expect(staged).toHaveBeenCalledTimes(1);
     expect(lights.every((light) => !light.visible)).toBe(true);
+    // The entity was already live before staging; restore that exact state.
+    expect(system.root.getObjectByName('signal-flare-1')?.visible).toBe(true);
   });
 
   it('flies, impacts a target once, and emits finite host-owned burn pulses without explosion semantics', () => {
