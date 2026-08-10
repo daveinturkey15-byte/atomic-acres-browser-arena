@@ -456,8 +456,8 @@ const fixedDummyCameras = Object.freeze(fixedDummyActors.map((actor) => {
  * reviewed contract update.
  */
 export const RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT = Object.freeze({
-  schemaVersion: 3,
-  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v3',
+  schemaVersion: 4,
+  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v4',
   los: Object.freeze({
     contract: 'actual-render-world-layout-occluder-multi-sentinel-los-v2',
     actorSelfOcclusionExcluded: true,
@@ -473,7 +473,7 @@ export const RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT = Object.freeze({
     }),
   }),
   atomic: Object.freeze({
-    id: 'atomic-south-road-crosslane-spawn-fixed-v3',
+    id: 'atomic-south-road-crosslane-spawn-fixed-v4',
     commandedPlayerPosition: ATOMIC_COMMANDED_PLAYER_POSITION,
     settlementPositionAnchor: ATOMIC_COMMANDED_PLAYER_POSITION,
     playerYaw: -Math.PI / 2,
@@ -487,8 +487,17 @@ export const RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT = Object.freeze({
       groundedRequired: true,
     }),
     botDistanceM: 5.2,
-    expectedBotPosition: ATOMIC_BOT_POSITION,
+    nominalBotPosition: ATOMIC_BOT_POSITION,
     expectedBotYaw: Math.PI / 2,
+    placement: Object.freeze({
+      contract: 'debug-place-bot-ahead-synchronous-transaction-v1',
+      source: '__ATOMIC_ACRES_DEBUG__.placeBotAhead',
+      distanceM: 5.2,
+      rootY: 0,
+      requiredYawOffsetRadians: 0,
+      arithmeticEpsilonM: 1e-9,
+      nominalPositionEnvelopeM: Object.freeze([0.0005, 0, 0.0005] as const),
+    }),
     mediumCamera: lookAtCamera('atomic-south-road-crosslane-medium-v2', [-2.2, 1.08, 40], ATOMIC_TARGET, 58),
     closeCamera: lookAtCamera('atomic-south-road-crosslane-close-v2', [0.2, 1.08, 40], ATOMIC_TARGET, 58),
   }),

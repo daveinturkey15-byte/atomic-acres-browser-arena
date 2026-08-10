@@ -23956,7 +23956,23 @@ const debugWindow = window as Window & {
     } | null;
     setBotPresentation: (stance: PlayerSnapshot['stance'] | null, speed?: number, weapon?: WeaponId) => void;
     clearBots: () => void;
-    placeBotAhead: (distance?: number) => void;
+    placeBotAhead: (distance?: number) => {
+      contract: 'debug-place-bot-ahead-synchronous-transaction-v1';
+      source: '__ATOMIC_ACRES_DEBUG__.placeBotAhead';
+      requestedDistanceM: number;
+      stagedDistanceM: number;
+      yawOffsetRadians: number;
+      presentedGameplayFrameAtCommand: number;
+      sourcePlayer: { position: number[]; yaw: number; grounded: boolean };
+      bot: {
+        id: string;
+        logicalPosition: number[];
+        rootPosition: number[];
+        rootYaw: number;
+        alive: boolean;
+        weapon: WeaponId;
+      };
+    } | null;
     placeBotRelative: (right: number, forward: number) => void;
     showBotDamageDirection: () => number | null;
     respawn: () => void;
@@ -24853,6 +24869,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         nextGrenadeInMs: Math.max(0, bot.nextGrenadeAt - performance.now()),
         grenadeActive: bot.grenadeActive,
         position: bot.position.toArray(),
+        rootYaw: bot.root.rotation.y,
         waypoint: bot.waypoint,
         blockedSince: bot.blockedSince,
         hasLineOfSight: bot.hasLineOfSight,
@@ -25643,10 +25660,16 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   clearBots: () => clearBots(),
   placeBotAhead: (distance = 5) => {
     const bot = bots.values().next().value as BotPlayer | undefined;
-    if (!bot) return;
+    if (!bot || !Number.isFinite(distance)) return null;
+    const presentedGameplayFrameAtCommand = sampleAdmissionState().presentedGameplayFrame;
     const stagedDistance = THREE.MathUtils.clamp(distance, 2.5, 9);
     const origin = player.position.clone();
+    const sourcePlayerYaw = player.yaw;
+    const sourcePlayerGrounded = playerGrounded;
+    const sourcePlayerPosition = origin.toArray();
+    if (!sourcePlayerPosition.every(Number.isFinite) || !Number.isFinite(sourcePlayerYaw)) return null;
     let stagedPosition: THREE.Vector3 | null = null;
+    let selectedYawOffset: number | null = null;
     // QA combat staging must not place the target inside a house, bus or cover
     // AABB. Try the requested forward ray first, then nearby clear bearings.
     const stagedYawOffsets = Array.from({ length: 16 }, (_, index) => {
@@ -25655,9 +25678,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       return step * (Math.PI / 8) * (index % 2 === 1 ? 1 : -1);
     });
     for (const yawOffset of stagedYawOffsets) {
-      const yaw = player.yaw + yawOffset;
+      const yaw = sourcePlayerYaw + yawOffset;
       const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
-      const candidate = new THREE.Vector3(player.position.x, 0, player.position.z)
+      const candidate = new THREE.Vector3(origin.x, 0, origin.z)
         .addScaledVector(forward, stagedDistance);
       const bodyPoint = { x: candidate.x, y: 0, z: candidate.z };
       if (!pointInsideBounds(bodyPoint, arena.bounds, 0.55) || isBlocked(bodyPoint, activeWorldColliders(), 0.45)) continue;
@@ -25673,16 +25696,34 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       // mask the visible skull and make the headshot acceptance intermittent.
       if (!clearAtHeight(1.06) || !clearAtHeight(1.58)) continue;
       stagedPosition = candidate;
+      selectedYawOffset = yawOffset;
       break;
     }
-    if (!stagedPosition) return;
+    if (!stagedPosition || selectedYawOffset === null) return null;
     bot.position.copy(stagedPosition);
     bot.root.position.copy(bot.position);
     bot.velocity.set(0, 0, 0);
-    bot.root.rotation.y = operatorYawToward(bot.position, player.position);
+    bot.root.rotation.y = operatorYawToward(bot.position, origin);
     poseOperator(bot.root, 'stand', 0, performance.now() * 0.001);
     bot.root.updateMatrixWorld(true);
     bot.invulnerableUntil = 0;
+    return {
+      contract: 'debug-place-bot-ahead-synchronous-transaction-v1',
+      source: '__ATOMIC_ACRES_DEBUG__.placeBotAhead',
+      requestedDistanceM: distance,
+      stagedDistanceM: stagedDistance,
+      yawOffsetRadians: selectedYawOffset,
+      presentedGameplayFrameAtCommand,
+      sourcePlayer: { position: sourcePlayerPosition, yaw: sourcePlayerYaw, grounded: sourcePlayerGrounded },
+      bot: {
+        id: bot.id,
+        logicalPosition: bot.position.toArray(),
+        rootPosition: bot.root.position.toArray(),
+        rootYaw: bot.root.rotation.y,
+        alive: bot.alive,
+        weapon: bot.weapon,
+      },
+    };
   },
   placeBotRelative: (right = 0, forward = 5) => {
     const bot = bots.values().next().value as BotPlayer | undefined;

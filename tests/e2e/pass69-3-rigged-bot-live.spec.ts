@@ -1637,11 +1637,83 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
   const atomicPlayerConvergence = await waitForAtomicPlayerConvergence(
     page, commandedAtomicPlayer.presentedGameplayFrame,
   );
-  await page.evaluate((fixture) => {
+  await page.waitForFunction((afterFrame) => (
+    window.__ATOMIC_ACRES_DEBUG__.admissionState().presentedGameplayFrame > afterFrame
+  ), atomicPlayerConvergence.samples.at(-1)!.presentedGameplayFrame);
+  const botPlacement = await page.evaluate((fixture) => {
     const api = window.__ATOMIC_ACRES_DEBUG__;
-    api.placeBotAhead(fixture.botDistanceM);
+    const before = api.snapshot() as any;
+    const preFrame = api.admissionState().presentedGameplayFrame;
     api.setBotPresentation('stand', 1.2, 'carbine');
+    const placement = api.placeBotAhead(fixture.botDistanceM);
+    const postFrame = api.admissionState().presentedGameplayFrame;
+    return {
+      preFrame,
+      postFrame,
+      prePlayer: {
+        position: [...before.player.position],
+        yaw: before.player.yaw,
+        grounded: before.player.grounded,
+      },
+      placement,
+    };
   }, RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic);
+  const placementContract = RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.placement;
+  expect(botPlacement.postFrame, 'presented frontier does not advance during synchronous bot placement').toBe(botPlacement.preFrame);
+  expect(botPlacement.preFrame, 'bot placement is sampled after convergence').toBeGreaterThan(
+    atomicPlayerConvergence.samples.at(-1)!.presentedGameplayFrame,
+  );
+  expect(botPlacement.prePlayer.position, 'placement player position is one exact finite vec3').toHaveLength(3);
+  expect(botPlacement.prePlayer.position.every(Number.isFinite), 'placement player axes are finite').toBe(true);
+  expect(botPlacement.prePlayer.grounded, 'placement player remains grounded').toBe(true);
+  expect(botPlacement.prePlayer.yaw, 'placement player retains fixed yaw').toBeCloseTo(
+    RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.playerYaw, 12,
+  );
+  botPlacement.prePlayer.position.forEach((value: number, axis: number) => expect(
+    withinNumericBoundary(
+      Math.abs(value - RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.settlementPositionAnchor[axis]),
+      RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.settlement.maximumAbsoluteAxisErrorM[axis],
+      [value, RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.settlementPositionAnchor[axis]],
+    ),
+    `placement player axis ${axis} remains in settlement envelope`,
+  ).toBe(true));
+  const derivedBotPosition = [
+    botPlacement.prePlayer.position[0] - Math.sin(botPlacement.prePlayer.yaw) * placementContract.distanceM,
+    placementContract.rootY,
+    botPlacement.prePlayer.position[2] - Math.cos(botPlacement.prePlayer.yaw) * placementContract.distanceM,
+  ];
+  const derivedBotYaw = Math.atan2(
+    -(botPlacement.prePlayer.position[0] - derivedBotPosition[0]),
+    -(botPlacement.prePlayer.position[2] - derivedBotPosition[2]),
+  );
+  expect(Math.abs(derivedBotYaw - RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.expectedBotYaw),
+    'derived facing yaw remains inside the immutable nominal fixture')
+    .toBeLessThanOrEqual(placementContract.arithmeticEpsilonM);
+  expect(botPlacement.placement).not.toBeNull();
+  expect(botPlacement.placement).toMatchObject({
+    contract: placementContract.contract,
+    source: placementContract.source,
+    requestedDistanceM: placementContract.distanceM,
+    stagedDistanceM: placementContract.distanceM,
+    yawOffsetRadians: placementContract.requiredYawOffsetRadians,
+    presentedGameplayFrameAtCommand: botPlacement.preFrame,
+    bot: { alive: true, weapon: 'carbine' },
+  });
+  expect(botPlacement.placement!.sourcePlayer).toEqual({
+    position: botPlacement.prePlayer.position,
+    yaw: botPlacement.prePlayer.yaw,
+    grounded: botPlacement.prePlayer.grounded,
+  });
+  expect(botPlacement.placement!.bot.logicalPosition).toEqual(botPlacement.placement!.bot.rootPosition);
+  botPlacement.placement!.bot.logicalPosition.forEach((value: number, axis: number) => expect(
+    Math.abs(value - derivedBotPosition[axis]), `derived placement axis ${axis}`,
+  ).toBeLessThanOrEqual(placementContract.arithmeticEpsilonM));
+  expect(Math.abs(botPlacement.placement!.bot.rootYaw - derivedBotYaw), 'derived bot-facing yaw')
+    .toBeLessThanOrEqual(placementContract.arithmeticEpsilonM);
+  derivedBotPosition.forEach((value: number, axis: number) => expect(
+    Math.abs(value - RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.nominalBotPosition[axis]),
+    `derived nominal bot axis ${axis}`,
+  ).toBeLessThanOrEqual(placementContract.nominalPositionEnvelopeM[axis]));
   await waitForStrictPose(page, 'armed-bot');
   const armedFirst = await page.evaluate(() => (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).bots[0]);
   await page.waitForTimeout(420);
@@ -1662,6 +1734,7 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
   });
   expect(armedFirst.id, 'armed first and second samples share exact actor identity').toBe(armedSecond.id);
   expect(stagedAtomic.bot.id, 'staged fixture is the same sampled armed actor').toBe(armedFirst.id);
+  expect(botPlacement.placement!.bot.id, 'placement transaction is the same sampled armed actor').toBe(armedFirst.id);
   expect([armedFirst.alive, armedSecond.alive, stagedAtomic.bot.alive], 'armed actor remains alive across staging').toEqual([
     true, true, true,
   ]);
@@ -1682,14 +1755,22 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
   expect(stagedAtomic.player.yaw, 'fixed Atomic player yaw').toBeCloseTo(
     RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.playerYaw, 8,
   );
-  stagedAtomic.bot.position.forEach((value: number, axis: number) => expect(
-    value,
-    `fixed Atomic bot axis ${axis}`,
-  ).toBeCloseTo(RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.expectedBotPosition[axis], 8));
-  expect(stagedAtomic.bot.yaw, 'fixed Atomic bot yaw faces the certified player line').toBeCloseTo(
-    RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.expectedBotYaw,
-    8,
+  expect(stagedAtomic.presentedGameplayFrame, 'later staged player follows placement transaction').toBeGreaterThan(
+    botPlacement.postFrame,
   );
+  for (const [label, bot] of [
+    ['placement', botPlacement.placement!.bot],
+    ['armed first', armedFirst],
+    ['armed second', armedSecond],
+    ['staged', stagedAtomic.bot],
+  ] as const) {
+    const position = label === 'placement' ? bot.logicalPosition : bot.position;
+    position.forEach((value: number, axis: number) => expect(
+      Math.abs(value - derivedBotPosition[axis]), `${label} bot derived axis ${axis}`,
+    ).toBeLessThanOrEqual(placementContract.arithmeticEpsilonM));
+    expect(Math.abs(bot.rootYaw - derivedBotYaw), `${label} bot root yaw remains stable`)
+      .toBeLessThanOrEqual(placementContract.arithmeticEpsilonM);
+  }
   const armedActor = { kind: 'bot' as const, id: armedSecond.id };
   const armedMediumScreenshot = await captureAtFixedPose(
     page, testInfo, RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.mediumCamera,
@@ -1845,9 +1926,9 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
     expect(endingSourceStatus, 'official rigged-bot evidence ends with a clean worktree').toBe('');
   }
   writeFileSync(receiptPath, `${JSON.stringify({
-    schemaVersion: 7,
+    schemaVersion: 8,
     status: 'AUTOMATION_PASS_OWNER_PENDING',
-    contract: 'atomic-acres/pass69-3-rigged-bot-live@7',
+    contract: 'atomic-acres/pass69-3-rigged-bot-live@8',
     evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-and-hand-detail-framing',
     target: officialEvidence ? expectedTarget : `development-${renderer}`,
     sourceSha,
@@ -1897,14 +1978,25 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
         definition: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic,
         commandedPlayer: commandedAtomicPlayer,
         convergence: atomicPlayerConvergence,
+        placement: botPlacement,
+        derivedBotPosition,
+        derivedBotYaw,
         stagedPlayer: {
           presentedGameplayFrame: stagedAtomic.presentedGameplayFrame,
           position: stagedAtomic.player.position,
           yaw: stagedAtomic.player.yaw,
           grounded: stagedAtomic.player.grounded,
         },
+        stagedBot: {
+          presentedGameplayFrame: stagedAtomic.presentedGameplayFrame,
+          position: stagedAtomic.bot.position,
+          rootYaw: stagedAtomic.bot.rootYaw,
+          id: stagedAtomic.bot.id,
+          alive: stagedAtomic.bot.alive,
+          weapon: stagedAtomic.bot.weapon,
+        },
         observedBotPosition: stagedAtomic.bot.position,
-        observedBotYaw: stagedAtomic.bot.yaw,
+        observedBotYaw: stagedAtomic.bot.rootYaw,
         observedBotId: stagedAtomic.bot.id,
         observedBotAlive: stagedAtomic.bot.alive,
         observedBotWeapon: stagedAtomic.bot.weapon,

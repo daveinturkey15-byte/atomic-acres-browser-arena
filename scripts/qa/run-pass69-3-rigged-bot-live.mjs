@@ -127,8 +127,8 @@ const fixedDummyActors = Object.freeze([
   Object.freeze({ id: 'test-dummy-delta', position: Object.freeze([64.88, Math.abs(Math.sin(3)) * 0.025, 14]), yaw: -Math.PI / 2 }),
 ]);
 const expectedVisualEvidenceContract = Object.freeze({
-  schemaVersion: 3,
-  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v3',
+  schemaVersion: 4,
+  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v4',
   los: Object.freeze({
     contract: 'actual-render-world-layout-occluder-multi-sentinel-los-v2',
     actorSelfOcclusionExcluded: true,
@@ -144,7 +144,7 @@ const expectedVisualEvidenceContract = Object.freeze({
     }),
   }),
   atomic: Object.freeze({
-    id: 'atomic-south-road-crosslane-spawn-fixed-v3',
+    id: 'atomic-south-road-crosslane-spawn-fixed-v4',
     commandedPlayerPosition: Object.freeze([-3, 1.7, 40]),
     settlementPositionAnchor: Object.freeze([-3, 1.7, 40]),
     playerYaw: -Math.PI / 2,
@@ -158,8 +158,17 @@ const expectedVisualEvidenceContract = Object.freeze({
       groundedRequired: true,
     }),
     botDistanceM: 5.2,
-    expectedBotPosition: Object.freeze([2.2, 0, 40]),
+    nominalBotPosition: Object.freeze([2.2, 0, 40]),
     expectedBotYaw: Math.PI / 2,
+    placement: Object.freeze({
+      contract: 'debug-place-bot-ahead-synchronous-transaction-v1',
+      source: '__ATOMIC_ACRES_DEBUG__.placeBotAhead',
+      distanceM: 5.2,
+      rootY: 0,
+      requiredYawOffsetRadians: 0,
+      arithmeticEpsilonM: 1e-9,
+      nominalPositionEnvelopeM: Object.freeze([0.0005, 0, 0.0005]),
+    }),
     mediumCamera: evidenceLookAtCamera('atomic-south-road-crosslane-medium-v2', [-2.2, 1.08, 40], [2.2, 1.08, 40], 58),
     closeCamera: evidenceLookAtCamera('atomic-south-road-crosslane-close-v2', [0.2, 1.08, 40], [2.2, 1.08, 40], 58),
   }),
@@ -381,6 +390,7 @@ function framingValid(
   expectedRootYaw,
   presentation,
   requireJointDetail = false,
+  rootTolerance = 1e-8,
 ) {
   if (framing?.missing !== false
     || !sameObject(framing.actor, actor)
@@ -419,8 +429,8 @@ function framingValid(
   if (!independentScreenPosition
     || !framing.screenPosition.every((value, axis) => close(value, independentScreenPosition[axis], 1e-6))
     || !framing.projectedWorldPosition.every((value, axis) => close(value, expectedAnchor[axis], 1e-9))
-    || expectedRootPosition && !framing.rootPosition.every((value, axis) => close(value, expectedRootPosition[axis], 1e-8))
-    || Number.isFinite(expectedRootYaw) && !close(framing.rootYaw, expectedRootYaw, 1e-8)) {
+    || expectedRootPosition && !framing.rootPosition.every((value, axis) => close(value, expectedRootPosition[axis], rootTolerance))
+    || Number.isFinite(expectedRootYaw) && wrappedAngleDelta(framing.rootYaw, expectedRootYaw) > rootTolerance) {
     return false;
   }
   const [x, y, z] = framing.screenPosition;
@@ -740,6 +750,7 @@ function screenshotValid(
   expectedRootYaw,
   requireJointDetail = false,
 ) {
+  if (!finiteVector(expectedRootPosition) || !Number.isFinite(expectedRootYaw)) return false;
   const path = resolve(root, expectedPath);
   const expectedActors = [actor];
   const projectionCamera = {
@@ -768,6 +779,7 @@ function screenshotValid(
       expectedRootYaw,
       record.presentation,
       requireJointDetail,
+      expectedVisualEvidenceContract.atomic.placement.arithmeticEpsilonM,
     );
 }
 
@@ -809,6 +821,84 @@ function axisErrorsWithin(left, right, maxima) {
     && left.every((value, axis) => withinNumericBoundary(
       Math.abs(value - right[axis]), maxima[axis], [value, right[axis]],
     ));
+}
+
+function wrappedAngleDelta(left, right) {
+  if (!Number.isFinite(left) || !Number.isFinite(right)) return Number.NaN;
+  return Math.abs(Math.atan2(Math.sin(left - right), Math.cos(left - right)));
+}
+
+function deriveBotPlacement(position, yaw, placement) {
+  if (!finiteVector(position) || !Number.isFinite(yaw) || !placement
+    || !Number.isFinite(placement.stagedDistanceM) || !Number.isFinite(placement.yawOffsetRadians)) return null;
+  const bearing = yaw + placement.yawOffsetRadians;
+  const rootPosition = [
+    position[0] - Math.sin(bearing) * placement.stagedDistanceM,
+    expectedVisualEvidenceContract.atomic.placement.rootY,
+    position[2] - Math.cos(bearing) * placement.stagedDistanceM,
+  ];
+  const rootYaw = Math.atan2(
+    -(position[0] - rootPosition[0]),
+    -(position[2] - rootPosition[2]),
+  );
+  return { rootPosition, rootYaw };
+}
+
+function atomicBotPlacementValid(fixedFixture) {
+  const definition = expectedVisualEvidenceContract.atomic;
+  const contract = definition.placement;
+  const transaction = fixedFixture?.placement;
+  const placement = transaction?.placement;
+  const convergenceSamples = fixedFixture?.convergence?.samples;
+  if (!transaction || !placement || !Array.isArray(convergenceSamples) || convergenceSamples.length === 0
+    || !nonnegativeSafeInteger(transaction.preFrame)
+    || transaction.postFrame !== transaction.preFrame
+    || transaction.preFrame <= convergenceSamples.at(-1)?.presentedGameplayFrame
+    || !finiteVector(transaction.prePlayer?.position)
+    || !Number.isFinite(transaction.prePlayer?.yaw)
+    || transaction.prePlayer.grounded !== true
+    || !axisErrorsWithin(
+      transaction.prePlayer.position,
+      definition.settlementPositionAnchor,
+      definition.settlement.maximumAbsoluteAxisErrorM,
+    )
+    || wrappedAngleDelta(transaction.prePlayer.yaw, definition.playerYaw) > contract.arithmeticEpsilonM
+    || placement.contract !== contract.contract
+    || placement.source !== contract.source
+    || placement.requestedDistanceM !== contract.distanceM
+    || placement.stagedDistanceM !== contract.distanceM
+    || placement.yawOffsetRadians !== contract.requiredYawOffsetRadians
+    || placement.presentedGameplayFrameAtCommand !== transaction.preFrame
+    || !sameArray(placement.sourcePlayer?.position, transaction.prePlayer.position)
+    || placement.sourcePlayer?.yaw !== transaction.prePlayer.yaw
+    || placement.sourcePlayer?.grounded !== transaction.prePlayer.grounded
+    || typeof placement.bot?.id !== 'string' || placement.bot.id.length === 0
+    || placement.bot.alive !== true || placement.bot.weapon !== 'carbine'
+    || !finiteVector(placement.bot.logicalPosition) || !finiteVector(placement.bot.rootPosition)
+    || !Number.isFinite(placement.bot.rootYaw)) return false;
+  const derived = deriveBotPlacement(
+    placement.sourcePlayer.position,
+    placement.sourcePlayer.yaw,
+    placement,
+  );
+  if (!derived
+    || !placement.bot.logicalPosition.every((value, axis) => close(
+      value, derived.rootPosition[axis], contract.arithmeticEpsilonM,
+    ))
+    || !placement.bot.rootPosition.every((value, axis) => close(
+      value, derived.rootPosition[axis], contract.arithmeticEpsilonM,
+    ))
+    || wrappedAngleDelta(placement.bot.rootYaw, derived.rootYaw) > contract.arithmeticEpsilonM
+    || wrappedAngleDelta(derived.rootYaw, definition.expectedBotYaw) > contract.arithmeticEpsilonM
+    || !sameArray(fixedFixture?.derivedBotPosition, derived.rootPosition)
+    || !Number.isFinite(fixedFixture?.derivedBotYaw)
+    || wrappedAngleDelta(fixedFixture?.derivedBotYaw, derived.rootYaw) > contract.arithmeticEpsilonM
+    || !derived.rootPosition.every((value, axis) => withinNumericBoundary(
+      Math.abs(value - definition.nominalBotPosition[axis]),
+      contract.nominalPositionEnvelopeM[axis],
+      [value, definition.nominalBotPosition[axis]],
+    ))) return false;
+  return true;
 }
 
 function atomicPlayerConvergenceValid(fixedFixture, firstCapturePresentedGameplayFrame) {
@@ -892,10 +982,13 @@ function atomicPlayerConvergenceValid(fixedFixture, firstCapturePresentedGamepla
       settlement.maximumAbsoluteAxisErrorM,
     )
     && close(fixedFixture.stagedPlayer.yaw, definition.playerYaw, 1e-8)
-    && fixedFixture.stagedPlayer.grounded === true;
+    && fixedFixture.stagedPlayer.grounded === true
+    && nonnegativeSafeInteger(fixedFixture?.placement?.postFrame)
+    && fixedFixture.stagedPlayer.presentedGameplayFrame > fixedFixture.placement.postFrame;
 }
 
-function handCameraValid(camera, actor, side, sourceScreenshot) {
+function handCameraValid(camera, actor, side, sourceScreenshot, expectedRootPosition, expectedRootYaw) {
+  if (!finiteVector(expectedRootPosition) || !Number.isFinite(expectedRootYaw)) return false;
   const expected = expectedHandCaptureJoints(side);
   const sourcePresentation = sourceScreenshot?.presentation?.pausedPresentedCapture;
   const sourceActor = sourcePresentation?.actors?.find((candidate) => sameObject(candidate.actor, actor));
@@ -932,17 +1025,19 @@ function handCameraValid(camera, actor, side, sourceScreenshot) {
       actor,
       closeRoiNdc,
       sourceProjectionCamera,
-      expectedVisualEvidenceContract.atomic.expectedBotPosition,
-      expectedVisualEvidenceContract.atomic.expectedBotYaw,
+      expectedRootPosition,
+      expectedRootYaw,
       sourceScreenshot?.presentation,
       true,
+      expectedVisualEvidenceContract.atomic.placement.arithmeticEpsilonM,
     )
     || !sourceActor
     || !captureActorFrameValid(sourceActor, actor)
     || !sourceActor.rootPosition.every((value, axis) => close(
-      value, expectedVisualEvidenceContract.atomic.expectedBotPosition[axis], 1e-8,
+      value, expectedRootPosition[axis], expectedVisualEvidenceContract.atomic.placement.arithmeticEpsilonM,
     ))
-    || !close(sourceActor.rootYaw, expectedVisualEvidenceContract.atomic.expectedBotYaw, 1e-8)
+    || wrappedAngleDelta(sourceActor.rootYaw, expectedRootYaw)
+      > expectedVisualEvidenceContract.atomic.placement.arithmeticEpsilonM
     || !sameObject(camera.sourceWeaponCenterWorld, sourceActor.weaponCenterWorld)
     || !finiteVector(camera.sourceWeaponCenterWorld)
     || !Array.isArray(camera.sourceSentinels)
@@ -1016,8 +1111,11 @@ function handFramingValid(
   if (framing?.missing !== false
     || !sameObject(framing.actor, actor)
     || !framingActorFrameBindingValid(framing, actor, presentation)
-    || expectedRootPosition && !framing.rootPosition.every((value, axis) => close(value, expectedRootPosition[axis], 1e-8))
-    || Number.isFinite(expectedRootYaw) && !close(framing.rootYaw, expectedRootYaw, 1e-8)
+    || expectedRootPosition && !framing.rootPosition.every((value, axis) => close(
+      value, expectedRootPosition[axis], expectedVisualEvidenceContract.atomic.placement.arithmeticEpsilonM,
+    ))
+    || Number.isFinite(expectedRootYaw) && wrappedAngleDelta(framing.rootYaw, expectedRootYaw)
+      > expectedVisualEvidenceContract.atomic.placement.arithmeticEpsilonM
     || framing.side !== side
     || framing.rootVisible !== true
     || framing.rootEffectivelyVisible !== true
@@ -1026,7 +1124,7 @@ function handFramingValid(
     || framing.effectivelyVisibleSkinnedMeshes.length < 1
     || framing.handSkinVisible !== true
     || !sameObject(framing.roiNdc, handRoiNdc)
-    || !handCameraValid(framing.camera, actor, side, sourceScreenshot)
+    || !handCameraValid(framing.camera, actor, side, sourceScreenshot, expectedRootPosition, expectedRootYaw)
     || !Number.isFinite(framing.canvas?.left)
     || !Number.isFinite(framing.canvas?.top)
     || !(framing.canvas?.width > 0)
@@ -1086,7 +1184,8 @@ function handFramingValid(
     && detail.minimumPixels >= handDetailThresholds.minimumWristFingerPixels;
 }
 
-function handScreenshotValid(record, expectedPath, actor, side, sourceScreenshot) {
+function handScreenshotValid(record, expectedPath, actor, side, sourceScreenshot, expectedRootPosition, expectedRootYaw) {
+  if (!finiteVector(expectedRootPosition) || !Number.isFinite(expectedRootYaw)) return false;
   const path = resolve(root, expectedPath);
   const expectedCamera = record?.framing?.camera?.fixtureCamera;
   return record?.path === expectedPath
@@ -1103,8 +1202,8 @@ function handScreenshotValid(record, expectedPath, actor, side, sourceScreenshot
       actor,
       side,
       record.presentation,
-      expectedVisualEvidenceContract.atomic.expectedBotPosition,
-      expectedVisualEvidenceContract.atomic.expectedBotYaw,
+      expectedRootPosition,
+      expectedRootYaw,
       sourceScreenshot,
     );
 }
@@ -1171,17 +1270,52 @@ function strictlyIncreasingCaptureRevisions(records) {
 function armedActorIdentityValid(armedBot) {
   const actorId = armedBot?.id;
   return typeof actorId === 'string' && actorId.length > 0
+    && armedBot.fixedFixture?.placement?.placement?.bot?.id === actorId
     && armedBot.first?.id === actorId
     && armedBot.second?.id === actorId
+    && armedBot.fixedFixture?.stagedBot?.id === actorId
     && armedBot.fixedFixture?.observedBotId === actorId
     && armedBot.alive === true
     && armedBot.first?.alive === true
     && armedBot.second?.alive === true
     && armedBot.fixedFixture?.observedBotAlive === true
+    && armedBot.fixedFixture?.placement?.placement?.bot?.alive === true
+    && armedBot.fixedFixture?.stagedBot?.alive === true
     && armedBot.weapon === 'carbine'
     && armedBot.first?.weapon === 'carbine'
     && armedBot.second?.weapon === 'carbine'
+    && armedBot.fixedFixture?.placement?.placement?.bot?.weapon === 'carbine'
+    && armedBot.fixedFixture?.stagedBot?.weapon === 'carbine'
     && armedBot.fixedFixture?.observedBotWeapon === 'carbine';
+}
+
+function armedBotPlacementStabilityValid(armedBot) {
+  const fixedFixture = armedBot?.fixedFixture;
+  const expectedPosition = fixedFixture?.derivedBotPosition;
+  const expectedYaw = fixedFixture?.derivedBotYaw;
+  const epsilon = expectedVisualEvidenceContract.atomic.placement.arithmeticEpsilonM;
+  const samples = [
+    fixedFixture?.placement?.placement?.bot?.logicalPosition,
+    armedBot?.first?.position,
+    armedBot?.second?.position,
+    fixedFixture?.stagedBot?.position,
+    fixedFixture?.observedBotPosition,
+  ];
+  const yaws = [
+    fixedFixture?.placement?.placement?.bot?.rootYaw,
+    armedBot?.first?.rootYaw,
+    armedBot?.second?.rootYaw,
+    fixedFixture?.stagedBot?.rootYaw,
+    fixedFixture?.observedBotYaw,
+  ];
+  return finiteVector(expectedPosition) && Number.isFinite(expectedYaw)
+    && nonnegativeSafeInteger(fixedFixture?.stagedBot?.presentedGameplayFrame)
+    && fixedFixture.stagedBot.presentedGameplayFrame === fixedFixture.stagedPlayer?.presentedGameplayFrame
+    && fixedFixture.stagedBot.presentedGameplayFrame > fixedFixture.placement?.postFrame
+    && samples.every((position) => finiteVector(position) && position.every((value, axis) => (
+      close(value, expectedPosition[axis], epsilon)
+    )))
+    && yaws.every((yaw) => wrappedAngleDelta(yaw, expectedYaw) <= epsilon);
 }
 
 function dummyActorIdentityValid(entry, expectedId) {
@@ -1676,13 +1810,20 @@ function receiptValidationFailures(receipt, sourceSha) {
   const add = (name, passed) => checks.push([name, passed]);
   const evidenceBase = `artifacts/pass69-3/rigged-bot-live/${target.renderer}`;
   const armedActor = { kind: 'bot', id: receipt.armedBot?.id };
+  const placementDerived = deriveBotPlacement(
+    receipt.armedBot?.fixedFixture?.placement?.placement?.sourcePlayer?.position,
+    receipt.armedBot?.fixedFixture?.placement?.placement?.sourcePlayer?.yaw,
+    receipt.armedBot?.fixedFixture?.placement?.placement,
+  );
+  const derivedRootPosition = placementDerived?.rootPosition;
+  const derivedRootYaw = placementDerived?.rootYaw;
   const expectedCaptureRois = {
     close: closeRoiNdc, hand: handRoiNdc, medium: mediumRoiNdc, overview: overviewRoiNdc,
   };
 
-  add('receipt.schemaVersion', receipt.schemaVersion === 7);
+  add('receipt.schemaVersion', receipt.schemaVersion === 8);
   add('receipt.status', receipt.status === 'AUTOMATION_PASS_OWNER_PENDING');
-  add('receipt.contract', receipt.contract === 'atomic-acres/pass69-3-rigged-bot-live@7');
+  add('receipt.contract', receipt.contract === 'atomic-acres/pass69-3-rigged-bot-live@8');
   add('receipt.evidenceScope', receipt.evidenceScope
     === 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-and-hand-detail-framing');
   add('receipt.target', receipt.target === targetName);
@@ -1745,40 +1886,48 @@ function receiptValidationFailures(receipt, sourceSha) {
     receipt.armedBot?.fixedFixture,
     receipt.armedBot?.screenshots?.medium?.presentation?.committed?.frame,
   ));
-  add('receipt.armedBot.fixedFixture.observedBotPosition',
-    finiteVector(receipt.armedBot?.fixedFixture?.observedBotPosition)
-      && receipt.armedBot.fixedFixture.observedBotPosition.every((value, axis) => close(
-        value, expectedVisualEvidenceContract.atomic.expectedBotPosition[axis], 1e-8,
-      )));
-  add('receipt.armedBot.fixedFixture.observedBotYaw', close(
-    receipt.armedBot?.fixedFixture?.observedBotYaw,
-    expectedVisualEvidenceContract.atomic.expectedBotYaw,
-    1e-8,
+  add('receipt.armedBot.fixedFixture.placement', atomicBotPlacementValid(
+    receipt.armedBot?.fixedFixture,
   ));
+  add('receipt.armedBot.fixedFixture.stability', armedBotPlacementStabilityValid(receipt.armedBot));
+  add('receipt.armedBot.fixedFixture.observedBotPosition',
+    finiteVector(derivedRootPosition)
+      && finiteVector(receipt.armedBot?.fixedFixture?.observedBotPosition)
+      && receipt.armedBot.fixedFixture.observedBotPosition.every((value, axis) => close(
+        value, derivedRootPosition[axis], expectedVisualEvidenceContract.atomic.placement.arithmeticEpsilonM,
+      )));
+  add('receipt.armedBot.fixedFixture.observedBotYaw', wrappedAngleDelta(
+    receipt.armedBot?.fixedFixture?.observedBotYaw,
+    derivedRootYaw,
+  ) <= expectedVisualEvidenceContract.atomic.placement.arithmeticEpsilonM);
   add('receipt.armedBot.screenshots.medium', screenshotValid(
     receipt.armedBot?.screenshots?.medium,
     `${evidenceBase}/armed-live-bot-medium.png`, armedActor, mediumRoiNdc,
     expectedVisualEvidenceContract.atomic.mediumCamera, 'atomic-acres',
-    expectedVisualEvidenceContract.atomic.expectedBotPosition,
-    expectedVisualEvidenceContract.atomic.expectedBotYaw,
+    derivedRootPosition,
+    derivedRootYaw,
   ));
   add('receipt.armedBot.screenshots.close', screenshotValid(
     receipt.armedBot?.screenshots?.close,
     `${evidenceBase}/armed-live-bot-close.png`, armedActor, closeRoiNdc,
     expectedVisualEvidenceContract.atomic.closeCamera, 'atomic-acres',
-    expectedVisualEvidenceContract.atomic.expectedBotPosition,
-    expectedVisualEvidenceContract.atomic.expectedBotYaw,
+    derivedRootPosition,
+    derivedRootYaw,
     true,
   ));
   add('receipt.armedBot.screenshots.leftHand', handScreenshotValid(
     receipt.armedBot?.screenshots?.leftHand,
     `${evidenceBase}/armed-live-bot-left-hand-close.png`, armedActor, 'left',
     receipt.armedBot?.screenshots?.close,
+    derivedRootPosition,
+    derivedRootYaw,
   ));
   add('receipt.armedBot.screenshots.rightHand', handScreenshotValid(
     receipt.armedBot?.screenshots?.rightHand,
     `${evidenceBase}/armed-live-bot-right-hand-close.png`, armedActor, 'right',
     receipt.armedBot?.screenshots?.close,
+    derivedRootPosition,
+    derivedRootYaw,
   ));
   add('receipt.armedBot.screenshots.revisionsStrictlyIncrease', strictlyIncreasingCaptureRevisions([
     receipt.armedBot?.screenshots?.medium,
@@ -1877,7 +2026,11 @@ function runContractSelfTest() {
     weapon: 'carbine',
     first: { id: 'bot-1', alive: true, weapon: 'carbine' },
     second: { id: 'bot-1', alive: true, weapon: 'carbine' },
-    fixedFixture: { observedBotId: 'bot-1', observedBotAlive: true, observedBotWeapon: 'carbine' },
+    fixedFixture: {
+      placement: { placement: { bot: { id: 'bot-1', alive: true, weapon: 'carbine' } } },
+      stagedBot: { id: 'bot-1', alive: true, weapon: 'carbine' },
+      observedBotId: 'bot-1', observedBotAlive: true, observedBotWeapon: 'carbine',
+    },
   };
   assert(armedActorIdentityValid(armedIdentity), 'one alive armed actor identity across every sample must pass');
   const swappedArmedIdentity = structuredClone(armedIdentity);
@@ -1921,11 +2074,49 @@ function runContractSelfTest() {
         maximumObservedAbsoluteAxisErrorM: [0, 0, 0],
         allGrounded: true,
       },
+      placement: {
+        preFrame: 110,
+        postFrame: 110,
+        prePlayer: {
+          position: [...anchor],
+          yaw: expectedVisualEvidenceContract.atomic.playerYaw,
+          grounded: true,
+        },
+        placement: {
+          contract: expectedVisualEvidenceContract.atomic.placement.contract,
+          source: expectedVisualEvidenceContract.atomic.placement.source,
+          requestedDistanceM: expectedVisualEvidenceContract.atomic.placement.distanceM,
+          stagedDistanceM: expectedVisualEvidenceContract.atomic.placement.distanceM,
+          yawOffsetRadians: expectedVisualEvidenceContract.atomic.placement.requiredYawOffsetRadians,
+          presentedGameplayFrameAtCommand: 110,
+          sourcePlayer: {
+            position: [...anchor],
+            yaw: expectedVisualEvidenceContract.atomic.playerYaw,
+            grounded: true,
+          },
+          bot: {
+            id: 'bot-1',
+            logicalPosition: [...expectedVisualEvidenceContract.atomic.nominalBotPosition],
+            rootPosition: [...expectedVisualEvidenceContract.atomic.nominalBotPosition],
+            rootYaw: expectedVisualEvidenceContract.atomic.expectedBotYaw,
+            alive: true,
+            weapon: 'carbine',
+          },
+        },
+      },
+      derivedBotPosition: [...expectedVisualEvidenceContract.atomic.nominalBotPosition],
+      derivedBotYaw: expectedVisualEvidenceContract.atomic.expectedBotYaw,
       stagedPlayer: {
         presentedGameplayFrame: 120,
         position: [...anchor],
         yaw: expectedVisualEvidenceContract.atomic.playerYaw,
         grounded: true,
+      },
+      stagedBot: {
+        presentedGameplayFrame: 120,
+        position: [...expectedVisualEvidenceContract.atomic.nominalBotPosition],
+        rootYaw: expectedVisualEvidenceContract.atomic.expectedBotYaw,
+        id: 'bot-1', alive: true, weapon: 'carbine',
       },
     };
     mutate(fixture);
@@ -1944,6 +2135,66 @@ function runContractSelfTest() {
     return fixture;
   };
   const validAtomicPlayerConvergence = (fixture) => atomicPlayerConvergenceValid(fixture, 121);
+  const validAtomicBotPlacement = (fixture) => atomicBotPlacementValid(fixture);
+  assert(validAtomicBotPlacement(makeAtomicPlayerFixture()),
+    'same-turn placement independently derives the fixed forward root and facing yaw');
+  assert(!validAtomicBotPlacement(makeAtomicPlayerFixture((fixture) => {
+    fixture.placement.prePlayer.position[0] += 0.00025;
+    fixture.placement.placement.sourcePlayer.position[0] += 0.00025;
+  })), 'shifted player with stale nominal bot and derived fields must fail');
+  assert(!validAtomicBotPlacement(makeAtomicPlayerFixture((fixture) => {
+    fixture.placement.placement.stagedDistanceM = 5.1;
+  })), 'wrong staged distance must fail');
+  assert(!validAtomicBotPlacement(makeAtomicPlayerFixture((fixture) => {
+    fixture.placement.placement.bot.logicalPosition[1] = 0.0000000011;
+    fixture.placement.placement.bot.rootPosition[1] = 0.0000000011;
+  })), 'wrong root Y beyond the tight arithmetic epsilon must fail');
+  assert(!validAtomicBotPlacement(makeAtomicPlayerFixture((fixture) => {
+    fixture.placement.placement.yawOffsetRadians = Math.PI / 8;
+  })), 'fallback bearing must fail');
+  assert(!validAtomicBotPlacement(makeAtomicPlayerFixture((fixture) => {
+    fixture.placement.placement.bot.rootYaw += 0.0000000011;
+  })), 'wrong placement root yaw must fail');
+  assert(!validAtomicBotPlacement(makeAtomicPlayerFixture((fixture) => {
+    fixture.placement.postFrame += 1;
+  })), 'placement whose presented frontier changes during the synchronous task must fail');
+  assert(!validAtomicBotPlacement(makeAtomicPlayerFixture((fixture) => {
+    fixture.placement.preFrame = fixture.convergence.samples.at(-1).presentedGameplayFrame;
+    fixture.placement.postFrame = fixture.placement.preFrame;
+    fixture.placement.placement.presentedGameplayFrameAtCommand = fixture.placement.preFrame;
+  })), 'placement at or before the final convergence frame must fail');
+  assert(!validAtomicBotPlacement(makeAtomicPlayerFixture((fixture) => {
+    fixture.placement.placement.sourcePlayer.position = [fixture.placement.prePlayer.position[0], 1.7];
+  })), 'malformed placement source vector must fail closed');
+  assert(!validAtomicBotPlacement(makeAtomicPlayerFixture((fixture) => {
+    fixture.derivedBotPosition[0] += 0.0000000011;
+  })), 'forged derived placement summary must fail independent recomputation');
+  assert(!validAtomicBotPlacement(makeAtomicPlayerFixture((fixture) => {
+    fixture.derivedBotYaw = Number.NaN;
+  })), 'non-finite derived yaw must fail closed');
+  const makeStableArmedBot = () => {
+    const fixedFixture = makeAtomicPlayerFixture();
+    const position = [...fixedFixture.derivedBotPosition];
+    const rootYaw = fixedFixture.derivedBotYaw;
+    return {
+      id: 'bot-1', alive: true, weapon: 'carbine',
+      first: { id: 'bot-1', alive: true, weapon: 'carbine', position: [...position], rootYaw },
+      second: { id: 'bot-1', alive: true, weapon: 'carbine', position: [...position], rootYaw },
+      fixedFixture: {
+        ...fixedFixture,
+        observedBotPosition: [...position], observedBotYaw: rootYaw,
+        observedBotId: 'bot-1', observedBotAlive: true, observedBotWeapon: 'carbine',
+      },
+    };
+  };
+  assert(armedBotPlacementStabilityValid(makeStableArmedBot()),
+    'placement, two armed samples and later staged actor remain on one derived root');
+  const laterRootMismatch = makeStableArmedBot();
+  laterRootMismatch.second.position[0] += 0.0000000011;
+  assert(!armedBotPlacementStabilityValid(laterRootMismatch), 'later bot root mismatch must fail');
+  const laterYawMismatch = makeStableArmedBot();
+  laterYawMismatch.fixedFixture.stagedBot.rootYaw += 0.0000000011;
+  assert(!armedBotPlacementStabilityValid(laterYawMismatch), 'later bot yaw mismatch must fail');
   assert(validAtomicPlayerConvergence(makeAtomicPlayerFixture()),
     'eight observed grounded presented-frame transitions over 50ms must pass');
   assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
@@ -2051,6 +2302,11 @@ function runContractSelfTest() {
   })), 'the staged player must be sampled after convergence');
   assert(!atomicPlayerConvergenceValid(makeAtomicPlayerFixture(), 120),
     'the staged player must precede the first committed Atomic capture');
+  const oldFixture = makeAtomicPlayerFixture();
+  delete oldFixture.placement;
+  assert(!atomicPlayerConvergenceValid(oldFixture, 121), 'old placement-less fixture fails closed without throwing');
+  assert(receiptValidationFailures({ schemaVersion: 7 }, '0'.repeat(40)).includes('receipt.schemaVersion'),
+    'receipt schema 7 is explicitly rejected without throwing');
   const nonUnitQuaternion = [0.1, -0.2, 0.3, 0.9];
   assert(normalizedQuaternionDelta(nonUnitQuaternion, nonUnitQuaternion) === 0,
     'identical non-unit quaternion arrays must have an exact zero orientation delta');
@@ -2378,7 +2634,7 @@ function runContractSelfTest() {
   const canvas = { left: 0, top: 0, width: 1_600, height: 900 };
   const viewport = { width: 1_600, height: 900 };
   const actor = { kind: 'bot', id: 'bot-1' };
-  const rootPosition = [...expectedVisualEvidenceContract.atomic.expectedBotPosition];
+  const rootPosition = [...expectedVisualEvidenceContract.atomic.nominalBotPosition];
   const rootYaw = expectedVisualEvidenceContract.atomic.expectedBotYaw;
   const projectionCamera = {
     ...expectedVisualEvidenceContract.atomic.closeCamera,

@@ -20,13 +20,22 @@ describe('fixed rigged actor visual evidence fixtures', () => {
   it('retains one immutable open-road Atomic staging line', () => {
     const fixture = RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic;
     expect(fixture).toMatchObject({
-      id: 'atomic-south-road-crosslane-spawn-fixed-v3',
+      id: 'atomic-south-road-crosslane-spawn-fixed-v4',
       commandedPlayerPosition: [-3, 1.7, 40],
       settlementPositionAnchor: [-3, 1.7, 40],
       playerYaw: -Math.PI / 2,
       botDistanceM: 5.2,
-      expectedBotPosition: [2.2, 0, 40],
+      nominalBotPosition: [2.2, 0, 40],
       expectedBotYaw: Math.PI / 2,
+      placement: {
+        contract: 'debug-place-bot-ahead-synchronous-transaction-v1',
+        source: '__ATOMIC_ACRES_DEBUG__.placeBotAhead',
+        distanceM: 5.2,
+        rootY: 0,
+        requiredYawOffsetRadians: 0,
+        arithmeticEpsilonM: 1e-9,
+        nominalPositionEnvelopeM: [0.0005, 0, 0.0005],
+      },
     });
     expect(fixture.settlement).toEqual({
       contract: 'grounded-distinct-presented-frame-axis-envelope-convergence-v3',
@@ -57,9 +66,9 @@ describe('fixed rigged actor visual evidence fixtures', () => {
       z: fixture.commandedPlayerPosition[2],
     }, map.physicsColliders, 0.42)).toBe(false);
     expect(isBlocked({
-      x: fixture.expectedBotPosition[0],
-      y: fixture.expectedBotPosition[1] + 1.7,
-      z: fixture.expectedBotPosition[2],
+      x: fixture.nominalBotPosition[0],
+      y: fixture.nominalBotPosition[1] + 1.7,
+      z: fixture.nominalBotPosition[2],
     }, map.physicsColliders, 0.42)).toBe(false);
   });
 
