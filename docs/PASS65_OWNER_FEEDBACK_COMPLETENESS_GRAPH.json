@@ -2414,6 +2414,8 @@
         "src/rigged-bot-visual-evidence-contract.ts",
         "src/rigged-evidence-occlusion.test.ts",
         "src/rigged-evidence-occlusion.ts",
+        "src/rigged-hand-evidence.test.ts",
+        "src/rigged-hand-evidence.ts",
         "tests/e2e/pass69-3-rigged-bot-live.spec.ts"
       ],
       "evidenceKinds": ["unit", "browser", "visual"],

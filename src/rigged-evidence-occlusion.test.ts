@@ -1,10 +1,14 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import {
+  classifyRiggedHandSelfOcclusionHit,
   collectRiggedEvidenceOccluders,
+  collectRiggedEvidenceSelfOccluders,
   firstRiggedEvidenceOccluder,
   installRiggedEvidenceMainCameraDrawSession,
   projectRiggedEvidenceLiveDeformedRasterRoi,
+  intersectRiggedEvidencePresentationObjects,
+  RIGGED_HAND_SELF_OCCLUSION_CONTRACT,
   riggedEvidenceIntersectionCanOcclude,
   riggedEvidenceMainCameraActorDrawComplete,
   validateRiggedEvidenceCaptureTargets,
@@ -765,5 +769,111 @@ describe('rigged evidence per-intersection occluder qualification', () => {
     expect(second).not.toBeNull();
     expect(second.deformedVertexProjectionDigest).not.toEqual(first.deformedVertexProjectionDigest);
     fixture.session.dispose();
+  });
+
+  it('includes the actor and held weapon for hand self-occlusion while still excluding camera children', () => {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    scene.add(camera);
+    const actor = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+    body.name = 'body';
+    const weapon = body.clone();
+    weapon.name = 'held-weapon';
+    actor.add(body, weapon);
+    scene.add(actor);
+    const cameraChild = body.clone();
+    camera.add(cameraChild);
+
+    expect(collectRiggedEvidenceSelfOccluders(
+      scene,
+      camera,
+      (node) => node instanceof THREE.Mesh && node.layers.test(camera.layers),
+    )).toEqual([body, weapon]);
+  });
+
+  it('intersects rendered presentation geometry without re-enabling its combat raycast', () => {
+    const material = new THREE.MeshBasicMaterial();
+    const presentation = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), material);
+    presentation.position.z = -2;
+    presentation.updateMatrixWorld(true);
+    presentation.raycast = () => undefined;
+    const raycaster = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, 0, -1), 0, 4);
+    expect(raycaster.intersectObject(presentation)).toHaveLength(0);
+    const evidenceHits = intersectRiggedEvidencePresentationObjects(raycaster, [presentation]);
+    expect(evidenceHits.length).toBeGreaterThan(0);
+    expect(evidenceHits[0]?.object).toBe(presentation);
+    expect(raycaster.intersectObject(presentation)).toHaveLength(0);
+    material.dispose();
+    presentation.geometry.dispose();
+  });
+
+  it('uses current skinned vertices and restores pre-existing cached bounds', () => {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+      -1, -1, 0, 1, -1, 0, 0, 1, 0,
+    ], 3));
+    geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute([
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ], 4));
+    geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute([
+      1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0,
+    ], 4));
+    const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+    const presentation = new THREE.SkinnedMesh(geometry, material);
+    const bone = new THREE.Bone();
+    presentation.add(bone);
+    presentation.bind(new THREE.Skeleton([bone]));
+    presentation.position.z = -2;
+    presentation.updateMatrixWorld(true);
+    presentation.skeleton.update();
+    const cachedBox = new THREE.Box3(new THREE.Vector3(99, 99, 99), new THREE.Vector3(100, 100, 100));
+    const cachedSphere = new THREE.Sphere(new THREE.Vector3(100, 100, 100), 0.1);
+    presentation.boundingBox = cachedBox;
+    presentation.boundingSphere = cachedSphere;
+    presentation.raycast = () => undefined;
+    const raycaster = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, 0, -1), 0, 4);
+    const evidenceHits = intersectRiggedEvidencePresentationObjects(raycaster, [presentation]);
+    expect(evidenceHits.length).toBeGreaterThan(0);
+    expect(evidenceHits[0]?.object).toBe(presentation);
+    expect(presentation.boundingBox).toBe(cachedBox);
+    expect(presentation.boundingSphere).toBe(cachedSphere);
+    material.dispose();
+    geometry.dispose();
+  });
+
+  it('accepts only terminal actor skin and rejects torso, weapon, world, and camera-inside hits', () => {
+    const actor = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+    body.name = 'body';
+    const weapon = body.clone();
+    weapon.name = 'weapon';
+    actor.add(body, weapon);
+    const world = body.clone();
+    world.name = 'world';
+    const origin = new THREE.Vector3(0, 0, 0);
+    const target = new THREE.Vector3(0, 0, 0.7);
+    const hit = (object: THREE.Object3D, distance: number): THREE.Intersection => ({
+      distance,
+      point: new THREE.Vector3(0, 0, distance),
+      object,
+    });
+
+    const terminal = classifyRiggedHandSelfOcclusionHit(hit(body, 0.65), origin, target, actor, weapon);
+    expect(terminal).toMatchObject({ clear: true, reason: 'terminal-hand-surface' });
+    expect(terminal?.terminalDeltaM).toBeCloseTo(0.05);
+    expect(classifyRiggedHandSelfOcclusionHit(hit(body, 0.4), origin, target, actor, weapon))
+      .toMatchObject({ clear: false, reason: 'actor-self-occlusion-before-hand-sentinel' });
+    expect(classifyRiggedHandSelfOcclusionHit(hit(weapon, 0.65), origin, target, actor, weapon))
+      .toMatchObject({ clear: false, heldWeapon: true, reason: 'held-weapon-before-hand-sentinel' });
+    expect(classifyRiggedHandSelfOcclusionHit(hit(world, 0.65), origin, target, actor, weapon))
+      .toMatchObject({ clear: false, reason: 'world-occlusion-before-hand-sentinel' });
+    expect(classifyRiggedHandSelfOcclusionHit(
+      hit(body, RIGGED_HAND_SELF_OCCLUSION_CONTRACT.cameraInsideOpaqueDistanceM),
+      origin,
+      target,
+      actor,
+      weapon,
+    )).toMatchObject({ clear: false, reason: 'camera-inside-opaque-geometry' });
   });
 });

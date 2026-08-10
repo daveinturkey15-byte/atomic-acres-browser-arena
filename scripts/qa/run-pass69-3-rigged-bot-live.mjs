@@ -103,11 +103,30 @@ const carbineSocketReferences = Object.freeze({
 const closeJointThresholds = Object.freeze({ minimumArmChainPixels: 80 });
 const handDetailThresholds = Object.freeze({ minimumWristFingerPixels: 12 });
 const handCameraContract = Object.freeze({
-  contract: 'fixed-horizontal-wrist-from-weapon-center-v1',
+  contract: 'fixed-shoulder-lateral-front-oblique-hand-v2',
   outsideOffsetM: 0.7,
   upwardOffsetM: 0.12,
   fovDegrees: 48,
   maximumSourceJointDriftM: 0.03,
+  frontObliqueDegrees: 20,
+  minimumHorizontalShoulderSpanM: 0.15,
+  minimumOrthogonalFrontLengthM: 0.08,
+  minimumWeaponCenterDistanceM: 0.08,
+  maximumWeaponCenterDistanceM: 0.65,
+  minimumAbsoluteLateralDot: 0.93,
+  minimumFrontDot: 0.33,
+  maximumFrontDot: 0.35,
+  maximumPeerDirectionDot: -0.75,
+  noFallback: true,
+});
+const handSelfOcclusionContract = Object.freeze({
+  contract: 'submitted-frame-hand-self-occlusion-v1',
+  actorSelfOcclusionIncluded: true,
+  actorAttachmentsIncluded: true,
+  heldWeaponTerminalHitAccepted: false,
+  terminalHandToleranceM: 0.06,
+  cameraInsideOpaqueDistanceM: 0.1,
+  sentinelNames: Object.freeze(['wrist-hand', 'thumb', 'index', 'middle', 'ring', 'pinky']),
 });
 const closeRoiNdc = Object.freeze({ minX: -0.46, maxX: 0.46, minY: -0.7, maxY: 0.7 });
 const handRoiNdc = Object.freeze({ minX: -0.55, maxX: 0.55, minY: -0.68, maxY: 0.68 });
@@ -148,13 +167,14 @@ const expectedSkinnedMeshNames = Object.freeze([
   'Cube023_1',
 ]);
 const expectedVisualEvidenceContract = Object.freeze({
-  schemaVersion: 6,
-  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v6',
+  schemaVersion: 7,
+  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v7',
   los: Object.freeze({
     contract: 'actual-render-world-layout-occluder-multi-sentinel-los-v2',
     actorSelfOcclusionExcluded: true,
     sentinels: evidenceLosSentinels,
   }),
+  handSelfOcclusion: handSelfOcclusionContract,
   presentation: Object.freeze({
     contract: 'capture-camera-committed-frame-v2',
     order: 'pause-final-submission-await-completion-then-compositor-v1',
@@ -1378,6 +1398,54 @@ function lineOfSightValid(lineOfSight, actor, expectedArena, presentation, frami
     });
 }
 
+function handSelfOcclusionValid(selfOcclusion, actor, side, presentation, framing) {
+  const paused = presentation?.pausedPresentedCapture;
+  const cachedMatches = paused?.handSelfOcclusion?.filter((candidate) => (
+    sameObject(candidate.actor, actor) && candidate.side === side
+  )) ?? [];
+  const { cameraPresentation: _cameraPresentation, ...sampledCachedFields } = selfOcclusion ?? {};
+  if (cachedMatches.length !== 1 || !sameObject(sampledCachedFields, cachedMatches[0])) return false;
+  if (Object.entries(handSelfOcclusionContract).some(([key, value]) => !sameObject(selfOcclusion?.[key], value))
+    || !sameObject(selfOcclusion.actor, actor)
+    || selfOcclusion.side !== side
+    || selfOcclusion.arenaId !== 'atomic-acres'
+    || selfOcclusion.heldWeaponIncluded !== true
+    || selfOcclusion.orderValid !== true
+    || selfOcclusion.allClear !== true
+    || selfOcclusion.captureFrame !== paused?.frame
+    || selfOcclusion.captureRevision !== paused?.captureRevision
+    || selfOcclusion.captureSubmissionSequence !== paused?.submissionSequence
+    || selfOcclusion.actorOccluderCount < 1
+    || selfOcclusion.heldWeaponOccluderCount < 1
+    || selfOcclusion.renderOccluderCount < selfOcclusion.actorOccluderCount
+    || !sameObject(selfOcclusion.cameraPresentation, paused)
+    || !Array.isArray(selfOcclusion.sentinels)
+    || selfOcclusion.sentinels.length !== handSelfOcclusionContract.sentinelNames.length) return false;
+  return selfOcclusion.sentinels.every((sentinel, index) => {
+    const framed = framing?.handDetail?.sentinels?.[index];
+    const blocker = sentinel.blocker;
+    const validTerminal = blocker === null || (blocker.clear === true
+      && blocker.reason === 'terminal-hand-surface'
+      && blocker.sameActor === true
+      && blocker.heldWeapon === false
+      && blocker.cameraInsideOpaqueGeometry === false
+      && Number.isFinite(blocker.terminalDeltaM) && blocker.terminalDeltaM >= 0
+      && blocker.terminalDeltaM <= handSelfOcclusionContract.terminalHandToleranceM
+      && Number.isFinite(blocker.hitPointToSentinelM)
+      && blocker.hitPointToSentinelM <= handSelfOcclusionContract.terminalHandToleranceM);
+    return sentinel.name === handSelfOcclusionContract.sentinelNames[index]
+      && sentinel.name === (framed?.role === 'wrist-hand' ? 'wrist-hand' : framed?.digit)
+      && sentinel.bone === framed?.bone
+      && sentinel.present === true
+      && sentinel.clear === true
+      && finiteVector(sentinel.worldPosition)
+      && sameObject(sentinel.worldPosition, framed?.worldPosition)
+      && Number.isFinite(sentinel.targetDistanceM)
+      && sentinel.targetDistanceM > 0
+      && validTerminal;
+  });
+}
+
 function screenshotFrameBindingValid(binding, presentation) {
   const paused = presentation?.pausedPresentedCapture;
   const expected = {
@@ -1679,6 +1747,64 @@ function atomicPlayerConvergenceValid(fixedFixture, firstCapturePresentedGamepla
     && fixedFixture.stagedPlayer.presentedGameplayFrame > fixedFixture.placement.postFrame;
 }
 
+function deriveExpectedHandCamera(side, leftShoulderWorld, rightShoulderWorld, weaponCenterWorld, sourceSentinels) {
+  if ((side !== 'left' && side !== 'right') || !finiteVector(leftShoulderWorld)
+    || !finiteVector(rightShoulderWorld) || !finiteVector(weaponCenterWorld)
+    || !Array.isArray(sourceSentinels) || sourceSentinels.length !== 6
+    || !sourceSentinels.every((sentinel) => finiteVector(sentinel.worldPosition))) return null;
+  const shoulderDelta = [rightShoulderWorld[0] - leftShoulderWorld[0], 0,
+    rightShoulderWorld[2] - leftShoulderWorld[2]];
+  const horizontalShoulderSpanM = Math.hypot(shoulderDelta[0], shoulderDelta[2]);
+  if (!(horizontalShoulderSpanM >= handCameraContract.minimumHorizontalShoulderSpanM)) return null;
+  const lateralWorld = shoulderDelta.map((value) => value / horizontalShoulderSpanM);
+  const shoulderMidWorld = [0, 1, 2].map((axis) => (leftShoulderWorld[axis] + rightShoulderWorld[axis]) / 2);
+  const rawFrontWorld = [weaponCenterWorld[0] - shoulderMidWorld[0], 0,
+    weaponCenterWorld[2] - shoulderMidWorld[2]];
+  const weaponCenterDistanceM = Math.hypot(rawFrontWorld[0], rawFrontWorld[2]);
+  if (!(weaponCenterDistanceM >= handCameraContract.minimumWeaponCenterDistanceM
+    && weaponCenterDistanceM <= handCameraContract.maximumWeaponCenterDistanceM)) return null;
+  const lateralProjection = dot(rawFrontWorld, lateralWorld);
+  const orthogonalFrontWorld = rawFrontWorld.map((value, axis) => value - lateralWorld[axis] * lateralProjection);
+  const orthogonalFrontLengthM = Math.hypot(orthogonalFrontWorld[0], orthogonalFrontWorld[2]);
+  if (!(orthogonalFrontLengthM >= handCameraContract.minimumOrthogonalFrontLengthM)) return null;
+  const frontWorld = orthogonalFrontWorld.map((value) => value / orthogonalFrontLengthM);
+  const sideSign = side === 'left' ? -1 : 1;
+  const oblique = handCameraContract.frontObliqueDegrees * Math.PI / 180;
+  const outsideDirectionWorld = lateralWorld.map((value, axis) => (
+    Math.cos(oblique) * sideSign * value + Math.sin(oblique) * frontWorld[axis]
+  ));
+  const peerOutsideDirectionWorld = lateralWorld.map((value, axis) => (
+    -Math.cos(oblique) * sideSign * value + Math.sin(oblique) * frontWorld[axis]
+  ));
+  const lateralDot = dot(outsideDirectionWorld, lateralWorld);
+  const frontDot = dot(outsideDirectionWorld, frontWorld);
+  const peerDirectionDot = dot(outsideDirectionWorld, peerOutsideDirectionWorld);
+  if (!(Math.abs(lateralDot) >= handCameraContract.minimumAbsoluteLateralDot
+    && Math.sign(lateralDot) === sideSign
+    && frontDot >= handCameraContract.minimumFrontDot
+    && frontDot <= handCameraContract.maximumFrontDot
+    && peerDirectionDot <= handCameraContract.maximumPeerDirectionDot)) return null;
+  const targetWorld = [0, 1, 2].map((axis) => (
+    sourceSentinels.reduce((sum, joint) => sum + joint.worldPosition[axis], 0) / sourceSentinels.length
+  ));
+  const positionWorld = targetWorld.map((value, axis) => value
+    + outsideDirectionWorld[axis] * handCameraContract.outsideOffsetM
+    + (axis === 1 ? handCameraContract.upwardOffsetM : 0));
+  return {
+    sideSign, leftShoulderWorld, rightShoulderWorld, shoulderMidWorld, horizontalShoulderSpanM,
+    lateralWorld, rawFrontWorld, weaponCenterDistanceM, orthogonalFrontWorld, orthogonalFrontLengthM,
+    frontWorld, outsideDirectionWorld, peerOutsideDirectionWorld, lateralDot, frontDot, peerDirectionDot,
+    targetWorld, positionWorld,
+    degeneracyPolicy: {
+      minimumHorizontalShoulderSpanM: handCameraContract.minimumHorizontalShoulderSpanM,
+      minimumOrthogonalFrontLengthM: handCameraContract.minimumOrthogonalFrontLengthM,
+      minimumWeaponCenterDistanceM: handCameraContract.minimumWeaponCenterDistanceM,
+      maximumWeaponCenterDistanceM: handCameraContract.maximumWeaponCenterDistanceM,
+      noFallback: true,
+    },
+  };
+}
+
 function handCameraValid(camera, actor, side, sourceScreenshot, expectedRootPosition, expectedRootYaw) {
   if (!finiteVector(expectedRootPosition) || !Number.isFinite(expectedRootYaw)) return false;
   const expected = expectedHandCaptureJoints(side);
@@ -1690,14 +1816,10 @@ function handCameraValid(camera, actor, side, sourceScreenshot, expectedRootPosi
     near: sourcePresentation?.near,
     far: sourcePresentation?.far,
   };
-  if (camera?.contract !== handCameraContract.contract
-    || camera.outsideOffsetM !== handCameraContract.outsideOffsetM
-    || camera.upwardOffsetM !== handCameraContract.upwardOffsetM
-    || camera.fovDegrees !== handCameraContract.fovDegrees
-    || camera.maximumSourceJointDriftM !== handCameraContract.maximumSourceJointDriftM
+  if (Object.entries(handCameraContract).some(([key, value]) => camera?.[key] !== value)
     || !sameObject(camera.actor, actor)
     || camera.side !== side
-    || camera.source !== 'armed-close-submitted-frame-weapon-center-and-rigged-joint-world-transforms'
+    || camera.source !== 'armed-close-submitted-frame-shoulder-lateral-weapon-front-and-rigged-hand-world-transforms'
     || sourceBinding?.contract !== 'armed-close-submitted-actor-source-v1'
     || sourceBinding.cameraId !== expectedVisualEvidenceContract.atomic.closeCamera.id
     || sourceBinding.frame !== sourcePresentation?.frame
@@ -1737,6 +1859,8 @@ function handCameraValid(camera, actor, side, sourceScreenshot, expectedRootPosi
       > expectedVisualEvidenceContract.atomic.placement.arithmeticEpsilonM
     || !sameObject(camera.sourceWeaponCenterWorld, sourceActor.weaponCenterWorld)
     || !finiteVector(camera.sourceWeaponCenterWorld)
+    || !Array.isArray(camera.sourceShoulders)
+    || camera.sourceShoulders.length !== 2
     || !Array.isArray(camera.sourceSentinels)
     || camera.sourceSentinels.length !== expected.length
     || !finiteVector(camera.outsideDirectionWorld)
@@ -1744,6 +1868,17 @@ function handCameraValid(camera, actor, side, sourceScreenshot, expectedRootPosi
     || !finiteVector(camera.positionWorld)
     || !Number.isFinite(camera.yaw)
     || !Number.isFinite(camera.pitch)) return false;
+  const expectedShoulders = expectedBones.filter(({ role }) => role === 'shoulder');
+  for (let index = 0; index < expectedShoulders.length; index += 1) {
+    const source = camera.sourceShoulders[index];
+    const wanted = expectedShoulders[index];
+    const submitted = sourceActor.jointScreenPositions.find((joint) => (
+      joint.kind === 'arm' && joint.side === wanted.side && joint.role === wanted.role && joint.bone === wanted.bone
+    ));
+    if (source.kind !== 'arm' || source.side !== wanted.side || source.role !== wanted.role
+      || source.bone !== wanted.bone || !finiteVector(source.worldPosition)
+      || !submitted || !sameObject(source.worldPosition, submitted.worldPosition)) return false;
+  }
   for (let index = 0; index < expected.length; index += 1) {
     const source = camera.sourceSentinels[index];
     const wanted = expected[index];
@@ -1755,25 +1890,26 @@ function handCameraValid(camera, actor, side, sourceScreenshot, expectedRootPosi
       || source.digit !== wanted.digit || source.bone !== wanted.bone || !finiteVector(source.worldPosition)
       || !submitted || !sameObject(source.worldPosition, submitted.worldPosition)) return false;
   }
-  const wristWorld = camera.sourceSentinels[0].worldPosition;
-  const outsideDelta = [
-    wristWorld[0] - camera.sourceWeaponCenterWorld[0],
-    0,
-    wristWorld[2] - camera.sourceWeaponCenterWorld[2],
-  ];
-  const outsideLength = Math.hypot(outsideDelta[0], outsideDelta[2]);
-  if (!(outsideLength > 0.01)) return false;
-  const expectedOutside = outsideDelta.map((value) => value / outsideLength);
-  const expectedTarget = [0, 1, 2].map((axis) => (
-    camera.sourceSentinels.reduce((sum, joint) => sum + joint.worldPosition[axis], 0) / expected.length
-  ));
-  const expectedPosition = expectedTarget.map((value, axis) => value
-    + expectedOutside[axis] * handCameraContract.outsideOffsetM
-    + (axis === 1 ? handCameraContract.upwardOffsetM : 0));
+  const derived = deriveExpectedHandCamera(
+    side,
+    camera.sourceShoulders.find((source) => source.side === 'left')?.worldPosition,
+    camera.sourceShoulders.find((source) => source.side === 'right')?.worldPosition,
+    camera.sourceWeaponCenterWorld,
+    camera.sourceSentinels,
+  );
+  if (!derived) return false;
+  const expectedTarget = derived.targetWorld;
+  const expectedPosition = derived.positionWorld;
   const aim = vectorSubtract(expectedTarget, expectedPosition);
   const expectedYaw = Math.atan2(-aim[0], -aim[2]);
   const expectedPitch = Math.atan2(aim[1], Math.hypot(aim[0], aim[2]));
-  return camera.outsideDirectionWorld.every((value, index) => close(value, expectedOutside[index], 1e-9))
+  const derivedFields = [
+    'sideSign', 'leftShoulderWorld', 'rightShoulderWorld', 'shoulderMidWorld', 'horizontalShoulderSpanM',
+    'lateralWorld', 'rawFrontWorld', 'weaponCenterDistanceM', 'orthogonalFrontWorld',
+    'orthogonalFrontLengthM', 'frontWorld', 'outsideDirectionWorld', 'peerOutsideDirectionWorld',
+    'lateralDot', 'frontDot', 'peerDirectionDot', 'degeneracyPolicy', 'targetWorld', 'positionWorld',
+  ];
+  return derivedFields.every((field) => sameObject(camera[field], derived[field]))
     && camera.targetWorld.every((value, index) => close(value, expectedTarget[index], 1e-9))
     && camera.positionWorld.every((value, index) => close(value, expectedPosition[index], 1e-9))
     && close(camera.yaw, expectedYaw, 1e-9)
@@ -1800,6 +1936,7 @@ function handFramingValid(
   const expected = expectedHandCaptureJoints(side);
   const detail = framing?.handDetail;
   const paused = presentation?.pausedPresentedCapture;
+  const frameActor = paused?.actors?.find((candidate) => sameObject(candidate.actor, actor));
   const projectionCamera = {
     ...framing?.camera?.fixtureCamera,
     near: paused?.near,
@@ -1820,6 +1957,10 @@ function handFramingValid(
     || !Array.isArray(framing.effectivelyVisibleSkinnedMeshes)
     || framing.effectivelyVisibleSkinnedMeshes.length < 1
     || framing.handSkinVisible !== true
+    || !finiteVector(framing.weaponCenterWorld)
+    || !Array.isArray(framing.sourceShoulders)
+    || framing.sourceShoulders.length !== 2
+    || !frameActor
     || !sameObject(framing.roiNdc, handRoiNdc)
     || !handCameraValid(framing.camera, actor, side, sourceScreenshot, expectedRootPosition, expectedRootYaw)
     || !Number.isFinite(framing.canvas?.left)
@@ -1838,6 +1979,19 @@ function handFramingValid(
     || detail.sentinels.length !== expected.length
     || !Array.isArray(detail.fingerSpans)
     || detail.fingerSpans.length !== 5) return false;
+  for (const shoulder of framing.sourceShoulders) {
+    const source = framing.camera.sourceShoulders.find((candidate) => candidate.bone === shoulder.bone);
+    const submitted = frameActor.jointScreenPositions.find((candidate) => candidate.kind === 'arm'
+      && candidate.side === shoulder.side && candidate.role === 'shoulder' && candidate.bone === shoulder.bone);
+    if (!source || !submitted || !finiteVector(shoulder.worldPosition)
+      || !sameObject(shoulder.worldPosition, submitted.worldPosition)
+      || positionDelta(shoulder.worldPosition, source.worldPosition) > handCameraContract.maximumSourceJointDriftM) {
+      return false;
+    }
+  }
+  if (!sameObject(framing.weaponCenterWorld, frameActor.weaponCenterWorld)
+    || positionDelta(framing.weaponCenterWorld, framing.camera.sourceWeaponCenterWorld)
+      > handCameraContract.maximumSourceJointDriftM) return false;
   const pixelFor = (ndc) => ({
     x: framing.canvas.left + (ndc[0] + 1) * 0.5 * framing.canvas.width,
     y: framing.canvas.top + (1 - ndc[1]) * 0.5 * framing.canvas.height,
@@ -1896,6 +2050,7 @@ function handScreenshotValid(record, expectedPath, actor, side, sourceScreenshot
     && evidenceCameraValid(record.camera, expectedCamera)
     && capturePresentationValid(record.presentation, expectedCamera, 'atomic-acres', [actor])
     && lineOfSightValid(record.lineOfSight, actor, 'atomic-acres', record.presentation, record.framing)
+    && handSelfOcclusionValid(record.selfOcclusion, actor, side, record.presentation, record.framing)
     && handFramingValid(
       record.framing,
       actor,
@@ -2542,11 +2697,11 @@ async function receiptValidationFailures(receipt, sourceSha) {
     close: closeRoiNdc, hand: handRoiNdc, medium: mediumRoiNdc, overview: overviewRoiNdc,
   };
 
-  add('receipt.schemaVersion', receipt.schemaVersion === 10);
+  add('receipt.schemaVersion', receipt.schemaVersion === 11);
   add('receipt.status', receipt.status === 'AUTOMATION_PASS_OWNER_PENDING');
-  add('receipt.contract', receipt.contract === 'atomic-acres/pass69-3-rigged-bot-live@10');
+  add('receipt.contract', receipt.contract === 'atomic-acres/pass69-3-rigged-bot-live@11');
   add('receipt.evidenceScope', receipt.evidenceScope
-    === 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-hand-detail-main-camera-draw-stamps-and-production-rgb-raster-proof');
+    === 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-shoulder-oblique-hand-detail-self-occlusion-main-camera-draw-stamps-and-production-rgb-raster-proof');
   add('receipt.target', receipt.target === targetName);
   add('receipt.sourceSha', receipt.sourceSha === sourceSha);
   add('receipt.endingSourceSha', receipt.endingSourceSha === sourceSha);
@@ -2574,6 +2729,8 @@ async function receiptValidationFailures(receipt, sourceSha) {
     receipt.visualReview?.automatedFramingIsNotVisualAcceptance === true);
   add('receipt.visualReview.worldLayoutLosDoesNotProveActorSelfOcclusion',
     receipt.visualReview?.worldLayoutLosDoesNotProveActorSelfOcclusion === true);
+  add('receipt.visualReview.handSelfOcclusionRayDoesNotReplaceVisualAcceptance',
+    receipt.visualReview?.handSelfOcclusionRayDoesNotReplaceVisualAcceptance === true);
   add('receipt.visualReview.inspectionScope', receipt.visualReview?.inspectionScope
     === 'armed medium/full close/left hand/right hand plus four restored dummy closeups, four suppressed controls, and shared overview');
   add('receipt.browser.project', receipt.browser?.project === 'chromium');
@@ -2656,6 +2813,10 @@ async function receiptValidationFailures(receipt, sourceSha) {
     derivedRootPosition,
     derivedRootYaw,
   ));
+  add('receipt.armedBot.screenshots.handCameraOppositeHemispheres', dot(
+    receipt.armedBot?.screenshots?.leftHand?.framing?.camera?.outsideDirectionWorld ?? [],
+    receipt.armedBot?.screenshots?.rightHand?.framing?.camera?.outsideDirectionWorld ?? [],
+  ) <= handCameraContract.maximumPeerDirectionDot);
   add('receipt.armedBot.screenshots.revisionsStrictlyIncrease', strictlyIncreasingCaptureRevisions([
     receipt.armedBot?.screenshots?.medium,
     receipt.armedBot?.screenshots?.close,
@@ -3857,6 +4018,9 @@ async function runContractSelfTest() {
   };
   const makeFrameActor = (cameraEvidence, points) => {
     const projectedWorldPosition = [rootPosition[0], rootPosition[1] + 1.35, rootPosition[2]];
+    const leftShoulder = findJoint(points, 'left', 'shoulder').worldPosition;
+    const rightShoulder = findJoint(points, 'right', 'shoulder').worldPosition;
+    const shoulderMid = leftShoulder.map((value, axis) => (value + rightShoulder[axis]) / 2);
     return {
       actor,
       rootUuid: actorRootUuid,
@@ -3869,7 +4033,7 @@ async function runContractSelfTest() {
       effectivelyVisibleSkinnedMeshes: ['Swat_Body'],
       armSkinVisible: true,
       handSkinVisible: true,
-      weaponCenterWorld: [0, 1.08, -18.7],
+      weaponCenterWorld: [shoulderMid[0] + 0.3, shoulderMid[1] - 0.2, shoulderMid[2]],
       projectedWorldPosition,
       screenPosition: projectWorldToNdc(projectedWorldPosition, cameraEvidence, aspect, 'webgl2'),
       jointScreenPositions: points.map((joint) => structuredClone(joint)),
@@ -3899,7 +4063,44 @@ async function runContractSelfTest() {
       blocker: null,
     })),
   });
-  const makePresentation = (cameraEvidence, frameActor, rendererName = 'webgl2', arenaId = 'atomic-acres') => {
+  const makeCachedHandSelfOcclusion = (
+    frameActor, cameraEvidence, side, arenaId, frame, submissionSequence,
+  ) => ({
+    ...handSelfOcclusionContract,
+    actor,
+    side,
+    arenaId,
+    captureFrame: frame,
+    captureRevision: 7,
+    captureSubmissionSequence: submissionSequence,
+    camera: {
+      position: cameraEvidence.position,
+      quaternion: yxzCameraQuaternion(cameraEvidence.yaw, cameraEvidence.pitch),
+      fov: cameraEvidence.fov,
+      captureRevision: 7,
+    },
+    heldWeaponIncluded: true,
+    renderOccluderCount: 8,
+    actorOccluderCount: 3,
+    heldWeaponOccluderCount: 2,
+    orderValid: true,
+    allClear: true,
+    sentinels: frameActor.jointScreenPositions
+      .filter((joint) => joint.side === side && (joint.role === 'wrist-hand' || joint.kind === 'finger'))
+      .map((joint) => ({
+        name: joint.role === 'wrist-hand' ? 'wrist-hand' : joint.digit,
+        bone: joint.bone,
+        present: true,
+        clear: true,
+        worldPosition: joint.worldPosition,
+        targetDistanceM: positionDelta(cameraEvidence.position, joint.worldPosition),
+        blocker: null,
+        reason: 'no-hit-before-hand-sentinel',
+      })),
+  });
+  const makePresentation = (
+    cameraEvidence, frameActor, rendererName = 'webgl2', arenaId = 'atomic-acres', handSide = null,
+  ) => {
     const webGpu = rendererName === 'webgpu';
     const committedSubmission = webGpu ? 10 : 0;
     const pausedSubmission = webGpu ? 12 : 0;
@@ -3926,6 +4127,9 @@ async function runContractSelfTest() {
         captureTargets: [actor],
         actors: [submittedActor],
         worldLayoutLineOfSight: [makeCachedLos(frameActor, cameraEvidence, arenaId, frame, submissionSequence)],
+        handSelfOcclusion: handSide === null ? [] : [
+          makeCachedHandSelfOcclusion(frameActor, cameraEvidence, handSide, arenaId, frame, submissionSequence),
+        ],
       };
     };
     const committed = makeReceipt(100, 1_000, committedSubmission, webGpu ? 9 : 0);
@@ -4399,16 +4603,24 @@ async function runContractSelfTest() {
       return { ...wanted, worldPosition: structuredClone(sourceJoint.worldPosition) };
     });
     const sourceWeaponCenterWorld = structuredClone(frameActor.weaponCenterWorld);
-    const wristWorld = sourceSentinels[0].worldPosition;
-    const outsideDelta = [wristWorld[0] - sourceWeaponCenterWorld[0], 0, wristWorld[2] - sourceWeaponCenterWorld[2]];
-    const outsideLength = Math.hypot(outsideDelta[0], outsideDelta[2]);
-    const outsideDirectionWorld = outsideDelta.map((value) => value / outsideLength);
-    const targetWorld = [0, 1, 2].map((axis) => (
-      sourceSentinels.reduce((sum, joint) => sum + joint.worldPosition[axis], 0) / sourceSentinels.length
-    ));
-    const positionWorld = targetWorld.map((value, axis) => value
-      + outsideDirectionWorld[axis] * handCameraContract.outsideOffsetM
-      + (axis === 1 ? handCameraContract.upwardOffsetM : 0));
+    const sourceShoulders = expectedBones.filter(({ role }) => role === 'shoulder').map((wanted) => {
+      const sourceJoint = frameActor.jointScreenPositions.find((joint) => (
+        joint.kind === 'arm' && joint.side === wanted.side && joint.role === wanted.role && joint.bone === wanted.bone
+      ));
+      return {
+        kind: 'arm', side: wanted.side, role: wanted.role, bone: wanted.bone,
+        worldPosition: structuredClone(sourceJoint.worldPosition),
+      };
+    });
+    const derived = deriveExpectedHandCamera(
+      side,
+      sourceShoulders.find((source) => source.side === 'left').worldPosition,
+      sourceShoulders.find((source) => source.side === 'right').worldPosition,
+      sourceWeaponCenterWorld,
+      sourceSentinels,
+    );
+    assert(derived !== null, `${side} shoulder-derived hand camera fixture must be non-degenerate`);
+    const { outsideDirectionWorld, targetWorld, positionWorld } = derived;
     const aim = vectorSubtract(targetWorld, positionWorld);
     const fixtureCamera = {
       id: `armed-live-bot-${side}-fixed-hand-detail`,
@@ -4425,7 +4637,7 @@ async function runContractSelfTest() {
       return { ...joint, worldPosition, ndc };
     });
     const handFrameActor = makeFrameActor(handProjectionCamera, handPoints);
-    const handPresentation = makePresentation(handProjectionCamera, handFrameActor);
+    const handPresentation = makePresentation(handProjectionCamera, handFrameActor, 'webgl2', 'atomic-acres', side);
     const handSentinels = handFrameActor.jointScreenPositions
       .filter((joint) => joint.side === side && (joint.role === 'wrist-hand' || joint.kind === 'finger'))
       .map((joint) => ({
@@ -4444,7 +4656,7 @@ async function runContractSelfTest() {
       ...handCameraContract,
       actor,
       side,
-      source: 'armed-close-submitted-frame-weapon-center-and-rigged-joint-world-transforms',
+      source: 'armed-close-submitted-frame-shoulder-lateral-weapon-front-and-rigged-hand-world-transforms',
       sourceFrameBinding: {
         contract: 'armed-close-submitted-actor-source-v1',
         cameraId: sourceScreenshot.camera.id,
@@ -4454,10 +4666,27 @@ async function runContractSelfTest() {
         actor,
       },
       sourceWeaponCenterWorld,
+      sourceShoulders,
       sourceSentinels,
-      outsideDirectionWorld,
-      targetWorld,
-      positionWorld,
+      leftShoulderWorld: derived.leftShoulderWorld,
+      rightShoulderWorld: derived.rightShoulderWorld,
+      shoulderMidWorld: derived.shoulderMidWorld,
+      horizontalShoulderSpanM: derived.horizontalShoulderSpanM,
+      lateralWorld: derived.lateralWorld,
+      rawFrontWorld: derived.rawFrontWorld,
+      weaponCenterDistanceM: derived.weaponCenterDistanceM,
+      orthogonalFrontWorld: derived.orthogonalFrontWorld,
+      orthogonalFrontLengthM: derived.orthogonalFrontLengthM,
+      frontWorld: derived.frontWorld,
+      sideSign: derived.sideSign,
+      outsideDirectionWorld: derived.outsideDirectionWorld,
+      peerOutsideDirectionWorld: derived.peerOutsideDirectionWorld,
+      lateralDot: derived.lateralDot,
+      frontDot: derived.frontDot,
+      peerDirectionDot: derived.peerDirectionDot,
+      degeneracyPolicy: derived.degeneracyPolicy,
+      targetWorld: derived.targetWorld,
+      positionWorld: derived.positionWorld,
       yaw: fixtureCamera.yaw,
       pitch: fixtureCamera.pitch,
       fixtureCamera,
@@ -4478,6 +4707,12 @@ async function runContractSelfTest() {
         effectivelyVisibleMeshCount: 1,
         effectivelyVisibleSkinnedMeshes: ['Swat_Body'],
         handSkinVisible: true,
+        weaponCenterWorld: structuredClone(handFrameActor.weaponCenterWorld),
+        sourceShoulders: handFrameActor.jointScreenPositions.filter((joint) => (
+          joint.kind === 'arm' && joint.role === 'shoulder'
+        )).map(({ kind, side: jointSide, role, bone, worldPosition }) => ({
+          kind, side: jointSide, role, bone, worldPosition: structuredClone(worldPosition),
+        })),
         canvas,
         viewport,
         roiNdc: handRoiNdc,
@@ -4495,6 +4730,10 @@ async function runContractSelfTest() {
         },
       },
       presentation: handPresentation,
+      selfOcclusion: {
+        ...structuredClone(handPresentation.pausedPresentedCapture.handSelfOcclusion[0]),
+        cameraPresentation: structuredClone(handPresentation.pausedPresentedCapture),
+      },
     };
   };
   const leftHand = handFramingFixture('left');
@@ -4508,8 +4747,20 @@ async function runContractSelfTest() {
     rootYaw,
     sourceScreenshot,
   );
+  const validateHandSelf = (fixture, side) => handSelfOcclusionValid(
+    fixture.selfOcclusion,
+    actor,
+    side,
+    fixture.presentation,
+    fixture.framing,
+  );
   assert(validateHand(leftHand, 'left'), 'fixed left hand detail framing must pass');
   assert(validateHand(rightHand, 'right'), 'fixed right hand detail framing must pass');
+  assert(validateHandSelf(leftHand, 'left'), 'same-frame left hand self-occlusion must pass');
+  assert(validateHandSelf(rightHand, 'right'), 'same-frame right hand self-occlusion must pass');
+  assert(dot(leftHand.framing.camera.outsideDirectionWorld, rightHand.framing.camera.outsideDirectionWorld)
+    <= handCameraContract.maximumPeerDirectionDot,
+  'left/right shoulder-derived camera directions must occupy opposite hemispheres');
   const croppedHand = structuredClone(leftHand);
   croppedHand.framing.handDetail.sentinels[1].withinRoi = false;
   croppedHand.framing.handDetail.sentinels[1].onScreen = false;
@@ -4528,6 +4779,72 @@ async function runContractSelfTest() {
   const staleHandSource = structuredClone(leftHand);
   staleHandSource.framing.camera.sourceFrameBinding.frame -= 1;
   assert(!validateHand(staleHandSource, 'left'), 'hand camera source must bind to the armed close submitted frame');
+  const swappedShoulders = structuredClone(leftHand);
+  [swappedShoulders.framing.camera.sourceShoulders[0].worldPosition,
+    swappedShoulders.framing.camera.sourceShoulders[1].worldPosition] = [
+    swappedShoulders.framing.camera.sourceShoulders[1].worldPosition,
+    swappedShoulders.framing.camera.sourceShoulders[0].worldPosition,
+  ];
+  assert(!validateHand(swappedShoulders, 'left'), 'swapped shoulder basis must fail');
+  const wristDirectionForgery = structuredClone(leftHand);
+  wristDirectionForgery.framing.camera.outsideDirectionWorld = [1, 0, 0];
+  assert(!validateHand(wristDirectionForgery, 'left'), 'wrist-based forged outside direction must fail');
+  const sameHemisphereForgery = structuredClone(rightHand);
+  sameHemisphereForgery.framing.camera.outsideDirectionWorld = structuredClone(
+    leftHand.framing.camera.outsideDirectionWorld,
+  );
+  assert(!validateHand(sameHemisphereForgery, 'right'), 'same-hemisphere right camera must fail');
+  assert(deriveExpectedHandCamera(
+    'left', [0, 1, 0], [0.1, 1, 0], [0.2, 1, 0], leftHand.framing.camera.sourceSentinels,
+  ) === null, 'sub-contract shoulder span must fail without fallback');
+  assert(deriveExpectedHandCamera(
+    'left', [0, 1, 0], [0.3, 1, 0], [0.5, 1, 0], leftHand.framing.camera.sourceSentinels,
+  ) === null, 'weapon front collinear with shoulder lateral must fail without fallback');
+  const mutateSelfReceipt = (fixture, mutate) => {
+    const adversary = structuredClone(fixture);
+    mutate(adversary.presentation.pausedPresentedCapture.handSelfOcclusion[0]);
+    adversary.selfOcclusion = {
+      ...structuredClone(adversary.presentation.pausedPresentedCapture.handSelfOcclusion[0]),
+      cameraPresentation: structuredClone(adversary.presentation.pausedPresentedCapture),
+    };
+    return adversary;
+  };
+  const torsoBlocker = mutateSelfReceipt(leftHand, (receipt) => {
+    receipt.allClear = false;
+    receipt.sentinels[1].clear = false;
+    receipt.sentinels[1].blocker = {
+      clear: false, reason: 'actor-self-occlusion-before-hand-sentinel', sameActor: true,
+      heldWeapon: false, cameraInsideOpaqueGeometry: false, terminalDeltaM: 0.2, hitPointToSentinelM: 0.2,
+    };
+  });
+  assert(!validateHandSelf(torsoBlocker, 'left'), 'actor torso self-occlusion must fail');
+  const weaponTerminal = mutateSelfReceipt(leftHand, (receipt) => {
+    receipt.allClear = false;
+    receipt.sentinels[2].clear = false;
+    receipt.sentinels[2].blocker = {
+      clear: false, reason: 'held-weapon-before-hand-sentinel', sameActor: true,
+      heldWeapon: true, cameraInsideOpaqueGeometry: false, terminalDeltaM: 0.01, hitPointToSentinelM: 0.01,
+    };
+  });
+  assert(!validateHandSelf(weaponTerminal, 'left'), 'held-weapon terminal hit must never be accepted');
+  const cameraInside = mutateSelfReceipt(leftHand, (receipt) => {
+    receipt.allClear = false;
+    receipt.sentinels[3].clear = false;
+    receipt.sentinels[3].blocker = {
+      clear: false, reason: 'camera-inside-opaque-geometry', sameActor: true,
+      heldWeapon: false, cameraInsideOpaqueGeometry: true, terminalDeltaM: 0.5, hitPointToSentinelM: 0.5,
+    };
+  });
+  assert(!validateHandSelf(cameraInside, 'left'), 'camera-inside opaque geometry must fail');
+  const missingSelfSentinel = mutateSelfReceipt(leftHand, (receipt) => {
+    receipt.allClear = false;
+    receipt.orderValid = false;
+    receipt.sentinels.pop();
+  });
+  assert(!validateHandSelf(missingSelfSentinel, 'left'), 'missing self-occlusion sentinel must fail');
+  const staleSelfReceipt = structuredClone(leftHand);
+  staleSelfReceipt.selfOcclusion.captureFrame -= 1;
+  assert(!validateHandSelf(staleSelfReceipt, 'left'), 'stale sampled self-occlusion frame must fail cached binding');
 }
 
 if (selfTestMode) {

@@ -11,6 +11,7 @@ import {
   type AtomicPlayerConvergence,
   type RiggedEvidenceCamera,
 } from '../../src/rigged-bot-visual-evidence-contract';
+import { deriveRiggedHandCamera, RIGGED_HAND_CAMERA_CONTRACT } from '../../src/rigged-hand-evidence';
 
 type Renderer = 'webgl2' | 'webgpu';
 
@@ -102,13 +103,7 @@ const CARBINE_SOCKET_REFERENCES = Object.freeze({
 });
 const CLOSE_JOINT_THRESHOLDS = Object.freeze({ minimumArmChainPixels: 80 });
 const HAND_DETAIL_THRESHOLDS = Object.freeze({ minimumWristFingerPixels: 12 });
-const HAND_CAMERA_CONTRACT = Object.freeze({
-  contract: 'fixed-horizontal-wrist-from-weapon-center-v1',
-  outsideOffsetM: 0.7,
-  upwardOffsetM: 0.12,
-  fovDegrees: 48,
-  maximumSourceJointDriftM: 0.03,
-});
+const HAND_CAMERA_CONTRACT = RIGGED_HAND_CAMERA_CONTRACT;
 const CLOSE_ROI_NDC = Object.freeze({ minX: -0.46, maxX: 0.46, minY: -0.7, maxY: 0.7 });
 const HAND_ROI_NDC = Object.freeze({ minX: -0.55, maxX: 0.55, minY: -0.68, maxY: 0.68 });
 const MEDIUM_ROI_NDC = Object.freeze({ minX: -0.68, maxX: 0.68, minY: -0.82, maxY: 0.82 });
@@ -1008,11 +1003,12 @@ async function commitCaptureCamera(
   camera: RiggedEvidenceCamera,
   captureTargets: readonly CaptureActor[],
   fixedVisualTimeMs: number | null = null,
-  principalWrite?: Readonly<{
+  principalWrite: Readonly<{
     mode: 'visible-observe' | 'principal-write-suppressed' | 'visible-restored';
     sessionId?: string;
     reuseCaptureTargets?: boolean;
-  }>,
+  }> | null = null,
+  handSide: 'left' | 'right' | null = null,
 ): Promise<any> {
   const before = await page.evaluate(() => {
     const api = window.__ATOMIC_ACRES_DEBUG__;
@@ -1025,11 +1021,14 @@ async function commitCaptureCamera(
       completedSequence: presentation.completedSequence,
     };
   });
-  const configured = await page.evaluate(({ requested, targets, fixedTime, principal }) => {
+  const configured = await page.evaluate(({ requested, targets, fixedTime, principal, requestedHandSide }) => {
     const api = window.__ATOMIC_ACRES_DEBUG__;
     api.setRenderPaused(true);
     if (principal?.reuseCaptureTargets !== true
       && !api.setRiggedEvidenceCaptureTargets(targets)) throw new Error('Rigged evidence capture target registration failed');
+    if (!api.setRiggedEvidenceHandCaptureSide(requestedHandSide)) {
+      throw new Error('Rigged evidence hand capture side registration failed');
+    }
     const session = principal ? api.riggedEvidencePrincipalWriteSession() : null;
     if (principal?.sessionId !== undefined && session?.sessionId !== principal.sessionId) {
       throw new Error('Rigged evidence principal-write session identity changed');
@@ -1048,13 +1047,19 @@ async function commitCaptureCamera(
     ))) throw new Error('Rigged evidence principal-write control configuration failed');
     api.setRenderPaused(false);
     return { revision, principalSession: session };
-  }, { requested: camera, targets: captureTargets, fixedTime: fixedVisualTimeMs, principal: principalWrite ?? null });
+  }, {
+    requested: camera,
+    targets: captureTargets,
+    fixedTime: fixedVisualTimeMs,
+    principal: principalWrite,
+    requestedHandSide: handSide,
+  });
   const requestedRevision = configured.revision;
   expect(requestedRevision, `${camera.id}: capture camera revision`).toEqual(expect.any(Number));
   expect(requestedRevision, `${camera.id}: capture revision advances from the sampled prior camera state`).toBeGreaterThan(
     before.captureRevision,
   );
-  await page.waitForFunction(({ revision, beforeFrame, expected, targets, expectedPrincipalMode }) => {
+  await page.waitForFunction(({ revision, beforeFrame, expected, targets, expectedPrincipalMode, requestedHandSide }) => {
     const review = (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).deterministicReview;
     const committed = review.presentedCapture;
     const close = (left: number, right: number) => Math.abs(left - right) <= 1e-8;
@@ -1069,6 +1074,7 @@ async function commitCaptureCamera(
         && actor.principalWriteControl.mode === expectedPrincipalMode
         && actor.rasterRoi?.anchorAndSixteenJointsInside === true
       )))
+      && (requestedHandSide === null || committed.handSelfOcclusion?.length === targets.length)
       && committed.position.every((value: number, index: number) => close(value, expected.position[index]))
       && close(committed.yaw, expected.yaw)
       && close(committed.pitch, expected.pitch)
@@ -1079,6 +1085,7 @@ async function commitCaptureCamera(
     expected: camera,
     targets: captureTargets,
     expectedPrincipalMode: principalWrite?.mode ?? null,
+    requestedHandSide: handSide,
   }, { timeout: 5_000 });
   const committed = await page.evaluate(() => (
     (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).deterministicReview.presentedCapture
@@ -1429,6 +1436,53 @@ async function sampleRequiredLineOfSight(
     expect(sentinel.targetDistanceM, `${label}:${sentinel.name}: exact sampled ray distance`).toBeGreaterThan(0.025);
   }
   return lineOfSight;
+}
+
+async function sampleRequiredHandSelfOcclusion(
+  page: Page,
+  actor: CaptureActor,
+  side: 'left' | 'right',
+  presentation: any,
+  framing: any,
+): Promise<any> {
+  const selfOcclusion = await page.evaluate(({ requestedActor, requestedSide }) => (
+    window.__ATOMIC_ACRES_DEBUG__.sampleRiggedEvidenceHandSelfOcclusion(
+      requestedActor.kind,
+      requestedActor.id,
+      requestedSide,
+    )
+  ), { requestedActor: actor, requestedSide: side });
+  const contract = RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.handSelfOcclusion;
+  const label = `${actor.kind}:${actor.id}:${side}-hand-self-occlusion`;
+  expect(selfOcclusion, label).toMatchObject({
+    ...contract,
+    actor,
+    side,
+    heldWeaponIncluded: true,
+    orderValid: true,
+    allClear: true,
+    captureFrame: presentation.pausedPresentedCapture.frame,
+    captureRevision: presentation.requestedRevision,
+    captureSubmissionSequence: presentation.pausedPresentedCapture.submissionSequence,
+    cameraPresentation: {
+      contract: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.contract,
+      captureRevision: presentation.requestedRevision,
+      submissionSequence: presentation.pausedPresentedCapture.submissionSequence,
+    },
+  });
+  expect(selfOcclusion.actorOccluderCount, `${label}: actor render geometry included`).toBeGreaterThan(0);
+  expect(selfOcclusion.heldWeaponOccluderCount, `${label}: held weapon render geometry included`).toBeGreaterThan(0);
+  expect(selfOcclusion.sentinels.map(({ name }: any) => name), `${label}: exact hand sentinel order`).toEqual(
+    contract.sentinelNames,
+  );
+  expect(framing.frame, `${label}: framing shares final submitted frame`).toBe(selfOcclusion.captureFrame);
+  expect(framing.captureRevision, `${label}: framing shares camera revision`).toBe(selfOcclusion.captureRevision);
+  for (const sentinel of selfOcclusion.sentinels) {
+    expect(sentinel, `${label}:${sentinel.name}`).toMatchObject({ present: true, clear: true });
+    expect(sentinel.blocker?.heldWeapon ?? false, `${label}:${sentinel.name}: no held-weapon terminal acceptance`).toBe(false);
+    expect(sentinel.blocker?.cameraInsideOpaqueGeometry ?? false, `${label}:${sentinel.name}: camera outside opaque geometry`).toBe(false);
+  }
+  return selfOcclusion;
 }
 
 async function screenshotWithHash(page: Page, testInfo: TestInfo, name: string): Promise<{ path: string; sha256: string }> {
@@ -1934,6 +1988,15 @@ async function captureHandFraming(
           && pixel.y <= Math.min(viewport.height, canvasBounds.bottom);
         return { ...joint, pixel, withinRoi, onScreen };
       });
+    const sourceShoulders = (target.jointScreenPositions ?? [])
+      .filter((joint: any) => joint.kind === 'arm' && joint.role === 'shoulder')
+      .map((joint: any) => ({
+        kind: joint.kind,
+        side: joint.side,
+        role: joint.role,
+        bone: joint.bone,
+        worldPosition: joint.worldPosition,
+      }));
     const orderValid = sentinels.length === expected.length && sentinels.every((joint: any, index: number) => {
       const wanted = expected[index];
       return joint.kind === wanted.kind && joint.side === wanted.side && joint.role === wanted.role
@@ -1960,6 +2023,8 @@ async function captureHandFraming(
       effectivelyVisibleMeshCount: target.effectivelyVisibleMeshCount,
       effectivelyVisibleSkinnedMeshes: target.effectivelyVisibleSkinnedMeshes,
       handSkinVisible: target.handSkinVisible,
+      weaponCenterWorld: target.weaponCenterWorld,
+      sourceShoulders,
       canvas: {
         left: canvasBounds.left,
         top: canvasBounds.top,
@@ -2017,6 +2082,7 @@ async function captureHandFraming(
   expect(framing.evidenceSentinels, `${label}: exact submitted-frame evidence bones`).toHaveLength(6);
   expect(framing.effectivelyVisibleSkinnedMeshes.length, `${label}: effective skinned renderables`).toBeGreaterThan(0);
   expect(framing.handDetail.sentinels, `${label}: wrist plus five digit sentinels`).toHaveLength(6);
+  expect(framing.sourceShoulders, `${label}: both shoulder basis sources`).toHaveLength(2);
   expect(framing.handDetail.fingerSpans, `${label}: five independently measured wrist-to-finger spans`).toHaveLength(5);
   for (const sentinel of framing.handDetail.sentinels) {
     const source = (camera.sourceSentinels as any[]).find((candidate) => candidate.bone === sentinel.bone);
@@ -2025,6 +2091,16 @@ async function captureHandFraming(
       HAND_CAMERA_CONTRACT.maximumSourceJointDriftM,
     );
   }
+  for (const shoulder of framing.sourceShoulders) {
+    const source = (camera.sourceShoulders as any[]).find((candidate) => candidate.bone === shoulder.bone);
+    expect(source, `${label}: ${shoulder.bone} is bound to the camera basis source`).toBeDefined();
+    expect(positionDelta(shoulder.worldPosition, source.worldPosition), `${label}: ${shoulder.bone} source-to-capture drift`).toBeLessThanOrEqual(
+      HAND_CAMERA_CONTRACT.maximumSourceJointDriftM,
+    );
+  }
+  expect(positionDelta(framing.weaponCenterWorld, camera.sourceWeaponCenterWorld as number[]), `${label}: weapon-center source-to-capture drift`).toBeLessThanOrEqual(
+    HAND_CAMERA_CONTRACT.maximumSourceJointDriftM,
+  );
   for (const span of framing.handDetail.fingerSpans) {
     expect(span.pixels, `${label}: ${span.digit} wrist-to-finger detail`).toBeGreaterThanOrEqual(
       HAND_DETAIL_THRESHOLDS.minimumWristFingerPixels,
@@ -2057,6 +2133,14 @@ async function captureHandAtFixedOutsidePose(
     ));
     return observed ? { ...wanted, worldPosition: observed.worldPosition } : null;
   });
+  const sourceShouldersUnverified = ARM_BONES.filter(({ role }) => role === 'shoulder').map((wanted) => {
+    const observed = sourceActor?.jointScreenPositions?.find((joint: any) => (
+      joint.kind === 'arm' && joint.side === wanted.side && joint.role === wanted.role && joint.bone === wanted.bone
+    ));
+    return observed ? {
+      kind: 'arm', side: wanted.side, role: wanted.role, bone: wanted.bone, worldPosition: observed.worldPosition,
+    } : null;
+  });
   const weaponCenterWorldUnverified = sourceActor?.weaponCenterWorld ?? null;
   const label = `${actor.kind}:${actor.id}:${side}-hand-camera`;
   expect(sourceCapture?.camera?.id, `${label}: source is the fixed armed close capture`).toBe(
@@ -2065,6 +2149,7 @@ async function captureHandAtFixedOutsidePose(
   expect(sourceActor?.actor, `${label}: source actor is bound to the submitted close frame`).toEqual(actor);
   expect(sourceSentinelsUnverified.every((joint) => joint !== null), `${label}: submitted close frame has all six source joints`).toBe(true);
   expect(sourceSentinelsUnverified).toHaveLength(6);
+  expect(sourceShouldersUnverified.every((joint) => joint !== null), `${label}: submitted close frame has both shoulder sources`).toBe(true);
   const sourceSentinels = sourceSentinelsUnverified as Array<{
     kind: string;
     side: string;
@@ -2073,23 +2158,39 @@ async function captureHandAtFixedOutsidePose(
     bone: string;
     worldPosition: number[];
   }>;
+  const sourceShoulders = sourceShouldersUnverified as Array<{
+    kind: 'arm'; side: 'left' | 'right'; role: 'shoulder'; bone: string; worldPosition: number[];
+  }>;
   expect(sourceSentinels.every(({ worldPosition }) => (
     Array.isArray(worldPosition) && worldPosition.length === 3 && worldPosition.every(Number.isFinite)
   )), `${label}: finite live wrist/finger world positions`).toBe(true);
   expect(Array.isArray(weaponCenterWorldUnverified) && weaponCenterWorldUnverified.length === 3, `${label}: submitted close-frame weapon center`).toBe(true);
   const weaponCenterWorld = weaponCenterWorldUnverified as number[];
   expect(weaponCenterWorld.every(Number.isFinite), `${label}: finite rendered weapon center`).toBe(true);
-  const wristWorld = sourceSentinels[0].worldPosition;
-  const outsideDelta = [wristWorld[0] - weaponCenterWorld[0], 0, wristWorld[2] - weaponCenterWorld[2]];
-  const outsideLength = Math.hypot(outsideDelta[0], outsideDelta[2]);
-  expect(outsideLength, `${label}: non-degenerate outside-of-weapon horizontal vector`).toBeGreaterThan(0.01);
-  const outsideDirectionWorld = outsideDelta.map((value) => value / outsideLength);
-  const targetWorld = [0, 1, 2].map((axis) => (
-    sourceSentinels.reduce((sum, joint) => sum + joint.worldPosition[axis], 0) / sourceSentinels.length
-  ));
-  const positionWorld = targetWorld.map((value, axis) => value
-    + outsideDirectionWorld[axis] * HAND_CAMERA_CONTRACT.outsideOffsetM
-    + (axis === 1 ? HAND_CAMERA_CONTRACT.upwardOffsetM : 0));
+  expect(sourceShoulders.every(({ worldPosition }) => (
+    Array.isArray(worldPosition) && worldPosition.length === 3 && worldPosition.every(Number.isFinite)
+  )), `${label}: finite live shoulder world positions`).toBe(true);
+  const derived = deriveRiggedHandCamera({
+    side,
+    leftShoulderWorld: sourceShoulders.find((joint) => joint.side === 'left')!.worldPosition,
+    rightShoulderWorld: sourceShoulders.find((joint) => joint.side === 'right')!.worldPosition,
+    weaponCenterWorld,
+    handSentinels: sourceSentinels,
+  });
+  const { targetWorld, positionWorld, outsideDirectionWorld } = derived;
+  expect(Math.sign(derived.lateralDot), `${label}: camera is on the requested lateral hemisphere`).toBe(derived.sideSign);
+  expect(Math.abs(derived.lateralDot), `${label}: shoulder-lateral contribution`).toBeGreaterThanOrEqual(
+    HAND_CAMERA_CONTRACT.minimumAbsoluteLateralDot,
+  );
+  expect(derived.frontDot, `${label}: fixed front-oblique contribution`).toBeGreaterThanOrEqual(
+    HAND_CAMERA_CONTRACT.minimumFrontDot,
+  );
+  expect(derived.frontDot, `${label}: fixed front-oblique contribution`).toBeLessThanOrEqual(
+    HAND_CAMERA_CONTRACT.maximumFrontDot,
+  );
+  expect(derived.peerDirectionDot, `${label}: theoretical opposite-side direction`).toBeLessThanOrEqual(
+    HAND_CAMERA_CONTRACT.maximumPeerDirectionDot,
+  );
   const aim = subtract(targetWorld, positionWorld);
   const horizontalAim = Math.hypot(aim[0], aim[2]);
   const pose = {
@@ -2112,7 +2213,7 @@ async function captureHandAtFixedOutsidePose(
     ...HAND_CAMERA_CONTRACT,
     actor,
     side,
-    source: 'armed-close-submitted-frame-weapon-center-and-rigged-joint-world-transforms',
+    source: 'armed-close-submitted-frame-shoulder-lateral-weapon-front-and-rigged-hand-world-transforms',
     sourceFrameBinding: {
       contract: 'armed-close-submitted-actor-source-v1',
       cameraId: sourceCapture.camera.id,
@@ -2122,17 +2223,35 @@ async function captureHandAtFixedOutsidePose(
       actor,
     },
     sourceWeaponCenterWorld: weaponCenterWorld,
+    sourceShoulders,
     sourceSentinels,
-    outsideDirectionWorld,
-    targetWorld,
-    positionWorld,
+    leftShoulderWorld: derived.leftShoulderWorld,
+    rightShoulderWorld: derived.rightShoulderWorld,
+    shoulderMidWorld: derived.shoulderMidWorld,
+    horizontalShoulderSpanM: derived.horizontalShoulderSpanM,
+    lateralWorld: derived.lateralWorld,
+    rawFrontWorld: derived.rawFrontWorld,
+    weaponCenterDistanceM: derived.weaponCenterDistanceM,
+    orthogonalFrontWorld: derived.orthogonalFrontWorld,
+    orthogonalFrontLengthM: derived.orthogonalFrontLengthM,
+    frontWorld: derived.frontWorld,
+    sideSign: derived.sideSign,
+    outsideDirectionWorld: derived.outsideDirectionWorld,
+    peerOutsideDirectionWorld: derived.peerOutsideDirectionWorld,
+    lateralDot: derived.lateralDot,
+    frontDot: derived.frontDot,
+    peerDirectionDot: derived.peerDirectionDot,
+    degeneracyPolicy: derived.degeneracyPolicy,
+    targetWorld: derived.targetWorld,
+    positionWorld: derived.positionWorld,
     yaw: pose.yaw,
     pitch: pose.pitch,
     fixtureCamera,
   };
-  const presentation = await commitCaptureCamera(page, fixtureCamera, [actor]);
+  const presentation = await commitCaptureCamera(page, fixtureCamera, [actor], null, null, side);
   const framing = await captureHandFraming(page, actor, side, camera, presentation);
   const lineOfSight = await sampleRequiredLineOfSight(page, actor, presentation, framing);
+  const selfOcclusion = await sampleRequiredHandSelfOcclusion(page, actor, side, presentation, framing);
   const screenshot = await screenshotPresentedFrameWithHash(
     page,
     testInfo,
@@ -2149,6 +2268,7 @@ async function captureHandAtFixedOutsidePose(
     camera: fixtureCamera,
     presentation,
     lineOfSight,
+    selfOcclusion,
     framing,
   };
 }
@@ -2405,6 +2525,13 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
     leftHand: await captureHandAtFixedOutsidePose(page, testInfo, armedActor, 'left', armedCloseScreenshot),
     rightHand: await captureHandAtFixedOutsidePose(page, testInfo, armedActor, 'right', armedCloseScreenshot),
   };
+  const handDirectionDot = (armedScreenshots.leftHand.framing.camera.outsideDirectionWorld as number[])
+    .reduce((sum, value, axis) => (
+      sum + value * (armedScreenshots.rightHand.framing.camera.outsideDirectionWorld as number[])[axis]
+    ), 0);
+  expect(handDirectionDot, 'left/right hand cameras occupy opposite shoulder-derived hemispheres').toBeLessThanOrEqual(
+    HAND_CAMERA_CONTRACT.maximumPeerDirectionDot,
+  );
   const atomicCaptureRevisions = [
     armedScreenshots.medium.presentation.requestedRevision,
     armedScreenshots.close.presentation.requestedRevision,
@@ -2543,10 +2670,10 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
     expect(endingSourceStatus, 'official rigged-bot evidence ends with a clean worktree').toBe('');
   }
   writeFileSync(receiptPath, `${JSON.stringify({
-    schemaVersion: 10,
+    schemaVersion: 11,
     status: 'AUTOMATION_PASS_OWNER_PENDING',
-    contract: 'atomic-acres/pass69-3-rigged-bot-live@10',
-    evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-hand-detail-main-camera-draw-stamps-and-production-rgb-raster-proof',
+    contract: 'atomic-acres/pass69-3-rigged-bot-live@11',
+    evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-shoulder-oblique-hand-detail-self-occlusion-main-camera-draw-stamps-and-production-rgb-raster-proof',
     target: officialEvidence ? expectedTarget : `development-${renderer}`,
     sourceSha,
     endingSourceSha,
@@ -2576,6 +2703,7 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
       status: 'PENDING_OWNER_INSPECTION',
       automatedFramingIsNotVisualAcceptance: true,
       worldLayoutLosDoesNotProveActorSelfOcclusion: true,
+      handSelfOcclusionRayDoesNotReplaceVisualAcceptance: true,
       inspectionScope: 'armed medium/full close/left hand/right hand plus four restored dummy closeups, four suppressed controls, and shared overview',
     },
     browser: {

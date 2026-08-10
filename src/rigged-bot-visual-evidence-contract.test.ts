@@ -196,6 +196,15 @@ describe('fixed rigged actor visual evidence fixtures', () => {
       'Cube037', 'Cube037_1', 'Cube037_2', 'Cube023', 'Cube023_1',
     ]);
     expect(new Set(RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES).size).toBe(9);
+    expect(RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.handSelfOcclusion).toEqual({
+      contract: 'submitted-frame-hand-self-occlusion-v1',
+      actorSelfOcclusionIncluded: true,
+      actorAttachmentsIncluded: true,
+      heldWeaponTerminalHitAccepted: false,
+      terminalHandToleranceM: 0.06,
+      cameraInsideOpaqueDistanceM: 0.1,
+      sentinelNames: ['wrist-hand', 'thumb', 'index', 'middle', 'ring', 'pinky'],
+    });
   });
 
   it('fails closed with bounded, sanitized and exact convergence timeout diagnostics', async () => {

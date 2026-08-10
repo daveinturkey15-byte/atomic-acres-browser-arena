@@ -30,10 +30,15 @@ import {
 import { applyBotEmissiveBrightness } from './operator-model';
 import { applyRemoteHumanReadabilityHighlight, remoteHumanReadabilityTelemetry } from './remote-player-readability';
 import {
+  classifyRiggedHandSelfOcclusionHit,
   collectRiggedEvidenceOccluders,
+  collectRiggedEvidenceSelfOccluders,
   firstRiggedEvidenceOccluder,
   installRiggedEvidenceMainCameraDrawSession,
   projectRiggedEvidenceLiveDeformedRasterRoi,
+  intersectRiggedEvidencePresentationObjects,
+  RIGGED_HAND_SELF_OCCLUSION_CONTRACT,
+  riggedEvidenceObjectDescendsFrom,
   riggedEvidenceMaterialCanOcclude,
   validateRiggedEvidenceCaptureTargets,
   type RiggedEvidenceMainCameraActorDrawReceipt,
@@ -1155,16 +1160,19 @@ type DebugCapturePresentationReceipt = Readonly<{
   captureTargets: readonly DebugRiggedEvidenceCaptureTarget[];
   actors: readonly DebugCaptureActorFrameEvidence[];
   worldLayoutLineOfSight: readonly Readonly<Record<string, unknown>>[];
+  handSelfOcclusion: readonly Readonly<Record<string, unknown>>[];
 }>;
 let debugCaptureCameraRevision = 0;
 let lastDebugCapturePresentation: DebugCapturePresentationReceipt | null = null;
 let debugRiggedEvidenceCaptureTargets: readonly DebugRiggedEvidenceCaptureTarget[] | null = null;
 let debugRiggedEvidenceMainCameraDrawSession: RiggedEvidenceMainCameraDrawSession | null = null;
+let debugRiggedEvidenceHandCaptureSide: 'left' | 'right' | null = null;
 
 function clearDebugRiggedEvidenceCaptureTargets(): void {
   debugRiggedEvidenceMainCameraDrawSession?.dispose();
   debugRiggedEvidenceMainCameraDrawSession = null;
   debugRiggedEvidenceCaptureTargets = null;
+  debugRiggedEvidenceHandCaptureSide = null;
 }
 let matchAdmissionGeneration = 0;
 const matchAdmissionCoordinator = new MatchAdmissionCoordinator();
@@ -24079,10 +24087,16 @@ const debugWindow = window as Window & {
       captureRevision: number,
       mode: RiggedEvidencePrincipalWriteMode,
     ) => boolean;
+    setRiggedEvidenceHandCaptureSide: (side: 'left' | 'right' | null) => boolean;
     awaitRiggedEvidenceCaptureCompletion: () => Promise<Record<string, unknown>>;
     sampleRiggedEvidenceLineOfSight: (
       actorKind: 'bot' | 'training-dummy',
       actorId: string,
+    ) => Record<string, unknown>;
+    sampleRiggedEvidenceHandSelfOcclusion: (
+      actorKind: 'bot' | 'training-dummy',
+      actorId: string,
+      side: 'left' | 'right',
     ) => Record<string, unknown>;
     setPass64SystemVisibility: (name: 'sky' | 'mist' | 'smoke' | 'dust' | 'grass' | 'water', visible: boolean) => boolean;
     setCaptureViewmodelHidden: (hidden: boolean) => void;
@@ -24270,6 +24284,123 @@ function debugCaptureActorFrameEvidence(
   });
 }
 
+function debugNearestHandSelfOcclusion(
+  origin: THREE.Vector3,
+  target: THREE.Vector3,
+  candidates: readonly THREE.Object3D[],
+): THREE.Intersection | null {
+  const delta = target.clone().sub(origin);
+  const targetDistanceM = delta.length();
+  if (!(targetDistanceM > 0)) return null;
+  const forwardRaycaster = new THREE.Raycaster(origin, delta.clone().normalize(), 0, targetDistanceM);
+  forwardRaycaster.layers.mask = camera.layers.mask;
+  const forward = firstRiggedEvidenceOccluder(
+    intersectRiggedEvidencePresentationObjects(forwardRaycaster, candidates),
+  );
+  const reverseRaycaster = new THREE.Raycaster(
+    target,
+    delta.clone().multiplyScalar(-1).normalize(),
+    0,
+    targetDistanceM,
+  );
+  reverseRaycaster.layers.mask = camera.layers.mask;
+  const reverse = firstRiggedEvidenceOccluder(
+    intersectRiggedEvidencePresentationObjects(reverseRaycaster, candidates),
+  );
+  const reverseFromCamera = reverse ? {
+    ...reverse,
+    distance: Math.max(0, targetDistanceM - reverse.distance),
+  } as THREE.Intersection : null;
+  return [forward, reverseFromCamera]
+    .filter((hit): hit is THREE.Intersection => hit !== null)
+    .sort((left, right) => left.distance - right.distance)[0] ?? null;
+}
+
+function debugRiggedHandSelfOcclusionForFrame(
+  frameActor: DebugCaptureActorFrameEvidence,
+  side: 'left' | 'right',
+  captureFrame: number,
+  captureSubmissionSequence: number,
+): Readonly<Record<string, unknown>> {
+  const { kind: actorKind, id: actorId } = frameActor.actor;
+  const actorRoot = debugRiggedEvidenceActorRoot(actorKind, actorId);
+  const operatorRoot = actorRoot ? resolveRiggedOperatorRuntimeRoot(actorRoot) : null;
+  const weaponRoot = (operatorRoot?.userData.operatorRig as { weapon?: THREE.Object3D } | undefined)?.weapon ?? null;
+  const cameraWorld = camera.getWorldPosition(new THREE.Vector3());
+  const base = {
+    ...RIGGED_HAND_SELF_OCCLUSION_CONTRACT,
+    actor: Object.freeze({ kind: actorKind, id: actorId }),
+    side,
+    arenaId: selectedArena.id,
+    captureFrame,
+    captureRevision: debugCaptureCameraRevision,
+    captureSubmissionSequence,
+    camera: Object.freeze({
+      position: Object.freeze(cameraWorld.toArray()),
+      quaternion: Object.freeze(camera.quaternion.toArray()),
+      fov: camera.fov,
+      captureRevision: debugCaptureCameraRevision,
+    }),
+  };
+  if (!actorRoot || !operatorRoot || !weaponRoot) return Object.freeze({
+    ...base,
+    heldWeaponIncluded: false,
+    renderOccluderCount: 0,
+    actorOccluderCount: 0,
+    heldWeaponOccluderCount: 0,
+    allClear: false,
+    reason: !actorRoot ? 'missing-actor-at-submitted-frame'
+      : !operatorRoot ? 'missing-operator-root-at-submitted-frame'
+        : 'missing-held-weapon-at-submitted-frame',
+    sentinels: Object.freeze([]),
+  });
+  scene.updateMatrixWorld(true);
+  const occluders = collectRiggedEvidenceSelfOccluders(scene, camera, debugMeshCanOccludeEvidence);
+  const sources = frameActor.jointScreenPositions.filter((source) => (
+    source.side === side && (source.role === 'wrist-hand' || source.kind === 'finger')
+  ));
+  const sentinels = sources.map((source) => {
+    const name = source.role === 'wrist-hand' ? 'wrist-hand' : source.digit;
+    if (typeof name !== 'string' || !Array.isArray(source.worldPosition)
+      || source.worldPosition.length !== 3
+      || !source.worldPosition.every((value) => typeof value === 'number' && Number.isFinite(value))) {
+      return Object.freeze({ name: name ?? null, present: false, clear: false, blocker: 'invalid-sentinel' });
+    }
+    const worldPosition = new THREE.Vector3().fromArray(source.worldPosition as [number, number, number]);
+    const intersection = debugNearestHandSelfOcclusion(cameraWorld, worldPosition, occluders);
+    const blocker = classifyRiggedHandSelfOcclusionHit(
+      intersection,
+      cameraWorld,
+      worldPosition,
+      actorRoot,
+      weaponRoot,
+    );
+    return Object.freeze({
+      name,
+      bone: source.bone ?? null,
+      present: true,
+      clear: blocker === null || blocker.clear === true,
+      worldPosition: Object.freeze(worldPosition.toArray()),
+      targetDistanceM: cameraWorld.distanceTo(worldPosition),
+      blocker: blocker ?? null,
+      reason: blocker?.reason ?? 'no-hit-before-hand-sentinel',
+    });
+  });
+  const expectedNames = RIGGED_HAND_SELF_OCCLUSION_CONTRACT.sentinelNames;
+  const orderValid = sentinels.length === expectedNames.length
+    && sentinels.every((sentinel, index) => sentinel.name === expectedNames[index]);
+  return Object.freeze({
+    ...base,
+    heldWeaponIncluded: true,
+    renderOccluderCount: occluders.length,
+    actorOccluderCount: occluders.filter((node) => riggedEvidenceObjectDescendsFrom(node, actorRoot)).length,
+    heldWeaponOccluderCount: occluders.filter((node) => riggedEvidenceObjectDescendsFrom(node, weaponRoot)).length,
+    orderValid,
+    allClear: orderValid && sentinels.every((sentinel) => sentinel.present && sentinel.clear),
+    sentinels: Object.freeze(sentinels),
+  });
+}
+
 function debugCapturePresentationReceipt(frame: number): DebugCapturePresentationReceipt {
   if (debugRiggedEvidenceCaptureTargets === null) {
     throw new Error('Rigged evidence presentation receipt requires registered capture targets');
@@ -24281,6 +24412,14 @@ function debugCapturePresentationReceipt(frame: number): DebugCapturePresentatio
     .filter((actor): actor is DebugCaptureActorFrameEvidence => actor !== null));
   const worldLayoutLineOfSight = Object.freeze(actors.map((actor) => (
     debugRiggedEvidenceLineOfSightForFrame(actor, frame, presentation.submissionSequence)
+  )));
+  const handSelfOcclusion = Object.freeze(debugRiggedEvidenceHandCaptureSide === null ? [] : actors.map((actor) => (
+    debugRiggedHandSelfOcclusionForFrame(
+      actor,
+      debugRiggedEvidenceHandCaptureSide!,
+      frame,
+      presentation.submissionSequence,
+    )
   )));
   return Object.freeze({
     contract: 'capture-camera-committed-frame-v2',
@@ -24304,6 +24443,7 @@ function debugCapturePresentationReceipt(frame: number): DebugCapturePresentatio
     captureTargets: Object.freeze(debugRiggedEvidenceCaptureTargets.map((target) => Object.freeze({ ...target }))),
     actors,
     worldLayoutLineOfSight,
+    handSelfOcclusion,
   });
 }
 
@@ -24488,6 +24628,41 @@ function sampleRiggedEvidenceLineOfSight(
     captureSubmissionSequence: cameraReceipt?.submissionSequence ?? null,
     allClear: false,
     reason: 'missing-or-stale-submitted-frame-los',
+    cameraPresentation: cameraReceipt,
+    sentinels: Object.freeze([]),
+  });
+  return Object.freeze({ ...cached, cameraPresentation: cameraReceipt });
+}
+
+function sampleRiggedEvidenceHandSelfOcclusion(
+  actorKind: 'bot' | 'training-dummy',
+  actorId: string,
+  side: 'left' | 'right',
+): Record<string, unknown> {
+  const cameraReceipt = lastDebugCapturePresentation;
+  const targetIsCurrentlyRegistered = debugRiggedEvidenceCaptureTargets?.some((target) => (
+    target.kind === actorKind && target.id === actorId
+  )) === true;
+  const cached = cameraReceipt?.handSelfOcclusion.find((receipt) => {
+    const actor = receipt.actor as { kind?: string; id?: string } | undefined;
+    return actor?.kind === actorKind && actor.id === actorId && receipt.side === side;
+  });
+  const receiptIsCurrent = cameraReceipt?.captureRevision === debugCaptureCameraRevision
+    && cameraReceipt.arenaId === selectedArena.id
+    && debugRiggedEvidenceHandCaptureSide === side
+    && debugRiggedEvidenceCaptureTargets !== null
+    && sameCaptureTargets(cameraReceipt.captureTargets, debugRiggedEvidenceCaptureTargets);
+  if (!cached || !targetIsCurrentlyRegistered || !receiptIsCurrent) return Object.freeze({
+    ...RIGGED_HAND_SELF_OCCLUSION_CONTRACT,
+    actor: Object.freeze({ kind: actorKind, id: actorId }),
+    side,
+    arenaId: selectedArena.id,
+    captureFrame: cameraReceipt?.frame ?? null,
+    captureRevision: cameraReceipt?.captureRevision ?? null,
+    captureSubmissionSequence: cameraReceipt?.submissionSequence ?? null,
+    heldWeaponIncluded: false,
+    allClear: false,
+    reason: 'missing-or-stale-submitted-frame-hand-self-occlusion',
     cameraPresentation: cameraReceipt,
     sentinels: Object.freeze([]),
   });
@@ -26320,11 +26495,20 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       mode,
     });
   },
+  setRiggedEvidenceHandCaptureSide: (side) => {
+    lastDebugCapturePresentation = null;
+    debugRiggedEvidenceHandCaptureSide = null;
+    if (side === null) return true;
+    if ((side !== 'left' && side !== 'right') || debugRiggedEvidenceCaptureTargets === null) return false;
+    debugRiggedEvidenceHandCaptureSide = side;
+    return true;
+  },
   awaitRiggedEvidenceCaptureCompletion: async () => {
     await flushWebGpuFrames(8_000);
     return renderRuntime.presentationTelemetry() as unknown as Record<string, unknown>;
   },
   sampleRiggedEvidenceLineOfSight,
+  sampleRiggedEvidenceHandSelfOcclusion,
   setPass64SystemVisibility: (name, visible) => {
     const objectNames = {
       sky: 'Pass 64 TSL atmosphere sky',

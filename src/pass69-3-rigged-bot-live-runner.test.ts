@@ -22,6 +22,7 @@ const artKit = readFileSync('src/art-kit.ts', 'utf8');
 const artKitTest = readFileSync('src/art-kit.test.ts', 'utf8');
 const legacy = readFileSync('src/legacy-main.ts', 'utf8');
 const dummyUnit = readFileSync('src/additional-maps-rigged-dummy.test.ts', 'utf8');
+const handEvidence = readFileSync('src/rigged-hand-evidence.ts', 'utf8');
 const gitignore = readFileSync('.gitignore', 'utf8');
 
 describe('Pass 69.3 real rigged-bot evidence boundary', () => {
@@ -232,19 +233,19 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       'expectedSentinelCount: 16',
       'minimumArmChainPixels: 80',
       'minimumWristFingerPixels: 12',
-      "contract: 'fixed-horizontal-wrist-from-weapon-center-v1'",
-      'outsideOffsetM: 0.7',
-      'upwardOffsetM: 0.12',
-      'fovDegrees: 48',
+      'RIGGED_HAND_CAMERA_CONTRACT',
       "status: 'AUTOMATION_PASS_OWNER_PENDING'",
       "status: 'PENDING_OWNER_INSPECTION'",
       'automatedFramingIsNotVisualAcceptance: true',
       'worldLayoutLosDoesNotProveActorSelfOcclusion: true',
+      'handSelfOcclusionRayDoesNotReplaceVisualAcceptance: true',
       'screenshotPresentedFrameWithHash(',
       "contract: 'paused-presented-frame-screenshot-v1'",
-      "source: 'armed-close-submitted-frame-weapon-center-and-rigged-joint-world-transforms'",
+      "source: 'armed-close-submitted-frame-shoulder-lateral-weapon-front-and-rigged-hand-world-transforms'",
       "contract: 'armed-close-submitted-actor-source-v1'",
       'api.setRiggedEvidenceCaptureTargets(targets)',
+      'api.setRiggedEvidenceHandCaptureSide(requestedHandSide)',
+      'sampleRiggedEvidenceHandSelfOcclusion(',
       'setRiggedEvidenceCaptureTargets([])',
       'awaitRiggedEvidenceCaptureCompletion()',
       'RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.expectedBotYaw',
@@ -252,17 +253,34 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       "contract: 'paused-render-live-pose-advance-v1'",
       'capture revision advances from the sampled prior camera state',
       "fetch('/channels/the-big-one/channel-provenance.json'",
-      "evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-hand-detail-main-camera-draw-stamps-and-production-rgb-raster-proof'",
+      "evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-shoulder-oblique-hand-detail-self-occlusion-main-camera-draw-stamps-and-production-rgb-raster-proof'",
       'api.admissionState().presentedGameplayFrame',
       'waitForAtomicPlayerConvergence(',
       'presentedGameplayFrame: stagedAtomic.presentedGameplayFrame',
     ]) expect(spec).toContain(token);
+    for (const token of [
+      "contract: 'fixed-shoulder-lateral-front-oblique-hand-v2'",
+      'outsideOffsetM: 0.7',
+      'upwardOffsetM: 0.12',
+      'fovDegrees: 48',
+      'maximumSourceJointDriftM: 0.03',
+      'frontObliqueDegrees: 20',
+      'noFallback: true',
+    ]) expect(handEvidence).toContain(token);
     expect(runner).toContain('sha256(path) === record.sha256');
     expect(runner).toContain('projectWorldToNdc(');
     expect(runner).toContain('framingActorFrameBindingValid(');
     expect(runner).toContain('screenshotFrameBindingValid(');
     expect(runner).toContain('capturePresentationValid(');
     expect(runner).toContain('lineOfSightValid(');
+    expect(runner).toContain('handSelfOcclusionValid(');
+    expect(runner).toContain("contract: 'fixed-shoulder-lateral-front-oblique-hand-v2'");
+    expect(runner).toContain('deriveExpectedHandCamera(');
+    expect(runner).toContain('swapped shoulder basis must fail');
+    expect(runner).toContain('weapon front collinear with shoulder lateral must fail without fallback');
+    expect(runner).toContain('held-weapon terminal hit must never be accepted');
+    expect(runner).toContain('camera-inside opaque geometry must fail');
+    expect(runner).toContain('stale sampled self-occlusion frame must fail cached binding');
     expect(runner).toContain('cachedMatches.length !== 1');
     expect(runner).toContain('completion.finalPausedSubmissionSequence !== paused.submissionSequence');
     expect(runner).toContain('completion.observedCompletedSequence >= paused.submissionSequence');
@@ -294,6 +312,8 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       'src/rigged-bot-visual-evidence-contract.test.ts',
       'src/rigged-evidence-occlusion.ts',
       'src/rigged-evidence-occlusion.test.ts',
+      'src/rigged-hand-evidence.ts',
+      'src/rigged-hand-evidence.test.ts',
       'src/pass69-3-rigged-bot-live-runner.test.ts',
       'tests/e2e/pass69-3-rigged-bot-live.spec.ts',
     ]));

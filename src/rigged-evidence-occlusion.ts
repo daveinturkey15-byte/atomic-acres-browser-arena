@@ -2,6 +2,16 @@ import * as THREE from 'three';
 
 export const RIGGED_EVIDENCE_OCCLUDER_MINIMUM_OPACITY = 0.75;
 
+export const RIGGED_HAND_SELF_OCCLUSION_CONTRACT = Object.freeze({
+  contract: 'submitted-frame-hand-self-occlusion-v1',
+  actorSelfOcclusionIncluded: true,
+  actorAttachmentsIncluded: true,
+  heldWeaponTerminalHitAccepted: false,
+  terminalHandToleranceM: 0.06,
+  cameraInsideOpaqueDistanceM: 0.1,
+  sentinelNames: Object.freeze(['wrist-hand', 'thumb', 'index', 'middle', 'ring', 'pinky'] as const),
+});
+
 export type RiggedEvidenceCaptureTarget = Readonly<{
   kind: 'bot' | 'training-dummy';
   id: string;
@@ -1350,6 +1360,41 @@ export function firstRiggedEvidenceOccluder(
   return intersections.find(riggedEvidenceIntersectionCanOcclude) ?? null;
 }
 
+/**
+ * Operator presentation meshes intentionally replace `raycast` with a no-op so
+ * combat can only hit authoritative proxies. Evidence rays still need rendered
+ * triangles, so invoke Three's native implementations without changing that
+ * live combat boundary. Current-pose skinned bounds are scoped to this call.
+ */
+export function intersectRiggedEvidencePresentationObjects(
+  raycaster: THREE.Raycaster,
+  candidates: readonly THREE.Object3D[],
+): THREE.Intersection[] {
+  const intersections: THREE.Intersection[] = [];
+  for (const candidate of candidates) {
+    if (!(candidate instanceof THREE.Mesh) || !candidate.layers.test(raycaster.layers)) continue;
+    if (candidate instanceof THREE.SkinnedMesh) {
+      const previousBoundingBox = candidate.boundingBox;
+      const previousBoundingSphere = candidate.boundingSphere;
+      Reflect.set(candidate, 'boundingBox', null);
+      Reflect.set(candidate, 'boundingSphere', null);
+      try {
+        THREE.SkinnedMesh.prototype.raycast.call(candidate, raycaster, intersections);
+      } finally {
+        Reflect.set(candidate, 'boundingBox', previousBoundingBox);
+        Reflect.set(candidate, 'boundingSphere', previousBoundingSphere);
+      }
+    } else if (candidate instanceof THREE.InstancedMesh) {
+      THREE.InstancedMesh.prototype.raycast.call(candidate, raycaster, intersections);
+    } else if (candidate instanceof THREE.BatchedMesh) {
+      THREE.BatchedMesh.prototype.raycast.call(candidate, raycaster, intersections);
+    } else {
+      THREE.Mesh.prototype.raycast.call(candidate, raycaster, intersections);
+    }
+  }
+  return intersections.sort((left, right) => left.distance - right.distance);
+}
+
 export function riggedEvidenceObjectDescendsFrom(
   node: THREE.Object3D,
   ancestor: THREE.Object3D,
@@ -1376,4 +1421,59 @@ export function collectRiggedEvidenceOccluders(
     occluders.push(node);
   });
   return occluders;
+}
+
+export function collectRiggedEvidenceSelfOccluders(
+  scene: THREE.Object3D,
+  camera: THREE.Camera,
+  isRenderableOccluder: (node: THREE.Object3D) => boolean,
+): THREE.Object3D[] {
+  const occluders: THREE.Object3D[] = [];
+  scene.traverse((node) => {
+    if (!isRenderableOccluder(node) || riggedEvidenceObjectDescendsFrom(node, camera)) return;
+    occluders.push(node);
+  });
+  return occluders;
+}
+
+export function classifyRiggedHandSelfOcclusionHit(
+  intersection: THREE.Intersection | null,
+  origin: THREE.Vector3,
+  target: THREE.Vector3,
+  actorRoot: THREE.Object3D,
+  weaponRoot: THREE.Object3D | null,
+): Readonly<Record<string, unknown>> | null {
+  if (!intersection) return null;
+  const targetDistanceM = origin.distanceTo(target);
+  const terminalDeltaM = targetDistanceM - intersection.distance;
+  const hitPointToSentinelM = intersection.point.distanceTo(target);
+  const sameActor = riggedEvidenceObjectDescendsFrom(intersection.object, actorRoot);
+  const heldWeapon = weaponRoot !== null
+    && riggedEvidenceObjectDescendsFrom(intersection.object, weaponRoot);
+  const cameraInsideOpaqueGeometry = intersection.distance
+    <= RIGGED_HAND_SELF_OCCLUSION_CONTRACT.cameraInsideOpaqueDistanceM;
+  const terminalHandSurface = sameActor && !heldWeapon && !cameraInsideOpaqueGeometry
+    && terminalDeltaM >= 0
+    && terminalDeltaM <= RIGGED_HAND_SELF_OCCLUSION_CONTRACT.terminalHandToleranceM
+    && hitPointToSentinelM <= RIGGED_HAND_SELF_OCCLUSION_CONTRACT.terminalHandToleranceM;
+  return Object.freeze({
+    name: intersection.object.name || intersection.object.type,
+    distanceM: intersection.distance,
+    targetDistanceM,
+    terminalDeltaM,
+    hitPointToSentinelM,
+    sameActor,
+    heldWeapon,
+    cameraInsideOpaqueGeometry,
+    clear: terminalHandSurface,
+    reason: cameraInsideOpaqueGeometry
+      ? 'camera-inside-opaque-geometry'
+      : heldWeapon
+        ? 'held-weapon-before-hand-sentinel'
+        : terminalHandSurface
+          ? 'terminal-hand-surface'
+          : sameActor
+            ? 'actor-self-occlusion-before-hand-sentinel'
+            : 'world-occlusion-before-hand-sentinel',
+  });
 }

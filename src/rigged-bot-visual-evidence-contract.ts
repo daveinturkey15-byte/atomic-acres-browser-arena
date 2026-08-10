@@ -1,4 +1,5 @@
 import { GUN_RANGE_TEST_BAY_CONTRACT, gunRangeTestBayRenderedDummyPose } from './gun-range-test-bay';
+import { RIGGED_HAND_SELF_OCCLUSION_CONTRACT } from './rigged-evidence-occlusion';
 
 export type RiggedEvidenceCamera = Readonly<{
   id: string;
@@ -468,13 +469,14 @@ export const RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES = Object.freeze([
 ] as const);
 
 export const RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT = Object.freeze({
-  schemaVersion: 6,
-  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v6',
+  schemaVersion: 7,
+  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v7',
   los: Object.freeze({
     contract: 'actual-render-world-layout-occluder-multi-sentinel-los-v2',
     actorSelfOcclusionExcluded: true,
     sentinels: Object.freeze(['head', 'shoulder-left', 'shoulder-right', 'pelvis', 'wrist-left', 'wrist-right'] as const),
   }),
+  handSelfOcclusion: RIGGED_HAND_SELF_OCCLUSION_CONTRACT,
   presentation: Object.freeze({
     contract: 'capture-camera-committed-frame-v2',
     order: 'pause-final-submission-await-completion-then-compositor-v1',
