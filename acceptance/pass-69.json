@@ -133,6 +133,12 @@
           "ref": "package.json",
           "command": "npx tsc --noEmit --pretty false && npm run build",
           "note": "TypeScript and the production build pass on the approved candidate."
+        },
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/atomic-acres.spec.ts",
+          "command": "npx playwright test tests/e2e/atomic-acres.spec.ts --project=chromium --workers=1 --retries=0 --grep \"falls back to the authored procedural arena\"",
+          "note": "The forced Blender-load failure keeps the normal 60-second admission contract and uses a dedicated 120-second hosted-SwiftShader allowance; the focused Windows test passes without changing shipped runtime bytes."
         }
       ]
     }
