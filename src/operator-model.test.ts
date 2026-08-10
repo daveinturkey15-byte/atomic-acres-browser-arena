@@ -23,6 +23,23 @@ const RIGHT_PINKY_BIND = new THREE.Quaternion(
 );
 const HAND_SENTINELS = (['left', 'right'] as const).flatMap((side) =>
   (['thumb', 'index', 'middle', 'ring', 'pinky'] as const).map((digit) => ({ side, digit })));
+type HandSide = typeof HAND_SENTINELS[number]['side'];
+type HandDigit = typeof HAND_SENTINELS[number]['digit'];
+const INDEPENDENT_HAND_BIND_FLOORS = Object.freeze({
+  thumb: 0.008,
+  index: 0.2,
+  middle: 0.18,
+  ring: 0.22,
+  pinky: 0.35,
+});
+const PRODUCT_HAND_BIND_FLOORS = Object.freeze({
+  thumb: 0.04,
+  index: 0.23,
+  middle: 0.21,
+  ring: 0.25,
+  pinky: 0.38,
+});
+const PRODUCT_HAND_FALLBACK_AXIS = [-1, 0, 0] as const;
 
 function handBoneName(side: 'left' | 'right', digit: string): string {
   return `${digit[0].toUpperCase()}${digit.slice(1)}2${side === 'left' ? 'L' : 'R'}`;
@@ -74,7 +91,25 @@ function localAtReportedBindDelta(bind: THREE.Quaternion, axis: THREE.Vector3, r
 }
 
 function enforceRightPinkyFloor(root: THREE.Object3D) {
-  return enforceRiggedOperatorHandBindDeltaFloor(root, 'right', 'pinky', 0.38, [-1, 0, 0])!;
+  return enforceRiggedOperatorHandBindDeltaFloor(root, 'right', 'pinky', 0.38, PRODUCT_HAND_FALLBACK_AXIS)!;
+}
+
+function findHandEntry(
+  rig: ReturnType<typeof makeHandFloorRig>,
+  side: HandSide,
+  digit: HandDigit,
+) {
+  return rig.entries.find((entry) => entry.side === side && entry.digit === digit)!;
+}
+
+function enforceProductHandFloor(root: THREE.Object3D, side: HandSide, digit: HandDigit) {
+  return enforceRiggedOperatorHandBindDeltaFloor(
+    root,
+    side,
+    digit,
+    PRODUCT_HAND_BIND_FLOORS[digit],
+    PRODUCT_HAND_FALLBACK_AXIS,
+  )!;
 }
 
 describe('rigged operator presentation contract', () => {
@@ -198,6 +233,203 @@ describe('rigged operator presentation contract', () => {
 });
 
 describe('post-mixer authored-bind hand floor', () => {
+  it('replays the official left-pinky and right-thumb cancellation traces on the actual rendered bones', () => {
+    const traces = [
+      {
+        side: 'left',
+        digit: 'pinky',
+        bind: [0.03783821687102318, 0.17641645669937134, -0.06506747752428055, 0.9814335107803345],
+        local: [-0.022799745863587184, -0.15256495255630437, 0.18767551491117984, -0.9700601720323629],
+        before: 0.25253567190298776,
+      },
+      {
+        side: 'right',
+        digit: 'thumb',
+        bind: [0.041727494448423386, 0.12201467901468277, -0.08518115431070328, 0.9879855513572693],
+        local: [0.028280358147412754, 0.12316254666324532, -0.08350633887954156, 0.9884529547297463],
+        before: 0.02855042381835995,
+      },
+    ] as const;
+
+    for (const trace of traces) {
+      const rig = makeHandFloorRig(RIGHT_PINKY_BIND.clone());
+      const target = findHandEntry(rig, trace.side, trace.digit);
+      target.quaternion.set(trace.bind[0], trace.bind[1], trace.bind[2], trace.bind[3]);
+      target.bone.quaternion.set(trace.local[0], trace.local[1], trace.local[2], trace.local[3]);
+      const otherBonesBefore = rig.entries.map((entry) => entry.bone.quaternion.toArray());
+      const receipt = enforceProductHandFloor(rig.root, trace.side, trace.digit) as any;
+      const productFloor = PRODUCT_HAND_BIND_FLOORS[trace.digit];
+
+      expect(receipt.beforeBindDeltaRadians, `${trace.side} ${trace.digit} official cancellation`).toBeCloseTo(trace.before, 12);
+      expect(receipt.afterBindDeltaRadians, `${trace.side} ${trace.digit} product floor`).toBeCloseTo(productFloor, 12);
+      expect(target.bone.quaternion.angleTo(target.quaternion), `${trace.side} ${trace.digit} rendered transform`).toBeCloseTo(productFloor, 12);
+      expect(receipt).toMatchObject({
+        side: trace.side,
+        digit: trace.digit,
+        bone: target.bone.name,
+        minimumBindDeltaRadians: productFloor,
+        allocationContract: 'persistent-per-rendered-hand-bone-v1',
+        intervened: true,
+        appliedToRenderedBone: true,
+        allFinite: true,
+      });
+      rig.entries.forEach((entry, index) => {
+        if (entry !== target) expect(entry.bone.quaternion.toArray()).toEqual(otherBonesBefore[index]);
+      });
+    }
+  });
+
+  it('clamps every second phalanx above its independent gate and reuses persistent receipt storage', () => {
+    for (const { side, digit } of HAND_SENTINELS) {
+      const rig = makeHandFloorRig(RIGHT_PINKY_BIND.clone());
+      const target = findHandEntry(rig, side, digit);
+      const productFloor = PRODUCT_HAND_BIND_FLOORS[digit];
+      const independentFloor = INDEPENDENT_HAND_BIND_FLOORS[digit];
+      const adversarialDelta = (productFloor + independentFloor) / 2;
+      const axis = new THREE.Vector3(
+        side === 'left' ? -0.8 : 0.7,
+        digit.length * 0.07,
+        side === 'left' ? 0.31 : -0.29,
+      ).normalize();
+      const adversarialLocal = localAtReportedBindDelta(target.quaternion, axis, adversarialDelta);
+      target.bone.quaternion.copy(adversarialLocal);
+      const immutableBindBefore = rig.entries.map((entry) => entry.quaternion.toArray());
+      const otherBonesBefore = rig.entries.map((entry) => entry.bone.quaternion.toArray());
+
+      expect(productFloor, `${side} ${digit} product margin`).toBeGreaterThan(independentFloor);
+      expect(target.bone.quaternion.angleTo(target.quaternion), `${side} ${digit} adversary clears only evidence floor`)
+        .toBeGreaterThan(independentFloor);
+      const first = enforceProductHandFloor(rig.root, side, digit) as any;
+      const firstGeneration = first.generation;
+      const firstIdentity = first;
+      const bindArrayIdentity = first.bindLocalQuaternion;
+      const beforeArrayIdentity = first.beforeLocalQuaternion;
+      const afterArrayIdentity = first.afterLocalQuaternion;
+      const axisArrayIdentity = first.appliedAxis;
+      const observedAxisIdentity = first.observedShortestRelativeAxis;
+      const cachedAxisIdentity = target.bone.userData.riggedHandBindFloorAxis;
+      const observedAxisStorageIdentity = target.bone.userData.riggedHandBindFloorObservedAxisStorage;
+      const correctedQuaternion = target.bone.quaternion.clone();
+
+      expect(first.beforeBindDeltaRadians, `${side} ${digit} adversarial delta`).toBeCloseTo(adversarialDelta, 12);
+      expect(first.afterBindDeltaRadians, `${side} ${digit} product clamp`).toBeCloseTo(productFloor, 12);
+      expect(first.intervened).toBe(true);
+      expect(first.generation).toBe(1);
+      expect(first.allocationContract).toBe('persistent-per-rendered-hand-bone-v1');
+      expect(Array.isArray(observedAxisIdentity)).toBe(true);
+
+      const second = enforceProductHandFloor(rig.root, side, digit) as any;
+      expect(second, `${side} ${digit} receipt record identity`).toBe(firstIdentity);
+      expect(second.bindLocalQuaternion, `${side} ${digit} bind array identity`).toBe(bindArrayIdentity);
+      expect(second.beforeLocalQuaternion, `${side} ${digit} before array identity`).toBe(beforeArrayIdentity);
+      expect(second.afterLocalQuaternion, `${side} ${digit} after array identity`).toBe(afterArrayIdentity);
+      expect(second.appliedAxis, `${side} ${digit} applied axis identity`).toBe(axisArrayIdentity);
+      expect(second.observedShortestRelativeAxis, `${side} ${digit} observed axis identity`).toBe(observedAxisIdentity);
+      expect(target.bone.userData.riggedHandBindFloorAxis, `${side} ${digit} cached axis identity`).toBe(cachedAxisIdentity);
+      expect(target.bone.userData.riggedHandBindFloorObservedAxisStorage, `${side} ${digit} observed storage identity`)
+        .toBe(observedAxisStorageIdentity);
+      expect(second.generation).toBe(firstGeneration + 1);
+      expect(second.intervened).toBe(false);
+      expect(target.bone.quaternion.toArray()).toEqual(correctedQuaternion.toArray());
+
+      expect(rig.entries.map((entry) => entry.quaternion.toArray()), `${side} ${digit} immutable authored bind`)
+        .toEqual(immutableBindBefore);
+      rig.entries.forEach((entry, index) => {
+        if (entry !== target) expect(entry.bone.quaternion.toArray()).toEqual(otherBonesBefore[index]);
+      });
+
+      const highLocal = localAtReportedBindDelta(target.quaternion, axis, productFloor + 0.12);
+      target.bone.quaternion.copy(highLocal);
+      const high = enforceProductHandFloor(rig.root, side, digit) as any;
+      expect(high).toBe(firstIdentity);
+      expect(high.intervened, `${side} ${digit} high phase`).toBe(false);
+      expect(high.renderedOrientationCorrectionRadians).toBe(0);
+      expect(target.bone.quaternion.angleTo(highLocal), `${side} ${digit} high phase transform`).toBeLessThan(1e-7);
+    }
+  });
+
+  it('keeps the projected floor hemisphere continuous through positive zero, signed zero, and negative zero', () => {
+    const rig = makeHandFloorRig(RIGHT_PINKY_BIND.clone());
+    const target = findHandEntry(rig, 'right', 'pinky');
+    target.quaternion.identity();
+    const fallbackAxis = new THREE.Vector3(-1, 0, 0);
+
+    target.bone.quaternion.setFromAxisAngle(fallbackAxis, 1e-6);
+    const positive = enforceProductHandFloor(rig.root, 'right', 'pinky') as any;
+    const positiveProjected = target.bone.quaternion.clone();
+    expect(positive.alignedObservedAxisHemisphere).toBe(false);
+
+    target.bone.quaternion.set(+0, +0, +0, 1);
+    const positiveZero = enforceProductHandFloor(rig.root, 'right', 'pinky') as any;
+    const positiveZeroProjected = target.bone.quaternion.clone();
+    expect(positiveZero.axisSource).toBe('previous-shortest-bind-relative');
+
+    target.bone.quaternion.set(-0, +0, -0, 1);
+    const negativeZero = enforceProductHandFloor(rig.root, 'right', 'pinky') as any;
+    const negativeZeroProjected = target.bone.quaternion.clone();
+    expect(negativeZero.axisSource).toBe('previous-shortest-bind-relative');
+
+    target.bone.quaternion.setFromAxisAngle(fallbackAxis, -1e-6);
+    const negative = enforceProductHandFloor(rig.root, 'right', 'pinky') as any;
+    const negativeProjected = target.bone.quaternion.clone();
+    expect(negative).toMatchObject({
+      alignedObservedAxisHemisphere: true,
+      axisSource: 'shortest-bind-relative-aligned-to-previous',
+      continuityReference: 'previous-shortest-bind-relative',
+      preservedShortestRelativeAxis: true,
+      allFinite: true,
+    });
+
+    expect(positiveProjected.angleTo(positiveZeroProjected)).toBeLessThan(1e-9);
+    expect(positiveProjected.angleTo(negativeZeroProjected)).toBeLessThan(1e-9);
+    expect(positiveProjected.angleTo(negativeProjected)).toBeLessThan(1e-9);
+    expect(negative.afterBindDeltaRadians).toBeCloseTo(PRODUCT_HAND_BIND_FLOORS.pinky, 12);
+
+    const aboveFloorAxis = fallbackAxis.clone().negate();
+    const aboveFloor = new THREE.Quaternion().setFromAxisAngle(
+      aboveFloorAxis,
+      PRODUCT_HAND_BIND_FLOORS.pinky + 0.02,
+    );
+    target.bone.quaternion.copy(aboveFloor);
+    const high = enforceProductHandFloor(rig.root, 'right', 'pinky') as any;
+    expect(high.intervened).toBe(false);
+    expect(target.bone.quaternion.toArray()).toEqual(aboveFloor.toArray());
+    target.bone.quaternion.setFromAxisAngle(aboveFloorAxis, 1e-6);
+    const refreshed = enforceProductHandFloor(rig.root, 'right', 'pinky') as any;
+    const refreshedAxis = shortestBindRelativeAxis(target.quaternion, target.bone.quaternion)!;
+    expect(refreshed.alignedObservedAxisHemisphere).toBe(false);
+    expect(refreshedAxis.dot(aboveFloorAxis)).toBeGreaterThan(1 - 1e-9);
+  });
+
+  it('stays finite over dense cancellation phases for all ten product floors', () => {
+    for (const { side, digit } of HAND_SENTINELS) {
+      const productFloor = PRODUCT_HAND_BIND_FLOORS[digit];
+      for (let sample = 0; sample <= 20; sample += 1) {
+        const rig = makeHandFloorRig(RIGHT_PINKY_BIND.clone());
+        const target = findHandEntry(rig, side, digit);
+        const angle = sample * (productFloor + 0.12) / 20;
+        const axis = new THREE.Vector3(
+          Math.sin(0.37 + sample * 0.11 + digit.length),
+          Math.cos(0.19 + sample * 0.07 + (side === 'left' ? 0 : 1)),
+          Math.sin(0.61 + sample * 0.05 + digit.charCodeAt(0) * 0.01),
+        ).normalize();
+        const local = localAtReportedBindDelta(target.quaternion, axis, angle);
+        target.bone.quaternion.copy(local);
+        const receipt = enforceProductHandFloor(rig.root, side, digit) as any;
+
+        expect(receipt.allFinite, `${side} ${digit} dense phase ${sample}`).toBe(true);
+        expect(target.bone.quaternion.angleTo(target.quaternion), `${side} ${digit} dense phase ${sample}`)
+          .toBeGreaterThanOrEqual(productFloor - 1e-9);
+        if (angle > 1e-8 && angle < productFloor - 1e-9) {
+          const afterAxis = shortestBindRelativeAxis(target.quaternion, target.bone.quaternion)!;
+          expect(Math.abs(afterAxis.dot(axis)), `${side} ${digit} dense axis ${sample}`).toBeCloseTo(1, 10);
+        } else if (angle >= productFloor - 1e-9) {
+          expect(target.bone.quaternion.angleTo(local), `${side} ${digit} dense unchanged ${sample}`).toBeLessThan(1e-7);
+        }
+      }
+    }
+  });
+
   it('minimally clamps both independently observed cancellation phases and preserves their shortest axes', () => {
     const traces = [
       {

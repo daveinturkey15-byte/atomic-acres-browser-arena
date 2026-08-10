@@ -70,7 +70,13 @@ const RENDERED_INFLUENCE_THRESHOLDS = Object.freeze({
   minimumMaximumNormalizedWeight: 0.2,
 });
 const GRIP_THRESHOLDS = Object.freeze({ maximumPositionErrorM: 0.015, maximumQuaternionErrorRadians: 0.2 });
-const RIGHT_PINKY_BIND_DELTA_FLOOR_RADIANS = 0.38;
+const CARBINE_SECOND_PHALANX_BIND_DELTA_FLOOR_RADIANS = Object.freeze({
+  thumb: 0.04,
+  index: 0.23,
+  middle: 0.21,
+  ring: 0.25,
+  pinky: 0.38,
+});
 const CARBINE_SOCKET_REFERENCES = Object.freeze({
   'support-socket-l': Object.freeze({
     authoredLocalPosition: Object.freeze([-0.10000000149011612, -0.03999999910593033, 0.47999998927116394]),
@@ -129,6 +135,46 @@ function normalizedQuaternionDelta(left: number[], right: number[]): number {
   const oppositeHemisphereChord = Math.hypot(...normalizedLeft.map((value, index) => value + normalizedRight[index]));
   const shortestChord = Math.min(sameHemisphereChord, oppositeHemisphereChord);
   return 4 * Math.asin(Math.min(1, Math.max(0, shortestChord / 2)));
+}
+
+function normalizedQuaternion(value: number[]): number[] {
+  const magnitude = Math.hypot(...value);
+  return value.map((component) => component / magnitude);
+}
+
+function multiplyQuaternions(left: number[], right: number[]): number[] {
+  const [lx, ly, lz, lw] = left;
+  const [rx, ry, rz, rw] = right;
+  return [
+    lx * rw + lw * rx + ly * rz - lz * ry,
+    ly * rw + lw * ry + lz * rx - lx * rz,
+    lz * rw + lw * rz + lx * ry - ly * rx,
+    lw * rw - lx * rx - ly * ry - lz * rz,
+  ];
+}
+
+function shortestBindRelativeRotation(bind: number[], local: number[]): { axis: number[] | null; radians: number } {
+  const normalizedBind = normalizedQuaternion(bind);
+  const normalizedLocal = normalizedQuaternion(local);
+  const relative = normalizedQuaternion(multiplyQuaternions(
+    [-normalizedBind[0], -normalizedBind[1], -normalizedBind[2], normalizedBind[3]],
+    normalizedLocal,
+  ));
+  if (relative[3] < 0) relative.forEach((component, index) => { relative[index] = -component; });
+  const axisLength = Math.hypot(relative[0], relative[1], relative[2]);
+  return {
+    axis: axisLength > 1e-8 ? relative.slice(0, 3).map((component) => component / axisLength) : null,
+    radians: 2 * Math.acos(Math.min(1, Math.max(-1, relative[3]))),
+  };
+}
+
+function projectedBindFloorQuaternion(bind: number[], axis: number[], radians: number): number[] {
+  const half = radians / 2;
+  const sine = Math.sin(half);
+  return normalizedQuaternion(multiplyQuaternions(
+    normalizedQuaternion(bind),
+    [axis[0] * sine, axis[1] * sine, axis[2] * sine, Math.cos(half)],
+  ));
 }
 
 function positionDelta(left: number[], right: number[]): number {
@@ -317,7 +363,7 @@ function expectArmPose(model: any, label: string, armed: boolean): void {
         wristOrientation: { referenceAvailable: true, wristSourceAsset: OPERATOR_ASSET },
       },
       fingerCurl: {
-        contract: 'pass65-evaluated-per-digit-grip-curl-v2',
+        contract: 'pass65-evaluated-per-digit-grip-curl-v3',
         sourceReferenceAvailable: true,
         expectedBoneCount: 10,
         bothHands: true,
@@ -347,59 +393,150 @@ function expectArmPose(model: any, label: string, armed: boolean): void {
       expect(grip.wristOrientation.errorRadians, `${label}: corrected wrist aligns to evaluated socket orientation`)
         .toBeLessThanOrEqual(GRIP_THRESHOLDS.maximumQuaternionErrorRadians);
     }
-    expect(model.supportGrip.fingerCurl.bones).toHaveLength(10);
-    expect(model.supportGrip.fingerCurl.bones.every(({ applied, curlRadians }: any) => applied === true && Math.abs(curlRadians) >= 0.18)).toBe(true);
-    const rightPinky = model.handPose.bones.find(({ side, digit }: any) => side === 'right' && digit === 'pinky');
-    const rightPinkyFloor = model.supportGrip.fingerCurl.rightPinkyBindFloor;
-    expect(rightPinkyFloor, `${label}: firing pinky floor receipts the rendered joint`).toMatchObject({
-      contract: 'post-mixer-authored-bind-relative-hand-floor-v1',
-      reference: 'immutable-authored-handBindPose-before-animation',
-      side: 'right',
-      digit: 'pinky',
-      sourceBone: 'Pinky2.R',
-      bone: 'Pinky2R',
-      minimumBindDeltaRadians: RIGHT_PINKY_BIND_DELTA_FLOOR_RADIANS,
-      preservedShortestRelativeAxis: true,
-      appliedToRenderedBone: true,
-      allFinite: true,
-    });
-    expect(rightPinkyFloor.afterBindDeltaRadians, `${label}: firing pinky post-mixer floor`)
-      .toBeGreaterThanOrEqual(RIGHT_PINKY_BIND_DELTA_FLOOR_RADIANS - 1e-9);
-    const bindNorm = Math.hypot(...rightPinkyFloor.bindLocalQuaternion);
-    const expectedAppliedRelativeAngle = 2 * Math.acos(
-      Math.cos(RIGHT_PINKY_BIND_DELTA_FLOOR_RADIANS / 2) / bindNorm,
-    );
-    expect(rightPinkyFloor.bindQuaternionNorm, `${label}: receipts immutable float32 bind norm`).toBeCloseTo(bindNorm, 12);
-    expect(rightPinkyFloor.floorTargetRelativeAngleRadians, `${label}: compensates authored float32 bind norm`).toBeCloseTo(expectedAppliedRelativeAngle, 12);
-    expect(rightPinkyFloor.bindNormCompensationRadians, `${label}: receipts bind-norm compensation`).toBeCloseTo(
-      expectedAppliedRelativeAngle - RIGHT_PINKY_BIND_DELTA_FLOOR_RADIANS,
-      12,
-    );
-    expect(rightPinkyFloor.beforeBindDeltaRadians, `${label}: independently recomputed pre-floor delta`).toBeCloseTo(
-      quaternionDelta(rightPinkyFloor.beforeLocalQuaternion, rightPinkyFloor.bindLocalQuaternion),
-      9,
-    );
-    expect(rightPinkyFloor.afterBindDeltaRadians, `${label}: independently recomputed post-floor delta`).toBeCloseTo(
-      quaternionDelta(rightPinkyFloor.afterLocalQuaternion, rightPinkyFloor.bindLocalQuaternion),
-      9,
-    );
-    expect(rightPinkyFloor.reportedBindDeltaCorrectionRadians, `${label}: receipts the bounded reported correction`).toBeCloseTo(
-      rightPinkyFloor.intervened
-        ? RIGHT_PINKY_BIND_DELTA_FLOOR_RADIANS - rightPinkyFloor.beforeBindDeltaRadians : 0,
-      9,
-    );
-    expect(rightPinkyFloor.renderedOrientationCorrectionRadians, `${label}: receipts the actual rendered correction`).toBeCloseTo(
-      normalizedQuaternionDelta(rightPinkyFloor.beforeLocalQuaternion, rightPinkyFloor.afterLocalQuaternion),
-      9,
-    );
-    expect(rightPinkyFloor.afterBindDeltaRadians, `${label}: telemetry equals actual rendered Pinky2R delta`).toBeCloseTo(
-      rightPinky.bindQuaternionDeltaRadians,
-      9,
-    );
-    expect(quaternionDelta(rightPinkyFloor.afterLocalQuaternion, rightPinky.localQuaternion), `${label}: telemetry is the actual rendered Pinky2R quaternion`)
-      .toBeLessThanOrEqual(1e-9);
-    expect(quaternionDelta(rightPinkyFloor.bindLocalQuaternion, rightPinky.bindLocalQuaternion), `${label}: floor uses immutable authored Pinky2R bind`)
-      .toBeLessThanOrEqual(1e-9);
+    const fingerCurl = model.supportGrip.fingerCurl;
+    expect(fingerCurl.bones).toHaveLength(HAND_BONES.length);
+    expect(fingerCurl.bindFloors, `${label}: all ten grip joints expose independent floor receipts`)
+      .toHaveLength(HAND_BONES.length);
+    expect(fingerCurl.bones.every(({ applied, curlRadians }: any) => applied === true && Math.abs(curlRadians) >= 0.18)).toBe(true);
+    for (let index = 0; index < HAND_BONES.length; index += 1) {
+      const expected = HAND_BONES[index];
+      const minimumFloorRadians = CARBINE_SECOND_PHALANX_BIND_DELTA_FLOOR_RADIANS[expected.digit];
+      const actual = model.handPose.bones.find(({ side, digit }: any) => side === expected.side && digit === expected.digit);
+      const curlBone = fingerCurl.bones[index];
+      const floor = fingerCurl.bindFloors[index];
+      const jointLabel = `${label}: ${expected.bone}`;
+      expect(minimumFloorRadians, `${jointLabel} product floor exceeds independent evidence threshold`)
+        .toBeGreaterThan(expected.minimumBindRadians);
+      expect(curlBone, `${jointLabel} nominal curl owns matching floor receipt`).toMatchObject({
+        side: expected.side,
+        digit: expected.digit,
+        bone: expected.bone,
+        applied: true,
+        bindRelativeFloor: floor,
+      });
+      expect(floor, `${jointLabel} receipts the rendered joint`).toMatchObject({
+        contract: 'post-mixer-authored-bind-relative-hand-floor-v1',
+        allocationContract: 'persistent-per-rendered-hand-bone-v1',
+        reference: 'immutable-authored-handBindPose-before-animation',
+        side: expected.side,
+        digit: expected.digit,
+        sourceBone: expected.sourceBone,
+        bone: expected.bone,
+        minimumBindDeltaRadians: minimumFloorRadians,
+        appliedToRenderedBone: true,
+        allFinite: true,
+      });
+      expect(Number.isInteger(floor.generation) && floor.generation > 0, `${jointLabel} persistent receipt generation`).toBe(true);
+      expect(floor.afterBindDeltaRadians, `${jointLabel} post-mixer floor`)
+        .toBeGreaterThanOrEqual(minimumFloorRadians - 1e-9);
+      const bindNorm = Math.hypot(...floor.bindLocalQuaternion);
+      const expectedFloorTargetAngle = 2 * Math.acos(Math.cos(minimumFloorRadians / 2) / bindNorm);
+      expect(floor.bindQuaternionNorm, `${jointLabel} immutable float32 bind norm`).toBeCloseTo(bindNorm, 12);
+      expect(floor.floorTargetRelativeAngleRadians, `${jointLabel} compensated floor target`).toBeCloseTo(expectedFloorTargetAngle, 12);
+      expect(floor.bindNormCompensationRadians, `${jointLabel} bind-norm compensation`).toBeCloseTo(
+        expectedFloorTargetAngle - minimumFloorRadians,
+        12,
+      );
+      expect(floor.beforeBindDeltaRadians, `${jointLabel} independently recomputed pre-floor delta`).toBeCloseTo(
+        quaternionDelta(floor.beforeLocalQuaternion, floor.bindLocalQuaternion),
+        9,
+      );
+      expect(floor.afterBindDeltaRadians, `${jointLabel} independently recomputed post-floor delta`).toBeCloseTo(
+        quaternionDelta(floor.afterLocalQuaternion, floor.bindLocalQuaternion),
+        9,
+      );
+      expect(floor.reportedBindDeltaCorrectionRadians, `${jointLabel} bounded reported correction`).toBeCloseTo(
+        floor.intervened ? minimumFloorRadians - floor.beforeBindDeltaRadians : 0,
+        9,
+      );
+      expect(floor.renderedOrientationCorrectionRadians, `${jointLabel} actual rendered correction`).toBeCloseTo(
+        normalizedQuaternionDelta(floor.beforeLocalQuaternion, floor.afterLocalQuaternion),
+        9,
+      );
+      const independentlyDerivedBefore = shortestBindRelativeRotation(
+        floor.bindLocalQuaternion,
+        floor.beforeLocalQuaternion,
+      );
+      if (independentlyDerivedBefore.axis === null) {
+        expect(floor.observedShortestRelativeAxis, `${jointLabel} exact bind has no fabricated observed axis`).toBeNull();
+      } else {
+        expect(floor.observedShortestRelativeAxis, `${jointLabel} exposes independently derivable pre-floor axis`).not.toBeNull();
+        expect(dot(independentlyDerivedBefore.axis, floor.observedShortestRelativeAxis), `${jointLabel} claimed observed axis equals bind^-1 * before`)
+          .toBeGreaterThanOrEqual(1 - 1e-9);
+      }
+      expect(length(floor.appliedAxis), `${jointLabel} applied projection axis is unit length`).toBeCloseTo(1, 9);
+      const independentlyExpectedAfter = floor.intervened
+        ? projectedBindFloorQuaternion(
+          floor.bindLocalQuaternion,
+          floor.appliedAxis,
+          floor.floorTargetRelativeAngleRadians,
+        )
+        : normalizedQuaternion(floor.beforeLocalQuaternion);
+      expect(normalizedQuaternionDelta(independentlyExpectedAfter, floor.afterLocalQuaternion), `${jointLabel} after transform is bind * axis-angle projection`)
+        .toBeLessThanOrEqual(1e-9);
+      const independentlyExpectedRenderedCorrection = floor.intervened
+        ? floor.alignedObservedAxisHemisphere
+          ? floor.floorTargetRelativeAngleRadians + independentlyDerivedBefore.radians
+          : Math.abs(floor.floorTargetRelativeAngleRadians - independentlyDerivedBefore.radians)
+        : 0;
+      expect(floor.renderedOrientationCorrectionRadians, `${jointLabel} correction matches independent projection geometry`)
+        .toBeCloseTo(independentlyExpectedRenderedCorrection, 9);
+      expect(floor.preservedShortestRelativeAxis, `${jointLabel} shortest-axis continuity`)
+        .toBe(floor.observedShortestRelativeAxis === null && floor.intervened ? null : true);
+      expect(typeof floor.alignedObservedAxisHemisphere, `${jointLabel} reports signed-zero continuity alignment`).toBe('boolean');
+      if (floor.observedShortestRelativeAxis !== null) {
+        expect(floor.usedPreviousAxis, `${jointLabel} observed axis is applied directly or sign-aligned`).toBe(false);
+        expect(floor.usedFallbackAxis, `${jointLabel} observed axis does not use fallback`).toBe(false);
+        const observedAppliedDot = floor.observedShortestRelativeAxis.reduce(
+          (sum: number, component: number, axisIndex: number) => sum + component * floor.appliedAxis[axisIndex],
+          0,
+        );
+        expect(Math.abs(observedAppliedDot), `${jointLabel} applied axis stays on the observed shortest axis line`)
+          .toBeGreaterThanOrEqual(1 - 1e-9);
+        if (floor.alignedObservedAxisHemisphere) {
+          expect(floor.intervened, `${jointLabel} only sub-floor poses may align axis hemisphere`).toBe(true);
+          expect(observedAppliedDot, `${jointLabel} alignment flips the raw shortest-axis hemisphere`).toBeLessThan(0);
+          expect(floor.axisSource, `${jointLabel} names the cached continuity reference`)
+            .toBe('shortest-bind-relative-aligned-to-previous');
+          expect(floor.continuityReference, `${jointLabel} receipts cached-axis continuity`)
+            .toBe('previous-shortest-bind-relative');
+        } else {
+          expect(observedAppliedDot, `${jointLabel} unaligned observed axis is unchanged`).toBeGreaterThan(0);
+          expect(floor.axisSource, `${jointLabel} raw observed-axis source`).toBe('shortest-bind-relative');
+          expect(
+            floor.intervened
+              ? floor.continuityReference === null
+                || floor.continuityReference === 'previous-shortest-bind-relative'
+              : floor.continuityReference === null,
+            `${jointLabel} truthful raw-axis continuity reference`,
+          ).toBe(true);
+        }
+      } else {
+        expect(floor.alignedObservedAxisHemisphere, `${jointLabel} exact bind cannot claim observed-axis alignment`).toBe(false);
+        if (floor.usedPreviousAxis) {
+          expect(floor.usedFallbackAxis).toBe(false);
+          expect(floor.axisSource).toBe('previous-shortest-bind-relative');
+          expect(floor.continuityReference).toBe(floor.intervened ? 'previous-shortest-bind-relative' : null);
+        } else {
+          expect(floor.usedFallbackAxis).toBe(true);
+          expect(floor.axisSource).toBe('authored-curl-fallback');
+          expect(floor.continuityReference).toBe(floor.intervened ? 'authored-curl-fallback' : null);
+          expect(dot(floor.appliedAxis, [-1, 0, 0]), `${jointLabel} exact-bind fallback is the product curl axis`)
+            .toBeGreaterThanOrEqual(1 - 1e-9);
+        }
+      }
+      expect(floor.afterBindDeltaRadians, `${jointLabel} receipt equals actual handPose delta`).toBeCloseTo(
+        actual.bindQuaternionDeltaRadians,
+        9,
+      );
+      expect(normalizedQuaternionDelta(floor.afterLocalQuaternion, actual.localQuaternion), `${jointLabel} receipt is actual rendered quaternion`)
+        .toBeLessThanOrEqual(1e-9);
+      expect(normalizedQuaternionDelta(floor.bindLocalQuaternion, actual.bindLocalQuaternion), `${jointLabel} uses immutable authored bind`)
+        .toBeLessThanOrEqual(1e-9);
+    }
+    const rightPinkyFloor = fingerCurl.bindFloors.find(({ side, digit }: any) => side === 'right' && digit === 'pinky');
+    expect(fingerCurl.rightPinkyBindFloor, `${label}: compatibility alias is not an independent proof`)
+      .toEqual(rightPinkyFloor);
   } else {
     expect(model.weaponChildren, `${label}: unarmed socket remains empty`).toBe(0);
     expect(model.weaponMount, `${label}: no mounted weapon`).toBeNull();

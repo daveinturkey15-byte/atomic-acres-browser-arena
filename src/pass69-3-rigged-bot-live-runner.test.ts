@@ -131,9 +131,26 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     expect(artKit).toContain('pinky: -0.76');
     expect(artKit).toContain('right: Object.freeze({ thumb: -0.34, index: -0.46, middle: -0.7, ring: -0.76, pinky: -0.78 })');
     expect(artKit).toContain('applyRiggedCarbineFingerCurlToBone(bone, curlRadians)');
-    expect(artKit).toContain('RIGGED_CARBINE_RIGHT_PINKY_BIND_DELTA_FLOOR_RADIANS = 0.38');
+    expect(artKit).toContain('RIGGED_CARBINE_SECOND_PHALANX_BIND_DELTA_FLOOR_RADIANS = Object.freeze({');
+    for (const productFloor of ['thumb: 0.04', 'index: 0.23', 'middle: 0.21', 'ring: 0.25', 'pinky: 0.38']) {
+      expect(artKit).toContain(productFloor);
+      expect(runner).toContain(productFloor);
+    }
     expect(artKit).toContain('enforceRiggedOperatorHandBindDeltaFloor(');
+    expect(artKit).toContain("contract: 'pass65-evaluated-per-digit-grip-curl-v3'");
+    expect(artKit).toContain('bindFloors,');
     expect(operator).toContain("contract: 'post-mixer-authored-bind-relative-hand-floor-v1'");
+    expect(operator).toContain("allocationContract: 'persistent-per-rendered-hand-bone-v1'");
+    expect(runner).toContain("floor.allocationContract !== 'persistent-per-rendered-hand-bone-v1'");
+    expect(runner).toContain('!Number.isInteger(floor.generation)');
+    expect(runner).toContain('curl.bindFloors.length !== expectedHandBones.length');
+    expect(runner).toContain("'shortest-bind-relative-aligned-to-previous'");
+    expect(runner).not.toContain("'shortest-bind-relative-aligned-to-authored-fallback'");
+    expect(runner).toContain('canonicalBindRelativePose(');
+    expect(runner).toContain('multiplyQuaternions(');
+    expect(runner).toContain('axisAngleQuaternion(floor.appliedAxis, floor.floorTargetRelativeAngleRadians)');
+    expect(runner).toContain('expectedRenderedCorrectionRadians');
+    expect(runner).toContain('carbineSecondPhalanxFallbackAxis[index]');
     expect(operator).toContain('floorTargetRelativeAngleRadians');
     expect(operator).toContain('reportedBindDeltaCorrectionRadians');
     expect(operatorUnit).toContain('0.2701489666915341');
@@ -227,6 +244,15 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       '0.350 rad pinky bind delta must pass',
       '0.379999 rad post-mixer pinky floor must fail',
       '0.380000 rad post-mixer pinky floor must pass',
+      'all ten above-floor rendered phases remain unchanged',
+      'previous-axis hemisphere-aligned receipt must pass',
+      'forged Y-axis receipt cannot impersonate the canonical X-axis pre-floor pose',
+      'exact-bind authored fallback axis must pass',
+      'missing one of ten bind-floor receipts must fail',
+      'duplicate bind-floor identity must not satisfy another joint',
+      'duplicate rendered handPose bone must fail',
+      'non-persistent receipt generation must fail',
+      'floor above independent evidence but below product floor must fail',
       'floor telemetry must match rendered Pinky2R hand pose',
       'corrected wrist rotation over 0.20 rad must fail',
       'post-overwrite socket cannot impersonate imported authored source',

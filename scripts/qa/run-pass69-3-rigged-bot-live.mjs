@@ -60,7 +60,14 @@ const antiTThresholds = Object.freeze({
   minimumElbowFlexRadians: 0.3,
 });
 const gripThresholds = Object.freeze({ maximumPositionErrorM: 0.015, maximumQuaternionErrorRadians: 0.2 });
-const rightPinkyBindDeltaFloorRadians = 0.38;
+const carbineSecondPhalanxProductFloors = Object.freeze({
+  thumb: 0.04,
+  index: 0.23,
+  middle: 0.21,
+  ring: 0.25,
+  pinky: 0.38,
+});
+const carbineSecondPhalanxFallbackAxis = Object.freeze([-1, 0, 0]);
 const carbineSocketReferences = Object.freeze({
   'support-socket-l': Object.freeze({
     atomicSocket: 'leftGrip',
@@ -140,6 +147,49 @@ function normalizedQuaternionDelta(left, right) {
   const oppositeHemisphereChord = vectorLength(normalizedLeft.map((value, index) => value + normalizedRight[index]));
   const shortestChord = Math.min(sameHemisphereChord, oppositeHemisphereChord);
   return 4 * Math.asin(Math.min(1, Math.max(0, shortestChord / 2)));
+}
+
+function normalizeQuaternion(value) {
+  if (!finiteVector(value, 4)) return null;
+  const length = vectorLength(value);
+  return length > 0 ? value.map((component) => component / length) : null;
+}
+
+function multiplyQuaternions(left, right) {
+  const [lx, ly, lz, lw] = left;
+  const [rx, ry, rz, rw] = right;
+  return [
+    lw * rx + lx * rw + ly * rz - lz * ry,
+    lw * ry - lx * rz + ly * rw + lz * rx,
+    lw * rz + lx * ry - ly * rx + lz * rw,
+    lw * rw - lx * rx - ly * ry - lz * rz,
+  ];
+}
+
+function axisAngleQuaternion(axis, radians) {
+  const half = radians / 2;
+  const sine = Math.sin(half);
+  return [axis[0] * sine, axis[1] * sine, axis[2] * sine, Math.cos(half)];
+}
+
+function canonicalBindRelativePose(bindLocalQuaternion, localQuaternion) {
+  const normalizedBind = normalizeQuaternion(bindLocalQuaternion);
+  const normalizedLocal = normalizeQuaternion(localQuaternion);
+  if (!normalizedBind || !normalizedLocal) return null;
+  const bindInverse = [-normalizedBind[0], -normalizedBind[1], -normalizedBind[2], normalizedBind[3]];
+  let relative = normalizeQuaternion(multiplyQuaternions(bindInverse, normalizedLocal));
+  if (!relative) return null;
+  if (relative[3] < 0) relative = relative.map((component) => -component);
+  const axisLength = Math.hypot(relative[0], relative[1], relative[2]);
+  return {
+    normalizedBind,
+    normalizedLocal,
+    relative,
+    angleRadians: 2 * Math.acos(Math.min(1, Math.max(-1, relative[3]))),
+    axis: axisLength > 1e-8
+      ? relative.slice(0, 3).map((component) => component / axisLength)
+      : null,
+  };
 }
 
 function positionDelta(left, right) {
@@ -578,101 +628,168 @@ function gripValid(grip, socketName) {
     && grip.wristOrientation.errorRadians <= gripThresholds.maximumQuaternionErrorRadians;
 }
 
-function fingerCurlValid(grip, model) {
-  const curl = grip?.fingerCurl;
-  const floor = curl?.rightPinkyBindFloor;
-  const actualPinky = model?.handPose?.bones?.find((bone) => bone.side === 'right' && bone.digit === 'pinky');
-  const pinkyCurl = curl?.bones?.find((bone) => bone.side === 'right' && bone.digit === 'pinky');
-  const beforeDelta = quaternionDelta(floor?.beforeLocalQuaternion, floor?.bindLocalQuaternion);
-  const afterDelta = quaternionDelta(floor?.afterLocalQuaternion, floor?.bindLocalQuaternion);
-  const renderedCorrection = normalizedQuaternionDelta(floor?.beforeLocalQuaternion, floor?.afterLocalQuaternion);
-  const bindNorm = finiteVector(floor?.bindLocalQuaternion, 4)
-    ? vectorLength(floor.bindLocalQuaternion) : Number.NaN;
+function handBindFloorValid(floor, curlBone, actualBone, expected) {
+  const productFloor = carbineSecondPhalanxProductFloors[expected.digit];
+  if (!(productFloor > expected.minimumBindRadians)
+    || floor?.contract !== 'post-mixer-authored-bind-relative-hand-floor-v1'
+    || floor.allocationContract !== 'persistent-per-rendered-hand-bone-v1'
+    || !Number.isInteger(floor.generation)
+    || floor.generation < 1
+    || floor.reference !== 'immutable-authored-handBindPose-before-animation'
+    || floor.side !== expected.side
+    || floor.digit !== expected.digit
+    || floor.sourceBone !== expected.sourceBone
+    || floor.bone !== expected.bone
+    || floor.minimumBindDeltaRadians !== productFloor
+    || !finiteVector(floor.bindLocalQuaternion, 4)
+    || !finiteVector(floor.beforeLocalQuaternion, 4)
+    || !finiteVector(floor.afterLocalQuaternion, 4)
+    || !finiteVector(floor.appliedAxis)
+    || !close(vectorLength(floor.bindLocalQuaternion), 1, 1e-7)
+    || !close(vectorLength(floor.beforeLocalQuaternion), 1, 1e-7)
+    || !close(vectorLength(floor.afterLocalQuaternion), 1, 1e-7)
+    || !close(vectorLength(floor.appliedAxis), 1, 1e-7)
+    || typeof floor.alignedObservedAxisHemisphere !== 'boolean'
+    || floor.appliedToRenderedBone !== true
+    || floor.allFinite !== true
+    || !Number.isFinite(floor.beforeBindDeltaRadians)
+    || !Number.isFinite(floor.afterBindDeltaRadians)
+    || !Number.isFinite(floor.reportedBindDeltaCorrectionRadians)
+    || !Number.isFinite(floor.renderedOrientationCorrectionRadians)) return false;
+
+  const bindNorm = vectorLength(floor.bindLocalQuaternion);
   const expectedAppliedRelativeAngle = 2 * Math.acos(Math.min(1, Math.max(-1,
-    Math.cos(rightPinkyBindDeltaFloorRadians / 2) / bindNorm,
+    Math.cos(productFloor / 2) / bindNorm,
   )));
-  const observedAxisValid = floor?.observedShortestRelativeAxis !== null
-    && finiteVector(floor?.observedShortestRelativeAxis)
-    && close(vectorLength(floor.observedShortestRelativeAxis), 1, 1e-7);
-  const appliedObservedAlignment = observedAxisValid
-    ? Math.abs(floor.observedShortestRelativeAxis.reduce(
+  const beforeDelta = quaternionDelta(floor.beforeLocalQuaternion, floor.bindLocalQuaternion);
+  const afterDelta = quaternionDelta(floor.afterLocalQuaternion, floor.bindLocalQuaternion);
+  const renderedCorrection = normalizedQuaternionDelta(floor.beforeLocalQuaternion, floor.afterLocalQuaternion);
+  const bindRelativePose = canonicalBindRelativePose(
+    floor.bindLocalQuaternion, floor.beforeLocalQuaternion,
+  );
+  if (!bindRelativePose) return false;
+  const observedAxisValid = bindRelativePose.axis !== null
+    && floor.observedShortestRelativeAxis !== null
+    && finiteVector(floor.observedShortestRelativeAxis)
+    && close(vectorLength(floor.observedShortestRelativeAxis), 1, 1e-7)
+    && floor.observedShortestRelativeAxis.reduce(
+      (sum, value, index) => sum + value * bindRelativePose.axis[index], 0,
+    ) >= 1 - 1e-7;
+  if ((bindRelativePose.axis === null) !== (floor.observedShortestRelativeAxis === null)) return false;
+  let axisProvenanceValid = false;
+  if (observedAxisValid) {
+    const observedAppliedDot = floor.observedShortestRelativeAxis.reduce(
       (sum, value, index) => sum + value * floor.appliedAxis[index], 0,
-    ))
-    : Number.NaN;
-  const axisProvenanceValid = observedAxisValid
-    ? floor.axisSource === 'shortest-bind-relative'
+    );
+    const alignedSourceReference = {
+      'shortest-bind-relative-aligned-to-previous': 'previous-shortest-bind-relative',
+    }[floor.axisSource];
+    axisProvenanceValid = close(Math.abs(observedAppliedDot), 1, 1e-7)
       && floor.usedPreviousAxis === false
       && floor.usedFallbackAxis === false
-      && close(appliedObservedAlignment, 1, 1e-7)
-    : floor.usedPreviousAxis === true
-      ? floor.axisSource === 'previous-shortest-bind-relative' && floor.usedFallbackAxis === false
-      : floor.usedFallbackAxis === true
-        && floor.axisSource === 'authored-curl-fallback' && floor.usedPreviousAxis === false;
-  const floorValid = floor?.contract === 'post-mixer-authored-bind-relative-hand-floor-v1'
-    && floor.reference === 'immutable-authored-handBindPose-before-animation'
-    && floor.side === 'right'
-    && floor.digit === 'pinky'
-    && floor.sourceBone === 'Pinky2.R'
-    && floor.bone === 'Pinky2R'
-    && floor.minimumBindDeltaRadians === rightPinkyBindDeltaFloorRadians
-    && finiteVector(floor.bindLocalQuaternion, 4)
-    && finiteVector(floor.beforeLocalQuaternion, 4)
-    && finiteVector(floor.afterLocalQuaternion, 4)
-    && close(vectorLength(floor.bindLocalQuaternion), 1, 1e-7)
-    && close(vectorLength(floor.beforeLocalQuaternion), 1, 1e-7)
-    && close(vectorLength(floor.afterLocalQuaternion), 1, 1e-7)
-    && finiteVector(floor.appliedAxis)
-    && close(vectorLength(floor.appliedAxis), 1, 1e-7)
-    && (floor.observedShortestRelativeAxis === null
-      || observedAxisValid)
-    && axisProvenanceValid
-    && (observedAxisValid
-      ? floor.preservedShortestRelativeAxis === true
-      : floor.preservedShortestRelativeAxis === null)
-    && floor.appliedToRenderedBone === true
-    && floor.allFinite === true
-    && Number.isFinite(floor.beforeBindDeltaRadians)
-    && Number.isFinite(floor.afterBindDeltaRadians)
-    && Number.isFinite(floor.reportedBindDeltaCorrectionRadians)
-    && Number.isFinite(floor.renderedOrientationCorrectionRadians)
-    && close(floor.bindQuaternionNorm, bindNorm, 1e-12)
+      && floor.preservedShortestRelativeAxis === true
+      && (floor.alignedObservedAxisHemisphere
+        ? floor.intervened === true
+          && observedAppliedDot < 0
+          && alignedSourceReference !== undefined
+          && floor.continuityReference === alignedSourceReference
+        : observedAppliedDot > 0
+          && floor.axisSource === 'shortest-bind-relative'
+          && (floor.intervened
+            ? [null, 'previous-shortest-bind-relative'].includes(floor.continuityReference)
+            : floor.continuityReference === null));
+  } else if (floor.observedShortestRelativeAxis === null
+    && floor.alignedObservedAxisHemisphere === false) {
+    if (floor.usedPreviousAxis === true) {
+      axisProvenanceValid = floor.axisSource === 'previous-shortest-bind-relative'
+        && floor.usedFallbackAxis === false
+        && floor.continuityReference === (floor.intervened ? 'previous-shortest-bind-relative' : null);
+    } else if (floor.usedFallbackAxis === true) {
+      axisProvenanceValid = floor.axisSource === 'authored-curl-fallback'
+        && floor.usedPreviousAxis === false
+        && floor.continuityReference === (floor.intervened ? 'authored-curl-fallback' : null)
+        && floor.appliedAxis.reduce(
+          (sum, value, index) => sum + value * carbineSecondPhalanxFallbackAxis[index], 0,
+        ) >= 1 - 1e-7;
+    }
+    axisProvenanceValid = axisProvenanceValid
+      && floor.preservedShortestRelativeAxis === (floor.intervened ? null : true);
+  }
+
+  const expectedAfter = floor.intervened
+    ? normalizeQuaternion(multiplyQuaternions(
+      bindRelativePose.normalizedBind,
+      axisAngleQuaternion(floor.appliedAxis, floor.floorTargetRelativeAngleRadians),
+    ))
+    : bindRelativePose.normalizedLocal;
+  if (!expectedAfter) return false;
+  const expectedRenderedCorrectionRadians = floor.intervened
+    ? floor.alignedObservedAxisHemisphere
+      ? floor.floorTargetRelativeAngleRadians + bindRelativePose.angleRadians
+      : Math.abs(floor.floorTargetRelativeAngleRadians - bindRelativePose.angleRadians)
+    : 0;
+  const independentlyConstructedAfterValid = normalizedQuaternionDelta(
+    expectedAfter, floor.afterLocalQuaternion,
+  ) <= 1e-9
+    && normalizedQuaternionDelta(expectedAfter, actualBone?.localQuaternion) <= 1e-9;
+
+  const scalarTelemetryValid = close(floor.bindQuaternionNorm, bindNorm, 1e-12)
     && close(floor.floorTargetRelativeAngleRadians, expectedAppliedRelativeAngle, 1e-12)
     && close(floor.bindNormCompensationRadians,
-      floor.floorTargetRelativeAngleRadians - rightPinkyBindDeltaFloorRadians, 1e-12)
+      floor.floorTargetRelativeAngleRadians - productFloor, 1e-12)
     && close(floor.beforeBindDeltaRadians, beforeDelta, 1e-9)
     && close(floor.afterBindDeltaRadians, afterDelta, 1e-9)
     && close(floor.reportedBindDeltaCorrectionRadians, floor.intervened
-      ? Math.max(0, rightPinkyBindDeltaFloorRadians - floor.beforeBindDeltaRadians) : 0, 1e-9)
+      ? Math.max(0, productFloor - floor.beforeBindDeltaRadians) : 0, 1e-9)
     && close(floor.renderedOrientationCorrectionRadians, renderedCorrection, 1e-9)
-    && floor.afterBindDeltaRadians >= rightPinkyBindDeltaFloorRadians - 1e-9
-    && (floor.intervened === true
-      ? floor.beforeBindDeltaRadians < rightPinkyBindDeltaFloorRadians - 1e-9
-        && close(floor.afterBindDeltaRadians, rightPinkyBindDeltaFloorRadians, 1e-9)
-      : floor.beforeBindDeltaRadians >= rightPinkyBindDeltaFloorRadians - 1e-9
-        && quaternionDelta(floor.beforeLocalQuaternion, floor.afterLocalQuaternion) <= 1e-9)
-    && actualPinky?.bone === 'Pinky2R'
-    && close(actualPinky.bindQuaternionDeltaRadians, floor.afterBindDeltaRadians, 1e-9)
-    && quaternionDelta(actualPinky.localQuaternion, floor.afterLocalQuaternion) <= 1e-9
-    && quaternionDelta(actualPinky.bindLocalQuaternion, floor.bindLocalQuaternion) <= 1e-9
-    && sameObject(pinkyCurl?.bindRelativeFloor, floor);
-  return curl?.contract === 'pass65-evaluated-per-digit-grip-curl-v2'
-    && curl.sourceReferenceAvailable === true
-    && curl.expectedBoneCount === expectedHandBones.length
-    && curl.bothHands === true
-    && curl.allAtOrAboveRequiredBindFloor === true
-    && curl.allApplied === true
-    && floorValid
-    && Array.isArray(curl.bones)
-    && curl.bones.length === expectedHandBones.length
-    && curl.bones.every((bone, index) => bone.side === expectedHandBones[index].side
-      && bone.digit === expectedHandBones[index].digit
-      && bone.bone === expectedHandBones[index].bone
-      && bone.applied === true
-      && Number.isFinite(bone.curlRadians)
-      && Math.abs(bone.curlRadians) >= 0.18
-      && (bone.side === 'right' && bone.digit === 'pinky'
-        ? sameObject(bone.bindRelativeFloor, floor)
-        : bone.bindRelativeFloor === null));
+    && close(floor.renderedOrientationCorrectionRadians, expectedRenderedCorrectionRadians, 1e-9)
+    && floor.afterBindDeltaRadians >= productFloor - 1e-9;
+  const interventionValid = floor.intervened === true
+      ? floor.beforeBindDeltaRadians < productFloor - 1e-9
+        && close(floor.afterBindDeltaRadians, productFloor, 1e-9)
+      : floor.beforeBindDeltaRadians >= productFloor - 1e-9
+        && normalizedQuaternionDelta(floor.beforeLocalQuaternion, floor.afterLocalQuaternion) <= 1e-9;
+  const curlBoneValid = curlBone?.side === expected.side
+    && curlBone.digit === expected.digit
+    && curlBone.bone === expected.bone
+    && curlBone.applied === true
+    && Number.isFinite(curlBone.curlRadians)
+    && Math.abs(curlBone.curlRadians) >= 0.18
+    && sameObject(curlBone.bindRelativeFloor, floor);
+  const actualBoneValid = actualBone?.side === expected.side
+    && actualBone.digit === expected.digit
+    && actualBone.joint === expected.joint
+    && actualBone.sourceBone === expected.sourceBone
+    && actualBone.bone === expected.bone
+    && close(actualBone.bindQuaternionDeltaRadians, floor.afterBindDeltaRadians, 1e-9)
+    && normalizedQuaternionDelta(actualBone.localQuaternion, floor.afterLocalQuaternion) <= 1e-9
+    && normalizedQuaternionDelta(actualBone.bindLocalQuaternion, floor.bindLocalQuaternion) <= 1e-9;
+  return axisProvenanceValid && independentlyConstructedAfterValid
+    && scalarTelemetryValid && interventionValid && curlBoneValid && actualBoneValid;
+}
+
+function fingerCurlValid(grip, model) {
+  const curl = grip?.fingerCurl;
+  if (curl?.contract !== 'pass65-evaluated-per-digit-grip-curl-v3'
+    || curl.sourceReferenceAvailable !== true
+    || curl.expectedBoneCount !== expectedHandBones.length
+    || curl.bothHands !== true
+    || curl.allAtOrAboveRequiredBindFloor !== true
+    || curl.allApplied !== true
+    || !Array.isArray(curl.bones)
+    || curl.bones.length !== expectedHandBones.length
+    || !Array.isArray(curl.bindFloors)
+    || curl.bindFloors.length !== expectedHandBones.length
+    || !Array.isArray(model?.handPose?.bones)
+    || model.handPose.bones.length !== expectedHandBones.length) return false;
+  for (let index = 0; index < expectedHandBones.length; index += 1) {
+    if (!handBindFloorValid(
+      curl.bindFloors[index], curl.bones[index], model.handPose.bones[index], expectedHandBones[index],
+    )) return false;
+  }
+  const rightPinkyIndex = expectedHandBones.findIndex(({ side, digit }) => side === 'right' && digit === 'pinky');
+  return rightPinkyIndex >= 0
+    && sameObject(curl.rightPinkyBindFloor, curl.bindFloors[rightPinkyIndex]);
 }
 
 function armPoseValid(model, armed) {
@@ -891,83 +1008,209 @@ function runContractSelfTest() {
     ...carbineSocketReferences['support-socket-l'].evaluatedTargetLocalPosition,
   ];
   assert(!gripValid(selfCertifiedSocket, 'support-socket-l'), 'post-overwrite socket cannot impersonate imported authored source');
-  const floorQuaternion = (radians) => [Math.sin(radians / 2), 0, 0, Math.cos(radians / 2)];
-  const pinkyFloor = {
-    contract: 'post-mixer-authored-bind-relative-hand-floor-v1',
-    reference: 'immutable-authored-handBindPose-before-animation',
-    side: 'right',
-    digit: 'pinky',
-    sourceBone: 'Pinky2.R',
-    bone: 'Pinky2R',
-    minimumBindDeltaRadians: rightPinkyBindDeltaFloorRadians,
-    bindQuaternionNorm: 1,
-    floorTargetRelativeAngleRadians: rightPinkyBindDeltaFloorRadians,
-    bindNormCompensationRadians: 0,
-    beforeBindDeltaRadians: 0.27,
-    afterBindDeltaRadians: rightPinkyBindDeltaFloorRadians,
-    reportedBindDeltaCorrectionRadians: rightPinkyBindDeltaFloorRadians - 0.27,
-    renderedOrientationCorrectionRadians: rightPinkyBindDeltaFloorRadians - 0.27,
-    bindLocalQuaternion: [0, 0, 0, 1],
-    beforeLocalQuaternion: floorQuaternion(0.27),
-    afterLocalQuaternion: floorQuaternion(rightPinkyBindDeltaFloorRadians),
-    observedShortestRelativeAxis: [1, 0, 0],
-    appliedAxis: [1, 0, 0],
-    axisSource: 'shortest-bind-relative',
-    intervened: true,
-    preservedShortestRelativeAxis: true,
-    usedPreviousAxis: false,
-    usedFallbackAxis: false,
-    appliedToRenderedBone: true,
-    allFinite: true,
+  const floorQuaternion = (radians, direction = 1) => [
+    direction * Math.sin(radians / 2), 0, 0, Math.cos(radians / 2),
+  ];
+  const makeFloorReceipt = (expected, minimumBindDeltaRadians) => {
+    const beforeBindDeltaRadians = (expected.minimumBindRadians + minimumBindDeltaRadians) / 2;
+    const beforeLocalQuaternion = floorQuaternion(beforeBindDeltaRadians);
+    const afterLocalQuaternion = floorQuaternion(minimumBindDeltaRadians);
+    return {
+      contract: 'post-mixer-authored-bind-relative-hand-floor-v1',
+      allocationContract: 'persistent-per-rendered-hand-bone-v1',
+      generation: 7,
+      reference: 'immutable-authored-handBindPose-before-animation',
+      side: expected.side,
+      digit: expected.digit,
+      sourceBone: expected.sourceBone,
+      bone: expected.bone,
+      minimumBindDeltaRadians,
+      bindQuaternionNorm: 1,
+      floorTargetRelativeAngleRadians: minimumBindDeltaRadians,
+      bindNormCompensationRadians: 0,
+      beforeBindDeltaRadians,
+      afterBindDeltaRadians: minimumBindDeltaRadians,
+      reportedBindDeltaCorrectionRadians: minimumBindDeltaRadians - beforeBindDeltaRadians,
+      renderedOrientationCorrectionRadians: normalizedQuaternionDelta(
+        beforeLocalQuaternion, afterLocalQuaternion,
+      ),
+      bindLocalQuaternion: [0, 0, 0, 1],
+      beforeLocalQuaternion,
+      afterLocalQuaternion,
+      observedShortestRelativeAxis: [1, 0, 0],
+      appliedAxis: [1, 0, 0],
+      axisSource: 'shortest-bind-relative',
+      alignedObservedAxisHemisphere: false,
+      continuityReference: 'previous-shortest-bind-relative',
+      intervened: true,
+      preservedShortestRelativeAxis: true,
+      usedPreviousAxis: false,
+      usedFallbackAxis: false,
+      appliedToRenderedBone: true,
+      allFinite: true,
+    };
   };
-  const curl = {
-    fingerCurl: {
-      contract: 'pass65-evaluated-per-digit-grip-curl-v2',
-      sourceReferenceAvailable: true,
-      expectedBoneCount: expectedHandBones.length,
-      bothHands: true,
-      rightPinkyBindFloor: pinkyFloor,
-      allAtOrAboveRequiredBindFloor: true,
-      allApplied: true,
-      bones: expectedHandBones.map(({ side, digit, bone }) => ({
-        side,
-        digit,
-        bone,
-        applied: true,
-        curlRadians: -0.3,
-        bindRelativeFloor: side === 'right' && digit === 'pinky' ? pinkyFloor : null,
-      })),
-    },
+  const makeCurlFixture = (minimumOverrides = new Map()) => {
+    const bindFloors = expectedHandBones.map((expected, index) => makeFloorReceipt(
+      expected,
+      minimumOverrides.get(index) ?? carbineSecondPhalanxProductFloors[expected.digit],
+    ));
+    const bones = expectedHandBones.map(({ side, digit, bone }, index) => ({
+      side,
+      digit,
+      bone,
+      applied: true,
+      curlRadians: -0.3,
+      bindRelativeFloor: bindFloors[index],
+    }));
+    return {
+      curl: {
+        fingerCurl: {
+          contract: 'pass65-evaluated-per-digit-grip-curl-v3',
+          sourceReferenceAvailable: true,
+          expectedBoneCount: expectedHandBones.length,
+          bothHands: true,
+          bindFloors,
+          rightPinkyBindFloor: bindFloors.at(-1),
+          allAtOrAboveRequiredBindFloor: true,
+          allApplied: true,
+          bones,
+        },
+      },
+      model: {
+        handPose: {
+          bones: expectedHandBones.map((expected, index) => ({
+            side: expected.side,
+            digit: expected.digit,
+            joint: expected.joint,
+            sourceBone: expected.sourceBone,
+            bone: expected.bone,
+            bindQuaternionDeltaRadians: bindFloors[index].afterBindDeltaRadians,
+            bindLocalQuaternion: bindFloors[index].bindLocalQuaternion,
+            localQuaternion: bindFloors[index].afterLocalQuaternion,
+          })),
+        },
+      },
+    };
   };
-  const curlModel = {
-    handPose: {
-      bones: [{
-        side: 'right',
-        digit: 'pinky',
-        bone: 'Pinky2R',
-        bindQuaternionDeltaRadians: rightPinkyBindDeltaFloorRadians,
-        bindLocalQuaternion: pinkyFloor.bindLocalQuaternion,
-        localQuaternion: pinkyFloor.afterLocalQuaternion,
-      }],
-    },
-  };
+  const { curl, model: curlModel } = makeCurlFixture();
   assert(fingerCurlValid(curl, curlModel), '0.380000 rad post-mixer pinky floor must pass');
+  const highPhaseCurl = structuredClone(curl);
+  const highPhaseModel = structuredClone(curlModel);
+  for (let index = 0; index < expectedHandBones.length; index += 1) {
+    const highFloor = highPhaseCurl.fingerCurl.bindFloors[index];
+    const highDelta = highFloor.minimumBindDeltaRadians + 0.12;
+    const highQuaternion = floorQuaternion(highDelta);
+    highFloor.beforeBindDeltaRadians = highDelta;
+    highFloor.afterBindDeltaRadians = highDelta;
+    highFloor.reportedBindDeltaCorrectionRadians = 0;
+    highFloor.renderedOrientationCorrectionRadians = 0;
+    highFloor.beforeLocalQuaternion = highQuaternion;
+    highFloor.afterLocalQuaternion = [...highQuaternion];
+    highFloor.intervened = false;
+    highFloor.continuityReference = null;
+    highPhaseCurl.fingerCurl.bones[index].bindRelativeFloor = highFloor;
+    highPhaseModel.handPose.bones[index].bindQuaternionDeltaRadians = highDelta;
+    highPhaseModel.handPose.bones[index].localQuaternion = highFloor.afterLocalQuaternion;
+  }
+  highPhaseCurl.fingerCurl.rightPinkyBindFloor = highPhaseCurl.fingerCurl.bindFloors.at(-1);
+  assert(fingerCurlValid(highPhaseCurl, highPhaseModel), 'all ten above-floor rendered phases remain unchanged');
+  const alignedContinuityCurl = structuredClone(curl);
+  const alignedContinuityModel = structuredClone(curlModel);
+  const alignedFloor = alignedContinuityCurl.fingerCurl.bindFloors[0];
+  alignedFloor.afterLocalQuaternion = floorQuaternion(alignedFloor.minimumBindDeltaRadians, -1);
+  alignedFloor.appliedAxis = [-1, 0, 0];
+  alignedFloor.axisSource = 'shortest-bind-relative-aligned-to-previous';
+  alignedFloor.alignedObservedAxisHemisphere = true;
+  alignedFloor.renderedOrientationCorrectionRadians = normalizedQuaternionDelta(
+    alignedFloor.beforeLocalQuaternion, alignedFloor.afterLocalQuaternion,
+  );
+  alignedContinuityCurl.fingerCurl.bones[0].bindRelativeFloor = alignedFloor;
+  alignedContinuityModel.handPose.bones[0].localQuaternion = alignedFloor.afterLocalQuaternion;
+  assert(fingerCurlValid(alignedContinuityCurl, alignedContinuityModel),
+    'previous-axis hemisphere-aligned receipt must pass');
+  const forgedAxisCurl = structuredClone(curl);
+  const forgedAxisModel = structuredClone(curlModel);
+  const forgedAxisFloor = forgedAxisCurl.fingerCurl.bindFloors[0];
+  forgedAxisFloor.observedShortestRelativeAxis = [0, 1, 0];
+  forgedAxisFloor.appliedAxis = [0, 1, 0];
+  forgedAxisFloor.afterLocalQuaternion = [
+    0,
+    Math.sin(forgedAxisFloor.minimumBindDeltaRadians / 2),
+    0,
+    Math.cos(forgedAxisFloor.minimumBindDeltaRadians / 2),
+  ];
+  forgedAxisFloor.renderedOrientationCorrectionRadians = normalizedQuaternionDelta(
+    forgedAxisFloor.beforeLocalQuaternion, forgedAxisFloor.afterLocalQuaternion,
+  );
+  forgedAxisCurl.fingerCurl.bones[0].bindRelativeFloor = forgedAxisFloor;
+  forgedAxisModel.handPose.bones[0].localQuaternion = forgedAxisFloor.afterLocalQuaternion;
+  assert(!fingerCurlValid(forgedAxisCurl, forgedAxisModel),
+    'forged Y-axis receipt cannot impersonate the canonical X-axis pre-floor pose');
+  const fallbackCurl = structuredClone(curl);
+  const fallbackModel = structuredClone(curlModel);
+  const fallbackFloor = fallbackCurl.fingerCurl.bindFloors[0];
+  fallbackFloor.generation = 1;
+  fallbackFloor.beforeBindDeltaRadians = 0;
+  fallbackFloor.beforeLocalQuaternion = [0, 0, 0, 1];
+  fallbackFloor.afterLocalQuaternion = floorQuaternion(fallbackFloor.minimumBindDeltaRadians, -1);
+  fallbackFloor.reportedBindDeltaCorrectionRadians = fallbackFloor.minimumBindDeltaRadians;
+  fallbackFloor.renderedOrientationCorrectionRadians = fallbackFloor.minimumBindDeltaRadians;
+  fallbackFloor.observedShortestRelativeAxis = null;
+  fallbackFloor.appliedAxis = [...carbineSecondPhalanxFallbackAxis];
+  fallbackFloor.axisSource = 'authored-curl-fallback';
+  fallbackFloor.alignedObservedAxisHemisphere = false;
+  fallbackFloor.continuityReference = 'authored-curl-fallback';
+  fallbackFloor.preservedShortestRelativeAxis = null;
+  fallbackFloor.usedPreviousAxis = false;
+  fallbackFloor.usedFallbackAxis = true;
+  fallbackCurl.fingerCurl.bones[0].bindRelativeFloor = fallbackFloor;
+  fallbackModel.handPose.bones[0].localQuaternion = fallbackFloor.afterLocalQuaternion;
+  assert(fingerCurlValid(fallbackCurl, fallbackModel), 'exact-bind authored fallback axis must pass');
   const missingCurl = structuredClone(curl);
   missingCurl.fingerCurl.bones[0].applied = false;
   assert(!fingerCurlValid(missingCurl, curlModel), 'missing finger curl must fail');
+  const missingReceipt = structuredClone(curl);
+  missingReceipt.fingerCurl.bindFloors.pop();
+  assert(!fingerCurlValid(missingReceipt, curlModel), 'missing one of ten bind-floor receipts must fail');
+  const duplicateReceipt = structuredClone(curl);
+  duplicateReceipt.fingerCurl.bindFloors[1] = structuredClone(duplicateReceipt.fingerCurl.bindFloors[0]);
+  duplicateReceipt.fingerCurl.bones[1].bindRelativeFloor = duplicateReceipt.fingerCurl.bindFloors[1];
+  assert(!fingerCurlValid(duplicateReceipt, curlModel), 'duplicate bind-floor identity must not satisfy another joint');
+  const duplicateRenderedBone = structuredClone(curlModel);
+  duplicateRenderedBone.handPose.bones[1] = structuredClone(duplicateRenderedBone.handPose.bones[0]);
+  assert(!fingerCurlValid(curl, duplicateRenderedBone), 'duplicate rendered handPose bone must fail');
+  const invalidGeneration = structuredClone(curl);
+  invalidGeneration.fingerCurl.bindFloors[0].generation = 0;
+  invalidGeneration.fingerCurl.bones[0].bindRelativeFloor = invalidGeneration.fingerCurl.bindFloors[0];
+  assert(!fingerCurlValid(invalidGeneration, curlModel), 'non-persistent receipt generation must fail');
+  for (let index = 0; index < expectedHandBones.length; index += 1) {
+    const expected = expectedHandBones[index];
+    const productFloor = carbineSecondPhalanxProductFloors[expected.digit];
+    const evidenceOnlyFloor = (expected.minimumBindRadians + productFloor) / 2;
+    const adversary = makeCurlFixture(new Map([[index, evidenceOnlyFloor]]));
+    assert(evidenceOnlyFloor > expected.minimumBindRadians && evidenceOnlyFloor < productFloor,
+      `${expected.bone} adversary must sit between evidence and product floors`);
+    assert(!fingerCurlValid(adversary.curl, adversary.model),
+      `${expected.bone} floor above independent evidence but below product floor must fail`);
+  }
   const underFloorCurl = structuredClone(curl);
   const underFloorModel = structuredClone(curlModel);
   const underFloorQuaternion = floorQuaternion(0.379999);
-  underFloorCurl.fingerCurl.rightPinkyBindFloor.afterBindDeltaRadians = 0.379999;
-  underFloorCurl.fingerCurl.rightPinkyBindFloor.afterLocalQuaternion = underFloorQuaternion;
-  underFloorCurl.fingerCurl.bones.at(-1).bindRelativeFloor = underFloorCurl.fingerCurl.rightPinkyBindFloor;
-  underFloorModel.handPose.bones[0].bindQuaternionDeltaRadians = 0.379999;
-  underFloorModel.handPose.bones[0].localQuaternion = underFloorQuaternion;
+  const underFloorReceipt = underFloorCurl.fingerCurl.bindFloors.at(-1);
+  underFloorReceipt.afterBindDeltaRadians = 0.379999;
+  underFloorReceipt.afterLocalQuaternion = underFloorQuaternion;
+  underFloorReceipt.renderedOrientationCorrectionRadians = normalizedQuaternionDelta(
+    underFloorReceipt.beforeLocalQuaternion, underFloorQuaternion,
+  );
+  underFloorCurl.fingerCurl.rightPinkyBindFloor = underFloorReceipt;
+  underFloorCurl.fingerCurl.bones.at(-1).bindRelativeFloor = underFloorReceipt;
+  underFloorModel.handPose.bones.at(-1).bindQuaternionDeltaRadians = 0.379999;
+  underFloorModel.handPose.bones.at(-1).localQuaternion = underFloorQuaternion;
   assert(!fingerCurlValid(underFloorCurl, underFloorModel), '0.379999 rad post-mixer pinky floor must fail');
   const telemetryOnlyCurl = structuredClone(curl);
-  telemetryOnlyCurl.fingerCurl.bones.at(-1).bindRelativeFloor = telemetryOnlyCurl.fingerCurl.rightPinkyBindFloor;
   const mismatchedRenderedPinky = structuredClone(curlModel);
-  mismatchedRenderedPinky.handPose.bones[0].bindQuaternionDeltaRadians = 0.35;
+  mismatchedRenderedPinky.handPose.bones.at(-1).bindQuaternionDeltaRadians = 0.35;
   assert(!fingerCurlValid(telemetryOnlyCurl, mismatchedRenderedPinky), 'floor telemetry must match rendered Pinky2R hand pose');
 
   const canvas = { left: 0, top: 0, width: 1_600, height: 900 };

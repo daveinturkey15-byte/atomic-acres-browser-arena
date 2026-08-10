@@ -1002,10 +1002,49 @@ const UNARMED_WRIST_BIND_DELTA_FLOOR_RADIANS = 0.075;
 const UNARMED_WRIST_AXIS_EPSILON = 1e-6;
 const HAND_BIND_FLOOR_COMPARISON_EPSILON = 1e-9;
 const HAND_BIND_FLOOR_AXIS_EPSILON = 1e-8;
+const HAND_BIND_FLOOR_AXIS_CACHE_KEY = 'riggedHandBindFloorAxis';
+const HAND_BIND_FLOOR_TELEMETRY_KEY = 'riggedHandBindFloorTelemetry';
+const HAND_BIND_FLOOR_OBSERVED_AXIS_STORAGE_KEY = 'riggedHandBindFloorObservedAxisStorage';
+type RiggedHandSide = 'left' | 'right';
+type RiggedHandDigit = 'thumb' | 'index' | 'middle' | 'ring' | 'pinky';
+type RiggedHandBindFloorTelemetry = Record<string, unknown> & {
+  contract: 'post-mixer-authored-bind-relative-hand-floor-v1';
+  allocationContract: 'persistent-per-rendered-hand-bone-v1';
+  generation: number;
+  bindLocalQuaternion: number[];
+  beforeLocalQuaternion: number[];
+  afterLocalQuaternion: number[];
+  observedShortestRelativeAxis: number[] | null;
+  appliedAxis: number[];
+};
+const HAND_BIND_FLOOR_SCRATCH = {
+  before: new THREE.Quaternion(),
+  relative: new THREE.Quaternion(),
+  observedAxis: new THREE.Vector3(),
+  cachedAxis: new THREE.Vector3(),
+  fallbackAxis: new THREE.Vector3(),
+  appliedAxis: new THREE.Vector3(),
+  targetDelta: new THREE.Quaternion(),
+  normalizedBefore: new THREE.Quaternion(),
+  normalizedAfter: new THREE.Quaternion(),
+};
 const UNARMED_WRIST_FALLBACK_AXIS = Object.freeze({
   left: Object.freeze([1, -0.45, -0.6] as const),
   right: Object.freeze([1, 0.45, 0.6] as const),
 });
+
+function writeQuaternionArray(target: number[], value: THREE.Quaternion): void {
+  target[0] = value.x;
+  target[1] = value.y;
+  target[2] = value.z;
+  target[3] = value.w;
+}
+
+function writeVectorArray(target: number[], value: THREE.Vector3): void {
+  target[0] = value.x;
+  target[1] = value.y;
+  target[2] = value.z;
+}
 
 /**
  * Enforce a post-mixer angular floor on one rendered hand joint relative to
@@ -1015,13 +1054,20 @@ const UNARMED_WRIST_FALLBACK_AXIS = Object.freeze({
  */
 export function enforceRiggedOperatorHandBindDeltaFloor(
   root: THREE.Object3D,
-  side: 'left' | 'right',
-  digit: 'thumb' | 'index' | 'middle' | 'ring' | 'pinky',
+  side: RiggedHandSide,
+  digit: RiggedHandDigit,
   minimumBindDeltaRadians: number,
   fallbackAxis: readonly [number, number, number],
 ): Record<string, unknown> | null {
   const runtimeState = runtime(root);
-  const entry = runtimeState?.handBindPose.find((candidate) => candidate.side === side && candidate.digit === digit);
+  if (!runtimeState) return null;
+  let entry: RiggedOperatorRuntime['handBindPose'][number] | undefined;
+  for (const candidate of runtimeState.handBindPose) {
+    if (candidate.side === side && candidate.digit === digit) {
+      entry = candidate;
+      break;
+    }
+  }
   if (!entry || !Number.isFinite(minimumBindDeltaRadians)
     || minimumBindDeltaRadians <= 0 || minimumBindDeltaRadians >= Math.PI) return null;
   const bindLocalQuaternion = entry.quaternion;
@@ -1034,91 +1080,139 @@ export function enforceRiggedOperatorHandBindDeltaFloor(
   // so solve the unit output angle that makes that immutable authored value
   // report the requested floor instead of silently missing it by float error.
   const floorTargetRelativeAngleRadians = 2 * Math.acos(THREE.MathUtils.clamp(normalizedBindDotTarget, -1, 1));
-  const beforeLocalQuaternion = entry.bone.quaternion.clone();
+  const beforeLocalQuaternion = HAND_BIND_FLOOR_SCRATCH.before.copy(entry.bone.quaternion);
   const beforeBindDeltaRadians = beforeLocalQuaternion.angleTo(bindLocalQuaternion);
-  const relative = bindLocalQuaternion.clone().invert().multiply(beforeLocalQuaternion).normalize();
+  const relative = HAND_BIND_FLOOR_SCRATCH.relative.copy(bindLocalQuaternion)
+    .invert().multiply(beforeLocalQuaternion).normalize();
   if (relative.w < 0) relative.set(-relative.x, -relative.y, -relative.z, -relative.w);
   const relativeAxisLength = Math.hypot(relative.x, relative.y, relative.z);
-  const observedAxis = relativeAxisLength > HAND_BIND_FLOOR_AXIS_EPSILON
-    ? new THREE.Vector3(relative.x, relative.y, relative.z).divideScalar(relativeAxisLength)
-    : null;
-  const cacheKey = `riggedHandBindFloorAxis:${side}:${digit}`;
-  const cachedAxisValue = entry.bone.userData[cacheKey];
-  const cachedAxisCandidate = Array.isArray(cachedAxisValue) && cachedAxisValue.length === 3
-    && cachedAxisValue.every((value) => typeof value === 'number' && Number.isFinite(value))
-    ? new THREE.Vector3().fromArray(cachedAxisValue as [number, number, number])
-    : null;
-  const cachedAxis = cachedAxisCandidate
-    && cachedAxisCandidate.lengthSq() > HAND_BIND_FLOOR_AXIS_EPSILON ** 2
-    ? cachedAxisCandidate.normalize()
-    : null;
-  const authoredFallbackAxis = new THREE.Vector3(...fallbackAxis);
+  const observedAxisAvailable = relativeAxisLength > HAND_BIND_FLOOR_AXIS_EPSILON;
+  if (observedAxisAvailable) {
+    HAND_BIND_FLOOR_SCRATCH.observedAxis.set(relative.x, relative.y, relative.z).divideScalar(relativeAxisLength);
+  }
+  const cachedAxisValue = entry.bone.userData[HAND_BIND_FLOOR_AXIS_CACHE_KEY];
+  const cachedAxisAvailable = Array.isArray(cachedAxisValue) && cachedAxisValue.length === 3
+    && typeof cachedAxisValue[0] === 'number' && Number.isFinite(cachedAxisValue[0])
+    && typeof cachedAxisValue[1] === 'number' && Number.isFinite(cachedAxisValue[1])
+    && typeof cachedAxisValue[2] === 'number' && Number.isFinite(cachedAxisValue[2])
+    && HAND_BIND_FLOOR_SCRATCH.cachedAxis.fromArray(cachedAxisValue as [number, number, number]).lengthSq()
+      > HAND_BIND_FLOOR_AXIS_EPSILON ** 2;
+  if (cachedAxisAvailable) HAND_BIND_FLOOR_SCRATCH.cachedAxis.normalize();
+  const authoredFallbackAxis = HAND_BIND_FLOOR_SCRATCH.fallbackAxis.set(...fallbackAxis);
   if (authoredFallbackAxis.lengthSq() <= HAND_BIND_FLOOR_AXIS_EPSILON ** 2) return null;
   authoredFallbackAxis.normalize();
-  const appliedAxis = observedAxis ?? cachedAxis ?? authoredFallbackAxis;
-  const axisSource = observedAxis
-    ? 'shortest-bind-relative'
-    : cachedAxis ? 'previous-shortest-bind-relative' : 'authored-curl-fallback';
   const intervened = beforeBindDeltaRadians
     < minimumBindDeltaRadians - HAND_BIND_FLOOR_COMPARISON_EPSILON;
+  const continuityReferenceAxis = cachedAxisAvailable
+    ? HAND_BIND_FLOOR_SCRATCH.cachedAxis
+    : authoredFallbackAxis;
+  const appliedAxis = HAND_BIND_FLOOR_SCRATCH.appliedAxis.copy(observedAxisAvailable
+    ? HAND_BIND_FLOOR_SCRATCH.observedAxis
+    : continuityReferenceAxis);
+  // A real observed axis seeds the persistent hemisphere without being
+  // rewritten. Subsequent sub-floor cancellation samples align to that prior
+  // observation; exact bind uses the authored fallback only when no observed
+  // direction has ever existed.
+  const alignedObservedAxisHemisphere = intervened && observedAxisAvailable && cachedAxisAvailable
+    && appliedAxis.dot(continuityReferenceAxis) < 0;
+  if (alignedObservedAxisHemisphere) appliedAxis.negate();
+  const axisSource = observedAxisAvailable
+    ? alignedObservedAxisHemisphere
+      ? 'shortest-bind-relative-aligned-to-previous'
+      : 'shortest-bind-relative'
+    : cachedAxisAvailable ? 'previous-shortest-bind-relative' : 'authored-curl-fallback';
   if (intervened) {
     entry.bone.quaternion.copy(bindLocalQuaternion).multiply(
-      new THREE.Quaternion().setFromAxisAngle(appliedAxis, floorTargetRelativeAngleRadians),
+      HAND_BIND_FLOOR_SCRATCH.targetDelta.setFromAxisAngle(appliedAxis, floorTargetRelativeAngleRadians),
     ).normalize();
   }
-  if (observedAxis) entry.bone.userData[cacheKey] = observedAxis.toArray();
-  else if (!cachedAxis) entry.bone.userData[cacheKey] = appliedAxis.toArray();
+  let persistentAxisCache = cachedAxisValue as number[] | undefined;
+  if (!Array.isArray(persistentAxisCache) || persistentAxisCache.length !== 3) {
+    persistentAxisCache = [0, 0, 0];
+    entry.bone.userData[HAND_BIND_FLOOR_AXIS_CACHE_KEY] = persistentAxisCache;
+  }
+  // While the source pose is inside the prohibited bind neighbourhood, keep
+  // the cached axis hemisphere continuous across +0/-0 cancellation. Once a
+  // real animation phase clears the floor it owns the cache again unchanged.
+  if (observedAxisAvailable) writeVectorArray(
+    persistentAxisCache,
+    intervened ? appliedAxis : HAND_BIND_FLOOR_SCRATCH.observedAxis,
+  );
+  else if (!cachedAxisAvailable) writeVectorArray(persistentAxisCache, appliedAxis);
   entry.bone.updateWorldMatrix(false, true);
   const afterBindDeltaRadians = entry.bone.quaternion.angleTo(bindLocalQuaternion);
   const reportedBindDeltaCorrectionRadians = intervened
     ? Math.max(0, minimumBindDeltaRadians - beforeBindDeltaRadians)
     : 0;
   const renderedOrientationCorrectionRadians = intervened
-    ? beforeLocalQuaternion.clone().normalize().angleTo(entry.bone.quaternion.clone().normalize())
+    ? HAND_BIND_FLOOR_SCRATCH.normalizedBefore.copy(beforeLocalQuaternion).normalize()
+      .angleTo(HAND_BIND_FLOOR_SCRATCH.normalizedAfter.copy(entry.bone.quaternion).normalize())
     : 0;
-  return {
-    contract: 'post-mixer-authored-bind-relative-hand-floor-v1',
-    reference: 'immutable-authored-handBindPose-before-animation',
-    side,
-    digit,
-    sourceBone: entry.sourceBone,
-    bone: entry.bone.name,
-    minimumBindDeltaRadians,
-    bindQuaternionNorm,
-    floorTargetRelativeAngleRadians,
-    bindNormCompensationRadians: floorTargetRelativeAngleRadians - minimumBindDeltaRadians,
-    beforeBindDeltaRadians,
-    afterBindDeltaRadians,
-    reportedBindDeltaCorrectionRadians,
-    renderedOrientationCorrectionRadians,
-    bindLocalQuaternion: bindLocalQuaternion.toArray(),
-    beforeLocalQuaternion: beforeLocalQuaternion.toArray(),
-    afterLocalQuaternion: entry.bone.quaternion.toArray(),
-    observedShortestRelativeAxis: observedAxis?.toArray() ?? null,
-    appliedAxis: appliedAxis.toArray(),
-    axisSource,
-    intervened,
-    preservedShortestRelativeAxis: observedAxis !== null
-      ? Math.abs(observedAxis.dot(appliedAxis)) >= 1 - 1e-9
-      : intervened ? null : true,
-    usedPreviousAxis: observedAxis === null && cachedAxis !== null,
-    usedFallbackAxis: observedAxis === null && cachedAxis === null,
-    appliedToRenderedBone: true,
-    allFinite: [
-      minimumBindDeltaRadians,
-      bindQuaternionNorm,
-      floorTargetRelativeAngleRadians,
-      floorTargetRelativeAngleRadians - minimumBindDeltaRadians,
-      beforeBindDeltaRadians,
-      afterBindDeltaRadians,
-      reportedBindDeltaCorrectionRadians,
-      renderedOrientationCorrectionRadians,
-      ...bindLocalQuaternion.toArray(),
-      ...beforeLocalQuaternion.toArray(),
-      ...entry.bone.quaternion.toArray(),
-      ...appliedAxis.toArray(),
-    ].every(Number.isFinite),
-  };
+  let telemetry = entry.bone.userData[HAND_BIND_FLOOR_TELEMETRY_KEY] as RiggedHandBindFloorTelemetry | undefined;
+  if (telemetry?.allocationContract !== 'persistent-per-rendered-hand-bone-v1') {
+    telemetry = {
+      contract: 'post-mixer-authored-bind-relative-hand-floor-v1',
+      allocationContract: 'persistent-per-rendered-hand-bone-v1',
+      generation: 0,
+      bindLocalQuaternion: [0, 0, 0, 1],
+      beforeLocalQuaternion: [0, 0, 0, 1],
+      afterLocalQuaternion: [0, 0, 0, 1],
+      observedShortestRelativeAxis: null,
+      appliedAxis: [0, 0, 0],
+    };
+    entry.bone.userData[HAND_BIND_FLOOR_TELEMETRY_KEY] = telemetry;
+  }
+  let observedAxisStorage = entry.bone.userData[HAND_BIND_FLOOR_OBSERVED_AXIS_STORAGE_KEY] as number[] | undefined;
+  if (!Array.isArray(observedAxisStorage) || observedAxisStorage.length !== 3) {
+    observedAxisStorage = [0, 0, 0];
+    entry.bone.userData[HAND_BIND_FLOOR_OBSERVED_AXIS_STORAGE_KEY] = observedAxisStorage;
+  }
+  if (observedAxisAvailable) writeVectorArray(observedAxisStorage, HAND_BIND_FLOOR_SCRATCH.observedAxis);
+  writeQuaternionArray(telemetry.bindLocalQuaternion, bindLocalQuaternion);
+  writeQuaternionArray(telemetry.beforeLocalQuaternion, beforeLocalQuaternion);
+  writeQuaternionArray(telemetry.afterLocalQuaternion, entry.bone.quaternion);
+  writeVectorArray(telemetry.appliedAxis, appliedAxis);
+  telemetry.generation += 1;
+  telemetry.reference = 'immutable-authored-handBindPose-before-animation';
+  telemetry.side = side;
+  telemetry.digit = digit;
+  telemetry.sourceBone = entry.sourceBone;
+  telemetry.bone = entry.bone.name;
+  telemetry.minimumBindDeltaRadians = minimumBindDeltaRadians;
+  telemetry.bindQuaternionNorm = bindQuaternionNorm;
+  telemetry.floorTargetRelativeAngleRadians = floorTargetRelativeAngleRadians;
+  telemetry.bindNormCompensationRadians = floorTargetRelativeAngleRadians - minimumBindDeltaRadians;
+  telemetry.beforeBindDeltaRadians = beforeBindDeltaRadians;
+  telemetry.afterBindDeltaRadians = afterBindDeltaRadians;
+  telemetry.reportedBindDeltaCorrectionRadians = reportedBindDeltaCorrectionRadians;
+  telemetry.renderedOrientationCorrectionRadians = renderedOrientationCorrectionRadians;
+  telemetry.observedShortestRelativeAxis = observedAxisAvailable ? observedAxisStorage : null;
+  telemetry.axisSource = axisSource;
+  telemetry.alignedObservedAxisHemisphere = alignedObservedAxisHemisphere;
+  telemetry.continuityReference = intervened
+    ? cachedAxisAvailable
+      ? 'previous-shortest-bind-relative'
+      : observedAxisAvailable ? null : 'authored-curl-fallback'
+    : null;
+  telemetry.intervened = intervened;
+  telemetry.preservedShortestRelativeAxis = observedAxisAvailable
+    ? Math.abs(HAND_BIND_FLOOR_SCRATCH.observedAxis.dot(appliedAxis)) >= 1 - 1e-9
+    : intervened ? null : true;
+  telemetry.usedPreviousAxis = !observedAxisAvailable && cachedAxisAvailable;
+  telemetry.usedFallbackAxis = !observedAxisAvailable && !cachedAxisAvailable;
+  telemetry.appliedToRenderedBone = true;
+  telemetry.allFinite = Number.isFinite(minimumBindDeltaRadians)
+    && Number.isFinite(bindQuaternionNorm)
+    && Number.isFinite(floorTargetRelativeAngleRadians)
+    && Number.isFinite(beforeBindDeltaRadians)
+    && Number.isFinite(afterBindDeltaRadians)
+    && Number.isFinite(reportedBindDeltaCorrectionRadians)
+    && Number.isFinite(renderedOrientationCorrectionRadians)
+    && telemetry.bindLocalQuaternion.every(Number.isFinite)
+    && telemetry.beforeLocalQuaternion.every(Number.isFinite)
+    && telemetry.afterLocalQuaternion.every(Number.isFinite)
+    && telemetry.appliedAxis.every(Number.isFinite);
+  return telemetry;
 }
 
 /**

@@ -1210,8 +1210,14 @@ const RIGGED_CARBINE_SECOND_PHALANX_CURL = Object.freeze({
   left: Object.freeze({ thumb: -0.18, index: -0.24, middle: -0.3, ring: -0.36, pinky: -0.76 }),
   right: Object.freeze({ thumb: -0.34, index: -0.46, middle: -0.7, ring: -0.76, pinky: -0.78 }),
 });
-const RIGGED_CARBINE_RIGHT_PINKY_BIND_DELTA_FLOOR_RADIANS = 0.38;
-const RIGGED_CARBINE_RIGHT_PINKY_FALLBACK_AXIS = Object.freeze([-1, 0, 0] as const);
+const RIGGED_CARBINE_SECOND_PHALANX_BIND_DELTA_FLOOR_RADIANS = Object.freeze({
+  thumb: 0.04,
+  index: 0.23,
+  middle: 0.21,
+  ring: 0.25,
+  pinky: 0.38,
+});
+const RIGGED_CARBINE_SECOND_PHALANX_FALLBACK_AXIS = Object.freeze([-1, 0, 0] as const);
 
 const RIGGED_GRIP_POSITION_ERROR_MAX_M = 0.015;
 const RIGGED_GRIP_QUATERNION_ERROR_MAX_RADIANS = 0.2;
@@ -1454,13 +1460,25 @@ function applyRiggedCarbineFingerCurl(
   rig: Extract<OperatorRig, { rigged: true }>,
   weapon: THREE.Group,
 ): Record<string, unknown> {
-  const bones: Array<Record<string, unknown>> = [];
+  const bones: Array<{
+    side: 'left' | 'right';
+    digit: keyof typeof RIGGED_CARBINE_SECOND_PHALANX_BIND_DELTA_FLOOR_RADIANS;
+    bone: string;
+    curlRadians: number;
+    bindRelativeFloor: Record<string, unknown> | null;
+    applied: boolean;
+  }> = [];
+  const bindFloors: Array<Record<string, unknown>> = [];
+  let rightPinkyBindFloor: Record<string, unknown> | null = null;
+  let leftHandApplied = false;
+  let rightHandApplied = false;
   if (weapon.userData.weaponId !== 'carbine') {
     return {
-      contract: 'pass65-evaluated-per-digit-grip-curl-v2',
+      contract: 'pass65-evaluated-per-digit-grip-curl-v3',
       sourceReferenceAvailable: false,
       expectedBoneCount: 10,
       bones,
+      bindFloors,
       rightPinkyBindFloor: null,
       allAtOrAboveRequiredBindFloor: false,
       allApplied: false,
@@ -1475,38 +1493,46 @@ function applyRiggedCarbineFingerCurl(
       const bone = wrist?.getObjectByName(runtimeName);
       const curlRadians = RIGGED_CARBINE_SECOND_PHALANX_CURL[side][digit];
       if (!(bone instanceof THREE.Bone)) {
-        bones.push({ side, digit, bone: runtimeName, curlRadians, applied: false });
+        bones.push({ side, digit, bone: runtimeName, curlRadians, bindRelativeFloor: null, applied: false });
         continue;
       }
       applyRiggedCarbineFingerCurlToBone(bone, curlRadians);
-      const bindRelativeFloor = side === 'right' && digit === 'pinky'
-        ? enforceRiggedOperatorHandBindDeltaFloor(
-          root,
-          side,
-          digit,
-          RIGGED_CARBINE_RIGHT_PINKY_BIND_DELTA_FLOOR_RADIANS,
-          RIGGED_CARBINE_RIGHT_PINKY_FALLBACK_AXIS,
-        )
-        : null;
+      const bindRelativeFloor = enforceRiggedOperatorHandBindDeltaFloor(
+        root,
+        side,
+        digit,
+        RIGGED_CARBINE_SECOND_PHALANX_BIND_DELTA_FLOOR_RADIANS[digit],
+        RIGGED_CARBINE_SECOND_PHALANX_FALLBACK_AXIS,
+      );
+      if (bindRelativeFloor !== null) bindFloors.push(bindRelativeFloor);
+      if (side === 'right' && digit === 'pinky') rightPinkyBindFloor = bindRelativeFloor;
+      if (side === 'left') leftHandApplied = true;
+      else rightHandApplied = true;
       bones.push({ side, digit, bone: runtimeName, curlRadians, bindRelativeFloor, applied: true });
     }
   }
-  const rightPinkyBindFloor = (bones.find(({ side, digit }) => side === 'right' && digit === 'pinky')
-    ?.bindRelativeFloor ?? null) as Record<string, unknown> | null;
-  const allAtOrAboveRequiredBindFloor = rightPinkyBindFloor?.appliedToRenderedBone === true
-    && rightPinkyBindFloor.allFinite === true
-    && Number(rightPinkyBindFloor.afterBindDeltaRadians)
-      >= RIGGED_CARBINE_RIGHT_PINKY_BIND_DELTA_FLOOR_RADIANS - 1e-9;
+  let allAtOrAboveRequiredBindFloor = bindFloors.length === 10 && bones.length === 10;
+  for (const { digit, bindRelativeFloor, applied } of bones) {
+    if (!applied || bindRelativeFloor?.appliedToRenderedBone !== true
+      || bindRelativeFloor.allFinite !== true
+      || bindRelativeFloor.minimumBindDeltaRadians
+        !== RIGGED_CARBINE_SECOND_PHALANX_BIND_DELTA_FLOOR_RADIANS[digit]
+      || Number(bindRelativeFloor.afterBindDeltaRadians)
+        < RIGGED_CARBINE_SECOND_PHALANX_BIND_DELTA_FLOOR_RADIANS[digit] - 1e-9) {
+      allAtOrAboveRequiredBindFloor = false;
+      break;
+    }
+  }
   return {
-    contract: 'pass65-evaluated-per-digit-grip-curl-v2',
+    contract: 'pass65-evaluated-per-digit-grip-curl-v3',
     sourceReferenceAvailable: true,
     expectedBoneCount: 10,
     bones,
-    bothHands: new Set(bones.filter(({ applied }) => applied === true).map(({ side }) => side)).size === 2,
+    bothHands: leftHandApplied && rightHandApplied,
+    bindFloors,
     rightPinkyBindFloor,
     allAtOrAboveRequiredBindFloor,
-    allApplied: bones.length === 10 && bones.every(({ applied }) => applied === true)
-      && allAtOrAboveRequiredBindFloor,
+    allApplied: allAtOrAboveRequiredBindFloor,
   };
 }
 
