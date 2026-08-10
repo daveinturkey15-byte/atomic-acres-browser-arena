@@ -95,7 +95,7 @@ describe('persistent window glass debris presentation', () => {
 
   it('retains the exact prewarmed instance and never allocates shard geometry on the breach frame', () => {
     const source = readFileSync('src/legacy-main.ts', 'utf8');
-    const prewarmStart = source.indexOf('async function prewarmWindowGlassDebrisPool');
+    const prewarmStart = source.indexOf('async function withStagedWindowGlassDebrisPool');
     const start = source.indexOf('function spawnPersistentWindowDebris');
     const end = source.indexOf('function clearPersistentWindowDebris', start);
     expect(prewarmStart).toBeGreaterThanOrEqual(0);
@@ -104,7 +104,21 @@ describe('persistent window glass debris presentation', () => {
     const prewarm = source.slice(prewarmStart, start);
     const block = source.slice(start, end);
     expect(prewarm).toContain('createFracturedWindowDebrisVisual({');
-    expect(prewarm).toContain('await renderRuntime.compileAndRender(stage, camera, scene);');
+    expect(prewarm).toContain('await submit(stage);');
+    expect(prewarm).toContain('(stage) => renderRuntime.compileAndRender(stage, camera, scene)');
+    expect(prewarm).toContain('parent: pooled.root.parent,');
+    expect(prewarm).toContain('visible: pooled.root.visible,');
+    expect(prewarm).toContain('position: pooled.root.position.clone(),');
+    expect(prewarm).toContain('quaternion: pooled.root.quaternion.clone(),');
+    expect(prewarm).toContain('scale: pooled.root.scale.clone(),');
+    expect(prewarm).toContain('instanceMatrix: new Float32Array(shards.instanceMatrix.array),');
+    expect(prewarm).toContain('finally {');
+    expect(prewarm).toContain('state.parent?.add(root);');
+    expect(prewarm).toContain('root.visible = state.visible;');
+    expect(prewarm).toContain('root.position.copy(state.position);');
+    expect(prewarm).toContain('root.quaternion.copy(state.quaternion);');
+    expect(prewarm).toContain('root.scale.copy(state.scale);');
+    expect(prewarm).toContain('shards.instanceMatrix.array.set(state.instanceMatrix);');
     expect(block).toContain('pooledWindowDebris.get(windowDebrisPoolKey(arena.id, window.id))');
     expect(block).not.toContain('createFracturedWindowDebrisVisual({');
     expect(block).not.toContain('new THREE.BoxGeometry');

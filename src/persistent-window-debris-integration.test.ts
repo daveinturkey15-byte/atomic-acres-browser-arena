@@ -48,7 +48,7 @@ describe('persistent physical house-window debris integration', () => {
   });
 
   it('uses one prewarmed instanced shard presentation instead of a second cosmetic RAF path', () => {
-    const poolStart = source.indexOf('async function prewarmWindowGlassDebrisPool(');
+    const poolStart = source.indexOf('async function withStagedWindowGlassDebrisPool(');
     const poolEnd = source.indexOf('\nfunction clearPersistentWindowDebris(', poolStart);
     const poolBlock = source.slice(poolStart, poolEnd);
     expect(poolStart).toBeGreaterThan(-1);
@@ -61,6 +61,24 @@ describe('persistent physical house-window debris integration', () => {
     expect(poolBlock).not.toContain('requestAnimationFrame');
     expect(poolBlock).not.toContain('.material.clone()');
     expect(source).toContain('spawnPersistentWindowDebris(window, normal)');
+  });
+
+  it('schedules exactly one deferred physics reconciliation for each admitted breach', () => {
+    const spawnStart = source.indexOf('function spawnPersistentWindowDebris(');
+    const breachEnd = source.indexOf('\nfunction breakWindowsAlongBallisticTrace(', spawnStart);
+    const block = source.slice(spawnStart, breachEnd);
+    const breakStart = block.indexOf('function breakHouseWindow(');
+    const breakBlock = block.slice(breakStart);
+    const deferredSync = 'scheduleBrowserPreparationIdleTask(() => syncInteractiveWorldPhysics());';
+
+    expect(spawnStart).toBeGreaterThan(-1);
+    expect(breachEnd).toBeGreaterThan(spawnStart);
+    expect(block.match(/scheduleBrowserPreparationIdleTask\(\(\) => syncInteractiveWorldPhysics\(\)\);/g))
+      .toHaveLength(1);
+    expect(breakBlock).toContain('spawnPersistentWindowDebris(window, normal);');
+    expect(breakBlock).toContain(deferredSync);
+    expect(breakBlock.indexOf('spawnPersistentWindowDebris(window, normal);'))
+      .toBeLessThan(breakBlock.indexOf(deferredSync));
   });
 
   it('lets later explosions re-impulse only still-active shed and falling window bodies', () => {

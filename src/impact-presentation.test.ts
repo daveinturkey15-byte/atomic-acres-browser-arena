@@ -141,6 +141,57 @@ describe('pooled impact presentation', () => {
     expect(compileAndRender).toHaveBeenCalledTimes(1);
   });
 
+  it('restores live impact state when a caller-owned exact composition rejects', async () => {
+    const scene = new THREE.Scene();
+    const camera = reviewCamera();
+    const presentation = new ImpactPresentation(scene);
+    presentation.impact(new THREE.Vector3(0.2, 1.1, -0.8), new THREE.Vector3(0, 1, 0), 'glass');
+    presentation.root.frustumCulled = true;
+    presentation.points.frustumCulled = true;
+    presentation.marks.frustumCulled = true;
+
+    const positionAttribute = presentation.points.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const colorAttribute = presentation.points.geometry.getAttribute('color') as THREE.BufferAttribute;
+    const instanceColor = presentation.marks.instanceColor!;
+    const before = {
+      positions: attributeValues(positionAttribute),
+      colors: attributeValues(colorAttribute),
+      matrices: attributeValues(presentation.marks.instanceMatrix),
+      markColors: attributeValues(instanceColor),
+      activeParticles: presentation.activeParticles(),
+      activeMarks: presentation.activeMarks(),
+      rootVisible: presentation.root.visible,
+      pointsVisible: presentation.points.visible,
+      marksVisible: presentation.marks.visible,
+    };
+    const submit = vi.fn(async (root: THREE.Object3D) => {
+      expect(root).toBe(presentation.root);
+      expect(root.parent).toBe(scene);
+      expect(root.visible).toBe(true);
+      expect(presentation.points.visible).toBe(true);
+      expect(presentation.marks.visible).toBe(true);
+      expect(presentation.points.frustumCulled).toBe(false);
+      expect(presentation.marks.frustumCulled).toBe(false);
+      throw new Error('injected exact-composition failure');
+    });
+
+    await expect(presentation.withStagedVocabulary(camera, submit))
+      .rejects.toThrow('injected exact-composition failure');
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(attributeValues(positionAttribute)).toEqual(before.positions);
+    expect(attributeValues(colorAttribute)).toEqual(before.colors);
+    expect(attributeValues(presentation.marks.instanceMatrix)).toEqual(before.matrices);
+    expect(attributeValues(instanceColor)).toEqual(before.markColors);
+    expect(presentation.activeParticles()).toBe(before.activeParticles);
+    expect(presentation.activeMarks()).toBe(before.activeMarks);
+    expect(presentation.root.visible).toBe(before.rootVisible);
+    expect(presentation.points.visible).toBe(before.pointsVisible);
+    expect(presentation.marks.visible).toBe(before.marksVisible);
+    expect(presentation.root.frustumCulled).toBe(true);
+    expect(presentation.points.frustumCulled).toBe(true);
+    expect(presentation.marks.frustumCulled).toBe(true);
+  });
+
   it('serializes distinct scene generations and retries independently after a failed generation', async () => {
     const presentation = new ImpactPresentation(new THREE.Scene());
     const camera = reviewCamera();

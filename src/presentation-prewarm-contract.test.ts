@@ -271,6 +271,26 @@ describe('presentation prewarm startup contract', () => {
     expect(matchBoundFirstShots).toContain("weaponView.prewarmBrowserWeaponFirePresentation('flamethrower',");
     expect(matchBoundFirstShots).toContain('renderRuntime.compileAndRender(scene, camera, scene)');
     expect(matchBoundFirstShots).toContain('prewarmExactWebGlMatchComposition()');
+    const glassImpactStage = matchBoundFirstShots.indexOf(
+      'await impactPresentation.withStagedVocabulary(camera,',
+    );
+    const glassPoolStage = matchBoundFirstShots.indexOf(
+      'withStagedWindowGlassDebrisPool(',
+      glassImpactStage,
+    );
+    const glassImpactSubmit = matchBoundFirstShots.indexOf(
+      '() => submitExactMatchComposition()',
+      glassPoolStage,
+    );
+    const ordinaryFireStage = matchBoundFirstShots.indexOf(
+      'weaponView.prewarmBrowserWeaponFirePresentation(player.weapon,',
+    );
+    expect(glassImpactStage).toBeGreaterThan(-1);
+    expect(glassPoolStage).toBeGreaterThan(glassImpactStage);
+    expect(glassImpactSubmit).toBeGreaterThan(glassPoolStage);
+    expect(glassImpactStage).toBeLessThan(ordinaryFireStage);
+    expect(matchBoundFirstShots.slice(glassImpactStage, ordinaryFireStage))
+      .toContain('arenaTransitionGeneration');
     expect(matchBoundFirstShots.indexOf('player.weapon'))
       .toBeLessThan(matchBoundFirstShots.indexOf("'flare-gun'"));
     expect(matchBoundFirstShots.indexOf("'flare-gun'"))

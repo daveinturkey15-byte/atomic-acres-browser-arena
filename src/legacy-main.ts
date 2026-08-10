@@ -10736,14 +10736,24 @@ function windowDebrisHalfExtents(
   });
 }
 
-async function prewarmWindowGlassDebrisPool(sceneGeneration: number): Promise<void> {
-  if (arena.breakableWindows.length === 0) return;
+async function withStagedWindowGlassDebrisPool(
+  sceneGeneration: number,
+  submit: (stage: THREE.Group) => Promise<void>,
+): Promise<void> {
   const stage = new THREE.Group();
   stage.name = `prewarmed-window-debris-pool-${sceneGeneration}`;
   stage.position.copy(camera.getWorldPosition(new THREE.Vector3()))
     .addScaledVector(camera.getWorldDirection(new THREE.Vector3()), 4);
   stage.quaternion.copy(camera.getWorldQuaternion(new THREE.Quaternion()));
-  const staged: PooledWindowDebris[] = [];
+  const staged: Array<Readonly<{
+    pooled: PooledWindowDebris;
+    parent: THREE.Object3D | null;
+    visible: boolean;
+    position: THREE.Vector3;
+    quaternion: THREE.Quaternion;
+    scale: THREE.Vector3;
+    instanceMatrix: Float32Array;
+  }>> = [];
   for (const [index, window] of arena.breakableWindows.entries()) {
     const key = windowDebrisPoolKey(arena.id, window.id);
     let pooled = pooledWindowDebris.get(key);
@@ -10758,29 +10768,58 @@ async function prewarmWindowGlassDebrisPool(sceneGeneration: number): Promise<vo
       root.userData.prewarmedSceneGeneration = sceneGeneration;
       pooled = Object.freeze({ key, arenaId: arena.id, windowId: window.id, root, halfExtents });
       pooledWindowDebris.set(key, pooled);
+      root.visible = false;
+      scene.add(root);
     }
     if ([...persistentWindowDebris.values()].some((entry) => entry.root === pooled.root)) {
       throw new Error(`${key}: cannot prewarm an active window-debris instance`);
     }
+    const shards = pooled.root.children.find((child): child is THREE.InstancedMesh => child instanceof THREE.InstancedMesh);
+    if (!shards) throw new Error(`${key}: retained glass-debris shard cluster is missing`);
+    staged.push(Object.freeze({
+      pooled,
+      parent: pooled.root.parent,
+      visible: pooled.root.visible,
+      position: pooled.root.position.clone(),
+      quaternion: pooled.root.quaternion.clone(),
+      scale: pooled.root.scale.clone(),
+      instanceMatrix: new Float32Array(shards.instanceMatrix.array),
+    }));
     updateFracturedWindowDebrisVisual(pooled.root, 0);
     pooled.root.visible = true;
     pooled.root.position.set(((index % 3) - 1) * 1.6, Math.floor(index / 3) * 1.4 - 0.7, 0);
     pooled.root.quaternion.identity();
     stage.add(pooled.root);
-    staged.push(pooled);
   }
   scene.add(stage);
   try {
-    await renderRuntime.compileAndRender(stage, camera, scene);
+    await submit(stage);
   } finally {
     stage.removeFromParent();
-    for (const pooled of staged) {
-      pooled.root.removeFromParent();
-      pooled.root.visible = false;
-      scene.add(pooled.root);
+    for (const state of staged) {
+      const { root } = state.pooled;
+      const shards = root.children.find((child): child is THREE.InstancedMesh => child instanceof THREE.InstancedMesh);
+      root.removeFromParent();
+      state.parent?.add(root);
+      root.visible = state.visible;
+      root.position.copy(state.position);
+      root.quaternion.copy(state.quaternion);
+      root.scale.copy(state.scale);
+      if (shards) {
+        shards.instanceMatrix.array.set(state.instanceMatrix);
+        shards.instanceMatrix.needsUpdate = true;
+      }
     }
     stage.clear();
   }
+}
+
+async function prewarmWindowGlassDebrisPool(sceneGeneration: number): Promise<void> {
+  if (arena.breakableWindows.length === 0) return;
+  await withStagedWindowGlassDebrisPool(
+    sceneGeneration,
+    (stage) => renderRuntime.compileAndRender(stage, camera, scene),
+  );
 }
 
 function spawnPersistentWindowDebris(window: ArenaMap['breakableWindows'][number], normal: THREE.Vector3): void {
@@ -10866,8 +10905,6 @@ function spawnPersistentWindowDebrisSynchronously(
     receivedPhysicsPose: false,
     spawnedAt: performance.now(),
   });
-  // Defer physics sync to avoid frame hitch on debris spawn.
-  scheduleBrowserPreparationIdleTask(() => syncInteractiveWorldPhysics());
 }
 
 function clearPersistentWindowDebris(): void {
@@ -10935,8 +10972,8 @@ function breakHouseWindow(
   spawnPersistentWindowDebris(window, normal);
   window.broken = true;
   window.mesh.visible = projection.paneVisible;
-  // Defer the heavy physics sync to avoid a frame hitch on glass break.
-  // Visual effects (impact flash, shards, audio) happen immediately.
+  // Coalesce the pane collider and optional debris-body admission into one
+  // deferred physics sync. Visual effects still happen immediately.
   scheduleBrowserPreparationIdleTask(() => syncInteractiveWorldPhysics());
   spawnImpactFlash(point, 'glass', normal);
   audio.impact('glass', point.distanceTo(camera.position));
@@ -11208,6 +11245,17 @@ async function prewarmMatchBoundFirstShotPresentations(): Promise<void> {
   const submitExactMatchComposition = renderRuntime.backend === 'webgpu'
     ? () => renderRuntime.compileAndRender(scene, camera, scene)
     : () => prewarmExactWebGlMatchComposition();
+
+  // The arena-bound WebGL pool compile targets the default sRGB framebuffer,
+  // while live AtomicSignal gameplay targets its linear HDR buffer. Stage both
+  // retained glass and impact draws together in the exact final composition so
+  // their first live breach cannot link a second program family.
+  await impactPresentation.withStagedVocabulary(camera, () => (
+    withStagedWindowGlassDebrisPool(
+      arenaTransitionGeneration,
+      () => submitExactMatchComposition(),
+    )
+  ));
 
   // Ordinary fire owns shared muzzle-smoke and casing programs without a
   // transient world light. Special weapons then add their complete retained
