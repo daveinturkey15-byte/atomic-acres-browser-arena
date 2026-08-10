@@ -25371,6 +25371,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     player.velocity.set(0, 0, 0);
     playerGrounded = false;
     wasGrounded = false;
+    lastGroundedAt = -10_000;
+    jumpQueuedAt = -10_000;
+    currentSprinting = false;
     player.yaw = yaw;
     player.pitch = THREE.MathUtils.clamp(pitch, -1.5, 1.5);
     camera.position.copy(player.position);

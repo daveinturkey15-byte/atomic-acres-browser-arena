@@ -29,14 +29,23 @@ describe('Pass 66 test-bay QA teleport support lifecycle integration', () => {
     const velocityReset = integration.indexOf('player.velocity.set(0, 0, 0);');
     const groundedReset = integration.indexOf('playerGrounded = false;');
     const priorGroundedReset = integration.indexOf('wasGrounded = false;');
+    const groundedHistoryReset = integration.indexOf('lastGroundedAt = -10_000;');
+    const jumpBufferReset = integration.indexOf('jumpQueuedAt = -10_000;');
+    const sprintReset = integration.indexOf('currentSprinting = false;');
     const cameraUpdate = integration.indexOf('camera.position.copy(player.position);');
     expect(bodyTeleport).toBeGreaterThan(-1);
     expect(velocityReset).toBeGreaterThan(bodyTeleport);
     expect(groundedReset).toBeGreaterThan(velocityReset);
     expect(priorGroundedReset).toBeGreaterThan(groundedReset);
-    expect(cameraUpdate).toBeGreaterThan(priorGroundedReset);
+    expect(groundedHistoryReset).toBeGreaterThan(priorGroundedReset);
+    expect(jumpBufferReset).toBeGreaterThan(groundedHistoryReset);
+    expect(sprintReset).toBeGreaterThan(jumpBufferReset);
+    expect(cameraUpdate).toBeGreaterThan(sprintReset);
     expect(integration.match(/playerGrounded = false;/gu)).toHaveLength(1);
     expect(integration.match(/wasGrounded = false;/gu)).toHaveLength(1);
+    expect(integration.match(/lastGroundedAt = -10_000;/gu)).toHaveLength(1);
+    expect(integration.match(/jumpQueuedAt = -10_000;/gu)).toHaveLength(1);
+    expect(integration.match(/currentSprinting = false;/gu)).toHaveLength(1);
   });
 
   it('keeps deterministic possessed-chopper aiming debug-only and unable to submit damage', () => {

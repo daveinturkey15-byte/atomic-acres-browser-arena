@@ -157,8 +157,8 @@ test('keeps authored arms and knife readable at 1440p, 4K and ultrawide', async 
       api.setMeleeCaptureProgress(null);
       // Face the authored west wall at prone eye height so both the forward
       // obstruction probes and the real floor collider contribute.
-      api.teleportPlayer(-19.65, 1.7, -14.5, Math.PI / 2, 0);
       api.setStance('prone');
+      api.teleportPlayer(-19.65, 1.7, -14.5, Math.PI / 2, 0);
     });
     await page.waitForFunction(() => {
       const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
@@ -180,9 +180,11 @@ test('keeps authored arms and knife readable at 1440p, 4K and ultrawide', async 
     await capture(page, testInfo, viewport, 'prone-wall-floor-clearance');
     await page.evaluate(() => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
-      api.teleportPlayer(0, 1.7, 8, 0, 0);
       api.setStance('stand');
+      api.teleportPlayer(0, 1.7, 8, 0, 0);
     });
+    await page.waitForTimeout(180);
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setStance('stand'));
     await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.player?.stance === 'stand');
   }
 

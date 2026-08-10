@@ -506,11 +506,13 @@ try {
     await page.evaluate(() => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
       api.setAds(false); api.setReloadCaptureProgress(null); api.setMeleeCaptureProgress(null);
-      // Leave the prior viewport's wall fixture before requesting stand. The
-      // runtime correctly refuses a stance expansion at an obstructed prone
-      // location; teleporting first makes this a deterministic open-floor reset.
-      api.teleportPlayer(0, 1.7, 0, Math.PI / 2, 0); api.setStance('stand');
+      // The prior viewport can end prone under obstructing cover. Attempt the
+      // expansion before leaving, then retry after the controller has grounded
+      // at the deterministic open-floor reset.
+      api.setStance('stand'); api.teleportPlayer(0, 1.7, 0, Math.PI / 2, 0);
     });
+    await page.waitForTimeout(180);
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setStance('stand'));
     await page.waitForFunction(() => {
       const snapshot = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
       return snapshot?.weaponPresentation?.adsProgress < 0.02 && snapshot?.player?.stance === 'stand';
@@ -664,7 +666,7 @@ try {
       // Face the current authored west-wall collider. The older 12/-32.55
       // fixture became open floor when the Gun Range shell/test-bay route was
       // rebuilt, so it could only prove the open-prone 0.09 m baseline.
-      api.teleportPlayer(-19.65, 1.7, -14.5, Math.PI / 2, 0); api.setStance('prone');
+      api.setStance('prone'); api.teleportPlayer(-19.65, 1.7, -14.5, Math.PI / 2, 0);
     });
     await page.waitForFunction(() => {
       const snapshot = window.__ATOMIC_ACRES_DEBUG__?.snapshot();

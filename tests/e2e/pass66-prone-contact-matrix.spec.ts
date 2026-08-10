@@ -251,9 +251,17 @@ async function stageDynamicContact(page: Page, preferredOffset = 0): Promise<Con
       api.setMeleeCaptureProgress(null);
       api.setFireCaptureAgeMs(null);
       api.teleportPlayer(fixture.x, fixture.y, fixture.z, fixture.yaw, 0);
-      api.setStance('stand');
     }, candidate);
     await page.waitForTimeout(450);
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setStance('stand'));
+    try {
+      await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.stance === 'stand', undefined, {
+        timeout: 1_000,
+      });
+    } catch {
+      rejected.push({ index, reason: 'stand-after-teleport-blocked' });
+      continue;
+    }
     const settleBefore = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.position as [number, number, number]);
     await page.waitForTimeout(220);
     const settleAfter = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.position as [number, number, number]);
