@@ -29,6 +29,12 @@ import {
 } from './weapon-model';
 import { applyBotEmissiveBrightness } from './operator-model';
 import { applyRemoteHumanReadabilityHighlight, remoteHumanReadabilityTelemetry } from './remote-player-readability';
+import {
+  collectRiggedEvidenceOccluders,
+  firstRiggedEvidenceOccluder,
+  riggedEvidenceMaterialCanOcclude,
+  validateRiggedEvidenceCaptureTargets,
+} from './rigged-evidence-occlusion';
 import { isSharedMeshGeometry } from './gpu-resource-ownership';
 import {
   ACTION_LABELS,
@@ -1096,6 +1102,50 @@ canvas.after(canvasHomeAnchor);
 const reducedMotionMedia = window.matchMedia('(prefers-reduced-motion: reduce)');
 let menuLifecycle = INITIAL_MENU_LIFECYCLE_STATE;
 let lastGameplayPresentedFrame = 0;
+type DebugCaptureActorFrameEvidence = Readonly<{
+  actor: Readonly<{ kind: 'bot' | 'training-dummy'; id: string }>;
+  rootPosition: readonly number[];
+  rootYaw: number;
+  rootVisible: boolean;
+  rootEffectivelyVisible: boolean;
+  effectivelyVisibleMeshCount: number;
+  effectivelyVisibleSkinnedMeshes: readonly string[];
+  armSkinVisible: boolean;
+  handSkinVisible: boolean;
+  weaponCenterWorld: readonly number[] | null;
+  projectedWorldPosition: readonly number[];
+  screenPosition: readonly number[];
+  jointScreenPositions: readonly Readonly<Record<string, unknown>>[];
+  evidenceSentinels: readonly Readonly<Record<string, unknown>>[];
+}>;
+type DebugRiggedEvidenceCaptureTarget = Readonly<{
+  kind: 'bot' | 'training-dummy';
+  id: string;
+}>;
+type DebugCapturePresentationReceipt = Readonly<{
+  contract: 'capture-camera-committed-frame-v1';
+  renderer: 'webgl2' | 'webgpu';
+  completionSemantics: 'synchronous-render-return' | 'submission-sequence-covered-by-completion-frontier';
+  arenaId: ArenaId;
+  frame: number;
+  captureRevision: number;
+  committedAtMs: number;
+  position: readonly [number, number, number];
+  quaternion: readonly [number, number, number, number];
+  yaw: number;
+  pitch: number;
+  fov: number;
+  near: number;
+  far: number;
+  submissionSequence: number;
+  completedSequence: number;
+  captureTargets: readonly DebugRiggedEvidenceCaptureTarget[];
+  actors: readonly DebugCaptureActorFrameEvidence[];
+  worldLayoutLineOfSight: readonly Readonly<Record<string, unknown>>[];
+}>;
+let debugCaptureCameraRevision = 0;
+let lastDebugCapturePresentation: DebugCapturePresentationReceipt | null = null;
+let debugRiggedEvidenceCaptureTargets: readonly DebugRiggedEvidenceCaptureTarget[] | null = null;
 let matchAdmissionGeneration = 0;
 const matchAdmissionCoordinator = new MatchAdmissionCoordinator();
 let matchPauseBackdropPresentationCount = 0;
@@ -12165,6 +12215,7 @@ async function startGame(
   matchWebGpuQualityFrozen = false;
   matchAdmissionGeneration = token.generation;
   lastGameplayPresentedFrame = 0;
+  lastDebugCapturePresentation = null;
   lastMatchAdmissionCadence = null;
   lastWebGlReadyPrime = null;
   prepareDeploymentTransition();
@@ -22324,6 +22375,8 @@ async function performArenaSelection(
     profileArenaTransition('authority-commit');
     characterPhysics = nextPhysics;
     selectedArena = nextSelection;
+    debugRiggedEvidenceCaptureTargets = null;
+    lastDebugCapturePresentation = null;
     arena = nextArena;
     interactiveWorldRuntime = nextInteractiveWorldRuntime;
     previousInteractiveWorldRuntime?.root.removeFromParent();
@@ -22458,6 +22511,8 @@ async function performArenaSelection(
     profileArenaTransition('rollback');
     characterPhysics = previousPhysics;
     selectedArena = previousSelection;
+    debugRiggedEvidenceCaptureTargets = null;
+    lastDebugCapturePresentation = null;
     arena = previousArena;
     interactiveWorldRuntime = previousInteractiveWorldRuntime;
     gameplayArenaPrepared = hadPreparedArena;
@@ -22556,6 +22611,8 @@ function stageMenuArenaSelection(id: ArenaId): void {
   const nextSelection = arenaSelection(id);
   if (nextSelection.id === selectedArena.id) return;
   selectedArena = nextSelection;
+  debugRiggedEvidenceCaptureTargets = null;
+  lastDebugCapturePresentation = null;
   document.documentElement.dataset.menuArenaId = selectedArena.id;
   syncArenaSelectionUi();
   setArenaMenuCamera();
@@ -23326,6 +23383,9 @@ function frame(now: number, scheduleNext = true): void {
       }
       if (frameSubmitted && gameStarted && menuLifecycle.surface === 'hidden') {
         lastGameplayPresentedFrame = frameCount;
+        if (debugCaptureCameraActive && debugRiggedEvidenceCaptureTargets !== null) {
+          lastDebugCapturePresentation = debugCapturePresentationReceipt(frameCount);
+        }
       }
       monitorSelectedArenaRender(now);
       if (activeRenderConfig.shadowMode === 'static') requestStaticShadowRefresh(false);
@@ -23947,7 +24007,7 @@ const debugWindow = window as Window & {
       fov?: number,
       fixedVisualTimeMs?: number,
       seed?: number,
-    ) => void;
+    ) => number | null;
     setCaptureCameraFarPlane: (far: number | null) => void;
     setCaptureCameraOrbit: (orbit: {
       centerX: number;
@@ -23964,6 +24024,14 @@ const debugWindow = window as Window & {
       lookAtZ?: number;
     } | null) => void;
     setArenaReviewCamera: (cameraId: string) => boolean;
+    setRiggedEvidenceCaptureTargets: (
+      targets: readonly Readonly<{ kind: 'bot' | 'training-dummy'; id: string }>[],
+    ) => boolean;
+    awaitRiggedEvidenceCaptureCompletion: () => Promise<Record<string, unknown>>;
+    sampleRiggedEvidenceLineOfSight: (
+      actorKind: 'bot' | 'training-dummy',
+      actorId: string,
+    ) => Record<string, unknown>;
     setPass64SystemVisibility: (name: 'sky' | 'mist' | 'smoke' | 'dust' | 'grass' | 'water', visible: boolean) => boolean;
     setCaptureViewmodelHidden: (hidden: boolean) => void;
     stageLoadingCaptureSquad: () => { staged: boolean; characters: number; positions: number[][] };
@@ -24083,6 +24151,267 @@ function debugObjectEffectivelyVisible(node: THREE.Object3D): boolean {
   return true;
 }
 
+function debugCaptureActorFrameEvidence(
+  target: DebugRiggedEvidenceCaptureTarget | null,
+): DebugCaptureActorFrameEvidence | null {
+  if (!target) return null;
+  const root = debugRiggedEvidenceActorRoot(target.kind, target.id);
+  if (!root) return null;
+  const operatorModel = riggedOperatorTelemetry(root) as {
+    effectivelyVisibleSkinnedMeshes?: string[];
+    armPose?: { allInEffectivelyVisibleSkinnedMesh?: boolean };
+    handPose?: { allInEffectivelyVisibleSkinnedMesh?: boolean };
+    weaponBounds?: { center?: number[] };
+  } | null;
+  const anchorHeight = target.kind === 'bot' ? 1.35 : 1.65;
+  const projectedWorldPosition = root.localToWorld(new THREE.Vector3(0, anchorHeight, 0)).toArray();
+  return Object.freeze({
+    actor: Object.freeze({ ...target }),
+    rootPosition: Object.freeze(root.getWorldPosition(new THREE.Vector3()).toArray()),
+    rootYaw: root.rotation.y,
+    rootVisible: root.visible,
+    rootEffectivelyVisible: debugObjectEffectivelyVisible(root),
+    effectivelyVisibleMeshCount: debugEffectivelyVisibleRenderableCount(root),
+    effectivelyVisibleSkinnedMeshes: Object.freeze([
+      ...((operatorModel?.effectivelyVisibleSkinnedMeshes as string[] | undefined) ?? []),
+    ]),
+    armSkinVisible: operatorModel?.armPose?.allInEffectivelyVisibleSkinnedMesh === true,
+    handSkinVisible: operatorModel?.handPose?.allInEffectivelyVisibleSkinnedMesh === true,
+    weaponCenterWorld: Array.isArray(operatorModel?.weaponBounds?.center)
+      ? Object.freeze([...operatorModel.weaponBounds.center])
+      : null,
+    projectedWorldPosition: Object.freeze(projectedWorldPosition),
+    screenPosition: Object.freeze(new THREE.Vector3().fromArray(projectedWorldPosition).project(camera).toArray()),
+    jointScreenPositions: Object.freeze(debugRiggedOperatorJointScreenPositions(operatorModel)
+      .map((joint) => Object.freeze(joint))),
+    evidenceSentinels: Object.freeze(debugRiggedEvidenceSentinelWorldPositions(root)),
+  });
+}
+
+function debugCapturePresentationReceipt(frame: number): DebugCapturePresentationReceipt {
+  if (debugRiggedEvidenceCaptureTargets === null) {
+    throw new Error('Rigged evidence presentation receipt requires registered capture targets');
+  }
+  camera.updateWorldMatrix(true, false);
+  const presentation = renderRuntime.presentationTelemetry();
+  const actors = Object.freeze(debugRiggedEvidenceCaptureTargets
+    .map(debugCaptureActorFrameEvidence)
+    .filter((actor): actor is DebugCaptureActorFrameEvidence => actor !== null));
+  const worldLayoutLineOfSight = Object.freeze(actors.map((actor) => (
+    debugRiggedEvidenceLineOfSightForFrame(actor, frame, presentation.submissionSequence)
+  )));
+  return Object.freeze({
+    contract: 'capture-camera-committed-frame-v1',
+    renderer: renderRuntime.backend,
+    completionSemantics: renderRuntime.backend === 'webgpu'
+      ? 'submission-sequence-covered-by-completion-frontier'
+      : 'synchronous-render-return',
+    arenaId: selectedArena.id,
+    frame,
+    captureRevision: debugCaptureCameraRevision,
+    committedAtMs: performance.now(),
+    position: Object.freeze(camera.position.toArray() as [number, number, number]),
+    quaternion: Object.freeze(camera.quaternion.toArray() as [number, number, number, number]),
+    yaw: camera.rotation.y,
+    pitch: camera.rotation.x,
+    fov: camera.fov,
+    near: camera.near,
+    far: camera.far,
+    submissionSequence: presentation.submissionSequence,
+    completedSequence: presentation.completedSequence,
+    captureTargets: Object.freeze(debugRiggedEvidenceCaptureTargets.map((target) => Object.freeze({ ...target }))),
+    actors,
+    worldLayoutLineOfSight,
+  });
+}
+
+const DEBUG_EVIDENCE_LOS_ENDPOINT_TOLERANCE_M = 0.025;
+const DEBUG_RIGGED_EVIDENCE_SENTINEL_DEFINITIONS = Object.freeze([
+  Object.freeze({ name: 'head', aliases: Object.freeze(['Head']) }),
+  Object.freeze({ name: 'shoulder-left', aliases: Object.freeze(['UpperArmL', 'UpperArm.L']) }),
+  Object.freeze({ name: 'shoulder-right', aliases: Object.freeze(['UpperArmR', 'UpperArm.R']) }),
+  Object.freeze({ name: 'pelvis', aliases: Object.freeze(['Hips']) }),
+  Object.freeze({ name: 'wrist-left', aliases: Object.freeze(['WristL', 'Wrist.L']) }),
+  Object.freeze({ name: 'wrist-right', aliases: Object.freeze(['WristR', 'Wrist.R']) }),
+] as const);
+
+function debugRiggedEvidenceActorRoot(
+  actorKind: 'bot' | 'training-dummy',
+  actorId: string,
+): THREE.Object3D | null {
+  if (actorKind === 'bot') {
+    return [...bots.values()].find((candidate) => candidate.id === actorId)?.root ?? null;
+  }
+  return arena.targets.find((candidate) => candidate.id === actorId && candidate.kind === 'training-dummy')?.root ?? null;
+}
+
+function debugMeshCanOccludeEvidence(node: THREE.Object3D): node is THREE.Mesh {
+  if (!(node instanceof THREE.Mesh) || node.userData.authoritativeProxy === true
+    || !debugObjectEffectivelyVisible(node) || !node.layers.test(camera.layers)
+    || (node.geometry.getAttribute('position')?.count ?? 0) < 1) return false;
+  const materials = Array.isArray(node.material) ? node.material : [node.material];
+  return materials.some(riggedEvidenceMaterialCanOcclude);
+}
+
+function debugNearestRenderBlocker(
+  origin: THREE.Vector3,
+  target: THREE.Vector3,
+  candidates: THREE.Object3D[],
+): { name: string; distanceM: number; targetDistanceM: number } | null {
+  const delta = target.clone().sub(origin);
+  const targetDistanceM = delta.length();
+  if (!(targetDistanceM > DEBUG_EVIDENCE_LOS_ENDPOINT_TOLERANCE_M)) return null;
+  const maximumDistance = targetDistanceM - DEBUG_EVIDENCE_LOS_ENDPOINT_TOLERANCE_M;
+  const hits: Array<{ object: THREE.Object3D; distanceM: number }> = [];
+  const forwardRaycaster = new THREE.Raycaster(origin, delta.clone().normalize(), 0, maximumDistance);
+  forwardRaycaster.layers.mask = camera.layers.mask;
+  const forward = firstRiggedEvidenceOccluder(forwardRaycaster.intersectObjects(candidates, false));
+  if (forward) hits.push({ object: forward.object, distanceM: forward.distance });
+  // A camera can be inside an opaque shell. The reverse cast sees the shell's
+  // actor-facing front face without mutating the live material to DoubleSide.
+  const reverseRaycaster = new THREE.Raycaster(
+    target,
+    delta.clone().multiplyScalar(-1).normalize(),
+    0,
+    maximumDistance,
+  );
+  reverseRaycaster.layers.mask = camera.layers.mask;
+  const reverse = firstRiggedEvidenceOccluder(reverseRaycaster.intersectObjects(candidates, false));
+  if (reverse) hits.push({
+    object: reverse.object,
+    distanceM: Math.max(0, targetDistanceM - reverse.distance),
+  });
+  hits.sort((left, right) => left.distanceM - right.distanceM);
+  const nearest = hits[0];
+  return nearest ? {
+    name: nearest.object.name || nearest.object.type,
+    distanceM: nearest.distanceM,
+    targetDistanceM,
+  } : null;
+}
+
+function debugRiggedEvidenceSentinelWorldPositions(actorRoot: THREE.Object3D): Array<Record<string, unknown>> {
+  actorRoot.updateWorldMatrix(true, true);
+  return DEBUG_RIGGED_EVIDENCE_SENTINEL_DEFINITIONS.map((definition) => {
+    const bone = definition.aliases.map((alias) => actorRoot.getObjectByName(alias)).find(Boolean);
+    return Object.freeze({
+      name: definition.name,
+      bone: bone?.name ?? null,
+      present: bone !== undefined,
+      worldPosition: bone
+        ? Object.freeze(bone.getWorldPosition(new THREE.Vector3()).toArray())
+        : null,
+    });
+  });
+}
+
+function debugRiggedEvidenceLineOfSightForFrame(
+  frameActor: DebugCaptureActorFrameEvidence,
+  captureFrame: number,
+  captureSubmissionSequence: number,
+): Readonly<Record<string, unknown>> {
+  const { kind: actorKind, id: actorId } = frameActor.actor;
+  const actorRoot = debugRiggedEvidenceActorRoot(actorKind, actorId);
+  const cameraWorld = camera.getWorldPosition(new THREE.Vector3());
+  if (!actorRoot) return Object.freeze({
+    contract: 'actual-render-world-layout-occluder-multi-sentinel-los-v2',
+    actor: Object.freeze({ kind: actorKind, id: actorId }),
+    arenaId: selectedArena.id,
+    actorSelfOcclusionExcluded: true,
+    captureFrame,
+    captureRevision: debugCaptureCameraRevision,
+    captureSubmissionSequence,
+    allClear: false,
+    reason: 'missing-actor-at-submitted-frame',
+    sentinels: Object.freeze([]),
+  });
+  scene.updateMatrixWorld(true);
+  const occluders = collectRiggedEvidenceOccluders(scene, camera, actorRoot, debugMeshCanOccludeEvidence);
+  const sentinelSources = frameActor.evidenceSentinels;
+  const sentinels = sentinelSources.map((source) => {
+    if (source.present !== true || !Array.isArray(source.worldPosition)) return Object.freeze({
+      name: source.name,
+      bone: source.bone,
+      present: false,
+      clear: false,
+      worldPosition: null,
+      targetDistanceM: null,
+      blocker: Object.freeze({ name: 'missing-sentinel-bone', distanceM: null, targetDistanceM: null }),
+    });
+    const worldPosition = new THREE.Vector3().fromArray(source.worldPosition as [number, number, number]);
+    const blocker = debugNearestRenderBlocker(cameraWorld, worldPosition, occluders);
+    return Object.freeze({
+      name: source.name,
+      bone: source.bone,
+      present: true,
+      clear: blocker === null,
+      worldPosition: Object.freeze(worldPosition.toArray()),
+      targetDistanceM: cameraWorld.distanceTo(worldPosition),
+      blocker: blocker ? Object.freeze(blocker) : null,
+    });
+  });
+  return Object.freeze({
+    contract: 'actual-render-world-layout-occluder-multi-sentinel-los-v2',
+    actor: Object.freeze({ kind: actorKind, id: actorId }),
+    arenaId: selectedArena.id,
+    actorSelfOcclusionExcluded: true,
+    captureFrame,
+    captureRevision: debugCaptureCameraRevision,
+    captureSubmissionSequence,
+    camera: Object.freeze({
+      position: Object.freeze(cameraWorld.toArray()),
+      quaternion: Object.freeze(camera.quaternion.toArray()),
+      fov: camera.fov,
+      captureRevision: debugCaptureCameraRevision,
+    }),
+    renderOccluderCount: occluders.length,
+    allClear: sentinels.length === DEBUG_RIGGED_EVIDENCE_SENTINEL_DEFINITIONS.length
+      && sentinels.every((sentinel) => sentinel.present && sentinel.clear),
+    sentinels: Object.freeze(sentinels),
+  });
+}
+
+function sameCaptureTargets(
+  left: readonly DebugRiggedEvidenceCaptureTarget[],
+  right: readonly DebugRiggedEvidenceCaptureTarget[],
+): boolean {
+  return left.length === right.length && left.every((target, index) => (
+    target.kind === right[index]?.kind && target.id === right[index]?.id
+  ));
+}
+
+function sampleRiggedEvidenceLineOfSight(
+  actorKind: 'bot' | 'training-dummy',
+  actorId: string,
+): Record<string, unknown> {
+  const cameraReceipt = lastDebugCapturePresentation;
+  const targetIsCurrentlyRegistered = debugRiggedEvidenceCaptureTargets?.some((target) => (
+    target.kind === actorKind && target.id === actorId
+  )) === true;
+  const cached = cameraReceipt?.worldLayoutLineOfSight.find((lineOfSight) => {
+    const actor = lineOfSight.actor as { kind?: string; id?: string } | undefined;
+    return actor?.kind === actorKind && actor.id === actorId;
+  });
+  const receiptIsCurrent = cameraReceipt?.captureRevision === debugCaptureCameraRevision
+    && cameraReceipt.arenaId === selectedArena.id
+    && debugRiggedEvidenceCaptureTargets !== null
+    && sameCaptureTargets(cameraReceipt.captureTargets, debugRiggedEvidenceCaptureTargets);
+  if (!cached || !targetIsCurrentlyRegistered || !receiptIsCurrent) return Object.freeze({
+    contract: 'actual-render-world-layout-occluder-multi-sentinel-los-v2',
+    actor: Object.freeze({ kind: actorKind, id: actorId }),
+    arenaId: selectedArena.id,
+    actorSelfOcclusionExcluded: true,
+    captureFrame: cameraReceipt?.frame ?? null,
+    captureRevision: cameraReceipt?.captureRevision ?? null,
+    captureSubmissionSequence: cameraReceipt?.submissionSequence ?? null,
+    allClear: false,
+    reason: 'missing-or-stale-submitted-frame-los',
+    cameraPresentation: cameraReceipt,
+    sentinels: Object.freeze([]),
+  });
+  return Object.freeze({ ...cached, cameraPresentation: cameraReceipt });
+}
+
 function debugEffectivelyVisibleRenderableCount(root: THREE.Object3D): number {
   let count = 0;
   root.traverse((node) => {
@@ -24169,6 +24498,17 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       captureCameraY: Number(camera.position.y.toFixed(2)),
       captureCameraZ: Number(camera.position.z.toFixed(2)),
       captureCameraYaw: Number((camera.rotation.y % (Math.PI * 2)).toFixed(2)),
+      captureCameraRevision: debugCaptureCameraRevision,
+      captureCamera: {
+        position: camera.position.toArray(),
+        quaternion: camera.quaternion.toArray(),
+        yaw: camera.rotation.y,
+        pitch: camera.rotation.x,
+        fov: camera.fov,
+        near: camera.near,
+        far: camera.far,
+      },
+      presentedCapture: lastDebugCapturePresentation,
       captureOrbitElapsedMs: debugCaptureOrbit ? Math.round(Math.max(0, performance.now() - debugCaptureOrbit.startedAtMs)) : null,
       renderSubmissionPaused,
       matchAdmissionPresentationPaused,
@@ -25665,9 +26005,12 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     if (gameStarted) network.send(createStateMessage());
   },
   setCaptureCameraPose: (x, y = 0, z = 0, yaw = 0, pitch = 0, fov = camera.fov, fixedVisualTimeMs, seed = 6501) => {
+    debugCaptureCameraRevision += 1;
     debugCaptureCameraActive = [x, y, z, yaw, pitch].every(Number.isFinite);
     debugCaptureCameraUsesQuaternion = false;
     if (!debugCaptureCameraActive) {
+      debugRiggedEvidenceCaptureTargets = null;
+      lastDebugCapturePresentation = null;
       debugCaptureCameraFov = null;
       debugCaptureOrbit = null;
       debugCaptureFixedVisualTimeMs = null;
@@ -25680,7 +26023,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       hudRoot.hidden = !gameStarted || menuLifecycle.surface !== 'hidden';
       camera.fov = preferredFov;
       camera.updateProjectionMatrix();
-      return;
+      return null;
     }
     debugCaptureFixedVisualTimeMs = Number.isFinite(fixedVisualTimeMs) ? Math.max(0, fixedVisualTimeMs!) : null;
     debugCaptureCameraPosition.set(x!, y, z);
@@ -25724,6 +26067,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       activeArenaReviewExposure = null;
       activeArenaReviewHud = null;
     }
+    return debugCaptureCameraRevision;
   },
   setCaptureCameraFarPlane: (far) => {
     const arenaFarPlane = selectedArena.id === 'rustworks-1v1' ? 1_400 : 180;
@@ -25755,6 +26099,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       lookAtZ: orbit.lookAtZ ?? null,
       startedAtMs: performance.now(),
     };
+    debugCaptureCameraRevision += 1;
     debugCaptureCameraActive = true;
     debugCaptureCameraUsesQuaternion = false;
     debugCaptureCameraFov = debugCaptureOrbit.fov;
@@ -25784,8 +26129,25 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     debugCaptureCameraUsesQuaternion = true;
     debugCaptureCameraFov = camera.fov;
     debugCaptureCameraActive = true;
+    debugCaptureCameraRevision += 1;
     return true;
   },
+  setRiggedEvidenceCaptureTargets: (targets) => {
+    lastDebugCapturePresentation = null;
+    debugRiggedEvidenceCaptureTargets = null;
+    const validated = validateRiggedEvidenceCaptureTargets(
+      targets,
+      (kind, id) => debugRiggedEvidenceActorRoot(kind, id) !== null,
+    );
+    if (!validated.valid) return false;
+    debugRiggedEvidenceCaptureTargets = validated.targets;
+    return true;
+  },
+  awaitRiggedEvidenceCaptureCompletion: async () => {
+    await flushWebGpuFrames(8_000);
+    return renderRuntime.presentationTelemetry() as unknown as Record<string, unknown>;
+  },
+  sampleRiggedEvidenceLineOfSight,
   setPass64SystemVisibility: (name, visible) => {
     const objectNames = {
       sky: 'Pass 64 TSL atmosphere sky',

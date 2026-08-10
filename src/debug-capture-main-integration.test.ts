@@ -18,6 +18,9 @@ describe('debug capture viewmodel integration', () => {
     expect(source).toContain('let debugCaptureCameraFov: number | null = null;');
     expect(source).toContain('debugCaptureCameraFov = THREE.MathUtils.clamp(Number.isFinite(fov) ? fov : camera.fov, 35, 100);');
     expect(source).toMatch(/if \(debugCaptureCameraActive\) \{[\s\S]*camera\.fov = debugCaptureCameraFov;[\s\S]*camera\.updateProjectionMatrix\(\);/);
-    expect(source).toMatch(/if \(!debugCaptureCameraActive\) \{\s+debugCaptureCameraFov = null;/);
+    expect(source).toMatch(/if \(!debugCaptureCameraActive\) \{[\s\S]*?debugCaptureCameraFov = null;/);
+    expect(source).toContain('debugRiggedEvidenceCaptureTargets = null;');
+    expect(source).toContain('lastDebugCapturePresentation = null;');
+    expect(source).toContain('debugCaptureCameraActive && debugRiggedEvidenceCaptureTargets !== null');
   });
 });

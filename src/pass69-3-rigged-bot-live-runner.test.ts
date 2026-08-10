@@ -203,13 +203,31 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       "status: 'AUTOMATION_PASS_OWNER_PENDING'",
       "status: 'PENDING_OWNER_INSPECTION'",
       'automatedFramingIsNotVisualAcceptance: true',
+      'worldLayoutLosDoesNotProveActorSelfOcclusion: true',
+      'screenshotPresentedFrameWithHash(',
+      "contract: 'paused-presented-frame-screenshot-v1'",
+      "source: 'armed-close-submitted-frame-weapon-center-and-rigged-joint-world-transforms'",
+      "contract: 'armed-close-submitted-actor-source-v1'",
+      'api.setRiggedEvidenceCaptureTargets(targets)',
+      'setRiggedEvidenceCaptureTargets([])',
+      'awaitRiggedEvidenceCaptureCompletion()',
+      'RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.expectedBotYaw',
+      'capturePausedLivePoseAdvance(',
+      "contract: 'paused-render-live-pose-advance-v1'",
+      'capture revision advances from the sampled prior camera state',
       "fetch('/channels/the-big-one/channel-provenance.json'",
-      "evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-full-body-and-fixed-hand-detail-framing'",
+      "evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-los-committed-frame-and-hand-detail-framing'",
     ]) expect(spec).toContain(token);
     expect(runner).toContain('sha256(path) === record.sha256');
-    expect(runner).toContain('framingValid(record.framing, actor, expectedRoi, requireJointDetail)');
-    expect(runner).toContain('closeJointFramingValid(framing, expectedRoi)');
-    expect(runner).toContain('handFramingValid(record.framing, actor, side)');
+    expect(runner).toContain('projectWorldToNdc(');
+    expect(runner).toContain('framingActorFrameBindingValid(');
+    expect(runner).toContain('screenshotFrameBindingValid(');
+    expect(runner).toContain('capturePresentationValid(');
+    expect(runner).toContain('lineOfSightValid(');
+    expect(runner).toContain('cachedMatches.length !== 1');
+    expect(runner).toContain('completion.finalPausedSubmissionSequence !== paused.submissionSequence');
+    expect(runner).toContain('completion.observedCompletedSequence >= paused.submissionSequence');
+    expect(runner).toContain('distinctScreenshotHashes(');
     expect(runner).toContain('armed-live-bot-left-hand-close.png');
     expect(runner).toContain('armed-live-bot-right-hand-close.png');
     expect(runner).toContain("add('receipt.visualReview.status', receipt.visualReview?.status === 'PENDING_OWNER_INSPECTION')");
@@ -229,6 +247,10 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       'src/operator-model.ts',
       'src/operator-model.test.ts',
       'src/legacy-main.ts',
+      'src/rigged-bot-visual-evidence-contract.ts',
+      'src/rigged-bot-visual-evidence-contract.test.ts',
+      'src/rigged-evidence-occlusion.ts',
+      'src/rigged-evidence-occlusion.test.ts',
       'src/pass69-3-rigged-bot-live-runner.test.ts',
       'tests/e2e/pass69-3-rigged-bot-live.spec.ts',
     ]));
@@ -271,9 +293,23 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       'offscreen shoulder must fail',
       'sub-80px arm chain must fail',
       'full-body close framing must not impersonate hand-detail magnification',
+      'forged offscreen world point with centered claimed NDC must fail',
+      'post-render live animation pose cannot impersonate the frozen submitted actor frame',
+      'submitted WebGL presentation fixture must pass',
+      'completion covering only the earlier committed WebGPU frame must fail',
+      'WebGPU fence completion beyond its paired submission must fail',
+      'reused capture-camera revision must fail',
+      'reused camera revision in a capture sequence must fail',
+      'swapped armed actor identity must fail',
+      'inactive or swapped dummy identity must fail',
+      'live pose advance while submitted screenshot frame remains frozen must pass',
+      'static live pose cannot prove separation from the frozen submitted frame',
+      'sampled clear LOS cannot contradict the cached submitted-frame blocker record',
+      'screenshot spanning a later gameplay frame must fail',
       'cropped hand sentinel must fail',
       'sub-12px fixed hand span must fail',
       'non-fixed hand camera distance must fail',
+      'hand camera source must bind to the armed close submitted frame',
     ]) expect(runner).toContain(token);
   });
 });

@@ -237,3 +237,21 @@ export function gunRangeTestBayDummyPose(
     yawRadians: Math.atan2(forward ? dx : -dx, forward ? dz : -dz),
   });
 }
+
+/** Full rendered root transform, including the bounded presentation-only foot bob. */
+export function gunRangeTestBayRenderedDummyPose(
+  definition: GunRangeTestBayDummyDefinition,
+  index: number,
+  nowMs: number,
+): Readonly<{ position: Readonly<Point3>; yawRadians: number }> {
+  if (!Number.isSafeInteger(index) || index < 0) throw new TypeError('dummy index must be a non-negative integer');
+  const pose = gunRangeTestBayDummyPose(definition, nowMs);
+  return Object.freeze({
+    position: Object.freeze({
+      x: pose.position.x,
+      y: pose.position.y + Math.abs(Math.sin(nowMs * 0.004 + index)) * 0.025,
+      z: pose.position.z,
+    }),
+    yawRadians: pose.yawRadians,
+  });
+}

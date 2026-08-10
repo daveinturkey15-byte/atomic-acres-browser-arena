@@ -103,6 +103,72 @@ const closeRoiNdc = Object.freeze({ minX: -0.46, maxX: 0.46, minY: -0.7, maxY: 0
 const handRoiNdc = Object.freeze({ minX: -0.55, maxX: 0.55, minY: -0.68, maxY: 0.68 });
 const mediumRoiNdc = Object.freeze({ minX: -0.68, maxX: 0.68, minY: -0.82, maxY: 0.82 });
 const overviewRoiNdc = Object.freeze({ minX: -0.97, maxX: 0.97, minY: -0.95, maxY: 0.95 });
+const evidenceLosSentinels = Object.freeze([
+  'head', 'shoulder-left', 'shoulder-right', 'pelvis', 'wrist-left', 'wrist-right',
+]);
+const evidenceLookAtCamera = (id, position, cameraTarget, fov) => {
+  const dx = cameraTarget[0] - position[0];
+  const dy = cameraTarget[1] - position[1];
+  const dz = cameraTarget[2] - position[2];
+  const rawYaw = Math.atan2(-dx, -dz);
+  return Object.freeze({
+    id,
+    position: Object.freeze([...position]),
+    target: Object.freeze([...cameraTarget]),
+    yaw: Object.is(rawYaw, -Math.PI) ? Math.PI : rawYaw,
+    pitch: Math.atan2(dy, Math.hypot(dx, dz)),
+    fov,
+  });
+};
+const fixedDummyActors = Object.freeze([
+  Object.freeze({ id: 'test-dummy-alpha', position: Object.freeze([63, 0, -16]), yaw: Math.PI / 2 }),
+  Object.freeze({ id: 'test-dummy-bravo', position: Object.freeze([72.56, Math.abs(Math.sin(1)) * 0.025, -6]), yaw: Math.PI / 2 }),
+  Object.freeze({ id: 'test-dummy-charlie', position: Object.freeze([72.52, Math.abs(Math.sin(2)) * 0.025, 4]), yaw: -Math.PI / 2 }),
+  Object.freeze({ id: 'test-dummy-delta', position: Object.freeze([64.88, Math.abs(Math.sin(3)) * 0.025, 14]), yaw: -Math.PI / 2 }),
+]);
+const expectedVisualEvidenceContract = Object.freeze({
+  schemaVersion: 1,
+  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v1',
+  los: Object.freeze({
+    contract: 'actual-render-world-layout-occluder-multi-sentinel-los-v2',
+    actorSelfOcclusionExcluded: true,
+    sentinels: evidenceLosSentinels,
+  }),
+  presentation: Object.freeze({
+    contract: 'capture-camera-committed-frame-v1',
+    order: 'pause-final-submission-await-completion-then-compositor-v1',
+    compositorBoundariesAfterCommit: 2,
+    rendererCompletion: Object.freeze({
+      webgl2: 'synchronous-render-return',
+      webgpu: 'submission-sequence-covered-by-completion-frontier',
+    }),
+  }),
+  atomic: Object.freeze({
+    id: 'atomic-open-road-south-fixed-v1',
+    playerPosition: Object.freeze([0, 1.7, -24]),
+    playerYaw: Math.PI,
+    botDistanceM: 5.2,
+    expectedBotPosition: Object.freeze([0, 0, -18.8]),
+    expectedBotYaw: 0,
+    mediumCamera: evidenceLookAtCamera('atomic-open-road-medium', [0, 1.08, -23.2], [0, 1.08, -18.8], 58),
+    closeCamera: evidenceLookAtCamera('atomic-open-road-close', [0, 1.08, -20.8], [0, 1.08, -18.8], 58),
+  }),
+  gunRange: Object.freeze({
+    id: 'gun-range-open-bay-fixed-v1',
+    fixedVisualTimeMs: 0,
+    overviewCamera: evidenceLookAtCamera('gun-range-dummies-north-overview', [90, 4.5, -23], [70, 1.15, -1], 58),
+    dummies: Object.freeze(fixedDummyActors.map((actor) => {
+      const forwardX = -Math.sin(actor.yaw);
+      const forwardZ = -Math.cos(actor.yaw);
+      const position = [actor.position[0] + forwardX * 2.1, 1.08, actor.position[2] + forwardZ * 2.1];
+      const cameraTarget = [actor.position[0], 1.08, actor.position[2]];
+      return Object.freeze({
+        actor,
+        camera: evidenceLookAtCamera(`${actor.id}-fixed-front-close`, position, cameraTarget, 58),
+      });
+    })),
+  }),
+});
 if (!selfTestMode && !validateReceiptMode) {
   mkdirSync(artifactBase, { recursive: true });
   rmSync(receiptPath, { force: true });
@@ -176,6 +242,42 @@ function axisAngleQuaternion(axis, radians) {
   return [axis[0] * sine, axis[1] * sine, axis[2] * sine, Math.cos(half)];
 }
 
+function yxzCameraQuaternion(yaw, pitch) {
+  const sx = Math.sin(pitch / 2);
+  const cx = Math.cos(pitch / 2);
+  const sy = Math.sin(yaw / 2);
+  const cy = Math.cos(yaw / 2);
+  return [sx * cy, cx * sy, -sx * sy, cx * cy];
+}
+
+function rotateVectorByQuaternion(vector, quaternion) {
+  const rotated = multiplyQuaternions(
+    multiplyQuaternions(quaternion, [vector[0], vector[1], vector[2], 0]),
+    [-quaternion[0], -quaternion[1], -quaternion[2], quaternion[3]],
+  );
+  return rotated.slice(0, 3);
+}
+
+function projectWorldToNdc(worldPosition, camera, aspect) {
+  if (!finiteVector(worldPosition) || !finiteVector(camera?.position)
+    || ![camera?.yaw, camera?.pitch, camera?.fov, camera?.near, camera?.far].every(Number.isFinite)
+    || !(aspect > 0) || !(camera.near > 0) || !(camera.far > camera.near)) return null;
+  const cameraQuaternion = yxzCameraQuaternion(camera.yaw, camera.pitch);
+  const inverseCameraQuaternion = [
+    -cameraQuaternion[0], -cameraQuaternion[1], -cameraQuaternion[2], cameraQuaternion[3],
+  ];
+  const local = rotateVectorByQuaternion(vectorSubtract(worldPosition, camera.position), inverseCameraQuaternion);
+  if (!(local[2] < 0)) return null;
+  const tangent = Math.tan(camera.fov * Math.PI / 360);
+  const projectionA = (camera.far + camera.near) / (camera.near - camera.far);
+  const projectionB = 2 * camera.far * camera.near / (camera.near - camera.far);
+  return [
+    local[0] / (-local[2] * tangent * aspect),
+    local[1] / (-local[2] * tangent),
+    (projectionA * local[2] + projectionB) / -local[2],
+  ];
+}
+
 function canonicalBindRelativePose(bindLocalQuaternion, localQuaternion) {
   const normalizedBind = normalizeQuaternion(bindLocalQuaternion);
   const normalizedLocal = normalizeQuaternion(localQuaternion);
@@ -201,7 +303,7 @@ function positionDelta(left, right) {
   return Math.hypot(...left.map((value, index) => value - right[index]));
 }
 
-function closeJointFramingValid(framing, expectedRoi) {
+function closeJointFramingValid(framing, expectedRoi, projectionCamera) {
   const detail = framing?.jointDetail;
   if (detail?.required !== true
     || detail.expectedSentinelCount !== expectedCaptureJoints.length
@@ -227,8 +329,15 @@ function closeJointFramingValid(framing, expectedRoi) {
       || !Array.isArray(sentinel.ndc) || sentinel.ndc.length !== 3 || !sentinel.ndc.every(Number.isFinite)
       || sentinel.withinRoi !== true || sentinel.onScreen !== true) return false;
     const [x, y, z] = sentinel.ndc;
+    const independentlyProjected = projectWorldToNdc(
+      sentinel.worldPosition,
+      projectionCamera,
+      framing.canvas.width / framing.canvas.height,
+    );
     const pixel = pixelFor(sentinel.ndc);
     if (x < expectedRoi.minX || x > expectedRoi.maxX || y < expectedRoi.minY || y > expectedRoi.maxY || z < -1 || z > 1
+      || !independentlyProjected
+      || !sentinel.ndc.every((value, axis) => close(value, independentlyProjected[axis], 1e-6))
       || !close(sentinel.pixel?.x, pixel.x, 1e-6) || !close(sentinel.pixel?.y, pixel.y, 1e-6)
       || pixel.x < Math.max(0, framing.canvas.left)
       || pixel.x > Math.min(framing.viewport.width, framing.canvas.left + framing.canvas.width)
@@ -253,9 +362,22 @@ function closeJointFramingValid(framing, expectedRoi) {
   return true;
 }
 
-function framingValid(framing, actor, expectedRoi, requireJointDetail = false) {
+function framingValid(
+  framing,
+  actor,
+  expectedRoi,
+  projectionCamera,
+  expectedRootPosition,
+  expectedRootYaw,
+  presentation,
+  requireJointDetail = false,
+) {
   if (framing?.missing !== false
     || !sameObject(framing.actor, actor)
+    || !framingActorFrameBindingValid(framing, actor, presentation)
+    || !finiteVector(framing.rootPosition)
+    || !Number.isFinite(framing.rootYaw)
+    || !finiteVector(framing.projectedWorldPosition)
     || !sameObject(framing.roiNdc, expectedRoi)
     || framing.withinRoi !== true
     || framing.onScreen !== true
@@ -277,6 +399,20 @@ function framingValid(framing, actor, expectedRoi, requireJointDetail = false) {
     || !(framing.viewport?.height > 0)
     || !Number.isFinite(framing.projectedPixel?.x)
     || !Number.isFinite(framing.projectedPixel?.y)) return false;
+  const independentScreenPosition = projectWorldToNdc(
+    framing.projectedWorldPosition,
+    projectionCamera,
+    framing.canvas.width / framing.canvas.height,
+  );
+  const anchorHeight = actor.kind === 'bot' ? 1.35 : 1.65;
+  const expectedAnchor = [framing.rootPosition[0], framing.rootPosition[1] + anchorHeight, framing.rootPosition[2]];
+  if (!independentScreenPosition
+    || !framing.screenPosition.every((value, axis) => close(value, independentScreenPosition[axis], 1e-6))
+    || !framing.projectedWorldPosition.every((value, axis) => close(value, expectedAnchor[axis], 1e-9))
+    || expectedRootPosition && !framing.rootPosition.every((value, axis) => close(value, expectedRootPosition[axis], 1e-8))
+    || Number.isFinite(expectedRootYaw) && !close(framing.rootYaw, expectedRootYaw, 1e-8)) {
+    return false;
+  }
   const [x, y, z] = framing.screenPosition;
   const expectedPixelX = framing.canvas.left + (x + 1) * 0.5 * framing.canvas.width;
   const expectedPixelY = framing.canvas.top + (1 - y) * 0.5 * framing.canvas.height;
@@ -289,16 +425,340 @@ function framingValid(framing, actor, expectedRoi, requireJointDetail = false) {
     && framing.projectedPixel.x <= Math.min(framing.viewport.width, framing.canvas.left + framing.canvas.width)
     && framing.projectedPixel.y >= Math.max(0, framing.canvas.top)
     && framing.projectedPixel.y <= Math.min(framing.viewport.height, framing.canvas.top + framing.canvas.height);
-  return rootValid && (!requireJointDetail || closeJointFramingValid(framing, expectedRoi));
+  return rootValid && (!requireJointDetail || closeJointFramingValid(framing, expectedRoi, projectionCamera));
 }
 
-function screenshotValid(record, expectedPath, actor, expectedRoi, requireJointDetail = false) {
+function evidenceCameraValid(camera, expected) {
+  return camera?.id === expected?.id
+    && finiteVector(camera.position)
+    && finiteVector(camera.target)
+    && camera.position.every((value, index) => close(value, expected.position[index], 1e-9))
+    && camera.target.every((value, index) => close(value, expected.target[index], 1e-9))
+    && close(camera.yaw, expected.yaw, 1e-9)
+    && close(camera.pitch, expected.pitch, 1e-9)
+    && close(camera.fov, expected.fov, 1e-9);
+}
+
+function captureActorFrameValid(frameActor, expectedActor) {
+  return sameObject(frameActor?.actor, expectedActor)
+    && finiteVector(frameActor.rootPosition)
+    && Number.isFinite(frameActor.rootYaw)
+    && frameActor.rootVisible === true
+    && frameActor.rootEffectivelyVisible === true
+    && frameActor.effectivelyVisibleMeshCount > 0
+    && Array.isArray(frameActor.effectivelyVisibleSkinnedMeshes)
+    && frameActor.effectivelyVisibleSkinnedMeshes.length > 0
+    && frameActor.armSkinVisible === true
+    && frameActor.handSkinVisible === true
+    && (expectedActor.kind === 'bot' ? finiteVector(frameActor.weaponCenterWorld) : frameActor.weaponCenterWorld === null)
+    && finiteVector(frameActor.projectedWorldPosition)
+    && finiteVector(frameActor.screenPosition)
+    && Array.isArray(frameActor.jointScreenPositions)
+    && frameActor.jointScreenPositions.length === expectedCaptureJoints.length
+    && frameActor.jointScreenPositions.every((joint, index) => {
+      const expected = expectedCaptureJoints[index];
+      return joint.kind === expected.kind && joint.side === expected.side
+        && joint.role === expected.role && joint.digit === expected.digit && joint.bone === expected.bone
+        && finiteVector(joint.worldPosition) && finiteVector(joint.ndc);
+    })
+    && Array.isArray(frameActor.evidenceSentinels)
+    && frameActor.evidenceSentinels.length === evidenceLosSentinels.length
+    && frameActor.evidenceSentinels.every((sentinel, index) => (
+      sentinel.name === evidenceLosSentinels[index]
+        && typeof sentinel.bone === 'string' && sentinel.bone.length > 0
+        && sentinel.present === true
+        && finiteVector(sentinel.worldPosition)
+    ));
+}
+
+function committedCameraValid(
+  committed,
+  expectedCamera,
+  expectedArena,
+  revision,
+  expectedActors,
+  rendererName = target.renderer,
+) {
+  const expectedCompletionSemantics = expectedVisualEvidenceContract.presentation.rendererCompletion[rendererName];
+  const expectedQuaternion = yxzCameraQuaternion(expectedCamera.yaw, expectedCamera.pitch);
+  return committed?.contract === expectedVisualEvidenceContract.presentation.contract
+    && committed.renderer === rendererName
+    && committed.completionSemantics === expectedCompletionSemantics
+    && committed.arenaId === expectedArena
+    && Number.isSafeInteger(committed.frame) && committed.frame > 0
+    && committed.captureRevision === revision
+    && Number.isFinite(committed.committedAtMs)
+    && finiteVector(committed.position)
+    && finiteVector(committed.quaternion, 4)
+    && close(vectorLength(committed.quaternion), 1, 1e-7)
+    && normalizedQuaternionDelta(committed.quaternion, expectedQuaternion) <= 1e-9
+    && committed.position.every((value, index) => close(value, expectedCamera.position[index], 1e-9))
+    && close(committed.yaw, expectedCamera.yaw, 1e-9)
+    && close(committed.pitch, expectedCamera.pitch, 1e-9)
+    && close(committed.fov, expectedCamera.fov, 1e-9)
+    && committed.near > 0 && committed.far > committed.near
+    && Number.isSafeInteger(committed.submissionSequence) && committed.submissionSequence >= 0
+    && Number.isSafeInteger(committed.completedSequence) && committed.completedSequence >= 0
+    && sameObject(committed.captureTargets, expectedActors)
+    && Array.isArray(committed.actors)
+    && committed.actors.length === expectedActors.length
+    && committed.actors.every((actor, index) => captureActorFrameValid(actor, expectedActors[index]))
+    && (rendererName === 'webgl2'
+      ? committed.submissionSequence === 0 && committed.completedSequence === 0
+      : committed.completedSequence <= committed.submissionSequence);
+}
+
+function capturePresentationValid(
+  presentation,
+  expectedCamera,
+  expectedArena,
+  expectedActors,
+  rendererName = target.renderer,
+) {
+  const revision = presentation?.requestedRevision;
+  const committed = presentation?.committed;
+  const paused = presentation?.pausedPresentedCapture;
+  const completion = presentation?.completion;
+  const laterFrames = presentation?.presentedGameplayFramesAfterCommit;
+  if (presentation?.contract !== expectedVisualEvidenceContract.presentation.contract
+    || presentation.order !== expectedVisualEvidenceContract.presentation.order
+    || !evidenceCameraValid(presentation.fixtureCamera, expectedCamera)
+    || !Number.isSafeInteger(presentation.priorCaptureRevision)
+    || presentation.priorCaptureRevision < 0
+    || !Number.isSafeInteger(revision) || revision < 1
+    || revision <= presentation.priorCaptureRevision
+    || !committedCameraValid(committed, expectedCamera, expectedArena, revision, expectedActors, rendererName)
+    || !committedCameraValid(paused, expectedCamera, expectedArena, revision, expectedActors, rendererName)
+    || normalizedQuaternionDelta(committed.quaternion, paused.quaternion) > 1e-9
+    || !close(committed.near, paused.near, 1e-9)
+    || !close(committed.far, paused.far, 1e-9)
+    || committed.committedAtMs > paused.committedAtMs
+    || paused.submissionSequence < committed.submissionSequence
+    || paused.completedSequence < committed.completedSequence
+    || !Array.isArray(laterFrames) || laterFrames.length !== 2
+    || !laterFrames.every((frame) => Number.isSafeInteger(frame) && frame > 0)
+    || laterFrames[0] <= committed.frame
+    || laterFrames[1] <= laterFrames[0]
+    || paused.frame < laterFrames[1]
+    || presentation.pausedPresentedGameplayFrame !== paused.frame
+    || presentation.compositorBoundariesAfterCommit
+      !== expectedVisualEvidenceContract.presentation.compositorBoundariesAfterCommit
+    || !Number.isSafeInteger(presentation.pausedAtFrameCount)
+    || presentation.pausedAtFrameCount < paused.frame
+    || completion?.contract !== 'renderer-presentation-completion-v1'
+    || completion.renderer !== rendererName
+    || completion.semantics !== expectedVisualEvidenceContract.presentation.rendererCompletion[rendererName]
+    || completion.required !== (rendererName === 'webgpu')
+    || !Number.isSafeInteger(completion.baselineSubmissionSequence)
+    || !Number.isSafeInteger(completion.baselineCompletedSequence)
+    || !Number.isSafeInteger(completion.observedSubmissionSequence)
+    || !Number.isSafeInteger(completion.observedCompletedSequence)
+    || !Number.isSafeInteger(completion.fenceSubmissionSequence)
+    || !Number.isSafeInteger(completion.fenceCompletedSequence)
+    || completion.baselineSubmissionSequence < 0
+    || completion.baselineCompletedSequence < 0
+    || completion.observedSubmissionSequence < 0
+    || completion.observedCompletedSequence < 0
+    || completion.fenceSubmissionSequence < 0
+    || completion.fenceCompletedSequence < 0
+    || completion.baselineCompletedSequence > completion.baselineSubmissionSequence
+    || completion.baselineCompletedSequence > committed.completedSequence
+    || committed.completedSequence > paused.completedSequence
+    || paused.completedSequence > completion.fenceCompletedSequence
+    || completion.fenceCompletedSequence > completion.fenceSubmissionSequence
+    || completion.fenceCompletedSequence > completion.observedCompletedSequence
+    || completion.observedCompletedSequence > completion.observedSubmissionSequence
+    || completion.observedSubmissionSequence < completion.baselineSubmissionSequence
+    || completion.finalPausedSubmissionSequence !== paused.submissionSequence
+    || completion.fenceSubmissionSequence !== paused.submissionSequence
+    || completion.fenceCompletedSequence < paused.submissionSequence
+    || completion.observedSubmissionSequence !== paused.submissionSequence
+    || completion.coversFinalPausedSubmission !== true
+    || completion.completedBeforeCompositorBoundaries !== true) return false;
+  return rendererName === 'webgl2'
+    ? completion.baselineSubmissionSequence === 0
+      && completion.baselineCompletedSequence === 0
+      && completion.observedSubmissionSequence === 0
+      && completion.observedCompletedSequence === 0
+    : (completion.baselineSubmissionSequence < committed.submissionSequence
+      && completion.observedCompletedSequence > completion.baselineCompletedSequence
+      && completion.observedCompletedSequence >= paused.submissionSequence);
+}
+
+function framingActorFrameBindingValid(framing, actor, presentation) {
+  const paused = presentation?.pausedPresentedCapture;
+  const frameActor = paused?.actors?.find((candidate) => sameObject(candidate.actor, actor));
+  const framedJoints = framing?.jointDetail?.sentinels ?? framing?.handDetail?.sentinels ?? [];
+  return frameActor !== undefined
+    && framing?.frame === paused.frame
+    && framing.captureRevision === paused.captureRevision
+    && sameObject(framing.actor, actor)
+    && sameObject(framing.rootPosition, frameActor.rootPosition)
+    && close(framing.rootYaw, frameActor.rootYaw, 1e-9)
+    && sameObject(framing.projectedWorldPosition, frameActor.projectedWorldPosition)
+    && (framing.screenPosition === undefined || sameObject(framing.screenPosition, frameActor.screenPosition))
+    && sameObject(framing.evidenceSentinels, frameActor.evidenceSentinels)
+    && framedJoints.every((joint) => {
+      const source = frameActor.jointScreenPositions.find((candidate) => (
+        candidate.kind === joint.kind && candidate.side === joint.side
+          && candidate.role === joint.role && candidate.digit === joint.digit && candidate.bone === joint.bone
+      ));
+      return source !== undefined
+        && sameObject(joint.worldPosition, source.worldPosition)
+        && sameObject(joint.ndc, source.ndc);
+    });
+}
+
+function lineOfSightValid(lineOfSight, actor, expectedArena, presentation, framing) {
+  const paused = presentation?.pausedPresentedCapture;
+  const frameActor = paused?.actors?.find((candidate) => sameObject(candidate.actor, actor));
+  const cachedMatches = paused?.worldLayoutLineOfSight?.filter((candidate) => sameObject(candidate.actor, actor)) ?? [];
+  const { cameraPresentation: _cameraPresentation, ...sampledCachedFields } = lineOfSight ?? {};
+  if (!frameActor || !framingActorFrameBindingValid(framing, actor, presentation)
+    || cachedMatches.length !== 1 || !sameObject(sampledCachedFields, cachedMatches[0])) return false;
+  return lineOfSight?.contract === expectedVisualEvidenceContract.los.contract
+    && sameObject(lineOfSight.actor, actor)
+    && lineOfSight.arenaId === expectedArena
+    && lineOfSight.actorSelfOcclusionExcluded === true
+    && lineOfSight.allClear === true
+    && lineOfSight.captureFrame === paused.frame
+    && lineOfSight.captureRevision === paused.captureRevision
+    && lineOfSight.captureSubmissionSequence === paused.submissionSequence
+    && lineOfSight.renderOccluderCount > 0
+    && finiteVector(lineOfSight.camera?.position)
+    && finiteVector(lineOfSight.camera?.quaternion, 4)
+    && close(vectorLength(lineOfSight.camera.quaternion), 1, 1e-7)
+    && Number.isFinite(lineOfSight.camera?.fov)
+    && sameObject(lineOfSight.camera.position, presentation?.pausedPresentedCapture?.position)
+    && sameObject(lineOfSight.camera.quaternion, presentation?.pausedPresentedCapture?.quaternion)
+    && close(lineOfSight.camera.fov, presentation?.pausedPresentedCapture?.fov, 1e-9)
+    && lineOfSight.camera?.captureRevision === presentation?.requestedRevision
+    && sameObject(lineOfSight.cameraPresentation, presentation?.pausedPresentedCapture)
+    && Array.isArray(lineOfSight.sentinels)
+    && lineOfSight.sentinels.length === evidenceLosSentinels.length
+    && lineOfSight.sentinels.every((sentinel, index) => {
+      const frameSentinel = frameActor.evidenceSentinels[index];
+      const jointBinding = sentinel.name.startsWith('shoulder-')
+        ? framing.jointDetail?.sentinels.find((joint) => (
+          joint.role === 'shoulder' && joint.side === sentinel.name.slice('shoulder-'.length)
+        ))
+        : sentinel.name.startsWith('wrist-')
+          ? (framing.jointDetail?.sentinels ?? framing.handDetail?.sentinels)?.find((joint) => (
+            joint.role === 'wrist-hand' && joint.side === sentinel.name.slice('wrist-'.length)
+          ))
+          : null;
+      return sentinel?.name === evidenceLosSentinels[index]
+        && sentinel.name === frameSentinel?.name
+        && sentinel.bone === frameSentinel?.bone
+        && sentinel.present === true
+        && sentinel.clear === true
+        && sentinel.blocker === null
+        && finiteVector(sentinel.worldPosition)
+        && sameObject(sentinel.worldPosition, frameSentinel.worldPosition)
+        && (!jointBinding || sameObject(sentinel.worldPosition, jointBinding.worldPosition))
+        && Number.isFinite(sentinel.targetDistanceM)
+        && sentinel.targetDistanceM > 0.025
+        && close(
+          sentinel.targetDistanceM,
+          positionDelta(lineOfSight.camera.position, sentinel.worldPosition),
+          1e-9,
+        );
+    });
+}
+
+function screenshotFrameBindingValid(binding, presentation) {
+  const paused = presentation?.pausedPresentedCapture;
+  const expected = {
+    debugRenderPaused: true,
+    frame: paused?.frame,
+    captureRevision: paused?.captureRevision,
+    submissionSequence: paused?.submissionSequence,
+    presentedGameplayFrame: presentation?.pausedPresentedGameplayFrame,
+  };
+  return binding?.contract === 'paused-presented-frame-screenshot-v1'
+    && binding.stable === true
+    && sameObject(binding.before, expected)
+    && sameObject(binding.after, expected);
+}
+
+function pausedLivePoseAdvanceValid(proof, actor, presentation) {
+  const expectedFrameBinding = {
+    debugRenderPaused: true,
+    frame: presentation?.pausedPresentedCapture?.frame,
+    captureRevision: presentation?.pausedPresentedCapture?.captureRevision,
+    submissionSequence: presentation?.pausedPresentedCapture?.submissionSequence,
+    presentedGameplayFrame: presentation?.pausedPresentedGameplayFrame,
+  };
+  if (proof?.contract !== 'paused-render-live-pose-advance-v1'
+    || !sameObject(proof.actor, actor)
+    || proof.animationBoundaries !== 4
+    || proof.minimumJointAdvanceM !== 0.00001
+    || !sameObject(proof.submittedFrameBinding, expectedFrameBinding)
+    || !sameObject(proof.before?.frameBinding, expectedFrameBinding)
+    || !sameObject(proof.after?.frameBinding, expectedFrameBinding)
+    || !Number.isSafeInteger(proof.before?.frameCount)
+    || !Number.isSafeInteger(proof.after?.frameCount)
+    || proof.after.frameCount <= proof.before.frameCount
+    || !Array.isArray(proof.before?.joints)
+    || !Array.isArray(proof.after?.joints)
+    || proof.before.joints.length !== expectedCaptureJoints.length
+    || proof.after.joints.length !== expectedCaptureJoints.length) return false;
+  const deltas = [];
+  for (let index = 0; index < expectedCaptureJoints.length; index += 1) {
+    const expected = expectedCaptureJoints[index];
+    const before = proof.before.joints[index];
+    const after = proof.after.joints[index];
+    if (before?.kind !== expected.kind || before.side !== expected.side || before.role !== expected.role
+      || before.digit !== expected.digit || before.bone !== expected.bone || !finiteVector(before.worldPosition)
+      || after?.kind !== expected.kind || after.side !== expected.side || after.role !== expected.role
+      || after.digit !== expected.digit || after.bone !== expected.bone || !finiteVector(after.worldPosition)) return false;
+    deltas.push(positionDelta(before.worldPosition, after.worldPosition));
+  }
+  const maximumJointAdvanceM = Math.max(...deltas);
+  return close(proof.maximumJointAdvanceM, maximumJointAdvanceM, 1e-9)
+    && maximumJointAdvanceM > proof.minimumJointAdvanceM;
+}
+
+function screenshotValid(
+  record,
+  expectedPath,
+  actor,
+  expectedRoi,
+  expectedCamera,
+  expectedArena,
+  expectedRootPosition,
+  expectedRootYaw,
+  requireJointDetail = false,
+) {
   const path = resolve(root, expectedPath);
+  const expectedActors = [actor];
+  const projectionCamera = {
+    ...expectedCamera,
+    near: record?.presentation?.pausedPresentedCapture?.near,
+    far: record?.presentation?.pausedPresentedCapture?.far,
+  };
   return record?.path === expectedPath
     && /^[a-f0-9]{64}$/u.test(record?.sha256 ?? '')
     && existsSync(path)
     && sha256(path) === record.sha256
-    && framingValid(record.framing, actor, expectedRoi, requireJointDetail);
+    && screenshotFrameBindingValid(record.screenshotFrameBinding, record.presentation)
+    && record.fixtureContract === expectedVisualEvidenceContract.contract
+    && (actor.kind === 'bot' && expectedCamera.id === expectedVisualEvidenceContract.atomic.closeCamera.id
+      ? pausedLivePoseAdvanceValid(record.pausedLivePoseAdvance, actor, record.presentation)
+      : record.pausedLivePoseAdvance === null)
+    && evidenceCameraValid(record.camera, expectedCamera)
+    && capturePresentationValid(record.presentation, expectedCamera, expectedArena, expectedActors)
+    && lineOfSightValid(record.lineOfSight, actor, expectedArena, record.presentation, record.framing)
+    && framingValid(
+      record.framing,
+      actor,
+      expectedRoi,
+      projectionCamera,
+      expectedRootPosition,
+      expectedRootYaw,
+      record.presentation,
+      requireJointDetail,
+    );
 }
 
 function expectedHandCaptureJoints(side) {
@@ -314,8 +774,16 @@ function finiteVector(value, dimensions = 3) {
   return Array.isArray(value) && value.length === dimensions && value.every(Number.isFinite);
 }
 
-function handCameraValid(camera, actor, side) {
+function handCameraValid(camera, actor, side, sourceScreenshot) {
   const expected = expectedHandCaptureJoints(side);
+  const sourcePresentation = sourceScreenshot?.presentation?.pausedPresentedCapture;
+  const sourceActor = sourcePresentation?.actors?.find((candidate) => sameObject(candidate.actor, actor));
+  const sourceBinding = camera?.sourceFrameBinding;
+  const sourceProjectionCamera = {
+    ...expectedVisualEvidenceContract.atomic.closeCamera,
+    near: sourcePresentation?.near,
+    far: sourcePresentation?.far,
+  };
   if (camera?.contract !== handCameraContract.contract
     || camera.outsideOffsetM !== handCameraContract.outsideOffsetM
     || camera.upwardOffsetM !== handCameraContract.upwardOffsetM
@@ -323,7 +791,38 @@ function handCameraValid(camera, actor, side) {
     || camera.maximumSourceJointDriftM !== handCameraContract.maximumSourceJointDriftM
     || !sameObject(camera.actor, actor)
     || camera.side !== side
-    || camera.source !== 'live-rendered-weapon-center-and-rigged-joint-world-transforms'
+    || camera.source !== 'armed-close-submitted-frame-weapon-center-and-rigged-joint-world-transforms'
+    || sourceBinding?.contract !== 'armed-close-submitted-actor-source-v1'
+    || sourceBinding.cameraId !== expectedVisualEvidenceContract.atomic.closeCamera.id
+    || sourceBinding.frame !== sourcePresentation?.frame
+    || sourceBinding.captureRevision !== sourcePresentation?.captureRevision
+    || sourceBinding.submissionSequence !== sourcePresentation?.submissionSequence
+    || !sameObject(sourceBinding.actor, actor)
+    || !evidenceCameraValid(sourceScreenshot?.camera, expectedVisualEvidenceContract.atomic.closeCamera)
+    || !capturePresentationValid(
+      sourceScreenshot?.presentation,
+      expectedVisualEvidenceContract.atomic.closeCamera,
+      'atomic-acres',
+      [actor],
+    )
+    || !screenshotFrameBindingValid(sourceScreenshot?.screenshotFrameBinding, sourceScreenshot?.presentation)
+    || !framingValid(
+      sourceScreenshot?.framing,
+      actor,
+      closeRoiNdc,
+      sourceProjectionCamera,
+      expectedVisualEvidenceContract.atomic.expectedBotPosition,
+      expectedVisualEvidenceContract.atomic.expectedBotYaw,
+      sourceScreenshot?.presentation,
+      true,
+    )
+    || !sourceActor
+    || !captureActorFrameValid(sourceActor, actor)
+    || !sourceActor.rootPosition.every((value, axis) => close(
+      value, expectedVisualEvidenceContract.atomic.expectedBotPosition[axis], 1e-8,
+    ))
+    || !close(sourceActor.rootYaw, expectedVisualEvidenceContract.atomic.expectedBotYaw, 1e-8)
+    || !sameObject(camera.sourceWeaponCenterWorld, sourceActor.weaponCenterWorld)
     || !finiteVector(camera.sourceWeaponCenterWorld)
     || !Array.isArray(camera.sourceSentinels)
     || camera.sourceSentinels.length !== expected.length
@@ -335,8 +834,13 @@ function handCameraValid(camera, actor, side) {
   for (let index = 0; index < expected.length; index += 1) {
     const source = camera.sourceSentinels[index];
     const wanted = expected[index];
+    const submitted = sourceActor.jointScreenPositions.find((joint) => (
+      joint.kind === wanted.kind && joint.side === wanted.side && joint.role === wanted.role
+        && joint.digit === wanted.digit && joint.bone === wanted.bone
+    ));
     if (source.kind !== wanted.kind || source.side !== wanted.side || source.role !== wanted.role
-      || source.digit !== wanted.digit || source.bone !== wanted.bone || !finiteVector(source.worldPosition)) return false;
+      || source.digit !== wanted.digit || source.bone !== wanted.bone || !finiteVector(source.worldPosition)
+      || !submitted || !sameObject(source.worldPosition, submitted.worldPosition)) return false;
   }
   const wristWorld = camera.sourceSentinels[0].worldPosition;
   const outsideDelta = [
@@ -360,14 +864,39 @@ function handCameraValid(camera, actor, side) {
     && camera.targetWorld.every((value, index) => close(value, expectedTarget[index], 1e-9))
     && camera.positionWorld.every((value, index) => close(value, expectedPosition[index], 1e-9))
     && close(camera.yaw, expectedYaw, 1e-9)
-    && close(camera.pitch, expectedPitch, 1e-9);
+    && close(camera.pitch, expectedPitch, 1e-9)
+    && evidenceCameraValid(camera.fixtureCamera, {
+      id: `armed-live-bot-${side}-fixed-hand-detail`,
+      position: expectedPosition,
+      target: expectedTarget,
+      yaw: expectedYaw,
+      pitch: expectedPitch,
+      fov: handCameraContract.fovDegrees,
+    });
 }
 
-function handFramingValid(framing, actor, side) {
+function handFramingValid(
+  framing,
+  actor,
+  side,
+  presentation,
+  expectedRootPosition,
+  expectedRootYaw,
+  sourceScreenshot,
+) {
   const expected = expectedHandCaptureJoints(side);
   const detail = framing?.handDetail;
+  const paused = presentation?.pausedPresentedCapture;
+  const projectionCamera = {
+    ...framing?.camera?.fixtureCamera,
+    near: paused?.near,
+    far: paused?.far,
+  };
   if (framing?.missing !== false
     || !sameObject(framing.actor, actor)
+    || !framingActorFrameBindingValid(framing, actor, presentation)
+    || expectedRootPosition && !framing.rootPosition.every((value, axis) => close(value, expectedRootPosition[axis], 1e-8))
+    || Number.isFinite(expectedRootYaw) && !close(framing.rootYaw, expectedRootYaw, 1e-8)
     || framing.side !== side
     || framing.rootVisible !== true
     || framing.rootEffectivelyVisible !== true
@@ -376,7 +905,7 @@ function handFramingValid(framing, actor, side) {
     || framing.effectivelyVisibleSkinnedMeshes.length < 1
     || framing.handSkinVisible !== true
     || !sameObject(framing.roiNdc, handRoiNdc)
-    || !handCameraValid(framing.camera, actor, side)
+    || !handCameraValid(framing.camera, actor, side, sourceScreenshot)
     || !Number.isFinite(framing.canvas?.left)
     || !Number.isFinite(framing.canvas?.top)
     || !(framing.canvas?.width > 0)
@@ -406,9 +935,16 @@ function handFramingValid(framing, actor, side) {
       || !finiteVector(sentinel.ndc) || !finiteVector(sentinel.worldPosition)
       || sentinel.withinRoi !== true || sentinel.onScreen !== true) return false;
     const [x, y, z] = sentinel.ndc;
+    const independentlyProjected = projectWorldToNdc(
+      sentinel.worldPosition,
+      projectionCamera,
+      framing.canvas.width / framing.canvas.height,
+    );
     const pixel = pixelFor(sentinel.ndc);
     const source = framing.camera.sourceSentinels[index];
     if (x < handRoiNdc.minX || x > handRoiNdc.maxX || y < handRoiNdc.minY || y > handRoiNdc.maxY || z < -1 || z > 1
+      || !independentlyProjected
+      || !sentinel.ndc.every((value, axis) => close(value, independentlyProjected[axis], 1e-6))
       || !close(sentinel.pixel?.x, pixel.x, 1e-6) || !close(sentinel.pixel?.y, pixel.y, 1e-6)
       || pixel.x < Math.max(0, framing.canvas.left)
       || pixel.x > Math.min(framing.viewport.width, framing.canvas.left + framing.canvas.width)
@@ -429,28 +965,116 @@ function handFramingValid(framing, actor, side) {
     && detail.minimumPixels >= handDetailThresholds.minimumWristFingerPixels;
 }
 
-function handScreenshotValid(record, expectedPath, actor, side) {
+function handScreenshotValid(record, expectedPath, actor, side, sourceScreenshot) {
   const path = resolve(root, expectedPath);
+  const expectedCamera = record?.framing?.camera?.fixtureCamera;
   return record?.path === expectedPath
     && /^[a-f0-9]{64}$/u.test(record?.sha256 ?? '')
     && existsSync(path)
     && sha256(path) === record.sha256
-    && handFramingValid(record.framing, actor, side);
+    && screenshotFrameBindingValid(record.screenshotFrameBinding, record.presentation)
+    && record.fixtureContract === expectedVisualEvidenceContract.contract
+    && evidenceCameraValid(record.camera, expectedCamera)
+    && capturePresentationValid(record.presentation, expectedCamera, 'atomic-acres', [actor])
+    && lineOfSightValid(record.lineOfSight, actor, 'atomic-acres', record.presentation, record.framing)
+    && handFramingValid(
+      record.framing,
+      actor,
+      side,
+      record.presentation,
+      expectedVisualEvidenceContract.atomic.expectedBotPosition,
+      expectedVisualEvidenceContract.atomic.expectedBotYaw,
+      sourceScreenshot,
+    );
 }
 
 function overviewScreenshotValid(record, expectedPath) {
   const path = resolve(root, expectedPath);
+  const expectedActors = expectedDummyIds.map((id) => ({ kind: 'training-dummy', id }));
+  const projectionCamera = {
+    ...expectedVisualEvidenceContract.gunRange.overviewCamera,
+    near: record?.presentation?.pausedPresentedCapture?.near,
+    far: record?.presentation?.pausedPresentedCapture?.far,
+  };
   return record?.path === expectedPath
     && /^[a-f0-9]{64}$/u.test(record?.sha256 ?? '')
     && existsSync(path)
     && sha256(path) === record.sha256
+    && screenshotFrameBindingValid(record.screenshotFrameBinding, record.presentation)
+    && record.fixtureContract === expectedVisualEvidenceContract.contract
+    && evidenceCameraValid(record.camera, expectedVisualEvidenceContract.gunRange.overviewCamera)
+    && capturePresentationValid(
+      record.presentation,
+      expectedVisualEvidenceContract.gunRange.overviewCamera,
+      'gun-range',
+      expectedActors,
+    )
+    && Array.isArray(record.lineOfSight)
+    && record.lineOfSight.length === expectedDummyIds.length
+    && record.lineOfSight.every((lineOfSight, index) => lineOfSightValid(
+      lineOfSight,
+      { kind: 'training-dummy', id: expectedDummyIds[index] },
+      'gun-range',
+      record.presentation,
+      record.framing?.[index],
+    ))
     && Array.isArray(record.framing)
     && record.framing.length === expectedDummyIds.length
     && record.framing.every((framing, index) => framingValid(
       framing,
       { kind: 'training-dummy', id: expectedDummyIds[index] },
       overviewRoiNdc,
+      projectionCamera,
+      expectedVisualEvidenceContract.gunRange.dummies[index].actor.position,
+      expectedVisualEvidenceContract.gunRange.dummies[index].actor.yaw,
+      record.presentation,
     ));
+}
+
+function distinctScreenshotHashes(records) {
+  return Array.isArray(records)
+    && records.length === 9
+    && records.every((record) => /^[a-f0-9]{64}$/u.test(record?.sha256 ?? ''))
+    && new Set(records.map((record) => record.sha256)).size === records.length;
+}
+
+function strictlyIncreasingCaptureRevisions(records) {
+  return Array.isArray(records)
+    && records.length > 0
+    && records.every((record) => Number.isSafeInteger(record?.presentation?.requestedRevision))
+    && records.every((record, index) => (
+      index === 0 || record.presentation.requestedRevision > records[index - 1].presentation.requestedRevision
+    ));
+}
+
+function armedActorIdentityValid(armedBot) {
+  const actorId = armedBot?.id;
+  return typeof actorId === 'string' && actorId.length > 0
+    && armedBot.first?.id === actorId
+    && armedBot.second?.id === actorId
+    && armedBot.fixedFixture?.observedBotId === actorId
+    && armedBot.alive === true
+    && armedBot.first?.alive === true
+    && armedBot.second?.alive === true
+    && armedBot.fixedFixture?.observedBotAlive === true
+    && armedBot.weapon === 'carbine'
+    && armedBot.first?.weapon === 'carbine'
+    && armedBot.second?.weapon === 'carbine'
+    && armedBot.fixedFixture?.observedBotWeapon === 'carbine';
+}
+
+function dummyActorIdentityValid(entry, expectedId) {
+  return entry?.id === expectedId
+    && entry.definition?.id === expectedId
+    && entry.first?.id === expectedId
+    && entry.second?.id === expectedId
+    && entry.first?.kind === 'training-dummy'
+    && entry.second?.kind === 'training-dummy'
+    && entry.first?.active === true
+    && entry.second?.active === true
+    && entry.definition?.armed === false
+    && entry.first?.armed === false
+    && entry.second?.armed === false;
 }
 
 function runtimeValid(runtime) {
@@ -935,11 +1559,11 @@ function receiptValidationFailures(receipt, sourceSha) {
     close: closeRoiNdc, hand: handRoiNdc, medium: mediumRoiNdc, overview: overviewRoiNdc,
   };
 
-  add('receipt.schemaVersion', receipt.schemaVersion === 4);
+  add('receipt.schemaVersion', receipt.schemaVersion === 5);
   add('receipt.status', receipt.status === 'AUTOMATION_PASS_OWNER_PENDING');
-  add('receipt.contract', receipt.contract === 'atomic-acres/pass69-3-rigged-bot-live@4');
+  add('receipt.contract', receipt.contract === 'atomic-acres/pass69-3-rigged-bot-live@5');
   add('receipt.evidenceScope', receipt.evidenceScope
-    === 'weighted-skin-anti-t-five-digit-grip-orientation-full-body-and-fixed-hand-detail-framing');
+    === 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-los-committed-frame-and-hand-detail-framing');
   add('receipt.target', receipt.target === targetName);
   add('receipt.sourceSha', receipt.sourceSha === sourceSha);
   add('receipt.endingSourceSha', receipt.endingSourceSha === sourceSha);
@@ -958,10 +1582,15 @@ function receiptValidationFailures(receipt, sourceSha) {
   add('receipt.handDetailThresholds', sameObject(receipt.handDetailThresholds, handDetailThresholds));
   add('receipt.handCameraContract', sameObject(receipt.handCameraContract, handCameraContract));
   add('receipt.captureRoisNdc', sameObject(receipt.captureRoisNdc, expectedCaptureRois));
+  add('receipt.visualEvidenceContract', sameObject(
+    receipt.visualEvidenceContract, expectedVisualEvidenceContract,
+  ));
   add('receipt.visualReview.required', receipt.visualReview?.required === true);
   add('receipt.visualReview.status', receipt.visualReview?.status === 'PENDING_OWNER_INSPECTION');
   add('receipt.visualReview.automatedFramingIsNotVisualAcceptance',
     receipt.visualReview?.automatedFramingIsNotVisualAcceptance === true);
+  add('receipt.visualReview.worldLayoutLosDoesNotProveActorSelfOcclusion',
+    receipt.visualReview?.worldLayoutLosDoesNotProveActorSelfOcclusion === true);
   add('receipt.visualReview.inspectionScope', receipt.visualReview?.inspectionScope
     === 'armed medium/full close/left hand/right hand plus four dummy closeups and shared overview');
   add('receipt.browser.project', receipt.browser?.project === 'chromium');
@@ -974,6 +1603,7 @@ function receiptValidationFailures(receipt, sourceSha) {
 
   add('receipt.armedBot.weapon', receipt.armedBot?.weapon === 'carbine');
   add('receipt.armedBot.alive', receipt.armedBot?.alive === true);
+  add('receipt.armedBot.identityContinuity', armedActorIdentityValid(receipt.armedBot));
   add('receipt.armedBot.first.operatorModel', armPoseValid(receipt.armedBot?.first?.operatorModel, true));
   add('receipt.armedBot.second.operatorModel', armPoseValid(receipt.armedBot?.second?.operatorModel, true));
   add('receipt.armedBot.first.operatorModel.supportGrip.fingerCurl', fingerCurlValid(
@@ -987,22 +1617,60 @@ function receiptValidationFailures(receipt, sourceSha) {
   add('receipt.armedBot.motion', motionValid(
     receipt.armedBot?.first, receipt.armedBot?.second, receipt.armedBot?.motion, false,
   ));
+  add('receipt.armedBot.fixedFixture.definition', sameObject(
+    receipt.armedBot?.fixedFixture?.definition, expectedVisualEvidenceContract.atomic,
+  ));
+  add('receipt.armedBot.fixedFixture.observedPlayerPosition',
+    finiteVector(receipt.armedBot?.fixedFixture?.observedPlayerPosition)
+      && receipt.armedBot.fixedFixture.observedPlayerPosition.every((value, axis) => close(
+        value, expectedVisualEvidenceContract.atomic.playerPosition[axis], 1e-8,
+      )));
+  add('receipt.armedBot.fixedFixture.observedPlayerYaw', close(
+    receipt.armedBot?.fixedFixture?.observedPlayerYaw,
+    expectedVisualEvidenceContract.atomic.playerYaw,
+    1e-8,
+  ));
+  add('receipt.armedBot.fixedFixture.observedBotPosition',
+    finiteVector(receipt.armedBot?.fixedFixture?.observedBotPosition)
+      && receipt.armedBot.fixedFixture.observedBotPosition.every((value, axis) => close(
+        value, expectedVisualEvidenceContract.atomic.expectedBotPosition[axis], 1e-8,
+      )));
+  add('receipt.armedBot.fixedFixture.observedBotYaw', close(
+    receipt.armedBot?.fixedFixture?.observedBotYaw,
+    expectedVisualEvidenceContract.atomic.expectedBotYaw,
+    1e-8,
+  ));
   add('receipt.armedBot.screenshots.medium', screenshotValid(
     receipt.armedBot?.screenshots?.medium,
     `${evidenceBase}/armed-live-bot-medium.png`, armedActor, mediumRoiNdc,
+    expectedVisualEvidenceContract.atomic.mediumCamera, 'atomic-acres',
+    expectedVisualEvidenceContract.atomic.expectedBotPosition,
+    expectedVisualEvidenceContract.atomic.expectedBotYaw,
   ));
   add('receipt.armedBot.screenshots.close', screenshotValid(
     receipt.armedBot?.screenshots?.close,
-    `${evidenceBase}/armed-live-bot-close.png`, armedActor, closeRoiNdc, true,
+    `${evidenceBase}/armed-live-bot-close.png`, armedActor, closeRoiNdc,
+    expectedVisualEvidenceContract.atomic.closeCamera, 'atomic-acres',
+    expectedVisualEvidenceContract.atomic.expectedBotPosition,
+    expectedVisualEvidenceContract.atomic.expectedBotYaw,
+    true,
   ));
   add('receipt.armedBot.screenshots.leftHand', handScreenshotValid(
     receipt.armedBot?.screenshots?.leftHand,
     `${evidenceBase}/armed-live-bot-left-hand-close.png`, armedActor, 'left',
+    receipt.armedBot?.screenshots?.close,
   ));
   add('receipt.armedBot.screenshots.rightHand', handScreenshotValid(
     receipt.armedBot?.screenshots?.rightHand,
     `${evidenceBase}/armed-live-bot-right-hand-close.png`, armedActor, 'right',
+    receipt.armedBot?.screenshots?.close,
   ));
+  add('receipt.armedBot.screenshots.revisionsStrictlyIncrease', strictlyIncreasingCaptureRevisions([
+    receipt.armedBot?.screenshots?.medium,
+    receipt.armedBot?.screenshots?.close,
+    receipt.armedBot?.screenshots?.leftHand,
+    receipt.armedBot?.screenshots?.rightHand,
+  ]));
 
   add('receipt.gunRangeDummies.expectedIds', sameArray(
     receipt.gunRangeDummies?.expectedIds, expectedDummyIds,
@@ -1016,7 +1684,7 @@ function receiptValidationFailures(receipt, sourceSha) {
     const id = expectedDummyIds[index];
     const entry = receipt.gunRangeDummies?.entries?.[index];
     const prefix = `receipt.gunRangeDummies.entries.${id}`;
-    add(`${prefix}.identity`, entry?.id === id && entry?.definition?.id === id);
+    add(`${prefix}.identity`, dummyActorIdentityValid(entry, id));
     add(`${prefix}.definition.unarmed`, entry?.definition?.armed === false);
     add(`${prefix}.first.unarmed`, entry?.first?.armed === false);
     add(`${prefix}.second.unarmed`, entry?.second?.armed === false);
@@ -1027,11 +1695,38 @@ function receiptValidationFailures(receipt, sourceSha) {
       === entry?.definition?.speedMps);
     add(`${prefix}.second.animationSpeed`, entry?.second?.operatorModel?.animationContract?.speed
       === entry?.definition?.speedMps);
+    add(`${prefix}.fixedFixture`, sameObject(
+      entry?.fixedFixture, expectedVisualEvidenceContract.gunRange.dummies[index],
+    ));
+    add(`${prefix}.fixedActor`, entry?.fixedActor?.id === id
+      && finiteVector(entry.fixedActor.position)
+      && entry.fixedActor.position.every((value, axis) => close(
+        value, expectedVisualEvidenceContract.gunRange.dummies[index].actor.position[axis], 1e-8,
+      ))
+      && close(entry.fixedActor.yaw, expectedVisualEvidenceContract.gunRange.dummies[index].actor.yaw, 1e-8)
+      && entry.fixedActor.frame === entry.closeScreenshot?.presentation?.pausedPresentedCapture?.frame
+      && entry.fixedActor.captureRevision === entry.closeScreenshot?.presentation?.requestedRevision);
     add(`${prefix}.closeScreenshot`, screenshotValid(
       entry?.closeScreenshot,
-      `${evidenceBase}/${id}-close.png`, { kind: 'training-dummy', id }, closeRoiNdc, true,
+      `${evidenceBase}/${id}-close.png`, { kind: 'training-dummy', id }, closeRoiNdc,
+      expectedVisualEvidenceContract.gunRange.dummies[index].camera, 'gun-range',
+      expectedVisualEvidenceContract.gunRange.dummies[index].actor.position,
+      expectedVisualEvidenceContract.gunRange.dummies[index].actor.yaw,
+      true,
     ));
   }
+  add('receipt.gunRangeDummies.screenshotRevisionsStrictlyIncrease', strictlyIncreasingCaptureRevisions([
+    receipt.gunRangeDummies?.overviewScreenshot,
+    ...(receipt.gunRangeDummies?.entries ?? []).map((entry) => entry.closeScreenshot),
+  ]));
+  add('receipt.screenshots.allExpectedHashesDistinct', distinctScreenshotHashes([
+    receipt.armedBot?.screenshots?.medium,
+    receipt.armedBot?.screenshots?.close,
+    receipt.armedBot?.screenshots?.leftHand,
+    receipt.armedBot?.screenshots?.rightHand,
+    receipt.gunRangeDummies?.overviewScreenshot,
+    ...(receipt.gunRangeDummies?.entries ?? []).map((entry) => entry.closeScreenshot),
+  ]));
   add('receipt.browserErrors.array', Array.isArray(receipt.browserErrors));
   add('receipt.browserErrors.empty', Array.isArray(receipt.browserErrors) && receipt.browserErrors.length === 0);
   return failedPredicateNames(checks);
@@ -1051,6 +1746,40 @@ function runContractSelfTest() {
   ), 'named predicate diagnostics expose only failed non-sensitive field paths');
   assert(sameArray(receiptValidationFailures(null, '0'.repeat(40)), ['receipt.object']),
     'non-object receipt reports one stable non-sensitive predicate');
+  const distinctHashFixtures = Array.from({ length: 9 }, (_, index) => ({
+    sha256: index.toString(16).padStart(64, '0'),
+  }));
+  assert(distinctScreenshotHashes(distinctHashFixtures), 'nine materially different capture hashes must pass');
+  distinctHashFixtures[8].sha256 = distinctHashFixtures[0].sha256;
+  assert(!distinctScreenshotHashes(distinctHashFixtures), 'duplicated/stuck compositor screenshot hash must fail');
+  const revisionFixtures = [1, 2, 3, 4].map((requestedRevision) => ({ presentation: { requestedRevision } }));
+  assert(strictlyIncreasingCaptureRevisions(revisionFixtures), 'strictly increasing capture revisions must pass');
+  revisionFixtures[2].presentation.requestedRevision = 2;
+  assert(!strictlyIncreasingCaptureRevisions(revisionFixtures), 'reused camera revision in a capture sequence must fail');
+  const armedIdentity = {
+    id: 'bot-1',
+    alive: true,
+    weapon: 'carbine',
+    first: { id: 'bot-1', alive: true, weapon: 'carbine' },
+    second: { id: 'bot-1', alive: true, weapon: 'carbine' },
+    fixedFixture: { observedBotId: 'bot-1', observedBotAlive: true, observedBotWeapon: 'carbine' },
+  };
+  assert(armedActorIdentityValid(armedIdentity), 'one alive armed actor identity across every sample must pass');
+  const swappedArmedIdentity = structuredClone(armedIdentity);
+  swappedArmedIdentity.second.id = 'bot-2';
+  assert(!armedActorIdentityValid(swappedArmedIdentity), 'swapped armed actor identity must fail');
+  const dummyIdentity = {
+    id: 'test-dummy-alpha',
+    definition: { id: 'test-dummy-alpha', armed: false },
+    first: { id: 'test-dummy-alpha', kind: 'training-dummy', active: true, armed: false },
+    second: { id: 'test-dummy-alpha', kind: 'training-dummy', active: true, armed: false },
+  };
+  assert(dummyActorIdentityValid(dummyIdentity, 'test-dummy-alpha'),
+    'one active unarmed dummy identity across every sample must pass');
+  const inactiveDummyIdentity = structuredClone(dummyIdentity);
+  inactiveDummyIdentity.second.active = false;
+  assert(!dummyActorIdentityValid(inactiveDummyIdentity, 'test-dummy-alpha'),
+    'inactive or swapped dummy identity must fail');
   const nonUnitQuaternion = [0.1, -0.2, 0.3, 0.9];
   assert(normalizedQuaternionDelta(nonUnitQuaternion, nonUnitQuaternion) === 0,
     'identical non-unit quaternion arrays must have an exact zero orientation delta');
@@ -1377,44 +2106,207 @@ function runContractSelfTest() {
 
   const canvas = { left: 0, top: 0, width: 1_600, height: 900 };
   const viewport = { width: 1_600, height: 900 };
-  const pixelFor = (ndc) => ({ x: (ndc[0] + 1) * 800, y: (1 - ndc[1]) * 450 });
+  const actor = { kind: 'bot', id: 'bot-1' };
+  const rootPosition = [...expectedVisualEvidenceContract.atomic.expectedBotPosition];
+  const rootYaw = expectedVisualEvidenceContract.atomic.expectedBotYaw;
+  const projectionCamera = {
+    ...expectedVisualEvidenceContract.atomic.closeCamera,
+    near: 0.1,
+    far: 180,
+  };
+  const aspect = canvas.width / canvas.height;
+  const worldForNdc = (ndc, depth = 2, cameraEvidence = projectionCamera) => {
+    const cameraTangent = Math.tan(cameraEvidence.fov * Math.PI / 360);
+    const cameraLocal = [
+      ndc[0] * depth * cameraTangent * aspect,
+      ndc[1] * depth * cameraTangent,
+      -depth,
+    ];
+    const worldDelta = rotateVectorByQuaternion(
+      cameraLocal,
+      yxzCameraQuaternion(cameraEvidence.yaw, cameraEvidence.pitch),
+    );
+    return cameraEvidence.position.map((value, axis) => value + worldDelta[axis]);
+  };
+  const pixelFor = (ndc) => ({
+    x: canvas.left + (ndc[0] + 1) * 0.5 * canvas.width,
+    y: canvas.top + (1 - ndc[1]) * 0.5 * canvas.height,
+  });
   const ndcFor = (joint) => {
     const sign = joint.side === 'left' ? -1 : 1;
-    if (joint.role === 'shoulder') return [sign * 0.2, 0.32, 0];
-    if (joint.role === 'elbow') return [sign * 0.18, 0.12, 0];
-    if (joint.role === 'wrist-hand') return [sign * 0.14, -0.08, 0];
+    if (joint.role === 'shoulder') return [sign * 0.2, 0.32];
+    if (joint.role === 'elbow') return [sign * 0.18, 0.12];
+    if (joint.role === 'wrist-hand') return [sign * 0.14, -0.08];
     const digitIndex = ['thumb', 'index', 'middle', 'ring', 'pinky'].indexOf(joint.digit);
-    return [sign * (0.14 + 0.018 * (digitIndex - 2)), -0.12 - 0.006 * digitIndex, 0];
+    return [sign * (0.14 + 0.018 * (digitIndex - 2)), -0.12 - 0.006 * digitIndex];
   };
-  const sentinels = expectedCaptureJoints.map((joint) => {
-    const ndc = ndcFor(joint);
+  const makeProjectedJoint = (joint, ndc2, cameraEvidence = projectionCamera) => {
+    const worldPosition = worldForNdc(ndc2, 2, cameraEvidence);
+    const ndc = projectWorldToNdc(worldPosition, cameraEvidence, aspect);
     return {
       ...joint,
-      worldPosition: [ndc[0], 1 + ndc[1], ndc[2]],
+      worldPosition,
       ndc,
       pixel: pixelFor(ndc),
       withinRoi: true,
       onScreen: true,
     };
-  });
+  };
+  const sentinels = expectedCaptureJoints.map((joint) => makeProjectedJoint(joint, ndcFor(joint)));
   const distance = (left, right) => Math.hypot(left.x - right.x, left.y - right.y);
-  const metrics = () => {
+  const metricsFor = (points) => {
     const armChainPixels = [];
     const wristFingerPixels = [];
     for (const side of ['left', 'right']) {
-      const shoulder = sentinels.find((joint) => joint.side === side && joint.role === 'shoulder');
-      const elbow = sentinels.find((joint) => joint.side === side && joint.role === 'elbow');
-      const wrist = sentinels.find((joint) => joint.side === side && joint.role === 'wrist-hand');
-      const fingers = sentinels.filter((joint) => joint.side === side && joint.kind === 'finger');
+      const shoulder = points.find((joint) => joint.side === side && joint.role === 'shoulder');
+      const elbow = points.find((joint) => joint.side === side && joint.role === 'elbow');
+      const wrist = points.find((joint) => joint.side === side && joint.role === 'wrist-hand');
+      const fingers = points.filter((joint) => joint.side === side && joint.kind === 'finger');
       armChainPixels.push({ side, pixels: distance(shoulder.pixel, elbow.pixel) + distance(elbow.pixel, wrist.pixel) });
-      wristFingerPixels.push({ side, fingerCount: fingers.length, minimumPixels: Math.min(...fingers.map((finger) => distance(wrist.pixel, finger.pixel))) });
+      wristFingerPixels.push({
+        side,
+        fingerCount: fingers.length,
+        minimumPixels: Math.min(...fingers.map((finger) => distance(wrist.pixel, finger.pixel))),
+      });
     }
     return { armChainPixels, wristFingerPixels };
   };
-  const jointMetrics = metrics();
+  const findJoint = (points, side, role) => points.find((joint) => joint.side === side && joint.role === role);
+  const evidenceSentinelFixture = (points) => [
+    { name: 'head', bone: 'Head', present: true, worldPosition: worldForNdc([0, 0.48]) },
+    { name: 'shoulder-left', bone: 'UpperArmL', present: true, worldPosition: findJoint(points, 'left', 'shoulder').worldPosition },
+    { name: 'shoulder-right', bone: 'UpperArmR', present: true, worldPosition: findJoint(points, 'right', 'shoulder').worldPosition },
+    { name: 'pelvis', bone: 'Hips', present: true, worldPosition: worldForNdc([0, -0.28]) },
+    { name: 'wrist-left', bone: 'WristL', present: true, worldPosition: findJoint(points, 'left', 'wrist-hand').worldPosition },
+    { name: 'wrist-right', bone: 'WristR', present: true, worldPosition: findJoint(points, 'right', 'wrist-hand').worldPosition },
+  ];
+  const makeFrameActor = (cameraEvidence, points) => {
+    const projectedWorldPosition = [rootPosition[0], rootPosition[1] + 1.35, rootPosition[2]];
+    return {
+      actor,
+      rootPosition,
+      rootYaw,
+      rootVisible: true,
+      rootEffectivelyVisible: true,
+      effectivelyVisibleMeshCount: 1,
+      effectivelyVisibleSkinnedMeshes: ['Swat_Body'],
+      armSkinVisible: true,
+      handSkinVisible: true,
+      weaponCenterWorld: [0, 1.08, -18.7],
+      projectedWorldPosition,
+      screenPosition: projectWorldToNdc(projectedWorldPosition, cameraEvidence, aspect),
+      jointScreenPositions: points.map((joint) => structuredClone(joint)),
+      evidenceSentinels: evidenceSentinelFixture(points),
+    };
+  };
+  const makeCachedLos = (frameActor, cameraEvidence, arenaId, frame, submissionSequence) => ({
+    contract: expectedVisualEvidenceContract.los.contract,
+    actor,
+    arenaId,
+    actorSelfOcclusionExcluded: true,
+    captureFrame: frame,
+    captureRevision: 7,
+    captureSubmissionSequence: submissionSequence,
+    camera: {
+      position: cameraEvidence.position,
+      quaternion: yxzCameraQuaternion(cameraEvidence.yaw, cameraEvidence.pitch),
+      fov: cameraEvidence.fov,
+      captureRevision: 7,
+    },
+    renderOccluderCount: 4,
+    allClear: true,
+    sentinels: frameActor.evidenceSentinels.map((sentinel) => ({
+      ...sentinel,
+      clear: true,
+      targetDistanceM: positionDelta(cameraEvidence.position, sentinel.worldPosition),
+      blocker: null,
+    })),
+  });
+  const makePresentation = (cameraEvidence, frameActor, rendererName = 'webgl2', arenaId = 'atomic-acres') => {
+    const webGpu = rendererName === 'webgpu';
+    const committedSubmission = webGpu ? 10 : 0;
+    const pausedSubmission = webGpu ? 12 : 0;
+    const makeReceipt = (frame, committedAtMs, submissionSequence, completedSequence) => ({
+      contract: expectedVisualEvidenceContract.presentation.contract,
+      renderer: rendererName,
+      completionSemantics: expectedVisualEvidenceContract.presentation.rendererCompletion[rendererName],
+      arenaId,
+      frame,
+      captureRevision: 7,
+      committedAtMs,
+      position: cameraEvidence.position,
+      quaternion: yxzCameraQuaternion(cameraEvidence.yaw, cameraEvidence.pitch),
+      yaw: cameraEvidence.yaw,
+      pitch: cameraEvidence.pitch,
+      fov: cameraEvidence.fov,
+      near: cameraEvidence.near ?? 0.1,
+      far: cameraEvidence.far ?? 180,
+      submissionSequence,
+      completedSequence,
+      captureTargets: [actor],
+      actors: [structuredClone(frameActor)],
+      worldLayoutLineOfSight: [makeCachedLos(frameActor, cameraEvidence, arenaId, frame, submissionSequence)],
+    });
+    const committed = makeReceipt(100, 1_000, committedSubmission, webGpu ? 9 : 0);
+    const pausedPresentedCapture = makeReceipt(103, 1_030, pausedSubmission, webGpu ? 10 : 0);
+    return {
+      contract: expectedVisualEvidenceContract.presentation.contract,
+      order: expectedVisualEvidenceContract.presentation.order,
+      fixtureCamera: {
+        id: cameraEvidence.id,
+        position: cameraEvidence.position,
+        target: cameraEvidence.target,
+        yaw: cameraEvidence.yaw,
+        pitch: cameraEvidence.pitch,
+        fov: cameraEvidence.fov,
+      },
+      priorCaptureRevision: 6,
+      requestedRevision: 7,
+      committed,
+      pausedPresentedCapture,
+      completion: {
+        contract: 'renderer-presentation-completion-v1',
+        required: webGpu,
+        renderer: rendererName,
+        semantics: expectedVisualEvidenceContract.presentation.rendererCompletion[rendererName],
+        baselineSubmissionSequence: webGpu ? 9 : 0,
+        baselineCompletedSequence: webGpu ? 9 : 0,
+        finalPausedSubmissionSequence: pausedSubmission,
+        fenceSubmissionSequence: pausedSubmission,
+        fenceCompletedSequence: pausedSubmission,
+        observedSubmissionSequence: pausedSubmission,
+        observedCompletedSequence: pausedSubmission,
+        coversFinalPausedSubmission: true,
+        completedBeforeCompositorBoundaries: true,
+      },
+      presentedGameplayFramesAfterCommit: [101, 102],
+      pausedPresentedGameplayFrame: 103,
+      compositorBoundariesAfterCommit: expectedVisualEvidenceContract.presentation.compositorBoundariesAfterCommit,
+      pausedAtFrameCount: 105,
+    };
+  };
+  const screenshotBindingFor = (presentation) => {
+    const point = {
+      debugRenderPaused: true,
+      frame: presentation.pausedPresentedCapture.frame,
+      captureRevision: presentation.pausedPresentedCapture.captureRevision,
+      submissionSequence: presentation.pausedPresentedCapture.submissionSequence,
+      presentedGameplayFrame: presentation.pausedPresentedGameplayFrame,
+    };
+    return { contract: 'paused-presented-frame-screenshot-v1', stable: true, before: point, after: structuredClone(point) };
+  };
+  const frameActor = makeFrameActor(projectionCamera, sentinels);
+  const presentation = makePresentation(projectionCamera, frameActor);
+  const jointMetrics = metricsFor(sentinels);
   const framing = {
     missing: false,
-    actor: { kind: 'bot', id: 'bot-1' },
+    actor,
+    frame: presentation.pausedPresentedCapture.frame,
+    captureRevision: presentation.requestedRevision,
+    rootPosition,
+    rootYaw,
+    projectedWorldPosition: frameActor.projectedWorldPosition,
+    evidenceSentinels: frameActor.evidenceSentinels,
     roiNdc: closeRoiNdc,
     withinRoi: true,
     onScreen: true,
@@ -1424,10 +2316,10 @@ function runContractSelfTest() {
     effectivelyVisibleSkinnedMeshes: ['Swat_Body'],
     armSkinVisible: true,
     handSkinVisible: true,
-    screenPosition: [0, 0, 0],
+    screenPosition: frameActor.screenPosition,
     canvas,
     viewport,
-    projectedPixel: { x: 800, y: 450 },
+    projectedPixel: pixelFor(frameActor.screenPosition),
     jointDetail: {
       required: true,
       expectedSentinelCount: expectedCaptureJoints.length,
@@ -1438,45 +2330,174 @@ function runContractSelfTest() {
       ...jointMetrics,
     },
   };
-  assert(framingValid(framing, framing.actor, closeRoiNdc, true), 'complete close joint framing must pass');
+  const validateCloseFraming = (candidate, candidatePresentation = presentation) => framingValid(
+    candidate,
+    actor,
+    closeRoiNdc,
+    projectionCamera,
+    rootPosition,
+    rootYaw,
+    candidatePresentation,
+    true,
+  );
+  assert(capturePresentationValid(
+    presentation, expectedVisualEvidenceContract.atomic.closeCamera, 'atomic-acres', [actor],
+  ), 'submitted WebGL presentation fixture must pass');
+  assert(validateCloseFraming(framing), 'complete close joint framing must pass');
+  assert(screenshotFrameBindingValid(screenshotBindingFor(presentation), presentation),
+    'screenshot must bind to an unchanged paused submitted frame');
+  const advancedScreenshot = screenshotBindingFor(presentation);
+  advancedScreenshot.after.frame += 1;
+  assert(!screenshotFrameBindingValid(advancedScreenshot, presentation),
+    'screenshot spanning a later gameplay frame must fail');
+  const poseAdvanceBinding = screenshotBindingFor(presentation).before;
+  const poseAdvanceBefore = sentinels.map((joint) => ({
+    kind: joint.kind,
+    side: joint.side,
+    role: joint.role,
+    digit: joint.digit,
+    bone: joint.bone,
+    worldPosition: structuredClone(joint.worldPosition),
+  }));
+  const poseAdvanceAfter = structuredClone(poseAdvanceBefore);
+  poseAdvanceAfter[6].worldPosition[0] += 0.001;
+  const poseAdvanceProof = {
+    contract: 'paused-render-live-pose-advance-v1',
+    actor,
+    animationBoundaries: 4,
+    minimumJointAdvanceM: 0.00001,
+    maximumJointAdvanceM: 0.001,
+    submittedFrameBinding: poseAdvanceBinding,
+    before: { frameCount: 103, frameBinding: poseAdvanceBinding, joints: poseAdvanceBefore },
+    after: { frameCount: 107, frameBinding: poseAdvanceBinding, joints: poseAdvanceAfter },
+  };
+  assert(pausedLivePoseAdvanceValid(poseAdvanceProof, actor, presentation),
+    'live pose advance while submitted screenshot frame remains frozen must pass');
+  const staticPoseProof = structuredClone(poseAdvanceProof);
+  staticPoseProof.after.joints = structuredClone(staticPoseProof.before.joints);
+  staticPoseProof.maximumJointAdvanceM = 0;
+  assert(!pausedLivePoseAdvanceValid(staticPoseProof, actor, presentation),
+    'static live pose cannot prove separation from the frozen submitted frame');
+
+  const mutateJointProjection = (candidate, candidatePresentation, index, ndc2) => {
+    const joint = candidate.jointDetail.sentinels[index];
+    const worldPosition = worldForNdc(ndc2);
+    const ndc = projectWorldToNdc(worldPosition, projectionCamera, aspect);
+    Object.assign(joint, { worldPosition, ndc, pixel: pixelFor(ndc) });
+    const frameJoint = candidatePresentation.pausedPresentedCapture.actors[0].jointScreenPositions[index];
+    frameJoint.worldPosition = structuredClone(worldPosition);
+    frameJoint.ndc = structuredClone(ndc);
+  };
   const cropped = structuredClone(framing);
-  cropped.jointDetail.sentinels[0].ndc[0] = closeRoiNdc.minX - 0.01;
-  cropped.jointDetail.sentinels[0].pixel = pixelFor(cropped.jointDetail.sentinels[0].ndc);
+  const croppedPresentation = structuredClone(presentation);
+  mutateJointProjection(cropped, croppedPresentation, 0, [closeRoiNdc.minX - 0.01, 0.32]);
   cropped.jointDetail.sentinels[0].withinRoi = false;
   cropped.jointDetail.sentinels[0].onScreen = false;
   cropped.jointDetail.allInsideRoi = false;
-  assert(!framingValid(cropped, cropped.actor, closeRoiNdc, true), 'cropped/off-ROI shoulder must fail');
+  assert(!validateCloseFraming(cropped, croppedPresentation), 'cropped/off-ROI shoulder must fail');
   const offscreen = structuredClone(framing);
-  offscreen.jointDetail.sentinels[0].ndc[0] = 1.01;
-  offscreen.jointDetail.sentinels[0].pixel = pixelFor(offscreen.jointDetail.sentinels[0].ndc);
+  const offscreenPresentation = structuredClone(presentation);
+  mutateJointProjection(offscreen, offscreenPresentation, 0, [1.01, 0.32]);
   offscreen.jointDetail.sentinels[0].withinRoi = false;
   offscreen.jointDetail.sentinels[0].onScreen = false;
   offscreen.jointDetail.allInsideRoi = false;
-  assert(!framingValid(offscreen, offscreen.actor, closeRoiNdc, true), 'offscreen shoulder must fail');
+  assert(!validateCloseFraming(offscreen, offscreenPresentation), 'offscreen shoulder must fail');
+  const forgedWorld = structuredClone(framing);
+  const forgedWorldPresentation = structuredClone(presentation);
+  forgedWorld.jointDetail.sentinels[6].worldPosition = [100, 100, 100];
+  forgedWorldPresentation.pausedPresentedCapture.actors[0].jointScreenPositions[6].worldPosition = [100, 100, 100];
+  assert(!validateCloseFraming(forgedWorld, forgedWorldPresentation),
+    'forged offscreen world point with centered claimed NDC must fail');
+  const advancedLivePose = structuredClone(framing);
+  const advancedWorldPosition = worldForNdc([-0.12, -0.13]);
+  const advancedNdc = projectWorldToNdc(advancedWorldPosition, projectionCamera, aspect);
+  Object.assign(advancedLivePose.jointDetail.sentinels[6], {
+    worldPosition: advancedWorldPosition,
+    ndc: advancedNdc,
+    pixel: pixelFor(advancedNdc),
+  });
+  assert(!validateCloseFraming(advancedLivePose),
+    'post-render live animation pose cannot impersonate the frozen submitted actor frame');
   const tinyArm = structuredClone(framing);
-  for (const role of ['elbow', 'wrist-hand']) {
-    const joint = tinyArm.jointDetail.sentinels.find((candidate) => candidate.side === 'left' && candidate.role === role);
-    joint.ndc = role === 'elbow' ? [-0.199, 0.319, 0] : [-0.198, 0.318, 0];
-    joint.pixel = pixelFor(joint.ndc);
-  }
-  tinyArm.jointDetail.armChainPixels[0].pixels = 3;
-  assert(!framingValid(tinyArm, tinyArm.actor, closeRoiNdc, true), 'sub-80px arm chain must fail');
+  const tinyArmPresentation = structuredClone(presentation);
+  mutateJointProjection(tinyArm, tinyArmPresentation, 1, [-0.199, 0.319]);
+  mutateJointProjection(tinyArm, tinyArmPresentation, 2, [-0.198, 0.318]);
+  Object.assign(tinyArm.jointDetail, metricsFor(tinyArm.jointDetail.sentinels));
+  assert(!validateCloseFraming(tinyArm, tinyArmPresentation), 'sub-80px arm chain must fail');
   const tinyFinger = structuredClone(framing);
+  const tinyFingerPresentation = structuredClone(presentation);
   const leftWrist = tinyFinger.jointDetail.sentinels.find((joint) => joint.side === 'left' && joint.role === 'wrist-hand');
-  const leftThumb = tinyFinger.jointDetail.sentinels.find((joint) => joint.side === 'left' && joint.digit === 'thumb');
-  leftThumb.ndc = [leftWrist.ndc[0] + 0.001, leftWrist.ndc[1], leftWrist.ndc[2]];
-  leftThumb.pixel = pixelFor(leftThumb.ndc);
-  tinyFinger.jointDetail.wristFingerPixels[0].minimumPixels = distance(leftWrist.pixel, leftThumb.pixel);
-  assert(framingValid(tinyFinger, tinyFinger.actor, closeRoiNdc, true), 'full-body close framing must not impersonate hand-detail magnification');
+  mutateJointProjection(tinyFinger, tinyFingerPresentation, 6, [leftWrist.ndc[0] + 0.001, leftWrist.ndc[1]]);
+  Object.assign(tinyFinger.jointDetail, metricsFor(tinyFinger.jointDetail.sentinels));
+  assert(validateCloseFraming(tinyFinger, tinyFingerPresentation),
+    'full-body close framing must not impersonate hand-detail magnification');
 
+  const sampledLineOfSight = {
+    ...presentation.pausedPresentedCapture.worldLayoutLineOfSight[0],
+    cameraPresentation: presentation.pausedPresentedCapture,
+  };
+  assert(lineOfSightValid(sampledLineOfSight, actor, 'atomic-acres', presentation, framing),
+    'cached submitted-frame line of sight must pass');
+  const blockedPresentation = structuredClone(presentation);
+  const blockedCached = blockedPresentation.pausedPresentedCapture.worldLayoutLineOfSight[0];
+  blockedCached.allClear = false;
+  blockedCached.sentinels[0].clear = false;
+  blockedCached.sentinels[0].blocker = { name: 'opaque-wall', distanceM: 0.5, targetDistanceM: 2 };
+  const blockedSample = { ...blockedCached, cameraPresentation: blockedPresentation.pausedPresentedCapture };
+  assert(!lineOfSightValid(blockedSample, actor, 'atomic-acres', blockedPresentation, framing),
+    'opaque submitted-frame LOS blocker must fail');
+  const mismatchedCachedPresentation = structuredClone(presentation);
+  mismatchedCachedPresentation.pausedPresentedCapture.worldLayoutLineOfSight[0].allClear = false;
+  const forgedClearSample = {
+    ...presentation.pausedPresentedCapture.worldLayoutLineOfSight[0],
+    cameraPresentation: mismatchedCachedPresentation.pausedPresentedCapture,
+  };
+  assert(!lineOfSightValid(forgedClearSample, actor, 'atomic-acres', mismatchedCachedPresentation, framing),
+    'sampled clear LOS cannot contradict the cached submitted-frame blocker record');
+
+  const wrongQuaternion = structuredClone(presentation);
+  wrongQuaternion.pausedPresentedCapture.quaternion = [0, 0.1, 0, Math.sqrt(0.99)];
+  assert(!capturePresentationValid(
+    wrongQuaternion, expectedVisualEvidenceContract.atomic.closeCamera, 'atomic-acres', [actor],
+  ), 'unit quaternion inconsistent with fixed yaw and pitch must fail');
+  const reusedRevision = structuredClone(presentation);
+  reusedRevision.priorCaptureRevision = reusedRevision.requestedRevision;
+  assert(!capturePresentationValid(
+    reusedRevision, expectedVisualEvidenceContract.atomic.closeCamera, 'atomic-acres', [actor],
+  ), 'reused capture-camera revision must fail');
+  const webGpuPresentation = makePresentation(projectionCamera, frameActor, 'webgpu');
+  assert(capturePresentationValid(
+    webGpuPresentation, expectedVisualEvidenceContract.atomic.closeCamera, 'atomic-acres', [actor], 'webgpu',
+  ), 'final paused WebGPU submission covered by explicit completion fence must pass');
+  const staleWebGpuPresentation = structuredClone(webGpuPresentation);
+  staleWebGpuPresentation.completion.fenceCompletedSequence = 10;
+  staleWebGpuPresentation.completion.observedCompletedSequence = 10;
+  assert(!capturePresentationValid(
+    staleWebGpuPresentation, expectedVisualEvidenceContract.atomic.closeCamera, 'atomic-acres', [actor], 'webgpu',
+  ), 'completion covering only the earlier committed WebGPU frame must fail');
+  const impossibleWebGpuCompletion = structuredClone(webGpuPresentation);
+  impossibleWebGpuCompletion.completion.fenceCompletedSequence = 13;
+  assert(!capturePresentationValid(
+    impossibleWebGpuCompletion, expectedVisualEvidenceContract.atomic.closeCamera,
+    'atomic-acres', [actor], 'webgpu',
+  ), 'WebGPU fence completion beyond its paired submission must fail');
+
+  const sourceScreenshot = {
+    camera: expectedVisualEvidenceContract.atomic.closeCamera,
+    presentation,
+    framing,
+    screenshotFrameBinding: screenshotBindingFor(presentation),
+  };
   const handFramingFixture = (side) => {
-    const actor = { kind: 'bot', id: 'bot-1' };
-    const handSentinels = sentinels.filter((joint) => joint.side === side
-      && (joint.role === 'wrist-hand' || joint.kind === 'finger')).map((joint) => structuredClone(joint));
-    const sourceSentinels = handSentinels.map(({ kind, side: jointSide, role, digit, bone, worldPosition }) => ({
-      kind, side: jointSide, role, digit, bone, worldPosition,
-    }));
-    const sourceWeaponCenterWorld = [0, 1, 0.1];
+    const expectedHand = expectedHandCaptureJoints(side);
+    const sourceSentinels = expectedHand.map((wanted) => {
+      const sourceJoint = frameActor.jointScreenPositions.find((joint) => (
+        joint.kind === wanted.kind && joint.side === wanted.side && joint.role === wanted.role
+          && joint.digit === wanted.digit && joint.bone === wanted.bone
+      ));
+      return { ...wanted, worldPosition: structuredClone(sourceJoint.worldPosition) };
+    });
+    const sourceWeaponCenterWorld = structuredClone(frameActor.weaponCenterWorld);
     const wristWorld = sourceSentinels[0].worldPosition;
     const outsideDelta = [wristWorld[0] - sourceWeaponCenterWorld[0], 0, wristWorld[2] - sourceWeaponCenterWorld[2]];
     const outsideLength = Math.hypot(outsideDelta[0], outsideDelta[2]);
@@ -1488,71 +2509,124 @@ function runContractSelfTest() {
       + outsideDirectionWorld[axis] * handCameraContract.outsideOffsetM
       + (axis === 1 ? handCameraContract.upwardOffsetM : 0));
     const aim = vectorSubtract(targetWorld, positionWorld);
+    const fixtureCamera = {
+      id: `armed-live-bot-${side}-fixed-hand-detail`,
+      position: positionWorld,
+      target: targetWorld,
+      yaw: Math.atan2(-aim[0], -aim[2]),
+      pitch: Math.atan2(aim[1], Math.hypot(aim[0], aim[2])),
+      fov: handCameraContract.fovDegrees,
+    };
+    const handProjectionCamera = { ...fixtureCamera, near: 0.1, far: 180 };
+    const handPoints = expectedCaptureJoints.map((joint, index) => {
+      const worldPosition = structuredClone(frameActor.jointScreenPositions[index].worldPosition);
+      const ndc = projectWorldToNdc(worldPosition, handProjectionCamera, aspect);
+      return { ...joint, worldPosition, ndc };
+    });
+    const handFrameActor = makeFrameActor(handProjectionCamera, handPoints);
+    const handPresentation = makePresentation(handProjectionCamera, handFrameActor);
+    const handSentinels = handFrameActor.jointScreenPositions
+      .filter((joint) => joint.side === side && (joint.role === 'wrist-hand' || joint.kind === 'finger'))
+      .map((joint) => ({
+        ...structuredClone(joint),
+        pixel: pixelFor(joint.ndc),
+        withinRoi: joint.ndc[0] >= handRoiNdc.minX && joint.ndc[0] <= handRoiNdc.maxX
+          && joint.ndc[1] >= handRoiNdc.minY && joint.ndc[1] <= handRoiNdc.maxY,
+        onScreen: Math.abs(joint.ndc[0]) <= 1 && Math.abs(joint.ndc[1]) <= 1,
+      }));
     const fingerSpans = handSentinels.slice(1).map((finger) => ({
       digit: finger.digit,
       bone: finger.bone,
       pixels: distance(handSentinels[0].pixel, finger.pixel),
     }));
-    return {
+    const cameraEvidence = {
+      ...handCameraContract,
       actor,
       side,
-      missing: false,
-      rootVisible: true,
-      rootEffectivelyVisible: true,
-      effectivelyVisibleMeshCount: 1,
-      effectivelyVisibleSkinnedMeshes: ['Swat_Body'],
-      handSkinVisible: true,
-      canvas,
-      viewport,
-      roiNdc: handRoiNdc,
-      camera: {
-        ...handCameraContract,
+      source: 'armed-close-submitted-frame-weapon-center-and-rigged-joint-world-transforms',
+      sourceFrameBinding: {
+        contract: 'armed-close-submitted-actor-source-v1',
+        cameraId: sourceScreenshot.camera.id,
+        frame: presentation.pausedPresentedCapture.frame,
+        captureRevision: presentation.pausedPresentedCapture.captureRevision,
+        submissionSequence: presentation.pausedPresentedCapture.submissionSequence,
+        actor,
+      },
+      sourceWeaponCenterWorld,
+      sourceSentinels,
+      outsideDirectionWorld,
+      targetWorld,
+      positionWorld,
+      yaw: fixtureCamera.yaw,
+      pitch: fixtureCamera.pitch,
+      fixtureCamera,
+    };
+    return {
+      framing: {
         actor,
         side,
-        source: 'live-rendered-weapon-center-and-rigged-joint-world-transforms',
-        sourceWeaponCenterWorld,
-        sourceSentinels,
-        outsideDirectionWorld,
-        targetWorld,
-        positionWorld,
-        yaw: Math.atan2(-aim[0], -aim[2]),
-        pitch: Math.atan2(aim[1], Math.hypot(aim[0], aim[2])),
+        frame: handPresentation.pausedPresentedCapture.frame,
+        captureRevision: handPresentation.requestedRevision,
+        missing: false,
+        rootPosition,
+        rootYaw,
+        projectedWorldPosition: handFrameActor.projectedWorldPosition,
+        evidenceSentinels: handFrameActor.evidenceSentinels,
+        rootVisible: true,
+        rootEffectivelyVisible: true,
+        effectivelyVisibleMeshCount: 1,
+        effectivelyVisibleSkinnedMeshes: ['Swat_Body'],
+        handSkinVisible: true,
+        canvas,
+        viewport,
+        roiNdc: handRoiNdc,
+        camera: cameraEvidence,
+        handDetail: {
+          required: true,
+          side,
+          expectedSentinelCount: 6,
+          sentinels: handSentinels,
+          orderValid: true,
+          allInsideRoi: handSentinels.every((joint) => joint.withinRoi && joint.onScreen),
+          fingerSpans,
+          minimumPixels: Math.min(...fingerSpans.map(({ pixels }) => pixels)),
+          thresholds: handDetailThresholds,
+        },
       },
-      handDetail: {
-        required: true,
-        side,
-        expectedSentinelCount: 6,
-        sentinels: handSentinels,
-        orderValid: true,
-        allInsideRoi: true,
-        fingerSpans,
-        minimumPixels: Math.min(...fingerSpans.map(({ pixels }) => pixels)),
-        thresholds: handDetailThresholds,
-      },
+      presentation: handPresentation,
     };
   };
-  const leftHandFraming = handFramingFixture('left');
-  const rightHandFraming = handFramingFixture('right');
-  assert(handFramingValid(leftHandFraming, leftHandFraming.actor, 'left'), 'fixed left hand detail framing must pass');
-  assert(handFramingValid(rightHandFraming, rightHandFraming.actor, 'right'), 'fixed right hand detail framing must pass');
-  const croppedHand = structuredClone(leftHandFraming);
-  croppedHand.handDetail.sentinels[1].ndc[0] = handRoiNdc.minX - 0.01;
-  croppedHand.handDetail.sentinels[1].pixel = pixelFor(croppedHand.handDetail.sentinels[1].ndc);
-  croppedHand.handDetail.sentinels[1].withinRoi = false;
-  croppedHand.handDetail.sentinels[1].onScreen = false;
-  croppedHand.handDetail.allInsideRoi = false;
-  assert(!handFramingValid(croppedHand, croppedHand.actor, 'left'), 'cropped hand sentinel must fail');
-  const shortHand = structuredClone(leftHandFraming);
-  const handWrist = shortHand.handDetail.sentinels[0];
-  const handThumb = shortHand.handDetail.sentinels[1];
-  handThumb.ndc = [handWrist.ndc[0] + 0.001, handWrist.ndc[1], handWrist.ndc[2]];
-  handThumb.pixel = pixelFor(handThumb.ndc);
-  shortHand.handDetail.fingerSpans[0].pixels = distance(handWrist.pixel, handThumb.pixel);
-  shortHand.handDetail.minimumPixels = shortHand.handDetail.fingerSpans[0].pixels;
-  assert(!handFramingValid(shortHand, shortHand.actor, 'left'), 'sub-12px fixed hand span must fail');
-  const autoFittedHand = structuredClone(leftHandFraming);
-  autoFittedHand.camera.outsideOffsetM = 0.69;
-  assert(!handFramingValid(autoFittedHand, autoFittedHand.actor, 'left'), 'non-fixed hand camera distance must fail');
+  const leftHand = handFramingFixture('left');
+  const rightHand = handFramingFixture('right');
+  const validateHand = (fixture, side) => handFramingValid(
+    fixture.framing,
+    actor,
+    side,
+    fixture.presentation,
+    rootPosition,
+    rootYaw,
+    sourceScreenshot,
+  );
+  assert(validateHand(leftHand, 'left'), 'fixed left hand detail framing must pass');
+  assert(validateHand(rightHand, 'right'), 'fixed right hand detail framing must pass');
+  const croppedHand = structuredClone(leftHand);
+  croppedHand.framing.handDetail.sentinels[1].withinRoi = false;
+  croppedHand.framing.handDetail.sentinels[1].onScreen = false;
+  croppedHand.framing.handDetail.allInsideRoi = false;
+  assert(!validateHand(croppedHand, 'left'), 'cropped hand sentinel must fail');
+  const shortHand = structuredClone(leftHand);
+  const handWrist = shortHand.framing.handDetail.sentinels[0];
+  const handThumb = shortHand.framing.handDetail.sentinels[1];
+  handThumb.pixel = { x: handWrist.pixel.x + 1, y: handWrist.pixel.y };
+  shortHand.framing.handDetail.fingerSpans[0].pixels = 1;
+  shortHand.framing.handDetail.minimumPixels = 1;
+  assert(!validateHand(shortHand, 'left'), 'sub-12px fixed hand span must fail');
+  const autoFittedHand = structuredClone(leftHand);
+  autoFittedHand.framing.camera.outsideOffsetM = 0.69;
+  assert(!validateHand(autoFittedHand, 'left'), 'non-fixed hand camera distance must fail');
+  const staleHandSource = structuredClone(leftHand);
+  staleHandSource.framing.camera.sourceFrameBinding.frame -= 1;
+  assert(!validateHand(staleHandSource, 'left'), 'hand camera source must bind to the armed close submitted frame');
 }
 
 if (selfTestMode) {

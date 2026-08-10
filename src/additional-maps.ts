@@ -12,7 +12,7 @@ import {
   createGunRangeTestBayDoorState,
   gunRangeTestBayDoorDynamicColliders,
   gunRangeTestBayDoorLeafBounds,
-  gunRangeTestBayDummyPose,
+  gunRangeTestBayRenderedDummyPose,
   type GunRangeTestBayDoorState,
   type GunRangeTestBayDummyDefinition,
 } from './gun-range-test-bay';
@@ -2200,10 +2200,10 @@ export function updateGunRangePresentation(root: THREE.Object3D, nowMs: number):
   });
   const testDummies = root.userData.gunRangeTestDummies as GunRangeTestDummyPresentation[] | undefined;
   testDummies?.forEach(({ root: dummy, definition, riggedOperator }, index) => {
-    const pose = gunRangeTestBayDummyPose(definition, nowMs);
+    const pose = gunRangeTestBayRenderedDummyPose(definition, index, nowMs);
     dummy.position.set(
       pose.position.x,
-      pose.position.y + Math.abs(Math.sin(nowMs * 0.004 + index)) * 0.025,
+      pose.position.y,
       pose.position.z,
     );
     dummy.rotation.y = pose.yawRadians;
