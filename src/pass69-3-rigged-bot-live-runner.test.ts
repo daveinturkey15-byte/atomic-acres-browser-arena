@@ -2,12 +2,19 @@ import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 
-const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> };
+const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as {
+  scripts: Record<string, string>;
+  devDependencies: Record<string, string>;
+};
+const packageLock = JSON.parse(readFileSync('package-lock.json', 'utf8')) as {
+  packages: Record<string, Record<string, any>>;
+};
 const graph = JSON.parse(readFileSync('docs/PASS65_OWNER_FEEDBACK_COMPLETENESS_GRAPH.json', 'utf8')) as {
   testCatalog: Array<{ id: string; command: string; paths: string[]; evidenceKinds: string[]; visualArtifactPaths?: string[] }>;
   feedbackNodes: Array<{ id: string; verification: { coverage: string; testRefs: string[]; artifactRefs: string[] } }>;
 };
 const runner = readFileSync('scripts/qa/run-pass69-3-rigged-bot-live.mjs', 'utf8');
+const rasterProofHelper = readFileSync('scripts/qa/rigged-rgb-raster-proof.mjs', 'utf8');
 const spec = readFileSync('tests/e2e/pass69-3-rigged-bot-live.spec.ts', 'utf8');
 const operator = readFileSync('src/operator-model.ts', 'utf8');
 const operatorUnit = readFileSync('src/operator-model.test.ts', 'utf8');
@@ -45,6 +52,20 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       "receipt.browser?.channel === 'msedge'",
       'endingSha !== sourceSha || sourceStatus()',
     ]) expect(runner).toContain(token);
+  });
+
+  it('source-freezes the exact direct Sharp decoder and independent RGB proof helper', () => {
+    expect(packageJson.devDependencies.sharp).toBe('0.34.5');
+    expect(packageLock.packages[''].devDependencies.sharp).toBe('0.34.5');
+    expect(packageLock.packages['node_modules/sharp']).toMatchObject({
+      version: '0.34.5',
+      resolved: 'https://registry.npmjs.org/sharp/-/sharp-0.34.5.tgz',
+      integrity: 'sha512-Ou9I5Ft9WNcCbXrU9cMgPBcCK8LiwLqcbywW3t4oDV37n1pzpuNLsYiAV8eODnjbtQlSDwZ2cUEeQz4E54Hltg==',
+      dev: true,
+    });
+    expect(runner).toContain("from './rigged-rgb-raster-proof.mjs'");
+    expect(rasterProofHelper).toContain("import sharp from 'sharp'");
+    expect(rasterProofHelper).toContain('export async function recomputeProductionRgbRasterProof');
   });
 
   it('uses the real authored GLB and rejects named-but-unskinned or geometrically T-shaped chains', () => {
@@ -200,7 +221,8 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       "'armed-live-bot-close'",
       '`armed-live-bot-${side}-hand-close`',
       "'gun-range-dummies-medium'",
-      '`${dummy.id}-close`',
+      '`${actor.id}-close-principal-suppressed`',
+      '`${actor.id}-close`',
       'sha256: sha256(screenshot)',
       'rootEffectivelyVisible',
       'effectivelyVisibleSkinnedMeshes',
@@ -230,7 +252,7 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       "contract: 'paused-render-live-pose-advance-v1'",
       'capture revision advances from the sampled prior camera state',
       "fetch('/channels/the-big-one/channel-provenance.json'",
-      "evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-hand-detail-and-main-camera-draw-stamps'",
+      "evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-hand-detail-main-camera-draw-stamps-and-production-rgb-raster-proof'",
       'api.admissionState().presentedGameplayFrame',
       'waitForAtomicPlayerConvergence(',
       'presentedGameplayFrame: stagedAtomic.presentedGameplayFrame',
@@ -259,6 +281,9 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       visualArtifactPaths: ['artifacts/pass69-3/rigged-bot-live'],
     });
     expect(catalog?.paths).toEqual(expect.arrayContaining([
+      'package-lock.json',
+      'package.json',
+      'scripts/qa/rigged-rgb-raster-proof.mjs',
       'scripts/qa/run-pass69-3-rigged-bot-live.mjs',
       'src/art-kit.test.ts',
       'src/art-kit.ts',
@@ -378,6 +403,24 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       'callback material/group slot mismatch must fail',
       'unpaired callback material/group multiset must fail',
       'duplicate principal material/group invocation must fail',
+      'forged padded/shifted/out-of-frame raster ROI must fail',
+      'excluded telemetry cache-path counters may differ without changing render-causal state',
+      'included target render-causal state digest drift must fail',
+      'included non-target render-causal state digest drift must fail',
+      'coherent restored depth/stencil write-state drift must fail phase parity',
+      'coherent restored material-group and effective draw-range drift must fail phase parity',
+      'coherent restored material-slot drift must fail phase parity',
+      'full ordered deformed-vertex projection digest drift must fail even inside unchanged extrema',
+      'same/stale raster bytes produce zero diff and cannot satisfy proof',
+      'one environment RGB pixel outside exact ROI is independently detected',
+      'alpha-only change cannot impersonate an RGB raster proof',
+      'fresh artifact creation rejects a pre-existing stale path',
+      'copied stale PNG is mechanically exposed as zero-diff identical content',
+      "{ label: 'near', depth: 0.1, webglZ: -1, webgpuZ: 0 }",
+      "{ label: 'interior', depth: 5, webglZ: 0.9610894941634242, webgpuZ: 0.980544747081712 }",
+      "{ label: 'far', depth: 180, webglZ: 1, webgpuZ: 1 }",
+      'projection must use exact backend-specific NDC depth with identical x/y',
+      'a WebGL-Z receipt must fail WebGPU recomputation and a WebGPU-Z receipt must fail WebGL recomputation',
       'same-ID actor-root replacement between committed and paused receipts must fail',
       'same-ID resolved operator-root swap between committed and paused receipts must fail',
       'same-root SkinnedMesh replacement between committed and paused receipts must fail',

@@ -33,10 +33,14 @@ import {
   collectRiggedEvidenceOccluders,
   firstRiggedEvidenceOccluder,
   installRiggedEvidenceMainCameraDrawSession,
+  projectRiggedEvidenceLiveDeformedRasterRoi,
   riggedEvidenceMaterialCanOcclude,
   validateRiggedEvidenceCaptureTargets,
   type RiggedEvidenceMainCameraActorDrawReceipt,
   type RiggedEvidenceMainCameraDrawSession,
+  type RiggedEvidencePrincipalWriteControlReceipt,
+  type RiggedEvidencePrincipalWriteMode,
+  type RiggedEvidenceRasterRoiReceipt,
 } from './rigged-evidence-occlusion';
 import { isSharedMeshGeometry } from './gpu-resource-ownership';
 import {
@@ -1124,6 +1128,8 @@ type DebugCaptureActorFrameEvidence = Readonly<{
   jointScreenPositions: readonly Readonly<Record<string, unknown>>[];
   evidenceSentinels: readonly Readonly<Record<string, unknown>>[];
   mainCameraDraw: RiggedEvidenceMainCameraActorDrawReceipt | null;
+  principalWriteControl: RiggedEvidencePrincipalWriteControlReceipt | null;
+  rasterRoi: RiggedEvidenceRasterRoiReceipt | null;
 }>;
 type DebugRiggedEvidenceCaptureTarget = Readonly<{
   kind: 'bot' | 'training-dummy';
@@ -23385,15 +23391,19 @@ function frame(now: number, scheduleNext = true): void {
     if (rendererFrameEligible && !debugRenderPaused && !renderSubmissionPaused && !webglContextLost
       && document.visibilityState === 'visible' && document.hasFocus()) {
       let frameSubmitted = false;
-      if (renderRuntime.backend === 'webgpu') {
-        const submissionMode: WebGpuSubmissionMode = gameStarted && matchState.phase === 'active'
-          && menuLifecycle.surface === 'hidden' && arenaSelectionReady && !renderSubmissionPaused
-          ? 'warmed-live'
-          : 'serialized';
-        frameSubmitted = submitWebGpuFrame(now, false, submissionMode);
-      } else {
-        atomicSignal?.render(scene, camera, VIEWMODEL_RENDER_LAYER);
-        frameSubmitted = true;
+      try {
+        if (renderRuntime.backend === 'webgpu') {
+          const submissionMode: WebGpuSubmissionMode = gameStarted && matchState.phase === 'active'
+            && menuLifecycle.surface === 'hidden' && arenaSelectionReady && !renderSubmissionPaused
+            ? 'warmed-live'
+            : 'serialized';
+          frameSubmitted = submitWebGpuFrame(now, false, submissionMode);
+        } else {
+          atomicSignal?.render(scene, camera, VIEWMODEL_RENDER_LAYER);
+          frameSubmitted = true;
+        }
+      } finally {
+        debugRiggedEvidenceMainCameraDrawSession?.restorePrincipalWritesAfterRenderCall();
       }
       if (frameSubmitted && gameStarted && menuLifecycle.surface === 'hidden') {
         lastGameplayPresentedFrame = frameCount;
@@ -24057,6 +24067,18 @@ const debugWindow = window as Window & {
     setRiggedEvidenceCaptureTargets: (
       targets: readonly Readonly<{ kind: 'bot' | 'training-dummy'; id: string }>[],
     ) => boolean;
+    riggedEvidencePrincipalWriteSession: () => Readonly<{
+      contract: 'rigged-principal-write-session-v1';
+      sessionId: string;
+      captureTargets: readonly Readonly<{ kind: 'bot' | 'training-dummy'; id: string }>[];
+    }> | null;
+    setRiggedEvidencePrincipalWriteMode: (
+      actorKind: 'bot' | 'training-dummy',
+      actorId: string,
+      sessionId: string,
+      captureRevision: number,
+      mode: RiggedEvidencePrincipalWriteMode,
+    ) => boolean;
     awaitRiggedEvidenceCaptureCompletion: () => Promise<Record<string, unknown>>;
     sampleRiggedEvidenceLineOfSight: (
       actorKind: 'bot' | 'training-dummy',
@@ -24198,6 +24220,21 @@ function debugCaptureActorFrameEvidence(
   } | null;
   const anchorHeight = target.kind === 'bot' ? 1.35 : 1.65;
   const projectedWorldPosition = root.localToWorld(new THREE.Vector3(0, anchorHeight, 0)).toArray();
+  const jointScreenPositions = debugRiggedOperatorJointScreenPositions(operatorModel);
+  const principalWriteControl = debugRiggedEvidenceMainCameraDrawSession?.principalWriteControlReceipt(
+    target,
+    frame,
+    captureRevision,
+  ) ?? null;
+  const rasterRoi = operatorRoot && principalWriteControl
+    ? projectRiggedEvidenceLiveDeformedRasterRoi(
+      operatorRoot,
+      camera,
+      RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES,
+      projectedWorldPosition,
+      jointScreenPositions,
+    )
+    : null;
   return Object.freeze({
     actor: Object.freeze({ ...target }),
     rootUuid: root.uuid,
@@ -24217,8 +24254,7 @@ function debugCaptureActorFrameEvidence(
       : null,
     projectedWorldPosition: Object.freeze(projectedWorldPosition),
     screenPosition: Object.freeze(new THREE.Vector3().fromArray(projectedWorldPosition).project(camera).toArray()),
-    jointScreenPositions: Object.freeze(debugRiggedOperatorJointScreenPositions(operatorModel)
-      .map((joint) => Object.freeze(joint))),
+    jointScreenPositions: Object.freeze(jointScreenPositions.map((joint) => Object.freeze(joint))),
     evidenceSentinels: Object.freeze(debugRiggedEvidenceSentinelWorldPositions(root)),
     mainCameraDraw: operatorRoot
       ? debugRiggedEvidenceMainCameraDrawSession?.actorReceipt(
@@ -24229,6 +24265,8 @@ function debugCaptureActorFrameEvidence(
         captureRevision,
       ) ?? null
       : null,
+    principalWriteControl,
+    rasterRoi,
   });
 }
 
@@ -24783,6 +24821,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         return {
           id: target.id,
           kind: target.kind ?? 'plate',
+          rootUuid: target.root.uuid,
+          operatorRootUuid: operator?.uuid ?? null,
           alwaysCritical: target.alwaysCritical === true,
           active: target.active,
           health: target.health,
@@ -26234,6 +26274,51 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     debugRiggedEvidenceCaptureTargets = validated.targets;
     debugRiggedEvidenceMainCameraDrawSession = drawSession;
     return true;
+  },
+  riggedEvidencePrincipalWriteSession: () => {
+    if (!debugRiggedEvidenceMainCameraDrawSession || !debugRiggedEvidenceCaptureTargets) return null;
+    return Object.freeze({
+      contract: 'rigged-principal-write-session-v1' as const,
+      sessionId: debugRiggedEvidenceMainCameraDrawSession.sessionId,
+      captureTargets: Object.freeze(debugRiggedEvidenceCaptureTargets.map((target) => Object.freeze({ ...target }))),
+    });
+  },
+  setRiggedEvidencePrincipalWriteMode: (
+    actorKind,
+    actorId,
+    sessionId,
+    captureRevision,
+    mode,
+  ) => {
+    const target = debugRiggedEvidenceCaptureTargets?.[0];
+    const canvasBounds = canvas.getBoundingClientRect();
+    if (!debugRenderPaused
+      || !debugCaptureCameraActive
+      || debugCaptureFixedVisualTimeMs !== 0
+      || selectedArena.id !== 'gun-range'
+      || debugRiggedEvidenceCaptureTargets?.length !== 1
+      || !target
+      || target.kind !== actorKind
+      || target.id !== actorId
+      || actorKind !== 'training-dummy'
+      || captureRevision !== debugCaptureCameraRevision
+      || sessionId !== debugRiggedEvidenceMainCameraDrawSession?.sessionId
+      || window.innerWidth !== 1_600
+      || window.innerHeight !== 900
+      || window.devicePixelRatio !== 1
+      || canvas.width !== 1_600
+      || canvas.height !== 900
+      || canvasBounds.left !== 0
+      || canvasBounds.top !== 0
+      || canvasBounds.width !== 1_600
+      || canvasBounds.height !== 900) return false;
+    lastDebugCapturePresentation = null;
+    return debugRiggedEvidenceMainCameraDrawSession.configurePrincipalWriteControl({
+      sessionId,
+      actor: target,
+      captureRevision,
+      mode,
+    });
   },
   awaitRiggedEvidenceCaptureCompletion: async () => {
     await flushWebGpuFrames(8_000);

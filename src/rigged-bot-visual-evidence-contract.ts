@@ -468,8 +468,8 @@ export const RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES = Object.freeze([
 ] as const);
 
 export const RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT = Object.freeze({
-  schemaVersion: 5,
-  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v5',
+  schemaVersion: 6,
+  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v6',
   los: Object.freeze({
     contract: 'actual-render-world-layout-occluder-multi-sentinel-los-v2',
     actorSelfOcclusionExcluded: true,
@@ -484,6 +484,20 @@ export const RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT = Object.freeze({
       pixelProof: false,
       expectedSkinnedMeshCount: RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES.length,
       expectedSkinnedMeshNames: RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES,
+    }),
+    productionRgbRasterProof: Object.freeze({
+      contract: 'gun-range-dummy-production-rgb-raster-proof-v1',
+      principalWriteControl: 'rigged-principal-write-control-v1',
+      rasterRoi: 'rigged-live-deformed-raster-roi-v1',
+      modes: Object.freeze(['visible-observe', 'principal-write-suppressed', 'visible-restored'] as const),
+      pngModes: Object.freeze(['principal-write-suppressed', 'visible-restored'] as const),
+      viewport: Object.freeze({ width: 1_600, height: 900, devicePixelRatio: 1 }),
+      changedPixelDefinition: 'any-rgb-byte-differs',
+      insideMinimumChangedPixels: 1,
+      outsideMaximumChangedPixels: 0,
+      alphaMustMatch: true,
+      roiPaddingPixels: 0,
+      ownerAcceptance: 'PENDING_OWNER_INSPECTION',
     }),
     rendererCompletion: Object.freeze({
       webgl2: 'synchronous-render-return',

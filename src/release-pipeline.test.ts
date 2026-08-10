@@ -210,6 +210,12 @@ describe('production release workflow', () => {
     expect(frameHitchMatrixRunner).toContain('scripts/qa/run-playwright-with-topology.mjs');
     expect(supportAircraftMatrixRunner).toContain('scripts/qa/run-playwright-with-topology.mjs');
     expect(riggedBotLiveRunner).toContain('scripts/qa/run-playwright-with-topology.mjs');
+    expect(riggedBotLiveRunner).toContain("from './rigged-rgb-raster-proof.mjs'");
+    expect(ownerFeedbackGraph.testCatalog.find(({ id }: { id: string }) => id === 'T-PASS69-3-RIGGED-DUMMY')?.paths)
+      .toEqual(expect.arrayContaining([
+        'package-lock.json',
+        'scripts/qa/rigged-rgb-raster-proof.mjs',
+      ]));
     const catalogScripts = new Set<string>();
     const queue = ownerFeedbackGraph.testCatalog
       .map(({ command }: { command: string }) => /^npm run ([^\s]+)/u.exec(command)?.[1])

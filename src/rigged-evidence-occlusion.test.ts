@@ -4,6 +4,7 @@ import {
   collectRiggedEvidenceOccluders,
   firstRiggedEvidenceOccluder,
   installRiggedEvidenceMainCameraDrawSession,
+  projectRiggedEvidenceLiveDeformedRasterRoi,
   riggedEvidenceIntersectionCanOcclude,
   riggedEvidenceMainCameraActorDrawComplete,
   validateRiggedEvidenceCaptureTargets,
@@ -487,6 +488,282 @@ describe('rigged evidence per-intersection occluder qualification', () => {
     const receipt = fixture.session.actorReceipt(fixture.actor, fixture.root, fixture.root, 41, 7)!;
     expect(receipt.complete).toBe(false);
     expect(riggedEvidenceMainCameraActorDrawComplete(receipt)).toBe(false);
+    fixture.session.dispose();
+  });
+
+  it('runs the exact observe/suppress/restored sequence and restores all three material writes per draw', () => {
+    const fixture = riggedDrawFixture();
+    fixture.material.depthWrite = false;
+    fixture.material.stencilWrite = true;
+    const renderMode = (
+      mode: 'visible-observe' | 'principal-write-suppressed' | 'visible-restored',
+      frame: number,
+      revision: number,
+    ) => {
+      fixture.setFrame(frame);
+      fixture.setCaptureRevision(revision);
+      expect(fixture.session.configurePrincipalWriteControl({
+        sessionId: fixture.session.sessionId,
+        actor: fixture.actor,
+        captureRevision: revision,
+        mode,
+      })).toBe(true);
+      fixture.invoke('before');
+      if (mode === 'principal-write-suppressed') {
+        expect({
+          colorWrite: fixture.material.colorWrite,
+          depthWrite: fixture.material.depthWrite,
+          stencilWrite: fixture.material.stencilWrite,
+        }).toEqual({ colorWrite: false, depthWrite: false, stencilWrite: false });
+      }
+      fixture.invoke('after');
+      fixture.session.restorePrincipalWritesAfterRenderCall();
+      return fixture.session.principalWriteControlReceipt(fixture.actor, frame, revision)!;
+    };
+    const observed = renderMode('visible-observe', 41, 7);
+    const suppressed = renderMode('principal-write-suppressed', 42, 8);
+    const restored = renderMode('visible-restored', 43, 9);
+    expect([observed.mode, suppressed.mode, restored.mode]).toEqual([
+      'visible-observe', 'principal-write-suppressed', 'visible-restored',
+    ]);
+    expect(suppressed).toMatchObject({
+      observedDrawCount: 1,
+      suppressionAppliedCount: 1,
+      suppressionRestoredAfterCount: 1,
+      suppressionRestoredFinallyCount: 0,
+      outstandingSuppressionCount: 0,
+      materialStateRestored: true,
+      complete: true,
+    });
+    expect(suppressed.suppressionEntries[0]).toMatchObject({
+      before: { colorWrite: true, depthWrite: false, stencilWrite: true },
+      suppressed: { colorWrite: false, depthWrite: false, stencilWrite: false },
+      suppressedExactly: true,
+      restoredBy: 'after-render',
+      after: { colorWrite: true, depthWrite: false, stencilWrite: true },
+      restoredExactly: true,
+    });
+    expect({
+      colorWrite: fixture.material.colorWrite,
+      depthWrite: fixture.material.depthWrite,
+      stencilWrite: fixture.material.stencilWrite,
+    }).toEqual({ colorWrite: true, depthWrite: false, stencilWrite: true });
+    expect(suppressed.drawManifest).toEqual(observed.drawManifest);
+    expect(restored.drawManifest).toEqual(observed.drawManifest);
+    fixture.session.dispose();
+  });
+
+  it('fails closed for stale sessions, stale revisions, wrong mode order, and zero callbacks', () => {
+    const fixture = riggedDrawFixture();
+    expect(fixture.session.configurePrincipalWriteControl({
+      sessionId: 'stale-session', actor: fixture.actor, captureRevision: 7, mode: 'visible-observe',
+    })).toBe(false);
+    expect(fixture.session.configurePrincipalWriteControl({
+      sessionId: fixture.session.sessionId, actor: fixture.actor, captureRevision: 6, mode: 'visible-observe',
+    })).toBe(false);
+    expect(fixture.session.configurePrincipalWriteControl({
+      sessionId: fixture.session.sessionId, actor: fixture.actor, captureRevision: 7, mode: 'principal-write-suppressed',
+    })).toBe(false);
+    expect(fixture.session.configurePrincipalWriteControl({
+      sessionId: fixture.session.sessionId, actor: fixture.actor, captureRevision: 7, mode: 'visible-observe',
+    })).toBe(true);
+    fixture.session.restorePrincipalWritesAfterRenderCall();
+    expect(fixture.session.principalWriteControlReceipt(fixture.actor, 41, 7)).toMatchObject({
+      observedDrawCount: 0,
+      complete: false,
+    });
+    fixture.setCaptureRevision(8);
+    expect(fixture.session.configurePrincipalWriteControl({
+      sessionId: fixture.session.sessionId, actor: fixture.actor, captureRevision: 8, mode: 'principal-write-suppressed',
+    })).toBe(false);
+    fixture.session.dispose();
+  });
+
+  it.each(['render-finally', 'abort', 'dispose'] as const)(
+    'restores an unbalanced suppressed callback on %s',
+    (restoration) => {
+      const fixture = riggedDrawFixture();
+      expect(fixture.session.configurePrincipalWriteControl({
+        sessionId: fixture.session.sessionId, actor: fixture.actor, captureRevision: 7, mode: 'visible-observe',
+      })).toBe(true);
+      fixture.invoke('before');
+      fixture.invoke('after');
+      fixture.session.restorePrincipalWritesAfterRenderCall();
+      fixture.setFrame(42);
+      fixture.setCaptureRevision(8);
+      expect(fixture.session.configurePrincipalWriteControl({
+        sessionId: fixture.session.sessionId, actor: fixture.actor, captureRevision: 8, mode: 'principal-write-suppressed',
+      })).toBe(true);
+      fixture.invoke('before');
+      expect(fixture.material.colorWrite).toBe(false);
+      if (restoration === 'render-finally') fixture.session.restorePrincipalWritesAfterRenderCall();
+      if (restoration === 'abort') fixture.session.abortPrincipalWriteControl();
+      if (restoration === 'dispose') fixture.session.dispose();
+      expect(fixture.material.colorWrite).toBe(true);
+      if (restoration === 'render-finally') {
+        expect(fixture.session.principalWriteControlReceipt(fixture.actor, 42, 8)).toMatchObject({
+          suppressionRestoredFinallyCount: 1,
+          complete: false,
+        });
+      }
+      fixture.session.dispose();
+    },
+  );
+
+  it('restores before a throwing original after-render callback escapes', () => {
+    const fixture = riggedDrawFixture();
+    fixture.session.dispose();
+    let throwAfter = false;
+    fixture.mesh.onAfterRender = () => { if (throwAfter) throw new Error('fixture-after-render'); };
+    const session = installRiggedEvidenceMainCameraDrawSession(
+      [{ actor: fixture.actor, root: fixture.root, operatorRoot: fixture.root }],
+      fixture.scene,
+      fixture.camera,
+      () => 42,
+      () => throwAfter ? 8 : 7,
+      ['fixture-skin'],
+    )!;
+    expect(session.configurePrincipalWriteControl({
+      sessionId: session.sessionId, actor: fixture.actor, captureRevision: 7, mode: 'visible-observe',
+    })).toBe(true);
+    fixture.invoke('before');
+    fixture.invoke('after');
+    session.restorePrincipalWritesAfterRenderCall();
+    throwAfter = true;
+    expect(session.configurePrincipalWriteControl({
+      sessionId: session.sessionId, actor: fixture.actor, captureRevision: 8, mode: 'principal-write-suppressed',
+    })).toBe(true);
+    fixture.invoke('before');
+    expect(fixture.material.colorWrite).toBe(false);
+    expect(() => fixture.invoke('after')).toThrow('fixture-after-render');
+    expect(fixture.material.colorWrite).toBe(true);
+    session.restorePrincipalWritesAfterRenderCall();
+    session.dispose();
+  });
+
+  it('restores a shared material before the next non-target actor callback', () => {
+    const fixture = riggedDrawFixture();
+    fixture.session.dispose();
+    const secondRoot = new THREE.Group();
+    fixture.scene.add(secondRoot);
+    const secondMesh = new THREE.SkinnedMesh(fixture.mesh.geometry.clone(), fixture.material);
+    secondMesh.name = 'fixture-skin';
+    const secondBone = new THREE.Bone();
+    secondMesh.add(secondBone);
+    secondMesh.bind(new THREE.Skeleton([secondBone]));
+    secondMesh.position.z = -2;
+    secondMesh.computeBoundingSphere();
+    secondRoot.add(secondMesh);
+    fixture.scene.updateMatrixWorld(true);
+    const secondActor = Object.freeze({ kind: 'training-dummy' as const, id: 'fixture-dummy' });
+    let frame = 41;
+    let revision = 7;
+    let nonTargetObserved: [boolean, boolean, boolean] | null = null;
+    secondMesh.onBeforeRender = () => {
+      nonTargetObserved = [fixture.material.colorWrite, fixture.material.depthWrite, fixture.material.stencilWrite];
+    };
+    const session = installRiggedEvidenceMainCameraDrawSession(
+      [
+        { actor: fixture.actor, root: fixture.root, operatorRoot: fixture.root },
+        { actor: secondActor, root: secondRoot, operatorRoot: secondRoot },
+      ],
+      fixture.scene,
+      fixture.camera,
+      () => frame,
+      () => revision,
+      ['fixture-skin'],
+    )!;
+    const invoke = (mesh: THREE.SkinnedMesh, phase: 'before' | 'after') => {
+      const callback = phase === 'before' ? mesh.onBeforeRender : mesh.onAfterRender;
+      callback.call(
+        mesh,
+        {} as THREE.WebGLRenderer,
+        fixture.scene,
+        fixture.camera,
+        mesh.geometry,
+        fixture.material,
+        null as unknown as THREE.Group,
+      );
+    };
+    expect(session.configurePrincipalWriteControl({
+      sessionId: session.sessionId, actor: fixture.actor, captureRevision: revision, mode: 'visible-observe',
+    })).toBe(true);
+    invoke(fixture.mesh, 'before'); invoke(fixture.mesh, 'after');
+    invoke(secondMesh, 'before'); invoke(secondMesh, 'after');
+    session.restorePrincipalWritesAfterRenderCall();
+    frame = 42; revision = 8; nonTargetObserved = null;
+    expect(session.configurePrincipalWriteControl({
+      sessionId: session.sessionId, actor: fixture.actor, captureRevision: revision, mode: 'principal-write-suppressed',
+    })).toBe(true);
+    invoke(fixture.mesh, 'before');
+    expect(fixture.material.colorWrite).toBe(false);
+    invoke(fixture.mesh, 'after');
+    invoke(secondMesh, 'before'); invoke(secondMesh, 'after');
+    session.restorePrincipalWritesAfterRenderCall();
+    expect(nonTargetObserved).toEqual([true, true, false]);
+    expect(session.principalWriteControlReceipt(fixture.actor, frame, revision)?.complete).toBe(true);
+    session.dispose();
+  });
+
+  it('derives a no-padding live-deformed ROI and changes its full ordered vertex digest with skin pose', () => {
+    const fixture = riggedDrawFixture();
+    const anchorWorld = [0, 0, -2] as const;
+    const ndc = new THREE.Vector3(...anchorWorld).project(fixture.camera).toArray();
+    const joints = Array.from({ length: 16 }, (_, index) => ({
+      kind: index < 6 ? 'arm' : 'finger',
+      side: index % 2 === 0 ? 'left' : 'right',
+      role: index < 6 ? 'joint' : null,
+      digit: index >= 6 ? 'digit' : null,
+      joint: index,
+      bone: `joint-${index}`,
+      worldPosition: [...anchorWorld],
+      ndc: [...ndc],
+    }));
+    const first = projectRiggedEvidenceLiveDeformedRasterRoi(
+      fixture.root,
+      fixture.camera,
+      ['fixture-skin'],
+      anchorWorld,
+      joints,
+    )!;
+    expect(first).not.toBeNull();
+    expect(first.roi).toEqual({
+      minX: Math.floor(first.projectedPixelExtrema.minX),
+      minY: Math.floor(first.projectedPixelExtrema.minY),
+      maxXExclusive: Math.ceil(first.projectedPixelExtrema.maxX),
+      maxYExclusive: Math.ceil(first.projectedPixelExtrema.maxY),
+    });
+    fixture.camera.coordinateSystem = THREE.WebGPUCoordinateSystem;
+    fixture.camera.updateProjectionMatrix();
+    expect(projectRiggedEvidenceLiveDeformedRasterRoi(
+      fixture.root, fixture.camera, ['fixture-skin'], anchorWorld, joints,
+    )).toBeNull();
+    const webgpuNdc = new THREE.Vector3(...anchorWorld).project(fixture.camera).toArray();
+    const webgpuJoints = joints.map((joint) => ({ ...joint, ndc: [...webgpuNdc] }));
+    const webgpu = projectRiggedEvidenceLiveDeformedRasterRoi(
+      fixture.root, fixture.camera, ['fixture-skin'], anchorWorld, webgpuJoints,
+    );
+    expect(webgpu).not.toBeNull();
+    expect(webgpu!.anchor.ndc[2]).toBeGreaterThanOrEqual(0);
+    fixture.camera.coordinateSystem = THREE.WebGLCoordinateSystem;
+    fixture.camera.updateProjectionMatrix();
+    const forgedNdc = structuredClone(joints);
+    forgedNdc[0].ndc[0] += 0.01;
+    expect(projectRiggedEvidenceLiveDeformedRasterRoi(
+      fixture.root, fixture.camera, ['fixture-skin'], anchorWorld, forgedNdc,
+    )).toBeNull();
+    fixture.mesh.skeleton.bones[0].position.x = 0.1;
+    fixture.mesh.skeleton.update();
+    fixture.scene.updateMatrixWorld(true);
+    const second = projectRiggedEvidenceLiveDeformedRasterRoi(
+      fixture.root,
+      fixture.camera,
+      ['fixture-skin'],
+      anchorWorld,
+      joints,
+    )!;
+    expect(second).not.toBeNull();
+    expect(second.deformedVertexProjectionDigest).not.toEqual(first.deformedVertexProjectionDigest);
     fixture.session.dispose();
   });
 });

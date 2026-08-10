@@ -155,8 +155,8 @@ describe('fixed rigged actor visual evidence fixtures', () => {
 
   it('requires committed camera frames, compositor boundaries, and all six LOS sentinels', () => {
     expect(RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT).toMatchObject({
-      schemaVersion: 5,
-      contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v5',
+      schemaVersion: 6,
+      contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v6',
     });
     expect(RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation).toEqual({
       contract: 'capture-camera-committed-frame-v2',
@@ -167,6 +167,20 @@ describe('fixed rigged actor visual evidence fixtures', () => {
         pixelProof: false,
         expectedSkinnedMeshCount: 9,
         expectedSkinnedMeshNames: RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES,
+      },
+      productionRgbRasterProof: {
+        contract: 'gun-range-dummy-production-rgb-raster-proof-v1',
+        principalWriteControl: 'rigged-principal-write-control-v1',
+        rasterRoi: 'rigged-live-deformed-raster-roi-v1',
+        modes: ['visible-observe', 'principal-write-suppressed', 'visible-restored'],
+        pngModes: ['principal-write-suppressed', 'visible-restored'],
+        viewport: { width: 1_600, height: 900, devicePixelRatio: 1 },
+        changedPixelDefinition: 'any-rgb-byte-differs',
+        insideMinimumChangedPixels: 1,
+        outsideMaximumChangedPixels: 0,
+        alphaMustMatch: true,
+        roiPaddingPixels: 0,
+        ownerAcceptance: 'PENDING_OWNER_INSPECTION',
       },
       rendererCompletion: {
         webgl2: 'synchronous-render-return',

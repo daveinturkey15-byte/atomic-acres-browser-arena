@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import sharp from 'sharp';
 import { GUN_RANGE_TEST_BAY_CONTRACT } from '../../src/gun-range-test-bay';
 import {
   RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT,
@@ -126,6 +127,160 @@ const EXPECTED_MAIN_CAMERA_DRAW_MESH_NAMES = Object.freeze([
 
 function sha256(value: Buffer): string {
   return createHash('sha256').update(value).digest('hex');
+}
+
+function jsonSha256(value: unknown): string {
+  return sha256(Buffer.from(JSON.stringify(value), 'utf8'));
+}
+
+function rasterStateDigests(state: any, targetId: string) {
+  const targetState = state.rangeTargets.find((target: any) => target.id === targetId);
+  const nonTargetState = state.rangeTargets.filter((target: any) => target.id !== targetId);
+  return {
+    contract: 'rigged-raster-state-digests-v1',
+    cameraSha256: jsonSha256(state.camera),
+    fixedVisualTimeSha256: jsonSha256(state.fixedTimeMs),
+    targetPoseSha256: jsonSha256(state.targetPose),
+    targetStateSha256: jsonSha256(targetState),
+    nonTargetStateSha256: jsonSha256(nonTargetState),
+    combinedSha256: jsonSha256(state),
+  };
+}
+
+function canonicalRangeRasterTargets(rawTargets: any[]) {
+  const expectedIds = GUN_RANGE_TEST_BAY_CONTRACT.dummies.map(({ id }) => id);
+  const dummies = rawTargets.filter(({ kind }) => kind === 'training-dummy');
+  if (dummies.length !== expectedIds.length
+    || new Set(dummies.map(({ id }) => id)).size !== expectedIds.length
+    || !expectedIds.every((id) => dummies.some((target) => target.id === id))) {
+    throw new Error('Gun Range raster state does not contain the exact four ordered dummy identities');
+  }
+  const canonicalBone = (bone: any) => ({
+    side: bone.side,
+    role: bone.role ?? null,
+    digit: bone.digit ?? null,
+    joint: bone.joint ?? null,
+    sourceBone: bone.sourceBone,
+    bone: bone.bone,
+    parentBone: bone.parentBone,
+    wristBone: bone.wristBone ?? null,
+    effectiveSkinnedMeshes: bone.effectiveSkinnedMeshes,
+    localPosition: bone.localPosition,
+    localQuaternion: bone.localQuaternion,
+    worldPosition: bone.worldPosition,
+    worldQuaternion: bone.worldQuaternion,
+    bindLocalPosition: bone.bindLocalPosition,
+    bindLocalQuaternion: bone.bindLocalQuaternion,
+    bindPositionDelta: bone.bindPositionDelta ?? null,
+    bindQuaternionDeltaRadians: bone.bindQuaternionDeltaRadians,
+  });
+  return expectedIds.map((id) => {
+    const target = dummies.find((candidate) => candidate.id === id)!;
+    const model = target.operatorModel;
+    return {
+      id: target.id,
+      kind: target.kind,
+      rootUuid: target.rootUuid,
+      operatorRootUuid: target.operatorRootUuid,
+      alwaysCritical: target.alwaysCritical,
+      active: target.active,
+      health: target.health,
+      maxHealth: target.maxHealth,
+      visible: target.visible,
+      rootEffectivelyVisible: target.rootEffectivelyVisible,
+      effectivelyVisibleMeshCount: target.effectivelyVisibleMeshCount,
+      position: target.position,
+      yaw: target.yaw,
+      screenPosition: target.screenPosition,
+      armed: target.armed,
+      jointScreenPositions: target.jointScreenPositions,
+      operator: {
+        activeClip: model.activeClip,
+        animationContract: model.animationContract,
+        effectivelyVisibleSkinnedMeshes: model.effectivelyVisibleSkinnedMeshes,
+        armPose: {
+          contract: model.armPose.contract,
+          bones: model.armPose.bones.map(canonicalBone),
+        },
+        handPose: {
+          contract: model.handPose.contract,
+          bones: model.handPose.bones.map(canonicalBone),
+        },
+      },
+    };
+  });
+}
+
+async function produceRasterDiffReceipt(controlPath: string, visiblePath: string, roi: any) {
+  const decode = async (path: string) => {
+    const decoded = await sharp(resolve(repositoryRoot, path), { failOn: 'error', limitInputPixels: 1_600 * 900 })
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    expect(decoded.info, `${path}: exact lossless RGBA decode`).toMatchObject({
+      width: 1_600,
+      height: 900,
+      channels: 4,
+    });
+    return decoded.data;
+  };
+  const [control, visible] = await Promise.all([decode(controlPath), decode(visiblePath)]);
+  const mask = Buffer.alloc(1_600 * 900);
+  const controlRgb = Buffer.alloc(1_600 * 900 * 3);
+  const visibleRgb = Buffer.alloc(1_600 * 900 * 3);
+  let changedPixelCount = 0;
+  let insideChangedPixelCount = 0;
+  let outsideChangedPixelCount = 0;
+  let alphaChangedPixelCount = 0;
+  let maxRgbChannelDelta = 0;
+  let minX = 1_600;
+  let minY = 900;
+  let maxXExclusive = 0;
+  let maxYExclusive = 0;
+  for (let pixel = 0; pixel < 1_600 * 900; pixel += 1) {
+    const rgba = pixel * 4;
+    const rgb = pixel * 3;
+    const x = pixel % 1_600;
+    const y = Math.floor(pixel / 1_600);
+    let changed = false;
+    for (let channel = 0; channel < 3; channel += 1) {
+      controlRgb[rgb + channel] = control[rgba + channel];
+      visibleRgb[rgb + channel] = visible[rgba + channel];
+      const delta = Math.abs(control[rgba + channel] - visible[rgba + channel]);
+      changed ||= delta !== 0;
+      maxRgbChannelDelta = Math.max(maxRgbChannelDelta, delta);
+    }
+    if (control[rgba + 3] !== visible[rgba + 3]) alphaChangedPixelCount += 1;
+    if (!changed) continue;
+    mask[pixel] = 1;
+    changedPixelCount += 1;
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxXExclusive = Math.max(maxXExclusive, x + 1);
+    maxYExclusive = Math.max(maxYExclusive, y + 1);
+    if (x >= roi.minX && x < roi.maxXExclusive && y >= roi.minY && y < roi.maxYExclusive) {
+      insideChangedPixelCount += 1;
+    } else {
+      outsideChangedPixelCount += 1;
+    }
+  }
+  return {
+    contract: 'lossless-rgba-rgb-diff-v1',
+    width: 1_600,
+    height: 900,
+    changedPixelDefinition: 'any-rgb-byte-differs',
+    changedPixelCount,
+    insideChangedPixelCount,
+    outsideChangedPixelCount,
+    alphaChangedPixelCount,
+    maxRgbChannelDelta,
+    changedPixelBbox: changedPixelCount === 0 ? null : { minX, minY, maxXExclusive, maxYExclusive },
+    diffMaskSha256: sha256(mask),
+    controlRawRgbSha256: sha256(controlRgb),
+    visibleRawRgbSha256: sha256(visibleRgb),
+    controlRawRgbaSha256: sha256(control),
+    visibleRawRgbaSha256: sha256(visible),
+  };
 }
 
 function withinNumericBoundary(observed: number, limit: number, scaleValues: readonly number[]): boolean {
@@ -853,6 +1008,11 @@ async function commitCaptureCamera(
   camera: RiggedEvidenceCamera,
   captureTargets: readonly CaptureActor[],
   fixedVisualTimeMs: number | null = null,
+  principalWrite?: Readonly<{
+    mode: 'visible-observe' | 'principal-write-suppressed' | 'visible-restored';
+    sessionId?: string;
+    reuseCaptureTargets?: boolean;
+  }>,
 ): Promise<any> {
   const before = await page.evaluate(() => {
     const api = window.__ATOMIC_ACRES_DEBUG__;
@@ -865,23 +1025,36 @@ async function commitCaptureCamera(
       completedSequence: presentation.completedSequence,
     };
   });
-  const requestedRevision = await page.evaluate(({ requested, targets, fixedTime }) => {
+  const configured = await page.evaluate(({ requested, targets, fixedTime, principal }) => {
     const api = window.__ATOMIC_ACRES_DEBUG__;
     api.setRenderPaused(true);
-    if (!api.setRiggedEvidenceCaptureTargets(targets)) throw new Error('Rigged evidence capture target registration failed');
+    if (principal?.reuseCaptureTargets !== true
+      && !api.setRiggedEvidenceCaptureTargets(targets)) throw new Error('Rigged evidence capture target registration failed');
+    const session = principal ? api.riggedEvidencePrincipalWriteSession() : null;
+    if (principal?.sessionId !== undefined && session?.sessionId !== principal.sessionId) {
+      throw new Error('Rigged evidence principal-write session identity changed');
+    }
     const revision = api.setCaptureCameraPose(
       requested.position[0], requested.position[1], requested.position[2],
       requested.yaw, requested.pitch, requested.fov,
       fixedTime === null ? undefined : fixedTime,
     );
+    if (principal && (!session || revision === null || !api.setRiggedEvidencePrincipalWriteMode(
+      targets[0].kind,
+      targets[0].id,
+      session.sessionId,
+      revision,
+      principal.mode,
+    ))) throw new Error('Rigged evidence principal-write control configuration failed');
     api.setRenderPaused(false);
-    return revision;
-  }, { requested: camera, targets: captureTargets, fixedTime: fixedVisualTimeMs });
+    return { revision, principalSession: session };
+  }, { requested: camera, targets: captureTargets, fixedTime: fixedVisualTimeMs, principal: principalWrite ?? null });
+  const requestedRevision = configured.revision;
   expect(requestedRevision, `${camera.id}: capture camera revision`).toEqual(expect.any(Number));
   expect(requestedRevision, `${camera.id}: capture revision advances from the sampled prior camera state`).toBeGreaterThan(
     before.captureRevision,
   );
-  await page.waitForFunction(({ revision, beforeFrame, expected, targets }) => {
+  await page.waitForFunction(({ revision, beforeFrame, expected, targets, expectedPrincipalMode }) => {
     const review = (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).deterministicReview;
     const committed = review.presentedCapture;
     const close = (left: number, right: number) => Math.abs(left - right) <= 1e-8;
@@ -891,6 +1064,11 @@ async function commitCaptureCamera(
       && JSON.stringify(committed.captureTargets) === JSON.stringify(targets)
       && committed.actors?.length === targets.length
       && committed.actors.every((actor: any) => actor.mainCameraDraw?.complete === true)
+      && (expectedPrincipalMode === null || committed.actors.every((actor: any) => (
+        actor.principalWriteControl?.complete === true
+        && actor.principalWriteControl.mode === expectedPrincipalMode
+        && actor.rasterRoi?.anchorAndSixteenJointsInside === true
+      )))
       && committed.position.every((value: number, index: number) => close(value, expected.position[index]))
       && close(committed.yaw, expected.yaw)
       && close(committed.pitch, expected.pitch)
@@ -900,6 +1078,7 @@ async function commitCaptureCamera(
     beforeFrame: before.captureFrame,
     expected: camera,
     targets: captureTargets,
+    expectedPrincipalMode: principalWrite?.mode ?? null,
   }, { timeout: 5_000 });
   const committed = await page.evaluate(() => (
     (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).deterministicReview.presentedCapture
@@ -954,6 +1133,8 @@ async function commitCaptureCamera(
       camera: snapshot.deterministicReview.captureCamera,
       admission: api.admissionState(),
       presentation: api.samplePresentationTelemetry(),
+      fixedTimeMs: snapshot.deterministicReview.fixedTimeMs,
+      rangeTargets: snapshot.rangePractice.targets,
     };
   });
   expect(paused.debugRenderPaused, `${camera.id}: renderer paused only after committed frame`).toBe(true);
@@ -965,6 +1146,91 @@ async function commitCaptureCamera(
     requestedRevision,
     `${camera.id}:paused:${captureTargets[index].kind}:${captureTargets[index].id}`,
   ));
+  if (principalWrite) {
+    const actorFrame = paused.presentedCapture.actors[0];
+    expect(actorFrame.principalWriteControl, `${camera.id}: exact principal-write control receipt`).toMatchObject({
+      contract: 'rigged-principal-write-control-v1',
+      sessionId: configured.principalSession.sessionId,
+      actor: captureTargets[0],
+      frame: paused.presentedCapture.frame,
+      captureRevision: requestedRevision,
+      mode: principalWrite.mode,
+      observedDrawCount: expect.any(Number),
+      suppressionRestoredFinallyCount: 0,
+      outstandingSuppressionCount: 0,
+      renderCallFinalized: true,
+      suppressionAppliedCountExact: true,
+      materialStateRestored: true,
+      failures: [],
+      complete: true,
+    });
+    expect(actorFrame.principalWriteControl.observedDrawCount, `${camera.id}: nonempty principal draw manifest`).toBeGreaterThan(0);
+    if (principalWrite.mode === 'principal-write-suppressed') {
+      expect(actorFrame.principalWriteControl.suppressionAppliedCount, `${camera.id}: every admitted target draw suppressed`).toBe(
+        actorFrame.principalWriteControl.observedDrawCount,
+      );
+      expect(actorFrame.principalWriteControl.suppressionRestoredAfterCount, `${camera.id}: every suppressed draw restored in callback`).toBe(
+        actorFrame.principalWriteControl.observedDrawCount,
+      );
+      expect(actorFrame.principalWriteControl.suppressionEntries, `${camera.id}: exact per-draw suppression entries`).toHaveLength(
+        actorFrame.principalWriteControl.observedDrawCount,
+      );
+      for (const entry of actorFrame.principalWriteControl.suppressionEntries) {
+        expect(entry.suppressed, `${camera.id}: all three principal writes disabled`).toEqual({
+          colorWrite: false,
+          depthWrite: false,
+          stencilWrite: false,
+        });
+        expect(entry.suppressedExactly, `${camera.id}: runtime observed exact suppressed state`).toBe(true);
+        expect(entry.restoredBy, `${camera.id}: callback-local restoration`).toBe('after-render');
+        expect(entry.after, `${camera.id}: exact original writes restored`).toEqual(entry.before);
+        expect(entry.restoredExactly, `${camera.id}: runtime observed exact restored state`).toBe(true);
+      }
+    } else {
+      expect(actorFrame.principalWriteControl.suppressionAppliedCount, `${camera.id}: visible mode makes no write mutation`).toBe(0);
+      expect(actorFrame.principalWriteControl.suppressionRestoredAfterCount, `${camera.id}: visible mode has nothing to restore`).toBe(0);
+      expect(actorFrame.principalWriteControl.suppressionEntries, `${camera.id}: visible mode has no suppression entries`).toEqual([]);
+    }
+    expect(actorFrame.rasterRoi, `${camera.id}: live deformed vertex raster ROI`).toMatchObject({
+      contract: 'rigged-live-deformed-raster-roi-v1',
+      viewport: {
+        cssWidth: 1_600,
+        cssHeight: 900,
+        devicePixelRatio: 1,
+        drawingBufferWidth: 1_600,
+        drawingBufferHeight: 900,
+      },
+      anchorAndSixteenJointsInside: true,
+    });
+    expect(actorFrame.rasterRoi.deformedVertexCount, `${camera.id}: live deformed vertices projected`).toBeGreaterThan(0);
+    expect(actorFrame.rasterRoi.joints, `${camera.id}: anchor plus exact sixteen joints`).toHaveLength(16);
+    expect([...actorFrame.rasterRoi.meshNames].sort(), `${camera.id}: exact nine ROI meshes`).toEqual(
+      [...EXPECTED_MAIN_CAMERA_DRAW_MESH_NAMES].sort(),
+    );
+    expect([...actorFrame.rasterRoi.meshUuids].sort(), `${camera.id}: ROI mesh UUIDs bind admitted draw`).toEqual(
+      actorFrame.mainCameraDraw.meshes.map(({ meshUuid }: any) => meshUuid).sort(),
+    );
+    const extrema = actorFrame.rasterRoi.projectedPixelExtrema;
+    expect(actorFrame.rasterRoi, `${camera.id}: exact no-padding half-open live-vertex ROI`).toMatchObject({
+      rounding: 'floor-min-ceil-max-half-open',
+      paddingPixels: 0,
+      roi: {
+        minX: Math.floor(extrema.minX),
+        minY: Math.floor(extrema.minY),
+        maxXExclusive: Math.ceil(extrema.maxX),
+        maxYExclusive: Math.ceil(extrema.maxY),
+      },
+      deformedVertexProjectionDigest: {
+        algorithm: 'fnv1a32-pair-ordered-float64-v1',
+        value: expect.stringMatching(/^[a-f0-9]{16}$/u),
+      },
+    });
+    expect(actorFrame.rasterRoi.joints.map(({ kind, side, role, digit, joint, bone }: any) => (
+      { kind, side, role, digit, joint, bone }
+    )), `${camera.id}: exact ROI joint identities`).toEqual(actorFrame.jointScreenPositions.map(({
+      kind, side, role, digit, joint, bone,
+    }: any) => ({ kind, side, role, digit, joint, bone })));
+  }
   expectPresentationDrawIdentity(paused.presentedCapture.actors, `${camera.id}:paused`);
   paused.presentedCapture.actors.forEach((actorFrame: any, index: number) => {
     const committedActor = committed.actors[index];
@@ -1064,12 +1330,35 @@ async function commitCaptureCamera(
       before.completedSequence,
     );
   }
+  const rasterState = {
+    camera: {
+      position: paused.presentedCapture.position,
+      quaternion: paused.presentedCapture.quaternion,
+      yaw: paused.presentedCapture.yaw,
+      pitch: paused.presentedCapture.pitch,
+      fov: paused.presentedCapture.fov,
+      near: paused.presentedCapture.near,
+      far: paused.presentedCapture.far,
+    },
+    fixedTimeMs: paused.fixedTimeMs,
+    targetPose: paused.presentedCapture.actors.map((actor: any) => ({
+      actor: actor.actor,
+      rootUuid: actor.rootUuid,
+      operatorRootUuid: actor.operatorRootUuid,
+      rootPosition: actor.rootPosition,
+      rootYaw: actor.rootYaw,
+      projectedWorldPosition: actor.projectedWorldPosition,
+      jointScreenPositions: actor.jointScreenPositions,
+    })),
+    rangeTargets: canonicalRangeRasterTargets(paused.rangeTargets),
+  };
   return {
     contract: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.contract,
     order: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.order,
     fixtureCamera: camera,
     priorCaptureRevision: before.captureRevision,
     requestedRevision,
+    principalWriteSession: configured.principalSession,
     committed,
     pausedPresentedCapture: paused.presentedCapture,
     completion: {
@@ -1092,6 +1381,8 @@ async function commitCaptureCamera(
     pausedPresentedGameplayFrame: paused.admission.presentedGameplayFrame,
     compositorBoundariesAfterCommit: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.compositorBoundariesAfterCommit,
     pausedAtFrameCount: afterBoundaries.frameCount,
+    rasterState,
+    rasterStateDigests: principalWrite ? rasterStateDigests(rasterState, captureTargets[0].id) : null,
   };
 }
 
@@ -1142,7 +1433,14 @@ async function sampleRequiredLineOfSight(
 
 async function screenshotWithHash(page: Page, testInfo: TestInfo, name: string): Promise<{ path: string; sha256: string }> {
   const path = resolve(artifactRoot, `${name}.png`);
-  const screenshot = await page.screenshot({ path, animations: 'disabled' });
+  expect(existsSync(path), `${name}: stale screenshot path is absent before capture`).toBe(false);
+  const screenshot = await page.screenshot({ animations: 'disabled' });
+  writeFileSync(path, screenshot, { flag: 'wx' });
+  const status = lstatSync(path);
+  expect(status.isFile() && !status.isSymbolicLink(), `${name}: regular non-link screenshot artifact`).toBe(true);
+  expect(repositoryRelative(realpathSync(path)), `${name}: real screenshot remains in repository`).toBe(
+    repositoryRelative(path),
+  );
   await testInfo.attach(name, { body: screenshot, contentType: 'image/png' });
   return { path: repositoryRelative(path), sha256: sha256(screenshot) };
 }
@@ -1470,6 +1768,125 @@ async function captureAtFixedPose(
     lineOfSight,
     pausedLivePoseAdvance,
     framing,
+  };
+}
+
+async function captureDummyProductionRgbRasterProof(
+  page: Page,
+  testInfo: TestInfo,
+  camera: RiggedEvidenceCamera,
+  actor: CaptureActor,
+) {
+  const fixedVisualTimeMs = RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.gunRange.fixedVisualTimeMs;
+  expect(fixedVisualTimeMs, `${actor.id}: production RGB proof fixed visual time`).toBe(0);
+  const observe = await commitCaptureCamera(page, camera, [actor], fixedVisualTimeMs, {
+    mode: 'visible-observe',
+  });
+  const sessionId = observe.principalWriteSession?.sessionId;
+  expect(sessionId, `${actor.id}: principal-write session identity`).toEqual(expect.any(String));
+  const control = await commitCaptureCamera(page, camera, [actor], fixedVisualTimeMs, {
+    mode: 'principal-write-suppressed',
+    sessionId,
+    reuseCaptureTargets: true,
+  });
+  const controlScreenshot = await screenshotPresentedFrameWithHash(
+    page,
+    testInfo,
+    `${actor.id}-close-principal-suppressed`,
+    control,
+  );
+  const restored = await commitCaptureCamera(page, camera, [actor], fixedVisualTimeMs, {
+    mode: 'visible-restored',
+    sessionId,
+    reuseCaptureTargets: true,
+  });
+  const [framing] = await captureFraming(page, [actor], restored, CLOSE_ROI_NDC, true);
+  const lineOfSight = await sampleRequiredLineOfSight(page, actor, restored, framing);
+  const visibleScreenshotCapture = await screenshotPresentedFrameWithHash(
+    page,
+    testInfo,
+    `${actor.id}-close`,
+    restored,
+  );
+  const visibleScreenshot = {
+    ...visibleScreenshotCapture,
+    fixtureContract: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.contract,
+    camera,
+    presentation: restored,
+    lineOfSight,
+    pausedLivePoseAdvance: null,
+    framing,
+  };
+  const phasePresentations = [observe, control, restored];
+  expect(phasePresentations.map((entry) => entry.principalWriteSession.sessionId), `${actor.id}: one session across three commits`).toEqual([
+    sessionId, sessionId, sessionId,
+  ]);
+  expect(phasePresentations.map((entry) => entry.requestedRevision).every((revision, index, revisions) => (
+    index === 0 || revision > revisions[index - 1]
+  )), `${actor.id}: observe/control/restored revisions strictly increase`).toBe(true);
+  expect(phasePresentations.map((entry) => entry.pausedPresentedCapture.actors[0].principalWriteControl.mode), `${actor.id}: exact three-mode order`).toEqual([
+    'visible-observe', 'principal-write-suppressed', 'visible-restored',
+  ]);
+  const drawManifests = phasePresentations.map((entry) => (
+    entry.pausedPresentedCapture.actors[0].principalWriteControl.drawManifest
+  ));
+  expect(drawManifests[0].length, `${actor.id}: nonempty admitted draw manifest`).toBeGreaterThan(0);
+  expect(drawManifests[1], `${actor.id}: suppressed draw manifest equals observed`).toEqual(drawManifests[0]);
+  expect(drawManifests[2], `${actor.id}: restored draw manifest equals observed`).toEqual(drawManifests[0]);
+  const rasterRois = phasePresentations.map((entry) => entry.pausedPresentedCapture.actors[0].rasterRoi);
+  expect(rasterRois[1], `${actor.id}: control ROI equals observed live-deformed ROI`).toEqual(rasterRois[0]);
+  expect(rasterRois[2], `${actor.id}: restored ROI equals observed live-deformed ROI`).toEqual(rasterRois[0]);
+  const stateDigests = phasePresentations.map((entry) => entry.rasterStateDigests);
+  expect(stateDigests[1], `${actor.id}: camera/fixed-time/pose/target/non-target state unchanged in control`).toEqual(
+    stateDigests[0],
+  );
+  expect(stateDigests[2], `${actor.id}: camera/fixed-time/pose/target/non-target state restored exactly`).toEqual(
+    stateDigests[0],
+  );
+  expect(controlScreenshot.sha256, `${actor.id}: suppressed and visible PNG file hashes differ`).not.toBe(
+    visibleScreenshot.sha256,
+  );
+  const rasterDiff = await produceRasterDiffReceipt(
+    controlScreenshot.path,
+    visibleScreenshot.path,
+    rasterRois[0].roi,
+  );
+  expect(rasterDiff.insideChangedPixelCount, `${actor.id}: at least one target RGB pixel changes`).toBeGreaterThanOrEqual(1);
+  expect(rasterDiff.changedPixelCount, `${actor.id}: every RGB change is inside exact actor ROI`).toBe(
+    rasterDiff.insideChangedPixelCount,
+  );
+  expect(rasterDiff.outsideChangedPixelCount, `${actor.id}: environment RGB remains byte-identical`).toBe(0);
+  expect(rasterDiff.alphaChangedPixelCount, `${actor.id}: alpha remains byte-identical`).toBe(0);
+  expect(rasterDiff.maxRgbChannelDelta, `${actor.id}: nonzero RGB channel delta`).toBeGreaterThan(0);
+  expect(rasterDiff.controlRawRgbSha256, `${actor.id}: raw control and visible RGB hashes differ`).not.toBe(
+    rasterDiff.visibleRawRgbSha256,
+  );
+  await page.evaluate(() => {
+    window.__ATOMIC_ACRES_DEBUG__.setRiggedEvidenceCaptureTargets([]);
+    window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false);
+  });
+  return {
+    contract: 'gun-range-dummy-production-rgb-raster-proof-v1',
+    actor,
+    camera,
+    fixedVisualTimeMs,
+    sessionId,
+    captureOrder: phasePresentations.map((entry, index) => ({
+      mode: ['visible-observe', 'principal-write-suppressed', 'visible-restored'][index],
+      frame: entry.pausedPresentedCapture.frame,
+      captureRevision: entry.requestedRevision,
+      submissionSequence: entry.pausedPresentedCapture.submissionSequence,
+      completedSequence: entry.pausedPresentedCapture.completedSequence,
+    })),
+    stateDigests: stateDigests[0],
+    drawManifest: drawManifests[0],
+    rasterRoi: rasterRois[0],
+    observePresentation: observe,
+    controlPresentation: control,
+    restoredPresentation: restored,
+    controlScreenshot,
+    visibleScreenshot,
+    rasterDiff,
   };
 }
 
@@ -1803,6 +2220,8 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
   rmSync(artifactRoot, { recursive: true, force: true });
   rmSync(receiptPath, { force: true });
   mkdirSync(artifactRoot, { recursive: true });
+  const artifactRootStatus = lstatSync(artifactRoot);
+  expect(artifactRootStatus.isDirectory() && !artifactRootStatus.isSymbolicLink(), 'fresh regular non-link artifact directory').toBe(true);
   if (officialEvidence) {
     expect(sourceSha, 'official rigged-bot evidence starts at requested exact HEAD').toBe(expectedSourceSha);
     expect(sourceStatus, 'official rigged-bot evidence starts from a clean worktree').toBe('');
@@ -2072,16 +2491,13 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
     const dummy = dummies[index];
     const fixedFixture = RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.gunRange.dummies[index];
     expect(fixedFixture.actor.id, `${dummy.id}: fixed camera identity`).toBe(dummy.id);
-    const closeScreenshot = await captureAtFixedPose(
+    const rasterProof = await captureDummyProductionRgbRasterProof(
       page,
       testInfo,
       fixedFixture.camera,
-      `${dummy.id}-close`,
       { kind: 'training-dummy', id: dummy.id },
-      CLOSE_ROI_NDC,
-      true,
-      RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.gunRange.fixedVisualTimeMs,
     );
+    const closeScreenshot = rasterProof.visibleScreenshot;
     const fixedActorFrame = closeScreenshot.presentation.pausedPresentedCapture.actors[0];
     expect(fixedActorFrame.actor, `${dummy.id}: exact final-frame actor identity`).toEqual({
       kind: 'training-dummy', id: dummy.id,
@@ -2102,12 +2518,13 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
         captureRevision: closeScreenshot.presentation.requestedRevision,
       },
       closeScreenshot,
+      rasterProof,
     });
   }
   const gunRangeRuntime = await captureSurfaceEvidence(page, testInfo, 'gun-range');
   const gunRangeCaptureRevisions = [
     overviewScreenshot.presentation.requestedRevision,
-    ...dummyEvidence.map((entry) => entry.closeScreenshot.presentation.requestedRevision),
+    ...dummyEvidence.flatMap((entry) => entry.rasterProof.captureOrder.map(({ captureRevision }: any) => captureRevision)),
   ];
   expect(gunRangeCaptureRevisions.every((revision, index) => (
     index === 0 || revision > gunRangeCaptureRevisions[index - 1]
@@ -2126,10 +2543,10 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
     expect(endingSourceStatus, 'official rigged-bot evidence ends with a clean worktree').toBe('');
   }
   writeFileSync(receiptPath, `${JSON.stringify({
-    schemaVersion: 9,
+    schemaVersion: 10,
     status: 'AUTOMATION_PASS_OWNER_PENDING',
-    contract: 'atomic-acres/pass69-3-rigged-bot-live@9',
-    evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-hand-detail-and-main-camera-draw-stamps',
+    contract: 'atomic-acres/pass69-3-rigged-bot-live@10',
+    evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-hand-detail-main-camera-draw-stamps-and-production-rgb-raster-proof',
     target: officialEvidence ? expectedTarget : `development-${renderer}`,
     sourceSha,
     endingSourceSha,
@@ -2159,7 +2576,7 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
       status: 'PENDING_OWNER_INSPECTION',
       automatedFramingIsNotVisualAcceptance: true,
       worldLayoutLosDoesNotProveActorSelfOcclusion: true,
-      inspectionScope: 'armed medium/full close/left hand/right hand plus four dummy closeups and shared overview',
+      inspectionScope: 'armed medium/full close/left hand/right hand plus four restored dummy closeups, four suppressed controls, and shared overview',
     },
     browser: {
       project: testInfo.project.name,
@@ -2210,5 +2627,5 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
     },
     surfaces: { armedBot: armedRuntime, gunRange: gunRangeRuntime },
     browserErrors,
-  }, null, 2)}\n`, 'utf8');
+  }, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
 });

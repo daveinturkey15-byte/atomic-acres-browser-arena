@@ -8,6 +8,13 @@ export type RiggedEvidenceCaptureTarget = Readonly<{
 }>;
 
 export const RIGGED_EVIDENCE_MAIN_CAMERA_DRAW_CONTRACT = 'rigged-main-camera-draw-stamp-v1';
+export const RIGGED_EVIDENCE_PRINCIPAL_WRITE_CONTROL_CONTRACT = 'rigged-principal-write-control-v1';
+export const RIGGED_EVIDENCE_RASTER_ROI_CONTRACT = 'rigged-live-deformed-raster-roi-v1';
+
+export type RiggedEvidencePrincipalWriteMode =
+  | 'visible-observe'
+  | 'principal-write-suppressed'
+  | 'visible-restored';
 
 type RiggedEvidenceDrawRange = Readonly<{
   start: number;
@@ -24,6 +31,8 @@ type RiggedEvidenceDrawMaterial = Readonly<{
   type: string;
   visible: boolean;
   colorWrite: boolean;
+  depthWrite: boolean;
+  stencilWrite: boolean;
   transparent: boolean;
   opacity: number;
 }>;
@@ -111,7 +120,89 @@ export type RiggedEvidenceMainCameraActorDrawReceipt = Readonly<{
   complete: boolean;
 }>;
 
+export type RiggedEvidencePrincipalWriteManifestEntry = Readonly<{
+  meshUuid: string;
+  meshName: string;
+  materialUuid: string;
+  materialIndex: number | null;
+  groupStart: number | null;
+  groupCount: number | null;
+}>;
+
+export type RiggedEvidencePrincipalWriteControlReceipt = Readonly<{
+  contract: typeof RIGGED_EVIDENCE_PRINCIPAL_WRITE_CONTROL_CONTRACT;
+  sessionId: string;
+  actor: RiggedEvidenceCaptureTarget;
+  frame: number;
+  captureRevision: number;
+  mode: RiggedEvidencePrincipalWriteMode;
+  drawManifest: readonly RiggedEvidencePrincipalWriteManifestEntry[];
+  suppressionEntries: readonly Readonly<{
+    draw: RiggedEvidencePrincipalWriteManifestEntry;
+    before: Readonly<{ colorWrite: boolean; depthWrite: boolean; stencilWrite: boolean }>;
+    suppressed: Readonly<{ colorWrite: false; depthWrite: false; stencilWrite: false }>;
+    suppressedExactly: boolean;
+    restoredBy: 'after-render' | 'render-finally' | 'abort' | 'dispose' | null;
+    after: Readonly<{ colorWrite: boolean; depthWrite: boolean; stencilWrite: boolean }>;
+    restoredExactly: boolean;
+  }>[];
+  observedDrawCount: number;
+  suppressionAppliedCount: number;
+  suppressionRestoredAfterCount: number;
+  suppressionRestoredFinallyCount: number;
+  outstandingSuppressionCount: number;
+  renderCallFinalized: boolean;
+  suppressionAppliedCountExact: boolean;
+  materialStateRestored: boolean;
+  failures: readonly string[];
+  complete: boolean;
+}>;
+
+export type RiggedEvidenceRasterRoiReceipt = Readonly<{
+  contract: typeof RIGGED_EVIDENCE_RASTER_ROI_CONTRACT;
+  viewport: Readonly<{
+    cssWidth: 1600;
+    cssHeight: 900;
+    devicePixelRatio: 1;
+    drawingBufferWidth: 1600;
+    drawingBufferHeight: 900;
+  }>;
+  meshNames: readonly string[];
+  meshUuids: readonly string[];
+  deformedVertexCount: number;
+  frontVertexCount: number;
+  inFrameVertexCount: number;
+  rounding: 'floor-min-ceil-max-half-open';
+  paddingPixels: 0;
+  projectedPixelExtrema: Readonly<{ minX: number; minY: number; maxX: number; maxY: number }>;
+  deformedVertexProjectionDigest: Readonly<{
+    algorithm: 'fnv1a32-pair-ordered-float64-v1';
+    value: string;
+  }>;
+  roi: Readonly<{ minX: number; minY: number; maxXExclusive: number; maxYExclusive: number }>;
+  anchor: Readonly<{
+    worldPosition: readonly [number, number, number];
+    ndc: readonly [number, number, number];
+    pixel: readonly [number, number];
+    inside: boolean;
+  }>;
+  joints: readonly Readonly<{
+    kind: unknown;
+    side: unknown;
+    role: unknown;
+    digit: unknown;
+    joint: unknown;
+    bone: unknown;
+    worldPosition: readonly [number, number, number];
+    ndc: readonly [number, number, number];
+    pixel: readonly [number, number];
+    inside: boolean;
+  }>[];
+  anchorAndSixteenJointsInside: boolean;
+}>;
+
 export type RiggedEvidenceMainCameraDrawSession = Readonly<{
+  sessionId: string;
   actorReceipt: (
     actor: RiggedEvidenceCaptureTarget,
     actorRoot: THREE.Object3D,
@@ -119,6 +210,19 @@ export type RiggedEvidenceMainCameraDrawSession = Readonly<{
     frame: number,
     captureRevision: number,
   ) => RiggedEvidenceMainCameraActorDrawReceipt | null;
+  configurePrincipalWriteControl: (request: Readonly<{
+    sessionId: string;
+    actor: RiggedEvidenceCaptureTarget;
+    captureRevision: number;
+    mode: RiggedEvidencePrincipalWriteMode;
+  }>) => boolean;
+  principalWriteControlReceipt: (
+    actor: RiggedEvidenceCaptureTarget,
+    frame: number,
+    captureRevision: number,
+  ) => RiggedEvidencePrincipalWriteControlReceipt | null;
+  restorePrincipalWritesAfterRenderCall: () => void;
+  abortPrincipalWriteControl: () => void;
   dispose: () => void;
 }>;
 
@@ -143,6 +247,30 @@ type RiggedEvidenceInstrumentedMesh = {
   beforeRender: THREE.Object3D['onBeforeRender'];
   afterRender: THREE.Object3D['onAfterRender'];
   draw: MutableRiggedEvidenceMeshDraw;
+};
+
+type MutablePrincipalWriteInvocation = {
+  record: RiggedEvidenceInstrumentedMesh;
+  material: THREE.Material;
+  manifest: RiggedEvidencePrincipalWriteManifestEntry;
+  originalColorWrite: boolean;
+  originalDepthWrite: boolean;
+  originalStencilWrite: boolean;
+  suppressedExactly: boolean;
+  restored: boolean;
+  restoredBy: 'after-render' | 'render-finally' | 'abort' | 'dispose' | null;
+  restoredExactly: boolean;
+};
+
+type MutablePrincipalWriteFrame = {
+  frame: number;
+  captureRevision: number;
+  observed: RiggedEvidencePrincipalWriteManifestEntry[];
+  applied: MutablePrincipalWriteInvocation[];
+  restoredAfterCount: number;
+  restoredFinallyCount: number;
+  renderCallFinalized: boolean;
+  failures: string[];
 };
 
 type RiggedEvidenceCallbackGroup = Readonly<{
@@ -217,9 +345,42 @@ function materialReceipt(material: THREE.Material): RiggedEvidenceDrawMaterial {
     type: material.type,
     visible: material.visible,
     colorWrite: material.colorWrite,
+    depthWrite: material.depthWrite,
+    stencilWrite: material.stencilWrite,
     transparent: material.transparent,
     opacity: material.opacity,
   });
+}
+
+function principalWriteManifestEntry(
+  mesh: THREE.SkinnedMesh,
+  material: THREE.Material,
+  callbackGroup: RiggedEvidenceCallbackGroup,
+): RiggedEvidencePrincipalWriteManifestEntry {
+  const groupValid = callbackGroup !== null && callbackGroup !== undefined
+    && typeof callbackGroup.start === 'number' && Number.isSafeInteger(callbackGroup.start)
+    && typeof callbackGroup.count === 'number' && Number.isSafeInteger(callbackGroup.count)
+    && typeof callbackGroup.materialIndex === 'number' && Number.isSafeInteger(callbackGroup.materialIndex);
+  return Object.freeze({
+    meshUuid: mesh.uuid,
+    meshName: mesh.name,
+    materialUuid: material.uuid,
+    materialIndex: groupValid ? Number(callbackGroup!.materialIndex) : null,
+    groupStart: groupValid ? Number(callbackGroup!.start) : null,
+    groupCount: groupValid ? Number(callbackGroup!.count) : null,
+  });
+}
+
+function samePrincipalWriteManifestEntry(
+  left: RiggedEvidencePrincipalWriteManifestEntry,
+  right: RiggedEvidencePrincipalWriteManifestEntry,
+): boolean {
+  return left.meshUuid === right.meshUuid
+    && left.meshName === right.meshName
+    && left.materialUuid === right.materialUuid
+    && left.materialIndex === right.materialIndex
+    && left.groupStart === right.groupStart
+    && left.groupCount === right.groupCount;
 }
 
 function meshMaterialSlotUuids(mesh: THREE.SkinnedMesh): string[] {
@@ -439,6 +600,183 @@ export function riggedEvidenceMainCameraActorDrawComplete(
     ));
 }
 
+export function projectRiggedEvidenceLiveDeformedRasterRoi(
+  operatorRoot: THREE.Object3D,
+  gameplayCamera: THREE.Camera,
+  expectedMeshNames: readonly string[],
+  anchorWorldPosition: readonly number[],
+  jointScreenPositions: readonly Readonly<Record<string, unknown>>[],
+): RiggedEvidenceRasterRoiReceipt | null {
+  const viewport = Object.freeze({
+    cssWidth: 1600 as const,
+    cssHeight: 900 as const,
+    devicePixelRatio: 1 as const,
+    drawingBufferWidth: 1600 as const,
+    drawingBufferHeight: 900 as const,
+  });
+  const meshes: THREE.SkinnedMesh[] = [];
+  operatorRoot.traverse((node) => {
+    if (node instanceof THREE.SkinnedMesh
+      && node.userData.authoritativeProxy !== true
+      && objectEffectivelyVisible(node)) meshes.push(node);
+  });
+  meshes.sort((left, right) => left.name.localeCompare(right.name) || left.uuid.localeCompare(right.uuid));
+  const sortedExpectedNames = sortedStrings(expectedMeshNames);
+  if (meshes.length < 1
+    || !sameStrings(sortedStrings(meshes.map(({ name }) => name)), sortedExpectedNames)
+    || new Set(meshes.map(({ name }) => name)).size !== meshes.length
+    || !Array.isArray(anchorWorldPosition)
+    || anchorWorldPosition.length !== 3
+    || !anchorWorldPosition.every((value) => typeof value === 'number' && Number.isFinite(value))
+    || jointScreenPositions.length !== 16) return null;
+
+  const minimumNdcDepth = gameplayCamera.coordinateSystem === THREE.WebGPUCoordinateSystem
+    ? 0
+    : gameplayCamera.coordinateSystem === THREE.WebGLCoordinateSystem
+      ? -1
+      : null;
+  if (minimumNdcDepth === null) return null;
+
+  const projectWorld = (world: THREE.Vector3) => {
+    const ndcVector = world.clone().project(gameplayCamera);
+    const ndc = ndcVector.toArray() as [number, number, number];
+    const pixel = [
+      (ndc[0] + 1) * 0.5 * viewport.drawingBufferWidth,
+      (1 - ndc[1]) * 0.5 * viewport.drawingBufferHeight,
+    ] as [number, number];
+    return { ndc, pixel };
+  };
+  const finiteInViewport = ({ ndc, pixel }: Readonly<{
+    ndc: readonly number[];
+    pixel: readonly number[];
+  }>) => ndc.length === 3
+    && pixel.length === 2
+    && [...ndc, ...pixel].every(Number.isFinite)
+    && ndc[2] >= minimumNdcDepth && ndc[2] <= 1
+    && pixel[0] >= 0 && pixel[0] < viewport.drawingBufferWidth
+    && pixel[1] >= 0 && pixel[1] < viewport.drawingBufferHeight;
+
+  const projectedVertices: Array<{ ndc: [number, number, number]; pixel: [number, number] }> = [];
+  let vertexDigestA = 0x811c9dc5;
+  let vertexDigestB = 0x9e3779b9;
+  const digestBytes = new DataView(new ArrayBuffer(8));
+  const digestByte = (value: number) => {
+    vertexDigestA = Math.imul(vertexDigestA ^ value, 0x01000193) >>> 0;
+    vertexDigestB = Math.imul(vertexDigestB ^ value, 0x85ebca6b) >>> 0;
+  };
+  const digestUint32 = (value: number) => {
+    digestBytes.setUint32(0, value, true);
+    for (let byte = 0; byte < 4; byte += 1) digestByte(digestBytes.getUint8(byte));
+  };
+  const digestFloat64 = (value: number) => {
+    digestBytes.setFloat64(0, value, true);
+    for (let byte = 0; byte < 8; byte += 1) digestByte(digestBytes.getUint8(byte));
+  };
+  const digestString = (value: string) => {
+    digestUint32(value.length);
+    for (let index = 0; index < value.length; index += 1) digestUint32(value.charCodeAt(index));
+  };
+  const localVertex = new THREE.Vector3();
+  for (const mesh of meshes) {
+    const positionCount = mesh.geometry.getAttribute('position')?.count ?? 0;
+    if (positionCount < 1 || !mesh.matrixWorld.elements.every(Number.isFinite)) return null;
+    digestString(mesh.name);
+    digestString(mesh.uuid);
+    digestUint32(positionCount);
+    for (let index = 0; index < positionCount; index += 1) {
+      // getVertexPosition evaluates morph targets and the live skeleton. Applying
+      // the already-submitted matrixWorld avoids touching renderer-owned bounds.
+      mesh.getVertexPosition(index, localVertex);
+      const worldVertex = localVertex.clone().applyMatrix4(mesh.matrixWorld);
+      const projected = projectWorld(worldVertex);
+      if (!finiteInViewport(projected)) return null;
+      digestUint32(index);
+      worldVertex.toArray().forEach(digestFloat64);
+      projected.ndc.forEach(digestFloat64);
+      projectedVertices.push(projected);
+    }
+  }
+  if (projectedVertices.length < 1) return null;
+  const minProjectedX = Math.min(...projectedVertices.map(({ pixel }) => pixel[0]));
+  const minProjectedY = Math.min(...projectedVertices.map(({ pixel }) => pixel[1]));
+  const maxProjectedX = Math.max(...projectedVertices.map(({ pixel }) => pixel[0]));
+  const maxProjectedY = Math.max(...projectedVertices.map(({ pixel }) => pixel[1]));
+  const roi = Object.freeze({
+    minX: Math.floor(minProjectedX),
+    minY: Math.floor(minProjectedY),
+    maxXExclusive: Math.ceil(maxProjectedX),
+    maxYExclusive: Math.ceil(maxProjectedY),
+  });
+  const projectedPixelExtrema = Object.freeze({
+    minX: minProjectedX,
+    minY: minProjectedY,
+    maxX: maxProjectedX,
+    maxY: maxProjectedY,
+  });
+  const deformedVertexProjectionDigest = Object.freeze({
+    algorithm: 'fnv1a32-pair-ordered-float64-v1' as const,
+    value: `${vertexDigestA.toString(16).padStart(8, '0')}${vertexDigestB.toString(16).padStart(8, '0')}`,
+  });
+  const pointInside = (pixel: readonly number[]) => pixel[0] >= roi.minX
+    && pixel[0] < roi.maxXExclusive
+    && pixel[1] >= roi.minY
+    && pixel[1] < roi.maxYExclusive;
+  const anchorProjected = projectWorld(new THREE.Vector3().fromArray(anchorWorldPosition as number[]));
+  if (!finiteInViewport(anchorProjected)) return null;
+  const anchor = Object.freeze({
+    worldPosition: Object.freeze([...anchorWorldPosition] as [number, number, number]),
+    ndc: Object.freeze(anchorProjected.ndc),
+    pixel: Object.freeze(anchorProjected.pixel),
+    inside: pointInside(anchorProjected.pixel),
+  });
+  const joints = jointScreenPositions.map((joint) => {
+    const ndcValue = joint.ndc;
+    const worldPositionValue = joint.worldPosition;
+    if (!Array.isArray(ndcValue) || ndcValue.length !== 3
+      || !ndcValue.every((value) => typeof value === 'number' && Number.isFinite(value))
+      || !Array.isArray(worldPositionValue) || worldPositionValue.length !== 3
+      || !worldPositionValue.every((value) => typeof value === 'number' && Number.isFinite(value))) return null;
+    const projected = projectWorld(new THREE.Vector3().fromArray(worldPositionValue as number[]));
+    if (!projected.ndc.every((value, index) => value === ndcValue[index])) return null;
+    if (!finiteInViewport(projected)) return null;
+    return Object.freeze({
+      kind: joint.kind ?? null,
+      side: joint.side ?? null,
+      role: joint.role ?? null,
+      digit: joint.digit ?? null,
+      joint: joint.joint ?? null,
+      bone: joint.bone ?? null,
+      worldPosition: Object.freeze([...worldPositionValue] as [number, number, number]),
+      ndc: Object.freeze(projected.ndc),
+      pixel: Object.freeze(projected.pixel),
+      inside: pointInside(projected.pixel),
+    });
+  });
+  if (joints.some((joint) => joint === null)) return null;
+  const exactJoints = joints as RiggedEvidenceRasterRoiReceipt['joints'];
+  const anchorAndSixteenJointsInside = anchor.inside && exactJoints.every(({ inside }) => inside);
+  if (!anchorAndSixteenJointsInside) return null;
+  return Object.freeze({
+    contract: RIGGED_EVIDENCE_RASTER_ROI_CONTRACT,
+    viewport,
+    meshNames: Object.freeze(meshes.map(({ name }) => name)),
+    meshUuids: Object.freeze(meshes.map(({ uuid }) => uuid)),
+    deformedVertexCount: projectedVertices.length,
+    frontVertexCount: projectedVertices.length,
+    inFrameVertexCount: projectedVertices.length,
+    rounding: 'floor-min-ceil-max-half-open',
+    paddingPixels: 0,
+    projectedPixelExtrema,
+    deformedVertexProjectionDigest,
+    roi,
+    anchor,
+    joints: Object.freeze([...exactJoints]),
+    anchorAndSixteenJointsInside,
+  });
+}
+
+let riggedEvidenceMainCameraDrawSessionSequence = 0;
+
 export function installRiggedEvidenceMainCameraDrawSession(
   actors: readonly Readonly<{
     actor: RiggedEvidenceCaptureTarget;
@@ -515,6 +853,99 @@ export function installRiggedEvidenceMainCameraDrawSession(
     }
   }
 
+  const sessionId = `rigged-main-camera-draw-session-${++riggedEvidenceMainCameraDrawSessionSequence}`;
+  let activePrincipalControl: Readonly<{
+    actor: RiggedEvidenceCaptureTarget;
+    captureRevision: number;
+    mode: RiggedEvidencePrincipalWriteMode;
+  }> | null = null;
+  let highestConfiguredPrincipalRevision = -1;
+  let principalControlSequenceStage = 0;
+  let principalFrame: MutablePrincipalWriteFrame = {
+    frame: -1,
+    captureRevision: -1,
+    observed: [],
+    applied: [],
+    restoredAfterCount: 0,
+    restoredFinallyCount: 0,
+    renderCallFinalized: false,
+    failures: [],
+  };
+  const outstandingPrincipalInvocations = () => principalFrame.applied.filter(({ restored }) => !restored);
+  const notePrincipalFailure = (failure: string): void => {
+    if (!principalFrame.failures.includes(failure)) principalFrame.failures.push(failure);
+  };
+  const restorePrincipalInvocation = (
+    invocation: MutablePrincipalWriteInvocation,
+    restoredBy: NonNullable<MutablePrincipalWriteInvocation['restoredBy']>,
+  ): void => {
+    if (invocation.restored) return;
+    const suppressedStateIntact = invocation.material.colorWrite === false
+      && invocation.material.depthWrite === false
+      && invocation.material.stencilWrite === false;
+    if (!suppressedStateIntact) notePrincipalFailure('suppressed-material-state-mutated-before-restore');
+    invocation.material.colorWrite = invocation.originalColorWrite;
+    invocation.material.depthWrite = invocation.originalDepthWrite;
+    invocation.material.stencilWrite = invocation.originalStencilWrite;
+    invocation.restoredExactly = invocation.material.colorWrite === invocation.originalColorWrite
+      && invocation.material.depthWrite === invocation.originalDepthWrite
+      && invocation.material.stencilWrite === invocation.originalStencilWrite;
+    invocation.restored = true;
+    invocation.restoredBy = restoredBy;
+    if (!invocation.restoredExactly) notePrincipalFailure('material-state-not-restored-exactly');
+    if (restoredBy === 'after-render') principalFrame.restoredAfterCount += 1;
+    if (restoredBy === 'render-finally') principalFrame.restoredFinallyCount += 1;
+  };
+  const restoreOutstandingPrincipalInvocations = (
+    restoredBy: NonNullable<MutablePrincipalWriteInvocation['restoredBy']>,
+  ): void => {
+    for (const invocation of [...outstandingPrincipalInvocations()].reverse()) {
+      restorePrincipalInvocation(invocation, restoredBy);
+    }
+  };
+  const resetPrincipalFrame = (frame: number, captureRevision: number): void => {
+    if (principalFrame.frame === frame && principalFrame.captureRevision === captureRevision) return;
+    if (outstandingPrincipalInvocations().length > 0) {
+      restoreOutstandingPrincipalInvocations('render-finally');
+    }
+    principalFrame = {
+      frame,
+      captureRevision,
+      observed: [],
+      applied: [],
+      restoredAfterCount: 0,
+      restoredFinallyCount: 0,
+      renderCallFinalized: false,
+      failures: [],
+    };
+  };
+  const principalControlMatchesRecord = (
+    record: RiggedEvidenceInstrumentedMesh,
+    captureRevision: number,
+  ): boolean => activePrincipalControl !== null
+    && activePrincipalControl.captureRevision === captureRevision
+    && activePrincipalControl.actor.kind === record.actor.kind
+    && activePrincipalControl.actor.id === record.actor.id;
+  const principalFrameComplete = (): boolean => {
+    if (!activePrincipalControl
+      || principalFrame.captureRevision !== activePrincipalControl.captureRevision
+      || principalFrame.observed.length < 1
+      || !principalFrame.renderCallFinalized
+      || outstandingPrincipalInvocations().length !== 0
+      || principalFrame.failures.length !== 0) return false;
+    if (activePrincipalControl.mode === 'principal-write-suppressed') {
+      return principalFrame.applied.length === principalFrame.observed.length
+        && principalFrame.applied.every(({ suppressedExactly, restored, restoredExactly }) => (
+          suppressedExactly && restored && restoredExactly
+        ))
+        && principalFrame.restoredAfterCount === principalFrame.applied.length
+        && principalFrame.restoredFinallyCount === 0;
+    }
+    return principalFrame.applied.length === 0
+      && principalFrame.restoredAfterCount === 0
+      && principalFrame.restoredFinallyCount === 0;
+  };
+
   let disposed = false;
   let ignoredFrame = -1;
   let ignoredCaptureRevision = -1;
@@ -572,12 +1003,60 @@ export function installRiggedEvidenceMainCameraDrawSession(
       );
       record.draw.beforeStamps.push(stamp);
       record.draw.before = stamp;
+      if (principalControlMatchesRecord(record, captureRevision)) {
+        resetPrincipalFrame(frame, captureRevision);
+        const manifest = principalWriteManifestEntry(
+          mesh,
+          material,
+          callbackGroup as unknown as RiggedEvidenceCallbackGroup,
+        );
+        principalFrame.observed.push(manifest);
+        if (activePrincipalControl?.mode === 'principal-write-suppressed') {
+          if (!stamp.stateValid) {
+            notePrincipalFailure('suppression-refused-for-invalid-admitted-draw');
+          } else if (outstandingPrincipalInvocations().some(({ record: candidate }) => candidate === record)) {
+            notePrincipalFailure('unbalanced-before-render-callback');
+            restoreOutstandingPrincipalInvocations('render-finally');
+          } else {
+            const invocation: MutablePrincipalWriteInvocation = {
+              record,
+              material,
+              manifest,
+              originalColorWrite: material.colorWrite,
+              originalDepthWrite: material.depthWrite,
+              originalStencilWrite: material.stencilWrite,
+              suppressedExactly: false,
+              restored: false,
+              restoredBy: null,
+              restoredExactly: false,
+            };
+            material.colorWrite = false;
+            material.depthWrite = false;
+            material.stencilWrite = false;
+            invocation.suppressedExactly = material.colorWrite === false
+              && material.depthWrite === false
+              && material.stencilWrite === false;
+            if (!invocation.suppressedExactly) notePrincipalFailure('material-state-not-suppressed-exactly');
+            principalFrame.applied.push(invocation);
+          }
+        }
+      }
     };
     const afterRender: THREE.Object3D['onAfterRender'] = function (
       this: THREE.Object3D,
       ...args
     ): void {
       const [, renderScene, renderCamera, , material, callbackGroup] = args;
+      let restoredSuppression = false;
+      if (!disposed) {
+        const outstanding = [...outstandingPrincipalInvocations()].reverse().find((invocation) => (
+          invocation.record === record && invocation.material === material
+        ));
+        if (outstanding) {
+          restorePrincipalInvocation(outstanding, 'after-render');
+          restoredSuppression = true;
+        }
+      }
       if (!disposed && qualifyMainCameraDraw(renderScene, renderCamera)) {
         const frame = currentFrame();
         const captureRevision = currentCaptureRevision();
@@ -596,6 +1075,9 @@ export function installRiggedEvidenceMainCameraDrawSession(
         );
         record.draw.afterStamps.push(stamp);
         record.draw.after = stamp;
+        if (principalControlMatchesRecord(record, captureRevision)
+          && activePrincipalControl?.mode === 'principal-write-suppressed'
+          && !restoredSuppression) notePrincipalFailure('after-render-without-suppressed-before-render');
       }
       originalAfterRender.apply(this, args);
     };
@@ -679,9 +1161,131 @@ export function installRiggedEvidenceMainCameraDrawSession(
   };
 
   return Object.freeze({
+    sessionId,
     actorReceipt,
+    configurePrincipalWriteControl: (request) => {
+      if (disposed
+        || request.sessionId !== sessionId
+        || !Number.isSafeInteger(request.captureRevision)
+        || request.captureRevision !== currentCaptureRevision()
+        || request.captureRevision <= highestConfiguredPrincipalRevision
+        || !['visible-observe', 'principal-write-suppressed', 'visible-restored'].includes(request.mode)
+        || !actorKeys.has(`${request.actor.kind}:${request.actor.id}`)) return false;
+      const expectedMode = (['visible-observe', 'principal-write-suppressed', 'visible-restored'] as const)[
+        principalControlSequenceStage
+      ];
+      if (request.mode !== expectedMode
+        || (activePrincipalControl !== null && !principalFrameComplete())) return false;
+      restoreOutstandingPrincipalInvocations('abort');
+      activePrincipalControl = Object.freeze({
+        actor: Object.freeze({ ...request.actor }),
+        captureRevision: request.captureRevision,
+        mode: request.mode,
+      });
+      highestConfiguredPrincipalRevision = request.captureRevision;
+      principalControlSequenceStage += 1;
+      principalFrame = {
+        frame: -1,
+        captureRevision: request.captureRevision,
+        observed: [],
+        applied: [],
+        restoredAfterCount: 0,
+        restoredFinallyCount: 0,
+        renderCallFinalized: false,
+        failures: [],
+      };
+      return true;
+    },
+    principalWriteControlReceipt: (actor, frame, captureRevision) => {
+      if (disposed
+        || !activePrincipalControl
+        || activePrincipalControl.actor.kind !== actor.kind
+        || activePrincipalControl.actor.id !== actor.id
+        || activePrincipalControl.captureRevision !== captureRevision
+        || principalFrame.frame !== frame
+        || principalFrame.captureRevision !== captureRevision) return null;
+      const drawManifest = Object.freeze(principalFrame.observed.map((entry) => Object.freeze({ ...entry })));
+      const suppressionEntries = Object.freeze(principalFrame.applied.map((invocation) => Object.freeze({
+        draw: Object.freeze({ ...invocation.manifest }),
+        before: Object.freeze({
+          colorWrite: invocation.originalColorWrite,
+          depthWrite: invocation.originalDepthWrite,
+          stencilWrite: invocation.originalStencilWrite,
+        }),
+        suppressed: Object.freeze({
+          colorWrite: false as const,
+          depthWrite: false as const,
+          stencilWrite: false as const,
+        }),
+        suppressedExactly: invocation.suppressedExactly,
+        restoredBy: invocation.restoredBy,
+        after: Object.freeze({
+          colorWrite: invocation.material.colorWrite,
+          depthWrite: invocation.material.depthWrite,
+          stencilWrite: invocation.material.stencilWrite,
+        }),
+        restoredExactly: invocation.restoredExactly,
+      })));
+      const outstandingSuppressionCount = outstandingPrincipalInvocations().length;
+      const suppressionAppliedCountExact = activePrincipalControl.mode === 'principal-write-suppressed'
+        ? principalFrame.applied.length === principalFrame.observed.length
+          && principalFrame.applied.every(({ manifest }, index) => (
+            samePrincipalWriteManifestEntry(manifest, principalFrame.observed[index])
+          ))
+        : principalFrame.applied.length === 0;
+      const materialStateRestored = principalFrame.applied.every((invocation) => (
+        invocation.suppressedExactly
+        && invocation.restored
+        && invocation.restoredExactly
+        && invocation.material.colorWrite === invocation.originalColorWrite
+        && invocation.material.depthWrite === invocation.originalDepthWrite
+        && invocation.material.stencilWrite === invocation.originalStencilWrite
+      ));
+      const partial = {
+        contract: RIGGED_EVIDENCE_PRINCIPAL_WRITE_CONTROL_CONTRACT,
+        sessionId,
+        actor: Object.freeze({ ...actor }),
+        frame,
+        captureRevision,
+        mode: activePrincipalControl.mode,
+        drawManifest,
+        suppressionEntries,
+        observedDrawCount: drawManifest.length,
+        suppressionAppliedCount: principalFrame.applied.length,
+        suppressionRestoredAfterCount: principalFrame.restoredAfterCount,
+        suppressionRestoredFinallyCount: principalFrame.restoredFinallyCount,
+        outstandingSuppressionCount,
+        renderCallFinalized: principalFrame.renderCallFinalized,
+        suppressionAppliedCountExact,
+        materialStateRestored,
+        failures: Object.freeze([...principalFrame.failures]),
+        complete: false,
+      } satisfies Omit<RiggedEvidencePrincipalWriteControlReceipt, 'complete'> & { complete: false };
+      return Object.freeze({ ...partial, complete: principalFrameComplete() });
+    },
+    restorePrincipalWritesAfterRenderCall: () => {
+      if (disposed || !activePrincipalControl) return;
+      const frame = currentFrame();
+      const captureRevision = currentCaptureRevision();
+      if (captureRevision !== activePrincipalControl.captureRevision) return;
+      resetPrincipalFrame(frame, captureRevision);
+      if (outstandingPrincipalInvocations().length > 0) {
+        notePrincipalFailure('render-call-ended-with-unbalanced-callbacks');
+        restoreOutstandingPrincipalInvocations('render-finally');
+      }
+      principalFrame.renderCallFinalized = true;
+    },
+    abortPrincipalWriteControl: () => {
+      if (!activePrincipalControl) return;
+      restoreOutstandingPrincipalInvocations('abort');
+      notePrincipalFailure('principal-write-control-aborted');
+      principalFrame.renderCallFinalized = true;
+      activePrincipalControl = null;
+    },
     dispose: () => {
       if (disposed) return;
+      restoreOutstandingPrincipalInvocations('dispose');
+      activePrincipalControl = null;
       disposed = true;
       for (const record of records) {
         if (record.mesh.onBeforeRender === record.beforeRender) {

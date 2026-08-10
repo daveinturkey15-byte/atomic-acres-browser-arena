@@ -6,6 +6,12 @@ import {
 } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+import sharp from 'sharp';
+import {
+  analyzeRawRgbaPair,
+  recomputeHalfOpenRasterRoi,
+  recomputeProductionRgbRasterProof,
+} from './rigged-rgb-raster-proof.mjs';
 
 const root = process.cwd();
 const targets = Object.freeze({
@@ -50,8 +56,10 @@ const expectedHandBones = Object.freeze([
   Object.freeze({ side: 'right', digit: 'pinky', joint: 2, sourceBone: 'Pinky2.R', bone: 'Pinky2R', minimumBindRadians: 0.35 }),
 ]);
 const expectedCaptureJoints = Object.freeze([
-  ...expectedBones.map(({ side, role, bone }) => Object.freeze({ kind: 'arm', side, role, digit: null, bone })),
-  ...expectedHandBones.map(({ side, digit, bone }) => Object.freeze({ kind: 'finger', side, role: null, digit, bone })),
+  ...expectedBones.map(({ side, role, bone }) => Object.freeze({ kind: 'arm', side, role, digit: null, joint: null, bone })),
+  ...expectedHandBones.map(({ side, digit, joint, bone }) => Object.freeze({
+    kind: 'finger', side, role: null, digit, joint, bone,
+  })),
 ]);
 const renderedInfluenceThresholds = Object.freeze({
   minimumNormalizedWeight: 0.05,
@@ -140,8 +148,8 @@ const expectedSkinnedMeshNames = Object.freeze([
   'Cube023_1',
 ]);
 const expectedVisualEvidenceContract = Object.freeze({
-  schemaVersion: 5,
-  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v5',
+  schemaVersion: 6,
+  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v6',
   los: Object.freeze({
     contract: 'actual-render-world-layout-occluder-multi-sentinel-los-v2',
     actorSelfOcclusionExcluded: true,
@@ -156,6 +164,20 @@ const expectedVisualEvidenceContract = Object.freeze({
       pixelProof: false,
       expectedSkinnedMeshCount: expectedSkinnedMeshNames.length,
       expectedSkinnedMeshNames,
+    }),
+    productionRgbRasterProof: Object.freeze({
+      contract: 'gun-range-dummy-production-rgb-raster-proof-v1',
+      principalWriteControl: 'rigged-principal-write-control-v1',
+      rasterRoi: 'rigged-live-deformed-raster-roi-v1',
+      modes: Object.freeze(['visible-observe', 'principal-write-suppressed', 'visible-restored']),
+      pngModes: Object.freeze(['principal-write-suppressed', 'visible-restored']),
+      viewport: Object.freeze({ width: 1_600, height: 900, devicePixelRatio: 1 }),
+      changedPixelDefinition: 'any-rgb-byte-differs',
+      insideMinimumChangedPixels: 1,
+      outsideMaximumChangedPixels: 0,
+      alphaMustMatch: true,
+      roiPaddingPixels: 0,
+      ownerAcceptance: 'PENDING_OWNER_INSPECTION',
     }),
     rendererCompletion: Object.freeze({
       webgl2: 'synchronous-render-return',
@@ -307,6 +329,10 @@ function sha256(path) {
   return createHash('sha256').update(readFileSync(path)).digest('hex');
 }
 
+function jsonSha256(value) {
+  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+}
+
 function sameArray(actual, expected) {
   return Array.isArray(actual)
     && actual.length === expected.length
@@ -375,10 +401,11 @@ function rotateVectorByQuaternion(vector, quaternion) {
   return rotated.slice(0, 3);
 }
 
-function projectWorldToNdc(worldPosition, camera, aspect) {
+function projectWorldToNdc(worldPosition, camera, aspect, rendererName) {
   if (!finiteVector(worldPosition) || !finiteVector(camera?.position)
     || ![camera?.yaw, camera?.pitch, camera?.fov, camera?.near, camera?.far].every(Number.isFinite)
-    || !(aspect > 0) || !(camera.near > 0) || !(camera.far > camera.near)) return null;
+    || !(aspect > 0) || !(camera.near > 0) || !(camera.far > camera.near)
+    || (rendererName !== 'webgl2' && rendererName !== 'webgpu')) return null;
   const cameraQuaternion = yxzCameraQuaternion(camera.yaw, camera.pitch);
   const inverseCameraQuaternion = [
     -cameraQuaternion[0], -cameraQuaternion[1], -cameraQuaternion[2], cameraQuaternion[3],
@@ -386,13 +413,24 @@ function projectWorldToNdc(worldPosition, camera, aspect) {
   const local = rotateVectorByQuaternion(vectorSubtract(worldPosition, camera.position), inverseCameraQuaternion);
   if (!(local[2] < 0)) return null;
   const tangent = Math.tan(camera.fov * Math.PI / 360);
-  const projectionA = (camera.far + camera.near) / (camera.near - camera.far);
-  const projectionB = 2 * camera.far * camera.near / (camera.near - camera.far);
+  const projectionA = rendererName === 'webgpu'
+    ? camera.far / (camera.near - camera.far)
+    : (camera.far + camera.near) / (camera.near - camera.far);
+  const projectionB = rendererName === 'webgpu'
+    ? camera.far * camera.near / (camera.near - camera.far)
+    : 2 * camera.far * camera.near / (camera.near - camera.far);
   return [
     local[0] / (-local[2] * tangent * aspect),
     local[1] / (-local[2] * tangent),
     (projectionA * local[2] + projectionB) / -local[2],
   ];
+}
+
+function ndcDepthValid(value, rendererName) {
+  return Number.isFinite(value)
+    && (rendererName === 'webgpu'
+      ? value >= 0 && value <= 1
+      : rendererName === 'webgl2' && value >= -1 && value <= 1);
 }
 
 function canonicalBindRelativePose(bindLocalQuaternion, localQuaternion) {
@@ -420,7 +458,7 @@ function positionDelta(left, right) {
   return Math.hypot(...left.map((value, index) => value - right[index]));
 }
 
-function closeJointFramingValid(framing, expectedRoi, projectionCamera) {
+function closeJointFramingValid(framing, expectedRoi, projectionCamera, rendererName) {
   const detail = framing?.jointDetail;
   if (detail?.required !== true
     || detail.expectedSentinelCount !== expectedCaptureJoints.length
@@ -450,9 +488,11 @@ function closeJointFramingValid(framing, expectedRoi, projectionCamera) {
       sentinel.worldPosition,
       projectionCamera,
       framing.canvas.width / framing.canvas.height,
+      rendererName,
     );
     const pixel = pixelFor(sentinel.ndc);
-    if (x < expectedRoi.minX || x > expectedRoi.maxX || y < expectedRoi.minY || y > expectedRoi.maxY || z < -1 || z > 1
+    if (x < expectedRoi.minX || x > expectedRoi.maxX || y < expectedRoi.minY || y > expectedRoi.maxY
+      || !ndcDepthValid(z, rendererName)
       || !independentlyProjected
       || !sentinel.ndc.every((value, axis) => close(value, independentlyProjected[axis], 1e-6))
       || !close(sentinel.pixel?.x, pixel.x, 1e-6) || !close(sentinel.pixel?.y, pixel.y, 1e-6)
@@ -521,6 +561,7 @@ function framingValid(
     framing.projectedWorldPosition,
     projectionCamera,
     framing.canvas.width / framing.canvas.height,
+    presentation?.pausedPresentedCapture?.renderer,
   );
   const anchorHeight = actor.kind === 'bot' ? 1.35 : 1.65;
   const expectedAnchor = [framing.rootPosition[0], framing.rootPosition[1] + anchorHeight, framing.rootPosition[2]];
@@ -536,14 +577,19 @@ function framingValid(
   const expectedPixelY = framing.canvas.top + (1 - y) * 0.5 * framing.canvas.height;
   const rootValid = x >= expectedRoi.minX && x <= expectedRoi.maxX
     && y >= expectedRoi.minY && y <= expectedRoi.maxY
-    && z >= -1 && z <= 1
+    && ndcDepthValid(z, presentation?.pausedPresentedCapture?.renderer)
     && Math.abs(framing.projectedPixel.x - expectedPixelX) <= 1e-6
     && Math.abs(framing.projectedPixel.y - expectedPixelY) <= 1e-6
     && framing.projectedPixel.x >= Math.max(0, framing.canvas.left)
     && framing.projectedPixel.x <= Math.min(framing.viewport.width, framing.canvas.left + framing.canvas.width)
     && framing.projectedPixel.y >= Math.max(0, framing.canvas.top)
     && framing.projectedPixel.y <= Math.min(framing.viewport.height, framing.canvas.top + framing.canvas.height);
-  return rootValid && (!requireJointDetail || closeJointFramingValid(framing, expectedRoi, projectionCamera));
+  return rootValid && (!requireJointDetail || closeJointFramingValid(
+    framing,
+    expectedRoi,
+    projectionCamera,
+    presentation?.pausedPresentedCapture?.renderer,
+  ));
 }
 
 function evidenceCameraValid(camera, expected) {
@@ -627,6 +673,8 @@ function mainCameraDrawStampValid(stamp, mesh, draw, frame, captureRevision) {
     && typeof stamp.material.type === 'string' && stamp.material.type.length > 0
     && stamp.material.visible === true
     && stamp.material.colorWrite === true
+    && typeof stamp.material.depthWrite === 'boolean'
+    && typeof stamp.material.stencilWrite === 'boolean'
     && typeof stamp.material.transparent === 'boolean'
     && Number.isFinite(stamp.material.opacity)
     && (!stamp.material.transparent || stamp.material.opacity > 0)
@@ -738,7 +786,8 @@ function captureActorFrameValid(frameActor, expectedActor, frame, captureRevisio
     && frameActor.jointScreenPositions.every((joint, index) => {
       const expected = expectedCaptureJoints[index];
       return joint.kind === expected.kind && joint.side === expected.side
-        && joint.role === expected.role && joint.digit === expected.digit && joint.bone === expected.bone
+        && joint.role === expected.role && joint.digit === expected.digit && joint.joint === expected.joint
+        && joint.bone === expected.bone
         && finiteVector(joint.worldPosition) && finiteVector(joint.ndc);
     })
     && Array.isArray(frameActor.evidenceSentinels)
@@ -903,6 +952,349 @@ function capturePresentationValid(
     : (completion.baselineSubmissionSequence < committed.submissionSequence
       && completion.observedCompletedSequence > completion.baselineCompletedSequence
       && completion.observedCompletedSequence >= paused.submissionSequence);
+}
+
+function normalizedPrincipalManifest(manifest) {
+  if (!Array.isArray(manifest)) return null;
+  const normalized = manifest.map((entry) => ({
+    meshUuid: entry?.meshUuid,
+    meshName: entry?.meshName,
+    materialUuid: entry?.materialUuid,
+    materialIndex: entry?.materialIndex ?? null,
+    groupStart: entry?.groupStart ?? null,
+    groupCount: entry?.groupCount ?? null,
+  }));
+  return normalized.sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
+}
+
+function admittedPrincipalManifest(mainCameraDraw) {
+  return normalizedPrincipalManifest(mainCameraDraw?.meshes?.flatMap((mesh) => (
+    mesh.beforeStamps.map((stamp) => ({
+      meshUuid: mesh.meshUuid,
+      meshName: mesh.meshName,
+      materialUuid: stamp.material.uuid,
+      materialIndex: stamp.drawRange.group?.materialIndex ?? null,
+      groupStart: stamp.drawRange.group?.start ?? null,
+      groupCount: stamp.drawRange.group?.count ?? null,
+    }))
+  )));
+}
+
+function admittedPrincipalEntries(mainCameraDraw) {
+  return mainCameraDraw?.meshes?.flatMap((mesh) => mesh.beforeStamps.map((stamp) => ({
+    draw: {
+      meshUuid: mesh.meshUuid,
+      meshName: mesh.meshName,
+      materialUuid: stamp.material.uuid,
+      materialIndex: stamp.drawRange.group?.materialIndex ?? null,
+      groupStart: stamp.drawRange.group?.start ?? null,
+      groupCount: stamp.drawRange.group?.count ?? null,
+    },
+    writes: {
+      colorWrite: stamp.material.colorWrite,
+      depthWrite: stamp.material.depthWrite,
+      stencilWrite: stamp.material.stencilWrite,
+    },
+  }))) ?? [];
+}
+
+function normalizedAdmittedPrincipalState(mainCameraDraw, stampCollection = 'beforeStamps') {
+  if (!Array.isArray(mainCameraDraw?.meshes)
+    || (stampCollection !== 'beforeStamps' && stampCollection !== 'afterStamps')) return null;
+  const entries = mainCameraDraw.meshes.flatMap((mesh) => {
+    const stamps = mesh?.[stampCollection];
+    if (!Array.isArray(stamps)) return [null];
+    return stamps.map((stamp) => ({
+      meshUuid: mesh.meshUuid,
+      meshName: mesh.meshName,
+      meshLayerMask: mesh.meshLayerMask,
+      materialSlotUuids: [...(stamp?.materialSlotUuids ?? [])],
+      materialUuidSet: [...(stamp?.materialUuidSet ?? [])],
+      materialMatchesMeshSlot: stamp?.materialMatchesMeshSlot,
+      material: {
+        uuid: stamp?.material?.uuid,
+        name: stamp?.material?.name,
+        type: stamp?.material?.type,
+        visible: stamp?.material?.visible,
+        colorWrite: stamp?.material?.colorWrite,
+        depthWrite: stamp?.material?.depthWrite,
+        stencilWrite: stamp?.material?.stencilWrite,
+        transparent: stamp?.material?.transparent,
+        opacity: stamp?.material?.opacity,
+      },
+      drawRange: {
+        start: stamp?.drawRange?.start,
+        count: stamp?.drawRange?.count,
+        effectiveCount: stamp?.drawRange?.effectiveCount,
+        positionCount: stamp?.drawRange?.positionCount,
+        indexCount: stamp?.drawRange?.indexCount,
+        group: stamp?.drawRange?.group === null ? null : {
+          start: stamp?.drawRange?.group?.start,
+          count: stamp?.drawRange?.group?.count,
+          materialIndex: stamp?.drawRange?.group?.materialIndex,
+        },
+      },
+    }));
+  });
+  if (entries.some((entry) => entry === null)) return null;
+  return entries.sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
+}
+
+function principalWriteControlValid(control, frameActor, actor, sessionId, mode, frame, captureRevision) {
+  const manifest = normalizedPrincipalManifest(control?.drawManifest);
+  const admitted = admittedPrincipalManifest(frameActor?.mainCameraDraw);
+  const visibleMode = mode !== 'principal-write-suppressed';
+  if (control?.contract !== 'rigged-principal-write-control-v1'
+    || control.sessionId !== sessionId
+    || !sameObject(control.actor, actor)
+    || control.frame !== frame
+    || control.captureRevision !== captureRevision
+    || control.mode !== mode
+    || !Array.isArray(control.drawManifest)
+    || control.drawManifest.length < 1
+    || control.drawManifest.some((entry) => !uuidValid(entry?.meshUuid)
+      || !expectedSkinnedMeshNames.includes(entry?.meshName)
+      || !uuidValid(entry?.materialUuid)
+      || !(entry.materialIndex === null || (Number.isSafeInteger(entry.materialIndex) && entry.materialIndex >= 0))
+      || !(entry.groupStart === null || (Number.isSafeInteger(entry.groupStart) && entry.groupStart >= 0))
+      || !(entry.groupCount === null || (Number.isSafeInteger(entry.groupCount) && entry.groupCount >= 0)))
+    || !sameObject(manifest, admitted)
+    || control.observedDrawCount !== control.drawManifest.length
+    || !Number.isSafeInteger(control.suppressionAppliedCount)
+    || !Number.isSafeInteger(control.suppressionRestoredAfterCount)
+    || !Number.isSafeInteger(control.suppressionRestoredFinallyCount)
+    || control.outstandingSuppressionCount !== 0
+    || control.renderCallFinalized !== true
+    || control.suppressionAppliedCountExact !== true
+    || control.materialStateRestored !== true
+    || !sameArray(control.failures, [])
+    || control.complete !== true
+    || !Array.isArray(control.suppressionEntries)) return false;
+  if (visibleMode) {
+    return control.suppressionAppliedCount === 0
+      && control.suppressionRestoredAfterCount === 0
+      && control.suppressionRestoredFinallyCount === 0
+      && control.suppressionEntries.length === 0;
+  }
+  return control.suppressionAppliedCount === control.observedDrawCount
+    && control.suppressionRestoredAfterCount === control.observedDrawCount
+    && control.suppressionRestoredFinallyCount === 0
+    && control.suppressionEntries.length === control.observedDrawCount
+    && control.suppressionEntries.every((entry, index) => {
+      const admittedMatches = admittedPrincipalEntries(frameActor.mainCameraDraw).filter((candidate) => (
+        sameObject(candidate.draw, entry.draw)
+      ));
+      return sameObject(entry.draw, control.drawManifest[index])
+        && admittedMatches.length === 1
+        && sameObject(entry.before, admittedMatches[0].writes)
+        && sameObject(entry.suppressed, { colorWrite: false, depthWrite: false, stencilWrite: false })
+        && entry.suppressedExactly === true
+        && entry.restoredBy === 'after-render'
+        && sameObject(entry.after, admittedMatches[0].writes)
+        && entry.restoredExactly === true;
+    });
+}
+
+function rasterRoiValid(rasterRoi, frameActor, camera) {
+  let recomputed;
+  try {
+    recomputed = recomputeHalfOpenRasterRoi(rasterRoi);
+  } catch {
+    return false;
+  }
+  const projectionCamera = camera;
+  const project = (worldPosition) => projectWorldToNdc(
+    worldPosition,
+    projectionCamera,
+    1_600 / 900,
+    camera?.renderer,
+  );
+  const anchorNdc = project(rasterRoi.anchor?.worldPosition);
+  const expectedMeshUuids = frameActor?.mainCameraDraw?.meshes?.map(({ meshUuid }) => meshUuid).sort();
+  if (!sameArray([...rasterRoi.meshNames ?? []].sort(), [...expectedSkinnedMeshNames].sort())
+    || !Array.isArray(rasterRoi.meshUuids)
+    || rasterRoi.meshUuids.length !== expectedSkinnedMeshNames.length
+    || new Set(rasterRoi.meshUuids).size !== rasterRoi.meshUuids.length
+    || !sameArray([...rasterRoi.meshUuids].sort(), expectedMeshUuids)
+    || !sameObject(rasterRoi.roi, recomputed)
+    || !sameObject(rasterRoi.anchor?.worldPosition, frameActor?.projectedWorldPosition)
+    || !anchorNdc
+    || !rasterRoi.anchor.ndc.every((value, axis) => close(value, anchorNdc[axis], 1e-9))
+    || !close(rasterRoi.anchor.pixel[0], (anchorNdc[0] + 1) * 800, 1e-9)
+    || !close(rasterRoi.anchor.pixel[1], (1 - anchorNdc[1]) * 450, 1e-9)
+    || !Array.isArray(rasterRoi.joints)
+    || rasterRoi.joints.length !== expectedCaptureJoints.length) return false;
+  return rasterRoi.joints.every((joint, index) => {
+    const expected = expectedCaptureJoints[index];
+    const actorJoint = frameActor.jointScreenPositions[index];
+    const ndc = project(joint.worldPosition);
+    return joint.kind === expected.kind
+      && joint.side === expected.side
+      && joint.role === expected.role
+      && joint.digit === expected.digit
+      && joint.joint === expected.joint
+      && joint.bone === expected.bone
+      && sameObject(joint.worldPosition, actorJoint.worldPosition)
+      && sameObject(joint.ndc, actorJoint.ndc)
+      && ndc !== null
+      && joint.ndc.every((value, axis) => close(value, ndc[axis], 1e-9))
+      && close(joint.pixel[0], (ndc[0] + 1) * 800, 1e-9)
+      && close(joint.pixel[1], (1 - ndc[1]) * 450, 1e-9);
+  });
+}
+
+function rasterStateDigestsValid(presentation, targetId) {
+  const state = presentation?.rasterState;
+  const digests = presentation?.rasterStateDigests;
+  const paused = presentation?.pausedPresentedCapture;
+  const targetState = state?.rangeTargets?.find((entry) => entry.id === targetId);
+  const nonTargetState = state?.rangeTargets?.filter((entry) => entry.id !== targetId);
+  const expectedCamera = paused ? {
+    position: paused.position,
+    quaternion: paused.quaternion,
+    yaw: paused.yaw,
+    pitch: paused.pitch,
+    fov: paused.fov,
+    near: paused.near,
+    far: paused.far,
+  } : null;
+  const expectedTargetPose = paused?.actors?.map((actor) => ({
+    actor: actor.actor,
+    rootUuid: actor.rootUuid,
+    operatorRootUuid: actor.operatorRootUuid,
+    rootPosition: actor.rootPosition,
+    rootYaw: actor.rootYaw,
+    projectedWorldPosition: actor.projectedWorldPosition,
+    jointScreenPositions: actor.jointScreenPositions,
+  }));
+  return digests?.contract === 'rigged-raster-state-digests-v1'
+    && state?.fixedTimeMs === 0
+    && sameObject(state.camera, expectedCamera)
+    && sameObject(state.targetPose, expectedTargetPose)
+    && Array.isArray(state.rangeTargets)
+    && state.rangeTargets.length === expectedDummyIds.length
+    && sameArray(state.rangeTargets.map(({ id }) => id), expectedDummyIds)
+    && state.rangeTargets.every((entry) => entry.kind === 'training-dummy'
+      && uuidValid(entry.rootUuid)
+      && uuidValid(entry.operatorRootUuid)
+      && typeof entry.active === 'boolean'
+      && Number.isFinite(entry.health)
+      && Number.isFinite(entry.maxHealth)
+      && typeof entry.visible === 'boolean'
+      && typeof entry.rootEffectivelyVisible === 'boolean'
+      && Number.isSafeInteger(entry.effectivelyVisibleMeshCount)
+      && finiteVector(entry.position)
+      && Number.isFinite(entry.yaw)
+      && finiteVector(entry.screenPosition)
+      && Array.isArray(entry.jointScreenPositions)
+      && entry.jointScreenPositions.length === expectedCaptureJoints.length
+      && entry.respawnInMs === undefined
+      && entry.operator?.armPose?.renderedInfluenceCache === undefined
+      && Array.isArray(entry.operator?.armPose?.bones)
+      && entry.operator.armPose.bones.length === expectedBones.length
+      && Array.isArray(entry.operator?.handPose?.bones)
+      && entry.operator.handPose.bones.length === expectedHandBones.length)
+    && state.rangeTargets.filter((entry) => entry.id === targetId).length === 1
+    && digests.cameraSha256 === jsonSha256(state.camera)
+    && digests.fixedVisualTimeSha256 === jsonSha256(state.fixedTimeMs)
+    && digests.targetPoseSha256 === jsonSha256(state.targetPose)
+    && digests.targetStateSha256 === jsonSha256(targetState)
+    && digests.nonTargetStateSha256 === jsonSha256(nonTargetState)
+    && digests.combinedSha256 === jsonSha256(state);
+}
+
+function principalPresentationValid(presentation, actor, camera, sessionId, mode) {
+  if (!capturePresentationValid(presentation, camera, 'gun-range', [actor])
+    || presentation?.principalWriteSession?.contract !== 'rigged-principal-write-session-v1'
+    || presentation.principalWriteSession.sessionId !== sessionId
+    || !sameObject(presentation.principalWriteSession.captureTargets, [actor])
+    || !rasterStateDigestsValid(presentation, actor.id)) return false;
+  const committedActor = presentation.committed.actors[0];
+  const pausedActor = presentation.pausedPresentedCapture.actors[0];
+  return principalWriteControlValid(
+    committedActor.principalWriteControl,
+    committedActor,
+    actor,
+    sessionId,
+    mode,
+    presentation.committed.frame,
+    presentation.requestedRevision,
+  )
+    && principalWriteControlValid(
+      pausedActor.principalWriteControl,
+      pausedActor,
+      actor,
+      sessionId,
+      mode,
+      presentation.pausedPresentedCapture.frame,
+      presentation.requestedRevision,
+    )
+    && rasterRoiValid(committedActor.rasterRoi, committedActor, presentation.committed)
+    && rasterRoiValid(pausedActor.rasterRoi, pausedActor, presentation.pausedPresentedCapture);
+}
+
+function rasterPhaseParityValid(phases) {
+  if (!Array.isArray(phases) || phases.length !== 3) return false;
+  const submittedActors = phases.flatMap((phase) => [
+    phase?.committed?.actors?.[0],
+    phase?.pausedPresentedCapture?.actors?.[0],
+  ]);
+  const pausedActors = phases.map((phase) => phase?.pausedPresentedCapture?.actors?.[0]);
+  const admittedStates = submittedActors.map((actorFrame) => (
+    normalizedAdmittedPrincipalState(actorFrame?.mainCameraDraw, 'beforeStamps')
+  ));
+  const restoredStates = submittedActors.map((actorFrame) => (
+    normalizedAdmittedPrincipalState(actorFrame?.mainCameraDraw, 'afterStamps')
+  ));
+  return submittedActors.every(Boolean)
+    && admittedStates.every((state) => state !== null && state.length > 0)
+    && admittedStates.every((state) => sameObject(state, admittedStates[0]))
+    && restoredStates.every((state, index) => sameObject(state, admittedStates[index]))
+    && phases.every((phase) => sameObject(phase.rasterStateDigests, phases[0].rasterStateDigests))
+    && pausedActors.every((actorFrame) => sameObject(
+      actorFrame.principalWriteControl?.drawManifest,
+      pausedActors[0].principalWriteControl?.drawManifest,
+    ))
+    && pausedActors.every((actorFrame) => sameObject(actorFrame.rasterRoi, pausedActors[0].rasterRoi));
+}
+
+function productionRgbRasterProofValid(proof, entry, id, expectedPathBase) {
+  const actor = { kind: 'training-dummy', id };
+  const camera = expectedVisualEvidenceContract.gunRange.dummies[expectedDummyIds.indexOf(id)]?.camera;
+  const phases = [proof?.observePresentation, proof?.controlPresentation, proof?.restoredPresentation];
+  const modes = ['visible-observe', 'principal-write-suppressed', 'visible-restored'];
+  const orders = proof?.captureOrder;
+  const pausedActors = phases.map((phase) => phase?.pausedPresentedCapture?.actors?.[0]);
+  if (proof?.contract !== 'gun-range-dummy-production-rgb-raster-proof-v1'
+    || !sameObject(proof.actor, actor)
+    || !evidenceCameraValid(proof.camera, camera)
+    || proof.fixedVisualTimeMs !== 0
+    || typeof proof.sessionId !== 'string' || proof.sessionId.length < 1
+    || Object.hasOwn(proof, 'observeScreenshot')
+    || !Array.isArray(orders) || orders.length !== 3
+    || !phases.every((phase, index) => principalPresentationValid(
+      phase, actor, camera, proof.sessionId, modes[index],
+    ))
+    || !orders.every((order, index) => order.mode === modes[index]
+      && order.frame === phases[index].pausedPresentedCapture.frame
+      && order.captureRevision === phases[index].requestedRevision
+      && order.submissionSequence === phases[index].pausedPresentedCapture.submissionSequence
+      && order.completedSequence === phases[index].pausedPresentedCapture.completedSequence)
+    || !orders.every((order, index) => index === 0
+      || (order.frame > orders[index - 1].frame && order.captureRevision > orders[index - 1].captureRevision))
+    || target.renderer === 'webgpu' && !orders.every((order, index) => index === 0
+      || order.submissionSequence > orders[index - 1].submissionSequence)
+    || !sameObject(proof.stateDigests, phases[0].rasterStateDigests)
+    || !rasterPhaseParityValid(phases)
+    || !sameObject(proof.drawManifest, pausedActors[0].principalWriteControl.drawManifest)
+    || !sameObject(proof.rasterRoi, pausedActors[0].rasterRoi)
+    || proof.controlScreenshot?.path !== `${expectedPathBase}/${id}-close-principal-suppressed.png`
+    || !/^[a-f0-9]{64}$/u.test(proof.controlScreenshot?.sha256 ?? '')
+    || !screenshotFrameBindingValid(proof.controlScreenshot?.screenshotFrameBinding, proof.controlPresentation)
+    || !sameObject(proof.visibleScreenshot, entry?.closeScreenshot)
+    || !sameObject(proof.visibleScreenshot?.presentation, proof.restoredPresentation)
+    || proof.controlScreenshot.sha256 === proof.visibleScreenshot?.sha256) return false;
+  return true;
 }
 
 function framingActorFrameBindingValid(framing, actor, presentation) {
@@ -1463,10 +1855,12 @@ function handFramingValid(
       sentinel.worldPosition,
       projectionCamera,
       framing.canvas.width / framing.canvas.height,
+      paused?.renderer,
     );
     const pixel = pixelFor(sentinel.ndc);
     const source = framing.camera.sourceSentinels[index];
-    if (x < handRoiNdc.minX || x > handRoiNdc.maxX || y < handRoiNdc.minY || y > handRoiNdc.maxY || z < -1 || z > 1
+    if (x < handRoiNdc.minX || x > handRoiNdc.maxX || y < handRoiNdc.minY || y > handRoiNdc.maxY
+      || !ndcDepthValid(z, paused?.renderer)
       || !independentlyProjected
       || !sentinel.ndc.every((value, axis) => close(value, independentlyProjected[axis], 1e-6))
       || !close(sentinel.pixel?.x, pixel.x, 1e-6) || !close(sentinel.pixel?.y, pixel.y, 1e-6)
@@ -1558,7 +1952,7 @@ function overviewScreenshotValid(record, expectedPath) {
 
 function distinctScreenshotHashes(records) {
   return Array.isArray(records)
-    && records.length === 9
+    && records.length === 13
     && records.every((record) => /^[a-f0-9]{64}$/u.test(record?.sha256 ?? ''))
     && new Set(records.map((record) => record.sha256)).size === records.length;
 }
@@ -2131,7 +2525,7 @@ function failedPredicateNames(checks) {
   return checks.filter(([, passed]) => passed !== true).map(([name]) => name);
 }
 
-function receiptValidationFailures(receipt, sourceSha) {
+async function receiptValidationFailures(receipt, sourceSha) {
   if (!receipt || typeof receipt !== 'object' || Array.isArray(receipt)) return ['receipt.object'];
   const checks = [];
   const add = (name, passed) => checks.push([name, passed]);
@@ -2148,11 +2542,11 @@ function receiptValidationFailures(receipt, sourceSha) {
     close: closeRoiNdc, hand: handRoiNdc, medium: mediumRoiNdc, overview: overviewRoiNdc,
   };
 
-  add('receipt.schemaVersion', receipt.schemaVersion === 9);
+  add('receipt.schemaVersion', receipt.schemaVersion === 10);
   add('receipt.status', receipt.status === 'AUTOMATION_PASS_OWNER_PENDING');
-  add('receipt.contract', receipt.contract === 'atomic-acres/pass69-3-rigged-bot-live@9');
+  add('receipt.contract', receipt.contract === 'atomic-acres/pass69-3-rigged-bot-live@10');
   add('receipt.evidenceScope', receipt.evidenceScope
-    === 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-hand-detail-and-main-camera-draw-stamps');
+    === 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-hand-detail-main-camera-draw-stamps-and-production-rgb-raster-proof');
   add('receipt.target', receipt.target === targetName);
   add('receipt.sourceSha', receipt.sourceSha === sourceSha);
   add('receipt.endingSourceSha', receipt.endingSourceSha === sourceSha);
@@ -2181,7 +2575,7 @@ function receiptValidationFailures(receipt, sourceSha) {
   add('receipt.visualReview.worldLayoutLosDoesNotProveActorSelfOcclusion',
     receipt.visualReview?.worldLayoutLosDoesNotProveActorSelfOcclusion === true);
   add('receipt.visualReview.inspectionScope', receipt.visualReview?.inspectionScope
-    === 'armed medium/full close/left hand/right hand plus four dummy closeups and shared overview');
+    === 'armed medium/full close/left hand/right hand plus four restored dummy closeups, four suppressed controls, and shared overview');
   add('receipt.browser.project', receipt.browser?.project === 'chromium');
   add('receipt.browser.channel', receipt.browser?.channel === 'msedge');
   add('receipt.browser.userAgent.edge', /Edg\//u.test(receipt.browser?.userAgent ?? ''));
@@ -2311,10 +2705,58 @@ function receiptValidationFailures(receipt, sourceSha) {
       expectedVisualEvidenceContract.gunRange.dummies[index].actor.yaw,
       true,
     ));
+    add(`${prefix}.rasterProof.structure`, productionRgbRasterProofValid(
+      entry?.rasterProof,
+      entry,
+      id,
+      evidenceBase,
+    ));
+    try {
+      const independentlyRecomputed = await recomputeProductionRgbRasterProof({
+        repositoryRoot: root,
+        controlPath: entry?.rasterProof?.controlScreenshot?.path,
+        visiblePath: entry?.rasterProof?.visibleScreenshot?.path,
+        expectedControlPath: `${evidenceBase}/${id}-close-principal-suppressed.png`,
+        expectedVisiblePath: `${evidenceBase}/${id}-close.png`,
+        rasterRoi: entry?.rasterProof?.rasterRoi,
+      });
+      const diff = independentlyRecomputed.diff;
+      add(`${prefix}.rasterProof.diskRecompute`, true);
+      add(`${prefix}.rasterProof.controlFileSha256`, independentlyRecomputed.controlFileSha256
+        === entry?.rasterProof?.controlScreenshot?.sha256);
+      add(`${prefix}.rasterProof.visibleFileSha256`, independentlyRecomputed.visibleFileSha256
+        === entry?.rasterProof?.visibleScreenshot?.sha256);
+      add(`${prefix}.rasterProof.claimedDiffExact`, sameObject(diff, entry?.rasterProof?.rasterDiff));
+      add(`${prefix}.rasterProof.changedInside`, Number.isSafeInteger(diff.insideChangedPixelCount)
+        && diff.insideChangedPixelCount >= 1
+        && diff.changedPixelCount === diff.insideChangedPixelCount);
+      add(`${prefix}.rasterProof.zeroOutside`, diff.outsideChangedPixelCount === 0);
+      add(`${prefix}.rasterProof.alphaIdentical`, diff.alphaChangedPixelCount === 0);
+      add(`${prefix}.rasterProof.hashesDiffer`, independentlyRecomputed.controlFileSha256
+        !== independentlyRecomputed.visibleFileSha256
+        && diff.controlRawRgbSha256 !== diff.visibleRawRgbSha256
+        && diff.controlRawRgbaSha256 !== diff.visibleRawRgbaSha256);
+      add(`${prefix}.rasterProof.metrics`, diff.contract === 'lossless-rgba-rgb-diff-v1'
+        && diff.width === 1_600 && diff.height === 900
+        && diff.changedPixelDefinition === 'any-rgb-byte-differs'
+        && Number.isSafeInteger(diff.changedPixelCount) && diff.changedPixelCount >= 1
+        && Number.isSafeInteger(diff.maxRgbChannelDelta) && diff.maxRgbChannelDelta >= 1
+        && diff.maxRgbChannelDelta <= 255
+        && /^[a-f0-9]{64}$/u.test(diff.diffMaskSha256)
+        && diff.changedPixelBbox !== null
+        && diff.changedPixelBbox.minX >= independentlyRecomputed.roi.minX
+        && diff.changedPixelBbox.minY >= independentlyRecomputed.roi.minY
+        && diff.changedPixelBbox.maxXExclusive <= independentlyRecomputed.roi.maxXExclusive
+        && diff.changedPixelBbox.maxYExclusive <= independentlyRecomputed.roi.maxYExclusive);
+    } catch {
+      add(`${prefix}.rasterProof.diskRecompute`, false);
+    }
   }
   add('receipt.gunRangeDummies.screenshotRevisionsStrictlyIncrease', strictlyIncreasingCaptureRevisions([
     receipt.gunRangeDummies?.overviewScreenshot,
-    ...(receipt.gunRangeDummies?.entries ?? []).map((entry) => entry.closeScreenshot),
+    ...(receipt.gunRangeDummies?.entries ?? []).flatMap((entry) => (
+      entry.rasterProof?.captureOrder?.map(({ captureRevision }) => ({ presentation: { requestedRevision: captureRevision } })) ?? []
+    )),
   ]));
   add('receipt.screenshots.allExpectedHashesDistinct', distinctScreenshotHashes([
     receipt.armedBot?.screenshots?.medium,
@@ -2322,14 +2764,17 @@ function receiptValidationFailures(receipt, sourceSha) {
     receipt.armedBot?.screenshots?.leftHand,
     receipt.armedBot?.screenshots?.rightHand,
     receipt.gunRangeDummies?.overviewScreenshot,
-    ...(receipt.gunRangeDummies?.entries ?? []).map((entry) => entry.closeScreenshot),
+    ...(receipt.gunRangeDummies?.entries ?? []).flatMap((entry) => [
+      entry.rasterProof?.controlScreenshot,
+      entry.closeScreenshot,
+    ]),
   ]));
   add('receipt.browserErrors.array', Array.isArray(receipt.browserErrors));
   add('receipt.browserErrors.empty', Array.isArray(receipt.browserErrors) && receipt.browserErrors.length === 0);
   return failedPredicateNames(checks);
 }
 
-function runContractSelfTest() {
+async function runContractSelfTest() {
   const assert = (condition, message) => {
     if (!condition) throw new Error(`Pass 69.3 rigged-bot contract self-test failed: ${message}`);
   };
@@ -2341,7 +2786,7 @@ function runContractSelfTest() {
     ]),
     ['receipt.armedBot.first.operatorModel.supportGrip.fingerCurl'],
   ), 'named predicate diagnostics expose only failed non-sensitive field paths');
-  assert(sameArray(receiptValidationFailures(null, '0'.repeat(40)), ['receipt.object']),
+  assert(sameArray(await receiptValidationFailures(null, '0'.repeat(40)), ['receipt.object']),
     'non-object receipt reports one stable non-sensitive predicate');
   const diagnosticTestRoot = mkdtempSync(resolve(tmpdir(), 'atomic-acres-invalid-receipt-'));
   try {
@@ -2369,16 +2814,234 @@ function runContractSelfTest() {
   } finally {
     rmSync(diagnosticTestRoot, { recursive: true, force: true });
   }
-  const distinctHashFixtures = Array.from({ length: 9 }, (_, index) => ({
+  const distinctHashFixtures = Array.from({ length: 13 }, (_, index) => ({
     sha256: index.toString(16).padStart(64, '0'),
   }));
-  assert(distinctScreenshotHashes(distinctHashFixtures), 'nine materially different capture hashes must pass');
-  distinctHashFixtures[8].sha256 = distinctHashFixtures[0].sha256;
+  assert(distinctScreenshotHashes(distinctHashFixtures), 'thirteen materially different capture hashes must pass');
+  distinctHashFixtures[12].sha256 = distinctHashFixtures[0].sha256;
   assert(!distinctScreenshotHashes(distinctHashFixtures), 'duplicated/stuck compositor screenshot hash must fail');
   const revisionFixtures = [1, 2, 3, 4].map((requestedRevision) => ({ presentation: { requestedRevision } }));
   assert(strictlyIncreasingCaptureRevisions(revisionFixtures), 'strictly increasing capture revisions must pass');
   revisionFixtures[2].presentation.requestedRevision = 2;
   assert(!strictlyIncreasingCaptureRevisions(revisionFixtures), 'reused camera revision in a capture sequence must fail');
+  const rasterRoiFixture = {
+    contract: 'rigged-live-deformed-raster-roi-v1',
+    viewport: {
+      cssWidth: 1_600, cssHeight: 900, devicePixelRatio: 1,
+      drawingBufferWidth: 1_600, drawingBufferHeight: 900,
+    },
+    meshNames: expectedSkinnedMeshNames,
+    meshUuids: expectedSkinnedMeshNames.map((_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`),
+    deformedVertexCount: 9,
+    frontVertexCount: 9,
+    inFrameVertexCount: 9,
+    rounding: 'floor-min-ceil-max-half-open',
+    paddingPixels: 0,
+    projectedPixelExtrema: { minX: 10.25, minY: 20.5, maxX: 30, maxY: 40.75 },
+    deformedVertexProjectionDigest: {
+      algorithm: 'fnv1a32-pair-ordered-float64-v1',
+      value: '0123456789abcdef',
+    },
+    roi: { minX: 10, minY: 20, maxXExclusive: 30, maxYExclusive: 41 },
+    anchor: { worldPosition: [0, 0, -2], ndc: [0, 0, 0], pixel: [15, 25], inside: true },
+    joints: Array.from({ length: 16 }, () => ({ pixel: [15, 25], inside: true })),
+    anchorAndSixteenJointsInside: true,
+  };
+  assert(sameObject(recomputeHalfOpenRasterRoi(rasterRoiFixture), rasterRoiFixture.roi),
+    'integer maximum uses exact ceil and receives no extra padding pixel');
+  for (const mutate of [
+    (fixture) => { fixture.roi.maxXExclusive += 1; },
+    (fixture) => { fixture.roi.minX += 1; },
+    (fixture) => { fixture.paddingPixels = 1; },
+    (fixture) => { fixture.projectedPixelExtrema.maxX = 1_600; fixture.roi.maxXExclusive = 1_600; },
+  ]) {
+    const adversary = structuredClone(rasterRoiFixture);
+    mutate(adversary);
+    let rejected = false;
+    try { recomputeHalfOpenRasterRoi(adversary); } catch { rejected = true; }
+    assert(rejected, 'forged padded/shifted/out-of-frame raster ROI must fail');
+  }
+  const parityMaterialUuid = '00000000-0000-4000-8000-000000000101';
+  const parityDrawStamp = {
+    materialSlotUuids: [parityMaterialUuid],
+    materialUuidSet: [parityMaterialUuid],
+    materialMatchesMeshSlot: true,
+    material: {
+      uuid: parityMaterialUuid,
+      name: 'fixture-material',
+      type: 'MeshStandardMaterial',
+      visible: true,
+      colorWrite: true,
+      depthWrite: true,
+      stencilWrite: false,
+      transparent: false,
+      opacity: 1,
+    },
+    drawRange: {
+      start: 0,
+      count: 'infinity',
+      effectiveCount: 3,
+      positionCount: 3,
+      indexCount: 3,
+      group: { start: 0, count: 3, materialIndex: 0 },
+    },
+  };
+  const parityMainCameraDraw = {
+    meshes: [{
+      meshUuid: '00000000-0000-4000-8000-000000000001',
+      meshName: 'fixture',
+      meshLayerMask: 1,
+      materialSlotUuids: [parityMaterialUuid],
+      materialUuidSet: [parityMaterialUuid],
+      beforeStamps: [structuredClone(parityDrawStamp)],
+      afterStamps: [structuredClone(parityDrawStamp)],
+    }],
+  };
+  const parityActorFrame = {
+    mainCameraDraw: parityMainCameraDraw,
+    principalWriteControl: { drawManifest: [{ meshName: 'fixture' }] },
+    rasterRoi: rasterRoiFixture,
+  };
+  const parityPhase = {
+    rasterStateDigests: {
+      contract: 'rigged-raster-state-digests-v1',
+      cameraSha256: '1'.repeat(64),
+      fixedVisualTimeSha256: '2'.repeat(64),
+      targetPoseSha256: '3'.repeat(64),
+      targetStateSha256: '4'.repeat(64),
+      nonTargetStateSha256: '5'.repeat(64),
+      combinedSha256: '6'.repeat(64),
+    },
+    committed: { actors: [structuredClone(parityActorFrame)] },
+    pausedPresentedCapture: { actors: [structuredClone(parityActorFrame)] },
+  };
+  const parityPhases = [structuredClone(parityPhase), structuredClone(parityPhase), structuredClone(parityPhase)];
+  parityPhases[1].telemetryDiagnostics = { renderedInfluenceCache: { computedBones: 6, reusedBones: 0 } };
+  parityPhases[2].telemetryDiagnostics = { renderedInfluenceCache: { computedBones: 0, reusedBones: 6 } };
+  assert(rasterPhaseParityValid(parityPhases),
+    'excluded telemetry cache-path counters may differ without changing render-causal state');
+  const changedTargetState = structuredClone(parityPhases);
+  changedTargetState[1].rasterStateDigests.targetStateSha256 = '7'.repeat(64);
+  assert(!rasterPhaseParityValid(changedTargetState),
+    'included target render-causal state digest drift must fail');
+  const changedCameraState = structuredClone(parityPhases);
+  changedCameraState[1].rasterStateDigests.cameraSha256 = '9'.repeat(64);
+  assert(!rasterPhaseParityValid(changedCameraState), 'camera digest drift must fail');
+  const changedFixedTime = structuredClone(parityPhases);
+  changedFixedTime[1].rasterStateDigests.fixedVisualTimeSha256 = 'a'.repeat(64);
+  assert(!rasterPhaseParityValid(changedFixedTime), 'fixed visual-time digest drift must fail');
+  const changedNonTargetState = structuredClone(parityPhases);
+  changedNonTargetState[1].rasterStateDigests.nonTargetStateSha256 = '8'.repeat(64);
+  assert(!rasterPhaseParityValid(changedNonTargetState),
+    'included non-target render-causal state digest drift must fail');
+  const changedRestoredWrites = structuredClone(parityPhases);
+  for (const actorFrame of [
+    changedRestoredWrites[2].committed.actors[0],
+    changedRestoredWrites[2].pausedPresentedCapture.actors[0],
+  ]) {
+    for (const collection of ['beforeStamps', 'afterStamps']) {
+      actorFrame.mainCameraDraw.meshes[0][collection][0].material.depthWrite = false;
+      actorFrame.mainCameraDraw.meshes[0][collection][0].material.stencilWrite = true;
+    }
+  }
+  assert(!rasterPhaseParityValid(changedRestoredWrites),
+    'coherent restored depth/stencil write-state drift must fail phase parity');
+  const changedRestoredDrawRange = structuredClone(parityPhases);
+  for (const actorFrame of [
+    changedRestoredDrawRange[2].committed.actors[0],
+    changedRestoredDrawRange[2].pausedPresentedCapture.actors[0],
+  ]) {
+    for (const collection of ['beforeStamps', 'afterStamps']) {
+      const range = actorFrame.mainCameraDraw.meshes[0][collection][0].drawRange;
+      range.group.count = 2;
+      range.effectiveCount = 2;
+    }
+  }
+  assert(!rasterPhaseParityValid(changedRestoredDrawRange),
+    'coherent restored material-group and effective draw-range drift must fail phase parity');
+  const changedRestoredMaterialSlots = structuredClone(parityPhases);
+  for (const actorFrame of [
+    changedRestoredMaterialSlots[2].committed.actors[0],
+    changedRestoredMaterialSlots[2].pausedPresentedCapture.actors[0],
+  ]) {
+    for (const collection of ['beforeStamps', 'afterStamps']) {
+      actorFrame.mainCameraDraw.meshes[0][collection][0].materialSlotUuids.push(
+        '00000000-0000-4000-8000-000000000102',
+      );
+    }
+  }
+  assert(!rasterPhaseParityValid(changedRestoredMaterialSlots),
+    'coherent restored material-slot drift must fail phase parity');
+  const changedVertexPose = structuredClone(parityPhases);
+  changedVertexPose[1].pausedPresentedCapture.actors[0].rasterRoi.deformedVertexProjectionDigest.value = 'fedcba9876543210';
+  assert(!rasterPhaseParityValid(changedVertexPose),
+    'full ordered deformed-vertex projection digest drift must fail even inside unchanged extrema');
+  const rawBytes = 1_600 * 900 * 4;
+  const controlRgba = Buffer.alloc(rawBytes);
+  const visibleRgba = Buffer.from(controlRgba);
+  const insidePixel = 25 * 1_600 + 15;
+  visibleRgba[insidePixel * 4] = 1;
+  const validRawDiff = analyzeRawRgbaPair(controlRgba, visibleRgba, 1_600, 900, rasterRoiFixture.roi);
+  assert(validRawDiff.changedPixelCount === 1
+    && validRawDiff.insideChangedPixelCount === 1
+    && validRawDiff.outsideChangedPixelCount === 0
+    && validRawDiff.alphaChangedPixelCount === 0,
+  'one RGB byte inside exact ROI must produce one accepted changed pixel');
+  const zeroRawDiff = analyzeRawRgbaPair(controlRgba, controlRgba, 1_600, 900, rasterRoiFixture.roi);
+  assert(zeroRawDiff.changedPixelCount === 0 && zeroRawDiff.changedPixelBbox === null,
+    'same/stale raster bytes produce zero diff and cannot satisfy proof');
+  const outsideRgba = Buffer.from(controlRgba);
+  outsideRgba[0] = 1;
+  const outsideRawDiff = analyzeRawRgbaPair(controlRgba, outsideRgba, 1_600, 900, rasterRoiFixture.roi);
+  assert(outsideRawDiff.outsideChangedPixelCount === 1,
+    'one environment RGB pixel outside exact ROI is independently detected');
+  const alphaOnlyRgba = Buffer.from(controlRgba);
+  alphaOnlyRgba[insidePixel * 4 + 3] = 1;
+  const alphaOnlyDiff = analyzeRawRgbaPair(controlRgba, alphaOnlyRgba, 1_600, 900, rasterRoiFixture.roi);
+  assert(alphaOnlyDiff.changedPixelCount === 0 && alphaOnlyDiff.alphaChangedPixelCount === 1,
+    'alpha-only change cannot impersonate an RGB raster proof');
+  assert(!sameObject(validRawDiff, { ...validRawDiff, diffMaskSha256: '0'.repeat(64) }),
+    'forged claimed diff-mask hash differs from independent recomputation');
+  const rasterArtifactRoot = mkdtempSync(resolve(tmpdir(), 'atomic-acres-raster-proof-'));
+  try {
+    const relativeBase = 'artifacts/pass69-3/rigged-bot-live/webgl2';
+    const artifactDirectory = resolve(rasterArtifactRoot, relativeBase);
+    mkdirSync(artifactDirectory, { recursive: true });
+    const controlPath = `${relativeBase}/fixture-control.png`;
+    const visiblePath = `${relativeBase}/fixture-visible.png`;
+    const stalePath = `${relativeBase}/fixture-stale.png`;
+    const pngFor = (rgba) => sharp(rgba, { raw: { width: 1_600, height: 900, channels: 4 } }).png().toBuffer();
+    const [controlPng, visiblePng] = await Promise.all([pngFor(controlRgba), pngFor(visibleRgba)]);
+    writeFileSync(resolve(rasterArtifactRoot, controlPath), controlPng, { flag: 'wx' });
+    writeFileSync(resolve(rasterArtifactRoot, visiblePath), visiblePng, { flag: 'wx' });
+    writeFileSync(resolve(rasterArtifactRoot, stalePath), controlPng, { flag: 'wx' });
+    let repeatPathRejected = false;
+    try { writeFileSync(resolve(rasterArtifactRoot, controlPath), visiblePng, { flag: 'wx' }); } catch { repeatPathRejected = true; }
+    assert(repeatPathRejected, 'fresh artifact creation rejects a pre-existing stale path');
+    const decodedProof = await recomputeProductionRgbRasterProof({
+      repositoryRoot: rasterArtifactRoot,
+      controlPath,
+      visiblePath,
+      expectedControlPath: controlPath,
+      expectedVisiblePath: visiblePath,
+      rasterRoi: rasterRoiFixture,
+    });
+    assert(decodedProof.diff.insideChangedPixelCount === 1 && decodedProof.diff.outsideChangedPixelCount === 0,
+      'lossless Sharp PNG decode preserves independent RGB diff');
+    const staleProof = await recomputeProductionRgbRasterProof({
+      repositoryRoot: rasterArtifactRoot,
+      controlPath,
+      visiblePath: stalePath,
+      expectedControlPath: controlPath,
+      expectedVisiblePath: stalePath,
+      rasterRoi: rasterRoiFixture,
+    });
+    assert(staleProof.diff.changedPixelCount === 0
+      && staleProof.controlFileSha256 === staleProof.visibleFileSha256,
+    'copied stale PNG is mechanically exposed as zero-diff identical content');
+  } finally {
+    rmSync(rasterArtifactRoot, { recursive: true, force: true });
+  }
   const armedIdentity = {
     id: 'bot-1',
     alive: true,
@@ -2664,7 +3327,7 @@ function runContractSelfTest() {
   const oldFixture = makeAtomicPlayerFixture();
   delete oldFixture.placement;
   assert(!atomicPlayerConvergenceValid(oldFixture, 121), 'old placement-less fixture fails closed without throwing');
-  assert(receiptValidationFailures({ schemaVersion: 8 }, '0'.repeat(40)).includes('receipt.schemaVersion'),
+  assert((await receiptValidationFailures({ schemaVersion: 9 }, '0'.repeat(40))).includes('receipt.schemaVersion'),
     'receipt schema 8 is explicitly rejected without throwing');
   const nonUnitQuaternion = [0.1, -0.2, 0.3, 0.9];
   assert(normalizedQuaternionDelta(nonUnitQuaternion, nonUnitQuaternion) === 0,
@@ -3018,6 +3681,32 @@ function runContractSelfTest() {
     );
     return cameraEvidence.position.map((value, axis) => value + worldDelta[axis]);
   };
+  const depthConventionCamera = {
+    position: [0, 0, 0], yaw: 0, pitch: 0, fov: 60, near: 0.1, far: 180,
+  };
+  const depthConventionFixtures = [
+    { label: 'near', depth: 0.1, webglZ: -1, webgpuZ: 0 },
+    { label: 'interior', depth: 5, webglZ: 0.9610894941634242, webgpuZ: 0.980544747081712 },
+    { label: 'far', depth: 180, webglZ: 1, webgpuZ: 1 },
+  ].map((fixture) => {
+    const worldPosition = worldForNdc([0.25, -0.125], fixture.depth, depthConventionCamera);
+    const webgl = projectWorldToNdc(worldPosition, depthConventionCamera, aspect, 'webgl2');
+    const webgpu = projectWorldToNdc(worldPosition, depthConventionCamera, aspect, 'webgpu');
+    assert(webgl && webgpu
+      && close(webgl[0], 0.25, 1e-12) && close(webgpu[0], 0.25, 1e-12)
+      && close(webgl[1], -0.125, 1e-12) && close(webgpu[1], -0.125, 1e-12)
+      && webgl[0] === webgpu[0] && webgl[1] === webgpu[1]
+      && close(webgl[2], fixture.webglZ, 1e-12)
+      && close(webgpu[2], fixture.webgpuZ, 1e-12)
+      && ndcDepthValid(webgl[2], 'webgl2')
+      && ndcDepthValid(webgpu[2], 'webgpu'),
+    `${fixture.label} projection must use exact backend-specific NDC depth with identical x/y`);
+    return { ...fixture, worldPosition, webgl, webgpu };
+  });
+  const interiorDepthFixture = depthConventionFixtures.find(({ label }) => label === 'interior');
+  assert(!interiorDepthFixture.webgl.every((value, axis) => close(value, interiorDepthFixture.webgpu[axis], 1e-12))
+    && !interiorDepthFixture.webgpu.every((value, axis) => close(value, interiorDepthFixture.webgl[axis], 1e-12)),
+  'a WebGL-Z receipt must fail WebGPU recomputation and a WebGPU-Z receipt must fail WebGL recomputation');
   const pixelFor = (ndc) => ({
     x: canvas.left + (ndc[0] + 1) * 0.5 * canvas.width,
     y: canvas.top + (1 - ndc[1]) * 0.5 * canvas.height,
@@ -3032,7 +3721,7 @@ function runContractSelfTest() {
   };
   const makeProjectedJoint = (joint, ndc2, cameraEvidence = projectionCamera) => {
     const worldPosition = worldForNdc(ndc2, 2, cameraEvidence);
-    const ndc = projectWorldToNdc(worldPosition, cameraEvidence, aspect);
+    const ndc = projectWorldToNdc(worldPosition, cameraEvidence, aspect, 'webgl2');
     return {
       ...joint,
       worldPosition,
@@ -3099,6 +3788,8 @@ function runContractSelfTest() {
           type: 'MeshStandardMaterial',
           visible: true,
           colorWrite: true,
+          depthWrite: true,
+          stencilWrite: false,
           transparent: false,
           opacity: 1,
         },
@@ -3180,7 +3871,7 @@ function runContractSelfTest() {
       handSkinVisible: true,
       weaponCenterWorld: [0, 1.08, -18.7],
       projectedWorldPosition,
-      screenPosition: projectWorldToNdc(projectedWorldPosition, cameraEvidence, aspect),
+      screenPosition: projectWorldToNdc(projectedWorldPosition, cameraEvidence, aspect, 'webgl2'),
       jointScreenPositions: points.map((joint) => structuredClone(joint)),
       evidenceSentinels: evidenceSentinelFixture(points),
     };
@@ -3287,6 +3978,73 @@ function runContractSelfTest() {
   };
   const frameActor = makeFrameActor(projectionCamera, sentinels);
   const presentation = makePresentation(projectionCamera, frameActor);
+  const principalActor = presentation.pausedPresentedCapture.actors[0];
+  const principalSessionId = 'fixture-principal-session';
+  const principalEntries = admittedPrincipalEntries(principalActor.mainCameraDraw);
+  const principalControlFixture = {
+    contract: 'rigged-principal-write-control-v1',
+    sessionId: principalSessionId,
+    actor,
+    frame: presentation.pausedPresentedCapture.frame,
+    captureRevision: presentation.requestedRevision,
+    mode: 'principal-write-suppressed',
+    drawManifest: principalEntries.map(({ draw }) => structuredClone(draw)),
+    suppressionEntries: principalEntries.map(({ draw, writes }) => ({
+      draw: structuredClone(draw),
+      before: structuredClone(writes),
+      suppressed: { colorWrite: false, depthWrite: false, stencilWrite: false },
+      suppressedExactly: true,
+      restoredBy: 'after-render',
+      after: structuredClone(writes),
+      restoredExactly: true,
+    })),
+    observedDrawCount: principalEntries.length,
+    suppressionAppliedCount: principalEntries.length,
+    suppressionRestoredAfterCount: principalEntries.length,
+    suppressionRestoredFinallyCount: 0,
+    outstandingSuppressionCount: 0,
+    renderCallFinalized: true,
+    suppressionAppliedCountExact: true,
+    materialStateRestored: true,
+    failures: [],
+    complete: true,
+  };
+  assert(principalWriteControlValid(
+    principalControlFixture,
+    principalActor,
+    actor,
+    principalSessionId,
+    'principal-write-suppressed',
+    presentation.pausedPresentedCapture.frame,
+    presentation.requestedRevision,
+  ), 'exact admitted before/suppressed/restored per-draw manifest must pass');
+  const forgedPrincipalWrites = structuredClone(principalControlFixture);
+  forgedPrincipalWrites.suppressionEntries[0].before.depthWrite = false;
+  forgedPrincipalWrites.suppressionEntries[0].after.depthWrite = false;
+  assert(!principalWriteControlValid(
+    forgedPrincipalWrites,
+    principalActor,
+    actor,
+    principalSessionId,
+    'principal-write-suppressed',
+    presentation.pausedPresentedCapture.frame,
+    presentation.requestedRevision,
+  ), 'coherently forged before/after writes cannot diverge from admitted material state');
+  const zeroPrincipalCallback = structuredClone(principalControlFixture);
+  zeroPrincipalCallback.drawManifest = [];
+  zeroPrincipalCallback.suppressionEntries = [];
+  zeroPrincipalCallback.observedDrawCount = 0;
+  zeroPrincipalCallback.suppressionAppliedCount = 0;
+  zeroPrincipalCallback.suppressionRestoredAfterCount = 0;
+  assert(!principalWriteControlValid(
+    zeroPrincipalCallback,
+    principalActor,
+    actor,
+    principalSessionId,
+    'principal-write-suppressed',
+    presentation.pausedPresentedCapture.frame,
+    presentation.requestedRevision,
+  ), 'zero-callback control cannot pass');
   const jointMetrics = metricsFor(sentinels);
   const framing = {
     missing: false,
@@ -3525,7 +4283,7 @@ function runContractSelfTest() {
   const mutateJointProjection = (candidate, candidatePresentation, index, ndc2) => {
     const joint = candidate.jointDetail.sentinels[index];
     const worldPosition = worldForNdc(ndc2);
-    const ndc = projectWorldToNdc(worldPosition, projectionCamera, aspect);
+    const ndc = projectWorldToNdc(worldPosition, projectionCamera, aspect, 'webgl2');
     Object.assign(joint, { worldPosition, ndc, pixel: pixelFor(ndc) });
     const frameJoint = candidatePresentation.pausedPresentedCapture.actors[0].jointScreenPositions[index];
     frameJoint.worldPosition = structuredClone(worldPosition);
@@ -3553,7 +4311,7 @@ function runContractSelfTest() {
     'forged offscreen world point with centered claimed NDC must fail');
   const advancedLivePose = structuredClone(framing);
   const advancedWorldPosition = worldForNdc([-0.12, -0.13]);
-  const advancedNdc = projectWorldToNdc(advancedWorldPosition, projectionCamera, aspect);
+  const advancedNdc = projectWorldToNdc(advancedWorldPosition, projectionCamera, aspect, 'webgl2');
   Object.assign(advancedLivePose.jointDetail.sentinels[6], {
     worldPosition: advancedWorldPosition,
     ndc: advancedNdc,
@@ -3663,7 +4421,7 @@ function runContractSelfTest() {
     const handProjectionCamera = { ...fixtureCamera, near: 0.1, far: 180 };
     const handPoints = expectedCaptureJoints.map((joint, index) => {
       const worldPosition = structuredClone(frameActor.jointScreenPositions[index].worldPosition);
-      const ndc = projectWorldToNdc(worldPosition, handProjectionCamera, aspect);
+      const ndc = projectWorldToNdc(worldPosition, handProjectionCamera, aspect, 'webgl2');
       return { ...joint, worldPosition, ndc };
     });
     const handFrameActor = makeFrameActor(handProjectionCamera, handPoints);
@@ -3773,7 +4531,7 @@ function runContractSelfTest() {
 }
 
 if (selfTestMode) {
-  runContractSelfTest();
+  await runContractSelfTest();
   console.log(JSON.stringify({ pass69_3RiggedBotContractSelfTest: 'PASS' }));
   process.exit(0);
 }
@@ -3789,7 +4547,7 @@ if (validateReceiptMode) {
   const validationSourceSha = execFileSync('git', ['rev-parse', 'HEAD'], {
     cwd: root, encoding: 'utf8', windowsHide: true,
   }).trim();
-  const failedPredicates = receiptValidationFailures(preservedReceipt, validationSourceSha);
+  const failedPredicates = await receiptValidationFailures(preservedReceipt, validationSourceSha);
   console.log(JSON.stringify({
     valid: failedPredicates.length === 0,
     target: targetName,
@@ -3849,7 +4607,7 @@ try {
   discardEvidence(`Pass 69.3 ${targetName} rigged-bot gate did not emit a readable receipt: ${error instanceof Error ? error.message : String(error)}`);
 }
 
-const failedPredicates = receiptValidationFailures(receipt, sourceSha);
+const failedPredicates = await receiptValidationFailures(receipt, sourceSha);
 if (failedPredicates.length > 0) {
   discardEvidence(
     `Pass 69.3 ${targetName} rigged-bot gate emitted invalid or stale evidence; failed predicates: ${failedPredicates.join(', ')}`,

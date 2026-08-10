@@ -2396,7 +2396,9 @@
       "id": "T-PASS69-3-RIGGED-DUMMY",
       "command": "npm run qa:pass69-3:rigged-bot-live",
       "paths": [
+        "package-lock.json",
         "package.json",
+        "scripts/qa/rigged-rgb-raster-proof.mjs",
         "scripts/qa/run-pass69-3-rigged-bot-live.mjs",
         "src/additional-maps.ts",
         "src/additional-maps-rigged-dummy.test.ts",
