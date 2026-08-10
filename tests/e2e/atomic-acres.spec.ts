@@ -549,7 +549,8 @@ test.describe('boot and authored presentation', () => {
     // readiness is asserted after a real solo deployment below.
     await expect(page.locator('html')).toHaveAttribute('data-ui-contract', 'pass64-command-v2');
     await expect(page.locator('#arena-title')).toContainText('NUKE TOWN');
-    await expect(page.locator('.command-brand span')).toContainText('PASS 69 · THE BIG ONE');
+    await expect(page.locator('.command-brand span')).toContainText('PASS 69');
+    await expect(page.locator('.command-brand span')).not.toContainText('THE BIG ONE');
     expect([20, 30, 40]).toContain(state.networkSync.selectedRateHz);
     expect(state.networkSync.stateIntervalMs).toBeCloseTo(1_000 / state.networkSync.selectedRateHz, 5);
     expect(state.networkSync.hostTime).toMatchObject({

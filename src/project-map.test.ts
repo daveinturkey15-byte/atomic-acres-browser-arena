@@ -35,7 +35,7 @@ describe('project map', () => {
     ]);
     expect(bundle.current.releaseState).toBe('release-candidate');
     expect(bundle.publishedChannels.liveTarget).toMatchObject({
-      pass: 'PASS 69', label: expect.stringContaining('THE BIG ONE'), path: 'channels/the-big-one', state: 'release-candidate',
+      pass: 'PASS 69', label: 'PASS 69', path: 'channels/the-big-one', state: 'release-candidate',
     });
     expect(bundle.publishedChannels.failedRegressionEvidence).toMatchObject({
       pass: 'PASS 64', role: 'published-failed-regression-evidence',
@@ -45,12 +45,12 @@ describe('project map', () => {
 
   it('keeps candidate and timestamped-production release copy mutually truthful', () => {
     expect(projectMapReleaseCopy('PENDING_PRODUCTION')).toMatchObject({
-      summary: expect.stringContaining('Live remains 69.1 pending exact-preview approval'),
+      summary: expect.stringContaining('current release candidate'),
       approvalHighlight: expect.stringContaining('Owner approval remains pending'),
     });
     const released = projectMapReleaseCopy('2026-08-09T20:00:00Z');
-    expect(released.summary).toContain('current released correction');
-    expect(released.summary).not.toContain('Live remains 69.1');
+    expect(released.summary).toContain('current released build');
+    expect(released.summary).not.toContain('release candidate');
     expect(released.approvalHighlight).toContain('was promoted only after approval');
     expect(released.approvalHighlight).not.toContain('remains pending');
   });
@@ -66,7 +66,7 @@ describe('project map', () => {
     expect(markdown.indexOf('## Current release snapshot')).toBeLessThan(markdown.indexOf('## Release archive'));
     expect(markdown).toContain(`### ${CHANGELOG[0]?.pass}: ${CHANGELOG[0]?.title}`);
     expect(markdown).toContain('TypeScript and Rapier own physics');
-    expect(markdown).toMatch(/Live target: PASS 69 \(THE BIG ONE v[\d.]+\); release-candidate/);
+    expect(markdown).toMatch(/Live target: PASS 69 \(PASS 69\); release-candidate/);
     expect(markdown).toContain('Failed-regression evidence: PASS 64');
   });
 

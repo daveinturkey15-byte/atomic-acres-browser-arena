@@ -53,7 +53,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
       'Window glass uses irregular independently moving instanced shards; zero-light world prewarm prevents the first breach from compiling its physical-material programs on the shot frame',
       'M14 thermal ghosts, Flamethrower streams and Flare targeting/collision work use retained bounded storage instead of first-use or per-frame allocation waves',
       'The secure test bay has canonical gun labels, an attached textured and emissive door assembly, posed rigged dummies and one atomic pickup-prompt writer',
-      'Pass 67.1 remains the frozen stable singleplayer channel and Pass 63 remains the rollback',
+      'Pass 63 remains the selectable stable WebGL fallback while newer historical channel bytes stay retained off the chooser',
     ]),
   }),
   Object.freeze({

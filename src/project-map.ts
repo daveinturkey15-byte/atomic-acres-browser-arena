@@ -61,11 +61,11 @@ export function projectMapReleaseCopy(releasedAt: string): Readonly<{
   const released = releasedAt !== PENDING_PRODUCTION_RELEASE;
   return Object.freeze({
     summary: released
-      ? 'Pass 69.3 is the current released correction for mobile control, ADS, authored aircraft, glass and weapon-effect regressions; Pass 67.1 stable and Pass 63 rollback evidence stay frozen.'
-      : 'Pass 69.3 is the correction candidate for mobile control, ADS, authored aircraft, glass and weapon-effect regressions while Live remains 69.1 pending exact-preview approval; Pass 67.1 stable and Pass 63 rollback evidence stay frozen.',
+      ? 'Pass 69 is the current released build for mobile control, ADS, authored aircraft, glass and weapon-effect improvements; the stable Pass 63 WebGL fallback stays frozen.'
+      : 'Pass 69 is the current release candidate for mobile control, ADS, authored aircraft, glass and weapon-effect improvements; the stable Pass 63 WebGL fallback stays frozen.',
     approvalHighlight: released
-      ? 'Pass 69.3 was promoted only after approval of its immutable preview; the historical 69.1 acceptance remains separate evidence'
-      : 'Owner approval remains pending on an immutable 69.3 preview; the currently published 69.1 deployment is not re-described as accepted evidence',
+      ? 'Pass 69 was promoted only after approval of its immutable preview'
+      : 'Owner approval remains pending on the immutable Pass 69 preview',
   });
 }
 
@@ -75,7 +75,7 @@ const projectMapCopy = projectMapReleaseCopy(projectMapReleasedAt);
 export const PROJECT_MAP_RELEASE: ChangelogEntry = Object.freeze({
   id: 'pass69',
   pass: PASS66_RELEASE_IDENTITY.pass,
-  title: 'The Big One',
+  title: 'Pass 69',
   releasedAt: projectMapReleasedAt,
   areas: Object.freeze(['MOBILE', 'FIRST-PERSON', 'SUPPORT', 'DESTRUCTION', 'HITL']),
   summary: projectMapCopy.summary,
@@ -86,7 +86,7 @@ export const PROJECT_MAP_RELEASE: ChangelogEntry = Object.freeze({
     'Irregular retained glass shards, live-ID M14 thermal ghosts and bounded Flamethrower / Flare work remove known cold allocation and shader gaps',
     'The secure test bay presents canonical weapon labels, one coherent door assembly, posed rigged dummies and atomic pickup text',
     projectMapCopy.approvalHighlight,
-    'Pass 67.1 stays frozen as stable singleplayer and Pass 63 remains the rollback',
+    'Pass 63 stays frozen as the selectable stable WebGL fallback',
   ]),
 });
 
