@@ -26,6 +26,8 @@ describe('Pass 69.3 real-authored near-plane evidence boundary', () => {
       "!key.toUpperCase().startsWith('VITE_')",
       'runtime.softwareAdapter === false',
       'runtime.actualBackend === target.renderer',
+      'receipt.schemaVersion !== 3',
+      "receipt.contract !== 'atomic-acres/pass69-3-authored-near-plane-catalog@3'",
       "receipt.evidenceScope !== 'maximum-contact-hip-settled-ads-fire-kick-reload-near-plane-clearance'",
       'endingSha !== sourceSha || sourceStatus()',
     ]) expect(runner).toContain(token);
@@ -107,20 +109,36 @@ describe('Pass 69.3 real-authored near-plane evidence boundary', () => {
     expect(runner).toContain('convergence.maximumDepthDelta <= 0.0005');
   });
 
-  it('binds maximum-contact evidence to the exact west-wall prone pose without inventing collider identity', () => {
+  it('binds maximum-contact evidence to the stable grounded west-wall prone pose', () => {
     const spec = readFileSync('tests/e2e/pass69-3-authored-near-plane-catalog.spec.ts', 'utf8');
     const runner = readFileSync('scripts/qa/run-pass69-3-authored-near-plane-catalog.mjs', 'utf8');
     for (const token of [
-      "contract: 'gun-range-west-wall-prone-pose-v1'",
+      "contract: 'gun-range-west-wall-prone-pose-v2'",
       'teleportPosition: Object.freeze([-19.65, 1.7, -14.5] as const)',
-      'settledPosition: Object.freeze([-19.65, 0.61, -14.5] as const)',
-      'maximumPositionAxisError: 0.02',
+      'settledPosition: Object.freeze([-19.6465, 0.6363, -14.5] as const)',
+      'maximumPositionAxisError: 0.005',
       'maximumAngularError: 0.000001',
+      "contract: 'consecutive-presented-contact-fixture-v1'",
+      'requiredStableTransitions: 8',
+      'minimumStableElapsedMs: 50',
+      'maximumSurfaceRetreatDelta: 0.0005',
+      'maximumSurfaceLiftDelta: 0.0005',
+      "state.matchPhase === 'active'",
+      'frame === previous.frame + 1',
       'state.player.yaw - fixture.yaw',
       'state.player.pitch - fixture.pitch',
       "contract: 'saturated-viewmodel-surface-retreat-v1'",
+      "return stageStableContactFixture(page, 'initial-deploy')",
+      'const fixtureConvergence = await stageStableContactFixture(page, `${afterWeapon}->${nextWeapon}`)',
     ]) expect(spec).toContain(token);
     expect(runner).toContain('function contactFixtureValid(contact)');
+    expect(runner).toContain('function contactFixtureConvergenceValid(convergence, expectedLabel)');
+    expect(runner).toContain('settledPosition: Object.freeze([-19.6465, 0.6363, -14.5])');
+    expect(runner).toContain('maximumPositionAxisError: 0.005');
+    expect(runner).toContain('convergence.endedPresentedFrame - convergence.startedPresentedFrame === convergence.stableTransitions');
+    expect(runner).toContain("requirements?.matchPhase === 'active'");
+    expect(runner).toContain('observed.surfaceRetreat >= observed.maximumSurfaceRetreat');
+    expect(runner).toContain('contactFixtureConvergenceValid(contact.convergence, \'initial-deploy\')');
     expect(runner).toContain('maximumPositionAxisError <= expectedContactFixture.maximumPositionAxisError');
     expect(runner).toContain('yawError <= expectedContactFixture.maximumAngularError');
     expect(runner).toContain('pitchError <= expectedContactFixture.maximumAngularError');
@@ -133,7 +151,10 @@ describe('Pass 69.3 real-authored near-plane evidence boundary', () => {
     for (const token of [
       "contract: 'gun-range-production-rematch-round-refresh-v1'",
       'api.rematch();',
+      'expect(roundBefore.playerAlive, `${afterWeapon}: player is alive before production rematch`).toBe(true)',
       'state.killstreak.matchEpoch > previous.matchEpoch',
+      'roundBefore.matchEpoch + 1',
+      'roundBefore.playerContinuity + 1',
       'timerAfterSeconds, `${afterWeapon}: production rematch advances the visible deadline`).toBeGreaterThan(timerBeforeSeconds)',
       'roundContinuity.push(await rematchGunRangeRoundAndRestoreContact(page, weapon, nextWeapon))',
       'refreshCount: roundContinuity.length',
@@ -141,8 +162,11 @@ describe('Pass 69.3 real-authored near-plane evidence boundary', () => {
     expect(runner).toContain('function roundContinuityValid(continuity)');
     expect(runner).toContain('continuity.refreshCount !== expectedWeapons.length - 1');
     expect(runner).toContain('entry.timerAfter.seconds > entry.timerBefore.seconds');
-    expect(runner).toContain('after.matchEpoch > before.matchEpoch');
-    expect(runner).toContain('after.playerContinuity > before.playerContinuity');
+    expect(runner).toContain('before?.playerAlive === true');
+    expect(runner).toContain('after?.playerAlive === true');
+    expect(runner).toContain('after.matchEpoch === before.matchEpoch + 1');
+    expect(runner).toContain('after.playerContinuity === before.playerContinuity + 1');
+    expect(runner).toContain('returnedFixtureValid(entry.returnedFixture, `${entry.afterWeapon}->${entry.nextWeapon}`)');
     expect(runner).toContain('!roundContinuityValid(receipt.roundContinuity)');
     expect(spec).toContain('requiredStableTransitions: 8');
     expect(spec).toContain('maximumDepthDelta: 0.0005');

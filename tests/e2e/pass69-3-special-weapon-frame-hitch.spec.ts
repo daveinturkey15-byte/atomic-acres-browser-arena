@@ -1,5 +1,11 @@
-import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { GUN_RANGE_TEST_BAY_CONTRACT } from '../../src/gun-range-test-bay';
+import {
+  captureFrameHitchRendererEvidence,
+  expectFrameHitchRendererEvidence,
+  frameHitchRoute,
+  writeOfficialFrameHitchReceipt,
+} from './pass69-3-frame-hitch-evidence';
 
 type SpecialWeapon = 'flamethrower' | 'flare-gun';
 
@@ -71,10 +77,7 @@ const MAX_SUSTAINED_PRESENTED_FRAME_GAP_MS = 120;
 const MAX_SUSTAINED_P95_MS = 50;
 
 async function deployGunRange(page: Page, seed: string): Promise<void> {
-  // Match the retained glass/MBR freeze gate's compatibility presentation so
-  // software CI measures the action path instead of Gun Range's full-scene
-  // raster ceiling. Renderer provenance below makes that distinction explicit.
-  await page.goto(`/?release=latest&map=gun-range&renderer=webgl2&render=compat&signal=off&grass=off&mist=off&clouds=off&rays=off&externalServices=off&seed=${seed}`);
+  await page.goto(frameHitchRoute('gun-range', seed, { signal: false }));
   await page.waitForFunction(() => Boolean(
     window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true
       && document.querySelector<HTMLButtonElement>('#solo')?.disabled === false,
@@ -425,42 +428,6 @@ async function probeHeldFlamethrower(page: Page, durationMs: number): Promise<Fl
   }), durationMs);
 }
 
-async function rendererProvenance(page: Page, testInfo: TestInfo): Promise<Record<string, unknown>> {
-  const browser = await page.evaluate(() => {
-    const canvas = document.querySelector<HTMLCanvasElement>('#game');
-    const gl = canvas?.getContext('webgl2') ?? null;
-    const debugInfo = gl?.getExtension('WEBGL_debug_renderer_info') as {
-      UNMASKED_VENDOR_WEBGL: number;
-      UNMASKED_RENDERER_WEBGL: number;
-    } | null;
-    const runtime = (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).render.runtime;
-    return {
-      userAgent: navigator.userAgent,
-      runtime: {
-        requestedBackend: runtime.requestedBackend,
-        actualBackend: runtime.actualBackend,
-        adapterLabel: runtime.adapterLabel,
-        adapterClass: runtime.adapterClass,
-        softwareAdapter: runtime.softwareAdapter,
-        canvasAntialias: runtime.canvasAntialias,
-        canvasSamples: runtime.canvasSamples,
-      },
-      webgl: gl ? {
-        maskedVendor: String(gl.getParameter(gl.VENDOR)),
-        maskedRenderer: String(gl.getParameter(gl.RENDERER)),
-        unmaskedVendor: debugInfo ? String(gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL)) : null,
-        unmaskedRenderer: debugInfo ? String(gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)) : null,
-        version: String(gl.getParameter(gl.VERSION)),
-      } : null,
-    };
-  });
-  return {
-    playwrightProject: testInfo.project.name,
-    browserChannel: process.env.QA_INSTALLED_EDGE === '1' ? 'installed-msedge' : 'bundled-chromium',
-    ...browser,
-  };
-}
-
 function expectBoundedFrameWindow(window: PresentedFrameWindow, minimumFrames: number): void {
   const evidence = `${window.label} ${JSON.stringify({
     frameDelta: window.frameDelta,
@@ -481,7 +448,8 @@ test('cold and held flamethrower fire remain inside the presented-frame freeze b
     if (message.type() === 'error') browserErrors.push(message.text());
   });
   await deployGunRange(page, 'pass69-3-flamethrower-hitch-gate');
-  const provenance = await rendererProvenance(page, testInfo);
+  const runtimeBefore = await captureFrameHitchRendererEvidence(page, testInfo);
+  expectFrameHitchRendererEvidence(runtimeBefore, 'gun-range', 'flamethrower initial runtime');
   const baseline = await samplePresentedFrameWindow(page, 'flamethrower-baseline', 750);
   await acquireTrainingWeapon(page, 'flamethrower');
   await page.locator('#game').click({ position: { x: 64, y: 64 }, force: true });
@@ -510,34 +478,6 @@ test('cold and held flamethrower fire remain inside the presented-frame freeze b
       weaponNearPlaneClear: presentation.weaponFraming?.nearPlaneClear ?? null,
     };
   });
-
-  await testInfo.attach('flamethrower-frame-hitch-receipt', {
-    body: Buffer.from(JSON.stringify({
-      thresholds: {
-        maximumEventToPresentedFrameMs: MAX_EVENT_TO_PRESENTED_FRAME_MS,
-        maximumSynchronousActionMs: MAX_SYNCHRONOUS_ACTION_MS,
-        maximumSustainedPresentedFrameGapMs: MAX_SUSTAINED_PRESENTED_FRAME_GAP_MS,
-        maximumSustainedP95Ms: MAX_SUSTAINED_P95_MS,
-      },
-      provenance,
-      baseline,
-      probe,
-      releaseProbe,
-      clearance,
-    }, null, 2)),
-    contentType: 'application/json',
-  });
-
-  console.log('PASS69_3_FLAMETHROWER_FRAME_HITCH', JSON.stringify({
-    provenance,
-    baseline: { ...baseline, gapsMs: undefined },
-    probe: {
-      ...probe,
-      frameWindow: { ...probe.frameWindow, gapsMs: undefined },
-    },
-    releaseProbe,
-    clearance,
-  }));
   expect(probe.synchronousMs).not.toBeNull();
   expect(probe.synchronousMs).toBeLessThan(MAX_SYNCHRONOUS_ACTION_MS);
   expect(probe.triggerToPresentedFrameMs).not.toBeNull();
@@ -548,8 +488,8 @@ test('cold and held flamethrower fire remain inside the presented-frame freeze b
   expect(releaseProbe.synchronousMs).toBeLessThan(MAX_SYNCHRONOUS_ACTION_MS);
   expect(releaseProbe.eventToPresentedFrameMs).toBeLessThan(MAX_EVENT_TO_PRESENTED_FRAME_MS);
   expect(probe.emissions).toBeGreaterThanOrEqual(8);
-  const expectedParticlesPerEmission = (provenance as any).runtime.softwareAdapter === true ? 2 : 4;
-  expect(probe.softwarePresentationBudget).toBe((provenance as any).runtime.softwareAdapter === true);
+  const expectedParticlesPerEmission = runtimeBefore.runtime.softwareAdapter === true ? 2 : 4;
+  expect(probe.softwarePresentationBudget).toBe(runtimeBefore.runtime.softwareAdapter === true);
   expect(probe.particlesPerEmission).toBe(expectedParticlesPerEmission);
   expect(probe.particlesSpawned).toBe(probe.emissions * expectedParticlesPerEmission);
   expect(probe.maximumActive).toBeGreaterThan(0);
@@ -567,7 +507,35 @@ test('cold and held flamethrower fire remain inside the presented-frame freeze b
   expectBoundedFrameWindow(baseline, 20);
   expectBoundedFrameWindow(probe.frameWindow, 50);
   expect(probe.frameWindow.maximumMs).toBeLessThan(baseline.p95Ms * 4 + 40);
+  const runtimeAfter = await captureFrameHitchRendererEvidence(page, testInfo);
+  expectFrameHitchRendererEvidence(runtimeAfter, 'gun-range', 'flamethrower final runtime');
   expect(browserErrors).toEqual([]);
+  const thresholds = {
+    maximumEventToPresentedFrameMs: MAX_EVENT_TO_PRESENTED_FRAME_MS,
+    maximumSynchronousActionMs: MAX_SYNCHRONOUS_ACTION_MS,
+    maximumSustainedPresentedFrameGapMs: MAX_SUSTAINED_PRESENTED_FRAME_GAP_MS,
+    maximumSustainedP95Ms: MAX_SUSTAINED_P95_MS,
+    maximumRelativeMultiplier: 4,
+    maximumRelativeAllowanceMs: 40,
+  };
+  await testInfo.attach('flamethrower-frame-hitch-receipt', {
+    body: Buffer.from(JSON.stringify({
+      thresholds, runtimeBefore, runtimeAfter, baseline, probe, releaseProbe, clearance,
+    }, null, 2)),
+    contentType: 'application/json',
+  });
+  console.log('PASS69_3_FLAMETHROWER_FRAME_HITCH', JSON.stringify({
+    runtimeBefore,
+    runtimeAfter,
+    baseline: { ...baseline, gapsMs: undefined },
+    probe: { ...probe, frameWindow: { ...probe.frameWindow, gapsMs: undefined } },
+    releaseProbe,
+    clearance,
+  }));
+  writeOfficialFrameHitchReceipt(
+    'flamethrower', runtimeBefore, runtimeAfter, thresholds,
+    { baseline, probe, releaseProbe, clearance }, browserErrors,
+  );
 });
 
 test('cold flare shot and sustained projectile updates remain inside the presented-frame freeze budget', async ({ page }, testInfo) => {
@@ -578,7 +546,8 @@ test('cold flare shot and sustained projectile updates remain inside the present
     if (message.type() === 'error') browserErrors.push(message.text());
   });
   await deployGunRange(page, 'pass69-3-flare-gun-hitch-gate');
-  const provenance = await rendererProvenance(page, testInfo);
+  const runtimeBefore = await captureFrameHitchRendererEvidence(page, testInfo);
+  expectFrameHitchRendererEvidence(runtimeBefore, 'gun-range', 'flare-gun initial runtime');
   const baseline = await samplePresentedFrameWindow(page, 'flare-gun-baseline', 750);
   await acquireTrainingWeapon(page, 'flare-gun');
   const impactStage = await stageFlareImpactAtTrainingDummy(page);
@@ -597,32 +566,6 @@ test('cold flare shot and sustained projectile updates remain inside the present
     poolExhaustionsDelta: after.poolExhaustions - before.poolExhaustions,
   };
 
-  await testInfo.attach('flare-gun-frame-hitch-receipt', {
-    body: Buffer.from(JSON.stringify({
-      thresholds: {
-        maximumEventToPresentedFrameMs: MAX_EVENT_TO_PRESENTED_FRAME_MS,
-        maximumSynchronousActionMs: MAX_SYNCHRONOUS_ACTION_MS,
-        maximumSustainedPresentedFrameGapMs: MAX_SUSTAINED_PRESENTED_FRAME_GAP_MS,
-        maximumSustainedP95Ms: MAX_SUSTAINED_P95_MS,
-      },
-      provenance,
-      baseline,
-      coldFire,
-      sustained,
-      impactStage,
-      effectTelemetry,
-    }, null, 2)),
-    contentType: 'application/json',
-  });
-
-  console.log('PASS69_3_FLARE_GUN_FRAME_HITCH', JSON.stringify({
-    provenance,
-    baseline: { ...baseline, gapsMs: undefined },
-    coldFire,
-    sustained: { ...sustained, gapsMs: undefined },
-    impactStage,
-    effectTelemetry,
-  }));
   expect(coldFire.presentedFrameDelta).toBeGreaterThan(0);
   expect(coldFire.synchronousMs).toBeLessThan(MAX_SYNCHRONOUS_ACTION_MS);
   expect(coldFire.eventToPresentedFrameMs).toBeLessThan(MAX_EVENT_TO_PRESENTED_FRAME_MS);
@@ -634,5 +577,43 @@ test('cold flare shot and sustained projectile updates remain inside the present
   expectBoundedFrameWindow(baseline, 20);
   expectBoundedFrameWindow(sustained, 20);
   expect(sustained.maximumMs).toBeLessThan(baseline.p95Ms * 4 + 40);
+  const runtimeAfter = await captureFrameHitchRendererEvidence(page, testInfo);
+  expectFrameHitchRendererEvidence(runtimeAfter, 'gun-range', 'flare-gun final runtime');
   expect(browserErrors).toEqual([]);
+  const thresholds = {
+    maximumEventToPresentedFrameMs: MAX_EVENT_TO_PRESENTED_FRAME_MS,
+    maximumSynchronousActionMs: MAX_SYNCHRONOUS_ACTION_MS,
+    maximumSustainedPresentedFrameGapMs: MAX_SUSTAINED_PRESENTED_FRAME_GAP_MS,
+    maximumSustainedP95Ms: MAX_SUSTAINED_P95_MS,
+    maximumRelativeMultiplier: 4,
+    maximumRelativeAllowanceMs: 40,
+  };
+  await testInfo.attach('flare-gun-frame-hitch-receipt', {
+    body: Buffer.from(JSON.stringify({
+      thresholds,
+      runtimeBefore,
+      runtimeAfter,
+      baseline,
+      coldFire,
+      sustained,
+      impactStage,
+      before,
+      after,
+      effectTelemetry,
+    }, null, 2)),
+    contentType: 'application/json',
+  });
+  console.log('PASS69_3_FLARE_GUN_FRAME_HITCH', JSON.stringify({
+    runtimeBefore,
+    runtimeAfter,
+    baseline: { ...baseline, gapsMs: undefined },
+    coldFire,
+    sustained: { ...sustained, gapsMs: undefined },
+    impactStage,
+    effectTelemetry,
+  }));
+  writeOfficialFrameHitchReceipt(
+    'flare-gun', runtimeBefore, runtimeAfter, thresholds,
+    { baseline, coldFire, sustained, impactStage, before, after, effectTelemetry }, browserErrors,
+  );
 });

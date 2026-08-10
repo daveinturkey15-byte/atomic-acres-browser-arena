@@ -82,15 +82,29 @@ const CONVERGENCE = Object.freeze({
   timeoutMs: 8_000,
 });
 const CONTACT_FIXTURE = Object.freeze({
-  contract: 'gun-range-west-wall-prone-pose-v1',
+  contract: 'gun-range-west-wall-prone-pose-v2',
   map: 'gun-range',
   stance: 'prone',
   teleportPosition: Object.freeze([-19.65, 1.7, -14.5] as const),
-  settledPosition: Object.freeze([-19.65, 0.61, -14.5] as const),
+  // Repeatable post-controller grounded state. The old 0.61m eye height was
+  // only the transient teleport/setStance value before the controller settled.
+  settledPosition: Object.freeze([-19.6465, 0.6363, -14.5] as const),
   yaw: Math.PI / 2,
   pitch: 0,
-  maximumPositionAxisError: 0.02,
+  maximumPositionAxisError: 0.005,
   maximumAngularError: 0.000001,
+  minimumSurfaceLift: 0.13,
+});
+const CONTACT_FIXTURE_CONVERGENCE = Object.freeze({
+  contract: 'consecutive-presented-contact-fixture-v1',
+  requiredStableTransitions: 8,
+  minimumStableElapsedMs: 50,
+  maximumPositionDelta: 0.0005,
+  maximumYawDelta: 0.000001,
+  maximumPitchDelta: 0.000001,
+  maximumSurfaceRetreatDelta: 0.0005,
+  maximumSurfaceLiftDelta: 0.0005,
+  timeoutMs: 10_000,
 });
 const ROUND_CONTINUITY = Object.freeze({
   contract: 'gun-range-production-rematch-round-refresh-v1',
@@ -200,6 +214,55 @@ type PoseConvergenceOptions = Readonly<{
   reloadProgress?: number;
 }>;
 
+type ContactFixtureConvergenceReceipt = Readonly<{
+  contract: string;
+  fixtureContract: string;
+  label: string;
+  requiredStableTransitions: number;
+  stableTransitions: number;
+  stableSampleCount: number;
+  startedPresentedFrame: number;
+  endedPresentedFrame: number;
+  stableElapsedMs: number;
+  totalElapsedMs: number;
+  maximumPositionDelta: number;
+  maximumYawDelta: number;
+  maximumPitchDelta: number;
+  maximumSurfaceRetreatDelta: number;
+  maximumSurfaceLiftDelta: number;
+  thresholds: Readonly<{
+    position: number;
+    yaw: number;
+    pitch: number;
+    surfaceRetreat: number;
+    surfaceLift: number;
+  }>;
+  requirements: Readonly<{
+    matchPhase: 'active';
+    map: string;
+    stance: string;
+    settledPosition: readonly number[];
+    maximumPositionAxisError: number;
+    yaw: number;
+    pitch: number;
+    maximumAngularError: number;
+    saturatedSurfaceRetreat: true;
+    minimumSurfaceLift: number;
+  }>;
+  observed: Readonly<{
+    matchPhase: 'active';
+    map: string;
+    stance: string;
+    presentedGameplayFrame: number;
+    position: number[];
+    yaw: number;
+    pitch: number;
+    surfaceRetreat: number;
+    maximumSurfaceRetreat: number;
+    surfaceLift: number;
+  }>;
+}>;
+
 async function waitForPoseConvergence(page: Page, options: PoseConvergenceOptions): Promise<Record<string, unknown>> {
   return page.evaluate(async ({ expected, limits }) => new Promise<Record<string, unknown>>((resolvePromise, rejectPromise) => {
     const startedAt = performance.now();
@@ -226,7 +289,7 @@ async function waitForPoseConvergence(page: Page, options: PoseConvergenceOption
       maximumRotationDelta = 0;
       maximumDepthDelta = 0;
     };
-    const vectorDelta = (left: number[], right: number[]): number => (
+    const vectorDelta = (left: readonly number[], right: readonly number[]): number => (
       Math.max(...left.map((value, index) => Math.abs(value - right[index]!)))
     );
     const tick = (): void => {
@@ -318,7 +381,221 @@ async function waitForPoseConvergence(page: Page, options: PoseConvergenceOption
   }), { expected: options, limits: CONVERGENCE });
 }
 
-async function deploy(page: Page): Promise<void> {
+async function waitForContactFixtureConvergence(page: Page, label: string): Promise<ContactFixtureConvergenceReceipt> {
+  return page.evaluate(async ({ fixture, limits, evidenceLabel }) => new Promise<ContactFixtureConvergenceReceipt>((resolvePromise, rejectPromise) => {
+    type ContactSample = Readonly<{
+      frame: number;
+      position: number[];
+      yaw: number;
+      pitch: number;
+      surfaceRetreat: number;
+      maximumSurfaceRetreat: number;
+      surfaceLift: number;
+    }>;
+    const startedAt = performance.now();
+    let previous: ContactSample | null = null;
+    let stableStartedAt = 0;
+    let stableStartedFrame = 0;
+    let stableTransitions = 0;
+    let maximumPositionDelta = 0;
+    let maximumYawDelta = 0;
+    let maximumPitchDelta = 0;
+    let maximumSurfaceRetreatDelta = 0;
+    let maximumSurfaceLiftDelta = 0;
+    let lastReason = 'no-sample';
+
+    const resetStableRun = (): void => {
+      stableStartedAt = 0;
+      stableStartedFrame = 0;
+      stableTransitions = 0;
+      maximumPositionDelta = 0;
+      maximumYawDelta = 0;
+      maximumPitchDelta = 0;
+      maximumSurfaceRetreatDelta = 0;
+      maximumSurfaceLiftDelta = 0;
+    };
+    const vectorDelta = (left: readonly number[], right: readonly number[]): number => (
+      Math.max(...left.map((value, index) => Math.abs(value - right[index]!)))
+    );
+    const angularDelta = (left: number, right: number): number => Math.abs(Math.atan2(
+      Math.sin(left - right),
+      Math.cos(left - right),
+    ));
+    const tick = (): void => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      const state = api.snapshot();
+      const frame = api.admissionState().presentedGameplayFrame as number;
+      const position = state.player.position as number[];
+      const yaw = state.player.yaw as number;
+      const pitch = state.player.pitch as number;
+      const surfaceRetreat = state.weaponPresentation.surfaceRetreat as number;
+      const maximumSurfaceRetreat = state.weaponPresentation.nearPlaneClearance?.maximumSurfaceRetreat as number;
+      const surfaceLift = state.weaponPresentation.surfaceLift as number;
+      const positionReady = Array.isArray(position)
+        && position.length === fixture.settledPosition.length
+        && position.every(Number.isFinite);
+      const positionAxisError = positionReady
+        ? vectorDelta(position, fixture.settledPosition)
+        : Number.POSITIVE_INFINITY;
+      const yawError = Number.isFinite(yaw) ? angularDelta(yaw, fixture.yaw) : Number.POSITIVE_INFINITY;
+      const pitchError = Number.isFinite(pitch) ? Math.abs(pitch - fixture.pitch) : Number.POSITIVE_INFINITY;
+      const authorityReady = state.matchPhase === 'active'
+        && state.arenaSelection.id === fixture.map
+        && state.player.stance === fixture.stance
+        && Number.isSafeInteger(frame)
+        && positionAxisError <= fixture.maximumPositionAxisError
+        && yawError <= fixture.maximumAngularError
+        && pitchError <= fixture.maximumAngularError
+        && Number.isFinite(surfaceRetreat)
+        && Number.isFinite(maximumSurfaceRetreat)
+        && surfaceRetreat >= maximumSurfaceRetreat
+        && Number.isFinite(surfaceLift)
+        && surfaceLift >= fixture.minimumSurfaceLift;
+      const sample = authorityReady ? {
+        frame,
+        position: [...position],
+        yaw,
+        pitch,
+        surfaceRetreat,
+        maximumSurfaceRetreat,
+        surfaceLift,
+      } : null;
+
+      if (!sample) {
+        lastReason = `authority-not-ready:${state.matchPhase}:${state.arenaSelection.id}:${state.player.stance}:${positionAxisError}:${yawError}:${pitchError}:${surfaceRetreat}:${maximumSurfaceRetreat}:${surfaceLift}`;
+        previous = null;
+        resetStableRun();
+      } else if (previous && frame === previous.frame + 1) {
+        const positionDelta = vectorDelta(sample.position, previous.position);
+        const yawDelta = angularDelta(sample.yaw, previous.yaw);
+        const pitchDelta = Math.abs(sample.pitch - previous.pitch);
+        const surfaceRetreatDelta = Math.abs(sample.surfaceRetreat - previous.surfaceRetreat);
+        const surfaceLiftDelta = Math.abs(sample.surfaceLift - previous.surfaceLift);
+        if (positionDelta <= limits.maximumPositionDelta
+          && yawDelta <= limits.maximumYawDelta
+          && pitchDelta <= limits.maximumPitchDelta
+          && surfaceRetreatDelta <= limits.maximumSurfaceRetreatDelta
+          && surfaceLiftDelta <= limits.maximumSurfaceLiftDelta) {
+          if (stableTransitions === 0) {
+            stableStartedAt = performance.now();
+            stableStartedFrame = previous.frame;
+          }
+          stableTransitions += 1;
+          maximumPositionDelta = Math.max(maximumPositionDelta, positionDelta);
+          maximumYawDelta = Math.max(maximumYawDelta, yawDelta);
+          maximumPitchDelta = Math.max(maximumPitchDelta, pitchDelta);
+          maximumSurfaceRetreatDelta = Math.max(maximumSurfaceRetreatDelta, surfaceRetreatDelta);
+          maximumSurfaceLiftDelta = Math.max(maximumSurfaceLiftDelta, surfaceLiftDelta);
+          const stableElapsedMs = performance.now() - stableStartedAt;
+          if (stableTransitions >= limits.requiredStableTransitions
+            && stableElapsedMs >= limits.minimumStableElapsedMs) {
+            resolvePromise({
+              contract: limits.contract,
+              fixtureContract: fixture.contract,
+              label: evidenceLabel,
+              requiredStableTransitions: limits.requiredStableTransitions,
+              stableTransitions,
+              stableSampleCount: stableTransitions + 1,
+              startedPresentedFrame: stableStartedFrame,
+              endedPresentedFrame: frame,
+              stableElapsedMs,
+              totalElapsedMs: performance.now() - startedAt,
+              maximumPositionDelta,
+              maximumYawDelta,
+              maximumPitchDelta,
+              maximumSurfaceRetreatDelta,
+              maximumSurfaceLiftDelta,
+              thresholds: {
+                position: limits.maximumPositionDelta,
+                yaw: limits.maximumYawDelta,
+                pitch: limits.maximumPitchDelta,
+                surfaceRetreat: limits.maximumSurfaceRetreatDelta,
+                surfaceLift: limits.maximumSurfaceLiftDelta,
+              },
+              requirements: {
+                matchPhase: 'active',
+                map: fixture.map,
+                stance: fixture.stance,
+                settledPosition: fixture.settledPosition,
+                maximumPositionAxisError: fixture.maximumPositionAxisError,
+                yaw: fixture.yaw,
+                pitch: fixture.pitch,
+                maximumAngularError: fixture.maximumAngularError,
+                saturatedSurfaceRetreat: true,
+                minimumSurfaceLift: fixture.minimumSurfaceLift,
+              },
+              observed: {
+                matchPhase: state.matchPhase,
+                map: state.arenaSelection.id,
+                stance: state.player.stance,
+                presentedGameplayFrame: frame,
+                position: sample.position,
+                yaw: sample.yaw,
+                pitch: sample.pitch,
+                surfaceRetreat: sample.surfaceRetreat,
+                maximumSurfaceRetreat: sample.maximumSurfaceRetreat,
+                surfaceLift: sample.surfaceLift,
+              },
+            });
+            return;
+          }
+        } else {
+          lastReason = `unstable:${positionDelta}:${yawDelta}:${pitchDelta}:${surfaceRetreatDelta}:${surfaceLiftDelta}`;
+          resetStableRun();
+        }
+      } else if (previous && frame !== previous.frame) {
+        lastReason = `non-consecutive-presented-frame:${previous.frame}->${frame}`;
+        resetStableRun();
+      }
+      if (sample && (!previous || frame !== previous.frame)) previous = sample;
+      if (performance.now() - startedAt >= limits.timeoutMs) {
+        rejectPromise(new Error(`Contact fixture convergence timed out for ${evidenceLabel}: ${lastReason}`));
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }), { fixture: CONTACT_FIXTURE, limits: CONTACT_FIXTURE_CONVERGENCE, evidenceLabel: label });
+}
+
+async function stageStableContactFixture(page: Page, label: string): Promise<ContactFixtureConvergenceReceipt> {
+  await page.evaluate((fixture) => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    api.setBotsFrozen(true);
+    api.setMovement(false);
+    api.setAds(false);
+    api.setFireCaptureAgeMs(null);
+    api.setReloadCaptureProgress(null);
+    api.setMeleeCaptureProgress(null);
+    // The shared fixture helper deliberately waits past teleport/setStance's
+    // transient 0.61m eye height for the live controller's grounded pose.
+    api.teleportPlayer(...fixture.teleportPosition, fixture.yaw, fixture.pitch);
+    api.setStance(fixture.stance);
+  }, CONTACT_FIXTURE);
+  try {
+    return await waitForContactFixtureConvergence(page, label);
+  } catch (error) {
+    const diagnostic = await page.evaluate((fixture) => {
+      const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
+      const position = state.player.position as number[];
+      return {
+        matchPhase: state.matchPhase,
+        map: state.arenaSelection.id,
+        stance: state.player.stance,
+        position,
+        positionAxisError: position.map((value, index) => Math.abs(value - fixture.settledPosition[index]!)),
+        yaw: state.player.yaw,
+        pitch: state.player.pitch,
+        surfaceRetreat: state.weaponPresentation.surfaceRetreat,
+        maximumSurfaceRetreat: state.weaponPresentation.nearPlaneClearance.maximumSurfaceRetreat,
+        surfaceLift: state.weaponPresentation.surfaceLift,
+      };
+    }, CONTACT_FIXTURE);
+    throw new Error(`Stable contact fixture staging failed for ${label}: ${JSON.stringify(diagnostic)}`, { cause: error });
+  }
+}
+
+async function deploy(page: Page): Promise<ContactFixtureConvergenceReceipt> {
   const requireWebGpu = renderer === 'webgpu' ? '&requireWebGPU=1' : '';
   await page.setViewportSize(viewport);
   await page.goto(`/?release=latest&map=gun-range&renderer=${renderer}${requireWebGpu}&render=${renderProfile}&grass=off&mist=off&rays=off&externalServices=off&seed=pass69-3-authored-near-plane-${renderer}`);
@@ -333,40 +610,7 @@ async function deploy(page: Page): Promise<void> {
     api.setMovement(false);
   });
   await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().matchPhase === 'active', undefined, { timeout: 60_000 });
-  await page.evaluate(() => {
-    const api = window.__ATOMIC_ACRES_DEBUG__;
-    api.setBotsFrozen(true);
-    api.setMovement(false);
-    api.setAds(false);
-    api.setFireCaptureAgeMs(null);
-    api.setReloadCaptureProgress(null);
-    api.setMeleeCaptureProgress(null);
-    // Existing Gun Range west-wall contact fixture. Prone retains the live
-    // floor-lift challenge while the wall retreat saturates its safe maximum.
-    api.teleportPlayer(-19.65, 1.7, -14.5, Math.PI / 2, 0);
-    api.setStance('prone');
-  });
-  await page.waitForFunction((fixture) => {
-    const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
-    const position = state.player.position;
-    const positionError = Array.isArray(position) && position.length === 3
-      ? Math.max(...position.map((value: number, index: number) => Math.abs(value - fixture.settledPosition[index]!)))
-      : Number.POSITIVE_INFINITY;
-    const yawError = Math.abs(Math.atan2(
-      Math.sin(state.player.yaw - fixture.yaw),
-      Math.cos(state.player.yaw - fixture.yaw),
-    ));
-    const pitchError = Math.abs(state.player.pitch - fixture.pitch);
-    return state.arenaSelection.id === fixture.map
-      && state.player.stance === fixture.stance
-      && positionError <= fixture.maximumPositionAxisError
-      && yawError <= fixture.maximumAngularError
-      && pitchError <= fixture.maximumAngularError
-      && state.weaponPresentation.surfaceRetreat >= state.weaponPresentation.nearPlaneClearance.maximumSurfaceRetreat
-      && state.weaponPresentation.surfaceLift >= 0.13;
-  }, CONTACT_FIXTURE, { timeout: 10_000 });
-  const before = await presentedFrame(page);
-  await waitForPresentedFrames(page, before, 4);
+  return stageStableContactFixture(page, 'initial-deploy');
 }
 
 async function rematchGunRangeRoundAndRestoreContact(
@@ -384,8 +628,10 @@ async function rematchGunRangeRoundAndRestoreContact(
       matchPhase: state.matchPhase,
       matchEpoch: state.killstreak.matchEpoch,
       playerContinuity: state.player.continuity,
+      playerAlive: state.player.alive,
     };
   });
+  expect(roundBefore.playerAlive, `${afterWeapon}: player is alive before production rematch`).toBe(true);
 
   await page.evaluate(() => {
     const api = window.__ATOMIC_ACRES_DEBUG__;
@@ -413,63 +659,25 @@ async function rematchGunRangeRoundAndRestoreContact(
       matchPhase: state.matchPhase,
       matchEpoch: state.killstreak.matchEpoch,
       playerContinuity: state.player.continuity,
+      playerAlive: state.player.alive,
       timerText: document.querySelector<HTMLElement>('#timer')?.textContent ?? '',
     };
   });
   const timerAfterSeconds = matchTimerSeconds(rematchObservation.timerText);
   expect(rematchObservation.matchPhase, `${afterWeapon}: production rematch returns to an active round`).toBe('active');
-  expect(rematchObservation.matchEpoch, `${afterWeapon}: production rematch advances match authority`).toBeGreaterThan(roundBefore.matchEpoch);
-  expect(rematchObservation.playerContinuity, `${afterWeapon}: production rematch advances player life`).toBeGreaterThan(roundBefore.playerContinuity);
+  expect(rematchObservation.playerAlive, `${afterWeapon}: player is alive after production rematch`).toBe(true);
+  expect(rematchObservation.matchEpoch, `${afterWeapon}: production rematch advances match authority exactly once`).toBe(
+    roundBefore.matchEpoch + 1,
+  );
+  expect(rematchObservation.playerContinuity, `${afterWeapon}: production rematch advances player life exactly once`).toBe(
+    roundBefore.playerContinuity + 1,
+  );
   expect(timerAfterSeconds, `${afterWeapon}: production rematch restores the two-minute clock`).toBeGreaterThanOrEqual(
     ROUND_CONTINUITY.minimumResetTimerSeconds,
   );
   expect(timerAfterSeconds, `${afterWeapon}: production rematch advances the visible deadline`).toBeGreaterThan(timerBeforeSeconds);
 
-  await page.evaluate((fixture) => {
-    const api = window.__ATOMIC_ACRES_DEBUG__;
-    api.teleportPlayer(...fixture.teleportPosition, fixture.yaw, fixture.pitch);
-    api.setStance('prone');
-  }, CONTACT_FIXTURE);
-  try {
-    await page.waitForFunction((fixture) => {
-      const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
-      const position = state.player.position;
-      if (!Array.isArray(position) || position.length !== 3) return false;
-      const positionError = Math.max(...position.map((value: number, index: number) => (
-        Math.abs(value - fixture.settledPosition[index]!)
-      )));
-      const yawError = Math.abs(Math.atan2(
-        Math.sin(state.player.yaw - fixture.yaw),
-        Math.cos(state.player.yaw - fixture.yaw),
-      ));
-      const pitchError = Math.abs(state.player.pitch - fixture.pitch);
-      return state.matchPhase === 'active'
-        && state.player.stance === fixture.stance
-        && positionError <= fixture.maximumPositionAxisError
-        && yawError <= fixture.maximumAngularError
-        && pitchError <= fixture.maximumAngularError
-        && state.weaponPresentation.surfaceRetreat >= state.weaponPresentation.nearPlaneClearance.maximumSurfaceRetreat;
-    }, CONTACT_FIXTURE, { timeout: 10_000 });
-  } catch (error) {
-    const diagnostic = await page.evaluate((fixture) => {
-      const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
-      const position = state.player.position as number[];
-      return {
-        matchPhase: state.matchPhase,
-        stance: state.player.stance,
-        position,
-        positionAxisError: position.map((value, index) => Math.abs(value - fixture.settledPosition[index]!)),
-        yaw: state.player.yaw,
-        pitch: state.player.pitch,
-        surfaceRetreat: state.weaponPresentation.surfaceRetreat,
-        maximumSurfaceRetreat: state.weaponPresentation.nearPlaneClearance.maximumSurfaceRetreat,
-        surfaceLift: state.weaponPresentation.surfaceLift,
-      };
-    }, CONTACT_FIXTURE);
-    throw new Error(`Contact restoration failed after ${afterWeapon}: ${JSON.stringify(diagnostic)}`, { cause: error });
-  }
-  const frameBefore = await presentedFrame(page);
-  await waitForPresentedFrames(page, frameBefore, 4);
+  const fixtureConvergence = await stageStableContactFixture(page, `${afterWeapon}->${nextWeapon}`);
   const returnedState = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot());
   return {
     contract: ROUND_CONTINUITY.contract,
@@ -482,11 +690,15 @@ async function rematchGunRangeRoundAndRestoreContact(
         matchPhase: rematchObservation.matchPhase,
         matchEpoch: rematchObservation.matchEpoch,
         playerContinuity: rematchObservation.playerContinuity,
+        playerAlive: rematchObservation.playerAlive,
       },
     },
     timerAfter: { text: rematchObservation.timerText, seconds: timerAfterSeconds },
     minimumResetTimerSeconds: ROUND_CONTINUITY.minimumResetTimerSeconds,
-    returnedFixture: assertFixturePose(returnedState, `${afterWeapon}: restored contact for ${nextWeapon}`),
+    returnedFixture: {
+      ...assertFixturePose(returnedState, `${afterWeapon}: restored contact for ${nextWeapon}`),
+      convergence: fixtureConvergence,
+    },
   };
 }
 
@@ -743,7 +955,7 @@ test('proves canonical authored first-person weapons satisfy the scoped maximum-
   const browserErrors: string[] = [];
   page.on('pageerror', (error) => browserErrors.push(error.stack ?? error.message));
   page.on('console', (message) => { if (message.type() === 'error') browserErrors.push(message.text()); });
-  await deploy(page);
+  const initialContactConvergence = await deploy(page);
 
   const servedCandidate = await page.evaluate(async () => {
     const response = await fetch('/channels/the-big-one/channel-provenance.json', { cache: 'no-store' });
@@ -763,7 +975,7 @@ test('proves canonical authored first-person weapons satisfy the scoped maximum-
 
   const runtimeBefore = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__!.snapshot().render.runtime as any);
   expectRendererProvenance(runtimeBefore, 'initial authored near-plane runtime');
-  const contactFixture = await page.evaluate((fixture) => {
+  const contactFixtureObservation = await page.evaluate((fixture) => {
     const state = window.__ATOMIC_ACRES_DEBUG__!.snapshot();
     const playerPosition = state.player.position as number[];
     const positionAxisError = playerPosition.map((value, index) => (
@@ -816,6 +1028,10 @@ test('proves canonical authored first-person weapons satisfy the scoped maximum-
       },
     };
   }, CONTACT_FIXTURE);
+  const contactFixture = {
+    ...contactFixtureObservation,
+    convergence: initialContactConvergence,
+  };
   expect(contactFixture).toMatchObject({
     contract: CONTACT_FIXTURE.contract,
     map: CONTACT_FIXTURE.map,
@@ -840,6 +1056,37 @@ test('proves canonical authored first-person weapons satisfy the scoped maximum-
       maximumSurfaceRetreat: 0.28,
       saturated: true,
     },
+    convergence: {
+      contract: CONTACT_FIXTURE_CONVERGENCE.contract,
+      fixtureContract: CONTACT_FIXTURE.contract,
+      label: 'initial-deploy',
+      requiredStableTransitions: CONTACT_FIXTURE_CONVERGENCE.requiredStableTransitions,
+      stableSampleCount: expect.any(Number),
+      thresholds: {
+        position: CONTACT_FIXTURE_CONVERGENCE.maximumPositionDelta,
+        yaw: CONTACT_FIXTURE_CONVERGENCE.maximumYawDelta,
+        pitch: CONTACT_FIXTURE_CONVERGENCE.maximumPitchDelta,
+        surfaceRetreat: CONTACT_FIXTURE_CONVERGENCE.maximumSurfaceRetreatDelta,
+        surfaceLift: CONTACT_FIXTURE_CONVERGENCE.maximumSurfaceLiftDelta,
+      },
+      requirements: {
+        matchPhase: 'active',
+        map: CONTACT_FIXTURE.map,
+        stance: CONTACT_FIXTURE.stance,
+        settledPosition: CONTACT_FIXTURE.settledPosition,
+        maximumPositionAxisError: CONTACT_FIXTURE.maximumPositionAxisError,
+        yaw: CONTACT_FIXTURE.yaw,
+        pitch: CONTACT_FIXTURE.pitch,
+        maximumAngularError: CONTACT_FIXTURE.maximumAngularError,
+        saturatedSurfaceRetreat: true,
+        minimumSurfaceLift: CONTACT_FIXTURE.minimumSurfaceLift,
+      },
+      observed: {
+        matchPhase: 'active',
+        map: CONTACT_FIXTURE.map,
+        stance: CONTACT_FIXTURE.stance,
+      },
+    },
   });
   expect(contactFixture.observedSettledPose.position).toHaveLength(3);
   expect(contactFixture.observedSettledPose.position.every(Number.isFinite), 'fixture: finite settled player position').toBe(true);
@@ -862,6 +1109,16 @@ test('proves canonical authored first-person weapons satisfy the scoped maximum-
   expect(contactFixture.surfaceRetreat).toBeGreaterThanOrEqual(contactFixture.maximumSurfaceRetreat);
   expect(contactFixture.contactAuthority.observedSurfaceRetreat).toBe(contactFixture.surfaceRetreat);
   expect(contactFixture.surfaceLift).toBeGreaterThanOrEqual(0.13);
+  expect(contactFixture.convergence.stableTransitions).toBeGreaterThanOrEqual(
+    CONTACT_FIXTURE_CONVERGENCE.requiredStableTransitions,
+  );
+  expect(contactFixture.convergence.stableSampleCount).toBe(contactFixture.convergence.stableTransitions + 1);
+  expect(
+    contactFixture.convergence.endedPresentedFrame - contactFixture.convergence.startedPresentedFrame,
+  ).toBe(contactFixture.convergence.stableTransitions);
+  expect(contactFixture.convergence.stableElapsedMs).toBeGreaterThanOrEqual(
+    CONTACT_FIXTURE_CONVERGENCE.minimumStableElapsedMs,
+  );
 
   const weaponEvidence: Array<Record<string, unknown>> = [];
   const roundContinuity: Array<Record<string, unknown>> = [];
@@ -1003,9 +1260,9 @@ test('proves canonical authored first-person weapons satisfy the scoped maximum-
   }
 
   writeFileSync(receiptPath, `${JSON.stringify({
-    schemaVersion: 2,
+    schemaVersion: 3,
     status: 'PASS',
-    contract: 'atomic-acres/pass69-3-authored-near-plane-catalog@2',
+    contract: 'atomic-acres/pass69-3-authored-near-plane-catalog@3',
     evidenceScope: 'maximum-contact-hip-settled-ads-fire-kick-reload-near-plane-clearance',
     target: officialEvidence ? expectedTarget : `development-${renderer}`,
     sourceSha,

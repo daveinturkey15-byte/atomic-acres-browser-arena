@@ -1,0 +1,361 @@
+import { createHash } from 'node:crypto';
+import { execFileSync, spawnSync } from 'node:child_process';
+import {
+  existsSync, mkdirSync, readFileSync, rmSync, writeFileSync,
+} from 'node:fs';
+import { resolve } from 'node:path';
+
+const root = process.cwd();
+const targets = Object.freeze({
+  'edge-webgl2': Object.freeze({ renderer: 'webgl2', port: '4551' }),
+  'edge-webgpu': Object.freeze({ renderer: 'webgpu', port: '4552' }),
+});
+const targetName = process.argv[2] ?? '';
+const target = targets[targetName];
+if (!target) {
+  throw new Error(`Pass 69.3 frame-hitch target must be one of ${Object.keys(targets).join(', ')}; received ${targetName || '(missing)'}`);
+}
+
+const artifactBase = resolve(root, 'artifacts/pass69-3/frame-hitch');
+const rendererArtifacts = resolve(artifactBase, target.renderer);
+const receiptPath = resolve(artifactBase, `receipt-${target.renderer}.json`);
+mkdirSync(artifactBase, { recursive: true });
+rmSync(rendererArtifacts, { recursive: true, force: true });
+rmSync(receiptPath, { force: true });
+
+function sourceStatus() {
+  return execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], {
+    cwd: root,
+    encoding: 'utf8',
+    windowsHide: true,
+  }).trim();
+}
+
+function discardEvidence(message) {
+  rmSync(rendererArtifacts, { recursive: true, force: true });
+  rmSync(receiptPath, { force: true });
+  throw new Error(message);
+}
+
+function sha256(path) {
+  return createHash('sha256').update(readFileSync(path)).digest('hex');
+}
+
+function readReceipt(kind) {
+  const path = resolve(rendererArtifacts, `${kind}.json`);
+  try {
+    return { path, value: JSON.parse(readFileSync(path, 'utf8')) };
+  } catch (error) {
+    discardEvidence(`Pass 69.3 ${targetName} did not emit readable ${kind} evidence: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+function finite(value) {
+  return Number.isFinite(value);
+}
+
+function exactArray(actual, expected) {
+  return Array.isArray(actual)
+    && actual.length === expected.length
+    && actual.every((value, index) => value === expected[index]);
+}
+
+function hardwareRuntimeValid(runtime, contextLifecycle, webgl) {
+  if (runtime?.requestedBackend !== target.renderer
+    || runtime.actualBackend !== target.renderer
+    || runtime.initialized !== true
+    || runtime.failClosed !== false
+    || runtime.softwareAdapter !== false
+    || runtime.deviceLost !== false
+    || runtime.uncapturedErrors !== 0
+    || typeof runtime.adapterLabel !== 'string'
+    || runtime.adapterLabel.trim().length === 0
+    || /swiftshader|llvmpipe|software|softpipe|\bwarp\b|microsoft basic/iu.test(runtime.adapterLabel)) return false;
+  if (target.renderer === 'webgpu') {
+    return runtime.adapterClass === 'GPUAdapter'
+      && runtime.deviceClass === 'GPUDevice'
+      && runtime.presentation?.status === 'healthy'
+      && webgl === null;
+  }
+  return runtime.adapterClass === 'WebGL2RenderingContext'
+    && runtime.presentation?.status === 'synchronous'
+    && /ANGLE/iu.test(runtime.adapterLabel)
+    && contextLifecycle?.lost === false
+    && contextLifecycle.losses === 0
+    && contextLifecycle.restorations === 0
+    && webgl?.adapterClass === 'WebGL2RenderingContext'
+    && webgl.unmaskedRenderer === runtime.adapterLabel
+    && typeof webgl.version === 'string'
+    && /WebGL 2/iu.test(webgl.version)
+    && !/swiftshader|llvmpipe|software|softpipe|\bwarp\b|microsoft basic/iu.test(
+      `${webgl.unmaskedVendor ?? ''} ${webgl.unmaskedRenderer ?? ''}`,
+    );
+}
+
+function componentEnvelopeValid(receipt, kind, expectedMap, sourceSha) {
+  const expectedScopes = {
+    'glass-m14': 'cold-and-warm-window-breach-plus-m14-event-to-presented-frame',
+    flamethrower: 'cold-and-held-flamethrower-emission-ground-fire-and-release-frame-pacing',
+    'flare-gun': 'cold-flare-flight-impact-and-burn-frame-pacing',
+  };
+  return receipt?.schemaVersion === 1
+    && receipt.status === 'PASS'
+    && receipt.contract === 'atomic-acres/pass69-3-frame-hitch-evidence@1'
+    && receipt.evidenceKind === kind
+    && receipt.evidenceScope === expectedScopes[kind]
+    && receipt.target === targetName
+    && receipt.sourceSha === sourceSha
+    && receipt.endingSourceSha === sourceSha
+    && receipt.cleanSource === true
+    && receipt.renderer === target.renderer
+    && receipt.renderProfile === 'blender'
+    && receipt.map === expectedMap
+    && receipt.browser?.project === 'chromium'
+    && receipt.browser?.channel === 'msedge'
+    && /Edg\//u.test(receipt.browser?.userAgent ?? '')
+    && receipt.servedCandidate?.schemaVersion === 4
+    && receipt.servedCandidate.channel === 'the-big-one'
+    && receipt.servedCandidate.releasePass === 'PASS 69'
+    && receipt.servedCandidate.path === 'channels/the-big-one'
+    && receipt.servedCandidate.sourceSha === sourceSha
+    && /^[a-f0-9]{64}$/u.test(receipt.servedCandidate?.treeSha256 ?? '')
+    && Number.isSafeInteger(receipt.servedCandidate?.exactRootFileCount)
+    && receipt.servedCandidate.exactRootFileCount >= 2
+    && hardwareRuntimeValid(receipt.runtimeBefore, receipt.contextLifecycleBefore, receipt.webglBefore)
+    && hardwareRuntimeValid(receipt.runtimeAfter, receipt.contextLifecycleAfter, receipt.webglAfter)
+    && receipt.runtimeErrorVisibleBefore === false
+    && receipt.runtimeErrorVisibleAfter === false
+    && Array.isArray(receipt.browserErrors)
+    && receipt.browserErrors.length === 0;
+}
+
+function thresholdsValid(thresholds, sustained) {
+  return thresholds?.maximumEventToPresentedFrameMs === 120
+    && thresholds.maximumSynchronousActionMs === 50
+    && thresholds.maximumRelativeMultiplier === 4
+    && thresholds.maximumRelativeAllowanceMs === 40
+    && (!sustained || (
+      thresholds.maximumSustainedPresentedFrameGapMs === 120
+      && thresholds.maximumSustainedP95Ms === 50
+    ));
+}
+
+function actionProbeValid(probe, action) {
+  return probe?.action === action
+    && finite(probe.synchronousMs) && probe.synchronousMs >= 0 && probe.synchronousMs < 50
+    && finite(probe.eventToPresentedFrameMs) && probe.eventToPresentedFrameMs >= 0
+    && probe.eventToPresentedFrameMs < 120
+    && Number.isSafeInteger(probe.presentedFrameDelta) && probe.presentedFrameDelta > 0;
+}
+
+function coldFireProbeValid(probe, label) {
+  return probe?.label === label
+    && finite(probe.synchronousMs) && probe.synchronousMs >= 0 && probe.synchronousMs < 50
+    && finite(probe.eventToPresentedFrameMs) && probe.eventToPresentedFrameMs >= 0
+    && probe.eventToPresentedFrameMs < 120
+    && Number.isSafeInteger(probe.presentedFrameDelta) && probe.presentedFrameDelta > 0;
+}
+
+function rounded(value) {
+  return Number(value.toFixed(3));
+}
+
+function percentile(sorted, quantile) {
+  return sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * quantile) - 1))];
+}
+
+function frameWindowValid(window, label, minimumDurationMs, minimumFrames) {
+  if (window?.label !== label
+    || !finite(window.durationMs) || window.durationMs < minimumDurationMs
+    || !Number.isSafeInteger(window.frameDelta) || window.frameDelta < minimumFrames
+    || !Array.isArray(window.gapsMs) || window.gapsMs.length === 0
+    || !window.gapsMs.every((gap) => finite(gap) && gap >= 0)
+    || !finite(window.p50Ms) || !finite(window.p95Ms) || !finite(window.p99Ms) || !finite(window.maximumMs)
+    || window.p95Ms >= 50 || window.maximumMs >= 120) return false;
+  const sorted = [...window.gapsMs].sort((left, right) => left - right);
+  return Math.abs(window.p50Ms - rounded(percentile(sorted, 0.5))) <= 0.001
+    && Math.abs(window.p95Ms - rounded(percentile(sorted, 0.95))) <= 0.001
+    && Math.abs(window.p99Ms - rounded(percentile(sorted, 0.99))) <= 0.001
+    && Math.abs(window.maximumMs - rounded(sorted[sorted.length - 1])) <= 0.001;
+}
+
+function glassM14EvidenceValid(receipt) {
+  const evidence = receipt.evidence;
+  const probes = evidence?.probes;
+  const expectedActions = ['noop', 'fire', 'fire', 'equip-m14', 'ads-on', 'fire', 'ads-off'];
+  if (!thresholdsValid(receipt.thresholds, false)
+    || evidence?.retainedGlassBefore?.pool?.contract !== 'retained-exact-instanced-render-object-v1'
+    || evidence.retainedGlassBefore.pool.retained !== 6
+    || evidence.retainedGlassBefore.pool.currentArenaRetained !== 6
+    || evidence.retainedGlassBefore.pool.active !== 0
+    || !exactArray(evidence.retainedGlassBefore.panes, [true, true, true, true, true, true])
+    || evidence?.glassAfter?.coldWindowBroken !== true
+    || evidence.glassAfter.warmWindowBroken !== true
+    || !Array.isArray(probes) || probes.length !== expectedActions.length
+    || !probes.every((probe, index) => actionProbeValid(probe, expectedActions[index]))) return false;
+  const baseline = probes[0];
+  return probes.slice(1).every((probe) => (
+    probe.eventToPresentedFrameMs < baseline.eventToPresentedFrameMs * 4 + 40
+  ));
+}
+
+function flamethrowerEvidenceValid(receipt) {
+  const evidence = receipt.evidence;
+  const baseline = evidence?.baseline;
+  const probe = evidence?.probe;
+  const releaseProbe = evidence?.releaseProbe;
+  const clearance = evidence?.clearance;
+  return thresholdsValid(receipt.thresholds, true)
+    && frameWindowValid(baseline, 'flamethrower-baseline', 750, 20)
+    && probe?.label === 'flamethrower-held-fire'
+    && finite(probe.durationMs) && probe.durationMs >= 2_000
+    && finite(probe.synchronousMs) && probe.synchronousMs >= 0 && probe.synchronousMs < 50
+    && finite(probe.triggerToPresentedFrameMs) && probe.triggerToPresentedFrameMs >= 0
+    && probe.triggerToPresentedFrameMs < 120
+    && finite(probe.firstEmissionObservedAfterTriggerMs) && probe.firstEmissionObservedAfterTriggerMs >= 0
+    && finite(probe.firstEmissionContainingFrameGapMs) && probe.firstEmissionContainingFrameGapMs >= 0
+    && probe.firstEmissionContainingFrameGapMs < 120
+    && frameWindowValid(probe.frameWindow, 'flamethrower-held-fire', 2_000, 50)
+    && probe.frameWindow.maximumMs < baseline.p95Ms * 4 + 40
+    && Number.isSafeInteger(probe.emissions) && probe.emissions >= 8
+    && probe.softwarePresentationBudget === false
+    && probe.particlesPerEmission === 4
+    && probe.particlesSpawned === probe.emissions * 4
+    && probe.maximumActive > 0
+    && probe.groundFireActive > 0
+    && probe.poolExhaustions === 0
+    && coldFireProbeValid(releaseProbe, 'flamethrower-release-clearance')
+    && clearance?.fastPathActive === false
+    && clearance.armNearPlaneClear === true
+    && clearance.weaponNearPlaneClear === true
+    && clearance.prewarmChecks >= 1
+    && clearance.entryTransitions >= 1
+    && clearance.exitTransitions >= 1
+    && clearance.skippedFrames >= 20;
+}
+
+function flareEvidenceValid(receipt) {
+  const evidence = receipt.evidence;
+  const before = evidence?.before;
+  const after = evidence?.after;
+  const effect = evidence?.effectTelemetry;
+  const impactStage = evidence?.impactStage;
+  return thresholdsValid(receipt.thresholds, true)
+    && frameWindowValid(evidence?.baseline, 'flare-gun-baseline', 750, 20)
+    && coldFireProbeValid(evidence?.coldFire, 'flare-gun-cold-fire')
+    && frameWindowValid(evidence?.sustained, 'flare-gun-impact-and-burn-lifecycle', 1_200, 20)
+    && evidence.sustained.maximumMs < evidence.baseline.p95Ms * 4 + 40
+    && typeof impactStage?.targetId === 'string' && impactStage.targetId.length > 0
+    && Array.isArray(impactStage.playerPosition) && impactStage.playerPosition.length === 3
+    && impactStage.playerPosition.every(finite)
+    && Array.isArray(impactStage.targetPosition) && impactStage.targetPosition.length === 3
+    && impactStage.targetPosition.every(finite)
+    && finite(impactStage.yaw) && finite(impactStage.pitch)
+    && finite(impactStage.distanceM) && impactStage.distanceM > 0
+    && effect?.spawnCountDelta === after?.spawnCount - before?.spawnCount
+    && effect.spawnCountDelta === 1
+    && effect.impactCountDelta === after.impactCount - before.impactCount
+    && effect.impactCountDelta > 0
+    && effect.burnPulseCountDelta === after.burnPulseCount - before.burnPulseCount
+    && effect.burnPulseCountDelta > 0
+    && effect.activeAfterWindow === after.active
+    && effect.flyingAfterWindow === after.flying
+    && effect.burningAfterWindow === after.burning
+    && after.flying + after.burning === after.active
+    && effect.poolExhaustionsDelta === after.poolExhaustions - before.poolExhaustions
+    && effect.poolExhaustionsDelta === 0;
+}
+
+const localViteOverrides = ['.env', '.env.local', '.env.production.local']
+  .filter((path) => existsSync(resolve(root, path)));
+if (localViteOverrides.length > 0) {
+  discardEvidence(`Pass 69.3 frame-hitch rejects local Vite environment overrides: ${localViteOverrides.join(', ')}`);
+}
+const sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], {
+  cwd: root,
+  encoding: 'utf8',
+  windowsHide: true,
+}).trim();
+if (!/^[a-f0-9]{40}$/u.test(sourceSha) || sourceStatus()) {
+  discardEvidence('Pass 69.3 frame-hitch requires one completely clean source SHA');
+}
+
+const inheritedEnvironment = Object.fromEntries(
+  Object.entries(process.env).filter(([key]) => !key.toUpperCase().startsWith('VITE_')),
+);
+const result = spawnSync(process.execPath, [
+  resolve(root, 'scripts/qa/run-playwright-with-topology.mjs'),
+  'tests/e2e/pass69-3-glass-m14-frame-hitch.spec.ts',
+  'tests/e2e/pass69-3-special-weapon-frame-hitch.spec.ts',
+  '--project=chromium',
+  '--workers=1',
+  '--retries=0',
+], {
+  cwd: root,
+  env: {
+    ...inheritedEnvironment,
+    NODE_ENV: 'production',
+    SOURCE_SHA: sourceSha,
+    RELEASE_PASS: 'PASS 69',
+    VITE_MATCH_BUILD_ID: sourceSha,
+    QA_INSTALLED_EDGE: '1',
+    QA_PREVIEW_PORT: target.port,
+    PASS69_3_FRAME_HITCH_RENDERER: target.renderer,
+    PASS69_3_FRAME_HITCH_RENDER_PROFILE: 'blender',
+    PASS69_3_FRAME_HITCH_SOURCE_SHA: sourceSha,
+    PASS69_3_FRAME_HITCH_TARGET: targetName,
+  },
+  stdio: 'inherit',
+  windowsHide: true,
+});
+if (result.error) discardEvidence(`Pass 69.3 ${targetName} frame-hitch failed to launch: ${result.error.message}`);
+if (result.signal) discardEvidence(`Pass 69.3 ${targetName} frame-hitch terminated by ${result.signal}`);
+if ((result.status ?? 1) !== 0) discardEvidence(`Pass 69.3 ${targetName} frame-hitch failed with exit ${result.status ?? 1}`);
+
+const components = Object.freeze({
+  'glass-m14': readReceipt('glass-m14'),
+  flamethrower: readReceipt('flamethrower'),
+  'flare-gun': readReceipt('flare-gun'),
+});
+if (!componentEnvelopeValid(components['glass-m14'].value, 'glass-m14', 'atomic-acres', sourceSha)
+  || !glassM14EvidenceValid(components['glass-m14'].value)
+  || !componentEnvelopeValid(components.flamethrower.value, 'flamethrower', 'gun-range', sourceSha)
+  || !flamethrowerEvidenceValid(components.flamethrower.value)
+  || !componentEnvelopeValid(components['flare-gun'].value, 'flare-gun', 'gun-range', sourceSha)
+  || !flareEvidenceValid(components['flare-gun'].value)) {
+  discardEvidence(`Pass 69.3 ${targetName} frame-hitch emitted invalid, incomplete, or weakened evidence`);
+}
+
+const endingSha = execFileSync('git', ['rev-parse', 'HEAD'], {
+  cwd: root,
+  encoding: 'utf8',
+  windowsHide: true,
+}).trim();
+if (endingSha !== sourceSha || sourceStatus()) {
+  discardEvidence(`Pass 69.3 ${targetName} frame-hitch source drifted during verification (${sourceSha} -> ${endingSha})`);
+}
+
+writeFileSync(receiptPath, `${JSON.stringify({
+  schemaVersion: 1,
+  status: 'PASS',
+  contract: 'atomic-acres/pass69-3-frame-hitch-matrix@1',
+  target: targetName,
+  renderer: target.renderer,
+  renderProfile: 'blender',
+  sourceSha,
+  endingSourceSha: endingSha,
+  cleanSource: true,
+  browser: { project: 'chromium', channel: 'msedge' },
+  isolatedPreviewPort: Number(target.port),
+  components: Object.fromEntries(Object.entries(components).map(([kind, component]) => [kind, {
+    path: component.path.replaceAll('\\', '/').slice(root.replaceAll('\\', '/').length + 1),
+    sha256: sha256(component.path),
+  }])),
+}, null, 2)}\n`, 'utf8');
+
+console.log(JSON.stringify({
+  pass69_3FrameHitch: 'PASS',
+  target: targetName,
+  sourceSha,
+  receiptPath,
+}, null, 2));

@@ -1,4 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
+import {
+  captureFrameHitchRendererEvidence,
+  expectFrameHitchRendererEvidence,
+  frameHitchRoute,
+  writeOfficialFrameHitchReceipt,
+} from './pass69-3-frame-hitch-evidence';
 
 type ProbeAction = 'noop' | 'fire' | 'equip-m14' | 'ads-on' | 'ads-off';
 
@@ -13,7 +19,7 @@ const MAX_EVENT_TO_PRESENTED_FRAME_MS = 120;
 const MAX_SYNCHRONOUS_ACTION_MS = 50;
 
 async function deploy(page: Page): Promise<void> {
-  await page.goto('/?release=latest&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&seed=pass69-3-hitch-gate');
+  await page.goto(frameHitchRoute('atomic-acres', 'pass69-3-glass-m14-hitch-gate'));
   await page.waitForFunction(() => Boolean(
     window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true
       && document.querySelector<HTMLButtonElement>('#solo')?.disabled === false,
@@ -77,13 +83,16 @@ test('glass breach and first M14 EBR use reach the next presented frame without 
     if (message.type() === 'error') browserErrors.push(message.text());
   });
   await deploy(page);
-  expect(await page.evaluate(() => {
+  const runtimeBefore = await captureFrameHitchRendererEvidence(page, testInfo);
+  expectFrameHitchRendererEvidence(runtimeBefore, 'atomic-acres', 'glass/M14 initial runtime');
+  const retainedGlassBefore = await page.evaluate(() => {
     const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
     return {
       pool: snapshot.windowGlassDebrisPool,
       panes: snapshot.breakableWindows.map((window: any) => window.retainedDebrisPrewarmed),
     };
-  })).toEqual({
+  });
+  expect(retainedGlassBefore).toEqual({
     pool: {
       contract: 'retained-exact-instanced-render-object-v1',
       retained: 6,
@@ -126,12 +135,28 @@ test('glass breach and first M14 EBR use reach the next presented frame without 
     window.__ATOMIC_ACRES_DEBUG__.snapshot() as any
   ).dmrThermal.active)).toBe(false);
 
+  const glassAfter = await page.evaluate(() => {
+    const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
+    return {
+      coldWindowBroken: snapshot.breakableWindows[0].broken,
+      warmWindowBroken: snapshot.breakableWindows[1].broken,
+      pool: snapshot.windowGlassDebrisPool,
+    };
+  });
+  expect(glassAfter).toMatchObject({ coldWindowBroken: true, warmWindowBroken: true });
+  const runtimeAfter = await captureFrameHitchRendererEvidence(page, testInfo);
+  expectFrameHitchRendererEvidence(runtimeAfter, 'atomic-acres', 'glass/M14 final runtime');
+
   const probes = [baseline, coldGlass, warmGlass, m14Equip, m14Ads, m14Shot, m14AdsRelease];
   await testInfo.attach('event-to-presented-frame-receipt', {
     body: Buffer.from(JSON.stringify({
-      renderer: 'webgl2',
+      renderer: runtimeAfter.runtime.actualBackend,
       maximumEventToPresentedFrameMs: MAX_EVENT_TO_PRESENTED_FRAME_MS,
       maximumSynchronousActionMs: MAX_SYNCHRONOUS_ACTION_MS,
+      runtimeBefore,
+      runtimeAfter,
+      retainedGlassBefore,
+      glassAfter,
       probes,
     }, null, 2)),
     contentType: 'application/json',
@@ -144,4 +169,17 @@ test('glass breach and first M14 EBR use reach the next presented frame without 
     ).toBeLessThan(baseline.eventToPresentedFrameMs * 4 + 40);
   }
   expect(browserErrors).toEqual([]);
+  writeOfficialFrameHitchReceipt(
+    'glass-m14',
+    runtimeBefore,
+    runtimeAfter,
+    {
+      maximumEventToPresentedFrameMs: MAX_EVENT_TO_PRESENTED_FRAME_MS,
+      maximumSynchronousActionMs: MAX_SYNCHRONOUS_ACTION_MS,
+      maximumRelativeMultiplier: 4,
+      maximumRelativeAllowanceMs: 40,
+    },
+    { retainedGlassBefore, glassAfter, probes },
+    browserErrors,
+  );
 });

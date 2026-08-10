@@ -54,15 +54,26 @@ const expectedFireAges = Object.freeze([0, 4, 8, 12, 16, 24, 36, 52, 78, 105, 15
 const expectedReloadProgress = Object.freeze([0.08, 0.22, 0.38, 0.52, 0.68, 0.84]);
 const fullscreenOptics = new Set(['sniper', 'm14-ebr']);
 const expectedContactFixture = Object.freeze({
-  contract: 'gun-range-west-wall-prone-pose-v1',
+  contract: 'gun-range-west-wall-prone-pose-v2',
   map: 'gun-range',
   stance: 'prone',
   teleportPosition: Object.freeze([-19.65, 1.7, -14.5]),
-  settledPosition: Object.freeze([-19.65, 0.61, -14.5]),
+  settledPosition: Object.freeze([-19.6465, 0.6363, -14.5]),
   yaw: Math.PI / 2,
   pitch: 0,
-  maximumPositionAxisError: 0.02,
+  maximumPositionAxisError: 0.005,
   maximumAngularError: 0.000001,
+  minimumSurfaceLift: 0.13,
+});
+const expectedContactFixtureConvergence = Object.freeze({
+  contract: 'consecutive-presented-contact-fixture-v1',
+  requiredStableTransitions: 8,
+  minimumStableElapsedMs: 50,
+  maximumPositionDelta: 0.0005,
+  maximumYawDelta: 0.000001,
+  maximumPitchDelta: 0.000001,
+  maximumSurfaceRetreatDelta: 0.0005,
+  maximumSurfaceLiftDelta: 0.0005,
 });
 const expectedRoundContinuity = Object.freeze({
   contract: 'gun-range-production-rematch-round-refresh-v1',
@@ -98,6 +109,83 @@ function matchTimerSeconds(value) {
   if (!match) return Number.NaN;
   const seconds = Number(match[2]);
   return seconds < 60 ? Number(match[1]) * 60 + seconds : Number.NaN;
+}
+
+function angularDelta(left, right) {
+  return Math.abs(Math.atan2(Math.sin(left - right), Math.cos(left - right)));
+}
+
+function contactFixtureConvergenceValid(convergence, expectedLabel) {
+  const requirements = convergence?.requirements;
+  const observed = convergence?.observed;
+  const position = observed?.position;
+  if (!Array.isArray(position)
+    || position.length !== expectedContactFixture.settledPosition.length
+    || !position.every(Number.isFinite)
+    || !Number.isFinite(observed?.yaw)
+    || !Number.isFinite(observed?.pitch)
+    || !Number.isFinite(observed?.surfaceRetreat)
+    || !Number.isFinite(observed?.maximumSurfaceRetreat)
+    || !Number.isFinite(observed?.surfaceLift)) return false;
+  const positionAxisError = position.map((value, index) => (
+    Math.abs(value - expectedContactFixture.settledPosition[index])
+  ));
+  const yawError = angularDelta(observed.yaw, expectedContactFixture.yaw);
+  const pitchError = Math.abs(observed.pitch - expectedContactFixture.pitch);
+  return convergence.contract === expectedContactFixtureConvergence.contract
+    && convergence.fixtureContract === expectedContactFixture.contract
+    && convergence.label === expectedLabel
+    && convergence.requiredStableTransitions === expectedContactFixtureConvergence.requiredStableTransitions
+    && Number.isSafeInteger(convergence.stableTransitions)
+    && convergence.stableTransitions >= expectedContactFixtureConvergence.requiredStableTransitions
+    && convergence.stableSampleCount === convergence.stableTransitions + 1
+    && Number.isSafeInteger(convergence.startedPresentedFrame)
+    && Number.isSafeInteger(convergence.endedPresentedFrame)
+    && convergence.endedPresentedFrame - convergence.startedPresentedFrame === convergence.stableTransitions
+    && Number.isFinite(convergence.stableElapsedMs)
+    && convergence.stableElapsedMs >= expectedContactFixtureConvergence.minimumStableElapsedMs
+    && Number.isFinite(convergence.totalElapsedMs)
+    && convergence.totalElapsedMs >= convergence.stableElapsedMs
+    && Number.isFinite(convergence.maximumPositionDelta)
+    && convergence.maximumPositionDelta >= 0
+    && convergence.maximumPositionDelta <= expectedContactFixtureConvergence.maximumPositionDelta
+    && Number.isFinite(convergence.maximumYawDelta)
+    && convergence.maximumYawDelta >= 0
+    && convergence.maximumYawDelta <= expectedContactFixtureConvergence.maximumYawDelta
+    && Number.isFinite(convergence.maximumPitchDelta)
+    && convergence.maximumPitchDelta >= 0
+    && convergence.maximumPitchDelta <= expectedContactFixtureConvergence.maximumPitchDelta
+    && Number.isFinite(convergence.maximumSurfaceRetreatDelta)
+    && convergence.maximumSurfaceRetreatDelta >= 0
+    && convergence.maximumSurfaceRetreatDelta <= expectedContactFixtureConvergence.maximumSurfaceRetreatDelta
+    && Number.isFinite(convergence.maximumSurfaceLiftDelta)
+    && convergence.maximumSurfaceLiftDelta >= 0
+    && convergence.maximumSurfaceLiftDelta <= expectedContactFixtureConvergence.maximumSurfaceLiftDelta
+    && convergence.thresholds?.position === expectedContactFixtureConvergence.maximumPositionDelta
+    && convergence.thresholds?.yaw === expectedContactFixtureConvergence.maximumYawDelta
+    && convergence.thresholds?.pitch === expectedContactFixtureConvergence.maximumPitchDelta
+    && convergence.thresholds?.surfaceRetreat === expectedContactFixtureConvergence.maximumSurfaceRetreatDelta
+    && convergence.thresholds?.surfaceLift === expectedContactFixtureConvergence.maximumSurfaceLiftDelta
+    && requirements?.matchPhase === 'active'
+    && requirements.map === expectedContactFixture.map
+    && requirements.stance === expectedContactFixture.stance
+    && sameArray(requirements.settledPosition, expectedContactFixture.settledPosition)
+    && requirements.maximumPositionAxisError === expectedContactFixture.maximumPositionAxisError
+    && requirements.yaw === expectedContactFixture.yaw
+    && requirements.pitch === expectedContactFixture.pitch
+    && requirements.maximumAngularError === expectedContactFixture.maximumAngularError
+    && requirements.saturatedSurfaceRetreat === true
+    && requirements.minimumSurfaceLift === expectedContactFixture.minimumSurfaceLift
+    && observed.matchPhase === 'active'
+    && observed.map === expectedContactFixture.map
+    && observed.stance === expectedContactFixture.stance
+    && observed.presentedGameplayFrame === convergence.endedPresentedFrame
+    && Math.max(...positionAxisError) <= expectedContactFixture.maximumPositionAxisError
+    && yawError <= expectedContactFixture.maximumAngularError
+    && pitchError <= expectedContactFixture.maximumAngularError
+    && observed.maximumSurfaceRetreat === 0.28
+    && observed.surfaceRetreat >= observed.maximumSurfaceRetreat
+    && observed.surfaceLift >= expectedContactFixture.minimumSurfaceLift;
 }
 
 function contactFixtureValid(contact) {
@@ -150,7 +238,17 @@ function contactFixtureValid(contact) {
     && contact.contactAuthority.observedSurfaceRetreat === contact.surfaceRetreat
     && contact.contactAuthority.maximumSurfaceRetreat === contact.maximumSurfaceRetreat
     && contact.contactAuthority.saturated === true
-    && contact.contactAuthority.observedSurfaceRetreat >= contact.contactAuthority.maximumSurfaceRetreat;
+    && contact.contactAuthority.observedSurfaceRetreat >= contact.contactAuthority.maximumSurfaceRetreat
+    && contactFixtureConvergenceValid(contact.convergence, 'initial-deploy')
+    && Math.max(...position.map((value, index) => (
+      Math.abs(value - contact.convergence.observed.position[index])
+    ))) <= expectedContactFixtureConvergence.maximumPositionDelta
+    && angularDelta(observed.yaw, contact.convergence.observed.yaw) <= expectedContactFixtureConvergence.maximumYawDelta
+    && Math.abs(observed.pitch - contact.convergence.observed.pitch) <= expectedContactFixtureConvergence.maximumPitchDelta
+    && Math.abs(contact.surfaceRetreat - contact.convergence.observed.surfaceRetreat)
+      <= expectedContactFixtureConvergence.maximumSurfaceRetreatDelta
+    && Math.abs(contact.surfaceLift - contact.convergence.observed.surfaceLift)
+      <= expectedContactFixtureConvergence.maximumSurfaceLiftDelta;
 }
 
 function fixturePoseValid(pose) {
@@ -181,6 +279,17 @@ function fixturePoseValid(pose) {
     && Math.abs(pose.pitchError - pitchError) <= 1e-12;
 }
 
+function returnedFixtureValid(pose, expectedLabel) {
+  if (!fixturePoseValid(pose)
+    || !contactFixtureConvergenceValid(pose?.convergence, expectedLabel)) return false;
+  const observed = pose.convergence.observed;
+  return Math.max(...pose.position.map((value, index) => (
+    Math.abs(value - observed.position[index])
+  ))) <= expectedContactFixtureConvergence.maximumPositionDelta
+    && angularDelta(pose.yaw, observed.yaw) <= expectedContactFixtureConvergence.maximumYawDelta
+    && Math.abs(pose.pitch - observed.pitch) <= expectedContactFixtureConvergence.maximumPitchDelta;
+}
+
 function roundContinuityValid(continuity) {
   if (continuity?.contract !== expectedRoundContinuity.contract
     || continuity.refreshCount !== expectedWeapons.length - 1
@@ -201,14 +310,16 @@ function roundContinuityValid(continuity) {
       && matchTimerSeconds(entry.timerAfter?.text) === entry.timerAfter.seconds
       && entry.minimumResetTimerSeconds === expectedRoundContinuity.minimumResetTimerSeconds
       && before?.matchPhase === 'active'
+      && before?.playerAlive === true
       && Number.isSafeInteger(before?.matchEpoch)
       && Number.isSafeInteger(before?.playerContinuity)
       && after?.matchPhase === 'active'
+      && after?.playerAlive === true
       && Number.isSafeInteger(after?.matchEpoch)
       && Number.isSafeInteger(after?.playerContinuity)
-      && after.matchEpoch > before.matchEpoch
-      && after.playerContinuity > before.playerContinuity
-      && fixturePoseValid(entry.returnedFixture);
+      && after.matchEpoch === before.matchEpoch + 1
+      && after.playerContinuity === before.playerContinuity + 1
+      && returnedFixtureValid(entry.returnedFixture, `${entry.afterWeapon}->${entry.nextWeapon}`);
   });
 }
 
@@ -476,9 +587,9 @@ const weaponsValid = Array.isArray(receipt.weapons)
       && sha256(screenshotFile) === entry.screenshot.sha256;
   });
 
-if (receipt.schemaVersion !== 2
+if (receipt.schemaVersion !== 3
   || receipt.status !== 'PASS'
-  || receipt.contract !== 'atomic-acres/pass69-3-authored-near-plane-catalog@2'
+  || receipt.contract !== 'atomic-acres/pass69-3-authored-near-plane-catalog@3'
   || receipt.evidenceScope !== 'maximum-contact-hip-settled-ads-fire-kick-reload-near-plane-clearance'
   || receipt.target !== targetName
   || receipt.sourceSha !== sourceSha

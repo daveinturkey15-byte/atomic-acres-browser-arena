@@ -2315,30 +2315,36 @@
     },
     {
       "id": "T-PASS69-3-GLASS-M14-HITCH",
-      "command": "npm run qa:playwright-topology -- tests/e2e/pass69-3-glass-m14-frame-hitch.spec.ts --project=chromium --workers=1 --retries=0",
+      "command": "npm run qa:pass69-3:frame-hitch",
       "paths": [
         "package.json",
+        "scripts/qa/run-pass69-3-frame-hitch-matrix.mjs",
         "src/legacy-main.ts",
+        "src/pass69-3-frame-hitch-runner.test.ts",
         "src/window-glass-debris-presentation.ts",
         "src/window-glass-debris-presentation.test.ts",
         "src/weapon-presentation.ts",
         "src/thermal-ghost-presentation.test.ts",
+        "tests/e2e/pass69-3-frame-hitch-evidence.ts",
         "tests/e2e/pass69-3-glass-m14-frame-hitch.spec.ts"
       ],
       "evidenceKinds": ["browser"]
     },
     {
       "id": "T-PASS69-3-FLAME-FLARE-HITCH",
-      "command": "npm run qa:playwright-topology -- tests/e2e/pass69-3-special-weapon-frame-hitch.spec.ts --project=chromium --workers=1 --retries=0",
+      "command": "npm run qa:pass69-3:frame-hitch",
       "paths": [
         "package.json",
+        "scripts/qa/run-pass69-3-frame-hitch-matrix.mjs",
         "src/arena-transition-profile.ts",
         "src/flamethrower-stream-system.ts",
         "src/flamethrower-stream-system.test.ts",
         "src/flare-projectile-system.ts",
         "src/flare-projectile-system.test.ts",
         "src/legacy-main.ts",
+        "src/pass69-3-frame-hitch-runner.test.ts",
         "src/weapon-presentation.ts",
+        "tests/e2e/pass69-3-frame-hitch-evidence.ts",
         "tests/e2e/pass69-3-special-weapon-frame-hitch.spec.ts"
       ],
       "evidenceKinds": ["browser"]
