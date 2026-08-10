@@ -1073,8 +1073,9 @@ export function enforceRiggedOperatorHandBindDeltaFloor(
   const reportedBindDeltaCorrectionRadians = intervened
     ? Math.max(0, minimumBindDeltaRadians - beforeBindDeltaRadians)
     : 0;
-  const renderedOrientationCorrectionRadians = beforeLocalQuaternion.clone().normalize()
-    .angleTo(entry.bone.quaternion.clone().normalize());
+  const renderedOrientationCorrectionRadians = intervened
+    ? beforeLocalQuaternion.clone().normalize().angleTo(entry.bone.quaternion.clone().normalize())
+    : 0;
   return {
     contract: 'post-mixer-authored-bind-relative-hand-floor-v1',
     reference: 'immutable-authored-handBindPose-before-animation',

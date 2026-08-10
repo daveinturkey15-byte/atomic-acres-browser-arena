@@ -248,6 +248,7 @@ describe('post-mixer authored-bind hand floor', () => {
     const highReceipt = enforceRightPinkyFloor(highRig.root);
     expect(highReceipt.beforeBindDeltaRadians).toBeCloseTo(1.2401019755382803, 12);
     expect(highReceipt.intervened).toBe(false);
+    expect(highReceipt.renderedOrientationCorrectionRadians).toBe(0);
     expect(highRig.pinky.bone.quaternion.toArray()).toEqual(highPhase.toArray());
 
     const axis = new THREE.Vector3(0.2, -0.9, 0.38).normalize();
@@ -263,6 +264,7 @@ describe('post-mixer authored-bind hand floor', () => {
     const boundaryReceipt = enforceRightPinkyFloor(boundaryRig.root);
     expect(boundaryReceipt.beforeBindDeltaRadians).toBeCloseTo(0.38, 12);
     expect(boundaryReceipt.intervened).toBe(false);
+    expect(boundaryReceipt.renderedOrientationCorrectionRadians).toBe(0);
     expect(boundaryRig.pinky.bone.quaternion.toArray()).toEqual(boundary.toArray());
   });
 
