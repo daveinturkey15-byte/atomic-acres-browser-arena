@@ -11,7 +11,9 @@ const targets = Object.freeze({
   'edge-webgpu': Object.freeze({ renderer: 'webgpu', port: '4562' }),
 });
 const selfTestMode = process.argv[2] === '--self-test';
-const targetName = selfTestMode ? 'edge-webgl2' : process.argv[2] ?? '';
+const validateReceiptMode = process.argv[2] === '--validate-receipt';
+const targetName = selfTestMode ? 'edge-webgl2'
+  : validateReceiptMode ? process.argv[3] ?? '' : process.argv[2] ?? '';
 const target = targets[targetName];
 if (!target) {
   throw new Error(`Pass 69.3 rigged-bot target must be one of ${Object.keys(targets).join(', ')}; received ${targetName || '(missing)'}`);
@@ -20,6 +22,8 @@ if (!target) {
 const artifactBase = resolve(root, 'artifacts/pass69-3/rigged-bot-live');
 const rendererArtifacts = resolve(artifactBase, target.renderer);
 const receiptPath = resolve(artifactBase, `receipt-${target.renderer}.json`);
+const validationReceiptPath = validateReceiptMode && process.argv[4]
+  ? resolve(root, process.argv[4]) : receiptPath;
 const expectedDummyIds = Object.freeze([
   'test-dummy-alpha', 'test-dummy-bravo', 'test-dummy-charlie', 'test-dummy-delta',
 ]);
@@ -99,7 +103,7 @@ const closeRoiNdc = Object.freeze({ minX: -0.46, maxX: 0.46, minY: -0.7, maxY: 0
 const handRoiNdc = Object.freeze({ minX: -0.55, maxX: 0.55, minY: -0.68, maxY: 0.68 });
 const mediumRoiNdc = Object.freeze({ minX: -0.68, maxX: 0.68, minY: -0.82, maxY: 0.82 });
 const overviewRoiNdc = Object.freeze({ minX: -0.97, maxX: 0.97, minY: -0.95, maxY: 0.95 });
-if (!selfTestMode) {
+if (!selfTestMode && !validateReceiptMode) {
   mkdirSync(artifactBase, { recursive: true });
   rmSync(receiptPath, { force: true });
 }
@@ -646,8 +650,8 @@ function handBindFloorValid(floor, curlBone, actualBone, expected) {
     || !finiteVector(floor.afterLocalQuaternion, 4)
     || !finiteVector(floor.appliedAxis)
     || !close(vectorLength(floor.bindLocalQuaternion), 1, 1e-7)
-    || !close(vectorLength(floor.beforeLocalQuaternion), 1, 1e-7)
-    || !close(vectorLength(floor.afterLocalQuaternion), 1, 1e-7)
+    || !close(vectorLength(floor.beforeLocalQuaternion), 1, 1e-5)
+    || !close(vectorLength(floor.afterLocalQuaternion), 1, 1e-5)
     || !close(vectorLength(floor.appliedAxis), 1, 1e-7)
     || typeof floor.alignedObservedAxisHemisphere !== 'boolean'
     || floor.appliedToRenderedBone !== true
@@ -917,10 +921,136 @@ function motionValid(first, second, motion, requireWorldMovement) {
   return deltasValid && motion.movingChains.every((chain) => chain.maximumRadians > 0.001);
 }
 
+function failedPredicateNames(checks) {
+  return checks.filter(([, passed]) => passed !== true).map(([name]) => name);
+}
+
+function receiptValidationFailures(receipt, sourceSha) {
+  if (!receipt || typeof receipt !== 'object' || Array.isArray(receipt)) return ['receipt.object'];
+  const checks = [];
+  const add = (name, passed) => checks.push([name, passed]);
+  const evidenceBase = `artifacts/pass69-3/rigged-bot-live/${target.renderer}`;
+  const armedActor = { kind: 'bot', id: receipt.armedBot?.id };
+  const expectedCaptureRois = {
+    close: closeRoiNdc, hand: handRoiNdc, medium: mediumRoiNdc, overview: overviewRoiNdc,
+  };
+
+  add('receipt.schemaVersion', receipt.schemaVersion === 4);
+  add('receipt.status', receipt.status === 'AUTOMATION_PASS_OWNER_PENDING');
+  add('receipt.contract', receipt.contract === 'atomic-acres/pass69-3-rigged-bot-live@4');
+  add('receipt.evidenceScope', receipt.evidenceScope
+    === 'weighted-skin-anti-t-five-digit-grip-orientation-full-body-and-fixed-hand-detail-framing');
+  add('receipt.target', receipt.target === targetName);
+  add('receipt.sourceSha', receipt.sourceSha === sourceSha);
+  add('receipt.endingSourceSha', receipt.endingSourceSha === sourceSha);
+  add('receipt.cleanSource', receipt.cleanSource === true);
+  add('receipt.renderer', receipt.renderer === target.renderer);
+  add('receipt.renderProfile', receipt.renderProfile === 'blender');
+  add('receipt.viewport', sameArray(receipt.viewport, [1_600, 900]));
+  add('receipt.armBindThresholds', sameObject(receipt.armBindThresholds, expectedBones));
+  add('receipt.handBindThresholds', sameObject(receipt.handBindThresholds, expectedHandBones));
+  add('receipt.renderedInfluenceThresholds', sameObject(
+    receipt.renderedInfluenceThresholds, renderedInfluenceThresholds,
+  ));
+  add('receipt.antiTThresholds', sameObject(receipt.antiTThresholds, antiTThresholds));
+  add('receipt.gripThresholds', sameObject(receipt.gripThresholds, gripThresholds));
+  add('receipt.closeJointThresholds', sameObject(receipt.closeJointThresholds, closeJointThresholds));
+  add('receipt.handDetailThresholds', sameObject(receipt.handDetailThresholds, handDetailThresholds));
+  add('receipt.handCameraContract', sameObject(receipt.handCameraContract, handCameraContract));
+  add('receipt.captureRoisNdc', sameObject(receipt.captureRoisNdc, expectedCaptureRois));
+  add('receipt.visualReview.required', receipt.visualReview?.required === true);
+  add('receipt.visualReview.status', receipt.visualReview?.status === 'PENDING_OWNER_INSPECTION');
+  add('receipt.visualReview.automatedFramingIsNotVisualAcceptance',
+    receipt.visualReview?.automatedFramingIsNotVisualAcceptance === true);
+  add('receipt.visualReview.inspectionScope', receipt.visualReview?.inspectionScope
+    === 'armed medium/full close/left hand/right hand plus four dummy closeups and shared overview');
+  add('receipt.browser.project', receipt.browser?.project === 'chromium');
+  add('receipt.browser.channel', receipt.browser?.channel === 'msedge');
+  add('receipt.browser.userAgent.edge', /Edg\//u.test(receipt.browser?.userAgent ?? ''));
+  add('receipt.surfaces.armedBot', surfaceValid(receipt.surfaces?.armedBot, 'atomic-acres', sourceSha));
+  add('receipt.surfaces.gunRange', surfaceValid(receipt.surfaces?.gunRange, 'gun-range', sourceSha));
+  add('receipt.surfaces.servedCandidate.equal', JSON.stringify(receipt.surfaces?.armedBot?.servedCandidate)
+    === JSON.stringify(receipt.surfaces?.gunRange?.servedCandidate));
+
+  add('receipt.armedBot.weapon', receipt.armedBot?.weapon === 'carbine');
+  add('receipt.armedBot.alive', receipt.armedBot?.alive === true);
+  add('receipt.armedBot.first.operatorModel', armPoseValid(receipt.armedBot?.first?.operatorModel, true));
+  add('receipt.armedBot.second.operatorModel', armPoseValid(receipt.armedBot?.second?.operatorModel, true));
+  add('receipt.armedBot.first.operatorModel.supportGrip.fingerCurl', fingerCurlValid(
+    receipt.armedBot?.first?.operatorModel?.supportGrip,
+    receipt.armedBot?.first?.operatorModel,
+  ));
+  add('receipt.armedBot.second.operatorModel.supportGrip.fingerCurl', fingerCurlValid(
+    receipt.armedBot?.second?.operatorModel?.supportGrip,
+    receipt.armedBot?.second?.operatorModel,
+  ));
+  add('receipt.armedBot.motion', motionValid(
+    receipt.armedBot?.first, receipt.armedBot?.second, receipt.armedBot?.motion, false,
+  ));
+  add('receipt.armedBot.screenshots.medium', screenshotValid(
+    receipt.armedBot?.screenshots?.medium,
+    `${evidenceBase}/armed-live-bot-medium.png`, armedActor, mediumRoiNdc,
+  ));
+  add('receipt.armedBot.screenshots.close', screenshotValid(
+    receipt.armedBot?.screenshots?.close,
+    `${evidenceBase}/armed-live-bot-close.png`, armedActor, closeRoiNdc, true,
+  ));
+  add('receipt.armedBot.screenshots.leftHand', handScreenshotValid(
+    receipt.armedBot?.screenshots?.leftHand,
+    `${evidenceBase}/armed-live-bot-left-hand-close.png`, armedActor, 'left',
+  ));
+  add('receipt.armedBot.screenshots.rightHand', handScreenshotValid(
+    receipt.armedBot?.screenshots?.rightHand,
+    `${evidenceBase}/armed-live-bot-right-hand-close.png`, armedActor, 'right',
+  ));
+
+  add('receipt.gunRangeDummies.expectedIds', sameArray(
+    receipt.gunRangeDummies?.expectedIds, expectedDummyIds,
+  ));
+  add('receipt.gunRangeDummies.overviewScreenshot', overviewScreenshotValid(
+    receipt.gunRangeDummies?.overviewScreenshot, `${evidenceBase}/gun-range-dummies-medium.png`,
+  ));
+  add('receipt.gunRangeDummies.entries.array', Array.isArray(receipt.gunRangeDummies?.entries));
+  add('receipt.gunRangeDummies.entries.count', receipt.gunRangeDummies?.entries?.length === expectedDummyIds.length);
+  for (let index = 0; index < expectedDummyIds.length; index += 1) {
+    const id = expectedDummyIds[index];
+    const entry = receipt.gunRangeDummies?.entries?.[index];
+    const prefix = `receipt.gunRangeDummies.entries.${id}`;
+    add(`${prefix}.identity`, entry?.id === id && entry?.definition?.id === id);
+    add(`${prefix}.definition.unarmed`, entry?.definition?.armed === false);
+    add(`${prefix}.first.unarmed`, entry?.first?.armed === false);
+    add(`${prefix}.second.unarmed`, entry?.second?.armed === false);
+    add(`${prefix}.first.operatorModel`, armPoseValid(entry?.first?.operatorModel, false));
+    add(`${prefix}.second.operatorModel`, armPoseValid(entry?.second?.operatorModel, false));
+    add(`${prefix}.motion`, motionValid(entry?.first, entry?.second, entry?.motion, true));
+    add(`${prefix}.first.animationSpeed`, entry?.first?.operatorModel?.animationContract?.speed
+      === entry?.definition?.speedMps);
+    add(`${prefix}.second.animationSpeed`, entry?.second?.operatorModel?.animationContract?.speed
+      === entry?.definition?.speedMps);
+    add(`${prefix}.closeScreenshot`, screenshotValid(
+      entry?.closeScreenshot,
+      `${evidenceBase}/${id}-close.png`, { kind: 'training-dummy', id }, closeRoiNdc, true,
+    ));
+  }
+  add('receipt.browserErrors.array', Array.isArray(receipt.browserErrors));
+  add('receipt.browserErrors.empty', Array.isArray(receipt.browserErrors) && receipt.browserErrors.length === 0);
+  return failedPredicateNames(checks);
+}
+
 function runContractSelfTest() {
   const assert = (condition, message) => {
     if (!condition) throw new Error(`Pass 69.3 rigged-bot contract self-test failed: ${message}`);
   };
+  assert(sameArray(
+    failedPredicateNames([
+      ['receipt.status', true],
+      ['receipt.armedBot.first.operatorModel.supportGrip.fingerCurl', false],
+      ['receipt.browserErrors.empty', true],
+    ]),
+    ['receipt.armedBot.first.operatorModel.supportGrip.fingerCurl'],
+  ), 'named predicate diagnostics expose only failed non-sensitive field paths');
+  assert(sameArray(receiptValidationFailures(null, '0'.repeat(40)), ['receipt.object']),
+    'non-object receipt reports one stable non-sensitive predicate');
   const nonUnitQuaternion = [0.1, -0.2, 0.3, 0.9];
   assert(normalizedQuaternionDelta(nonUnitQuaternion, nonUnitQuaternion) === 0,
     'identical non-unit quaternion arrays must have an exact zero orientation delta');
@@ -1115,6 +1245,38 @@ function runContractSelfTest() {
   }
   highPhaseCurl.fingerCurl.rightPinkyBindFloor = highPhaseCurl.fingerCurl.bindFloors.at(-1);
   assert(fingerCurlValid(highPhaseCurl, highPhaseModel), 'all ten above-floor rendered phases remain unchanged');
+  const nonUnitLocalCurl = structuredClone(highPhaseCurl);
+  const nonUnitLocalModel = structuredClone(highPhaseModel);
+  const nonUnitLocalFloor = nonUnitLocalCurl.fingerCurl.bindFloors[0];
+  const localScale = 0.9999965226367968;
+  nonUnitLocalFloor.beforeLocalQuaternion = nonUnitLocalFloor.beforeLocalQuaternion
+    .map((component) => component * localScale);
+  nonUnitLocalFloor.afterLocalQuaternion = [...nonUnitLocalFloor.beforeLocalQuaternion];
+  nonUnitLocalFloor.beforeBindDeltaRadians = quaternionDelta(
+    nonUnitLocalFloor.beforeLocalQuaternion, nonUnitLocalFloor.bindLocalQuaternion,
+  );
+  nonUnitLocalFloor.afterBindDeltaRadians = nonUnitLocalFloor.beforeBindDeltaRadians;
+  nonUnitLocalCurl.fingerCurl.bones[0].bindRelativeFloor = nonUnitLocalFloor;
+  nonUnitLocalModel.handPose.bones[0].localQuaternion = nonUnitLocalFloor.afterLocalQuaternion;
+  nonUnitLocalModel.handPose.bones[0].bindQuaternionDeltaRadians = nonUnitLocalFloor.afterBindDeltaRadians;
+  assert(fingerCurlValid(nonUnitLocalCurl, nonUnitLocalModel),
+    'finite non-unit animation quaternion uses normalized orientation validation');
+  const excessiveNormDriftCurl = structuredClone(highPhaseCurl);
+  const excessiveNormDriftModel = structuredClone(highPhaseModel);
+  const excessiveNormDriftFloor = excessiveNormDriftCurl.fingerCurl.bindFloors[0];
+  excessiveNormDriftFloor.beforeLocalQuaternion = excessiveNormDriftFloor.beforeLocalQuaternion
+    .map((component) => component * 0.99998);
+  excessiveNormDriftFloor.afterLocalQuaternion = [...excessiveNormDriftFloor.beforeLocalQuaternion];
+  excessiveNormDriftFloor.beforeBindDeltaRadians = quaternionDelta(
+    excessiveNormDriftFloor.beforeLocalQuaternion, excessiveNormDriftFloor.bindLocalQuaternion,
+  );
+  excessiveNormDriftFloor.afterBindDeltaRadians = excessiveNormDriftFloor.beforeBindDeltaRadians;
+  excessiveNormDriftCurl.fingerCurl.bones[0].bindRelativeFloor = excessiveNormDriftFloor;
+  excessiveNormDriftModel.handPose.bones[0].localQuaternion = excessiveNormDriftFloor.afterLocalQuaternion;
+  excessiveNormDriftModel.handPose.bones[0].bindQuaternionDeltaRadians
+    = excessiveNormDriftFloor.afterBindDeltaRadians;
+  assert(!fingerCurlValid(excessiveNormDriftCurl, excessiveNormDriftModel),
+    'local animation quaternion norm drift beyond 1e-5 must fail');
   const alignedContinuityCurl = structuredClone(curl);
   const alignedContinuityModel = structuredClone(curlModel);
   const alignedFloor = alignedContinuityCurl.fingerCurl.bindFloors[0];
@@ -1399,6 +1561,27 @@ if (selfTestMode) {
   process.exit(0);
 }
 
+if (validateReceiptMode) {
+  let preservedReceipt;
+  try {
+    preservedReceipt = JSON.parse(readFileSync(validationReceiptPath, 'utf8'));
+  } catch {
+    console.error(JSON.stringify({ valid: false, failedPredicates: ['receipt.readable'] }, null, 2));
+    process.exit(1);
+  }
+  const validationSourceSha = execFileSync('git', ['rev-parse', 'HEAD'], {
+    cwd: root, encoding: 'utf8', windowsHide: true,
+  }).trim();
+  const failedPredicates = receiptValidationFailures(preservedReceipt, validationSourceSha);
+  console.log(JSON.stringify({
+    valid: failedPredicates.length === 0,
+    target: targetName,
+    sourceSha: validationSourceSha,
+    failedPredicates,
+  }, null, 2));
+  process.exit(failedPredicates.length === 0 ? 0 : 1);
+}
+
 const localViteOverrides = ['.env', '.env.local', '.env.production.local']
   .filter((path) => existsSync(resolve(root, path)));
 if (localViteOverrides.length > 0) {
@@ -1449,91 +1632,9 @@ try {
   discardEvidence(`Pass 69.3 ${targetName} rigged-bot gate did not emit a readable receipt: ${error instanceof Error ? error.message : String(error)}`);
 }
 
-const armedBase = `artifacts/pass69-3/rigged-bot-live/${target.renderer}`;
-const armedValid = receipt.armedBot?.weapon === 'carbine'
-  && receipt.armedBot.alive === true
-  && motionValid(receipt.armedBot.first, receipt.armedBot.second, receipt.armedBot.motion, false)
-  && screenshotValid(
-    receipt.armedBot.screenshots?.medium,
-    `${armedBase}/armed-live-bot-medium.png`,
-    { kind: 'bot', id: receipt.armedBot.id },
-    mediumRoiNdc,
-  )
-  && screenshotValid(
-    receipt.armedBot.screenshots?.close,
-    `${armedBase}/armed-live-bot-close.png`,
-    { kind: 'bot', id: receipt.armedBot.id },
-    closeRoiNdc,
-    true,
-  )
-  && handScreenshotValid(
-    receipt.armedBot.screenshots?.leftHand,
-    `${armedBase}/armed-live-bot-left-hand-close.png`,
-    { kind: 'bot', id: receipt.armedBot.id },
-    'left',
-  )
-  && handScreenshotValid(
-    receipt.armedBot.screenshots?.rightHand,
-    `${armedBase}/armed-live-bot-right-hand-close.png`,
-    { kind: 'bot', id: receipt.armedBot.id },
-    'right',
-  );
-const dummiesValid = sameArray(receipt.gunRangeDummies?.expectedIds, expectedDummyIds)
-  && overviewScreenshotValid(receipt.gunRangeDummies?.overviewScreenshot, `${armedBase}/gun-range-dummies-medium.png`)
-  && Array.isArray(receipt.gunRangeDummies?.entries)
-  && receipt.gunRangeDummies.entries.length === expectedDummyIds.length
-  && receipt.gunRangeDummies.entries.every((entry, index) => entry?.id === expectedDummyIds[index]
-    && entry.definition?.id === expectedDummyIds[index]
-    && entry.definition?.armed === false
-    && entry.first?.armed === false
-    && entry.second?.armed === false
-    && motionValid(entry.first, entry.second, entry.motion, true)
-    && entry.first.operatorModel.animationContract.speed === entry.definition.speedMps
-    && entry.second.operatorModel.animationContract.speed === entry.definition.speedMps
-    && screenshotValid(
-      entry.closeScreenshot,
-      `${armedBase}/${expectedDummyIds[index]}-close.png`,
-      { kind: 'training-dummy', id: expectedDummyIds[index] },
-      closeRoiNdc,
-      true,
-    ));
-if (receipt.schemaVersion !== 4
-  || receipt.status !== 'AUTOMATION_PASS_OWNER_PENDING'
-  || receipt.contract !== 'atomic-acres/pass69-3-rigged-bot-live@4'
-  || receipt.evidenceScope !== 'weighted-skin-anti-t-five-digit-grip-orientation-full-body-and-fixed-hand-detail-framing'
-  || receipt.target !== targetName
-  || receipt.sourceSha !== sourceSha
-  || receipt.endingSourceSha !== sourceSha
-  || receipt.cleanSource !== true
-  || receipt.renderer !== target.renderer
-  || receipt.renderProfile !== 'blender'
-  || !sameArray(receipt.viewport, [1_600, 900])
-  || !sameObject(receipt.armBindThresholds, expectedBones)
-  || !sameObject(receipt.handBindThresholds, expectedHandBones)
-  || !sameObject(receipt.renderedInfluenceThresholds, renderedInfluenceThresholds)
-  || !sameObject(receipt.antiTThresholds, antiTThresholds)
-  || !sameObject(receipt.gripThresholds, gripThresholds)
-  || !sameObject(receipt.closeJointThresholds, closeJointThresholds)
-  || !sameObject(receipt.handDetailThresholds, handDetailThresholds)
-  || !sameObject(receipt.handCameraContract, handCameraContract)
-  || !sameObject(receipt.captureRoisNdc, {
-    close: closeRoiNdc, hand: handRoiNdc, medium: mediumRoiNdc, overview: overviewRoiNdc,
-  })
-  || receipt.visualReview?.required !== true
-  || receipt.visualReview.status !== 'PENDING_OWNER_INSPECTION'
-  || receipt.visualReview.automatedFramingIsNotVisualAcceptance !== true
-  || receipt.visualReview.inspectionScope !== 'armed medium/full close/left hand/right hand plus four dummy closeups and shared overview'
-  || receipt.browser?.project !== 'chromium'
-  || receipt.browser?.channel !== 'msedge'
-  || !/Edg\//u.test(receipt.browser?.userAgent ?? '')
-  || !surfaceValid(receipt.surfaces?.armedBot, 'atomic-acres', sourceSha)
-  || !surfaceValid(receipt.surfaces?.gunRange, 'gun-range', sourceSha)
-  || JSON.stringify(receipt.surfaces.armedBot.servedCandidate) !== JSON.stringify(receipt.surfaces.gunRange.servedCandidate)
-  || !armedValid
-  || !dummiesValid
-  || !Array.isArray(receipt.browserErrors)
-  || receipt.browserErrors.length !== 0) {
-  discardEvidence(`Pass 69.3 ${targetName} rigged-bot gate emitted invalid or stale evidence`);
+const failedPredicates = receiptValidationFailures(receipt, sourceSha);
+if (failedPredicates.length > 0) {
+  discardEvidence(`Pass 69.3 ${targetName} rigged-bot gate emitted invalid or stale evidence; failed predicates: ${failedPredicates.join(', ')}`);
 }
 
 const endingSha = execFileSync('git', ['rev-parse', 'HEAD'], {

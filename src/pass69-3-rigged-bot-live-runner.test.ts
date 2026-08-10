@@ -41,7 +41,7 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       "runtime.adapterClass === 'GPUAdapter'",
       "runtime.adapterClass === 'WebGL2RenderingContext'",
       'surface.contextLifecycle.losses === 0',
-      "receipt.browser?.channel !== 'msedge'",
+      "receipt.browser?.channel === 'msedge'",
       'endingSha !== sourceSha || sourceStatus()',
     ]) expect(runner).toContain(token);
   });
@@ -151,6 +151,11 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     expect(runner).toContain('axisAngleQuaternion(floor.appliedAxis, floor.floorTargetRelativeAngleRadians)');
     expect(runner).toContain('expectedRenderedCorrectionRadians');
     expect(runner).toContain('carbineSecondPhalanxFallbackAxis[index]');
+    expect(runner).not.toContain('close(vectorLength(floor.beforeLocalQuaternion), 1, 1e-7)');
+    expect(runner).not.toContain('close(vectorLength(floor.afterLocalQuaternion), 1, 1e-7)');
+    expect(runner).toContain('close(vectorLength(floor.beforeLocalQuaternion), 1, 1e-5)');
+    expect(runner).toContain('close(vectorLength(floor.afterLocalQuaternion), 1, 1e-5)');
+    expect(runner).toContain('finite non-unit animation quaternion uses normalized orientation validation');
     expect(operator).toContain('floorTargetRelativeAngleRadians');
     expect(operator).toContain('reportedBindDeltaCorrectionRadians');
     expect(operatorUnit).toContain('0.2701489666915341');
@@ -168,8 +173,8 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     for (const id of ['test-dummy-alpha', 'test-dummy-bravo', 'test-dummy-charlie', 'test-dummy-delta']) {
       expect(runner).toContain(`'${id}'`);
     }
-    expect(runner).toContain('receipt.gunRangeDummies.entries.length === expectedDummyIds.length');
-    expect(runner).toContain('motionValid(entry.first, entry.second, entry.motion, true)');
+    expect(runner).toContain('receipt.gunRangeDummies?.entries?.length === expectedDummyIds.length');
+    expect(runner).toContain('motionValid(entry?.first, entry?.second, entry?.motion, true)');
     const botSnapshot = legacy.slice(legacy.indexOf('bots: [...bots.values()].map((bot) => {'), legacy.indexOf('botEscalation:', legacy.indexOf('bots: [...bots.values()].map((bot) => {')));
     expect(botSnapshot.match(/riggedOperatorTelemetry\(bot\.root\)/gu)).toHaveLength(1);
     expect(botSnapshot).toContain('presentationReady: operatorModel !== null');
@@ -207,7 +212,10 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     expect(runner).toContain('handFramingValid(record.framing, actor, side)');
     expect(runner).toContain('armed-live-bot-left-hand-close.png');
     expect(runner).toContain('armed-live-bot-right-hand-close.png');
-    expect(runner).toContain("receipt.visualReview.status !== 'PENDING_OWNER_INSPECTION'");
+    expect(runner).toContain("add('receipt.visualReview.status', receipt.visualReview?.status === 'PENDING_OWNER_INSPECTION')");
+    expect(runner).toContain("const validateReceiptMode = process.argv[2] === '--validate-receipt'");
+    expect(runner).toContain('failed predicates: ${failedPredicates.join(\', \')}');
+    expect(runner).toContain("failedPredicates: ['receipt.readable']");
     const catalog = graph.testCatalog.find(({ id }) => id === 'T-PASS69-3-RIGGED-DUMMY');
     expect(catalog).toMatchObject({
       command: 'npm run qa:pass69-3:rigged-bot-live',
@@ -245,6 +253,9 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       '0.379999 rad post-mixer pinky floor must fail',
       '0.380000 rad post-mixer pinky floor must pass',
       'all ten above-floor rendered phases remain unchanged',
+      'finite non-unit animation quaternion uses normalized orientation validation',
+      'local animation quaternion norm drift beyond 1e-5 must fail',
+      'named predicate diagnostics expose only failed non-sensitive field paths',
       'previous-axis hemisphere-aligned receipt must pass',
       'forged Y-axis receipt cannot impersonate the canonical X-axis pre-floor pose',
       'exact-bind authored fallback axis must pass',
