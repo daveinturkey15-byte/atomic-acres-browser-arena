@@ -10,6 +10,23 @@ const presentationSources = [
 ] as const;
 
 describe('presentation prewarm startup contract', () => {
+  it('keeps special-weapon light membership constant and idles the bounded lights at zero intensity', () => {
+    const flare = readFileSync(new URL('./flare-projectile-system.ts', import.meta.url), 'utf8');
+    const flame = readFileSync(new URL('./flamethrower-stream-system.ts', import.meta.url), 'utf8');
+    expect(flare).toContain('this.light = new THREE.PointLight(0xff4a24, 0, 9, 2);');
+    expect(flare).toContain('this.root.add(this.light);');
+    expect(flare.match(/signal-flare-bounded-light/g)).toHaveLength(1);
+    expect(flare).not.toContain('root.add(halo, core, light);');
+    expect(flare).toContain('boundedLightCount: 1');
+    expect(flare).toContain('boundedLightIntensity: this.light.intensity');
+    expect(flame).toContain('this.light = new THREE.PointLight(0xff6a22, 0, 7, 2);');
+    expect(flame).toContain('this.light.visible = true;');
+    expect(flame).not.toContain('this.light.visible = emitted > 0');
+    expect(flame).not.toContain('this.light.visible = remaining > 0');
+    expect(flame).not.toContain('this.light.visible = false');
+    expect(flame).toContain('boundedLightIntensity: this.light.intensity');
+  });
+
   it('keeps WebKit on real basic-depth shadows instead of invalid PCF comparison samplers', () => {
     const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
     expect(source).toContain("const shadowSamplerMode = webGlShadowSamplerMode(navigator.userAgent);");
@@ -314,6 +331,8 @@ describe('presentation prewarm startup contract', () => {
     expect(matchBoundFirstShots).toContain('weaponView.prewarmBrowserWeaponFirePresentation(player.weapon,');
     expect(matchBoundFirstShots).toContain('flareProjectileSystem.withStagedFirstShotPresentation(camera,');
     expect(matchBoundFirstShots).toContain("weaponView.prewarmBrowserWeaponFirePresentation('flare-gun',");
+    expect(matchBoundFirstShots).toContain('flareProjectileSystem.withStagedImpactBurnPresentation(camera,');
+    expect(matchBoundFirstShots).toContain("weaponView.prewarmBrowserWeaponReloadPresentation('flare-gun',");
     expect(matchBoundFirstShots).toContain('flamethrowerStreamPresentation.withStagedFirstShotPresentation(camera,');
     expect(matchBoundFirstShots).toContain("weaponView.prewarmBrowserWeaponFirePresentation('flamethrower',");
     expect(matchBoundFirstShots).toContain('renderRuntime.compileAndRender(scene, camera, scene)');
@@ -346,6 +365,30 @@ describe('presentation prewarm startup contract', () => {
       .toBeLessThan(matchBoundFirstShots.indexOf("'flare-gun'"));
     expect(matchBoundFirstShots.indexOf("'flare-gun'"))
       .toBeLessThan(matchBoundFirstShots.indexOf("'flamethrower'"));
+    const flareFlightStage = matchBoundFirstShots.indexOf('flareProjectileSystem.withStagedFirstShotPresentation(camera,');
+    const flareBurnStage = matchBoundFirstShots.indexOf('flareProjectileSystem.withStagedImpactBurnPresentation(camera,');
+    const flareBurnImpactStage = matchBoundFirstShots.indexOf(
+      'impactPresentation.withStagedVocabulary(camera,',
+      flareBurnStage,
+    );
+    const flareReloadStage = matchBoundFirstShots.indexOf(
+      "weaponView.prewarmBrowserWeaponReloadPresentation('flare-gun',",
+      flareBurnImpactStage,
+    );
+    const flameStage = matchBoundFirstShots.indexOf('flamethrowerStreamPresentation.withStagedFirstShotPresentation(camera,');
+    const flameImpactStage = matchBoundFirstShots.indexOf(
+      'impactPresentation.withStagedVocabulary(camera,',
+      flameStage,
+    );
+    expect(flareFlightStage).toBeLessThan(flareBurnStage);
+    expect(flareBurnStage).toBeLessThan(flareBurnImpactStage);
+    expect(flareBurnImpactStage).toBeLessThan(flareReloadStage);
+    expect(flareReloadStage).toBeLessThan(flameStage);
+    expect(flameStage).toBeLessThan(flameImpactStage);
+    expect(flameImpactStage).toBeLessThan(matchBoundFirstShots.indexOf(
+      "weaponView.prewarmBrowserWeaponFirePresentation('flamethrower',",
+      flameImpactStage,
+    ));
     const firstMatchBoundCall = matchDeployment.indexOf('await prewarmMatchBoundFirstShotPresentations(token);');
     expect(firstMatchBoundCall).toBeGreaterThan(matchDeployment.indexOf('await prewarmBotPresentations();'));
     expect(matchDeployment.match(/await prewarmMatchBoundFirstShotPresentations\(token\);/g)).toHaveLength(2);

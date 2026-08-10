@@ -95,8 +95,8 @@ function hardwareRuntimeValid(runtime, contextLifecycle, webgl) {
 function componentEnvelopeValid(receipt, kind, expectedMap, sourceSha) {
   const expectedScopes = {
     'glass-m14': 'cold-carbine-empty-sky-plus-cold-and-warm-window-breach-plus-m14-event-to-presented-frame',
-    flamethrower: 'cold-and-held-flamethrower-emission-ground-fire-and-release-frame-pacing',
-    'flare-gun': 'cold-flare-flight-impact-and-burn-frame-pacing',
+    flamethrower: 'cold-equip-ready-and-held-flamethrower-emission-ground-fire-and-release-frame-pacing',
+    'flare-gun': 'cold-equip-ready-flare-flight-impact-burn-and-auto-reload-frame-pacing',
   };
   return receipt?.schemaVersion === 1
     && receipt.status === 'PASS'
@@ -184,6 +184,26 @@ function coldFireProbeValid(probe, label) {
     && Number.isSafeInteger(probe.presentedFrameDelta) && probe.presentedFrameDelta > 0;
 }
 
+function specialEquipProbeValid(probe, weapon, configuredSpinUpMs) {
+  const readiness = probe?.readiness;
+  return actionProbeValid(probe, 'acquire-training-weapon', `${weapon}-equip-ready`)
+    && finite(probe.readyMs) && probe.readyMs >= probe.eventToPresentedFrameMs && probe.readyMs < 5_000
+    && finite(probe.maximumAnimationFrameGapMs) && probe.maximumAnimationFrameGapMs >= 0
+    && probe.maximumAnimationFrameGapMs < 120
+    && readiness?.requestedWeapon === weapon
+    && readiness.ready === true
+    && readiness.modelLoaded === true
+    && readiness.gpuReady === true
+    && readiness.resident === true
+    && readiness.catalogPrewarming === false
+    && readiness.importedWeapon === weapon
+    && readiness.mountedIsRequested === true
+    && readiness.assetCacheLoading === 0
+    && readiness.switchingReady === true
+    && readiness.switchingRemainingMs === 0
+    && readiness.configuredSpinUpMs === configuredSpinUpMs;
+}
+
 function rounded(value) {
   return Number(value.toFixed(3));
 }
@@ -244,11 +264,15 @@ function glassM14EvidenceValid(receipt) {
 function flamethrowerEvidenceValid(receipt) {
   const evidence = receipt.evidence;
   const baseline = evidence?.baseline;
+  const equipProbe = evidence?.equipProbe;
   const probe = evidence?.probe;
   const releaseProbe = evidence?.releaseProbe;
   const clearance = evidence?.clearance;
   return thresholdsValid(receipt.thresholds, true)
     && frameWindowValid(baseline, 'flamethrower-baseline', 750, 20)
+    && specialEquipProbeValid(equipProbe, 'flamethrower', 180)
+    && equipProbe.eventToPresentedFrameMs < baseline.p95Ms * 4 + 40
+    && equipProbe.maximumAnimationFrameGapMs < baseline.p95Ms * 4 + 40
     && probe?.label === 'flamethrower-held-fire'
     && finite(probe.durationMs) && probe.durationMs >= 2_000
     && finite(probe.synchronousMs) && probe.synchronousMs >= 0 && probe.synchronousMs < 50
@@ -282,10 +306,17 @@ function flareEvidenceValid(receipt) {
   const after = evidence?.after;
   const effect = evidence?.effectTelemetry;
   const impactStage = evidence?.impactStage;
+  const equipProbe = evidence?.equipProbe;
   return thresholdsValid(receipt.thresholds, true)
     && frameWindowValid(evidence?.baseline, 'flare-gun-baseline', 750, 20)
+    && specialEquipProbeValid(equipProbe, 'flare-gun', 0)
+    && equipProbe.eventToPresentedFrameMs < evidence.baseline.p95Ms * 4 + 40
+    && equipProbe.maximumAnimationFrameGapMs < evidence.baseline.p95Ms * 4 + 40
     && coldFireProbeValid(evidence?.coldFire, 'flare-gun-cold-fire')
     && frameWindowValid(evidence?.sustained, 'flare-gun-impact-and-burn-lifecycle', 1_200, 20)
+    && evidence.autoReloadObserved === true
+    && finite(evidence.reloadStartedAfterFireMs) && evidence.reloadStartedAfterFireMs >= 0
+    && evidence.reloadStartedAfterFireMs < evidence.sustained.durationMs
     && evidence.sustained.maximumMs < evidence.baseline.p95Ms * 4 + 40
     && typeof impactStage?.targetId === 'string' && impactStage.targetId.length > 0
     && Array.isArray(impactStage.playerPosition) && impactStage.playerPosition.length === 3

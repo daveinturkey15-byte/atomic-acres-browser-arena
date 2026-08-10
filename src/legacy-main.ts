@@ -11338,8 +11338,15 @@ async function prewarmMatchBoundFirstShotPresentations(token: MatchAdmissionToke
   await flareProjectileSystem.withStagedFirstShotPresentation(camera, () => (
     weaponView.prewarmBrowserWeaponFirePresentation('flare-gun', submitExactMatchComposition)
   ));
+  await flareProjectileSystem.withStagedImpactBurnPresentation(camera, () => (
+    impactPresentation.withStagedVocabulary(camera, () => (
+      weaponView.prewarmBrowserWeaponReloadPresentation('flare-gun', submitExactMatchComposition)
+    ))
+  ));
   await flamethrowerStreamPresentation.withStagedFirstShotPresentation(camera, () => (
-    weaponView.prewarmBrowserWeaponFirePresentation('flamethrower', submitExactMatchComposition)
+    impactPresentation.withStagedVocabulary(camera, () => (
+      weaponView.prewarmBrowserWeaponFirePresentation('flamethrower', submitExactMatchComposition)
+    ))
   ));
 }
 
@@ -23837,6 +23844,20 @@ function sampleDmrThermalReadiness() {
   });
 }
 
+function sampleWeaponActionReadiness() {
+  const now = performance.now();
+  return Object.freeze({
+    weapon: player.weapon,
+    switchingReady: now >= player.switchingUntil,
+    switchingRemainingMs: Math.max(0, player.switchingUntil - now),
+    configuredSpinUpMs: WEAPONS[player.weapon].spinUpMs ?? 0,
+    spinUpActive: spinUpWeapon === player.weapon && spinUpStartedAtPerformanceMs !== null,
+    spinUpElapsedMs: spinUpWeapon === player.weapon && spinUpStartedAtPerformanceMs !== null
+      ? Math.max(0, now - spinUpStartedAtPerformanceMs)
+      : 0,
+  });
+}
+
 type DebugPlayerPose = Readonly<{ yaw: number; pitch: number }>;
 
 const debugWindow = window as Window & {
@@ -23849,6 +23870,7 @@ const debugWindow = window as Window & {
     sampleActiveWeaponReadiness: () => ReturnType<typeof weaponView.activeWeaponReadiness>;
     sampleWeaponAssetCache: () => ReturnType<typeof pass65WeaponCacheTelemetry>;
     sampleDmrThermalReadiness: () => ReturnType<typeof sampleDmrThermalReadiness>;
+    sampleWeaponActionReadiness: () => ReturnType<typeof sampleWeaponActionReadiness>;
     traceBallistics: (
       weapon: WeaponId,
       origin: [number, number, number],
@@ -24082,6 +24104,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   sampleActiveWeaponReadiness: () => weaponView.activeWeaponReadiness(),
   sampleWeaponAssetCache: () => pass65WeaponCacheTelemetry(),
   sampleDmrThermalReadiness,
+  sampleWeaponActionReadiness,
   snapshot: () => ({
     bootstrap: {
       stage: bootstrapStage,

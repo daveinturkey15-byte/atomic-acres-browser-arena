@@ -30,6 +30,9 @@ type InternalPresentation = {
   casingCursor: number;
   smokeCursor: number;
   shotsPresented: number;
+  active: string;
+  reloadLastProgress: number;
+  models: Map<string, THREE.Object3D>;
 };
 
 function internals(presentation: WeaponPresentation): InternalPresentation {
@@ -58,6 +61,24 @@ function casingState(casing: InternalCasing) {
     frames: casing.frames,
     active: casing.active,
   };
+}
+
+function objectState(root: THREE.Object3D) {
+  const state: Array<Readonly<{
+    name: string;
+    visible: boolean;
+    position: number[];
+    quaternion: number[];
+    scale: number[];
+  }>> = [];
+  root.traverse((node) => state.push({
+    name: node.name,
+    visible: node.visible,
+    position: node.position.toArray(),
+    quaternion: node.quaternion.toArray(),
+    scale: node.scale.toArray(),
+  }));
+  return state;
 }
 
 describe('retained first-fire GPU prewarm', () => {
@@ -153,5 +174,36 @@ describe('retained first-fire GPU prewarm', () => {
     expect(state.casings[0]?.mesh.visible).toBe(true);
     expect(state.casings[0]?.mesh.geometry).toBe(state.brassGeometry);
     expect(state.casings[1]).toMatchObject({ active: false });
+  });
+
+  it('stages the imported flare reload pose and restores model/action state when submission throws', async () => {
+    const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250), false);
+    await presentation.load();
+    await presentation.prepareBrowserWeapon('flare-gun');
+    const state = internals(presentation);
+    const model = state.models.get('flare-gun')!;
+    model.position.set(0.3, 0.4, 0.5);
+    model.quaternion.setFromEuler(new THREE.Euler(0.1, 0.2, 0.3));
+    model.scale.set(0.9, 1.1, 1.2);
+    state.reloadLastProgress = 0.27;
+    const before = {
+      active: state.active,
+      reloadLastProgress: state.reloadLastProgress,
+      rootVisible: presentation.root.visible,
+      model: objectState(model),
+    };
+    await expect(presentation.prewarmBrowserWeaponReloadPresentation('flare-gun', async (root) => {
+      expect(root).toBe(presentation.root);
+      expect(state.active).toBe('flare-gun');
+      expect(state.reloadLastProgress).toBe(0.5);
+      expect(model.visible).toBe(true);
+      throw new Error('intentional reload submit failure');
+    })).rejects.toThrow('intentional reload submit failure');
+    expect({
+      active: state.active,
+      reloadLastProgress: state.reloadLastProgress,
+      rootVisible: presentation.root.visible,
+      model: objectState(model),
+    }).toEqual(before);
   });
 });

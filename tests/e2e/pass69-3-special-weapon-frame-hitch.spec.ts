@@ -27,6 +27,32 @@ type ColdFireProbe = Readonly<{
   presentedFrameDelta: number;
 }>;
 
+type SpecialWeaponEquipReadiness = Readonly<{
+  requestedWeapon: string;
+  ready: boolean;
+  modelLoaded: boolean;
+  gpuReady: boolean;
+  resident: boolean;
+  catalogPrewarming: boolean;
+  importedWeapon: string | null;
+  mountedIsRequested: boolean;
+  assetCacheLoading: number;
+  switchingReady: boolean;
+  switchingRemainingMs: number;
+  configuredSpinUpMs: number;
+}>;
+
+type SpecialWeaponEquipProbe = Readonly<{
+  label: 'flamethrower-equip-ready' | 'flare-gun-equip-ready';
+  action: 'acquire-training-weapon';
+  synchronousMs: number;
+  eventToPresentedFrameMs: number;
+  presentedFrameDelta: number;
+  readyMs: number;
+  maximumAnimationFrameGapMs: number;
+  readiness: SpecialWeaponEquipReadiness;
+}>;
+
 type FlamethrowerProbe = Readonly<{
   label: 'flamethrower-held-fire';
   durationMs: number;
@@ -60,6 +86,8 @@ type FlareLifecycleProbe = Readonly<{
   frameWindow: PresentedFrameWindow;
   before: FlareEffectTelemetry;
   after: FlareEffectTelemetry;
+  autoReloadObserved: boolean;
+  reloadStartedAfterFireMs: number | null;
 }>;
 
 type FlareImpactStage = Readonly<{
@@ -91,7 +119,7 @@ async function deployGunRange(page: Page, seed: string): Promise<void> {
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true));
 }
 
-async function acquireTrainingWeapon(page: Page, weapon: SpecialWeapon): Promise<void> {
+async function acquireTrainingWeapon(page: Page, weapon: SpecialWeapon): Promise<SpecialWeaponEquipProbe> {
   const station = GUN_RANGE_TEST_BAY_CONTRACT.weaponStations.find(({ id }) => id === weapon);
   if (!station) throw new Error(`Missing Gun Range training station for ${weapon}`);
   await page.evaluate(({ x, z }) => {
@@ -102,23 +130,83 @@ async function acquireTrainingWeapon(page: Page, weapon: SpecialWeapon): Promise
       .some((candidate: { kind: string; targetId: string }) => candidate.kind === 'test-bay-weapon'
         && candidate.targetId === `test-bay-weapon:${expectedWeapon}`)
   ), weapon)).toBe(true);
-  expect(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.interactTestBayStation())).toBe(true);
-  await expect.poll(async () => page.evaluate((expectedWeapon) => {
-    const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
-    return {
-      weapon: snapshot.player.weapon,
-      localHolder: snapshot.timedMapWeapons.localHolder,
-      authorityStatus: snapshot.timedMapWeapons.states[expectedWeapon].status,
-    };
-  }, weapon)).toEqual({ weapon, localHolder: weapon, authorityStatus: 'held' });
-  // The authority grant intentionally owns a 420 ms swap fence. Waiting for it
-  // does not warm either effect: no trigger or special-weapon emission occurs.
-  await page.waitForTimeout(500);
+  const equipProbe = await page.evaluate((expectedWeapon) => new Promise<SpecialWeaponEquipProbe>((resolve, reject) => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    requestAnimationFrame(() => {
+      const startedAt = performance.now();
+      const presentedBefore = debug.admissionState().presentedGameplayFrame;
+      const accepted = debug.interactTestBayStation();
+      const synchronousMs = performance.now() - startedAt;
+      if (!accepted) {
+        reject(new Error(`Training-station acquisition rejected for ${expectedWeapon}`));
+        return;
+      }
+      let previousAnimationFrameAt = startedAt;
+      let maximumAnimationFrameGapMs = 0;
+      let firstPresentedAtMs: number | null = null;
+      let firstPresentedFrameDelta = 0;
+      let lastReadiness: SpecialWeaponEquipReadiness | null = null;
+      const deadline = startedAt + 5_000;
+      const inspect = () => {
+        const now = performance.now();
+        maximumAnimationFrameGapMs = Math.max(maximumAnimationFrameGapMs, now - previousAnimationFrameAt);
+        previousAnimationFrameAt = now;
+        const presentedAfter = debug.admissionState().presentedGameplayFrame;
+        if (firstPresentedAtMs === null && presentedAfter > presentedBefore) {
+          firstPresentedAtMs = now - startedAt;
+          firstPresentedFrameDelta = presentedAfter - presentedBefore;
+        }
+        const snapshot = debug.snapshot() as any;
+        const weaponReadiness = debug.sampleActiveWeaponReadiness();
+        const actionReadiness = debug.sampleWeaponActionReadiness();
+        const assetCacheLoading = debug.sampleWeaponAssetCache().loading;
+        lastReadiness = {
+          ...weaponReadiness,
+          assetCacheLoading,
+          switchingReady: actionReadiness.switchingReady,
+          switchingRemainingMs: actionReadiness.switchingRemainingMs,
+          configuredSpinUpMs: actionReadiness.configuredSpinUpMs,
+        };
+        const authorityReady = snapshot.player.weapon === expectedWeapon
+          && snapshot.timedMapWeapons.localHolder === expectedWeapon
+          && snapshot.timedMapWeapons.states[expectedWeapon].status === 'held';
+        const importedReady = weaponReadiness.requestedWeapon === expectedWeapon
+          && weaponReadiness.ready
+          && weaponReadiness.modelLoaded
+          && weaponReadiness.gpuReady
+          && weaponReadiness.resident
+          && !weaponReadiness.catalogPrewarming
+          && weaponReadiness.importedWeapon === expectedWeapon
+          && weaponReadiness.mountedIsRequested;
+        if (firstPresentedAtMs !== null && authorityReady && importedReady
+          && assetCacheLoading === 0 && actionReadiness.switchingReady) {
+          resolve({
+            label: `${expectedWeapon}-equip-ready` as SpecialWeaponEquipProbe['label'],
+            action: 'acquire-training-weapon',
+            synchronousMs: Number(synchronousMs.toFixed(3)),
+            eventToPresentedFrameMs: Number(firstPresentedAtMs.toFixed(3)),
+            presentedFrameDelta: firstPresentedFrameDelta,
+            readyMs: Number((now - startedAt).toFixed(3)),
+            maximumAnimationFrameGapMs: Number(maximumAnimationFrameGapMs.toFixed(3)),
+            readiness: lastReadiness,
+          });
+          return;
+        }
+        if (now >= deadline) {
+          reject(new Error(`Training-station acquisition did not become presentation-ready: ${JSON.stringify(lastReadiness)}`));
+          return;
+        }
+        requestAnimationFrame(inspect);
+      };
+      requestAnimationFrame(inspect);
+    });
+  }), weapon);
   // Face down the longest clear test-bay axis so the projectile remains in
   // admitted flight throughout the bounded sustained-update window.
   await page.evaluate(({ x, z }) => {
     window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(x, 1.7, z, 0, 0);
   }, station.position);
+  return equipProbe;
 }
 
 async function stageFlareImpactAtTrainingDummy(page: Page): Promise<FlareImpactStage> {
@@ -232,11 +320,15 @@ async function probeColdFlareLifecycle(page: Page, durationMs: number): Promise<
       let lastFrame = startedFrame;
       let lastPresentedAt = startedAt;
       let eventToPresentedFrameMs: number | null = null;
+      let reloadStartedAfterFireMs: number | null = null;
       const gapsMs: number[] = [];
       debug.fireOnce();
       const synchronousMs = performance.now() - startedAt;
       const inspect = () => {
         const now = performance.now();
+        if (reloadStartedAfterFireMs === null && (debug.snapshot() as any).player.reloading === true) {
+          reloadStartedAfterFireMs = now - startedAt;
+        }
         const presentedFrame = debug.admissionState().presentedGameplayFrame;
         if (presentedFrame > lastFrame) {
           gapsMs.push(now - lastPresentedAt);
@@ -273,6 +365,9 @@ async function probeColdFlareLifecycle(page: Page, durationMs: number): Promise<
             },
             before,
             after: effectSnapshot(),
+            autoReloadObserved: reloadStartedAfterFireMs !== null,
+            reloadStartedAfterFireMs: reloadStartedAfterFireMs === null
+              ? null : Number(reloadStartedAfterFireMs.toFixed(3)),
           });
           return;
         }
@@ -343,18 +438,8 @@ async function probeHeldFlamethrower(page: Page, durationMs: number): Promise<Fl
       let triggerToPresentedFrameMs: number | null = null;
       let firstEmissionObservedAfterTriggerMs: number | null = null;
       let firstEmissionContainingFrameGapMs: number | null = null;
-      let emissionObservedSinceLastPresentedFrame = false;
+      let lastPresentedEmissionCount = before.emissions;
       const gapsMs: number[] = [];
-      const ammoElement = document.querySelector<HTMLElement>('#ammo');
-      const startingAmmo = Number(ammoElement?.textContent ?? Number.NaN);
-      const ammoObserver = new MutationObserver(() => {
-        const currentAmmo = Number(ammoElement?.textContent ?? Number.NaN);
-        if (firstEmissionObservedAfterTriggerMs !== null || !Number.isFinite(startingAmmo)
-          || !Number.isFinite(currentAmmo) || currentAmmo >= startingAmmo) return;
-        firstEmissionObservedAfterTriggerMs = performance.now() - startedAt;
-        emissionObservedSinceLastPresentedFrame = true;
-      });
-      if (ammoElement) ammoObserver.observe(ammoElement, { childList: true, characterData: true, subtree: true });
       // Capture-to-microtask spans the real pointer handler without including
       // controller/CDP latency. The actual held state remains owned by the
       // production input path and is released by Playwright after the probe.
@@ -363,19 +448,20 @@ async function probeHeldFlamethrower(page: Page, durationMs: number): Promise<Fl
         try {
           const now = performance.now();
           const presentedFrame = debug.admissionState().presentedGameplayFrame;
+          const currentEmissionCount = (debug.snapshot() as any).timedMapWeapons.flameStream.emissions;
           if (presentedFrame > lastFrame) {
             const gap = now - lastPresentedAt;
             gapsMs.push(gap);
             if (triggerToPresentedFrameMs === null) triggerToPresentedFrameMs = now - startedAt;
-            if (emissionObservedSinceLastPresentedFrame && firstEmissionContainingFrameGapMs === null) {
+            if (currentEmissionCount > lastPresentedEmissionCount && firstEmissionContainingFrameGapMs === null) {
+              firstEmissionObservedAfterTriggerMs = now - startedAt;
               firstEmissionContainingFrameGapMs = gap;
-              emissionObservedSinceLastPresentedFrame = false;
             }
+            lastPresentedEmissionCount = currentEmissionCount;
             lastFrame = presentedFrame;
             lastPresentedAt = now;
           }
           if (now - startedAt >= selectedDurationMs) {
-            ammoObserver.disconnect();
             const after = (debug.snapshot() as any).timedMapWeapons.flameStream;
             if (gapsMs.length === 0) {
               reject(new Error('flamethrower-held-fire presented no gameplay frames'));
@@ -419,7 +505,6 @@ async function probeHeldFlamethrower(page: Page, durationMs: number): Promise<Fl
           }
           requestAnimationFrame(inspect);
         } catch (error) {
-          ammoObserver.disconnect();
           reject(error);
         }
       };
@@ -440,6 +525,31 @@ function expectBoundedFrameWindow(window: PresentedFrameWindow, minimumFrames: n
     .toBeLessThan(MAX_SUSTAINED_PRESENTED_FRAME_GAP_MS);
 }
 
+function expectBoundedEquipProbe(
+  probe: SpecialWeaponEquipProbe,
+  weapon: SpecialWeapon,
+  configuredSpinUpMs: number,
+): void {
+  expect(probe.synchronousMs).toBeLessThan(MAX_SYNCHRONOUS_ACTION_MS);
+  expect(probe.eventToPresentedFrameMs).toBeLessThan(MAX_EVENT_TO_PRESENTED_FRAME_MS);
+  expect(probe.maximumAnimationFrameGapMs).toBeLessThan(MAX_SUSTAINED_PRESENTED_FRAME_GAP_MS);
+  expect(probe.presentedFrameDelta).toBeGreaterThan(0);
+  expect(probe.readiness).toMatchObject({
+    requestedWeapon: weapon,
+    ready: true,
+    modelLoaded: true,
+    gpuReady: true,
+    resident: true,
+    catalogPrewarming: false,
+    importedWeapon: weapon,
+    mountedIsRequested: true,
+    assetCacheLoading: 0,
+    switchingReady: true,
+    switchingRemainingMs: 0,
+    configuredSpinUpMs,
+  });
+}
+
 test('cold and held flamethrower fire remain inside the presented-frame freeze budget', async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   const browserErrors: string[] = [];
@@ -451,7 +561,10 @@ test('cold and held flamethrower fire remain inside the presented-frame freeze b
   const runtimeBefore = await captureFrameHitchRendererEvidence(page, testInfo);
   expectFrameHitchRendererEvidence(runtimeBefore, 'gun-range', 'flamethrower initial runtime');
   const baseline = await samplePresentedFrameWindow(page, 'flamethrower-baseline', 750);
-  await acquireTrainingWeapon(page, 'flamethrower');
+  const equipProbe = await acquireTrainingWeapon(page, 'flamethrower');
+  expectBoundedEquipProbe(equipProbe, 'flamethrower', 180);
+  expect(equipProbe.eventToPresentedFrameMs).toBeLessThan(baseline.p95Ms * 4 + 40);
+  expect(equipProbe.maximumAnimationFrameGapMs).toBeLessThan(baseline.p95Ms * 4 + 40);
   await page.locator('#game').click({ position: { x: 64, y: 64 }, force: true });
   await page.waitForFunction(() => document.pointerLockElement === document.querySelector('#game'), undefined, { timeout: 5_000 });
   const heldProbePromise = probeHeldFlamethrower(page, 2_000);
@@ -520,7 +633,7 @@ test('cold and held flamethrower fire remain inside the presented-frame freeze b
   };
   await testInfo.attach('flamethrower-frame-hitch-receipt', {
     body: Buffer.from(JSON.stringify({
-      thresholds, runtimeBefore, runtimeAfter, baseline, probe, releaseProbe, clearance,
+      thresholds, runtimeBefore, runtimeAfter, baseline, equipProbe, probe, releaseProbe, clearance,
     }, null, 2)),
     contentType: 'application/json',
   });
@@ -528,13 +641,14 @@ test('cold and held flamethrower fire remain inside the presented-frame freeze b
     runtimeBefore,
     runtimeAfter,
     baseline: { ...baseline, gapsMs: undefined },
+    equipProbe,
     probe: { ...probe, frameWindow: { ...probe.frameWindow, gapsMs: undefined } },
     releaseProbe,
     clearance,
   }));
   writeOfficialFrameHitchReceipt(
     'flamethrower', runtimeBefore, runtimeAfter, thresholds,
-    { baseline, probe, releaseProbe, clearance }, browserErrors,
+    { baseline, equipProbe, probe, releaseProbe, clearance }, browserErrors,
   );
 });
 
@@ -549,13 +663,16 @@ test('cold flare shot and sustained projectile updates remain inside the present
   const runtimeBefore = await captureFrameHitchRendererEvidence(page, testInfo);
   expectFrameHitchRendererEvidence(runtimeBefore, 'gun-range', 'flare-gun initial runtime');
   const baseline = await samplePresentedFrameWindow(page, 'flare-gun-baseline', 750);
-  await acquireTrainingWeapon(page, 'flare-gun');
+  const equipProbe = await acquireTrainingWeapon(page, 'flare-gun');
+  expectBoundedEquipProbe(equipProbe, 'flare-gun', 0);
+  expect(equipProbe.eventToPresentedFrameMs).toBeLessThan(baseline.p95Ms * 4 + 40);
+  expect(equipProbe.maximumAnimationFrameGapMs).toBeLessThan(baseline.p95Ms * 4 + 40);
   const impactStage = await stageFlareImpactAtTrainingDummy(page);
   // One continuous strict frame sample owns the cold action, target/floor
   // impact, and the first real 500 ms burn pulse. This prevents a flight-only
   // pass from hiding a hitch in either collision or burn processing.
   const lifecycle = await probeColdFlareLifecycle(page, 1_200);
-  const { coldFire, frameWindow: sustained, before, after } = lifecycle;
+  const { coldFire, frameWindow: sustained, before, after, autoReloadObserved, reloadStartedAfterFireMs } = lifecycle;
   const effectTelemetry = {
     spawnCountDelta: after.spawnCount - before.spawnCount,
     impactCountDelta: after.impactCount - before.impactCount,
@@ -565,13 +682,15 @@ test('cold flare shot and sustained projectile updates remain inside the present
     burningAfterWindow: after.burning,
     poolExhaustionsDelta: after.poolExhaustions - before.poolExhaustions,
   };
-
   expect(coldFire.presentedFrameDelta).toBeGreaterThan(0);
   expect(coldFire.synchronousMs).toBeLessThan(MAX_SYNCHRONOUS_ACTION_MS);
   expect(coldFire.eventToPresentedFrameMs).toBeLessThan(MAX_EVENT_TO_PRESENTED_FRAME_MS);
   expect(effectTelemetry.spawnCountDelta).toBe(1);
   expect(effectTelemetry.impactCountDelta).toBeGreaterThan(0);
   expect(effectTelemetry.burnPulseCountDelta).toBeGreaterThan(0);
+  expect(autoReloadObserved).toBe(true);
+  expect(reloadStartedAfterFireMs).not.toBeNull();
+  expect(reloadStartedAfterFireMs!).toBeLessThan(sustained.durationMs);
   expect(after.flying + after.burning).toBe(after.active);
   expect(effectTelemetry.poolExhaustionsDelta).toBe(0);
   expectBoundedFrameWindow(baseline, 20);
@@ -594,11 +713,14 @@ test('cold flare shot and sustained projectile updates remain inside the present
       runtimeBefore,
       runtimeAfter,
       baseline,
+      equipProbe,
       coldFire,
       sustained,
       impactStage,
       before,
       after,
+      autoReloadObserved,
+      reloadStartedAfterFireMs,
       effectTelemetry,
     }, null, 2)),
     contentType: 'application/json',
@@ -607,13 +729,19 @@ test('cold flare shot and sustained projectile updates remain inside the present
     runtimeBefore,
     runtimeAfter,
     baseline: { ...baseline, gapsMs: undefined },
+    equipProbe,
     coldFire,
     sustained: { ...sustained, gapsMs: undefined },
     impactStage,
     effectTelemetry,
+    autoReloadObserved,
+    reloadStartedAfterFireMs,
   }));
   writeOfficialFrameHitchReceipt(
     'flare-gun', runtimeBefore, runtimeAfter, thresholds,
-    { baseline, coldFire, sustained, impactStage, before, after, effectTelemetry }, browserErrors,
+    {
+      baseline, equipProbe, coldFire, sustained, impactStage, before, after,
+      effectTelemetry, autoReloadObserved, reloadStartedAfterFireMs,
+    }, browserErrors,
   );
 });

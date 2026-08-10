@@ -1774,6 +1774,83 @@ export class WeaponPresentation {
     }
   }
 
+  /** Rehearse the exact retained reload pose without advancing live reload authority. */
+  async prewarmBrowserWeaponReloadPresentation(
+    id: WeaponId,
+    submit: (root: THREE.Object3D) => Promise<void>,
+  ): Promise<void> {
+    await this.prepareBrowserWeapon(id);
+    const model = this.models.get(id);
+    if (!model) throw new Error(`Pass 65 reload presentation unavailable after load: ${id}`);
+    const priorActive = this.active;
+    const priorReloadLastProgress = this.reloadLastProgress;
+    const priorNodes: Array<Readonly<{
+      node: THREE.Object3D;
+      visible: boolean;
+      position: THREE.Vector3;
+      quaternion: THREE.Quaternion;
+      scale: THREE.Vector3;
+    }>> = [];
+    this.root.traverse((node) => priorNodes.push({
+      node,
+      visible: node.visible,
+      position: node.position.clone(),
+      quaternion: node.quaternion.clone(),
+      scale: node.scale.clone(),
+    }));
+    try {
+      this.active = id;
+      this.root.visible = true;
+      for (const entry of this.models.values()) entry.visible = entry === model;
+      this.updateActiveSockets(id);
+      reloadImportedWeapon(model);
+      updateImportedWeapon(model, 0.16);
+      if (this.authoredArmsRoot) {
+        playFirstPersonArmAction(this.authoredArmsRoot, 'reload');
+        updateFirstPersonArmAnimations(this.authoredArmsRoot, 0.16);
+      }
+      const reloadPose = reloadPoseAt(id, 0.5);
+      const magazineName = id === 'carbine'
+        ? 'curved-magazine'
+        : id === 'lmg'
+          ? 'lmg-box-magazine'
+          : id === 'pistol' || id === 'machine-pistol' || id === 'magnum'
+            ? 'pistol-magazine'
+            : 'straight-magazine';
+      const magazine = model.getObjectByName(magazineName);
+      if (magazine) {
+        const restX = Number(magazine.userData.restX ?? magazine.position.x);
+        const restY = Number(magazine.userData.restY ?? magazine.position.y);
+        const restZ = Number(magazine.userData.restZ ?? magazine.position.z);
+        const restRotationZ = Number(magazine.userData.restRotationZ ?? magazine.rotation.z);
+        magazine.position.set(
+          restX + reloadPose.magazineLateral,
+          restY - reloadPose.magazineDrop,
+          restZ + reloadPose.magazineForward,
+        );
+        magazine.rotation.z = restRotationZ + reloadPose.magazineTwist;
+      }
+      const reloadShell = model.getObjectByName('reload-shell');
+      if (reloadShell) {
+        reloadShell.visible = reloadPose.shellVisible;
+        reloadShell.position.set(-0.16 + reloadPose.shellTravel * 0.13, -0.13 + reloadPose.shellTravel * 0.035, -0.02);
+      }
+      this.reloadLastProgress = 0.5;
+      await submit(this.root);
+    } finally {
+      resetImportedWeaponAnimations(model);
+      if (this.authoredArmsRoot) resetFirstPersonArmAnimations(this.authoredArmsRoot);
+      this.active = priorActive;
+      this.reloadLastProgress = priorReloadLastProgress;
+      for (const prior of priorNodes) {
+        prior.node.visible = prior.visible;
+        prior.node.position.copy(prior.position);
+        prior.node.quaternion.copy(prior.quaternion);
+        prior.node.scale.copy(prior.scale);
+      }
+    }
+  }
+
   private async performBrowserWeaponCatalogPrewarm(
     ids: readonly WeaponId[],
     onProgress?: (loaded: number, total: number) => void,

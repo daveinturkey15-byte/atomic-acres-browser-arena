@@ -86,6 +86,8 @@ describe('Pass 69.3 clean exact-SHA frame-hitch matrix', () => {
     expect(specialSpec).toContain('baseline.p95Ms * 4 + 40');
     expect(specialSpec).toContain('const MAX_SUSTAINED_PRESENTED_FRAME_GAP_MS = 120;');
     expect(specialSpec).toContain('const MAX_SUSTAINED_P95_MS = 50;');
+    expect(specialSpec).toContain('expectBoundedEquipProbe(equipProbe');
+    expect(specialSpec).toContain('probe.maximumAnimationFrameGapMs');
     for (const token of [
       'thresholds?.maximumEventToPresentedFrameMs === 120',
       'thresholds.maximumSynchronousActionMs === 50',
@@ -98,6 +100,8 @@ describe('Pass 69.3 clean exact-SHA frame-hitch matrix', () => {
       'probe.eventToPresentedFrameMs < baseline.eventToPresentedFrameMs * 4 + 40',
       'probe.maximumAnimationFrameGapMs < baseline.eventToPresentedFrameMs * 4 + 40',
       'probe.frameWindow.maximumMs < baseline.p95Ms * 4 + 40',
+      'equipProbe.eventToPresentedFrameMs < baseline.p95Ms * 4 + 40',
+      'equipProbe.maximumAnimationFrameGapMs < baseline.p95Ms * 4 + 40',
       'evidence.sustained.maximumMs < evidence.baseline.p95Ms * 4 + 40',
       'rounded(percentile(sorted, 0.95))',
       'rounded(sorted[sorted.length - 1])',
@@ -132,7 +136,14 @@ describe('Pass 69.3 clean exact-SHA frame-hitch matrix', () => {
       .toBeLessThan(runner.indexOf("['fire', 'cold-glass-breach']"));
     for (const token of [
       "label: 'flamethrower-held-fire'",
+      "action: 'acquire-training-weapon'",
+      'debug.sampleActiveWeaponReadiness()',
+      'debug.sampleWeaponAssetCache().loading',
+      'debug.sampleWeaponActionReadiness()',
+      'actionReadiness.switchingReady',
+      'actionReadiness.configuredSpinUpMs',
       "await page.mouse.down({ button: 'left' })",
+      'currentEmissionCount > lastPresentedEmissionCount',
       'probe.emissions >= 8',
       'probe.particlesSpawned === probe.emissions * 4',
       'probe.groundFireActive > 0',
@@ -141,7 +152,11 @@ describe('Pass 69.3 clean exact-SHA frame-hitch matrix', () => {
       'effect.spawnCountDelta === 1',
       'effect.impactCountDelta > 0',
       'effect.burnPulseCountDelta > 0',
+      'evidence.autoReloadObserved === true',
+      'evidence.reloadStartedAfterFireMs < evidence.sustained.durationMs',
       'after.flying + after.burning === after.active',
+      "specialEquipProbeValid(equipProbe, 'flamethrower', 180)",
+      "specialEquipProbeValid(equipProbe, 'flare-gun', 0)",
     ]) expect(`${specialSpec}\n${runner}`).toContain(token);
     expect(glassSpec).toContain("writeOfficialFrameHitchReceipt(\n    'glass-m14'");
     expect(specialSpec).toContain("'flamethrower', runtimeBefore, runtimeAfter, thresholds");

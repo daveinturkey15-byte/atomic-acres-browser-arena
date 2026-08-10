@@ -40,7 +40,7 @@ describe('flare projectile system', () => {
     scene.traverse((node) => {
       if (node instanceof THREE.PointLight && node.name === 'signal-flare-bounded-light') lights.push(node);
     });
-    expect(lights).toHaveLength(FLARE_PROJECTILE_EFFECT.poolCapacity);
+    expect(lights).toHaveLength(1);
     expect(lights.every((light) => !light.visible)).toBe(true);
     expect(system.spawn({
       ownerId: 'player-webgl', ownerTeam: 0, origin: new THREE.Vector3(), direction: new THREE.Vector3(1, 0, 0),
@@ -64,6 +64,77 @@ describe('flare projectile system', () => {
     expect(lights.every((light) => !light.visible)).toBe(true);
     // The entity was already live before staging; restore that exact state.
     expect(system.root.getObjectByName('signal-flare-1')?.visible).toBe(true);
+  });
+
+  it('keeps one bounded WebGPU light in the scene graph at zero idle intensity without idle mutation', () => {
+    const scene = new THREE.Scene();
+    const system = new FlareProjectileSystem(scene, false, true);
+    const lights: THREE.PointLight[] = [];
+    scene.traverse((node) => {
+      if (node instanceof THREE.PointLight && node.name === 'signal-flare-bounded-light') lights.push(node);
+    });
+    expect(lights).toHaveLength(1);
+    expect(system.telemetry()).toMatchObject({
+      active: 0,
+      visibleEffects: 0,
+      boundedLightCount: 1,
+      boundedLightVisible: true,
+      boundedLightIntensity: 0,
+      boundedLightWrites: 0,
+    });
+    system.update(0.016, 16, callbacks());
+    expect(system.telemetry()).toMatchObject({ boundedLightIntensity: 0, boundedLightWrites: 0 });
+    expect(system.spawn({
+      ownerId: 'player-light', ownerTeam: 0, origin: new THREE.Vector3(1, 2, 3),
+      direction: new THREE.Vector3(1, 0, 0), authority: true, actionNonce: 1, now: 20,
+    })).toBe(true);
+    expect(system.telemetry()).toMatchObject({ boundedLightVisible: true, boundedLightIntensity: 18 });
+    system.clear();
+    expect(system.telemetry()).toMatchObject({
+      active: 0, visibleEffects: 0, boundedLightVisible: true, boundedLightIntensity: 0,
+    });
+    expect(lights).toHaveLength(1);
+  });
+
+  it('restores every staged flare burn visual and shared-light value when submission throws', async () => {
+    const system = new FlareProjectileSystem(new THREE.Scene(), false, true);
+    const camera = new THREE.PerspectiveCamera();
+    camera.position.set(3, 4, 5);
+    camera.lookAt(3, 4, 0);
+    camera.updateWorldMatrix(true, false);
+    const root = system.root.getObjectByName('signal-flare-1') as THREE.Group;
+    const halo = root.getObjectByName('signal-flare-halo') as THREE.Mesh;
+    root.position.set(7, 8, 9);
+    root.quaternion.setFromEuler(new THREE.Euler(0.2, 0.3, 0.4));
+    root.scale.set(1.1, 1.2, 1.3);
+    halo.scale.set(0.7, 0.8, 0.9);
+    const haloMaterial = halo.material as THREE.MeshBasicMaterial;
+    haloMaterial.opacity = 0.19;
+    const before = {
+      visible: root.visible,
+      position: root.position.toArray(),
+      quaternion: root.quaternion.toArray(),
+      scale: root.scale.toArray(),
+      haloScale: halo.scale.toArray(),
+      haloOpacity: haloMaterial.opacity,
+      telemetry: system.telemetry(),
+    };
+    await expect(system.withStagedImpactBurnPresentation(camera, async () => {
+      expect(root.visible).toBe(true);
+      expect(halo.scale.x).toBeCloseTo(1.8);
+      expect(haloMaterial.opacity).toBeCloseTo(0.52);
+      expect(system.telemetry()).toMatchObject({ boundedLightVisible: true, boundedLightIntensity: 18 });
+      throw new Error('intentional burn submit failure');
+    })).rejects.toThrow('intentional burn submit failure');
+    expect({
+      visible: root.visible,
+      position: root.position.toArray(),
+      quaternion: root.quaternion.toArray(),
+      scale: root.scale.toArray(),
+      haloScale: halo.scale.toArray(),
+      haloOpacity: haloMaterial.opacity,
+      telemetry: system.telemetry(),
+    }).toEqual(before);
   });
 
   it('flies, impacts a target once, and emits finite host-owned burn pulses without explosion semantics', () => {

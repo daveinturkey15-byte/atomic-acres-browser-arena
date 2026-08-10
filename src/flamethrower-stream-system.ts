@@ -179,9 +179,9 @@ type FlamethrowerPresentationState = Readonly<{
   direction: THREE.Vector3;
   side: THREE.Vector3;
   emitterPosition: THREE.Vector3;
-  lightVisible: boolean;
   lightIntensity: number;
   lightPosition: THREE.Vector3;
+  lightWrites: number;
 }>;
 
 /** Fixed-capacity first/third-person flame stream with no live mesh creation. */
@@ -221,6 +221,7 @@ export class FlamethrowerStreamSystem {
   private groundFireMerges = 0;
   private lastDistanceM = 0;
   private prewarmGeneration = -1;
+  private lightWrites = 0;
 
   constructor(scene: THREE.Scene, flattenMaterials: boolean, private readonly softwareAdapter = false) {
     this.particlesPerEmission = softwareAdapter
@@ -262,10 +263,13 @@ export class FlamethrowerStreamSystem {
     this.groundMesh.frustumCulled = false;
     this.groundMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.groundMesh.userData.presentationOnly = true;
-    this.light = new THREE.PointLight(0xff6a22, flattenMaterials ? 0 : 14, 7, 2);
+    // Keep Three r185's scene LightsNode stable: the retained light is always a
+    // member of the graph and idles at zero intensity instead of toggling visible.
+    this.light = new THREE.PointLight(0xff6a22, 0, 7, 2);
     this.light.name = 'flamethrower-bounded-stream-light';
     this.light.castShadow = false;
-    this.light.visible = false;
+    this.light.visible = true;
+    this.light.userData.baseIntensity = flattenMaterials ? 0 : 14;
     this.root.add(this.mesh, this.groundMesh, this.light);
     scene.add(this.root);
     this.writeMatrices();
@@ -320,8 +324,7 @@ export class FlamethrowerStreamSystem {
     }
     this.particlesSpawned += emitted;
     this.maximumActive = Math.max(this.maximumActive, this.activeParticles);
-    this.light.position.copy(start);
-    this.light.visible = emitted > 0;
+    if (emitted > 0) this.setLight(Number(this.light.userData.baseIntensity ?? 14), start);
     this.mesh.instanceColor!.needsUpdate = true;
     if (emitted > 0) this.mesh.instanceMatrix.needsUpdate = true;
     return emitted > 0;
@@ -392,10 +395,19 @@ export class FlamethrowerStreamSystem {
       this.writeParticleMatrix(slot);
       particleMatricesChanged = true;
     }
-    this.light.visible = remaining > 0;
     if (remaining > 0) {
+      const priorX = this.light.position.x;
+      const priorY = this.light.position.y;
+      const priorZ = this.light.position.z;
       this.light.position.lerp(this.emitterPosition, Math.min(1, deltaSeconds * 18));
-      this.light.intensity = 11 + Math.sin(this.sequence * 2.41 + remaining) * 2.2;
+      const intensity = 11 + Math.sin(this.sequence * 2.41 + remaining) * 2.2;
+      const changed = priorX !== this.light.position.x || priorY !== this.light.position.y
+        || priorZ !== this.light.position.z || this.light.intensity !== intensity;
+      this.light.intensity = intensity;
+      if (changed) this.lightWrites += 1;
+    } else if (this.light.intensity !== 0) {
+      this.light.intensity = 0;
+      this.lightWrites += 1;
     }
     if (particleMatricesChanged) this.mesh.instanceMatrix.needsUpdate = true;
     this.updateGroundMatrices(now);
@@ -408,7 +420,10 @@ export class FlamethrowerStreamSystem {
     this.groundActive.fill(0);
     this.groundSpawnedAt.fill(0);
     this.groundExpiresAt.fill(0);
-    this.light.visible = false;
+    if (this.light.intensity !== 0) {
+      this.light.intensity = 0;
+      this.lightWrites += 1;
+    }
     this.activeParticles = 0;
     this.activeGroundFires = 0;
     this.writeMatrices();
@@ -428,8 +443,8 @@ export class FlamethrowerStreamSystem {
       groundCursor: this.groundCursor, groundFireMerges: this.groundFireMerges,
       particleMatrixWrites: this.particleMatrixWrites, groundMatrixWrites: this.groundMatrixWrites,
       direction: this.direction.clone(), side: this.side.clone(), emitterPosition: this.emitterPosition.clone(),
-      lightVisible: this.light.visible, lightIntensity: this.light.intensity,
-      lightPosition: this.light.position.clone(),
+      lightIntensity: this.light.intensity,
+      lightPosition: this.light.position.clone(), lightWrites: this.lightWrites,
     };
   }
 
@@ -440,8 +455,7 @@ export class FlamethrowerStreamSystem {
     const now = performance.now();
     this.emit(start, start.clone().addScaledVector(direction, 8), now);
     this.igniteGround(start.clone().addScaledVector(direction, 2.4), now);
-    this.light.visible = true;
-    this.light.intensity = Number(this.light.userData.baseIntensity ?? 14);
+    this.setLight(Number(this.light.userData.baseIntensity ?? 14));
   }
 
   private restorePresentationState(state: FlamethrowerPresentationState): void {
@@ -468,7 +482,6 @@ export class FlamethrowerStreamSystem {
     this.direction.copy(state.direction);
     this.side.copy(state.side);
     this.emitterPosition.copy(state.emitterPosition);
-    this.light.visible = state.lightVisible;
     this.light.intensity = state.lightIntensity;
     this.light.position.copy(state.lightPosition);
     this.writeMatrices();
@@ -477,6 +490,7 @@ export class FlamethrowerStreamSystem {
     // Preserve the externally receipted counters exactly across prewarm.
     this.particleMatrixWrites = state.particleMatrixWrites;
     this.groundMatrixWrites = state.groundMatrixWrites;
+    this.lightWrites = state.lightWrites;
   }
 
   async prewarm(runtime: PresentationPrewarmRuntime, camera: THREE.Camera, sceneGeneration: number): Promise<void> {
@@ -521,6 +535,10 @@ export class FlamethrowerStreamSystem {
     prewarmGeneration: number;
     particlesPerEmission: number;
     softwareAdapter: boolean;
+    boundedLightCount: 1;
+    boundedLightVisible: boolean;
+    boundedLightIntensity: number;
+    boundedLightWrites: number;
   }> {
     return Object.freeze({
       capacity: this.active.length,
@@ -538,7 +556,24 @@ export class FlamethrowerStreamSystem {
       prewarmGeneration: this.prewarmGeneration,
       particlesPerEmission: this.particlesPerEmission,
       softwareAdapter: this.softwareAdapter,
+      boundedLightCount: 1,
+      boundedLightVisible: this.light.visible,
+      boundedLightIntensity: this.light.intensity,
+      boundedLightWrites: this.lightWrites,
     });
+  }
+
+  private setLight(intensity: number, position?: THREE.Vector3): void {
+    let changed = false;
+    if (position && !this.light.position.equals(position)) {
+      this.light.position.copy(position);
+      changed = true;
+    }
+    if (this.light.intensity !== intensity) {
+      this.light.intensity = intensity;
+      changed = true;
+    }
+    if (changed) this.lightWrites += 1;
   }
 
   private nextInactiveSlot(): number | null {

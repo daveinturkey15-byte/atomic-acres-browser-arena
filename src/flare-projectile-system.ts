@@ -76,7 +76,7 @@ type FlareEntity = {
   root: THREE.Group;
   core: THREE.Mesh;
   halo: THREE.Mesh;
-  light: THREE.PointLight;
+  lightIntensity: number;
   velocity: THREE.Vector3;
   ownerId: string;
   ownerTeam: Team;
@@ -141,6 +141,7 @@ export function flareSegmentSphereFraction(
 export class FlareProjectileSystem {
   readonly root = new THREE.Group();
   private readonly entities: FlareEntity[] = [];
+  private readonly light: THREE.PointLight;
   private readonly admittedKeys = new Set<string>();
   private readonly activeByKey = new Map<string, FlareEntity>();
   private spawnCount = 0;
@@ -166,6 +167,7 @@ export class FlareProjectileSystem {
   private replicaUpdates = 0;
   private replicaReleases = 0;
   private replicaRejectedSnapshots = 0;
+  private lightWrites = 0;
 
   constructor(
     scene: THREE.Scene,
@@ -175,6 +177,15 @@ export class FlareProjectileSystem {
     this.root.name = 'signal-flare-projectile-pool';
     this.root.userData.presentationOnly = true;
     scene.add(this.root);
+    // Three r185 invalidates the scene LightsNode when visible light membership
+    // changes. One retained light at zero idle intensity keeps that graph stable
+    // without making all twelve pooled flares permanent shader inputs.
+    this.light = new THREE.PointLight(0xff4a24, 0, 9, 2);
+    this.light.name = 'signal-flare-bounded-light';
+    this.light.castShadow = false;
+    this.light.visible = dynamicLightsEnabled;
+    this.light.userData.baseIntensity = flattenMaterials ? 0 : 18;
+    this.root.add(this.light);
     const coreGeometry = new THREE.SphereGeometry(0.095, 10, 7);
     const haloGeometry = new THREE.SphereGeometry(0.24, 10, 7);
     for (let index = 0; index < FLARE_PROJECTILE_EFFECT.poolCapacity; index += 1) {
@@ -194,18 +205,13 @@ export class FlareProjectileSystem {
         blending: THREE.AdditiveBlending,
         toneMapped: false,
       }));
-      const light = new THREE.PointLight(0xff4a24, flattenMaterials ? 0 : 18, 9, 2);
-      light.castShadow = false;
-      light.visible = dynamicLightsEnabled;
-      light.userData.baseIntensity = flattenMaterials ? 0 : 18;
       halo.userData.baseOpacity = flattenMaterials ? 0.34 : 0.5;
       core.name = 'signal-flare-core';
       halo.name = 'signal-flare-halo';
-      light.name = 'signal-flare-bounded-light';
-      root.add(halo, core, light);
+      root.add(halo, core);
       this.root.add(root);
       this.entities.push({
-        root, core, halo, light, velocity: new THREE.Vector3(), ownerId: '', ownerTeam: 0,
+        root, core, halo, lightIntensity: 0, velocity: new THREE.Vector3(), ownerId: '', ownerTeam: 0,
         authority: false, actionNonce: 0, phase: 'idle', spawnedAt: 0, impactedAt: 0,
         expiresAt: 0, nextBurnPulseAt: 0, burnPulseIndex: 0,
       });
@@ -257,10 +263,11 @@ export class FlareProjectileSystem {
     if (haloMaterial instanceof THREE.MeshBasicMaterial) {
       haloMaterial.opacity = Number(available.halo.userData.baseOpacity ?? 0.5);
     }
-    available.light.intensity = Number(available.light.userData.baseIntensity ?? 0);
+    available.lightIntensity = Number(this.light.userData.baseIntensity ?? 0);
     this.activeByKey.set(key, available);
     this.spawnCount += 1;
     this.lifecycleRevision += 1;
+    this.syncSharedLight();
     return true;
   }
 
@@ -277,6 +284,7 @@ export class FlareProjectileSystem {
       if (entity.phase === 'flight') this.updateFlight(entity, deltaSeconds, now, targets, callbacks);
       if (entity.phase === 'burn') this.updateBurn(entity, now, targets, callbacks);
     }
+    this.syncSharedLight();
   }
 
   hasActiveProjectiles(): boolean {
@@ -311,6 +319,7 @@ export class FlareProjectileSystem {
     this.authoritySnapshotSeq = 0;
     this.lastReplicaSnapshotSeq = -1;
     this.lastReplicaSampledAtHostTimeMs = Number.NEGATIVE_INFINITY;
+    this.syncSharedLight();
   }
 
   inspectActiveReplicas(now: number): readonly FlareActiveReplicaInspection[] {
@@ -468,6 +477,7 @@ export class FlareProjectileSystem {
     this.replicaCreates += created;
     this.replicaUpdates += updated;
     this.replicaReleases += released;
+    this.syncSharedLight();
     return Object.freeze({
       accepted: true, reason: 'accepted', created, updated, released,
       skippedExpired, skippedAuthority, poolExhaustions,
@@ -535,6 +545,7 @@ export class FlareProjectileSystem {
       this.applyAuthorityCheckpointEntity(entity, effect, now);
       restored += 1;
     }
+    this.syncSharedLight();
     return Object.freeze({
       accepted: true,
       restored,
@@ -546,44 +557,15 @@ export class FlareProjectileSystem {
 
   async prewarm(runtime: PresentationPrewarmRuntime, camera: THREE.Camera, sceneGeneration: number): Promise<void> {
     if (this.prewarmGeneration === sceneGeneration) return;
-    const entity = this.entities[0];
-    if (!entity) return;
-    camera.updateWorldMatrix(true, false);
-    // WebGL shader keys encode the exact point-light count. Compile the real
-    // first-shot topology (one flare) against the complete arena; compiling
-    // eight pooled lights or only the flare root does not warm the one-light
-    // programs used by live world materials. WebGPU retains the bounded
-    // worst-case pooled topology because its TSL pipeline owns that vocabulary.
-    const stagedEntities = runtime.backend === 'webgl2' ? [entity] : this.entities;
-    const priorStates = stagedEntities.map((entry) => ({
-      visible: entry.root.visible,
-      position: entry.root.position.clone(),
-      intensity: entry.light.intensity,
-    }));
-    const cameraPosition = camera.getWorldPosition(new THREE.Vector3());
-    const cameraDirection = camera.getWorldDirection(new THREE.Vector3());
-    stagedEntities.forEach((entry, index) => {
-      entry.root.position.copy(cameraPosition)
-        .addScaledVector(cameraDirection, 4 + index * 0.35);
-      entry.root.visible = true;
-      entry.light.intensity = Number(entry.light.userData.baseIntensity ?? 0);
-    });
-    try {
+    await this.withStagedFirstShotPresentation(camera, async () => {
       const scene = this.root.parent as THREE.Scene;
       await runtime.compileAndRender(
         runtime.backend === 'webgl2' && this.dynamicLightsEnabled ? scene : this.root,
         camera,
         scene,
       );
-      this.prewarmGeneration = sceneGeneration;
-    } finally {
-      stagedEntities.forEach((entry, index) => {
-        const prior = priorStates[index]!;
-        entry.root.visible = prior.visible;
-        entry.root.position.copy(prior.position);
-        entry.light.intensity = prior.intensity;
-      });
-    }
+    });
+    this.prewarmGeneration = sceneGeneration;
   }
 
   /**
@@ -596,31 +578,73 @@ export class FlareProjectileSystem {
     camera: THREE.Camera,
     action: () => Promise<void>,
   ): Promise<void> {
+    await this.withStagedVisualPresentation(camera, false, action);
+  }
+
+  /** Stage the retained impact/burn appearance against the constant shared light graph. */
+  async withStagedImpactBurnPresentation(
+    camera: THREE.Camera,
+    action: () => Promise<void>,
+  ): Promise<void> {
+    await this.withStagedVisualPresentation(camera, true, action);
+  }
+
+  private async withStagedVisualPresentation(
+    camera: THREE.Camera,
+    burn: boolean,
+    action: () => Promise<void>,
+  ): Promise<void> {
     const entity = this.entities[0];
     if (!entity) return action();
     const priorVisible = entity.root.visible;
     const priorPosition = entity.root.position.clone();
+    const priorQuaternion = entity.root.quaternion.clone();
+    const priorScale = entity.root.scale.clone();
     const priorCoreVisible = entity.core.visible;
     const priorHaloVisible = entity.halo.visible;
-    const priorLightVisible = entity.light.visible;
-    const priorIntensity = entity.light.intensity;
+    const priorHaloScale = entity.halo.scale.clone();
+    const haloMaterial = entity.halo.material;
+    const priorHaloOpacity = haloMaterial instanceof THREE.MeshBasicMaterial ? haloMaterial.opacity : null;
+    const priorEntityLightIntensity = entity.lightIntensity;
+    const priorLightIntensity = this.light.intensity;
+    const priorLightPosition = this.light.position.clone();
+    const priorLightWrites = this.lightWrites;
+    camera.updateWorldMatrix(true, false);
     const cameraPosition = camera.getWorldPosition(new THREE.Vector3());
     const cameraDirection = camera.getWorldDirection(new THREE.Vector3());
     entity.root.position.copy(cameraPosition).addScaledVector(cameraDirection, 4);
+    entity.root.quaternion.identity();
+    entity.root.scale.setScalar(1);
     entity.root.visible = true;
     entity.core.visible = true;
     entity.halo.visible = true;
-    entity.light.visible = this.dynamicLightsEnabled;
-    entity.light.intensity = Number(entity.light.userData.baseIntensity ?? 0);
+    entity.halo.scale.setScalar(burn ? 1.8 : 1);
+    if (haloMaterial instanceof THREE.MeshBasicMaterial) {
+      haloMaterial.opacity = burn ? 0.52 : Number(entity.halo.userData.baseOpacity ?? 0.5);
+    }
+    entity.lightIntensity = Number(this.light.userData.baseIntensity ?? 0);
+    if (this.dynamicLightsEnabled) {
+      this.light.position.copy(entity.root.position);
+      this.light.intensity = entity.lightIntensity;
+      this.lightWrites += 1;
+    }
     try {
       await action();
     } finally {
       entity.root.visible = priorVisible;
       entity.root.position.copy(priorPosition);
+      entity.root.quaternion.copy(priorQuaternion);
+      entity.root.scale.copy(priorScale);
       entity.core.visible = priorCoreVisible;
       entity.halo.visible = priorHaloVisible;
-      entity.light.visible = priorLightVisible;
-      entity.light.intensity = priorIntensity;
+      entity.halo.scale.copy(priorHaloScale);
+      if (haloMaterial instanceof THREE.MeshBasicMaterial && priorHaloOpacity !== null) {
+        haloMaterial.opacity = priorHaloOpacity;
+      }
+      entity.lightIntensity = priorEntityLightIntensity;
+      this.light.intensity = priorLightIntensity;
+      this.light.position.copy(priorLightPosition);
+      this.lightWrites = priorLightWrites;
     }
   }
 
@@ -641,6 +665,11 @@ export class FlareProjectileSystem {
     replicaUpdates: number;
     replicaReleases: number;
     replicaRejectedSnapshots: number;
+    visibleEffects: number;
+    boundedLightCount: 1;
+    boundedLightVisible: boolean;
+    boundedLightIntensity: number;
+    boundedLightWrites: number;
   }> {
     return Object.freeze({
       capacity: this.entities.length,
@@ -659,6 +688,11 @@ export class FlareProjectileSystem {
       replicaUpdates: this.replicaUpdates,
       replicaReleases: this.replicaReleases,
       replicaRejectedSnapshots: this.replicaRejectedSnapshots,
+      visibleEffects: this.entities.filter((entity) => entity.root.visible).length,
+      boundedLightCount: 1,
+      boundedLightVisible: this.light.visible,
+      boundedLightIntensity: this.light.intensity,
+      boundedLightWrites: this.lightWrites,
     });
   }
 
@@ -670,7 +704,7 @@ export class FlareProjectileSystem {
     if (haloMaterial instanceof THREE.MeshBasicMaterial) {
       haloMaterial.opacity = Number(entity.halo.userData.baseOpacity ?? 0.5);
     }
-    entity.light.intensity = Number(entity.light.userData.baseIntensity ?? 0);
+    entity.lightIntensity = Number(this.light.userData.baseIntensity ?? 0);
   }
 
   private applyBurnAppearance(entity: FlareEntity, progress: number): void {
@@ -678,7 +712,7 @@ export class FlareProjectileSystem {
     entity.halo.scale.setScalar(1.8 + bounded * 1.6);
     const haloMaterial = entity.halo.material;
     if (haloMaterial instanceof THREE.MeshBasicMaterial) haloMaterial.opacity = (1 - bounded) * 0.52;
-    entity.light.intensity = Number(entity.light.userData.baseIntensity ?? 18) * (1 - bounded);
+    entity.lightIntensity = Number(this.light.userData.baseIntensity ?? 18) * (1 - bounded);
   }
 
   private applyPresentationReplica(
@@ -841,7 +875,7 @@ export class FlareProjectileSystem {
     entity.halo.scale.setScalar(1.8 + progress * 1.6);
     const haloMaterial = entity.halo.material;
     if (haloMaterial instanceof THREE.MeshBasicMaterial) haloMaterial.opacity = (1 - progress) * 0.52;
-    entity.light.intensity = Number(entity.light.userData.baseIntensity ?? 18) * (1 - progress);
+    entity.lightIntensity = Number(this.light.userData.baseIntensity ?? 18) * (1 - progress);
     while (entity.authority && entity.nextBurnPulseAt <= now && entity.nextBurnPulseAt <= entity.expiresAt) {
       entity.burnPulseIndex += 1;
       for (const target of targets) {
@@ -882,8 +916,29 @@ export class FlareProjectileSystem {
     entity.nextBurnPulseAt = 0;
     entity.burnPulseIndex = 0;
     entity.velocity.set(0, 0, 0);
-    entity.light.intensity = 0;
+    entity.lightIntensity = 0;
     if (wasActive) this.lifecycleRevision += 1;
+  }
+
+  private syncSharedLight(): void {
+    // Concurrent flares retain emissive cores/halos; the bounded world light
+    // follows the strongest live flare without changing scene-light membership.
+    let selected: FlareEntity | null = null;
+    for (const entity of this.entities) {
+      if (entity.phase === 'idle' || entity.lightIntensity <= 0) continue;
+      if (!selected || entity.lightIntensity > selected.lightIntensity) selected = entity;
+    }
+    const intensity = this.dynamicLightsEnabled ? selected?.lightIntensity ?? 0 : 0;
+    let changed = false;
+    if (this.light.intensity !== intensity) {
+      this.light.intensity = intensity;
+      changed = true;
+    }
+    if (selected && !this.light.position.equals(selected.root.position)) {
+      this.light.position.copy(selected.root.position);
+      changed = true;
+    }
+    if (changed) this.lightWrites += 1;
   }
 
   private targetsForUpdate(
