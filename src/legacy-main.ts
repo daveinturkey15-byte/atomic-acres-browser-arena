@@ -23776,6 +23776,7 @@ const debugWindow = window as Window & {
       fixedVisualTimeMs?: number,
       seed?: number,
     ) => void;
+    setCaptureCameraFarPlane: (far: number | null) => void;
     setCaptureCameraOrbit: (orbit: {
       centerX: number;
       centerY: number;
@@ -25470,6 +25471,13 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       activeArenaReviewExposure = null;
       activeArenaReviewHud = null;
     }
+  },
+  setCaptureCameraFarPlane: (far) => {
+    const arenaFarPlane = selectedArena.id === 'rustworks-1v1' ? 1_400 : 180;
+    const requestedFarPlane = Number.isFinite(far) ? THREE.MathUtils.clamp(far!, camera.near + 1, 2_000) : arenaFarPlane;
+    if (camera.far === requestedFarPlane) return;
+    camera.far = requestedFarPlane;
+    camera.updateProjectionMatrix();
   },
   setCaptureCameraOrbit: (orbit) => {
     // Game-loop-owned cinematic drift for capture cameras. Runs every

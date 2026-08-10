@@ -1050,6 +1050,10 @@ export type KillstreakPresentationTelemetry = Readonly<{
     visible: boolean;
     visibleMeshCount: number;
     visibleBounds: Readonly<{ min: readonly number[]; max: readonly number[] }> | null;
+    activeLodIndex: number | null;
+    activeLodName: string | null;
+    activeLodAsset: string | null;
+    activeAircraftWing: SupportAircraftWingVisibility | null;
   }>[];
   chopperWeaponActionsPresented: number;
   chopperImpactActionsPresented: number;
@@ -2818,6 +2822,23 @@ export class KillstreakPresentation {
       const bounds = new THREE.Box3();
       const meshBounds = new THREE.Box3();
       let visibleMeshCount = 0;
+      let activeLodIndex: number | null = null;
+      let activeLodName: string | null = null;
+      let activeLodAsset: string | null = null;
+      let activeAircraftWing: SupportAircraftWingVisibility | null = null;
+      const authoredLod = entry.root.children.find((child): child is THREE.LOD => child instanceof THREE.LOD);
+      if (authoredLod) {
+        const currentLevel = authoredLod.getCurrentLevel();
+        if (currentLevel >= 0 && authoredLod.levels[currentLevel]?.object.visible === true) {
+          const activeLevel = authoredLod.levels[currentLevel]!.object;
+          activeLodIndex = currentLevel;
+          activeLodName = activeLevel.name;
+          activeLodAsset = typeof activeLevel.userData.presentationAsset === 'string'
+            ? activeLevel.userData.presentationAsset
+            : null;
+          activeAircraftWing = (activeLevel.userData.aircraftWingVisibility as SupportAircraftWingVisibility | undefined) ?? null;
+        }
+      }
       entry.root.traverse((node) => {
         if (!(node instanceof THREE.Mesh) || !effectivelyVisible(node, entry.root)) return;
         node.geometry.computeBoundingBox();
@@ -2838,6 +2859,10 @@ export class KillstreakPresentation {
           min: Object.freeze(bounds.min.toArray()),
           max: Object.freeze(bounds.max.toArray()),
         }),
+        activeLodIndex,
+        activeLodName,
+        activeLodAsset,
+        activeAircraftWing,
       });
     }).sort((left, right) => left.entityId.localeCompare(right.entityId)));
     const markerDetails = [...this.placementMarkers.values()]
