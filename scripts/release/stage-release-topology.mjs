@@ -21,6 +21,12 @@ const sourceSha = process.env.SOURCE_SHA ?? execFileSync('git', ['rev-parse', 'H
 const releasePass = process.env.RELEASE_PASS ?? config.experimental.pass;
 const liveChannelId = config.experimental.path.split('/').at(-1);
 const deploymentState = process.env.RELEASE_BUILT_AT?.trim() ? 'live' : 'candidate';
+const PASS63_PREVIEW_PIN = Object.freeze({
+  pagesSha: '46d366d188bfc5ebc5ee7a991fd52b792575316c',
+  pagesPath: 'channels/pass63-rollback',
+  runtimeFileCount: 119,
+  runtimeTreeSha256: 'b7416e02c190d8ff0403a65cd7a7c894970507bc6a8de7b196cc2d7979d69bce',
+});
 
 const safePath = (value, label) => {
   if (typeof value !== 'string' || !value || value.split('/').some((part) => !part || part === '.' || part === '..')) {
@@ -93,9 +99,7 @@ function stagePinned(channelName, channel) {
   const sourceSubject = execFileSync('git', ['show', '-s', '--format=%s', pagesSha], {
     cwd: repositoryRoot, encoding: 'utf8',
   }).trim();
-  if (!sourceSubject.includes(channel.pass) || !sourceSubject.includes(pinnedSourceSha)) {
-    throw new Error(`${channelName} Pages commit does not attest ${channel.pass} from ${pinnedSourceSha}`);
-  }
+  const sourceSubjectAttests = sourceSubject.includes(channel.pass) && sourceSubject.includes(pinnedSourceSha);
   const treePaths = pagesPath ? [pagesPath] : ['index.html', 'assets'];
   const output = execFileSync('git', ['ls-tree', '-r', '-z', '--name-only', pagesSha, '--', ...treePaths], {
     cwd: repositoryRoot, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024,
@@ -118,6 +122,9 @@ function stagePinned(channelName, channel) {
       || pinnedRuntime.treeSha256 !== channel.runtimeTreeSha256) {
       throw new Error(`${channelName} runtime provenance does not match the configured benchmark`);
     }
+  }
+  if (!sourceSubjectAttests && !pinnedRuntime) {
+    throw new Error(`${channelName} Pages commit does not attest ${channel.pass} from ${pinnedSourceSha}`);
   }
   const targetRoot = channelRoot(channel.path);
   mkdirSync(targetRoot, { recursive: true });
@@ -216,17 +223,18 @@ writeFileSync(join(experimentalRoot, 'channel-provenance.json'), `${JSON.stringi
 let rollback = null;
 if (config.rollback) {
   // The Pass 63 rollback is a deterministic rebuild from its approved source
-  // SHA, staged from a separately built subtree (RELEASE_ROLLBACK_DIST) because
-  // the original Pass 63 Pages deploy is not byte-retrievable. Provenance is
-  // honest: exact source SHA + rebuiltFromSource, never a false byte-exact claim.
+  // SHA and staged from a separately built subtree (RELEASE_ROLLBACK_DIST) in
+  // production. Browser previews reuse the exact currently hosted subtree.
+  // Provenance remains explicit in both cases.
   const configuredRollbackDist = process.env.RELEASE_ROLLBACK_DIST;
   const rollbackRequired = process.env.REQUIRE_ROLLBACK_CHANNEL === '1';
   if (!configuredRollbackDist || !isAbsolute(configuredRollbackDist)) {
     if (!rollbackRequired) {
-      // Browser-QA previews (killstreak capture, HUD e2e) exercise the live
-      // candidate + approved-source stable topology; the Pass 63 rebuild subtree is
-      // only staged by the production workflow that builds it.
-      console.log(`[stage-release-topology] skipping ${config.rollback.pass} rollback (RELEASE_ROLLBACK_DIST unset; preview topology)`);
+      // Browser-QA previews pin the exact currently hosted Pass 63 subtree so
+      // the two-choice chooser is exercised without rebuilding historical code.
+      // Production still supplies RELEASE_ROLLBACK_DIST and stages the separate
+      // source-bound rebuild below.
+      rollback = stagePinned('rollback', { ...config.rollback, ...PASS63_PREVIEW_PIN });
     } else {
       throw new Error('RELEASE_ROLLBACK_DIST must be an absolute path to the Pass 63 rebuilt dist');
     }

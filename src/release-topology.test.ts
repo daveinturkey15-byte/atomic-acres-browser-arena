@@ -112,6 +112,8 @@ describe('Pass 69 release topology', () => {
     expect(staging).toContain('...(rollback ? {');
     expect(staging).toContain('stable: {');
     expect(staging).toContain("RELEASE_ROLLBACK_DIST");
+    expect(staging).toContain("pagesSha: '46d366d188bfc5ebc5ee7a991fd52b792575316c'");
+    expect(staging).toContain("rollback = stagePinned('rollback', { ...config.rollback, ...PASS63_PREVIEW_PIN })");
     expect(staging).toContain("schemaVersion: 4");
     expect(staging).toContain("process.env.RELEASE_BUILT_AT?.trim() ? 'live' : 'candidate'");
     expect(staging).toContain('deploymentState,');
