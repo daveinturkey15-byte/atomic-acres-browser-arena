@@ -1,11 +1,20 @@
 import * as THREE from 'three';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { isBlocked } from './collision';
 import { SPAWN_LAYOUT } from './arena-layout';
 import { SIMULATION_HZ } from './gameplay';
 import { buildArena } from './map';
 import { CharacterPhysics } from './physics';
-import { RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT, fixedGunRangeDummyFixtureMatchesAuthoredMotion } from './rigged-bot-visual-evidence-contract';
+import {
+  RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT,
+  fixedGunRangeDummyFixtureMatchesAuthoredMotion,
+  waitForAtomicPlayerConvergenceInPage,
+} from './rigged-bot-visual-evidence-contract';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe('fixed rigged actor visual evidence fixtures', () => {
   it('retains one immutable open-road Atomic staging line', () => {
@@ -113,5 +122,104 @@ describe('fixed rigged actor visual evidence fixtures', () => {
       'head', 'shoulder-left', 'shoulder-right', 'pelvis', 'wrist-left', 'wrist-right',
     ]);
     expect(RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.los.actorSelfOcclusionExcluded).toBe(true);
+  });
+
+  it('fails closed with bounded, sanitized and exact convergence timeout diagnostics', async () => {
+    type Observation = Readonly<{
+      frame: unknown;
+      position: unknown;
+      grounded: boolean;
+    }>;
+    const callbacks: FrameRequestCallback[] = [];
+    let now = 0;
+    let observation: Observation = { frame: 99, position: [0, 1, 0], grounded: true };
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      callbacks.push(callback);
+      return callbacks.length;
+    });
+    vi.stubGlobal('window', {
+      __ATOMIC_ACRES_DEBUG__: {
+        admissionState: () => ({ presentedGameplayFrame: observation.frame }),
+        snapshot: () => ({ player: { position: observation.position, grounded: observation.grounded } }),
+      },
+    });
+
+    const completion = waitForAtomicPlayerConvergenceInPage({
+      commandedFrame: 99,
+      expectedSettledPosition: [0, 1, 0],
+      settlement: {
+        contract: 'diagnostic-test',
+        minimumObservedTransitions: 1_000,
+        minimumDurationMs: 50,
+        maximumAxisDeltaM: 0.0005,
+        maximumFinalAxisErrorM: 0.0005,
+        groundedRequired: true,
+      },
+    }).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    const runObservation = (next: Observation, atMs: number) => {
+      observation = next;
+      now = atMs;
+      const callback = callbacks.shift();
+      expect(callback, 'a bounded waiter callback must remain scheduled').toBeTypeOf('function');
+      callback!(atMs);
+    };
+
+    runObservation({ frame: 100, position: [Number.NaN, Number.POSITIVE_INFINITY, 0], grounded: true }, 1);
+    runObservation({ frame: 100, position: [0, 1, 0], grounded: true }, 2);
+    runObservation({ frame: 100, position: [0, 1, 0], grounded: true }, 3);
+    runObservation({ frame: 101, position: [0.0005, 1, 0], grounded: true }, 4);
+    runObservation({ frame: 100, position: [0, 1, 0], grounded: true }, 5);
+    runObservation({ frame: 101, position: [-0.0005, 1, 0], grounded: true }, 6);
+    runObservation({ frame: 102, position: [0.000001, 1, 0], grounded: true }, 7);
+    for (let index = 0; index < 20; index += 1) {
+      runObservation({ frame: 99, position: [0, 1, 0], grounded: true }, 8 + index);
+    }
+    runObservation({ frame: 103, position: [Number.NaN, Number.NEGATIVE_INFINITY, 0], grounded: true }, 10_001);
+
+    const error = await completion;
+    expect(error).toBeInstanceOf(Error);
+    const message = (error as Error).message;
+    const jsonStart = message.indexOf('{');
+    expect(jsonStart).toBeGreaterThan(0);
+    const diagnostics = JSON.parse(message.slice(jsonStart));
+    expect(diagnostics).toMatchObject({
+      outcome: 'timeout',
+      diagnosticRingCapacity: 16,
+      callbackCount: 28,
+      acceptedSampleCount: 5,
+      currentAcceptedStreak: 0,
+      longestAcceptedStreak: 2,
+      duplicatePresentedFrameDecision: 'ignore-without-reset-or-acceptance',
+      reasonCounters: {
+        'invalid-position-vector': 2,
+        'accepted-first-sample': 1,
+        'duplicate-presented-frame-ignored': 1,
+        'accepted-transition': 2,
+        'reversed-presented-frame': 1,
+        'transition-axis-delta': 1,
+        'pre-command-frame': 20,
+      },
+    });
+    expect(diagnostics.recentRawObservations).toHaveLength(16);
+    expect(diagnostics.recentResetEvents).toHaveLength(16);
+    expect(diagnostics.recentRawObservations.at(-1)).toMatchObject({
+      decision: 'reset-invalid-position-vector',
+      position: ['NaN', '-Infinity', 0],
+    });
+    expect(diagnostics.observedAbsoluteAxisErrorRangesM).toEqual([
+      { minimum: 0, maximum: 0.0005 },
+      { minimum: 0, maximum: 0 },
+      { minimum: 0, maximum: 0 },
+    ]);
+    expect(diagnostics.acceptedAbsoluteAxisErrorRangesM).toEqual([
+      { minimum: 0, maximum: 0.0005 },
+      { minimum: 0, maximum: 0 },
+      { minimum: 0, maximum: 0 },
+    ]);
+    expect(JSON.stringify(diagnostics)).not.toContain('null,null');
   });
 });

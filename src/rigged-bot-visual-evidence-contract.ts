@@ -9,6 +9,343 @@ export type RiggedEvidenceCamera = Readonly<{
   fov: number;
 }>;
 
+export type AtomicPlayerSettlementSample = Readonly<{
+  presentedGameplayFrame: number;
+  atMs: number;
+  position: readonly number[];
+  grounded: boolean;
+}>;
+
+export type AtomicPlayerConvergence = Readonly<{
+  contract: string;
+  expectedSettledPosition: readonly number[];
+  samples: readonly AtomicPlayerSettlementSample[];
+  transitionCount: number;
+  durationMs: number;
+  maximumObservedAxisDeltaM: number;
+  maximumFinalAxisErrorM: number;
+  allGrounded: boolean;
+}>;
+
+type AtomicPlayerSettlementContract = Readonly<{
+  contract: string;
+  minimumObservedTransitions: number;
+  minimumDurationMs: number;
+  maximumAxisDeltaM: number;
+  maximumFinalAxisErrorM: number;
+  groundedRequired: boolean;
+}>;
+
+/**
+ * Browser-evaluable convergence waiter. Keep every dependency inside this
+ * function: Playwright serializes it into the inspected page rather than
+ * executing it in the test runner.
+ */
+export function waitForAtomicPlayerConvergenceInPage({
+  commandedFrame,
+  expectedSettledPosition,
+  settlement,
+}: Readonly<{
+  commandedFrame: number;
+  expectedSettledPosition: readonly number[];
+  settlement: AtomicPlayerSettlementContract;
+}>): Promise<AtomicPlayerConvergence> {
+  return new Promise<AtomicPlayerConvergence>((resolveConvergence, reject) => {
+    const diagnosticRingCapacity = 16;
+    const timeoutMs = 10_000;
+    const startedAt = performance.now();
+    let samples: AtomicPlayerSettlementSample[] = [];
+    let callbackCount = 0;
+    let acceptedSampleCount = 0;
+    let longestAcceptedStreak = 0;
+    let groundedObservationCount = 0;
+    let firstObservedPresentedGameplayFrame: number | null = null;
+    let lastObservedPresentedGameplayFrame: number | null = null;
+    let firstAcceptedPresentedGameplayFrame: number | null = null;
+    let lastAcceptedPresentedGameplayFrame: number | null = null;
+    let minimumObservedY = Number.POSITIVE_INFINITY;
+    let maximumObservedY = Number.NEGATIVE_INFINITY;
+    let minimumAcceptedY = Number.POSITIVE_INFINITY;
+    let maximumAcceptedY = Number.NEGATIVE_INFINITY;
+    const minimumObservedAxisErrorM = [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY];
+    const maximumObservedAxisErrorM = [Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY];
+    const minimumAcceptedAxisErrorM = [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY];
+    const maximumAcceptedAxisErrorM = [Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY];
+    const reasonCounters: Record<string, number> = {};
+    const recentRawObservations: Record<string, unknown>[] = [];
+    const recentResetEvents: Record<string, unknown>[] = [];
+
+    const finiteExactVector3 = (value: unknown): value is readonly [number, number, number] => (
+      Array.isArray(value)
+      && value.length === 3
+      && value.every((entry) => typeof entry === 'number' && Number.isFinite(entry))
+    );
+    const finiteSafeInteger = (value: unknown): value is number => Number.isSafeInteger(value);
+    const sanitizeNumber = (value: number): number | string => {
+      if (Number.isFinite(value)) return value;
+      if (Number.isNaN(value)) return 'NaN';
+      return value === Number.POSITIVE_INFINITY ? 'Infinity' : '-Infinity';
+    };
+    const sanitize = (value: unknown): unknown => {
+      if (typeof value === 'number') return sanitizeNumber(value);
+      if (Array.isArray(value)) return value.map(sanitize);
+      if (value && typeof value === 'object') {
+        return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, sanitize(entry)]));
+      }
+      return value;
+    };
+    const pushBounded = (ring: Record<string, unknown>[], entry: Record<string, unknown>) => {
+      ring.push(entry);
+      if (ring.length > diagnosticRingCapacity) ring.splice(0, ring.length - diagnosticRingCapacity);
+    };
+    const countReason = (reason: string) => {
+      reasonCounters[reason] = (reasonCounters[reason] ?? 0) + 1;
+    };
+    const maximumAxisDelta = (
+      left: readonly [number, number, number],
+      right: readonly [number, number, number],
+    ) => Math.max(
+      Math.abs(left[0] - right[0]),
+      Math.abs(left[1] - right[1]),
+      Math.abs(left[2] - right[2]),
+    );
+    const noteAccepted = (current: AtomicPlayerSettlementSample) => {
+      acceptedSampleCount += 1;
+      longestAcceptedStreak = Math.max(longestAcceptedStreak, samples.length);
+      firstAcceptedPresentedGameplayFrame ??= current.presentedGameplayFrame;
+      lastAcceptedPresentedGameplayFrame = current.presentedGameplayFrame;
+      minimumAcceptedY = Math.min(minimumAcceptedY, current.position[1]);
+      maximumAcceptedY = Math.max(maximumAcceptedY, current.position[1]);
+      current.position.forEach((value, axis) => {
+        const errorM = Math.abs(value - expectedSettledPosition[axis]);
+        minimumAcceptedAxisErrorM[axis] = Math.min(minimumAcceptedAxisErrorM[axis], errorM);
+        maximumAcceptedAxisErrorM[axis] = Math.max(maximumAcceptedAxisErrorM[axis], errorM);
+      });
+    };
+    const resetSamples = (
+      reason: string,
+      observation: Record<string, unknown>,
+      replacement: AtomicPlayerSettlementSample[] = [],
+    ) => {
+      const priorStreakLength = samples.length;
+      samples = replacement;
+      countReason(reason);
+      pushBounded(recentResetEvents, {
+        callback: callbackCount,
+        reason,
+        priorStreakLength,
+        replacementStreakLength: replacement.length,
+        observation: sanitize(observation),
+      });
+      if (replacement.length === 1) noteAccepted(replacement[0]);
+    };
+    const finiteRange = (minimum: number, maximum: number) => (
+      Number.isFinite(minimum) && Number.isFinite(maximum) ? { minimum, maximum } : null
+    );
+    const finiteAxisRanges = (minimum: number[], maximum: number[]) => minimum.map((value, axis) => (
+      finiteRange(value, maximum[axis])
+    ));
+    const diagnosticPayload = (outcome: string, elapsedMs: number) => sanitize({
+      outcome,
+      contract: settlement?.contract,
+      timeoutMs,
+      elapsedMs,
+      commandedFrame,
+      expectedSettledPosition,
+      settlement,
+      diagnosticRingCapacity,
+      callbackCount,
+      acceptedSampleCount,
+      currentAcceptedStreak: samples.length,
+      longestAcceptedStreak,
+      groundedObservationCount,
+      firstObservedPresentedGameplayFrame,
+      lastObservedPresentedGameplayFrame,
+      firstAcceptedPresentedGameplayFrame,
+      lastAcceptedPresentedGameplayFrame,
+      observedYRangeM: finiteRange(minimumObservedY, maximumObservedY),
+      acceptedYRangeM: finiteRange(minimumAcceptedY, maximumAcceptedY),
+      observedAbsoluteAxisErrorRangesM: finiteAxisRanges(minimumObservedAxisErrorM, maximumObservedAxisErrorM),
+      acceptedAbsoluteAxisErrorRangesM: finiteAxisRanges(minimumAcceptedAxisErrorM, maximumAcceptedAxisErrorM),
+      duplicatePresentedFrameDecision: 'ignore-without-reset-or-acceptance',
+      reasonCounters,
+      recentRawObservations,
+      recentResetEvents,
+    });
+    const rejectWithDiagnostics = (message: string, outcome: string, elapsedMs: number) => {
+      reject(new Error(`${message}: ${JSON.stringify(diagnosticPayload(outcome, elapsedMs))}`));
+    };
+
+    if (!finiteSafeInteger(commandedFrame)
+      || !finiteExactVector3(expectedSettledPosition)
+      || !settlement
+      || typeof settlement.contract !== 'string'
+      || !finiteSafeInteger(settlement.minimumObservedTransitions)
+      || settlement.minimumObservedTransitions < 1
+      || !Number.isFinite(settlement.minimumDurationMs)
+      || settlement.minimumDurationMs < 0
+      || !Number.isFinite(settlement.maximumAxisDeltaM)
+      || settlement.maximumAxisDeltaM < 0
+      || !Number.isFinite(settlement.maximumFinalAxisErrorM)
+      || settlement.maximumFinalAxisErrorM < 0
+      || typeof settlement.groundedRequired !== 'boolean') {
+      rejectWithDiagnostics('Atomic open-road convergence configuration is invalid', 'invalid-configuration', 0);
+      return;
+    }
+
+    const sample = () => {
+      callbackCount += 1;
+      const observedAtMs = performance.now();
+      let rawPresentedGameplayFrame: unknown;
+      let rawPosition: unknown;
+      let grounded = false;
+      let snapshotError: unknown = null;
+      try {
+        const api = (window as any).__ATOMIC_ACRES_DEBUG__;
+        const snapshot = api.snapshot();
+        rawPresentedGameplayFrame = api.admissionState().presentedGameplayFrame;
+        rawPosition = snapshot?.player?.position;
+        grounded = snapshot?.player?.grounded === true;
+      } catch (error) {
+        snapshotError = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+      }
+
+      const observation: Record<string, unknown> = {
+        callback: callbackCount,
+        atMs: sanitizeNumber(observedAtMs),
+        presentedGameplayFrame: sanitize(rawPresentedGameplayFrame),
+        position: sanitize(rawPosition),
+        grounded,
+        snapshotError,
+        decision: 'pending',
+        streakLengthBefore: samples.length,
+      };
+      if (grounded) groundedObservationCount += 1;
+      if (finiteSafeInteger(rawPresentedGameplayFrame)) {
+        firstObservedPresentedGameplayFrame ??= rawPresentedGameplayFrame;
+        lastObservedPresentedGameplayFrame = rawPresentedGameplayFrame;
+      }
+      if (finiteExactVector3(rawPosition)) {
+        minimumObservedY = Math.min(minimumObservedY, rawPosition[1]);
+        maximumObservedY = Math.max(maximumObservedY, rawPosition[1]);
+        rawPosition.forEach((value, axis) => {
+          const errorM = Math.abs(value - expectedSettledPosition[axis]);
+          minimumObservedAxisErrorM[axis] = Math.min(minimumObservedAxisErrorM[axis], errorM);
+          maximumObservedAxisErrorM[axis] = Math.max(maximumObservedAxisErrorM[axis], errorM);
+        });
+      }
+
+      const previous = samples.at(-1);
+      let current: AtomicPlayerSettlementSample | null = null;
+      if (!Number.isFinite(observedAtMs)) {
+        observation.decision = 'reset-invalid-observation-time';
+        resetSamples('invalid-observation-time', observation);
+      } else if (snapshotError !== null) {
+        observation.decision = 'reset-snapshot-error';
+        resetSamples('snapshot-error', observation);
+      } else if (!finiteSafeInteger(rawPresentedGameplayFrame)) {
+        observation.decision = 'reset-invalid-presented-frame';
+        resetSamples('invalid-presented-frame', observation);
+      } else if (!finiteExactVector3(rawPosition)) {
+        observation.decision = 'reset-invalid-position-vector';
+        resetSamples('invalid-position-vector', observation);
+      } else {
+        current = {
+          presentedGameplayFrame: rawPresentedGameplayFrame,
+          atMs: observedAtMs,
+          position: [...rawPosition],
+          grounded,
+        };
+        const currentFinalAxisErrorM = maximumAxisDelta(rawPosition, expectedSettledPosition);
+        observation.absoluteAxisErrorsM = rawPosition.map((value, axis) => (
+          Math.abs(value - expectedSettledPosition[axis])
+        ));
+        observation.maximumFinalAxisErrorM = currentFinalAxisErrorM;
+        if (current.presentedGameplayFrame <= commandedFrame) {
+          observation.decision = 'reset-pre-command-frame';
+          resetSamples('pre-command-frame', observation);
+        } else if (!current.grounded) {
+          observation.decision = 'reset-not-grounded';
+          resetSamples('not-grounded', observation);
+        } else if (currentFinalAxisErrorM > settlement.maximumFinalAxisErrorM) {
+          observation.decision = 'reset-outside-final-envelope';
+          observation.maximumFinalAxisErrorM = currentFinalAxisErrorM;
+          resetSamples('outside-final-envelope', observation);
+        } else if (!previous) {
+          samples = [current];
+          observation.decision = 'accept-first-sample';
+          countReason('accepted-first-sample');
+          noteAccepted(current);
+        } else if (current.presentedGameplayFrame === previous.presentedGameplayFrame) {
+          observation.decision = 'ignore-duplicate-presented-frame';
+          countReason('duplicate-presented-frame-ignored');
+        } else if (current.presentedGameplayFrame < previous.presentedGameplayFrame) {
+          observation.decision = 'reset-reversed-presented-frame';
+          resetSamples('reversed-presented-frame', observation, [current]);
+        } else {
+          const axisDeltaM = maximumAxisDelta(current.position as readonly [number, number, number], previous.position as readonly [number, number, number]);
+          observation.maximumAxisDeltaM = axisDeltaM;
+          if (axisDeltaM > settlement.maximumAxisDeltaM) {
+            observation.decision = 'reset-transition-axis-delta';
+            resetSamples('transition-axis-delta', observation, [current]);
+          } else {
+            samples.push(current);
+            observation.decision = 'accept-transition';
+            countReason('accepted-transition');
+            noteAccepted(current);
+          }
+        }
+      }
+      observation.streakLengthAfter = samples.length;
+      pushBounded(recentRawObservations, sanitize(observation) as Record<string, unknown>);
+
+      if (samples.length >= settlement.minimumObservedTransitions + 1) {
+        const durationMs = samples.at(-1)!.atMs - samples[0].atMs;
+        const maximumObservedAxisDeltaM = Math.max(...samples.slice(1).map((entry, index) => (
+          maximumAxisDelta(
+            entry.position as readonly [number, number, number],
+            samples[index].position as readonly [number, number, number],
+          )
+        )));
+        const maximumFinalAxisErrorM = maximumAxisDelta(
+          samples.at(-1)!.position as readonly [number, number, number],
+          expectedSettledPosition,
+        );
+        const allGrounded = samples.every((entry) => entry.grounded);
+        if (durationMs >= settlement.minimumDurationMs
+          && maximumObservedAxisDeltaM <= settlement.maximumAxisDeltaM
+          && maximumFinalAxisErrorM <= settlement.maximumFinalAxisErrorM
+          && (!settlement.groundedRequired || allGrounded)) {
+          countReason('converged');
+          resolveConvergence({
+            contract: settlement.contract,
+            expectedSettledPosition,
+            samples,
+            transitionCount: samples.length - 1,
+            durationMs,
+            maximumObservedAxisDeltaM,
+            maximumFinalAxisErrorM,
+            allGrounded,
+          });
+          return;
+        }
+        if (durationMs < settlement.minimumDurationMs) countReason('candidate-window-too-short');
+      }
+      const elapsedMs = performance.now() - startedAt;
+      if (elapsedMs > timeoutMs) {
+        rejectWithDiagnostics(
+          'Atomic open-road player did not reach the fixed grounded convergence contract',
+          'timeout',
+          elapsedMs,
+        );
+        return;
+      }
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
+}
+
 const lookAtCamera = (
   id: string,
   position: readonly [number, number, number],

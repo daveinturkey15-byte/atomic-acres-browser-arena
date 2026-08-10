@@ -4,7 +4,12 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { GUN_RANGE_TEST_BAY_CONTRACT } from '../../src/gun-range-test-bay';
-import { RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT, type RiggedEvidenceCamera } from '../../src/rigged-bot-visual-evidence-contract';
+import {
+  RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT,
+  waitForAtomicPlayerConvergenceInPage,
+  type AtomicPlayerConvergence,
+  type RiggedEvidenceCamera,
+} from '../../src/rigged-bot-visual-evidence-contract';
 
 type Renderer = 'webgl2' | 'webgpu';
 
@@ -122,88 +127,11 @@ function route(map: 'atomic-acres' | 'gun-range', seed: string): string {
     + `&signal=off&grass=off&mist=off&clouds=off&rays=off&externalServices=off&seed=${seed}-${renderer}`;
 }
 
-type AtomicPlayerSettlementSample = Readonly<{
-  presentedGameplayFrame: number;
-  atMs: number;
-  position: readonly number[];
-  grounded: boolean;
-}>;
-
-type AtomicPlayerConvergence = Readonly<{
-  contract: string;
-  expectedSettledPosition: readonly number[];
-  samples: readonly AtomicPlayerSettlementSample[];
-  transitionCount: number;
-  durationMs: number;
-  maximumObservedAxisDeltaM: number;
-  maximumFinalAxisErrorM: number;
-  allGrounded: boolean;
-}>;
-
 async function waitForAtomicPlayerConvergence(
   page: Page,
   commandedPresentedGameplayFrame: number,
 ): Promise<AtomicPlayerConvergence> {
-  return page.evaluate(async ({ commandedFrame, expectedSettledPosition, settlement }) => new Promise<AtomicPlayerConvergence>((resolveConvergence, reject) => {
-    const startedAt = performance.now();
-    let samples: AtomicPlayerSettlementSample[] = [];
-    const maximumAxisDelta = (left: readonly number[], right: readonly number[]) => Math.max(
-      ...left.map((value, axis) => Math.abs(value - right[axis])),
-    );
-    const sample = () => {
-      const api = window.__ATOMIC_ACRES_DEBUG__;
-      const snapshot = api.snapshot() as any;
-      const current: AtomicPlayerSettlementSample = {
-        presentedGameplayFrame: api.admissionState().presentedGameplayFrame,
-        atMs: performance.now(),
-        position: [...snapshot.player.position],
-        grounded: snapshot.player.grounded === true,
-      };
-      const previous = samples.at(-1);
-      const currentFinalAxisErrorM = maximumAxisDelta(current.position, expectedSettledPosition);
-      if (current.presentedGameplayFrame <= commandedFrame
-        || !current.grounded
-        || currentFinalAxisErrorM > settlement.maximumFinalAxisErrorM) samples = [];
-      else if (!previous) samples = [current];
-      else if (current.presentedGameplayFrame === previous.presentedGameplayFrame) {
-        // A browser callback is not a presentation receipt. Ignore it until the
-        // admitted gameplay frame advances.
-      } else if (current.presentedGameplayFrame < previous.presentedGameplayFrame
-        || maximumAxisDelta(current.position, previous.position) > settlement.maximumAxisDeltaM) {
-        samples = [current];
-      } else samples.push(current);
-      if (samples.length >= settlement.minimumObservedTransitions + 1) {
-        const durationMs = samples.at(-1)!.atMs - samples[0].atMs;
-        const maximumObservedAxisDeltaM = Math.max(...samples.slice(1).map((entry, index) => (
-          maximumAxisDelta(entry.position, samples[index].position)
-        )));
-        const maximumFinalAxisErrorM = maximumAxisDelta(samples.at(-1)!.position, expectedSettledPosition);
-        const allGrounded = samples.every((entry) => entry.grounded);
-        if (durationMs >= settlement.minimumDurationMs
-          && maximumObservedAxisDeltaM <= settlement.maximumAxisDeltaM
-          && maximumFinalAxisErrorM <= settlement.maximumFinalAxisErrorM
-          && (!settlement.groundedRequired || allGrounded)) {
-          resolveConvergence({
-            contract: settlement.contract,
-            expectedSettledPosition,
-            samples,
-            transitionCount: samples.length - 1,
-            durationMs,
-            maximumObservedAxisDeltaM,
-            maximumFinalAxisErrorM,
-            allGrounded,
-          });
-          return;
-        }
-      }
-      if (performance.now() - startedAt > 10_000) {
-        reject(new Error('Atomic open-road player did not reach the fixed grounded convergence contract'));
-        return;
-      }
-      requestAnimationFrame(sample);
-    };
-    requestAnimationFrame(sample);
-  }), {
+  return page.evaluate(waitForAtomicPlayerConvergenceInPage, {
     commandedFrame: commandedPresentedGameplayFrame,
     expectedSettledPosition: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.expectedSettledPlayerPosition,
     settlement: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.settlement,
