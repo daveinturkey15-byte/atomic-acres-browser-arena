@@ -757,6 +757,12 @@ function runtime(root: THREE.Object3D): RiggedOperatorRuntime | undefined {
   return root.userData.riggedOperatorRuntime as RiggedOperatorRuntime | undefined;
 }
 
+export function resolveRiggedOperatorRuntimeRoot(root: THREE.Object3D): THREE.Object3D | null {
+  if (runtime(root)) return root;
+  const candidates = root.children.filter((child) => runtime(child) !== undefined);
+  return candidates.length === 1 ? candidates[0] : null;
+}
+
 function actionFor(runtimeState: RiggedOperatorRuntime, name: string): THREE.AnimationAction | undefined {
   const existing = runtimeState.actions.get(name);
   if (existing) return existing;

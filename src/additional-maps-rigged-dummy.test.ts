@@ -173,9 +173,42 @@ vi.mock('./art-kit', async (importOriginal) => {
 });
 
 import { buildGunRange, updateGunRangePresentation } from './additional-maps';
-import { poseUnarmedRiggedOperatorHands, riggedOperatorTelemetry } from './operator-model';
+import { poseUnarmedRiggedOperatorHands, resolveRiggedOperatorRuntimeRoot, riggedOperatorTelemetry } from './operator-model';
 
 describe('Gun Range rigged training-dummy presentation', () => {
+  it('resolves operator telemetry from either the runtime root or its direct wrapper', () => {
+    const map = buildGunRange(new THREE.Scene());
+    const presentation = (map.root.userData.gunRangeTestDummies as Array<{
+      root: THREE.Group;
+      riggedOperator: THREE.Group | null;
+    }>)[0];
+    const operator = presentation.riggedOperator;
+    expect(operator).toBeInstanceOf(THREE.Group);
+
+    const directRoot = resolveRiggedOperatorRuntimeRoot(operator!);
+    const wrappedRoot = resolveRiggedOperatorRuntimeRoot(presentation.root);
+    expect(directRoot).toBe(operator);
+    expect(wrappedRoot).toBe(operator);
+
+    expect(resolveRiggedOperatorRuntimeRoot(new THREE.Group())).toBeNull();
+    const ambiguousWrapper = new THREE.Group();
+    const duplicateOperatorA = new THREE.Group();
+    const duplicateOperatorB = new THREE.Group();
+    duplicateOperatorA.userData.riggedOperatorRuntime = operator!.userData.riggedOperatorRuntime;
+    duplicateOperatorB.userData.riggedOperatorRuntime = operator!.userData.riggedOperatorRuntime;
+    ambiguousWrapper.add(duplicateOperatorA, duplicateOperatorB);
+    expect(resolveRiggedOperatorRuntimeRoot(ambiguousWrapper)).toBeNull();
+
+    for (const resolved of [directRoot, wrappedRoot]) {
+      const telemetry = riggedOperatorTelemetry(resolved!) as {
+        skeletons: number;
+        effectivelyVisibleSkinnedMeshes: string[];
+      } | null;
+      expect(telemetry?.skeletons).toBeGreaterThan(0);
+      expect(telemetry?.effectivelyVisibleSkinnedMeshes).toContain('Swat_Body');
+    }
+  });
+
   it('poses the retained operator child and advances its runtime bone instead of posing the wrapper', () => {
     const map = buildGunRange(new THREE.Scene());
     const presentations = map.root.userData.gunRangeTestDummies as Array<{

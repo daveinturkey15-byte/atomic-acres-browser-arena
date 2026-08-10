@@ -618,7 +618,7 @@ import {
 } from './interactive-world-protocol';
 import { TracerPool } from './tracer-pool';
 import { AsyncSerialQueue } from './async-serial-queue';
-import { RIGGED_OPERATOR_CORPSE_ACTION_NAMES, loadRiggedOperatorAsset, prewarmRiggedOperatorActions, riggedOperatorAssetReady, riggedOperatorTelemetry } from './operator-model';
+import { RIGGED_OPERATOR_CORPSE_ACTION_NAMES, loadRiggedOperatorAsset, prewarmRiggedOperatorActions, resolveRiggedOperatorRuntimeRoot, riggedOperatorAssetReady, riggedOperatorTelemetry } from './operator-model';
 import {
   WeaponPresentation,
   type WeaponViewmodelCatalogGpuPrewarmer,
@@ -24173,7 +24173,8 @@ function debugCaptureActorFrameEvidence(
   if (!target) return null;
   const root = debugRiggedEvidenceActorRoot(target.kind, target.id);
   if (!root) return null;
-  const operatorModel = riggedOperatorTelemetry(root) as {
+  const operatorRoot = resolveRiggedOperatorRuntimeRoot(root);
+  const operatorModel = (operatorRoot ? riggedOperatorTelemetry(operatorRoot) : null) as {
     effectivelyVisibleSkinnedMeshes?: string[];
     armPose?: { allInEffectivelyVisibleSkinnedMesh?: boolean };
     handPose?: { allInEffectivelyVisibleSkinnedMesh?: boolean };
@@ -24749,7 +24750,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       values: arena.targets.map((target) => target.scoreValue),
       targets: arena.targets.map((target) => {
         const operator = target.kind === 'training-dummy'
-          ? target.root.children.find((child) => child.userData.riggedOperatorRuntime !== undefined)
+          ? resolveRiggedOperatorRuntimeRoot(target.root)
           : undefined;
         const operatorModel = operator ? riggedOperatorTelemetry(operator) : null;
         return {
