@@ -2304,10 +2304,13 @@
     },
     {
       "id": "T-PASS69-3-ADS-PHYSICAL",
-      "command": "npm run qa:playwright-topology -- tests/e2e/pass69-3-ads-physical-clearance.spec.ts --project=chromium --workers=1 --retries=0",
+      "command": "npm run qa:pass69-3:ads-physical",
       "paths": [
+        "package.json",
+        "scripts/qa/run-pass69-3-ads-physical-clearance.mjs",
         "src/weapon-presentation.ts",
         "src/ads-physical-aperture.test.ts",
+        "src/pass69-3-ads-physical-clearance-runner.test.ts",
         "tests/e2e/pass69-3-ads-physical-clearance.spec.ts"
       ],
       "evidenceKinds": ["browser", "visual"],
