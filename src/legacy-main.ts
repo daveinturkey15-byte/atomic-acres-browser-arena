@@ -25369,6 +25369,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     player.position.set(x, y, z);
     characterPhysics?.teleportEye(player.position);
     player.velocity.set(0, 0, 0);
+    playerGrounded = false;
+    wasGrounded = false;
     player.yaw = yaw;
     player.pitch = THREE.MathUtils.clamp(pitch, -1.5, 1.5);
     camera.position.copy(player.position);

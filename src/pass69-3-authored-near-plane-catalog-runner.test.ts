@@ -143,6 +143,13 @@ describe('Pass 69.3 real-authored near-plane evidence boundary', () => {
     expect(runner).toContain('yawError <= expectedContactFixture.maximumAngularError');
     expect(runner).toContain('pitchError <= expectedContactFixture.maximumAngularError');
     expect(runner).toContain('!contactFixtureValid(receipt.contactFixture)');
+    const stageStart = spec.indexOf('async function stageStableContactFixture(');
+    const stageEnd = spec.indexOf('async function deploy(', stageStart);
+    expect(stageStart).toBeGreaterThan(-1);
+    expect(stageEnd).toBeGreaterThan(stageStart);
+    const stage = spec.slice(stageStart, stageEnd);
+    expect(stage.indexOf('api.setStance(fixture.stance);'))
+      .toBeLessThan(stage.indexOf('api.teleportPlayer(...fixture.teleportPosition, fixture.yaw, fixture.pitch);'));
   });
 
   it('keeps the long catalog inside the production Gun Range round lifecycle without weakening convergence', () => {

@@ -567,10 +567,11 @@ async function stageStableContactFixture(page: Page, label: string): Promise<Con
     api.setFireCaptureAgeMs(null);
     api.setReloadCaptureProgress(null);
     api.setMeleeCaptureProgress(null);
-    // The shared fixture helper deliberately waits past teleport/setStance's
-    // transient 0.61m eye height for the live controller's grounded pose.
-    api.teleportPlayer(...fixture.teleportPosition, fixture.yaw, fixture.pitch);
+    // Enter prone while the current controller contact is authoritative. The
+    // teleport then invalidates that contact and the convergence proof waits
+    // for the prone controller to settle into its repeatable grounded pose.
     api.setStance(fixture.stance);
+    api.teleportPlayer(...fixture.teleportPosition, fixture.yaw, fixture.pitch);
   }, CONTACT_FIXTURE);
   try {
     return await waitForContactFixtureConvergence(page, label);

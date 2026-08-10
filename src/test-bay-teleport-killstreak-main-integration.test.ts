@@ -18,6 +18,27 @@ describe('Pass 66 test-bay QA teleport support lifecycle integration', () => {
     expect(integration).not.toContain('grantTrainingReward');
   });
 
+  it('invalidates stale ground contact after moving the authoritative physics body', () => {
+    const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+    const start = source.indexOf('  teleportPlayer: (x, y, z, yaw = player.yaw, pitch = player.pitch) => {');
+    const end = source.indexOf('  setCaptureCameraPose:', start);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const integration = source.slice(start, end);
+    const bodyTeleport = integration.indexOf('characterPhysics?.teleportEye(player.position);');
+    const velocityReset = integration.indexOf('player.velocity.set(0, 0, 0);');
+    const groundedReset = integration.indexOf('playerGrounded = false;');
+    const priorGroundedReset = integration.indexOf('wasGrounded = false;');
+    const cameraUpdate = integration.indexOf('camera.position.copy(player.position);');
+    expect(bodyTeleport).toBeGreaterThan(-1);
+    expect(velocityReset).toBeGreaterThan(bodyTeleport);
+    expect(groundedReset).toBeGreaterThan(velocityReset);
+    expect(priorGroundedReset).toBeGreaterThan(groundedReset);
+    expect(cameraUpdate).toBeGreaterThan(priorGroundedReset);
+    expect(integration.match(/playerGrounded = false;/gu)).toHaveLength(1);
+    expect(integration.match(/wasGrounded = false;/gu)).toHaveLength(1);
+  });
+
   it('keeps deterministic possessed-chopper aiming debug-only and unable to submit damage', () => {
     const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
     const start = source.indexOf('  aimPossessedChopperAtTrainingDummy: (targetId) => {');
