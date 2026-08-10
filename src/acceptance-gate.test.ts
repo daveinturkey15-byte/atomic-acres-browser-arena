@@ -83,6 +83,7 @@ describe('release acceptance manifest', () => {
     const manifestPath = 'acceptance/pass-62.json';
     expect(classifyPreviewDelta([manifestPath, 'docs/VERIFICATION_AND_RELEASE_HYGIENE.md'], manifestPath).ok).toBe(true);
     expect(classifyPreviewDelta([manifestPath, 'tests/e2e/atomic-acres.spec.ts'], manifestPath).ok).toBe(true);
+    expect(classifyPreviewDelta([manifestPath, 'src/admission-debug-contract.test.ts'], manifestPath).ok).toBe(true);
     expect(classifyPreviewDelta([manifestPath, 'src/main.ts'], manifestPath)).toMatchObject({ ok: false });
     expect(classifyPreviewDelta([manifestPath, 'src/release-channels.ts'], manifestPath)).toMatchObject({ ok: false });
   });
