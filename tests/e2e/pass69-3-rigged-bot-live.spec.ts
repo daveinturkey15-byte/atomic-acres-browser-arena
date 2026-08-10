@@ -1135,18 +1135,29 @@ async function deploy(page: Page, map: 'atomic-acres' | 'gun-range'): Promise<vo
   await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().matchPhase === 'active', undefined, { timeout: 60_000 });
 }
 
+type PrincipalWriteCaptureOptions = Readonly<{
+  mode: 'visible-observe' | 'principal-write-suppressed' | 'visible-restored';
+  sessionId?: string;
+  reuseCaptureTargets?: boolean;
+}>;
+
+type CommitCaptureCameraOptions = Readonly<{
+  principalWrite?: PrincipalWriteCaptureOptions;
+  handSide?: 'left' | 'right';
+}>;
+
 async function commitCaptureCamera(
   page: Page,
   camera: RiggedEvidenceCamera,
   captureTargets: readonly CaptureActor[],
   fixedVisualTimeMs: number | null = null,
-  principalWrite: Readonly<{
-    mode: 'visible-observe' | 'principal-write-suppressed' | 'visible-restored';
-    sessionId?: string;
-    reuseCaptureTargets?: boolean;
-  }> | null = null,
-  handSide: 'left' | 'right' | null = null,
+  options: CommitCaptureCameraOptions = {},
 ): Promise<any> {
+  const principalWrite = options.principalWrite ?? null;
+  const handSide = options.handSide ?? null;
+  if (principalWrite !== null && handSide !== null) {
+    throw new Error('Rigged evidence capture cannot combine hand self-occlusion and principal-write control');
+  }
   const before = await page.evaluate(() => {
     const api = window.__ATOMIC_ACRES_DEBUG__;
     const review = (api.snapshot() as any).deterministicReview;
@@ -2154,14 +2165,16 @@ async function captureDummyProductionRgbRasterProof(
   const fixedVisualTimeMs = RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.gunRange.fixedVisualTimeMs;
   expect(fixedVisualTimeMs, `${actor.id}: production RGB proof fixed visual time`).toBe(0);
   const observe = await commitCaptureCamera(page, camera, [actor], fixedVisualTimeMs, {
-    mode: 'visible-observe',
+    principalWrite: { mode: 'visible-observe' },
   });
   const sessionId = observe.principalWriteSession?.sessionId;
   expect(sessionId, `${actor.id}: principal-write session identity`).toEqual(expect.any(String));
   const control = await commitCaptureCamera(page, camera, [actor], fixedVisualTimeMs, {
-    mode: 'principal-write-suppressed',
-    sessionId,
-    reuseCaptureTargets: true,
+    principalWrite: {
+      mode: 'principal-write-suppressed',
+      sessionId,
+      reuseCaptureTargets: true,
+    },
   });
   const controlScreenshot = await screenshotPresentedFrameWithHash(
     page,
@@ -2170,9 +2183,11 @@ async function captureDummyProductionRgbRasterProof(
     control,
   );
   const restored = await commitCaptureCamera(page, camera, [actor], fixedVisualTimeMs, {
-    mode: 'visible-restored',
-    sessionId,
-    reuseCaptureTargets: true,
+    principalWrite: {
+      mode: 'visible-restored',
+      sessionId,
+      reuseCaptureTargets: true,
+    },
   });
   const [framing] = await captureFraming(page, [actor], restored, CLOSE_ROI_NDC, true);
   const lineOfSight = await sampleRequiredLineOfSight(page, actor, restored, framing);
@@ -2568,7 +2583,7 @@ async function captureHandAtFixedOutsidePose(
     pitch: pose.pitch,
     fixtureCamera,
   };
-  const presentation = await commitCaptureCamera(page, fixtureCamera, [actor], null, null, side);
+  const presentation = await commitCaptureCamera(page, fixtureCamera, [actor], null, { handSide: side });
   const framing = await captureHandFraming(page, actor, side, camera, presentation);
   const lineOfSight = await sampleRequiredLineOfSight(page, actor, presentation, framing);
   const selfOcclusion = await sampleRequiredHandSelfOcclusion(page, actor, side, presentation, framing);

@@ -155,8 +155,8 @@ describe('fixed rigged actor visual evidence fixtures', () => {
 
   it('requires committed camera frames, compositor boundaries, and all six LOS sentinels', () => {
     expect(RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT).toMatchObject({
-      schemaVersion: 6,
-      contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v6',
+      schemaVersion: 7,
+      contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v7',
     });
     expect(RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation).toEqual({
       contract: 'capture-camera-committed-frame-v2',
