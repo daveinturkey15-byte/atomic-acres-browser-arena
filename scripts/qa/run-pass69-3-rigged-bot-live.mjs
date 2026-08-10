@@ -128,18 +128,35 @@ const fixedDummyActors = Object.freeze([
   Object.freeze({ id: 'test-dummy-charlie', position: Object.freeze([72.52, Math.abs(Math.sin(2)) * 0.025, 4]), yaw: -Math.PI / 2 }),
   Object.freeze({ id: 'test-dummy-delta', position: Object.freeze([64.88, Math.abs(Math.sin(3)) * 0.025, 14]), yaw: -Math.PI / 2 }),
 ]);
+const expectedSkinnedMeshNames = Object.freeze([
+  'Cube018',
+  'Cube018_1',
+  'Cube018_2',
+  'Swat_Feet',
+  'Cube037',
+  'Cube037_1',
+  'Cube037_2',
+  'Cube023',
+  'Cube023_1',
+]);
 const expectedVisualEvidenceContract = Object.freeze({
-  schemaVersion: 4,
-  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v4',
+  schemaVersion: 5,
+  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v5',
   los: Object.freeze({
     contract: 'actual-render-world-layout-occluder-multi-sentinel-los-v2',
     actorSelfOcclusionExcluded: true,
     sentinels: evidenceLosSentinels,
   }),
   presentation: Object.freeze({
-    contract: 'capture-camera-committed-frame-v1',
+    contract: 'capture-camera-committed-frame-v2',
     order: 'pause-final-submission-await-completion-then-compositor-v1',
     compositorBoundariesAfterCommit: 2,
+    mainCameraDraw: Object.freeze({
+      contract: 'rigged-main-camera-draw-stamp-v1',
+      pixelProof: false,
+      expectedSkinnedMeshCount: expectedSkinnedMeshNames.length,
+      expectedSkinnedMeshNames,
+    }),
     rendererCompletion: Object.freeze({
       webgl2: 'synchronous-render-return',
       webgpu: 'submission-sequence-covered-by-completion-frontier',
@@ -540,8 +557,170 @@ function evidenceCameraValid(camera, expected) {
     && close(camera.fov, expected.fov, 1e-9);
 }
 
-function captureActorFrameValid(frameActor, expectedActor) {
+function exactUniqueStringSet(actual, expected) {
+  return Array.isArray(actual)
+    && actual.length === expected.length
+    && actual.every((value) => typeof value === 'string' && value.length > 0)
+    && new Set(actual).size === actual.length
+    && sameArray([...actual].sort(), [...expected].sort());
+}
+
+function uuidValid(value) {
+  return typeof value === 'string' && /^[0-9a-f-]{36}$/iu.test(value);
+}
+
+function mainCameraInvocationKey(stamp) {
+  return JSON.stringify([
+    stamp?.material?.uuid ?? null,
+    stamp?.drawRange?.group?.start ?? null,
+    stamp?.drawRange?.group?.count ?? null,
+    stamp?.drawRange?.group?.materialIndex ?? null,
+  ]);
+}
+
+function mainCameraDrawStampValid(stamp, mesh, draw, frame, captureRevision) {
+  const range = stamp?.drawRange;
+  const availableCount = range?.indexCount ?? range?.positionCount;
+  const rangeCount = range?.count === 'infinity'
+    ? Math.max(0, availableCount - range.start)
+    : range?.count;
+  const rangeEnd = Number.isSafeInteger(availableCount) && Number.isSafeInteger(range?.start)
+    && Number.isSafeInteger(rangeCount)
+    ? Math.min(availableCount, range.start + rangeCount)
+    : Number.NaN;
+  const group = range?.group;
+  const groupValid = group === null
+    ? mesh?.materialSlotUuids?.length === 1 && stamp?.material?.uuid === mesh.materialSlotUuids[0]
+    : Number.isSafeInteger(group?.start) && group.start >= 0
+      && Number.isSafeInteger(group?.count) && group.count >= 0
+      && Number.isSafeInteger(group?.materialIndex) && group.materialIndex >= 0
+      && group.materialIndex < mesh?.materialSlotUuids?.length
+      && stamp?.material?.uuid === mesh.materialSlotUuids[group.materialIndex];
+  const groupStart = group?.start ?? 0;
+  const groupEnd = Number.isSafeInteger(availableCount) && Number.isSafeInteger(groupStart)
+    && Number.isSafeInteger(group?.count ?? availableCount)
+    ? Math.min(availableCount, groupStart + (group?.count ?? availableCount))
+    : Number.NaN;
+  const expectedEffectiveCount = Math.max(0, Math.min(rangeEnd, groupEnd) - Math.max(range?.start, groupStart));
+  return stamp?.frame === frame
+    && stamp.captureRevision === captureRevision
+    && stamp.meshUuid === mesh.meshUuid
+    && stamp.meshName === mesh.meshName
+    && stamp.actorRootUuid === draw.actorRootUuid
+    && stamp.operatorRootUuid === draw.operatorRootUuid
+    && stamp.descendsFromActorRoot === true
+    && stamp.descendsFromOperatorRoot === true
+    && stamp.meshLayerMask === mesh.meshLayerMask
+    && stamp.sceneUuid === draw.gameplaySceneUuid
+    && stamp.cameraUuid === draw.gameplayCameraUuid
+    && stamp.sceneOverrideMaterialUuid === null
+    && Number.isSafeInteger(stamp.cameraLayerMask) && (stamp.cameraLayerMask & 1) === 1
+    && (stamp.meshLayerMask & stamp.cameraLayerMask) !== 0
+    && sameArray(stamp.materialSlotUuids, mesh.materialSlotUuids)
+    && exactUniqueStringSet(stamp.materialUuidSet, mesh.materialUuidSet)
+    && sameArray(stamp.materialUuidSet, mesh.materialUuidSet)
+    && uuidValid(stamp.material?.uuid)
+    && stamp.materialUuidSet.includes(stamp.material.uuid)
+    && stamp.materialMatchesMeshSlot === true
+    && groupValid
+    && typeof stamp.material.name === 'string'
+    && typeof stamp.material.type === 'string' && stamp.material.type.length > 0
+    && stamp.material.visible === true
+    && stamp.material.colorWrite === true
+    && typeof stamp.material.transparent === 'boolean'
+    && Number.isFinite(stamp.material.opacity)
+    && (!stamp.material.transparent || stamp.material.opacity > 0)
+    && Number.isSafeInteger(range?.start) && range.start >= 0
+    && (range.count === 'infinity' || (Number.isSafeInteger(range.count) && range.count >= 0))
+    && Number.isSafeInteger(range.effectiveCount) && range.effectiveCount > 0
+    && range.effectiveCount === expectedEffectiveCount
+    && Number.isSafeInteger(range.positionCount) && range.positionCount > 0
+    && (range.indexCount === null
+      || (Number.isSafeInteger(range.indexCount) && range.indexCount > 0))
+    && stamp.world?.attachedToGameplayScene === true
+    && stamp.world.effectivelyVisible === true
+    && stamp.world.matrixFinite === true
+    && Number.isFinite(stamp.world.determinant) && Math.abs(stamp.world.determinant) > 1e-12
+    && finiteVector(stamp.world.position)
+    && finiteVector(stamp.world.scale)
+    && typeof stamp.frustum?.frustumCulled === 'boolean'
+    && stamp.frustum.intersectsMainCameraFrustum === true
+    && stamp.frustum.boundingSphere?.finite === true
+    && finiteVector(stamp.frustum.boundingSphere.center)
+    && Number.isFinite(stamp.frustum.boundingSphere.radius)
+    && stamp.frustum.boundingSphere.radius >= 0
+    && stamp.stateValid === true;
+}
+
+function mainCameraDrawValid(
+  draw,
+  expectedActor,
+  frame,
+  captureRevision,
+  actorRootUuid,
+  operatorRootUuid,
+) {
+  if (draw?.contract !== expectedVisualEvidenceContract.presentation.mainCameraDraw.contract
+    || draw.pixelProof !== false
+    || !sameObject(draw.actor, expectedActor)
+    || draw.frame !== frame
+    || draw.captureRevision !== captureRevision
+    || !uuidValid(draw.gameplaySceneUuid)
+    || !uuidValid(draw.gameplayCameraUuid)
+    || draw.actorRootUuid !== actorRootUuid || !uuidValid(draw.actorRootUuid)
+    || draw.operatorRootUuid !== operatorRootUuid || !uuidValid(draw.operatorRootUuid)
+    || !exactUniqueStringSet(draw.expectedMeshNames, expectedSkinnedMeshNames)
+    || !exactUniqueStringSet(draw.beforeMeshNames, expectedSkinnedMeshNames)
+    || !exactUniqueStringSet(draw.afterMeshNames, expectedSkinnedMeshNames)
+    || !Array.isArray(draw.expectedMeshUuids)
+    || draw.expectedMeshUuids.length !== expectedSkinnedMeshNames.length
+    || new Set(draw.expectedMeshUuids).size !== expectedSkinnedMeshNames.length
+    || !draw.expectedMeshUuids.every((uuid) => /^[0-9a-f-]{36}$/iu.test(uuid))
+    || !Array.isArray(draw.meshes)
+    || draw.meshes.length !== expectedSkinnedMeshNames.length
+    || !exactUniqueStringSet(draw.meshes.map(({ meshName }) => meshName), expectedSkinnedMeshNames)
+    || !exactUniqueStringSet(draw.meshes.map(({ meshUuid }) => meshUuid), draw.expectedMeshUuids)
+    || draw.exactExpectedMeshNames !== true
+    || draw.exactExpectedMeshUuids !== true
+    || draw.complete !== true
+    || !Number.isSafeInteger(draw.ignoredCallbacks?.wrongScene) || draw.ignoredCallbacks.wrongScene < 0
+    || !Number.isSafeInteger(draw.ignoredCallbacks?.wrongCamera) || draw.ignoredCallbacks.wrongCamera < 0
+    || !Number.isSafeInteger(draw.ignoredCallbacks?.nonWorldCameraLayer)
+    || draw.ignoredCallbacks.nonWorldCameraLayer < 0) return false;
+  return draw.meshes.every((mesh) => (
+    uuidValid(mesh.meshUuid)
+      && expectedSkinnedMeshNames.includes(mesh.meshName)
+      && Array.isArray(mesh.materialSlotUuids) && mesh.materialSlotUuids.length > 0
+      && mesh.materialSlotUuids.every(uuidValid)
+      && exactUniqueStringSet(mesh.materialUuidSet, [...new Set(mesh.materialSlotUuids)].sort())
+      && sameArray(mesh.materialUuidSet, [...new Set(mesh.materialSlotUuids)].sort())
+      && Number.isSafeInteger(mesh.meshLayerMask) && mesh.meshLayerMask > 0
+      && Number.isSafeInteger(mesh.beforeCount) && mesh.beforeCount > 0
+      && mesh.afterCount === mesh.beforeCount
+      && Array.isArray(mesh.beforeStamps) && mesh.beforeStamps.length === mesh.beforeCount
+      && Array.isArray(mesh.afterStamps) && mesh.afterStamps.length === mesh.afterCount
+      && sameObject(mesh.before, mesh.beforeStamps.at(-1))
+      && sameObject(mesh.after, mesh.afterStamps.at(-1))
+      && mesh.complete === true
+      && mesh.beforeStamps.every((stamp) => mainCameraDrawStampValid(
+        stamp, mesh, draw, frame, captureRevision,
+      ))
+      && mesh.afterStamps.every((stamp) => mainCameraDrawStampValid(
+        stamp, mesh, draw, frame, captureRevision,
+      ))
+      && sameArray(
+        mesh.beforeStamps.map(mainCameraInvocationKey).sort(),
+        mesh.afterStamps.map(mainCameraInvocationKey).sort(),
+      )
+      && new Set(mesh.beforeStamps.map(mainCameraInvocationKey)).size === mesh.beforeStamps.length
+      && new Set(mesh.afterStamps.map(mainCameraInvocationKey)).size === mesh.afterStamps.length
+  ));
+}
+
+function captureActorFrameValid(frameActor, expectedActor, frame, captureRevision) {
   return sameObject(frameActor?.actor, expectedActor)
+    && uuidValid(frameActor.rootUuid)
+    && uuidValid(frameActor.operatorRootUuid)
     && finiteVector(frameActor.rootPosition)
     && Number.isFinite(frameActor.rootYaw)
     && frameActor.rootVisible === true
@@ -569,7 +748,15 @@ function captureActorFrameValid(frameActor, expectedActor) {
         && typeof sentinel.bone === 'string' && sentinel.bone.length > 0
         && sentinel.present === true
         && finiteVector(sentinel.worldPosition)
-    ));
+    ))
+    && mainCameraDrawValid(
+      frameActor.mainCameraDraw,
+      expectedActor,
+      frame,
+      captureRevision,
+      frameActor.rootUuid,
+      frameActor.operatorRootUuid,
+    );
 }
 
 function committedCameraValid(
@@ -582,6 +769,13 @@ function committedCameraValid(
 ) {
   const expectedCompletionSemantics = expectedVisualEvidenceContract.presentation.rendererCompletion[rendererName];
   const expectedQuaternion = yxzCameraQuaternion(expectedCamera.yaw, expectedCamera.pitch);
+  const sceneUuids = committed?.actors?.map(({ mainCameraDraw }) => mainCameraDraw?.gameplaySceneUuid) ?? [];
+  const cameraUuids = committed?.actors?.map(({ mainCameraDraw }) => mainCameraDraw?.gameplayCameraUuid) ?? [];
+  const actorRootUuids = committed?.actors?.map(({ rootUuid }) => rootUuid) ?? [];
+  const operatorRootUuids = committed?.actors?.map(({ operatorRootUuid }) => operatorRootUuid) ?? [];
+  const meshUuids = committed?.actors?.flatMap(({ mainCameraDraw }) => (
+    mainCameraDraw?.meshes?.map(({ meshUuid }) => meshUuid) ?? []
+  )) ?? [];
   return committed?.contract === expectedVisualEvidenceContract.presentation.contract
     && committed.renderer === rendererName
     && committed.completionSemantics === expectedCompletionSemantics
@@ -603,7 +797,18 @@ function committedCameraValid(
     && sameObject(committed.captureTargets, expectedActors)
     && Array.isArray(committed.actors)
     && committed.actors.length === expectedActors.length
-    && committed.actors.every((actor, index) => captureActorFrameValid(actor, expectedActors[index]))
+    && sceneUuids.length === expectedActors.length && new Set(sceneUuids).size === 1
+    && cameraUuids.length === expectedActors.length && new Set(cameraUuids).size === 1
+    && actorRootUuids.length === expectedActors.length && new Set(actorRootUuids).size === expectedActors.length
+    && operatorRootUuids.length === expectedActors.length && new Set(operatorRootUuids).size === expectedActors.length
+    && meshUuids.length === expectedActors.length * expectedSkinnedMeshNames.length
+    && new Set(meshUuids).size === meshUuids.length
+    && committed.actors.every((actor, index) => captureActorFrameValid(
+      actor,
+      expectedActors[index],
+      committed.frame,
+      revision,
+    ))
     && (rendererName === 'webgl2'
       ? committed.submissionSequence === 0 && committed.completedSequence === 0
       : committed.completedSequence <= committed.submissionSequence);
@@ -630,6 +835,20 @@ function capturePresentationValid(
     || revision <= presentation.priorCaptureRevision
     || !committedCameraValid(committed, expectedCamera, expectedArena, revision, expectedActors, rendererName)
     || !committedCameraValid(paused, expectedCamera, expectedArena, revision, expectedActors, rendererName)
+    || committed.actors.some((actor, index) => (
+      actor.mainCameraDraw.gameplaySceneUuid !== paused.actors[index].mainCameraDraw.gameplaySceneUuid
+        || actor.mainCameraDraw.gameplayCameraUuid !== paused.actors[index].mainCameraDraw.gameplayCameraUuid
+        || actor.rootUuid !== paused.actors[index].rootUuid
+        || actor.operatorRootUuid !== paused.actors[index].operatorRootUuid
+        || !sameObject(
+          actor.mainCameraDraw.meshes.map(({ meshName, meshUuid, materialSlotUuids }) => (
+            [meshName, meshUuid, materialSlotUuids]
+          )).sort((left, right) => left[0].localeCompare(right[0])),
+          paused.actors[index].mainCameraDraw.meshes.map(({ meshName, meshUuid, materialSlotUuids }) => (
+            [meshName, meshUuid, materialSlotUuids]
+          )).sort((left, right) => left[0].localeCompare(right[0])),
+        )
+      ))
     || normalizedQuaternionDelta(committed.quaternion, paused.quaternion) > 1e-9
     || !close(committed.near, paused.near, 1e-9)
     || !close(committed.far, paused.far, 1e-9)
@@ -1113,7 +1332,12 @@ function handCameraValid(camera, actor, side, sourceScreenshot, expectedRootPosi
       expectedVisualEvidenceContract.atomic.placement.arithmeticEpsilonM,
     )
     || !sourceActor
-    || !captureActorFrameValid(sourceActor, actor)
+    || !captureActorFrameValid(
+      sourceActor,
+      actor,
+      sourcePresentation.frame,
+      sourcePresentation.captureRevision,
+    )
     || !sourceActor.rootPosition.every((value, axis) => close(
       value, expectedRootPosition[axis], expectedVisualEvidenceContract.atomic.placement.arithmeticEpsilonM,
     ))
@@ -1924,11 +2148,11 @@ function receiptValidationFailures(receipt, sourceSha) {
     close: closeRoiNdc, hand: handRoiNdc, medium: mediumRoiNdc, overview: overviewRoiNdc,
   };
 
-  add('receipt.schemaVersion', receipt.schemaVersion === 8);
+  add('receipt.schemaVersion', receipt.schemaVersion === 9);
   add('receipt.status', receipt.status === 'AUTOMATION_PASS_OWNER_PENDING');
-  add('receipt.contract', receipt.contract === 'atomic-acres/pass69-3-rigged-bot-live@8');
+  add('receipt.contract', receipt.contract === 'atomic-acres/pass69-3-rigged-bot-live@9');
   add('receipt.evidenceScope', receipt.evidenceScope
-    === 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-and-hand-detail-framing');
+    === 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-hand-detail-and-main-camera-draw-stamps');
   add('receipt.target', receipt.target === targetName);
   add('receipt.sourceSha', receipt.sourceSha === sourceSha);
   add('receipt.endingSourceSha', receipt.endingSourceSha === sourceSha);
@@ -2440,8 +2664,8 @@ function runContractSelfTest() {
   const oldFixture = makeAtomicPlayerFixture();
   delete oldFixture.placement;
   assert(!atomicPlayerConvergenceValid(oldFixture, 121), 'old placement-less fixture fails closed without throwing');
-  assert(receiptValidationFailures({ schemaVersion: 7 }, '0'.repeat(40)).includes('receipt.schemaVersion'),
-    'receipt schema 7 is explicitly rejected without throwing');
+  assert(receiptValidationFailures({ schemaVersion: 8 }, '0'.repeat(40)).includes('receipt.schemaVersion'),
+    'receipt schema 8 is explicitly rejected without throwing');
   const nonUnitQuaternion = [0.1, -0.2, 0.3, 0.9];
   assert(normalizedQuaternionDelta(nonUnitQuaternion, nonUnitQuaternion) === 0,
     'identical non-unit quaternion arrays must have an exact zero orientation delta');
@@ -2846,10 +3070,106 @@ function runContractSelfTest() {
     { name: 'wrist-left', bone: 'WristL', present: true, worldPosition: findJoint(points, 'left', 'wrist-hand').worldPosition },
     { name: 'wrist-right', bone: 'WristR', present: true, worldPosition: findJoint(points, 'right', 'wrist-hand').worldPosition },
   ];
+  const fixtureUuid = (index) => `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`;
+  const actorRootUuid = fixtureUuid(902);
+  const operatorRootUuid = fixtureUuid(903);
+  const makeMainCameraDraw = (frame, captureRevision) => {
+    const gameplaySceneUuid = fixtureUuid(900);
+    const gameplayCameraUuid = fixtureUuid(901);
+    const meshes = expectedSkinnedMeshNames.map((meshName, index) => {
+      const meshUuid = fixtureUuid(index + 1);
+      const materialUuid = fixtureUuid(index + 101);
+      const stamp = {
+        frame,
+        captureRevision,
+        meshUuid,
+        meshName,
+        actorRootUuid,
+        operatorRootUuid,
+        descendsFromActorRoot: true,
+        descendsFromOperatorRoot: true,
+        meshLayerMask: 1,
+        sceneUuid: gameplaySceneUuid,
+        cameraUuid: gameplayCameraUuid,
+        cameraLayerMask: 1,
+        sceneOverrideMaterialUuid: null,
+        material: {
+          uuid: materialUuid,
+          name: `material-${index}`,
+          type: 'MeshStandardMaterial',
+          visible: true,
+          colorWrite: true,
+          transparent: false,
+          opacity: 1,
+        },
+        materialSlotUuids: [materialUuid],
+        materialUuidSet: [materialUuid],
+        materialMatchesMeshSlot: true,
+        drawRange: {
+          start: 0,
+          count: 'infinity',
+          effectiveCount: 3,
+          positionCount: 3,
+          indexCount: 3,
+          group: null,
+        },
+        world: {
+          attachedToGameplayScene: true,
+          effectivelyVisible: true,
+          matrixFinite: true,
+          determinant: 1,
+          position: [0, 0, -2],
+          scale: [1, 1, 1],
+        },
+        frustum: {
+          frustumCulled: true,
+          intersectsMainCameraFrustum: true,
+          boundingSphere: { center: [0, 0, -2], radius: 1, finite: true },
+        },
+        stateValid: true,
+      };
+      return {
+        meshUuid,
+        meshName,
+        materialSlotUuids: [materialUuid],
+        materialUuidSet: [materialUuid],
+        meshLayerMask: 1,
+        beforeCount: 1,
+        afterCount: 1,
+        beforeStamps: [structuredClone(stamp)],
+        afterStamps: [structuredClone(stamp)],
+        before: structuredClone(stamp),
+        after: structuredClone(stamp),
+        complete: true,
+      };
+    });
+    return {
+      contract: expectedVisualEvidenceContract.presentation.mainCameraDraw.contract,
+      pixelProof: false,
+      actor,
+      frame,
+      captureRevision,
+      gameplaySceneUuid,
+      gameplayCameraUuid,
+      actorRootUuid,
+      operatorRootUuid,
+      expectedMeshNames: expectedSkinnedMeshNames.slice().sort(),
+      expectedMeshUuids: meshes.map(({ meshUuid }) => meshUuid).sort(),
+      beforeMeshNames: expectedSkinnedMeshNames.slice().sort(),
+      afterMeshNames: expectedSkinnedMeshNames.slice().sort(),
+      ignoredCallbacks: { wrongScene: 0, wrongCamera: 0, nonWorldCameraLayer: 0 },
+      meshes,
+      exactExpectedMeshNames: true,
+      exactExpectedMeshUuids: true,
+      complete: true,
+    };
+  };
   const makeFrameActor = (cameraEvidence, points) => {
     const projectedWorldPosition = [rootPosition[0], rootPosition[1] + 1.35, rootPosition[2]];
     return {
       actor,
+      rootUuid: actorRootUuid,
+      operatorRootUuid,
       rootPosition,
       rootYaw,
       rootVisible: true,
@@ -2892,27 +3212,31 @@ function runContractSelfTest() {
     const webGpu = rendererName === 'webgpu';
     const committedSubmission = webGpu ? 10 : 0;
     const pausedSubmission = webGpu ? 12 : 0;
-    const makeReceipt = (frame, committedAtMs, submissionSequence, completedSequence) => ({
-      contract: expectedVisualEvidenceContract.presentation.contract,
-      renderer: rendererName,
-      completionSemantics: expectedVisualEvidenceContract.presentation.rendererCompletion[rendererName],
-      arenaId,
-      frame,
-      captureRevision: 7,
-      committedAtMs,
-      position: cameraEvidence.position,
-      quaternion: yxzCameraQuaternion(cameraEvidence.yaw, cameraEvidence.pitch),
-      yaw: cameraEvidence.yaw,
-      pitch: cameraEvidence.pitch,
-      fov: cameraEvidence.fov,
-      near: cameraEvidence.near ?? 0.1,
-      far: cameraEvidence.far ?? 180,
-      submissionSequence,
-      completedSequence,
-      captureTargets: [actor],
-      actors: [structuredClone(frameActor)],
-      worldLayoutLineOfSight: [makeCachedLos(frameActor, cameraEvidence, arenaId, frame, submissionSequence)],
-    });
+    const makeReceipt = (frame, committedAtMs, submissionSequence, completedSequence) => {
+      const submittedActor = structuredClone(frameActor);
+      submittedActor.mainCameraDraw = makeMainCameraDraw(frame, 7);
+      return {
+        contract: expectedVisualEvidenceContract.presentation.contract,
+        renderer: rendererName,
+        completionSemantics: expectedVisualEvidenceContract.presentation.rendererCompletion[rendererName],
+        arenaId,
+        frame,
+        captureRevision: 7,
+        committedAtMs,
+        position: cameraEvidence.position,
+        quaternion: yxzCameraQuaternion(cameraEvidence.yaw, cameraEvidence.pitch),
+        yaw: cameraEvidence.yaw,
+        pitch: cameraEvidence.pitch,
+        fov: cameraEvidence.fov,
+        near: cameraEvidence.near ?? 0.1,
+        far: cameraEvidence.far ?? 180,
+        submissionSequence,
+        completedSequence,
+        captureTargets: [actor],
+        actors: [submittedActor],
+        worldLayoutLineOfSight: [makeCachedLos(frameActor, cameraEvidence, arenaId, frame, submissionSequence)],
+      };
+    };
     const committed = makeReceipt(100, 1_000, committedSubmission, webGpu ? 9 : 0);
     const pausedPresentedCapture = makeReceipt(103, 1_030, pausedSubmission, webGpu ? 10 : 0);
     return {
@@ -3009,6 +3333,159 @@ function runContractSelfTest() {
   assert(capturePresentationValid(
     presentation, expectedVisualEvidenceContract.atomic.closeCamera, 'atomic-acres', [actor],
   ), 'submitted WebGL presentation fixture must pass');
+  const forEachMainCameraStamp = (mesh, mutate) => {
+    for (const stamp of [...mesh.beforeStamps, ...mesh.afterStamps, mesh.before, mesh.after]) {
+      mutate(stamp);
+    }
+  };
+  const expectMainCameraDrawMutationRejected = (message, mutate) => {
+    const adversary = structuredClone(presentation);
+    mutate(adversary.pausedPresentedCapture.actors[0].mainCameraDraw);
+    assert(!capturePresentationValid(
+      adversary, expectedVisualEvidenceContract.atomic.closeCamera, 'atomic-acres', [actor],
+    ), message);
+  };
+  expectMainCameraDrawMutationRejected('missing shipped SkinnedMesh name must fail', (draw) => {
+    draw.meshes.pop();
+  });
+  expectMainCameraDrawMutationRejected('extra SkinnedMesh name must fail', (draw) => {
+    const extra = structuredClone(draw.meshes[0]);
+    extra.meshName = 'UnexpectedMesh';
+    extra.meshUuid = fixtureUuid(999);
+    extra.before.meshName = extra.meshName;
+    extra.before.meshUuid = extra.meshUuid;
+    extra.after.meshName = extra.meshName;
+    extra.after.meshUuid = extra.meshUuid;
+    draw.meshes.push(extra);
+  });
+  expectMainCameraDrawMutationRejected('duplicate shipped SkinnedMesh name must fail', (draw) => {
+    draw.meshes[1].meshName = draw.meshes[0].meshName;
+    draw.meshes[1].before.meshName = draw.meshes[0].meshName;
+    draw.meshes[1].after.meshName = draw.meshes[0].meshName;
+  });
+  expectMainCameraDrawMutationRejected('wrong-frame main-camera stamp must fail', (draw) => {
+    for (const stamp of [...draw.meshes[0].beforeStamps, draw.meshes[0].before]) stamp.frame -= 1;
+  });
+  expectMainCameraDrawMutationRejected('coherent changed main-camera UUID must fail cross-receipt binding', (draw) => {
+    draw.gameplayCameraUuid = fixtureUuid(999);
+    for (const mesh of draw.meshes) {
+      forEachMainCameraStamp(mesh, (stamp) => { stamp.cameraUuid = draw.gameplayCameraUuid; });
+    }
+  });
+  expectMainCameraDrawMutationRejected('coherent changed gameplay-scene UUID must fail cross-receipt binding', (draw) => {
+    draw.gameplaySceneUuid = fixtureUuid(998);
+    for (const mesh of draw.meshes) {
+      forEachMainCameraStamp(mesh, (stamp) => { stamp.sceneUuid = draw.gameplaySceneUuid; });
+    }
+  });
+  expectMainCameraDrawMutationRejected('unbalanced main-camera before/after callbacks must fail', (draw) => {
+    draw.meshes[0].afterCount = 0;
+  });
+  expectMainCameraDrawMutationRejected('missing main-camera callback must fail', (draw) => {
+    draw.meshes[0].beforeCount = 0;
+    draw.meshes[0].beforeStamps = [];
+    draw.meshes[0].before = null;
+  });
+  expectMainCameraDrawMutationRejected('detached main-camera draw state must fail', (draw) => {
+    forEachMainCameraStamp(draw.meshes[0], (stamp) => { stamp.world.attachedToGameplayScene = false; });
+  });
+  expectMainCameraDrawMutationRejected('main-camera layer mismatch must fail', (draw) => {
+    draw.meshes[0].meshLayerMask = 2;
+    forEachMainCameraStamp(draw.meshes[0], (stamp) => { stamp.meshLayerMask = 2; });
+  });
+  expectMainCameraDrawMutationRejected('offscreen main-camera frustum state must fail', (draw) => {
+    forEachMainCameraStamp(draw.meshes[0], (stamp) => { stamp.frustum.intersectsMainCameraFrustum = false; });
+  });
+  expectMainCameraDrawMutationRejected('zero main-camera draw range must fail', (draw) => {
+    forEachMainCameraStamp(draw.meshes[0], (stamp) => { stamp.drawRange.effectiveCount = 0; });
+  });
+  expectMainCameraDrawMutationRejected('invisible main-camera material must fail', (draw) => {
+    forEachMainCameraStamp(draw.meshes[0], (stamp) => { stamp.material.visible = false; });
+  });
+  expectMainCameraDrawMutationRejected('same-scene same-camera override-material pass must fail', (draw) => {
+    forEachMainCameraStamp(draw.meshes[0], (stamp) => {
+      stamp.sceneOverrideMaterialUuid = fixtureUuid(997);
+    });
+  });
+  expectMainCameraDrawMutationRejected('zero-count callback group must fail', (draw) => {
+    forEachMainCameraStamp(draw.meshes[0], (stamp) => {
+      stamp.drawRange.group = { start: 0, count: 0, materialIndex: 0 };
+      stamp.drawRange.effectiveCount = 0;
+    });
+  });
+  expectMainCameraDrawMutationRejected('callback material/group slot mismatch must fail', (draw) => {
+    const mesh = draw.meshes[0];
+    const secondMaterialUuid = fixtureUuid(996);
+    mesh.materialSlotUuids.push(secondMaterialUuid);
+    mesh.materialUuidSet.push(secondMaterialUuid);
+    mesh.materialUuidSet.sort();
+    forEachMainCameraStamp(mesh, (stamp) => {
+      stamp.materialSlotUuids.push(secondMaterialUuid);
+      stamp.materialUuidSet.push(secondMaterialUuid);
+      stamp.materialUuidSet.sort();
+      stamp.drawRange.group = { start: 0, count: 3, materialIndex: 1 };
+    });
+  });
+  expectMainCameraDrawMutationRejected('unpaired callback material/group multiset must fail', (draw) => {
+    const mesh = draw.meshes[0];
+    for (const stamp of [...mesh.afterStamps, mesh.after]) {
+      stamp.drawRange.group = { start: 0, count: 3, materialIndex: 0 };
+    }
+  });
+  expectMainCameraDrawMutationRejected('duplicate principal material/group invocation must fail', (draw) => {
+    const mesh = draw.meshes[0];
+    mesh.beforeStamps.push(structuredClone(mesh.beforeStamps[0]));
+    mesh.afterStamps.push(structuredClone(mesh.afterStamps[0]));
+    mesh.beforeCount = mesh.beforeStamps.length;
+    mesh.afterCount = mesh.afterStamps.length;
+    mesh.before = structuredClone(mesh.beforeStamps.at(-1));
+    mesh.after = structuredClone(mesh.afterStamps.at(-1));
+  });
+  const coherentRootReplacement = structuredClone(presentation);
+  const replacementFrameActor = coherentRootReplacement.pausedPresentedCapture.actors[0];
+  replacementFrameActor.rootUuid = fixtureUuid(995);
+  replacementFrameActor.mainCameraDraw.actorRootUuid = replacementFrameActor.rootUuid;
+  for (const mesh of replacementFrameActor.mainCameraDraw.meshes) {
+    forEachMainCameraStamp(mesh, (stamp) => { stamp.actorRootUuid = replacementFrameActor.rootUuid; });
+  }
+  assert(!capturePresentationValid(
+    coherentRootReplacement, expectedVisualEvidenceContract.atomic.closeCamera, 'atomic-acres', [actor],
+  ), 'same-ID actor-root replacement between committed and paused receipts must fail');
+  const coherentOperatorSwap = structuredClone(presentation);
+  const swappedFrameActor = coherentOperatorSwap.pausedPresentedCapture.actors[0];
+  swappedFrameActor.operatorRootUuid = fixtureUuid(994);
+  swappedFrameActor.mainCameraDraw.operatorRootUuid = swappedFrameActor.operatorRootUuid;
+  for (const mesh of swappedFrameActor.mainCameraDraw.meshes) {
+    forEachMainCameraStamp(mesh, (stamp) => { stamp.operatorRootUuid = swappedFrameActor.operatorRootUuid; });
+  }
+  assert(!capturePresentationValid(
+    coherentOperatorSwap, expectedVisualEvidenceContract.atomic.closeCamera, 'atomic-acres', [actor],
+  ), 'same-ID resolved operator-root swap between committed and paused receipts must fail');
+  const coherentMeshReplacement = structuredClone(presentation);
+  const replacedDraw = coherentMeshReplacement.pausedPresentedCapture.actors[0].mainCameraDraw;
+  const replacedMesh = replacedDraw.meshes[0];
+  const priorMeshUuid = replacedMesh.meshUuid;
+  replacedMesh.meshUuid = fixtureUuid(993);
+  forEachMainCameraStamp(replacedMesh, (stamp) => { stamp.meshUuid = replacedMesh.meshUuid; });
+  replacedDraw.expectedMeshUuids = replacedDraw.expectedMeshUuids
+    .map((uuid) => uuid === priorMeshUuid ? replacedMesh.meshUuid : uuid)
+    .sort();
+  assert(!capturePresentationValid(
+    coherentMeshReplacement, expectedVisualEvidenceContract.atomic.closeCamera, 'atomic-acres', [actor],
+  ), 'same-root SkinnedMesh replacement between committed and paused receipts must fail');
+  const coherentMaterialReplacement = structuredClone(presentation);
+  const replacedMaterialMesh = coherentMaterialReplacement.pausedPresentedCapture.actors[0].mainCameraDraw.meshes[0];
+  const replacementMaterialUuid = fixtureUuid(992);
+  replacedMaterialMesh.materialSlotUuids = [replacementMaterialUuid];
+  replacedMaterialMesh.materialUuidSet = [replacementMaterialUuid];
+  forEachMainCameraStamp(replacedMaterialMesh, (stamp) => {
+    stamp.material.uuid = replacementMaterialUuid;
+    stamp.materialSlotUuids = [replacementMaterialUuid];
+    stamp.materialUuidSet = [replacementMaterialUuid];
+  });
+  assert(!capturePresentationValid(
+    coherentMaterialReplacement, expectedVisualEvidenceContract.atomic.closeCamera, 'atomic-acres', [actor],
+  ), 'same-mesh material-slot replacement between committed and paused receipts must fail');
   assert(validateCloseFraming(framing), 'complete close joint framing must pass');
   assert(screenshotFrameBindingValid(screenshotBindingFor(presentation), presentation),
     'screenshot must bind to an unchanged paused submitted frame');

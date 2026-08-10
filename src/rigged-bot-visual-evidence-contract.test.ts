@@ -1,4 +1,8 @@
+import { readFile } from 'node:fs/promises';
 import * as THREE from 'three';
+import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { isBlocked } from './collision';
 import { SPAWN_LAYOUT } from './arena-layout';
@@ -6,6 +10,7 @@ import { SIMULATION_HZ } from './gameplay';
 import { buildArena } from './map';
 import { CharacterPhysics } from './physics';
 import {
+  RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES,
   RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT,
   fixedGunRangeDummyFixtureMatchesAuthoredMotion,
   waitForAtomicPlayerConvergenceInPage,
@@ -17,6 +22,36 @@ afterEach(() => {
 });
 
 describe('fixed rigged actor visual evidence fixtures', () => {
+  it('pins the retained LOD0 asset and resolved operator clone to the shipped nine-mesh manifest', async () => {
+    vi.stubGlobal('self', globalThis);
+    vi.stubGlobal('ProgressEvent', class ProgressEvent {
+      readonly type: string;
+      constructor(type: string) { this.type = type; }
+    });
+    vi.stubGlobal('createImageBitmap', async () => ({
+      width: 1,
+      height: 1,
+      close: () => undefined,
+    }) as unknown as ImageBitmap);
+    const bytes = await readFile('public/assets/original/models/operators/pass65-third-person-operator-lod0.glb');
+    const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+    const asset = await new Promise<GLTF>((resolveAsset, rejectAsset) => {
+      new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parse(arrayBuffer, '', resolveAsset, rejectAsset);
+    });
+    const dummyRoot = new THREE.Group();
+    dummyRoot.name = 'gun-range-retained-operator-fixture';
+    dummyRoot.add(cloneSkeleton(asset.scene));
+    const resolvedNames: string[] = [];
+    dummyRoot.traverse((node) => {
+      if (node instanceof THREE.SkinnedMesh && node.userData.authoritativeProxy !== true) {
+        resolvedNames.push(node.name);
+      }
+    });
+    expect(resolvedNames.sort()).toEqual([...RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES].sort());
+    expect(resolvedNames).toHaveLength(9);
+    expect(new Set(resolvedNames).size).toBe(9);
+  });
+
   it('retains one immutable open-road Atomic staging line', () => {
     const fixture = RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic;
     expect(fixture).toMatchObject({
@@ -119,10 +154,20 @@ describe('fixed rigged actor visual evidence fixtures', () => {
   });
 
   it('requires committed camera frames, compositor boundaries, and all six LOS sentinels', () => {
+    expect(RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT).toMatchObject({
+      schemaVersion: 5,
+      contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v5',
+    });
     expect(RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation).toEqual({
-      contract: 'capture-camera-committed-frame-v1',
+      contract: 'capture-camera-committed-frame-v2',
       order: 'pause-final-submission-await-completion-then-compositor-v1',
       compositorBoundariesAfterCommit: 2,
+      mainCameraDraw: {
+        contract: 'rigged-main-camera-draw-stamp-v1',
+        pixelProof: false,
+        expectedSkinnedMeshCount: 9,
+        expectedSkinnedMeshNames: RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES,
+      },
       rendererCompletion: {
         webgl2: 'synchronous-render-return',
         webgpu: 'submission-sequence-covered-by-completion-frontier',
@@ -132,6 +177,11 @@ describe('fixed rigged actor visual evidence fixtures', () => {
       'head', 'shoulder-left', 'shoulder-right', 'pelvis', 'wrist-left', 'wrist-right',
     ]);
     expect(RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.los.actorSelfOcclusionExcluded).toBe(true);
+    expect(RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES).toEqual([
+      'Cube018', 'Cube018_1', 'Cube018_2', 'Swat_Feet',
+      'Cube037', 'Cube037_1', 'Cube037_2', 'Cube023', 'Cube023_1',
+    ]);
+    expect(new Set(RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES).size).toBe(9);
   });
 
   it('fails closed with bounded, sanitized and exact convergence timeout diagnostics', async () => {

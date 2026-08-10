@@ -32,8 +32,11 @@ import { applyRemoteHumanReadabilityHighlight, remoteHumanReadabilityTelemetry }
 import {
   collectRiggedEvidenceOccluders,
   firstRiggedEvidenceOccluder,
+  installRiggedEvidenceMainCameraDrawSession,
   riggedEvidenceMaterialCanOcclude,
   validateRiggedEvidenceCaptureTargets,
+  type RiggedEvidenceMainCameraActorDrawReceipt,
+  type RiggedEvidenceMainCameraDrawSession,
 } from './rigged-evidence-occlusion';
 import { isSharedMeshGeometry } from './gpu-resource-ownership';
 import {
@@ -51,6 +54,7 @@ import {
   type KeyBindingProfile,
 } from './key-bindings';
 import { GUN_RANGE_FIRING_LINE_Z, applyAdditionalMapPresentationProfile, applyRustworksPresentationProfile, buildGunRange, buildRustworks1v1, buildSkylineTerminal, updateGunRangePresentation, updateGunRangeTestBayDoor } from './additional-maps';
+import { RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES } from './rigged-bot-visual-evidence-contract';
 import {
   GUN_RANGE_TEST_BAY_CONTRACT,
   nearestGunRangeTestBaySupportStation,
@@ -1104,6 +1108,8 @@ let menuLifecycle = INITIAL_MENU_LIFECYCLE_STATE;
 let lastGameplayPresentedFrame = 0;
 type DebugCaptureActorFrameEvidence = Readonly<{
   actor: Readonly<{ kind: 'bot' | 'training-dummy'; id: string }>;
+  rootUuid: string;
+  operatorRootUuid: string;
   rootPosition: readonly number[];
   rootYaw: number;
   rootVisible: boolean;
@@ -1117,13 +1123,14 @@ type DebugCaptureActorFrameEvidence = Readonly<{
   screenPosition: readonly number[];
   jointScreenPositions: readonly Readonly<Record<string, unknown>>[];
   evidenceSentinels: readonly Readonly<Record<string, unknown>>[];
+  mainCameraDraw: RiggedEvidenceMainCameraActorDrawReceipt | null;
 }>;
 type DebugRiggedEvidenceCaptureTarget = Readonly<{
   kind: 'bot' | 'training-dummy';
   id: string;
 }>;
 type DebugCapturePresentationReceipt = Readonly<{
-  contract: 'capture-camera-committed-frame-v1';
+  contract: 'capture-camera-committed-frame-v2';
   renderer: 'webgl2' | 'webgpu';
   completionSemantics: 'synchronous-render-return' | 'submission-sequence-covered-by-completion-frontier';
   arenaId: ArenaId;
@@ -1146,6 +1153,13 @@ type DebugCapturePresentationReceipt = Readonly<{
 let debugCaptureCameraRevision = 0;
 let lastDebugCapturePresentation: DebugCapturePresentationReceipt | null = null;
 let debugRiggedEvidenceCaptureTargets: readonly DebugRiggedEvidenceCaptureTarget[] | null = null;
+let debugRiggedEvidenceMainCameraDrawSession: RiggedEvidenceMainCameraDrawSession | null = null;
+
+function clearDebugRiggedEvidenceCaptureTargets(): void {
+  debugRiggedEvidenceMainCameraDrawSession?.dispose();
+  debugRiggedEvidenceMainCameraDrawSession = null;
+  debugRiggedEvidenceCaptureTargets = null;
+}
 let matchAdmissionGeneration = 0;
 const matchAdmissionCoordinator = new MatchAdmissionCoordinator();
 let matchPauseBackdropPresentationCount = 0;
@@ -22375,7 +22389,7 @@ async function performArenaSelection(
     profileArenaTransition('authority-commit');
     characterPhysics = nextPhysics;
     selectedArena = nextSelection;
-    debugRiggedEvidenceCaptureTargets = null;
+    clearDebugRiggedEvidenceCaptureTargets();
     lastDebugCapturePresentation = null;
     arena = nextArena;
     interactiveWorldRuntime = nextInteractiveWorldRuntime;
@@ -22511,7 +22525,7 @@ async function performArenaSelection(
     profileArenaTransition('rollback');
     characterPhysics = previousPhysics;
     selectedArena = previousSelection;
-    debugRiggedEvidenceCaptureTargets = null;
+    clearDebugRiggedEvidenceCaptureTargets();
     lastDebugCapturePresentation = null;
     arena = previousArena;
     interactiveWorldRuntime = previousInteractiveWorldRuntime;
@@ -22611,7 +22625,7 @@ function stageMenuArenaSelection(id: ArenaId): void {
   const nextSelection = arenaSelection(id);
   if (nextSelection.id === selectedArena.id) return;
   selectedArena = nextSelection;
-  debugRiggedEvidenceCaptureTargets = null;
+  clearDebugRiggedEvidenceCaptureTargets();
   lastDebugCapturePresentation = null;
   document.documentElement.dataset.menuArenaId = selectedArena.id;
   syncArenaSelectionUi();
@@ -24169,6 +24183,8 @@ function debugObjectEffectivelyVisible(node: THREE.Object3D): boolean {
 
 function debugCaptureActorFrameEvidence(
   target: DebugRiggedEvidenceCaptureTarget | null,
+  frame: number,
+  captureRevision: number,
 ): DebugCaptureActorFrameEvidence | null {
   if (!target) return null;
   const root = debugRiggedEvidenceActorRoot(target.kind, target.id);
@@ -24184,6 +24200,8 @@ function debugCaptureActorFrameEvidence(
   const projectedWorldPosition = root.localToWorld(new THREE.Vector3(0, anchorHeight, 0)).toArray();
   return Object.freeze({
     actor: Object.freeze({ ...target }),
+    rootUuid: root.uuid,
+    operatorRootUuid: operatorRoot?.uuid ?? '',
     rootPosition: Object.freeze(root.getWorldPosition(new THREE.Vector3()).toArray()),
     rootYaw: root.rotation.y,
     rootVisible: root.visible,
@@ -24202,6 +24220,15 @@ function debugCaptureActorFrameEvidence(
     jointScreenPositions: Object.freeze(debugRiggedOperatorJointScreenPositions(operatorModel)
       .map((joint) => Object.freeze(joint))),
     evidenceSentinels: Object.freeze(debugRiggedEvidenceSentinelWorldPositions(root)),
+    mainCameraDraw: operatorRoot
+      ? debugRiggedEvidenceMainCameraDrawSession?.actorReceipt(
+        target,
+        root,
+        operatorRoot,
+        frame,
+        captureRevision,
+      ) ?? null
+      : null,
   });
 }
 
@@ -24212,13 +24239,13 @@ function debugCapturePresentationReceipt(frame: number): DebugCapturePresentatio
   camera.updateWorldMatrix(true, false);
   const presentation = renderRuntime.presentationTelemetry();
   const actors = Object.freeze(debugRiggedEvidenceCaptureTargets
-    .map(debugCaptureActorFrameEvidence)
+    .map((target) => debugCaptureActorFrameEvidence(target, frame, debugCaptureCameraRevision))
     .filter((actor): actor is DebugCaptureActorFrameEvidence => actor !== null));
   const worldLayoutLineOfSight = Object.freeze(actors.map((actor) => (
     debugRiggedEvidenceLineOfSightForFrame(actor, frame, presentation.submissionSequence)
   )));
   return Object.freeze({
-    contract: 'capture-camera-committed-frame-v1',
+    contract: 'capture-camera-committed-frame-v2',
     renderer: renderRuntime.backend,
     completionSemantics: renderRuntime.backend === 'webgpu'
       ? 'submission-sequence-covered-by-completion-frontier'
@@ -26052,7 +26079,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     debugCaptureCameraActive = [x, y, z, yaw, pitch].every(Number.isFinite);
     debugCaptureCameraUsesQuaternion = false;
     if (!debugCaptureCameraActive) {
-      debugRiggedEvidenceCaptureTargets = null;
+      clearDebugRiggedEvidenceCaptureTargets();
       lastDebugCapturePresentation = null;
       debugCaptureCameraFov = null;
       debugCaptureOrbit = null;
@@ -26177,13 +26204,35 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   },
   setRiggedEvidenceCaptureTargets: (targets) => {
     lastDebugCapturePresentation = null;
-    debugRiggedEvidenceCaptureTargets = null;
+    clearDebugRiggedEvidenceCaptureTargets();
     const validated = validateRiggedEvidenceCaptureTargets(
       targets,
       (kind, id) => debugRiggedEvidenceActorRoot(kind, id) !== null,
     );
     if (!validated.valid) return false;
+    if (validated.targets === null) return true;
+    const actors: Array<{
+      actor: DebugRiggedEvidenceCaptureTarget;
+      root: THREE.Object3D;
+      operatorRoot: THREE.Object3D;
+    }> = [];
+    for (const actor of validated.targets) {
+      const root = debugRiggedEvidenceActorRoot(actor.kind, actor.id);
+      const operatorRoot = root ? resolveRiggedOperatorRuntimeRoot(root) : null;
+      if (!root || !operatorRoot) return false;
+      actors.push({ actor, root, operatorRoot });
+    }
+    const drawSession = installRiggedEvidenceMainCameraDrawSession(
+      actors,
+      scene,
+      camera,
+      () => frameCount,
+      () => debugCaptureCameraRevision,
+      RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES,
+    );
+    if (!drawSession) return false;
     debugRiggedEvidenceCaptureTargets = validated.targets;
+    debugRiggedEvidenceMainCameraDrawSession = drawSession;
     return true;
   },
   awaitRiggedEvidenceCaptureCompletion: async () => {

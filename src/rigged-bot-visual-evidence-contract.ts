@@ -455,18 +455,36 @@ const fixedDummyCameras = Object.freeze(fixedDummyActors.map((actor) => {
  * geometry: authored layout drift must fail the LOS/framing gate and require a
  * reviewed contract update.
  */
+export const RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES = Object.freeze([
+  'Cube018',
+  'Cube018_1',
+  'Cube018_2',
+  'Swat_Feet',
+  'Cube037',
+  'Cube037_1',
+  'Cube037_2',
+  'Cube023',
+  'Cube023_1',
+] as const);
+
 export const RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT = Object.freeze({
-  schemaVersion: 4,
-  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v4',
+  schemaVersion: 5,
+  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v5',
   los: Object.freeze({
     contract: 'actual-render-world-layout-occluder-multi-sentinel-los-v2',
     actorSelfOcclusionExcluded: true,
     sentinels: Object.freeze(['head', 'shoulder-left', 'shoulder-right', 'pelvis', 'wrist-left', 'wrist-right'] as const),
   }),
   presentation: Object.freeze({
-    contract: 'capture-camera-committed-frame-v1',
+    contract: 'capture-camera-committed-frame-v2',
     order: 'pause-final-submission-await-completion-then-compositor-v1',
     compositorBoundariesAfterCommit: 2,
+    mainCameraDraw: Object.freeze({
+      contract: 'rigged-main-camera-draw-stamp-v1',
+      pixelProof: false,
+      expectedSkinnedMeshCount: RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES.length,
+      expectedSkinnedMeshNames: RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES,
+    }),
     rendererCompletion: Object.freeze({
       webgl2: 'synchronous-render-return',
       webgpu: 'submission-sequence-covered-by-completion-frontier',

@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   collectRiggedEvidenceOccluders,
   firstRiggedEvidenceOccluder,
+  installRiggedEvidenceMainCameraDrawSession,
   riggedEvidenceIntersectionCanOcclude,
+  riggedEvidenceMainCameraActorDrawComplete,
   validateRiggedEvidenceCaptureTargets,
 } from './rigged-evidence-occlusion';
 
@@ -13,6 +15,86 @@ function fakeHit(mesh: THREE.Mesh, distance: number, materialIndex: number): THR
     point: new THREE.Vector3(distance, 0, 0),
     object: mesh,
     face: { a: 0, b: 1, c: 2, normal: new THREE.Vector3(1, 0, 0), materialIndex },
+  };
+}
+
+function riggedDrawFixture() {
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 180);
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld(true);
+  scene.add(camera);
+  const root = new THREE.Group();
+  scene.add(root);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+    -0.5, -0.5, 0,
+    0.5, -0.5, 0,
+    0, 0.5, 0,
+  ], 3));
+  geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute([
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+  ], 4));
+  geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute([
+    1, 0, 0, 0,
+    1, 0, 0, 0,
+    1, 0, 0, 0,
+  ], 4));
+  geometry.setIndex([0, 1, 2]);
+  const material = new THREE.MeshBasicMaterial();
+  material.name = 'fixture-material';
+  const mesh = new THREE.SkinnedMesh(geometry, material);
+  mesh.name = 'fixture-skin';
+  const bone = new THREE.Bone();
+  mesh.add(bone);
+  mesh.bind(new THREE.Skeleton([bone]));
+  mesh.position.z = -2;
+  mesh.computeBoundingSphere();
+  root.add(mesh);
+  scene.updateMatrixWorld(true);
+  camera.updateMatrixWorld(true);
+  const actor = Object.freeze({ kind: 'bot' as const, id: 'fixture-bot' });
+  let frame = 41;
+  let captureRevision = 7;
+  const session = installRiggedEvidenceMainCameraDrawSession(
+    [{ actor, root, operatorRoot: root }],
+    scene,
+    camera,
+    () => frame,
+    () => captureRevision,
+    ['fixture-skin'],
+  );
+  const invoke = (
+    phase: 'before' | 'after',
+    renderScene: THREE.Scene = scene,
+    renderCamera: THREE.Camera = camera,
+    renderMaterial: THREE.Material = material,
+    callbackGroup: Readonly<{ start: number; count: number; materialIndex: number }> | null = null,
+  ) => {
+    const callback = phase === 'before' ? mesh.onBeforeRender : mesh.onAfterRender;
+    callback.call(
+      mesh,
+      {} as THREE.WebGLRenderer,
+      renderScene,
+      renderCamera,
+      geometry,
+      renderMaterial,
+      callbackGroup as unknown as THREE.Group,
+    );
+  };
+  return {
+    scene,
+    camera,
+    root,
+    mesh,
+    material,
+    actor,
+    session: session!,
+    invoke,
+    setFrame: (value: number) => { frame = value; },
+    setCaptureRevision: (value: number) => { captureRevision = value; },
   };
 }
 
@@ -109,5 +191,302 @@ describe('rigged evidence per-intersection occluder qualification', () => {
       (node) => node instanceof THREE.Mesh && node.layers.test(camera.layers),
     );
     expect(observed).toEqual([otherActor]);
+  });
+
+  it('records only exact gameplay-scene, gameplay-camera, world-layer callbacks and restores prior hooks', () => {
+    const fixture = riggedDrawFixture();
+    let originalBeforeCalls = 0;
+    let originalAfterCalls = 0;
+    fixture.session.dispose();
+    fixture.mesh.onBeforeRender = () => { originalBeforeCalls += 1; };
+    fixture.mesh.onAfterRender = () => { originalAfterCalls += 1; };
+    const originalBefore = fixture.mesh.onBeforeRender;
+    const originalAfter = fixture.mesh.onAfterRender;
+    const session = installRiggedEvidenceMainCameraDrawSession(
+      [{ actor: fixture.actor, root: fixture.root, operatorRoot: fixture.root }],
+      fixture.scene,
+      fixture.camera,
+      () => 41,
+      () => 7,
+      ['fixture-skin'],
+    )!;
+    const wrongScene = new THREE.Scene();
+    const wrongCamera = fixture.camera.clone();
+    fixture.invoke('before', wrongScene, fixture.camera);
+    fixture.invoke('after', wrongScene, fixture.camera);
+    fixture.invoke('before', fixture.scene, wrongCamera);
+    fixture.invoke('after', fixture.scene, wrongCamera);
+    fixture.camera.layers.set(2);
+    fixture.invoke('before');
+    fixture.invoke('after');
+    fixture.camera.layers.set(0);
+    fixture.invoke('before');
+    fixture.invoke('after');
+
+    const receipt = session.actorReceipt(fixture.actor, fixture.root, fixture.root, 41, 7)!;
+    expect(receipt).toMatchObject({
+      pixelProof: false,
+      expectedMeshNames: ['fixture-skin'],
+      beforeMeshNames: ['fixture-skin'],
+      afterMeshNames: ['fixture-skin'],
+      ignoredCallbacks: { wrongScene: 2, wrongCamera: 2, nonWorldCameraLayer: 2 },
+      exactExpectedMeshNames: true,
+      exactExpectedMeshUuids: true,
+      complete: true,
+    });
+    expect(receipt.meshes[0]).toMatchObject({ beforeCount: 1, afterCount: 1, complete: true });
+    expect(receipt.meshes[0].before).toMatchObject({
+      frame: 41,
+      captureRevision: 7,
+      meshName: 'fixture-skin',
+      meshLayerMask: 1,
+      sceneUuid: fixture.scene.uuid,
+      cameraLayerMask: 1,
+      sceneOverrideMaterialUuid: null,
+      drawRange: { start: 0, count: 'infinity', effectiveCount: 3, positionCount: 3, indexCount: 3 },
+      world: { attachedToGameplayScene: true, effectivelyVisible: true, matrixFinite: true, determinant: 1 },
+      frustum: { frustumCulled: true, intersectsMainCameraFrustum: true },
+      stateValid: true,
+    });
+    expect(riggedEvidenceMainCameraActorDrawComplete(receipt)).toBe(true);
+    expect(originalBeforeCalls).toBe(4);
+    expect(originalAfterCalls).toBe(4);
+    session.dispose();
+    expect(fixture.mesh.onBeforeRender).toBe(originalBefore);
+    expect(fixture.mesh.onAfterRender).toBe(originalAfter);
+    session.dispose();
+  });
+
+  it('binds stamps to the exact frame and capture revision', () => {
+    const fixture = riggedDrawFixture();
+    fixture.invoke('before');
+    fixture.invoke('after');
+    expect(fixture.session.actorReceipt(fixture.actor, fixture.root, fixture.root, 41, 7)?.complete).toBe(true);
+    const replacementRoot = new THREE.Group();
+    (replacementRoot as unknown as { uuid: string }).uuid = fixture.root.uuid;
+    const replacementOperatorRoot = new THREE.Group();
+    (replacementOperatorRoot as unknown as { uuid: string }).uuid = fixture.root.uuid;
+    fixture.root.add(replacementOperatorRoot);
+    expect(fixture.session.actorReceipt(fixture.actor, replacementRoot, fixture.root, 41, 7)).toBeNull();
+    expect(fixture.session.actorReceipt(fixture.actor, fixture.root, replacementOperatorRoot, 41, 7)).toBeNull();
+    expect(fixture.session.actorReceipt(fixture.actor, fixture.root, fixture.root, 42, 7)).toMatchObject({
+      beforeMeshNames: [],
+      afterMeshNames: [],
+      complete: false,
+    });
+    fixture.setFrame(42);
+    fixture.setCaptureRevision(8);
+    fixture.invoke('before');
+    fixture.invoke('after');
+    expect(fixture.session.actorReceipt(fixture.actor, fixture.root, fixture.root, 42, 8)?.complete).toBe(true);
+    expect(fixture.session.actorReceipt(fixture.actor, fixture.root, fixture.root, 41, 7)?.complete).toBe(false);
+    fixture.session.dispose();
+  });
+
+  it('rejects missing, extra, duplicate, or hidden visible-mesh manifests before installing callbacks', () => {
+    const missing = riggedDrawFixture();
+    missing.session.dispose();
+    expect(installRiggedEvidenceMainCameraDrawSession(
+      [{ actor: missing.actor, root: missing.root, operatorRoot: missing.root }], missing.scene, missing.camera,
+      () => 41, () => 7, ['missing-skin'],
+    )).toBeNull();
+
+    const extra = riggedDrawFixture();
+    extra.session.dispose();
+    const extraMesh = extra.mesh.clone();
+    extraMesh.name = 'extra-skin';
+    extra.root.add(extraMesh);
+    expect(installRiggedEvidenceMainCameraDrawSession(
+      [{ actor: extra.actor, root: extra.root, operatorRoot: extra.root }], extra.scene, extra.camera,
+      () => 41, () => 7, ['fixture-skin'],
+    )).toBeNull();
+
+    const duplicate = riggedDrawFixture();
+    duplicate.session.dispose();
+    const duplicateMesh = duplicate.mesh.clone();
+    duplicateMesh.name = 'fixture-skin';
+    duplicate.root.add(duplicateMesh);
+    expect(installRiggedEvidenceMainCameraDrawSession(
+      [{ actor: duplicate.actor, root: duplicate.root, operatorRoot: duplicate.root }],
+      duplicate.scene, duplicate.camera, () => 41, () => 7,
+      ['fixture-skin', 'another-skin'],
+    )).toBeNull();
+
+    const hidden = riggedDrawFixture();
+    hidden.session.dispose();
+    hidden.mesh.visible = false;
+    expect(installRiggedEvidenceMainCameraDrawSession(
+      [{ actor: hidden.actor, root: hidden.root, operatorRoot: hidden.root }], hidden.scene, hidden.camera,
+      () => 41, () => 7, ['fixture-skin'],
+    )).toBeNull();
+
+    const shared = riggedDrawFixture();
+    shared.session.dispose();
+    expect(installRiggedEvidenceMainCameraDrawSession(
+      [
+        { actor: shared.actor, root: shared.root, operatorRoot: shared.root },
+        {
+          actor: { kind: 'training-dummy', id: 'same-root-forged-dummy' },
+          root: shared.root,
+          operatorRoot: shared.root,
+        },
+      ],
+      shared.scene,
+      shared.camera,
+      () => 41,
+      () => 7,
+      ['fixture-skin'],
+    )).toBeNull();
+  });
+
+  it('fails a null renderer-owned bound without computing or persisting one in the evidence callback', () => {
+    const fixture = riggedDrawFixture();
+    (fixture.mesh as unknown as { boundingSphere: THREE.Sphere | null }).boundingSphere = null;
+    fixture.invoke('before');
+    fixture.invoke('after');
+    const receipt = fixture.session.actorReceipt(fixture.actor, fixture.root, fixture.root, 41, 7)!;
+    expect(fixture.mesh.boundingSphere).toBeNull();
+    expect(receipt.meshes[0].before?.frustum.boundingSphere).toBeNull();
+    expect(receipt.complete).toBe(false);
+    fixture.session.dispose();
+  });
+
+  it('does not update mesh or camera matrices after an existing callback mutates local transforms', () => {
+    const fixture = riggedDrawFixture();
+    fixture.session.dispose();
+    const meshWorldBefore = fixture.mesh.matrixWorld.clone();
+    const cameraWorldBefore = fixture.camera.matrixWorld.clone();
+    fixture.mesh.onBeforeRender = () => {
+      fixture.mesh.position.x = 5;
+      fixture.camera.position.x = 7;
+    };
+    const session = installRiggedEvidenceMainCameraDrawSession(
+      [{ actor: fixture.actor, root: fixture.root, operatorRoot: fixture.root }],
+      fixture.scene, fixture.camera, () => 41, () => 7, ['fixture-skin'],
+    )!;
+    fixture.invoke('before');
+    expect(fixture.mesh.matrixWorld.equals(meshWorldBefore)).toBe(true);
+    expect(fixture.camera.matrixWorld.equals(cameraWorldBefore)).toBe(true);
+    expect(session.actorReceipt(fixture.actor, fixture.root, fixture.root, 41, 7)?.meshes[0].before?.world.position[0]).toBe(0);
+    session.dispose();
+  });
+
+  it('stamps and rejects a same-scene same-camera override-material pass', () => {
+    const fixture = riggedDrawFixture();
+    const override = new THREE.MeshDepthMaterial();
+    fixture.scene.overrideMaterial = override;
+    fixture.invoke('before');
+    fixture.invoke('after');
+    const receipt = fixture.session.actorReceipt(fixture.actor, fixture.root, fixture.root, 41, 7)!;
+    expect(receipt.meshes[0].before?.sceneOverrideMaterialUuid).toBe(override.uuid);
+    expect(receipt.meshes[0].after?.sceneOverrideMaterialUuid).toBe(override.uuid);
+    expect(receipt.complete).toBe(false);
+    fixture.session.dispose();
+  });
+
+  it('records every material group and fails a zero or malformed group intersection', () => {
+    const fixture = riggedDrawFixture();
+    const secondMaterial = new THREE.MeshBasicMaterial();
+    (fixture.material as unknown as { uuid: string }).uuid = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+    (secondMaterial as unknown as { uuid: string }).uuid = '00000000-0000-4000-8000-000000000001';
+    (fixture.mesh as unknown as { material: THREE.Material | THREE.Material[] }).material = [
+      fixture.material,
+      secondMaterial,
+    ];
+    const group0 = { start: 0, count: 3, materialIndex: 0 };
+    const group1 = { start: 0, count: 3, materialIndex: 1 };
+    fixture.invoke('before', fixture.scene, fixture.camera, fixture.material, group0);
+    fixture.invoke('after', fixture.scene, fixture.camera, fixture.material, group0);
+    fixture.invoke('before', fixture.scene, fixture.camera, secondMaterial, group1);
+    fixture.invoke('after', fixture.scene, fixture.camera, secondMaterial, group1);
+    const complete = fixture.session.actorReceipt(fixture.actor, fixture.root, fixture.root, 41, 7)!;
+    expect(complete.meshes[0]).toMatchObject({ beforeCount: 2, afterCount: 2, complete: true });
+    expect(complete.meshes[0].materialSlotUuids).toEqual([fixture.material.uuid, secondMaterial.uuid]);
+    expect(complete.meshes[0].materialUuidSet).toEqual([secondMaterial.uuid, fixture.material.uuid]);
+    expect(complete.meshes[0].beforeStamps.map(({ drawRange }) => drawRange.group)).toEqual([group0, group1]);
+
+    fixture.setFrame(42);
+    const zeroGroup = { start: 0, count: 0, materialIndex: 0 };
+    fixture.invoke('before', fixture.scene, fixture.camera, fixture.material, zeroGroup);
+    fixture.invoke('after', fixture.scene, fixture.camera, fixture.material, zeroGroup);
+    fixture.invoke('before', fixture.scene, fixture.camera, secondMaterial, group1);
+    fixture.invoke('after', fixture.scene, fixture.camera, secondMaterial, group1);
+    expect(fixture.session.actorReceipt(fixture.actor, fixture.root, fixture.root, 42, 7)?.complete).toBe(false);
+
+    fixture.setFrame(43);
+    fixture.invoke('before', fixture.scene, fixture.camera, fixture.material, null);
+    fixture.invoke('after', fixture.scene, fixture.camera, fixture.material, null);
+    expect(fixture.session.actorReceipt(fixture.actor, fixture.root, fixture.root, 43, 7)?.complete).toBe(false);
+
+    fixture.setFrame(44);
+    (fixture.mesh as unknown as { material: THREE.Material | THREE.Material[] }).material = [
+      fixture.material,
+      fixture.material,
+    ];
+    fixture.invoke('before', fixture.scene, fixture.camera, fixture.material, group0);
+    fixture.invoke('after', fixture.scene, fixture.camera, fixture.material, group0);
+    fixture.invoke('before', fixture.scene, fixture.camera, fixture.material, group1);
+    fixture.invoke('after', fixture.scene, fixture.camera, fixture.material, group1);
+    const reused = fixture.session.actorReceipt(fixture.actor, fixture.root, fixture.root, 44, 7)!;
+    expect(reused.complete).toBe(true);
+    expect(reused.meshes[0].materialSlotUuids).toEqual([fixture.material.uuid, fixture.material.uuid]);
+    expect(reused.meshes[0].materialUuidSet).toEqual([fixture.material.uuid]);
+
+    fixture.setFrame(45);
+    fixture.invoke('before', fixture.scene, fixture.camera, fixture.material, group0);
+    fixture.invoke('after', fixture.scene, fixture.camera, fixture.material, group0);
+    fixture.invoke('before', fixture.scene, fixture.camera, fixture.material, group0);
+    fixture.invoke('after', fixture.scene, fixture.camera, fixture.material, group0);
+    expect(fixture.session.actorReceipt(fixture.actor, fixture.root, fixture.root, 45, 7)?.complete).toBe(false);
+    fixture.session.dispose();
+  });
+
+  it.each([
+    ['no callback', (_fixture: ReturnType<typeof riggedDrawFixture>) => undefined],
+    ['detached actor', (fixture: ReturnType<typeof riggedDrawFixture>) => {
+      fixture.root.removeFromParent();
+      fixture.invoke('before');
+      fixture.invoke('after');
+    }],
+    ['reparented mesh', (fixture: ReturnType<typeof riggedDrawFixture>) => {
+      const replacementRoot = new THREE.Group();
+      fixture.scene.add(replacementRoot);
+      replacementRoot.add(fixture.mesh);
+      fixture.invoke('before');
+      fixture.invoke('after');
+    }],
+    ['layer mismatch', (fixture: ReturnType<typeof riggedDrawFixture>) => {
+      fixture.mesh.layers.set(1);
+      fixture.invoke('before');
+      fixture.invoke('after');
+    }],
+    ['offscreen bounds', (fixture: ReturnType<typeof riggedDrawFixture>) => {
+      fixture.mesh.position.x = 1_000;
+      fixture.scene.updateMatrixWorld(true);
+      fixture.invoke('before');
+      fixture.invoke('after');
+    }],
+    ['zero draw range', (fixture: ReturnType<typeof riggedDrawFixture>) => {
+      fixture.mesh.geometry.setDrawRange(0, 0);
+      fixture.invoke('before');
+      fixture.invoke('after');
+    }],
+    ['invisible material', (fixture: ReturnType<typeof riggedDrawFixture>) => {
+      fixture.material.visible = false;
+      fixture.invoke('before');
+      fixture.invoke('after');
+    }],
+    ['scene override material', (fixture: ReturnType<typeof riggedDrawFixture>) => {
+      fixture.scene.overrideMaterial = new THREE.MeshDepthMaterial();
+      fixture.invoke('before');
+      fixture.invoke('after');
+    }],
+  ])('fails closed for the %s adversary', (_label, mutate) => {
+    const fixture = riggedDrawFixture();
+    mutate(fixture);
+    const receipt = fixture.session.actorReceipt(fixture.actor, fixture.root, fixture.root, 41, 7)!;
+    expect(receipt.complete).toBe(false);
+    expect(riggedEvidenceMainCameraActorDrawComplete(receipt)).toBe(false);
+    fixture.session.dispose();
   });
 });

@@ -112,6 +112,17 @@ const CLOSE_ROI_NDC = Object.freeze({ minX: -0.46, maxX: 0.46, minY: -0.7, maxY:
 const HAND_ROI_NDC = Object.freeze({ minX: -0.55, maxX: 0.55, minY: -0.68, maxY: 0.68 });
 const MEDIUM_ROI_NDC = Object.freeze({ minX: -0.68, maxX: 0.68, minY: -0.82, maxY: 0.82 });
 const OVERVIEW_ROI_NDC = Object.freeze({ minX: -0.97, maxX: 0.97, minY: -0.95, maxY: 0.95 });
+const EXPECTED_MAIN_CAMERA_DRAW_MESH_NAMES = Object.freeze([
+  'Cube018',
+  'Cube018_1',
+  'Cube018_2',
+  'Swat_Feet',
+  'Cube037',
+  'Cube037_1',
+  'Cube037_2',
+  'Cube023',
+  'Cube023_1',
+].sort());
 
 function sha256(value: Buffer): string {
   return createHash('sha256').update(value).digest('hex');
@@ -124,6 +135,161 @@ function withinNumericBoundary(observed: number, limit: number, scaleValues: rea
 
 function repositoryRelative(path: string): string {
   return relative(repositoryRoot, path).replaceAll('\\', '/');
+}
+
+function expectExactMainCameraDrawReceipt(
+  actorFrame: any,
+  expectedActor: Readonly<{ kind: 'bot' | 'training-dummy'; id: string }>,
+  frame: number,
+  captureRevision: number,
+  label: string,
+): void {
+  const draw = actorFrame?.mainCameraDraw;
+  expect(
+    [...RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.mainCameraDraw.expectedSkinnedMeshNames].sort(),
+    `${label}: contract matches the independently pinned shipped manifest`,
+  ).toEqual(EXPECTED_MAIN_CAMERA_DRAW_MESH_NAMES);
+  expect(actorFrame.rootUuid, `${label}: current actor-root UUID`).toMatch(/^[0-9a-f-]{36}$/iu);
+  expect(actorFrame.operatorRootUuid, `${label}: current operator-root UUID`).toMatch(/^[0-9a-f-]{36}$/iu);
+  expect(draw, `${label}: exact main-camera draw receipt`).toMatchObject({
+    contract: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.mainCameraDraw.contract,
+    pixelProof: false,
+    actor: expectedActor,
+    frame,
+    captureRevision,
+    actorRootUuid: actorFrame.rootUuid,
+    operatorRootUuid: actorFrame.operatorRootUuid,
+    expectedMeshNames: EXPECTED_MAIN_CAMERA_DRAW_MESH_NAMES,
+    beforeMeshNames: EXPECTED_MAIN_CAMERA_DRAW_MESH_NAMES,
+    afterMeshNames: EXPECTED_MAIN_CAMERA_DRAW_MESH_NAMES,
+    exactExpectedMeshNames: true,
+    exactExpectedMeshUuids: true,
+    complete: true,
+  });
+  expect(draw.gameplaySceneUuid, `${label}: gameplay scene UUID`).toMatch(/^[0-9a-f-]{36}$/iu);
+  expect(draw.gameplayCameraUuid, `${label}: gameplay camera UUID`).toMatch(/^[0-9a-f-]{36}$/iu);
+  expect(draw.expectedMeshNames, `${label}: no duplicate expected mesh names`).toHaveLength(
+    new Set(draw.expectedMeshNames).size,
+  );
+  expect(draw.expectedMeshUuids, `${label}: nine expected mesh UUIDs`).toHaveLength(
+    RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.mainCameraDraw.expectedSkinnedMeshCount,
+  );
+  expect(new Set(draw.expectedMeshUuids).size, `${label}: unique expected mesh UUIDs`).toBe(
+    RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.mainCameraDraw.expectedSkinnedMeshCount,
+  );
+  expect(draw.meshes, `${label}: exact shipped SkinnedMesh cardinality`).toHaveLength(
+    RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.mainCameraDraw.expectedSkinnedMeshCount,
+  );
+  expect(draw.meshes.map(({ meshName }: any) => meshName).sort(), `${label}: exact shipped SkinnedMesh names`)
+    .toEqual(EXPECTED_MAIN_CAMERA_DRAW_MESH_NAMES);
+  expect(draw.meshes.map(({ meshUuid }: any) => meshUuid).sort(), `${label}: exact expected mesh UUID set`)
+    .toEqual([...draw.expectedMeshUuids].sort());
+  for (const mesh of draw.meshes) {
+    const meshLabel = `${label}:${mesh.meshName}`;
+    expect(mesh.meshUuid, `${meshLabel}: mesh UUID`).toMatch(/^[0-9a-f-]{36}$/iu);
+    expect(mesh.beforeCount, `${meshLabel}: admitted before callbacks`).toBeGreaterThan(0);
+    expect(mesh.afterCount, `${meshLabel}: balanced before/after callbacks`).toBe(mesh.beforeCount);
+    expect(mesh.beforeStamps, `${meshLabel}: all before stamps`).toHaveLength(mesh.beforeCount);
+    expect(mesh.afterStamps, `${meshLabel}: all after stamps`).toHaveLength(mesh.afterCount);
+    expect(mesh.before, `${meshLabel}: final before stamp`).toEqual(mesh.beforeStamps.at(-1));
+    expect(mesh.after, `${meshLabel}: final after stamp`).toEqual(mesh.afterStamps.at(-1));
+    expect(mesh.complete, `${meshLabel}: complete callback pair`).toBe(true);
+    expect(mesh.materialSlotUuids.length, `${meshLabel}: nonempty ordered material slots`).toBeGreaterThan(0);
+    expect(mesh.materialSlotUuids.every((uuid: unknown) => typeof uuid === 'string' && /^[0-9a-f-]{36}$/iu.test(uuid)),
+      `${meshLabel}: material-slot UUID shape`).toBe(true);
+    expect(mesh.materialUuidSet, `${meshLabel}: independently derived unique material UUID set`).toEqual(
+      [...new Set(mesh.materialSlotUuids)].sort(),
+    );
+    const invocationKey = (stamp: any) => JSON.stringify([
+      stamp.material.uuid,
+      stamp.drawRange.group?.start ?? null,
+      stamp.drawRange.group?.count ?? null,
+      stamp.drawRange.group?.materialIndex ?? null,
+    ]);
+    expect(mesh.beforeStamps.map(invocationKey).sort(), `${meshLabel}: balanced material/group invocations`)
+      .toEqual(mesh.afterStamps.map(invocationKey).sort());
+    expect(new Set(mesh.beforeStamps.map(invocationKey)).size, `${meshLabel}: one before stamp per material/group`)
+      .toBe(mesh.beforeStamps.length);
+    expect(new Set(mesh.afterStamps.map(invocationKey)).size, `${meshLabel}: one after stamp per material/group`)
+      .toBe(mesh.afterStamps.length);
+    for (const [phase, stamps] of [['before', mesh.beforeStamps], ['after', mesh.afterStamps]] as const) {
+      for (const stamp of stamps) {
+      expect(stamp, `${meshLabel}: ${phase} stamp`).toMatchObject({
+        frame,
+        captureRevision,
+        meshUuid: mesh.meshUuid,
+        meshName: mesh.meshName,
+        actorRootUuid: draw.actorRootUuid,
+        operatorRootUuid: draw.operatorRootUuid,
+        descendsFromActorRoot: true,
+        descendsFromOperatorRoot: true,
+        sceneUuid: draw.gameplaySceneUuid,
+        cameraUuid: draw.gameplayCameraUuid,
+        sceneOverrideMaterialUuid: null,
+        materialSlotUuids: mesh.materialSlotUuids,
+        materialUuidSet: mesh.materialUuidSet,
+        materialMatchesMeshSlot: true,
+        stateValid: true,
+        world: {
+          attachedToGameplayScene: true,
+          effectivelyVisible: true,
+          matrixFinite: true,
+        },
+        frustum: {
+          intersectsMainCameraFrustum: true,
+          boundingSphere: { finite: true },
+        },
+      });
+      expect(stamp.meshLayerMask & stamp.cameraLayerMask, `${meshLabel}: ${phase} layer intersection`).not.toBe(0);
+      expect(stamp.cameraLayerMask & 1, `${meshLabel}: ${phase} world-layer camera pass`).toBe(1);
+      expect(stamp.drawRange.effectiveCount, `${meshLabel}: ${phase} nonzero draw range`).toBeGreaterThan(0);
+      expect(stamp.drawRange.positionCount, `${meshLabel}: ${phase} positions`).toBeGreaterThan(0);
+      if (stamp.drawRange.group !== null) {
+        expect(stamp.drawRange.group, `${meshLabel}: ${phase} valid material group`).toMatchObject({
+          start: expect.any(Number), count: expect.any(Number), materialIndex: expect.any(Number),
+        });
+        expect(Number.isSafeInteger(stamp.drawRange.group.start), `${meshLabel}: ${phase} group start`).toBe(true);
+        expect(Number.isSafeInteger(stamp.drawRange.group.count), `${meshLabel}: ${phase} group count`).toBe(true);
+        expect(Number.isSafeInteger(stamp.drawRange.group.materialIndex), `${meshLabel}: ${phase} group material`).toBe(true);
+        expect(stamp.drawRange.group.start, `${meshLabel}: ${phase} nonnegative group start`).toBeGreaterThanOrEqual(0);
+        expect(stamp.drawRange.group.count, `${meshLabel}: ${phase} nonnegative group count`).toBeGreaterThanOrEqual(0);
+        expect(stamp.drawRange.group.materialIndex, `${meshLabel}: ${phase} material slot in range`)
+          .toBeLessThan(mesh.materialSlotUuids.length);
+        expect(stamp.material.uuid, `${meshLabel}: ${phase} callback material owns the stamped group slot`)
+          .toBe(mesh.materialSlotUuids[stamp.drawRange.group.materialIndex]);
+      } else {
+        expect(mesh.materialSlotUuids, `${meshLabel}: ${phase} null group only for a single material`).toHaveLength(1);
+        expect(stamp.material.uuid, `${meshLabel}: ${phase} callback material owns the single slot`)
+          .toBe(mesh.materialSlotUuids[0]);
+      }
+      expect(stamp.world.position.every(Number.isFinite), `${meshLabel}: ${phase} finite world position`).toBe(true);
+      expect(stamp.world.scale.every(Number.isFinite), `${meshLabel}: ${phase} finite world scale`).toBe(true);
+      expect(Number.isFinite(stamp.world.determinant), `${meshLabel}: ${phase} finite determinant`).toBe(true);
+      expect(Math.abs(stamp.world.determinant), `${meshLabel}: ${phase} nonzero determinant`).toBeGreaterThan(1e-12);
+      expect(stamp.material, `${meshLabel}: ${phase} drawable material`).toMatchObject({
+        visible: true,
+        colorWrite: true,
+      });
+      expect(!stamp.material.transparent || stamp.material.opacity > 0, `${meshLabel}: ${phase} material opacity`).toBe(true);
+      expect(stamp.frustum.boundingSphere.center.every(Number.isFinite), `${meshLabel}: ${phase} finite bound center`).toBe(true);
+      expect(stamp.frustum.boundingSphere.radius, `${meshLabel}: ${phase} finite bound radius`).toBeGreaterThanOrEqual(0);
+      }
+    }
+  }
+}
+
+function expectPresentationDrawIdentity(actors: readonly any[], label: string): void {
+  const draws = actors.map(({ mainCameraDraw }) => mainCameraDraw);
+  expect(new Set(draws.map(({ gameplaySceneUuid }) => gameplaySceneUuid)).size,
+    `${label}: one gameplay scene across all actors`).toBe(1);
+  expect(new Set(draws.map(({ gameplayCameraUuid }) => gameplayCameraUuid)).size,
+    `${label}: one gameplay camera across all actors`).toBe(1);
+  expect(new Set(actors.map(({ rootUuid }) => rootUuid)).size,
+    `${label}: distinct registered actor wrappers`).toBe(actors.length);
+  expect(new Set(actors.map(({ operatorRootUuid }) => operatorRootUuid)).size,
+    `${label}: distinct resolved operator roots`).toBe(actors.length);
+  const allMeshUuids = draws.flatMap(({ meshes }) => meshes.map(({ meshUuid }: any) => meshUuid));
+  expect(new Set(allMeshUuids).size, `${label}: disjoint per-actor SkinnedMesh UUIDs`).toBe(allMeshUuids.length);
 }
 
 function route(map: 'atomic-acres' | 'gun-range', seed: string): string {
@@ -719,11 +885,12 @@ async function commitCaptureCamera(
     const review = (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).deterministicReview;
     const committed = review.presentedCapture;
     const close = (left: number, right: number) => Math.abs(left - right) <= 1e-8;
-    return committed?.contract === 'capture-camera-committed-frame-v1'
+    return committed?.contract === 'capture-camera-committed-frame-v2'
       && committed.frame > beforeFrame
       && committed.captureRevision === revision
       && JSON.stringify(committed.captureTargets) === JSON.stringify(targets)
       && committed.actors?.length === targets.length
+      && committed.actors.every((actor: any) => actor.mainCameraDraw?.complete === true)
       && committed.position.every((value: number, index: number) => close(value, expected.position[index]))
       && close(committed.yaw, expected.yaw)
       && close(committed.pitch, expected.pitch)
@@ -745,6 +912,14 @@ async function commitCaptureCamera(
   });
   expect(committed.captureTargets, `${camera.id}: exact ordered registered actors`).toEqual(captureTargets);
   expect(committed.actors.map(({ actor }: any) => actor), `${camera.id}: exact submitted-frame actor evidence`).toEqual(captureTargets);
+  committed.actors.forEach((actorFrame: any, index: number) => expectExactMainCameraDrawReceipt(
+    actorFrame,
+    captureTargets[index],
+    committed.frame,
+    requestedRevision,
+    `${camera.id}:committed:${captureTargets[index].kind}:${captureTargets[index].id}`,
+  ));
+  expectPresentationDrawIdentity(committed.actors, `${camera.id}:committed`);
   expect(normalizedQuaternionDelta(committed.quaternion, yxzCameraQuaternion(camera.yaw, camera.pitch)), `${camera.id}: rendered camera quaternion matches fixed yaw/pitch`).toBeLessThanOrEqual(1e-9);
   if (renderer === 'webgl2') {
     expect([committed.submissionSequence, committed.completedSequence], `${camera.id}: WebGL render return is synchronous`).toEqual([0, 0]);
@@ -783,6 +958,31 @@ async function commitCaptureCamera(
   });
   expect(paused.debugRenderPaused, `${camera.id}: renderer paused only after committed frame`).toBe(true);
   expect(paused.presentedCapture.captureRevision, `${camera.id}: paused frame retains requested camera`).toBe(requestedRevision);
+  paused.presentedCapture.actors.forEach((actorFrame: any, index: number) => expectExactMainCameraDrawReceipt(
+    actorFrame,
+    captureTargets[index],
+    paused.presentedCapture.frame,
+    requestedRevision,
+    `${camera.id}:paused:${captureTargets[index].kind}:${captureTargets[index].id}`,
+  ));
+  expectPresentationDrawIdentity(paused.presentedCapture.actors, `${camera.id}:paused`);
+  paused.presentedCapture.actors.forEach((actorFrame: any, index: number) => {
+    const committedActor = committed.actors[index];
+    expect(actorFrame.rootUuid, `${camera.id}: stable registered actor wrapper`).toBe(committedActor.rootUuid);
+    expect(actorFrame.operatorRootUuid, `${camera.id}: stable resolved operator root`).toBe(committedActor.operatorRootUuid);
+    expect(actorFrame.mainCameraDraw.gameplaySceneUuid, `${camera.id}: stable gameplay scene`).toBe(
+      committedActor.mainCameraDraw.gameplaySceneUuid,
+    );
+    expect(actorFrame.mainCameraDraw.gameplayCameraUuid, `${camera.id}: stable gameplay camera`).toBe(
+      committedActor.mainCameraDraw.gameplayCameraUuid,
+    );
+    const meshIdentity = (frameActor: any) => frameActor.mainCameraDraw.meshes
+      .map(({ meshName, meshUuid, materialSlotUuids }: any) => [meshName, meshUuid, materialSlotUuids])
+      .sort((left: any[], right: any[]) => left[0].localeCompare(right[0]));
+    expect(meshIdentity(actorFrame), `${camera.id}: stable per-actor mesh/material-slot identity`).toEqual(
+      meshIdentity(committedActor),
+    );
+  });
   expect(paused.presentedCapture, `${camera.id}: paused renderer commit semantics`).toMatchObject({
     renderer,
     completionSemantics: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.rendererCompletion[renderer],
@@ -1926,10 +2126,10 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
     expect(endingSourceStatus, 'official rigged-bot evidence ends with a clean worktree').toBe('');
   }
   writeFileSync(receiptPath, `${JSON.stringify({
-    schemaVersion: 8,
+    schemaVersion: 9,
     status: 'AUTOMATION_PASS_OWNER_PENDING',
-    contract: 'atomic-acres/pass69-3-rigged-bot-live@8',
-    evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-and-hand-detail-framing',
+    contract: 'atomic-acres/pass69-3-rigged-bot-live@9',
+    evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-hand-detail-and-main-camera-draw-stamps',
     target: officialEvidence ? expectedTarget : `development-${renderer}`,
     sourceSha,
     endingSourceSha,
