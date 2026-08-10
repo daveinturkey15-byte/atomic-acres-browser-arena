@@ -84,6 +84,7 @@ type RiggedOperatorRuntime = {
   stancePivot: THREE.Group;
   visual: THREE.Group;
   weaponSocket: THREE.Group;
+  canonicalEvidence: RiggedOperatorCanonicalEvidence;
   stance: 'stand' | 'crouch' | 'prone';
   crouchBlend: number;
   proneBlend: number;
@@ -132,6 +133,54 @@ type RiggedOperatorRuntime = {
     quaternion: THREE.Quaternion;
   }>;
 };
+
+export type RiggedOperatorCanonicalBoneIdentity = Readonly<{
+  index: number;
+  name: string;
+  uuid: string;
+  parentIndex: number;
+}>;
+
+export type RiggedOperatorCanonicalSkinIdentity = Readonly<{
+  name: string;
+  uuid: string;
+  geometryUuid: string;
+  positionCount: number;
+  skinIndexCount: number;
+  skinIndexItemSize: number;
+  skinIndexNormalized: boolean;
+  skinWeightCount: number;
+  skinWeightItemSize: number;
+  skinWeightNormalized: boolean;
+  skeletonBones: readonly RiggedOperatorCanonicalBoneIdentity[];
+}>;
+
+export type RiggedOperatorCanonicalEvidenceManifest = Readonly<{
+  contract: 'runtime-canonical-operator-skin-manifest-v1';
+  assetUrl: string;
+  lod: 0 | 1;
+  visual: Readonly<{ name: string; uuid: string }>;
+  skinnedMeshes: readonly RiggedOperatorCanonicalSkinIdentity[];
+  wrists: readonly Readonly<{ side: 'left' | 'right'; name: string; uuid: string }>[];
+}>;
+
+type RiggedOperatorCanonicalEvidence = {
+  visual: THREE.Group;
+  skinnedMeshes: readonly THREE.SkinnedMesh[];
+  wrists: Readonly<Partial<Record<'left' | 'right', THREE.Bone>>>;
+  assetUrl: string;
+  lod: 0 | 1;
+  manifest?: RiggedOperatorCanonicalEvidenceManifest;
+};
+
+export type RiggedOperatorHandEvidenceIdentity = Readonly<{
+  operatorRoot: THREE.Object3D;
+  visual: THREE.Group;
+  side: 'left' | 'right';
+  wrist: THREE.Bone;
+  skinnedMeshes: readonly THREE.SkinnedMesh[];
+  manifest: RiggedOperatorCanonicalEvidenceManifest;
+}>;
 
 type RenderedVertexInfluenceTelemetry = Readonly<{
   contract: 'rendered-joints0-weights0-influence-v1';
@@ -757,6 +806,73 @@ function runtime(root: THREE.Object3D): RiggedOperatorRuntime | undefined {
   return root.userData.riggedOperatorRuntime as RiggedOperatorRuntime | undefined;
 }
 
+function canonicalEvidenceManifest(
+  evidence: RiggedOperatorCanonicalEvidence,
+): RiggedOperatorCanonicalEvidenceManifest {
+  if (evidence.manifest) return evidence.manifest;
+  const skinnedMeshes = Object.freeze(evidence.skinnedMeshes.map((mesh) => {
+    const boneIndices = new Map(mesh.skeleton.bones.map((bone, index) => [bone, index]));
+    const position = mesh.geometry.getAttribute('position');
+    const skinIndex = mesh.geometry.getAttribute('skinIndex');
+    const skinWeight = mesh.geometry.getAttribute('skinWeight');
+    return Object.freeze({
+      name: mesh.name,
+      uuid: mesh.uuid,
+      geometryUuid: mesh.geometry.uuid,
+      positionCount: position?.count ?? -1,
+      skinIndexCount: skinIndex?.count ?? -1,
+      skinIndexItemSize: skinIndex?.itemSize ?? -1,
+      skinIndexNormalized: skinIndex?.normalized ?? false,
+      skinWeightCount: skinWeight?.count ?? -1,
+      skinWeightItemSize: skinWeight?.itemSize ?? -1,
+      skinWeightNormalized: skinWeight?.normalized ?? false,
+      skeletonBones: Object.freeze(mesh.skeleton.bones.map((bone, index) => Object.freeze({
+        index,
+        name: bone.name,
+        uuid: bone.uuid,
+        parentIndex: bone.parent instanceof THREE.Bone ? (boneIndices.get(bone.parent) ?? -1) : -1,
+      }))),
+    });
+  }));
+  evidence.manifest = Object.freeze({
+    contract: 'runtime-canonical-operator-skin-manifest-v1',
+    assetUrl: evidence.assetUrl,
+    lod: evidence.lod,
+    visual: Object.freeze({ name: evidence.visual.name, uuid: evidence.visual.uuid }),
+    skinnedMeshes,
+    wrists: Object.freeze((['left', 'right'] as const).flatMap((side) => {
+      const wrist = evidence.wrists[side];
+      return wrist ? [Object.freeze({ side, name: wrist.name, uuid: wrist.uuid })] : [];
+    })),
+  });
+  return evidence.manifest;
+}
+
+export function riggedOperatorCanonicalEvidenceManifest(
+  root: THREE.Object3D,
+): RiggedOperatorCanonicalEvidenceManifest | null {
+  const evidence = runtime(root)?.canonicalEvidence;
+  return evidence ? canonicalEvidenceManifest(evidence) : null;
+}
+
+export function riggedOperatorHandEvidenceIdentity(
+  root: THREE.Object3D,
+  side: 'left' | 'right',
+): RiggedOperatorHandEvidenceIdentity | null {
+  const runtimeState = runtime(root);
+  const wrist = runtimeState?.canonicalEvidence.wrists[side];
+  if (!runtimeState || !wrist || runtimeState.canonicalEvidence.skinnedMeshes.length === 0) return null;
+  const manifest = canonicalEvidenceManifest(runtimeState.canonicalEvidence);
+  return Object.freeze({
+    operatorRoot: root,
+    visual: runtimeState.canonicalEvidence.visual,
+    side,
+    wrist,
+    skinnedMeshes: runtimeState.canonicalEvidence.skinnedMeshes,
+    manifest,
+  });
+}
+
 export function resolveRiggedOperatorRuntimeRoot(root: THREE.Object3D): THREE.Object3D | null {
   if (runtime(root)) return root;
   const candidates = root.children.filter((child) => runtime(child) !== undefined);
@@ -845,8 +961,10 @@ export function createRiggedOperator(
   visual.rotation.y = Math.PI;
   const embeddedWeaponsSuppressed = suppressEmbeddedWeaponObjects(visual);
   const prepareMaterial = createOperatorInstanceMaterialResolver(team, flattenMaterials, appearance);
+  const canonicalSkinnedMeshes: THREE.SkinnedMesh[] = [];
   visual.traverse((node) => {
     if (!(node instanceof THREE.Mesh)) return;
+    if (node instanceof THREE.SkinnedMesh) canonicalSkinnedMeshes.push(node);
     node.castShadow = !flattenMaterials;
     node.receiveShadow = !flattenMaterials;
     node.userData.presentationOnly = true;
@@ -911,6 +1029,17 @@ export function createRiggedOperator(
       quaternion: bone.quaternion.clone(),
     }] : [];
   });
+  const canonicalWrists = Object.freeze({
+    left: armBindPose.find((entry) => entry.side === 'left' && entry.role === 'wrist-hand')?.bone,
+    right: armBindPose.find((entry) => entry.side === 'right' && entry.role === 'wrist-hand')?.bone,
+  });
+  const canonicalEvidence: RiggedOperatorCanonicalEvidence = {
+    visual,
+    skinnedMeshes: Object.freeze([...canonicalSkinnedMeshes]),
+    wrists: canonicalWrists,
+    assetUrl: operatorAsset.source,
+    lod: operatorAsset.lod,
+  };
   root.updateWorldMatrix(true, true);
   const operatorRootWorld = root.getWorldQuaternion(new THREE.Quaternion());
   for (const entry of armBindPose.filter(({ role }) => role === 'wrist-hand')) {
@@ -937,6 +1066,7 @@ export function createRiggedOperator(
     stancePivot,
     visual,
     weaponSocket,
+    canonicalEvidence,
     stance: 'stand',
     crouchBlend: 0,
     proneBlend: 0,

@@ -44,6 +44,10 @@ const artifactRoot = resolve(artifactBase, renderer);
 const receiptPath = resolve(artifactBase, `receipt-${renderer}.json`);
 const OPERATOR_SOURCE = 'Atomic Acres Pass 65 operator / Quaternius CC0 derivative';
 const OPERATOR_ASSET = './assets/original/models/operators/pass65-third-person-operator-lod0.glb';
+const CANONICAL_OPERATOR_SKIN_MANIFEST_CONTRACT = 'runtime-canonical-operator-skin-manifest-v1';
+const CANONICAL_OPERATOR_SKIN_NAMES = Object.freeze(['Cube018', 'Cube018_1', 'Cube018_2', 'Swat_Feet', 'Cube037', 'Cube037_1', 'Cube037_2', 'Cube023', 'Cube023_1']);
+const CANONICAL_OPERATOR_WRIST_NAMES = Object.freeze({ left: 'WristL', right: 'WristR' });
+const THREE_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const CARBINE_WORLD_ASSET = './assets/original/models/weapons/pass65-firearms/carbine/carbine-world-lod0.glb';
 const ANTI_T_THRESHOLDS = Object.freeze({
   minimumVerticalDropM: 0.08,
@@ -538,6 +542,134 @@ function subtract(left: number[], right: number[]): number[] {
 
 function dot(left: number[], right: number[]): number {
   return left.reduce((sum, value, index) => sum + value * right[index], 0);
+}
+
+function canonicalOperatorSkinManifestValid(manifest: any): boolean {
+  if (manifest?.contract !== CANONICAL_OPERATOR_SKIN_MANIFEST_CONTRACT
+    || manifest.assetUrl !== OPERATOR_ASSET || manifest.lod !== 0
+    || manifest.visual?.name !== 'rigged-operator-visual'
+    || !THREE_UUID_PATTERN.test(manifest.visual?.uuid ?? '')
+    || !Array.isArray(manifest.skinnedMeshes)
+    || manifest.skinnedMeshes.length !== CANONICAL_OPERATOR_SKIN_NAMES.length
+    || !Array.isArray(manifest.wrists) || manifest.wrists.length !== 2) return false;
+  const meshUuids = new Set<string>();
+  for (let index = 0; index < CANONICAL_OPERATOR_SKIN_NAMES.length; index += 1) {
+    const mesh = manifest.skinnedMeshes[index];
+    if (mesh?.name !== CANONICAL_OPERATOR_SKIN_NAMES[index]
+      || !THREE_UUID_PATTERN.test(mesh.uuid ?? '') || meshUuids.has(mesh.uuid)
+      || !THREE_UUID_PATTERN.test(mesh.geometryUuid ?? '')
+      || !Number.isSafeInteger(mesh.positionCount) || mesh.positionCount <= 0
+      || mesh.skinIndexCount !== mesh.positionCount || mesh.skinWeightCount !== mesh.positionCount
+      || mesh.skinIndexItemSize !== 4 || mesh.skinWeightItemSize !== 4
+      || mesh.skinIndexNormalized !== false || typeof mesh.skinWeightNormalized !== 'boolean'
+      || !Array.isArray(mesh.skeletonBones) || mesh.skeletonBones.length < 1) return false;
+    meshUuids.add(mesh.uuid);
+    const boneUuids = new Set<string>();
+    for (let boneIndex = 0; boneIndex < mesh.skeletonBones.length; boneIndex += 1) {
+      const bone = mesh.skeletonBones[boneIndex];
+      if (bone?.index !== boneIndex || typeof bone.name !== 'string' || bone.name.length === 0
+        || !THREE_UUID_PATTERN.test(bone.uuid ?? '') || boneUuids.has(bone.uuid)
+        || !Number.isSafeInteger(bone.parentIndex) || bone.parentIndex < -1
+        || bone.parentIndex >= mesh.skeletonBones.length || bone.parentIndex === boneIndex) return false;
+      boneUuids.add(bone.uuid);
+    }
+    for (let boneIndex = 0; boneIndex < mesh.skeletonBones.length; boneIndex += 1) {
+      const visited = new Set<number>();
+      let cursor = boneIndex;
+      while (cursor !== -1) {
+        if (visited.has(cursor)) return false;
+        visited.add(cursor);
+        cursor = mesh.skeletonBones[cursor].parentIndex;
+      }
+    }
+  }
+  const wristUuids = new Set<string>();
+  for (const [wristIndex, side] of (['left', 'right'] as const).entries()) {
+    const wrist = manifest.wrists[wristIndex];
+    const matches = manifest.wrists.filter((candidate: any) => candidate?.side === side);
+    if (matches.length !== 1 || wrist?.side !== side || wrist.name !== CANONICAL_OPERATOR_WRIST_NAMES[side]
+      || !THREE_UUID_PATTERN.test(wrist.uuid ?? '') || wristUuids.has(wrist.uuid)
+      || !manifest.skinnedMeshes.some((mesh: any) => (
+        mesh.skeletonBones.filter((bone: any) => bone.uuid === wrist.uuid && bone.name === wrist.name).length === 1
+      ))
+      || manifest.skinnedMeshes.some((mesh: any) => {
+        const namedWristBones = mesh.skeletonBones.filter((bone: any) => bone.name === wrist.name);
+        return namedWristBones.length > 1
+          || namedWristBones.some((bone: any) => bone.uuid !== wrist.uuid);
+      })) return false;
+    wristUuids.add(wrist.uuid);
+  }
+  return true;
+}
+
+function canonicalBoneDescendsFromWrist(skeletonBones: any[], boneIndex: number, wristUuid: string): boolean {
+  const visited = new Set<number>();
+  let cursor = boneIndex;
+  while (Number.isSafeInteger(cursor) && cursor >= 0 && cursor < skeletonBones.length && !visited.has(cursor)) {
+    visited.add(cursor);
+    const bone = skeletonBones[cursor];
+    if (bone.uuid === wristUuid) return true;
+    cursor = bone.parentIndex;
+  }
+  return false;
+}
+
+function recomputeCanonicalFaceInfluence(blocker: any, manifest: any, side: 'left' | 'right') {
+  if (!canonicalOperatorSkinManifestValid(manifest)
+    || blocker?.requestedSide !== side || blocker.requestedWrist !== CANONICAL_OPERATOR_WRIST_NAMES[side]) return null;
+  const meshMatches = manifest.skinnedMeshes.filter((mesh: any) => (
+    mesh.name === blocker.mesh && mesh.uuid === blocker.meshUuid && mesh.geometryUuid === blocker.geometryUuid
+  ));
+  const wristMatches = manifest.wrists.filter((wrist: any) => (
+    wrist.side === side && wrist.name === blocker.requestedWrist && wrist.uuid === blocker.requestedWristUuid
+  ));
+  if (meshMatches.length !== 1 || wristMatches.length !== 1) return null;
+  const mesh = meshMatches[0];
+  const wrist = wristMatches[0];
+  expect(blocker.skinAttributeProvenance, 'terminal face uses exact submitted canonical geometry attributes').toEqual({
+    positionCount: mesh.positionCount,
+    skinIndexCount: mesh.skinIndexCount,
+    skinIndexItemSize: mesh.skinIndexItemSize,
+    skinIndexNormalized: mesh.skinIndexNormalized,
+    skinWeightCount: mesh.skinWeightCount,
+    skinWeightItemSize: mesh.skinWeightItemSize,
+    skinWeightNormalized: mesh.skinWeightNormalized,
+    valid: true,
+  });
+  const faceVertices = [blocker.face?.a, blocker.face?.b, blocker.face?.c];
+  if (!faceVertices.every((vertex) => Number.isSafeInteger(vertex) && vertex >= 0 && vertex < mesh.positionCount)
+    || new Set(faceVertices).size !== 3
+    || !Array.isArray(blocker.dominantBones) || blocker.dominantBones.length !== 3) return null;
+  let ownedCount = 0;
+  for (let vertex = 0; vertex < 3; vertex += 1) {
+    const dominant = blocker.dominantBones[vertex];
+    if (dominant?.vertexIndex !== faceVertices[vertex]
+      || !Array.isArray(dominant.skinIndices) || dominant.skinIndices.length !== 4
+      || !dominant.skinIndices.every((skinIndex: number) => Number.isSafeInteger(skinIndex)
+        && skinIndex >= 0 && skinIndex < mesh.skeletonBones.length)
+      || !Array.isArray(dominant.skinWeights) || dominant.skinWeights.length !== 4
+      || !dominant.skinWeights.every((weight: number) => Number.isFinite(weight) && weight >= 0)
+      || !Array.isArray(dominant.normalizedWeights) || dominant.normalizedWeights.length !== 4) return null;
+    const weightSum = dominant.skinWeights.reduce((sum: number, weight: number) => sum + weight, 0);
+    if (!Number.isFinite(weightSum) || !(weightSum > 0)) return null;
+    const normalized = dominant.skinWeights.map((weight: number) => weight / weightSum);
+    if (!dominant.normalizedWeights.every((weight: number, slot: number) => scaleAwareEqual(
+      weight, normalized[slot], [weight, normalized[slot], weightSum, ...dominant.skinWeights],
+    ))) return null;
+    let dominantSlot = 0;
+    for (let slot = 1; slot < 4; slot += 1) {
+      if (dominant.skinWeights[slot] > dominant.skinWeights[dominantSlot]) dominantSlot = slot;
+    }
+    const skinIndex = dominant.skinIndices[dominantSlot];
+    const bone = mesh.skeletonBones[skinIndex];
+    const handOwned = canonicalBoneDescendsFromWrist(mesh.skeletonBones, skinIndex, wrist.uuid);
+    if (dominant.slot !== dominantSlot || dominant.skinIndex !== skinIndex
+      || !scaleAwareEqual(dominant.normalizedWeight, normalized[dominantSlot], [weightSum, ...normalized])
+      || dominant.bone !== bone.name || dominant.boneUuid !== bone.uuid
+      || dominant.handOwned !== handOwned) return null;
+    if (handOwned) ownedCount += 1;
+  }
+  return { ownedCount, faceHandOwned: ownedCount >= 2 };
 }
 
 function length(vector: number[]): number {
@@ -1266,6 +1398,14 @@ async function commitCaptureCamera(
     completionSemantics: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.rendererCompletion[renderer],
   });
   expect(paused.presentedCapture.frame, `${camera.id}: committed frame is monotonic`).toBeGreaterThanOrEqual(committed.frame);
+  expect(paused.presentedCapture.actors.map(({ actor }: any) => actor), `${camera.id}: paused actor order remains exact`)
+    .toEqual(captureTargets);
+  for (let index = 0; index < captureTargets.length; index += 1) {
+    expect(
+      paused.presentedCapture.actors[index].canonicalOperatorSkinManifest,
+      `${camera.id}:${captureTargets[index].id}: canonical operator identity persists from committed to paused frame`,
+    ).toEqual(committed.actors[index].canonicalOperatorSkinManifest);
+  }
   expect(committed.completedSequence, `${camera.id}: committed completion frontier follows baseline`).toBeGreaterThanOrEqual(
     before.completedSequence,
   );
@@ -1484,6 +1624,15 @@ async function sampleRequiredHandSelfOcclusion(
   expect(cameraPresentation, `${label}: exact cached camera presentation`).toEqual(
     presentation.pausedPresentedCapture,
   );
+  const frameActorMatches = presentation.pausedPresentedCapture.actors.filter((candidate: any) => (
+    candidate.actor.kind === actor.kind && candidate.actor.id === actor.id
+  ));
+  expect(frameActorMatches, `${label}: one exact submitted-frame actor`).toHaveLength(1);
+  const frameManifest = frameActorMatches[0].canonicalOperatorSkinManifest;
+  expect(canonicalOperatorSkinManifestValid(frameManifest), `${label}: fixed canonical operator skin manifest`).toBe(true);
+  expect(selfOcclusion.canonicalOperatorSkinManifest, `${label}: hand receipt binds submitted canonical asset`).toEqual(
+    frameManifest,
+  );
   expect(selfOcclusion.actorOccluderCount, `${label}: actor render geometry included`).toBeGreaterThan(0);
   expect(selfOcclusion.heldWeaponOccluderCount, `${label}: held weapon render geometry included`).toBeGreaterThan(0);
   for (const [field, value] of [
@@ -1575,23 +1724,54 @@ async function sampleRequiredHandSelfOcclusion(
       contract.terminalHandToleranceM,
     );
     const hitPointDistanceM = positionDelta(blocker.hitPointWorld, sentinel.worldPosition);
+    const cameraToHitDistanceM = positionDelta(selfOcclusion.camera.position, blocker.hitPointWorld);
+    const cameraToTarget = subtract(sentinel.worldPosition, selfOcclusion.camera.position);
+    const cameraToHit = subtract(blocker.hitPointWorld, selfOcclusion.camera.position);
+    const rayParameter = dot(cameraToHit, cameraToTarget) / (expectedTargetDistanceM * expectedTargetDistanceM);
+    const rayProjection = selfOcclusion.camera.position.map((value: number, axis: number) => (
+      value + cameraToTarget[axis] * rayParameter
+    ));
+    const rayLateralDistanceM = positionDelta(blocker.hitPointWorld, rayProjection);
     const representationScale = Math.max(
       1,
       blocker.targetDistanceM,
       blocker.distanceM,
+      ...selfOcclusion.camera.position.map(Math.abs),
       ...blocker.hitPointWorld.map(Math.abs),
       ...sentinel.worldPosition.map(Math.abs),
     );
     const representationTolerance = Number.EPSILON * 16 * representationScale;
-    const hitPointWithinTolerance = hitPointDistanceM <= contract.terminalHandToleranceM
-      || (terminalWithinTolerance
+    const hitPointMatchesTerminalDelta = Math.abs(hitPointDistanceM - rawTerminalDeltaM) <= representationTolerance;
+    const hitPointWithinTolerance = hitPointMatchesTerminalDelta
+      && (hitPointDistanceM <= contract.terminalHandToleranceM
+        || (terminalWithinTolerance
         && Math.abs(hitPointDistanceM - rawTerminalDeltaM) <= representationTolerance
-        && rawTerminalDeltaM - contract.terminalHandToleranceM <= representationTolerance);
+        && rawTerminalDeltaM - contract.terminalHandToleranceM <= representationTolerance));
+    const raySegmentValid = rayParameter >= 0 && rayParameter <= 1
+      && rayLateralDistanceM <= representationTolerance
+      && Math.abs(cameraToHitDistanceM - blocker.distanceM) <= representationTolerance;
     const expectedHitPointBoundaryComparisonM = hitPointWithinTolerance
       && hitPointDistanceM > contract.terminalHandToleranceM
       ? contract.terminalHandToleranceM
       : hitPointDistanceM;
     expect(hitPointWithinTolerance, `${label}:${sentinel.name}: exact hit-point boundary`).toBe(true);
+    expect(scaleAwareEqual(
+      blocker.cameraToHitDistanceM,
+      cameraToHitDistanceM,
+      [blocker.cameraToHitDistanceM, cameraToHitDistanceM, representationScale],
+    ), `${label}:${sentinel.name}: independently recomputed camera-to-hit distance`).toBe(true);
+    expect(scaleAwareEqual(
+      blocker.rayParameter,
+      rayParameter,
+      [blocker.rayParameter, rayParameter],
+    ), `${label}:${sentinel.name}: independently recomputed ray parameter`).toBe(true);
+    expect(scaleAwareEqual(
+      blocker.rayLateralDistanceM,
+      rayLateralDistanceM,
+      [blocker.rayLateralDistanceM, rayLateralDistanceM, representationScale],
+    ), `${label}:${sentinel.name}: independently recomputed ray lateral distance`).toBe(true);
+    expect(blocker.raySegmentValid, `${label}:${sentinel.name}: diagnostic ray classification`).toBe(raySegmentValid);
+    expect(raySegmentValid, `${label}:${sentinel.name}: hit lies on finite camera-to-sentinel segment`).toBe(true);
     expect(scaleAwareEqual(
       blocker.hitPointToSentinelM,
       hitPointDistanceM,
@@ -1613,27 +1793,14 @@ async function sampleRequiredHandSelfOcclusion(
     ), `${label}:${sentinel.name}: exact scale-aware ULP allowance`).toBe(true);
     expect(blocker.cameraInsideOpaqueGeometry, `${label}:${sentinel.name}: independent camera-inside classification`)
       .toBe(blocker.distanceM <= contract.cameraInsideOpaqueDistanceM);
-    expect(blocker.dominantBones, `${label}:${sentinel.name}: three dominant face bones`).toHaveLength(3);
-    const ownedCount = blocker.dominantBones.filter(({ handOwned }: any) => handOwned === true).length;
-    expect(blocker.dominantBones.every(({ handOwned }: any) => typeof handOwned === 'boolean'),
-      `${label}:${sentinel.name}: explicit per-vertex ownership booleans`).toBe(true);
-    expect(blocker.handOwnedDominantBoneCount, `${label}:${sentinel.name}: majority count`).toBe(ownedCount);
-    expect(ownedCount, `${label}:${sentinel.name}: hand-owned face majority`).toBeGreaterThanOrEqual(2);
-    for (let vertex = 0; vertex < blocker.dominantBones.length; vertex += 1) {
-      const dominant = blocker.dominantBones[vertex];
-      expect(dominant.vertexIndex, `${label}:${sentinel.name}: face vertex binding`).toBe(
-        [blocker.face.a, blocker.face.b, blocker.face.c][vertex],
-      );
-      expect(Number.isSafeInteger(dominant.slot) && dominant.slot >= 0 && dominant.slot <= 3,
-        `${label}:${sentinel.name}: dominant slot`).toBe(true);
-      expect(Number.isSafeInteger(dominant.skinIndex) && dominant.skinIndex >= 0,
-        `${label}:${sentinel.name}: dominant skin index`).toBe(true);
-      expect(Number.isFinite(dominant.normalizedWeight)
-        && dominant.normalizedWeight >= 0 && dominant.normalizedWeight <= 1,
-      `${label}:${sentinel.name}: normalized dominant weight`).toBe(true);
-      expect(typeof dominant.bone === 'string' && dominant.bone.length > 0,
-        `${label}:${sentinel.name}: dominant bone identity`).toBe(true);
-    }
+    const faceInfluence = recomputeCanonicalFaceInfluence(blocker, frameManifest, side);
+    expect(faceInfluence, `${label}:${sentinel.name}: independently recomputed canonical face influence`).not.toBeNull();
+    expect(blocker.handOwnedDominantBoneCount, `${label}:${sentinel.name}: recomputed majority count`)
+      .toBe(faceInfluence!.ownedCount);
+    expect(faceInfluence!.faceHandOwned, `${label}:${sentinel.name}: recomputed hand-owned face majority`).toBe(true);
+    expect(blocker.faceInfluenceProvenanceValid, `${label}:${sentinel.name}: diagnostic face provenance`).toBe(true);
+    expect(blocker.faceHandOwned, `${label}:${sentinel.name}: diagnostic hand ownership`)
+      .toBe(faceInfluence!.faceHandOwned);
   }
   return selfOcclusion;
 }

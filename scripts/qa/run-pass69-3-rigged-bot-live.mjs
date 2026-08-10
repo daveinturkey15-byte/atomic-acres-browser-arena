@@ -128,6 +128,11 @@ const handSelfOcclusionContract = Object.freeze({
   cameraInsideOpaqueDistanceM: 0.1,
   sentinelNames: Object.freeze(['wrist-hand', 'thumb', 'index', 'middle', 'ring', 'pinky']),
 });
+const canonicalOperatorSkinManifestContract = 'runtime-canonical-operator-skin-manifest-v1';
+const canonicalOperatorAssetUrl = './assets/original/models/operators/pass65-third-person-operator-lod0.glb';
+const canonicalOperatorSkinNames = Object.freeze(['Cube018', 'Cube018_1', 'Cube018_2', 'Swat_Feet', 'Cube037', 'Cube037_1', 'Cube037_2', 'Cube023', 'Cube023_1']);
+const canonicalOperatorWristNames = Object.freeze({ left: 'WristL', right: 'WristR' });
+const threeUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const closeRoiNdc = Object.freeze({ minX: -0.46, maxX: 0.46, minY: -0.7, maxY: 0.7 });
 const handRoiNdc = Object.freeze({ minX: -0.55, maxX: 0.55, minY: -0.68, maxY: 0.68 });
 const mediumRoiNdc = Object.freeze({ minX: -0.68, maxX: 0.68, minY: -0.82, maxY: 0.82 });
@@ -785,6 +790,77 @@ function mainCameraDrawValid(
   ));
 }
 
+function canonicalOperatorSkinManifestValid(manifest) {
+  if (manifest?.contract !== canonicalOperatorSkinManifestContract
+    || manifest.assetUrl !== canonicalOperatorAssetUrl
+    || manifest.lod !== 0
+    || manifest.visual?.name !== 'rigged-operator-visual'
+    || !threeUuidPattern.test(manifest.visual?.uuid ?? '')
+    || !Array.isArray(manifest.skinnedMeshes)
+    || manifest.skinnedMeshes.length !== canonicalOperatorSkinNames.length
+    || !Array.isArray(manifest.wrists) || manifest.wrists.length !== 2) return false;
+  const meshUuids = new Set();
+  for (let index = 0; index < canonicalOperatorSkinNames.length; index += 1) {
+    const mesh = manifest.skinnedMeshes[index];
+    if (mesh?.name !== canonicalOperatorSkinNames[index]
+      || !threeUuidPattern.test(mesh.uuid ?? '') || meshUuids.has(mesh.uuid)
+      || !threeUuidPattern.test(mesh.geometryUuid ?? '')
+      || !Number.isSafeInteger(mesh.positionCount) || mesh.positionCount <= 0
+      || mesh.skinIndexCount !== mesh.positionCount || mesh.skinWeightCount !== mesh.positionCount
+      || mesh.skinIndexItemSize !== 4 || mesh.skinWeightItemSize !== 4
+      || mesh.skinIndexNormalized !== false || typeof mesh.skinWeightNormalized !== 'boolean'
+      || !Array.isArray(mesh.skeletonBones) || mesh.skeletonBones.length < 1) return false;
+    meshUuids.add(mesh.uuid);
+    const boneUuids = new Set();
+    for (let boneIndex = 0; boneIndex < mesh.skeletonBones.length; boneIndex += 1) {
+      const bone = mesh.skeletonBones[boneIndex];
+      if (bone?.index !== boneIndex || typeof bone.name !== 'string' || bone.name.length === 0
+        || !threeUuidPattern.test(bone.uuid ?? '') || boneUuids.has(bone.uuid)
+        || !Number.isSafeInteger(bone.parentIndex) || bone.parentIndex < -1
+        || bone.parentIndex >= mesh.skeletonBones.length || bone.parentIndex === boneIndex) return false;
+      boneUuids.add(bone.uuid);
+    }
+    for (let boneIndex = 0; boneIndex < mesh.skeletonBones.length; boneIndex += 1) {
+      const visited = new Set();
+      let cursor = boneIndex;
+      while (cursor !== -1) {
+        if (visited.has(cursor)) return false;
+        visited.add(cursor);
+        cursor = mesh.skeletonBones[cursor].parentIndex;
+      }
+    }
+  }
+  const wristUuids = new Set();
+  for (const [wristIndex, side] of ['left', 'right'].entries()) {
+    const wrist = manifest.wrists[wristIndex];
+    if (!wrist || wrist.side !== side || wrist.name !== canonicalOperatorWristNames[side]
+      || !threeUuidPattern.test(wrist.uuid ?? '') || wristUuids.has(wrist.uuid)
+      || manifest.wrists.filter((candidate) => candidate?.side === side).length !== 1
+      || !manifest.skinnedMeshes.some((mesh) => (
+        mesh.skeletonBones.filter((bone) => bone.uuid === wrist.uuid && bone.name === wrist.name).length === 1
+      ))
+      || manifest.skinnedMeshes.some((mesh) => {
+        const namedWristBones = mesh.skeletonBones.filter((bone) => bone.name === wrist.name);
+        return namedWristBones.length > 1
+          || namedWristBones.some((bone) => bone.uuid !== wrist.uuid);
+      })) return false;
+    wristUuids.add(wrist.uuid);
+  }
+  return true;
+}
+
+function canonicalBoneDescendsFromWrist(skeletonBones, boneIndex, wristUuid) {
+  const visited = new Set();
+  let cursor = boneIndex;
+  while (Number.isSafeInteger(cursor) && cursor >= 0 && cursor < skeletonBones.length && !visited.has(cursor)) {
+    visited.add(cursor);
+    const bone = skeletonBones[cursor];
+    if (bone.uuid === wristUuid) return true;
+    cursor = bone.parentIndex;
+  }
+  return false;
+}
+
 function captureActorFrameValid(frameActor, expectedActor, frame, captureRevision) {
   return sameObject(frameActor?.actor, expectedActor)
     && uuidValid(frameActor.rootUuid)
@@ -796,6 +872,7 @@ function captureActorFrameValid(frameActor, expectedActor, frame, captureRevisio
     && frameActor.effectivelyVisibleMeshCount > 0
     && Array.isArray(frameActor.effectivelyVisibleSkinnedMeshes)
     && frameActor.effectivelyVisibleSkinnedMeshes.length > 0
+    && canonicalOperatorSkinManifestValid(frameActor.canonicalOperatorSkinManifest)
     && frameActor.armSkinVisible === true
     && frameActor.handSkinVisible === true
     && (expectedActor.kind === 'bot' ? finiteVector(frameActor.weaponCenterWorld) : frameActor.weaponCenterWorld === null)
@@ -918,6 +995,10 @@ function capturePresentationValid(
           )).sort((left, right) => left[0].localeCompare(right[0])),
         )
       ))
+    || !committed.actors.every((actor, index) => sameObject(
+      actor.canonicalOperatorSkinManifest,
+      paused.actors[index].canonicalOperatorSkinManifest,
+    ))
     || normalizedQuaternionDelta(committed.quaternion, paused.quaternion) > 1e-9
     || !close(committed.near, paused.near, 1e-9)
     || !close(committed.far, paused.far, 1e-9)
@@ -1398,6 +1479,73 @@ function lineOfSightValid(lineOfSight, actor, expectedArena, presentation, frami
     });
 }
 
+function recomputeCanonicalFaceInfluence(blocker, manifest, side) {
+  if (!canonicalOperatorSkinManifestValid(manifest)
+    || blocker?.requestedSide !== side
+    || blocker.requestedWrist !== canonicalOperatorWristNames[side]) return null;
+  const meshMatches = manifest.skinnedMeshes.filter((mesh) => (
+    mesh.name === blocker.mesh && mesh.uuid === blocker.meshUuid && mesh.geometryUuid === blocker.geometryUuid
+  ));
+  const wristMatches = manifest.wrists.filter((wrist) => (
+    wrist.side === side && wrist.name === blocker.requestedWrist && wrist.uuid === blocker.requestedWristUuid
+  ));
+  if (meshMatches.length !== 1 || wristMatches.length !== 1) return null;
+  const mesh = meshMatches[0];
+  const wrist = wristMatches[0];
+  const attributes = blocker.skinAttributeProvenance;
+  if (!sameObject(attributes, {
+    positionCount: mesh.positionCount,
+    skinIndexCount: mesh.skinIndexCount,
+    skinIndexItemSize: mesh.skinIndexItemSize,
+    skinIndexNormalized: mesh.skinIndexNormalized,
+    skinWeightCount: mesh.skinWeightCount,
+    skinWeightItemSize: mesh.skinWeightItemSize,
+    skinWeightNormalized: mesh.skinWeightNormalized,
+    valid: true,
+  })) return null;
+  const faceVertices = [blocker.face?.a, blocker.face?.b, blocker.face?.c];
+  if (!faceVertices.every((vertex) => Number.isSafeInteger(vertex)
+      && vertex >= 0 && vertex < mesh.positionCount)
+    || new Set(faceVertices).size !== 3
+    || !Array.isArray(blocker.dominantBones) || blocker.dominantBones.length !== 3) return null;
+  let ownedCount = 0;
+  for (let vertex = 0; vertex < 3; vertex += 1) {
+    const dominant = blocker.dominantBones[vertex];
+    if (dominant?.vertexIndex !== faceVertices[vertex]
+      || !Array.isArray(dominant.skinIndices) || dominant.skinIndices.length !== 4
+      || !dominant.skinIndices.every((index) => Number.isSafeInteger(index)
+        && index >= 0 && index < mesh.skeletonBones.length)
+      || !Array.isArray(dominant.skinWeights) || dominant.skinWeights.length !== 4
+      || !dominant.skinWeights.every((weight) => Number.isFinite(weight) && weight >= 0)
+      || !Array.isArray(dominant.normalizedWeights) || dominant.normalizedWeights.length !== 4) return null;
+    const weightSum = dominant.skinWeights.reduce((sum, weight) => sum + weight, 0);
+    if (!Number.isFinite(weightSum) || !(weightSum > 0)) return null;
+    const independentlyNormalized = dominant.skinWeights.map((weight) => weight / weightSum);
+    if (!dominant.normalizedWeights.every((weight, slot) => scaleAwareEqual(
+      weight,
+      independentlyNormalized[slot],
+      [weight, independentlyNormalized[slot], weightSum, ...dominant.skinWeights],
+    ))) return null;
+    let dominantSlot = 0;
+    for (let slot = 1; slot < 4; slot += 1) {
+      if (dominant.skinWeights[slot] > dominant.skinWeights[dominantSlot]) dominantSlot = slot;
+    }
+    const skinIndex = dominant.skinIndices[dominantSlot];
+    const bone = mesh.skeletonBones[skinIndex];
+    const handOwned = canonicalBoneDescendsFromWrist(mesh.skeletonBones, skinIndex, wrist.uuid);
+    if (dominant.slot !== dominantSlot || dominant.skinIndex !== skinIndex
+      || !scaleAwareEqual(
+        dominant.normalizedWeight,
+        independentlyNormalized[dominantSlot],
+        [dominant.normalizedWeight, independentlyNormalized[dominantSlot], weightSum],
+      )
+      || dominant.bone !== bone.name || dominant.boneUuid !== bone.uuid
+      || dominant.handOwned !== handOwned) return null;
+    if (handOwned) ownedCount += 1;
+  }
+  return { ownedCount, faceHandOwned: ownedCount >= 2 };
+}
+
 function handSelfOcclusionValid(selfOcclusion, actor, side, presentation, framing) {
   const paused = presentation?.pausedPresentedCapture;
   const cachedMatches = Array.isArray(paused?.handSelfOcclusion)
@@ -1407,6 +1555,10 @@ function handSelfOcclusionValid(selfOcclusion, actor, side, presentation, framin
     : [];
   const { cameraPresentation: _cameraPresentation, ...sampledCachedFields } = selfOcclusion ?? {};
   if (cachedMatches.length !== 1 || !sameObject(sampledCachedFields, cachedMatches[0])) return false;
+  const frameActorMatches = Array.isArray(paused?.actors)
+    ? paused.actors.filter((candidate) => sameObject(candidate?.actor, actor))
+    : [];
+  const frameManifest = frameActorMatches[0]?.canonicalOperatorSkinManifest;
   const renderCount = selfOcclusion?.renderOccluderCount;
   const actorCount = selfOcclusion?.actorOccluderCount;
   const heldWeaponCount = selfOcclusion?.heldWeaponOccluderCount;
@@ -1426,6 +1578,9 @@ function handSelfOcclusionValid(selfOcclusion, actor, side, presentation, framin
     || selfOcclusion.captureFrame !== paused?.frame
     || selfOcclusion.captureRevision !== paused?.captureRevision
     || selfOcclusion.captureSubmissionSequence !== paused?.submissionSequence
+    || frameActorMatches.length !== 1
+    || !canonicalOperatorSkinManifestValid(frameManifest)
+    || !sameObject(selfOcclusion.canonicalOperatorSkinManifest, frameManifest)
     || !Number.isSafeInteger(renderCount) || !Number.isSafeInteger(actorCount)
     || !Number.isSafeInteger(heldWeaponCount)
     || !(heldWeaponCount > 0 && heldWeaponCount <= actorCount && actorCount <= renderCount)
@@ -1455,38 +1610,50 @@ function handSelfOcclusionValid(selfOcclusion, actor, side, presentation, framin
       const rawHitPointDistanceM = hitPointWorldValid && sentinelWorldValid
         ? positionDelta(blocker.hitPointWorld, sentinel.worldPosition)
         : Number.NaN;
+      const cameraToHitDistanceM = hitPointWorldValid
+        ? positionDelta(selfOcclusion.camera.position, blocker.hitPointWorld)
+        : Number.NaN;
+      const cameraToTarget = sentinelWorldValid
+        ? vectorSubtract(sentinel.worldPosition, selfOcclusion.camera.position)
+        : [];
+      const cameraToHit = hitPointWorldValid
+        ? vectorSubtract(blocker.hitPointWorld, selfOcclusion.camera.position)
+        : [];
+      const rayParameter = expectedTargetDistanceM > 0
+        ? dot(cameraToHit, cameraToTarget) / (expectedTargetDistanceM * expectedTargetDistanceM)
+        : Number.NaN;
+      const rayProjection = finiteVector(cameraToTarget) && Number.isFinite(rayParameter)
+        ? selfOcclusion.camera.position.map((value, axis) => value + cameraToTarget[axis] * rayParameter)
+        : [];
+      const rayLateralDistanceM = finiteVector(rayProjection) && hitPointWorldValid
+        ? positionDelta(blocker.hitPointWorld, rayProjection)
+        : Number.NaN;
       const representationScale = Math.max(
         1,
         blocker.targetDistanceM,
         blocker.distanceM,
+        ...selfOcclusion.camera.position.map(Math.abs),
         ...(hitPointWorldValid ? blocker.hitPointWorld.map(Math.abs) : []),
         ...(finiteVector(sentinel.worldPosition) ? sentinel.worldPosition.map(Math.abs) : []),
       );
       const representationTolerance = Number.EPSILON * 16 * representationScale;
-      const hitPointWithinTolerance = rawHitPointDistanceM <= handSelfOcclusionContract.terminalHandToleranceM
-        || (terminalDistanceWithinTolerance
+      const hitPointMatchesTerminalDelta = Math.abs(rawHitPointDistanceM - rawTerminalDeltaM)
+        <= representationTolerance;
+      const hitPointWithinTolerance = hitPointMatchesTerminalDelta
+        && (rawHitPointDistanceM <= handSelfOcclusionContract.terminalHandToleranceM
+          || (terminalDistanceWithinTolerance
           && Math.abs(rawHitPointDistanceM - rawTerminalDeltaM) <= representationTolerance
           && rawTerminalDeltaM - handSelfOcclusionContract.terminalHandToleranceM
-            <= representationTolerance);
+            <= representationTolerance));
+      const raySegmentValid = Number.isFinite(rayParameter) && rayParameter >= 0 && rayParameter <= 1
+        && rayLateralDistanceM <= representationTolerance
+        && Math.abs(cameraToHitDistanceM - blocker.distanceM) <= representationTolerance;
       const expectedHitPointBoundaryComparisonM = hitPointWithinTolerance
         && rawHitPointDistanceM > handSelfOcclusionContract.terminalHandToleranceM
         ? handSelfOcclusionContract.terminalHandToleranceM
         : rawHitPointDistanceM;
-      const faceVertices = [blocker.face?.a, blocker.face?.b, blocker.face?.c];
-      const dominantBonesValid = Array.isArray(blocker.dominantBones)
-        && blocker.dominantBones.length === 3
-        && blocker.dominantBones.every((dominant, vertex) => (
-          Number.isSafeInteger(dominant?.vertexIndex) && dominant.vertexIndex === faceVertices[vertex]
-          && Number.isSafeInteger(dominant.slot) && dominant.slot >= 0 && dominant.slot <= 3
-          && Number.isSafeInteger(dominant.skinIndex) && dominant.skinIndex >= 0
-          && Number.isFinite(dominant.normalizedWeight)
-          && dominant.normalizedWeight >= 0 && dominant.normalizedWeight <= 1
-          && typeof dominant.bone === 'string' && dominant.bone.length > 0
-          && typeof dominant.handOwned === 'boolean'
-        ));
-      const ownedCount = dominantBonesValid
-        ? blocker.dominantBones.filter((dominant) => dominant.handOwned).length
-        : -1;
+      const faceInfluence = recomputeCanonicalFaceInfluence(blocker, frameManifest, side);
+      const ownedCount = faceInfluence?.ownedCount ?? -1;
       validTerminal = blocker.clear === true
         && blocker.reason === 'terminal-hand-surface'
         && blocker.sameActor === true
@@ -1495,12 +1662,27 @@ function handSelfOcclusionValid(selfOcclusion, actor, side, presentation, framin
         && blocker.requestedSide === side
         && blocker.requestedWrist === (side === 'left' ? 'WristL' : 'WristR')
         && blocker.requestedWristMatchesSide === true
-        && typeof blocker.mesh === 'string' && blocker.mesh.length > 0
+        && faceInfluence !== null
         && blocker.name === blocker.mesh
-        && faceVertices.every((value) => Number.isSafeInteger(value) && value >= 0)
         && Number.isSafeInteger(blocker.materialIndex) && blocker.materialIndex >= 0
         && hitPointWorldValid
         && Number.isFinite(blocker.distanceM) && blocker.distanceM >= 0
+        && Number.isFinite(blocker.cameraToHitDistanceM) && blocker.cameraToHitDistanceM >= 0
+        && scaleAwareEqual(
+          blocker.cameraToHitDistanceM,
+          cameraToHitDistanceM,
+          [blocker.cameraToHitDistanceM, cameraToHitDistanceM, representationScale],
+        )
+        && Number.isFinite(blocker.rayParameter)
+        && scaleAwareEqual(blocker.rayParameter, rayParameter, [blocker.rayParameter, rayParameter])
+        && Number.isFinite(blocker.rayLateralDistanceM) && blocker.rayLateralDistanceM >= 0
+        && scaleAwareEqual(
+          blocker.rayLateralDistanceM,
+          rayLateralDistanceM,
+          [blocker.rayLateralDistanceM, rayLateralDistanceM, representationScale],
+        )
+        && blocker.raySegmentValid === raySegmentValid
+        && raySegmentValid
         && Number.isFinite(blocker.targetDistanceM) && blocker.targetDistanceM > 0
         && scaleAwareEqual(
           blocker.targetDistanceM,
@@ -1547,11 +1729,11 @@ function handSelfOcclusionValid(selfOcclusion, actor, side, presentation, framin
           blocker.distanceM <= handSelfOcclusionContract.cameraInsideOpaqueDistanceM
         )
         && blocker.cameraInsideOpaqueGeometry === false
-        && dominantBonesValid
         && Number.isSafeInteger(blocker.handOwnedDominantBoneCount)
         && blocker.handOwnedDominantBoneCount === ownedCount
-        && ownedCount >= 2
-        && blocker.faceHandOwned === true;
+        && faceInfluence.faceHandOwned
+        && blocker.faceInfluenceProvenanceValid === true
+        && blocker.faceHandOwned === faceInfluence.faceHandOwned;
     }
     return sentinel.name === handSelfOcclusionContract.sentinelNames[index]
       && sentinel.name === (framed?.role === 'wrist-hand' ? 'wrist-hand' : framed?.digit)
@@ -4147,6 +4329,36 @@ async function runContractSelfTest() {
       complete: true,
     };
   };
+  const fixtureBoneIdentities = Object.freeze([
+    Object.freeze({ index: 0, name: 'WristL', uuid: '00000000-0000-4000-8000-000000000101', parentIndex: -1 }),
+    Object.freeze({ index: 1, name: 'Index2L', uuid: '00000000-0000-4000-8000-000000000102', parentIndex: 0 }),
+    Object.freeze({ index: 2, name: 'Torso', uuid: '00000000-0000-4000-8000-000000000103', parentIndex: -1 }),
+    Object.freeze({ index: 3, name: 'WristR', uuid: '00000000-0000-4000-8000-000000000104', parentIndex: -1 }),
+    Object.freeze({ index: 4, name: 'Index2R', uuid: '00000000-0000-4000-8000-000000000105', parentIndex: 3 }),
+  ]);
+  const fixtureCanonicalOperatorSkinManifest = Object.freeze({
+    contract: canonicalOperatorSkinManifestContract,
+    assetUrl: canonicalOperatorAssetUrl,
+    lod: 0,
+    visual: Object.freeze({ name: 'rigged-operator-visual', uuid: '00000000-0000-4000-8000-000000000001' }),
+    skinnedMeshes: Object.freeze(canonicalOperatorSkinNames.map((name, index) => Object.freeze({
+      name,
+      uuid: `00000000-0000-4000-8000-${String(10 + index).padStart(12, '0')}`,
+      geometryUuid: `00000000-0000-4000-8000-${String(20 + index).padStart(12, '0')}`,
+      positionCount: 6,
+      skinIndexCount: 6,
+      skinIndexItemSize: 4,
+      skinIndexNormalized: false,
+      skinWeightCount: 6,
+      skinWeightItemSize: 4,
+      skinWeightNormalized: false,
+      skeletonBones: fixtureBoneIdentities,
+    }))),
+    wrists: Object.freeze([
+      Object.freeze({ side: 'left', name: 'WristL', uuid: fixtureBoneIdentities[0].uuid }),
+      Object.freeze({ side: 'right', name: 'WristR', uuid: fixtureBoneIdentities[3].uuid }),
+    ]),
+  });
   const makeFrameActor = (cameraEvidence, points) => {
     const projectedWorldPosition = [rootPosition[0], rootPosition[1] + 1.35, rootPosition[2]];
     const leftShoulder = findJoint(points, 'left', 'shoulder').worldPosition;
@@ -4161,7 +4373,8 @@ async function runContractSelfTest() {
       rootVisible: true,
       rootEffectivelyVisible: true,
       effectivelyVisibleMeshCount: 1,
-      effectivelyVisibleSkinnedMeshes: ['Swat_Body'],
+      effectivelyVisibleSkinnedMeshes: [...canonicalOperatorSkinNames],
+      canonicalOperatorSkinManifest: fixtureCanonicalOperatorSkinManifest,
       armSkinVisible: true,
       handSkinVisible: true,
       weaponCenterWorld: [shoulderMid[0] + 0.3, shoulderMid[1] - 0.2, shoulderMid[2]],
@@ -4204,6 +4417,7 @@ async function runContractSelfTest() {
     captureFrame: frame,
     captureRevision: 7,
     captureSubmissionSequence: submissionSequence,
+    canonicalOperatorSkinManifest: frameActor.canonicalOperatorSkinManifest,
     camera: {
       position: cameraEvidence.position,
       quaternion: yxzCameraQuaternion(cameraEvidence.yaw, cameraEvidence.pitch),
@@ -4238,8 +4452,20 @@ async function runContractSelfTest() {
         const terminalDeltaM = targetDistanceM - distanceM;
         const hitPointToSentinelM = positionDelta(hitPointWorld, joint.worldPosition);
         const representationScale = Math.max(
-          1, targetDistanceM, distanceM, ...hitPointWorld.map(Math.abs), ...joint.worldPosition.map(Math.abs),
+          1, targetDistanceM, distanceM, ...cameraEvidence.position.map(Math.abs),
+          ...hitPointWorld.map(Math.abs), ...joint.worldPosition.map(Math.abs),
         );
+        const cameraToHitDistanceM = positionDelta(cameraEvidence.position, hitPointWorld);
+        const rayParameter = dot(
+          vectorSubtract(hitPointWorld, cameraEvidence.position),
+          vectorSubtract(joint.worldPosition, cameraEvidence.position),
+        ) / (targetDistanceM * targetDistanceM);
+        const rayProjection = cameraEvidence.position.map((value, axis) => value + ray[axis] * rayParameter);
+        const rayLateralDistanceM = positionDelta(hitPointWorld, rayProjection);
+        const hitMesh = frameActor.canonicalOperatorSkinManifest.skinnedMeshes[0];
+        const wristIndex = side === 'left' ? 0 : 3;
+        const fingerIndex = side === 'left' ? 1 : 4;
+        const wrist = frameActor.canonicalOperatorSkinManifest.wrists.find((candidate) => candidate.side === side);
         return {
           name: 'wrist-hand',
           bone: joint.bone,
@@ -4248,12 +4474,18 @@ async function runContractSelfTest() {
           worldPosition: joint.worldPosition,
           targetDistanceM,
           blocker: {
-            name: 'Swat_Body',
-            mesh: 'Swat_Body',
+            name: canonicalOperatorSkinNames[0],
+            mesh: canonicalOperatorSkinNames[0],
+            meshUuid: hitMesh.uuid,
+            geometryUuid: hitMesh.geometryUuid,
             face: { a: 0, b: 1, c: 2 },
             materialIndex: 0,
             hitPointWorld,
             distanceM,
+            cameraToHitDistanceM,
+            rayParameter,
+            rayLateralDistanceM,
+            raySegmentValid: true,
             targetDistanceM,
             terminalDeltaM,
             hitPointToSentinelM,
@@ -4265,13 +4497,58 @@ async function runContractSelfTest() {
             canonicalOperatorSkinnedMesh: true,
             requestedSide: side,
             requestedWrist: side === 'left' ? 'WristL' : 'WristR',
+            requestedWristUuid: wrist.uuid,
             requestedWristMatchesSide: true,
+            skinAttributeProvenance: {
+              positionCount: hitMesh.positionCount,
+              skinIndexCount: hitMesh.skinIndexCount,
+              skinIndexItemSize: hitMesh.skinIndexItemSize,
+              skinIndexNormalized: hitMesh.skinIndexNormalized,
+              skinWeightCount: hitMesh.skinWeightCount,
+              skinWeightItemSize: hitMesh.skinWeightItemSize,
+              skinWeightNormalized: hitMesh.skinWeightNormalized,
+              valid: true,
+            },
             dominantBones: [
-              { vertexIndex: 0, slot: 0, skinIndex: 0, normalizedWeight: 0.8, bone: side === 'left' ? 'WristL' : 'WristR', handOwned: true },
-              { vertexIndex: 1, slot: 0, skinIndex: 1, normalizedWeight: 0.7, bone: side === 'left' ? 'Index2L' : 'Index2R', handOwned: true },
-              { vertexIndex: 2, slot: 0, skinIndex: 2, normalizedWeight: 0.9, bone: 'Torso', handOwned: false },
+              {
+                vertexIndex: 0,
+                skinIndices: [wristIndex, 2, 2, 2],
+                skinWeights: [0.8, 0.2, 0, 0],
+                normalizedWeights: [0.8, 0.2, 0, 0],
+                slot: 0,
+                skinIndex: wristIndex,
+                normalizedWeight: 0.8,
+                bone: side === 'left' ? 'WristL' : 'WristR',
+                boneUuid: fixtureBoneIdentities[wristIndex].uuid,
+                handOwned: true,
+              },
+              {
+                vertexIndex: 1,
+                skinIndices: [fingerIndex, 2, 2, 2],
+                skinWeights: [0.7, 0.3, 0, 0],
+                normalizedWeights: [0.7, 0.3, 0, 0],
+                slot: 0,
+                skinIndex: fingerIndex,
+                normalizedWeight: 0.7,
+                bone: side === 'left' ? 'Index2L' : 'Index2R',
+                boneUuid: fixtureBoneIdentities[fingerIndex].uuid,
+                handOwned: true,
+              },
+              {
+                vertexIndex: 2,
+                skinIndices: [2, wristIndex, wristIndex, wristIndex],
+                skinWeights: [0.9, 0.1, 0, 0],
+                normalizedWeights: [0.9, 0.1, 0, 0],
+                slot: 0,
+                skinIndex: 2,
+                normalizedWeight: 0.9,
+                bone: 'Torso',
+                boneUuid: fixtureBoneIdentities[2].uuid,
+                handOwned: false,
+              },
             ],
             handOwnedDominantBoneCount: 2,
+            faceInfluenceProvenanceValid: true,
             faceHandOwned: true,
             cameraInsideOpaqueGeometry: false,
             clear: true,
@@ -4753,6 +5030,15 @@ async function runContractSelfTest() {
   assert(!capturePresentationValid(
     reusedRevision, expectedVisualEvidenceContract.atomic.closeCamera, 'atomic-acres', [actor],
   ), 'reused capture-camera revision must fail');
+  const replacedOperatorBetweenSubmittedFrames = structuredClone(presentation);
+  replacedOperatorBetweenSubmittedFrames.committed.actors[0].canonicalOperatorSkinManifest.visual.uuid
+    = '00000000-0000-4000-8000-000000009998';
+  assert(!capturePresentationValid(
+    replacedOperatorBetweenSubmittedFrames,
+    expectedVisualEvidenceContract.atomic.closeCamera,
+    'atomic-acres',
+    [actor],
+  ), 'committed and paused frames must retain the exact canonical operator object manifest');
   const webGpuPresentation = makePresentation(projectionCamera, frameActor, 'webgpu');
   assert(capturePresentationValid(
     webGpuPresentation, expectedVisualEvidenceContract.atomic.closeCamera, 'atomic-acres', [actor], 'webgpu',
@@ -5080,6 +5366,112 @@ async function runContractSelfTest() {
   });
   assert(!validateHandSelf(sideWristMismatch, 'left'),
     'requested side and wrist mismatch must fail despite forged true binding claim');
+  const attachmentNameForgery = mutateSelfReceipt(leftHand, (receipt) => {
+    receipt.sentinels[0].blocker.name = 'same-skeleton-skinned-attachment';
+    receipt.sentinels[0].blocker.mesh = 'same-skeleton-skinned-attachment';
+    receipt.sentinels[0].blocker.canonicalOperatorSkinnedMesh = true;
+  });
+  assert(!validateHandSelf(attachmentNameForgery, 'left'),
+    'forged canonical boolean cannot admit a same-skeleton skinned attachment name');
+  const attachmentUuidForgery = mutateSelfReceipt(leftHand, (receipt) => {
+    receipt.sentinels[0].blocker.meshUuid = '00000000-0000-4000-8000-000000009999';
+  });
+  assert(!validateHandSelf(attachmentUuidForgery, 'left'), 'forged terminal mesh UUID must fail canonical identity binding');
+  const normalizedWeightForgery = mutateSelfReceipt(leftHand, (receipt) => {
+    receipt.sentinels[0].blocker.dominantBones[0].normalizedWeights[0] += 0.01;
+  });
+  assert(!validateHandSelf(normalizedWeightForgery, 'left'), 'claimed normalized weight must equal raw WEIGHTS_0 recomputation');
+  const skeletonBoneForgery = mutateSelfReceipt(leftHand, (receipt) => {
+    receipt.sentinels[0].blocker.dominantBones[0].boneUuid = fixtureBoneIdentities[2].uuid;
+  });
+  assert(!validateHandSelf(skeletonBoneForgery, 'left'), 'dominant skeleton index must resolve to its canonical bone UUID');
+  const stableTie = mutateSelfReceipt(leftHand, (receipt) => {
+    const dominant = receipt.sentinels[0].blocker.dominantBones[0];
+    dominant.skinWeights = [0.5, 0.5, 0, 0];
+    dominant.normalizedWeights = [0.5, 0.5, 0, 0];
+    dominant.normalizedWeight = 0.5;
+  });
+  assert(validateHandSelf(stableTie, 'left'), 'equal raw weights must retain the stable lower-index dominant slot');
+  const forgedTieWinner = mutateSelfReceipt(stableTie, (receipt) => {
+    const blocker = receipt.sentinels[0].blocker;
+    const dominant = blocker.dominantBones[0];
+    dominant.slot = 1;
+    dominant.skinIndex = 2;
+    dominant.bone = 'Torso';
+    dominant.boneUuid = fixtureBoneIdentities[2].uuid;
+    dominant.handOwned = false;
+    blocker.handOwnedDominantBoneCount = 1;
+    blocker.faceHandOwned = true;
+  });
+  assert(!validateHandSelf(forgedTieWinner, 'left'), 'equal-weight tie cannot be redirected away from the lower slot');
+  const mutateSelfAndFrameManifest = (fixture, mutate) => {
+    const adversary = structuredClone(fixture);
+    const paused = adversary.presentation.pausedPresentedCapture;
+    const receipt = paused.handSelfOcclusion[0];
+    mutate(receipt.canonicalOperatorSkinManifest, paused.actors[0].canonicalOperatorSkinManifest);
+    adversary.selfOcclusion = {
+      ...structuredClone(receipt),
+      cameraPresentation: structuredClone(paused),
+    };
+    return adversary;
+  };
+  for (const [label, mutate] of [
+    ['missing', (receiptManifest, frameManifest) => {
+      receiptManifest.skinnedMeshes.pop();
+      frameManifest.skinnedMeshes.pop();
+    }],
+    ['extra', (receiptManifest, frameManifest) => {
+      receiptManifest.skinnedMeshes.push(structuredClone(receiptManifest.skinnedMeshes.at(-1)));
+      frameManifest.skinnedMeshes.push(structuredClone(frameManifest.skinnedMeshes.at(-1)));
+    }],
+    ['duplicate', (receiptManifest, frameManifest) => {
+      receiptManifest.skinnedMeshes[1].name = receiptManifest.skinnedMeshes[0].name;
+      frameManifest.skinnedMeshes[1].name = frameManifest.skinnedMeshes[0].name;
+    }],
+  ]) {
+    assert(!validateHandSelf(mutateSelfAndFrameManifest(leftHand, mutate), 'left'),
+      `${label} canonical runtime skin manifest must fail independently fixed admission`);
+  }
+  const duplicateWristManifest = mutateSelfAndFrameManifest(leftHand, (receiptManifest, frameManifest) => {
+    receiptManifest.wrists[1] = structuredClone(receiptManifest.wrists[0]);
+    frameManifest.wrists[1] = structuredClone(frameManifest.wrists[0]);
+  });
+  assert(!validateHandSelf(duplicateWristManifest, 'left'), 'duplicate WristL manifest entry must fail exact side binding');
+  const duplicateWristBoneManifest = structuredClone(fixtureCanonicalOperatorSkinManifest);
+  duplicateWristBoneManifest.skinnedMeshes[0].skeletonBones[2].name = 'WristL';
+  assert(!canonicalOperatorSkinManifestValid(duplicateWristBoneManifest),
+    'duplicate WristL skeleton bone name must fail canonical identity validation');
+  const cyclicSkeletonManifest = structuredClone(fixtureCanonicalOperatorSkinManifest);
+  cyclicSkeletonManifest.skinnedMeshes[0].skeletonBones[0].parentIndex = 1;
+  assert(!canonicalOperatorSkinManifestValid(cyclicSkeletonManifest),
+    'cyclic canonical skeleton ancestry must fail closed');
+  const coherentOffRayForgery = mutateSelfReceipt(leftHand, (receipt) => {
+    const sentinel = receipt.sentinels[0];
+    const blocker = sentinel.blocker;
+    const terminalDeltaM = blocker.targetDistanceM - blocker.distanceM;
+    const camera = receipt.camera.position;
+    blocker.hitPointWorld = [
+      sentinel.worldPosition[0] + 0.03,
+      sentinel.worldPosition[1],
+      sentinel.worldPosition[2] + Math.sqrt(terminalDeltaM * terminalDeltaM - 0.03 * 0.03),
+    ];
+    blocker.hitPointToSentinelM = positionDelta(blocker.hitPointWorld, sentinel.worldPosition);
+    blocker.hitPointBoundaryComparisonM = blocker.hitPointToSentinelM;
+    blocker.cameraToHitDistanceM = positionDelta(camera, blocker.hitPointWorld);
+    const ray = vectorSubtract(sentinel.worldPosition, camera);
+    blocker.rayParameter = dot(vectorSubtract(blocker.hitPointWorld, camera), ray)
+      / (blocker.targetDistanceM * blocker.targetDistanceM);
+    const projection = camera.map((value, axis) => value + ray[axis] * blocker.rayParameter);
+    blocker.rayLateralDistanceM = positionDelta(blocker.hitPointWorld, projection);
+    blocker.raySegmentValid = true;
+    const representationScale = Math.max(
+      1, blocker.targetDistanceM, blocker.distanceM, ...camera.map(Math.abs),
+      ...blocker.hitPointWorld.map(Math.abs), ...sentinel.worldPosition.map(Math.abs),
+    );
+    blocker.boundaryUlpAllowanceM = Number.EPSILON * 16 * representationScale;
+  });
+  assert(!validateHandSelf(coherentOffRayForgery, 'left'),
+    'coherent terminal-radius forgery must fail camera-hit collinearity and segment arithmetic');
   const setTerminalGap = (receipt, gapM) => {
     const sentinel = receipt.sentinels[0];
     const blocker = sentinel.blocker;
@@ -5092,12 +5484,23 @@ async function runContractSelfTest() {
     const terminalDeltaM = targetDistanceM - distanceM;
     const hitPointToSentinelM = positionDelta(hitPointWorld, sentinel.worldPosition);
     const representationScale = Math.max(
-      1, targetDistanceM, distanceM, ...hitPointWorld.map(Math.abs), ...sentinel.worldPosition.map(Math.abs),
+      1, targetDistanceM, distanceM, ...receipt.camera.position.map(Math.abs),
+      ...hitPointWorld.map(Math.abs), ...sentinel.worldPosition.map(Math.abs),
     );
+    const cameraToHitDistanceM = positionDelta(receipt.camera.position, hitPointWorld);
+    const rayParameter = dot(
+      vectorSubtract(hitPointWorld, receipt.camera.position),
+      vectorSubtract(sentinel.worldPosition, receipt.camera.position),
+    ) / (targetDistanceM * targetDistanceM);
+    const rayProjection = receipt.camera.position.map((value, axis) => value + ray[axis] * rayParameter);
     blocker.distanceM = distanceM;
     blocker.targetDistanceM = targetDistanceM;
     blocker.terminalDeltaM = terminalDeltaM;
     blocker.hitPointWorld = hitPointWorld;
+    blocker.cameraToHitDistanceM = cameraToHitDistanceM;
+    blocker.rayParameter = rayParameter;
+    blocker.rayLateralDistanceM = positionDelta(hitPointWorld, rayProjection);
+    blocker.raySegmentValid = true;
     blocker.hitPointToSentinelM = hitPointToSentinelM;
     blocker.terminalBoundaryComparisonM = gapM === handSelfOcclusionContract.terminalHandToleranceM
       ? handSelfOcclusionContract.terminalHandToleranceM : terminalDeltaM;

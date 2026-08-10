@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { RiggedOperatorHandEvidenceIdentity } from './operator-model';
 
 export const RIGGED_EVIDENCE_OCCLUDER_MINIMUM_OPACITY = 0.75;
 
@@ -1454,15 +1455,25 @@ export function classifyRiggedHandSelfOcclusionHit(
   origin: THREE.Vector3,
   target: THREE.Vector3,
   actorRoot: THREE.Object3D,
-  operatorRoot: THREE.Object3D,
   weaponRoot: THREE.Object3D | null,
   requestedSide: 'left' | 'right',
-  requestedWrist: THREE.Bone,
+  canonicalOperator: RiggedOperatorHandEvidenceIdentity,
 ): Readonly<Record<string, unknown>> | null {
   if (!intersection) return null;
+  const {
+    operatorRoot, visual, wrist: requestedWrist, skinnedMeshes: canonicalSkinnedMeshes, manifest,
+  } = canonicalOperator;
   const targetDistanceM = origin.distanceTo(target);
   const rawTerminalDeltaM = targetDistanceM - intersection.distance;
   const rawHitPointToSentinelM = intersection.point.distanceTo(target);
+  const cameraToHitDistanceM = origin.distanceTo(intersection.point);
+  const cameraToTarget = target.clone().sub(origin);
+  const cameraToHit = intersection.point.clone().sub(origin);
+  const rayParameter = targetDistanceM > 0
+    ? cameraToHit.dot(cameraToTarget) / (targetDistanceM * targetDistanceM)
+    : Number.NaN;
+  const rayProjection = origin.clone().addScaledVector(cameraToTarget, rayParameter);
+  const rayLateralDistanceM = intersection.point.distanceTo(rayProjection);
   const terminalBoundaryDistanceM = targetDistanceM
     - RIGGED_HAND_SELF_OCCLUSION_CONTRACT.terminalHandToleranceM;
   const terminalDistanceWithinTolerance = intersection.distance >= terminalBoundaryDistanceM
@@ -1476,12 +1487,19 @@ export function classifyRiggedHandSelfOcclusionHit(
     ...intersection.point.toArray().map(Math.abs),
   );
   const representationTolerance = Number.EPSILON * 16 * representationScale;
-  const hitPointWithinTolerance = rawHitPointToSentinelM
-      <= RIGGED_HAND_SELF_OCCLUSION_CONTRACT.terminalHandToleranceM
-    || (terminalDistanceWithinTolerance
+  const hitPointMatchesTerminalDelta = Math.abs(rawHitPointToSentinelM - rawTerminalDeltaM)
+    <= representationTolerance;
+  const hitPointWithinTolerance = hitPointMatchesTerminalDelta
+    && (rawHitPointToSentinelM <= RIGGED_HAND_SELF_OCCLUSION_CONTRACT.terminalHandToleranceM
+      || (terminalDistanceWithinTolerance
       && Math.abs(rawHitPointToSentinelM - rawTerminalDeltaM) <= representationTolerance
       && rawTerminalDeltaM - RIGGED_HAND_SELF_OCCLUSION_CONTRACT.terminalHandToleranceM
-        <= representationTolerance);
+        <= representationTolerance));
+  const cameraToHitDistanceMatches = Math.abs(cameraToHitDistanceM - intersection.distance)
+    <= representationTolerance;
+  const raySegmentValid = Number.isFinite(rayParameter) && rayParameter >= 0 && rayParameter <= 1
+    && rayLateralDistanceM <= representationTolerance
+    && cameraToHitDistanceMatches;
   const terminalBoundaryComparisonM = terminalDistanceWithinTolerance
       && rawTerminalDeltaM > RIGGED_HAND_SELF_OCCLUSION_CONTRACT.terminalHandToleranceM
     ? RIGGED_HAND_SELF_OCCLUSION_CONTRACT.terminalHandToleranceM
@@ -1495,45 +1513,89 @@ export function classifyRiggedHandSelfOcclusionHit(
     && riggedEvidenceObjectDescendsFrom(intersection.object, weaponRoot);
   const mesh = intersection.object;
   const expectedWristName = requestedSide === 'left' ? 'WristL' : 'WristR';
-  const requestedWristMatchesSide = requestedWrist.name === expectedWristName
-    && operatorRoot.getObjectByName(expectedWristName) === requestedWrist;
+  const manifestWrist = manifest.wrists.find(({ side }) => side === requestedSide);
+  const requestedWristMatchesSide = canonicalOperator.side === requestedSide
+    && requestedWrist.name === expectedWristName
+    && manifestWrist?.name === expectedWristName
+    && manifestWrist.uuid === requestedWrist.uuid
+    && riggedEvidenceObjectDescendsFrom(requestedWrist, visual);
+  const canonicalMeshIndex = mesh instanceof THREE.SkinnedMesh
+    ? canonicalSkinnedMeshes.indexOf(mesh)
+    : -1;
+  const canonicalMeshIdentity = canonicalMeshIndex >= 0 ? manifest.skinnedMeshes[canonicalMeshIndex] : undefined;
   const canonicalOperatorSkinnedMesh = requestedWristMatchesSide && mesh instanceof THREE.SkinnedMesh
-    && riggedEvidenceObjectDescendsFrom(mesh, operatorRoot)
+    && canonicalMeshIndex >= 0
+    && canonicalSkinnedMeshes.length === manifest.skinnedMeshes.length
+    && canonicalMeshIdentity?.name === mesh.name
+    && canonicalMeshIdentity.uuid === mesh.uuid
+    && manifest.visual.name === visual.name
+    && manifest.visual.uuid === visual.uuid
+    && riggedEvidenceObjectDescendsFrom(visual, operatorRoot)
+    && riggedEvidenceObjectDescendsFrom(mesh, visual)
     && mesh.skeleton.bones.includes(requestedWrist)
-    && riggedEvidenceObjectDescendsFrom(requestedWrist, operatorRoot);
+    && riggedEvidenceObjectDescendsFrom(operatorRoot, actorRoot);
   const face = intersection.face;
+  const position = mesh instanceof THREE.SkinnedMesh ? mesh.geometry.getAttribute('position') : undefined;
+  const skinIndex = mesh instanceof THREE.SkinnedMesh ? mesh.geometry.getAttribute('skinIndex') : undefined;
+  const skinWeight = mesh instanceof THREE.SkinnedMesh ? mesh.geometry.getAttribute('skinWeight') : undefined;
+  const skinAttributesValid = canonicalOperatorSkinnedMesh
+    && position !== undefined && skinIndex !== undefined && skinWeight !== undefined
+    && skinIndex.itemSize === 4 && skinWeight.itemSize === 4
+    && skinIndex.normalized === false
+    && skinIndex.count === position.count && skinWeight.count === position.count;
+  const skinAttributeProvenance = Object.freeze({
+    positionCount: position?.count ?? null,
+    skinIndexCount: skinIndex?.count ?? null,
+    skinIndexItemSize: skinIndex?.itemSize ?? null,
+    skinIndexNormalized: skinIndex?.normalized ?? null,
+    skinWeightCount: skinWeight?.count ?? null,
+    skinWeightItemSize: skinWeight?.itemSize ?? null,
+    skinWeightNormalized: skinWeight?.normalized ?? null,
+    valid: skinAttributesValid,
+  });
   const dominantBones = canonicalOperatorSkinnedMesh && face
     ? [face.a, face.b, face.c].map((vertexIndex) => {
-      const skinIndex = mesh.geometry.getAttribute('skinIndex');
-      const skinWeight = mesh.geometry.getAttribute('skinWeight');
       const component = (attribute: THREE.BufferAttribute | THREE.InterleavedBufferAttribute, slot: number) => {
         if (slot === 0) return attribute.getX(vertexIndex);
         if (slot === 1) return attribute.getY(vertexIndex);
         if (slot === 2) return attribute.getZ(vertexIndex);
         return attribute.getW(vertexIndex);
       };
-      if (!skinIndex || !skinWeight || skinIndex.itemSize < 4 || skinWeight.itemSize < 4
+      if (!skinAttributesValid || !skinIndex || !skinWeight || !position
         || !Number.isSafeInteger(vertexIndex) || vertexIndex < 0
-        || vertexIndex >= skinIndex.count || vertexIndex >= skinWeight.count) return Object.freeze({
+        || vertexIndex >= position.count) return Object.freeze({
         vertexIndex,
+        skinIndices: null,
+        skinWeights: null,
+        normalizedWeights: null,
         slot: null,
         skinIndex: null,
         normalizedWeight: null,
         bone: null,
+        boneUuid: null,
         handOwned: false,
       });
+      const indices = [0, 1, 2, 3].map((slot) => component(skinIndex, slot));
       const weights = [0, 1, 2, 3].map((slot) => component(skinWeight, slot));
       const weightSum = weights.reduce((sum, weight) => sum + weight, 0);
-      if (!weights.every((weight) => Number.isFinite(weight) && weight >= 0) || !(weightSum > 0)) {
+      if (!indices.every((index) => Number.isSafeInteger(index)
+          && index >= 0 && index < mesh.skeleton.bones.length)
+        || !weights.every((weight) => Number.isFinite(weight) && weight >= 0)
+        || !Number.isFinite(weightSum) || !(weightSum > 0)) {
         return Object.freeze({
           vertexIndex,
+          skinIndices: Object.freeze(indices),
+          skinWeights: Object.freeze(weights),
+          normalizedWeights: null,
           slot: null,
           skinIndex: null,
           normalizedWeight: null,
           bone: null,
+          boneUuid: null,
           handOwned: false,
         });
       }
+      const normalizedWeights = weights.map((weight) => weight / weightSum);
       let dominantSlot = 0;
       for (let slot = 1; slot < 4; slot += 1) {
         if (weights[slot] > weights[dominantSlot]) dominantSlot = slot;
@@ -1546,29 +1608,46 @@ export function classifyRiggedHandSelfOcclusionHit(
         && (dominantBone === requestedWrist || riggedEvidenceObjectDescendsFrom(dominantBone, requestedWrist));
       return Object.freeze({
         vertexIndex,
+        skinIndices: Object.freeze(indices),
+        skinWeights: Object.freeze(weights),
+        normalizedWeights: Object.freeze(normalizedWeights),
         slot: dominantSlot,
         skinIndex: dominantSkinIndex,
-        normalizedWeight: weights[dominantSlot] / weightSum,
+        normalizedWeight: normalizedWeights[dominantSlot],
         bone: dominantBone?.name ?? null,
+        boneUuid: dominantBone?.uuid ?? null,
         handOwned,
       });
     })
     : [];
   const handOwnedDominantBoneCount = dominantBones.filter(({ handOwned }) => handOwned).length;
-  const faceHandOwned = dominantBones.length === 3 && handOwnedDominantBoneCount >= 2;
+  const faceInfluenceProvenanceValid = dominantBones.length === 3 && dominantBones.every((dominant) => (
+    Array.isArray(dominant.skinIndices) && dominant.skinIndices.length === 4
+    && Array.isArray(dominant.skinWeights) && dominant.skinWeights.length === 4
+    && Array.isArray(dominant.normalizedWeights) && dominant.normalizedWeights.length === 4
+    && Number.isSafeInteger(dominant.slot) && Number.isSafeInteger(dominant.skinIndex)
+    && typeof dominant.bone === 'string' && typeof dominant.boneUuid === 'string'
+  )) && new Set(dominantBones.map(({ vertexIndex }) => vertexIndex)).size === 3;
+  const faceHandOwned = faceInfluenceProvenanceValid && handOwnedDominantBoneCount >= 2;
   const cameraInsideOpaqueGeometry = intersection.distance
     <= RIGGED_HAND_SELF_OCCLUSION_CONTRACT.cameraInsideOpaqueDistanceM;
   const terminalHandSurface = sameActor && canonicalOperatorSkinnedMesh && faceHandOwned
     && !heldWeapon && !cameraInsideOpaqueGeometry
-    && terminalDistanceWithinTolerance
+    && terminalDistanceWithinTolerance && raySegmentValid
     && hitPointWithinTolerance;
   return Object.freeze({
     name: intersection.object.name || intersection.object.type,
     mesh: intersection.object.name || intersection.object.type,
+    meshUuid: intersection.object.uuid,
+    geometryUuid: mesh instanceof THREE.Mesh ? mesh.geometry.uuid : null,
     face: face ? Object.freeze({ a: face.a, b: face.b, c: face.c }) : null,
     materialIndex: face?.materialIndex ?? null,
     hitPointWorld: Object.freeze(intersection.point.toArray()),
     distanceM: intersection.distance,
+    cameraToHitDistanceM,
+    rayParameter,
+    rayLateralDistanceM,
+    raySegmentValid,
     targetDistanceM,
     terminalDeltaM: rawTerminalDeltaM,
     hitPointToSentinelM: rawHitPointToSentinelM,
@@ -1580,8 +1659,11 @@ export function classifyRiggedHandSelfOcclusionHit(
     canonicalOperatorSkinnedMesh,
     requestedSide,
     requestedWrist: requestedWrist.name,
+    requestedWristUuid: requestedWrist.uuid,
     requestedWristMatchesSide,
+    skinAttributeProvenance,
     dominantBones: Object.freeze(dominantBones),
+    faceInfluenceProvenanceValid,
     handOwnedDominantBoneCount,
     faceHandOwned,
     cameraInsideOpaqueGeometry,

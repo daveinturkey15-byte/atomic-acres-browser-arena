@@ -315,8 +315,15 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     expect(handOcclusion).toContain('THREE.InstancedMesh.prototype.raycast.call(candidate, raycaster, intersections)');
     expect(handOcclusion).toContain("Reflect.set(candidate, 'boundingSphere', previousBoundingSphere)");
     expect(handOcclusion).toContain('THREE.BatchedMesh.prototype.raycast.call(candidate, raycaster, intersections)');
-    expect(handOcclusion).toContain("operatorRoot.getObjectByName(expectedWristName) === requestedWrist");
-    expect(handOcclusion).toContain('handOwnedDominantBoneCount >= 2');
+    expect(handOcclusion).toContain('canonicalSkinnedMeshes.indexOf(mesh)');
+    expect(handOcclusion).toContain('manifestWrist.uuid === requestedWrist.uuid');
+    expect(handOcclusion).toContain('faceInfluenceProvenanceValid && handOwnedDominantBoneCount >= 2');
+    expect(legacy).toContain('riggedOperatorHandEvidenceIdentity(operatorRoot, side)');
+    expect(runner).toContain("'Cube018', 'Cube018_1', 'Cube018_2', 'Swat_Feet'");
+    expect(runner).toContain('canonicalOperatorSkinManifestValid');
+    expect(runner).toContain('recomputeCanonicalFaceInfluence');
+    expect(runner).toContain('committed and paused frames must retain the exact canonical operator object manifest');
+    expect(runner).toContain('coherent terminal-radius forgery must fail camera-hit collinearity and segment arithmetic');
     const catalog = graph.testCatalog.find(({ id }) => id === 'T-PASS69-3-RIGGED-DUMMY');
     expect(catalog).toMatchObject({
       command: 'npm run qa:pass69-3:rigged-bot-live',

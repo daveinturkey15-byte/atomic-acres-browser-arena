@@ -631,7 +631,7 @@ import {
 } from './interactive-world-protocol';
 import { TracerPool } from './tracer-pool';
 import { AsyncSerialQueue } from './async-serial-queue';
-import { RIGGED_OPERATOR_CORPSE_ACTION_NAMES, loadRiggedOperatorAsset, prewarmRiggedOperatorActions, resolveRiggedOperatorRuntimeRoot, riggedOperatorAssetReady, riggedOperatorTelemetry } from './operator-model';
+import { RIGGED_OPERATOR_CORPSE_ACTION_NAMES, loadRiggedOperatorAsset, prewarmRiggedOperatorActions, resolveRiggedOperatorRuntimeRoot, riggedOperatorAssetReady, riggedOperatorCanonicalEvidenceManifest, riggedOperatorHandEvidenceIdentity, riggedOperatorTelemetry } from './operator-model';
 import {
   WeaponPresentation,
   type WeaponViewmodelCatalogGpuPrewarmer,
@@ -1125,6 +1125,7 @@ type DebugCaptureActorFrameEvidence = Readonly<{
   rootEffectivelyVisible: boolean;
   effectivelyVisibleMeshCount: number;
   effectivelyVisibleSkinnedMeshes: readonly string[];
+  canonicalOperatorSkinManifest: Readonly<Record<string, unknown>> | null;
   armSkinVisible: boolean;
   handSkinVisible: boolean;
   weaponCenterWorld: readonly number[] | null;
@@ -24232,6 +24233,9 @@ function debugCaptureActorFrameEvidence(
     handPose?: { allInEffectivelyVisibleSkinnedMesh?: boolean };
     weaponBounds?: { center?: number[] };
   } | null;
+  const canonicalOperatorSkinManifest = operatorRoot
+    ? riggedOperatorCanonicalEvidenceManifest(operatorRoot)
+    : null;
   const anchorHeight = target.kind === 'bot' ? 1.35 : 1.65;
   const projectedWorldPosition = root.localToWorld(new THREE.Vector3(0, anchorHeight, 0)).toArray();
   const jointScreenPositions = debugRiggedOperatorJointScreenPositions(operatorModel);
@@ -24261,6 +24265,7 @@ function debugCaptureActorFrameEvidence(
     effectivelyVisibleSkinnedMeshes: Object.freeze([
       ...((operatorModel?.effectivelyVisibleSkinnedMeshes as string[] | undefined) ?? []),
     ]),
+    canonicalOperatorSkinManifest,
     armSkinVisible: operatorModel?.armPose?.allInEffectivelyVisibleSkinnedMesh === true,
     handSkinVisible: operatorModel?.handPose?.allInEffectivelyVisibleSkinnedMesh === true,
     weaponCenterWorld: Array.isArray(operatorModel?.weaponBounds?.center)
@@ -24326,8 +24331,7 @@ function debugRiggedHandSelfOcclusionForFrame(
   const actorRoot = debugRiggedEvidenceActorRoot(actorKind, actorId);
   const operatorRoot = actorRoot ? resolveRiggedOperatorRuntimeRoot(actorRoot) : null;
   const weaponRoot = (operatorRoot?.userData.operatorRig as { weapon?: THREE.Object3D } | undefined)?.weapon ?? null;
-  const requestedWristCandidate = operatorRoot?.getObjectByName(side === 'left' ? 'WristL' : 'WristR') ?? null;
-  const requestedWrist = requestedWristCandidate instanceof THREE.Bone ? requestedWristCandidate : null;
+  const canonicalOperator = operatorRoot ? riggedOperatorHandEvidenceIdentity(operatorRoot, side) : null;
   const cameraWorld = camera.getWorldPosition(new THREE.Vector3());
   const base = {
     ...RIGGED_HAND_SELF_OCCLUSION_CONTRACT,
@@ -24337,6 +24341,7 @@ function debugRiggedHandSelfOcclusionForFrame(
     captureFrame,
     captureRevision: debugCaptureCameraRevision,
     captureSubmissionSequence,
+    canonicalOperatorSkinManifest: canonicalOperator?.manifest ?? null,
     camera: Object.freeze({
       position: Object.freeze(cameraWorld.toArray()),
       quaternion: Object.freeze(camera.quaternion.toArray()),
@@ -24344,7 +24349,7 @@ function debugRiggedHandSelfOcclusionForFrame(
       captureRevision: debugCaptureCameraRevision,
     }),
   };
-  if (!actorRoot || !operatorRoot || !weaponRoot || !requestedWrist) return Object.freeze({
+  if (!actorRoot || !operatorRoot || !weaponRoot || !canonicalOperator) return Object.freeze({
     ...base,
     heldWeaponIncluded: false,
     renderOccluderCount: 0,
@@ -24354,7 +24359,7 @@ function debugRiggedHandSelfOcclusionForFrame(
     reason: !actorRoot ? 'missing-actor-at-submitted-frame'
       : !operatorRoot ? 'missing-operator-root-at-submitted-frame'
         : !weaponRoot ? 'missing-held-weapon-at-submitted-frame'
-          : 'missing-requested-wrist-at-submitted-frame',
+          : 'missing-canonical-operator-hand-identity-at-submitted-frame',
     sentinels: Object.freeze([]),
   });
   scene.updateMatrixWorld(true);
@@ -24376,10 +24381,9 @@ function debugRiggedHandSelfOcclusionForFrame(
       cameraWorld,
       worldPosition,
       actorRoot,
-      operatorRoot,
       weaponRoot,
       side,
-      requestedWrist,
+      canonicalOperator,
     );
     return Object.freeze({
       name,
