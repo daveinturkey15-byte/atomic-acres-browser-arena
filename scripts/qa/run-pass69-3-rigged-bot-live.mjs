@@ -1,9 +1,11 @@
 import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
-  existsSync, mkdirSync, readFileSync, rmSync,
+  constants as fsConstants, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync,
+  readFileSync, realpathSync, rmSync, statSync, utimesSync, writeFileSync,
 } from 'node:fs';
-import { resolve } from 'node:path';
+import { relative, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 
 const root = process.cwd();
 const targets = Object.freeze({
@@ -199,10 +201,89 @@ function sourceStatus() {
   }).trim();
 }
 
-function discardEvidence(message) {
+function invalidDiagnosticReceiptPath(baseDirectory, renderer, sourceSha, receiptSha256) {
+  const boundedSha = /^[a-f0-9]{40}$/u.test(sourceSha) ? sourceSha : 'unknown-source';
+  if (!/^[a-f0-9]{64}$/u.test(receiptSha256)) throw new Error('invalid diagnostic receipt checksum');
+  return resolve(
+    baseDirectory,
+    'INVALID-diagnostics',
+    `receipt-${renderer}-${boundedSha}-${receiptSha256}-INVALID.json`,
+  );
+}
+
+function persistInvalidDiagnosticReceipt(sourcePath, baseDirectory, renderer, sourceSha) {
+  const sourceStat = lstatSync(sourcePath);
+  if (!sourceStat.isFile() || sourceStat.isSymbolicLink()) {
+    throw new Error('invalid diagnostic receipt source is not a regular non-link file');
+  }
+  const baseStat = lstatSync(baseDirectory);
+  if (!baseStat.isDirectory() || baseStat.isSymbolicLink()) {
+    throw new Error('invalid diagnostic artifact base is not a regular non-link directory');
+  }
+  const diagnosticDirectory = resolve(baseDirectory, 'INVALID-diagnostics');
+  mkdirSync(diagnosticDirectory, { recursive: true });
+  const diagnosticDirectoryStat = lstatSync(diagnosticDirectory);
+  if (!diagnosticDirectoryStat.isDirectory() || diagnosticDirectoryStat.isSymbolicLink()) {
+    throw new Error('invalid diagnostic directory is a link, junction, or non-directory');
+  }
+  const realBase = realpathSync(baseDirectory);
+  const realDiagnosticDirectory = realpathSync(diagnosticDirectory);
+  if (relative(realBase, realDiagnosticDirectory) !== 'INVALID-diagnostics') {
+    throw new Error('invalid diagnostic directory escapes the artifact base');
+  }
+
+  const receiptSha256 = sha256(sourcePath);
+  const diagnosticPath = invalidDiagnosticReceiptPath(
+    baseDirectory, renderer, sourceSha, receiptSha256,
+  );
+  let reusedExisting = false;
+  let created = false;
+  try {
+    copyFileSync(sourcePath, diagnosticPath, fsConstants.COPYFILE_EXCL);
+    created = true;
+  } catch (error) {
+    if (!(error && typeof error === 'object' && error.code === 'EEXIST')) throw error;
+    reusedExisting = true;
+  }
+
+  try {
+    const diagnosticStat = lstatSync(diagnosticPath);
+    if (!diagnosticStat.isFile() || diagnosticStat.isSymbolicLink()) {
+      throw new Error('invalid diagnostic receipt destination is a link or non-regular file');
+    }
+    if (realpathSync(resolve(diagnosticPath, '..')) !== realDiagnosticDirectory) {
+      throw new Error('invalid diagnostic receipt destination escapes the diagnostic directory');
+    }
+    const persistedSha256 = sha256(diagnosticPath);
+    const byteIdentical = readFileSync(sourcePath).equals(readFileSync(diagnosticPath));
+    if (persistedSha256 !== receiptSha256 || !byteIdentical) {
+      throw new Error('invalid diagnostic receipt content-address verification failed');
+    }
+  } catch (error) {
+    if (created) rmSync(diagnosticPath, { force: true });
+    throw error;
+  }
+  return Object.freeze({ path: diagnosticPath, sha256: receiptSha256, reusedExisting });
+}
+
+function discardEvidence(message, quarantineSourceSha = null) {
+  let diagnosticReceipt = null;
+  let diagnosticFailure = null;
+  if (quarantineSourceSha !== null && existsSync(receiptPath)) {
+    try {
+      diagnosticReceipt = persistInvalidDiagnosticReceipt(
+        receiptPath, artifactBase, target.renderer, quarantineSourceSha,
+      );
+    } catch (error) {
+      diagnosticFailure = error instanceof Error ? error.message : String(error);
+    }
+  }
   rmSync(receiptPath, { force: true });
   rmSync(rendererArtifacts, { recursive: true, force: true });
-  throw new Error(message);
+  const diagnosticSuffix = diagnosticReceipt
+    ? `; exact invalid receipt quarantined for local diagnostics only (INVALID, never canonical/publishable, sha256=${diagnosticReceipt.sha256}, reusedExisting=${diagnosticReceipt.reusedExisting}): ${relative(root, diagnosticReceipt.path).replaceAll('\\', '/')}`
+    : diagnosticFailure ? `; invalid receipt quarantine failed closed (${diagnosticFailure})` : '';
+  throw new Error(`${message}${diagnosticSuffix}`);
 }
 
 function sha256(path) {
@@ -1511,34 +1592,37 @@ function gripValid(grip, socketName) {
     && grip.wristOrientation.errorRadians <= gripThresholds.maximumQuaternionErrorRadians;
 }
 
-function handBindFloorValid(floor, curlBone, actualBone, expected) {
+function handBindFloorValidationFailures(floor, curlBone, actualBone, expected) {
+  const failures = [];
+  const add = (reason, passed) => { if (passed !== true) failures.push(reason); };
   const productFloor = carbineSecondPhalanxProductFloors[expected.digit];
-  if (!(productFloor > expected.minimumBindRadians)
-    || floor?.contract !== 'post-mixer-authored-bind-relative-hand-floor-v1'
-    || floor.allocationContract !== 'persistent-per-rendered-hand-bone-v1'
-    || !Number.isInteger(floor.generation)
-    || floor.generation < 1
-    || floor.reference !== 'immutable-authored-handBindPose-before-animation'
-    || floor.side !== expected.side
-    || floor.digit !== expected.digit
-    || floor.sourceBone !== expected.sourceBone
-    || floor.bone !== expected.bone
-    || floor.minimumBindDeltaRadians !== productFloor
-    || !finiteVector(floor.bindLocalQuaternion, 4)
-    || !finiteVector(floor.beforeLocalQuaternion, 4)
-    || !finiteVector(floor.afterLocalQuaternion, 4)
-    || !finiteVector(floor.appliedAxis)
-    || !close(vectorLength(floor.bindLocalQuaternion), 1, 1e-7)
-    || !close(vectorLength(floor.beforeLocalQuaternion), 1, 1e-5)
-    || !close(vectorLength(floor.afterLocalQuaternion), 1, 1e-5)
-    || !close(vectorLength(floor.appliedAxis), 1, 1e-7)
-    || typeof floor.alignedObservedAxisHemisphere !== 'boolean'
-    || floor.appliedToRenderedBone !== true
-    || floor.allFinite !== true
-    || !Number.isFinite(floor.beforeBindDeltaRadians)
-    || !Number.isFinite(floor.afterBindDeltaRadians)
-    || !Number.isFinite(floor.reportedBindDeltaCorrectionRadians)
-    || !Number.isFinite(floor.renderedOrientationCorrectionRadians)) return false;
+  add('product-floor-margin', productFloor > expected.minimumBindRadians);
+  add('contract', floor?.contract === 'post-mixer-authored-bind-relative-hand-floor-v1');
+  add('allocation-contract', floor?.allocationContract === 'persistent-per-rendered-hand-bone-v1');
+  add('generation', Number.isInteger(floor?.generation) && floor.generation >= 1);
+  add('reference', floor?.reference === 'immutable-authored-handBindPose-before-animation');
+  add('side', floor?.side === expected.side);
+  add('digit', floor?.digit === expected.digit);
+  add('source-bone', floor?.sourceBone === expected.sourceBone);
+  add('bone', floor?.bone === expected.bone);
+  add('minimum-floor', floor?.minimumBindDeltaRadians === productFloor);
+  add('bind-quaternion-shape', finiteVector(floor?.bindLocalQuaternion, 4));
+  add('before-quaternion-shape', finiteVector(floor?.beforeLocalQuaternion, 4));
+  add('after-quaternion-shape', finiteVector(floor?.afterLocalQuaternion, 4));
+  add('applied-axis-shape', finiteVector(floor?.appliedAxis));
+  if (failures.length > 0) return failures;
+  add('bind-quaternion-norm', close(vectorLength(floor.bindLocalQuaternion), 1, 1e-7));
+  add('before-quaternion-norm', close(vectorLength(floor.beforeLocalQuaternion), 1, 1e-5));
+  add('after-quaternion-norm', close(vectorLength(floor.afterLocalQuaternion), 1, 1e-5));
+  add('applied-axis-norm', close(vectorLength(floor.appliedAxis), 1, 1e-7));
+  add('alignment-flag', typeof floor.alignedObservedAxisHemisphere === 'boolean');
+  add('rendered-bone-application', floor.appliedToRenderedBone === true);
+  add('finite-flag', floor.allFinite === true);
+  add('before-delta-finite', Number.isFinite(floor.beforeBindDeltaRadians));
+  add('after-delta-finite', Number.isFinite(floor.afterBindDeltaRadians));
+  add('reported-correction-finite', Number.isFinite(floor.reportedBindDeltaCorrectionRadians));
+  add('rendered-correction-finite', Number.isFinite(floor.renderedOrientationCorrectionRadians));
+  if (failures.length > 0) return failures;
 
   const bindNorm = vectorLength(floor.bindLocalQuaternion);
   const expectedAppliedRelativeAngle = 2 * Math.acos(Math.min(1, Math.max(-1,
@@ -1550,7 +1634,8 @@ function handBindFloorValid(floor, curlBone, actualBone, expected) {
   const bindRelativePose = canonicalBindRelativePose(
     floor.bindLocalQuaternion, floor.beforeLocalQuaternion,
   );
-  if (!bindRelativePose) return false;
+  add('canonical-bind-relative-pose', bindRelativePose !== null);
+  if (!bindRelativePose) return failures;
   const observedAxisValid = bindRelativePose.axis !== null
     && floor.observedShortestRelativeAxis !== null
     && finiteVector(floor.observedShortestRelativeAxis)
@@ -1558,7 +1643,7 @@ function handBindFloorValid(floor, curlBone, actualBone, expected) {
     && floor.observedShortestRelativeAxis.reduce(
       (sum, value, index) => sum + value * bindRelativePose.axis[index], 0,
     ) >= 1 - 1e-7;
-  if ((bindRelativePose.axis === null) !== (floor.observedShortestRelativeAxis === null)) return false;
+  add('observed-axis-presence', (bindRelativePose.axis === null) === (floor.observedShortestRelativeAxis === null));
   let axisProvenanceValid = false;
   if (observedAxisValid) {
     const observedAppliedDot = floor.observedShortestRelativeAxis.reduce(
@@ -1605,7 +1690,8 @@ function handBindFloorValid(floor, curlBone, actualBone, expected) {
       axisAngleQuaternion(floor.appliedAxis, floor.floorTargetRelativeAngleRadians),
     ))
     : bindRelativePose.normalizedLocal;
-  if (!expectedAfter) return false;
+  add('expected-after-quaternion', expectedAfter !== null);
+  if (!expectedAfter) return failures;
   const expectedRenderedCorrectionRadians = floor.intervened
     ? floor.alignedObservedAxisHemisphere
       ? floor.floorTargetRelativeAngleRadians + bindRelativePose.angleRadians
@@ -1647,32 +1733,49 @@ function handBindFloorValid(floor, curlBone, actualBone, expected) {
     && close(actualBone.bindQuaternionDeltaRadians, floor.afterBindDeltaRadians, 1e-9)
     && normalizedQuaternionDelta(actualBone.localQuaternion, floor.afterLocalQuaternion) <= 1e-9
     && normalizedQuaternionDelta(actualBone.bindLocalQuaternion, floor.bindLocalQuaternion) <= 1e-9;
-  return axisProvenanceValid && independentlyConstructedAfterValid
-    && scalarTelemetryValid && interventionValid && curlBoneValid && actualBoneValid;
+  add('axis-provenance', axisProvenanceValid);
+  add('constructed-after-quaternion', independentlyConstructedAfterValid);
+  add('scalar-telemetry', scalarTelemetryValid);
+  add('intervention-semantics', interventionValid);
+  add('curl-floor-binding', curlBoneValid);
+  add('rendered-hand-bone-binding', actualBoneValid);
+  return failures;
+}
+
+function handBindFloorValid(floor, curlBone, actualBone, expected) {
+  return handBindFloorValidationFailures(floor, curlBone, actualBone, expected).length === 0;
+}
+
+function fingerCurlValidationFailures(grip, model, prefix = 'fingerCurl') {
+  const failures = [];
+  const add = (reason, passed) => { if (passed !== true) failures.push(`${prefix}.${reason}`); };
+  const curl = grip?.fingerCurl;
+  add('contract', curl?.contract === 'pass65-evaluated-per-digit-grip-curl-v3');
+  add('source-reference', curl?.sourceReferenceAvailable === true);
+  add('expected-bone-count', curl?.expectedBoneCount === expectedHandBones.length);
+  add('both-hands', curl?.bothHands === true);
+  add('all-at-or-above-floor', curl?.allAtOrAboveRequiredBindFloor === true);
+  add('all-applied', curl?.allApplied === true);
+  add('curl-bones-count', Array.isArray(curl?.bones) && curl.bones.length === expectedHandBones.length);
+  add('bind-floors-count', Array.isArray(curl?.bindFloors) && curl.bindFloors.length === expectedHandBones.length);
+  add('rendered-hand-bones-count', Array.isArray(model?.handPose?.bones)
+    && model.handPose.bones.length === expectedHandBones.length);
+  if (failures.length > 0) return failures;
+  for (let index = 0; index < expectedHandBones.length; index += 1) {
+    const expected = expectedHandBones[index];
+    const bonePrefix = `${prefix}.${expected.side}.${expected.digit}.${expected.bone}`;
+    failures.push(...handBindFloorValidationFailures(
+      curl.bindFloors[index], curl.bones[index], model.handPose.bones[index], expectedHandBones[index],
+    ).map((reason) => `${bonePrefix}.${reason}`));
+  }
+  const rightPinkyIndex = expectedHandBones.findIndex(({ side, digit }) => side === 'right' && digit === 'pinky');
+  add('right-pinky-alias', rightPinkyIndex >= 0
+    && sameObject(curl.rightPinkyBindFloor, curl.bindFloors[rightPinkyIndex]));
+  return failures;
 }
 
 function fingerCurlValid(grip, model) {
-  const curl = grip?.fingerCurl;
-  if (curl?.contract !== 'pass65-evaluated-per-digit-grip-curl-v3'
-    || curl.sourceReferenceAvailable !== true
-    || curl.expectedBoneCount !== expectedHandBones.length
-    || curl.bothHands !== true
-    || curl.allAtOrAboveRequiredBindFloor !== true
-    || curl.allApplied !== true
-    || !Array.isArray(curl.bones)
-    || curl.bones.length !== expectedHandBones.length
-    || !Array.isArray(curl.bindFloors)
-    || curl.bindFloors.length !== expectedHandBones.length
-    || !Array.isArray(model?.handPose?.bones)
-    || model.handPose.bones.length !== expectedHandBones.length) return false;
-  for (let index = 0; index < expectedHandBones.length; index += 1) {
-    if (!handBindFloorValid(
-      curl.bindFloors[index], curl.bones[index], model.handPose.bones[index], expectedHandBones[index],
-    )) return false;
-  }
-  const rightPinkyIndex = expectedHandBones.findIndex(({ side, digit }) => side === 'right' && digit === 'pinky');
-  return rightPinkyIndex >= 0
-    && sameObject(curl.rightPinkyBindFloor, curl.bindFloors[rightPinkyIndex]);
+  return fingerCurlValidationFailures(grip, model).length === 0;
 }
 
 function armPoseValid(model, armed) {
@@ -1866,16 +1969,22 @@ function receiptValidationFailures(receipt, sourceSha) {
   add('receipt.armedBot.weapon', receipt.armedBot?.weapon === 'carbine');
   add('receipt.armedBot.alive', receipt.armedBot?.alive === true);
   add('receipt.armedBot.identityContinuity', armedActorIdentityValid(receipt.armedBot));
-  add('receipt.armedBot.first.operatorModel', armPoseValid(receipt.armedBot?.first?.operatorModel, true));
-  add('receipt.armedBot.second.operatorModel', armPoseValid(receipt.armedBot?.second?.operatorModel, true));
-  add('receipt.armedBot.first.operatorModel.supportGrip.fingerCurl', fingerCurlValid(
-    receipt.armedBot?.first?.operatorModel?.supportGrip,
-    receipt.armedBot?.first?.operatorModel,
-  ));
-  add('receipt.armedBot.second.operatorModel.supportGrip.fingerCurl', fingerCurlValid(
-    receipt.armedBot?.second?.operatorModel?.supportGrip,
-    receipt.armedBot?.second?.operatorModel,
-  ));
+  const firstOperatorModel = receipt.armedBot?.first?.operatorModel;
+  const secondOperatorModel = receipt.armedBot?.second?.operatorModel;
+  const firstCurlPrefix = 'receipt.armedBot.first.operatorModel.supportGrip.fingerCurl';
+  const secondCurlPrefix = 'receipt.armedBot.second.operatorModel.supportGrip.fingerCurl';
+  const firstCurlFailures = fingerCurlValidationFailures(
+    firstOperatorModel?.supportGrip, firstOperatorModel, firstCurlPrefix,
+  );
+  const secondCurlFailures = fingerCurlValidationFailures(
+    secondOperatorModel?.supportGrip, secondOperatorModel, secondCurlPrefix,
+  );
+  add('receipt.armedBot.first.operatorModel', armPoseValid(firstOperatorModel, true));
+  add('receipt.armedBot.second.operatorModel', armPoseValid(secondOperatorModel, true));
+  add(firstCurlPrefix, firstCurlFailures.length === 0);
+  for (const failure of firstCurlFailures) add(failure, false);
+  add(secondCurlPrefix, secondCurlFailures.length === 0);
+  for (const failure of secondCurlFailures) add(failure, false);
   add('receipt.armedBot.motion', motionValid(
     receipt.armedBot?.first, receipt.armedBot?.second, receipt.armedBot?.motion, false,
   ));
@@ -2010,6 +2119,32 @@ function runContractSelfTest() {
   ), 'named predicate diagnostics expose only failed non-sensitive field paths');
   assert(sameArray(receiptValidationFailures(null, '0'.repeat(40)), ['receipt.object']),
     'non-object receipt reports one stable non-sensitive predicate');
+  const diagnosticTestRoot = mkdtempSync(resolve(tmpdir(), 'atomic-acres-invalid-receipt-'));
+  try {
+    const diagnosticTestSource = resolve(diagnosticTestRoot, 'receipt.json');
+    writeFileSync(diagnosticTestSource, '{"status":"INVALID_DIAGNOSTIC_FIXTURE"}\n', 'utf8');
+    const firstDiagnostic = persistInvalidDiagnosticReceipt(
+      diagnosticTestSource, diagnosticTestRoot, target.renderer, 'a'.repeat(40),
+    );
+    const pinnedDiagnosticTime = new Date('2001-01-01T00:00:00.000Z');
+    utimesSync(firstDiagnostic.path, pinnedDiagnosticTime, pinnedDiagnosticTime);
+    const pinnedMtimeMs = statSync(firstDiagnostic.path).mtimeMs;
+    const secondDiagnostic = persistInvalidDiagnosticReceipt(
+      diagnosticTestSource, diagnosticTestRoot, target.renderer, 'a'.repeat(40),
+    );
+    assert(firstDiagnostic.path !== receiptPath
+      && firstDiagnostic.path.includes('INVALID-diagnostics')
+      && firstDiagnostic.path.includes(firstDiagnostic.sha256)
+      && firstDiagnostic.reusedExisting === false
+      && secondDiagnostic.path === firstDiagnostic.path
+      && secondDiagnostic.sha256 === firstDiagnostic.sha256
+      && secondDiagnostic.reusedExisting === true
+      && statSync(firstDiagnostic.path).mtimeMs === pinnedMtimeMs
+      && readFileSync(firstDiagnostic.path).equals(readFileSync(diagnosticTestSource)),
+    'repeated same-source invalid receipt reuses one content-addressed exact object without overwrite');
+  } finally {
+    rmSync(diagnosticTestRoot, { recursive: true, force: true });
+  }
   const distinctHashFixtures = Array.from({ length: 9 }, (_, index) => ({
     sha256: index.toString(16).padStart(64, '0'),
   }));
@@ -2602,6 +2737,10 @@ function runContractSelfTest() {
   invalidGeneration.fingerCurl.bindFloors[0].generation = 0;
   invalidGeneration.fingerCurl.bones[0].bindRelativeFloor = invalidGeneration.fingerCurl.bindFloors[0];
   assert(!fingerCurlValid(invalidGeneration, curlModel), 'non-persistent receipt generation must fail');
+  assert(sameArray(
+    fingerCurlValidationFailures(invalidGeneration, curlModel, 'receipt.armedBot.first.operatorModel.supportGrip.fingerCurl'),
+    ['receipt.armedBot.first.operatorModel.supportGrip.fingerCurl.left.thumb.Thumb2L.generation'],
+  ), 'one forged bind-floor field names the exact actor phase, bone, and reason');
   for (let index = 0; index < expectedHandBones.length; index += 1) {
     const expected = expectedHandBones[index];
     const productFloor = carbineSecondPhalanxProductFloors[expected.digit];
@@ -3235,7 +3374,10 @@ try {
 
 const failedPredicates = receiptValidationFailures(receipt, sourceSha);
 if (failedPredicates.length > 0) {
-  discardEvidence(`Pass 69.3 ${targetName} rigged-bot gate emitted invalid or stale evidence; failed predicates: ${failedPredicates.join(', ')}`);
+  discardEvidence(
+    `Pass 69.3 ${targetName} rigged-bot gate emitted invalid or stale evidence; failed predicates: ${failedPredicates.join(', ')}`,
+    sourceSha,
+  );
 }
 
 const endingSha = execFileSync('git', ['rev-parse', 'HEAD'], {

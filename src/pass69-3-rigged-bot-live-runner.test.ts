@@ -15,6 +15,7 @@ const artKit = readFileSync('src/art-kit.ts', 'utf8');
 const artKitTest = readFileSync('src/art-kit.test.ts', 'utf8');
 const legacy = readFileSync('src/legacy-main.ts', 'utf8');
 const dummyUnit = readFileSync('src/additional-maps-rigged-dummy.test.ts', 'utf8');
+const gitignore = readFileSync('.gitignore', 'utf8');
 
 describe('Pass 69.3 real rigged-bot evidence boundary', () => {
   it('owns separate clean-SHA installed-Edge hardware WebGL2 and native-WebGPU lanes', () => {
@@ -141,9 +142,9 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     expect(artKit).toContain('bindFloors,');
     expect(operator).toContain("contract: 'post-mixer-authored-bind-relative-hand-floor-v1'");
     expect(operator).toContain("allocationContract: 'persistent-per-rendered-hand-bone-v1'");
-    expect(runner).toContain("floor.allocationContract !== 'persistent-per-rendered-hand-bone-v1'");
-    expect(runner).toContain('!Number.isInteger(floor.generation)');
-    expect(runner).toContain('curl.bindFloors.length !== expectedHandBones.length');
+    expect(runner).toContain("floor?.allocationContract === 'persistent-per-rendered-hand-bone-v1'");
+    expect(runner).toContain("add('generation', Number.isInteger(floor?.generation) && floor.generation >= 1)");
+    expect(runner).toContain("add('bind-floors-count', Array.isArray(curl?.bindFloors)");
     expect(runner).toContain("'shortest-bind-relative-aligned-to-previous'");
     expect(runner).not.toContain("'shortest-bind-relative-aligned-to-authored-fallback'");
     expect(runner).toContain('canonicalBindRelativePose(');
@@ -156,6 +157,19 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     expect(runner).toContain('close(vectorLength(floor.beforeLocalQuaternion), 1, 1e-5)');
     expect(runner).toContain('close(vectorLength(floor.afterLocalQuaternion), 1, 1e-5)');
     expect(runner).toContain('finite non-unit animation quaternion uses normalized orientation validation');
+    expect(runner).toContain('fingerCurlValidationFailures(');
+    expect(runner).toContain("fingerCurl.left.thumb.Thumb2L.generation");
+    expect(runner).toContain("'INVALID-diagnostics'");
+    expect(runner).toContain('copyFileSync(sourcePath, diagnosticPath, fsConstants.COPYFILE_EXCL)');
+    expect(runner).toContain('persistedSha256 !== receiptSha256 || !byteIdentical');
+    expect(runner).toContain('INVALID, never canonical/publishable');
+    expect(runner).toContain('firstDiagnostic.path !== receiptPath');
+    expect(runner).toContain('secondDiagnostic.reusedExisting === true');
+    expect(runner).toContain('statSync(firstDiagnostic.path).mtimeMs === pinnedMtimeMs');
+    expect(runner).toContain('diagnosticDirectoryStat.isSymbolicLink()');
+    expect(runner).toContain('rmSync(receiptPath, { force: true })');
+    expect(runner).toContain('throw new Error(`${message}${diagnosticSuffix}`)');
+    expect(gitignore.split(/\r?\n/u)).toContain('artifacts/');
     expect(operator).toContain('floorTargetRelativeAngleRadians');
     expect(operator).toContain('reportedBindDeltaCorrectionRadians');
     expect(operatorUnit).toContain('0.2701489666915341');
