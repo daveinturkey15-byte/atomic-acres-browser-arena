@@ -159,10 +159,9 @@ async function openChooser(page) {
   const buttons = page.locator('#release-channel-options button');
   const labels = await buttons.allTextContents();
   const expectedBadge = expectedReleasedAt ? 'LIVE' : 'RELEASE CANDIDATE';
-  if (await buttons.count() !== 3
-    || !labels.some((text) => text.includes(channelConfig.experimental.pass) && text.includes(expectedBadge) && text.includes('THE BIG ONE'))
-    || !labels.some((text) => text.includes('PASS 67.1') && text.includes('STABLE') && text.includes('SINGLEPLAYER'))
-    || !labels.some((text) => text.includes('PASS 63') && text.includes('ROLLBACK'))
+  if (await buttons.count() !== 2
+    || !labels.some((text) => text.includes(channelConfig.experimental.pass) && text.includes(expectedBadge) && !text.includes('THE BIG ONE'))
+    || !labels.some((text) => text.includes('PASS 63') && text.includes('STABLE') && text.includes('WEBGL'))
     || labels.some((text) => text.includes('PASS 66') || text.includes('PASS 65') || text.includes('PASS 64') || text.includes('PASS 59'))) {
     throw new Error(`Unexpected chooser labels: ${JSON.stringify(labels)}`);
   }
@@ -264,18 +263,20 @@ try {
   const chooser = await observedPage();
   try {
     chooserLabels = await openChooser(chooser.page);
-    for (const choice of ['experimental', 'stable', 'rollback']) {
+    for (const choice of ['experimental', 'stable']) {
       if (await chooser.page.locator(`[data-release-choice="${choice}"]`).count() !== 1) {
         throw new Error(`Missing unique ${choice} chooser action: ${JSON.stringify(chooserLabels)}`);
       }
+    }
+    if (await chooser.page.locator('[data-release-choice="rollback"]').count() !== 0) {
+      throw new Error(`Rollback must not be a third chooser action: ${JSON.stringify(chooserLabels)}`);
     }
   } finally {
     await chooser.close();
   }
 
   await verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass69');
-  await verifyChoice('stable', 'channels/recent-stable', 'PASS 67.1', 'pass66');
-  await verifyChoice('rollback', 'channels/pass63-rollback', 'PASS 63', 'pass63');
+  await verifyChoice('stable', 'channels/pass63-rollback', 'PASS 63', 'pass63');
   if (releasePass && !normalizedPass(routes.experimental.eyebrow).includes(normalizedPass(releasePass))) {
     throw new Error(`Experimental runtime ${routes.experimental.eyebrow} does not match ${releasePass}`);
   }
