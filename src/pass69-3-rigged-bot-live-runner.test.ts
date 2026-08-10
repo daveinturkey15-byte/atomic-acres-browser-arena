@@ -151,6 +151,7 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     for (const token of [
       "'armed-live-bot-medium'",
       "'armed-live-bot-close'",
+      '`armed-live-bot-${side}-hand-close`',
       "'gun-range-dummies-medium'",
       '`${dummy.id}-close`',
       'sha256: sha256(screenshot)',
@@ -162,15 +163,22 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       'expectedSentinelCount: 16',
       'minimumArmChainPixels: 80',
       'minimumWristFingerPixels: 12',
+      "contract: 'fixed-horizontal-wrist-from-weapon-center-v1'",
+      'outsideOffsetM: 0.7',
+      'upwardOffsetM: 0.12',
+      'fovDegrees: 48',
       "status: 'AUTOMATION_PASS_OWNER_PENDING'",
       "status: 'PENDING_OWNER_INSPECTION'",
       'automatedFramingIsNotVisualAcceptance: true',
       "fetch('/channels/the-big-one/channel-provenance.json'",
-      "evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-and-joint-framing'",
+      "evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-full-body-and-fixed-hand-detail-framing'",
     ]) expect(spec).toContain(token);
     expect(runner).toContain('sha256(path) === record.sha256');
     expect(runner).toContain('framingValid(record.framing, actor, expectedRoi, requireJointDetail)');
     expect(runner).toContain('closeJointFramingValid(framing, expectedRoi)');
+    expect(runner).toContain('handFramingValid(record.framing, actor, side)');
+    expect(runner).toContain('armed-live-bot-left-hand-close.png');
+    expect(runner).toContain('armed-live-bot-right-hand-close.png');
     expect(runner).toContain("receipt.visualReview.status !== 'PENDING_OWNER_INSPECTION'");
     const catalog = graph.testCatalog.find(({ id }) => id === 'T-PASS69-3-RIGGED-DUMMY');
     expect(catalog).toMatchObject({
@@ -193,7 +201,7 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     expect(hf228?.verification.artifactRefs).toEqual([]);
   });
 
-  it('executes adversarial zero-weight, elbow-boundary, rotated-grip and cropped-joint mutations', () => {
+  it('executes adversarial zero-weight, elbow, grip, full-body and fixed-hand mutations', () => {
     const output = execFileSync(process.execPath, ['scripts/qa/run-pass69-3-rigged-bot-live.mjs', '--self-test'], {
       encoding: 'utf8',
       windowsHide: true,
@@ -210,7 +218,10 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       'cropped/off-ROI shoulder must fail',
       'offscreen shoulder must fail',
       'sub-80px arm chain must fail',
-      'sub-12px wrist-finger detail must fail',
+      'full-body close framing must not impersonate hand-detail magnification',
+      'cropped hand sentinel must fail',
+      'sub-12px fixed hand span must fail',
+      'non-fixed hand camera distance must fail',
     ]) expect(runner).toContain(token);
   });
 });

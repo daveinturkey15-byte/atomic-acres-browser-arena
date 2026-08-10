@@ -78,8 +78,17 @@ const carbineSocketReferences = Object.freeze({
     calibrationReason: 'authored-firing-grip-retained',
   }),
 });
-const closeJointThresholds = Object.freeze({ minimumArmChainPixels: 80, minimumWristFingerPixels: 12 });
+const closeJointThresholds = Object.freeze({ minimumArmChainPixels: 80 });
+const handDetailThresholds = Object.freeze({ minimumWristFingerPixels: 12 });
+const handCameraContract = Object.freeze({
+  contract: 'fixed-horizontal-wrist-from-weapon-center-v1',
+  outsideOffsetM: 0.7,
+  upwardOffsetM: 0.12,
+  fovDegrees: 48,
+  maximumSourceJointDriftM: 0.03,
+});
 const closeRoiNdc = Object.freeze({ minX: -0.46, maxX: 0.46, minY: -0.7, maxY: 0.7 });
+const handRoiNdc = Object.freeze({ minX: -0.55, maxX: 0.55, minY: -0.68, maxY: 0.68 });
 const mediumRoiNdc = Object.freeze({ minX: -0.68, maxX: 0.68, minY: -0.82, maxY: 0.82 });
 const overviewRoiNdc = Object.freeze({ minX: -0.97, maxX: 0.97, minY: -0.95, maxY: 0.95 });
 if (!selfTestMode) {
@@ -171,8 +180,7 @@ function closeJointFramingValid(framing, expectedRoi) {
     if (!close(reportedChain.pixels, chainPixels, 1e-6)
       || chainPixels < closeJointThresholds.minimumArmChainPixels
       || reportedHand.fingerCount !== 5
-      || !close(reportedHand.minimumPixels, minimumFingerPixels, 1e-6)
-      || minimumFingerPixels < closeJointThresholds.minimumWristFingerPixels) return false;
+      || !close(reportedHand.minimumPixels, minimumFingerPixels, 1e-6)) return false;
   }
   return true;
 }
@@ -223,6 +231,143 @@ function screenshotValid(record, expectedPath, actor, expectedRoi, requireJointD
     && existsSync(path)
     && sha256(path) === record.sha256
     && framingValid(record.framing, actor, expectedRoi, requireJointDetail);
+}
+
+function expectedHandCaptureJoints(side) {
+  return [
+    ...expectedBones.filter((joint) => joint.side === side && joint.role === 'wrist-hand')
+      .map(({ side: jointSide, role, bone }) => ({ kind: 'arm', side: jointSide, role, digit: null, bone })),
+    ...expectedHandBones.filter((joint) => joint.side === side)
+      .map(({ side: jointSide, digit, bone }) => ({ kind: 'finger', side: jointSide, role: null, digit, bone })),
+  ];
+}
+
+function finiteVector(value, dimensions = 3) {
+  return Array.isArray(value) && value.length === dimensions && value.every(Number.isFinite);
+}
+
+function handCameraValid(camera, actor, side) {
+  const expected = expectedHandCaptureJoints(side);
+  if (camera?.contract !== handCameraContract.contract
+    || camera.outsideOffsetM !== handCameraContract.outsideOffsetM
+    || camera.upwardOffsetM !== handCameraContract.upwardOffsetM
+    || camera.fovDegrees !== handCameraContract.fovDegrees
+    || camera.maximumSourceJointDriftM !== handCameraContract.maximumSourceJointDriftM
+    || !sameObject(camera.actor, actor)
+    || camera.side !== side
+    || camera.source !== 'live-rendered-weapon-center-and-rigged-joint-world-transforms'
+    || !finiteVector(camera.sourceWeaponCenterWorld)
+    || !Array.isArray(camera.sourceSentinels)
+    || camera.sourceSentinels.length !== expected.length
+    || !finiteVector(camera.outsideDirectionWorld)
+    || !finiteVector(camera.targetWorld)
+    || !finiteVector(camera.positionWorld)
+    || !Number.isFinite(camera.yaw)
+    || !Number.isFinite(camera.pitch)) return false;
+  for (let index = 0; index < expected.length; index += 1) {
+    const source = camera.sourceSentinels[index];
+    const wanted = expected[index];
+    if (source.kind !== wanted.kind || source.side !== wanted.side || source.role !== wanted.role
+      || source.digit !== wanted.digit || source.bone !== wanted.bone || !finiteVector(source.worldPosition)) return false;
+  }
+  const wristWorld = camera.sourceSentinels[0].worldPosition;
+  const outsideDelta = [
+    wristWorld[0] - camera.sourceWeaponCenterWorld[0],
+    0,
+    wristWorld[2] - camera.sourceWeaponCenterWorld[2],
+  ];
+  const outsideLength = Math.hypot(outsideDelta[0], outsideDelta[2]);
+  if (!(outsideLength > 0.01)) return false;
+  const expectedOutside = outsideDelta.map((value) => value / outsideLength);
+  const expectedTarget = [0, 1, 2].map((axis) => (
+    camera.sourceSentinels.reduce((sum, joint) => sum + joint.worldPosition[axis], 0) / expected.length
+  ));
+  const expectedPosition = expectedTarget.map((value, axis) => value
+    + expectedOutside[axis] * handCameraContract.outsideOffsetM
+    + (axis === 1 ? handCameraContract.upwardOffsetM : 0));
+  const aim = vectorSubtract(expectedTarget, expectedPosition);
+  const expectedYaw = Math.atan2(-aim[0], -aim[2]);
+  const expectedPitch = Math.atan2(aim[1], Math.hypot(aim[0], aim[2]));
+  return camera.outsideDirectionWorld.every((value, index) => close(value, expectedOutside[index], 1e-9))
+    && camera.targetWorld.every((value, index) => close(value, expectedTarget[index], 1e-9))
+    && camera.positionWorld.every((value, index) => close(value, expectedPosition[index], 1e-9))
+    && close(camera.yaw, expectedYaw, 1e-9)
+    && close(camera.pitch, expectedPitch, 1e-9);
+}
+
+function handFramingValid(framing, actor, side) {
+  const expected = expectedHandCaptureJoints(side);
+  const detail = framing?.handDetail;
+  if (framing?.missing !== false
+    || !sameObject(framing.actor, actor)
+    || framing.side !== side
+    || framing.rootVisible !== true
+    || framing.rootEffectivelyVisible !== true
+    || !(framing.effectivelyVisibleMeshCount > 0)
+    || !Array.isArray(framing.effectivelyVisibleSkinnedMeshes)
+    || framing.effectivelyVisibleSkinnedMeshes.length < 1
+    || framing.handSkinVisible !== true
+    || !sameObject(framing.roiNdc, handRoiNdc)
+    || !handCameraValid(framing.camera, actor, side)
+    || !Number.isFinite(framing.canvas?.left)
+    || !Number.isFinite(framing.canvas?.top)
+    || !(framing.canvas?.width > 0)
+    || !(framing.canvas?.height > 0)
+    || !(framing.viewport?.width > 0)
+    || !(framing.viewport?.height > 0)
+    || detail?.required !== true
+    || detail.side !== side
+    || detail.expectedSentinelCount !== expected.length
+    || detail.orderValid !== true
+    || detail.allInsideRoi !== true
+    || !sameObject(detail.thresholds, handDetailThresholds)
+    || !Array.isArray(detail.sentinels)
+    || detail.sentinels.length !== expected.length
+    || !Array.isArray(detail.fingerSpans)
+    || detail.fingerSpans.length !== 5) return false;
+  const pixelFor = (ndc) => ({
+    x: framing.canvas.left + (ndc[0] + 1) * 0.5 * framing.canvas.width,
+    y: framing.canvas.top + (1 - ndc[1]) * 0.5 * framing.canvas.height,
+  });
+  const pixelDistance = (left, right) => Math.hypot(left.x - right.x, left.y - right.y);
+  for (let index = 0; index < expected.length; index += 1) {
+    const sentinel = detail.sentinels[index];
+    const wanted = expected[index];
+    if (sentinel.kind !== wanted.kind || sentinel.side !== wanted.side
+      || sentinel.role !== wanted.role || sentinel.digit !== wanted.digit || sentinel.bone !== wanted.bone
+      || !finiteVector(sentinel.ndc) || !finiteVector(sentinel.worldPosition)
+      || sentinel.withinRoi !== true || sentinel.onScreen !== true) return false;
+    const [x, y, z] = sentinel.ndc;
+    const pixel = pixelFor(sentinel.ndc);
+    const source = framing.camera.sourceSentinels[index];
+    if (x < handRoiNdc.minX || x > handRoiNdc.maxX || y < handRoiNdc.minY || y > handRoiNdc.maxY || z < -1 || z > 1
+      || !close(sentinel.pixel?.x, pixel.x, 1e-6) || !close(sentinel.pixel?.y, pixel.y, 1e-6)
+      || pixel.x < Math.max(0, framing.canvas.left)
+      || pixel.x > Math.min(framing.viewport.width, framing.canvas.left + framing.canvas.width)
+      || pixel.y < Math.max(0, framing.canvas.top)
+      || pixel.y > Math.min(framing.viewport.height, framing.canvas.top + framing.canvas.height)
+      || positionDelta(sentinel.worldPosition, source.worldPosition) > handCameraContract.maximumSourceJointDriftM) return false;
+  }
+  const wrist = detail.sentinels[0];
+  const fingers = detail.sentinels.slice(1);
+  const spans = fingers.map((finger) => pixelDistance(wrist.pixel, finger.pixel));
+  for (let index = 0; index < fingers.length; index += 1) {
+    const reported = detail.fingerSpans[index];
+    if (reported.digit !== fingers[index].digit || reported.bone !== fingers[index].bone
+      || !close(reported.pixels, spans[index], 1e-6)
+      || spans[index] < handDetailThresholds.minimumWristFingerPixels) return false;
+  }
+  return close(detail.minimumPixels, Math.min(...spans), 1e-6)
+    && detail.minimumPixels >= handDetailThresholds.minimumWristFingerPixels;
+}
+
+function handScreenshotValid(record, expectedPath, actor, side) {
+  const path = resolve(root, expectedPath);
+  return record?.path === expectedPath
+    && /^[a-f0-9]{64}$/u.test(record?.sha256 ?? '')
+    && existsSync(path)
+    && sha256(path) === record.sha256
+    && handFramingValid(record.framing, actor, side);
 }
 
 function overviewScreenshotValid(record, expectedPath) {
@@ -675,7 +820,14 @@ function runContractSelfTest() {
   };
   const sentinels = expectedCaptureJoints.map((joint) => {
     const ndc = ndcFor(joint);
-    return { ...joint, ndc, pixel: pixelFor(ndc), withinRoi: true, onScreen: true };
+    return {
+      ...joint,
+      worldPosition: [ndc[0], 1 + ndc[1], ndc[2]],
+      ndc,
+      pixel: pixelFor(ndc),
+      withinRoi: true,
+      onScreen: true,
+    };
   });
   const distance = (left, right) => Math.hypot(left.x - right.x, left.y - right.y);
   const metrics = () => {
@@ -747,7 +899,92 @@ function runContractSelfTest() {
   leftThumb.ndc = [leftWrist.ndc[0] + 0.001, leftWrist.ndc[1], leftWrist.ndc[2]];
   leftThumb.pixel = pixelFor(leftThumb.ndc);
   tinyFinger.jointDetail.wristFingerPixels[0].minimumPixels = distance(leftWrist.pixel, leftThumb.pixel);
-  assert(!framingValid(tinyFinger, tinyFinger.actor, closeRoiNdc, true), 'sub-12px wrist-finger detail must fail');
+  assert(framingValid(tinyFinger, tinyFinger.actor, closeRoiNdc, true), 'full-body close framing must not impersonate hand-detail magnification');
+
+  const handFramingFixture = (side) => {
+    const actor = { kind: 'bot', id: 'bot-1' };
+    const handSentinels = sentinels.filter((joint) => joint.side === side
+      && (joint.role === 'wrist-hand' || joint.kind === 'finger')).map((joint) => structuredClone(joint));
+    const sourceSentinels = handSentinels.map(({ kind, side: jointSide, role, digit, bone, worldPosition }) => ({
+      kind, side: jointSide, role, digit, bone, worldPosition,
+    }));
+    const sourceWeaponCenterWorld = [0, 1, 0.1];
+    const wristWorld = sourceSentinels[0].worldPosition;
+    const outsideDelta = [wristWorld[0] - sourceWeaponCenterWorld[0], 0, wristWorld[2] - sourceWeaponCenterWorld[2]];
+    const outsideLength = Math.hypot(outsideDelta[0], outsideDelta[2]);
+    const outsideDirectionWorld = outsideDelta.map((value) => value / outsideLength);
+    const targetWorld = [0, 1, 2].map((axis) => (
+      sourceSentinels.reduce((sum, joint) => sum + joint.worldPosition[axis], 0) / sourceSentinels.length
+    ));
+    const positionWorld = targetWorld.map((value, axis) => value
+      + outsideDirectionWorld[axis] * handCameraContract.outsideOffsetM
+      + (axis === 1 ? handCameraContract.upwardOffsetM : 0));
+    const aim = vectorSubtract(targetWorld, positionWorld);
+    const fingerSpans = handSentinels.slice(1).map((finger) => ({
+      digit: finger.digit,
+      bone: finger.bone,
+      pixels: distance(handSentinels[0].pixel, finger.pixel),
+    }));
+    return {
+      actor,
+      side,
+      missing: false,
+      rootVisible: true,
+      rootEffectivelyVisible: true,
+      effectivelyVisibleMeshCount: 1,
+      effectivelyVisibleSkinnedMeshes: ['Swat_Body'],
+      handSkinVisible: true,
+      canvas,
+      viewport,
+      roiNdc: handRoiNdc,
+      camera: {
+        ...handCameraContract,
+        actor,
+        side,
+        source: 'live-rendered-weapon-center-and-rigged-joint-world-transforms',
+        sourceWeaponCenterWorld,
+        sourceSentinels,
+        outsideDirectionWorld,
+        targetWorld,
+        positionWorld,
+        yaw: Math.atan2(-aim[0], -aim[2]),
+        pitch: Math.atan2(aim[1], Math.hypot(aim[0], aim[2])),
+      },
+      handDetail: {
+        required: true,
+        side,
+        expectedSentinelCount: 6,
+        sentinels: handSentinels,
+        orderValid: true,
+        allInsideRoi: true,
+        fingerSpans,
+        minimumPixels: Math.min(...fingerSpans.map(({ pixels }) => pixels)),
+        thresholds: handDetailThresholds,
+      },
+    };
+  };
+  const leftHandFraming = handFramingFixture('left');
+  const rightHandFraming = handFramingFixture('right');
+  assert(handFramingValid(leftHandFraming, leftHandFraming.actor, 'left'), 'fixed left hand detail framing must pass');
+  assert(handFramingValid(rightHandFraming, rightHandFraming.actor, 'right'), 'fixed right hand detail framing must pass');
+  const croppedHand = structuredClone(leftHandFraming);
+  croppedHand.handDetail.sentinels[1].ndc[0] = handRoiNdc.minX - 0.01;
+  croppedHand.handDetail.sentinels[1].pixel = pixelFor(croppedHand.handDetail.sentinels[1].ndc);
+  croppedHand.handDetail.sentinels[1].withinRoi = false;
+  croppedHand.handDetail.sentinels[1].onScreen = false;
+  croppedHand.handDetail.allInsideRoi = false;
+  assert(!handFramingValid(croppedHand, croppedHand.actor, 'left'), 'cropped hand sentinel must fail');
+  const shortHand = structuredClone(leftHandFraming);
+  const handWrist = shortHand.handDetail.sentinels[0];
+  const handThumb = shortHand.handDetail.sentinels[1];
+  handThumb.ndc = [handWrist.ndc[0] + 0.001, handWrist.ndc[1], handWrist.ndc[2]];
+  handThumb.pixel = pixelFor(handThumb.ndc);
+  shortHand.handDetail.fingerSpans[0].pixels = distance(handWrist.pixel, handThumb.pixel);
+  shortHand.handDetail.minimumPixels = shortHand.handDetail.fingerSpans[0].pixels;
+  assert(!handFramingValid(shortHand, shortHand.actor, 'left'), 'sub-12px fixed hand span must fail');
+  const autoFittedHand = structuredClone(leftHandFraming);
+  autoFittedHand.camera.outsideOffsetM = 0.69;
+  assert(!handFramingValid(autoFittedHand, autoFittedHand.actor, 'left'), 'non-fixed hand camera distance must fail');
 }
 
 if (selfTestMode) {
@@ -822,6 +1059,18 @@ const armedValid = receipt.armedBot?.weapon === 'carbine'
     { kind: 'bot', id: receipt.armedBot.id },
     closeRoiNdc,
     true,
+  )
+  && handScreenshotValid(
+    receipt.armedBot.screenshots?.leftHand,
+    `${armedBase}/armed-live-bot-left-hand-close.png`,
+    { kind: 'bot', id: receipt.armedBot.id },
+    'left',
+  )
+  && handScreenshotValid(
+    receipt.armedBot.screenshots?.rightHand,
+    `${armedBase}/armed-live-bot-right-hand-close.png`,
+    { kind: 'bot', id: receipt.armedBot.id },
+    'right',
   );
 const dummiesValid = sameArray(receipt.gunRangeDummies?.expectedIds, expectedDummyIds)
   && overviewScreenshotValid(receipt.gunRangeDummies?.overviewScreenshot, `${armedBase}/gun-range-dummies-medium.png`)
@@ -842,10 +1091,10 @@ const dummiesValid = sameArray(receipt.gunRangeDummies?.expectedIds, expectedDum
       closeRoiNdc,
       true,
     ));
-if (receipt.schemaVersion !== 3
+if (receipt.schemaVersion !== 4
   || receipt.status !== 'AUTOMATION_PASS_OWNER_PENDING'
-  || receipt.contract !== 'atomic-acres/pass69-3-rigged-bot-live@3'
-  || receipt.evidenceScope !== 'weighted-skin-anti-t-five-digit-grip-orientation-and-joint-framing'
+  || receipt.contract !== 'atomic-acres/pass69-3-rigged-bot-live@4'
+  || receipt.evidenceScope !== 'weighted-skin-anti-t-five-digit-grip-orientation-full-body-and-fixed-hand-detail-framing'
   || receipt.target !== targetName
   || receipt.sourceSha !== sourceSha
   || receipt.endingSourceSha !== sourceSha
@@ -859,10 +1108,15 @@ if (receipt.schemaVersion !== 3
   || !sameObject(receipt.antiTThresholds, antiTThresholds)
   || !sameObject(receipt.gripThresholds, gripThresholds)
   || !sameObject(receipt.closeJointThresholds, closeJointThresholds)
-  || !sameObject(receipt.captureRoisNdc, { close: closeRoiNdc, medium: mediumRoiNdc, overview: overviewRoiNdc })
+  || !sameObject(receipt.handDetailThresholds, handDetailThresholds)
+  || !sameObject(receipt.handCameraContract, handCameraContract)
+  || !sameObject(receipt.captureRoisNdc, {
+    close: closeRoiNdc, hand: handRoiNdc, medium: mediumRoiNdc, overview: overviewRoiNdc,
+  })
   || receipt.visualReview?.required !== true
   || receipt.visualReview.status !== 'PENDING_OWNER_INSPECTION'
   || receipt.visualReview.automatedFramingIsNotVisualAcceptance !== true
+  || receipt.visualReview.inspectionScope !== 'armed medium/full close/left hand/right hand plus four dummy closeups and shared overview'
   || receipt.browser?.project !== 'chromium'
   || receipt.browser?.channel !== 'msedge'
   || !/Edg\//u.test(receipt.browser?.userAgent ?? '')

@@ -86,8 +86,17 @@ const CARBINE_SOCKET_REFERENCES = Object.freeze({
     calibrationReason: 'authored-firing-grip-retained',
   }),
 });
-const CLOSE_JOINT_THRESHOLDS = Object.freeze({ minimumArmChainPixels: 80, minimumWristFingerPixels: 12 });
+const CLOSE_JOINT_THRESHOLDS = Object.freeze({ minimumArmChainPixels: 80 });
+const HAND_DETAIL_THRESHOLDS = Object.freeze({ minimumWristFingerPixels: 12 });
+const HAND_CAMERA_CONTRACT = Object.freeze({
+  contract: 'fixed-horizontal-wrist-from-weapon-center-v1',
+  outsideOffsetM: 0.7,
+  upwardOffsetM: 0.12,
+  fovDegrees: 48,
+  maximumSourceJointDriftM: 0.03,
+});
 const CLOSE_ROI_NDC = Object.freeze({ minX: -0.46, maxX: 0.46, minY: -0.7, maxY: 0.7 });
+const HAND_ROI_NDC = Object.freeze({ minX: -0.55, maxX: 0.55, minY: -0.68, maxY: 0.68 });
 const MEDIUM_ROI_NDC = Object.freeze({ minX: -0.68, maxX: 0.68, minY: -0.82, maxY: 0.82 });
 const OVERVIEW_ROI_NDC = Object.freeze({ minX: -0.97, maxX: 0.97, minY: -0.95, maxY: 0.95 });
 
@@ -601,7 +610,6 @@ async function captureFraming(
       }
       for (const hand of framing.jointDetail.wristFingerPixels) {
         expect(hand.fingerCount, `${label}: ${hand.side} has five projected digit sentinels`).toBe(5);
-        expect(hand.minimumPixels, `${label}: ${hand.side} wrist-to-finger detail`).toBeGreaterThanOrEqual(CLOSE_JOINT_THRESHOLDS.minimumWristFingerPixels);
       }
     }
   }
@@ -641,6 +649,225 @@ async function captureAtPose(
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
   const [framing] = await captureFraming(page, [actor], roiNdc, requireJointDetail);
   const screenshot = await screenshotWithHash(page, testInfo, name);
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false));
+  return { ...screenshot, framing };
+}
+
+async function captureHandFraming(
+  page: Page,
+  actor: CaptureActor,
+  side: 'left' | 'right',
+  camera: Record<string, unknown>,
+): Promise<any> {
+  const expectedJoints = [
+    ...ARM_BONES.filter((joint) => joint.side === side && joint.role === 'wrist-hand')
+      .map(({ side: jointSide, role, bone }) => ({ kind: 'arm', side: jointSide, role, digit: null, bone })),
+    ...HAND_BONES.filter((joint) => joint.side === side)
+      .map(({ side: jointSide, digit, bone }) => ({ kind: 'finger', side: jointSide, role: null, digit, bone })),
+  ];
+  const framing = await page.evaluate(({ requestedActor, requestedSide, expected, roi, thresholds, cameraEvidence }) => {
+    const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
+    const target = requestedActor.kind === 'bot'
+      ? snapshot.bots.find((candidate: any) => candidate.id === requestedActor.id)
+      : snapshot.rangePractice.targets.find((candidate: any) => candidate.id === requestedActor.id);
+    if (!target) return { actor: requestedActor, side: requestedSide, missing: true, camera: cameraEvidence };
+    const canvasBounds = document.querySelector<HTMLCanvasElement>('#game')!.getBoundingClientRect();
+    const viewport = { width: window.innerWidth, height: window.innerHeight };
+    const pointToPixel = ([x, y]: number[]) => ({
+      x: canvasBounds.left + (x + 1) * 0.5 * canvasBounds.width,
+      y: canvasBounds.top + (1 - y) * 0.5 * canvasBounds.height,
+    });
+    const pointInside = ([x, y, z]: number[]) => Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)
+      && x >= roi.minX && x <= roi.maxX && y >= roi.minY && y <= roi.maxY && z >= -1 && z <= 1;
+    const pixelDistance = (left: { x: number; y: number }, right: { x: number; y: number }) => (
+      Math.hypot(left.x - right.x, left.y - right.y)
+    );
+    const sentinels = (target.jointScreenPositions ?? [])
+      .filter((joint: any) => joint.side === requestedSide
+        && (joint.role === 'wrist-hand' || joint.kind === 'finger'))
+      .map((joint: any) => {
+        const pixel = pointToPixel(joint.ndc);
+        const withinRoi = pointInside(joint.ndc);
+        const onScreen = withinRoi
+          && pixel.x >= Math.max(0, canvasBounds.left)
+          && pixel.x <= Math.min(viewport.width, canvasBounds.right)
+          && pixel.y >= Math.max(0, canvasBounds.top)
+          && pixel.y <= Math.min(viewport.height, canvasBounds.bottom);
+        return { ...joint, pixel, withinRoi, onScreen };
+      });
+    const orderValid = sentinels.length === expected.length && sentinels.every((joint: any, index: number) => {
+      const wanted = expected[index];
+      return joint.kind === wanted.kind && joint.side === wanted.side && joint.role === wanted.role
+        && joint.digit === wanted.digit && joint.bone === wanted.bone;
+    });
+    const wrist = sentinels.find((joint: any) => joint.role === 'wrist-hand');
+    const fingerSpans = sentinels.filter((joint: any) => joint.kind === 'finger').map((finger: any) => ({
+      digit: finger.digit,
+      bone: finger.bone,
+      pixels: wrist ? pixelDistance(wrist.pixel, finger.pixel) : 0,
+    }));
+    return {
+      actor: requestedActor,
+      side: requestedSide,
+      missing: false,
+      rootVisible: requestedActor.kind === 'bot' ? target.rootVisible : target.visible,
+      rootEffectivelyVisible: target.rootEffectivelyVisible,
+      effectivelyVisibleMeshCount: target.effectivelyVisibleMeshCount,
+      effectivelyVisibleSkinnedMeshes: target.operatorModel?.effectivelyVisibleSkinnedMeshes ?? [],
+      handSkinVisible: target.operatorModel?.handPose?.allInEffectivelyVisibleSkinnedMesh === true,
+      canvas: {
+        left: canvasBounds.left,
+        top: canvasBounds.top,
+        width: canvasBounds.width,
+        height: canvasBounds.height,
+      },
+      viewport,
+      roiNdc: roi,
+      camera: cameraEvidence,
+      handDetail: {
+        required: true,
+        side: requestedSide,
+        expectedSentinelCount: expected.length,
+        sentinels,
+        orderValid,
+        allInsideRoi: sentinels.length === expected.length
+          && sentinels.every((joint: any) => joint.withinRoi && joint.onScreen),
+        fingerSpans,
+        minimumPixels: fingerSpans.length === 5 ? Math.min(...fingerSpans.map(({ pixels }: any) => pixels)) : 0,
+        thresholds,
+      },
+    };
+  }, {
+    requestedActor: actor,
+    requestedSide: side,
+    expected: expectedJoints,
+    roi: HAND_ROI_NDC,
+    thresholds: HAND_DETAIL_THRESHOLDS,
+    cameraEvidence: camera,
+  });
+  const label = `${actor.kind}:${actor.id}:${side}-hand`;
+  expect(framing, `${label}: live hand capture actor exists`).toMatchObject({
+    actor,
+    side,
+    missing: false,
+    rootVisible: true,
+    rootEffectivelyVisible: true,
+    handSkinVisible: true,
+    roiNdc: HAND_ROI_NDC,
+    handDetail: {
+      required: true,
+      side,
+      expectedSentinelCount: 6,
+      orderValid: true,
+      allInsideRoi: true,
+      thresholds: HAND_DETAIL_THRESHOLDS,
+    },
+  });
+  expect(framing.effectivelyVisibleMeshCount, `${label}: effective renderables`).toBeGreaterThan(0);
+  expect(framing.effectivelyVisibleSkinnedMeshes.length, `${label}: effective skinned renderables`).toBeGreaterThan(0);
+  expect(framing.handDetail.sentinels, `${label}: wrist plus five digit sentinels`).toHaveLength(6);
+  expect(framing.handDetail.fingerSpans, `${label}: five independently measured wrist-to-finger spans`).toHaveLength(5);
+  for (const sentinel of framing.handDetail.sentinels) {
+    const source = (camera.sourceSentinels as any[]).find((candidate) => candidate.bone === sentinel.bone);
+    expect(source, `${label}: ${sentinel.bone} is bound to the camera source pose`).toBeDefined();
+    expect(positionDelta(sentinel.worldPosition, source.worldPosition), `${label}: ${sentinel.bone} source-to-capture drift`).toBeLessThanOrEqual(
+      HAND_CAMERA_CONTRACT.maximumSourceJointDriftM,
+    );
+  }
+  for (const span of framing.handDetail.fingerSpans) {
+    expect(span.pixels, `${label}: ${span.digit} wrist-to-finger detail`).toBeGreaterThanOrEqual(
+      HAND_DETAIL_THRESHOLDS.minimumWristFingerPixels,
+    );
+  }
+  return framing;
+}
+
+async function captureHandAtFixedOutsidePose(
+  page: Page,
+  testInfo: TestInfo,
+  actor: CaptureActor,
+  side: 'left' | 'right',
+) {
+  const expectedJoints = [
+    ...ARM_BONES.filter((joint) => joint.side === side && joint.role === 'wrist-hand')
+      .map(({ side: jointSide, role, bone }) => ({ kind: 'arm', side: jointSide, role, digit: null, bone })),
+    ...HAND_BONES.filter((joint) => joint.side === side)
+      .map(({ side: jointSide, digit, bone }) => ({ kind: 'finger', side: jointSide, role: null, digit, bone })),
+  ];
+  const source = await page.evaluate(({ requestedActor, expected }) => {
+    const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
+    const target = requestedActor.kind === 'bot'
+      ? snapshot.bots.find((candidate: any) => candidate.id === requestedActor.id)
+      : snapshot.rangePractice.targets.find((candidate: any) => candidate.id === requestedActor.id);
+    if (!target) return { valid: false, reason: 'missing-actor', sentinels: [], weaponCenterWorld: null };
+    const sentinels = expected.map((wanted) => {
+      const observed = (target.jointScreenPositions ?? []).find((joint: any) => (
+        joint.kind === wanted.kind && joint.side === wanted.side && joint.role === wanted.role
+          && joint.digit === wanted.digit && joint.bone === wanted.bone
+      ));
+      return observed ? { ...wanted, worldPosition: observed.worldPosition } : null;
+    });
+    const weaponCenterWorld = target.operatorModel?.weaponBounds?.center ?? null;
+    return {
+      valid: sentinels.every((joint) => joint !== null)
+        && Array.isArray(weaponCenterWorld) && weaponCenterWorld.length === 3,
+      reason: null,
+      sentinels,
+      weaponCenterWorld,
+    };
+  }, { requestedActor: actor, expected: expectedJoints });
+  const label = `${actor.kind}:${actor.id}:${side}-hand-camera`;
+  expect(source.valid, `${label}: live wrist/finger joints and rendered weapon center are available`).toBe(true);
+  expect(source.sentinels).toHaveLength(6);
+  const sourceSentinels = source.sentinels as Array<{ worldPosition: number[] }>;
+  expect(sourceSentinels.every(({ worldPosition }) => (
+    Array.isArray(worldPosition) && worldPosition.length === 3 && worldPosition.every(Number.isFinite)
+  )), `${label}: finite live wrist/finger world positions`).toBe(true);
+  const weaponCenterWorld = source.weaponCenterWorld as number[];
+  expect(weaponCenterWorld.every(Number.isFinite), `${label}: finite rendered weapon center`).toBe(true);
+  const wristWorld = sourceSentinels[0].worldPosition;
+  const outsideDelta = [wristWorld[0] - weaponCenterWorld[0], 0, wristWorld[2] - weaponCenterWorld[2]];
+  const outsideLength = Math.hypot(outsideDelta[0], outsideDelta[2]);
+  expect(outsideLength, `${label}: non-degenerate outside-of-weapon horizontal vector`).toBeGreaterThan(0.01);
+  const outsideDirectionWorld = outsideDelta.map((value) => value / outsideLength);
+  const targetWorld = [0, 1, 2].map((axis) => (
+    sourceSentinels.reduce((sum, joint) => sum + joint.worldPosition[axis], 0) / sourceSentinels.length
+  ));
+  const positionWorld = targetWorld.map((value, axis) => value
+    + outsideDirectionWorld[axis] * HAND_CAMERA_CONTRACT.outsideOffsetM
+    + (axis === 1 ? HAND_CAMERA_CONTRACT.upwardOffsetM : 0));
+  const aim = subtract(targetWorld, positionWorld);
+  const horizontalAim = Math.hypot(aim[0], aim[2]);
+  const pose = {
+    x: positionWorld[0],
+    y: positionWorld[1],
+    z: positionWorld[2],
+    yaw: Math.atan2(-aim[0], -aim[2]),
+    pitch: Math.atan2(aim[1], horizontalAim),
+    fov: HAND_CAMERA_CONTRACT.fovDegrees,
+  };
+  const camera = {
+    ...HAND_CAMERA_CONTRACT,
+    actor,
+    side,
+    source: 'live-rendered-weapon-center-and-rigged-joint-world-transforms',
+    sourceWeaponCenterWorld: weaponCenterWorld,
+    sourceSentinels,
+    outsideDirectionWorld,
+    targetWorld,
+    positionWorld,
+    yaw: pose.yaw,
+    pitch: pose.pitch,
+  };
+  await page.evaluate(({ x, y, z, yaw, pitch, fov }) => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    api.setRenderPaused(false);
+    api.setCaptureCameraPose(x, y, z, yaw, pitch, fov);
+  }, pose);
+  await waitForPresentedFrame(page);
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
+  const framing = await captureHandFraming(page, actor, side, camera);
+  const screenshot = await screenshotWithHash(page, testInfo, `armed-live-bot-${side}-hand-close`);
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false));
   return { ...screenshot, framing };
 }
@@ -742,6 +969,8 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
   const armedScreenshots = {
     medium: await captureAtPose(page, testInfo, armedSecond.position, 4.4, 'armed-live-bot-medium', armedActor, MEDIUM_ROI_NDC),
     close: await captureAtPose(page, testInfo, armedSecond.position, 2.00, 'armed-live-bot-close', armedActor, CLOSE_ROI_NDC, true),
+    leftHand: await captureHandAtFixedOutsidePose(page, testInfo, armedActor, 'left'),
+    rightHand: await captureHandAtFixedOutsidePose(page, testInfo, armedActor, 'right'),
   };
   const armedRuntime = await captureSurfaceEvidence(page, testInfo, 'atomic-acres');
 
@@ -818,10 +1047,10 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
     expect(endingSourceStatus, 'official rigged-bot evidence ends with a clean worktree').toBe('');
   }
   writeFileSync(receiptPath, `${JSON.stringify({
-    schemaVersion: 3,
+    schemaVersion: 4,
     status: 'AUTOMATION_PASS_OWNER_PENDING',
-    contract: 'atomic-acres/pass69-3-rigged-bot-live@3',
-    evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-and-joint-framing',
+    contract: 'atomic-acres/pass69-3-rigged-bot-live@4',
+    evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-full-body-and-fixed-hand-detail-framing',
     target: officialEvidence ? expectedTarget : `development-${renderer}`,
     sourceSha,
     endingSourceSha,
@@ -837,12 +1066,19 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
     antiTThresholds: ANTI_T_THRESHOLDS,
     gripThresholds: GRIP_THRESHOLDS,
     closeJointThresholds: CLOSE_JOINT_THRESHOLDS,
-    captureRoisNdc: { close: CLOSE_ROI_NDC, medium: MEDIUM_ROI_NDC, overview: OVERVIEW_ROI_NDC },
+    handDetailThresholds: HAND_DETAIL_THRESHOLDS,
+    handCameraContract: HAND_CAMERA_CONTRACT,
+    captureRoisNdc: {
+      close: CLOSE_ROI_NDC,
+      hand: HAND_ROI_NDC,
+      medium: MEDIUM_ROI_NDC,
+      overview: OVERVIEW_ROI_NDC,
+    },
     visualReview: {
       required: true,
       status: 'PENDING_OWNER_INSPECTION',
       automatedFramingIsNotVisualAcceptance: true,
-      inspectionScope: 'armed medium/close plus four dummy closeups and shared overview',
+      inspectionScope: 'armed medium/full close/left hand/right hand plus four dummy closeups and shared overview',
     },
     browser: {
       project: testInfo.project.name,
