@@ -18,6 +18,7 @@ const ownerFeedbackSkill = readFileSync('.agents/skills/atomic-acres-owner-feedb
 const playwrightConfig = readFileSync('playwright.config.ts', 'utf8');
 const ownedPlaywrightRunner = readFileSync('scripts/qa/run-playwright-with-topology.mjs', 'utf8');
 const adsPhysicalMatrixRunner = readFileSync('scripts/qa/run-pass69-3-ads-physical-clearance.mjs', 'utf8');
+const nearPlaneMatrixRunner = readFileSync('scripts/qa/run-pass69-3-authored-near-plane-catalog.mjs', 'utf8');
 const frameHitchMatrixRunner = readFileSync('scripts/qa/run-pass69-3-frame-hitch-matrix.mjs', 'utf8');
 const nightlyPropertyRunner = readFileSync('scripts/qa/run-pass25a-nightly-property.mjs', 'utf8');
 const mutationRunner = readFileSync('scripts/qa/run-pass25a-mutation.mjs', 'utf8');
@@ -165,6 +166,7 @@ describe('production release workflow', () => {
       .filter(({ command }: { command: string }) => (
         command.includes('playwright')
         || command === 'npm run qa:pass69-3:ads-physical'
+        || command === 'npm run qa:pass69-3:near-plane'
         || command === 'npm run qa:pass69-3:frame-hitch'
       ));
     expect(playwrightTests.map(({ id }: { id: string }) => id)).toEqual([
@@ -184,6 +186,7 @@ describe('production release workflow', () => {
       'T-PICKUP-REPICK',
       'T-MOBILE-TOUCH-69-1',
       'T-PASS69-3-ADS-PHYSICAL',
+      'T-PASS69-3-NEAR-PLANE',
       'T-PASS69-3-GLASS-M14-HITCH',
       'T-PASS69-3-FLAME-FLARE-HITCH',
     ]);
@@ -191,9 +194,11 @@ describe('production release workflow', () => {
     expect(playwrightCommands.every((command: string) => (
       command.startsWith('npm run qa:playwright-topology -- ')
       || command === 'npm run qa:pass69-3:ads-physical'
+      || command === 'npm run qa:pass69-3:near-plane'
       || command === 'npm run qa:pass69-3:frame-hitch'
     ))).toBe(true);
     expect(adsPhysicalMatrixRunner).toContain('scripts/qa/run-playwright-with-topology.mjs');
+    expect(nearPlaneMatrixRunner).toContain('scripts/qa/run-playwright-with-topology.mjs');
     expect(frameHitchMatrixRunner).toContain('scripts/qa/run-playwright-with-topology.mjs');
     const catalogScripts = new Set<string>();
     const queue = ownerFeedbackGraph.testCatalog

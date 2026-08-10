@@ -2317,6 +2317,20 @@
       "visualArtifactPaths": ["artifacts/pass69-3/ads-physical-clearance"]
     },
     {
+      "id": "T-PASS69-3-NEAR-PLANE",
+      "command": "npm run qa:pass69-3:near-plane",
+      "paths": [
+        "package.json",
+        "scripts/qa/run-pass69-3-authored-near-plane-catalog.mjs",
+        "src/character-presentation-contract.ts",
+        "src/pass69-3-authored-near-plane-catalog-runner.test.ts",
+        "src/weapon-presentation.ts",
+        "tests/e2e/pass69-3-authored-near-plane-catalog.spec.ts"
+      ],
+      "evidenceKinds": ["browser", "visual"],
+      "visualArtifactPaths": ["artifacts/pass69-3/authored-near-plane-catalog"]
+    },
+    {
       "id": "T-PASS69-3-GLASS-M14-HITCH",
       "command": "npm run qa:pass69-3:frame-hitch",
       "paths": [
@@ -7164,8 +7178,8 @@
     {"id":"HF-217","sourceOutcomeIds":["CORR-HF-217","P69AUG09-002"],"planningRequirementIds":["R307","R600","R608","R609","R610"],"canonicalOwner":"Mobile browser gesture/input lifecycle","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-MOBILE-TOUCH-69-1","T-HUD-UNIT"],"artifactRefs":[]}},
     {"id":"HF-218","sourceOutcomeIds":["CORR-HF-218","P69AUG09-003"],"planningRequirementIds":["R307","R600","R608","R609","R610"],"canonicalOwner":"Mobile HUD/layout","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-MOBILE-TOUCH-69-1","T-HUD-E2E","T-HUD-UNIT"],"artifactRefs":[]}},
     {"id":"HF-219","sourceOutcomeIds":["CORR-HF-219","P69AUG09-004"],"planningRequirementIds":["R600","R608","R609"],"canonicalOwner":"Mobile control mapping","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-MOBILE-TOUCH-69-1","T-HUD-UNIT"],"artifactRefs":[]}},
-    {"id":"HF-220","sourceOutcomeIds":["CORR-HF-220","P69AUG09-005"],"planningRequirementIds":["R105","R108","R109","R608","R609"],"canonicalOwner":"Operator rig/viewmodel forge","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-OPERATOR-GATE","T-WEAPON-PRESENTATION","T-VIEWMODEL-FRAMING"],"artifactRefs":[]}},
-    {"id":"HF-221","sourceOutcomeIds":["CORR-HF-221","P69AUG09-006","P69AUG09-007"],"planningRequirementIds":["R105","R108","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R307","R608","R610"],"canonicalOwner":"ADS/viewmodel presentation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-WEAPON-PRESENTATION","T-ADS-SIGHT-CATALOG","T-SCOPED-ADS","T-PASS69-3-ADS-PHYSICAL"],"artifactRefs":[]}},
+    {"id":"HF-220","sourceOutcomeIds":["CORR-HF-220","P69AUG09-005"],"planningRequirementIds":["R105","R108","R109","R608","R609"],"canonicalOwner":"Operator rig/viewmodel forge","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-OPERATOR-GATE","T-WEAPON-PRESENTATION","T-VIEWMODEL-FRAMING","T-PASS69-3-NEAR-PLANE"],"artifactRefs":[]}},
+    {"id":"HF-221","sourceOutcomeIds":["CORR-HF-221","P69AUG09-006","P69AUG09-007"],"planningRequirementIds":["R105","R108","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R307","R608","R610"],"canonicalOwner":"ADS/viewmodel presentation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-WEAPON-PRESENTATION","T-ADS-SIGHT-CATALOG","T-SCOPED-ADS","T-PASS69-3-ADS-PHYSICAL","T-PASS69-3-NEAR-PLANE"],"artifactRefs":[]}},
     {"id":"HF-222","sourceOutcomeIds":["CORR-HF-222","P69AUG09-008"],"planningRequirementIds":["R111","R307","R400","R401","R402","R403","R404","R405","R406","R407","R408","R409","R410","R411","R412","R413","R606","R610"],"canonicalOwner":"Destructible glass/frame pacing","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-DESTRUCTIBLE","T-PASS69-3-GLASS-M14-HITCH","T-COLD-WEBGPU-ADMISSION","T-WEBGPU-ENDURANCE","T-NATIVE-FRAME-PACING"],"artifactRefs":[]}},
     {"id":"HF-223","sourceOutcomeIds":["CORR-HF-223","P69AUG09-009","P69AUG09-010","P69AUG09-011"],"planningRequirementIds":["R108","R112","R113","R304","R502","R505","R511","R608","R609"],"canonicalOwner":"Support vehicle asset/presentation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-SUPPORT-VEHICLE-GATE","T-SUPPORT-VISUAL-E2E","T-PROVENANCE"],"artifactRefs":[]}},
     {"id":"HF-224","sourceOutcomeIds":["CORR-HF-224","P69AUG09-012"],"planningRequirementIds":["R111","R400","R401","R402","R403","R404","R405","R406","R407","R408","R409","R410","R411","R412","R413","R608","R610"],"canonicalOwner":"Glass debris presentation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-DESTRUCTIBLE","T-PASS69-3-GLASS-M14-HITCH"],"artifactRefs":[]}},
