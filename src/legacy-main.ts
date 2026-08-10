@@ -24159,19 +24159,27 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       playerDownrange: selectedArena.id === 'gun-range' && player.position.z < GUN_RANGE_FIRING_LINE_Z,
       activeTargets: arena.targets.filter((target) => target.active).length,
       values: arena.targets.map((target) => target.scoreValue),
-      targets: arena.targets.map((target) => ({
-        id: target.id,
-        kind: target.kind ?? 'plate',
-        alwaysCritical: target.alwaysCritical === true,
-        active: target.active,
-        health: target.health,
-        maxHealth: target.maxHealth,
-        respawnDelayMs: target.respawnDelayMs ?? 2_200,
-        respawnInMs: target.active ? 0 : Math.max(0, target.respawnAt - performance.now()),
-        visible: target.root.visible,
-        position: target.root.position.toArray(),
-        screenPosition: target.root.localToWorld(new THREE.Vector3(0, 1.65, 0)).project(camera).toArray(),
-      })),
+      targets: arena.targets.map((target) => {
+        const operator = target.kind === 'training-dummy'
+          ? target.root.children.find((child) => child.userData.riggedOperatorRuntime !== undefined)
+          : undefined;
+        return {
+          id: target.id,
+          kind: target.kind ?? 'plate',
+          alwaysCritical: target.alwaysCritical === true,
+          active: target.active,
+          health: target.health,
+          maxHealth: target.maxHealth,
+          respawnDelayMs: target.respawnDelayMs ?? 2_200,
+          respawnInMs: target.active ? 0 : Math.max(0, target.respawnAt - performance.now()),
+          visible: target.root.visible,
+          position: target.root.getWorldPosition(new THREE.Vector3()).toArray(),
+          yaw: target.root.rotation.y,
+          screenPosition: target.root.localToWorld(new THREE.Vector3(0, 1.65, 0)).project(camera).toArray(),
+          armed: target.root.userData.armed ?? null,
+          operatorModel: operator ? riggedOperatorTelemetry(operator) : null,
+        };
+      }),
     },
     leaderboard: {
       schemaVersion: HIGH_SCORE_SCHEMA_VERSION,

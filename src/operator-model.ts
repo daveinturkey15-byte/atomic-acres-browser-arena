@@ -101,12 +101,29 @@ type RiggedOperatorRuntime = {
     footLeft?: THREE.Bone;
     footRight?: THREE.Bone;
   };
+  /** Immutable local transforms captured from the authored GLB before animation. */
+  armBindPose: Array<{
+    side: 'left' | 'right';
+    role: 'shoulder' | 'elbow' | 'wrist-hand';
+    bone: THREE.Bone;
+    position: THREE.Vector3;
+    quaternion: THREE.Quaternion;
+  }>;
   poseBeforeStance?: Array<{
     bone: THREE.Bone;
     position: THREE.Vector3;
     quaternion: THREE.Quaternion;
   }>;
 };
+
+const RIGGED_OPERATOR_ARM_BONES = Object.freeze([
+  Object.freeze({ side: 'left' as const, role: 'shoulder' as const, names: Object.freeze(['UpperArmL', 'UpperArm.L']) }),
+  Object.freeze({ side: 'left' as const, role: 'elbow' as const, names: Object.freeze(['LowerArmL', 'LowerArm.L']) }),
+  Object.freeze({ side: 'left' as const, role: 'wrist-hand' as const, names: Object.freeze(['WristL', 'Wrist.L']) }),
+  Object.freeze({ side: 'right' as const, role: 'shoulder' as const, names: Object.freeze(['UpperArmR', 'UpperArm.R']) }),
+  Object.freeze({ side: 'right' as const, role: 'elbow' as const, names: Object.freeze(['LowerArmR', 'LowerArm.R']) }),
+  Object.freeze({ side: 'right' as const, role: 'wrist-hand' as const, names: Object.freeze(['WristR', 'Wrist.R']) }),
+]);
 
 /**
  * Only clips reachable from the live operator controller belong in the runtime
@@ -805,6 +822,16 @@ export function createRiggedOperator(
     }
     return undefined;
   };
+  const armBindPose = RIGGED_OPERATOR_ARM_BONES.flatMap(({ side, role, names }) => {
+    const bone = poseBone(...names);
+    return bone ? [{
+      side,
+      role,
+      bone,
+      position: bone.position.clone(),
+      quaternion: bone.quaternion.clone(),
+    }] : [];
+  });
   root.userData.riggedOperatorRuntime = {
     mixer,
     clips,
@@ -831,6 +858,7 @@ export function createRiggedOperator(
       footLeft: poseBone('FootL', 'Foot.L'),
       footRight: poseBone('FootR', 'Foot.R'),
     },
+    armBindPose,
   } satisfies RiggedOperatorRuntime;
   root.userData.operatorAsset = {
     source: 'Atomic Acres Pass 65 operator / Quaternius CC0 derivative',
@@ -977,6 +1005,53 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
     (node) => node.userData.authoritativeProxy === true && node.userData.hitZone === 'head',
   );
   const hitProxyHeadWorld = headProxy?.getWorldPosition(new THREE.Vector3()) ?? null;
+  root.updateWorldMatrix(true, true);
+  const armPoseBones = (runtimeState.armBindPose ?? []).map((entry) => {
+    const localPosition = entry.bone.position.toArray();
+    const localQuaternion = entry.bone.quaternion.toArray();
+    const worldPosition = entry.bone.getWorldPosition(new THREE.Vector3()).toArray();
+    const worldQuaternion = entry.bone.getWorldQuaternion(new THREE.Quaternion()).toArray();
+    const bindPositionDelta = entry.bone.position.distanceTo(entry.position);
+    const bindQuaternionDeltaRadians = entry.bone.quaternion.angleTo(entry.quaternion);
+    return {
+      side: entry.side,
+      role: entry.role,
+      bone: entry.bone.name,
+      localPosition,
+      localQuaternion,
+      worldPosition,
+      worldQuaternion,
+      bindLocalPosition: entry.position.toArray(),
+      bindLocalQuaternion: entry.quaternion.toArray(),
+      bindPositionDelta,
+      bindQuaternionDeltaRadians,
+      finite: [
+        ...localPosition,
+        ...localQuaternion,
+        ...worldPosition,
+        ...worldQuaternion,
+        bindPositionDelta,
+        bindQuaternionDeltaRadians,
+      ].every(Number.isFinite),
+    };
+  });
+  const armChains = (['left', 'right'] as const).map((side) => {
+    const shoulder = armPoseBones.find((bone) => bone.side === side && bone.role === 'shoulder');
+    const elbow = armPoseBones.find((bone) => bone.side === side && bone.role === 'elbow');
+    const wrist = armPoseBones.find((bone) => bone.side === side && bone.role === 'wrist-hand');
+    if (!shoulder || !elbow || !wrist) return { side, complete: false };
+    const shoulderWorld = new THREE.Vector3().fromArray(shoulder.worldPosition);
+    const elbowWorld = new THREE.Vector3().fromArray(elbow.worldPosition);
+    const wristWorld = new THREE.Vector3().fromArray(wrist.worldPosition);
+    return {
+      side,
+      complete: true,
+      upperArmLength: shoulderWorld.distanceTo(elbowWorld),
+      forearmLength: elbowWorld.distanceTo(wristWorld),
+      elbowBendRadians: shoulderWorld.clone().sub(elbowWorld).angleTo(wristWorld.clone().sub(elbowWorld)),
+      shoulderToWristVerticalDrop: shoulderWorld.y - wristWorld.y,
+    };
+  });
   return {
     source: root.userData.operatorAsset?.source,
     assetUrl: root.userData.operatorAsset?.assetUrl,
@@ -1009,6 +1084,22 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
     hitProxyHeadDelta: headBoneWorld && hitProxyHeadWorld ? headBoneWorld.distanceTo(hitProxyHeadWorld) : null,
     armBonesPresent: ['UpperArmL', 'LowerArmL', 'WristL', 'UpperArmR', 'LowerArmR', 'WristR']
       .filter((name) => runtimeState.visual.getObjectByName(name) instanceof THREE.Bone).length,
+    armPose: {
+      contract: 'source-glb-bind-arm-chain-v1',
+      reference: 'authored-glb-local-transform-before-animation',
+      expectedBoneCount: RIGGED_OPERATOR_ARM_BONES.length,
+      bones: armPoseBones,
+      chains: armChains,
+      allPresent: armPoseBones.length === RIGGED_OPERATOR_ARM_BONES.length
+        && armChains.every((chain) => chain.complete),
+      allFinite: armPoseBones.every((bone) => bone.finite)
+        && armChains.every((chain) => !chain.complete || [
+          chain.upperArmLength,
+          chain.forearmLength,
+          chain.elbowBendRadians,
+          chain.shoulderToWristVerticalDrop,
+        ].every(Number.isFinite)),
+    },
     meleeKnifeVisible: root.getObjectByName('operator-melee-knife')?.visible === true,
     mergedVertexLod: runtimeState.visual.getObjectByName('Swat_Merged_Vertex_LOD')?.visible === true,
     weaponChildren: runtimeState.weaponSocket.children.length,

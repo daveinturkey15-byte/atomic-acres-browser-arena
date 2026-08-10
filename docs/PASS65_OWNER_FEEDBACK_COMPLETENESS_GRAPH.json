@@ -2382,13 +2382,19 @@
     },
     {
       "id": "T-PASS69-3-RIGGED-DUMMY",
-      "command": "npx vitest run src/additional-maps-rigged-dummy.test.ts",
+      "command": "npm run qa:pass69-3:rigged-bot-live",
       "paths": [
+        "package.json",
+        "scripts/qa/run-pass69-3-rigged-bot-live.mjs",
         "src/additional-maps.ts",
-        "src/additional-maps.test.ts",
-        "src/additional-maps-rigged-dummy.test.ts"
+        "src/additional-maps-rigged-dummy.test.ts",
+        "src/legacy-main.ts",
+        "src/operator-model.ts",
+        "src/pass69-3-rigged-bot-live-runner.test.ts",
+        "tests/e2e/pass69-3-rigged-bot-live.spec.ts"
       ],
-      "evidenceKinds": ["unit"]
+      "evidenceKinds": ["unit", "browser", "visual"],
+      "visualArtifactPaths": ["artifacts/pass69-3/rigged-bot-live"]
     },
     {
       "id": "T-PASS69-3-FLAME-FLARE-POOL",
