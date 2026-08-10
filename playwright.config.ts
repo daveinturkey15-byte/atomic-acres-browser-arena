@@ -35,7 +35,16 @@ export default defineConfig({
       name: 'chromium',
       // Opt into the machine-installed Edge binary without widening CI's
       // default browser requirement or maintaining a second Chromium project.
-      use: { ...devices['Desktop Chrome'], channel: installedEdgeChannel, viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 },
+      // Desktop Chrome's descriptor pins a bundled-Chromium UA. Clear that
+      // emulation for Edge evidence so navigator.userAgent proves the binary
+      // Playwright actually launched instead of repeating the fixture string.
+      use: {
+        ...devices['Desktop Chrome'],
+        channel: installedEdgeChannel,
+        userAgent: installedEdgeChannel ? undefined : devices['Desktop Chrome'].userAgent,
+        viewport: { width: 1280, height: 720 },
+        deviceScaleFactor: 1,
+      },
     },
     {
       name: 'firefox',

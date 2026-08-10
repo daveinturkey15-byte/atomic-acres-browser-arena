@@ -17,6 +17,7 @@ const pass66ExecutionPlan = readFileSync('docs/PASS66_HITL_EXECUTION_PLAN_2026-0
 const ownerFeedbackSkill = readFileSync('.agents/skills/atomic-acres-owner-feedback-gate/SKILL.md', 'utf8');
 const playwrightConfig = readFileSync('playwright.config.ts', 'utf8');
 const ownedPlaywrightRunner = readFileSync('scripts/qa/run-playwright-with-topology.mjs', 'utf8');
+const frameHitchMatrixRunner = readFileSync('scripts/qa/run-pass69-3-frame-hitch-matrix.mjs', 'utf8');
 const nightlyPropertyRunner = readFileSync('scripts/qa/run-pass25a-nightly-property.mjs', 'utf8');
 const mutationRunner = readFileSync('scripts/qa/run-pass25a-mutation.mjs', 'utf8');
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
@@ -151,6 +152,7 @@ describe('production release workflow', () => {
   it('owns and closes the local preview lifecycle for every catalogued Playwright gate', () => {
     expect(packageJson.scripts['qa:playwright-topology']).toBe('node scripts/qa/run-playwright-with-topology.mjs');
     expect(playwrightConfig).toContain("const externalPreview = process.env.QA_EXTERNAL_PREVIEW === '1'");
+    expect(playwrightConfig).toContain("userAgent: installedEdgeChannel ? undefined : devices['Desktop Chrome'].userAgent");
     expect(playwrightConfig).toContain('webServer: externalPreview ? undefined :');
     expect(ownedPlaywrightRunner).toContain('outDir: temporaryDist');
     expect(ownedPlaywrightRunner).toContain("['scripts/release/stage-release-topology.mjs']");
@@ -159,7 +161,9 @@ describe('production release workflow', () => {
     expect(ownedPlaywrightRunner).toContain('httpServer.closeAllConnections?.()');
     expect(ownedPlaywrightRunner).toContain('removeTemporaryTopology();');
     const playwrightTests = ownerFeedbackGraph.testCatalog
-      .filter(({ command }: { command: string }) => command.includes('playwright'));
+      .filter(({ command }: { command: string }) => (
+        command.includes('playwright') || command === 'npm run qa:pass69-3:frame-hitch'
+      ));
     expect(playwrightTests.map(({ id }: { id: string }) => id)).toEqual([
       'T-MENU-LIFECYCLE-E2E',
       'T-CARE-LATCH-E2E',
@@ -181,7 +185,11 @@ describe('production release workflow', () => {
       'T-PASS69-3-FLAME-FLARE-HITCH',
     ]);
     const playwrightCommands = playwrightTests.map(({ command }: { command: string }) => command);
-    expect(playwrightCommands.every((command: string) => command.startsWith('npm run qa:playwright-topology -- '))).toBe(true);
+    expect(playwrightCommands.every((command: string) => (
+      command.startsWith('npm run qa:playwright-topology -- ')
+      || command === 'npm run qa:pass69-3:frame-hitch'
+    ))).toBe(true);
+    expect(frameHitchMatrixRunner).toContain('scripts/qa/run-playwright-with-topology.mjs');
     const catalogScripts = new Set<string>();
     const queue = ownerFeedbackGraph.testCatalog
       .map(({ command }: { command: string }) => /^npm run ([^\s]+)/u.exec(command)?.[1])
