@@ -105,6 +105,17 @@ type RiggedOperatorRuntime = {
   armBindPose: Array<{
     side: 'left' | 'right';
     role: 'shoulder' | 'elbow' | 'wrist-hand';
+    sourceBone: string;
+    bone: THREE.Bone;
+    position: THREE.Vector3;
+    quaternion: THREE.Quaternion;
+  }>;
+  /** Authored finger joints animated by Walk, captured before mixer evaluation. */
+  handBindPose: Array<{
+    side: 'left' | 'right';
+    digit: 'middle' | 'ring';
+    joint: 2;
+    sourceBone: string;
     bone: THREE.Bone;
     position: THREE.Vector3;
     quaternion: THREE.Quaternion;
@@ -117,13 +128,31 @@ type RiggedOperatorRuntime = {
 };
 
 const RIGGED_OPERATOR_ARM_BONES = Object.freeze([
-  Object.freeze({ side: 'left' as const, role: 'shoulder' as const, names: Object.freeze(['UpperArmL', 'UpperArm.L']) }),
-  Object.freeze({ side: 'left' as const, role: 'elbow' as const, names: Object.freeze(['LowerArmL', 'LowerArm.L']) }),
-  Object.freeze({ side: 'left' as const, role: 'wrist-hand' as const, names: Object.freeze(['WristL', 'Wrist.L']) }),
-  Object.freeze({ side: 'right' as const, role: 'shoulder' as const, names: Object.freeze(['UpperArmR', 'UpperArm.R']) }),
-  Object.freeze({ side: 'right' as const, role: 'elbow' as const, names: Object.freeze(['LowerArmR', 'LowerArm.R']) }),
-  Object.freeze({ side: 'right' as const, role: 'wrist-hand' as const, names: Object.freeze(['WristR', 'Wrist.R']) }),
+  Object.freeze({ side: 'left' as const, role: 'shoulder' as const, sourceBone: 'UpperArm.L', names: Object.freeze(['UpperArmL', 'UpperArm.L']) }),
+  Object.freeze({ side: 'left' as const, role: 'elbow' as const, sourceBone: 'LowerArm.L', names: Object.freeze(['LowerArmL', 'LowerArm.L']) }),
+  Object.freeze({ side: 'left' as const, role: 'wrist-hand' as const, sourceBone: 'Wrist.L', names: Object.freeze(['WristL', 'Wrist.L']) }),
+  Object.freeze({ side: 'right' as const, role: 'shoulder' as const, sourceBone: 'UpperArm.R', names: Object.freeze(['UpperArmR', 'UpperArm.R']) }),
+  Object.freeze({ side: 'right' as const, role: 'elbow' as const, sourceBone: 'LowerArm.R', names: Object.freeze(['LowerArmR', 'LowerArm.R']) }),
+  Object.freeze({ side: 'right' as const, role: 'wrist-hand' as const, sourceBone: 'Wrist.R', names: Object.freeze(['WristR', 'Wrist.R']) }),
 ]);
+
+// These are real animated second phalanges in the shipped operator GLB. They
+// prove that each tracked wrist terminates in an authored hand, not a named arm
+// transform with no skinned finger descendants.
+const RIGGED_OPERATOR_HAND_BONES = Object.freeze([
+  Object.freeze({ side: 'left' as const, digit: 'middle' as const, joint: 2 as const, sourceBone: 'Middle2.L', names: Object.freeze(['Middle2L', 'Middle2.L']) }),
+  Object.freeze({ side: 'left' as const, digit: 'ring' as const, joint: 2 as const, sourceBone: 'Ring2.L', names: Object.freeze(['Ring2L', 'Ring2.L']) }),
+  Object.freeze({ side: 'right' as const, digit: 'middle' as const, joint: 2 as const, sourceBone: 'Middle2.R', names: Object.freeze(['Middle2R', 'Middle2.R']) }),
+  Object.freeze({ side: 'right' as const, digit: 'ring' as const, joint: 2 as const, sourceBone: 'Ring2.R', names: Object.freeze(['Ring2R', 'Ring2.R']) }),
+]);
+
+const RIGGED_OPERATOR_ANTI_T_THRESHOLDS = Object.freeze({
+  minimumVerticalDropM: 0.08,
+  minimumVerticalDropRatio: 0.18,
+  maximumHorizontalReachRatio: 0.9,
+  maximumOutwardReachRatio: 0.82,
+  minimumElbowFlexRadians: 0.12,
+});
 
 /**
  * Only clips reachable from the live operator controller belong in the runtime
@@ -822,11 +851,24 @@ export function createRiggedOperator(
     }
     return undefined;
   };
-  const armBindPose = RIGGED_OPERATOR_ARM_BONES.flatMap(({ side, role, names }) => {
+  const armBindPose = RIGGED_OPERATOR_ARM_BONES.flatMap(({ side, role, sourceBone, names }) => {
     const bone = poseBone(...names);
     return bone ? [{
       side,
       role,
+      sourceBone,
+      bone,
+      position: bone.position.clone(),
+      quaternion: bone.quaternion.clone(),
+    }] : [];
+  });
+  const handBindPose = RIGGED_OPERATOR_HAND_BONES.flatMap(({ side, digit, joint, sourceBone, names }) => {
+    const bone = poseBone(...names);
+    return bone ? [{
+      side,
+      digit,
+      joint,
+      sourceBone,
       bone,
       position: bone.position.clone(),
       quaternion: bone.quaternion.clone(),
@@ -859,6 +901,7 @@ export function createRiggedOperator(
       footRight: poseBone('FootR', 'Foot.R'),
     },
     armBindPose,
+    handBindPose,
   } satisfies RiggedOperatorRuntime;
   root.userData.operatorAsset = {
     source: 'Atomic Acres Pass 65 operator / Quaternius CC0 derivative',
@@ -994,10 +1037,29 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
       if (aim.lengthSq() > 1e-8) muzzleForwardDot = aim.normalize().dot(operatorForward.normalize());
     }
   }
+  const effectivelyVisible = (node: THREE.Object3D): boolean => {
+    let cursor: THREE.Object3D | null = node;
+    while (cursor) {
+      if (!cursor.visible) return false;
+      cursor = cursor.parent;
+    }
+    return true;
+  };
+  const skinnedMeshIsRenderable = (mesh: THREE.SkinnedMesh): boolean => {
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    return effectivelyVisible(mesh)
+      && materials.some((material) => material.visible && material.colorWrite
+        && (!material.transparent || material.opacity > 0))
+      && (mesh.geometry.getAttribute('position')?.count ?? 0) > 0;
+  };
+  const effectiveSkinnedMeshes: THREE.SkinnedMesh[] = [];
   let visibleSkinnedMeshes = 0;
   let visibleEmbeddedWeapons = 0;
   runtimeState.visual.traverse((node) => {
-    if (node instanceof THREE.SkinnedMesh && node.visible) visibleSkinnedMeshes += 1;
+    if (node instanceof THREE.SkinnedMesh && node.visible) {
+      visibleSkinnedMeshes += 1;
+      if (skinnedMeshIsRenderable(node)) effectiveSkinnedMeshes.push(node);
+    }
     if (node.userData.embeddedWeaponSuppressed === true && node.visible) visibleEmbeddedWeapons += 1;
   });
   const headBoneWorld = runtimeState.poseBones.head?.getWorldPosition(new THREE.Vector3()) ?? null;
@@ -1006,6 +1068,19 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
   );
   const hitProxyHeadWorld = headProxy?.getWorldPosition(new THREE.Vector3()) ?? null;
   root.updateWorldMatrix(true, true);
+  const skinMembership = (bone: THREE.Bone): string[] => effectiveSkinnedMeshes
+    .filter((mesh) => mesh.skeleton.bones.includes(bone))
+    .map((mesh) => mesh.name);
+  const descendantPath = (descendant: THREE.Object3D, ancestor: THREE.Object3D): string[] | null => {
+    const path = [descendant.name];
+    let cursor = descendant.parent;
+    while (cursor) {
+      path.unshift(cursor.name);
+      if (cursor === ancestor) return path;
+      cursor = cursor.parent;
+    }
+    return null;
+  };
   const armPoseBones = (runtimeState.armBindPose ?? []).map((entry) => {
     const localPosition = entry.bone.position.toArray();
     const localQuaternion = entry.bone.quaternion.toArray();
@@ -1016,7 +1091,10 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
     return {
       side: entry.side,
       role: entry.role,
+      sourceBone: entry.sourceBone,
       bone: entry.bone.name,
+      parentBone: entry.bone.parent?.name ?? null,
+      effectiveSkinnedMeshes: skinMembership(entry.bone),
       localPosition,
       localQuaternion,
       worldPosition,
@@ -1025,6 +1103,7 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
       bindLocalQuaternion: entry.quaternion.toArray(),
       bindPositionDelta,
       bindQuaternionDeltaRadians,
+      inEffectivelyVisibleSkinnedMesh: skinMembership(entry.bone).length > 0,
       finite: [
         ...localPosition,
         ...localQuaternion,
@@ -1035,6 +1114,49 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
       ].every(Number.isFinite),
     };
   });
+  const handPoseBones = (runtimeState.handBindPose ?? []).map((entry) => {
+    const wrist = runtimeState.armBindPose.find((candidate) => (
+      candidate.side === entry.side && candidate.role === 'wrist-hand'
+    ))?.bone;
+    const localPosition = entry.bone.position.toArray();
+    const localQuaternion = entry.bone.quaternion.toArray();
+    const worldPosition = entry.bone.getWorldPosition(new THREE.Vector3()).toArray();
+    const worldQuaternion = entry.bone.getWorldQuaternion(new THREE.Quaternion()).toArray();
+    const bindQuaternionDeltaRadians = entry.bone.quaternion.angleTo(entry.quaternion);
+    const effectiveSkinMembership = skinMembership(entry.bone);
+    const wristDescendantPath = wrist ? descendantPath(entry.bone, wrist) : null;
+    return {
+      side: entry.side,
+      digit: entry.digit,
+      joint: entry.joint,
+      sourceBone: entry.sourceBone,
+      bone: entry.bone.name,
+      parentBone: entry.bone.parent?.name ?? null,
+      wristBone: wrist?.name ?? null,
+      wristDescendantPath,
+      descendantOfWrist: wristDescendantPath !== null,
+      effectiveSkinnedMeshes: effectiveSkinMembership,
+      inEffectivelyVisibleSkinnedMesh: effectiveSkinMembership.length > 0,
+      localPosition,
+      localQuaternion,
+      worldPosition,
+      worldQuaternion,
+      bindLocalPosition: entry.position.toArray(),
+      bindLocalQuaternion: entry.quaternion.toArray(),
+      bindQuaternionDeltaRadians,
+      finite: [
+        ...localPosition,
+        ...localQuaternion,
+        ...worldPosition,
+        ...worldQuaternion,
+        bindQuaternionDeltaRadians,
+      ].every(Number.isFinite),
+    };
+  });
+  const commonEffectiveSkinMeshes = effectiveSkinnedMeshes
+    .filter((mesh) => [...(runtimeState.armBindPose ?? []), ...(runtimeState.handBindPose ?? [])]
+      .every((entry) => mesh.skeleton.bones.includes(entry.bone)))
+    .map((mesh) => mesh.name);
   const armChains = (['left', 'right'] as const).map((side) => {
     const shoulder = armPoseBones.find((bone) => bone.side === side && bone.role === 'shoulder');
     const elbow = armPoseBones.find((bone) => bone.side === side && bone.role === 'elbow');
@@ -1043,13 +1165,60 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
     const shoulderWorld = new THREE.Vector3().fromArray(shoulder.worldPosition);
     const elbowWorld = new THREE.Vector3().fromArray(elbow.worldPosition);
     const wristWorld = new THREE.Vector3().fromArray(wrist.worldPosition);
+    const shoulderToElbow = elbowWorld.clone().sub(shoulderWorld);
+    const elbowToWrist = wristWorld.clone().sub(elbowWorld);
+    const shoulderToWrist = wristWorld.clone().sub(shoulderWorld);
+    const upperArmLength = shoulderToElbow.length();
+    const forearmLength = elbowToWrist.length();
+    const armLength = upperArmLength + forearmLength;
+    const elbowBendRadians = shoulderWorld.clone().sub(elbowWorld).angleTo(elbowToWrist);
+    const elbowFlexRadians = Math.PI - elbowBendRadians;
+    const shoulderToWristVerticalDrop = shoulderWorld.y - wristWorld.y;
+    const shoulderToWristHorizontalReach = Math.hypot(shoulderToWrist.x, shoulderToWrist.z);
+    const torsoWorld = runtimeState.poseBones.torso?.getWorldPosition(new THREE.Vector3()) ?? null;
+    const outwardAxis = torsoWorld ? shoulderWorld.clone().sub(torsoWorld).setY(0) : new THREE.Vector3();
+    const shoulderToWristOutwardReach = outwardAxis.lengthSq() > 1e-8
+      ? shoulderToWrist.dot(outwardAxis.normalize())
+      : Number.NaN;
+    const hierarchyPath = descendantPath(
+      runtimeState.armBindPose.find((entry) => entry.side === side && entry.role === 'wrist-hand')!.bone,
+      runtimeState.armBindPose.find((entry) => entry.side === side && entry.role === 'shoulder')!.bone,
+    );
+    const directHierarchy = hierarchyPath?.length === 3
+      && runtimeState.armBindPose.find((entry) => entry.side === side && entry.role === 'elbow')?.bone.parent
+        === runtimeState.armBindPose.find((entry) => entry.side === side && entry.role === 'shoulder')?.bone
+      && runtimeState.armBindPose.find((entry) => entry.side === side && entry.role === 'wrist-hand')?.bone.parent
+        === runtimeState.armBindPose.find((entry) => entry.side === side && entry.role === 'elbow')?.bone;
+    const shoulderToWristVerticalDropRatio = shoulderToWristVerticalDrop / Math.max(armLength, 1e-6);
+    const shoulderToWristHorizontalReachRatio = shoulderToWristHorizontalReach / Math.max(armLength, 1e-6);
+    const shoulderToWristOutwardReachRatio = Math.abs(shoulderToWristOutwardReach) / Math.max(armLength, 1e-6);
     return {
       side,
       complete: true,
-      upperArmLength: shoulderWorld.distanceTo(elbowWorld),
-      forearmLength: elbowWorld.distanceTo(wristWorld),
-      elbowBendRadians: shoulderWorld.clone().sub(elbowWorld).angleTo(wristWorld.clone().sub(elbowWorld)),
-      shoulderToWristVerticalDrop: shoulderWorld.y - wristWorld.y,
+      hierarchyPath,
+      directHierarchy,
+      upperArmLength,
+      forearmLength,
+      armLength,
+      elbowBendRadians,
+      elbowFlexRadians,
+      upperArmVerticalDrop: shoulderWorld.y - elbowWorld.y,
+      forearmVerticalDrop: elbowWorld.y - wristWorld.y,
+      shoulderToWristVerticalDrop,
+      shoulderToWristVerticalDropRatio,
+      shoulderToWristHorizontalReach,
+      shoulderToWristHorizontalReachRatio,
+      shoulderOutwardAxis: outwardAxis.toArray(),
+      shoulderToWristOutwardReach,
+      shoulderToWristOutwardReachRatio,
+      verticalDropToOutwardReachRatio: shoulderToWristVerticalDrop
+        / Math.max(Math.abs(shoulderToWristOutwardReach), 1e-6),
+      antiTPoseGeometry: directHierarchy === true
+        && shoulderToWristVerticalDrop >= RIGGED_OPERATOR_ANTI_T_THRESHOLDS.minimumVerticalDropM
+        && shoulderToWristVerticalDropRatio >= RIGGED_OPERATOR_ANTI_T_THRESHOLDS.minimumVerticalDropRatio
+        && shoulderToWristHorizontalReachRatio <= RIGGED_OPERATOR_ANTI_T_THRESHOLDS.maximumHorizontalReachRatio
+        && shoulderToWristOutwardReachRatio <= RIGGED_OPERATOR_ANTI_T_THRESHOLDS.maximumOutwardReachRatio
+        && elbowFlexRadians >= RIGGED_OPERATOR_ANTI_T_THRESHOLDS.minimumElbowFlexRadians,
     };
   });
   return {
@@ -1079,26 +1248,49 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
     },
     skeletons: runtimeState.visual.getObjectsByProperty('isSkinnedMesh', true).length,
     visibleSkinnedMeshes,
+    effectivelyVisibleSkinnedMeshes: effectiveSkinnedMeshes.map((mesh) => mesh.name),
     headBoneWorld: headBoneWorld?.toArray() ?? null,
     hitProxyHeadWorld: hitProxyHeadWorld?.toArray() ?? null,
     hitProxyHeadDelta: headBoneWorld && hitProxyHeadWorld ? headBoneWorld.distanceTo(hitProxyHeadWorld) : null,
-    armBonesPresent: ['UpperArmL', 'LowerArmL', 'WristL', 'UpperArmR', 'LowerArmR', 'WristR']
-      .filter((name) => runtimeState.visual.getObjectByName(name) instanceof THREE.Bone).length,
+    armBonesPresent: (runtimeState.armBindPose ?? []).length,
     armPose: {
-      contract: 'source-glb-bind-arm-chain-v1',
+      contract: 'source-glb-skinned-anti-t-arm-chain-v2',
       reference: 'authored-glb-local-transform-before-animation',
+      thresholds: RIGGED_OPERATOR_ANTI_T_THRESHOLDS,
       expectedBoneCount: RIGGED_OPERATOR_ARM_BONES.length,
       bones: armPoseBones,
       chains: armChains,
+      commonEffectiveSkinnedMeshes: commonEffectiveSkinMeshes,
       allPresent: armPoseBones.length === RIGGED_OPERATOR_ARM_BONES.length
         && armChains.every((chain) => chain.complete),
+      allHierarchyValid: armChains.every((chain) => chain.complete && chain.directHierarchy === true),
+      allInEffectivelyVisibleSkinnedMesh: armPoseBones.every((bone) => bone.inEffectivelyVisibleSkinnedMesh)
+        && commonEffectiveSkinMeshes.length > 0,
+      allAntiTPoseGeometry: armChains.every((chain) => chain.complete && chain.antiTPoseGeometry === true),
       allFinite: armPoseBones.every((bone) => bone.finite)
-        && armChains.every((chain) => !chain.complete || [
-          chain.upperArmLength,
-          chain.forearmLength,
-          chain.elbowBendRadians,
-          chain.shoulderToWristVerticalDrop,
-        ].every(Number.isFinite)),
+        && armChains.every((chain) => !chain.complete || ('armLength' in chain
+          && chain.shoulderOutwardAxis?.length === 3
+          && chain.shoulderOutwardAxis.every(Number.isFinite)
+          && [
+            chain.upperArmLength, chain.forearmLength, chain.armLength,
+            chain.elbowBendRadians, chain.elbowFlexRadians,
+            chain.upperArmVerticalDrop, chain.forearmVerticalDrop,
+            chain.shoulderToWristVerticalDrop, chain.shoulderToWristVerticalDropRatio,
+            chain.shoulderToWristHorizontalReach, chain.shoulderToWristHorizontalReachRatio,
+            chain.shoulderToWristOutwardReach, chain.shoulderToWristOutwardReachRatio,
+            chain.verticalDropToOutwardReachRatio,
+          ].every(Number.isFinite))),
+    },
+    handPose: {
+      contract: 'source-glb-animated-middle-ring-finger-descendants-v1',
+      reference: 'shipped-lod0-walk-animated-second-phalanges',
+      expectedBoneCount: RIGGED_OPERATOR_HAND_BONES.length,
+      bones: handPoseBones,
+      allPresent: handPoseBones.length === RIGGED_OPERATOR_HAND_BONES.length,
+      allDescendantOfWrist: handPoseBones.every((bone) => bone.descendantOfWrist),
+      allInEffectivelyVisibleSkinnedMesh: handPoseBones.every((bone) => bone.inEffectivelyVisibleSkinnedMesh)
+        && commonEffectiveSkinMeshes.length > 0,
+      allFinite: handPoseBones.every((bone) => bone.finite),
     },
     meleeKnifeVisible: root.getObjectByName('operator-melee-knife')?.visible === true,
     mergedVertexLod: runtimeState.visual.getObjectByName('Swat_Merged_Vertex_LOD')?.visible === true,

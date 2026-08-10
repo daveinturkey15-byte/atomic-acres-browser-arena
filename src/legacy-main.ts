@@ -24051,6 +24051,29 @@ const debugWindow = window as Window & {
 
   };
 };
+
+function debugObjectEffectivelyVisible(node: THREE.Object3D): boolean {
+  let cursor: THREE.Object3D | null = node;
+  while (cursor) {
+    if (!cursor.visible) return false;
+    cursor = cursor.parent;
+  }
+  return true;
+}
+
+function debugEffectivelyVisibleRenderableCount(root: THREE.Object3D): number {
+  let count = 0;
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh) || node.userData.authoritativeProxy === true
+      || !debugObjectEffectivelyVisible(node) || !node.layers.test(camera.layers)
+      || (node.geometry.getAttribute('position')?.count ?? 0) < 1) return;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    if (materials.some((material) => material.visible && material.colorWrite
+      && (!material.transparent || material.opacity > 0))) count += 1;
+  });
+  return count;
+}
+
 debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   admissionState: sampleAdmissionState,
   samplePresentationTelemetry: () => renderRuntime.presentationTelemetry(),
@@ -24325,6 +24348,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
           respawnDelayMs: target.respawnDelayMs ?? 2_200,
           respawnInMs: target.active ? 0 : Math.max(0, target.respawnAt - performance.now()),
           visible: target.root.visible,
+          rootEffectivelyVisible: debugObjectEffectivelyVisible(target.root),
+          effectivelyVisibleMeshCount: debugEffectivelyVisibleRenderableCount(target.root),
           position: target.root.getWorldPosition(new THREE.Vector3()).toArray(),
           yaw: target.root.rotation.y,
           screenPosition: target.root.localToWorld(new THREE.Vector3(0, 1.65, 0)).project(camera).toArray(),
@@ -24410,54 +24435,62 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       } : null,
     },
     spawnSelection: lastPlayerSpawnAudit ? { ...lastPlayerSpawnAudit } : null,
-    bots: [...bots.values()].map((bot) => ({
-      id: bot.id,
-      name: bot.name,
-      team: bot.team,
-      hp: bot.hp,
-      alive: bot.alive,
-      kills: bot.kills,
-      deaths: bot.deaths,
-      weapon: bot.weapon,
-      grenade: bot.grenade,
-      nextGrenadeInMs: Math.max(0, bot.nextGrenadeAt - performance.now()),
-      grenadeActive: bot.grenadeActive,
-      position: bot.position.toArray(),
-      waypoint: bot.waypoint,
-      blockedSince: bot.blockedSince,
-      hasLineOfSight: bot.hasLineOfSight,
-      perception: {
-        revision: bot.perception.revision,
-        targetLockId: bot.perception.targetLockId,
-        blindRemainingMs: Math.max(0, bot.perception.blindUntilHostTimeMs - currentHostTimeMs()),
-        fireSuppressedRemainingMs: Math.max(0, bot.perception.fireSuppressedUntilHostTimeMs - currentHostTimeMs()),
-        canFire: bot.perceptionCanFire,
-        aimErrorRadians: bot.perceptionAimError,
-      },
-      rootVisible: bot.root.visible,
-      screenPosition: bot.root.localToWorld(new THREE.Vector3(0, 1.35, 0)).project(camera).toArray(),
-      visibleMeshCount: (() => {
-        let count = 0;
-        bot.root.traverse((node) => {
-          if (node instanceof THREE.Mesh && node.visible && node.userData.authoritativeProxy !== true) count += 1;
-        });
-        return count;
-      })(),
-      operatorModel: riggedOperatorTelemetry(bot.root),
-      neonHaze: bot.root.userData.neonBotHaze === true
-        && bot.root.getObjectByName('neon-purple-bot-haze') instanceof THREE.Sprite,
-      presentationReady: riggedOperatorTelemetry(bot.root) !== null || ['presentation-reaction-gear', 'field-radio-pack', 'asymmetric-shoulder-plate', 'team-radio-antenna']
-        .every((name) => bot.root.getObjectByName(name) !== undefined),
-      presentationWeaponSafe: (() => {
-        const weapon = bot.root.getObjectByName(`operator-${bot.root.userData.operatorRig?.weaponId ?? 'carbine'}`);
-        if (!weapon) return false;
-        let safe = true;
-        weapon.traverse((node) => {
-          if (node instanceof THREE.Mesh && node.userData.presentationOnly !== true) safe = false;
-        });
-        return safe;
-      })(),
-    })),
+    bots: [...bots.values()].map((bot) => {
+      // Telemetry walks every skinned mesh and bone chain. Cache it once for
+      // this actor in this snapshot so presentationReady cannot double that
+      // work or observe a different animation frame.
+      const operatorModel = riggedOperatorTelemetry(bot.root);
+      return {
+        id: bot.id,
+        name: bot.name,
+        team: bot.team,
+        hp: bot.hp,
+        alive: bot.alive,
+        kills: bot.kills,
+        deaths: bot.deaths,
+        weapon: bot.weapon,
+        grenade: bot.grenade,
+        nextGrenadeInMs: Math.max(0, bot.nextGrenadeAt - performance.now()),
+        grenadeActive: bot.grenadeActive,
+        position: bot.position.toArray(),
+        waypoint: bot.waypoint,
+        blockedSince: bot.blockedSince,
+        hasLineOfSight: bot.hasLineOfSight,
+        perception: {
+          revision: bot.perception.revision,
+          targetLockId: bot.perception.targetLockId,
+          blindRemainingMs: Math.max(0, bot.perception.blindUntilHostTimeMs - currentHostTimeMs()),
+          fireSuppressedRemainingMs: Math.max(0, bot.perception.fireSuppressedUntilHostTimeMs - currentHostTimeMs()),
+          canFire: bot.perceptionCanFire,
+          aimErrorRadians: bot.perceptionAimError,
+        },
+        rootVisible: bot.root.visible,
+        rootEffectivelyVisible: debugObjectEffectivelyVisible(bot.root),
+        screenPosition: bot.root.localToWorld(new THREE.Vector3(0, 1.35, 0)).project(camera).toArray(),
+        visibleMeshCount: (() => {
+          let count = 0;
+          bot.root.traverse((node) => {
+            if (node instanceof THREE.Mesh && node.visible && node.userData.authoritativeProxy !== true) count += 1;
+          });
+          return count;
+        })(),
+        effectivelyVisibleMeshCount: debugEffectivelyVisibleRenderableCount(bot.root),
+        operatorModel,
+        neonHaze: bot.root.userData.neonBotHaze === true
+          && bot.root.getObjectByName('neon-purple-bot-haze') instanceof THREE.Sprite,
+        presentationReady: operatorModel !== null || ['presentation-reaction-gear', 'field-radio-pack', 'asymmetric-shoulder-plate', 'team-radio-antenna']
+          .every((name) => bot.root.getObjectByName(name) !== undefined),
+        presentationWeaponSafe: (() => {
+          const weapon = bot.root.getObjectByName(`operator-${bot.root.userData.operatorRig?.weaponId ?? 'carbine'}`);
+          if (!weapon) return false;
+          let safe = true;
+          weapon.traverse((node) => {
+            if (node instanceof THREE.Mesh && node.userData.presentationOnly !== true) safe = false;
+          });
+          return safe;
+        })(),
+      };
+    }),
     botEscalation: {
       deaths: soloBotDeaths,
       initialBots: selectedArena.soloBotCount,

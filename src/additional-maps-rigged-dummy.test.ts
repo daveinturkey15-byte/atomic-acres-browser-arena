@@ -16,28 +16,64 @@ vi.mock('./art-kit', async (importOriginal) => {
     visual.name = 'rigged-operator-visual';
     const hips = new THREE.Bone();
     hips.name = 'Hips';
-    hips.add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 1, 0.3), new THREE.MeshBasicMaterial()));
+    const torso = new THREE.Bone();
+    torso.name = 'Torso';
+    torso.position.set(0, 1.1, 0);
+    hips.add(torso);
+    const bone = (boneName: string, position: THREE.Vector3, parent: THREE.Bone): THREE.Bone => {
+      const createdBone = new THREE.Bone();
+      createdBone.name = boneName;
+      createdBone.position.copy(position);
+      parent.add(createdBone);
+      return createdBone;
+    };
+    const leftShoulder = bone('UpperArmL', new THREE.Vector3(-0.24, 0.35, 0), torso);
+    const leftElbow = bone('LowerArmL', new THREE.Vector3(-0.18, -0.25, 0), leftShoulder);
+    const leftWrist = bone('WristL', new THREE.Vector3(0.02, -0.2, 0.08), leftElbow);
+    const rightShoulder = bone('UpperArmR', new THREE.Vector3(0.24, 0.35, 0), torso);
+    const rightElbow = bone('LowerArmR', new THREE.Vector3(0.18, -0.25, 0), rightShoulder);
+    const rightWrist = bone('WristR', new THREE.Vector3(-0.02, -0.2, 0.08), rightElbow);
     const armBones = [
-      ['left', 'shoulder', 'UpperArmL', new THREE.Vector3(-0.24, 1.45, 0)],
-      ['left', 'elbow', 'LowerArmL', new THREE.Vector3(-0.38, 0, 0)],
-      ['left', 'wrist-hand', 'WristL', new THREE.Vector3(-0.34, 0, 0)],
-      ['right', 'shoulder', 'UpperArmR', new THREE.Vector3(0.24, 1.45, 0)],
-      ['right', 'elbow', 'LowerArmR', new THREE.Vector3(0.38, 0, 0)],
-      ['right', 'wrist-hand', 'WristR', new THREE.Vector3(0.34, 0, 0)],
-    ].map(([side, role, boneName, position]) => {
-      const bone = new THREE.Bone();
-      bone.name = String(boneName);
-      bone.position.copy(position as THREE.Vector3);
-      hips.add(bone);
+      { side: 'left' as const, role: 'shoulder' as const, sourceBone: 'UpperArm.L', bone: leftShoulder },
+      { side: 'left' as const, role: 'elbow' as const, sourceBone: 'LowerArm.L', bone: leftElbow },
+      { side: 'left' as const, role: 'wrist-hand' as const, sourceBone: 'Wrist.L', bone: leftWrist },
+      { side: 'right' as const, role: 'shoulder' as const, sourceBone: 'UpperArm.R', bone: rightShoulder },
+      { side: 'right' as const, role: 'elbow' as const, sourceBone: 'LowerArm.R', bone: rightElbow },
+      { side: 'right' as const, role: 'wrist-hand' as const, sourceBone: 'Wrist.R', bone: rightWrist },
+    ].map((entry) => ({ ...entry, position: entry.bone.position.clone(), quaternion: entry.bone.quaternion.clone() }));
+    const handBones = ([
+      ['left', 'middle', 'Middle1L', 'Middle2L', 'Middle2.L', leftWrist, -0.025],
+      ['left', 'ring', 'Ring1L', 'Ring2L', 'Ring2.L', leftWrist, 0.025],
+      ['right', 'middle', 'Middle1R', 'Middle2R', 'Middle2.R', rightWrist, 0.025],
+      ['right', 'ring', 'Ring1R', 'Ring2R', 'Ring2.R', rightWrist, -0.025],
+    ] as const).map(([side, digit, parentName, boneName, sourceBone, wrist, offsetX]) => {
+      const first = bone(parentName, new THREE.Vector3(offsetX, -0.035, -0.045), wrist);
+      const second = bone(boneName, new THREE.Vector3(0, -0.05, 0), first);
       return {
-        side: side as 'left' | 'right',
-        role: role as 'shoulder' | 'elbow' | 'wrist-hand',
-        bone,
-        position: bone.position.clone(),
-        quaternion: bone.quaternion.clone(),
+        side,
+        digit,
+        joint: 2 as const,
+        sourceBone,
+        bone: second,
+        position: second.position.clone(),
+        quaternion: second.quaternion.clone(),
+        first,
       };
     });
-    visual.add(hips);
+    const geometry = new THREE.BoxGeometry(0.5, 1, 0.3);
+    const vertexCount = geometry.getAttribute('position').count;
+    geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(new Uint16Array(vertexCount * 4), 4));
+    const weights = new Float32Array(vertexCount * 4);
+    for (let index = 0; index < vertexCount; index += 1) weights[index * 4] = 1;
+    geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(weights, 4));
+    const body = new THREE.SkinnedMesh(geometry, new THREE.MeshBasicMaterial());
+    body.name = 'Swat_Body';
+    body.add(hips);
+    body.bind(new THREE.Skeleton([
+      hips, torso, ...armBones.map((entry) => entry.bone),
+      ...handBones.flatMap((entry) => [entry.first, entry.bone]),
+    ]));
+    visual.add(body);
     const weaponSocket = new THREE.Group();
     weaponSocket.name = 'weapon-socket';
     if (weaponId) {
@@ -65,6 +101,15 @@ vi.mock('./art-kit', async (importOriginal) => {
           [...first.toArray(), ...second.toArray()],
         );
       }),
+      ...handBones.map(({ bone }, index) => {
+        const first = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.55 + index * 0.01, 0, 0));
+        const second = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.68 + index * 0.01, 0, 0));
+        return new THREE.QuaternionKeyframeTrack(
+          `${bone.name}.quaternion`,
+          [0, 1],
+          [...first.toArray(), ...second.toArray()],
+        );
+      }),
     ]);
     const idleAction = mixer.clipAction(idle);
     idleAction.play();
@@ -81,8 +126,9 @@ vi.mock('./art-kit', async (importOriginal) => {
       crouchBlend: 0,
       proneBlend: 0,
       speed: 0,
-      poseBones: { hips },
+      poseBones: { hips, torso },
       armBindPose: armBones,
+      handBindPose: handBones,
     };
     root.userData.operatorRig = {
       rigged: true,
@@ -121,6 +167,10 @@ describe('Gun Range rigged training-dummy presentation', () => {
     expect(operator?.getObjectByName('weapon-socket')?.children).toHaveLength(0);
     const armBones = ['UpperArmL', 'LowerArmL', 'WristL', 'UpperArmR', 'LowerArmR', 'WristR']
       .map((name) => operator?.getObjectByName(name) as THREE.Bone);
+    expect(armBones[1].parent).toBe(armBones[0]);
+    expect(armBones[2].parent).toBe(armBones[1]);
+    expect(armBones[4].parent).toBe(armBones[3]);
+    expect(armBones[5].parent).toBe(armBones[4]);
     const before = armBones.map((bone) => bone.quaternion.clone());
 
     updateGunRangePresentation(map.root, 9_000);
@@ -131,13 +181,45 @@ describe('Gun Range rigged training-dummy presentation', () => {
     const telemetry = riggedOperatorTelemetry(operator!);
     expect(telemetry?.activeClip).toBe('Walk');
     expect(telemetry?.armPose).toMatchObject({
-      contract: 'source-glb-bind-arm-chain-v1',
+      contract: 'source-glb-skinned-anti-t-arm-chain-v2',
       expectedBoneCount: 6,
       allPresent: true,
       allFinite: true,
+      allHierarchyValid: true,
+      allInEffectivelyVisibleSkinnedMesh: true,
+      allAntiTPoseGeometry: true,
     });
-    const posedBones = (telemetry?.armPose as { bones: Array<{ bindQuaternionDeltaRadians: number }> }).bones;
+    expect(telemetry?.handPose).toMatchObject({
+      contract: 'source-glb-animated-middle-ring-finger-descendants-v1',
+      expectedBoneCount: 4,
+      allPresent: true,
+      allDescendantOfWrist: true,
+      allInEffectivelyVisibleSkinnedMesh: true,
+      allFinite: true,
+    });
+    const armPose = telemetry?.armPose as {
+      bones: Array<{ bindQuaternionDeltaRadians: number; inEffectivelyVisibleSkinnedMesh: boolean }>;
+      chains: Array<{ hierarchyPath: string[]; antiTPoseGeometry: boolean; shoulderToWristVerticalDrop: number; elbowFlexRadians: number }>;
+      commonEffectiveSkinnedMeshes: string[];
+    };
+    const posedBones = armPose.bones;
     expect(posedBones).toHaveLength(6);
-    expect(posedBones.every(({ bindQuaternionDeltaRadians }) => bindQuaternionDeltaRadians > 0)).toBe(true);
+    expect(posedBones.every(({ bindQuaternionDeltaRadians }) => bindQuaternionDeltaRadians > 0.05)).toBe(true);
+    expect(posedBones.every(({ inEffectivelyVisibleSkinnedMesh }) => inEffectivelyVisibleSkinnedMesh)).toBe(true);
+    expect(armPose.commonEffectiveSkinnedMeshes).toContain('Swat_Body');
+    expect(armPose.chains.map(({ hierarchyPath }) => hierarchyPath)).toEqual([
+      ['UpperArmL', 'LowerArmL', 'WristL'],
+      ['UpperArmR', 'LowerArmR', 'WristR'],
+    ]);
+    expect(armPose.chains.every(({ antiTPoseGeometry, shoulderToWristVerticalDrop, elbowFlexRadians }) => (
+      antiTPoseGeometry && shoulderToWristVerticalDrop >= 0.08 && elbowFlexRadians >= 0.12
+    ))).toBe(true);
+    const handPose = telemetry?.handPose as {
+      bones: Array<{ bone: string; wristDescendantPath: string[]; bindQuaternionDeltaRadians: number }>;
+    };
+    expect(handPose.bones.map(({ bone }) => bone)).toEqual(['Middle2L', 'Ring2L', 'Middle2R', 'Ring2R']);
+    expect(handPose.bones.every(({ wristDescendantPath, bindQuaternionDeltaRadians }) => (
+      wristDescendantPath.length === 3 && bindQuaternionDeltaRadians >= 0.12
+    ))).toBe(true);
   });
 });

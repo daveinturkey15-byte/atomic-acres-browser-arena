@@ -36,15 +36,31 @@ const artifactRoot = resolve(artifactBase, renderer);
 const receiptPath = resolve(artifactBase, `receipt-${renderer}.json`);
 const OPERATOR_SOURCE = 'Atomic Acres Pass 65 operator / Quaternius CC0 derivative';
 const OPERATOR_ASSET = './assets/original/models/operators/pass65-third-person-operator-lod0.glb';
-const MINIMUM_BIND_ROTATION_RADIANS = 0.005;
+const ANTI_T_THRESHOLDS = Object.freeze({
+  minimumVerticalDropM: 0.08,
+  minimumVerticalDropRatio: 0.18,
+  maximumHorizontalReachRatio: 0.9,
+  maximumOutwardReachRatio: 0.82,
+  minimumElbowFlexRadians: 0.12,
+});
 const ARM_BONES = Object.freeze([
-  Object.freeze({ side: 'left', role: 'shoulder', bone: 'UpperArmL' }),
-  Object.freeze({ side: 'left', role: 'elbow', bone: 'LowerArmL' }),
-  Object.freeze({ side: 'left', role: 'wrist-hand', bone: 'WristL' }),
-  Object.freeze({ side: 'right', role: 'shoulder', bone: 'UpperArmR' }),
-  Object.freeze({ side: 'right', role: 'elbow', bone: 'LowerArmR' }),
-  Object.freeze({ side: 'right', role: 'wrist-hand', bone: 'WristR' }),
+  Object.freeze({ side: 'left', role: 'shoulder', sourceBone: 'UpperArm.L', bone: 'UpperArmL', minimumBindRadians: 0.5 }),
+  Object.freeze({ side: 'left', role: 'elbow', sourceBone: 'LowerArm.L', bone: 'LowerArmL', minimumBindRadians: 0.15 }),
+  Object.freeze({ side: 'left', role: 'wrist-hand', sourceBone: 'Wrist.L', bone: 'WristL', minimumBindRadians: 0.05 }),
+  Object.freeze({ side: 'right', role: 'shoulder', sourceBone: 'UpperArm.R', bone: 'UpperArmR', minimumBindRadians: 0.5 }),
+  Object.freeze({ side: 'right', role: 'elbow', sourceBone: 'LowerArm.R', bone: 'LowerArmR', minimumBindRadians: 0.15 }),
+  Object.freeze({ side: 'right', role: 'wrist-hand', sourceBone: 'Wrist.R', bone: 'WristR', minimumBindRadians: 0.05 }),
 ]);
+const HAND_BONES = Object.freeze([
+  Object.freeze({ side: 'left', digit: 'middle', joint: 2, sourceBone: 'Middle2.L', bone: 'Middle2L' }),
+  Object.freeze({ side: 'left', digit: 'ring', joint: 2, sourceBone: 'Ring2.L', bone: 'Ring2L' }),
+  Object.freeze({ side: 'right', digit: 'middle', joint: 2, sourceBone: 'Middle2.R', bone: 'Middle2R' }),
+  Object.freeze({ side: 'right', digit: 'ring', joint: 2, sourceBone: 'Ring2.R', bone: 'Ring2R' }),
+]);
+const MINIMUM_FINGER_BIND_RADIANS = 0.12;
+const CLOSE_ROI_NDC = Object.freeze({ minX: -0.46, maxX: 0.46, minY: -0.7, maxY: 0.7 });
+const MEDIUM_ROI_NDC = Object.freeze({ minX: -0.68, maxX: 0.68, minY: -0.82, maxY: 0.82 });
+const OVERVIEW_ROI_NDC = Object.freeze({ minX: -0.97, maxX: 0.97, minY: -0.95, maxY: 0.95 });
 
 function sha256(value: Buffer): string {
   return createHash('sha256').update(value).digest('hex');
@@ -69,6 +85,49 @@ function positionDelta(left: number[], right: number[]): number {
   return Math.hypot(...left.map((value, index) => value - right[index]));
 }
 
+function subtract(left: number[], right: number[]): number[] {
+  return left.map((value, index) => value - right[index]);
+}
+
+function dot(left: number[], right: number[]): number {
+  return left.reduce((sum, value, index) => sum + value * right[index], 0);
+}
+
+function length(vector: number[]): number {
+  return Math.hypot(...vector);
+}
+
+function armGeometry(model: any, side: 'left' | 'right', chain: any) {
+  const shoulder = model.armPose.bones.find((bone: any) => bone.side === side && bone.role === 'shoulder');
+  const elbow = model.armPose.bones.find((bone: any) => bone.side === side && bone.role === 'elbow');
+  const wrist = model.armPose.bones.find((bone: any) => bone.side === side && bone.role === 'wrist-hand');
+  const shoulderToElbow = subtract(elbow.worldPosition, shoulder.worldPosition);
+  const elbowToWrist = subtract(wrist.worldPosition, elbow.worldPosition);
+  const shoulderToWrist = subtract(wrist.worldPosition, shoulder.worldPosition);
+  const elbowToShoulder = shoulderToElbow.map((value) => -value);
+  const upperArmLength = length(shoulderToElbow);
+  const forearmLength = length(elbowToWrist);
+  const armLength = upperArmLength + forearmLength;
+  const elbowBendRadians = Math.acos(Math.min(1, Math.max(-1,
+    dot(elbowToShoulder, elbowToWrist) / Math.max(upperArmLength * forearmLength, 1e-9))));
+  const shoulderToWristVerticalDrop = shoulder.worldPosition[1] - wrist.worldPosition[1];
+  const shoulderToWristHorizontalReach = Math.hypot(shoulderToWrist[0], shoulderToWrist[2]);
+  const shoulderToWristOutwardReach = dot(shoulderToWrist, chain.shoulderOutwardAxis);
+  return {
+    upperArmLength,
+    forearmLength,
+    armLength,
+    elbowBendRadians,
+    elbowFlexRadians: Math.PI - elbowBendRadians,
+    shoulderToWristVerticalDrop,
+    shoulderToWristVerticalDropRatio: shoulderToWristVerticalDrop / armLength,
+    shoulderToWristHorizontalReach,
+    shoulderToWristHorizontalReachRatio: shoulderToWristHorizontalReach / armLength,
+    shoulderToWristOutwardReach,
+    shoulderToWristOutwardReachRatio: Math.abs(shoulderToWristOutwardReach) / armLength,
+  };
+}
+
 function expectArmPose(model: any, label: string, armed: boolean): void {
   expect(model, `${label}: canonical authored operator GLB`).toMatchObject({
     source: OPERATOR_SOURCE,
@@ -80,30 +139,75 @@ function expectArmPose(model: any, label: string, armed: boolean): void {
     armBonesPresent: 6,
     visibleEmbeddedWeapons: 0,
     armPose: {
-      contract: 'source-glb-bind-arm-chain-v1',
+      contract: 'source-glb-skinned-anti-t-arm-chain-v2',
       reference: 'authored-glb-local-transform-before-animation',
       expectedBoneCount: 6,
       allPresent: true,
+      allFinite: true,
+      allHierarchyValid: true,
+      allInEffectivelyVisibleSkinnedMesh: true,
+      allAntiTPoseGeometry: true,
+      thresholds: ANTI_T_THRESHOLDS,
+    },
+    handPose: {
+      contract: 'source-glb-animated-middle-ring-finger-descendants-v1',
+      reference: 'shipped-lod0-walk-animated-second-phalanges',
+      expectedBoneCount: 4,
+      allPresent: true,
+      allDescendantOfWrist: true,
+      allInEffectivelyVisibleSkinnedMesh: true,
       allFinite: true,
     },
   });
   expect(model.skinnedMeshes, `${label}: real skinned renderables`).toBeGreaterThan(0);
   expect(model.visibleSkinnedMeshes, `${label}: visible skinned renderables`).toBeGreaterThan(0);
+  expect(model.effectivelyVisibleSkinnedMeshes.length, `${label}: effective skinned renderables`).toBeGreaterThan(0);
   expect(model.animationContract.speed, `${label}: active locomotion pose`).toBeGreaterThan(0.18);
-  expect(model.armPose.bones.map(({ side, role, bone }: any) => ({ side, role, bone })), `${label}: both complete arm chains`)
-    .toEqual(ARM_BONES);
-  for (const bone of model.armPose.bones) {
+  expect(model.armPose.commonEffectiveSkinnedMeshes.length, `${label}: one visible skin owns arms and hands`).toBeGreaterThan(0);
+  expect(model.armPose.bones.map(({ side, role, sourceBone, bone }: any) => ({ side, role, sourceBone, bone })), `${label}: both complete authored arm chains`)
+    .toEqual(ARM_BONES.map(({ minimumBindRadians: _minimum, ...bone }) => bone));
+  for (const [index, bone] of model.armPose.bones.entries()) {
+    const expected = ARM_BONES[index];
     expect(bone.finite, `${label}: ${bone.bone} finite transform`).toBe(true);
+    expect(bone.inEffectivelyVisibleSkinnedMesh, `${label}: ${bone.bone} drives a visible skin`).toBe(true);
+    expect(bone.effectiveSkinnedMeshes, `${label}: ${bone.bone} shares a rendered skeleton`)
+      .toEqual(expect.arrayContaining(model.armPose.commonEffectiveSkinnedMeshes));
     expect(bone.bindQuaternionDeltaRadians, `${label}: ${bone.bone} leaves authored T/bind pose`)
-      .toBeGreaterThanOrEqual(MINIMUM_BIND_ROTATION_RADIANS);
+      .toBeGreaterThanOrEqual(expected.minimumBindRadians);
+  }
+  expect(model.handPose.bones.map(({ side, digit, joint, sourceBone, bone }: any) => ({ side, digit, joint, sourceBone, bone })), `${label}: shipped animated finger joints`)
+    .toEqual(HAND_BONES);
+  for (const finger of model.handPose.bones) {
+    expect(finger.descendantOfWrist, `${label}: ${finger.bone} descends from ${finger.wristBone}`).toBe(true);
+    expect(finger.wristDescendantPath, `${label}: ${finger.bone} has a real phalanx chain`).toHaveLength(3);
+    expect(finger.wristDescendantPath[0]).toBe(finger.wristBone);
+    expect(finger.wristDescendantPath.at(-1)).toBe(finger.bone);
+    expect(finger.inEffectivelyVisibleSkinnedMesh, `${label}: ${finger.bone} drives the rendered hand`).toBe(true);
+    expect(finger.bindQuaternionDeltaRadians, `${label}: ${finger.bone} has a nontrivial authored pose`)
+      .toBeGreaterThanOrEqual(MINIMUM_FINGER_BIND_RADIANS);
   }
   expect(model.armPose.chains).toHaveLength(2);
   for (const chain of model.armPose.chains) {
     expect(chain, `${label}: ${chain.side} shoulder/elbow/wrist-hand chain`).toMatchObject({ complete: true });
-    expect(chain.upperArmLength).toBeGreaterThan(0.1);
-    expect(chain.forearmLength).toBeGreaterThan(0.1);
-    expect(chain.elbowBendRadians).toBeGreaterThan(0);
-    expect(chain.elbowBendRadians).toBeLessThan(Math.PI);
+    const expectedBones = ARM_BONES.filter((bone) => bone.side === chain.side).map((bone) => bone.bone);
+    expect(chain.hierarchyPath, `${label}: ${chain.side} real descendant hierarchy`).toEqual(expectedBones);
+    expect(chain.directHierarchy, `${label}: ${chain.side} direct shoulder to elbow to wrist`).toBe(true);
+    expect(chain.shoulderOutwardAxis, `${label}: ${chain.side} finite outward axis`).toHaveLength(3);
+    expect(length(chain.shoulderOutwardAxis)).toBeCloseTo(1, 6);
+    const observed = armGeometry(model, chain.side, chain);
+    for (const [key, value] of Object.entries(observed)) {
+      expect(chain[key], `${label}: independently recomputed ${chain.side} ${key}`).toBeCloseTo(value, 7);
+    }
+    expect(observed.upperArmLength).toBeGreaterThan(0.1);
+    expect(observed.forearmLength).toBeGreaterThan(0.1);
+    expect(observed.elbowFlexRadians, `${label}: ${chain.side} meaningful elbow bend`)
+      .toBeGreaterThanOrEqual(ANTI_T_THRESHOLDS.minimumElbowFlexRadians);
+    expect(observed.shoulderToWristVerticalDrop, `${label}: ${chain.side} wrist materially below shoulder`)
+      .toBeGreaterThanOrEqual(ANTI_T_THRESHOLDS.minimumVerticalDropM);
+    expect(observed.shoulderToWristVerticalDropRatio).toBeGreaterThanOrEqual(ANTI_T_THRESHOLDS.minimumVerticalDropRatio);
+    expect(observed.shoulderToWristHorizontalReachRatio).toBeLessThanOrEqual(ANTI_T_THRESHOLDS.maximumHorizontalReachRatio);
+    expect(observed.shoulderToWristOutwardReachRatio).toBeLessThanOrEqual(ANTI_T_THRESHOLDS.maximumOutwardReachRatio);
+    expect(chain.antiTPoseGeometry, `${label}: ${chain.side} cannot be a horizontal T arm`).toBe(true);
   }
   if (armed) {
     expect(model.weaponChildren, `${label}: one mounted authored weapon`).toBe(1);
@@ -116,11 +220,25 @@ function expectArmPose(model: any, label: string, armed: boolean): void {
     expect(model.supportGrip, `${label}: both hands solve onto the weapon`).toMatchObject({
       bothHandsConnected: true,
       finite: true,
+      torsoClear: true,
+      torsoRelativeBendHint: true,
       socketName: 'support-socket-l',
-      dominantGrip: { finite: true, socketName: 'grip-socket-r' },
+      weaponLocalBounds: { containsTarget: true },
+      dominantGrip: {
+        finite: true,
+        torsoClear: true,
+        torsoRelativeBendHint: true,
+        socketName: 'grip-socket-r',
+        weaponLocalBounds: { containsTarget: true },
+      },
     });
-    expect(model.supportGrip.supportError).toBeLessThanOrEqual(0.055);
-    expect(model.supportGrip.dominantGrip.supportError).toBeLessThanOrEqual(0.055);
+    for (const grip of [model.supportGrip, model.supportGrip.dominantGrip]) {
+      expect(grip.supportError, `${label}: grip reaches authored socket`).toBeLessThanOrEqual(0.025);
+      expect(grip.minimumOutwardClearance, `${label}: nonzero torso clearance floor`).toBeGreaterThan(0);
+      expect(grip.elbowTorsoOutward, `${label}: elbow remains outward of torso floor`)
+        .toBeGreaterThanOrEqual(grip.minimumOutwardClearance);
+      expect(grip.weaponLocalBounds.distanceToTarget, `${label}: grip socket lies inside weapon bounds`).toBe(0);
+    }
   } else {
     expect(model.weaponChildren, `${label}: unarmed socket remains empty`).toBe(0);
     expect(model.weaponMount, `${label}: no mounted weapon`).toBeNull();
@@ -248,6 +366,72 @@ async function screenshotWithHash(page: Page, testInfo: TestInfo, name: string):
   return { path: repositoryRelative(path), sha256: sha256(screenshot) };
 }
 
+type CaptureActor = Readonly<{ kind: 'bot' | 'training-dummy'; id: string }>;
+type CaptureRoi = Readonly<{ minX: number; maxX: number; minY: number; maxY: number }>;
+
+async function captureFraming(page: Page, actors: readonly CaptureActor[], roiNdc: CaptureRoi): Promise<any[]> {
+  const evidence = await page.evaluate(({ requestedActors, roi }) => {
+    const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
+    const canvasBounds = document.querySelector<HTMLCanvasElement>('#game')!.getBoundingClientRect();
+    const viewport = { width: window.innerWidth, height: window.innerHeight };
+    return requestedActors.map((actor) => {
+      const target = actor.kind === 'bot'
+        ? snapshot.bots.find((candidate: any) => candidate.id === actor.id)
+        : snapshot.rangePractice.targets.find((candidate: any) => candidate.id === actor.id);
+      if (!target) return { actor, missing: true };
+      const [x, y, z] = target.screenPosition;
+      const withinRoi = Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)
+        && x >= roi.minX && x <= roi.maxX && y >= roi.minY && y <= roi.maxY
+        && z >= -1 && z <= 1;
+      const projectedPixel = {
+        x: canvasBounds.left + (x + 1) * 0.5 * canvasBounds.width,
+        y: canvasBounds.top + (1 - y) * 0.5 * canvasBounds.height,
+      };
+      const onScreen = withinRoi && canvasBounds.width > 0 && canvasBounds.height > 0
+        && projectedPixel.x >= Math.max(0, canvasBounds.left)
+        && projectedPixel.x <= Math.min(viewport.width, canvasBounds.right)
+        && projectedPixel.y >= Math.max(0, canvasBounds.top)
+        && projectedPixel.y <= Math.min(viewport.height, canvasBounds.bottom);
+      return {
+        actor,
+        missing: false,
+        screenPosition: [x, y, z],
+        roiNdc: roi,
+        withinRoi,
+        onScreen,
+        rootVisible: actor.kind === 'bot' ? target.rootVisible : target.visible,
+        rootEffectivelyVisible: target.rootEffectivelyVisible,
+        effectivelyVisibleMeshCount: target.effectivelyVisibleMeshCount,
+        effectivelyVisibleSkinnedMeshes: target.operatorModel?.effectivelyVisibleSkinnedMeshes ?? [],
+        armSkinVisible: target.operatorModel?.armPose?.allInEffectivelyVisibleSkinnedMesh === true,
+        handSkinVisible: target.operatorModel?.handPose?.allInEffectivelyVisibleSkinnedMesh === true,
+        canvas: {
+          left: canvasBounds.left,
+          top: canvasBounds.top,
+          width: canvasBounds.width,
+          height: canvasBounds.height,
+        },
+        viewport,
+        projectedPixel,
+      };
+    });
+  }, { requestedActors: actors, roi: roiNdc });
+  for (const framing of evidence) {
+    const label = `${framing.actor.kind}:${framing.actor.id}`;
+    expect(framing.missing, `${label}: capture actor exists`).toBe(false);
+    expect(framing.rootVisible, `${label}: root visible`).toBe(true);
+    expect(framing.rootEffectivelyVisible, `${label}: visible through every ancestor`).toBe(true);
+    expect(framing.effectivelyVisibleMeshCount, `${label}: effective renderables`).toBeGreaterThan(0);
+    expect(framing.effectivelyVisibleSkinnedMeshes.length, `${label}: effective skinned renderables`).toBeGreaterThan(0);
+    expect(framing.armSkinVisible, `${label}: arm bones drive visible skin`).toBe(true);
+    expect(framing.handSkinVisible, `${label}: finger bones drive visible skin`).toBe(true);
+    expect(framing.screenPosition.every(Number.isFinite), `${label}: finite projection`).toBe(true);
+    expect(framing.withinRoi, `${label}: bounded live screenshot ROI ${JSON.stringify(framing)}`).toBe(true);
+    expect(framing.onScreen, `${label}: projected actor point is inside the visible canvas and viewport`).toBe(true);
+  }
+  return evidence;
+}
+
 function cameraPose(target: number[], distance: number): { x: number; y: number; z: number; yaw: number; pitch: number } {
   const x = target[0] + distance * 0.72;
   const y = target[1] + 1.08;
@@ -261,7 +445,15 @@ function cameraPose(target: number[], distance: number): { x: number; y: number;
   };
 }
 
-async function captureAtPose(page: Page, testInfo: TestInfo, target: number[], distance: number, name: string) {
+async function captureAtPose(
+  page: Page,
+  testInfo: TestInfo,
+  target: number[],
+  distance: number,
+  name: string,
+  actor: CaptureActor,
+  roiNdc: CaptureRoi,
+) {
   const pose = cameraPose(target, distance);
   await page.evaluate(({ x, y, z, yaw, pitch }) => {
     const api = window.__ATOMIC_ACRES_DEBUG__;
@@ -270,9 +462,56 @@ async function captureAtPose(page: Page, testInfo: TestInfo, target: number[], d
   }, pose);
   await waitForPresentedFrame(page);
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
+  const [framing] = await captureFraming(page, [actor], roiNdc);
   const screenshot = await screenshotWithHash(page, testInfo, name);
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false));
-  return screenshot;
+  return { ...screenshot, framing };
+}
+
+async function waitForStrictPose(
+  page: Page,
+  kind: 'armed-bot' | 'unarmed-dummies',
+  expectedIds: readonly string[] = [],
+): Promise<void> {
+  await expect.poll(async () => page.evaluate(({ actorKind, ids, armBones, fingerBones, fingerMinimum }) => {
+    const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
+    const actors = actorKind === 'armed-bot'
+      ? snapshot.bots.slice(0, 1)
+      : snapshot.rangePractice.targets.filter((target: any) => target.kind === 'training-dummy');
+    if (actorKind === 'armed-bot' && !(actors[0]?.alive && actors[0]?.weapon === 'carbine')) return false;
+    if (actorKind === 'unarmed-dummies'
+      && (actors.length !== ids.length || actors.some((actor: any, index: number) => actor.id !== ids[index]))) return false;
+    return actors.every((actor: any) => {
+      const model = actor.operatorModel;
+      const grip = model?.supportGrip;
+      return model?.activeClip === 'Walk'
+        && model.armPose?.allHierarchyValid === true
+        && model.armPose?.allInEffectivelyVisibleSkinnedMesh === true
+        && model.armPose?.allAntiTPoseGeometry === true
+        && model.armPose.bones?.length === armBones.length
+        && model.armPose.bones.every((bone: any, index: number) => (
+          bone.bindQuaternionDeltaRadians >= armBones[index].minimumBindRadians
+        ))
+        && model.handPose?.allDescendantOfWrist === true
+        && model.handPose?.allInEffectivelyVisibleSkinnedMesh === true
+        && model.handPose.bones?.length === fingerBones.length
+        && model.handPose.bones.every((bone: any) => bone.bindQuaternionDeltaRadians >= fingerMinimum)
+        && (actorKind === 'armed-bot'
+          ? model.weaponChildren === 1
+            && grip?.bothHandsConnected === true
+            && grip.torsoClear === true
+            && grip.elbowTorsoOutward >= grip.minimumOutwardClearance
+            && grip.dominantGrip?.torsoClear === true
+            && grip.dominantGrip.elbowTorsoOutward >= grip.dominantGrip.minimumOutwardClearance
+          : actor.armed === false && model.weaponChildren === 0 && model.weaponMount === null);
+    });
+  }, {
+    actorKind: kind,
+    ids: expectedIds,
+    armBones: ARM_BONES,
+    fingerBones: HAND_BONES,
+    fingerMinimum: MINIMUM_FINGER_BIND_RADIANS,
+  }), { timeout: 12_000 }).toBe(true);
 }
 
 test('real armed bot and all four unarmed Gun Range dummies leave the authored T/bind pose', async ({ browser, page }, testInfo) => {
@@ -297,26 +536,19 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
     api.placeBotAhead(5.2);
     api.setBotPresentation('stand', 1.2, 'carbine');
   });
-  await expect.poll(async () => page.evaluate(() => {
-    const bot = (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).bots[0];
-    const model = bot?.operatorModel;
-    return Boolean(bot?.alive && bot?.weapon === 'carbine'
-      && model?.activeClip === 'Walk'
-      && model?.weaponChildren === 1
-      && model?.supportGrip?.bothHandsConnected === true
-      && model?.armPose?.bones?.length === 6
-      && model.armPose.bones.every((bone: any) => bone.bindQuaternionDeltaRadians >= 0.005));
-  }), { timeout: 12_000 }).toBe(true);
+  await waitForStrictPose(page, 'armed-bot');
   const armedFirst = await page.evaluate(() => (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).bots[0]);
   await page.waitForTimeout(420);
+  await waitForStrictPose(page, 'armed-bot');
   const armedSecond = await page.evaluate(() => (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).bots[0]);
   expectArmPose(armedFirst.operatorModel, 'armed live bot first pose', true);
   expectArmPose(armedSecond.operatorModel, 'armed live bot second pose', true);
   const armedMotion = poseMotion(armedFirst, armedSecond);
   expectPoseMotion(armedMotion, 'armed live bot', false);
+  const armedActor = { kind: 'bot' as const, id: armedSecond.id };
   const armedScreenshots = {
-    medium: await captureAtPose(page, testInfo, armedSecond.position, 4.4, 'armed-live-bot-medium'),
-    close: await captureAtPose(page, testInfo, armedSecond.position, 2.15, 'armed-live-bot-close'),
+    medium: await captureAtPose(page, testInfo, armedSecond.position, 4.4, 'armed-live-bot-medium', armedActor, MEDIUM_ROI_NDC),
+    close: await captureAtPose(page, testInfo, armedSecond.position, 2.15, 'armed-live-bot-close', armedActor, CLOSE_ROI_NDC),
   };
   const armedRuntime = await captureSurfaceEvidence(page, testInfo, 'atomic-acres');
 
@@ -326,21 +558,11 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
     window.__ATOMIC_ACRES_DEBUG__.setCaptureViewmodelHidden(true);
   });
   const expectedDummyIds = GUN_RANGE_TEST_BAY_CONTRACT.dummies.map(({ id }) => id);
-  await expect.poll(async () => page.evaluate((ids) => {
-    const dummies = (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).rangePractice.targets
-      .filter((target: any) => target.kind === 'training-dummy');
-    return dummies.length === ids.length
-      && dummies.every((dummy: any, index: number) => dummy.id === ids[index]
-        && dummy.armed === false
-        && dummy.operatorModel?.activeClip === 'Walk'
-        && dummy.operatorModel?.weaponChildren === 0
-        && dummy.operatorModel?.weaponMount === null
-        && dummy.operatorModel?.armPose?.bones?.length === 6
-        && dummy.operatorModel.armPose.bones.every((bone: any) => bone.bindQuaternionDeltaRadians >= 0.005));
-  }, expectedDummyIds), { timeout: 12_000 }).toBe(true);
+  await waitForStrictPose(page, 'unarmed-dummies', expectedDummyIds);
   const dummyFirst = await page.evaluate(() => (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).rangePractice.targets
     .filter((target: any) => target.kind === 'training-dummy'));
   await page.waitForTimeout(460);
+  await waitForStrictPose(page, 'unarmed-dummies', expectedDummyIds);
   const dummySecond = await page.evaluate(() => (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).rangePractice.targets
     .filter((target: any) => target.kind === 'training-dummy'));
   expect(dummyFirst.map(({ id }: any) => id)).toEqual(expectedDummyIds);
@@ -362,13 +584,29 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
   expect(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setArenaReviewCamera('gun-range-test-bay-overview'))).toBe(true);
   await waitForPresentedFrame(page);
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
-  const overviewScreenshot = await screenshotWithHash(page, testInfo, 'gun-range-dummies-medium');
+  const overviewFraming = await captureFraming(
+    page,
+    expectedDummyIds.map((id) => ({ kind: 'training-dummy' as const, id })),
+    OVERVIEW_ROI_NDC,
+  );
+  const overviewScreenshot = {
+    ...await screenshotWithHash(page, testInfo, 'gun-range-dummies-medium'),
+    framing: overviewFraming,
+  };
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false));
   const dummyEvidence = [];
   for (const dummy of dummies) {
     const current = await page.evaluate((id) => (window.__ATOMIC_ACRES_DEBUG__.snapshot() as any).rangePractice.targets
       .find((target: any) => target.id === id), dummy.id);
-    const closeScreenshot = await captureAtPose(page, testInfo, current.position, 2.1, `${dummy.id}-close`);
+    const closeScreenshot = await captureAtPose(
+      page,
+      testInfo,
+      current.position,
+      2.1,
+      `${dummy.id}-close`,
+      { kind: 'training-dummy', id: dummy.id },
+      CLOSE_ROI_NDC,
+    );
     dummyEvidence.push({ ...dummy, closeScreenshot });
   }
   const gunRangeRuntime = await captureSurfaceEvidence(page, testInfo, 'gun-range');
@@ -386,10 +624,10 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
     expect(endingSourceStatus, 'official rigged-bot evidence ends with a clean worktree').toBe('');
   }
   writeFileSync(receiptPath, `${JSON.stringify({
-    schemaVersion: 1,
+    schemaVersion: 2,
     status: 'PASS',
-    contract: 'atomic-acres/pass69-3-rigged-bot-live@1',
-    evidenceScope: 'real-glb-armed-bot-and-four-unarmed-moving-dummies-arm-chain-pose',
+    contract: 'atomic-acres/pass69-3-rigged-bot-live@2',
+    evidenceScope: 'real-glb-skinned-hierarchy-anti-t-hands-grip-and-live-framing',
     target: officialEvidence ? expectedTarget : `development-${renderer}`,
     sourceSha,
     endingSourceSha,
@@ -397,7 +635,18 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
     renderer,
     renderProfile,
     viewport: [1_600, 900],
-    minimumBindRotationRadians: MINIMUM_BIND_ROTATION_RADIANS,
+    armBindThresholds: ARM_BONES.map(({ side, role, sourceBone, bone, minimumBindRadians }) => (
+      { side, role, sourceBone, bone, minimumBindRadians }
+    )),
+    minimumFingerBindRadians: MINIMUM_FINGER_BIND_RADIANS,
+    antiTThresholds: ANTI_T_THRESHOLDS,
+    captureRoisNdc: { close: CLOSE_ROI_NDC, medium: MEDIUM_ROI_NDC, overview: OVERVIEW_ROI_NDC },
+    visualReview: {
+      required: true,
+      status: 'PENDING_OWNER_INSPECTION',
+      automatedFramingIsNotVisualAcceptance: true,
+      inspectionScope: 'armed medium/close plus four dummy closeups and shared overview',
+    },
     browser: {
       project: testInfo.project.name,
       channel: officialEvidence ? 'msedge' : 'configured-chromium',
