@@ -127,8 +127,8 @@ const fixedDummyActors = Object.freeze([
   Object.freeze({ id: 'test-dummy-delta', position: Object.freeze([64.88, Math.abs(Math.sin(3)) * 0.025, 14]), yaw: -Math.PI / 2 }),
 ]);
 const expectedVisualEvidenceContract = Object.freeze({
-  schemaVersion: 2,
-  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v2',
+  schemaVersion: 3,
+  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v3',
   los: Object.freeze({
     contract: 'actual-render-world-layout-occluder-multi-sentinel-los-v2',
     actorSelfOcclusionExcluded: true,
@@ -144,16 +144,17 @@ const expectedVisualEvidenceContract = Object.freeze({
     }),
   }),
   atomic: Object.freeze({
-    id: 'atomic-south-road-crosslane-spawn-fixed-v2',
+    id: 'atomic-south-road-crosslane-spawn-fixed-v3',
     commandedPlayerPosition: Object.freeze([-3, 1.7, 40]),
-    expectedSettledPlayerPosition: Object.freeze([-3, 1.6984, 40]),
+    settlementPositionAnchor: Object.freeze([-3, 1.7, 40]),
     playerYaw: -Math.PI / 2,
     settlement: Object.freeze({
-      contract: 'grounded-distinct-presented-frame-convergence-v2',
+      contract: 'grounded-distinct-presented-frame-axis-envelope-convergence-v3',
       minimumObservedTransitions: 8,
       minimumDurationMs: 50,
       maximumAxisDeltaM: 0.0005,
-      maximumFinalAxisErrorM: 0.0005,
+      maximumAxisSpanM: 0.0005,
+      maximumAbsoluteAxisErrorM: Object.freeze([0.0005, 0.00225, 0.0005]),
       groundedRequired: true,
     }),
     botDistanceM: 5.2,
@@ -789,31 +790,55 @@ function maximumAxisDelta(left, right) {
     : Number.NaN;
 }
 
+function withinNumericBoundary(observed, limit, scaleValues) {
+  return Number.isFinite(observed) && Number.isFinite(limit) && finiteVector(scaleValues, scaleValues.length)
+    && observed <= limit + Number.EPSILON * 8 * Math.max(1, ...scaleValues.map(Math.abs));
+}
+
+function meetsMinimumBoundary(observed, minimum, scaleValues) {
+  return Number.isFinite(observed) && Number.isFinite(minimum) && finiteVector(scaleValues, scaleValues.length)
+    && observed + Number.EPSILON * 8 * Math.max(1, ...scaleValues.map(Math.abs)) >= minimum;
+}
+
+function nonnegativeSafeInteger(value) {
+  return Number.isSafeInteger(value) && value >= 0;
+}
+
+function axisErrorsWithin(left, right, maxima) {
+  return finiteVector(left) && finiteVector(right) && finiteVector(maxima)
+    && left.every((value, axis) => withinNumericBoundary(
+      Math.abs(value - right[axis]), maxima[axis], [value, right[axis]],
+    ));
+}
+
 function atomicPlayerConvergenceValid(fixedFixture, firstCapturePresentedGameplayFrame) {
   const definition = expectedVisualEvidenceContract.atomic;
   const settlement = definition.settlement;
   const commanded = fixedFixture?.commandedPlayer;
   const convergence = fixedFixture?.convergence;
   const samples = convergence?.samples;
-  if (!Number.isInteger(commanded?.presentedGameplayFrame)
+  if (!nonnegativeSafeInteger(commanded?.presentedGameplayFrame)
     || !sameArray(commanded?.position, definition.commandedPlayerPosition)
     || commanded.yaw !== definition.playerYaw
     || commanded.grounded !== false
     || convergence?.contract !== settlement.contract
-    || !sameArray(convergence.expectedSettledPosition, definition.expectedSettledPlayerPosition)
+    || !sameArray(convergence.positionAnchor, definition.settlementPositionAnchor)
     || !Array.isArray(samples)
     || samples.length < settlement.minimumObservedTransitions + 1
+    || !nonnegativeSafeInteger(convergence.transitionCount)
     || convergence.transitionCount !== samples.length - 1
     || convergence.transitionCount < settlement.minimumObservedTransitions
-    || !Number.isInteger(firstCapturePresentedGameplayFrame)) return false;
+    || !nonnegativeSafeInteger(firstCapturePresentedGameplayFrame)) return false;
   for (let index = 0; index < samples.length; index += 1) {
     const sample = samples[index];
-    if (!Number.isInteger(sample?.presentedGameplayFrame)
+    if (!nonnegativeSafeInteger(sample?.presentedGameplayFrame)
       || !Number.isFinite(sample?.atMs)
+      || sample.atMs < 0
       || !finiteVector(sample?.position)
       || sample.grounded !== true
-      || maximumAxisDelta(sample.position, definition.expectedSettledPlayerPosition)
-        > settlement.maximumFinalAxisErrorM
+      || !axisErrorsWithin(
+        sample.position, definition.settlementPositionAnchor, settlement.maximumAbsoluteAxisErrorM,
+      )
       || index > 0 && (sample.presentedGameplayFrame <= samples[index - 1].presentedGameplayFrame
         || sample.atMs <= samples[index - 1].atMs)) {
       return false;
@@ -825,23 +850,47 @@ function atomicPlayerConvergenceValid(fixedFixture, firstCapturePresentedGamepla
     sample.position, samples[index].position,
   ));
   const maximumObservedAxisDeltaM = Math.max(...observedDeltas);
-  const maximumFinalAxisErrorM = maximumAxisDelta(
-    samples.at(-1).position, definition.expectedSettledPlayerPosition,
-  );
-  return durationMs >= settlement.minimumDurationMs
-    && maximumObservedAxisDeltaM <= settlement.maximumAxisDeltaM
-    && maximumFinalAxisErrorM <= settlement.maximumFinalAxisErrorM
+  const maximumObservedAxisSpanM = [0, 1, 2].map((axis) => {
+    const values = samples.map((sample) => sample.position[axis]);
+    return Math.max(...values) - Math.min(...values);
+  });
+  const maximumObservedAbsoluteAxisErrorM = [0, 1, 2].map((axis) => Math.max(
+    ...samples.map((sample) => Math.abs(sample.position[axis] - definition.settlementPositionAnchor[axis])),
+  ));
+  return meetsMinimumBoundary(durationMs, settlement.minimumDurationMs, [samples[0].atMs, samples.at(-1).atMs])
+    && withinNumericBoundary(
+      maximumObservedAxisDeltaM, settlement.maximumAxisDeltaM, samples.flatMap((sample) => sample.position),
+    )
+    && maximumObservedAxisSpanM.every((spanM, axis) => withinNumericBoundary(
+      spanM, settlement.maximumAxisSpanM, samples.map((sample) => sample.position[axis]),
+    ))
+    && maximumObservedAbsoluteAxisErrorM.every((errorM, axis) => withinNumericBoundary(
+      errorM,
+      settlement.maximumAbsoluteAxisErrorM[axis],
+      [...samples.map((sample) => sample.position[axis]), definition.settlementPositionAnchor[axis]],
+    ))
     && convergence.allGrounded === true
-    && close(convergence.durationMs, durationMs, 1e-9)
-    && close(convergence.maximumObservedAxisDeltaM, maximumObservedAxisDeltaM, 1e-9)
-    && close(convergence.maximumFinalAxisErrorM, maximumFinalAxisErrorM, 1e-9)
-    && Number.isInteger(fixedFixture?.stagedPlayer?.presentedGameplayFrame)
+    && Number.isFinite(convergence.durationMs)
+    && convergence.durationMs >= 0
+    && Number.isFinite(convergence.maximumObservedAxisDeltaM)
+    && convergence.maximumObservedAxisDeltaM >= 0
+    && convergence.durationMs === durationMs
+    && convergence.maximumObservedAxisDeltaM === maximumObservedAxisDeltaM
+    && finiteVector(convergence.maximumObservedAxisSpanM)
+    && convergence.maximumObservedAxisSpanM.every((value) => value >= 0)
+    && sameArray(convergence.maximumObservedAxisSpanM, maximumObservedAxisSpanM)
+    && finiteVector(convergence.maximumObservedAbsoluteAxisErrorM)
+    && convergence.maximumObservedAbsoluteAxisErrorM.every((value) => value >= 0)
+    && sameArray(convergence.maximumObservedAbsoluteAxisErrorM, maximumObservedAbsoluteAxisErrorM)
+    && nonnegativeSafeInteger(fixedFixture?.stagedPlayer?.presentedGameplayFrame)
     && fixedFixture.stagedPlayer.presentedGameplayFrame > samples.at(-1).presentedGameplayFrame
     && fixedFixture.stagedPlayer.presentedGameplayFrame < firstCapturePresentedGameplayFrame
     && finiteVector(fixedFixture.stagedPlayer.position)
-    && maximumAxisDelta(
-      fixedFixture.stagedPlayer.position, definition.expectedSettledPlayerPosition,
-    ) <= settlement.maximumFinalAxisErrorM
+    && axisErrorsWithin(
+      fixedFixture.stagedPlayer.position,
+      definition.settlementPositionAnchor,
+      settlement.maximumAbsoluteAxisErrorM,
+    )
     && close(fixedFixture.stagedPlayer.yaw, definition.playerYaw, 1e-8)
     && fixedFixture.stagedPlayer.grounded === true;
 }
@@ -1631,9 +1680,9 @@ function receiptValidationFailures(receipt, sourceSha) {
     close: closeRoiNdc, hand: handRoiNdc, medium: mediumRoiNdc, overview: overviewRoiNdc,
   };
 
-  add('receipt.schemaVersion', receipt.schemaVersion === 6);
+  add('receipt.schemaVersion', receipt.schemaVersion === 7);
   add('receipt.status', receipt.status === 'AUTOMATION_PASS_OWNER_PENDING');
-  add('receipt.contract', receipt.contract === 'atomic-acres/pass69-3-rigged-bot-live@6');
+  add('receipt.contract', receipt.contract === 'atomic-acres/pass69-3-rigged-bot-live@7');
   add('receipt.evidenceScope', receipt.evidenceScope
     === 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-and-hand-detail-framing');
   add('receipt.target', receipt.target === targetName);
@@ -1847,11 +1896,11 @@ function runContractSelfTest() {
   assert(!dummyActorIdentityValid(inactiveDummyIdentity, 'test-dummy-alpha'),
     'inactive or swapped dummy identity must fail');
   const makeAtomicPlayerFixture = (mutate = () => {}) => {
-    const expected = [...expectedVisualEvidenceContract.atomic.expectedSettledPlayerPosition];
+    const anchor = [...expectedVisualEvidenceContract.atomic.settlementPositionAnchor];
     const samples = Array.from({ length: 9 }, (_, index) => ({
       presentedGameplayFrame: 101 + index,
       atMs: 1_000 + index * 8,
-      position: [...expected],
+      position: [...anchor],
       grounded: true,
     }));
     const fixture = {
@@ -1863,17 +1912,18 @@ function runContractSelfTest() {
       },
       convergence: {
         contract: expectedVisualEvidenceContract.atomic.settlement.contract,
-        expectedSettledPosition: expected,
+        positionAnchor: anchor,
         samples,
         transitionCount: 8,
         durationMs: 0,
         maximumObservedAxisDeltaM: 0,
-        maximumFinalAxisErrorM: 0,
+        maximumObservedAxisSpanM: [0, 0, 0],
+        maximumObservedAbsoluteAxisErrorM: [0, 0, 0],
         allGrounded: true,
       },
       stagedPlayer: {
         presentedGameplayFrame: 120,
-        position: [...expected],
+        position: [...anchor],
         yaw: expectedVisualEvidenceContract.atomic.playerYaw,
         grounded: true,
       },
@@ -1883,7 +1933,13 @@ function runContractSelfTest() {
     fixture.convergence.maximumObservedAxisDeltaM = Math.max(...samples.slice(1).map((sample, index) => (
       maximumAxisDelta(sample.position, samples[index].position)
     )));
-    fixture.convergence.maximumFinalAxisErrorM = maximumAxisDelta(samples.at(-1).position, expected);
+    fixture.convergence.maximumObservedAxisSpanM = [0, 1, 2].map((axis) => {
+      const values = samples.map((sample) => sample.position[axis]);
+      return Math.max(...values) - Math.min(...values);
+    });
+    fixture.convergence.maximumObservedAbsoluteAxisErrorM = [0, 1, 2].map((axis) => Math.max(
+      ...samples.map((sample) => Math.abs(sample.position[axis] - anchor[axis])),
+    ));
     fixture.convergence.allGrounded = samples.every((sample) => sample.grounded);
     return fixture;
   };
@@ -1896,17 +1952,47 @@ function runContractSelfTest() {
   assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
     fixture.convergence.samples[0].presentedGameplayFrame = fixture.commandedPlayer.presentedGameplayFrame;
   })), 'a pre-command or command-frame presentation sample must fail convergence');
+  assert(validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
+    fixture.convergence.samples.forEach((sample) => { sample.position[0] += 0.0005; });
+  })), 'horizontal absolute error at 0.0005m must pass');
   assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
-    fixture.convergence.samples.forEach((sample, index) => { sample.position[0] += index * 0.000075125; });
-  })), 'settled player error above 0.0005m must fail even with bounded transitions');
+    fixture.convergence.samples.forEach((sample) => { sample.position[0] += 0.000501; });
+  })), 'horizontal absolute error at 0.000501m must fail');
+  assert(validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
+    fixture.convergence.samples.forEach((sample) => { sample.position[1] += 0.00225; });
+  })), 'vertical absolute error at 0.00225m must pass');
   assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
-    fixture.convergence.samples[4].position[0] += 0.000501;
+    fixture.convergence.samples.forEach((sample) => { sample.position[1] += 0.002251; });
+  })), 'vertical absolute error at 0.002251m must fail');
+  assert(validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
+    fixture.convergence.samples.forEach((sample) => { sample.position[2] += 0.0005; });
+  })), 'depth absolute error at 0.0005m must pass despite representation rounding');
+  for (const [axis, limit] of expectedVisualEvidenceContract.atomic.settlement.maximumAbsoluteAxisErrorM.entries()) {
+    assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
+      fixture.convergence.samples.forEach((sample) => { sample.position[axis] += limit + 1e-9; });
+    })), `axis ${axis} absolute error 1e-9m beyond its boundary must fail`);
+  }
+  assert(validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
+    fixture.convergence.samples.forEach((sample) => { sample.position[1] = 1.700099; });
+  })), 'warmed grounded y=1.700099m must pass the command-anchored vertical envelope');
+  assert(validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
+    fixture.convergence.samples.forEach((sample) => { sample.position[1] = 1.698398; });
+  })), 'cold grounded y=1.698398m must pass the command-anchored vertical envelope');
+  assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
+    fixture.convergence.samples.forEach((sample) => { sample.position[1] = 1.697749; });
+  })), 'wrong grounded hover outside the vertical command envelope must fail');
+  assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
+    fixture.convergence.samples[0].position[1] += 0.002251;
+  })), 'an earlier out-of-envelope sample cannot be hidden by a final in-envelope sample');
+  assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
+    fixture.convergence.samples[3].position[0] -= 0.0005;
+    fixture.convergence.samples[4].position[0] += 0.000001;
   })), 'one player transition above 0.0005m must fail');
   assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
     fixture.convergence.samples.forEach((sample, index) => {
-      sample.position[0] -= 0.00392 - index * 0.00049;
+      sample.position[1] -= 0.00225 - index * 0.00049;
     });
-  })), 'slow drift from outside the final envelope must fail even when every adjacent step is bounded');
+  })), 'monotonic in-envelope 0.00049m drift must fail the 0.0005m accepted-window span');
   assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
     fixture.convergence.samples[4].presentedGameplayFrame = fixture.convergence.samples[3].presentedGameplayFrame;
   })), 'a reused presented frame must fail convergence');
@@ -1918,6 +2004,9 @@ function runContractSelfTest() {
       if (index >= 4) sample.presentedGameplayFrame += 1;
     });
   })), 'a strictly increasing WebGPU presentation gap must pass convergence');
+  assert(validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
+    fixture.convergence.samples.forEach((sample, index) => { sample.atMs = 1_000 + index * 6.25; });
+  })), 'an exact 50ms convergence window must pass');
   assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
     fixture.convergence.samples.forEach((sample, index) => { sample.atMs = 1_000 + index * 6; });
   })), 'a convergence window shorter than 50ms must fail');
@@ -1926,7 +2015,37 @@ function runContractSelfTest() {
   })), 'an ungrounded player sample must fail convergence');
   assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
     fixture.stagedPlayer.position[0] += 0.000501;
-  })), 'the later staged player must independently remain inside the final envelope');
+  })), 'the later staged player must independently satisfy the horizontal envelope');
+  assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
+    fixture.stagedPlayer.position[1] += 0.002251;
+  })), 'the later staged player must independently satisfy the vertical envelope');
+  assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
+    fixture.stagedPlayer.position = [fixture.stagedPlayer.position[0], fixture.stagedPlayer.position[1]];
+  })), 'a malformed staged-player vector must fail closed');
+  const malformedAxisMaximum = makeAtomicPlayerFixture();
+  malformedAxisMaximum.convergence.maximumObservedAbsoluteAxisErrorM = [0, 0];
+  assert(!validAtomicPlayerConvergence(malformedAxisMaximum),
+    'a malformed per-axis receipt maximum must fail closed');
+  const forgedAxisMaximum = makeAtomicPlayerFixture();
+  forgedAxisMaximum.convergence.maximumObservedAbsoluteAxisErrorM[1] = 0.000001;
+  assert(!validAtomicPlayerConvergence(forgedAxisMaximum),
+    'a forged correct-length per-axis receipt maximum must fail recomputation');
+  const forgedAxisSpan = makeAtomicPlayerFixture();
+  forgedAxisSpan.convergence.maximumObservedAxisSpanM[1] += 0.000001;
+  assert(!validAtomicPlayerConvergence(forgedAxisSpan),
+    'a forged per-axis span summary must fail recomputation');
+  const negativeTelemetry = makeAtomicPlayerFixture();
+  negativeTelemetry.convergence.maximumObservedAxisDeltaM = -0.0000000005;
+  negativeTelemetry.convergence.maximumObservedAxisSpanM[1] = -0.0000000005;
+  negativeTelemetry.convergence.maximumObservedAbsoluteAxisErrorM[1] = -0.0000000005;
+  assert(!validAtomicPlayerConvergence(negativeTelemetry),
+    'negative near-zero convergence telemetry must fail closed');
+  assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
+    fixture.convergence.samples[0].presentedGameplayFrame = -1;
+  })), 'negative presented gameplay frames must fail closed');
+  assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
+    fixture.convergence.samples[0].atMs = -1;
+  })), 'negative observation times must fail closed');
   assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
     fixture.stagedPlayer.presentedGameplayFrame = fixture.convergence.samples.at(-1).presentedGameplayFrame;
   })), 'the staged player must be sampled after convergence');

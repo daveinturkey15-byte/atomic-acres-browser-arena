@@ -117,6 +117,11 @@ function sha256(value: Buffer): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
+function withinNumericBoundary(observed: number, limit: number, scaleValues: readonly number[]): boolean {
+  return Number.isFinite(observed) && Number.isFinite(limit) && scaleValues.every(Number.isFinite)
+    && observed <= limit + Number.EPSILON * 8 * Math.max(1, ...scaleValues.map(Math.abs));
+}
+
 function repositoryRelative(path: string): string {
   return relative(repositoryRoot, path).replaceAll('\\', '/');
 }
@@ -133,7 +138,7 @@ async function waitForAtomicPlayerConvergence(
 ): Promise<AtomicPlayerConvergence> {
   return page.evaluate(waitForAtomicPlayerConvergenceInPage, {
     commandedFrame: commandedPresentedGameplayFrame,
-    expectedSettledPosition: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.expectedSettledPlayerPosition,
+    positionAnchor: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.settlementPositionAnchor,
     settlement: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.settlement,
   });
 }
@@ -1663,10 +1668,16 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
   expect([armedFirst.weapon, armedSecond.weapon, stagedAtomic.bot.weapon], 'armed actor retains exact carbine identity').toEqual([
     'carbine', 'carbine', 'carbine',
   ]);
+  expect(stagedAtomic.player.position, 'settled Atomic player is one exact finite vec3').toHaveLength(3);
+  expect(stagedAtomic.player.position.every(Number.isFinite), 'settled Atomic player axes are finite').toBe(true);
   stagedAtomic.player.position.forEach((value: number, axis: number) => expect(
-    Math.abs(value - RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.expectedSettledPlayerPosition[axis]),
+    withinNumericBoundary(
+      Math.abs(value - RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.settlementPositionAnchor[axis]),
+      RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.settlement.maximumAbsoluteAxisErrorM[axis],
+      [value, RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.settlementPositionAnchor[axis]],
+    ),
     `settled Atomic player axis ${axis} error`,
-  ).toBeLessThanOrEqual(RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.settlement.maximumFinalAxisErrorM));
+  ).toBe(true));
   expect(stagedAtomic.player.grounded, 'settled Atomic player remains grounded before evidence capture').toBe(true);
   expect(stagedAtomic.player.yaw, 'fixed Atomic player yaw').toBeCloseTo(
     RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.playerYaw, 8,
@@ -1834,9 +1845,9 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
     expect(endingSourceStatus, 'official rigged-bot evidence ends with a clean worktree').toBe('');
   }
   writeFileSync(receiptPath, `${JSON.stringify({
-    schemaVersion: 6,
+    schemaVersion: 7,
     status: 'AUTOMATION_PASS_OWNER_PENDING',
-    contract: 'atomic-acres/pass69-3-rigged-bot-live@6',
+    contract: 'atomic-acres/pass69-3-rigged-bot-live@7',
     evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-and-hand-detail-framing',
     target: officialEvidence ? expectedTarget : `development-${renderer}`,
     sourceSha,

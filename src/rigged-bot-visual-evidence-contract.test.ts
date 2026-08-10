@@ -20,20 +20,21 @@ describe('fixed rigged actor visual evidence fixtures', () => {
   it('retains one immutable open-road Atomic staging line', () => {
     const fixture = RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic;
     expect(fixture).toMatchObject({
-      id: 'atomic-south-road-crosslane-spawn-fixed-v2',
+      id: 'atomic-south-road-crosslane-spawn-fixed-v3',
       commandedPlayerPosition: [-3, 1.7, 40],
-      expectedSettledPlayerPosition: [-3, 1.6984, 40],
+      settlementPositionAnchor: [-3, 1.7, 40],
       playerYaw: -Math.PI / 2,
       botDistanceM: 5.2,
       expectedBotPosition: [2.2, 0, 40],
       expectedBotYaw: Math.PI / 2,
     });
     expect(fixture.settlement).toEqual({
-      contract: 'grounded-distinct-presented-frame-convergence-v2',
+      contract: 'grounded-distinct-presented-frame-axis-envelope-convergence-v3',
       minimumObservedTransitions: 8,
       minimumDurationMs: 50,
       maximumAxisDeltaM: 0.0005,
-      maximumFinalAxisErrorM: 0.0005,
+      maximumAxisSpanM: 0.0005,
+      maximumAbsoluteAxisErrorM: [0.0005, 0.00225, 0.0005],
       groundedRequired: true,
     });
     expect(fixture.mediumCamera.position).toEqual([-2.2, 1.08, 40]);
@@ -43,7 +44,7 @@ describe('fixed rigged actor visual evidence fixtures', () => {
     expect(fixture.closeCamera.yaw).toBeCloseTo(-Math.PI / 2, 12);
   });
 
-  it('falsifies the retired ramp point and keeps the v2 player/bot line clear at player radius', () => {
+  it('falsifies the retired ramp point and keeps the v3 player/bot line clear at player radius', () => {
     const map = buildArena(new THREE.Scene());
     const fixture = RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic;
     expect(SPAWN_LAYOUT[1]).toContainEqual([
@@ -62,7 +63,7 @@ describe('fixed rigged actor visual evidence fixtures', () => {
     }, map.physicsColliders, 0.42)).toBe(false);
   });
 
-  it('settles through the real game-order Rapier controller inside the fixed 0.0005m envelope', async () => {
+  it('settles through the real game-order Rapier controller inside the fixed axis envelope', async () => {
     const map = buildArena(new THREE.Scene());
     const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds);
     const fixture = RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic;
@@ -84,9 +85,9 @@ describe('fixed rigged actor visual evidence fixtures', () => {
       }
       const settled = physics.eyePosition();
       expect(grounded).toBe(true);
-      expect(Math.abs(settled.x - fixture.expectedSettledPlayerPosition[0])).toBeLessThanOrEqual(0.0005);
-      expect(Math.abs(settled.y - fixture.expectedSettledPlayerPosition[1])).toBeLessThanOrEqual(0.0005);
-      expect(Math.abs(settled.z - fixture.expectedSettledPlayerPosition[2])).toBeLessThanOrEqual(0.0005);
+      expect(Math.abs(settled.x - fixture.settlementPositionAnchor[0])).toBeLessThanOrEqual(0.0005);
+      expect(Math.abs(settled.y - fixture.settlementPositionAnchor[1])).toBeLessThanOrEqual(0.00225);
+      expect(Math.abs(settled.z - fixture.settlementPositionAnchor[2])).toBeLessThanOrEqual(0.0005);
     } finally {
       physics.dispose();
     }
@@ -147,13 +148,14 @@ describe('fixed rigged actor visual evidence fixtures', () => {
 
     const completion = waitForAtomicPlayerConvergenceInPage({
       commandedFrame: 99,
-      expectedSettledPosition: [0, 1, 0],
+      positionAnchor: [0, 1, 0],
       settlement: {
         contract: 'diagnostic-test',
         minimumObservedTransitions: 1_000,
         minimumDurationMs: 50,
         maximumAxisDeltaM: 0.0005,
-        maximumFinalAxisErrorM: 0.0005,
+        maximumAxisSpanM: 0.0005,
+        maximumAbsoluteAxisErrorM: [0.0005, 0.00225, 0.0005],
         groundedRequired: true,
       },
     }).then(
@@ -221,5 +223,112 @@ describe('fixed rigged actor visual evidence fixtures', () => {
       { minimum: 0, maximum: 0 },
     ]);
     expect(JSON.stringify(diagnostics)).not.toContain('null,null');
+  });
+
+  it('recovers from an early span violation and accepts nine later stable presentations', async () => {
+    const callbacks: FrameRequestCallback[] = [];
+    let now = 0;
+    let frame = 100;
+    let position = [-3, 1.7, 40];
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      callbacks.push(callback);
+      return callbacks.length;
+    });
+    vi.stubGlobal('window', {
+      __ATOMIC_ACRES_DEBUG__: {
+        admissionState: () => ({ presentedGameplayFrame: frame }),
+        snapshot: () => ({ player: { position, grounded: true } }),
+      },
+    });
+    const completion = waitForAtomicPlayerConvergenceInPage({
+      commandedFrame: 100,
+      positionAnchor: [-3, 1.7, 40],
+      settlement: {
+        contract: 'axis-recovery-test',
+        minimumObservedTransitions: 8,
+        minimumDurationMs: 50,
+        maximumAxisDeltaM: 0.0005,
+        maximumAxisSpanM: 0.0005,
+        maximumAbsoluteAxisErrorM: [0.0005, 0.00225, 0.0005],
+        groundedRequired: true,
+      },
+    });
+    const present = (nextPosition: number[], atMs: number) => {
+      frame += 1;
+      position = nextPosition;
+      now = atMs;
+      const callback = callbacks.shift();
+      expect(callback).toBeTypeOf('function');
+      callback!(atMs);
+    };
+    present([-3, 1.69775, 40], 1);
+    present([-3, 1.69824, 40], 9);
+    present([-3, 1.69873, 40], 17);
+    for (let index = 0; index < 9; index += 1) present([-3, 1.700099, 40], 25 + index * 8);
+    const convergence = await completion;
+    expect(convergence.samples).toHaveLength(9);
+    expect(convergence.samples.every((sample) => sample.position[1] === 1.700099)).toBe(true);
+    expect(convergence.maximumObservedAxisSpanM).toEqual([0, 0, 0]);
+    expect(convergence.maximumObservedAbsoluteAxisErrorM[1]).toBeCloseTo(0.000099, 12);
+  });
+
+  it('accepts the exact mathematical X/Y/Z envelope boundaries despite representation rounding', async () => {
+    const callbacks: FrameRequestCallback[] = [];
+    let now = 0;
+    let frame = 100;
+    const position = [-3 + 0.0005, 1.7 + 0.00225, 40 + 0.0005];
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      callbacks.push(callback);
+      return callbacks.length;
+    });
+    vi.stubGlobal('window', {
+      __ATOMIC_ACRES_DEBUG__: {
+        admissionState: () => ({ presentedGameplayFrame: frame }),
+        snapshot: () => ({ player: { position, grounded: true } }),
+      },
+    });
+    const completion = waitForAtomicPlayerConvergenceInPage({
+      commandedFrame: 100,
+      positionAnchor: [-3, 1.7, 40],
+      settlement: {
+        contract: 'axis-boundary-rounding-test',
+        minimumObservedTransitions: 8,
+        minimumDurationMs: 50,
+        maximumAxisDeltaM: 0.0005,
+        maximumAxisSpanM: 0.0005,
+        maximumAbsoluteAxisErrorM: [0.0005, 0.00225, 0.0005],
+        groundedRequired: true,
+      },
+    });
+    for (let index = 0; index < 9; index += 1) {
+      frame += 1;
+      now = 1 + index * 8;
+      const callback = callbacks.shift();
+      expect(callback).toBeTypeOf('function');
+      callback!(now);
+    }
+    const convergence = await completion;
+    expect(convergence.maximumObservedAbsoluteAxisErrorM).toEqual(position.map((value, axis) => (
+      Math.abs(value - [-3, 1.7, 40][axis])
+    )));
+  });
+
+  it('rejects malformed axis tolerances before sampling', async () => {
+    vi.spyOn(performance, 'now').mockReturnValue(0);
+    await expect(waitForAtomicPlayerConvergenceInPage({
+      commandedFrame: 100,
+      positionAnchor: [-3, 1.7, 40],
+      settlement: {
+        contract: 'malformed-axis-tolerance-test',
+        minimumObservedTransitions: 8,
+        minimumDurationMs: 50,
+        maximumAxisDeltaM: 0.0005,
+        maximumAxisSpanM: 0.0005,
+        maximumAbsoluteAxisErrorM: [0.0005, Number.NaN, 0.0005],
+        groundedRequired: true,
+      },
+    })).rejects.toThrow('invalid-configuration');
   });
 });

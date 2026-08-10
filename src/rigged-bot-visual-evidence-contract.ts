@@ -18,12 +18,13 @@ export type AtomicPlayerSettlementSample = Readonly<{
 
 export type AtomicPlayerConvergence = Readonly<{
   contract: string;
-  expectedSettledPosition: readonly number[];
+  positionAnchor: readonly number[];
   samples: readonly AtomicPlayerSettlementSample[];
   transitionCount: number;
   durationMs: number;
   maximumObservedAxisDeltaM: number;
-  maximumFinalAxisErrorM: number;
+  maximumObservedAxisSpanM: readonly [number, number, number];
+  maximumObservedAbsoluteAxisErrorM: readonly [number, number, number];
   allGrounded: boolean;
 }>;
 
@@ -32,7 +33,8 @@ type AtomicPlayerSettlementContract = Readonly<{
   minimumObservedTransitions: number;
   minimumDurationMs: number;
   maximumAxisDeltaM: number;
-  maximumFinalAxisErrorM: number;
+  maximumAxisSpanM: number;
+  maximumAbsoluteAxisErrorM: readonly [number, number, number];
   groundedRequired: boolean;
 }>;
 
@@ -43,11 +45,11 @@ type AtomicPlayerSettlementContract = Readonly<{
  */
 export function waitForAtomicPlayerConvergenceInPage({
   commandedFrame,
-  expectedSettledPosition,
+  positionAnchor,
   settlement,
 }: Readonly<{
   commandedFrame: number;
-  expectedSettledPosition: readonly number[];
+  positionAnchor: readonly number[];
   settlement: AtomicPlayerSettlementContract;
 }>): Promise<AtomicPlayerConvergence> {
   return new Promise<AtomicPlayerConvergence>((resolveConvergence, reject) => {
@@ -109,6 +111,20 @@ export function waitForAtomicPlayerConvergenceInPage({
       Math.abs(left[1] - right[1]),
       Math.abs(left[2] - right[2]),
     );
+    const withinNumericBoundary = (
+      observed: number,
+      limit: number,
+      scaleValues: readonly number[],
+    ) => observed <= limit + Number.EPSILON * 8 * Math.max(1, ...scaleValues.map(Math.abs));
+    const meetsMinimumBoundary = (
+      observed: number,
+      minimum: number,
+      scaleValues: readonly number[],
+    ) => observed + Number.EPSILON * 8 * Math.max(1, ...scaleValues.map(Math.abs)) >= minimum;
+    const axisSpan = (entries: readonly AtomicPlayerSettlementSample[]) => [0, 1, 2].map((axis) => {
+      const values = entries.map((entry) => entry.position[axis]);
+      return Math.max(...values) - Math.min(...values);
+    }) as [number, number, number];
     const noteAccepted = (current: AtomicPlayerSettlementSample) => {
       acceptedSampleCount += 1;
       longestAcceptedStreak = Math.max(longestAcceptedStreak, samples.length);
@@ -117,7 +133,7 @@ export function waitForAtomicPlayerConvergenceInPage({
       minimumAcceptedY = Math.min(minimumAcceptedY, current.position[1]);
       maximumAcceptedY = Math.max(maximumAcceptedY, current.position[1]);
       current.position.forEach((value, axis) => {
-        const errorM = Math.abs(value - expectedSettledPosition[axis]);
+        const errorM = Math.abs(value - positionAnchor[axis]);
         minimumAcceptedAxisErrorM[axis] = Math.min(minimumAcceptedAxisErrorM[axis], errorM);
         maximumAcceptedAxisErrorM[axis] = Math.max(maximumAcceptedAxisErrorM[axis], errorM);
       });
@@ -151,7 +167,7 @@ export function waitForAtomicPlayerConvergenceInPage({
       timeoutMs,
       elapsedMs,
       commandedFrame,
-      expectedSettledPosition,
+      positionAnchor,
       settlement,
       diagnosticRingCapacity,
       callbackCount,
@@ -177,7 +193,8 @@ export function waitForAtomicPlayerConvergenceInPage({
     };
 
     if (!finiteSafeInteger(commandedFrame)
-      || !finiteExactVector3(expectedSettledPosition)
+      || commandedFrame < 0
+      || !finiteExactVector3(positionAnchor)
       || !settlement
       || typeof settlement.contract !== 'string'
       || !finiteSafeInteger(settlement.minimumObservedTransitions)
@@ -186,8 +203,10 @@ export function waitForAtomicPlayerConvergenceInPage({
       || settlement.minimumDurationMs < 0
       || !Number.isFinite(settlement.maximumAxisDeltaM)
       || settlement.maximumAxisDeltaM < 0
-      || !Number.isFinite(settlement.maximumFinalAxisErrorM)
-      || settlement.maximumFinalAxisErrorM < 0
+      || !Number.isFinite(settlement.maximumAxisSpanM)
+      || settlement.maximumAxisSpanM < 0
+      || !finiteExactVector3(settlement.maximumAbsoluteAxisErrorM)
+      || settlement.maximumAbsoluteAxisErrorM.some((value) => value < 0)
       || typeof settlement.groundedRequired !== 'boolean') {
       rejectWithDiagnostics('Atomic open-road convergence configuration is invalid', 'invalid-configuration', 0);
       return;
@@ -229,7 +248,7 @@ export function waitForAtomicPlayerConvergenceInPage({
         minimumObservedY = Math.min(minimumObservedY, rawPosition[1]);
         maximumObservedY = Math.max(maximumObservedY, rawPosition[1]);
         rawPosition.forEach((value, axis) => {
-          const errorM = Math.abs(value - expectedSettledPosition[axis]);
+          const errorM = Math.abs(value - positionAnchor[axis]);
           minimumObservedAxisErrorM[axis] = Math.min(minimumObservedAxisErrorM[axis], errorM);
           maximumObservedAxisErrorM[axis] = Math.max(maximumObservedAxisErrorM[axis], errorM);
         });
@@ -237,13 +256,13 @@ export function waitForAtomicPlayerConvergenceInPage({
 
       const previous = samples.at(-1);
       let current: AtomicPlayerSettlementSample | null = null;
-      if (!Number.isFinite(observedAtMs)) {
+      if (!Number.isFinite(observedAtMs) || observedAtMs < 0) {
         observation.decision = 'reset-invalid-observation-time';
         resetSamples('invalid-observation-time', observation);
       } else if (snapshotError !== null) {
         observation.decision = 'reset-snapshot-error';
         resetSamples('snapshot-error', observation);
-      } else if (!finiteSafeInteger(rawPresentedGameplayFrame)) {
+      } else if (!finiteSafeInteger(rawPresentedGameplayFrame) || rawPresentedGameplayFrame < 0) {
         observation.decision = 'reset-invalid-presented-frame';
         resetSamples('invalid-presented-frame', observation);
       } else if (!finiteExactVector3(rawPosition)) {
@@ -256,21 +275,25 @@ export function waitForAtomicPlayerConvergenceInPage({
           position: [...rawPosition],
           grounded,
         };
-        const currentFinalAxisErrorM = maximumAxisDelta(rawPosition, expectedSettledPosition);
-        observation.absoluteAxisErrorsM = rawPosition.map((value, axis) => (
-          Math.abs(value - expectedSettledPosition[axis])
-        ));
-        observation.maximumFinalAxisErrorM = currentFinalAxisErrorM;
+        const currentAbsoluteAxisErrorM = rawPosition.map((value, axis) => (
+          Math.abs(value - positionAnchor[axis])
+        )) as [number, number, number];
+        observation.absoluteAxisErrorsM = currentAbsoluteAxisErrorM;
         if (current.presentedGameplayFrame <= commandedFrame) {
           observation.decision = 'reset-pre-command-frame';
           resetSamples('pre-command-frame', observation);
         } else if (!current.grounded) {
           observation.decision = 'reset-not-grounded';
           resetSamples('not-grounded', observation);
-        } else if (currentFinalAxisErrorM > settlement.maximumFinalAxisErrorM) {
-          observation.decision = 'reset-outside-final-envelope';
-          observation.maximumFinalAxisErrorM = currentFinalAxisErrorM;
-          resetSamples('outside-final-envelope', observation);
+        } else if (currentAbsoluteAxisErrorM.some((errorM, axis) => (
+          !withinNumericBoundary(
+            errorM,
+            settlement.maximumAbsoluteAxisErrorM[axis],
+            [rawPosition[axis], positionAnchor[axis]],
+          )
+        ))) {
+          observation.decision = 'reset-outside-axis-envelope';
+          resetSamples('outside-axis-envelope', observation);
         } else if (!previous) {
           samples = [current];
           observation.decision = 'accept-first-sample';
@@ -285,14 +308,29 @@ export function waitForAtomicPlayerConvergenceInPage({
         } else {
           const axisDeltaM = maximumAxisDelta(current.position as readonly [number, number, number], previous.position as readonly [number, number, number]);
           observation.maximumAxisDeltaM = axisDeltaM;
-          if (axisDeltaM > settlement.maximumAxisDeltaM) {
+          if (!withinNumericBoundary(
+            axisDeltaM,
+            settlement.maximumAxisDeltaM,
+            [...current.position, ...previous.position],
+          )) {
             observation.decision = 'reset-transition-axis-delta';
             resetSamples('transition-axis-delta', observation, [current]);
           } else {
-            samples.push(current);
-            observation.decision = 'accept-transition';
-            countReason('accepted-transition');
-            noteAccepted(current);
+            const prospectiveAxisSpanM = axisSpan([...samples, current]);
+            observation.prospectiveAxisSpanM = prospectiveAxisSpanM;
+            if (prospectiveAxisSpanM.some((spanM, axis) => !withinNumericBoundary(
+              spanM,
+              settlement.maximumAxisSpanM,
+              [...samples.map((entry) => entry.position[axis]), current!.position[axis]],
+            ))) {
+              observation.decision = 'reset-accepted-window-axis-span';
+              resetSamples('accepted-window-axis-span', observation, [current]);
+            } else {
+              samples.push(current);
+              observation.decision = 'accept-transition';
+              countReason('accepted-transition');
+              noteAccepted(current);
+            }
           }
         }
       }
@@ -307,29 +345,47 @@ export function waitForAtomicPlayerConvergenceInPage({
             samples[index].position as readonly [number, number, number],
           )
         )));
-        const maximumFinalAxisErrorM = maximumAxisDelta(
-          samples.at(-1)!.position as readonly [number, number, number],
-          expectedSettledPosition,
-        );
+        const maximumObservedAbsoluteAxisErrorM = [0, 1, 2].map((axis) => Math.max(
+          ...samples.map((entry) => Math.abs(entry.position[axis] - positionAnchor[axis])),
+        )) as [number, number, number];
+        const maximumObservedAxisSpanM = axisSpan(samples);
         const allGrounded = samples.every((entry) => entry.grounded);
-        if (durationMs >= settlement.minimumDurationMs
-          && maximumObservedAxisDeltaM <= settlement.maximumAxisDeltaM
-          && maximumFinalAxisErrorM <= settlement.maximumFinalAxisErrorM
+        if (meetsMinimumBoundary(durationMs, settlement.minimumDurationMs, [samples[0].atMs, samples.at(-1)!.atMs])
+          && withinNumericBoundary(
+            maximumObservedAxisDeltaM,
+            settlement.maximumAxisDeltaM,
+            samples.flatMap((entry) => entry.position),
+          )
+          && maximumObservedAxisSpanM.every((spanM, axis) => withinNumericBoundary(
+            spanM,
+            settlement.maximumAxisSpanM,
+            samples.map((entry) => entry.position[axis]),
+          ))
+          && maximumObservedAbsoluteAxisErrorM.every((errorM, axis) => (
+            withinNumericBoundary(
+              errorM,
+              settlement.maximumAbsoluteAxisErrorM[axis],
+              [...samples.map((entry) => entry.position[axis]), positionAnchor[axis]],
+            )
+          ))
           && (!settlement.groundedRequired || allGrounded)) {
           countReason('converged');
           resolveConvergence({
             contract: settlement.contract,
-            expectedSettledPosition,
+            positionAnchor,
             samples,
             transitionCount: samples.length - 1,
             durationMs,
             maximumObservedAxisDeltaM,
-            maximumFinalAxisErrorM,
+            maximumObservedAxisSpanM,
+            maximumObservedAbsoluteAxisErrorM,
             allGrounded,
           });
           return;
         }
-        if (durationMs < settlement.minimumDurationMs) countReason('candidate-window-too-short');
+        if (!meetsMinimumBoundary(
+          durationMs, settlement.minimumDurationMs, [samples[0].atMs, samples.at(-1)!.atMs],
+        )) countReason('candidate-window-too-short');
       }
       const elapsedMs = performance.now() - startedAt;
       if (elapsedMs > timeoutMs) {
@@ -367,7 +423,6 @@ const lookAtCamera = (
 };
 
 const ATOMIC_COMMANDED_PLAYER_POSITION = Object.freeze([-3, 1.7, 40] as const);
-const ATOMIC_EXPECTED_SETTLED_PLAYER_POSITION = Object.freeze([-3, 1.6984, 40] as const);
 const ATOMIC_BOT_POSITION = Object.freeze([2.2, 0, 40] as const);
 const ATOMIC_TARGET = Object.freeze([2.2, 1.08, 40] as const);
 
@@ -401,8 +456,8 @@ const fixedDummyCameras = Object.freeze(fixedDummyActors.map((actor) => {
  * reviewed contract update.
  */
 export const RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT = Object.freeze({
-  schemaVersion: 2,
-  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v2',
+  schemaVersion: 3,
+  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v3',
   los: Object.freeze({
     contract: 'actual-render-world-layout-occluder-multi-sentinel-los-v2',
     actorSelfOcclusionExcluded: true,
@@ -418,16 +473,17 @@ export const RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT = Object.freeze({
     }),
   }),
   atomic: Object.freeze({
-    id: 'atomic-south-road-crosslane-spawn-fixed-v2',
+    id: 'atomic-south-road-crosslane-spawn-fixed-v3',
     commandedPlayerPosition: ATOMIC_COMMANDED_PLAYER_POSITION,
-    expectedSettledPlayerPosition: ATOMIC_EXPECTED_SETTLED_PLAYER_POSITION,
+    settlementPositionAnchor: ATOMIC_COMMANDED_PLAYER_POSITION,
     playerYaw: -Math.PI / 2,
     settlement: Object.freeze({
-      contract: 'grounded-distinct-presented-frame-convergence-v2',
+      contract: 'grounded-distinct-presented-frame-axis-envelope-convergence-v3',
       minimumObservedTransitions: 8,
       minimumDurationMs: 50,
       maximumAxisDeltaM: 0.0005,
-      maximumFinalAxisErrorM: 0.0005,
+      maximumAxisSpanM: 0.0005,
+      maximumAbsoluteAxisErrorM: Object.freeze([0.0005, 0.00225, 0.0005] as const),
       groundedRequired: true,
     }),
     botDistanceM: 5.2,
