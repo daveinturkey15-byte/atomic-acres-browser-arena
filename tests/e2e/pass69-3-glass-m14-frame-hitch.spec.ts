@@ -9,6 +9,7 @@ import {
 type ProbeAction = 'noop' | 'fire' | 'equip-m14' | 'ads-on' | 'ads-off';
 
 type FrameProbe = Readonly<{
+  label: string;
   action: ProbeAction;
   synchronousMs: number;
   eventToPresentedFrameMs: number;
@@ -32,8 +33,8 @@ async function deploy(page: Page): Promise<void> {
   }, undefined, { timeout: 30_000 });
 }
 
-async function eventToNextPresentedFrame(page: Page, action: ProbeAction): Promise<FrameProbe> {
-  return page.evaluate((selectedAction) => new Promise<FrameProbe>((resolve, reject) => {
+async function eventToNextPresentedFrame(page: Page, label: string, action: ProbeAction): Promise<FrameProbe> {
+  return page.evaluate(({ selectedLabel, selectedAction }) => new Promise<FrameProbe>((resolve, reject) => {
     const debug = window.__ATOMIC_ACRES_DEBUG__;
     if (!debug) return reject(new Error('Atomic Acres debug surface is unavailable'));
     requestAnimationFrame(() => {
@@ -49,6 +50,7 @@ async function eventToNextPresentedFrame(page: Page, action: ProbeAction): Promi
         const presentedAfter = debug.admissionState().presentedGameplayFrame;
         if (presentedAfter > presentedBefore) {
           resolve({
+            label: selectedLabel,
             action: selectedAction,
             synchronousMs: Number(synchronousMs.toFixed(3)),
             eventToPresentedFrameMs: Number((performance.now() - startedAt).toFixed(3)),
@@ -64,18 +66,18 @@ async function eventToNextPresentedFrame(page: Page, action: ProbeAction): Promi
       };
       requestAnimationFrame(inspect);
     });
-  }), action);
+  }), { selectedLabel: label, selectedAction: action });
 }
 
 function expectBoundedProbe(probe: FrameProbe): void {
-  const evidence = `${probe.action} ${JSON.stringify(probe)}`;
+  const evidence = `${probe.label}/${probe.action} ${JSON.stringify(probe)}`;
   expect(probe.presentedFrameDelta, `${evidence}: presentation must advance`).toBeGreaterThan(0);
   expect(probe.synchronousMs, `${evidence}: synchronous action budget`).toBeLessThan(MAX_SYNCHRONOUS_ACTION_MS);
   expect(probe.eventToPresentedFrameMs, `${evidence}: event-to-next-presented-frame budget`)
     .toBeLessThan(MAX_EVENT_TO_PRESENTED_FRAME_MS);
 }
 
-test('glass breach and first M14 EBR use reach the next presented frame without a freeze', async ({ page }, testInfo) => {
+test('cold carbine control, glass breach and first M14 EBR use reach the next presented frame without a freeze', async ({ page }, testInfo) => {
   test.setTimeout(90_000);
   const browserErrors: string[] = [];
   page.on('pageerror', (error) => browserErrors.push(error.message));
@@ -102,22 +104,31 @@ test('glass breach and first M14 EBR use reach the next presented frame without 
     panes: [true, true, true, true, true, true],
   });
 
-  const baseline = await eventToNextPresentedFrame(page, 'noop');
+  const baseline = await eventToNextPresentedFrame(page, 'baseline-noop', 'noop');
 
   await page.evaluate(() => {
     const debug = window.__ATOMIC_ACRES_DEBUG__;
     debug.setBotsFrozen(true);
     debug.equipWeapon('carbine');
+    const snapshot = debug.snapshot() as any;
+    const [x, y, z] = snapshot.player.position;
+    debug.teleportPlayer(x, y, z, snapshot.player.yaw, 1.25);
+  });
+  const coldCarbine = await eventToNextPresentedFrame(page, 'cold-carbine-empty-sky', 'fire');
+
+  await page.waitForTimeout(250);
+  await page.evaluate(() => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
     debug.stageWindow(0, 4);
   });
-  const coldGlass = await eventToNextPresentedFrame(page, 'fire');
+  const coldGlass = await eventToNextPresentedFrame(page, 'cold-glass-breach', 'fire');
   await expect.poll(async () => page.evaluate(() => (
     window.__ATOMIC_ACRES_DEBUG__.snapshot() as any
   ).breakableWindows[0].broken)).toBe(true);
 
   await page.waitForTimeout(150);
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.stageWindow(1, 4));
-  const warmGlass = await eventToNextPresentedFrame(page, 'fire');
+  const warmGlass = await eventToNextPresentedFrame(page, 'warm-glass-breach', 'fire');
   await expect.poll(async () => page.evaluate(() => (
     window.__ATOMIC_ACRES_DEBUG__.snapshot() as any
   ).breakableWindows[1].broken)).toBe(true);
@@ -127,10 +138,10 @@ test('glass breach and first M14 EBR use reach the next presented frame without 
     debug.placeBotAhead(6);
     debug.aimAtBot('body');
   });
-  const m14Equip = await eventToNextPresentedFrame(page, 'equip-m14');
-  const m14Ads = await eventToNextPresentedFrame(page, 'ads-on');
-  const m14Shot = await eventToNextPresentedFrame(page, 'fire');
-  const m14AdsRelease = await eventToNextPresentedFrame(page, 'ads-off');
+  const m14Equip = await eventToNextPresentedFrame(page, 'm14-cold-equip', 'equip-m14');
+  const m14Ads = await eventToNextPresentedFrame(page, 'm14-cold-ads-on', 'ads-on');
+  const m14Shot = await eventToNextPresentedFrame(page, 'm14-cold-fire', 'fire');
+  const m14AdsRelease = await eventToNextPresentedFrame(page, 'm14-ads-off', 'ads-off');
   await expect.poll(async () => page.evaluate(() => (
     window.__ATOMIC_ACRES_DEBUG__.snapshot() as any
   ).dmrThermal.active)).toBe(false);
@@ -147,7 +158,7 @@ test('glass breach and first M14 EBR use reach the next presented frame without 
   const runtimeAfter = await captureFrameHitchRendererEvidence(page, testInfo);
   expectFrameHitchRendererEvidence(runtimeAfter, 'atomic-acres', 'glass/M14 final runtime');
 
-  const probes = [baseline, coldGlass, warmGlass, m14Equip, m14Ads, m14Shot, m14AdsRelease];
+  const probes = [baseline, coldCarbine, coldGlass, warmGlass, m14Equip, m14Ads, m14Shot, m14AdsRelease];
   await testInfo.attach('event-to-presented-frame-receipt', {
     body: Buffer.from(JSON.stringify({
       renderer: runtimeAfter.runtime.actualBackend,
@@ -162,7 +173,7 @@ test('glass breach and first M14 EBR use reach the next presented frame without 
     contentType: 'application/json',
   });
   for (const probe of probes) expectBoundedProbe(probe);
-  for (const probe of [coldGlass, warmGlass, m14Equip, m14Ads, m14Shot, m14AdsRelease]) {
+  for (const probe of [coldCarbine, coldGlass, warmGlass, m14Equip, m14Ads, m14Shot, m14AdsRelease]) {
     expect(
       probe.eventToPresentedFrameMs,
       `${probe.action}: regression must remain within 4x the no-op frame plus 40ms`,

@@ -94,7 +94,7 @@ function hardwareRuntimeValid(runtime, contextLifecycle, webgl) {
 
 function componentEnvelopeValid(receipt, kind, expectedMap, sourceSha) {
   const expectedScopes = {
-    'glass-m14': 'cold-and-warm-window-breach-plus-m14-event-to-presented-frame',
+    'glass-m14': 'cold-carbine-empty-sky-plus-cold-and-warm-window-breach-plus-m14-event-to-presented-frame',
     flamethrower: 'cold-and-held-flamethrower-emission-ground-fire-and-release-frame-pacing',
     'flare-gun': 'cold-flare-flight-impact-and-burn-frame-pacing',
   };
@@ -140,8 +140,9 @@ function thresholdsValid(thresholds, sustained) {
     ));
 }
 
-function actionProbeValid(probe, action) {
+function actionProbeValid(probe, action, label) {
   return probe?.action === action
+    && probe.label === label
     && finite(probe.synchronousMs) && probe.synchronousMs >= 0 && probe.synchronousMs < 50
     && finite(probe.eventToPresentedFrameMs) && probe.eventToPresentedFrameMs >= 0
     && probe.eventToPresentedFrameMs < 120
@@ -182,7 +183,16 @@ function frameWindowValid(window, label, minimumDurationMs, minimumFrames) {
 function glassM14EvidenceValid(receipt) {
   const evidence = receipt.evidence;
   const probes = evidence?.probes;
-  const expectedActions = ['noop', 'fire', 'fire', 'equip-m14', 'ads-on', 'fire', 'ads-off'];
+  const expectedProbes = [
+    ['noop', 'baseline-noop'],
+    ['fire', 'cold-carbine-empty-sky'],
+    ['fire', 'cold-glass-breach'],
+    ['fire', 'warm-glass-breach'],
+    ['equip-m14', 'm14-cold-equip'],
+    ['ads-on', 'm14-cold-ads-on'],
+    ['fire', 'm14-cold-fire'],
+    ['ads-off', 'm14-ads-off'],
+  ];
   if (!thresholdsValid(receipt.thresholds, false)
     || evidence?.retainedGlassBefore?.pool?.contract !== 'retained-exact-instanced-render-object-v1'
     || evidence.retainedGlassBefore.pool.retained !== 6
@@ -191,8 +201,8 @@ function glassM14EvidenceValid(receipt) {
     || !exactArray(evidence.retainedGlassBefore.panes, [true, true, true, true, true, true])
     || evidence?.glassAfter?.coldWindowBroken !== true
     || evidence.glassAfter.warmWindowBroken !== true
-    || !Array.isArray(probes) || probes.length !== expectedActions.length
-    || !probes.every((probe, index) => actionProbeValid(probe, expectedActions[index]))) return false;
+    || !Array.isArray(probes) || probes.length !== expectedProbes.length
+    || !probes.every((probe, index) => actionProbeValid(probe, ...expectedProbes[index]))) return false;
   const baseline = probes[0];
   return probes.slice(1).every((probe) => (
     probe.eventToPresentedFrameMs < baseline.eventToPresentedFrameMs * 4 + 40

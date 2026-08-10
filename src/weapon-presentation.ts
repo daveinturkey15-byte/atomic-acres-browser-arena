@@ -1655,6 +1655,30 @@ export class WeaponPresentation {
     const priorLightVisible = this.muzzleLight.visible;
     const priorLightIntensity = this.muzzleLight.intensity;
     const priorRootPosition = this.root.position.clone();
+    const priorCasingCursor = this.casingCursor;
+    const priorSmokeCursor = this.smokeCursor;
+    const priorSmokeVisible = this.smokePoints.visible;
+    const priorSmokePositions = this.smokePositions.slice();
+    const priorSmokeColors = this.smokeColors.slice();
+    const priorSmokes = this.smokes.map((smoke) => ({
+      velocity: smoke.velocity.clone(),
+      life: smoke.life,
+      maxLife: smoke.maxLife,
+      active: smoke.active,
+    }));
+    const stagedCasing = this.casings[this.casingCursor % this.casings.length];
+    const priorCasing = stagedCasing ? {
+      geometry: stagedCasing.mesh.geometry,
+      material: stagedCasing.mesh.material,
+      position: stagedCasing.mesh.position.clone(),
+      quaternion: stagedCasing.mesh.quaternion.clone(),
+      scale: stagedCasing.mesh.scale.clone(),
+      visible: stagedCasing.mesh.visible,
+      velocity: stagedCasing.velocity.clone(),
+      life: stagedCasing.life,
+      frames: stagedCasing.frames,
+      active: stagedCasing.active,
+    } : null;
     try {
       this.active = id;
       this.root.visible = true;
@@ -1669,6 +1693,42 @@ export class WeaponPresentation {
         this.enforceNearPlaneClearance(model, this.root.getObjectByName('first-person-arms'));
         this.flamethrowerHeldFireClearancePrewarmChecks += 1;
       }
+      // Submit the exact retained Points and brass Mesh used by a legal shot,
+      // without calling fire() or advancing gameplay/presentation cursors. An
+      // idle viewmodel compile cannot create these material programs because
+      // both pooled objects are normally hidden until the accepted shot.
+      const muzzle = this.socketLocalPosition(model, 'muzzle-socket')
+        ?? new THREE.Vector3(0, 0.08, -1.15);
+      const smokeCount = Math.min(this.smokes.length, Math.ceil(weaponFamilyPresentation(id).smokeBase));
+      for (let index = 0; index < smokeCount; index += 1) {
+        const slot = (this.smokeCursor + index) % this.smokes.length;
+        const smoke = this.smokes[slot];
+        const offset = slot * 3;
+        this.smokePositions[offset] = muzzle.x + (index - smokeCount / 2) * 0.012;
+        this.smokePositions[offset + 1] = muzzle.y + index * 0.008;
+        this.smokePositions[offset + 2] = muzzle.z - 0.05 - index * 0.035;
+        smoke.velocity.set(0, 0.12, -0.14);
+        smoke.maxLife = 0.2;
+        smoke.life = smoke.maxLife;
+        smoke.active = true;
+        this.smokeColors[offset] = this.smokeColors[offset + 1] = this.smokeColors[offset + 2] = 0.62;
+      }
+      this.smokePoints.visible = smokeCount > 0;
+      (this.smokePoints.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+      (this.smokePoints.geometry.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
+      if (stagedCasing) {
+        stagedCasing.mesh.geometry = this.brassGeometry;
+        stagedCasing.mesh.material = this.brassMaterial;
+        stagedCasing.mesh.position.copy(
+          this.socketLocalPosition(model, 'eject-socket') ?? new THREE.Vector3(0.12, 0.04, -0.48),
+        );
+        stagedCasing.mesh.rotation.set(0.2, 0, Math.PI / 2);
+        stagedCasing.mesh.visible = true;
+        stagedCasing.velocity.set(1.05, 0.85, 0.1);
+        stagedCasing.life = 0.42;
+        stagedCasing.frames = 0;
+        stagedCasing.active = true;
+      }
       await submit(this.root);
     } finally {
       resetImportedWeaponAnimations(model);
@@ -1682,6 +1742,34 @@ export class WeaponPresentation {
       this.muzzleLight.visible = priorLightVisible;
       this.muzzleLight.intensity = priorLightIntensity;
       this.root.position.copy(priorRootPosition);
+      this.casingCursor = priorCasingCursor;
+      this.smokeCursor = priorSmokeCursor;
+      this.smokePositions.set(priorSmokePositions);
+      this.smokeColors.set(priorSmokeColors);
+      this.smokePoints.visible = priorSmokeVisible;
+      (this.smokePoints.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+      (this.smokePoints.geometry.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
+      for (let index = 0; index < this.smokes.length; index += 1) {
+        const smoke = this.smokes[index];
+        const prior = priorSmokes[index];
+        if (!prior) continue;
+        smoke.velocity.copy(prior.velocity);
+        smoke.life = prior.life;
+        smoke.maxLife = prior.maxLife;
+        smoke.active = prior.active;
+      }
+      if (stagedCasing && priorCasing) {
+        stagedCasing.mesh.geometry = priorCasing.geometry;
+        stagedCasing.mesh.material = priorCasing.material;
+        stagedCasing.mesh.position.copy(priorCasing.position);
+        stagedCasing.mesh.quaternion.copy(priorCasing.quaternion);
+        stagedCasing.mesh.scale.copy(priorCasing.scale);
+        stagedCasing.mesh.visible = priorCasing.visible;
+        stagedCasing.velocity.copy(priorCasing.velocity);
+        stagedCasing.life = priorCasing.life;
+        stagedCasing.frames = priorCasing.frames;
+        stagedCasing.active = priorCasing.active;
+      }
       this.updateActiveSockets(priorActive);
     }
   }

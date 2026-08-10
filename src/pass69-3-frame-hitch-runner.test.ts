@@ -101,11 +101,15 @@ describe('Pass 69.3 clean exact-SHA frame-hitch matrix', () => {
 
   it('binds receipts to actual glass breach, held flame, and flare flight-impact-burn telemetry', () => {
     for (const token of [
+      "'cold-carbine-empty-sky'",
+      "debug.teleportPlayer(x, y, z, snapshot.player.yaw, 1.25)",
       "debug.stageWindow(0, 4)",
       "window.__ATOMIC_ACRES_DEBUG__.stageWindow(1, 4)",
       ').breakableWindows[0].broken',
       ').breakableWindows[1].broken',
-      "'noop', 'fire', 'fire', 'equip-m14', 'ads-on', 'fire', 'ads-off'",
+      "['fire', 'cold-glass-breach']",
+      "['fire', 'warm-glass-breach']",
+      "['equip-m14', 'm14-cold-equip']",
       'coldWindowBroken !== true',
       'warmWindowBroken !== true',
     ]) expect(`${glassSpec}\n${runner}`).toContain(token);

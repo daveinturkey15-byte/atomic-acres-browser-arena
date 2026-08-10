@@ -190,7 +190,7 @@ export function expectFrameHitchRendererEvidence(
 }
 
 const evidenceScopes: Readonly<Record<FrameHitchEvidenceKind, string>> = Object.freeze({
-  'glass-m14': 'cold-and-warm-window-breach-plus-m14-event-to-presented-frame',
+  'glass-m14': 'cold-carbine-empty-sky-plus-cold-and-warm-window-breach-plus-m14-event-to-presented-frame',
   flamethrower: 'cold-and-held-flamethrower-emission-ground-fire-and-release-frame-pacing',
   'flare-gun': 'cold-flare-flight-impact-and-burn-frame-pacing',
 });
