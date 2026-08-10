@@ -1,249 +1,138 @@
 {
   "schemaVersion": 1,
   "releasePass": "PASS 69",
-  "feedbackReceivedAt": "2026-08-08T14:07:11Z",
+  "feedbackReceivedAt": "2026-08-10T14:00:00Z",
   "status": "accepted",
   "preview": {
-    "kind": "github-actions-artifact",
-    "ref": "pr-preview-53-139a753dd11658a3855832d73b1222308f1b0e24",
-    "sourceSha": "139a753dd11658a3855832d73b1222308f1b0e24",
-    "createdAt": "2026-08-08T14:28:38.949Z"
+    "kind": "immutable-url",
+    "ref": "http://127.0.0.1:4175/?release=choose&renderer=webgpu&requireWebGPU=1&source=95788909eab9727ed1dc82d7ef9a9d64d519830e",
+    "sourceSha": "95788909eab9727ed1dc82d7ef9a9d64d519830e",
+    "createdAt": "2026-08-10T14:18:30Z"
   },
   "humanAcceptance": {
     "state": "approved",
     "approvedBy": "Dave",
-    "approvedAt": "2026-08-08T14:31:31Z",
-    "evidence": "Dave approved through the current authorized owner Telegram channel after immutable artifact 9023055533 became available. His selected response was: 'Approve this exact preview and publish Pass 69.1'. This binds publication authorization to preview pr-preview-53-139a753dd11658a3855832d73b1222308f1b0e24 at source SHA 139a753dd11658a3855832d73b1222308f1b0e24. Dave had stated that he would test the mobile feel more properly later, so this records exact publication approval and does not claim hands-on preview inspection."
+    "approvedAt": "2026-08-10T14:25:05Z",
+    "evidence": "Dave tested the SHA-keyed local staged preview and explicitly replied: 'ok its good, get it published'. This approval binds Pass 69 publication to source SHA 95788909eab9727ed1dc82d7ef9a9d64d519830e and its two-choice Pass 69 / Pass 63 Stable WebGL release shell."
   },
   "requirements": [
     {
       "id": "R1",
-      "summary": "Mobile thumbsticks acquire through their complete visible discs and emulate normalized gamepad axes",
-      "expected": "Move and aim engage from the centre knob, inner disc, edge and diagonals; the visible fixed-origin disc maps to circular -1..1 axes and uses the same applyRadialDeadzone curve as physical gamepad sticks.",
-      "falsifier": "A centre-knob press is ignored, an inner press only works near the edge, diagonal magnitude exceeds one, or touch and physical-gamepad radial shaping diverge.",
-      "acceptance": "mixed",
+      "summary": "Publish the exact locally approved Pass 69 gameplay candidate",
+      "expected": "Production serves the exact gameplay, weapon, support, mobile and visual candidate that Dave tested locally at source SHA 95788909eab9727ed1dc82d7ef9a9d64d519830e.",
+      "falsifier": "Production uses another source SHA, the staged runtime digest changes after approval, or a runtime/release-shell path changes after the approved preview.",
+      "acceptance": "human",
       "state": "verified",
       "evidence": [
         {
-          "kind": "unit",
-          "ref": "src/mobile-touch-controls.test.ts",
-          "command": "npx vitest run src/mobile-touch-controls.test.ts",
-          "note": "Pure centre, inner, edge and diagonal projections use the physical-gamepad radial deadzone helper and remain circularly bounded."
-        },
-        {
-          "kind": "browser",
-          "ref": "tests/e2e/pass69-mobile-touch-layout.spec.ts",
-          "command": "npm run qa:playwright-topology -- tests/e2e/pass69-mobile-touch-layout.spec.ts --project=chromium --workers=1 --retries=0",
-          "note": "A real captured pointer acquires through each centre knob, then drives live player movement and camera yaw before clean release."
-        },
-        {
-          "kind": "visual",
-          "ref": "artifact://pr-preview-53-139a753dd11658a3855832d73b1222308f1b0e24/mobile-touch-layout",
-          "note": "The approved immutable preview contains the fixed visible stick discs exercised at 320x667, 390x844 and 844x390."
+          "kind": "manual",
+          "ref": "owner-hitl://pass69/95788909eab9727ed1dc82d7ef9a9d64d519830e",
+          "note": "Dave tested the SHA-keyed local staged preview and explicitly authorized publication of this exact candidate."
         }
       ]
     },
     {
       "id": "R2",
-      "summary": "FIRE is beside the right aim stick without overlapping other mobile controls",
-      "expected": "FIRE is the final visual and focus-order control and remains within one practical thumb gap of the right aim stick in narrow portrait, portrait and landscape while every hit region remains distinct.",
-      "falsifier": "FIRE is farther than the bounded thumb gap, overlaps the aim stick or another button, steals another pointer, leaves the viewport, or has focus order inconsistent with its visual order.",
+      "summary": "The public chooser exposes exactly Pass 69 and stable Pass 63 WebGL",
+      "expected": "The root chooser has exactly two selectable cards: Pass 69 at channels/the-big-one and Pass 63 Stable WebGL at channels/pass63-rollback; Pass 67.1 is retained internally but is not selectable.",
+      "falsifier": "A third card appears, Pass 67.1 is selectable, either required card is absent, or either card routes to the wrong subtree.",
       "acceptance": "mixed",
       "state": "verified",
       "evidence": [
         {
           "kind": "browser",
-          "ref": "tests/e2e/pass69-mobile-touch-layout.spec.ts",
-          "command": "npm run qa:playwright-topology -- tests/e2e/pass69-mobile-touch-layout.spec.ts --project=chromium --workers=1 --retries=0",
-          "note": "The retained three-viewport collision matrix reports zero intersections and a FIRE-to-aim edge gap no greater than 24 CSS pixels."
+          "ref": "tests/e2e/release-channel-chooser.spec.ts",
+          "command": "npm run qa:playwright-topology -- tests/e2e/release-channel-chooser.spec.ts --project=chromium --workers=1 --retries=0",
+          "note": "The served staged chooser requires exactly two cards and verifies both direct destinations."
         },
         {
           "kind": "visual",
-          "ref": "artifact://pr-preview-53-139a753dd11658a3855832d73b1222308f1b0e24/fire-near-aim-stick",
-          "note": "Immutable-preview screenshots show FIRE immediately above the portrait aim stick and immediately left of it in landscape."
+          "ref": "artifact://local-hitl-preview/95788909eab9727ed1dc82d7ef9a9d64d519830e/pass69-pass63-chooser",
+          "note": "Dave inspected the local production-style chooser showing only Pass 69 and Pass 63 Stable WebGL."
         }
       ]
     },
     {
       "id": "R3",
-      "summary": "Bidirectional mid-match rotation recovers without crash and releases held touch ownership",
-      "expected": "Portrait-to-landscape and landscape-to-portrait changes keep the current match active, coalesce renderer/camera sizing, clear held FIRE and stick state, preserve advancing frames and leave controls usable; ordinary internal renderer resizing does not clear touch input.",
-      "falsifier": "Rotation emits a page error, strands or duplicates the match, leaves held input latched, loses controls, stops frame advancement, or adaptive pixel-ratio/support-camera resizing incorrectly releases touch input.",
-      "acceptance": "mechanical",
+      "summary": "Current player-facing branding is Pass 69 rather than The Big One",
+      "expected": "The chooser, runtime identity, command shell and current project information present the release as Pass 69 without current The Big One branding.",
+      "falsifier": "The chooser or current runtime shell still presents The Big One, a versioned 69.3 public label replaces Pass 69, or player-facing release surfaces disagree.",
+      "acceptance": "mixed",
       "state": "verified",
       "evidence": [
         {
-          "kind": "browser",
-          "ref": "tests/e2e/pass69-mobile-touch-layout.spec.ts",
-          "command": "npm run qa:playwright-topology -- tests/e2e/pass69-mobile-touch-layout.spec.ts --project=chromium --workers=1 --retries=0",
-          "note": "One active match rotates in both directions while movement, aim and FIRE pointers are held in turn; each orientation recovers active phase, centres held sticks, clears triggerHeld, advances frames, retains controls and emits zero page errors."
+          "kind": "unit",
+          "ref": "src/release-topology.test.ts",
+          "command": "npx vitest run src/release-topology.test.ts src/project-map.test.ts src/ui/pass64-shell.test.ts",
+          "note": "Release identity, chooser copy and current runtime shell are pinned to Pass 69 and reject The Big One branding."
         },
         {
-          "kind": "contract",
-          "ref": "src/legacy-main.ts",
-          "command": "npx tsc --noEmit",
-          "note": "Viewport events call recoverViewport while established internal resize callers retain the geometry-only coalesced resize path."
+          "kind": "browser",
+          "ref": "tests/e2e/release-channel-chooser.spec.ts",
+          "command": "npm run qa:playwright-topology -- tests/e2e/release-channel-chooser.spec.ts --project=chromium --workers=1 --retries=0",
+          "note": "The real staged chooser and Pass 69 route display Pass 69 and reject current The Big One copy."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifact://local-hitl-preview/95788909eab9727ed1dc82d7ef9a9d64d519830e/pass69-branding",
+          "note": "The owner-reviewed chooser visibly identifies the candidate as Pass 69."
         }
       ]
     },
     {
       "id": "R4",
-      "summary": "Gun Field Kit restores canonical DPS without duplicating stale balance UI",
-      "expected": "The selected-primary inspector contains one DPS row calculated as base damage times pellets times RPM divided by 60, followed by Damage, Fire Rate, Range and Control; AK-47 displays 350.",
-      "falsifier": "DPS is absent, duplicated, hard-coded independently of the weapon registry, uses a non-canonical formula, clips, or AK-47 projects a value other than 350.",
-      "acceptance": "mixed",
+      "summary": "Stable Pass 63 WebGL remains pinned to its approved source",
+      "expected": "The selectable fallback is rebuilt only from Pass 63 source ac85e9b8b46cc2370aee903d564ecf3c4682b24c and is staged at channels/pass63-rollback with separate provenance.",
+      "falsifier": "The fallback uses a different source, is rebuilt with Pass 69 shared runtime bytes, loses provenance, or the stable card routes elsewhere.",
+      "acceptance": "mechanical",
       "state": "verified",
       "evidence": [
         {
-          "kind": "unit",
-          "ref": "src/ui/pass66-overhaul.test.ts",
-          "command": "npx vitest run src/ui/pass66-overhaul.test.ts src/ui/field-kit-weapon-presentation.test.ts",
-          "note": "The shell retains one five-stat inspector including DPS while the weapon-card cyclic-DPS catalog projection remains canonical."
+          "kind": "contract",
+          "ref": "release-channels.json",
+          "command": "npx vitest run src/release-topology.test.ts src/release-channel.test.ts",
+          "note": "The Pass 63 source SHA and route remain exact while the public config maps the stable card to the rollback subtree."
         },
         {
-          "kind": "browser",
-          "ref": "tests/e2e/pass66-field-kit-killstreak-menu.spec.ts",
-          "command": "npm run qa:playwright-topology -- tests/e2e/pass66-field-kit-killstreak-menu.spec.ts --project=chromium --workers=1 --retries=0",
-          "note": "The served custom AK-47 inspector displays one visible DPS row with value 350 and remains bounded across retained desktop widths."
-        },
-        {
-          "kind": "visual",
-          "ref": "artifact://pr-preview-53-139a753dd11658a3855832d73b1222308f1b0e24/field-kit-dps",
-          "note": "The immutable preview screenshot visibly shows DPS 350 in the selected AK-47 panel."
+          "kind": "contract",
+          "ref": "scripts/release/stage-release-topology.mjs",
+          "command": "node scripts/release/stage-release-topology.mjs",
+          "note": "The production topology stages Pass 63 from its separately rebuilt dist and emits its own source-bound provenance."
         }
       ]
     },
     {
       "id": "R5",
-      "summary": "The player-facing static or asset-backed image note is removed",
-      "expected": "Weapon previews remain accessible and weapon-specific without rendering the ASSET-BACKED STILL badge or equivalent implementation-note copy.",
-      "falsifier": "ASSET-BACKED STILL, STATIC-BACKED IMAGE or equivalent player-facing copy remains in source, built bytes or the Field Kit DOM, or preview alt text becomes inaccessible.",
-      "acceptance": "mixed",
-      "state": "verified",
-      "evidence": [
-        {
-          "kind": "browser",
-          "ref": "tests/e2e/pass66-field-kit-killstreak-menu.spec.ts",
-          "command": "npm run qa:playwright-topology -- tests/e2e/pass66-field-kit-killstreak-menu.spec.ts --project=chromium --workers=1 --retries=0",
-          "note": "The served Field Kit rejects the retired badge text while every weapon-specific preview image loads."
-        },
-        {
-          "kind": "visual",
-          "ref": "artifact://pr-preview-53-139a753dd11658a3855832d73b1222308f1b0e24/field-kit-no-asset-badge",
-          "note": "Visual inspection of the immutable preview shows no asset/static-backed badge."
-        }
-      ]
+      "summary": "Known remaining hand framing and cosmetic refinements move to Pass 70",
+      "expected": "Pass 69 publishes the owner-approved improved state without claiming the hands or remaining cosmetic issues are final; all new changes are isolated to Pass 70.",
+      "falsifier": "Pass 69 is blocked indefinitely on the acknowledged cosmetic work, the limitations are described as complete, or Pass 70 changes enter the approved Pass 69 SHA.",
+      "acceptance": "human",
+      "state": "deferred",
+      "deferApproval": {
+        "approvedBy": "Dave",
+        "approvedAt": "2026-08-10T14:25:05Z",
+        "reason": "Dave judged the current build good enough to publish and explicitly assigned remaining hands and other improvements to Pass 70."
+      }
     },
     {
       "id": "R6",
-      "summary": "The corrected live route is player-facing version 69.1",
-      "expected": "The live chooser, runtime identity and changelog show The Big One v69.1 while the protected internal acceptance lane remains PASS 69 and Stable Pass 67.1 plus Rollback Pass 63 retain their pinned source topology.",
-      "falsifier": "The live card/runtime still presents v69, channel labels disagree, Stable or Rollback provenance changes, or the release infrastructure is weakened merely to admit a decimal internal pass number.",
-      "acceptance": "mixed",
-      "state": "verified",
-      "evidence": [
-        {
-          "kind": "browser",
-          "ref": "tests/e2e/release-channel-chooser.spec.ts",
-          "command": "npm run qa:playwright-topology -- tests/e2e/release-channel-chooser.spec.ts --project=chromium --workers=1 --retries=0",
-          "note": "The staged production chooser presents PASS 69.1 / THE BIG ONE v69.1 and retains byte-pinned Stable and Rollback routes."
-        },
-        {
-          "kind": "contract",
-          "ref": "release-channels.json",
-          "command": "npx vitest run src/release-channel.test.ts src/release-topology.test.ts src/changelog.test.ts src/project-map.test.ts",
-          "note": "Public version copy is v69.1; internal PASS 69 acceptance and prior-channel topology remain intact."
-        },
-        {
-          "kind": "visual",
-          "ref": "artifact://pr-preview-53-139a753dd11658a3855832d73b1222308f1b0e24/release-chooser-69.1",
-          "note": "The immutable preview chooser visibly presents PASS 69.1 and THE BIG ONE v69.1."
-        }
-      ]
-    },
-    {
-      "id": "R7",
-      "summary": "Farcrysis is absent from player-facing release notes and project information",
-      "expected": "No Farcrysis deferral note or runtime/map/asset reference appears in the candidate source, built browser bytes, Last Release dialog, Project Map or release chooser.",
-      "falsifier": "Farcrysis appears in player-facing source, build output, chooser, changelog, project map or any selectable runtime route.",
-      "acceptance": "mechanical",
-      "state": "verified",
-      "evidence": [
-        {
-          "kind": "contract",
-          "ref": "src/changelog.ts",
-          "command": "npx vitest run src/changelog.test.ts src/project-map.test.ts src/release-channel.test.ts",
-          "note": "Public release/project surfaces retain their other notes while omitting Farcrysis. Independent extraction of the immutable artifact found zero Farcrysis strings."
-        }
-      ]
-    },
-    {
-      "id": "R8",
-      "summary": "Ctrl+Shift+R recovery guidance is visible before selecting a game version",
-      "expected": "Candidate and staged production version choosers visibly tell the player to press Ctrl+Shift+R when the selected version did not update, at desktop and narrow widths.",
-      "falsifier": "The guidance exists only inside Options, loads after channel selection, clips at a retained width, or is absent from staged production-shell bytes.",
-      "acceptance": "mixed",
-      "state": "verified",
-      "evidence": [
-        {
-          "kind": "browser",
-          "ref": "tests/e2e/release-channel-chooser.spec.ts",
-          "command": "npm run qa:playwright-topology -- tests/e2e/release-channel-chooser.spec.ts --project=chromium --workers=1 --retries=0",
-          "note": "The front chooser requires visible Ctrl+Shift+R guidance before navigating to a channel."
-        },
-        {
-          "kind": "visual",
-          "ref": "artifact://pr-preview-53-139a753dd11658a3855832d73b1222308f1b0e24/release-chooser-refresh-guidance",
-          "note": "The immutable preview screenshot shows the guidance directly below the version cards."
-        }
-      ]
-    },
-    {
-      "id": "R9",
-      "summary": "The Options hard game refresh is available on the front version chooser",
-      "expected": "HARD RESET / REFRESH clears every CacheStorage entry and reloads the current chooser with a fresh cachebust parameter before a version is selected.",
-      "falsifier": "The button is decorative, performs an ordinary reload, leaves seeded cache entries, navigates to a channel, loses the chooser, or is absent from the staged production shell.",
-      "acceptance": "mixed",
-      "state": "verified",
-      "evidence": [
-        {
-          "kind": "browser",
-          "ref": "tests/e2e/release-channel-chooser.spec.ts",
-          "command": "npm run qa:playwright-topology -- tests/e2e/release-channel-chooser.spec.ts --project=chromium --workers=1 --retries=0",
-          "note": "The test seeds a cache, activates the front button, observes a changed cachebust URL, proves the cache was deleted and confirms the chooser remains visible."
-        },
-        {
-          "kind": "visual",
-          "ref": "artifact://pr-preview-53-139a753dd11658a3855832d73b1222308f1b0e24/release-chooser-hard-refresh",
-          "note": "The immutable preview visibly exposes HARD RESET / REFRESH beside the Ctrl+Shift+R note."
-        }
-      ]
-    },
-    {
-      "id": "R10",
-      "summary": "Retained Pass 69 gameplay and protected release topology do not regress",
-      "expected": "Existing FIRE, held automatic FIRE, USE, PAUSE, pointer cancellation, portrait/landscape layout, gameplay properties, build/provenance contracts and pinned Stable/Rollback channels remain intact outside the explicit correction surfaces.",
-      "falsifier": "A retained Pass 69 unit/property/browser contract fails, an unrelated release channel changes source, touch FIRE regains pointer-lock coupling, USE or PAUSE breaks, or exact-head build/provenance validation fails.",
+      "summary": "Release-shell and retained gameplay contracts remain green",
+      "expected": "Focused release topology, routing, project-map, changelog and shell tests pass; TypeScript and production build complete without weakening release or rollback guards.",
+      "falsifier": "A focused contract fails, TypeScript fails, the build fails, release provenance is weakened, or a required browser route emits a new error.",
       "acceptance": "mechanical",
       "state": "verified",
       "evidence": [
         {
           "kind": "unit",
-          "ref": "package.json",
-          "command": "npm test",
-          "note": "The exact source passed 2,179 tests with two explicit published-media policy skips, including deterministic gameplay property replay."
-        },
-        {
-          "kind": "browser",
-          "ref": "tests/e2e/pass69-mobile-touch-layout.spec.ts",
-          "command": "npm run qa:playwright-topology -- tests/e2e/pass69-mobile-touch-layout.spec.ts tests/e2e/pass66-field-kit-killstreak-menu.spec.ts tests/e2e/release-channel-chooser.spec.ts --project=chromium --workers=1 --retries=0",
-          "note": "All 18 affected real-browser tests passed on the exact source, including held FIRE, USE, PAUSE, collision-free responsive layouts and release routing."
+          "ref": "src/release-topology.test.ts",
+          "command": "npx vitest run src/release-topology.test.ts src/release-channel.test.ts src/project-map.test.ts src/changelog.test.ts src/ui/pass64-shell.test.ts",
+          "note": "All focused release and player-facing identity tests pass on the approved SHA."
         },
         {
           "kind": "contract",
-          "ref": "scripts/release/write-preview-receipt.mjs",
-          "command": "node scripts/release/write-preview-receipt.mjs --head 139a753dd11658a3855832d73b1222308f1b0e24 --pr 53",
-          "note": "GitHub Linux and Windows static/unit jobs passed and artifact 9023055533 attests source SHA 139a753d with 507 files and tree hash ee1c082490200ee6e02e0b64913f901c0dcb36ae2dc5559c0c9767337aee97be."
+          "ref": "package.json",
+          "command": "npx tsc --noEmit --pretty false && npm run build",
+          "note": "TypeScript and the production build pass on the approved candidate."
         }
       ]
     }
