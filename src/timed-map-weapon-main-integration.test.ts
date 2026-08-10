@@ -137,6 +137,19 @@ describe('timed map weapon legacy-main integration', () => {
     expect(main).toContain('flameStream: flamethrowerStreamPresentation.telemetry()');
   });
 
+  it('keeps idle railgun action ownership at hip and enters reload only while rechambering', () => {
+    const update = between('function updatePhysics(dt: number)', '\nfunction interpolationSourceSnapshotRateHz(');
+    const progressStart = update.indexOf("const railgunReloadProgress = player.weapon === 'railgun' && railgunRechamberPresentationActive");
+    const progressEnd = update.indexOf('\n  const viewmodelObstruction', progressStart);
+    expect(progressStart).toBeGreaterThanOrEqual(0);
+    expect(progressEnd).toBeGreaterThan(progressStart);
+    const progress = update.slice(progressStart, progressEnd);
+    expect(progress).toContain('THREE.MathUtils.clamp(');
+    expect(progress).toContain(': null;');
+    expect(progress).not.toContain(': 0;');
+    expect(update).toContain("player.weapon === 'railgun' ? railgunReloadProgress : gameplayReloadProgress(");
+  });
+
   it('keeps flame and flare frame loops on retained pools and cached snapshots', () => {
     const groundFireUpdate = between(
       'function updateFlamethrowerGroundFires(now: number)',

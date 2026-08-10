@@ -20015,7 +20015,7 @@ function updatePhysics(dt: number): void {
   cameraRoll = damp(cameraRoll, -lateralSpeed * (adsHeld ? 0.006 : 0.016), 11, dt);
   const railgunReloadProgress = player.weapon === 'railgun' && railgunRechamberPresentationActive
     ? THREE.MathUtils.clamp(1 - Math.max(0, railgunState.chamberReadyAtHostTimeMs - currentHostTimeMs()) / RAILGUN_RECHAMBER_MS, 0, 1)
-    : 0;
+    : null;
   const viewmodelObstruction = currentViewmodelObstructionPose();
   const weaponActionEvents = weaponView.update({
     dt,
