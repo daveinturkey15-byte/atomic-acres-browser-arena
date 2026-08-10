@@ -511,12 +511,16 @@ try {
       // at the deterministic open-floor reset.
       api.setStance('stand'); api.teleportPlayer(0, 1.7, 0, Math.PI / 2, 0);
     });
-    await page.waitForTimeout(180);
-    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setStance('stand'));
     await page.waitForFunction(() => {
-      const snapshot = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
-      return snapshot?.weaponPresentation?.adsProgress < 0.02 && snapshot?.player?.stance === 'stand';
-    });
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      const snapshot = api?.snapshot();
+      if (!api || !snapshot) return false;
+      // Teleportation truthfully invalidates ground contact. Retry the
+      // production stance request until landing makes it admissible.
+      if (snapshot.player?.stance !== 'stand') api.setStance('stand');
+      const current = api.snapshot();
+      return current?.weaponPresentation?.adsProgress < 0.02 && current?.player?.stance === 'stand';
+    }, undefined, { timeout: 5_000, polling: 50 });
     await page.waitForTimeout(220);
     let state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
     const hipLabel = `${viewport.id}/hip`;

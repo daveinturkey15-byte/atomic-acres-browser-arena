@@ -12,6 +12,16 @@ async function snapshot(page: Page): Promise<any> {
   return page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot());
 }
 
+async function restoreStandingAfterTeleport(page: Page): Promise<void> {
+  await page.waitForFunction(() => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    const state = api?.snapshot();
+    if (!api || !state) return false;
+    if (state.player?.stance !== 'stand') api.setStance('stand');
+    return api.snapshot()?.player?.stance === 'stand';
+  }, undefined, { timeout: 5_000, polling: 50 });
+}
+
 async function capture(page: Page, testInfo: TestInfo, viewport: Viewport, pose: string): Promise<void> {
   const path = testInfo.outputPath(`${viewport.name}-${pose}.png`);
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
@@ -183,9 +193,9 @@ test('keeps authored arms and knife readable at 1440p, 4K and ultrawide', async 
       api.setStance('stand');
       api.teleportPlayer(0, 1.7, 8, 0, 0);
     });
-    await page.waitForTimeout(180);
-    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setStance('stand'));
-    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.player?.stance === 'stand');
+    // The teleport invalidates stale ground contact. Keep requesting stand
+    // until the production grounded guard accepts it after the fall settles.
+    await restoreStandingAfterTeleport(page);
   }
 
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setMeleeCaptureProgress(null));
