@@ -131,10 +131,15 @@ function quaternionDelta(left, right) {
 
 function normalizedQuaternionDelta(left, right) {
   if (!Array.isArray(left) || !Array.isArray(right) || left.length !== 4 || right.length !== 4) return Number.NaN;
-  const denominator = vectorLength(left) * vectorLength(right);
-  if (!(denominator > 0)) return Number.NaN;
-  const dot = Math.abs(left.reduce((sum, value, index) => sum + value * right[index], 0) / denominator);
-  return 2 * Math.acos(Math.min(1, Math.max(-1, dot)));
+  const leftLength = vectorLength(left);
+  const rightLength = vectorLength(right);
+  if (!(leftLength > 0) || !(rightLength > 0)) return Number.NaN;
+  const normalizedLeft = left.map((value) => value / leftLength);
+  const normalizedRight = right.map((value) => value / rightLength);
+  const sameHemisphereChord = vectorLength(normalizedLeft.map((value, index) => value - normalizedRight[index]));
+  const oppositeHemisphereChord = vectorLength(normalizedLeft.map((value, index) => value + normalizedRight[index]));
+  const shortestChord = Math.min(sameHemisphereChord, oppositeHemisphereChord);
+  return 4 * Math.asin(Math.min(1, Math.max(0, shortestChord / 2)));
 }
 
 function positionDelta(left, right) {
@@ -799,6 +804,11 @@ function runContractSelfTest() {
   const assert = (condition, message) => {
     if (!condition) throw new Error(`Pass 69.3 rigged-bot contract self-test failed: ${message}`);
   };
+  const nonUnitQuaternion = [0.1, -0.2, 0.3, 0.9];
+  assert(normalizedQuaternionDelta(nonUnitQuaternion, nonUnitQuaternion) === 0,
+    'identical non-unit quaternion arrays must have an exact zero orientation delta');
+  assert(normalizedQuaternionDelta(nonUnitQuaternion, nonUnitQuaternion.map((value) => -value)) === 0,
+    'opposite-hemisphere quaternion arrays must have an exact zero orientation delta');
   const weightedBone = {
     vertexInfluence: {
       contract: 'rendered-joints0-weights0-influence-v1',

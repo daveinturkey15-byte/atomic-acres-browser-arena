@@ -121,9 +121,14 @@ function quaternionDelta(left: number[], right: number[]): number {
 }
 
 function normalizedQuaternionDelta(left: number[], right: number[]): number {
-  const denominator = Math.hypot(...left) * Math.hypot(...right);
-  const dot = Math.abs(left.reduce((sum, value, index) => sum + value * right[index], 0) / denominator);
-  return 2 * Math.acos(Math.min(1, Math.max(-1, dot)));
+  const leftLength = Math.hypot(...left);
+  const rightLength = Math.hypot(...right);
+  const normalizedLeft = left.map((value) => value / leftLength);
+  const normalizedRight = right.map((value) => value / rightLength);
+  const sameHemisphereChord = Math.hypot(...normalizedLeft.map((value, index) => value - normalizedRight[index]));
+  const oppositeHemisphereChord = Math.hypot(...normalizedLeft.map((value, index) => value + normalizedRight[index]));
+  const shortestChord = Math.min(sameHemisphereChord, oppositeHemisphereChord);
+  return 4 * Math.asin(Math.min(1, Math.max(0, shortestChord / 2)));
 }
 
 function positionDelta(left: number[], right: number[]): number {
