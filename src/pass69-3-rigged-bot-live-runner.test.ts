@@ -216,7 +216,10 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       "contract: 'paused-render-live-pose-advance-v1'",
       'capture revision advances from the sampled prior camera state',
       "fetch('/channels/the-big-one/channel-provenance.json'",
-      "evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-los-committed-frame-and-hand-detail-framing'",
+      "evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-and-hand-detail-framing'",
+      'api.admissionState().presentedGameplayFrame',
+      'waitForAtomicPlayerConvergence(',
+      'presentedGameplayFrame: stagedAtomic.presentedGameplayFrame',
     ]) expect(spec).toContain(token);
     expect(runner).toContain('sha256(path) === record.sha256');
     expect(runner).toContain('projectWorldToNdc(');
@@ -227,6 +230,7 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     expect(runner).toContain('cachedMatches.length !== 1');
     expect(runner).toContain('completion.finalPausedSubmissionSequence !== paused.submissionSequence');
     expect(runner).toContain('completion.observedCompletedSequence >= paused.submissionSequence');
+    expect(runner).toContain('screenshots?.medium?.presentation?.committed?.frame');
     expect(runner).toContain('distinctScreenshotHashes(');
     expect(runner).toContain('armed-live-bot-left-hand-close.png');
     expect(runner).toContain('armed-live-bot-right-hand-close.png');
@@ -278,6 +282,19 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       'finite non-unit animation quaternion uses normalized orientation validation',
       'local animation quaternion norm drift beyond 1e-5 must fail',
       'named predicate diagnostics expose only failed non-sensitive field paths',
+      'retired x=0 interior-ramp fixture must fail',
+      'a pre-command or command-frame presentation sample must fail convergence',
+      'settled player error above 0.0005m must fail even with bounded transitions',
+      'one player transition above 0.0005m must fail',
+      'slow drift from outside the final envelope must fail even when every adjacent step is bounded',
+      'a reused presented frame must fail convergence',
+      'a reversed presented frame must fail convergence',
+      'a strictly increasing WebGPU presentation gap must pass convergence',
+      'a convergence window shorter than 50ms must fail',
+      'an ungrounded player sample must fail convergence',
+      'the later staged player must independently remain inside the final envelope',
+      'the staged player must be sampled after convergence',
+      'the staged player must precede the first committed Atomic capture',
       'previous-axis hemisphere-aligned receipt must pass',
       'forged Y-axis receipt cannot impersonate the canonical X-axis pre-floor pose',
       'exact-bind authored fallback axis must pass',

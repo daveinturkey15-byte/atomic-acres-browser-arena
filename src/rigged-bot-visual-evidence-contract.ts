@@ -29,9 +29,10 @@ const lookAtCamera = (
   });
 };
 
-const ATOMIC_PLAYER_POSITION = Object.freeze([0, 1.7, -24] as const);
-const ATOMIC_BOT_POSITION = Object.freeze([0, 0, -18.8] as const);
-const ATOMIC_TARGET = Object.freeze([0, 1.08, -18.8] as const);
+const ATOMIC_COMMANDED_PLAYER_POSITION = Object.freeze([-3, 1.7, 40] as const);
+const ATOMIC_EXPECTED_SETTLED_PLAYER_POSITION = Object.freeze([-3, 1.6984, 40] as const);
+const ATOMIC_BOT_POSITION = Object.freeze([2.2, 0, 40] as const);
+const ATOMIC_TARGET = Object.freeze([2.2, 1.08, 40] as const);
 
 const fixedDummyActors = Object.freeze(GUN_RANGE_TEST_BAY_CONTRACT.dummies.map((definition, index) => {
   const pose = gunRangeTestBayRenderedDummyPose(definition, index, 0);
@@ -63,8 +64,8 @@ const fixedDummyCameras = Object.freeze(fixedDummyActors.map((actor) => {
  * reviewed contract update.
  */
 export const RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT = Object.freeze({
-  schemaVersion: 1,
-  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v1',
+  schemaVersion: 2,
+  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v2',
   los: Object.freeze({
     contract: 'actual-render-world-layout-occluder-multi-sentinel-los-v2',
     actorSelfOcclusionExcluded: true,
@@ -80,14 +81,23 @@ export const RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT = Object.freeze({
     }),
   }),
   atomic: Object.freeze({
-    id: 'atomic-open-road-south-fixed-v1',
-    playerPosition: ATOMIC_PLAYER_POSITION,
-    playerYaw: Math.PI,
+    id: 'atomic-south-road-crosslane-spawn-fixed-v2',
+    commandedPlayerPosition: ATOMIC_COMMANDED_PLAYER_POSITION,
+    expectedSettledPlayerPosition: ATOMIC_EXPECTED_SETTLED_PLAYER_POSITION,
+    playerYaw: -Math.PI / 2,
+    settlement: Object.freeze({
+      contract: 'grounded-distinct-presented-frame-convergence-v2',
+      minimumObservedTransitions: 8,
+      minimumDurationMs: 50,
+      maximumAxisDeltaM: 0.0005,
+      maximumFinalAxisErrorM: 0.0005,
+      groundedRequired: true,
+    }),
     botDistanceM: 5.2,
     expectedBotPosition: ATOMIC_BOT_POSITION,
-    expectedBotYaw: 0,
-    mediumCamera: lookAtCamera('atomic-open-road-medium', [0, 1.08, -23.2], ATOMIC_TARGET, 58),
-    closeCamera: lookAtCamera('atomic-open-road-close', [0, 1.08, -20.8], ATOMIC_TARGET, 58),
+    expectedBotYaw: Math.PI / 2,
+    mediumCamera: lookAtCamera('atomic-south-road-crosslane-medium-v2', [-2.2, 1.08, 40], ATOMIC_TARGET, 58),
+    closeCamera: lookAtCamera('atomic-south-road-crosslane-close-v2', [0.2, 1.08, 40], ATOMIC_TARGET, 58),
   }),
   gunRange: Object.freeze({
     id: 'gun-range-open-bay-fixed-v1',

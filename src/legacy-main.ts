@@ -24817,6 +24817,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       prone: player.stance === 'prone',
       yaw: player.yaw,
       pitch: player.pitch,
+      grounded: playerGrounded,
       sprinting: currentSprinting,
       grenades: player.grenades,
       combatInventory: localGuestCombatInventory(),

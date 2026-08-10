@@ -127,8 +127,8 @@ const fixedDummyActors = Object.freeze([
   Object.freeze({ id: 'test-dummy-delta', position: Object.freeze([64.88, Math.abs(Math.sin(3)) * 0.025, 14]), yaw: -Math.PI / 2 }),
 ]);
 const expectedVisualEvidenceContract = Object.freeze({
-  schemaVersion: 1,
-  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v1',
+  schemaVersion: 2,
+  contract: 'pass69-3-fixed-rigged-actor-los-fixtures-v2',
   los: Object.freeze({
     contract: 'actual-render-world-layout-occluder-multi-sentinel-los-v2',
     actorSelfOcclusionExcluded: true,
@@ -144,14 +144,23 @@ const expectedVisualEvidenceContract = Object.freeze({
     }),
   }),
   atomic: Object.freeze({
-    id: 'atomic-open-road-south-fixed-v1',
-    playerPosition: Object.freeze([0, 1.7, -24]),
-    playerYaw: Math.PI,
+    id: 'atomic-south-road-crosslane-spawn-fixed-v2',
+    commandedPlayerPosition: Object.freeze([-3, 1.7, 40]),
+    expectedSettledPlayerPosition: Object.freeze([-3, 1.6984, 40]),
+    playerYaw: -Math.PI / 2,
+    settlement: Object.freeze({
+      contract: 'grounded-distinct-presented-frame-convergence-v2',
+      minimumObservedTransitions: 8,
+      minimumDurationMs: 50,
+      maximumAxisDeltaM: 0.0005,
+      maximumFinalAxisErrorM: 0.0005,
+      groundedRequired: true,
+    }),
     botDistanceM: 5.2,
-    expectedBotPosition: Object.freeze([0, 0, -18.8]),
-    expectedBotYaw: 0,
-    mediumCamera: evidenceLookAtCamera('atomic-open-road-medium', [0, 1.08, -23.2], [0, 1.08, -18.8], 58),
-    closeCamera: evidenceLookAtCamera('atomic-open-road-close', [0, 1.08, -20.8], [0, 1.08, -18.8], 58),
+    expectedBotPosition: Object.freeze([2.2, 0, 40]),
+    expectedBotYaw: Math.PI / 2,
+    mediumCamera: evidenceLookAtCamera('atomic-south-road-crosslane-medium-v2', [-2.2, 1.08, 40], [2.2, 1.08, 40], 58),
+    closeCamera: evidenceLookAtCamera('atomic-south-road-crosslane-close-v2', [0.2, 1.08, 40], [2.2, 1.08, 40], 58),
   }),
   gunRange: Object.freeze({
     id: 'gun-range-open-bay-fixed-v1',
@@ -772,6 +781,69 @@ function expectedHandCaptureJoints(side) {
 
 function finiteVector(value, dimensions = 3) {
   return Array.isArray(value) && value.length === dimensions && value.every(Number.isFinite);
+}
+
+function maximumAxisDelta(left, right) {
+  return finiteVector(left) && finiteVector(right)
+    ? Math.max(...left.map((value, axis) => Math.abs(value - right[axis])))
+    : Number.NaN;
+}
+
+function atomicPlayerConvergenceValid(fixedFixture, firstCapturePresentedGameplayFrame) {
+  const definition = expectedVisualEvidenceContract.atomic;
+  const settlement = definition.settlement;
+  const commanded = fixedFixture?.commandedPlayer;
+  const convergence = fixedFixture?.convergence;
+  const samples = convergence?.samples;
+  if (!Number.isInteger(commanded?.presentedGameplayFrame)
+    || !sameArray(commanded?.position, definition.commandedPlayerPosition)
+    || commanded.yaw !== definition.playerYaw
+    || commanded.grounded !== false
+    || convergence?.contract !== settlement.contract
+    || !sameArray(convergence.expectedSettledPosition, definition.expectedSettledPlayerPosition)
+    || !Array.isArray(samples)
+    || samples.length < settlement.minimumObservedTransitions + 1
+    || convergence.transitionCount !== samples.length - 1
+    || convergence.transitionCount < settlement.minimumObservedTransitions
+    || !Number.isInteger(firstCapturePresentedGameplayFrame)) return false;
+  for (let index = 0; index < samples.length; index += 1) {
+    const sample = samples[index];
+    if (!Number.isInteger(sample?.presentedGameplayFrame)
+      || !Number.isFinite(sample?.atMs)
+      || !finiteVector(sample?.position)
+      || sample.grounded !== true
+      || maximumAxisDelta(sample.position, definition.expectedSettledPlayerPosition)
+        > settlement.maximumFinalAxisErrorM
+      || index > 0 && (sample.presentedGameplayFrame <= samples[index - 1].presentedGameplayFrame
+        || sample.atMs <= samples[index - 1].atMs)) {
+      return false;
+    }
+  }
+  if (samples[0].presentedGameplayFrame <= commanded.presentedGameplayFrame) return false;
+  const durationMs = samples.at(-1).atMs - samples[0].atMs;
+  const observedDeltas = samples.slice(1).map((sample, index) => maximumAxisDelta(
+    sample.position, samples[index].position,
+  ));
+  const maximumObservedAxisDeltaM = Math.max(...observedDeltas);
+  const maximumFinalAxisErrorM = maximumAxisDelta(
+    samples.at(-1).position, definition.expectedSettledPlayerPosition,
+  );
+  return durationMs >= settlement.minimumDurationMs
+    && maximumObservedAxisDeltaM <= settlement.maximumAxisDeltaM
+    && maximumFinalAxisErrorM <= settlement.maximumFinalAxisErrorM
+    && convergence.allGrounded === true
+    && close(convergence.durationMs, durationMs, 1e-9)
+    && close(convergence.maximumObservedAxisDeltaM, maximumObservedAxisDeltaM, 1e-9)
+    && close(convergence.maximumFinalAxisErrorM, maximumFinalAxisErrorM, 1e-9)
+    && Number.isInteger(fixedFixture?.stagedPlayer?.presentedGameplayFrame)
+    && fixedFixture.stagedPlayer.presentedGameplayFrame > samples.at(-1).presentedGameplayFrame
+    && fixedFixture.stagedPlayer.presentedGameplayFrame < firstCapturePresentedGameplayFrame
+    && finiteVector(fixedFixture.stagedPlayer.position)
+    && maximumAxisDelta(
+      fixedFixture.stagedPlayer.position, definition.expectedSettledPlayerPosition,
+    ) <= settlement.maximumFinalAxisErrorM
+    && close(fixedFixture.stagedPlayer.yaw, definition.playerYaw, 1e-8)
+    && fixedFixture.stagedPlayer.grounded === true;
 }
 
 function handCameraValid(camera, actor, side, sourceScreenshot) {
@@ -1559,11 +1631,11 @@ function receiptValidationFailures(receipt, sourceSha) {
     close: closeRoiNdc, hand: handRoiNdc, medium: mediumRoiNdc, overview: overviewRoiNdc,
   };
 
-  add('receipt.schemaVersion', receipt.schemaVersion === 5);
+  add('receipt.schemaVersion', receipt.schemaVersion === 6);
   add('receipt.status', receipt.status === 'AUTOMATION_PASS_OWNER_PENDING');
-  add('receipt.contract', receipt.contract === 'atomic-acres/pass69-3-rigged-bot-live@5');
+  add('receipt.contract', receipt.contract === 'atomic-acres/pass69-3-rigged-bot-live@6');
   add('receipt.evidenceScope', receipt.evidenceScope
-    === 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-los-committed-frame-and-hand-detail-framing');
+    === 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-and-hand-detail-framing');
   add('receipt.target', receipt.target === targetName);
   add('receipt.sourceSha', receipt.sourceSha === sourceSha);
   add('receipt.endingSourceSha', receipt.endingSourceSha === sourceSha);
@@ -1620,15 +1692,9 @@ function receiptValidationFailures(receipt, sourceSha) {
   add('receipt.armedBot.fixedFixture.definition', sameObject(
     receipt.armedBot?.fixedFixture?.definition, expectedVisualEvidenceContract.atomic,
   ));
-  add('receipt.armedBot.fixedFixture.observedPlayerPosition',
-    finiteVector(receipt.armedBot?.fixedFixture?.observedPlayerPosition)
-      && receipt.armedBot.fixedFixture.observedPlayerPosition.every((value, axis) => close(
-        value, expectedVisualEvidenceContract.atomic.playerPosition[axis], 1e-8,
-      )));
-  add('receipt.armedBot.fixedFixture.observedPlayerYaw', close(
-    receipt.armedBot?.fixedFixture?.observedPlayerYaw,
-    expectedVisualEvidenceContract.atomic.playerYaw,
-    1e-8,
+  add('receipt.armedBot.fixedFixture.playerConvergence', atomicPlayerConvergenceValid(
+    receipt.armedBot?.fixedFixture,
+    receipt.armedBot?.screenshots?.medium?.presentation?.committed?.frame,
   ));
   add('receipt.armedBot.fixedFixture.observedBotPosition',
     finiteVector(receipt.armedBot?.fixedFixture?.observedBotPosition)
@@ -1780,6 +1846,92 @@ function runContractSelfTest() {
   inactiveDummyIdentity.second.active = false;
   assert(!dummyActorIdentityValid(inactiveDummyIdentity, 'test-dummy-alpha'),
     'inactive or swapped dummy identity must fail');
+  const makeAtomicPlayerFixture = (mutate = () => {}) => {
+    const expected = [...expectedVisualEvidenceContract.atomic.expectedSettledPlayerPosition];
+    const samples = Array.from({ length: 9 }, (_, index) => ({
+      presentedGameplayFrame: 101 + index,
+      atMs: 1_000 + index * 8,
+      position: [...expected],
+      grounded: true,
+    }));
+    const fixture = {
+      commandedPlayer: {
+        presentedGameplayFrame: 100,
+        position: [...expectedVisualEvidenceContract.atomic.commandedPlayerPosition],
+        yaw: expectedVisualEvidenceContract.atomic.playerYaw,
+        grounded: false,
+      },
+      convergence: {
+        contract: expectedVisualEvidenceContract.atomic.settlement.contract,
+        expectedSettledPosition: expected,
+        samples,
+        transitionCount: 8,
+        durationMs: 0,
+        maximumObservedAxisDeltaM: 0,
+        maximumFinalAxisErrorM: 0,
+        allGrounded: true,
+      },
+      stagedPlayer: {
+        presentedGameplayFrame: 120,
+        position: [...expected],
+        yaw: expectedVisualEvidenceContract.atomic.playerYaw,
+        grounded: true,
+      },
+    };
+    mutate(fixture);
+    fixture.convergence.durationMs = samples.at(-1).atMs - samples[0].atMs;
+    fixture.convergence.maximumObservedAxisDeltaM = Math.max(...samples.slice(1).map((sample, index) => (
+      maximumAxisDelta(sample.position, samples[index].position)
+    )));
+    fixture.convergence.maximumFinalAxisErrorM = maximumAxisDelta(samples.at(-1).position, expected);
+    fixture.convergence.allGrounded = samples.every((sample) => sample.grounded);
+    return fixture;
+  };
+  const validAtomicPlayerConvergence = (fixture) => atomicPlayerConvergenceValid(fixture, 121);
+  assert(validAtomicPlayerConvergence(makeAtomicPlayerFixture()),
+    'eight observed grounded presented-frame transitions over 50ms must pass');
+  assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
+    fixture.commandedPlayer.position[0] = 0;
+  })), 'retired x=0 interior-ramp fixture must fail');
+  assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
+    fixture.convergence.samples[0].presentedGameplayFrame = fixture.commandedPlayer.presentedGameplayFrame;
+  })), 'a pre-command or command-frame presentation sample must fail convergence');
+  assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
+    fixture.convergence.samples.forEach((sample, index) => { sample.position[0] += index * 0.000075125; });
+  })), 'settled player error above 0.0005m must fail even with bounded transitions');
+  assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
+    fixture.convergence.samples[4].position[0] += 0.000501;
+  })), 'one player transition above 0.0005m must fail');
+  assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
+    fixture.convergence.samples.forEach((sample, index) => {
+      sample.position[0] -= 0.00392 - index * 0.00049;
+    });
+  })), 'slow drift from outside the final envelope must fail even when every adjacent step is bounded');
+  assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
+    fixture.convergence.samples[4].presentedGameplayFrame = fixture.convergence.samples[3].presentedGameplayFrame;
+  })), 'a reused presented frame must fail convergence');
+  assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
+    fixture.convergence.samples[4].presentedGameplayFrame = fixture.convergence.samples[3].presentedGameplayFrame - 1;
+  })), 'a reversed presented frame must fail convergence');
+  assert(validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
+    fixture.convergence.samples.forEach((sample, index) => {
+      if (index >= 4) sample.presentedGameplayFrame += 1;
+    });
+  })), 'a strictly increasing WebGPU presentation gap must pass convergence');
+  assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
+    fixture.convergence.samples.forEach((sample, index) => { sample.atMs = 1_000 + index * 6; });
+  })), 'a convergence window shorter than 50ms must fail');
+  assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
+    fixture.convergence.samples[4].grounded = false;
+  })), 'an ungrounded player sample must fail convergence');
+  assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
+    fixture.stagedPlayer.position[0] += 0.000501;
+  })), 'the later staged player must independently remain inside the final envelope');
+  assert(!validAtomicPlayerConvergence(makeAtomicPlayerFixture((fixture) => {
+    fixture.stagedPlayer.presentedGameplayFrame = fixture.convergence.samples.at(-1).presentedGameplayFrame;
+  })), 'the staged player must be sampled after convergence');
+  assert(!atomicPlayerConvergenceValid(makeAtomicPlayerFixture(), 120),
+    'the staged player must precede the first committed Atomic capture');
   const nonUnitQuaternion = [0.1, -0.2, 0.3, 0.9];
   assert(normalizedQuaternionDelta(nonUnitQuaternion, nonUnitQuaternion) === 0,
     'identical non-unit quaternion arrays must have an exact zero orientation delta');

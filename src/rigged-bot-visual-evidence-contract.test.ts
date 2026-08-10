@@ -1,22 +1,86 @@
+import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
+import { isBlocked } from './collision';
+import { SPAWN_LAYOUT } from './arena-layout';
+import { SIMULATION_HZ } from './gameplay';
+import { buildArena } from './map';
+import { CharacterPhysics } from './physics';
 import { RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT, fixedGunRangeDummyFixtureMatchesAuthoredMotion } from './rigged-bot-visual-evidence-contract';
 
 describe('fixed rigged actor visual evidence fixtures', () => {
   it('retains one immutable open-road Atomic staging line', () => {
     const fixture = RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic;
     expect(fixture).toMatchObject({
-      id: 'atomic-open-road-south-fixed-v1',
-      playerPosition: [0, 1.7, -24],
-      playerYaw: Math.PI,
+      id: 'atomic-south-road-crosslane-spawn-fixed-v2',
+      commandedPlayerPosition: [-3, 1.7, 40],
+      expectedSettledPlayerPosition: [-3, 1.6984, 40],
+      playerYaw: -Math.PI / 2,
       botDistanceM: 5.2,
-      expectedBotPosition: [0, 0, -18.8],
-      expectedBotYaw: 0,
+      expectedBotPosition: [2.2, 0, 40],
+      expectedBotYaw: Math.PI / 2,
     });
-    expect(fixture.mediumCamera.position).toEqual([0, 1.08, -23.2]);
-    expect(fixture.closeCamera.position).toEqual([0, 1.08, -20.8]);
+    expect(fixture.settlement).toEqual({
+      contract: 'grounded-distinct-presented-frame-convergence-v2',
+      minimumObservedTransitions: 8,
+      minimumDurationMs: 50,
+      maximumAxisDeltaM: 0.0005,
+      maximumFinalAxisErrorM: 0.0005,
+      groundedRequired: true,
+    });
+    expect(fixture.mediumCamera.position).toEqual([-2.2, 1.08, 40]);
+    expect(fixture.closeCamera.position).toEqual([0.2, 1.08, 40]);
     expect(fixture.mediumCamera.target).toEqual(fixture.closeCamera.target);
-    expect(fixture.mediumCamera.yaw).toBeCloseTo(Math.PI, 12);
-    expect(fixture.closeCamera.yaw).toBeCloseTo(Math.PI, 12);
+    expect(fixture.mediumCamera.yaw).toBeCloseTo(-Math.PI / 2, 12);
+    expect(fixture.closeCamera.yaw).toBeCloseTo(-Math.PI / 2, 12);
+  });
+
+  it('falsifies the retired ramp point and keeps the v2 player/bot line clear at player radius', () => {
+    const map = buildArena(new THREE.Scene());
+    const fixture = RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic;
+    expect(SPAWN_LAYOUT[1]).toContainEqual([
+      fixture.commandedPlayerPosition[0], fixture.commandedPlayerPosition[2],
+    ]);
+    expect(isBlocked({ x: 0, y: 1.7, z: -24 }, map.physicsColliders, 0.42)).toBe(true);
+    expect(isBlocked({
+      x: fixture.commandedPlayerPosition[0],
+      y: fixture.commandedPlayerPosition[1],
+      z: fixture.commandedPlayerPosition[2],
+    }, map.physicsColliders, 0.42)).toBe(false);
+    expect(isBlocked({
+      x: fixture.expectedBotPosition[0],
+      y: fixture.expectedBotPosition[1] + 1.7,
+      z: fixture.expectedBotPosition[2],
+    }, map.physicsColliders, 0.42)).toBe(false);
+  });
+
+  it('settles through the real game-order Rapier controller inside the fixed 0.0005m envelope', async () => {
+    const map = buildArena(new THREE.Scene());
+    const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds);
+    const fixture = RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic;
+    try {
+      physics.teleportEye({
+        x: fixture.commandedPlayerPosition[0],
+        y: fixture.commandedPlayerPosition[1],
+        z: fixture.commandedPlayerPosition[2],
+      });
+      let grounded = false;
+      let verticalVelocity = 0;
+      const step = 1 / SIMULATION_HZ;
+      for (let frame = 0; frame < 32; frame += 1) {
+        verticalVelocity -= 24.5 * step;
+        if (grounded) verticalVelocity = Math.max(0, verticalVelocity);
+        const movement = physics.move({ x: 0, y: verticalVelocity * step, z: 0 }, step);
+        grounded = movement.grounded;
+        if (movement.blockedY && verticalVelocity < 0) verticalVelocity = 0;
+      }
+      const settled = physics.eyePosition();
+      expect(grounded).toBe(true);
+      expect(Math.abs(settled.x - fixture.expectedSettledPlayerPosition[0])).toBeLessThanOrEqual(0.0005);
+      expect(Math.abs(settled.y - fixture.expectedSettledPlayerPosition[1])).toBeLessThanOrEqual(0.0005);
+      expect(Math.abs(settled.z - fixture.expectedSettledPlayerPosition[2])).toBeLessThanOrEqual(0.0005);
+    } finally {
+      physics.dispose();
+    }
   });
 
   it('pins every dummy and camera to an authored time-zero front view', () => {

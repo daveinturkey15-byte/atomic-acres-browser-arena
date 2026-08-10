@@ -122,6 +122,94 @@ function route(map: 'atomic-acres' | 'gun-range', seed: string): string {
     + `&signal=off&grass=off&mist=off&clouds=off&rays=off&externalServices=off&seed=${seed}-${renderer}`;
 }
 
+type AtomicPlayerSettlementSample = Readonly<{
+  presentedGameplayFrame: number;
+  atMs: number;
+  position: readonly number[];
+  grounded: boolean;
+}>;
+
+type AtomicPlayerConvergence = Readonly<{
+  contract: string;
+  expectedSettledPosition: readonly number[];
+  samples: readonly AtomicPlayerSettlementSample[];
+  transitionCount: number;
+  durationMs: number;
+  maximumObservedAxisDeltaM: number;
+  maximumFinalAxisErrorM: number;
+  allGrounded: boolean;
+}>;
+
+async function waitForAtomicPlayerConvergence(
+  page: Page,
+  commandedPresentedGameplayFrame: number,
+): Promise<AtomicPlayerConvergence> {
+  return page.evaluate(async ({ commandedFrame, expectedSettledPosition, settlement }) => new Promise<AtomicPlayerConvergence>((resolveConvergence, reject) => {
+    const startedAt = performance.now();
+    let samples: AtomicPlayerSettlementSample[] = [];
+    const maximumAxisDelta = (left: readonly number[], right: readonly number[]) => Math.max(
+      ...left.map((value, axis) => Math.abs(value - right[axis])),
+    );
+    const sample = () => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      const snapshot = api.snapshot() as any;
+      const current: AtomicPlayerSettlementSample = {
+        presentedGameplayFrame: api.admissionState().presentedGameplayFrame,
+        atMs: performance.now(),
+        position: [...snapshot.player.position],
+        grounded: snapshot.player.grounded === true,
+      };
+      const previous = samples.at(-1);
+      const currentFinalAxisErrorM = maximumAxisDelta(current.position, expectedSettledPosition);
+      if (current.presentedGameplayFrame <= commandedFrame
+        || !current.grounded
+        || currentFinalAxisErrorM > settlement.maximumFinalAxisErrorM) samples = [];
+      else if (!previous) samples = [current];
+      else if (current.presentedGameplayFrame === previous.presentedGameplayFrame) {
+        // A browser callback is not a presentation receipt. Ignore it until the
+        // admitted gameplay frame advances.
+      } else if (current.presentedGameplayFrame < previous.presentedGameplayFrame
+        || maximumAxisDelta(current.position, previous.position) > settlement.maximumAxisDeltaM) {
+        samples = [current];
+      } else samples.push(current);
+      if (samples.length >= settlement.minimumObservedTransitions + 1) {
+        const durationMs = samples.at(-1)!.atMs - samples[0].atMs;
+        const maximumObservedAxisDeltaM = Math.max(...samples.slice(1).map((entry, index) => (
+          maximumAxisDelta(entry.position, samples[index].position)
+        )));
+        const maximumFinalAxisErrorM = maximumAxisDelta(samples.at(-1)!.position, expectedSettledPosition);
+        const allGrounded = samples.every((entry) => entry.grounded);
+        if (durationMs >= settlement.minimumDurationMs
+          && maximumObservedAxisDeltaM <= settlement.maximumAxisDeltaM
+          && maximumFinalAxisErrorM <= settlement.maximumFinalAxisErrorM
+          && (!settlement.groundedRequired || allGrounded)) {
+          resolveConvergence({
+            contract: settlement.contract,
+            expectedSettledPosition,
+            samples,
+            transitionCount: samples.length - 1,
+            durationMs,
+            maximumObservedAxisDeltaM,
+            maximumFinalAxisErrorM,
+            allGrounded,
+          });
+          return;
+        }
+      }
+      if (performance.now() - startedAt > 10_000) {
+        reject(new Error('Atomic open-road player did not reach the fixed grounded convergence contract'));
+        return;
+      }
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  }), {
+    commandedFrame: commandedPresentedGameplayFrame,
+    expectedSettledPosition: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.expectedSettledPlayerPosition,
+    settlement: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.settlement,
+  });
+}
+
 function quaternionDelta(left: number[], right: number[]): number {
   const dot = Math.abs(left.reduce((sum, value, index) => sum + value * right[index], 0));
   return 2 * Math.acos(Math.min(1, Math.max(-1, dot)));
@@ -1592,14 +1680,32 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
   page.on('console', (message) => { if (message.type() === 'error') browserErrors.push(message.text()); });
 
   await deploy(page, 'atomic-acres');
-  await page.evaluate((fixture) => {
+  const commandedAtomicPlayer = await page.evaluate((fixture) => {
     const api = window.__ATOMIC_ACRES_DEBUG__;
     api.setCaptureViewmodelHidden(true);
     api.setBotsFrozen(true);
     api.teleportPlayer(
-      fixture.playerPosition[0], fixture.playerPosition[1], fixture.playerPosition[2],
+      fixture.commandedPlayerPosition[0], fixture.commandedPlayerPosition[1], fixture.commandedPlayerPosition[2],
       fixture.playerYaw, 0,
     );
+    const snapshot = api.snapshot() as any;
+    return {
+      presentedGameplayFrame: api.admissionState().presentedGameplayFrame,
+      position: [...snapshot.player.position],
+      yaw: snapshot.player.yaw,
+      grounded: snapshot.player.grounded,
+    };
+  }, RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic);
+  expect(commandedAtomicPlayer.position, 'Atomic player teleport applies the commanded open-road position immediately')
+    .toEqual(RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.commandedPlayerPosition);
+  expect(commandedAtomicPlayer.yaw, 'Atomic player teleport applies the commanded open-road yaw immediately')
+    .toBe(RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.playerYaw);
+  expect(commandedAtomicPlayer.grounded, 'teleport starts outside the settled-ground authority').toBe(false);
+  const atomicPlayerConvergence = await waitForAtomicPlayerConvergence(
+    page, commandedAtomicPlayer.presentedGameplayFrame,
+  );
+  await page.evaluate((fixture) => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
     api.placeBotAhead(fixture.botDistanceM);
     api.setBotPresentation('stand', 1.2, 'carbine');
   }, RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic);
@@ -1613,8 +1719,13 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
   const armedMotion = poseMotion(armedFirst, armedSecond);
   expectPoseMotion(armedMotion, 'armed live bot', false);
   const stagedAtomic = await page.evaluate(() => {
-    const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
-    return { player: snapshot.player, bot: snapshot.bots[0] };
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    const snapshot = api.snapshot() as any;
+    return {
+      presentedGameplayFrame: api.admissionState().presentedGameplayFrame,
+      player: snapshot.player,
+      bot: snapshot.bots[0],
+    };
   });
   expect(armedFirst.id, 'armed first and second samples share exact actor identity').toBe(armedSecond.id);
   expect(stagedAtomic.bot.id, 'staged fixture is the same sampled armed actor').toBe(armedFirst.id);
@@ -1625,9 +1736,10 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
     'carbine', 'carbine', 'carbine',
   ]);
   stagedAtomic.player.position.forEach((value: number, axis: number) => expect(
-    value,
-    `fixed Atomic player axis ${axis}`,
-  ).toBeCloseTo(RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.playerPosition[axis], 8));
+    Math.abs(value - RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.expectedSettledPlayerPosition[axis]),
+    `settled Atomic player axis ${axis} error`,
+  ).toBeLessThanOrEqual(RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.settlement.maximumFinalAxisErrorM));
+  expect(stagedAtomic.player.grounded, 'settled Atomic player remains grounded before evidence capture').toBe(true);
   expect(stagedAtomic.player.yaw, 'fixed Atomic player yaw').toBeCloseTo(
     RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic.playerYaw, 8,
   );
@@ -1794,10 +1906,10 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
     expect(endingSourceStatus, 'official rigged-bot evidence ends with a clean worktree').toBe('');
   }
   writeFileSync(receiptPath, `${JSON.stringify({
-    schemaVersion: 5,
+    schemaVersion: 6,
     status: 'AUTOMATION_PASS_OWNER_PENDING',
-    contract: 'atomic-acres/pass69-3-rigged-bot-live@5',
-    evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-los-committed-frame-and-hand-detail-framing',
+    contract: 'atomic-acres/pass69-3-rigged-bot-live@6',
+    evidenceScope: 'weighted-skin-anti-t-five-digit-grip-orientation-fixed-grounded-convergence-los-committed-frame-and-hand-detail-framing',
     target: officialEvidence ? expectedTarget : `development-${renderer}`,
     sourceSha,
     endingSourceSha,
@@ -1844,8 +1956,14 @@ test('real armed bot and all four unarmed Gun Range dummies leave the authored T
       motion: armedMotion,
       fixedFixture: {
         definition: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.atomic,
-        observedPlayerPosition: stagedAtomic.player.position,
-        observedPlayerYaw: stagedAtomic.player.yaw,
+        commandedPlayer: commandedAtomicPlayer,
+        convergence: atomicPlayerConvergence,
+        stagedPlayer: {
+          presentedGameplayFrame: stagedAtomic.presentedGameplayFrame,
+          position: stagedAtomic.player.position,
+          yaw: stagedAtomic.player.yaw,
+          grounded: stagedAtomic.player.grounded,
+        },
         observedBotPosition: stagedAtomic.bot.position,
         observedBotYaw: stagedAtomic.bot.yaw,
         observedBotId: stagedAtomic.bot.id,
