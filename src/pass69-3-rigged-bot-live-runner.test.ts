@@ -128,6 +128,7 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
     expect(artKit).toContain("liveTargetContract: 'runtime-calibrated-from-authored-source-v1'");
     expect(artKit).toContain("calibrationReason: 'third-person-swat-chain-reach-without-unsafe-stretch'");
     expect(artKit).toContain('pinky: -0.76');
+    expect(artKit).toContain('right: Object.freeze({ thumb: -0.34, index: -0.46, middle: -0.7, ring: -0.76, pinky: -0.78 })');
     expect(artKit).toContain('applyRiggedCarbineFingerCurlToBone(bone, curlRadians)');
     expect(artKitTest).toContain('0.2593672251552949');
     expect(artKitTest).toContain('0.3746668889113999');

@@ -33,6 +33,47 @@ describe('rigged carbine finger wrap', () => {
     expect(corrected.every(({ bindDeltaRadians }) => bindDeltaRadians >= 0.35)).toBe(true);
     expect(corrected[1].bone.quaternion.angleTo(oldSecond.bone.quaternion)).toBeCloseTo(0.339595123444383, 12);
   });
+
+  it('replays both hardware poses on Pinky2R without phase-cancelling the firing-hand wrap', () => {
+    const bind = new THREE.Quaternion(
+      0.03783833980560303,
+      -0.1764165163040161,
+      0.06506768614053726,
+      0.9814335107803345,
+    );
+    const tracedAfterOldCurl = [
+      new THREE.Quaternion(-0.5778872235655073, -0.24442568285682092, 0.07340550207689384, 0.775196179747526),
+      new THREE.Quaternion(-0.12608956202419042, 0.13168703956221717, -0.20287110996152946, -0.9621008201448803),
+    ];
+    const oldCurlInverse = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.82, 0, 0, 'XYZ'));
+    const replay = (trace: THREE.Quaternion, curlRadians: number) => {
+      const bone = new THREE.Bone();
+      bone.name = 'Pinky2R';
+      bone.quaternion.copy(trace).multiply(oldCurlInverse);
+      applyRiggedCarbineFingerCurlToBone(bone, curlRadians);
+      return { bone, bindDeltaRadians: bone.quaternion.angleTo(bind) };
+    };
+
+    const old = tracedAfterOldCurl.map((trace) => replay(trace, -0.82));
+    expect(old[0].bindDeltaRadians).toBeCloseTo(1.3302674277261661, 12);
+    expect(old[1].bindDeltaRadians).toBeCloseTo(0.34169386046352035, 12);
+    expect(old[1].bindDeltaRadians >= 0.35).toBe(false);
+
+    const corrected = tracedAfterOldCurl.map((trace) => replay(trace, -0.78));
+    expect(corrected[0].bindDeltaRadians).toBeCloseTo(1.2914456606563347, 12);
+    expect(corrected[1].bindDeltaRadians).toBeCloseTo(0.36981904581827996, 12);
+    expect(corrected.every(({ bindDeltaRadians }) => bindDeltaRadians >= 0.35)).toBe(true);
+    expect(corrected[1].bone.quaternion.toArray()).toEqual([
+      -0.14530507857983138,
+      0.1276035513223795,
+      -0.20546410230402973,
+      -0.9593867832703411,
+    ]);
+
+    const clearsRetainedBindDelta = (radians: number) => radians >= 0.35;
+    expect(clearsRetainedBindDelta(0.349)).toBe(false);
+    expect(clearsRetainedBindDelta(0.35)).toBe(true);
+  });
 });
 
 describe('authored texture readiness', () => {

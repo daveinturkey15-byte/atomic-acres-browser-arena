@@ -1203,12 +1203,12 @@ const RIGGED_CARBINE_GRIP_REFERENCE = Object.freeze({
 });
 
 const RIGGED_CARBINE_SECOND_PHALANX_CURL = Object.freeze({
-  // Exact hardware-trace replay: the old -0.42 left pinky produced only
-  // 0.259367 rad from bind on the second pose. -0.76 produces 0.374667 rad,
-  // clears the retained 0.35 gate with margin, and remains shy of the firing
-  // hand's natural -0.82 wrap.
+  // Exact hardware-trace replay: -0.76 clears the support pinky at 0.374667
+  // rad; -0.78 clears the firing pinky at 0.369819 rad. The latter avoids the
+  // phase-dependent cancellation seen at -0.82 while retaining a natural
+  // progression beyond the firing-hand ring's -0.76 wrap.
   left: Object.freeze({ thumb: -0.18, index: -0.24, middle: -0.3, ring: -0.36, pinky: -0.76 }),
-  right: Object.freeze({ thumb: -0.34, index: -0.46, middle: -0.7, ring: -0.76, pinky: -0.82 }),
+  right: Object.freeze({ thumb: -0.34, index: -0.46, middle: -0.7, ring: -0.76, pinky: -0.78 }),
 });
 
 const RIGGED_GRIP_POSITION_ERROR_MAX_M = 0.015;
