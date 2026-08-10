@@ -2214,14 +2214,6 @@ async function sampleRequiredLineOfSight(
     captureFrame: presentation.pausedPresentedCapture.frame,
     captureRevision: presentation.requestedRevision,
     captureSubmissionSequence: presentation.pausedPresentedCapture.submissionSequence,
-    drawAdmission: {
-      contract: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.handDrawAdmission.contract,
-      scope: 'hand',
-      side,
-      complete: true,
-      allRequiredBonesAdmitted: true,
-      allTerminalSurfacesBound: true,
-    },
     cameraPresentation: {
       contract: RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.contract,
       captureRevision: presentation.requestedRevision,

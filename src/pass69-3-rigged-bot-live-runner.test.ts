@@ -535,5 +535,13 @@ describe('Pass 69.3 real rigged-bot evidence boundary', () => {
       'all contributing canonical meshes must resolve the expected bone to one UUID',
       'digit influence must descend from the trusted requested-side wrist',
     ]) expect(runner).toContain(token);
+
+    const lineOfSightSampler = spec.slice(
+      spec.indexOf('async function sampleRequiredLineOfSight('),
+      spec.indexOf('async function sampleRequiredHandSelfOcclusion('),
+    );
+    expect(lineOfSightSampler).not.toContain(
+      'RIGGED_BOT_VISUAL_EVIDENCE_CONTRACT.presentation.handDrawAdmission.contract',
+    );
   });
 });
