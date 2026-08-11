@@ -1,9 +1,17 @@
 import { defineConfig, devices } from '@playwright/test';
+import {
+  PASS70_NATIVE_USER_AGENT_ENV,
+  pass70NativeEngineUserAgentEnabled,
+  resolvePass70ChromiumProjectUserAgent,
+} from './scripts/qa/pass70-cross-browser-native-user-agent-contract.mjs';
 
 const previewPort = Number(process.env.QA_PREVIEW_PORT ?? '4173');
 const externalPreview = process.env.QA_EXTERNAL_PREVIEW === '1';
 const requireOwnedFreshPreview = process.env.QA_REQUIRE_OWNED_FRESH_PREVIEW === '1';
 const installedEdgeChannel = process.env.QA_INSTALLED_EDGE === '1' ? 'msedge' as const : undefined;
+const nativeEngineUserAgent = pass70NativeEngineUserAgentEnabled(
+  process.env[PASS70_NATIVE_USER_AGENT_ENV],
+);
 
 if (externalPreview && requireOwnedFreshPreview) {
   throw new Error('QA_REQUIRE_OWNED_FRESH_PREVIEW cannot be combined with QA_EXTERNAL_PREVIEW');
@@ -36,12 +44,17 @@ export default defineConfig({
       // Opt into the machine-installed Edge binary without widening CI's
       // default browser requirement or maintaining a second Chromium project.
       // Desktop Chrome's descriptor pins a bundled-Chromium UA. Clear that
-      // emulation for Edge evidence so navigator.userAgent proves the binary
-      // Playwright actually launched instead of repeating the fixture string.
+      // emulation for Edge evidence and explicit Pass 70 engine matrices so
+      // navigator.userAgent proves the binary Playwright actually launched
+      // instead of repeating the Chromium fixture string.
       use: {
         ...devices['Desktop Chrome'],
         channel: installedEdgeChannel,
-        userAgent: installedEdgeChannel ? undefined : devices['Desktop Chrome'].userAgent,
+        userAgent: resolvePass70ChromiumProjectUserAgent({
+          desktopChromeUserAgent: devices['Desktop Chrome'].userAgent,
+          installedEdgeChannel,
+          nativeEngineUserAgent,
+        }),
         viewport: { width: 1280, height: 720 },
         deviceScaleFactor: 1,
       },

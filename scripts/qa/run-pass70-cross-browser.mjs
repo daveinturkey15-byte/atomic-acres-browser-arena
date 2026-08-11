@@ -2,6 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
+import { PASS70_NATIVE_USER_AGENT_ENV } from './pass70-cross-browser-native-user-agent-contract.mjs';
 
 const targets = Object.freeze({
   available: Object.freeze({
@@ -78,6 +79,7 @@ const result = spawnSync(process.execPath, [
   env: {
     ...process.env,
     PASS70_VERIFY_CROSS_BROWSER: '1',
+    [PASS70_NATIVE_USER_AGENT_ENV]: '1',
     PASS70_CROSS_BROWSER_SOURCE_SHA: sourceSha,
     PASS70_ENGINE_MATRIX: target.engines,
     PASS70_CROSS_GUEST_ENGINE: target.guestEngine,
