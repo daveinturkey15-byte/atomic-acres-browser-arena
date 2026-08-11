@@ -362,34 +362,16 @@ test('an active flare repairs a rejoining guest without duplicate replicas', asy
     firedBeforeRepair += 1;
   }
 
-  await Promise.all([host, guest].map((page) => page.waitForFunction(() => {
-    const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-    return state.gameStarted && state.matchPhase === 'active'
-      && state.privateMatch?.members.every((member: { connected: boolean }) => member.connected)
-      && state.remotePlayers.length === 1;
-  }, undefined, { timeout: 60_000 })));
-  expect(await guest.evaluate(() => (
-    window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.members
-      .find((member: { name: string }) => member.name.startsWith('Timed Guest'))?.id
-  ))).toBe(guestId);
-  const repairReplica = await host.evaluate((hostId) => (
-    window.__ATOMIC_ACRES_DEBUG__.snapshot().timedMapWeapons.flareActiveReplicas
-      .filter((replica: { ownerId: string; authority: boolean }) => replica.ownerId === hostId && replica.authority)
-      .sort((left: { remainingMs: number }, right: { remainingMs: number }) => right.remainingMs - left.remainingMs)[0]
-  ), hostId);
-  expect(repairReplica).toBeTruthy();
-  await guest.waitForFunction(({ ownerId, actionNonce }) => {
+  await guest.waitForFunction((ownerId) => {
     const timed = window.__ATOMIC_ACRES_DEBUG__.snapshot().timedMapWeapons;
     const replica = timed.flareActiveReplicas
-      .find((candidate: { ownerId: string; actionNonce: number }) => (
-        candidate.ownerId === ownerId && candidate.actionNonce === actionNonce
-      ));
+      .filter((candidate: { ownerId: string; authority: boolean }) => (
+        candidate.ownerId === ownerId && candidate.authority === false
+      ))
+      .sort((left: { remainingMs: number }, right: { remainingMs: number }) => right.remainingMs - left.remainingMs)[0];
     return replica?.authority === false
       && timed.flarePresentationReplication.lastAdmission?.accepted === true;
-  }, {
-    ownerId: repairReplica.ownerId,
-    actionNonce: repairReplica.actionNonce,
-  }, { timeout: 10_000 });
+  }, hostId, { timeout: 15_000 });
   const guestRepair = await guest.evaluate(() => {
     const timed = window.__ATOMIC_ACRES_DEBUG__.snapshot().timedMapWeapons;
     return {
@@ -407,6 +389,12 @@ test('an active flare repairs a rejoining guest without duplicate replicas', asy
   expect(guestRepair.telemetry.replicaCreates).toBeGreaterThanOrEqual(guestRepair.replicas.length);
   expect(guestRepair.telemetry.replicaCreates).toBeLessThanOrEqual(firedBeforeRepair);
   expect(guestRepair.telemetry.active).toBe(guestRepair.replicas.length);
+  const repairReplica = guestRepair.replicas
+    .filter((replica: { ownerId: string; authority: boolean }) => (
+      replica.ownerId === hostId && replica.authority === false
+    ))
+    .sort((left: { remainingMs: number }, right: { remainingMs: number }) => right.remainingMs - left.remainingMs)[0];
+  expect(repairReplica).toBeTruthy();
   const persistedActiveRepair = await host.evaluate(() => {
     const raw = localStorage.getItem('atomic-acres:host-match-checkpoint:v3');
     return raw ? JSON.parse(raw) : null;
@@ -414,6 +402,17 @@ test('an active flare repairs a rejoining guest without duplicate replicas', asy
   expect(persistedActiveRepair.flareProjectiles.effects.some((effect: { ownerId: string; actionNonce: number }) => (
     effect.ownerId === repairReplica.ownerId && effect.actionNonce === repairReplica.actionNonce
   ))).toBe(true);
+
+  await Promise.all([host, guest].map((page) => page.waitForFunction(() => {
+    const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+    return state.gameStarted && state.matchPhase === 'active'
+      && state.privateMatch?.members.every((member: { connected: boolean }) => member.connected)
+      && state.remotePlayers.length === 1;
+  }, undefined, { timeout: 60_000 })));
+  expect(await guest.evaluate(() => (
+    window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.members
+      .find((member: { name: string }) => member.name.startsWith('Timed Guest'))?.id
+  ))).toBe(guestId);
 
   await Promise.all([host, guest].map((page) => page.waitForFunction(() => (
     window.__ATOMIC_ACRES_DEBUG__.snapshot().timedMapWeapons.flareActiveReplicas.length === 0

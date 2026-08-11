@@ -47,7 +47,7 @@ describe('Pass 66 owned browser verifier runners', () => {
     ]) expect(runner).toContain(marker);
   });
 
-  it('binds the nine-test stability matrix to five wrapper-owned tokenized peer identities', () => {
+  it('binds the ten-test stability matrix to five wrapper-owned tokenized peer identities', () => {
     expect(multiplayerStability).toContain("PASS66_HOST_RECOVERY_PEER_PATH");
     expect(multiplayerStability).toContain("PASS66_OWNER_FEEDBACK_PEER_PATH");
     expect(multiplayerStability).toContain("PASS66_TIMED_WEAPONS_PEER_PATH");

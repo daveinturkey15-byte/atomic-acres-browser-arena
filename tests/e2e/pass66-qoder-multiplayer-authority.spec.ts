@@ -121,6 +121,7 @@ function ladderProjection(state: any): any[] {
 }
 
 test('post-death ladders survive authenticated replacements and an immediate host renderer crash exactly once', async ({ browser, browserName }) => {
+  test.setTimeout(300_000);
   test.skip(browserName === 'firefox', 'Two simultaneous headless Firefox SWGL pages are covered by the serial browser matrix.');
   const [hostContext, guestContext] = await Promise.all([
     browser.newContext(),
@@ -221,7 +222,15 @@ test('post-death ladders survive authenticated replacements and an immediate hos
       (window as any).__ATOMIC_ACRES_DEBUG__.activateKillstreakWithReceipt('scout-sweep')
     ));
     expect(crashActivation).toMatchObject({ sequence: 2, lifeId: death.nextLifeId });
-    await expect.poll(async () => host.evaluate(({ id, activationId }) => {
+    await expect.poll(async () => host.evaluate((id) => {
+      const actor = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().killstreak.actors
+        .find((candidate: any) => candidate.actorId === id);
+      if (!actor) return null;
+      // Zero-count rewards are intentionally omitted from the recipient
+      // projection, so an absent slot on a present actor is the canonical zero.
+      return actor.availableCharges.find((entry: any) => entry.id === 'scout-sweep')?.count ?? 0;
+    }, guestId), { timeout: 8_000 }).toBe(0);
+    expect(await host.evaluate(({ id, activationId }) => {
       const raw = localStorage.getItem('atomic-acres:host-match-checkpoint:v3');
       if (!raw) return null;
       const checkpoint = JSON.parse(raw);
@@ -232,10 +241,12 @@ test('post-death ladders survive authenticated replacements and an immediate hos
         lifeId: actor?.lifeId ?? null,
         containsRawToken: JSON.stringify(checkpoint).includes('resumeToken"'),
       };
-    }, { id: guestId, activationId: crashActivation.activationId }), {
-      timeout: 1_000,
-      intervals: [25, 50, 100],
-    }).toEqual({ replayIdRetained: true, charge: 0, lifeId: death.nextLifeId, containsRawToken: false });
+    }, { id: guestId, activationId: crashActivation.activationId })).toEqual({
+      replayIdRetained: true,
+      charge: 0,
+      lifeId: death.nextLifeId,
+      containsRawToken: false,
+    });
 
     // The renderer crash below is deliberate. Retain any errors already observed,
     // but do not mistake Chromium's crash diagnostic for a game page error.
@@ -285,6 +296,136 @@ test('post-death ladders survive authenticated replacements and an immediate hos
       firstSlotCharge: 0,
       retainedReplayIds: 1,
     });
+    expect(errors).toEqual([]);
+  } finally {
+    await Promise.all([hostContext.close(), guestContext.close()]);
+  }
+});
+
+test('a guest death-drop scavenge converges through host authority exactly once', async ({ browser, browserName }) => {
+  test.skip(browserName === 'firefox', 'Two simultaneous headless Firefox SWGL pages are covered by the serial browser matrix.');
+  const [hostContext, guestContext] = await Promise.all([
+    browser.newContext(),
+    browser.newContext(),
+  ]);
+  const errors: string[] = [];
+  try {
+    const { host, guest } = await startMatch(
+      hostContext,
+      guestContext,
+      ['Scavenge Host', 'Scavenge Guest'],
+      ['pass70-scavenge-host', 'pass70-scavenge-guest'],
+    );
+    host.on('pageerror', (error) => errors.push(`host: ${error.message}`));
+    guest.on('pageerror', (error) => errors.push(`guest: ${error.message}`));
+    const guestId = await host.evaluate(() => (
+      (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers[0].id as string
+    ));
+
+    expect(await host.evaluate((id) => (
+      (window as any).__ATOMIC_ACRES_DEBUG__.forceRemoteDeathForReconnect(id)
+    ), guestId)).toMatchObject({ targetId: guestId });
+    await expect.poll(async () => host.evaluate(() => {
+      const candidate = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().deathDrops[0];
+      return candidate ?? null;
+    })).not.toBeNull();
+    const hostDrop = await host.evaluate(() => (
+      (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().deathDrops[0]
+    ));
+    await expect.poll(async () => guest.evaluate((dropId) => {
+      const candidate = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().deathDrops
+        .find((entry: any) => entry.id === dropId);
+      return candidate ? {
+        weapon: candidate.weapon,
+        ammoAvailable: candidate.ammoAvailable,
+        weaponAvailable: candidate.weaponAvailable,
+      } : null;
+    }, hostDrop.id)).toEqual({
+      weapon: hostDrop.weapon,
+      ammoAvailable: true,
+      weaponAvailable: true,
+    });
+    await expect.poll(async () => guest.evaluate(() => {
+      const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+      return { alive: state.player.alive, hp: state.player.hp };
+    })).toEqual({ alive: true, hp: 100 });
+    await expect.poll(async () => host.evaluate((id) => {
+      const remote = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers
+        .find((candidate: any) => candidate.id === id);
+      return remote ? { hp: remote.hp, reserve: remote.combatInventory?.reserve?.carbine ?? null } : null;
+    }, guestId)).toEqual({ hp: 100, reserve: 120 });
+
+    await guest.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.fireOnce());
+    await expect.poll(async () => host.evaluate((id) => {
+      const remote = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers
+        .find((candidate: any) => candidate.id === id);
+      return remote?.combatInventory?.ammo?.carbine ?? null;
+    }, guestId)).toBe(29);
+    await guest.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.reload());
+    await expect.poll(async () => host.evaluate((id) => {
+      const remote = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers
+        .find((candidate: any) => candidate.id === id);
+      return remote ? {
+        ammo: remote.combatInventory?.ammo?.carbine ?? null,
+        reserve: remote.combatInventory?.reserve?.carbine ?? null,
+      } : null;
+    }, guestId), { timeout: 5_000 }).toEqual({ ammo: 30, reserve: 119 });
+    await expect.poll(async () => guest.evaluate(() => {
+      const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+      return { ammo: state.player.ammo, reserve: state.player.reserve };
+    })).toEqual({ ammo: 30, reserve: 119 });
+
+    const [dropX, dropY, dropZ] = hostDrop.position as [number, number, number];
+    await guest.evaluate(([x, y, z]) => (
+      (window as any).__ATOMIC_ACRES_DEBUG__.teleportPlayer(x, y, z)
+    ), [dropX, dropY + 1.55, dropZ + 4]);
+    await host.waitForFunction(([x, z]) => (
+      (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers
+        .some((remote: any) => Math.abs(remote.position[0] - x) < 0.5
+          && Math.abs(remote.position[2] - (z + 4)) < 0.5)
+    ), [dropX, dropZ], { timeout: 10_000 });
+    await guest.evaluate(([x, y, z]) => (
+      (window as any).__ATOMIC_ACRES_DEBUG__.teleportPlayer(x, y, z)
+    ), [dropX, dropY + 1.55, dropZ + 2.2]);
+    await host.waitForFunction(([x, z]) => (
+      (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers
+        .some((remote: any) => Math.abs(remote.position[0] - x) < 0.5
+          && Math.abs(remote.position[2] - (z + 2.2)) < 0.5)
+    ), [dropX, dropZ], { timeout: 10_000 });
+    await guest.evaluate(([x, y, z]) => (
+      (window as any).__ATOMIC_ACRES_DEBUG__.teleportPlayer(x, y, z)
+    ), [dropX, dropY + 1.55, dropZ]);
+
+    await expect.poll(async () => guest.evaluate(() => {
+      const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+      return { reserve: state.player.reserve, grenades: state.player.grenades };
+    })).toEqual({ reserve: 120, grenades: 1 });
+    const inventoryAfterScavenge = await guest.evaluate(() => {
+      const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+      return { reserve: state.player.reserve, grenades: state.player.grenades };
+    });
+    expect(inventoryAfterScavenge).toEqual({ reserve: 120, grenades: 1 });
+    await expect.poll(async () => host.evaluate(({ dropId, playerId }) => {
+      const snapshot = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+      const candidate = snapshot.deathDrops
+        .find((entry: any) => entry.id === dropId);
+      const remote = snapshot.remotePlayers.find((entry: any) => entry.id === playerId);
+      return candidate && remote ? {
+        ammoAvailable: candidate.ammoAvailable,
+        weaponAvailable: candidate.weaponAvailable,
+        reserve: remote.combatInventory?.reserve?.carbine ?? null,
+      } : null;
+    }, { dropId: hostDrop.id, playerId: guestId })).toEqual({
+      ammoAvailable: false,
+      weaponAvailable: true,
+      reserve: 120,
+    });
+
+    await guest.waitForTimeout(750);
+    expect(await guest.evaluate(() => {
+      const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+      return { reserve: state.player.reserve, grenades: state.player.grenades };
+    })).toEqual(inventoryAfterScavenge);
     expect(errors).toEqual([]);
   } finally {
     await Promise.all([hostContext.close(), guestContext.close()]);

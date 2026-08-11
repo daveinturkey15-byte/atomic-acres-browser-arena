@@ -101,13 +101,13 @@ test('served provenance requires the exact configured candidate identity', () =>
   }, expected).join('\n'), /file count mismatch/u);
 });
 
-test('Playwright JSON must prove the exact five-spec nine-test serial Chromium matrix', () => {
+test('Playwright JSON must prove the exact five-spec ten-test serial Chromium matrix', () => {
   const report = validReport();
   assert.deepEqual(multiplayerPlaywrightReportFailures(report), []);
   const summary = summarizeMultiplayerPlaywrightReport(report);
-  assert.equal(summary.totalTests, 9);
-  assert.equal(summary.passedTests, 9);
-  assert.deepEqual(summary.specs.map(({ testCount }) => testCount), [1, 1, 3, 3, 1]);
+  assert.equal(summary.totalTests, 10);
+  assert.equal(summary.passedTests, 10);
+  assert.deepEqual(summary.specs.map(({ testCount }) => testCount), [1, 1, 3, 4, 1]);
 
   const missing = validReport();
   missing.suites.pop();

@@ -338,7 +338,7 @@ export class FlareProjectileSystem {
   inspectActiveReplicas(now: number): readonly FlareActiveReplicaInspection[] {
     if (!Number.isFinite(now)) return Object.freeze([]);
     const replicas = this.entities
-      .filter((entity) => entity.phase !== 'idle' && entity.expiresAt > now)
+      .filter((entity) => entity.phase !== 'idle')
       .map((entity) => Object.freeze({
         ownerId: entity.ownerId,
         ownerTeam: entity.ownerTeam,
@@ -348,7 +348,7 @@ export class FlareProjectileSystem {
         velocity: entity.phase === 'flight'
           ? Object.freeze(entity.velocity.toArray() as [number, number, number])
           : null,
-        remainingMs: entity.expiresAt - now,
+        remainingMs: Math.max(0, entity.expiresAt - now),
         authority: entity.authority,
       }))
       .sort((left, right) => {

@@ -271,6 +271,25 @@ describe('flare projectile system', () => {
     expect(system.burnPulseRevisionValue()).toBe(0);
   });
 
+  it('keeps replica inspection aligned with telemetry until the next valid update releases an expired effect', () => {
+    const system = new FlareProjectileSystem(new THREE.Scene(), true);
+    expect(system.spawn({
+      ownerId: 'owner-expiry', ownerTeam: 0, origin: new THREE.Vector3(),
+      direction: new THREE.Vector3(1, 0, 0), authority: true, actionNonce: 12, now: 0,
+    })).toBe(true);
+    system.update(0.05, 50, callbacks({ worldCollisionFraction: () => 0.5 }));
+
+    const expiresAt = 50 + FLARE_PROJECTILE_EFFECT.burnDurationMs;
+    expect(system.telemetry().active).toBe(1);
+    expect(system.inspectActiveReplicas(expiresAt)).toEqual([
+      expect.objectContaining({ ownerId: 'owner-expiry', phase: 'burn', remainingMs: 0, authority: true }),
+    ]);
+
+    system.update(0.016, expiresAt, callbacks());
+    expect(system.inspectActiveReplicas(expiresAt)).toEqual([]);
+    expect(system.telemetry().active).toBe(0);
+  });
+
   it('does not rebuild target or world snapshots between authority burn pulses', () => {
     const system = new FlareProjectileSystem(new THREE.Scene(), true);
     const hostileTargets = vi.fn(() => []);

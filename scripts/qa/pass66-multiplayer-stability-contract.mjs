@@ -26,9 +26,10 @@ export const PASS66_MULTIPLAYER_SPECS = Object.freeze([
   }),
   Object.freeze({
     path: 'tests/e2e/pass66-qoder-multiplayer-authority.spec.ts',
-    expectedTests: 3,
+    expectedTests: 4,
     titles: Object.freeze([
       'post-death ladders survive authenticated replacements and an immediate host renderer crash exactly once',
+      'a guest death-drop scavenge converges through host authority exactly once',
       'Semtex and crossbolt sticky results apply once under duplicate, reorder and guest rejoin',
       'host-authoritative facing flash and semantic smoke break bot lock while the guest observes safe replicas',
     ]),

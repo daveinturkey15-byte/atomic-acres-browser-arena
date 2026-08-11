@@ -225,7 +225,7 @@ test('requires one byte-bound top-panel action surface for both supports across 
   }, expected).join('\n'), /one readable highlighted action surface/u);
 });
 
-test('requires the exact nine-test multiplayer matrix and five tokenized peer identities', () => {
+test('requires the exact ten-test multiplayer matrix and five tokenized peer identities', () => {
   const currentCandidate = { ...candidate, releasePass: 'PASS 70' };
   const baseUrl = 'http://127.0.0.1:4530/channels/the-big-one/';
   const receipt = {
@@ -259,9 +259,9 @@ test('requires the exact nine-test multiplayer matrix and five tokenized peer id
       path: `/peerjs-${String(index + 5).repeat(24)}`, localOnly: true,
     })),
     playwright: {
-      stats: { expected: 9, skipped: 0, unexpected: 0, flaky: 0, durationMs: 800 },
-      totalTests: 9,
-      passedTests: 9,
+      stats: { expected: 10, skipped: 0, unexpected: 0, flaky: 0, durationMs: 800 },
+      totalTests: 10,
+      passedTests: 10,
       specs: PASS66_MULTIPLAYER_SPECS.map((spec) => ({
         path: spec.path,
         testCount: spec.expectedTests,
