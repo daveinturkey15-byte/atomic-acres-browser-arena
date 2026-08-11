@@ -875,8 +875,8 @@
     display: none;
   }
 
-  /* First-person Chopper Gunner / Piloted Drone cockpit HUD: a gunsight reticle
-     plus hull and ammo readouts, styled after the owner's reference photos. */
+  /* Pass 70 authored support cockpit overlay. The centre remains optically
+     clear: four disconnected aim arms frame the authoritative camera ray. */
   #gunner-cockpit-hud {
     position: absolute;
     inset: 0;
@@ -892,65 +892,96 @@
     position: absolute;
     left: 50%;
     top: 50%;
-    width: min(20vh, 16vw);
+    width: clamp(126px, min(20vh, 16vw), 188px);
     aspect-ratio: 1;
     transform: translate(-50%, -50%);
+    color: rgba(124, 255, 173, 0.96);
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.95));
   }
 
-  #gunner-cockpit-hud .gunner-reticle i,
-  #gunner-cockpit-hud .gunner-reticle b {
+  #gunner-cockpit-hud .gunner-reticle > span {
     position: absolute;
     left: 50%;
     top: 50%;
-    background: rgba(120, 255, 170, 0.92);
-    box-shadow: 0 0 6px rgba(0, 0, 0, 0.8);
-    transform: translate(-50%, -50%);
+    background: currentColor;
+    box-shadow: 0 0 5px rgba(75, 255, 143, 0.52);
   }
 
-  #gunner-cockpit-hud .gunner-reticle i { width: 2px; height: 34%; }
-  #gunner-cockpit-hud .gunner-reticle b { width: 34%; height: 2px; }
+  #gunner-cockpit-hud .gunner-reticle .north,
+  #gunner-cockpit-hud .gunner-reticle .south { width: 2px; height: 22%; transform: translateX(-50%); }
+  #gunner-cockpit-hud .gunner-reticle .north { bottom: 58%; top: auto; }
+  #gunner-cockpit-hud .gunner-reticle .south { top: 58%; }
+  #gunner-cockpit-hud .gunner-reticle .east,
+  #gunner-cockpit-hud .gunner-reticle .west { width: 22%; height: 2px; transform: translateY(-50%); }
+  #gunner-cockpit-hud .gunner-reticle .east { left: 58%; }
+  #gunner-cockpit-hud .gunner-reticle .west { left: auto; right: 58%; }
 
-  #gunner-cockpit-hud .gunner-reticle span {
+  #gunner-cockpit-hud .gunner-reticle > i {
     position: absolute;
     width: 16%;
     height: 16%;
-    border: 0 solid rgba(120, 255, 170, 0.9);
+    border: 0 solid currentColor;
   }
 
-  #gunner-cockpit-hud .gunner-reticle .tl { left: 6%; top: 6%; border-left-width: 3px; border-top-width: 3px; }
-  #gunner-cockpit-hud .gunner-reticle .tr { right: 6%; top: 6%; border-right-width: 3px; border-top-width: 3px; }
-  #gunner-cockpit-hud .gunner-reticle .bl { left: 6%; bottom: 6%; border-left-width: 3px; border-bottom-width: 3px; }
-  #gunner-cockpit-hud .gunner-reticle .br { right: 6%; bottom: 6%; border-right-width: 3px; border-bottom-width: 3px; }
+  #gunner-cockpit-hud .gunner-reticle .tl { left: 4%; top: 4%; border-left-width: 2px; border-top-width: 2px; }
+  #gunner-cockpit-hud .gunner-reticle .tr { right: 4%; top: 4%; border-right-width: 2px; border-top-width: 2px; }
+  #gunner-cockpit-hud .gunner-reticle .bl { left: 4%; bottom: 4%; border-left-width: 2px; border-bottom-width: 2px; }
+  #gunner-cockpit-hud .gunner-reticle .br { right: 4%; bottom: 4%; border-right-width: 2px; border-bottom-width: 2px; }
+
+  #gunner-cockpit-hud .gunner-status {
+    position: absolute;
+    top: max(20px, env(safe-area-inset-top));
+    left: 50%;
+    display: grid;
+    min-width: min(480px, calc(100vw - 32px));
+    grid-template-columns: auto 1fr auto;
+    align-items: baseline;
+    gap: 12px;
+    padding: 8px 14px;
+    border-block: 1px solid rgba(120, 255, 170, 0.42);
+    color: #d9ffea;
+    background: linear-gradient(90deg, transparent, rgba(2, 16, 10, 0.72) 18%, rgba(2, 16, 10, 0.72) 82%, transparent);
+    transform: translateX(-50%);
+    text-shadow: 0 1px 5px #000;
+  }
+
+  #gunner-cockpit-hud .gunner-status small,
+  #gunner-cockpit-hud .gunner-status span { font: 800 10px/1 Inter, system-ui, sans-serif; letter-spacing: 0.16em; color: #7effad; }
+  #gunner-cockpit-hud .gunner-status strong { font: 900 14px/1 Inter, system-ui, sans-serif; letter-spacing: 0.11em; text-align: center; }
+
+  #gunner-cockpit-hud .gunner-instruments {
+    position: absolute;
+    left: 50%;
+    bottom: max(26px, calc(env(safe-area-inset-bottom) + 12px));
+    display: grid;
+    width: min(760px, calc(100vw - 40px));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    border-block: 1px solid rgba(120, 255, 170, 0.38);
+    background: linear-gradient(90deg, transparent, rgba(3, 18, 12, 0.78) 8%, rgba(3, 18, 12, 0.78) 92%, transparent);
+    transform: translateX(-50%);
+  }
 
   #gunner-cockpit-hud .gunner-readout {
-    position: absolute;
-    bottom: 12vh;
-    left: 8vw;
-    padding: 10px 18px;
-    border: 1px solid rgba(120, 255, 170, 0.5);
-    border-radius: 4px;
-    background: rgba(4, 14, 10, 0.6);
+    min-width: 0;
+    padding: 8px 10px 9px;
+    border-inline-end: 1px solid rgba(120, 255, 170, 0.20);
     color: #b8ffd6;
-    text-align: left;
-  }
-
-  #gunner-cockpit-hud .gunner-readout.right {
-    left: auto;
-    right: 8vw;
-    text-align: right;
+    text-align: center;
   }
 
   #gunner-cockpit-hud .gunner-readout small {
     display: block;
-    font: 800 12px/1 Inter, system-ui, sans-serif;
-    letter-spacing: 0.22em;
+    font: 800 9px/1 Inter, system-ui, sans-serif;
+    letter-spacing: 0.16em;
     color: rgba(120, 255, 170, 0.8);
   }
 
   #gunner-cockpit-hud .gunner-readout strong {
     display: block;
-    margin-top: 4px;
-    font: 900 40px/1 Inter, system-ui, sans-serif;
+    margin-top: 5px;
+    overflow: hidden;
+    font: 900 clamp(18px, 2.6vw, 28px)/1 Inter, system-ui, sans-serif;
+    text-overflow: ellipsis;
     color: #eafff3;
     text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
   }
@@ -958,7 +989,7 @@
   #gunner-cockpit-hud #chopper-thermal {
     position: absolute;
     left: 50%;
-    top: 9vh;
+    top: max(66px, calc(env(safe-area-inset-top) + 54px));
     transform: translateX(-50%);
     padding: 7px 16px;
     border: 1px solid rgba(255, 120, 140, 0.55);
@@ -977,6 +1008,46 @@
     letter-spacing: 0.24em;
     color: #ffb3c0;
     text-shadow: 0 0 8px rgba(255, 80, 100, 0.6);
+  }
+
+  #gunner-target-confirm {
+    position: absolute;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    min-width: 54px;
+    min-height: 42px;
+    border: 2px solid #ffb454;
+    color: #fff2d8;
+    transform: translate(-50%, -50%);
+    filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.95));
+    animation: gunner-target-confirm 650ms ease-out both;
+  }
+
+  #gunner-target-confirm[hidden] { display: none; }
+  #gunner-target-confirm span { font: 900 8px/1 Inter, system-ui, sans-serif; letter-spacing: 0.18em; color: #ffc36e; }
+  #gunner-target-confirm strong { font: 950 18px/1 Inter, system-ui, sans-serif; }
+
+  @keyframes gunner-target-confirm {
+    from { opacity: 0; transform: translate(-50%, -50%) scale(1.35); }
+    28% { opacity: 1; }
+    to { opacity: 0.88; transform: translate(-50%, -50%) scale(1); }
+  }
+
+  @media (max-width: 760px), (max-height: 520px) {
+    #gunner-cockpit-hud .gunner-status { top: max(8px, env(safe-area-inset-top)); min-width: calc(100vw - 20px); gap: 7px; padding: 6px 8px; }
+    #gunner-cockpit-hud .gunner-status span { display: none; }
+    #gunner-cockpit-hud .gunner-status { grid-template-columns: auto 1fr; }
+    #gunner-cockpit-hud #chopper-thermal { top: max(42px, calc(env(safe-area-inset-top) + 40px)); max-width: calc(100vw - 24px); padding: 5px 9px; text-align: center; }
+    #gunner-cockpit-hud #chopper-thermal span { font-size: 8px; letter-spacing: 0.12em; }
+    #gunner-cockpit-hud .gunner-reticle { width: clamp(104px, 28vw, 142px); }
+    #gunner-cockpit-hud .gunner-instruments { bottom: max(8px, env(safe-area-inset-bottom)); width: calc(100vw - 18px); grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    #gunner-cockpit-hud .gunner-readout { padding: 5px 6px; }
+    #gunner-cockpit-hud .gunner-readout strong { margin-top: 3px; font-size: clamp(15px, 4vw, 20px); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #gunner-target-confirm { animation: none; }
   }
 
   /* Each firearm projects its own canonical sight signature. The marker stays

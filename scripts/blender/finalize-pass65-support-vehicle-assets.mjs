@@ -99,7 +99,7 @@ const sharedBoundary = {
   creator: 'Atomic Acres project',
   owner: 'Atomic Acres project',
   created: '2026-07-26',
-  refined: '2026-08-02',
+  refined: '2026-08-11',
   license: 'Project-original; no third-party meshes or textures',
   blenderVersion: '5.1.2',
   generator: sourceScript,
@@ -121,8 +121,9 @@ const chopperProvenance = {
   title: 'Pass 65 Chopper Gunner authored vehicle and first-person cockpit',
   ...sharedBoundary,
   inspirationBoundary: 'Original stylized near-future support helicopter. No copied commercial-game geometry, texture, logo, HUD, animation, UI, or audio.',
-  visualRevision: 'close-range-tandem-armored-airframe-v4',
-  detailContract: 'layered-armour-framed-canopy-fasteners-sensors-ordnance-mechanics-v4',
+  visualRevision: 'pass70-complete-tandem-attack-airframe-v5',
+  detailContract: 'complete-exterior-cockpit-gun-readable-materials-v5',
+  materialRevision: 'pass70-daylight-readable-olive-pbr-v1',
   sourceBlend: chopperSourceBlend,
   sharedConsumers: ['menu-prerecorded-map-preview', 'ai-flown-chopper-gunner', 'player-optional-chopper-gunner'],
   worldGlbs: chopper.records,
@@ -144,7 +145,7 @@ const chopperProvenance = {
     externalUris: 0,
   },
   authorityBoundary: 'Presentation only. Flight, targeting, damage, collision, duration, ownership and replication remain TypeScript authoritative.',
-  determinism: { command: 'npm run author:blender-support-vehicles', cleanFactoryStartup: true, pythonHashSeed: 0 },
+  determinism: { command: 'npm run author:blender-support-chopper', cleanFactoryStartup: true, pythonHashSeed: 0 },
   reproducibility: reproducibilityBoundary,
 };
 await writeFile(absolute(chopperProvenancePath), `${JSON.stringify(chopperProvenance, null, 2)}\n`, 'utf8');
@@ -215,10 +216,11 @@ const replaceSupport = (id, entry) => {
 };
 replaceSupport('chopper-gunner-vehicle-v1', {
   id: 'chopper-gunner-vehicle-v1', releaseState: 'release-ready', sourceKind: 'project-original-blender', owner: 'Atomic Acres project',
-  qualityTier: 'hero-support-vehicle-and-first-person-cockpit', materialFamily: 'tactical-gunmetal-cyan-green-orange-pbr',
+  qualityTier: 'hero-support-vehicle-and-first-person-cockpit', materialFamily: 'daylight-readable-olive-gunmetal-cyan-green-orange-pbr',
   textureDensity: '512px project-owned PBR map set', triangleRange: { lod0: [45_000, 60_000], lod1: [36_000, 50_000], lod2: [20_000, 32_000] },
   placeholderStatus: 'forbidden-and-not-present', sharedConsumers: chopperProvenance.sharedConsumers, runtimeForwardAxis: '-Z',
   visualRevision: chopperProvenance.visualRevision, detailContract: chopperProvenance.detailContract,
+  materialRevision: chopperProvenance.materialRevision,
   sourceBlend: chopperSourceBlend, sourceScript, worldGlbs: chopper.records, firstPersonGlb: chopper.records[0], pbrMaps: chopperPbrMaps,
   provenance: chopperProvenanceRecord, sockets: SUPPORT_VEHICLE_SPECS.chopper.sockets,
   semanticNodes: SUPPORT_VEHICLE_SPECS.chopper.nodes, actions: SUPPORT_VEHICLE_SPECS.chopper.actions,
@@ -249,8 +251,8 @@ upsertAsset({
   sourceScript: sourceScript.path, sourceScriptSha256: sourceScript.sha256,
   sourceProvenance: chopperProvenanceRecord.path, sourceProvenanceSha256: chopperProvenanceRecord.sha256,
   preview: chopperContactSheet.path,
-  format: 'Three strict decreasing optimized self-contained glTF 2.0 binary LODs with embedded WebP PBR maps, complete armoured tandem attack-helicopter silhouette, authored unobstructed gunner sightline/HUD/weapon view, detailed exterior rotors/gun/sockets and eight animation clips',
-  modifications: 'Project-original close-range v4 tandem attack-helicopter refinement with overlapping side and dorsal armour, raised fasteners and louvers, faceted framed pilot/gunner glazing, armoured nose and cheeks, restrained olive PBR, separated dual-aperture nose sensor, braced pylons, forward-aligned finned missiles, collared seven-tube rocket pods, mechanical rotor yokes/pitch links, tail gearbox, gun armour/feed chute and damped skid gear. Possessed view still excludes exterior shell and rotors; runtime gameplay authority remains TypeScript-owned.',
+  format: 'Three strict decreasing optimized self-contained glTF 2.0 binary LODs with embedded WebP PBR maps, complete armoured tandem attack-helicopter silhouette, authored full cockpit/dashboard/HUD/weapon view, detailed exterior rotors/gun/sockets and eight animation clips',
+  modifications: 'Project-original Pass 70 v5 attack-helicopter presentation with daylight-readable olive armour, transparent canopy and HUD glass, separated gunmetal/frame values, overlapping side and dorsal armour, raised fasteners and louvers, faceted pilot/gunner glazing, armoured nose and cheeks, dual-aperture nose sensor, braced pylons, finned missiles, rocket pods, mechanical rotor hardware, gun armour/feed chute and damped skid gear. Possessed view presents the complete cockpit while excluding exterior shell and rotors; runtime gameplay authority remains TypeScript-owned.',
   attributionRequired: false,
 });
 upsertAsset({

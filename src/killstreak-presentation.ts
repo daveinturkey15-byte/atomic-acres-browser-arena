@@ -1026,6 +1026,18 @@ export type KillstreakCarpetWorkflowTelemetry = Readonly<{
     | 'depthTest' | 'writesDepth' | 'raycastDisabled' | 'visible'>>[];
 }>;
 
+type FirstPersonCockpitAlignmentTelemetry = Readonly<{
+  cameraWorldPosition: readonly number[];
+  cameraPivotWorldPosition: readonly number[];
+  cockpitWorldPosition: readonly number[];
+  parentName: string;
+  parentWorldScale: readonly number[];
+  pivotErrorM: number;
+  dashboardCameraSpacePosition: readonly number[] | null;
+  hudCameraSpacePosition: readonly number[] | null;
+  weaponCameraSpacePosition: readonly number[] | null;
+}>;
+
 export type KillstreakPresentationTelemetry = Readonly<{
   entities: number;
   impactFlashes: number;
@@ -1076,8 +1088,13 @@ export type KillstreakPresentationTelemetry = Readonly<{
     presentationSource: string;
     visibleMeshNames: readonly string[];
     visibleOutsideSightline: readonly string[];
+    visibleOutsideCockpit: readonly string[];
+    dashboardVisible: boolean;
+    displaysVisible: boolean;
     hudVisible: boolean;
     weaponVisible: boolean;
+    overlayLayerExclusive: boolean;
+    alignment: FirstPersonCockpitAlignmentTelemetry | null;
   }> | null;
   markerDetails: readonly KillstreakPlacementMarkerTelemetry[];
   bounded: boolean;
@@ -1122,6 +1139,16 @@ function isGunnerSightlineNode(root: THREE.Object3D, node: THREE.Object3D): bool
   return false;
 }
 
+function isGunnerCockpitNode(root: THREE.Object3D, node: THREE.Object3D): boolean {
+  let cursor: THREE.Object3D | null = node;
+  while (cursor && cursor !== root) {
+    if (cursor.name === 'chopper-first-person-cockpit'
+      || cursor.userData.firstPersonCockpit === true) return true;
+    cursor = cursor.parent;
+  }
+  return false;
+}
+
 function isFirstPersonOnlyNode(root: THREE.Object3D, node: THREE.Object3D): boolean {
   let cursor: THREE.Object3D | null = node;
   while (cursor && cursor !== root) {
@@ -1132,29 +1159,50 @@ function isFirstPersonOnlyNode(root: THREE.Object3D, node: THREE.Object3D): bool
 }
 
 const supportMaterialBaseDepthWrite = new WeakMap<THREE.Material, boolean>();
+const SUPPORT_WORLD_RENDER_LAYER = 0;
+const SUPPORT_FIRST_PERSON_RENDER_LAYER = 2;
 
 function setSupportFirstPersonVisibility(root: THREE.Group, possessed: boolean): void {
   root.visible = true;
   root.traverse((node) => {
     if (!(node instanceof THREE.Mesh)) return;
     const gunnerSightlineNode = isGunnerSightlineNode(root, node);
+    const gunnerCockpitNode = isGunnerCockpitNode(root, node);
     const firstPersonOnlyNode = isFirstPersonOnlyNode(root, node);
     const retiredStaticSource = node.userData.staticBatchRendered === true
       && node.userData.supportStaticBatchOutput !== true;
     const overrideActive = node.userData.supportFirstPersonOverrideActive === true;
     if (possessed) {
-      if (!overrideActive) node.userData.supportBaseVisible = node.visible;
+      if (!overrideActive) {
+        node.userData.supportBaseVisible = node.visible;
+        node.userData.supportBaseLayerMask = node.layers.mask;
+      }
       node.userData.supportFirstPersonOverrideActive = true;
-      node.visible = gunnerSightlineNode && !retiredStaticSource;
+      node.visible = gunnerCockpitNode && !retiredStaticSource;
+      if (gunnerCockpitNode) {
+        // The complete cockpit is a first-person viewmodel. Keep optional
+        // effects layers, but remove the ordinary world layer so both renderer
+        // backends use the established isolated viewmodel vocabulary.
+        node.layers.mask = (node.layers.mask & ~(1 << SUPPORT_WORLD_RENDER_LAYER))
+          | (1 << SUPPORT_FIRST_PERSON_RENDER_LAYER);
+      }
     } else if (overrideActive) {
       node.visible = node.userData.supportBaseVisible === true && !firstPersonOnlyNode;
+      if (typeof node.userData.supportBaseLayerMask === 'number') {
+        node.layers.mask = node.userData.supportBaseLayerMask;
+      }
       node.userData.supportFirstPersonOverrideActive = false;
     } else if (firstPersonOnlyNode) {
       node.visible = false;
     }
-    if (!node.material || !gunnerSightlineNode) return;
+    if (!node.material || !gunnerCockpitNode) return;
     const materials = Array.isArray(node.material) ? node.material : [node.material];
     for (const entry of materials) {
+      // Only transparent cockpit glass and the projected sightline opt out of
+      // depth writes. Opaque frame/dashboard/gun materials keep normal depth,
+      // so both WebGL2 and WebGPU retain a readable authored cockpit instead
+      // of a see-through or flattened overlay.
+      if (!gunnerSightlineNode && !entry.transparent && entry.opacity >= 1) continue;
       if (!supportMaterialBaseDepthWrite.has(entry)) supportMaterialBaseDepthWrite.set(entry, entry.depthWrite);
       entry.depthWrite = possessed ? false : supportMaterialBaseDepthWrite.get(entry)!;
     }
@@ -1298,6 +1346,7 @@ function buildProceduralChopperFallback(): PresentedEntity {
   gun.position.set(0, -0.58, -0.72);
   const gunMuzzle = presentationSocket('chopper-gun-muzzle-socket', [0, -0.58, -1.24]);
   const forwardSocket = presentationSocket('chopper-forward-socket', [0, 0, -1.9]);
+  const noseSensor = presentationSocket('chopper-nose-sensor', [0, -0.28, -1.72]);
   const muzzleFlashAction = presentationSocket('chopper-muzzle-flash', [0, -0.58, -1.24]);
   const tracerAction = presentationSocket('chopper-tracer-action', [0, -0.58, -1.24]);
   const impactAction = presentationSocket('chopper-impact-action', [0, -0.58, -1.24]);
@@ -1385,7 +1434,7 @@ function buildProceduralChopperFallback(): PresentedEntity {
   root.add(
     fuselage, rearFuselage, canopy, glareshield, belly, noseArmour, tail, fin, stabilizer,
     ...stubWings, ...enginePods, ...rocketPods,
-    gun, gunMuzzle, forwardSocket, muzzleFlashAction, tracerAction, impactAction,
+    gun, gunMuzzle, forwardSocket, noseSensor, muzzleFlashAction, tracerAction, impactAction,
     cameraSocket, cockpit, rotor, tailRotor, ...skids,
   );
   root.userData.forwardAxis = [0, 0, -1];
@@ -1761,6 +1810,10 @@ export class KillstreakPresentation {
   private readonly firstPersonForwardScratch = new THREE.Vector3();
   private readonly firstPersonSocketQuaternionScratch = new THREE.Quaternion();
   private readonly firstPersonRootQuaternionScratch = new THREE.Quaternion();
+  private readonly firstPersonCockpitCameraPivot = new WeakMap<THREE.Object3D, THREE.Vector3>();
+  private readonly firstPersonCockpitSocketWorldScratch = new THREE.Vector3();
+  private readonly firstPersonCockpitDesiredParentScratch = new THREE.Vector3();
+  private readonly firstPersonCockpitPivotOffsetScratch = new THREE.Vector3();
   private readonly sensorRoot = new THREE.Group();
   private readonly sensorSilhouettes: THREE.Group[];
   private visibleSensorContacts = 0;
@@ -1768,6 +1821,7 @@ export class KillstreakPresentation {
   private chopperImpactActionsPresented = 0;
   private lastChopperWeaponActions: readonly string[] = Object.freeze([]);
   private firstPersonEntityId: string | null = null;
+  private firstPersonCockpitAlignment: FirstPersonCockpitAlignmentTelemetry | null = null;
   private disposed = false;
   private readonly placementMarkers = new Map<string, PresentedPlacementMarker>();
   private readonly locallyExpiredMarkerRevisions = new Map<string, number>();
@@ -2195,6 +2249,7 @@ export class KillstreakPresentation {
     }>>();
     const lodStates = new Map<THREE.LOD, boolean>();
     const possessedMaterialDepthWrite = new Map<THREE.Material, boolean>();
+    const possessedLayerMasks = new Map<THREE.Mesh, number>();
     const chopperRoot = this.entityPools.get('chopper')?.[0]?.root ?? null;
     const rootVisible = this.root.visible;
     const rootFrustumCulled = this.root.frustumCulled;
@@ -2322,10 +2377,17 @@ export class KillstreakPresentation {
         chopperRoot.traverse((node) => {
           if (!(node instanceof THREE.Mesh)) return;
           const gunnerSightlineNode = isGunnerSightlineNode(chopperRoot, node);
-          node.visible = gunnerSightlineNode;
-          if (!gunnerSightlineNode) return;
+          const gunnerCockpitNode = isGunnerCockpitNode(chopperRoot, node);
+          const retiredStaticSource = node.userData.staticBatchRendered === true
+            && node.userData.supportStaticBatchOutput !== true;
+          node.visible = gunnerCockpitNode && !retiredStaticSource;
+          if (!gunnerCockpitNode) return;
+          possessedLayerMasks.set(node, node.layers.mask);
+          node.layers.mask = (node.layers.mask & ~(1 << SUPPORT_WORLD_RENDER_LAYER))
+            | (1 << SUPPORT_FIRST_PERSON_RENDER_LAYER);
           const materials = Array.isArray(node.material) ? node.material : [node.material];
           for (const entry of materials) {
+            if (!gunnerSightlineNode && !entry.transparent && entry.opacity >= 1) continue;
             if (!possessedMaterialDepthWrite.has(entry)) possessedMaterialDepthWrite.set(entry, entry.depthWrite);
             entry.depthWrite = false;
           }
@@ -2341,6 +2403,7 @@ export class KillstreakPresentation {
         batch.instanceMatrix.needsUpdate = true;
       }
       for (const [material, depthWrite] of possessedMaterialDepthWrite) material.depthWrite = depthWrite;
+      for (const [node, layerMask] of possessedLayerMasks) node.layers.mask = layerMask;
       for (const [lod, autoUpdate] of lodStates) lod.autoUpdate = autoUpdate;
       for (const [stagedRootIndex, stagedRoot] of stagedRoots.entries()) {
         stagedRoot.traverse((node) => {
@@ -2716,6 +2779,7 @@ export class KillstreakPresentation {
   setFirstPersonEntity(id: string | null): void {
     if (id === this.firstPersonEntityId) return;
     this.firstPersonEntityId = id;
+    this.firstPersonCockpitAlignment = null;
     const presented = id ? this.entities.get(id) : null;
     if (presented) {
       // A possessed support view must use the current immutable snapshot pose;
@@ -2739,14 +2803,58 @@ export class KillstreakPresentation {
     return anchor.addScaledVector(forward, 0.08);
   }
 
-  alignFirstPersonCockpit(id: string, cameraWorldQuaternion: THREE.Quaternion): void {
+  alignFirstPersonCockpit(
+    id: string,
+    cameraWorldPosition: THREE.Vector3,
+    cameraWorldQuaternion: THREE.Quaternion,
+  ): void {
     const presented = this.entities.get(id);
-    const root = presented?.root;
     const cockpit = presented?.cockpit;
-    if (!root || !cockpit) return;
-    root.updateWorldMatrix(true, false);
-    const inverseParent = root.getWorldQuaternion(this.firstPersonRootQuaternionScratch).invert();
+    const socket = presented?.cameraSocket;
+    const parent = cockpit?.parent;
+    if (!cockpit || !socket || !parent) return;
+    parent.updateWorldMatrix(true, false);
+    socket.updateWorldMatrix(true, false);
+    cockpit.updateWorldMatrix(true, false);
+    let authoredCameraPivot = this.firstPersonCockpitCameraPivot.get(cockpit);
+    if (!authoredCameraPivot) {
+      authoredCameraPivot = cockpit.worldToLocal(
+        socket.getWorldPosition(this.firstPersonCockpitSocketWorldScratch),
+      ).clone();
+      this.firstPersonCockpitCameraPivot.set(cockpit, authoredCameraPivot);
+    }
+    const inverseParent = parent.getWorldQuaternion(this.firstPersonRootQuaternionScratch).invert();
     cockpit.quaternion.copy(inverseParent.multiply(cameraWorldQuaternion));
+    const desiredParentPosition = parent.worldToLocal(
+      this.firstPersonCockpitDesiredParentScratch.copy(cameraWorldPosition),
+    );
+    const pivotOffset = this.firstPersonCockpitPivotOffsetScratch.copy(authoredCameraPivot)
+      .multiply(cockpit.scale)
+      .applyQuaternion(cockpit.quaternion);
+    cockpit.position.copy(desiredParentPosition).sub(pivotOffset);
+    cockpit.updateMatrixWorld(true);
+    if (this.firstPersonCockpitAlignment) return;
+    const cameraPivotWorldPosition = cockpit.localToWorld(authoredCameraPivot.clone());
+    const inverseCameraQuaternion = cameraWorldQuaternion.clone().invert();
+    const cameraSpacePosition = (name: string): readonly number[] | null => {
+      const node = cockpit.getObjectByName(name);
+      if (!node) return null;
+      return Object.freeze(node.getWorldPosition(new THREE.Vector3())
+        .sub(cameraWorldPosition)
+        .applyQuaternion(inverseCameraQuaternion)
+        .toArray());
+    };
+    this.firstPersonCockpitAlignment = Object.freeze({
+      cameraWorldPosition: Object.freeze(cameraWorldPosition.toArray()),
+      cameraPivotWorldPosition: Object.freeze(cameraPivotWorldPosition.toArray()),
+      cockpitWorldPosition: Object.freeze(cockpit.getWorldPosition(new THREE.Vector3()).toArray()),
+      parentName: parent.name,
+      parentWorldScale: Object.freeze(parent.getWorldScale(new THREE.Vector3()).toArray()),
+      pivotErrorM: cameraPivotWorldPosition.distanceTo(cameraWorldPosition),
+      dashboardCameraSpacePosition: cameraSpacePosition('chopper-cockpit-dashboard-3d'),
+      hudCameraSpacePosition: cameraSpacePosition('chopper-cockpit-hud-glass'),
+      weaponCameraSpacePosition: cameraSpacePosition('chopper-gunner-weapon-view'),
+    });
   }
 
   carpetWorkflowTelemetry(): KillstreakCarpetWorkflowTelemetry {
@@ -2932,10 +3040,15 @@ export class KillstreakPresentation {
       ? (() => {
           const visibleMeshNames: string[] = [];
           const visibleOutsideSightline: string[] = [];
+          const visibleOutsideCockpit: string[] = [];
+          let overlayLayerExclusive = true;
           firstPersonRoot.traverse((node) => {
             if (!(node instanceof THREE.Mesh) || !effectivelyVisible(node, firstPersonRoot)) return;
             visibleMeshNames.push(node.name);
             if (!isGunnerSightlineNode(firstPersonRoot, node)) visibleOutsideSightline.push(node.name);
+            if (!isGunnerCockpitNode(firstPersonRoot, node)) visibleOutsideCockpit.push(node.name);
+            overlayLayerExclusive &&= (node.layers.mask & (1 << SUPPORT_FIRST_PERSON_RENDER_LAYER)) !== 0
+              && (node.layers.mask & (1 << SUPPORT_WORLD_RENDER_LAYER)) === 0;
           });
           const subtreeHasVisibleMesh = (name: string): boolean => {
             const subtree = firstPersonRoot.getObjectByName(name);
@@ -2950,9 +3063,15 @@ export class KillstreakPresentation {
             presentationSource: String(firstPersonRoot.userData.presentationSource ?? 'unknown'),
             visibleMeshNames: Object.freeze(visibleMeshNames.sort()),
             visibleOutsideSightline: Object.freeze(visibleOutsideSightline.sort()),
+            visibleOutsideCockpit: Object.freeze(visibleOutsideCockpit.sort()),
+            dashboardVisible: subtreeHasVisibleMesh('chopper-cockpit-dashboard-3d'),
+            displaysVisible: subtreeHasVisibleMesh('chopper-cockpit-display-cyan')
+              && subtreeHasVisibleMesh('chopper-cockpit-display-green'),
             hudVisible: subtreeHasVisibleMesh('chopper-cockpit-hud-glass')
               && subtreeHasVisibleMesh('chopper-cockpit-hud-target-ring'),
             weaponVisible: subtreeHasVisibleMesh('chopper-gunner-weapon-view'),
+            overlayLayerExclusive,
+            alignment: this.firstPersonCockpitAlignment,
           });
         })()
       : null;

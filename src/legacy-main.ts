@@ -150,8 +150,10 @@ import { KillstreakLoadoutController } from './killstreak-loadout';
 import type { KillstreakLoadoutV1, Pass65KillstreakId } from './killstreak-catalog';
 import {
   HostKillstreakRuntime,
+  chopperGunnerAuthoritativeRay,
   chopperGunnerCameraOrigin,
   type KillstreakDamageEvent,
+  type KillstreakEntitySnapshot,
   type KillstreakRecipientSnapshot,
   type KillstreakWorld,
 } from './killstreak-runtime';
@@ -17840,11 +17842,12 @@ function recordOwnerSupportDamage(event: KillstreakDamageEvent): void {
   const anchor = projectSupportDamageAnchor(targetPosition, camera, viewport);
   supportDamageFeedbackTelemetry.record(event, anchor, viewport);
   showDamageNumber(event.damage, 'body', undefined, { ...anchor, targetId: event.targetId });
-  audio.hit(false);
   supportDamageDealtByActivation.set(
     event.activationId,
     (supportDamageDealtByActivation.get(event.activationId) ?? 0) + event.damage,
   );
+  showGunnerTargetConfirm(event, anchor, performance.now());
+  audio.hit(false);
   const displayedSupport = preferredOwnedSupportEntity();
   if (displayedSupport?.activationId === event.activationId) {
     element<HTMLElement>('#chopper-damage-dealt').textContent = String(Math.round(
@@ -18462,38 +18465,99 @@ const killstreakPossessionCameraScratch = new THREE.Vector3();
  * on every miss, so mirror the admitted cadence as presentation-only feedback.
  */
 let nextLocalSupportGunReportAt = 0;
+let gunnerTargetConfirmUntil = 0;
+const GUNNER_TARGET_CONFIRM_DURATION_MS = 650;
 
 /**
- * First-person cockpit HUD for the Chopper Gunner and Piloted Drone: a gunsight
- * reticle plus hull/ammo readouts, shown only while the player is at the
- * controls. Presentation-only; values mirror the authoritative entity snapshot.
+ * First-person cockpit HUD for the Chopper Gunner and Piloted Drone. Values
+ * mirror the authoritative entity snapshot; the disconnected reticle leaves
+ * the exact centre ray unobstructed on desktop and mobile.
  */
-function syncGunnerCockpitHud(entity: { health: number; magazine: number | null }): void {
+function syncGunnerCockpitHud(
+  entity: KillstreakEntitySnapshot,
+  possessionKind: 'chopper-gunner' | 'piloted-drone',
+  now: number,
+): void {
   const hud = element<HTMLElement>('#gunner-cockpit-hud');
   hud.hidden = false;
+  hud.setAttribute('aria-hidden', 'false');
+  hud.dataset.supportKind = possessionKind;
   element<HTMLElement>('#gunner-hull').textContent = String(Math.max(0, Math.round(entity.health)));
   element<HTMLElement>('#gunner-ammo').textContent = entity.magazine === null ? '∞' : String(entity.magazine);
+  element<HTMLElement>('#gunner-altitude').textContent = `${Math.max(0, Math.round(entity.position[1] - (arena.bounds.minY ?? 0)))}M`;
+  element<HTMLElement>('#gunner-speed').textContent = String(Math.round(Math.hypot(...entity.velocity)));
+  element<HTMLElement>('#gunner-time').textContent = (Math.max(0, entity.expiresInMs) / 1_000).toFixed(1);
+  element<HTMLElement>('#gunner-damage').textContent = String(Math.round(
+    supportDamageDealtByActivation.get(entity.activationId) ?? 0,
+  ));
+  element<HTMLElement>('#gunner-platform').textContent = possessionKind === 'chopper-gunner' ? 'CHOPPER GUNNER' : 'PILOTED DRONE';
+  element<HTMLElement>('#gunner-weapon-mode').textContent = possessionKind === 'chopper-gunner' ? '30MM AUTOCANNON' : 'REMOTE CANNON';
+  if (now >= gunnerTargetConfirmUntil) {
+    element<HTMLElement>('#gunner-target-confirm').hidden = true;
+    hud.dataset.hitConfirm = 'false';
+  }
 }
 
 function hideGunnerCockpitHud(): void {
-  element<HTMLElement>('#gunner-cockpit-hud').hidden = true;
+  const hud = element<HTMLElement>('#gunner-cockpit-hud');
+  hud.hidden = true;
+  hud.setAttribute('aria-hidden', 'true');
+  hud.dataset.supportKind = 'none';
+  hud.dataset.hitConfirm = 'false';
+  const targetConfirm = element<HTMLElement>('#gunner-target-confirm');
+  targetConfirm.hidden = true;
+  targetConfirm.style.removeProperty('left');
+  targetConfirm.style.removeProperty('top');
+  delete targetConfirm.dataset.targetId;
+  element<HTMLElement>('#chopper-thermal').hidden = true;
+  gunnerTargetConfirmUntil = 0;
+  nextLocalSupportGunReportAt = 0;
+}
+
+function showGunnerTargetConfirm(
+  event: KillstreakDamageEvent,
+  anchor: SupportDamageScreenAnchor,
+  now: number,
+): void {
+  if (event.source !== 'chopper' || !anchor.visible) return;
+  const possession = localKillstreakActorSnapshot()?.possession;
+  const entity = possession?.kind === 'chopper-gunner'
+    ? killstreakSnapshot.entities.find((candidate) => candidate.id === possession.entityId)
+    : null;
+  if (!entity || entity.activationId !== event.activationId) return;
+  const hud = element<HTMLElement>('#gunner-cockpit-hud');
+  const targetConfirm = element<HTMLElement>('#gunner-target-confirm');
+  targetConfirm.style.left = `${anchor.xPx}px`;
+  targetConfirm.style.top = `${anchor.yPx}px`;
+  targetConfirm.dataset.targetId = event.targetId;
+  targetConfirm.querySelector<HTMLElement>('strong')!.textContent = String(Math.round(event.damage));
+  // Re-arm the short CSS pulse when successive rounds hit the same target.
+  targetConfirm.hidden = true;
+  void targetConfirm.offsetWidth;
+  targetConfirm.hidden = false;
+  hud.dataset.hitConfirm = 'true';
+  gunnerTargetConfirmUntil = now + GUNNER_TARGET_CONFIRM_DURATION_MS;
+}
+
+function resetKillstreakPossessionPresentation(): void {
+  killstreakPresentation.setFirstPersonEntity(null);
+  hideGunnerCockpitHud();
+  if (!dmrThermalActive) thermalGhostPresentation.sync([], false);
+  if (camera.near !== 0.08) {
+    camera.near = 0.08;
+    camera.updateProjectionMatrix();
+  }
 }
 
 function updateKillstreakPossession(now: number): void {
   const possession = localKillstreakActorSnapshot()?.possession;
-  if (!possession) {
-    killstreakPresentation.setFirstPersonEntity(null);
-    hideGunnerCockpitHud();
-    if (camera.near !== 0.08) {
-      camera.near = 0.08;
-      camera.updateProjectionMatrix();
-    }
+  if (!possession || !player.alive) {
+    resetKillstreakPossessionPresentation();
     return;
   }
   const entity = killstreakSnapshot.entities.find((entry) => entry.id === possession.entityId);
   if (!entity) {
-    killstreakPresentation.setFirstPersonEntity(null);
-    hideGunnerCockpitHud();
+    resetKillstreakPossessionPresentation();
     return;
   }
   killstreakPresentation.setFirstPersonEntity(entity.id);
@@ -18505,15 +18569,16 @@ function updateKillstreakPossession(now: number): void {
     position = killstreakPossessionCameraScratch.set(entity.position[0], entity.position[1], entity.position[2]);
   }
   camera.position.copy(position);
-  if (camera.near !== 0.35) {
-    camera.near = 0.35;
+  const supportCameraNear = possession.kind === 'chopper-gunner' ? 0.08 : 0.35;
+  if (camera.near !== supportCameraNear) {
+    camera.near = supportCameraNear;
     camera.updateProjectionMatrix();
   }
   camera.rotation.order = 'YXZ';
   camera.rotation.y = player.yaw;
   camera.rotation.x = player.pitch;
-  killstreakPresentation.alignFirstPersonCockpit(entity.id, camera.quaternion);
-  syncGunnerCockpitHud(entity);
+  killstreakPresentation.alignFirstPersonCockpit(entity.id, camera.position, camera.quaternion);
+  syncGunnerCockpitHud(entity, possession.kind, now);
   // Chopper Gunner thermal vision: the heavy autocannon shoots through walls,
   // so the cockpit reveals living hostiles with the same thermal-ghost overlay
   // family as the M14 DMR scope.
@@ -18544,9 +18609,9 @@ function updateKillstreakPossession(now: number): void {
     // trigger is unmistakable (presentation-only; the host owns real hits).
     if (possession.kind === 'chopper-gunner') {
       killstreakPresentation.presentChopperWeaponAction(entity.id);
-      const muzzle = camera.getWorldPosition(new THREE.Vector3());
-      const aim = camera.getWorldDirection(new THREE.Vector3());
-      muzzle.addScaledVector(aim, 1.4).y -= 0.18;
+      const shotRay = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, player.yaw, player.pitch);
+      const muzzle = new THREE.Vector3(...shotRay.tracerOrigin);
+      const aim = new THREE.Vector3(...shotRay.direction);
       spawnTracer(muzzle, muzzle.clone().addScaledVector(aim, 130), 0xffb347);
     }
     nextLocalSupportGunReportAt = now + (possession.kind === 'chopper-gunner'
@@ -18583,11 +18648,13 @@ function updatePass65KillstreakRuntime(now: number): void {
   if (!gameStarted) {
     audio.syncChopperRotors([]);
     killstreakPresentation.clear();
+    resetKillstreakPossessionPresentation();
     return;
   }
   if (matchState.phase === 'ended') {
     audio.syncChopperRotors([]);
     killstreakPresentation.clear();
+    resetKillstreakPossessionPresentation();
     return;
   }
   if (network.role !== 'client' && matchState.phase === 'active') {

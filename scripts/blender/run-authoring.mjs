@@ -165,6 +165,18 @@ function authorSupportAircraftVisibility() {
   }
 }
 
+function authorSupportChopper() {
+  mkdirSync('public/assets/original/models/support', { recursive: true });
+  env.PASS65_SUPPORT_AUTHORING_SCOPE = 'chopper';
+  runBlenderPython('scripts/blender/create-pass65-support-vehicles.py');
+  for (const lod of [0, 1, 2]) {
+    optimizeGlb(
+      `artifacts/blender-support-vehicles/raw/chopper/pass65-chopper-gunner-lod${lod}.glb`,
+      `public/assets/original/models/support/pass65-chopper-gunner-lod${lod}.glb`,
+    );
+  }
+}
+
 function authorWeaponFamilies() {
   const spec = JSON.parse(readFileSync('source-assets/blender/pass65-weapon-family-specs.json', 'utf8'));
   const previewIds = new Set((process.env.PASS65_WEAPON_PREVIEW_IDS ?? '')
@@ -306,6 +318,9 @@ if (target === 'arena') {
   run(process.execPath, ['scripts/blender/finalize-pass65-support-vehicle-assets.mjs']);
 } else if (target === 'support-aircraft-visibility') {
   authorSupportAircraftVisibility();
+  run(process.execPath, ['scripts/blender/finalize-pass65-support-vehicle-assets.mjs']);
+} else if (target === 'support-chopper') {
+  authorSupportChopper();
   run(process.execPath, ['scripts/blender/finalize-pass65-support-vehicle-assets.mjs']);
 } else {
   console.error(`Unknown authoring target: ${target ?? '<missing>'}`);

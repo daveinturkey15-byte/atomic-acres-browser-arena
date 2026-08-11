@@ -5,22 +5,23 @@
   "creator": "Atomic Acres project",
   "owner": "Atomic Acres project",
   "created": "2026-07-26",
-  "refined": "2026-08-02",
+  "refined": "2026-08-11",
   "license": "Project-original; no third-party meshes or textures",
   "blenderVersion": "5.1.2",
   "generator": {
     "path": "scripts/blender/create-pass65-support-vehicles.py",
-    "sha256": "4ac7c18f2e2bd11b21b78a1dae0a9ed8d19500904fec6316cd402daedcec9366"
+    "sha256": "af5a230b1d4980ce40dec89f7d9bba98c011fc4dd50132a5d126cb46e71f626e"
   },
   "runtimeForwardAxis": "-Z",
   "blenderAuthoringForwardAxis": "+Y converted to glTF -Z by Y-up export",
   "presentationOnly": true,
   "inspirationBoundary": "Original stylized near-future support helicopter. No copied commercial-game geometry, texture, logo, HUD, animation, UI, or audio.",
-  "visualRevision": "close-range-tandem-armored-airframe-v4",
-  "detailContract": "layered-armour-framed-canopy-fasteners-sensors-ordnance-mechanics-v4",
+  "visualRevision": "pass70-complete-tandem-attack-airframe-v5",
+  "detailContract": "complete-exterior-cockpit-gun-readable-materials-v5",
+  "materialRevision": "pass70-daylight-readable-olive-pbr-v1",
   "sourceBlend": {
     "path": "source-assets/blender/pass65-chopper-gunner.blend",
-    "sha256": "6d645dc3bdf6ce6990f3c5b292cee4296d4be60ba755c4b6d163fa5f5ed1a8e0"
+    "sha256": "0d2bcdc052102f9814046e672f0b9c154ca1b11a4b9914762eda2b9286f072a5"
   },
   "sharedConsumers": [
     "menu-prerecorded-map-preview",
@@ -30,37 +31,37 @@
   "worldGlbs": [
     {
       "path": "public/assets/original/models/support/pass65-chopper-gunner-lod0.glb",
-      "sha256": "fba45762d0fb0cb7cc68a58e791b50fc8243a03489ca528d3273e2fba5e1afcb",
+      "sha256": "990ac82639ccc68e6dd480710355d16e1e5a7e3100cf10d218e26122895d303c",
       "lod": 0,
       "triangles": 59740,
-      "bytes": 951740
+      "bytes": 958824
     },
     {
       "path": "public/assets/original/models/support/pass65-chopper-gunner-lod1.glb",
-      "sha256": "c737b8b6c332ecf414890a170c07852197b6223178947ff17c1b0ec01ae8237d",
+      "sha256": "e3a3abd354d3251102f52e83b2988ee2518aba4a4af24bcab4caa6a93a2457c2",
       "lod": 1,
       "triangles": 49920,
-      "bytes": 844688
+      "bytes": 835504
     },
     {
       "path": "public/assets/original/models/support/pass65-chopper-gunner-lod2.glb",
-      "sha256": "a96352c773caf04c8649253d22fa2420a14963d7344b94b9a928aa1b867c5115",
+      "sha256": "a4253fea3264fabe205b0384e8c2a77cb4f78ab737ce64b543396dd88bb9a514",
       "lod": 2,
       "triangles": 29068,
-      "bytes": 562896
+      "bytes": 565304
     }
   ],
   "firstPersonGlb": {
     "path": "public/assets/original/models/support/pass65-chopper-gunner-lod0.glb",
-    "sha256": "fba45762d0fb0cb7cc68a58e791b50fc8243a03489ca528d3273e2fba5e1afcb",
+    "sha256": "990ac82639ccc68e6dd480710355d16e1e5a7e3100cf10d218e26122895d303c",
     "lod": 0,
     "triangles": 59740,
-    "bytes": 951740
+    "bytes": 958824
   },
   "pbrMaps": {
     "baseColor": {
       "path": "public/assets/original/textures/support/pass65-chopper-albedo.png",
-      "sha256": "3e99137cf87a5968a68cf675fc7ade2598341f8871ecd32bf51a0e54683dfef2",
+      "sha256": "245e185d4578825299e5b7ec2f03ae9af653b5b9e0db1f18cc5120d885920737",
       "width": 512,
       "height": 512
     },
@@ -89,6 +90,7 @@
     "chopper-tail-boom",
     "chopper-tail-fin",
     "chopper-sleek-cockpit-canopy",
+    "chopper-nose-sensor",
     "chopper-first-person-cockpit",
     "chopper-gunner-sightline",
     "chopper-gunner-weapon-view",
@@ -125,7 +127,7 @@
   "review": {
     "acceptedFirstPersonFrame": {
       "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png",
-      "sha256": "680a235168bfa0021232aa1e7cfe6332b91616f60bd5369b9fea60e110f9b4be",
+      "sha256": "e285ede0f3834c4cc07aa377c3b47796a8bead9733d7d9c8d64c52b71008c875",
       "cameraId": "accepted-first-person-instruments",
       "width": 960,
       "height": 540
@@ -133,42 +135,42 @@
     "renders": [
       {
         "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-exterior-front-quarter.png",
-        "sha256": "9eea7657545ff8a5f235a95641c315e7865abb22060f72c1030828e08f955a29",
+        "sha256": "c4a2cef44be0c803c5327ff506e54f563e183488597bfc6e015fc869b937c9af",
         "cameraId": "exterior-front-quarter",
         "width": 512,
         "height": 512
       },
       {
         "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-rotor-gun-profile.png",
-        "sha256": "6ab3fb88c9d8488e7b0b0ea7b3f8d6968c7411b592b2ec63c3a2fe6cb3da826c",
+        "sha256": "dd23b2e905cf370d3b25c021cd07f3234121bfef10efc03103899ab6258fd977",
         "cameraId": "rotor-gun-profile",
         "width": 512,
         "height": 512
       },
       {
         "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-rear-fuselage-quarter.png",
-        "sha256": "0ff2f36a67577aa9c0f2ce20fa8c9f6a218ecf26e163c42ebb4a750e11b605a7",
+        "sha256": "72ee65a8436a24c9b5457aef3f9fee5d6636b5f74470568e9ce891e4b5d08699",
         "cameraId": "rear-fuselage-quarter",
         "width": 512,
         "height": 512
       },
       {
         "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-canopy-armour-closeup.png",
-        "sha256": "962f9956e7e2ff2f391ea23d4b068fdf15a8afeb697509470a06ac18a0ca1f32",
+        "sha256": "8094b93191189ebb5820daca325d6b37e0b2d0d5dd25db16165a46e2ced645fe",
         "cameraId": "canopy-armour-closeup",
         "width": 512,
         "height": 512
       },
       {
         "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-ordnance-mechanics-closeup.png",
-        "sha256": "cdad3267e043253cb20464d15f6844f90061e1ba55a86332e576c662ac44e120",
+        "sha256": "332ccd949b2d350495b91648cfc742daca84d869d87421094470ab71900ae328",
         "cameraId": "ordnance-mechanics-closeup",
         "width": 512,
         "height": 512
       },
       {
         "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png",
-        "sha256": "680a235168bfa0021232aa1e7cfe6332b91616f60bd5369b9fea60e110f9b4be",
+        "sha256": "e285ede0f3834c4cc07aa377c3b47796a8bead9733d7d9c8d64c52b71008c875",
         "cameraId": "accepted-first-person-instruments",
         "width": 960,
         "height": 540
@@ -176,7 +178,7 @@
     ],
     "contactSheet": {
       "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-contact-sheet.png",
-      "sha256": "54a1ce8a69a1c3568f5fde64c568b9224ff7142d5cde77d1833c2041fd555347",
+      "sha256": "2bacb4fa9a168a2878cf19921f86d23cb681d061ef9c1eb1d4480bb151d250ed",
       "cameraId": "accepted-contact-sheet",
       "width": 1536,
       "height": 1024
@@ -188,7 +190,7 @@
       {
         "lod": 0,
         "triangles": 59740,
-        "bytes": 951740,
+        "bytes": 958824,
         "meshNodes": 360,
         "materials": 19,
         "images": 4,
@@ -240,7 +242,7 @@
       {
         "lod": 1,
         "triangles": 49920,
-        "bytes": 844688,
+        "bytes": 835504,
         "meshNodes": 301,
         "materials": 19,
         "images": 4,
@@ -284,7 +286,7 @@
       {
         "lod": 2,
         "triangles": 29068,
-        "bytes": 562896,
+        "bytes": 565304,
         "meshNodes": 164,
         "materials": 19,
         "images": 4,
@@ -329,7 +331,7 @@
   },
   "authorityBoundary": "Presentation only. Flight, targeting, damage, collision, duration, ownership and replication remain TypeScript authoritative.",
   "determinism": {
-    "command": "npm run author:blender-support-vehicles",
+    "command": "npm run author:blender-support-chopper",
     "cleanFactoryStartup": true,
     "pythonHashSeed": 0
   },

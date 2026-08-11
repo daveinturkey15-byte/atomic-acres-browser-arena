@@ -163,6 +163,66 @@ test('renders the five-second Gun Range tunnel, grey test bay, and slow unarmed 
   });
   await expect(page.locator('#gunner-cockpit-hud')).toBeVisible();
   await expect(page.locator('#gunner-cockpit-hud .gunner-reticle')).toBeVisible();
+  await expect(page.locator('#gunner-cockpit-hud')).toHaveAttribute('data-support-kind', 'chopper-gunner');
+  const cockpitHudLayout = async () => page.evaluate(() => {
+    const reticle = document.querySelector<HTMLElement>('#gunner-cockpit-hud .gunner-reticle')!;
+    const centre = { x: innerWidth / 2, y: innerHeight / 2 };
+    const aimPartRects = [...reticle.children].map((child) => (child as HTMLElement).getBoundingClientRect());
+    const readouts = [...document.querySelectorAll<HTMLElement>('#gunner-cockpit-hud .gunner-readout')]
+      .map((readout) => {
+        const bounds = readout.getBoundingClientRect();
+        return {
+          id: readout.querySelector('strong')?.id ?? '',
+          width: bounds.width,
+          height: bounds.height,
+          inside: bounds.left >= -1 && bounds.top >= -1 && bounds.right <= innerWidth + 1 && bounds.bottom <= innerHeight + 1,
+        };
+      });
+    return {
+      viewport: [innerWidth, innerHeight],
+      readouts,
+      centreClear: aimPartRects.every((bounds) => !(
+        centre.x >= bounds.left && centre.x <= bounds.right && centre.y >= bounds.top && centre.y <= bounds.bottom
+      )),
+      centreContract: reticle.dataset.centreClear,
+    };
+  });
+  expect(await cockpitHudLayout()).toMatchObject({
+    viewport: [2_560, 1_440],
+    centreClear: true,
+    centreContract: 'true',
+    readouts: expect.arrayContaining([
+      expect.objectContaining({ id: 'gunner-hull', inside: true }),
+      expect.objectContaining({ id: 'gunner-ammo', inside: true }),
+      expect.objectContaining({ id: 'gunner-altitude', inside: true }),
+      expect.objectContaining({ id: 'gunner-speed', inside: true }),
+      expect.objectContaining({ id: 'gunner-time', inside: true }),
+      expect.objectContaining({ id: 'gunner-damage', inside: true }),
+    ]),
+  });
+  const cockpitPresentation = await page.evaluate(() => (
+    window.__ATOMIC_ACRES_DEBUG__.snapshot() as any
+  ).killstreakPresentation.firstPersonSightline);
+  expect(cockpitPresentation).toMatchObject({
+    visibleOutsideCockpit: [],
+    dashboardVisible: true,
+    displaysVisible: true,
+    hudVisible: true,
+    weaponVisible: true,
+    overlayLayerExclusive: true,
+    alignment: { pivotErrorM: expect.any(Number) },
+  });
+  expect(cockpitPresentation.alignment.pivotErrorM).toBeLessThan(0.001);
+  const pass70ChopperEvidence = resolve(process.cwd(), 'artifacts/pass70/chopper-gunner');
+  mkdirSync(pass70ChopperEvidence, { recursive: true });
+  await page.screenshot({ path: resolve(pass70ChopperEvidence, 'possessed-desktop-webgl2-2560x1440.png'), animations: 'disabled' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileCockpitHud = await cockpitHudLayout();
+  expect(mobileCockpitHud).toMatchObject({ viewport: [390, 844], centreClear: true, centreContract: 'true' });
+  expect(mobileCockpitHud.readouts).toHaveLength(6);
+  expect(mobileCockpitHud.readouts.every(({ inside, width, height }) => inside && width > 0 && height > 0)).toBe(true);
+  await page.screenshot({ path: resolve(pass70ChopperEvidence, 'possessed-mobile-webgl2-390x844.png'), animations: 'disabled' });
+  await page.setViewportSize({ width: 2_560, height: 1_440 });
 
   let selectedAim: {
     entityId: string;
@@ -272,6 +332,8 @@ test('renders the five-second Gun Range tunnel, grey test bay, and slow unarmed 
         && sample.activationId === activationId
         && sample.damage > 0
         && sample.atMs >= startedAtMs);
+      const targetConfirm = document.querySelector<HTMLElement>('#gunner-target-confirm');
+      const cockpitHud = document.querySelector<HTMLElement>('#gunner-cockpit-hud');
       return {
         hit: target.health < baselineHp && Boolean(admitted),
         targetHealth: target.health,
@@ -281,6 +343,11 @@ test('renders the five-second Gun Range tunnel, grey test bay, and slow unarmed 
         controlAdmission: snapshot.killstreakControlAdmission,
         feedbackReceived: snapshot.supportDamageFeedback.received,
         admitted: admitted ?? null,
+        targetConfirm: {
+          hidden: targetConfirm?.hidden ?? true,
+          targetId: targetConfirm?.dataset.targetId ?? null,
+          hitConfirm: cockpitHud?.dataset.hitConfirm ?? null,
+        },
       };
     }, {
       expectedTargetId: targetId,
@@ -289,6 +356,9 @@ test('renders the five-second Gun Range tunnel, grey test bay, and slow unarmed 
       startedAtMs: fireBaseline.startedAtMs,
     });
     controlledDamageObserved = heldFireDiagnostic.hit === true;
+    if (controlledDamageObserved) {
+      await page.screenshot({ path: resolve(pass70ChopperEvidence, 'authoritative-target-hit-confirm-webgl2.png'), animations: 'allow' });
+    }
   }
   await test.info().attach('controlled-chopper-fire-diagnostic.json', {
     body: Buffer.from(`${JSON.stringify(heldFireDiagnostic, null, 2)}\n`, 'utf8'),
@@ -325,6 +395,7 @@ test('renders the five-second Gun Range tunnel, grey test bay, and slow unarmed 
   });
   expect(controlledDamage.possession).toEqual({ kind: 'chopper-gunner', entityId: chopperControl.entityId });
   expect(controlledDamage.gunController).toBe('owner-player');
+  expect(heldFireDiagnostic?.targetConfirm).toEqual({ hidden: false, targetId, hitConfirm: 'true' });
 
   await page.keyboard.press(chopperControl.inputKey!);
   await expect.poll(async () => page.evaluate((entityId) => {
@@ -334,6 +405,9 @@ test('renders the five-second Gun Range tunnel, grey test bay, and slow unarmed 
     return { possession: actor?.possession ?? null, gunController: entity?.gunController ?? null };
   }, chopperControl.entityId), { timeout: 5_000 }).toEqual({ possession: null, gunController: 'ai' });
   await expect(page.locator('#gunner-cockpit-hud')).toBeHidden();
+  await expect(page.locator('#gunner-cockpit-hud')).toHaveAttribute('data-support-kind', 'none');
+  await expect(page.locator('#gunner-target-confirm')).toBeHidden();
+  await expect(page.locator('#chopper-thermal')).toBeHidden();
   await expect(page.locator('html')).toHaveAttribute('data-killstreak-possession', 'none');
 
   for (const cameraId of [

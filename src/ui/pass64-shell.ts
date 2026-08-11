@@ -385,10 +385,18 @@ function hudMarkup(): string {
     <div id="overdrive-hud" hidden><small>2× DAMAGE</small><strong id="overdrive-time">30.0</strong><span>OVERDRIVE</span></div>
     <div id="power-announcement" hidden aria-live="assertive"><small>MID-MAP POWER WEAPON</small><strong>2× DAMAGE</strong><span>30 SECONDS</span></div>
     <div id="pickup-prompt" hidden><kbd>F</kbd><span>PICK UP</span><strong></strong></div>
-    <div id="gunner-cockpit-hud" hidden aria-hidden="true">
-      <div class="gunner-reticle"><i></i><b></b><span class="tl"></span><span class="tr"></span><span class="bl"></span><span class="br"></span></div>
-      <div class="gunner-readout"><small>HULL</small><strong id="gunner-hull">100</strong></div>
-      <div class="gunner-readout right"><small>AMMO</small><strong id="gunner-ammo">∞</strong></div>
+    <div id="gunner-cockpit-hud" hidden aria-hidden="true" data-support-kind="none" data-hit-confirm="false">
+      <div class="gunner-status"><small id="gunner-platform">GUNNER</small><strong id="gunner-weapon-mode">30MM AUTOCANNON</strong><span>AI FLIGHT · OWNER CONTROL</span></div>
+      <div class="gunner-reticle" data-centre-clear="true" aria-hidden="true"><span class="north"></span><span class="east"></span><span class="south"></span><span class="west"></span><i class="tl"></i><i class="tr"></i><i class="bl"></i><i class="br"></i></div>
+      <div id="gunner-target-confirm" hidden aria-hidden="true"><span>HIT</span><strong>0</strong></div>
+      <div class="gunner-instruments" aria-hidden="true">
+        <div class="gunner-readout"><small>HULL</small><strong id="gunner-hull">100</strong></div>
+        <div class="gunner-readout"><small>AMMO</small><strong id="gunner-ammo">&infin;</strong></div>
+        <div class="gunner-readout"><small>ALT</small><strong id="gunner-altitude">0M</strong></div>
+        <div class="gunner-readout"><small>SPD</small><strong id="gunner-speed">0</strong></div>
+        <div class="gunner-readout"><small>TIME</small><strong id="gunner-time">0.0</strong></div>
+        <div class="gunner-readout"><small>DAMAGE</small><strong id="gunner-damage">0</strong></div>
+      </div>
       <div id="chopper-thermal" hidden aria-hidden="true"><span>THERMAL · THROUGH-WALL AUTOCANNON · HOSTILES</span></div>
     </div>
     <pre id="runtime-error-log" hidden aria-hidden="true"></pre>

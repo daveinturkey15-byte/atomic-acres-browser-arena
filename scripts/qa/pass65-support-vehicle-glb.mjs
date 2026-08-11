@@ -8,9 +8,16 @@ export const SUPPORT_VEHICLE_SPECS = Object.freeze({
     root: (lod) => `Pass65Chopper_LOD${lod}`,
     variant: null,
     material: 'MAT_Pass65Chopper_Armor_PBR',
+    materialRevision: 'pass70-daylight-readable-olive-pbr-v1',
+    valueBreakMaterials: Object.freeze([
+      'MAT_Pass65Chopper_DarkArmor', 'MAT_Pass65Chopper_Gunmetal',
+      'MAT_Pass65Chopper_CockpitFrame', 'MAT_Pass65Chopper_CanopyGlass',
+      'MAT_Pass65Chopper_HUDGlass', 'MAT_Pass65Chopper_HUDCyan', 'MAT_Pass65Chopper_HUDGreen',
+    ]),
     nodes: Object.freeze([
       'chopper-fuselage', 'chopper-rear-fuselage', 'chopper-tail-boom', 'chopper-tail-fin',
-      'chopper-sleek-cockpit-canopy', 'chopper-first-person-cockpit', 'chopper-gunner-sightline',
+      'chopper-sleek-cockpit-canopy', 'chopper-nose-sensor',
+      'chopper-first-person-cockpit', 'chopper-gunner-sightline',
       'chopper-gunner-weapon-view',
       'chopper-cockpit-dashboard-3d', 'chopper-cockpit-display-cyan', 'chopper-cockpit-display-green',
       'chopper-cockpit-hud-glass', 'chopper-cockpit-hud-target-ring',
@@ -190,8 +197,8 @@ export function auditSupportVehicleGlb(json, bytes, family, lod) {
   }
   const detailCounts = {};
   if (family === 'chopper') {
-    if (root?.extras?.visual_revision !== 'close-range-tandem-armored-airframe-v4'
-      || root?.extras?.detail_contract !== 'layered-armour-framed-canopy-fasteners-sensors-ordnance-mechanics-v4') {
+    if (root?.extras?.visual_revision !== 'pass70-complete-tandem-attack-airframe-v5'
+      || root?.extras?.detail_contract !== 'complete-exterior-cockpit-gun-readable-materials-v5') {
       failures.push(`chopper LOD${lod}: authored airframe refinement contract missing`);
     }
     const requiredDetail = [
@@ -232,6 +239,25 @@ export function auditSupportVehicleGlb(json, bytes, family, lod) {
       const count = nodes.filter((node) => node.name?.startsWith(prefix)).length;
       detailCounts[prefix] = count;
       if (count < minimum) failures.push(`chopper LOD${lod}: ${prefix} detail count ${count} is below ${minimum}`);
+    }
+    const authoredMaterials = new Map((json.materials ?? []).map((material) => [material.name, material]));
+    const canopyGlass = authoredMaterials.get('MAT_Pass65Chopper_CanopyGlass');
+    const hudGlass = authoredMaterials.get('MAT_Pass65Chopper_HUDGlass');
+    const materialAlpha = (material) => material?.pbrMetallicRoughness?.baseColorFactor?.[3] ?? 1;
+    if (canopyGlass?.alphaMode !== 'BLEND' || materialAlpha(canopyGlass) < 0.25 || materialAlpha(canopyGlass) > 0.48) {
+      failures.push(`chopper LOD${lod}: canopy must remain transparent readable glass, never an opaque block`);
+    }
+    if (hudGlass?.alphaMode !== 'BLEND' || materialAlpha(hudGlass) > 0.18) {
+      failures.push(`chopper LOD${lod}: HUD combiner must remain clear projected glass`);
+    }
+    for (const name of [
+      'MAT_Pass65Chopper_Armor_PBR', 'MAT_Pass65Chopper_DarkArmor',
+      'MAT_Pass65Chopper_Gunmetal', 'MAT_Pass65Chopper_CockpitFrame',
+    ]) {
+      const authored = authoredMaterials.get(name);
+      if (!authored || authored.alphaMode === 'BLEND' || materialAlpha(authored) < 0.99) {
+        failures.push(`chopper LOD${lod}: ${name} must remain opaque standard glTF PBR for WebGL2/WebGPU parity`);
+      }
     }
   } else if (family === 'care') {
     if (root?.extras?.visual_revision !== 'close-range-heavy-cargo-aircraft-v4'

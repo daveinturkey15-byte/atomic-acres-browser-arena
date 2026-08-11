@@ -30,7 +30,7 @@ REVIEW_TARGET = os.environ.get("PASS65_SUPPORT_REVIEW_TARGET", "")
 FOCUSED_FP_REVIEW = REVIEW_TARGET == "chopper-fp"
 FP_DIAGNOSTIC_REVIEW = REVIEW_TARGET == "chopper-fp-diagnostic"
 AUTHORING_SCOPE = os.environ.get("PASS65_SUPPORT_AUTHORING_SCOPE", "all")
-if AUTHORING_SCOPE not in {"all", "aircraft"}:
+if AUTHORING_SCOPE not in {"all", "aircraft", "chopper"}:
     raise RuntimeError(f"unsupported PASS65_SUPPORT_AUTHORING_SCOPE={AUTHORING_SCOPE!r}")
 
 for directory in (
@@ -499,8 +499,9 @@ def root_metadata(name: str, asset_id: str, lod: int, variant: str | None = None
 
 def build_chopper(lod: int, materials):
     root = root_metadata(f"Pass65Chopper_LOD{lod}", "chopper-gunner-vehicle-v1", lod)
-    root["visual_revision"] = "close-range-tandem-armored-airframe-v4"
-    root["detail_contract"] = "layered-armour-framed-canopy-fasteners-sensors-ordnance-mechanics-v4"
+    root["visual_revision"] = "pass70-complete-tandem-attack-airframe-v5"
+    root["detail_contract"] = "complete-exterior-cockpit-gun-readable-materials-v5"
+    root["material_revision"] = "pass70-daylight-readable-olive-pbr-v1"
     segments = (28, 20, 14)[lod]
     rings = (16, 12, 8)[lod]
     body = empty("chopper-fuselage", (0, 0, 0), root, "fuselage")
@@ -1782,18 +1783,23 @@ def render_chopper_reviews(roots) -> None:
         print(f"CHOPPER_FP_DIAGNOSTIC={diagnostic}")
         return
     def render_accepted_first_person() -> Path:
+        cockpit = next((
+            obj for obj in hierarchy(lod0)
+            if obj.name == "chopper-first-person-cockpit"
+            or obj.get("canonical_node_name") == "chopper-first-person-cockpit"
+        ), None)
         sightline = next((
             obj for obj in hierarchy(lod0)
             if obj.name == "chopper-gunner-sightline"
             or obj.get("canonical_node_name") == "chopper-gunner-sightline"
         ), None)
-        if sightline is None:
-            raise RuntimeError("authored unobstructed chopper gunner sightline missing from focused review")
-        sightline_nodes = set(hierarchy(sightline))
+        if cockpit is None or sightline is None:
+            raise RuntimeError("authored complete cockpit or unobstructed gunner sightline missing from focused review")
+        cockpit_nodes = set(hierarchy(cockpit))
         for obj in hierarchy(lod0):
             if obj.type == "MESH":
-                obj.hide_render = obj not in sightline_nodes
-                obj.hide_viewport = obj not in sightline_nodes
+                obj.hide_render = obj not in cockpit_nodes
+                obj.hide_viewport = obj not in cockpit_nodes
         for obj in hierarchy(fp_world):
             obj.hide_render = False
             obj.hide_viewport = False
@@ -1803,12 +1809,12 @@ def render_chopper_reviews(roots) -> None:
         scene.render.resolution_x = 960
         scene.render.resolution_y = 540
         scene.render.resolution_percentage = 100
-        scene.view_settings.exposure = -0.65
+        scene.view_settings.exposure = -0.15
         background = scene.world.node_tree.nodes.get("Background")
-        background.inputs["Strength"].default_value = 0.18
+        background.inputs["Strength"].default_value = 0.28
         for obj in bpy.data.objects:
             if obj.type == "LIGHT" and obj.name.startswith("Review_"):
-                obj.data.energy *= 0.38
+                obj.data.energy *= 0.62
         scene.frame_set(7)
         focused_path = CHOPPER_REVIEW / "pass65-chopper-first-person-instruments-16x9.png"
         scene.render.filepath = str(focused_path)
@@ -1909,21 +1915,21 @@ if AUTHORING_SCOPE != "aircraft":
     reset()
     chopper_images = {
         kind: make_texture(
-            "pass65-chopper", kind, (0.17, 0.20, 0.16),
+            "pass65-chopper", kind, (0.25, 0.30, 0.22),
             emissive_panel_seams=False,
         )
         for kind in ("albedo", "normal", "orm", "emissive")
     }
     chopper_materials = {
         "armor": textured_material("MAT_Pass65Chopper_Armor_PBR", chopper_images),
-        "dark": simple_material("MAT_Pass65Chopper_DarkArmor", (0.055, 0.085, 0.095), 0.84, 0.31),
-        "metal": simple_material("MAT_Pass65Chopper_Gunmetal", (0.095, 0.120, 0.128), 0.92, 0.22),
-        "frame": simple_material("MAT_Pass65Chopper_CockpitFrame", (0.075, 0.135, 0.145), 0.78, 0.29),
-        "cockpit": simple_material("MAT_Pass65Chopper_CockpitInterior", (0.060, 0.095, 0.105), 0.50, 0.42),
-        "panel_wear": simple_material("MAT_Pass65Chopper_PanelWear", (0.28, 0.32, 0.29), 0.86, 0.34),
+        "dark": simple_material("MAT_Pass65Chopper_DarkArmor", (0.090, 0.125, 0.125), 0.78, 0.36),
+        "metal": simple_material("MAT_Pass65Chopper_Gunmetal", (0.145, 0.165, 0.172), 0.88, 0.27),
+        "frame": simple_material("MAT_Pass65Chopper_CockpitFrame", (0.175, 0.235, 0.215), 0.68, 0.38, (0.025, 0.055, 0.045), 0.16),
+        "cockpit": simple_material("MAT_Pass65Chopper_CockpitInterior", (0.145, 0.185, 0.160), 0.40, 0.52, (0.020, 0.045, 0.032), 0.22),
+        "panel_wear": simple_material("MAT_Pass65Chopper_PanelWear", (0.36, 0.41, 0.34), 0.76, 0.42),
         "panel_seam": simple_material("MAT_Pass65Chopper_PanelSeam", (0.055, 0.070, 0.067), 0.66, 0.58),
         "seat": simple_material("MAT_Pass65Chopper_Seat", (0.10, 0.15, 0.16), 0.08, 0.62),
-        "glass": simple_material("MAT_Pass65Chopper_CanopyGlass", (0.025, 0.040, 0.035), 0.18, 0.24, (0.08, 0.035, 0.010), 0.10, 0.62),
+        "glass": simple_material("MAT_Pass65Chopper_CanopyGlass", (0.050, 0.105, 0.098), 0.12, 0.30, (0.02, 0.11, 0.10), 0.16, 0.38),
         "hudglass": simple_material("MAT_Pass65Chopper_HUDGlass", (0.02, 0.20, 0.24), 0.08, 0.10, (0.01, 0.46, 0.60), 0.42, 0.12),
         "hud_cyan": simple_material("MAT_Pass65Chopper_HUDCyan", (0.01, 0.12, 0.15), 0.12, 0.22, (0.01, 0.62, 0.82), 1.8),
         "hud_green": simple_material("MAT_Pass65Chopper_HUDGreen", (0.01, 0.15, 0.055), 0.10, 0.22, (0.06, 0.80, 0.26), 1.7),
@@ -1946,6 +1952,11 @@ if AUTHORING_SCOPE != "aircraft":
     if FOCUSED_FP_REVIEW or FP_DIAGNOSTIC_REVIEW:
         print(f"CHOPPER_BLEND={CHOPPER_BLEND}")
         print(f"CHOPPER_FP_REVIEW={CHOPPER_REVIEW / 'pass65-chopper-first-person-instruments.png'}")
+        print(f"CHOPPER_REVIEW={CHOPPER_REVIEW / 'pass65-chopper-contact-sheet.png'}")
+        raise SystemExit(0)
+
+    if AUTHORING_SCOPE == "chopper":
+        print(f"CHOPPER_BLEND={CHOPPER_BLEND}")
         print(f"CHOPPER_REVIEW={CHOPPER_REVIEW / 'pass65-chopper-contact-sheet.png'}")
         raise SystemExit(0)
 

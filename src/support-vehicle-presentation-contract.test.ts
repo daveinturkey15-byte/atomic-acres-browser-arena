@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   SUPPORT_FORWARD_AXIS,
   SUPPORT_VEHICLE_PRESENTATION_CONTRACT,
+  missingSupportMaterials,
   missingSupportNodes,
   supportForwardAlignment,
 } from './support-vehicle-presentation-contract';
@@ -33,13 +34,17 @@ describe('support vehicle authored orientation contract', () => {
       swarm: 'drone-swarm-gun-double-baseline-v1',
     });
     expect(SUPPORT_VEHICLE_PRESENTATION_CONTRACT.chopper.possessedView).toEqual({
-      visibleOnlyBelow: 'chopper-gunner-sightline',
-      requiredVisibleNodes: ['chopper-cockpit-hud-glass', 'chopper-cockpit-hud-target-ring', 'chopper-gunner-weapon-view'],
+      visibleOnlyBelow: 'chopper-first-person-cockpit',
+      requiredVisibleNodes: [
+        'chopper-cockpit-dashboard-3d', 'chopper-cockpit-display-cyan', 'chopper-cockpit-display-green',
+        'chopper-cockpit-hud-glass', 'chopper-cockpit-hud-target-ring', 'chopper-gunner-weapon-view',
+      ],
       forbiddenVisibleNodes: ['chopper-fuselage', 'chopper-rear-fuselage', 'chopper-main-rotor', 'chopper-tail-rotor'],
     });
     expect(SUPPORT_VEHICLE_PRESENTATION_CONTRACT.chopper.requiredNodes).toEqual([
       'chopper-fuselage', 'chopper-rear-fuselage', 'chopper-tail-boom', 'chopper-tail-fin',
       'chopper-sleek-cockpit-canopy', 'chopper-main-rotor', 'chopper-tail-rotor',
+      'chopper-nose-sensor',
       'chopper-player-gun', 'chopper-gun-muzzle-socket', 'chopper-forward-socket',
       'chopper-first-person-camera-socket', 'chopper-first-person-cockpit',
       'chopper-gunner-sightline', 'chopper-gunner-weapon-view',
@@ -68,5 +73,7 @@ describe('support vehicle authored orientation contract', () => {
     ))).toBe(true);
     expect(missingSupportNodes(new THREE.Group(), SUPPORT_VEHICLE_PRESENTATION_CONTRACT.drone.requiredNodes))
       .toEqual(SUPPORT_VEHICLE_PRESENTATION_CONTRACT.drone.requiredNodes);
+    expect(missingSupportMaterials(new THREE.Group(), SUPPORT_VEHICLE_PRESENTATION_CONTRACT.chopper.requiredMaterials))
+      .toEqual(SUPPORT_VEHICLE_PRESENTATION_CONTRACT.chopper.requiredMaterials);
   });
 });

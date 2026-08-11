@@ -164,6 +164,7 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(block).toContain('projectSupportDamageAnchor(targetPosition, camera, viewport)');
     expect(block).toContain('supportDamageFeedbackTelemetry.record(event, anchor, viewport)');
     expect(block).toContain("showDamageNumber(event.damage, 'body', undefined, { ...anchor, targetId: event.targetId })");
+    expect(block).toContain('showGunnerTargetConfirm(event, anchor, performance.now())');
     expect(block).not.toContain('showHitmarker(');
   });
 
@@ -175,7 +176,12 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(block).toContain('chopperGunnerCameraOrigin(entity.position, entity.attitude)');
     expect(block).toContain('killstreakPresentation.presentChopperWeaponAction(entity.id)');
     expect(block).toContain('killstreakPossessionCameraScratch.set(origin[0], origin[1], origin[2])');
+    expect(block).toContain('chopperGunnerAuthoritativeRay(entity.position, entity.attitude, player.yaw, player.pitch)');
+    expect(block).toContain('new THREE.Vector3(...shotRay.tracerOrigin)');
+    expect(block).toContain('new THREE.Vector3(...shotRay.direction)');
+    expect(block).toContain('resetKillstreakPossessionPresentation()');
     expect(block).not.toContain('new THREE.Vector3(...chopperGunnerCameraOrigin');
+    expect(block).not.toContain('camera.getWorldPosition(new THREE.Vector3())');
   });
 
   it('plays the authored chopper impact action for host-applied and client-received authoritative hits', () => {
