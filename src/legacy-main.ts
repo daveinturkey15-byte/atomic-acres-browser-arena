@@ -19,6 +19,7 @@ import { webGlShadowSamplerMode } from './webgl-shadow-compatibility';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem, rustworksOceanAmplitude } from './water-system';
 import { PASS66_RELEASE_IDENTITY } from './release-identity';
+import { drawPass70DroneSwarmLogo } from './pass70-drone-swarm-logo';
 import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon, waitForPendingArtTextures } from './art-kit';
 import { BotWeaponGpuVocabulary } from './bot-weapon-gpu-vocabulary';
 import {
@@ -18942,45 +18943,7 @@ function drawPalantirLogo(): HTMLCanvasElement | null {
   canvas.height = 512;
   const context = canvas.getContext('2d');
   if (!context) return null;
-  // Fiery halo
-  const halo = context.createRadialGradient(256, 256, 90, 256, 256, 250);
-  halo.addColorStop(0, 'rgba(255,170,80,0.95)');
-  halo.addColorStop(0.45, 'rgba(214,84,26,0.55)');
-  halo.addColorStop(1, 'rgba(60,10,2,0)');
-  context.fillStyle = halo;
-  context.fillRect(0, 0, 512, 512);
-  // Orb body
-  const orb = context.createRadialGradient(210, 210, 30, 256, 256, 168);
-  orb.addColorStop(0, '#7a4a2a');
-  orb.addColorStop(0.55, '#3a2010');
-  orb.addColorStop(1, '#120804');
-  context.fillStyle = orb;
-  context.beginPath();
-  context.arc(256, 256, 168, 0, Math.PI * 2);
-  context.fill();
-  // Fiery iris ring
-  context.strokeStyle = '#ff8c3a';
-  context.lineWidth = 16;
-  context.beginPath();
-  context.arc(256, 256, 96, 0, Math.PI * 2);
-  context.stroke();
-  context.strokeStyle = 'rgba(255,200,120,0.85)';
-  context.lineWidth = 5;
-  context.beginPath();
-  context.arc(256, 256, 96, 0, Math.PI * 2);
-  context.stroke();
-  // Vertical pupil
-  const pupil = context.createLinearGradient(256, 168, 256, 344);
-  pupil.addColorStop(0, '#ffd9a8');
-  pupil.addColorStop(0.5, '#ff5a1e');
-  pupil.addColorStop(1, '#7a1400');
-  context.fillStyle = pupil;
-  context.fillRect(224, 176, 64, 160);
-  // Glare
-  context.fillStyle = 'rgba(255,240,214,0.5)';
-  context.beginPath();
-  context.arc(206, 198, 34, 0, Math.PI * 2);
-  context.fill();
+  drawPass70DroneSwarmLogo(context);
   return canvas;
 }
 
