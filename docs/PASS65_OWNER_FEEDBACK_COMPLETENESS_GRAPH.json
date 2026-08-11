@@ -349,13 +349,30 @@
       "outcomeProjectionSha256": "965e8260dd170ad173dddebbd9ed14dff914891bbca663e939e647c180dacf51"
     },
     {
+      "id": "SRC-CODEX-P70-AUG11-FIREFOX-MP-001",
+      "kind": "codex-owner-feedback",
+      "externalLocator": "codex-task:pass70-owner-firefox-multiplayer-2026-08-11#feedback-and-screenshots",
+      "rawByteLength": 913,
+      "rawSha256": "d676f3638b1e2e01dde9a3a23193442ca6ee3b84c69357f686e295a674720deb",
+      "rawEndsWithCrLf": false,
+      "normalizedRepositoryPath": "docs/pass70-sources/codex-owner-firefox-multiplayer-2026-08-11.txt",
+      "normalization": "UTF-8; CRLF converted to LF; one final LF added; text semantics unchanged",
+      "normalizedByteLength": 900,
+      "normalizedSha256": "79a824ed423c6e9691faf42fde99926f293d6b9c05d0a7dd97b285d93c85eb7b",
+      "outcomeCollection": "codexPass70August11FirefoxMultiplayerOutcomes",
+      "outcomeIdPrefix": "P70FFMP",
+      "outcomeCount": 11,
+      "lineAtomCounts": {"1":2,"3":1,"5":1,"7":2,"9":2,"11":1,"13":1,"15":1},
+      "outcomeProjectionSha256": "cfe805d3d9bc0eec7d2a76ba7801a45224aa075a9fb0c506c8123f0efe10f225"
+    },
+    {
       "id": "SRC-CORRECTION-LEDGER-001",
       "kind": "canonical-correction-ledger",
       "repositoryPath": "docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md",
       "ledgerVersion": 1,
-      "latestFeedbackId": "HF-271",
-      "outcomeCount": 271,
-      "stateIndependentOutcomeSha256": "17073a3d96d5afcebcb9c28ab87d308fe9b9b9de1ca6bd5d9e5e6bcb7288017e"
+      "latestFeedbackId": "HF-277",
+      "outcomeCount": 277,
+      "stateIndependentOutcomeSha256": "022656d186933cb8a794fa4edd0901519b4c4d53e12b41f24fdcc205da92e8e4"
     },
     {
       "id": "SRC-PLANNING-MATRIX-001",
@@ -1039,7 +1056,7 @@
     "outcomeIdTemplate": "CORR-{feedbackId}",
     "sourceLocatorTemplate": "{feedbackId}.observation",
     "feedbackIdStart": "HF-001",
-    "feedbackIdEnd": "HF-271"
+    "feedbackIdEnd": "HF-277"
   },
   "supersessions": [
     {
@@ -7458,7 +7475,13 @@
     {"id":"HF-268","sourceOutcomeIds":["CORR-HF-268","P70HITL2-014"],"planningRequirementIds":["R105","R108","R109","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R608"],"canonicalOwner":"Flare Gun asset/presentation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-WEAPON-PRESENTATION","T-WEAPON-ASSET-GATE","T-TIMED-MAP-WEAPONS"],"artifactRefs":[]}},
     {"id":"HF-269","sourceOutcomeIds":["CORR-HF-269","P70HITL2-015"],"planningRequirementIds":["R109","R232","R236","R304","R510","R600","R610"],"canonicalOwner":"Timed weapon/human-hit authority","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-TIMED-MAP-WEAPONS","T-PASS69-3-FLAME-FLARE-POOL","T-MULTIPLAYER-STABILITY","T-NETWORK"],"artifactRefs":[]}},
     {"id":"HF-270","sourceOutcomeIds":["CORR-HF-270","P70HITL2-016","P70HITL2-017"],"planningRequirementIds":["R110","R304","R307","R600","R604","R608","R610"],"canonicalOwner":"Gun Range multiplayer clock authority","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-GUN-RANGE-TEST-BAY","T-MULTIPLAYER-STABILITY","T-NETWORK","T-ADDITIONAL-MAPS"],"artifactRefs":[]}},
-    {"id":"HF-271","sourceOutcomeIds":["CORR-HF-271","P70HITL2-018","P70HITL2-019"],"planningRequirementIds":["R001","R002","R003","R005","R006","R010","R303","R600","R608","R611","R612","R613"],"canonicalOwner":"Pass 70 integration/HITL lineage","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-OWNER-GATE","T-RELEASE-SHELL","T-PASS70-START-BENCHMARK"],"artifactRefs":[]}}
+    {"id":"HF-271","sourceOutcomeIds":["CORR-HF-271","P70HITL2-018","P70HITL2-019"],"planningRequirementIds":["R001","R002","R003","R005","R006","R010","R303","R600","R608","R611","R612","R613"],"canonicalOwner":"Pass 70 integration/HITL lineage","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-OWNER-GATE","T-RELEASE-SHELL","T-PASS70-START-BENCHMARK"],"artifactRefs":[]}},
+    {"id":"HF-272","sourceOutcomeIds":["CORR-HF-272","P70FFMP-001","P70FFMP-002","P70FFMP-003","P70FFMP-006"],"planningRequirementIds":["R002","R003","R004","R105","R304","R307","R600","R604","R608","R610","R613"],"canonicalOwner":"Cross-browser audio/frame compatibility","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-AUDIO","T-INSTALLED-FIREFOX","T-BROWSER-ADMISSION","T-NATIVE-FRAME-PACING"],"artifactRefs":[]}},
+    {"id":"HF-273","sourceOutcomeIds":["CORR-HF-273","P70FFMP-004","P70FFMP-005"],"planningRequirementIds":["R002","R004","R304","R307","R600","R604","R610","R613"],"canonicalOwner":"Multiplayer join/rejoin lifecycle authority","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-MULTIPLAYER-STABILITY","T-NETWORK","T-INSTALLED-FIREFOX"],"artifactRefs":[]}},
+    {"id":"HF-274","sourceOutcomeIds":["CORR-HF-274","P70FFMP-007","P70FFMP-008"],"planningRequirementIds":["R003","R105","R304","R307","R600","R604","R608","R610","R613"],"canonicalOwner":"Cross-browser release compatibility","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-INSTALLED-FIREFOX","T-BROWSER-ADMISSION","T-RELEASE-SHELL"],"artifactRefs":[]}},
+    {"id":"HF-275","sourceOutcomeIds":["CORR-HF-275","P70FFMP-009"],"planningRequirementIds":["R108","R200","R201","R202","R203","R204","R205","R304","R600","R609"],"canonicalOwner":"Multiplayer HUD/chat layout","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-HUD-E2E","T-HUD-UNIT","T-MULTIPLAYER-STABILITY"],"artifactRefs":[]}},
+    {"id":"HF-276","sourceOutcomeIds":["CORR-HF-276","P70FFMP-010"],"planningRequirementIds":["R002","R003","R105","R109","R232","R304","R307","R600","R604","R605","R608","R610","R613"],"canonicalOwner":"Multiplayer ADS/frame-pacing authority","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-MULTIPLAYER-STABILITY","T-NATIVE-FRAME-PACING","T-NETWORK","T-AUDIO","T-VIEWMODEL-FRAMING"],"artifactRefs":[]}},
+    {"id":"HF-277","sourceOutcomeIds":["CORR-HF-277","P70FFMP-011"],"planningRequirementIds":["R108","R109","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R304","R600","R608","R609","R610"],"canonicalOwner":"Multiplayer operator material/readability","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-OPERATOR-GATE","T-MULTIPLAYER-STABILITY","T-BROWSER-ADMISSION"],"artifactRefs":[]}}
   ],
   "desktopUntitledOutcomes": [
     {
@@ -9216,5 +9239,18 @@
     {"id":"P70HITL2-017","sourceLocator":"L13#4","normalizedOutcome":"The shared Gun Range clock must pause while any admitted alive participant is inside the killstreak room, whether that participant is the host or a guest.","feedbackIds":["HF-270"],"planningRequirementIds":["R110","R304","R307","R600","R604","R608","R610"]},
     {"id":"P70HITL2-018","sourceLocator":"L15#1","normalizedOutcome":"Preserve every other accepted Pass 70 behavior while applying this correction round.","feedbackIds":["HF-271"],"planningRequirementIds":["R001","R002","R003","R005","R006","R010","R303","R600","R608","R611","R612","R613"]},
     {"id":"P70HITL2-019","sourceLocator":"L15#2","normalizedOutcome":"After the corrections are integrated and verified, provide another clean exact-SHA local HITL candidate without publishing it.","feedbackIds":["HF-271"],"planningRequirementIds":["R001","R002","R003","R005","R006","R010","R303","R600","R608","R611","R612","R613"]}
+  ],
+  "codexPass70August11FirefoxMultiplayerOutcomes": [
+    {"id":"P70FFMP-001","sourceLocator":"L1#1","normalizedOutcome":"A live Pass 69 Firefox player must be able to start and play a one-bot Skirmish.","feedbackIds":["HF-272"],"planningRequirementIds":["R002","R003","R004","R105","R304","R307","R600","R604","R608","R610","R613"]},
+    {"id":"P70FFMP-002","sourceLocator":"L1#2","normalizedOutcome":"The Firefox frame loop must not repeatedly fail, kick the player or terminate the admitted match.","feedbackIds":["HF-272"],"planningRequirementIds":["R002","R003","R004","R105","R304","R307","R600","R604","R608","R610","R613"]},
+    {"id":"P70FFMP-003","sourceLocator":"L3#1","normalizedOutcome":"Correct the captured Firefox `AudioListener.positionX.value` undefined failure without weakening frame error reporting.","feedbackIds":["HF-272"],"planningRequirementIds":["R002","R003","R004","R105","R304","R307","R600","R604","R608","R610","R613"]},
+    {"id":"P70FFMP-004","sourceLocator":"L5#1","normalizedOutcome":"Joining an admitted private lobby must not fail with `Could not connect to peer` after the host frame remains healthy.","feedbackIds":["HF-273"],"planningRequirementIds":["R002","R004","R304","R307","R600","R604","R610","R613"]},
+    {"id":"P70FFMP-005","sourceLocator":"L7#1","normalizedOutcome":"After a Firefox client crash, bounded rejoin must restore the same active host room and preserved identity.","feedbackIds":["HF-273"],"planningRequirementIds":["R002","R004","R304","R307","R600","R604","R610","R613"]},
+    {"id":"P70FFMP-006","sourceLocator":"L7#2","normalizedOutcome":"A recoverable cross-browser lifecycle must not strand the player on a `SYSTEM PAUSED` reload screen.","feedbackIds":["HF-272"],"planningRequirementIds":["R002","R003","R004","R105","R304","R307","R600","R604","R608","R610","R613"]},
+    {"id":"P70FFMP-007","sourceLocator":"L9#1","normalizedOutcome":"Retain Chrome's comparatively better observed multiplayer behavior while correcting the Firefox path.","feedbackIds":["HF-274"],"planningRequirementIds":["R003","R105","R304","R307","R600","R604","R608","R610","R613"]},
+    {"id":"P70FFMP-008","sourceLocator":"L9#2","normalizedOutcome":"Supported multiplayer and solo startup must work across Firefox, Safari or WebKit and Chromium-family Opera, Chrome and Edge.","feedbackIds":["HF-274"],"planningRequirementIds":["R003","R105","R304","R307","R600","R604","R608","R610","R613"]},
+    {"id":"P70FFMP-009","sourceLocator":"L11#1","normalizedOutcome":"Move room chat higher on the left above HP and stats without responsive HUD overlap.","feedbackIds":["HF-275"],"planningRequirementIds":["R108","R200","R201","R202","R203","R204","R205","R304","R600","R609"]},
+    {"id":"P70FFMP-010","sourceLocator":"L13#1","normalizedOutcome":"Host and guest ADS firefights must remain smooth and must not freeze under online combat load.","feedbackIds":["HF-276"],"planningRequirementIds":["R002","R003","R105","R109","R232","R304","R307","R600","R604","R605","R608","R610","R613"]},
+    {"id":"P70FFMP-011","sourceLocator":"L15#1","normalizedOutcome":"Give hosted and guest human operators an orange readability aura at half the accepted purple-bot strength.","feedbackIds":["HF-277"],"planningRequirementIds":["R108","R109","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R304","R600","R608","R609","R610"]}
   ]
 }

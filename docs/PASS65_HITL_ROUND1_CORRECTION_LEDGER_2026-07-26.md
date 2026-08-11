@@ -1,6 +1,6 @@
 # Pass 65 HITL Round 1 Correction Ledger
 
-<!-- owner-feedback-ledger-version: 1; latest-id: HF-271 -->
+<!-- owner-feedback-ledger-version: 1; latest-id: HF-277 -->
 
 Status: **BLOCKING CORRECTION WAVE — NOT APPROVED, NOT PUBLISHABLE**
 
@@ -300,6 +300,12 @@ This ledger is the authoritative translation of Dave's first local Pass 65 revie
 | HF-269 | P1 | A Flare projectile that first collides with a valid human applies host-authoritative direct-hit damage exactly once before continuing to its later admitted ground-fire impact. | Timed weapon/human-hit authority | Solo and two-peer actor-before-world tests bind projectile generation, target life, direct result, continued flight, later burn and duplicate/reorder/rejoin behavior; missing human damage, delayed damage, double hit, client authority or premature ground burn fails. | Flare Gun direct hits against local and remote humans | OPEN |
 | HF-270 | P0 | Every Gun Range match and rematch starts from exactly 120 seconds, then one host-authoritative shared clock pauses while any admitted alive host or guest occupies the killstreak room and resumes exactly once after the last occupant leaves. | Gun Range multiplayer clock authority | Solo and two-peer host/guest enter/stay/exit/re-enter, hidden-host heartbeat, death, disconnect, rejoin and rematch tests require identical 120-second endpoints and frozen remaining time on every peer; five-minute reset, decrement in-room, client-only pause, host/guest disagreement, duplicate resume or stale rematch state fails. | Gun Range solo, hosted lobby, active match, rejoin and rematch | OPEN |
 | HF-271 | P1 | The accepted remainder of Pass 70 remains regression-free and the corrected union is delivered as a new clean exact-SHA local HITL candidate without publishing or changing the byte-exact Pass 63 rollback. | Pass 70 integration/HITL lineage | Full affected unit/browser/native-WebGPU/multiplayer gates, clean-tree topology staging and exact-source receipts must preserve unaffected outcomes, expose only Pass 70 and Pass 63 locally and keep publication disabled; unrelated regression, stale preview bytes, rollback drift or premature Pages publication fails. | Integrated Pass 70 HITL2 candidate and protected release channels | OPEN |
+| HF-272 | P0 | Firefox can start and sustain a one-bot Skirmish without the live frame loop throwing on unsupported modern Web Audio listener parameters, kicking the player or entering the `SYSTEM PAUSED` reload state. | Cross-browser audio/frame compatibility | Real Firefox start/play/reload coverage plus pure capability mutations must exercise both AudioParam and legacy listener APIs; any `positionX`/`value` exception, swallowed frame error, paused test block, lost audio orientation or one-bot-only crash fails. | Live frame loop, Web Audio listener and one-bot solo Skirmish | OPEN |
+| HF-273 | P0 | Firefox and Chromium-family peers can host, join, crash, reconnect and rejoin the same active lobby without `Could not connect to peer`, stale identity or frame-loop failure. | Multiplayer join/rejoin lifecycle authority | Cross-engine two-peer tests cover join, ready/start, host/guest crash, bounded same-room rejoin and identity continuity; timeout, data-channel rejection, duplicate member, stale peer route or forced fresh lobby fails. | Private lobby admission, PeerJS/data channel and active-room recovery | OPEN |
+| HF-274 | P0 | Supported browser behavior is standards-compatible across Firefox, Safari/WebKit and Chromium-family Chrome, Edge and Opera rather than relying on one engine's optional APIs. | Cross-browser release compatibility | The owned candidate matrix must pass Firefox, WebKit and Chromium and run installed Chrome/Edge smoke where available, with unsupported optional APIs feature-detected; engine-specific crash, false fallback or untested compatibility claim fails. | Solo/multiplayer startup, renderer admission, input, audio and release smoke | OPEN |
+| HF-275 | P1 | Room chat sits higher on the left above HP/vitals/stats without covering combat information at supported desktop and mobile viewports. | Multiplayer HUD/chat layout | Desktop/mobile layout tests and screenshots require bounded left stacking, no overlap with vitals/stats/menu/controls and retained keyboard/touch access; lower placement, clipping or occlusion fails. | In-match room chat, vitals and responsive HUD | OPEN |
+| HF-276 | P0 | Host and guest ADS firefights remain responsive without a frame freeze or repeated asset/audio/network work on the combat frame. | Multiplayer ADS/frame-pacing authority | Two-peer sustained ADS/fire profiling across Firefox and Chromium records bounded max/recovery frame time, stable weapon readiness and no duplicate network/audio effects; visible freeze, >500 ms steady-state frame, repeated preparation or authority divergence fails. | Hosted combat, ADS/viewmodel, audio and network frame pacing | OPEN |
+| HF-277 | P1 | Hosted and guest human operators use a subtle orange readability aura at exactly half the accepted purple-bot emissive strength so they do not read as dark black silhouettes. | Multiplayer operator material/readability | Canonical material tests and cross-engine screenshots require orange emissive identity on remote humans at 0.25 when bot purple is 0.5, with no team/authority/occlusion change; black silhouettes, bot-strength glare, local-player leakage or material drift fails. | Remote human operator model and multiplayer presentation | OPEN |
 
 ### 3A. Implemented boundaries awaiting independent candidate evidence
 
@@ -542,6 +548,12 @@ The feedback IDs remain the correction source; these ranges bind each row back t
 | HF-269 | R109, R232, R236, R304, R510, R600, R610 |
 | HF-270 | R110, R304, R307, R600, R604, R608, R610 |
 | HF-271 | R001, R002, R003, R005, R006, R010, R303, R600, R608, R611, R612, R613 |
+| HF-272 | R002, R003, R004, R105, R304, R307, R600, R604, R608, R610, R613 |
+| HF-273 | R002, R004, R304, R307, R600, R604, R610, R613 |
+| HF-274 | R003, R105, R304, R307, R600, R604, R608, R610, R613 |
+| HF-275 | R108, R200-R205, R304, R600, R609 |
+| HF-276 | R002, R003, R105, R109, R232, R304, R307, R600, R604, R605, R608, R610, R613 |
+| HF-277 | R108, R109, R220-R232, R304, R600, R608, R609, R610 |
 
 ## 4. Canonical contract supersessions
 
