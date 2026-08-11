@@ -485,6 +485,7 @@ describe('network protocol guards', () => {
         snapshotHostTimeMs: 1_000,
         activeAtHostTimeMs: null,
         activeAtEpochMs: null,
+        matchClock: null,
       },
       nonce: 2,
     };

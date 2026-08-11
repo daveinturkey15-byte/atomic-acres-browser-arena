@@ -68,10 +68,18 @@ import { GUN_RANGE_FIRING_LINE_Z, applyAdditionalMapPresentationProfile, applyRu
 import { RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES } from './rigged-bot-visual-evidence-contract';
 import {
   GUN_RANGE_TEST_BAY_CONTRACT,
-  gunRangeTestBayFrozenTimer,
   nearestGunRangeTestBaySupportStation,
   nearestGunRangeTestBayWeaponStation,
 } from './gun-range-test-bay';
+import {
+  advanceGunRangeMatchClock,
+  createGunRangeMatchClockSnapshot,
+  gunRangeTestBayOccupants,
+  holdGunRangeReplicaAtAuthorityBoundary,
+  projectGunRangeMatchClock,
+  type GunRangeClockParticipant,
+  type GunRangeMatchClockSnapshot,
+} from './gun-range-match-clock-authority';
 import {
   BOT_DEATHS_PER_REINFORCEMENT,
   BOT_GRENADE_POOL,
@@ -2865,7 +2873,8 @@ function invalidateActiveWorldCollisionCache(): void {
 let gunRangeTestBayDoorColliders: readonly DynamicWorldCollider[] = [];
 let gunRangeTestBayDoorBallisticSurfaces: readonly BallisticSurface[] = [];
 let gunRangeTestBayDoorColliderArena: THREE.Object3D | null = null;
-let gunRangeTestBayPlayerWasInside = false;
+let gunRangeMatchClockState: GunRangeMatchClockSnapshot | null = null;
+let gunRangeMatchClockOccupantIds: readonly string[] = Object.freeze([]);
 
 function activeGunRangeTestBayDoorColliders(activeArena: ArenaMap = arena): readonly DynamicWorldCollider[] {
   return activeArena === arena && selectedArena.id === 'gun-range'
@@ -5605,7 +5614,144 @@ function resetPrivateLobbyState(): void {
   lastAppliedLocalShotResultSeq = -1;
   authoritativeScores.clear();
   resetTextChat();
+  gunRangeMatchClockState = null;
+  gunRangeMatchClockOccupantIds = Object.freeze([]);
   hidePrivateLobbyPresentation();
+}
+
+function gunRangeMatchClockDurationMs(): number | null {
+  const multiplayerConfig = privateLobbySnapshot?.config ?? privateMatchConfig;
+  const arenaId = network.role === 'offline' ? selectedArena.id : multiplayerConfig.arenaId;
+  if (arenaId !== 'gun-range') return null;
+  const durationMs = network.role === 'offline'
+    ? selectedArena.matchRules.durationMs
+    : multiplayerConfig.durationMs;
+  return durationMs !== null && Number.isFinite(durationMs) && durationMs > 0 ? durationMs : null;
+}
+
+function admittedGunRangeClockParticipants(): readonly GunRangeClockParticipant[] {
+  if (network.role === 'client') return Object.freeze([]);
+  if (network.role === 'offline') {
+    return Object.freeze([Object.freeze({
+      id: player.id,
+      admitted: true,
+      connected: true,
+      alive: player.alive,
+      position: Object.freeze({ x: player.position.x, y: player.position.y, z: player.position.z }),
+    })]);
+  }
+  const participants: GunRangeClockParticipant[] = [];
+  const hostMember = hostLobbyMembers.get(player.id);
+  participants.push(Object.freeze({
+    id: player.id,
+    admitted: hostMember !== undefined,
+    connected: hostMember?.connected === true,
+    alive: player.alive,
+    position: Object.freeze({ x: player.position.x, y: player.position.y, z: player.position.z }),
+  }));
+  for (const member of hostLobbyMembers.values()) {
+    if (member.id === player.id) continue;
+    const retained = retainedRemoteAuthorities.get(member.id)?.snapshot;
+    const remote = remotes.get(member.id)?.snapshot;
+    const authoritative = retained ?? remote;
+    const health = remoteHealthAuthorities.get(member.id);
+    if (!authoritative) continue;
+    participants.push(Object.freeze({
+      id: member.id,
+      admitted: true,
+      connected: member.connected,
+      alive: health?.alive === true,
+      position: Object.freeze({ x: authoritative.x, y: authoritative.y, z: authoritative.z }),
+    }));
+  }
+  return Object.freeze(participants);
+}
+
+function sampleAuthoritativeGunRangeMatchClock(nowHostTimeMs: number): GunRangeMatchClockSnapshot | null {
+  const durationMs = gunRangeMatchClockDurationMs();
+  if (durationMs === null || network.role === 'client') return null;
+  if (!gunRangeMatchClockState) {
+    if (matchState.phase !== 'active') return null;
+    gunRangeMatchClockState = createGunRangeMatchClockSnapshot(durationMs, matchState.phaseStartedAt);
+  }
+  gunRangeMatchClockState = advanceGunRangeMatchClock(
+    gunRangeMatchClockState,
+    nowHostTimeMs,
+    gunRangeMatchClockState.paused,
+    durationMs,
+  ).state;
+  return gunRangeMatchClockState;
+}
+
+function projectActiveGunRangeMatchClock(nowLocalMonoMs: number): void {
+  const durationMs = gunRangeMatchClockDurationMs();
+  if (durationMs === null || !gunRangeMatchClockState || matchState.phase !== 'active') return;
+  const sampleAtLocalMonoMs = network.role === 'client'
+    ? hostTimeToGuestMono(
+        hostTimeMapping,
+        gunRangeMatchClockState.sampledAtHostTimeMs,
+        nowLocalMonoMs,
+        privateLobbySnapshot?.snapshotHostTimeMs ?? gunRangeMatchClockState.sampledAtHostTimeMs,
+      )
+    : gunRangeMatchClockState.sampledAtHostTimeMs;
+  matchState = {
+    ...matchState,
+    ...projectGunRangeMatchClock(
+      gunRangeMatchClockState,
+      sampleAtLocalMonoMs,
+      nowLocalMonoMs,
+      durationMs,
+    ),
+  };
+}
+
+function initializeGunRangeMatchClock(mode: 'solo' | 'host' | 'client'): void {
+  gunRangeMatchClockOccupantIds = Object.freeze([]);
+  const durationMs = gunRangeMatchClockDurationMs();
+  if (durationMs === null) {
+    gunRangeMatchClockState = null;
+    return;
+  }
+  if (mode === 'client') {
+    gunRangeMatchClockState = privateLobbySnapshot?.matchClock ?? null;
+    projectActiveGunRangeMatchClock(performance.now());
+    return;
+  }
+  if (!gunRangeMatchClockState) {
+    const activeAt = matchState.phase === 'active' ? matchState.phaseStartedAt : matchState.endsAt;
+    gunRangeMatchClockState = createGunRangeMatchClockSnapshot(durationMs, activeAt);
+  }
+  projectActiveGunRangeMatchClock(performance.now());
+}
+
+function updateGunRangeMatchClockAuthority(nowLocalMonoMs: number): void {
+  const durationMs = gunRangeMatchClockDurationMs();
+  if (!gameStarted || durationMs === null || matchState.phase !== 'active') return;
+  if (network.role === 'client') {
+    projectActiveGunRangeMatchClock(nowLocalMonoMs);
+    return;
+  }
+  if (!gunRangeMatchClockState) {
+    gunRangeMatchClockState = createGunRangeMatchClockSnapshot(durationMs, matchState.phaseStartedAt);
+  }
+  gunRangeMatchClockOccupantIds = gunRangeTestBayOccupants(
+    admittedGunRangeClockParticipants(),
+    GUN_RANGE_TEST_BAY_CONTRACT.bay.bounds,
+  );
+  const step = advanceGunRangeMatchClock(
+    gunRangeMatchClockState,
+    nowLocalMonoMs,
+    gunRangeMatchClockOccupantIds.length > 0,
+    durationMs,
+  );
+  gunRangeMatchClockState = step.state;
+  projectActiveGunRangeMatchClock(nowLocalMonoMs);
+  if (step.transition !== null && network.role === 'host') {
+    // A pause edge is infrequent but release-critical. Make it crash-durable
+    // before publishing the newer reliable lobby revision to connected peers.
+    persistActiveHostMatchCheckpoint(true);
+    broadcastHostLobby('active');
+  }
 }
 
 function hostSnapshot(phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phase ?? 'waiting'): LobbySnapshot {
@@ -5621,6 +5767,10 @@ function hostSnapshot(phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phas
   const scores = scoreIds
     .map((id) => authoritativeScores.get(id) ?? (hostLobbyMembers.has(id) ? emptyPlayerScore(id) : undefined))
     .filter((score): score is PlayerScore => score !== undefined);
+  const snapshotHostTimeMs = performance.now();
+  const matchClock = phase === 'active'
+    ? sampleAuthoritativeGunRangeMatchClock(snapshotHostTimeMs)
+    : null;
   return {
     revision: privateLobbyRevision,
     hostId: player.id,
@@ -5628,9 +5778,10 @@ function hostSnapshot(phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phas
     config: privateMatchConfig,
     members,
     scores,
-    snapshotHostTimeMs: performance.now(),
+    snapshotHostTimeMs,
     activeAtHostTimeMs: privateMatchActiveAtHostTimeMs,
     activeAtEpochMs: privateMatchActiveAtEpochMs,
+    matchClock,
   };
 }
 
@@ -5839,6 +5990,13 @@ function createHostMatchCheckpoint(
   }
   const railgun = checkpointRailgunAuthority(railgunState, nowMonoMs);
   if (!railgun) return null;
+  const matchClock = privateMatchConfig.arenaId === 'gun-range' && matchState.phase === 'active'
+    ? sampleAuthoritativeGunRangeMatchClock(nowMonoMs)
+    : null;
+  if (privateMatchConfig.arenaId === 'gun-range' && matchState.phase === 'active' && !matchClock) return null;
+  const elapsedSinceActiveMs = matchClock
+    ? privateMatchConfig.durationMs - matchClock.remainingMs
+    : nowMonoMs - privateMatchActiveAtHostTimeMs;
   const checkpoint: HostMatchCheckpoint = {
     schemaVersion: HOST_MATCH_CHECKPOINT_SCHEMA_VERSION,
     protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
@@ -5848,7 +6006,7 @@ function createHostMatchCheckpoint(
     activeAtEpochMs: privateMatchActiveAtEpochMs,
     matchEpoch: killstreakMatchEpoch,
     phase: matchState.phase,
-    elapsedSinceActiveMs: nowMonoMs - privateMatchActiveAtHostTimeMs,
+    elapsedSinceActiveMs,
     lobbyRevision: privateLobbyRevision,
     config: privateMatchConfig,
     members,
@@ -5900,6 +6058,7 @@ function createHostMatchCheckpoint(
     railgun,
     killstreak,
     timedMapWeapons,
+    ...(matchClock ? { matchClock } : {}),
     flareProjectiles,
     flareShotFeedback,
   };
@@ -6108,6 +6267,8 @@ function restoreRecoveredHostRuntime(checkpoint: HostMatchCheckpoint, nowMonoMs 
 function initializeFreshHostLobby(): void {
   if (pendingHostMatchRecovery?.roomCode !== network.roomCode) clearStoredHostMatchCheckpoint();
   hostMatchRecoveryPreparing = false;
+  gunRangeMatchClockState = null;
+  gunRangeMatchClockOccupantIds = Object.freeze([]);
   // Remember the room code so a host who crashes can reclaim it on rehost,
   // letting guests who still have it saved rejoin the same lobby.
   saveLastHostedRoomCode(network.roomCode);
@@ -6169,6 +6330,8 @@ function initializeRecoveredHostLobby(checkpoint: HostMatchCheckpoint): boolean 
   privateMatchMode = checkpoint.config.mode;
   privateMatchActiveAtHostTimeMs = timing.activeAtLocalMonoMs;
   privateMatchActiveAtEpochMs = checkpoint.activeAtEpochMs;
+  gunRangeMatchClockState = timing.matchClock;
+  gunRangeMatchClockOccupantIds = Object.freeze([]);
   killstreakMatchEpoch = checkpoint.matchEpoch;
   privateLobbyRevision = checkpoint.lobbyRevision;
   player.id = checkpoint.hostPlayer.id;
@@ -7273,6 +7436,8 @@ function returnPrivateMatchToLobby(asHost: boolean, admissionToken?: MatchAdmiss
 function acceptLobbyState(message: LobbyStateMessage): void {
   if (network.role !== 'client' || message.by !== message.snapshot.hostId) return;
   if (privateLobbySnapshot && message.snapshot.revision < privateLobbySnapshot.revision) return;
+  if (message.snapshot.matchClock && gunRangeMatchClockState
+    && message.snapshot.matchClock.revision < gunRangeMatchClockState.revision) return;
   const previousSnapshot = privateLobbySnapshot;
   const enteringActiveLobby = previousSnapshot?.phase !== 'active' && message.snapshot.phase === 'active';
   const newerRevision = previousSnapshot === null || message.snapshot.revision > previousSnapshot.revision;
@@ -7294,6 +7459,8 @@ function acceptLobbyState(message: LobbyStateMessage): void {
   privateMatchMode = message.snapshot.config.mode;
   privateMatchActiveAtHostTimeMs = message.snapshot.activeAtHostTimeMs;
   privateMatchActiveAtEpochMs = message.snapshot.activeAtEpochMs;
+  gunRangeMatchClockState = message.snapshot.matchClock;
+  if (!gunRangeMatchClockState) gunRangeMatchClockOccupantIds = Object.freeze([]);
   lobbyArenaSyncPromise = lobbyArenaSyncPromise
     .catch(() => undefined)
     .then(() => synchronizeLobbyArena());
@@ -7311,6 +7478,7 @@ function acceptLobbyState(message: LobbyStateMessage): void {
     return;
   }
   if (endingFromHost) endTimedMatchFromAuthority(performance.now());
+  else if (gameStarted) projectActiveGunRangeMatchClock(performance.now());
   renderPrivateLobby();
   renderTextChat();
   if (message.snapshot.activeAtHostTimeMs !== null && message.snapshot.activeAtEpochMs !== null
@@ -12442,6 +12610,8 @@ async function startGame(
   targetHits = 0;
   rangeScore = 0;
   rangeShotsFired = 0;
+  if (!hostRecovery) gunRangeMatchClockState = null;
+  gunRangeMatchClockOccupantIds = Object.freeze([]);
   roundShotsFired = 0;
   roundHitShots = 0;
   roundHeadshots = 0;
@@ -12703,6 +12873,7 @@ async function startGame(
   } else {
     matchState = createMatch(matchStartedAt, matchRules);
   }
+  initializeGunRangeMatchClock(mode);
   overdriveState = createOverdriveState(activeAtLocalMonoMs ?? matchStartedAt);
   const railgunActiveAt = matchState.phase === 'active' ? matchState.phaseStartedAt : matchState.endsAt;
   initializeRailgunForMatch(railgunActiveAt, hostRecovery);
@@ -20737,9 +20908,17 @@ function updateMatchState(now: number): void {
   const ffa = gameMode !== 'solo' && privateMatchMode === 'ffa';
   const orderedFfa = freeForAllLeaders([...authoritativeScores.values()]);
   matchState = preserveSoloCountdownCue(matchState, now, lastMatchCountdownCue, gameMode === 'solo');
-  matchState = ffa
+  const preAdvanceState = matchState;
+  const advancedState = ffa
     ? advanceFreeForAllMatch(matchState, now, orderedFfa, rules)
     : advanceMatch(matchState, now, scores, rules);
+  matchState = holdGunRangeReplicaAtAuthorityBoundary(
+    preAdvanceState,
+    advancedState,
+    network.role === 'client'
+      && privateLobbySnapshot?.config.arenaId === 'gun-range'
+      && privateLobbySnapshot.phase === 'active',
+  );
   let presentation = matchPresentationAt(matchState, now, scores, player.team, rules, arena.label);
   if (ffa) {
     const localRank = Math.max(1, orderedFfa.findIndex((entry) => entry.id === player.id) + 1);
@@ -21269,28 +21448,8 @@ function updateHud(now: number): void {
   // DOM reconstruction can stay at 10 Hz. The rotating minimap has its own
   // bounded 60 Hz cadence so uncapped rendering cannot flood Canvas2D work.
   if (now - lastHudAt < 100) return;
-  const elapsedSinceLastHudMs = Math.max(0, now - lastHudAt);
   lastHudAt = now;
-  if (gameStarted) {
-    // Freeze the remaining Gun Range clock while the player stays in the test
-    // bay. Re-anchoring both endpoints preserves elapsed and remaining time;
-    // leaving the bay simply stops extending the window, so countdown resumes.
-    const testBayTimerEligible = selectedArena.id === 'gun-range'
-      && matchState.phase === 'active' && player.alive;
-    if (testBayTimerEligible) {
-      const bay = GUN_RANGE_TEST_BAY_CONTRACT.bay.bounds;
-      const inBay = player.position.x >= bay.minX && player.position.x <= bay.maxX
-        && player.position.z >= bay.minZ && player.position.z <= bay.maxZ;
-      if (inBay && gunRangeTestBayPlayerWasInside) {
-        matchState = {
-          ...matchState,
-          ...gunRangeTestBayFrozenTimer(matchState, elapsedSinceLastHudMs),
-        };
-      }
-      gunRangeTestBayPlayerWasInside = inBay;
-    } else gunRangeTestBayPlayerWasInside = false;
-    updateMatchState(now);
-  }
+  if (gameStarted) updateMatchState(now);
   const spec = WEAPONS[player.weapon];
   const speed = Math.hypot(player.velocity.x, player.velocity.z);
   const adsSettled = adsHeld && weaponView.adsProgress() >= 0.9;
@@ -22865,6 +23024,8 @@ function resetForMode(preserveAdmission = false): void {
   targetHits = 0;
   rangeScore = 0;
   rangeShotsFired = 0;
+  gunRangeMatchClockState = null;
+  gunRangeMatchClockOccupantIds = Object.freeze([]);
   roundShotsFired = 0;
   roundHitShots = 0;
   roundHeadshots = 0;
@@ -23141,12 +23302,18 @@ function scheduleStateBroadcast(): void {
     localSnapshotRateState.rateHz,
   );
   stateBroadcastTimer = setTimeout(() => {
+    const now = performance.now();
     const schedulingDecision = reconcilePresentationScheduling('network heartbeat eligibility');
     if (schedulingDecision.mode === 'hosted-authority-network') hostedBackgroundNetworkHeartbeatCount += 1;
-    if (gameStarted && network.role === 'host') updateTimedMapWeapons(performance.now());
+    if (gameStarted && network.role === 'host') {
+      // Hidden/occluded hosts intentionally stop presentation frames but keep
+      // this authority heartbeat alive. Sample bay occupancy here as well so
+      // a guest pause edge cannot depend on the host tab being visible.
+      updateGunRangeMatchClockAuthority(now);
+      updateTimedMapWeapons(now);
+    }
     if (gameStarted && !matchAdmissionPresentationPaused && network.role !== 'offline' && player.alive
       && !(network.role === 'client' && awaitingCanonicalGuestAuthority)) {
-      const now = performance.now();
       localSnapshotRateState = updateSnapshotRate(localSnapshotRateState, {
         rttMs: hostTimeMapping.sampleCount > 0 ? hostTimeMapping.rttMs : localLobbyPingMs ?? 20,
         jitterMs: hostTimeMapping.sampleCount > 0 ? hostTimeMapping.jitterMs : 0,
@@ -23585,6 +23752,7 @@ function frame(now: number, scheduleNext = true): void {
     }
     waterSystem.update(visualNow / 1_000);
     if (gameStarted) updateMinimap(now);
+    updateGunRangeMatchClockAuthority(now);
     updateHud(now);
     arenaContrastLighting.update(visualNow);
     pass64TslSystems?.update(visualNow);
@@ -24994,6 +25162,13 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     gameMode,
     matchPhase: matchState.phase,
     matchEndReason: matchState.endReason ?? null,
+    matchClock: gunRangeMatchClockState ? {
+      ...gunRangeMatchClockState,
+      authorityRole: network.role === 'client' ? 'replica' : network.role === 'host' ? 'host' : 'offline',
+      occupantIds: [...gunRangeMatchClockOccupantIds],
+      projectedEndsAt: matchState.endsAt,
+      effectiveRemainingMs: Math.max(0, matchState.endsAt - performance.now()),
+    } : null,
     privateMatch: privateLobbySnapshot ? {
       mode: privateMatchMode,
       arenaId: privateLobbySnapshot.config.arenaId,
@@ -25003,6 +25178,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       hostedBotCount: privateLobbySnapshot.config.hostedBotCount,
       autoBalance: privateLobbySnapshot.config.autoBalance,
       durationMs: privateLobbySnapshot.config.durationMs,
+      matchClock: privateLobbySnapshot.matchClock ? { ...privateLobbySnapshot.matchClock } : null,
       members: privateLobbySnapshot.members.map((member) => ({ ...member })),
       scores: [...authoritativeScores.values()].map((score) => ({ ...score })),
       activeAtHostTimeMs: privateMatchActiveAtHostTimeMs,

@@ -2,6 +2,10 @@ import type { Team } from './protocol';
 import type { ArenaId } from './map-selection';
 import { isHostedBotCount, type HostedBotCount } from './hosted-bots';
 import { isDhv, type Dhv } from './handicap';
+import {
+  isGunRangeMatchClockSnapshot,
+  type GunRangeMatchClockSnapshot,
+} from './gun-range-match-clock-authority';
 
 export const ROOM_CAPACITIES = [4, 6] as const;
 export type RoomCapacity = typeof ROOM_CAPACITIES[number];
@@ -49,6 +53,7 @@ export type LobbySnapshot = Readonly<{
   snapshotHostTimeMs: number;
   activeAtHostTimeMs: number | null;
   activeAtEpochMs: number | null;
+  matchClock: GunRangeMatchClockSnapshot | null;
 }>;
 
 export const DEFAULT_PRIVATE_MATCH_CONFIG: PrivateMatchConfig = Object.freeze({
@@ -162,7 +167,14 @@ export function isLobbySnapshot(value: unknown): value is LobbySnapshot {
       && Number(snapshot.activeAtHostTimeMs) <= Number(snapshot.snapshotHostTimeMs) + MAX_HOST_START_FUTURE_LEAD_MS;
   const validEpochStart = snapshot.activeAtEpochMs === null
     || Number.isFinite(snapshot.activeAtEpochMs) && Number(snapshot.activeAtEpochMs) >= 0 && Number(snapshot.activeAtEpochMs) <= 10_000_000_000_000;
-  return validHostStart && validEpochStart && (snapshot.activeAtHostTimeMs === null) === (snapshot.activeAtEpochMs === null);
+  const activeGunRange = snapshot.config.arenaId === 'gun-range' && snapshot.phase === 'active';
+  const validMatchClock = activeGunRange
+    ? isGunRangeMatchClockSnapshot(snapshot.matchClock, snapshot.config.durationMs)
+      && snapshot.matchClock.sampledAtHostTimeMs <= Number(snapshot.snapshotHostTimeMs)
+    : snapshot.matchClock === null;
+  return validHostStart && validEpochStart
+    && (snapshot.activeAtHostTimeMs === null) === (snapshot.activeAtEpochMs === null)
+    && validMatchClock;
 }
 
 export function balanceLobbyTeams(members: readonly LobbyMember[]): LobbyMember[] {

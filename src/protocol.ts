@@ -70,7 +70,7 @@ import { validateKillstreakLoadout, type KillstreakLoadoutV1 } from './killstrea
 export { GRENADE_IDS, type GrenadeId } from './combat/grenade-catalog';
 
 export type Team = 0 | 1;
-export const MULTIPLAYER_PROTOCOL_VERSION = 14;
+export const MULTIPLAYER_PROTOCOL_VERSION = 15;
 export type PrimaryWeaponId =
   | 'carbine' | 'smg' | 'lmg' | 'scattergun' | 'sniper'
   | 'mini-uzi' | 'mp5' | 'm4a1' | 'ak-47' | 'minigun' | 'm14-ebr' | 'slug-shotgun';
