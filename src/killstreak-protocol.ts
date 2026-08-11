@@ -12,6 +12,7 @@ import type {
 } from './killstreak-runtime';
 import {
   CARE_TARGET_MARKER_MAX_LIFETIME_MS,
+  CARPET_BOMBER_IMPACT_COUNT,
   CARPET_TARGET_MARKER_MAX_LIFETIME_MS,
   MAX_RETAINED_CARE_REWARDS,
   MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD,
@@ -20,6 +21,12 @@ import {
   SUPPORT_TARGET_CORRIDOR_MAX_LENGTH_M,
 } from './killstreak-runtime';
 import { DRONE_SUPPORT_DEFINITIONS } from './killstreak-support-catalog';
+import {
+  CARPET_GROUND_FIRE_AUTHORITY_CAPACITY,
+  CARPET_GROUND_FIRE_STATE_CHUNK_SIZE,
+  CARPET_GROUND_FIRE_STATE_MAX_CHUNKS,
+} from './carpet-ground-fire-multiplayer';
+import type { CarpetGroundFirePresentationSnapshot } from './flamethrower-stream-system';
 
 export type KillstreakLoadoutIntentMessage = Readonly<{
   type: 'killstreak-loadout-intent';
@@ -93,13 +100,27 @@ export type KillstreakDamageResultMessage = Readonly<{
   nonce: number;
 }>;
 
+export type KillstreakCarpetFireStateMessage = Readonly<{
+  type: 'killstreak-carpet-fire-state';
+  by: string;
+  forPlayerId: string;
+  matchEpoch: number;
+  snapshotId: number;
+  chunkIndex: number;
+  chunkCount: number;
+  totalFires: number;
+  fires: readonly CarpetGroundFirePresentationSnapshot[];
+  nonce: number;
+}>;
+
 export type KillstreakProtocolMessage = KillstreakLoadoutIntentMessage
   | KillstreakActivateIntentMessage
   | KillstreakControlIntentMessage
   | KillstreakCareCaptureIntentMessage
   | KillstreakCareCaptureResultMessage
   | KillstreakStateMessage
-  | KillstreakDamageResultMessage;
+  | KillstreakDamageResultMessage
+  | KillstreakCarpetFireStateMessage;
 
 export type KillstreakStateAdmission = Readonly<{
   accepted: boolean;
@@ -417,6 +438,18 @@ function isImpactEvent(value: unknown): value is KillstreakImpactEvent {
     && (value.phase === 'drop' ? value.atMs <= value.impactAtMs : value.atMs >= value.impactAtMs);
 }
 
+function isCarpetGroundFirePresentationSnapshot(value: unknown): value is CarpetGroundFirePresentationSnapshot {
+  return object(value)
+    && exactKeys(value, ['activationId', 'impactOrdinal', 'position', 'expiresAtHostTimeMs'])
+    && activationId(value.activationId)
+    && typeof value.impactOrdinal === 'number'
+    && Number.isSafeInteger(value.impactOrdinal)
+    && value.impactOrdinal >= 0
+    && value.impactOrdinal < CARPET_BOMBER_IMPACT_COUNT
+    && vec3(value.position)
+    && finite(value.expiresAtHostTimeMs, 0, Number.MAX_SAFE_INTEGER);
+}
+
 export function isKillstreakProtocolMessage(value: unknown): value is KillstreakProtocolMessage {
   if (!object(value) || typeof value.type !== 'string') return false;
   if (value.type === 'killstreak-loadout-intent') {
@@ -470,6 +503,31 @@ export function isKillstreakProtocolMessage(value: unknown): value is Killstreak
       && placementMarkersMatchRecipient(value.snapshot, value.forPlayerId)
       && finite(value.nonce, 0, Number.MAX_SAFE_INTEGER);
   }
+  if (value.type === 'killstreak-carpet-fire-state') {
+    if (!exactKeys(value, [
+      'type', 'by', 'forPlayerId', 'matchEpoch', 'snapshotId', 'chunkIndex', 'chunkCount',
+      'totalFires', 'fires', 'nonce',
+    ])
+      || !actorId(value.by) || !actorId(value.forPlayerId)
+      || !safeCounter(value.matchEpoch) || !safeCounter(value.snapshotId)
+      || !safeCounter(value.chunkIndex) || !safeCounter(value.chunkCount)
+      || !safeCounter(value.totalFires)
+      || value.chunkCount < 1 || value.chunkCount > CARPET_GROUND_FIRE_STATE_MAX_CHUNKS
+      || value.chunkIndex >= value.chunkCount
+      || value.totalFires > CARPET_GROUND_FIRE_AUTHORITY_CAPACITY
+      || value.chunkCount !== Math.max(1, Math.ceil(value.totalFires / CARPET_GROUND_FIRE_STATE_CHUNK_SIZE))
+      || !Array.isArray(value.fires)
+      || value.fires.length !== Math.min(
+        CARPET_GROUND_FIRE_STATE_CHUNK_SIZE,
+        Math.max(0, value.totalFires - value.chunkIndex * CARPET_GROUND_FIRE_STATE_CHUNK_SIZE),
+      )
+      || !value.fires.every(isCarpetGroundFirePresentationSnapshot)
+      || new Set(value.fires.map((fire) => {
+        const snapshot = fire as CarpetGroundFirePresentationSnapshot;
+        return `${snapshot.activationId}:${snapshot.impactOrdinal}`;
+      })).size !== value.fires.length) return false;
+    return finite(value.nonce, 0, Number.MAX_SAFE_INTEGER);
+  }
   if (value.type === 'killstreak-damage-result') {
     return exactKeys(value, ['type', 'by', 'matchEpoch', 'revision', 'events', 'impacts', 'nonce'])
       && actorId(value.by) && safeCounter(value.matchEpoch) && safeCounter(value.revision)
@@ -489,6 +547,7 @@ export function killstreakMessageBelongsToPlayer(message: KillstreakProtocolMess
   if (!playerId) return false;
   if (message.type === 'killstreak-care-capture-result') return message.by === playerId || message.forPlayerId === playerId;
   if (message.type === 'killstreak-state') return message.by === playerId || message.forPlayerId === playerId;
+  if (message.type === 'killstreak-carpet-fire-state') return message.by === playerId || message.forPlayerId === playerId;
   if (message.type === 'killstreak-damage-result') return message.impacts.length > 0
     || message.by === playerId
     || message.events.some((event) => event.ownerId === playerId || event.targetId === playerId);
@@ -498,6 +557,7 @@ export function killstreakMessageBelongsToPlayer(message: KillstreakProtocolMess
 export function isKillstreakHostAuthorityMessage(message: KillstreakProtocolMessage): boolean {
   return message.type === 'killstreak-care-capture-result'
     || message.type === 'killstreak-state'
+    || message.type === 'killstreak-carpet-fire-state'
     || message.type === 'killstreak-damage-result';
 }
 

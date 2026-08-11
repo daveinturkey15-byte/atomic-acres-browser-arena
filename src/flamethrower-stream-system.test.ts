@@ -84,6 +84,16 @@ describe('flamethrower stream presentation', () => {
     expect(system.telemetry().groundFireActive).toBe(0);
   });
 
+  it('replays a retained ground-fire visual for the exact host-authored remaining lifetime', () => {
+    const system = new FlamethrowerStreamSystem(new THREE.Scene(), false);
+    expect(system.igniteGround(new THREE.Vector3(1, 0, 2), 2_500, 3_500)).toBe(true);
+    system.update(0.1, 5_999);
+    expect(system.telemetry().groundFireActive).toBe(1);
+    system.update(0.1, 6_000);
+    expect(system.telemetry().groundFireActive).toBe(0);
+    expect(system.igniteGround(new THREE.Vector3(), 6_001, 5_001)).toBe(false);
+  });
+
   it('writes only live particle slots and spatially merges repeated ground presentation', () => {
     const system = new FlamethrowerStreamSystem(new THREE.Scene(), false);
     const before = system.telemetry();

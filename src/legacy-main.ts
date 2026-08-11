@@ -181,6 +181,7 @@ import {
   type KillstreakActivateIntentMessage,
   type KillstreakCareCaptureResultMessage,
   type KillstreakControlIntentMessage,
+  type KillstreakCarpetFireStateMessage,
   type KillstreakDamageResultMessage,
   type KillstreakLoadoutIntentMessage,
   type KillstreakStateMessage,
@@ -725,7 +726,11 @@ import {
   FlamethrowerStreamSystem,
   flamethrowerPulseImpactPresentationEnabled,
 } from './flamethrower-stream-system';
-import { CarpetGroundFireGuestPresentationAdmission } from './carpet-ground-fire-multiplayer';
+import {
+  CARPET_GROUND_FIRE_AUTHORITY_CAPACITY,
+  CarpetGroundFireGuestPresentationAdmission,
+  carpetGroundFireStateChunks,
+} from './carpet-ground-fire-multiplayer';
 import { DMR_THERMAL_MAGNIFICATION, DMR_THERMAL_MAX_CONTACTS, DmrThermalPresentation, dmrThermalOcclusionBudget, type DmrThermalContact } from './dmr-thermal-presentation';
 import { runStagedDmrThermalPrewarm } from './dmr-thermal-prewarm-lifecycle';
 import { ThermalGhostPresentation, type ThermalGhostTarget } from './thermal-ghost-presentation';
@@ -1634,12 +1639,54 @@ const flamethrowerStreamPresentation = new FlamethrowerStreamSystem(
 const FLAMETHROWER_GROUND_FIRE_RADIUS_M = 1.8;
 const FLAMETHROWER_GROUND_FIRE_CAPACITY = 24;
 const flamethrowerGroundFires = new FlamethrowerGroundFirePool(FLAMETHROWER_GROUND_FIRE_CAPACITY);
+const carpetGroundFires = new FlamethrowerGroundFirePool(CARPET_GROUND_FIRE_AUTHORITY_CAPACITY);
 const flamethrowerGroundFireBotSnapshot: BotPlayer[] = [];
 const flamethrowerGroundFireUp = new THREE.Vector3(0, 1, 0);
 const presentFlamethrowerPulseImpact = flamethrowerPulseImpactPresentationEnabled(softwareRenderer);
 const carpetGroundFireGuestPresentation = new CarpetGroundFireGuestPresentationAdmission();
 const pendingCarpetGroundFireDamageEvents: KillstreakDamageEvent[] = [];
+const carpetGroundFireAuthorityTelemetry = {
+  admitted: 0,
+  duplicate: 0,
+  exhausted: 0,
+  invalid: 0,
+  maximumActive: 0,
+};
 let flamethrowerGroundFireBotSnapshotReady = false;
+
+function resetCarpetGroundFireAuthorityTelemetry(): void {
+  carpetGroundFireAuthorityTelemetry.admitted = 0;
+  carpetGroundFireAuthorityTelemetry.duplicate = 0;
+  carpetGroundFireAuthorityTelemetry.exhausted = 0;
+  carpetGroundFireAuthorityTelemetry.invalid = 0;
+  carpetGroundFireAuthorityTelemetry.maximumActive = 0;
+}
+
+function sendCarpetGroundFirePresentationSnapshot(
+  forPlayerId: string,
+  nowHostTimeMs = performance.now(),
+): boolean {
+  if (network.role !== 'host' || !forPlayerId) return false;
+  const snapshotId = randomNonce();
+  const chunks = carpetGroundFireStateChunks(
+    snapshotId,
+    carpetGroundFires.carpetPresentationSnapshots(nowHostTimeMs),
+  );
+  if (chunks.length === 0) return false;
+  let sent = true;
+  for (const chunk of chunks) {
+    const message: KillstreakCarpetFireStateMessage = {
+      type: 'killstreak-carpet-fire-state',
+      by: player.id,
+      forPlayerId,
+      matchEpoch: killstreakMatchEpoch,
+      ...chunk,
+      nonce: randomNonce(),
+    };
+    sent = network.sendToPlayer(forPlayerId, message) && sent;
+  }
+  return sent;
+}
 
 function applyFlamethrowerGroundFirePulse(fire: Readonly<{
   ownerId: string;
@@ -1703,6 +1750,7 @@ function updateFlamethrowerGroundFires(now: number): void {
   flamethrowerGroundFireBotSnapshotReady = false;
   pendingCarpetGroundFireDamageEvents.length = 0;
   flamethrowerGroundFires.update(now, FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS, applyFlamethrowerGroundFirePulse);
+  carpetGroundFires.update(now, FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS, applyFlamethrowerGroundFirePulse);
   if (network.role !== 'host' || pendingCarpetGroundFireDamageEvents.length === 0) return;
   for (let offset = 0; offset < pendingCarpetGroundFireDamageEvents.length; offset += MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP) {
     const message: KillstreakDamageResultMessage = {
@@ -6559,6 +6607,7 @@ function sendGuestResumeAuthority(playerId: string, remote: RemotePlayer): boole
   const pending = pendingGuestAuthorityRepairs.get(playerId);
   if (connectionEpoch && pending?.connectionEpoch === connectionEpoch) {
     network.sendToPlayer(playerId, pending.message);
+    sendCarpetGroundFirePresentationSnapshot(playerId);
     return true;
   }
   const member = hostLobbyMembers.get(playerId);
@@ -6598,6 +6647,7 @@ function sendGuestResumeAuthority(playerId: string, remote: RemotePlayer): boole
   };
   pendingGuestAuthorityRepairs.set(playerId, Object.freeze({ connectionEpoch, authorityNonce, message }));
   network.sendToPlayer(playerId, message);
+  sendCarpetGroundFirePresentationSnapshot(playerId, now);
   return true;
 }
 
@@ -8943,6 +8993,30 @@ function onNetworkMessage(message: GameMessage): void {
       refreshLocalKillstreakSnapshot();
       if (actor.streak > (previousActor?.streak ?? actor.streak)) recordImmediateStreak();
       updateFieldSupportHud();
+    }
+    return;
+  }
+  if (message.type === 'killstreak-carpet-fire-state') {
+    if (network.role !== 'client'
+      || message.by !== privateLobbySnapshot?.hostId
+      || message.forPlayerId !== player.id
+      || message.matchEpoch !== killstreakMatchEpoch) return;
+    const presentedAt = performance.now();
+    const nowHostTimeMs = currentHostTimeMs();
+    for (const fire of message.fires) {
+      const remainingMs = carpetGroundFireGuestPresentation.admitSnapshot(
+        message.matchEpoch,
+        fire,
+        nowHostTimeMs,
+      );
+      if (remainingMs === null) continue;
+      // Rejoin repair is presentation-only. Only the host's separate Carpet
+      // authority pool can emit damage receipts.
+      flamethrowerStreamPresentation.igniteGround(
+        new THREE.Vector3(...fire.position),
+        presentedAt,
+        remainingMs,
+      );
     }
     return;
   }
@@ -12739,6 +12813,8 @@ async function startGame(
   clearFlareTargetSnapshots();
   flamethrowerStreamPresentation.clear();
   flamethrowerGroundFires.clear();
+  carpetGroundFires.clear();
+  resetCarpetGroundFireAuthorityTelemetry();
   carpetGroundFireGuestPresentation.clear();
   timedMapWeaponAudit = createTimedMapWeaponAudit();
   pendingFlareShotRequests.clear();
@@ -13311,6 +13387,11 @@ function initializeTimedMapWeaponsForMatch(
   clearFlareTargetSnapshots();
   flamethrowerStreamPresentation.clear();
   flamethrowerGroundFires.clear();
+  // Active support entities deliberately terminate across host replacement in
+  // KillstreakRuntimeCheckpoint; Carpet residual fire follows that same
+  // declared recovery boundary instead of silently outliving its activation.
+  carpetGroundFires.clear();
+  resetCarpetGroundFireAuthorityTelemetry();
   carpetGroundFireGuestPresentation.clear();
   if (recovery) restoreRecoveredFlareRuntime(recovery, performance.now());
   if (network.role === 'host') broadcastTimedMapWeaponState();
@@ -18930,10 +19011,9 @@ function updatePass65KillstreakRuntime(now: number): void {
       if (impact.source === 'carpet-bomber') {
         carpetWorldImpacts.push({ point, radius: 4.5, maximumDamage: 240, shedBlastClass: 'carpet-bomber-obliteration' });
         // Carpet bombs leave burning napalm on the ground too.
-        if (flamethrowerStreamPresentation.igniteGround(point, now)) {
-          const owner = killstreakRuntime.carpetBomberOwner(impact.activationId);
-          if (owner) {
-            flamethrowerGroundFires.ignite({
+        const owner = killstreakRuntime.carpetBomberOwner(impact.activationId);
+        const admission = owner
+          ? carpetGroundFires.ignite({
               ownerId: owner.ownerId,
               ownerTeam: owner.team,
               point,
@@ -18944,8 +19024,24 @@ function updatePass65KillstreakRuntime(now: number): void {
               damageSource: 'carpet-bomber',
               activationId: impact.activationId,
               impactOrdinal: impact.ordinal,
-            });
-          }
+            })
+          : 'invalid';
+        if (admission === 'created') {
+          carpetGroundFireAuthorityTelemetry.admitted += 1;
+          carpetGroundFireAuthorityTelemetry.maximumActive = Math.max(
+            carpetGroundFireAuthorityTelemetry.maximumActive,
+            carpetGroundFires.activeCount(),
+          );
+          flamethrowerStreamPresentation.igniteGround(point, now);
+        } else {
+          carpetGroundFireAuthorityTelemetry[admission] += 1;
+          recordMatchDiagnostic('carpet-ground-fire-authority', 'rejected', {
+            actorId: owner?.ownerId ?? player.id,
+            weaponOrEffect: 'carpet-bomber',
+            position: [point.x, point.y, point.z],
+            reason: `authority-${admission}`,
+            modifiers: [`activation:${impact.activationId}`, `impact:${impact.ordinal}`],
+          });
         }
         audio.explosion(now);
         supportExplosionPresentation.emit(point, 4.5, now);
@@ -25307,6 +25403,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         lastAdmission: lastFlarePresentationAdmission ? { ...lastFlarePresentationAdmission } : null,
       },
       flameStream: flamethrowerStreamPresentation.telemetry(),
+      carpetGroundFireAuthority: {
+        capacity: carpetGroundFires.capacity(),
+        active: carpetGroundFires.activeCount(),
+        ...carpetGroundFireAuthorityTelemetry,
+      },
       audit: { ...timedMapWeaponAudit },
       currentHostTimeMs: currentHostTimeMs(),
       lastBroadcastAt: lastTimedMapWeaponStateBroadcastAt,
