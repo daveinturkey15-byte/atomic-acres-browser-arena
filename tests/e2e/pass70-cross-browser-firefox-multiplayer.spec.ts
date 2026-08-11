@@ -998,6 +998,16 @@ test(`Chromium host and ${crossGuestEngine} guest survive ADS combat, guest rejo
     expect(await host.evaluate(() => (
       (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.members.map((member: any) => member.id).sort()
     ))).toEqual(initialMemberIds);
+    const [recoveredHostPosition, recoveredGuestPosition] = await Promise.all([
+      host.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().player.position as RecoveryPose),
+      guest.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().player.position as RecoveryPose),
+    ]);
+    for (const [actual, expected] of [
+      [recoveredHostPosition, checkpointReceipt.hostPosition],
+      [recoveredGuestPosition, checkpointReceipt.guestPosition],
+    ] as const) {
+      expect(actual.every((value, index) => Math.abs(value - Number(expected[index])) < 0.4)).toBe(true);
+    }
 
     const runtimeLogs = await Promise.all([host, guest].map((page) => page.evaluate(() => (
       document.querySelector('#runtime-error-log')?.textContent?.trim() ?? ''
