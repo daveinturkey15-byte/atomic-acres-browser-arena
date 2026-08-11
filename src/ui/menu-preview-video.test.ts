@@ -25,9 +25,9 @@ describe('prerecorded map-selection previews', () => {
       expect(definition.width / definition.height).toBeCloseTo(16 / 9, 5);
       expect(definition.width).toBe(2560);
       expect(definition.height).toBe(1440);
-      expect(definition.webm).toMatch(new RegExp(`${id}\\.webm\\?v=pass66-runtime-preview-v13$`));
-      expect(definition.mp4).toMatch(new RegExp(`${id}\\.mp4\\?v=pass66-runtime-preview-v13$`));
-      expect(definition.poster).toMatch(new RegExp(`${id}\\.webp\\?v=pass66-runtime-preview-v13$`));
+      expect(definition.webm).toMatch(new RegExp(`${id}\\.webm\\?v=pass66-runtime-preview-v14$`));
+      expect(definition.mp4).toMatch(new RegExp(`${id}\\.mp4\\?v=pass66-runtime-preview-v14$`));
+      expect(definition.poster).toMatch(new RegExp(`${id}\\.webp\\?v=pass66-runtime-preview-v14$`));
       return [definition.webm, definition.mp4, definition.poster];
     });
     expect(new Set(assets).size).toBe(assets.length);
@@ -59,12 +59,12 @@ describe('prerecorded map-selection previews', () => {
     expect(markup).not.toContain('<canvas');
   });
 
-  it('binds runtime playback to the native-1440p v13 authoring and encoding contract', () => {
+  it('binds runtime playback to the native-1440p v14 authoring and encoding contract', () => {
     expect(choreography).toMatchObject({
       schemaVersion: 4,
       recipeId: 'pass66-authoritative-runtime-menu-preview-v2',
       captureId: 'pass66-authoritative-runtime-menu-preview-capture-v2',
-      generatedAt: '2026-08-02',
+      generatedAt: '2026-08-11',
       fps: 30,
       durationSeconds: 8,
       frameCount: 240,
@@ -74,7 +74,7 @@ describe('prerecorded map-selection previews', () => {
         overlayOutputScale: 2,
       },
       media: {
-        cacheKey: 'pass66-runtime-preview-v13',
+        cacheKey: 'pass66-runtime-preview-v14',
         encodingBudget: {
           minimumAverageBitrateKbps: 3000,
           maximumAverageBitrateKbps: 9000,
@@ -116,11 +116,11 @@ describe('prerecorded map-selection previews', () => {
     });
     expect(cacheFamilyLockFailures(cacheFamilyLock, RETAINED_CACHE_FAMILY_BASELINE)).toEqual([]);
     expect(cacheFamilyLock.families.some((family) => family.cacheKey === 'pass66-runtime-preview-v4')).toBe(false);
-    const v13Families = cacheFamilyLock.families.filter((family) => family.cacheKey === 'pass66-runtime-preview-v13');
-    expect(v13Families.length).toBeLessThanOrEqual(1);
-    if (v13Families.length === 1) {
-      expect(cacheFamilyLock.families.indexOf(v13Families[0]!)).toBeGreaterThanOrEqual(RETAINED_CACHE_FAMILY_BASELINE.families.length);
-      expect(v13Families[0]?.recipeId).toBe(choreography.recipeId);
+    const v14Families = cacheFamilyLock.families.filter((family) => family.cacheKey === 'pass66-runtime-preview-v14');
+    expect(v14Families.length).toBeLessThanOrEqual(1);
+    if (v14Families.length === 1) {
+      expect(cacheFamilyLock.families.indexOf(v14Families[0]!)).toBeGreaterThanOrEqual(RETAINED_CACHE_FAMILY_BASELINE.families.length);
+      expect(v14Families[0]?.recipeId).toBe(choreography.recipeId);
     }
   });
 });

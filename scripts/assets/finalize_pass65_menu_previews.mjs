@@ -35,7 +35,7 @@ const verifierPath = path.join(root, 'scripts/qa/verify-pass65-menu-preview-prod
 const chopperSourcePath = path.join(root, 'source-assets/blender/pass65-chopper-gunner.blend');
 const acceptedCockpitEvidence = 'docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png';
 const acceptedCockpitEvidencePath = path.join(root, acceptedCockpitEvidence);
-const acceptedCockpitDigest = '680a235168bfa0021232aa1e7cfe6332b91616f60bd5369b9fea60e110f9b4be';
+const acceptedCockpitDigest = 'e285ede0f3834c4cc07aa377c3b47796a8bead9733d7d9c8d64c52b71008c875';
 const choreography = JSON.parse(await readFile(choreographyPath, 'utf8'));
 const generatedAt = choreography.generatedAt;
 const arenas = Object.keys(choreography.arenas);
@@ -86,7 +86,7 @@ function validateRecipe() {
   if (choreography.schemaVersion !== 4
     || choreography.recipeId !== 'pass66-authoritative-runtime-menu-preview-v2'
     || choreography.captureId !== 'pass66-authoritative-runtime-menu-preview-capture-v2'
-    || choreography.generatedAt !== '2026-08-02') {
+    || choreography.generatedAt !== '2026-08-11') {
     throw new Error('canonical authoritative-runtime choreography schema or recipe id is invalid');
   }
   if (choreography.capture?.source !== 'authoritative-runtime-arena'
@@ -114,7 +114,7 @@ function validateRecipe() {
     || choreography.reviewFrames.at(-1) !== choreography.frameCount) {
     throw new Error('reviewFrames must be unique and include the exact loop endpoints');
   }
-  if (choreography.media.cacheKey !== 'pass66-runtime-preview-v13') throw new Error('runtime preview cache key is stale');
+  if (choreography.media.cacheKey !== 'pass66-runtime-preview-v14') throw new Error('runtime preview cache key is stale');
   const budget = choreography.media.encodingBudget;
   if (budget?.minimumAverageBitrateKbps !== 3000
     || budget?.maximumAverageBitrateKbps !== 9000

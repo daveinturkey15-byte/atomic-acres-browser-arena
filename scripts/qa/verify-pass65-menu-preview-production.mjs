@@ -31,8 +31,8 @@ const runtimeSourcePath = path.join(root, 'src/ui/menu-preview-video.ts');
 const runtimeEntryPath = path.join(root, 'src/legacy-main.ts');
 const cameraEvaluatorPath = path.join(root, 'src/ui/menu-preview-camera.ts');
 const acceptedCockpitEvidence = 'docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png';
-const acceptedCockpitDigest = '680a235168bfa0021232aa1e7cfe6332b91616f60bd5369b9fea60e110f9b4be';
-const requiredGenerationDate = '2026-08-02';
+const acceptedCockpitDigest = 'e285ede0f3834c4cc07aa377c3b47796a8bead9733d7d9c8d64c52b71008c875';
+const requiredGenerationDate = '2026-08-11';
 const arenas = ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range'];
 const helicopterArenas = arenas.slice(0, 3);
 const captureToolPaths = [generatorPath, integrityPath, integrityTypesPath, dependencyManifestPath];
@@ -599,7 +599,7 @@ if (choreography.schemaVersion !== 4
   || choreography.recipeId !== 'pass66-authoritative-runtime-menu-preview-v2'
   || choreography.captureId !== 'pass66-authoritative-runtime-menu-preview-capture-v2'
   || choreography.generatedAt !== requiredGenerationDate) failures.push('canonical runtime choreography schema/recipe/capture identity drifted');
-if (choreography.media?.cacheKey !== 'pass66-runtime-preview-v13') failures.push('canonical runtime preview cache family is not the fresh Pass 66 v13 family');
+if (choreography.media?.cacheKey !== 'pass66-runtime-preview-v14') failures.push('canonical runtime preview cache family is not the fresh Pass 70 v14 family');
 if (choreography.capture?.source !== 'authoritative-runtime-arena'
   || choreography.capture?.backend !== 'webgpu'
   || choreography.capture?.overlayScale !== 0.5
