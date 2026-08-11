@@ -7,6 +7,32 @@ import {
 
 const peerPort = Number(process.env.PASS66_QODER_AUTHORITY_PEER_PORT ?? 9_069);
 let peerServer: OwnedPeerServer | null = null;
+const REJOIN_FOREGROUND_OWNERSHIP_TIMEOUT_MS = 5_000;
+const REJOIN_TRANSPORT_ADMISSION_TIMEOUT_MS = 20_000;
+const REJOIN_END_TO_END_ADMISSION_TIMEOUT_MS = 75_000;
+const REJOIN_PRESENTATION_SAMPLE_INTERVAL_MS = 500;
+const REJOIN_PRESENTATION_TRACE_INTERVAL_MS = 5_000;
+
+type RejoinAdmissionSample = Readonly<{
+  ready: boolean;
+  transportReady: boolean;
+  document: Readonly<{ visibilityState: DocumentVisibilityState; hasFocus: boolean }>;
+  gameStarted: boolean;
+  matchPhase: string | null;
+  admission: unknown;
+  deployment: Readonly<{
+    stage: string | null;
+    percent: string | null;
+    etaSeconds: string | null;
+  }>;
+  networkLifecycle: unknown;
+  privateMatch: Readonly<{
+    phase: string | null;
+    members: readonly Readonly<{ id: string; connected: boolean }>[];
+  }> | null;
+}>;
+
+type TimedRejoinAdmissionSample = RejoinAdmissionSample & Readonly<{ elapsedMs: number }>;
 
 test.use({
   launchOptions: {
@@ -49,6 +75,114 @@ async function openPlayer(context: BrowserContext, name: string, seed: string): 
   }, undefined, { timeout: 45_000 });
   await page.locator('#player-name').fill(name);
   return page;
+}
+
+async function sampleRejoinAdmission(guest: Page): Promise<RejoinAdmissionSample> {
+  return guest.evaluate(() => {
+    const debug = (window as any).__ATOMIC_ACRES_DEBUG__;
+    const state = debug?.snapshot?.() ?? null;
+    const members = state?.privateMatch?.members ?? [];
+    const transportReady = state?.networkLifecycle?.hostConnectionOpen === true
+      && members.length === 2
+      && members.every((member: any) => member.connected === true);
+    const transition = document.querySelector<HTMLElement>('#deployment-transition');
+    return {
+      ready: transportReady && state?.gameStarted === true && state?.matchPhase === 'active',
+      transportReady,
+      document: {
+        visibilityState: document.visibilityState,
+        hasFocus: document.hasFocus(),
+      },
+      gameStarted: state?.gameStarted === true,
+      matchPhase: typeof state?.matchPhase === 'string' ? state.matchPhase : null,
+      admission: debug?.admissionState?.() ?? null,
+      deployment: {
+        stage: transition?.dataset.loadingStage ?? null,
+        percent: transition?.dataset.loadingPercent ?? null,
+        etaSeconds: transition?.dataset.loadingEtaSeconds ?? null,
+      },
+      networkLifecycle: state?.networkLifecycle ?? null,
+      privateMatch: state?.privateMatch ? {
+        phase: typeof state.privateMatch.phase === 'string' ? state.privateMatch.phase : null,
+        members: members.map((member: any) => ({ id: member.id, connected: member.connected === true })),
+      } : null,
+    };
+  });
+}
+
+async function sampleRejoinFailureDiagnostic(guest: Page): Promise<unknown> {
+  return guest.evaluate(() => {
+    const debug = (window as any).__ATOMIC_ACRES_DEBUG__;
+    return {
+      capturedAtEpochMs: Date.now(),
+      document: {
+        visibilityState: document.visibilityState,
+        hasFocus: document.hasFocus(),
+      },
+      admission: debug?.admissionState?.() ?? null,
+      weaponCatalog: debug?.sampleWeaponCatalogReadiness?.() ?? null,
+      state: debug?.snapshot?.() ?? null,
+      deployment: document.querySelector<HTMLElement>('#deployment-transition')?.dataset ?? null,
+      networkStatus: document.querySelector<HTMLElement>('#network-status')?.textContent?.trim() ?? null,
+    };
+  });
+}
+
+async function attachRejoinEvidence(name: string, evidence: unknown): Promise<void> {
+  await test.info().attach(name, {
+    body: JSON.stringify(evidence, null, 2),
+    contentType: 'application/json',
+  });
+}
+
+function rejoinSampleFingerprint(sample: RejoinAdmissionSample): string {
+  return JSON.stringify({
+    ready: sample.ready,
+    transportReady: sample.transportReady,
+    document: sample.document,
+    gameStarted: sample.gameStarted,
+    matchPhase: sample.matchPhase,
+    admission: sample.admission,
+    deployment: sample.deployment,
+    privateMatch: sample.privateMatch,
+  });
+}
+
+async function waitForRejoinPresentation(guest: Page, rejoinStartedAt: number): Promise<Readonly<{
+  elapsedMs: number;
+  totalElapsedMs: number;
+  samples: readonly TimedRejoinAdmissionSample[];
+}>> {
+  const startedAt = Date.now();
+  const samples: TimedRejoinAdmissionSample[] = [];
+  let lastFingerprint = '';
+  let nextPeriodicTraceAt = 0;
+  while (true) {
+    const current = await sampleRejoinAdmission(guest);
+    const elapsedMs = Date.now() - startedAt;
+    const totalElapsedMs = Date.now() - rejoinStartedAt;
+    const timed = Object.freeze({ ...current, elapsedMs });
+    const fingerprint = rejoinSampleFingerprint(current);
+    if (fingerprint !== lastFingerprint || elapsedMs >= nextPeriodicTraceAt) {
+      samples.push(timed);
+      lastFingerprint = fingerprint;
+      nextPeriodicTraceAt = elapsedMs + REJOIN_PRESENTATION_TRACE_INTERVAL_MS;
+    }
+    if (current.document.visibilityState !== 'visible' || !current.document.hasFocus) {
+      const diagnostic = await sampleRejoinFailureDiagnostic(guest);
+      const evidence = { elapsedMs, totalElapsedMs, samples, diagnostic };
+      await attachRejoinEvidence('qoder-rejoin-foreground-loss', evidence);
+      throw new Error(`Qoder rejoin lost foreground presentation ownership: ${JSON.stringify({ elapsedMs, totalElapsedMs, document: current.document, deployment: current.deployment })}`);
+    }
+    if (totalElapsedMs >= REJOIN_END_TO_END_ADMISSION_TIMEOUT_MS) {
+      const diagnostic = await sampleRejoinFailureDiagnostic(guest);
+      const evidence = { elapsedMs, totalElapsedMs, samples, diagnostic };
+      await attachRejoinEvidence('qoder-rejoin-presentation-timeout', evidence);
+      throw new Error(`Qoder rejoin presentation did not converge within the ${REJOIN_END_TO_END_ADMISSION_TIMEOUT_MS} ms end-to-end bound: ${JSON.stringify({ elapsedMs, totalElapsedMs, document: current.document, admission: current.admission, deployment: current.deployment })}`);
+    }
+    if (current.ready) return Object.freeze({ elapsedMs, totalElapsedMs, samples: Object.freeze(samples) });
+    await guest.waitForTimeout(REJOIN_PRESENTATION_SAMPLE_INTERVAL_MS);
+  }
 }
 
 async function startMatch(
@@ -94,13 +228,38 @@ async function rejoinGuest(guest: Page, roomCode: string, name: string): Promise
   await expect(guest.locator('#room-input')).toHaveValue(roomCode);
   await expect(guest.locator('#join')).toHaveText('REJOIN LAST MATCH');
   await guest.locator('#player-name').fill(name);
+  await guest.bringToFront();
+  await expect.poll(async () => guest.evaluate(() => ({
+    visibilityState: document.visibilityState,
+    hasFocus: document.hasFocus(),
+  })), { timeout: REJOIN_FOREGROUND_OWNERSHIP_TIMEOUT_MS })
+    .toEqual({ visibilityState: 'visible', hasFocus: true });
+  const rejoinStartedAt = Date.now();
   await guest.locator('#join').click();
-  await guest.waitForFunction(() => {
-    const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
-    return state.gameStarted && state.matchPhase === 'active'
-      && state.networkLifecycle.hostConnectionOpen === true
-      && state.privateMatch?.members.every((member: any) => member.connected);
-  }, undefined, { timeout: 75_000 });
+  try {
+    await guest.waitForFunction(() => {
+      const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+      return state.networkLifecycle.hostConnectionOpen === true
+        && state.privateMatch?.members.length === 2
+        && state.privateMatch.members.every((member: any) => member.connected === true);
+    }, undefined, { timeout: REJOIN_TRANSPORT_ADMISSION_TIMEOUT_MS });
+  } catch (error) {
+    const diagnostic = await sampleRejoinFailureDiagnostic(guest);
+    await attachRejoinEvidence('qoder-rejoin-transport-timeout', {
+      elapsedMs: Date.now() - rejoinStartedAt,
+      diagnostic,
+    });
+    throw new Error(`Qoder rejoin transport did not converge within ${REJOIN_TRANSPORT_ADMISSION_TIMEOUT_MS} ms: ${JSON.stringify(diagnostic)}`, { cause: error });
+  }
+  const transportElapsedMs = Date.now() - rejoinStartedAt;
+  const presentation = await waitForRejoinPresentation(guest, rejoinStartedAt);
+  await attachRejoinEvidence(`qoder-rejoin-${name.toLowerCase().replaceAll(' ', '-')}`, {
+    transportElapsedMs,
+    presentationElapsedMs: presentation.elapsedMs,
+    totalElapsedMs: presentation.totalElapsedMs,
+    endToEndAdmissionTimeoutMs: REJOIN_END_TO_END_ADMISSION_TIMEOUT_MS,
+    samples: presentation.samples,
+  });
 }
 
 async function settleCrashPrimitive(operation: Promise<unknown>, timeoutMs = 5_000): Promise<void> {

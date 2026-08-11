@@ -144,6 +144,63 @@ test('all five runtime specs bind their navigated page through the shared exact-
   }
 });
 
+test('Qoder replacement admission restores foreground ownership without widening frozen bounds', () => {
+  const source = readFileSync('tests/e2e/pass66-qoder-multiplayer-authority.spec.ts', 'utf8');
+  const samplerStart = source.indexOf('async function sampleRejoinAdmission(');
+  const failureDiagnosticStart = source.indexOf('async function sampleRejoinFailureDiagnostic(', samplerStart);
+  const failureDiagnosticEnd = source.indexOf('function rejoinSampleFingerprint(', failureDiagnosticStart);
+  const presentationStart = source.indexOf('async function waitForRejoinPresentation(');
+  const presentationEnd = source.indexOf('async function startMatch(', presentationStart);
+  const rejoinStart = source.indexOf('async function rejoinGuest(');
+  const rejoinEnd = source.indexOf('async function settleCrashPrimitive(', rejoinStart);
+  assert.ok(samplerStart >= 0 && failureDiagnosticStart > samplerStart);
+  assert.ok(failureDiagnosticEnd > failureDiagnosticStart);
+  assert.ok(presentationStart >= 0 && presentationEnd > presentationStart);
+  assert.ok(rejoinStart >= 0 && rejoinEnd > rejoinStart);
+  const sampler = source.slice(samplerStart, failureDiagnosticStart);
+  const failureDiagnostic = source.slice(failureDiagnosticStart, failureDiagnosticEnd);
+  const presentation = source.slice(presentationStart, presentationEnd);
+  const rejoin = source.slice(rejoinStart, rejoinEnd);
+
+  assert.match(source, /REJOIN_FOREGROUND_OWNERSHIP_TIMEOUT_MS = 5_000/u);
+  assert.match(source, /REJOIN_TRANSPORT_ADMISSION_TIMEOUT_MS = 20_000/u);
+  assert.match(source, /REJOIN_END_TO_END_ADMISSION_TIMEOUT_MS = 75_000/u);
+  assert.match(source, /test\.describe\.configure\(\{ timeout: 240_000 \}\);/u);
+  assert.doesNotMatch(rejoin, /150_000/u);
+
+  const bringToFrontAt = rejoin.indexOf('await guest.bringToFront();');
+  const foregroundAssertionAt = rejoin.indexOf("toEqual({ visibilityState: 'visible', hasFocus: true });");
+  const trustedRejoinAt = rejoin.indexOf("await guest.locator('#join').click();");
+  assert.ok(bringToFrontAt >= 0 && foregroundAssertionAt > bringToFrontAt && trustedRejoinAt > foregroundAssertionAt);
+  assert.match(rejoin, /timeout: REJOIN_FOREGROUND_OWNERSHIP_TIMEOUT_MS/u);
+
+  const transportStart = rejoin.indexOf('try {');
+  const transportEnd = rejoin.indexOf('const transportElapsedMs', transportStart);
+  assert.ok(transportStart >= 0 && transportEnd > transportStart);
+  const transport = rejoin.slice(transportStart, transportEnd);
+  assert.match(transport, /state\.networkLifecycle\.hostConnectionOpen === true/u);
+  assert.match(transport, /state\.privateMatch\?\.members\.length === 2/u);
+  assert.match(transport, /timeout: REJOIN_TRANSPORT_ADMISSION_TIMEOUT_MS/u);
+  assert.doesNotMatch(transport, /state\.(?:gameStarted|matchPhase)/u);
+
+  assert.match(sampler, /visibilityState: document\.visibilityState/u);
+  assert.match(sampler, /hasFocus: document\.hasFocus\(\)/u);
+  assert.match(sampler, /dataset\.loadingStage/u);
+  assert.match(sampler, /dataset\.loadingPercent/u);
+  assert.match(sampler, /dataset\.loadingEtaSeconds/u);
+  assert.match(failureDiagnostic, /sampleWeaponCatalogReadiness/u);
+  assert.ok(
+    presentation.indexOf('totalElapsedMs >= REJOIN_END_TO_END_ADMISSION_TIMEOUT_MS')
+      < presentation.indexOf('if (current.ready)'),
+    'the exact 75s end-to-end bound must win over a late readiness sample',
+  );
+  assert.match(presentation, /attachRejoinEvidence\('qoder-rejoin-foreground-loss'/u);
+  assert.match(presentation, /attachRejoinEvidence\('qoder-rejoin-presentation-timeout'/u);
+  assert.match(rejoin, /attachRejoinEvidence\('qoder-rejoin-transport-timeout'/u);
+  assert.match(rejoin, /totalElapsedMs: presentation\.totalElapsedMs/u);
+  assert.match(rejoin, /samples: presentation\.samples/u);
+});
+
 test('final receipt binds exact runtime, test matrix and five physical peer identities', () => {
   const baseUrl = 'http://127.0.0.1:4530/channels/the-big-one/';
   const receipt = {
