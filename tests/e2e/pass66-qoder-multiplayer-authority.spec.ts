@@ -13,6 +13,7 @@ const REJOIN_END_TO_END_ADMISSION_TIMEOUT_MS = 75_000;
 const REJOIN_PRESENTATION_SAMPLE_INTERVAL_MS = 500;
 const REJOIN_PRESENTATION_TRACE_INTERVAL_MS = 5_000;
 const HOST_RECOVERY_END_TO_END_TIMEOUT_MS = 90_000;
+const GUEST_RENDER_RESUME_FRAME_TIMEOUT_MS = 10_000;
 const REMOTE_STAGE_ACK_TIMEOUT_MS = 10_000;
 
 type Position3 = readonly [number, number, number];
@@ -299,8 +300,16 @@ async function sampleHostRecoveryEvidence(host: Page, guest: Page): Promise<unkn
       remotePlayerCount: state?.remotePlayers?.length ?? null,
       networkLifecycle: state?.networkLifecycle ?? null,
       privateMatch: state?.privateMatch ?? null,
+      runtimeProvenance: state?.render?.runtime ?? null,
+      arenaTransition: state?.arenaSelection?.streaming?.transition ?? null,
       admission: debug?.admissionState?.() ?? null,
       weaponCatalog: debug?.sampleWeaponCatalogReadiness?.() ?? null,
+      menuPrewarm: {
+        lifecycle: document.documentElement.dataset.menuLifecycle ?? null,
+        state: state?.menuLifecycle ?? null,
+        preview: state?.menuPreview?.rendererEvidence ?? null,
+        rendererResidency: debug?.sampleRendererResidency?.() ?? null,
+      },
       deployment: document.querySelector<HTMLElement>('#deployment-transition')?.dataset ?? null,
     };
   });
@@ -517,67 +526,122 @@ test('post-death ladders survive authenticated replacements and an immediate hos
       containsRawToken: false,
     });
 
+    const guestRecoveryTopology = await guest.evaluate(() => {
+      const debug = (window as any).__ATOMIC_ACRES_DEBUG__;
+      const state = debug.snapshot();
+      const softwareAdapter = state.render.runtime.softwareAdapter === true;
+      if (softwareAdapter) debug.setRenderPaused(true);
+      return {
+        softwareAdapter,
+        pausedAtPresentedGameplayFrame: Number(debug.admissionState().presentedGameplayFrame),
+        runtimeProvenance: state.render.runtime,
+        arenaTransition: state.arenaSelection?.streaming?.transition ?? null,
+        menuPrewarm: {
+          lifecycle: document.documentElement.dataset.menuLifecycle ?? null,
+          state: state.menuLifecycle ?? null,
+          preview: state.menuPreview?.rendererEvidence ?? null,
+          rendererResidency: debug.sampleRendererResidency?.() ?? null,
+        },
+      };
+    });
+    expect(typeof guestRecoveryTopology.softwareAdapter).toBe('boolean');
+    expect(Number.isFinite(guestRecoveryTopology.pausedAtPresentedGameplayFrame)).toBe(true);
+
     // The renderer crash below is deliberate. Retain any errors already observed,
-    // but do not mistake Chromium's crash diagnostic for a game page error.
-    host.removeAllListeners('pageerror');
-    const cdp = await hostContext.newCDPSession(host);
-    await settleCrashPrimitive(cdp.send('Page.crash'));
-    host = await openPlayer(hostContext, 'Ladder Host', 'pass66-ladder-host-recovery');
-    host.on('pageerror', (error) => errors.push(`recovered host: ${error.message}`));
-    await expect(host.locator('#host')).toHaveText('RESUME HOSTED MATCH');
-    const hostRecoveryStartedAt = Date.now();
-    await host.locator('#host').click();
+    // but do not mistake Chromium's crash diagnostic for a game page error. A
+    // co-located software renderer is paused only for this recovery window so
+    // the recovering host retains the same production prewarm/readiness work.
+    let hostRecoveryElapsedMs = 0;
     try {
-      await host.waitForFunction(() => {
-        const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
-        return state.gameStarted && state.matchPhase === 'active';
-      }, undefined, { timeout: remainingHostRecoveryTimeoutMs(hostRecoveryStartedAt) });
-    } catch (error) {
-      await failHostRecoveryStage('host-active', hostRecoveryStartedAt, host, guest, error);
+      host.removeAllListeners('pageerror');
+      const cdp = await hostContext.newCDPSession(host);
+      await settleCrashPrimitive(cdp.send('Page.crash'));
+      host = await openPlayer(hostContext, 'Ladder Host', 'pass66-ladder-host-recovery');
+      host.on('pageerror', (error) => errors.push(`recovered host: ${error.message}`));
+      await expect(host.locator('#host')).toHaveText('RESUME HOSTED MATCH');
+      const hostRecoveryStartedAt = Date.now();
+      await host.locator('#host').click();
+      try {
+        await host.waitForFunction(() => {
+          const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+          return state.gameStarted && state.matchPhase === 'active';
+        }, undefined, { timeout: remainingHostRecoveryTimeoutMs(hostRecoveryStartedAt) });
+      } catch (error) {
+        await failHostRecoveryStage('host-active', hostRecoveryStartedAt, host, guest, error);
+      }
+      await guest.bringToFront();
+      try {
+        await expect.poll(async () => guest.evaluate(() => ({
+          visibilityState: document.visibilityState,
+          hasFocus: document.hasFocus(),
+        })), {
+          timeout: Math.min(
+            REJOIN_FOREGROUND_OWNERSHIP_TIMEOUT_MS,
+            remainingHostRecoveryTimeoutMs(hostRecoveryStartedAt),
+          ),
+        }).toEqual({ visibilityState: 'visible', hasFocus: true });
+      } catch (error) {
+        await failHostRecoveryStage('guest-foreground', hostRecoveryStartedAt, host, guest, error);
+      }
+      try {
+        await guest.waitForFunction(() => {
+          const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+          return state.gameStarted && state.matchPhase === 'active'
+            && state.networkLifecycle.hostConnectionOpen === true;
+        }, undefined, { timeout: remainingHostRecoveryTimeoutMs(hostRecoveryStartedAt) });
+      } catch (error) {
+        await failHostRecoveryStage('guest-active', hostRecoveryStartedAt, host, guest, error);
+      }
+      try {
+        await host.waitForFunction(() => (
+          (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().killstreak.actors.length === 2
+        ), undefined, { timeout: remainingHostRecoveryTimeoutMs(hostRecoveryStartedAt) });
+      } catch (error) {
+        await failHostRecoveryStage('host-actors', hostRecoveryStartedAt, host, guest, error);
+      }
+      hostRecoveryElapsedMs = Date.now() - hostRecoveryStartedAt;
+      if (hostRecoveryElapsedMs > HOST_RECOVERY_END_TO_END_TIMEOUT_MS) {
+        await failHostRecoveryStage(
+          'end-to-end-bound',
+          hostRecoveryStartedAt,
+          host,
+          guest,
+          new Error(`Recovery completed after ${hostRecoveryElapsedMs} ms`),
+        );
+      }
+    } finally {
+      if (guestRecoveryTopology.softwareAdapter) {
+        await guest.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.setRenderPaused(false));
+      }
     }
-    await guest.bringToFront();
-    try {
-      await expect.poll(async () => guest.evaluate(() => ({
-        visibilityState: document.visibilityState,
-        hasFocus: document.hasFocus(),
-      })), {
-        timeout: Math.min(
-          REJOIN_FOREGROUND_OWNERSHIP_TIMEOUT_MS,
-          remainingHostRecoveryTimeoutMs(hostRecoveryStartedAt),
-        ),
-      }).toEqual({ visibilityState: 'visible', hasFocus: true });
-    } catch (error) {
-      await failHostRecoveryStage('guest-foreground', hostRecoveryStartedAt, host, guest, error);
-    }
-    try {
-      await guest.waitForFunction(() => {
-        const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
-        return state.gameStarted && state.matchPhase === 'active'
-          && state.networkLifecycle.hostConnectionOpen === true;
-      }, undefined, { timeout: remainingHostRecoveryTimeoutMs(hostRecoveryStartedAt) });
-    } catch (error) {
-      await failHostRecoveryStage('guest-active', hostRecoveryStartedAt, host, guest, error);
-    }
-    try {
-      await host.waitForFunction(() => (
-        (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().killstreak.actors.length === 2
-      ), undefined, { timeout: remainingHostRecoveryTimeoutMs(hostRecoveryStartedAt) });
-    } catch (error) {
-      await failHostRecoveryStage('host-actors', hostRecoveryStartedAt, host, guest, error);
-    }
-    const hostRecoveryElapsedMs = Date.now() - hostRecoveryStartedAt;
-    if (hostRecoveryElapsedMs > HOST_RECOVERY_END_TO_END_TIMEOUT_MS) {
-      await failHostRecoveryStage(
-        'end-to-end-bound',
-        hostRecoveryStartedAt,
-        host,
-        guest,
-        new Error(`Recovery completed after ${hostRecoveryElapsedMs} ms`),
-      );
+
+    let resumedGuestPresentedGameplayFrame = guestRecoveryTopology.pausedAtPresentedGameplayFrame;
+    if (guestRecoveryTopology.softwareAdapter) {
+      try {
+        await guest.waitForFunction((baselineFrame) => (
+          (window as any).__ATOMIC_ACRES_DEBUG__.admissionState().presentedGameplayFrame > baselineFrame
+        ), guestRecoveryTopology.pausedAtPresentedGameplayFrame, {
+          timeout: GUEST_RENDER_RESUME_FRAME_TIMEOUT_MS,
+        });
+      } catch (error) {
+        await attachRejoinEvidence('qoder-host-recovery-guest-render-resume-timeout', {
+          timeoutMs: GUEST_RENDER_RESUME_FRAME_TIMEOUT_MS,
+          guestRecoveryTopology,
+          diagnostic: await sampleHostRecoveryEvidence(host, guest),
+        });
+        throw error;
+      }
+      resumedGuestPresentedGameplayFrame = await guest.evaluate(() => Number(
+        (window as any).__ATOMIC_ACRES_DEBUG__.admissionState().presentedGameplayFrame,
+      ));
+      expect(resumedGuestPresentedGameplayFrame)
+        .toBeGreaterThan(guestRecoveryTopology.pausedAtPresentedGameplayFrame);
     }
     await attachRejoinEvidence('qoder-host-recovery-complete', {
       elapsedMs: hostRecoveryElapsedMs,
       endToEndTimeoutMs: HOST_RECOVERY_END_TO_END_TIMEOUT_MS,
+      guestRecoveryTopology,
+      resumedGuestPresentedGameplayFrame,
       diagnostic: await sampleHostRecoveryEvidence(host, guest),
     });
 

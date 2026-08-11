@@ -201,28 +201,50 @@ test('Qoder replacement admission restores foreground ownership without widening
   assert.match(rejoin, /samples: presentation\.samples/u);
 });
 
-test('Qoder host recovery gives the guest foreground before actor convergence within the frozen 90s', () => {
+test('Qoder host recovery isolates a co-located software renderer within the frozen 90s', () => {
   const source = readFileSync('tests/e2e/pass66-qoder-multiplayer-authority.spec.ts', 'utf8');
+  const samplerStart = source.indexOf('async function sampleHostRecoveryEvidence(');
+  const samplerEnd = source.indexOf('async function failHostRecoveryStage(', samplerStart);
+  const failureEnd = source.indexOf('async function selectClearDeathDropApproach(', samplerEnd);
   const ladderStart = source.indexOf("test('post-death ladders survive authenticated replacements");
   const ladderEnd = source.indexOf("test('a guest death-drop scavenge", ladderStart);
+  assert.ok(samplerStart >= 0 && samplerEnd > samplerStart);
+  assert.ok(failureEnd > samplerEnd);
   assert.ok(ladderStart >= 0 && ladderEnd > ladderStart);
+  const sampler = source.slice(samplerStart, samplerEnd);
+  const failureDiagnostic = source.slice(samplerEnd, failureEnd);
   const ladder = source.slice(ladderStart, ladderEnd);
 
   assert.match(source, /HOST_RECOVERY_END_TO_END_TIMEOUT_MS = 90_000/u);
+  assert.match(source, /GUEST_RENDER_RESUME_FRAME_TIMEOUT_MS = 10_000/u);
   assert.match(ladder, /test\.setTimeout\(300_000\)/u);
   assert.doesNotMatch(ladder, /timeout: 90_000/u);
   assert.equal(
     ladder.match(/remainingHostRecoveryTimeoutMs\(hostRecoveryStartedAt\)/gu)?.length,
     4,
   );
+  assert.equal(source.match(/setRenderPaused\(/gu)?.length, 2);
+  assert.equal(ladder.match(/setRenderPaused\(/gu)?.length, 2);
 
+  const topologyAt = ladder.indexOf('const guestRecoveryTopology = await guest.evaluate');
+  const softwareAdapterAt = ladder.indexOf('state.render.runtime.softwareAdapter === true', topologyAt);
+  const pauseAt = ladder.indexOf('debug.setRenderPaused(true)', softwareAdapterAt);
+  const crashAt = ladder.indexOf("cdp.send('Page.crash')", pauseAt);
   const hostClickAt = ladder.indexOf("await host.locator('#host').click();");
   const hostActiveAt = ladder.indexOf("failHostRecoveryStage('host-active'");
   const guestForegroundAt = ladder.indexOf('await guest.bringToFront();', hostActiveAt);
   const guestActiveAt = ladder.indexOf("failHostRecoveryStage('guest-active'", guestForegroundAt);
   const hostActorsAt = ladder.indexOf("failHostRecoveryStage('host-actors'", guestActiveAt);
+  const endToEndBoundAt = ladder.indexOf('hostRecoveryElapsedMs > HOST_RECOVERY_END_TO_END_TIMEOUT_MS', hostActorsAt);
+  const recoveryFinallyAt = ladder.indexOf('} finally {', hostActorsAt);
+  const unpauseAt = ladder.indexOf('setRenderPaused(false)', recoveryFinallyAt);
+  const resumedFrameAt = ladder.indexOf('presentedGameplayFrame > baselineFrame', unpauseAt);
+  assert.ok(topologyAt >= 0 && softwareAdapterAt > topologyAt && pauseAt > softwareAdapterAt);
+  assert.ok(crashAt > pauseAt && hostClickAt > crashAt);
   assert.ok(hostClickAt >= 0 && hostActiveAt > hostClickAt);
   assert.ok(guestForegroundAt > hostActiveAt && guestActiveAt > guestForegroundAt && hostActorsAt > guestActiveAt);
+  assert.ok(endToEndBoundAt > hostActorsAt && recoveryFinallyAt > endToEndBoundAt);
+  assert.ok(unpauseAt > recoveryFinallyAt && resumedFrameAt > unpauseAt);
   assert.doesNotMatch(ladder.slice(hostClickAt, guestForegroundAt), /killstreak\.actors/u);
   assert.match(ladder, /visibilityState: document\.visibilityState/u);
   assert.match(ladder, /hasFocus: document\.hasFocus\(\)/u);
@@ -230,7 +252,17 @@ test('Qoder host recovery gives the guest foreground before actor convergence wi
   assert.match(ladder, /snapshot\(\)\.killstreak\.actors\.length === 2/u);
   assert.match(ladder, /hostRecoveryElapsedMs > HOST_RECOVERY_END_TO_END_TIMEOUT_MS/u);
   assert.match(ladder, /'end-to-end-bound'/u);
+  assert.match(ladder, /timeout: GUEST_RENDER_RESUME_FRAME_TIMEOUT_MS/u);
+  assert.match(ladder, /qoder-host-recovery-guest-render-resume-timeout/u);
   assert.match(ladder, /qoder-host-recovery-complete/u);
+  assert.match(ladder, /if \(softwareAdapter\) debug\.setRenderPaused\(true\)/u);
+  assert.match(ladder, /finally \{\s+if \(guestRecoveryTopology\.softwareAdapter\)/u);
+  assert.match(failureDiagnostic, /sampleHostRecoveryEvidence\(host, guest\)/u);
+  assert.match(sampler, /runtimeProvenance: state\?\.render\?\.runtime/u);
+  assert.match(sampler, /arenaTransition: state\?\.arenaSelection\?\.streaming\?\.transition/u);
+  assert.match(sampler, /menuPrewarm:/u);
+  assert.match(sampler, /state: state\?\.menuLifecycle/u);
+  assert.match(sampler, /sampleRendererResidency/u);
 });
 
 test('Qoder death-drop staging derives a collision-clear route without widening its 10s ACK bound', () => {
