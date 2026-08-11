@@ -301,11 +301,6 @@ test('an active flare repairs a rejoining guest without duplicate replicas', asy
     window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.members
       .find((member: { id: string }) => member.id === id)?.connected === true
   ), guestId, { timeout: 20_000 });
-  const hostRemoteSeqBeforeRepair = await host.evaluate((id) => (
-    window.__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers
-      .find((remote: { id: string }) => remote.id === id)?.seq ?? null
-  ), guestId);
-  expect(hostRemoteSeqBeforeRepair).not.toBeNull();
 
   const beforeShots = await host.evaluate(() => (
     window.__ATOMIC_ACRES_DEBUG__.snapshot().timedMapWeapons.states['flare-gun'].shotsRemaining
@@ -385,18 +380,26 @@ test('an active flare repairs a rejoining guest without duplicate replicas', asy
     }, { ownerId: hostId, actionNonce: repairSource.replica.actionNonce });
     expect(liveAtWorldRepair.replica, 'selected host flare remains live across world-ready repair').toBeTruthy();
     expect(liveAtWorldRepair.replica.remainingMs).toBeGreaterThan(0);
-    await host.waitForFunction(({ ownerId, actionNonce, priorBroadcastAt }) => {
-      const timed = window.__ATOMIC_ACRES_DEBUG__.snapshot().timedMapWeapons;
+    await host.waitForFunction(({ ownerId, guestId, actionNonce, priorBroadcastAt }) => {
+      const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+      const timed = snapshot.timedMapWeapons;
       return timed.flarePresentationReplication.lastBroadcastAt > priorBroadcastAt
+        && snapshot.remotePlayers.some((candidate: { id: string }) => candidate.id === guestId)
         && timed.flareActiveReplicas.some((candidate: {
           ownerId: string; authority: boolean; actionNonce: number; remainingMs: number;
         }) => candidate.ownerId === ownerId && candidate.authority === true
           && candidate.actionNonce === actionNonce && candidate.remainingMs > 0);
     }, {
       ownerId: hostId,
+      guestId,
       actionNonce: repairSource.replica.actionNonce,
       priorBroadcastAt: repairSource.broadcastAt,
     }, { timeout: 15_000 });
+    const hostRemoteSeqAtWorldRepair = await host.evaluate((id) => (
+      window.__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers
+        .find((remote: { id: string }) => remote.id === id)?.seq ?? null
+    ), guestId);
+    expect(hostRemoteSeqAtWorldRepair).not.toBeNull();
 
     await guest.waitForFunction(({ ownerId, actionNonce }) => {
       const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
@@ -410,13 +413,14 @@ test('an active flare repairs a rejoining guest without duplicate replicas', asy
         && snapshot.player.lastAppliedGuestResumeAuthority !== null;
     }, { ownerId: hostId, actionNonce: repairSource.replica.actionNonce }, { timeout: 15_000 });
     // The guest emits its ACK before a fresh state commit on the same ordered
-    // event lane, while the host rejects replacement state until that ACK.
-    // A later remote sequence therefore proves the host accepted the ACK.
+    // event lane, while the host rejects replacement state until that ACK. A
+    // sequence advance from the post-world-ready remote therefore proves the
+    // host accepted the ACK without assuming the remote existed at lobby auth.
     await host.waitForFunction(({ guestId, priorSeq }) => {
       const remote = window.__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers
         .find((candidate: { id: string }) => candidate.id === guestId);
       return remote !== undefined && remote.seq > priorSeq;
-    }, { guestId, priorSeq: hostRemoteSeqBeforeRepair }, { timeout: 15_000 });
+    }, { guestId, priorSeq: hostRemoteSeqAtWorldRepair }, { timeout: 15_000 });
   } catch (error) {
     const [hostDiagnostic, guestDiagnostic] = await Promise.all([
       host.evaluate(() => {
