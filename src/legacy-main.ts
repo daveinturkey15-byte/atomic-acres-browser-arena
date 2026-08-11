@@ -680,6 +680,7 @@ import {
   type FlarePresentationReconcileResult,
   type FlareBurnPulse,
   type FlareProjectileCallbacks,
+  type FlareProjectileDirectHit,
   type FlareProjectileImpact,
   type FlareProjectileTarget,
 } from './flare-projectile-system';
@@ -691,7 +692,9 @@ import {
 } from './flare-authority-checkpoint';
 import { FLAMETHROWER_EFFECT, FLARE_PROJECTILE_EFFECT } from './special-weapon-effects';
 import {
+  FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE,
   FLAMETHROWER_GROUND_FIRE_DURATION_MS,
+  FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS,
   FlamethrowerGroundFirePool,
   FlamethrowerStreamSystem,
   flamethrowerPulseImpactPresentationEnabled,
@@ -1602,8 +1605,6 @@ const flamethrowerStreamPresentation = new FlamethrowerStreamSystem(
   softwareRenderer,
 );
 const FLAMETHROWER_GROUND_FIRE_RADIUS_M = 1.8;
-const FLAMETHROWER_GROUND_FIRE_PULSE_MS = 500;
-const FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE = 6;
 const FLAMETHROWER_GROUND_FIRE_CAPACITY = 24;
 const flamethrowerGroundFires = new FlamethrowerGroundFirePool(FLAMETHROWER_GROUND_FIRE_CAPACITY);
 const flamethrowerGroundFireBotSnapshot: BotPlayer[] = [];
@@ -1639,7 +1640,7 @@ function applyFlamethrowerGroundFirePulse(fire: Readonly<{
 
 function updateFlamethrowerGroundFires(now: number): void {
   flamethrowerGroundFireBotSnapshotReady = false;
-  flamethrowerGroundFires.update(now, FLAMETHROWER_GROUND_FIRE_PULSE_MS, applyFlamethrowerGroundFirePulse);
+  flamethrowerGroundFires.update(now, FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS, applyFlamethrowerGroundFirePulse);
 }
 
 const dmrThermalPresentation = new DmrThermalPresentation(scene, element<HTMLElement>('#dmr-thermal'));
@@ -12953,6 +12954,7 @@ function restoreRecoveredFlareRuntime(
       // burn pulses. Only immutable world collision and effect time advance.
       hostileTargets: () => Object.freeze([]),
       burnLineOfSight: () => false,
+      onDirectHit: () => undefined,
       onImpact: () => undefined,
       onBurnPulse: () => undefined,
       onExpire: () => undefined,
@@ -14128,7 +14130,7 @@ function tryFire(now: number): void {
           actionNonce: randomNonce(),
           now,
           durationMs: FLAMETHROWER_GROUND_FIRE_DURATION_MS,
-          pulseIntervalMs: FLAMETHROWER_GROUND_FIRE_PULSE_MS,
+          pulseIntervalMs: FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS,
         });
       }
     }
@@ -16297,7 +16299,8 @@ function finishPendingFlareShot(
   };
   flareShotResultContexts.set(`${ownerId}:${actionNonce}`, Object.freeze({
     ...pending,
-    expiresAt: resolvedAt + FLARE_PROJECTILE_EFFECT.burnDurationMs + 1_000,
+    expiresAt: resolvedAt + FLARE_PROJECTILE_EFFECT.maximumFlightMs
+      + FLARE_PROJECTILE_EFFECT.burnDurationMs + 1_000,
   }));
   shotTimingTelemetry.recordHostResolution({
     fireTimeMs: pending.request.fireTimeMs,
@@ -16311,16 +16314,25 @@ function finishPendingFlareShot(
   network.send(result);
 }
 
+function handleFlareDirectHit(hit: FlareProjectileDirectHit): void {
+  const outcome = applyFlareTargetDamage(
+    hit.target,
+    hit.ownerId,
+    hit.actionNonce,
+    hit.directDamage,
+    hit.point,
+  );
+  if (outcome) timedMapWeaponAudit.flareDamage += outcome.damage;
+  finishPendingFlareShot(hit.ownerId, hit.actionNonce, outcome);
+}
+
 function handleFlareImpact(impact: FlareProjectileImpact): void {
   timedMapWeaponAudit.flareImpacts += 1;
-  // Flare fire also ignites the floor like napalm for its full burn duration.
+  // Direct damage is resolved during flight; only the later world impact
+  // starts the visual fire. FlareProjectileSystem exclusively owns its DOT.
   const groundPoint = new THREE.Vector3(impact.point.x, Math.max(0.06, impact.point.y), impact.point.z);
   flamethrowerStreamPresentation.igniteGround(groundPoint, performance.now());
-  const outcome = impact.authority && impact.target
-    ? applyFlareTargetDamage(impact.target, impact.ownerId, impact.actionNonce, impact.directDamage, impact.point)
-    : null;
-  if (outcome) timedMapWeaponAudit.flareDamage += outcome.damage;
-  if (impact.authority) finishPendingFlareShot(impact.ownerId, impact.actionNonce, outcome);
+  if (impact.authority) finishPendingFlareShot(impact.ownerId, impact.actionNonce, null);
 }
 
 function handleFlareBurnPulse(pulse: FlareBurnPulse): void {
@@ -16377,6 +16389,7 @@ const flareProjectileCallbacks: FlareProjectileCallbacks = Object.freeze({
     }
     return true;
   },
+  onDirectHit: handleFlareDirectHit,
   onImpact: handleFlareImpact,
   onBurnPulse: handleFlareBurnPulse,
   onExpire: (expiry) => {
@@ -18526,7 +18539,7 @@ function updatePass65KillstreakRuntime(now: number): void {
             actionNonce: randomNonce(),
             now,
             durationMs: FLAMETHROWER_GROUND_FIRE_DURATION_MS,
-            pulseIntervalMs: FLAMETHROWER_GROUND_FIRE_PULSE_MS,
+            pulseIntervalMs: FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS,
           });
         }
         audio.explosion(now);

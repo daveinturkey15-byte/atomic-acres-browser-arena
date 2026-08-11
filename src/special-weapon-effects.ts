@@ -14,7 +14,7 @@ export const FLARE_PROJECTILE_EFFECT = Object.freeze({
   burnDurationMs: 5_000,
   directDamage: 42,
   burnRadiusM: 3.4,
-  maximumBurnDamage: 20,
+  burnDamagePerSecond: 10,
   poolCapacity: 12,
 });
 
@@ -74,11 +74,10 @@ export function flareProjectileExpired(state: FlareProjectileKinematics): boolea
   return !Number.isFinite(state.ageMs) || state.ageMs >= FLARE_PROJECTILE_EFFECT.maximumFlightMs;
 }
 
-/** Non-explosive thermal burn: direct impact is separate and this has no impulse. */
-export function flareBurnDamage(distanceM: number): number {
+/** Flat non-explosive fire DPS while a target remains inside the admitted radius. */
+export function flareBurnDamagePerSecond(distanceM: number): number {
   if (!Number.isFinite(distanceM) || distanceM < 0 || distanceM >= FLARE_PROJECTILE_EFFECT.burnRadiusM) return 0;
-  const normalized = 1 - distanceM / FLARE_PROJECTILE_EFFECT.burnRadiusM;
-  return FLARE_PROJECTILE_EFFECT.maximumBurnDamage * normalized * normalized;
+  return FLARE_PROJECTILE_EFFECT.burnDamagePerSecond;
 }
 
 export function flamethrowerStreamScale(distanceM: number): number {

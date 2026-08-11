@@ -31,6 +31,7 @@ import type {
   FlareAuthorityContinuationCheckpoint,
   FlareShooterFeedbackCheckpoint,
 } from './flare-authority-checkpoint';
+import { FLARE_AUTHORITY_CHECKPOINT_SCHEMA_VERSION } from './flare-authority-checkpoint';
 
 class MemoryStorage {
   readonly values = new Map<string, string>();
@@ -45,7 +46,7 @@ function weaponCounters(value: number): Record<WeaponId, number> {
 
 function activeGuestFlare(ownerId = 'guest-1', actionNonce = 91): FlareAuthorityContinuationCheckpoint {
   return Object.freeze({
-    schemaVersion: 1,
+    schemaVersion: FLARE_AUTHORITY_CHECKPOINT_SCHEMA_VERSION,
     snapshotSeq: 4,
     effects: Object.freeze([Object.freeze({
       ownerId,
@@ -55,6 +56,7 @@ function activeGuestFlare(ownerId = 'guest-1', actionNonce = 91): FlareAuthority
       position: Object.freeze([0, 2, 0] as const),
       velocity: Object.freeze([52, 0, 0] as const),
       remainingMs: 4_500,
+      directHitDelivered: false,
       nextBurnPulseRemainingMs: null,
       burnPulseIndex: 0,
     })]),
@@ -171,7 +173,7 @@ function checkpoint(overrides: Partial<HostMatchCheckpoint> = {}): HostMatchChec
       sha256: 'a'.repeat(64),
       expiresAtEpochMs: savedAtEpochMs + HOST_MATCH_CHECKPOINT_TTL_MS,
     }],
-    flareProjectiles: { schemaVersion: 1, snapshotSeq: 0, effects: [] },
+    flareProjectiles: { schemaVersion: FLARE_AUTHORITY_CHECKPOINT_SCHEMA_VERSION, snapshotSeq: 0, effects: [] },
     flareShotFeedback: [],
     railgun: checkpointRailgunAuthority(createRailgunAuthorityState('disabled', 0, 0, 7), 1_000)!,
     timedMapWeapons: checkpointTimedMapWeaponAuthorities({

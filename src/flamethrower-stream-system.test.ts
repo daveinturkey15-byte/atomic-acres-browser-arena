@@ -2,7 +2,9 @@ import * as THREE from 'three';
 import { describe, expect, it, vi } from 'vitest';
 import { FLAMETHROWER_EFFECT } from './special-weapon-effects';
 import {
+  FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE,
   FLAMETHROWER_GROUND_FIRE_DURATION_MS,
+  FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS,
   FlamethrowerGroundFirePool,
   FlamethrowerStreamSystem,
   flamethrowerPulseImpactPresentationEnabled,
@@ -156,5 +158,35 @@ describe('flamethrower stream presentation', () => {
     expect(pulsed).toEqual(['player-a:1.4', 'player-a:1']);
     pool.update(5_200, 500, () => undefined);
     expect(pool.activeCount()).toBe(0);
+  });
+
+  it('applies exactly ten five-damage pulses over five seconds without retroactive catch-up', () => {
+    const pool = new FlamethrowerGroundFirePool(1);
+    expect(pool.ignite({
+      ownerId: 'player-a', ownerTeam: 0, point: new THREE.Vector3(1, 0, 2), actionNonce: 9, now: 100,
+      durationMs: FLAMETHROWER_GROUND_FIRE_DURATION_MS,
+      pulseIntervalMs: FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS,
+    })).toBe('created');
+    let pulses = 0;
+    let damage = 0;
+    const applyPulse = () => {
+      pulses += 1;
+      damage += FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE;
+    };
+    for (let now = 100; now <= 4_600; now += FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS) {
+      pool.update(now, FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS, applyPulse);
+    }
+    expect({ pulses, damage, active: pool.activeCount() }).toEqual({ pulses: 10, damage: 50, active: 1 });
+    pool.update(5_100, FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS, applyPulse);
+    expect({ pulses, damage, active: pool.activeCount() }).toEqual({ pulses: 10, damage: 50, active: 0 });
+
+    expect(pool.ignite({
+      ownerId: 'player-a', ownerTeam: 0, point: new THREE.Vector3(), actionNonce: 10, now: 6_000,
+      durationMs: FLAMETHROWER_GROUND_FIRE_DURATION_MS,
+      pulseIntervalMs: FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS,
+    })).toBe('created');
+    pool.update(6_000, FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS, applyPulse);
+    pool.update(8_400, FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS, applyPulse);
+    expect(pulses).toBe(12);
   });
 });

@@ -20,6 +20,7 @@ function flight(ownerId = 'guest-1', actionNonce = 1): FlareAuthorityContinuatio
     position: Object.freeze([0, 2, 0] as const),
     velocity: Object.freeze([52, 0, 0] as const),
     remainingMs: 5_500,
+    directHitDelivered: false,
     nextBurnPulseRemainingMs: null,
     burnPulseIndex: 0,
   });
@@ -34,6 +35,7 @@ function burn(ownerId = 'guest-2', actionNonce = 2): FlareAuthorityContinuationE
     position: Object.freeze([4, 0, 2] as const),
     velocity: null,
     remainingMs: 4_000,
+    directHitDelivered: false,
     nextBurnPulseRemainingMs: 500,
     burnPulseIndex: 0,
   });
@@ -76,6 +78,9 @@ describe('flare authority checkpoint', () => {
   it('requires an exact, sorted, unique, twelve-entity-bounded continuation', () => {
     const valid = authority([flight('guest-1', 1), burn('guest-2', 2)]);
     expect(isFlareAuthorityContinuationCheckpoint(valid)).toBe(true);
+    expect(isFlareAuthorityContinuationCheckpoint({ ...valid, schemaVersion: 1 })).toBe(false);
+    expect(isFlareAuthorityContinuationCheckpoint(authority([{ ...flight(), directHitDelivered: true }]))).toBe(true);
+    expect(isFlareAuthorityContinuationCheckpoint(authority([{ ...flight(), directHitDelivered: 'yes' as never }]))).toBe(false);
     expect(isFlareAuthorityContinuationCheckpoint({ ...valid, resumeToken: 'secret' })).toBe(false);
     expect(isFlareAuthorityContinuationCheckpoint(authority([burn('z-owner', 1), flight('a-owner', 1)]))).toBe(false);
     expect(isFlareAuthorityContinuationCheckpoint(authority([flight(), flight()]))).toBe(false);

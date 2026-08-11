@@ -11,6 +11,8 @@ const HARDWARE_PARTICLES_PER_EMISSION = 4;
 const SOFTWARE_PARTICLES_PER_EMISSION = 2;
 const MIN_STREAM_DISTANCE_M = 0.35;
 export const FLAMETHROWER_GROUND_FIRE_DURATION_MS = 5_000;
+export const FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS = 500;
+export const FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE = 5;
 const GROUND_FIRE_POOL_CAPACITY = 24;
 
 export const FLAMETHROWER_GROUND_FIRE_MERGE_RADIUS_M = 0.8;
@@ -91,7 +93,10 @@ export class FlamethrowerGroundFirePool {
     entry.actionNonce = input.actionNonce;
     entry.sequence = ++this.nextSequence;
     entry.expiresAt = input.now + input.durationMs;
-    entry.nextPulseAt = input.now + input.pulseIntervalMs;
+    // Apply the first half-second quantum as soon as the actor enters the
+    // patch, then nine more before the five-second expiry. Frame stalls never
+    // replay historical occupancy.
+    entry.nextPulseAt = input.now;
     this.activeEntries += 1;
     return 'created';
   }

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {
   FLARE_PROJECTILE_EFFECT,
-  flareBurnDamage,
+  flareBurnDamagePerSecond,
 } from './special-weapon-effects';
 import {
   FLARE_AUTHORITY_CHECKPOINT_SCHEMA_VERSION,
@@ -41,6 +41,16 @@ export type FlareProjectileImpact = Readonly<{
   directDamage: number;
 }>;
 
+export type FlareProjectileDirectHit = Readonly<{
+  ownerId: string;
+  ownerTeam: Team;
+  actionNonce: number;
+  authority: true;
+  point: THREE.Vector3;
+  target: FlareProjectileTarget;
+  directDamage: number;
+}>;
+
 export type FlareBurnPulse = Readonly<{
   ownerId: string;
   ownerTeam: Team;
@@ -65,6 +75,7 @@ export type FlareProjectileCallbacks = Readonly<{
   withinBounds: (point: THREE.Vector3) => boolean;
   hostileTargets: (ownerId: string, ownerTeam: Team) => readonly FlareProjectileTarget[];
   burnLineOfSight: (point: THREE.Vector3, target: FlareProjectileTarget) => boolean;
+  onDirectHit: (hit: FlareProjectileDirectHit) => void;
   onImpact: (impact: FlareProjectileImpact) => void;
   onBurnPulse: (pulse: FlareBurnPulse) => void;
   onExpire: (expiry: FlareProjectileExpiry) => void;
@@ -86,6 +97,7 @@ type FlareEntity = {
   spawnedAt: number;
   impactedAt: number;
   expiresAt: number;
+  directHitDelivered: boolean;
   nextBurnPulseAt: number;
   burnPulseIndex: number;
 };
@@ -213,7 +225,7 @@ export class FlareProjectileSystem {
       this.entities.push({
         root, core, halo, lightIntensity: 0, velocity: new THREE.Vector3(), ownerId: '', ownerTeam: 0,
         authority: false, actionNonce: 0, phase: 'idle', spawnedAt: 0, impactedAt: 0,
-        expiresAt: 0, nextBurnPulseAt: 0, burnPulseIndex: 0,
+        expiresAt: 0, directHitDelivered: false, nextBurnPulseAt: 0, burnPulseIndex: 0,
       });
     }
   }
@@ -256,6 +268,7 @@ export class FlareProjectileSystem {
     available.spawnedAt = input.now;
     available.impactedAt = 0;
     available.expiresAt = input.now + FLARE_PROJECTILE_EFFECT.maximumFlightMs;
+    available.directHitDelivered = false;
     available.nextBurnPulseAt = 0;
     available.burnPulseIndex = 0;
     available.halo.scale.setScalar(1);
@@ -276,7 +289,7 @@ export class FlareProjectileSystem {
     this.targetCacheCount = 0;
     for (const entity of this.entities) {
       if (entity.phase === 'idle') continue;
-      const needsTargets = entity.phase === 'flight'
+      const needsTargets = (entity.phase === 'flight' && entity.authority && !entity.directHitDelivered)
         || (entity.authority && entity.nextBurnPulseAt <= now && entity.nextBurnPulseAt <= entity.expiresAt);
       const targets = needsTargets
         ? this.targetsForUpdate(entity.ownerId, entity.ownerTeam, callbacks)
@@ -498,6 +511,7 @@ export class FlareProjectileSystem {
           ? Object.freeze(entity.velocity.toArray() as [number, number, number])
           : null,
         remainingMs: entity.expiresAt - now,
+        directHitDelivered: entity.directHitDelivered,
         nextBurnPulseRemainingMs: entity.phase === 'burn' && entity.burnPulseIndex < FLARE_BURN_PULSE_COUNT
           ? Math.max(0, entity.nextBurnPulseAt - now)
           : null,
@@ -733,6 +747,7 @@ export class FlareProjectileSystem {
     entity.phase = snapshot.phase;
     if (previousPhase !== entity.phase) this.lifecycleRevision += 1;
     entity.expiresAt = now + remainingMs;
+    entity.directHitDelivered = false;
     if (snapshot.phase === 'flight' && velocity) {
       entity.velocity.copy(velocity);
       entity.spawnedAt = now - (FLARE_PROJECTILE_EFFECT.maximumFlightMs - remainingMs);
@@ -768,6 +783,7 @@ export class FlareProjectileSystem {
     entity.phase = effect.phase;
     if (previousPhase !== entity.phase) this.lifecycleRevision += 1;
     entity.expiresAt = now + effect.remainingMs;
+    entity.directHitDelivered = effect.directHitDelivered;
     entity.burnPulseIndex = effect.burnPulseIndex;
     if (effect.phase === 'flight') {
       entity.velocity.set(...effect.velocity!);
@@ -802,23 +818,37 @@ export class FlareProjectileSystem {
     }
     let target: FlareProjectileTarget | null = null;
     let targetFraction = Number.POSITIVE_INFINITY;
-    for (const candidate of targets) {
-      const fraction = flareSegmentSphereFraction(
-        this.start,
-        this.delta,
-        candidate.position,
-        candidate.radiusM + FLARE_PROJECTILE_EFFECT.collisionRadiusM,
-      );
-      if (fraction !== null && fraction < targetFraction) {
-        targetFraction = fraction;
-        target = candidate;
+    if (entity.authority && !entity.directHitDelivered) {
+      for (const candidate of targets) {
+        const fraction = flareSegmentSphereFraction(
+          this.start,
+          this.delta,
+          candidate.position,
+          candidate.radiusM + FLARE_PROJECTILE_EFFECT.collisionRadiusM,
+        );
+        if (fraction !== null && fraction < targetFraction) {
+          targetFraction = fraction;
+          target = candidate;
+        }
       }
     }
     const worldFraction = collisionFraction ?? Number.POSITIVE_INFINITY;
-    const hitFraction = Math.min(worldFraction, targetFraction);
-    if (hitFraction <= 1) {
-      if (hitFraction <= 1) entity.root.position.copy(this.start).addScaledVector(this.delta, hitFraction);
-      this.beginBurn(entity, now, targetFraction <= worldFraction ? target : null, callbacks);
+    if (target && targetFraction <= worldFraction && targetFraction <= 1) {
+      entity.root.position.copy(this.start).addScaledVector(this.delta, targetFraction);
+      entity.directHitDelivered = true;
+      callbacks.onDirectHit(Object.freeze({
+        ownerId: entity.ownerId,
+        ownerTeam: entity.ownerTeam,
+        actionNonce: entity.actionNonce,
+        authority: true,
+        point: entity.root.position.clone(),
+        target,
+        directDamage: FLARE_PROJECTILE_EFFECT.directDamage,
+      }));
+    }
+    if (worldFraction <= 1) {
+      entity.root.position.copy(this.start).addScaledVector(this.delta, worldFraction);
+      this.beginBurn(entity, now, callbacks);
       return;
     }
     this.next.copy(this.start).add(this.delta);
@@ -834,7 +864,7 @@ export class FlareProjectileSystem {
       this.release(entity);
       return;
     }
-    entity.root.position.add(this.delta);
+    entity.root.position.copy(this.next);
     this.flightDirection.copy(entity.velocity).normalize();
     entity.root.quaternion.setFromUnitVectors(this.projectileForward, this.flightDirection);
   }
@@ -842,7 +872,6 @@ export class FlareProjectileSystem {
   private beginBurn(
     entity: FlareEntity,
     now: number,
-    target: FlareProjectileTarget | null,
     callbacks: FlareProjectileCallbacks,
   ): void {
     entity.phase = 'burn';
@@ -860,8 +889,8 @@ export class FlareProjectileSystem {
       actionNonce: entity.actionNonce,
       authority: entity.authority,
       point: entity.root.position.clone(),
-      target,
-      directDamage: target && entity.authority ? FLARE_PROJECTILE_EFFECT.directDamage : 0,
+      target: null,
+      directDamage: 0,
     }));
   }
 
@@ -880,15 +909,15 @@ export class FlareProjectileSystem {
       entity.burnPulseIndex += 1;
       for (const target of targets) {
         const distance = entity.root.position.distanceTo(target.position);
-        const totalDamage = flareBurnDamage(distance);
-        if (totalDamage <= 0 || !callbacks.burnLineOfSight(entity.root.position, target)) continue;
+        const damagePerSecond = flareBurnDamagePerSecond(distance);
+        if (damagePerSecond <= 0 || !callbacks.burnLineOfSight(entity.root.position, target)) continue;
         callbacks.onBurnPulse(Object.freeze({
           ownerId: entity.ownerId,
           ownerTeam: entity.ownerTeam,
           actionNonce: entity.actionNonce,
           point: entity.root.position.clone(),
           target,
-          damage: totalDamage / FLARE_BURN_PULSE_COUNT,
+          damage: damagePerSecond * FLARE_BURN_PULSE_INTERVAL_MS / 1_000,
           pulseIndex: entity.burnPulseIndex,
         }));
         this.burnPulseCount += 1;
@@ -913,6 +942,7 @@ export class FlareProjectileSystem {
     entity.spawnedAt = 0;
     entity.impactedAt = 0;
     entity.expiresAt = 0;
+    entity.directHitDelivered = false;
     entity.nextBurnPulseAt = 0;
     entity.burnPulseIndex = 0;
     entity.velocity.set(0, 0, 0);

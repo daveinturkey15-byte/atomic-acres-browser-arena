@@ -10,6 +10,7 @@ function callbacks(overrides: Partial<FlareProjectileCallbacks> = {}): FlareProj
     withinBounds: () => true,
     hostileTargets: () => [],
     burnLineOfSight: () => true,
+    onDirectHit: () => undefined,
     onImpact: () => undefined,
     onBurnPulse: () => undefined,
     onExpire: () => undefined,
@@ -137,25 +138,73 @@ describe('flare projectile system', () => {
     }).toEqual(before);
   });
 
-  it('flies, impacts a target once, and emits finite host-owned burn pulses without explosion semantics', () => {
+  it('damages one target before the later world impact, then burns for exactly 10 DPS over five seconds', () => {
     const scene = new THREE.Scene();
     const system = new FlareProjectileSystem(scene, false);
-    const target = { id: 'bot-1', lifeId: 1, kind: 'bot' as const, position: new THREE.Vector3(3, 0, 0), radiusM: 0.5 };
+    const target = { id: 'bot-1', lifeId: 1, kind: 'bot' as const, position: new THREE.Vector3(1.5, 0, 0), radiusM: 0.5 };
+    const directHit = vi.fn();
     const impact = vi.fn();
     const pulse = vi.fn();
+    const order: string[] = [];
     expect(system.spawn({
       ownerId: 'player-a', ownerTeam: 0, origin: new THREE.Vector3(), direction: new THREE.Vector3(1, 0, 0),
       authority: true, actionNonce: 77, now: 0,
     })).toBe(true);
-    system.update(0.05, 50, callbacks({ hostileTargets: () => [target], onImpact: impact, onBurnPulse: pulse }));
-    expect(impact).toHaveBeenCalledTimes(1);
-    expect(impact.mock.calls[0][0]).toMatchObject({
+    system.update(0.05, 50, callbacks({
+      worldCollisionFraction: () => 0.9,
+      hostileTargets: () => [target],
+      onDirectHit: (event) => { order.push('direct'); directHit(event); },
+      onImpact: (event) => { order.push('ground'); impact(event); },
+      onBurnPulse: pulse,
+    }));
+    expect(order).toEqual(['direct', 'ground']);
+    expect(directHit).toHaveBeenCalledTimes(1);
+    expect(directHit.mock.calls[0][0]).toMatchObject({
       ownerId: 'player-a', target: { id: 'bot-1' }, directDamage: FLARE_PROJECTILE_EFFECT.directDamage,
     });
-    system.update(0.05, 550, callbacks({ hostileTargets: () => [target], onImpact: impact, onBurnPulse: pulse }));
-    expect(pulse).toHaveBeenCalledTimes(1);
-    expect(pulse.mock.calls[0][0].damage).toBeGreaterThan(0);
+    expect(impact).toHaveBeenCalledTimes(1);
+    expect(impact.mock.calls[0][0]).toMatchObject({
+      ownerId: 'player-a', target: null, directDamage: 0,
+    });
+    expect(directHit.mock.calls[0][0].point.x).toBeLessThan(impact.mock.calls[0][0].point.x);
+
+    target.position.copy(impact.mock.calls[0][0].point);
+    for (let now = 550; now <= 5_050; now += 500) {
+      system.update(0.05, now, callbacks({ hostileTargets: () => [target], onBurnPulse: pulse }));
+    }
+    expect(pulse).toHaveBeenCalledTimes(10);
+    expect(pulse.mock.calls.map(([event]) => event.damage)).toEqual(Array(10).fill(5));
+    expect(pulse.mock.calls.reduce((total, [event]) => total + event.damage, 0)).toBe(50);
     expect(pulse.mock.calls[0][0]).not.toHaveProperty('explosiveSource');
+    system.update(0.05, 5_550, callbacks({ hostileTargets: () => [target], onBurnPulse: pulse }));
+    expect(pulse).toHaveBeenCalledTimes(10);
+  });
+
+  it('checkpoints a delivered direct hit so authority migration cannot apply it twice', () => {
+    const target = { id: 'bot-1', lifeId: 1, kind: 'bot' as const, position: new THREE.Vector3(1.5, 0, 0), radiusM: 0.5 };
+    const source = new FlareProjectileSystem(new THREE.Scene(), true);
+    const sourceDirectHit = vi.fn();
+    expect(source.spawn({
+      ownerId: 'player-a', ownerTeam: 0, origin: new THREE.Vector3(), direction: new THREE.Vector3(1, 0, 0),
+      authority: true, actionNonce: 78, now: 0,
+    })).toBe(true);
+    source.update(0.05, 50, callbacks({ hostileTargets: () => [target], onDirectHit: sourceDirectHit }));
+    expect(sourceDirectHit).toHaveBeenCalledTimes(1);
+    const checkpoint = source.checkpointAuthority(50)!;
+    expect(checkpoint.effects[0]).toMatchObject({ phase: 'flight', directHitDelivered: true });
+
+    const restored = new FlareProjectileSystem(new THREE.Scene(), true);
+    expect(restored.restoreAuthorityCheckpoint(checkpoint, 0, 100)).toMatchObject({ accepted: true, restored: 1 });
+    const repeatedDirectHit = vi.fn();
+    const groundImpact = vi.fn();
+    restored.update(0.05, 150, callbacks({
+      worldCollisionFraction: () => 0.5,
+      hostileTargets: () => [target],
+      onDirectHit: repeatedDirectHit,
+      onImpact: groundImpact,
+    }));
+    expect(repeatedDirectHit).not.toHaveBeenCalled();
+    expect(groundImpact).toHaveBeenCalledTimes(1);
   });
 
   it('keeps predicted peer flares visual-only and rejects duplicate action nonces', () => {
