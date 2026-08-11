@@ -30,6 +30,21 @@ export function resolveProductionReleasedAt(
   return injectedReleasedAt;
 }
 
+export function pass70ReleaseCopy(releasedAt: string): Readonly<{ summary: string; lineage: string }> {
+  const released = releasedAt !== PENDING_PRODUCTION_RELEASE;
+  return Object.freeze({
+    summary: released
+      ? 'Pass 70 improves first-person weapons and hands, support streaks, the Gun Range test bay, Field Kit clarity and multiplayer recovery without changing the retained Pass 63 fallback.'
+      : 'Pass 70 is the local owner-review candidate, improving first-person weapons and hands, support streaks, the Gun Range test bay, Field Kit clarity and multiplayer recovery without changing the retained Pass 63 fallback.',
+    lineage: released
+      ? 'Pass 69 remains the immutable comparison benchmark and Pass 63 remains the only selectable stable WebGL fallback'
+      : 'Pass 69 remains the immutable live comparison benchmark and Pass 63 remains the only selectable stable WebGL fallback until this exact candidate is approved',
+  });
+}
+
+const pass70ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+const pass70Copy = pass70ReleaseCopy(pass70ReleasedAt);
+
 /**
  * Newest first. Keep this player-facing rather than turning it into an internal
  * commit log. Historical `releasedAt` values come from protected production
@@ -38,10 +53,28 @@ export function resolveProductionReleasedAt(
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
   Object.freeze({
+    id: 'pass70',
+    pass: 'PASS 70',
+    title: 'Pass 70 · Combat, Support & Multiplayer Refinement',
+    releasedAt: pass70ReleasedAt,
+    areas: Object.freeze(['FIRST-PERSON', 'SUPPORT', 'MULTIPLAYER', 'GUN RANGE', 'LOADOUT', 'STABILITY']),
+    summary: pass70Copy.summary,
+    highlights: Object.freeze([
+      'Carbine, Mini Uzi, Railgun and crossbow optics keep opaque weapon bodies while exposing the authored aim lane, clear scope glass and safe loaded-bolt path',
+      'Connected first-person hands, catalog-wide wall and prone contact poses, persistent decals and grounded glass debris improve close-quarters presentation',
+      'Chopper Gunner gains an authored readable cockpit, responsive instruments, authoritative muzzle feedback and complete exit cleanup while accepted support aircraft remain retained',
+      'Flare direct hits resolve before ground impact and both flare and carpet fire apply an exact 10 damage per second for five seconds without duplicate damage lanes',
+      'The Gun Range test bay has coherent collision and ballistics, a lit textured door, room-only timer freeze, forward-facing illuminated dummies and crossbow-valid targets',
+      'Field Kit cards and Manage/Rename share one clear DPS plus five-stat projection on desktop and mobile, with an unmistakable selected state and verified save-to-close behavior',
+      'Multiplayer corrections cover authoritative Railgun pickup convergence, same-room host recovery, the two-minute Gun Range contract, current arena accessibility copy and Pass-neutral soak tooling',
+      pass70Copy.lineage,
+    ]),
+  }),
+  Object.freeze({
     id: 'pass69',
     pass: 'PASS 69',
     title: 'Pass 69.3 · Mobile, Weapons & Support Reconciliation',
-    releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
+    releasedAt: '2026-08-10T21:19:47Z',
     areas: Object.freeze(['MOBILE', 'FIRST-PERSON', 'SUPPORT', 'DESTRUCTION', 'STABILITY']),
     summary: 'Pass 69.3 reconciles the rejected 69.2 work with responsive touch controls, clear physical ADS sightlines, visible authored support aircraft and bounded weapon-effect presentation.',
     highlights: Object.freeze([
@@ -452,5 +485,6 @@ export function formatChangelogTimestampDetail(isoTimestamp: string): string {
 }
 
 export function lastUpdatedButtonLabel(entry: ChangelogEntry = latestChangelogEntry()): string {
+  if (entry.releasedAt === PENDING_PRODUCTION_RELEASE) return 'CURRENT CANDIDATE · OWNER REVIEW PENDING';
   return `LAST RELEASE · ${formatChangelogTimestamp(entry.releasedAt)}`;
 }

@@ -61,11 +61,11 @@ export function projectMapReleaseCopy(releasedAt: string): Readonly<{
   const released = releasedAt !== PENDING_PRODUCTION_RELEASE;
   return Object.freeze({
     summary: released
-      ? 'Pass 69 is the current released build for mobile control, ADS, authored aircraft, glass and weapon-effect improvements; the stable Pass 63 WebGL fallback stays frozen.'
-      : 'Pass 69 is the current release candidate for mobile control, ADS, authored aircraft, glass and weapon-effect improvements; the stable Pass 63 WebGL fallback stays frozen.',
+      ? 'Pass 70 is the current released build for first-person combat, support, Gun Range, loadout and multiplayer improvements; the stable Pass 63 WebGL fallback stays frozen.'
+      : 'Pass 70 is the current local HITL candidate for first-person combat, support, Gun Range, loadout and multiplayer improvements; the stable Pass 63 WebGL fallback stays frozen.',
     approvalHighlight: released
-      ? 'Pass 69 was promoted only after approval of its immutable preview'
-      : 'Owner approval remains pending on the immutable Pass 69 preview',
+      ? 'Pass 70 was promoted only after approval of its immutable preview'
+      : 'Owner approval remains pending on the immutable Pass 70 preview',
   });
 }
 
@@ -73,18 +73,18 @@ const projectMapReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELE
 const projectMapCopy = projectMapReleaseCopy(projectMapReleasedAt);
 
 export const PROJECT_MAP_RELEASE: ChangelogEntry = Object.freeze({
-  id: 'pass69',
+  id: 'pass70',
   pass: PASS66_RELEASE_IDENTITY.pass,
-  title: 'Pass 69',
+  title: 'Pass 70',
   releasedAt: projectMapReleasedAt,
-  areas: Object.freeze(['MOBILE', 'FIRST-PERSON', 'SUPPORT', 'DESTRUCTION', 'HITL']),
+  areas: Object.freeze(['FIRST-PERSON', 'SUPPORT', 'MULTIPLAYER', 'GUN RANGE', 'LOADOUT', 'HITL']),
   summary: projectMapCopy.summary,
   highlights: Object.freeze([
-    'Responsive touch clusters suppress accidental selection, preserve chat editing and keep both HUD and controls clear of the aim cone',
-    'Authored arm handedness and physical HK416 / Mini Uzi sight apertures replace the failed reflection and empty-node ADS fixes',
-    'Care-package and Carpet Bomber LOD contracts require visible authored wing meshes and reject generic release fallback aircraft',
-    'Irregular retained glass shards, live-ID M14 thermal ghosts and bounded Flamethrower / Flare work remove known cold allocation and shader gaps',
-    'The secure test bay presents canonical weapon labels, one coherent door assembly, posed rigged dummies and atomic pickup text',
+    'Opaque weapon bodies retain only their authored clear lens and reticle corridors, with connected hands and bounded wall or prone contact poses',
+    'Railgun and Chopper Gunner presentation has explicit activation, firing, death, match-end and exit cleanup rather than persistent overlays',
+    'The secure test bay shares visible, movement, Rapier and ballistic structure authority while its timer freezes only inside the room',
+    'Field Kit cards and the Manage/Rename inspector share one desktop/mobile DPS and five-stat projection with verified selected and save states',
+    'Multiplayer pickup, recovery, duration, accessibility and soak contracts are corrected against the immutable Pass 69 comparison evidence',
     projectMapCopy.approvalHighlight,
     'Pass 63 stays frozen as the selectable stable WebGL fallback',
   ]),
@@ -298,11 +298,11 @@ export function createProjectMapBundle(
         runtimeTreeSha256: PASS64_FAILED_REGRESSION_IDENTITY.runtimeTreeSha256,
       },
       stable: {
-        pass: releaseChannelsJson.stable.pass,
-        label: releaseChannelsJson.stable.label,
-        path: releaseChannelsJson.stable.path,
-        sourceSha: releaseChannelsJson.stable.sourceSha,
-        pagesSha: releaseChannelsJson.stable.pagesSha,
+        pass: releaseChannelsJson.rollback.pass,
+        label: releaseChannelsJson.rollback.label,
+        path: releaseChannelsJson.rollback.path,
+        sourceSha: releaseChannelsJson.rollback.sourceSha,
+        pagesSha: releaseChannelsJson.rollback.pagesSha,
         role: 'stable',
       },
     },

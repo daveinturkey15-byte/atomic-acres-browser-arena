@@ -2,13 +2,13 @@
   "schemaVersion": 4,
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
-    "label": "PASS 69",
-    "description": "Pass 69: the current locally approved gameplay, weapons, support, mobile and visual build."
+    "label": "PASS 70",
+    "description": "Pass 70: gameplay, weapons, support, multiplayer, mobile and visual improvements."
   },
   "experimental": {
-    "label": "PASS 69",
-    "description": "The current locally approved Pass 69 build.",
-    "pass": "PASS 69",
+    "label": "PASS 70",
+    "description": "Pass 70 gameplay and presentation build.",
+    "pass": "PASS 70",
     "path": "channels/the-big-one"
   },
   "stable": {
@@ -27,6 +27,10 @@
     "description": "The retained stable WebGL build, rebuilt deterministically from its approved Pass 63 source SHA.",
     "pass": "PASS 63",
     "sourceSha": "ac85e9b8b46cc2370aee903d564ecf3c4682b24c",
+    "pagesSha": "46d366d188bfc5ebc5ee7a991fd52b792575316c",
+    "pagesPath": "channels/pass63-rollback",
+    "runtimeFileCount": 119,
+    "runtimeTreeSha256": "b7416e02c190d8ff0403a65cd7a7c894970507bc6a8de7b196cc2d7979d69bce",
     "path": "channels/pass63-rollback",
     "rebuiltFromSource": true
   }

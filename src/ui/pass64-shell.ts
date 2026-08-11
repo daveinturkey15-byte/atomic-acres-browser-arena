@@ -297,7 +297,7 @@ function deploymentTransitionMarkup(): string {
       <div class="cockpit-instruments"><span><small>ALT</small><b>024 M</b></span><span><small>HDG</small><b>049</b></span><span><small>ROTOR</small><b>ARMED</b></span></div>
     </div>
     <div class="deployment-transition-console">
-      <small id="deployment-transition-kicker">PASS 69 // DEPLOYMENT STREAM</small>
+      <small id="deployment-transition-kicker">${PASS66_RELEASE_IDENTITY.pass} // DEPLOYMENT STREAM</small>
       <strong id="deployment-transition-title">NUKE TOWN</strong>
       <span id="deployment-transition-status">Preparing authoritative arena state…</span>
       <progress id="deployment-transition-progress" max="100" value="0" aria-label="Map loading progress">0%</progress>

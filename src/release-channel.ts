@@ -24,6 +24,18 @@ export type ReleaseChannelConfig = {
     runtimeTreeSha256?: string;
     path: string;
   };
+  rollback?: {
+    label: string;
+    description: string;
+    pass: string;
+    sourceSha: string;
+    pagesSha: string;
+    pagesPath: string;
+    runtimeFileCount: number;
+    runtimeTreeSha256: string;
+    path: string;
+    rebuiltFromSource: boolean;
+  };
 };
 
 export function releaseChannelDecision(

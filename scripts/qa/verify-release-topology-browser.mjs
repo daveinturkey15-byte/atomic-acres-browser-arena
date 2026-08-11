@@ -189,11 +189,11 @@ async function verifyRuntime(page, expectedPath, expectedPass, expectedChangelog
   if (expectedChangelogId) {
     await page.waitForSelector('#last-updated-btn', { timeout: 60_000 });
     const lastReleaseLabel = (await page.locator('#last-updated-btn').textContent())?.trim() ?? '';
-    const requiresPublishedTimestamp = Boolean(expectedReleasedAt)
-      || !releasePass
-      || normalizedPass(expectedPass) === normalizedPass(releasePass);
-    if (!lastReleaseLabel.includes('LAST RELEASE')
-      || (requiresPublishedTimestamp && lastReleaseLabel.includes('PENDING_PRODUCTION'))) {
+    const isCurrentCandidate = expectedPath === channelConfig.experimental.path;
+    const expectsPendingCandidate = isCurrentCandidate && !expectedReleasedAt;
+    if (expectsPendingCandidate
+      ? lastReleaseLabel !== 'CURRENT CANDIDATE · OWNER REVIEW PENDING'
+      : !lastReleaseLabel.includes('LAST RELEASE') || lastReleaseLabel.includes('PENDING_PRODUCTION')) {
       throw new Error(`Invalid Last Release label for ${expectedPass}: ${JSON.stringify(lastReleaseLabel)}`);
     }
     await page.locator('#last-updated-btn').click();
@@ -204,14 +204,19 @@ async function verifyRuntime(page, expectedPath, expectedPass, expectedChangelog
     if (!normalizedPass(currentReleaseText).includes(normalizedPass(expectedPass))) {
       throw new Error(`${expectedPass} Last Release details do not identify the current pass: ${JSON.stringify(currentReleaseText)}`);
     }
-    const releasedAt = await currentRelease.locator('time').getAttribute('datetime');
-    if (!releasedAt
-      || (requiresPublishedTimestamp && releasedAt === 'PENDING_PRODUCTION')
-      || (releasedAt !== 'PENDING_PRODUCTION' && Number.isNaN(Date.parse(releasedAt)))) {
+    const releaseState = (await currentRelease.locator('.changelog-entry-pass b').textContent())?.trim() ?? null;
+    const time = currentRelease.locator('time');
+    const releasedAt = await time.getAttribute('datetime');
+    const timeText = (await time.textContent())?.replace(/\s+/g, ' ').trim() ?? '';
+    if (expectsPendingCandidate) {
+      if (releaseState !== 'LOCAL CANDIDATE' || releasedAt !== null
+        || !timeText.includes('NOT PUBLISHED') || !timeText.includes('AWAITING OWNER HITL')) {
+        throw new Error(`${expectedPass} candidate is not explicitly pending owner HITL: ${JSON.stringify({ releaseState, releasedAt, timeText })}`);
+      }
+    } else if (!releasedAt || Number.isNaN(Date.parse(releasedAt)) || timeText.includes('NOT PUBLISHED')) {
       throw new Error(`${expectedPass} Last Release timestamp is not a published instant: ${JSON.stringify(releasedAt)}`);
     }
     if (expectedReleasedAt && normalizedPass(expectedPass) === normalizedPass(releasePass)) {
-      const releaseState = (await currentRelease.locator('.changelog-entry-pass b').textContent())?.trim() ?? null;
       verifyProductionReleaseTimestamp({
         expectedReleasedAt,
         observedReleasedAt: releasedAt,
@@ -275,7 +280,7 @@ try {
     await chooser.close();
   }
 
-  await verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass69');
+  await verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass70');
   await verifyChoice('stable', 'channels/pass63-rollback', 'PASS 63', 'pass63');
   if (releasePass && !normalizedPass(routes.experimental.eyebrow).includes(normalizedPass(releasePass))) {
     throw new Error(`Experimental runtime ${routes.experimental.eyebrow} does not match ${releasePass}`);

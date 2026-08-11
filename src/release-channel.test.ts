@@ -14,22 +14,22 @@ describe('release channel entry routing', () => {
     expect(releaseChannelDecision('?release=choose', 'localhost', canonical)).toBe('choose');
   });
 
-  it('routes latest, normal and experimental aliases to live Pass 69', () => {
+  it('routes latest, normal and experimental aliases to the Pass 70 candidate', () => {
     expect(releaseChannelDecision('?release=latest', canonical, canonical)).toBe('latest');
     expect(releaseChannelDecision('?release=normal', canonical, canonical)).toBe('latest');
     expect(releaseChannelDecision('?release=experimental', canonical, canonical)).toBe('latest');
     expect(releaseChannelDecision('?release=stable', canonical, canonical)).toBe('stable');
   });
 
-  it('keeps room invitations on the live Pass 69 multiplayer client', () => {
+  it('keeps room invitations on the Pass 70 multiplayer candidate', () => {
     expect(releaseChannelDecision('?room=abc&autojoin=1&release=choose', canonical, canonical)).toBe('latest');
   });
 
   it('resolves the pinned Pass 63 tree beneath the repository Pages root and bypasses its archived chooser', () => {
     expect(stableReleaseUrl(
       'https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/',
-      'channels/recent-stable',
-    )).toBe('https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/recent-stable/?release=latest');
+      'channels/pass63-rollback',
+    )).toBe('https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass63-rollback/?release=latest');
   });
 
   it('rejects paths that could escape the deployed root', () => {

@@ -81,10 +81,11 @@ describe('production release workflow', () => {
     expect(workflow).toContain('Rebuild Pass 67.1 stable with its original Pages publication timestamp');
     expect(workflow).toContain('VITE_RELEASED_AT="$stable_released_at"');
     expect(workflow).toContain('REQUIRE_STABLE_RELEASE_TIMESTAMP: \'1\'');
-    expect(topologyBrowserVerifier).toContain('Boolean(expectedReleasedAt)');
+    expect(topologyBrowserVerifier).toContain('expectsPendingCandidate = isCurrentCandidate && !expectedReleasedAt');
+    expect(topologyBrowserVerifier).toContain("lastReleaseLabel !== 'CURRENT CANDIDATE · OWNER REVIEW PENDING'");
+    expect(topologyBrowserVerifier).toContain('verifyProductionReleaseTimestamp');
     expect(workflow.match(/test -n "\$\{RELEASE_BUILT_AT:-\}"/g)).toHaveLength(2);
     expect(topologyBrowserVerifier).toContain('process.env.RELEASE_BUILT_AT?.trim()');
-    expect(topologyBrowserVerifier).toContain('verifyProductionReleaseTimestamp');
     expect(workflow).toContain('node scripts/release/write-production-receipt.mjs');
     expect(receiptWriter).toContain('releaseBuiltAt: process.env.RELEASE_BUILT_AT');
   });
@@ -297,8 +298,8 @@ describe('production release workflow', () => {
     expect(workflow).not.toContain('gh run watch');
   });
 
-  it('binds the live browser proof to public Pass 69 and Pass 63 choices, internal stable provenance, aliases, and Last Release', () => {
-    expect(liveTopologyVerifier).toContain("verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass69')");
+  it('binds the live browser proof to public Pass 70 and Pass 63 choices, internal stable provenance, aliases, and Last Release', () => {
+    expect(liveTopologyVerifier).toContain("verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass70')");
     expect(liveTopologyVerifier).toContain("verifyChoice('stable', 'channels/pass63-rollback', 'PASS 63', 'pass63')");
     expect(liveTopologyVerifier).not.toContain("verifyChoice('rollback'");
     expect(liveTopologyVerifier).toContain('pinned-channel-provenance.json');
@@ -307,6 +308,9 @@ describe('production release workflow', () => {
     expect(liveTopologyVerifier).toContain("verifyLegacyRoute('normal'");
     expect(liveTopologyVerifier).toContain("verifyLegacyRoute('room'");
     expect(liveTopologyVerifier).toContain('Last Release timestamp is not a published instant');
+    expect(liveTopologyVerifier).toContain("lastReleaseLabel !== 'CURRENT CANDIDATE · OWNER REVIEW PENDING'");
+    expect(liveTopologyVerifier).toContain("releaseState !== 'LOCAL CANDIDATE'");
+    expect(liveTopologyVerifier).toContain("timeText.includes('NOT PUBLISHED')");
     expect(liveTopologyVerifier).not.toContain("'channels/the-big-one', 'PASS 65'");
   });
 

@@ -11,7 +11,11 @@ import {
 } from './release-channel';
 
 const releaseChannels: ReleaseChannelConfig = releaseChannelsJson;
+const stableFallback = releaseChannels.rollback ?? releaseChannels.stable;
 const newestBuildIsPublished = CHANGELOG[0]?.releasedAt !== PENDING_PRODUCTION_RELEASE;
+const latestDescription = newestBuildIsPublished
+  ? 'The approved Pass 70 gameplay and presentation build.'
+  : 'The local Pass 70 HITL candidate. Publication remains disabled until owner approval.';
 const appElement = document.querySelector<HTMLDivElement>('#app');
 if (!appElement) throw new Error('Missing #app root');
 const app = appElement;
@@ -23,7 +27,7 @@ async function loadLatestBuild(): Promise<void> {
 }
 
 function openStableBuild(): void {
-  window.location.assign(stableReleaseUrl(document.baseURI, releaseChannels.stable.path));
+  window.location.assign(stableReleaseUrl(document.baseURI, stableFallback.path));
 }
 
 function showReleaseChooser(): void {
@@ -38,12 +42,12 @@ function showReleaseChooser(): void {
           <button type="button" class="release-channel-option primary" data-release-choice="latest">
             <small>${releaseChannels.experimental.pass} · ${newestBuildIsPublished ? 'LIVE' : 'RELEASE CANDIDATE'}</small>
             <strong>${releaseChannels.latest.label}</strong>
-            <span>${releaseChannels.latest.description}</span>
+            <span>${latestDescription}</span>
           </button>
           <button type="button" class="release-channel-option" data-release-choice="stable">
-            <small>${releaseChannels.stable.pass} · PINNED COPY</small>
-            <strong>${releaseChannels.stable.label}</strong>
-            <span>${releaseChannels.stable.description}</span>
+            <small>${stableFallback.pass} · STABLE WEBGL</small>
+            <strong>${stableFallback.label}</strong>
+            <span>${stableFallback.description}</span>
           </button>
         </div>
         <section class="release-channel-refresh" aria-label="Refresh this version chooser">

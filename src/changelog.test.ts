@@ -5,18 +5,20 @@ import {
   formatChangelogTimestampDetail,
   lastUpdatedButtonLabel,
   latestChangelogEntry,
+  pass70ReleaseCopy,
   PENDING_PRODUCTION_RELEASE,
   resolveProductionReleasedAt,
 } from './changelog';
 
 describe('changelog', () => {
-  it('keeps the pending Pass 69 release first until production injects its timestamp', () => {
+  it('keeps the pending Pass 70 release first and freezes the published Pass 69 timestamp', () => {
     expect(CHANGELOG.length).toBeGreaterThan(0);
     const latest = latestChangelogEntry();
-    expect(latest.id).toBe('pass69');
+    expect(latest.id).toBe('pass70');
     expect(latest.id).toBe(CHANGELOG[0]?.id);
-    expect(latest.title).toContain('Pass 69.3');
-    expect(latest.summary).toContain('Pass 69.3');
+    expect(latest.title).toContain('Pass 70');
+    expect(latest.summary).toContain('Pass 70');
+    expect(CHANGELOG.find((entry) => entry.id === 'pass69')?.releasedAt).toBe('2026-08-10T21:19:47Z');
     expect(formatChangelogTimestamp('2026-07-22T15:43:16+01:00')).toBe('22 JUL 2026 · 15:43 BST');
     expect(formatChangelogTimestampDetail('2026-07-22T15:43:16+01:00')).toBe(
       '22 JUL 2026 · 15:43 BST · UTC+1 · 15:43:16',
@@ -25,7 +27,7 @@ describe('changelog', () => {
     expect(formatChangelogTimestampDetail('2026-07-23T22:51:43Z')).toBe(
       '23 JUL 2026 · 23:51 BST · UTC+1 · 23:51:43',
     );
-    expect(lastUpdatedButtonLabel(latest)).toContain(PENDING_PRODUCTION_RELEASE);
+    expect(lastUpdatedButtonLabel(latest)).toBe('CURRENT CANDIDATE · OWNER REVIEW PENDING');
   });
 
   it('uses the successful production promotion rather than implementation time', () => {
@@ -64,6 +66,16 @@ describe('changelog', () => {
       .toBe('2026-07-22T21:25:35+01:00');
     expect(() => resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE, 'not-a-time'))
       .toThrow('Invalid VITE_RELEASED_AT');
+  });
+
+  it('keeps Pass 70 candidate and timestamped production copy mutually truthful', () => {
+    expect(pass70ReleaseCopy(PENDING_PRODUCTION_RELEASE)).toMatchObject({
+      summary: expect.stringContaining('local owner-review candidate'),
+      lineage: expect.stringContaining('until this exact candidate is approved'),
+    });
+    const released = pass70ReleaseCopy('2026-08-11T10:00:00Z');
+    expect(released.summary).not.toContain('candidate');
+    expect(released.lineage).not.toContain('until this exact candidate is approved');
   });
 
   it('requires player-facing areas and highlights on every entry', () => {
