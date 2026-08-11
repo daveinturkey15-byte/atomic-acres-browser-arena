@@ -2524,6 +2524,17 @@
         "src/flare-projectile-system.test.ts"
       ],
       "evidenceKinds": ["unit"]
+    },
+    {
+      "id": "T-PASS70-START-BENCHMARK",
+      "command": "npx vitest run src/pass70-start-benchmark.test.ts",
+      "paths": [
+        "baselines/pass69/pass70-start-benchmark.json",
+        "src/pass70-start-benchmark.test.ts",
+        "scripts/release/verify-benchmark-record.mjs",
+        "release-channels.json"
+      ],
+      "evidenceKinds": ["unit", "contract"]
     }
   ],
   "artifactCatalog": [],
@@ -7348,7 +7359,7 @@
     {"id":"HF-249","sourceOutcomeIds":["CORR-HF-249","P70AUG10-030","P70AUG10-031","P70AUG10-032"],"planningRequirementIds":["R108","R200","R201","R202","R203","R204","R205","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R600","R608","R609"],"canonicalOwner":"Loadout UI/combat-registry projection","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-FIELD-KIT-MENU","T-HUD-E2E","T-HUD-UNIT","T-WEAPON-CATALOG","T-PERSISTENCE"],"artifactRefs":[]}},
     {"id":"HF-250","sourceOutcomeIds":["CORR-HF-250","P70AUG10-033"],"planningRequirementIds":["R200","R201","R202","R203","R204","R205","R600","R609"],"canonicalOwner":"Loadout selection/readability","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-FIELD-KIT-MENU","T-HUD-E2E","T-HUD-UNIT","T-PERSISTENCE"],"artifactRefs":[]}},
     {"id":"HF-251","sourceOutcomeIds":["CORR-HF-251","P70AUG10-034"],"planningRequirementIds":["R201","R202","R205","R306","R600","R609"],"canonicalOwner":"Loadout persistence/UI lifecycle","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-FIELD-KIT-MENU","T-HUD-E2E","T-HUD-UNIT","T-PERSISTENCE"],"artifactRefs":[]}},
-    {"id":"HF-252","sourceOutcomeIds":["CORR-HF-252","P70AUG10-001","P70AUG10-002"],"planningRequirementIds":["R001","R002","R003","R005","R006","R010","R303","R600","R608","R611","R612","R613"],"canonicalOwner":"Release identity/lineage","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-RELEASE-SHELL","T-OWNER-GATE"],"artifactRefs":[]}}
+    {"id":"HF-252","sourceOutcomeIds":["CORR-HF-252","P70AUG10-001","P70AUG10-002"],"planningRequirementIds":["R001","R002","R003","R005","R006","R010","R303","R600","R608","R611","R612","R613"],"canonicalOwner":"Release identity/lineage","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-RELEASE-SHELL","T-OWNER-GATE","T-PASS70-START-BENCHMARK"],"artifactRefs":[]}}
   ],
   "desktopUntitledOutcomes": [
     {
