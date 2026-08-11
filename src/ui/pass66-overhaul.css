@@ -1187,9 +1187,30 @@ body.mtc-live {
   body.mtc-live #text-chat[data-open="true"] {
     z-index: 95;
     left: var(--mtc-safe-left);
-    right: var(--mtc-safe-right);
-    bottom: var(--mtc-safe-bottom);
-    width: auto;
+    right: auto;
+    bottom: calc(var(--mtc-safe-bottom) + var(--mtc-stick-size) + 112px);
+    width: min(360px, calc(100vw - var(--mtc-safe-left) - var(--mtc-safe-right)));
+  }
+
+  body.mtc-live #text-chat[data-open="true"] #text-chat-log {
+    max-height: 72px;
+  }
+
+  /* HF-275: keep live room chat visibly above the complete lower-left operator
+     console instead of merely clearing its health number. Lobby chat retains its
+     in-flow placement and touch chat retains the dedicated control-safe rules. */
+  @media (min-width: 701px) {
+    #text-chat[data-context="game"] {
+      bottom: clamp(232px, 18vh, 340px);
+    }
+  }
+
+  @media (orientation: landscape) {
+    body.mtc-live #text-chat[data-open="true"] {
+      left: calc(var(--mtc-safe-left) + var(--mtc-stick-size) + var(--mtc-action-width) + 16px);
+      bottom: calc(var(--mtc-safe-bottom) + var(--mtc-stick-size) + 8px);
+      width: min(360px, calc(100vw - var(--mtc-stick-size) - var(--mtc-stick-size) - var(--mtc-action-width) - var(--mtc-action-width) - 48px));
+    }
   }
 
   @media (orientation: portrait) {

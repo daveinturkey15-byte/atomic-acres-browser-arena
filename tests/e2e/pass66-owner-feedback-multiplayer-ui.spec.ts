@@ -219,7 +219,7 @@ test('host map changes converge and lobby controls remain stable across streak s
   });
   expect(servedReadability.readability).toMatchObject({
     color: 0xff8c3a,
-    intensity: 0.06,
+    intensity: 0.25,
     allDepthTested: true,
     allDepthWriting: true,
   });

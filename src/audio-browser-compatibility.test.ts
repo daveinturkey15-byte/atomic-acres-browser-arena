@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ArenaAudio, resolveBrowserAudioContext } from './audio';
+import { ArenaAudio, resolveBrowserAudioContext, updateBrowserAudioListenerPose } from './audio';
 
 class FakeAudioParam {
   value = 0;
@@ -98,5 +98,75 @@ describe('browser Web Audio constructor compatibility', () => {
     expect(internals.context).toBeNull();
     expect(internals.master).toBeNull();
     expect(internals.buses.size).toBe(0);
+  });
+});
+
+describe('cross-engine AudioListener pose compatibility', () => {
+  const position = { x: 3, y: 1.7, z: -8 };
+
+  it('updates the complete modern AudioParam listener pose', () => {
+    const listener = {
+      positionX: new FakeAudioParam(), positionY: new FakeAudioParam(), positionZ: new FakeAudioParam(),
+      forwardX: new FakeAudioParam(), forwardY: new FakeAudioParam(), forwardZ: new FakeAudioParam(),
+      upX: new FakeAudioParam(), upY: new FakeAudioParam(), upZ: new FakeAudioParam(),
+    };
+    expect(updateBrowserAudioListenerPose(listener, position, Math.PI / 2)).toBe('modern-audio-param');
+    expect([listener.positionX.value, listener.positionY.value, listener.positionZ.value]).toEqual([3, 1.7, -8]);
+    expect(listener.forwardX.value).toBeCloseTo(-1);
+    expect(listener.forwardY.value).toBe(0);
+    expect(listener.forwardZ.value).toBeCloseTo(0);
+    expect([listener.upX.value, listener.upY.value, listener.upZ.value]).toEqual([0, 1, 0]);
+  });
+
+  it('uses Firefox-style legacy setters when optional listener AudioParams are absent', () => {
+    const writes: number[][] = [];
+    const listener = {
+      positionX: undefined,
+      setPosition: (...values: number[]) => { writes.push(values); },
+      setOrientation: (...values: number[]) => { writes.push(values); },
+    };
+    expect(updateBrowserAudioListenerPose(listener, position, 0)).toBe('legacy-setters');
+    expect(writes).toEqual([[3, 1.7, -8], [-0, 0, -1, 0, 1, 0]]);
+  });
+
+  it('publishes the exact legacy setter mode through ArenaAudio runtime telemetry', () => {
+    const writes: number[][] = [];
+    const audio = new ArenaAudio();
+    const internals = audio as unknown as { context: unknown };
+    internals.context = {
+      state: 'running',
+      listener: {
+        setPosition: (...values: number[]) => { writes.push(values); },
+        setOrientation: (...values: number[]) => { writes.push(values); },
+      },
+    };
+    audio.updateListener(position, 0);
+    expect(audio.telemetry().listener.poseMode).toBe('legacy-setters');
+    expect(writes).toEqual([[3, 1.7, -8], [-0, 0, -1, 0, 1, 0]]);
+  });
+
+  it('resolves mixed capabilities atomically and does not partially mutate an unsupported listener', () => {
+    const positionX = new FakeAudioParam();
+    const positionY = new FakeAudioParam();
+    const positionZ = new FakeAudioParam();
+    const orientationWrites: number[][] = [];
+    expect(updateBrowserAudioListenerPose({
+      positionX, positionY, positionZ,
+      setOrientation: (...values: number[]) => { orientationWrites.push(values); },
+    }, position, Math.PI)).toBe('hybrid');
+    expect([positionX.value, positionY.value, positionZ.value]).toEqual([3, 1.7, -8]);
+    expect(orientationWrites).toHaveLength(1);
+
+    const untouched = new FakeAudioParam();
+    expect(updateBrowserAudioListenerPose({ positionX: untouched }, position, 0)).toBe('unavailable');
+    expect(untouched.value).toBe(0);
+  });
+
+  it('does not swallow a real legacy listener failure', () => {
+    const listener = {
+      setPosition: () => { throw new DOMException('device failed', 'NotSupportedError'); },
+      setOrientation: () => undefined,
+    };
+    expect(() => updateBrowserAudioListenerPose(listener, position, 0)).toThrow('device failed');
   });
 });

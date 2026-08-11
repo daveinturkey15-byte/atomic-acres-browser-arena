@@ -55,6 +55,77 @@ export type BrowserAudioContextResolution = Readonly<{
   source: 'standard' | 'webkit' | 'unavailable';
 }>;
 
+export type AudioListenerPoseMode = 'modern-audio-param' | 'legacy-setters' | 'hybrid' | 'unavailable';
+
+type AudioListenerAudioParam = { value: number };
+
+type CompatibleAudioListener = Readonly<{
+  positionX?: unknown;
+  positionY?: unknown;
+  positionZ?: unknown;
+  forwardX?: unknown;
+  forwardY?: unknown;
+  forwardZ?: unknown;
+  upX?: unknown;
+  upY?: unknown;
+  upZ?: unknown;
+  setPosition?: (x: number, y: number, z: number) => void;
+  setOrientation?: (x: number, y: number, z: number, xUp: number, yUp: number, zUp: number) => void;
+}>;
+
+function isMutableAudioParam(value: unknown): value is AudioListenerAudioParam {
+  return typeof value === 'object' && value !== null
+    && 'value' in value && typeof (value as { value?: unknown }).value === 'number';
+}
+
+/**
+ * AudioListener's per-axis AudioParams remain optional in shipping engines.
+ * Resolve the complete position and orientation capabilities before writing so
+ * a partially implemented listener cannot receive half a pose. Setter errors
+ * deliberately propagate to the frame error surface; only absent optional APIs
+ * select the legacy or silent compatibility path.
+ */
+export function updateBrowserAudioListenerPose(
+  listener: AudioListener | CompatibleAudioListener,
+  position: SpatialPoint,
+  yawRadians: number,
+): AudioListenerPoseMode {
+  if (![position.x, position.y, position.z, yawRadians].every(Number.isFinite)) return 'unavailable';
+  const compatible = listener as CompatibleAudioListener;
+  const modernPosition = [compatible.positionX, compatible.positionY, compatible.positionZ]
+    .every(isMutableAudioParam);
+  const modernOrientation = [
+    compatible.forwardX, compatible.forwardY, compatible.forwardZ,
+    compatible.upX, compatible.upY, compatible.upZ,
+  ].every(isMutableAudioParam);
+  const legacyPosition = typeof compatible.setPosition === 'function';
+  const legacyOrientation = typeof compatible.setOrientation === 'function';
+  if ((!modernPosition && !legacyPosition) || (!modernOrientation && !legacyOrientation)) return 'unavailable';
+
+  const forwardX = -Math.sin(yawRadians);
+  const forwardZ = -Math.cos(yawRadians);
+  if (modernPosition) {
+    (compatible.positionX as AudioListenerAudioParam).value = position.x;
+    (compatible.positionY as AudioListenerAudioParam).value = position.y;
+    (compatible.positionZ as AudioListenerAudioParam).value = position.z;
+  } else {
+    compatible.setPosition!(position.x, position.y, position.z);
+  }
+  if (modernOrientation) {
+    (compatible.forwardX as AudioListenerAudioParam).value = forwardX;
+    (compatible.forwardY as AudioListenerAudioParam).value = 0;
+    (compatible.forwardZ as AudioListenerAudioParam).value = forwardZ;
+    (compatible.upX as AudioListenerAudioParam).value = 0;
+    (compatible.upY as AudioListenerAudioParam).value = 1;
+    (compatible.upZ as AudioListenerAudioParam).value = 0;
+  } else {
+    compatible.setOrientation!(forwardX, 0, forwardZ, 0, 1, 0);
+  }
+  if (modernPosition && modernOrientation) return 'modern-audio-param';
+  if (!modernPosition && !modernOrientation) return 'legacy-setters';
+  return 'hybrid';
+}
+
 export type AudioOutputProbe = Readonly<{
   available: boolean;
   sampleRate: number;
@@ -273,6 +344,7 @@ type ContinuousVoiceOwnership = Readonly<{
 export class ArenaAudio {
   private context: AudioContext | null = null;
   private contextSource: 'uninitialized' | 'failed' | BrowserAudioContextResolution['source'] = 'uninitialized';
+  private listenerPoseMode: AudioListenerPoseMode = 'unavailable';
   private master: GainNode | null = null;
   private outputAnalyser: AnalyserNode | null = null;
   private outputTimeDomain: Float32Array<ArrayBuffer> | null = null;
@@ -450,6 +522,7 @@ export class ArenaAudio {
     const context = this.context;
     this.context = null;
     this.contextSource = 'uninitialized';
+    this.listenerPoseMode = 'unavailable';
     this.master = null;
     this.outputAnalyser = null;
     this.outputTimeDomain = null;
@@ -481,20 +554,11 @@ export class ArenaAudio {
   }
 
   updateListener(position: SpatialPoint, yawRadians: number): void {
-    if (!this.context || !Number.isFinite(yawRadians)) return;
+    if (!this.context || ![position.x, position.y, position.z, yawRadians].every(Number.isFinite)) return;
     this.listenerPosition.x = position.x;
     this.listenerPosition.y = position.y;
     this.listenerPosition.z = position.z;
-    const listener = this.context.listener;
-    listener.positionX.value = position.x;
-    listener.positionY.value = position.y;
-    listener.positionZ.value = position.z;
-    listener.forwardX.value = -Math.sin(yawRadians);
-    listener.forwardY.value = 0;
-    listener.forwardZ.value = -Math.cos(yawRadians);
-    listener.upX.value = 0;
-    listener.upY.value = 1;
-    listener.upZ.value = 0;
+    this.listenerPoseMode = updateBrowserAudioListenerPose(this.context.listener, position, yawRadians);
   }
 
   worldFootstep(position: SpatialPoint, surface: SpatialFootstepSurface, movement: FootstepMovement, occluded = false): boolean {
@@ -1194,6 +1258,7 @@ export class ArenaAudio {
       source: 'uninitialized' | 'failed' | BrowserAudioContextResolution['source'];
       state: AudioContextState | 'unavailable' | 'failed' | 'locked';
     };
+    listener: { poseMode: AudioListenerPoseMode };
     explosionMix: ExplosionAudioGate & { coalesceMs: number };
     ambience: { continuousSources: number; busGain: number; arena: ArenaId | null };
     grenadeFuse: { beeps: number; startMs: number };
@@ -1234,6 +1299,7 @@ export class ArenaAudio {
         state: this.context?.state
           ?? (this.contextSource === 'unavailable' ? 'unavailable' : this.contextSource === 'failed' ? 'failed' : 'locked'),
       },
+      listener: { poseMode: this.listenerPoseMode },
       explosionMix: { ...this.explosionAudioGate, coalesceMs: EXPLOSION_AUDIO_COALESCE_MS },
       ambience: { continuousSources: this.arenaSources.length, busGain: this.ambience?.gain.value ?? 0.12, arena: this.activeArena },
       grenadeFuse: { beeps: this.grenadeFuseBeeps, startMs: GRENADE_FUSE_BEEP_START_MS },
