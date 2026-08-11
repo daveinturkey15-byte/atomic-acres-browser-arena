@@ -8,6 +8,7 @@ import {
   GUN_RANGE_TEST_BAY_DOOR_OPEN_MS,
   GUN_RANGE_TEST_BAY_STRUCTURE,
   advanceGunRangeTestBayDoor,
+  advanceGunRangeTestBayDoorForObservers,
   createGunRangeTestBayDoorState,
   gunRangeTestBayDoorDynamicBallisticSurfaces,
   gunRangeTestBayDoorDynamicColliders,
@@ -16,8 +17,10 @@ import {
   gunRangeTestBayRenderedDummyPose,
   gunRangeTestBayFrozenTimer,
   gunRangeTestBayStructureBounds,
+  isGunRangeTestBayDoorState,
   nearestGunRangeTestBaySupportStation,
   nearestGunRangeTestBayWeaponStation,
+  projectGunRangeTestBayDoorState,
 } from './gun-range-test-bay';
 
 describe('Gun Range grey test-bay authority', () => {
@@ -135,6 +138,33 @@ describe('Gun Range grey test-bay authority', () => {
     const closing = advanceGunRangeTestBayDoor(retained.state, 1_600, far);
     expect(closing.state.phase).toBe('closing');
     expect(closing.audioIntent).toBeNull();
+  });
+
+  it('lets any admitted observer open one shared door and projects replicas without local authorship', () => {
+    const initial = createGunRangeTestBayDoorState(1_000);
+    const started = advanceGunRangeTestBayDoorForObservers(initial, 1_000, [
+      { x: 20, y: 1.7, z: 0 },
+      GUN_RANGE_TEST_BAY_CONTRACT.door.trigger,
+    ]);
+    expect(started).toMatchObject({ audioIntent: 'secure-door-opening-thump' });
+    expect(started.state).toMatchObject({ phase: 'opening', openness: 0, thumpSequence: 1 });
+
+    const projected = projectGunRangeTestBayDoorState(
+      started.state,
+      1_000 + GUN_RANGE_TEST_BAY_DOOR_OPEN_MS / 2,
+    );
+    expect(projected).toMatchObject({ phase: 'opening', openness: 0.5, thumpSequence: 1 });
+    expect(gunRangeTestBayDoorDynamicColliders(projected)[0]?.bounds).toEqual(
+      gunRangeTestBayDoorDynamicBallisticSurfaces(projected)[0]?.bounds,
+    );
+    expect(projectGunRangeTestBayDoorState(projected, 1_000 + GUN_RANGE_TEST_BAY_DOOR_OPEN_MS)).toMatchObject({
+      phase: 'open', openness: 1, thumpSequence: 1,
+    });
+
+    const noObservers = advanceGunRangeTestBayDoorForObservers(projected, 1_500, []);
+    expect(noObservers.state.phase).toBe('closing');
+    expect(isGunRangeTestBayDoorState(noObservers.state)).toBe(true);
+    expect(isGunRangeTestBayDoorState({ ...noObservers.state, callerPosition: [0, 0, 0] })).toBe(false);
   });
 
   it('keeps slow unarmed dummies continuous, bounded, and below walking speed', () => {

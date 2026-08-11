@@ -7,6 +7,7 @@ const hudCss = readFileSync(new URL('./ui/pass65-hud.css', import.meta.url), 'ut
 const presentation = readFileSync(new URL('./killstreak-presentation.ts', import.meta.url), 'utf8');
 const authoring = readFileSync(new URL('../scripts/blender/create-pass65-support-vehicles.py', import.meta.url), 'utf8');
 const authoringRunner = readFileSync(new URL('../scripts/blender/run-authoring.mjs', import.meta.url), 'utf8');
+const e2e = readFileSync(new URL('../tests/e2e/pass70-chopper-gunner.spec.ts', import.meta.url), 'utf8');
 
 describe('Pass 70 complete Chopper Gunner contract', () => {
   it('presents the complete authored cockpit while excluding exterior and rotors', () => {
@@ -14,7 +15,8 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     const end = presentation.indexOf('\nfunction buildAuthoredSupportVehicle(', start);
     const block = presentation.slice(start, end);
     expect(block).toContain('isGunnerCockpitNode(root, node)');
-    expect(block).toContain('node.visible = gunnerCockpitNode && !retiredStaticSource');
+    expect(block).toContain('node.visible = gunnerCockpitNode && !gunnerSightBlocker && !retiredStaticSource');
+    expect(block).toContain('const gunnerSightBlocker = gunnerSightlineNode && !gunnerWeaponViewNode');
     expect(block).toContain('1 << SUPPORT_FIRST_PERSON_RENDER_LAYER');
     expect(block).toContain('node.layers.mask = node.userData.supportBaseLayerMask');
     expect(block).toContain('!entry.transparent && entry.opacity >= 1');
@@ -33,6 +35,7 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     expect(hudCss).toContain('@media (max-width: 760px), (max-height: 520px)');
     expect(hudCss).toContain('grid-template-columns: repeat(3, minmax(0, 1fr))');
     expect(hudCss).toContain('env(safe-area-inset-bottom)');
+    expect(hudCss).toContain('top: max(54px, calc(env(safe-area-inset-top) + 52px));');
   });
 
   it('uses authority geometry and target projection for shot and damage feedback', () => {
@@ -68,8 +71,9 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
   it('authors and optimizes only Chopper LODs for this correction', () => {
     expect(authoring).toContain('{"all", "aircraft", "chopper"}');
     expect(authoring).toContain('if AUTHORING_SCOPE == "chopper"');
-    expect(authoring).toContain('pass70-complete-tandem-attack-airframe-v5');
-    expect(authoring).toContain('complete-exterior-cockpit-gun-readable-materials-v5');
+    expect(authoring).toContain('pass70-connected-rear-tail-airframe-v7');
+    expect(authoring).toContain('continuous-rear-tail-silhouette-cockpit-clear-sightline-v7');
+    expect(authoring).toContain('Chopper_TailRootCollar_LOD');
     expect(authoring).toContain('pass70-daylight-readable-olive-pbr-v1');
     const runnerStart = authoringRunner.indexOf('function authorSupportChopper()');
     const runnerEnd = authoringRunner.indexOf('\nfunction authorWeaponFamilies(', runnerStart);
@@ -78,5 +82,103 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     expect(runner).toContain('pass65-chopper-gunner-lod${lod}.glb');
     expect(runner).not.toContain('pass65-care-aircraft');
     expect(runner).not.toContain('pass65-carpet-aircraft');
+  });
+
+  it('prewarms the exact shared LOD bands at near-field scale and restores the gameplay projection', () => {
+    expect(presentation).toContain('export const SUPPORT_VEHICLE_LOD_DISTANCES = Object.freeze([0, 95, 190] as const);');
+    expect(presentation).toContain('export const SUPPORT_VEHICLE_PREWARM_DISTANCES = deriveSupportVehiclePrewarmDistances();');
+    expect(presentation).toContain('lod.addLevel(level, SUPPORT_VEHICLE_LOD_DISTANCES[index]');
+    expect(presentation).toContain('SUPPORT_VEHICLE_PREWARM_DISTANCES.entries()');
+    expect(presentation).toContain('projectionCamera.far = requiredPrewarmFar');
+    expect(presentation).toContain('projectionCamera.far = originalPrewarmFar');
+    expect(presentation).not.toContain('[24, 50, 88]');
+  });
+
+  it('fits exterior evidence to stable airframe geometry rather than transient fire actions', () => {
+    expect(presentation).toContain('supportVehicleStableAirframeBounds(entry.root, camera, this.submittedScene)');
+    expect(presentation).toContain("'chopper-tracer-action'");
+    expect(presentation).toContain("'chopper-muzzle-flash'");
+    expect(presentation).toContain("'chopper-impact-action'");
+    expect(e2e).toContain('const visibleBounds = detail.stableAirframeBounds;');
+    expect(e2e).toContain('const visibleBounds = detail.drawableStableAirframeBounds;');
+    expect(e2e).toContain('receipt.reviewedChopper.drawableStableMeshCount > 0');
+    expect(e2e).toContain('rasterVisibility.visiblePixelRatio');
+    expect(e2e).toContain('rasterVisibility.maximumLuminance');
+    expect(e2e).toContain('captureChopperExteriorHiddenControl()');
+    expect(e2e).toContain('attributableRasterDifference.materiallyChangedPixelRatio');
+    expect(e2e).toContain('exterior-hidden-control.nonpublishable.png');
+    expect(e2e).toContain('side * Math.PI / 3');
+    expect(e2e.indexOf("page.screenshot({ path: resolve(evidence, 'exterior-front-quarter.png')"))
+      .toBeLessThan(e2e.indexOf("{ kind: 'training-dummy', id: 'test-dummy-alpha' }"));
+  });
+
+  it('commits a zero-target exterior camera without loosening rigged actor receipts', () => {
+    const genericStart = legacy.indexOf('function debugCommittedCameraPresentationReceipt(');
+    const genericEnd = legacy.indexOf('\nfunction debugCapturePresentationReceipt(', genericStart);
+    const generic = legacy.slice(genericStart, genericEnd);
+    const riggedStart = genericEnd;
+    const riggedEnd = legacy.indexOf('\nconst DEBUG_EVIDENCE_LOS_ENDPOINT_TOLERANCE_M', riggedStart);
+    const rigged = legacy.slice(riggedStart, riggedEnd);
+    expect(generic).toContain("contract: 'capture-camera-committed-frame-v1'");
+    expect(generic).toContain('targetCount: lastKillstreakWorldTargetCount');
+    expect(generic).toContain('chopperAutonomousFireHeld: currentDebugChopperExteriorReviewHoldActive()');
+    expect(generic).toContain('activeChopperTransientActionNames()');
+    expect(rigged).toContain("throw new Error('Rigged evidence presentation receipt requires registered capture targets')");
+    expect(legacy).toContain('lastDebugCommittedCameraPresentation = debugCommittedCameraPresentationReceipt(frameCount)');
+    expect(legacy).toContain('debugCaptureCameraActive && debugRiggedEvidenceCaptureTargets !== null');
+    expect(legacy).toContain('if (!synchronizeDebugChopperExteriorReviewHold()) {');
+    expect(legacy).toContain('synchronizeDebugChopperExteriorReviewHold();');
+    expect(legacy).toContain('resetDebugChopperExteriorReviewHold();');
+    const runtimeUpdate = legacy.slice(
+      legacy.indexOf('function updatePass65KillstreakRuntime('),
+      legacy.indexOf('\nfunction updateCarePackageCollection', legacy.indexOf('function updatePass65KillstreakRuntime(')),
+    );
+    expect(runtimeUpdate.indexOf('synchronizeDebugChopperExteriorReviewHold();'))
+      .toBeLessThan(runtimeUpdate.indexOf('if (!gameStarted)'));
+    const captureSetter = legacy.slice(
+      legacy.indexOf('setCaptureCameraPose:'),
+      legacy.indexOf('\n  setCaptureCameraFarPlane:', legacy.indexOf('setCaptureCameraPose:')),
+    );
+    expect(captureSetter).toContain('if (!debugCaptureCameraActive) {\n      resetDebugChopperExteriorReviewHold();');
+    const holdSetter = legacy.slice(
+      legacy.indexOf('setChopperExteriorReviewHold:'),
+      legacy.indexOf('\n  setRiggedEvidenceCaptureTargets:', legacy.indexOf('setChopperExteriorReviewHold:')),
+    );
+    expect(holdSetter).toContain('matchPhase: matchState.phase');
+    expect(holdSetter).toContain('menuSurface: menuLifecycle.surface');
+    expect(holdSetter).toContain('if (!held) {\n      resetDebugChopperExteriorReviewHold();\n      return true;');
+    expect(e2e).toContain('setChopperExteriorReviewTracking(true)');
+    expect(e2e).toContain("pauseCompletedPresentedFrame(page, trackerRevision, 'camera-only')");
+    expect(e2e).toContain('awaitCommittedCameraCompletion()');
+    expect(e2e).toContain('setChopperExteriorReviewHold(true)');
+    expect(e2e).toContain('targetCount: 0');
+    expect(e2e).toContain('activeChopperTransientActions: []');
+  });
+
+  it('keeps rear-fuselage and tail continuity visible without flattening the whole airframe', () => {
+    expect(presentation).toContain("'chopper-rear-fuselage'");
+    expect(presentation).toContain("'chopper-tail-boom'");
+    expect(presentation).toContain("const CHOPPER_REAR_TAIL_MATERIAL_NAME = 'MAT_Pass65Chopper_RearTailArmor_PBR';");
+    expect(presentation).toContain('minimumRoughness: 0.78');
+    expect(presentation).toContain('maximumMetalness: 0.28');
+    expect(presentation).toContain('isolateAuthoredChopperRearTailArmor(root);');
+  });
+
+  it('captures only an exact completed WebGPU frame without weakening the watchdog', () => {
+    const start = e2e.indexOf('async function pauseCompletedPresentedFrame(');
+    const end = e2e.indexOf('\ntest(', start);
+    const capture = e2e.slice(start, end);
+    expect(capture).toContain('receipt?.captureRevision === revision');
+    expect(capture).toContain('api.setRenderPaused(true)');
+    expect(capture).toContain('awaitRiggedEvidenceCaptureCompletion()');
+    expect(capture).toContain('paused.receipt.submissionSequence');
+    expect(capture).toContain('completion.completedSequence).toBeGreaterThanOrEqual(completion.submissionSequence)');
+    expect(e2e).toContain('targetDirectionDot');
+    expect(e2e).toContain('quaternionDot');
+    expect(e2e).toContain('exteriorReceipt.near');
+    expect(e2e).toContain('exteriorReceipt.far');
+    expect(capture.indexOf('api.setRenderPaused(true)')).toBeLessThan(capture.indexOf('awaitRiggedEvidenceCaptureCompletion()'));
+    expect(e2e).not.toContain('Renderer presentation made no GPU progress');
+    expect(e2e).not.toContain('errors.filter');
   });
 });

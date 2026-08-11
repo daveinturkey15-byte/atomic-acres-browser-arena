@@ -76,7 +76,7 @@ describe('Pass 62 arena contrast lighting', () => {
       'rustrig-container-dynamic-southeast',
     ]));
     rig.applyDefinition(gunRangeDefinition);
-    expect(rig.telemetry()).toMatchObject({ arenaId: 'gun-range', activeLights: 6, shadowCastingLights: 6 });
+    expect(rig.telemetry()).toMatchObject({ arenaId: 'gun-range', activeLights: 7, shadowCastingLights: 7 });
     const rangeLight = scene.getObjectByName('gun-range-range-inspection-key-1') as THREE.SpotLight;
     const targetX = rangeLight.target.position.x;
     rig.update(3_000);
@@ -104,8 +104,8 @@ describe('Pass 65 Gun Range authored contrast light', () => {
     const practical = gunRangeDefinition.lighting.practicals.find((entry) => entry.id === 'range-inspection-key');
     const light = practical?.light;
     expect(light).toBeDefined();
-    expect(gunRangeDefinition.budgets.maximumShadowLights).toBe(6);
-    expect(gunRangeDefinition.lighting.practicals.filter((entry) => entry.castsShadow)).toHaveLength(6);
+    expect(gunRangeDefinition.budgets.maximumShadowLights).toBe(7);
+    expect(gunRangeDefinition.lighting.practicals.filter((entry) => entry.castsShadow)).toHaveLength(7);
     for (const authored of gunRangeDefinition.lighting.practicals.flatMap((entry) => entry.light ? [entry.light] : [])) {
       expect(arenaVolumeContainsPoint(authored.intendedVolume, authored.position), `${authored.position}`).toBe(true);
       expect(arenaVolumeContainsPoint(authored.intendedVolume, authored.target), `${authored.target}`).toBe(true);
@@ -170,9 +170,9 @@ describe('Pass 65 Gun Range authored contrast light', () => {
     expect(rangeLight.shadow.mapSize.toArray()).toEqual([512, 512]);
     expect(rangeLight.userData).toMatchObject({ presentationOnly: true, blocksShots: false, practicalPolicyId: practical.id });
     expect(rig.telemetry()).toMatchObject({
-      activeLights: 6,
-      shadowCastingLights: 6,
-      maximumShadowLights: 6,
+      activeLights: 7,
+      shadowCastingLights: 7,
+      maximumShadowLights: 7,
       authoredLights: expect.arrayContaining([
         expect.objectContaining({
           practicalId: practical.id,
@@ -181,10 +181,11 @@ describe('Pass 65 Gun Range authored contrast light', () => {
         expect.objectContaining({ practicalId: 'range-cyan-lane-key', color: 0x53e9e1, shadowMapSize: 256 }),
         expect.objectContaining({ practicalId: 'range-amber-lane-key', color: 0xffb84f, shadowMapSize: 256 }),
         expect.objectContaining({ practicalId: 'test-bay-door-approach-key', color: 0x72f4ed, shadowMapSize: 256 }),
+        expect.objectContaining({ practicalId: 'test-bay-door-bay-key', color: 0xffc06a, shadowMapSize: 256 }),
         expect.objectContaining({ practicalId: 'test-bay-inspection-key', color: 0xc8f7ff, shadowMapSize: 512 }),
         expect.objectContaining({ practicalId: 'test-bay-support-key', color: 0xffbf66, shadowMapSize: 256 }),
       ]),
-      occlusion: { activeLocalLights: 6, shadowedLocalLights: 6, violations: [] },
+      occlusion: { activeLocalLights: 7, shadowedLocalLights: 7, violations: [] },
     });
 
     const stepMs = 100;

@@ -174,6 +174,13 @@ describe('timed map weapon legacy-main integration', () => {
   });
 
   it('keeps flare direct impact and ground DOT on exactly one authority lane each', () => {
+    const apply = between('function applyFlareTargetDamage(', '\nfunction finishPendingFlareShot(');
+    expect(apply).toContain("if (target.id === player.id) {");
+    expect(apply).toContain('applyDamage(outgoing, ownerId, 1, false, cause);');
+    expect(apply).toContain('const health = remoteHealthAuthorities.get(target.id);');
+    expect(apply).toContain('sendAuthoritativeHit({');
+    expect(apply).toContain("kind: 'shot'");
+
     const directHit = between('function handleFlareDirectHit(', '\nfunction handleFlareImpact(');
     expect(directHit).toContain('applyFlareTargetDamage(');
     expect(directHit).toContain('finishPendingFlareShot(hit.ownerId, hit.actionNonce, outcome)');

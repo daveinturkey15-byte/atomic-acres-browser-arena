@@ -171,6 +171,10 @@ export type GunRangeTestBayDoorStep = Readonly<{
   collisionChanged: boolean;
 }>;
 
+const GUN_RANGE_TEST_BAY_DOOR_STATE_KEYS = Object.freeze([
+  'phase', 'openness', 'updatedAtMs', 'thumpSequence',
+] as const);
+
 export type GunRangeTestBayFrozenTimer = Readonly<{
   phaseStartedAt: number;
   endsAt: number;
@@ -196,6 +200,20 @@ function distanceToDoorTrigger(position: Readonly<Point3>): number {
   return Math.hypot(position.x - trigger.x, position.y - trigger.y, position.z - trigger.z);
 }
 
+export function isGunRangeTestBayDoorState(value: unknown): value is GunRangeTestBayDoorState {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const state = value as Record<string, unknown>;
+  return Object.keys(state).length === GUN_RANGE_TEST_BAY_DOOR_STATE_KEYS.length
+    && GUN_RANGE_TEST_BAY_DOOR_STATE_KEYS.every((key) => Object.hasOwn(state, key))
+    && (state.phase === 'closed' || state.phase === 'opening' || state.phase === 'open' || state.phase === 'closing')
+    && Number.isFinite(state.openness) && Number(state.openness) >= 0 && Number(state.openness) <= 1
+    && Number.isFinite(state.updatedAtMs) && Number(state.updatedAtMs) >= 0
+    && Number.isSafeInteger(state.thumpSequence) && Number(state.thumpSequence) >= 0
+    && Number(state.thumpSequence) <= 1_000_000_000
+    && (state.phase !== 'closed' || state.openness === 0)
+    && (state.phase !== 'open' || state.openness === 1);
+}
+
 export function createGunRangeTestBayDoorState(nowMs = 0): GunRangeTestBayDoorState {
   if (!Number.isFinite(nowMs) || nowMs < 0) throw new TypeError('door time must be finite and non-negative');
   return Object.freeze({ phase: 'closed', openness: 0, updatedAtMs: nowMs, thumpSequence: 0 });
@@ -206,14 +224,26 @@ export function advanceGunRangeTestBayDoor(
   nowMs: number,
   observerPosition: Readonly<Point3>,
 ): GunRangeTestBayDoorStep {
+  return advanceGunRangeTestBayDoorForObservers(state, nowMs, [observerPosition]);
+}
+
+export function advanceGunRangeTestBayDoorForObservers(
+  state: GunRangeTestBayDoorState,
+  nowMs: number,
+  observerPositions: readonly Readonly<Point3>[],
+): GunRangeTestBayDoorStep {
   if (!Number.isFinite(nowMs) || nowMs < state.updatedAtMs
-    || ![observerPosition.x, observerPosition.y, observerPosition.z].every(Number.isFinite)) {
-    throw new TypeError('door step requires monotonic finite time and observer position');
+    || !isGunRangeTestBayDoorState(state)
+    || !Array.isArray(observerPositions)
+    || !observerPositions.every((position) => (
+      [position.x, position.y, position.z].every(Number.isFinite)
+    ))) {
+    throw new TypeError('door step requires monotonic finite time and finite observer positions');
   }
-  const distance = distanceToDoorTrigger(observerPosition);
-  const wantsOpen = distance <= (state.openness > 0
+  const threshold = state.openness > 0
     ? GUN_RANGE_TEST_BAY_DOOR_RELEASE_RADIUS_M
-    : GUN_RANGE_TEST_BAY_DOOR_TRIGGER_RADIUS_M);
+    : GUN_RANGE_TEST_BAY_DOOR_TRIGGER_RADIUS_M;
+  const wantsOpen = observerPositions.some((position) => distanceToDoorTrigger(position) <= threshold);
   const delta = (nowMs - state.updatedAtMs) / GUN_RANGE_TEST_BAY_DOOR_OPEN_MS;
   const openness = Math.min(1, Math.max(0, state.openness + (wantsOpen ? delta : -delta)));
   const phase: GunRangeTestBayDoorPhase = openness <= 0
@@ -233,6 +263,30 @@ export function advanceGunRangeTestBayDoor(
     state: next,
     audioIntent: openingStarted ? GUN_RANGE_TEST_BAY_CONTRACT.door.thumpIntent : null,
     collisionChanged,
+  });
+}
+
+/** Advance a host-authored transition on a replica without admitting any
+ * local observer. The phase is the authority decision; only its bounded leaf
+ * travel is projected through the host-to-guest monotonic clock mapping. */
+export function projectGunRangeTestBayDoorState(
+  state: GunRangeTestBayDoorState,
+  nowMs: number,
+): GunRangeTestBayDoorState {
+  if (!isGunRangeTestBayDoorState(state) || !Number.isFinite(nowMs) || nowMs < state.updatedAtMs) {
+    throw new TypeError('door projection requires valid state and monotonic mapped time');
+  }
+  const delta = (nowMs - state.updatedAtMs) / GUN_RANGE_TEST_BAY_DOOR_OPEN_MS;
+  const openness = state.phase === 'opening'
+    ? Math.min(1, state.openness + delta)
+    : state.phase === 'closing'
+      ? Math.max(0, state.openness - delta)
+      : state.openness;
+  return Object.freeze({
+    phase: openness <= 0 ? 'closed' : openness >= 1 ? 'open' : state.phase,
+    openness,
+    updatedAtMs: nowMs,
+    thumpSequence: state.thumpSequence,
   });
 }
 

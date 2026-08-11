@@ -486,10 +486,12 @@ describe('network protocol guards', () => {
         activeAtHostTimeMs: null,
         activeAtEpochMs: null,
         matchClock: null,
+        testBayDoor: null,
       },
       nonce: 2,
     };
     expect(isGameMessage(join)).toBe(true);
+    expect(isGameMessage({ ...join, protocolVersion: MULTIPLAYER_PROTOCOL_VERSION - 1 })).toBe(false);
     expect(messageBelongsToPlayer(join, 'abc')).toBe(true);
     expect(isGameMessage({ ...join, resumeToken: 'short' })).toBe(false);
     expect(isGameMessage(lobbyState)).toBe(true);

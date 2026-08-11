@@ -35,8 +35,8 @@ const aircraftEntry = productionManifest.supportVehicles?.find((candidate) => ca
 if (!chopperEntry || !aircraftEntry) throw new Error('Pass 65 support vehicle production entries are missing');
 const expectedRefinementContracts = Object.freeze({
   chopper: Object.freeze({
-    visualRevision: 'pass70-complete-tandem-attack-airframe-v5',
-    detailContract: 'complete-exterior-cockpit-gun-readable-materials-v5',
+    visualRevision: 'pass70-connected-rear-tail-airframe-v7',
+    detailContract: 'continuous-rear-tail-silhouette-cockpit-clear-sightline-v7',
     materialRevision: 'pass70-daylight-readable-olive-pbr-v1',
   }),
   care: Object.freeze({
@@ -109,7 +109,7 @@ else {
     'assert len(roots)==3',
     "required={'chopper-rear-fuselage','chopper-tail-boom','chopper-tail-fin','chopper-first-person-cockpit','chopper-gunner-sightline','chopper-gunner-weapon-view','chopper-nose-sensor'}",
     "assert all(required.issubset({c.get('canonical_node_name') for c in r.children_recursive}) for r in roots)",
-    "assert all(r.get('visual_revision')=='pass70-complete-tandem-attack-airframe-v5' and r.get('detail_contract')=='complete-exterior-cockpit-gun-readable-materials-v5' and r.get('material_revision')=='pass70-daylight-readable-olive-pbr-v1' for r in roots)",
+    "assert all(r.get('visual_revision')=='pass70-connected-rear-tail-airframe-v7' and r.get('detail_contract')=='continuous-rear-tail-silhouette-cockpit-clear-sightline-v7' and r.get('material_revision')=='pass70-daylight-readable-olive-pbr-v1' for r in roots)",
     "names=lambda r:[str(c.get('canonical_node_name','')) for c in r.children_recursive]",
     "count=lambda r,prefix:sum(n.startswith(prefix) for n in names(r))",
     "lod0=next(r for r in roots if r.get('quality_tier')=='LOD0')",

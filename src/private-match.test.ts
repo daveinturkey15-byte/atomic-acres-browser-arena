@@ -10,6 +10,7 @@ import {
   estimateHostClockOffset,
   freeForAllLeaders,
   isLobbySnapshot,
+  isPrivateMatchConfig,
   latencyQuality,
   playersAreHostile,
   recordPlayerDamage,
@@ -37,6 +38,7 @@ const snapshot = (changes: Partial<LobbySnapshot> = {}): LobbySnapshot => ({
   activeAtHostTimeMs: null,
   activeAtEpochMs: null,
   matchClock: null,
+  testBayDoor: null,
   ...changes,
 });
 
@@ -94,10 +96,13 @@ describe('private match lobby', () => {
       activeAtHostTimeMs: 0,
       activeAtEpochMs: 1,
       matchClock: { schemaVersion: 1, revision: 0, paused: false, remainingMs: 120_000, sampledAtHostTimeMs: 500 },
+      testBayDoor: { phase: 'closed', openness: 0, updatedAtMs: 500, thumpSequence: 0 },
     });
     expect(isLobbySnapshot(range)).toBe(true);
     expect(range.config.hostedBotCount).toBe(0);
     expect(playersAreHostile(range.config.mode, { ...members[0], team: 0 }, { ...members[1], team: 0 })).toBe(true);
+    expect(isPrivateMatchConfig({ ...range.config, durationMs: 60_000 })).toBe(false);
+    expect(isPrivateMatchConfig({ ...range.config, durationMs: 180_000 })).toBe(false);
   });
 
   it('derives team totals and stable FFA leaders from authoritative scores', () => {

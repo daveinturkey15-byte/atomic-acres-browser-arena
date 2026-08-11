@@ -86,7 +86,7 @@ describe('Pass 70 Gun Range test-bay world authority', () => {
     expect(assembly.userData).toMatchObject({
       authorityId: GUN_RANGE_TEST_BAY_CONTRACT.door.id,
       structure: 'static-frame-with-dynamic-leaf',
-      practicalIds: ['test-bay-door-approach-key'],
+      practicalIds: ['test-bay-door-approach-key', 'test-bay-door-bay-key'],
     });
     expect(leaf.parent).toBe(assembly);
     for (const definition of GUN_RANGE_TEST_BAY_STRUCTURE.filter(({ assemblyRole }) => assemblyRole)) {
@@ -99,6 +99,10 @@ describe('Pass 70 Gun Range test-bay world authority', () => {
       'gun-range-test-bay-door-armour-bay-face',
       'gun-range-test-bay-door-status-range-face',
       'gun-range-test-bay-door-status-bay-face',
+      'gun-range-test-bay-door-glass-range-north',
+      'gun-range-test-bay-door-glass-bay-south',
+      'gun-range-test-bay-door-chevron-range-upper',
+      'gun-range-test-bay-door-chevron-bay-lower',
     ]) expect(map.root.getObjectByName(id)?.parent, id).toBe(leaf);
     const emitter = map.root.getObjectByName('gun-range-test-bay-door-practical-emitter') as THREE.Mesh;
     expect(emitter.parent).toBe(assembly);
@@ -109,8 +113,25 @@ describe('Pass 70 Gun Range test-bay world authority', () => {
     const leafMaterial = leaf.material as THREE.MeshStandardMaterial;
     expect(leafMaterial.name).toBe('GunRange_TestBay_SecureDoor_PanelTexture');
     expect(leafMaterial.userData.testBayDoorTextureMapping).toEqual({ pattern: 'panel', repeat: [2, 3] });
+    expect(leafMaterial.emissiveIntensity).toBeGreaterThanOrEqual(0.75);
+    expect(leafMaterial.metalness).toBeLessThan(0.6);
+    for (const face of ['range', 'bay']) {
+      for (const vertical of ['upper', 'lower']) {
+        for (const side of ['north', 'south']) {
+          const tile = map.root.getObjectByName(
+            `gun-range-test-bay-door-armour-tile-${face}-${vertical}-${side}`,
+          ) as THREE.Mesh;
+          expect(tile.parent, tile.name).toBe(leaf);
+          expect((tile.material as THREE.MeshStandardMaterial).name).toBe('GunRange_TestBay_DoorArmour_SatinSteel');
+        }
+      }
+    }
     const practical = gunRangeVisualDefinition.lighting.practicals.find(({ id }) => id === 'test-bay-door-approach-key');
     expect(practical?.light?.position).toEqual(emitter.position.toArray());
+    const bayEmitter = map.root.getObjectByName('gun-range-test-bay-door-bay-practical-emitter') as THREE.Mesh;
+    const bayPractical = gunRangeVisualDefinition.lighting.practicals.find(({ id }) => id === 'test-bay-door-bay-key');
+    expect(bayEmitter.parent).toBe(assembly);
+    expect(bayPractical?.light?.position).toEqual(bayEmitter.position.toArray());
   });
 
   it('keeps every illuminated moving dummy grounded, bounded, and targetable by the live hit-proxy catalog', () => {

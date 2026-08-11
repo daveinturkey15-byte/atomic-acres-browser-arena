@@ -45,6 +45,17 @@ describe('Pass 65 modern tactical HUD layout contract', () => {
     expect(shell).toContain('class="support-optic-frame" aria-hidden="true"');
   });
 
+  it('gives Chopper possession one uncluttered HUD lane and one centre marker', () => {
+    for (const surface of [
+      '.hud-mission-console', '.hud-map-console', '.hud-operator-console', '.hud-weapon-console',
+      '#support-block', '#support-combat-feedback', '#crosshair',
+    ]) {
+      expect(hudCss).toContain(`html[data-killstreak-possession="chopper-gunner"] ${surface}`);
+    }
+    expect(hudCss).toMatch(/data-killstreak-possession="chopper-gunner"[\s\S]*?display:\s*none !important/);
+    expect(hudCss).not.toContain('html[data-killstreak-possession="chopper-gunner"] #gunner-cockpit-hud');
+  });
+
   it('enhances the existing support action row without a duplicate operate banner', () => {
     expect(shell).not.toContain('id="killstreak-enter-prompt"');
     expect(shell).toContain('<footer id="support-control-action">');

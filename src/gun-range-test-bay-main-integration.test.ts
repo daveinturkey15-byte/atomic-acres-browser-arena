@@ -24,6 +24,7 @@ describe('Gun Range test-bay match timer integration', () => {
     expect(block).toContain('gunRangeTestBayOccupants(');
     expect(block).toContain('admittedGunRangeClockParticipants(),');
     expect(block).toContain('GUN_RANGE_TEST_BAY_CONTRACT.bay.bounds,');
+    expect(block).toContain('const sampleTimeMs = Math.max(nowLocalMonoMs, gunRangeMatchClockState.sampledAtHostTimeMs);');
     expect(block).toContain('persistActiveHostMatchCheckpoint(true);');
     expect(block).toContain("broadcastHostLobby('active');");
 
@@ -32,14 +33,27 @@ describe('Gun Range test-bay match timer integration', () => {
     const participants = source.slice(participantStart, participantEnd);
     expect(participants).toContain('const hostMember = hostLobbyMembers.get(player.id);');
     expect(participants).toContain('const retained = retainedRemoteAuthorities.get(member.id)?.snapshot;');
+    expect(participants).toContain('member.connected && remote !== undefined && !remote.awaitingReplacementState');
     expect(participants).toContain('alive: health?.alive === true');
+
+    const sampleStart = source.indexOf('function sampleAuthoritativeGunRangeMatchClock');
+    const sampleEnd = source.indexOf('\nfunction projectActiveGunRangeMatchClock', sampleStart);
+    const sample = source.slice(sampleStart, sampleEnd);
+    expect(sample).toContain('const sampleTimeMs = Math.max(nowHostTimeMs, gunRangeMatchClockState.sampledAtHostTimeMs);');
   });
 
   it('carries the revisioned clock in active lobby snapshots, host recovery, and authenticated rejoin', () => {
+    const syncStart = source.indexOf('async function synchronizeLobbyArena');
+    const syncEnd = source.indexOf('\nfunction matchAdmissionIdentity', syncStart);
+    const sync = source.slice(syncStart, syncEnd);
+    expect(sync).toContain('activateArenaSelection(arenaId, admissionToken !== undefined, admissionToken)');
+
     const hostSnapshotStart = source.indexOf('function hostSnapshot(');
     const hostSnapshotEnd = source.indexOf('\nfunction broadcastHostLobby', hostSnapshotStart);
     const hostSnapshot = source.slice(hostSnapshotStart, hostSnapshotEnd);
     expect(hostSnapshot).toContain("const matchClock = phase === 'active'");
+    expect(hostSnapshot).toContain('gunRangeMatchClockState?.sampledAtHostTimeMs ?? 0');
+    expect(hostSnapshot).toContain('gunRangeTestBayDoorState?.updatedAtMs ?? 0');
     expect(hostSnapshot).toContain('sampleAuthoritativeGunRangeMatchClock(snapshotHostTimeMs)');
     expect(hostSnapshot).toContain('matchClock,');
 
@@ -82,10 +96,52 @@ describe('Gun Range test-bay match timer integration', () => {
     const heartbeat = source.slice(heartbeatStart, heartbeatEnd);
     expect(heartbeat).toContain('const now = performance.now();');
     expect(heartbeat).toContain("if (gameStarted && network.role === 'host') {");
+    expect(heartbeat).toContain('const doorState = updateGunRangeTestBayDoorAuthority(now);');
+    expect(heartbeat).toContain('synchronizeGunRangeTestBayDoorWorld(doorState, false);');
+    expect(heartbeat).toContain('flushGunRangeTestBayDoorBroadcast();');
     expect(heartbeat).toContain('updateGunRangeMatchClockAuthority(now);');
     expect(heartbeat).toContain('updateTimedMapWeapons(now);');
     expect(heartbeat.indexOf('updateGunRangeMatchClockAuthority(now);'))
       .toBeLessThan(heartbeat.indexOf('network.send(createStateMessage())'));
     expect(heartbeat.match(/const now = performance\.now\(\);/g)).toHaveLength(1);
+  });
+
+  it('applies hidden-heartbeat door motion to render, collision, and ballistic authority before replication', () => {
+    const syncStart = source.indexOf('function synchronizeGunRangeTestBayDoorWorld');
+    const syncEnd = source.indexOf('\nfunction sampleAuthoritativeGunRangeMatchClock', syncStart);
+    const sync = source.slice(syncStart, syncEnd);
+    expect(syncStart).toBeGreaterThanOrEqual(0);
+    expect(sync).toContain('applyGunRangeTestBayDoorState(arena.root, doorState)');
+    expect(sync).toContain('gunRangeTestBayDoorColliders = doorFrame.dynamicColliders;');
+    expect(sync).toContain('gunRangeTestBayDoorBallisticSurfaces = doorFrame.dynamicBallisticSurfaces;');
+    expect(sync).toContain('if (doorArenaChanged || doorFrame.collisionChanged) syncInteractiveWorldPhysics();');
+
+    const updateStart = source.indexOf('function updateGunRangeTestBayDoorAuthority');
+    const updateEnd = source.indexOf('\nfunction synchronizeGunRangeTestBayDoorWorld', updateStart);
+    const update = source.slice(updateStart, updateEnd);
+    expect(update).toContain('gunRangeTestBayDoorBroadcastPending = true;');
+    expect(update).not.toContain("broadcastHostLobby('active');");
+
+    const heartbeatStart = source.indexOf('function scheduleStateBroadcast(): void {');
+    const heartbeatEnd = source.indexOf('\nscheduleStateBroadcast();', heartbeatStart);
+    const heartbeat = source.slice(heartbeatStart, heartbeatEnd);
+    const synchronized = heartbeat.indexOf('synchronizeGunRangeTestBayDoorWorld(doorState, false);');
+    const flushed = heartbeat.indexOf('flushGunRangeTestBayDoorBroadcast();');
+    const sent = heartbeat.indexOf('network.send(createStateMessage())');
+    expect(synchronized).toBeLessThan(flushed);
+    expect(flushed).toBeLessThan(sent);
+
+    const broadcastStart = source.indexOf('function broadcastHostLobby');
+    const broadcastEnd = source.indexOf('\nconst LAST_HOSTED_ROOM_KEY', broadcastStart);
+    const broadcast = source.slice(broadcastStart, broadcastEnd);
+    expect(broadcast).toContain('synchronizeGunRangeTestBayDoorWorld(');
+    expect(broadcast.indexOf('synchronizeGunRangeTestBayDoorWorld('))
+      .toBeLessThan(broadcast.indexOf('network.send(message);'));
+
+    const frameStart = source.indexOf("} else if (selectedArena.id === 'gun-range') {");
+    const frameEnd = source.indexOf('\n    waterSystem.update', frameStart);
+    const frame = source.slice(frameStart, frameEnd);
+    expect(frame).toContain('synchronizeGunRangeTestBayDoorWorld(doorState, true);');
+    expect(frame).not.toContain('gunRangeTestBayDoorColliders = doorFrame.dynamicColliders;');
   });
 });

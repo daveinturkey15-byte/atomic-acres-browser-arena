@@ -534,7 +534,8 @@ test('loads and prewarms the exact authored support-vehicle family before deploy
     visibleOutsideCockpit: [],
     dashboardVisible: true,
     displaysVisible: true,
-    hudVisible: true,
+    hudVisible: false,
+    centreSightlineClear: true,
     weaponVisible: true,
     overlayLayerExclusive: true,
   });

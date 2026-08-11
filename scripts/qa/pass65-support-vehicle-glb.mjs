@@ -197,8 +197,8 @@ export function auditSupportVehicleGlb(json, bytes, family, lod) {
   }
   const detailCounts = {};
   if (family === 'chopper') {
-    if (root?.extras?.visual_revision !== 'pass70-complete-tandem-attack-airframe-v5'
-      || root?.extras?.detail_contract !== 'complete-exterior-cockpit-gun-readable-materials-v5') {
+    if (root?.extras?.visual_revision !== 'pass70-connected-rear-tail-airframe-v7'
+      || root?.extras?.detail_contract !== 'continuous-rear-tail-silhouette-cockpit-clear-sightline-v7') {
       failures.push(`chopper LOD${lod}: authored airframe refinement contract missing`);
     }
     const requiredDetail = [
@@ -219,6 +219,7 @@ export function auditSupportVehicleGlb(json, bytes, family, lod) {
       ['Chopper_MainBladeGrip_', 4],
       ['Chopper_TailBladeGrip_', 4],
       ['Chopper_TailGearbox_', 1],
+      ['Chopper_TailRootCollar_', 1],
       ['Chopper_GunBarrelCollar_', 3],
       ['Chopper_GunArmourShroud_', 2],
       ['Chopper_SkidDamper_', 4],

@@ -121,8 +121,8 @@ const chopperProvenance = {
   title: 'Pass 65 Chopper Gunner authored vehicle and first-person cockpit',
   ...sharedBoundary,
   inspirationBoundary: 'Original stylized near-future support helicopter. No copied commercial-game geometry, texture, logo, HUD, animation, UI, or audio.',
-  visualRevision: 'pass70-complete-tandem-attack-airframe-v5',
-  detailContract: 'complete-exterior-cockpit-gun-readable-materials-v5',
+  visualRevision: 'pass70-connected-rear-tail-airframe-v7',
+  detailContract: 'continuous-rear-tail-silhouette-cockpit-clear-sightline-v7',
   materialRevision: 'pass70-daylight-readable-olive-pbr-v1',
   sourceBlend: chopperSourceBlend,
   sharedConsumers: ['menu-prerecorded-map-preview', 'ai-flown-chopper-gunner', 'player-optional-chopper-gunner'],
@@ -252,7 +252,7 @@ upsertAsset({
   sourceProvenance: chopperProvenanceRecord.path, sourceProvenanceSha256: chopperProvenanceRecord.sha256,
   preview: chopperContactSheet.path,
   format: 'Three strict decreasing optimized self-contained glTF 2.0 binary LODs with embedded WebP PBR maps, complete armoured tandem attack-helicopter silhouette, authored full cockpit/dashboard/HUD/weapon view, detailed exterior rotors/gun/sockets and eight animation clips',
-  modifications: 'Project-original Pass 70 v5 attack-helicopter presentation with daylight-readable olive armour, transparent canopy and HUD glass, separated gunmetal/frame values, overlapping side and dorsal armour, raised fasteners and louvers, faceted pilot/gunner glazing, armoured nose and cheeks, dual-aperture nose sensor, braced pylons, finned missiles, rocket pods, mechanical rotor hardware, gun armour/feed chute and damped skid gear. Possessed view presents the complete cockpit while excluding exterior shell and rotors; runtime gameplay authority remains TypeScript-owned.',
+  modifications: 'Project-original Pass 70 v7 attack-helicopter presentation with a continuous rear-cabin to TailRootCollar, tail-boom and tail-fin silhouette; daylight-readable olive armour; transparent canopy and HUD glass; separated gunmetal/frame values; overlapping side and dorsal armour; raised fasteners and louvers; faceted pilot/gunner glazing; armoured nose and cheeks; dual-aperture nose sensor; braced pylons; finned missiles; rocket pods; mechanical rotor hardware; gun armour/feed chute and damped skid gear. Possessed view presents the complete cockpit while excluding exterior shell and rotors; runtime gameplay authority remains TypeScript-owned.',
   attributionRequired: false,
 });
 upsertAsset({

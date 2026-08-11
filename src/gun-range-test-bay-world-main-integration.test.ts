@@ -21,9 +21,49 @@ describe('Pass 70 Gun Range test-bay runtime integration', () => {
     const updateStart = source.indexOf("} else if (selectedArena.id === 'gun-range') {");
     const updateEnd = source.indexOf('\n    waterSystem.update(', updateStart);
     const update = source.slice(updateStart, updateEnd);
-    expect(update).toContain('gunRangeTestBayDoorColliders = doorFrame.dynamicColliders;');
-    expect(update).toContain('gunRangeTestBayDoorBallisticSurfaces = doorFrame.dynamicBallisticSurfaces;');
-    expect(update).toContain('syncInteractiveWorldPhysics();');
+    expect(update).toContain('synchronizeGunRangeTestBayDoorWorld(doorState, true);');
+    expect(update).not.toContain('updateGunRangeTestBayDoor(arena.root, now, player.position)');
+
+    const synchronization = functionBlock('synchronizeGunRangeTestBayDoorWorld(', 'sampleAuthoritativeGunRangeMatchClock(');
+    expect(synchronization).toContain('gunRangeTestBayDoorColliders = doorFrame.dynamicColliders;');
+    expect(synchronization).toContain('gunRangeTestBayDoorBallisticSurfaces = doorFrame.dynamicBallisticSurfaces;');
+    expect(synchronization).toContain('syncInteractiveWorldPhysics();');
+    expect(synchronization).toContain('applyGunRangeTestBayDoorState(arena.root, doorState)');
+  });
+
+  it('projects one host-authored multi-player door state on every peer and hidden-host heartbeat', () => {
+    const authority = functionBlock('sampleAuthoritativeGunRangeTestBayDoor(', 'projectActiveGunRangeTestBayDoor(');
+    expect(authority).toContain('admittedGunRangeClockParticipants()');
+    expect(authority).toContain('const sampleTimeMs = Math.max(nowHostTimeMs, prior.updatedAtMs);');
+    expect(authority).toContain('participant.admitted && participant.connected && participant.alive');
+    expect(authority).toContain('advanceGunRangeTestBayDoorForObservers(');
+
+    const projection = functionBlock('projectActiveGunRangeTestBayDoor(', 'initializeGunRangeTestBayDoor(');
+    expect(projection).toContain("network.role !== 'client'");
+    expect(projection).toContain('hostTimeToGuestMono(');
+    expect(projection).toContain('Math.max(0, Math.min(nowLocalMonoMs, sampleAtLocalMonoMs))');
+    expect(projection).toContain('projectGunRangeTestBayDoorState(');
+
+    const hostSnapshot = functionBlock('hostSnapshot(', 'broadcastHostLobby(');
+    expect(hostSnapshot).toContain("const testBayDoor = phase === 'active'");
+    expect(hostSnapshot).toContain('sampleAuthoritativeGunRangeTestBayDoor(snapshotHostTimeMs)');
+    expect(hostSnapshot).toContain('testBayDoor,');
+
+    const accept = functionBlock('acceptLobbyState(', 'authorizeRedeploy(');
+    expect(accept).toContain('gunRangeTestBayDoorState = message.snapshot.testBayDoor;');
+
+    const heartbeat = functionBlock('scheduleStateBroadcast(', 'effectiveFramePacing(');
+    expect(heartbeat).toContain('const doorState = updateGunRangeTestBayDoorAuthority(now);');
+    expect(heartbeat).toContain('synchronizeGunRangeTestBayDoorWorld(doorState, false);');
+    expect(heartbeat).toContain('flushGunRangeTestBayDoorBroadcast();');
+    expect(heartbeat.indexOf('updateGunRangeTestBayDoorAuthority(now);'))
+      .toBeLessThan(heartbeat.indexOf('network.send(createStateMessage())'));
+    expect(heartbeat.indexOf('synchronizeGunRangeTestBayDoorWorld(doorState, false);'))
+      .toBeLessThan(heartbeat.indexOf('flushGunRangeTestBayDoorBroadcast();'));
+
+    const broadcast = functionBlock('broadcastHostLobby(', 'saveLastHostedRoomCode(');
+    expect(broadcast.indexOf('synchronizeGunRangeTestBayDoorWorld('))
+      .toBeLessThan(broadcast.indexOf('network.send(message);'));
   });
 
   it('projects live moving training dummies into the crossbow target buffer and damage path', () => {
