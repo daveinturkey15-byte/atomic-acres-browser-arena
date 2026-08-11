@@ -9,7 +9,6 @@ export const GUN_RANGE_TEST_BAY_DOOR_OPEN_MS = 720;
 export const GUN_RANGE_TEST_BAY_DOOR_TRIGGER_RADIUS_M = 4.2;
 export const GUN_RANGE_TEST_BAY_DOOR_RELEASE_RADIUS_M = 6.4;
 export const GUN_RANGE_TEST_BAY_STATION_INTERACTION_RANGE_M = 2.8;
-export const GUN_RANGE_TEST_BAY_DEFAULT_TIMER_DURATION_MS = 120_000;
 
 const WALK_SPEED_MPS = movementProfile({
   crouched: false,
@@ -121,15 +120,19 @@ export type GunRangeTestBayFrozenTimer = Readonly<{
   endsAt: number;
 }>;
 
-/** Keep the range clock at its full duration while the player remains in the test bay. */
+/** Shift the active timer window so no match time elapses while the player is in the test bay. */
 export function gunRangeTestBayFrozenTimer(
-  nowMs: number,
-  durationMs = GUN_RANGE_TEST_BAY_DEFAULT_TIMER_DURATION_MS,
+  timer: GunRangeTestBayFrozenTimer,
+  elapsedInsideMs: number,
 ): GunRangeTestBayFrozenTimer {
-  if (!Number.isFinite(nowMs) || nowMs < 0 || !Number.isFinite(durationMs) || durationMs <= 0) {
-    throw new TypeError('test-bay timer requires finite non-negative time and positive duration');
+  if (![timer.phaseStartedAt, timer.endsAt, elapsedInsideMs].every(Number.isFinite)
+    || timer.endsAt < timer.phaseStartedAt || elapsedInsideMs < 0) {
+    throw new TypeError('test-bay timer requires a finite ordered window and non-negative elapsed time');
   }
-  return Object.freeze({ phaseStartedAt: nowMs, endsAt: nowMs + durationMs });
+  return Object.freeze({
+    phaseStartedAt: timer.phaseStartedAt + elapsedInsideMs,
+    endsAt: timer.endsAt + elapsedInsideMs,
+  });
 }
 
 function distanceToDoorTrigger(position: Readonly<Point3>): number {

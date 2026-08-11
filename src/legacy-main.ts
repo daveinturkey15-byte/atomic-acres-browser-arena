@@ -68,7 +68,6 @@ import { GUN_RANGE_FIRING_LINE_Z, applyAdditionalMapPresentationProfile, applyRu
 import { RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES } from './rigged-bot-visual-evidence-contract';
 import {
   GUN_RANGE_TEST_BAY_CONTRACT,
-  GUN_RANGE_TEST_BAY_DEFAULT_TIMER_DURATION_MS,
   gunRangeTestBayFrozenTimer,
   nearestGunRangeTestBaySupportStation,
   nearestGunRangeTestBayWeaponStation,
@@ -2848,6 +2847,7 @@ function invalidateActiveWorldCollisionCache(): void {
 
 let gunRangeTestBayDoorColliders: readonly DynamicWorldCollider[] = [];
 let gunRangeTestBayDoorColliderArena: THREE.Object3D | null = null;
+let gunRangeTestBayPlayerWasInside = false;
 
 function activeGunRangeTestBayDoorColliders(activeArena: ArenaMap = arena): readonly DynamicWorldCollider[] {
   return activeArena === arena && selectedArena.id === 'gun-range'
@@ -21079,22 +21079,26 @@ function updateHud(now: number): void {
   // DOM reconstruction can stay at 10 Hz. The rotating minimap has its own
   // bounded 60 Hz cadence so uncapped rendering cannot flood Canvas2D work.
   if (now - lastHudAt < 100) return;
+  const elapsedSinceLastHudMs = Math.max(0, now - lastHudAt);
   lastHudAt = now;
   if (gameStarted) {
-    // Gun Range: freeze and reset the 2-minute timer every time the player
-    // enters the killstreak test bay area, and keep it frozen while inside.
-    if (selectedArena.id === 'gun-range' && matchState.phase === 'active' && player.alive) {
+    // Freeze the remaining Gun Range clock while the player stays in the test
+    // bay. Re-anchoring both endpoints preserves elapsed and remaining time;
+    // leaving the bay simply stops extending the window, so countdown resumes.
+    const testBayTimerEligible = selectedArena.id === 'gun-range'
+      && matchState.phase === 'active' && player.alive;
+    if (testBayTimerEligible) {
       const bay = GUN_RANGE_TEST_BAY_CONTRACT.bay.bounds;
       const inBay = player.position.x >= bay.minX && player.position.x <= bay.maxX
         && player.position.z >= bay.minZ && player.position.z <= bay.maxZ;
-      if (inBay) {
-        const rules = currentMatchRules();
-        const durationMs = rules.durationMs ?? GUN_RANGE_TEST_BAY_DEFAULT_TIMER_DURATION_MS;
-        // Freeze at the full duration: reset on every fresh entry, then keep
-        // the end anchored to now while inside so the clock never counts down.
-        matchState = { phase: 'active', ...gunRangeTestBayFrozenTimer(now, durationMs), winner: null };
+      if (inBay && gunRangeTestBayPlayerWasInside) {
+        matchState = {
+          ...matchState,
+          ...gunRangeTestBayFrozenTimer(matchState, elapsedSinceLastHudMs),
+        };
       }
-    }
+      gunRangeTestBayPlayerWasInside = inBay;
+    } else gunRangeTestBayPlayerWasInside = false;
     updateMatchState(now);
   }
   const spec = WEAPONS[player.weapon];

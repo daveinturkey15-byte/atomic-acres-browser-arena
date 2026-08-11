@@ -10,10 +10,11 @@ describe('Gun Range test-bay match timer integration', () => {
     const block = source.slice(start, end);
     expect(start).toBeGreaterThanOrEqual(0);
     expect(end).toBeGreaterThan(start);
-    expect(block).toContain('if (inBay) {');
-    expect(block).toContain('...gunRangeTestBayFrozenTimer(now, durationMs)');
-    expect(block).not.toContain('gunRangeTestBayTimerResetLastEpoch');
-    expect(block).not.toContain('gunRangeTestBayPlayerWasInside');
-    expect(block.indexOf('gunRangeTestBayFrozenTimer(now, durationMs)')).toBeLessThan(block.indexOf('updateMatchState(now)'));
+    expect(block).toContain('if (inBay && gunRangeTestBayPlayerWasInside) {');
+    expect(block).toContain('...gunRangeTestBayFrozenTimer(matchState, elapsedSinceLastHudMs)');
+    expect(block).toContain('gunRangeTestBayPlayerWasInside = inBay;');
+    expect(block).toContain('else gunRangeTestBayPlayerWasInside = false;');
+    expect(block.indexOf('gunRangeTestBayFrozenTimer(matchState, elapsedSinceLastHudMs)'))
+      .toBeLessThan(block.indexOf('updateMatchState(now)'));
   });
 });
