@@ -146,10 +146,20 @@ const weaponsValid = Array.isArray(receipt.weapons)
           && entry.ads.sightBore.contract === 'physical-aperture-spatial-degenerate-v1'
           && entry.ads.sightBore.rayCount === 9
         : entry.ads?.rearOccluderTrim === null && entry.ads?.sightBore === null)
-      && entry.ads?.opaqueSightWindow?.contract === 'camera-ndc-centre-reticle-window-rays-v2'
+      && entry.ads?.opaqueSightWindow?.contract === 'camera-ndc-authored-sight-aperture-rays-v3'
+      && entry.ads.opaqueSightWindow.acceptance === (weapon === 'carbine' ? 'nine-ray-window-clear' : 'centre-ray-clear')
+      && entry.ads.opaqueSightWindow.accepted === true
       && entry.ads.opaqueSightWindow.ndcRadius === 0.02
-      && entry.ads?.opaqueSightWindow?.blockedRays === 0
-      && entry.ads.opaqueSightWindow.maximumHits === 0
+      && entry.ads.opaqueSightWindow.centerHits === 0
+      && Array.isArray(entry.ads.opaqueSightWindow.samples)
+      && entry.ads.opaqueSightWindow.samples.length === 9
+      && entry.ads.opaqueSightWindow.samples[0]?.label === 'center'
+      && entry.ads.opaqueSightWindow.samples[0]?.count === 0
+      && (weapon === 'carbine'
+        ? entry.ads.opaqueSightWindow.blockedRays === 0
+          && entry.ads.opaqueSightWindow.maximumHits === 0
+          && Array.isArray(entry.ads.opaqueSightWindow.meshes) && entry.ads.opaqueSightWindow.meshes.length === 0
+        : entry.ads.opaqueSightWindow.blockedRays > 0 && entry.ads.opaqueSightWindow.blockedRays < 9)
       && materialStateValid(entry.ads?.materials, weapon === 'carbine' ? 1 : 0)
       && JSON.stringify(entry.ads.materials) === JSON.stringify(entry.hip.materials)
       && materialStateValid(entry.restored, weapon === 'carbine' ? 1 : 0)

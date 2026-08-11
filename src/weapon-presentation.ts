@@ -2811,25 +2811,30 @@ export class WeaponPresentation {
       const ndcRadius = 0.02;
       if (!model || (this.active !== 'carbine' && this.active !== 'mini-uzi')) {
         return {
-          contract: 'camera-ndc-centre-reticle-window-rays-v2',
+          contract: 'camera-ndc-authored-sight-aperture-rays-v3',
+          acceptance: 'not-applicable',
+          accepted: true,
           rayCount: 9,
           ndcRadius,
+          centerHits: 0,
           blockedRays: 0,
           maximumHits: 0,
           meshes: [] as string[],
+          samples: [] as ReadonlyArray<unknown>,
         };
       }
       model.updateWorldMatrix(true, true);
       const offsets = [
-        [0, 0],
-        [-ndcRadius, 0], [ndcRadius, 0], [0, -ndcRadius], [0, ndcRadius],
-        [-0.014, -0.014], [-0.014, 0.014], [0.014, -0.014], [0.014, 0.014],
+        ['center', 0, 0],
+        ['left', -ndcRadius, 0], ['right', ndcRadius, 0], ['lower', 0, -ndcRadius], ['upper', 0, ndcRadius],
+        ['lower-left', -0.014, -0.014], ['upper-left', -0.014, 0.014],
+        ['lower-right', 0.014, -0.014], ['upper-right', 0.014, 0.014],
       ] as const;
       const raycaster = new THREE.Raycaster();
       raycaster.layers.mask = this.camera.layers.mask;
       raycaster.near = this.camera instanceof THREE.PerspectiveCamera ? this.camera.near : 0;
       raycaster.far = this.camera instanceof THREE.PerspectiveCamera ? this.camera.far : Number.POSITIVE_INFINITY;
-      const samples = offsets.map(([x, y]) => {
+      const samples = offsets.map(([label, x, y]) => {
         raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
         const hits = raycaster.intersectObject(model, true).filter((hit) => {
           if (!(hit.object instanceof THREE.Mesh)) return false;
@@ -2843,15 +2848,32 @@ export class WeaponPresentation {
           const material = materials[hit.face?.materialIndex ?? 0] ?? materials[0];
           return material?.visible === true && material.colorWrite !== false && material.opacity >= 0.35;
         });
-        return { count: hits.length, meshes: hits.map((hit) => hit.object.name) };
+        return {
+          label,
+          ndc: [x, y] as const,
+          count: hits.length,
+          hits: hits.map((hit) => {
+            const mesh = hit.object as THREE.Mesh;
+            const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+            const material = materials[hit.face?.materialIndex ?? 0] ?? materials[0];
+            return { mesh: mesh.name, material: material?.name ?? '', distance: hit.distance };
+          }),
+        };
       });
+      const acceptance = this.active === 'mini-uzi' ? 'centre-ray-clear' : 'nine-ray-window-clear';
+      const blockedRays = samples.filter((sample) => sample.count > 0).length;
+      const centerHits = samples[0].count;
       return {
-        contract: 'camera-ndc-centre-reticle-window-rays-v2',
+        contract: 'camera-ndc-authored-sight-aperture-rays-v3',
+        acceptance,
+        accepted: acceptance === 'centre-ray-clear' ? centerHits === 0 : blockedRays === 0,
         rayCount: samples.length,
         ndcRadius,
-        blockedRays: samples.filter((sample) => sample.count > 0).length,
+        centerHits,
+        blockedRays,
         maximumHits: samples.reduce((maximum, sample) => Math.max(maximum, sample.count), 0),
-        meshes: [...new Set(samples.flatMap((sample) => sample.meshes))],
+        meshes: [...new Set(samples.flatMap((sample) => sample.hits.map((hit) => hit.mesh)))],
+        samples,
       };
     })();
     return {

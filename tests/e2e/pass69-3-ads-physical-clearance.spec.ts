@@ -186,14 +186,22 @@ test('carbine and Mini Uzi expose a physical ADS corridor without fading their o
     expect(adsMaterials.invalidOpaqueBodyCount, `${weapon}: ADS body remains opaque`).toBe(0);
     expect(adsMaterials.invalidOpticWindowCount, `${weapon}: ADS window remains clear`).toBe(0);
     expect(ads.weaponPresentation.opticMaterialSemantics.sightPictureRetreat, `${weapon}: ADS-only physical viewmodel retreat`).toBeGreaterThanOrEqual(0.25);
-    expect(ads.weaponPresentation.adsOpaqueSightWindow, `${weapon}: nine-ray centre-reticle window`).toMatchObject({
-      contract: 'camera-ndc-centre-reticle-window-rays-v2',
+    expect(ads.weaponPresentation.adsOpaqueSightWindow, `${weapon}: authored centre-reticle aperture`).toMatchObject({
+      contract: 'camera-ndc-authored-sight-aperture-rays-v3',
+      acceptance: weapon === 'carbine' ? 'nine-ray-window-clear' : 'centre-ray-clear',
+      accepted: true,
       rayCount: 9,
       ndcRadius: 0.02,
-      blockedRays: 0,
-      maximumHits: 0,
-      meshes: [],
+      centerHits: 0,
     });
+    expect(ads.weaponPresentation.adsOpaqueSightWindow.samples, `${weapon}: exact nine diagnostic rays`).toHaveLength(9);
+    expect(ads.weaponPresentation.adsOpaqueSightWindow.samples[0]).toMatchObject({ label: 'center', ndc: [0, 0], count: 0 });
+    if (weapon === 'carbine') {
+      expect(ads.weaponPresentation.adsOpaqueSightWindow).toMatchObject({ blockedRays: 0, maximumHits: 0, meshes: [] });
+    } else {
+      expect(ads.weaponPresentation.adsOpaqueSightWindow.blockedRays, `${weapon}: opaque iron-sight surround remains`).toBeGreaterThan(0);
+      expect(ads.weaponPresentation.adsOpaqueSightWindow.blockedRays, `${weapon}: centre ray remains the clear aperture`).toBeLessThan(9);
+    }
 
     const adsScreenshotPath = resolve(artifactRoot, `${index + 1}-${weapon}-physical-ads-corridor.png`);
     const screenshot = await page.screenshot({
