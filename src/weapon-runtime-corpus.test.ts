@@ -8,6 +8,13 @@ import { WEAPON_IDS } from './protocol';
 
 function fakeGltf(url: string) {
   const scene = new THREE.Group();
+  if (url.includes('pass65-crossbow')) {
+    const loadedBolt = new THREE.Group();
+    loadedBolt.name = 'crossbow-loaded-bolt';
+    loadedBolt.position.set(0, 0.12, -0.85);
+    loadedBolt.userData.atomic_socket = 'bolt';
+    scene.add(loadedBolt);
+  }
   const material = (name: string): THREE.MeshStandardMaterial => {
     const texture = new THREE.Texture();
     texture.image = { width: 4, height: 4 };

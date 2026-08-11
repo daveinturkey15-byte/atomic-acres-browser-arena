@@ -133,6 +133,16 @@ function fakeArmsGltf(): FakeGltf {
   return { scene, animations };
 }
 
+function fakeCrossbowGltf(): FakeGltf {
+  const scene = new THREE.Group();
+  const loadedBolt = new THREE.Group();
+  loadedBolt.name = 'crossbow-loaded-bolt';
+  loadedBolt.position.set(0, 0.12, -0.85);
+  loadedBolt.userData.atomic_socket = 'bolt';
+  scene.add(loadedBolt);
+  return { scene, animations: [] };
+}
+
 function fakeKnifeGltf(): FakeGltf {
   const scene = new THREE.Group();
   const grip = new THREE.Group(); grip.name = 'grip-socket-r'; grip.position.set(0, 0.61, 0);
@@ -147,6 +157,7 @@ function fakeKnifeGltf(): FakeGltf {
 function fakeGltfForUrl(url: string): FakeGltf {
   if (url.includes('pass65-first-person-arms')) return fakeArmsGltf();
   if (url.includes('pass65-field-knife')) return fakeKnifeGltf();
+  if (url.includes('pass65-crossbow')) return fakeCrossbowGltf();
   return fakeWeaponGltf(weaponIdFromUrl(url));
 }
 

@@ -8,7 +8,12 @@ import { WEAPON_IDS, type WeaponId } from './protocol';
 
 type WeaponAsset = { scene: THREE.Group; clips: THREE.AnimationClip[] };
 type PresentationAssetId = WeaponId | 'field-knife';
-type ImportedWeaponRuntime = { mixer: THREE.AnimationMixer; actions: Map<string, THREE.AnimationAction>; weapon: PresentationAssetId };
+type ImportedWeaponRuntime = {
+  mixer: THREE.AnimationMixer;
+  actions: Map<string, THREE.AnimationAction>;
+  weapon: PresentationAssetId;
+  crossbowLoadedBolt: THREE.Object3D | null;
+};
 type CachedWeaponAsset = WeaponAsset & { key: string; variant: Pass65WeaponVariant; refs: number; lastUsed: number };
 
 export type Pass65CrossbowVariant = 'first-person' | 'world' | 'drop';
@@ -396,6 +401,18 @@ export async function prewarmPass65RuntimeWeaponCorpus(
 
 export const PASS70_FIRST_PERSON_OPTIC_WINDOW_CONTRACT = 'semantic-first-person-optic-window-v1' as const;
 export const PASS70_FIRST_PERSON_OPTIC_WINDOW_OPACITY = 0.1;
+export const PASS70_CROSSBOW_LOADED_BOLT_CLEARANCE_CONTRACT = 'semantic-loaded-bolt-local-y-zero-v1' as const;
+
+/** Restores the semantic loaded bolt after the shipped NLA bind pose leaked its empty-reload offset. */
+export function resetPass70CrossbowLoadedBoltRestPose(bolt: THREE.Object3D): void {
+  bolt.position.set(0, 0, 0);
+  bolt.userData.pass70ClearanceContract = PASS70_CROSSBOW_LOADED_BOLT_CLEARANCE_CONTRACT;
+}
+
+/** Keeps authored longitudinal fire/reload travel while preventing it from rising through the optic lenses. */
+export function clampPass70CrossbowLoadedBoltAnimation(bolt: THREE.Object3D): void {
+  bolt.position.y = 0;
+}
 
 export function isFirstPersonOpticWindowSurface(nodeName: string, materialName: string): boolean {
   const materialSemantic = materialName.trim().toLowerCase();
@@ -591,6 +608,15 @@ function instantiateWeaponAsset(
   });
   cloneMeshGeometriesForOwner(visual, `pass65-${id}-${variant}`);
   root.add(visual);
+  const crossbowLoadedBolt = id === 'explosive-crossbow'
+    ? visual.getObjectByName('crossbow-loaded-bolt') ?? null
+    : null;
+  if (id === 'explosive-crossbow') {
+    if (!crossbowLoadedBolt || crossbowLoadedBolt.userData.atomic_socket !== 'bolt') {
+      throw new Error('Pass 70 crossbow loaded-bolt semantic node is missing');
+    }
+    resetPass70CrossbowLoadedBoltRestPose(crossbowLoadedBolt);
+  }
   const identityNodes: THREE.Object3D[] = [];
   visual.traverse((node) => {
     if (node.userData.asset_id === `pass65-weapon-${id}`) identityNodes.push(node);
@@ -598,7 +624,9 @@ function instantiateWeaponAsset(
   const identity = identityNodes[0]?.userData;
   const mixer = new THREE.AnimationMixer(visual);
   const actions = new Map(asset.clips.map((clip) => [clip.name, mixer.clipAction(clip)]));
-  root.userData.importedWeaponRuntime = { mixer, actions, weapon: id } satisfies ImportedWeaponRuntime;
+  root.userData.importedWeaponRuntime = {
+    mixer, actions, weapon: id, crossbowLoadedBolt,
+  } satisfies ImportedWeaponRuntime;
   root.userData.importedWeaponSource = source;
   root.userData.firstPersonSource = variant === 'first-person' ? 'project-original-blender-pass65-firearm' : undefined;
   root.userData.projectOriginalWeapon = true;
@@ -852,7 +880,10 @@ function playMatching(root: THREE.Object3D, fragment: string): void {
 }
 
 export function updateImportedWeapon(root: THREE.Object3D, dt: number): void {
-  runtime(root)?.mixer.update(Math.min(0.05, Math.max(0, dt)));
+  const state = runtime(root);
+  if (!state) return;
+  state.mixer.update(Math.min(0.05, Math.max(0, dt)));
+  if (state.crossbowLoadedBolt) clampPass70CrossbowLoadedBoltAnimation(state.crossbowLoadedBolt);
 }
 
 /** Clears retained firearm/knife actions without advancing presentation time. */
