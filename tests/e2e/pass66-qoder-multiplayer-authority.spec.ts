@@ -705,35 +705,40 @@ test('a guest death-drop scavenge converges through host authority exactly once'
     expect(await host.evaluate((id) => (
       (window as any).__ATOMIC_ACRES_DEBUG__.forceRemoteDeathForReconnect(id)
     ), guestId)).toMatchObject({ targetId: guestId });
-    await expect.poll(async () => host.evaluate(() => {
-      const candidate = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().deathDrops[0];
-      return candidate ?? null;
-    })).not.toBeNull();
-    const hostDrop = await host.evaluate(() => (
-      (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().deathDrops[0]
-    ));
-    await expect.poll(async () => guest.evaluate((dropId) => {
-      const candidate = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().deathDrops
-        .find((entry: any) => entry.id === dropId);
-      return candidate ? {
-        weapon: candidate.weapon,
-        ammoAvailable: candidate.ammoAvailable,
-        weaponAvailable: candidate.weaponAvailable,
-      } : null;
-    }, hostDrop.id)).toEqual({
-      weapon: hostDrop.weapon,
-      ammoAvailable: true,
-      weaponAvailable: true,
-    });
-    await expect.poll(async () => guest.evaluate(() => {
-      const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
-      return { alive: state.player.alive, hp: state.player.hp };
-    })).toEqual({ alive: true, hp: 100 });
-    await expect.poll(async () => host.evaluate((id) => {
-      const remote = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers
-        .find((candidate: any) => candidate.id === id);
-      return remote ? { hp: remote.hp, reserve: remote.combatInventory?.reserve?.carbine ?? null } : null;
-    }, guestId)).toEqual({ hp: 100, reserve: 120 });
+    let hostDrop: any = null;
+    await expect.poll(async () => {
+      hostDrop = await host.evaluate(() => {
+        const candidate = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().deathDrops[0];
+        return candidate ?? null;
+      });
+      return hostDrop;
+    }).not.toBeNull();
+    expect(hostDrop.expiresInMs).toBeGreaterThan(0);
+    const dropObservedAtEpochMs = Date.now();
+    await Promise.all([
+      expect.poll(async () => guest.evaluate((dropId) => {
+        const candidate = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().deathDrops
+          .find((entry: any) => entry.id === dropId);
+        return candidate ? {
+          weapon: candidate.weapon,
+          ammoAvailable: candidate.ammoAvailable,
+          weaponAvailable: candidate.weaponAvailable,
+        } : null;
+      }, hostDrop.id)).toEqual({
+        weapon: hostDrop.weapon,
+        ammoAvailable: true,
+        weaponAvailable: true,
+      }),
+      expect.poll(async () => guest.evaluate(() => {
+        const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+        return { alive: state.player.alive, hp: state.player.hp };
+      })).toEqual({ alive: true, hp: 100 }),
+      expect.poll(async () => host.evaluate((id) => {
+        const remote = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers
+          .find((candidate: any) => candidate.id === id);
+        return remote ? { hp: remote.hp, reserve: remote.combatInventory?.reserve?.carbine ?? null } : null;
+      }, guestId)).toEqual({ hp: 100, reserve: 120 }),
+    ]);
 
     await guest.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.fireOnce());
     await expect.poll(async () => host.evaluate((id) => {
@@ -742,58 +747,115 @@ test('a guest death-drop scavenge converges through host authority exactly once'
       return remote?.combatInventory?.ammo?.carbine ?? null;
     }, guestId)).toBe(29);
     await guest.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.reload());
-    await expect.poll(async () => host.evaluate((id) => {
-      const remote = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers
-        .find((candidate: any) => candidate.id === id);
-      return remote ? {
-        ammo: remote.combatInventory?.ammo?.carbine ?? null,
-        reserve: remote.combatInventory?.reserve?.carbine ?? null,
-      } : null;
-    }, guestId), { timeout: 5_000 }).toEqual({ ammo: 30, reserve: 119 });
-    await expect.poll(async () => guest.evaluate(() => {
-      const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
-      return { ammo: state.player.ammo, reserve: state.player.reserve };
-    })).toEqual({ ammo: 30, reserve: 119 });
+    await Promise.all([
+      expect.poll(async () => host.evaluate((id) => {
+        const remote = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers
+          .find((candidate: any) => candidate.id === id);
+        return remote ? {
+          ammo: remote.combatInventory?.ammo?.carbine ?? null,
+          reserve: remote.combatInventory?.reserve?.carbine ?? null,
+        } : null;
+      }, guestId), { timeout: 5_000 }).toEqual({ ammo: 30, reserve: 119 }),
+      expect.poll(async () => guest.evaluate(() => {
+        const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+        return { ammo: state.player.ammo, reserve: state.player.reserve };
+      })).toEqual({ ammo: 30, reserve: 119 }),
+    ]);
 
     const dropPosition = hostDrop.position as Position3;
     const approach = await selectClearDeathDropApproach(guest, dropPosition);
     if (!approach) throw new Error(`No collision-clear death-drop approach for ${JSON.stringify(dropPosition)}`);
-    await stageRemoteAt(guest, host, guestId, approach.outer, 'outer');
     await stageRemoteAt(guest, host, guestId, approach.middle, 'middle');
     await guest.evaluate(([x, y, z]) => (
       (window as any).__ATOMIC_ACRES_DEBUG__.teleportPlayer(x, y, z)
     ), approach.pickup);
 
-    await expect.poll(async () => guest.evaluate(() => {
-      const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
-      return { reserve: state.player.reserve, grenades: state.player.grenades };
-    })).toEqual({ reserve: 120, grenades: 1 });
-    const inventoryAfterScavenge = await guest.evaluate(() => {
-      const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
-      return { reserve: state.player.reserve, grenades: state.player.grenades };
-    });
-    expect(inventoryAfterScavenge).toEqual({ reserve: 120, grenades: 1 });
-    await expect.poll(async () => host.evaluate(({ dropId, playerId }) => {
-      const snapshot = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
-      const candidate = snapshot.deathDrops
-        .find((entry: any) => entry.id === dropId);
-      const remote = snapshot.remotePlayers.find((entry: any) => entry.id === playerId);
-      return candidate && remote ? {
-        ammoAvailable: candidate.ammoAvailable,
-        weaponAvailable: candidate.weaponAvailable,
-        reserve: remote.combatInventory?.reserve?.carbine ?? null,
-      } : null;
-    }, { dropId: hostDrop.id, playerId: guestId })).toEqual({
+    let hostPostScavengeProjection: any = null;
+    await expect.poll(async () => {
+      const projection = await host.evaluate(({ dropId, playerId }) => {
+        const snapshot = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+        const candidate = snapshot.deathDrops
+          .find((entry: any) => entry.id === dropId);
+        const remote = snapshot.remotePlayers.find((entry: any) => entry.id === playerId);
+        return {
+          remotePresent: remote !== undefined,
+          dropPresent: candidate !== undefined,
+          ammoAvailable: candidate?.ammoAvailable ?? null,
+          weaponAvailable: candidate?.weaponAvailable ?? null,
+          expiresInMs: candidate?.expiresInMs ?? null,
+          hostInventory: remote ? {
+            reserve: remote.combatInventory?.reserve?.carbine ?? null,
+            grenades: remote.combatInventory?.grenades ?? null,
+          } : null,
+        };
+      }, { dropId: hostDrop.id, playerId: guestId });
+      if (projection.remotePresent === true
+        && projection.dropPresent === true
+        && projection.ammoAvailable === false
+        && projection.weaponAvailable === true
+        && projection.hostInventory?.reserve === 120
+        && projection.hostInventory?.grenades === 1
+        && projection.expiresInMs > 0) hostPostScavengeProjection = projection;
+      return hostPostScavengeProjection !== null;
+    }).toBe(true);
+    const hostPostScavengeObservedAtEpochMs = Date.now();
+    const wallClockElapsedSinceDropObservationMs = hostPostScavengeObservedAtEpochMs - dropObservedAtEpochMs;
+    const wallClockRemainingTtlMs = hostDrop.expiresInMs - wallClockElapsedSinceDropObservationMs;
+    expect(hostPostScavengeProjection).toMatchObject({
+      remotePresent: true,
+      dropPresent: true,
       ammoAvailable: false,
       weaponAvailable: true,
-      reserve: 120,
+      hostInventory: { reserve: 120, grenades: 1 },
+    });
+    expect(hostPostScavengeProjection.expiresInMs).toBeGreaterThan(0);
+    expect(wallClockRemainingTtlMs).toBeGreaterThan(0);
+    await attachRejoinEvidence('qoder-death-drop-authority-before-expiry', {
+      drop: {
+        id: hostDrop.id,
+        observedAtEpochMs: dropObservedAtEpochMs,
+        initialExpiresInMs: hostDrop.expiresInMs,
+      },
+      authorityObservation: {
+        observedAtEpochMs: hostPostScavengeObservedAtEpochMs,
+        wallClockElapsedSinceDropObservationMs,
+        wallClockRemainingTtlMs,
+      },
+      hostPostScavengeProjection,
     });
 
+    let inventoryAfterScavenge: any = null;
+    await expect.poll(async () => {
+      inventoryAfterScavenge = await guest.evaluate(() => {
+        const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+        return { reserve: state.player.reserve, grenades: state.player.grenades };
+      });
+      return inventoryAfterScavenge;
+    }).toEqual({ reserve: 120, grenades: 1 });
+
     await guest.waitForTimeout(750);
-    expect(await guest.evaluate(() => {
-      const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
-      return { reserve: state.player.reserve, grenades: state.player.grenades };
-    })).toEqual(inventoryAfterScavenge);
+    const [laterHostInventory, laterGuestInventory] = await Promise.all([
+      host.evaluate((id) => {
+        const remote = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers
+          .find((candidate: any) => candidate.id === id);
+        return remote ? {
+          reserve: remote.combatInventory?.reserve?.carbine ?? null,
+          grenades: remote.combatInventory?.grenades ?? null,
+        } : null;
+      }, guestId),
+      guest.evaluate(() => {
+        const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+        return { reserve: state.player.reserve, grenades: state.player.grenades };
+      }),
+    ]);
+    await attachRejoinEvidence('qoder-death-drop-exact-once', {
+      hostInventoryAfterScavenge: hostPostScavengeProjection.hostInventory,
+      laterHostInventory,
+      inventoryAfterScavenge,
+      laterGuestInventory,
+    });
+    expect(laterHostInventory).toEqual(hostPostScavengeProjection.hostInventory);
+    expect(laterGuestInventory).toEqual(inventoryAfterScavenge);
     expect(errors).toEqual([]);
   } finally {
     await Promise.all([hostContext.close(), guestContext.close()]);

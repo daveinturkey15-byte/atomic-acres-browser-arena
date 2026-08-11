@@ -265,7 +265,7 @@ test('Qoder host recovery isolates a co-located software renderer within the fro
   assert.match(sampler, /sampleRendererResidency/u);
 });
 
-test('Qoder death-drop staging derives a collision-clear route without widening its 10s ACK bound', () => {
+test('Qoder death-drop staging proves host authority before natural expiry without widening bounds', () => {
   const source = readFileSync('tests/e2e/pass66-qoder-multiplayer-authority.spec.ts', 'utf8');
   const selectorStart = source.indexOf('async function selectClearDeathDropApproach(');
   const selectorEnd = source.indexOf('async function stageRemoteAt(', selectorStart);
@@ -288,9 +288,46 @@ test('Qoder death-drop staging derives a collision-clear route without widening 
   assert.match(stage, /candidate\.id === id/u);
   assert.match(stage, /qoder-death-drop-stage-/u);
   assert.match(deathDrop, /selectClearDeathDropApproach\(guest, dropPosition\)/u);
-  assert.match(deathDrop, /stageRemoteAt\(guest, host, guestId, approach\.outer, 'outer'\)/u);
+  assert.equal(deathDrop.match(/stageRemoteAt\(/gu)?.length, 1);
+  assert.doesNotMatch(deathDrop, /stageRemoteAt\(guest, host, guestId, approach\.outer/u);
   assert.match(deathDrop, /stageRemoteAt\(guest, host, guestId, approach\.middle, 'middle'\)/u);
   assert.doesNotMatch(deathDrop, /dropZ \+ (?:4|2\.2)/u);
+
+  const dropObservedAt = deathDrop.indexOf('const dropObservedAtEpochMs = Date.now()');
+  const initialParallelAt = deathDrop.indexOf('await Promise.all([', dropObservedAt);
+  const fireAt = deathDrop.indexOf('__ATOMIC_ACRES_DEBUG__.fireOnce()');
+  const reloadAt = deathDrop.indexOf('__ATOMIC_ACRES_DEBUG__.reload()', fireAt);
+  const reloadParallelAt = deathDrop.indexOf('await Promise.all([', reloadAt);
+  const middleAt = deathDrop.indexOf("stageRemoteAt(guest, host, guestId, approach.middle, 'middle')", reloadAt);
+  const pickupAt = deathDrop.indexOf('), approach.pickup);', middleAt);
+  const hostProjectionAt = deathDrop.indexOf('let hostPostScavengeProjection', pickupAt);
+  const guestInventoryAt = deathDrop.indexOf('let inventoryAfterScavenge', hostProjectionAt);
+  const laterInventoryAt = deathDrop.indexOf('const [laterHostInventory, laterGuestInventory]', guestInventoryAt);
+  const exactOnceEvidenceAt = deathDrop.indexOf("attachRejoinEvidence('qoder-death-drop-exact-once'", laterInventoryAt);
+  assert.ok(dropObservedAt >= 0 && initialParallelAt > dropObservedAt && fireAt > initialParallelAt);
+  assert.ok(reloadAt > fireAt && reloadParallelAt > reloadAt && middleAt > reloadParallelAt && pickupAt > middleAt);
+  assert.ok(hostProjectionAt > pickupAt && guestInventoryAt > hostProjectionAt && laterInventoryAt > guestInventoryAt);
+  assert.ok(exactOnceEvidenceAt > laterInventoryAt);
+  assert.doesNotMatch(deathDrop.slice(laterInventoryAt, exactOnceEvidenceAt), /deathDrops/u);
+
+  assert.match(deathDrop, /\)\)\.toBe\(29\)/u);
+  assert.equal(deathDrop.match(/toEqual\(\{ ammo: 30, reserve: 119 \}\)/gu)?.length, 2);
+  assert.match(deathDrop, /projection\.remotePresent === true/u);
+  assert.match(deathDrop, /projection\.dropPresent === true/u);
+  assert.match(deathDrop, /projection\.ammoAvailable === false/u);
+  assert.match(deathDrop, /projection\.weaponAvailable === true/u);
+  assert.match(deathDrop, /projection\.hostInventory\?\.reserve === 120/u);
+  assert.match(deathDrop, /projection\.hostInventory\?\.grenades === 1/u);
+  assert.match(deathDrop, /projection\.expiresInMs > 0/u);
+  assert.match(deathDrop, /expect\(hostPostScavengeProjection\.expiresInMs\)\.toBeGreaterThan\(0\)/u);
+  assert.match(deathDrop, /wallClockRemainingTtlMs/u);
+  assert.match(deathDrop, /expect\(wallClockRemainingTtlMs\)\.toBeGreaterThan\(0\)/u);
+  assert.match(deathDrop, /qoder-death-drop-authority-before-expiry/u);
+  assert.doesNotMatch(deathDrop, /const inventoryAfterScavenge = await guest\.evaluate/u);
+  assert.match(deathDrop, /waitForTimeout\(750\)/u);
+  assert.match(deathDrop, /qoder-death-drop-exact-once/u);
+  assert.match(deathDrop, /expect\(laterHostInventory\)\.toEqual\(hostPostScavengeProjection\.hostInventory\)/u);
+  assert.match(deathDrop, /expect\(laterGuestInventory\)\.toEqual\(inventoryAfterScavenge\)/u);
 });
 
 test('final receipt binds exact runtime, test matrix and five physical peer identities', () => {
