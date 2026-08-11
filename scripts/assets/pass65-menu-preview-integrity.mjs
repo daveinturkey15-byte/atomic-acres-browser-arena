@@ -68,6 +68,14 @@ export const RETAINED_CACHE_FAMILY_BASELINE = Object.freeze({
       totalBytes: 55332502,
       recordedAt: '2026-08-02',
     }),
+    Object.freeze({
+      cacheKey: 'pass66-runtime-preview-v14',
+      recipeId: 'pass66-authoritative-runtime-menu-preview-v2',
+      finalMediaSetSha256: 'a6bbb232f86099e760e68ad8ac83675c0bd672920eb0addd7f72e204da37d76b',
+      fileCount: 12,
+      totalBytes: 55288644,
+      recordedAt: '2026-08-11',
+    }),
   ]),
 });
 

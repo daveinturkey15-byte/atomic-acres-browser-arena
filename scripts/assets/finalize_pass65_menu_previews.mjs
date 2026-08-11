@@ -33,9 +33,10 @@ const dependencyPrinterPath = path.join(root, 'scripts/assets/print-pass65-menu-
 const finalizerPath = fileURLToPath(import.meta.url);
 const verifierPath = path.join(root, 'scripts/qa/verify-pass65-menu-preview-production.mjs');
 const chopperSourcePath = path.join(root, 'source-assets/blender/pass65-chopper-gunner.blend');
+const acceptedCockpitSourceDigest = '25a2556e5eccddf53e8214acbe71386820e818e359f35aa5b6a074cc3b4142c5';
 const acceptedCockpitEvidence = 'docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png';
 const acceptedCockpitEvidencePath = path.join(root, acceptedCockpitEvidence);
-const acceptedCockpitDigest = 'e285ede0f3834c4cc07aa377c3b47796a8bead9733d7d9c8d64c52b71008c875';
+const acceptedCockpitEvidenceDigest = '8882a597f015d5e16a731b88c6167bd4eb93fe811992f8424754df5dbd753e8b';
 const choreography = JSON.parse(await readFile(choreographyPath, 'utf8'));
 const generatedAt = choreography.generatedAt;
 const arenas = Object.keys(choreography.arenas);
@@ -114,7 +115,7 @@ function validateRecipe() {
     || choreography.reviewFrames.at(-1) !== choreography.frameCount) {
     throw new Error('reviewFrames must be unique and include the exact loop endpoints');
   }
-  if (choreography.media.cacheKey !== 'pass66-runtime-preview-v14') throw new Error('runtime preview cache key is stale');
+  if (choreography.media.cacheKey !== 'pass66-runtime-preview-v15') throw new Error('runtime preview cache key is stale');
   const budget = choreography.media.encodingBudget;
   if (budget?.minimumAverageBitrateKbps !== 3000
     || budget?.maximumAverageBitrateKbps !== 9000
@@ -644,8 +645,24 @@ function sourceRecord(arena, canonicalDependencies, dependencyClosure) {
 }
 
 validateRecipe();
+const actualCockpitSourceDigest = await sha256(chopperSourcePath);
+if (actualCockpitSourceDigest !== acceptedCockpitSourceDigest) {
+  throw new Error(`Accepted authored cockpit source digest drifted: expected ${acceptedCockpitSourceDigest}, got ${actualCockpitSourceDigest}`);
+}
+const actualCockpitEvidenceDigest = await sha256(acceptedCockpitEvidencePath);
+if (actualCockpitEvidenceDigest !== acceptedCockpitEvidenceDigest) {
+  throw new Error(`Accepted cockpit evidence digest drifted: expected ${acceptedCockpitEvidenceDigest}, got ${actualCockpitEvidenceDigest}`);
+}
 if (process.env.AA_PREVIEW_VALIDATE_ONLY === '1') {
-  console.log(JSON.stringify({ recipeValidation: 'passed', recipeId: choreography.recipeId, arenas }, null, 2));
+  console.log(JSON.stringify({
+    recipeValidation: 'passed',
+    recipeId: choreography.recipeId,
+    arenas,
+    acceptedCockpit: {
+      sourceSha256: actualCockpitSourceDigest,
+      evidenceSha256: actualCockpitEvidenceDigest,
+    },
+  }, null, 2));
   process.exit(0);
 }
 await mkdir(runtimeRoot, { recursive: true });
@@ -663,10 +680,6 @@ const {
   currentCanonicalDependencies,
   currentDependencyClosure,
 } = await assertCaptureReceipt();
-const actualCockpitEvidenceDigest = await sha256(acceptedCockpitEvidencePath);
-if (actualCockpitEvidenceDigest !== acceptedCockpitDigest) {
-  throw new Error(`Accepted cockpit evidence digest drifted: expected ${acceptedCockpitDigest}, got ${actualCockpitEvidenceDigest}`);
-}
 const retainedCacheFamilyLock = JSON.parse(await readFile(cacheFamilyLockPath, 'utf8'));
 const retainedCacheLockIssues = cacheFamilyLockFailures(retainedCacheFamilyLock, RETAINED_CACHE_FAMILY_BASELINE);
 if (retainedCacheLockIssues.length > 0) throw new Error(retainedCacheLockIssues.join(' | '));

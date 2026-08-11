@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import choreography from '../../source-assets/menu/pass65-preview-masters/choreography.json';
 import cacheFamilyLock from '../../source-assets/menu/pass65-preview-masters/cache-family-lock.json';
@@ -14,6 +17,13 @@ import {
 } from './menu-preview-video';
 import { menuPreviewDefinition } from './menu-preview-camera';
 
+const ACCEPTED_COCKPIT_SOURCE_SHA256 = '25a2556e5eccddf53e8214acbe71386820e818e359f35aa5b6a074cc3b4142c5';
+const ACCEPTED_COCKPIT_EVIDENCE_SHA256 = '8882a597f015d5e16a731b88c6167bd4eb93fe811992f8424754df5dbd753e8b';
+
+function sha256(relativePath: string): string {
+  return createHash('sha256').update(readFileSync(resolve(process.cwd(), relativePath))).digest('hex');
+}
+
 describe('prerecorded map-selection previews', () => {
   it('defines one distinct WebM, MP4, and poster for every selectable arena', () => {
     expect(() => assertMenuPreviewVideoInventory()).not.toThrow();
@@ -25,9 +35,9 @@ describe('prerecorded map-selection previews', () => {
       expect(definition.width / definition.height).toBeCloseTo(16 / 9, 5);
       expect(definition.width).toBe(2560);
       expect(definition.height).toBe(1440);
-      expect(definition.webm).toMatch(new RegExp(`${id}\\.webm\\?v=pass66-runtime-preview-v14$`));
-      expect(definition.mp4).toMatch(new RegExp(`${id}\\.mp4\\?v=pass66-runtime-preview-v14$`));
-      expect(definition.poster).toMatch(new RegExp(`${id}\\.webp\\?v=pass66-runtime-preview-v14$`));
+      expect(definition.webm).toMatch(new RegExp(`${id}\\.webm\\?v=pass66-runtime-preview-v15$`));
+      expect(definition.mp4).toMatch(new RegExp(`${id}\\.mp4\\?v=pass66-runtime-preview-v15$`));
+      expect(definition.poster).toMatch(new RegExp(`${id}\\.webp\\?v=pass66-runtime-preview-v15$`));
       return [definition.webm, definition.mp4, definition.poster];
     });
     expect(new Set(assets).size).toBe(assets.length);
@@ -59,7 +69,7 @@ describe('prerecorded map-selection previews', () => {
     expect(markup).not.toContain('<canvas');
   });
 
-  it('binds runtime playback to the native-1440p v14 authoring and encoding contract', () => {
+  it('binds runtime playback to the native-1440p v15 authoring and encoding contract', () => {
     expect(choreography).toMatchObject({
       schemaVersion: 4,
       recipeId: 'pass66-authoritative-runtime-menu-preview-v2',
@@ -74,7 +84,7 @@ describe('prerecorded map-selection previews', () => {
         overlayOutputScale: 2,
       },
       media: {
-        cacheKey: 'pass66-runtime-preview-v14',
+        cacheKey: 'pass66-runtime-preview-v15',
         encodingBudget: {
           minimumAverageBitrateKbps: 3000,
           maximumAverageBitrateKbps: 9000,
@@ -115,12 +125,33 @@ describe('prerecorded map-selection previews', () => {
       },
     });
     expect(cacheFamilyLockFailures(cacheFamilyLock, RETAINED_CACHE_FAMILY_BASELINE)).toEqual([]);
+    expect(RETAINED_CACHE_FAMILY_BASELINE.families.at(-1)).toEqual({
+      cacheKey: 'pass66-runtime-preview-v14',
+      recipeId: 'pass66-authoritative-runtime-menu-preview-v2',
+      finalMediaSetSha256: 'a6bbb232f86099e760e68ad8ac83675c0bd672920eb0addd7f72e204da37d76b',
+      fileCount: 12,
+      totalBytes: 55288644,
+      recordedAt: '2026-08-11',
+    });
     expect(cacheFamilyLock.families.some((family) => family.cacheKey === 'pass66-runtime-preview-v4')).toBe(false);
-    const v14Families = cacheFamilyLock.families.filter((family) => family.cacheKey === 'pass66-runtime-preview-v14');
-    expect(v14Families.length).toBeLessThanOrEqual(1);
-    if (v14Families.length === 1) {
-      expect(cacheFamilyLock.families.indexOf(v14Families[0]!)).toBeGreaterThanOrEqual(RETAINED_CACHE_FAMILY_BASELINE.families.length);
-      expect(v14Families[0]?.recipeId).toBe(choreography.recipeId);
+    const v15Families = cacheFamilyLock.families.filter((family) => family.cacheKey === 'pass66-runtime-preview-v15');
+    expect(v15Families.length).toBeLessThanOrEqual(1);
+    if (v15Families.length === 1) {
+      expect(cacheFamilyLock.families.indexOf(v15Families[0]!)).toBeGreaterThanOrEqual(RETAINED_CACHE_FAMILY_BASELINE.families.length);
+      expect(v15Families[0]?.recipeId).toBe(choreography.recipeId);
+    }
+  });
+
+  it('pins v15 to the integrated v7 authored cockpit source and reviewed evidence bytes', () => {
+    expect(sha256('source-assets/blender/pass65-chopper-gunner.blend')).toBe(ACCEPTED_COCKPIT_SOURCE_SHA256);
+    expect(sha256('docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png')).toBe(ACCEPTED_COCKPIT_EVIDENCE_SHA256);
+    for (const relativePath of [
+      'scripts/assets/finalize_pass65_menu_previews.mjs',
+      'scripts/qa/verify-pass65-menu-preview-production.mjs',
+    ]) {
+      const source = readFileSync(resolve(process.cwd(), relativePath), 'utf8');
+      expect(source).toContain(`acceptedCockpitSourceDigest = '${ACCEPTED_COCKPIT_SOURCE_SHA256}'`);
+      expect(source).toContain(`acceptedCockpitEvidenceDigest = '${ACCEPTED_COCKPIT_EVIDENCE_SHA256}'`);
     }
   });
 });
