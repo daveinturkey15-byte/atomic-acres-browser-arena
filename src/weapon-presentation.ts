@@ -2805,10 +2805,12 @@ export class WeaponPresentation {
       opticWindows: [],
     };
     const opaqueSightWindowHits = (() => {
+      const ndcRadius = 0.02;
       if (!model || (this.active !== 'carbine' && this.active !== 'mini-uzi')) {
         return {
-          contract: 'camera-ndc-sight-window-opaque-weapon-rays-v1',
+          contract: 'camera-ndc-centre-reticle-window-rays-v2',
           rayCount: 9,
+          ndcRadius,
           blockedRays: 0,
           maximumHits: 0,
           meshes: [] as string[],
@@ -2817,8 +2819,8 @@ export class WeaponPresentation {
       model.updateWorldMatrix(true, true);
       const offsets = [
         [0, 0],
-        [-0.05, 0], [0.05, 0], [0, -0.05], [0, 0.05],
-        [-0.035, -0.035], [-0.035, 0.035], [0.035, -0.035], [0.035, 0.035],
+        [-ndcRadius, 0], [ndcRadius, 0], [0, -ndcRadius], [0, ndcRadius],
+        [-0.014, -0.014], [-0.014, 0.014], [0.014, -0.014], [0.014, 0.014],
       ] as const;
       const raycaster = new THREE.Raycaster();
       raycaster.layers.mask = this.camera.layers.mask;
@@ -2833,8 +2835,9 @@ export class WeaponPresentation {
         return { count: hits.length, meshes: hits.map((hit) => hit.object.name) };
       });
       return {
-        contract: 'camera-ndc-sight-window-opaque-weapon-rays-v1',
+        contract: 'camera-ndc-centre-reticle-window-rays-v2',
         rayCount: samples.length,
+        ndcRadius,
         blockedRays: samples.filter((sample) => sample.count > 0).length,
         maximumHits: samples.reduce((maximum, sample) => Math.max(maximum, sample.count), 0),
         meshes: [...new Set(samples.flatMap((sample) => sample.meshes))],

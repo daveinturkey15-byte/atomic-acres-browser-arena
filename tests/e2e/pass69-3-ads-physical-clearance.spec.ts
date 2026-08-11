@@ -174,9 +174,10 @@ test('carbine and Mini Uzi expose a physical ADS corridor without fading their o
     expect(adsMaterials.invalidOpaqueBodyCount, `${weapon}: ADS body remains opaque`).toBe(0);
     expect(adsMaterials.invalidOpticWindowCount, `${weapon}: ADS window remains clear`).toBe(0);
     expect(ads.weaponPresentation.opticMaterialSemantics.sightPictureRetreat, `${weapon}: ADS-only physical viewmodel retreat`).toBeGreaterThanOrEqual(0.25);
-    expect(ads.weaponPresentation.adsOpaqueSightWindow, `${weapon}: nine-ray camera sight window`).toMatchObject({
-      contract: 'camera-ndc-sight-window-opaque-weapon-rays-v1',
+    expect(ads.weaponPresentation.adsOpaqueSightWindow, `${weapon}: nine-ray centre-reticle window`).toMatchObject({
+      contract: 'camera-ndc-centre-reticle-window-rays-v2',
       rayCount: 9,
+      ndcRadius: 0.02,
       blockedRays: 0,
       maximumHits: 0,
       meshes: [],

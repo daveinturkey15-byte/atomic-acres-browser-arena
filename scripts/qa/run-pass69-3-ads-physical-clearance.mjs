@@ -139,6 +139,8 @@ const weaponsValid = Array.isArray(receipt.weapons)
       && entry.ads?.sightBore?.applied === true
       && entry.ads.sightBore.contract === 'physical-aperture-spatial-degenerate-v1'
       && entry.ads.sightBore.rayCount === 9
+      && entry.ads?.opaqueSightWindow?.contract === 'camera-ndc-centre-reticle-window-rays-v2'
+      && entry.ads.opaqueSightWindow.ndcRadius === 0.02
       && entry.ads?.opaqueSightWindow?.blockedRays === 0
       && entry.ads.opaqueSightWindow.maximumHits === 0
       && materialStateValid(entry.ads?.materials, weapon === 'carbine' ? 1 : 0)
