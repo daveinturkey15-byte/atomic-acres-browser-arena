@@ -14,6 +14,8 @@ type Particle = {
 
 export const MAX_IMPACT_PARTICLES = 72;
 export const MAX_IMPACT_MARKS = 48;
+export const IMPACT_DECAL_SURFACE_OFFSET_M = 0.006;
+export const IMPACT_DECAL_OPACITY = 0.72;
 const HIDDEN_Y = -10_000;
 
 export type ImpactPresentationSurface = ImpactSurface | BallisticMaterialId;
@@ -107,8 +109,14 @@ export class ImpactPresentation {
       new THREE.MeshBasicMaterial({
         color: 0xffffff,
         transparent: true,
-        opacity: reducedDetail ? 0.36 : 0.4,
+        // Marks are gameplay-readable evidence, not optional decoration. Keep
+        // the same contrast in every profile; profile budgets may bound pool
+        // capacity but must never make the latest admitted impact disappear.
+        opacity: IMPACT_DECAL_OPACITY,
         depthWrite: false,
+        depthTest: true,
+        side: THREE.DoubleSide,
+        toneMapped: false,
         polygonOffset: true,
         polygonOffsetFactor: -3,
         polygonOffsetUnits: -1,
@@ -342,9 +350,10 @@ export class ImpactPresentation {
     const markCapacity = Math.max(8, Math.round(MAX_IMPACT_MARKS * this.decalCapacityScale));
     const markSlot = this.markCursor++ % markCapacity;
     const markNormal = normal.clone().normalize();
-    // 3.2 cm standoff keeps the decal clear of skin-over-solid z-fighting on
-    // uneven arena geometry while staying glued to the surface visually.
-    const markPosition = point.clone().addScaledVector(markNormal, 0.032);
+    // Polygon offset carries the z-fighting burden; a six-millimetre physical
+    // offset keeps the mark attached to the struck surface instead of reading
+    // as a floating card at grazing angles.
+    const markPosition = point.clone().addScaledVector(markNormal, IMPACT_DECAL_SURFACE_OFFSET_M);
     const markRotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), markNormal);
     markRotation.premultiply(new THREE.Quaternion().setFromAxisAngle(markNormal, presentationRandom() * Math.PI));
     this.marks.setMatrixAt(markSlot, new THREE.Matrix4().compose(

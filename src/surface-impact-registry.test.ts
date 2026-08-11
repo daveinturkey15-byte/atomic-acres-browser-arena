@@ -5,6 +5,7 @@ import { buildGunRange, buildRustworks1v1, buildSkylineTerminal } from './additi
 import { BALLISTIC_MATERIALS } from './ballistics';
 import { ImpactPresentation, MAX_IMPACT_MARKS } from './impact-presentation';
 import { buildArena } from './map';
+import { WEAPON_IDS } from './protocol';
 import { SURFACE_IMPACT_PROFILES, auditSurfaceImpactCoverage } from './surface-impact-registry';
 
 describe('Pass 65 collision-material decal governance', () => {
@@ -63,6 +64,24 @@ describe('Pass 65 collision-material decal governance', () => {
     expect(presentation.activeMarks()).toBeLessThanOrEqual(MAX_IMPACT_MARKS);
     presentation.resetForRound();
     expect(presentation.activeMarks()).toBe(0);
+  });
+
+  it('admits one visible persistent mark for every canonical weapon in every presentation profile', () => {
+    for (const reducedDetail of [false, true]) {
+      const presentation = new ImpactPresentation(new THREE.Scene(), reducedDetail);
+      presentation.setBudget(0.35, 0.35);
+      WEAPON_IDS.forEach((weapon, index) => {
+        const material = Object.keys(BALLISTIC_MATERIALS)[index % Object.keys(BALLISTIC_MATERIALS).length]!;
+        presentation.impact(
+          new THREE.Vector3(index * 0.02, 1, 0),
+          new THREE.Vector3(0, 0, 1),
+          material as keyof typeof BALLISTIC_MATERIALS,
+        );
+        expect(presentation.activeMarks(), `${weapon}:${reducedDetail ? 'reduced' : 'full'}`)
+          .toBeGreaterThan(0);
+      });
+      expect((presentation.marks.material as THREE.MeshBasicMaterial).opacity).toBeGreaterThanOrEqual(0.7);
+    }
   });
 
   it('routes authoritative material IDs into presentation and resets only at a round boundary', () => {

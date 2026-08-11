@@ -626,6 +626,7 @@ import { canAdmitMajorDebris, SHARED_MAJOR_DEBRIS_BUDGET } from './major-debris-
 import {
   createFracturedWindowDebrisVisual,
   updateFracturedWindowDebrisVisual,
+  windowGlassDebrisSettleMode,
 } from './window-glass-debris-presentation';
 import {
   INTERACTIVE_WORLD_SCHEMA_VERSION,
@@ -2964,11 +2965,27 @@ function updatePersistentWindowDebrisPhysics(dt = 1 / SIMULATION_HZ): void {
       entry.root.position.set(snapshot.position.x, snapshot.position.y, snapshot.position.z);
       entry.root.quaternion.set(snapshot.rotation.x, snapshot.rotation.y, snapshot.rotation.z, snapshot.rotation.w);
       entry.definition = majorDebrisDefinitionFromSnapshot(entry.definition, snapshot);
-      if (snapshot.sleeping) {
+      const settleMode = windowGlassDebrisSettleMode(
+        snapshot.position.y,
+        entry.fallbackRestY,
+        snapshot.sleeping,
+      );
+      if (settleMode !== 'physics-active') {
         // HF-155: the shards remain as persistent visual evidence, but a settled
         // pane-sized Rapier cuboid must not remain an invisible movement blocker.
         entry.physicsActive = false;
         retireSettledPhysics = true;
+        if (settleMode === 'settled') {
+          entry.root.position.y = entry.fallbackRestY;
+          entry.fallbackSettled = true;
+          entry.fallbackVelocity.set(0, 0, 0);
+          entry.fallbackAngular.set(0, 0, 0);
+        } else {
+          // Sleeping on the sill is not support authority for loose shards.
+          // Retire the cuboid and continue a bounded presentation-only fall.
+          entry.receivedPhysicsPose = false;
+          entry.fallbackVelocity.y = Math.min(entry.fallbackVelocity.y, -0.9);
+        }
       }
       continue;
     }
