@@ -87,6 +87,9 @@ type RiggedViewArm = FirstPersonArmChain & {
   bindShoulderPosition: THREE.Vector3;
   bindShoulderScale: THREE.Vector3;
 };
+type RiggedForearmReinforcement = {
+  meshes: readonly [THREE.Mesh, THREE.Mesh];
+};
 type ViewArmRig = {
   side: 'left' | 'right';
   shoulder: THREE.Group;
@@ -174,6 +177,35 @@ function viewmodelGripFamily(weapon: WeaponId): ViewmodelGripFamily {
   if (weapon === 'lmg' || weapon === 'minigun' || weapon === 'flamethrower') return 'heavy';
   if (weapon === 'explosive-crossbow') return 'crossbow';
   return 'long-gun';
+}
+
+export const RIGGED_HAND_POSE_CHAIN_CONTRACT = 'weapon-space-palm-direction-and-wrist-roll-v1';
+const RIGGED_SUPPORT_HAND_DIRECTION_LOCAL = Object.freeze(new THREE.Vector3(0.85, -0.20, -0.45).normalize());
+const RIGGED_RELOAD_HAND_DIRECTION_LOCAL = Object.freeze(new THREE.Vector3(0.90, -0.25, -0.05).normalize());
+const RIGGED_SUPPORT_WRIST_ROLL_RADIANS = THREE.MathUtils.degToRad(-4);
+const RIGGED_RELOAD_WRIST_ROLL_RADIANS = THREE.MathUtils.degToRad(-20);
+
+/**
+ * Replays the accepted Blender palm directions in glTF weapon space. Blender's
+ * `(x, y, z)` authoring vectors become `(x, z, -y)` in the runtime delivery.
+ * Keeping this interpolation independent of the camera prevents reload roll
+ * and stance framing from turning the support glove into a loose finger chain.
+ */
+export function riggedSupportHandDirectionLocal(
+  reloadBlend: number,
+  target: THREE.Vector3,
+): THREE.Vector3 {
+  return target.copy(RIGGED_SUPPORT_HAND_DIRECTION_LOCAL)
+    .lerp(RIGGED_RELOAD_HAND_DIRECTION_LOCAL, THREE.MathUtils.clamp(reloadBlend, 0, 1))
+    .normalize();
+}
+
+export function riggedSupportWristRollRadians(reloadBlend: number): number {
+  return THREE.MathUtils.lerp(
+    RIGGED_SUPPORT_WRIST_ROLL_RADIANS,
+    RIGGED_RELOAD_WRIST_ROLL_RADIANS,
+    THREE.MathUtils.clamp(reloadBlend, 0, 1),
+  );
 }
 
 type FingerCurlProfile = Readonly<Record<FirstPersonFingerBone['digit'], readonly [number, number, number]>>;
@@ -730,6 +762,33 @@ function tuneAuthoredFirstPersonArmMaterials(root: THREE.Object3D, flattenMateri
   root.userData.armMaterialPresentationAdjusted = adjusted;
 }
 
+function firstPersonForearmReinforcementMaterial(root: THREE.Object3D): THREE.MeshStandardMaterial {
+  let authoredSleeve: THREE.MeshStandardMaterial | null = null;
+  root.traverse((node) => {
+    if (authoredSleeve || !(node instanceof THREE.Mesh)) return;
+    const candidates = Array.isArray(node.material) ? node.material : [node.material];
+    authoredSleeve = candidates.find((material): material is THREE.MeshStandardMaterial => (
+      material instanceof THREE.MeshStandardMaterial
+      && material.name.toLowerCase().includes('arms_sleeve')
+    )) ?? null;
+  });
+  const retainedSleeve = authoredSleeve as THREE.MeshStandardMaterial | null;
+  const material = retainedSleeve?.clone() ?? new THREE.MeshStandardMaterial({
+    color: 0x3a403e,
+    roughness: 0.88,
+    metalness: 0.02,
+  });
+  material.name = 'MAT_Pass70_Arms_Forearm_Reinforcement_PBR';
+  material.transparent = false;
+  material.opacity = 1;
+  material.depthWrite = true;
+  material.depthTest = true;
+  material.side = THREE.FrontSide;
+  material.roughness = Math.max(material.roughness, 0.78);
+  if (material.normalMap) material.normalScale.multiplyScalar(0.9);
+  return material;
+}
+
 function weaponHipYaw(weapon: WeaponId): number {
   return weapon === 'carbine'
     ? 0.18
@@ -860,6 +919,7 @@ export class WeaponPresentation {
   private readonly armRigs: ViewArmRig[] = [];
   private readonly riggedArmRigs: RiggedViewArm[] = [];
   private readonly riggedFingerBones: FirstPersonFingerBone[] = [];
+  private riggedForearmReinforcement: RiggedForearmReinforcement | null = null;
   private readonly fingerPoseEuler = new THREE.Euler(0, 0, 0, 'XYZ');
   private readonly fingerPoseQuaternion = new THREE.Quaternion();
   private readonly meleeGripWorld = new THREE.Vector3();
@@ -879,6 +939,19 @@ export class WeaponPresentation {
     bendHint: new THREE.Vector3(),
     elbowTarget: new THREE.Vector3(),
     handDirection: new THREE.Vector3(),
+    weaponForward: new THREE.Vector3(),
+    weaponRotation: new THREE.Quaternion(),
+    parentWorldRotation: new THREE.Quaternion(),
+    boneWorldRotation: new THREE.Quaternion(),
+    rolledBoneWorldRotation: new THREE.Quaternion(),
+    wristRoll: new THREE.Quaternion(),
+    reinforcementElbow: new THREE.Vector3(),
+    reinforcementWrist: new THREE.Vector3(),
+    reinforcementDirection: new THREE.Vector3(),
+    reinforcementAxisY: new THREE.Vector3(0, 1, 0),
+    reinforcementMidpoint: new THREE.Vector3(),
+    reinforcementScale: new THREE.Vector3(),
+    reinforcementRotation: new THREE.Quaternion(),
     handTarget: new THREE.Vector3(),
     wristTarget: new THREE.Vector3(),
     solvedWrist: new THREE.Vector3(),
@@ -896,7 +969,6 @@ export class WeaponPresentation {
     meleeBendHintWorld: new THREE.Vector3(),
     meleeHandDirectionWorld: new THREE.Vector3(),
     meleeArmsWorldRotation: new THREE.Quaternion(),
-    gripEuler: new THREE.Euler(),
     elbowSolver: {
       toTarget: new THREE.Vector3(),
       perpendicular: new THREE.Vector3(),
@@ -1482,6 +1554,25 @@ export class WeaponPresentation {
       }
       this.riggedFingerBones.push(...authoredArms.fingers);
       this.authoredArmsRoot = authoredArms.root;
+      const reinforcementMaterial = firstPersonForearmReinforcementMaterial(authoredArms.root);
+      const reinforcementGeometry = new THREE.CylinderGeometry(0.78, 1, 1, 14, 3, false);
+      const reinforcementMeshFor = (rig: RiggedViewArm): THREE.Mesh => {
+        const mesh = new THREE.Mesh(reinforcementGeometry, reinforcementMaterial);
+        mesh.name = `pass70-${rig.side}-forearm-volume-reinforcement`;
+        mesh.frustumCulled = false;
+        mesh.castShadow = false;
+        mesh.receiveShadow = false;
+        mesh.visible = false;
+        mesh.userData.contract = 'authored-chain-following-tapered-forearm-volume-v1';
+        mesh.userData.presentationOnly = true;
+        authoredArms.root.add(mesh);
+        return mesh;
+      };
+      const reinforcementMeshes: [THREE.Mesh, THREE.Mesh] = [
+        reinforcementMeshFor(this.riggedArmRigs[0]!),
+        reinforcementMeshFor(this.riggedArmRigs[1]!),
+      ];
+      this.riggedForearmReinforcement = { meshes: reinforcementMeshes };
       this.root.add(authoredArms.root);
       const authoredKnife = createPass65FieldKnifeModel(this.flattenMaterials, 'first-person');
       if (!authoredKnife) throw new Error('Pass 65 authored first-person field knife failed the release contract');
@@ -3169,6 +3260,54 @@ export class WeaponPresentation {
     return elbowTarget;
   }
 
+  private rollRiggedWristWorld(rig: RiggedViewArm, axisWorld: THREE.Vector3, radians: number): void {
+    if (Math.abs(radians) <= 1e-8 || axisWorld.lengthSq() <= 1e-8) return;
+    const scratch = this.riggedArmSolveScratch;
+    rig.wrist.updateWorldMatrix(true, false);
+    const parentWorldRotation = rig.wrist.parent
+      ? rig.wrist.parent.getWorldQuaternion(scratch.parentWorldRotation)
+      : scratch.parentWorldRotation.identity();
+    const boneWorldRotation = rig.wrist.getWorldQuaternion(scratch.boneWorldRotation);
+    scratch.wristRoll.setFromAxisAngle(axisWorld, radians);
+    scratch.rolledBoneWorldRotation.copy(scratch.wristRoll).multiply(boneWorldRotation);
+    rig.wrist.quaternion.copy(parentWorldRotation.invert().multiply(scratch.rolledBoneWorldRotation)).normalize();
+    rig.wrist.updateWorldMatrix(false, true);
+  }
+
+  private updateRiggedForearmReinforcement(arms: THREE.Object3D, visible: boolean): void {
+    const reinforcement = this.riggedForearmReinforcement;
+    if (!reinforcement || this.riggedArmRigs.length !== 2) return;
+    if (!visible) {
+      for (const mesh of reinforcement.meshes) mesh.visible = false;
+      return;
+    }
+    const scratch = this.riggedArmSolveScratch;
+    arms.updateWorldMatrix(true, false);
+    for (let index = 0; index < this.riggedArmRigs.length; index += 1) {
+      const rig = this.riggedArmRigs[index]!;
+      const elbow = arms.worldToLocal(rig.elbow.getWorldPosition(scratch.reinforcementElbow));
+      const wrist = arms.worldToLocal(rig.wrist.getWorldPosition(scratch.reinforcementWrist));
+      const direction = scratch.reinforcementDirection.copy(wrist).sub(elbow);
+      const length = direction.length();
+      if (!Number.isFinite(length) || length <= 1e-5) {
+        reinforcement.meshes[index]!.visible = false;
+        continue;
+      }
+      direction.multiplyScalar(1 / length);
+      scratch.reinforcementMidpoint.copy(elbow).add(wrist).multiplyScalar(0.5);
+      scratch.reinforcementRotation.setFromUnitVectors(scratch.reinforcementAxisY, direction);
+      // The source sleeve keeps all authored skinning and PBR detail. This
+      // shallow tapered shell only restores the distal forearm volume that the
+      // live two-bone twist can pinch edge-on; it never owns hand contact.
+      scratch.reinforcementScale.set(0.054, length * 0.94, 0.043);
+      const mesh = reinforcement.meshes[index]!;
+      mesh.position.copy(scratch.reinforcementMidpoint);
+      mesh.quaternion.copy(scratch.reinforcementRotation);
+      mesh.scale.copy(scratch.reinforcementScale);
+      mesh.visible = true;
+    }
+  }
+
   private restoreRiggedArmBindPose(): boolean {
     for (const rig of this.riggedArmRigs) {
       rig.shoulder.quaternion.copy(rig.bindShoulder);
@@ -3347,26 +3486,25 @@ export class WeaponPresentation {
       const calibratedReach = physicalReach * RIGGED_ARM_MAX_REACH_RATIO;
       let gripSocketCalibration = 0;
       const bendHint = scratch.bendHint.set(rig.side === 'left' ? -0.7 : 0.7, -1, 0.25).applyQuaternion(cameraRotation);
-      const handDirection = scratch.handDirection.set(
-        rig.side === 'left' ? 0.2 : 0.08,
-        rig.side === 'left' ? -0.08 : -0.28,
-        -1,
-      ).normalize();
-      const gripRotation = WEAPON_HAND_ROTATIONS[this.active][rig.side];
-      scratch.gripEuler.set(
-        gripRotation[0] * 0.24,
-        gripRotation[1] * 0.24,
-        gripRotation[2] * 0.24,
-        'XYZ',
-      );
-      handDirection.applyEuler(scratch.gripEuler).applyQuaternion(cameraRotation);
+      const weaponRotation = activeModel.getWorldQuaternion(scratch.weaponRotation);
+      const muzzle = activeModel.getObjectByName('muzzle-socket');
+      const weaponForward = muzzle
+        ? scratch.weaponForward.copy(muzzle.getWorldPosition(scratch.handTarget)).sub(socketTarget).normalize()
+        : scratch.weaponForward.set(0, 0, 1).applyQuaternion(weaponRotation).normalize();
+      const handDirection = rig.side === 'left'
+        ? riggedSupportHandDirectionLocal(reloadPose.handToReload, scratch.handDirection).applyQuaternion(weaponRotation).normalize()
+        : scratch.handDirection.copy(weaponForward);
+      const wristRollRadians = rig.side === 'left'
+        ? riggedSupportWristRollRadians(reloadPose.handToReload)
+        : 0;
+      const contactIterationErrors: number[] | null = diagnostics ? [] : null;
 
       // Iterate the wrist endpoint until the actual palm, rather than the cuff
       // joint, meets the authored weapon socket. This mirrors the source-asset
       // contact solve and keeps sleeves behind the controls at hip, ADS and
       // reload poses. All corrections remain bounded by the physical chain.
       const wristTarget = scratch.wristTarget.copy(socketTarget);
-      for (let iteration = 0; iteration < 4; iteration += 1) {
+      for (let iteration = 0; iteration < 2; iteration += 1) {
         const requestedReach = shoulderPosition.distanceTo(wristTarget);
         if (requestedReach > calibratedReach) {
           const unclampedX = wristTarget.x;
@@ -3381,8 +3519,10 @@ export class WeaponPresentation {
         this.poseRiggedArmToWristTarget(
           rig, wristTarget, shoulderPosition, upperLength, lowerLength, bendHint, handDirection,
         );
+        this.rollRiggedWristWorld(rig, handDirection, wristRollRadians);
         this.riggedPalmWorld(rig, scratch.palmWorld);
         const correction = scratch.palmCorrection.copy(socketTarget).sub(scratch.palmWorld);
+        contactIterationErrors?.push(correction.length());
         wristTarget.add(correction);
         if (correction.lengthSq() <= 0.00025 * 0.00025) break;
       }
@@ -3395,6 +3535,7 @@ export class WeaponPresentation {
       const elbowTarget = this.poseRiggedArmToWristTarget(
         rig, wristTarget, shoulderPosition, upperLength, lowerLength, bendHint, handDirection,
       );
+      this.rollRiggedWristWorld(rig, handDirection, wristRollRadians);
       const solvedWrist = rig.wrist.getWorldPosition(scratch.solvedWrist);
       const solvedPalm = this.riggedPalmWorld(rig, scratch.diagnosticPalm);
       const reachRatio = shoulderPosition.distanceTo(wristTarget) / Math.max(upperLength + lowerLength, 1e-6);
@@ -3416,6 +3557,10 @@ export class WeaponPresentation {
         target: socketTarget.toArray(),
         wristTarget: wristTarget.toArray(),
         contactAnchor: 'mean-digit-base-palm-v1',
+        poseChainContract: RIGGED_HAND_POSE_CHAIN_CONTRACT,
+        handDirection: handDirection.toArray(),
+        wristRollRadians,
+        contactIterationErrors,
         contactError: solvedPalm.distanceTo(socketTarget),
         wristContactError: solvedWrist.distanceTo(wristTarget),
         reachRatio,
@@ -3728,6 +3873,7 @@ export class WeaponPresentation {
     this.centerSightReference(activeModel);
     if (arms && !meleeActive) this.solveArms(arms, activeModel, reloadPose);
     if (!authoredMeleeActive) this.solveRiggedArms(activeModel, reloadPose);
+    if (arms) this.updateRiggedForearmReinforcement(arms, !authoredMeleeActive);
     // The conservative position cap and authored contact retreat above are the
     // live near-plane contract.
     // Exact skinned bounds remain available to admission/diagnostic probes, but
