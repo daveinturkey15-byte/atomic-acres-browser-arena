@@ -196,6 +196,7 @@ describe('production release workflow', () => {
       'T-GUN-RANGE-TEST-BAY',
       'T-TIMED-MAP-WEAPONS',
       'T-FIELD-KIT-MENU',
+      'T-PASS70-FIELD-KIT-BROWSER',
       'T-RUSTRIG-PHYSICS',
       'T-PICKUP-REPICK',
       'T-MOBILE-TOUCH-69-1',
