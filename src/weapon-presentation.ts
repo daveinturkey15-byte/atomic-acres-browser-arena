@@ -365,7 +365,6 @@ function viewmodelMeleeScreenOffset(camera: THREE.Camera): number {
 }
 
 const FIRST_PERSON_ADS_BORE_RADIUS: Readonly<Partial<Record<WeaponId, number>>> = Object.freeze({
-  carbine: 0.032,
   'mini-uzi': 0.024,
 });
 const FIRST_PERSON_ADS_SIGHT_PICTURE_RETREAT: Readonly<Partial<Record<WeaponId, number>>> = Object.freeze({
@@ -388,11 +387,12 @@ type AdsSightBoreTelemetry = Readonly<{
 
 /**
  * Punches a small, real aperture through only the cloned first-person render
- * batches intersecting the authored rear-to-front sight axis. Pass 65 merged
- * the HK416 lens and Mini Uzi sight plates into material batches, leaving the
- * semantic optic nodes empty; toggling those nodes therefore hid no pixels.
- * Degenerating intersected cloned indices keeps sockets, materials and source
- * topology stable while guaranteeing that the centre sight ray is unobstructed.
+ * batches intersecting the authored rear-to-front sight axis. The carbine's
+ * authored optic is genuine clear space once its optic socket is centred, so
+ * it deliberately does not use this geometry-degeneration fallback. The Mini
+ * Uzi retains the fallback for its merged iron-sight plate. Degenerating
+ * intersected cloned indices keeps sockets, materials and source topology
+ * stable.
  */
 export function carveFirstPersonAdsSightBore(id: WeaponId, model: THREE.Object3D): AdsSightBoreTelemetry | null {
   const radius = FIRST_PERSON_ADS_BORE_RADIUS[id];
@@ -494,7 +494,7 @@ type RearOccluderTrimTelemetry = Readonly<{
 
 /** Removes only merged butt/stock triangles intersecting the rear sight corridor. */
 export function trimFirstPersonRearOccluder(id: WeaponId, model: THREE.Object3D): RearOccluderTrimTelemetry | null {
-  if (id !== 'carbine' && id !== 'mini-uzi') return null;
+  if (id !== 'mini-uzi') return null;
   const rearSocket = model.getObjectByName('rear-sight-socket');
   const frontSocket = model.getObjectByName('front-sight-socket');
   if (!rearSocket || !frontSocket) return null;
@@ -503,7 +503,7 @@ export function trimFirstPersonRearOccluder(id: WeaponId, model: THREE.Object3D)
   const front = model.worldToLocal(frontSocket.getWorldPosition(new THREE.Vector3()));
   const axis = front.clone().sub(rear).normalize();
   if (axis.lengthSq() < 0.99) return null;
-  const radius = id === 'carbine' ? 0.065 : 0.05;
+  const radius = 0.05;
   const lateral = new THREE.Vector3(1, 0, 0);
   if (Math.abs(lateral.dot(axis)) > 0.9) lateral.set(0, 1, 0);
   lateral.addScaledVector(axis, -lateral.dot(axis)).normalize();
@@ -2724,7 +2724,10 @@ export class WeaponPresentation {
                       : ['pistol-rear-sight'];
     // Pass 65 authored GLBs expose a canonical socket contract. Cosmetic mesh
     // names are retained only as a fallback for the procedural/headless models.
-    return model?.getObjectByName('rear-sight-socket')
+    return (this.active === 'carbine'
+      ? model?.getObjectByName('optic-socket') ?? model?.getObjectByName('optic-reticle')
+      : model?.getObjectByName('rear-sight-socket'))
+      ?? model?.getObjectByName('rear-sight-socket')
       ?? sightNames.map((name) => model?.getObjectByName(name)).find((sight) => sight !== undefined);
   }
 
@@ -2824,10 +2827,18 @@ export class WeaponPresentation {
       ] as const;
       const raycaster = new THREE.Raycaster();
       raycaster.layers.mask = this.camera.layers.mask;
+      raycaster.near = this.camera instanceof THREE.PerspectiveCamera ? this.camera.near : 0;
+      raycaster.far = this.camera instanceof THREE.PerspectiveCamera ? this.camera.far : Number.POSITIVE_INFINITY;
       const samples = offsets.map(([x, y]) => {
         raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
         const hits = raycaster.intersectObject(model, true).filter((hit) => {
-          if (!(hit.object instanceof THREE.Mesh) || !hit.object.visible) return false;
+          if (!(hit.object instanceof THREE.Mesh)) return false;
+          let ancestor: THREE.Object3D | null = hit.object;
+          while (ancestor && ancestor !== model) {
+            if (!ancestor.visible) return false;
+            ancestor = ancestor.parent;
+          }
+          if (ancestor !== model || !model.visible) return false;
           const materials = Array.isArray(hit.object.material) ? hit.object.material : [hit.object.material];
           const material = materials[hit.face?.materialIndex ?? 0] ?? materials[0];
           return material?.visible === true && material.colorWrite !== false && material.opacity >= 0.35;
@@ -2918,6 +2929,7 @@ export class WeaponPresentation {
       modelVisibleMeshCount,
       attachedWeaponBatchStats: model?.userData.attachedWeaponBatchStats ?? null,
       adsProgress: this.adsBlend,
+      sightReferenceName: sight?.name ?? null,
       sightOffset: projected ? [projected.x, projected.y] : null,
       armsVisible: arms?.visible === true || this.meleeRig.visible,
       armMeshCount,

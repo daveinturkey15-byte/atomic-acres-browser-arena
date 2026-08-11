@@ -25,12 +25,12 @@ function occludedSightModel(): THREE.Group {
 }
 
 describe('physical first-person ADS aperture', () => {
-  it.each(['carbine', 'mini-uzi'] as const)('degenerates cloned render triangles blocking the %s sight axis', (weapon) => {
+  it('degenerates cloned render triangles blocking the Mini Uzi sight axis', () => {
     const model = occludedSightModel();
     const geometry = (model.getObjectByName('test_FP_LOD0_Runtime_static_MAT_blocker') as THREE.Mesh).geometry;
     const originalIndexCount = geometry.index?.count;
 
-    const result = carveFirstPersonAdsSightBore(weapon, model);
+    const result = carveFirstPersonAdsSightBore('mini-uzi', model);
 
     expect(result).toMatchObject({
       applied: true,
@@ -44,6 +44,16 @@ describe('physical first-person ADS aperture', () => {
       const element = triangle * 3;
       return new Set([index.getX(element), index.getX(element + 1), index.getX(element + 2)]).size;
     })).toEqual([1, 1]);
+  });
+
+  it('does not carve a second artificial hole through the carbine receiver', () => {
+    const model = occludedSightModel();
+    const blocker = model.getObjectByName('test_FP_LOD0_Runtime_static_MAT_blocker') as THREE.Mesh;
+    const before = Array.from(blocker.geometry.index!.array);
+
+    expect(carveFirstPersonAdsSightBore('carbine', model)).toBeNull();
+    expect(trimFirstPersonRearOccluder('carbine', model)).toBeNull();
+    expect(Array.from(blocker.geometry.index!.array)).toEqual(before);
   });
 
   it('does not alter weapons outside the explicit obstructed-sight set', () => {
@@ -68,7 +78,7 @@ describe('physical first-person ADS aperture', () => {
     model.add(offAxis);
     const offAxisBefore = Array.from(offAxis.geometry.index!.array);
 
-    const result = trimFirstPersonRearOccluder('carbine', model);
+    const result = trimFirstPersonRearOccluder('mini-uzi', model);
 
     expect(result).toMatchObject({
       applied: true,

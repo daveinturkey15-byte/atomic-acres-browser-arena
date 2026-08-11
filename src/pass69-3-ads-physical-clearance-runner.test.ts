@@ -37,6 +37,7 @@ describe('Pass 69.3 physical ADS evidence boundary', () => {
       'materials.invalidOpticWindowCount === 0',
       "weapon === 'carbine' ? 1 : 0",
       "entry.ads?.opaqueSightWindow?.contract === 'camera-ndc-centre-reticle-window-rays-v2'",
+      "entry.ads?.sightReferenceName === (weapon === 'carbine' ? 'optic-socket' : 'rear-sight-socket')",
       'endingSha !== sourceSha || sourceStatus()',
     ]) expect(runner).toContain(token);
   });
@@ -59,6 +60,8 @@ describe('Pass 69.3 physical ADS evidence boundary', () => {
       "expect(adsMaterials, `${weapon}: ADS does not mutate any material semantics`).toEqual(hipMaterials)",
       "expect(hipMaterials.opticWindowCount, `${weapon}: exact semantic lens expectation`).toBe(weapon === 'carbine' ? 1 : 0)",
       "contract: 'camera-ndc-centre-reticle-window-rays-v2'",
+      "weapon === 'carbine' ? 'optic-socket' : 'rear-sight-socket'",
+      "expect(ads.weaponPresentation.sightOffset, `${weapon}: authored sight is centred`).toEqual([0, 0])",
       "expect(opticMaterialsFor(reEquipped), `${weapon}: switch-back preserves exact material semantics`)",
       "channel: officialEvidence ? 'msedge' : 'configured-chromium'",
       "expect(endingSourceStatus, 'official physical ADS evidence ends with a clean worktree').toBe('')",

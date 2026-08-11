@@ -133,12 +133,15 @@ const weaponsValid = Array.isArray(receipt.weapons)
     const adsFile = resolve(root, adsPath);
     return entry?.weapon === weapon
       && materialStateValid(entry.hip?.materials, weapon === 'carbine' ? 1 : 0)
-      && entry.ads?.rearOccluderTrim?.applied === true
-      && entry.ads.rearOccluderTrim.contract === 'rear-sight-axis-spatial-degenerate-v1'
-      && entry.ads.rearOccluderTrim.suppressionRatio < 0.08
-      && entry.ads?.sightBore?.applied === true
-      && entry.ads.sightBore.contract === 'physical-aperture-spatial-degenerate-v1'
-      && entry.ads.sightBore.rayCount === 9
+      && entry.ads?.sightReferenceName === (weapon === 'carbine' ? 'optic-socket' : 'rear-sight-socket')
+      && (weapon === 'mini-uzi'
+        ? entry.ads?.rearOccluderTrim?.applied === true
+          && entry.ads.rearOccluderTrim.contract === 'rear-sight-axis-spatial-degenerate-v1'
+          && entry.ads.rearOccluderTrim.suppressionRatio < 0.08
+          && entry.ads?.sightBore?.applied === true
+          && entry.ads.sightBore.contract === 'physical-aperture-spatial-degenerate-v1'
+          && entry.ads.sightBore.rayCount === 9
+        : entry.ads?.rearOccluderTrim === null && entry.ads?.sightBore === null)
       && entry.ads?.opaqueSightWindow?.contract === 'camera-ndc-centre-reticle-window-rays-v2'
       && entry.ads.opaqueSightWindow.ndcRadius === 0.02
       && entry.ads?.opaqueSightWindow?.blockedRays === 0

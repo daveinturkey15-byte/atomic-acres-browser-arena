@@ -158,18 +158,27 @@ test('carbine and Mini Uzi expose a physical ADS corridor without fading their o
     }, weapon, { timeout: 8_000 });
     const ads = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot() as any);
     const adsMaterials = opticMaterialsFor(ads);
-    expect(ads.weaponPresentation.firstPersonRearOccluderTrim, `${weapon}: actual served rear geometry trim`).toMatchObject({
-      applied: true,
-      contract: 'rear-sight-axis-spatial-degenerate-v1',
-    });
-    expect(ads.weaponPresentation.firstPersonRearOccluderTrim.suppressedElements).toBeGreaterThan(0);
-    expect(ads.weaponPresentation.firstPersonRearOccluderTrim.suppressionRatio, `${weapon}: hip geometry retention`).toBeLessThan(0.08);
-    expect(ads.weaponPresentation.firstPersonAdsSightBore, `${weapon}: actual served physical aperture`).toMatchObject({
-      applied: true,
-      contract: 'physical-aperture-spatial-degenerate-v1',
-      rayCount: 9,
-    });
-    expect(ads.weaponPresentation.firstPersonAdsSightBore.suppressedElements).toBeGreaterThan(0);
+    expect(ads.weaponPresentation.sightReferenceName, `${weapon}: authored sight reference`).toBe(
+      weapon === 'carbine' ? 'optic-socket' : 'rear-sight-socket',
+    );
+    expect(ads.weaponPresentation.sightOffset, `${weapon}: authored sight is centred`).toEqual([0, 0]);
+    if (weapon === 'mini-uzi') {
+      expect(ads.weaponPresentation.firstPersonRearOccluderTrim, `${weapon}: actual served rear geometry trim`).toMatchObject({
+        applied: true,
+        contract: 'rear-sight-axis-spatial-degenerate-v1',
+      });
+      expect(ads.weaponPresentation.firstPersonRearOccluderTrim.suppressedElements).toBeGreaterThan(0);
+      expect(ads.weaponPresentation.firstPersonRearOccluderTrim.suppressionRatio, `${weapon}: hip geometry retention`).toBeLessThan(0.08);
+      expect(ads.weaponPresentation.firstPersonAdsSightBore, `${weapon}: actual served physical aperture`).toMatchObject({
+        applied: true,
+        contract: 'physical-aperture-spatial-degenerate-v1',
+        rayCount: 9,
+      });
+      expect(ads.weaponPresentation.firstPersonAdsSightBore.suppressedElements).toBeGreaterThan(0);
+    } else {
+      expect(ads.weaponPresentation.firstPersonRearOccluderTrim, `${weapon}: no artificial lower receiver hole`).toBeNull();
+      expect(ads.weaponPresentation.firstPersonAdsSightBore, `${weapon}: authored optic aperture needs no geometry carve`).toBeNull();
+    }
     expect(adsMaterials, `${weapon}: ADS does not mutate any material semantics`).toEqual(hipMaterials);
     expect(adsMaterials.invalidOpaqueBodyCount, `${weapon}: ADS body remains opaque`).toBe(0);
     expect(adsMaterials.invalidOpticWindowCount, `${weapon}: ADS window remains clear`).toBe(0);
@@ -209,6 +218,7 @@ test('carbine and Mini Uzi expose a physical ADS corridor without fading their o
       },
       ads: {
         materials: adsMaterials,
+        sightReferenceName: ads.weaponPresentation.sightReferenceName,
         sightPictureRetreat: ads.weaponPresentation.opticMaterialSemantics.sightPictureRetreat,
         sightOffset: ads.weaponPresentation.sightOffset,
         rearOccluderTrim: ads.weaponPresentation.firstPersonRearOccluderTrim,
