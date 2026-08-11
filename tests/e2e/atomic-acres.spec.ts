@@ -288,7 +288,11 @@ type DebugState = {
       runtimeTracks: number;
       upperChainTracksExcluded: number;
     } | null;
-    riggedArms: Array<{ finite: boolean; bindOffsetsPreserved: boolean; contactError: number }>;
+    riggedArms: Array<{
+      side: 'left' | 'right'; weapon: string; active: boolean; stowed?: boolean;
+      finite: boolean; withinStableReach?: boolean; authoredSegmentDirectionsPreserved?: boolean;
+      contactError?: number; palmOrientationError?: number; shoulderEntryNdc?: [number, number, number];
+    }>;
     importedModel: { source: string; weapon: string; clips: number; meshes: number; renderPrimitives: number; triangles: number; detailMeshes: number; socketContractReady: boolean; muzzleForwardDot: number | null; sightForwardDot: number | null } | null;
   };
   sniperScope: { active: boolean; magnification: number; baseFov: number; cameraFov: number; viewmodelVisible: boolean };
@@ -1453,6 +1457,10 @@ test.describe('solo mechanics', () => {
       }, weapon);
       await expect.poll(async () => (await debug(page)).weaponPresentation.weapon).toBe(weapon);
       await expect.poll(async () => (await debug(page)).weaponPresentation.importedModel?.weapon ?? null).toBe(weapon);
+      await expect.poll(async () => {
+        const arms = (await debug(page)).weaponPresentation.riggedArms;
+        return arms.length === 2 && arms.every((arm) => arm.weapon === weapon);
+      }).toBe(true);
       const weaponState = (await debug(page)).weaponPresentation;
       expect(weaponState.armsVisible, `${weapon}:armsVisible`).toBe(true);
       expect(weaponState.armMeshCount, `${weapon}:armMeshCount`).toBeGreaterThanOrEqual(4);
@@ -1494,7 +1502,16 @@ test.describe('solo mechanics', () => {
       expect(weaponState.modelVisibleMeshCount, `${weapon}:modelVisibleMeshCount`).toBeLessThanOrEqual(16);
       expect(weaponState.attachedWeaponBatchStats, `${weapon}:qualityPathPreservesPbrParts`).toBeNull();
       expect(weaponState.riggedArms, `${weapon}:riggedArms`).toHaveLength(2);
-      expect(weaponState.riggedArms.every((arm: { finite: boolean; bindOffsetsPreserved: boolean; contactError: number }) => arm.finite && arm.bindOffsetsPreserved && arm.contactError <= 0.02), `${weapon}:handContact`).toBe(true);
+      const activeArms = weaponState.riggedArms.filter((arm) => arm.active);
+      const handgun = ['pistol', 'magnum', 'machine-pistol', 'flashlight-pistol', 'flare-gun'].includes(weapon);
+      expect(activeArms, `${weapon}:activeArmCount`).toHaveLength(handgun ? 1 : 2);
+      expect(activeArms.every((arm) => arm.finite
+        && arm.withinStableReach === true
+        && arm.authoredSegmentDirectionsPreserved === true
+        && (arm.contactError ?? Number.POSITIVE_INFINITY) <= 0.01
+        && (arm.palmOrientationError ?? Number.POSITIVE_INFINITY) <= 0.2
+        && (arm.shoulderEntryNdc?.[1] ?? Number.POSITIVE_INFINITY) <= -1.02), `${weapon}:authoredPalmAndSleeveContract`).toBe(true);
+      if (handgun) expect(weaponState.riggedArms.find((arm) => arm.side === 'left')).toMatchObject({ stowed: true, active: false });
       expect(weaponState.sightOffset?.every(Number.isFinite), `${weapon}:sightOffset`).toBe(true);
       finishIds.add(weaponState.weaponFinishId);
       await captureViewmodel(`test-results/pass65-${weapon}-first-person-neutral.png`);
@@ -1548,7 +1565,10 @@ test.describe('solo mechanics', () => {
       socketContractReady: true,
     });
     expect(crossbowState.riggedArms).toHaveLength(2);
-    expect(crossbowState.riggedArms.every((arm) => arm.finite && arm.bindOffsetsPreserved && arm.contactError <= 0.02)).toBe(true);
+    expect(crossbowState.riggedArms.every((arm) => arm.active && arm.finite
+      && arm.authoredSegmentDirectionsPreserved === true
+      && (arm.contactError ?? Number.POSITIVE_INFINITY) <= 0.01
+      && (arm.palmOrientationError ?? Number.POSITIVE_INFINITY) <= 0.2)).toBe(true);
     await captureViewmodel('test-results/pass65-explosive-crossbow-first-person-neutral.png');
 
     const state = await debug(page);

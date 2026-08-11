@@ -8,10 +8,12 @@ import {
   FULLSCREEN_PRESENTATION_SUPPRESSED_SCALE,
   FULLSCREEN_PRESENTATION_SUPPRESSION_CONTRACT,
   HIP_VIEWMODEL_SCALE,
+  FIRST_PERSON_HAND_POLICY_CONTRACT,
   RIGGED_HAND_POSE_CHAIN_CONTRACT,
   VIEWMODEL_NEAR_PLANE_SAFE_RETREAT,
   WeaponPresentation,
   authoredNearPlaneContactRetreat,
+  firstPersonHandPolicy,
   riggedSupportHandDirectionLocal,
   riggedSupportWristRollRadians,
   type WeaponViewmodelCatalogGpuPrewarmEntry,
@@ -91,6 +93,21 @@ function fakeWeaponGltf(id: Pass65AuthoredFirearmId, animated = false): FakeGltf
     rendered.name = `${id}_FP_LOD0_Runtime_static_MAT_behavior-test`;
     identity.add(rear, front, rendered);
   }
+  if (id === 'railgun') {
+    const backer = new THREE.Mesh(
+      new THREE.BoxGeometry(0.2, 0.12, 0.12),
+      new THREE.MeshStandardMaterial({ name: 'MAT_Pass65_railgun_Gunmetal' }),
+    );
+    backer.name = 'railgun_FP_LOD0_Runtime_static_MAT_Pass65_railgun_Gunmetal';
+    backer.position.set(0, 0, 0.1);
+    const lens = new THREE.Mesh(
+      new THREE.BoxGeometry(0.16, 0.08, 0.012),
+      new THREE.MeshStandardMaterial({ name: 'MAT_Pass65_railgun_Lens' }),
+    );
+    lens.name = 'railgun_FP_LOD0_Runtime_static_MAT_Pass65_railgun_Lens';
+    lens.position.set(0, 0, 0.1);
+    identity.add(backer, lens);
+  }
   scene.add(identity);
   const animations = animated
     ? [new THREE.AnimationClip('reload', 1, [
@@ -116,6 +133,13 @@ function fakeArmsGltf(): FakeGltf {
     elbow.position.set(0, -0.36, 0);
     wrist.position.set(0, -0.34, 0);
     shoulder.add(elbow); elbow.add(wrist); scene.add(shoulder);
+    const palmContact = new THREE.Group();
+    palmContact.name = suffix === 'R' ? 'right-palm-contact' : 'left-palm-contact';
+    palmContact.position.set(0, -0.08, 0);
+    palmContact.userData.positive_determinant = true;
+    palmContact.userData.palm_forward_axis = '+Y';
+    palmContact.userData.palm_up_axis = '+Z';
+    wrist.add(palmContact);
     for (const digit of ['Index', 'Middle', 'Ring', 'Pinky', 'Thumb']) {
       let parent: THREE.Object3D = wrist;
       for (const joint of [1, 2, 3]) {
@@ -198,7 +222,7 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     const reload = riggedSupportHandDirectionLocal(1, new THREE.Vector3());
     const midpoint = riggedSupportHandDirectionLocal(0.5, new THREE.Vector3());
 
-    expect(RIGGED_HAND_POSE_CHAIN_CONTRACT).toBe('weapon-space-palm-direction-and-wrist-roll-v1');
+    expect(RIGGED_HAND_POSE_CHAIN_CONTRACT).toBe('authored-palm-full-transform-to-socket-frame-v2');
     expect(support.distanceTo(expectedSupport)).toBeLessThan(1e-12);
     expect(reload.distanceTo(expectedReload)).toBeLessThan(1e-12);
     expect(midpoint.length()).toBeCloseTo(1, 12);
@@ -206,6 +230,25 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(riggedSupportHandDirectionLocal(2, new THREE.Vector3()).distanceTo(expectedReload)).toBeLessThan(1e-12);
     expect(riggedSupportWristRollRadians(0)).toBeCloseTo(THREE.MathUtils.degToRad(-4), 12);
     expect(riggedSupportWristRollRadians(1)).toBeCloseTo(THREE.MathUtils.degToRad(-20), 12);
+  });
+
+  it('uses one firing hand for sidearms and admits the support hand only during reload', () => {
+    expect(firstPersonHandPolicy('pistol')).toEqual({
+      contract: FIRST_PERSON_HAND_POLICY_CONTRACT,
+      gripFamily: 'handgun',
+      firingHand: 'right',
+      supportHand: 'reload-only-stowed',
+      activeChainCount: 1,
+    });
+    expect(firstPersonHandPolicy('flare-gun')).toMatchObject({
+      gripFamily: 'handgun', supportHand: 'reload-only-stowed', activeChainCount: 1,
+    });
+    expect(firstPersonHandPolicy('pistol', 0.5)).toMatchObject({
+      supportHand: 'active', activeChainCount: 2,
+    });
+    expect(firstPersonHandPolicy('m4a1')).toMatchObject({
+      gripFamily: 'long-gun', supportHand: 'active', activeChainCount: 2,
+    });
   });
 
   it('finishes catalog GPU batches and drop-knife staging while animation frames are suspended hidden', async () => {
@@ -1035,26 +1078,8 @@ describe('Pass 65 managed weapon runtime behavior', () => {
       knifeVisible: true,
     });
     expect(active.authoredMeleeGripError).toBeLessThan(1e-6);
-    const forearmReinforcements: THREE.Mesh[] = [];
-    arms?.traverse((node) => {
-      if (node instanceof THREE.Mesh && node.name.startsWith('pass70-') && node.name.endsWith('-forearm-volume-reinforcement')) {
-        forearmReinforcements.push(node);
-      }
-    });
-    expect(forearmReinforcements.map((mesh) => mesh.name).sort()).toEqual([
-      'pass70-left-forearm-volume-reinforcement',
-      'pass70-right-forearm-volume-reinforcement',
-    ]);
-    for (const reinforcement of forearmReinforcements) {
-      const material = reinforcement.material as THREE.MeshStandardMaterial;
-      expect(reinforcement.visible).toBe(false);
-      expect(reinforcement.userData).toMatchObject({
-        contract: 'authored-chain-following-tapered-forearm-volume-v1',
-        presentationOnly: true,
-      });
-      expect(material).toMatchObject({ transparent: false, opacity: 1, depthWrite: true, depthTest: true });
-      expect(material.normalScale.toArray()).toEqual([0.9, 0.9]);
-    }
+    expect(arms?.getObjectByName('pass70-left-forearm-volume-reinforcement')).toBeUndefined();
+    expect(arms?.getObjectByName('pass70-right-forearm-volume-reinforcement')).toBeUndefined();
     expect(active.riggedArms).toEqual(expect.arrayContaining([
       expect.objectContaining({ side: 'right', action: 'melee', knifeAttachedToRightWrist: true }),
     ]));
@@ -1073,12 +1098,6 @@ describe('Pass 65 managed weapon runtime behavior', () => {
       riggedMeleeBindPoseRestoredExactly: true,
       knifeVisible: false,
     });
-    for (const reinforcement of forearmReinforcements) {
-      expect(reinforcement.visible).toBe(true);
-      expect(reinforcement.scale.x).toBeCloseTo(0.054, 12);
-      expect(reinforcement.scale.y).toBeGreaterThan(0);
-      expect(reinforcement.scale.z).toBeCloseTo(0.043, 12);
-    }
     expect(arms?.visible).toBe(true);
   });
 

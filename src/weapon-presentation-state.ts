@@ -26,6 +26,7 @@ export type ViewmodelContactProfile = Readonly<{
   maximumYawRadians: number;
   maximumRollRadians: number;
   maximumAdditionalLiftMeters: number;
+  maximumWallDropMeters: number;
   minimumScale: number;
 }>;
 
@@ -41,6 +42,7 @@ export type ViewmodelContactResponse = Readonly<{
   yawRadians: number;
   rollRadians: number;
   additionalLiftMeters: number;
+  additionalDropMeters: number;
   scale: number;
   minimumScale: number;
   aimAuthority: 'camera-forward-unchanged';
@@ -50,7 +52,7 @@ const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
 const finite = (value: number, fallback = 0): number => Number.isFinite(value) ? value : fallback;
 export const ADS_IN_RESPONSE_PER_SECOND = 22;
 export const ADS_OUT_RESPONSE_PER_SECOND = 18;
-export const VIEWMODEL_CONTACT_RESPONSE_CONTRACT = 'catalog-viewmodel-contact-response-v1';
+export const VIEWMODEL_CONTACT_RESPONSE_CONTRACT = 'catalog-viewmodel-contact-response-v2';
 const VIEWMODEL_PRONE_BASE_RETREAT_METERS = 0.09;
 const VIEWMODEL_MAX_WALL_RETREAT_METERS = 0.62;
 const VIEWMODEL_PRONE_BASE_LIFT_METERS = 0.115;
@@ -64,12 +66,14 @@ const contactProfile = (
   maximumYawRadians = -0.14,
   maximumRollRadians = 0.09,
   maximumAdditionalLiftMeters = 0.055,
+  maximumWallDropMeters = 0.22,
 ): ViewmodelContactProfile => Object.freeze({
   weapon,
   maximumHighReadyPitchRadians,
   maximumYawRadians,
   maximumRollRadians,
   maximumAdditionalLiftMeters,
+  maximumWallDropMeters,
   minimumScale,
 });
 
@@ -82,31 +86,31 @@ const contactProfile = (
  */
 export const VIEWMODEL_CONTACT_PROFILES: Readonly<Record<WeaponId, ViewmodelContactProfile>> = Object.freeze({
   carbine: contactProfile('carbine', 0.82, 0.79),
-  smg: contactProfile('smg', 0.68, 0.83, -0.11, 0.075, 0.045),
-  lmg: contactProfile('lmg', 0.94, 0.76, -0.17, 0.1, 0.065),
-  scattergun: contactProfile('scattergun', 0.9, 0.77, -0.16, 0.1, 0.06),
-  sniper: contactProfile('sniper', 0.96, 0.75, -0.17, 0.1, 0.065),
-  'mini-uzi': contactProfile('mini-uzi', 0.62, 0.85, -0.1, 0.07, 0.04),
-  mp5: contactProfile('mp5', 0.7, 0.82, -0.12, 0.08, 0.05),
+  smg: contactProfile('smg', 0.68, 0.83, -0.11, 0.075, 0.045, 0.19),
+  lmg: contactProfile('lmg', 0.94, 0.76, -0.17, 0.1, 0.065, 0.25),
+  scattergun: contactProfile('scattergun', 0.9, 0.77, -0.16, 0.1, 0.06, 0.24),
+  sniper: contactProfile('sniper', 0.96, 0.75, -0.17, 0.1, 0.065, 0.25),
+  'mini-uzi': contactProfile('mini-uzi', 0.62, 0.85, -0.1, 0.07, 0.04, 0.18),
+  mp5: contactProfile('mp5', 0.7, 0.82, -0.12, 0.08, 0.05, 0.2),
   m4a1: contactProfile('m4a1', 0.84, 0.78),
   'ak-47': contactProfile('ak-47', 0.86, 0.78, -0.15),
-  minigun: contactProfile('minigun', 1, 0.74, -0.18, 0.11, 0.07),
-  'm14-ebr': contactProfile('m14-ebr', 0.94, 0.76, -0.16, 0.1, 0.065),
-  'slug-shotgun': contactProfile('slug-shotgun', 0.92, 0.76, -0.16, 0.1, 0.065),
-  pistol: contactProfile('pistol', 0.56, 0.87, -0.08, 0.06, 0.035),
-  'machine-pistol': contactProfile('machine-pistol', 0.62, 0.85, -0.09, 0.065, 0.04),
-  magnum: contactProfile('magnum', 0.62, 0.84, -0.09, 0.065, 0.04),
-  'flashlight-pistol': contactProfile('flashlight-pistol', 0.58, 0.86, -0.08, 0.06, 0.04),
-  'explosive-crossbow': contactProfile('explosive-crossbow', 0.78, 0.8, -0.13, 0.085, 0.055),
-  railgun: contactProfile('railgun', 0.98, 0.75, -0.18, 0.11, 0.07),
-  flamethrower: contactProfile('flamethrower', 0.96, 0.75, -0.18, 0.11, 0.07),
-  'flare-gun': contactProfile('flare-gun', 0.55, 0.87, -0.08, 0.06, 0.035),
+  minigun: contactProfile('minigun', 1, 0.74, -0.18, 0.11, 0.07, 0.27),
+  'm14-ebr': contactProfile('m14-ebr', 0.94, 0.76, -0.16, 0.1, 0.065, 0.25),
+  'slug-shotgun': contactProfile('slug-shotgun', 0.92, 0.76, -0.16, 0.1, 0.065, 0.24),
+  pistol: contactProfile('pistol', 0.56, 0.87, -0.08, 0.06, 0.035, 0.17),
+  'machine-pistol': contactProfile('machine-pistol', 0.62, 0.85, -0.09, 0.065, 0.04, 0.18),
+  magnum: contactProfile('magnum', 0.62, 0.84, -0.09, 0.065, 0.04, 0.18),
+  'flashlight-pistol': contactProfile('flashlight-pistol', 0.58, 0.86, -0.08, 0.06, 0.04, 0.17),
+  'explosive-crossbow': contactProfile('explosive-crossbow', 0.78, 0.8, -0.13, 0.085, 0.055, 0.22),
+  railgun: contactProfile('railgun', 0.98, 0.75, -0.18, 0.11, 0.07, 0.26),
+  flamethrower: contactProfile('flamethrower', 0.96, 0.75, -0.18, 0.11, 0.07, 0.26),
+  'flare-gun': contactProfile('flare-gun', 0.55, 0.87, -0.08, 0.06, 0.035, 0.18),
 });
 
 /**
- * Presentation-only contact fold. Fully settled ADS keeps the authored sight
- * axis and aperture framing unmodified; hip fire progressively raises, cants
- * and foreshortens the complete connected weapon-and-hands root.
+ * Presentation-only contact fold. ADS reduces the fold but cannot cancel it:
+ * an always-on-top viewmodel would otherwise draw through the wall at the exact
+ * moment contact is most likely. Open-space ADS remains byte-for-byte neutral.
  * No camera, projectile or gameplay-ray state is an input or output.
  */
 export function viewmodelContactResponse(
@@ -129,7 +133,8 @@ export function viewmodelContactResponse(
   );
   const obstructionBlend = Math.max(wallBlend, floorBlend);
   const adsRemaining = 1 - clamp01(finite(adsBlend));
-  const highReadyBlend = adsRemaining <= 0.001 ? 0 : obstructionBlend * adsRemaining;
+  const contactRetention = 0.48 + 0.52 * adsRemaining;
+  const highReadyBlend = obstructionBlend * contactRetention;
   return Object.freeze({
     contract: VIEWMODEL_CONTACT_RESPONSE_CONTRACT,
     profileId: weapon,
@@ -141,7 +146,12 @@ export function viewmodelContactResponse(
     pitchRadians: highReadyBlend === 0 ? 0 : profile.maximumHighReadyPitchRadians * highReadyBlend,
     yawRadians: highReadyBlend === 0 ? 0 : profile.maximumYawRadians * highReadyBlend,
     rollRadians: highReadyBlend === 0 ? 0 : profile.maximumRollRadians * highReadyBlend,
-    additionalLiftMeters: profile.maximumAdditionalLiftMeters * wallBlend * (adsRemaining <= 0.001 ? 0 : adsRemaining),
+    additionalLiftMeters: profile.maximumAdditionalLiftMeters
+      * Math.max(wallBlend, floorBlend)
+      * (0.72 + 0.28 * adsRemaining),
+    additionalDropMeters: profile.maximumWallDropMeters
+      * wallBlend
+      * (0.72 + 0.28 * adsRemaining),
     scale: 1 - (1 - profile.minimumScale) * highReadyBlend,
     minimumScale: profile.minimumScale,
     aimAuthority: 'camera-forward-unchanged',

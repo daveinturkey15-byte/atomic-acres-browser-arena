@@ -106,6 +106,7 @@ describe('weapon presentation state', () => {
       expect(profile.weapon).toBe(weapon);
       expect(profile.minimumScale).toBeGreaterThanOrEqual(0.7);
       expect(profile.minimumScale).toBeLessThanOrEqual(0.9);
+      expect(profile.maximumWallDropMeters).toBeGreaterThanOrEqual(0.17);
       expect(response).toMatchObject({
         contract: VIEWMODEL_CONTACT_RESPONSE_CONTRACT,
         profileId: weapon,
@@ -121,12 +122,13 @@ describe('weapon presentation state', () => {
         response.yawRadians,
         response.rollRadians,
         response.additionalLiftMeters,
+        response.additionalDropMeters,
         response.scale,
       ].every(Number.isFinite)).toBe(true);
     }
   });
 
-  it('leaves open-space hip pose neutral and removes contact cant at settled ADS', () => {
+  it('leaves open-space hip pose neutral and retains a bounded contact stow at settled ADS', () => {
     expect(viewmodelContactResponse('carbine', 0, 0, false, 0)).toMatchObject({
       active: false,
       obstructionBlend: 0,
@@ -135,18 +137,20 @@ describe('weapon presentation state', () => {
       yawRadians: 0,
       rollRadians: 0,
       additionalLiftMeters: 0,
+      additionalDropMeters: 0,
       scale: 1,
     });
     const adsContact = viewmodelContactResponse('carbine', 0.7, 0.2, true, 1);
     expect(adsContact).toMatchObject({
       active: true,
-      highReadyBlend: 0,
-      pitchRadians: 0,
-      yawRadians: 0,
-      rollRadians: 0,
       aimAuthority: 'camera-forward-unchanged',
     });
-    expect(adsContact.scale).toBe(1);
-    expect(adsContact.additionalLiftMeters).toBe(0);
+    expect(adsContact.highReadyBlend).toBeGreaterThan(0.4);
+    expect(adsContact.pitchRadians).toBeGreaterThan(0.3);
+    expect(adsContact.yawRadians).toBeLessThan(0);
+    expect(adsContact.rollRadians).toBeGreaterThan(0);
+    expect(adsContact.scale).toBeLessThan(1);
+    expect(adsContact.additionalLiftMeters).toBeGreaterThan(0);
+    expect(adsContact.additionalDropMeters).toBeGreaterThan(0);
   });
 });

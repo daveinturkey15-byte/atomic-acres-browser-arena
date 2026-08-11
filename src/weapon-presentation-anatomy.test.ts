@@ -69,7 +69,9 @@ describe('first-person anatomical presentation', () => {
       cleared.update({ ...REST_POSE, prone: true, surfaceLift: 0.34 });
     }
     expect(cleared.presentationState().surfaceLift).toBeCloseTo(0.34, 8);
-    expect(cleared.root.position.y - baseline.root.position.y).toBeCloseTo(0.34, 3);
+    const floorResponse = viewmodelContactResponse('carbine', 0, 0.34, true, 0);
+    expect(cleared.root.position.y - baseline.root.position.y)
+      .toBeCloseTo(0.34 + floorResponse.additionalLiftMeters, 3);
   });
 
   it('returns to the resolution-stable dynamically centred sight picture in ADS', async () => {
@@ -213,7 +215,7 @@ describe('first-person anatomical presentation', () => {
     const contact = viewmodelContactResponse('minigun', surfaceRetreat, 0, false, 0);
     expect(presentation.root.position.toArray()).toEqual([
       HIP_VIEWMODEL_POSITION.x,
-      HIP_VIEWMODEL_POSITION.y + contact.additionalLiftMeters,
+      HIP_VIEWMODEL_POSITION.y + contact.additionalLiftMeters - contact.additionalDropMeters,
       HIP_VIEWMODEL_POSITION.z + surfaceRetreat - VIEWMODEL_NEAR_PLANE_CLEARANCE
         - authoredNearPlaneContactRetreat('minigun', surfaceRetreat),
     ]);
@@ -316,9 +318,9 @@ describe('first-person anatomical presentation', () => {
       }
       const state = presentation.presentationState();
       expect(state.adsProgress, weapon).toBeGreaterThan(0.999);
-      expect(state.contactResponse.pitchRadians, weapon).toBe(0);
-      expect(state.contactResponse.yawRadians, weapon).toBe(0);
-      expect(state.contactResponse.rollRadians, weapon).toBe(0);
+      expect(state.contactResponse.highReadyBlend, weapon).toBeGreaterThan(0.4);
+      expect(state.contactResponse.pitchRadians, weapon).toBeGreaterThan(0.2);
+      expect(state.contactResponse.additionalDropMeters, weapon).toBeGreaterThan(0.1);
       expect(state.sightOffset?.[0], weapon).toBeCloseTo(0, 3);
       expect(state.sightOffset?.[1], weapon).toBeCloseTo(0, 3);
       expect(state.adsOpaqueSightWindow.acceptance, weapon).toBe(

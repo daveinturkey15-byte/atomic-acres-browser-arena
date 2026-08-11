@@ -81,13 +81,14 @@ test('Pass 70 keeps every catalog viewmodel clear of prone wall/floor contact wi
     const state = await equipSettledContact(page, weapon);
     const presentation = state.weaponPresentation;
     expect(presentation.contactResponse, weapon).toMatchObject({
-      contract: 'catalog-viewmodel-contact-response-v1',
+      contract: 'catalog-viewmodel-contact-response-v2',
       profileId: weapon,
       active: true,
       aimAuthority: 'camera-forward-unchanged',
     });
     expect(presentation.contactResponse.obstructionBlend, weapon).toBeGreaterThan(0.25);
     expect(presentation.contactResponse.pitchRadians, weapon).toBeGreaterThan(0.14);
+    expect(presentation.contactResponse.additionalDropMeters, weapon).toBeGreaterThan(0.04);
     expect(presentation.viewmodelViewport.rootScale, weapon).toBeGreaterThanOrEqual(0.55);
     expect(presentation.viewmodelViewport.rootScale, weapon).toBeCloseTo(
       HIP_VIEWMODEL_SCALE
@@ -110,19 +111,76 @@ test('Pass 70 keeps every catalog viewmodel clear of prone wall/floor contact wi
     await equipSettledContact(page, weapon);
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setAds(true));
     await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().weaponPresentation.adsProgress > 0.999);
+    await page.waitForTimeout(300);
     const state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
-    expect(state.weaponPresentation.contactResponse, weapon).toMatchObject({
-      pitchRadians: 0,
-      yawRadians: 0,
-      rollRadians: 0,
-      scale: 1,
-    });
-    expect(state.weaponPresentation.adsOpaqueSightWindow.accepted, `${weapon}: clear centre aperture`).toBe(true);
+    expect(state.weaponPresentation.contactResponse.highReadyBlend, weapon).toBeGreaterThan(0.2);
+    expect(state.weaponPresentation.contactResponse.pitchRadians, weapon).toBeGreaterThan(0.1);
+    expect(state.weaponPresentation.contactResponse.additionalDropMeters, weapon).toBeGreaterThan(0.04);
+    expect(state.weaponPresentation.contactResponse.scale, weapon).toBeLessThan(1);
+    assertFraming(state.weaponPresentation.weaponFraming, `${weapon}/contact-ads/weapon`);
+    assertFraming(state.weaponPresentation.armFraming, `${weapon}/contact-ads/arms`);
+    expect(state.aimAlignment.errorCssPixels, `${weapon}: retained camera-forward aim`).toBeLessThanOrEqual(1);
+    expect(state.weaponPresentation.contactResponse.aimAuthority, weapon).toBe('camera-forward-unchanged');
     expect(state.weaponPresentation.opticMaterialSemantics.invalidOpticWindowCount, weapon).toBe(0);
     expect(state.weaponPresentation.opticMaterialSemantics.invalidOpaqueBodyCount, weapon).toBe(0);
+  }
+
+  // A contact fold deliberately moves the physical weapon away from its
+  // ordinary sight picture. Re-prove the authored centre aperture separately
+  // in open space so this gate cannot pass by either disabling contact stow or
+  // accepting an opaque scope/iron-sight block.
+  await page.evaluate(() => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    api.setAds(false);
+    api.setStance('stand');
+    api.teleportPlayer(0, 1.7, 8, 0, 0);
+  });
+  // Teleporting invalidates grounded contact for a few frames; the production
+  // stance guard correctly rejects an early stand request, so poll the real
+  // request until the player has settled rather than mutating stance state.
+  await page.waitForTimeout(600);
+  await page.waitForFunction(() => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    if (api.snapshot().player.stance !== 'stand') api.setStance('stand');
+    return api.snapshot().player.stance === 'stand';
+  }, undefined, { timeout: 10_000, polling: 50 });
+  await page.waitForFunction(() => {
+    const presentation = window.__ATOMIC_ACRES_DEBUG__.snapshot().weaponPresentation;
+    return presentation.surfaceRetreat < 0.01 && presentation.contactResponse.active === false;
+  }, undefined, { timeout: 10_000 });
+  for (const weapon of ['carbine', 'mini-uzi'] as const) {
+    await page.evaluate((weaponId) => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      api.equipWeapon(weaponId);
+      api.setAds(true);
+    }, weapon);
+    await page.waitForFunction((weaponId) => {
+      const presentation = window.__ATOMIC_ACRES_DEBUG__.snapshot().weaponPresentation;
+      return presentation.weapon === weaponId && presentation.adsProgress > 0.999;
+    }, weapon);
+    await page.waitForTimeout(300);
+    const state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
+    expect(state.weaponPresentation.contactResponse.active, weapon).toBe(false);
+    expect(state.weaponPresentation.adsOpaqueSightWindow.accepted, `${weapon}: open-space clear centre aperture`).toBe(true);
     expect(state.weaponPresentation.sightOffset[0], weapon).toBeCloseTo(0, 3);
     expect(state.weaponPresentation.sightOffset[1], weapon).toBeCloseTo(0, 3);
   }
+
+  await page.evaluate(({ position, yaw }) => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    api.setAds(false);
+    api.teleportPlayer(position[0], position[1], position[2], yaw, 0);
+  }, CONTACT_FIXTURE);
+  await page.waitForTimeout(600);
+  await page.waitForFunction(() => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    if (api.snapshot().player.stance !== 'prone') api.setStance('prone');
+    return api.snapshot().player.stance === 'prone';
+  }, undefined, { timeout: 10_000, polling: 50 });
+  await page.waitForFunction(() => {
+    const presentation = window.__ATOMIC_ACRES_DEBUG__.snapshot().weaponPresentation;
+    return presentation.surfaceRetreat > 0.25 && presentation.contactResponse.active === true;
+  }, undefined, { timeout: 10_000 });
 
   await page.evaluate(() => {
     const api = window.__ATOMIC_ACRES_DEBUG__;
