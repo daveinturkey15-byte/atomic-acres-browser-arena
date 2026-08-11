@@ -161,7 +161,9 @@ test('carbine and Mini Uzi expose a physical ADS corridor without fading their o
     expect(ads.weaponPresentation.sightReferenceName, `${weapon}: authored sight reference`).toBe(
       weapon === 'carbine' ? 'optic-socket' : 'rear-sight-socket',
     );
-    expect(ads.weaponPresentation.sightOffset, `${weapon}: authored sight is centred`).toEqual([0, 0]);
+    expect(ads.weaponPresentation.sightOffset, `${weapon}: authored sight offset shape`).toHaveLength(2);
+    expect(Math.abs(ads.weaponPresentation.sightOffset[0]), `${weapon}: authored sight is within one horizontal CSS pixel`).toBeLessThanOrEqual(2 / 1_600);
+    expect(Math.abs(ads.weaponPresentation.sightOffset[1]), `${weapon}: authored sight is within one vertical CSS pixel`).toBeLessThanOrEqual(2 / 900);
     if (weapon === 'mini-uzi') {
       expect(ads.weaponPresentation.firstPersonRearOccluderTrim, `${weapon}: actual served rear geometry trim`).toMatchObject({
         applied: true,

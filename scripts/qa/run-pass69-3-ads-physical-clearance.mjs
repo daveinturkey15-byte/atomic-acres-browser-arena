@@ -134,6 +134,10 @@ const weaponsValid = Array.isArray(receipt.weapons)
     return entry?.weapon === weapon
       && materialStateValid(entry.hip?.materials, weapon === 'carbine' ? 1 : 0)
       && entry.ads?.sightReferenceName === (weapon === 'carbine' ? 'optic-socket' : 'rear-sight-socket')
+      && Array.isArray(entry.ads?.sightOffset) && entry.ads.sightOffset.length === 2
+      && entry.ads.sightOffset.every(Number.isFinite)
+      && Math.abs(entry.ads.sightOffset[0]) <= 2 / 1_600
+      && Math.abs(entry.ads.sightOffset[1]) <= 2 / 900
       && (weapon === 'mini-uzi'
         ? entry.ads?.rearOccluderTrim?.applied === true
           && entry.ads.rearOccluderTrim.contract === 'rear-sight-axis-spatial-degenerate-v1'
