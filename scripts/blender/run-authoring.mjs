@@ -55,6 +55,12 @@ function runBlenderPython(script) {
   ]);
 }
 
+function runBlenderFilePython(blend, script) {
+  run(blenderCommand, [
+    '--background', blend, '--python-exit-code', '1', '--python', script,
+  ]);
+}
+
 function assertLfOnly(pathname, label) {
   const bytes = readFileSync(pathname);
   if (bytes.includes(13)) {
@@ -74,54 +80,37 @@ function authorCrossbow() {
 
 function authorOperatorArms() {
   if (!dryRun) mkdirSync('public/assets/original/models/operators', { recursive: true });
-  const raw = 'artifacts/blender-operator-arms/djmaesen-prototype';
+  const raw = 'artifacts/blender-operator-arms/pass70-manual-master';
   const reviews = `${raw}/reviews`;
-  const reviewWeapons = `${raw}/review-weapons`;
-  if (!dryRun) mkdirSync(reviewWeapons, { recursive: true });
-  const weaponSources = {
-    pistol: 'public/assets/original/models/weapons/pass65-firearms/pistol/pistol-fp-lod0.glb',
-    mp5: 'public/assets/original/models/weapons/pass65-firearms/mp5/mp5-fp-lod0.glb',
-    m4a1: 'public/assets/original/models/weapons/pass65-firearms/m4a1/m4a1-fp-lod0.glb',
-    knife: 'public/assets/original/models/weapons/pass65-field-knife/pass65-field-knife-fp-lod0.glb',
-  };
-  for (const [id, source] of Object.entries(weaponSources)) {
-    run(process.execPath, [gltfTransformCli, 'copy', source, `${reviewWeapons}/${id}-uncompressed.glb`]);
-  }
-  runBlenderPython('scripts/blender/build-pass65-djmaesen-first-person-arms.py');
+  runBlenderFilePython(
+    'source-assets/blender/pass69-3-first-person-operator-arms.blend',
+    'scripts/blender/export-pass69-3-first-person-operator-arms.py',
+  );
   if (!dryRun) {
-    assertLfOnly(`${reviews}/weapon-contact-receipt.json`, 'Operator-arms contact receipt');
+    assertLfOnly(
+      `${reviews}/pass69-3-first-person-arms-contact-receipt.json`,
+      'Operator-arms manual-master contact receipt',
+    );
   }
   for (const lod of [0, 1]) optimizeGlb(
     `${raw}/pass65-first-person-arms-lod${lod}.glb`,
     `public/assets/original/models/operators/pass65-first-person-arms-lod${lod}.glb`,
   );
   if (!dryRun) {
-    mkdirSync('public/assets/original/textures/operators/pass65-first-person-arms', { recursive: true });
-    for (const map of ['baseColor', 'normal', 'roughness', 'metallic']) copyFileSync(
-      `${raw}/textures/pass65-first-person-arms-${map}.png`,
-      `public/assets/original/textures/operators/pass65-first-person-arms/pass65-first-person-arms-${map}.png`,
-    );
     copyFileSync(
-      `${raw}/pass65-first-person-arms-djmaesen-prototype.blend`,
-      'source-assets/blender/pass65-first-person-operator-arms.blend',
+      `${reviews}/pass69-3-first-person-arms-contact-receipt.json`,
+      'source-assets/blender/pass69-3-first-person-operator-arms-contact-receipt.json',
     );
-    copyFileSync(
-      `${reviews}/weapon-contact-receipt.json`,
-      'source-assets/blender/pass65-first-person-operator-arms-contact-receipt.json',
-    );
-    mkdirSync('docs/assets/pass65-operators/first-person-arms', { recursive: true });
+    mkdirSync('docs/assets/pass69-3-operators/first-person-arms', { recursive: true });
     for (const label of [
-      'pistol-hip', 'mp5-hip', 'm4a1-hip', 'm4a1-grip-oblique',
-      'm4a1-ads', 'm4a1-reload', 'knife-contact',
+      'neutral-front', 'forearm-wrist-quarter', 'hand-anatomy-closeup',
+      'reload-cuff-flex', 'firing-digit-separation',
     ]) copyFileSync(
-      `${reviews}/pass65-djmaesen-arms-${label}.png`,
-      `docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-${label}.png`,
-    );
-    copyFileSync(
-      `${reviews}/pass65-djmaesen-arms-weapon-contact-sheet.png`,
-      'docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-contact-sheet.png',
+      `${reviews}/pass69-3-first-person-arms-${label}.png`,
+      `docs/assets/pass69-3-operators/first-person-arms/pass69-3-first-person-arms-${label}.png`,
     );
   }
+  run(process.execPath, ['scripts/blender/compose-pass69-3-first-person-arms-review.mjs']);
 }
 
 function authorSupportVehicles() {

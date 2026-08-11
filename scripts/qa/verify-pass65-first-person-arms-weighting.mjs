@@ -20,6 +20,12 @@ const componentMaximum = (accessor) => {
 };
 
 const canonicalPair = (left, right) => [left, right].sort().join(':');
+const REQUIRED_MEANINGFUL_BONES = Object.freeze([
+  ...['L', 'R'].flatMap((side) => [
+    `UpperArm${side}`, `LowerArm${side}`, `Wrist${side}`,
+    `Thumb2${side}`, `Index2${side}`, `Middle2${side}`, `Ring2${side}`, `Pinky2${side}`,
+  ]),
+]);
 
 await MeshoptDecoder.ready;
 const io = new NodeIO()
@@ -32,6 +38,8 @@ for (const delivery of deliveries) {
   const document = await io.read(delivery.path);
   const root = document.getRoot();
   const pairCounts = new Map();
+  const positiveWeightCounts = new Map(REQUIRED_MEANINGFUL_BONES.map((bone) => [bone, 0]));
+  const strongWeightCounts = new Map(REQUIRED_MEANINGFUL_BONES.map((bone) => [bone, 0]));
   let vertices = 0;
   let blendedVertices = 0;
   let normalizedVertices = 0;
@@ -59,7 +67,14 @@ for (const delivery of deliveries) {
           const index = vertex * elementSize + influence;
           const weight = Number(weightArray[index]) / maximum;
           sum += weight;
-          if (weight > 0.05) active.push(joints[Number(jointArray[index])]);
+          const joint = joints[Number(jointArray[index])];
+          if (weight >= 0.05) {
+            active.push(joint);
+            if (positiveWeightCounts.has(joint)) positiveWeightCounts.set(joint, positiveWeightCounts.get(joint) + 1);
+          }
+          if (weight >= 0.20 && strongWeightCounts.has(joint)) {
+            strongWeightCounts.set(joint, strongWeightCounts.get(joint) + 1);
+          }
         }
         if (Math.abs(sum - 1) <= 0.015) normalizedVertices += 1;
         if (active.length >= 2) {
@@ -83,12 +98,22 @@ for (const delivery of deliveries) {
   for (const pair of REQUIRED_ARM_BLEND_PAIRS) {
     if ((pairCounts.get(pair) ?? 0) < 4) failures.push(`${delivery.path}: blended pair ${pair} has fewer than four vertices`);
   }
+  for (const bone of REQUIRED_MEANINGFUL_BONES) {
+    if ((positiveWeightCounts.get(bone) ?? 0) < 4 || (strongWeightCounts.get(bone) ?? 0) < 1) {
+      failures.push(
+        `${delivery.path}: ${bone} lacks meaningful deformation evidence `
+        + `(>=0.05=${positiveWeightCounts.get(bone) ?? 0}, >=0.20=${strongWeightCounts.get(bone) ?? 0})`,
+      );
+    }
+  }
   reports.push(Object.freeze({
     ...delivery,
     vertices,
     blendedVertices,
     blendedRatio: Number(blendedRatio.toFixed(6)),
     normalizedVertices,
+    positiveWeightVertexCounts: Object.fromEntries(positiveWeightCounts),
+    strongWeightVertexCounts: Object.fromEntries(strongWeightCounts),
     requiredPairCounts: Object.fromEntries(REQUIRED_ARM_BLEND_PAIRS.map((pair) => [pair, pairCounts.get(pair) ?? 0])),
   }));
 }

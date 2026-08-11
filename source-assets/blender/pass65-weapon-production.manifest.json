@@ -116,20 +116,20 @@
     "currentRuntimeSource": "public/assets/original/models/operators/pass65-first-person-arms-lod0.glb",
     "placeholderStatus": "forbidden-and-not-present",
     "sourceBlend": {
-      "path": "source-assets/blender/pass65-first-person-operator-arms.blend",
-      "sha256": "cfcdca753520317b110179c675b6196156593dfc209ca4b7ea9ced8e7f3e17fa"
+      "path": "source-assets/blender/pass69-3-first-person-operator-arms.blend",
+      "sha256": "936348c930d6132bd97da4ba557349bd7f13b9c57362e37e831ee45c019ff27c"
     },
     "sourceScript": {
-      "path": "scripts/blender/build-pass65-djmaesen-first-person-arms.py",
-      "sha256": "ea5a42f332a7fbf44f922ee5f2526e46ffa3e520491e9dfe754778dadbd0bc0f"
+      "path": "scripts/blender/export-pass69-3-first-person-operator-arms.py",
+      "sha256": "6b7303c620bf532c2c0d386fac80d77729aa5529d5ca416d8e17437766748438"
     },
     "firstPersonGlbs": [
       {
         "path": "public/assets/original/models/operators/pass65-first-person-arms-lod0.glb",
-        "sha256": "953a113e4cfd1f79f0394a7e8b1c601590edc85be52906eb5397e7291ab5a707",
+        "sha256": "ff4db4971cab4ca8bca20941ad090eb12b3d94b21b6e981904895e19f15885a6",
         "lod": 0,
-        "triangles": 7207,
-        "bytes": 406008,
+        "triangles": 9744,
+        "bytes": 343572,
         "skinnedMeshNodes": 4,
         "renderPrimitives": 4,
         "skins": 4,
@@ -141,16 +141,16 @@
       },
       {
         "path": "public/assets/original/models/operators/pass65-first-person-arms-lod1.glb",
-        "sha256": "addd8e4da4dc4659a6b84ece3a084360c495cfd1876b6f68dcccc058346bfaa0",
+        "sha256": "9672274b3832d5021ec069791a91bb75127e465088ca992b997e99a8c86fd04c",
         "lod": 1,
-        "triangles": 5039,
-        "bytes": 387520,
+        "triangles": 7703,
+        "bytes": 327824,
         "skinnedMeshNodes": 4,
         "renderPrimitives": 4,
         "skins": 4,
         "sourceWeightedParts": 16,
         "bones": 37,
-        "blendedVertexCount": 2281,
+        "blendedVertexCount": 3197,
         "multiBoneWeightedParts": 4,
         "knifeSocketParent": "WristR"
       }
@@ -158,7 +158,7 @@
     "pbrMaps": {
       "baseColor": {
         "path": "public/assets/original/textures/operators/pass65-first-person-arms/pass65-first-person-arms-baseColor.png",
-        "sha256": "31525a7731899098f1142756cb503f14e7af6930165c3035ba812ab25b5680ea",
+        "sha256": "079a08dd975d6ae93e6d70b7423a165b0991608ed630cae47bf91cf012939b5d",
         "width": 1024,
         "height": 1024
       },
@@ -182,8 +182,8 @@
       }
     },
     "provenance": {
-      "path": "source-assets/blender/pass65-first-person-operator-arms.provenance.json",
-      "sha256": "95d33318fa868d3c962d5fb0ca7984864ef4b01dd0f55d9e50adde1f36fd0628"
+      "path": "source-assets/blender/pass69-3-first-person-operator-arms.provenance.json",
+      "sha256": "8cb3ac8cd482c2caae40f43e8d678535a1e7092248081b754db776f1866596d7"
     },
     "bones": [
       "Root",
@@ -228,7 +228,9 @@
       "right-hand-grip-socket",
       "left-hand-grip-socket",
       "right-wrist-knife-socket",
-      "left-hand-grenade-socket"
+      "left-hand-grenade-socket",
+      "right-palm-contact",
+      "left-palm-contact"
     ],
     "actions": [
       "equip",
@@ -246,13 +248,16 @@
       "inspect"
     ],
     "materialContract": "opaque-depth-writing",
-    "visualRevision": "licensed-anatomical-viewmodel-v8",
-    "limbProfileContract": "hero-scale-connected-forearm-deformation-v2",
-    "handPoseContract": "licensed-articulated-weapon-and-knife-grip-v2",
+    "materialContrastContract": "owned-basecolor-contrast-retone-v1",
+    "visualRevision": "pass70-manual-anatomical-viewmodel-v1",
+    "limbProfileContract": "manual-continuous-cuff-forearm-deformation-v1",
+    "handPoseContract": "manual-separated-articulated-digit-contact-v1",
     "shoulderEntryContract": "weighted-capped-fps-frame-edge-sleeve-v2",
-    "gloveConstructionContract": "opaque-uv-preserved-scaled-anatomical-hand-v2",
+    "gloveConstructionContract": "opaque-manual-cuff-palm-digit-continuity-v1",
+    "palmContactContract": "authored-wrist-parented-full-transform-v1",
     "weaponGripReviewContract": "seven-view-actual-weapon-contact-v2",
-    "weightingContract": "adjacent-bone-normalized-blend-v5",
+    "weightingContract": "manual-adjacent-joint-normalized-blend-v1",
+    "manualMasterContract": "checked-in-editable-blend-export-only-v1",
     "runtimeAnimationContract": "authored-fingers-under-runtime-chain-ik-v1",
     "fingerSegmentCount": 30,
     "weaponGripReviewFrames": 7,
@@ -266,72 +271,58 @@
     "review": {
       "renders": [
         {
-          "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-pistol-hip.png",
-          "sha256": "e6aa9182b1b9000391748e1f2bcc03f131449260b83800232b41897599e9a35b",
-          "width": 960,
-          "height": 540,
-          "cameraId": "pistol-hip"
+          "path": "docs/assets/pass69-3-operators/first-person-arms/pass69-3-first-person-arms-neutral-front.png",
+          "sha256": "17caf75ead2f9046ce17e00da8ab6fae8085cab3d6445f768143f868633536ca",
+          "width": 800,
+          "height": 800,
+          "cameraId": "neutral-front"
         },
         {
-          "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-mp5-hip.png",
-          "sha256": "c76cc949ff178b25a295062d179b78153b9b50d291be8fc0c30ce94270804995",
-          "width": 960,
-          "height": 540,
-          "cameraId": "mp5-hip"
+          "path": "docs/assets/pass69-3-operators/first-person-arms/pass69-3-first-person-arms-forearm-wrist-quarter.png",
+          "sha256": "cc12fff9d6421960c1cb8f4268a765d6a01790bedfa2e52db92aef3d703cebc1",
+          "width": 800,
+          "height": 800,
+          "cameraId": "forearm-wrist-quarter"
         },
         {
-          "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-m4a1-hip.png",
-          "sha256": "a85c06301ea7d7ad2caa1875b271e38b551517dadb91b31fc0e17edf475ad77d",
-          "width": 960,
-          "height": 540,
-          "cameraId": "m4a1-hip"
+          "path": "docs/assets/pass69-3-operators/first-person-arms/pass69-3-first-person-arms-hand-anatomy-closeup.png",
+          "sha256": "d979db84ec2f0c88d4c08f2520d0766b00ba9c86958817ccf945a1c70db608c8",
+          "width": 800,
+          "height": 800,
+          "cameraId": "hand-anatomy-closeup"
         },
         {
-          "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-m4a1-grip-oblique.png",
-          "sha256": "4df6070546f79ca80bc3993c7fd303cf5abbb68a3a2e065ad4737c9fbfdfb331",
-          "width": 960,
-          "height": 540,
-          "cameraId": "m4a1-grip-oblique"
+          "path": "docs/assets/pass69-3-operators/first-person-arms/pass69-3-first-person-arms-reload-cuff-flex.png",
+          "sha256": "9baae6c655f17fe360b49295f026a0f377f6ba82ae88655a2fc22e7e8f3ac224",
+          "width": 800,
+          "height": 800,
+          "cameraId": "reload-cuff-flex"
         },
         {
-          "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-m4a1-ads.png",
-          "sha256": "d67f1c1ef154f1cccab92eab107687e38cedd8731c47bdd7db49b5abc722ce8b",
-          "width": 960,
-          "height": 540,
-          "cameraId": "m4a1-ads"
-        },
-        {
-          "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-m4a1-reload.png",
-          "sha256": "46ce0015f4117d2211d445dd9344389054257b73d52e9ad66c6caea4431354d3",
-          "width": 960,
-          "height": 540,
-          "cameraId": "m4a1-reload"
-        },
-        {
-          "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-knife-contact.png",
-          "sha256": "a43e119e1d4b361e2545c14e278728f49692723dd622c1800ba98ae29d894b98",
-          "width": 960,
-          "height": 540,
-          "cameraId": "knife-contact"
+          "path": "docs/assets/pass69-3-operators/first-person-arms/pass69-3-first-person-arms-firing-digit-separation.png",
+          "sha256": "8ea4045b9243ee861e773723c6caf1bd9282e22302ee0188fc3e10d66994f4ff",
+          "width": 800,
+          "height": 800,
+          "cameraId": "firing-digit-separation"
         }
       ],
       "contactSheet": {
-        "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-contact-sheet.png",
-        "sha256": "79ad8efe7eb9428b0c5b0baa378e2634a34e221f2ce1a4f593e256784be4cf7f",
-        "width": 2880,
-        "height": 1620
+        "path": "docs/assets/pass69-3-operators/first-person-arms/pass69-3-first-person-arms-review-sheet.png",
+        "sha256": "6baf43c2c606ea4051d15a0c6664919bed4374f7c3a6513832e3fed391ecacf2",
+        "width": 2400,
+        "height": 1708
       },
       "contactReceipt": {
-        "path": "source-assets/blender/pass65-first-person-operator-arms-contact-receipt.json",
-        "sha256": "f6bc60dd5c55f8cb775180ecb0c2785bc302be44c3d4be5d52ea90d14f738bfb"
+        "path": "source-assets/blender/pass69-3-first-person-operator-arms-contact-receipt.json",
+        "sha256": "e64280cb3c84d390d7bb23d27037b551cc959f2ad48c53f4147f8bcc0a35fb0b"
       }
     },
     "technicalAudit": {
       "lods": [
         {
           "lod": 0,
-          "triangles": 7207,
-          "bytes": 406008,
+          "triangles": 9744,
+          "bytes": 343572,
           "meshNodes": 4,
           "skinnedMeshNodes": 4,
           "renderPrimitives": 4,
@@ -444,8 +435,8 @@
         },
         {
           "lod": 1,
-          "triangles": 5039,
-          "bytes": 387520,
+          "triangles": 7703,
+          "bytes": 327824,
           "meshNodes": 4,
           "skinnedMeshNodes": 4,
           "renderPrimitives": 4,
@@ -479,7 +470,7 @@
               "leftContacts": 212
             }
           },
-          "blendedVertexCount": 2281,
+          "blendedVertexCount": 3197,
           "multiBoneWeightedParts": 4,
           "blendedJointPairs": [
             "Index1L:Index2L",
@@ -500,6 +491,7 @@
             "LowerArmL:Pinky1L",
             "LowerArmL:Ring1L",
             "LowerArmL:Thumb1L",
+            "LowerArmL:Thumb2L",
             "LowerArmL:UpperArmL",
             "LowerArmL:WristL",
             "LowerArmR:Middle1R",
@@ -534,6 +526,7 @@
             "Ring1L:Ring2L",
             "Ring1L:WristL",
             "Ring1R:Ring2R",
+            "Ring1R:Ring3R",
             "Ring1R:WristR",
             "Ring2L:Ring3L",
             "Ring2L:WristL",
@@ -549,7 +542,8 @@
             "Thumb2L:WristL",
             "Thumb2R:Thumb3R",
             "Thumb2R:WristR",
-            "Thumb3L:WristL"
+            "Thumb3L:WristL",
+            "Thumb3R:WristR"
           ],
           "knifeSocketParent": "WristR"
         }
