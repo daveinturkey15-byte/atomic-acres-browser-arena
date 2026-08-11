@@ -332,11 +332,23 @@
     box-shadow: inset 4px 0 var(--p66-cyan), var(--p66-card-shadow);
   }
   .kit-card > span { color: #587074; font-size: 10px; }
+  .kit-card > span:first-child { min-height: 24px; padding-right: 112px; overflow-wrap: anywhere; }
   .kit-card > strong { margin-top: 7px; color: var(--p66-ink); font-size: 27px; }
   .kit-card > b { margin-top: 7px; color: var(--p66-amber); font-size: 11px; }
   .kit-card p { margin: 9px 0; color: var(--p66-muted); font-size: 12px; line-height: 1.42; }
   .kit-card > i { color: #667a7d; font-size: 10px; }
-  .kit-card em { color: var(--p66-cyan); font-size: 10px; }
+  .kit-card em {
+    padding: 6px 9px;
+    border: 1px solid var(--p66-cyan);
+    border-radius: 999px;
+    background: #0d4144;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    box-shadow: 0 4px 12px rgba(0, 36, 40, 0.28);
+  }
+  .kit-card.selected em { display: inline-flex; align-items: center; }
 
   .kit-stat-strip { display: grid; gap: 9px; margin: 12px 0 12px; }
   .kit-stat-strip span { display: grid; grid-template-columns: 76px 1fr 26px; align-items: center; gap: 10px; }
@@ -463,22 +475,34 @@
   .loadout-manager-grid select,
   .loadout-manager-grid button { min-height: 44px; border-radius: 4px; font-size: 14px; }
   .loadout-manager-grid button { grid-column: 1 / -1; border-color: var(--p66-cyan-bright); background: #006d74; color: #fff; }
+  .loadout-save-status {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding: 10px 12px;
+    border-left: 3px solid var(--p66-cyan-bright);
+    background: rgba(82, 238, 243, 0.09);
+    color: #e9fbfa;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1.45;
+    letter-spacing: 0.04em;
+  }
+  .loadout-save-status[data-kind='error'] {
+    border-left-color: #ff7c72;
+    background: rgba(255, 79, 68, 0.13);
+    color: #fff1ef;
+  }
 
   .loadout-inspector {
+    min-width: 0;
     padding: 22px;
     border: 1px solid rgba(82, 238, 243, 0.32);
     border-radius: 5px;
     background: #0e1e21;
   }
-  .loadout-inspector small { color: #82aaa8; font-size: 12px; letter-spacing: 0.08em; }
-  .loadout-inspector strong { display: block; margin-top: 6px; color: #fff; font: 800 34px/1 var(--ui-display); }
-  .loadout-inspector span { display: block; margin-top: 7px; color: var(--p66-cyan-bright); font-size: 14px; }
-  .loadout-inspector-stats { display: grid; gap: 14px; margin: 20px 0; }
-  .loadout-inspector-stats > div { display: grid; grid-template-columns: 104px 1fr; align-items: center; gap: 12px; }
-  .loadout-inspector-stats dt { color: #b6cbca; font-size: 13px; letter-spacing: 0.04em; }
-  .loadout-inspector-stats dd { display: grid; grid-template-columns: 1fr 84px; align-items: center; gap: 10px; margin: 0; }
-  .loadout-inspector-stats dd i { height: 10px; border-radius: 5px; background: linear-gradient(90deg, var(--p66-cyan-bright) var(--loadout-stat, 50%), #294347 var(--loadout-stat, 50%)); }
-  .loadout-inspector-stats dd b { color: #fff; font-size: 15px; font-weight: 800; text-align: right; }
+  .loadout-inspector .weapon-menu-stat-deck { gap: 13px; }
+  .loadout-inspector .weapon-menu-stat-heading > b { font-size: clamp(24px, 2vw, 34px); }
+  .loadout-inspector .weapon-menu-dps > strong { font-size: clamp(38px, 3vw, 52px); }
   .loadout-inspector > p[data-loadout-grenade-detail] { margin: 0; padding-top: 12px; border-top: 1px solid #2b4548; color: #e9bb72; font-size: 12px; line-height: 1.5; }
 
   #menu-panel-streaks { min-height: 100%; }
@@ -802,6 +826,8 @@
     .custom-kit-grid,
     .killstreak-slot-grid,
     .loadout-manager-grid { grid-template-columns: 1fr; }
+    .loadout-manager,
+    .loadout-inspector { padding: 14px; }
     .kit-heading { align-items: start; flex-direction: column; }
     .kit-heading small { text-align: left; }
     .map-card-grid { grid-template-columns: 1fr; }

@@ -2323,6 +2323,37 @@
       "visualArtifactPaths": ["artifacts/pass66/ui-correction"]
     },
     {
+      "id": "T-PASS70-FIELD-KIT-UNIT",
+      "command": "npx vitest run src/ui/field-kit-weapon-presentation.test.ts src/ui/pass64-shell.test.ts src/ui/pass66-readability.test.ts src/ui/pass66-overhaul.test.ts src/ui/pass70-field-kit-runtime-integration.test.ts",
+      "paths": [
+        "src/ui/field-kit-weapon-presentation.ts",
+        "src/ui/field-kit-weapon-presentation.test.ts",
+        "src/ui/pass64-shell.ts",
+        "src/ui/pass64-shell.test.ts",
+        "src/ui/pass66-readability.css",
+        "src/ui/pass66-readability.test.ts",
+        "src/ui/pass66-overhaul.css",
+        "src/ui/pass66-overhaul.test.ts",
+        "src/ui/pass70-field-kit-runtime-integration.test.ts"
+      ],
+      "evidenceKinds": ["unit", "contract"]
+    },
+    {
+      "id": "T-PASS70-FIELD-KIT-BROWSER",
+      "command": "npm run qa:playwright-topology -- tests/e2e/pass66-field-kit-killstreak-menu.spec.ts tests/e2e/pass70-field-kit-mobile.spec.ts --project=chromium --workers=1 --retries=0",
+      "paths": [
+        "src/legacy-main.ts",
+        "src/ui/field-kit-weapon-presentation.ts",
+        "src/ui/pass64-shell.ts",
+        "src/ui/pass66-readability.css",
+        "src/ui/pass66-overhaul.css",
+        "tests/e2e/pass66-field-kit-killstreak-menu.spec.ts",
+        "tests/e2e/pass70-field-kit-mobile.spec.ts"
+      ],
+      "evidenceKinds": ["browser", "visual"],
+      "visualArtifactPaths": ["artifacts/pass66/ui-correction", "artifacts/pass70/field-kit-ui"]
+    },
+    {
       "id": "T-RUSTRIG-PHYSICS",
       "command": "npm run qa:playwright-topology -- tests/e2e/rustworks-refinement.spec.ts --project=chromium --workers=1 --retries=0",
       "paths": [
@@ -7371,9 +7402,9 @@
     {"id":"HF-246","sourceOutcomeIds":["CORR-HF-246","P70AUG10-025"],"planningRequirementIds":["R105","R108","R223","R232","R236","R608"],"canonicalOwner":"Crossbow optic/projectile presentation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-WEAPON-PRESENTATION","T-SCOPED-ADS","T-TIMED-MAP-WEAPONS"],"artifactRefs":[]}},
     {"id":"HF-247","sourceOutcomeIds":["CORR-HF-247","P70AUG10-027"],"planningRequirementIds":["R108","R506","R600","R608","R609"],"canonicalOwner":"Drone Swarm identity/presentation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-SUPPORT-VEHICLE-GATE","T-SUPPORT-VISUAL-E2E","T-PROVENANCE"],"artifactRefs":[]}},
     {"id":"HF-248","sourceOutcomeIds":["CORR-HF-248","P70AUG10-028"],"planningRequirementIds":["R111","R307","R400","R401","R402","R403","R404","R405","R406","R407","R408","R409","R410","R411","R412","R413","R608","R610"],"canonicalOwner":"Glass debris physics/presentation","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-DESTRUCTIBLE","T-PASS69-3-GLASS-M14-HITCH","T-RUSTRIG-PHYSICS","T-COLD-WEBGPU-ADMISSION","T-NATIVE-FRAME-PACING"],"artifactRefs":[]}},
-    {"id":"HF-249","sourceOutcomeIds":["CORR-HF-249","P70AUG10-030","P70AUG10-031","P70AUG10-032"],"planningRequirementIds":["R108","R200","R201","R202","R203","R204","R205","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R600","R608","R609"],"canonicalOwner":"Loadout UI/combat-registry projection","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-FIELD-KIT-MENU","T-HUD-E2E","T-HUD-UNIT","T-WEAPON-CATALOG","T-PERSISTENCE"],"artifactRefs":[]}},
-    {"id":"HF-250","sourceOutcomeIds":["CORR-HF-250","P70AUG10-033"],"planningRequirementIds":["R200","R201","R202","R203","R204","R205","R600","R609"],"canonicalOwner":"Loadout selection/readability","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-FIELD-KIT-MENU","T-HUD-E2E","T-HUD-UNIT","T-PERSISTENCE"],"artifactRefs":[]}},
-    {"id":"HF-251","sourceOutcomeIds":["CORR-HF-251","P70AUG10-034"],"planningRequirementIds":["R201","R202","R205","R306","R600","R609"],"canonicalOwner":"Loadout persistence/UI lifecycle","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-FIELD-KIT-MENU","T-HUD-E2E","T-HUD-UNIT","T-PERSISTENCE"],"artifactRefs":[]}},
+    {"id":"HF-249","sourceOutcomeIds":["CORR-HF-249","P70AUG10-030","P70AUG10-031","P70AUG10-032"],"planningRequirementIds":["R108","R200","R201","R202","R203","R204","R205","R220","R221","R222","R223","R224","R225","R226","R227","R228","R229","R230","R231","R232","R600","R608","R609"],"canonicalOwner":"Loadout UI/combat-registry projection","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-FIELD-KIT-MENU","T-PASS70-FIELD-KIT-UNIT","T-PASS70-FIELD-KIT-BROWSER","T-HUD-E2E","T-HUD-UNIT","T-WEAPON-CATALOG","T-PERSISTENCE"],"artifactRefs":[]}},
+    {"id":"HF-250","sourceOutcomeIds":["CORR-HF-250","P70AUG10-033"],"planningRequirementIds":["R200","R201","R202","R203","R204","R205","R600","R609"],"canonicalOwner":"Loadout selection/readability","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-FIELD-KIT-MENU","T-PASS70-FIELD-KIT-UNIT","T-PASS70-FIELD-KIT-BROWSER","T-HUD-E2E","T-HUD-UNIT","T-PERSISTENCE"],"artifactRefs":[]}},
+    {"id":"HF-251","sourceOutcomeIds":["CORR-HF-251","P70AUG10-034"],"planningRequirementIds":["R201","R202","R205","R306","R600","R609"],"canonicalOwner":"Loadout persistence/UI lifecycle","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-FIELD-KIT-MENU","T-PASS70-FIELD-KIT-UNIT","T-PASS70-FIELD-KIT-BROWSER","T-HUD-E2E","T-HUD-UNIT","T-PERSISTENCE"],"artifactRefs":[]}},
     {"id":"HF-252","sourceOutcomeIds":["CORR-HF-252","P70AUG10-001","P70AUG10-002"],"planningRequirementIds":["R001","R002","R003","R005","R006","R010","R303","R600","R608","R611","R612","R613"],"canonicalOwner":"Release identity/lineage","ownerSource":"SRC-CORRECTION-LEDGER-001","verification":{"coverage":"partial","testRefs":["T-RELEASE-SHELL","T-OWNER-GATE","T-PASS70-START-BENCHMARK"],"artifactRefs":[]}}
   ],
   "desktopUntitledOutcomes": [

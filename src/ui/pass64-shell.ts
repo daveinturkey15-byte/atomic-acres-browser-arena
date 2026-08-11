@@ -14,7 +14,7 @@ import { PASS66_RELEASE_IDENTITY } from '../release-identity';
 import { advancedGraphicsMarkup } from './advanced-graphics-controls';
 import './advanced-graphics.css';
 import { menuPreviewVideoDefinition, menuPreviewVideoMarkup } from './menu-preview-video';
-import { weaponMenuPresentationMarkup } from './field-kit-weapon-presentation';
+import { weaponMenuPresentationMarkup, weaponMenuStatDeckMarkup } from './field-kit-weapon-presentation';
 
 export type Pass64ShellViewModel = Readonly<{
   playerName: string;
@@ -46,13 +46,13 @@ function mapCardsMarkup(): string {
 }
 
 function fieldKitCardsMarkup(): string {
-  return FIELD_KITS.map((kit) => `<button type="button" class="kit-card" data-kit-id="${kit.id}">
+  return FIELD_KITS.map((kit) => `<button type="button" class="kit-card" data-kit-id="${kit.id}" aria-pressed="false">
     <span>${kit.role}</span>
     <strong>${kit.title}</strong>
     <b>${WEAPONS[kit.weapon].name} · ${WEAPONS[kit.sidearm].name}</b>
     <p>${kit.summary}</p>
     ${weaponMenuPresentationMarkup(kit.weapon)}
-    <em>SELECTED</em>
+    <em aria-hidden="true">✓ SELECTED</em>
   </button>`).join('');
 }
 
@@ -65,7 +65,7 @@ function customPresetCardsMarkup(): string {
     <p>Persistent operator-defined equipment. Changes queue safely for the next deployment.</p>
     <i>1 primary · 1 secondary · 1 grenade</i>
     ${weaponMenuPresentationMarkup(defaultPrimaryIds[index - 1]!)}
-    <em>SELECTED</em>
+    <em aria-hidden="true">✓ SELECTED</em>
     <span class="kit-modify-row"><small>RENAME / MODIFY</small><b data-custom-modify="custom-${index}" aria-controls="loadout-manager">EDIT</b></span>
   </button>`).join('');
   return cards;
@@ -170,16 +170,10 @@ function fieldKitPanelMarkup(): string {
         <label>SECONDARY<select id="loadout-secondary">${weaponOptionsMarkup('secondary')}</select></label>
         <label>GRENADE<select id="loadout-grenade">${grenadeOptionsMarkup()}</select></label>
         <button id="loadout-save" type="button">SAVE LOADOUT</button>
+        <p id="loadout-save-status" class="loadout-save-status" role="status" aria-live="polite" hidden></p>
       </div>
       <aside id="loadout-inspector" class="loadout-inspector" aria-live="polite">
-        <div><small>PRIMARY WEAPON</small><strong data-loadout-inspector-name>HK416</strong><span data-loadout-inspector-meta>AUTOMATIC / 650 RPM</span></div>
-        <dl class="loadout-inspector-stats">
-          <div class="loadout-inspector-dps"><dt>DPS</dt><dd><i data-loadout-stat="dps"></i><b data-loadout-value="dps">336</b></dd></div>
-          <div><dt>DAMAGE</dt><dd><i data-loadout-stat="damage"></i><b data-loadout-value="damage">31</b></dd></div>
-          <div><dt>FIRE RATE</dt><dd><i data-loadout-stat="fire-rate"></i><b data-loadout-value="fire-rate">650</b></dd></div>
-          <div><dt>RANGE</dt><dd><i data-loadout-stat="range"></i><b data-loadout-value="range">72m</b></dd></div>
-          <div><dt>CONTROL</dt><dd><i data-loadout-stat="control"></i><b data-loadout-value="control">72</b></dd></div>
-        </dl>
+        ${weaponMenuStatDeckMarkup('m4a1')}
         <p data-loadout-grenade-detail>FRAG / TIMED EXPLOSIVE / ONE CARRIED</p>
       </aside>
       </div>

@@ -45,7 +45,10 @@ describe('Pass 66 dense-surface readability contract', () => {
 
   it('keeps Field Kit metrics and the killstreak demo rail responsive and motion-safe', () => {
     expect(css).toContain('.weapon-menu-presentation');
-    expect(css).toContain('.weapon-menu-metric[data-weapon-metric=\'recoil-load\']');
+    expect(css).toContain('.weapon-menu-dps');
+    expect(css).toContain('font: 900 clamp(30px, 2.2vw, 42px)');
+    expect(css).toContain('grid-template-columns: minmax(102px, 1fr) minmax(72px, auto)');
+    expect(css).toContain('overflow-wrap: anywhere');
     expect(css).toContain('.killstreak-loadout-layout');
     expect(css).toContain('.killstreak-demo-rail[data-motion=\'poster\']');
     expect(css).toContain('@media (prefers-reduced-motion: reduce)');

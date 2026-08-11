@@ -51,7 +51,13 @@ describe('Pass 66 command shell', () => {
     expect(markup).toContain('<option value="flash">Flashbang</option>');
     expect(markup).toContain('<option value="semtex">Semtex</option>');
     expect(markup.match(/data-weapon-presentation/g)).toHaveLength(7);
-    expect(markup.match(/data-weapon-metric="damage"/g)).toHaveLength(7);
+    expect(markup.match(/data-weapon-dps(?:\s|>)/g)).toHaveLength(8);
+    expect(markup.match(/data-weapon-metric="damage"/g)).toHaveLength(8);
+    expect(markup.match(/data-weapon-metric="piercing"/g)).toHaveLength(8);
+    expect(markup.match(/data-weapon-metric=/g)).toHaveLength(40);
+    expect(markup).not.toContain('data-loadout-stat="dps"');
+    expect(markup).toContain('id="loadout-save-status"');
+    expect(markup.match(/✓ SELECTED/g)).toHaveLength(7);
     expect(markup).toContain('pass65-firearms/carbine-hero-quarter.webp');
     expect(markup).toContain('pass65-firearms/m4a1-hero-quarter.webp');
   });

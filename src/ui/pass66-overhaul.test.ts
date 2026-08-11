@@ -25,16 +25,14 @@ describe('Pass 66 tactical UI overhaul', () => {
       'loadout-secondary', 'loadout-grenade', 'loadout-save', 'loadout-inspector',
       'graphics-profile', 'advanced-graphics', 'audio-settings', 'support-block',
     ]) expect(markup).toContain(`id="${id}"`);
-    // Exactly one canonical stat deck per card: the weapon-menu CATALOG
-    // BALLISTICS deck. The older real-stat strip was removed as a duplicate.
+    // Every card and the manager use one canonical CATALOG BALLISTICS deck.
+    // DPS is a standalone value; only the five owner-requested metrics have bars.
     expect(markup).not.toContain('class="kit-stat-strip kit-stat-strip-real"');
     expect(markup).not.toContain('class="kit-dps"');
-    expect(markup).toContain('data-weapon-metric="cyclic-dps"');
-    expect(markup.match(/data-loadout-stat=/gu)).toHaveLength(5);
-    expect(markup).toContain('data-loadout-stat="damage"');
-    expect(markup).toContain('data-loadout-stat="dps"');
-    expect(markup).not.toContain('data-loadout-stat="wallbang"');
-    expect(markup).toContain('loadout-inspector-dps');
+    expect(markup.match(/data-weapon-dps(?:\s|>)/gu)).toHaveLength(8);
+    expect(markup.match(/data-weapon-metric=/gu)).toHaveLength(40);
+    expect(markup).toContain('data-weapon-metric="piercing"');
+    expect(markup).not.toContain('data-loadout-stat=');
     expect(markup).toContain('data-loadout-grenade-detail');
     // The shell no longer emits the retired kit-stat-strip. The final cascade
     // must therefore leave the canonical asset + metric deck visible.
@@ -42,7 +40,8 @@ describe('Pass 66 tactical UI overhaul', () => {
     expect(css).not.toContain('.kit-card .weapon-menu-presentation { display: block; }');
     expect(css).toContain('.custom-kit-grid .kit-card:not(.manage-kit-card)');
     expect(css).toContain('background: linear-gradient(150deg, #16302f, #0d1e20)');
-    expect(css).toContain('.custom-kit-grid .kit-card:not(.manage-kit-card) .kit-stat-strip small { color: #e8f4f2; }');
+    expect(css).toContain('.kit-card.selected em { display: inline-flex; align-items: center; }');
+    expect(css).toContain('.loadout-save-status[data-kind=\'error\']');
   });
 
   it('adds a sticky killstreak demo rail and minimal video cockpit symbology', () => {

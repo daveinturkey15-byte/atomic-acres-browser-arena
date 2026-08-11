@@ -7667,6 +7667,7 @@ let loadoutState: LoadoutStorageV2 = playerProfileStore.current.loadout;
 let managedPresetId: LoadoutPresetId = loadoutState.selected.kind === 'custom'
   ? loadoutState.selected.presetId
   : 'custom-1';
+let loadoutSaveInFlight = false;
 
 type CombatLoadoutSelection = Readonly<{
   primary: PrimaryWeaponId;
@@ -7775,6 +7776,14 @@ function renderCustomLoadoutEditor(): void {
   renderLoadoutInspector();
 }
 
+function setLoadoutSaveStatus(text = '', kind: 'ok' | 'error' = 'ok'): void {
+  const status = document.querySelector<HTMLElement>('#loadout-save-status');
+  if (!status) return;
+  status.textContent = text;
+  status.dataset.kind = kind;
+  status.hidden = text.length === 0;
+}
+
 function renderLoadoutInspector(): void {
   const inspector = document.querySelector<HTMLElement>('#loadout-inspector');
   const primarySelect = document.querySelector<HTMLSelectElement>('#loadout-primary');
@@ -7783,25 +7792,7 @@ function renderLoadoutInspector(): void {
   const weapon = WEAPON_CATALOG.find((definition) => definition.id === primarySelect.value);
   if (!weapon) return;
   inspector.dataset.weapon = weapon.id;
-  const name = inspector.querySelector<HTMLElement>('[data-loadout-inspector-name]');
-  const meta = inspector.querySelector<HTMLElement>('[data-loadout-inspector-meta]');
-  if (name) name.textContent = weapon.displayName.toUpperCase();
-  if (meta) meta.textContent = `${weapon.fireMode.toUpperCase()} / ${weapon.rpm} RPM / ${weapon.penetration.calibreLabel.toUpperCase()}`;
-  const control = Math.round(Math.max(8, Math.min(100, 100 - (weapon.recoil.pitchRadians + weapon.recoil.yawRadians) * 760)));
-  const cyclicDps = weapon.damage.base * weapon.pellets * weapon.rpm / 60;
-  const stats = {
-    dps: { value: String(Math.round(cyclicDps)), percent: Math.min(100, cyclicDps / 12) },
-    damage: { value: String(Math.round(weapon.damage.base * weapon.pellets)), percent: Math.min(100, weapon.damage.base * weapon.pellets) },
-    'fire-rate': { value: String(weapon.rpm), percent: Math.min(100, weapon.rpm / 12) },
-    range: { value: `${weapon.damage.falloffEndM}m`, percent: Math.min(100, weapon.damage.falloffEndM / 1.2) },
-    control: { value: String(control), percent: control },
-  } as const;
-  for (const [id, stat] of Object.entries(stats)) {
-    const bar = inspector.querySelector<HTMLElement>(`[data-loadout-stat="${id}"]`);
-    const value = inspector.querySelector<HTMLElement>(`[data-loadout-value="${id}"]`);
-    bar?.style.setProperty('--loadout-stat', `${stat.percent}%`);
-    if (value) value.textContent = stat.value;
-  }
+  applyWeaponMenuPresentation(inspector, weapon.id as WeaponId);
 
   const grenadeDetail = inspector.querySelector<HTMLElement>('[data-loadout-grenade-detail]');
   if (grenadeDetail) {
@@ -7813,6 +7804,13 @@ function renderLoadoutInspector(): void {
     };
     grenadeDetail.textContent = `${profiles[grenadeSelect.value] ?? grenadeSelect.value.toUpperCase()} / ONE CARRIED`;
   }
+}
+
+function applyLoadoutCardSelection(card: HTMLButtonElement, selected: boolean): void {
+  card.classList.toggle('selected', selected);
+  card.setAttribute('aria-pressed', String(selected));
+  if (selected) card.setAttribute('aria-current', 'true');
+  else card.removeAttribute('aria-current');
 }
 
 function renderFieldKitSelection(): void {
@@ -7847,15 +7845,13 @@ function renderFieldKitSelection(): void {
   summary.replaceChildren(status, title, equipment);
   document.querySelectorAll<HTMLButtonElement>('[data-kit-id]').forEach((card) => {
     const selected = loadoutState.selected.kind === 'curated' && card.dataset.kitId === loadoutState.selected.kitId;
-    card.classList.toggle('selected', selected);
-    card.setAttribute('aria-pressed', String(selected));
+    applyLoadoutCardSelection(card, selected);
   });
   document.querySelectorAll<HTMLButtonElement>('[data-custom-preset-id]').forEach((card) => {
     const presetId = card.dataset.customPresetId as LoadoutPresetId;
     const preset = loadoutState.customPresets.find((entry) => entry.id === presetId);
     const selected = loadoutState.selected.kind === 'custom' && loadoutState.selected.presetId === presetId;
-    card.classList.toggle('selected', selected);
-    card.setAttribute('aria-pressed', String(selected));
+    applyLoadoutCardSelection(card, selected);
     const label = card.querySelector<HTMLElement>('[data-custom-name]');
     const equipmentLabel = card.querySelector<HTMLElement>('[data-custom-equipment]');
     if (label && preset) label.textContent = preset.displayName;
@@ -7886,29 +7882,52 @@ function chooseCustomPreset(presetId: LoadoutPresetId): void {
 }
 
 function saveManagedPreset(): void {
-  const current = loadoutState.customPresets.find((entry) => entry.id === managedPresetId);
-  if (!current) return;
-  const primary = element<HTMLSelectElement>('#loadout-primary').value;
-  const secondary = element<HTMLSelectElement>('#loadout-secondary').value;
-  const grenade = element<HTMLSelectElement>('#loadout-grenade').value;
-  if (!loadoutEligibility.primaryIds.includes(primary)
-    || !loadoutEligibility.secondaryIds.includes(secondary)
-    || !GRENADE_IDS.includes(grenade as GrenadeId)) return;
-  const updated = Object.freeze({
-    ...current,
-    displayName: sanitizeLoadoutPresetName(element<HTMLInputElement>('#loadout-preset-name').value, managedPresetId),
-    primary,
-    secondary,
-    grenade: grenade as LoadoutGrenadeId,
-  });
-  const candidate = {
-    ...loadoutState,
-    customPresets: loadoutState.customPresets.map((preset) => preset.id === managedPresetId ? updated : preset),
-  };
-  if (!persistLoadoutState(candidate)) return;
-  applyMenuLoadoutImmediately();
-  renderFieldKitSelection();
-  setStatus(`${updated.displayName} saved.`, 'ok');
+  const manager = element<HTMLElement>('#loadout-manager');
+  if (manager.hidden || loadoutSaveInFlight) return;
+  const submittedPresetId = managedPresetId;
+  const saveButton = element<HTMLButtonElement>('#loadout-save');
+  loadoutSaveInFlight = true;
+  saveButton.disabled = true;
+  try {
+    const current = loadoutState.customPresets.find((entry) => entry.id === submittedPresetId);
+    if (!current) {
+      setLoadoutSaveStatus('SAVE FAILED · SELECT A VALID CUSTOM SLOT AND TRY AGAIN.', 'error');
+      return;
+    }
+    const primary = element<HTMLSelectElement>('#loadout-primary').value;
+    const secondary = element<HTMLSelectElement>('#loadout-secondary').value;
+    const grenade = element<HTMLSelectElement>('#loadout-grenade').value;
+    if (!loadoutEligibility.primaryIds.includes(primary)
+      || !loadoutEligibility.secondaryIds.includes(secondary)
+      || !GRENADE_IDS.includes(grenade as GrenadeId)) {
+      setLoadoutSaveStatus('SAVE FAILED · CHOOSE AN ELIGIBLE PRIMARY, SECONDARY AND GRENADE.', 'error');
+      return;
+    }
+    const updated = Object.freeze({
+      ...current,
+      displayName: sanitizeLoadoutPresetName(element<HTMLInputElement>('#loadout-preset-name').value, submittedPresetId),
+      primary,
+      secondary,
+      grenade: grenade as LoadoutGrenadeId,
+    });
+    const candidate = {
+      ...loadoutState,
+      customPresets: loadoutState.customPresets.map((preset) => preset.id === submittedPresetId ? updated : preset),
+    };
+    if (!persistLoadoutState(candidate)) {
+      setLoadoutSaveStatus('SAVE FAILED · YOUR EDITS ARE STILL HERE. RETRY WHEN STORAGE IS AVAILABLE.', 'error');
+      return;
+    }
+    applyMenuLoadoutImmediately();
+    renderFieldKitSelection();
+    manager.hidden = true;
+    setLoadoutSaveStatus();
+    setStatus(`${updated.displayName} saved.`, 'ok');
+    document.querySelector<HTMLButtonElement>(`[data-custom-preset-id="${submittedPresetId}"]`)?.focus();
+  } finally {
+    loadoutSaveInFlight = false;
+    saveButton.disabled = false;
+  }
 }
 
 document.querySelectorAll<HTMLButtonElement>('[data-menu-tab]').forEach((button) => {
@@ -7945,11 +7964,13 @@ document.querySelectorAll<HTMLElement>('[data-custom-modify]').forEach((edit) =>
     managedPresetId = (edit.dataset.customModify ?? managedPresetId) as LoadoutPresetId;
     const manager = element<HTMLElement>('#loadout-manager');
     manager.hidden = false;
+    setLoadoutSaveStatus();
     renderCustomLoadoutEditor();
   });
 });
 element<HTMLSelectElement>('#loadout-manage-preset').addEventListener('change', (event) => {
   managedPresetId = (event.currentTarget as HTMLSelectElement).value as LoadoutPresetId;
+  setLoadoutSaveStatus();
   renderCustomLoadoutEditor();
 });
 element<HTMLSelectElement>('#loadout-primary').addEventListener('change', renderLoadoutInspector);

@@ -253,8 +253,8 @@
 #advanced-graphics .advanced-graphics-range output { font-size: var(--pass66-micro); }
 
 /* HF-182/HF-183: weapon-specific Field Kit inspection with catalog-derived,
- * independently labelled combat facts. The bars visualize each stated value;
- * there is deliberately no synthetic balance/quality score. */
+ * independently labelled combat facts. DPS stands alone without a bar; the
+ * five requested facts remain text-readable as well as visually comparable. */
 #menu-panel-kit .kit-card:not(.manage-kit-card) {
   min-height: 0;
 }
@@ -299,19 +299,19 @@
 .weapon-menu-metrics,
 .weapon-menu-metric,
 .weapon-menu-metric > span,
-.weapon-menu-stat-heading {
+.weapon-menu-stat-heading,
+.weapon-menu-dps,
+.weapon-menu-dps > span {
   display: grid;
 }
 
 .weapon-menu-stat-deck { align-content: start; gap: 9px; min-width: 0; }
 .weapon-menu-stat-heading { gap: 3px; }
 .weapon-menu-stat-heading > b {
-  overflow: hidden;
   color: #f2fbfa;
   font: 900 var(--pass66-label)/1 var(--ui-display, 'Barlow Condensed', sans-serif);
   letter-spacing: 0.06em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .weapon-menu-stat-heading > small {
   color: #79b9b6;
@@ -319,38 +319,59 @@
   letter-spacing: 0.07em;
 }
 
+.weapon-menu-dps {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  padding: 9px 11px;
+  border: 1px solid rgba(255, 196, 107, 0.66);
+  background: rgba(255, 196, 107, 0.1);
+}
+.weapon-menu-dps > span { gap: 3px; }
+.weapon-menu-dps b {
+  color: #ffc46b;
+  font: 900 clamp(12px, 0.8vw, 14px)/1 var(--ui-copy, Inter, sans-serif);
+  letter-spacing: 0.1em;
+}
+.weapon-menu-dps small {
+  color: #a8c1bf;
+  font: 800 var(--pass66-micro)/1 var(--ui-copy, Inter, sans-serif);
+  letter-spacing: 0.06em;
+}
+.weapon-menu-dps > strong {
+  color: #fff;
+  font: 900 clamp(30px, 2.2vw, 42px)/0.86 var(--ui-display, 'Barlow Condensed', sans-serif);
+  font-variant-numeric: tabular-nums;
+}
+
 .weapon-menu-metrics {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 11px;
+  grid-template-columns: 1fr;
+  gap: 9px;
 }
 
 
 .weapon-menu-metric { min-width: 0; gap: 4px; }
 .weapon-menu-metric > span {
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 6px;
-  align-items: end;
-}
-.weapon-menu-metric b,
-.weapon-menu-metric strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  grid-template-columns: minmax(102px, 1fr) minmax(72px, auto);
+  gap: 10px;
+  align-items: baseline;
 }
 .weapon-menu-metric b {
   color: #8ba5a7;
   font: 800 var(--pass66-micro)/1 var(--ui-copy, Inter, sans-serif);
   letter-spacing: 0.08em;
-  text-overflow: clip;
-  font-size: clamp(8px, 0.62vw, 10px);
+  font-size: clamp(10px, 0.62vw, 11px);
+  overflow-wrap: anywhere;
 }
 .weapon-menu-metric strong {
   color: #eff8f7;
   font: 900 var(--pass66-micro)/1 var(--ui-copy, Inter, sans-serif);
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  text-align: right;
 }
 .weapon-menu-metric > i {
-  height: 5px;
+  height: 7px;
   overflow: hidden;
   background: rgba(142, 167, 170, 0.17);
 }
@@ -359,10 +380,6 @@
   width: var(--weapon-metric-fill, 0%);
   height: 100%;
   background: linear-gradient(90deg, #2daeb1, #78eee2);
-}
-.weapon-menu-metric[data-weapon-metric='recoil-load'] > i > i,
-.weapon-menu-metric[data-weapon-metric='ads-cone'] > i > i {
-  background: linear-gradient(90deg, #ffca57, #ff735f);
 }
 
 /* HF-184/HF-185: readable equipped chain plus a bounded local presentation
