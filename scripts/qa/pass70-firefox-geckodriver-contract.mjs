@@ -187,6 +187,52 @@ function soloCycleFailures(value, expectedLabel) {
   if (value.pointerLock !== true || value.adsHeldObserved !== true || value.adsReleasedObserved !== true) {
     errors.push(`${label} pointer-lock/ADS lifecycle is incomplete`);
   }
+  if (value.canvasTarget?.elementId !== 'game' || value.canvasTarget?.topElementId !== 'game'
+    || value.canvasTarget?.topElementTag !== 'canvas'
+    || value.canvasTarget?.verifiedAtAction !== true
+    || !Number.isSafeInteger(value.canvasTarget?.x) || value.canvasTarget.x < 0
+    || !Number.isSafeInteger(value.canvasTarget?.y) || value.canvasTarget.y < 0
+    || !finite(value.canvasTarget?.rect?.left) || !finite(value.canvasTarget?.rect?.top)
+    || !finite(value.canvasTarget?.rect?.right) || !finite(value.canvasTarget?.rect?.bottom)
+    || !finite(value.canvasTarget?.rect?.width) || value.canvasTarget.rect.width <= 0
+    || !finite(value.canvasTarget?.rect?.height) || value.canvasTarget.rect.height <= 0
+    || value.canvasTarget.rect.right <= value.canvasTarget.rect.left
+    || value.canvasTarget.rect.bottom <= value.canvasTarget.rect.top
+    || value.canvasTarget.x < value.canvasTarget.rect.left || value.canvasTarget.x > value.canvasTarget.rect.right
+    || value.canvasTarget.y < value.canvasTarget.rect.top || value.canvasTarget.y > value.canvasTarget.rect.bottom) {
+    errors.push(`${label} native canvas input target is not proven unobscured`);
+  }
+  if (value.preRetryPointerLock?.locked !== false || value.preRetryPointerLock?.surface !== 'hidden'
+    || value.preRetryPointerLock?.pointerLockLifecycle !== 'denied'
+    || !Number.isSafeInteger(value.preRetryPointerLock?.pointerRejectCount)
+    || value.preRetryPointerLock.pointerRejectCount < 1) {
+    errors.push(`${label} automatic pointer-lock request did not settle before native retry`);
+  }
+  const pointerLockMouseDown = Array.isArray(value.trustedEvents)
+    ? value.trustedEvents.find((event) => event?.phase === 'pointer-lock' && event.type === 'mousedown'
+      && event.button === 0 && event.trusted === true && event.targetId === 'game')
+    : null;
+  const successfulPointerLock = Array.isArray(value.pointerLockEvents)
+    ? value.pointerLockEvents.find((event) => event?.type === 'pointerlockchange'
+      && event.phase === 'pointer-lock' && event.trusted === true && event.lockedElementId === 'game'
+      && Number.isSafeInteger(event.sequence) && Number.isSafeInteger(pointerLockMouseDown?.sequence)
+      && event.sequence > pointerLockMouseDown.sequence)
+    : null;
+  if (!Array.isArray(value.pointerLockEvents)
+    || !successfulPointerLock
+    || !value.pointerLockEvents.some((event) => event?.type === 'pointerlockerror'
+      && event.phase === 'solo' && event.trusted === true && event.lockedElementId === null
+      && Number.isSafeInteger(event.sequence) && event.sequence < pointerLockMouseDown?.sequence)
+    || value.pointerLockEvents.some((event) => event?.type === 'pointerlockerror'
+      && event.phase === 'pointer-lock' && event.sequence > pointerLockMouseDown?.sequence)
+    || value.pointerLockEvents.some((event) => !Number.isSafeInteger(event?.sequence)
+      || !finite(event?.atMs) || event.atMs < 0)
+    || value.pointerLockLifecycle?.surface !== 'hidden'
+    || value.pointerLockLifecycle?.state !== 'locked'
+    || !Number.isSafeInteger(value.pointerLockLifecycle?.rejectCount)
+    || value.pointerLockLifecycle.rejectCount < 0) {
+    errors.push(`${label} native pointer-lock event/lifecycle proof is incomplete`);
+  }
   if (value.ammo?.beforeFire !== 2 || value.ammo?.afterFire !== 1
     || !Number.isSafeInteger(value.ammo?.afterReload) || value.ammo.afterReload <= 1
     || value.reload?.observedStart !== true || value.reload?.observedCompletion !== true) {

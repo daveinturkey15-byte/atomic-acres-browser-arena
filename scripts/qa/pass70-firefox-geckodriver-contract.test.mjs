@@ -49,7 +49,7 @@ function trustedSoloEvents() {
     { phase: 'ads-up', type: 'mouseup', trusted: true, button: 2, code: null, targetId: 'game' },
     { phase: 'reload', type: 'keydown', trusted: true, button: null, code: 'KeyR', targetId: null },
     { phase: 'reload', type: 'keyup', trusted: true, button: null, code: 'KeyR', targetId: null },
-  ];
+  ].map((event, index) => ({ sequence: index + 2, atMs: 100 + index, ...event }));
 }
 
 function frames() {
@@ -94,6 +94,21 @@ function soloCycle(label) {
     webglVersion: 'WebGL 2.0',
     userAgent: firefoxUserAgent,
     pointerLock: true,
+    canvasTarget: {
+      x: 204,
+      y: 130,
+      elementId: 'game',
+      topElementId: 'game',
+      topElementTag: 'canvas',
+      rect: { left: 0, top: 0, right: 1_280, bottom: 720, width: 1_280, height: 720 },
+      verifiedAtAction: true,
+    },
+    preRetryPointerLock: { locked: false, surface: 'hidden', pointerLockLifecycle: 'denied', pointerRejectCount: 1, status: 'Mouse capture was blocked. Click the match to retry.' },
+    pointerLockEvents: [
+      { sequence: 1, atMs: 99, phase: 'solo', type: 'pointerlockerror', trusted: true, lockedElementId: null },
+      { sequence: 4, atMs: 102, phase: 'pointer-lock', type: 'pointerlockchange', trusted: true, lockedElementId: 'game' },
+    ],
+    pointerLockLifecycle: { surface: 'hidden', state: 'locked', rejectCount: 1 },
     adsHeldObserved: true,
     adsReleasedObserved: true,
     ammo: { beforeFire: 2, afterFire: 1, afterReload: 30, reserveAfterReload: 1 },
@@ -223,6 +238,15 @@ test('accepts one exact complete Firefox GeckoDriver receipt', () => {
   assert.doesNotThrow(() => assertPass70FirefoxGeckodriverReceipt(receipt, expected));
 });
 
+test('accepts an earlier automatic pointer-lock rejection followed by a sequenced trusted retry', () => {
+  const receipt = validReceipt();
+  const solo = receipt.soloCycles[0];
+  assert.equal(solo.pointerLockEvents[0].type, 'pointerlockerror');
+  assert.ok(solo.pointerLockEvents[0].sequence < solo.trustedEvents[1].sequence);
+  assert.ok(solo.pointerLockEvents[1].sequence > solo.trustedEvents[1].sequence);
+  assert.deepEqual(pass70FirefoxGeckodriverReceiptFailures(receipt, expected), []);
+});
+
 test('normalizes the direct WebDriver BiDi log.entryAdded params shape without dropping error severity', () => {
   assert.deepEqual(normalizePass70BidiLogEntry({
     type: 'event',
@@ -265,6 +289,16 @@ mutation('the two sessions share a Firefox process', (receipt) => { receipt.owne
 mutation('an owned Firefox process survives cleanup', (receipt) => { receipt.cleanup.allOwnedProcessesExited = false; }, /cleanup proof/u);
 mutation('the solo match contains more than one bot', (receipt) => { receipt.soloCycles[0].botCount = 2; }, /exact one-bot/u);
 mutation('the solo pointer lock is absent', (receipt) => { receipt.soloCycles[0].pointerLock = false; }, /pointer-lock\/ADS/u);
+mutation('the native canvas hit point is obscured', (receipt) => { receipt.soloCycles[0].canvasTarget.topElementId = 'banner'; }, /native canvas input target/u);
+mutation('the automatic request is still pending at native retry', (receipt) => {
+  receipt.soloCycles[0].preRetryPointerLock.pointerLockLifecycle = 'requesting';
+}, /did not settle before native retry/u);
+mutation('Firefox emits pointerlockerror', (receipt) => {
+  receipt.soloCycles[0].pointerLockEvents.push({ sequence: 5, atMs: 103, phase: 'pointer-lock', type: 'pointerlockerror', trusted: true, lockedElementId: null });
+}, /pointer-lock event\/lifecycle proof/u);
+mutation('an earlier automatic lock is misattributed to the explicit retry', (receipt) => {
+  receipt.soloCycles[0].pointerLockEvents[1].sequence = 2;
+}, /pointer-lock event\/lifecycle proof/u);
 mutation('a required native input event is missing', (receipt) => { receipt.soloCycles[0].trustedEvents.splice(3, 1); }, /trusted input event proof|missing trusted fire/u);
 mutation('an input event is synthetic', (receipt) => {
   receipt.soloCycles[0].trustedEvents.push({ phase: 'extra', type: 'click', trusted: false, targetId: 'game' });
@@ -307,6 +341,9 @@ test('runner uses raw W3C HTTP and native trusted actions without automation dep
     "event.isTrusted",
     "document.querySelector('#runtime-error-log')",
     "document.pointerLockElement?.id === 'game'",
+    'document.elementFromPoint(x, y)',
+    "origin: 'viewport', x: canvasTarget.x, y: canvasTarget.y",
+    "document.addEventListener('pointerlockerror'",
     "{ type: 'keyDown', value: 'r' }",
     "debug.setAmmo('carbine', 2, 30)",
     'debug.setBotsFrozen(true)',

@@ -682,8 +682,10 @@ async function installPageProbe(driver) {
   await driver.execute(`
     const probe = {
       phase: 'idle',
+      sequence: 0,
       events: [],
       errors: [],
+      pointerLockEvents: [],
     };
     const describeTarget = (target) => {
       if (!(target instanceof Element)) return { targetId: null, targetTag: null };
@@ -694,7 +696,10 @@ async function installPageProbe(driver) {
     };
     const record = (event) => {
       const target = describeTarget(event.target);
+      const sequence = ++probe.sequence;
       probe.events.push({
+        sequence,
+        atMs: performance.now(),
         phase: probe.phase,
         type: event.type,
         trusted: event.isTrusted,
@@ -717,6 +722,26 @@ async function installPageProbe(driver) {
       probe.errors.push({
         type: 'unhandledrejection',
         message: reason instanceof Error ? reason.name + ': ' + reason.message : String(reason),
+      });
+    });
+    document.addEventListener('pointerlockchange', (event) => {
+      probe.pointerLockEvents.push({
+        sequence: ++probe.sequence,
+        atMs: performance.now(),
+        phase: probe.phase,
+        type: event.type,
+        trusted: event.isTrusted,
+        lockedElementId: document.pointerLockElement?.id ?? null,
+      });
+    });
+    document.addEventListener('pointerlockerror', (event) => {
+      probe.pointerLockEvents.push({
+        sequence: ++probe.sequence,
+        atMs: performance.now(),
+        phase: probe.phase,
+        type: event.type,
+        trusted: event.isTrusted,
+        lockedElementId: document.pointerLockElement?.id ?? null,
       });
     });
     window.__PASS70_GECKODRIVER_PROBE__ = probe;
@@ -901,19 +926,98 @@ async function runSoloCycle(driver, label) {
   if (setup.state.ammo !== 2 || setup.state.reserve !== 30 || setup.readiness?.ready !== true) {
     throw new Error(`${label} Firefox deterministic weapon setup failed: ${JSON.stringify(setup)}`);
   }
-  const gameElement = await driver.find('#game');
+  await driver.find('#game');
+  const canvasTarget = await driver.execute(`
+    const canvas = document.querySelector('#game');
+    if (!(canvas instanceof HTMLCanvasElement)) return null;
+    const rect = canvas.getBoundingClientRect();
+    const bounds = {
+      left: rect.left,
+      top: rect.top,
+      right: rect.right,
+      bottom: rect.bottom,
+      width: rect.width,
+      height: rect.height,
+    };
+    const candidates = [
+      [0.16, 0.18], [0.84, 0.18], [0.16, 0.82], [0.84, 0.82],
+      [0.50, 0.50], [0.28, 0.50], [0.72, 0.50],
+    ];
+    for (const [xFraction, yFraction] of candidates) {
+      const x = Math.round(rect.left + rect.width * xFraction);
+      const y = Math.round(rect.top + rect.height * yFraction);
+      const top = document.elementFromPoint(x, y);
+      if (top === canvas) {
+        return {
+          x,
+          y,
+          elementId: canvas.id,
+          topElementId: top.id,
+          topElementTag: top.tagName.toLowerCase(),
+          rect: bounds,
+          verifiedAtAction: true,
+        };
+      }
+    }
+    return {
+      x: -1,
+      y: -1,
+      elementId: canvas.id,
+      topElementId: document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)?.id ?? null,
+      topElementTag: document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)?.tagName?.toLowerCase() ?? null,
+      rect: bounds,
+      verifiedAtAction: false,
+    };
+  `);
+  if (canvasTarget?.verifiedAtAction !== true || canvasTarget.elementId !== 'game' || canvasTarget.topElementId !== 'game') {
+    throw new Error(`${label} Firefox has no unobscured native canvas input point: ${JSON.stringify(canvasTarget)}`);
+  }
+  const preRetryPointerLock = await poll(`${label} automatic pointer-lock request settlement`, () => driver.execute(`
+    const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+    return {
+      locked: document.pointerLockElement?.id === 'game',
+      surface: state?.menuLifecycle?.surface ?? null,
+      pointerLockLifecycle: state?.menuLifecycle?.pointerLock ?? null,
+      pointerRejectCount: state?.menuLifecycle?.pointerRejectCount ?? null,
+      status: document.querySelector('#status')?.textContent?.trim() ?? '',
+      pointerLockEvents: window.__PASS70_GECKODRIVER_PROBE__?.pointerLockEvents ?? [],
+    };
+  `), (state) => state?.locked === true || (state?.pointerLockLifecycle === 'denied'
+    && state.pointerLockEvents.some((event) => event?.type === 'pointerlockerror' && event.phase === 'solo')),
+  10_000, 100);
+  if (preRetryPointerLock.locked || preRetryPointerLock.surface !== 'hidden'
+    || preRetryPointerLock.pointerLockLifecycle !== 'denied'
+    || !Number.isSafeInteger(preRetryPointerLock.pointerRejectCount) || preRetryPointerLock.pointerRejectCount < 1) {
+    throw new Error(`${label} Firefox automatic pointer-lock request did not settle into the expected retry state: ${JSON.stringify({ canvasTarget, preRetryPointerLock })}`);
+  }
   await setProbePhase(driver, 'pointer-lock');
   await driver.performActions([{
     type: 'pointer', id: 'pass70-mouse', parameters: { pointerType: 'mouse' },
     actions: [
-      { type: 'pointerMove', duration: 0, origin: { [ELEMENT_KEY]: gameElement }, x: 0, y: 0 },
+      { type: 'pointerMove', duration: 0, origin: 'viewport', x: canvasTarget.x, y: canvasTarget.y },
       { type: 'pointerDown', button: 0 },
+      { type: 'pause', duration: 80 },
       { type: 'pointerUp', button: 0 },
     ],
   }]);
   await poll(`${label} trusted canvas pointer lock`, () => driver.execute(`
-    return { locked: document.pointerLockElement?.id === 'game', focused: document.hasFocus() };
-  `), (state) => state?.locked === true && state.focused === true, 15_000);
+    const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+    return {
+      locked: document.pointerLockElement?.id === 'game',
+      focused: document.hasFocus(),
+      surface: state?.menuLifecycle?.surface ?? null,
+      pointerLockLifecycle: state?.menuLifecycle?.pointerLock ?? null,
+      pointerRejectCount: state?.menuLifecycle?.pointerRejectCount ?? null,
+      status: document.querySelector('#status')?.textContent?.trim() ?? '',
+      topElementId: document.elementFromPoint(arguments[0], arguments[1])?.id ?? null,
+      canvasRect: (() => {
+        const rect = document.querySelector('#game')?.getBoundingClientRect();
+        return rect ? { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height } : null;
+      })(),
+      events: (window.__PASS70_GECKODRIVER_PROBE__?.events ?? []).filter((event) => event.phase === 'pointer-lock'),
+      pointerLockEvents: window.__PASS70_GECKODRIVER_PROBE__?.pointerLockEvents ?? [],
+    };
+  `, [canvasTarget.x, canvasTarget.y]), (state) => state?.locked === true && state.focused === true, 15_000);
   await startFrameProbe(driver);
   await setProbePhase(driver, 'ads-down');
   await driver.performActions([{
@@ -969,6 +1073,8 @@ async function runSoloCycle(driver, label) {
         pointerLock: document.pointerLockElement?.id === 'game',
         adsHeld: state.textChat.adsHeld,
         events: window.__PASS70_GECKODRIVER_PROBE__.events,
+        pointerLockEvents: window.__PASS70_GECKODRIVER_PROBE__.pointerLockEvents,
+        menuLifecycle: state.menuLifecycle,
       };
     `),
   ]);
@@ -982,6 +1088,14 @@ async function runSoloCycle(driver, label) {
     webglVersion: active.webglVersion,
     userAgent: active.userAgent,
     pointerLock: eventState.pointerLock,
+    canvasTarget,
+    preRetryPointerLock,
+    pointerLockEvents: eventState.pointerLockEvents,
+    pointerLockLifecycle: {
+      surface: eventState.menuLifecycle.surface,
+      state: eventState.menuLifecycle.pointerLock,
+      rejectCount: eventState.menuLifecycle.pointerRejectCount,
+    },
     adsHeldObserved: true,
     adsReleasedObserved: eventState.adsHeld === false,
     ammo: { beforeFire, afterFire, afterReload: afterReload.ammo, reserveAfterReload: afterReload.reserve },
