@@ -158,11 +158,13 @@ import { KillstreakLoadoutController } from './killstreak-loadout';
 import type { KillstreakLoadoutV1, Pass65KillstreakId } from './killstreak-catalog';
 import {
   HostKillstreakRuntime,
+  MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP,
   chopperGunnerAuthoritativeRay,
   chopperGunnerCameraOrigin,
   type KillstreakDamageEvent,
   type KillstreakEntitySnapshot,
   type KillstreakRecipientSnapshot,
+  type KillstreakTarget,
   type KillstreakWorld,
 } from './killstreak-runtime';
 import { KillstreakPresentation, loadHunterDronePresentation, loadSupportVehiclePresentations, supportVehiclePresentationTelemetry } from './killstreak-presentation';
@@ -723,6 +725,7 @@ import {
   FlamethrowerStreamSystem,
   flamethrowerPulseImpactPresentationEnabled,
 } from './flamethrower-stream-system';
+import { CarpetGroundFireGuestPresentationAdmission } from './carpet-ground-fire-multiplayer';
 import { DMR_THERMAL_MAGNIFICATION, DMR_THERMAL_MAX_CONTACTS, DmrThermalPresentation, dmrThermalOcclusionBudget, type DmrThermalContact } from './dmr-thermal-presentation';
 import { runStagedDmrThermalPrewarm } from './dmr-thermal-prewarm-lifecycle';
 import { ThermalGhostPresentation, type ThermalGhostTarget } from './thermal-ghost-presentation';
@@ -1634,11 +1637,16 @@ const flamethrowerGroundFires = new FlamethrowerGroundFirePool(FLAMETHROWER_GROU
 const flamethrowerGroundFireBotSnapshot: BotPlayer[] = [];
 const flamethrowerGroundFireUp = new THREE.Vector3(0, 1, 0);
 const presentFlamethrowerPulseImpact = flamethrowerPulseImpactPresentationEnabled(softwareRenderer);
+const carpetGroundFireGuestPresentation = new CarpetGroundFireGuestPresentationAdmission();
+const pendingCarpetGroundFireDamageEvents: KillstreakDamageEvent[] = [];
 let flamethrowerGroundFireBotSnapshotReady = false;
 
 function applyFlamethrowerGroundFirePulse(fire: Readonly<{
   ownerId: string;
   point: THREE.Vector3;
+  damageSource: 'flamethrower' | 'carpet-bomber';
+  activationId: string | null;
+  pulseAtMs: number;
 }>): void {
   // Napalm burns EVERYONE who stands in it - self, friends and enemies alike
   // (same friendly-fire rule as the Carpet Bomber).
@@ -1659,12 +1667,55 @@ function applyFlamethrowerGroundFirePulse(fire: Readonly<{
       applyBotDamage(bot, FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE, 'body', { kind: 'killstreak', effect: 'carpet-bomber' }, fire.ownerId);
     }
   }
+  if (network.role === 'host' && fire.damageSource === 'carpet-bomber' && fire.activationId) {
+    const remoteTargets: KillstreakTarget[] = [];
+    for (const remote of remotes.values()) {
+      const health = remoteHealthAuthorities.get(remote.snapshot.id);
+      if (!health) continue;
+      remoteTargets.push({
+        id: remote.snapshot.id,
+        kind: 'player',
+        team: remote.snapshot.team,
+        lifeId: remote.continuity,
+        alive: health.alive,
+        position: [remote.snapshot.x, remote.snapshot.y, remote.snapshot.z],
+      });
+    }
+    const events = killstreakRuntime.carpetGroundFireDamageEvents({
+      activationId: fire.activationId,
+      ownerId: fire.ownerId,
+      point: [fire.point.x, fire.point.y, fire.point.z],
+      radiusM: FLAMETHROWER_GROUND_FIRE_RADIUS_M,
+      damage: FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE,
+      atMs: fire.pulseAtMs,
+    }, remoteTargets);
+    for (const event of events) {
+      const applied = applyKillstreakDamageEvent(event);
+      if (!applied || applied.damage <= 0) continue;
+      pendingCarpetGroundFireDamageEvents.push(applied);
+      recordOwnerSupportDamage(applied);
+    }
+  }
   if (presentFlamethrowerPulseImpact) spawnImpactFlash(fire.point, 'concrete', flamethrowerGroundFireUp);
 }
 
 function updateFlamethrowerGroundFires(now: number): void {
   flamethrowerGroundFireBotSnapshotReady = false;
+  pendingCarpetGroundFireDamageEvents.length = 0;
   flamethrowerGroundFires.update(now, FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS, applyFlamethrowerGroundFirePulse);
+  if (network.role !== 'host' || pendingCarpetGroundFireDamageEvents.length === 0) return;
+  for (let offset = 0; offset < pendingCarpetGroundFireDamageEvents.length; offset += MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP) {
+    const message: KillstreakDamageResultMessage = {
+      type: 'killstreak-damage-result',
+      by: player.id,
+      matchEpoch: killstreakMatchEpoch,
+      revision: killstreakSnapshot.revision,
+      events: pendingCarpetGroundFireDamageEvents.slice(offset, offset + MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP),
+      impacts: [],
+      nonce: randomNonce(),
+    };
+    network.send(message);
+  }
 }
 
 const dmrThermalPresentation = new DmrThermalPresentation(scene, element<HTMLElement>('#dmr-thermal'));
@@ -8909,6 +8960,11 @@ function onNetworkMessage(message: GameMessage): void {
     for (const impact of message.impacts) {
       if (impact.phase !== 'impact') continue;
       const point = new THREE.Vector3(...impact.position);
+      if (carpetGroundFireGuestPresentation.admit(message.matchEpoch, impact)) {
+        // Presentation only: the guest never creates an authority pool entry,
+        // so the replicated host receipt cannot double-apply residual damage.
+        flamethrowerStreamPresentation.igniteGround(point, presentedAt);
+      }
       audio.explosion(presentedAt);
       supportExplosionPresentation.emit(point, 4.5, presentedAt);
     }
@@ -12683,6 +12739,7 @@ async function startGame(
   clearFlareTargetSnapshots();
   flamethrowerStreamPresentation.clear();
   flamethrowerGroundFires.clear();
+  carpetGroundFireGuestPresentation.clear();
   timedMapWeaponAudit = createTimedMapWeaponAudit();
   pendingFlareShotRequests.clear();
   flareShotResultContexts.clear();
@@ -13254,6 +13311,7 @@ function initializeTimedMapWeaponsForMatch(
   clearFlareTargetSnapshots();
   flamethrowerStreamPresentation.clear();
   flamethrowerGroundFires.clear();
+  carpetGroundFireGuestPresentation.clear();
   if (recovery) restoreRecoveredFlareRuntime(recovery, performance.now());
   if (network.role === 'host') broadcastTimedMapWeaponState();
 }
@@ -18873,15 +18931,21 @@ function updatePass65KillstreakRuntime(now: number): void {
         carpetWorldImpacts.push({ point, radius: 4.5, maximumDamage: 240, shedBlastClass: 'carpet-bomber-obliteration' });
         // Carpet bombs leave burning napalm on the ground too.
         if (flamethrowerStreamPresentation.igniteGround(point, now)) {
-          flamethrowerGroundFires.ignite({
-            ownerId: player.id,
-            ownerTeam: player.team,
-            point,
-            actionNonce: randomNonce(),
-            now,
-            durationMs: FLAMETHROWER_GROUND_FIRE_DURATION_MS,
-            pulseIntervalMs: FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS,
-          });
+          const owner = killstreakRuntime.carpetBomberOwner(impact.activationId);
+          if (owner) {
+            flamethrowerGroundFires.ignite({
+              ownerId: owner.ownerId,
+              ownerTeam: owner.team,
+              point,
+              actionNonce: randomNonce(),
+              now,
+              durationMs: FLAMETHROWER_GROUND_FIRE_DURATION_MS,
+              pulseIntervalMs: FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS,
+              damageSource: 'carpet-bomber',
+              activationId: impact.activationId,
+              impactOrdinal: impact.ordinal,
+            });
+          }
         }
         audio.explosion(now);
         supportExplosionPresentation.emit(point, 4.5, now);

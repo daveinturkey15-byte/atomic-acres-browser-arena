@@ -916,6 +916,60 @@ export class HostKillstreakRuntime {
     this.revision += 1;
   }
 
+  /** Host-owned attribution retained while a Carpet Bomber is producing impacts. */
+  carpetBomberOwner(activationId: string): Readonly<{ ownerId: string; team: 0 | 1 }> | null {
+    const activation = this.carpetBombers.get(activationId);
+    if (activation) return Object.freeze({ ownerId: activation.ownerId, team: activation.team });
+    for (const entity of this.entities.values()) {
+      if (entity.activationId === activationId && entity.kind === 'aircraft') {
+        return Object.freeze({ ownerId: entity.ownerId, team: entity.team });
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Creates canonical, collision-free damage receipts for hosted humans inside
+   * one admitted Carpet Bomber ground-fire patch. The caller supplies only the
+   * host's remote-human snapshot; local-player and bot lanes remain unchanged.
+   */
+  carpetGroundFireDamageEvents(input: Readonly<{
+    activationId: string;
+    ownerId: string;
+    point: SupportVec3;
+    radiusM: number;
+    damage: number;
+    atMs: number;
+  }>, targets: readonly KillstreakTarget[]): readonly KillstreakDamageEvent[] {
+    if (!/^[A-Za-z0-9_-]{8,80}$/.test(input.activationId)
+      || !/^[A-Za-z0-9_-]{1,80}$/.test(input.ownerId)
+      || !finiteTuple(input.point)
+      || !Number.isFinite(input.radiusM) || input.radiusM <= 0
+      || !Number.isFinite(input.damage) || input.damage <= 0
+      || !Number.isFinite(input.atMs) || input.atMs < 0) return Object.freeze([]);
+    const radiusSquared = input.radiusM * input.radiusM;
+    const events: KillstreakDamageEvent[] = [];
+    for (const target of [...targets].sort((left, right) => left.id.localeCompare(right.id))) {
+      if (target.kind !== 'player' || !target.alive || !finiteTuple(target.position)) continue;
+      const dx = target.position[0] - input.point[0];
+      const dz = target.position[2] - input.point[2];
+      if (dx * dx + dz * dz >= radiusSquared) continue;
+      events.push(this.damageEvent(
+        input.activationId,
+        'carpet-bomber',
+        input.ownerId,
+        target,
+        input.damage,
+        input.point,
+        input.atMs,
+        target.position,
+        input.point,
+      ));
+      if (events.length >= MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP) break;
+    }
+    return Object.freeze(events);
+  }
+
   checkpoint(nowMs: number): KillstreakRuntimeCheckpoint | null {
     if (!Number.isFinite(nowMs)
       || this.actors.size > MAX_KILLSTREAK_CHECKPOINT_ACTORS

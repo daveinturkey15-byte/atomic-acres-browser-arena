@@ -189,4 +189,37 @@ describe('flamethrower stream presentation', () => {
     pool.update(8_400, FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS, applyPulse);
     expect(pulses).toBe(12);
   });
+
+  it('retains deterministic Carpet Bomber identity and pulse ordinals without changing cadence', () => {
+    const pool = new FlamethrowerGroundFirePool(1);
+    expect(pool.ignite({
+      ownerId: 'guest-owner', ownerTeam: 1, point: new THREE.Vector3(2, 0, 3), actionNonce: 17, now: 1_000,
+      durationMs: FLAMETHROWER_GROUND_FIRE_DURATION_MS,
+      pulseIntervalMs: FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS,
+      damageSource: 'carpet-bomber', activationId: 'ks-activation-9-3', impactOrdinal: 7,
+    })).toBe('created');
+    const receipts: Array<Readonly<{
+      ownerId: string;
+      activationId: string | null;
+      impactOrdinal: number;
+      pulseIndex: number;
+      pulseAtMs: number;
+    }>> = [];
+    for (let now = 1_000; now <= 5_500; now += 500) {
+      pool.update(now, FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS, (fire) => receipts.push({
+        ownerId: fire.ownerId,
+        activationId: fire.activationId,
+        impactOrdinal: fire.impactOrdinal,
+        pulseIndex: fire.pulseIndex,
+        pulseAtMs: fire.pulseAtMs,
+      }));
+    }
+    expect(receipts).toHaveLength(10);
+    expect(receipts.map(({ pulseIndex }) => pulseIndex)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(receipts[0]).toEqual({
+      ownerId: 'guest-owner', activationId: 'ks-activation-9-3', impactOrdinal: 7,
+      pulseIndex: 0, pulseAtMs: 1_000,
+    });
+    expect(receipts.at(-1)?.pulseAtMs).toBe(5_500);
+  });
 });

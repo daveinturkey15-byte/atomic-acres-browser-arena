@@ -33,6 +33,11 @@ type MutableGroundFire = {
   ownerTeam: Team;
   point: THREE.Vector3;
   actionNonce: number;
+  damageSource: 'flamethrower' | 'carpet-bomber';
+  activationId: string | null;
+  impactOrdinal: number;
+  pulseIndex: number;
+  pulseAtMs: number;
   sequence: number;
   expiresAt: number;
   nextPulseAt: number;
@@ -59,6 +64,11 @@ export class FlamethrowerGroundFirePool {
       ownerTeam: 0 as Team,
       point: new THREE.Vector3(),
       actionNonce: 0,
+      damageSource: 'flamethrower',
+      activationId: null,
+      impactOrdinal: -1,
+      pulseIndex: 0,
+      pulseAtMs: 0,
       sequence: 0,
       expiresAt: 0,
       nextPulseAt: 0,
@@ -74,11 +84,19 @@ export class FlamethrowerGroundFirePool {
     now: number;
     durationMs: number;
     pulseIntervalMs: number;
+    damageSource?: 'flamethrower' | 'carpet-bomber';
+    activationId?: string;
+    impactOrdinal?: number;
   }>): 'created' | 'exhausted' | 'invalid' {
+    const damageSource = input.damageSource ?? 'flamethrower';
     if (!input.ownerId || !Number.isSafeInteger(input.actionNonce)
       || !finiteVector3(input.point) || !Number.isFinite(input.now)
       || !Number.isFinite(input.durationMs) || input.durationMs <= 0
-      || !Number.isFinite(input.pulseIntervalMs) || input.pulseIntervalMs <= 0) return 'invalid';
+      || !Number.isFinite(input.pulseIntervalMs) || input.pulseIntervalMs <= 0
+      || damageSource === 'carpet-bomber' && (
+        typeof input.activationId !== 'string' || !/^[A-Za-z0-9_-]{8,80}$/.test(input.activationId)
+        || !Number.isSafeInteger(input.impactOrdinal) || input.impactOrdinal! < 0
+      )) return 'invalid';
     let entry: MutableGroundFire | null = null;
     for (const candidate of this.entries) {
       if (candidate.active) continue;
@@ -91,6 +109,11 @@ export class FlamethrowerGroundFirePool {
     entry.ownerTeam = input.ownerTeam;
     entry.point.copy(input.point);
     entry.actionNonce = input.actionNonce;
+    entry.damageSource = damageSource;
+    entry.activationId = damageSource === 'carpet-bomber' ? input.activationId! : null;
+    entry.impactOrdinal = damageSource === 'carpet-bomber' ? input.impactOrdinal! : -1;
+    entry.pulseIndex = 0;
+    entry.pulseAtMs = input.now;
     entry.sequence = ++this.nextSequence;
     entry.expiresAt = input.now + input.durationMs;
     // Apply the first half-second quantum as soon as the actor enters the
@@ -124,7 +147,9 @@ export class FlamethrowerGroundFirePool {
     for (let index = 0; index < dueCount; index += 1) {
       const entry = this.entries[this.dueIndices[index]!]!;
       entry.nextPulseAt = now + pulseIntervalMs;
+      entry.pulseAtMs = now;
       onPulse(entry);
+      entry.pulseIndex += 1;
     }
   }
 
@@ -147,6 +172,11 @@ export class FlamethrowerGroundFirePool {
     entry.ownerId = '';
     entry.ownerTeam = 0;
     entry.actionNonce = 0;
+    entry.damageSource = 'flamethrower';
+    entry.activationId = null;
+    entry.impactOrdinal = -1;
+    entry.pulseIndex = 0;
+    entry.pulseAtMs = 0;
     entry.sequence = 0;
     entry.expiresAt = 0;
     entry.nextPulseAt = 0;
