@@ -9,6 +9,7 @@ import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 import { SUPPORT_WEAPON_FEEDBACK_CONTRACT } from './support-vehicle-presentation-contract';
 import { yieldBrowserCpuTask, yieldBrowserPreparationFrame } from './browser-preparation-scheduler';
 import { GPU_SHARED_GEOMETRY_KEY } from './gpu-resource-ownership';
+import { attachPass70DroneSwarmBodyMarks } from './pass70-drone-swarm-logo';
 
 const MAX_PRESENTED_ENTITIES = 32;
 const MAX_IMPACT_FLASHES = 20;
@@ -1440,6 +1441,7 @@ function buildDrone(mode: 'piloted' | 'swarm' | null): PresentedEntity {
       const clip = hunterDroneAnimations.find((candidate) => candidate.name === clipName);
       if (clip) mixer.clipAction(clip).play();
     }
+    if (mode === 'swarm') attachPass70DroneSwarmBodyMarks(root);
     return presentedEntity(root, null, [mixer], true);
   }
   const root = new THREE.Group();
@@ -1478,6 +1480,7 @@ function buildDrone(mode: 'piloted' | 'swarm' | null): PresentedEntity {
     rotor.add(arm, disc);
   }
   root.add(body, eye, gun, muzzleSocket, cameraSocket, rotor);
+  if (mode === 'swarm') attachPass70DroneSwarmBodyMarks(root);
   root.userData.presentationSource = 'procedural-non-release-fallback';
   return presentedEntity(root, rotor, [], false);
 }

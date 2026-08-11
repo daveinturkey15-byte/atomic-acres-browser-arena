@@ -549,9 +549,9 @@ describe('killstreak presentation', () => {
       prewarmed: 6,
       pooledEntityInstances: 29,
       pooledSwarmDrones: 24,
-      swarmRenderBatches: 12,
+      swarmRenderBatches: 14,
       swarmRenderedInstances: 1,
-      swarmVisibleRenderBatches: 12,
+      swarmVisibleRenderBatches: 14,
       swarmMinimumRenderedInstances: 1,
       swarmMaximumRenderedInstances: 1,
       prewarmedAuthoredSupportFamilies: [],
@@ -768,6 +768,17 @@ describe('killstreak presentation', () => {
     expect(swarm.userData.presentationFamilyId).toBe(standalone.userData.presentationFamilyId);
     expect(swarm.userData.gunProfileId).toBe(DRONE_SWARM_GUN_PROFILE_ID);
     expect(swarm.getObjectByName('drone-mounted-gun')).toBeDefined();
+    expect(swarm.userData.pass70DroneSwarmBodyLogo).toBe('drone-body-black-field-white-hollow-ring-open-chevron-v1');
+    expect(swarm.getObjectByName('pass70-drone-swarm-body-logo-top')).toBeDefined();
+    expect(swarm.getObjectByName('pass70-drone-swarm-body-logo-bottom')).toBeDefined();
+    const logoBatchMaterials = presentation.root.children
+      .filter((node): node is THREE.InstancedMesh => node instanceof THREE.InstancedMesh)
+      .flatMap((node) => Array.isArray(node.material) ? node.material : [node.material])
+      .map((entry) => entry.name);
+    expect(logoBatchMaterials).toEqual(expect.arrayContaining([
+      'MAT_Pass70_DroneSwarmLogo_BlackField',
+      'MAT_Pass70_DroneSwarmLogo_WhiteMark',
+    ]));
     presentation.dispose();
   });
 
