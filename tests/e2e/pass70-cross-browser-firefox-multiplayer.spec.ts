@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 import {
   chromium,
+  devices,
   expect,
   firefox,
   test,
@@ -139,14 +140,20 @@ async function sampleBrowserAudioListenerCapabilities(page: Page): Promise<Recor
   });
 }
 
-type EngineKind = 'chromium' | 'firefox' | 'webkit' | 'chrome' | 'edge';
+type EngineKind = 'chromium' | 'firefox' | 'webkit' | 'chrome' | 'edge' | 'opera';
 type ListenerPoseMode = 'modern-audio-param' | 'legacy-setters' | 'hybrid' | 'unavailable';
-const supportedEngines: readonly EngineKind[] = ['chromium', 'firefox', 'webkit', 'chrome', 'edge'];
+const supportedEngines: readonly EngineKind[] = ['chromium', 'firefox', 'webkit', 'chrome', 'edge', 'opera'];
 const verifyCrossBrowser = process.env.PASS70_VERIFY_CROSS_BROWSER === '1';
 const verifyFirefox = process.env.PASS70_VERIFY_FIREFOX === '1';
+const verifyOpera = process.env.PASS70_VERIFY_OPERA === '1';
+const operaExecutablePath = process.env.PASS70_OPERA_EXECUTABLE_PATH ?? null;
+const operaBinarySha256 = process.env.PASS70_OPERA_BINARY_SHA256 ?? null;
 const expectedSourceSha = process.env.PASS70_CROSS_BROWSER_SOURCE_SHA ?? null;
 if (verifyCrossBrowser && !/^[a-f0-9]{40}$/u.test(expectedSourceSha ?? '')) {
   throw new Error('PASS70_VERIFY_CROSS_BROWSER requires exact PASS70_CROSS_BROWSER_SOURCE_SHA provenance');
+}
+if (verifyOpera && (!operaExecutablePath || !/^[a-f0-9]{64}$/u.test(operaBinarySha256 ?? ''))) {
+  throw new Error('PASS70_VERIFY_OPERA requires exact executable path and SHA-256 provenance');
 }
 const configuredEngineMatrix = (process.env.PASS70_ENGINE_MATRIX ?? supportedEngines.join(','))
   .split(',')
@@ -187,6 +194,11 @@ async function openEngineBrowser(kind: EngineKind): Promise<Browser> {
     return firefox.launch({ headless: true, ...(executablePath ? { executablePath } : {}) });
   }
   if (kind === 'webkit') return webkit.launch({ headless: true });
+  if (kind === 'opera') {
+    const executablePath = process.env.PASS70_OPERA_EXECUTABLE_PATH;
+    if (!executablePath) throw new Error('PASS70_VERIFY_OPERA requires PASS70_OPERA_EXECUTABLE_PATH');
+    return chromium.launch({ headless: true, executablePath });
+  }
   return chromium.launch({ headless: true, channel: kind === 'chrome' ? 'chrome' : 'msedge' });
 }
 
@@ -210,7 +222,7 @@ async function newPageWithDeadline(context: BrowserContext, label: string): Prom
   }
 }
 
-for (const kind of ['firefox', 'chromium', 'webkit', 'chrome', 'edge'] as const) {
+for (const kind of ['firefox', 'chromium', 'webkit', 'chrome', 'edge', 'opera'] as const) {
   test(`one-bot Skirmish starts, plays and weapon-reloads in ${kind}`, async ({ browserName }, testInfo) => {
     test.skip(browserName !== 'chromium', 'The explicit engine matrix is owned once by the Chromium project.');
     test.skip(!verifyCrossBrowser,
@@ -218,6 +230,8 @@ for (const kind of ['firefox', 'chromium', 'webkit', 'chrome', 'edge'] as const)
     test.skip(!engineMatrix.has(kind), `${kind} is not selected by PASS70_ENGINE_MATRIX.`);
     test.skip(kind === 'firefox' && !verifyFirefox,
       'Set PASS70_VERIFY_FIREFOX=1 to run the real fail-closed Firefox start/play/reload lane.');
+    test.skip(kind === 'opera' && !verifyOpera,
+      'Set PASS70_VERIFY_OPERA=1 and PASS70_OPERA_EXECUTABLE_PATH to run the real Opera lane.');
     const baseUrl = String(testInfo.project.use.baseURL);
     const browser = await openEngineBrowser(kind);
     try {
@@ -232,6 +246,9 @@ for (const kind of ['firefox', 'chromium', 'webkit', 'chrome', 'edge'] as const)
       await writeFile(receiptPath, JSON.stringify({
         sourceSha: expectedSourceSha,
         engine: kind,
+        engineBinary: kind === 'opera'
+          ? { executablePath: operaExecutablePath, sha256: operaBinarySha256 }
+          : null,
         browserVersion: browser.version(),
         listenerCapabilities,
         ...first,
@@ -241,6 +258,7 @@ for (const kind of ['firefox', 'chromium', 'webkit', 'chrome', 'edge'] as const)
       expect(first.frameDelta).toBeGreaterThan(20);
       expect(first.audioListenerMode).toBe(listenerPoseModeFromCapabilities(listenerCapabilities));
       expect(first.audioContext).toEqual({ source: 'standard', state: 'running' });
+      if (kind === 'opera') expect(first.userAgent).toMatch(/\bOPR\//u);
 
       if (kind === 'firefox') {
         await page.reload({ waitUntil: 'domcontentloaded' });
@@ -266,6 +284,221 @@ for (const kind of ['firefox', 'chromium', 'webkit', 'chrome', 'edge'] as const)
     }
   });
 }
+
+test('iPhone 15-class touch/WebKit starts one-bot Skirmish and survives ADS/reload', async ({ browserName }, testInfo) => {
+  test.skip(browserName !== 'chromium', 'The explicit engine matrix is owned once by the Chromium project.');
+  test.skip(!verifyCrossBrowser,
+    'Run the explicit Pass 70 cross-browser verifier; ordinary Chromium projects do not launch external engines.');
+  test.skip(!engineMatrix.has('webkit'), 'WebKit is not selected by PASS70_ENGINE_MATRIX.');
+  const baseUrl = String(testInfo.project.use.baseURL);
+  const browser = await webkit.launch({ headless: true });
+  try {
+    const { defaultBrowserType: _defaultBrowserType, ...iphone15 } = devices['iPhone 15'];
+    const context = await browser.newContext(iphone15);
+    const page = await newPageWithDeadline(context, 'iphone-15-webkit');
+    const diagnostics: BrowserDiagnostics = { pageErrors: [], consoleErrors: [] };
+    attachBrowserDiagnostics(page, 'iphone-15-webkit', diagnostics);
+    await preparePlayer(page, baseUrl, 'iPhone 15 Solo', 'pass70-iphone15-webkit');
+    const soloBounds = await page.locator('#solo').boundingBox();
+    if (!soloBounds) throw new Error('iPhone 15: solo button has no touch target');
+    await page.touchscreen.tap(soloBounds.x + soloBounds.width / 2, soloBounds.y + soloBounds.height / 2);
+    await page.waitForFunction(() => {
+      const state = (window as any).__ATOMIC_ACRES_DEBUG__?.snapshot();
+      return state?.gameStarted === true && state.matchPhase === 'active' && state.bots?.length === 1;
+    }, undefined, { timeout: 90_000 });
+    const actionBefore = await page.evaluate(() => {
+      const debug = (window as any).__ATOMIC_ACRES_DEBUG__;
+      debug.setBotsFrozen(true);
+      debug.setRenderPaused(false);
+      debug.equipWeapon('carbine');
+      debug.setAmmo('carbine', 2, 30);
+      const root = document.querySelector<HTMLElement>('#mobile-touch-controls');
+      if (!root) throw new Error('Missing mobile touch root');
+      const events: Array<Record<string, unknown>> = [];
+      const record = (event: PointerEvent) => {
+        const control = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-mtc]')?.dataset.mtc;
+        if (!control) return;
+        const state = debug.snapshot();
+        events.push({
+          control,
+          type: event.type,
+          pointerType: event.pointerType,
+          trusted: event.isTrusted,
+          adsHeld: state.textChat.adsHeld,
+          ammo: state.player.ammo,
+          reloading: state.player.reloading,
+        });
+      };
+      root.addEventListener('pointerdown', record);
+      root.addEventListener('pointerup', record);
+      (window as any).__PASS70_MOBILE_INPUT_PROBE__ = events;
+      return { ammo: debug.snapshot().player.ammo };
+    });
+    const touchControl = async (control: 'ads' | 'fire' | 'reload') => {
+      const target = page.locator(`[data-mtc="${control}"]`);
+      await expect(target).toBeVisible();
+      const bounds = await target.boundingBox();
+      if (!bounds || bounds.width < 44 || bounds.height < 44) {
+        throw new Error(`${control}: mobile control is not a positive 44px touch target`);
+      }
+      await page.touchscreen.tap(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+    };
+    await startFrameProbe(page);
+    await touchControl('ads');
+    await page.locator('[data-mtc="ads"]').evaluate((target) => {
+      const control = target as HTMLElement & { setPointerCapture(pointerId: number): void };
+      const originalSetPointerCapture = control.setPointerCapture.bind(control);
+      control.setPointerCapture = () => undefined;
+      (window as any).__PASS70_RESTORE_ADS_POINTER_CAPTURE__ = () => {
+        control.setPointerCapture = originalSetPointerCapture;
+      };
+      control.dispatchEvent(new PointerEvent('pointerdown', {
+        bubbles: true, cancelable: true, pointerId: 70_015, pointerType: 'touch', isPrimary: true, buttons: 1,
+      }));
+    });
+    await expect.poll(async () => page.evaluate(() => (
+      (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().textChat.adsHeld
+    ))).toBe(true);
+    await page.waitForFunction(() => (
+      (window as any).__PASS70_ADS_FRAME_PROBE__.frames >= 30
+      && (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().textChat.adsHeld === true
+      && (window as any).__ATOMIC_ACRES_DEBUG__.sampleActiveWeaponReadiness().ready === true
+    ));
+    await touchControl('fire');
+    await expect.poll(async () => page.evaluate(() => (
+      (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().player.ammo
+    ))).toBe(actionBefore.ammo - 1);
+    await page.locator('[data-mtc="ads"]').evaluate((target) => {
+      target.dispatchEvent(new PointerEvent('pointerup', {
+        bubbles: true, cancelable: true, pointerId: 70_015, pointerType: 'touch', isPrimary: true, buttons: 0,
+      }));
+      (window as any).__PASS70_RESTORE_ADS_POINTER_CAPTURE__?.();
+      delete (window as any).__PASS70_RESTORE_ADS_POINTER_CAPTURE__;
+    });
+    await expect.poll(async () => page.evaluate(() => (
+      (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().textChat.adsHeld
+    ))).toBe(false);
+    await touchControl('reload');
+    await expect.poll(async () => page.evaluate(() => (
+      (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().player.reloading
+    ))).toBe(true);
+    await expect.poll(async () => page.evaluate(() => {
+      const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().player;
+      return !state.reloading && state.ammo > 1;
+    }), { timeout: 15_000 }).toBe(true);
+    await page.waitForTimeout(750);
+    const frameProbe = await stopFrameProbe(page);
+    const first = await page.evaluate(() => {
+      const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+      return {
+        botCount: state.bots.length,
+        audioContext: state.audio.context,
+        audioListenerMode: state.audio.listener.poseMode,
+        runtimeError: document.querySelector('#runtime-error-log')?.textContent?.trim() ?? '',
+        systemPaused: document.querySelector('#banner')?.textContent?.includes('SYSTEM PAUSED') ?? false,
+        ammo: state.player.ammo,
+        reloading: state.player.reloading,
+        matchPhase: state.matchPhase,
+        userAgent: navigator.userAgent,
+        inputEvents: (window as any).__PASS70_MOBILE_INPUT_PROBE__,
+      };
+    });
+    const listenerCapabilities = await sampleBrowserAudioListenerCapabilities(page);
+    const layout = await page.evaluate(() => {
+      const visibleBounds = (selector: string) => {
+        const node = document.querySelector<HTMLElement>(selector);
+        if (!node || node.hidden) return null;
+        const rect = node.getBoundingClientRect();
+        const style = getComputedStyle(node);
+        return {
+          left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom,
+          width: rect.width, height: rect.height,
+          displayed: style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) > 0,
+          pointerEvents: style.pointerEvents,
+        };
+      };
+      const surfaces = {
+        ads: visibleBounds('[data-mtc="ads"]'),
+        fire: visibleBounds('[data-mtc="fire"]'),
+        reload: visibleBounds('[data-mtc="reload"]'),
+        mission: visibleBounds('.hud-mission-console'),
+        operator: visibleBounds('.hud-operator-console'),
+        weapon: visibleBounds('.hud-weapon-console'),
+      };
+      const overlaps = (left: NonNullable<(typeof surfaces)[keyof typeof surfaces]>, right: typeof left) => (
+        left.left < right.right && left.right > right.left && left.top < right.bottom && left.bottom > right.top
+      );
+      const entries = Object.entries(surfaces).filter((entry): entry is [string, NonNullable<(typeof surfaces)[keyof typeof surfaces]>] => entry[1] !== null);
+      const collisions: string[] = [];
+      for (let leftIndex = 0; leftIndex < entries.length; leftIndex += 1) {
+        for (let rightIndex = leftIndex + 1; rightIndex < entries.length; rightIndex += 1) {
+          const left = entries[leftIndex]!;
+          const right = entries[rightIndex]!;
+          if (overlaps(left[1], right[1])) collisions.push(`${left[0]}:${right[0]}`);
+        }
+      }
+      return {
+        viewport: [innerWidth, innerHeight],
+        screen: [screen.width, screen.height],
+        devicePixelRatio,
+        touchPoints: navigator.maxTouchPoints,
+        controlsRoot: visibleBounds('#mobile-touch-controls'),
+        surfaces,
+        collisions,
+        horizontalOverflowPx: Math.max(0, document.documentElement.scrollWidth - innerWidth),
+      };
+    });
+    expect(first).toMatchObject({ botCount: 1, runtimeError: '', systemPaused: false, reloading: false, matchPhase: 'active' });
+    expect(frameProbe.frames).toBeGreaterThan(30);
+    expect(frameProbe.maxGapMs).toBeLessThan(500);
+    expect(first.inputEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({ control: 'ads', type: 'pointerdown', pointerType: 'touch', trusted: true, adsHeld: true }),
+      expect.objectContaining({ control: 'ads', type: 'pointerup', pointerType: 'touch', trusted: true, adsHeld: false }),
+      expect.objectContaining({ control: 'ads', type: 'pointerdown', pointerType: 'touch', trusted: false, adsHeld: true }),
+      expect.objectContaining({ control: 'ads', type: 'pointerup', pointerType: 'touch', trusted: false, adsHeld: false }),
+      expect.objectContaining({ control: 'fire', type: 'pointerdown', pointerType: 'touch', trusted: true, ammo: actionBefore.ammo - 1 }),
+      expect.objectContaining({ control: 'reload', type: 'pointerdown', pointerType: 'touch', trusted: true, reloading: true }),
+    ]));
+    expect(first.audioContext).toEqual({ source: 'standard', state: 'running' });
+    expect(first.audioListenerMode).toBe(listenerPoseModeFromCapabilities(listenerCapabilities));
+    expect(first.userAgent).toMatch(/iPhone.*AppleWebKit.*Mobile.*Safari/u);
+    expect(layout).toMatchObject({
+      viewport: [393, 659], screen: [393, 852], devicePixelRatio: 3,
+      horizontalOverflowPx: 0, collisions: [],
+    });
+    expect(Number(layout.touchPoints)).toBeGreaterThan(0);
+    for (const surface of Object.values(layout.surfaces)) {
+      expect(surface).not.toBeNull();
+      expect(surface.displayed).toBe(true);
+      expect(surface.width).toBeGreaterThanOrEqual(44);
+      expect(surface.height).toBeGreaterThanOrEqual(44);
+      expect(surface.left).toBeGreaterThanOrEqual(0);
+      expect(surface.top).toBeGreaterThanOrEqual(0);
+      expect(surface.right).toBeLessThanOrEqual(393);
+      expect(surface.bottom).toBeLessThanOrEqual(659);
+    }
+    const receiptPath = testInfo.outputPath('pass70-iphone15-webkit-receipt.json');
+    await writeFile(receiptPath, JSON.stringify({
+      sourceSha: expectedSourceSha,
+      device: 'Playwright iPhone 15 descriptor',
+      qualification: 'Windows WebKit emulation; not native iOS Safari',
+      sustainedAdsInput: 'synthetic touch PointerEvent on the production ADS control after a trusted touchscreen tap',
+      browserVersion: browser.version(),
+      listenerCapabilities,
+      layout,
+      frameProbe,
+      ...first,
+    }, null, 2), 'utf8');
+    await testInfo.attach('iphone15-webkit-receipt', { path: receiptPath, contentType: 'application/json' });
+    const screenshot = testInfo.outputPath('pass70-iphone15-webkit.png');
+    await page.screenshot({ path: screenshot, animations: 'disabled' });
+    await testInfo.attach('iphone15-webkit', { path: screenshot, contentType: 'image/png' });
+    expectNoBrowserFaults(diagnostics);
+    await context.close();
+  } finally {
+    await browser.close();
+  }
+});
 
 async function waitForActivePair(host: Page, guest: Page): Promise<void> {
   await Promise.all([host, guest].map((page) => page.waitForFunction(() => {
@@ -489,6 +722,8 @@ test(`Chromium host and ${crossGuestEngine} guest survive ADS combat, guest rejo
       sampleBrowserAudioListenerCapabilities(host),
       sampleBrowserAudioListenerCapabilities(guest),
     ]);
+    const guestUserAgent = await guest.evaluate(() => navigator.userAgent);
+    if (crossGuestEngine === 'opera') expect(guestUserAgent).toMatch(/\bOPR\//u);
     const guestPosition = await guest.evaluate(() => (
       (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().player.position as [number, number, number]
     ));
@@ -554,6 +789,10 @@ test(`Chromium host and ${crossGuestEngine} guest survive ADS combat, guest rejo
     await writeFile(crossEngineReceiptPath, JSON.stringify({
       sourceSha: expectedSourceSha,
       guestEngine: crossGuestEngine,
+      guestEngineBinary: crossGuestEngine === 'opera'
+        ? { executablePath: operaExecutablePath, sha256: operaBinarySha256 }
+        : null,
+      guestUserAgent,
       initialMemberIds,
       remoteReadability,
       listenerCapabilities: { host: hostListenerCapabilities, guest: guestListenerCapabilities },

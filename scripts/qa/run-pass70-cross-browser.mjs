@@ -1,5 +1,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { basename, resolve } from 'node:path';
 
 const targets = Object.freeze({
   available: Object.freeze({
@@ -12,7 +14,22 @@ const targets = Object.freeze({
     engines: 'firefox',
     guestEngine: 'firefox',
     verifyFirefox: true,
+    verifyOpera: false,
     defaultPort: '4548',
+  }),
+  iphone15: Object.freeze({
+    engines: 'webkit',
+    guestEngine: 'webkit',
+    verifyFirefox: false,
+    verifyOpera: false,
+    defaultPort: '4549',
+  }),
+  opera: Object.freeze({
+    engines: 'opera',
+    guestEngine: 'opera',
+    verifyFirefox: false,
+    verifyOpera: true,
+    defaultPort: '4550',
   }),
 });
 
@@ -21,6 +38,20 @@ const target = targets[targetName];
 if (!target) {
   throw new Error(`Pass 70 cross-browser target must be one of ${Object.keys(targets).join(', ')}; received ${targetName || '(missing)'}`);
 }
+const operaExecutablePath = process.env.PASS70_OPERA_EXECUTABLE_PATH
+  ? resolve(process.env.PASS70_OPERA_EXECUTABLE_PATH)
+  : null;
+if (target.verifyOpera && (
+  !operaExecutablePath
+  || !existsSync(operaExecutablePath)
+  || !statSync(operaExecutablePath).isFile()
+  || basename(operaExecutablePath).toLowerCase() !== 'opera.exe'
+)) {
+  throw new Error('Pass 70 Opera verification requires an existing PASS70_OPERA_EXECUTABLE_PATH');
+}
+const operaBinarySha256 = operaExecutablePath
+  ? createHash('sha256').update(readFileSync(operaExecutablePath)).digest('hex')
+  : null;
 
 const sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], {
   cwd: process.cwd(), encoding: 'utf8', windowsHide: true,
@@ -51,6 +82,11 @@ const result = spawnSync(process.execPath, [
     VITE_MATCH_BUILD_ID: sourceSha,
     QA_PREVIEW_PORT: process.env.QA_PREVIEW_PORT ?? target.defaultPort,
     ...(target.verifyFirefox ? { PASS70_VERIFY_FIREFOX: '1' } : {}),
+    ...(target.verifyOpera ? {
+      PASS70_VERIFY_OPERA: '1',
+      PASS70_OPERA_EXECUTABLE_PATH: operaExecutablePath,
+      PASS70_OPERA_BINARY_SHA256: operaBinarySha256,
+    } : {}),
   },
   stdio: 'inherit',
   windowsHide: true,
