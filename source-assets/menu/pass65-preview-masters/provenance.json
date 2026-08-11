@@ -7,43 +7,43 @@
   "releaseState": "HITL candidate only",
   "choreography": {
     "path": "source-assets/menu/pass65-preview-masters/choreography.json",
-    "sha256": "37868fa190fcdd7d94310fd7645209c239db9c666ad4d8ff988825bbac988eb1",
+    "sha256": "bb20e2a901ffcc6a756b30a13f28b67e84495058b061aa821a732d900afd6575",
     "recipeId": "pass66-authoritative-runtime-menu-preview-v2"
   },
   "documentation": {
     "path": "source-assets/menu/pass65-preview-masters/README.md",
-    "sha256": "f53ca307dfa2e353bec90110646750b65bbb301231679a5b63db4e250f39c946"
+    "sha256": "936c0e938dac4fbf060ca1e714bf8e49b6e3efb6647ba81a8c3ce9052db54504"
   },
   "generator": {
     "path": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
-    "sha256": "0cf83fd5e94434951bc6949d90a6aa5db3625707e3cf0298d0a8d59dcc47ef88",
+    "sha256": "6579f04ced1e266bdb6065bb788eadd249e217ab63a33e9fa461a9b520101a26",
     "engine": "Playwright installed Chrome hardware WebGPU",
     "deterministicCapture": true
   },
   "finalizer": {
     "path": "scripts/assets/finalize_pass65_menu_previews.mjs",
-    "sha256": "32077b5cfcb2d9a7e0d83081223fa93fb7c54bb81b381508b93395e52adfa100",
+    "sha256": "abcba66c62b5435253dbf3b984cf775ae91183425a4a23c0a9fb8caa7aa88be1",
     "ffmpeg": "required"
   },
   "verification": {
     "path": "scripts/qa/verify-pass65-menu-preview-production.mjs",
-    "sha256": "d891596c77ff4b034244f3d920cf896473e3483e9e2efc814916856f9565790c",
+    "sha256": "9f3d16467c1830500a56be637118cca8bd14fee65bfe5c4f54d6c792030362e5",
     "failClosed": true
   },
   "captureReceipt": {
     "path": "source-assets/menu/pass65-preview-masters/runtime-capture-receipt.json",
-    "sha256": "0b8c21f9fba2d0563a4d78fbc5cf808a8be79682bc1a08514fa2380951cb1b15",
+    "sha256": "233242833d49a6cd090e7ff65a123322a3f776aaf11c396a2dff8a4e86dda42c",
     "captureId": "pass66-authoritative-runtime-menu-preview-capture-v2",
     "backend": "webgpu"
   },
   "captureTools": [
     {
       "path": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
-      "sha256": "0cf83fd5e94434951bc6949d90a6aa5db3625707e3cf0298d0a8d59dcc47ef88"
+      "sha256": "6579f04ced1e266bdb6065bb788eadd249e217ab63a33e9fa461a9b520101a26"
     },
     {
       "path": "scripts/assets/pass65-menu-preview-integrity.mjs",
-      "sha256": "9125ec7ef5d8aea18ff75c33c68dfec20160926c86e40a783ab766177a5c6b1d"
+      "sha256": "1f0d8d6a9ff8906ffa5a5f4d71670ddaae41dbd2197658fc536fd05c361ac895"
     },
     {
       "path": "scripts/assets/pass65-menu-preview-integrity.d.mts",
@@ -174,24 +174,24 @@
       "public/assets/original/skies/terminal-airport-dawn.webp",
       "public/assets/third-party/quaternius/animated-guns"
     ],
-    "fileCount": 1069,
-    "totalBytes": 112718512,
-    "treeSha256": "48d248481fac258454ae273757938f948ebe72a944d5063cecf8e26e107f5dc2"
+    "fileCount": 1079,
+    "totalBytes": 112895625,
+    "treeSha256": "ee5508fc6d9bc5da5c28f0dfaed7e7d5bb8415be6e48de2bb307ee557b3f3ba3"
   },
   "cacheFamilyLock": {
     "path": "source-assets/menu/pass65-preview-masters/cache-family-lock.json",
-    "sha256": "387aa473df0b03c9140baaa07992da98de65d9e839889407c2984f3dd87ca0bb",
-    "cacheKey": "pass66-runtime-preview-v14",
-    "finalMediaSetSha256": "a6bbb232f86099e760e68ad8ac83675c0bd672920eb0addd7f72e204da37d76b"
+    "sha256": "97ab0e9b9900720c5f0cdc7b10616130ad33d8aad588dd5781baea7f8e084e8f",
+    "cacheKey": "pass66-runtime-preview-v15",
+    "finalMediaSetSha256": "7c32a0ceead6ddf2bc3de130ab66e967dfd5bc828e158e137463ce59adc6aacf"
   },
   "authoredCockpit": {
     "assetId": "chopper-gunner-vehicle-v1",
     "path": "source-assets/blender/pass65-chopper-gunner.blend",
-    "sha256": "0d2bcdc052102f9814046e672f0b9c154ca1b11a4b9914762eda2b9286f072a5",
+    "sha256": "25a2556e5eccddf53e8214acbe71386820e818e359f35aa5b6a074cc3b4142c5",
     "qualityTier": "LOD0",
     "role": "visual design reference; compact black-grey treatment is baked offline over runtime footage",
     "evidence": "docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png",
-    "evidenceSha256": "e285ede0f3834c4cc07aa377c3b47796a8bead9733d7d9c8d64c52b71008c875"
+    "evidenceSha256": "8882a597f015d5e16a731b88c6167bd4eb93fe811992f8424754df5dbd753e8b"
   },
   "sources": [
     {
@@ -221,7 +221,7 @@
           "public/assets/third-party/quaternius/animated-guns/"
         ]
       },
-      "dependencyClosureTreeSha256": "48d248481fac258454ae273757938f948ebe72a944d5063cecf8e26e107f5dc2"
+      "dependencyClosureTreeSha256": "ee5508fc6d9bc5da5c28f0dfaed7e7d5bb8415be6e48de2bb307ee557b3f3ba3"
     },
     {
       "arenaId": "skyline-terminal",
@@ -248,7 +248,7 @@
           "public/assets/third-party/quaternius/animated-guns/"
         ]
       },
-      "dependencyClosureTreeSha256": "48d248481fac258454ae273757938f948ebe72a944d5063cecf8e26e107f5dc2"
+      "dependencyClosureTreeSha256": "ee5508fc6d9bc5da5c28f0dfaed7e7d5bb8415be6e48de2bb307ee557b3f3ba3"
     },
     {
       "arenaId": "rustworks-1v1",
@@ -275,7 +275,7 @@
           "public/assets/third-party/quaternius/animated-guns/"
         ]
       },
-      "dependencyClosureTreeSha256": "48d248481fac258454ae273757938f948ebe72a944d5063cecf8e26e107f5dc2"
+      "dependencyClosureTreeSha256": "ee5508fc6d9bc5da5c28f0dfaed7e7d5bb8415be6e48de2bb307ee557b3f3ba3"
     },
     {
       "arenaId": "gun-range",
@@ -310,7 +310,7 @@
           "public/assets/third-party/quaternius/animated-guns/"
         ]
       },
-      "dependencyClosureTreeSha256": "48d248481fac258454ae273757938f948ebe72a944d5063cecf8e26e107f5dc2"
+      "dependencyClosureTreeSha256": "ee5508fc6d9bc5da5c28f0dfaed7e7d5bb8415be6e48de2bb307ee557b3f3ba3"
     }
   ],
   "render": {
@@ -397,13 +397,13 @@
   "runtimeFiles": [
     {
       "path": "public/assets/original/menu-previews/atomic-acres.mp4",
-      "sha256": "94fa2baea6395dc7dbec774ff659bf147fa20dbb42f27d92a6f7846274a3bc20",
+      "sha256": "eaf9311df48b6a9eaa926f87eb10e544b042adc61e66e602ea01c25cebcd7865",
       "arenaId": "atomic-acres",
       "extension": "mp4"
     },
     {
       "path": "public/assets/original/menu-previews/atomic-acres.webm",
-      "sha256": "085a5652c4039ae851c65809d997d6dd1d7bdf0ddf4223016451c9b49b4680a4",
+      "sha256": "2e587dbbb2f85ae4a53d10c529ba4790ae205102d0df34acc835c8183b42f4c4",
       "arenaId": "atomic-acres",
       "extension": "webm"
     },
@@ -415,13 +415,13 @@
     },
     {
       "path": "public/assets/original/menu-previews/skyline-terminal.mp4",
-      "sha256": "9f3e00921806d95cf1f234cae0688c777952ff5c1edbd602afde099a19c96733",
+      "sha256": "2c8d8731dd8b66cbc849eff5cca9380fccf01d64d203bb9eb2c84f6b3867d96a",
       "arenaId": "skyline-terminal",
       "extension": "mp4"
     },
     {
       "path": "public/assets/original/menu-previews/skyline-terminal.webm",
-      "sha256": "9d586897a28dba0199d6dedaef0f63c40a6a1ddf05b4e9585d2b5ee6ee100366",
+      "sha256": "c4863313d81597e2425ef823eeff65494c1e12344fc48eb49dbe8e4741dadb3c",
       "arenaId": "skyline-terminal",
       "extension": "webm"
     },
@@ -433,13 +433,13 @@
     },
     {
       "path": "public/assets/original/menu-previews/rustworks-1v1.mp4",
-      "sha256": "13103fdeba6b48b867f20b744f30b7f8cd8a3f3338df375b3e54664aa0c93d72",
+      "sha256": "67a9c9e19b48d1bbc6e3efc506c908699e0c119963aae31c6d10326f282dda73",
       "arenaId": "rustworks-1v1",
       "extension": "mp4"
     },
     {
       "path": "public/assets/original/menu-previews/rustworks-1v1.webm",
-      "sha256": "4eb9ac1b69e46fd548e677cfd7e076a7dc7300d80952fd7fa266ba574252a8da",
+      "sha256": "34edbd96c5270392a7d49d4e5c64704c7eb5926f325a6dec622c17c99f319223",
       "arenaId": "rustworks-1v1",
       "extension": "webm"
     },
@@ -471,7 +471,7 @@
   "reviewEvidence": [
     {
       "path": "docs/assets/pass65-menu-previews/atomic-acres-review-frames.webp",
-      "sha256": "62d32a708a8b70515910ef5279af0eef7bcd61f133639c0442dfd93b9413f778",
+      "sha256": "1f18f60c9d55e4490f557514d2ca611dea5b566db0788130d021b9883b1ecf7e",
       "arenaId": "atomic-acres",
       "frames": [
         1,
@@ -483,7 +483,7 @@
     },
     {
       "path": "docs/assets/pass65-menu-previews/skyline-terminal-review-frames.webp",
-      "sha256": "c7d8527bd69436b1d57d0c44af4ea902f3f2768701427b54bd1df83ebefd076e",
+      "sha256": "a5d7deea5dbed2b2687f188995d8c474931dcd8896716180812e6f8d40aa9f2d",
       "arenaId": "skyline-terminal",
       "frames": [
         1,
@@ -495,7 +495,7 @@
     },
     {
       "path": "docs/assets/pass65-menu-previews/rustworks-1v1-review-frames.webp",
-      "sha256": "e6c419dff4666f7e29552d0506a6d4220eca493d4a42bd94edbf0c7fd7a5a09f",
+      "sha256": "98535cc7dae4eb0f28412d06e514a6a100c85b4f5cebef6d277ea7817c6c9a89",
       "arenaId": "rustworks-1v1",
       "frames": [
         1,
