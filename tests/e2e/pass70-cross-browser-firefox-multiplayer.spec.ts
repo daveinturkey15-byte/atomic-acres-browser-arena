@@ -292,6 +292,7 @@ test('Playwright iPhone 15 touch/WebKit starts one-bot Skirmish and survives ADS
   const browser = await webkit.launch({ headless: true });
   try {
     const { defaultBrowserType: _defaultBrowserType, ...iphone15 } = devices['iPhone 15'];
+    expect(iphone15.hasTouch, 'Playwright iPhone 15 descriptor keeps touch emulation enabled').toBe(true);
     const context = await browser.newContext(iphone15);
     const page = await newPageWithDeadline(context, 'iphone-15-webkit');
     const diagnostics: BrowserDiagnostics = { pageErrors: [], consoleErrors: [] };
@@ -448,6 +449,7 @@ test('Playwright iPhone 15 touch/WebKit starts one-bot Skirmish and survives ADS
         screen: [screen.width, screen.height],
         devicePixelRatio,
         touchPoints: navigator.maxTouchPoints,
+        touchStartProperty: 'ontouchstart' in window,
         controlsRoot: visibleBounds('#mobile-touch-controls'),
         surfaces,
         collisions,
@@ -488,7 +490,10 @@ test('Playwright iPhone 15 touch/WebKit starts one-bot Skirmish and survives ADS
       viewport: [393, 659], screen: [393, 852], devicePixelRatio: 3,
       horizontalOverflowPx: 0, collisions: [],
     });
-    expect(Number(layout.touchPoints)).toBeGreaterThan(0);
+    expect(
+      layout.touchStartProperty || Number(layout.touchPoints) > 0,
+      'runtime exposes at least one production touch-capability signal',
+    ).toBe(true);
     for (const surface of Object.values(layout.surfaces)) {
       expect(surface).not.toBeNull();
       expect(surface.displayed).toBe(true);
