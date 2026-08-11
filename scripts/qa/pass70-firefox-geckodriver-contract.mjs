@@ -101,6 +101,24 @@ function inputEventFailures(events, label) {
   return [];
 }
 
+function eventStreamFailures(inputEvents, pointerLockEvents, label) {
+  if (!Array.isArray(inputEvents) || !Array.isArray(pointerLockEvents)) {
+    return [`${label} global event order proof is incomplete`];
+  }
+  const locallyOrdered = (events) => events.every((event, index) => Number.isSafeInteger(event?.sequence)
+    && event.sequence > 0 && finite(event.atMs) && event.atMs >= 0
+    && (index === 0 || (event.sequence > events[index - 1].sequence && event.atMs >= events[index - 1].atMs)));
+  if (!locallyOrdered(inputEvents) || !locallyOrdered(pointerLockEvents)) {
+    return [`${label} global event order proof is invalid`];
+  }
+  const merged = [...inputEvents, ...pointerLockEvents].sort((left, right) => left.sequence - right.sequence);
+  if (merged.some((event, index) => event.sequence !== index + 1
+    || (index > 0 && event.atMs < merged[index - 1].atMs))) {
+    return [`${label} global event order proof is invalid`];
+  }
+  return [];
+}
+
 function faultFailures(value, label) {
   if (!record(value)) return [`${label} fault proof is missing`];
   const errors = [];
@@ -208,6 +226,11 @@ function soloCycleFailures(value, expectedLabel) {
     || value.preRetryPointerLock.pointerRejectCount < 1) {
     errors.push(`${label} automatic pointer-lock request did not settle before native retry`);
   }
+  errors.push(...eventStreamFailures(value.trustedEvents, value.pointerLockEvents, label));
+  const soloClick = Array.isArray(value.trustedEvents)
+    ? value.trustedEvents.find((event) => event?.phase === 'solo' && event.type === 'click'
+      && event.button === 0 && event.trusted === true && event.targetId === 'solo')
+    : null;
   const pointerLockMouseDown = Array.isArray(value.trustedEvents)
     ? value.trustedEvents.find((event) => event?.phase === 'pointer-lock' && event.type === 'mousedown'
       && event.button === 0 && event.trusted === true && event.targetId === 'game')
@@ -216,15 +239,20 @@ function soloCycleFailures(value, expectedLabel) {
     ? value.pointerLockEvents.find((event) => event?.type === 'pointerlockchange'
       && event.phase === 'pointer-lock' && event.trusted === true && event.lockedElementId === 'game'
       && Number.isSafeInteger(event.sequence) && Number.isSafeInteger(pointerLockMouseDown?.sequence)
-      && event.sequence > pointerLockMouseDown.sequence)
+      && event.sequence > pointerLockMouseDown.sequence && event.atMs >= pointerLockMouseDown.atMs)
+    : null;
+  const automaticPointerLockRejection = Array.isArray(value.pointerLockEvents)
+    ? value.pointerLockEvents.find((event) => event?.type === 'pointerlockerror'
+      && event.phase === 'solo' && event.trusted === true && event.lockedElementId === null
+      && Number.isSafeInteger(event.sequence) && Number.isSafeInteger(soloClick?.sequence)
+      && Number.isSafeInteger(pointerLockMouseDown?.sequence)
+      && event.sequence > soloClick.sequence && event.sequence < pointerLockMouseDown.sequence
+      && event.atMs >= soloClick.atMs && event.atMs <= pointerLockMouseDown.atMs)
     : null;
   if (!Array.isArray(value.pointerLockEvents)
     || !successfulPointerLock
-    || !value.pointerLockEvents.some((event) => event?.type === 'pointerlockerror'
-      && event.phase === 'solo' && event.trusted === true && event.lockedElementId === null
-      && Number.isSafeInteger(event.sequence) && event.sequence < pointerLockMouseDown?.sequence)
-    || value.pointerLockEvents.some((event) => event?.type === 'pointerlockerror'
-      && event.phase === 'pointer-lock' && event.sequence > pointerLockMouseDown?.sequence)
+    || !automaticPointerLockRejection
+    || value.pointerLockEvents.some((event) => event?.type === 'pointerlockerror' && event.phase === 'pointer-lock')
     || value.pointerLockEvents.some((event) => !Number.isSafeInteger(event?.sequence)
       || !finite(event?.atMs) || event.atMs < 0)
     || value.pointerLockLifecycle?.surface !== 'hidden'

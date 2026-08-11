@@ -40,6 +40,7 @@ function candidate() {
 }
 
 function trustedSoloEvents() {
+  const sequences = [1, 3, 5, 6, 7, 8, 9, 10];
   return [
     { phase: 'solo', type: 'click', trusted: true, button: 0, code: null, targetId: 'solo' },
     { phase: 'pointer-lock', type: 'mousedown', trusted: true, button: 0, code: null, targetId: 'game' },
@@ -49,7 +50,7 @@ function trustedSoloEvents() {
     { phase: 'ads-up', type: 'mouseup', trusted: true, button: 2, code: null, targetId: 'game' },
     { phase: 'reload', type: 'keydown', trusted: true, button: null, code: 'KeyR', targetId: null },
     { phase: 'reload', type: 'keyup', trusted: true, button: null, code: 'KeyR', targetId: null },
-  ].map((event, index) => ({ sequence: index + 2, atMs: 100 + index, ...event }));
+  ].map((event, index) => ({ sequence: sequences[index], atMs: 99 + sequences[index], ...event }));
 }
 
 function frames() {
@@ -105,8 +106,8 @@ function soloCycle(label) {
     },
     preRetryPointerLock: { locked: false, surface: 'hidden', pointerLockLifecycle: 'denied', pointerRejectCount: 1, status: 'Mouse capture was blocked. Click the match to retry.' },
     pointerLockEvents: [
-      { sequence: 1, atMs: 99, phase: 'solo', type: 'pointerlockerror', trusted: true, lockedElementId: null },
-      { sequence: 4, atMs: 102, phase: 'pointer-lock', type: 'pointerlockchange', trusted: true, lockedElementId: 'game' },
+      { sequence: 2, atMs: 101, phase: 'solo', type: 'pointerlockerror', trusted: true, lockedElementId: null },
+      { sequence: 4, atMs: 103, phase: 'pointer-lock', type: 'pointerlockchange', trusted: true, lockedElementId: 'game' },
     ],
     pointerLockLifecycle: { surface: 'hidden', state: 'locked', rejectCount: 1 },
     adsHeldObserved: true,
@@ -242,6 +243,7 @@ test('accepts an earlier automatic pointer-lock rejection followed by a sequence
   const receipt = validReceipt();
   const solo = receipt.soloCycles[0];
   assert.equal(solo.pointerLockEvents[0].type, 'pointerlockerror');
+  assert.ok(solo.pointerLockEvents[0].sequence > solo.trustedEvents[0].sequence);
   assert.ok(solo.pointerLockEvents[0].sequence < solo.trustedEvents[1].sequence);
   assert.ok(solo.pointerLockEvents[1].sequence > solo.trustedEvents[1].sequence);
   assert.deepEqual(pass70FirefoxGeckodriverReceiptFailures(receipt, expected), []);
@@ -294,11 +296,29 @@ mutation('the automatic request is still pending at native retry', (receipt) => 
   receipt.soloCycles[0].preRetryPointerLock.pointerLockLifecycle = 'requesting';
 }, /did not settle before native retry/u);
 mutation('Firefox emits pointerlockerror', (receipt) => {
-  receipt.soloCycles[0].pointerLockEvents.push({ sequence: 5, atMs: 103, phase: 'pointer-lock', type: 'pointerlockerror', trusted: true, lockedElementId: null });
+  receipt.soloCycles[0].pointerLockEvents.push({ sequence: 11, atMs: 110, phase: 'pointer-lock', type: 'pointerlockerror', trusted: true, lockedElementId: null });
+}, /pointer-lock event\/lifecycle proof/u);
+mutation('the automatic rejection predates the trusted Solo click', (receipt) => {
+  receipt.soloCycles[0].trustedEvents[0].sequence = 2;
+  receipt.soloCycles[0].trustedEvents[0].atMs = 101;
+  receipt.soloCycles[0].pointerLockEvents[0].sequence = 1;
+  receipt.soloCycles[0].pointerLockEvents[0].atMs = 100;
 }, /pointer-lock event\/lifecycle proof/u);
 mutation('an earlier automatic lock is misattributed to the explicit retry', (receipt) => {
-  receipt.soloCycles[0].pointerLockEvents[1].sequence = 2;
+  receipt.soloCycles[0].trustedEvents[1].sequence = 4;
+  receipt.soloCycles[0].trustedEvents[1].atMs = 103;
+  receipt.soloCycles[0].pointerLockEvents[1].sequence = 3;
+  receipt.soloCycles[0].pointerLockEvents[1].atMs = 102;
 }, /pointer-lock event\/lifecycle proof/u);
+mutation('a global event sequence is missing', (receipt) => {
+  delete receipt.soloCycles[0].pointerLockEvents[0].sequence;
+}, /global event order/u);
+mutation('two global events claim the same sequence', (receipt) => {
+  receipt.soloCycles[0].pointerLockEvents[1].sequence = receipt.soloCycles[0].trustedEvents[1].sequence;
+}, /global event order/u);
+mutation('global event time reverses', (receipt) => {
+  receipt.soloCycles[0].pointerLockEvents[1].atMs = receipt.soloCycles[0].trustedEvents[1].atMs - 1;
+}, /global event order/u);
 mutation('a required native input event is missing', (receipt) => { receipt.soloCycles[0].trustedEvents.splice(3, 1); }, /trusted input event proof|missing trusted fire/u);
 mutation('an input event is synthetic', (receipt) => {
   receipt.soloCycles[0].trustedEvents.push({ phase: 'extra', type: 'click', trusted: false, targetId: 'game' });
