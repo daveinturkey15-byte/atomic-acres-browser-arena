@@ -201,6 +201,66 @@ test('Qoder replacement admission restores foreground ownership without widening
   assert.match(rejoin, /samples: presentation\.samples/u);
 });
 
+test('Qoder host recovery gives the guest foreground before actor convergence within the frozen 90s', () => {
+  const source = readFileSync('tests/e2e/pass66-qoder-multiplayer-authority.spec.ts', 'utf8');
+  const ladderStart = source.indexOf("test('post-death ladders survive authenticated replacements");
+  const ladderEnd = source.indexOf("test('a guest death-drop scavenge", ladderStart);
+  assert.ok(ladderStart >= 0 && ladderEnd > ladderStart);
+  const ladder = source.slice(ladderStart, ladderEnd);
+
+  assert.match(source, /HOST_RECOVERY_END_TO_END_TIMEOUT_MS = 90_000/u);
+  assert.match(ladder, /test\.setTimeout\(300_000\)/u);
+  assert.doesNotMatch(ladder, /timeout: 90_000/u);
+  assert.equal(
+    ladder.match(/remainingHostRecoveryTimeoutMs\(hostRecoveryStartedAt\)/gu)?.length,
+    4,
+  );
+
+  const hostClickAt = ladder.indexOf("await host.locator('#host').click();");
+  const hostActiveAt = ladder.indexOf("failHostRecoveryStage('host-active'");
+  const guestForegroundAt = ladder.indexOf('await guest.bringToFront();', hostActiveAt);
+  const guestActiveAt = ladder.indexOf("failHostRecoveryStage('guest-active'", guestForegroundAt);
+  const hostActorsAt = ladder.indexOf("failHostRecoveryStage('host-actors'", guestActiveAt);
+  assert.ok(hostClickAt >= 0 && hostActiveAt > hostClickAt);
+  assert.ok(guestForegroundAt > hostActiveAt && guestActiveAt > guestForegroundAt && hostActorsAt > guestActiveAt);
+  assert.doesNotMatch(ladder.slice(hostClickAt, guestForegroundAt), /killstreak\.actors/u);
+  assert.match(ladder, /visibilityState: document\.visibilityState/u);
+  assert.match(ladder, /hasFocus: document\.hasFocus\(\)/u);
+  assert.match(ladder, /state\.networkLifecycle\.hostConnectionOpen === true/u);
+  assert.match(ladder, /snapshot\(\)\.killstreak\.actors\.length === 2/u);
+  assert.match(ladder, /hostRecoveryElapsedMs > HOST_RECOVERY_END_TO_END_TIMEOUT_MS/u);
+  assert.match(ladder, /'end-to-end-bound'/u);
+  assert.match(ladder, /qoder-host-recovery-complete/u);
+});
+
+test('Qoder death-drop staging derives a collision-clear route without widening its 10s ACK bound', () => {
+  const source = readFileSync('tests/e2e/pass66-qoder-multiplayer-authority.spec.ts', 'utf8');
+  const selectorStart = source.indexOf('async function selectClearDeathDropApproach(');
+  const selectorEnd = source.indexOf('async function stageRemoteAt(', selectorStart);
+  const stageEnd = source.indexOf('function ladderProjection(', selectorEnd);
+  const deathDropStart = source.indexOf("test('a guest death-drop scavenge");
+  const deathDropEnd = source.indexOf("test('Semtex and crossbolt", deathDropStart);
+  assert.ok(selectorStart >= 0 && selectorEnd > selectorStart && stageEnd > selectorEnd);
+  assert.ok(deathDropStart >= 0 && deathDropEnd > deathDropStart);
+  const selector = source.slice(selectorStart, selectorEnd);
+  const stage = source.slice(selectorEnd, stageEnd);
+  const deathDrop = source.slice(deathDropStart, deathDropEnd);
+
+  assert.match(source, /REMOTE_STAGE_ACK_TIMEOUT_MS = 10_000/u);
+  assert.match(selector, /directionIndex < 32/u);
+  assert.match(selector, /dx \* 4/u);
+  assert.match(selector, /dx \* 2\.2/u);
+  assert.match(selector, /collisionProbeAt/u);
+  assert.match(selector, /segmentBlocked/u);
+  assert.match(stage, /timeout: REMOTE_STAGE_ACK_TIMEOUT_MS/u);
+  assert.match(stage, /candidate\.id === id/u);
+  assert.match(stage, /qoder-death-drop-stage-/u);
+  assert.match(deathDrop, /selectClearDeathDropApproach\(guest, dropPosition\)/u);
+  assert.match(deathDrop, /stageRemoteAt\(guest, host, guestId, approach\.outer, 'outer'\)/u);
+  assert.match(deathDrop, /stageRemoteAt\(guest, host, guestId, approach\.middle, 'middle'\)/u);
+  assert.doesNotMatch(deathDrop, /dropZ \+ (?:4|2\.2)/u);
+});
+
 test('final receipt binds exact runtime, test matrix and five physical peer identities', () => {
   const baseUrl = 'http://127.0.0.1:4530/channels/the-big-one/';
   const receipt = {

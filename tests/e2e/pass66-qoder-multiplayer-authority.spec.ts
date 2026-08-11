@@ -12,6 +12,17 @@ const REJOIN_TRANSPORT_ADMISSION_TIMEOUT_MS = 20_000;
 const REJOIN_END_TO_END_ADMISSION_TIMEOUT_MS = 75_000;
 const REJOIN_PRESENTATION_SAMPLE_INTERVAL_MS = 500;
 const REJOIN_PRESENTATION_TRACE_INTERVAL_MS = 5_000;
+const HOST_RECOVERY_END_TO_END_TIMEOUT_MS = 90_000;
+const REMOTE_STAGE_ACK_TIMEOUT_MS = 10_000;
+
+type Position3 = readonly [number, number, number];
+
+type DeathDropApproach = Readonly<{
+  directionIndex: number;
+  outer: Position3;
+  middle: Position3;
+  pickup: Position3;
+}>;
 
 type RejoinAdmissionSample = Readonly<{
   ready: boolean;
@@ -269,6 +280,105 @@ async function settleCrashPrimitive(operation: Promise<unknown>, timeoutMs = 5_0
   ]);
 }
 
+function remainingHostRecoveryTimeoutMs(startedAt: number): number {
+  return Math.max(1, HOST_RECOVERY_END_TO_END_TIMEOUT_MS - (Date.now() - startedAt));
+}
+
+async function sampleHostRecoveryEvidence(host: Page, guest: Page): Promise<unknown> {
+  const sample = (page: Page) => page.evaluate(() => {
+    const debug = (window as any).__ATOMIC_ACRES_DEBUG__;
+    const state = debug?.snapshot?.() ?? null;
+    return {
+      document: {
+        visibilityState: document.visibilityState,
+        hasFocus: document.hasFocus(),
+      },
+      gameStarted: state?.gameStarted === true,
+      matchPhase: state?.matchPhase ?? null,
+      actorCount: state?.killstreak?.actors?.length ?? null,
+      remotePlayerCount: state?.remotePlayers?.length ?? null,
+      networkLifecycle: state?.networkLifecycle ?? null,
+      privateMatch: state?.privateMatch ?? null,
+      admission: debug?.admissionState?.() ?? null,
+      weaponCatalog: debug?.sampleWeaponCatalogReadiness?.() ?? null,
+      deployment: document.querySelector<HTMLElement>('#deployment-transition')?.dataset ?? null,
+    };
+  });
+  const [hostState, guestState] = await Promise.all([sample(host), sample(guest)]);
+  return { capturedAtEpochMs: Date.now(), host: hostState, guest: guestState };
+}
+
+async function failHostRecoveryStage(
+  stage: string,
+  startedAt: number,
+  host: Page,
+  guest: Page,
+  cause: unknown,
+): Promise<never> {
+  const elapsedMs = Date.now() - startedAt;
+  const diagnostic = await sampleHostRecoveryEvidence(host, guest);
+  await attachRejoinEvidence(`qoder-host-recovery-${stage}`, {
+    stage,
+    elapsedMs,
+    endToEndTimeoutMs: HOST_RECOVERY_END_TO_END_TIMEOUT_MS,
+    diagnostic,
+  });
+  throw new Error(`Qoder host recovery failed at ${stage} after ${elapsedMs} ms`, { cause });
+}
+
+async function selectClearDeathDropApproach(guest: Page, dropPosition: Position3): Promise<DeathDropApproach | null> {
+  const selected = await guest.evaluate(([dropX, dropY, dropZ]) => {
+    const api = (window as any).__ATOMIC_ACRES_DEBUG__;
+    const pickup: [number, number, number] = [dropX, dropY + 1.55, dropZ];
+    for (let directionIndex = 0; directionIndex < 32; directionIndex += 1) {
+      const angle = directionIndex * Math.PI / 16;
+      const dx = Math.cos(angle);
+      const dz = Math.sin(angle);
+      const outer: [number, number, number] = [dropX + dx * 4, pickup[1], dropZ + dz * 4];
+      const middle: [number, number, number] = [dropX + dx * 2.2, pickup[1], dropZ + dz * 2.2];
+      if ([outer, middle, pickup].some(([x, y, z]) => api.collisionProbeAt(x, y, z))) continue;
+      if (api.segmentBlocked(outer[0], outer[2], pickup[0], pickup[2])) continue;
+      return { directionIndex, outer, middle, pickup };
+    }
+    return null;
+  }, dropPosition);
+  return selected as DeathDropApproach | null;
+}
+
+async function stageRemoteAt(
+  guest: Page,
+  host: Page,
+  remoteId: string,
+  position: Position3,
+  label: string,
+): Promise<void> {
+  await guest.evaluate(([x, y, z]) => (
+    (window as any).__ATOMIC_ACRES_DEBUG__.teleportPlayer(x, y, z)
+  ), position);
+  try {
+    await host.waitForFunction(({ id, target }) => {
+      const remote = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers
+        .find((candidate: any) => candidate.id === id);
+      return remote !== undefined
+        && Math.abs(remote.position[0] - target[0]) < 0.5
+        && Math.abs(remote.position[2] - target[2]) < 0.5;
+    }, { id: remoteId, target: position }, { timeout: REMOTE_STAGE_ACK_TIMEOUT_MS });
+  } catch (error) {
+    const [guestState, hostState] = await Promise.all([
+      guest.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().player),
+      host.evaluate((id) => (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers
+        .find((candidate: any) => candidate.id === id) ?? null, remoteId),
+    ]);
+    await attachRejoinEvidence(`qoder-death-drop-stage-${label}`, {
+      label,
+      target: position,
+      guest: guestState,
+      hostRemote: hostState,
+    });
+    throw new Error(`Qoder death-drop ${label} position was not acknowledged within ${REMOTE_STAGE_ACK_TIMEOUT_MS} ms`, { cause: error });
+  }
+}
+
 function ladderProjection(state: any): any[] {
   return state.killstreak.actors.map((actor: any) => ({
     actorId: actor.actorId,
@@ -415,14 +525,61 @@ test('post-death ladders survive authenticated replacements and an immediate hos
     host = await openPlayer(hostContext, 'Ladder Host', 'pass66-ladder-host-recovery');
     host.on('pageerror', (error) => errors.push(`recovered host: ${error.message}`));
     await expect(host.locator('#host')).toHaveText('RESUME HOSTED MATCH');
+    const hostRecoveryStartedAt = Date.now();
     await host.locator('#host').click();
-    await host.waitForFunction(() => {
-      const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
-      return state.gameStarted && state.matchPhase === 'active' && state.killstreak.actors.length === 2;
-    }, undefined, { timeout: 90_000 });
-    await guest.waitForFunction(() => (
-      (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().networkLifecycle.hostConnectionOpen === true
-    ), undefined, { timeout: 90_000 });
+    try {
+      await host.waitForFunction(() => {
+        const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+        return state.gameStarted && state.matchPhase === 'active';
+      }, undefined, { timeout: remainingHostRecoveryTimeoutMs(hostRecoveryStartedAt) });
+    } catch (error) {
+      await failHostRecoveryStage('host-active', hostRecoveryStartedAt, host, guest, error);
+    }
+    await guest.bringToFront();
+    try {
+      await expect.poll(async () => guest.evaluate(() => ({
+        visibilityState: document.visibilityState,
+        hasFocus: document.hasFocus(),
+      })), {
+        timeout: Math.min(
+          REJOIN_FOREGROUND_OWNERSHIP_TIMEOUT_MS,
+          remainingHostRecoveryTimeoutMs(hostRecoveryStartedAt),
+        ),
+      }).toEqual({ visibilityState: 'visible', hasFocus: true });
+    } catch (error) {
+      await failHostRecoveryStage('guest-foreground', hostRecoveryStartedAt, host, guest, error);
+    }
+    try {
+      await guest.waitForFunction(() => {
+        const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+        return state.gameStarted && state.matchPhase === 'active'
+          && state.networkLifecycle.hostConnectionOpen === true;
+      }, undefined, { timeout: remainingHostRecoveryTimeoutMs(hostRecoveryStartedAt) });
+    } catch (error) {
+      await failHostRecoveryStage('guest-active', hostRecoveryStartedAt, host, guest, error);
+    }
+    try {
+      await host.waitForFunction(() => (
+        (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().killstreak.actors.length === 2
+      ), undefined, { timeout: remainingHostRecoveryTimeoutMs(hostRecoveryStartedAt) });
+    } catch (error) {
+      await failHostRecoveryStage('host-actors', hostRecoveryStartedAt, host, guest, error);
+    }
+    const hostRecoveryElapsedMs = Date.now() - hostRecoveryStartedAt;
+    if (hostRecoveryElapsedMs > HOST_RECOVERY_END_TO_END_TIMEOUT_MS) {
+      await failHostRecoveryStage(
+        'end-to-end-bound',
+        hostRecoveryStartedAt,
+        host,
+        guest,
+        new Error(`Recovery completed after ${hostRecoveryElapsedMs} ms`),
+      );
+    }
+    await attachRejoinEvidence('qoder-host-recovery-complete', {
+      elapsedMs: hostRecoveryElapsedMs,
+      endToEndTimeoutMs: HOST_RECOVERY_END_TO_END_TIMEOUT_MS,
+      diagnostic: await sampleHostRecoveryEvidence(host, guest),
+    });
 
     await expect.poll(async () => host.evaluate(({ id, lifeId }) => {
       const actor = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().killstreak.actors
@@ -534,26 +691,14 @@ test('a guest death-drop scavenge converges through host authority exactly once'
       return { ammo: state.player.ammo, reserve: state.player.reserve };
     })).toEqual({ ammo: 30, reserve: 119 });
 
-    const [dropX, dropY, dropZ] = hostDrop.position as [number, number, number];
+    const dropPosition = hostDrop.position as Position3;
+    const approach = await selectClearDeathDropApproach(guest, dropPosition);
+    if (!approach) throw new Error(`No collision-clear death-drop approach for ${JSON.stringify(dropPosition)}`);
+    await stageRemoteAt(guest, host, guestId, approach.outer, 'outer');
+    await stageRemoteAt(guest, host, guestId, approach.middle, 'middle');
     await guest.evaluate(([x, y, z]) => (
       (window as any).__ATOMIC_ACRES_DEBUG__.teleportPlayer(x, y, z)
-    ), [dropX, dropY + 1.55, dropZ + 4]);
-    await host.waitForFunction(([x, z]) => (
-      (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers
-        .some((remote: any) => Math.abs(remote.position[0] - x) < 0.5
-          && Math.abs(remote.position[2] - (z + 4)) < 0.5)
-    ), [dropX, dropZ], { timeout: 10_000 });
-    await guest.evaluate(([x, y, z]) => (
-      (window as any).__ATOMIC_ACRES_DEBUG__.teleportPlayer(x, y, z)
-    ), [dropX, dropY + 1.55, dropZ + 2.2]);
-    await host.waitForFunction(([x, z]) => (
-      (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers
-        .some((remote: any) => Math.abs(remote.position[0] - x) < 0.5
-          && Math.abs(remote.position[2] - (z + 2.2)) < 0.5)
-    ), [dropX, dropZ], { timeout: 10_000 });
-    await guest.evaluate(([x, y, z]) => (
-      (window as any).__ATOMIC_ACRES_DEBUG__.teleportPlayer(x, y, z)
-    ), [dropX, dropY + 1.55, dropZ]);
+    ), approach.pickup);
 
     await expect.poll(async () => guest.evaluate(() => {
       const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
