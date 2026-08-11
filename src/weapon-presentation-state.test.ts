@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
+  VIEWMODEL_CONTACT_PROFILES,
+  VIEWMODEL_CONTACT_RESPONSE_CONTRACT,
   advanceAdsBlend,
   advanceWeaponHeat,
   fireCycleAt,
   hitReactionAt,
   magnifiedFovDegrees,
   viewmodelFloorClearance,
+  viewmodelContactResponse,
   viewmodelObstructionPose,
   viewmodelSurfaceRetreat,
 } from './weapon-presentation-state';
+import { WEAPON_IDS } from './protocol';
 
 describe('weapon presentation state', () => {
   it('accumulates and cools bounded weapon heat', () => {
@@ -92,5 +96,57 @@ describe('weapon presentation state', () => {
     expect(viewmodelFloorClearance(null, false, 0.61)).toBeNull();
     expect(viewmodelObstructionPose(null, true, viewmodelFloorClearance(null, true, 0.61)).lift)
       .toBeGreaterThanOrEqual(0.13);
+  });
+
+  it('owns a bounded contact response for every canonical weapon', () => {
+    expect(Object.keys(VIEWMODEL_CONTACT_PROFILES).sort()).toEqual([...WEAPON_IDS].sort());
+    for (const weapon of WEAPON_IDS) {
+      const profile = VIEWMODEL_CONTACT_PROFILES[weapon];
+      const response = viewmodelContactResponse(weapon, 0.7, 0.2, true, 0);
+      expect(profile.weapon).toBe(weapon);
+      expect(profile.minimumScale).toBeGreaterThanOrEqual(0.7);
+      expect(profile.minimumScale).toBeLessThanOrEqual(0.9);
+      expect(response).toMatchObject({
+        contract: VIEWMODEL_CONTACT_RESPONSE_CONTRACT,
+        profileId: weapon,
+        active: true,
+        aimAuthority: 'camera-forward-unchanged',
+      });
+      expect(response.obstructionBlend).toBeGreaterThan(0.85);
+      expect(response.pitchRadians).toBeGreaterThan(0.5);
+      expect(response.scale).toBeGreaterThanOrEqual(profile.minimumScale);
+      expect(response.scale).toBeLessThan(1);
+      expect([
+        response.pitchRadians,
+        response.yawRadians,
+        response.rollRadians,
+        response.additionalLiftMeters,
+        response.scale,
+      ].every(Number.isFinite)).toBe(true);
+    }
+  });
+
+  it('leaves open-space hip pose neutral and removes contact cant at settled ADS', () => {
+    expect(viewmodelContactResponse('carbine', 0, 0, false, 0)).toMatchObject({
+      active: false,
+      obstructionBlend: 0,
+      highReadyBlend: 0,
+      pitchRadians: 0,
+      yawRadians: 0,
+      rollRadians: 0,
+      additionalLiftMeters: 0,
+      scale: 1,
+    });
+    const adsContact = viewmodelContactResponse('carbine', 0.7, 0.2, true, 1);
+    expect(adsContact).toMatchObject({
+      active: true,
+      highReadyBlend: 0,
+      pitchRadians: 0,
+      yawRadians: 0,
+      rollRadians: 0,
+      aimAuthority: 'camera-forward-unchanged',
+    });
+    expect(adsContact.scale).toBe(1);
+    expect(adsContact.additionalLiftMeters).toBe(0);
   });
 });

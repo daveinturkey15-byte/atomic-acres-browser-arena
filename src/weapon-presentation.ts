@@ -20,7 +20,13 @@ import {
 } from './operator-model';
 import { solveTwoBoneElbow, solveTwoBoneElbowInto, type TwoBoneElbowScratch } from './ik';
 import { reloadActionEvents, reloadPoseAt, viewmodelReloadStageAt, type ReloadPose, type WeaponActionEvent } from './weapon-actions';
-import { advanceAdsBlend, advanceWeaponHeat, fireCycleAt } from './weapon-presentation-state';
+import {
+  advanceAdsBlend,
+  advanceWeaponHeat,
+  fireCycleAt,
+  viewmodelContactResponse,
+  type ViewmodelContactResponse,
+} from './weapon-presentation-state';
 import { weaponFamilyPresentation } from './weapon-family-presentation';
 import {
   PASS70_FIRST_PERSON_OPTIC_WINDOW_CONTRACT,
@@ -933,6 +939,8 @@ export class WeaponPresentation {
   private flamethrowerHeldFireClearancePrewarmChecks = 0;
   private surfaceRetreat = 0;
   private surfaceLift = 0;
+  private prone = false;
+  private contactResponse: ViewmodelContactResponse = viewmodelContactResponse('carbine', 0, 0, false, 0);
   private fullscreenPresentationSuppressed = false;
   private readonly minigunSpool = createMinigunSpoolState();
   private actionContract: CharacterActionContract = characterActionContract({
@@ -2325,6 +2333,13 @@ export class WeaponPresentation {
     const previousActive = this.active;
     if (id !== this.active) resetMinigunSpool(this.minigunSpool);
     this.active = id;
+    this.contactResponse = viewmodelContactResponse(
+      id,
+      this.surfaceRetreat,
+      this.surfaceLift,
+      this.prone,
+      this.adsBlend,
+    );
     this.switchBlend = immediate ? 1 : 0;
     this.reloadLastProgress = 0;
     this.pendingScattergunShell = false;
@@ -2361,10 +2376,7 @@ export class WeaponPresentation {
   setPresentationVisible(visible: boolean): void {
     if (this.fullscreenPresentationSuppressed) {
       this.fullscreenPresentationSuppressed = false;
-      this.root.scale.setScalar(
-        THREE.MathUtils.lerp(HIP_VIEWMODEL_SCALE, ADS_VIEWMODEL_SCALE, this.adsBlend)
-          * viewmodelScreenScale(this.camera),
-      );
+      this.root.scale.setScalar(this.unsuppressedViewmodelScale());
     }
     this.root.visible = visible;
     this.viewmodelFill.intensity = visible
@@ -2384,7 +2396,7 @@ export class WeaponPresentation {
     this.root.visible = true;
     this.root.scale.setScalar(suppressed
       ? FULLSCREEN_PRESENTATION_SUPPRESSED_SCALE
-      : THREE.MathUtils.lerp(HIP_VIEWMODEL_SCALE, ADS_VIEWMODEL_SCALE, this.adsBlend) * viewmodelScreenScale(this.camera));
+      : this.unsuppressedViewmodelScale());
     this.viewmodelFill.intensity = suppressed
       ? 0
       : Number(this.viewmodelFill.userData.authoredIntensity ?? 0);
@@ -2393,6 +2405,12 @@ export class WeaponPresentation {
 
   suppressForSniperScope(suppressed: boolean): void {
     this.suppressForFullscreenPresentation(suppressed);
+  }
+
+  private unsuppressedViewmodelScale(): number {
+    return THREE.MathUtils.lerp(HIP_VIEWMODEL_SCALE, ADS_VIEWMODEL_SCALE, this.adsBlend)
+      * viewmodelScreenScale(this.camera)
+      * this.contactResponse.scale;
   }
 
   /**
@@ -2421,6 +2439,8 @@ export class WeaponPresentation {
     this.shotsPresented = 0;
     this.surfaceRetreat = surfaceRetreat;
     this.surfaceLift = 0;
+    this.prone = false;
+    this.contactResponse = viewmodelContactResponse(this.active, surfaceRetreat, 0, false, 0);
     resetMinigunSpool(this.minigunSpool);
 
     this.muzzleLight.intensity = 0;
@@ -2450,15 +2470,19 @@ export class WeaponPresentation {
     const surfaceRetreatClamped = Math.min(surfaceRetreat, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT);
     this.root.position.set(
       HIP_VIEWMODEL_POSITION.x,
-      HIP_VIEWMODEL_POSITION.y,
+      HIP_VIEWMODEL_POSITION.y + this.contactResponse.additionalLiftMeters,
       // The wall retreat is capped at the near-plane-safe distance: pushing
       // the weapon further back would drive the arms/stock through the near
       // plane and fail the prone framing contract.
       HIP_VIEWMODEL_POSITION.z + surfaceRetreatClamped - VIEWMODEL_NEAR_PLANE_CLEARANCE
         - authoredNearPlaneContactRetreat(this.active, surfaceRetreatClamped),
     );
-    this.root.rotation.set(0, weaponHipYaw(this.active), 0);
-    this.root.scale.setScalar(HIP_VIEWMODEL_SCALE);
+    this.root.rotation.set(
+      this.contactResponse.pitchRadians,
+      weaponHipYaw(this.active) + this.contactResponse.yawRadians,
+      this.contactResponse.rollRadians,
+    );
+    this.root.scale.setScalar(HIP_VIEWMODEL_SCALE * this.contactResponse.scale);
     this.meleeRig.visible = false;
     this.meleeKnife.visible = false;
     this.passiveKnife.visible = false;
@@ -2983,6 +3007,7 @@ export class WeaponPresentation {
       actionContract: this.actionContract,
       surfaceRetreat: this.surfaceRetreat,
       surfaceLift: this.surfaceLift,
+      contactResponse: this.contactResponse,
       riggedArms: this.riggedArmDiagnostics,
       armsSource: arms?.userData.authoredFirstPersonArms === true
         ? 'authored-two-chain'
@@ -3423,10 +3448,20 @@ export class WeaponPresentation {
     this.swayX = THREE.MathUtils.lerp(this.swayX, 0, smoothing(7));
     this.swayY = THREE.MathUtils.lerp(this.swayY, 0, smoothing(7));
     this.adsBlend = advanceAdsBlend(this.adsBlend, pose.ads, pose.dt, this.active);
+    this.surfaceRetreat = pose.surfaceRetreat ?? 0;
+    this.surfaceLift = pose.surfaceLift ?? 0;
+    this.prone = pose.prone;
+    this.contactResponse = viewmodelContactResponse(
+      this.active,
+      this.surfaceRetreat,
+      this.surfaceLift,
+      this.prone,
+      this.adsBlend,
+    );
     // The physical aperture and bounded retreat own ADS clearance. Weapon
     // receivers, stocks and hands remain opaque; only semantically named lens
     // materials are clear from model instantiation onward.
-    this.root.scale.setScalar(THREE.MathUtils.lerp(HIP_VIEWMODEL_SCALE, ADS_VIEWMODEL_SCALE, this.adsBlend) * viewmodelScreenScale(this.camera));
+    this.root.scale.setScalar(this.unsuppressedViewmodelScale());
     this.sprintBlend = THREE.MathUtils.lerp(this.sprintBlend, pose.sprinting ? 1 : 0, smoothing(13));
     this.muzzleFlash.visible = this.muzzleLight.intensity > 0.45;
     const arms = this.root.getObjectByName('first-person-arms');
@@ -3662,22 +3697,34 @@ export class WeaponPresentation {
       - (presentationKick > 0.05 ? 0.1 : 0);
     const targetPosition = this.frameTargetPosition.set(
       viewmodelBaseX + adsX + (bobX + this.swayX) * aimSteady - pose.lateralSpeed * 0.012 * aimSteady + meleeArc * viewmodelMeleeScreenOffset(this.camera) + grenadeArc * 0.18 + reloadStage.lateral,
-      viewmodelBaseY + adsY + (bobY + breath) * aimSteady + sprintDrop + crouchLift + proneLift + switchDrop + reloadStage.lift - presentationKick * 0.095 - pose.landingImpulse * 0.075 * aimSteady + meleeArc * 0.26,
+      viewmodelBaseY + adsY + (bobY + breath) * aimSteady + sprintDrop + crouchLift + proneLift
+        + this.contactResponse.additionalLiftMeters + switchDrop + reloadStage.lift
+        - presentationKick * 0.095 - pose.landingImpulse * 0.075 * aimSteady + meleeArc * 0.26,
       Math.min(
         viewmodelBaseZ + adsZ + surfaceRetreatClamped - adsSightPictureRetreat - VIEWMODEL_NEAR_PLANE_CLEARANCE + presentationKick * profile.recoilTranslation * 1.12 + grenadeArc * 0.24,
         fireNearPlaneCapZ,
       ) - authoredContactRetreat,
     );
-    this.surfaceRetreat = pose.surfaceRetreat ?? 0;
-    this.surfaceLift = pose.surfaceLift ?? 0;
     this.root.position.lerp(targetPosition, smoothing(18));
-    this.root.rotation.x = THREE.MathUtils.lerp(this.root.rotation.x, presentationKick * profile.recoilRotation * 1.15 - this.swayY * aimSteady - grenadeArc * 0.42 + reloadStage.pitch, smoothing(22));
+    this.root.rotation.x = THREE.MathUtils.lerp(
+      this.root.rotation.x,
+      presentationKick * profile.recoilRotation * 1.15 - this.swayY * aimSteady
+        - grenadeArc * 0.42 + reloadStage.pitch + this.contactResponse.pitchRadians,
+      smoothing(22),
+    );
     this.root.rotation.y = THREE.MathUtils.lerp(
       this.root.rotation.y,
-      hipYaw * (1 - this.adsBlend) - this.swayX * 2 * aimSteady - this.sprintBlend * 0.38 - meleeArc * 0.18,
+      hipYaw * (1 - this.adsBlend) - this.swayX * 2 * aimSteady - this.sprintBlend * 0.38
+        - meleeArc * 0.18 + this.contactResponse.yawRadians,
       smoothing(13),
     );
-    this.root.rotation.z = THREE.MathUtils.lerp(this.root.rotation.z, reloadStage.roll - this.sprintBlend * 0.22 - pose.lateralSpeed * (pose.prone ? 0.01 : 0.025) * aimSteady - meleeArc * 0.42 + shotRoll, smoothing(13));
+    this.root.rotation.z = THREE.MathUtils.lerp(
+      this.root.rotation.z,
+      reloadStage.roll - this.sprintBlend * 0.22
+        - pose.lateralSpeed * (pose.prone ? 0.01 : 0.025) * aimSteady
+        - meleeArc * 0.42 + shotRoll + this.contactResponse.rollRadians,
+      smoothing(13),
+    );
     this.centerSightReference(activeModel);
     if (arms && !meleeActive) this.solveArms(arms, activeModel, reloadPose);
     if (!authoredMeleeActive) this.solveRiggedArms(activeModel, reloadPose);

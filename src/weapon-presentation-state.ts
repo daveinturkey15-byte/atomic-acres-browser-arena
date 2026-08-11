@@ -20,10 +20,133 @@ export type ViewmodelObstructionPose = Readonly<{
   lift: number;
 }>;
 
+export type ViewmodelContactProfile = Readonly<{
+  weapon: WeaponId;
+  maximumHighReadyPitchRadians: number;
+  maximumYawRadians: number;
+  maximumRollRadians: number;
+  maximumAdditionalLiftMeters: number;
+  minimumScale: number;
+}>;
+
+export type ViewmodelContactResponse = Readonly<{
+  contract: typeof VIEWMODEL_CONTACT_RESPONSE_CONTRACT;
+  profileId: WeaponId;
+  active: boolean;
+  wallBlend: number;
+  floorBlend: number;
+  obstructionBlend: number;
+  highReadyBlend: number;
+  pitchRadians: number;
+  yawRadians: number;
+  rollRadians: number;
+  additionalLiftMeters: number;
+  scale: number;
+  minimumScale: number;
+  aimAuthority: 'camera-forward-unchanged';
+}>;
+
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
 const finite = (value: number, fallback = 0): number => Number.isFinite(value) ? value : fallback;
 export const ADS_IN_RESPONSE_PER_SECOND = 22;
 export const ADS_OUT_RESPONSE_PER_SECOND = 18;
+export const VIEWMODEL_CONTACT_RESPONSE_CONTRACT = 'catalog-viewmodel-contact-response-v1';
+const VIEWMODEL_PRONE_BASE_RETREAT_METERS = 0.09;
+const VIEWMODEL_MAX_WALL_RETREAT_METERS = 0.62;
+const VIEWMODEL_PRONE_BASE_LIFT_METERS = 0.115;
+const VIEWMODEL_PRONE_FLOOR_LIFT_BUDGET_METERS = 0.085;
+const VIEWMODEL_STANDING_FLOOR_LIFT_BUDGET_METERS = 0.04;
+
+const contactProfile = (
+  weapon: WeaponId,
+  maximumHighReadyPitchRadians: number,
+  minimumScale: number,
+  maximumYawRadians = -0.14,
+  maximumRollRadians = 0.09,
+  maximumAdditionalLiftMeters = 0.055,
+): ViewmodelContactProfile => Object.freeze({
+  weapon,
+  maximumHighReadyPitchRadians,
+  maximumYawRadians,
+  maximumRollRadians,
+  maximumAdditionalLiftMeters,
+  minimumScale,
+});
+
+/**
+ * One explicit response for every canonical first-person weapon. Long/heavy
+ * families receive a stronger high-ready fold and slightly more foreshortening;
+ * compact sidearms retain more of their authored screen size. The complete
+ * catalog record prevents a newly added gun from silently reverting to the
+ * clipping-prone neutral pose.
+ */
+export const VIEWMODEL_CONTACT_PROFILES: Readonly<Record<WeaponId, ViewmodelContactProfile>> = Object.freeze({
+  carbine: contactProfile('carbine', 0.82, 0.79),
+  smg: contactProfile('smg', 0.68, 0.83, -0.11, 0.075, 0.045),
+  lmg: contactProfile('lmg', 0.94, 0.76, -0.17, 0.1, 0.065),
+  scattergun: contactProfile('scattergun', 0.9, 0.77, -0.16, 0.1, 0.06),
+  sniper: contactProfile('sniper', 0.96, 0.75, -0.17, 0.1, 0.065),
+  'mini-uzi': contactProfile('mini-uzi', 0.62, 0.85, -0.1, 0.07, 0.04),
+  mp5: contactProfile('mp5', 0.7, 0.82, -0.12, 0.08, 0.05),
+  m4a1: contactProfile('m4a1', 0.84, 0.78),
+  'ak-47': contactProfile('ak-47', 0.86, 0.78, -0.15),
+  minigun: contactProfile('minigun', 1, 0.74, -0.18, 0.11, 0.07),
+  'm14-ebr': contactProfile('m14-ebr', 0.94, 0.76, -0.16, 0.1, 0.065),
+  'slug-shotgun': contactProfile('slug-shotgun', 0.92, 0.76, -0.16, 0.1, 0.065),
+  pistol: contactProfile('pistol', 0.56, 0.87, -0.08, 0.06, 0.035),
+  'machine-pistol': contactProfile('machine-pistol', 0.62, 0.85, -0.09, 0.065, 0.04),
+  magnum: contactProfile('magnum', 0.62, 0.84, -0.09, 0.065, 0.04),
+  'flashlight-pistol': contactProfile('flashlight-pistol', 0.58, 0.86, -0.08, 0.06, 0.04),
+  'explosive-crossbow': contactProfile('explosive-crossbow', 0.78, 0.8, -0.13, 0.085, 0.055),
+  railgun: contactProfile('railgun', 0.98, 0.75, -0.18, 0.11, 0.07),
+  flamethrower: contactProfile('flamethrower', 0.96, 0.75, -0.18, 0.11, 0.07),
+  'flare-gun': contactProfile('flare-gun', 0.55, 0.87, -0.08, 0.06, 0.035),
+});
+
+/**
+ * Presentation-only contact fold. Fully settled ADS keeps the authored sight
+ * axis and aperture framing unmodified; hip fire progressively raises, cants
+ * and foreshortens the complete connected weapon-and-hands root.
+ * No camera, projectile or gameplay-ray state is an input or output.
+ */
+export function viewmodelContactResponse(
+  weapon: WeaponId,
+  surfaceRetreatMeters: number,
+  surfaceLiftMeters: number,
+  prone: boolean,
+  adsBlend: number,
+): ViewmodelContactResponse {
+  const profile = VIEWMODEL_CONTACT_PROFILES[weapon];
+  const retreat = Math.max(0, finite(surfaceRetreatMeters));
+  const lift = Math.max(0, finite(surfaceLiftMeters));
+  const wallBlend = clamp01(
+    (retreat - (prone ? VIEWMODEL_PRONE_BASE_RETREAT_METERS : 0))
+      / VIEWMODEL_MAX_WALL_RETREAT_METERS,
+  );
+  const floorBlend = clamp01(
+    (lift - (prone ? VIEWMODEL_PRONE_BASE_LIFT_METERS : 0))
+      / (prone ? VIEWMODEL_PRONE_FLOOR_LIFT_BUDGET_METERS : VIEWMODEL_STANDING_FLOOR_LIFT_BUDGET_METERS),
+  );
+  const obstructionBlend = Math.max(wallBlend, floorBlend);
+  const adsRemaining = 1 - clamp01(finite(adsBlend));
+  const highReadyBlend = adsRemaining <= 0.001 ? 0 : obstructionBlend * adsRemaining;
+  return Object.freeze({
+    contract: VIEWMODEL_CONTACT_RESPONSE_CONTRACT,
+    profileId: weapon,
+    active: obstructionBlend > 0.001,
+    wallBlend,
+    floorBlend,
+    obstructionBlend,
+    highReadyBlend,
+    pitchRadians: highReadyBlend === 0 ? 0 : profile.maximumHighReadyPitchRadians * highReadyBlend,
+    yawRadians: highReadyBlend === 0 ? 0 : profile.maximumYawRadians * highReadyBlend,
+    rollRadians: highReadyBlend === 0 ? 0 : profile.maximumRollRadians * highReadyBlend,
+    additionalLiftMeters: profile.maximumAdditionalLiftMeters * wallBlend * (adsRemaining <= 0.001 ? 0 : adsRemaining),
+    scale: 1 - (1 - profile.minimumScale) * highReadyBlend,
+    minimumScale: profile.minimumScale,
+    aimAuthority: 'camera-forward-unchanged',
+  });
+}
 
 /**
  * A number of authored floors are raycast planes rather than movement boxes.
@@ -80,14 +203,15 @@ export function viewmodelObstructionPose(
   const distance = nearestForwardSurfaceMeters === null || !Number.isFinite(nearestForwardSurfaceMeters)
     ? Number.POSITIVE_INFINITY
     : Math.max(0, nearestForwardSurfaceMeters);
-  const obstruction = distance >= 1.45 ? 0 : (1 - distance / 1.45) * 0.62;
+  const obstruction = distance >= 1.45 ? 0 : (1 - distance / 1.45) * VIEWMODEL_MAX_WALL_RETREAT_METERS;
   const floorClearance = floorClearanceMeters === null || !Number.isFinite(floorClearanceMeters)
     ? Number.POSITIVE_INFINITY
     : Math.max(0, floorClearanceMeters);
   const floorPressure = floorClearance >= 0.82 ? 0 : (1 - floorClearance / 0.82);
   return {
-    retreat: Math.min(0.7, Math.max(0, obstruction + (prone ? 0.09 : 0))),
-    lift: Math.min(0.2, Math.max(0, (prone ? 0.115 : 0) + floorPressure * (prone ? 0.075 : 0.04))),
+    retreat: Math.min(0.7, Math.max(0, obstruction + (prone ? VIEWMODEL_PRONE_BASE_RETREAT_METERS : 0))),
+    lift: Math.min(0.2, Math.max(0, (prone ? VIEWMODEL_PRONE_BASE_LIFT_METERS : 0)
+      + floorPressure * (prone ? 0.075 : VIEWMODEL_STANDING_FLOOR_LIFT_BUDGET_METERS))),
   };
 }
 

@@ -9,6 +9,8 @@ import {
   WeaponPresentation,
   authoredNearPlaneContactRetreat,
 } from './weapon-presentation';
+import { VIEWMODEL_CONTACT_RESPONSE_CONTRACT, viewmodelContactResponse } from './weapon-presentation-state';
+import { WEAPON_IDS } from './protocol';
 
 const REST_POSE = {
   dt: 1 / 60,
@@ -208,16 +210,17 @@ describe('first-person anatomical presentation', () => {
     presentation.snapToMatchStartRestPose(surfaceRetreat);
 
     const state = presentation.presentationState();
+    const contact = viewmodelContactResponse('minigun', surfaceRetreat, 0, false, 0);
     expect(presentation.root.position.toArray()).toEqual([
       HIP_VIEWMODEL_POSITION.x,
-      HIP_VIEWMODEL_POSITION.y,
+      HIP_VIEWMODEL_POSITION.y + contact.additionalLiftMeters,
       HIP_VIEWMODEL_POSITION.z + surfaceRetreat - VIEWMODEL_NEAR_PLANE_CLEARANCE
         - authoredNearPlaneContactRetreat('minigun', surfaceRetreat),
     ]);
     expect(presentation.root.scale.toArray()).toEqual([
-      HIP_VIEWMODEL_SCALE,
-      HIP_VIEWMODEL_SCALE,
-      HIP_VIEWMODEL_SCALE,
+      HIP_VIEWMODEL_SCALE * contact.scale,
+      HIP_VIEWMODEL_SCALE * contact.scale,
+      HIP_VIEWMODEL_SCALE * contact.scale,
     ]);
     expect(state).toMatchObject({
       adsProgress: 0,
@@ -227,6 +230,7 @@ describe('first-person anatomical presentation', () => {
       knifeVisible: false,
       passiveKnifeVisible: false,
       surfaceRetreat,
+      contactResponse: contact,
       meleeArmSource: 'inactive',
       minigunSpool: { fraction: 0, phase: 'idle' },
       nearPlaneClearance: {
@@ -261,6 +265,66 @@ describe('first-person anatomical presentation', () => {
         expect(material.depthWrite).toBe(true);
       }
     });
+  });
+
+  it('folds the connected weapon-and-hands root away from contact for the complete catalog', async () => {
+    const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
+    const presentation = new WeaponPresentation(camera, false);
+    await presentation.load();
+    for (const weapon of WEAPON_IDS) {
+      presentation.setWeapon(weapon, true);
+      for (let frame = 0; frame < 120; frame += 1) {
+        presentation.update({
+          ...REST_POSE,
+          prone: true,
+          surfaceRetreat: 0.7,
+          surfaceLift: 0.2,
+        });
+      }
+      const state = presentation.presentationState();
+      expect(state.contactResponse, weapon).toMatchObject({
+        contract: VIEWMODEL_CONTACT_RESPONSE_CONTRACT,
+        profileId: weapon,
+        active: true,
+        aimAuthority: 'camera-forward-unchanged',
+      });
+      expect(state.contactResponse.obstructionBlend, weapon).toBeGreaterThan(0.85);
+      expect(state.contactResponse.pitchRadians, weapon).toBeGreaterThan(0.5);
+      expect(state.viewmodelViewport.rootScale, weapon).toBeGreaterThan(0.55);
+      expect(state.viewmodelViewport.rootScale, weapon).toBeLessThan(HIP_VIEWMODEL_SCALE);
+      expect(state.viewmodelViewport.rootRotation.every(Number.isFinite), weapon).toBe(true);
+      expect(state.weaponFraming?.finite, weapon).toBe(true);
+      expect(state.weaponFraming?.nearPlaneClear, weapon).toBe(true);
+      expect(state.armFraming?.finite, weapon).toBe(true);
+      expect(state.armFraming?.nearPlaneClear, weapon).toBe(true);
+    }
+  });
+
+  it('preserves Carbine and Mini Uzi centre apertures during contact ADS', async () => {
+    for (const weapon of ['carbine', 'mini-uzi'] as const) {
+      const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250), false);
+      await presentation.load();
+      presentation.setWeapon(weapon, true);
+      for (let frame = 0; frame < 180; frame += 1) {
+        presentation.update({
+          ...REST_POSE,
+          prone: true,
+          ads: true,
+          surfaceRetreat: 0.7,
+          surfaceLift: 0.2,
+        });
+      }
+      const state = presentation.presentationState();
+      expect(state.adsProgress, weapon).toBeGreaterThan(0.999);
+      expect(state.contactResponse.pitchRadians, weapon).toBe(0);
+      expect(state.contactResponse.yawRadians, weapon).toBe(0);
+      expect(state.contactResponse.rollRadians, weapon).toBe(0);
+      expect(state.sightOffset?.[0], weapon).toBeCloseTo(0, 3);
+      expect(state.sightOffset?.[1], weapon).toBeCloseTo(0, 3);
+      expect(state.adsOpaqueSightWindow.acceptance, weapon).toBe(
+        weapon === 'carbine' ? 'nine-ray-window-clear' : 'centre-ray-clear',
+      );
+    }
   });
 
   it('rotates the authored minigun barrel cluster before the first legal shot', async () => {

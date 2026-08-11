@@ -648,6 +648,11 @@ import {
   type ViewmodelObstructionPose,
 } from './weapon-presentation-state';
 import { RailgunPresentation, type RailgunThermalContact } from './railgun-presentation';
+import {
+  RAILGUN_SCOPE_MAGNIFICATION,
+  deriveRailgunScopePresentation,
+  type RailgunScopePresentationState,
+} from './railgun-scope-state';
 import { TimedMapWeaponPresentation } from './timed-map-weapon-presentation';
 import {
   TIMED_MAP_WEAPON_DEFINITIONS,
@@ -4841,6 +4846,7 @@ let previousHudScores: [number, number] = [0, 0];
 let adsHeld = false;
 let sniperScopeActive = false;
 let dmrThermalActive = false;
+let railgunScopeActive = false;
 let mouseTriggerHeld = false;
 let mouseAdsHeld = false;
 let gamepadMove = { x: 0, y: 0 };
@@ -4858,8 +4864,16 @@ let wasGrounded = false;
 let sensitivity = 1;
 let controllerSensitivity = 1;
 let preferredFov = 82;
-/** Railgun thermal scope magnification; matches the catalog optic (2.5×). */
-const RAILGUN_SCOPE_MAGNIFICATION = 2.5;
+/** Runtime-owned clear-scope lifecycle; aim remains camera-forward. */
+let railgunScopeState: RailgunScopePresentationState = deriveRailgunScopePresentation({
+  alive: false,
+  localHolder: false,
+  weapon: 'railgun',
+  adsHeld: false,
+  adsProgress: 0,
+  baseFov: preferredFov,
+  cameraFov: preferredFov,
+});
 let botsFrozen = false;
 let debugBotStanceOverride: PlayerSnapshot['stance'] | null = null;
 let debugBotSpeedOverride = 0;
@@ -4994,6 +5008,7 @@ function clearGameplayInput(): void {
   hudRoot.classList.remove('sniper-scope-active');
   dmrThermalPresentation.update(camera, [], false);
   hudRoot.classList.remove('dmr-thermal-active');
+  deactivateRailgunScopePresentation();
   audio.minigunDrive(0, 'idle', false);
   currentSprinting = false;
   jumpQueuedAt = -10_000;
@@ -13608,6 +13623,7 @@ function tryFireRailgun(now: number): void {
   const shotId = `${localConnectionEpoch}:rail:${localShotSeq++}`;
   railgunAdsResetRequired = true;
   adsHeld = false;
+  deactivateRailgunScopePresentation();
   presentLocalRailgunTrigger();
   roundShotsFired += 1;
   if (network.role === 'client') {
@@ -13851,12 +13867,10 @@ function updateRailgun(now: number): void {
     railgunRechamberPresentationActive = false;
   }
   railgunPresentation.updateWorld(railgunState, now);
-  // The optic is an authority-side thermal scope: it engages on a settled aim
-  // and must stay live for the whole aim hold - gating it on the per-shot re-ADS
-  // flag turned see-through-walls off the instant the player fired, which read
-  // as the railgun scope having lost the feature entirely.
-  const thermalActive = localHoldsRailgun() && player.weapon === 'railgun' && adsHeld
-    && weaponView.adsProgress() >= 0.45;
+  // Thermal silhouettes share the exact settled clear-scope lifecycle. This
+  // prevents the reveal from appearing over the physical hip model or surviving
+  // fire/unADS/swap while retaining the Railgun's through-wall identity.
+  const thermalActive = railgunScopeActive;
   // The railgun's signature see-through-walls reveal: cyan thermal silhouettes
   // of hostile combatants drawn with depth testing disabled so they read through
   // geometry. This is the weapon's unique selling point and must always work.
@@ -20156,17 +20170,34 @@ function clearFieldSupport(): void {
   updateFieldSupportHud();
 }
 
+function deactivateRailgunScopePresentation(): void {
+  railgunScopeState = deriveRailgunScopePresentation({
+    alive: player.alive,
+    localHolder: localHoldsRailgun(),
+    weapon: player.weapon,
+    adsHeld: false,
+    adsProgress: weaponView.adsProgress(),
+    baseFov: preferredFov,
+    cameraFov: camera.fov,
+  });
+  railgunScopeActive = false;
+  hudRoot.classList.remove('railgun-scope-active');
+  railgunPresentation.updateThermal(camera, [], false);
+  weaponView.setPresentationVisible(shouldShowWeaponViewmodel());
+}
+
 function shouldShowWeaponViewmodel(): boolean {
   return gameStarted
     && player.alive
     && !localKillstreakActorSnapshot()?.possession
     && !sniperScopeActive
     && !dmrThermalActive
+    && !railgunScopeActive
     && !debugCaptureViewmodelHidden;
 }
 
 function synchronizeWeaponViewmodelPresentation(): void {
-  if (sniperScopeActive || dmrThermalActive || localKillstreakActorSnapshot()?.possession) {
+  if (sniperScopeActive || dmrThermalActive || railgunScopeActive || localKillstreakActorSnapshot()?.possession) {
     weaponView.suppressForFullscreenPresentation(true);
     return;
   }
@@ -20364,6 +20395,17 @@ function updatePhysics(dt: number): void {
     && weaponView.adsProgress() >= 0.9
     && Math.abs(camera.fov - aimingFov) < 0.35;
   hudRoot.classList.toggle('dmr-thermal-active', dmrThermalActive);
+  railgunScopeState = deriveRailgunScopePresentation({
+    alive: player.alive,
+    localHolder: localHoldsRailgun(),
+    weapon: player.weapon,
+    adsHeld,
+    adsProgress: weaponView.adsProgress(),
+    baseFov: preferredFov,
+    cameraFov: camera.fov,
+  });
+  railgunScopeActive = railgunScopeState.active;
+  hudRoot.classList.toggle('railgun-scope-active', railgunScopeActive);
   synchronizeWeaponViewmodelPresentation();
   camera.position.copy(player.position);
   camera.position.y += cameraHeightOffset - landingImpulse * 0.035 * accessibilityRuntime.weaponMotionScale;
@@ -24879,6 +24921,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       adsResetRequired: railgunAdsResetRequired,
       rechamberPresentationActive: railgunRechamberPresentationActive,
       adsProgress: weaponView.adsProgress(),
+      scopeActive: railgunScopeActive,
       thermalVisible: !element<HTMLElement>('#railgun-thermal').hidden,
       presentation: railgunPresentation.telemetry(),
       claimAudit: { ...railgunClaimAudit },
@@ -25097,11 +25140,13 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     random: runtimeRandomTelemetry(),
     aimAlignment: (() => {
       const canvasBounds = canvas.getBoundingClientRect();
-      const activeReticle = dmrThermalActive
-        ? element<HTMLElement>('.dmr-thermal-reticle')
-        : sniperScopeOverlay.hidden
-          ? element<HTMLElement>('#crosshair')
-          : element<HTMLElement>('.scope-reticle');
+      const activeReticle = railgunScopeActive
+        ? element<HTMLElement>('.railgun-scope-reticle')
+        : dmrThermalActive
+          ? element<HTMLElement>('.dmr-thermal-reticle')
+          : sniperScopeOverlay.hidden
+            ? element<HTMLElement>('#crosshair')
+            : element<HTMLElement>('.scope-reticle');
       const reticleBounds = activeReticle.getBoundingClientRect();
       const direction = camera.getWorldDirection(new THREE.Vector3());
       const rayNdc = camera.position.clone().addScaledVector(direction, 100).project(camera);
@@ -25113,6 +25158,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         ? { x: reticleBounds.left + reticleBounds.width / 2, y: reticleBounds.top + reticleBounds.height / 2 }
         : canvasCentre;
       return {
+        reticle: railgunScopeActive
+          ? 'railgun-camera-forward'
+          : dmrThermalActive ? 'dmr-thermal' : sniperScopeActive ? 'sniper' : 'hip-crosshair',
         canvas: { left: canvasBounds.left, top: canvasBounds.top, width: canvasBounds.width, height: canvasBounds.height },
         reticleCentre,
         rayNdc: [rayNdc.x, rayNdc.y],
@@ -25655,6 +25703,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     weaponPresentation: {
       ...weaponView.presentationState(),
       depthSeparatedFromWorld: true,
+    },
+    railgunScope: {
+      ...railgunScopeState,
+      active: railgunScopeActive,
+      viewmodelVisible: shouldShowWeaponViewmodel(),
     },
     sniperScope: {
       active: !sniperScopeOverlay.hidden,
