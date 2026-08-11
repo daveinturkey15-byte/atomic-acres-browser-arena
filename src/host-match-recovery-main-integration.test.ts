@@ -103,12 +103,18 @@ describe('same-browser hosted active-match recovery integration', () => {
   });
 
   it('keeps gameplay-triggered checkpoint serialization off the live shot frame', () => {
+    const safeCapture = functionBody('createRecoverySafeHostMatchCheckpoint', 'persistActiveHostMatchCheckpoint');
+    expect(safeCapture).toContain('hostRecoveryPoseAudit(checkpoint)');
+    expect(safeCapture).toContain('hostCheckpointRejectedPoseWrites += 1');
+    expect(safeCapture).toContain('lastHostCheckpointRejectedPoseReason = audit.reason');
+    expect(safeCapture).not.toContain('clearHostMatchCheckpoint');
+    expect(safeCapture).not.toContain('saveHostMatchCheckpoint');
     const persist = functionBody('persistActiveHostMatchCheckpoint', 'clearStoredHostMatchCheckpoint');
     const forcedBranch = persist.slice(persist.indexOf('if (force) {'), persist.indexOf('if (hostCheckpointPersistScheduled)'));
     const deferredBranch = persist.slice(persist.indexOf('scheduleBrowserPreparationIdleTask'));
-    expect(forcedBranch).toContain('createHostMatchCheckpoint()');
+    expect(forcedBranch).toContain('createRecoverySafeHostMatchCheckpoint()');
     expect(forcedBranch).toContain('saveHostMatchCheckpoint(storage, checkpoint)');
-    expect(deferredBranch).toContain('createHostMatchCheckpoint()');
+    expect(deferredBranch).toContain('createRecoverySafeHostMatchCheckpoint()');
     expect(deferredBranch).toContain('saveHostMatchCheckpoint(deferredStorage, checkpoint)');
     expect(deferredBranch).toContain('remainingThrottleMs');
     expect(deferredBranch).toContain('persistActiveHostMatchCheckpoint();');
@@ -120,6 +126,18 @@ describe('same-browser hosted active-match recovery integration', () => {
     expect(main).toContain("if (document.visibilityState === 'hidden') persistActiveHostMatchCheckpoint(true)");
     expect(main).toContain("window.addEventListener('pagehide', () => {\n  persistActiveHostMatchCheckpoint(true);");
     expect(main).toContain("window.addEventListener('beforeunload', () => {\n  persistActiveHostMatchCheckpoint(true);");
+  });
+
+  it('reports the exact owned recovery admission reason and pose-write diagnostics', () => {
+    const recovery = functionBody('resumeRecoveredHostMatch', 'initializeRecoveredHostLobby');
+    expect(recovery).toContain('const result = await beginPrivateMatch(');
+    expect(recovery).toContain("result.status === 'failed'");
+    expect(recovery).toContain('result.error.message');
+    expect(recovery).toContain('result.reason');
+    expect(recovery).toContain('Stored match could not be restored safely: ${exactReason}');
+    expect(main).toContain('hostMatchRecoveryCheckpoint: {');
+    expect(main).toContain('rejectedPoseWrites: hostCheckpointRejectedPoseWrites');
+    expect(main).toContain('lastRejectedPoseReason: lastHostCheckpointRejectedPoseReason');
   });
 
   it('checkpoints and restores guest health/loadout/pose/inventory plus finite railgun authority before reconnect repair', () => {

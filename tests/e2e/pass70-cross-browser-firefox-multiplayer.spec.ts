@@ -147,6 +147,7 @@ async function sampleBrowserAudioListenerCapabilities(page: Page): Promise<Recor
 type EngineKind = 'chromium' | 'firefox' | 'webkit' | 'chrome' | 'edge' | 'opera';
 const supportedEngines: readonly EngineKind[] = ['chromium', 'firefox', 'webkit', 'chrome', 'edge', 'opera'];
 const verifyCrossBrowser = process.env.PASS70_VERIFY_CROSS_BROWSER === '1';
+const verifyCrossEnginePair = process.env.PASS70_VERIFY_CROSS_ENGINE_PAIR === '1';
 const verifyFirefox = process.env.PASS70_VERIFY_FIREFOX === '1';
 const verifyOpera = process.env.PASS70_VERIFY_OPERA === '1';
 const operaExecutablePath = process.env.PASS70_OPERA_EXECUTABLE_PATH ?? null;
@@ -524,6 +525,97 @@ async function waitForActivePair(host: Page, guest: Page): Promise<void> {
   }, undefined, { timeout: 90_000 })));
 }
 
+type RecoveryPose = [number, number, number];
+
+async function stageHostWithClearRemoteLineOfSight(
+  host: Page,
+  guestPosition: RecoveryPose,
+): Promise<RecoveryPose> {
+  const staged = await host.evaluate(([guestX, guestY, guestZ]) => {
+    const debug = (window as any).__ATOMIC_ACRES_DEBUG__;
+    const bounds = debug.snapshot().arenaSelection.bounds as {
+      minX: number; maxX: number; minZ: number; maxZ: number;
+    };
+    const radii = [5, 6, 7, 8, 9, 10];
+    const clearanceOffsets = [
+      [0, 0], [0.12, 0], [-0.12, 0], [0, 0.12], [0, -0.12],
+      [0.085, 0.085], [0.085, -0.085], [-0.085, 0.085], [-0.085, -0.085],
+    ];
+    for (const radius of radii) {
+      for (let step = 0; step < 16; step += 1) {
+        const angle = step * Math.PI / 8;
+        const x = guestX + Math.sin(angle) * radius;
+        const z = guestZ + Math.cos(angle) * radius;
+        if (x < bounds.minX + 0.6 || x > bounds.maxX - 0.6
+          || z < bounds.minZ + 0.6 || z > bounds.maxZ - 0.6) continue;
+        if (clearanceOffsets.some(([dx, dz]) => debug.collisionProbeAt(x + dx, guestY, z + dz))) continue;
+        if (debug.segmentBlocked(guestX, guestZ, x, z)) continue;
+        debug.teleportPlayer(x, guestY, z, 0, 0);
+        return [x, guestY, z] as RecoveryPose;
+      }
+    }
+    throw new Error('Rustworks has no deterministic clear recovery-safe host pose around the guest');
+  }, guestPosition);
+  await host.waitForFunction(({ guest, expectedHost }) => {
+    const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
+    const remote = state.remotePlayers[0];
+    const near = (actual: readonly number[], expected: readonly number[]) => (
+      actual.every((value, index) => Math.abs(value - expected[index]!) < 0.5)
+    );
+    return remote && near(remote.authoritativePosition, guest) && near(state.player.position, expectedHost);
+  }, { guest: guestPosition, expectedHost: staged }, { timeout: 15_000 });
+  return staged;
+}
+
+type RecoveryCheckpointActor = Readonly<{ id: string; position: RecoveryPose }>;
+
+async function waitForFreshHostRecoveryCheckpoint(
+  host: Page,
+  expected: Readonly<{
+    roomCode: string;
+    freshAfterEpochMs: number;
+    host: RecoveryCheckpointActor;
+    guest: RecoveryCheckpointActor;
+  }>,
+): Promise<Record<string, any>> {
+  const handle = await host.waitForFunction((target) => {
+    const raw = localStorage.getItem('atomic-acres:host-match-checkpoint:v3');
+    if (!raw) return false;
+    let checkpoint: any;
+    try {
+      checkpoint = JSON.parse(raw);
+    } catch {
+      return false;
+    }
+    const near = (pose: any, expectedPosition: readonly number[]) => (
+      pose && ['x', 'y', 'z'].every((axis, index) => (
+        Number.isFinite(pose[axis]) && Math.abs(pose[axis] - expectedPosition[index]!) < 0.4
+      ))
+    );
+    const guest = checkpoint.guests?.find((entry: any) => entry.snapshot?.id === target.guest.id);
+    const connectedIds = checkpoint.members
+      ?.filter((member: any) => member.connected)
+      .map((member: any) => member.id)
+      .sort();
+    const expectedConnectedIds = [target.host.id, target.guest.id].sort();
+    if (checkpoint.roomCode !== target.roomCode
+      || checkpoint.savedAtEpochMs < target.freshAfterEpochMs
+      || checkpoint.hostPlayer?.id !== target.host.id
+      || !near(checkpoint.hostPlayer, target.host.position)
+      || !near(guest?.snapshot, target.guest.position)
+      || JSON.stringify(connectedIds) !== JSON.stringify(expectedConnectedIds)) return false;
+    return {
+      savedAtEpochMs: checkpoint.savedAtEpochMs,
+      lobbyRevision: checkpoint.lobbyRevision,
+      hostId: checkpoint.hostPlayer.id,
+      guestId: guest.snapshot.id,
+      hostPosition: [checkpoint.hostPlayer.x, checkpoint.hostPlayer.y, checkpoint.hostPlayer.z],
+      guestPosition: [guest.snapshot.x, guest.snapshot.y, guest.snapshot.z],
+    };
+  }, expected, { timeout: 15_000 });
+  return handle.jsonValue() as Promise<Record<string, any>>;
+}
+
 async function startFrameProbe(page: Page): Promise<void> {
   await page.evaluate(() => {
     const probe = { active: true, frames: 0, gaps: [] as number[], last: performance.now() };
@@ -607,6 +699,8 @@ test(`Chromium host and ${crossGuestEngine} guest survive ADS combat, guest rejo
   test.skip(browserName !== 'chromium', 'The explicit cross-engine pair is owned once by the Chromium project.');
   test.skip(!verifyCrossBrowser,
     'Run the explicit Pass 70 cross-browser verifier; ordinary Chromium projects do not launch external engines.');
+  test.skip(!verifyCrossEnginePair,
+    'This runner target does not own the explicit desktop host/guest lifecycle pair.');
   test.skip(crossGuestEngine === 'firefox' && !verifyFirefox,
     'Set PASS70_VERIFY_FIREFOX=1 to run the real fail-closed Firefox cross-engine lifecycle lane.');
   const baseUrl = String(testInfo.project.use.baseURL);
@@ -741,18 +835,7 @@ test(`Chromium host and ${crossGuestEngine} guest survive ADS combat, guest rejo
     const guestPosition = await guest.evaluate(() => (
       (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().player.position as [number, number, number]
     ));
-    await host.evaluate(([x, y, z]) => {
-      const debug = (window as any).__ATOMIC_ACRES_DEBUG__;
-      debug.teleportPlayer(x, y, z + 5, 0, 0);
-    }, guestPosition);
-    await host.waitForFunction(([x, _y, z]) => {
-      const state = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot();
-      const remote = state.remotePlayers[0];
-      return remote && Math.abs(remote.authoritativePosition[0] - x) < 0.5
-        && Math.abs(remote.authoritativePosition[2] - z) < 0.5
-        && Math.abs(state.player.position[0] - x) < 0.5
-        && Math.abs(state.player.position[2] - (z + 5)) < 0.5;
-    }, guestPosition, { timeout: 15_000 });
+    await stageHostWithClearRemoteLineOfSight(host, guestPosition);
     await Promise.all([host, guest].map((page) => page.evaluate(() => {
       const debug = (window as any).__ATOMIC_ACRES_DEBUG__;
       debug.setRenderPaused(false);
@@ -830,15 +913,7 @@ test(`Chromium host and ${crossGuestEngine} guest survive ADS combat, guest rejo
       contentType: 'application/json',
     });
 
-    await host.evaluate(([x, y, z]) => {
-      const debug = (window as any).__ATOMIC_ACRES_DEBUG__;
-      debug.teleportPlayer(x, y, z + 5, 0, 0);
-    }, guestPosition);
-    await host.waitForFunction(([x, _y, z]) => {
-      const remote = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers[0];
-      return remote && Math.abs(remote.authoritativePosition[0] - x) < 0.5
-        && Math.abs(remote.authoritativePosition[2] - z) < 0.5;
-    }, guestPosition, { timeout: 15_000 });
+    await stageHostWithClearRemoteLineOfSight(host, guestPosition);
     await host.evaluate(() => {
       const debug = (window as any).__ATOMIC_ACRES_DEBUG__;
       debug.aimAtRemoteWithOffset(0, 0);
@@ -879,7 +954,35 @@ test(`Chromium host and ${crossGuestEngine} guest survive ADS combat, guest rejo
     await waitForActivePair(host, guest);
     expect(await guest.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().player.id)).toBe(guestId);
 
-    await host.waitForFunction(() => localStorage.getItem('atomic-acres:host-match-checkpoint:v3') !== null, undefined, { timeout: 15_000 });
+    const freshAfterEpochMs = await host.evaluate(() => Date.now());
+    const rejoinedGuestPosition = await guest.evaluate(() => (
+      (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().player.position as RecoveryPose
+    ));
+    await stageHostWithClearRemoteLineOfSight(host, rejoinedGuestPosition);
+    const [checkpointHost, checkpointGuest] = await Promise.all([
+      host.evaluate(() => {
+        const player = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().player;
+        return { id: player.id, position: player.position as RecoveryPose };
+      }),
+      guest.evaluate(() => {
+        const player = (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().player;
+        return { id: player.id, position: player.position as RecoveryPose };
+      }),
+    ]);
+    const checkpointReceipt = await waitForFreshHostRecoveryCheckpoint(host, {
+      roomCode,
+      freshAfterEpochMs,
+      host: checkpointHost,
+      guest: checkpointGuest,
+    });
+    expect(checkpointReceipt).toMatchObject({ hostId: checkpointHost.id, guestId: checkpointGuest.id });
+    expect(Number(checkpointReceipt.savedAtEpochMs)).toBeGreaterThanOrEqual(freshAfterEpochMs);
+    for (const [actual, expected] of [
+      [checkpointReceipt.hostPosition, checkpointHost.position],
+      [checkpointReceipt.guestPosition, checkpointGuest.position],
+    ] as const) {
+      expect((actual as number[]).every((value, index) => Math.abs(value - expected[index]!) < 0.4)).toBe(true);
+    }
     await crashChromiumPage(hostContext, host);
     host = await newPageWithDeadline(hostContext, 'chromium-host-recovered');
     attachBrowserDiagnostics(host, 'chromium-host-recovered', diagnostics);

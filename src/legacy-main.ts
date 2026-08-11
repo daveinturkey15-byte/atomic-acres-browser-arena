@@ -491,6 +491,7 @@ import {
   type GuestAuthorityCheckpoint,
   type ResumeTokenDigestCheckpoint,
 } from './host-match-checkpoint';
+import { auditHostRecoveryPoses, type HostRecoveryPoseAudit } from './host-match-recovery-pose';
 import {
   HIGH_SCORE_STORAGE_KEY,
   HIGH_SCORE_SCHEMA_VERSION,
@@ -6525,8 +6526,29 @@ function createHostMatchCheckpoint(
 
 let lastHostCheckpointPersistAtEpochMs = 0;
 let hostCheckpointPersistScheduled = false;
+let hostCheckpointRejectedPoseWrites = 0;
+let lastHostCheckpointRejectedPoseReason: string | null = null;
+let lastHostCheckpointRejectedPoseAtEpochMs: number | null = null;
 const HOST_CHECKPOINT_PERSIST_INTERVAL_MS = 2_000;
 const HOST_CHECKPOINT_IDLE_TIMEOUT_MS = 250;
+
+function hostRecoveryPoseAudit(checkpoint: HostMatchCheckpoint): HostRecoveryPoseAudit {
+  return auditHostRecoveryPoses(checkpoint, selectedArena.id, arena.bounds, activeWorldColliders());
+}
+
+function createRecoverySafeHostMatchCheckpoint(): HostMatchCheckpoint | null {
+  const checkpoint = createHostMatchCheckpoint();
+  if (!checkpoint) return null;
+  const audit = hostRecoveryPoseAudit(checkpoint);
+  if (audit.accepted) return checkpoint;
+  hostCheckpointRejectedPoseWrites += 1;
+  lastHostCheckpointRejectedPoseReason = audit.reason;
+  lastHostCheckpointRejectedPoseAtEpochMs = Date.now();
+  // Deliberately retain the prior known-safe localStorage receipt. A transient
+  // collider-invalid pose must not replace the only checkpoint that can be
+  // admitted after a renderer crash.
+  return null;
+}
 /**
  * Persist the bounded host checkpoint. Serializing the entire match state
  * (bots, inventories, flare projectiles) and writing localStorage on the shot
@@ -6539,7 +6561,7 @@ function persistActiveHostMatchCheckpoint(force = false): boolean {
   if (!storage) return false;
   if (force) {
     lastHostCheckpointPersistAtEpochMs = Date.now();
-    const checkpoint = createHostMatchCheckpoint();
+    const checkpoint = createRecoverySafeHostMatchCheckpoint();
     return checkpoint ? saveHostMatchCheckpoint(storage, checkpoint) : false;
   }
   if (hostCheckpointPersistScheduled) return true;
@@ -6562,7 +6584,7 @@ function persistActiveHostMatchCheckpoint(force = false): boolean {
       return;
     }
     lastHostCheckpointPersistAtEpochMs = nowEpochMs;
-    const checkpoint = createHostMatchCheckpoint();
+    const checkpoint = createRecoverySafeHostMatchCheckpoint();
     if (checkpoint) saveHostMatchCheckpoint(deferredStorage, checkpoint);
   }, HOST_CHECKPOINT_IDLE_TIMEOUT_MS);
   return true;
@@ -6602,22 +6624,9 @@ function recoveryRemainingMs(value: number, checkpoint: HostMatchCheckpoint, now
   return Math.max(0, value - Math.max(0, nowEpochMs - checkpoint.savedAtEpochMs));
 }
 
-function hostRecoveryPositionsFitArena(checkpoint: HostMatchCheckpoint): boolean {
-  const withinHeight = (y: number): boolean => Number.isFinite(y) && y >= -25 && y <= 250;
-  return checkpoint.config.arenaId === selectedArena.id
-    && pointInsideBounds(checkpoint.hostPlayer, arena.bounds, 0.44)
-    && withinHeight(checkpoint.hostPlayer.y)
-    && !isBlocked(checkpoint.hostPlayer, activeWorldColliders(), 0.44)
-    && checkpoint.guests.every((entry) => pointInsideBounds(entry.snapshot, arena.bounds, 0.44)
-      && withinHeight(entry.snapshot.y)
-      && !isBlocked(entry.snapshot, activeWorldColliders(), 0.44))
-    && checkpoint.bots.every((entry) => pointInsideBounds(entry.snapshot, arena.bounds, 0.44)
-      && withinHeight(entry.snapshot.y)
-      && !isBlocked({ ...entry.snapshot, y: entry.snapshot.y + 1.7 }, activeWorldColliders(), 0.42));
-}
-
 function restoreRecoveredHostRuntime(checkpoint: HostMatchCheckpoint, nowMonoMs = performance.now()): number {
-  if (!hostRecoveryPositionsFitArena(checkpoint)) throw new Error('Stored host recovery positions are outside the selected arena');
+  const poseAudit = hostRecoveryPoseAudit(checkpoint);
+  if (!poseAudit.accepted) throw new Error(`Stored host recovery positions are unsafe: ${poseAudit.reason}`);
   const hostState = checkpoint.hostPlayer;
   const hostScore = checkpoint.scores.find((score) => score.id === hostState.id);
   if (!hostScore || player.id !== hostState.id) throw new Error('Stored host recovery identity is inconsistent');
@@ -6760,7 +6769,7 @@ async function resumeRecoveredHostMatch(
   checkpoint: HostMatchCheckpoint,
   timing: HostMatchResumeTiming,
 ): Promise<void> {
-  await beginPrivateMatch(
+  const result = await beginPrivateMatch(
     'host',
     timing.activeAtLocalMonoMs,
     checkpoint.activeAtEpochMs,
@@ -6770,7 +6779,12 @@ async function resumeRecoveredHostMatch(
   hostMatchRecoveryPreparing = false;
   if (!gameStarted) {
     pendingHostRecoveryJoins.clear();
-    setStatus('Stored match could not be restored safely. Reload to open a fresh lobby.', 'error');
+    const exactReason = result.status === 'failed'
+      ? result.error.message
+      : result.status === 'superseded'
+        ? result.reason
+        : 'Match admission ended without publishing an active match';
+    setStatus(`Stored match could not be restored safely: ${exactReason}. Reload to open a fresh lobby.`, 'error');
     return;
   }
   pendingHostMatchRecovery = null;
@@ -25919,6 +25933,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       hostTimeOffsetMs: network.role === 'client' ? hostTimeMapping.offsetMs : 0,
       localPingMs: localLobbyPingMs,
     } : null,
+    hostMatchRecoveryCheckpoint: {
+      rejectedPoseWrites: hostCheckpointRejectedPoseWrites,
+      lastRejectedPoseReason: lastHostCheckpointRejectedPoseReason,
+      lastRejectedPoseAtEpochMs: lastHostCheckpointRejectedPoseAtEpochMs,
+    },
     textChat: {
       open: textChatOpen,
       focused: document.activeElement === textChatInput,

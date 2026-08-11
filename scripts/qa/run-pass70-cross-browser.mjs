@@ -7,12 +7,14 @@ const targets = Object.freeze({
   available: Object.freeze({
     engines: 'chromium,webkit,chrome,edge',
     guestEngine: 'edge',
+    verifyCrossEnginePair: true,
     verifyFirefox: false,
     defaultPort: '4547',
   }),
   firefox: Object.freeze({
     engines: 'firefox',
     guestEngine: 'firefox',
+    verifyCrossEnginePair: true,
     verifyFirefox: true,
     verifyOpera: false,
     defaultPort: '4548',
@@ -20,6 +22,7 @@ const targets = Object.freeze({
   iphone15: Object.freeze({
     engines: 'webkit',
     guestEngine: 'webkit',
+    verifyCrossEnginePair: false,
     verifyFirefox: false,
     verifyOpera: false,
     defaultPort: '4549',
@@ -27,6 +30,7 @@ const targets = Object.freeze({
   opera: Object.freeze({
     engines: 'opera',
     guestEngine: 'opera',
+    verifyCrossEnginePair: true,
     verifyFirefox: false,
     verifyOpera: true,
     defaultPort: '4550',
@@ -77,6 +81,7 @@ const result = spawnSync(process.execPath, [
     PASS70_CROSS_BROWSER_SOURCE_SHA: sourceSha,
     PASS70_ENGINE_MATRIX: target.engines,
     PASS70_CROSS_GUEST_ENGINE: target.guestEngine,
+    PASS70_VERIFY_CROSS_ENGINE_PAIR: target.verifyCrossEnginePair ? '1' : '0',
     SOURCE_SHA: sourceSha,
     RELEASE_PASS: 'PASS 70',
     VITE_MATCH_BUILD_ID: sourceSha,
