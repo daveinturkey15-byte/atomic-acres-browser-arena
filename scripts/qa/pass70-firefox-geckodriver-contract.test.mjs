@@ -379,6 +379,13 @@ test('runner uses raw W3C HTTP and native trusted actions without automation dep
   ]) assert.ok(!runnerSource.includes(forbidden), `forbidden false-green shortcut: ${forbidden}`);
 });
 
+test('runner sampleFaults injected browser script survives host template-literal evaluation', () => {
+  const literal = runnerSource.match(/async function sampleFaults[\s\S]*?driver\.execute\((`[\s\S]*?`)\);/u)?.[1];
+  assert.ok(literal, 'sampleFaults browser script template was not found');
+  const browserScript = Function(`"use strict"; return ${literal};`)();
+  assert.doesNotThrow(() => Function(browserScript));
+});
+
 test('runner pins and safely extracts the exact official GeckoDriver archive', () => {
   const gecko = PASS70_FIREFOX_GECKODRIVER_IDENTITY.geckodriver;
   assert.equal(gecko.archiveName, 'geckodriver-v0.37.1-win64.zip');

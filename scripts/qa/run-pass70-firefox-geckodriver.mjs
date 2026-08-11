@@ -885,7 +885,7 @@ async function sampleFaults(driver, bidiStartIndex) {
       runtimeErrorLog,
       systemPaused: bannerText.includes('SYSTEM PAUSED'),
       capturedErrors,
-      faultText: [runtimeErrorLog, bannerText, ...capturedErrors.map((entry) => entry.message)].join('\n'),
+      faultText: [runtimeErrorLog, bannerText, ...capturedErrors.map((entry) => entry.message)].join('\\n'),
     };
   `);
   const bidiErrors = await driver.bidiErrorsSince(bidiStartIndex);
